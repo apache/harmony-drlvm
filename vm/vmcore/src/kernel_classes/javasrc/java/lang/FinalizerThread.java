@@ -1,0 +1,344 @@
+/*
+ *  Copyright 2005-2006 The Apache Software Foundation or its licensors, as applicable.
+ *
+ *  Licensed under the Apache License, Version 2.0 (the "License");
+ *  you may not use this file except in compliance with the License.
+ *  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ *  Unless required by applicable law or agreed to in writing, software
+ *  distributed under the License is distributed on an "AS IS" BASIS,
+ *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ *  See the License for the specific language governing permissions and
+ *  limitations under the License.
+ */
+/*
+ * @author Salikh Zakirov, Pavel Afremov
+ * @version $Revision: 1.1.2.2.4.3 $
+ */
+package java.lang;
+
+/**
+ * Dedicated finalizer thread.
+ */
+class FinalizerThread extends Thread {
+    
+    /**
+     * Wake up permanent finalizer threads or create additional 
+     * temporary threads, and wait until they start.
+     * @param wait - says to wait untill all finalizer threads complite work. 
+     */ 
+    public static void startFinalization(boolean wait) {
+        if (!enabled) {
+            return;
+        }
+
+        //wakeup finalazer threads
+        wakeupFinalization();
+
+        // work balance system creates balancing threads
+        spawnBalanceThreads();
+
+        // if flag is raised up waits finalization complete
+        if (wait) {
+            waitFinalizationEnd();
+        }
+    }
+
+    /**
+     * VM calls this thread from Runtime.runFinalization().
+     */
+    public static void runFinalization() {
+        startFinalization(true);
+    }
+
+    /*
+     * Staic package private part
+     */
+
+    /**
+     * Initializes finalization system. Starts permanent thread.
+     */
+    static void initialize() {
+        trace("FinalizerThread: static initialization started");
+
+        String p = System.getProperty("vm.finalize");
+        processorsQuantity = getProcessorsQuantity();
+        
+        // -Dvm.finalize=0 disables the finalizer thread
+        if ("0".equalsIgnoreCase(p) || "off".equalsIgnoreCase(p)
+                || "no".equalsIgnoreCase(p) || "false".equalsIgnoreCase(p)) {
+            warn("finalizer thread have not been created");
+        } else {
+            (new FinalizerThread(true)).start();
+            enabled = true;
+        }
+        
+        trace("FinalizerThread: static initialization complete");
+    }
+
+    /**
+     * VM calls this method to request finalizer thread shutdown.
+     */
+    static void shutdown() {
+        trace("shutting down finalizer thread");
+        if (startFinalizationOnExit) {
+            doFinalizationOnExit();
+        }
+        
+        synchronized (workLock) {
+            shutdown = true;
+            workLock.notifyAll();
+        }
+    }
+
+    /*
+     * Support for runFinalizersOnExit(boolean) from Runtime class
+     */
+    static void setFinalizersOnExit(boolean value) {
+        startFinalizationOnExit = value;
+    }
+
+    /*
+     * Staic private part
+     */
+    
+    // Finalizer Threads Group
+    private static final ThreadGroup threadGroup = new ThreadGroup("Finalizer Threads Group");
+    
+    // Maximum quantity of finalizers threads
+    private static final int MAX_THREADS = 256;
+
+    // Lock used to wake up permanent finalizer threads and synchronize change of state of work
+    private static Object workLock = new Object();
+
+    // Shows that finalizers works in state on exit
+    // Used by VM. It should be package private to eliminate compiler warning.
+    static boolean onExit = false;
+
+    /*
+     * Lock used to to synchronize quantity of active threads and to wake up finalizer starter thread
+     * when new finalization tasks aren't available and finalizer threads finish work.
+     */
+    private static Object waitFinishLock = new Object();
+
+    /*
+     * The Quantity of active finalizer threads which shoud be stopped to wake up finalizer starter 
+     * thread. When is thread is started this counter is incremented when thread is stoppig it's decremeted.
+     * Zero means finalization tasks aren't available and finalizer threads aren't working.
+     */
+    private static int waitFinishCounter = 0;
+
+    // true indicates that finalization on exit should be started
+    private static volatile boolean startFinalizationOnExit = false;
+
+    // Indicates processors quantity in the system
+    private static int processorsQuantity;
+
+    // true means finalizer threads is enabled
+    private static boolean enabled = false;
+
+    // true means finalizer threads need to shut down
+    private static boolean shutdown = false;
+
+    /**
+     * Gets quantity of processors in the System
+     */
+    private static native int getFinalizersQuantity();
+
+    /**
+     * Gets quantity of processors in the System
+     */
+    private static native int getProcessorsQuantity();
+
+    /**
+     * Do finalizations in native mode for specified quantity of finalizable object
+     */
+    private static native int doFinalization(int quantity);
+    
+    private static native void fillFinalizationQueueOnExit();
+    
+    /**
+     * Returns true if current thread is finalizer thread
+     */
+    private static boolean isFinalizerThread() {
+        return ((Thread.currentThread()) instanceof FinalizerThread);
+    }
+    
+    /**
+     * Wakes up permanent finalizer threads
+     */
+    private static void wakeupFinalization() {
+        synchronized (workLock) {
+            workLock.notifyAll();
+        }
+    }
+
+    /**
+     * Waits when finalization work is completed and then returns.
+     */
+    private static void waitFinalizationEnd() {
+        if (isFinalizerThread()) {
+            return;
+        }
+        
+        synchronized (waitFinishLock) {
+            if (waitFinishCounter > 0) {
+                try {
+                    waitFinishLock.wait();
+                } catch (InterruptedException e) {}
+            }
+        }
+    }
+
+    /**
+     * Starts additional temporary threads to make sure
+     * finalization system keeps number of unfinalized objects
+     * at acceptable level.
+     * Waits until created thraed starts and then return.
+     * It is called from startFinalization() only.
+     */
+    private static void spawnBalanceThreads() {
+        FinalizerThread newThread = null;
+        if (waitFinishCounter >= MAX_THREADS) {
+            // do nothing   
+        } else {
+            try {
+                for (int i = 0; i < processorsQuantity; i++) {
+                    newThread = new FinalizerThread(false);
+                    
+                    synchronized (newThread){
+                        newThread.start();
+                        
+                        // waiting when new thread will be started
+                        try {
+                            newThread.wait();
+                        } catch (InterruptedException e) {}
+                    }
+                }
+            } catch (OutOfMemoryError e) {}
+        }
+    } 
+
+    private static void doFinalizationOnExit() {
+        System.gc();
+        startFinalization(true);
+
+        fillFinalizationQueueOnExit();
+        
+        synchronized (workLock) {
+            onExit = true;
+        }
+        startFinalization(true);
+    }
+    
+    /**
+     * Waits when new finalization task are available and finalizer threads can continue work
+     */
+    private static void waitNewTask() {
+        if (getFinalizersQuantity() != 0) {
+            return;
+        }
+
+        synchronized (workLock) {
+            synchronized (waitFinishLock) {
+                waitFinishCounter --;
+
+                if (waitFinishCounter == 0) {
+                    waitFinishLock.notifyAll();
+                }
+            }
+
+            while ((getFinalizersQuantity() == 0) && (!shutdown)) {
+                try {
+                    workLock.wait();
+                } catch (InterruptedException e) {}
+            }
+            
+            synchronized (waitFinishLock) {
+                waitFinishCounter ++;
+            }
+        }
+    }
+
+    /**
+     * debug output.
+     */
+    private static void trace (Object o) {
+        /*
+        System.err.println(o);
+        System.err.flush();
+        */
+    }
+
+    /**
+     * Prints warning.
+     */
+    private static void warn (Object o) {
+        System.err.println("FinalizerThread: " + o);
+        System.err.flush();
+    }
+
+    public FinalizerThread () {
+        this (true);
+    }
+    
+    protected FinalizerThread (boolean permanent) {
+        super(threadGroup, "FinalizerThread");
+        this.permanent = permanent;
+        this.setDaemon(true);
+    }
+
+    public void run() {
+        trace((permanent ? "permanent":"temporary") 
+                + " finalization thread started");
+        
+        try {
+            synchronized (waitFinishLock) {
+                waitFinishCounter ++;
+            }
+
+            // notify that finalizer thread has started
+            synchronized (this) {
+                notify();
+            }
+            
+            while (true) {
+                int n = doFinalization(128);
+
+                synchronized (workLock) {
+                    if (shutdown) {
+                        trace("terminated by shutdown request");
+                        break;
+                    }
+                } 
+                
+                if (0 == n) {
+                    if (permanent) {
+                        waitNewTask();
+                    } else {
+                        break;
+                    }
+                }
+            }
+        } catch (Throwable e) {
+            warn("FinalizerThread terminated by " + e);
+            throw new RuntimeException("FinalizerThread interrupted", e);
+        } finally {
+            synchronized (waitFinishLock) {
+                waitFinishCounter --;
+
+                if (waitFinishCounter == 0) {
+                    waitFinishLock.notifyAll();
+                }
+            }
+            trace("FinalizerThread completed");
+        }
+    }
+
+    /**
+     * Indicates that thread shouldn't be destroyed when finalization is complete
+     */
+    private boolean permanent;
+}

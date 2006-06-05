@@ -1,0 +1,186 @@
+<!--
+    Copyright 2005-2006 The Apache Software Foundation or its licensors, as applicable.
+
+    Licensed under the Apache License, Version 2.0 (the "License");
+    you may not use this file except in compliance with the License.
+    You may obtain a copy of the License at
+
+       http://www.apache.org/licenses/LICENSE-2.0
+
+    Unless required by applicable law or agreed to in writing, software
+    distributed under the License is distributed on an "AS IS" BASIS,
+    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+    See the License for the specific language governing permissions and
+    limitations under the License.
+-->
+<!--
+Author: Marina V. Goldburt
+Version: $Revision: 1.7.2.7 $
+-->
+<project name="COMMON_CLASSLIB_TARGET">
+
+    <target name="common_classlib" description="common descriptor for all components">
+                <property name="build.classlib.home" location="${build.CLASSLIB.home}"/>
+        <propertyregex override="yes" property="component.name" input="${component}" regexp=".*\.([^\.]*)" replace="\1" defaultValue="${component}" />
+
+        <!--native part -->
+        <select os="lnx">
+            <property name="os.native.dir" location="${build.CLASSLIB.home}/native-src/linux.IA32" />
+        </select>
+        <select os="win">
+            <property name="os.native.dir" location="${build.CLASSLIB.home}/native-src/win.IA32" />
+        </select>
+
+        <property name="shared.dir" location="${build.CLASSLIB.home}/native-src/shared"/>
+        
+        <property name="common.src" value="${os.native.dir}/${component.name}" />
+        <property name="common.includes" value="${os.native.dir}/${component.name}" />
+        <fileset id="c.fileset" dir="${build.CLASSLIB.home}/native-src">
+                <select os="win">
+                <include name="win.IA32/${component.name}\*.c" />
+                </select>
+                <select os="lnx">
+                <include name="linux.IA32/${component.name}\*.c" />
+                </select>
+                <include name="shared/${component.name}\*.c" />
+        </fileset>
+        <fileset id="cpp.fileset" dir="${build.CLASSLIB.home}/native-src">
+                <select os="win">
+                <include name="win.IA32/${component.name}\*.cpp" />
+                </select>
+                <select os="lnx">
+                <include name="linux.IA32/${component.name}\*.cpp" />
+                </select>
+                <include name="shared/${component.name}\*.cpp" />
+        </fileset>
+        <fileset id="asm.fileset" dir="${os.native.dir}">
+            <include name="${component.name}\*.asm" />
+            <include name="${component.name}\*.s" />
+        </fileset>
+        <select os="lnx">
+            <property name="asm.executable" value="as" />
+        </select>
+
+        <!-- convert 'classlib.luni' to 'classlib/luni' -->
+        <propertyregex property="component.as.path"
+                       input="${component}"
+                       regexp="\."
+                       replace="/"
+                       global="true"
+                       defaultValue="${component}"
+                       override="true" />
+
+        <property name="libdir" location="${build.semi.dir}/${component.as.path}/_bin" />
+
+        <compiler id="common.compiler">
+            <!--common for cpp and c-->
+            <includepath>
+                <pathelement location="${os.native.dir}/include" />
+                <pathelement location="${shared.dir}/include" />
+                <pathelement location="${common.src}" />
+                <pathelement location="${shared.dir}/${component.name}" />
+            </includepath>
+            <select cfg="release">
+                <defineset define="NDEBUG" />
+            </select>
+            <select cfg="debug">
+                <defineset define="_DEBUG" />
+            </select>
+            <select arch="ia32">
+                <defineset define="_IA32_" />
+            </select>
+            <select os="win">
+                <defineset define="_DLL,_WINSOCKAPI_,_WIN32,WIN32,_WIN95,_WIN32_DCOM,_MT" />
+                <defineset>
+                    <define value="_cdecl" name="CRTAPI1" />
+                    <define value="_cdecl" name="CRTAPI2" />
+                    <define value="1" name="_X86_" />
+                    <define value="0x0400" name="WINVER" />
+                    <define value="0x0400" name="_WIN32_WINDOWS" />
+                    <define value="0x0500" name="_WIN32_IE" />
+                </defineset>
+                <compilerarg value="-FIsehmap.h" />
+                <compilerarg value="-Ogityb1" />
+                <compilerarg value="-Zm400" />
+                <compilerarg value="-GF" />
+                <compilerarg value="-Gs" />
+                <compilerarg value="-Zi" />
+            </select>
+            <select os="lnx">
+                <defineset define="LINUX,_REENTRANT,IPv6_FUNCTION_SUPPORT,HYX86" />
+                <compilerarg value="-march=pentium3" />
+                <select cxx="icc">
+                    <compilerarg value="-w1" />
+                </select>
+                <!-- FIXME                      <compilerarg value="-Werror" /> -->
+                <select cfg="release">
+                    <compilerarg value="-O1" />
+                </select>
+                <select cfg="debug">
+                    <compilerarg value="-O1" />
+                </select>
+            </select>
+        </compiler>
+
+        <compiler id="common.cpp.compiler" name="${build.cxx}" extends="common.compiler">
+            <select os="lnx">
+                <compilerarg value="-fno-exceptions" />
+                <compilerarg value="-fno-rtti" />
+            </select>
+        </compiler>
+        <compiler id="common.c.compiler" name="${build.cxx}" extends="common.compiler" />
+
+        <linker name="${build.cxx}" id="common.linker">
+            <select os="win">
+                <syslibset libs="kernel32,user32,gdi32,comdlg32,winspool" />
+                <select cfg="debug">
+                    <syslibset libs="msvcrtd" />
+                </select>
+                <select cfg="release">
+                    <syslibset libs="msvcrt" />
+                </select>
+            </select>
+
+            <select os="win">
+                <syslibset libs="advapi32,odbc32,userenv,ws2_32,mswsock" />
+            </select>
+
+        </linker>
+
+        <!---java part -->
+        <property name="os.java.dir" location="${build.CLASSLIB.home}/modules" />
+        <property name="jardir" location="${build.semi.dir}/${component.as.path}/_jar" />
+
+                <path id="java.source">
+            <dirset dir="${os.java.dir}">
+                <include name="*/src/main/java" />
+                <include name="*/src/common/javasrc" />
+                <select os="win">
+                    <include name="*/src/windows/javasrc" />
+                </select>
+                <select os="lnx">
+                    <include name="*/src/linux/javasrc" />
+                </select>
+            </dirset>
+        </path>
+
+        <mkdir dir="${jardir}" />
+        <property name="java.build.dir" location="${build.semi.dir}/classlib/_classes" />
+
+        <property name="extra.icu4c.jardir" value="${jardir}" />
+
+        <path id="java.class.path">
+            <pathelement location="${java.build.dir}" />
+            <fileset dir="${extra.icu4c.jardir}" includes="${extra.icu4c.jarname}" />
+        </path>
+
+        <if>
+            <available file="${build.CLASSLIB.home}/make/patternsets/${component.name}.txt" />
+            <then>
+                <patternset id="java.classes.pattern" excludesfile="${build.CLASSLIB.home}/make/patternsets/kernel.txt" includesfile="${build.CLASSLIB.home}/make/patternsets/${component.name}.txt" />
+            </then>
+        </if>
+        <patternset id="java.source.pattern" refid="java.classes.pattern" />
+        <property name="jarname" value="${component.name}.jar" />
+    </target>
+</project>

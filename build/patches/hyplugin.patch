@@ -1,0 +1,117 @@
+Index: build/pre-copied/common/HYPLUGIN/src/org/apache/harmony/eclipse/jdt/launching/HyVMInstallType.java
+===================================================================
+--- build/pre-copied/common/HYPLUGIN/src/org/apache/harmony/eclipse/jdt/launching/HyVMInstallType.java	(revision 387505)
++++ build/pre-copied/common/HYPLUGIN/src/org/apache/harmony/eclipse/jdt/launching/HyVMInstallType.java	(working copy)
+@@ -54,7 +54,12 @@
+ 		File java = new File(installLocation, "bin" + File.separator + "java"); //$NON-NLS-2$ //$NON-NLS-1$
+ 		File javaExe = new File(installLocation,
+ 				"bin" + File.separator + "java.exe"); //$NON-NLS-2$ //$NON-NLS-1$
+-		if (!(java.isFile() || javaExe.isFile())) {
++		
++		// IJVM: check ij vm executables 
++		File javaIJ = new File(installLocation, "bin" + File.separator + "ij"); //$NON-NLS-2$ //$NON-NLS-1$
++		File javaIJExe = new File(installLocation,
++				"bin" + File.separator + "ij.exe"); //$NON-NLS-2$ //$NON-NLS-1$
++		if (!(java.isFile() || javaExe.isFile() || javaIJ.isFile() || javaIJExe.isFile())) {
+ 			if (HyLaunchingPlugin.isDebuggingInstalling()) {
+ 				try {
+ 					System.out.println(HyLaunchingPlugin.getUniqueIdentifier()
+@@ -92,9 +97,13 @@
+ 	 */
+ 	public File detectInstallLocation() {
+ 		// Try to detect wether the current VM is a Harmony installation.
+-		if (!"clear".equals(System.getProperty("com.ibm.oti.configuration", "missing"))) //$NON-NLS-1$ //$NON-NLS-2$ //$NON-NLS-3$
+-			return null;
+ 
++		// IJVM: 
++		// In case of ij vm we have no configuration property. Skip the check - the presence of 
++		// bootclasspath.properties file is sufficient for correct installation detection.
++		//if (!"clear".equals(System.getProperty("com.ibm.oti.configuration", "missing"))) //$NON-NLS-1$ //$NON-NLS-2$ //$NON-NLS-3$
++			//return null;
++
+ 		File home = new File(System.getProperty("java.home")); //$NON-NLS-1$
+ 		IStatus status = validateInstallLocation(home);
+ 		if (status.isOK()) {
+@@ -113,8 +122,15 @@
+ 		// Find kernel types
+ 		LibraryLocation kernel = getKernelLocation(installLocation,
+ 				"default", "clearvm"); //$NON-NLS-1$ //$NON-NLS-2$
++		
++		// IJVM: 
++		// for ij vm kernelSize = 0  
++		// for ibm vm kernelSize = 1  
++		int kernelSize = 1;
+ 		if (kernel == null) {
+-			return new LibraryLocation[] {};
++			kernelSize = 0;
++			// IJVM: continue without kernel libraries
++			//return new LibraryLocation[] {};
+ 		}
+ 
+ 		List bootLibraries = getBootLibraries(installLocation);
+@@ -126,12 +142,13 @@
+ 		List extensions = getExtensionLibraries(installLocation);
+ 
+ 		// Combine the libraries result
+-		LibraryLocation[] allLibraries = new LibraryLocation[1
++		LibraryLocation[] allLibraries = new LibraryLocation[kernelSize
+ 				+ bootLibraries.size() + extensions.size()];
+ 		
+ 		int libraryCount = 0;
+ 
+ 		// Start with the kernel library location
++		if (kernel != null)
+ 		allLibraries[libraryCount++] = kernel;
+ 
+ 		// Append the boot libraries
+@@ -333,8 +350,9 @@
+ 			kernelProperties.load(propsFile);
+ 			propsFile.close();
+ 		} catch (IOException ex) {
+-			System.out
+-					.println("Warning: could not open properties file " + propertyFile.getPath()); //$NON-NLS-1$
++			// IJVM: Print no warnings on ij vm
++			//System.out
++			//		.println("Warning: could not open properties file " + propertyFile.getPath()); //$NON-NLS-1$
+ 			return null;
+ 		}
+ 
+@@ -382,4 +400,5 @@
+ 				.length()));
+ 		return buf.toString();
+ 	}
+-}
+\ No newline at end of file
++}
++
+Index: build/pre-copied/common/HYPLUGIN/src/org/apache/harmony/eclipse/jdt/launching/HyVMRunner.java
+===================================================================
+--- build/pre-copied/common/HYPLUGIN/src/org/apache/harmony/eclipse/jdt/launching/HyVMRunner.java	(revision 387505)
++++ build/pre-copied/common/HYPLUGIN/src/org/apache/harmony/eclipse/jdt/launching/HyVMRunner.java	(working copy)
+@@ -178,6 +178,11 @@
+ 			if (!javaw.exists()) {
+ 				program.replace(directoryLength, program.length(), "java"); //$NON-NLS-1$
+ 			}
++			// IJVM: try to use ij vm executable name 
++			File java= new File(program.toString());
++			if (!java.exists()) {
++				program.replace(directoryLength, program.length(), "ij"); //$NON-NLS-1$
++			}
+ 		} else {
+ 			program.append(command);
+ 		}
+Index: build/pre-copied/common/HYPLUGIN/src/org/apache/harmony/eclipse/jdt/launching/HyLaunchingPlugin.java
+===================================================================
+--- build/pre-copied/common/HYPLUGIN/src/org/apache/harmony/eclipse/jdt/launching/HyLaunchingPlugin.java  (revision 387505) 
++++ build/pre-copied/common/HYPLUGIN/src/org/apache/harmony/eclipse/jdt/launching/HyLaunchingPlugin.java     (working copy) 
+@@ -64,7 +64,10 @@ public class HyLaunchingPlugin extends P
+                super.stop(context);
+        }
+ 
+-       public static HyLaunchingPlugin getDefault() {
++       public static synchronized HyLaunchingPlugin getDefault() {
++               if(plugin==null) {
++                       plugin=new HyLaunchingPlugin();
++               }
+                return plugin;
+        }

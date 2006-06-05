@@ -1,0 +1,879 @@
+/*
+ *  Copyright 2005-2006 The Apache Software Foundation or its licensors, as applicable.
+ *
+ *  Licensed under the Apache License, Version 2.0 (the "License");
+ *  you may not use this file except in compliance with the License.
+ *  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ *  Unless required by applicable law or agreed to in writing, software
+ *  distributed under the License is distributed on an "AS IS" BASIS,
+ *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ *  See the License for the specific language governing permissions and
+ *  limitations under the License.
+ */
+/** 
+ * @author Pavel Pervov
+ * @version $Revision: 1.1.2.3.2.1.2.4 $
+ */  
+
+#define LOG_DOMAIN "vm.core"
+#include "cxxlog.h"
+
+#include "open/thread.h"
+#include "Class.h"
+#include "classloader.h"
+#include "environment.h"
+#include "method_lookup.h"
+#include "nogc.h"
+#include "open/vm_util.h"
+#include "jit_intf_cpp.h"
+#include "atomics.h"
+
+#ifdef _IPF_
+#include "vm_ipf.h"
+#endif // _IPF_
+
+
+/////////////////////////////////////////////////////////////////
+// begin Method
+/////////////////////////////////////////////////////////////////
+
+
+
+Arg_List_Iterator initialize_arg_list_iterator(const char *descr)
+{
+    while(*descr != '(') {
+        descr++;
+    }
+    assert(*descr == '(');
+    return descr + 1;
+} //initialize_iterator
+
+
+
+Java_Type curr_arg(Arg_List_Iterator it)
+{
+    return (Java_Type)*(char *)it;
+} //curr_arg
+
+
+
+Class_Handle get_curr_arg_class(Arg_List_Iterator it,
+                                Method_Handle m)
+{
+    Global_Env *env = VM_Global_State::loader_env;
+    Java_Type UNUSED t = curr_arg(it);
+    assert(t == JAVA_TYPE_CLASS || t == JAVA_TYPE_ARRAY);
+    Arg_List_Iterator next = advance_arg_iterator(it);
+    size_t len = ((char *)next) - ((char *)it);
+    const char* name = (const char*)it;
+    String* n;
+    if(name[0] == 'L') {
+        n = env->string_pool.lookup(name+1, len-2);
+    } else {
+        n = env->string_pool.lookup(name, len);
+    }
+    Class* clss = ((Method *)m)->get_class();
+    Class* c = clss->class_loader->LoadClass(env, n);
+    return c;
+} //get_curr_arg_class
+
+
+
+Arg_List_Iterator advance_arg_iterator(Arg_List_Iterator it)
+{
+    char *iter = (char *)it;
+    while(*iter == '[')
+        iter++;
+
+    if(*iter == ')') {
+        return iter;
+    }
+
+    if(*iter == 'L') {
+        while(*iter++ != ';')
+            ;
+        return iter;
+    }
+
+    iter++;
+
+    return iter;
+} //advance_arg_iterator
+
+
+// Return the return type of this method.
+VMEXPORT // temporary solution for interpreter unplug
+Java_Type Method::get_return_java_type()
+{
+    const char *descr = get_descriptor()->bytes;
+    while(*descr != ')')
+        descr++;
+    return (Java_Type)*(descr + 1);
+} //Method::get_return_java_type
+
+
+
+Class_Handle method_get_return_type_class(Method_Handle m)
+{
+    assert(tmn_is_suspend_enabled());
+    Method *method = (Method *)m;
+    Global_Env *env = VM_Global_State::loader_env;
+    Java_Type UNUSED t = method->get_return_java_type();
+    assert(t == JAVA_TYPE_CLASS || t == JAVA_TYPE_ARRAY);
+    const char *descr = method->get_descriptor()->bytes;
+    while(*descr != ')')
+        descr++;
+    descr++;
+    String *n;
+    if(descr[0] == 'L') {
+        descr++;
+        size_t len = strlen(descr);
+        n = env->string_pool.lookup(descr, len-1);
+    } else {
+        n = env->string_pool.lookup(descr);
+    }
+
+    Class *clss = method->get_class();
+    Class *c = clss->class_loader->LoadVerifyAndPrepareClass(env, n);
+    return c;
+} //method_get_return_type_class
+
+
+
+// Previously this method is not implemented
+// Return the return class of this method (for non-primitive return types)
+Class* Method::get_return_class_type()
+{
+    Class *clss = (Class*)method_get_return_type_class(this);
+    
+    return clss;
+} //Method::get_return_class_type
+
+
+
+Handler::Handler()
+{
+    _start_pc    = 0;
+    _end_pc      = 0;
+    _handler_pc  = 0;
+    _catch_type  = NULL;
+} //Handler::Handler
+
+
+VMEXPORT // temporary solution for interpreter unplug
+unsigned Method::num_bc_exception_handlers()
+{
+    return _n_handlers;
+} //Method::num_bc_exception_handlers
+
+
+
+VMEXPORT // temporary solution for interpreter unplug
+Handler *
+Method::get_bc_exception_handler_info(unsigned eh_number)
+{
+    assert(eh_number < _n_handlers);
+    return _handlers + eh_number;
+} //Method::get_bc_exception_handler_info
+
+
+
+void Method::set_num_target_exception_handlers(JIT *jit, unsigned n)
+{
+    CodeChunkInfo *jit_info = get_chunk_info_mt(jit, CodeChunkInfo::main_code_chunk_id);
+    assert (jit_info->_num_target_exception_handlers == 0);
+    jit_info->_num_target_exception_handlers = n;
+    assert (!jit_info->_target_exception_handlers);
+    jit_info->_target_exception_handlers = (Target_Exception_Handler_Ptr*) Alloc(sizeof(Target_Exception_Handler_Ptr) * n);
+    memset(jit_info->_target_exception_handlers, 0, n * sizeof(Target_Exception_Handler_Ptr));
+} //Method::set_num_target_exception_handlers
+
+
+
+unsigned Method::get_num_target_exception_handlers(JIT *jit) {
+    CodeChunkInfo *jit_info = get_chunk_info_mt(jit, CodeChunkInfo::main_code_chunk_id);
+    assert(jit_info != NULL);
+    return jit_info->_num_target_exception_handlers; 
+} //Method::get_num_target_exception_handlers
+
+
+
+void Method::set_target_exception_handler_info(JIT *jit,
+                                               unsigned eh_number,
+                                               void *start_ip,
+                                               void *end_ip,
+                                               void *handler_ip,
+                                               Class *catch_clss,
+                                               bool exc_obj_is_dead)
+{
+    CodeChunkInfo *jit_info = get_chunk_info_mt(jit, CodeChunkInfo::main_code_chunk_id);
+    assert(eh_number < jit_info->_num_target_exception_handlers);
+    jit_info->_target_exception_handlers[eh_number] =
+        new Target_Exception_Handler(start_ip,
+                                     end_ip,
+                                     handler_ip,
+                                     catch_clss,
+                                     exc_obj_is_dead);
+} //Method::set_target_exception_handler_info
+
+
+
+Target_Exception_Handler_Ptr
+Method::get_target_exception_handler_info(JIT *jit, unsigned eh_num)
+{
+    CodeChunkInfo *jit_info = get_chunk_info_mt(jit, CodeChunkInfo::main_code_chunk_id);
+    assert(jit_info != NULL);
+    return jit_info->_target_exception_handlers[eh_num];
+} //Method::get_target_exception_handler_info
+
+
+
+VMEXPORT // temporary solution for interpreter unplug
+Arg_List_Iterator Method::get_argument_list()
+{
+    return initialize_arg_list_iterator(get_descriptor()->bytes);
+} //Method::get_argument_list
+
+
+VMEXPORT // temporary solution for interpreter unplug
+unsigned Method::get_num_arg_bytes()
+{
+    // Use this old scheme until we can use the new JIT interface's methods to inspect the types of
+    // each method argument. This requires that these methods support Java, and that
+    // they work during VM's bootstrapping.
+    unsigned nb = 0;
+    if (!is_static()) {
+        nb = 4;
+    }
+    Arg_List_Iterator iter = get_argument_list();
+    Java_Type typ;
+    while((typ = curr_arg(iter)) != JAVA_TYPE_END) {
+        switch(typ) {
+        case JAVA_TYPE_LONG:
+        case JAVA_TYPE_DOUBLE:
+            nb += 8;
+            break;
+        default:
+            nb += 4;
+            break;
+        }
+        iter = advance_arg_iterator(iter);
+    }
+    return nb;
+} //Method::get_num_arg_bytes
+
+
+
+unsigned Method::get_num_ref_args()
+{
+    unsigned nargs;
+
+    if(is_static())
+        nargs = 0;
+    else
+        nargs = 1;
+
+    Arg_List_Iterator iter = get_argument_list();
+    Java_Type typ;
+    while((typ = curr_arg(iter)) != JAVA_TYPE_END) {
+        switch(typ) {
+        case JAVA_TYPE_CLASS:
+        case JAVA_TYPE_ARRAY:
+            nargs++;
+            break;
+        default:
+            break;
+        }
+        iter = advance_arg_iterator(iter);
+    }
+
+    return nargs;
+} //Method::get_num_ref_args
+
+
+
+unsigned Method::get_num_args()
+{
+    unsigned nargs;
+
+    if(is_static()) {
+        nargs = 0;
+    } else {
+        nargs = 1;
+    }
+
+    Arg_List_Iterator iter = get_argument_list();
+    Java_Type UNUSED typ;
+    while((typ = curr_arg(iter)) != JAVA_TYPE_END) {
+        nargs++;
+        iter = advance_arg_iterator(iter);
+    }
+
+    return nargs;
+} //Method::get_num_args
+
+
+
+static unsigned alloc_call_count = 0;
+
+void *Method::allocate_code_block_mt(size_t size, size_t alignment, JIT *jit, unsigned heat, int id, Code_Allocation_Action action)
+{
+    assert(jit != NULL);
+    alloc_call_count++;
+
+#ifdef _IPF_
+    // Add one bundle to avoid boundary conditions for exception throwing when the call to athrow is in the last bundle of a method
+    // and return link points to the first bundle of the following method.
+    size += 16;
+#endif
+    void *addr;
+    if (size == 0) {
+        addr = NULL;
+    } else {
+        addr = malloc_fixed_code_for_jit(size, alignment, heat, action);
+    }
+
+    if (action == CAA_Simulate) {
+        // Simulating allocation: return the chunk address without registering a new CodeChunkInfo for it.
+        return addr;
+    }
+
+    // Create (if necessary) and initialize a CodeChunkInfo for the new code chunk.
+    CodeChunkInfo *jit_info = get_chunk_info_mt(jit, id);
+
+    assert(jit_info);
+    assert(jit_info->get_code_block_addr() == NULL);
+    lock();
+    jit_info->_heat                 = heat;
+    jit_info->_code_block           = addr;
+    jit_info->_code_block_size      = size;
+    jit_info->_code_block_alignment = alignment;
+    unlock();
+
+    vm_methods->add(jit_info); // Method table is thread safe
+    return addr;
+} // Method::allocate_code_block
+
+// Read/Write data block.
+void *Method::allocate_rw_data_block(size_t size, size_t alignment, JIT *jit)
+{
+    // Make sure alignment is a power of 2.
+    assert((alignment & (alignment-1)) == 0);
+    void *rw_data_block;
+    if(!size) {
+        rw_data_block = NULL;
+    } else {
+        size_t size_with_padding = size + alignment - 1;
+        rw_data_block = Alloc(size_with_padding);
+        rw_data_block = (void *) ((POINTER_SIZE_INT)((char*)rw_data_block + alignment - 1) & ~(POINTER_SIZE_INT)(alignment-1));
+
+    }
+    return rw_data_block;
+} //Method::allocate_rw_data_block
+
+
+
+// Allocate memory for extra information needed by JIT.
+void *Method::allocate_jit_info_block(size_t size, JIT *jit)
+{
+    assert(size); // should be no need to allocate empty blocks
+    Byte* p_block = (Byte *) Alloc(size + sizeof(JIT **));
+
+    // Store a pointer to the JIT before the JIT info block.
+    *(JIT **) p_block = jit;
+
+    Byte* jit_info_block = p_block + sizeof(JIT **);
+    
+    CodeChunkInfo *jit_info = get_chunk_info_mt(jit, CodeChunkInfo::main_code_chunk_id);
+    assert(jit_info != NULL);
+
+    lock();
+    jit_info->_jit_info_block = jit_info_block;
+    jit_info->_jit_info_block_size = size;
+    unlock();
+    return jit_info_block;
+} // Method::allocate_jit_info_block
+
+
+
+// Create a new CodeChunkInfo.
+CodeChunkInfo *Method::create_code_chunk_info_mt()
+{
+    CodeChunkInfo *result_chunk = (CodeChunkInfo *) Alloc(sizeof(CodeChunkInfo));
+    CodeChunkInfo::initialize_code_chunk(result_chunk);
+    
+    return result_chunk;
+} //create_code_chunk_info
+
+
+
+CodeChunkInfo *Method::get_chunk_info_no_create_mt(JIT *jit, int id)
+{
+    // NOTE:unlocked access to chunks, this requires sfence in addition of this
+    // chunks
+    CodeChunkInfo *jit_info;
+    for (jit_info = get_first_JIT_specific_info();  jit_info;  jit_info = jit_info->_next) {
+        if ((jit_info->get_jit() == jit) && (jit_info->get_id() == id)) {
+            return jit_info;
+        }
+    }
+    return NULL;
+} // Method::get_chunk_info_no_create_mt
+
+
+
+CodeChunkInfo *Method::get_chunk_info_mt(JIT *jit, int id)
+{
+    CodeChunkInfo *jit_info = get_chunk_info_no_create_mt(jit, id);
+    if (jit_info != NULL) {
+        return jit_info;
+    }
+
+    jit_info = create_code_chunk_info_mt();
+    jit_info->set_jit(jit);
+    jit_info->set_id(id);
+    jit_info->set_method(this);
+
+    // Ensure that the first element of the method's code chunk list is the main code chunk for this or some other jit
+    lock();
+    bool insert_at_head = true;
+
+    if (!CodeChunkInfo::is_main_code_chunk_id(id) && (_jits != NULL)) {
+        if (_jits->get_jit() == jit) {
+            assert(_jits->get_id() != id);
+            insert_at_head = false;
+        }
+    }
+
+    if (insert_at_head) {
+        jit_info->_next = _jits;
+        // Write barrier is needed as we use
+        // unlocked fast access to the collection
+        MemoryWriteBarrier();
+        _jits = jit_info;
+    } else {
+        jit_info->_next = _jits->_next;
+        // Write barrier is needed as we use
+        // unlocked fast access to the collection
+        MemoryWriteBarrier();
+        _jits->_next = jit_info;
+    }
+    unlock();
+    return jit_info;
+} //Method::get_chunk_info
+
+
+//
+//  alignment parameter is applied to &(bytes[0])
+//
+void *Method::allocate_JIT_data_block(size_t size, JIT *jit, size_t alignment)
+{
+    // Make sure alignment is a power of 2.
+    assert((alignment & (alignment-1)) == 0);
+    char *data_block;
+    if(!size) {
+        data_block = NULL;
+    } else {
+        size_t size_with_padding = size + sizeof(JIT_Data_Block) + alignment - 1;
+        data_block = (char*) Alloc(size_with_padding);
+
+        // aligning data with specified alignment.
+        size_t mask = (size_t)(alignment-1);
+        size_t data_offset = (size_t) &((JIT_Data_Block *)0)->bytes[0];
+        data_block += mask & (0 - (POINTER_SIZE_INT)data_block - data_offset);
+    }
+    JIT_Data_Block *block = (JIT_Data_Block *)data_block;
+
+    CodeChunkInfo *jit_info;
+    for (jit_info = _jits;  jit_info;  jit_info = jit_info->_next) {
+        if ((jit_info->get_jit() == jit) && (jit_info->get_id() == CodeChunkInfo::main_code_chunk_id)) {
+            block->next = jit_info->_data_blocks;
+            jit_info->_data_blocks = block;
+            break;
+        }
+    }
+    if (jit_info == NULL) {
+        jit_info = create_code_chunk_info_mt();
+        jit_info->set_jit(jit);
+        jit_info->_next = _jits;
+        MemoryWriteBarrier();
+        _jits = jit_info;
+        block->next = jit_info->_data_blocks;
+        jit_info->_data_blocks = block;
+    }
+    return &(block->bytes[0]);
+} //Method::allocate_JIT_data_block
+
+
+
+void Method::add_vtable_patch(void *patch)
+{
+    p_vtable_patch_lock->_lock();                         // vvv
+
+    if (_vtable_patch == NULL) {
+        VTable_Patches *vp = (VTable_Patches *)STD_MALLOC(sizeof(VTable_Patches));
+        memset(vp, 0, sizeof(VTable_Patches));
+        _vtable_patch = vp;
+    }
+
+
+    VTable_Patches *curr_vp = _vtable_patch;
+    for (int i = 0; i < MAX_VTABLE_PATCH_ENTRIES; i++) {
+        if (curr_vp->patch_table[i] == NULL) {
+            curr_vp->patch_table[i] = patch;
+            p_vtable_patch_lock->_unlock();               // ^^
+            return;
+        }
+    }
+    VTable_Patches *new_vp = (VTable_Patches *)STD_MALLOC(sizeof(VTable_Patches));
+    memset(new_vp, 0, sizeof(VTable_Patches));
+    new_vp->next = curr_vp;
+    _vtable_patch = new_vp;
+    new_vp->patch_table[0] = patch;
+
+    p_vtable_patch_lock->_unlock();                     // ^^^
+} //Method::add_vtable_patch
+
+
+
+void Method::apply_vtable_patches()
+{
+    p_vtable_patch_lock->_lock();
+
+    if (_vtable_patch == NULL) {
+        // Constructors are never entered into a vtable.
+        p_vtable_patch_lock->_unlock();
+        return;
+    }
+
+    void *code_addr = get_code_addr();
+
+    VTable_Patches *vp = (VTable_Patches *)_vtable_patch;
+    for(;  (vp != NULL);  vp = vp->next) {
+        for (int i = 0;  i < MAX_VTABLE_PATCH_ENTRIES;  i++) {
+            if (vp->patch_table[i] != NULL) {
+                *((void **)vp->patch_table[i]) = code_addr;
+            }
+        }
+    }
+
+    p_vtable_patch_lock->_unlock();
+} //Method::apply_vtable_patches
+
+
+
+unsigned Method::num_exceptions_method_can_throw() 
+{
+    return _n_exceptions;   
+} //Method::num_exceptions_method_can_throw
+
+
+
+String* Method::get_exception_name (int n) 
+{
+    if (!_exceptions || (n >= _n_exceptions)) return NULL;
+    return _exceptions[n];
+}
+
+
+
+//////////////////////////////////////////////////////
+// begin inlining support
+
+struct Inline_Record {
+    JIT *jit;
+    Method *caller;
+    Inline_Record *next;
+    bool equals(JIT *jit_, Method* caller_){
+        if (jit == jit_ &&
+            caller == caller_)
+            return true;
+        return false;
+    }
+};
+
+
+void Method::set_inline_assumption(JIT *jit, Method *caller) 
+{
+    // don't insert a record repeatedly
+    Inline_Record *itr = inline_records;
+    while (itr != NULL){
+        if (itr->equals(jit, caller) )
+            return;
+        itr = itr->next;
+    }
+    Inline_Record *ir = (Inline_Record *)STD_MALLOC(sizeof(Inline_Record));
+    ir->jit    = jit;
+    ir->caller = caller;
+    ir->next   = inline_records;
+    inline_records = ir;
+} //Method::set_inline_assumption
+
+
+void Method::method_was_overridden() 
+{
+    _flags.is_overridden = 1;
+
+    while(inline_records) {
+        Inline_Record *curr = inline_records;
+        curr->jit->method_was_overridden(curr->caller, this);
+        inline_records = curr->next;
+        STD_FREE(curr);
+    }
+} //Method::method_was_overridden
+
+// end inlining support
+//////////////////////////////////////////////////////
+
+
+
+////////////////////////////////////////////////////////////////////
+// begin support for JIT notification when methods are overridden
+
+// Notify the given JIT whenever this method is overridden by a newly loaded class.
+// The callback_data pointer will be passed back to the JIT during the callback.  
+// The JIT's callback function is JIT_overridden_method_callback.
+void Method::register_jit_overridden_method_callback(JIT *jit_to_be_notified, void *callback_data)
+{
+    // Don't insert the same entry repeatedly on the notify_override_records list.
+    Method_Change_Notification_Record *nr = _notify_override_records;
+    while (nr != NULL) {
+        if (nr->equals(jit_to_be_notified, callback_data)) {
+            return;
+        }
+        nr = nr->next;
+    }
+
+    // Insert a new notification record.
+    Method_Change_Notification_Record *new_nr = 
+        (Method_Change_Notification_Record *)STD_MALLOC(sizeof(Method_Change_Notification_Record));
+    new_nr->method_of_interest = this;
+    new_nr->jit                = jit_to_be_notified;
+    new_nr->callback_data      = callback_data;
+    new_nr->next               = _notify_override_records;
+    _notify_override_records = new_nr;
+} //Method::register_jit_overridden_method_callback
+
+
+void Method::do_jit_overridden_method_callbacks(Method *overriding_method) 
+{
+    Method_Change_Notification_Record *nr;
+    for (nr = _notify_override_records;  nr != NULL;  nr = nr->next) {
+        JIT *jit_to_be_notified = nr->jit;
+        Boolean code_was_modified = 
+            jit_to_be_notified->overridden_method_callback(/*overridden_method*/ this,
+                                                           /*new_method*/ overriding_method,
+                                                           nr->callback_data);
+        if (code_was_modified) {
+#ifdef _IPF_
+            // 20030128 Is this flush_hw_cache() necessary?
+            CodeChunkInfo *jit_info;
+            for (jit_info = get_first_JIT_specific_info(); jit_info; jit_info = jit_info->_next) {
+                if (jit_info->get_jit() == jit_to_be_notified) {
+                    flush_hw_cache((Byte *)jit_info->get_code_block_addr(), jit_info->get_code_block_size());
+                }
+            }
+            sync_i_cache();            
+            do_mf();
+#endif //_IPF_
+        }
+    }
+} //Method::do_jit_overridden_method_callbacks
+
+// end support for JIT notification when methods are overridden
+////////////////////////////////////////////////////////////////////
+
+
+
+
+////////////////////////////////////////////////////////////////////
+// begin support for JIT notification when methods are recompiled
+
+// Notify the given JIT whenever this method is recompiled or initially compiled.
+// The callback_data pointer will be passed back to the JIT during the callback.  
+// The JIT's callback function is JIT_recompiled_method_callback.
+void Method::register_jit_recompiled_method_callback(JIT *jit_to_be_notified, void *callback_data)
+{
+    // Don't insert the same entry repeatedly on the _notify_recompiled_records list.
+    Method_Change_Notification_Record *nr = _notify_recompiled_records;
+    while (nr != NULL) {
+        if (nr->equals(jit_to_be_notified, callback_data)) {
+            return;
+        }
+        nr = nr->next;
+    }
+
+    // Insert a new notification record.
+    Method_Change_Notification_Record *new_nr = 
+        (Method_Change_Notification_Record *)STD_MALLOC(sizeof(Method_Change_Notification_Record));
+    new_nr->method_of_interest = this;
+    new_nr->jit                = jit_to_be_notified;
+    new_nr->callback_data      = callback_data;
+    new_nr->next               = _notify_recompiled_records;
+    _notify_recompiled_records = new_nr;
+} //Method::register_jit_recompiled_method_callback
+
+
+void Method::do_jit_recompiled_method_callbacks() 
+{
+    Method_Change_Notification_Record *nr;
+    for (nr = _notify_recompiled_records;  nr != NULL;  nr = nr->next) {
+        JIT *jit_to_be_notified = nr->jit;
+        Boolean code_was_modified = 
+            jit_to_be_notified->recompiled_method_callback(this, nr->callback_data);
+        if (code_was_modified) {
+#ifdef _IPF_
+            CodeChunkInfo *jit_info;
+            for (jit_info = get_first_JIT_specific_info(); jit_info; jit_info = jit_info->_next) {
+                if (jit_info->get_jit() == jit_to_be_notified) {
+                    flush_hw_cache((Byte *)jit_info->get_code_block_addr(), jit_info->get_code_block_size());
+                }
+            }
+            sync_i_cache();            
+            do_mf();
+#endif //_IPF_
+        }
+    }
+} //Method::do_jit_recompiled_method_callbacks
+
+// end support for JIT notification when methods are recompiled
+////////////////////////////////////////////////////////////////////
+
+
+
+//////////////////////////////////////////////////////
+// begin nop analysis
+
+
+Method_Handle resolve_special_method_env(Global_Env *env,
+                                         Class_Handle c,
+                                         unsigned index);
+
+
+enum Nop_Stack_State {
+    NS_StackEmpty,
+    NS_ThisPushed,
+    NS_ThisAndZeroPushed
+};
+
+void Method::_set_nop()
+{
+    bool verbose = false;
+
+    Global_Env *env = VM_Global_State::loader_env;
+    if (get_name() != env->Init_String || get_descriptor() != env->VoidVoidDescriptor_String) {
+        return;
+    }
+
+    if(is_native()) {
+        return;
+    }
+    unsigned len = _byte_code_length;
+    if(!len) {
+        return;
+    }
+    Byte *bc = _byte_codes;
+    Nop_Stack_State stack_state = NS_StackEmpty;
+    if(verbose) {
+        printf("=========== nop[%d]: %s.%s%s\n", len, get_class()->name->bytes, get_name()->bytes, get_descriptor()->bytes);
+    }
+    for (unsigned idx = 0; idx < len; idx++) {
+        Byte b = bc[idx];
+        if(verbose) {
+            printf("\tbc[%d]=%d, state=%d\n", idx, b, stack_state);
+        }
+        if(b == 0xb1) {   // return
+            if(verbose) {
+                printf("+++++++ nop: %s.%s%s\n", get_class()->name->bytes, get_name()->bytes, get_descriptor()->bytes);
+            }
+            _flags.is_nop = TRUE;
+            return;
+        }
+        switch(stack_state) {
+        case NS_StackEmpty:
+            switch(b) {
+            case 0x2a:  // aload_0
+                stack_state = NS_ThisPushed;
+                break;
+            default:
+                return;
+            }
+            break;
+        case NS_ThisPushed:
+            switch(b) {
+            case 0x01:  // aconst_null
+            case 0x03:  // iconst_0
+                stack_state = NS_ThisAndZeroPushed;
+                break;
+            case 0xb7:  // invokespecial
+                {
+                    unsigned index = (bc[idx + 1] << 8) + bc[idx + 2];
+                    if(verbose) {
+                        printf("\tinvokespecial, index=%d\n", index);
+                    }
+                    Method_Handle mh = resolve_special_method_env(VM_Global_State::loader_env,
+                                                                  get_class(),
+                                                                  index);
+                    Method *callee = (Method *)mh;
+                    if(!callee) {
+                        if(verbose) {
+                            printf("\tinvokespecial, callee==null\n");
+                        }
+                        return;
+                    }
+                    if(callee == this) {
+                        return;
+                    }
+                    if(verbose) {
+                        printf("invokespecial: %s.%s%s\n", callee->get_class()->name->bytes, callee->get_name()->bytes, callee->get_descriptor()->bytes);
+                    }
+                    if(!callee->is_nop()) {
+                        return;
+                    }
+                    const char *descr = callee->get_descriptor()->bytes;
+                    if(descr[1] != ')') {
+                        return;
+                    }
+                    if(verbose) {
+                        printf("invokespecial nop: %s.%s%s\n", callee->get_class()->name->bytes, callee->get_name()->bytes, callee->get_descriptor()->bytes);
+                    }
+                }
+                stack_state = NS_StackEmpty;
+                idx += 2;
+                break;
+            default:
+                return;
+            }
+            break;
+        case NS_ThisAndZeroPushed:
+            switch(b) {
+            case 0xb5:  // putfield
+                stack_state = NS_StackEmpty;
+                if(verbose) {
+                    printf("\tputfield\n");
+                }
+                idx += 2;
+                break;
+            default:
+                return;
+            }
+            break;
+        default:
+            ABORT("Unexpected stack state");
+            return;
+        }
+    }
+    ABORT("Should not get here");
+} //Method::_set_nop
+
+
+// end nop analysis
+//////////////////////////////////////////////////////
+
+/////////////////////////////////////////////////////////////////
+// end Method
+/////////////////////////////////////////////////////////////////
+

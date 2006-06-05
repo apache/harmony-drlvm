@@ -1,0 +1,99 @@
+<?xml version="1.0" encoding="ISO-8859-1"?>
+<!--
+    Copyright 2005-2006 The Apache Software Foundation or its licensors, as applicable.
+  
+    Licensed under the Apache License, Version 2.0 (the "License");
+    you may not use this file except in compliance with the License.
+    You may obtain a copy of the License at
+  
+       http://www.apache.org/licenses/LICENSE-2.0
+  
+    Unless required by applicable law or agreed to in writing, software
+    distributed under the License is distributed on an "AS IS" BASIS,
+    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+    See the License for the specific language governing permissions and
+    limitations under the License.
+-->
+<!--
+Author: Sergey V. Dmitriev, Dmitry B. Yershov
+Version: $Revision: 1.4.2.4 $
+-->
+<!--
+    This is build descriptor for the component "vm.hythr".
+
+    Please refer to make/components/README.txt for details about the component
+    build descriptor structure.
+  -->
+
+<project name="vm.hythr">
+    <target name="init" depends="common_vm">
+        <property name="build.depends" value="extra.apr,vm.vmcore" />
+        <property name="libname" value="hythr" />
+        <property name="outtype" value="shared" />
+        <property name="src" location="${build.vm.home}" />
+
+        <compiler id="cpp.compiler" extends="common.cpp.compiler">
+            <includepath>
+                <pathelement location="${extra.apr.includes}" />
+            </includepath>
+
+            <includepath>
+                <dirset dir="${src}">
+                    <include name="include" />
+                    <include name="vmcore/include" />
+                    <include name="port/src/include" />
+
+                    <select os="win">
+                        <include name="vmcore/src/util/win/include" />
+                    </select>
+
+                    <select os="lnx">
+                        <include name="vmcore/src/util/linux/include" />
+                    </select>
+                </dirset>
+            </includepath>
+
+            <fileset dir="${src}">
+                <include name="vmcore/src/thread/hythr/*.cpp" />
+            </fileset>
+
+            <select os="win" cfg="release" cxx="icl">
+                <compilerarg value="/Qip" />
+            </select>
+
+            <select os="win">
+                <defineset define="_USRDLL" />
+            </select>
+
+            <select os="lnx">
+                <defineset define="LINUX" />
+            </select>
+
+            <select os="lnx">
+                <compilerarg value="-Wno-deprecated" />
+                <compilerarg value="-fno-exceptions" />
+            </select>
+        </compiler>
+
+        <linker id="linker" extends="common.linker">
+            <select os="win">
+                <linkerarg value="/DEF:${src}/vmcore/src/thread/hythr/hythr.def" />
+            </select>
+
+            <select cfg="debug" os="win">
+                <linkerarg value="/NODEFAULTLIB:libcmt.lib" />
+            </select>
+
+            <select os="lnx">
+                <linkerarg value="-Wl,-init" />
+                <linkerarg value="-Wl,hythread_library_init" />
+                <linkerarg value="-Wl,--version-script,${src}/vmcore/src/thread/hythr/hythr.exp" />
+            </select>
+
+            <select os="win">
+                <libset libs="${vm.vmcore.lib}" dir="${vm.vmcore.libdir}" />
+                <syslibset libs="advapi32,ws2_32" />
+            </select>
+        </linker>
+    </target>
+</project>

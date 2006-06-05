@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="ISO-8859-1"?>
+<!--
+    Copyright 2005-2006 The Apache Software Foundation or its licensors, as applicable.
+  
+    Licensed under the Apache License, Version 2.0 (the "License");
+    you may not use this file except in compliance with the License.
+    You may obtain a copy of the License at
+  
+       http://www.apache.org/licenses/LICENSE-2.0
+  
+    Unless required by applicable law or agreed to in writing, software
+    distributed under the License is distributed on an "AS IS" BASIS,
+    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+    See the License for the specific language governing permissions and
+    limitations under the License.
+-->
+<!--
+Author: Sergey V. Dmitriev, Marina V. Goldburt
+Version: $Revision: 1.1.2.4 $
+-->
+
+<!--
+    This is build descriptor for the component "harmony39.regex".
+
+    Please refer to make/components/README.txt for details about the component
+    build descriptor structure.
+  -->
+
+<project name="extra.harmony39.regex">
+    <target name="init" depends="common_extra">
+        <property name="build.java.depends" value="vm.kernel_classes,
+                                                   classlib.luni,
+                                                   classlib.text"/>
+
+        <path id="java.source">
+            <pathelement location="${build.HARMONY39.home}/src/common/javasrc" />
+        </path>
+
+        <patternset id="java.source.pattern"  includes="java/util/regex/**/*.java"/>
+        <patternset id="java.classes.pattern" includes="java/util/regex/**/*.class"/>
+
+        <path id="java.class.path">
+            <pathelement location="${java.build.dir}"/>
+            <fileset dir="${vm.kernel_classes.jardir}" includes="*.jar" />
+            <fileset dir="${classlib.luni.jardir}" includes="*.jar" />
+            <fileset dir="${classlib.text.jardir}" includes="*.jar" />
+        </path>
+
+        <property name="jarname" value="regex.jar"/>
+    </target>
+</project>

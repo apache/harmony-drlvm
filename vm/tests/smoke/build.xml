@@ -1,0 +1,70 @@
+<?xml version="1.0" encoding="ISO-8859-1"?>
+<!--
+    Copyright 2005-2006 The Apache Software Foundation or its licensors, as applicable.
+  
+    Licensed under the Apache License, Version 2.0 (the "License");
+    you may not use this file except in compliance with the License.
+    You may obtain a copy of the License at
+  
+       http://www.apache.org/licenses/LICENSE-2.0
+  
+    Unless required by applicable law or agreed to in writing, software
+    distributed under the License is distributed on an "AS IS" BASIS,
+    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+    See the License for the specific language governing permissions and
+    limitations under the License.
+-->
+<!-- 
+Author: Dmitry B. Yershov
+Version: $Revision: 1.6.20.4 $
+-->
+
+<project name="Smoke_Tests" default="build_smoke_tests" basedir="../..">
+	<property environment="env"/>
+	<property name="build.compiler" value="org.eclipse.jdt.core.JDTCompilerAdapter"/>
+        <property name="build.dir" value="${env.BUILD_DIR}"/>
+        <property name="smoke.dir" value="${env.SMOKE_DIR}"/>
+        <property name="eclipse.home" value="${env.ECLIPSE_HOME}"/>
+        <property name="eclipse.version" value="${env.ECLIPSE_VERSION}"/>
+        <property name="source.ver" value="1.3"/>
+        <property name="java.debug.option" value="on"/>
+
+    <target name="extract_jar">
+	<unjar src="${eclipse.home}/plugins/org.eclipse.jdt.core_3.1.1.jar"
+               dest="${eclipse.home}/plugins"
+               overwrite="false">
+            <patternset>
+              <include name="**/*.jar"/>
+            </patternset>
+        </unjar>
+    </target>
+
+    <target name="build_smoke_tests" description="Build smoke tests with Eclipse java compiler">
+        <echo message="Compile smoke sources by Eclipse 3.1.1 compiler..."/>
+        <javac 
+            srcdir="${basedir}/${smoke.dir}"
+            destdir="${build.dir}/${smoke.dir}" 
+            source="${source.ver}"
+            debug="${java.debug.option}">
+        </javac>
+
+    </target>
+    
+    <target name="build_relcheck_suite" depends="extract_jar, build_smoke_tests"
+                description="Build a suite for standalone relcheck run">
+            <property name="suite.dir" value="${env.SUITE_DIR}"/>
+            <copy todir="${suite.dir}/${smoke.dir}">
+                <fileset dir="${basedir}/${smoke.dir}" includes="**/*.java"/>
+            </copy>
+            <copy todir="${suite.dir}/scripts" failonerror="true">
+                <fileset dir="${basedir}/build">
+                    <include name="rel*"/>
+                    <include name="run_relcheck.sh"/>
+                    <include name="check.sh"/>
+                    <include name="functions.sh"/>
+                </fileset>
+            </copy>
+            <copy file="${basedir}/ij.sh" todir="${suite.dir}"/>
+        </target>
+
+</project>

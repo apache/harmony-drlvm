@@ -1,0 +1,181 @@
+/*
+ *  Copyright 2005-2006 The Apache Software Foundation or its licensors, as applicable.
+ *
+ *  Licensed under the Apache License, Version 2.0 (the "License");
+ *  you may not use this file except in compliance with the License.
+ *  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ *  Unless required by applicable law or agreed to in writing, software
+ *  distributed under the License is distributed on an "AS IS" BASIS,
+ *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ *  See the License for the specific language governing permissions and
+ *  limitations under the License.
+ */
+
+/**
+ * @author Intel, Pavel A. Ozhdikhin
+ * @version $Revision: 1.9.22.4 $
+ *
+ */
+
+#ifndef _INLINER_H_
+#define _INLINER_H_
+
+#include "StlPriorityQueue.h"
+#include "Tree.h"
+
+namespace Jitrino {
+
+class MemoryManager;
+class IRManager;
+class TypeManager;
+class InstFactory;
+class OpndManager;
+class CFGNode;
+class MethodInst;
+class Inst;
+class Opnd;
+class FlowGraph;
+class CompilationInterface;
+class MethodDesc;
+class DominatorTree;
+class DominatorNode;
+class LoopTree;
+class JitrinoParameterTable;
+class Method_Table;
+
+class InlineNode : public TreeNode {
+public:
+    InlineNode(IRManager& irm, Inst *callInst, CFGNode *callNode) : _irm(irm), _callInst(callInst), _callNode(callNode) {}
+    InlineNode* getChild()    {return (InlineNode*) child;}
+    InlineNode* getSiblings() {return (InlineNode*) siblings;}
+    InlineNode* getParent()   {return (InlineNode*) parent;}
+    IRManager&  getIRManager()      { return _irm; }
+    Inst*       getCallInst() { return _callInst; }
+    CFGNode*    getCallNode() { return _callNode; }
+    void print(::std::ostream& os);
+    void printTag(::std::ostream& os);
+private:
+    IRManager&  _irm;
+    Inst*       _callInst;
+    CFGNode*    _callNode;
+};
+
+class InlineTree : public Tree {
+public:
+    InlineTree(InlineNode* r) {
+        root = r;
+    }
+    InlineNode *getRoot() { return (InlineNode*)root; }
+
+    uint32 computeCheckSum() { return computeCheckSum(getRoot()); }
+private:
+    uint32 computeCheckSum(InlineNode* node);
+};
+
+class Inliner
+{
+public:
+    Inliner(MemoryManager& mm, IRManager& irm, 
+            bool doProfileOnly=false);
+
+    // Inline this method into the current CFG and process it for further
+    // inline candidates.  If the argument is the top level CFG, only processing
+    // occurs.
+    void inlineAndProcessRegion(InlineNode* inlineNode, DominatorTree* dtree, LoopTree* ltree);
+
+    // Connect input and return operands of the region to the top-level method.  Do not yet splice.
+    void connectRegion(InlineNode* inlineNode);
+
+    // Build the flowgraph for the next inline candidate method.  Note, this flowgraph
+    // is not yet connected to the top level CFG.   
+    InlineNode* getNextRegionToInline();
+
+    InlineTree& getInlineTree() { return _inlineTree; } 
+
+    void reset();
+
+    static double getProfileMethodCount(CompilationInterface& compileIntf, MethodDesc& methodDesc); 
+
+private:
+    class CallSite {
+    public:
+        CallSite(int32 benefit, CFGNode* callNode, InlineNode* inlineNode) : benefit(benefit), callNode(callNode), inlineNode(inlineNode) {}
+
+        int32 benefit;
+        CFGNode* callNode;
+        InlineNode* inlineNode;
+    };
+
+    class CallSiteCompare {
+    public:
+        bool operator()(const CallSite& site1, const CallSite& site2) { return site1.benefit < site2.benefit; }
+    };
+
+    void scaleBlockCounts(CFGNode* callSite, IRManager& inlinedIRM);
+    void processRegion(InlineNode *inlineNode, DominatorTree* dtree, LoopTree* ltree);
+    void processDominatorNode(InlineNode *inlineNode, DominatorNode* dtree, LoopTree* ltree);
+
+    // True if this method should be processed for further inlining.  I.e., 
+    // can we inline the calls in this method?
+    bool canInlineFrom(MethodDesc& methodDesc);
+
+    // True if this method may be inlined into a calling method.
+    bool canInlineInto(MethodDesc& methodDesc);
+
+    bool isLeafMethod(MethodDesc& methodDesc);
+
+    int32 computeInlineBenefit(CFGNode* node, MethodDesc& methodDesc, InlineNode* parentInlineNode, uint32 loopDepth);
+
+    MemoryManager& _mm;
+    IRManager& _toplevelIRM;
+    TypeManager& _typeManager;
+    InstFactory& _instFactory;
+    OpndManager& _opndManager;
+
+    bool _hasProfileInfo;
+    bool _useInliningTranslatorCall;
+
+    StlPriorityQueue<CallSite, StlVector<CallSite>, CallSiteCompare> _inlineCandidates;
+    uint32 _initByteSize;
+    uint32 _currentByteSize;
+
+    InlineTree _inlineTree;
+
+    bool _doProfileOnlyInlining;
+    bool _useInliningTranslator;
+
+    double _maxInlineGrowthFactor;
+    uint32 _minInlineStop;
+    int32 _minBenefitThreshold;
+    
+    uint32 _inlineSmallMaxByteSize;
+    int32 _inlineSmallBonus;
+    
+    uint32 _inlineMediumMaxByteSize;
+    int32 _inlineMediumBonus;
+
+    uint32 _inlineLargeMinByteSize;
+    int32 _inlineLargePenalty;
+
+    int32 _inlineLoopBonus;
+    int32 _inlineLeafBonus;
+    int32 _inlineSynchBonus;
+    int32 _inlineRecursionPenalty;
+    int32 _inlineExactArgBonus;
+    int32 _inlineExactAllBonus;
+
+    bool _inlineSkipExceptionPath;
+    Method_Table* _inlineSkipMethodTable;
+
+    uint64 oldMethodId;
+
+    bool _usesOptimisticBalancedSync;
+};
+
+
+} //namespace Jitrino 
+
+#endif // _INLINER_H_

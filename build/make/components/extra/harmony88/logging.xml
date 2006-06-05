@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="ISO-8859-1"?>
+<!--
+    Copyright 2005-2006 The Apache Software Foundation or its licensors, as applicable.
+  
+    Licensed under the Apache License, Version 2.0 (the "License");
+    you may not use this file except in compliance with the License.
+    You may obtain a copy of the License at
+  
+       http://www.apache.org/licenses/LICENSE-2.0
+  
+    Unless required by applicable law or agreed to in writing, software
+    distributed under the License is distributed on an "AS IS" BASIS,
+    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+    See the License for the specific language governing permissions and
+    limitations under the License.
+-->
+<!--
+Author: Sergey V. Dmitriev, Marina V. Goldburt
+-->
+
+<!--
+        This is build descriptor for the component "harmony88.logging".
+
+        Please refer to make/components/README.txt for details about the component
+        build descriptor structure.
+-->
+
+<project name="extra.harmony88.logging">
+    <target name="init" depends="common_extra">
+        <property name="build.java.depends"
+                  value="vm.kernel_classes, classlib.luni,
+                  classlib.nio, classlib.nio_char, classlib.security,
+                  classlib.text, extra.harmony39.beans"/>
+
+        <path id="java.source">
+            <pathelement location="${build.HARMONY88.home}/modules/logging/src/main/java" />
+        </path>
+
+        <patternset id="java.source.pattern"  includes="java/util/logging/**/*.java"/>
+        <patternset id="java.classes.pattern" includes="java/util/logging/**/*.class"/>
+
+        <path id="java.class.path">
+            <pathelement location="${java.build.dir}"/>
+            <fileset dir="${vm.kernel_classes.jardir}" includes="*.jar" />
+            <fileset dir="${classlib.luni.jardir}" includes="*.jar" />
+            <fileset dir="${classlib.nio.jardir}" includes="*.jar" />
+            <fileset dir="${classlib.nio_char.jardir}" includes="*.jar" />
+            <fileset dir="${classlib.security.jardir}" includes="*.jar" />
+            <fileset dir="${classlib.text.jardir}" includes="*.jar" />
+            <fileset dir="${extra.harmony39.beans.jardir}" includes="*.jar" />
+        </path>
+
+        <property name="jarname" value="logging.jar"/>
+    </target>
+</project>

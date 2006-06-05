@@ -1,0 +1,699 @@
+<?xml version="1.0" encoding="ISO-8859-1"?>
+<!--
+    Copyright 2005-2006 The Apache Software Foundation or its licensors, as applicable.
+  
+    Licensed under the Apache License, Version 2.0 (the "License");
+    you may not use this file except in compliance with the License.
+    You may obtain a copy of the License at
+  
+       http://www.apache.org/licenses/LICENSE-2.0
+  
+    Unless required by applicable law or agreed to in writing, software
+    distributed under the License is distributed on an "AS IS" BASIS,
+    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+    See the License for the specific language governing permissions and
+    limitations under the License.
+-->
+<!--
+Author:  Marina V. Goldburt
+Version: $Revision: 1.5.2.33 $
+-->
+
+<project name="get.resources" default="update.external.resources">
+
+    <target name="check.ant.version">
+        <propertyregex property="ant.sub.sub.version" input="${ant.version}" regexp="version (\d*)\.(\d*)\.(\d*)" select="\3" defaultValue="0" />
+        <propertyregex property="ant.sub.version" input="${ant.version}" regexp="version (\d*)\.(\d*)\.(\d*)" select="\2" defaultValue="0" />
+        <propertyregex property="ant.version1" input="${ant.version}" regexp="version (\d*)\.(\d*)\.(\d*)" select="\1" defaultValue="0" />
+
+        <math result="ch1" operand1="${ant.version1}" operation="min" operand2="1" datatype="int" />
+        <math result="ch2" operand1="${ant.sub.version}" operation="min" operand2="6" datatype="int" />
+        <math result="ch3" operand1="${ant.sub.sub.version}" operation="min" operand2="5" datatype="int" />
+
+        <fail>
+            <condition>
+                <not>
+                    <and>
+                        <equals arg1="${ch1}" arg2="1" />
+                        <equals arg1="${ch2}" arg2="6" />
+                        <equals arg1="${ch3}" arg2="5" />
+                    </and>
+                </not>
+            </condition>
+* You have wrong version of ANT :${ant.version}
+* Make sure you have Ant 1.6.5 or above installed from
+* http://ant.apache.org/bindownload.cgi and that ANT_HOME environment
+* variable points out to the Ant installation dir, e.g.
+* export ANT_HOME=/usr/local/ant_1.6.5
+        </fail>
+    </target>
+
+    <target name="init" depends="">
+        <!-- precopied folder location -->
+        <property name="build.precopied.dir" location="../pre-copied" />
+        <condition property="jars.exist">
+            <and>
+                <available file="tmp/done.txt" />
+                <available file="tmp/ant-contrib.jar" />
+            </and>
+        </condition>
+        <condition property="cpptasks.patched">
+            <and>
+                <available file="tmp/patched.txt" />
+            </and>
+        </condition>
+        <echo message="jars: ${jars.exist}" />
+    </target>
+
+
+    <target name="get.antcontrib" depends="init" unless="jars.exist">
+        <echo message="here" />
+        <ant antfile="get_antcontrib.xml" inheritall="true" />
+    </target>
+
+    <!-- plugin the ANTCONTRIB -->
+    <target name="plugin.antcontrib" depends="get.antcontrib">
+        <!-- plug in the ANTCONTRIB -->
+        <taskdef resource="net/sf/antcontrib/antlib.xml">
+            <classpath>
+                <pathelement location="tmp/ant-contrib.jar" />
+            </classpath>
+        </taskdef>
+    </target>
+
+    <target name="update.external.resources" depends="get.antcontrib, 
+                                                      plugin.antcontrib,
+                                                      check.ant.version,
+                                                      download.remote.files,
+                                                      unzip.resources,
+                                                      check.unzipped.externals,
+                                                      copy.nessessary.jars,
+                                                      apply.patches,
+                                                      execute.cpptasks.patch.with.eclipse.compiler.in.classpath">
+    </target>
+
+
+    <target name="setup.check.files" depends="setup.resources">
+        <property name="CPPTASKS.check.file" value="cpptasks.jar" />
+        <property name="APR.check.file" value="file_io/netware/filestat.c" />
+        <property name="APRUTIL.check.file" value="encoding/apr_base64.c" />
+        <property name="APRICONV.check.file" value="lib/api_version.c" />
+        <property name="LOG4CXX.check.file" value="configure.in" />
+        <property name="ZLIB.check.file" value="zlib1.dll" />
+        <property name="HYPLUGIN.check.file" value="src/org/apache/harmony/eclipse/jdt/launching/HyLaunchingPlugin.java" />
+        <property name="CLASSLIB.check.file" value="native-src/README.txt" />
+        <property name="ECLIPSE.check.file" value="plugins/org.eclipse.jdt.core_3.1.1.jar" />
+        <property name="XALAN.check.file" value="xalan.jar" />
+        <property name="VM.check.file" value="vmstart/src/main.cpp" />
+        <property name="HARMONY39.check.file" value="src/common/javasrc/java/util/regex/EOLSet.java" />
+        <property name="HARMONY88.check.file" value="modules/logging/src/main/java/java/util/logging/Logger.java" />
+        <property name="BCPROV.check.file" value="bcprov-jdk14-129.jar" />
+        <property name="RESOLVER.check.file" value="resolver.jar" />
+        <property name="PATCHES.check.file" value="common/HYPLUGIN/src/org/apache/harmony/eclipse/jdt/launching/HyLaunchingPlugin.java" />
+    </target>
+
+    <!-- Patching CPPTASKS before using it. -->
+    <!-- We do it in separate ant process.  -->
+    <target name="patch.cpptasks" depends="plugin.antcontrib" unless="cpptasks.patched">
+        <mkdir dir="tmp/cpptasks/patched.src" />
+        <mkdir dir="tmp/cpptasks/patched.classes" />
+        <property environment="env" />
+        <echo message="Patching CPPTASKS..." />
+        <!-- patching itself: 3 files -->
+        <property name="files.to.patch" value="net/sf/antcontrib/cpptasks/devstudio/DevStudioCCompiler.java net/sf/antcontrib/cpptasks/intel/IntelWin32CCompiler.java net/sf/antcontrib/cpptasks/intel/IntelWin64CCompiler.java" />
+
+        <for list="${files.to.patch}" param="filename" delimiter=" ">
+            <sequential>
+                <copy todir="tmp/cpptasks/patched.src">
+                    <fileset dir="${env.CPPTASKS_HOME}">
+                        <include name="**/src/@{filename}" />
+                    </fileset>
+                </copy>
+            </sequential>
+        </for>
+
+        <fileset id="src.files" dir="tmp/cpptasks/patched.src">
+            <include name="**/*" />
+        </fileset>
+
+        <for param="filename">
+            <fileset refid="src.files" />
+            <sequential>
+                <loadfile property="file.content.@{filename}" srcFile="@{filename}" />
+
+                <propertyregex property="file.patched.content" input="${file.content.@{filename}}" override="true" regexp="(?m)(public\s+int\s+getMaximumCommandLength\(\)\s+\{\s*$\s+)return 1024;" replace="\1return 65535;" defaultValue="${file.content.@{filename}}" />
+
+                <!-- patch the file only if something's changed -->
+                <if>
+                    <not>
+                        <equals arg1="${file.content.@{filename}}" arg2="${file.patched.content}" />
+                    </not>
+                    <then>
+                        <echo file="@{filename}" message="${file.patched.content}" />
+                    </then>
+                </if>
+            </sequential>
+        </for>
+
+        <!-- compile the patched source -->
+        <javac srcdir="tmp/cpptasks/patched.src" destdir="tmp/cpptasks/patched.classes" source="1.4" target="1.4" failonerror="true">
+            <classpath>
+                <fileset dir="${env.CPPTASKS_HOME}" includes="**/*.jar" />
+                <fileset dir="${java.home}" includes="**/*.jar" />
+            </classpath>
+            <patternset>
+                <include name="**/*.java" />
+            </patternset>
+        </javac>
+        <echo file="tmp/patched.txt" message="done" />
+    </target>
+
+
+    <target name="check.unzipped.externals" depends="init,setup.check.files,setup.properties">
+
+        <for param="resource" list="${os.resources}" delimiter=",">
+            <sequential>
+                <property name="local.@{resource}.home" value="${build.precopied.dir}/${build.os.short}/@{resource}" />
+                <check-resource resource="@{resource}" />
+            </sequential>
+        </for>
+
+        <for param="resource" list="${common.resources}" delimiter=",">
+            <sequential>
+                <property name="local.@{resource}.home" value="${build.precopied.dir}/common/@{resource}" />
+                <check-resource resource="@{resource}" />
+            </sequential>
+        </for>
+    </target>
+
+    <target name="copy.nessessary.jars">
+        <propertyregex property="build.ECLIPSE.path" input="${if.ECLIPSE.exist}" regexp="(.*)/${ECLIPSE.check.file}" select="\1" />
+        <unzip dest="tmp">
+            <fileset dir="${build.ECLIPSE.path}" includes="plugins/org.eclipse.jdt.core_3.1.1.jar" />
+            <patternset>
+                <include name="jdtCompilerAdapter.jar" />
+            </patternset>
+        </unzip>
+        <copy tofile="tmp/org.eclipse.jdt.core_3.1.1.jar">
+            <fileset dir="${build.ECLIPSE.path}" includes="plugins/org.eclipse.jdt.core_3.1.1.jar" />
+        </copy>
+        <copy tofile="tmp/junit.jar">
+            <fileset dir="${build.ECLIPSE.path}">
+                <include name="plugins/org.junit_3.8.1/junit.jar" />
+            </fileset>
+        </copy>
+        <propertyregex property="build.XALAN.path" input="${if.XALAN.exist}" regexp="(.*)/${XALAN.check.file}" select="\1" />
+        <copy file="${build.XALAN.path}/xalan.jar" todir="tmp" />
+        <fail>
+            <condition>
+                <not>
+                    <available file="${build.XALAN.path}/serializer.jar" />
+                </not>
+            </condition>Error:
+* Your XALAN_HOME: ${build.XALAN.path} doesn't contains serializer.jar.
+* Use default settings in the ${resources.properties.file} file 
+* to download the correct archive
+*
+* See README for details.
+        </fail>
+        <copy file="${build.XALAN.path}/serializer.jar" todir="tmp" />
+        <propertyregex property="build.CPPTASKS.path" input="${if.CPPTASKS.exist}" regexp="(.*)/${CPPTASKS.check.file}" select="\1" />
+        <copy file="${build.CPPTASKS.path}/cpptasks.jar" todir="tmp/cpptasks" />
+        <echo message="done" file="tmp/done.txt" />
+    </target>
+
+    <target name="generate.internal.variables" depends="">
+
+        <echo file="${generated.properties.file}" message="" />
+        <for param="resource" list="${os.resources},${common.resources}" delimiter=",">
+            <sequential>
+                <propertycopy override="true" from="local.@{resource}.home" property="build.r.home" />
+                <propertycopy property="resourcepath" from="if.@{resource}.exist" override="true" />
+                <propertycopy override="true" from="@{resource}.check.file" property="check.file" />
+                <propertyregex property="build.@{resource}.path" input="${resourcepath}" regexp="(.*)/${check.file}" select="\1" />
+                <propertycopy override="true" property="build.resource.path" from="build.@{resource}.path" />
+                <echo file="${generated.properties.file}" append="true">
+                    build.@{resource}.home=${build.resource.path}
+                </echo>
+            </sequential>
+        </for>
+    </target>
+
+    <target name="execute.cpptasks.patch.with.eclipse.compiler.in.classpath" unless="cpptasks.patched" depends="init, setup.resources, copy.nessessary.jars">
+        <path id="class.path">
+            <pathelement location="tmp\org.eclipse.jdt.core_3.1.1.jar" />
+            <pathelement location="tmp\jdtCompilerAdapter.jar" />
+            <pathelement location="tmp\junit*.jar" />
+            <pathelement location="tmp\xalan.jar" />
+            <pathelement location="tmp\cpptasks\patched.classes" />
+            <pathelement location="tmp\cpptasks\cpptasks.jar" />
+        </path>
+        <pathconvert refid="class.path" property="class.line" />
+        <property name="setup.file" location="./setup.xml" />
+        <property name="cpptasks.home" location="${build.CPPTASKS.path}" />
+
+        <if>
+            <isset property="if.win" />
+            <then>
+                <if>
+                    <available file="${env.JAVA_HOME}\bin\ij.exe" />
+                    <then>
+                        <exec executable="${env.JAVA_HOME}\bin\ij.exe">
+                            <arg line="-Duser.timezone=en_US -classpath ${env.ANT_HOME}\lib\ant-launcher.jar -Dant.home=${env.ANT_HOME} org.apache.tools.ant.launch.Launcher -cp ${class.line} -Dbuild.compiler=org.eclipse.jdt.core.JDTCompilerAdapter -f ${setup.file} patch.cpptasks" />
+                            <env key="CLASSPATH" value="${class.line}" />
+                            <env key="CPPTASKS_HOME" value="${cpptasks.home}" />
+                        </exec>
+                    </then>
+                    <else>
+                        <exec executable="${env.ANT_HOME}\bin\ant.bat">
+                            <arg line=" -f ${setup.file} patch.cpptasks -Dbuild.compiler=org.eclipse.jdt.core.JDTCompilerAdapter" />
+                            <env key="CLASSPATH" value="${class.line}" />
+                            <env key="CPPTASKS_HOME" value="${cpptasks.home}" />
+                        </exec>
+                    </else>
+                </if>
+            </then>
+        </if>
+        <if>
+            <isset property="if.lnx" />
+            <then>
+                <if>
+                    <available file="${env.JAVA_HOME}/bin/ij" />
+                    <then>
+                        <exec executable="${env.JAVA_HOME}/bin/ij">
+                            <arg line="-Duser.timezone=en_US -classpath ${env.ANT_HOME}/lib/ant-launcher.jar -Dant.home=${env.ANT_HOME} org.apache.tools.ant.launch.Launcher -cp ${class.line} -Dbuild.compiler=org.eclipse.jdt.core.JDTCompilerAdapter -f ${setup.file} patch.cpptasks" />
+                            <env key="CLASSPATH" value="${class.line}" />
+                            <env key="CPPTASKS_HOME" value="${cpptasks.home}" />
+                        </exec>
+                    </then>
+                    <else>
+                        <exec executable="${env.ANT_HOME}/bin/ant">
+                            <arg line=" --noconfig -f ${setup.file} patch.cpptasks -Dbuild.compiler=org.eclipse.jdt.core.JDTCompilerAdapter" />
+                            <env key="CLASSPATH" value="${class.line}" />
+                            <env key="CPPTASKS_HOME" value="${cpptasks.home}" />
+                        </exec>
+                    </else>
+                </if>
+            </then>
+        </if>
+    </target>
+
+    <target name="setup.resources" depends="plugin.antcontrib">
+        <property name="common.resources" value="LOG4CXX,HYPLUGIN,CLASSLIB,CPPTASKS,XALAN,VM,HARMONY39,HARMONY88,BCPROV,RESOLVER,PATCHES" />
+        <property name="build.resources" value="CPPTASKS,ECLIPSE" />
+        <if>
+            <isset property="if.lnx" />
+            <then>
+                <property name="build.os.short" value="lnx" />
+                <property name="os.resources" value="APR,APRUTIL,APRICONV,ECLIPSE" />
+            </then>
+            <else>
+                <property name="build.os.short" value="win" />
+                <property name="os.resources" value="APR,APRUTIL,APRICONV,ECLIPSE,ZLIB" />
+            </else>
+        </if>
+    </target>
+
+    <target name="setup.properties" depends="plugin.antcontrib,setup.resources,setup.check.files">
+        <for list="${common.resources},${os.resources}" param="resource" delimiter=",">
+            <sequential>
+                <propertycopy name="remote.@{resource}.archive" from="env.remote.@{resource}.archive" silent="true" />
+                <property name="remote.@{resource}.archive" value="no_settings_in_config_or_environment" />
+                <propertycopy name="local.@{resource}.archive" from="env.local.@{resource}.archive" silent="true" />
+                <propertycopy name="@{resource}_HOME" from="env.@{resource}_HOME" silent="true" />
+                <propertycopy name="remote.@{resource}.archive.type" from="env.remote.@{resource}.archive.type" silent="true" />
+                <if>
+                    <isset property="@{resource}_HOME" />
+                    <then>
+                        <propertycopy override="true" property="check.file" from="@{resource}.check.file" />
+                        <propertycopy override="true" property="build.RESOURCE_HOME" from="@{resource}_HOME" />
+                        <condition property="local.@{resource}.home" value="${build.RESOURCE_HOME}">
+                            <available file="${build.RESOURCE_HOME}/${check.file}" />
+                        </condition>
+                    </then>
+                </if>
+                <property name="remote.@{resource}.archive.type" value="archive" />
+
+                <if>
+                    <and>
+                        <equals arg1="${remote.@{resource}.archive}" arg2="no_settings_in_config_or_environment" />
+                        <not>
+                            <isset property="@{resource}_HOME" />
+                        </not>
+                    </and>
+                    <then>
+                        <if>
+                            <equals arg1="@{resource}" arg2="VM" />
+                            <then>
+                                <fail>Error:
+* Location of VM is not specified.
+*
+* Please specify the VM location by setting VM_HOME (for example, in
+* make/lnx.properties or make/win.properties or in environment).
+*
+* See README for details.
+                                </fail>
+                            </then>
+                            <else>
+                                <fail>Error:
+* Location of @{resource} is not specified.
+*
+* Please specify the @{resource} location by setting one of:
+*   1. remote.@{resource}.archive (make/lnx.properties or make/win.properties)
+*   2. local.@{resource}.archive  (make/lnx.properties or make/win.properties)
+*   3. @{resource}_HOME           (make/lnx.properties or
+*                                  make/win.properties or in environment)
+*
+* See README for details.
+                                </fail>
+                            </else>
+                        </if>
+                    </then>
+                </if>
+            </sequential>
+        </for>
+        <propertycopy name="http.proxyHost" from="env.http.proxyHost" silent="true" />
+        <propertycopy name="http.proxyPort" from="env.http.proxyPort" silent="true" />
+        <if>
+            <isset property="http.proxyHost" />
+            <then>
+                <echo message="using proxy settings: ${http.proxyHost} port:${http.proxyPort}" />
+                <setproxy proxyhost="${http.proxyHost}" proxyport="${http.proxyPort}" />
+            </then>
+        </if>
+    </target>
+
+    <target name="download.remote.files" depends="plugin.antcontrib,
+                                                  setup.resources, 
+                                                  setup.properties">
+        <for param="resource" list="${os.resources}" delimiter=",">
+            <sequential>
+                <get-remote-resource resource="@{resource}" archive.dest.dir="${build.precopied.dir}/archives/${build.os.short}" local.home.dest.dir="${build.precopied.dir}/${build.os.short}" />
+            </sequential>
+        </for>
+        <for param="resource" list="${common.resources}" delimiter=",">
+            <sequential>
+                <get-remote-resource resource="@{resource}" archive.dest.dir="${build.precopied.dir}/archives/common" local.home.dest.dir="${build.precopied.dir}/common" />
+            </sequential>
+        </for>
+    </target>
+
+    <target name="unzip.resources" depends="download.remote.files">
+        <mkdir dir="${build.precopied.dir}" />
+        <for param="resource" list="${os.resources}" delimiter=",">
+            <sequential>
+                <unzip-resource resource="@{resource}" dest.dir="${build.precopied.dir}/${build.os.short}" />
+            </sequential>
+        </for>
+        <for param="resource" list="${common.resources}" delimiter=",">
+            <sequential>
+                <unzip-resource resource="@{resource}" dest.dir="${build.precopied.dir}/common" />
+            </sequential>
+        </for>
+    </target>
+
+    <target name="clean.update" depends="init">
+        <delete dir="${build.precopied.dir}" failonerror="false" />
+        <delete file="tmp/patched.txt" />
+        <delete file="tmp/done.txt" />
+    </target>
+
+    <target name="check.tmp.jars">
+        <fail>
+            <condition>
+                <not>
+                    <and>
+                        <available file="tmp/jdtCompilerAdapter.jar" />
+                        <available file="tmp/org.eclipse.jdt.core_3.1.1.jar" />
+                        <available file="tmp/junit.jar" />
+                        <available file="tmp/xalan.jar" />
+                        <available file="tmp/cpptasks/cpptasks.jar" />
+                    </and>
+                </not>
+            </condition>Error:
+* External resources are not downloaded.
+* Please, execute "build update" before actual building or testing.
+*
+* For example:
+*     c:\build> build.bat update
+*     c:\build> build.bat
+*
+* See README for details.
+                </fail>
+        <property name="jars.checked" value="true" />
+    </target>
+
+    <target name="apply.patches" depends="plugin.antcontrib,
+                                          check.ant.version,
+                                          download.remote.files,
+                                          unzip.resources,
+                                          check.unzipped.externals,
+                                          generate.internal.variables">
+        <for param="resource" list="${os.resources}" delimiter=",">
+            <sequential>
+                <if>
+                    <available file="${build.PATCHES.path}/${build.os.short}/@{resource}" />
+                    <then>
+                        <propertycopy override="true" from="build.@{resource}.path" property="res.path" />
+                        <copy todir="${res.path}" overwrite="yes" failonerror="false">
+                            <fileset dir="${build.PATCHES.path}/${build.os.short}/@{resource}" includes="**" excludes="*.patch" />
+                        </copy>
+                    </then>
+                </if>
+            </sequential>
+        </for>
+        <for param="resource" list="${common.resources}" delimiter=",">
+            <sequential>
+                <if>
+                    <available file="${build.PATCHES.path}/common/@{resource}" />
+                    <then>
+                        <propertycopy override="true" from="build.@{resource}.path" property="res.path" />
+                        <copy todir="${res.path}" overwrite="yes" failonerror="false">
+                            <fileset dir="${build.PATCHES.path}/common/@{resource}" includes="**" excludes="*.patch" />
+                        </copy>
+                    </then>
+                </if>
+            </sequential>
+        </for>
+    </target>
+
+    <target name="setup" depends="check.tmp.jars,
+                                  plugin.antcontrib,
+                                  check.ant.version,
+                                  check.unzipped.externals,
+                                  generate.internal.variables" />
+
+    <macrodef name="get-remote-resource">
+        <attribute name="resource" />
+        <attribute name="archive.dest.dir" />
+        <attribute name="local.home.dest.dir" />
+        <sequential>
+            <if>
+                <not>
+                    <or>
+                        <isset property="local.@{resource}.home" />
+                        <isset property="local.@{resource}.archive" />
+                    </or>
+                </not>
+                <then>
+                    <propertycopy override="true" property="remote.resource.archive" from="remote.@{resource}.archive" />
+                    <propertycopy override="true" property="remote.resource.archive.type" from="remote.@{resource}.archive.type" />
+                    <switch value="${remote.resource.archive.type}">
+                        <case value="archive">
+                            <propertyregex property="archive.@{resource}.filename" input="${remote.resource.archive}" regexp=".*?([^/\\]+)$" select="\1" defaultValue="" />
+                            <propertycopy override="true" property="archive.filename" from="archive.@{resource}.filename" silent="true" />
+                            <property name="@{resource}.grr.destdir" value="@{archive.dest.dir}" />
+                            <property name="local.@{resource}.archive" value="@{archive.dest.dir}/@{resource}/${archive.filename}" />
+                        </case>
+                        <default>
+                            <property name="@{resource}.grr.destdir" value="@{local.home.dest.dir}" />
+                            <property name="local.@{resource}.archive" value="@{local.home.dest.dir}/@{resource}" />
+                        </default>
+                    </switch>
+                    <propertycopy override="true" from="@{resource}.grr.destdir" property="dest.dir" />
+                    <if>
+                        <available file="${dest.dir}/@{resource}.txt" />
+                        <then>
+                            <loadfile property="old.@{resource}.location" srcFile="${dest.dir}/@{resource}.txt" />
+                        </then>
+                    </if>
+                    <propertycopy override="true" property="old.location" from="old.@{resource}.location" silent="true" />
+                    <if>
+                        <and>
+                            <available file="${dest.dir}/@{resource}.txt" />
+                            <equals arg1="${old.location}" arg2="${remote.@{resource}.archive}" />
+                        </and>
+                        <then>
+                        </then>
+                        <else>
+                            <delete file="${dest.dir}/@{resource}.txt" failonerror="false" />
+                            <delete dir="${dest.dir}/@{resource}" />
+                            <mkdir dir="${dest.dir}/@{resource}" />
+                            <switch value="${remote.resource.archive.type}">
+                                <case value="svn">
+                                    <echo message="downloading svn: @{resource} from ${remote.resource.archive}" />
+                                    <if>
+                                        <isset property="if.win" />
+                                        <then>
+                                            <exec executable="svn.exe" failonerror="true">
+                                                <arg line="co --non-interactive ${remote.resource.archive} ${dest.dir}/@{resource}" />
+                                            </exec>
+                                        </then>
+                                        <else>
+                                            <exec executable="svn" failonerror="true">
+                                                <arg line="co --non-interactive ${remote.resource.archive} ${dest.dir}/@{resource}" />
+                                            </exec>
+                                        </else>
+                                    </if>
+                                </case>
+                                <default>
+                                    <echo message="downloading @{resource} from ${remote.resource.archive}" />
+                                    <propertyregex property="archive.@{resource}.filename" input="${remote.resource.archive}" regexp=".*?([^/\\]+)$" select="\1" defaultValue="" />
+                                    <propertycopy override="true" property="archive.filename" from="archive.@{resource}.filename" silent="true" />
+                                    <if>
+                                        <not>
+                                            <or>
+                                                <contains string="___${remote.resource.archive}" substring="___http:" />
+                                                <contains string="___${remote.resource.archive}" substring="___ftp:" />
+                                                <contains string="___${remote.resource.archive}" substring="___https:" />
+                                                <contains string="___${remote.resource.archive}" substring="___jar:" />
+                                            </or>
+                                        </not>
+                                        <then>
+                                            <copy file="${remote.resource.archive}" tofile="${dest.dir}/@{resource}/${archive.filename}" />
+                                        </then>
+                                        <else>
+                                            <get src="${remote.resource.archive}" ignoreerrors="false" dest="${dest.dir}/@{resource}/${archive.filename}" verbose="true" />
+                                        </else>
+                                    </if>
+                                </default>
+                            </switch>
+                            <echo message="${remote.resource.archive}" file="${dest.dir}/@{resource}.txt" />
+                        </else>
+                    </if>
+                </then>
+            </if>
+        </sequential>
+    </macrodef>
+
+    <macrodef name="unzip-resource">
+        <attribute name="resource" />
+        <attribute name="dest.dir" />
+        <sequential>
+            <propertycopy override="true" property="remote.resource.archive.type" from="remote.@{resource}.archive.type" />
+            <if>
+                <equals arg1="archive" arg2="${remote.resource.archive.type}" />
+                <then>
+                    <property name="local.@{resource}.home" value="@{dest.dir}/@{resource}" />
+                    <propertycopy override="true" property="resource_HOME" from="local.@{resource}.home" />
+                    <if>
+                        <available file="@{dest.dir}/@{resource}.txt" />
+                        <then>
+                            <loadfile property="local.old.@{resource}.location" srcFile="@{dest.dir}/@{resource}.txt" />
+                        </then>
+                    </if>
+                    <propertycopy override="true" property="local.old.location" from="local.old.@{resource}.location" silent="true" />
+                    <propertycopy override="true" property="archive.resource.home" from="local.@{resource}.archive" silent="true" />
+                    <propertycopy property="remote.archive" override="true" from="remote.@{resource}.archive" silent="true" />
+                    <if>
+                        <and>
+                            <equals arg1="${resource_HOME}" arg2="@{dest.dir}/@{resource}" />
+                            <or>
+                                <not>
+                                    <available file="@{dest.dir}/@{resource}.txt" />
+                                </not>
+                                <not>
+                                    <equals arg1="${local.old.location}" arg2="${remote.archive}${archive.resource.home}" />
+                                </not>
+                            </or>
+                        </and>
+                        <then>
+                            <delete file="@{dest.dir}/@{resource}.txt" />
+                            <delete dir="@{dest.dir}/@{resource}" />
+                            <mkdir dir="@{dest.dir}/@{resource}" />
+                            <echo message="unzipping: @{resource} from ${archive.resource.home}" />
+                            <propertyregex property="file.extension" input="${archive.resource.home}" override="true" regexp=".*(tar.gz|jar|zip)$" replace="\1" defaultValue="aaa" />
+                            <fail>
+                                <condition>
+                                    <equals arg1="${file.extension}" arg2="" />
+                                </condition>Error:
+*  
+*  Unsupported archive type of the archive @{resource}
+*  file : ${archive.resource.home}
+*  supported archives : jar/tar.gz/zip
+*
+                            </fail>
+                            <mkdir dir="@{dest.dir}/@{resource}" />
+                            <if>
+                                <equals arg1="${file.extension}" arg2="zip" />
+                                <then>
+                                    <unzip src="${archive.resource.home}" dest="@{dest.dir}/@{resource}/" />
+                                </then>
+                            </if>
+                            <if>
+                                <equals arg1="${file.extension}" arg2="jar" />
+                                <then>
+                                    <unjar src="${archive.resource.home}" dest="@{dest.dir}/@{resource}/" />
+                                </then>
+                            </if>
+                            <if>
+                                <equals arg1="${file.extension}" arg2="tar.gz" />
+                                <then>
+                                    <gunzip src="${archive.resource.home}" dest="@{dest.dir}/@{resource}/gunzipped.tar" />
+                                    <untar src="@{dest.dir}/@{resource}/gunzipped.tar" dest="@{dest.dir}/@{resource}/" />
+                                </then>
+                            </if>
+                            <propertycopy property="remote.archive" override="true" from="remote.@{resource}.archive" silent="true" />
+                            <echo file="@{dest.dir}/@{resource}.txt" message="${remote.archive}${archive.resource.home}" />
+                        </then>
+                    </if>
+                </then>
+            </if>
+        </sequential>
+    </macrodef>
+    <macrodef name="check-resource">
+        <attribute name="resource" />
+        <sequential>
+            <propertycopy override="true" property="resource_HOME" from="local.@{resource}.home" />
+            <propertycopy override="true" property="check.resource.file" from="@{resource}.check.file" />
+
+            <fail>
+                <condition>
+                    <not>
+                        <available file="${resource_HOME}" />
+                    </not>
+                </condition>Error:
+*
+* @{resource} can't be found
+* This can be because of you have incorrect corresponding location
+* in the ${resources.properties.file} or in your environment
+* or you have not executed "build update" previously.
+*
+* See README for details.
+            </fail>
+
+            <fileset id="@{resource}.check" dir="${resource_HOME}">
+                <include name="*/${check.resource.file}" />
+                <include name="${check.resource.file}" />
+            </fileset>
+
+            <pathconvert dirsep="/" refid="@{resource}.check" property="if.@{resource}.exist" setonempty="false" />
+
+            <if>
+                <not>
+                    <isset property="if.@{resource}.exist" />
+                </not>
+                <then>
+                    <fail>Error:
+*
+* @{resource} cannot be found.
+* This can be if you have incorrect corresponding location
+* in the ${resources.properties.file} or you have not executed "build update" previously.
+*
+* See README for details.
+                    </fail>
+                </then>
+            </if>
+        </sequential>
+    </macrodef>
+</project>

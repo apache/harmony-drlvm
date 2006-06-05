@@ -1,0 +1,420 @@
+/*
+ *  Copyright 2005-2006 The Apache Software Foundation or its licensors, as applicable.
+ *
+ *  Licensed under the Apache License, Version 2.0 (the "License");
+ *  you may not use this file except in compliance with the License.
+ *  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ *  Unless required by applicable law or agreed to in writing, software
+ *  distributed under the License is distributed on an "AS IS" BASIS,
+ *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ *  See the License for the specific language governing permissions and
+ *  limitations under the License.
+ */
+/** 
+ * @author Intel, Alexei Fedotov
+ * @version $Revision: 1.1.2.1.4.3 $
+ */  
+
+
+#ifndef _DLL_JIT_INTF_H_
+#define _DLL_JIT_INTF_H_
+
+#include <string.h>
+#include "jit_intf_cpp.h"
+#include "jit_export_jpda.h"
+#include <apr-1/apr_dso.h>
+#include <apr-1/apr_dso.h>
+#include "open/thread.h"
+
+bool vm_is_a_jit_dll(const char *dll_filename);
+
+
+class Dll_JIT: public JIT {
+
+public:
+
+    Dll_JIT();
+
+    Dll_JIT(const char *dll_filename);
+
+    ~Dll_JIT() { 
+        if (_deinit != NULL) _deinit(this); 
+        if (pool != NULL) apr_pool_destroy(pool);
+        //XXX Alexey Varlamov 20050808 - nobody unloads library itself
+    }
+
+    void
+    next_command_line_argument(const char *option,
+                               const char *arg
+                               )
+    {
+        if (_next_command_line_argument != NULL)
+            _next_command_line_argument(this, option, arg);
+    }
+
+
+    JIT_Result 
+    gen_method_info(Compile_Handle     compilation,
+                    Method_Handle      method,
+                    JIT_Flags          flags
+                    )
+    {   
+        return _gen_method_info(this, compilation, method, flags);
+    }
+
+    JIT_Result 
+    compile_method(Compile_Handle     compilation,
+                   Method_Handle      method,
+                   JIT_Flags          flags
+                   )
+    {
+        if (_compile_method == NULL)
+            return JIT_FAILURE;
+        return _compile_method(this, compilation, method, flags);
+    }
+
+    JIT_Result 
+    compile_method_with_params(Compile_Handle            compilation,
+                               Method_Handle             method,
+                               OpenMethodExecutionParams flags
+                               )
+    {
+        if (_compile_method_with_params == NULL)
+            return JIT_FAILURE;
+        return _compile_method_with_params(this, compilation, method, flags);
+    }
+
+    void
+    unwind_stack_frame(Method_Handle       method,
+                       JitFrameContext*  context
+                       )
+    {
+        _unwind_stack_frame(this, method, context);
+    }
+
+
+    void 
+    get_root_set_from_stack_frame(Method_Handle          method,
+                                  GC_Enumeration_Handle  enum_handle,
+                                  const JitFrameContext*     context
+                                  )
+    {
+        _get_root_set_from_stack_frame(this, method, enum_handle, context);
+    }
+
+    void 
+    get_root_set_for_thread_dump(Method_Handle          method,
+                                  GC_Enumeration_Handle  enum_handle,
+                                  const JitFrameContext*     context
+                                  )
+    {
+        _get_root_set_for_thread_dump(this, method, enum_handle, context);
+    }
+
+    uint32
+    get_inline_depth(InlineInfoPtr  ptr,
+                     uint32         offset)
+    {
+        if (_get_inline_depth != NULL) {
+            return _get_inline_depth(this, ptr, offset);
+        }
+        return 0;
+    }
+
+    Method_Handle
+    get_inlined_method(InlineInfoPtr  ptr,
+                     uint32         offset,
+                     uint32         inline_depth)
+    {
+        if (_get_inlined_method != NULL) {
+            return _get_inlined_method(this, ptr, offset, inline_depth);
+        }
+        return NULL;
+    }
+
+    Boolean
+    can_enumerate(Method_Handle method,
+                  NativeCodePtr eip
+                  )
+    {
+        return _can_enumerate(this, method, eip);
+    }
+
+
+    void
+    fix_handler_context(Method_Handle      method,
+                        JitFrameContext* context
+                        )
+    {
+        _fix_handler_context(this, method, context);
+    }
+
+
+    void *
+    get_address_of_this(Method_Handle            method,
+                        const JitFrameContext* context
+                        )
+    {
+        return (void *)_get_address_of_this(this, method, context);
+    }
+
+
+    Boolean
+    call_returns_a_reference(Method_Handle            method,
+                             const JitFrameContext* context
+                             )
+    {
+        return _call_returns_a_reference(this, method, context);
+    }
+
+   void thread_recompile_methods()
+   {
+       _thread_recompile_methods();
+   }
+
+
+
+    Boolean
+    extended_class_callback(Class_Handle  extended_class,
+                            Class_Handle  new_class,
+                            void         *callback_data)
+    {
+        if (_extended_class_callback != NULL) {
+            return _extended_class_callback(this, extended_class, new_class, callback_data);
+        }
+        return FALSE;
+    }
+
+    Boolean
+    overridden_method_callback(Method_Handle  overridden_method,
+                               Method_Handle  new_method,
+                               void          *callback_data)
+    {
+        if (_overridden_method_callback != NULL) {
+            return _overridden_method_callback(this, overridden_method, new_method, callback_data);
+        }
+        return FALSE;
+    }
+
+    Boolean
+    recompiled_method_callback(Method_Handle  recompiled_method,
+                               void          *callback_data)
+    {
+        if (_recompiled_method_callback != NULL) {
+            return _recompiled_method_callback(this, recompiled_method, callback_data);
+        }
+        return FALSE;
+    }
+
+    Boolean 
+    supports_compressed_references()
+    {
+        if (_supports_compressed_references != NULL) {
+            return _supports_compressed_references(this);
+        }
+        return FALSE;
+    }
+
+    Boolean code_block_relocated(Method_Handle method, int id, NativeCodePtr old_address, NativeCodePtr new_address)
+    {
+        if (_code_block_relocated != NULL)
+        {
+            return _code_block_relocated(this, method, id, old_address, new_address);
+        }
+        return FALSE;
+    }
+
+    void
+    execute_method(jmethodID method, jvalue *return_value, jvalue *args) {
+        _execute_method(this, method, return_value, args);
+    }
+
+    OpenExeJpdaError get_bc_location_for_native(Method_Handle method,
+        NativeCodePtr native_pc, uint16 *bc_pc)
+    {
+        if (_get_bc_location_for_native == NULL) 
+            return EXE_ERROR_UNSUPPORTED;
+        else
+            return _get_bc_location_for_native(this, method,  native_pc, bc_pc);
+    }  
+
+    OpenExeJpdaError get_native_location_for_bc(Method_Handle method,
+        uint16 bc_pc, NativeCodePtr *native_pc)
+    {
+        if (_get_native_location_for_bc == NULL) 
+            return EXE_ERROR_UNSUPPORTED;
+        else
+            return _get_native_location_for_bc(this, method, bc_pc, native_pc);
+    }  
+
+    OpenExeJpdaError get_local_var(Method_Handle method, const JitFrameContext *context,
+        uint16 var_num, VM_Data_Type var_type, void *value_ptr)
+    {
+        if (_get_local_var == NULL) 
+            return EXE_ERROR_UNSUPPORTED;
+        else
+            return _get_local_var(this, method, context, var_num, var_type, value_ptr);
+    }  
+
+    OpenExeJpdaError set_local_var(Method_Handle method, const JitFrameContext *context,
+        uint16 var_num, VM_Data_Type var_type, void *value_ptr)
+    {
+        if (_set_local_var == NULL) 
+            return EXE_ERROR_UNSUPPORTED;
+        else
+            return _set_local_var(this, method, context, var_num, var_type, value_ptr);
+    }  
+
+    apr_dso_handle_t* get_lib_handle() const {return lib_handle;}
+
+private:
+    void (*_deinit)(JIT_Handle jit);
+
+    void
+    (*_next_command_line_argument)(JIT_Handle jit,
+                                   const char *option,
+                                   const char *arg
+                                   );
+
+    JIT_Result 
+    (*_gen_method_info)(JIT_Handle jit,
+                        Compile_Handle     compilation,
+                        Method_Handle      method,
+                        JIT_Flags          flags
+                        );
+
+    JIT_Result 
+    (*_compile_method)(JIT_Handle jit,
+                       Compile_Handle     compilation,
+                       Method_Handle      method,
+                       JIT_Flags          flags
+                       );
+
+    JIT_Result 
+    (*_compile_method_with_params)(JIT_Handle jit,
+                                   Compile_Handle            compilation,
+                                   Method_Handle             method,
+                                   OpenMethodExecutionParams flags
+                                   );
+
+    void
+    (*_unwind_stack_frame)(JIT_Handle         jit,
+                           Method_Handle      method,
+                           JitFrameContext*   context
+                           );
+
+    void 
+    (*_get_root_set_from_stack_frame)(JIT_Handle              jit,
+                                      Method_Handle           method,
+                                      GC_Enumeration_Handle   enum_handle,
+                                      const JitFrameContext*  context
+                                      );
+
+    void 
+    (*_get_root_set_for_thread_dump)(JIT_Handle              jit,
+                                      Method_Handle           method,
+                                      GC_Enumeration_Handle   enum_handle,
+                                      const JitFrameContext*  context
+                                      );
+    
+    uint32
+    (*_get_inline_depth)(
+                        JIT_Handle jit,                    
+                        InlineInfoPtr  ptr, 
+                        uint32         offset);
+
+    Method_Handle
+    (*_get_inlined_method)(JIT_Handle jit,
+                            InlineInfoPtr  ptr, 
+                            uint32         offset,
+                            uint32         inline_depth);
+
+    Boolean
+    (*_can_enumerate)(JIT_Handle    jit,
+                      Method_Handle method,
+                      NativeCodePtr eip
+                      );
+
+    void
+    (*_get_breakpoints)(JIT_Handle         jit,
+                        Method_Handle      method,
+                        uint32            *bp,
+                        JitFrameContext   *context
+                        );
+
+    void
+    (*_fix_handler_context)(JIT_Handle         jit,
+                            Method_Handle      method,
+                            JitFrameContext*   context
+                            );
+
+    void *
+    (*_get_address_of_this)(JIT_Handle               jit,
+                            Method_Handle            method,
+                            const JitFrameContext* context
+                            );
+
+    Boolean
+    (*_call_returns_a_reference)(JIT_Handle               jit,
+                                 Method_Handle            method,
+                                 const JitFrameContext*   context
+                                 );
+
+    Boolean
+    (*_code_block_relocated)(JIT_Handle jit, Method_Handle method, int id, NativeCodePtr old_address, NativeCodePtr new_address);
+
+
+    void *
+    (*_thread_recompile_methods)();
+
+
+    Boolean
+    (*_extended_class_callback)(JIT_Handle jit,
+                                Class_Handle  extended_class,
+                                Class_Handle  new_class,
+                                void         *callback_data);
+
+    Boolean
+    (*_overridden_method_callback)(JIT_Handle jit,
+                                   Method_Handle  overridden_method,
+                                   Method_Handle  new_method,
+                                   void          *callback_data);
+
+    Boolean
+    (*_recompiled_method_callback)(JIT_Handle jit,
+                                   Method_Handle  recompiled_method, 
+                                   void          *callback_data);
+
+    Boolean 
+    (*_supports_compressed_references)(JIT_Handle jit);
+
+    void
+    (*_execute_method) (JIT_Handle jit, jmethodID method, jvalue *return_value, jvalue *args);
+    
+    OpenExeJpdaError 
+        (*_get_bc_location_for_native)(JIT_Handle jit, Method_Handle  method,
+        NativeCodePtr   native_pc, uint16 *bc_pc);
+
+    OpenExeJpdaError 
+        (*_get_native_location_for_bc)(JIT_Handle jit, Method_Handle  method,
+        uint16 bc_pc, NativeCodePtr   *native_pc);
+
+    OpenExeJpdaError
+        (*_get_local_var)(JIT_Handle jit, Method_Handle method, const JitFrameContext *context,
+        uint16 var_num, VM_Data_Type var_type, void *value_ptr);
+
+    OpenExeJpdaError
+        (*_set_local_var)(JIT_Handle jit, Method_Handle method, const JitFrameContext *context,
+        uint16 var_num, VM_Data_Type var_type, void *value_ptr);
+
+    const char *jit_dll_filename;
+    apr_pool_t *pool;
+    apr_dso_handle_t *lib_handle;
+};
+
+
+
+#endif

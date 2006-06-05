@@ -1,0 +1,265 @@
+<?xml version="1.0" encoding="ISO-8859-1"?>
+<!--
+    Copyright 2005-2006 The Apache Software Foundation or its licensors, as applicable.
+  
+    Licensed under the Apache License, Version 2.0 (the "License");
+    you may not use this file except in compliance with the License.
+    You may obtain a copy of the License at
+  
+       http://www.apache.org/licenses/LICENSE-2.0
+  
+    Unless required by applicable law or agreed to in writing, software
+    distributed under the License is distributed on an "AS IS" BASIS,
+    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+    See the License for the specific language governing permissions and
+    limitations under the License.
+-->
+<!--
+Author: Marina V. Goldburt, Dmitry B. Yershov
+Version: $Revision: 1.5.2.3 $
+-->
+<!--
+    This is build descriptor for the component "vm.vmcore".
+
+    Please refer to make/components/README.txt for details about the component
+    build descriptor structure.
+  -->
+
+<project name="vm.vmcore">
+    <target name="init" depends="common_vm">
+        <property name="build.depends" value="extra.apr,
+                                              extra.aprutil,
+                                              extra.log4cxx,
+                                              extra.zlib,
+                                              vm.encoder,
+                                              vm.port" />
+        <property name="libname" value="vmcore" />
+        <property name="outtype" value="shared" />
+        <property name="src" location="${build.vm.home}" />
+
+        <compiler id="cpp.compiler" extends="common.cpp.compiler">
+            <fileset dir="${build.vm.home}/vmcore/src">
+                <include name="class_support/*.cpp" />
+                <include name="exception/*.cpp" />
+                <include name="init/*.cpp" />
+                <include name="gc/*.cpp" />
+                <include name="interpreter/*.cpp" />
+                <include name="jit/*.cpp" />
+                <include name="jni/*.cpp" />
+                <include name="jvmti/*.cpp" />
+                <include name="object/*.cpp" />
+                <include name="reflection/*.cpp" />
+                <include name="stack/*.cpp" />
+                <include name="thread/*.cpp" />
+                <include name="util/*.cpp" />
+                <include name="verifier/*.cpp" />
+            </fileset>
+
+            <fileset dir="${build.vm.home}/vmcore/src/kernel_classes/native">
+                <include name="*.cpp" />
+
+                <select os="lnx">
+                    <exclude name="Runtime_win.cpp" />
+                    <exclude name="System_win.cpp" />
+                </select>
+
+                <select os="win">
+                    <exclude name="Runtime_lnx.cpp" />
+                    <exclude name="System_lnx.cpp" />
+                </select>
+            </fileset>
+
+            <fileset dir="${build.vm.home}">
+                <include name="port/src/lil/*.cpp" />
+                <include name="vmstart/src/compmgr/*.cpp" />
+
+                <select arch="ipf">
+                    <include name="port/src/lil/ipf/pim/*.cpp" />
+                </select>
+
+                <select arch="ia32">
+                    <include name="port/src/lil/ia32/pim/*.cpp" />
+                </select>
+
+                <select arch="em64t">
+                    <include name="port/src/lil/em64t/pim/*.cpp" />
+                </select>
+            </fileset>
+
+            <fileset dir="${build.vm.home}/vmcore/src">
+                <select os="win">
+                    <include name="util/win/*.cpp" />
+                </select>
+
+                <select os="win" arch="ia32">
+                    <include name="util/win/ia32/*.cpp" />
+                </select>
+
+                <select os="win" arch="em64t">
+                    <include name="util/win/em64t/*.cpp" />
+                </select>
+
+                <select os="win" arch="ipf">
+                    <include name="util/win/ipf/*.cpp" />
+                </select>
+
+                <select arch="ipf">
+                    <include name="util/ipf/base/*.cpp" />
+                    <include name="util/ipf/base_natives/*.cpp" />
+                    <include name="util/ipf/code_emit/*.cpp" />
+                </select>
+
+                <select arch="ia32">
+                    <include name="util/ia32/base/*.cpp" />
+                    <include name="util/ia32/base_natives/*.cpp" />
+                </select>
+
+                <select arch="em64t">
+                    <include name="util/em64t/base/*.cpp" />
+                    <include name="util/em64t/base_natives/*.cpp" />
+                </select>
+
+                <select os="lnx">
+                    <include name="util/linux/os_wrapper.cpp" />
+                    <include name="util/linux/stubs.cpp" />
+                    <include name="util/linux/crash_handler.cpp" />
+
+                    <select arch="ia32">
+                        <include name="util/linux/signals_ia32.cpp" />
+                    </select>
+
+                    <select arch="em64t">
+                        <include name="util/linux/signals_em64t.cpp" />
+                    </select>
+
+                    <select arch="ipf">
+                        <include name="util/linux/signals_ipf.cpp" />
+                    </select>
+                </select>
+            </fileset>
+
+            <includepath>
+                <pathelement location="${extra.apr.includes}" />
+                <pathelement location="${extra.log4cxx.includes}" />
+                <select os="win">
+                    <pathelement location="${extra.zlib.includes}" />
+                </select>
+            </includepath>
+
+            <includepath>
+                <dirset dir="${build.vm.home}">
+                    <include name="include" />
+                    <include name="vmcore/include" />
+                    <include name="port/include" />
+                </dirset>
+
+                <pathelement path="${extra.log4cxx.includes}" />
+
+                <select os="win">
+                    <dirset dir="${build.vm.home}">
+                        <include name="vmcore/src/util/win/include" />
+                        <include name="vm/win" />
+                    </dirset>
+
+                    <pathelement path="${extra.zlib.includes}" />
+                </select>
+
+                <select os="lnx">
+                    <dirset dir="${build.vm.home}">
+                        <include name="vm/common/base" />
+                        <include name="vmcore/src/util/linux/include" />
+                        <include name="vm/linux" />
+                    </dirset>
+                </select>
+
+                <select arch="ipf">
+                    <dirset dir="${build.vm.home}">
+                        <include name="vmcore/src/util/ipf/include" />
+                        <include name="vm/ipf/base" />
+                        <include name="vmcore/src/util/ipf/base_natives" />
+                        <include name="vm/ipf/dynopt_ipf" />
+                        <include name="port/src/lil/ipf/pim/include" />
+
+                        <select os="win">
+                            <include name="vm/common/dynopt" />
+                        </select>
+                    </dirset>
+                </select>
+
+                <select arch="ia32">
+                    <dirset dir="${build.vm.home}">
+                        <include name="vmcore/src/util/ia32/base_natives" />
+                        <include name="vm/ia32/debugger/include" />
+                        <include name="port/src/encoder/ia32_em64t" />
+                        <include name="port/src/lil/ia32/pim/include" />
+                    </dirset>
+                </select>
+
+                <select arch="em64t">
+                    <dirset dir="${build.vm.home}">
+                        <include name="vmcore/src/util/em64t/base_natives" />
+                        <include name="vm/em64t/debugger/include" />
+                        <include name="port/src/encoder/ia32_em64t" />
+                        <include name="port/src/lil/em64t/pim/include" />
+                    </dirset>
+                </select>
+            </includepath>
+
+            <select os="win" cfg="release" cxx="icl">
+                <compilerarg value="/Qip" />
+            </select>
+
+            <defineset define="BUILDING_VM,GC_V4,USE_DLL_JIT,APR_DECLARE_STATIC" />
+        </compiler>
+
+        <select os="lnx" arch="ia32">
+            <fileset id="asm.fileset"
+                     dir="${build.vm.home}/vmcore">
+                <include name="src/util/ia32/base/*.asm" />
+            </fileset>
+        </select>
+
+        <select os="lnx" arch="ipf">
+            <fileset id="asm.fileset"
+                 dir="${build.vm.home}/vmcore">
+                <include name="src/util/ipf/base/*.asm" />
+            </fileset>
+        </select>
+
+        <linker id="linker" extends="common.linker">
+            <libset libs="${vm.port.lib}"
+                    dir="${vm.port.libdir}" />
+
+            <libset libs="${vm.encoder.lib}"
+                    dir="${vm.encoder.libdir}" />
+
+            <libset libs="${extra.log4cxx.lib}"
+                    dir="${extra.log4cxx.libdir}" />
+
+            <libset libs="${extra.aprutil.lib}"
+                    dir="${extra.aprutil.libdir}" />
+
+            <libset libs="${extra.apr.lib}"
+                    dir="${extra.apr.libdir}" />
+
+            <select os="win">
+                <libset libs="${extra.zlib.lib}"
+                        dir="${extra.zlib.libdir}" />
+            </select>
+
+            <select os="win" cfg="debug">
+                <linkerarg value="/NODEFAULTLIB:libcmt.lib" />
+            </select>
+
+            <select os="lnx">
+                <linkerarg value="--export-dynamic" />
+                <linkerarg value="-lz" />
+                <linkerarg value="-lxml2" />
+                <linkerarg value="-lm" />
+                <linkerarg value="-ldl" />
+                <linkerarg value="-lpthread" />
+                <linkerarg value="-lstdc++" />
+            </select>
+        </linker>
+    </target>
+</project>

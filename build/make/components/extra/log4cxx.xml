@@ -1,0 +1,108 @@
+<?xml version="1.0" encoding="ISO-8859-1"?>
+<!--
+    Copyright 2005-2006 The Apache Software Foundation or its licensors, as applicable.
+  
+    Licensed under the Apache License, Version 2.0 (the "License");
+    you may not use this file except in compliance with the License.
+    You may obtain a copy of the License at
+  
+       http://www.apache.org/licenses/LICENSE-2.0
+  
+    Unless required by applicable law or agreed to in writing, software
+    distributed under the License is distributed on an "AS IS" BASIS,
+    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+    See the License for the specific language governing permissions and
+    limitations under the License.
+-->
+<!--
+Author: Marina V. Goldburt, Dmitry B. Yershov
+Version: $Revision: 1.4.2.6 $
+-->
+<!--
+    This is build descriptor for the component "extra.log4cxx".
+
+    Please refer to make/components/README.txt for details about the component
+    build descriptor structure.
+  -->
+
+<project name="extra.log4cxx">
+
+
+    <target name="prepare_src">
+        <mkdir dir="${build.dir}/src/include" />
+        <property name="src" location="${build.LOG4CXX.home}" />
+        <copy todir="${build.dir}/src/include" failonerror="true">
+            <fileset dir="${build.LOG4CXX.home}/include" includes="**/*" />
+        </copy>
+        <property name="includes" location="${build.dir}/src/include" />
+    </target>
+
+    <target name="config-check" depends="prepare_src">
+        <condition property="config-available" value="true">
+            <and>
+                <available file="${includes}/log4cxx/log4cxx.h" />
+                <available file="${includes}/log4cxx/private/log4cxx_private.h" />
+            </and>
+        </condition>
+    </target>
+
+    <target name="configure" unless="config-available">
+        <select os="win">
+            <copy tofile="${includes}/log4cxx/log4cxx.h" file="${includes}/log4cxx/log4cxx.hw" />
+            <copy tofile="${includes}/log4cxx/private/log4cxx_private.h" file="${includes}/log4cxx/private/log4cxx_private.hw" />
+        </select>
+        <select os="lnx">
+            <copy tofile="${includes}/log4cxx/log4cxx.h" file="${includes}/log4cxx/log4cxx.h.in" />
+            <copy tofile="${includes}/log4cxx/private/log4cxx_private.h" file="${includes}/log4cxx/private/log4cxx_private.h.in" />
+        </select>
+
+        <property name="logchar_is_utf8" value="0" />
+        <property name="has.wchar_t" value="1" />
+        <property name="logchar_is_cfstring" value="0" />
+        <property name="logchar_is_wchar" value="1" />
+
+        <replaceregexp file="${includes}/log4cxx/log4cxx.h" match="@LOGCHAR_IS_CFSTRING@" replace="${logchar_is_cfstring}" />
+
+        <replaceregexp file="${includes}/log4cxx/log4cxx.h" match="@LOGCHAR_IS_UTF8@" replace="${logchar_is_utf8}" />
+
+        <replaceregexp file="${includes}/log4cxx/log4cxx.h" match="@LOGCHAR_IS_WCHAR@" replace="${logchar_is_wchar}" />
+
+        <replaceregexp file="${includes}/log4cxx/log4cxx.h" match="#define LOG4CXX_HAS_WCHAR_T.*" replace="#define LOG4CXX_HAS_WCHAR_T ${has.wchar_t}" />
+    </target>
+
+    <target name="init" depends="config-check,configure, common_extra">
+        <property name="build.depends" value="extra.apr,extra.aprutil" />
+        <property name="libname" value="log4cxx" />
+        <property name="outtype" value="static" />
+        <compiler id="cpp.compiler" extends="common.cpp.compiler">
+            <select os="lnx">
+                <includepath path="/usr/include/libxml2" />
+            </select>
+            <includepath>
+                <pathelement location="${includes}" />
+                <pathelement location="${extra.apr.includes}/apr-1" />
+                <pathelement location="${extra.aprutil.includes}" />
+                <select os="win">
+                    <pathelement location="${extra.apriconv.includes}" />
+                </select>
+            </includepath>
+            <fileset dir="${src}/src">
+                <include name="*.cpp" />
+                <select os="lnx">
+                    <exclude name="iconv_module.cpp" />
+                </select>
+            </fileset>
+            <select os="win">
+                <compilerarg value="/EHsc" />
+                <defineset define="_USRDLL,DLL_EXPORTS,APR_DECLARE_EXPORT,APU_DECLARE_EXPORT,LOG4CXX_STATIC,LOG4CXX" />
+            </select>
+            <select os="lnx">
+                <includepath path="/usr/include/libxml2" />
+                <select arch="em64t,ipf">
+                    <compilerarg value="-fPIC" />
+                </select>
+                <defineset define="STDC_HEADERS,LOG4CXX,LOG4CXX_STATIC,APR_DECLARE_EXPORT,APU_DECLARE_EXPORT" />
+            </select>
+        </compiler>
+    </target>
+</project>

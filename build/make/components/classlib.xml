@@ -1,0 +1,73 @@
+<?xml version="1.0" encoding="ISO-8859-1"?>
+<!--
+    Copyright 2005-2006 The Apache Software Foundation or its licensors, as applicable.
+  
+    Licensed under the Apache License, Version 2.0 (the "License");
+    you may not use this file except in compliance with the License.
+    You may obtain a copy of the License at
+  
+       http://www.apache.org/licenses/LICENSE-2.0
+  
+    Unless required by applicable law or agreed to in writing, software
+    distributed under the License is distributed on an "AS IS" BASIS,
+    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+    See the License for the specific language governing permissions and
+    limitations under the License.
+-->
+<!--
+Author: Marina V. Goldburt, Dmitry B. Yershov
+Version: $Revision: 1.6.2.7 $
+-->
+<!--
+    This is build descriptor for the component "classlib".
+
+    Please refer to make/components/README.txt for details about the component
+    build descriptor structure.
+  -->
+
+<project name="classlib">
+    <target name="init" depends="common">
+        <select arch="ia32">
+            <property name="build.depends" value="classlib.nio_char,
+                                                  classlib.regex,
+                                                  classlib.security,
+                                                  extra.icu4c,
+                                                  classlib.crypto,
+                                                  classlib.x_net,
+                                                  classlib.archive,
+                                                  classlib.common,
+                                                  classlib.fdlibm,
+                                                  classlib.luni,
+                                                  classlib.math,
+                                                  classlib.nio,
+                                                  classlib.pool,
+                                                  classlib.port,
+                                                  classlib.sig,
+                                                  classlib.sql,
+                                                  classlib.text,
+                                                  classlib.auth,
+                                                  classlib.zip,
+                                                  classlib.zlib" />
+            <select os="lnx">
+                <property name="os.native.dir" location="${build.CLASSLIB.home}/native-src/linux.IA32" />
+            </select>
+            <select os="win">
+                <property name="os.native.dir" location="${build.CLASSLIB.home}/native-src/win.IA32" />
+            </select>
+
+            <mkdir dir="${build.dir}/includes" />
+            <copy todir="${build.dir}/includes">
+                <fileset dir="${os.native.dir}/include">
+                    <include name="**" />
+                      <exclude name="jni.h" />
+                </fileset>
+            </copy>
+
+            <property name="includes" location="${build.dir}/includes" />
+        </select>
+
+        <select arch="em64t,ipf">
+            <property name="build.depends" value="" />
+        </select>
+    </target>
+</project>

@@ -1,0 +1,104 @@
+<!--
+    Copyright 2005-2006 The Apache Software Foundation or its licensors, as applicable.
+  
+    Licensed under the Apache License, Version 2.0 (the "License");
+    you may not use this file except in compliance with the License.
+    You may obtain a copy of the License at
+  
+       http://www.apache.org/licenses/LICENSE-2.0
+  
+    Unless required by applicable law or agreed to in writing, software
+    distributed under the License is distributed on an "AS IS" BASIS,
+    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+    See the License for the specific language governing permissions and
+    limitations under the License.
+-->
+<!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<!--
+Author: Alexey V. Varlamov
+Version: $Revision: 1.1.2.1.4.3 $
+-->
+<html>
+
+<head>
+<title>PVL Porting Layer Notes</title>
+</head>
+
+<body>
+
+<h3>1. Design notes</h3>
+
+The porting layer design adheres to concepts of APR (<a href="http://apr.apache.org/docs/apr/">Apache Portable Runtime libraries</a>). These particularly include:
+<ul>
+<li>	explicit memory management based on pools;
+<li>	consistent error reporting approach via returned status value;
+<li>	incomplete types to enforce platform abstraction.
+</ul>
+Detailed APIs mainly follow APR standard, but there may not be strict correspondence in signatures. Pure C should be used for implementation.
+
+<h4>Using APR binaries directly</h4>
+We define our own headers (aligned with APR), but do not wrap APR functions in code (no delegating calls). 
+Instead, we map our signatures to APR functions directly, where it is possible, - via a set of defines, like this:
+<pre>
+#define port_allocator_create(allocator) apr_allocator_create(allocator)
+#define port_allocator_destroy(allocator) apr_allocator_destroy(allocator)
+</pre>
+So, there is no runtime performance penalty at all. 
+<p>
+Why don't we use APR headers directly?
+Because, current approach has several advantages which we consider significant:
+<ul>
+<li>Flexibility to switch portlib implementation at any moment - to j9 or any other, including our own. In other words, we hide internal portlib issues from API customers.
+<li>We have a number of extensions (currently there are over 20 functions in portlib, which are not in APR). So we have consistent naming of all portlib API
+<li>Easy to bugfix or tune particular functions. We already discovered cases, when certain APR functions have flaws or do not suite VM needs properly - and we can replace single functions very easily. The same is applicable for VAV.
+<li>When (if) the time comes for dynamic linking of porting layer, or for multi-VM support, our headers are more suitable for organizing vtables than APR ones (which somewhere use defines instead of real functions).
+<li>APR has its own build organization, completely different from DRL. Namely, there are different sets of headers for each platform, with specific defines. We avoid extra inconveniences by introducing common headers.
+<li>Clearly identified subset of APR functionality, which is actually used - will be helpful for further VM porting
+</ul>
+
+Of course, we also realize drawbacks of it:
+<ul>
+<li>Need for duplication of headers and documentation (though we may simply use redirection links to APR docs).
+<li>Potential compatibility issues with future APR development (e.g. on extension boundaries).
+<li>Some space for confusion in open community, especially for those experienced in APR applications.
+</ul>
+
+<h3>2. Directory structure</h3>
+
+Porting functionality is split to several groups (atomics, file I/O, mempools, etc). Each group has a base directory, which contains subdirectories with actual code. These subdirectories are named after the platforms and/or architectures they are compiled on. If there is a strong dependency on both OS and machine architecture, the subdirectory name should combine both. For example:
+<pre>
+   Port
+	|
+	 -> file_io
+	|	|
+	|	 -> linux
+	|	|
+	|	 -> windows
+	|
+	 -> atomics
+		|
+		 -> linux_em64t
+		|
+		 -> linux_ia32
+		|
+		 -> windows
+</pre>
+
+Public headers are kept in a separate base directory named include. Implementation headers may be kept in source directories?
+
+<h3>3. Build system</h3>
+
+Currently we reuse VM build system  based on MakeCommon. <br>
+TODO - document platform defines and macros.
+
+<h3>4. APR issues </h3>
+<ul>
+<li>	Non-buffered file I/O on Windows has bad support for <code>apr_file_eof();</code>
+<li>	On Windows, <code>apr_dso_load()</code> fails on NULL path - 
+		which is meant for obtaining a handle for the calling module itself;
+</ul>
+
+
+</body>
+
+</html>

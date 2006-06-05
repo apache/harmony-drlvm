@@ -1,0 +1,7 @@
+
+    GC "Missy" (based on GC_v4)
+
+This directory contains the source code of the mark-compact garbage collector.
+
+--
+Salikh.Zakirov@Intel.com

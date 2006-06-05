@@ -1,0 +1,214 @@
+<!--
+    Copyright 2005-2006 The Apache Software Foundation or its licensors, as applicable.
+  
+    Licensed under the Apache License, Version 2.0 (the "License");
+    you may not use this file except in compliance with the License.
+    You may obtain a copy of the License at
+  
+       http://www.apache.org/licenses/LICENSE-2.0
+  
+    Unless required by applicable law or agreed to in writing, software
+    distributed under the License is distributed on an "AS IS" BASIS,
+    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+    See the License for the specific language governing permissions and
+    limitations under the License.
+-->
+<!--
+Author: Marina V. Goldburt
+Version: $Revision: 1.6.2.6 $
+-->
+<project name="COMMON_VM_TARGET">
+    <target name="common_vm" description="common descriptor for all VM components">
+        <property name="build.vm.home" location="${build.VM.home}"/>
+        <property name="common.src" value="${build.vm.home}" />
+
+        <!-- convert 'vm.interpreter' to 'vm/interpreter' -->
+        <propertyregex property="component.as.path" input="${component}" regexp="\." replace="/" global="true" defaultValue="${component}" override="true" />
+
+        <property name="libdir" location="${build.semi.dir}/${component.as.path}/_bin" />
+
+        <property name="jardir" location="${build.semi.dir}/${component.as.path}/_jar" />
+
+        <property name="java.build.dir" location="${build.semi.dir}/${component.as.path}/_classes" />
+
+        <compiler id="common.compiler">
+            <!--common for cpp and c-->
+            <includepath>
+                <pathelement location="${build.vm.home}/port/include" />
+                <pathelement location="${build.vm.home}/include" />
+            </includepath>
+
+            <select cfg="release">
+                <defineset define="NDEBUG" />
+            </select>
+
+            <select cfg="debug">
+                <defineset define="_DEBUG" />
+                <defineset define="VM_STATS" />
+            </select>
+
+            <select arch="ia32">
+                <defineset define="_IA32_" />
+            </select>
+
+            <select arch="ipf">
+                <defineset define="_IPF_" />
+                <defineset define="POINTER64" />
+            </select>
+
+            <select arch="em64t">
+                <defineset define="_EM64T_" />
+                <defineset define="POINTER64" />
+                <defineset define="LAZY_LOCK" />
+            </select>
+
+            <select os="win">
+                <defineset>
+                    <define name="PLATFORM_NT" />
+                    <define name="WIN32" />
+                    <define name="_WINDOWS" />
+                    <define name="_WIN32_WINNT" value="0x0501" />
+                </defineset>
+
+                <compilerarg value="/Fp${build.dir}/_obj\" />
+                <compilerarg value="/Fr${build.dir}/_obj\" />
+                <compilerarg value="/Fd${build.dir}/_obj\" />
+                <compilerarg value="/nologo" />
+                <compilerarg value="/W3" />
+
+                <compilerarg value="/WX" />
+                <compilerarg value="/Zi" />
+            </select>
+
+            <select os="lnx">
+                <defineset define="PLATFORM_POSIX" />
+                <defineset define="__SMP__" />
+                <defineset define="_REENTRANT" />
+                <defineset define="LINUX_TLS_OPT" />
+
+                <select arch="ia32">
+                    <defineset define="_LARGEFILE64_SOURCE" />
+                </select>
+
+                <compilerarg value="-fno-exceptions" />
+
+                <select cxx="icc">
+                    <compilerarg value="-w1" />
+                </select>
+
+                <compilerarg value="-Werror" />
+
+                <select cfg="release">
+                    <compilerarg value="-O2" />
+                </select>
+
+                <select cfg="debug">
+                    <compilerarg value="-O0" />
+                </select>
+            </select>
+
+
+            <select cfg="release">
+                <select os="win" cxx="icl">
+                    <compilerarg value="/QxN" />
+                    <compilerarg value="/O3" />
+                    <compilerarg value="/Qip" />
+                </select>
+
+                <select os="win" cxx="msvc">
+                    <compilerarg value="/Ox" />
+                </select>
+            </select>
+
+            <select cfg="debug">
+                <select os="win" cxx="icl">
+                    <compilerarg value="/QxN" />
+                    <compilerarg value="/Qip" />
+                </select>
+
+                <select os="win" cxx="msvc">
+                    <compilerarg value="/Ox" />
+                </select>
+            </select>
+        </compiler>
+
+        <compiler id="common.cpp.compiler" name="${build.cxx}" extends="common.compiler">
+            <select arch="em64t,ipf">
+                <compilerarg value="-fPIC" />
+            </select>
+
+            <select os="win">
+                <select cfg="debug">
+                    <compilerarg value="/EHsc" />
+                    <compilerarg value="/Od" />
+                </select>
+
+                <select arch="ia32,em64t" cxx="icl">
+                    <compilerarg value="/ZI" />
+                </select>
+
+                <select os="win" cfg="release" cxx="icl">
+                    <compilerarg value="/QxN" />
+                    <compilerarg value="/O3" />
+                </select>
+
+                <select cxx="msvc">
+                    <compilerarg value="/GX" />
+                </select>
+
+                <select cxx="icl">
+                    <compilerarg value="/Qvc7.1" />
+                </select>
+            </select>
+
+            <select os="lnx">
+                <compilerarg value="-Wno-deprecated" />
+                <compilerarg value="-x" />
+                <compilerarg value="c++" />
+
+                <select cxx="icc">
+                    <compilerarg value="-cxxlib-gcc" />
+                </select>
+            </select>
+        </compiler>
+
+        <compiler id="common.c.compiler" name="${build.cxx}" extends="common.compiler">
+            <select os="lnx" arch="em64t,ipf">
+                <compilerarg value="-fPIC" />
+            </select>
+            <select cfg="debug">
+                <select os="win" cxx="icl">
+                    <compilerarg value="/O3" />
+                </select>
+            </select>
+        </compiler>
+
+        <linker name="${build.cxx}" id="common.linker">
+            <select os="win">
+                <linkerarg value="/pdb:${build.dir}/_bin" />
+                <linkerarg value="/debug" />
+            </select>
+
+            <select os="win" cfg="release">
+                <linkerarg value="/MD" />
+            </select>
+
+            <select os="win" cfg="debug">
+                <linkerarg value="/MDd" />
+                <linkerarg value="/Zi" />
+                <linkerarg value="/Od" />
+            </select>
+
+            <select os="win">
+                <syslibset libs="advapi32,odbc32,userenv,ws2_32,mswsock" />
+            </select>
+            <select os="lnx">
+                <syslibset type="static" libs="z,pthread,xml2" />
+                <syslibset type="shared" libs="m,dl,stdc++" />
+            </select>
+            <select os="lnx" cxx="gcc">
+                <syslibset type="shared" libs="gcc_s" />
+            </select>
+        </linker>
+    </target>
+</project>

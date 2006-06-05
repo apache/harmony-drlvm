@@ -1,0 +1,85 @@
+<?xml version="1.0" encoding="ISO-8859-1"?>
+<!--
+    Copyright 2005-2006 The Apache Software Foundation or its licensors, as applicable.
+
+    Licensed under the Apache License, Version 2.0 (the "License");
+    you may not use this file except in compliance with the License.
+    You may obtain a copy of the License at
+
+       http://www.apache.org/licenses/LICENSE-2.0
+
+    Unless required by applicable law or agreed to in writing, software
+    distributed under the License is distributed on an "AS IS" BASIS,
+    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+    See the License for the specific language governing permissions and
+    limitations under the License.
+-->
+<!--
+Author: Marina V. Goldburt, Dmitry B. Yershov
+Version: $Revision: 1.4.2.5 $
+-->
+<!--
+    This is build descriptor for the component "extra.icu4c".
+
+    Please refer to make/components/README.txt for details about the component
+    build descriptor structure.
+  -->
+
+<project name="extra.icu4c">
+    <target name="init">
+        <property name="jarname" value="icu4j_3_4.jar,icu4jni-3.4.jar" />
+        <property name="libname" value="icuuc"/>
+        <property name="libdir" value="${build.dir}/_bin"/>
+        <property name="jardir" value="${build.dir}/_jar"/>
+
+        <select os="win">
+            <property name="from.dir"
+                      location="${build.CLASSLIB.home}/depends/oss/win.IA32" />
+        </select>
+
+        <select os="lnx">
+            <property name="from.dir"
+                      location="${build.CLASSLIB.home}/depends/oss/linux.IA32" />
+        </select>
+
+        <dependset>
+            <srcfileset dir="${from.dir}" includes="icu4c-3.4-harmony.zip" />
+            <targetfileset dir="${jardir}" includes="icu4j_3_4.jar" />
+        </dependset>
+        <if>
+            <not>
+                <available file="${jardir}/icu4j_3_4.jar"/>
+            </not>
+            <then>
+
+                <unzip src="${from.dir}/icu4c-3.4-harmony.zip" dest="${build.dir}" />
+
+                <copy file="${build.CLASSLIB.home}/depends/jars/icu4j_3_4.jar"
+                      todir="${jardir}" />
+
+                <copy file="${build.CLASSLIB.home}/depends/jars/icu4jni-3.4.jar"
+                      todir="${jardir}" />
+            </then>
+        </if>
+
+        <select os="win">
+            <copy todir="${libdir}">
+                <fileset dir="${build.CLASSLIB.home}/depends/libs/win.IA32" includes="icu*,ICU*"/>
+            </copy>
+        </select>
+
+        <select os="lnx">
+            <copy todir="${libdir}">
+                <fileset dir="${build.CLASSLIB.home}/depends/libs/linux.IA32" includes="libicu*,libICU*"/>
+            </copy>
+        </select>
+
+        <move todir="${build.dir}/_bin">
+                            <fileset dir="${build.dir}/text">
+                                <include name="*"/>
+                            </fileset>
+         </move>
+
+        <property name="includes" value="${build.dir}/include" />
+    </target>
+</project>

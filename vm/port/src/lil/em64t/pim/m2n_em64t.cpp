@@ -1,0 +1,333 @@
+/*
+ *  Copyright 2005-2006 The Apache Software Foundation or its licensors, as applicable.
+ *
+ *  Licensed under the Apache License, Version 2.0 (the "License");
+ *  you may not use this file except in compliance with the License.
+ *  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ *  Unless required by applicable law or agreed to in writing, software
+ *  distributed under the License is distributed on an "AS IS" BASIS,
+ *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ *  See the License for the specific language governing permissions and
+ *  limitations under the License.
+ */
+/** 
+ * @author Evgueni Brevnov
+ * @version $Revision: 1.1.2.1.4.4 $
+ */  
+
+#include <string.h>
+
+#include "open/types.h"
+#include "port_malloc.h"
+#include "vm_threads.h"
+
+#include "m2n.h"
+#include "encoder.h"
+#include "m2n_em64t_internal.h"
+#include "lil_code_generator_em64t.h"
+
+/*    Generic Interface    */
+
+void m2n_null_init(M2nFrame * m2n){
+    memset(m2n, 0, sizeof(M2nFrame));
+}
+
+M2nFrame* m2n_get_last_frame() {
+    return p_TLS_vmthread->last_m2n_frame;
+}
+
+M2nFrame* m2n_get_last_frame(VM_thread * thread) {
+    return thread->last_m2n_frame;
+}
+
+void m2n_set_last_frame(M2nFrame * lm2nf) {
+    p_TLS_vmthread->last_m2n_frame = lm2nf;
+}
+
+M2nFrame * m2n_get_previous_frame(M2nFrame * m2nf) {
+    return m2nf->prev_m2nf;
+}
+
+ObjectHandles* m2n_get_local_handles(M2nFrame * m2nf) {
+    return m2nf->local_object_handles;
+}
+
+void m2n_set_local_handles(M2nFrame * m2nf, ObjectHandles * handles) {
+    m2nf->local_object_handles = handles;
+}
+
+NativeCodePtr m2n_get_ip(M2nFrame * m2nf) {
+    return (NativeCodePtr *) m2nf->rip;
+}
+
+void m2n_set_ip(M2nFrame * lm2nf, NativeCodePtr ip) {
+    lm2nf->rip = (uint64)ip;
+} 
+
+Method_Handle m2n_get_method(M2nFrame * m2nf) {
+    return m2nf->method;
+}
+
+frame_type m2n_get_frame_type(M2nFrame * m2nf) {
+    return m2nf->current_frame_type;
+}
+
+void m2n_set_frame_type(M2nFrame * m2nf, frame_type m2nf_type) {
+    m2nf->current_frame_type = m2nf_type;
+}
+
+M2nFrame * m2n_push_suspended_frame(Registers * regs) {
+    M2nFrame * m2nf = (M2nFrame *)STD_MALLOC(sizeof(M2nFrame));
+    m2nf->p_lm2nf = (M2nFrame**)1;
+    m2nf->method = NULL;
+    m2nf->local_object_handles = NULL;
+
+    m2nf->rip  = regs->rip;
+    m2nf->regs = regs;
+
+    m2nf->prev_m2nf = m2n_get_last_frame();
+    m2n_set_last_frame(m2nf);
+    return m2nf;
+}
+
+bool m2n_is_suspended_frame(M2nFrame * m2nf) {
+    return (uint64)m2nf->p_lm2nf == 1;
+
+}
+
+void * m2n_get_frame_base(M2nFrame * m2nf) {
+    // regs should be last field in the M2nFrame structure
+    return &m2nf->regs;
+}
+
+/*    Internal Interface    */
+
+// rsp should point to the bottom of the activation frame since push may occur
+// inputs should be preserved outside if required since we do a call
+// num_std_need_to_save registers will be preserved
+char * m2n_gen_ts_to_register(char * buf, const R_Opnd * reg, unsigned num_callee_saves,
+                              unsigned num_std_need_to_save, unsigned num_ret_need_to_save,
+                              bool use_callee_saves) {
+#ifdef PLATFORM_POSIX
+    // preserve std places
+    unsigned i;
+    unsigned num_std_saved = 0;
+    // use calle-saves registers first
+    if (use_callee_saves) {
+        while (num_std_saved < num_std_need_to_save &&
+            (i = num_callee_saves + num_std_saved) < LcgEM64TContext::MAX_GR_LOCALS) {
+            buf = mov(buf, LcgEM64TContext::get_reg_from_map(
+                LcgEM64TContext::GR_LOCALS_OFFSET + i),
+                LcgEM64TContext::get_reg_from_map(LcgEM64TContext::STD_PLACES_OFFSET + num_std_saved),
+                size_64);
+            ++num_std_saved;
+        }
+    }
+    // if we still have not preserved std places save them on the stack
+    while (num_std_saved < num_std_need_to_save) {
+        buf = push(buf, LcgEM64TContext::get_reg_from_map(
+            LcgEM64TContext::STD_PLACES_OFFSET + num_std_saved), size_64);
+        ++num_std_saved;
+    }
+    assert(num_std_saved == num_std_need_to_save);
+
+    // preserve returns
+    unsigned num_ret_saved = 0;
+    if (use_callee_saves) {
+        while (num_ret_saved < num_ret_need_to_save &&
+            (i = num_callee_saves + num_std_saved + num_ret_saved) < LcgEM64TContext::MAX_GR_LOCALS) {
+                buf = mov(buf, LcgEM64TContext::get_reg_from_map(
+                    LcgEM64TContext::GR_LOCALS_OFFSET + i),
+                    LcgEM64TContext::get_reg_from_map(LcgEM64TContext::GR_RETURNS_OFFSET + num_ret_saved),
+                    size_64);
+                ++num_ret_saved;
+            }
+    }
+    // if we still have not preserved returns save them on the stack
+    while (num_ret_saved < num_ret_need_to_save) {
+        buf = push(buf, LcgEM64TContext::get_reg_from_map(
+            LcgEM64TContext::GR_RETURNS_OFFSET + num_std_saved), size_64);
+        ++num_ret_saved;
+    }
+    assert(num_ret_saved == num_ret_need_to_save);
+
+    // TODO: FIXME: only absolute addressing mode is supported now
+    buf = mov(buf, rax_opnd, Imm_Opnd(size_64, (uint64)get_thread_ptr), size_64);
+    buf = call(buf, rax_opnd, size_64);
+    if (reg != &rax_opnd) {
+        buf = mov(buf, *reg,  rax_opnd, size_64);
+    }
+
+    // restore returns & std places
+    if (use_callee_saves) {
+        // restore from the stack first
+        i = num_callee_saves + num_std_saved;
+        while (num_ret_saved > 0 && i + num_ret_saved > LcgEM64TContext::MAX_GR_LOCALS) {
+            --num_ret_saved;
+            buf = pop(buf, LcgEM64TContext::get_reg_from_map(
+                LcgEM64TContext::GR_RETURNS_OFFSET + num_ret_saved), size_64);
+        }
+        while (num_std_saved > 0 && num_callee_saves + num_std_saved > LcgEM64TContext::MAX_GR_LOCALS) {
+            --num_std_saved;
+            buf = pop(buf, LcgEM64TContext::get_reg_from_map(
+                LcgEM64TContext::STD_PLACES_OFFSET + num_std_saved), size_64);
+        }
+        // restore from callee-saves registers
+        i = num_callee_saves + num_std_saved;
+        while (num_ret_saved > 0) {
+            --num_ret_saved;
+            buf = mov(buf, LcgEM64TContext::get_reg_from_map(
+                LcgEM64TContext::GR_RETURNS_OFFSET + num_ret_saved),
+                LcgEM64TContext::get_reg_from_map(
+                LcgEM64TContext::GR_LOCALS_OFFSET + i + num_ret_saved),
+                size_64);
+        }
+        while (num_std_saved > 0) {
+            --num_std_saved;
+            buf = mov(buf, LcgEM64TContext::get_reg_from_map(
+                LcgEM64TContext::STD_PLACES_OFFSET + num_std_saved),
+                LcgEM64TContext::get_reg_from_map(
+                LcgEM64TContext::GR_LOCALS_OFFSET + num_callee_saves + num_std_saved),
+                size_64);
+        }
+    } else {
+        // restore all returns from the stack
+        while (num_ret_saved > 0) {
+            --num_ret_saved;
+            buf = pop(buf, LcgEM64TContext::get_reg_from_map(
+                LcgEM64TContext::GR_RETURNS_OFFSET + num_ret_saved), size_64);
+        }
+        // restore all std places from the stack
+        while (num_std_saved > 0) {
+            --num_std_saved;
+            buf = pop(buf, LcgEM64TContext::get_reg_from_map(
+                LcgEM64TContext::STD_PLACES_OFFSET + num_std_saved), size_64);
+        }
+    }
+#else //!PLATFORM_POSIX
+    buf = prefix(buf, fs_prefix);
+    buf = mov(buf, *reg,  M_Opnd(0x14), size_64);
+#endif //!PLATFORM_POSIX
+    return buf;
+}
+
+char * m2n_gen_set_local_handles_r(char * buf, unsigned bytes_to_m2n, const R_Opnd * src_reg) {
+    unsigned offset_local_handles = (unsigned)(uint64) &((M2nFrame*)0)->local_object_handles;
+    buf = mov(buf, M_Base_Opnd(rsp_reg, bytes_to_m2n+offset_local_handles), *src_reg, size_64);
+    return buf;
+}
+
+char * m2n_gen_set_local_handles_imm(char * buf, unsigned bytes_to_m2n, const Imm_Opnd * imm) {
+    unsigned offset_local_handles = (unsigned)(uint64)&((M2nFrame*)0)->local_object_handles;
+    buf = mov(buf, M_Base_Opnd(rsp_reg, bytes_to_m2n+offset_local_handles), *imm, size_64);
+    return buf;
+}
+
+// inputs should be preserved outside if required since we do a call
+// num_std_need_to_save registers will be preserved
+char * m2n_gen_push_m2n(char * buf, Method_Handle method, 
+                        frame_type current_frame_type, 
+                        bool handles,
+                        unsigned num_callee_saves,
+                        unsigned num_std_need_to_save,
+                        int32 bytes_to_m2n) {
+    //adjust stack pointer if required
+    bytes_to_m2n += get_size_of_m2n() - num_callee_saves * LcgEM64TContext::GR_SIZE;
+    if (bytes_to_m2n != 0) {
+        buf = alu(buf, add_opc, rsp_opnd, Imm_Opnd(bytes_to_m2n), size_64);
+    }
+
+    // TODO: check if it makes sense to save all callee-saves registers here
+    //store rest of callee-saves registers
+    for (unsigned i = num_callee_saves; i < LcgEM64TContext::MAX_GR_LOCALS; i++) {
+        buf = push(buf,
+            LcgEM64TContext::get_reg_from_map(LcgEM64TContext::GR_LOCALS_OFFSET + i),
+            size_64);
+    }
+
+    // TODO: check if we can skip pushing current_frame_type, method and local handles
+    // store current frame type
+    if (method == NULL && current_frame_type == FRAME_UNKNOWN) {
+        buf = alu(buf, sub_opc, rsp_opnd,
+            Imm_Opnd(3 * LcgEM64TContext::GR_SIZE), size_64);
+    } else {
+        // TODO: FIXME: we can use push imm32 if operand is fit to 32 bits
+        buf = mov(buf, rax_opnd, Imm_Opnd(size_64, (uint64)current_frame_type), size_64);
+        buf = push(buf, rax_opnd, size_64);
+        // store a method associated with the current m2n frame
+        buf = mov(buf, rax_opnd, Imm_Opnd(size_64, (uint64)method), size_64);
+        buf = push(buf, rax_opnd, size_64);
+        // store local object handles
+        buf = mov(buf, rax_opnd, Imm_Opnd(size_64, (uint64)0), size_64);
+        buf = push(buf, rax_opnd, size_64);
+    }
+
+    // move pointer to the current VM_Thread structure to rax
+    buf = m2n_gen_ts_to_register(buf, &rax_opnd, num_callee_saves, num_std_need_to_save, 0, true);
+
+    // shift to the last_m2n_frame field
+    int32 last_m2n_frame_offset = (int32)(int64)&((VM_thread*)0)->last_m2n_frame;
+    buf = alu(buf, add_opc,  rax_opnd,  Imm_Opnd(last_m2n_frame_offset), size_64);
+    // store pointer to pointer to last m2n frame
+    buf = push(buf, rax_opnd, size_64);
+    // save pointer to the previous m2n frame
+    buf = push(buf,  M_Base_Opnd(rax_reg, 0), size_64);
+    // update last m2n frame of the current thread
+    buf = mov(buf,  M_Base_Opnd(rax_reg, 0), rsp_opnd, size_64);
+    return buf;
+}
+
+char * m2n_gen_pop_m2n(char * buf, bool handles, unsigned num_callee_saves,
+                      unsigned bytes_to_m2n, unsigned num_preserve_ret) {
+    assert (num_preserve_ret <= 2);
+    unsigned handles_offset = 2 * LcgEM64TContext::GR_SIZE + bytes_to_m2n;
+    if (handles) {
+        if (num_preserve_ret > 0) {
+            // Save return value
+            assert(LcgEM64TContext::GR_SIZE == 8);
+            handles_offset += LcgEM64TContext::GR_SIZE;
+            buf = push(buf,  rax_opnd, size_64);
+            if (num_preserve_ret > 1) {
+                handles_offset += LcgEM64TContext::GR_SIZE;
+                buf = push(buf,  rdx_opnd, size_64);
+            }
+        }
+
+        // Must free the handles
+        M_Base_Opnd m(rsp_reg, handles_offset);
+        buf = mov(buf,  rdi_opnd, m, size_64);
+        buf = mov(buf, rax_opnd, Imm_Opnd(size_64, (uint64)free_local_object_handles2), size_64);
+        buf = call(buf, rax_opnd, size_64);
+
+        if (num_preserve_ret > 0) {
+            // Restore return value
+            if (num_preserve_ret > 1) {
+                buf = pop(buf,  rdx_opnd, size_64);
+            }
+            buf = pop(buf,  rax_opnd, size_64);
+        }
+    }
+
+    if (bytes_to_m2n > 0) {
+        buf = alu(buf, add_opc, rsp_opnd, Imm_Opnd(bytes_to_m2n), size_64);
+    }
+    // pop prev_m2nf
+    buf = pop(buf, r10_opnd, size_64);
+    // pop p_lm2nf
+    buf = pop(buf, r11_opnd, size_64);
+    buf = mov(buf, M_Base_Opnd(r11_reg, 0), r10_opnd, size_64);
+    // skip local_object_handles, method, current_frame_type
+    buf = alu(buf, add_opc, rsp_opnd,
+        Imm_Opnd(3 * LcgEM64TContext::GR_SIZE), size_64);
+
+    // restore part of callee-saves registers
+    for (int i = LcgEM64TContext::MAX_GR_LOCALS - 1; i >= (int)num_callee_saves; i--) {
+        buf = pop(buf,
+            LcgEM64TContext::get_reg_from_map(LcgEM64TContext::GR_LOCALS_OFFSET + i),
+            size_64);
+    }
+    return buf;
+}

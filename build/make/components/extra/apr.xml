@@ -1,0 +1,175 @@
+<?xml version="1.0" encoding="ISO-8859-1"?>
+<!--
+    Copyright 2005-2006 The Apache Software Foundation or its licensors, as applicable.
+  
+    Licensed under the Apache License, Version 2.0 (the "License");
+    you may not use this file except in compliance with the License.
+    You may obtain a copy of the License at
+  
+       http://www.apache.org/licenses/LICENSE-2.0
+  
+    Unless required by applicable law or agreed to in writing, software
+    distributed under the License is distributed on an "AS IS" BASIS,
+    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+    See the License for the specific language governing permissions and
+    limitations under the License.
+-->
+<!--
+Author: Marina V. Goldburt, Dmitry B. Yershov
+Version: $Revision: 1.4.2.5 $
+-->
+
+<!--
+    This is build descriptor for the component "extra.apr".
+
+    Please refer to make/components/README.txt for details about the component
+    build descriptor structure.
+  -->
+
+<project name="extra.apr">
+    <target name="copy.apr.includes">
+        <mkdir dir="${build.dir}/include/apr-1" />
+
+        <copy todir="${build.dir}/include/apr-1">
+            <fileset dir="${includes.apr}" includes="*.h" />
+        </copy>
+
+        <property name="includes" location="${build.dir}/include" />
+    </target>
+
+    <target name="prepare_src">
+        <mkdir dir="${build.dir}/src" />
+        <copy todir="${build.dir}/src" failonerror="true">
+            <fileset dir="${build.APR.home}" includes="**/*" />
+        </copy>
+        <chmod perm="+x">
+            <fileset dir="${build.dir}/src/build">
+                <include name="**/*" />
+            </fileset>
+        </chmod>
+        <property name="src" location="${build.dir}/src" />
+        <property name="includes.apr" location="${src}/include" />
+    </target>
+
+    <target name="configure-check" depends="prepare_src">
+        <condition property="apr-config-available" value="true">
+            <available file="${includes.apr}/apr.h" />
+        </condition>
+    </target>
+
+    <target name="apr-configure" unless="apr-config-available">
+        <select os="lnx">
+            <exec executable="sh" dir="${src}">
+                <arg value="./buildconf" />
+            </exec>
+
+            <exec executable="sh" dir="${src}">
+                <arg value="./configure" />
+                <arg value="CXX=${build.cxx}" />
+                <arg value="CC=${build.cxx}" />
+            </exec>
+
+            <replaceregexp file="${includes.apr}/apr.h" match="#define APR_HAS_OS_UUID           1" replace="#define APR_HAS_OS_UUID           0" />
+
+            <replaceregexp file="${includes.apr}/apr.h" match="APR_HAS_POSIXSEM_SERIALIZE        0" replace="APR_HAS_POSIXSEM_SERIALIZE        1" />
+
+            <replaceregexp file="${includes.apr}/apr.h" match="#define APR_HAS_PROC_PTHREAD_SERIALIZE    0" replace="#define APR_HAS_PROC_PTHREAD_SERIALIZE    1" />
+        </select>
+
+        <select os="win">
+            <copy file="${includes.apr}/apr.hw" tofile="${includes.apr}/apr.h" failonerror="true" />
+        </select>
+    </target>
+
+    <target name="init" depends="configure-check, apr-configure, copy.apr.includes, common_extra">
+        <property name="libname" value="apr-1" />
+        <property name="outtype" value="static" />
+
+        <select os="lnx">
+            <compiler id="c.compiler" extends="common.c.compiler">
+                <includepath path="${src}/include" />
+                <includepath path="${src}/include/arch" />
+                <includepath path="${src}/include/arch/unix" />
+
+                <fileset dir="${src}">
+                    <include name="**/unix/*.c" />
+                    <exclude name="**/unix/apr_app.c" />
+                </fileset>
+
+                <fileset dir="${src}/file_io/unix" includes="copy.c fileacc.c filepath_util.c fullrw.c mktemp.c tempdir.c" />
+                <fileset dir="${src}/memory/unix" includes="*.c" />
+                <fileset dir="${src}/misc/unix" includes="*.c" />
+                <!--                <fileset dir="${src}/misc/unix" includes="errorcodes.c getopt.c otherchild.c version.c" /> -->
+                <fileset dir="${src}/mmap/unix" includes="common.c" />
+                <fileset dir="${src}/network_io/unix" includes="inet_ntop.c inet_pton.c sockaddr.c" />
+                <fileset dir="${src}/poll/unix" includes="select.c" />
+                <fileset dir="${src}/random/unix" includes="*.c" />
+                <fileset dir="${src}/strings" includes="*.c" />
+                <fileset dir="${src}/tables" includes="*.c" />
+                <fileset dir="${src}/support/unix" includes="waitio.c" />
+
+                <defineset define="APR_DECLARE_EXPORT,PLATFORM_POSIX,_LARGEFILE64_SOURCE" />
+                <defineset define="_HAVE_CONFIG_H,_REENTRANT,_GNU_SOURCE" />
+
+                <select arch="ipf,em64t">
+                    <compilerarg value="-fPIC" />
+                </select>
+            </compiler>
+        </select>
+        <select os="win">
+            <compiler id="c.compiler" extends="common.c.compiler">
+                <includepath>
+                    <dirset dir="${src}">
+                        <include name="include" />
+                        <include name="include/arch" />
+                        <include name="include/arch/win32" />
+                    </dirset>
+                </includepath>
+
+                <includepath>
+                    <dirset dir="${src}">
+                        <include name="include/arch/unix" />
+                    </dirset>
+                </includepath>
+
+                <fileset dir="${src}">
+                    <include name="user/win32/*.c" />
+                    <include name="time/win32/*.c" />
+                    <include name="threadproc/win32/*.c" />
+                    <include name="tables/*.c" />
+                    <include name="strings/*.c" />
+                    <include name="shmem/win32/*.c" />
+                    <include name="random/unix/*.c" />
+                    <include name="passwd/*.c" />
+                    <include name="network_io/win32/*.c" />
+                    <include name="network_io/unix/multicast.c" />
+                    <include name="network_io/unix/sockaddr.c" />
+                    <include name="network_io/unix/inet_pton.c" />
+                    <include name="network_io/unix/inet_ntop.c" />
+                    <include name="mmap/win32/*.c" />
+                    <include name="mmap/unix/common.c" />
+                    <include name="misc/unix/version.c" />
+                    <include name="misc/unix/otherchild.c" />
+                    <include name="misc/unix/getopt.c" />
+                    <include name="misc/unix/errorcodes.c" />
+                    <include name="misc/win32/*.c" />
+                    <include name="memory/unix/apr_pools.c" />
+                    <include name="locks/win32/*.c" />
+                    <include name="dso/win32/*.c" />
+                    <include name="file_io/win32/*.c" />
+                    <include name="file_io/unix/fileacc.c" />
+                    <include name="file_io/unix/copy.c" />
+                    <include name="file_io/unix/filepath_util.c" />
+                    <include name="file_io/unix/tempdir.c" />
+                    <include name="file_io/unix/mktemp.c" />
+                    <include name="file_io/unix/fullrw.c" />
+                    <include name="atomic/win32/*.c" />
+                    <include name="support/unix/waitio.c" />
+                    <include name="poll/unix/select.c" />
+                </fileset>
+
+                <defineset define="APR_DECLARE_EXPORT" />
+            </compiler>
+        </select>
+    </target>
+</project>

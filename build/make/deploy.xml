@@ -1,0 +1,221 @@
+<!--
+    Copyright 2005-2006 The Apache Software Foundation or its licensors, as applicable.
+
+    Licensed under the Apache License, Version 2.0 (the "License");
+    you may not use this file except in compliance with the License.
+    You may obtain a copy of the License at
+
+       http://www.apache.org/licenses/LICENSE-2.0
+
+    Unless required by applicable law or agreed to in writing, software
+    distributed under the License is distributed on an "AS IS" BASIS,
+    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+    See the License for the specific language governing permissions and
+    limitations under the License.
+-->
+<!--
+Author:  Sergey V. Dmitriev
+Version: $Revision: 1.6.2.20 $
+-->
+
+<!--
+Description of the product deploy folder.
+-->
+
+<deploy>
+    <vm>
+        <vmstart>
+            <executable>bin:ij</executable>
+        </vmstart>
+
+        <encoder>
+            <static>bin:encoder</static>
+        </encoder>
+
+        <em>
+            <shared>bin:em</shared>
+        </em>
+
+        <vmcore>
+            <static>bin:vmcore</static>
+            <shared>bin:vmcore</shared>
+        </vmcore>
+
+        <interpreter>
+            <shared>bin:interpreter</shared>
+        </interpreter>
+
+        <select arch="ia32,ipf">
+            <jitrino>
+                <shared>bin:jitrino</shared>
+            </jitrino>
+        </select>
+
+        <gc>
+            <shared>bin:gc</shared>
+        </gc>
+
+        <select arch="ia32">
+            <vmi>
+                <shared>bin:vmi</shared>
+            </vmi>
+        </select>
+
+        <kernel_classes>
+            <jar>lib/boot:kernel</jar>
+        </kernel_classes>
+
+        <hythr>
+            <shared>bin:hythr</shared>
+        </hythr>
+     </vm>
+
+    <select arch="ia32">
+        <classlib>
+            <auth>
+                <shared>bin:hyauth</shared>
+            </auth>
+
+            <archive>
+                <jar>lib/boot:archive</jar>
+                <shared>bin:hyarchive</shared>
+            </archive>
+
+            <luni>
+                <jar>lib/boot:luni</jar>
+                <shared>bin:hyluni</shared>
+            </luni>
+
+
+            <math>
+                <shared>bin:hymath</shared>
+            </math>
+
+            <nio>
+                <jar>lib/boot:nio</jar>
+                <shared>bin:hynio</shared>
+            </nio>
+
+            <nio_char>
+                <jar>lib/boot:nio_char</jar>
+            </nio_char>
+
+            <security>
+                <jar>lib/boot:security</jar>
+            </security>
+
+            <crypto>
+                <jar>lib/boot:crypto</jar>
+            </crypto>
+
+            <x_net>
+                <jar>lib/boot:x_net</jar>
+            </x_net>
+
+            <sql>
+                <jar>lib/boot:sql</jar>
+            </sql>
+
+            <text>
+                <jar>lib/boot:text</jar>
+                <shared>bin:hytext</shared>
+            </text>
+
+            <port>
+                <shared>bin:hyprt</shared>
+            </port>
+
+            <pool>
+                <shared>bin:hypool</shared>
+            </pool>
+
+            <sig>
+                <shared>bin:hysig</shared>
+            </sig>
+
+            <zlib>
+                <shared>bin:hyzlib</shared>
+            </zlib>
+        </classlib>
+    </select>
+
+    <extra>
+        <eclipse_script>
+            <select os="win">
+                <other>bin:eclipse.bat</other>
+            </select>
+
+            <select os="lnx">
+                <other>bin:eclipse.sh</other>
+            </select>
+        </eclipse_script>
+        <select os="win">
+            <zlib>
+                <shared>bin:zlib1</shared>
+            </zlib>
+        </select>
+
+        <hyplugin>
+            <jar>lib:*</jar>
+        </hyplugin>
+
+        <jre_libraries>
+            <other>lib/boot:*</other>
+        </jre_libraries>
+
+        <icu4c>
+            <jar>lib/boot:*</jar>
+            <shared>bin:*</shared>
+        </icu4c>
+
+        <xml_api_copy>
+            <jar>lib/boot:*</jar>
+        </xml_api_copy>
+
+        <ij_script>
+            <select os="win">
+                <other>bin:ij.bat</other>
+            </select>
+
+            <select os="lnx">
+                <other>bin:ij.sh</other>
+            </select>
+        </ij_script>
+
+        <harmony39>
+            <beans>
+                <jar>lib/boot:beans</jar>
+            </beans>
+
+            <regex>
+                <jar>lib/boot:regex</jar>
+            </regex>
+
+            <math>
+                <jar>lib/boot:math</jar>
+            </math>
+        </harmony39>
+
+        <harmony88>
+            <logging>
+                <jar>lib/boot:logging</jar>
+            </logging>
+        </harmony88>
+
+        <bcprov>
+            <jar>lib/boot:*</jar>
+        </bcprov>
+
+        <resolver>
+            <jar>lib/boot:resolver</jar>
+        </resolver>
+
+        <serializer>
+            <jar>lib/boot:serializer</jar>
+        </serializer>
+
+        <hello>
+            <other>bin:Hello.class</other>
+        </hello>
+    </extra>
+</deploy>

@@ -1,0 +1,705 @@
+<!--
+    Copyright 2005-2006 The Apache Software Foundation or its licensors, as applicable.
+
+    Licensed under the Apache License, Version 2.0 (the "License");
+    you may not use this file except in compliance with the License.
+    You may obtain a copy of the License at
+
+       http://www.apache.org/licenses/LICENSE-2.0
+
+    Unless required by applicable law or agreed to in writing, software
+    distributed under the License is distributed on an "AS IS" BASIS,
+    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+    See the License for the specific language governing permissions and
+    limitations under the License.
+
+	Portions, Copyright C 1991-2005 Unicode, Inc. The following applies to Unicode.
+
+	COPYRIGHT AND PERMISSION NOTICE
+    Copyright C 1991-2005 Unicode, Inc. All rights reserved. Distributed under the Terms of Use
+	in http://www.unicode.org/copyright.html.
+    Permission is hereby granted, free of charge, to any person obtaining a copy of the Unicode data files
+	and any associated documentation (the "Data Files") or Unicode software and any associated documentation
+	(the "Software") to deal in the Data Files or Software without restriction, including without limitation
+	the rights to use, copy, modify, merge, publish, distribute, and/or sell copies of the Data Files or Software,
+	and to permit persons to whom the Data Files or Software are furnished to do so, provided that
+	(a) the above copyright notice(s) and this permission notice appear with all copies of the Data Files or Software,
+	(b) both the above copyright notice(s) and this permission notice appear in associated documentation, and
+	(c) there is clear notice in each modified Data File or in the Software as well as in the documentation associated with
+	the Data File(s) or Software that the data or software has been modified.
+    THE DATA FILES AND SOFTWARE ARE PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED,
+	INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE
+	AND NONINFRINGEMENT OF THIRD PARTY RIGHTS. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR HOLDERS INCLUDED
+	IN THIS NOTICE BE LIABLE FOR ANY CLAIM, OR ANY SPECIAL INDIRECT OR CONSEQUENTIAL DAMAGES, OR ANY DAMAGES WHATSOEVER
+	RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION,
+	ARISING OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THE DATA FILES OR SOFTWARE.
+    Except as contained in this notice, the name of a copyright holder shall not be used in advertising or otherwise
+	to promote the sale, use or other dealings in these Data Files or Software without prior written authorization
+	of the copyright holder.
+    2. Additional terms from the Database:
+    Copyright C 1995-1999 Unicode, Inc. All Rights reserved.
+    Disclaimer
+    The Unicode Character Database is provided as is by Unicode, Inc. No claims are made as to fitness for
+	any particular purpose. No warranties of any kind are expressed or implied. The recipient agrees to determine
+	applicability of information provided. If this file has been purchased on magnetic or optical media from Unicode, Inc.,
+	the sole remedy for any claim will be exchange of defective media within 90 days of receipt.
+    This disclaimer is applicable for all other data files accompanying the Unicode Character Database,
+	some of which have been compiled by the Unicode Consortium, and some of which have been supplied by other sources.
+    Limitations on Rights to Redistribute This Data
+	Recipient is granted the right to make copies in any form for internal distribution and to freely use
+	the information supplied in the creation of products supporting the UnicodeTM Standard.
+	The files in the Unicode Character Database can be redistributed to third parties or other organizations
+	(whether for profit or not) as long as this notice and the disclaimer notice are retained.
+	Information can be extracted from these files and used in documentation or programs, as long as there is
+	an accompanying notice indicating the source.
+
+-->
+
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN"
+"http://www.w3.org/TR/html4/loose.dtd">
+
+
+<html>
+<head>
+    <meta http-equiv="Content-Type"
+          content="text/html; charset=us-ascii">
+
+    <title>Getting Started with DRL</title>
+    <link rel="Stylesheet"
+          type="text/css"
+          media="all"
+          href="drl.css">
+</head>
+
+<body>
+    <p class="title"><a name="TOP"></a>Getting Started with DRL</p>
+
+    <p>The Dynamic Runtime Layer (DRL) is a clean-room
+    implementation of the Java<a href="#*">*</a> 2 Platform,
+    Standard Edition (J2SE<a href="#*">*</a>) 1.5.0. The design
+    keystones of the DRL virtual machine (VM) are clarity of
+    concept, modularity, extensibility, and competitive
+    performance. This document describes the first version of DRL
+    deployed in March 2006.</p>
+
+    <p>To quickly start with DRL, walk through the provided
+    scenarios. It is recommended that you strictly follow the
+    instructions of this guide to ensure system stability and
+    anticipated results.</p>
+
+    <p class="TOC"><a href="#Overview">Overview</a></p>
+
+    <p class="TOC"><a href="#Before_You_Start">Before You
+    Start</a></p>
+
+    <p class="TOC"><a href="#Running_Hello">Running an
+    Application</a></p>
+
+    <p class="TOC"><a href="#Eclipse_Hello_world">Running an
+    Application in Eclipse</a></p>
+
+    <p class="TOC"><a href="#Eclipse_debug_scenario">Debugging an
+    Application in Eclipse</a></p>
+
+    <p class="TOC"><a href="#Command_line_Options">Command-line
+    Options</a></p>
+
+    <p class="TOC"><a href="#Disclaimer">Disclaimer and Legal
+    Information</a></p>
+
+    <h2><a name="Overview"></a>Overview</h2>
+
+    <p>In the Getting Started document, the first scenario
+    illustrates running an application with DRL, and the two others
+    demonstrate running and debugging an application in the
+    Eclipse<a href="#*">*</a> integrated development environment.
+    DRL is used to run both Eclipse<a href="#*">*</a> and the new
+    application. After completing this guide, you will be able to
+    run and debug your own applications with DRL.</p>
+
+    <h2><a name="Before_You_Start"></a> Before You Start</h2>
+
+    <p>By following the instructions in the <code>README.txt</code>
+    file, install DRL and run acceptance tests to make sure that
+    the installation is complete. You will have the default
+    configuration installed on your system. To change the default
+    DRL settings, use the <a href=
+    "#Command_line_Options">Command-line Options</a>
+    listed in this document.</p>
+    <h3>Notations Conventions</h3>
+    <p>When following the scenarios described below, please make the following adjustments: </p>
+    <ul>
+      <li>
+    In the paths indicated, the slash \ is in the Windows<a href="#*">*</a> style,
+	and / is in the Linux<a href="#*">*</a> style. Verify that your paths are correct when doing cut-and-paste.
+      <li>The file <code>eclipse.bat</code> on Windows<a href="#*">*</a> corresponds to the file <code>eclipse.sh</code> on Linux<a href="#*">*</a>.
+</ul>
+<p class="backtotop"><a href="#TOP">Back to top</a></p>
+    <h1><a name="Running_Hello"></a>Running an Application</h1>
+
+    <p>This scenario provides step-by-step instructions on running
+    the <code>Hello</code> application in the Windows<a href=
+    "#*">*</a> or the Linux<a href=
+    "#*">*</a> console. The scenario uses the
+    <code>Hello.class</code> Java<a href=
+    "#*">*</a> class distributed with the
+    product as the sample Java<a href=
+    "#*">*</a> application.</p>
+
+    <ol>
+        <li>To start DRL, change your current directory to the
+        <code>&lt;<b>installation folder</b>&gt;\bin</code>
+        directory.
+
+        <li>Check that you have files <code>ij.exe</code> on Windows<a href=
+    "#*">*</a> or <code>ij</code> on Linux<a href=
+    "#*">*</a> and
+        <code>Hello.class</code> in the <code>\bin</code>
+        directory.
+        <br>
+        On Linux<a href="#*">*</a>, make sure that you can run applications
+		and load dynamic libraries from the current directory.
+		For example:
+    		<pre>export PATH=.:${PATH}
+export LD_LIBRARY_PATH=${PWD}:${LD_LIBRARY_PATH}</pre>
+
+        If you are using the Intel(R) C++ compiler, make sure
+	the <code>LD_LIBRARY_PATH</code> contains location of the ICC libraries.
+
+        <li>
+            Run the <code>Hello</code> application by entering:
+            <pre>
+ij Hello
+</pre>
+
+            <p>You will see &ldquo;<i>Hello World!</i>" printed on
+            the screen. This means that you have successfully
+            launched the virtual machine, and that
+            it has processed the <code>Hello.class</code> Java<a href=
+    "#*">*</a>
+            class to execute the <code>Hello</code>
+            application.</p>
+
+    </ol>
+<p class="backtotop"><a href="#TOP">Back to top</a></p>
+    <h1><a name="Eclipse_Hello_world"></a> Running an Application
+    in Eclipse</h1>
+
+    <p>This scenario provides step-by-step instructions on running
+    a Java application in the Eclipse<a href="#*">*</a>
+    environment. In the scenario, you will launch
+       Eclipse<a href="#*">*</a>, create a new project and a new
+       Java class within this project, and finally you will run the
+       new application.</p>
+
+    <ol>
+        <li>Download the Eclipse<a href="#*">*</a> 3.1.1 package
+         at <a href=
+        "http://download.eclipse.org/eclipse/downloads/"
+           target=
+           "_blank">http://download.eclipse.org/eclipse/downloads/</a>,
+           and unpack this distribution.
+
+	<li>Set the environment variable <code>ECLIPSE_HOME</code>
+	to point to the location of the Eclipse<a href="#*">*</a> installation directory.
+	<br>
+	On Linux<a href="#*">*</a>,
+        if you are using the Intel(R) C++ compiler, additionally set the <code>LD_LIBRARY_PATH</code>
+	variable to point to the location of the ICC libraries.
+
+      <li>On Windows<a href="#*">*</a>, edit the Eclipse<a href="#*">*</a> launch script
+        <code>&lt;<b>installation
+        folder</b>&gt;/bin/eclipse.bat:</code> make sure
+	that <code>BUILD_HOME</code> variable points to the
+      <code>&lt;<b>installation folder</b>&gt;.
+
+	<li>Start Eclipse<a href="#*">*</a> by launching Eclipse starter script:
+	<br>on Windows<a href="#*">*</a>:
+	  <code>&lt;<b>installation folder</b>&gt;/bin/eclipse.bat</code>;
+	<br>on Linux<a href="#*">*</a>:
+	  <code>&lt;<b>installation folder</b>&gt;/bin/eclipse.sh</code>.
+
+      <li>
+            After running Eclipse<a href="#*">*</a> starter script, the
+            <b>Workspace Launcher</b> dialog opens. Specify the
+            path to your workspace directory. In the example, click
+            <b>OK</b> to set the default path.
+
+            <p style="text-align: center"><img border="0"
+                 width="438"
+                 height="244"
+                 src="images/workspace_launcher.gif"
+                 alt=
+                 "Specifying the Workspace directory for the Project"></p>
+
+
+      <li>The <b>Welcome</b> page of the Eclipse<a href="#*">*</a>
+	environment opens. Close the window to proceed.
+
+      <li>
+            Create a new project via <b>File &gt; New &gt;
+            Project&hellip;</b>
+
+            <p>The <b>New project</b> dialog appears. Select
+            <b>Java Project</b>, click <b>Next</b> and type the
+            project name in the <b>New Java Project</b> field, in
+            the example, <i>Hello</i>. Then click the <b>Finish</b>
+            button.</p>
+
+            <p style="text-align: center"><img border="0"
+                 width="500"
+                 height="555"
+                 src="images/new_project.gif"
+                 alt=
+                 "Dialog: New Java Project with Default Settings"></p>
+
+            <p>When prompted to switch to the Java Perspective,
+            click <b>Yes</b>.</p>
+
+
+      <li>
+            The <b>Package Explorer</b> tab opens in the left-hand
+            part of the workspace with the name of your project
+            displayed.
+
+            <p style="text-align: center"><img border="0"
+                 width="691"
+                 height="609"
+                 src="images/package_explorer.gif"
+                 alt=
+                 "Eclipse Platform Workspace with the Package Explorer and the Hello Class">
+            </p>
+
+
+      <li>
+            Create a new class via <b>File &gt; New &gt; Class
+            <i>&hellip;</i></b>
+
+            <p>The <b>New Java Class</b> wizard opens. Type in the
+            class name, in the example, <i>HelloWorld</i> and
+            select the <b>public static void main(String[]
+            args)</b> check box at the bottom of the dialog
+            window.</p>
+
+            <p style="text-align: center"><img border="0"
+                 width="515"
+                 height="557"
+                 src="images/new_java_class.gif"
+                 alt=
+                 "Dialog New Java Class with Settings Configured as Required">
+            </p>
+
+
+      <li>
+            You have created the <code>HelloWorld</code> class. The
+            workspace gets updated with the class information as
+            shown below.
+
+            <p>In the <b>Package Explorer</b> window, you can see
+            that the class is in the default package. The
+            <b>Outline</b> window displays the one method of this
+            class: the <code>main</code> method with an array of
+            <code>String</code> parameters.</p>
+
+            <p style="text-align: center"><img border="0"
+                 width="834"
+                 height="636"
+                 src="images/workspace1.gif"
+                 alt=
+                 "Workspace with the HelloWorld.java Class conent Displayed">
+            </p>
+
+
+      <li>
+            In the body of the <code>main</code> method, type in
+            the following:
+            <pre>
+int i=18;
+System.out.println("Hello World");
+</pre>
+
+
+      <li>Save this file via <b>File &gt; Save</b>.
+
+      <li>
+            Run the <code>HelloWorld</code> class: right click
+            <b>HelloWorld.java</b> in the <b>Package Explorer</b>
+            tab and go <b>Run &gt; Java Application</b>.
+
+            <p style="text-align: center"><img border="0"
+                 width="593"
+                 height="637"
+                 src="images/run_java_application.gif"
+                 alt="running Java Application Dialog"></p>
+
+            <p>The result of the execution is printed out in the
+            <b>Console</b> tab at the bottom of the page: <i>"Hello
+            World!"</i> is printed.</p>
+
+            <p style="text-align: center"><img border="0"
+                 width="456"
+                 height="290"
+                 src="images/print_hello_world.gif"
+                 alt=
+                 "Result of Application Execution printed out"></p>
+
+
+      <li>To close Eclipse<a href="#*">*</a>, go <b>File &gt;
+        Exit</b> and then click <b>OK</b>.
+    </ol>
+<p class="backtotop"><a href="#TOP">Back to top</a></p>
+    <h1><a name="Eclipse_debug_scenario"></a> Debugging an
+    Application in Eclipse</h1>
+
+    <p>This scenario provides instructions on how to debug a simple
+    application in Eclipse<a href="#*">*</a>.</p>
+
+    <ol>
+        <li>Repeat steps 1 to 11 of the previous scenario to set up
+        the workspace and create a new class in the new
+        project.
+
+        <li>
+            Setup the breakpoint. Place the cursor at the following
+            line:
+            <pre>
+System.out.println ("Hello World!");
+</pre>
+
+            <p>Go <b>Run</b> &gt; <b>Toggle Line
+            Breakpoint</b>.</p>
+
+            <p style="text-align: center"><img border="0"
+                 width="423"
+                 height="515"
+                 src="images/toggle_breakpoint.gif"
+                 alt=
+                 "Menu Item for Inserting the Toggle Line Breakpoint"></p>
+
+            <p>A blue circle appears on the left border of the
+            <b>HelloWorld.java</b> tab.</p>
+
+            <p style="text-align: center"><img border="0"
+                 width="560"
+                 height="411"
+                 src="images/selecting_code.gif"
+                 alt="HelloWorld.java class content selected"></p>
+
+
+      <li>Start the debug operation.
+        <ol>
+          <li>            Right-click <b>HelloWorld.java</b> in the <b>Package
+              Explorer</b> tab and
+          and go <b>Debug As &gt; Debug... </b>. The <strong>Debug</strong> window appears.
+          <li>Go to <strong>Java Application</strong> in the left tab and select the <code>HelloWorld</code> application configuration.
+		  If this configuration is not listed, click <strong>New</strong>. The configuration details of the <code>HelloWord</code> application appear
+		  on the right side of the workspace.
+          <li> Select the<strong> Arguments</strong> pane and type <code>-Xint</code> in the VM arguments field.
+          <li>Press the <strong>Debug </strong>button to start the debug operation. You will be prompted to switch to the debug
+    perspective. Click <b>Yes</b>.
+      </ol>
+    </ol>
+
+      <p style="text-align: center"><img border="0"
+                 width="601"
+                 height="614"
+                 src="images/debug_java_application.gif"
+                 alt=
+                 "Menu Item for Debugging a Java Application"></p>
+
+    <ol start="4">
+      <li>
+            The workspace gets updated.
+
+          <p>The <b>Debug</b> tab appears in the top right-hand
+              corner with the <code>main</code> method selected on
+              line 18 in the <code>HelloWorld</code> class. The
+            <b>Variables</b> tab also appears with the values of
+            local variables <code>i</code> and <code>args</code>. </p>
+
+            <p style="text-align: center"><img border="0"
+                 width="724"
+                 height="506"
+                 src="images/debugging_code.gif"
+                 alt="Code Highlighted"></p>
+
+
+      <li>
+            To finish the <code>HelloWorld</code> application, go
+            <b>Run &gt; Resume<i>.</i></b><br>
+             When the application has finished, the <b>Debug</b>
+            and the <b>Console</b> tab get updated. The <b>Console</b> tab
+              at the bottom displays the result of execution:
+            <i>Hello World!</i>
+
+            <p style="text-align: center"><img border="0"
+                 width="725"
+                 height="574"
+                 src="images/debug_result.gif"
+                 alt="Code Highlighted"></p>
+
+
+      <li>Close Eclipse<a href="#*">*</a> via <b>File &gt;
+        Exit</b> and then click <b>OK</b>.
+</ol>
+    <p class="backtotop"><a href="#TOP">Back to top</a></p>
+    <h1><a name="Command_line_Options"></a> Supported Command-line
+    Options</h1>
+
+    <h2><a name="Standard_options"></a>Supported Standard
+    Options</h2>
+
+    <p>Use the standard supported options listed in this section to
+    apply custom configuration settings to your system.</p>
+
+    <p><code>-classpath</code> and <code>-cp</code> specify the
+    class search path for directories and <code>.zip</code> and
+    <code>.jar</code> files.</p>
+
+
+        <p class="note">Note</p>
+
+        <p class="notetext">Multiple values for directories and
+        file locations go in a list separated by the character
+        &ldquo;:&rdquo; on Linux<a href="#*">*</a> and the
+        character &ldquo;;&rdquo; on Windows<a href="#*">*</a>.</p>
+
+
+    <p><code>-D&lt;name&gt;=&lt;value&gt;</code> sets the system
+    property to be accessible for the user application through the
+    <code>java.lang.System</code> class.</p>
+
+    <p><code>-showversion</code> prints the product version and
+    continues execution.</p>
+
+    <p><code>-version</code> prints the product version and
+    exits.</p>
+
+    <p><code>-fullversion</code> prints the full product version
+    and exits.</p>
+
+    <p><code>-verbose [:class|:gc|:jni]</code> enables verbose
+    output.</p>
+
+    <p><code>-agentlib:&lt;library name&gt;[=&lt;agent
+    options&gt;]</code> loads the JVMTI agent library. The library
+    name is platform-independent.</p>
+
+    <p><code>-agentpath:&lt;library name&gt;[=&lt;agent
+    options]</code> loads the JVMTI agent library. The library name
+    is platform-dependent.</p>
+
+    <p><code>-verify</code> triggers full bytecode verification.
+    Minimal verification is performed even without this option
+    specified.</p>
+
+    <p><code>-?</code> and <code>-help</code> print the help
+    message.</p>
+
+    <p><code>-X</code>  prints help
+    information on non-standard options.</p>
+
+    <p><code>-jar &lt;jar file&gt;</code> specifies the name of the archive containing the class and
+    resource files for the application, with the startup class
+    indicated in the manifest file.</p>
+
+    <h2>Supported Non-Standard Options</h2>
+
+    <p>Below supported non-standard options are grouped by their
+    functionality.</p>
+
+    <h3>Virtual Machine Options</h3>
+
+    <p>Use these command-line options to further configure
+    DRLVM.</p>
+
+    <p class="class">Common Virtual Machine Options</p>
+
+    <p><code>-Xbootclasspath:&lt;PATH&gt;</code> sets the boot
+    class path to the specified value.</p>
+
+    <p><code>-Xbootclasspath/a:&lt;PATH&gt;</code> appends the
+    specified directories and files to the boot class path.</p>
+
+    <p><code>-Xbootclasspath/p:&lt;PATH&gt;</code> prepends the
+    specified directories and files to the boot class path.</p>
+
+    <p><code>-Xstats &lt;mask&gt;</code> generates various
+    statistics.</p>
+
+    <p><code>-Xdebug</code> does nothing, is a compatibility
+    option.</p>
+
+    <p><code>-Xnoagent</code> does nothing, is a compatibility
+    option.</p>
+
+    <p><code>-Xrun</code> does the same as the
+    <code>-agentlib</code> option for backward compatibility with
+    JVMDI.</p>
+
+    <p><code>-Xverbose[:&lt;category&gt;[:&lt;file&gt;]</code>
+    switches on logging for a specified category and logs that
+    category to a file.</p>
+
+    <p><code>-Xwarn[:&lt;category&gt;[:&lt;file&gt;]</code>
+    switches off verbose logging off for a specified category and
+    logs that category to a file.</p>
+
+    <p><code>-Xverboseconf:&lt;file&gt;</code> sets up logging via
+    the <code>log4cxx</code> configuration file.</p>
+
+    <p><code>-Xverboselog:&lt;file&gt;</code> logs verbose output
+    to a file.</p>
+
+    <p class="class">Memory Heap Options</p>
+
+    <p><code>-Xms&lt;size&gt;</code> sets the Java<a href=
+    "#*">*</a> heap size.</p>
+
+    <p><code>-Xmx&lt;size&gt;</code> sets the maximum
+       Java<a href="#*">*</a> heap size, for example:</p>
+    <pre>
+-Xms80m
+-Xmx60000000</pre>
+
+    <p class="class">Logging Options</p>
+
+    <p><code>-Xfileline</code> adds source information to logging
+    messages.</p>
+
+    <p><code>-Xthread</code> adds the thread ID to logging
+    messages.</p>
+
+    <p><code>-Xcategory</code> adds the category name to logging
+    messages.</p>
+
+    <p><code>-Xtimestamp</code> adds the timestamp to logging
+    messages.</p>
+
+    <p><code>-Xfunction</code> adds the function signature to
+    logging messages.</p>
+    <p><code>-Xlog[:&lt;category&gt;[:&lt;file&gt;]</code> switches on debug logging for a specified category and logs that category to a file. </p>
+	<p><code>-Xtrace[:&lt;category&gt;[:&lt;file&gt;]</code> switches on trace logging for a specified category and logs that category to a file. </p>
+
+    <p class="class"> Execution Manager Options </p>
+    <p> <code>-Xem jet:[&lt;path to JIT library&gt;]</code> runs the virtual machine with a single baseline just-in-time compiler. </p>
+    <p> <code>-Xem opt:[&lt;path to JIT library&gt;]</code> runs the virtual machine with a single optimizing just-in-time compiler. </p>
+    <p> <code>-verbose:em</code> prints detailed information on execution management. </p>
+    <p class="class">Other</p>
+
+    <p><code>-Xint</code> enables using the interpreter to execute
+    the program.</p>
+
+    <p><code>-Xem</code> <code>&lt;em options&gt;</code> specifies the execution manager specific
+    options.</p>
+
+    <p><code>-Xdll &lt;dll name&gt;</code> indicates a specific
+    .dll file.</p>
+
+    <p><code>-Xno_parallel_jit</code> prohibits compilation in the
+    parallel mode.</p>
+
+    <p><code>-Xdumpfile &lt;file&gt;</code> specifies the file name
+    for the dump.</p>
+
+    <h2><a name="JIT_Options"></a> Just-in-time Compiler
+    Options</h2>
+
+    <p>Use the following command-line options to configure
+    operation of the optimizing just-in-time compiler.</p>
+
+    <p><code>&ndash;Xem opt: -Xjit LOG=\"root=all\"</code> enables
+    the single-JIT mode for the optimizing JIT compiler and logs
+    all information to <code>stdout</code>.</p>
+
+    <p><code>&ndash;Xem opt: -Xjit LOG=\"root=ir,file\"</code> does
+    the same as above and dumps the intermediate representation
+    (IR) logs to file system.</p>
+
+    <p><code>&ndash;Xem opt: -Xjit LOG=\"filter=file:\"</code>
+    generates a list of JIT-compiled methods into the file named
+    <code>file</code>.</p>
+
+    <p><code>&ndash;Xem opt: -Xjit
+    LOG=\"opt=ir,file,filter=file:1-3\"</code> dumps the high-level
+    representation (HIR) of the first three methods from the file
+    <code>file</code> (generated by the previous option).</p>
+
+    <p><code>&ndash;Xem opt: -Xjit METHODS=\"file:1-3\" -Xjit
+    ia32::itrace=on</code> traces, that is, logs to
+    <code>stdout</code>, entries and exits to and from the first
+    three methods from the file <code>file.</code></p>
+
+    <p><code>&ndash;Xem opt: -Xjit opt::skip=off &ndash;Xjit
+    tra::guardedInlining=off</code> enables all high-level
+    optimizations and disables translation-time guarded
+    inlining.</p>
+
+    <p><code>&ndash;Xem opt: -Xjit opt::skip=off &ndash;Xjit
+    tra::guardedInlining=off -Xjit
+    LOG=\"root=ir,file,filter=java/lang/Object::\" -Xjit
+    opt::dumpdot=on -Xjit ia32::dumpdot=on</code> enables printing
+    methods intermediate representations in the form of
+    <code>.dot</code> files after major high- and low-level IR
+    transformation stages. The resulting <code>.dot</code> files
+    can be converted to a graphical representation. With these
+    settings, only methods of the <code>Object</code> class are
+    logged.</p>
+
+    <p class="note">Note</p>
+
+    <p class="notetext">General syntax of the JIT log system
+    options is the following:</p>
+    <pre>
+ -Xjit LOG=\"<i>[</i>file<i>|</i>singlefile<i>][</i>filter=<i>filter_expression</i><i>]{&lt;category_name&gt;</i> =<i>&lt;log_level&gt;}</i>\"
+
+</pre>
+
+    <h2><a name="Garbage_Collection_Options"></a>Garbage Collection
+    Options</h2>
+
+    <p><code>-Xgc fixed runs</code> GC in a non-moving mode.</p>
+
+    <h1><a name="Disclaimer"></a>Disclaimer and Legal
+    Information</h1>
+
+    <p>(C) Copyright 2005-2006 Intel Corporation</p>
+
+    <p>(C) Copyright 2005-2006 The Apache Software Foundation or
+    its licensors, as applicable.</p>
+
+    <p>Licensed under the Apache License, Version 2.0 (the
+    "License"); you may not use this file except in compliance with
+    the License. You may obtain a copy of the License at</p>
+
+    <p><a href="http://www.apache.org/licenses/LICENSE-2.0"
+       target=
+       "_blank">http://www.apache.org/licenses/LICENSE-2.0</a></p>
+
+    <p>Unless required by applicable law or agreed to in writing,
+    software distributed under the License is distributed on an "AS
+    IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either
+    express or implied. See the License for the specific language
+    governing permissions and limitations under the License.</p>
+    <p>Portions, Copyright &copy; 1991-2005 Unicode, Inc. The following applies to Unicode. <br>
+      <br>
+COPYRIGHT AND PERMISSION NOTICE</p>
+    <p> Copyright &copy; 1991-2005 Unicode, Inc. All rights reserved. Distributed under the Terms of Use in <a href="http://www.unicode.org/copyright.html"  target="_blank">http://www.unicode.org/copyright.html</a>. Permission is hereby granted, free of charge, to any person obtaining a copy of the Unicode data files and any associated documentation (the &quot;Data Files&quot;) or Unicode software and any associated documentation (the &quot;Software&quot;) to deal in the Data Files or Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, and/or sell copies of the Data Files or Software, and to permit persons to whom the Data Files or Software are furnished to do so, provided that (a) the above copyright notice(s) and this permission notice appear with all copies of the Data Files or Software, (b) both the above copyright notice(s) and this permission notice appear in associated documentation, and (c) there is clear notice in each modified Data File or in the Software as well as in the documentation associated with the Data File(s) or Software that the data or software has been modified.</p>
+    <p> THE DATA FILES AND SOFTWARE ARE PROVIDED &quot;AS IS&quot;, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT OF THIRD PARTY RIGHTS. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR HOLDERS INCLUDED IN THIS NOTICE BE LIABLE FOR ANY CLAIM, OR ANY SPECIAL INDIRECT OR CONSEQUENTIAL DAMAGES, OR ANY DAMAGES WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THE DATA FILES OR SOFTWARE.</p>
+    <p> Except as contained in this notice, the name of a copyright holder shall not be used in advertising or otherwise to promote the sale, use or other dealings in these Data Files or Software without prior written authorization of the copyright holder.</p>
+    <p> 2. Additional terms from the Database:</p>
+    <p>Copyright &copy; 1995-1999 Unicode, Inc. All Rights reserved.</p>
+    <p>Disclaimer </p>
+    <p> The Unicode Character Database is provided as is by Unicode, Inc. No claims are made as to fitness for any particular purpose. No warranties of any kind are expressed or implied. The recipient agrees to determine applicability of information provided. If this file has been purchased on magnetic or optical media from Unicode, Inc., the sole remedy for any claim will be exchange of defective media within 90 days of receipt. This disclaimer is applicable for all other data files accompanying the Unicode Character Database, some of which have been compiled by the Unicode Consortium, and some of which have been supplied by other sources.</p>
+    <p> Limitations on Rights to Redistribute This Data</p>
+    <p> Recipient is granted the right to make copies in any form for internal distribution and to freely use the information supplied in the creation of products supporting the Unicode<sup>TM</sup> Standard.
+        The files in the Unicode Character Database can be redistributed to third parties or other organizations (whether for profit or not) as long as this notice and the disclaimer notice are retained. Information can be extracted from these files and used in documentation or programs, as long as there is an accompanying notice indicating the source. </p>
+    <p class="backtotop"><a href="#TOP">Back to top</a></p>
+	<p class="backtotop">&nbsp;</p>
+	<p><a name="*">*</a> Other brands and names are the property of
+    their respective owners.</p>
+
+    <p class="update">Last update: March'31 2006</p>
+
+</body>
+</html>

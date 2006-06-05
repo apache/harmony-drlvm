@@ -1,0 +1,165 @@
+<?xml version="1.0" encoding="ISO-8859-1"?>
+<!--
+    Copyright 2005-2006 The Apache Software Foundation or its licensors, as applicable.
+  
+    Licensed under the Apache License, Version 2.0 (the "License");
+    you may not use this file except in compliance with the License.
+    You may obtain a copy of the License at
+  
+       http://www.apache.org/licenses/LICENSE-2.0
+  
+    Unless required by applicable law or agreed to in writing, software
+    distributed under the License is distributed on an "AS IS" BASIS,
+    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+    See the License for the specific language governing permissions and
+    limitations under the License.
+-->
+<!--
+Author: Sergey V. Dmitriev, Dmitry B. Yershov
+Version: $Revision: 1.3.2.3 $
+-->
+<!--
+    This is build descriptor for the component "vm.interpreter".
+
+    Please refer to make/components/README.txt for details about the component
+    build descriptor structure.
+  -->
+
+<project name="vm.interpreter">
+    <target name="init" depends="common_vm">
+        <property name="build.depends" value="extra.apr,
+                                              extra.log4cxx,
+                                              vm.vmcore" />
+        <property name="libname" value="interpreter" />
+        <property name="outtype" value="shared" />
+        <property name="src" location="${build.vm.home}/interpreter/src" />
+
+        <compiler id="cpp.compiler" extends="common.cpp.compiler">
+            <fileset dir="${src}">
+                <include name="interpreter.cpp" />
+                <include name="interp_stack_trace.cpp" />
+                <include name="interpreter_ti.cpp" />
+                <include name="interp_exports.cpp" />
+                <include name="interp_vm_helpers.cpp" />
+                <select arch="ia32">
+                    <include name="interp_native_ia32.cpp" />
+                </select>
+                <select arch="ipf">
+                    <include name="interp_native_ipf.cpp" />
+                </select>
+                <select arch="em64t">
+                    <include name="interp_native_em64t.cpp" />
+                </select>
+            </fileset>
+
+            <includepath>
+                <pathelement location="${extra.apr.includes}" />
+                <pathelement location="${extra.log4cxx.includes}" />
+
+                <select os="win">
+                    <pathelement location="${extra.zlib.includes}" />
+                </select>
+            </includepath>
+
+            <includepath>
+                <dirset dir="${build.vm.home}">
+                    <include name="include" />
+                    <include name="vmcore/include" />
+                    <include name="port/include" />
+
+                    <select os="win">
+                        <include name="vmcore/src/util/win/include" />
+                        <include name="vm/win" />
+                    </select>
+
+                    <select os="lnx">
+                        <include name="vm/common/base" />
+                        <include name="vmcore/src/util/linux/include" />
+                    </select>
+
+                    <select arch="ipf">
+                        <include name="vmcore/src/util/ipf/include" />
+                        <include name="vm/ipf/include" />
+                        <include name="vmcore/src/util/ipf/base_natives" />
+                        <include name="vm/ipf/dynopt_ipf" />
+                        <include name="port/src/lil/ipf/pim/include" />
+                    </select>
+
+                    <select arch="ia32">
+                        <include name="vmcore/src/util/ia32/base_natives" />
+                        <include name="vm/ia32/debugger/include" />
+                        <include name="port/src/encoder/ia32_em64t" />
+                        <include name="port/src/lil/ia32/pim/include" />
+                    </select>
+
+                    <select arch="em64t">
+                        <include name="vmcore/src/util/em64t/base_natives" />
+                        <include name="vm/em64t/debugger/include" />
+                        <include name="port/src/encoder/ia32_em64t" />
+                        <include name="port/src/lil/em64t/pim/include" />
+                    </select>
+
+                    <select os="win" arch="ipf">
+                        <include name="vm/common/dynopt" />
+                    </select>
+                </dirset>
+            </includepath>
+
+            <defineset define="GC_V4,USE_DLL_JIT,BUILDING_JIT" />
+
+            <select os="win">
+                <select cfg="release">
+                    <compilerarg value="/Op" />
+
+                    <select cxx="icl">
+                        <compilerarg value="/Qip" />
+                    </select>
+                </select>
+
+                <select cxx="icl">
+                    <compilerarg value="-Qwd1572" />
+                </select>
+            </select>
+
+            <select os="win" cxx="icl">
+                <compilerarg value="-Qwd1572" />
+            </select>
+        </compiler>
+
+        <select os="lnx">
+            <fileset id="asm.fileset" dir="${src}">
+                <select os="lnx" arch="ia32">
+                    <include name="invokeJNI_ia32.asm" />
+                </select>
+
+                <select os="lnx" arch="em64t">
+                    <include name="invokeJNI_em64t.asm" />
+                </select>
+
+                <select os="lnx" arch="ipf">
+                    <include name="invokeJNI_ipf.asm" />
+                </select>
+
+                <select os="win" arch="ipf">
+                    <include name="invokeJNI_Windows_ipf.asm" />
+                </select>
+            </fileset>
+        </select>
+
+        <linker id="linker" extends="common.linker">
+            <select os="lnx">
+                <linkerarg value="--export-dynamic" />
+            </select>
+
+            <select os="win" cfg="debug">
+                <linkerarg value="/NODEFAULTLIB:libcmt.lib" />
+            </select>
+
+            <select os="win">
+                <syslibset libs="advapi32,userenv,ws2_32,vmcore,odbc32,mswsock" />
+            </select>
+
+            <libset libs="${vm.vmcore.lib}" dir="${vm.vmcore.libdir}" />
+        </linker>
+    </target>
+</project>

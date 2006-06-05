@@ -1,0 +1,37 @@
+<!--
+    Copyright 2005-2006 The Apache Software Foundation or its licensors, as applicable.
+  
+    Licensed under the Apache License, Version 2.0 (the "License");
+    you may not use this file except in compliance with the License.
+    You may obtain a copy of the License at
+  
+       http://www.apache.org/licenses/LICENSE-2.0
+  
+    Unless required by applicable law or agreed to in writing, software
+    distributed under the License is distributed on an "AS IS" BASIS,
+    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+    See the License for the specific language governing permissions and
+    limitations under the License.
+-->
+<!--
+Author: Marina V. Goldburt
+Version: $Revision: 1.4.2.2 $
+-->
+<project name="BUILD_JAVA_TARGET">
+    <target name="build.java" depends="init_component" if="java.build.dir">
+        <echo message="## Building Java classes of '${component}'" />
+
+        <mkdir dir="${java.build.dir}" />
+        <property name="build.compiler" value="org.eclipse.jdt.core.JDTCompilerAdapter" />
+        <javac destdir="${java.build.dir}" source="1.4">
+            <src refid="java.source" />
+            <patternset refid="java.source.pattern" />
+            <bootclasspath refid="java.class.path"/>
+        </javac>
+        <fileset id="java.classes.fileset" dir="${java.build.dir}">
+            <patternset refid="java.classes.pattern" />
+        </fileset>
+        <pathconvert pathsep="," property="java.files" refid="java.classes.fileset" setonempty="false" />
+    </target>
+
+</project>

@@ -1,0 +1,211 @@
+<!--
+    Copyright 2005-2006 The Apache Software Foundation or its licensors, as applicable.
+  
+    Licensed under the Apache License, Version 2.0 (the "License");
+    you may not use this file except in compliance with the License.
+    You may obtain a copy of the License at
+  
+       http://www.apache.org/licenses/LICENSE-2.0
+  
+    Unless required by applicable law or agreed to in writing, software
+    distributed under the License is distributed on an "AS IS" BASIS,
+    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+    See the License for the specific language governing permissions and
+    limitations under the License.
+-->
+<!--
+Author: Marina V. Goldburt
+Version: $Revision: 1.5.2.6 $
+-->
+<project name="BUILD_NATIVE_TARGET">
+
+    <target name="build.native"
+            depends="build.native.init,
+                     build.native.c,
+                     build.native.cpp,
+                     build.native.asm,
+                     build.native.link" />
+    <target name="build.native.init" depends="init_component">
+        <echo message="## Building native of '${component}'" />
+
+        <propertycopy name="cfg.build"
+                      from="${component}.cfg"
+                      override="yes" />
+
+        <mkdir dir="${build.dir}" />
+        <if>
+            <not>
+                <isreference refid="c.compiler" />
+            </not>
+            <then>
+                <compiler id="c.compiler" extends="common.c.compiler" />
+            </then>
+        </if>
+        <if>
+            <not>
+                <isreference refid="cpp.compiler" />
+            </not>
+            <then>
+                <compiler id="cpp.compiler" extends="common.cpp.compiler" />
+            </then>
+        </if>
+        <if>
+            <not>
+                <isreference refid="linker" />
+            </not>
+            <then>
+                <linker id="linker" extends="common.linker" />
+            </then>
+        </if>
+
+        <!-- default values (if is not set in descriptor -->
+        <property name="outtype" value="static" />
+        <property name="libname" value="${component}" />
+                
+        <!-- setting default values (if they are not defined in the descriptors -->
+        <property name="${component}.outtype" value="static" />
+        <property name="${component}.libname" value="${component}" />
+        <property name="${component}.src" location="${common.src}" />
+        <property name="${component}.includes" location="${common.includes}" />
+        <property name="libdir" value="${build.dir}/_bin" />
+
+        <mkdir dir="${libdir}" />
+        <property name="${component}.libdir" location="${libdir}" />        
+        <!-- exporting libdir to other components -->
+
+        <property name="have.to.rebuild" value="true"/>
+        <property name="lib.out.dir" location="${libdir}" />
+        <mkdir dir="${lib.out.dir}" />
+
+        <condition property="is.cfg.debug" value="true">
+            <equals arg1="${cfg.build}" arg2="debug" />
+        </condition>
+        <property name="is.cfg.debug" value="false" />
+            
+        <property name="obj.out.dir" location="${build.dir}/_obj" />
+        <mkdir dir="${obj.out.dir}" />
+    </target>
+
+    <!-- compiles c sources ${c.compiler} must be set in the component descriptor 
+                to point what sources have to be compiled -->
+    <target name="build.native.c" depends="build.native.init" if="have.to.rebuild">
+        <cc objdir="${build.dir}/_obj" debug="${is.cfg.debug}" runtime="static" multithreaded="true">
+            <compiler refid="c.compiler" />
+            <select os="win">
+                <compilerarg value="/Zi" />
+            </select>
+            <select os="lnx">
+                <linkerarg value="-g" />
+            </select>
+            <fileset refid="c.fileset" />
+        </cc>
+    </target>
+
+    <!-- compiles cpp sources ${cpp.compiler} must be set in the component descriptor 
+                to point what sources have to be compiled -->
+    <target name="build.native.cpp" depends="build.native.init" if="have.to.rebuild">
+        <cc objdir="${build.dir}/_obj" debug="${is.cfg.debug}" runtime="static" multithreaded="true">
+            <compiler refid="cpp.compiler" />
+            <select os="win">
+                <compilerarg value="/Zi" />
+            </select>
+            <select os="lnx">
+                <linkerarg value="-g" />
+            </select>
+            <fileset refid="cpp.fileset" />
+        </cc>
+    </target>
+
+    <target name="build.native.asm.init" depends="build.native.init" if="have.to.rebuild">
+        <property name="asm.args" value="" />
+
+        <select cxx="gcc">
+            <property name="asm.executable" value="gcc" />
+        </select>
+        <select cxx="icc">
+            <property name="asm.executable" value="icc" />
+        </select>
+        <select os="win">
+            <property name="asm.executable" value="ml" />
+            <property name="asm.add.arg" value="/c /Cp /W3 /nologo /coff /Zm /Zd /Zi /Gd   -DWIN32" />
+        </select>
+
+        <condition property="asm.add.arg" value="-Wa,--fatal-warnings -c -x assembler-with-cpp -g">
+            <or>
+                <equals arg1="icc" arg2="${asm.executable}" />
+                <equals arg1="gcc" arg2="${asm.executable}" />
+            </or>
+        </condition>
+        <property name="asm.add.arg" value="" />
+    </target>
+
+    <target name="build.native.asm" depends="build.native.asm.init" if="have.to.rebuild">
+        <for param="file">
+            <fileset refid="asm.fileset" />
+            <sequential>
+                <propertyregex override="yes" property="object" input="@{file}" regexp=".*[/\\]([^\.]*)\.[^\.]*" replace="\1" defaultValue="@{file}" />
+                <dependset>
+                    <srcfileset refid="asm.fileset" />
+                    <targetfilelist dir="${build.dir}" files="${object}.o" />
+                </dependset>
+                <if>
+                    <not>
+                        <available file="${build.dir}/${object}.o" />
+                    </not>
+                    <then>
+                        <exec executable="${asm.executable}" failonerror="true">
+                            <arg line="${asm.args}" />
+                            <arg line="${asm.add.arg}" />
+                            <select os="lnx">
+                                <arg line=" -o${build.dir}/_obj/${object}.o @{file} " />
+                            </select>
+                            <select os="win">
+                                <arg line="/Fo${build.dir}/_obj/${object}.o @{file} " />
+                            </select>
+                        </exec>
+                    </then>
+                </if>
+            </sequential>
+        </for>
+    </target>
+
+    <target name="build.native.link.init" if="have.to.rebuild">
+        <fileset id="link.fileset" dir="${build.dir}/_obj">
+            <include name="*.o" />
+            <include name="*.obj" />
+        </fileset>
+
+        <pathconvert pathsep="," property="files" refid="link.fileset" />
+        <condition property="link.present" value="true">
+            <not>
+                <equals arg1="${files}" arg2="" />
+            </not>
+        </condition>
+
+        <condition property="not.static" value="true">
+            <and>
+                <isset property="link.present" />
+                <not>
+                    <equals arg1="${outtype}" arg2="static" />
+                </not>
+            </and>
+        </condition>
+    </target>
+
+    <!-- links all object files to the output library (static or shared) -->
+    <target name="build.native.link"
+            depends="build.native.link.init"
+            if="link.present">
+        <cc name="${build.cxx}"
+            debug="${is.cfg.debug}"
+            outfile="${lib.out.dir}/${libname}"
+            outtype="${outtype}">
+            <select os="win">
+                <linkerarg value="/pdb:${build.dir}/_bin/${libname}.pdb" />
+                <linkerarg value="/debug" />
+            </select>
+            <linker refid="linker" />
+            <fileset refid="link.fileset" />
+        </cc>
+    </target>
+</project>
