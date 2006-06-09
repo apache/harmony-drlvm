@@ -80,7 +80,7 @@ Version: $Revision: 1.4.2.6 $
             </select>
             <includepath>
                 <pathelement location="${includes}" />
-                <pathelement location="${extra.apr.includes}/apr-1" />
+                <pathelement location="${extra.apr.includes}" />
                 <pathelement location="${extra.aprutil.includes}" />
                 <select os="win">
                     <pathelement location="${extra.apriconv.includes}" />
