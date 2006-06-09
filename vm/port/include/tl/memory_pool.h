@@ -23,7 +23,7 @@
 
 #include <assert.h>
 #include <stdio.h>
-#include <apr-1/apr_pools.h>
+#include <apr_pools.h>
 #include "open/types.h"
 #include "log_macro.h"
 

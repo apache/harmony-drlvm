@@ -22,7 +22,8 @@
 #include <stdio.h>
 #include <string.h>
 #include <vector>
-#include <apr-1/apr_strings.h>
+#include <apr_strings.h>
+
 #include "assert.h"
 #include "port_malloc.h"
 #include "port_dso.h"

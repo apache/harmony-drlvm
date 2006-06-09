@@ -22,7 +22,7 @@
 
 #include "open/types.h"
 #include "open/em.h"
-#include <apr-1/apr_dso.h>
+#include <apr_dso.h>
 
 #ifdef __cplusplus
 extern "C" {

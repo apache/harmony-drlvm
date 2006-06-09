@@ -23,10 +23,11 @@
 #include <assert.h>
 #include <stdlib.h>
 
+#include <apr_dso.h>
+#include <apr_strings.h>
+#include <apr_portable.h>
+
 #include "port_disasm.h"
-#include "apr-1/apr_dso.h"
-#include "apr-1/apr_strings.h"
-#include "apr-1/apr_portable.h"
 
 // this is mostly imperical data 
 #if defined(_IA32_)

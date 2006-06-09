@@ -21,7 +21,7 @@
 #include <unistd.h>
 #include <limits.h>
 #include "port_filepath.h"
-#include <apr-1/apr_strings.h>
+#include <apr_strings.h>
 
 
 APR_DECLARE(char *) port_filepath_canonical(const char* original,

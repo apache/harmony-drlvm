@@ -25,7 +25,7 @@
 
 #ifndef USE_GC_STATIC
 
-#include <apr-1/apr_dso.h>
+#include <apr_dso.h>
 #include "dll_gc.h"
 #include "open/gc.h"
 #include "open/vm_util.h"

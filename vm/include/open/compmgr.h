@@ -28,7 +28,7 @@
 #ifndef _OPEN_COMPMGR_H
 #define _OPEN_COMPMGR_H
 
-#include <apr-1/apr_pools.h>
+#include <apr_pools.h>
 
 #ifdef __cplusplus
 extern "C"

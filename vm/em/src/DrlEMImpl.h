@@ -27,7 +27,7 @@
 #include "open/vm_util.h"
 #include "open/em_profile_access.h"
 
-#include "apr-1/apr_dso.h"
+#include <apr_dso.h>
 #include <string>
 #include <set>
 #include <vector>

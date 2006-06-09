@@ -19,9 +19,9 @@
 */  
 
 #include <dlfcn.h>
-#include <stdlib.h>
-#include <apr-1/apr_dso.h>
-#include <apr-1/apr_strings.h>
+#include <stdliapr_dso.h>
+#include <b.h>
+#include <apr_strings.h>
 #include "port_dso.h"
 
 struct apr_dso_handle_t {

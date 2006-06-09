@@ -18,13 +18,14 @@
  * @version $Revision: 1.1.2.1.4.4 $
  */  
 
+#include <apr_atomic.h>
+
 #include "jni.h"
 #include "Class.h"
 #include "object_handles.h"
 #include "environment.h"
 #include "atomics.h"
 #include "vm_arrays.h"
-#include <apr-1/apr_atomic.h>
 #include "port_atomic.h"
 #include "open/thread.h"
 

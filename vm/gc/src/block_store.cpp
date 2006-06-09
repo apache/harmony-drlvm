@@ -24,8 +24,8 @@
 #include <iostream>
 
 // VM interface header files
-#include <apr-1/apr_atomic.h>
-#include <apr-1/apr_file_io.h>
+#include <apr_atomic.h>
+#include <apr_file_io.h>
 #include "port_malloc.h"
 #include "port_sysinfo.h"
 #include "open/vm_gc.h"

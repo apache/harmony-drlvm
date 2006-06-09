@@ -44,8 +44,8 @@
 #include "verifier.h"
 
 #include "port_filepath.h"
-#include <apr-1/apr_file_io.h>
-#include <apr-1/apr_file_info.h>
+#include <apr_file_io.h>
+#include <apr_file_info.h>
 
 #include "jarfile_util.h"
 #include "jni_utils.h"

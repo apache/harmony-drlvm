@@ -22,7 +22,7 @@
 #include "cxxlog.h"
 
 #include "root_set_enum_internal.h"
-#include <apr-1/apr_time.h>
+#include <apr_time.h>
 #include "unloading.h"
 #include "thread_manager.h"
 #include "interpreter.h"

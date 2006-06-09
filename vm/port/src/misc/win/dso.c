@@ -20,11 +20,13 @@
 
 #include <windows.h>
 #include <string.h>
-#include <apr-1/apr_dso.h>
+
+#include <apr_dso.h>
+#include <apr_strings.h>
+#include <apr_env.h>
+
 #include "port_dso.h"
 #include "port_sysinfo.h"
-#include <apr-1/apr_strings.h>
-#include <apr-1/apr_env.h>
 
 struct apr_dso_handle_t {
 	apr_pool_t *pool;

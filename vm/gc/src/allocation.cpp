@@ -25,7 +25,7 @@
 
 // VM interface header files
 #include "platform_lowlevel.h"
-#include <apr-1/apr_atomic.h>
+#include <apr_atomic.h>
 #include "open/vm_gc.h"
 #include "open/gc.h"
 

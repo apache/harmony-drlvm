@@ -22,8 +22,8 @@
 #define LOG_DOMAIN "vm.core"
 #include "cxxlog.h"
 
-#include <apr-1/apr_strings.h>
-#include <apr-1/apr_env.h>
+#include <apr_strings.h>
+#include <apr_env.h>
 #include "port_filepath.h"
 
 #include <string.h>

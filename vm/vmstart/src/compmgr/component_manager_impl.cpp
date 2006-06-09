@@ -18,9 +18,9 @@
  * @version $Revision: 1.1.2.2.4.5 $
  */  
 
-#include <apr-1/apr_atomic.h>
-#include <apr-1/apr_lib.h>
-#include <apr-1/apr_strings.h>
+#include <apr_atomic.h>
+#include <apr_lib.h>
+#include <apr_strings.h>
 
 #include "open/compmgr.h"
 #include "component_manager_impl.h"

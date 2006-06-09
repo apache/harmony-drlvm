@@ -22,7 +22,7 @@
 #define _PORT_VMEM_H_
 
 #include "port_general.h"
-#include <apr-1/apr_pools.h>
+#include <apr_pools.h>
 
 #ifdef __cplusplus
 extern "C" {

@@ -21,8 +21,8 @@
 #include <assert.h>
 
 #include "dump.h"
-#include "apr-1/apr_file_io.h"
-#include "apr-1/apr_pools.h"
+#include <apr_file_io.h>
+#include <apr_pools.h>
 #include "port_disasm.h"
 
 

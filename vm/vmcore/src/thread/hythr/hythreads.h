@@ -18,11 +18,11 @@
  * @version $Revision: 1.1.2.1.4.4 $
  */  
 #include "vm_threads.h"
-#include <apr-1/apr_general.h>
-#include <apr-1/apr_thread_mutex.h>
-#include <apr-1/apr_thread_cond.h>
-#include <apr-1/apr_thread_proc.h>
-#include <apr-1/apr_portable.h>
+#include <apr_general.h>
+#include <apr_thread_mutex.h>
+#include <apr_thread_cond.h>
+#include <apr_thread_proc.h>
+#include <apr_portable.h>
 
 #include<stdio.h>
 #include<assert.h>

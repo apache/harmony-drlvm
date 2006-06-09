@@ -21,11 +21,12 @@
  * JVMTI raw monitor API
  */
 
+#include <apr_time.h>
+
 #include "platform_lowlevel.h"
 #include "lock_manager.h"
 #include "jvmti_direct.h"
 #include "jvmti_utils.h"
-#include <apr-1/apr_time.h>
 #include "vm_threads.h"
 #include "vm_process.h"
 #include "cxxlog.h"

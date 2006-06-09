@@ -20,7 +20,7 @@
 #ifndef _gc_v4_H_
 #define _gc_v4_H_
 
-#include <apr-1/apr_time.h>
+#include <apr_time.h>
 
 #include "gc_header.h"
 #include "open/vm.h"

@@ -21,6 +21,8 @@
  * JVMTI property API
  */
 
+#include <apr_file_info.h>
+
 #include "jvmti_direct.h"
 #include "jvmti_utils.h"
 #include "environment.h"
@@ -28,7 +30,6 @@
 #include "cxxlog.h"
 #include "port_filepath.h"
 #include "suspend_checker.h"
-#include <apr-1/apr_file_info.h>
 
 /*
  * Add To Bootstrap Class Loader Search

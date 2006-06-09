@@ -19,7 +19,7 @@
 */
 
 #include <windows.h>
-#include <apr-1/apr_strings.h>
+#include <apr_strings.h>
 #include "port_sysinfo.h"
 
 typedef struct {

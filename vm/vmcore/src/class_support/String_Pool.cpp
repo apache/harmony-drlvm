@@ -29,8 +29,9 @@
 using namespace std;
 
 #include <assert.h>
+#include <apr_atomic.h>
+
 #include "String_Pool.h"
-#include <apr-1/apr_atomic.h>
 #include "environment.h"
 #include "open/vm_util.h"
 #include "atomics.h"

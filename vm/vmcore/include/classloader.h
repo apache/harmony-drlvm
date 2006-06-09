@@ -21,7 +21,7 @@
 #define _CLASSLOADER_H_
 
 #include <sstream>
-#include <apr-1/apr_pools.h>
+#include <apr_pools.h>
 
 #include "vm_core_types.h"
 #include "object_layout.h"

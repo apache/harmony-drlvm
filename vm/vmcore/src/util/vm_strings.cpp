@@ -19,12 +19,14 @@
  */  
 
 #define LOG_DOMAIN "vm.accessors"
+
+#include <apr_atomic.h>
+
 #include "cxxlog.h"
 
 #include "vm_strings.h"
 #include "environment.h"
 #include "vm_stats.h"
-#include <apr-1/apr_atomic.h>
 #include "exceptions.h"
 #include "vm_arrays.h"
 

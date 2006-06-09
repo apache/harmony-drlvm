@@ -27,7 +27,7 @@
 //#include "open/types.h"
 #include "hash_table.h"
 #include "port_malloc.h"
-#include <apr-1/apr_atomic.h>
+#include <apr_atomic.h>
 
 // GC includes
 #include "gc_cout.h"

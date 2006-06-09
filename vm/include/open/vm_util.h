@@ -22,7 +22,7 @@
 #ifndef _VM_UTILS_H_
 #define _VM_UTILS_H_
 
-#include <apr-1/apr_general.h>
+#include <apr_general.h>
 #include "port_malloc.h"
 #include "open/types.h"
 

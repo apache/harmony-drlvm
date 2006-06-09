@@ -23,8 +23,8 @@
 #include "jvmti_utils.h"
 #include "vm_threads.h"
 #include "jit_export_jpda.h"
-#include <apr-1/apr_dso.h>
-#include <apr-1/apr_strings.h>
+#include <apr_dso.h>
+#include <apr_strings.h>
 #include "log_macro.h"
 
 //using namespace du_ti;

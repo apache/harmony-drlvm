@@ -24,7 +24,7 @@
 #include <limits.h>
 #include <errno.h>
 #include "port_sysinfo.h"
-#include <apr-1/apr_strings.h>
+#include <apr_strings.h>
 
 APR_DECLARE(apr_status_t) port_executable_name(char** self_name,
 								   apr_pool_t* pool) {

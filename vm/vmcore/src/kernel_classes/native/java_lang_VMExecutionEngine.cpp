@@ -26,7 +26,7 @@
  * java.lang.VMExecutionEngine class.
  */
 
-#include <apr-1/apr_file_io.h>
+#include <apr_file_io.h>
 #include "environment.h"
 #include "port_filepath.h"
 #include "port_sysinfo.h"

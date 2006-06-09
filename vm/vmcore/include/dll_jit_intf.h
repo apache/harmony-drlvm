@@ -25,8 +25,8 @@
 #include <string.h>
 #include "jit_intf_cpp.h"
 #include "jit_export_jpda.h"
-#include <apr-1/apr_dso.h>
-#include <apr-1/apr_dso.h>
+#include <apr_dso.h>
+#include <apr_dso.h>
 #include "open/thread.h"
 
 bool vm_is_a_jit_dll(const char *dll_filename);

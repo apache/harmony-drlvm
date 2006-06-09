@@ -23,8 +23,8 @@
 
 #include "open/types.h"
 #include "port_general.h"
-#include <apr-1/apr_pools.h>
-#include <apr-1/apr_dso.h>
+#include <apr_pools.h>
+#include <apr_dso.h>
 
 #ifdef __cplusplus
 extern "C" {

@@ -21,7 +21,7 @@
 #ifndef _PORT_GENERAL_H_
 #define _PORT_GENERAL_H_
 
-#include <apr-1/apr.h>
+#include <apr.h>
 
 #ifndef NULL
 #ifdef __cplusplus

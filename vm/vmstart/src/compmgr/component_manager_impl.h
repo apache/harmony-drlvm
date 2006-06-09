@@ -22,8 +22,8 @@
 #define _VM_COMPONENT_MANAGER_IMPL_H
 
 #include "component_manager.h"
-#include <apr-1/apr_thread_rwlock.h>
-#include <apr-1/apr_dso.h>
+#include <apr_thread_rwlock.h>
+#include <apr_dso.h>
 
 typedef struct _Dll {
     /**

@@ -19,9 +19,9 @@
 */  
 
 #include <unistd.h>
-#include <apr-1/apr_file_info.h>
-#include <apr-1/apr_strings.h>
-#include <apr-1/apr_file_io.h>
+#include <apr_file_info.h>
+#include <apr_strings.h>
+#include <apr_file_io.h>
 #include "port_sysinfo.h"
 
 static const char* const zone_dir = "/usr/share/zoneinfo";

@@ -24,10 +24,10 @@
 
 #include "properties.h"
 #include "open/vm_util.h"
-#include <apr-1/apr_file_io.h>
-#include <apr-1/apr_file_info.h>
-#include <apr-1/apr_env.h>
-#include <apr-1/apr_strings.h>
+#include <apr_file_io.h>
+#include <apr_file_info.h>
+#include <apr_env.h>
+#include <apr_strings.h>
 #include "port_dso.h"
 #include "port_filepath.h"
 #include "port_sysinfo.h"

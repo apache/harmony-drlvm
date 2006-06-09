@@ -26,7 +26,7 @@
 #ifndef _NATIVES_SUPPORT_LIB_H_
 #define _NATIVES_SUPPORT_LIB_H_
 
-#include <apr-1/apr_dso.h>
+#include <apr_dso.h>
 #include "vm_core_types.h"
 #include "jni_types.h"
 

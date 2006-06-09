@@ -21,7 +21,7 @@
 #define _DLL_EM_INTF_H_
 
 #include "em_intf_cpp.h"
-#include <apr-1/apr_dso.h>
+#include <apr_dso.h>
 
 bool vm_is_a_em_dll(const char *dll_filename);
 

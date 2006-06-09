@@ -19,7 +19,7 @@
 */  
 
 #include "port_filepath.h"
-#include <apr-1/apr_strings.h>
+#include <apr_strings.h>
 
 APR_DECLARE(char *) port_filepath_merge(const char* root,
                           const char* trail,

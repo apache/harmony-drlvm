@@ -24,7 +24,7 @@
 #include "thread_generic.h"
 #include "open/vm_util.h"
 #include "properties.h"
-#include <apr-1/apr_env.h>
+#include <apr_env.h>
 #include "vm_synch.h"
 #include "init.h"
 #include "compile.h"

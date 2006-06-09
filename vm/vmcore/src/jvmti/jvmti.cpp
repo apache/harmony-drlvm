@@ -36,7 +36,7 @@
 #include "open/thread.h"
 #include "port_filepath.h"
 #include "port_dso.h"
-#include <apr-1/apr_strings.h>
+#include <apr_strings.h>
 
 #ifdef PLATFORM_NT
 #define AGENT_ONLOAD "_Agent_OnLoad@12"

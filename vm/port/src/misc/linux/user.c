@@ -23,7 +23,7 @@
 #include <unistd.h>
 #include <errno.h>
 #include "port_sysinfo.h"
-#include <apr-1/apr_strings.h>
+#include <apr_strings.h>
 
 APR_DECLARE(apr_status_t) port_user_name(char** account,
 							 apr_pool_t* pool){

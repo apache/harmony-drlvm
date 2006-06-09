@@ -23,7 +23,7 @@
 
 #include <assert.h>
 #include "platform_lowlevel.h"
-#include <apr-1/apr_atomic.h>
+#include <apr_atomic.h>
 
 #include "open/types.h"
 #include "open/vm_gc.h"
