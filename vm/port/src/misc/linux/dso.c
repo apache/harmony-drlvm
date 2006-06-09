@@ -19,8 +19,8 @@
 */  
 
 #include <dlfcn.h>
-#include <stdliapr_dso.h>
-#include <b.h>
+#include <stdlib.h>
+#include <apr_dso.h>
 #include <apr_strings.h>
 #include "port_dso.h"
 
