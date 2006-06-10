@@ -38,6 +38,7 @@ namespace Jitrino {
 template <typename DataflowValue>
 class DataflowTF {
 public:
+    virtual ~DataflowTF() {}
     // returns true if changed
     virtual bool apply(const DataflowValue &in, DataflowValue &out) = 0;
 };
@@ -45,6 +46,7 @@ public:
 template <typename DataflowValue>
 class DataflowInstance {
 public:
+    virtual ~DataflowInstance() {}
     typedef DataflowValue ValueType;
     virtual DataflowTF<DataflowValue> *getNodeBehavior(CFGNode *node) = 0;
     virtual DataflowValue getEntryValue() = 0;

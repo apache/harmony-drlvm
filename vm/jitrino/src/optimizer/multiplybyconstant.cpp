@@ -52,6 +52,7 @@
 #include "CompilationContext.h"
 
 #include <float.h>
+#include <math.h>
 
 #include "Stl.h"
 #include "simplifier.h"
@@ -63,14 +64,8 @@
 namespace Jitrino {
 
 #ifdef PLATFORM_POSIX
-inline bool isfinite(double s) {
-    return (finite(s) != 0);
-}
 // isnan(double s) is declared in float.h
 #else
-inline bool isfinite(double s) {
-    return (_finite(s) != 0);
-}
 inline bool isnan(double s) {
     return (_isnan(s) != 0);
 }

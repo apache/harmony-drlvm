@@ -61,6 +61,8 @@ DEFINE_OPTPASS(DepthReassociationPass)
 
 DEFINE_OPTPASS(LateDepthReassociationPass)
 
+class Simplifier;
+
 //
 // Try to re-associate expressions to either
 //    - reduce expression height

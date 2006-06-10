@@ -352,7 +352,7 @@ void Layouter::runImpl() {
         } else if (!strcmp(params, "topdown")) {
             type = Linearizer::TOPDOWN;
         } else if (!strcmp(params, "mixed")) {
-            type = irManager.hasLoops() ? Linearizer::BOTTOM_UP  : type = Linearizer::TOPDOWN;
+            type = irManager.hasLoops() ? Linearizer::BOTTOM_UP  : Linearizer::TOPDOWN;
         } else if (!strcmp(params, "topological")) {
             type = Linearizer::TOPOLOGICAL;
         } else {

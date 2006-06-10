@@ -537,6 +537,7 @@ inline bool neg_overflowed(inttype nega, inttype a) {
     return (nega == a);
 };
 
+#if 0
 template <typename inttype>
 inline bool mul_overflowed(inttype prod, inttype a, inttype b) {
     // let's just be really conservative.
@@ -552,6 +553,7 @@ inline bool mul_overflowed(inttype prod, inttype a, inttype b) {
     else
         return false;
 };
+#endif
 
 } //namespace Jitrino 
 

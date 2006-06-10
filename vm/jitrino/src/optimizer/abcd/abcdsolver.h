@@ -191,12 +191,12 @@ public:
     // by considering either var1 or var2, depending on derefVar1
     // if (!checkVar1), var2 should have been fully dereferenced 
     // and checked first.; sets noneApply=true if none apply 
-    ProofLattice AbcdSolver::proveForSpecialCases(const VarBound &var1,
-                                                  const VarBound &var2,
-                                                  ConstBound c,
-                                                  bool checkVar1,
-                                                  bool &noneApply,
-                                                  AbcdReasons *why); // if non-null and proven true, reasons why
+    ProofLattice proveForSpecialCases(const VarBound &var1,
+                                      const VarBound &var2,
+                                      ConstBound c,
+                                      bool checkVar1,
+                                      bool &noneApply,
+                                      AbcdReasons *why); // if non-null and proven true, reasons why
     void tryToEliminate(Inst *); // solve for an instruction;
     void tryToFoldBranch(Inst *);
     void tryToFoldCompare(Inst *);

@@ -48,6 +48,7 @@ class PiOpnd;
 
 class OpndBase {    // rename to Opnd
 public:
+    virtual ~OpndBase() {}
     uint32  getId() const                 {return id;}
     Type*   getType() const               {return type;}
     void    setType(Type *t)              {type = t;}
@@ -104,6 +105,7 @@ private:
 
 class Opnd : public OpndBase {
 public:
+    virtual ~Opnd() {}
     void    setIsGlobal(bool val)   {isGlobalFlag = val;}
     bool    isGlobal() const        {return isGlobalFlag;}
     //
@@ -126,6 +128,7 @@ protected:
 
 class SsaOpnd : public Opnd {
 public:
+    virtual ~SsaOpnd() {}
     virtual bool isSsaOpnd() const    {return true;}
 protected:
     friend class OpndManager;
@@ -136,6 +139,7 @@ protected:
 
 class SsaTmpOpnd : public SsaOpnd {
 public:
+    virtual ~SsaTmpOpnd() {}
     virtual bool isSsaTmpOpnd() const    {return true;}
 private:
     friend class OpndManager;
@@ -144,6 +148,7 @@ private:
 
 class PiOpnd : public SsaOpnd {
 public:
+    virtual ~PiOpnd() {}
     virtual bool isSsaTmpOpnd() const    {return false;};
     virtual bool isPiOpnd() const        {return true;};
     const Opnd *getOrg() const { return orgOpnd; };
@@ -162,6 +167,7 @@ class VarAccessInst;
 
 class VarOpnd : public Opnd {
 public:
+    virtual ~VarOpnd() {}
     virtual bool    isVarOpnd() const      {return true;}
     bool            isAddrTaken() const    {return isAddrTakenFlag;}
     void            setAddrTaken()         {isAddrTakenFlag = true;}
@@ -216,6 +222,7 @@ private:
 //
 class SsaVarOpnd : public SsaOpnd {
 public:
+    virtual ~SsaVarOpnd() {}
     virtual bool isSsaVarOpnd() const {return true;}
     VarOpnd* getVar()           {return var;}
     //
@@ -305,6 +312,7 @@ class OpndRenameTable : public HashTable<Opnd,Opnd> {
 public:
     OpndRenameTable(MemoryManager& mm, uint32 size = 16, bool renameSSA = false): 
         HashTable<Opnd,Opnd>(mm,size) {renameSsaOpnd = renameSSA;}
+    virtual ~OpndRenameTable() {}
     
     Opnd *getMapping(Opnd *from)   {return lookup(from); }
     void  setMapping(Opnd *from, Opnd *to) {

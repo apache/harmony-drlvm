@@ -187,6 +187,7 @@ private:
 
 class BitSet::Visitor {
 public:
+        virtual ~Visitor() {}
 	virtual void visit(uint32 elem) = 0;
 };
 
@@ -194,7 +195,8 @@ public:
 class BitSet::Printer : public BitSet::Visitor {
 public:
 	Printer(::std::ostream & _os) : os(_os) {}
-    void visit(uint32 i) { os << " " << (int) i;}
+        virtual ~Printer() {}
+        void visit(uint32 i) { os << " " << (int) i;}
 private:
 	::std::ostream & os;
 };

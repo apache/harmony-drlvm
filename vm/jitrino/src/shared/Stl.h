@@ -41,7 +41,11 @@
 
 #include <ext/hash_set>
 #include <ext/hash_map>
+#if (defined __GNUC__) && ((__GNUC__ >= 3 && __GNUC_MINOR__ > 3) || __GNUC__ > 3)
+#include <ext/hash_fun.h>
+#else
 #include <ext/stl_hash_fun.h>
+#endif
 
 #else
 
@@ -218,7 +222,7 @@ public:
   StlVectorSet(Allocator const& a) : Vector(a) {}
   StlVectorSet(Allocator const& a, size_type n, const T& x = T()) : Vector(n, x, a) {}
   StlVectorSet(const Vector & a) :  Vector(a) {
-      sort(begin(), end());
+      sort(StlVectorSet<T,Allocator>::begin(), StlVectorSet<T,Allocator>::end());
   }
   StlVectorSet& operator=(const Vector & a) { Vector::operator=(a); return *this; };
   StlVectorSet& operator=(const StlVectorSet & a) { 
@@ -242,8 +246,8 @@ public:
       }
   }
   void insert(iterator i1, iterator i2) {
-      Vector::insert(end(), i1, i2);
-      ::std::sort(begin(), end());
+      Vector::insert(StlVectorSet<T>::end(), i1, i2);
+      ::std::sort(StlVectorSet<T>::begin(), StlVectorSet<T>::end());
   }
   size_type erase(const T& x) { 
       ::std::pair<iterator, iterator> found= equal_range(x);
@@ -264,31 +268,31 @@ public:
       else return 0;
   }
     const_iterator lower_bound(const T& x) const {
-      return ::std::lower_bound(begin(), end(), x);
+      return ::std::lower_bound(StlVectorSet<T,Allocator>::begin(), StlVectorSet<T,Allocator>::end(), x);
   }
   iterator lower_bound(const T& x) {
-      return ::std::lower_bound(begin(), end(), x);
+      return ::std::lower_bound(StlVectorSet<T,Allocator>::begin(), StlVectorSet<T,Allocator>::end(), x);
   }
   const_iterator upper_bound(const T& x) const {
-      return ::std::upper_bound(begin(), end(), x);
+      return ::std::upper_bound(StlVectorSet<T,Allocator>::begin(), StlVectorSet<T,Allocator>::end(), x);
   }
   iterator upper_bound(const T& x) {
-      return ::std::upper_bound(begin(), end(), x);
+      return ::std::upper_bound(StlVectorSet<T,Allocator>::begin(), StlVectorSet<T,Allocator>::end(), x);
   }
   ::std::pair<const_iterator, const_iterator> equal_range(const T& x) const {
-      return ::std::equal_range(begin(), end(), x);
+      return ::std::equal_range(StlVectorSet<T,Allocator>::begin(), StlVectorSet<T,Allocator>::end(), x);
   }
   ::std::pair<iterator, iterator> equal_range(const T& x) {
-      return ::std::equal_range(begin(), end(), x);
+      return ::std::equal_range(StlVectorSet<T,Allocator>::begin(), StlVectorSet<T,Allocator>::end(), x);
   }
   const_iterator find(const T& x) const {
       ::std::pair<const_iterator, const_iterator> found= equal_range(x);
-      if (found.first == found.second) return end();
+      if (found.first == found.second) return StlVectorSet<T,Allocator>::end();
       else return found.first;
   }
   iterator find(const T& x) { 
       ::std::pair<iterator, iterator> found= equal_range(x);
-      if (found.first == found.second) return end();
+      if (found.first == found.second) return StlVectorSet<T,Allocator>::end();
       else return found.first;
   }
   bool has(const T& x) const { 
@@ -312,8 +316,8 @@ public:
   StlBoolVector(Allocator const& a, size_type n, bool x = false) : Vector(n, x, a) {}
 
   // Automatically resize as needed.
-  bool getBit(size_type n) { if(n < size()) return at(n); else return false; }
-  bool setBit(size_type n, bool value=true) { if(n >= size()) resize(n+1); bool old = at(n); at(n) = value; return old; }
+  bool getBit(size_type n) { if(n < StlBoolVector<Allocator>::size()) return at(n); else return false; }
+  bool setBit(size_type n, bool value=true) { if(n >= StlBoolVector<Allocator>::size()) resize(n+1); bool old = at(n); at(n) = value; return old; }
 };
 typedef StlBoolVector<> StlBitVector;
 
@@ -339,7 +343,7 @@ public:
   StlSet(Allocator const& a) : Set(Traits(), a) {}
   StlSet(Traits const& t, Allocator const& a) : Set(t, a) {}
 
-  bool has(const KeyT& k) const { return (find(k) != end()); };
+  bool has(const KeyT& k) const { return (find(k) != StlSet<KeyT,Traits,Allocator>::end()); };
 };
 
 /**
@@ -353,7 +357,7 @@ public:
   StlMultiSet(Allocator const& a) : MultiSet(Traits(), a) {}
   StlMultiSet(Traits const& t, Allocator const& a) : MultiSet(t, a) {}
 
-  bool has(const KeyT& k) const { return (find(k) != end()); };
+  bool has(const KeyT& k) const { return (find(k) != StlMultiSet<KeyT>::end()); };
 };
 
 /**
@@ -367,7 +371,7 @@ public:
   StlMap(Allocator const& a) : Map(Traits(), a) {}
   StlMap(Traits const& t, Allocator const& a) : Map(t, a) {}
 
-  bool has(const KeyT& k) const { return (find(k) != end()); };
+  bool has(const KeyT& k) const { return (find(k) != StlMap<KeyT,ValueT,Traits,Allocator>::end()); };
 };
 
 /**
@@ -381,7 +385,7 @@ public:
   StlMultiMap(Allocator const& a) : MultiMap(Traits(), a) {}
   StlMultiMap(Traits const& t, Allocator const& a) : MultiMap(t, a) {}
 
-  bool has(const KeyT& k) const { return (find(k) != end()); };
+  bool has(const KeyT& k) const { return (find(k) != StlMultiMap<KeyT,ValueT,Traits,Allocator>::end()); };
 };
 
 /**
@@ -424,7 +428,7 @@ public:
   StlHashSet(Allocator const& a) : HashSet(HashCompareFun(), a) {}
   StlHashSet(Allocator const& a, size_type n) : HashSet(HashCompareFun(), a) {}
 
-  bool has(const T& k) const { return (find(k) != end()); };
+  bool has(const T& k) const { return (find(k) != StlHashSet<T,HashCompareFun,Allocator>::end()); };
 };
 #else
 template<class T, class HashFun = StlSimpleHash, class CompareFun = ::std::equal_to<T>, class Allocator = StlMMAllocator<T> >
@@ -455,7 +459,7 @@ public:
   StlHashMultiSet(Allocator const& a) : HashMultiSet(HashCompareFun(), a) {}
   StlHashMultiSet(Allocator const& a, size_type n) : HashMultiSet(HashCompareFun(), a) {}
 
-  bool has(const T& k) const { return (find(k) != end()); };
+  bool has(const T& k) const { return (find(k) != StlHashMultiSet<T,HashCompareFun,Allocator>::end()); };
 };
 #else
 template<class T, class HashFun = StlSimpleHash, class CompareFun = ::std::equal_to<T>, class Allocator = StlMMAllocator<T> >
@@ -486,7 +490,7 @@ public:
   StlHashMap(Allocator const& a) : HashMap(HashCompareFun(), a) {}
   StlHashMap(Allocator const& a, size_type n) : HashMap(HashCompareFun(), a) {}
 
-  bool has(const KeyT& k) const { return (find(k) != end()); };
+  bool has(const KeyT& k) const { return (find(k) != StlHashMap<KeyT,ValueT,HashCompareFun,Allocator>::end()); };
 };
 
 #else
@@ -518,7 +522,7 @@ public:
   StlHashMultiMap(Allocator const& a) : HashMultiMap(HashCompareFun(), a) {}
   StlHashMultiMap(Allocator const& a, size_type n) : HashMultiMap(HashCompareFun(), a) {}
 
-  bool has(const KeyT& k) const { return (find(k) != end()); };
+  bool has(const KeyT& k) const { return (find(k) != StlHashMultiMap<KeyT,ValueT,HashCompareFun,Allocator>::end()); };
 };
 #else
 template<class KeyT, class ValueT, class HashFun = StlSimpleHash, class CompareFun = ::std::equal_to<KeyT>, class Allocator = StlMMAllocator<ValueT> >

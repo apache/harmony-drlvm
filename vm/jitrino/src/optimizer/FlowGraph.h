@@ -166,6 +166,7 @@ public:
 
     class ProfileAnnotator : public ControlFlowNode::Annotator {
     public:
+	virtual ~ProfileAnnotator() {}
         void annotateNode(::std::ostream& os, ControlFlowNode* _node) {
             CFGNode* node = (CFGNode*) _node;
             os << "[Freq=" << ::std::setprecision(4) << node->getFreq();

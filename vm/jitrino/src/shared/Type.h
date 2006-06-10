@@ -147,6 +147,7 @@ public:
 		InavlidTag = NumTypeTags
     };
     Type(Tag t) : tag(t), id(++nextTypeId) {}
+    virtual ~Type() {}
     const Tag tag;
     bool    isBuiltinValue()   {return isBuiltinValue(tag); }
     bool    isNumeric()        {return isNumeric(tag);      }
@@ -369,6 +370,7 @@ public:
     PtrType(Type* t,bool isManagedPtr,ValueName array=NULL, ValueName index=NULL) 
         : Type(isManagedPtr ? ManagedPtr : UnmanagedPtr), pointedToType(t), array(array), index(index) {}
     PtrType* asPtrType() { return this; }
+    virtual ~PtrType() {}
     Type*   getPointedToType()            {return pointedToType;}
     ValueName getArrayName() { return array; }
     ValueName getIndexName() { return index; }
@@ -383,6 +385,7 @@ class FunctionPtrType : public Type {
 public:
     FunctionPtrType(bool isCompressed=false) : Type(isCompressed ? CompressedMethodPtr : MethodPtr) { }
     FunctionPtrType* asFunctionPtrType() { return this; }
+    virtual ~FunctionPtrType() {}
     virtual uint32 getNumParams() = 0;
     virtual Type* getParamType(uint32) = 0;
     virtual Type* getReturnType() = 0;
@@ -393,6 +396,7 @@ class MethodPtrType : public FunctionPtrType {
 public:
     MethodPtrType(MethodDesc* md, TypeManager& tm, bool isCompressed=false, ValueName obj=NULL) 
         : FunctionPtrType(isCompressed), methodDesc(md), methodSig(md->getMethodSig()), typeManager(tm), object(obj) {}
+    virtual ~MethodPtrType() {}
     MethodPtrType* asMethodPtrType() { return this; }
     uint32 getNumParams() { return methodSig->getNumParams(); }
     Type* getParamType(uint32 i);
@@ -412,6 +416,7 @@ class VTablePtrType : public Type {
 public:
     VTablePtrType(Type* t, bool isCompressed=false) : Type(isCompressed? CompressedVTablePtr : VTablePtr), 
                                                       baseType(t) {}
+    virtual ~VTablePtrType() {}
     Type*          getBaseType()            {return baseType;}
     virtual void   print(::std::ostream& os);
 private:
@@ -429,6 +434,7 @@ class NamedType : public Type {
 public:
     NamedType(Tag t, void* td, TypeManager& tm) 
         : Type(t), vmTypeHandle(td), typeManager(tm) {}
+    virtual ~NamedType() {}
 
     NamedType* asNamedType() { return this; }
     bool needsInitialization();
@@ -452,11 +458,13 @@ protected:
 class ValueType : public Type {
 public:
     ValueType(Tag t) : Type(t) {}
+    virtual ~ValueType() {}
 };
 
 class UserValueType : public NamedType {
 public:
     UserValueType(void* td,TypeManager& tm) : NamedType(Value,td,tm) {}
+    virtual ~UserValueType() {}
     virtual const char* getName();
     virtual const char* getNameQualifier();
     //
@@ -626,6 +634,7 @@ private:
 class TypeManager {
 public:
     TypeManager(MemoryManager& mm);
+    virtual ~TypeManager() {}
     void    init(CompilationInterface &compInt);
     void    init();
     MemoryManager&  getMemManager()        {return memManager;}

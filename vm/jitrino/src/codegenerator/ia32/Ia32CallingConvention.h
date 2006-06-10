@@ -48,6 +48,7 @@ Implementers of this interface are used as arguments to some IRManager methods
 class CallingConvention
 {	
 public:	
+        virtual ~CallingConvention() {}
 	//--------------------------------------------------------------
 
 	struct OpndInfo
@@ -103,7 +104,7 @@ typedef StlVector<const CallingConvention *> CallingConventionVector;
 class STDCALLCallingConvention: public CallingConvention
 {	
 public:	
-
+        virtual ~STDCALLCallingConvention() {}
 	virtual void	getOpndInfo(ArgKind kind, uint32 argCount, OpndInfo * infos)const;
 	virtual uint32	getCalleeSavedRegs(OpndKind regKind)const;
 	virtual bool	calleeRestoresStack()const{ return true; }
@@ -119,6 +120,7 @@ public:
 class DRLCallingConvention: public STDCALLCallingConvention
 {	
 public:	
+        virtual ~DRLCallingConvention() {}
 	virtual bool	pushLastToFirst()const{ return false; }
 
 };
@@ -131,6 +133,7 @@ public:
 class CDECLCallingConvention: public STDCALLCallingConvention
 {	
 public:	
+        virtual ~CDECLCallingConvention() {}
 	virtual bool	calleeRestoresStack()const{ return false; }
 };
 

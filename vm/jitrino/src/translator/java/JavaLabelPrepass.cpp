@@ -1123,6 +1123,9 @@ void JavaLabelPrepass::dcmpg()                             { genCompare(doubleTy
 
 void JavaLabelPrepass::new_(uint32 constPoolIndex)         { 
     StateInfo::SlotInfo slot;
+    slot.slotFlags = 0;
+    slot.varNumber = 0;
+    slot.jsrLabelOffset = 0;
     StateInfo::setNonNull(&slot);
     StateInfo::setExactType(&slot);
     Type* nType = resolveTypeNew(constPoolIndex);
@@ -1162,6 +1165,10 @@ void JavaLabelPrepass::newarray(uint8 etype)                {
 void JavaLabelPrepass::anewarray(uint32 constPoolIndex)    { 
     popAndCheck(int32Type); 
     StateInfo::SlotInfo slot;
+    slot.slotFlags = 0;
+    slot.varNumber = 0;
+    slot.jsrLabelOffset = 0;
+
     StateInfo::setNonNull(&slot);
     StateInfo::setExactType(&slot);
     Type* type = resolveType(constPoolIndex);

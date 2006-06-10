@@ -56,6 +56,8 @@ class CompilationContext;
 
 class ExceptionCallback {
 public:
+
+    virtual ~ExceptionCallback() {}
     virtual void catchBlock(uint32 tryOffset,
                             uint32 tryLength,
                             uint32 handlerOffset,
@@ -81,6 +83,7 @@ public:
 //
 class MethodSignatureDesc {
 public:
+    virtual ~MethodSignatureDesc() {}
     virtual uint32   getNumParams()                  = 0;
     virtual Type**   getParamTypes()                 = 0;
     virtual Type*    getParamType(uint32 paramIndex) = 0;
@@ -89,6 +92,7 @@ public:
 
 class TypeMemberDesc {
 public:
+    virtual ~TypeMemberDesc() {}
     virtual const char* getName()            = 0;
     virtual const char* getSignatureString() = 0;
 	virtual void  printFullName(::std::ostream& os) = 0;
@@ -100,6 +104,7 @@ public:
 
 class FieldDesc : public TypeMemberDesc {
 public:
+    virtual ~FieldDesc() {}
     //
     // this field is constant after it is initialized
     // can only be mutated by constructor (instance fields) or
@@ -120,6 +125,7 @@ public:
 
 class MethodDesc : public TypeMemberDesc {
 public:
+    virtual ~MethodDesc() {}
     virtual bool isNative()              = 0;
     virtual bool isSynchronized()        = 0;
     virtual bool isNoInlining()          = 0;
@@ -206,6 +212,7 @@ inline ::std::ostream& operator<<(::std::ostream& os, const PersistentInstructio
 
 class ClassHierarchyIterator {
 public:
+    virtual ~ClassHierarchyIterator() {}
     virtual bool isValid() = 0; // true if iterator is valid
     virtual bool hasNext() = 0; // true if iterator is not done 
     virtual ObjectType* getNext() = 0; // return next class in iterator and advance iterator
@@ -213,6 +220,7 @@ public:
 
 class ClassHierarchyMethodIterator {
 public:
+    virtual ~ClassHierarchyMethodIterator() {}
     virtual bool hasNext() = 0; // true if iterator is not done 
     virtual MethodDesc* getNext() = 0; // return next class in iterator and advance iterator
 };
@@ -220,6 +228,7 @@ public:
 
 class CompilationInterface {
 public:
+    virtual ~CompilationInterface() {}
     virtual TypeManager&  getTypeManager() = 0;
     //
     // returns the method to compile
@@ -541,6 +550,7 @@ private:
 
 class DataInterface {
 public:
+    virtual ~DataInterface() {}
     //
     // returns true if instance fields that are references are compressed
     //
@@ -554,6 +564,7 @@ public:
 
 class GCInterface {
 public:
+    virtual ~GCInterface() {}
     virtual void enumerateRootReference(void** reference) = 0;
     virtual void enumerateCompressedRootReference(uint32* reference) = 0;
     virtual void enumerateRootManagedReference(void** slotReference, int slotOffset) = 0;
@@ -565,11 +576,13 @@ public:
 
 class BinaryRewritingInterface {
 public:
+    virtual ~BinaryRewritingInterface() {}
     virtual void rewriteCodeBlock(Byte* codeBlock, Byte* newCode, size_t length) = 0;
 };
 
 class Compiler {
 public:
+    virtual ~Compiler() {}
     //
     //  Return true if the method has been successfully compiled,
     //  false - otherwise
@@ -596,7 +609,7 @@ typedef void PC_Callback_Fn(Method_Profile_Handle);
 
 class ProfilingInterface {
 public:
-    virtual ~ProfilingInterface(){};
+    virtual ~ProfilingInterface() {}
     
     virtual MethodProfile* getMethodProfile(MemoryManager& mm, ProfileType type, MethodDesc& md, JITProfilingRole role=JITProfilingRole_USE) const = 0;
     virtual bool hasMethodProfile(ProfileType type, MethodDesc& md, JITProfilingRole role=JITProfilingRole_USE) const = 0;

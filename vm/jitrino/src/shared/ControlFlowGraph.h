@@ -166,6 +166,7 @@ public:
 
         class Annotator {
         public:
+	    virtual ~Annotator() {}
             virtual void annotateNode(::std::ostream& os, Node* node) = 0;
         };
 

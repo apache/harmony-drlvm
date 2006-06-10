@@ -155,6 +155,7 @@ class CSEHashTable {
 public:
     CSEHashTable(MemoryManager& mm) 
         : numCSE(0), hashTable(mm, CSE_HASH_TABLE_SIZE) {}
+    virtual ~CSEHashTable() {}
 
     void    kill() {hashTable.removeAll();}
     virtual Inst*  lookupKey(CSEHashKey* key) { return lookupKeyBase(key); }
@@ -210,6 +211,7 @@ private:
 
 class ScopedCSEHashTable : public CSEHashTable {
 public:
+    virtual ~ScopedCSEHashTable() {}
     ScopedCSEHashTable(MemoryManager& mm, ScopedCSEHashTable* outerScope) 
         : CSEHashTable(mm), _outerScope(outerScope) {
     }

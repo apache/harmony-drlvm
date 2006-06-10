@@ -129,6 +129,7 @@ public:
     InlineInfoBuilder(InlineInfoBuilder* parentBuilder) : 
         parent(parentBuilder)
     {}
+    virtual ~InlineInfoBuilder() {}
 
     void setParentBuilder(InlineInfoBuilder* builder) { parent = builder; }
 

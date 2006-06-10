@@ -530,14 +530,19 @@ bool Field::parse(Class *clss, Const_Pool *cp, unsigned cp_size, ByteReader &cfs
 bool Handler::parse(Const_Pool* cp, unsigned cp_size, unsigned code_length,
                     ByteReader &cfs)
 {
-    if(!cfs.parse_u2_be((uint16*)&_start_pc))
+    uint16 start = 0;
+    if(!cfs.parse_u2_be(&start))
         return false;
+
+    _start_pc = (unsigned) start;
 
     if (_start_pc >= code_length)
         return false;
 
-    if (!cfs.parse_u2_be((uint16 *)&_end_pc))
+    uint16 end;
+    if (!cfs.parse_u2_be(&end))
         return false;
+    _end_pc = (unsigned) end;
 
     if (_end_pc > code_length)
         return false;
@@ -545,8 +550,10 @@ bool Handler::parse(Const_Pool* cp, unsigned cp_size, unsigned code_length,
     if (_start_pc >= _end_pc)
         return false;
 
-    if (!cfs.parse_u2_be((uint16 *)&_handler_pc))
+    uint16 handler;
+    if (!cfs.parse_u2_be(&handler))
         return false;
+    _handler_pc = (unsigned) handler;
 
     if (_handler_pc >= code_length)
         return false;

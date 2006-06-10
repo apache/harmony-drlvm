@@ -68,6 +68,7 @@ LogStaticThreshold = LogNone;
 const LogLevel
 LogDefaultThreshold = LogNone;
 
+class Category;
 
 /**
  * A stream-like class for logging output.
@@ -77,26 +78,8 @@ class CategoryStream {
     friend class Category;
 public:
     template <class T>
-    CategoryStream<level>& operator<<(const T& value) {
-        // Should be compile-time NOP if first test fails.
-        if(level >= LogStaticThreshold) {
-            if(cat->isLogDynamicEnabled(level)) {
-                cat->out() << value;
-            }
-        }
-        return *this;
-    }
-
-    CategoryStream& operator << (::std::ostream& (*f)(::std::ostream&))
-    {
-        // Should be compile-time NOP if first test fails.
-        if(level >= LogStaticThreshold) {
-            if(cat->isLogDynamicEnabled(level)) {
-                f(cat->out());
-            }
-        }
-        return *this;
-    }
+    inline CategoryStream<level>& operator<<(const T& value);
+    inline CategoryStream& operator << (::std::ostream& (*f)(::std::ostream&));
 
 private:
     CategoryStream() {}
@@ -211,6 +194,32 @@ private:
     bool parentOverride;
 
 };
+
+
+template <LogLevel level>
+template <class T>
+CategoryStream<level>&
+CategoryStream<level>::operator<<(const T& value) {
+    // Should be compile-time NOP if first test fails.
+    if(level >= LogStaticThreshold) {
+	if(cat->isLogDynamicEnabled(level)) {
+	    cat->out() << value;
+	}
+    }
+    return *this;
+}
+
+template <LogLevel level>
+CategoryStream<level>&
+CategoryStream<level>::operator << (::std::ostream& (*f)(::std::ostream&)) {
+    // Should be compile-time NOP if first test fails.
+    if(level >= LogStaticThreshold) {
+	if(cat->isLogDynamicEnabled(level)) {
+	    f(cat->out());
+	}
+    }
+    return *this;
+}
 
 } //namespace Jitrino 
 

@@ -182,7 +182,7 @@ public:
 	static void printOpndRoles(::std::ostream& os, uint32 roles)
 	{ IRPrinter p; p.setStream(os); p.printOpndRoles(roles); }
 
-	void IRPrinter::printOpndName(const Opnd * opnd);
+	void printOpndName(const Opnd * opnd);
 	static void printOpndName(::std::ostream& os, const Opnd * opnd)
 	{ IRPrinter p; p.setStream(os); p.printOpndName(opnd); }
 
@@ -254,7 +254,7 @@ public:
 	IRInstConstraintPrinter(const IRManager * irm=0, const char * _title=0)
 		:IRPrinter(irm, _title){}
 
-	virtual void IRInstConstraintPrinter::printOpnd(const Inst * inst, uint32 opndIdx, bool isLiveBefore=false, bool isLiveAfter=false);
+	virtual void printOpnd(const Inst * inst, uint32 opndIdx, bool isLiveBefore=false, bool isLiveAfter=false);
 };
 
 //========================================================================================

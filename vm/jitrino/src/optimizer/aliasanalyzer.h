@@ -34,6 +34,7 @@ class Type;
 class AliasAnalyzer
 {
 public:
+    virtual ~AliasAnalyzer() {}
     /**
      * Return false if op1 and op2 cannot point to same location in memory.
      * Both op1 and op2 must be reference or pointer typed.  The method will
@@ -52,6 +53,7 @@ public:
 class TypeAliasAnalyzer : public AliasAnalyzer
 {
 public:
+    virtual ~TypeAliasAnalyzer() {}
     bool mayAlias(Opnd* op1, Opnd* op2);
 
     bool mayAlias(Type* t1, Type* t2);

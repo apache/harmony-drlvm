@@ -30,6 +30,7 @@ namespace Jitrino {
 
 class ByteCodeParserCallback {
 public:
+    virtual ~ByteCodeParserCallback() {}
     // parses one byte code starting at given offset,
     // updates nextOffset to point at next byte code,
     // returns false if parsing should stop

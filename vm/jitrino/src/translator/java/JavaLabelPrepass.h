@@ -128,6 +128,7 @@ public:
         uint16 slotFlags;
         SlotVar *vars;
         uint32 jsrLabelOffset;
+	SlotInfo() : type(0), varNumber(0), slotFlags(0), vars(0), jsrLabelOffset(0) {}
     };
 
     // remove all slots containing returnAddress for RET instruction with jsrNexOffset == offset
@@ -272,7 +273,7 @@ public:
     StateInfo*              getStateInfo()  { return &stateInfo; }
     StateTable*             getStateTable() { return stateTable; }
 
-    static JavaLabelPrepass::JavaVarType JavaLabelPrepass::getJavaType(Type *type) {
+    static JavaVarType getJavaType(Type *type) {
         assert(type);
         switch(type->tag) {
         case Type::Boolean:  case Type::Char:

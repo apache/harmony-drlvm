@@ -314,7 +314,7 @@ private:
 	Opnd * simpleOp_I8(Mnemonic mn, Type * dstType, Opnd * src1, Opnd * src2);
 
 	Opnd * simpleOp_I4(Mnemonic mn, Type * dstType, Opnd * src1, Opnd * src2);
-	Opnd * InstCodeSelector::fpOp(Mnemonic mn, Type * dstType, Opnd * src1, Opnd * src2);	
+	Opnd * fpOp(Mnemonic mn, Type * dstType, Opnd * src1, Opnd * src2);	
 
 	Opnd * createResultOpnd(Type * dstType);
 

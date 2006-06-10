@@ -39,6 +39,7 @@ namespace Ia32{
     class DispatchNode;
     class BasicBlock;
     class Inst;
+    class CFG;
 
     typedef double  ProbValue;
     typedef double  ExecCntValue;
@@ -266,6 +267,7 @@ namespace Ia32{
         };
 
         //---------------------------------------------------------------------------------------------
+	virtual ~Node() {}
         /** Returns the ID of the node */
         uint32              getId()const {return id;}
         /** Returns the kind of the node representing its class */
@@ -372,6 +374,7 @@ namespace Ia32{
     class DispatchNode : public Node 
     {
     public:
+	virtual ~DispatchNode() {}
 
         /** Auxiliary method, returns true if the catch edges are sorted */
         bool catchEdgesAreSorted()const;
@@ -399,6 +402,7 @@ namespace Ia32{
     protected: 
         UnwindNode(CFG * cfg, uint32 id, ExecCntValue cnt = UnknownExecCnt) :Node(cfg, id, cnt) 
         {setKind(Kind_UnwindNode); }
+	virtual ~UnwindNode() {}
         //---------------------------------------------------------------------------------------------
         friend class CFG;
     };
@@ -412,6 +416,7 @@ namespace Ia32{
     protected: 
         ExitNode(CFG * cfg, uint32 id, ExecCntValue cnt = UnknownExecCnt) :Node(cfg, id, cnt) 
         {setKind(Kind_ExitNode); }
+	virtual ~ExitNode() {}
         //---------------------------------------------------------------------------------------------
         friend class CFG;
     };
@@ -547,7 +552,7 @@ namespace Ia32{
         void    verify();
     //---------------------------------------------------------------------------------------------
     protected: 
-        BasicBlock::BasicBlock(CFG * cfg, uint32 id, ExecCntValue cnt) 
+        BasicBlock(CFG * cfg, uint32 id, ExecCntValue cnt) 
             : Node(cfg, id, cnt), layoutSucc(NULL), codeOffset(0), codeSize(0), fallThroughEdge(0), directBranchEdge(0)
         {setKind(Kind_BasicBlock); }
 

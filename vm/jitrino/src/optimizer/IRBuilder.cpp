@@ -1075,13 +1075,13 @@ IRBuilder::genTauVirtualCall(MethodDesc* methodDesc,
         tauTypesChecked = propagateCopy(tauTypesChecked);
     }
     if (irBuilderFlags.doSimplify) {
-        Opnd *dst = dst = simplifier.simplifyTauVirtualCall(methodDesc,
-                                                            returnType,
-                                                            tauNullCheckedFirstArg,
-                                                            tauTypesChecked,
-                                                            numArgs,
-                                                            args,
-                                                            inlineInfoBuilder);
+        Opnd *dst = simplifier.simplifyTauVirtualCall(methodDesc,
+                                                      returnType,
+                                                      tauNullCheckedFirstArg,
+                                                      tauTypesChecked,
+                                                      numArgs,
+                                                      args,
+                                                      inlineInfoBuilder);
         if (dst) return dst;
     }
     

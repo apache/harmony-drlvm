@@ -26,7 +26,17 @@
 namespace Jitrino 
 {
 
-class CountWriter;
+class CountWriter
+{
+public:
+
+	virtual ~CountWriter ()		{}
+
+	virtual void write (const char* key, const char*  value)    	= 0;
+	virtual void write (const char* key, int          value)		= 0;
+	virtual void write (const char* key, unsigned int value)		= 0;
+	virtual void write (const char* key, double       value)		= 0;
+};
 
 
 class CounterBase
@@ -64,18 +74,6 @@ public:
 	T value;
 };
 
-
-class CountWriter
-{
-public:
-
-	virtual ~CountWriter ()		{}
-
-	virtual void write (const char* key, const char*  value)    	= 0;
-	virtual void write (const char* key, int          value)		= 0;
-	virtual void write (const char* key, unsigned int value)		= 0;
-	virtual void write (const char* key, double       value)		= 0;
-};
 
 
 } //namespace Jitrino 

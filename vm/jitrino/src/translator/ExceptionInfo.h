@@ -29,6 +29,7 @@ class LabelInst;
 
 class ExceptionInfo {
 public:
+    virtual ~ExceptionInfo() {}
     uint32  getId()            {return id;}
     uint32  getBeginOffset(){return beginOffset;}
     uint32  getEndOffset()    {return endOffset;}
@@ -65,6 +66,7 @@ public:
             uint32 endOffset,
             ExceptionInfo* _tryBlock) 
     : ExceptionInfo(id,beginOffset,endOffset), tryBlock(_tryBlock) {}
+    virtual ~Handler() {}
     uint32 getTryRegionId()            {return tryBlock->getId();}
     ExceptionInfo* getTryBlock()    {return tryBlock;}
 private:
@@ -81,6 +83,7 @@ public:
                  uint32 endOffset,
                  CatchBlock* tryBlock,
                  Type* excType);
+    virtual ~CatchHandler() {}
 
     Type*          getExceptionType()              {return exceptionType;}
     uint32         getExceptionOrder()             {return order;        }
@@ -101,6 +104,7 @@ public:
                uint32 endOffset,
                uint32 exceptionIndex) 
     : ExceptionInfo(id,beginOffset,endOffset), handlers(NULL), excTableIndex(exceptionIndex) {}
+    virtual ~CatchBlock() {}
     bool isCatchBlock()                {return true;}
     uint32 getExcTableIndex() { return excTableIndex; }
     void addHandler(CatchHandler* handler) {

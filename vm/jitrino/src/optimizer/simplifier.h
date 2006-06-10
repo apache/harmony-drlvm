@@ -1079,17 +1079,17 @@ protected:
     // re-association machinery
     friend class Reassociate;
     Opnd*
-    Simplifier::simplifyAddViaReassociation2(Type* type, Opnd* src1, Opnd* src2);
+    simplifyAddViaReassociation2(Type* type, Opnd* src1, Opnd* src2);
     Opnd*
-    Simplifier::simplifyNegViaReassociation2(Type* type, Opnd* src1);
+    simplifyNegViaReassociation2(Type* type, Opnd* src1);
     Opnd*
-    Simplifier::simplifySubViaReassociation2(Type* type, Opnd* src1, Opnd *src2);
+    simplifySubViaReassociation2(Type* type, Opnd* src1, Opnd *src2);
     Opnd*
-    Simplifier::simplifyMulViaReassociation2(Type* type, Opnd* src1, Opnd* src2);
+    simplifyMulViaReassociation2(Type* type, Opnd* src1, Opnd* src2);
     Opnd*
-    Simplifier::simplifyAddOffsetViaReassociation(Opnd* uncompBase, Opnd *offset);
+    simplifyAddOffsetViaReassociation(Opnd* uncompBase, Opnd *offset);
     Opnd*
-    Simplifier::simplifyAddOffsetPlusHeapbaseViaReassociation(Opnd *compBase,
+    simplifyAddOffsetPlusHeapbaseViaReassociation(Opnd *compBase,
                                                               Opnd *offsetPlusHeapbase);
     Reassociate *theReassociate;
 };

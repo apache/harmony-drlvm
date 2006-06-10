@@ -64,6 +64,8 @@ struct TranslatorFlags {
 
 class TranslatorIntfc {
 public:
+
+    virtual ~TranslatorIntfc() {}
     
     // all TranslatorIntfc::flags fields are initialized by readTranslatorCommandLineParams()
     static void readFlagsFromCommandLine(CompilationContext* cs, bool ia32Cg);

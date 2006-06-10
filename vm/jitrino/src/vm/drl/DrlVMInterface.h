@@ -148,6 +148,7 @@ public:
        case VM_DATA_TYPE_F4:      return getSingleType();
        case VM_DATA_TYPE_BOOLEAN: return getBooleanType();
        case VM_DATA_TYPE_CHAR:    return getCharType();
+       default: assert(0);
        }
        return NULL;
     }

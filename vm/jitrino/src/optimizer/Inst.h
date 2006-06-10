@@ -82,6 +82,7 @@ class   TauPiInst;
 //
 class InstFormatVisitor {
 public:
+    virtual ~InstFormatVisitor() {}
     virtual void accept(Inst*) = 0;
     virtual void accept(BranchInst*) = 0;
     virtual void accept(CallInst*) = 0;
@@ -112,6 +113,7 @@ public:
 
 class Inst : private Dlink {
 public:
+    virtual ~Inst() {}
     // modified Dlink methods
     void unlink() {
         Dlink::unlink(); 
@@ -1563,6 +1565,7 @@ public:
 
 class InstOptimizer {
 public:
+    virtual ~InstOptimizer() {}
     // returns 0 or an optimized version of inst;
     virtual Inst*
     optimizeInst(Inst* inst) {

@@ -40,6 +40,7 @@ namespace Ia32 {
  */
 class Linearizer {
 public:
+    virtual ~Linearizer() {}
     enum LinearizerType { TOPOLOGICAL, TOPDOWN, BOTTOM_UP};
     static void doLayout(LinearizerType t, IRManager* irManager);
     static bool hasValidLayout(IRManager* irm);
@@ -88,6 +89,7 @@ class TopologicalLayout : public Linearizer {
     friend class Linearizer;
 protected:
     TopologicalLayout(IRManager* irManager) : Linearizer(irManager){};
+    virtual ~TopologicalLayout() {}
     void linearizeCfgImpl();
 };
 

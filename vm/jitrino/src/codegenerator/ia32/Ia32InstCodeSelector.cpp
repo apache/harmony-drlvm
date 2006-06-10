@@ -26,6 +26,7 @@
 #include "Ia32CodeGenerator.h"
 #include "Ia32Printer.h"
 #include <float.h>
+#include <math.h>
 
 #ifdef PLATFORM_POSIX
 #define _isnan isnan

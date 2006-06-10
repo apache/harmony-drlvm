@@ -175,6 +175,7 @@ public:
 
 class InstructionCallback {
 public:
+    virtual ~InstructionCallback() {}
     virtual void            opndMaybeGlobal(CG_OpndHandle* opnd) = 0;
 
     // tau generating instructions
@@ -468,8 +469,10 @@ private:
 //
 class VarCodeSelector {
 public:
+    virtual ~VarCodeSelector() {}
     class Callback {
     public:
+    virtual ~Callback() {}
     virtual uint32 defVar(Type* varType,bool isAddressTaken,bool isPinned) = 0;
 	virtual void setManagedPointerBase(uint32 managedPtrVarNum, uint32 baseVarNum) = 0;
     };
@@ -481,6 +484,7 @@ public:
 //
 class BlockCodeSelector {
 public:
+    virtual ~BlockCodeSelector() {}
     virtual void genCode(InstructionCallback&) = 0;
 };
 
@@ -489,8 +493,10 @@ public:
 //
 class CFGCodeSelector {
 public:
+    virtual ~CFGCodeSelector() {}
     class Callback {
     public:
+	virtual ~Callback() {}
         enum BlockKind {Prolog, InnerBlock, Epilog};
         virtual uint32  genDispatchNode(uint32 numInEdges,uint32 numOutEdges,double cnt) = 0;
         virtual uint32  genBlock(uint32 numInEdges,uint32 numOutEdges, BlockKind blockKind,
@@ -518,9 +524,11 @@ public:
 //
 class MethodCodeSelector {
 public:
+    virtual ~MethodCodeSelector() {}
     MethodCodeSelector() {}
     class Callback {
     public:
+	virtual ~Callback() {}
         virtual void    genVars(uint32 numLocals,VarCodeSelector&) = 0;
         virtual void    setMethodDesc(MethodDesc * desc) = 0;
         virtual void    genCFG(uint32 numNodes,CFGCodeSelector&,bool useProfile) = 0;
@@ -531,6 +539,7 @@ public:
 
 class CodeGenerator {
 public:
+    virtual ~CodeGenerator() {}
     virtual bool genCode(MethodCodeSelector&) = 0;
     static void readFlagsFromCommandLine(CompilationContext* cs, bool ia32Cg);
     static void showFlagsFromCommandLine(bool ia32Cg);
@@ -538,12 +547,14 @@ public:
 
 class CodeGeneratorFactory {
 public:
+    virtual ~CodeGeneratorFactory() {}
     virtual CodeGenerator* getCodeGenerator(MemoryManager &mm, 
                                             CompilationInterface& compInterface) = 0;
 };
 
 class RuntimeInterface {
 public:
+    virtual ~RuntimeInterface() {}
     virtual void  unwindStack(MethodDesc* methodDesc, ::JitFrameContext* context, bool isFirst) = 0;
 
     virtual void  getGCRootSet(MethodDesc* methodDesc, GCInterface* gcInterface, 

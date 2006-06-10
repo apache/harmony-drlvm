@@ -38,6 +38,7 @@
 #include "CompilationContext.h"
 
 #include <float.h>
+#include <math.h>
 
 namespace Jitrino {
 /*
@@ -48,12 +49,12 @@ namespace Jitrino {
  */
 
 #ifdef PLATFORM_POSIX
-inline bool isfinite(double s) {
+inline bool isFinite(double s) {
     return (finite(s) != 0);
 }
 // isnan(double s) is declared in float.h
 #else
-inline bool isfinite(double s) {
+inline bool isFinite(double s) {
     return (_finite(s) != 0);
 }
 inline bool isnan(double s) {
@@ -3050,7 +3051,7 @@ Simplifier::simplifyTauCheckFinite(Opnd* opnd, bool &alwaysThrows) {
         case Type::Single: // single
             {
                 float s = value.s;
-                if (!isfinite((double)s)) {
+                if (!isFinite((double)s)) {
                     alwaysThrows = true;
                     return genTauUnsafe()->getDst();
                 }
@@ -3059,7 +3060,7 @@ Simplifier::simplifyTauCheckFinite(Opnd* opnd, bool &alwaysThrows) {
         case Type::Double:
             {
                 double d = value.d;
-                if (!isfinite(d)) {
+                if (!isFinite(d)) {
                     alwaysThrows = true;
                     return genTauUnsafe()->getDst();
                 }

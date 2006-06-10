@@ -60,6 +60,7 @@ public:
 		: memManager(mm), table(t), tableSize(size) {
 		removeAll();
 	}
+	virtual ~HashTableImpl() {}
 	void* lookup(void* key) const {
 		HashTableLink* entry = lookupEntry(key);
 		if (entry == NULL)
@@ -198,6 +199,7 @@ template <class KEY>
 class KeyLinkHashTable : HashTableImpl {
 public:
 	KeyLinkHashTable(MemoryManager& mm,uint32 size) : HashTableImpl(mm,size) {}
+	virtual ~KeyLinkHashTable() {}
 	void*	lookup(KEY* key) const {return HashTableImpl::lookup(key);}
 	void	insert(KEY* key,void* value) {HashTableImpl::insert(key,value);}
 	void	remove(KEY* key) {HashTableImpl::remove(key);}
@@ -244,7 +246,7 @@ protected:
 		if (freeList == NULL) {
 			// get last guy at the end of mru list
 			link = (Link*)mruList.getPrev()->getElem();
-			remove(&link->key);
+			FixedKeyLinkHashTable<KEY,NUM_LINKS>::remove(&link->key);
 		}
 		assert(freeList != NULL);
 		link = freeList;
@@ -301,6 +303,7 @@ class DoubleKeyHashTable : KeyLinkHashTable<DoublePtrKey> {
 public:
 	DoubleKeyHashTable(MemoryManager& mm,uint32 size) 
 		: KeyLinkHashTable<DoublePtrKey>(mm,size) {}
+	virtual ~DoubleKeyHashTable() {}
 	void*	lookup(void* key1,void* key2) const {
 		DoublePtrKey key(key1,key2);
 		return KeyLinkHashTable<DoublePtrKey>::lookup(&key);

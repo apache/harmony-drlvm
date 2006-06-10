@@ -49,7 +49,8 @@ class Node;
 class Edge {
 
 public:
-        Edge() : predNode(NULL), succNode(NULL), nextPredEdge(NULL), nextSuccEdge(NULL) {}
+    Edge() : predNode(NULL), succNode(NULL), nextPredEdge(NULL), nextSuccEdge(NULL) {}
+    virtual ~Edge() {}
     Node*    getPredNode()            {return predNode; }
     Node*    getSuccNode()            {return succNode; }
     Edge*    getNextPredEdge()        {return nextPredEdge; }
@@ -83,7 +84,8 @@ protected:
 class Node : public Dlink {
 
    public:
-       Node():  traversalNum(0), dfnum(INVALID_DFN), succs(NULL), preds(NULL) {}
+    Node():  traversalNum(0), dfnum(INVALID_DFN), succs(NULL), preds(NULL) {}
+    virtual ~Node() {}
     //
     //  true if there is any edge to a successor node.
     bool    hasEdge(Node* succNode);

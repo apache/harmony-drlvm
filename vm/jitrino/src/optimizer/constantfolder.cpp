@@ -26,6 +26,7 @@
 #define CAST(a, b) ((a)b)
 
 #include <float.h>
+#include <math.h>
 
 /*
  * The constant folding optimization is described in [S.Muchnick. Advanced Compiler
@@ -37,7 +38,7 @@ namespace Jitrino {
 
 using namespace std;
 
-inline int isfinite(double s) {
+inline int isFinite(double s) {
     return finite(s);
 }
 
@@ -51,7 +52,7 @@ inline double _chgsign(double d) {
 
 // isnan(double s) is declared in float.h
 #else
-inline int isfinite(double s) {
+inline int isFinite(double s) {
     return _finite(s);
 }
 
@@ -92,7 +93,7 @@ template <typename tointtype, typename fromfloattype>
 inline tointtype float2int(fromfloattype f)
 {
     if (isnan(f)) return (tointtype) 0;
-    if (isfinite(f) && 
+    if (isFinite(f) && 
         (((fromfloattype(minint<tointtype>(0))) < f) &&
          (f < fromfloattype(maxint<tointtype>(0)))))
         return (tointtype) f; // both C++ and Java truncate
@@ -104,7 +105,7 @@ template <typename tointtype, typename fromfloattype>
 inline tointtype float2uint(fromfloattype s)
 {
     if (isnan(s) || (s < 0.0)) return (tointtype) 0;
-    if (isfinite(s) && (s < maxuintasfloat<tointtype>(0)))
+    if (isFinite(s) && (s < maxuintasfloat<tointtype>(0)))
         return (tointtype) s;
     return maxuint<tointtype>(0);
 }

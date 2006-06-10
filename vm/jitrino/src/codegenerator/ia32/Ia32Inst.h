@@ -182,14 +182,14 @@ public:
 	Type * getType()const{ return type; }
 
 	/** returns the constraint of the specified kind sk */
-	Constraint Opnd::getConstraint(ConstraintKind ck)const
+	Constraint getConstraint(ConstraintKind ck)const
 	{
 		if (ck==ConstraintKind_Current)
 			return constraints[ConstraintKind_Location].isNull()?constraints[ConstraintKind_Calculated]:constraints[ConstraintKind_Location];
 		return ck==ConstraintKind_Size?Constraint(OpndKind_Any, constraints[ConstraintKind_Initial].getSize()):constraints[ck];
 	}
 
-	Constraint Opnd::getConstraint(ConstraintKind ck, OpndSize size)const
+	Constraint getConstraint(ConstraintKind ck, OpndSize size)const
 	{	Constraint c=getConstraint(ck); return size==OpndSize_Any?c:c.getAliasConstraint(size); }
 
     /** returns true if the operand CAN BE assigned to a location defined by constraint
@@ -291,7 +291,7 @@ protected:
 private:
 
 	//-------------------------------------------------------------------------
-	Opnd::Opnd(uint32 _id, Type * t, Constraint c)
+	Opnd(uint32 _id, Type * t, Constraint c)
 		:id(_id), firstId(_id), type(t), memOpndKind(MemOpndKind_Null), baseReg(RegName_Null)
 		{ constraints[ConstraintKind_Initial]=constraints[ConstraintKind_Calculated]=c; }
 
@@ -709,6 +709,8 @@ public:
 	typedef uint32 iterator;
 	inline Opnds(const Inst * inst, uint32 r)
 	{
+	        rolesToCheck = 0;
+		roles = NULL;
 		opnds = inst->getOpnds();
 
 		if (r & Inst::OpndRole_InstLevel) {
@@ -728,7 +730,7 @@ public:
 				roles = inst->getOpndRoles();
 				rolesToCheck = r;
 				startIndex = next(startIndex - 1);
-			}else roles = NULL;
+			}
 		}else{
 			instEndIndex = inst->opndCount;
 			endIndex = instEndIndex + (instEndIndex<<2);

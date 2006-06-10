@@ -40,6 +40,8 @@ public:
         child = chd;
     }
 
+    virtual ~TreeNode() {}
+
     virtual void print(::std::ostream& os) { os << "T"; }
     virtual void printTag(::std::ostream& os) { print(os); }
 
@@ -148,7 +150,7 @@ public:
     Tree(): root(NULL) {}
     TreeNode* getRoot() {return root;}
 
-    virtual void Tree::printDotFile(MethodDesc& mh, char *suffix) {
+    virtual void printDotFile(MethodDesc& mh, char *suffix) {
         if (root == NULL) return;
         PrintDotFile::printDotFile(mh,suffix);
     }

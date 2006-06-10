@@ -27,11 +27,11 @@ namespace Ia32 {
 const Encoder::OpcodeGroupDescription Encoder::dummyOpcodeGroupDescription;
 
 const Encoder::MemOpndConstraints Encoder::memOpndConstraints[16]= {
-    {
+    {{
     Constraint(OpndKind_GPReg, OpndSize_32), 
     Constraint(OpndKind_GPReg, OpndSize_32),
     Constraint(OpndKind_Imm, OpndSize_32),
-    Constraint(OpndKind_Imm, OpndSize_32) }, 
+    Constraint(OpndKind_Imm, OpndSize_32) }}, 
     // others contain null constraints, to be fixed later
 };
 
