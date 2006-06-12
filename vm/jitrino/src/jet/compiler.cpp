@@ -418,6 +418,9 @@ void Compiler::bbs_mark_one(unsigned pc, bool jmp_target, bool add_ref,
     else {
         BBInfo bbinfo;
         bbinfo.start = pc;
+        bbinfo.last_pc = 0;
+        bbinfo.next_bb = 0;
+        bbinfo.ipoff = 0;
 
         //      bbinfo.next_bb = NOTHING;
         //      bbinfo.code_start = NULL;
