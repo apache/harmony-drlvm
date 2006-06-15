@@ -88,7 +88,6 @@ Version: $Revision: 1.5.2.33 $
                                                       unzip.resources,
                                                       check.unzipped.externals,
                                                       copy.nessessary.jars,
-                                                      apply.patches,
                                                       execute.cpptasks.patch.with.eclipse.compiler.in.classpath">
     </target>
 
@@ -105,11 +104,8 @@ Version: $Revision: 1.5.2.33 $
         <property name="ECLIPSE.check.file" value="plugins/org.eclipse.jdt.core_3.1.1.jar" />
         <property name="XALAN.check.file" value="xalan.jar" />
         <property name="VM.check.file" value="vmstart/src/main.cpp" />
-        <property name="HARMONY39.check.file" value="src/common/javasrc/java/util/regex/EOLSet.java" />
-        <property name="HARMONY88.check.file" value="modules/logging/src/main/java/java/util/logging/Logger.java" />
         <property name="BCPROV.check.file" value="bcprov-jdk14-129.jar" />
         <property name="RESOLVER.check.file" value="resolver.jar" />
-        <property name="PATCHES.check.file" value="common/HYPLUGIN/src/org/apache/harmony/eclipse/jdt/launching/HyLaunchingPlugin.java" />
     </target>
 
     <!-- Patching CPPTASKS before using it. -->
@@ -180,8 +176,26 @@ Version: $Revision: 1.5.2.33 $
 
         <for param="resource" list="${common.resources}" delimiter=",">
             <sequential>
-                <property name="local.@{resource}.home" value="${build.precopied.dir}/common/@{resource}" />
-                <check-resource resource="@{resource}" />
+
+                <!-- start treating CLASSLIB as special.  We'll remove this
+                     once we get a round of review
+
+                     If classlib, just hardwire according to the property
+                 -->
+
+                <if>
+                    <equals arg1="@{resource}" arg2="CLASSLIB"/>
+                    <then>
+                        <property name="local.@{resource}.home"
+                                  value="${external.dep.CLASSLIB}" />
+                        <check-resource resource="@{resource}" />
+                    </then>
+                    <else>
+                        <property name="local.@{resource}.home" value="${build.precopied.dir}/common/@{resource}" />
+                        <check-resource resource="@{resource}" />
+
+                    </else>
+                </if>
             </sequential>
         </for>
     </target>
@@ -299,7 +313,7 @@ Version: $Revision: 1.5.2.33 $
     </target>
 
     <target name="setup.resources" depends="plugin.antcontrib">
-        <property name="common.resources" value="LOG4CXX,HYPLUGIN,CLASSLIB,CPPTASKS,XALAN,VM,HARMONY39,HARMONY88,BCPROV,RESOLVER,PATCHES" />
+        <property name="common.resources" value="LOG4CXX,HYPLUGIN,CLASSLIB,CPPTASKS,XALAN,VM,BCPROV,RESOLVER" />
         <property name="build.resources" value="CPPTASKS,ECLIPSE" />
         <if>
             <isset property="if.lnx" />

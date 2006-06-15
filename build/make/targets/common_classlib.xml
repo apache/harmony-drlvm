@@ -75,13 +75,6 @@ Version: $Revision: 1.7.2.7 $
         <compiler id="common.compiler">
             <!--common for cpp and c-->
             <includepath>
-
-<!-- $$$ geirm for what's coming...  
-                <pathelement location="${build.CLASSLIB.home}/deploy/include" />
-                <pathelement location="${build.CLASSLIB.home}/deploy/jdk/include" />
-                <pathelement location="${build.CLASSLIB.home}/modules/luni/src/main/native/include/shared" />
--->
-
                 <pathelement location="${os.native.dir}/include" />
                 <pathelement location="${shared.dir}/include" />
                 <pathelement location="${common.src}" />

@@ -54,6 +54,20 @@ Version: $Revision: 1.16.2.20 $
 
 <project name="build" default="build">
 
+    <!-- ===============================================================
+        Define locations of external dependencies
+      ================================================================== -->
+    <target name="extern_dep">
+
+        <!-- set the path root for the classlib : must be relative to the build directory -->
+        <property name="external.dep.CLASSLIB" value="../../../../classlib/trunk" />
+
+        <!-- some derived values -->
+        <property name="external.dep.CLASSLIB.includes" value="${external.dep.CLASSLIB}/deploy/include" />
+        <property name="external.dep.CLASSLIB.libdir" value="${external.dep.CLASSLIB}/deploy/lib" />
+        <property name="external.dep.CLASSLIB.jardir" value="${external.dep.CLASSLIB}/deploy/jdk/jre/lib/boot"/>
+    </target>
+
     <target name="detect.os.arch.cxx.cfg">
         <property environment="env" />
 
@@ -199,9 +213,6 @@ Version: $Revision: 1.16.2.20 $
 
         <property name="generated.properties.file" value="${build.semi.dir}/env.properties" />
 
-        <!-- set Eclipse java compiler -->
-        <property name="build.compiler" value="org.eclipse.jdt.core.JDTCompilerAdapter" />
-
         <!-- product binary deploy location -->
         <property name="build.deploy.dir" location="../${build.os.short}_${build.arch}_${build.cxx}_${build.cfg}/deploy/jre" />
 
@@ -261,6 +272,7 @@ Version: $Revision: 1.16.2.20 $
             <equals arg1="${COMPONENTS}" arg2="deploy" />
             <then>
                 <property name="build.deploy.components" value="${build.deploy.all.components}" />
+                <property name="build.deploy.components" value="${build.deploy.all.components}" />
             </then>
             <else>
                 <!-- Convert 'a b c' into 'a|b|c'.
@@ -278,7 +290,18 @@ Version: $Revision: 1.16.2.20 $
             </else>
         </if>
 
+        <!-- javac source and target -->
+        <property name="javac.source" value="1.5"/>
+        <property name="javac.target" value="jsr14"/>
+
+        <!-- set the modern java compiler -->
+        <property name="build.compiler" value="modern" />
+
+        <!-- set Eclipse java compiler  someday, we'll switch back-->
+ <!--       <property name="build.compiler" value="org.eclipse.jdt.core.JDTCompilerAdapter" /> -->
+
         <echo message="Configuration:" />
+        <echo message="    classlib root = ${external.dep.CLASSLIB}" />
         <echo message="               os = ${build.os}" />
         <echo message="             arch = ${build.arch}" />
         <echo message="              cxx = ${build.cxx}" />
@@ -286,7 +309,7 @@ Version: $Revision: 1.16.2.20 $
         <echo message="       components = ${COMPONENTS}" />
     </target>
 
-    <target name="setup" depends="detect.os.arch.cxx.cfg, set.semis.dirs">
+    <target name="setup" depends="extern_dep,detect.os.arch.cxx.cfg, set.semis.dirs">
         <ant antfile="setup.xml" target="setup" inheritall="true" />
     </target>
 
@@ -381,7 +404,8 @@ Version: $Revision: 1.16.2.20 $
     <!-- put the rest of product (everything but components' output) to the deploy directory -->
     <target name="fill.up.deploy" depends="deploy.jni.n.jvmti.includes,
                                            deploy.readme,
-                                           deploy.getting_started">
+                                           deploy.getting_started,
+                                           deploy.copy_classlib">
         <if>
             <and>
                 <isset property="if.lnx" />
@@ -400,6 +424,24 @@ Version: $Revision: 1.16.2.20 $
             </then>
         </if>
     </target>
+
+    <!-- copies the deploy stuff from classlib -->
+    <target name="deploy.copy_classlib">
+
+        <copy todir="${build.deploy.dir}/bin">
+            <fileset dir="${external.dep.CLASSLIB}/deploy/jdk/jre/bin">
+                <include name="*"/>
+            </fileset>
+        </copy>
+
+        <copy todir="${build.deploy.dir}/lib/boot">
+            <fileset dir="${external.dep.CLASSLIB}/deploy/jdk/jre/lib/boot">
+                <include name="**/*"/>
+            </fileset>
+        </copy>
+
+    </target>
+
 
     <target name="deploy.jni.n.jvmti.includes">
         <copy todir="${build.deploy.dir}/include">

@@ -22,8 +22,9 @@ Version: $Revision: 1.4.2.2 $
         <echo message="## Building Java classes of '${component}'" />
 
         <mkdir dir="${java.build.dir}" />
-        <property name="build.compiler" value="org.eclipse.jdt.core.JDTCompilerAdapter" />
-        <javac destdir="${java.build.dir}" source="1.4">
+
+        <javac destdir="${java.build.dir}" source="${javac.source}"
+                target="${javac.target}" debug="${java.debug.option}">
             <src refid="java.source" />
             <patternset refid="java.source.pattern" />
             <bootclasspath refid="java.class.path"/>

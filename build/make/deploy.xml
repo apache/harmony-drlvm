@@ -70,74 +70,6 @@ Description of the product deploy folder.
         </hythr>
      </vm>
 
-    <select arch="ia32">
-        <classlib>
-            <auth>
-                <shared>bin:hyauth</shared>
-            </auth>
-
-            <archive>
-                <jar>lib/boot:archive</jar>
-                <shared>bin:hyarchive</shared>
-            </archive>
-
-            <luni>
-                <jar>lib/boot:luni</jar>
-                <shared>bin:hyluni</shared>
-            </luni>
-
-
-            <math>
-                <shared>bin:hymath</shared>
-            </math>
-
-            <nio>
-                <jar>lib/boot:nio</jar>
-                <shared>bin:hynio</shared>
-            </nio>
-
-            <nio_char>
-                <jar>lib/boot:nio_char</jar>
-            </nio_char>
-
-            <security>
-                <jar>lib/boot:security</jar>
-            </security>
-
-            <crypto>
-                <jar>lib/boot:crypto</jar>
-            </crypto>
-
-            <x_net>
-                <jar>lib/boot:x_net</jar>
-            </x_net>
-
-            <sql>
-                <jar>lib/boot:sql</jar>
-            </sql>
-
-            <text>
-                <jar>lib/boot:text</jar>
-                <shared>bin:hytext</shared>
-            </text>
-
-            <port>
-                <shared>bin:hyprt</shared>
-            </port>
-
-            <pool>
-                <shared>bin:hypool</shared>
-            </pool>
-
-            <sig>
-                <shared>bin:hysig</shared>
-            </sig>
-
-            <zlib>
-                <shared>bin:hyzlib</shared>
-            </zlib>
-        </classlib>
-    </select>
 
     <extra>
         <eclipse_script>
@@ -181,26 +113,6 @@ Description of the product deploy folder.
                 <other>bin:ij.sh</other>
             </select>
         </ij_script>
-
-        <harmony39>
-            <beans>
-                <jar>lib/boot:beans</jar>
-            </beans>
-
-            <regex>
-                <jar>lib/boot:regex</jar>
-            </regex>
-
-            <math>
-                <jar>lib/boot:math</jar>
-            </math>
-        </harmony39>
-
-        <harmony88>
-            <logging>
-                <jar>lib/boot:logging</jar>
-            </logging>
-        </harmony88>
 
         <bcprov>
             <jar>lib/boot:*</jar>
