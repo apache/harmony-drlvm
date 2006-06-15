@@ -22,7 +22,7 @@
 
 // These macros are automatically updated upon commit.
 // PLEASE DO NOT TOUCH
-#define PATCH_BRANCH "DRL-M1-Harmony"
+#define PATCH_BRANCH "DRLVM HEAD"
 #define PATCH_LEVEL 4807
 #define PATCH_DATE "2006-05-02"
 // end of automatically updated macros
@@ -65,7 +65,7 @@
 #define VERSION_ARCH "ia32"
 #endif
 
-#define VM_VERSION "DRL " PATCH_BRANCH "-" EXPAND(PATCH_LEVEL)
+#define VM_VERSION "Apache Harmony " PATCH_BRANCH "-" EXPAND(PATCH_LEVEL)
 
 #define VERSION VM_VERSION " (" PATCH_DATE "), " \
     VERSION_OS "/" VERSION_ARCH "/" VERSION_COMPILER ", " VERSION_DEBUG_STRING
