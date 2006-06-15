@@ -99,10 +99,10 @@ char *predefined_propeties[] =
 #define API_DLL6 "hytext"
 #define API_DLL7 "hypool"
 #define API_DLL8 "vmi"
-#define API_DLL9 "hynio"
+//#define API_DLL9 "hynio"
 #define API_DLLA "hyluni"
 #define API_DLLB "hyarchive"
-#define API_DLLC "hymath"
+//#define API_DLLC "hymath"
 
 #define GC_DLL "gc"
 #define EM_DLL "em"
@@ -268,10 +268,10 @@ static void define_undefined_predefined_properties(Properties & properties)
         API_DLL5,
         API_DLL6,
         API_DLL8,
-        API_DLL9,
+     //   API_DLL9,
         API_DLLA,
-        API_DLLB,
-        API_DLLC
+        API_DLLB
+     //   API_DLLC
     };
     int n_api_dll_files = sizeof(api_dll_files) / sizeof(char *);
 
