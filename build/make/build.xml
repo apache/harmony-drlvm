@@ -431,6 +431,7 @@ Version: $Revision: 1.16.2.20 $
         <copy todir="${build.deploy.dir}/bin">
             <fileset dir="${external.dep.CLASSLIB}/deploy/jdk/jre/bin">
                 <include name="*"/>
+                <exclude name="java*"/>
             </fileset>
         </copy>
 
