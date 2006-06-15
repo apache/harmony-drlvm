@@ -51,6 +51,13 @@ public final class Field extends AccessibleObject implements Member {
     Field(Object obj) {
         data = new FieldData(obj);
     }
+
+    /**
+     *  TODO : fix gmj
+     */
+    public boolean isSynthetic() {
+        return false;
+    }
     
     /**
      * Called by VM to obtain this field's handle.

@@ -18,11 +18,12 @@
  * @version $Revision: 1.1.2.3.4.3 $
  */ 
 
-package com.ibm.oti.vm;
+package org.apache.harmony.kernel.vm;
+
+import org.apache.harmony.luni.internal.net.www.protocol.jar.JarURLConnection;
+import org.apache.harmony.luni.util.DeleteOnExit;
 
 import org.apache.harmony.vm.VMStack;
-import com.ibm.oti.net.www.protocol.jar.JarURLConnection;
-import com.ibm.oti.util.DeleteOnExit;
 
 public final class VM {
 

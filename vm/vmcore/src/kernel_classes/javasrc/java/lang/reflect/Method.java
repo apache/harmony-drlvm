@@ -53,6 +53,13 @@ public final class Method extends AccessibleObject implements Member {
     Method(Object obj) {
         data = new MethodData(obj);
     }
+
+    /**
+     *  TODO : fix gmj
+     */
+    public boolean isSynthetic() {
+        return false;
+    }
     
     /**
      * Called by VM to obtain this method's handle.

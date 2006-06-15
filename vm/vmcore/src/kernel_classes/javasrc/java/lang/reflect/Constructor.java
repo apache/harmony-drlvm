@@ -53,6 +53,13 @@ public final class Constructor extends AccessibleObject implements Member {
     Constructor(Object obj) {
         data = new ConstructorData(obj);
     }
+
+    /**
+     *  TODO : fix gmj
+     */
+    public boolean isSynthetic() {
+        return false;
+    }
     
     /**
      * Called by VM to obtain this constructor's handle.
