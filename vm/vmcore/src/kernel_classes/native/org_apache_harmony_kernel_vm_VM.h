@@ -28,10 +28,10 @@
 #include <jni.h>
 
 
-/* Header for class com.ibm.oti.vm.VM */
+/* Header for class org.apache.harmony.kernel.vm.VM */
 
-#ifndef _COM_IBM_OTI_VM_VM_H
-#define _COM_IBM_OTI_VM_VM_H
+#ifndef _ORG_APACHE_HARMONY_KERNEL_VM_VM_H
+#define _ORG_APACHE_HARMONY_KERNEL_VM_VM_H
 
 #ifdef __cplusplus
 extern "C" {
@@ -41,10 +41,10 @@ extern "C" {
 /* Native methods */
 
 /*
- * Method: com.ibm.oti.vm.VM.getClassLoader(Ljava/lang/Class;)Ljava/lang/ClassLoader;
+ * Method: org.apache.harmony.kernel.vm.VM.getClassLoader(Ljava/lang/Class;)Ljava/lang/ClassLoader;
  */
 JNIEXPORT jobject JNICALL
-Java_com_ibm_oti_vm_VM_getClassLoader(JNIEnv *, jclass, 
+Java_org_apache_harmony_kernel_vm_VM_getClassLoader(JNIEnv *, jclass, 
     jclass);
 
 

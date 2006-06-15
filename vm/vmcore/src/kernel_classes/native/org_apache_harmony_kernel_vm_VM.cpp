@@ -19,10 +19,10 @@
  */
 
 /**
- * @file com_ibm_oti_vm_VM.cpp
+ * @file org_apache_harmony_kernel_vm_VM.cpp
  *
  * This file is a part of kernel class natives VM core component.
- * It contains implementation for native methods of com.ibm.oti.vm.VM kernel
+ * It contains implementation for native methods of org.apache.harmony.kernel.vm.VM kernel
  * class. Not all of the methods are implemented now.
  */
 
@@ -31,14 +31,14 @@
 #define LOG_DOMAIN "vm.accessors"
 #include "jni_utils.h"
 
-#include "com_ibm_oti_vm_VM.h"
+#include "org_apache_harmony_kernel_vm_VM.h"
 #include "java_lang_VMClassRegistry.h"
 
 /**
  * Implements java.lang.String.intern(..) method.
  * For details see kernel classes component documentation.
  */
-JNIEXPORT jobject JNICALL Java_com_ibm_oti_vm_VM_getClassLoader
+JNIEXPORT jobject JNICALL Java_org_apache_harmony_kernel_vm_VM_getClassLoader
 (JNIEnv *jenv, jclass, jclass clazz)
 {
     // reuse similar method in VMClassRegistry
