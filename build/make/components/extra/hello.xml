@@ -27,7 +27,7 @@ Version: $Revision: 1.1.2.3 $
 
 <project name="extra.hello">
     <target name="init" >
-        <property name="build.java.depends" value="vm.kernel_classes,classlib.luni" />
+        <property name="build.java.depends" value="vm.kernel_classes" />
 
         <mkdir dir="${build.dir}/_other" />
 
@@ -57,7 +57,8 @@ public class Hello {
 
         <path id="java.class.path">
             <fileset dir="${vm.kernel_classes.jardir}" includes="${vm.kernel_classes.jarname}" />
-            <fileset dir="${classlib.luni.jardir}" includes="${classlib.luni.jarname}" />
+
+            <fileset dir="${external.dep.CLASSLIB.jardir}" includes="*.jar" />
         </path>
     </target>
 </project>

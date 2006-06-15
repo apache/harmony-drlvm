@@ -27,34 +27,27 @@ Version: $Revision: 1.4.2.5 $
 
 <project name="extra.icu4c">
     <target name="init">
-        <property name="jarname" value="icu4j_3_4.jar,icu4jni-3.4.jar" />
+        <property name="jarname" value="icu4j-3.4.jar,icu4jni-3.4.jar" />
         <property name="libname" value="icuuc"/>
         <property name="libdir" value="${build.dir}/_bin"/>
         <property name="jardir" value="${build.dir}/_jar"/>
 
-        <select os="win">
-            <property name="from.dir"
-                      location="${build.CLASSLIB.home}/depends/oss/win.IA32" />
-        </select>
-
-        <select os="lnx">
-            <property name="from.dir"
-                      location="${build.CLASSLIB.home}/depends/oss/linux.IA32" />
-        </select>
+        <property name="from.dir"
+                      location="${build.CLASSLIB.home}/depends/oss" />
 
         <dependset>
             <srcfileset dir="${from.dir}" includes="icu4c-3.4-harmony.zip" />
-            <targetfileset dir="${jardir}" includes="icu4j_3_4.jar" />
+            <targetfileset dir="${jardir}" includes="icu4j-3.4.jar" />
         </dependset>
         <if>
             <not>
-                <available file="${jardir}/icu4j_3_4.jar"/>
+                <available file="${jardir}/icu4j-3.4.jar"/>
             </not>
             <then>
 
-                <unzip src="${from.dir}/icu4c-3.4-harmony.zip" dest="${build.dir}" />
+                <unzip src="${from.dir}/icu4c-3.4-harmony.zip" dest="${build.dir}/unicode" />
 
-                <copy file="${build.CLASSLIB.home}/depends/jars/icu4j_3_4.jar"
+                <copy file="${build.CLASSLIB.home}/modules/text/depends/icu4j/icu4j-3.4.jar"
                       todir="${jardir}" />
 
                 <copy file="${build.CLASSLIB.home}/depends/jars/icu4jni-3.4.jar"
@@ -66,20 +59,26 @@ Version: $Revision: 1.4.2.5 $
             <copy todir="${libdir}">
                 <fileset dir="${build.CLASSLIB.home}/depends/libs/win.IA32" includes="icu*,ICU*"/>
             </copy>
+
+            <move todir="${build.dir}/_bin">
+                <fileset dir="${build.dir}/unicode">
+                    <include name="icuuc.lib"/>
+                </fileset>
+            </move>
         </select>
 
         <select os="lnx">
             <copy todir="${libdir}">
                 <fileset dir="${build.CLASSLIB.home}/depends/libs/linux.IA32" includes="libicu*,libICU*"/>
             </copy>
+
+            <move todir="${build.dir}/_bin">
+                <fileset dir="${build.dir}/unicode">
+                    <include name="libicuuc.so*"/>
+                </fileset>
+             </move>
         </select>
 
-        <move todir="${build.dir}/_bin">
-                            <fileset dir="${build.dir}/text">
-                                <include name="*"/>
-                            </fileset>
-         </move>
-
-        <property name="includes" value="${build.dir}/include" />
+        <property name="includes" value="${build.dir}" />
     </target>
 </project>
