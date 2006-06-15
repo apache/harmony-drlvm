@@ -32,8 +32,6 @@ Version: $Revision: 1.1.2.11 $
                                               extra.aprutil,
                                               extra.bcprov,
                                               extra.eclipse_script,
-                                              extra.harmony39,
-                                              extra.harmony88,
                                               extra.hello,
                                               extra.icu4c,
                                               extra.hyplugin,
@@ -44,5 +42,6 @@ Version: $Revision: 1.1.2.11 $
                                               extra.serializer,
                                               extra.xml_api_copy,
                                               extra.zlib" />
+       
     </target>
 </project>

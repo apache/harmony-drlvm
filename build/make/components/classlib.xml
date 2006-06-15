@@ -28,26 +28,7 @@ Version: $Revision: 1.6.2.7 $
 <project name="classlib">
     <target name="init" depends="common">
         <select arch="ia32">
-            <property name="build.depends" value="classlib.nio_char,
-                                                  classlib.regex,
-                                                  classlib.security,
-                                                  extra.icu4c,
-                                                  classlib.crypto,
-                                                  classlib.x_net,
-                                                  classlib.archive,
-                                                  classlib.common,
-                                                  classlib.fdlibm,
-                                                  classlib.luni,
-                                                  classlib.math,
-                                                  classlib.nio,
-                                                  classlib.pool,
-                                                  classlib.port,
-                                                  classlib.sig,
-                                                  classlib.sql,
-                                                  classlib.text,
-                                                  classlib.auth,
-                                                  classlib.zip,
-                                                  classlib.zlib" />
+            <property name="build.depends" value="extra.icu4c" />
             <select os="lnx">
                 <property name="os.native.dir" location="${build.CLASSLIB.home}/native-src/linux.IA32" />
             </select>
