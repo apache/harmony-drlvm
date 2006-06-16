@@ -33,7 +33,7 @@ Version: $Revision: 1.4.2.5 $
         <property name="jardir" value="${build.dir}/_jar"/>
 
         <property name="from.dir"
-                      location="${build.CLASSLIB.home}/depends/oss" />
+                      location="${external.dep.CLASSLIB}/depends/oss" />
 
         <dependset>
             <srcfileset dir="${from.dir}" includes="icu4c-3.4-harmony.zip" />
@@ -47,17 +47,17 @@ Version: $Revision: 1.4.2.5 $
 
                 <unzip src="${from.dir}/icu4c-3.4-harmony.zip" dest="${build.dir}/unicode" />
 
-                <copy file="${build.CLASSLIB.home}/modules/text/depends/icu4j/icu4j-3.4.jar"
+                <copy file="${external.dep.CLASSLIB}/modules/text/depends/icu4j/icu4j-3.4.jar"
                       todir="${jardir}" />
 
-                <copy file="${build.CLASSLIB.home}/depends/jars/icu4jni-3.4.jar"
+                <copy file="${external.dep.CLASSLIB}/depends/jars/icu4jni-3.4.jar"
                       todir="${jardir}" />
             </then>
         </if>
 
         <select os="win">
             <copy todir="${libdir}">
-                <fileset dir="${build.CLASSLIB.home}/depends/libs/win.IA32" includes="icu*,ICU*"/>
+                <fileset dir="${external.dep.CLASSLIB}/depends/libs/win.IA32" includes="icu*,ICU*"/>
             </copy>
 
             <move todir="${build.dir}/_bin">
@@ -69,7 +69,7 @@ Version: $Revision: 1.4.2.5 $
 
         <select os="lnx">
             <copy todir="${libdir}">
-                <fileset dir="${build.CLASSLIB.home}/depends/libs/linux.IA32" includes="libicu*,libICU*"/>
+                <fileset dir="${external.dep.CLASSLIB}/depends/libs/linux.IA32" includes="libicu*,libICU*"/>
             </copy>
 
             <move todir="${build.dir}/_bin">
