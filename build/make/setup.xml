@@ -313,7 +313,7 @@ Version: $Revision: 1.5.2.33 $
     </target>
 
     <target name="setup.resources" depends="plugin.antcontrib">
-        <property name="common.resources" value="LOG4CXX,HYPLUGIN,CLASSLIB,CPPTASKS,XALAN,VM,BCPROV,RESOLVER" />
+        <property name="common.resources" value="LOG4CXX,HYPLUGIN,CPPTASKS,XALAN,VM,BCPROV,RESOLVER" />
         <property name="build.resources" value="CPPTASKS,ECLIPSE" />
         <if>
             <isset property="if.lnx" />
