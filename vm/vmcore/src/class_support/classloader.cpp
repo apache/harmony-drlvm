@@ -1099,10 +1099,18 @@ Class* ClassLoader::AllocateAndReportInstance(const Global_Env* env, Class* clss
     const String* name = clss->name;
     assert(name);
 
-    if(env->InBootstrap()) {
+    if (env->InBootstrap()) {
+    	
+    	/*
+    	 *  AnnotatedElement, GenericDeclaration, Type are there becuase in 
+    	 *  Java 5, Class implements them in addition to Serializable
+    	 */
         assert((clss->name == env->JavaLangObject_String)
              || (strcmp(clss->name->bytes, "java/io/Serializable") == 0)
-             || (clss->name == env->JavaLangClass_String));
+             || (clss->name == env->JavaLangClass_String)
+             || (strcmp(clss->name->bytes, "java/lang/reflect/AnnotatedElement") == 0)
+             || (strcmp(clss->name->bytes, "java/lang/reflect/GenericDeclaration") == 0)
+             || (strcmp(clss->name->bytes, "java/lang/reflect/Type") == 0));
         clss->class_handle = NULL;
     } else {
         Class* root_class = env->JavaLangClass_Class;

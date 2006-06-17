@@ -129,11 +129,18 @@ static void bootstrap_initial_java_classes(Global_Env *env)
 {
     assert(tmn_is_suspend_enabled());
     TRACE2("init", "bootstrapping initial java classes");
-    // Bootstrap java.lang.Class class. This requires also loading the two classes 
-    // it inherits/implements: java.io.Serializable and java.lang.Object.
+    
+    /*
+     *  Bootstrap java.lang.Class class. This requires also loading the other classes 
+     *  it inherits/implements: java.io.Serializable and java.lang.Object, and 
+     * j.l.reflect.AnnotatedElement, GenericDeclaration and Type as per Java 5
+     */
     env->StartVMBootstrap();
     Class *class_java_lang_Object   = preload_class(env, env->JavaLangObject_String);
     env->java_io_Serializable_Class = preload_class(env, env->Serializable_String);
+    Class *AnnotatedElement_Class   = preload_class(env, "java/lang/reflect/AnnotatedElement");
+    Class *GenericDeclaration_Class = preload_class(env, "java/lang/reflect/GenericDeclaration");
+    Class *Type_Class               = preload_class(env, "java/lang/reflect/Type");
     env->JavaLangClass_Class        = preload_class(env, env->JavaLangClass_String);
     env->JavaLangObject_Class       = class_java_lang_Object;
     env->FinishVMBootstrap();
@@ -141,6 +148,9 @@ static void bootstrap_initial_java_classes(Global_Env *env)
     // Now create the java_lang_Class instances for these three classes.
     create_instance_for_class(env, env->JavaLangClass_Class);
     create_instance_for_class(env, env->java_io_Serializable_Class);
+    create_instance_for_class(env, AnnotatedElement_Class);
+    create_instance_for_class(env, GenericDeclaration_Class);
+    create_instance_for_class(env, Type_Class);
     create_instance_for_class(env, env->JavaLangObject_Class);
 
     // during bootstrapping suspend status never matters,
@@ -149,13 +159,19 @@ static void bootstrap_initial_java_classes(Global_Env *env)
     jvmti_send_class_prepare_event(env->JavaLangObject_Class);
     jvmti_send_class_load_event(env, env->java_io_Serializable_Class);
     jvmti_send_class_prepare_event(env->java_io_Serializable_Class);
+    jvmti_send_class_load_event(env, AnnotatedElement_Class);
+    jvmti_send_class_prepare_event(AnnotatedElement_Class);
+    jvmti_send_class_load_event(env, GenericDeclaration_Class);
+    jvmti_send_class_prepare_event(GenericDeclaration_Class);
+    jvmti_send_class_load_event(env, Type_Class);
+    jvmti_send_class_prepare_event(Type_Class);
     jvmti_send_class_load_event(env, env->JavaLangClass_Class);
     jvmti_send_class_prepare_event(env->JavaLangClass_Class);
 
 #ifdef VM_STATS
     // Account for the 3 classes loaded before env->JavaLangObject_Class is set.
-    env->JavaLangObject_Class->num_allocations += 3;
-    env->JavaLangObject_Class->num_bytes_allocated += (3 * env->JavaLangClass_Class->instance_data_size);
+    env->JavaLangObject_Class->num_allocations += 6;
+    env->JavaLangObject_Class->num_bytes_allocated += (6 * env->JavaLangClass_Class->instance_data_size);
 #endif //VM_STATS
     TRACE2("init", "bootstrapping initial java classes complete");
 } // bootstrap_initial_java_classes
