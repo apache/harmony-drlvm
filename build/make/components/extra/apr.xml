@@ -59,14 +59,13 @@ Version: $Revision: 1.4.2.5 $
 
     <target name="apr-configure" unless="apr-config-available">
         <select os="lnx">
-            <exec executable="sh" dir="${src}">
+        	
+<!--            <exec executable="sh" dir="${src}">
                 <arg value="./buildconf" />
             </exec>
-
+-->
             <exec executable="sh" dir="${src}">
                 <arg value="./configure" />
-                <arg value="CXX=${build.cxx}" />
-                <arg value="CC=${build.cxx}" />
             </exec>
 
             <replaceregexp file="${includes.apr}/apr.h" match="#define APR_HAS_OS_UUID           1" replace="#define APR_HAS_OS_UUID           0" />
@@ -86,6 +85,18 @@ Version: $Revision: 1.4.2.5 $
         <property name="outtype" value="static" />
 
         <select os="lnx">
+
+        	<!-- simply invoke make to let it build as the APR people suggest  -->
+            <!-- we'll need to tune this wrt flags and such                    -->
+        	
+        	<exec executable="make" dir="${src}"/>
+        	        		
+        	<!-- the rest of the build expect the lib to be in _bin  -->
+        	
+        	<copy file="${src}/.libs/lib${libname}.a" todir="${src}/../_bin" />
+
+    	<!--  this is the original build approach - leaving here for now 
+    	
             <compiler id="c.compiler" extends="common.c.compiler">
                 <includepath path="${src}/include" />
                 <includepath path="${src}/include/arch" />
@@ -99,7 +110,6 @@ Version: $Revision: 1.4.2.5 $
                 <fileset dir="${src}/file_io/unix" includes="copy.c fileacc.c filepath_util.c fullrw.c mktemp.c tempdir.c" />
                 <fileset dir="${src}/memory/unix" includes="*.c" />
                 <fileset dir="${src}/misc/unix" includes="*.c" />
-                <!--                <fileset dir="${src}/misc/unix" includes="errorcodes.c getopt.c otherchild.c version.c" /> -->
                 <fileset dir="${src}/mmap/unix" includes="common.c" />
                 <fileset dir="${src}/network_io/unix" includes="inet_ntop.c inet_pton.c sockaddr.c" />
                 <fileset dir="${src}/poll/unix" includes="select.c" />
@@ -115,6 +125,7 @@ Version: $Revision: 1.4.2.5 $
                     <compilerarg value="-fPIC" />
                 </select>
             </compiler>
+            -->
         </select>
         <select os="win">
             <compiler id="c.compiler" extends="common.c.compiler">
