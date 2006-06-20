@@ -83,9 +83,9 @@ CLASSPATH=`pwd`/make/tmp/ant-contrib.jar:$CLASSPATH
 export CLASSPATH
 
 if [ -x $JAVA_HOME/bin/ij ]; then
-    ANT_COMMAND="$JAVA_HOME/bin/ij  -Duser.timezone=en_US -classpath $ANT_HOME/lib/ant-launcher.jar -Dant.home=$ANT_HOME org.apache.tools.ant.launch.Launcher -cp $CLASSPATH -Dbuild.compiler=org.eclipse.jdt.core.JDTCompilerAdapter"
+    ANT_COMMAND="$JAVA_HOME/bin/ij  -Duser.timezone=en_US -classpath $ANT_HOME/lib/ant-launcher.jar -Dant.home=$ANT_HOME org.apache.tools.ant.launch.Launcher -cp $CLASSPATH "
 else
-    ANT_COMMAND="$ANT_HOME/bin/ant --noconfig -Dbuild.compiler=org.eclipse.jdt.core.JDTCompilerAdapter"
+    ANT_COMMAND="$ANT_HOME/bin/ant --noconfig"
 fi
 
 # it is necessarily to compile 'vm.jitrino' in release mode
