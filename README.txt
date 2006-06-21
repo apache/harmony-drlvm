@@ -1,10 +1,8 @@
-INTEL CONTRIBUTION TO APACHE HARMONY
-          May 2, 2006
+Apache Harmony DRLVM
 ======================================
 
-This archive contains the contribution to the Apache 
-Harmony project from Intel. The contribution consists 
-of the following components: 
+DRLVM is one of the virtual machines of the Apache Harmony 
+project.  It contains : 
 
     - VM (VM Core)
     - GC
@@ -15,35 +13,46 @@ of the following components:
 
 See http://wiki.apache.org/harmony for a definition of these components.
 
-This donation can do the following with Harmony classes:
+At the time of original intial donation it can do the following with Harmony classes:
 
-   - Run Eclipse* version 3.1.1: create, edit, compile, and launch Java* applications
+   - Run Eclipse version 3.1.1: create, edit, compile, and launch Java applications
    - Provide a self-hosting development environment: the JRE can build itself
 
-The supported configurations are Windows* IA-32 and Linux* IA-32. 
+The supported configurations are Windows IA-32 and Linux IA-32. 
 
 0. QUICK START
 --------------
-This section gives brief instructions on how to build DRLVM on Windows* with
+This section gives brief instructions on how to build DRLVM on Windows with
 the standard configuration. For more detailed instructions, bundle content description, 
 and other useful information, read further. 
 
-1. Unzip DRLVM_src_*_*_Harmony.zip and Patches_for_Harmony_*.zip  in the same directory.
+1. Checkout the code for DRLVM from the Apache Harmony subversion repository
 
-2. Set the following environment variables:
+   http://svn.apache.org/repos/asf/incubator/harmony/enhanced/drlvm/trunk
+
+   (if you are reading this, you probably already have done that or have a snapshot)
+
+2. Checkout the classlibrary.  This needs to be done first, and build first, as
+   the DRLVM build depends on it.  Again, use a snapshot or get from the SVN repo : 
+   
+      http://svn.apache.org/repos/asf/incubator/harmony/enhanced/drlvm/trunk
+      
+   Follow the instructions to build the classlibrary.
+      
+3. Set the following environment variables:
    ANT_HOME must point to the location of Apache Ant.  
-   JAVA_HOME must point to the location of the Java* Runtime Environment. 
+   JAVA_HOME must point to the location of the Java Runtime Environment. 
 
    NOTE: All paths must be absolute. 
-
-3. Change the working directory to Harmony/build.
-
-4. Run the following command:
+   
+4. In the trunk/build directory, run the following command:
 
         build.bat update -Dhttp.proxyHost=proxy -Dhttp.proxyPort=8080
 
-   The class libraries and other sources are downloaded or checked out from the 
-   Internet at this stage. Make sure that the SVN and Ant Internet settings are correct. 
+   where the last two arguments are optional, and depend on your local environment.
+   
+   The dependencies are downloaded at this stage. As svn and ant are used, please
+   make sure that the SVN and Ant Internet settings are correct. 
    See steps 3.12.3 and 3.12.4 below for more information.
 
 5. Run the following command:
@@ -55,18 +64,16 @@ and other useful information, read further.
 
 7. If building the DRLVM fails, read this README and follow building instructions to the point.
 
-1. ARCHIVE CONTENTS
--------------------
+1. DRLVM SOURTS TREE CONTENTS
+-----------------------------
 
-The archive contains the source files, the building environment,
-and the smoke tests source files for lightweight testing of the provided
-implementation.
+This source tree the source files, the building environment,
+and the smoke tests source files for lightweight testing of the
+DRLVM.
 
-After extracting the archive, the following directories appear under
-<EXTRACT_DIR>/Harmony, where <EXTRACT_DIR> is the location, to which
-you have extracted this archive:
+The structure is as follows : 
 
-<EXTRACT_DIR>/Harmony/
+<EXTRACT_DIR>/trunk/
        |
        +---build          - Files required to build the contribution
        |      
@@ -105,17 +112,14 @@ you have extracted this archive:
            +- vmstart     - Partial implementation of the invocation API for starting
                             the VM as a dynamic library 
 
-NOTE: There are two patches for Harmony CLASSLIB and Harmony Eclipse plug-in that
- distributed separately in file harmony_for_vm_patches.zip. 
- It should be unpacked in <EXTRACT_DIR>. New directory Harmony/build/patches 
- will be created. See harmony_for_vm_patches.zip README.txt for more details. 
 
 2. TOOLS AND ENVIRONMENT VARIABLES REQUIRED FOR THE BUILD
 -----------------------------------------------------------
 
-To build the Java*, C/C++ and assembler source files of DRLVM, install the following software and tools:
+To build the Java, C/C++ and assembler source files of DRLVM, install the following 
+software and tools:
 
-+ Java* Runtime      - Apache Harmony Execution Environment
++ Java Runtime      - Apache Harmony Execution Environment
                        http://www-128.ibm.com/developerworks/java/jdk/harmony
 
 + Class libraries    - Harmony Class Libraries
@@ -124,13 +128,12 @@ To build the Java*, C/C++ and assembler source files of DRLVM, install the follo
 + Apache Ant         - Apache Ant, version 1.6.5 or higher
                        http://ant.apache.org
 
-+ C/C++ compiler     - on Windows*, use one of the following: 
++ C/C++ compiler     - on Windows, use one of the following: 
 
-                       + Microsoft* 32-bit C/C++ Compiler, version 7 or higher
-                       + Windows* platform SDK
-                       + Microsoft* Visual Studio .NET* 2003 or higher
+                       + Microsoft 32-bit C/C++ Compiler, version 7 or higher
+                       + Windows platform SDK
+                       + Microsoft Visual Studio .NET 2003 or higher
                          http://www.microsoft.com/products
-                         
                        + Intel C++ Compiler, version 9.0
                          http://www.intel.com/cd/software/products/asmo-na/eng/compilers/index.htm
 
@@ -142,16 +145,11 @@ To build the Java*, C/C++ and assembler source files of DRLVM, install the follo
 Additionally, the building system will download
 the following software and libraries from the Internet:
 
-+ HARMONY-39         - The beans, regex, and math contribution
-                       http://issues.apache.org/jira/browse/HARMONY-39
-
-+ HARMONY-88         - The jndi, logging, prefs and sql contribution
-                       http://issues.apache.org/jira/browse/HARMONY-39
 
 + Xalan-Java         - Xalan-Java, version 2.7.0
                        http://xml.apache.org/xalan-j/ 
 
-+ Eclipse*           - Eclipse* SDK, version 3.1.1
++ Eclipse           - Eclipse* SDK, version 3.1.1
                        http://download.eclipse.org/eclipse/downloads/
 
 + Cpp Tasks          - Cpp Tasks collection, version 1.0 beta 3 or higher
@@ -225,14 +223,14 @@ as described below:
 
 3.3 Set up the environment by following the instructions below specific for your operating system:
     
-    On Windows*, do the following:
+    On Windows, do the following:
     
     set ANT_HOME=<Path to Ant 1.6.5>
     set JAVA_HOME=<Path to JRE 1.4>    
     set COMPILER_CFG_SCRIPT=<path to vcvars.bat or iclvars.bat>
     The default value: C:\Program Files\Intel\Compiler\C++\9.0\IA32\Bin\iclvars.bat>
               
-    On Linux*, do the following:
+    On Linux, do the following:
     
     export JAVA_HOME=<Path to JRE 1.4>
     export ANT_HOME=<Path to Ant 1.6.5>
@@ -245,7 +243,7 @@ as described below:
 
 3.5 Download the libraries required for the build, specifically:
     
-     On Windows*:         |  On Linux*:
+     On Windows:          |  On Linux:
      ---------------------+--------------------
      build.bat update     |  build.sh update
  
@@ -286,12 +284,12 @@ as described below:
     To run an application called Hello, go to the directory 
     ./build/${OS}_ia32_${CXX}_${BUILD_CFG}/deploy/jre/bin and type:
          
-    On Windows*:        |  On Linux*:
+    On Windows :        |  On Linux :
     --------------------+--------------------
     ij.exe Hello        | LD_LIBRARY_PATH=$PWD; export LD_LIBRARY_PATH
                         | ./ij Hello
 
-    On Linux*, the convenience script ij.sh configures LD_LIBRARY_PATH 
+    On Linux, the convenience script ij.sh configures LD_LIBRARY_PATH 
     automatically. If you have generated the executable with the Intel(R) C++ compiler,
     add path to ICC libraries to LD_LIBRARY_PATH too, for example: 
 
@@ -299,10 +297,10 @@ as described below:
         export LD_LIBRARY_PATH
         ./ij Hello
 
-    To run Eclipse*, set the ECLIPSE_HOME variable to point to the Eclipse* 
+    To run Eclipse, set the ECLIPSE_HOME variable to point to the Eclipse 
     installation directory and type:
 
-    On Windows*:        |  On Linux*:
+    On Windows:        |  On Linux:
     --------------------+--------------------
     eclipse.bat         |  eclipse.sh
 
@@ -318,17 +316,17 @@ as described below:
                    |
                    +---bin
                    |    |
-                   |    +--- ij.exe      (if Windows*)
-                   |    +--- *.dll       (if Windows*)
-                   |    +--- *.pdb       (if Windows*)
-                   |    +--- ij.bat      (if Windows*)
-                   |    +--- eclipse.bat (if Windows*)
+                   |    +--- ij.exe      (if Windows)
+                   |    +--- *.dll       (if Windows)
+                   |    +--- *.pdb       (if Windows)
+                   |    +--- ij.bat      (if Windows)
+                   |    +--- eclipse.bat (if Windows)
                    |    |
-                   |    +--- ij          (if Linux*)
-                   |    +--- *.so        (if Linux*)
-                   |    +--- *.a         (if Linux*)
-                   |    +--- ij.sh       (if Linux*)
-                   |    +--- eclipse.sh  (if Linux*)
+                   |    +--- ij          (if Linux)
+                   |    +--- *.so        (if Linux)
+                   |    +--- *.a         (if Linux)
+                   |    +--- ij.sh       (if Linux)
+                   |    +--- eclipse.sh  (if Linux)
                    |    |
                    |    \--- Hello.class
                    |
@@ -687,9 +685,3 @@ is not optimal due to heavy bug fixing.
 Implement correctly all items pointed in the section Partially
 implemented features in the section KNOWN ISSUES of this file.
 
-
-9. DISCLAIMER AND LEGAL INFORMATION
-------------------------------------
-
-
-*) Other brands and names are the property of their respective owners.
