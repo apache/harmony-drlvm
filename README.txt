@@ -13,7 +13,8 @@ project.  It contains :
 
 See http://wiki.apache.org/harmony for a definition of these components.
 
-At the time of original intial donation it can do the following with Harmony classes:
+At the time of original initial donation it could do the following with
+Harmony classes:
 
    - Run Eclipse version 3.1.1: create, edit, compile, and launch Java applications
    - Provide a self-hosting development environment: the JRE can build itself
