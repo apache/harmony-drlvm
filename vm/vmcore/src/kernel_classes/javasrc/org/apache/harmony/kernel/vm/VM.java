@@ -57,6 +57,13 @@ public final class VM {
     }
 
     /**
+     * Always return null for bootstrap class loader
+     */
+    public static ClassLoader bootCallerClassLoader() {
+        return null;
+    }
+
+    /**
      * 1) We expect this method will be removed since it's
      *    not safe to return class loader from the stack with out security checks.
      * @deprecated
