@@ -153,11 +153,9 @@ static char *load_full_api_files_path_names_list(const char *path)
 	        if ((jre_file_name[0] != 0x0D || jre_file_name[0] != 0x0A)
 				&& !strncmp(jre_file_name ,BOOTCLASSPATH_PROP_NAME, strlen(BOOTCLASSPATH_PROP_NAME))) {
                 char *char_pos = jre_file_name + strlen(BOOTCLASSPATH_PROP_NAME);
-                if (NULL == char_pos)
-                    continue;
                 // Check that there are digits after dots so only bootclasspath
                 // elements appear in the property
-                if (char_pos[1] < '0' || char_pos[1] > '9')
+                if (char_pos[0] != '.' || char_pos[1] < '0' || char_pos[1] > '9')
                     continue;
                 
                 if(props_count == array_size) {
