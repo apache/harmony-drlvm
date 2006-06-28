@@ -36,6 +36,7 @@
 #define PROP_FILE_NAME "vm.properties"
 #define BOOT_PROPS_FILE_NAME "bootclasspath.properties"
 #define BOOTCLASSPATH_PROP_NAME "bootclasspath"
+#define BOOTCLASSPATH_KERNEL_JAR "kernel.jar"
 
 #define MAX_PROP_LINE 5120
 
@@ -140,7 +141,6 @@ int str_compare(const void *arg1, const void *arg2) {
 static char *load_full_api_files_path_names_list(const char *path)
 {
     char *full_name = "";
-    bool nfirst_time = false;
     int array_size = 30;
     char **props = (char**)STD_MALLOC(array_size*sizeof(char*));
     char *jre_file_path = apr_pstrcat(prop_pool, path, PORT_FILE_SEPARATOR_STR BOOT_PROPS_FILE_NAME, NULL);
@@ -152,11 +152,19 @@ static char *load_full_api_files_path_names_list(const char *path)
         while (!apr_file_eof(f_jre) && !apr_file_gets(jre_file_name, MAX_PROP_LINE, f_jre)) {
 	        if ((jre_file_name[0] != 0x0D || jre_file_name[0] != 0x0A)
 				&& !strncmp(jre_file_name ,BOOTCLASSPATH_PROP_NAME, strlen(BOOTCLASSPATH_PROP_NAME))) {
+                char *char_pos = jre_file_name + strlen(BOOTCLASSPATH_PROP_NAME);
+                if (NULL == char_pos)
+                    continue;
+                // Check that there are digits after dots so only bootclasspath
+                // elements appear in the property
+                if (char_pos[1] < '0' || char_pos[1] > '9')
+                    continue;
+                
                 if(props_count == array_size) {
                     array_size *= 2;
                     props = (char**)STD_REALLOC(props, array_size*sizeof(char*));
                 }
-                char *char_pos = strchr(jre_file_name, 0x0D);
+                char_pos = strchr(jre_file_name, 0x0D);
                 if (char_pos != NULL) {
                     *char_pos = '\0';
                 } else {
@@ -173,11 +181,13 @@ static char *load_full_api_files_path_names_list(const char *path)
 	    }
     
 		qsort(props, props_count, sizeof(char*), str_compare);
+        
+        full_name = apr_pstrcat(prop_pool, path, PORT_FILE_SEPARATOR_STR,
+            BOOTCLASSPATH_KERNEL_JAR, NULL);
+        
         for(int i = 0; i < props_count; i++){
-            full_name = apr_pstrcat(prop_pool, full_name,
-                nfirst_time ? PORT_PATH_SEPARATOR_STR : "",
+            full_name = apr_pstrcat(prop_pool, full_name, PORT_PATH_SEPARATOR_STR,
                 path, PORT_FILE_SEPARATOR_STR, props[i] + strlen(props[i]) + 1, NULL);
-            nfirst_time=true;
             STD_FREE(props[i]);
         }
         STD_FREE(props);
