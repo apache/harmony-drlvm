@@ -91,10 +91,6 @@ Description of the product deploy folder.
             <jar>lib:*</jar>
         </hyplugin>
 
-        <jre_libraries>
-            <other>lib/boot:*</other>
-        </jre_libraries>
-
         <icu4c>
             <jar>lib/boot:*</jar>
             <shared>bin:*</shared>
