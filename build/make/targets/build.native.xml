@@ -89,7 +89,7 @@ Version: $Revision: 1.5.2.6 $
     <!-- compiles c sources ${c.compiler} must be set in the component descriptor 
                 to point what sources have to be compiled -->
     <target name="build.native.c" depends="build.native.init" if="have.to.rebuild">
-        <cc objdir="${build.dir}/_obj" debug="${is.cfg.debug}" runtime="static" multithreaded="true">
+        <cc objdir="${build.dir}/_obj" debug="${is.cfg.debug}" runtime="static" multithreaded="true" subsystem="console">
             <compiler refid="c.compiler" />
             <select os="win">
                 <compilerarg value="/Zi" />
@@ -104,7 +104,7 @@ Version: $Revision: 1.5.2.6 $
     <!-- compiles cpp sources ${cpp.compiler} must be set in the component descriptor 
                 to point what sources have to be compiled -->
     <target name="build.native.cpp" depends="build.native.init" if="have.to.rebuild">
-        <cc objdir="${build.dir}/_obj" debug="${is.cfg.debug}" runtime="static" multithreaded="true">
+        <cc objdir="${build.dir}/_obj" debug="${is.cfg.debug}" runtime="static" multithreaded="true"  subsystem="console">
             <compiler refid="cpp.compiler" />
             <select os="win">
                 <compilerarg value="/Zi" />
@@ -199,7 +199,7 @@ Version: $Revision: 1.5.2.6 $
         <cc name="${build.cxx}"
             debug="${is.cfg.debug}"
             outfile="${lib.out.dir}/${libname}"
-            outtype="${outtype}">
+            outtype="${outtype}"  subsystem="console">
             <select os="win">
                 <linkerarg value="/pdb:${build.dir}/_bin/${libname}.pdb" />
                 <linkerarg value="/debug" />

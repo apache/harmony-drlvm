@@ -57,11 +57,14 @@ Version: $Revision: 1.5.2.33 $
                 <available file="tmp/ant-contrib.jar" />
             </and>
         </condition>
+
+        <!-- cpptasks patching removed  
         <condition property="cpptasks.patched">
             <and>
                 <available file="tmp/patched.txt" />
             </and>
         </condition>
+        -->
         <echo message="jars: ${jars.exist}" />
     </target>
 
@@ -87,8 +90,7 @@ Version: $Revision: 1.5.2.33 $
                                                       download.remote.files,
                                                       unzip.resources,
                                                       check.unzipped.externals,
-                                                      copy.nessessary.jars,
-                                                      execute.cpptasks.patch.with.eclipse.compiler.in.classpath">
+                                                      copy.nessessary.jars">
     </target>
 
 
@@ -108,61 +110,6 @@ Version: $Revision: 1.5.2.33 $
         <property name="RESOLVER.check.file" value="resolver.jar" />
     </target>
 
-    <!-- Patching CPPTASKS before using it. -->
-    <!-- We do it in separate ant process.  -->
-    <target name="patch.cpptasks" depends="plugin.antcontrib" unless="cpptasks.patched">
-        <mkdir dir="tmp/cpptasks/patched.src" />
-        <mkdir dir="tmp/cpptasks/patched.classes" />
-        <property environment="env" />
-        <echo message="Patching CPPTASKS..." />
-        <!-- patching itself: 3 files -->
-        <property name="files.to.patch" value="net/sf/antcontrib/cpptasks/devstudio/DevStudioCCompiler.java net/sf/antcontrib/cpptasks/intel/IntelWin32CCompiler.java net/sf/antcontrib/cpptasks/intel/IntelWin64CCompiler.java" />
-
-        <for list="${files.to.patch}" param="filename" delimiter=" ">
-            <sequential>
-                <copy todir="tmp/cpptasks/patched.src">
-                    <fileset dir="${env.CPPTASKS_HOME}">
-                        <include name="**/src/@{filename}" />
-                    </fileset>
-                </copy>
-            </sequential>
-        </for>
-
-        <fileset id="src.files" dir="tmp/cpptasks/patched.src">
-            <include name="**/*" />
-        </fileset>
-
-        <for param="filename">
-            <fileset refid="src.files" />
-            <sequential>
-                <loadfile property="file.content.@{filename}" srcFile="@{filename}" />
-
-                <propertyregex property="file.patched.content" input="${file.content.@{filename}}" override="true" regexp="(?m)(public\s+int\s+getMaximumCommandLength\(\)\s+\{\s*$\s+)return 1024;" replace="\1return 65535;" defaultValue="${file.content.@{filename}}" />
-
-                <!-- patch the file only if something's changed -->
-                <if>
-                    <not>
-                        <equals arg1="${file.content.@{filename}}" arg2="${file.patched.content}" />
-                    </not>
-                    <then>
-                        <echo file="@{filename}" message="${file.patched.content}" />
-                    </then>
-                </if>
-            </sequential>
-        </for>
-
-        <!-- compile the patched source -->
-        <javac srcdir="tmp/cpptasks/patched.src" destdir="tmp/cpptasks/patched.classes" source="1.4" target="1.4" failonerror="true">
-            <classpath>
-                <fileset dir="${env.CPPTASKS_HOME}" includes="**/*.jar" />
-                <fileset dir="${java.home}" includes="**/*.jar" />
-            </classpath>
-            <patternset>
-                <include name="**/*.java" />
-            </patternset>
-        </javac>
-        <echo file="tmp/patched.txt" message="done" />
-    </target>
 
 
     <target name="check.unzipped.externals" depends="init,setup.check.files,setup.properties">
@@ -232,7 +179,7 @@ Version: $Revision: 1.5.2.33 $
         </fail>
         <copy file="${build.XALAN.path}/serializer.jar" todir="tmp" />
         <propertyregex property="build.CPPTASKS.path" input="${if.CPPTASKS.exist}" regexp="(.*)/${CPPTASKS.check.file}" select="\1" />
-        <copy file="${build.CPPTASKS.path}/cpptasks.jar" todir="tmp/cpptasks" />
+        <copy file="${build.CPPTASKS.path}/cpptasks.jar" todir="tmp" />
         <echo message="done" file="tmp/done.txt" />
     </target>
 
@@ -253,64 +200,7 @@ Version: $Revision: 1.5.2.33 $
         </for>
     </target>
 
-    <target name="execute.cpptasks.patch.with.eclipse.compiler.in.classpath" unless="cpptasks.patched" depends="init, setup.resources, copy.nessessary.jars">
-        <path id="class.path">
-            <pathelement location="tmp\org.eclipse.jdt.core_3.1.1.jar" />
-            <pathelement location="tmp\jdtCompilerAdapter.jar" />
-            <pathelement location="tmp\junit*.jar" />
-            <pathelement location="tmp\xalan.jar" />
-            <pathelement location="tmp\cpptasks\patched.classes" />
-            <pathelement location="tmp\cpptasks\cpptasks.jar" />
-        </path>
-        <pathconvert refid="class.path" property="class.line" />
-        <property name="setup.file" location="./setup.xml" />
-        <property name="cpptasks.home" location="${build.CPPTASKS.path}" />
 
-        <if>
-            <isset property="if.win" />
-            <then>
-                <if>
-                    <available file="${env.JAVA_HOME}\bin\ij.exe" />
-                    <then>
-                        <exec executable="${env.JAVA_HOME}\bin\ij.exe">
-                            <arg line="-Duser.timezone=en_US -classpath ${env.ANT_HOME}\lib\ant-launcher.jar -Dant.home=${env.ANT_HOME} org.apache.tools.ant.launch.Launcher -cp ${class.line} -Dbuild.compiler=org.eclipse.jdt.core.JDTCompilerAdapter -f ${setup.file} patch.cpptasks" />
-                            <env key="CLASSPATH" value="${class.line}" />
-                            <env key="CPPTASKS_HOME" value="${cpptasks.home}" />
-                        </exec>
-                    </then>
-                    <else>
-                        <exec executable="${env.ANT_HOME}\bin\ant.bat">
-                            <arg line=" -f ${setup.file} patch.cpptasks -Dbuild.compiler=org.eclipse.jdt.core.JDTCompilerAdapter" />
-                            <env key="CLASSPATH" value="${class.line}" />
-                            <env key="CPPTASKS_HOME" value="${cpptasks.home}" />
-                        </exec>
-                    </else>
-                </if>
-            </then>
-        </if>
-        <if>
-            <isset property="if.lnx" />
-            <then>
-                <if>
-                    <available file="${env.JAVA_HOME}/bin/ij" />
-                    <then>
-                        <exec executable="${env.JAVA_HOME}/bin/ij">
-                            <arg line="-Duser.timezone=en_US -classpath ${env.ANT_HOME}/lib/ant-launcher.jar -Dant.home=${env.ANT_HOME} org.apache.tools.ant.launch.Launcher -cp ${class.line} -Dbuild.compiler=org.eclipse.jdt.core.JDTCompilerAdapter -f ${setup.file} patch.cpptasks" />
-                            <env key="CLASSPATH" value="${class.line}" />
-                            <env key="CPPTASKS_HOME" value="${cpptasks.home}" />
-                        </exec>
-                    </then>
-                    <else>
-                        <exec executable="${env.ANT_HOME}/bin/ant">
-                            <arg line=" --noconfig -f ${setup.file} patch.cpptasks -Dbuild.compiler=org.eclipse.jdt.core.JDTCompilerAdapter" />
-                            <env key="CLASSPATH" value="${class.line}" />
-                            <env key="CPPTASKS_HOME" value="${cpptasks.home}" />
-                        </exec>
-                    </else>
-                </if>
-            </then>
-        </if>
-    </target>
 
     <target name="setup.resources" depends="plugin.antcontrib">
         <property name="common.resources" value="LOG4CXX,HYPLUGIN,CPPTASKS,XALAN,VM,BCPROV,RESOLVER" />
@@ -441,7 +331,9 @@ Version: $Revision: 1.5.2.33 $
                         <available file="tmp/org.eclipse.jdt.core_3.1.1.jar" />
                         <available file="tmp/junit.jar" />
                         <available file="tmp/xalan.jar" />
+			<!-- Removed cpptasks patching
                         <available file="tmp/cpptasks/cpptasks.jar" />
+ 			-->
                     </and>
                 </not>
             </condition>Error:
