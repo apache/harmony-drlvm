@@ -224,7 +224,7 @@ Version: $Revision: 1.16.2.20 $
         <ant antfile="setup.xml" target="clean.update" inheritall="true" />
     </target>
 
-    <target name="update" depends="detect.os.arch.cxx.cfg, set.semis.dirs">
+    <target name="update" depends="extern_dep, detect.os.arch.cxx.cfg, set.semis.dirs">
         <ant antfile="setup.xml" target="update.external.resources" inheritall="true" />
     </target>
 

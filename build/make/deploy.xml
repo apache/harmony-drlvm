@@ -91,14 +91,6 @@ Description of the product deploy folder.
             <jar>lib:*</jar>
         </hyplugin>
 
-        <icu4c>
-            <jar>lib/boot:*</jar>
-            <shared>bin:*</shared>
-        </icu4c>
-
-        <xml_api_copy>
-            <jar>lib/boot:*</jar>
-        </xml_api_copy>
 
         <ij_script>
             <select os="win">
@@ -109,18 +101,6 @@ Description of the product deploy folder.
                 <other>bin:ij.sh</other>
             </select>
         </ij_script>
-
-        <bcprov>
-            <jar>lib/boot:*</jar>
-        </bcprov>
-
-        <resolver>
-            <jar>lib/boot:resolver</jar>
-        </resolver>
-
-        <serializer>
-            <jar>lib/boot:serializer</jar>
-        </serializer>
 
         <hello>
             <other>bin:Hello.class</other>

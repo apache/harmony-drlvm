@@ -30,17 +30,12 @@ Version: $Revision: 1.1.2.11 $
         <property name="build.depends" value="extra.apr,
                                               extra.apriconv,
                                               extra.aprutil,
-                                              extra.bcprov,
                                               extra.eclipse_script,
                                               extra.hello,
-                                              extra.icu4c,
                                               extra.hyplugin,
                                               extra.ij_script,
                                               extra.jre_libraries,
                                               extra.log4cxx,
-                                              extra.resolver,
-                                              extra.serializer,
-                                              extra.xml_api_copy,
                                               extra.zlib" />
        
     </target>

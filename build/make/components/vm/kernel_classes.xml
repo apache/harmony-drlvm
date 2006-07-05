@@ -37,9 +37,6 @@ Version: $Revision: 1.4.2.5 $
             <pathelement location="${build.vm.home}/vmcore/src/kernel_classes/javasrc" />
         </path>                 
 
-        <patternset id="java.classes.pattern"  includes="**/*.class"/>
-        <patternset id="java.source.pattern"  includes="**/*.java"/>
-
         <path id="java.class.path">
             <pathelement location="${java.build.dir}"/>
 

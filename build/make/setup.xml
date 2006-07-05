@@ -106,8 +106,6 @@ Version: $Revision: 1.5.2.33 $
         <property name="ECLIPSE.check.file" value="plugins/org.eclipse.jdt.core_3.1.1.jar" />
         <property name="XALAN.check.file" value="xalan.jar" />
         <property name="VM.check.file" value="vmstart/src/main.cpp" />
-        <property name="BCPROV.check.file" value="bcprov-jdk14-129.jar" />
-        <property name="RESOLVER.check.file" value="resolver.jar" />
     </target>
 
 
@@ -163,6 +161,8 @@ Version: $Revision: 1.5.2.33 $
                 <include name="plugins/org.junit_3.8.1/junit.jar" />
             </fileset>
         </copy>
+
+
         <propertyregex property="build.XALAN.path" input="${if.XALAN.exist}" regexp="(.*)/${XALAN.check.file}" select="\1" />
         <copy file="${build.XALAN.path}/xalan.jar" todir="tmp" />
         <fail>
@@ -178,6 +178,7 @@ Version: $Revision: 1.5.2.33 $
 * See README for details.
         </fail>
         <copy file="${build.XALAN.path}/serializer.jar" todir="tmp" />
+
         <propertyregex property="build.CPPTASKS.path" input="${if.CPPTASKS.exist}" regexp="(.*)/${CPPTASKS.check.file}" select="\1" />
         <copy file="${build.CPPTASKS.path}/cpptasks.jar" todir="tmp" />
         <echo message="done" file="tmp/done.txt" />
@@ -203,7 +204,7 @@ Version: $Revision: 1.5.2.33 $
 
 
     <target name="setup.resources" depends="plugin.antcontrib">
-        <property name="common.resources" value="LOG4CXX,HYPLUGIN,CPPTASKS,XALAN,VM,BCPROV,RESOLVER" />
+        <property name="common.resources" value="LOG4CXX,HYPLUGIN,CPPTASKS,XALAN,VM" />
         <property name="build.resources" value="CPPTASKS,ECLIPSE" />
         <if>
             <isset property="if.lnx" />
