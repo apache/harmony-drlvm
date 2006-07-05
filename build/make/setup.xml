@@ -165,19 +165,6 @@ Version: $Revision: 1.5.2.33 $
 
         <propertyregex property="build.XALAN.path" input="${if.XALAN.exist}" regexp="(.*)/${XALAN.check.file}" select="\1" />
         <copy file="${build.XALAN.path}/xalan.jar" todir="tmp" />
-        <fail>
-            <condition>
-                <not>
-                    <available file="${build.XALAN.path}/serializer.jar" />
-                </not>
-            </condition>Error:
-* Your XALAN_HOME: ${build.XALAN.path} doesn't contains serializer.jar.
-* Use default settings in the ${resources.properties.file} file 
-* to download the correct archive
-*
-* See README for details.
-        </fail>
-        <copy file="${build.XALAN.path}/serializer.jar" todir="tmp" />
 
         <propertyregex property="build.CPPTASKS.path" input="${if.CPPTASKS.exist}" regexp="(.*)/${CPPTASKS.check.file}" select="\1" />
         <copy file="${build.CPPTASKS.path}/cpptasks.jar" todir="tmp" />

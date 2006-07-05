@@ -126,7 +126,6 @@ SET CLASSPATH=%CLASSPATH%;.\make\tmp\org.eclipse.jdt.core_3.1.1.jar
 SET CLASSPATH=%CLASSPATH%;.\make\tmp\jdtCompilerAdapter.jar
 SET CLASSPATH=%CLASSPATH%;.\make\tmp\junit.jar
 SET CLASSPATH=%CLASSPATH%;.\make\tmp\xalan.jar
-SET CLASSPATH=%CLASSPATH%;.\make\tmp\serializer.jar
 
 SET CLASSPATH=%CD%\make\tmp\cpptasks\patched.classes;%CLASSPATH%
 SET CLASSPATH=.\make\tmp\ant-contrib.jar;%CLASSPATH%

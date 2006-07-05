@@ -77,7 +77,6 @@ CLASSPATH=$CLASSPATH:`pwd`/make/tmp/org.eclipse.jdt.core_3.1.1.jar;
 CLASSPATH=$CLASSPATH:`pwd`/make/tmp/jdtCompilerAdapter.jar
 CLASSPATH=$CLASSPATH:`pwd`/make/tmp/junit.jar
 CLASSPATH=$CLASSPATH:`pwd`/make/tmp/xalan.jar
-CLASSPATH=$CLASSPATH:`pwd`/make/tmp/serializer.jar
 CLASSPATH=`pwd`/make/tmp/cpptasks/patched.classes:$CLASSPATH
 CLASSPATH=`pwd`/make/tmp/ant-contrib.jar:$CLASSPATH
 export CLASSPATH
