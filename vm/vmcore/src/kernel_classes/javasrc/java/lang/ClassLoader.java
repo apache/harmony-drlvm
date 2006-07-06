@@ -51,9 +51,9 @@ import org.apache.harmony.vm.VMStack;
 public abstract class ClassLoader {
 
     /**
-     * default protection domain. It is initialized in static block.
+     * default protection domain.
      */
-    private static final ProtectionDomain defaultDomain;
+    private ProtectionDomain defaultDomain;
 
     /**
      * package private to access from the java.lang.Class class.
@@ -123,10 +123,6 @@ public abstract class ClassLoader {
     private final ClassLoader parentClassLoader;
 
     static {
-        // Initializes default protection domain
-        CodeSource cs = new CodeSource(null, (Certificate[])null);
-        PermissionCollection perm = Policy.getPolicy().getPermissions(cs);
-        defaultDomain = new ProtectionDomain(cs, perm);
         // Check whether we should enable assertions
         enableAssertions = VMExecutionEngine.getAssertionStatus(null) > 0
             ? true : false;
@@ -387,6 +383,10 @@ public abstract class ClassLoader {
             throw new IndexOutOfBoundsException("Check your arguments");
         }
         if (domain == null) {
+            if (defaultDomain == null) {
+                defaultDomain = new ProtectionDomain(
+                        new CodeSource(null, (Certificate[])null), null, this, null);            
+            }        
             domain = defaultDomain;
         }
         Certificate[] certs = null;
