@@ -1747,12 +1747,16 @@ vf_check_cp_single_const( unsigned short index,     // constant pool entry index
         type = ctex->m_type->NewType( "Ljava/lang/String", 17 );
         vf_set_vector_stack_entry_ref( cp_parse->field.f_vector, 0, type );
         break;
+	case _CONSTANT_Class:
+        type = ctex->m_type->NewType( "Ljava/lang/Class", 16 );
+        vf_set_vector_stack_entry_ref( cp_parse->field.f_vector, 0, type );
+		break;
     default:
         VERIFY_REPORT( ctex, "(class: " << class_get_name( ctex->m_class )
             << ", method: " << method_get_name( ctex->m_method )
             << method_get_descriptor( ctex->m_method )
             << ") Illegal type in constant pool,"
-            << index << ": CONSTANT_Integer, CONSTANT_Float or CONSTANT_String are expected" );
+            << index << ": CONSTANT_Integer, CONSTANT_Float, CONSTANT_String or CONSTANT_Class are expected" );
         return VER_ErrorConstantPool;
     }
     return VER_OK;

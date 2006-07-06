@@ -13,10 +13,6 @@
  *  See the License for the specific language governing permissions and
  *  limitations under the License.
  */
-/** 
- * @author Ivan Volosyuk
- * @version $Revision: 1.61.4.15.4.4 $
- */  
 #include "interpreter.h"
 #include "interpreter_exports.h"
 #include "interpreter_imports.h"
@@ -955,18 +951,22 @@ ldc(StackFrame& frame, uint32 index) {
 
 #ifndef NDEBUG
     switch(cp_tag(cp, index)) {
-        case 8:
+        case CONSTANT_String:
             DEBUG_BYTECODE("#" << dec << (int)index << " String: \"" << cp[index].CONSTANT_String.string->bytes << "\"");
             break;
-        case 3:
+        case CONSTANT_Integer:
             DEBUG_BYTECODE("#" << dec << (int)index << " Integer: " << (int)cp[index].int_value);
             break;
-        case 4:
+        case CONSTANT_Float:
             DEBUG_BYTECODE("#" << dec << (int)index << " Float: " << cp[index].float_value);
+            break;
+        case CONSTANT_Class:
+            DEBUG_BYTECODE("#" << dec << (int)index << " Class: \"" << const_pool_get_class_name(clazz, index) << "\"");
             break;
         default:
             DEBUG_BYTECODE("#" << dec << (int)index << " Unknown type = " << cp_tag(cp, index));
-            ABORT("Unknown type");
+            DIE("ldc instruction: unexpected type (" << cp_tag(cp, index) 
+                << ") of constant pool entry [" << index << "]");
             break;
     }
 #endif
@@ -979,6 +979,19 @@ ldc(StackFrame& frame, uint32 index) {
         // FIXME: only compressed references
         frame.stack.pick().cr = COMPRESS_REF(vm_instantiate_cp_string_resolved(str));
         frame.stack.ref() = FLAG_OBJECT;
+        return !exn_raised();
+    } 
+    else if (cp_is_class(cp, index)) 
+    {
+        Class *other_class = interp_resolve_class(clazz, index);
+        if (!other_class) {
+             return false;
+        }
+        assert(!tmn_is_suspend_enabled());
+        
+        frame.stack.pick().cr = COMPRESS_REF(*(other_class->class_handle));
+        frame.stack.ref() = FLAG_OBJECT;
+        
         return !exn_raised();
     }
     

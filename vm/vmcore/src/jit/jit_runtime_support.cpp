@@ -154,14 +154,40 @@ static NativeCodePtr rth_get_lil_multianewarray(int* dyn_count)
 }
 
 ///////////////////////////////////////////////////////////
-// Load Constant String
+// Load Constant String or Class
 
-static NativeCodePtr rth_get_lil_ldc_string(int* dyn_count)
+static ManagedObject * rth_ldc_ref_helper(Class *c, unsigned cp_index) 
+    {
+    Const_Pool *cp = c->const_pool;
+    if (cp_is_string(cp, cp_index)) 
+    {
+        return vm_instantiate_cp_string_slow(c, cp_index);
+    } 
+    else if (cp_is_class(cp, cp_index)) 
+    {
+        assert(!tmn_is_suspend_enabled());
+        tmn_suspend_enable();
+        Class *objClass = class_resolve_class(c, cp_index); 
+        tmn_suspend_disable();
+        if (objClass) {
+            return struct_Class_to_java_lang_Class(objClass);
+        }
+        if (!exn_raised()) {
+            class_throw_linking_error(c, cp_index, 0);
+        } else {
+            exn_throw(exn_get());
+        }
+    }
+    exn_throw_by_name("java/lang/InternalError", "Unsupported ldc argument");
+    return NULL;
+}
+
+static NativeCodePtr rth_get_lil_ldc_ref(int* dyn_count)
 {
     static NativeCodePtr addr = NULL;
 
     if (!addr) {
-        ManagedObject* (*p_instantiate_string)(Class*,unsigned) = vm_instantiate_cp_string_slow;
+        ManagedObject* (*p_instantiate_ref)(Class*,unsigned) = rth_ldc_ref_helper;
         LilCodeStub* cs = lil_parse_code_stub("entry 0:managed:g4,pint:ref;");
         assert(cs);
         if (dyn_count) {
@@ -176,9 +202,9 @@ static NativeCodePtr rth_get_lil_ldc_string(int* dyn_count)
             "call %0i;"
             "pop_m2n;"
             "ret;",
-            p_instantiate_string);
+            p_instantiate_ref);
         assert(cs && lil_is_valid(cs));
-        addr = LilCodeGenerator::get_platform()->compile(cs, "rth_ldc_string", dump_stubs);
+        addr = LilCodeGenerator::get_platform()->compile(cs, "rth_ldc_ref", dump_stubs);
         lil_free_code_stub(cs);
     }
 
@@ -1665,7 +1691,7 @@ NativeCodePtr rth_get_lil_helper(VM_RT_SUPPORT f)
     case VM_RT_MULTIANEWARRAY_RESOLVED:
         return rth_get_lil_multianewarray(dyn_count);
     case VM_RT_LDC_STRING:
-        return rth_get_lil_ldc_string(dyn_count);
+        return rth_get_lil_ldc_ref(dyn_count);
         // Exceptions
     case VM_RT_THROW:
     case VM_RT_THROW_SET_STACK_TRACE:

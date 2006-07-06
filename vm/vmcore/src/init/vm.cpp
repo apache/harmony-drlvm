@@ -115,25 +115,25 @@ Class *class_resolve_class(Class *clss, unsigned cp_index)
 
 
 // A run-time error occurs if called for an index which does not represent
-// a constant of type String, Integer, Float, Long or Double.
+// a constant of type Class, String, Integer, Float, Long or Double.
 Java_Type class_get_cp_const_type(Class *clss, unsigned cp_index)
 {
     Const_Pool *cp = clss->const_pool;
-    assert(cp_is_constant(cp, cp_index));
     switch(cp_tag(cp, cp_index)) {
     case CONSTANT_String:
         return JAVA_TYPE_STRING;
     case CONSTANT_Integer:
-            return JAVA_TYPE_INT;
+        return JAVA_TYPE_INT;
     case CONSTANT_Float:
-            return JAVA_TYPE_FLOAT;
+        return JAVA_TYPE_FLOAT;
     case CONSTANT_Long:
-            return JAVA_TYPE_LONG;
+        return JAVA_TYPE_LONG;
     case CONSTANT_Double:
-            return JAVA_TYPE_DOUBLE;
-    
+        return JAVA_TYPE_DOUBLE;
+    case CONSTANT_Class:
+        return JAVA_TYPE_CLASS;
     default:
-        DIE("unknown constant type in classfile");
+        DIE("non-constant type is requested from constant pool : " << cp_tag(cp, cp_index));
     }
     return JAVA_TYPE_INVALID;
 } //class_get_cp_const_type
