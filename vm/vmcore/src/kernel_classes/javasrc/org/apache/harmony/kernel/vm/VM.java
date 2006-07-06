@@ -114,4 +114,21 @@ public final class VM {
         	Runtime.getRuntime().addShutdownHook(new Thread(new DeleteOnExitHook()));
     	}
     }
+    
+    /**
+     *  Returns an intern-ed representation of the 
+     *  String
+     *  
+     *  @param s string to be interned
+     *  @return String that has the same contents as 
+     *    argument, but from internal pool
+     */
+    public static String intern(String s) {
+        return intern0(s);
+    }
+    
+    /**
+     * Invokes native string interning service.
+     */
+    private static native String intern0(String s);
 }

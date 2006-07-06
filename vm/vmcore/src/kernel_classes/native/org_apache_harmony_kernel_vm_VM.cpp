@@ -13,11 +13,6 @@
  *  See the License for the specific language governing permissions and
  *  limitations under the License.
  */
-/** 
- * @author Euguene Ostrovsky
- * @version $Revision: 1.1.2.1.4.6 $
- */
-
 /**
  * @file org_apache_harmony_kernel_vm_VM.cpp
  *
@@ -31,6 +26,7 @@
 #define LOG_DOMAIN "vm.accessors"
 #include "jni_utils.h"
 
+#include "vm_strings.h"
 #include "org_apache_harmony_kernel_vm_VM.h"
 #include "java_lang_VMClassRegistry.h"
 
@@ -43,4 +39,15 @@ JNIEXPORT jobject JNICALL Java_org_apache_harmony_kernel_vm_VM_getClassLoader
 {
     // reuse similar method in VMClassRegistry
     return Java_java_lang_VMClassRegistry_getClassLoader(jenv, NULL, clazz);
+}
+
+/**
+ * Implements org.apache.harmony.vm.VM.intern0(..) method.
+ * For details see kernel classes component documentation.
+ */
+JNIEXPORT jstring JNICALL
+Java_org_apache_harmony_kernel_vm_VM_intern0(JNIEnv *jenv, jclass, jstring str)
+{
+    // call corresponding VM internal function
+    return string_intern(jenv, str);
 }
