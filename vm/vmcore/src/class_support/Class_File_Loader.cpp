@@ -1623,33 +1623,62 @@ static bool class_parse_interfaces(Class *clss, ByteReader &cfs)
 
 
 
+/*
+ *  Parses and verifies the classfile.  Format is (from JVM spec) :
+ * 
+ *    ClassFile {
+ *      u4 magic;
+ *      u2 minor_version;
+ *      u2 major_version;
+ *      u2 constant_pool_count;
+ *      cp_info constant_pool[constant_pool_count-1];
+ *      u2 access_flags;
+ *      u2 this_class;
+ *      u2 super_class;
+ *      u2 interfaces_count;
+ *      u2 interfaces[interfaces_count];
+ *      u2 fields_count;
+ *      field_info fields[fields_count];
+ *      u2 methods_count;
+ *      method_info methods[methods_count];
+ *      u2 attributes_count;
+ *      attribute_info attributes[attributes_count];
+ *   }
+ */
 bool class_parse(Global_Env* env,
                  Class* clss,
                  unsigned* super_class_cp_index,
                  ByteReader& cfs)
 {
+    /*
+     *  get and check magic number (Oxcafebabe)
+     */
     uint32 magic;
-    if(!cfs.parse_u4_be(&magic)) {
+    if (!cfs.parse_u4_be(&magic)) {
         REPORT_FAILED_CLASS_CLASS(clss->class_loader, clss, "java/lang/ClassFormatError",
             clss->name->bytes << ".class is not a valid Java class file");
         return false;
     }
 
-    if(magic != CLASSFILE_MAGIC) {
+    if (magic != CLASSFILE_MAGIC) {
         REPORT_FAILED_CLASS_CLASS(clss->class_loader, clss, "java/lang/ClassFormatError",
             clss->name->bytes << ": invalid magic");
         return false;
     }
 
+    /*
+     *  get and check major/minor version of classfile
+     *  1.1 (45.0-3) 1.2 (46.???) 1.3 (47.???) 1.4 (48.?) 5 (49.0)
+     */
     uint16 minor_version;
-    if(!cfs.parse_u2_be(&minor_version)) {
+    if (!cfs.parse_u2_be(&minor_version)) {
         REPORT_FAILED_CLASS_CLASS(clss->class_loader, clss, "java/lang/ClassFormatError",
             clss->name->bytes << ": could not parse minor version");
         return false;
     }
 
     uint16 major_version;
-    if(!cfs.parse_u2_be(&major_version)) {
+    if (!cfs.parse_u2_be(&major_version)) {
         REPORT_FAILED_CLASS_CLASS(clss->class_loader, clss, "java/lang/ClassFormatError",
             clss->name->bytes << ": could not parse major version");
         return false;
@@ -1663,15 +1692,16 @@ bool class_parse(Global_Env* env,
         return false;
     }
 
-    //
-    //  allocate and parse constant pool
-    //
-    if(!class_parse_const_pool(clss, env->string_pool, cfs))
+    /*
+     *  allocate and parse constant pool
+     */
+    if (!class_parse_const_pool(clss, env->string_pool, cfs)) {
         return false;
+    }
 
-    //
-    // check and preprocess the constant pool
-    //
+    /*
+     * check and preprocess the constant pool
+     */
     if (!check_const_pool(clss, clss->const_pool, clss->cp_size))
         return false;
 
@@ -1689,11 +1719,11 @@ bool class_parse(Global_Env* env,
         clss->access_flags |= ACC_ABSTRACT;
     }
 
-    //
-    // parse this_class & super_class & verify their constant pool entries
-    //
+    /*
+     * parse this_class & super_class & verify their constant pool entries
+     */
     uint16 this_class;
-    if(!cfs.parse_u2_be(&this_class)) {
+    if (!cfs.parse_u2_be(&this_class)) {
         REPORT_FAILED_CLASS_CLASS(clss->class_loader, clss, "java/lang/ClassFormatError",
             clss->name->bytes << ": could not parse this class index");
         return false;
@@ -1707,26 +1737,30 @@ bool class_parse(Global_Env* env,
         return false;
     }
 
-    // When defineClass from byte stream, there are cases that clss->name is null,
-    // so we should add a check here
+    /*
+     * When defineClass from byte stream, there are cases that clss->name is null,
+     * so we should add a check here
+     */
     if (clss->name && name != clss->name) { 
         REPORT_FAILED_CLASS_CLASS(clss->class_loader, clss, "java/lang/NoClassDefFoundError",
             clss->name->bytes << ": class name in class data does not match class name passed");
         return false;
     }
 
-    if(!clss->name) {
+    if (!clss->name) {
         clss->name = name;
     }
 
-    // Mark the current class as resolved.
+    /*
+     *  Mark the current class as resolved.
+     */
     cp_resolve_to_class(clss->const_pool, this_class, clss);
 
-    //
-    // parse the super class name
-    //
+    /*
+     * parse the super class name
+     */
     uint16 super_class;
-    if(!cfs.parse_u2_be(&super_class)) {
+    if (!cfs.parse_u2_be(&super_class)) {
         REPORT_FAILED_CLASS_CLASS(clss->class_loader, clss, "java/lang/ClassFormatError",
             clss->name->bytes << ": could not parse super class index");
         return false;
@@ -1734,7 +1768,7 @@ bool class_parse(Global_Env* env,
 
     *super_class_cp_index = super_class;
 
-    if(super_class == 0) {
+    if (super_class == 0) {
         //
         // this class must represent java.lang.Object
         //
@@ -1747,7 +1781,7 @@ bool class_parse(Global_Env* env,
         clss->super_name = NULL;
     } else {
         clss->super_name = cp_check_class(clss->const_pool, clss->cp_size, super_class);
-        if(clss->super_name == NULL) {
+        if (clss->super_name == NULL) {
             REPORT_FAILED_CLASS_CLASS(clss->class_loader, clss, "java/lang/ClassFormatError",
                 clss->name->bytes << ": super_class constant pool entry "
                 << super_class << " is an illegal CONSTANT_Class entry");
@@ -1755,30 +1789,30 @@ bool class_parse(Global_Env* env,
         }
     }
 
-    //
-    // allocate and parse class' interfaces
-    //
+    /*
+     * allocate and parse class' interfaces
+     */
     if (!class_parse_interfaces(clss, cfs))
         return false;
 
-    // 
-    // allocate and parse class' fields
-    //
+    /* 
+     *  allocate and parse class' fields
+     */
     if (!class_parse_fields(env, clss, cfs))
         return false;
 
 
-    // 
-    // allocate and parse class' methods
-    //
+    /* 
+     *  allocate and parse class' methods
+     */
     if (!class_parse_methods(clss, cfs, env))
         return false;
 
-    //
-    // only the FileName attribute is defined for Class
-    //
+    /*
+     *  only the FileName attribute is defined for Class
+     */
     uint16 n_attrs;
-    if(!cfs.parse_u2_be(&n_attrs)) {
+    if (!cfs.parse_u2_be(&n_attrs)) {
         REPORT_FAILED_CLASS_CLASS(clss->class_loader, clss, "java/lang/ClassFormatError",
             clss->name->bytes << ": could not parse number of attributes");
         return false;
@@ -1965,14 +1999,17 @@ bool class_parse(Global_Env* env,
         } // switch
     } // for
 
-    // can't be both final and interface, or both final and abstract
-    if(class_is_final(clss) && class_is_interface(clss))
+    /*
+     *   can't be both final and interface, or both final and abstract
+     */
+    if (class_is_final(clss) && class_is_interface(clss))
     {
         REPORT_FAILED_CLASS_CLASS(clss->class_loader, clss, "java/lang/ClassFormatError",
             clss->name->bytes << ": interface cannot have ACC_FINAL flag set");
         return false;
     }
-    if(class_is_final(clss) && class_is_abstract(clss)) {
+    
+    if (class_is_final(clss) && class_is_abstract(clss)) {
         REPORT_FAILED_CLASS_CLASS(clss->class_loader, clss, "java/lang/ClassFormatError",
             clss->name->bytes << ": class cannot have both ACC_FINAL and ACC_ABSTRACT flags set");
         return false;
