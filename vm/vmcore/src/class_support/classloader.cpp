@@ -300,10 +300,17 @@ Class* ClassLoader::DefineClass(Global_Env* env, const char* class_name,
     if(!clss) {
         return NULL;
     }
-    // Create a Class File Stream object
+    
+    /*
+     *  Create a Class File Stream object
+     */
     ByteReader cfs(bytecode, offset, length);
     unsigned super_class_cp_index;
     assert(clss->state == ST_Start);
+    
+    /* 
+     * now parse and verify the class data
+     */
     if(!class_parse(env, clss, &super_class_cp_index, cfs)) {
         if (NULL != redef_buf)
             _deallocate(redef_buf);
