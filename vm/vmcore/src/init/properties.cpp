@@ -74,7 +74,6 @@ char *predefined_propeties[] =
     // user.home, java.io.tmpdir
 
     // Hardcoded properties
-    "java.ext.dirs=",
     "java.vm.specification.version=1.0",
     "java.vm.specification.vendor=Sun Microsystems Inc.",
     "java.vm.specification.name=Java Virtual Machine Specification",
@@ -309,6 +308,10 @@ static void define_undefined_predefined_properties(Properties & properties)
     *p = '\0';
     add_pair_to_properties(properties, "java.home", base_path_buf);
     TRACE( "java.home = " << base_path_buf);
+
+    char *ext_path = port_filepath_merge(base_path_buf, "lib" PORT_FILE_SEPARATOR_STR "ext", prop_pool);
+    add_pair_to_properties(properties, "java.ext.dirs", ext_path);
+    TRACE( "java.ext.dirs = " << ext_path);
 
     // vm.boot.class.path initialization. Value is
     // java.home PATH_SEPARATOR lib PATH_SEPARATOR API_CLASSES_ARCHIVE
