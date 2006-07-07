@@ -446,6 +446,12 @@ Version: $Revision: 1.16.2.20 $
             </fileset>
         </copy>
 
+        <copy todir="${build.deploy.dir}/lib">
+            <fileset dir="${external.dep.CLASSLIB}/deploy/jdk/jre/lib">
+                <include name="logging.properties"/>
+            </fileset>
+        </copy> 
+
     </target>
 
 
