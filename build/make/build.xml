@@ -427,30 +427,13 @@ Version: $Revision: 1.16.2.20 $
     <!-- copies the deploy stuff from classlib -->
     <target name="deploy.copy_classlib">
 
-        <copy todir="${build.deploy.dir}/bin">
-            <fileset dir="${external.dep.CLASSLIB}/deploy/jdk/jre/bin">
-                <include name="*"/>
-                <exclude name="java*"/>
+        <copy todir="${build.deploy.dir}">
+            <fileset dir="${external.dep.CLASSLIB}/deploy/jdk/jre">
+                <include name="**"/>
+                <exclude name="bin/java*"/>
+                <exclude name="bin/default/**"/>
             </fileset>
         </copy>
-
-        <copy todir="${build.deploy.dir}/lib/boot">
-            <fileset dir="${external.dep.CLASSLIB}/deploy/jdk/jre/lib/boot">
-                <include name="**/*"/>
-            </fileset>
-        </copy>
-
-        <copy todir="${build.deploy.dir}/lib/ext">
-            <fileset dir="${external.dep.CLASSLIB}/deploy/jdk/jre/lib/ext">
-                <include name="**/*"/>
-            </fileset>
-        </copy>
-
-        <copy todir="${build.deploy.dir}/lib">
-            <fileset dir="${external.dep.CLASSLIB}/deploy/jdk/jre/lib">
-                <include name="logging.properties"/>
-            </fileset>
-        </copy> 
 
     </target>
 
