@@ -134,6 +134,7 @@ Version: $Revision: 1.16.2.20 $
 
         <loadproperties srcFile="${resources.properties.file}">
             <filterchain>
+                <expandproperties/>
                 <prefixlines prefix="env." />
                 <tokenfilter>
                     <replaceregex pattern="\\" replace="/" flags="gi" />
