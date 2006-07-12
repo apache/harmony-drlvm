@@ -36,4 +36,8 @@ void parse_vm_arguments(Global_Env *p_env);
 void parse_jit_arguments(JavaVMInitArgs* vm_arguments);
 void print_generic_help();
 
+void create_vm(Global_Env *p_env, JavaVMInitArgs* vm_arguments);
+void destroy_vm(Global_Env *p_env);  
+extern Global_Env env;
+
 #endif //_INIT_H

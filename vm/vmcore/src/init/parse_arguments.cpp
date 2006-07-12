@@ -277,6 +277,9 @@ void parse_vm_arguments(Global_Env *p_env)
         else if (strcmp(option, "-XcleanupOnExit") == 0) {
             add_pair_to_properties(p_env->properties, "vm.cleanupOnExit", "true");       
         }
+        else if (strcmp(option, "_org.apache.harmony.vmi.portlib") == 0) {
+            // Ignore _org.apache.harmony.vmi.portlib for now;
+        }
         else {
             ECHO("Unknown option " << option << USE_JAVA_HELP);
             LOGGER_EXIT(1);

@@ -281,7 +281,7 @@ static int run_java_shutdown()
     return 0;
 } //run_java_shutdown
 
-static void create_vm(Global_Env *p_env, JavaVMInitArgs* vm_arguments) 
+void create_vm(Global_Env *p_env, JavaVMInitArgs* vm_arguments) 
 {
 #ifdef PLATFORM_POSIX
     init_linux_thread_system();
@@ -541,7 +541,7 @@ static int run_main(Global_Env *p_env, char* class_name, char* jar_file,
     return result;
 } //run_main
 
-static void destroy_vm(Global_Env *p_env) 
+void destroy_vm(Global_Env *p_env) 
 {
     assert(p_TLS_vmthread->app_status == thread_is_running);
 

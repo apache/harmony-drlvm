@@ -42,6 +42,7 @@
 #include "stack_trace.h"
 #include "m2n.h"
 #include "nogc.h"
+#include "init.h"
 
 #include "Verifier_stub.h"
 
@@ -1216,11 +1217,30 @@ VMEXPORT jlong JNICALL GetDirectBufferCapacity(JNIEnv* env, jobject buf)
     return (jlong)CallStaticIntMethod(env, bbcl, id, buf);
 }
 
+
+VMEXPORT jint JNICALL JNI_CreateJavaVM(JavaVM **p_vm, JNIEnv **p_env, void *vm_args) {
+    static int called = 0; // this function can only be called once for now;
+
+    init_log_system();
+    TRACE2("jni", "CreateJavaVM called");
+    if (called) {
+        WARN("Java Invoke :: multiple VM instances are not implemented");
+        ASSERT(0, "Not implemented");
+        return JNI_ERR;
+    } else {
+        create_vm(&env, (JavaVMInitArgs *)vm_args);
+        *p_env = &jni_env;
+        *p_vm = jni_env.vm;
+        return JNI_OK;
+    }
+}
+
+
 VMEXPORT jint JNICALL DestroyVM(JavaVM*)
 {
-    WARN("Java Invoke :: DestroyVM not implemented");
-    ASSERT(0, "Not implemented");
-    return JNI_ERR;
+    TRACE2("jni", "DestroyVM  called");
+    destroy_vm(&env);
+    return JNI_OK;
 }
 
 VMEXPORT jint JNICALL AttachCurrentThread(JavaVM* vm, void** penv, void* UNREF args)

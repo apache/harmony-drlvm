@@ -1727,4 +1727,17 @@ struct JavaVM_External {
 #endif
 };
 
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+JNIEXPORT jint JNICALL JNI_CreateJavaVM(JavaVM **p_vm, JNIEnv **p_env, void *vm_args);
+
+#ifdef __cplusplus
+}
+#endif
+
+
+
 #endif /* _JNI_H_ */
