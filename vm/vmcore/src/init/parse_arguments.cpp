@@ -65,7 +65,7 @@ extern unsigned long    btb_interval;
 //
 //------ End DYNOPT support ----------------------------------------
 
-#define EXECUTABLE_NAME "ij"
+#define EXECUTABLE_NAME "java"
 #define USE_JAVA_HELP "\nUse " EXECUTABLE_NAME " -help to get help on" \
     " command line options"
 

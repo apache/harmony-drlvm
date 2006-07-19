@@ -22,6 +22,10 @@ int vm_main(int argc, char *argv[]);
 
 int main(int argc, char *argv[])
 {
-    // delegate control to vm-provided initialization function
+    /*
+     * delegate control to vm-provided initialization function
+     * currently found in vmcore/src/init/vm_main.cpp
+     */
+     
     return vm_main(argc, argv);
 }
