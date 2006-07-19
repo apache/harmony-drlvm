@@ -39,9 +39,6 @@ EXTERNAL_DIR=/nfs/site/proj/drl/share/binaries/externals/clean
 # Set default environment variables
 # ================================================
 
-if [ -z "$JAVA_HOME" ]; then
-    JAVA_HOME=/usr/local/jrockit-j2sdk1.4.2_04
-fi
 
 # Apache Ant 1.6.2 or higher (can be obtained at http://ant.apache.org)
 if [ -z "$ANT_HOME" ]; then
@@ -53,13 +50,7 @@ fi
 # Check external resources / software installation
 # ================================================
 
-if [ ! -x $JAVA_HOME/bin/java ] && [ ! -x $JAVA_HOME/bin/ij ]; then
-    echo "* Neigher $JAVA_HOME/bin/java nor $JAVA_HOME/bin/ij found."
-    echo "* Make sure you have J2SDK or DRLVM installed on your computer and that"
-    echo "* JAVA_HOME environment variable points out to its installation dir, e.g."
-    echo "* export JAVA_HOME=/usr/local/jdk_1.4.2"
-    ERROR
-elif [ ! -x $ANT_HOME/bin/ant ]; then
+if [ ! -x $ANT_HOME/bin/ant ]; then
     echo "* File $ANT_HOME/bin/ant not found."
     echo "* Make sure you have Ant 1.6.5 or above installed from"
     echo "* http://ant.apache.org/bindownload.cgi and that ANT_HOME environment"
@@ -68,7 +59,6 @@ elif [ ! -x $ANT_HOME/bin/ant ]; then
     ERROR
 fi
 
-export JAVA_HOME=`(cd $JAVA_HOME;pwd)`
 export ANT_HOME=`(cd $ANT_HOME;pwd)`
 export CXX
 export BUILD_CFG
@@ -81,11 +71,7 @@ CLASSPATH=`pwd`/make/tmp/cpptasks/patched.classes:$CLASSPATH
 CLASSPATH=`pwd`/make/tmp/ant-contrib.jar:$CLASSPATH
 export CLASSPATH
 
-if [ -x $JAVA_HOME/bin/ij ]; then
-    ANT_COMMAND="$JAVA_HOME/bin/ij  -Duser.timezone=en_US -classpath $ANT_HOME/lib/ant-launcher.jar -Dant.home=$ANT_HOME org.apache.tools.ant.launch.Launcher -cp $CLASSPATH "
-else
-    ANT_COMMAND="$ANT_HOME/bin/ant --noconfig"
-fi
+ANT_COMMAND="$ANT_HOME/bin/ant --noconfig"
 
 # it is necessarily to compile 'vm.jitrino' in release mode
 

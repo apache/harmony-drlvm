@@ -19,31 +19,31 @@ Author: Sergey V. Dmitriev, Marina V. Goldburt
 Version: $Revision: 1.1.2.6 $
 -->
 <!--
-    This is build descriptor for the component "extra.ij_script".
+    This is build descriptor for the component "extra.java_script".
 
     Please refer to make/components/README.txt for details about the component
     build descriptor structure.
   -->
 
-<project name="extra.ij_script">
+<project name="extra.java_script">
     <target name="init" >
         <mkdir dir="${build.dir}/_other" />
         <select os="win">
-            <echo file="${build.dir}/_other/ij.bat">
+            <echo file="${build.dir}/_other/java.bat">
 <![CDATA[
-.\ij.exe %*
+.\java.exe %*
 ]]>
 </echo>
         </select>
 
         <select os="lnx">
-            <echo file="${build.dir}/_other/ij.sh">
+            <echo file="${build.dir}/_other/java.sh">
 #!/bin/sh
 
-IJ_DIR=`dirname $0`
-LD_LIBRARY_PATH=$IJ_DIR:$LD_LIBRARY_PATH
+JAVA_DIR=`dirname $0`
+LD_LIBRARY_PATH=$JAVA_DIR:$LD_LIBRARY_PATH
 export LD_LIBRARY_PATH
-$IJ_DIR/ij  "$@"
+$JAVA_DIR/java  "$@"
 </echo>
         </select>
     </target>

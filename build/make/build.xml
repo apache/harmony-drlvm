@@ -413,8 +413,8 @@ Version: $Revision: 1.16.2.20 $
             <then>
                 <chmod perm="755">
                     <fileset dir="${build.deploy.dir}/bin">
-                        <include name="ij" />
-                        <include name="ij.sh" />
+                        <include name="java" />
+                        <include name="java.sh" />
                         <include name="eclipse.sh" />
                         <include name="*.so" />
                         <include name="*.so.*" />
@@ -494,10 +494,10 @@ the ${build.os}* operating system.
             <isset property="if.win"/>
             <then>
 <echo file="${build.deploy.dir}/readme.txt" append="true">
-Use generic Java* conventions for launching ij.exe
+Use generic Java* conventions for launching java.exe
 
     c:\drlvm&gt;cd bin
-    c:\drlvm\bin&gt;ij -classpath . Hello
+    c:\drlvm\bin&gt;java -classpath . Hello
 </echo>
             </then>
             <else>
@@ -506,21 +506,21 @@ Use generic Java* conventions for launching ij.exe
 		<then>
 		<!-- ${CXX} == icc -->
 <echo file="${build.deploy.dir}/readme.txt" append="true">
-Use generic Java* conventions for launching ij
+Use generic Java* conventions for launching java
 
     $ cd bin
     $ LD_LIBRARY_PATH=${PWD}:&lt;Path to ICC libs&gt;:${LD_LIBRARY_PATH}; export LD_LIBRARY_PATH
-    $ ./ij -classpath . Hello
+    $ ./java -classpath . Hello
 </echo>
 		</then>
 		<else>
 		<!-- ${CXX} != icc -->
 <echo file="${build.deploy.dir}/readme.txt" append="true">
-Use generic Java* conventions for launching ij
+Use generic Java* conventions for launching java
 
     $ cd bin
     $ LD_LIBRARY_PATH=${PWD}:${LD_LIBRARY_PATH}; export LD_LIBRARY_PATH
-    $ ./ij -classpath . Hello
+    $ ./java -classpath . Hello
 </echo>
 		</else>
 	      </if>

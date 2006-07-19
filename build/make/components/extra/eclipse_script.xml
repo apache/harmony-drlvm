@@ -37,10 +37,10 @@ set BUILD_HOME=${build.deploy.dir}
             <echo file="${build.dir}/_other/eclipse.bat" append="true">
 <![CDATA[
 if exist "%ECLIPSE_HOME%/plugins/org.eclipse.jdt.core_3.1.1.jar" (
-   rem Copying IJ Launching Plugin to Eclipse directory
+   rem Copying Java Launching Plugin to Eclipse directory
    del /S /Q "%ECLIPSE_HOME%\plugins\org.apache.harmony.eclipse.jdt.launching_1.0.0.*.*"
    copy "%BUILD_HOME%\lib\org.apache.harmony.eclipse.jdt.launching_1.0.0.jar" "%ECLIPSE_HOME%\plugins"
-    "%BUILD_HOME%\bin\ij.exe" -cp "%ECLIPSE_HOME%\startup.jar" -Dosgi.install.area="%ECLIPSE_HOME%" org.eclipse.core.launcher.Main -debug
+    "%BUILD_HOME%\bin\java.exe" -cp "%ECLIPSE_HOME%\startup.jar" -Dosgi.install.area="%ECLIPSE_HOME%" org.eclipse.core.launcher.Main -debug
 ) else (
     echo ===================================================================
     echo Please install Eclipse 3.1.1 or reset ECLIPSE_HOME correspondingly.
@@ -56,12 +56,12 @@ if exist "%ECLIPSE_HOME%/plugins/org.eclipse.jdt.core_3.1.1.jar" (
 <![CDATA[
 #! /bin/sh
 
-IJ_DIR=`dirname $0`
-case $IJ_DIR in
+JAVA_DIR=`dirname $0`
+case $JAVA_DIR in
    /*) ;;
-   *) IJ_DIR=$PWD/$IJ_DIR;;
+   *) JAVA_DIR=$PWD/$JAVA_DIR;;
 esac
-export LD_LIBRARY_PATH=$IJ_DIR:$LD_LIBRARY_PATH
+export LD_LIBRARY_PATH=$JAVA_DIR:$LD_LIBRARY_PATH
 if [ ! -f "${ECLIPSE_HOME}/plugins/org.eclipse.jdt.core_3.1.1.jar" ]; then
     echo "==================================================================="
     echo "Please install Eclipse 3.1.1 or reset ECLIPSE_HOME correspondingly."
@@ -69,8 +69,8 @@ if [ ! -f "${ECLIPSE_HOME}/plugins/org.eclipse.jdt.core_3.1.1.jar" ]; then
     exit 1
 fi
 rm -rf ${ECLIPSE_HOME}/plugins/org.apache.harmony.eclipse.jdt.launching_1.0.0*
-cp -R ${IJ_DIR}/../lib/org.apache.harmony.eclipse.jdt.launching_1.0.0.jar ${ECLIPSE_HOME}/plugins/
-${IJ_DIR}/ij -Xmx512m -Xms512m -Xjit -Dosgi.install.area=${ECLIPSE_HOME} -classpath ${ECLIPSE_HOME}/startup.jar org.eclipse.core.launcher.Main  -debug
+cp -R ${JAVA_DIR}/../lib/org.apache.harmony.eclipse.jdt.launching_1.0.0.jar ${ECLIPSE_HOME}/plugins/
+${JAVA_DIR}/java -Xmx512m -Xms512m -Xjit -Dosgi.install.area=${ECLIPSE_HOME} -classpath ${ECLIPSE_HOME}/startup.jar org.eclipse.core.launcher.Main  -debug
 
 ]]>
 </echo>

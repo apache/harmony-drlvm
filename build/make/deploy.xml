@@ -25,7 +25,7 @@ Description of the product deploy folder.
 <deploy>
     <vm>
         <vmstart>
-            <executable>bin:ij</executable>
+            <executable>bin:java</executable>
         </vmstart>
 
         <encoder>
@@ -92,15 +92,15 @@ Description of the product deploy folder.
         </hyplugin>
 
 
-        <ij_script>
+        <java_script>
             <select os="win">
-                <other>bin:ij.bat</other>
+                <other>bin:java.bat</other>
             </select>
 
             <select os="lnx">
-                <other>bin:ij.sh</other>
+                <other>bin:java.sh</other>
             </select>
-        </ij_script>
+        </java_script>
 
         <hello>
             <other>bin:Hello.class</other>

@@ -96,9 +96,9 @@ REM Check JAVA_HOME & ANT_HOME
 REM ================================================
 
 IF NOT EXIST "%JAVA_HOME%\bin\java.exe" (
-    IF NOT EXIST "%JAVA_HOME%\bin\ij.exe" (
-        ECHO * Neigher "%JAVA_HOME%\bin\java.exe" nor "%JAVA_HOME%\bin\ij.exe" found.
-        ECHO * Make sure you have Harmony JRE or DRLVM installed on your computer and that 
+    IF NOT EXIST "%JAVA_HOME%\bin\java.exe" (
+        ECHO * Neigher "%JAVA_HOME%\bin\java.exe" nor "%JAVA_HOME%\bin\java.exe" found.
+        ECHO * Make sure you have Harmony JRE or DRLVM installed on your computer and that
         ECHO * JAVA_HOME environment variable points out to its installation dir, e.g.
         ECHO * SET JAVA_HOME=c:\jre
         GOTO ERROR
@@ -109,7 +109,7 @@ IF NOT EXIST "%ANT_HOME%\bin\ant.bat" (
     ECHO * File %ANT_HOME%\bin\ant.bat not found.
     ECHO * Make sure you have Ant 1.6.5 or above installed from
     ECHO * http://ant.apache.org/bindownload.cgi and the ANT_HOME environment
-    ECHO * variable points to the Ant installation dir, e.g. 
+    ECHO * variable points to the Ant installation dir, e.g.
     ECHO * SET ANT_HOME=c:\ant_1.6.5
     GOTO ERROR
 )
@@ -130,12 +130,7 @@ SET CLASSPATH=%CLASSPATH%;.\make\tmp\xalan.jar
 SET CLASSPATH=%CD%\make\tmp\cpptasks\patched.classes;%CLASSPATH%
 SET CLASSPATH=.\make\tmp\ant-contrib.jar;%CLASSPATH%
 
-REM Ant launcher doesn't know about ij.exe
-IF EXIST "%JAVA_HOME%\bin\ij.exe" (
-    SET ANT_COMMAND=%JAVA_HOME%\bin\ij.exe -Duser.timezone=en_US -classpath %ANT_HOME%\lib\ant-launcher.jar -Dant.home=%ANT_HOME% org.apache.tools.ant.launch.Launcher -cp %CLASSPATH% -Dbuild.compiler=org.eclipse.jdt.core.JDTCompilerAdapter
-) ELSE (
-    SET ANT_COMMAND=%ANT_HOME%\bin\ant.bat
-)
+SET ANT_COMMAND=%ANT_HOME%\bin\ant.bat
 
 REM  Note: vm.jitrino is always complied in release mode, otherwise it makes VM debug too slow
 CALL "%ANT_COMMAND%" -f make/build.xml -Dvm.jitrino.cfg=release %*

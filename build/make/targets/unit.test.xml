@@ -36,7 +36,7 @@ Version: $Revision: 1.4.2.4 $
                 </javac>
                 <mkdir dir="${build.dir}/_unit.tests/report" />
                 <junit printsummary="true" haltonfailure="no"
-                       fork="yes" forkmode="once" jvm="${build.deploy.dir}/bin/ij.exe" failureproperty="some.unit.test.is.failed">
+                       fork="yes" forkmode="once" jvm="${build.deploy.dir}/bin/java.exe" failureproperty="some.unit.test.is.failed">
                     <jvmarg value="-Xbootclasspath/p:${build.dir}/_unit.tests/classes;${build.junit.jar}" />
                     <formatter type="plain" usefile="true" />
                     <batchtest todir="${build.dir}/_unit.tests/report">

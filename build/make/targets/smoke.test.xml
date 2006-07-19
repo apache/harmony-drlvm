@@ -136,7 +136,7 @@ Version: $Revision: 1.4.2.11 $
                                 <equals arg1="${int.or.jit.arg}" arg2="" />
                             </not>
                             <then>
-                                <java newenvironment="yes" output="${build.dir}/_smoke.tests/reports/${class.name}_${jit.or.interpreter}.out" classname="${class.name}" fork="true" jvm="${build.deploy.dir}/bin/ij${executable.postfix}" error="${build.dir}/_smoke.tests/reports/${class.name}_${jit.or.interpreter}.out.err">
+                                <java newenvironment="yes" output="${build.dir}/_smoke.tests/reports/${class.name}_${jit.or.interpreter}.out" classname="${class.name}" fork="true" jvm="${build.deploy.dir}/bin/java${executable.postfix}" error="${build.dir}/_smoke.tests/reports/${class.name}_${jit.or.interpreter}.out.err">
                                     <jvmarg value="-Dvm.assert_dialog=0" />
                                     <jvmarg value="${int.or.jit.arg}" />
                                     <jvmarg value="-classpath" />
@@ -145,7 +145,7 @@ Version: $Revision: 1.4.2.11 $
                                 </java>
                             </then>
                             <else>
-                                <java newenvironment="yes" output="${build.dir}/_smoke.tests/reports/${class.name}_${jit.or.interpreter}.out" classname="${class.name}" fork="true" jvm="${build.deploy.dir}/bin/ij${executable.postfix}" error="${build.dir}/_smoke.tests/reports/${class.name}_${jit.or.interpreter}.out.err">
+                                <java newenvironment="yes" output="${build.dir}/_smoke.tests/reports/${class.name}_${jit.or.interpreter}.out" classname="${class.name}" fork="true" jvm="${build.deploy.dir}/bin/java${executable.postfix}" error="${build.dir}/_smoke.tests/reports/${class.name}_${jit.or.interpreter}.out.err">
                                     <jvmarg value="-Dvm.assert_dialog=0" />
                                     <jvmarg value="-classpath" />
                                     <jvmarg value="${build.dir}/_smoke.tests/classes" />
@@ -167,7 +167,7 @@ Version: $Revision: 1.4.2.11 $
                                 <condition property="java.executable" value="${env.JAVA_HOME}/bin/java${executable.postfix}">
                                     <available file="${env.JAVA_HOME}/bin/java${executable.postfix}" />
                                 </condition>
-                                <property name="java.executable" value="${env.JAVA_HOME}/bin/ij${executable.postfix}" />
+                                <property name="java.executable" value="${env.JAVA_HOME}/bin/java${executable.postfix}" />
 
                                 <java output="${build.dir}/_smoke.tests/reports/${class.name}_${jit.or.interpreter}.golden" classname="${class.name}" fork="true" jvm="${java.executable}" error="${build.dir}/_smoke.tests/reports/${class.name}_${jit.or.interpreter}.golden.err">
                                     <jvmarg value="-classpath" />
