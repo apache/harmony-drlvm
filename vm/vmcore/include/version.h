@@ -13,10 +13,10 @@
  *  See the License for the specific language governing permissions and
  *  limitations under the License.
  */
-/** 
+/**
  * @author Alexei Fedotov, Gregory Shimansky
  * @version $Revision: 1.1.2.150.2.11.2.560 $
- */  
+ */
 #ifndef _VERSION_H
 #define _VERSION_H
 
@@ -67,7 +67,7 @@
 
 #define VM_VERSION "Apache Harmony " PATCH_BRANCH "-" EXPAND(PATCH_LEVEL)
 
-#define VERSION VM_VERSION " (" PATCH_DATE "), " \
+#define VERSION "java version \"1.5.0\" \n" VM_VERSION " (" PATCH_DATE "), " \
     VERSION_OS "/" VERSION_ARCH "/" VERSION_COMPILER ", " VERSION_DEBUG_STRING
 
 #endif // _VERSION_H
