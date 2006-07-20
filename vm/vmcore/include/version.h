@@ -65,10 +65,11 @@
 #define VERSION_ARCH "ia32"
 #endif
 
-#define VM_VERSION "Apache Harmony " PATCH_BRANCH "-" EXPAND(PATCH_LEVEL)
+#define VM_VERSION "Apache Harmony HEAD"
 
-#define VERSION "java version \"1.5.0\" \n" VM_VERSION " (" PATCH_DATE "), " \
-    VERSION_OS "/" VERSION_ARCH "/" VERSION_COMPILER ", " VERSION_DEBUG_STRING
+#define VERSION "java version \"1.5.0\" \n" "pre-alpha : not complete or compatible\n" VM_VERSION " (" __DATE__ "), " \
+    VERSION_OS "/" VERSION_ARCH "/" VERSION_COMPILER ", " VERSION_DEBUG_STRING "\n" \
+    "http://incubator.apache.org/harmony"
 
 #endif // _VERSION_H
 
