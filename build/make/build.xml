@@ -507,25 +507,15 @@ Version: $Revision: 1.16.2.20 $
     <target name="deploy.readme" depends="plugin.antcontrib, set.semis.dirs">
         <echo file="${build.deploy.dir}/readme.txt">
 
-    Dynamic Runtime Layer (DRL)
+    Apache Harmony JRE with DRLVM
     Binary Release for ${build.os}*/${build.arch}
 
 
-This archive contains the Java* run-time environment.   
+CONTENTS
+---------
 
+The JRE contains the following directories
 
-1. INSTALLATION INSTRUCTIONS
-----------------------------
-
-To install the product, extract this archive to a convenient location,
-further referred to as &lt;EXTRACT_DIR&gt;.
-
-
-2. ARCHIVE CONTENTS
--------------------
-
-After extracting the archive, the following directories appear under
-&lt;EXTRACT_DIR&gt;:
 
   bin         - Main DRL executable file and set of dynamic libraries
                 needed for running
@@ -534,70 +524,25 @@ After extracting the archive, the following directories appear under
   lib         - Compiled classes and other resources
 
 
-3. SYSTEM REQUIREMENTS FOR RUNNING DRL
---------------------------------------
+SYSTEM REQUIREMENTS
+-------------------
 
-To use the DRL, install the product on a system with the ${build.arch} architecture and
-the ${build.os}* operating system.
+This distribution was build for  the ${build.arch} architecture and
+the ${build.os} operating system.
 
-4. HOW TO RUN VM WITH DRL CLASS LIBRARIES
------------------------------------------
 </echo>
 
-        <if>
-            <isset property="if.win"/>
-            <then>
-<echo file="${build.deploy.dir}/readme.txt" append="true">
-Use generic Java* conventions for launching java.exe
-
-    c:\drlvm&gt;cd bin
-    c:\drlvm\bin&gt;java -classpath . Hello
-</echo>
-            </then>
-            <else>
-	      <if>
-		<equals arg1="${build.cxx}" arg2="icc"/>
-		<then>
-		<!-- ${CXX} == icc -->
-<echo file="${build.deploy.dir}/readme.txt" append="true">
-Use generic Java* conventions for launching java
-
-    $ cd bin
-    $ LD_LIBRARY_PATH=${PWD}:&lt;Path to ICC libs&gt;:${LD_LIBRARY_PATH}; export LD_LIBRARY_PATH
-    $ ./java -classpath . Hello
-</echo>
-		</then>
-		<else>
-		<!-- ${CXX} != icc -->
-<echo file="${build.deploy.dir}/readme.txt" append="true">
-Use generic Java* conventions for launching java
-
-    $ cd bin
-    $ LD_LIBRARY_PATH=${PWD}:${LD_LIBRARY_PATH}; export LD_LIBRARY_PATH
-    $ ./java -classpath . Hello
-</echo>
-		</else>
-	      </if>
-            </else>
-        </if>
 
         <echo file="${build.deploy.dir}/readme.txt" append="true">
 
 
-5. HOW TO SELECT THE EXECUTION MODE
------------------------------------
+JIT EXECUTION MODE
+------------------
 
-By default, DRL runs with the just-in-time compiler enabled. 
-To start DRL with the interpreter, supply the -Xint command-line option
+By default, the VM runs with the just-in-time compiler enabled.
+To start the VM with the interpreter, supply the -Xint command-line option
 right after the executable name.
 
-
-6. DISCLAIMER AND LEGAL INFORMATION
-------------------------------------
-
-*) Other brands and names are the property of their respective owners.
-
-This file was updated on March 14, 2006
 </echo>
         <fixcrlf srcDir="${build.deploy.dir}" includes="readme.txt" />
     </target>
