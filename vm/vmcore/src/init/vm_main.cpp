@@ -266,18 +266,28 @@ static int run_java_shutdown()
 
     JNIEnv* jenv = (JNIEnv*) jni_native_intf;
 
+    /*
+     * Make shutdown resistant to possible exceptions left in JNI code
+     */
+    if (jenv->ExceptionOccurred()) {
+        PROCESS_EXCEPTION("Exception left unhandled before destroying VM");
+    }
+
     jclass start_class = jenv->FindClass("java/lang/VMStart");
-    if (jenv->ExceptionOccurred() || !start_class)
+    if (jenv->ExceptionOccurred() || !start_class) {
         PROCESS_EXCEPTION("can't find starter class: java/lang/VMStart");
+    }
 
     jmethodID shutdown_method = jenv->GetStaticMethodID(start_class, "shutdown", "()V");
-    if (jenv->ExceptionOccurred() || !shutdown_method)
+    if (jenv->ExceptionOccurred() || !shutdown_method) {
         PROCESS_EXCEPTION("can't find initialize method in class java/lang/VMStart");
+    }
 
     jenv->CallStaticVoidMethod(start_class, shutdown_method);
-    if (jenv->ExceptionOccurred())
+    if (jenv->ExceptionOccurred()) {
         PROCESS_EXCEPTION("error during shutdown() method execution");
-
+    }
+    
     return 0;
 } //run_java_shutdown
 
