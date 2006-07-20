@@ -50,11 +50,10 @@ fi
 # Check external resources / software installation
 # ================================================
 
-if [ ! -x $JAVA_HOME/bin/java ] && [ ! -x $JAVA_HOME/bin/ij ]; then
-    echo "* Neigher $JAVA_HOME/bin/java nor $JAVA_HOME/bin/ij found."
+if [ ! -x $JAVA_HOME/bin/java ] ; then
+    echo "* Neither $JAVA_HOME/bin/java not found."
     echo "* Make sure you have J2SDK or DRLVM installed on your computer and that"
-    echo "* JAVA_HOME environment variable points out to its installation dir, e.g."
-    echo "* export JAVA_HOME=/usr/local/jdk_1.4.2"
+    echo "* JAVA_HOME environment variable points out to its installation dir"
     ERROR
 elif [ ! -x $ANT_HOME/bin/ant ]; then
     echo "* File $ANT_HOME/bin/ant not found."

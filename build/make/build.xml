@@ -217,6 +217,8 @@ Version: $Revision: 1.16.2.20 $
         <!-- product binary deploy location -->
         <property name="build.deploy.dir" location="../${build.os.short}_${build.arch}_${build.cxx}_${build.cfg}/deploy/jre" />
 
+        <property name="canonical.deploy.dir" location="../deploy" />
+
         <!-- product doc deploy location -->
         <property name="build.deploy.doc.dir" location="../${build.os.short}_${build.arch}_${build.cxx}_${build.cfg}/docs" />
     </target>
@@ -313,7 +315,9 @@ Version: $Revision: 1.16.2.20 $
     </target>
 
     <!-- Main target for building components -->
-    <target name="build" depends="setup, init, set.target.to.build, process.components, fill.up.deploy" />
+    <target name="build" depends="setup, init, set.target.to.build,
+                                    process.components, fill.up.deploy,
+                                    deploy.canonical" />
 
     <target name="set.target.to.build">
         <property name="target" value="build" />
@@ -404,7 +408,8 @@ Version: $Revision: 1.16.2.20 $
     <target name="fill.up.deploy" depends="deploy.jni.n.jvmti.includes,
                                            deploy.readme,
                                            deploy.getting_started,
-                                           deploy.copy_classlib">
+                                           deploy.copy_classlib,
+                                           deploy.tweakname">
         <if>
             <and>
                 <isset property="if.lnx" />
@@ -413,8 +418,53 @@ Version: $Revision: 1.16.2.20 $
             <then>
                 <chmod perm="755">
                     <fileset dir="${build.deploy.dir}/bin">
+                        <include name="java.exec" />
                         <include name="java" />
-                        <include name="java.sh" />
+                        <include name="eclipse.sh" />
+                        <include name="*.so" />
+                        <include name="*.so.*" />
+                    </fileset>
+                </chmod>
+            </then>
+        </if>
+    </target>
+
+    <!-- tweak the names of java -> java.exec and
+         java.sh -> java so typing "java" works -->
+    <target name="deploy.tweakname">
+
+        <if>
+            <isset property="if.lnx"/>
+            <then>
+                <move file="${build.deploy.dir}/bin/java"
+                    tofile="${build.deploy.dir}/bin/java.exec" />
+                <move file="${build.deploy.dir}/bin/java.sh"
+                    tofile="${build.deploy.dir}/bin/java" />
+            </then>
+        </if>
+
+    </target>
+
+    <!-- place things into canonical 'deploy' directory
+    so irrespective of the platform, compiler or release/debug
+    there's a predicable place to find the output -->
+
+    <target name="deploy.canonical">
+        <delete dir="${canonical.deploy.dir}" />
+
+        <mkdir dir="${canonical.deploy.dir}" />
+
+        <copy todir="${canonical.deploy.dir}/jre">
+            <fileset dir="${build.deploy.dir}"/>
+        </copy>
+
+        <if>
+            <isset property="if.lnx"/>
+            <then>
+                <chmod perm="755">
+                    <fileset dir="${canonical.deploy.dir}/jre/bin">
+                        <include name="java.exec" />
+                        <include name="java" />
                         <include name="eclipse.sh" />
                         <include name="*.so" />
                         <include name="*.so.*" />

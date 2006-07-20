@@ -43,7 +43,7 @@ Version: $Revision: 1.1.2.6 $
 JAVA_DIR=`dirname $0`
 LD_LIBRARY_PATH=$JAVA_DIR:$LD_LIBRARY_PATH
 export LD_LIBRARY_PATH
-$JAVA_DIR/java  "$@"
+$JAVA_DIR/java.exec "$@"
 </echo>
         </select>
     </target>
