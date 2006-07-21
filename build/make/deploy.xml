@@ -102,8 +102,5 @@ Description of the product deploy folder.
             </select>
         </java_script>
 
-        <hello>
-            <other>bin:Hello.class</other>
-        </hello>
     </extra>
 </deploy>

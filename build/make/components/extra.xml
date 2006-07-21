@@ -31,7 +31,6 @@ Version: $Revision: 1.1.2.11 $
                                               extra.apriconv,
                                               extra.aprutil,
                                               extra.eclipse_script,
-                                              extra.hello,
                                               extra.hyplugin,
                                               extra.java_script,
                                               extra.jre_libraries,

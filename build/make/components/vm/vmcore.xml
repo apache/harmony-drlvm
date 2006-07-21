@@ -37,6 +37,14 @@ Version: $Revision: 1.5.2.3 $
         <property name="outtype" value="shared" />
         <property name="src" location="${build.vm.home}" />
 
+        <copy file="${build.vm.home}/vmcore/include/version_svn_tag_orig.h"
+              tofile="${build.vm.home}/vmcore/include/version_svn_tag.h" overwrite="true">
+            <filterset>
+                <filter token="svn.revision" value="${svn.revision}"/>
+            </filterset>
+        </copy>
+
+
         <compiler id="cpp.compiler" extends="common.cpp.compiler">
             <fileset dir="${build.vm.home}/vmcore/src">
                 <include name="class_support/*.cpp" />

@@ -54,6 +54,8 @@ Version: $Revision: 1.16.2.20 $
 
 <project name="build" default="build">
 
+    <property name="canonical.deploy.dir" location="../deploy" />
+
     <!-- ===============================================================
         Define locations of external dependencies
       ================================================================== -->
@@ -221,8 +223,6 @@ Version: $Revision: 1.16.2.20 $
         <!-- product binary deploy location -->
         <property name="build.deploy.dir" location="../${build.os.short}_${build.arch}_${build.cxx}_${build.cfg}/deploy/jre" />
 
-        <property name="canonical.deploy.dir" location="../deploy" />
-
         <!-- product doc deploy location -->
         <property name="build.deploy.doc.dir" location="../${build.os.short}_${build.arch}_${build.cxx}_${build.cfg}/docs" />
     </target>
@@ -314,8 +314,25 @@ Version: $Revision: 1.16.2.20 $
         <echo message="       components = ${COMPONENTS}" />
     </target>
 
-    <target name="setup" depends="extern_dep,detect.os.arch.cxx.cfg, set.semis.dirs">
+    <target name="setup" depends="svn-prop,extern_dep,detect.os.arch.cxx.cfg, set.semis.dirs">
         <ant antfile="setup.xml" target="setup" inheritall="true" />
+    </target>
+
+    <target name="svn-prop">
+        <exec executable="svn">
+            <arg value="--non-interactive" />
+            <arg value="info" />
+            <redirector outputproperty="svn.revision">
+                <outputfilterchain>
+                    <linecontains>
+                        <contains value="Revision: " />
+                    </linecontains>
+                    <tokenfilter>
+                        <replacestring from="Revision: " to=""/>
+                    </tokenfilter>
+                </outputfilterchain>
+            </redirector>
+        </exec>
     </target>
 
     <!-- Main target for building components -->
@@ -406,6 +423,7 @@ Version: $Revision: 1.16.2.20 $
         <delete dir="../${build.os.short}_${build.arch}_${build.cxx}_${build.cfg}/harmony" failonerror="false" />
         <delete dir="../${build.os.short}_${build.arch}_${build.cxx}_${build.cfg}/deploy" failonerror="false" />
         <delete dir="../${build.os.short}_${build.arch}_${build.cxx}_${build.cfg}/semis" failonerror="false" />
+        <delete dir="${canonical.deploy.dir}" failonerror="false"/>
     </target>
 
     <!-- put the rest of product (everything but components' output) to the deploy directory -->
