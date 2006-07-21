@@ -20,6 +20,8 @@
 #ifndef _VERSION_H
 #define _VERSION_H
 
+#include "version_svn_tag.h"
+
 // These macros are automatically updated upon commit.
 // PLEASE DO NOT TOUCH
 #define PATCH_BRANCH "DRLVM HEAD"
@@ -67,8 +69,9 @@
 
 #define VM_VERSION "Apache Harmony HEAD"
 
-#define VERSION "java version \"1.5.0\" \n" "pre-alpha : not complete or compatible\n" VM_VERSION " (" __DATE__ "), " \
-    VERSION_OS "/" VERSION_ARCH "/" VERSION_COMPILER ", " VERSION_DEBUG_STRING "\n" \
+#define VERSION "java version \"1.5.0\" \n" "pre-alpha : not complete or compatible\n" \
+    "svn = r" VERSION_SVN_TAG ", (" __DATE__ "), " \
+    VERSION_OS "/" VERSION_ARCH "/" VERSION_COMPILER ", " VERSION_DEBUG_STRING " build\n" \
     "http://incubator.apache.org/harmony"
 
 #endif // _VERSION_H
