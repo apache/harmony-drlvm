@@ -206,6 +206,9 @@ void exn_athrow(ManagedObject* exn_obj, Class_Handle exn_class, Method_Handle ex
 // Mutates the regs value, which should be used to "resume" the managed code.
 void exn_athrow_regs(Registers* regs, Class_Handle exn_class);
 
+// exception catch callback to restore stack after Stack Overflow Error
+void exception_catch_callback();
+
 //**** Runtime exception support
 
 // rth_throw takes an exception and throws it
@@ -262,5 +265,10 @@ VMEXPORT // temporary solution for interpreter unplug
 ManagedObject* get_current_thread_exception();
 VMEXPORT // temporary solution for interpreter unplug
 void __stdcall set_current_thread_exception(ManagedObject* obj);
+
+void set_guard_stack();
+void init_stack_info();
+VMEXPORT size_t get_available_stack_size();
+VMEXPORT bool check_available_stack_size(size_t required_size);
 
 #endif // _EXCEPTIONS_H_

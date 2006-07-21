@@ -742,6 +742,8 @@ static JIT_Result compile_do_compilation(Method* method, JIT_Flags flags)
         return JIT_SUCCESS;
     } else if (method->get_state()==Method::ST_NotCompiled && exn_raised()) {
         return JIT_FAILURE;
+    } else if(!check_available_stack_size(256*1024)) {
+        return JIT_FAILURE;
     }
 
     JIT_Result res = JIT_FAILURE;

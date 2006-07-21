@@ -364,6 +364,13 @@ static void process_uncaught_exception(VM_thread *p_vm_thread, ManagedObject *ex
 //JNI implementation
 void __cdecl call_the_run_method( void * p_args )
 {
+#ifdef _IA32_
+    init_stack_info();
+#ifdef PLATFORM_POSIX
+    set_guard_stack();
+#endif // PLATFORM_POSIX
+#endif // _IA32_
+
     //when a new thread created, gc is disabled, because VM thread structure 
     //was set 0 initially, then gc_enabled_status kept 0 till now
     VM_thread *p_vm_thread=(VM_thread *)(((void **)p_args)[0]); 

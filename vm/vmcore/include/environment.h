@@ -123,6 +123,7 @@ struct Global_Env {
     Class* java_lang_Error_Class;
     Class* java_lang_ExceptionInInitializerError_Class;
     Class* java_lang_NullPointerException_Class;
+    Class* java_lang_StackOverflowError_Class;
 
     Class* java_lang_ClassNotFoundException_Class;
     Class* java_lang_NoClassDefFoundError_Class;

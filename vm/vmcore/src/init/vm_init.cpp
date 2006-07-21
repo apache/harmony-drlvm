@@ -282,6 +282,8 @@ bool vm_init(Global_Env *env)
         preload_class(env, "java/lang/ClassNotFoundException");
     env->java_lang_NullPointerException_Class =
         preload_class(env, env->JavaLangNullPointerException_String);
+    env->java_lang_StackOverflowError_Class =
+        preload_class(env, "java/lang/StackOverflowError");
     env->java_lang_ArrayIndexOutOfBoundsException_Class =
         preload_class(env, env->JavaLangArrayIndexOutOfBoundsException_String);
     env->java_lang_ArrayStoreException_Class =
@@ -295,6 +297,8 @@ bool vm_init(Global_Env *env)
     env->java_lang_OutOfMemoryError = oh_allocate_global_handle();
 
     tmn_suspend_disable();
+    // precompile StackOverflowError
+    class_alloc_new_object_and_run_default_constructor(env->java_lang_StackOverflowError_Class);
     env->java_lang_OutOfMemoryError->object = 
         class_alloc_new_object(env->java_lang_OutOfMemoryError_Class);
     tmn_suspend_enable();

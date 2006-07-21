@@ -116,6 +116,7 @@ ready_for_exceptions(false)
     java_lang_Error_Class = NULL;
     java_lang_ExceptionInInitializerError_Class = NULL;
     java_lang_NullPointerException_Class = NULL;
+    java_lang_StackOverflowError_Class = NULL;
     java_lang_ArrayIndexOutOfBoundsException_Class = NULL;
     java_lang_ArrayStoreException_Class = NULL;
     java_lang_ArithmeticException_Class = NULL;

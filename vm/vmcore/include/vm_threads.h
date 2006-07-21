@@ -101,6 +101,12 @@ public:
     // TODO: Needs to be replaced with jobject!
     volatile ManagedObject*           p_exception_object;
 
+    // flag which indicate that guard page on the stak should be restored
+    bool restore_guard_page;
+
+    // thread stack address
+    void* stack_addr;
+
     // Should JVMTI code be notified about exception in p_exception_object
     bool                              ti_exception_callback_pending;
 

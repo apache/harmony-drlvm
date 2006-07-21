@@ -26,6 +26,7 @@
 #include "cxxlog.h"
 
 #include "platform.h"
+#include <sys/mman.h>
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <unistd.h>
@@ -102,7 +103,17 @@ static void linux_regs_to_sigcontext(ucontext_t *uc, Registers* regs)
     uc->uc_mcontext.gregs[REG_ESP] = regs->esp;
 }
 
-static bool linux_throw_from_sigcontext(ucontext_t *uc, Class* exc_clss)
+static void throw_from_sigcontext(ucontext_t *uc, Class* exc_clss)
+{
+    Registers regs;
+    linux_sigcontext_to_regs(&regs, uc);
+
+    exn_athrow_regs(&regs, exc_clss);
+
+    linux_regs_to_sigcontext(uc, &regs);
+}
+
+static bool java_throw_from_sigcontext(ucontext_t *uc, Class* exc_clss)
 {
     ASSERT_NO_INTERPRETER;
     unsigned *eip = (unsigned *) uc->uc_mcontext.gregs[REG_EIP];
@@ -111,12 +122,7 @@ static bool linux_throw_from_sigcontext(ucontext_t *uc, Class* exc_clss)
         return false;
     }
 
-    Registers regs;
-    linux_sigcontext_to_regs(&regs, uc);
-
-    exn_athrow_regs(&regs, exc_clss);
-
-    linux_regs_to_sigcontext(uc, &regs);
+    throw_from_sigcontext(uc, exc_clss);
     return true;
 }
 
@@ -185,6 +191,142 @@ void print_native_stack (unsigned *ebp) {
     addr2line(buf);
 }
 
+/*
+ * Information about stack
+ */
+inline void* find_stack_addr() {
+    int err;
+    void* stack_addr;
+    pthread_attr_t pthread_attr;
+
+    pthread_t thread = pthread_self();
+    err = pthread_getattr_np(thread, &pthread_attr);
+    err = pthread_attr_getstackaddr(&pthread_attr, &stack_addr);
+    pthread_attr_destroy(&pthread_attr);
+    return stack_addr;
+}
+
+inline size_t find_stack_size() {
+    int err;
+    size_t stack_size;
+    pthread_attr_t pthread_attr;
+
+    pthread_attr_init(&pthread_attr);
+    err = pthread_attr_getstacksize(&pthread_attr, &stack_size);
+    pthread_attr_destroy(&pthread_attr);
+    return stack_size;
+}
+
+inline size_t find_guard_stack_size() {
+    return 64*1024;
+}
+
+inline size_t find_guard_page_size() {
+    int err;
+    size_t guard_size;
+    pthread_attr_t pthread_attr;
+
+    pthread_attr_init(&pthread_attr);
+    err = pthread_attr_getguardsize(&pthread_attr, &guard_size);
+    pthread_attr_destroy(&pthread_attr);
+    return guard_size;
+}
+
+static size_t common_stack_size;
+static size_t common_guard_stack_size;
+static size_t common_guard_page_size;
+
+inline void* get_stack_addr() {
+    return p_TLS_vmthread->stack_addr;
+}
+
+inline size_t get_stack_size() {
+    return common_stack_size;
+}
+
+inline size_t get_guard_stack_size() {
+    return common_guard_stack_size;
+}
+
+inline size_t get_guard_page_size() {
+    return common_guard_page_size;
+}
+
+
+void init_stack_info() {
+    p_TLS_vmthread->stack_addr = find_stack_addr();
+    common_stack_size = find_stack_size();
+    common_guard_stack_size = find_guard_stack_size();
+    common_guard_page_size =find_guard_page_size();
+}
+
+void set_guard_stack() {
+    int err;
+    char* stack_addr = (char*) get_stack_addr();
+    size_t stack_size = get_stack_size();
+    size_t guard_stack_size = get_guard_stack_size();
+    size_t guard_page_size = get_guard_page_size();
+
+    err = mprotect(stack_addr - stack_size + guard_page_size + guard_stack_size,
+        guard_page_size, PROT_NONE);
+
+    stack_t sigalt;
+    sigalt.ss_sp = stack_addr - stack_size + guard_page_size;
+    sigalt.ss_flags = SS_ONSTACK;
+    sigalt.ss_size = guard_stack_size;
+
+    err = sigaltstack (&sigalt, NULL);
+}
+
+size_t get_available_stack_size() {
+    char* stack_adrr = (char*) get_stack_addr();
+    size_t used_stack_size = stack_adrr - ((char*)&stack_adrr);
+    size_t available_stack_size =
+            get_stack_size() - used_stack_size
+            - get_guard_page_size() - get_guard_stack_size();
+    return available_stack_size;
+}
+
+bool check_available_stack_size(size_t required_size) {
+    if (get_available_stack_size() < required_size) {
+        exn_raise_by_name("java/lang/StackOverflowError");
+        return false;
+    } else {
+        return true;
+    }
+}
+
+void remove_guard_stack() {
+    int err;
+    char* stack_addr = (char*) get_stack_addr();
+    size_t stack_size = get_stack_size();
+    size_t guard_stack_size = get_guard_stack_size();
+    size_t guard_page_size = get_guard_page_size();
+
+    err = mprotect(stack_addr - stack_size + guard_page_size + guard_stack_size,
+        guard_page_size, PROT_READ | PROT_WRITE);
+
+    stack_t sigalt;
+    sigalt.ss_sp = stack_addr - stack_size + guard_page_size;
+    sigalt.ss_flags = SS_DISABLE;
+    sigalt.ss_size = guard_stack_size;
+
+    err = sigaltstack (&sigalt, NULL);
+}
+
+bool check_stack_overflow(siginfo_t *info, ucontext_t *uc) {
+    char* stack_addr = (char*) get_stack_addr();
+    size_t stack_size = get_stack_size();
+    size_t guard_stack_size = get_guard_stack_size();
+    size_t guard_page_size = get_guard_page_size();
+
+    char* guard_page_begin = stack_addr - stack_size + guard_page_size + guard_stack_size;
+    char* guard_page_end = guard_page_begin + guard_page_size;
+    char* fault_addr = (char*)(info->si_addr);
+    //char* esp_value = (char*)(uc->uc_mcontext.gregs[REG_ESP]);
+
+    return((guard_page_begin <= fault_addr) && (fault_addr <= guard_page_end));
+}
 
 /*
  * We find the true signal stack frame set-up by kernel,which is located
@@ -193,16 +335,47 @@ void print_native_stack (unsigned *ebp) {
  * returned, application can continue its execution in Java exception handler.
  */
 
+void stack_overflow_handler(int signum, siginfo_t* UNREF info, void* context)
+{
+    ucontext_t *uc = (ucontext_t *)context;
+    Global_Env *env = VM_Global_State::loader_env;
+
+    if (java_throw_from_sigcontext(
+                uc, env->java_lang_StackOverflowError_Class)) {
+        return;
+    } else {
+        if (is_unwindable()) {
+            if (tmn_is_suspend_enabled()) {
+                tmn_suspend_disable();
+            }
+            throw_from_sigcontext(
+                uc, env->java_lang_StackOverflowError_Class);
+        } else {
+            remove_guard_stack();
+            exn_raise_by_name("java/lang/StackOverflowError");
+            p_TLS_vmthread->restore_guard_page = true;
+        }
+    }
+}
+
 void null_java_reference_handler(int signum, siginfo_t* UNREF info, void* context)
 {
     ucontext_t *uc = (ucontext_t *)context;
     Global_Env *env = VM_Global_State::loader_env;
 
+    if (check_stack_overflow(info, uc)) {
+        stack_overflow_handler(signum, info, context);
+        return;
+    }
+
     if (env->shutting_down != 0) {
         fprintf(stderr, "null_java_reference_handler(): called in shutdown stage\n");
     } else if (!interpreter_enabled()) {
-        if (linux_throw_from_sigcontext(
+        if (java_throw_from_sigcontext(
                     uc, env->java_lang_NullPointerException_Class)) {
+            return;
+        } else {
+            fprintf(stderr, "SIGSEGV in VM code.\n");
             return;
         }
     }
@@ -220,7 +393,7 @@ void null_java_divide_by_zero_handler(int signum, siginfo_t* UNREF info, void* c
     if (env->shutting_down != 0) {
         fprintf(stderr, "null_java_divide_by_zero_handler(): called in shutdown stage\n");
     } else if (!interpreter_enabled()) {
-        if (linux_throw_from_sigcontext(
+        if (java_throw_from_sigcontext(
                     uc, env->java_lang_ArithmeticException_Class)) {
             return;
         }
@@ -305,7 +478,7 @@ void locate_sigcontext(int UNREF signum)
         ebp = (uint32 *)ebp[0];
     }
 
-    if (sc_nest < 0) {
+     if (sc_nest < 0) {
         printf("cannot locate sigcontext.\n");
         printf("Please add or remove any irrelevant statement(e.g. add a null printf) in VM source code, then rebuild it. If problem remains, please submit a bug report. Thank you very much\n");
         exit(1);
@@ -376,7 +549,7 @@ void initialize_signals()
     sigaction(SIGUSR2, &sa, NULL);
 
     sigemptyset(&sa.sa_mask);
-    sa.sa_flags = SA_SIGINFO;
+    sa.sa_flags = SA_SIGINFO | SA_ONSTACK;
     sa.sa_sigaction = &null_java_reference_handler;
     sigaction(SIGSEGV, &sa, NULL);
 

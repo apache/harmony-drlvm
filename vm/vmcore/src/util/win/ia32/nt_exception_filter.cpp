@@ -21,6 +21,7 @@
 
 #include "cxxlog.h"
 #include "method_lookup.h"
+#include "m2n.h"
 #include "open/thread.h"
 #include "Environment.h"
 #include "exceptions.h"
@@ -148,6 +149,141 @@ static void print_callstack(LPEXCEPTION_POINTERS nt_exception)
     fflush(stderr);
 }
 
+/*
+ * Information about stack
+ */
+inline void* find_stack_addr() {
+    void* stack_addr;
+    size_t reg_size;
+    MEMORY_BASIC_INFORMATION memory_information;
+
+    VirtualQuery(&memory_information, &memory_information, sizeof(memory_information));
+    reg_size = memory_information.RegionSize;
+    stack_addr =((char*) memory_information.BaseAddress) + reg_size;
+
+    return stack_addr;
+}
+
+inline size_t find_stack_size() {
+   void* stack_addr;
+    size_t stack_size;
+    size_t reg_size;
+    MEMORY_BASIC_INFORMATION memory_information;
+
+    VirtualQuery(&memory_information, &memory_information, sizeof(memory_information));
+    reg_size = memory_information.RegionSize;
+    stack_addr = ((char*) memory_information.BaseAddress) + reg_size;
+    stack_size = ((char*) stack_addr) - ((char*) memory_information.AllocationBase);
+
+    return stack_size;
+}
+
+inline size_t find_guard_page_size() {
+    size_t  guard_size;
+    SYSTEM_INFO system_info;
+
+    GetSystemInfo(&system_info);
+    guard_size = system_info.dwPageSize;
+
+    return guard_size;
+}
+
+inline size_t find_guard_stack_size() {
+    // guaerded stack size on windows can be equals one page size only :(
+    return find_guard_page_size();
+}
+
+static size_t common_stack_size;
+static size_t common_guard_stack_size;
+static size_t common_guard_page_size;
+
+inline void* get_stack_addr() {
+    return p_TLS_vmthread->stack_addr;
+}
+
+inline size_t get_stack_size() {
+    return common_stack_size;
+}
+
+inline size_t get_guard_stack_size() {
+    return common_guard_stack_size;
+}
+
+inline size_t get_guard_page_size() {
+    return common_guard_page_size;
+}
+
+
+void init_stack_info() {
+    p_TLS_vmthread->stack_addr = find_stack_addr();
+    common_stack_size = find_stack_size();
+    common_guard_stack_size = find_guard_stack_size();
+    common_guard_page_size =find_guard_page_size();
+}
+
+void set_guard_stack() {
+    void* stack_addr = get_stack_addr();
+    size_t stack_size = get_stack_size();
+    size_t page_size = get_guard_page_size();
+
+    if (!VirtualFree((char*)stack_addr - stack_size + page_size,
+        page_size, MEM_DECOMMIT)) {
+        // should be successful always
+        assert(0);
+    }
+
+    DWORD oldProtect;
+
+    if (!VirtualProtect((char*)stack_addr - stack_size + page_size + page_size,
+        page_size, PAGE_GUARD | PAGE_READWRITE, &oldProtect)) {
+        // should be successful always
+        assert(0);
+    }
+
+    p_TLS_vmthread->restore_guard_page = false;
+}
+
+size_t get_available_stack_size() {
+    char* stack_adrr = (char*) get_stack_addr();
+    size_t used_stack_size = ((size_t)stack_adrr) - ((size_t)(&stack_adrr));
+    size_t available_stack_size =
+            get_stack_size() - used_stack_size
+            - get_guard_page_size() - get_guard_stack_size();
+    return available_stack_size;
+}
+
+bool check_available_stack_size(size_t required_size) {
+    if (get_available_stack_size() < required_size) {
+        exn_raise_by_name("java/lang/StackOverflowError");
+        return false;
+    } else {
+        return true;
+    }
+}
+
+// exception catch callback to restore stack after Stack Overflow Error
+static void __cdecl exception_catch_callback_wrapper(){
+    exception_catch_callback();
+}
+
+static void __declspec(naked) __stdcall naked_exception_catch_callback() {
+    __asm {
+        push ebp
+        mov ebp, esp
+        push eax
+        push ebx
+        push ecx
+        push edx
+        call exception_catch_callback_wrapper
+        pop edx
+        pop ecx
+        pop ebx
+        pop eax
+        leave
+        ret
+    }
+}
+
 LONG NTAPI vectored_exception_handler(LPEXCEPTION_POINTERS nt_exception)
 {
     DWORD code = nt_exception->ExceptionRecord->ExceptionCode;
@@ -167,9 +303,22 @@ LONG NTAPI vectored_exception_handler(LPEXCEPTION_POINTERS nt_exception)
         // method else crash handler or default handler is executed, this means that
         // it was thrown by VM C/C++ code.
         if ((code == STATUS_ACCESS_VIOLATION
-                || code == STATUS_INTEGER_DIVIDE_BY_ZERO)
-                && vm_identify_eip((void *)context->Eip) == VM_TYPE_JAVA)
+                || code == STATUS_INTEGER_DIVIDE_BY_ZERO
+                || code == STATUS_STACK_OVERFLOW)
+                && vm_identify_eip((void *)context->Eip) == VM_TYPE_JAVA) {
             run_default_handler = false;
+        } else if (code == STATUS_STACK_OVERFLOW) {
+            if (is_unwindable()) {
+                if (tmn_is_suspend_enabled()) {
+                    tmn_suspend_disable();
+                }
+                run_default_handler = false;
+            } else {
+                exn_raise_by_name("java/lang/StackOverflowError");
+                p_TLS_vmthread->restore_guard_page = true;
+                return EXCEPTION_CONTINUE_EXECUTION;
+            }
+        }
 
     } else {
         if (VM_Global_State::loader_env->shutting_down > 1) {
@@ -233,6 +382,17 @@ LONG NTAPI vectored_exception_handler(LPEXCEPTION_POINTERS nt_exception)
 
     switch(nt_exception->ExceptionRecord->ExceptionCode) 
     {
+    case STATUS_STACK_OVERFLOW:
+        // stack overflow exception -- see ...\vc\include\winnt.h
+        {
+            TRACE2("signals", "StackOverflowError detected at "
+                << (void *) context->Eip << " on the stack at "
+                << (void *) context->Esp);
+            // Lazy exception object creation
+            exc_clss = env->java_lang_StackOverflowError_Class;
+            p_TLS_vmthread->restore_guard_page = true;
+        }
+        break;
     case STATUS_ACCESS_VIOLATION:
         // null pointer exception -- see ...\vc\include\winnt.h
         {
@@ -256,9 +416,25 @@ LONG NTAPI vectored_exception_handler(LPEXCEPTION_POINTERS nt_exception)
     }
 
     Registers regs;
+
     nt_to_vm_context(context, &regs);
 
+    uint32 exception_esp = regs.esp;
+    DebugUtilsTI* ti = VM_Global_State::loader_env->TI;
+
     exn_athrow_regs(&regs, exc_clss);
+
+    if (exception_esp < regs.esp) {
+        if (p_TLS_vmthread->restore_guard_page) {
+            regs.esp = regs.esp - 4;
+            *((uint32*) regs.esp) = regs.eip;
+            regs.eip = ((uint32)naked_exception_catch_callback);
+        }
+    } else {
+        // should be unreachable code
+        //jvmti_exception_catch_callback(&regs);
+        assert(0);
+    }
 
     vm_to_nt_context(&regs, context);
 

@@ -17,6 +17,6 @@
 #ifndef _VERSION_SVN_TAG_
 #define _VERSION_SVN_TAG_
 
-#define VERSION_SVN_TAG  "unknown"
+#define VERSION_SVN_TAG  "424438"
 
 #endif // _VERSION_SVN_TAG_

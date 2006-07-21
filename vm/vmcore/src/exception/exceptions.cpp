@@ -510,6 +510,10 @@ void clear_current_thread_exception()
     // gc safe operation.
     assert(!tmn_is_suspend_enabled());
     p_TLS_vmthread->p_exception_object = NULL;
+
+    if (p_TLS_vmthread->restore_guard_page) {
+        set_guard_stack();
+    }
 }   //clear_current_thread_exception
 
 void rethrow_current_thread_exception()
@@ -1079,6 +1083,15 @@ void exn_athrow_regs(Registers * regs, Class_Handle exn_class)
 #endif
 }   //exn_athrow_regs
 
+//////////////////////////////////////////////////////////////////////////
+// Exception Catch support
+
+// exception catch callback to restore stack after Stack Overflow Error
+void exception_catch_callback() {
+    if (p_TLS_vmthread->restore_guard_page) {
+        set_guard_stack();
+    }
+}
 
 //////////////////////////////////////////////////////////////////////////
 // Runtime Exception Support
