@@ -1097,9 +1097,16 @@ public final class Class<T> implements Serializable, AnnotatedElement, GenericDe
                 .toArray(new Method[methods.size()]);
         }
 
+        /**
+         *  Checks if two methods match by name and parameter types.
+         *  Ignored return type
+         *
+         * @param m1 one method to check
+         * @param m2 the other method to check
+         * @return true if they match, false otherwise
+         */
         private boolean isMethodMatches(Method m1, Method m2) {
             return m1.getName().equals(m2.getName())
-                && m1.getReturnType() == m2.getReturnType()
                 && isTypeMatches(m1.getParameterTypes(), m2.getParameterTypes());
         }
 
