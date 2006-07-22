@@ -83,3 +83,4 @@ ANT_COMMAND="$ANT_HOME/bin/ant --noconfig"
 $ANT_COMMAND -f ./make/build.xml -Dvm.jitrino.cfg=release "$@"  || ERROR
 
 # 	
+# 
