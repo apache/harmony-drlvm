@@ -141,7 +141,9 @@ static void insertSystemProperties(JNIEnv *jenv, jobject pProperties)
         properties_get_string_property( 
             reinterpret_cast<PropertiesHandle>(&((JNIEnv_Internal*)jenv)->vm->vm_env->properties),
             "java.class.path") );
-    PropPut(jenv, pProperties, "java.class.version", "45.3");
+
+    // TODO : fix this - it should come from Class.h
+    PropPut(jenv, pProperties, "java.class.version", "49.0");
 
     //VM specified/APP specified properties are supported here.
     Properties::Iterator *iterator = VM_Global_State::loader_env->properties.getIterator();
