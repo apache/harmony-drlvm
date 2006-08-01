@@ -810,7 +810,7 @@ jobject JNICALL NewObjectA(JNIEnv *env,
         return 0;
     }
 
-    CallVoidMethodA(env, new_handle, methodID, args);
+    CallNonvirtualVoidMethodA(env, new_handle, clazz, methodID, args);
     if (ExceptionCheck(env))
         return NULL;
     else
