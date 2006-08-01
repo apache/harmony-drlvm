@@ -191,7 +191,11 @@ void DestroyVM() {
     gc_wrapup();
     vm_mem_dealloc();
     vm_uninitialize_critical_sections();    
- 
+
+    // FIXME: vm_methods should be moved to Global_Env - then 
+    // call ~Method_Lookup_Table() in EnvClearInternals()
+    vm_methods->~Method_Lookup_Table();
+
 #ifdef DUMP_IPF_STUBS
     extern FILE *ipf_stubs_out_file;
     if (ipf_stubs_out_file) {

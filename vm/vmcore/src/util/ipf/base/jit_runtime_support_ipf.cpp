@@ -1123,7 +1123,7 @@ static void *get_vm_rt_initialize_class_compactor()
     emitter.ipf_brret(br_many, br_sptk, br_none, BRANCH_RETURN_LINK_REG, SCRATCH_PRED_REG);
 
     // push m2n frame
-    unsigned out_arg0 = m2n_gen_push_m2n(&emitter, NULL, FRAME_UNKNOWN, false, 0, 0, 1);
+    unsigned out_arg0 = m2n_gen_push_m2n(&emitter, NULL, FRAME_JNI, false, 0, 0, 1);
     emitter.ipf_mov(out_arg0+0, IN_REG0);
     void (*p_class_initialize)(Class *clss);
     p_class_initialize = class_initialize;

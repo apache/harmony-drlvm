@@ -3614,6 +3614,14 @@ vf_opcode_invoke( vf_Code_t *code,              // code instruction
             << ") Must call initializers using invokespecial" );
         return VER_ErrorConstantPool;
     }
+    // check number of arguments
+    if( cp_parse.method.m_inlen > 255 ) {
+        VERIFY_REPORT( ctex, "(class: " << class_get_name( ctex->m_class ) 
+            << ", method: " << method_get_name( ctex->m_method )
+            << method_get_descriptor( ctex->m_method )
+            << ") The number of method parameters is limited to 255" );
+        return VER_ErrorInstruction;
+    }
     // set stack modifier for instruction
     vf_set_stack_modifier( code, cp_parse.method.m_outlen - cp_parse.method.m_inlen );
     // set minimal stack for instruction
@@ -3648,6 +3656,14 @@ vf_opcode_invokespecial( vf_Code_t *code,              // code instruction
     result = vf_parse_const_pool( *(code->m_addr), cp_index, &cp_parse, ctex );
     if( result != VER_OK ) {
         return result;
+    }
+    // check number of arguments
+    if( cp_parse.method.m_inlen > 255 ) {
+        VERIFY_REPORT( ctex, "(class: " << class_get_name( ctex->m_class ) 
+            << ", method: " << method_get_name( ctex->m_method )
+            << method_get_descriptor( ctex->m_method )
+            << ") The number of method parameters is limited to 255" );
+        return VER_ErrorInstruction;
     }
     // set stack modifier for instruction
     vf_set_stack_modifier( code, cp_parse.method.m_outlen - cp_parse.method.m_inlen );
@@ -4008,6 +4024,13 @@ vf_opcode_multianewarray( vf_Code_t *code,              // code instruction
     unsigned short index;
     for( index = 0; array[index] == '['; index++ ) {
         continue;
+    }
+    if( index > 255 ) {
+        VERIFY_REPORT( ctex, "(class: " << class_get_name( ctex->m_class ) 
+            << ", method: " << method_get_name( ctex->m_method )
+            << method_get_descriptor( ctex->m_method )
+            << ") Array with too many dimensions" );
+        return VER_ErrorInstruction;
     }
     if( dimension == 0 || index < dimension ) {
         VERIFY_REPORT( ctex, "(class: " << class_get_name( ctex->m_class ) 

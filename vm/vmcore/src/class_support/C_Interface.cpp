@@ -787,28 +787,18 @@ void *class_get_const_string_intern_addr(Class_Handle cl, unsigned index)
 } //class_get_const_string_intern_addr
 
 
-const char* class_get_cp_entry_signature(Class_Handle src_class, unsigned short cp_index)
+const char* class_get_cp_entry_signature(Class_Handle src_class, unsigned short index)
 {
     Class* clss = (Class*)src_class;
-    // TODO: check that cp_index is valid for src_class; assert for now
-    assert(cp_index < clss->cp_size);
-    assert(cp_is_methodref(clss->const_pool, cp_index)
-        || cp_is_interfacemethodref(clss->const_pool, cp_index)
-        || cp_is_fieldref(clss->const_pool, cp_index));
+    // TODO: check that index is valid for src_class; assert for now
+    assert(index < clss->cp_size);
+    assert(cp_is_methodref(clss->const_pool, index)
+        || cp_is_interfacemethodref(clss->const_pool, index)
+        || cp_is_fieldref(clss->const_pool, index));
 
-    Const_Pool* cp_item = &(clss->const_pool[cp_index]);
-    if(cp_is_resolved(clss->const_pool, cp_index)) {
-        Class_Member* sig_src = cp_item->CONSTANT_ref.method;
-        return sig_src->get_descriptor()->bytes;
-    } else {
-        unsigned short next_idx = cp_item->CONSTANT_ref.name_and_type_index;
-        cp_item = &(clss->const_pool[next_idx]);
-        if(cp_is_resolved(clss->const_pool, next_idx)) {
-            return cp_item->CONSTANT_NameAndType.descriptor->bytes;
-        } else {
-            return clss->const_pool[cp_item->CONSTANT_NameAndType.descriptor_index].CONSTANT_Utf8.string->bytes;
-        }
-    }
+    index = clss->const_pool[index].CONSTANT_ref.name_and_type_index;
+    index = clss->const_pool[index].CONSTANT_NameAndType.descriptor_index;
+    return clss->const_pool[index].CONSTANT_Utf8.string->bytes;
 } // class_get_cp_entry_signature
 
 
@@ -1025,7 +1015,7 @@ Class_Handle class_find_class_from_loader(ClassLoaderHandle loader, const char* 
     if (!ch) return NULL;
     // All initialization from jni should not propagate exceptions and
     // should return to calling native method.
-    if(init) class_initialize_from_jni(ch, false);
+    if(init) class_initialize_from_jni(ch);
 
     if(exn_get()) {
         return 0;
@@ -1047,17 +1037,9 @@ const char *const_pool_get_field_name(Class_Handle cl, unsigned index)
         ABORT("Wrong index");
         return 0;
     }
-    if (cp_is_resolved(const_pool,index)) {
-        return const_pool[index].CONSTANT_ref.field->get_name()->bytes;
-    } else {
-        index = const_pool[index].CONSTANT_ref.name_and_type_index;
-        if(cp_is_resolved(const_pool, index)) {
-            return const_pool[index].CONSTANT_NameAndType.name->bytes;
-        } else {
-            index = const_pool[index].CONSTANT_NameAndType.name_index;
-            return const_pool[index].CONSTANT_Utf8.string->bytes;
-        }
-    }
+    index = const_pool[index].CONSTANT_ref.name_and_type_index;
+    index = const_pool[index].CONSTANT_NameAndType.name_index;
+    return const_pool[index].CONSTANT_Utf8.string->bytes;
 } //const_pool_get_field_name
 
 
@@ -1070,12 +1052,8 @@ const char *const_pool_get_field_class_name(Class_Handle cl, unsigned index)
         ABORT("Wrong index");
         return 0;
     }
-    if (cp_is_resolved(const_pool,index)) {
-        return const_pool[index].CONSTANT_ref.field->get_class()->name->bytes;
-    } else {
-        index = const_pool[index].CONSTANT_ref.class_index;
-        return const_pool_get_class_name(cl,index);
-    }
+    index = const_pool[index].CONSTANT_ref.class_index;
+    return const_pool_get_class_name(cl,index);
 } //const_pool_get_field_class_name
 
 
@@ -1088,17 +1066,9 @@ const char *const_pool_get_field_descriptor(Class_Handle cl, unsigned index)
         ABORT("Wrong index");
         return 0;
     }
-    if (cp_is_resolved(const_pool,index)) {
-        return const_pool[index].CONSTANT_ref.field->get_descriptor()->bytes;
-    } else {
-        index = const_pool[index].CONSTANT_ref.name_and_type_index;
-        if(cp_is_resolved(const_pool, index)) {
-            return const_pool[index].CONSTANT_NameAndType.descriptor->bytes;
-        } else {
-            index = const_pool[index].CONSTANT_NameAndType.descriptor_index;
-            return const_pool[index].CONSTANT_Utf8.string->bytes;
-        }
-    }
+    index = const_pool[index].CONSTANT_ref.name_and_type_index;
+    index = const_pool[index].CONSTANT_NameAndType.descriptor_index;
+    return const_pool[index].CONSTANT_Utf8.string->bytes;
 } //const_pool_get_field_descriptor
 
 
@@ -1111,17 +1081,9 @@ const char *const_pool_get_method_name(Class_Handle cl, unsigned index)
         ABORT("Wrong index");
         return 0;
     }
-    if (cp_is_resolved(const_pool,index)) {
-        return const_pool[index].CONSTANT_ref.method->get_name()->bytes;
-    } else {
-        index = const_pool[index].CONSTANT_ref.name_and_type_index;
-        if(cp_is_resolved(const_pool, index)) {
-            return const_pool[index].CONSTANT_NameAndType.name->bytes;
-        } else {
-            index = const_pool[index].CONSTANT_NameAndType.name_index;
-            return const_pool[index].CONSTANT_Utf8.string->bytes;
-        }
-    }
+    index = const_pool[index].CONSTANT_ref.name_and_type_index;
+    index = const_pool[index].CONSTANT_NameAndType.name_index;
+    return const_pool[index].CONSTANT_Utf8.string->bytes;
 } //const_pool_get_method_name
 
 
@@ -1134,12 +1096,8 @@ const char *const_pool_get_method_class_name(Class_Handle cl, unsigned index)
         ABORT("Wrong index");
         return 0;
     }
-    if (cp_is_resolved(const_pool,index)) {
-        return const_pool[index].CONSTANT_ref.method->get_class()->name->bytes;
-    } else {
-        index = const_pool[index].CONSTANT_ref.class_index;
-        return const_pool_get_class_name(cl,index);
-    }
+    index = const_pool[index].CONSTANT_ref.class_index;
+    return const_pool_get_class_name(cl,index);
 } //const_pool_get_method_class_name
 
 
@@ -1152,17 +1110,9 @@ const char *const_pool_get_interface_method_name(Class_Handle cl, unsigned index
         ABORT("Wrong index");
         return 0;
     }
-    if (cp_is_resolved(const_pool,index)) {
-        return const_pool[index].CONSTANT_ref.method->get_name()->bytes;
-    } else {
-        index = const_pool[index].CONSTANT_ref.name_and_type_index;
-        if(cp_is_resolved(const_pool, index)) {
-            return const_pool[index].CONSTANT_NameAndType.name->bytes;
-        } else {
-            index = const_pool[index].CONSTANT_NameAndType.name_index;
-            return const_pool[index].CONSTANT_Utf8.string->bytes;
-        }
-    }
+    index = const_pool[index].CONSTANT_ref.name_and_type_index;
+    index = const_pool[index].CONSTANT_NameAndType.name_index;
+    return const_pool[index].CONSTANT_Utf8.string->bytes;
 } //const_pool_get_interface_method_name
 
 
@@ -1175,12 +1125,8 @@ const char *const_pool_get_interface_method_class_name(Class_Handle cl, unsigned
         ABORT("Wrong index");
         return 0;
     }
-    if (cp_is_resolved(const_pool,index)) {
-        return const_pool[index].CONSTANT_ref.method->get_class()->name->bytes;
-    } else {
-        index = const_pool[index].CONSTANT_ref.class_index;
-        return const_pool_get_class_name(cl,index);
-    }
+    index = const_pool[index].CONSTANT_ref.class_index;
+    return const_pool_get_class_name(cl,index);
 } //const_pool_get_interface_method_class_name
 
 
@@ -1193,17 +1139,9 @@ const char *const_pool_get_method_descriptor(Class_Handle cl, unsigned index)
         ABORT("Wrong index");
         return 0;
     }
-    if (cp_is_resolved(const_pool,index)) {
-        return const_pool[index].CONSTANT_ref.method->get_descriptor()->bytes;
-    } else {
-        index = const_pool[index].CONSTANT_ref.name_and_type_index;
-        if(cp_is_resolved(const_pool, index)) {
-            return const_pool[index].CONSTANT_NameAndType.descriptor->bytes;
-        } else {
-            index = const_pool[index].CONSTANT_NameAndType.descriptor_index;
-            return const_pool[index].CONSTANT_Utf8.string->bytes;
-        }
-    }
+    index = const_pool[index].CONSTANT_ref.name_and_type_index;
+    index = const_pool[index].CONSTANT_NameAndType.descriptor_index;
+    return const_pool[index].CONSTANT_Utf8.string->bytes;
 } //const_pool_get_method_descriptor
 
 
@@ -1216,17 +1154,9 @@ const char *const_pool_get_interface_method_descriptor(Class_Handle cl, unsigned
         ABORT("Wrong index");
         return 0;
     }
-    if (cp_is_resolved(const_pool,index)) {
-        return const_pool[index].CONSTANT_ref.method->get_descriptor()->bytes;
-    } else {
-        index = const_pool[index].CONSTANT_ref.name_and_type_index;
-        if(cp_is_resolved(const_pool, index)) {
-            return const_pool[index].CONSTANT_NameAndType.descriptor->bytes;
-        } else {
-            index = const_pool[index].CONSTANT_NameAndType.descriptor_index;
-            return const_pool[index].CONSTANT_Utf8.string->bytes;
-        }
-    }
+    index = const_pool[index].CONSTANT_ref.name_and_type_index;
+    index = const_pool[index].CONSTANT_NameAndType.descriptor_index;
+    return const_pool[index].CONSTANT_Utf8.string->bytes;
 } //const_pool_get_interface_method_descriptor
 
 
@@ -1239,11 +1169,7 @@ const char *const_pool_get_class_name(Class_Handle cl, unsigned index)
         ABORT("Wrong index");
         return 0;
     }
-    if (cp_is_resolved(const_pool,index)) {
-        return const_pool[index].CONSTANT_Class.klass->name->bytes;
-    } else {
-        return const_pool[const_pool[index].CONSTANT_Class.name_index].CONSTANT_Utf8.string->bytes;
-    }
+    return const_pool[const_pool[index].CONSTANT_Class.name_index].CONSTANT_Utf8.string->bytes;
 } //const_pool_get_class_name
 
 

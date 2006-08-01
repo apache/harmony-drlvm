@@ -26,42 +26,80 @@
 #include "cxxlog.h"
 #include "suspend_checker.h"
 #include "environment.h"
+#include "interpreter_exports.h"
 
-static const jvmtiCapabilities jvmti_supported_capabilities =
+static const jvmtiCapabilities jvmti_supported_interpreter_capabilities =
 {
-    1, // can_tag_objects
-    1, // can_generate_field_modification_events
-    1, // can_generate_field_access_events
+    0, // can_tag_objects
+    0, // can_generate_field_modification_events
+    0, // can_generate_field_access_events
     1, // can_get_bytecodes
     1, // can_get_synthetic_attribute
     1, // can_get_owned_monitor_info
     1, // can_get_current_contended_monitor
     1, // can_get_monitor_info
     1, // can_pop_frame
-    1, // can_redefine_classes
-    1, // can_signal_thread
+    0, // can_redefine_classes
+    0, // can_signal_thread
     1, // can_get_source_file_name
     1, // can_get_line_numbers
     1, // can_get_source_debug_extension
     1, // can_access_local_variables
-    1, // can_maintain_original_method_order
+    0, // can_maintain_original_method_order
     1, // can_generate_single_step_events
     1, // can_generate_exception_events
     1, // can_generate_frame_pop_events
     1, // can_generate_breakpoint_events
     1, // can_suspend
-    1, // can_redefine_any_class
-    1, // can_get_current_thread_cpu_time
-    1, // can_get_thread_cpu_time
+    0, // can_redefine_any_class
+    0, // can_get_current_thread_cpu_time
+    0, // can_get_thread_cpu_time
     1, // can_generate_method_entry_events
     1, // can_generate_method_exit_events
     1, // can_generate_all_class_hook_events
     1, // can_generate_compiled_method_load_events
-    1, // can_generate_monitor_events
-    1, // can_generate_vm_object_alloc_events
-    1, // can_generate_native_method_bind_events
-    1, // can_generate_garbage_collection_events
-    1  // can_generate_object_free_events
+    0, // can_generate_monitor_events
+    0, // can_generate_vm_object_alloc_events
+    0, // can_generate_native_method_bind_events
+    0, // can_generate_garbage_collection_events
+    0  // can_generate_object_free_events
+};
+
+static const jvmtiCapabilities jvmti_supported_jit_capabilities =
+{
+    0, // can_tag_objects
+    0, // can_generate_field_modification_events
+    0, // can_generate_field_access_events
+    1, // can_get_bytecodes
+    1, // can_get_synthetic_attribute
+    1, // can_get_owned_monitor_info
+    1, // can_get_current_contended_monitor
+    1, // can_get_monitor_info
+    0, // can_pop_frame
+    0, // can_redefine_classes
+    0, // can_signal_thread
+    1, // can_get_source_file_name
+    1, // can_get_line_numbers
+    1, // can_get_source_debug_extension
+    1, // can_access_local_variables
+    0, // can_maintain_original_method_order
+    0, // can_generate_single_step_events
+    1, // can_generate_exception_events
+    1, // can_generate_frame_pop_events
+    0, // can_generate_breakpoint_events
+    1, // can_suspend
+    0, // can_redefine_any_class
+    0, // can_get_current_thread_cpu_time
+    0, // can_get_thread_cpu_time
+    0, // can_generate_method_entry_events
+    0, // can_generate_method_exit_events
+    1, // can_generate_all_class_hook_events
+    1, // can_generate_compiled_method_load_events
+    0, // can_generate_monitor_events
+    0, // can_generate_vm_object_alloc_events
+    0, // can_generate_native_method_bind_events
+    0, // can_generate_garbage_collection_events
+    0  // can_generate_object_free_events
 };
 
 // 1 means that corresponding capability can be enabled
@@ -77,8 +115,8 @@ static const jvmtiCapabilities jvmti_enable_on_live_flags =
     1, // can_get_current_contended_monitor
     1, // can_get_monitor_info
     0, // can_pop_frame
-    1, // can_redefine_classes
-    1, // can_signal_thread
+    0, // can_redefine_classes
+    0, // can_signal_thread
     1, // can_get_source_file_name
     1, // can_get_line_numbers
     1, // can_get_source_debug_extension
@@ -89,18 +127,18 @@ static const jvmtiCapabilities jvmti_enable_on_live_flags =
     0, // can_generate_frame_pop_events
     0, // can_generate_breakpoint_events
     1, // can_suspend
-    1, // can_redefine_any_class
-    1, // can_get_current_thread_cpu_time
-    1, // can_get_thread_cpu_time
+    0, // can_redefine_any_class
+    0, // can_get_current_thread_cpu_time
+    0, // can_get_thread_cpu_time
     0, // can_generate_method_entry_events
     0, // can_generate_method_exit_events
     1, // can_generate_all_class_hook_events
     1, // can_generate_compiled_method_load_events
     0, // can_generate_monitor_events
-    1, // can_generate_vm_object_alloc_events
-    1, // can_generate_native_method_bind_events
-    1, // can_generate_garbage_collection_events
-    1  // can_generate_object_free_events
+    0, // can_generate_vm_object_alloc_events
+    0, // can_generate_native_method_bind_events
+    0, // can_generate_garbage_collection_events
+    0  // can_generate_object_free_events
 };
 
 /*
@@ -133,7 +171,8 @@ jvmtiGetPotentialCapabilities(jvmtiEnv* env,
         return errorCode;
 
     if (JVMTI_PHASE_ONLOAD == phase)
-        *capabilities_ptr = jvmti_supported_capabilities;
+        *capabilities_ptr = interpreter_enabled() ?
+            jvmti_supported_interpreter_capabilities : jvmti_supported_jit_capabilities;
     else
     {
         // Add all capabilities from supported on live phase to already posessed capabilities
@@ -184,8 +223,10 @@ jvmtiAddCapabilities(jvmtiEnv* env,
     jvmtiCapabilities posessed = ti_env->posessed_capabilities;
     
     const jvmtiCapabilities* available_caps =
-        (phase == JVMTI_PHASE_LIVE) ? &jvmti_enable_on_live_flags
-                                    : &jvmti_supported_capabilities;
+        (phase == JVMTI_PHASE_LIVE) ? &jvmti_enable_on_live_flags :
+        (interpreter_enabled() ?
+            &jvmti_supported_interpreter_capabilities :
+            &jvmti_supported_jit_capabilities);
 
     unsigned char* requested = (unsigned char*)capabilities_ptr;
     unsigned char* available = (unsigned char*)available_caps;

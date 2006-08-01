@@ -738,11 +738,11 @@ VMEXPORT void vm_notify_live_object_class(Class_Handle);
 #if (defined __cplusplus) && (defined PLATFORM_POSIX)
 extern "C" {
 #endif
-VMEXPORT void class_initialize_from_jni(Class *clss, bool throw_exception);
+VMEXPORT void class_initialize_from_jni(Class *clss);
 #if (defined __cplusplus) && (defined PLATFORM_POSIX)
 }
 #endif
-VMEXPORT void class_initialize_ex(Class *clss, bool throw_exception);
+VMEXPORT void class_initialize_ex(Class *clss);
 VMEXPORT void class_initialize(Class *clss);
 
 
@@ -1180,7 +1180,6 @@ public:
     enum State {
         ST_NotCompiled,                 // initial state
         ST_NotLinked = ST_NotCompiled,  // native not linked to implementation
-        ST_BeingCompiled,               // jitting
         ST_Compiled,                    // compiled by JIT
         ST_Linked = ST_Compiled         // native linked to implementation
     };

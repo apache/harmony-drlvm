@@ -154,6 +154,7 @@ void Global_Env::EnvClearInternals()
         cl = ClIterator.next();
         delete cltmp;
     }
+    ClassLoader::DeleteClassLoaderTable();
     tmn_suspend_enable();
 
     if (TI)

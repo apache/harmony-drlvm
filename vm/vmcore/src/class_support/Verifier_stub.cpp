@@ -74,6 +74,9 @@ class_verify(const Global_Env* env, Class *clss)
 bool
 class_verify_constraints(const Global_Env* env, Class* clss)
 {
+    if(clss->state == ST_Error)
+        return true;
+
     assert(clss->is_verified >= 1);
 
     // fast path

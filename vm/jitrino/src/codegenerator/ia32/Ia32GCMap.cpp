@@ -432,13 +432,13 @@ void RuntimeInterface::getGCRootSet(MethodDesc* methodDesc, GCInterface* gcInter
     const uint32* gcPointImage = GCMap::findGCSafePointStart((uint32*)gcBlock, *context->p_eip);
     if (gcPointImage != NULL) {
         MemoryManager mm(128,"RuntimeInterface::getGCRootSet");
-        GCSafePoint* gcSite = new GCSafePoint(mm, gcPointImage);
-        if (gcSite->getNumOpnds() > 0) { 
+        GCSafePoint gcSite(mm, gcPointImage);
+        if (gcSite.getNumOpnds() > 0) { 
             //this is a performance filter for empty points 
             // and debug filter for hardware exception point that have no stack info assigned.
             StackInfo stackInfo(mm);
             stackInfo.read(methodDesc, *context->p_eip, false);
-            gcSite->enumerate(gcInterface, context, stackInfo);
+            gcSite.enumerate(gcInterface, context, stackInfo);
         }
     } else {
         //NPE + GC -> nothing to enumerate for this frame;

@@ -867,7 +867,6 @@ ManagedObject *jvmti_jit_exception_event_callback_call(ManagedObject *exn_object
     JIT *jit, Method *method, NativeCodePtr native_location,
     JIT *catch_jit, Method *catch_method, NativeCodePtr native_catch_location)
 {
-    assert(!exn_raised());
     SuspendDisabledChecker sdc;
 
     DebugUtilsTI *ti = VM_Global_State::loader_env->TI;

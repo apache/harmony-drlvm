@@ -24,7 +24,7 @@ import java.util.List;
 import java.util.LinkedList;
 import java.util.Iterator;
 import java.util.WeakHashMap;
-import java.util.Set;
+import java.util.ConcurrentModificationException;
 
 /**
  * @com.intel.drl.spec_ref 
@@ -110,17 +110,17 @@ public class ThreadGroup implements Thread.UncaughtExceptionHandler{
      */
     public int activeCount() {
         int count = 0;
-        List groupsListCopy = null; // a copy of subgroups list
-        Set threadsCopy = null; // threads
+        List groupsListCopy = null;  // a copy of subgroups list
+        Object[] threadsCopy = null; // a copy of threads list
         synchronized (this) {
             if (destroyed) {
                 return 0;
             }
-         	groupsListCopy = (List)groups.clone();
-            threadsCopy = threads.keySet();
+            threadsCopy = copyThreads();
+            groupsListCopy = (List)groups.clone();
         }
-        for (Iterator it = threadsCopy.iterator(); it.hasNext();) {
-            if ( ((Thread)it.next()).isAlive()) {
+        for (int i = 0; i < threadsCopy.length; i++) {
+            if (((Thread) threadsCopy[i]).isAlive()) {
                 count++;
             }
         }
@@ -391,6 +391,21 @@ public class ThreadGroup implements Thread.UncaughtExceptionHandler{
         }
         groups.add(group);
     }
+    
+    /**
+     * Copies this ThreadGroup's threads to an array which is used in iteration
+     * over threads because iteration over a WeakHashMap object can lead to
+     * ConcurrentModificationException.
+     */
+    private Object[] copyThreads() {
+        while (true) {
+            try {
+                // toArray() can throw ConcurrentModificationException
+                return threads.keySet().toArray();
+            } catch (ConcurrentModificationException e) {
+            }
+        }
+    }
 
     /**
      * Copies all the threads contained in the snapshot of this thread group to
@@ -407,21 +422,20 @@ public class ThreadGroup implements Thread.UncaughtExceptionHandler{
      *         done
      */
     private int enumerate(Thread[] list, int offset, boolean recurse) {
-        if (destroyed) {
-            return offset;
-        }
-        List groupsListCopy = null; // a copy of subgroups list
-        Set threadsCopy = null; // a copy of threads list
+        List groupsListCopy = null;  // a copy of subgroups list
+        Object[] threadsCopy = null; // a copy of threads list
         synchronized (this) {
-            threadsCopy = threads.keySet();
+            if (destroyed) {
+                return offset;
+            }
+            threadsCopy = copyThreads();
             if (recurse) {
                 groupsListCopy = (List)groups.clone();
             }
         }
-        for (Iterator it = threadsCopy.iterator(); it.hasNext();) {
-            Thread nextThread = (Thread)it.next();
-            if (nextThread.isAlive()) {
-                list[offset++] = nextThread;
+        for (int i = 0; i < threadsCopy.length; i++) {
+            if (((Thread) threadsCopy[i]).isAlive()) {
+                list[offset++] = (Thread) threadsCopy[i];
                 if (offset == list.length) {
                     return offset;
                 }
@@ -480,13 +494,14 @@ public class ThreadGroup implements Thread.UncaughtExceptionHandler{
     private void list(String prefix) {
         System.out.println(prefix + toString());
         prefix += LISTING_INDENT;
-        List groupsListCopy = null; // a copy of subgroups list
-        Set threadsCopy = threads.keySet();
+        List groupsListCopy = null;   // a copy of subgroups list
+        Object[] threadsCopy = null;  // a copy of threads list
         synchronized (this) {
-            for (Iterator it = threadsCopy.iterator(); it.hasNext();) {
-                System.out.println(prefix + it.next());
-            }
+            threadsCopy = copyThreads();
             groupsListCopy = (List)groups.clone();
+        }
+        for (int i = 0; i < threadsCopy.length; i++) {
+            System.out.println(prefix + (Thread) threadsCopy[i]);
         }
         for (Iterator it = groupsListCopy.iterator(); it.hasNext();) {
             ((ThreadGroup)it.next()).list(prefix);
@@ -514,8 +529,9 @@ public class ThreadGroup implements Thread.UncaughtExceptionHandler{
      * method to avoid calls to the checkAccess() method on subgroups
      */
     private synchronized void nonsecureInterrupt() {
-        for (Iterator it = threads.keySet().iterator(); it.hasNext();) {
-            ((Thread)it.next()).interrupt();
+        Object[] threadsCopy = copyThreads(); // a copy of threads list
+        for (int i = 0; i < threadsCopy.length; i++) {
+            ((Thread) threadsCopy[i]).interrupt();
         }
         for (Iterator it = groups.iterator(); it.hasNext();) {
             ((ThreadGroup)it.next()).nonsecureInterrupt();
@@ -527,8 +543,9 @@ public class ThreadGroup implements Thread.UncaughtExceptionHandler{
      * to avoid calls to the checkAccess() method on subgroups
      */
     private synchronized void nonsecureResume() {
-        for (Iterator it = threads.keySet().iterator(); it.hasNext();) {
-            ((Thread)it.next()).resume();
+        Object[] threadsCopy = copyThreads();
+        for (int i = 0; i < threadsCopy.length; i++) {
+            ((Thread) threadsCopy[i]).resume();
         }
         for (Iterator it = groups.iterator(); it.hasNext();) {
             ((ThreadGroup)it.next()).nonsecureResume();
@@ -556,8 +573,9 @@ public class ThreadGroup implements Thread.UncaughtExceptionHandler{
      * We add this method to avoid calls to the checkAccess() method on subgroups
      */
     private synchronized void nonsecureStop() {
-        for (Iterator it = threads.keySet().iterator(); it.hasNext();) {
-            ((Thread)it.next()).stop();
+        Object[] threadsCopy = copyThreads();
+        for (int i = 0; i < threadsCopy.length; i++) {
+            ((Thread) threadsCopy[i]).stop();
         }
         for (Iterator it = groups.iterator(); it.hasNext();) {
             ((ThreadGroup)it.next()).nonsecureStop();
@@ -569,8 +587,9 @@ public class ThreadGroup implements Thread.UncaughtExceptionHandler{
      * We add this method to avoid calls to the checkAccess() method on subgroups
      */
     private synchronized void nonsecureSuspend() {
-        for (Iterator it = threads.keySet().iterator(); it.hasNext();) {
-            ((Thread)it.next()).suspend();
+        Object[] threadsCopy = copyThreads(); // a copy of threads list
+        for (int i = 0; i < threadsCopy.length; i++) {
+            ((Thread) threadsCopy[i]).suspend();
         }
         for (Iterator it = groups.iterator(); it.hasNext();) {
             ((ThreadGroup)it.next()).nonsecureSuspend();

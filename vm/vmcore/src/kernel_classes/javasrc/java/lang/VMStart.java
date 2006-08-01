@@ -115,7 +115,7 @@ class VMStart {
                 // load and start main class
                 ClassLoader loader = ClassLoader.getSystemClassLoader();
                 Class cl = Class.forName(mainClass, true, loader);
-                final Method mainMethod = cl.getDeclaredMethod("main", 
+                final Method mainMethod = cl.getMethod("main", 
                         new Class[]{String[].class});
                 int expectedModifiers = (Modifier.PUBLIC | Modifier.STATIC);
                 if ((mainMethod.getModifiers() & expectedModifiers) != expectedModifiers 

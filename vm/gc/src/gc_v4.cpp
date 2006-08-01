@@ -165,6 +165,8 @@ Garbage_Collector::~Garbage_Collector()
         STD_FREE(_gc_thread_work_finished_event_handles);
     if (_live_objects_found_by_second_trace_heap)
         delete _live_objects_found_by_second_trace_heap;
+    if (_live_objects_found_by_first_trace_heap)
+        delete _live_objects_found_by_first_trace_heap;
 
     // free blocks memory 
     _p_block_store->init_block_iterator();

@@ -802,7 +802,7 @@ vf_check_instruction_in_vector( vf_MapEntry_t *stack,       // stack map vector
                 VERIFY_REPORT( ctex, "(class: " << class_get_name( ctex->m_class ) 
                     << ", method: " << method_get_name( ctex->m_method )
                     << method_get_descriptor( ctex->m_method )
-                    << ") Data flow analysis error" );
+                    << ") Data flow analysis error (uninitialized)" );
                 return result;
             }
             copy = true;

@@ -145,15 +145,20 @@ interpreter_st_get_catch_method(Method ** method_ptr,
         }
         Handler *h;
 
-        if (load_method_handled_exceptions(frame->method) == false) {
-            // InternalError occured resolving exception somewhere
-            // too early to process it, it will be reported again.
-            clear_current_thread_exception();
-        } else if(findExceptionHandler(*frame, exn->object, &h)) {
+        if(findExceptionHandler(*frame, &exn->object, &h)) {
             *method_ptr = frame->method;
             *location_ptr = frame->ip - (uint8*)(*method_ptr)->get_byte_code_addr();
             break;
         }
+
+        if (frame->exception) {
+            // FIXME: needs investigation, very specific condition
+            *method_ptr = NULL;
+            *location_ptr = 0;
+            frame->exception = NULL;
+            break;
+        }
+
         interp_si_goto_previous(si);
     }
 }
@@ -218,6 +223,12 @@ interp_enumerate_root_set_single_thread_on_stack(VM_thread *thread) {
             ASSERT_OBJECT(si->This);
             vm_enumerate_root_reference((void**)&si->This, FALSE);
             DEBUG_GC("  [THIS]: " << si->This->vt()->clss->name->bytes << endl);
+        }
+
+        if (si->exception) {
+            ASSERT_OBJECT(si->exception);
+            vm_enumerate_root_reference((void**)&si->exception, FALSE);
+            DEBUG_GC("  [EXCEPTION]: " << si->exception->vt()->clss->name->bytes << endl);
         }
 
         if (method->is_native()) {

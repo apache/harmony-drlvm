@@ -52,7 +52,7 @@ public:
                 delete pe_tmp;
             }
         }
-        delete buckets;
+        delete[] buckets;
     }
     short hash(void* key){
         // For 32-bit architectures k3 & k4 will be 0 and have no effect on the hash

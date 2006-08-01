@@ -41,8 +41,8 @@ unsigned system_page_size = 0;
 unsigned page_size_for_allocation = 0;
 size_t   initial_code_pool_size = 0;
 
-Pool_Descriptor* jit_code_pool;
-Pool_Descriptor* vtable_data_pool;
+Pool_Descriptor* jit_code_pool = NULL;
+Pool_Descriptor* vtable_data_pool = NULL;
 
 static apr_pool_t* aux_pool;
 static apr_thread_mutex_t* aux_mutex;
@@ -283,6 +283,10 @@ void vm_init_mem_alloc()
 
 void vm_mem_dealloc()
 {
+    delete vtable_data_pool;
+    vtable_data_pool = NULL;
+    delete jit_code_pool;
+    jit_code_pool = NULL;
     std::vector<port_vmem_t *>::iterator it;
     for (it = m_allocated_memory_ptrs.begin(); it != m_allocated_memory_ptrs.end(); it++)
     {

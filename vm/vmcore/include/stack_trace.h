@@ -68,6 +68,8 @@ void st_print_frame(ExpandableMemBlock* buf, StackTraceFrame*);
 // It is intended for debugging purposes.
 void st_print(FILE*);
 
+void st_print();
+
 Method_Handle get_method(StackIterator* si);
 
 

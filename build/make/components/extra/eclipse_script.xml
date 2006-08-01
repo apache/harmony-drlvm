@@ -31,7 +31,7 @@ Version: $Revision: 1.1.2.9 $
         <select os="win">
             <echo file="${build.dir}/_other/eclipse.bat">
 @echo off
-set BUILD_HOME=${build.deploy.dir}
+set BUILD_HOME=%~dp0\..\
 </echo>
 
             <echo file="${build.dir}/_other/eclipse.bat" append="true">

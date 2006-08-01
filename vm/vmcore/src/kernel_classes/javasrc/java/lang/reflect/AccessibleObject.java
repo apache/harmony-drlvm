@@ -211,7 +211,7 @@ public class AccessibleObject {
      *         Class
      */
     private void setAccessible0(boolean flag) throws SecurityException {
-        if (this instanceof Constructor
+        if (flag && this instanceof Constructor
             && ((Constructor)this).getDeclaringClass() == Class.class) {
             throw new SecurityException(
                 "Can not make the java.lang.Class class constructor accessible");

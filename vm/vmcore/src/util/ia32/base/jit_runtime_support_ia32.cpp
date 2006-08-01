@@ -246,13 +246,21 @@ static void *getaddress__vm_initialize_class_naked()
              jc r=0,not_initialized; \
              ret; \
              :not_initialized; \
-             push_m2n 0, 0; \
+             push_m2n 0, %1i; \
              in2out platform:void; \
-             call %1i; \
+             call %2i; \
+             l1 = ts; \
+             ld l1, [l1 + %3i:ref]; \
+             jc l1 != 0,_exn_raised; \
              pop_m2n; \
-             ret;",
-            (void *)is_class_initialized,
-            (void *)class_initialize);
+             ret; \
+             :_exn_raised; \
+             out platform::void; \
+             call.noret %4i;",
+             (void *)is_class_initialized,
+             FRAME_JNI,
+             (void *)class_initialize,
+             OFFSET(VM_thread, p_exception_object), (void*)rethrow_current_thread_exception);
         assert(lil_is_valid(cs));
         addr = LilCodeGenerator::get_platform()->compile(cs, "vm_initialize_class_naked", dump_stubs);
         lil_free_code_stub(cs);

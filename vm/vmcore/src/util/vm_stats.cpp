@@ -32,6 +32,7 @@
 #include "classloader.h"
 
 #include "vm_stats.h"
+#include "GlobalClassLoaderIterator.h"
 
 VM_Statistics vm_stats_total;
 
@@ -471,28 +472,31 @@ static void print_classes()
 static void print_methods()
 {
     printf("--------- begin native method execution counts (total and slow-path):\n");
-    ClassTable* ct = VM_Global_State::loader_env->bootstrap_class_loader->
-        GetLoadedClasses();
-    ClassTable::iterator it;
-    for (it = ct->begin(); it != ct->end(); it++)
-    {
-        Class *c = it->second;
-        int n_methods = c->n_methods;
-        for(int i = 0; i < n_methods; i++) {
-            Method *m = &(c->methods[i]);
-            if (m->is_fake_method()) {
-                continue;   // ignore fake methods
-            }
-            if(m->num_accesses) {
-                const char *cname = c->name->bytes;
-                const char *mname = m->get_name()->bytes;
-                const char *descr = m->get_descriptor()->bytes;
-                printf("%11" FMT64 "u : %11" FMT64 "u ::: %s.%s%s\n",
-                       m->num_accesses,
-                       m->num_slow_accesses,
-                       cname,
-                       mname,
-                       descr);
+    GlobalClassLoaderIterator clIterator;
+    ClassLoader *cl;
+    for(cl = clIterator.first(); cl; cl = clIterator.next()) {
+        ClassTable* ct = cl->GetLoadedClasses();
+        ClassTable::iterator it;
+        for (it = ct->begin(); it != ct->end(); it++)
+        {
+            Class *c = it->second;
+            int n_methods = c->n_methods;
+            for(int i = 0; i < n_methods; i++) {
+                Method *m = &(c->methods[i]);
+                if (m->is_fake_method()) {
+                    continue;   // ignore fake methods
+                }
+                if(m->num_accesses) {
+                    const char *cname = c->name->bytes;
+                    const char *mname = m->get_name()->bytes;
+                    const char *descr = m->get_descriptor()->bytes;
+                    printf("%11" FMT64 "u : %11" FMT64 "u ::: %s.%s%s\n",
+                        m->num_accesses,
+                        m->num_slow_accesses,
+                        cname,
+                        mname,
+                        descr);
+                }
             }
         }
     }

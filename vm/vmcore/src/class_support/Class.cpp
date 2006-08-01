@@ -180,20 +180,7 @@ Method *class_lookup_method(Class *clss,
 void* Field::get_address()
 {
     assert(is_static());
-#ifdef _DEBUG
-    Class *c = get_class();
-    assert(c);
-    switch(c->state) {
-    case ST_Prepared:
-    case ST_Initializing:
-    case ST_Initialized:
-    case ST_InstanceSizeComputed:
-        break;
-    default:
-        DIE("Invalid class state " << c->state);
-        break;
-    }
-#endif
+    assert(is_offset_computed());
     return (char *)(get_class()->static_data_block) + get_offset();
 } // Field::get_address
 

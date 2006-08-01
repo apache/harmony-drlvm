@@ -126,10 +126,6 @@ public:
 			:memoryManager(mm), steps(mm), error(0)
 		{}
 
-		IRTransformerPath()
-			:memoryManager(*new MemoryManager(0x1000, "StaticIRTransformerPath")), steps(memoryManager), error(0)
-		{}
-
 		bool parse(const char * str);
 
 		bool parseOption(const char * str, Step& result);

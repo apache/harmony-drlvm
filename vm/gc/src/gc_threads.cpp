@@ -151,6 +151,8 @@ GC_Thread::GC_Thread(Garbage_Collector *p_gc, pthread_t gc_thread_id)
 
 GC_Thread::~GC_Thread()
 {
+    vm_destroy_event(_gc_thread_start_work_event);
+    vm_destroy_event(_gc_thread_work_done_event);
 }
 
 

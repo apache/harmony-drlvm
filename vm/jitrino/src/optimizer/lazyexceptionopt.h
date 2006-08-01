@@ -56,7 +56,7 @@ private:
 private:
     IRManager     &irManager;
     MemoryManager &memManager;
-    MemoryManager &leMemManager;
+    MemoryManager leMemManager;
     CompilationInterface &compInterface;
     bool isExceptionInit;
     bool isArgCheckNull;

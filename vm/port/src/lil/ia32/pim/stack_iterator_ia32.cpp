@@ -30,7 +30,7 @@
 #include "encoder.h"
 #include "interpreter.h"
 
-#include "cxxlog.h"
+#include "clog.h"
 
 #ifndef NDEBUG
 #include "dump.h"
@@ -72,14 +72,13 @@ static void si_unwind_from_m2n(StackIterator* si)
 
     si->m2nfl   = m2n_get_previous_frame(m2nfl);
 
-    TRACE2("si", "si_unwind_from_m2n, ip = " 
-        << (void*)m2nfl->eip);
+    TRACE2("si", ("si_unwind_from_m2n, ip = %p",(void*)m2nfl->eip));
 
     // Is it a normal M2nFrame or one for suspended managed code?
     if ((uint32)m2nfl->p_lm2nf==1) {
         // Suspended managed code, eip is at instruction, esp & registers are in regs structure
-        TRACE2("si", "si_unwind_from_m2n from suspended managed code, ip = " 
-            << (void*)m2nfl->regs->eip);
+        TRACE2("si", ("si_unwind_from_m2n from suspended managed code, ip = %p", 
+            (void*)m2nfl->regs->eip));
         si->c.esp = m2nfl->regs->esp;
         si->c.p_eip = &(m2nfl->regs->eip);
         si->c.is_ip_past = FALSE;
@@ -241,27 +240,28 @@ void si_goto_previous(StackIterator* si)
 {
     ASSERT_NO_INTERPRETER
     if (si->cci) {
-        TRACE2("si", "si_goto_previous from ip = "
-            << (void*)si_get_ip(si) << " ("
-            << method_get_name(si->cci->get_method())
-            << method_get_descriptor(si->cci->get_method()) << ")");
+        TRACE2("si", ("si_goto_previous from ip = %p (%s%s)",
+            (void*)si_get_ip(si),
+            method_get_name(si->cci->get_method()),
+            method_get_descriptor(si->cci->get_method())));
         assert(si->cci->get_jit() && si->cci->get_method());
         si->cci->get_jit()->unwind_stack_frame(si->cci->get_method(), si_get_jit_context(si));
         si->c.is_ip_past = TRUE;
     } else {
-        TRACE2("si", "si_goto_previous from ip = " 
-            << (void*)si_get_ip(si) << " (M2N)");
+        TRACE2("si", ("si_goto_previous from ip = %p (M2N)",
+            (void*)si_get_ip(si)));
         if (!si->m2nfl) return;
         si_unwind_from_m2n(si);
     }
     si->cci = vm_methods->find(si_get_ip(si), true);
     if (si->cci) {
-        TRACE2("si", "si_goto_previous to ip = " << (void*)si_get_ip(si)
-            << " (" << method_get_name(si->cci->get_method())
-            << method_get_descriptor(si->cci->get_method()) << ")");
+        TRACE2("si", ("si_goto_previous to ip = %p (%s%s)",
+            (void*)si_get_ip(si),
+            method_get_name(si->cci->get_method()),
+            method_get_descriptor(si->cci->get_method())));
     } else {
-        TRACE2("si", "si_goto_previous to ip = " << (void*)si_get_ip(si)
-            << " (M2N)");
+        TRACE2("si", ("si_goto_previous to ip = %p (M2N)",
+            (void*)si_get_ip(si)));
     }
 }
 
@@ -353,31 +353,30 @@ void si_set_return_pointer(StackIterator* si, void** return_value)
  */
 void cpp_set_last_frame(M2nFrame* lm2nf)
 {
-    //printf("Unwinding.... lm2nf=0x%08x\n", lm2nf);
+    TRACE2("exn",("Unwinding.... lm2nf=0x%08x\n", lm2nf));
     void *handler;
     __asm {
         mov eax, fs:[0]
         mov handler, eax
     }
 
-    //printf(" handler=0x%p\n", handler);
+    TRACE2("exn",(" handler=0x%p\n", handler));
     if (!(handler < lm2nf)) {
         return;
     }
 
     // finding lastFrame > lm2nf, should be last
     void *lastFrame = p_TLS_vmthread->lastFrame;
-    //printf("  curr = 0x%p\n", lastFrame);
+    TRACE2("exn",("  curr = 0x%p\n", lastFrame));
 
     if (!(lastFrame < lm2nf)) {
-        /* _DO_ _NOT_ change into TRACE2, WARN or anything like!! */
         printf("Unwinding:  Lost lastFrame\n");
         __asm { int 3 }
     }
 
     while(true) {
         void *prevFrame = *(void**)lastFrame;
-        //printf("  prev = 0x%p\n", prevFrame);
+        TRACE2("exn",("  prev = 0x%p\n", prevFrame));
         if (prevFrame == 0) {
             break;
         }
@@ -391,18 +390,18 @@ void cpp_set_last_frame(M2nFrame* lm2nf)
     }
 
     if (!(handler < lastFrame)) {
-        //printf("all ok\n");
+        TRACE2("exn",("all ok\n"));
         return;
     }
 
-    // NO LOGGER PLEASE! doesn't work with destructive unwinding!
-    fprintf(stderr, "ERROR: Destructive unwinding: C++ objects detected on stack!\n");
+    // NO CXX LOGGER PLEASE! doesn't work with destructive unwinding!
+    INFO2("exn", ("ERROR: Destructive unwinding: C++ objects detected on stack!\n"));
 
     while(handler < lastFrame) {
-        fprintf(stderr, "  droping 0x%p\n", handler);
+        INFO2("exn", ("  droping 0x%p\n", handler));
         handler = *(int**)handler;
     }
-    fprintf(stderr, " setting curr 0x%p\n", handler);
+    INFO2("exn", (" setting curr 0x%p\n", handler));
     __asm {
         mov eax, handler
         mov fs:[0], eax
@@ -415,9 +414,8 @@ void cpp_set_last_frame(M2nFrame* lm2nf)
 
 void si_transfer_control(StackIterator* si)
 {
-/* !!!! NO LOGGER IS ALLOWED IN THIS FUNCTION !!!
- * !!!! RELEASE BUILD WILL BE BROKEN          !!!
- * !!!! NO TRACE2, INFO, WARN, ECHO, ASSERT, ...*/
+/* !!!! NO CXX LOGGER IS ALLOWED IN THIS FUNCTION !!!
+ * !!!! RELEASE BUILD WILL BE BROKEN          !!!*/
     // 1. Copy si to stack
     StackIterator local_si;
     memcpy(&local_si, si, sizeof(StackIterator));
@@ -432,10 +430,10 @@ void si_transfer_control(StackIterator* si)
     cpp_set_last_frame(local_si.m2nfl);
 #endif // _WIN32
 
-    //TRACE2("exn", "generating control transfer stub");
+    TRACE2("exn", ("generating control transfer stub"));
     // 3. Call the stub
     transfer_control_stub_type tcs = gen_transfer_control_stub();
-    //TRACE2("exn", "tcs");
+    TRACE2("exn", ("tcs"));
     tcs(&local_si);
 }
 

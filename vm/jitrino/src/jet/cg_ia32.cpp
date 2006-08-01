@@ -848,26 +848,29 @@ void Compiler::gen_dup(JavaByteCodes opc)
         {
         jtype j0 = m_jframe->top();
         jtype j1 = m_jframe->top(1);
+        // The further pop/push wipes out the correct state, as 
+        // JFrame::push presumes that items go to registers, so we 
+        // need make sure that both the items are indeed on registers 
+        // before any action.
+        RegName r0 = vstack(0);
+        RegName r1 = vstack(1);
+
         vpop(j0);
         vpop(j1);
         vpush(j0, false);
         vpush(j1, true);
         if (is_f(j0) != is_f(j1)) {
             // they are on the different vstacks, 
-            // thus they're already on different regs.
-            // nothing to do, just update the real stack
+            // thus they're already on different regs -
+            // nothing to do
         }
         else if (is_f(j0)) {
             EncoderBase::Operand scratch = vlocal(j0, -1, false, true);
-            RegName r0 = vstack(0);
-            RegName r1 = vstack(1);
             voper(typeInfo[j0].mov, scratch, r0);
             voper(typeInfo[j0].mov, r0, r1);
             voper(typeInfo[j0].mov, r1, scratch);
         }
         else {
-            RegName r0 = vstack(0);
-            RegName r1 = vstack(1);
             voper(Mnemonic_XCHG, r0, r1);
         }
         }

@@ -709,7 +709,7 @@ jclass FindClass(JNIEnv* env_ext, String* name)
     Class* clss =
         class_load_verify_prepare_by_loader_jni(VM_Global_State::loader_env, s, loader);
     if(clss) {
-        class_initialize_from_jni(clss, false);
+        class_initialize_from_jni(clss);
         if (exn_raised()) return NULL;
         assert(tmn_is_suspend_enabled());
         return struct_Class_to_jclass(clss);

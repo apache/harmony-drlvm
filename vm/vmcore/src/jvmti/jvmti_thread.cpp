@@ -653,6 +653,9 @@ jvmtiGetCurrentContendedMonitor(jvmtiEnv* env,
         return JVMTI_ERROR_NULL_POINTER;
     }
 
+    if (NULL == thread)
+        thread = thread_current_thread();
+
     jint state;
     // check error condition: JVMTI_ERROR_INVALID_THREAD
     err = jvmtiGetThreadState(env, thread, &state);
@@ -995,20 +998,24 @@ int thread_get_all_threads(jthread** threads_ptr){
     return num_active_threads;
 }
 
-jobject thread_contends_for_lock(jthread thread){
-    assert(!tmn_is_suspend_enabled());
-    
-    VM_thread * vm_thread = get_vm_thread_ptr_safe(jvmti_test_jenv, thread);
+jobject thread_contends_for_lock(jthread thread)
+{
+    SuspendEnabledChecker sec;
+    VM_thread *vm_thread = get_vm_thread_ptr_safe(jvmti_test_jenv, thread);
 
-    //assert(vm_thread);
-    if ( !vm_thread)
+    assert(vm_thread);
+
+    tmn_suspend_disable();
+    ManagedObject *p_obj = mon_enter_array[vm_thread->thread_index].p_obj;
+    if (NULL == p_obj)
     {
+        tmn_suspend_enable();
         return NULL;
     }
 
-    ManagedObject * p_obj = mon_enter_array[vm_thread -> thread_index].p_obj;
-    ObjectHandle oh = oh_allocate_global_handle();
-    oh -> object = p_obj;
+    ObjectHandle oh = oh_allocate_local_handle();
+    oh->object = p_obj;
+    tmn_suspend_enable();
 
     return (jobject)oh;
 }

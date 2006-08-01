@@ -735,10 +735,15 @@ static JIT_Result compile_do_compilation(Method* method, JIT_Flags flags)
 {
     assert(tmn_is_suspend_enabled());
     tmn_suspend_disable();
-    class_initialize_ex(method->get_class(), false);
+    class_initialize_ex(method->get_class());
     tmn_suspend_enable();
     
-    if (method->get_state() == Method::ST_Compiled) {
+    method->lock();
+    if (exn_raised()) {
+        method->unlock();
+        return JIT_FAILURE;
+    } else if (method->get_state() == Method::ST_Compiled) {
+        method->unlock();
         return JIT_SUCCESS;
     } else if (method->get_state()==Method::ST_NotCompiled && exn_raised()) {
         return JIT_FAILURE;
@@ -746,28 +751,22 @@ static JIT_Result compile_do_compilation(Method* method, JIT_Flags flags)
         return JIT_FAILURE;
     }
 
-    JIT_Result res = JIT_FAILURE;
     if (method->is_native()) {
-        method->lock();
-        if (method->get_state() == Method::ST_NotCompiled) {
-            method->set_state(Method::ST_BeingCompiled);
-            res = compile_prepare_native_method(method, flags);
+        JIT_Result res = compile_prepare_native_method(method, flags);            
+        if (res == JIT_SUCCESS) {
             compile_flush_generated_code();
-            if (res == JIT_SUCCESS) {
-                method->set_state(Method::ST_Compiled);
-                method->do_jit_recompiled_method_callbacks();
-                method->apply_vtable_patches();
-            }
-        } else {
-            res = JIT_SUCCESS;
+            method->set_state(Method::ST_Compiled);
+            method->do_jit_recompiled_method_callbacks();
+            method->apply_vtable_patches();
         }
         method->unlock();
+        return res;
     } else {
         // Call an execution manager to compile the method.
         // An execution manager is safe to call from multiple threads.
-        res = VM_Global_State::loader_env->em_interface->CompileMethod(method);
+        method->unlock();
+        return VM_Global_State::loader_env->em_interface->CompileMethod(method);
     }
-    return res;
 }
 
 // Make a suitable exception to throw if compilation fails.

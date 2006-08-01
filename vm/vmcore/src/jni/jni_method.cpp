@@ -42,7 +42,7 @@ static bool ensure_initialised(JNIEnv* env, Class* clss)
 {
     assert(tmn_is_suspend_enabled());
     if(clss->state != ST_Initialized) {
-        class_initialize_from_jni(clss, false);
+        class_initialize_from_jni(clss);
         if(clss->state == ST_Error) {
             if (!exn_raised()) // If exception is already raised, no need to
                                // throw new one, just return instead

@@ -61,7 +61,9 @@ class FinalizerThread extends Thread {
      * Initializes finalization system. Starts permanent thread.
      */
     static void initialize() {
-        trace("FinalizerThread: static initialization started");
+        if (TRACE) {
+            trace("FinalizerThread: static initialization started");
+        }
 
         String p = System.getProperty("vm.finalize");
         processorsQuantity = getProcessorsQuantity();
@@ -74,15 +76,20 @@ class FinalizerThread extends Thread {
             (new FinalizerThread(true)).start();
             enabled = true;
         }
-        
-        trace("FinalizerThread: static initialization complete");
+
+        if (TRACE) {
+            trace("FinalizerThread: static initialization complete");
+        }
     }
 
     /**
      * VM calls this method to request finalizer thread shutdown.
      */
     static void shutdown() {
-        trace("shutting down finalizer thread");
+        if (TRACE) {
+            trace("shutting down finalizer thread");
+        }
+
         if (startFinalizationOnExit) {
             doFinalizationOnExit();
         }
@@ -110,21 +117,27 @@ class FinalizerThread extends Thread {
     // Maximum quantity of finalizers threads
     private static final int MAX_THREADS = 256;
 
+    // create separate class for finalizer workLock to easier debugging
+    private static class FinalizerWorkLock {};
+
     // Lock used to wake up permanent finalizer threads and synchronize change of state of work
-    private static Object workLock = new Object();
+    private static Object workLock = new FinalizerWorkLock();
 
     // Shows that finalizers works in state on exit
     // Used by VM. It should be package private to eliminate compiler warning.
     static boolean onExit = false;
 
+    // create separate class for finalizer waitFinishLock to easier debugging
+    private static class FinalizerWaitFinishLock {};
+
     /*
      * Lock used to to synchronize quantity of active threads and to wake up finalizer starter thread
      * when new finalization tasks aren't available and finalizer threads finish work.
      */
-    private static Object waitFinishLock = new Object();
+    private static Object waitFinishLock = new FinalizerWaitFinishLock();
 
     /*
-     * The Quantity of active finalizer threads which shoud be stopped to wake up finalizer starter 
+     * The Quantity of active finalizer threads which shoud be stopped to wake up finalizer starter
      * thread. When is thread is started this counter is incremented when thread is stoppig it's decremeted.
      * Zero means finalization tasks aren't available and finalizer threads aren't working.
      */
@@ -200,20 +213,27 @@ class FinalizerThread extends Thread {
      * It is called from startFinalization() only.
      */
     private static void spawnBalanceThreads() {
+        /* finalizer threads shouldn't be spawn by finalizer thread,
+         * in this case balancing can't work
+         */
+        if (isFinalizerThread()) {
+            return;
+        }
+
         FinalizerThread newThread = null;
         if (waitFinishCounter >= MAX_THREADS) {
-            // do nothing   
+            // do nothing
         } else {
             try {
                 for (int i = 0; i < processorsQuantity; i++) {
                     newThread = new FinalizerThread(false);
-                    
-                    synchronized (newThread){
+
+                    synchronized (newThread.startLock){
                         newThread.start();
-                        
+
                         // waiting when new thread will be started
                         try {
-                            newThread.wait();
+                            newThread.startLock.wait();
                         } catch (InterruptedException e) {}
                     }
                 }
@@ -262,6 +282,8 @@ class FinalizerThread extends Thread {
         }
     }
 
+    private static final boolean TRACE = false;
+
     /**
      * debug output.
      */
@@ -283,7 +305,12 @@ class FinalizerThread extends Thread {
     public FinalizerThread () {
         this (true);
     }
-    
+
+    // create separate class for finalizer startLock to easier debugging
+    private class FinalizerStartLock {};
+
+    private FinalizerStartLock startLock = new FinalizerStartLock();
+
     protected FinalizerThread (boolean permanent) {
         super(threadGroup, "FinalizerThread");
         this.permanent = permanent;
@@ -291,28 +318,41 @@ class FinalizerThread extends Thread {
     }
 
     public void run() {
-        trace((permanent ? "permanent":"temporary") 
-                + " finalization thread started");
-        
+        // don't put any code here, before try block
+
         try {
             synchronized (waitFinishLock) {
                 waitFinishCounter ++;
             }
 
-            // notify that finalizer thread has started
-            synchronized (this) {
-                notify();
+            /* notify that finalizer thread has started.
+             * Don't put any code whith any memory allocation before here!
+             * It should be granted that notify is called in any case!
+             */
+            synchronized (startLock) {
+                startLock.notify();
             }
-            
+
+            if (TRACE) {
+                if (permanent) {
+                    trace("permanent finalization thread started");
+                } else {
+                    trace("temporary finalization thread started");
+                }
+            }
+
             while (true) {
                 int n = doFinalization(128);
 
                 synchronized (workLock) {
                     if (shutdown) {
-                        trace("terminated by shutdown request");
+
+                        if (TRACE) {
+                            trace("terminated by shutdown request");
+                        }
                         break;
                     }
-                } 
+                }
                 
                 if (0 == n) {
                     if (permanent) {
@@ -322,9 +362,9 @@ class FinalizerThread extends Thread {
                     }
                 }
             }
-        } catch (Throwable e) {
-            warn("FinalizerThread terminated by " + e);
-            throw new RuntimeException("FinalizerThread interrupted", e);
+        } catch (Throwable th) {
+            warn("FinalizerThread terminated by " + th);
+            throw new RuntimeException("FinalizerThread interrupted", th);
         } finally {
             synchronized (waitFinishLock) {
                 waitFinishCounter --;
@@ -333,7 +373,10 @@ class FinalizerThread extends Thread {
                     waitFinishLock.notifyAll();
                 }
             }
-            trace("FinalizerThread completed");
+
+            if (TRACE) {
+                trace("FinalizerThread completed");
+            }
         }
     }
 

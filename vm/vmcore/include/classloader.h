@@ -255,6 +255,10 @@ public:
     static void PrintUnloadingStats();
     static unsigned GetClassLoaderNumber() { return m_nextEntry; }
     static ClassLoader** GetClassLoaderTable() { return m_table; }
+    static void DeleteClassLoaderTable(){
+        STD_FREE(m_table);
+        m_table = NULL;
+    }
     inline void* Alloc(size_t size) {
         assert(pool);
         Lock();

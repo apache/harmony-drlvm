@@ -575,18 +575,16 @@ static Method* _resolve_method(Global_Env *env, Class *clss, unsigned cp_index)
     // CONSTANT_InterfaceMethodref must refer to an interface (vm spec 4.4.2)
     if (cp_is_methodref(cp, cp_index) && class_is_interface(other_clss)) {
         CLASS_REPORT_FAILURE(clss, cp_index, "java/lang/IncompatibleClassChangeError",
-            "Can't find method "
-            << other_clss->name->bytes << "." << name->bytes << desc->bytes
-            << "while resolving constant pool entry " << cp_index
+            other_clss->name->bytes
+            << " while resolving constant pool entry " << cp_index
             << " in class " << clss->name->bytes);
         return NULL;
     }
 
     if(cp_is_interfacemethodref(cp, cp_index) && !class_is_interface(other_clss)) {
         CLASS_REPORT_FAILURE(clss, cp_index, "java/lang/IncompatibleClassChangeError",
-            "Can't find method "
-            << other_clss->name->bytes << "." << name->bytes << desc->bytes
-            << "while resolving constant pool entry " << cp_index
+            other_clss->name->bytes
+            << " while resolving constant pool entry " << cp_index
             << " in class " << clss->name->bytes);
         return NULL;
     }
@@ -595,20 +593,18 @@ static Method* _resolve_method(Global_Env *env, Class *clss, unsigned cp_index)
     if (method == NULL) {
         // NoSuchMethodError
         CLASS_REPORT_FAILURE(clss, cp_index, "java/lang/NoSuchMethodError",
-            "Can't find method "
-            << other_clss->name->bytes << "." << name->bytes << desc->bytes
+            other_clss->name->bytes << "." << name->bytes << desc->bytes
             << " while resolving constant pool entry at index " << cp_index
             << " in class " << clss->name->bytes);
         return NULL;
     }
 
-    if (method_is_abstract(method) && !class_is_abstract(method->get_class()) ) {
+    if(method_is_abstract(method) && !class_is_abstract(other_clss)) {
         // AbstractMethodError
         CLASS_REPORT_FAILURE(clss, cp_index, "java/lang/AbstractMethodError",
-            "Found abstract method "
-            << other_clss->name->bytes << "." << name->bytes << desc->bytes
+            other_clss->name->bytes << "." << name->bytes << desc->bytes
             << " while resolving constant pool entry at index " << cp_index
-            << " in non-abstract class " << clss->name->bytes);
+            << " in class " << clss->name->bytes);
         return NULL;
     }
 
@@ -618,8 +614,7 @@ static Method* _resolve_method(Global_Env *env, Class *clss, unsigned cp_index)
     if (check_member_access(method,clss) == 0) {
         // IllegalAccessError
         CLASS_REPORT_FAILURE(clss, cp_index, "java/lang/IllegalAccessError",
-            "Can't access method "
-            << other_clss->name->bytes << "." << name->bytes << desc->bytes
+            other_clss->name->bytes << "." << name->bytes << desc->bytes
             << " while resolving constant pool entry at index " << cp_index
             << " in class " << clss->name->bytes);
         return NULL; 

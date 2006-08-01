@@ -1909,11 +1909,7 @@ bool class_parse(Global_Env* env,
                 }
 
                 if(!found_myself){
-                    String *clssname;
-                    if(cp_is_resolved(clss->const_pool, inner_clss_info_idx))
-                        clssname = (String*)clss->const_pool[inner_clss_info_idx].CONSTANT_Class.klass->name;
-                    else
-                        clssname = cp_check_class(clss->const_pool, clss->cp_size, inner_clss_info_idx);
+                    String *clssname = cp_check_class(clss->const_pool, clss->cp_size, inner_clss_info_idx);
                     // Only handle this class
                     if(clss->name == clssname)
                         found_myself = 1;

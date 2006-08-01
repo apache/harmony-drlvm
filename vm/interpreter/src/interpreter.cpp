@@ -1593,7 +1593,6 @@ Opcode_PUTSTATIC(StackFrame& frame) {
     Field *field = interp_resolve_static_field(clazz, fieldId, true);
     if (!field) return; // exception
     
-    // FIXME: is it possible to move the code into !cp_is_resolved condition above?
     class_initialize(field->get_class());
 
     if (exn_raised()) {
@@ -1681,7 +1680,6 @@ Opcode_GETSTATIC(StackFrame& frame) {
     Field *field = interp_resolve_static_field(clazz, fieldId, false);
     if (!field) return; // exception
 
-    // FIXME: is it possible to move the code into !cp_is_resolved condition above?
     class_initialize(field->get_class());
 
     if (exn_raised()) {
@@ -2038,7 +2036,6 @@ Opcode_INVOKESTATIC(StackFrame& frame) {
             << method->get_name()->bytes << "/"
             << method->get_descriptor()->bytes << endl);
 
-    // FIXME: is it possible to move the code into !cp_is_resolved condition above?
     class_initialize(method->get_class());
 
     if (exn_raised()) {
@@ -2264,7 +2261,7 @@ Opcode_ATHROW(StackFrame& frame) {
 }
 
 bool
-findExceptionHandler(StackFrame& frame, ManagedObject *exception, Handler **hh) {
+findExceptionHandler(StackFrame& frame, ManagedObject **exception, Handler **hh) {
     assert(!exn_raised());
     assert(!tmn_is_suspend_enabled());
 
@@ -2280,7 +2277,6 @@ findExceptionHandler(StackFrame& frame, ManagedObject *exception, Handler **hh) 
     DEBUG_BYTECODE("ip = " << dec << (int)ip << endl);
 
     Class *clazz = m->get_class();
-    Const_Pool *cp = clazz->const_pool;
 
     for(uint32 i = 0; i < m->num_bc_exception_handlers(); i++) {
         Handler *h = m->get_bc_exception_handler_info(i);
@@ -2299,12 +2295,16 @@ findExceptionHandler(StackFrame& frame, ManagedObject *exception, Handler **hh) 
 
             DEBUG_BYTECODE("catch type index = " << (int)catch_type_index << endl);
 
-            assert(cp_is_class(cp, catch_type_index));
-            // Class should be already loaded
-            if (!cp_is_resolved(cp, catch_type_index)) continue;
+            Class *obj = interp_resolve_class(clazz, catch_type_index);
 
-            Class *excHandler = cp[catch_type_index].CONSTANT_Class.klass;
-            if (!vm_instanceof(exception, excHandler)) continue;
+            if (!obj) {
+                // possible if verifier is disabled
+                frame.exception = get_current_thread_exception();
+                clear_current_thread_exception();
+                return false;
+            }
+
+            if (!vm_instanceof(*exception, obj)) continue;
         }
         *hh = h;
         return true;
@@ -2313,11 +2313,11 @@ findExceptionHandler(StackFrame& frame, ManagedObject *exception, Handler **hh) 
 }
 
 static inline bool
-processExceptionHandler(StackFrame& frame, ManagedObject *exception) {
+processExceptionHandler(StackFrame& frame, ManagedObject **exception) {
     Method *m = frame.method;
     Handler *h;
     if (findExceptionHandler(frame, exception, &h)){
-        DEBUG_BYTECODE("Exception caught: " << exception->vt()->clss->name->bytes << endl);
+        DEBUG_BYTECODE("Exception caught: " << (*exception)->vt()->clss->name->bytes << endl);
         DEBUG_BYTECODE("Found handler!\n");
         frame.ip = (uint8*)m->get_byte_code_addr() + h->get_handler_pc();
         return true;
@@ -2450,40 +2450,6 @@ method_exit_callback_with_frame(Method *method, StackFrame& frame) {
     tmn_suspend_enable();
     method_exit_callback(method, false, val);
     tmn_suspend_disable();
-}
-
-bool
-load_method_handled_exceptions(Method *m) {
-    // loading exception from exception tables
-    Class *clss = m->get_class();
-    Const_Pool *cp = clss->const_pool;
-
-    // loading will not work in exception state
-    assert(!exn_raised());
-
-    for(uint32 i = 0; i < m->num_bc_exception_handlers(); i++) {
-        Handler *h = m->get_bc_exception_handler_info(i);
-        uint32 catch_type_index = h->get_catch_type_index();
-
-        if (!catch_type_index) continue;
-
-        assert(cp_is_class(cp, catch_type_index));
-        if (cp_is_resolved(cp, catch_type_index)) continue;
-
-        Class *obj = interp_resolve_class(clss, catch_type_index);
-
-        if (!obj) {
-            // possible if verifier is disabled
-            clear_current_thread_exception();
-            continue;
-#if 0
-            interp_throw_exception("java/lang/InternalError",
-                    "bad exception catch class");
-            return false;
-#endif
-        }
-    }
-    return true;
 }
 
 void
@@ -2754,6 +2720,7 @@ restart:
                                         new_ml = (MonitorList*) ALLOC_FRAME(sizeof(MonitorList));
                                     }
                                     new_ml->next = frame.locked_monitors;
+                                    new_ml->monitor = NULL;
                                     frame.locked_monitors = new_ml;
                                     Opcode_MONITORENTER(frame);
                                     exc = get_current_thread_exception();
@@ -2935,33 +2902,19 @@ got_exception:
             if (!exc) continue;
         }
 
-        frame.stack.clear();
-        frame.stack.push();
-        frame.stack.pick().cr = COMPRESS_REF(exc);
-        frame.stack.ref() = FLAG_OBJECT;
+        frame.exception = exc;
         clear_current_thread_exception();
 
-        if (load_method_handled_exceptions(frame.method)) {
-            // reloading exception, can be gc-moved in
-            // load_method_handled_exceptions
-            exc = UNCOMPRESS_REF(frame.stack.pick().cr);
-            if (processExceptionHandler(frame, exc)) continue;
-
-            // exception is not handled in the method, returning exception to caller
-            set_current_thread_exception(exc);
-            p_TLS_vmthread->ti_exception_callback_pending = false;
-        } else {
-            // error loading exceptions for method, the InternalError reported
-            // notify jvmti
-            // The code may only be executed if verifier is disabled
-            assert(exn_raised());
-            assert(!tmn_is_suspend_enabled());
-            jvmti_interpreter_exception_event_callback_call();
-            assert(!tmn_is_suspend_enabled());
-
-            // exiting the method
-            exc = get_current_thread_exception();
+        if (processExceptionHandler(frame, &frame.exception)) {
+            frame.stack.clear();
+            frame.stack.push();
+            frame.stack.pick().cr = COMPRESS_REF(frame.exception);
+            frame.stack.ref() = FLAG_OBJECT;
+            frame.exception = 0;
+            continue;
         }
+        set_current_thread_exception(frame.exception);
+        p_TLS_vmthread->ti_exception_callback_pending = false;
         
         if (frame.locked_monitors) {
             vm_monitor_exit_wrapper(frame.locked_monitors->monitor);

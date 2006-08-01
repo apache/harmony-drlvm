@@ -394,7 +394,7 @@ bool vm_init(Global_Env *env)
         env->finalizer_on_exit = (jboolean*) finalizer_on_exit_field->get_address();
         assert(env->finalizer_shutdown);
         assert(env->finalizer_on_exit);
-        class_initialize_from_jni(env->finalizer_thread, false);
+        class_initialize_from_jni(env->finalizer_thread);
     } else {
         env->finalizer_thread = NULL;
     }

@@ -1225,7 +1225,7 @@ vf_check_access_constraint( const char *super_name,             // name of super
     // get instance class
     class_handler instance = vf_resolve_class( instance_name, false, ctex );
     if( !instance ) {
-        // inctance class isn't loaded
+        // instance class isn't loaded
         return VER_ClassNotLoaded;
     }
 
@@ -1336,10 +1336,11 @@ vf_force_check_constraint( vf_TypeConstraint_t *constraint,     // class constra
     }
 
     /**
-     * Verifier which is built on Java Spec recommendation of verification proccess
-     * doesn't check interfaces usage. Unfortunately, a lot of Java applications
-     * depends on this neglect. To be compatible with those applications we should
-     * do full constraint checks only if -Xverify option is present in command line.
+     * Verifier which is built on Java VM Specification 2nd Edition (4.9.2)
+     * recommendation of verification proccess doesn't check interfaces usage.
+     * Unfortunately, a lot of Java applications depends on this neglect.
+     * To be compatible with those applications we should do full constraint
+     * checks only if -Xverify option is present in command line.
      */
     if( !ctex->m_dump.m_verify && class_is_interface_( target ) ) {
         // no need to check

@@ -59,6 +59,8 @@ DrlEMImpl* DrlEMFactory::getEMInstance() {
 void DrlEMFactory::deinitEMInstance() {
     assert(emInstance!=NULL);
     emInstance->deinit();
+    delete emInstance;
+    emInstance = NULL;
 }
 
 

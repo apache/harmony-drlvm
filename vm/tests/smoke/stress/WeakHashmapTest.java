@@ -22,7 +22,7 @@ package stress;
 import java.util.*;
 
 /**
- * @keyword XXX_bug_6164
+ * @keyword
  */
 
 public class WeakHashmapTest {
@@ -62,53 +62,68 @@ public class WeakHashmapTest {
         t1.setDaemon(true);
         t1.start();
 
-        new Thread() {
+        Thread worker1 = new Thread() {
             public void run() {
-                for(int j = 0; j < 50; j++) {
+                for(int j = 0; j < 10; j++) {
                     for(int i = 0; i < 1000; i++) {
                         String s = "" + i;
-                        map.put(new WeakHashmapTest(s), s);
+                        synchronized (map) {
+                            map.put(new WeakHashmapTest(s), s);
+                        }
                     }
                     trace("+");
                     map.clear();
                 }
             }
-        }.start();
+        };
+        worker1.start();
 
-        new Thread() {
+        Thread worker2 = new Thread() {
             public void run() {
-                for(int j = 0; j < 50; j++) {
+                for(int j = 0; j < 10; j++) {
                     for(int i = 1000; i >= 0; --i) {
                         String s = "" + i;
                         WeakHashmapTest t = new WeakHashmapTest(s);
-                        map.put(t, s);
+                        synchronized (map) {
+                            map.put(t, s);
+                        }
                         if ((i & 3) == 0) map2.put(t, s);
                     }
                     trace("-");
                 }
             }
-        }.start();
+        };
+        worker2.start();
 
-        new Thread() {
+        Thread worker3 = new Thread() {
             public void run() {
-                for(int j = 0; j < 50; j++) {
+                for(int j = 0; j < 10; j++) {
                     for(int i = 0; i < 1000; i++) {
-                        map.get(new WeakHashmapTest("" + i));
+                        synchronized (map) {
+                            map.get(new WeakHashmapTest("" + i));
+                        }
                     }
                     trace("g");
                 }
             }
-        }.start();
+        };
+        worker3.start();
 
 
-        for(int j = 0; j < 50; j++) {
+        for(int j = 0; j < 10; j++) {
             for(int i = 0; i < 1000; i++) {
-                map.get(new WeakHashmapTest("" + i));
+                synchronized (map) {
+                    map.get(new WeakHashmapTest("" + i));
+                }
             }
             trace(".");
         }
 
-        System.out.println("PASSED");
+        try { worker1.join(); } catch (InterruptedException e) {}
+        try { worker2.join(); } catch (InterruptedException e) {}
+        try { worker3.join(); } catch (InterruptedException e) {}
+
+        System.out.println("\nPASSED");
     }
 
     public static void trace(Object o) {

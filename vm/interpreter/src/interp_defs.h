@@ -223,6 +223,7 @@ struct StackFrame {
     StackFrame *prev;
     FramePopListener *framePopListener;
     ManagedObject *This;
+    ManagedObject *exception;
     struct MonitorList *locked_monitors;
     struct MonitorList *free_monitors;
     PopFrameState jvmti_pop_frame;
@@ -253,7 +254,7 @@ void method_exit_callback(Method *method, bool was_popped_by_exception, jvalue r
 void method_exit_callback_with_frame(Method *method, StackFrame& frame);
 void frame_pop_callback(FramePopListener *l, Method *method, jboolean was_popped_by_exception);
 void single_step_callback(StackFrame &frame);
-bool findExceptionHandler(StackFrame& frame, ManagedObject *exception, Handler **h);
+bool findExceptionHandler(StackFrame& frame, ManagedObject **exception, Handler **h);
 bool load_method_handled_exceptions(Method *m);
 
 /********* INLINE FUNCTIONS *******/
@@ -407,7 +408,6 @@ Stack::getStorageSize(int size) {
 // Setup locals and stack on C stack.
 #define SETUP_LOCALS_AND_STACK(frame,method)                   \
     int max_stack = method->get_max_stack();                   \
-    if (max_stack == 0) max_stack = 1;                         \
     frame.stack.init(ALLOC_FRAME(                              \
                 Stack::getStorageSize(max_stack)), max_stack); \
     int max_locals = method->get_max_locals();                 \

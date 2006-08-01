@@ -34,8 +34,9 @@
 
 // Initializes a class.
 
-static void class_initialize1(Class *clss, bool throw_exception)
+static void class_initialize1(Class *clss)
 {
+    assert(!exn_raised());
     assert(!tmn_is_suspend_enabled());
 
     // the following code implements the 11-step class initialization program
@@ -78,7 +79,6 @@ static void class_initialize1(Class *clss, bool throw_exception)
         jthrowable exc = exn_get();
         if (exc) {
             vm_monitor_exit(struct_Class_to_java_lang_Class(clss));
-            if (throw_exception) exn_throw_only(exc);
             return;
         }
     }
@@ -103,12 +103,9 @@ static void class_initialize1(Class *clss, bool throw_exception)
         vm_monitor_exit(struct_Class_to_java_lang_Class(clss));
         tmn_suspend_enable();
         jthrowable exn = exn_create("java/lang/NoClassDefFoundError",
-            clss->name->bytes, class_get_error_cause(clss));
+            clss->name->bytes);
         tmn_suspend_disable();
-        if (throw_exception)
-            exn_throw_only(exn);
-        else
-            exn_raise_only(exn);
+        exn_raise_only(exn);
         return;
     }
 
@@ -124,15 +121,9 @@ static void class_initialize1(Class *clss, bool throw_exception)
     // ---  step 7 ------------------------------------------------------------
 
     if (clss->super_class) {
-        class_initialize_ex(clss->super_class, throw_exception);
+        class_initialize_ex(clss->super_class);
 
         if (clss->super_class->state == ST_Error) { 
-            // NOTE ivan: looks like this code is not executed on jit
-            // made it interpreter specific.
-            // the non-destructive exception propagaion may be used
-            // in other circumstances too, e.g. in top-level class loading
-            // -salikh
-
             vm_monitor_enter_slow(struct_Class_to_java_lang_Class(clss));
             tmn_suspend_enable();
             REPORT_FAILED_CLASS_CLASS_EXN(clss->class_loader, clss,
@@ -261,13 +252,7 @@ static void class_initialize1(Class *clss, bool throw_exception)
         assert(!tmn_is_suspend_enabled());
         thread_object_notify_all(struct_Class_to_java_lang_Class_Handle(clss));
         vm_monitor_exit(struct_Class_to_java_lang_Class(clss));
-
-        if (throw_exception) {
-            exn_throw_only(p_error_object);
-            // may return in case of interpreter or topmost M2N frame
-        } else {
-            exn_raise_only(p_error_object);
-        }
+        exn_raise_only(p_error_object);
     }
     // end of 11 step class initialization program
 } //class_initialize1
@@ -278,7 +263,7 @@ static void class_initialize1(Class *clss, bool throw_exception)
 #if (defined __cplusplus) && (defined PLATFORM_POSIX)
 extern "C" {
 #endif
-void class_initialize_from_jni(Class *clss, bool throw_exception)
+void class_initialize_from_jni(Class *clss)
 {
     assert(tmn_is_suspend_enabled());
 
@@ -294,7 +279,7 @@ void class_initialize_from_jni(Class *clss, bool throw_exception)
 
     tmn_suspend_disable();
     if (class_needs_initialization(clss)) {
-        class_initialize1(clss, throw_exception);
+        class_initialize1(clss);
     }
     tmn_suspend_enable();
 } // class_initialize_from_jni
@@ -305,12 +290,12 @@ void class_initialize_from_jni(Class *clss, bool throw_exception)
 // VMEXPORT
 void class_initialize(Class *clss)
 {
-    class_initialize_ex(clss, true);
+    class_initialize_ex(clss);
 }
 
 
 
-void class_initialize_ex(Class *clss, bool throw_exception)
+void class_initialize_ex(Class *clss)
 {
     assert(!tmn_is_suspend_enabled());
 
@@ -326,6 +311,6 @@ void class_initialize_ex(Class *clss, bool throw_exception)
     tmn_suspend_disable();
     
     if ( class_needs_initialization(clss)) {
-        class_initialize1(clss, throw_exception);
+        class_initialize1(clss);
     }
 } //class_initialize

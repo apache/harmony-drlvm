@@ -17,6 +17,10 @@
  * @author Pavel Pervov, Pavel Rebriy
  * @version $Revision: 1.1.2.1.4.3 $
  */  
+
+#ifndef _BYTECODES_H_
+#define _BYTECODES_H_
+
 /** 
  * Enum of bytecode opcodes.
  */
@@ -234,3 +238,5 @@ enum JavaByteCodes {
     OPCODE_FAST_GETFIELD_INT, /* 0xcc */
 #endif /* FAST_BYTECODES */
 };
+#endif // _BYTECODES_H_
+

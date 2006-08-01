@@ -781,10 +781,11 @@ public class Thread implements Runnable {
             localValues.put(local, value);
             return value;
         }
-        if ((value = localValues.get(local)) == null) {
-            value = local.initialValue();
-            localValues.put(local, value);
+        if (localValues.containsKey(local)) {
+            return localValues.get(local);
         }
+        value = local.initialValue();
+        localValues.put(local, value);
         return value;
     }
     

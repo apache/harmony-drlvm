@@ -64,7 +64,7 @@ int LazyExceptionOpt::level=0;
 
 LazyExceptionOpt::LazyExceptionOpt(IRManager &ir_manager, MemoryManager& mem_manager) :
     irManager(ir_manager), memManager(mem_manager), 
-    leMemManager(*(new MemoryManager(1000,"LazyExceptionOpt::doLazyExceptionOpt"))),
+    leMemManager(1024,"LazyExceptionOpt::doLazyExceptionOpt"),
     compInterface(ir_manager.getCompilationInterface()),nodeSet(NULL)
 {
 }

@@ -301,6 +301,12 @@ void Objects_To_Finalize::run_finalizers()
 {
     assert(tmn_is_suspend_enabled());
 
+    Class* finalizer_thread = VM_Global_State::loader_env->finalizer_thread;
+
+    if (!finalizer_thread) {
+        return;
+    }
+
     int num_objects = getLength();
 
     if (num_objects == 0) {
@@ -317,13 +323,6 @@ void Objects_To_Finalize::run_finalizers()
     
     jvalue args[1];
     args[0].z = false;
-
-    Class* finalizer_thread = VM_Global_State::loader_env->finalizer_thread;
-    
-    if (!finalizer_thread) {
-        p_TLS_vmthread->finalize_thread_flags &= ~FINALIZER_STARTER;
-        return;
-    }
 
     Method* finalize_meth = class_lookup_method_recursive(finalizer_thread,
         "startFinalization", "(Z)V");

@@ -75,6 +75,14 @@ using namespace std;
 
 extern bool dump_stubs;
 
+// macro that gets the offset of a certain field within a struct or class type
+#define OFFSET(Struct, Field) \
+    ((POINTER_SIZE_SINT) (&(((Struct *) NULL)->Field) - NULL))
+
+// macro that gets the size of a field within a struct or class
+#define SIZE(Struct, Field) \
+    (sizeof(((Struct *) NULL)->Field))
+
 //////////////////////////////////////////////////////////////////////////
 // Object Creation
 
@@ -700,6 +708,7 @@ static NativeCodePtr rth_get_lil_initialize_class(int* dyn_count)
     if (!addr) {
         POINTER_SIZE_INT (*p_is_inited)(Class*) = is_class_initialized;
         void (*p_init)(Class*) = class_initialize;
+        void (*p_rethrow)() = rethrow_current_thread_exception;
         LilCodeStub* cs = lil_parse_code_stub("entry 0:rth:pint:void;");
         assert(cs);
         if (dyn_count) {
@@ -712,13 +721,21 @@ static NativeCodePtr rth_get_lil_initialize_class(int* dyn_count)
             "jc r=0,not_initialized;"
             "ret;"
             ":not_initialized;"
-            "push_m2n 0, 0;"
+            "push_m2n 0, %1i;"
             "m2n_save_all;"
             "in2out platform:void;"
-            "call %1i;"
+            "call %2i;"
+            "locals 1;"
+            "l0 = ts;"
+            "ld l0, [l0 + %3i:ref];"
+            "jc l0 != 0,_exn_raised;"
             "pop_m2n;"
-            "ret;",
-            p_is_inited, p_init);
+            "ret;"
+            ":_exn_raised;"
+            "out platform::void;"
+            "call.noret %4i;",
+            p_is_inited, FRAME_JNI, p_init,
+            OFFSET(VM_thread, p_exception_object), p_rethrow);
         assert(cs && lil_is_valid(cs));
         addr = LilCodeGenerator::get_platform()->compile(cs, "rth_get_initialize_class", dump_stubs);
         lil_free_code_stub(cs);
@@ -1568,7 +1585,7 @@ static void * rth_resolve(Class_Handle klass, unsigned cp_idx,
             tmn_suspend_disable();
             if (class_needs_initialization(that_class)) {
                 assert(!exn_raised());
-                class_initialize_ex(that_class, false);
+                class_initialize_ex(that_class);
             }
             return ret;
         }
@@ -1580,7 +1597,7 @@ static void * rth_resolve(Class_Handle klass, unsigned cp_idx,
             tmn_suspend_disable();
             if (class_needs_initialization(that_class)) {
                 assert(!exn_raised());
-                class_initialize_ex(that_class, false);
+                class_initialize_ex(that_class);
             }
             return ret;
         }
@@ -2056,16 +2073,6 @@ void vm_checkcast_update_stats(ManagedObject *obj, Class *super)
  * Auxiliary functions and macros, used by the generators of
  * LIL checkcast and instanceof stubs
  */
-
-
-// macro that gets the offset of a certain field within a struct or class type
-#define OFFSET(Struct, Field) \
-  ((POINTER_SIZE_SINT) (&(((Struct *) NULL)->Field) - NULL))
-
-// macro that gets the size of a field within a struct or class
-#define SIZE(Struct, Field) \
-  (sizeof(((Struct *) NULL)->Field))
-
 
 // appends code that throws a ClassCastException to a LIL stub
 static LilCodeStub *gen_lil_throw_ClassCastException(LilCodeStub *cs) {
@@ -2673,8 +2680,8 @@ VMEXPORT void * vm_create_helper_for_function(void* (*fptr)(void*))
         "entry 0:stdcall:pint:pint;"    // the single argument is 'void*'
         "push_m2n 0, 0;"                // create m2n frame
         "out stdcall::void;"
-        "call %0i;"                     // call tmn_suspen_enable()
-        "in2out stdcall:pint;"          // reloads input arg into output
+        "call %0i;"                     // call tmn_suspend_enable()
+        "in2out stdcall:pint;"          // reload input arg into output
         "call %1i;"                     // call the foo
         "locals 2;"                     //
         "l0 = r;"                       // save result

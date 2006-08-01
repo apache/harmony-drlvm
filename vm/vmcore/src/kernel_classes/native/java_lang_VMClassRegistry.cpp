@@ -422,7 +422,7 @@ JNIEXPORT void JNICALL Java_java_lang_VMClassRegistry_initializeClass
     Java_java_lang_VMClassRegistry_linkClass(jenv, unused, clazz);
     if(jenv->ExceptionCheck())
         return;
-    class_initialize_from_jni(clss, false);
+    class_initialize_from_jni(clss);
 }
 
 /*

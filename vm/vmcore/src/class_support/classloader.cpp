@@ -153,6 +153,8 @@ ClassLoader::~ClassLoader()
         }
         delete GetJavaTypes();
     }
+    if (m_package_table)
+        delete m_package_table;
 }
 
 bool ClassLoader::LoadingClass::CreateWaitingEvent(const String* className) 
@@ -279,6 +281,7 @@ Class* ClassLoader::DefineClass(Global_Env* env, const char* class_name,
 
     m_lock._lock();
     if(m_failedClasses->Lookup(className)) {
+        FailedLoadingClass(className);
         m_lock._unlock();
         return NULL;
     }
@@ -298,6 +301,7 @@ Class* ClassLoader::DefineClass(Global_Env* env, const char* class_name,
 
     clss = NewClass(env, className);
     if(!clss) {
+        FailedLoadingClass(className);
         return NULL;
     }
     
@@ -788,6 +792,7 @@ Class* ClassLoader::StartLoadingClass(Global_Env* UNREF env, const String* class
             if(loading->IsInitiator(cur_thread) || loading->IsDefiner(cur_thread)) {
                 // check if one thread can load one class recursively
                 // at first sight, this is a circularity error condition
+                FailedLoadingClass(className);
                 aulock.ForceUnlock();
                 REPORT_FAILED_CLASS_NAME(this, className->bytes,
                     "java/lang/ClassCircularityError", className->bytes);
@@ -832,15 +837,15 @@ Class* ClassLoader::StartLoadingClass(Global_Env* UNREF env, const String* class
     }
 }
 
-
 void ClassLoader::FailedLoadingClass(const String* className)
 {
     LMAutoUnlock aulock( &m_lock );
 
     LoadingClass* lc = m_loadingClasses->Lookup(className);
-    assert(lc);
-    lc->SignalLoading();
-    RemoveLoadingClass(className, lc);
+    if(lc) {
+        lc->SignalLoading();
+        RemoveLoadingClass(className, lc);
+    }
     if(m_reportedClasses->Lookup(className)) {
         m_reportedClasses->Remove(className);
     }
@@ -976,6 +981,7 @@ Class* ClassLoader::SetupAsArray(Global_Env* env, const String* classNameString)
         // in class name
         if ('\0' != *(baseType + 1))
         {
+            FailedLoadingClass(classNameString);
             REPORT_FAILED_CLASS_NAME(this, classNameString->bytes, "java/lang/NoClassDefFoundError", classNameString->bytes);
             return NULL;
         }
@@ -989,6 +995,7 @@ Class* ClassLoader::SetupAsArray(Global_Env* env, const String* classNameString)
             for(nameLen = 0; baseType[nameLen] != ';' &&
                              baseType[nameLen] != 0; nameLen++);
             if(!baseType[nameLen]) {
+                FailedLoadingClass(classNameString);
                 REPORT_FAILED_CLASS_NAME(this, className, "java/lang/NoClassDefFoundError", className);
                 return NULL;
             }
@@ -1002,6 +1009,7 @@ Class* ClassLoader::SetupAsArray(Global_Env* env, const String* classNameString)
         break;
 
     default:
+        FailedLoadingClass(classNameString);
         REPORT_FAILED_CLASS_NAME(this, className,
             "java/lang/NoClassDefFoundError", className);
         return NULL;
@@ -1034,6 +1042,7 @@ Class* ClassLoader::SetupAsArray(Global_Env* env, const String* classNameString)
 
         m_lock._lock();
         if(m_failedClasses->Lookup(classNameString)) {
+            FailedLoadingClass(classNameString);
             m_lock._unlock();
             return NULL;
         }
@@ -1081,7 +1090,7 @@ Class* ClassLoader::SetupAsArray(Global_Env* env, const String* classNameString)
         klass->package = elementClass->package;
 
         // array classes implement two interfaces: Cloneable and Serializable
-        klass->superinterfaces = (Class_Superinterface*) STD_MALLOC(2 * sizeof(Class_Superinterface));
+        klass->superinterfaces = (Class_Superinterface*) Alloc(2 * sizeof(Class_Superinterface));
         klass->superinterfaces[0].name = env->Clonable_String;
         klass->superinterfaces[1].name = env->Serializable_String;
         klass->n_superinterfaces = 2;
@@ -1319,10 +1328,10 @@ GenericFunctionPointer ClassLoader::LookupNative(Method* method)
     int dlen = method_desc->len;
     int len = clen + 1 + mlen + dlen;
     char *error = (char*)STD_ALLOCA(len + 1);
-    memcpy(error, class_name, clen);
+    memcpy(error, class_name->bytes, clen);
     error[clen] = '.';
-    memcpy(error + clen + 1, method_name, mlen);
-    memcpy(error + clen + 1 + mlen, method_desc, dlen);
+    memcpy(error + clen + 1, method_name->bytes, mlen);
+    memcpy(error + clen + 1 + mlen, method_desc->bytes, dlen);
     error[len] = '\0';
 
     // trace
@@ -1511,6 +1520,15 @@ BootstrapClassLoader::~BootstrapClassLoader()
         delete primitive_types[i];
         primitive_types[i] = NULL;
     }
+
+    for(BCPElement* bcpe = m_BCPElements.m_first;
+        bcpe != NULL; bcpe = bcpe->m_next)
+    {
+        if(bcpe->m_isJarFile) {
+            bcpe->m_jar->~JarFile();
+            bcpe->m_jar = NULL;
+        }
+    }
 }
 
 bool BootstrapClassLoader::Initialize(ManagedObject* UNREF loader)
@@ -1593,19 +1611,18 @@ Class* BootstrapClassLoader::LoadClass(Global_Env* UNREF env,
     // Not in the class cache: load the class or, if an array class, create it
     if(className->bytes[0] == '[') {
         // array classes require special handling
-        return SetupAsArray(m_env, className);
+        klass = SetupAsArray(m_env, className);
     } else {
         // load class from file
         klass = LoadFromFile(className);
     }
-
     return klass;
 } // BootstrapClassLoader::LoadClass
 
 
 Class* UserDefinedClassLoader::LoadClass(Global_Env* env, const String* className)
 {
-    assert( m_loader != NULL );
+    assert(m_loader != NULL);
 
     Class* klass = StartLoadingClass(env, className);
     LMAutoUnlock aulock(&m_lock);
@@ -1621,8 +1638,9 @@ Class* UserDefinedClassLoader::LoadClass(Global_Env* env, const String* classNam
 
     char* cname = const_cast<char*>(className->bytes);
     if( cname[0] == '[' ) {
-        return SetupAsArray(env, className);
-    } 
+        klass = SetupAsArray(env, className);
+        return klass;
+    }
 
     // Replace '/' with '.'
     unsigned class_name_len = className->len + 1;
@@ -1691,15 +1709,15 @@ Class* UserDefinedClassLoader::LoadClass(Global_Env* env, const String* classNam
 
     if(exn_raised()) {
         tmn_suspend_enable();
-        
+
         jthrowable exn = GetClassError(className->bytes);
         if(!exn) {
             exn = exn_get();
             // translate ClassNotFoundException to NoClassDefFoundError (if any)
             Class* NotFoundExn_class = env->java_lang_ClassNotFoundException_Class;
             Class *exn_class = jobject_to_struct_Class(exn);
-            
-            INFO("Loading of " << className->bytes << " class failed due to " 
+
+            INFO("Loading of " << className->bytes << " class failed due to "
                 << exn_class->name->bytes);
 
             while(exn_class && exn_class != NotFoundExn_class) {
@@ -1721,11 +1739,11 @@ Class* UserDefinedClassLoader::LoadClass(Global_Env* env, const String* classNam
                         "to NoClassDefFoundError for " << className->bytes);
                 }
             }
-            
-            FailedLoadingClass(className);
+
             AddFailedClass(className, exn);
         }
         exn_clear();
+        FailedLoadingClass(className);
         return NULL;
     }
     if(res.l == NULL)
