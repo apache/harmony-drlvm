@@ -506,6 +506,7 @@ Version: $Revision: 1.16.2.20 $
                 <include name="**"/>
                 <exclude name="bin/java*"/>
                 <exclude name="bin/default/**"/>
+                <exclude name="bin/*hythr*"/>
             </fileset>
         </copy>
 
