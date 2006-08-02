@@ -320,7 +320,6 @@ Version: $Revision: 1.16.2.20 $
 
     <target name="svn-prop">
         <exec executable="svn">
-            <arg value="--non-interactive" />
             <arg value="info" />
             <redirector outputproperty="svn.revision">
                 <outputfilterchain>
