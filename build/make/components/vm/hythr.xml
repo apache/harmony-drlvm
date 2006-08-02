@@ -27,7 +27,7 @@ Version: $Revision: 1.4.2.4 $
 
 <project name="vm.hythr">
     <target name="init" depends="common_vm">
-        <property name="build.depends" value="extra.apr,vm.vmcore" />
+        <property name="build.depends" value="extra.apr,extra.aprutil" />
         <property name="libname" value="hythr" />
         <property name="outtype" value="shared" />
         <property name="src" location="${build.vm.home}" />
@@ -62,7 +62,7 @@ Version: $Revision: 1.4.2.4 $
             </select>
 
             <select os="win">
-                <defineset define="_USRDLL" />
+                <defineset define="_USRDLL,APR_DECLARE_STATIC" />
             </select>
 
             <select os="lnx">
@@ -90,8 +90,10 @@ Version: $Revision: 1.4.2.4 $
                 <linkerarg value="-Wl,--version-script,${src}/vmcore/src/thread/hythr/hythr.exp" />
             </select>
 
+            <libset libs="${extra.apr.lib}"
+                    dir="${extra.apr.libdir}" />
+
             <select os="win">
-                <libset libs="${vm.vmcore.lib}" dir="${vm.vmcore.libdir}" />
                 <syslibset libs="advapi32,ws2_32" />
             </select>
         </linker>

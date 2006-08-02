@@ -51,6 +51,8 @@ hythread_monitor_enter (hythread_monitor_t monitor);
 JNIEXPORT int __cdecl 
 hythread_monitor_exit (hythread_monitor_t monitor);
 JNIEXPORT int __cdecl
+hythread_monitor_notify (hythread_monitor_t monitor);
+JNIEXPORT int __cdecl
 hythread_monitor_notify_all (hythread_monitor_t monitor);
 JNIEXPORT int __cdecl
 hythread_monitor_wait (hythread_monitor_t monitor);
@@ -63,6 +65,8 @@ hythread_attach (hythread_t* handle);
 JNIEXPORT void __cdecl 
 hythread_detach (hythread_t handle);
 JNIEXPORT hythread_t __cdecl hythread_self();
+JNIEXPORT int __cdecl
+hythread_exit (hythread_monitor_t monitor);
 
 JNIEXPORT unsigned* __cdecl 
 hythread_global (char* name);

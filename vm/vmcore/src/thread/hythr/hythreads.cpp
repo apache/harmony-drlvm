@@ -53,6 +53,7 @@ hythread_monitor_t p_global_monitor;
 // Will do all initilalization of thread library.
 // init global_monitor now.
 JNIEXPORT void  __cdecl hythread_init (void*  lib)  {
+    apr_initialize();
     hythread_monitor_init_with_name(&p_global_monitor, 0, "Thread Global Monitor");
     hythread_monitor_t *mon = (hythread_monitor_t*)hythread_global(GLOBAL_MONITOR_NAME);
     *mon = p_global_monitor;
@@ -114,6 +115,12 @@ hythread_monitor_enter (hythread_monitor_t monitor){
 JNIEXPORT int __cdecl 
 hythread_monitor_exit (hythread_monitor_t monitor) { 
     apr_status_t stat = apr_thread_mutex_unlock(monitor->mutex);
+    RET_ON_ERROR(stat)
+    return 0; 
+}
+JNIEXPORT int __cdecl
+hythread_monitor_notify(hythread_monitor_t monitor){ 
+    apr_status_t stat = apr_thread_cond_signal(monitor->cond);
     RET_ON_ERROR(stat)
     return 0; 
 }
@@ -257,5 +264,27 @@ hythread_create(hythread_t* handle, unsigned stacksize, unsigned priority, unsig
     RET_ON_ERROR(stat);
     return 0;
 }
+
+
+JNIEXPORT int __cdecl
+hythread_exit (hythread_monitor_t monitor) {
+   apr_status_t stat;
+   apr_os_thread_t aott;
+   apr_thread_t *att = NULL;
+
+   // att = (apr_thread_t*)apr_pcalloc(get_pool(), sizeof(apr_thread_t*));	
+   aott = apr_os_thread_current();
+   stat = apr_os_thread_put(&att, &aott, get_pool());
+   RET_ON_ERROR(stat);
+    
+   if (monitor) {
+      hythread_monitor_exit(monitor);
+   }
+
+   return apr_thread_exit(att, 0);
+}
+
+
+
 
 }// extern "C"
