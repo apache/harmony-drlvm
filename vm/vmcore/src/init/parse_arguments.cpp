@@ -278,7 +278,8 @@ void parse_vm_arguments(Global_Env *p_env)
             add_pair_to_properties(p_env->properties, "vm.cleanupOnExit", "true");       
         }
         else if (strcmp(option, "_org.apache.harmony.vmi.portlib") == 0) {
-            // Ignore _org.apache.harmony.vmi.portlib for now;
+            // Store a pointer to the portlib
+            p_env->portLib = p_env->vm_arguments.options[i].extraInfo;
         }
         else {
             ECHO("Unknown option " << option << USE_JAVA_HELP);

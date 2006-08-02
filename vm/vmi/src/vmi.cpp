@@ -124,6 +124,13 @@ HyPortLibrary *JNICALL GetPortLibrary(VMInterface *vmi)
 
     if (! initialized)
     {
+        // First, try to get the portlib pointer from global env (must have been put there during args parse)
+        portLibPointer = (HyPortLibrary*)VM_Global_State::loader_env->portLib;
+        if (NULL != portLibPointer) {
+			initialized = 1;
+            return portLibPointer;
+        }
+        // If the above fails, initialize portlib here
         int rc;
         HyPortLibraryVersion portLibraryVersion;
         HYPORT_SET_VERSION(&portLibraryVersion, HYPORT_CAPABILITY_MASK);
@@ -140,8 +147,8 @@ HyPortLibrary *JNICALL GetPortLibrary(VMInterface *vmi)
     //        know there is portLib is initialized there already.
     portLibPointer = &portLib;
     }
-    TRACE("vmi->GetPortLibrary(): returning: " << &portLib);
-    return &portLib;
+    TRACE("vmi->GetPortLibrary(): returning: " << portLibPointer);
+    return portLibPointer;
 }
 
 
@@ -175,8 +182,9 @@ HyZipCachePool* JNICALL GetZipCachePool(VMInterface *vmi)
     {
         return zipCachePool;
     }
+    HyPortLibrary *portLibPointer = GetPortLibrary(vmi);
     assert(portLibPointer);
-    zipCachePool = zipCachePool_new(&portLib);
+    zipCachePool = zipCachePool_new(portLibPointer);
     assert(zipCachePool);
     return zipCachePool;
 }

@@ -139,6 +139,8 @@ ready_for_exceptions(false)
     shutting_down = 0;
 
     TI = NULL;
+    portLib = NULL;
+
 
     nsoTable = nso_init_lookup_table(&this->string_pool);
 }       //Global_Env::Global_Env

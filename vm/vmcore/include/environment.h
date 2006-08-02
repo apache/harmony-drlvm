@@ -41,6 +41,8 @@ struct Global_Env {
     Properties&               properties;
     DebugUtilsTI*             TI;
     NSOTableItem*             nsoTable;
+    void*                     portLib;  // Classlib's port library
+    
     //
     // globals
     //
