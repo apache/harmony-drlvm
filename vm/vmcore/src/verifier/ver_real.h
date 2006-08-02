@@ -233,6 +233,7 @@ typedef enum {
     VF_CHECK_ACCESS_FIELD,
     VF_CHECK_ACCESS_METHOD,
     VF_CHECK_DIRECT_SUPER,
+    VF_CHECK_INVOKESPECIAL,
     VF_CHECK_NUM
 } vf_CheckConstraint_t;
 

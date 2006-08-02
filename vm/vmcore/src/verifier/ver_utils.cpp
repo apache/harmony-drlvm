@@ -477,6 +477,7 @@ vf_TypePool::CheckTypes( vf_ValidType_t *required,        // required type
             }
         }
         return false;
+
     case VF_CHECK_ACCESS_FIELD:    // check field access
         // compare types
         assert( required->number == 1 );
@@ -490,6 +491,7 @@ vf_TypePool::CheckTypes( vf_ValidType_t *required,        // required type
                             index, VF_CHECK_ACCESS_FIELD );
         }
         return false;
+
     case VF_CHECK_ACCESS_METHOD:   // check method access
         // compare types
         assert( required->number == 1 );
@@ -503,10 +505,29 @@ vf_TypePool::CheckTypes( vf_ValidType_t *required,        // required type
                             index, VF_CHECK_ACCESS_METHOD );
         }
         return false;
+    case VF_CHECK_DIRECT_SUPER:
+        if( required->number == 1 && available->number == 1 ) {
+            if( required->string[0] != available->string[0] ) {
+                SetRestriction( required->string[0], available->string[0],
+                                    0, VF_CHECK_DIRECT_SUPER );
+            }
+            return false;
+        }
+        return true;
+
+    case VF_CHECK_INVOKESPECIAL:
+        assert( required->number == 1 );
+        for( index1 = 0; index1 < available->number; index1++ ) {
+            SetRestriction( required->string[0], available->string[index1],
+                            index, VF_CHECK_INVOKESPECIAL );
+        }
+        return false;
     default:
         DIE("Verifier: CompareTypes: unknown check type in switch");
+        return true;
     }
-    return true;
+    // unreachable code
+    assert(0);
 } // vf_TypePool::CheckTypes
 
 /**
@@ -968,7 +989,8 @@ vf_is_assign_valid( class_handler source,   // checked class
 static bool
 vf_is_valid( class_handler source,              // checked class
              class_handler target,              // required class
-             vf_CheckConstraint_t check)        // checked class type
+             class_handler current,             // current class
+             unsigned check)                    // checked class type
 {
     switch( check )
     {
@@ -986,18 +1008,25 @@ vf_is_valid( class_handler source,              // checked class
         return class_is_same_class( class_get_super_class( source ), target );
     case VF_CHECK_ACCESS_FIELD:     // protected field access
     case VF_CHECK_ACCESS_METHOD:    // protected method acceess
-        if( class_is_same_package( source, target )
-            || vf_is_super_class( source, target ) )
+        if( class_is_same_package( source, current )
+            || vf_is_super_class( source, current ) )
         {
             return true;
         }
-        break;
+        return false;
+    case VF_CHECK_INVOKESPECIAL:
+        if( vf_is_super_class( source, current ) 
+            && vf_is_super_class( current, target ) )
+        {
+            return true;
+        }
+        return false;
     default:
-        VERIFY_DEBUG( "vf_is_valid: invalid check type" );
-        vf_error();
-        break;
+        DIE( "Verifier: vf_is_valid: invalid check type" );
+        return false;
     }
-    return false;
+    // unreachable code
+    assert(0);
 } // vf_is_valid
 
 /**
@@ -1009,7 +1038,7 @@ vf_check_without_loading( vf_TypeConstraint_t *restriction,  // checked constrat
 {
     switch( restriction->check_type )
     {
-    case VF_CHECK_DIRECT_SUPER:
+    case VF_CHECK_SUPER:
         /**
          * Extension for class java/lang/Object doesn't check
          * because it's expected all references extend it.
@@ -1106,7 +1135,7 @@ vf_check_constraint( vf_TypeConstraint_t *restriction,  // checked constratint
     }
 
     // check restriction
-    if( !vf_is_valid( source, target, (vf_CheckConstraint_t)restriction->check_type ) ) {
+    if( !vf_is_valid( source, target, ctex->m_class, restriction->check_type ) ) {
         // return error
         switch( restriction->check_type )
         {
@@ -1230,7 +1259,7 @@ vf_check_access_constraint( const char *super_name,             // name of super
     }
 
     // check access constraint
-    if( !vf_is_valid( instance, ctex->m_class, check_type ) )
+    if( !vf_is_valid( instance, NULL, ctex->m_class, check_type ) )
     {
         // return error
         switch( check_type )
@@ -1389,7 +1418,7 @@ vf_force_check_constraint( vf_TypeConstraint_t *constraint,     // class constra
     }
 
     // check restriction
-    if( !vf_is_valid( source, target, check ) )
+    if( !vf_is_valid( source, target, ctex->m_class, check ) )
     {
         switch( check )
         {

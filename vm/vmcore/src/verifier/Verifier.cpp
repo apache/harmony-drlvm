@@ -3678,9 +3678,11 @@ vf_opcode_invokespecial( vf_Code_t *code,              // code instruction
     if( !strcmp( cp_parse.method.m_name, "<init>" ) ) {
         // set uninitialized check
         vf_set_in_vector_type( code, 0, SM_UNINITIALIZED );
+        vf_set_in_vector_check( code, 0, VF_CHECK_DIRECT_SUPER );
+    } else {
+        // set method access check
+        vf_set_in_vector_check( code, 0, VF_CHECK_INVOKESPECIAL );
     }
-    // set method access check
-    vf_set_in_vector_check( code, 0, VF_CHECK_ACCESS_METHOD );
     vf_set_in_vector_check_index( code, 0, cp_index );
     return VER_OK;
 } // vf_opcode_invokespecial
@@ -5322,7 +5324,10 @@ vf_verify_class( class_handler klass,      // verified class
             result = vf_verify_method_bytecode( &context );
             context.ClearContext();
         }
-        if (result != VER_OK) {
+        if( result == VER_NoSupportJSR ) {
+            result = VER_OK;
+        }
+        if (result != VER_OK ) {
             goto labelEnd_verifyClass;
         }
     }
@@ -5344,9 +5349,6 @@ labelEnd_verifyClass:
     vf_delete_pool( context.m_pool );
     delete context.m_type;
     *message = context.m_error;
-    if( result == VER_NoSupportJSR ) {
-        result = VER_OK;
-    }
 #if _VERIFY_DEBUG
     if( result != VER_OK ) {
         VERIFY_DEBUG( "VerifyError: " << (context.m_error ? context.m_error : "NULL") );

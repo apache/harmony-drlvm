@@ -505,6 +505,14 @@ vf_check_entry_refs( vf_MapEntry_t *source,    // stack map entry
             return result;
         }
         break;
+    case VF_CHECK_DIRECT_SUPER:     // check is target class is direct super class of source
+        is_error = ctex->m_type->CheckTypes( target->m_vtype, source->m_vtype,
+            0, VF_CHECK_DIRECT_SUPER );
+        break;
+    case VF_CHECK_INVOKESPECIAL:    // check invokespecial object reference
+        is_error = ctex->m_type->CheckTypes( target->m_vtype, source->m_vtype,
+                    0, VF_CHECK_INVOKESPECIAL );
+        break;
     default:
         DIE( "Verifier: vf_check_entry_refs: unknown check in switch" );
     }
@@ -822,7 +830,7 @@ vf_check_instruction_in_vector( vf_MapEntry_t *stack,       // stack map vector
                 VERIFY_REPORT( ctex, "(class: " << class_get_name( ctex->m_class ) 
                     << ", method: " << method_get_name( ctex->m_method )
                     << method_get_descriptor( ctex->m_method )
-                    << ") Data flow analysis error" );
+                    << ") Data flow analysis error (uninitialized)" );
                 return result;
             }
             // check initialization class in constructor
