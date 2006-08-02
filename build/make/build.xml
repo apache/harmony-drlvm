@@ -56,6 +56,9 @@ Version: $Revision: 1.16.2.20 $
 
     <property name="canonical.deploy.dir" location="../deploy" />
 
+    <property file="../drlvm.properties"/>
+    <property file="${user.home}/drlvm.properties"/>
+
     <!-- ===============================================================
         Define locations of external dependencies
       ================================================================== -->
