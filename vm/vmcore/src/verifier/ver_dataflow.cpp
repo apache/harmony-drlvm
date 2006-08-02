@@ -1115,6 +1115,19 @@ vf_check_end_node_data_flow( unsigned node_num,         // graph node number
         return VER_OK;
     }
 
+    // check <init> method
+    if( !memcmp( method_get_name( ctex->m_method ), "<init>", 7 )
+        && ctex->m_vtype.m_class != ctex->m_vtype.m_object )
+    {
+        if( invector->m_local->m_type == SM_UNINITIALIZED ) {
+            VERIFY_REPORT( ctex, "(class: " << class_get_name( ctex->m_class ) 
+                << ", method: " << method_get_name( ctex->m_method )
+                << method_get_descriptor( ctex->m_method )
+                << ") Constructor must be invoked" );
+            return VER_ErrorDataFlow;
+        }
+    }
+
     // get first instruction
     vf_Code_t *instr = &ctex->m_code[ctex->m_graph->GetNodeFirstInstr( node_num )];
 
@@ -1336,7 +1349,7 @@ vf_create_method_begin_vector( vf_Context_t *ctex )     // verifier context
         // fill "this" entry
         const char *name = class_get_name( ctex->m_class );
         vf_ValidType_t *type = vf_create_class_valid_type( name, ctex );
-        if( !strcmp( method_get_name( ctex->m_method ), "<init>" ) ) {
+        if( !memcmp( method_get_name( ctex->m_method ), "<init>", 7 ) ) {
             vector->m_local->m_type = SM_UNINITIALIZED;
         } else {
             vector->m_local->m_type = SM_REF;

@@ -344,6 +344,7 @@ vf_TypePool::DumpTypeConstraints( ostream *out )    // output stream
     {
         *out << "CONSTRAINT: have \""
             << constraint->source << "\" need \"" << constraint->target << "\" for method "
+            << class_get_name( method_get_class( m_method ) ) << "."
             << method_get_name( m_method ) << method_get_descriptor( m_method ) << endl;
     }
     return;
@@ -411,10 +412,12 @@ vf_TypePool::SetRestriction( const char *target,                // target class 
         VERIFY_TRACE( "constraint", "CONSTRAINT: for class \""
             << class_get_name( method_get_class( m_method ) ) << "\" CP index #" << index
             << " check access: have \"" << source << "\" need \"" << target << "\" for method "
+            << class_get_name( method_get_class( m_method ) ) << "."
             << method_get_name( m_method ) << method_get_descriptor( m_method ) );
     } else {
         VERIFY_TRACE( "constraint", "CONSTRAINT: have \""
             << source << "\" need \"" << target << "\" for method "
+            << class_get_name( method_get_class( m_method ) ) << "."
             << method_get_name( m_method ) << method_get_descriptor( m_method ) );
     }
     return;
@@ -1222,7 +1225,7 @@ vf_check_access_constraint( const char *super_name,             // name of super
             VERIFY_DEBUG( "verifying class " << class_get_name( ctex->m_class )
                 << " (method " << method_get_name( ctex->m_method )
                 << method_get_descriptor( ctex->m_method )
-                << ") couldn't resolve field by constant pool index #" << index );
+                << ") couldn't resolve field with constant pool index #" << index );
             return VER_OK;
         }
         if( field_is_protected( field ) ) {
@@ -1235,7 +1238,7 @@ vf_check_access_constraint( const char *super_name,             // name of super
             VERIFY_DEBUG( "verifying class " << class_get_name( ctex->m_class )
                 << " (method " << method_get_name( ctex->m_method )
                 << method_get_descriptor( ctex->m_method )
-                << ") couldn't resolve method by constant pool index #" << index );
+                << ") couldn't resolve method with constant pool index #" << index );
             return VER_OK;
         }
         if( method_is_protected( method ) ) {
