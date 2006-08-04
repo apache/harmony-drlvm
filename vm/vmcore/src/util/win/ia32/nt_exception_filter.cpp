@@ -29,9 +29,13 @@
 // Windows specific
 #include <string>
 #include <excpt.h>
-#include <dbghelp.h>
-#include <windows.h> 
-#pragma comment(linker, "/defaultlib:dbghelp.lib")
+
+// TODO - fix temporarily comment to solve win2k's lack of dbghelp.lib problem
+//    search for $$WIN2k for other related mods for this to undo
+//
+// #include <dbghelp.h>
+// #include <windows.h>
+// #pragma comment(linker, "/defaultlib:dbghelp.lib")
 
 static inline void nt_to_vm_context(PCONTEXT context, Registers* regs)
 {
@@ -84,6 +88,8 @@ static void print_state(LPEXCEPTION_POINTERS nt_exception, const char *msg)
             nt_exception->ContextRecord->Ebp);
     fprintf(stderr, "    EIP: 0x%08x\n", nt_exception->ContextRecord->Eip);
 }
+
+/*  todo - resolve problem for win2k  $$WIN2k
 
 // CallStack print
 #define CALLSTACK_DEPTH_LIMIT 100 // max stack length is 100 to prevent getting into loop
@@ -148,6 +154,8 @@ static void print_callstack(LPEXCEPTION_POINTERS nt_exception)
 
     fflush(stderr);
 }
+
+*/
 
 /*
  * Information about stack
@@ -367,7 +375,9 @@ LONG NTAPI vectored_exception_handler(LPEXCEPTION_POINTERS nt_exception)
 
         if (!vm_get_boolean_property_value_with_default("vm.assert_dialog")) {
             print_state(nt_exception, msg);
-            print_callstack(nt_exception);
+
+            // TODO fix for win2k runtime problem  $$WIN2k
+            // print_callstack(nt_exception);
             LOGGER_EXIT(-1);
 
         }
