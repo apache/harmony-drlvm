@@ -320,9 +320,13 @@ jvmtiGetAllStackTraces(jvmtiEnv* env,
        return res;
     }
 
-    jvmtiStackInfo *info = (jvmtiStackInfo*)
-        STD_MALLOC(sizeof(jvmtiStackInfo) * count
-                + sizeof(jvmtiFrameInfo) * max_frame_count * count);
+    jvmtiStackInfo *info;
+    res = _allocate(sizeof(jvmtiStackInfo) * count +
+        sizeof(jvmtiFrameInfo) * max_frame_count * count,
+        (unsigned char **)&info);
+
+    if (JVMTI_ERROR_NONE != res)
+        return res;
 
     jthread currentThread = getCurrentThread();
     int i;
@@ -334,6 +338,9 @@ jvmtiGetAllStackTraces(jvmtiEnv* env,
         info[i].thread = threads[i];
         res = jvmtiGetThreadState(env, threads[i], &info[i].state);
 
+        if (JVMTI_ERROR_NONE != res)
+            return res;
+
         // FIXME: suspended thread might be resumed in other jvmti thread?
         if (info[i].state != JVMTI_THREAD_STATE_SUSPENDED) {
             if (IsSameObject(jvmti_test_jenv, currentThread, threads[i]))
@@ -344,9 +351,15 @@ jvmtiGetAllStackTraces(jvmtiEnv* env,
 
     // geting thread states
     for(i = 0; i < count; i++) {
-        info[i].frame_buffer = ((jvmtiFrameInfo*)(info + 1)) + i;
-        jvmtiGetStackTrace(env, info[i].thread, 0, max_frame_count,
+        // Frame_buffer pointer should pointer to the memory right
+        // after the jvmtiStackInfo structures
+        info[i].frame_buffer = ((jvmtiFrameInfo *)&info[count]) +
+            max_frame_count * i;
+        res = jvmtiGetStackTrace(env, info[i].thread, 0, max_frame_count,
             info[i].frame_buffer, &info[i].frame_count);
+
+        if (JVMTI_ERROR_NONE != res)
+            return res;
     }
 
     // unsuspend suspended threads.
@@ -383,6 +396,7 @@ jvmtiGetThreadListStackTraces(jvmtiEnv* env,
     SuspendEnabledChecker sec;
     jint count = thread_count;
     const jthread *threads = thread_list;
+    jvmtiError res;
 
     /*
      * Check given env & current phase.
@@ -403,12 +417,12 @@ jvmtiGetThreadListStackTraces(jvmtiEnv* env,
     if (max_frame_count < 0)
         return JVMTI_ERROR_ILLEGAL_ARGUMENT;
 
-    jvmtiStackInfo *info = (jvmtiStackInfo*)
-        STD_MALLOC(sizeof(jvmtiStackInfo) * count
-                + sizeof(jvmtiFrameInfo) * max_frame_count * count);
+    jvmtiStackInfo *info;
+    res = _allocate(sizeof(jvmtiStackInfo) * count +
+        sizeof(jvmtiFrameInfo) * max_frame_count * count,
+        (unsigned char **)&info);
 
     int i;
-
     jthread currentThread = getCurrentThread();
     // stoping all threads
     for(i = 0; i < count; i++) {
@@ -416,7 +430,10 @@ jvmtiGetThreadListStackTraces(jvmtiEnv* env,
         // event handler for thread death should block thread death
         // until the function end.
         info[i].thread = threads[i];
-        env->GetThreadState(threads[i], &info[i].state);
+        res = jvmtiGetThreadState(env, threads[i], &info[i].state);
+
+        if (JVMTI_ERROR_NONE != res)
+            return res;
 
         // FIXME: suspended thread might be resumed in other jvmti thread?
         if (info[i].state != JVMTI_THREAD_STATE_SUSPENDED) {
@@ -428,9 +445,15 @@ jvmtiGetThreadListStackTraces(jvmtiEnv* env,
 
     // geting thread states
     for(i = 0; i < count; i++) {
-        info[i].frame_buffer = ((jvmtiFrameInfo*)(info + 1)) + i;
-        env->GetStackTrace(info[i].thread, 0, max_frame_count,
+        // Frame_buffer pointer should pointer to the memory right
+        // after the jvmtiStackInfo structures
+        info[i].frame_buffer = ((jvmtiFrameInfo *)&info[count]) +
+            max_frame_count * i;
+        res = jvmtiGetStackTrace(env, info[i].thread, 0, max_frame_count,
                 info[i].frame_buffer, &info[i].frame_count);
+
+        if (JVMTI_ERROR_NONE != res)
+            return res;
     }
 
     // unsuspend suspended threads.
