@@ -22,10 +22,40 @@
 import org.vmmagic.unboxed.*;
 import org.apache.HarmonyDRLVM.mm.mmtk.*;
 import org.mmtk.vm.*;
+import org.mmtk.plan.nogc.*;
 
 public class test {
 	public static void main(String[] args) {
         VM vm_init = new VM();
+        NoGC nogc = new NoGC();
+        //NoGCMutator mc = (NoGCMutator)VM.activePlan.mutator(0);    //getNextMutator();
+        //System.out.println("test NoGC, mc = " + mc);
+        NoGCMutator nm = new NoGCMutator();
+
+        Address addr;
+        for (int kk = 0; kk < 10; kk++) 
+        {
+            addr = nm.alloc(64, 8, 0, NoGC.ALLOC_DEFAULT, 0);
+
+            Object obj = new Object();
+            ObjectReference or = ObjectReference.fromObject(obj);
+            Address addr2 = or.toAddress();
+            int vtblPtr = addr2.loadInt();
+
+            addr.store(vtblPtr);
+            ObjectReference or2 = addr.toObjectReference();
+
+            Object obj2 = or2.toObject();
+
+            System.out.println("obj2 = " + obj2);
+        }
+
+        for (long ii = 0; ii < 0x00FFffFFffFFffFFL; ii++) // for it to run out of memory, see if error msg is correct
+        {
+            addr = nm.alloc(64, 8, 0, NoGC.ALLOC_DEFAULT, 0);
+            //System.out.println("test NoGC alloc --- " + Integer.toHexString(addr.toInt()) );
+        }
+
         System.out.println("top of test wjw------");
 		test0();
 		test1();
