@@ -36,10 +36,7 @@ import java.lang.ref.PhantomReference;
 
 /**
  * This class manages SoftReferences, WeakReferences, and
- * PhantomReferences. 
- * 
- * @author Chris Hoffmann
- * @modified Andrew Gray
+ * PhantomReferences.
  */
 public final class ReferenceGlue extends org.mmtk.vm.ReferenceGlue implements Uninterruptible 
 {
@@ -123,7 +120,7 @@ public final class ReferenceGlue extends org.mmtk.vm.ReferenceGlue implements Un
      */
     protected boolean getReferencesAreObjects()
     {
-        System.out.println("org.apache.HarmonyDRLVM.mm.mmtk.ReferenceGlue.getReferencesAreObjects() was called");
+        //System.out.println("org.apache.HarmonyDRLVM.mm.mmtk.ReferenceGlue.getReferencesAreObjects() was called");
         return false;
     }
   

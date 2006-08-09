@@ -24,8 +24,10 @@ package org.apache.HarmonyDRLVM.mm.mmtk;
 
 import org.mmtk.plan.Plan;
 import org.mmtk.policy.ImmortalSpace;
+import org.mmtk.policy.Space;
 import org.mmtk.utility.Constants;
 
+import org.mmtk.vm.VM;
 import org.vmmagic.unboxed.*;
 import org.vmmagic.pragma.*;
 
@@ -33,31 +35,64 @@ import org.vmmagic.pragma.*;
 public class Memory extends org.mmtk.vm.Memory
   implements Constants, Uninterruptible {
 
-    protected final Address getHeapStartConstant() { return Address.fromInt(0x100); } //BOOT_IMAGE_DATA_START
-    protected final Address getHeapEndConstant() { return Address.fromInt(0xFFff0000); }  //MAXIMUM_MAPPABLE
+    static protected int PHONY_JAVA_HEAP_SIZE = 1024 * 1024 * 256;
+    static protected byte [] immortalPinnedScratchObject;  //wjw -- ugly hack, make it static so that it is always enumerated
+    static protected int dangerousPointerToStartOfScratchArea;
+    static protected int dangerousPointerToEndOfScratchArea;
+    static 
+    {
+        immortalPinnedScratchObject = new byte[PHONY_JAVA_HEAP_SIZE];
+        ObjectReference or = ObjectReference.fromObject(immortalPinnedScratchObject);
+        Address addr = or.toAddress();
+        addr = addr.plus(Space.BYTES_IN_CHUNK + 16);  // add 16 to skip over the object's header area
+        dangerousPointerToStartOfScratchArea = addr.toWord().rshl(Space.LOG_BYTES_IN_CHUNK).lsh(Space.LOG_BYTES_IN_CHUNK).toInt();
+
+        addr = or.toAddress();
+        addr = addr.plus(PHONY_JAVA_HEAP_SIZE);
+        dangerousPointerToEndOfScratchArea = addr.toInt();
+        dangerousPointerToEndOfScratchArea = addr.toWord().rshl(Space.LOG_BYTES_IN_CHUNK).lsh(Space.LOG_BYTES_IN_CHUNK).toInt();
+    }
+ 
+    protected final Address getHeapStartConstant() // toss { return Address.fromInt(0x100); } //BOOT_IMAGE_DATA_START
+    {
+        Address heapStart = Address.fromInt(dangerousPointerToStartOfScratchArea);
+        System.out.println("org.apache.HarmonyDRLVM.mm.mmtk.Memory.getHeapStartConstant() = " + Integer.toHexString(heapStart.toInt()) );
+        return heapStart;
+    }
+    protected final Address getHeapEndConstant() // toss { return Address.fromInt(0xFFff0000); }  //MAXIMUM_MAPPABLE
+    {
+        Address heapEnd = Address.fromInt(dangerousPointerToEndOfScratchArea);
+        System.out.println("org.apache.HarmonyDRLVM.mm.mmtk.Memory.getHeapEndConstant() = " + Integer.toHexString(heapEnd.toInt()) );
+        return heapEnd;
+    }
     protected final Address getAvailableStartConstant() 
     { 
-        System.out.println("org.apache.HarmonyDRLVM.mm.mmtk.Memory.getAvailableStartConstant(), needs fixing now");
-        return Address.fromInt(0); //BOOT_IMAGE_CODE_END
+        Address availableStart = Address.fromInt(dangerousPointerToStartOfScratchArea);
+        System.out.println("org.apache.HarmonyDRLVM.mm.mmtk.Memory.getAvailableStartConstant() = " + Integer.toHexString(availableStart.toInt()) );
+        return availableStart;
     }
     protected final Address getAvailableEndConstant() 
-    { 
-        System.out.println("org.apache.HarmonyDRLVM.mm.mmtk.Memory.getAvailableEndConstant(), needs fixing now");      
-        return Address.fromInt(0); //MAXIMUM_MAPPABLE;
+    {      
+        Address availableEnd = Address.fromInt(dangerousPointerToEndOfScratchArea);
+        System.out.println("org.apache.HarmonyDRLVM.mm.mmtk.Memory.getAvailableEndConstant() = " + Integer.toHexString(availableEnd.toInt() )); 
+        return availableEnd;
     }
   protected final byte getLogBytesInAddressConstant() { return 2; }
   protected final byte getLogBytesInWordConstant() { return 2; }
   protected final byte getLogBytesInPageConstant() { return 12; }
-  protected final byte getLogMinAlignmentConstant() { return 3;}
+  protected final byte getLogMinAlignmentConstant() { return 2;}
   protected final byte getMaxAlignmentShiftConstant() { return 3; } //wjw -- I dont have a clue
   protected final int getMaxBytesPaddingConstant() { return 8; } 
   protected final int getAlignmentValueConstant() { return 0x01020304;}
  
+  private static int BOOT_SEGMENT_MB = (0x800000>>LOG_BYTES_IN_MBYTE);
 
     public final ImmortalSpace getVMSpace() throws InterruptiblePragma
     {
-        System.out.println("org.apache.HarmonyDRLVM.mm.mmtk.Memory.globalPrepareVMSpace() needs fixing");
-        return null;
+        ImmortalSpace bootSpace = new ImmortalSpace("boot", Plan.DEFAULT_POLL_FREQUENCY, 
+            BOOT_SEGMENT_MB, false);
+        System.out.println("org.apache.HarmonyDRLVM.mm.mmtk.Memory.getVMSpace(), bootSpace = " + bootSpace);
+        return bootSpace;
     }
 
     public final void globalPrepareVMSpace() 
@@ -80,7 +115,9 @@ public class Memory extends org.mmtk.vm.Memory
     }
     public final void setHeapRange(int id, Address start, Address end) 
     {
-        System.out.println("org.apache.HarmonyDRLVM.mm.mmtk.Memory.setHeapRange() needs fixing");
+        System.out.println("org.apache.HarmonyDRLVM.mm.mmtk.Memory.setHeapRange() id = " + id + 
+            " start = " + Integer.toHexString(start.toInt()) + 
+            " end = " + Integer.toHexString(end.toInt())                );
     }
  /**
    * Maps an area of virtual memory.
@@ -90,7 +127,7 @@ public class Memory extends org.mmtk.vm.Memory
    * @return 0 if successful, otherwise the system errno
    */
   public final int mmap(Address start, int size) {
-      System.out.println("org.apache.HarmonyDRLVM.mm.mmtk.Memory.mmap() needs fixing");
+      //System.out.println("org.apache.HarmonyDRLVM.mm.mmtk.Memory.mmap() needs fixing");
       /*
     Address result = VM_Memory.mmap(start, Extent.fromIntZeroExtend(size),
                                        VM_Memory.PROT_READ | VM_Memory.PROT_WRITE | VM_Memory.PROT_EXEC, 
@@ -102,7 +139,7 @@ public class Memory extends org.mmtk.vm.Memory
       VM.sysFail("mmap with MAP_FIXED has unexpected behavior");
     }
     */
-    return 99;
+    return 0;
   }
   
   /**

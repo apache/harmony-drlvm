@@ -40,7 +40,7 @@ public class Barriers extends org.mmtk.vm.Barriers implements Uninterruptible {
                                            ObjectReference target, Offset offset, 
                                            int locationMetadata, int mode) 
     throws InlinePragma {
-    System.out.println("org.apache.HarmonyDRLVM.mm.mmtk.Barrier -- something was called (but should not be)" );
+    System.out.println("org.apache.HarmonyDRLVM.mm.mmtk.Barriers -- performWriteInBarrier was called (but should not be)" );
     //wjw turn this on when we need it -----> Object obj = ref.toObject();
     //wjw    VM_Magic.setObjectAtOffset(obj, offset, target.toObject(), locationMetadata);  
   }
@@ -71,7 +71,7 @@ public class Barriers extends org.mmtk.vm.Barriers implements Uninterruptible {
     } while (!VM_Magic.attemptObject(obj, offset, oldObject, newObject));
     return ObjectReference.fromObject(oldObject); 
     */
-    System.out.println("org.apache.HarmonyDRLVM.mm.mmtk.Barrier -- something was called (but should not be)" );
+    System.out.println("org.apache.HarmonyDRLVM.mm.mmtk.Barriers -- performWriteInBarrierAtomic was called (but should not be)" );
 
     return ref;  // keep the compiler happy
   }
@@ -90,7 +90,7 @@ public class Barriers extends org.mmtk.vm.Barriers implements Uninterruptible {
     setArrayNoBarrierStatic(dst, index, value);
   }
   public static final void setArrayNoBarrierStatic(char [] dst, int index, char value) {
-      System.out.println("org.apache.HarmonyDRLVM.mm.mmtk.Barrier -- something was called (but should not be)" );
+      System.out.println("org.apache.HarmonyDRLVM.mm.mmtk.Barriers.setArrayNoBarrier()" );
       dst[index] = value;
   }
 
@@ -106,7 +106,7 @@ public class Barriers extends org.mmtk.vm.Barriers implements Uninterruptible {
     return getArrayNoBarrierStatic(src, index);
   }
   public static final char getArrayNoBarrierStatic(char [] src, int index) {
-      System.out.println("org.apache.HarmonyDRLVM.mm.mmtk.Barrier -- something was called (but should not be)" );
+      System.out.println("org.apache.HarmonyDRLVM.mm.mmtk.Barriers.getArrayNoBarrier()" );
       return src[index];
   }
 
@@ -122,7 +122,7 @@ public class Barriers extends org.mmtk.vm.Barriers implements Uninterruptible {
     return getArrayNoBarrierStatic(src, index);
   }
   public static final byte getArrayNoBarrierStatic(byte [] src, int index) {
-      System.out.println("org.apache.HarmonyDRLVM.mm.mmtk.Barrier -- something was called (but should not be)" );
+      System.out.println("org.apache.HarmonyDRLVM.mm.mmtk.Barriers.getArrayNoBarrier()" );
       return src[index];
   }
 
@@ -135,7 +135,7 @@ public class Barriers extends org.mmtk.vm.Barriers implements Uninterruptible {
    * @return the new value of element
    */
   public final int getArrayNoBarrier(int [] src, int index) {
-      System.out.println("org.apache.HarmonyDRLVM.mm.mmtk.Barrier -- something was called (but should not be)" );
+      System.out.println("org.apache.HarmonyDRLVM.mm.mmtk.Barriers.getArrayNoBarrier()" );
       return src[index];
   }
 
@@ -148,7 +148,7 @@ public class Barriers extends org.mmtk.vm.Barriers implements Uninterruptible {
    * @return the new value of element
    */
   public final Object getArrayNoBarrier(Object [] src, int index) {
-      System.out.println("org.apache.HarmonyDRLVM.mm.mmtk.Barrier -- something was called (but should not be)" );
+      System.out.println("org.apache.HarmonyDRLVM.mm.mmtk.Barriers.getArrayNoBarrier()" );
       return src[index];
   }
   
@@ -165,7 +165,7 @@ public class Barriers extends org.mmtk.vm.Barriers implements Uninterruptible {
     return getArrayNoBarrierStatic(src, index);
   }
   public static final byte[] getArrayNoBarrierStatic(byte[][] src, int index) {
-      System.out.println("org.apache.HarmonyDRLVM.mm.mmtk.Barrier -- something was called (but should not be)" );
+      System.out.println("org.apache.HarmonyDRLVM.mm.mmtk.Barriers.getArrayNoBarrierStatic()" );
       return src[index];
   }
 }

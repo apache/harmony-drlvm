@@ -62,7 +62,7 @@ public class Lock extends org.mmtk.vm.Lock implements Uninterruptible {
         System.out.println("org.apache.HarmonyDRLVM.mm.mmtk.Lock.acquire(): " + name);
       try 
       {
-          this.wait();
+          //this.wait();
       } 
       catch (Exception e) 
       { 
@@ -82,7 +82,7 @@ public class Lock extends org.mmtk.vm.Lock implements Uninterruptible {
   public void release() 
   {
        System.out.println("org.apache.HarmonyDRLVM.mm.mmtk.Lock.release(): " + name);
-       this.notify();
+       //this.notify();
   }
 
 }

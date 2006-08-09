@@ -56,7 +56,7 @@ public final class Options extends org.mmtk.vm.Options {
       key += name.substring(old, space);
     } while (true);
     */
-    System.out.println("org.apache.HarmonyDRLVM.mm.mmtk.getKey() was called");
+    System.out.println("org.apache.HarmonyDRLVM.mm.mmtk.Options.getKey(String) " + name);
     return null;
   }
 
