@@ -71,10 +71,10 @@ public class Assert extends org.mmtk.vm.Assert implements Uninterruptible {
     {
         if (cond == false) 
         {
-            System.out.println("org.apache.HarmonyDRLVM.mm.mmtk.Assert._assert(): ");
+            System.out.println("****** org.apache.HarmonyDRLVM.mm.mmtk.Assert._assert() ******");
             Object obj = new Object();
             obj = null;
-            obj.notifyAll();  // this should cause a stack trace and exit
+            obj.notifyAll();
         }
     }
 
