@@ -4155,9 +4155,10 @@ vf_parse_bytecode( vf_Context_t *ctex )     // verifier context
     
     /**
      * Allocate memory for codeInstr
+     * +1 more instruction is the end of exception handler
      */
     vf_Instr_t *codeInstr = (vf_Instr_t*)vf_alloc_pool_memory( ctex->m_pool,
-                                    len * sizeof(vf_Instr_t) );
+                                    (len + 1) * sizeof(vf_Instr_t) );
     /**
      * Create start-entry instruction
      */
@@ -5021,10 +5022,17 @@ vf_parse_bytecode( vf_Context_t *ctex )     // verifier context
     }
 
     /**
+     * Create end-entry instruction
+     */
+    code = ctex->m_code;
+    vf_create_end_entry( &code[codeNum], ctex );
+    codeInstr[index].m_instr = codeNum;
+    codeNum++;
+
+    /**
      * Set handler basic blocks
      */
     edges = 0;
-    code = ctex->m_code;
     for( index = 0; index < handlcount; index++ ) {
         // check instruction range
         unsigned short start_pc;
@@ -5033,7 +5041,7 @@ vf_parse_bytecode( vf_Context_t *ctex )     // verifier context
         unsigned short handler_cp_index;
         method_get_exc_handler_info( ctex->m_method, (unsigned short)index, &start_pc, &end_pc,
             &handler_pc, &handler_cp_index );
-        if( ( start_pc >= len ) || ( end_pc >= len ) || ( handler_pc >= len ) )
+        if( ( start_pc >= len ) || ( end_pc > len ) || ( handler_pc >= len ) )
         {
             VERIFY_REPORT( ctex, "(class: " << class_get_name( ctex->m_class ) 
                     << ", method: " << method_get_name( ctex->m_method )
@@ -5093,7 +5101,7 @@ vf_parse_bytecode( vf_Context_t *ctex )     // verifier context
          * Set handler branches to last instructions of basic blocks
          */
         for( count = start_pc + 1; count <= end_pc; count++ ) {
-            if( codeInstr[count].m_mark ) {
+            if( count < len && codeInstr[count].m_mark ) {
                 // calculate code instruction number
                 instr = codeInstr[count].m_instr - 1;
                 // check existen of handler array
@@ -5110,12 +5118,6 @@ vf_parse_bytecode( vf_Context_t *ctex )     // verifier context
             }
         }
     }
-
-    /**
-     * Create end-entry instruction
-     */
-    vf_create_end_entry( &code[codeNum], ctex );
-    codeNum++;
 
     /** 
      * Initialize basic block count
