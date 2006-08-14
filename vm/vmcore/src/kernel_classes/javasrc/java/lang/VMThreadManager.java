@@ -30,7 +30,7 @@ package java.lang;
  * reference to the Thread object even if it hasn't been initialized yet.
  * <p>
  * This class must be implemented according to the common policy for porting
- * interfaces - see the porting interface overview for more detailes.
+ * interfaces - see the porting interface overview for more details.
  * 
  * @api2vm
  */
@@ -168,7 +168,7 @@ final class VMThreadManager {
      * <p>
      * The method allows to set the stack size for the thread specified in its
      * {@link Thread#Thread(java.lang.ThreadGroup, java.lang.Runnable,
-     * java.lang.String, long) contstructor}.
+     * java.lang.String, long) constructor}.
      * <p>
      * <b>Note:</b> This method is used for the {@link Thread#start()
      * Thread.start()} method implementation.

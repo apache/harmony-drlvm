@@ -24,7 +24,7 @@ package org.apache.harmony.vm;
  * methods must be used for different tasks to reach the better performance.
  * <p>
  * This class must be implemented according to the common policy for porting
- * interfaces - see the porting interface overview for more detailes.
+ * interfaces - see the porting interface overview for more details.
  * 
  * @author Evgueni Brevnov, Roman S. Bushmanov
  * @version $Revision: 1.1.6.4 $
@@ -40,7 +40,7 @@ public final class VMStack {
     }
 
     /**
-     * Returnes the class from the specified depth in the stack. If the
+     * Returns the class from the specified depth in the stack. If the
      * specified depth is equal to zero then the caller of the caller of this
      * method should be returned. Reflection stack frames should not be taken
      * into account. 
@@ -51,7 +51,7 @@ public final class VMStack {
      *         depth, null is returned.
      * @api2vm
      */
-    public static native Class getCallerClass(int depth);
+    public static native Class<?> getCallerClass(int depth);
 
     /**
      * Collects and returns the stack of the current thread as an array of
@@ -79,11 +79,11 @@ public final class VMStack {
     
     /**
      * Saves stack information of currently executing thread. Returned object
-     * can be used as a heandler to obtain an array of
+     * can be used as a handler to obtain an array of
      * <code>java.lang.StackTraceElement</code> by means of the
      * {@link VMStack#getStackTrace() VMStack.getStackTrace()} method.
      *   
-     * @return heandler of the current stack. 
+     * @return handler of the current stack. 
      */
     public static native Object getStackState();
     
@@ -99,7 +99,7 @@ public final class VMStack {
      * be excluded form the resulting array. The most top (recently invoked)
      * method is stored as a first element of the array.
      * 
-     * @param state heandler returned by the
+     * @param state handler returned by the
      *        {@link VMStack#getStackState() VMStack.getStackState()} method.
      * @return array of <code>StackTraceElement</code> elements. If stack is
      *         empty then array of length 0 should be returned.
@@ -118,5 +118,5 @@ public final class VMStack {
      * @return class loader of the specified class.
      * @api2vm
      */
-    static native ClassLoader getClassLoader(Class clazz);
+    static native ClassLoader getClassLoader(Class<?> clazz);
 }
