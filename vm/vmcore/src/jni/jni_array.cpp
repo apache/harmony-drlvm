@@ -1243,10 +1243,9 @@ void JNICALL GetBooleanArrayRegion (JNIEnv *env,
 {
     TRACE2("jni", "GetBooleanArrayRegion called");
     assert(tmn_is_suspend_enabled());
-    assert(len >= 0);
     jsize length = GetArrayLength(env, array);
     jsize end = start + len;
-    if(start < 0 || start >= length || end < 0 || end > length) {
+    if(start < 0 || len < 0 || end > length) {
         char msg[30];
         sprintf(msg, "%d..%d", start, end);
         ThrowNew_Quick(env, "java/lang/ArrayIndexOutOfBoundsException", msg);
@@ -1273,10 +1272,9 @@ void JNICALL GetByteArrayRegion    (JNIEnv *env,
 {
     TRACE2("jni", "GetByteArrayRegion called");
     assert(tmn_is_suspend_enabled());
-    assert(len >= 0);
     jsize length = GetArrayLength(env, array);
     jsize end = start + len;
-    if(start < 0 || start >= length || end < 0 || end > length) {
+    if(start < 0 || len < 0 || end > length) {
         char msg[30];
         sprintf(msg, "%d..%d", start, end);
         ThrowNew_Quick(env, "java/lang/ArrayIndexOutOfBoundsException", msg);
@@ -1303,10 +1301,9 @@ void JNICALL GetCharArrayRegion(JNIEnv *env,
 {
     TRACE2("jni", "GetCharArrayRegion called");
     assert(tmn_is_suspend_enabled());
-    assert(len >= 0);
     jsize length = GetArrayLength(env, array);
     jsize end = start + len;
-    if(start < 0 || start >= length || end < 0 || end > length) {
+    if(start < 0 || len < 0 || end > length) {
         char msg[30];
         sprintf(msg, "%d..%d", start, end);
         ThrowNew_Quick(env, "java/lang/ArrayIndexOutOfBoundsException", msg);
@@ -1333,10 +1330,9 @@ void JNICALL GetShortArrayRegion(JNIEnv *env,
 {
     TRACE2("jni", "GetShortArrayRegion called");
     assert(tmn_is_suspend_enabled());
-    assert(len >= 0);
     jsize length = GetArrayLength(env, array);
     jsize end = start + len;
-    if(start < 0 || start >= length || end < 0 || end > length) {
+    if(start < 0 || len < 0 || end > length) {
         char msg[30];
         sprintf(msg, "%d..%d", start, end);
         ThrowNew_Quick(env, "java/lang/ArrayIndexOutOfBoundsException", msg);
@@ -1363,10 +1359,9 @@ void JNICALL GetIntArrayRegion(JNIEnv *env,
 {
     TRACE2("jni", "GetIntArrayRegion called");
     assert(tmn_is_suspend_enabled());
-    assert(len >= 0);
     jsize length = GetArrayLength(env, array);
     jsize end = start + len;
-    if(start < 0 || start >= length || end < 0 || end > length) {
+    if(start < 0 || len < 0 || end > length) {
         char msg[30];
         sprintf(msg, "%d..%d", start, end);
         ThrowNew_Quick(env, "java/lang/ArrayIndexOutOfBoundsException", msg);
@@ -1393,10 +1388,9 @@ void JNICALL GetLongArrayRegion(JNIEnv *env,
 {
     TRACE2("jni", "GetLongArrayRegion called");
     assert(tmn_is_suspend_enabled());
-    assert(len >= 0);
     jsize length = GetArrayLength(env, array);
     jsize end = start + len;
-    if(start < 0 || start >= length || end < 0 || end > length) {
+    if(start < 0 || len < 0 || end > length) {
         char msg[30];
         sprintf(msg, "%d..%d", start, end);
         ThrowNew_Quick(env, "java/lang/ArrayIndexOutOfBoundsException", msg);
@@ -1423,10 +1417,9 @@ void JNICALL GetFloatArrayRegion(JNIEnv *env,
 {
     TRACE2("jni", "GetFloatArrayRegion called");
     assert(tmn_is_suspend_enabled());
-    assert(len >= 0);
     jsize length = GetArrayLength(env, array);
     jsize end = start + len;
-    if(start < 0 || start >= length || end < 0 || end > length) {
+    if(start < 0 || len < 0 || end > length) {
         char msg[30];
         sprintf(msg, "%d..%d", start, end);
         ThrowNew_Quick(env, "java/lang/ArrayIndexOutOfBoundsException", msg);
@@ -1453,10 +1446,9 @@ void JNICALL GetDoubleArrayRegion(JNIEnv *env,
 {
     TRACE2("jni", "GetDoubleArrayRegion called");
     assert(tmn_is_suspend_enabled());
-    assert(len >= 0);
     jsize length = GetArrayLength(env, array);
     jsize end = start + len;
-    if(start < 0 || start >= length || end < 0 || end > length) {
+    if(start < 0 || len < 0 || end > length) {
         char msg[30];
         sprintf(msg, "%d..%d", start, end);
         ThrowNew_Quick(env, "java/lang/ArrayIndexOutOfBoundsException", msg);
@@ -1491,10 +1483,9 @@ void JNICALL SetBooleanArrayRegion(JNIEnv *env,
 {
     TRACE2("jni", "SetBooleanArrayRegion called");
     assert(tmn_is_suspend_enabled());
-    assert(len >= 0);
     jsize length = GetArrayLength(env, array);
     jsize end = start + len;
-    if(start < 0 || start >= length || end < 0 || end > length) {
+    if(start < 0 || len < 0 || end > length) {
         char msg[30];
         sprintf(msg, "%d..%d", start, end);
         ThrowNew_Quick(env, "java/lang/ArrayIndexOutOfBoundsException", msg);
@@ -1523,12 +1514,9 @@ void JNICALL SetByteArrayRegion(JNIEnv *env,
 {
     TRACE2("jni", "SetByteArrayRegion called");
     assert(tmn_is_suspend_enabled());
-    assert(len >= 0);
-    if (len == 0) //don't need to do set exactly
-        return;
     jsize length = GetArrayLength(env, array);
     jsize end = start + len;
-    if(start < 0 || start >= length || end < 0 || end > length) {
+    if(start < 0 || len < 0 || end > length) {
         char msg[30];
         sprintf(msg, "%d..%d", start, end);
         ThrowNew_Quick(env, "java/lang/ArrayIndexOutOfBoundsException", msg);
@@ -1557,10 +1545,9 @@ void JNICALL SetCharArrayRegion(JNIEnv *env,
 {
     TRACE2("jni", "SetCharArrayRegion called");
     assert(tmn_is_suspend_enabled());
-    assert(len >= 0);
     jsize length = GetArrayLength(env, array);
     jsize end = start + len;
-    if(start < 0 || start >= length || end < 0 || end > length) {
+    if(start < 0 || len < 0 || end > length) {
         char msg[30];
         sprintf(msg, "%d..%d", start, end);
         ThrowNew_Quick(env, "java/lang/ArrayIndexOutOfBoundsException", msg);
@@ -1589,10 +1576,9 @@ void JNICALL SetShortArrayRegion(JNIEnv *env,
 {
     TRACE2("jni", "SetShortArrayRegion called");
     assert(tmn_is_suspend_enabled());
-    assert(len >= 0);
     jsize length = GetArrayLength(env, array);
     jsize end = start + len;
-    if(start < 0 || start >= length || end < 0 || end > length) {
+    if(start < 0 || len < 0 || end > length) {
         char msg[30];
         sprintf(msg, "%d..%d", start, end);
         ThrowNew_Quick(env, "java/lang/ArrayIndexOutOfBoundsException", msg);
@@ -1621,10 +1607,9 @@ void JNICALL SetIntArrayRegion(JNIEnv *env,
 {
     TRACE2("jni", "SetIntArrayRegion called");
     assert(tmn_is_suspend_enabled());
-    assert(len >= 0);
     jsize length = GetArrayLength(env, array);
     jsize end = start + len;
-    if(start < 0 || start >= length || end < 0 || end > length) {
+    if(start < 0 || len < 0 || end > length) {
         char msg[30];
         sprintf(msg, "%d..%d", start, end);
         ThrowNew_Quick(env, "java/lang/ArrayIndexOutOfBoundsException", msg);
@@ -1653,10 +1638,9 @@ void JNICALL SetLongArrayRegion(JNIEnv *env,
 {
     TRACE2("jni", "SetLongArrayRegion called");
     assert(tmn_is_suspend_enabled());
-    assert(len >= 0);
     jsize length = GetArrayLength(env, array);
     jsize end = start + len;
-    if(start < 0 || start >= length || end < 0 || end > length) {
+    if(start < 0 || len < 0 || end > length) {
         char msg[30];
         sprintf(msg, "%d..%d", start, end);
         ThrowNew_Quick(env, "java/lang/ArrayIndexOutOfBoundsException", msg);
@@ -1685,10 +1669,9 @@ void JNICALL SetFloatArrayRegion(JNIEnv *env,
 {
     TRACE2("jni", "SetFloatArrayRegion called");
     assert(tmn_is_suspend_enabled());
-    assert(len >= 0);
     jsize length = GetArrayLength(env, array);
     jsize end = start + len;
-    if(start < 0 || start >= length || end < 0 || end > length) {
+    if(start < 0 || len < 0 || end > length) {
         char msg[30];
         sprintf(msg, "%d..%d", start, end);
         ThrowNew_Quick(env, "java/lang/ArrayIndexOutOfBoundsException", msg);
@@ -1717,10 +1700,9 @@ void JNICALL SetDoubleArrayRegion(JNIEnv *env,
 {
     TRACE2("jni", "SetDoubleArrayRegion called");
     assert(tmn_is_suspend_enabled());
-    assert(len >= 0);
     jsize length = GetArrayLength(env, array);
     jsize end = start + len;
-    if(start < 0 || start >= length || end < 0 || end > length) {
+    if(start < 0 || len < 0 || end > length) {
         char msg[30];
         sprintf(msg, "%d..%d", start, end);
         ThrowNew_Quick(env, "java/lang/ArrayIndexOutOfBoundsException", msg);
