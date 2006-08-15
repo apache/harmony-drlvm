@@ -32,6 +32,14 @@ public final class Atomics {
 
     private Atomics() {};
 
+     /**
+      * Returns offset of the given field.
+      * @param field the field for which offset is returned
+      *
+      * @return offset of the given field
+      */
+    public static native long getFieldOffset(Field field);
+
     /**
      * Atomically sets an integer field to x if it currently contains the expected value.
      * @param o object those integer field needs to be set
@@ -42,7 +50,7 @@ public final class Atomics {
      * @return true if the value was set.
      * False return indicates that the actual value was not equal to the expected value.
      */
-    public static native boolean compareAndSetInt(Object o, Field field, int expected, int x);
+    public static native boolean compareAndSetInt(Object o, long offset, int expected, int x);
 
     /**
      * Atomically sets a boolean field to x if it currently contains the expected value.
@@ -54,7 +62,7 @@ public final class Atomics {
      * @return true if the value was set.
      * False return indicates that the actual value was not equal to the expected value.
      */
-    public static native boolean compareAndSetBoolean(Object o, Field field, boolean expected, boolean x);
+    public static native boolean compareAndSetBoolean(Object o, long offset, boolean expected, boolean x);
 
 
     /**
@@ -67,7 +75,7 @@ public final class Atomics {
      * @return true if the value was set.
      * False return indicates that the actual value was not equal to the expected value.
      */
-    public static native boolean compareAndSetLong(Object o, Field field, long expected, long x);
+    public static native boolean compareAndSetLong(Object o, long offset, long expected, long x);
 
 
     /**
@@ -80,7 +88,7 @@ public final class Atomics {
      * @return true if the value was set.
      * False return indicates that the actual value was not equal to the expected value.
      */
-    public static native boolean compareAndSetObject(Object o, Field field, Object expected, Object x);
+    public static native boolean compareAndSetObject(Object o, long offset, Object expected, Object x);
 
 
     /**

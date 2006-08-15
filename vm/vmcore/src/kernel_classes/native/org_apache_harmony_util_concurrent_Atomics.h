@@ -41,32 +41,38 @@ extern "C" {
 /* Native methods */
 
 /*
- * Method: org.apache.harmony.util.concurrent.Atomics.compareAndSetInt(Ljava/lang/Object;Ljava/lang/reflect/Field;II)Z
+ * Method: org.apache.harmony.util.concurrent.Atomics.getFieldOffset(Ljava/lang/reflect/Field;)J
  */
-JNIEXPORT jboolean JNICALL
-Java_org_apache_harmony_util_concurrent_Atomics_compareAndSetInt__Ljava_lang_Object_2Ljava_lang_reflect_Field_2II(JNIEnv *, jclass, 
-    jobject, jobject, jint, jint);
+JNIEXPORT jlong JNICALL
+Java_org_apache_harmony_util_concurrent_Atomics_getFieldOffset(JNIEnv *, jclass, jobject);
 
 /*
- * Method: org.apache.harmony.util.concurrent.Atomics.compareAndSetBoolean(Ljava/lang/Object;Ljava/lang/reflect/Field;ZZ)Z
+ * Method: org.apache.harmony.util.concurrent.Atomics.compareAndSetInt(Ljava/lang/Object;JII)Z
  */
 JNIEXPORT jboolean JNICALL
-Java_org_apache_harmony_util_concurrent_Atomics_compareAndSetBoolean__Ljava_lang_Object_2Ljava_lang_reflect_Field_2ZZ(JNIEnv *, jclass, 
-    jobject, jobject, jboolean, jboolean);
+Java_org_apache_harmony_util_concurrent_Atomics_compareAndSetInt__Ljava_lang_Object_2JII(JNIEnv *, jclass, 
+    jobject, jlong, jint, jint);
 
 /*
- * Method: org.apache.harmony.util.concurrent.Atomics.compareAndSetLong(Ljava/lang/Object;Ljava/lang/reflect/Field;JJ)Z
+ * Method: org.apache.harmony.util.concurrent.Atomics.compareAndSetBoolean(Ljava/lang/Object;JZZ)Z
  */
 JNIEXPORT jboolean JNICALL
-Java_org_apache_harmony_util_concurrent_Atomics_compareAndSetLong__Ljava_lang_Object_2Ljava_lang_reflect_Field_2JJ(JNIEnv *, jclass, 
-    jobject, jobject, jlong, jlong);
+Java_org_apache_harmony_util_concurrent_Atomics_compareAndSetBoolean__Ljava_lang_Object_2JZZ(JNIEnv *, jclass, 
+    jobject, jlong, jboolean, jboolean);
 
 /*
- * Method: org.apache.harmony.util.concurrent.Atomics.compareAndSetObject(Ljava/lang/Object;Ljava/lang/reflect/Field;Ljava/lang/Object;Ljava/lang/Object;)Z
+ * Method: org.apache.harmony.util.concurrent.Atomics.compareAndSetLong(Ljava/lang/Object;JJJ)Z
  */
 JNIEXPORT jboolean JNICALL
-Java_org_apache_harmony_util_concurrent_Atomics_compareAndSetObject__Ljava_lang_Object_2Ljava_lang_reflect_Field_2Ljava_lang_Object_2Ljava_lang_Object_2(JNIEnv *, jclass, 
-    jobject, jobject, jobject, jobject);
+Java_org_apache_harmony_util_concurrent_Atomics_compareAndSetLong__Ljava_lang_Object_2JJJ(JNIEnv *, jclass, 
+    jobject, jlong, jlong, jlong);
+
+/*
+ * Method: org.apache.harmony.util.concurrent.Atomics.compareAndSetObject(Ljava/lang/Object;JLjava/lang/Object;Ljava/lang/Object;)Z
+ */
+JNIEXPORT jboolean JNICALL
+Java_org_apache_harmony_util_concurrent_Atomics_compareAndSetObject__Ljava_lang_Object_2JLjava_lang_Object_2Ljava_lang_Object_2(JNIEnv *, jclass, 
+    jobject, jlong, jobject, jobject);
 
 /*
  * Method: org.apache.harmony.util.concurrent.Atomics.compareAndSetInt([IIII)Z

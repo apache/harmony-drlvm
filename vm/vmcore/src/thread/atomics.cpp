@@ -69,18 +69,17 @@ bool gc_heap_slot_cas_ref (Managed_Object_Handle p_base_of_object_with_slot,
 }
 
 
-jlong getFieldOffset (JNIEnv *env, jobject field) {
+JNIEXPORT jlong getFieldOffset(JNIEnv * env, jobject field) 
+{
     Field *f = (Field *) FromReflectedField(env, field);
     return f->get_offset();
 }
 
-
 JNIEXPORT jboolean compareAndSetObjectField
-(JNIEnv * env, jobject UNREF accesor, jobject obj, jobject fieldID, jobject expected, jobject value)
+(JNIEnv * env, jobject UNREF accesor, jobject obj, jlong offset, jobject expected, jobject value)
 {
 
     assert(tmn_is_suspend_enabled());
-    jlong offset = getFieldOffset(env, fieldID);
 
     ObjectHandle h = (ObjectHandle)obj;
     ObjectHandle v = (ObjectHandle)value;
@@ -116,10 +115,9 @@ JNIEXPORT jboolean compareAndSetObjectField
 
 
 JNIEXPORT jboolean compareAndSetBooleanField
-(JNIEnv * env, jobject UNREF accesor, jobject obj, jobject fieldID, jboolean expected, jboolean value)
+(JNIEnv * env, jobject UNREF accesor, jobject obj, jlong offset, jboolean expected, jboolean value)
 {
     assert(tmn_is_suspend_enabled());
-    jlong offset = getFieldOffset(env, fieldID);
     ObjectHandle h = (ObjectHandle)obj;
 
     tmn_suspend_disable();
@@ -135,11 +133,10 @@ JNIEXPORT jboolean compareAndSetBooleanField
 
                   
 JNIEXPORT jboolean compareAndSetIntField
-(JNIEnv * env, jobject UNREF accesor, jobject obj, jobject fieldID, jint expected, jint value)
+(JNIEnv * env, jobject UNREF accesor, jobject obj, jlong offset, jint expected, jint value)
 {
 
     assert(tmn_is_suspend_enabled());
-    jlong offset = getFieldOffset(env, fieldID);
     ObjectHandle h = (ObjectHandle)obj;
 
     tmn_suspend_disable();
@@ -155,10 +152,9 @@ JNIEXPORT jboolean compareAndSetIntField
 
 
 JNIEXPORT jboolean compareAndSetLongField
-(JNIEnv * env, jobject UNREF accesor, jobject obj, jobject fieldID, jlong expected, jlong value)
+(JNIEnv * env, jobject UNREF accesor, jobject obj, jlong offset, jlong expected, jlong value)
 {
     assert(tmn_is_suspend_enabled());
-    jlong offset = getFieldOffset(env, fieldID);
     ObjectHandle h = (ObjectHandle)obj;
 
     tmn_suspend_disable();

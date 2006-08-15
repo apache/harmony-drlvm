@@ -25,17 +25,21 @@
 #include "Class.h"
 #include "vm_synch.h"
 
+
+JNIEXPORT jlong getFieldOffset
+  (JNIEnv * env, jobject field);
+
 JNIEXPORT jboolean compareAndSetObjectField
-  (JNIEnv * env, jobject self, jobject obj, jobject fieldID, jobject expected, jobject value);
+  (JNIEnv * env, jobject self, jobject obj, jlong offset, jobject expected, jobject value);
       
 JNIEXPORT jboolean compareAndSetBooleanField
-  (JNIEnv * env, jobject self, jobject obj, jobject fieldID, jboolean expected, jboolean value);
+  (JNIEnv * env, jobject self, jobject obj, jlong offset, jboolean expected, jboolean value);
                   
 JNIEXPORT jboolean compareAndSetIntField
-  (JNIEnv * env, jobject self, jobject obj, jobject fieldID, jint expected, jint value);
+  (JNIEnv * env, jobject self, jobject obj, jlong offset, jint expected, jint value);
                   
 JNIEXPORT jboolean compareAndSetLongField
-  (JNIEnv * env, jobject self, jobject obj, jobject fieldID, jlong expected, jlong value);
+  (JNIEnv * env, jobject self, jobject obj, jlong offset, jlong expected, jlong value);
                
 JNIEXPORT jboolean compareAndSetObjectArray
 (JNIEnv * env, jobject self, jobjectArray array, jint index, jobject expected, jobject value);

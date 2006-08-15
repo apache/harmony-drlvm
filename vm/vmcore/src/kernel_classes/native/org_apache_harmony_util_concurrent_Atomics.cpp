@@ -23,37 +23,44 @@
 #include "org_apache_harmony_util_concurrent_Atomics.h"
 
 
-JNIEXPORT jboolean JNICALL 
-Java_org_apache_harmony_util_concurrent_Atomics_compareAndSetObject__Ljava_lang_Object_2Ljava_lang_reflect_Field_2Ljava_lang_Object_2Ljava_lang_Object_2
-(JNIEnv * env, jobject self, jobject obj, jobject fieldID, jobject expected, jobject value)
-{     
-    return compareAndSetObjectField(env, self, obj, fieldID, expected, value);
-}
-
-
-JNIEXPORT jboolean JNICALL
-Java_org_apache_harmony_util_concurrent_Atomics_compareAndSetBoolean__Ljava_lang_Object_2Ljava_lang_reflect_Field_2ZZ
-(JNIEnv * env, jobject self, jobject obj, jobject fieldID, jboolean expected, jboolean value)
+JNIEXPORT jlong JNICALL
+Java_org_apache_harmony_util_concurrent_Atomics_getFieldOffset(JNIEnv * env, jclass self, 
+    jobject field)
 {
-    return compareAndSetBooleanField(env, self, obj, fieldID, expected, value);
+    return getFieldOffset(env, field);
 }
 
-                  
-JNIEXPORT jboolean JNICALL
-Java_org_apache_harmony_util_concurrent_Atomics_compareAndSetInt__Ljava_lang_Object_2Ljava_lang_reflect_Field_2II
-(JNIEnv * env, jobject self, jobject obj, jobject fieldID, jint expected, jint value)
+JNIEXPORT jboolean JNICALL 
+Java_org_apache_harmony_util_concurrent_Atomics_compareAndSetObject__Ljava_lang_Object_2JLjava_lang_Object_2Ljava_lang_Object_2
+(JNIEnv * env, jobject self, jobject obj, jlong offset, jobject expected, jobject value)
 {     
-    return compareAndSetIntField(env, self, obj, fieldID, expected, value);
-}
-
-
-JNIEXPORT jboolean JNICALL
-Java_org_apache_harmony_util_concurrent_Atomics_compareAndSetLong__Ljava_lang_Object_2Ljava_lang_reflect_Field_2JJ
-(JNIEnv * env, jobject self, jobject obj, jobject fieldID, jlong expected, jlong value)
-{     
-    return compareAndSetLongField(env, self, obj, fieldID, expected, value);
+    return compareAndSetObjectField(env, self, obj, offset, expected, value);
 }
  
+ 
+JNIEXPORT jboolean JNICALL
+Java_org_apache_harmony_util_concurrent_Atomics_compareAndSetBoolean__Ljava_lang_Object_2JZZ 
+(JNIEnv * env, jobject self, jobject obj, jlong offset, jboolean expected, jboolean value)
+{
+    return compareAndSetBooleanField(env, self, obj, offset, expected, value);
+}
+ 
+                   
+JNIEXPORT jboolean JNICALL
+Java_org_apache_harmony_util_concurrent_Atomics_compareAndSetInt__Ljava_lang_Object_2JII 
+(JNIEnv * env, jobject self, jobject obj, jlong offset, jint expected, jint value)
+{     
+    return compareAndSetIntField(env, self, obj, offset, expected, value);
+}
+ 
+ 
+JNIEXPORT jboolean JNICALL
+Java_org_apache_harmony_util_concurrent_Atomics_compareAndSetLong__Ljava_lang_Object_2JJJ 
+(JNIEnv * env, jobject self, jobject obj, jlong offset, jlong expected, jlong value)
+{     
+    return compareAndSetLongField(env, self, obj, offset, expected, value);
+}
+
 
 JNIEXPORT jboolean JNICALL
 Java_org_apache_harmony_util_concurrent_Atomics_compareAndSetInt___3IIII
