@@ -93,10 +93,6 @@ Description of the product deploy folder.
 
 
         <java_script>
-            <select os="win">
-                <other>bin:java.bat</other>
-            </select>
-
             <select os="lnx">
                 <other>bin:java.sh</other>
             </select>

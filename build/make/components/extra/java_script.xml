@@ -28,14 +28,6 @@ Version: $Revision: 1.1.2.6 $
 <project name="extra.java_script">
     <target name="init" >
         <mkdir dir="${build.dir}/_other" />
-        <select os="win">
-            <echo file="${build.dir}/_other/java.bat">
-<![CDATA[
-.\java.exe %*
-]]>
-</echo>
-        </select>
-
         <select os="lnx">
             <echo file="${build.dir}/_other/java.sh">
 #!/bin/sh
