@@ -289,7 +289,10 @@ size_t get_available_stack_size() {
             - get_guard_page_size() - get_guard_stack_size();
     return available_stack_size;
 }
-
+size_t get_default_stack_size() {
+    size_t default_stack_size = get_stack_size();
+    return default_stack_size;
+}
 bool check_available_stack_size(size_t required_size) {
     if (get_available_stack_size() < required_size) {
         exn_raise_by_name("java/lang/StackOverflowError");

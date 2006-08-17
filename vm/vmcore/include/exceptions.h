@@ -270,5 +270,6 @@ void set_guard_stack();
 void init_stack_info();
 VMEXPORT size_t get_available_stack_size();
 VMEXPORT bool check_available_stack_size(size_t required_size);
+VMEXPORT size_t get_default_stack_size();
 
 #endif // _EXCEPTIONS_H_
