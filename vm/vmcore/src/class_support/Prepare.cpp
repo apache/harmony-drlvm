@@ -855,7 +855,7 @@ void assign_offsets_to_class_methods(Class *clss)
                 for (j = 0;  j < n_super_virtual_method_entries;  j++) {
                     Method *m = super_vtable_descriptors[j];
                     if (name == m->get_name() && desc == m->get_descriptor()) {
-                        if( m->is_final() ) {
+                        if( m->is_final() && !m->is_private() ) {
                             clss->state = ST_Error;
                             return;
                         }
