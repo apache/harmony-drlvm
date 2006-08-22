@@ -22,14 +22,18 @@
 package org.apache.HarmonyDRLVM.mm.mmtk;
 
 import org.mmtk.plan.nogc.*;
+import org.mmtk.plan.marksweep.*;
 import org.vmmagic.pragma.*;
+import org.mmtk.plan.Plan;
 
-public final class SelectedPlan extends NoGC
-  implements Uninterruptible {
+public final class SelectedPlan implements Uninterruptible 
+{
+    //public static final Plan singleton = new NoGC();
+    public static final MS singleton = new MS();
+    public static org.apache.HarmonyDRLVM.mm.mmtk.ActivePlan ap = new org.apache.HarmonyDRLVM.mm.mmtk.ActivePlan();
 
-  public static final SelectedPlan singleton = new SelectedPlan();
-  
-  public static final SelectedPlan get() throws InlinePragma {
-    return singleton;
-  }
+    public static final Plan get() throws InlinePragma 
+    {
+        return singleton;
+    }
 }

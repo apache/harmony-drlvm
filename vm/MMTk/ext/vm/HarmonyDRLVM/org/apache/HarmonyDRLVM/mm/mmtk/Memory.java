@@ -35,7 +35,7 @@ import org.vmmagic.pragma.*;
 public class Memory extends org.mmtk.vm.Memory
   implements Constants, Uninterruptible {
 
-    static protected int PHONY_JAVA_HEAP_SIZE = 1024 * 1024 * 256;
+    static protected int PHONY_JAVA_HEAP_SIZE = 1024 * 1024 * 350;
     static protected byte [] immortalPinnedScratchObject;  //wjw -- ugly hack, make it static so that it is always enumerated
     static protected int dangerousPointerToStartOfScratchArea;
     static protected int dangerousPointerToEndOfScratchArea;
@@ -97,21 +97,21 @@ public class Memory extends org.mmtk.vm.Memory
 
     public final void globalPrepareVMSpace() 
     {
-        System.out.println("org.apache.HarmonyDRLVM.mm.mmtk.Memory.globalPrepareVMSpace() needs fixing");
+        //System.out.println("org.apache.HarmonyDRLVM.mm.mmtk.Memory.globalPrepareVMSpace() needs fixing");
     }
 
     public final void collectorPrepareVMSpace() 
     {
-        System.out.println("org.apache.HarmonyDRLVM.mm.mmtk.Memory.collectorPrepareVMSpace() needs fixing");
+        //System.out.println("org.apache.HarmonyDRLVM.mm.mmtk.Memory.collectorPrepareVMSpace() needs fixing");
     }
 
     public final void collectorReleaseVMSpace() 
     {
-        System.out.println("org.apache.HarmonyDRLVM.mm.mmtk.Memory.collectorReleaseVMSpace() needs fixing");
+        //System.out.println("org.apache.HarmonyDRLVM.mm.mmtk.Memory.collectorReleaseVMSpace() needs fixing");
     }
     public final void globalReleaseVMSpace() 
     {
-        System.out.println("org.apache.HarmonyDRLVM.mm.mmtk.Memory.gobalReleaseVMSpace() needs fixing");
+        //System.out.println("org.apache.HarmonyDRLVM.mm.mmtk.Memory.gobalReleaseVMSpace() needs fixing");
     }
     public final void setHeapRange(int id, Address start, Address end) 
     {
@@ -151,7 +151,8 @@ public class Memory extends org.mmtk.vm.Memory
    * <code>false</code>
    */
   public final boolean mprotect(Address start, int size) {
-    System.out.println("org.apache.HarmonyDRLVM.mm.mmtk.Memory.mprotect() needs fixing");
+    System.out.println("org.apache.HarmonyDRLVM.mm.mmtk.Memory.mprotect() needs fixing, start = " + Integer.toHexString(start.toInt())
+     +   " size = " + size);
     return false; //return VM_Memory.mprotect(start, Extent.fromIntZeroExtend(size), VM_Memory.PROT_NONE);
   }
 
@@ -228,10 +229,10 @@ public class Memory extends org.mmtk.vm.Memory
    */
 
   public final void sync() throws InlinePragma {
-    System.out.println("org.apache.HarmonyDRLVM.mm.mmtk.Memory.sync() was called"); 
+    //System.out.println("org.apache.HarmonyDRLVM.mm.mmtk.Memory.sync() was called"); 
   }
 
   public final void isync() throws InlinePragma {
-    System.out.println("org.apache.HarmonyDRLVM.mm.mmtk.Memory.isync() was called");
+    //System.out.println("org.apache.HarmonyDRLVM.mm.mmtk.Memory.isync() was called");
   }
 }

@@ -36,9 +36,12 @@ public final class Strings extends org.mmtk.vm.Strings implements Uninterruptibl
   public final void write(char [] c, int len) {
       for (int xx=0; xx < c.length; xx++) 
       {
-        System.out.print(c[xx]);    
+        System.out.print(c[xx]);
+        int zz = (int)c[xx];
+        if (zz == 0) break;
       }
       System.out.println("");
+      for (int xx=0; xx < c.length; xx++) c[xx] = 0;
   }
 
   /**
@@ -50,9 +53,12 @@ public final class Strings extends org.mmtk.vm.Strings implements Uninterruptibl
   public final void writeThreadId(char [] c, int len) {
       for (int xx=0; xx < c.length; xx++) 
       {
-          System.out.print(c[xx]);    
+          System.out.print(c[xx]); 
+          int zz = (int)c[xx];
+          if (zz == 0) break;
       }
-      System.out.println("");    
+      System.out.println("");
+      for (int xx=0; xx < c.length; xx++) c[xx] = 0;
   }
 
   /**
@@ -72,18 +78,14 @@ public final class Strings extends org.mmtk.vm.Strings implements Uninterruptibl
   public final int copyStringToChars(String src, char [] dst,
                                      int dstBegin, int dstEnd)
     throws LogicallyUninterruptiblePragma {
-      /*
-    if (VM.runningVM)
-      VM_Processor.getCurrentProcessor().disableThreadSwitching();
+  
+    
     int len = src.length();
     int n = (dstBegin + len <= dstEnd) ? len : (dstEnd - dstBegin);
-    for (int i = 0; i < n; i++) 
-      Barriers.setArrayNoBarrierStatic(dst, dstBegin + i, src.charAt(i));
-    if (VM.runningVM)
-      VM_Processor.getCurrentProcessor().enableThreadSwitching();
+      for (int i = 0; i < n; i++) 
+      {
+          Barriers.setArrayNoBarrierStatic(dst, dstBegin + i, src.charAt(i));
+      }
     return n;
-    */
-      System.out.println("org.apache.HarmonyDRLVM.mm.mmtk.Strings.copyStringToChars()");
-      return 0;
   }
 }

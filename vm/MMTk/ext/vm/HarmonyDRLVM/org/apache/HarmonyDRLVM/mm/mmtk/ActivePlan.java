@@ -21,7 +21,6 @@
 package org.apache.HarmonyDRLVM.mm.mmtk;
 
 import org.mmtk.plan.Plan;
-import org.mmtk.plan.nogc.*;
 import org.mmtk.plan.CollectorContext;
 import org.mmtk.plan.MutatorContext;
 import org.mmtk.plan.PlanConstraints;
@@ -36,15 +35,15 @@ public final class ActivePlan extends org.mmtk.vm.ActivePlan implements Uninterr
 
   /* Collector and Mutator Context Management */
   private static final int MAX_CONTEXTS = 1;  //wjw -- just do single thread for starts
-  private static NoGCCollector[] collectors = new NoGCCollector[MAX_CONTEXTS];
+  private static CollectorContext[] collectors = new CollectorContext[MAX_CONTEXTS];
   private static int collectorCount = 0; // Number of collector instances 
-  private static NoGCMutator[] mutators = new NoGCMutator[MAX_CONTEXTS];
+  private static MutatorContext[] mutators = new MutatorContext[MAX_CONTEXTS];
   private static int mutatorCount = 0; // Number of mutator instances 
   private static SynchronizedCounter mutatorCounter = new SynchronizedCounter();
 
   /** @return The active Plan instance. */
   public final Plan global() throws InlinePragma {
-    return SelectedPlan.get();  //wjw SelectedPlan is hardcoded for NoGC for now...
+    return SelectedPlan.get();
   } 
   
   /** @return The active PlanConstraints instance. */
@@ -109,7 +108,7 @@ public final class ActivePlan extends org.mmtk.vm.ActivePlan implements Uninterr
    * @return The CollectorContext's unique identifier
    */
   public final int registerCollector(CollectorContext collector) throws InterruptiblePragma {
-    collectors[collectorCount] = (NoGCCollector)collector;
+    collectors[collectorCount] = collector;
     return collectorCount++;
   }
   
@@ -123,7 +122,7 @@ public final class ActivePlan extends org.mmtk.vm.ActivePlan implements Uninterr
    */
     //wjw -- this needs to be called by VM when a new java thread is created
   public final int registerMutator(MutatorContext mutator) throws InterruptiblePragma {
-    mutators[mutatorCount] = (NoGCMutator)mutator;
+    mutators[mutatorCount] = mutator;
     return mutatorCount++;
   } 
 }

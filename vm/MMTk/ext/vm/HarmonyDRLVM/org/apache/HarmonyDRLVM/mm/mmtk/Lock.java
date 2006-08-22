@@ -41,28 +41,62 @@ import org.mmtk.utility.Log;
 public class Lock extends org.mmtk.vm.Lock implements Uninterruptible {
 
 
+  static private int idx;             // lock id (based on a non-resetting counter)
+  static Object criticalSection = new Object();
+
   // Core Instance fields
   private String name;        // logical name of lock
-  private int id;             // lock id (based on a non-resetting counter)
+  private int id;
+  private Thread owningThread;
+  private int recursionCount;
 
-  public Lock(String name) { 
-    this();
+  public Lock() 
+  {
+        this("no name lock");
+  }
+
+  public Lock(String name) {
     this.name = name;
+    
+      try 
+      {
+          synchronized(criticalSection) 
+          {
+              this.id = Lock.idx;
+              Lock.idx++;
+          }
+      } 
+      catch (Exception e) {System.out.println("org.apache.HarmonyDRLVM.mm.mmtk.Lock() has a problem");  }
   }
-  
-  public Lock() { 
-
-  }
+ 
 
   public void setName(String str) {
     name = str;
   }
 
   public void acquire() {
-        System.out.println("org.apache.HarmonyDRLVM.mm.mmtk.Lock.acquire(): " + name);
+        //System.out.println("org.apache.HarmonyDRLVM.mm.mmtk.Lock.acquire(): " + name);
+   
       try 
       {
-          //this.wait();
+          while(true) 
+          {
+              synchronized(criticalSection) 
+              {
+                  if (recursionCount == 0) 
+                  {
+                      recursionCount++;
+                      owningThread = Thread.currentThread();
+                      break;
+                  }
+                  else if (  owningThread == Thread.currentThread()  ) 
+                      {
+                          recursionCount++;
+                          break;
+                      }
+              }
+              Thread.sleep(500);
+          }
       } 
       catch (Exception e) 
       { 
@@ -71,7 +105,7 @@ public class Lock extends org.mmtk.vm.Lock implements Uninterruptible {
   }
 
   public void check (int w) {
-        System.out.println("org.apache.HarmonyDRLVM.mm.mmtk.Lock.check(), w = " + w + name);    
+        //System.out.println("org.apache.HarmonyDRLVM.mm.mmtk.Lock.check(), w = " + w + name);    
   }
 
   // Release the lock by incrementing serving counter.
@@ -81,8 +115,28 @@ public class Lock extends org.mmtk.vm.Lock implements Uninterruptible {
   //
   public void release() 
   {
-       System.out.println("org.apache.HarmonyDRLVM.mm.mmtk.Lock.release(): " + name);
-       //this.notify();
+       //System.out.println("org.apache.HarmonyDRLVM.mm.mmtk.Lock.release(): " + name + "--- " + this);
+      try 
+      {
+              synchronized(criticalSection) 
+              {
+                  if (recursionCount != 0) 
+                  {
+                      if (owningThread != Thread.currentThread() ) 
+                      {
+                          System.out.println("org.apache.HarmonyDRLVM.mm.mmtk.Lock.release() -- locks out of balance 1");
+                      } 
+                      else 
+                      {
+                          recursionCount--;
+                          if (recursionCount ==0) owningThread = null;
+                      }
+                  } else System.out.println("org.apache.HarmonyDRLVM.mm.mmtk.Lock.release() -- locks out of balance 2");
+              }
+      } 
+      catch (Exception e) 
+      { 
+          System.out.println("org.apache.HarmonyDRLVM.mm.mmtk.Lock.acquire() has a problem: " + e);
+      }
   }
-
 }

@@ -48,7 +48,7 @@ public final class ReferenceGlue extends org.mmtk.vm.ReferenceGlue implements Un
      */
     public void scanReferences(int semantics, boolean nursery)
     {
-        System.out.println("org.apache.HarmonyDRLVM.mm.mmtk.ReferenceGlue.scanReferences() was called");
+        //System.out.println("org.apache.HarmonyDRLVM.mm.mmtk.ReferenceGlue.scanReferences() was called");
     }
 
     /**

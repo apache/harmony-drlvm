@@ -22,20 +22,22 @@
 package org.apache.HarmonyDRLVM.mm.mmtk;
 
 import org.mmtk.plan.nogc.*;
+import org.mmtk.plan.marksweep.*;
 import org.vmmagic.pragma.*;
+import org.mmtk.plan.PlanConstraints;
 
 /**
  * This class extends the selected MMTk constraints class. 
  */
-public final class SelectedPlanConstraints extends NoGCConstraints
-  implements Uninterruptible {
 
-  public static final SelectedPlanConstraints singleton = new SelectedPlanConstraints();
-  
-  /**
-   * Return the instance of the SelectedPlan
-   */
-  public static final SelectedPlanConstraints get() throws InlinePragma {
-    return singleton;
-  }
+public final class SelectedPlanConstraints implements Uninterruptible 
+{
+    //public static final PlanConstraints singleton = new NoGCConstraints();
+    public static final PlanConstraints singleton = new MSConstraints();
+
+    public static final PlanConstraints get() throws InlinePragma 
+    {
+        return singleton;
+    }
 }
+

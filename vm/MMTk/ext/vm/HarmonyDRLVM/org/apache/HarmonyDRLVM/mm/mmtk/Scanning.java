@@ -117,6 +117,7 @@ public class Scanning extends org.mmtk.vm.Scanning implements Constants, Uninter
   public final void preCopyGCInstances(TraceLocal trace) 
   throws NoInlinePragma {
         System.out.println("org.apache.HarmonyDRLVM.mm.mmtk.Scanning.preCopyGCInstances() was called");
+        VM.assertions._assert(false);
   }
   
  
@@ -131,6 +132,7 @@ public class Scanning extends org.mmtk.vm.Scanning implements Constants, Uninter
   private static void precopyChildren(TraceLocal trace, Object object) 
     throws UninterruptiblePragma, InlinePragma {
         System.out.println("org.apache.HarmonyDRLVM.mm.mmtk.Scanning.precopyChildren() was called");
+        VM.assertions._assert(false);
   }
 
  /**
@@ -172,7 +174,8 @@ public class Scanning extends org.mmtk.vm.Scanning implements Constants, Uninter
       //trace.addRootLocation(VM_Magic.objectAsAddress(VM_Scheduler.threads).plus(threadIndex<<LOG_BYTES_IN_ADDRESS));
     //}
     //VM_CollectorThread.gcBarrier.rendezvous(4200);
-    System.out.println("org.apache.HarmonyDRLVM.mm.mmtk.Scanning.computeAllRoots() was called");
+    //System.out.println("*****************************org.apache.HarmonyDRLVM.mm.mmtk.Scanning.computeAllRoots() was called TraceLocal = "  + trace);
+    /////////////////VM.assertions._assert(false);
       return;
   }
 }

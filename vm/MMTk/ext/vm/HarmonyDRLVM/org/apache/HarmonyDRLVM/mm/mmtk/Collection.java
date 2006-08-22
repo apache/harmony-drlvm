@@ -30,6 +30,7 @@ import org.mmtk.utility.Finalizer;
 import org.mmtk.utility.heap.HeapGrowthManager;
 import org.mmtk.utility.ReferenceProcessor;
 import org.mmtk.utility.options.Options;
+import org.mmtk.vm.*;
 
 /*  wjw we will need some analog to the below imports later on, keep the below as a reference
 import com.ibm.JikesRVM.VM;
@@ -74,7 +75,8 @@ public class Collection extends org.mmtk.vm.Collection implements Constants, Uni
    */
   public static final void init() throws InterruptiblePragma {
         //wjw NoGC does not have a collector, do nothing for starts
-      System.out.println("org.apache.HarmonyDRLVM.mm.mmtk.Collection.init() has been called");
+      System.out.println("org.apache.HarmonyDRLVM.mm.mmtk.Collection.init() has been called -1-");
+      VM.assertions._assert(false);
   }
 
   /**
@@ -87,10 +89,13 @@ public class Collection extends org.mmtk.vm.Collection implements Constants, Uni
    * <code>TRIGGER_REASONS - 1</code>.
    */
   public final void triggerCollection(int why) throws InterruptiblePragma {
-    System.out.println("org.apache.HarmonyDRLVM.mm.mmtk.Collection.triggerCollection() has been called why = " + why);
+      //System.out.println("org.apache.HarmonyDRLVM.mm.mmtk.Collection.triggerCollection() -2- has been called why = " + why);
+      //VM.assertions._assert(false);
+      CollectorContext cc = SelectedPlan.ap.collector();
+      cc.collect();
   }
   
-    /* whw -- toss all of triggerCollectionStatic()
+    /* wjw -- toss all of triggerCollectionStatic()
   public static final void triggerCollectionStatic(int why) throws InterruptiblePragma {
     if (VM.VerifyAssertions) VM._assert((why >= 0) && (why < TRIGGER_REASONS)); 
     Plan.collectionInitiated();
@@ -130,7 +135,8 @@ public class Collection extends org.mmtk.vm.Collection implements Constants, Uni
    */
   public final void triggerCollectionNow(int why) 
     throws LogicallyUninterruptiblePragma {
-    System.out.println("org.apache.HarmonyDRLVM.mm.mmtk.Collection.triggerCollection() has been called why = " + why);
+    System.out.println("org.apache.HarmonyDRLVM.mm.mmtk.Collection.triggerCollection() has been called -3- why = " + why);
+    VM.assertions._assert(false);
   }
 
   /**
@@ -139,7 +145,8 @@ public class Collection extends org.mmtk.vm.Collection implements Constants, Uni
    */
   public final void triggerAsyncCollection()
     throws UninterruptiblePragma {
-    System.out.println("org.apache.HarmonyDRLVM.mm.mmtk.Collection.triggerAsyncCollection() has been called"); 
+    System.out.println("org.apache.HarmonyDRLVM.mm.mmtk.Collection.triggerAsyncCollection() has been called -4-");
+    VM.assertions._assert(false);
   }
 
   /**
@@ -151,6 +158,7 @@ public class Collection extends org.mmtk.vm.Collection implements Constants, Uni
    * @return True if GC is not in progress.
    */
  public final boolean noThreadsInGC() throws UninterruptiblePragma {
+   VM.assertions._assert(false);
    return true;   //wjw for starts, we are doing NoGC with single thread
  }
 
@@ -162,7 +170,8 @@ public class Collection extends org.mmtk.vm.Collection implements Constants, Uni
   public final void prepareMutator(MutatorContext m) {
         //wjw since its single thread NoGC for now, do nothing
         //probably need to suspend the mutator at a safepoint
-        System.out.println("org.apache.HarmonyDRLVM.mm.mmtk.Collection.prepareMutator() has been called"); 
+        //System.out.println("org.apache.HarmonyDRLVM.mm.mmtk.Collection.prepareMutator() has been called -5-"); 
+       // VM.assertions._assert(false);
   }
   
   /**
@@ -173,18 +182,25 @@ public class Collection extends org.mmtk.vm.Collection implements Constants, Uni
   public final void prepareCollector(CollectorContext c) {
       //wjw since its single thread NoGC for now, do nothing
       //probably need to enumerate the roots (???)
-      System.out.println("org.apache.HarmonyDRLVM.mm.mmtk.Collection.prepareCollector() has been called");  
+      //System.out.println("org.apache.HarmonyDRLVM.mm.mmtk.Collection.prepareCollector() has been called -6- ");  
+      //VM.assertions._assert(false);
   }
 
   /**
    * Rendezvous with all other processors, returning the rank
    * (that is, the order this processor arrived at the barrier).
    */
+  private boolean rendFlag = false;
   public final int rendezvous(int where) throws UninterruptiblePragma {
       //wjw since its single thread NoGC for now, do nothing
       //probably need to wait on a sync barrier before proceeding
-      System.out.println("org.apache.HarmonyDRLVM.mm.mmtk.Collection.rendezvous() has been called"); 
-    return 0;
+      if (rendFlag == false) 
+      {
+          System.out.println("org.apache.HarmonyDRLVM.mm.mmtk.Collection.rendezvous() has been called -7-"); 
+          rendFlag = true;
+      }
+      ////////////////VM.assertions._assert(false);
+    return 1;
   }
 
   /***********************************************************************
@@ -201,6 +217,7 @@ public class Collection extends org.mmtk.vm.Collection implements Constants, Uni
   public static final void scheduleFinalizerThread ()
     throws UninterruptiblePragma {
       //wjw since its single thread NoGC for now, do nothing
-      System.out.println("org.apache.HarmonyDRLVM.mm.mmtk.Collection.rendezvous() has been called");
+      System.out.println("org.apache.HarmonyDRLVM.mm.mmtk.Collection.rendezvous() has been called -8-");
+      VM.assertions._assert(false);
     }
 }

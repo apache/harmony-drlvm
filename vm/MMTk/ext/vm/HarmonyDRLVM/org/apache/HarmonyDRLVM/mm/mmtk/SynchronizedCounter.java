@@ -25,6 +25,7 @@ package org.apache.HarmonyDRLVM.mm.mmtk;
 
 import org.vmmagic.pragma.*;
 import org.vmmagic.unboxed.Offset;
+import org.mmtk.vm.*;
 
 /**
  * A counter that supports atomic increment and reset.
@@ -39,7 +40,7 @@ public final class SynchronizedCounter extends org.mmtk.vm.SynchronizedCounter i
 
   public static void boot() {
     //offset = VM_Entrypoints.synchronizedCounterField.getOffset();
-      System.out.println("org.apache.HarmonyDRLVM.mm.mmtk.SynchronizedCounter.boot()");
+      //System.out.println("org.apache.HarmonyDRLVM.mm.mmtk.SynchronizedCounter.boot() -- fix VM_Entrypoints...");
   }
 
   private int count = 0;
@@ -55,8 +56,13 @@ public final class SynchronizedCounter extends org.mmtk.vm.SynchronizedCounter i
     }
     return oldValue;
     */
-    System.out.println("org.apache.HarmonyDRLVM.mm.mmtk.SynchronizedCounter.reset()");
-      return 0;
+    int oldValue = count;  // unsynchronized access for now, single thread operation only
+    count = 0;
+    //System.out.println("org.apache.HarmonyDRLVM.mm.mmtk.SynchronizedCounter.reset() oldValue = " + oldValue);
+      //return 0;
+
+ 
+      return oldValue;
   }
 
   // Returns the value before the add
@@ -64,14 +70,19 @@ public final class SynchronizedCounter extends org.mmtk.vm.SynchronizedCounter i
   public int increment() {
     //if (VM.VerifyAssertions) VM._assert(!offset.isMax());
     //return VM_Synchronization.fetchAndAdd(this, offset, 1);
-    System.out.println("org.apache.HarmonyDRLVM.mm.mmtk.SynchronizedCounter.increment()");
-    return 0;
+      //VM.assertions._assert(false);
+    //return 0;
+
+    int oldValue = count;
+    count++;
+      //if (count == 1)
+            //System.out.println("org.apache.HarmonyDRLVM.mm.mmtk.SynchronizedCounter.increment() oldValue = " + oldValue);
+    return oldValue;
   }
 
   public int peek () {
-    //return count;
-    System.out.println("org.apache.HarmonyDRLVM.mm.mmtk.SynchronizedCounter.peek()");
-      return 0;
+    //System.out.println("org.apache.HarmonyDRLVM.mm.mmtk.SynchronizedCounter.peek() count = " + count);
+    return count;
   }
 
 }

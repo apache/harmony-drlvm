@@ -22,17 +22,20 @@
 package org.apache.HarmonyDRLVM.mm.mmtk;
 
 import org.mmtk.plan.nogc.*;
+import org.mmtk.plan.marksweep.*;
 import org.vmmagic.pragma.*;
+import org.mmtk.plan.CollectorContext;
 
 public final class SelectedCollectorContext implements 
   Uninterruptible {
 
-  public static final NoGCCollector singleton = new NoGCCollector();
+  //public static final CollectorContext singleton = new NoGCCollector();
+  public static final CollectorContext singleton = new  MSCollector();
   
   /**
    * Return the instance of the SelectedPlan
    */
-  public static final NoGCCollector get() throws InlinePragma {
+  public static final CollectorContext get() throws InlinePragma {
     return singleton;
   }
 }

@@ -28,6 +28,7 @@ import org.mmtk.utility.alloc.Allocator;
 
 import org.vmmagic.unboxed.*;
 import org.vmmagic.pragma.*;
+import org.mmtk.vm.*;
 
 /**
  * $Id: ObjectModel.java,v 1.6 2006/06/19 06:08:15 steveb-oss Exp $ 
@@ -80,6 +81,7 @@ get_object_size_bytes(Partial_Reveal_Object *p_obj)
       return copyArray(from, tib, type.asArray(), allocator);
   */
       System.out.println("wjw org.apache.HarmonyDRLVM.mm.mmtk.ObjectModel.copy was called");
+      VM.assertions._assert(false);
       return from;  //wjw -- keep the compiler happy for now
   }
 
@@ -170,6 +172,7 @@ get_object_size_bytes(Partial_Reveal_Object *p_obj)
     return start.plus(bytes);
 */
       System.out.println("wjw org.apache.HarmonyDRLVM.mm.mmtk.ObjectModel.copyTo() was called");
+      VM.assertions._assert(false);
       return Address.fromInt(0);
   }
 
@@ -184,6 +187,7 @@ get_object_size_bytes(Partial_Reveal_Object *p_obj)
    */
   public ObjectReference getReferenceWhenCopiedTo(ObjectReference from, Address to) {
     System.out.println("wjw org.apache.HarmonyDRLVM.mm.mmtk.ObjectModel.getReferenceWhenCopiedTo() was called");
+    VM.assertions._assert(false);
     return from;  // keep the compiler happy -- xObjectReference.fromObject(VM_ObjectModel.getReferenceWhenCopiedTo(from, to));
   }
   
@@ -194,6 +198,7 @@ get_object_size_bytes(Partial_Reveal_Object *p_obj)
    */
   public Address getObjectEndAddress(ObjectReference object) {
     System.out.println("wjw org.apache.HarmonyDRLVM.mm.mmtk.ObjectModel.getObjectEndAddress() was called");
+    VM.assertions._assert(false);
     return Address.fromInt(0);  // keep the compiler happy
   }
   
@@ -206,6 +211,7 @@ get_object_size_bytes(Partial_Reveal_Object *p_obj)
   public int getSizeWhenCopied(ObjectReference object) {
     //need to use drlvm's get_object_size_bytes()
     System.out.println("wjw org.apache.HarmonyDRLVM.mm.mmtk.ObjectModel.getSizeWhenCopied() was called");
+    VM.assertions._assert(false);
     return 0;  // VM_ObjectModel.bytesRequiredWhenCopied(object);
   }
   
@@ -227,6 +233,7 @@ get_object_size_bytes(Partial_Reveal_Object *p_obj)
     }
 */
     System.out.println("wjw org.apache.HarmonyDRLVM.mm.mmtk.ObjectModel.getAlignWhenCopied() was called");
+    VM.assertions._assert(false);
     return 0;
   }
   
@@ -247,6 +254,7 @@ get_object_size_bytes(Partial_Reveal_Object *p_obj)
     }
     */
       System.out.println("wjw org.apache.HarmonyDRLVM.mm.mmtk.ObjectModel.getAlignOffsetWhenCopied() was called");
+      VM.assertions._assert(false);
       return 0;
   }
   
@@ -258,6 +266,7 @@ get_object_size_bytes(Partial_Reveal_Object *p_obj)
    */
   public int getCurrentSize(ObjectReference object) {
       System.out.println("wjw org.apache.HarmonyDRLVM.mm.mmtk.ObjectModel.getCurrentSize() was called");
+      VM.assertions._assert(false);
       return 0;
       // return VM_ObjectModel.bytesUsed(object);
   }
@@ -267,6 +276,7 @@ get_object_size_bytes(Partial_Reveal_Object *p_obj)
    */
   public ObjectReference getNextObject(ObjectReference object) {
     System.out.println("wjw org.apache.HarmonyDRLVM.mm.mmtk.ObjectModel.getNextObject() was called");
+    VM.assertions._assert(false);
     return ObjectReference.fromObject(null);
   }
 
@@ -275,6 +285,7 @@ get_object_size_bytes(Partial_Reveal_Object *p_obj)
    */
   public ObjectReference getObjectFromStartAddress(Address start) {
     System.out.println("wjw org.apache.HarmonyDRLVM.mm.mmtk.ObjectModel.getObjectFromStartAddress() was called");
+    VM.assertions._assert(false);
     return ObjectReference.fromObject(null);
   }
   
@@ -287,12 +298,14 @@ get_object_size_bytes(Partial_Reveal_Object *p_obj)
   public byte [] getTypeDescriptor(ObjectReference ref) {
     //VM_Atom descriptor = VM_Magic.getObjectType(ref).getDescriptor();
     System.out.println("wjw org.apache.HarmonyDRLVM.mm.mmtk.ObjectModel.getTypeDescriptor() was called");
+    VM.assertions._assert(false);
     return new byte[10]; // descriptor.toByteArray();
   }
 
   public int getArrayLength(ObjectReference object) 
     throws InlinePragma {
     System.out.println("wjw org.apache.HarmonyDRLVM.mm.mmtk.ObjectModel.getArrayLength() was called");
+    VM.assertions._assert(false);
     //return VM_Magic.getArrayLength(object.toObject());
     return 0;
   }
@@ -304,6 +317,7 @@ get_object_size_bytes(Partial_Reveal_Object *p_obj)
    */
   public boolean testAvailableBit(ObjectReference object, int idx) {
     System.out.println("wjw org.apache.HarmonyDRLVM.mm.mmtk.ObjectModel.testAvailableBit() was called");
+    VM.assertions._assert(false);
     //return VM_ObjectModel.testAvailableBit(object.toObject(), idx);
     return false;
   }
@@ -319,6 +333,7 @@ get_object_size_bytes(Partial_Reveal_Object *p_obj)
   public void setAvailableBit(ObjectReference object, int idx,
                                      boolean flag) {
     System.out.println("wjw org.apache.HarmonyDRLVM.mm.mmtk.ObjectModel.setAvailableBit() was called");
+    VM.assertions._assert(false);
     //VM_ObjectModel.setAvailableBit(object.toObject(), idx, flag);
     return;
   }
@@ -339,6 +354,7 @@ get_object_size_bytes(Partial_Reveal_Object *p_obj)
   public boolean attemptAvailableBits(ObjectReference object,
                                              Word oldVal, Word newVal) {
     System.out.println("wjw org.apache.HarmonyDRLVM.mm.mmtk.ObjectModel.attemptAvailableBits() was called");
+    VM.assertions._assert(false);
     //return VM_ObjectModel.attemptAvailableBits(object.toObject(), oldVal, newVal);
     return false;
   }
@@ -352,6 +368,7 @@ get_object_size_bytes(Partial_Reveal_Object *p_obj)
    */
   public Word prepareAvailableBits(ObjectReference object) {
     System.out.println("wjw org.apache.HarmonyDRLVM.mm.mmtk.ObjectModel.attemptAvailableBits() was called");
+    VM.assertions._assert(false);
     //return VM_ObjectModel.prepareAvailableBits(object.toObject());
     return Word.fromInt(0);
   }
@@ -364,6 +381,7 @@ get_object_size_bytes(Partial_Reveal_Object *p_obj)
    */
   public void writeAvailableBitsWord(ObjectReference object, Word val) {
     System.out.println("wjw org.apache.HarmonyDRLVM.mm.mmtk.ObjectModel.attemptAvailableBits() was called");
+    VM.assertions._assert(false);
     //VM_ObjectModel.writeAvailableBitsWord(object.toObject(), val);
     return;
   }
@@ -376,6 +394,7 @@ get_object_size_bytes(Partial_Reveal_Object *p_obj)
    */
   public Word readAvailableBitsWord(ObjectReference object) {
       System.out.println("wjw org.apache.HarmonyDRLVM.mm.mmtk.ObjectModel.readAvailableBitsWord() was called");
+      VM.assertions._assert(false);
       //return VM_ObjectModel.readAvailableBitsWord(object);
       return Word.fromInt(0);
   }
@@ -391,6 +410,7 @@ get_object_size_bytes(Partial_Reveal_Object *p_obj)
   /* AJG: Should this be a variable rather than method? */
   public Offset GC_HEADER_OFFSET() {
     System.out.println("wjw org.apache.HarmonyDRLVM.mm.mmtk.ObjectModel.GC_HEADER_OFFSET() was called");
+    VM.assertions._assert(false);
     //return VM_ObjectModel.GC_HEADER_OFFSET;
     return Offset.fromInt(0);
   }
@@ -404,6 +424,7 @@ get_object_size_bytes(Partial_Reveal_Object *p_obj)
   public Address objectStartRef(ObjectReference object)
     throws InlinePragma {
     System.out.println("wjw org.apache.HarmonyDRLVM.mm.mmtk.ObjectModel.objectStartRef() was called");
+    VM.assertions._assert(false);
     //return VM_ObjectModel.objectStartRef(object);
     return Address.fromInt(0);
   }
@@ -417,6 +438,7 @@ get_object_size_bytes(Partial_Reveal_Object *p_obj)
    */
   public Address refToAddress(ObjectReference object) {
     System.out.println("wjw org.apache.HarmonyDRLVM.mm.mmtk.ObjectModel.objectStartRef() was called");
+    VM.assertions._assert(false);
     //return VM_ObjectModel.getPointerInMemoryRegion(object);
     return Address.fromInt(0);
   }
@@ -442,6 +464,7 @@ get_object_size_bytes(Partial_Reveal_Object *p_obj)
 */
   {
       System.out.println("wjw org.apache.HarmonyDRLVM.mm.mmtk.ObjectModel.isAcyclic() was called");
+      VM.assertions._assert(false);
       return false;
   }
 
@@ -474,6 +497,7 @@ get_object_size_bytes(Partial_Reveal_Object *p_obj)
     if (VM.VerifyAssertions) VM._assert(vmType.getMMType() != null);
     return (MMType) vmType.getMMType();
   */
+    VM.assertions._assert(false);
     return new MMType(false, false, false, 0, null);
   }
 }

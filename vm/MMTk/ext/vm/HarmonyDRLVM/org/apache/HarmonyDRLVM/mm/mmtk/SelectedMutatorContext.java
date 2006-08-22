@@ -22,17 +22,21 @@
 package org.apache.HarmonyDRLVM.mm.mmtk;
 
 import org.mmtk.plan.nogc.*;
+import org.mmtk.plan.marksweep.*;
 import org.vmmagic.pragma.*;
+import org.mmtk.plan.MutatorContext;
 
 public final class SelectedMutatorContext 
   implements Uninterruptible {
 
-  public static final NoGCMutator singleton = new NoGCMutator();
+  //public static final MutatorContext singleton = new NoGCMutator();
+  public static final MutatorContext singleton = new MSMutator();
   
   /**
    * Return the instance of the SelectedPlan
    */
-  public static final NoGCMutator get() throws InlinePragma {
+  public static final MutatorContext get() throws InlinePragma 
+  {
     return singleton;
   }
 }
