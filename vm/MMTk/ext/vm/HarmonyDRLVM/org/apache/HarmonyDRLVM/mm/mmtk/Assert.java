@@ -38,7 +38,7 @@ public class Assert extends org.mmtk.vm.Assert implements Uninterruptible {
    * @param str A string describing the error condition.
    */
   public final void error(String str) {
-    System.out.println("org.apache.HarmonyDRLVM.mm.mmtk.Assert.error(): " + str);
+    System.out.println("******org.apache.HarmonyDRLVM.mm.mmtk.Assert.error(): " + str);
     str = null;
     str.notifyAll();  // this should cause a stack trace and exit
   }
@@ -49,13 +49,13 @@ public class Assert extends org.mmtk.vm.Assert implements Uninterruptible {
    * @param message the string to log
    */
   public final void fail(String message) { 
-      System.out.println("org.apache.HarmonyDRLVM.mm.mmtk.Assert.fail(): " + message);
+      System.out.println("******org.apache.HarmonyDRLVM.mm.mmtk.Assert.fail(): " + message);
       message = null;
       message.notifyAll();  // this should cause a stack trace and exit 
   }
 
   public final void exit(int rc) throws UninterruptiblePragma {
-      System.out.println("org.apache.HarmonyDRLVM.mm.mmtk.Assert.exit(): " + rc);
+      System.out.println("******org.apache.HarmonyDRLVM.mm.mmtk.Assert.exit(): " + rc);
       Object obj = new Object();
       obj = null;
       obj.notifyAll();  // this should cause a stack trace and exit
@@ -71,7 +71,7 @@ public class Assert extends org.mmtk.vm.Assert implements Uninterruptible {
     {
         if (cond == false) 
         {
-            System.out.println("****** org.apache.HarmonyDRLVM.mm.mmtk.Assert._assert() ******");
+            System.out.println("****** org.apache.HarmonyDRLVM.mm.mmtk.Assert._assert()");
             Object obj = new Object();
             obj = null;
             obj.notifyAll();
@@ -85,12 +85,12 @@ public class Assert extends org.mmtk.vm.Assert implements Uninterruptible {
  /* public static final boolean VerifyAssertions = VM.VerifyAssertions; */
 
   public final void _assert(boolean cond, String s) throws InlinePragma {
-      System.out.println("org.apache.HarmonyDRLVM.mm.mmtk.Assert._assert(): " + s);
+      System.out.println("******org.apache.HarmonyDRLVM.mm.mmtk.Assert._assert(): " + s);
       s.notifyAll();  // this should cause a stack trace and exit
   }
 
   public final void dumpStack() {
-      System.out.println("org.apache.HarmonyDRLVM.mm.mmtk.Assert.dumpStack(): ");
+      System.out.println("******org.apache.HarmonyDRLVM.mm.mmtk.Assert.dumpStack(): ");
       Object obj = new Object();
       obj = null;
       obj.notifyAll();  // this should cause a stack trace and exit
