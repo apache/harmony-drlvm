@@ -27,10 +27,14 @@
 #include "environment.h"
 #include "Class.h"
 #include "cxxlog.h"
-#include "open/thread.h"
+
 #include "interpreter_exports.h"
 #include "interpreter_imports.h"
 #include "suspend_checker.h"
+
+
+#include "open/jthread.h"
+#include "open/hythread_ext.h"
 
 // Called when current thread reached breakpoint.
 // Returns breakpoint ID received from executing engine on creating of the
@@ -41,7 +45,7 @@ jvmti_process_breakpoint_event(jmethodID method, jlocation location)
     TRACE2("jvmti-break", "BREAKPOINT occured, location = " << location);
     NativeObjectHandles handles;
     ObjectHandle hThread = oh_allocate_local_handle();
-    hThread->object = (Java_java_lang_Thread *)p_TLS_vmthread->p_java_lang_thread;
+    hThread->object = (Java_java_lang_Thread *)jthread_get_java_thread(hythread_self())->object;
     tmn_suspend_enable();
 
     // FIXME: lock breakpoint table
@@ -76,7 +80,7 @@ jvmti_process_breakpoint_event(jmethodID method, jlocation location)
             NULL != et; et = next_et)
         {
             next_et = et->next;
-            if (et->thread == p_TLS_vmthread)
+            if (et->thread == hythread_self())
             {
                 jvmtiEventBreakpoint func = (jvmtiEventBreakpoint)env->get_event_callback(JVMTI_EVENT_BREAKPOINT);
                 if (NULL != func)

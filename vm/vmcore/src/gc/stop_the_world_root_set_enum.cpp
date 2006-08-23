@@ -55,12 +55,12 @@ static void
 vm_enumerate_the_current_thread()
 {
     // Process roots for the current thread
-    assert(p_TLS_vmthread->gc_status == zero);
-    p_TLS_vmthread->gc_status = gc_at_safepoint;
+    //assert(p_TLS_vmthread->gc_status == zero);
+    //p_TLS_vmthread->gc_status = gc_at_safepoint;
     vm_enumerate_thread(p_TLS_vmthread);
 
     // Enumeration for this thread is complete.
-    p_TLS_vmthread->gc_status = gc_enumeration_done;
+    //p_TLS_vmthread->gc_status = gc_enumeration_done;
 
 } // vm_enumerate_the_current_thread
 
@@ -84,28 +84,33 @@ stop_the_world_root_set_enumeration()
 
     INFO2("threads","Start thread suspension ");
     vm_time_start_hook(&_start_time);   //thread suspension time measurement        
-    suspend_all_threads_except_current();
+
+      hythread_iterator_t  iterator;
+    hythread_suspend_all(&iterator, NULL);
+
     thread_suspend_time = vm_time_end_hook(&_start_time, &_end_time);
-    INFO2("threads","Thread suspension time: "<< thread_suspend_time <<" mksec");
+    INFO2("tm.suspend","Thread suspension time: "<< thread_suspend_time <<" mksec");
 
     class_unloading_clear_mark_bits();
 
     // Run through list of active threads and enumerate each one of them.
-    tmn_suspend_enable(); // to make tm_iterator_create()happy: it uses assert(tmn_is_suspend_enabled());
-    tm_iterator_t * iterator = tm_iterator_create();
-    tmn_suspend_disable();
-    VM_thread *thread = tm_iterator_next(iterator);
-    while(thread) {
-        if (thread != p_TLS_vmthread) {
+    hythread_t tm_thread = hythread_iterator_next(&iterator);
+    
+    //VM_thread *thread = get_vm_thread (hythread_iterator_next(&iterator));
+    while(tm_thread) {
+        VM_thread *thread = get_vm_thread(tm_thread);
+        if (thread && thread != p_TLS_vmthread) {
             vm_enumerate_thread(thread);
             // Enumeration for this thread is complete.
-            thread->gc_status = gc_enumeration_done;
+            //thread->gc_status = gc_enumeration_done;
+            //assert(thread->gc_status==gc_enumeration_done);
+            //thread->gc_status=gc_enumeration_done;
         }
-        thread = tm_iterator_next(iterator);
+        tm_thread = hythread_iterator_next(&iterator);
     }
-    tm_iterator_release(iterator);
 
     vm_enumerate_the_current_thread();
+
     // finally, process all the global refs
     vm_enumerate_root_set_global_refs();
 
@@ -121,7 +126,7 @@ stop_the_world_root_set_enumeration()
 void 
 vm_enumerate_root_set_all_threads()
 {
-    assert(!tmn_is_suspend_enabled());
+    assert(!hythread_is_suspend_enabled());
     // it is convenient to have gc_enabled_status == disabled
     // during the enumeration -salikh
 
@@ -135,14 +140,7 @@ vm_enumerate_root_set_all_threads()
 
     stop_the_world_root_set_enumeration();
     
-    // ASSERT that enumeration is done for all threads...
-    int n_threads = thread_gc_number_of_threads();
-    for(int i = 0; i < n_threads; i++) {
-        VM_thread * UNUSED thread = (VM_thread *) thread_gc_enumerate_one();
-        assert (thread->gc_status == gc_enumeration_done);
-    }
-
-    assert(!tmn_is_suspend_enabled());
+    assert(!hythread_is_suspend_enabled());
     // vm_gc_unlock_enum expects suspend enabled, enable it here
 
 } //vm_enumerate_root_set_all_threads
@@ -161,7 +159,7 @@ void vm_resume_threads_after()
     class_unloading_start();
 
     // Run through list of active threads and resume each one of them.
-    resume_all_threads();
+    hythread_resume_all( NULL);
 
     // Make sure register stack is up-to-date with the potentially updated backing store
     si_reload_registers();
@@ -174,10 +172,10 @@ void vm_hint_finalize() {
     // which itself operates either with 
     // gc_enabled_status == disabled, e.g. from managed code,
     // but at the GC-safe point (because the collection was done)
-    assert(!tmn_is_suspend_enabled());
+    assert(!hythread_is_suspend_enabled());
 
     tmn_suspend_enable();
-    assert(tmn_is_suspend_enabled());
+    assert(hythread_is_suspend_enabled());
 
     // Finalizers and reference enqueuing is performed from vm_hint_finalize(),
     // GC guarantees to call this function after the completion of collection,
@@ -212,8 +210,7 @@ void vm_enumerate_thread(VM_thread *thread)
     }
     StackIterator* si;
     TRACE2("enumeration", "Enumerating thread " << thread << 
-    (thread == p_TLS_vmthread ? ", this thread" : ", suspended in native code")
-                << ", GCEnabled=" << (thread -> suspend_enabled_status));
+    (thread == p_TLS_vmthread ? ", this thread" : ", suspended in native code"));
      si = si_create_from_native(thread);
     vm_enumerate_root_set_single_thread_on_stack(si);    
     // Enumerate references associated with a thread that are not stored on the thread's stack.

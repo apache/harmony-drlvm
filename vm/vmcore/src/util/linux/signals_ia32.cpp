@@ -74,9 +74,6 @@
 static int sc_nest = -1;
 static uint32 exam_point;
 
-bool SuspendThread(unsigned UNREF xx){ return 0; }
-bool ResumeThread(unsigned UNREF xx){ return 1; }
-
 static void linux_sigcontext_to_regs(Registers* regs, ucontext_t *uc)
 {
     regs->eax = uc->uc_mcontext.gregs[REG_EAX];
@@ -351,8 +348,8 @@ void stack_overflow_handler(int signum, siginfo_t* UNREF info, void* context)
         return;
     } else {
         if (is_unwindable()) {
-            if (tmn_is_suspend_enabled()) {
-                tmn_suspend_disable();
+            if (hythread_is_suspend_enabled()) {
+                hythread_suspend_disable();
             }
             throw_from_sigcontext(
                 uc, env->java_lang_StackOverflowError_Class);
@@ -503,10 +500,13 @@ void abort_handler (int signum, siginfo_t* UNREF info, void* context) {
 }
 
 /*
+ * MOVED TO PORT, DO NOT USE USR2
  * USR2 signal used to yield the thread at suspend algorithm
- */ 
+ * 
  
 void yield_other_handler(int signum, siginfo_t* info, void* context) {
+    // FIXME: integration, should be moved to port or OpenTM
+    
     Global_Env *env = VM_Global_State::loader_env;
     if (env->shutting_down != 0) {
         // Too late for this kind of signals
@@ -535,8 +535,9 @@ void yield_other_handler(int signum, siginfo_t* info, void* context) {
     }
 
     DIE("Cannot find Java thread using signal context");
-}
 
+}
+*/
 void initialize_signals()
 {
     // First figure out how to locate the context in the
@@ -548,12 +549,14 @@ void initialize_signals()
     //behaviour, which is different from BSD. But glibc2 in Linux
     //implements BSD semantics.
     struct sigaction sa;
+/*
+ * MOVED TO PORT, DO NOT USE USR2
 
     sigemptyset(&sa.sa_mask);
     sa.sa_flags = SA_SIGINFO | SA_RESTART;
     sa.sa_sigaction = yield_other_handler;
     sigaction(SIGUSR2, &sa, NULL);
-
+*/
     sigemptyset(&sa.sa_mask);
     sa.sa_flags = SA_SIGINFO | SA_ONSTACK;
     sa.sa_sigaction = &null_java_reference_handler;

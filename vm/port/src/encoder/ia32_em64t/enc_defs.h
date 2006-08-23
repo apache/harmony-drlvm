@@ -527,6 +527,7 @@ Mnemonic_SETcc,                         // Set Byte on Condition
 
 Mnemonic_SAL, Mnemonic_SHL=Mnemonic_SAL,// Shift left
 Mnemonic_SAR,                           // Unsigned shift right
+Mnemonic_ROR,                           // rotate right
 Mnemonic_SHR,                           // Signed shift right
 Mnemonic_SHRD,                          // Double Precision Shift Right
 Mnemonic_SHLD,                          // Double Precision Shift Left

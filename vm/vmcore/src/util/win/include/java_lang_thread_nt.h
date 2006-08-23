@@ -28,23 +28,3 @@
 #define J_V_M_T_I_E_H NULL
 #define E_H_RECOMP NULL
 
-#define OS_THREAD_INIT_1()
-
-#define OS_SYNC_SUPPORT()
-
-
-#define OS_THREAD_INIT_2() \
-    p_TLS_vmthread = p_vm_thread; 
-
-
-#define THREAD_CLEANUP() 
-
-#define BEGINTHREADEX_SUSPENDSTATE 1
-
-#define SET_THREAD_DATA_MACRO()
-
-    
-#define THREAD_ACTIVE_IN_OS_MACRO()
-
-#define CHECK_HIJACK_SUPPORT_MACRO()
-

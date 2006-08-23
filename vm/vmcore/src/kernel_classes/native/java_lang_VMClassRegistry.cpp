@@ -33,7 +33,7 @@
 #include "jni_utils.h"
 #include "reflection.h"
 #include "stack_trace.h"
-#include "open/thread.h"
+
 #include "vm_strings.h"
 
 #include "java_lang_VMClassRegistry.h"

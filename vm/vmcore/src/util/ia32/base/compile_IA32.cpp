@@ -36,7 +36,7 @@ using namespace std;
 
 #include "lock_manager.h"
 #include "open/types.h"
-#include "open/thread.h"
+
 #include "Class.h"
 #include "environment.h"
 #include "method_lookup.h"
@@ -97,7 +97,7 @@ static uint32* get_arg_word(unsigned num_arg_words, unsigned word)
 
 void compile_protect_arguments(Method_Handle method, GcFrame* gc)
 {
-    assert(!tmn_is_suspend_enabled());
+    assert(!hythread_is_suspend_enabled());
     Method_Signature_Handle msh = method_get_signature(method);
     unsigned num_args = method_args_get_number(msh);
     unsigned num_arg_words = ((Method*)method)->get_num_arg_bytes()>>2;
@@ -262,13 +262,13 @@ void *create_call_native_proc_stub(char *proc_addr, char *stub_name, CNP_FinalAc
         // pop args, leaving stack pointer pointing at return address
         ss = alu(ss, add_opc,  esp_opnd,  ecx_opnd);
         ss = ret(ss);
-        break;
     }
+        break;
     case CNP_JmpToRetAddrFinalAction: {
         // Continue execution in, e.g., the newly compiled method.
         ss = jump(ss,  eax_opnd);
-        break;
     }
+        break;
     default:
         ABORT("Wrong final action");
     }
@@ -484,7 +484,6 @@ NativeCodePtr compile_gen_compile_me(Method_Handle method) {
 //
 //    return addr;
 //} // compile_gen_compile_me_exc_throw
- 
 
 void gen_native_hashcode(Emitter_Handle h, Method *m);
 unsigned native_hashcode_fastpath_size(Method *m);

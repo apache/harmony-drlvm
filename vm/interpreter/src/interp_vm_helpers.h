@@ -18,7 +18,7 @@
  * @version $Revision: 1.2.12.2.4.3 $
  */  
 #include "Class.h"
-#include "open/thread.h"
+
 
 
 /**

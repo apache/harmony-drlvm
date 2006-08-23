@@ -17,10 +17,6 @@
  * @author Intel, Evgueni Brevnov
  * @version $Revision: 1.1.2.1.4.3 $
  */  
-
-#define LOG_DOMAIN "vm.exn_filter"
-#include "cxxlog.h"
-
 #include "platform_lowlevel.h"
 
 #include "Class.h"
@@ -33,7 +29,7 @@
 #include "open/vm_util.h"
 #include "compile.h"
 #include "../../../arch/ipf/include/vm_ipf.h"
-#include "open/thread.h"
+
 
 #include "exception_filter.h"
 

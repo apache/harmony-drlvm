@@ -26,6 +26,7 @@
 #ifndef USE_GC_STATIC
 
 #include <apr_dso.h>
+#include <apr_errno.h>
 #include "dll_gc.h"
 #include "open/gc.h"
 #include "open/vm_util.h"
@@ -284,15 +285,21 @@ bool vm_is_a_gc_dll(const char *dll_filename)
     
     apr_dso_handle_t *handle;
     bool result = false;
-    if (apr_dso_load(&handle, dll_filename, pool) == APR_SUCCESS)
+    apr_status_t stat;
+    if ((stat = apr_dso_load(&handle, dll_filename, pool)) == APR_SUCCESS)
     {
         apr_dso_handle_sym_t tmp;
         if (apr_dso_sym(&tmp, handle, "gc_init") == APR_SUCCESS) {
             result = true;
         }
         apr_dso_unload(handle);
+    } else {
+        char buf[1024];
+        apr_dso_error(handle, buf, 1024);
+        WARN("Loading error" << buf);
+        //apr_strerror(stat, buf, 1024);
+        //printf("error %s, is %d, expected %d\n", buf, stat, APR_SUCCESS);
     }
-
     return result;
 } //vm_is_a_gc_dll
 

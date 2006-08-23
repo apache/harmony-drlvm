@@ -37,7 +37,7 @@
 
 #else  // !PLATFORM_POSIX
 
-#if defined(BUILDING_VM)
+#if defined(BUILDING_VM) && !defined(STATIC_BUILD)
 #define VMEXPORT __declspec(dllexport)
 #define JITEXPORT __declspec(dllimport)
 #define EMEXPORT __declspec(dllimport)

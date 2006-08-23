@@ -32,7 +32,7 @@
 #include "object_handles.h"
 #include "vm_stats.h"
 #include "vm_threads.h"
-#include "open/thread.h"
+
 #include "thread_manager.h"
 #include "open/types.h"
 #include "open/vm_util.h"
@@ -66,7 +66,7 @@ static GcFrameNode* gc_frame_node_new(unsigned capacity)
 
 GcFrame::GcFrame(unsigned size_hint)
 {
-    assert(!tmn_is_suspend_enabled());
+    assert(!hythread_is_suspend_enabled());
 
     if (size_hint>0)
         nodes = gc_frame_node_new(size_hint);
@@ -78,7 +78,7 @@ GcFrame::GcFrame(unsigned size_hint)
 
 GcFrame::~GcFrame()
 {
-    assert(!tmn_is_suspend_enabled());
+    assert(!hythread_is_suspend_enabled());
 
     assert(p_TLS_vmthread->gc_frames==this);
     p_TLS_vmthread->gc_frames = next;
@@ -97,7 +97,7 @@ void GcFrame::add_object(ManagedObject** p)
     assert(p);
     assert(NULL == *p || (*p >= vm_heap_base_address()
         && *p < vm_heap_ceiling_address()));
-    assert(!tmn_is_suspend_enabled());
+    assert(!hythread_is_suspend_enabled());
 
     ensure_capacity();
     nodes->elements[nodes->obj_size+nodes->mp_size] = nodes->elements[nodes->obj_size];
@@ -107,7 +107,7 @@ void GcFrame::add_object(ManagedObject** p)
 
 void GcFrame::add_managed_pointer(ManagedPointer* p)
 {
-    assert(!tmn_is_suspend_enabled());
+    assert(!hythread_is_suspend_enabled());
 
     ensure_capacity();
     nodes->elements[nodes->obj_size+nodes->mp_size] = (void**)p;
@@ -156,13 +156,13 @@ managed_object_is_java_lang_class_unsafe(ManagedObject* p_obj) {
 
 bool
 managed_object_is_java_lang_class(ManagedObject* p_obj) {
-    assert(!tmn_is_suspend_enabled());
+    assert(!hythread_is_suspend_enabled());
     return managed_object_is_java_lang_class_unsafe(p_obj);
 }
 
 bool
 object_is_java_lang_class(ObjectHandle oh) {
-    assert(tmn_is_suspend_enabled());
+    assert(hythread_is_suspend_enabled());
     tmn_suspend_disable();
     bool res = managed_object_is_java_lang_class_unsafe(oh->object);
     tmn_suspend_enable();
@@ -178,13 +178,13 @@ managed_object_object_is_valid_unsafe(ManagedObject* p_obj) {
 
 bool
 managed_object_is_valid(ManagedObject* p_obj) {
-    assert(!tmn_is_suspend_enabled());
+    assert(!hythread_is_suspend_enabled());
     return managed_object_object_is_valid_unsafe(p_obj);
 }
 
 bool
 object_is_valid(ObjectHandle oh) {
-    assert(tmn_is_suspend_enabled());
+    assert(hythread_is_suspend_enabled());
     tmn_suspend_disable();
     bool res = managed_object_object_is_valid_unsafe(oh->object);
     tmn_suspend_enable();
@@ -199,25 +199,22 @@ static ObjectHandlesOld* global_object_handles = NULL;
 
 ObjectHandle oh_allocate_global_handle()
 {
-    assert(tmn_is_suspend_enabled());
 
     // Allocate and init handle
     ObjectHandlesOld* h = oh_allocate_object_handle(); //(ObjectHandlesOld*)m_malloc(sizeof(ObjectHandlesOld));
     h->handle.object = NULL;
     h->allocated_on_the_stack = false;
     
-    tm_acquire_tm_lock();
- 
     tmn_suspend_disable(); // ----------------vvv
+    p_handle_lock->_lock(); 
     // Insert at beginning of globals list
     h->prev = NULL;
     h->next = global_object_handles;
     global_object_handles = h;
     if(h->next)
         h->next->prev = h;
+    p_handle_lock->_unlock();
     tmn_suspend_enable(); //--------------------------------------------^^^
-    tm_release_tm_lock();
-
     return &h->handle;
 } //vm_create_global_object_handle
 
@@ -230,10 +227,8 @@ static bool UNUSED is_global_handle(ObjectHandle handle)
 
 void oh_deallocate_global_handle(ObjectHandle handle)
 {
-    assert(tmn_is_suspend_enabled());
-
-    tm_acquire_tm_lock();
     tmn_suspend_disable(); // ----------vvv
+    p_handle_lock->_lock();
     assert(is_global_handle(handle));
 
     handle->object = NULL;
@@ -242,9 +237,8 @@ void oh_deallocate_global_handle(ObjectHandle handle)
     if (h->prev) h->prev->next = h->next;
     if (h==global_object_handles) global_object_handles = h->next;
 
+    p_handle_lock->_unlock();
     tmn_suspend_enable(); // -------------------------------------^^^
-    tm_release_tm_lock();
-
     STD_FREE(h);
 } //vm_delete_global_object_handle
 
@@ -289,7 +283,7 @@ ObjectHandle oh_allocate_handle(ObjectHandles** hs)
 {
     // the function should be called only from suspend disabled mode
     // as it is not gc safe.
-    assert(!tmn_is_suspend_enabled());
+    assert(!hythread_is_suspend_enabled());
     ObjectHandlesNew* cur = (ObjectHandlesNew*)*hs;
     if (!cur || cur->size>=cur->capacity)
         cur = oh_add_new_handles((ObjectHandlesNew**)hs);
@@ -356,9 +350,9 @@ void NativeObjectHandles::enumerate()
 VMEXPORT // temporary solution for interpreter unplug
 ObjectHandle oh_allocate_local_handle()
 {
-    assert(!tmn_is_suspend_enabled());
+    assert(!hythread_is_suspend_enabled());
     // FIXME: it looks like this should be uncoment or suspend_disable added 
-       //assert(!tmn_is_suspend_enabled());
+       //assert(!hythread_is_suspend_enabled());
        
        
     // ? 20021202 There are really 3 cases to check: 
@@ -385,7 +379,7 @@ ObjectHandle oh_allocate_local_handle()
 }
 
 ObjectHandle oh_convert_to_local_handle(ManagedObject* pointer) {
-    assert(!tmn_is_suspend_enabled());
+    assert(!hythread_is_suspend_enabled());
     ObjectHandle jobj = oh_allocate_local_handle();
     TRACE2("oh", "oh_convert_to_local_handle() pointer = " << pointer << ", handle = " << jobj);
     jobj->object = pointer;

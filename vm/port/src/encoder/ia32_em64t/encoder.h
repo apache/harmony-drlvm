@@ -102,7 +102,7 @@ enum ALU_Opcode {
 //
 enum Shift_Opcode {
     shld_opc,   shrd_opc,   shl_opc,    shr_opc,
-    sar_opc,    max_shift_opcode=5,     n_shift = 5
+    sar_opc,    ror_opc, max_shift_opcode=6,     n_shift = 6
 };
 
 enum ConditionCode {
@@ -454,7 +454,7 @@ ENCODER_DECLARE_EXPORT char * alu(char * stream, ALU_Opcode opc, const R_Opnd & 
 ENCODER_DECLARE_EXPORT char * test(char * stream, const RM_Opnd & rm, const Imm_Opnd & imm, Opnd_Size sz = size_platf);
 ENCODER_DECLARE_EXPORT char * test(char * stream, const RM_Opnd & rm, const R_Opnd & r, Opnd_Size sz = size_platf);
 
-// shift instructions: shl, shr, sar, shld, shrd
+// shift instructions: shl, shr, sar, shld, shrd, ror
 ENCODER_DECLARE_EXPORT char * shift(char * stream, Shift_Opcode opc, const RM_Opnd & rm, const Imm_Opnd & imm, Opnd_Size sz = size_platf);
 ENCODER_DECLARE_EXPORT char * shift(char * stream, Shift_Opcode opc, const RM_Opnd & rm, Opnd_Size sz = size_platf);
 ENCODER_DECLARE_EXPORT char * shift(char * stream, Shift_Opcode opc, const RM_Opnd & rm, const R_Opnd & r, const Imm_Opnd & imm, Opnd_Size sz = size_platf);

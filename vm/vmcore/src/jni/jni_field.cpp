@@ -31,14 +31,14 @@
 #include "object_handles.h"
 #include "open/vm_util.h"
 #include "vm_threads.h"
-#include "open/thread.h"
+
 #include "ini.h"
 #include "exceptions.h"
 
 
 static bool ensure_initialised(JNIEnv* env, Class* clss)
 {
-    assert(tmn_is_suspend_enabled());
+    assert(hythread_is_suspend_enabled());
     if(clss->state != ST_Initialized) {
         class_initialize_from_jni(clss);
         if(clss->state == ST_Error) {
@@ -60,7 +60,7 @@ jfieldID JNICALL GetFieldID(JNIEnv *env,
                             const char *sig)
 {
     TRACE2("jni", "GetFieldID called");
-    assert(tmn_is_suspend_enabled());
+    assert(hythread_is_suspend_enabled());
     Class* clss = jclass_to_struct_Class(clazz);
     Field *field = class_lookup_field_recursive(clss, name, sig);
     if (NULL == field || field->is_static())
@@ -82,9 +82,9 @@ jfieldID JNICALL GetFieldID_Quick(JNIEnv * UNREF env,
                                   const char *field_name,
                                   const char *sig)
 {
-    assert(tmn_is_suspend_enabled());
+    assert(hythread_is_suspend_enabled());
     String *class_string = VM_Global_State::loader_env->string_pool.lookup(class_name);
-    assert(tmn_is_suspend_enabled());
+    assert(hythread_is_suspend_enabled());
     Class *clss =
         class_load_verify_prepare_from_jni(VM_Global_State::loader_env, class_string);
     if(!clss) {
@@ -100,7 +100,7 @@ jfieldID JNICALL GetStaticFieldID(JNIEnv *env,
                                   const char *sig)
 {
     TRACE2("jni", "GetStaticFieldID called");
-    assert(tmn_is_suspend_enabled());
+    assert(hythread_is_suspend_enabled());
 
     Class* clss = jclass_to_struct_Class(clazz);
     Field *field = class_lookup_field_recursive(clss, name, sig);
@@ -121,7 +121,7 @@ jfieldID JNICALL GetStaticFieldID(JNIEnv *env,
 
 jobject JNICALL GetObjectFieldOffset(JNIEnv* UNREF env, jobject obj, jint offset)
 {
-    assert(tmn_is_suspend_enabled());
+    assert(hythread_is_suspend_enabled());
     ObjectHandle h = (ObjectHandle)obj;
 
     tmn_suspend_disable();       //---------------------------------v
@@ -145,7 +145,7 @@ jobject JNICALL GetObjectField(JNIEnv *env,
                                jfieldID fieldID)
 {
     TRACE2("jni", "GetObjectField called, id = " << fieldID);
-    assert(tmn_is_suspend_enabled());
+    assert(hythread_is_suspend_enabled());
     Field *f = (Field *)fieldID;
     assert(f);
     assert(IsInstanceOf(env, obj, struct_Class_to_jclass(f->get_class())));
@@ -158,7 +158,7 @@ jobject JNICALL GetObjectField(JNIEnv *env,
 
 jboolean JNICALL GetBooleanFieldOffset(JNIEnv * UNREF env, jobject obj, jint offset)
 {
-    assert(tmn_is_suspend_enabled());
+    assert(hythread_is_suspend_enabled());
     ObjectHandle h = (ObjectHandle)obj;
 
     tmn_suspend_disable();       //---------------------------------v
@@ -176,7 +176,7 @@ jboolean JNICALL GetBooleanField(JNIEnv *env,
                                  jfieldID fieldID)
 {
     TRACE2("jni", "GetBooleanField called, id = " << fieldID);
-    assert(tmn_is_suspend_enabled());
+    assert(hythread_is_suspend_enabled());
     Field *f = (Field *)fieldID;
     assert(f);
     if (!ensure_initialised(env, f->get_class())) return 0;
@@ -187,7 +187,7 @@ jboolean JNICALL GetBooleanField(JNIEnv *env,
 
 jbyte JNICALL GetByteFieldOffset(JNIEnv * UNREF env, jobject obj, jint offset)
 {
-    assert(tmn_is_suspend_enabled());
+    assert(hythread_is_suspend_enabled());
     ObjectHandle h = (ObjectHandle)obj;
 
     tmn_suspend_disable();       //---------------------------------v
@@ -205,7 +205,7 @@ jbyte JNICALL GetByteField(JNIEnv *env,
                            jfieldID fieldID)
 {
     TRACE2("jni", "GetByteField called, id = " << fieldID);
-    assert(tmn_is_suspend_enabled());
+    assert(hythread_is_suspend_enabled());
     Field *f = (Field *)fieldID;
     assert(f);
     assert(IsInstanceOf(env, obj, struct_Class_to_jclass(f->get_class())));
@@ -218,7 +218,7 @@ jbyte JNICALL GetByteField(JNIEnv *env,
 
 jchar JNICALL GetCharFieldOffset(JNIEnv * UNREF env, jobject obj, jint offset)
 {
-    assert(tmn_is_suspend_enabled());
+    assert(hythread_is_suspend_enabled());
     ObjectHandle h = (ObjectHandle)obj;
 
     tmn_suspend_disable();     //---------------------------------v
@@ -236,7 +236,7 @@ jchar JNICALL GetCharField(JNIEnv *env,
                            jfieldID fieldID)
 {
     TRACE2("jni", "GetCharField called, id = " << fieldID);
-    assert(tmn_is_suspend_enabled());
+    assert(hythread_is_suspend_enabled());
     Field *f = (Field *)fieldID;
     assert(f);
     assert(IsInstanceOf(env, obj, struct_Class_to_jclass(f->get_class())));
@@ -249,7 +249,7 @@ jchar JNICALL GetCharField(JNIEnv *env,
 
 jshort JNICALL GetShortFieldOffset(JNIEnv * UNREF env, jobject obj, jint offset)
 {
-    assert(tmn_is_suspend_enabled());
+    assert(hythread_is_suspend_enabled());
     ObjectHandle h = (ObjectHandle)obj;
 
     tmn_suspend_disable();       //---------------------------------v
@@ -267,7 +267,7 @@ jshort JNICALL GetShortField(JNIEnv *env,
                              jfieldID fieldID)
 {
     TRACE2("jni", "GetShortField called, id = " << fieldID);
-    assert(tmn_is_suspend_enabled());
+    assert(hythread_is_suspend_enabled());
     Field *f = (Field *)fieldID;
     assert(f);
     assert(IsInstanceOf(env, obj, struct_Class_to_jclass(f->get_class())));
@@ -280,7 +280,7 @@ jshort JNICALL GetShortField(JNIEnv *env,
 
 jint JNICALL GetIntFieldOffset(JNIEnv * UNREF env, jobject obj, jint offset)
 {
-    assert(tmn_is_suspend_enabled());
+    assert(hythread_is_suspend_enabled());
     ObjectHandle h = (ObjectHandle)obj;
 
     tmn_suspend_disable();       //---------------------------------v
@@ -298,7 +298,7 @@ jint JNICALL GetIntField(JNIEnv *env,
                          jfieldID fieldID)
 {
     TRACE2("jni", "GetIntField called, id = " << fieldID);
-    assert(tmn_is_suspend_enabled());
+    assert(hythread_is_suspend_enabled());
     Field *f = (Field *)fieldID;
     assert(f);
     assert(IsInstanceOf(env, obj, struct_Class_to_jclass(f->get_class())));
@@ -311,7 +311,7 @@ jint JNICALL GetIntField(JNIEnv *env,
 
 jlong JNICALL GetLongFieldOffset(JNIEnv * UNREF env, jobject obj, jint offset)
 {
-    assert(tmn_is_suspend_enabled());
+    assert(hythread_is_suspend_enabled());
     ObjectHandle h = (ObjectHandle)obj;
 
     tmn_suspend_disable();       //---------------------------------v
@@ -329,7 +329,7 @@ jlong JNICALL GetLongField(JNIEnv *env,
                            jfieldID fieldID)
 {
     TRACE2("jni", "GetLongField called, id = " << fieldID);
-    assert(tmn_is_suspend_enabled());
+    assert(hythread_is_suspend_enabled());
     Field *f = (Field *)fieldID;
     assert(f);
     assert(IsInstanceOf(env, obj, struct_Class_to_jclass(f->get_class())));
@@ -342,7 +342,7 @@ jlong JNICALL GetLongField(JNIEnv *env,
 
 jfloat JNICALL GetFloatFieldOffset(JNIEnv * UNREF env, jobject obj, jint offset)
 {
-    assert(tmn_is_suspend_enabled());
+    assert(hythread_is_suspend_enabled());
     ObjectHandle h = (ObjectHandle)obj;
 
     tmn_suspend_disable();       //---------------------------------v
@@ -360,7 +360,7 @@ jfloat JNICALL GetFloatField(JNIEnv *env,
                              jfieldID fieldID)
 {
     TRACE2("jni", "GetFloatField called, id = " << fieldID);
-    assert(tmn_is_suspend_enabled());
+    assert(hythread_is_suspend_enabled());
     Field *f = (Field *)fieldID;
     assert(f);
     assert(IsInstanceOf(env, obj, struct_Class_to_jclass(f->get_class())));
@@ -373,7 +373,7 @@ jfloat JNICALL GetFloatField(JNIEnv *env,
 
 jdouble JNICALL GetDoubleFieldOffset(JNIEnv * UNREF env, jobject obj, jint offset)
 {
-    assert(tmn_is_suspend_enabled());
+    assert(hythread_is_suspend_enabled());
     ObjectHandle h = (ObjectHandle)obj;
 
     tmn_suspend_disable();       //---------------------------------v
@@ -391,7 +391,7 @@ jdouble JNICALL GetDoubleField(JNIEnv *env,
                                jfieldID fieldID)
 {
     TRACE2("jni", "GetDoubleField called, id = " << fieldID);
-    assert(tmn_is_suspend_enabled());
+    assert(hythread_is_suspend_enabled());
     Field *f = (Field *)fieldID;
     assert(f);
     assert(IsInstanceOf(env, obj, struct_Class_to_jclass(f->get_class())));
@@ -414,7 +414,7 @@ jdouble JNICALL GetDoubleField(JNIEnv *env,
 
 void JNICALL SetObjectFieldOffset(JNIEnv * UNREF env, jobject obj, jint offset, jobject value)
 {
-    assert(tmn_is_suspend_enabled());
+    assert(hythread_is_suspend_enabled());
     ObjectHandle h = (ObjectHandle)obj;
     ObjectHandle v = (ObjectHandle)value;
 
@@ -441,7 +441,7 @@ void JNICALL SetObjectField(JNIEnv *env,
                             jobject value)
 {
     TRACE2("jni", "SetObjectField called, id = " << fieldID);
-    assert(tmn_is_suspend_enabled());
+    assert(hythread_is_suspend_enabled());
     Field *f = (Field *)fieldID;
     assert(f);
     assert(IsInstanceOf(env, obj, struct_Class_to_jclass(f->get_class())));
@@ -454,7 +454,7 @@ void JNICALL SetObjectField(JNIEnv *env,
 
 void JNICALL SetBooleanFieldOffset(JNIEnv * UNREF env, jobject obj, jint offset, jboolean value)
 {
-    assert(tmn_is_suspend_enabled());
+    assert(hythread_is_suspend_enabled());
     ObjectHandle h = (ObjectHandle)obj;
 
     tmn_suspend_disable();       //---------------------------------v
@@ -471,7 +471,7 @@ void JNICALL SetBooleanField(JNIEnv *env,
                              jboolean value)
 {
     TRACE2("jni", "SetBooleanField called, id = " << fieldID << " value = " << value);
-    assert(tmn_is_suspend_enabled());
+    assert(hythread_is_suspend_enabled());
     Field *f = (Field *)fieldID;
     assert(f);
     if (!ensure_initialised(env, f->get_class())) return;
@@ -482,7 +482,7 @@ void JNICALL SetBooleanField(JNIEnv *env,
 
 void JNICALL SetByteFieldOffset(JNIEnv * UNREF env, jobject obj, jint offset, jbyte value)
 {
-    assert(tmn_is_suspend_enabled());
+    assert(hythread_is_suspend_enabled());
     ObjectHandle h = (ObjectHandle)obj;
 
     tmn_suspend_disable();       //---------------------------------v
@@ -502,7 +502,7 @@ void JNICALL SetByteField(JNIEnv *env,
                           jbyte value)
 {
     TRACE2("jni", "SetByteField called, id = " << fieldID << " value = " << value);
-    assert(tmn_is_suspend_enabled());
+    assert(hythread_is_suspend_enabled());
     Field *f = (Field *)fieldID;
     assert(f);
     assert(IsInstanceOf(env, obj, struct_Class_to_jclass(f->get_class())));
@@ -515,7 +515,7 @@ void JNICALL SetByteField(JNIEnv *env,
 
 void JNICALL SetCharFieldOffset(JNIEnv * UNREF env, jobject obj, jint offset, jchar value)
 {
-    assert(tmn_is_suspend_enabled());
+    assert(hythread_is_suspend_enabled());
     ObjectHandle h = (ObjectHandle)obj;
 
     tmn_suspend_disable();       //---------------------------------v
@@ -532,7 +532,7 @@ void JNICALL SetCharField(JNIEnv *env,
                           jchar value)
 {
     TRACE2("jni", "SetCharField called, id = " << fieldID << " value = " << value);
-    assert(tmn_is_suspend_enabled());
+    assert(hythread_is_suspend_enabled());
     Field *f = (Field *)fieldID;
     assert(f);
     assert(IsInstanceOf(env, obj, struct_Class_to_jclass(f->get_class())));
@@ -545,7 +545,7 @@ void JNICALL SetCharField(JNIEnv *env,
 
 void JNICALL SetShortFieldOffset(JNIEnv * UNREF env, jobject obj, jint offset, jshort value)
 {
-    assert(tmn_is_suspend_enabled());
+    assert(hythread_is_suspend_enabled());
     ObjectHandle h = (ObjectHandle)obj;
 
     tmn_suspend_disable();       //---------------------------------v
@@ -565,7 +565,7 @@ void JNICALL SetShortField(JNIEnv *env,
                            jshort value)
 {
     TRACE2("jni", "SetShortField called, id = " << fieldID << " value = " << value);
-    assert(tmn_is_suspend_enabled());
+    assert(hythread_is_suspend_enabled());
     Field *f = (Field *)fieldID;
     assert(f);
     assert(IsInstanceOf(env, obj, struct_Class_to_jclass(f->get_class())));
@@ -578,7 +578,7 @@ void JNICALL SetShortField(JNIEnv *env,
 
 void JNICALL SetIntFieldOffset(JNIEnv * UNREF env, jobject obj, jint offset, jint value)
 {
-    assert(tmn_is_suspend_enabled());
+    assert(hythread_is_suspend_enabled());
     ObjectHandle h = (ObjectHandle)obj;
 
     tmn_suspend_disable();       //---------------------------------v
@@ -595,7 +595,7 @@ void JNICALL SetIntField(JNIEnv *env,
                          jint value)
 {
     TRACE2("jni", "SetIntField called, id = " << fieldID << " value = " << value);
-    assert(tmn_is_suspend_enabled());
+    assert(hythread_is_suspend_enabled());
     Field *f = (Field *)fieldID;
     assert(f);
     assert(IsInstanceOf(env, obj, struct_Class_to_jclass(f->get_class())));
@@ -608,7 +608,7 @@ void JNICALL SetIntField(JNIEnv *env,
 
 void JNICALL SetLongFieldOffset(JNIEnv * UNREF env, jobject obj, jint offset, jlong value)
 {
-    assert(tmn_is_suspend_enabled());
+    assert(hythread_is_suspend_enabled());
     ObjectHandle h = (ObjectHandle)obj;
 
     tmn_suspend_disable();       //---------------------------------v
@@ -625,7 +625,7 @@ void JNICALL SetLongField(JNIEnv *env,
                           jlong value)
 {
     TRACE2("jni", "SetLongField called, id = " << fieldID << " value = " << value);
-    assert(tmn_is_suspend_enabled());
+    assert(hythread_is_suspend_enabled());
     Field *f = (Field *)fieldID;
     assert(f);
     assert(IsInstanceOf(env, obj, struct_Class_to_jclass(f->get_class())));
@@ -637,7 +637,7 @@ void JNICALL SetLongField(JNIEnv *env,
 
 void JNICALL SetFloatFieldOffset(JNIEnv * UNREF env, jobject obj, jint offset, jfloat value)
 {
-    assert(tmn_is_suspend_enabled());
+    assert(hythread_is_suspend_enabled());
     ObjectHandle h = (ObjectHandle)obj;
 
     tmn_suspend_disable();       //---------------------------------v
@@ -654,7 +654,7 @@ void JNICALL SetFloatField(JNIEnv *env,
                            jfloat value)
 {
     TRACE2("jni", "SetFloatField called, id = " << fieldID << " value = " << value);
-    assert(tmn_is_suspend_enabled());
+    assert(hythread_is_suspend_enabled());
     Field *f = (Field *)fieldID;
     assert(f);
     assert(IsInstanceOf(env, obj, struct_Class_to_jclass(f->get_class())));
@@ -667,7 +667,7 @@ void JNICALL SetFloatField(JNIEnv *env,
 
 void JNICALL SetDoubleFieldOffset(JNIEnv * UNREF env, jobject obj, jint offset, jdouble value)
 {
-    assert(tmn_is_suspend_enabled());
+    assert(hythread_is_suspend_enabled());
     ObjectHandle h = (ObjectHandle)obj;
 
     tmn_suspend_disable();       //---------------------------------v
@@ -684,7 +684,7 @@ void JNICALL SetDoubleField(JNIEnv *env,
                             jdouble value)
 {
     TRACE2("jni", "SetDoubleField called, id = " << fieldID << " value = " << value);
-    assert(tmn_is_suspend_enabled());
+    assert(hythread_is_suspend_enabled());
     Field *f = (Field *)fieldID;
     assert(f);
     assert(IsInstanceOf(env, obj, struct_Class_to_jclass(f->get_class())));
@@ -713,7 +713,7 @@ jobject JNICALL GetStaticObjectField(JNIEnv *env,
                                      jfieldID fieldID)
 {
     TRACE2("jni", "GetStaticObjectField called, id = " << fieldID);
-    assert(tmn_is_suspend_enabled());
+    assert(hythread_is_suspend_enabled());
     Field *f = (Field *)fieldID;
     assert(f);
     if (!ensure_initialised(env, f->get_class())) return 0;
@@ -741,7 +741,7 @@ jboolean JNICALL GetStaticBooleanField(JNIEnv *env,
                                        jfieldID fieldID)
 {
     TRACE2("jni", "GetStaticBooleanField called, id = " << fieldID);
-    assert(tmn_is_suspend_enabled());
+    assert(hythread_is_suspend_enabled());
     Field *f = (Field *)fieldID;
     assert(f);
     if (!ensure_initialised(env, f->get_class())) return 0;
@@ -755,7 +755,7 @@ jbyte JNICALL GetStaticByteField(JNIEnv *env,
                                  jfieldID fieldID)
 {
     TRACE2("jni", "GetStaticByteField called, id = " << fieldID);
-    assert(tmn_is_suspend_enabled());
+    assert(hythread_is_suspend_enabled());
     Field *f = (Field *)fieldID;
     assert(f);
     if (!ensure_initialised(env, f->get_class())) return 0;
@@ -769,7 +769,7 @@ jchar JNICALL GetStaticCharField(JNIEnv *env,
                                  jfieldID fieldID)
 {
     TRACE2("jni", "GetStaticCharField called, id = " << fieldID);
-    assert(tmn_is_suspend_enabled());
+    assert(hythread_is_suspend_enabled());
     Field *f = (Field *)fieldID;
     assert(f);
     if (!ensure_initialised(env, f->get_class())) return 0;
@@ -783,7 +783,7 @@ jshort JNICALL GetStaticShortField(JNIEnv *env,
                                    jfieldID fieldID)
 {
     TRACE2("jni", "GetStaticShortField called, id = " << fieldID);
-    assert(tmn_is_suspend_enabled());
+    assert(hythread_is_suspend_enabled());
     Field *f = (Field *)fieldID;
     assert(f);
     if (!ensure_initialised(env, f->get_class())) return 0;
@@ -797,7 +797,7 @@ jint JNICALL GetStaticIntField(JNIEnv *env,
                                jfieldID fieldID)
 {
     TRACE2("jni", "GetStaticIntField called, id = " << fieldID);
-    assert(tmn_is_suspend_enabled());
+    assert(hythread_is_suspend_enabled());
     Field *f = (Field *)fieldID;
     assert(f);
     if (!ensure_initialised(env, f->get_class())) return 0;
@@ -811,7 +811,7 @@ jlong JNICALL GetStaticLongField(JNIEnv *env,
                                  jfieldID fieldID)
 {
     TRACE2("jni", "GetStaticLongField called, id = " << fieldID);
-    assert(tmn_is_suspend_enabled());
+    assert(hythread_is_suspend_enabled());
     Field *f = (Field *)fieldID;
     assert(f);
     if (!ensure_initialised(env, f->get_class())) return 0;
@@ -825,7 +825,7 @@ jfloat JNICALL GetStaticFloatField(JNIEnv *env,
                                   jfieldID fieldID)
 {
     TRACE2("jni", "GetStaticFloatField called, id = " << fieldID);
-    assert(tmn_is_suspend_enabled());
+    assert(hythread_is_suspend_enabled());
     Field *f = (Field *)fieldID;
     assert(f);
     if (!ensure_initialised(env, f->get_class())) return 0;
@@ -839,7 +839,7 @@ jdouble JNICALL GetStaticDoubleField(JNIEnv *env,
                                      jfieldID fieldID)
 {
     TRACE2("jni", "GetStaticDoubleField called, id = " << fieldID);
-    assert(tmn_is_suspend_enabled());
+    assert(hythread_is_suspend_enabled());
     Field *f = (Field *)fieldID;
     assert(f);
     if (!ensure_initialised(env, f->get_class())) return 0;
@@ -866,7 +866,7 @@ void JNICALL SetStaticObjectField(JNIEnv *env,
                                   jobject value)
 {
     TRACE2("jni", "SetStaticObjectField called, id = " << fieldID);
-    assert(tmn_is_suspend_enabled());
+    assert(hythread_is_suspend_enabled());
     Field *f = (Field *)fieldID;
     assert(f);
     if (!ensure_initialised(env, f->get_class())) return;
@@ -892,7 +892,7 @@ void JNICALL SetStaticBooleanField(JNIEnv *env,
                                    jboolean value)
 {
     TRACE2("jni", "SetStaticBooleanField called, id = " << fieldID << " value = " << value);
-    assert(tmn_is_suspend_enabled());
+    assert(hythread_is_suspend_enabled());
     Field *f = (Field *)fieldID;
     assert(f);
     if (!ensure_initialised(env, f->get_class())) return;
@@ -908,7 +908,7 @@ void JNICALL SetStaticByteField(JNIEnv *env,
                                 jbyte value)
 {
     TRACE2("jni", "SetStaticByteField called, id = " << fieldID << " value = " << value);
-    assert(tmn_is_suspend_enabled());
+    assert(hythread_is_suspend_enabled());
     Field *f = (Field *)fieldID;
     assert(f);
     if (!ensure_initialised(env, f->get_class())) return;
@@ -928,7 +928,7 @@ void JNICALL SetStaticCharField(JNIEnv *env,
                                 jchar value)
 {
     TRACE2("jni", "SetStaticCharField called, id = " << fieldID << " value = " << value);
-    assert(tmn_is_suspend_enabled());
+    assert(hythread_is_suspend_enabled());
     Field *f = (Field *)fieldID;
     assert(f);
     if (!ensure_initialised(env, f->get_class())) return;
@@ -944,7 +944,7 @@ void JNICALL SetStaticShortField(JNIEnv *env,
                                  jshort value)
 {
     TRACE2("jni", "SetStaticShortField called, id = " << fieldID << " value = " << value);
-    assert(tmn_is_suspend_enabled());
+    assert(hythread_is_suspend_enabled());
     Field *f = (Field *)fieldID;
     assert(f);
     if (!ensure_initialised(env, f->get_class())) return;
@@ -964,7 +964,7 @@ void JNICALL SetStaticIntField(JNIEnv *env,
                                jint value)
 {
     TRACE2("jni", "SetStaticIntField called, id = " << fieldID << " value = " << value);
-    assert(tmn_is_suspend_enabled());
+    assert(hythread_is_suspend_enabled());
     Field *f = (Field *)fieldID;
     assert(f);
     if (!ensure_initialised(env, f->get_class())) return;
@@ -981,7 +981,7 @@ void JNICALL SetStaticLongField(JNIEnv *env,
                                 jlong value)
 {
     TRACE2("jni", "SetStaticLongField called, id = " << fieldID << " value = " << value);
-    assert(tmn_is_suspend_enabled());
+    assert(hythread_is_suspend_enabled());
     Field *f = (Field *)fieldID;
     assert(f);
     if (!ensure_initialised(env, f->get_class())) return;
@@ -997,7 +997,7 @@ void JNICALL SetStaticFloatField(JNIEnv *env,
                                  jfloat value)
 {
     TRACE2("jni", "SetStaticFloatField called, id = " << fieldID << " value = " << value);
-    assert(tmn_is_suspend_enabled());
+    assert(hythread_is_suspend_enabled());
     Field *f = (Field *)fieldID;
     assert(f);
     if (!ensure_initialised(env, f->get_class())) return;
@@ -1013,7 +1013,7 @@ void JNICALL SetStaticDoubleField(JNIEnv *env,
                                   jdouble value)
 {
     TRACE2("jni", "SetStaticDoubleField called, id = " << fieldID << " value = " << value);
-    assert(tmn_is_suspend_enabled());
+    assert(hythread_is_suspend_enabled());
     Field *f = (Field *)fieldID;
     assert(f);
     if (!ensure_initialised(env, f->get_class())) return;

@@ -27,34 +27,26 @@ Version: $Revision: 1.4.2.4 $
 
 <project name="vm.hythr">
     <target name="init" depends="common_vm">
-        <property name="build.depends" value="extra.apr,extra.aprutil" />
+        <property name="build.depends" value="extra.apr,vm.encoder,
+vm.port,extra.log4cxx, extra.aprutil" />
         <property name="libname" value="hythr" />
         <property name="outtype" value="shared" />
         <property name="src" location="${build.vm.home}" />
 
-        <compiler id="cpp.compiler" extends="common.cpp.compiler">
-            <includepath>
-                <pathelement location="${extra.apr.includes}" />
-            </includepath>
+        <compiler id="c.compiler" extends="common.c.compiler">
 
             <includepath>
-                <dirset dir="${src}">
-                    <include name="include" />
-                    <include name="vmcore/include" />
-                    <include name="port/src/include" />
-
-                    <select os="win">
-                        <include name="vmcore/src/util/win/include" />
-                    </select>
-
-                    <select os="lnx">
-                        <include name="vmcore/src/util/linux/include" />
-                    </select>
-                </dirset>
+              <pathelement location="${extra.apr.includes}" />
+              <pathelement location="${extra.apr.includes}/apr-1" />
+              <pathelement location="${vm.port.includes}" />
+              <pathelement location="${build.vm.home}/thread/src" />
+              <pathelement location="${build.vm.home}/port/src/encoder/ia32_em64t" />
             </includepath>
 
             <fileset dir="${src}">
-                <include name="vmcore/src/thread/hythr/*.cpp" />
+                <include name="thread/src/*native*.c" />
+                <!-- include name="thread/src/*task*.c" / -->
+                <include name="thread/src/thread_init.c" />
             </fileset>
 
             <select os="win" cfg="release" cxx="icl">
@@ -62,22 +54,32 @@ Version: $Revision: 1.4.2.4 $
             </select>
 
             <select os="win">
-                <defineset define="_USRDLL,APR_DECLARE_STATIC" />
+                <defineset define="_USRDLL" />
             </select>
 
             <select os="lnx">
                 <defineset define="LINUX" />
             </select>
 
-            <select os="lnx">
-                <compilerarg value="-Wno-deprecated" />
-                <compilerarg value="-fno-exceptions" />
-            </select>
+             <defineset define="APR_DECLARE_STATIC" />
         </compiler>
 
+
         <linker id="linker" extends="common.linker">
+           <libset libs="${vm.port.lib}"
+                   dir="${vm.port.libdir}" />
+
+            <libset libs="${extra.log4cxx.lib}"
+                    dir="${extra.log4cxx.libdir}" />
+
+            <libset libs="${extra.aprutil.lib}"
+                    dir="${extra.aprutil.libdir}" />
+
+            <libset libs="${extra.apr.lib}"
+                    dir="${extra.apr.libdir}" />
+
             <select os="win">
-                <linkerarg value="/DEF:${src}/vmcore/src/thread/hythr/hythr.def" />
+                <linkerarg value="/DEF:${src}/thread/src/hythr.def" />
             </select>
 
             <select cfg="debug" os="win">
@@ -87,11 +89,8 @@ Version: $Revision: 1.4.2.4 $
             <select os="lnx">
                 <linkerarg value="-Wl,-init" />
                 <linkerarg value="-Wl,hythread_library_init" />
-                <linkerarg value="-Wl,--version-script,${src}/vmcore/src/thread/hythr/hythr.exp" />
+                <linkerarg value="-Wl,--version-script,${src}/thread/src/hythr.exp" />
             </select>
-
-            <libset libs="${extra.apr.lib}"
-                    dir="${extra.apr.libdir}" />
 
             <select os="win">
                 <syslibset libs="advapi32,ws2_32" />

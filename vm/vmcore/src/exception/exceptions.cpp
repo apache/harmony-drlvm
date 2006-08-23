@@ -29,7 +29,7 @@
 #include "m2n.h"
 #include "object_handles.h"
 #include "vm_strings.h"
-#include "open/thread.h"
+
 
 // internal declaration of functions
 void __stdcall set_current_thread_exception_internal(ManagedObject * exn);
@@ -48,7 +48,7 @@ void exn_throw(jthrowable exc)
 
 void exn_throw_only(jthrowable exc)
 {
-    assert(!tmn_is_suspend_enabled());
+    assert(!hythread_is_suspend_enabled());
     // Temporary fix of incorrect using of throw_by name in the interpreter 
     if (interpreter_enabled()) {
         exn_raise_only(exc);
@@ -140,7 +140,7 @@ static Method *lookup_constructor(Class * exc_clss, const char *signature)
 static jthrowable create_exception(const char *exception_name)
 {
 
-    assert(tmn_is_suspend_enabled());
+    assert(hythread_is_suspend_enabled());
     Class *exc_clss = get_class(exception_name);
     if (exc_clss == NULL) {
         assert(exn_raised());
@@ -165,7 +165,7 @@ static jthrowable create_exception(const char *exception_name)
 static jthrowable create_exception(const char *exception_name,
     jthrowable cause)
 {
-    assert(tmn_is_suspend_enabled());
+    assert(hythread_is_suspend_enabled());
     Class *exc_clss = get_class(exception_name);
     if (exc_clss == NULL) {
         assert(exn_raised());
@@ -202,7 +202,7 @@ static jthrowable create_exception(const char *exception_name,
     jthrowable cause, const char *message)
 {
     // XXX salikh: change to unconditional thread_disable_suspend()
-    assert(tmn_is_suspend_enabled());
+    assert(hythread_is_suspend_enabled());
 
     Class *exc_clss = get_class(exception_name);
     if (exc_clss == NULL) {
@@ -293,7 +293,7 @@ jthrowable exn_create(const char* exception_class, const char* message, jthrowab
 
 void exn_throw_by_name(const char *exception_name)
 {
-    assert(tmn_is_suspend_enabled());
+    assert(hythread_is_suspend_enabled());
     jthrowable exc = create_exception(exception_name);
     tmn_suspend_disable();
     exn_throw_only(exc);
@@ -303,7 +303,7 @@ void exn_throw_by_name(const char *exception_name)
 
 void exn_throw_by_name(const char *exception_name, const char *message)
 {
-    assert(tmn_is_suspend_enabled());
+    assert(hythread_is_suspend_enabled());
     jthrowable exc = create_exception(exception_name, NULL, message);
     tmn_suspend_disable();
     exn_throw_only(exc);
@@ -484,7 +484,7 @@ update_handler_address(NativeCodePtr new_handler_ip)
 
 void __stdcall set_current_thread_exception_internal(ManagedObject * exn)
 {
-    assert(!tmn_is_suspend_enabled());
+    assert(!hythread_is_suspend_enabled());
     p_TLS_vmthread->p_exception_object = (volatile ManagedObject *) exn;
     p_TLS_vmthread->ti_exception_callback_pending = true;
 }
@@ -508,7 +508,7 @@ void clear_current_thread_exception()
     // function should be only called from suspend disabled mode
     // it changes enumeratable reference to zero which is not
     // gc safe operation.
-    assert(!tmn_is_suspend_enabled());
+    assert(!hythread_is_suspend_enabled());
     p_TLS_vmthread->p_exception_object = NULL;
 
     if (p_TLS_vmthread->restore_guard_page) {
@@ -563,7 +563,7 @@ inline void exn_java_print_stack_trace(FILE * UNREF f, ManagedObject * exn)
 // prints stackTrace via jni
 inline void exn_jni_print_stack_trace(FILE * f, jthrowable exc)
 {
-    assert(tmn_is_suspend_enabled());
+    assert(hythread_is_suspend_enabled());
     // finds java environment
     JNIEnv_Internal *jenv = jni_native_intf;
 
@@ -698,7 +698,7 @@ inline void exn_jni_print_stack_trace(FILE * f, jthrowable exc)
         }
     }
 
-    assert(tmn_is_suspend_enabled());
+    assert(hythread_is_suspend_enabled());
 }
 
 inline void exn_native_print_stack_trace(FILE * f, ManagedObject * exn)
@@ -738,7 +738,7 @@ inline void exn_native_print_stack_trace(FILE * f, ManagedObject * exn)
 // prints stack trace using 3 ways: via java, via jni, and native
 void exn_print_stack_trace(FILE * f, ManagedObject * exn)
 {
-    assert(!tmn_is_suspend_enabled());
+    assert(!hythread_is_suspend_enabled());
     // saves curent thread exception and clear to allow java to work
     Java_java_lang_Throwable *cte = get_current_thread_exception();
     jthrowable j = oh_allocate_local_handle();
@@ -798,7 +798,7 @@ FIXME:Don't wor under ClassPath, Fix requred
 void print_uncaught_exception_message(FILE * f, char *context_message,
     ManagedObject * exn)
 {
-    assert(!tmn_is_suspend_enabled());
+    assert(!hythread_is_suspend_enabled());
     fprintf(f, "** During %s uncaught exception: %s\n", context_message,
         exn->vt()->clss->name->bytes);
     exn_print_stack_trace(f, exn);
@@ -811,9 +811,9 @@ void print_uncaught_exception_message(FILE * f, char *context_message,
 static ManagedObject *create_lazy_exception(StackIterator * UNREF throw_si,
     Class_Handle exn_class, Method_Handle exn_constr, uint8 * exn_constr_args)
 {
-    assert(!tmn_is_suspend_enabled());
+    assert(!hythread_is_suspend_enabled());
     volatile ManagedObject *exn_obj = 0;
-    assert(!tmn_is_suspend_enabled());
+    assert(!hythread_is_suspend_enabled());
     exn_obj =
         class_alloc_new_object_and_run_constructor((Class *) exn_class,
         (Method *) exn_constr, exn_constr_args);
@@ -839,7 +839,7 @@ static void exn_propagate_exception(StackIterator * si,
     ManagedObject ** exn_obj, Class_Handle exn_class,
     Method_Handle exn_constr, uint8 * exn_constr_args)
 {
-    assert(!tmn_is_suspend_enabled());
+    assert(!hythread_is_suspend_enabled());
     ASSERT_NO_INTERPRETER assert(*exn_obj || exn_class);
 
     // Save the throw context
@@ -940,7 +940,8 @@ static void exn_propagate_exception(StackIterator * si,
         // No appropriate handler found, undo synchronization
         if (method->is_synchronized()) {
             if (method->is_static()) {
-                assert(!tmn_is_suspend_enabled());
+                assert(!hythread_is_suspend_enabled());
+                TRACE2("tm.locks", ("unlock staic sync methods... %x",  exn_obj));
                 vm_monitor_exit(struct_Class_to_java_lang_Class(method->
                         get_class()));
             }
@@ -948,6 +949,7 @@ static void exn_propagate_exception(StackIterator * si,
                 void **p_this =
                     (void **) jit->get_address_of_this(method,
                     si_get_jit_context(si));
+                TRACE2("tm.locks", ("unlock sync methods...%x" , *p_this));
                 vm_monitor_exit((ManagedObject *) * p_this);
             }
         }
@@ -969,7 +971,7 @@ static void exn_propagate_exception(StackIterator * si,
             create_lazy_exception(throw_si, exn_class, exn_constr,
             exn_constr_args);
     }
-    assert(!tmn_is_suspend_enabled());
+    assert(!hythread_is_suspend_enabled());
 
     CodeChunkInfo *catch_cci = si_get_code_chunk_info(si);
     Method *catch_method = NULL;
@@ -1025,7 +1027,7 @@ void exn_athrow(ManagedObject * exn_obj, Class_Handle exn_class,
  * !!!! RELEASE BUILD WILL BE BROKEN          !!!
  * !!!! NO TRACE2, INFO, WARN, ECHO, ASSERT, ...
  */
-    assert(!tmn_is_suspend_enabled());
+    assert(!hythread_is_suspend_enabled());
     //TRACE2("exn","exn_athrow");
     ASSERT_NO_INTERPRETER if ((exn_obj == NULL) && (exn_class == NULL)) {
         Global_Env *env = VM_Global_State::loader_env;
@@ -1240,7 +1242,7 @@ NativeCodePtr exn_get_rth_throw_array_index_out_of_bounds()
 // Return the type of negative array size exception
 Class_Handle exn_get_negative_array_size_exception_type()
 {
-    assert(tmn_is_suspend_enabled());
+    assert(hythread_is_suspend_enabled());
     Class *exn_clss;
 
 
@@ -1275,6 +1277,45 @@ NativeCodePtr exn_get_rth_throw_negative_array_size()
 
     return addr;
 }   //exn_get_rth_throw_negative_array_size
+
+
+// Return the type of illegal state exception
+Class_Handle exn_get_illegal_state_exception_type()
+{
+    assert(hythread_is_suspend_enabled());
+    Class *exn_clss;
+
+
+    Global_Env *env = VM_Global_State::loader_env;
+    String *exc_str =
+        env->string_pool.lookup("java/lang/IllegalMonitorStateException");
+    exn_clss =
+        env->bootstrap_class_loader->LoadVerifyAndPrepareClass(env, exc_str);
+    assert(exn_clss);
+
+    return exn_clss;
+}
+
+// rth_throw_negative_array_size throws a negative array size exception (lazily)
+NativeCodePtr exn_get_rth_throw_illegal_state_exception()
+{
+    static NativeCodePtr addr = NULL;
+    if (addr) {
+        return addr;
+    }
+
+    LilCodeStub *cs = lil_parse_code_stub("entry 0:managed::void;"
+        "std_places 1;" "sp0=%0i;" "tailcall %1i;",
+        exn_get_illegal_state_exception_type(),
+        lil_npc_to_fp(exn_get_rth_throw_lazy_trampoline()));
+    assert(lil_is_valid(cs));
+    addr =
+        LilCodeGenerator::get_platform()->compile(cs,
+        "rth_throw_illegal_state_exception", dump_stubs);
+    lil_free_code_stub(cs);
+
+    return addr;
+}   //exn_get_rth_throw_illegal_state_exception
 
 
 // rth_throw_array_store throws an array store exception (lazily)
@@ -1326,7 +1367,7 @@ NativeCodePtr exn_get_rth_throw_arithmetic()
 // Return the type of class cast exception
 Class_Handle exn_get_class_cast_exception_type()
 {
-    assert(tmn_is_suspend_enabled());
+    assert(hythread_is_suspend_enabled());
     Class *exn_clss;
 
     Global_Env *env = VM_Global_State::loader_env;
@@ -1362,7 +1403,7 @@ NativeCodePtr exn_get_rth_throw_class_cast_exception()
 // Return the type of incompatible class change exception
 Class_Handle exn_get_incompatible_class_change_exception_type()
 {
-    assert(tmn_is_suspend_enabled());
+    assert(hythread_is_suspend_enabled());
     Class *exn_clss;
 
     Global_Env *env = VM_Global_State::loader_env;

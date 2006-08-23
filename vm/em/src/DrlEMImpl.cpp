@@ -100,6 +100,7 @@ DrlEMImpl::DrlEMImpl() : jh(NULL), _execute_method(NULL), interpreterMode(false)
     nMethodsCompiled=0;
     nMethodsRecompiled=0;
     tick=0;
+    hymutex_create(&recompilationLock, TM_MUTEX_NESTED);
 #ifndef _EM64T_
     initProfileAccess();
 #endif
@@ -107,6 +108,7 @@ DrlEMImpl::DrlEMImpl() : jh(NULL), _execute_method(NULL), interpreterMode(false)
 
 DrlEMImpl::~DrlEMImpl() {
     deallocateResources();
+    hymutex_destroy(recompilationLock);
 }
 
 void DrlEMImpl::initProfileAccess() {
@@ -628,15 +630,15 @@ bool DrlEMImpl::initProfileCollectors(RChain* chain, const std::string& config) 
 
 void DrlEMImpl::methodProfileIsReady(MethodProfile* mp) {
     
-    recompilationLock.lock();
+    hymutex_lock(recompilationLock);
     if (methodsInRecompile.find((Method_Profile_Handle)mp)!=methodsInRecompile.end()) {
         //method is already recompiling by another thread or by this thread(recursion)
-        recompilationLock.unlock();
+        hymutex_unlock(recompilationLock);
         return;
     }
     methodsInRecompile.insert((Method_Profile_Handle)mp);
     nMethodsRecompiled++;
-    recompilationLock.unlock();
+    hymutex_unlock(recompilationLock);
 
     const char* methodName = NULL;
     const char* className = NULL;
@@ -677,9 +679,9 @@ void DrlEMImpl::methodProfileIsReady(MethodProfile* mp) {
             }
         }
     }
-    recompilationLock.lock();
+    hymutex_lock(recompilationLock);
     methodsInRecompile.erase((Method_Profile_Handle)mp);
-    recompilationLock.unlock();
+    hymutex_unlock(recompilationLock);
 }
 
 ProfileCollector* DrlEMImpl::getProfileCollector(EM_PCTYPE type, JIT_Handle jh, EM_JIT_PC_Role jitRole) const {

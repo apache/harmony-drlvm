@@ -46,7 +46,9 @@
 #include "nogc.h"
 
 #include "object_generic.h"
-#include "open/thread.h"
+
+#include "open/hythread_ext.h"
+#include "open/jthread.h"
 #include "component_manager.h"
 #include "lock_manager.h"
 #include "root_set_enum_internal.h"
@@ -207,10 +209,8 @@ void vm_exit(int exit_code)
 {
     // Send VM_Death event and switch phase to VM_Death
     jvmti_send_vm_death_event();
-void terminate_all_threads();
     if (vm_get_boolean_property_value_with_default("vm.cleanupOnExit"))
-        terminate_all_threads();
-
+        jthread_cancel_all();
     /* FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME *
      * gregory - JVMTI shutdown should be part of DestroyVM after current VM shutdown      *
      * problems are fixed                                                                  *

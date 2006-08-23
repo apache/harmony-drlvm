@@ -24,11 +24,9 @@
 #include "jni_direct.h"
 #include "jvmti.h"
 
-class VM_thread;
-
 struct TIEventThread
 {
-    VM_thread *thread;
+    hythread_t thread;
     TIEventThread *next;
 };
 
@@ -81,11 +79,17 @@ jint get_thread_stack_depth(VM_thread *thread, jint* pskip = NULL);
 
 /* Events functions */
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+    
 void jvmti_send_vm_start_event(Global_Env *env, JNIEnv *jni_env);
 void jvmti_send_vm_init_event(Global_Env *env);
 void jvmti_send_compiled_method_load_event(Method *method);
 void jvmti_send_dynamic_code_generated_event(const char *name, const void *address, jint length);
-void jvmti_send_contended_enter_or_entered_monitor_event(jobject obj, bool isEnter);
+VMEXPORT void jvmti_send_contended_enter_or_entered_monitor_event(jobject obj, int isEnter);
+VMEXPORT void jvmti_send_wait_monitor_event(jobject obj, jlong timeout);
+VMEXPORT void jvmti_send_waited_monitor_event(jobject obj, jboolean is_timed_out);
 void jvmti_send_exception_event(jthrowable exn_object,
     Method *method, jlocation location,
     Method *catch_method, jlocation catch_location);
@@ -96,8 +100,12 @@ void jvmti_send_class_file_load_hook_event(const Global_Env* env,
     int classlen, unsigned char* classbytes,
     int* newclasslen, unsigned char** newclass);
 void jvmti_send_class_prepare_event(Class* clss);
-void jvmti_send_thread_start_end_event(int is_start);
+VMEXPORT void jvmti_send_thread_start_end_event(int is_start);
 void jvmti_send_vm_death_event();
+
+#ifdef __cplusplus
+}
+#endif
 
 /* External events functions */
 VMEXPORT void jvmti_interpreter_exception_event_callback_call(void);

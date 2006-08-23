@@ -29,9 +29,11 @@
 #include "jit_intf_cpp.h"
 #include "em_intf.h"
 #include "heap.h"
-#include "open/thread.h"
+ 
+
 #include "vm_stats.h"
 #include "vm_strings.h"
+
 #include "compile.h"
 #include "jit_runtime_support.h"
 #include "lil_code_generator.h"
@@ -421,7 +423,7 @@ NativeCodePtr compile_create_lil_jni_stub(Method_Handle method, void* func, Nati
     cs = lil_parse_onto_end(cs,
                             "out platform::void;"
                             "call %0i;",
-                            tmn_suspend_enable);
+                            hythread_suspend_enable);
     assert(cs);
 
     //***** Part 5: Set up arguments
@@ -502,7 +504,7 @@ NativeCodePtr compile_create_lil_jni_stub(Method_Handle method, void* func, Nati
     cs = lil_parse_onto_end(cs,
                             "out platform::void;"
                             "call %0i;",
-                            tmn_suspend_disable);
+                            hythread_suspend_disable);
     assert(cs);
 
     //***** Part 9: Synchronise
@@ -733,7 +735,7 @@ JIT_Result compile_do_compilation_jit(Method* method, JIT* jit)
 // Assumes that GC is disabled, but a GC-safe point
 static JIT_Result compile_do_compilation(Method* method, JIT_Flags flags)
 {
-    assert(tmn_is_suspend_enabled());
+    assert(hythread_is_suspend_enabled());
     tmn_suspend_disable();
     class_initialize_ex(method->get_class());
     tmn_suspend_enable();
@@ -777,7 +779,7 @@ static JIT_Result compile_do_compilation(Method* method, JIT_Flags flags)
 static ManagedObject* compile_make_exception(const char* name, Method* method)
 { // FIXME: prototype should be changed to getrid of managed objects as parameters.
   // Now it works in gc disabled mode because of prototype.
-    assert(!tmn_is_suspend_enabled());
+    assert(!hythread_is_suspend_enabled());
     ObjectHandle old_exn = oh_allocate_local_handle();
     old_exn->object = get_current_thread_exception();
     clear_current_thread_exception();
@@ -834,9 +836,7 @@ static ManagedObject* compile_make_exception(const char* name, Method* method)
 NativeCodePtr compile_jit_a_method(Method* method)
 {
     { // Start of block with GcFrames
-    int tmn_suspend_disable_count();   
-    TRACE2("compile", "compile_jit_a_method " << method << " sus_copunt:" << tmn_suspend_disable_count());
-    assert(tmn_suspend_disable_count()==1);
+    TRACE2("compile", "compile_jit_a_method " << method );
  
     ASSERT_NO_INTERPRETER;
 
@@ -851,7 +851,6 @@ NativeCodePtr compile_jit_a_method(Method* method)
     tmn_suspend_enable(); 
     JIT_Result res = compile_do_compilation(method, flags);
     tmn_suspend_disable();
-
     if (res == JIT_SUCCESS) {
         assert(&gc == p_TLS_vmthread->gc_frames); 
         NativeCodePtr entry_point = method->get_code_addr();
@@ -861,11 +860,12 @@ NativeCodePtr compile_jit_a_method(Method* method)
         return entry_point;
     }
 
-    assert(!tmn_is_suspend_enabled());
+    assert(!hythread_is_suspend_enabled());
     
     INFO2("compile", "Could not compile " << method);
-    
     const char* exn_class;
+
+
     ManagedObject *cause = get_current_thread_exception();
     if (!cause) {
         if (method->is_native()) {

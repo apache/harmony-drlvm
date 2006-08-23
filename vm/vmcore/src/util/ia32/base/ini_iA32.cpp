@@ -32,7 +32,7 @@ using namespace std;
 #include "Class.h"
 #include "exceptions.h"
 #include "vm_threads.h"
-#include "open/thread.h"
+
 #include "compile.h"
 #include "nogc.h"
 #include "encoder.h"
@@ -128,7 +128,7 @@ JIT_execute_method_default(JIT_Handle jit, jmethodID methodID, jvalue *return_va
     int argId = sz;
     int pos = 0;
 
-    assert(!tmn_is_suspend_enabled());
+    assert(!hythread_is_suspend_enabled());
     if (!method->is_static()) {
         ObjectHandle handle = (ObjectHandle) args[pos++].l;
         assert(handle);

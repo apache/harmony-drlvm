@@ -33,7 +33,7 @@
 #include "environment.h"
 #include <string.h>
 #include "properties.h"
-#include "open/thread.h"
+
 #include "port_filepath.h"
 #include "port_dso.h"
 #include <apr_strings.h>

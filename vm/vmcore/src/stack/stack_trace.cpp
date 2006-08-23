@@ -24,7 +24,7 @@
 #include "stack_trace.h"
 #include "interpreter.h"
 #include "jit_intf_cpp.h"
-#include "open/thread.h"
+
 #include "method_lookup.h"
 
 Method_Handle get_method(StackIterator* si)

@@ -1,0 +1,234 @@
+<!--
+    Copyright 2005-2006 The Apache Software Foundation or its licensors, as applicable.
+  
+    Licensed under the Apache License, Version 2.0 (the "License");
+    you may not use this file except in compliance with the License.
+    You may obtain a copy of the License at
+  
+       http://www.apache.org/licenses/LICENSE-2.0
+  
+    Unless required by applicable law or agreed to in writing, software
+    distributed under the License is distributed on an "AS IS" BASIS,
+    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+    See the License for the specific language governing permissions and
+    limitations under the License.
+-->
+<!--
+Author:  Sergey V. Dmitriev, Marina V. Goldburt
+Version: $Revision$
+-->
+
+<project name="C UNIT TESTS">
+    <target name="cunit.test" depends="init_component">
+        <if>
+            <isreference refid="unit.test.c.src" />
+            <then>
+
+                <!-- compiler to compile framework as well as the unit tests -->
+                <compiler name="${build.cxx}" id="unit.test.c.compiler">
+                    <defineset define="APR_DECLARE_STATIC, _DEBUG, VM_STATS" />
+                    <defineset define="BUILDING_VM" />
+
+                    <select os="win">
+                        <defineset define="PLATFORM_NT, WIN32, _WINDOWS, _IA32_" />
+                        <defineset define="_WIN32_WINNT=0x0501" />
+                    </select>
+
+                    <select os="lnx">
+                        <defineset define="LINUX, GC_V4" />
+                        <defineset define="USE_DLL_JIT, PLATFORM_POSIX" />
+                        <defineset define="__SMP__, _REENTRANT" />
+                        <defineset define="LINUX_TLS_OPT, _IA32_" />
+                        <defineset define="_LARGEFILE64_SOURCE" />
+                        <compilerarg value="-Wall" />
+                        <compilerarg value="-fno-exceptions" />
+                        <compilerarg value="-g" />
+                        <compilerarg value="-O0" />
+                    </select>
+                </compiler>
+            
+                <!-- Compiling framework -->
+                <echo message="## Compiling framework..." />
+
+                <!-- a new property: cunit tests work dir -->
+                <property name="unit.test.c.workdir"
+                          value="${build.dir}/_cunit.tests" />
+
+                <mkdir dir="${unit.test.c.workdir}/_obj" />
+
+                <cc objdir="${unit.test.c.workdir}/_obj"
+                    debug="true"
+                    runtime="static"
+                    multithreaded="true">
+
+                    <compiler refid="unit.test.c.compiler" />
+
+                    <fileset refid="unit.test.c.framework.src" />
+                    <fileset dir="${build.VM.home}/tests/unit/thread/utils">
+                        <include name="*.c" />
+                    </fileset>
+
+                    <includepath refid="unit.test.common.c.include" />
+                    <includepath refid="unit.test.c.include" />
+                </cc>
+
+                <!-- a list of all source files with unit tests -->
+
+                <pathconvert pathsep=","
+                             property="unit.test.c.files"
+                             refid="unit.test.c.src" />
+
+                <!-- operation system sensitive executive binary file extention.
+                     simply said: "" or ".exe" ;) -->
+                <condition property="extention" value=".exe">
+                    <isset property="if.win" />
+                </condition>
+                <property name="extention" value="" />
+
+                <!-- replacing: 'xxx.c, yyy.c' => 'xxx yyy' -->
+                <propertyregex override="yes"
+                               property="unit.test.c.files"
+                               input="${unit.test.c.files}"
+                               regexp="\.c"
+                               replace=""
+                               defaultValue="${unit.test.c.files}" />
+
+
+                <!-- Compiling unit tests -->
+
+                <echo message="## Compiling C unit tests" />
+
+                <cc objdir="${unit.test.c.workdir}/_obj"
+                    debug="true"
+                    runtime="static"
+                    multithreaded="true" 
+                    subsystem="console">
+                    <compiler refid="unit.test.c.compiler" />
+
+                    <fileset refid="unit.test.c.src" />
+                    <includepath refid="unit.test.common.c.include" />
+                    <includepath refid="unit.test.c.include" />
+                </cc>
+
+                <mkdir dir="${unit.test.c.workdir}/_bin" />
+
+                <!-- copy zlib library; it's necessary for test execution -->
+                <copy todir="${unit.test.c.workdir}/_bin">
+                    <fileset dir="${external.dep.CLASSLIB}/deploy/jdk/jre/bin" includes="*hyzlib*" />
+                </copy>
+
+                <mkdir dir="${unit.test.c.workdir}/report" />
+
+                <!-- set of properties which will be needed for test execution -->
+                <property name="filename" value="--" />
+                <property name="outputproperty" value="--" />
+                <property name="resultproperty" value="--" />
+
+                <for list="${unit.test.c.files}" param="file" delimiter=",">
+                    <sequential>
+
+                        <!-- make it possible to overwrite the property -->
+                        <var name="filename" unset="true" />
+                        <basename property="filename" file="@{file}" />
+
+                        <!-- Linking unit test -->
+                        <echo message="## Linking C unit test: ${filename}" />
+
+                        <cc name="${build.cxx}"
+                            debug="true"
+                            outfile="${unit.test.c.workdir}/_bin/${filename}"
+                            outtype="executable" 
+                            subsystem="console">
+                            <linker name="${build.cxx}">
+                                <fileset dir="${unit.test.c.workdir}/_obj">
+                                    <include name="${filename}.o*" />
+                                    <include name="thread_unit_test_main.o*" />
+                                    <include name="thread_unit_test_utils.o*" />
+                                    <include name="thread_unit_test_vm_emulator.o*" />
+                                    <include name="testframe.o*" />
+                                    <include name="tm2vm.o*" />
+                                </fileset>
+
+                                <fileset dir="${build.semi.dir}/vm/jthread/_obj">
+                                    <include name="*.o*" />
+                                </fileset>
+
+                                <fileset dir="${build.semi.dir}/vm/hythr/_obj">
+                                    <include name="*.o*" />
+                                </fileset>
+
+                                <libset libs="encoder" dir="${build.semi.dir}/vm/encoder/_bin" />
+                                <libset libs="apr-1" dir="${build.semi.dir}/extra/apr/_bin" />
+                                <libset libs="aprutil-1" dir="${build.semi.dir}/extra/aprutil/_bin" />
+                                <libset libs="port" dir="${build.semi.dir}/vm/port/_bin" />
+                                <libset libs="log4cxx" dir="${build.semi.dir}/extra/log4cxx/_bin" />
+                                <libset libs="hyzlib" dir="${external.dep.CLASSLIB}/deploy/jdk/jre/bin" />
+
+                                <select os="win">
+                                    <syslibset libs="advapi32, ws2_32, mswsock, user32, userenv, odbc32" />
+                                    <linkerarg value="/NODEFAULTLIB:libcmt.lib" />
+                                </select>
+
+                                <select os="lnx" cxx="gcc">
+                                    <syslibset type="shared" libs="stdc++, gcc_s, pthread" />
+                                </select>
+                            </linker>
+                        </cc>
+                    </sequential>
+                </for>
+
+                <for list="${unit.test.c.files}" param="file" delimiter=",">
+                    <sequential>
+
+                        <!-- make it possible to overwrite the property -->
+                        <var name="filename" unset="true" />
+                        <basename property="filename" file="@{file}" />
+
+                        <!-- Executing unit test -->
+                        <echo message="## Executing C unit test: ${filename}" />
+
+                        <var name="outputproperty" unset="true" />
+                        <var name="resultproperty" unset="true" />
+
+                        <exec dir="${unit.test.c.workdir}/_bin"
+                              executable="${unit.test.c.workdir}/_bin/${filename}${extention}"
+                              resultproperty="resultproperty"
+                              outputproperty="outputproperty">
+                            <select os="lnx">
+                                <env key="LD_LIBRARY_PATH" path="${unit.test.c.workdir}/_bin" />
+                            </select>
+                        </exec>
+
+                        <echo file="${unit.test.c.workdir}/report/${filename}.out"
+                              message="${outputproperty}" />
+                        <echo message="${outputproperty}" />
+
+                        <if>
+                            <not>
+                                <equals arg1="${resultproperty}" arg2="0" />
+                            </not>
+                            <then>
+                                <property name="some.test.failed" value="true" />
+                                <echo message="## TEST FAILED" />
+                            </then>
+                            <else>
+                                <echo message="## TEST PASSED" />
+                            </else>
+                        </if>
+                    </sequential>
+                </for>
+
+                <if>
+                    <isset property="some.test.failed" />
+                    <then>
+                        <echo message="## Please find tests and results at ${build.dir}/_cunit.tests/" />
+                        <fail message="## SOME TESTS FAILED" />
+                    </then>
+                </if>
+
+                <echo message="## Please find tests and results at ${build.dir}/_cunit.tests/" />
+                <echo message="## TESTS PASSED" />
+            </then>
+        </if>
+    </target>
+</project>

@@ -28,6 +28,7 @@
 
 // Portlib interface header files
 #include "port_atomic.h"
+#include "open/hythread_ext.h"
 
 // GC header files
 #include "hash_table.h"
@@ -483,7 +484,7 @@ private:
     // set of blocks that contain at least one pinned root
     std::set<block_info*> m_pinned_blocks;
 
-    HANDLE *_gc_thread_work_finished_event_handles;
+    hysem_t *_gc_thread_work_finished_event_handles;
 
     Work_Packet_Manager *_mark_scan_pool;
 

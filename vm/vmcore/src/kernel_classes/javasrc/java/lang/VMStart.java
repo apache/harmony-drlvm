@@ -51,6 +51,7 @@ class VMStart {
             // create main thread in new thread group
             MainThread mainThread = new MainThread(mainClassName, args);
             mainThread.start();
+            //startHelperThreads();
             //System.out.println("Join Group " + Thread.currentThread().getThreadGroup());
         } catch (Throwable e) {
             e.printStackTrace(System.err);
@@ -103,8 +104,10 @@ class VMStart {
             this.args = args;
             
         }
-        
         public void run() {
+        }
+
+        void runImpl() {
             // prevent access from user classes to run() method
             if(started) {
                 return;
@@ -137,8 +140,18 @@ class VMStart {
             } catch (Throwable e) {
             	exitCode = 1;
                 e.printStackTrace(System.err);
-            } 
-        }
+            }  finally {
+                group.remove(this);
+                synchronized(lock) {
+                    this.isAlive = false;
+                    lock.notifyAll();
+                }
+           }
+       }
+    }
+    
+    static void mainThreadInit() {
+        Thread theFirstThread = new Thread(true);
     }
     
     

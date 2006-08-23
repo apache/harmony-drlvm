@@ -29,7 +29,7 @@
 #include "interp_vm_helpers.h"
 #include "ini.h"
 #include "compile.h"
-#include "open/thread.h"
+
 #include "thread_manager.h"
 
 // ppervov: HACK: allows using STL modifiers (dec/hex) and special constants (endl)
@@ -882,7 +882,7 @@ Opcode_LREM(StackFrame& frame) {
 #define DEF_OPCODE_CMP(CMP,check)                   \
 static inline void                                  \
 Opcode_##CMP(StackFrame& frame) {                   \
-    tmn_safe_point();                                \
+    hythread_safe_point();                                \
     int32 val = frame.stack.pick().i;               \
     frame.stack.ref() = FLAG_NONE; /* for OPCODE_IFNULL */ \
     DEBUG_BYTECODE("val = " << (int)val);                    \
@@ -906,7 +906,7 @@ DEF_OPCODE_CMP(IFLT,<0)  // Opcode_IFLT
 #define DEF_OPCODE_IF_ICMPXX(NAME,cmp)                          \
 static inline void                                              \
 Opcode_IF_ICMP ## NAME(StackFrame& frame) {                     \
-    tmn_safe_point();                                           \
+    hythread_safe_point();                                           \
     int32 val0 = frame.stack.pick(1).i;                         \
     int32 val1 = frame.stack.pick(0).i;                         \
     frame.stack.ref(1) = FLAG_NONE;                             \
@@ -987,7 +987,7 @@ ldc(StackFrame& frame, uint32 index) {
         if (!other_class) {
              return false;
         }
-        assert(!tmn_is_suspend_enabled());
+        assert(!hythread_is_suspend_enabled());
         
         frame.stack.pick().cr = COMPRESS_REF(*(other_class->class_handle));
         frame.stack.ref() = FLAG_OBJECT;
@@ -2004,7 +2004,7 @@ Opcode_INVOKEVIRTUAL(StackFrame& frame) {
             << method->get_name()->bytes << "/"
             << method->get_descriptor()->bytes<< endl);
 
-    tmn_safe_point();
+    hythread_safe_point();
     interpreterInvokeVirtual(frame, method);
 }
 
@@ -2020,7 +2020,7 @@ Opcode_INVOKEINTERFACE(StackFrame& frame) {
             << method->get_name()->bytes << "/"
             << method->get_descriptor()->bytes << endl);
 
-    tmn_safe_point();
+    hythread_safe_point();
     interpreterInvokeInterface(frame, method);
 }
 
@@ -2042,7 +2042,7 @@ Opcode_INVOKESTATIC(StackFrame& frame) {
         return;
     }
 
-    tmn_safe_point();
+    hythread_safe_point();
     interpreterInvokeStatic(frame, method);
 }
 
@@ -2058,7 +2058,7 @@ Opcode_INVOKESPECIAL(StackFrame& frame) {
             << method->get_name()->bytes << "/"
              << method->get_descriptor()->bytes << endl);
 
-    tmn_safe_point();
+    hythread_safe_point();
     interpreterInvokeSpecial(frame, method);
 }
 
@@ -2108,14 +2108,14 @@ Opcode_LOOKUPSWITCH(StackFrame& frame) {
 
 static inline void
 Opcode_GOTO(StackFrame& frame) {
-    tmn_safe_point();
+    hythread_safe_point();
     DEBUG_BYTECODE("going to instruction");
     frame.ip += read_int16(frame.ip + 1);
 }
 
 static inline void
 Opcode_GOTO_W(StackFrame& frame) {
-    tmn_safe_point();
+    hythread_safe_point();
     DEBUG_BYTECODE("going to instruction");
     frame.ip += read_int32(frame.ip + 1);
 }
@@ -2256,14 +2256,14 @@ Opcode_ATHROW(StackFrame& frame) {
         return;
     }
     DEBUG_BYTECODE(" " << obj->vt()->clss->name->bytes << endl);
-    assert(!tmn_is_suspend_enabled());
+    assert(!hythread_is_suspend_enabled());
     set_current_thread_exception(obj);
 }
 
 bool
 findExceptionHandler(StackFrame& frame, ManagedObject **exception, Handler **hh) {
     assert(!exn_raised());
-    assert(!tmn_is_suspend_enabled());
+    assert(!hythread_is_suspend_enabled());
 
     Method *m = frame.method;
     DEBUG_BYTECODE("Searching for exception handler:");
@@ -2387,13 +2387,16 @@ void stack_dump() {
 
 static inline
 void UNUSED dump_all_java_stacks() {
-    tm_iterator_t * iterator = tm_iterator_create();
-    VM_thread *thread = tm_iterator_next(iterator);
+    hythread_iterator_t  iterator;
+    hythread_suspend_all(&iterator, NULL);
+    VM_thread *thread = get_vm_thread (hythread_iterator_next(&iterator));
     while(thread) {
         stack_dump(thread);
-        thread = tm_iterator_next(iterator);
+        thread = get_vm_thread (hythread_iterator_next(&iterator));
     }
-    tm_iterator_release(iterator);
+
+    hythread_resume_all( NULL);
+
     INFO("****** END OF JAVA STACKS *****\n");
 }
 
@@ -2407,9 +2410,9 @@ method_exit_callback_with_frame(Method *method, StackFrame& frame) {
     val.j = 0;
 
     if (exc) {
-        tmn_suspend_enable();
+        hythread_suspend_enable();
         method_exit_callback(method, true, val);
-        tmn_suspend_disable();
+        hythread_suspend_disable();
         return;
     }
 
@@ -2447,9 +2450,9 @@ method_exit_callback_with_frame(Method *method, StackFrame& frame) {
             ABORT("Unexpected java type");
     }
 
-    tmn_suspend_enable();
+    hythread_suspend_enable();
     method_exit_callback(method, false, val);
-    tmn_suspend_disable();
+    hythread_suspend_disable();
 }
 
 void
@@ -2461,15 +2464,15 @@ interpreter(StackFrame &frame) {
 
     M2N_ALLOC_MACRO;
     assert(!exn_raised());
-    assert(!tmn_is_suspend_enabled());
+    assert(!hythread_is_suspend_enabled());
     
-    uint8 *first = (uint8*) p_TLS_vmthread->firstFrame;
+    uint8 *first = (uint8*) get_thread_ptr()->firstFrame;
     int stackLength = ((uint8*)first) - ((uint8*)&frame);
     if (stackLength > 500000) { // FIXME: hardcoded stack limit
-        if (!(p_TLS_vmthread->interpreter_state & INTERP_STATE_STACK_OVERFLOW)) {
-            p_TLS_vmthread->interpreter_state |= INTERP_STATE_STACK_OVERFLOW;
+        if (!(get_thread_ptr()->interpreter_state & INTERP_STATE_STACK_OVERFLOW)) {
+            get_thread_ptr()->interpreter_state |= INTERP_STATE_STACK_OVERFLOW;
             interp_throw_exception("java/lang/StackOverflowError");
-            p_TLS_vmthread->interpreter_state &= ~INTERP_STATE_STACK_OVERFLOW;
+            get_thread_ptr()->interpreter_state &= ~INTERP_STATE_STACK_OVERFLOW;
 
             if (frame.framePopListener)
                 frame_pop_callback(frame.framePopListener, frame.method, true);
@@ -2481,9 +2484,9 @@ interpreter(StackFrame &frame) {
     if (interpreter_ti_notification_mode
             & INTERPRETER_TI_METHOD_ENTRY_EVENT) {
         M2N_ALLOC_MACRO;
-        tmn_suspend_enable();
+        hythread_suspend_enable();
         method_entry_callback(frame.method);
-        tmn_suspend_disable();
+        hythread_suspend_disable();
         M2N_FREE_MACRO;
     }
 
@@ -2528,7 +2531,7 @@ restart:
         frame.last_bytecodes[(frame.n_last_bytecode++) & 7] = ip0;
 #endif
 
-        assert(!tmn_is_suspend_enabled());
+        assert(!hythread_is_suspend_enabled());
         switch(ip0) {
             case OPCODE_NOP:
                 Opcode_NOP(frame); break;
@@ -2889,12 +2892,12 @@ check_exception:
         exc = get_current_thread_exception();
         if (exc == 0) continue;
 got_exception:
-        if (p_TLS_vmthread->ti_exception_callback_pending) {
+        if (get_thread_ptr()->ti_exception_callback_pending) {
 
             assert(exn_raised());
-            assert(!tmn_is_suspend_enabled());
+            assert(!hythread_is_suspend_enabled());
             jvmti_interpreter_exception_event_callback_call();
-            assert(!tmn_is_suspend_enabled());
+            assert(!hythread_is_suspend_enabled());
 
             exc = get_current_thread_exception();
 
@@ -2928,7 +2931,7 @@ got_exception:
         if (frame.framePopListener)
             frame_pop_callback(frame.framePopListener, frame.method, true);
         M2N_FREE_MACRO;
-        assert(!tmn_is_suspend_enabled());
+        assert(!hythread_is_suspend_enabled());
         return;
     }
 }
@@ -2939,7 +2942,7 @@ interpreter_execute_method(
         jvalue   *return_value,
         jvalue   *args) {
 
-    assert(!tmn_is_suspend_enabled());
+    assert(!hythread_is_suspend_enabled());
 
     StackFrame frame;
     memset(&frame, 0, sizeof(frame));
@@ -2951,7 +2954,7 @@ interpreter_execute_method(
             frame.This = args[0].l->object;
     }
     if (frame.prev == 0) {
-        p_TLS_vmthread->firstFrame = (void*) &frame;
+        get_thread_ptr()->firstFrame = (void*) &frame;
     }
     setLastStackFrame(&frame);
 

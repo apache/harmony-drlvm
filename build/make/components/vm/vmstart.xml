@@ -33,7 +33,8 @@ Version: $Revision: 1.3.2.2 $
                                               vm.port,
                                               extra.apr,
                                               extra.aprutil,
-                                              extra.log4cxx" />
+                                              extra.log4cxx, 
+                                              vm.hythr" />
         <property name="outtype" value="executable" />
         <property name="libname" value="java" />
         <property name="src" location="${build.vm.home}/launcher/src" />
@@ -48,6 +49,7 @@ Version: $Revision: 1.3.2.2 $
             <libset libs="${vm.vmcore.lib}" dir="${vm.vmcore.libdir}" />
             <libset libs="${vm.encoder.lib}" dir="${vm.encoder.libdir}" />
             <libset libs="${vm.port.lib}" dir="${vm.port.libdir}" />
+            <libset libs="${vm.hythr.lib}" dir="${vm.hythr.libdir}" />
             <libset libs="${extra.aprutil.lib}" dir="${extra.aprutil.libdir}" />
             <libset libs="${extra.apr.lib}" dir="${extra.apr.libdir}" />
             <select cfg="debug" os="win">

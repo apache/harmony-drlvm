@@ -28,14 +28,6 @@
 #include "method_lookup.h"
 #include "open/gc.h"
 
-// void vm_thread_enumerate_from_native(VM_thread *thread); // unused anywhere
-
-BOOL port_CloseHandle(VmEventHandle UNREF hh)
-{
-    ABORT("Not implemented");
-    return 0;
-}
-
 //wgs: I wonder if we could give it a errno
 #if defined (__INTEL_COMPILER) 
 #pragma warning( push )
@@ -65,23 +57,7 @@ void _fpreset(void)
     ABORT("Not implemented");
 }
 
-BOOL GetThreadContext(VmThreadHandle UNREF hthread, const CONTEXT * UNREF lpcontext)
-{
-  ABORT("Not implemented");
-  return 0;
-}
 
-BOOL SetThreadContext(VmThreadHandle UNREF hh, const CONTEXT * UNREF cc)
-{
-  ABORT("Not implemented");
-  return 0;
-}
-
-int VM_thread::setPriority(int UNREF priority)
-{
-    ABORT("Not implemented");
-    return 0;
-}
 
 #include <sys/time.h>
 __uint64 GetTickCount(void)
@@ -101,33 +77,8 @@ __uint64 GetTickCount(void)
     }
 }
 
-CriticalSection::CriticalSection()
-{
-    m_cs = (void *) new CRITICAL_SECTION;
-    InitializeCriticalSection((CRITICAL_SECTION *)m_cs);
-}
-
-CriticalSection::~CriticalSection()
-{
-    DeleteCriticalSection((CRITICAL_SECTION *)m_cs);
-    delete (CRITICAL_SECTION *)m_cs;
-}
-
-void CriticalSection::lock()
-{
-    EnterCriticalSection((CRITICAL_SECTION *)m_cs);
-}
-
-void CriticalSection::unlock()
-{
-    LeaveCriticalSection((CRITICAL_SECTION *)m_cs);
-}
-
-bool CriticalSection::tryLock()
-{
-    return TryEnterCriticalSection((CRITICAL_SECTION *)m_cs) ? true : false;
-}
-
+/* TODO reimplement this code while implementing IPF support.
+ 
 VmRegisterContext::VmRegisterContext()
 {
     CONTEXT *ctx = new CONTEXT;
@@ -160,6 +111,7 @@ void VmRegisterContext::setFlag(VmRegisterContext::ContextFlag flag)
     }
     ((CONTEXT *)_pcontext)->ContextFlags = old;
 }
+
 
 void VmRegisterContext::getContext(VM_thread *thread)
 {
@@ -250,3 +202,4 @@ void VmRegisterContext::getBspAndRnat(VM_thread * UNREF thread, uint64 ** UNREF 
     ABORT("Not supported"); // shouldn't be called under IA-32
 #endif // !_IPF_
 }
+*/

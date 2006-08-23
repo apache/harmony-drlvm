@@ -18,7 +18,8 @@
  * @version $Revision: 1.1.2.1.4.4 $
  */  
 #include "thread_generic.h"
-#include "open/thread.h"
+#include "open/hythread_ext.h"
+
 
 #ifdef __cplusplus
 extern "C" {
@@ -26,7 +27,7 @@ extern "C" {
 
 JNIEXPORT void JNICALL Java_java_lang_VMStart_joinAllNonDaemonThreads (JNIEnv * UNREF jenv, jclass UNREF starter)
 {
-    wait_until_non_daemon_threads_are_dead();
+    hythread_wait_for_all_nondaemon_threads();
 }
 
 #ifdef __cplusplus

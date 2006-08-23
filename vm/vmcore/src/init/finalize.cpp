@@ -36,7 +36,7 @@
 #include "jit_runtime_support.h"
 #include "vm_synch.h"
 #include "finalize.h"
-#include "open/thread.h"
+
 
 #define LOG_DOMAIN "vm.object_queue"
 #include "classloader.h"
@@ -75,7 +75,7 @@ __declspec(dllexport)
 // weak/soft/phantom references.
 //
 
-VmEventHandle begin_run_finalizer;
+hylatch_t begin_run_finalizer;
 
 class Object_Queue
 {
@@ -149,6 +149,7 @@ Object_Queue::Object_Queue(char*  log_domain)
  * Allocates array to save objects. Should be called from synchronized block.
  * Now it's called from add_object only.
  */
+ 
 void Object_Queue::reallocate(unsigned new_capacity)
 {
     ManagedObject **new_table =
@@ -261,7 +262,7 @@ void Objects_To_Finalize::add_object(ManagedObject *p_obj)
 // workaround method to ignore classes java.nio.charset.CharsetEncoder
 // java.io.FileDescriptor & java.io.FileOutputStream during finalization on exit
 bool Objects_To_Finalize::is_class_ignored(Class* test) {
-    assert(!tmn_is_suspend_enabled());
+    assert(!hythread_is_suspend_enabled());
     
     if (!classes_cached) {
     
@@ -299,7 +300,7 @@ bool Objects_To_Finalize::is_class_ignored(Class* test) {
 
 void Objects_To_Finalize::run_finalizers()
 {
-    assert(tmn_is_suspend_enabled());
+    assert(hythread_is_suspend_enabled());
 
     Class* finalizer_thread = VM_Global_State::loader_env->finalizer_thread;
 
@@ -468,13 +469,13 @@ void vm_finalize_object(Managed_Object_Handle p_obj)
 void vm_run_pending_finalizers()
 {
     NativeObjectHandles nhs;
-    assert(tmn_is_suspend_enabled());
+    assert(hythread_is_suspend_enabled());
     objects_to_finalize.run_finalizers();
 } //vm_run_pending_finalizers
 
 int vm_do_finalization(int quantity)
 {
-    assert(tmn_is_suspend_enabled());
+    assert(hythread_is_suspend_enabled());
     return objects_to_finalize.do_finalization(quantity);
 } //vm_run_pending_finalizers
 

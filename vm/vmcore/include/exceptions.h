@@ -243,6 +243,8 @@ NativeCodePtr exn_get_rth_throw_class_cast_exception();
 // rth_throw_incompatible_class_change_exception throws an incompatible class change exception (lazily)
 NativeCodePtr exn_get_rth_throw_incompatible_class_change_exception();
 
+NativeCodePtr exn_get_rth_throw_illegal_state_exception();
+
 //**** Various standard exception types
 
 Class_Handle exn_get_class_cast_exception_type();

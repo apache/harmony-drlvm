@@ -39,7 +39,7 @@ using namespace std;
 #include "stub_code_utils.h"
 #include "root_set_enum_internal.h"
 
-#include "open/thread.h"
+
 
 #include <pthread.h>
 #include <signal.h>

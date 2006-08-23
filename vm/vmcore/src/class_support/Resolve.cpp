@@ -104,7 +104,7 @@
 
 #include "open/bytecodes.h"
 #include "open/vm_util.h"
-#include "open/thread.h"
+
 
 #define CLASS_REPORT_FAILURE(target, cp_index, exnclass, exnmsg)    \
 {                                                               \
@@ -132,7 +132,7 @@ static Class* _resolve_class(Global_Env *env,
                              Class *clss,
                              unsigned cp_index)
 {
-    assert(tmn_is_suspend_enabled());
+    assert(hythread_is_suspend_enabled());
     Const_Pool *cp = clss->const_pool;
 
     clss->m_lock->_lock();

@@ -33,7 +33,7 @@
 #include "lock_manager.h"
 #include "jni_direct.h" // FIXME ???? Can we use it here ????
 #include "open/vm_util.h"
-#include "open/thread.h"
+
 #include "jni_types.h"
 
 #define LOG_DOMAIN "natives"
@@ -113,7 +113,7 @@ static char* name_list[] =
 
         JavaVM* vm = jni_native_intf->vm; // FIXME ???? Can we use it here ????
 
-        assert(tmn_is_suspend_enabled());
+        assert(hythread_is_suspend_enabled());
         jint res = onload_func(vm, NULL);
 
         return res;
@@ -150,7 +150,7 @@ static char* name_list[] =
 
         JavaVM* vm = jni_native_intf->vm; // FIXME ???? Can we use it here ????
 
-        assert(tmn_is_suspend_enabled());
+        assert(hythread_is_suspend_enabled());
         onunload_func(vm, NULL);
         return;
     }

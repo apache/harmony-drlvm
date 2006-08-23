@@ -87,7 +87,7 @@ private:
 
     // preallocated mem for temporary (method-local) needs
     std::vector<EBMethodProfile*> tmpProfiles;
-    CriticalSection profilesLock;
+    hymutex_t profilesLock;
 };
 
 class EBMethodProfile : public MethodProfile {

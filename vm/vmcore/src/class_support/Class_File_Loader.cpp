@@ -30,7 +30,6 @@
 #include "Class.h"
 #include "vm_strings.h"
 #include "open/vm_util.h"
-#include "open/thread.h"
 #include "bytereader.h"
 #include "compile.h"
 #include "jit_intf_cpp.h"
@@ -2175,7 +2174,7 @@ Class *class_load_verify_prepare_by_loader_jni(Global_Env* env,
                                                const String* classname,
                                                ClassLoader* cl)
 {
-    assert(tmn_is_suspend_enabled());
+    assert(hythread_is_suspend_enabled());
     // if no class loader passed, re-route to bootstrap
     if(!cl) cl = env->bootstrap_class_loader;
     Class* clss = cl->LoadVerifyAndPrepareClass(env, classname);
@@ -2185,7 +2184,7 @@ Class *class_load_verify_prepare_by_loader_jni(Global_Env* env,
 
 Class *class_load_verify_prepare_from_jni(Global_Env *env, const String *classname)
 {
-    assert(tmn_is_suspend_enabled());
+    assert(hythread_is_suspend_enabled());
     Class *clss = env->bootstrap_class_loader->LoadVerifyAndPrepareClass(env, classname);
     return clss;
 }

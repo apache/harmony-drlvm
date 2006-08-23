@@ -50,13 +50,14 @@ BBPolling::getOrCreateTLSBaseReg(Edge* e)
                                                              RegName_EDI);
         // Basic Block for flag address calculating. (To be inserted before the loopHeaders)
         BasicBlock * bbpFlagAddrBlock = irManager.newBasicBlock();
-#ifdef PLATFORM_POSIX
+//#ifdef PLATFORM_POSIX
          // TLS base can be obtained by calling get_thread_ptr()  (from vm_threads.h)
          Opnd * target=irManager.newImmOpnd( irManager.getTypeManager().getIntPtrType(),
                                              Opnd::RuntimeInfo::Kind_HelperAddress,
                                             (void*)CompilationInterface::Helper_GetSuspReqFlag
                                            );
          bbpFlagAddrBlock->appendInsts(irManager.newCallInst(target, &CallingConvention_STDCALL, 0, NULL, tlsBaseReg));
+/*
 #else // PLATFORM_POSIX
         // TLS base can be obtained from [fs:0x14]
         Opnd* tlsBase = irManager.newMemOpnd(typeInt32, MemOpndKind_Any, NULL, 0x14, RegName_FS);
@@ -67,7 +68,7 @@ BBPolling::getOrCreateTLSBaseReg(Edge* e)
             bbpFlagAddrBlock->appendInsts(irManager.newInst(Mnemonic_MOV, tlsBaseReg, tlsBase));
         }
 #endif // PLATFORM_POSIX
-
+*/
         // inserting bbpFlagAddrBlock before the given loopHeader
         uint32 startIndex = otherStartNdx[id];
 

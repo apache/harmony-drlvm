@@ -31,7 +31,7 @@ extern VMEXPORT void free_local_object_handles2(ObjectHandles * head);
 
 
 #define M2N_ALLOC_MACRO                                     \
-    assert(!tmn_is_suspend_enabled());                      \
+    assert(!hythread_is_suspend_enabled());                      \
     M2nFrame m2n;                                           \
     memset((void*)&m2n, 0, sizeof(M2nFrame));               \
     m2n.prev_m2nf = m2n_get_last_frame();                   \
@@ -47,7 +47,7 @@ extern VMEXPORT void free_local_object_handles2(ObjectHandles * head);
     m2n_set_local_handles(&m2n, (ObjectHandles*)&handles)
 
 #define M2N_FREE_MACRO                                      \
-    assert(!tmn_is_suspend_enabled());                      \
+    assert(!hythread_is_suspend_enabled());                      \
     free_local_object_handles2(m2n_get_local_handles(&m2n));\
     m2n_set_last_frame(m2n_get_previous_frame(&m2n))
 

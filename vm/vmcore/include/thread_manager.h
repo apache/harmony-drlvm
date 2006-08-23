@@ -27,44 +27,20 @@
 extern "C" {
 #endif
 
-struct tm_iterator_t{
-    bool init;
-    VM_thread * current;
-};
-
-void tm_acquire_tm_lock();
-void tm_release_tm_lock();
-bool tm_try_acquire_tm_lock();
-
-tm_iterator_t * tm_iterator_create();
-int             tm_iterator_release(tm_iterator_t *);
-int             tm_iterator_reset(tm_iterator_t *);
-VM_thread *     tm_iterator_next(tm_iterator_t *);
  
 void vm_thread_shutdown();
 void vm_thread_init(Global_Env *p_env);
 
-VM_thread * get_a_thread_block();
-void tmn_thread_attach();
+void vm_thread_attach();
+void vm_thread_detach();
 
 void free_this_thread_block(VM_thread *);
+VM_thread * get_a_thread_block();
 
-extern VM_thread *p_free_thread_blocks;
-extern VM_thread *p_active_threads_list;
-extern VM_thread *p_threads_iterator;
 
 extern volatile VM_thread *p_the_safepoint_control_thread;  // only set when a gc is happening
 extern volatile safepoint_state global_safepoint_status;
 
-extern unsigned non_daemon_thread_count;
-
-extern VmEventHandle non_daemon_threads_dead_handle;
-extern VmEventHandle new_thread_started_handle;
-
-extern VmEventHandle non_daemon_threads_are_all_dead;
-
-extern thread_array quick_thread_id[];
-extern POINTER_SIZE_INT hint_free_quick_thread_id;
 
 #ifdef __cplusplus
 }

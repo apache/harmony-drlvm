@@ -22,22 +22,21 @@
 #include "cxxlog.h"
 
 #include "Class.h"
-#include "open/thread.h"
-#include "mon_enter_exit.h"
+#include "open/jthread.h"
 #include "exceptions.h"
 #include "thread_manager.h"
 #include "Verifier_stub.h"
 #include "vm_strings.h"
 #include "classloader.h"
 #include "ini.h"
-
+#include "vm_threads.h"
 
 // Initializes a class.
 
 static void class_initialize1(Class *clss)
 {
     assert(!exn_raised());
-    assert(!tmn_is_suspend_enabled());
+    assert(!hythread_is_suspend_enabled());
 
     // the following code implements the 11-step class initialization program
     // described in page 226, section 12.4.2 of Java Language Spec, 1996
@@ -47,38 +46,21 @@ static void class_initialize1(Class *clss)
 
     // ---  step 1   ----------------------------------------------------------
 
-    assert(!tmn_is_suspend_enabled());
-    vm_monitor_enter_slow(struct_Class_to_java_lang_Class(clss));
-
-#ifdef _DEBUG
-    if (clss->p_initializing_thread){
-        tmn_suspend_enable();
-        tm_iterator_t * iterator = tm_iterator_create();
-        tmn_suspend_disable();
-        volatile VM_thread *p_scan = tm_iterator_next(iterator);
-        while (p_scan) {
-            if (p_scan == (VM_thread *)clss->p_initializing_thread) break;
-            p_scan = tm_iterator_next(iterator);
-        }
-        tm_iterator_release(iterator);
-        assert(p_scan);     // make sure p_initializer_thread is legit
-    }
-#endif  
+    assert(!hythread_is_suspend_enabled());
+    jobject jlc = struct_Class_to_java_lang_Class_Handle(clss);
+    jthread_monitor_enter(jlc);
 
     // ---  step 2   ----------------------------------------------------------
     TRACE2("class.init", "initializing class " << clss->name->bytes << " STEP 2" ); 
 
-    jobject jlc = struct_Class_to_java_lang_Class_Handle(clss);
     while(((VM_thread *)(clss->p_initializing_thread) != p_TLS_vmthread) &&
         (clss->state == ST_Initializing) ) {
         // thread_object_wait had been expecting the only unsafe reference
         // to be its parameter, so enable_gc() should be safe here -salikh
-        tmn_suspend_enable();
-        thread_object_wait(jlc, 0);
-        tmn_suspend_disable();
+         jthread_monitor_wait(jlc);
         jthrowable exc = exn_get();
         if (exc) {
-            vm_monitor_exit(struct_Class_to_java_lang_Class(clss));
+             jthread_monitor_exit(jlc);
             return;
         }
     }
@@ -86,26 +68,27 @@ static void class_initialize1(Class *clss)
     // ---  step 3   ----------------------------------------------------------
 
     if ( (VM_thread *)(clss->p_initializing_thread) == p_TLS_vmthread) {
-        vm_monitor_exit(struct_Class_to_java_lang_Class(clss));
+        jthread_monitor_exit(jlc);
         return;
     }
 
     // ---  step 4   ----------------------------------------------------------
 
     if (clss->state == ST_Initialized) {
-        vm_monitor_exit(struct_Class_to_java_lang_Class(clss));
+        jthread_monitor_exit(jlc);
         return;
     }
 
     // ---  step 5   ----------------------------------------------------------
 
     if (clss->state == ST_Error) {
-        vm_monitor_exit(struct_Class_to_java_lang_Class(clss));
+        jthread_monitor_exit(jlc);
         tmn_suspend_enable();
         jthrowable exn = exn_create("java/lang/NoClassDefFoundError",
             clss->name->bytes);
         tmn_suspend_disable();
         exn_raise_only(exn);
+       
         return;
     }
 
@@ -116,7 +99,7 @@ static void class_initialize1(Class *clss)
     clss->state = ST_Initializing;
     assert(clss->p_initializing_thread == 0);
     clss->p_initializing_thread = (void *)p_TLS_vmthread;
-    vm_monitor_exit(struct_Class_to_java_lang_Class(clss));
+    jthread_monitor_exit(jlc);
 
     // ---  step 7 ------------------------------------------------------------
 
@@ -124,15 +107,16 @@ static void class_initialize1(Class *clss)
         class_initialize_ex(clss->super_class);
 
         if (clss->super_class->state == ST_Error) { 
-            vm_monitor_enter_slow(struct_Class_to_java_lang_Class(clss));
+            jthread_monitor_enter(jlc);
             tmn_suspend_enable();
             REPORT_FAILED_CLASS_CLASS_EXN(clss->class_loader, clss,
                 class_get_error_cause(clss->super_class));
             tmn_suspend_disable();
             clss->p_initializing_thread = 0;
-            assert(!tmn_is_suspend_enabled());
-            thread_object_notify_all(struct_Class_to_java_lang_Class_Handle(clss));
-            vm_monitor_exit(struct_Class_to_java_lang_Class(clss));
+            clss->state = ST_Error;
+            assert(!hythread_is_suspend_enabled());
+            jthread_monitor_notify_all(jlc);
+            jthread_monitor_exit(jlc);
             return;
         }
     }
@@ -183,22 +167,20 @@ static void class_initialize1(Class *clss)
 
     Method *meth = clss->static_initializer;
     if (meth == NULL) {
-        vm_monitor_enter_slow(struct_Class_to_java_lang_Class(clss));
+        jthread_monitor_enter(jlc);
         clss->state = ST_Initialized;
         TRACE2("classloader", "class " << clss->name->bytes << " initialized");
         clss->p_initializing_thread = 0;
-        assert(!tmn_is_suspend_enabled());
-        thread_object_notify_all (struct_Class_to_java_lang_Class_Handle(clss));
-        vm_monitor_exit(struct_Class_to_java_lang_Class(clss));
+        assert(!hythread_is_suspend_enabled());
+        jthread_monitor_notify_all(jlc);
+        jthread_monitor_exit(jlc);
         return;
     }
 
     TRACE2("class.init", "initializing class " << clss->name->bytes << " STEP 8" ); 
     jthrowable p_error_object;
-    int tmn_suspend_disable_count();   
-    assert(tmn_suspend_disable_count()==1);
 
-    assert(!tmn_is_suspend_enabled());
+    assert(!hythread_is_suspend_enabled());
     vm_execute_java_method_array((jmethodID) meth, 0, 0);
     p_error_object = exn_get();
 
@@ -206,30 +188,30 @@ static void class_initialize1(Class *clss)
     TRACE2("class.init", "initializing class " << clss->name->bytes << " STEP 9" ); 
 
     if(!p_error_object) {
-        vm_monitor_enter_slow(struct_Class_to_java_lang_Class(clss));
+        jthread_monitor_enter(jlc);
         clss->state = ST_Initialized;
         TRACE2("classloader", "class " << clss->name->bytes << " initialized");
         clss->p_initializing_thread = 0;
         assert(clss->p_error == 0);
-        assert(!tmn_is_suspend_enabled());
-        thread_object_notify_all (struct_Class_to_java_lang_Class_Handle(clss));
-        vm_monitor_exit(struct_Class_to_java_lang_Class(clss));
+        assert(!hythread_is_suspend_enabled());
+        jthread_monitor_notify_all(jlc);
+        jthread_monitor_exit(jlc);
         return;
     }
 
     // ---  step 10  ----------------------------------------------------------
 
     if(p_error_object) {
-        assert(!tmn_is_suspend_enabled());
+       assert(!hythread_is_suspend_enabled());
         clear_current_thread_exception();
         Class *p_error_class = p_error_object->object->vt()->clss;
         Class *jle = VM_Global_State::loader_env->java_lang_Error_Class;
         while(p_error_class && p_error_class != jle) {
             p_error_class = p_error_class->super_class;
         }
-        assert(!tmn_is_suspend_enabled());
+        assert(!hythread_is_suspend_enabled());
         if((!p_error_class) || (p_error_class != jle) ) {
-#ifdef _DEBUG
+#ifdef _DEBUG_REMOVED
             Class* eiie = VM_Global_State::loader_env->java_lang_ExceptionInInitializerError_Class;
             assert(eiie);
 #endif
@@ -245,13 +227,13 @@ static void class_initialize1(Class *clss)
         tmn_suspend_disable();
 
         // ---  step 11  ----------------------------------------------------------
-        assert(!tmn_is_suspend_enabled());
-        vm_monitor_enter_slow(struct_Class_to_java_lang_Class(clss));
+        assert(!hythread_is_suspend_enabled());
+        jthread_monitor_enter(jlc);
         clss->state = ST_Error;
         clss->p_initializing_thread = 0;
-        assert(!tmn_is_suspend_enabled());
-        thread_object_notify_all(struct_Class_to_java_lang_Class_Handle(clss));
-        vm_monitor_exit(struct_Class_to_java_lang_Class(clss));
+        assert(!hythread_is_suspend_enabled());
+        jthread_monitor_notify_all(jlc);
+        jthread_monitor_exit(jlc);
         exn_raise_only(p_error_object);
     }
     // end of 11 step class initialization program
@@ -265,7 +247,7 @@ extern "C" {
 #endif
 void class_initialize_from_jni(Class *clss)
 {
-    assert(tmn_is_suspend_enabled());
+    assert(hythread_is_suspend_enabled());
 
     // check verifier constraints
     if(!class_verify_constraints(VM_Global_State::loader_env, clss)) {
@@ -297,7 +279,7 @@ void class_initialize(Class *clss)
 
 void class_initialize_ex(Class *clss)
 {
-    assert(!tmn_is_suspend_enabled());
+    assert(!hythread_is_suspend_enabled());
 
     // check verifier constraints
     tmn_suspend_enable();

@@ -27,9 +27,9 @@
 
 void interp_throw_exception(const char* exc) {
     M2N_ALLOC_MACRO;
-    assert(!tmn_is_suspend_enabled());
+    assert(!hythread_is_suspend_enabled());
     tmn_suspend_enable();
-    assert(tmn_is_suspend_enabled());
+    assert(hythread_is_suspend_enabled());
     throw_java_exception(exc);
     tmn_suspend_disable();
     M2N_FREE_MACRO;
@@ -37,9 +37,9 @@ void interp_throw_exception(const char* exc) {
 
 void interp_throw_exception(const char* exc, const char *message) {
     M2N_ALLOC_MACRO;
-    assert(!tmn_is_suspend_enabled());
+    assert(!hythread_is_suspend_enabled());
     tmn_suspend_enable();
-    assert(tmn_is_suspend_enabled());
+    assert(hythread_is_suspend_enabled());
     throw_java_exception(exc, message);
     tmn_suspend_disable();
     M2N_FREE_MACRO;
@@ -56,7 +56,7 @@ GenericFunctionPointer interp_find_native(Method_Handle method)
 
 
 Class* interp_resolve_class(Class *clazz, int classId) {
-    assert(!tmn_is_suspend_enabled());
+    assert(!hythread_is_suspend_enabled());
     Compilation_Handle handle;
     handle.env = VM_Global_State::loader_env;
     handle.jit = 0;
@@ -73,7 +73,7 @@ Class* interp_resolve_class(Class *clazz, int classId) {
 }
 
 Class* interp_resolve_class_new(Class *clazz, int classId) {
-    assert(!tmn_is_suspend_enabled());
+    assert(!hythread_is_suspend_enabled());
     Compilation_Handle handle;
     handle.env = VM_Global_State::loader_env;
     handle.jit = 0;
@@ -91,7 +91,7 @@ Class* interp_resolve_class_new(Class *clazz, int classId) {
 
 
 Field* interp_resolve_static_field(Class *clazz, int fieldId, bool putfield) {
-    assert(!tmn_is_suspend_enabled());
+    assert(!hythread_is_suspend_enabled());
     Compilation_Handle handle;
     handle.env = VM_Global_State::loader_env;
     handle.jit = 0;
@@ -109,7 +109,7 @@ Field* interp_resolve_static_field(Class *clazz, int fieldId, bool putfield) {
 }
 
 Field* interp_resolve_nonstatic_field(Class *clazz, int fieldId, bool putfield) {
-    assert(!tmn_is_suspend_enabled());
+    assert(!hythread_is_suspend_enabled());
     Compilation_Handle handle;
     handle.env = VM_Global_State::loader_env;
     handle.jit = 0;
@@ -128,13 +128,13 @@ Field* interp_resolve_nonstatic_field(Class *clazz, int fieldId, bool putfield) 
 
 
 Method* interp_resolve_virtual_method(Class* clazz, int methodId) {
-    assert(!tmn_is_suspend_enabled());
+    assert(!hythread_is_suspend_enabled());
     Compilation_Handle handle;
     handle.env = VM_Global_State::loader_env;
     handle.jit = 0;
 
     tmn_suspend_enable();
-    assert(tmn_is_suspend_enabled());
+    assert(hythread_is_suspend_enabled());
     Method *method = resolve_virtual_method(
             (Compile_Handle*)&handle, clazz, methodId);
     tmn_suspend_disable();
@@ -146,13 +146,13 @@ Method* interp_resolve_virtual_method(Class* clazz, int methodId) {
 }
 
 Method* interp_resolve_interface_method(Class* clazz, int methodId) {
-    assert(!tmn_is_suspend_enabled());
+    assert(!hythread_is_suspend_enabled());
     Compilation_Handle handle;
     handle.env = VM_Global_State::loader_env;
     handle.jit = 0;
 
     tmn_suspend_enable();
-    assert(tmn_is_suspend_enabled());
+    assert(hythread_is_suspend_enabled());
     Method *method = resolve_interface_method(
             (Compile_Handle*)&handle, clazz, methodId);
     tmn_suspend_disable();
@@ -164,7 +164,7 @@ Method* interp_resolve_interface_method(Class* clazz, int methodId) {
 }
 
 Method *interp_resolve_static_method(Class *clazz, int methodId) {
-    assert(!tmn_is_suspend_enabled());
+    assert(!hythread_is_suspend_enabled());
     Compilation_Handle handle;
     handle.env = VM_Global_State::loader_env;
     handle.jit = 0;
@@ -181,7 +181,7 @@ Method *interp_resolve_static_method(Class *clazz, int methodId) {
 }
 
 Method *interp_resolve_special_method(Class *clazz, int methodId) {
-    assert(!tmn_is_suspend_enabled());
+    assert(!hythread_is_suspend_enabled());
     Compilation_Handle handle;
     handle.env = VM_Global_State::loader_env;
     handle.jit = 0;

@@ -114,7 +114,7 @@ void verify_stack_enumeration() {
     if (NULL == heap_ceiling) { heap_ceiling = gc_heap_ceiling_address(); }
 
     // GC must be prevented from happening while we hijack the GC functions
-    assert(!tmn_is_suspend_enabled());
+    assert(!hythread_is_suspend_enabled());
 
     // save away the GC function pointer
     add_root_set_entry_func gc_add_root_set_entry_saved 

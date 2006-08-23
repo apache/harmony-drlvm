@@ -40,37 +40,6 @@
 
 #include "platform.h"
 
-// moved from util_log.h, there should be better place for this definition.
-
-typedef unsigned pthread_t; // see documentation on _beginthread
-typedef CRITICAL_SECTION pthread_mutex_t;
-typedef struct pthread_mutexattr_t pthread_mutexattr_t;
-typedef void *sem_t;
-
-inline pthread_t pthread_self() {
-    return GetCurrentThreadId();
-}
-
-inline int pthread_mutex_init (pthread_mutex_t *mutex, pthread_mutexattr_t *attr) { 
-    InitializeCriticalSection(mutex);
-    return 0; 
-}
-
-inline int pthread_mutex_destroy (pthread_mutex_t *mutex) {
-    DeleteCriticalSection(mutex);
-    return 0;
-}
-
-inline int pthread_mutex_lock (pthread_mutex_t *mutex) {
-    EnterCriticalSection(mutex);
-    return 0;
-}
-
-inline int pthread_mutex_unlock (pthread_mutex_t *mutex) {
-    LeaveCriticalSection(mutex);
-    return 0;
-}
-
 inline void disable_assert_dialogs() {
     _CrtSetReportMode(_CRT_ASSERT, _CRTDBG_MODE_FILE);
     _CrtSetReportFile(_CRT_ASSERT, _CRTDBG_FILE_STDOUT);
@@ -94,28 +63,5 @@ struct timespec {
     long tv_sec;
     long tv_nsec;
 };
-
-inline int sem_init(sem_t *semaphore, int pshared, unsigned int value) {
-    *semaphore = CreateSemaphore(NULL, value, INFINITE, NULL);
-    return 0;
-}
-
-inline int sem_destroy(sem_t *sem) {
-    return CloseHandle(*sem);
-}
-
-inline int sem_post(sem_t *semaphore) {
-    return ReleaseSemaphore(*semaphore, 1, NULL);
-}
-
-inline int sem_wait(sem_t *semaphore) {
-    return WaitForSingleObject(*semaphore, INFINITE);
-}
-
-inline int sem_timedwait(sem_t *semaphore,
-               const struct timespec *abs_timeout) {
-    return WaitForSingleObject(*semaphore, abs_timeout->tv_sec*1000);
-}
-
 
 #endif // _platform_lowlevel_H_

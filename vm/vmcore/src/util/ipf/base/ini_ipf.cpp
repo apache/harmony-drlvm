@@ -38,7 +38,7 @@ using namespace std;
 #include "Class.h"
 #include "exceptions.h"
 #include "vm_threads.h"
-#include "open/thread.h"
+
 #include "vm_synch.h"
 #include "compile.h"
 #include "open/vm_util.h"
@@ -142,7 +142,7 @@ JIT_execute_method_default(JIT_Handle jh,
                            jvalue   *args)
 {
     Method *meth = (Method*) methodID;
-    assert(!tmn_is_suspend_enabled());
+    assert(!hythread_is_suspend_enabled());
     void *entry_point = meth->get_code_addr();
     int nargs = meth->get_num_args();
     uint64 arg_words[255];

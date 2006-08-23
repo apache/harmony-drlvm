@@ -24,8 +24,7 @@
 #ifndef _lock_manager_H_
 #define _lock_manager_H_ 
 
-#include "open/vm_util.h" // for CriticalSection
-
+#include "open/vm_util.h" 
 #include "open/types.h"
 
 #ifdef __cplusplus
@@ -50,7 +49,7 @@ public:
     bool _lock_enum_or_null (bool return_null_on_fail);
 
 private:
-    /*CRITICAL_SECTION*/ CriticalSection    _critical_section;
+    hymutex_t    lock;
 };
 
 
@@ -70,11 +69,9 @@ private:
 extern Lock_Manager *p_jit_a_method_lock;
 extern Lock_Manager *p_vtable_patch_lock;
 extern Lock_Manager *p_meth_addr_table_lock;
-extern Lock_Manager *p_thread_lock;
 // 20040224 Support for recording which methods (actually, CodeChunkInfo's) call which other methods.
 extern Lock_Manager *p_method_call_lock;
-VMEXPORT extern Lock_Manager *p_gc_lock;
-extern Lock_Manager *p_tm_lock;
+extern Lock_Manager *p_handle_lock;
 #endif // __cplusplus
 
 #endif // _lock_manager_H_

@@ -13,6 +13,10 @@
  *  See the License for the specific language governing permissions and
  *  limitations under the License.
  */
+
+/**
+ * @keyword XXX_fails
+ */
 public class StackTest {
 
     static int depth = 0;

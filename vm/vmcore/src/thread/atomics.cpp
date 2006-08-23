@@ -27,7 +27,7 @@
 #include "atomics.h"
 #include "vm_arrays.h"
 #include "port_atomic.h"
-#include "open/thread.h"
+
 
 /*
  * Common atomic functions.
@@ -79,7 +79,7 @@ JNIEXPORT jboolean compareAndSetObjectField
 (JNIEnv * env, jobject UNREF accesor, jobject obj, jlong offset, jobject expected, jobject value)
 {
 
-    assert(tmn_is_suspend_enabled());
+    assert(hythread_is_suspend_enabled());
 
     ObjectHandle h = (ObjectHandle)obj;
     ObjectHandle v = (ObjectHandle)value;
@@ -117,7 +117,7 @@ JNIEXPORT jboolean compareAndSetObjectField
 JNIEXPORT jboolean compareAndSetBooleanField
 (JNIEnv * env, jobject UNREF accesor, jobject obj, jlong offset, jboolean expected, jboolean value)
 {
-    assert(tmn_is_suspend_enabled());
+    assert(hythread_is_suspend_enabled());
     ObjectHandle h = (ObjectHandle)obj;
 
     tmn_suspend_disable();
@@ -136,7 +136,7 @@ JNIEXPORT jboolean compareAndSetIntField
 (JNIEnv * env, jobject UNREF accesor, jobject obj, jlong offset, jint expected, jint value)
 {
 
-    assert(tmn_is_suspend_enabled());
+    assert(hythread_is_suspend_enabled());
     ObjectHandle h = (ObjectHandle)obj;
 
     tmn_suspend_disable();
@@ -154,7 +154,7 @@ JNIEXPORT jboolean compareAndSetIntField
 JNIEXPORT jboolean compareAndSetLongField
 (JNIEnv * env, jobject UNREF accesor, jobject obj, jlong offset, jlong expected, jlong value)
 {
-    assert(tmn_is_suspend_enabled());
+    assert(hythread_is_suspend_enabled());
     ObjectHandle h = (ObjectHandle)obj;
 
     tmn_suspend_disable();
@@ -173,7 +173,7 @@ JNIEXPORT jboolean compareAndSetLongField
 JNIEXPORT jboolean compareAndSetObjectArray
 (JNIEnv * UNREF env, jobject UNREF self, jobjectArray array, jint index, jobject expected, jobject value)
 {
-    assert(tmn_is_suspend_enabled());
+    assert(hythread_is_suspend_enabled());
 
     tmn_suspend_disable();
 
@@ -209,7 +209,7 @@ JNIEXPORT jboolean compareAndSetObjectArray
 JNIEXPORT jboolean compareAndSetBooleanArray
 (JNIEnv * UNREF env, jobject UNREF self, jbooleanArray array, jint index, jboolean expected, jboolean value)
 {
-    assert(tmn_is_suspend_enabled());
+    assert(hythread_is_suspend_enabled());
 
     tmn_suspend_disable();
 
@@ -228,7 +228,7 @@ JNIEXPORT jboolean compareAndSetBooleanArray
 JNIEXPORT jboolean compareAndSetIntArray
 (JNIEnv * UNREF env, jobject UNREF self, jintArray array, jint index, jint expected, jint value)
 {
-    assert(tmn_is_suspend_enabled());
+    assert(hythread_is_suspend_enabled());
 
     tmn_suspend_disable();
 
@@ -247,7 +247,7 @@ JNIEXPORT jboolean compareAndSetIntArray
 JNIEXPORT jboolean compareAndSetLongArray
 (JNIEnv * UNREF env, jobject UNREF self, jlongArray array, jint index, jlong expected, jlong value)
 {
-    assert(tmn_is_suspend_enabled());
+    assert(hythread_is_suspend_enabled());
 
     tmn_suspend_disable();
 

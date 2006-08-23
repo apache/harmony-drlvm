@@ -199,33 +199,6 @@ const char *socket_strerror(int errcode){
 }
 
 
-CriticalSection::CriticalSection()
-{
-    m_cs = (void *) new CRITICAL_SECTION;
-    InitializeCriticalSection((CRITICAL_SECTION *)m_cs);
-}
-
-CriticalSection::~CriticalSection()
-{
-    DeleteCriticalSection((CRITICAL_SECTION *)m_cs);
-    delete (CRITICAL_SECTION *)m_cs;
-}
-
-void CriticalSection::lock()
-{
-    EnterCriticalSection((CRITICAL_SECTION *)m_cs);
-}
-
-void CriticalSection::unlock()
-{
-    LeaveCriticalSection((CRITICAL_SECTION *)m_cs);
-}
-
-bool CriticalSection::tryLock()
-{
-    return TryEnterCriticalSection((CRITICAL_SECTION *)m_cs) ? true : false;
-}
-
 VmRegisterContext::VmRegisterContext()
 {
     CONTEXT *ctx = new CONTEXT;
@@ -259,6 +232,7 @@ void VmRegisterContext::setFlag(VmRegisterContext::ContextFlag flag)
     ((CONTEXT *)_pcontext)->ContextFlags = old;
 }
 
+/*  FIXME integration uncomment and fix
 void VmRegisterContext::getContext(VM_thread *thread)
 {
     CONTEXT *ctx = (CONTEXT *) _pcontext;
@@ -354,4 +328,4 @@ int VM_thread::setPriority(int priority)
 {
     return SetThreadPriority(thread_handle, priority);
 }
-
+*/

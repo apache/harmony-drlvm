@@ -26,6 +26,7 @@
 #include <memory.h>
 #include <assert.h>
 #include <time.h>
+#include <open/hythread_ext.h>
 
 
 // VM interface header files
@@ -299,7 +300,7 @@ Work_Packet_Manager::wait_till_there_is_work_or_no_work()
             }
         }
 
-        Sleep(0);
+        hythread_sleep(0);
 
 #ifndef _IPF_
 #ifndef PLATFORM_POSIX

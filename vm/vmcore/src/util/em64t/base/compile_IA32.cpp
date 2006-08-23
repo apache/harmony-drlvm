@@ -52,7 +52,7 @@ using namespace std;
 #include "nogc.h"
 
 #include "open/gc.h"
-#include "open/thread.h"
+
  
 #include "open/vm_util.h"
 #include "vm_synch.h"
@@ -95,7 +95,7 @@ static uint64* get_arg_word(unsigned num_arg_words, unsigned word)
 
 void compile_protect_arguments(Method_Handle method, GcFrame* gc)
 {
-    assert(!tmn_is_suspend_enabled());
+    assert(!hythread_is_suspend_enabled());
     Method_Signature_Handle msh = method_get_signature(method);
     unsigned num_args = method_args_get_number(msh);
     unsigned num_arg_words = ((Method*)method)->get_num_arg_bytes()>>2;

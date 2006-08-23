@@ -30,7 +30,7 @@
 #include "open/vm_util.h"
 #include "cxxlog.h"
 #include "thread_generic.h"
-#include "open/thread.h"
+#include "open/jthread.h"
 #include "suspend_checker.h"
 #include "stack_iterator.h"
 #include "stack_trace.h"
@@ -113,7 +113,7 @@ GetLocal_checkArgs(jvmtiEnv* env,
     if (si_is_native(si))                                                   \
     {                                                                       \
         if (thread_suspended)                                               \
-            thread_resume(thread);                                          \
+            jthread_resume(thread);                                          \
         si_free(si);                                                        \
         return JVMTI_ERROR_OPAQUE_FRAME;                                    \
     }                                                                       \
@@ -121,7 +121,7 @@ GetLocal_checkArgs(jvmtiEnv* env,
     if (si_is_past_end(si))                                                 \
     {                                                                       \
         if (thread_suspended)                                               \
-            thread_resume(thread);                                          \
+            jthread_resume(thread);                                          \
         si_free(si);                                                        \
         return JVMTI_ERROR_NO_MORE_FRAMES;                                  \
     }                                                                       \
@@ -166,7 +166,7 @@ jvmtiGetLocalObject(jvmtiEnv* env,
         vm_thread = get_vm_thread_ptr_safe(jvmti_test_jenv, thread);
         if (vm_thread != p_TLS_vmthread)
         {
-            thread_suspend(thread);
+            jthread_suspend(thread);
             thread_suspended = true;
         }
     }
@@ -202,7 +202,7 @@ jvmtiGetLocalObject(jvmtiEnv* env,
     }
 
     if (thread_suspended)
-        thread_resume(thread);
+        jthread_resume(thread);
 
     return err;
 }
@@ -242,7 +242,7 @@ jvmtiGetLocalInt(jvmtiEnv* env,
         vm_thread = get_vm_thread_ptr_safe(jvmti_test_jenv, thread);
         if (vm_thread != p_TLS_vmthread)
         {
-            thread_suspend(thread);
+            jthread_suspend(thread);
             thread_suspended = true;
         }
     }
@@ -270,7 +270,7 @@ jvmtiGetLocalInt(jvmtiEnv* env,
     }
 
     if (thread_suspended)
-        thread_resume(thread);
+        jthread_resume(thread);
 
     return err;
 }
@@ -310,7 +310,7 @@ jvmtiGetLocalLong(jvmtiEnv* env,
         vm_thread = get_vm_thread_ptr_safe(jvmti_test_jenv, thread);
         if (vm_thread != p_TLS_vmthread)
         {
-            thread_suspend(thread);
+            jthread_suspend(thread);
             thread_suspended = true;
         }
     }
@@ -338,7 +338,7 @@ jvmtiGetLocalLong(jvmtiEnv* env,
     }
 
     if (thread_suspended)
-        thread_resume(thread);
+        jthread_resume(thread);
 
     return err;
 }
@@ -423,7 +423,7 @@ jvmtiSetLocalObject(jvmtiEnv* env,
         vm_thread = get_vm_thread_ptr_safe(jvmti_test_jenv, thread);
         if (vm_thread != p_TLS_vmthread)
         {
-            thread_suspend(thread);
+            jthread_suspend(thread);
             thread_suspended = true;
         }
     }
@@ -459,7 +459,7 @@ jvmtiSetLocalObject(jvmtiEnv* env,
     }
 
     if (thread_suspended)
-        thread_resume(thread);
+        jthread_resume(thread);
 
     return err;
 }
@@ -499,7 +499,7 @@ jvmtiSetLocalInt(jvmtiEnv* env,
         vm_thread = get_vm_thread_ptr_safe(jvmti_test_jenv, thread);
         if (vm_thread != p_TLS_vmthread)
         {
-            thread_suspend(thread);
+            jthread_suspend(thread);
             thread_suspended = true;
         }
     }
@@ -527,7 +527,7 @@ jvmtiSetLocalInt(jvmtiEnv* env,
     }
 
     if (thread_suspended)
-        thread_resume(thread);
+        jthread_resume(thread);
 
     return err;
 }
@@ -567,7 +567,7 @@ jvmtiSetLocalLong(jvmtiEnv* env,
         vm_thread = get_vm_thread_ptr_safe(jvmti_test_jenv, thread);
         if (vm_thread != p_TLS_vmthread)
         {
-            thread_suspend(thread);
+            jthread_suspend(thread);
             thread_suspended = true;
         }
     }
@@ -595,7 +595,7 @@ jvmtiSetLocalLong(jvmtiEnv* env,
     }
 
     if (thread_suspended)
-        thread_resume(thread);
+        jthread_resume(thread);
 
     return err;
 }

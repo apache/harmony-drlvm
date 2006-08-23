@@ -21,22 +21,21 @@
 #include "thread_generic.h"
 #include "java_util_concurrent_locks_LockSupport.h"
 #include "jni.h"
-
+#include "open/jthread.h"
 
 /* Inaccessible static: parked */
 /*
  * Method: java.util.concurrent.locks.LockSupport.unpark(Ljava/lang/Thread;)V
  */
 JNIEXPORT void JNICALL Java_java_util_concurrent_locks_LockSupport_unpark (JNIEnv *jenv, jclass, jobject thread) {
-    if (!thread) return;
-    unpark(get_vm_thread_ptr_safe(jenv, thread));
+    jthread_unpark(thread);
 }
 
 /*
  * Method: java.util.concurrent.locks.LockSupport.park()V
  */
 JNIEXPORT void JNICALL Java_java_util_concurrent_locks_LockSupport_park (JNIEnv * UNREF jenv, jclass) {
-    park();
+    jthread_park();
 }
 
 /*
@@ -49,7 +48,7 @@ JNIEXPORT void JNICALL Java_java_util_concurrent_locks_LockSupport_park (JNIEnv 
 #endif
 
 JNIEXPORT void JNICALL Java_java_util_concurrent_locks_LockSupport_parkNanos(JNIEnv * UNREF jenv, jclass, jlong nanos) {
-    parktimed(nanos/((jlong)1000000), (jint)(nanos%((jlong)1000000)));
+    jthread_timed_park(0,(jint)nanos);
 }
 
 #if defined (__INTEL_COMPILER)
@@ -60,6 +59,7 @@ JNIEXPORT void JNICALL Java_java_util_concurrent_locks_LockSupport_parkNanos(JNI
  * Method: java.util.concurrent.locks.LockSupport.parkUntil(J)V
  */
 JNIEXPORT void JNICALL Java_java_util_concurrent_locks_LockSupport_parkUntil(JNIEnv * UNREF jenv, jclass UNREF thread, jlong milis) {
-    parkuntil(milis, 0);
+    //FIXME integration should be parkUntil
+    jthread_timed_park((jlong)milis, 0);
 }
 

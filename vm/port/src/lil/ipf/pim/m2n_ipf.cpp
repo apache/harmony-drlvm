@@ -33,7 +33,7 @@
 #include "stub_code_utils.h"
 #include "open/vm_util.h" // For vm_get_boolean_property_value_with_default
 #include "interpreter.h"
-#include "open/thread.h"
+
 
 //////////////////////////////////////////////////////////////////////////
 // Utilities
@@ -98,7 +98,7 @@ M2nFrame* m2n_get_last_frame(VM_thread* thread)
 
 void m2n_set_last_frame(M2nFrame* lm2nf)
 {
-    assert(!tmn_is_suspend_enabled());
+    assert(!hythread_is_suspend_enabled());
     p_TLS_vmthread->last_m2n_frame = lm2nf;
 }
 
@@ -222,7 +222,7 @@ void m2n_gen_set_local_handles_imm(Merced_Code_Emitter* emitter, uint64 imm_val)
 void free_local_object_handles2(ObjectHandles* head);
 
 void m2n_pop_local_handles() {
-    assert(!tmn_is_suspend_enabled());
+    assert(!hythread_is_suspend_enabled());
     M2nFrame *m2n = m2n_get_last_frame();
     free_local_object_handles3(m2n_get_local_handles(m2n));
 }

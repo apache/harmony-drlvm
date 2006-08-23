@@ -50,6 +50,8 @@ EBProfileCollector::EBProfileCollector(EM_PC_Interface* em, const std::string& n
             <<" mode:"<<(mode == EB_PCMODE_ASYNC? "ASYNC": "SYNC");
         INFO2(catName.c_str(), msg.str().c_str());
     }
+
+    hymutex_create(&profilesLock, TM_MUTEX_NESTED);
 }
 
 Method_Profile_Handle eb_profiler_create_profile(PC_Handle ph, Method_Handle mh) {
@@ -108,6 +110,8 @@ EBProfileCollector::~EBProfileCollector() {
         EBMethodProfile* profile = it->second;
         delete profile;
     }
+
+    hymutex_destroy(profilesLock);
 }
 
 MethodProfile* EBProfileCollector::getMethodProfile(Method_Handle mh) const {
@@ -121,7 +125,7 @@ MethodProfile* EBProfileCollector::getMethodProfile(Method_Handle mh) const {
 EBMethodProfile* EBProfileCollector::createProfile(Method_Handle mh) {
     EBMethodProfile* profile = new EBMethodProfile(this, mh);
 
-    profilesLock.lock();
+    hymutex_lock(profilesLock);
 
     assert(profilesByMethod.find(mh) == profilesByMethod.end());
     profilesByMethod[mh] = profile;
@@ -129,7 +133,7 @@ EBMethodProfile* EBProfileCollector::createProfile(Method_Handle mh) {
     newProfiles.push_back(profile);
     }
 
-    profilesLock.unlock();
+    hymutex_unlock(profilesLock);
 
     return profile;
 }
@@ -150,10 +154,10 @@ static void logReadyProfile(const std::string& catName, const std::string& profi
 void EBProfileCollector::onTimeout() {
     assert(mode == EB_PCMODE_ASYNC);
     if(!newProfiles.empty()) {
-        profilesLock.lock();
+        hymutex_lock(profilesLock);
         greenProfiles.insert(greenProfiles.end(), newProfiles.begin(), newProfiles.end());
         newProfiles.clear();
-        profilesLock.unlock();
+        hymutex_unlock(profilesLock);
     }
 
     for (std::vector<EBMethodProfile*>::iterator it = greenProfiles.begin(), end = greenProfiles.end(); it!=end; ++it) {

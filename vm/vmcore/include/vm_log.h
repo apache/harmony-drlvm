@@ -72,7 +72,7 @@ inline LoggerString& operator<<(LoggerString& log, const Method* method) {
 * The convenience method for logging managed objects.
 */
 inline LoggerString& operator<<(LoggerString& log, /*const*/ ManagedObject* object) {
-    assert(!tmn_is_suspend_enabled());
+    assert(!hythread_is_suspend_enabled());
     if (object) {
         log << object->vt()->clss << "@" << (void*) object;
     } else {
@@ -85,13 +85,13 @@ inline LoggerString& operator<<(LoggerString& log, /*const*/ ManagedObject* obje
 * The convenience method for logging JNI object handles.
 */
 inline LoggerString& operator<<(LoggerString& log, const jobject jobj) {
-    tmn_suspend_disable_recursive();
+    hythread_suspend_disable();
     if (jobj) {
         log << jobj->object;
     } else {
         log << "<null jobject>";
     }
-    tmn_suspend_enable_recursive();
+    hythread_suspend_enable();
     return log;
 }
 

@@ -29,33 +29,11 @@
 extern "C" {
 #endif
 
-#define MAX_VM_THREADS 2048
-
-#define java_lang_Thread_NORM_PRIORITY 5L
-
-VM_thread *get_vm_thread_ptr(void *p_ref);
-
-void Java_java_lang_Thread_setPriority_generic(VM_thread *p_thr, long pty);
-jint Java_java_lang_Thread_countStackFrames_generic(VM_thread *p_thr);
-
 VMEXPORT VM_thread *get_vm_thread_ptr_safe(JNIEnv *, jobject);
 
-
 /////////////////////////////////////////////////////////////////////////////////
 /////////////////////////////////////////////////////////////////////////////////
 
-
-void Java_java_lang_Thread_start_generic(JNIEnv *, jobject,
-                                         jvmtiEnv * jvmtiEnv, jvmtiStartFunction proc, 
-                                         const void* arg, jint priority);
-
-void Java_java_lang_Thread_interrupt_generic(VM_thread *) ;
-
-void Java_java_lang_Thread_sleep_generic(JNIEnv *, VM_thread *, int64);
-
-void set_interrupt_flag_in_thread_object(JNIEnv *, jobject );
-
-void wait_until_non_daemon_threads_are_dead();
 
 #ifdef __cplusplus
 }

@@ -232,7 +232,7 @@ static void string_set_fields_separate(ManagedObject* str, unsigned length, unsi
 // Return: str gets the string object, buf points to buffer
 static void string_create(unsigned unicode_length, bool eight_bit, ManagedObject** str, StringBuffer* buf)
 {
-    assert(!tmn_is_suspend_enabled());
+    assert(!hythread_is_suspend_enabled());
 
     Global_Env *global_env = VM_Global_State::loader_env;
     Class *clss;
@@ -256,7 +256,7 @@ static void string_create(unsigned unicode_length, bool eight_bit, ManagedObject
 
     VTable *jls_vtable = VM_Global_State::loader_env->JavaLangString_VTable;
 
-    assert(!tmn_is_suspend_enabled());
+    assert(!hythread_is_suspend_enabled());
     GcFrame gc(2);
     gc.add_object((ManagedObject**)&array);
 
@@ -330,7 +330,7 @@ ManagedObject* string_create_from_unicode(const uint16* buf, unsigned length)
 
 ObjectHandle string_create_from_utf8_h(const char* buf, unsigned length)
 {
-    assert(tmn_is_suspend_enabled());
+    assert(hythread_is_suspend_enabled());
     tmn_suspend_disable();
     ObjectHandle res = oh_allocate_local_handle();
     res->object = string_create_from_utf8(buf, length);
@@ -340,7 +340,7 @@ ObjectHandle string_create_from_utf8_h(const char* buf, unsigned length)
 
 ObjectHandle string_create_from_unicode_h(const uint16* buf, unsigned length)
 {
-    assert(tmn_is_suspend_enabled());
+    assert(hythread_is_suspend_enabled());
     tmn_suspend_disable();
     ObjectHandle res = oh_allocate_local_handle();
     res->object = string_create_from_unicode(buf, length);
@@ -355,7 +355,7 @@ ObjectHandle string_create_from_unicode_h(const uint16* buf, unsigned length)
 // returns length in characters
 unsigned string_get_length(ManagedObject* str)
 {
-    assert(!tmn_is_suspend_enabled());
+    assert(!hythread_is_suspend_enabled());
     assert(str);
 
     if (f_count_offset == 0) init_fields();
@@ -366,7 +366,7 @@ unsigned string_get_length(ManagedObject* str)
 // returns length in characters
 unsigned string_get_length_h(ObjectHandle str)
 {
-    assert(tmn_is_suspend_enabled());
+    assert(hythread_is_suspend_enabled());
     tmn_suspend_disable();
     assert(str && str->object);
     unsigned len = string_get_length(str->object);
@@ -390,7 +390,7 @@ unsigned string_get_utf8_length(ManagedObject* str)
 // returns the length of the UTF8 encoding of the string
 unsigned string_get_utf8_length_h(ObjectHandle str)
 {
-    assert(tmn_is_suspend_enabled());
+    assert(hythread_is_suspend_enabled());
     tmn_suspend_disable();
     assert(str && str->object);
     unsigned utf8_len = string_get_utf8_length(str->object);
@@ -473,7 +473,7 @@ const char* string_get_utf8_chars(ManagedObject* string)
 // Caller should free the result
 const char* string_get_utf8_chars_h(ObjectHandle string)
 {
-    assert(tmn_is_suspend_enabled());
+    assert(hythread_is_suspend_enabled());
     tmn_suspend_disable();
     assert(string && string->object);
     const char* res = string_get_utf8_chars(string->object);
@@ -497,7 +497,7 @@ void string_get_unicode_region(ManagedObject* str, unsigned offset, unsigned cou
 // Copy the characters offset..offset+count-1 into buf
 void string_get_unicode_region_h(ObjectHandle str, unsigned offset, unsigned count, uint16* buf)
 {
-    assert(tmn_is_suspend_enabled());
+    assert(hythread_is_suspend_enabled());
     tmn_suspend_disable();
     assert(str && str->object && offset+count<=string_get_length(str->object));
     string_get_unicode_region(str->object, offset, count, buf);
@@ -519,7 +519,7 @@ void string_get_utf8_region(ManagedObject* str, unsigned offset, unsigned count,
 // Encode characters offset..offset+count-1 into UTF8 and place in buf
 void string_get_utf8_region_h(ObjectHandle str, unsigned offset, unsigned count, char* buf)
 {
-    assert(tmn_is_suspend_enabled());
+    assert(hythread_is_suspend_enabled());
     tmn_suspend_disable();
     assert(str && str->object && offset+count<=string_get_length(str->object));
     string_get_utf8_region(str->object, offset, count, buf);
@@ -534,7 +534,7 @@ void string_get_utf8_region_h(ObjectHandle str, unsigned offset, unsigned count,
 VMEXPORT // temporary solution for interpreter unplug
 Java_java_lang_String *vm_instantiate_cp_string_resolved(String *str)
 {
-    assert(!tmn_is_suspend_enabled());
+    assert(!hythread_is_suspend_enabled());
     Global_Env *env = VM_Global_State::loader_env;
     if (env->compress_references) {
         if (str->intern.compressed_ref != 0) {
@@ -550,7 +550,7 @@ Java_java_lang_String *vm_instantiate_cp_string_resolved(String *str)
     if (!lang_string) { // if OutOfMemory
         return NULL;
     }
-    assert(!tmn_is_suspend_enabled());
+    assert(!hythread_is_suspend_enabled());
 
     // Atomically update the string structure since some other thread might be trying to make the same update.
     // The GC won't be able to enumerate here since GC is disabled, so there are no race conditions with GC.

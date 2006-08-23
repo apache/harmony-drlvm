@@ -62,8 +62,7 @@ extern bool cross_block_compaction;
 extern bool sweeps_during_gc;
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-unsigned int __stdcall gc_thread_func (void *);
-
+int __cdecl gc_thread_func (void *arg);
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 GC_Mark_Activity::GC_Mark_Activity(Garbage_Collector *p_gc) {
@@ -88,7 +87,17 @@ GC_Mark_Activity::~GC_Mark_Activity() {
     assert(_input_packet == NULL);
 }
 
-GC_Thread::GC_Thread(Garbage_Collector *p_gc, pthread_t gc_thread_id)
+
+hythread_group_t gc_thread_group = NULL;
+hythread_group_t get_thread_group () {
+    if (!gc_thread_group) {
+        IDATA UNUSED stat = hythread_group_create(&gc_thread_group);
+        assert(stat == TM_ERROR_NONE);
+    }
+    return gc_thread_group;
+}
+
+GC_Thread::GC_Thread(Garbage_Collector *p_gc, int gc_thread_id)
     : GC_Mark_Activity(p_gc)
 {
 
@@ -106,37 +115,15 @@ GC_Thread::GC_Thread(Garbage_Collector *p_gc, pthread_t gc_thread_id)
     }
         
     //////////////////
-     _gc_thread_start_work_event = CreateEvent( 
-                                            NULL,   // pointer to security attributes 
-                                            FALSE,  // flag for manual-reset event  -- auto reset mode 
-                                            FALSE,  // flag for initial state 
-                                            NULL    // pointer to event-object name 
-                                        ); 
-    assert(_gc_thread_start_work_event);
-    Boolean rstat = ResetEvent(_gc_thread_start_work_event);
-    assert(rstat);
-
+    IDATA stat = hysem_create(&_gc_thread_start_work_event, 0, 1); 
+    assert(stat == TM_ERROR_NONE);
 
     //////////////////
-    _gc_thread_work_done_event = CreateEvent( 
-                                        NULL,   // pointer to security attributes 
-                                        FALSE,  // flag for manual-reset event  -- auto reset mode 
-                                        FALSE,  // flag for initial state 
-                                        NULL    // pointer to event-object name 
-                                    ); 
-    assert(_gc_thread_work_done_event);
-
-    rstat = ResetEvent(_gc_thread_work_done_event);
-    assert(rstat);
-
-    _thread_handle = vm_beginthreadex(NULL,
-                                    0,
-                                    gc_thread_func,
-                                    (LPVOID) this,
-                                    0,
-                                    &(_thread_id));
-
-    if (!_thread_handle) { 
+    stat = hysem_create(&_gc_thread_work_done_event, 0, 1); 
+    assert(stat == TM_ERROR_NONE);
+    _thread_handle=NULL;
+    stat = hythread_create_with_group(&_thread_handle, get_thread_group(), 0, 0, 0, gc_thread_func, this);
+    if (stat != TM_ERROR_NONE) { 
         DIE("GC_Thread::GC_Thread(..): CreateThread() failed...exiting...");
     }
 
@@ -151,8 +138,8 @@ GC_Thread::GC_Thread(Garbage_Collector *p_gc, pthread_t gc_thread_id)
 
 GC_Thread::~GC_Thread()
 {
-    vm_destroy_event(_gc_thread_start_work_event);
-    vm_destroy_event(_gc_thread_work_done_event);
+    hysem_destroy(_gc_thread_start_work_event);
+    hysem_destroy(_gc_thread_work_done_event);
 }
 
 
@@ -170,10 +157,10 @@ GC_Thread::reset(bool compact_this_gc)
 #endif
     }
 
-    Boolean rstat = ResetEvent(_gc_thread_start_work_event);
-    assert(rstat);
-    rstat = ResetEvent(_gc_thread_work_done_event);
-    assert(rstat);
+    IDATA rstat = hysem_set(_gc_thread_start_work_event,0);
+    assert(rstat == TM_ERROR_NONE);
+    rstat = hysem_set(_gc_thread_work_done_event,0);
+    assert(rstat == TM_ERROR_NONE);
     _num_bytes_recovered_by_sweep = 0;
 
 ////////////////////////////////
@@ -187,8 +174,8 @@ GC_Thread::reset(bool compact_this_gc)
 void 
 GC_Thread::wait_for_work()
 {
-    DWORD UNUSED wstat = WaitForSingleObject(_gc_thread_start_work_event, INFINITE);        
-    assert(wstat != WAIT_FAILED);
+    IDATA UNUSED wstat = hysem_wait(_gc_thread_start_work_event);        
+    assert(wstat == TM_ERROR_NONE);
 }
 
 
@@ -197,15 +184,15 @@ void
 GC_Thread::signal_work_is_done()
 {
     // I am done with my job. SIGNAL MASTER THREAD
-    Boolean UNUSED sstat = SetEvent(_gc_thread_work_done_event);
-    assert(sstat);
+    IDATA UNUSED sstat = hysem_post(_gc_thread_work_done_event);
+    assert(sstat == TM_ERROR_NONE);
 }
 
 
 volatile POINTER_SIZE_INT dummy_for_good_cache_performance = 0;             
 
 
-unsigned int __stdcall gc_thread_func (void *arg)
+int __cdecl gc_thread_func (void *arg)
 {
     GC_Thread *p_gc_thread = (GC_Thread *) arg; 
     assert(p_gc_thread);

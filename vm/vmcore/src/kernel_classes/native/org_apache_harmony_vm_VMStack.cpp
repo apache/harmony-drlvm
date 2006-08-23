@@ -29,7 +29,6 @@
 #define LOG_DOMAIN "kernel.stack"
 #include "cxxlog.h"
 
-#include "open/thread.h"
 #include "stack_trace.h"
 #include "jni_direct.h"
 #include "jni_utils.h"
@@ -61,7 +60,7 @@ JNIEXPORT jclass JNICALL Java_org_apache_harmony_vm_VMStack_getCallerClass
     if (!res) return NULL;
 
     // obtain and return class of the frame
-    assert(tmn_is_suspend_enabled());
+    assert(hythread_is_suspend_enabled());
     return struct_Class_to_jclass((Class*)method_get_class(frame.method));
 }
 
@@ -128,7 +127,7 @@ JNIEXPORT jobjectArray JNICALL Java_org_apache_harmony_vm_VMStack_getClasses
     unsigned maxSize = signedMaxSize;
 
 
-    assert(tmn_is_suspend_enabled());
+    assert(hythread_is_suspend_enabled());
     unsigned size;
     StackTraceFrame* frames;
     st_get_trace(&size, &frames);
@@ -152,7 +151,7 @@ JNIEXPORT jobjectArray JNICALL Java_org_apache_harmony_vm_VMStack_getClasses
         length ++;
     }
 
-    assert(tmn_is_suspend_enabled());
+    assert(hythread_is_suspend_enabled());
 
     jclass ste = struct_Class_to_java_lang_Class_Handle(VM_Global_State::loader_env->JavaLangClass_Class);
     assert(ste);
@@ -162,7 +161,7 @@ JNIEXPORT jobjectArray JNICALL Java_org_apache_harmony_vm_VMStack_getClasses
     if (arr == NULL) {
         // OutOfMemoryError
         core_free(frames);
-        assert(tmn_is_suspend_enabled());
+        assert(hythread_is_suspend_enabled());
         return NULL;
     }
 
@@ -183,7 +182,7 @@ JNIEXPORT jobjectArray JNICALL Java_org_apache_harmony_vm_VMStack_getClasses
     }
 
     core_free(frames);
-    assert(tmn_is_suspend_enabled());
+    assert(hythread_is_suspend_enabled());
     return arr;
 }
 
@@ -282,16 +281,18 @@ JNIEXPORT jobjectArray JNICALL Java_org_apache_harmony_vm_VMStack_getStackTrace
             }
         }
     }
+    // skip Thread.runImpl()
+    size--;
 
     // skip the VMStart$MainThread if one exits from the bottom of the stack
     // along with 2 reflection frames used to invoke method main
     static String* starter_String = genv->string_pool.lookup("java/lang/VMStart$MainThread");
-    Method_Handle method = frames[size-1].method;
+    Method_Handle method = frames[size].method;
     assert(method);
     // skip only for main application thread
-    if (!strcmp(method_get_name(method), "run")
+    if (!strcmp(method_get_name(method), "runImpl")
         && method->get_class()->name == starter_String) {
-        int rem = size - skip;
+        int rem = size - skip-1;
         size -= rem < 3 ? rem : 3;
     }
 
@@ -299,7 +300,7 @@ JNIEXPORT jobjectArray JNICALL Java_org_apache_harmony_vm_VMStack_getStackTrace
         << " frames but there are only "
         << size << " frames in stack");
     
-    assert(tmn_is_suspend_enabled());
+    assert(hythread_is_suspend_enabled());
     jclass ste = struct_Class_to_java_lang_Class_Handle(genv->java_lang_StackTraceElement_Class);
     assert(ste);
 

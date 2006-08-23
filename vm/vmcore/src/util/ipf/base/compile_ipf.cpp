@@ -58,7 +58,7 @@ using namespace std;
 #include "open/vm_util.h"
 #include "vm_synch.h"
 #include "vm_threads.h"
-#include "open/thread.h"
+
 #include "ini.h"
 
 #define METHOD_NAME_BUF_SIZE 512
@@ -363,7 +363,7 @@ void compile_flush_generated_code()
 static void protect_value_type(Class_Handle c, uint64* start, GcFrame* gc)
 {
     ABORT("It is supposed that the function is never called");
-    assert(!tmn_is_suspend_enabled());
+    assert(!hythread_is_suspend_enabled());
     unsigned num_fields = class_num_instance_fields_recursive(c);
     for(unsigned i=0; i<num_fields; i++) {
         Field_Handle f = class_get_instance_field_recursive(c, i);
@@ -398,7 +398,7 @@ static void protect_value_type(Class_Handle c, uint64* start, GcFrame* gc)
 
 void compile_protect_arguments(Method_Handle method, GcFrame* gc)
 {
-    assert(!tmn_is_suspend_enabled());
+    assert(!hythread_is_suspend_enabled());
     Method_Signature_Handle msh = method_get_signature(method);
     unsigned num_args = method_args_get_number(msh);
     M2nFrame* m2nf = m2n_get_last_frame();

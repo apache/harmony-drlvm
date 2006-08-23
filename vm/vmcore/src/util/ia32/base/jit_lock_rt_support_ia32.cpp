@@ -18,6 +18,8 @@
  * @version $Revision: 1.1.2.2.4.3 $
  */  
 
+#include <open/hythread_ext.h>
+#include <open/thread_helpers.h>
 
 #include "platform_lowlevel.h"
 
@@ -40,7 +42,6 @@ using namespace std;
 #include "lil_code_generator.h"
 #include "../m2n_ia32_internal.h"
 #include "object_handles.h"
-#include "open/thread.h"
 #include "Class.h"
 
 #ifdef VM_STATS
@@ -51,7 +52,7 @@ using namespace std;
 #include "dump.h"
 extern bool dump_stubs;
 #endif
-
+#define INPUT_ARG_OFFSET 4
 char *gen_setup_j2n_frame(char *s);
 char *gen_pop_j2n_frame(char *s);
 
@@ -77,72 +78,53 @@ static char * gen_convert_struct_class_to_object(char *ss, char **patch_addr_nul
 } //gen_convert_struct_class_to_object
 
 
+/*
+ * Helper for monenter intstruction
+ */
 static char * gen_restore_monitor_enter(char *ss, char *patch_addr_null_arg)
 {
+    
+    // Obtain lockword offset for the given object
     const unsigned header_offset = ManagedObject::header_offset();
+    signed offset;
+    assert(header_offset);
 #ifdef VM_STATS
     ss = inc(ss,  M_Opnd((unsigned)&(vm_stats_total.num_monitor_enter)));
 #endif
-
-#ifdef USE_TLS_API
-    ss = call(ss, (char *)get_self_stack_key);
-    ss = mov(ss,  edx_opnd,  eax_opnd);
-#else //USE_TLS_API
-    *ss++ = (char)0x64;
-    *ss++ = (char)0xa1;
-    *ss++ = (char)0x14;
-    *ss++ = (char)0x00;
-    *ss++ = (char)0x00;
-    *ss++ = (char)0x00;
-    ss = mov(ss,  edx_opnd,  M_Base_Opnd(eax_reg, (uint32)&((VM_thread *)0)->stack_key) );
-#endif //!USE_TLS_API
-    
-    ss = alu(ss, xor_opc,  eax_opnd,  eax_opnd);
     ss = mov(ss,  ecx_opnd,  M_Base_Opnd(esp_reg, INPUT_ARG_OFFSET));
     
     ss = test(ss,  ecx_opnd,   ecx_opnd);
     ss = branch8(ss, Condition_Z,  Imm_Opnd(size_8, 0));
     char *backpatch_address__null_pointer = ((char *)ss) - 1;
 
-    ss = prefix(ss, lock_prefix);   
-    ss = cmpxchg(ss,  M_Base_Opnd(ecx_reg, header_offset + STACK_KEY_OFFSET),  edx_opnd, size_16);
+    ss = alu(ss, add_opc, ecx_opnd, Imm_Opnd(header_offset)); // pop parameters
+    ss = gen_monitorenter_fast_path_helper(ss, ecx_opnd);
+    ss = test(ss,  eax_opnd,   eax_opnd);
     ss = branch8(ss, Condition_NZ,  Imm_Opnd(size_8, 0));
     char *backpatch_address__fast_monitor_failed = ((char *)ss) - 1;
-
     ss = ret(ss,  Imm_Opnd(4));
 
-    signed offset = (signed)ss - (signed)backpatch_address__fast_monitor_failed - 1;
+    // Slow path: happens when the monitor is busy (contention case)
+    offset = (signed)ss - (signed)backpatch_address__fast_monitor_failed - 1;
     *backpatch_address__fast_monitor_failed = (char)offset;
 
     ss = gen_setup_j2n_frame(ss);
     ss = push(ss,  M_Base_Opnd(esp_reg, m2n_sizeof_m2n_frame));
  
-/*
-     // packing heap pointer to handle -salikh
     ss = call(ss, (char *)oh_convert_to_local_handle);
     ss = alu(ss, add_opc, esp_opnd, Imm_Opnd(4)); // pop parameters
-    ss = push(ss, eax_opnd); // push the address of the handle
-    ss = call(ss, (char *)tmn_suspend_enable); // enable gc
-    // -salikh
 
-    ss = call(ss, (char *)vm_monitor_enter_slow_handle);
-    ss = alu(ss, add_opc, esp_opnd, Imm_Opnd(4)); // pop parameters
-
-    // disable gc afterwards -salikh
-    ss = call(ss, (char *)tmn_suspend_disable); // disable gc
-    // -salikh
-*/
-    ss = call(ss, (char *)vm_monitor_enter_slow);
-    ss = alu(ss, add_opc,  esp_opnd,  Imm_Opnd(4));
+    ss = gen_monitorenter_slow_path_helper(ss, eax_opnd);
   
     ss = gen_pop_j2n_frame(ss);
     ss = ret(ss,  Imm_Opnd(4));
 
-    offset = (signed)ss - (signed)backpatch_address__null_pointer - 1;
-    *backpatch_address__null_pointer = (char)offset;
+    // Handle NPE here
+    signed npe_offset = (signed)ss - (signed)backpatch_address__null_pointer - 1;
+    *backpatch_address__null_pointer = (char)npe_offset;
     if (patch_addr_null_arg != NULL) {
-        offset = (signed)ss - (signed)patch_addr_null_arg - 1;
-        *patch_addr_null_arg = (char)offset;
+        npe_offset = (signed)ss - (signed)patch_addr_null_arg - 1;
+        *patch_addr_null_arg = (char)npe_offset;
     }
     // Object is null so throw a null pointer exception
     ss = jump(ss, (char*)exn_get_rth_throw_null_pointer());
@@ -197,127 +179,40 @@ void * restore__vm_monitor_enter_static_naked(void * code_addr)
 
 static char * gen_restore_monitor_exit(char *ss, char *patch_addr_null_arg)
 {
+
     const unsigned header_offset = ManagedObject::header_offset();
 #ifdef VM_STATS
-    ss = inc(ss,  M_Opnd((unsigned)&(vm_stats_total.num_monitor_exit)));
+    ss = inc(ss,  M_Opnd((unsigned)&(vm_stats_total.num_monitor_enter)));
 #endif
 
-#define CHECK_FOR_ILLEGAL_MONITOR_STATE_EXCEPTION
-#ifdef CHECK_FOR_ILLEGAL_MONITOR_STATE_EXCEPTION
-#ifdef USE_TLS_API
-    ss = call(ss, (char *)get_self_stack_key);
-    ss = shift(ss, shl_opc,  eax_opnd,  Imm_Opnd(16));
-#else
-//#error This code has not been tested.
-    ss = mov(ss,  eax_opnd,  esp_opnd);
-    ss = alu(ss, and_opc,  eax_opnd,  Imm_Opnd(0xffff0000));
-#endif //#ifdef USE_TLS_API else
     ss = mov(ss,  ecx_opnd,  M_Base_Opnd(esp_reg, INPUT_ARG_OFFSET));
-    ss = alu(ss, xor_opc,  eax_opnd,  M_Base_Opnd(ecx_reg, header_offset));
-    ss = test(ss,  eax_opnd,  Imm_Opnd(0xffffff80));
+    ss = test(ss,  ecx_opnd,   ecx_opnd);
+    ss = branch8(ss, Condition_Z,  Imm_Opnd(size_8, 0));
+    char *backpatch_address__null_pointer = ((char *)ss) - 1;
+
+    ss = alu(ss, add_opc, ecx_opnd, Imm_Opnd(header_offset));
+    ss = gen_monitor_exit_helper(ss, ecx_opnd);
+    ss = test(ss,  eax_opnd,   eax_opnd);
     ss = branch8(ss, Condition_NZ,  Imm_Opnd(size_8, 0));
-    char *backpatch_address__slow_path = ((char *)ss) - 1;
-    ss = alu(ss, and_opc,  M_Base_Opnd(ecx_reg, header_offset),  Imm_Opnd(0x0000ffff));
-    ss = ret(ss,  Imm_Opnd(4));
-    signed offset1 = (signed)ss-(signed)backpatch_address__slow_path - 1;
-    *backpatch_address__slow_path = (char)offset1;
-#else // !CHECK_FOR_ILLEGAL_MONITOR_STATE_EXCEPTION
-    ss = mov(ss,  ecx_opnd,  M_Base_Opnd(esp_reg, INPUT_ARG_OFFSET));
-    // The current ia32.cpp doesn't support a 16-bit test instruction, so
-    // we hack it here.
-    *ss = 0x66; ss++; // prefix 0x66 means use the 16-bit form instead of the 32-bit form
-    ss = test(ss,  M_Base_Opnd(ecx_reg, header_offset),  Imm_Opnd(0xff80));
-    ss -= 2; // Adjust for a 16-bit immediate instead of a 32-bit immediate.
-    ss = branch8(ss, cc_ne,  Imm_Opnd(size_8, 0), 0);
-    char *backpatch_address__slow_path = ((char *)ss) - 1;
-    ss = mov(ss,  M_Base_Opnd(ecx_reg, header_offset + STACK_KEY_OFFSET),  Imm_Opnd(0), opnd_16);
-    ss = ret(ss,  Imm_Opnd(4));
-    signed offset1 = (signed)ss-(signed)backpatch_address__slow_path - 1;
-    *backpatch_address__slow_path = offset1;
-#endif // !CHECK_FOR_ILLEGAL_MONITOR_STATE_EXCEPTION
-
-#ifdef USE_TLS_API
-    ss = call(ss, (char *)get_self_stack_key);
-    ss = mov(ss,  edx_opnd,  eax_opnd);
-#else //USE_TLS_API
-    *ss++ = (char)0x64;
-    *ss++ = (char)0xa1;
-    *ss++ = (char)0x14;
-    *ss++ = (char)0x00;
-    *ss++ = (char)0x00;
-    *ss++ = (char)0x00;
-    ss = mov(ss,  edx_opnd,  M_Base_Opnd(eax_reg, (uint32)&((VM_thread *)0)->stack_key) );
-#endif //!USE_TLS_API
-
-    ss = mov(ss,  ecx_opnd,  M_Base_Opnd(esp_reg, INPUT_ARG_OFFSET));
-    ss = mov(ss,  eax_opnd,  M_Base_Opnd(ecx_reg, header_offset + STACK_KEY_OFFSET ), size_16);
-    ss = alu(ss, cmp_opc,  eax_opnd,  edx_opnd, size_16);
-    ss = branch8(ss, Condition_NZ,  Imm_Opnd(size_8, 0));
-    char *backpatch_address__illegal_monitor_failed = ((char *)ss) - 1;
-
-    ss = mov(ss,  eax_opnd,  M_Base_Opnd(ecx_reg,header_offset + HASH_CONTENTION_AND_RECURSION_OFFSET), size_16);
-
-    // need to code AH: ESP & size_8 -> AH
-    ss = alu(ss, cmp_opc,  esp_opnd,  Imm_Opnd(size_8, 0), size_8);
-
-    ss = branch8(ss, Condition_NZ,  Imm_Opnd(size_8, 0));
-    char *backpatch_address__recursed_monitor_failed = ((char *)ss) - 1;
-
-    //release the lock
-
-    ss = mov(ss,  edx_opnd,  Imm_Opnd(0));
-    ss = mov(ss,  M_Base_Opnd(ecx_reg, header_offset + STACK_KEY_OFFSET),  edx_opnd, size_16);
-
-    ss = mov(ss,  edx_opnd,  eax_opnd);
-    ss = alu(ss, and_opc,  edx_opnd,  Imm_Opnd(0x80));
-
-    ss = branch8(ss, Condition_NZ,  Imm_Opnd(size_8, 0));
-    char *backpatch_address__contended_monitor_failed = ((char *)ss) - 1;
+    char *backpatch_address__fast_monitor_failed = ((char *)ss) - 1;
     ss = ret(ss,  Imm_Opnd(4));
 
-    signed 
-    offset = (signed)ss-(signed)backpatch_address__contended_monitor_failed - 1;
-    *backpatch_address__contended_monitor_failed = (char)offset;
-    ss = push(ss,  M_Base_Opnd(esp_reg, INPUT_ARG_OFFSET));
-    ss = call(ss, (char *)find_an_interested_thread);
-    ss = alu(ss, add_opc,  esp_opnd,  Imm_Opnd(4));
-    ss = ret(ss,  Imm_Opnd(4));
+    signed offset = (signed)ss - (signed)backpatch_address__fast_monitor_failed - 1;
+    *backpatch_address__fast_monitor_failed = (char)offset;
+    //  illegal state happend
+    ss = jump(ss, (char*)exn_get_rth_throw_illegal_state_exception());
 
-    offset = (signed)ss-(signed)backpatch_address__recursed_monitor_failed - 1;
-    *backpatch_address__recursed_monitor_failed = (char)offset;
-    // esp_opnd & size_8 translates to AH
-    ss = dec(ss, esp_opnd,  size_8);
-    ss = mov(ss,   M_Base_Opnd(ecx_reg, header_offset + RECURSION_OFFSET),  esp_opnd, size_8);
-    ss = ret(ss,  Imm_Opnd(4));
-
-    offset = (signed)ss-(signed)backpatch_address__illegal_monitor_failed - 1;
-    *backpatch_address__illegal_monitor_failed = (char)offset;
+    offset = (signed)ss - (signed)backpatch_address__null_pointer - 1;
+    *backpatch_address__null_pointer = (char)offset;
     if (patch_addr_null_arg != NULL) {
         offset = (signed)ss - (signed)patch_addr_null_arg - 1;
         *patch_addr_null_arg = (char)offset;
     }
-    ss = gen_setup_j2n_frame(ss);
-    ss = push(ss,  M_Base_Opnd(esp_reg, m2n_sizeof_m2n_frame));
-
- /*
-     // packing heap pointer to handle -salikh
-    ss = call(ss, (char *)oh_convert_to_local_handle);
-    ss = alu(ss, add_opc, esp_opnd, Imm_Opnd(4)); // pop parameters
-    ss = push(ss, eax_opnd); // push the address of the handle
-    ss = call(ss, (char *)tmn_suspend_enable); // enable gc
-    // -salikh
-
-    ss = call(ss, (char *)vm_monitor_exit_handle);
-    ss = alu(ss, add_opc, esp_opnd, Imm_Opnd(4));
-
-    // disable gc afterwards -salikh
-    ss = call(ss, (char *)tmn_suspend_disable); // disable gc
-    // -salikh
-*/
-    ss = call(ss, (char *)vm_monitor_exit);
-    ss = alu(ss, add_opc,  esp_opnd,  Imm_Opnd(4));
+    // Object is null so throw a null pointer exception
+    ss = jump(ss, (char*)exn_get_rth_throw_null_pointer());
     
     return ss;
+  
 } //gen_restore_monitor_exit
 
 
@@ -372,7 +267,7 @@ void * getaddress__vm_monitor_enter_naked()
         return addr;
     }
 
-    const int stub_size = 126;
+    const int stub_size = 226;
     char *stub = (char *)malloc_fixed_code_for_jit(stub_size, DEFAULT_CODE_ALIGNMENT, CODE_BLOCK_HEAT_MAX/2, CAA_Allocate);
 #ifdef _DEBUG
     memset(stub, 0xcc /*int 3*/, stub_size);
@@ -411,7 +306,7 @@ void * getaddress__vm_monitor_enter_static_naked()
         return addr;
     }
 
-    const int stub_size = 150;
+    const int stub_size = 250;
     char *stub = (char *)malloc_fixed_code_for_jit(stub_size, DEFAULT_CODE_ALIGNMENT, CODE_BLOCK_HEAT_MAX/2, CAA_Allocate);
 #ifdef _DEBUG
     memset(stub, 0xcc /*int 3*/, stub_size);

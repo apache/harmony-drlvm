@@ -43,7 +43,9 @@ using namespace std;
 #include "nogc.h"
 #include "encoder.h"
 #include "open/vm_util.h"
-#include "open/thread.h"
+
+#include "open/thread_helpers.h"
+
 #include "vm_threads.h"
 #include "mon_enter_exit.h"
 #include "vm_arrays.h"
@@ -77,22 +79,16 @@ extern bool dump_stubs;
 #define SIZE(Struct, Field) \
   (sizeof(((Struct *) NULL)->Field))
 
-
-void * getaddress__vm_monitor_enter_naked();
-void * getaddress__vm_monitor_enter_static_naked();
-void * getaddress__vm_monitor_exit_naked();
-void * getaddress__vm_monitor_exit_static_naked();
 void * get_generic_rt_support_addr_ia32(VM_RT_SUPPORT f);
 
 
 /////////////////////////////////////////////////////////////////
 // begin VM_Runtime_Support
 /////////////////////////////////////////////////////////////////
-CriticalSection cs;
 
 static void vm_throw_java_lang_ClassCastException()
 {
-    assert(!tmn_is_suspend_enabled());
+    assert(!hythread_is_suspend_enabled());
     throw_java_exception("java/lang/ClassCastException");
     ABORT("The last called function should not return");
 } //vm_throw_java_lang_ClassCastException
@@ -225,7 +221,7 @@ static Boolean is_class_initialized(Class *clss)
     vm_stats_total.num_is_class_initialized++;
     clss->num_class_init_checks++;
 #endif // VM_STATS
-    assert(!tmn_is_suspend_enabled());
+    assert(!hythread_is_suspend_enabled());
     return clss->state == ST_Initialized;
 } //is_class_initialized
 
@@ -393,10 +389,10 @@ static void *generate_object_allocation_stub_with_thread_pointer(char *fast_obj_
     memset(stub, 0xcc /*int 3*/, stub_size);
 #endif
     char *ss = stub;
-
-#ifdef PLATFORM_POSIX
+// openTM integration 
+//#ifdef PLATFORM_POSIX
     ss = call(ss, (char *)vm_get_gc_thread_local);
-#else // !PLATFORM_POSIX
+/*#else // !PLATFORM_POSIX
     *ss++ = (char)0x64;
     *ss++ = (char)0xa1;
     *ss++ = (char)0x14;
@@ -405,6 +401,7 @@ static void *generate_object_allocation_stub_with_thread_pointer(char *fast_obj_
     *ss++ = (char)0x00;
     ss = alu(ss, add_opc,  eax_opnd,  Imm_Opnd((uint32)&((VM_thread *)0)->_gc_private_information));
 #endif // !PLATFORM_POSIX
+*/
     ss = push(ss,  eax_opnd);
 
     ss = push(ss,  M_Base_Opnd(esp_reg, 12));
@@ -423,9 +420,10 @@ static void *generate_object_allocation_stub_with_thread_pointer(char *fast_obj_
     *backpatch_address__fast_alloc_failed = (char)offset;
     
     ss = gen_setup_j2n_frame(ss);
-#ifdef PLATFORM_POSIX
+// openTM integration 
+//#ifdef PLATFORM_POSIX
     ss = call(ss, (char *)vm_get_gc_thread_local);
-#else // !PLATFORM_POSIX
+/*#else // !PLATFORM_POSIX
     *ss++ = (char)0x64;
     *ss++ = (char)0xa1;
     *ss++ = (char)0x14;
@@ -434,6 +432,7 @@ static void *generate_object_allocation_stub_with_thread_pointer(char *fast_obj_
     *ss++ = (char)0x00;
     ss = alu(ss, add_opc,  eax_opnd,  Imm_Opnd((uint32)&((VM_thread *)0)->_gc_private_information));
 #endif // !PLATFORM_POSIX
+*/  
     ss = push(ss,  eax_opnd);
     ss = push(ss,  M_Base_Opnd(esp_reg, 8+m2n_sizeof_m2n_frame));
     ss = push(ss,  M_Base_Opnd(esp_reg, 8+m2n_sizeof_m2n_frame));
@@ -926,7 +925,7 @@ void * getaddress__vm_get_interface_vtable_old_naked()  //wjw verify that this w
 
 static void vm_throw_java_lang_ArithmeticException()
 {
-    assert(!tmn_is_suspend_enabled());
+    assert(!hythread_is_suspend_enabled());
     throw_java_exception("java/lang/ArithmeticException");
     ABORT("The last called function should not return");
 } //vm_throw_java_lang_ArithmeticException
@@ -1125,7 +1124,7 @@ static int64 __stdcall vm_lrem(int64 m, int64 n) stdcall__;
 
 static int64 __stdcall vm_lrem(int64 m, int64 n)
 {
-    assert(!tmn_is_suspend_enabled());
+    assert(!hythread_is_suspend_enabled());
     return m % n;
 } //vm_lrem
 
@@ -1176,7 +1175,7 @@ static int64 __stdcall vm_ldiv(int64 m, int64 n) stdcall__;
 
 static int64 __stdcall vm_ldiv(int64 m, int64 n)
 {
-    assert(!tmn_is_suspend_enabled());
+    assert(!hythread_is_suspend_enabled());
     assert(n);
     return m / n;
 } //vm_ldiv
@@ -1236,7 +1235,14 @@ static void register_request_for_rt_function(VM_RT_SUPPORT f) {
 
 #endif //VM_STATS
 
+void * getaddress__vm_monitor_enter_naked();
+void * getaddress__vm_monitor_enter_static_naked();
+void * getaddress__vm_monitor_exit_naked();
 
+/**
+  * Returns fast monitor exit static function.
+  */
+void * getaddress__vm_monitor_exit_static_naked();
 void *vm_get_rt_support_addr(VM_RT_SUPPORT f)
 {
 #ifdef VM_STATS

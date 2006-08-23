@@ -100,7 +100,7 @@ public class ThreadGroup implements Thread.UncaughtExceptionHandler{
      */
     ThreadGroup() {
         this.parent = null;
-        this.name = "main";
+        this.name = "System";
         this.daemon = false;
     }
 
@@ -119,11 +119,13 @@ public class ThreadGroup implements Thread.UncaughtExceptionHandler{
             threadsCopy = copyThreads();
             groupsListCopy = (List)groups.clone();
         }
+        
         for (int i = 0; i < threadsCopy.length; i++) {
             if (((Thread) threadsCopy[i]).isAlive()) {
                 count++;
             }
         }
+        
         for (Iterator it = groupsListCopy.iterator(); it.hasNext();) {
             count += ((ThreadGroup)it.next()).activeCount();
         }

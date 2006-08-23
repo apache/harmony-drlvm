@@ -227,9 +227,6 @@ VMEXPORT // temporary solution for interpreter unplug
 void vm_enumerate_root_set_single_thread_not_on_stack(VM_thread *thread)
 {
     assert(thread);
-    if (thread->p_java_lang_thread != NULL) {
-        vm_enumerate_root_reference((void **)&(thread->p_java_lang_thread), FALSE);
-    }
     if (thread->p_exception_object != NULL) {
         vm_enumerate_root_reference((void **)&(thread->p_exception_object), FALSE);
     }

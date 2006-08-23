@@ -23,6 +23,7 @@
 
 #include "thread_generic.h"
 #include "open/vm_util.h"
+#include "open/hythread_ext.h"
 #include "properties.h"
 #include <apr_env.h>
 #include "vm_synch.h"
@@ -76,13 +77,18 @@ VMEXPORT bool dump_stubs = false;
 
 bool parallel_jit = true;
 
+static bool begin_shutdown_hooks = false;
+
 static M2nFrame* p_m2n = NULL;
 
 typedef union {
     ObjectHandlesOld old;
     ObjectHandlesNew nw;
 } HandlesUnion;
+
 static HandlesUnion* p_handles = NULL;
+
+hythread_library_t hythread_lib;
 
 static void initialize_javahome(Global_Env* p_env)
 {
@@ -198,7 +204,7 @@ static void process_properties_dlls(Global_Env* p_env)
 
 static int run_java_main(char *class_name, char **java_args, int java_args_num)
 {
-    assert(tmn_is_suspend_enabled());
+    assert(hythread_is_suspend_enabled());
 
     JNIEnv* jenv = (JNIEnv*) jni_native_intf;
 
@@ -241,7 +247,7 @@ static int run_java_main(char *class_name, char **java_args, int java_args_num)
 
 static int run_java_init()
 {
-    assert(tmn_is_suspend_enabled());
+    assert(hythread_is_suspend_enabled());
 
     JNIEnv* jenv = (JNIEnv*) jni_native_intf;
 
@@ -262,7 +268,7 @@ static int run_java_init()
 
 static int run_java_shutdown()
 {
-    assert(tmn_is_suspend_enabled());
+    assert(hythread_is_suspend_enabled());
 
     JNIEnv* jenv = (JNIEnv*) jni_native_intf;
 
@@ -293,9 +299,8 @@ static int run_java_shutdown()
 
 void create_vm(Global_Env *p_env, JavaVMInitArgs* vm_arguments) 
 {
-#ifdef PLATFORM_POSIX
-    init_linux_thread_system();
-#elif defined(PLATFORM_NT)
+    
+#if defined(PLATFORM_NT)
     OSVERSIONINFO osvi;
     osvi.dwOSVersionInfoSize = sizeof(OSVERSIONINFO);
     BOOL ok = GetVersionEx(&osvi);
@@ -312,24 +317,18 @@ void create_vm(Global_Env *p_env, JavaVMInitArgs* vm_arguments)
         exit(1);
     }
 #endif
-
-
-    non_daemon_threads_dead_handle = vm_create_event( 
-            NULL,   // pointer to security attributes 
-            FALSE,  // flag for manual-reset event  -- auto reset mode 
-            FALSE,  // flag for initial state 
-            NULL    // pointer to event-object name 
-        ); 
-    assert(non_daemon_threads_dead_handle);
+    hythread_init(hythread_lib);
+    vm_thread_init(&env);
 
     VM_Global_State::loader_env = &env;
-
-    tmn_thread_attach();
+    hythread_attach(NULL);
+    // should be removed
+    vm_thread_attach();
     MARK_STACK_END
 
     p_env->TI = new DebugUtilsTI;
 
-    assert(tmn_is_suspend_enabled());
+    assert(hythread_is_suspend_enabled());
 
     vm_initialize_critical_sections();
     initialize_vm_cmd_state(p_env, vm_arguments); //PASS vm_arguments to p_env->vm_arguments and free vm_arguments 
@@ -392,7 +391,7 @@ void create_vm(Global_Env *p_env, JavaVMInitArgs* vm_arguments)
     // Initialize memory allocation
     vm_init_mem_alloc();
     gc_init();
-    gc_thread_init(&p_TLS_vmthread->_gc_private_information);
+   // gc_thread_init(&p_TLS_vmthread->_gc_private_information);
 
     // Prepares to load natives
     bool UNREF status = natives_init();
@@ -456,10 +455,8 @@ void create_vm(Global_Env *p_env, JavaVMInitArgs* vm_arguments)
         }
     }
 
-    assert(p_TLS_vmthread->app_status == thread_is_birthing);
-
     // create first m2n frame
-    assert(tmn_is_suspend_enabled());
+    assert(hythread_is_suspend_enabled());
     tmn_suspend_disable();
     p_m2n = (M2nFrame*) p_env->mem_pool.alloc(sizeof(M2nFrame));
     p_handles = (HandlesUnion*) p_env->mem_pool.alloc(sizeof(HandlesUnion));
@@ -481,15 +478,6 @@ void create_vm(Global_Env *p_env, JavaVMInitArgs* vm_arguments)
     // Send VM init event
     jvmti_send_vm_init_event(p_env);
 
-    // Signal the GC that the VM is now completely 
-    // initialized. Hence GC stop-the-world events
-    // can occur at any time, since the VM is now
-    // ready to enumerate live references when asked.
-    gc_vm_initialized();
-
-    assert(p_TLS_vmthread->app_status == thread_is_birthing);
-    // Now, we set it to "running" just before entering user code.
-    p_TLS_vmthread->app_status = thread_is_running;
 
     int result = run_java_init();
 
@@ -553,7 +541,6 @@ static int run_main(Global_Env *p_env, char* class_name, char* jar_file,
 
 void destroy_vm(Global_Env *p_env) 
 {
-    assert(p_TLS_vmthread->app_status == thread_is_running);
 
     run_java_shutdown();
 
@@ -593,13 +580,14 @@ VMEXPORT int vm_main(int argc, char *argv[])
 
 static inline
 void dump_all_java_stacks() {
-    tm_iterator_t * iterator = tm_iterator_create();
-    VM_thread *thread = tm_iterator_next(iterator);
+    hythread_iterator_t  iterator;
+    hythread_suspend_all(&iterator, NULL);
+    VM_thread *thread = get_vm_thread (hythread_iterator_next(&iterator));
     while(thread) {
         interpreter.stack_dump(thread);
-        thread = tm_iterator_next(iterator);
+        thread = get_vm_thread (hythread_iterator_next(&iterator));
     }
-    tm_iterator_release(iterator);
+    hythread_resume_all( NULL);
     INFO("****** END OF JAVA STACKS *****\n");
 }
 
@@ -618,7 +606,8 @@ void quit_handler(int UNREF x) {
     }
 }
 
-void interrupt_handler(int UNREF x) {
+void interrupt_handler(int UNREF x)
+{
     if (VM_Global_State::loader_env->shutting_down != 0) {
         // too late for quit handler
         // required infrastructure can be missing.
@@ -626,10 +615,10 @@ void interrupt_handler(int UNREF x) {
         return;
     }
 
-    static bool begin_shutdown_hooks = false;
     if(!begin_shutdown_hooks){
         begin_shutdown_hooks = true;
-        vm_set_event(non_daemon_threads_dead_handle);
+        //FIXME: integration should do int another way.
+        //vm_set_event(non_daemon_threads_dead_handle);
     }else
         exit(1); //vm_exit(1);
 }

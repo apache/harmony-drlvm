@@ -29,7 +29,7 @@
 #include "Class.h"
 #include "cxxlog.h"
 #include "thread_generic.h"
-#include "open/thread.h"
+#include "open/jthread.h"
 #include "suspend_checker.h"
 #include "stack_trace.h"
 #include "stack_iterator.h"
@@ -41,7 +41,7 @@ static JNIEnv * jvmti_test_jenv = jni_native_intf;
 jthread getCurrentThread() {
     tmn_suspend_disable();
     ObjectHandle hThread = oh_allocate_local_handle();
-    hThread->object = (Java_java_lang_Thread *)p_TLS_vmthread->p_java_lang_thread;
+    hThread->object = (Java_java_lang_Thread *)jthread_get_java_thread(hythread_self())->object;
     tmn_suspend_enable();
     return (jthread) hThread;
 }
@@ -69,10 +69,10 @@ jint get_thread_stack_depth(VM_thread *thread, jint* pskip)
         Class *clss = method_get_class(method);
         assert(clss);
 
-        if (strcmp(method_get_name(method), "run") == 0 &&
+        if (strcmp(method_get_name(method), "runImpl") == 0 &&
             strcmp(class_get_name(clss), "java/lang/VMStart$MainThread") == 0)
         {
-            skip = 3;
+            skip = 4;
         }
     }
 
@@ -153,7 +153,7 @@ jvmtiGetStackTrace(jvmtiEnv* env,
         // Check that this thread is not current
         if (vm_thread != p_TLS_vmthread)
         {
-            thread_suspend(thread);
+            jthread_suspend(thread);
             thread_suspended = true;
         }
     }
@@ -176,7 +176,7 @@ jvmtiGetStackTrace(jvmtiEnv* env,
             if (start < 0)
             {
                 if (thread_suspended)
-                    thread_resume(thread);
+                    jthread_resume(thread);
                 return JVMTI_ERROR_ILLEGAL_ARGUMENT;
             }
         }
@@ -264,7 +264,7 @@ jvmtiGetStackTrace(jvmtiEnv* env,
     }
 
     if (thread_suspended)
-        thread_resume(thread);
+        jthread_resume(thread);
 
     return errStack;
 }
@@ -311,12 +311,12 @@ jvmtiGetAllStackTraces(jvmtiEnv* env,
     // FIXME: new threads can be created before all threads are suspended
     // event handler for thread_creating should block creation new threads
     // at this moment
-    assert(tmn_is_suspend_enabled());
-    tm_acquire_tm_lock();
+    assert(hythread_is_suspend_enabled());
+    hythread_global_lock();
     res = jvmtiGetAllThreads(env, &count, &threads);
 
     if (res != JVMTI_ERROR_NONE) {
-       tm_release_tm_lock();
+       hythread_global_unlock();
        return res;
     }
 
@@ -345,7 +345,7 @@ jvmtiGetAllStackTraces(jvmtiEnv* env,
         if (info[i].state != JVMTI_THREAD_STATE_SUSPENDED) {
             if (IsSameObject(jvmti_test_jenv, currentThread, threads[i]))
                 continue;
-            thread_suspend(threads[i]);
+            jthread_suspend(threads[i]);
         }
     }
 
@@ -365,10 +365,10 @@ jvmtiGetAllStackTraces(jvmtiEnv* env,
     // unsuspend suspended threads.
     for(i = 0; i < count; i++) {
         if (info[i].state != JVMTI_THREAD_STATE_SUSPENDED)
-            thread_resume(threads[i]);
+            jthread_resume(threads[i]);
     }
 
-    tm_release_tm_lock();
+    hythread_global_unlock();
     * thread_count_ptr = count;
     *stack_info_ptr = info;
     return JVMTI_ERROR_NONE;
@@ -439,7 +439,7 @@ jvmtiGetThreadListStackTraces(jvmtiEnv* env,
         if (info[i].state != JVMTI_THREAD_STATE_SUSPENDED) {
             if (IsSameObject(jvmti_test_jenv, currentThread, threads[i]))
                 continue;
-            thread_suspend(threads[i]);
+            jthread_suspend(threads[i]);
         }
     }
 
@@ -459,7 +459,7 @@ jvmtiGetThreadListStackTraces(jvmtiEnv* env,
     // unsuspend suspended threads.
     for(i = 0; i < count; i++) {
         if (info[i].state != JVMTI_THREAD_STATE_SUSPENDED)
-            thread_resume(threads[i]);
+            jthread_resume(threads[i]);
     }
 
     *stack_info_ptr = info;
@@ -521,7 +521,7 @@ jvmtiGetFrameCount(jvmtiEnv* env,
         // Check that this thread is not current
         if (vm_thread != p_TLS_vmthread)
         {
-            thread_suspend(thread);
+            jthread_suspend(thread);
             thread_suspended = true;
         }
     }
@@ -540,7 +540,7 @@ jvmtiGetFrameCount(jvmtiEnv* env,
     }
 
     if (thread_suspended)
-        thread_resume(thread);
+        jthread_resume(thread);
 
     return errStack;
 }
@@ -668,7 +668,7 @@ jvmtiGetFrameLocation(jvmtiEnv* env,
         // Check that this thread is not current
         if (vm_thread != p_TLS_vmthread)
         {
-            thread_suspend(thread);
+            jthread_suspend(thread);
             thread_suspended = true;
         }
     }
@@ -760,7 +760,7 @@ jvmtiGetFrameLocation(jvmtiEnv* env,
     }
 
     if (thread_suspended)
-        thread_resume(thread);
+        jthread_resume(thread);
 
     return errStack;
 }

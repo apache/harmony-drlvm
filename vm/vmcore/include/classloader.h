@@ -82,7 +82,7 @@ struct ClassLoader
         WaitingThread* m_waitingThreads;
         // this event is signaled when class loader finishes
         // (successfully or unsuccessfully) loading this class
-        VmEventHandle m_loadWaitEvent;
+        int m_loadWaitFlag;
         // thread which owns class definition
         VM_thread* m_defineOwner;
         // thread which first started loading this class
@@ -94,7 +94,7 @@ struct ClassLoader
 #endif
             m_threadsPool(NULL),
             m_waitingThreads(NULL),
-            m_loadWaitEvent(0),
+            m_loadWaitFlag(0),
             m_defineOwner(NULL),
             m_initiatingThread(NULL) {}
         LoadingClass(const LoadingClass& lc) {
@@ -103,7 +103,7 @@ struct ClassLoader
 #endif
             m_threadsPool = lc.m_threadsPool;
             m_waitingThreads = lc.m_waitingThreads;
-            m_loadWaitEvent = lc.m_loadWaitEvent;
+            m_loadWaitFlag = lc.m_loadWaitFlag;
             m_defineOwner = lc.m_defineOwner;
             m_initiatingThread = lc.m_initiatingThread;
         }
@@ -113,7 +113,7 @@ struct ClassLoader
 #endif
             m_threadsPool = lc.m_threadsPool;
             m_waitingThreads = lc.m_waitingThreads;
-            m_loadWaitEvent = lc.m_loadWaitEvent;
+            m_loadWaitFlag = lc.m_loadWaitFlag;
             m_defineOwner = lc.m_defineOwner;
             m_initiatingThread = lc.m_initiatingThread;
 
@@ -124,20 +124,16 @@ struct ClassLoader
                 apr_pool_destroy(m_threadsPool);
                 m_threadsPool = NULL;
             }
-            if(m_loadWaitEvent != 0) {
-                vm_destroy_event(m_loadWaitEvent);
-                m_loadWaitEvent = 0;
-            }
+            m_loadWaitFlag = 0;
         }
 
-        bool CreateWaitingEvent(const String* className);
         void WaitLoading() {
-            assert(m_loadWaitEvent != 0);
-            vm_wait_for_single_object(m_loadWaitEvent, INFINITE);
+            while(!m_loadWaitFlag) {
+                hythread_yield();
+            }
         }
         void SignalLoading() {
-            if(m_loadWaitEvent != 0)
-                vm_set_event(m_loadWaitEvent);
+            m_loadWaitFlag = 1;
         }
         bool IsDefiner(VM_thread* thread) { return m_defineOwner == thread; }
         bool HasDefiner() { return m_defineOwner != NULL; }
@@ -153,6 +149,7 @@ struct ClassLoader
         // this operation should be synchronized
         void RemoveWaitingThread(VM_thread* thread, ClassLoader* cl, const String* clsname);
         bool HasWaitingThreads() { return (m_waitingThreads != NULL); }
+           
     };
 
 public:

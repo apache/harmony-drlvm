@@ -39,8 +39,7 @@ void vm_initialize_critical_sections()
     p_jit_a_method_lock = new Lock_Manager();
     p_vtable_patch_lock = new Lock_Manager();
     p_meth_addr_table_lock = new Lock_Manager();
-    p_thread_lock = new Lock_Manager();
-    p_tm_lock = new Lock_Manager();
+    p_handle_lock = new Lock_Manager();
 
     // 20040224 Support for recording which methods (actually, CodeChunkInfo's) call which other methods.
     p_method_call_lock = new Lock_Manager();
@@ -51,8 +50,7 @@ void vm_uninitialize_critical_sections()
     delete p_jit_a_method_lock;
     delete p_vtable_patch_lock;
     delete p_meth_addr_table_lock;
-    delete p_thread_lock;
-    delete p_tm_lock;
+    delete p_handle_lock;
 
     delete p_method_call_lock;
 } //vm_uninitialize_critical_sections
@@ -127,7 +125,7 @@ VTable *cached_object_array_vtable_ptr;
 
 static void bootstrap_initial_java_classes(Global_Env *env)
 {
-    assert(tmn_is_suspend_enabled());
+    assert(hythread_is_suspend_enabled());
     TRACE2("init", "bootstrapping initial java classes");
     
     /*
@@ -203,20 +201,18 @@ static bool initialize_system_class_loader(JNIEnv* jenv)
     return true;
 } //initialize_system_class_loader
 
+static bool init_thread_object(JNIEnv *);
 
 bool vm_init(Global_Env *env)
 {
     if(vm_is_initialized)
         return false;
-    assert(tmn_is_suspend_enabled());
+    assert(hythread_is_suspend_enabled());
 
     vm_is_initialized = true;
     TRACE2("init","Initializing VM");
 
     vm_monitor_init();
-
-    vm_thread_init(env);
-    active_thread_count = 1;
 
     env->bootstrap_class_loader = new BootstrapClassLoader(env); // !!! use proper MM
     env->bootstrap_class_loader->Initialize();
@@ -326,7 +322,7 @@ bool vm_init(Global_Env *env)
     Method *m = class_lookup_method(env->java_lang_Throwable_Class, 
         env->Init_String, env->VoidVoidDescriptor_String);
     assert(m);
-    assert(tmn_is_suspend_enabled());
+    assert(hythread_is_suspend_enabled());
     m->set_side_effects(MSE_False);
 
     m = class_lookup_method(env->java_lang_Throwable_Class,
@@ -354,13 +350,12 @@ bool vm_init(Global_Env *env)
     env->ReadyForExceptions();
 
     TRACE2("init", "initializing thread group");
-    assert(tmn_is_suspend_enabled());
-
-    bool init_threadgroup();
-    if (! init_threadgroup())
-        return false;
+    assert(hythread_is_suspend_enabled());
 
     JNIEnv *jni_env = (JNIEnv *)jni_native_intf;
+    if (! init_thread_object(jni_env))
+        return false;
+
 
     TRACE2("init", "Invoking the java.lang.Class constructor");
     Class *jlc = env->JavaLangClass_Class;
@@ -442,3 +437,42 @@ bool vm_init(Global_Env *env)
 
     return true;
 } //vm_init
+
+static bool init_thread_object(JNIEnv *jenv)
+{
+    Global_Env *env = VM_Global_State::loader_env;
+
+    assert(hythread_is_suspend_enabled());
+
+    // Load, prepare and initialize the "Thread class"
+    String *ss = env->string_pool.lookup("java/lang/VMStart");
+    Class *thread_clss = env->bootstrap_class_loader->LoadVerifyAndPrepareClass(env, ss);
+    assert(thread_clss);
+    assert(hythread_is_suspend_enabled());
+    tmn_suspend_disable();
+    class_initialize(thread_clss);
+    assert(!hythread_is_suspend_enabled());
+
+    ObjectHandle jThreadClass = oh_allocate_local_handle();
+    jThreadClass->object = struct_Class_to_java_lang_Class(thread_clss);
+    tmn_suspend_enable();
+
+    jmethodID main_method = jenv->GetStaticMethodID(jThreadClass, "mainThreadInit", "()V");
+    if (ExceptionOccurred(jenv) || !main_method) {
+        WARN("*** Error: exception occured in main Thread constructor.");
+        ExceptionDescribe(jenv);
+        ExceptionClear(jenv);
+        return false;
+    }
+
+    jenv->CallStaticVoidMethod(jThreadClass, main_method);
+    
+    if (ExceptionOccurred(jenv)) {
+        WARN("*** Error: exception occured in main Thread constructor.");
+        ExceptionDescribe(jenv);
+        ExceptionClear(jenv);
+        return false;
+    }
+
+    return true;
+} //init_thread_object

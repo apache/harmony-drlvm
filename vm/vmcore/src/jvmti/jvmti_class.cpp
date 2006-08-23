@@ -33,7 +33,7 @@
 #include "vm_strings.h"
 #include "environment.h"
 #include "classloader.h"
-#include "open/thread.h"
+
 #include "suspend_checker.h"
 
 /*
@@ -54,7 +54,7 @@
 static inline Class* get_class_from_handle(jvmtiEnv* UNREF env, jvmtiPhase UNREF phase_mask,
                                            jclass handle, void* p1, void *p2, jvmtiError* errorCode)
 {
-    assert(tmn_is_suspend_enabled());
+    assert(hythread_is_suspend_enabled());
 
     if (NULL == handle || p1 == NULL || p2 == NULL)
     {

@@ -260,7 +260,7 @@ bool load_method_handled_exceptions(Method *m);
 /********* INLINE FUNCTIONS *******/
 static inline StackFrame*
 getLastStackFrame() {
-    return (StackFrame*)p_TLS_vmthread->lastFrame;
+    return (StackFrame*)get_thread_ptr()->lastFrame;
 }
 
 static inline StackFrame*
@@ -273,7 +273,7 @@ enum interpreter_state {
 };
 
 static inline void setLastStackFrame(StackFrame *frame) {
-    p_TLS_vmthread->lastFrame = frame;
+    get_thread_ptr()->lastFrame = frame;
 }
 
 void

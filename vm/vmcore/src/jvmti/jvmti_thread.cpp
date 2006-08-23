@@ -27,28 +27,27 @@
 #include "jvmti_utils.h"
 #include "vm_threads.h"
 #include "thread_generic.h"
-#include "open/thread.h"
+
+#include "open/ti_thread.h"
+#include "open/jthread.h"
 #include "thread_manager.h"
 #include "object_handles.h"
 #include "open/vm_util.h"
 #include "platform_lowlevel.h"
 #include "mon_enter_exit.h"
-#include "mon_enter_exit.h"
 #include "interpreter_exports.h"
 #include "environment.h"
 #include "suspend_checker.h"
 
+
 #define MAX_JVMTI_ENV_NUMBER 10
-// jvmti_local_storage_static is used to store local storage for thread == NULL
-static JVMTILocalStorage jvmti_local_storage_static[MAX_JVMTI_ENV_NUMBER];
 static JNIEnv * jvmti_test_jenv = jni_native_intf;
-extern VM_thread * get_vm_thread_ptr_safe(JNIEnv * env, jobject thread);
-jobject get_jobject(VM_thread * thread);
 
 Boolean is_valid_thread_object(jthread thread)
 {
-    if (NULL == thread)
+    if (NULL == thread){
         return false;
+    }
 
     tmn_suspend_disable();       //---------------------------------v
     ObjectHandle h = (ObjectHandle)thread;
@@ -56,15 +55,13 @@ Boolean is_valid_thread_object(jthread thread)
 
     // Check that reference pointer points to the heap
     if (mo < (ManagedObject *)Class::heap_base ||
-        mo > (ManagedObject *)Class::heap_end)
-    {
+        mo > (ManagedObject *)Class::heap_end){
         tmn_suspend_enable();
         return false;
     }
 
     // Check that object is an instance of java.lang.Thread or extends it
-    if (mo->vt() == NULL)
-    {
+    if (mo->vt() == NULL){
         tmn_suspend_enable();
         return false;
     }
@@ -104,21 +101,13 @@ jvmtiGetThreadState(jvmtiEnv* env,
             return JVMTI_ERROR_INVALID_THREAD;
     }
     else
-        thread = thread_current_thread();
+        thread = jthread_self();
 
-    if (thread_state_ptr == NULL)
-    {
+    if (thread_state_ptr == NULL){
         return JVMTI_ERROR_NULL_POINTER;
     }
-
-    int state = thread_get_thread_state(thread);
-
-    if (state == -1)
-    {
-        return JVMTI_ERROR_THREAD_NOT_ALIVE; // non-existant thread
-    }
-
-    * thread_state_ptr = state;
+    IDATA UNUSED status = jthread_get_state(thread, thread_state_ptr);
+    assert(status == TM_ERROR_NONE);
 
     return JVMTI_ERROR_NONE;
 }
@@ -140,6 +129,10 @@ jvmtiGetAllThreads(jvmtiEnv* env,
                    jint* threads_count_ptr,
                    jthread** threads_ptr)
 {
+    jthread_iterator_t iterator;
+    int i,java_thread_count; 
+    jthread* java_threads;
+    jvmtiError err;
     TRACE2("jvmti.thread", "GetAllThreads called");
     SuspendEnabledChecker sec;
     /*
@@ -149,13 +142,25 @@ jvmtiGetAllThreads(jvmtiEnv* env,
 
     CHECK_EVERYTHING();
 
-    if (threads_count_ptr == NULL || threads_ptr == NULL)
-    {
+    if (threads_count_ptr == NULL || threads_ptr == NULL){
         return JVMTI_ERROR_NULL_POINTER;
     }
 
-    *threads_count_ptr = thread_get_all_threads(threads_ptr);
+     //jthread_get_all_threads(threads_ptr, threads_count_ptr);
 
+    iterator=jthread_iterator_create();
+    java_thread_count = jthread_iterator_size(iterator);
+    //allocate memory
+    err=jvmtiAllocate(env,java_thread_count*sizeof(jthread),(unsigned char**)&java_threads);
+    if (err != JVMTI_ERROR_NONE){
+          return err; 
+    } 
+    for (i=0;i<java_thread_count;i++)    {
+        java_threads[i]=jthread_iterator_next(&iterator);
+    }
+    *threads_count_ptr = java_thread_count;
+    *threads_ptr = java_threads;
+    jthread_iterator_release(&iterator);
     return JVMTI_ERROR_NONE;
 }
 
@@ -186,12 +191,10 @@ jvmtiSuspendThread(jvmtiEnv* env,
 
     jvmtiError err = env -> GetCapabilities(&capa);
 
-    if (err != JVMTI_ERROR_NONE) 
-    {
+    if (err != JVMTI_ERROR_NONE){
        return err; 
     } 
-    if (capa.can_suspend == 0)
-    {
+    if (capa.can_suspend == 0){
         return JVMTI_ERROR_MUST_POSSESS_CAPABILITY;
     }
 
@@ -201,24 +204,25 @@ jvmtiSuspendThread(jvmtiEnv* env,
             return JVMTI_ERROR_INVALID_THREAD;
     }
     else
-        thread = thread_current_thread();
+        thread = jthread_self();
 
     jint state;
     err = jvmtiGetThreadState(env, thread, &state);
 
-    if (err != JVMTI_ERROR_NONE)
+     if (err != JVMTI_ERROR_NONE){
         return err;
+    } 
 
     // check error condition: JVMTI_ERROR_THREAD_NOT_ALIVE
     if ((state & JVMTI_THREAD_STATE_ALIVE) == 0)
         return JVMTI_ERROR_THREAD_NOT_ALIVE;
 
-    if ((state & JVMTI_THREAD_STATE_SUSPENDED) != 0)
+    if (state & JVMTI_THREAD_STATE_SUSPENDED)
         return JVMTI_ERROR_THREAD_SUSPENDED;
 
-    thread_suspend(thread);
 
-    return JVMTI_ERROR_NONE;
+
+    return (jvmtiError)jthread_suspend(thread);
 }
 
 /*
@@ -254,27 +258,20 @@ jvmtiSuspendThreadList(jvmtiEnv* env,
 
     jvmtiError err = env -> GetCapabilities(&capa);
 
-    if (err != JVMTI_ERROR_NONE) 
-    {
+    if (err != JVMTI_ERROR_NONE){
        return err; 
     } 
-    if (capa.can_suspend == 0)
-    {
+    if (capa.can_suspend == 0){
         return JVMTI_ERROR_MUST_POSSESS_CAPABILITY;
     }
-
-    if (request_count < 0)
-    {
+    if (request_count < 0){
         return JVMTI_ERROR_ILLEGAL_ARGUMENT;
     }
-
-    if (request_list == NULL || results == NULL)
-    {
+    if (request_list == NULL || results == NULL){
         return JVMTI_ERROR_NULL_POINTER;
     }
 
-    for (int i = 0; i < request_count; i++)
-    {
+    for (int i = 0; i < request_count; i++){
         results[i] = jvmtiSuspendThread(env, request_list[i]);
     }
 
@@ -308,17 +305,16 @@ jvmtiResumeThread(jvmtiEnv* env,
 
     jvmtiError err = jvmtiGetCapabilities(env, &capa);
 
-    if (err != JVMTI_ERROR_NONE) 
-    {
+    if (err != JVMTI_ERROR_NONE){
        return err; 
     } 
-    if (capa.can_suspend == 0)
-    {
+    if (capa.can_suspend == 0){
         return JVMTI_ERROR_MUST_POSSESS_CAPABILITY;
     }
-
-    if (false)
-    { // TBD
+    if (!is_valid_thread_object(thread)){
+        return JVMTI_ERROR_INVALID_THREAD;
+    }
+    if (false){ // TBD
         return JVMTI_ERROR_INVALID_TYPESTATE;
     }
 
@@ -326,20 +322,19 @@ jvmtiResumeThread(jvmtiEnv* env,
         return JVMTI_ERROR_INVALID_THREAD;
 
     jint state;
-    // check error condition: JVMTI_ERROR_INVALID_THREAD
+
     err = jvmtiGetThreadState(env, thread, &state);
 
     if (err != JVMTI_ERROR_NONE)
         return err;
 
-    // check error condition: JVMTI_ERROR_THREAD_NOT_ALIVE
     if ((state & JVMTI_THREAD_STATE_ALIVE) == 0)
         return JVMTI_ERROR_THREAD_NOT_ALIVE;
 
     if ((state & JVMTI_THREAD_STATE_SUSPENDED) == 0)
         return JVMTI_ERROR_THREAD_NOT_SUSPENDED;
 
-    thread_resume(thread);
+    jthread_resume(thread);
 
     return JVMTI_ERROR_NONE;
 }
@@ -373,27 +368,20 @@ jvmtiResumeThreadList(jvmtiEnv* env,
 
     jvmtiError err = env -> GetCapabilities(&capa);
 
-    if (err != JVMTI_ERROR_NONE) 
-    {
+    if (err != JVMTI_ERROR_NONE){
        return err; 
     } 
-    if (capa.can_suspend == 0)
-    {
+    if (capa.can_suspend == 0){
         return JVMTI_ERROR_MUST_POSSESS_CAPABILITY;
     }
-
-    if (request_count < 0)
-    {
+    if (request_count < 0){
         return JVMTI_ERROR_ILLEGAL_ARGUMENT;
     }
-
-    if (request_list == NULL || results == NULL)
-    {
+    if (request_list == NULL || results == NULL){
         return JVMTI_ERROR_NULL_POINTER;
     }
 
-    for (int i = 0; i < request_count; i++)
-    {
+    for (int i = 0; i < request_count; i++){
         results[i] = jvmtiResumeThread(env, request_list[i]);
     }
 
@@ -413,7 +401,7 @@ jvmtiResumeThreadList(jvmtiEnv* env,
 jvmtiError JNICALL
 jvmtiStopThread(jvmtiEnv* env,
                 jthread thread,
-                jobject UNREF exception)
+                jobject exception)
 {
     TRACE2("jvmti.thread", "StopThread called");
     SuspendEnabledChecker sec;
@@ -428,19 +416,17 @@ jvmtiStopThread(jvmtiEnv* env,
 
     jvmtiError err = env -> GetCapabilities(&capa);
 
-    if (err != JVMTI_ERROR_NONE) 
-    {
+    if (err != JVMTI_ERROR_NONE){
        return err; 
     } 
-    if (capa.can_signal_thread == 0)
-    {
+    if (capa.can_signal_thread == 0){
         return JVMTI_ERROR_MUST_POSSESS_CAPABILITY;
     }
-
-    if (!is_valid_thread_object(thread))
+    if (!is_valid_thread_object(thread)){
         return JVMTI_ERROR_INVALID_THREAD;
+    }
 
-    thread_stop(thread, NULL);
+    jthread_exception_stop(thread, exception);
 
     return JVMTI_NYI;
 }
@@ -470,28 +456,17 @@ jvmtiInterruptThread(jvmtiEnv* env,
 
     jvmtiError err = env -> GetCapabilities(&capa);
 
-    if (err != JVMTI_ERROR_NONE) 
-    {
+    if (err != JVMTI_ERROR_NONE){
        return err; 
     } 
-    if (capa.can_signal_thread == 0)
-    {
+    if (capa.can_signal_thread == 0){
         return JVMTI_ERROR_MUST_POSSESS_CAPABILITY;
     }
-
-    if (!is_valid_thread_object(thread))
+    if (!is_valid_thread_object(thread)){
         return JVMTI_ERROR_INVALID_THREAD;
-
-    VM_thread * vm_thread = get_vm_thread_ptr_safe(jvmti_test_jenv, thread);
-
-    if (!vm_thread)
-    {
-        return JVMTI_ERROR_THREAD_NOT_ALIVE; // non-existant thread
     }
 
-    thread_interrupt(thread);
-
-    return JVMTI_ERROR_NONE;
+    return (jvmtiError)jthread_interrupt(thread);
 }
 
 /*
@@ -525,7 +500,7 @@ jvmtiGetThreadInfo(jvmtiEnv* env,
             return JVMTI_ERROR_INVALID_THREAD;
     }
     else
-        thread = thread_current_thread();
+        thread = jthread_self();
 
     jclass cl = GetObjectClass(jvmti_test_jenv, thread);
     jmethodID id = jvmti_test_jenv -> GetMethodID(cl, "getName","()Ljava/lang/String;");
@@ -573,42 +548,36 @@ jvmtiGetOwnedMonitorInfo(jvmtiEnv* env,
 
     jvmtiError err = env -> GetCapabilities(&capa);
 
-    if (err != JVMTI_ERROR_NONE) 
-    {
+    if (err != JVMTI_ERROR_NONE){
        return err; 
     } 
-    if (capa.can_get_owned_monitor_info == 0)
-    {
+    if (capa.can_get_owned_monitor_info == 0){
         return JVMTI_ERROR_MUST_POSSESS_CAPABILITY;
     }
-
     if (NULL != thread)
     {
         if (!is_valid_thread_object(thread))
             return JVMTI_ERROR_INVALID_THREAD;
     }
     else
-        thread = thread_current_thread();
-
-    VM_thread * vm_thread = get_vm_thread_ptr_safe(jvmti_test_jenv, thread);
-
-    if (!vm_thread)
-    {
-        return JVMTI_ERROR_THREAD_NOT_ALIVE; // non-existant thread
-    }
-
-    if (owned_monitor_count_ptr == NULL || owned_monitors_ptr == NULL)
-    {
+        thread = jthread_self();
+    if (owned_monitor_count_ptr == NULL || owned_monitors_ptr == NULL){
         return JVMTI_ERROR_NULL_POINTER;
     }
 
-    int count = thread_get_owned_monitor_info(thread, owned_monitors_ptr);
+    jint state;
 
-    if (count == -1){
-        return JVMTI_ERROR_NULL_POINTER;
+    err = jvmtiGetThreadState(env, thread, &state);
+
+    if (err != JVMTI_ERROR_NONE){
+        return err;
+    }
+    if ((state & JVMTI_THREAD_STATE_ALIVE) == 0){
+        return JVMTI_ERROR_THREAD_NOT_ALIVE;
     }
 
-    *owned_monitor_count_ptr = count;
+    IDATA UNUSED status = jthread_get_owned_monitors(thread, owned_monitor_count_ptr, owned_monitors_ptr);
+    assert(status == TM_ERROR_NONE);
 
     return JVMTI_ERROR_NONE;
 }
@@ -639,37 +608,32 @@ jvmtiGetCurrentContendedMonitor(jvmtiEnv* env,
 
     jvmtiError err = env -> GetCapabilities(&capa);
 
-    if (err != JVMTI_ERROR_NONE) 
-    {
+    if (err != JVMTI_ERROR_NONE){
        return err; 
     } 
-    if (capa.can_get_current_contended_monitor == 0)
-    {
+    if (capa.can_get_current_contended_monitor == 0){
         return JVMTI_ERROR_MUST_POSSESS_CAPABILITY;
     }
-
-    if (monitor_ptr == NULL)
-    {
+    if (monitor_ptr == NULL){
         return JVMTI_ERROR_NULL_POINTER;
     }
-
     if (NULL == thread)
-        thread = thread_current_thread();
+        thread = jthread_self();
 
     jint state;
-    // check error condition: JVMTI_ERROR_INVALID_THREAD
+
     err = jvmtiGetThreadState(env, thread, &state);
 
-    if (err != JVMTI_ERROR_NONE)
+    if (err != JVMTI_ERROR_NONE){
         return err;
-
-    // check error condition: JVMTI_ERROR_THREAD_NOT_ALIVE
-    if ((state & JVMTI_THREAD_STATE_ALIVE) == 0)
+    }
+    if ((state & JVMTI_THREAD_STATE_ALIVE) == 0){
         return JVMTI_ERROR_THREAD_NOT_ALIVE;
+    }
 
-    *monitor_ptr = thread_contends_for_lock(thread);
+    IDATA status = jthread_get_contended_monitor(thread, monitor_ptr);
 
-    return JVMTI_ERROR_NONE;
+    return (jvmtiError)status;
 }
 
 /*
@@ -696,16 +660,13 @@ jvmtiRunAgentThread(jvmtiEnv* env,
 
     CHECK_EVERYTHING();
 
-    if (priority < JVMTI_THREAD_MIN_PRIORITY || priority > JVMTI_THREAD_MAX_PRIORITY)
-    {
+    if (priority < JVMTI_THREAD_MIN_PRIORITY || priority > JVMTI_THREAD_MAX_PRIORITY){
         return JVMTI_ERROR_INVALID_PRIORITY;
     }
-
-    if (!is_valid_thread_object(thread))
+    if (!is_valid_thread_object(thread)){
         return JVMTI_ERROR_INVALID_THREAD;
-
-    if (proc == NULL)
-    {
+    }
+    if (proc == NULL){
         return JVMTI_ERROR_NULL_POINTER;
     }
 
@@ -716,7 +677,14 @@ jvmtiRunAgentThread(jvmtiEnv* env,
     assert(set_daemon);
     CallVoidMethod(jvmti_test_jenv, thread, set_daemon, JNI_TRUE);
     // Run new thread
-    Java_java_lang_Thread_start_generic(jvmti_test_jenv, thread, env, proc, arg, priority);
+    // FIXME TM integration, pass arguments correctly
+    //Java_java_lang_Thread_start_generic(jvmti_test_jenv, thread, env, proc, arg, priority);
+    jthread_threadattr_t attrs;
+    attrs.priority = priority; 
+    attrs.stacksize = 0;
+    attrs.daemon = JNI_TRUE;
+    attrs.jvmti_env = env;
+    jthread_create_with_function(jvmti_test_jenv, thread, &attrs, proc, arg);
 
     return JVMTI_ERROR_NONE;
 }
@@ -749,33 +717,38 @@ jvmtiSetThreadLocalStorage(jvmtiEnv* env,
 
     if (NULL != thread)
     {
-        if (!is_valid_thread_object(thread))
+        if (!is_valid_thread_object(thread)){
             return JVMTI_ERROR_INVALID_THREAD;
     }
-    else
-        thread = thread_current_thread();
-
-    VM_thread* vm_thread = thread != NULL ? 
-        get_vm_thread_ptr_safe(jvmti_test_jenv, thread) : p_TLS_vmthread;
-
-    if (!vm_thread)
-    {
-        return JVMTI_ERROR_THREAD_NOT_ALIVE; // non-existant thread
     }
+    else
+        thread = jthread_self();
+
+    jint state;
+
+    jvmtiError err = jvmtiGetThreadState(env, thread, &state);
+
+    if (err != JVMTI_ERROR_NONE){
+        return err;
+    }
+    if ((state & JVMTI_THREAD_STATE_ALIVE) == 0){
+        return JVMTI_ERROR_THREAD_NOT_ALIVE;
+    }
+
     JVMTILocalStorage* aa = NULL;
-    JVMTILocalStorage* lstg = &vm_thread -> jvmti_local_storage;
+    JVMTILocalStorage* lstg = jthread_get_jvmti_local_storage(thread);
     if (lstg -> env == NULL) {
         if (lstg -> data == NULL) {
             // we have no records stored;
             // so, we put our first record into vm_thread -> jvmti_local_storage
-            vm_thread -> jvmti_local_storage.env = (data == NULL) ? NULL : env;
-            vm_thread -> jvmti_local_storage.data = (void *)data;
+            lstg -> env = (data == NULL) ? NULL : env;
+            lstg -> data = (void *)data;
             return JVMTI_ERROR_NONE;
         } else {
             // we have more than one record stored;
             // so, they are stored in array which is pointed at by 
             // vm_thread -> jvmti_local_storage -> data  
-            aa = (JVMTILocalStorage*)vm_thread -> jvmti_local_storage.data;
+            aa = (JVMTILocalStorage*)lstg -> data;
         }
     } else {
         // we have just one record stored;
@@ -793,21 +766,25 @@ jvmtiSetThreadLocalStorage(jvmtiEnv* env,
                 aa[0].env = NULL;
                 aa[0].data = NULL;
             }
-            aa[0].env = vm_thread -> jvmti_local_storage.env;
-            aa[0].data = vm_thread -> jvmti_local_storage.data;
-            vm_thread -> jvmti_local_storage.env = NULL;
-            vm_thread -> jvmti_local_storage.data = (void *) aa;
+            aa[0].env = lstg -> env;
+            aa[0].data = lstg -> data;
+            lstg -> env = NULL;
+            lstg -> data = (void *)aa;
         }
     }
     // array look up for existing env or for free record
+    int ii = -1;
     for (int i = 0; i < MAX_JVMTI_ENV_NUMBER; i++){
-        if (aa[i].env == env || aa[i].env == NULL ) {
-            aa[i].env = (data == NULL) ? NULL : env;
-            aa[i].data = (void *)data;
-            return JVMTI_ERROR_NONE;
+        if (aa[i].env == env){
+            ii = i;
+            break;
+        } else if (aa[i].env == NULL && ii < 0){
+            ii = i;
         }
     }
-    ASSERT(0, "Array is full");
+    assert(ii > -1); // ii == -1 => array is full
+    aa[ii].env = (data == NULL) ? NULL : env;
+    aa[ii].data = (void *)data;
 
     return JVMTI_ERROR_NONE;
 }
@@ -834,26 +811,35 @@ jvmtiGetThreadLocalStorage(jvmtiEnv* env,
 
     CHECK_EVERYTHING();
 
-    if (data_ptr == NULL)
+    if (data_ptr == NULL){
         return JVMTI_ERROR_NULL_POINTER;
+    }
 
     if (NULL != thread)
     {
-        if (!is_valid_thread_object(thread))
+        if (!is_valid_thread_object(thread)){
             return JVMTI_ERROR_INVALID_THREAD;
     }
+    }
     else
-        thread = thread_current_thread();
+        thread = jthread_self();
+
+    jint state;
+    jvmtiError err = jvmtiGetThreadState(env, thread, &state);
+
+    if (err != JVMTI_ERROR_NONE){
+        return err;
+    }
+    if ((state & JVMTI_THREAD_STATE_ALIVE) == 0){
+        return JVMTI_ERROR_THREAD_NOT_ALIVE;
+}
 
     *data_ptr = NULL;
 
-    VM_thread* vm_thread = thread != NULL ? 
-        get_vm_thread_ptr_safe(jvmti_test_jenv, thread) : p_TLS_vmthread;
+    //if (!vm_thread)
+    //    return JVMTI_ERROR_THREAD_NOT_ALIVE; // non-existant thread
 
-    if (!vm_thread)
-        return JVMTI_ERROR_THREAD_NOT_ALIVE; // non-existant thread
-
-    JVMTILocalStorage* lstg = &vm_thread -> jvmti_local_storage;
+    JVMTILocalStorage* lstg = jthread_get_jvmti_local_storage(thread);
     if (lstg -> env == NULL) {
         if (lstg -> data != NULL) {
             // we have more than one record stored;
@@ -876,306 +862,4 @@ jvmtiGetThreadLocalStorage(jvmtiEnv* env,
     }
 
     return JVMTI_ERROR_NONE;
-}
-
-/*
- * -------------------------------------------------------------------------------
- * -------------------------------------------------------------------------------
- */
-
-jobject get_jobject(VM_thread * thread) {
-    ObjectHandle hThread = oh_allocate_global_handle();
-    tmn_suspend_disable();
-    hThread->object = (struct ManagedObject *)thread->p_java_lang_thread;
-    tmn_suspend_enable();
-    return (jthread)hThread;
-}
-
-int thread_get_thread_state(jthread thread) {
-
-    VM_thread * vm_thread = get_vm_thread_ptr_safe(jvmti_test_jenv, thread);
-
-    if ( !vm_thread)
-    {
-        jclass cl =  GetObjectClass(jvmti_test_jenv, thread);
-        jfieldID id = jvmti_test_jenv -> GetFieldID(cl, "started", "Z");
-        jboolean started  = jvmti_test_jenv -> GetBooleanField(thread, id);
-        return started  ? JVMTI_THREAD_STATE_TERMINATED : 0; // 0 - New thread
-    }
-    return vm_thread -> get_jvmti_thread_state(thread);
-}
-
-jint VM_thread::get_jvmti_thread_state(jthread thread){
-
-    // see: thread_is_alive(jobject jThreadObj)
-    jint jvmti_thread_state = 0;
-    if ( app_status == zip) {
-        return JVMTI_ERROR_THREAD_NOT_ALIVE; // non-existant thread
-    }
-    java_state as = this->app_status;  
-    switch (as) {
-        case thread_is_sleeping:
-            jvmti_thread_state |= JVMTI_THREAD_STATE_ALIVE | JVMTI_THREAD_STATE_SLEEPING |
-                                  JVMTI_THREAD_STATE_WAITING; 
-            break;
-        case thread_is_waiting:
-            jvmti_thread_state |= JVMTI_THREAD_STATE_ALIVE | JVMTI_THREAD_STATE_WAITING |
-                                  JVMTI_THREAD_STATE_IN_OBJECT_WAIT |
-                                  JVMTI_THREAD_STATE_WAITING_INDEFINITELY; 
-            break;
-        case thread_is_timed_waiting:
-            jvmti_thread_state |= JVMTI_THREAD_STATE_ALIVE | JVMTI_THREAD_STATE_WAITING |
-                                  JVMTI_THREAD_STATE_IN_OBJECT_WAIT |
-                                  JVMTI_THREAD_STATE_WAITING_WITH_TIMEOUT; 
-            break;
-        case thread_is_blocked:
-            jvmti_thread_state |= JVMTI_THREAD_STATE_ALIVE | JVMTI_THREAD_STATE_BLOCKED_ON_MONITOR_ENTER; 
-            break;
-        case thread_is_birthing:
-        case thread_is_running:
-            jvmti_thread_state |= JVMTI_THREAD_STATE_ALIVE | JVMTI_THREAD_STATE_RUNNABLE; 
-            break;
-        case thread_is_dying:
-            jvmti_thread_state |= JVMTI_THREAD_STATE_TERMINATED; 
-            break;
-        default:
-            ABORT("Unexpected thread state");
-            break;
-    }
-    // end see
-    jvmti_thread_state |= this -> jvmti_thread_state & JVMTI_THREAD_STATE_WAITING_INDEFINITELY;
-    jvmti_thread_state |= this -> jvmti_thread_state & JVMTI_THREAD_STATE_WAITING_WITH_TIMEOUT;
-    jvmti_thread_state |= this -> jvmti_thread_state & JVMTI_THREAD_STATE_SUSPENDED;
-    if (thread_is_alive(thread)){
-        jvmti_thread_state |= JVMTI_THREAD_STATE_ALIVE; 
-    }
-    if (thread_is_interrupted(thread, JNI_FALSE)){
-        jvmti_thread_state |= JVMTI_THREAD_STATE_INTERRUPTED; 
-    }
-    unsigned nnn = interpreter.interpreter_st_get_interrupted_method_native_bit(this);
-    if (nnn) {
-        jvmti_thread_state |= JVMTI_THREAD_STATE_IN_NATIVE; 
-    }
-    return jvmti_thread_state;
-}
-
-int thread_get_all_threads(jthread** threads_ptr){
-
-    jthread * all_jthreads = NULL;
-    int num_active_threads = 0;
-
-    tm_iterator_t * iterator = tm_iterator_create();
-    VM_thread *thread = tm_iterator_next(iterator);
-    assert(thread);
-    while (thread)
-    {
-        num_active_threads++;
-        thread = tm_iterator_next(iterator);
-    }
-
-    jvmtiError jvmti_error = _allocate(sizeof(jthread*) *
-            num_active_threads, (unsigned char **)&all_jthreads);
-
-    if (JVMTI_ERROR_NONE != jvmti_error)
-    {
-        tm_iterator_release(iterator);
-        return jvmti_error;
-    }
-
-    int ii = 0;
-
-    tm_iterator_reset(iterator);
-    thread = tm_iterator_next(iterator);
-    while (thread)
-    {
-        all_jthreads[ii] = get_jobject(thread);
-        ii++;
-        thread = tm_iterator_next(iterator);
-    }
-    tm_iterator_release(iterator);
-
-    *threads_ptr = all_jthreads;
-    return num_active_threads;
-}
-
-jobject thread_contends_for_lock(jthread thread)
-{
-    SuspendEnabledChecker sec;
-    VM_thread *vm_thread = get_vm_thread_ptr_safe(jvmti_test_jenv, thread);
-
-    assert(vm_thread);
-
-    tmn_suspend_disable();
-    ManagedObject *p_obj = mon_enter_array[vm_thread->thread_index].p_obj;
-    if (NULL == p_obj)
-    {
-        tmn_suspend_enable();
-        return NULL;
-    }
-
-    ObjectHandle oh = oh_allocate_local_handle();
-    oh->object = p_obj;
-    tmn_suspend_enable();
-
-    return (jobject)oh;
-}
-
-int thread_get_owned_monitor_info(jthread thread, jobject ** owned_monitors_ptr) {
-
-    VM_thread * vm_thread = get_vm_thread_ptr_safe(jvmti_test_jenv, thread);
-
-    //assert(vm_thread);
-    if (!vm_thread)
-    {
-        return -1; // non-existant thread
-    }
-
-    jint count = vm_thread -> jvmti_owned_monitor_count;
-    jobject* pp = NULL;
-    jvmtiError jvmti_error = _allocate(sizeof(jobject*) * count, (unsigned char **)&pp);
-
-    if (jvmti_error != JVMTI_ERROR_NONE)
-    {
-        return -1;
-    }
-
-    int i;
-    for(i = 0; i < count; i++)
-    {
-        pp[i] = vm_thread -> jvmti_owned_monitors[i];
-    }
-    *owned_monitors_ptr = pp;
-    return count;
-}
-
-
-void thread_stop(jthread thread, jobject UNREF threadDeathException) {
-
-    VM_thread * vm_thread = get_vm_thread_ptr_safe(jni_native_intf, thread);
-
-    vm_thread -> is_stoped = true;
-}
-
-
-int thread_set_jvmt_thread_local_storage(jvmtiEnv* env,
-                           jthread thread,
-                           const void* data)
-{
-    if (thread == NULL)
-    {
-        for (int i = 0; i < MAX_JVMTI_ENV_NUMBER; i++){
-            if (jvmti_local_storage_static[i].env == env || 
-                                     jvmti_local_storage_static[i].env == NULL ) {
-
-                jvmti_local_storage_static[i].env = (data == NULL) ? NULL : env;
-                jvmti_local_storage_static[i].data = (void *)data;
-                return 0;
-            }
-        }
-        ABORT("Can't find appropriate local storage for the thread");
-        return -1;
-    }
-
-    VM_thread* vm_thread = get_vm_thread_ptr_safe(jvmti_test_jenv, thread);
-
-    if (!vm_thread)
-    {
-        return -1; // non-existant thread
-    }
-    JVMTILocalStorage* aa = NULL;
-    JVMTILocalStorage* lstg = &vm_thread -> jvmti_local_storage;
-    if (lstg -> env == NULL) {
-        if (lstg -> data == NULL) {
-            // we have no records stored;
-            // so, we put our first record into vm_thread -> jvmti_local_storage
-            vm_thread -> jvmti_local_storage.env = (data == NULL) ? NULL : env;
-            vm_thread -> jvmti_local_storage.data = (void *)data;
-            return JVMTI_ERROR_NONE;
-        } else {
-            // we have more than one record stored;
-            // so, they are stored in array which is pointed at by 
-            // vm_thread -> jvmti_local_storage -> data  
-            aa = (JVMTILocalStorage*)vm_thread -> jvmti_local_storage.data;
-        }
-    } else {
-        // we have just one record stored;
-        // so, it's stored in vm_thread -> jvmti_local_storage 
-        if (lstg -> env == env) {
-            // override data in this record
-            lstg -> data = (void *)data;
-            return 0;
-        } else if (data != NULL){
-            // we have just one record stored and we have to add another one; 
-            // so, array is created and record is copied there 
-            aa = (JVMTILocalStorage*)STD_MALLOC(sizeof(JVMTILocalStorage)*
-                                                           MAX_JVMTI_ENV_NUMBER);
-            for (int i = 0; i < MAX_JVMTI_ENV_NUMBER; i++){
-                aa[0].env = NULL;
-                aa[0].data = NULL;
-            }
-            aa[0].env = vm_thread -> jvmti_local_storage.env;
-            aa[0].data = vm_thread -> jvmti_local_storage.data;
-            vm_thread -> jvmti_local_storage.env = NULL;
-            vm_thread -> jvmti_local_storage.data = (void *) aa;
-        }
-    }
-    // array look up for existing env or for free record
-    for (int i = 0; i < MAX_JVMTI_ENV_NUMBER; i++){
-        if (aa[i].env == env || aa[i].env == NULL ) {
-            aa[i].env = (data == NULL) ? NULL : env;
-            aa[i].data = (void *)data;
-            return 0;
-        }
-    }
-    ABORT("Array is full");
-
-    return 0;
-}
-
-int thread_get_jvmti_thread_local_storage(jvmtiEnv* env,
-                           jthread thread,
-                           void** data_ptr)
-{
-    *data_ptr = NULL;
-
-    if (thread == NULL) // for compatibility with other Java VM
-    {
-        for (int i = 0; i < MAX_JVMTI_ENV_NUMBER; i++){
-            if (jvmti_local_storage_static[i].env == env) {
-                *data_ptr = jvmti_local_storage_static[i].data;
-                break;
-            }
-        }
-        return 0;
-    }
-
-    VM_thread* vm_thread = get_vm_thread_ptr_safe(jvmti_test_jenv, thread);
-
-    if (!vm_thread)
-    {
-        return -1; // non-existant thread
-    }
-
-    JVMTILocalStorage* lstg = &vm_thread -> jvmti_local_storage;
-    if (lstg -> env == NULL) {
-        if (lstg -> data != NULL) {
-            // we have more than one record stored;
-            // so, they are stored in array which is pointed at by 
-            // vm_thread -> jvmti_local_storage -> data  
-            JVMTILocalStorage* aa = (JVMTILocalStorage* )lstg -> data;
-            for (int i = 0; i < MAX_JVMTI_ENV_NUMBER; i++){
-                if (aa[i].env == env) {
-                    *data_ptr = aa[i].data;
-                    break;
-                }
-            }
-        }
-    } else {
-        // we have just one record stored;
-        // so, it's stored in vm_thread -> jvmti_local_storage 
-        if (lstg -> env == env) {
-            *data_ptr = lstg -> data;
-        }
-    }
-    return 0;
 }

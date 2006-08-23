@@ -36,7 +36,7 @@
 #include "exception_filter.h"
 
 #include "thread_generic.h"
-#include "open/thread.h"
+
 
 
 // Afremov Pavel 20050117
@@ -63,7 +63,7 @@ int NT_exception_filter(LPEXCEPTION_POINTERS p_NT_exception)
     }
 
     // since we are now sure NPE occured in java code, gc should also have been disabled
-    assert(!tmn_is_suspend_enabled());
+    assert(!hythread_is_suspend_enabled());
 
     
     volatile ManagedObject *exc = 0;

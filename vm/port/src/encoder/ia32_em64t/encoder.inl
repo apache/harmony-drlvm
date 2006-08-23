@@ -720,12 +720,12 @@ ENCODER_DECLARE_EXPORT char * set_d(char * stream, bool set) {
 }
 
 ENCODER_DECLARE_EXPORT char * scas( char * stream, unsigned char prefix ) {
+    EncoderBase::Operands args;
     if (prefix != no_prefix) {
         assert(prefix == prefix_repnz || prefix == prefix_repz);
         *stream = prefix;
         ++stream;
     }
-	EncoderBase::Operands args;
     return (char*)EncoderBase::encode(stream, Mnemonic_SCAS, args);
 }
 
@@ -735,6 +735,7 @@ ENCODER_DECLARE_EXPORT char * stos(char * stream, unsigned char prefix) {
         *stream = prefix;
         ++stream;
     }
+    
 	EncoderBase::Operands args;
 	return (char*)EncoderBase::encode(stream, Mnemonic_STOS, args);
 }

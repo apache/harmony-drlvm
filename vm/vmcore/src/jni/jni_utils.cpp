@@ -39,7 +39,7 @@
 #include "method_lookup.h"
 #include "nogc.h"
 #include "m2n.h"
-#include "open/thread.h"
+
 
 #include "exception.h"
 #include "stack_trace.h"
@@ -52,7 +52,7 @@ Class_Handle jni_get_class_handle(JNIEnv* UNREF jenv, jclass clazz)
 jclass jni_class_from_handle(JNIEnv* UNREF jenv, Class_Handle clss)
 {
     if (!clss) return NULL;
-    assert(tmn_is_suspend_enabled());
+    assert(hythread_is_suspend_enabled());
     return struct_Class_to_jclass((Class*)clss);
 }
 
@@ -452,7 +452,7 @@ jclass SignatureToClass (JNIEnv* env, const char* sig)
 //We'd better use this routine
 jclass SignatureToClass (JNIEnv* env_ext, const char* sig, ClassLoader *class_loader)
 {
-    assert(tmn_is_suspend_enabled());
+    assert(hythread_is_suspend_enabled());
     JNIEnv_Internal *env = (JNIEnv_Internal *)env_ext;
     assert (sig);
 
@@ -614,7 +614,7 @@ jclass FindClassWithClassLoader(JNIEnv* jenv, const char *name, ClassLoader *loa
 
 jclass FindClassWithClassLoader(JNIEnv* jenv, String *name, ClassLoader *loader)
 {
-    assert(tmn_is_suspend_enabled());
+    assert(hythread_is_suspend_enabled());
 
     Class* c = loader->LoadVerifyAndPrepareClass( VM_Global_State::loader_env, name);
     assert(!exn_raised());
@@ -696,7 +696,7 @@ jclass FindClass(JNIEnv* env_ext, String* name)
 #endif
 
     JNIEnv_Internal *env = (JNIEnv_Internal *)env_ext;
-    assert(tmn_is_suspend_enabled());
+    assert(hythread_is_suspend_enabled());
     // Determine loader
     StackTraceFrame stf;
     bool res = st_get_frame(0, &stf);
@@ -711,7 +711,7 @@ jclass FindClass(JNIEnv* env_ext, String* name)
     if(clss) {
         class_initialize_from_jni(clss);
         if (exn_raised()) return NULL;
-        assert(tmn_is_suspend_enabled());
+        assert(hythread_is_suspend_enabled());
         return struct_Class_to_jclass(clss);
     } else {
         // The JNI spec says that we should throw one of: ClassFormatError,
@@ -730,7 +730,7 @@ jclass FindClass(JNIEnv* env_ext, String* name)
 jobject CreateNewThrowable(JNIEnv* jenv, Class* clazz, 
                            const char * message, jthrowable cause = 0)
 {
-    assert(tmn_is_suspend_enabled());
+    assert(hythread_is_suspend_enabled());
 
     if (!clazz) {
         return NULL;
@@ -773,7 +773,7 @@ jobject CreateNewThrowable(JNIEnv* jenv, Class* clazz,
         initArgs[1].l = cause;
         jvalue res;
 
-        assert(tmn_is_suspend_enabled());
+        assert(hythread_is_suspend_enabled());
         tmn_suspend_disable();
         vm_execute_java_method_array((jmethodID) initCause, &res, initArgs);
         tmn_suspend_enable();

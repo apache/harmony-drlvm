@@ -29,7 +29,7 @@ extern "C" {
 void
 java_lang_Object_notifyAll(jobject);
 
-int
+jint
 java_lang_Object_wait(jobject, jlong);
 
 void

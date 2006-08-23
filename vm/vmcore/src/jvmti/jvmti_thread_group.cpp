@@ -23,13 +23,13 @@
 
 #include "jvmti_utils.h"
 #include "vm_threads.h"
+#include <open/jthread.h>
 #include "open/vm_util.h"
 #include "cxxlog.h"
 #include "suspend_checker.h"
 #include "environment.h"
 
 static JNIEnv_Internal * jvmti_test_jenv = jni_native_intf;
-jobject get_jobject(VM_thread * thread);
 
 /*
  * Get Top Thread Groups
@@ -60,7 +60,7 @@ jvmtiGetTopThreadGroups(jvmtiEnv* env,
     jclass cl = struct_Class_to_java_lang_Class_Handle(VM_Global_State::loader_env->java_lang_Thread_Class);
     jmethodID id = jvmti_test_jenv -> GetMethodID(cl,
             "getThreadGroup","()Ljava/lang/ThreadGroup;");
-    jobject current_thread = get_jobject(p_TLS_vmthread);
+    jobject current_thread = (jobject)jthread_self();
     jobject group = jvmti_test_jenv -> CallObjectMethod (current_thread, id);
 
     cl = struct_Class_to_java_lang_Class_Handle(VM_Global_State::loader_env->java_lang_ThreadGroup_Class);

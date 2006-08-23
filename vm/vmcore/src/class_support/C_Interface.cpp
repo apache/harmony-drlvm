@@ -28,7 +28,8 @@
 #include "vm_arrays.h"
 #include "vm_strings.h"
 #include "properties.h"
-#include "open/thread.h"
+
+#include "open/hythread_ext.h"
 #include "thread_manager.h"
 
 #include "Verifier_stub.h"
@@ -995,7 +996,7 @@ Class_Handle class_find_loaded(ClassLoaderHandle loader, const char* name)
 
 Class_Handle class_find_class_from_loader(ClassLoaderHandle loader, const char* n, Boolean init)
 {
-    assert(tmn_is_suspend_enabled()); // -salikh
+    assert(hythread_is_suspend_enabled()); // -salikh
     char *new_name = strdup(n);
     char *p = new_name;
     while (*p) {
@@ -1009,7 +1010,7 @@ Class_Handle class_find_class_from_loader(ClassLoaderHandle loader, const char* 
         ch = class_load_verify_prepare_by_loader_jni(
             VM_Global_State::loader_env, name, loader);
     } else {
-        assert(tmn_is_suspend_enabled());
+        assert(hythread_is_suspend_enabled());
         ch = class_load_verify_prepare_from_jni(VM_Global_State::loader_env, name);
     }
     if (!ch) return NULL;
@@ -1181,7 +1182,7 @@ unsigned method_number_throws(Method_Handle m)
 
 Class_Handle method_get_throws(Method_Handle mh, unsigned idx)
 {
-    assert(tmn_is_suspend_enabled());
+    assert(hythread_is_suspend_enabled());
     assert(mh);
     Method* m = (Method*)mh;
     String* exn_name = m->get_exception_name(idx);
@@ -1758,7 +1759,7 @@ Method_Handle class_get_method(Class_Handle ch, unsigned index)
 // -gc magic needs this to do the recursive load.
 Class_Handle field_get_class_of_field_value(Field_Handle fh)
 {
-    assert(tmn_is_suspend_enabled());
+    assert(hythread_is_suspend_enabled());
     assert(fh);
     Class_Handle ch = class_load_class_by_descriptor(field_get_descriptor(fh), 
                                           field_get_class(fh));
@@ -2291,7 +2292,7 @@ enum safepoint_state get_global_safepoint_status()
 void vm_gc_lock_enum()
 {
     tmn_suspend_enable();
-    tm_acquire_tm_lock();
+    hythread_global_lock();
     tmn_suspend_disable();
 } // vm_gc_lock_enum
 
@@ -2299,7 +2300,7 @@ void vm_gc_lock_enum()
 
 void vm_gc_unlock_enum()
 {
-    tm_release_tm_lock();
+     hythread_global_unlock();
 } // vm_gc_unlock_enum
 
 
@@ -2481,40 +2482,12 @@ void vm_patch_code_block(Byte *code_block, Byte *new_code, size_t size)
     // patches done by JIT on IPF: it replaces the branch offset in a single bundle containing 
     // a branch long. Note that this function does not synchronize the I- or D-caches.
 
-    bool gc_enabled = false;
-    if ((p_TLS_vmthread != NULL) && !tmn_is_suspend_enabled()) {
-        tmn_suspend_enable();
-        gc_enabled = true;
-    }
-    tm_acquire_tm_lock();
-    if (gc_enabled) {
-        tmn_suspend_disable();
-    }
-
     // Run through list of active threads and suspend the other ones.
-    tm_iterator_t * iterator = tm_iterator_create();
-    VM_thread *thread = tm_iterator_next(iterator);
-    while (thread != NULL) {
-        if (thread != p_TLS_vmthread) {
-            SUSPEND_THREAD(thread);
-        }
-        thread = tm_iterator_next(iterator);
-    }
-
+     hythread_suspend_all(NULL, NULL);
     patch_code_with_threads_suspended(code_block, new_code, size);
 
-    // Resume each of the other threads.
-    tm_iterator_reset(iterator);
-    thread = tm_iterator_next(iterator);
-    while (thread != NULL) {
-        if (thread != p_TLS_vmthread) {
-            RESUME_THREAD(thread);
-        }
-        thread = tm_iterator_next(iterator);
-    }
-    tm_iterator_release(iterator);
+     hythread_resume_all(NULL);
 
-    tm_release_tm_lock();
 } //vm_patch_code_block
 
 
@@ -2663,5 +2636,7 @@ CallingConvention vm_managed_calling_convention()
 } //vm_managed_calling_convention
 
 unsigned thread_get_suspend_request_offset() {
-    return APR_OFFSETOF(VM_thread, suspend_request);
+    //FIXME: 
+    //return APR_OFFSETOF(VM_thread, suspend_request);
+    return 0;
 }

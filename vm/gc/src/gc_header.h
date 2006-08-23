@@ -29,6 +29,7 @@
 #include "open/vm_gc.h"
 #include "open/vm.h"
 #include "gc_cout.h"
+#include "open/hythread_ext.h"
 
 #include "hash_table.h"
 //
@@ -578,7 +579,7 @@ inline void spin_lock(volatile int* lock) {
         // we still haven't got the lock
         // spin & yield until we grabbed the lock
         while (apr_atomic_cas32((volatile uint32 *)lock, 1, 0) == 1) {
-            Sleep(1);
+            hythread_yield();
         }
     }
 }

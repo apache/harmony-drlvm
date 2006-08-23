@@ -29,7 +29,7 @@
 #include "object_handles.h"
 #include "jvmti_utils.h"
 #include "cxxlog.h"
-#include "open/thread.h"
+
 #include "jvmti_interface.h"
 #include "suspend_checker.h"
 #include "jvmti_internal.h"

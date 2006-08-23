@@ -316,7 +316,7 @@ void Method::unlock()
 //
 ManagedObject *struct_Class_to_java_lang_Class(Class *clss)
 {
-    assert(!tmn_is_suspend_enabled());
+    assert(!hythread_is_suspend_enabled());
     assert(clss);
     ManagedObject** hjlc = clss->class_handle;
     assert(hjlc);
@@ -369,7 +369,7 @@ jobject struct_Class_to_java_lang_Class_Handle(Class *clss) {
 */
 jclass struct_Class_to_jclass(Class *c)
 {
-    assert(tmn_is_suspend_enabled());
+    assert(hythread_is_suspend_enabled());
     tmn_suspend_disable(); // ------------------------vvv
     ObjectHandle h = oh_allocate_local_handle();
     h->object = struct_Class_to_java_lang_Class(c);
@@ -400,7 +400,7 @@ Class *jobject_to_struct_Class(jobject jobj)
 // Given a class instance, find its corresponding struct Class.
 Class *java_lang_Class_to_struct_Class(ManagedObject *jlc)
 {
-    assert(!tmn_is_suspend_enabled());
+    assert(!hythread_is_suspend_enabled());
     assert(jlc != NULL);
     assert(jlc->vt());
     assert(jlc->vt()->clss == VM_Global_State::loader_env->JavaLangClass_Class);
@@ -432,7 +432,7 @@ void set_struct_Class_field_in_java_lang_Class(const Global_Env* env, ManagedObj
 void class_report_failure(Class* target, uint16 cp_index, jthrowable exn)
 {
     assert(cp_index > 0 && cp_index < target->cp_size);
-    assert(tmn_is_suspend_enabled());
+    assert(hythread_is_suspend_enabled());
     if (exn_raised()) {
         TRACE2("classloader.error", "runtime exception in classloading");
         return;

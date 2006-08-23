@@ -1,5 +1,5 @@
 <!--
-    Copyright 2005-2006 The Apache Software Foundation or its licensors, as applicable.
+    Copyright 2005 The Apache Software Foundation or its licensors, as applicable.
   
     Licensed under the Apache License, Version 2.0 (the "License");
     you may not use this file except in compliance with the License.
@@ -82,6 +82,7 @@ Version: $Revision: 1.6.2.6 $
 
             <select os="lnx">
                 <defineset define="PLATFORM_POSIX" />
+                <defineset define="LINUX" />
                 <defineset define="__SMP__" />
                 <defineset define="_REENTRANT" />
                 <defineset define="LINUX_TLS_OPT" />
@@ -210,5 +211,18 @@ Version: $Revision: 1.6.2.6 $
                 <syslibset type="shared" libs="gcc_s" />
             </select>
         </linker>
+
+        <fileset id="unit.test.c.framework.src"
+                 dir="${build.VM.home}/tests/unit/framework">
+            <include name="*.c" />
+        </fileset>
+
+        <path id="unit.test.common.c.include">
+            <pathelement location="${build.VM.home}/tests/unit/framework" />
+            <pathelement location="${build.VM.home}/include" />
+            <pathelement location="${build.VM.home}/include/open" />
+            <pathelement location="${build.VM.home}/thread/src" />
+            <pathelement location="${build.VM.home}/port/include" />
+        </path>
     </target>
 </project>

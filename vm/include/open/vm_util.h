@@ -26,17 +26,17 @@
 #include "port_malloc.h"
 #include "open/types.h"
 
-class CriticalSection
-{
-public:
-    VMEXPORT CriticalSection();
-    VMEXPORT ~CriticalSection();
-    VMEXPORT void lock();
-    VMEXPORT void unlock();
-    VMEXPORT bool tryLock();
-private:
-    /*CRITICAL_SECTION*/ void *m_cs;
-};
+#include "hythread_ext.h"
+
+inline IDATA wait_for_multiple_semaphores(int num, hysem_t *sems) {
+    for (int i = 0; i < num; i ++) {
+           IDATA stat = hysem_wait(sems[i]);
+           if (stat !=TM_ERROR_NONE) {
+                return stat;
+           }
+    }
+    return TM_ERROR_NONE;
+}
 
 typedef struct String String;
 
@@ -65,22 +65,6 @@ public:
 private:
     void *_pcontext; // this would be a pointer to CONTEXT on NT
 };
-
-/**
- * Low level thread and sync primitives. Should be replaced
- * with java threading analogues during refactoring.
- */
-VmThreadHandle vm_beginthreadex( void * security, unsigned stack_size, unsigned(__stdcall *start_address)(void *), void *arglist, unsigned initflag, pthread_t *thrdaddr);
-VmThreadHandle vm_beginthread(void(__cdecl *start_address)(void *), unsigned stack_size, void *arglist);
-void vm_endthreadex(int);
-void vm_endthread(void);
-
-VmEventHandle vm_create_event(int *, unsigned int, unsigned int, char *);
-BOOL vm_reset_event(VmEventHandle hEvent);
-BOOL vm_set_event(VmEventHandle hEvent);
-DWORD vm_wait_for_single_object(VmEventHandle hHandle, DWORD dwMilliseconds);
-DWORD vm_wait_for_multiple_objects(DWORD num, const VmEventHandle * handle, BOOL flag, DWORD dwMilliseconds);
-
 
 VMEXPORT void vm_exit(int exit_code);
 

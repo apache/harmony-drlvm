@@ -94,6 +94,12 @@ public class Thread implements Runnable {
      */
     boolean started = false;
 
+    
+    /**
+     * Indicates if the thread is alive.
+     */
+    boolean isAlive = false;
+
     /**
      * Thread's target - a <code>Runnable</code> object whose <code>run</code>
      * method should be invoked
@@ -130,7 +136,7 @@ public class Thread implements Runnable {
     /**
      * Synchronization is done using internal lock.
      */
-    private Object lock = new Object();
+    Object lock = new Object();
 
     /**
      * generates a unique thread ID
@@ -195,21 +201,6 @@ public class Thread implements Runnable {
         Thread currentThread = VMThreadManager.currentThread();
         SecurityManager securityManager = System.getSecurityManager();
 
-        // If currentThread == this we suppose that the constructor was called
-        // by VM to create a Thread instance representing the Main Thread
-        if (currentThread == this) {
-            this.name = "main";
-            this.group = new ThreadGroup();
-            this.group.add(this);
-            this.priority = NORM_PRIORITY;
-            this.daemon = false;
-            this.target = null;
-            this.stackSize = 0;
-            this.started = true;
-            // initialize the system class loader and set it as context
-            // classloader
-            ClassLoader.getSystemClassLoader();
-        } else {
             ThreadGroup threadGroup = null;
             if (group != null) {
                 if (securityManager != null) {
@@ -227,13 +218,45 @@ public class Thread implements Runnable {
             // throws NullPointerException if the given name is null
             this.name = (name != THREAD) ? this.name = name.toString() : THREAD
                     + threadCounter++;
-            setPriority(currentThread.priority);
             this.daemon = currentThread.daemon;
             this.contextClassLoader = currentThread.contextClassLoader;
             this.target = target;
             this.stackSize = stackSize;
+        this.priority = currentThread.priority;
             initializeInheritableLocalValues(currentThread);
+    
+        checkGCWatermark();
+        
+        ThreadWeakRef oldRef = ThreadWeakRef.poll();
+        ThreadWeakRef newRef = new ThreadWeakRef(this);
+        
+        long oldPointer = (oldRef == null)? 0 : oldRef.getNativeAddr();
+        long newPointer = VMThreadManager.init(this, newRef, oldPointer);
+        if (newPointer == 0) {
+           throw new OutOfMemoryError("Failed to create new thread");   
         }
+        newRef.setNativeAddr(newPointer);
+        
+        this.threadId = getNextThreadId();
+        SecurityUtils.putContext(this, AccessController.getContext());
+        checkAccess(); 
+        }
+
+    /**
+     * @com.intel.drl.spec_ref
+     */
+    Thread(boolean nativeThread) {
+        VMThreadManager.attach(this);
+        this.name = "System thread";
+        this.group = new ThreadGroup();
+        this.group.add(this);
+        this.daemon = false;
+        this.started = true;
+        this.priority = NORM_PRIORITY;
+        // initialize the system class loader and set it as context
+        // classloader
+        ClassLoader.getSystemClassLoader();
+        
         this.threadId = getNextThreadId();
         SecurityUtils.putContext(this, AccessController.getContext());
     }
@@ -310,14 +333,24 @@ public class Thread implements Runnable {
             throw new IllegalArgumentException(
                 "Arguments don't match the expected range!");
         }
-        VMThreadManager.sleep(millis, nanos);
+        int status = VMThreadManager.sleep(millis, nanos);
+        if (status == VMThreadManager.TM_ERROR_INTERRUPT) {
+            throw new InterruptedException();        
+        } else if (status != VMThreadManager.TM_ERROR_NONE) {
+            throw new InternalError(
+                "Thread Manager internal error " + status);
+        }
     }
 
     /**
      * @com.intel.drl.spec_ref
      */
     public static void yield() {
-        VMThreadManager.yield();
+        int status = VMThreadManager.yield();
+        if (status != VMThreadManager.TM_ERROR_NONE) {
+            throw new InternalError(
+                "Thread Manager internal error " + status);
+        }
     }
 
     /**
@@ -465,7 +498,11 @@ public class Thread implements Runnable {
     public void interrupt() {
         synchronized (lock) {
             checkAccess();
-            VMThreadManager.interrupt(this);
+            int status = VMThreadManager.interrupt(this);
+            if (status != VMThreadManager.TM_ERROR_NONE) {
+                throw new InternalError(
+                    "Thread Manager internal error " + status);
+            }
         }
     }
 
@@ -474,25 +511,10 @@ public class Thread implements Runnable {
      */
     public final boolean isAlive() {
         synchronized (lock) {
-            if (!started || group == null) {
-                return false;
-            }
-            return true;
+            return this.isAlive;
         }
     }
 
-    /**
-     * The method is called by VM implementation after run() so that Thread
-     * could make some cleanup. Thread removes itself from ThreadGroup. It
-     * automatically means that thread is not alive anymore.
-     */
-    void kill() {
-        synchronized (lock) {
-            // will set group = null.
-            group.remove(this);
-            lock.notifyAll();
-        }
-    }
 
     /**
      * @com.intel.drl.spec_ref
@@ -567,7 +589,11 @@ public class Thread implements Runnable {
     public final void resume() {
         synchronized (lock) {
             checkAccess();
-            VMThreadManager.resume(this);
+            int status = VMThreadManager.resume(this);
+            if (status != VMThreadManager.TM_ERROR_NONE) {
+                throw new InternalError(
+                    "Thread Manager internal error " + status);
+            }
         }
     }
 
@@ -629,7 +655,11 @@ public class Thread implements Runnable {
         ThreadGroup threadGroup = group;
         this.priority = (priority > threadGroup.maxPriority)
             ? threadGroup.maxPriority : priority;
-        VMThreadManager.setPriority(this, this.priority);
+        int status = VMThreadManager.setPriority(this, this.priority);
+        if (status != VMThreadManager.TM_ERROR_NONE) {
+        //    throw new InternalError(
+        //        "Thread Manager internal error " + status);
+        }
     }
 
     /**
@@ -642,10 +672,36 @@ public class Thread implements Runnable {
                 throw new IllegalThreadStateException(
                         "This thread was already started!");
             }
+
+            this.isAlive = true;
+            
+            if (VMThreadManager.start(this, stackSize, daemon, priority) != 0) {
+                throw new OutOfMemoryError("Failed to create new thread");
+            } 
+            
             started = true;
-            VMThreadManager.start(this, stackSize);
         }
     }
+
+    /*
+     * This method serves as a wrapper around Thread.run() method to meet 
+     * specification requirements in regard to ucaught exception catching.
+     */
+    void runImpl() {
+        try {
+            run();
+        } catch (Throwable e) {
+           getUncaughtExceptionHandler().uncaughtException(this, e);
+        } finally {
+            group.remove(this);
+            synchronized(lock) {
+                this.isAlive = false;
+                lock.notifyAll();
+            }
+        }
+    }
+
+    
 
 // for 5.0
 /*    public enum State {
@@ -687,7 +743,11 @@ public class Thread implements Runnable {
                         .checkPermission(RuntimePermissionCollection.STOP_THREAD_PERMISSION);
                 }
             }
-            VMThreadManager.stop(this, throwable);
+            int status = VMThreadManager.stop(this, throwable);
+            if (status != VMThreadManager.TM_ERROR_NONE) {
+                throw new InternalError(
+                    "Thread Manager internal error " + status);
+            }
         }
     }
 
@@ -697,7 +757,11 @@ public class Thread implements Runnable {
     public final void suspend() {
         synchronized (lock) {
             checkAccess();
-            VMThreadManager.suspend(this);
+            int status = VMThreadManager.suspend(this);
+            if (status != VMThreadManager.TM_ERROR_NONE) {
+                throw new InternalError(
+                    "Thread Manager internal error " + status);
+            }
         }
     }
 
@@ -834,5 +898,26 @@ public class Thread implements Runnable {
          * @com.intel.drl.spec_ref
          */
         void uncaughtException(Thread t, Throwable e);
+    }
+
+    /*
+     * Number of threads that was created w/o garbage collection.
+     */ 
+    private static int       currentGCWatermarkCount = 0;
+
+    /*
+     * Max number of threads to be created w/o GC, required collect dead Thread 
+     * references.
+     */
+    private static final int GC_WATERMARK_MAX_COUNT     = 700;
+    
+    /*
+     * Checks if more then GC_WATERMARK_MAX_COUNT threads was created and calls
+     * System.gc() to ensure that dead thread references was callected.
+     */
+    private void             checkGCWatermark() {
+        if (++currentGCWatermarkCount % GC_WATERMARK_MAX_COUNT == 0) {
+            System.gc();
+        }
     }
 }

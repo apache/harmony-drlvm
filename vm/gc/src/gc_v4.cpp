@@ -26,8 +26,9 @@
 using namespace std;
 
 // VM interface header files
-#include "platform_lowlevel.h"
+#include "open/vm_util.h"
 #include "open/vm_gc.h"
+#include "open/hythread_ext.h"
 
 // GC header files
 #include "gc_cout.h"
@@ -100,7 +101,7 @@ Garbage_Collector::Garbage_Collector(POINTER_SIZE_INT initial_heap_size, POINTER
 
     _p_block_store  = new Block_Store(initial_heap_size, final_heap_size, block_size_bytes);
     
-    _gc_thread_work_finished_event_handles = (HANDLE *) STD_MALLOC(sizeof(HANDLE) * get_num_worker_threads());
+    _gc_thread_work_finished_event_handles = (hysem_t *) STD_MALLOC(sizeof(hysem_t ) * get_num_worker_threads());
     
     if (mark_scan_load_balanced) {
         _mark_scan_pool = new Work_Packet_Manager();
@@ -721,8 +722,8 @@ Garbage_Collector::get_gc_threads_to_begin_task(gc_thread_action task)
     for (unsigned int y = 0; y < get_num_worker_threads(); y++) {
         
         _gc_threads[y]->set_task_to_do(task);
-        Boolean UNUSED sstat = SetEvent(_gc_threads[y]->get_gc_thread_start_work_event_handle());
-        assert(sstat);
+        IDATA UNUSED sstat = hysem_post(_gc_threads[y]->get_gc_thread_start_work_event_handle());
+        assert(sstat == TM_ERROR_NONE);
     }
 }
 
@@ -730,9 +731,8 @@ Garbage_Collector::get_gc_threads_to_begin_task(gc_thread_action task)
 void 
 Garbage_Collector::wait_for_gc_threads_to_complete_assigned_task()
 {
-    DWORD UNUSED ret = WaitForMultipleObjects( (DWORD) get_num_worker_threads(), (const HANDLE *)_gc_thread_work_finished_event_handles, TRUE, INFINITE);
-    assert(ret != WAIT_TIMEOUT);
-    assert(ret != WAIT_FAILED);
+    IDATA UNUSED sstat = wait_for_multiple_semaphores( get_num_worker_threads(), _gc_thread_work_finished_event_handles);
+    assert(sstat == TM_ERROR_NONE);
 }
 
 #undef LOG_DOMAIN

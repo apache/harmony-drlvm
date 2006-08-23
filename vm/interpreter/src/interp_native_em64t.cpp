@@ -22,6 +22,7 @@
 #include "interpreter_exports.h"
 #include "interpreter_imports.h"
 
+#include "find_natives.h"
 #include "exceptions.h"
 #include "mon_enter_exit.h"
 
@@ -29,7 +30,7 @@
 #include "interp_defs.h"
 #include "ini.h"
 
-#include "open/thread.h"
+
 
 // ppervov: HACK: allows using STL modifiers (dec/hex) and special constants (endl)
 using namespace std;
@@ -70,7 +71,7 @@ interpreter_execute_native_method(
         Method *method,
         jvalue *return_value,
         jvalue *args) {
-    assert(!tmn_is_suspend_enabled());
+    assert(!hythread_is_suspend_enabled());
 
     DEBUG_TRACE("\n<<< interpreter_invoke_native: "
            << method->get_class()->name->bytes << " "
@@ -181,8 +182,8 @@ interpreter_execute_native_method(
         method_entry_callback(method);
 
     if (method->is_synchronized()) {
-        assert(tmn_is_suspend_enabled());
-        vm_monitor_enter_slow_handle(_this);
+        assert(hythread_is_suspend_enabled());
+        jthread_monitor_enter(_this);
     }
 
     jvalue *resultPtr = return_value;

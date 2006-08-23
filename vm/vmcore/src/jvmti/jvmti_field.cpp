@@ -27,7 +27,7 @@
 #include "vm_strings.h"
 #include "jvmti_utils.h"
 #include "cxxlog.h"
-#include "open/thread.h"
+
 #include "suspend_checker.h"
 
 /*

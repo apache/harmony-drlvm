@@ -48,7 +48,7 @@ using namespace std;
 #include "nogc.h"
 #include "encoder.h"
 #include "open/vm_util.h"
-#include "open/thread.h"
+
 #include "vm_threads.h"
 #include "mon_enter_exit.h"
 #include "vm_arrays.h"
@@ -88,11 +88,10 @@ void * get_generic_rt_support_addr_ia32(VM_RT_SUPPORT f);
 /////////////////////////////////////////////////////////////////
 // begin VM_Runtime_Support
 /////////////////////////////////////////////////////////////////
-CriticalSection cs;
 /*
 static void vm_throw_java_lang_ClassCastException()
 {
-    assert(!tmn_is_suspend_enabled());
+    assert(!hythread_is_suspend_enabled());
     throw_java_exception("java/lang/ClassCastException");
 } //vm_throw_java_lang_ClassCastException
 
@@ -153,7 +152,7 @@ static Boolean is_class_initialized(Class *clss)
     vm_stats_total.num_is_class_initialized++;
     clss->num_class_init_checks++;
 #endif // VM_STATS
-    assert(!tmn_is_suspend_enabled());
+    assert(!hythread_is_suspend_enabled());
     return clss->state == ST_Initialized;
 } //is_class_initialized
 */
@@ -394,7 +393,7 @@ void * getaddress__vm_get_interface_vtable_old_naked()  //wjw verify that this w
 /*
 static void vm_throw_java_lang_ArithmeticException()
 {
-    assert(!tmn_is_suspend_enabled());
+    assert(!hythread_is_suspend_enabled());
     throw_java_exception("java/lang/ArithmeticException");
 } //vm_throw_java_lang_ArithmeticException
 
@@ -460,7 +459,7 @@ static int64 __stdcall vm_lrem(int64 m, int64 n) stdcall__;
 
 static int64 __stdcall vm_lrem(int64 m, int64 n)
 {
-    assert(!tmn_is_suspend_enabled());
+    assert(!hythread_is_suspend_enabled());
     return m % n;
 } //vm_lrem
 */
@@ -476,7 +475,7 @@ static int64 __stdcall vm_ldiv(int64 m, int64 n) stdcall__;
 
 static int64 __stdcall vm_ldiv(int64 m, int64 n)
 {
-    assert(!tmn_is_suspend_enabled());
+    assert(!hythread_is_suspend_enabled());
     assert(n);
     return m / n;
 } //vm_ldiv

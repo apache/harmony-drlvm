@@ -29,7 +29,7 @@
 #include "vm_strings.h"
 #include "reflection.h"
 #include "port_malloc.h"
-#include "open/thread.h"
+
 #include "exceptions.h"
 #include "heap.h"
 #include "primitives_support.h"

@@ -33,7 +33,7 @@
 
 #include <assert.h>
 #include "open/types.h"
-#include "open/thread.h"
+#include "open/hythread_ext.h"
 #include "jni.h"
 #include "open/vm.h"
 typedef struct VTable VTable;
@@ -87,14 +87,14 @@ typedef struct ManagedObject {
             return ((ManagedObjectUncompressedVtablePtr *)this)->vt_unsafe();
     }
     VTable *vt() {
-        assert(!tmn_is_suspend_enabled());
+        assert(!hythread_is_suspend_enabled());
         if (are_vtable_pointers_compressed())
             return ((ManagedObjectCompressedVtablePtr *)this)->vt();
         else
             return ((ManagedObjectUncompressedVtablePtr *)this)->vt();
     }
     uint32 get_obj_info() {
-        assert(!tmn_is_suspend_enabled());
+        assert(!hythread_is_suspend_enabled());
         if (are_vtable_pointers_compressed())
             return ((ManagedObjectCompressedVtablePtr *)this)->get_obj_info();
         else
@@ -103,7 +103,7 @@ typedef struct ManagedObject {
     uint32 *get_obj_info_addr() { return (uint32 *)((char *)this + header_offset()); }
 
     void set_obj_info(uint32 value) {
-        assert(!tmn_is_suspend_enabled());
+        assert(!hythread_is_suspend_enabled());
         if (are_vtable_pointers_compressed())
             ((ManagedObjectCompressedVtablePtr *)this)->set_obj_info(value);
         else

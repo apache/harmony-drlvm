@@ -26,7 +26,7 @@
 #include "cxxlog.h"
 
 #include "open/gc.h"
-#include "open/thread.h"
+
 #include "suspend_checker.h"
 
 /*
@@ -108,7 +108,7 @@ jvmtiForceGarbageCollection(jvmtiEnv* env)
 
     CHECK_EVERYTHING();
 
-    assert(tmn_is_suspend_enabled());
+    assert(hythread_is_suspend_enabled());
     // no matter how counter-intuitive,
     // gc_force_gc() expects gc_enabled_status == disabled,
     // but, obviously, at a GC safepoint.

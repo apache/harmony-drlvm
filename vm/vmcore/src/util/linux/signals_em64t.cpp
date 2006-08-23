@@ -231,8 +231,9 @@ void null_java_divide_by_zero_handler(int signum, siginfo_t* info, void* context
 }
 
 /*
+ * MOVED TO PORT, DO NOT USE USR2
  * USR2 signal used to yield the thread at suspend algorithm
- */ 
+ * 
  
 void yield_other_handler(int signum, siginfo_t* info, void* context) {
 
@@ -263,7 +264,7 @@ void yield_other_handler(int signum, siginfo_t* info, void* context) {
 
     DIE("Cannot find Java thread using signal context");
 }
-
+*/
 
 /*
 See function initialize_signals() below first please.
@@ -373,12 +374,14 @@ void initialize_signals()
     //behaviour, which is different from BSD. But glibc2 in Linux
     //implements BSD semantics.
     struct sigaction sa;
+/*
+ * MOVED TO PORT, DO NOT USE USR2
 
     sigemptyset(&sa.sa_mask);
     sa.sa_flags = SA_SIGINFO | SA_RESTART;
     sa.sa_sigaction = yield_other_handler;
     sigaction(SIGUSR2, &sa, NULL);
-
+*/
     sigemptyset(&sa.sa_mask);
     sa.sa_flags = SA_SIGINFO;
     sa.sa_sigaction = &null_java_reference_handler;

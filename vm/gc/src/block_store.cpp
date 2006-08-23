@@ -345,7 +345,7 @@ get_block_store_lock()
     while (apr_atomic_casptr((volatile void **)&block_store_lock, 
         (void *)1, (void *)0) == (void *)1) {
         while (block_store_lock == (void *)1) {
-            Sleep(1);
+            hythread_yield();
         }
     }
 }

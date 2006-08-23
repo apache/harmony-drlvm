@@ -26,8 +26,6 @@
 
 typedef unsigned long DWORD;
 typedef int BOOL;
-typedef void *VmEventHandle;
-typedef VmEventHandle VmThreadHandle;
 
 #ifndef FMT64
 #define FMT64 "I64"

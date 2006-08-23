@@ -46,7 +46,7 @@ void String_Pool::lock_pool ()
     // Spin until lock is m_free.
     while (apr_atomic_casptr(
         (volatile void **)&string_pool_lock, (void *)1, (void *)0) != 0) {
-        Sleep (0);
+        hythread_yield();
     }
 }
 

@@ -36,7 +36,6 @@
 #include "compile.h"
 #include "interpreter_exports.h"
 #include "interpreter.h"
-#include "open/thread.h"
 #include "lil.h"
 #include "lil_code_generator.h"
 
@@ -1393,7 +1392,7 @@ bool class_prepare(Global_Env* env, Class *clss)
         if(!env->InBootstrap())
         {
             autoUnlocker.ForceUnlock();
-            assert(tmn_is_suspend_enabled());
+            assert(hythread_is_suspend_enabled());
             if (init_fields) {
                 jvmti_send_class_prepare_event(clss);
             }
@@ -1607,7 +1606,7 @@ bool class_prepare(Global_Env* env, Class *clss)
     if (!assign_values_to_class_static_final_fields(clss)) 
     { 
         //OOME happened
-        assert(tmn_is_suspend_enabled());
+        assert(hythread_is_suspend_enabled());
         return false;
     }
 
@@ -1640,7 +1639,7 @@ bool class_prepare(Global_Env* env, Class *clss)
     if(!env->InBootstrap())
     {
         autoUnlocker.ForceUnlock();
-        assert(tmn_is_suspend_enabled());
+        assert(hythread_is_suspend_enabled());
         jvmti_send_class_prepare_event(clss);
     }
     TRACE2("classloader.prepare", "END class prepare, class name = " << clss->name->bytes);

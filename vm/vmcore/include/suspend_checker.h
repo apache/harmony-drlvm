@@ -22,19 +22,19 @@
 #ifndef _SUSPEND_CHECKER_H_
 #define _SUSPEND_CHECKER_H_
 
-#include "open/thread.h"
+#include "open/hythread_ext.h"
 
 class SuspendEnabledChecker
 {
 public:
     inline SuspendEnabledChecker()
     {
-        assert(tmn_is_suspend_enabled());
+        assert(hythread_is_suspend_enabled());
     }
 
     inline ~SuspendEnabledChecker()
     {
-        assert(tmn_is_suspend_enabled());
+        assert(hythread_is_suspend_enabled());
     }
 };
 
@@ -43,12 +43,12 @@ class SuspendDisabledChecker
 public:
     inline SuspendDisabledChecker()
     {
-        assert(!tmn_is_suspend_enabled());
+        assert(!hythread_is_suspend_enabled());
     }
 
     inline ~SuspendDisabledChecker()
     {
-        assert(!tmn_is_suspend_enabled());
+        assert(!hythread_is_suspend_enabled());
     }
 };
 

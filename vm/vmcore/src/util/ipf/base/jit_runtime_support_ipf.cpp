@@ -50,7 +50,7 @@ using namespace std;
 #include "open/vm_util.h"
 #include "vm_strings.h"
 #include "vm_threads.h"
-#include "open/thread.h"
+
 #include "vm_stats.h"
 #include "merced.h"
 #include "Code_Emitter.h"
@@ -167,7 +167,7 @@ static ManagedObject* vm_rt_ldc_string(Class *clss, unsigned cp_index)
 
 extern "C" ManagedObject *vm_rt_new_resolved(Class *c)
 {
-    assert(!tmn_is_suspend_enabled());
+    assert(!hythread_is_suspend_enabled());
     assert(strcmp(c->name->bytes, "java/lang/Class")); 
 #ifdef VM_STATS
     vm_stats_total.num_class_alloc_new_object++;
@@ -1250,7 +1250,7 @@ static void gen_vm_rt_monitorenter_fast_path(Merced_Code_Emitter &emitter, bool 
         emitter.set_target(nonnull_target);
     }
 
-    // If the cmpxchg failed, we fall through and execute the slow monitor enter path by calling vm_monitor_enter_slow.
+    // If the cmpxchg failed, we fall through and execute the slow monitor enter path by calling vm_monitor_enter.
 } //gen_vm_rt_monitorenter_fast_path
 
 
@@ -1427,9 +1427,9 @@ static void *get_vm_rt_monitor_enter_address(bool check_null)
     if (addr) {
         return addr;
     }
-    void (*p_vm_monitor_enter_slow)(ManagedObject *p_obj);
-    p_vm_monitor_enter_slow = vm_monitor_enter_slow;
-    addr = gen_vm_rt_monitor_wrapper((void **)p_vm_monitor_enter_slow, gen_vm_rt_monitorenter_fast_path,
+    void (*p_vm_monitor_enter)(ManagedObject *p_obj);
+    p_vm_monitor_enter = vm_monitor_enter;
+    addr = gen_vm_rt_monitor_wrapper((void **)p_vm_monitor_enter, gen_vm_rt_monitorenter_fast_path,
                                       check_null, /*static_operation*/ false,
                                       "rt_monitor_enter_slowpath", "rt_monitor_enter_fastpath");
     return addr;
@@ -1460,9 +1460,9 @@ static void *get_vm_rt_monitor_enter_static_address()
         return addr;
     }
     // 20030220 The "static" monitor enter function is only called with a struct Class pointer, which can't be NULL.
-    void (*p_vm_monitor_enter_slow)(ManagedObject *p_obj);
-    p_vm_monitor_enter_slow = vm_monitor_enter_slow;
-    addr = gen_vm_rt_monitor_wrapper((void **)p_vm_monitor_enter_slow, gen_vm_rt_monitorenter_fast_path, 
+    void (*p_vm_monitor_enter)(ManagedObject *p_obj);
+    p_vm_monitor_enter = vm_monitor_enter;
+    addr = gen_vm_rt_monitor_wrapper((void **)p_vm_monitor_enter, gen_vm_rt_monitorenter_fast_path, 
                                       /*check_null*/ false, /*static_operation*/ true,
                                       "rt_monitor_enter_static_slowpath", "rt_monitor_enter_static_fastpath");
     return addr;

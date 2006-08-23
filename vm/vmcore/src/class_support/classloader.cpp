@@ -38,7 +38,7 @@
 #include "jvmti_internal.h"
 #include "ini.h"
 #include "open/gc.h"
-#include "open/thread.h"
+#include "open/hythread_ext.h"
 #include "open/vm_util.h"
 #include "suspend_checker.h"
 #include "verifier.h"
@@ -155,18 +155,6 @@ ClassLoader::~ClassLoader()
     }
     if (m_package_table)
         delete m_package_table;
-}
-
-bool ClassLoader::LoadingClass::CreateWaitingEvent(const String* className) 
-{
-    if(m_loadWaitEvent == 0)
-        m_loadWaitEvent = vm_create_event(NULL, TRUE, FALSE, NULL);
-    if(m_loadWaitEvent == 0) {
-        DIE2("classloader", "Event creation failed for class " << className->bytes
-            << ", which is loaded concurrently");
-        return false;
-    }
-    return true;
 }
 
 void ClassLoader::LoadingClass::EnqueueInitiator(VM_thread* new_definer, ClassLoader* cl, const String* clsname) 
@@ -392,7 +380,7 @@ Class* ClassLoader::DefineClass(Global_Env* env, const char* class_name,
 
 Class* ClassLoader::LoadVerifyAndPrepareClass(Global_Env* env, const String* name)
 {
-    assert(tmn_is_suspend_enabled());
+    assert(hythread_is_suspend_enabled());
 
     Class* clss = LoadClass(env, name);
     if(!clss) return NULL;
@@ -804,11 +792,6 @@ Class* ClassLoader::StartLoadingClass(Global_Env* UNREF env, const String* class
                 // avoid preliminary removal of LoadingClass
                 loading->AddWaitingThread(cur_thread, this, className);
                 // lazy wait event creation
-                if(!loading->CreateWaitingEvent(className)) {
-                    // should never get here
-                    DIE("Event creation failure was not reported: should never get here!");
-                    return NULL;
-                }
                 aulock.ForceUnlock();
                 // only wait for class loading if we are in bootstrap class loader
                 loading->WaitLoading();
@@ -894,12 +877,6 @@ Class* ClassLoader::WaitDefinition(Global_Env* env, const String* className)
                 // defining thread should not get here
                 assert(!loading->IsDefiner(cur_thread));
                 assert(loading->AlreadyWaiting(cur_thread));
-                // lazy wait event creation
-                if(!loading->CreateWaitingEvent(className)) {
-                    // should never get here
-                    DIE("Event creation failure was not reported: should never get here!");
-                    return NULL;
-                }
                 m_lock._unlock();
                 TRACE2("classloader.collisions", this << " " << cur_thread << " WAITING " << className->bytes);
                 // wait class loading
@@ -1663,7 +1640,7 @@ Class* UserDefinedClassLoader::LoadClass(Global_Env* env, const String* classNam
     // wgs's comment here:
     //  * (Ljava/lang/String;Z) is not abstract in current JDK version
     //  * Generally (Ljava/lang/String;) are overloaded
-    assert(tmn_is_suspend_enabled());
+    assert(hythread_is_suspend_enabled());
     assert(!exn_raised());
     tmn_suspend_disable();
 
@@ -1932,7 +1909,7 @@ Class* BootstrapClassLoader::LoadFromJarFile( JarFile* jar_file,
 VMEXPORT GenericFunctionPointer
 classloader_find_native(const Method_Handle method)
 {
-    assert(tmn_is_suspend_enabled());
+    assert(hythread_is_suspend_enabled());
     assert( !exn_raised() );
 
     // get class and class loader of a given method

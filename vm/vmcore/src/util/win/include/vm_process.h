@@ -35,68 +35,8 @@
 #include <windows.h>
 #include <assert.h>
 
-inline VmEventHandle vm_beginthreadex( void * security, unsigned stack_size, unsigned(__stdcall *start_address)(void *), void *arglist, unsigned initflag, pthread_t *thrdaddr)
-{
-    return (VmEventHandle) _beginthreadex(security, stack_size, start_address, arglist, initflag, thrdaddr);
-}
 
-inline void vm_endthreadex(int value)
-{
-    _endthreadex(value);
-}
-
-inline VmEventHandle vm_beginthread(void(__cdecl *start_address)(void *), unsigned stack_size, void *arglist)
-{
-    uintptr_t result = _beginthread(start_address, stack_size, arglist);
-    // on windows error code is -1 !!!
-    if (result == -1L)
-        return NULL;
-
-    return (VmEventHandle) result;
-}
-
-inline void vm_endthread(void)
-{
-    _endthread();
-}
-
-inline VmEventHandle vm_create_event(int *lpEventAttributes, unsigned int bManualReset, unsigned int bInitialState, char *lpName)
-{
-    assert(lpEventAttributes == NULL);
-    return CreateEvent(NULL, bManualReset, bInitialState, lpName);
-}
-
-inline BOOL vm_destroy_event( VmEventHandle handle )
-{
-    assert( handle != INVALID_HANDLE_VALUE );
-    return CloseHandle( handle ) == FALSE ? 0 : 1;
-}
-
-inline BOOL vm_reset_event(VmEventHandle hEvent)
-{
-    return ResetEvent(hEvent);
-}
-
-inline BOOL vm_set_event(VmEventHandle hEvent)
-{
-    return SetEvent(hEvent);
-}
-
-inline void vm_yield() {
-    Sleep(0);
-}
-
-inline DWORD vm_wait_for_single_object(VmEventHandle hHandle, DWORD dwMilliseconds)
-{
-    return WaitForSingleObject(hHandle, dwMilliseconds);
-}
-
-inline DWORD vm_wait_for_multiple_objects(DWORD num, const VmEventHandle * handle, BOOL flag, DWORD dwMilliseconds)
-{
-    return WaitForMultipleObjects(num, handle, flag, dwMilliseconds);
-}
-
-inline void vm_terminate_thread(VmThreadHandle thrdaddr) {
+/*inline void vm_terminate_thread(VmThreadHandle thrdaddr) {
     TerminateThread(thrdaddr,0);    
-}
+}*/
 #endif

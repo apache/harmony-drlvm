@@ -104,9 +104,9 @@ public class Runtime {
             //  In the first phase all registered shutdown hooks, if any, are started in some
             //  unspecified order and allowed to run concurrently until they finish.
             synchronized (Synchro.class) {
+                try {
                 if (VMState == 0) {
                     VMState = 1;
-
                     if (hooksList != null) {
                         for (int i = 0; i < hooksList.size(); i++) {
                             ((Thread)hooksList.elementAt(i)).start();
@@ -126,7 +126,7 @@ public class Runtime {
                         hooksList.removeAllElements();
                     }
                 }
-
+                } catch (Throwable e) {} // skip any exceptions in shutdown sequence
             }
 
             // #2:

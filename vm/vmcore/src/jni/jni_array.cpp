@@ -28,7 +28,7 @@
 #include "object_handles.h"
 #include "open/vm_util.h"
 #include "vm_threads.h"
-#include "open/thread.h"
+
 #include "ini.h"
 #include "vm_arrays.h"
 #include "nogc.h"
@@ -41,7 +41,7 @@ jsize JNICALL GetArrayLength(JNIEnv * UNREF env,
                              jarray array)
 {
     TRACE2("jni", "GetArrayLength called");
-    assert(tmn_is_suspend_enabled());
+    assert(hythread_is_suspend_enabled());
     ObjectHandle h = (ObjectHandle)array;
 
     tmn_suspend_disable();   //-----------------v
@@ -65,7 +65,7 @@ jarray JNICALL NewObjectArray(JNIEnv * UNREF env,
                               jobject initialElement)
 {
     TRACE2("jni", "NewObjectArray called");
-    assert(tmn_is_suspend_enabled());
+    assert(hythread_is_suspend_enabled());
     ObjectHandle elem_handle = (ObjectHandle)initialElement;
 
     Class* clss = jclass_to_struct_Class(elementClass);
@@ -136,7 +136,7 @@ jarray JNICALL NewObjectArray(JNIEnv * UNREF env,
 jobject JNICALL GetObjectArrayElement(JNIEnv *env, jobjectArray array, jsize index)
 {
     TRACE2("jni", "GetObjectArrayElement called");
-    assert(tmn_is_suspend_enabled());
+    assert(hythread_is_suspend_enabled());
     if (array == NULL) {
         // This should not happen.
         ASSERT(0, "Input parameter 'array' is NULL");
@@ -176,7 +176,7 @@ void JNICALL SetObjectArrayElement(JNIEnv *env,
                                    jobject value)
 {
     TRACE2("jni", "SetObjectArrayElement called");
-    assert(tmn_is_suspend_enabled());
+    assert(hythread_is_suspend_enabled());
     if (array == NULL) {
         // This should not happen.
         ASSERT(0, "Input parameter 'array' is NULL");
@@ -235,7 +235,7 @@ void JNICALL SetObjectArrayElement(JNIEnv *env,
 jbooleanArray JNICALL NewBooleanArray(JNIEnv * UNREF env, jsize length)
 {
     TRACE2("jni", "NewBooleanArray called");
-    assert(tmn_is_suspend_enabled());
+    assert(hythread_is_suspend_enabled());
     Class *clss = VM_Global_State::loader_env->ArrayOfBoolean_Class;
     
     unsigned sz = vm_array_size(clss->vtable, length);
@@ -267,7 +267,7 @@ jbooleanArray JNICALL NewBooleanArray(JNIEnv * UNREF env, jsize length)
 jbyteArray JNICALL NewByteArray(JNIEnv * UNREF env, jsize length)
 {
     TRACE2("jni", "NewByteArray called");
-    assert(tmn_is_suspend_enabled());
+    assert(hythread_is_suspend_enabled());
     Class *clss = VM_Global_State::loader_env->ArrayOfByte_Class;
     assert(clss);
  
@@ -300,7 +300,7 @@ jbyteArray JNICALL NewByteArray(JNIEnv * UNREF env, jsize length)
 jcharArray JNICALL NewCharArray(JNIEnv * UNREF env, jsize length)
 {
     TRACE2("jni", "NewCharArray called");
-    assert(tmn_is_suspend_enabled());
+    assert(hythread_is_suspend_enabled());
     Class *clss = VM_Global_State::loader_env->ArrayOfChar_Class;
  
     unsigned sz = vm_array_size(clss->vtable, length);
@@ -332,7 +332,7 @@ jcharArray JNICALL NewCharArray(JNIEnv * UNREF env, jsize length)
 jshortArray JNICALL NewShortArray(JNIEnv * UNREF env, jsize length)
 {
     TRACE2("jni", "NewShortArray called");
-    assert(tmn_is_suspend_enabled());
+    assert(hythread_is_suspend_enabled());
     Class *clss = VM_Global_State::loader_env->ArrayOfShort_Class;
  
     unsigned sz = vm_array_size(clss->vtable, length);
@@ -365,7 +365,7 @@ jshortArray JNICALL NewShortArray(JNIEnv * UNREF env, jsize length)
 jintArray JNICALL NewIntArray(JNIEnv * UNREF env, jsize length)
 {
     TRACE2("jni", "NewIntArray called");
-    assert(tmn_is_suspend_enabled());
+    assert(hythread_is_suspend_enabled());
     Class *clss = VM_Global_State::loader_env->ArrayOfInt_Class;
     unsigned sz = vm_array_size(clss->vtable, length);
     tmn_suspend_disable();       //---------------------------------v
@@ -396,7 +396,7 @@ jintArray JNICALL NewIntArray(JNIEnv * UNREF env, jsize length)
 jlongArray JNICALL NewLongArray(JNIEnv * UNREF env, jsize length)
 {
     TRACE2("jni", "NewLongArray called");
-    assert(tmn_is_suspend_enabled());
+    assert(hythread_is_suspend_enabled());
     Class *clss = VM_Global_State::loader_env->ArrayOfLong_Class;
     unsigned sz = vm_array_size(clss->vtable, length);
     tmn_suspend_disable();       //---------------------------------v
@@ -427,7 +427,7 @@ jlongArray JNICALL NewLongArray(JNIEnv * UNREF env, jsize length)
 jfloatArray JNICALL NewFloatArray(JNIEnv * UNREF env, jsize length)
 {
     TRACE2("jni", "NewFloatArray called");
-    assert(tmn_is_suspend_enabled());
+    assert(hythread_is_suspend_enabled());
     Class *clss = VM_Global_State::loader_env->ArrayOfFloat_Class;
     unsigned sz = vm_array_size(clss->vtable, length);
     tmn_suspend_disable();       //---------------------------------v
@@ -458,7 +458,7 @@ jfloatArray JNICALL NewFloatArray(JNIEnv * UNREF env, jsize length)
 jdoubleArray JNICALL NewDoubleArray(JNIEnv * UNREF env, jsize length)
 {
     TRACE2("jni", "NewDoubleArray called");
-    assert(tmn_is_suspend_enabled());
+    assert(hythread_is_suspend_enabled());
     Class *clss = VM_Global_State::loader_env->ArrayOfDouble_Class;
     unsigned sz = vm_array_size(clss->vtable, length);
     tmn_suspend_disable();       //---------------------------------v
@@ -499,7 +499,7 @@ jboolean *JNICALL GetBooleanArrayElements(JNIEnv * UNREF env,
                                           jboolean *isCopy)
 {
     TRACE2("jni", "GetBooleanArrayElements called");
-    assert(tmn_is_suspend_enabled());
+    assert(hythread_is_suspend_enabled());
     ObjectHandle h = (ObjectHandle)array;
 
     tmn_suspend_disable();       //---------------------------------v
@@ -539,7 +539,7 @@ jbyte *JNICALL GetByteArrayElements(JNIEnv * UNREF env,
                                     jboolean *isCopy)
 {
     TRACE2("jni", "GetByteArrayElements called");
-    assert(tmn_is_suspend_enabled());
+    assert(hythread_is_suspend_enabled());
     ObjectHandle h = (ObjectHandle)array;
 
     tmn_suspend_disable();       //---------------------------------v
@@ -579,7 +579,7 @@ jchar *JNICALL GetCharArrayElements(JNIEnv * UNREF env,
                                     jboolean *isCopy)
 {
     TRACE2("jni", "GetCharArrayElements called");
-    assert(tmn_is_suspend_enabled());
+    assert(hythread_is_suspend_enabled());
     ObjectHandle h = (ObjectHandle)array;
 
     tmn_suspend_disable();       //---------------------------------v
@@ -619,7 +619,7 @@ jshort *JNICALL GetShortArrayElements(JNIEnv * UNREF env,
                                       jboolean *isCopy)
 {
     TRACE2("jni", "GetShortArrayElements called");
-    assert(tmn_is_suspend_enabled());
+    assert(hythread_is_suspend_enabled());
     ObjectHandle h = (ObjectHandle)array;
 
     tmn_suspend_disable();       //---------------------------------v
@@ -659,7 +659,7 @@ jint *JNICALL GetIntArrayElements(JNIEnv *env,
                                   jboolean *isCopy)
 {
     TRACE2("jni", "GetIntArrayElements called");
-    assert(tmn_is_suspend_enabled());
+    assert(hythread_is_suspend_enabled());
     ObjectHandle h = (ObjectHandle)array;
 
     tmn_suspend_disable();       //---------------------------------v
@@ -700,7 +700,7 @@ jlong *JNICALL GetLongArrayElements(JNIEnv * UNREF env,
                                     jboolean *isCopy)
 {
     TRACE2("jni", "GetLongArrayElements called");
-    assert(tmn_is_suspend_enabled());
+    assert(hythread_is_suspend_enabled());
     ObjectHandle h = (ObjectHandle)array;
 
     tmn_suspend_disable();       //---------------------------------v
@@ -740,7 +740,7 @@ jfloat *JNICALL GetFloatArrayElements(JNIEnv *env,
                                       jboolean *isCopy)
 {
     TRACE2("jni", "GetFloatArrayElements called");
-    assert(tmn_is_suspend_enabled());
+    assert(hythread_is_suspend_enabled());
     ObjectHandle h = (ObjectHandle)array;
 
     tmn_suspend_disable();       //---------------------------------v
@@ -781,7 +781,7 @@ jdouble *JNICALL GetDoubleArrayElements(JNIEnv * UNREF env,
                                         jboolean *isCopy)
 {
     TRACE2("jni", "GetDoubleArrayElements called");
-    assert(tmn_is_suspend_enabled());
+    assert(hythread_is_suspend_enabled());
     ObjectHandle h = (ObjectHandle)array;
 
     tmn_suspend_disable();       //---------------------------------v
@@ -831,7 +831,7 @@ void JNICALL ReleaseBooleanArrayElements(JNIEnv *env,
                                          jint mode)
 {
     TRACE2("jni", "ReleaseBooleanArrayElements called");
-    assert(tmn_is_suspend_enabled());
+    assert(hythread_is_suspend_enabled());
     ObjectHandle h = (ObjectHandle)array;
     tmn_suspend_disable();       //---------------------------------v
 
@@ -881,7 +881,7 @@ void JNICALL ReleaseByteArrayElements(JNIEnv *env,
                                       jint mode)
 {
     TRACE2("jni", "ReleaseByteArrayElements called");
-    assert(tmn_is_suspend_enabled());
+    assert(hythread_is_suspend_enabled());
     ObjectHandle h = (ObjectHandle)array;
 
     tmn_suspend_disable();       //---------------------------------v
@@ -931,7 +931,7 @@ void JNICALL ReleaseCharArrayElements(JNIEnv *env,
                                       jint mode)
 {
     TRACE2("jni", "ReleaseCharArrayElements called");
-    assert(tmn_is_suspend_enabled());
+    assert(hythread_is_suspend_enabled());
     ObjectHandle h = (ObjectHandle)array;
     tmn_suspend_disable();       //---------------------------------v
 
@@ -981,7 +981,7 @@ void JNICALL ReleaseShortArrayElements(JNIEnv *env,
                                        jint mode)
 {
     TRACE2("jni", "ReleaseShortArrayElements called");
-    assert(tmn_is_suspend_enabled());
+    assert(hythread_is_suspend_enabled());
     ObjectHandle h = (ObjectHandle)array;
     tmn_suspend_disable();       //---------------------------------v
 
@@ -1031,7 +1031,7 @@ void JNICALL ReleaseIntArrayElements(JNIEnv *env,
                                      jint mode)
 {
     TRACE2("jni", "ReleaseIntArrayElements called");
-    assert(tmn_is_suspend_enabled());
+    assert(hythread_is_suspend_enabled());
     ObjectHandle h = (ObjectHandle)array;
     tmn_suspend_disable();       //---------------------------------v
 
@@ -1081,7 +1081,7 @@ void JNICALL ReleaseLongArrayElements(JNIEnv *env,
                                       jint mode)
 {
     TRACE2("jni", "ReleaseLongArrayElements called");
-    assert(tmn_is_suspend_enabled());
+    assert(hythread_is_suspend_enabled());
     ObjectHandle h = (ObjectHandle)array;
     tmn_suspend_disable();       //---------------------------------v
 
@@ -1131,7 +1131,7 @@ void JNICALL ReleaseFloatArrayElements(JNIEnv *env,
                                        jint mode)
 {
     TRACE2("jni", "ReleaseFloatArrayElements called");
-    assert(tmn_is_suspend_enabled());
+    assert(hythread_is_suspend_enabled());
     ObjectHandle h = (ObjectHandle)array;
     tmn_suspend_disable();       //---------------------------------v
 
@@ -1182,7 +1182,7 @@ void JNICALL ReleaseDoubleArrayElements(JNIEnv *env,
                                         jint mode)
 {
     TRACE2("jni", "ReleaseDoubleArrayElements called");
-    assert(tmn_is_suspend_enabled());
+    assert(hythread_is_suspend_enabled());
     ObjectHandle h = (ObjectHandle)array;
     tmn_suspend_disable();       //---------------------------------v
 
@@ -1242,7 +1242,7 @@ void JNICALL GetBooleanArrayRegion (JNIEnv *env,
                                     jboolean *buf)
 {
     TRACE2("jni", "GetBooleanArrayRegion called");
-    assert(tmn_is_suspend_enabled());
+    assert(hythread_is_suspend_enabled());
     jsize length = GetArrayLength(env, array);
     jsize end = start + len;
     if(start < 0 || len < 0 || end > length) {
@@ -1271,7 +1271,7 @@ void JNICALL GetByteArrayRegion    (JNIEnv *env,
                                     jbyte *buf)
 {
     TRACE2("jni", "GetByteArrayRegion called");
-    assert(tmn_is_suspend_enabled());
+    assert(hythread_is_suspend_enabled());
     jsize length = GetArrayLength(env, array);
     jsize end = start + len;
     if(start < 0 || len < 0 || end > length) {
@@ -1300,7 +1300,7 @@ void JNICALL GetCharArrayRegion(JNIEnv *env,
                                 jchar *buf)
 {
     TRACE2("jni", "GetCharArrayRegion called");
-    assert(tmn_is_suspend_enabled());
+    assert(hythread_is_suspend_enabled());
     jsize length = GetArrayLength(env, array);
     jsize end = start + len;
     if(start < 0 || len < 0 || end > length) {
@@ -1329,7 +1329,7 @@ void JNICALL GetShortArrayRegion(JNIEnv *env,
                                  jshort *buf)
 {
     TRACE2("jni", "GetShortArrayRegion called");
-    assert(tmn_is_suspend_enabled());
+    assert(hythread_is_suspend_enabled());
     jsize length = GetArrayLength(env, array);
     jsize end = start + len;
     if(start < 0 || len < 0 || end > length) {
@@ -1358,7 +1358,7 @@ void JNICALL GetIntArrayRegion(JNIEnv *env,
                                jint *buf)
 {
     TRACE2("jni", "GetIntArrayRegion called");
-    assert(tmn_is_suspend_enabled());
+    assert(hythread_is_suspend_enabled());
     jsize length = GetArrayLength(env, array);
     jsize end = start + len;
     if(start < 0 || len < 0 || end > length) {
@@ -1387,7 +1387,7 @@ void JNICALL GetLongArrayRegion(JNIEnv *env,
                                 jlong *buf)
 {
     TRACE2("jni", "GetLongArrayRegion called");
-    assert(tmn_is_suspend_enabled());
+    assert(hythread_is_suspend_enabled());
     jsize length = GetArrayLength(env, array);
     jsize end = start + len;
     if(start < 0 || len < 0 || end > length) {
@@ -1416,7 +1416,7 @@ void JNICALL GetFloatArrayRegion(JNIEnv *env,
                                  jfloat *buf)
 {
     TRACE2("jni", "GetFloatArrayRegion called");
-    assert(tmn_is_suspend_enabled());
+    assert(hythread_is_suspend_enabled());
     jsize length = GetArrayLength(env, array);
     jsize end = start + len;
     if(start < 0 || len < 0 || end > length) {
@@ -1445,7 +1445,7 @@ void JNICALL GetDoubleArrayRegion(JNIEnv *env,
                                   jdouble *buf)
 {
     TRACE2("jni", "GetDoubleArrayRegion called");
-    assert(tmn_is_suspend_enabled());
+    assert(hythread_is_suspend_enabled());
     jsize length = GetArrayLength(env, array);
     jsize end = start + len;
     if(start < 0 || len < 0 || end > length) {
@@ -1482,7 +1482,7 @@ void JNICALL SetBooleanArrayRegion(JNIEnv *env,
                                    jboolean *buf)
 {
     TRACE2("jni", "SetBooleanArrayRegion called");
-    assert(tmn_is_suspend_enabled());
+    assert(hythread_is_suspend_enabled());
     jsize length = GetArrayLength(env, array);
     jsize end = start + len;
     if(start < 0 || len < 0 || end > length) {
@@ -1513,7 +1513,7 @@ void JNICALL SetByteArrayRegion(JNIEnv *env,
                                 jbyte *buf)
 {
     TRACE2("jni", "SetByteArrayRegion called");
-    assert(tmn_is_suspend_enabled());
+    assert(hythread_is_suspend_enabled());
     jsize length = GetArrayLength(env, array);
     jsize end = start + len;
     if(start < 0 || len < 0 || end > length) {
@@ -1544,7 +1544,7 @@ void JNICALL SetCharArrayRegion(JNIEnv *env,
                                 jchar *buf)
 {
     TRACE2("jni", "SetCharArrayRegion called");
-    assert(tmn_is_suspend_enabled());
+    assert(hythread_is_suspend_enabled());
     jsize length = GetArrayLength(env, array);
     jsize end = start + len;
     if(start < 0 || len < 0 || end > length) {
@@ -1575,7 +1575,7 @@ void JNICALL SetShortArrayRegion(JNIEnv *env,
                                  jshort *buf)
 {
     TRACE2("jni", "SetShortArrayRegion called");
-    assert(tmn_is_suspend_enabled());
+    assert(hythread_is_suspend_enabled());
     jsize length = GetArrayLength(env, array);
     jsize end = start + len;
     if(start < 0 || len < 0 || end > length) {
@@ -1606,7 +1606,7 @@ void JNICALL SetIntArrayRegion(JNIEnv *env,
                                jint *buf)
 {
     TRACE2("jni", "SetIntArrayRegion called");
-    assert(tmn_is_suspend_enabled());
+    assert(hythread_is_suspend_enabled());
     jsize length = GetArrayLength(env, array);
     jsize end = start + len;
     if(start < 0 || len < 0 || end > length) {
@@ -1637,7 +1637,7 @@ void JNICALL SetLongArrayRegion(JNIEnv *env,
                                 jlong *buf)
 {
     TRACE2("jni", "SetLongArrayRegion called");
-    assert(tmn_is_suspend_enabled());
+    assert(hythread_is_suspend_enabled());
     jsize length = GetArrayLength(env, array);
     jsize end = start + len;
     if(start < 0 || len < 0 || end > length) {
@@ -1668,7 +1668,7 @@ void JNICALL SetFloatArrayRegion(JNIEnv *env,
                                  jfloat *buf)
 {
     TRACE2("jni", "SetFloatArrayRegion called");
-    assert(tmn_is_suspend_enabled());
+    assert(hythread_is_suspend_enabled());
     jsize length = GetArrayLength(env, array);
     jsize end = start + len;
     if(start < 0 || len < 0 || end > length) {
@@ -1699,7 +1699,7 @@ void JNICALL SetDoubleArrayRegion(JNIEnv *env,
                                   jdouble *buf)
 {
     TRACE2("jni", "SetDoubleArrayRegion called");
-    assert(tmn_is_suspend_enabled());
+    assert(hythread_is_suspend_enabled());
     jsize length = GetArrayLength(env, array);
     jsize end = start + len;
     if(start < 0 || len < 0 || end > length) {

@@ -32,7 +32,8 @@
 #include "open/types.h"
 #include "open/vm_util.h"
 #include "vm_threads.h"
-#include "open/thread.h"
+#include "open/jthread.h"
+
 #include "vm_synch.h"
 #include "exceptions.h"
 #include "reflection.h"
@@ -376,7 +377,7 @@ jclass JNICALL DefineClass(JNIEnv *jenv,
                            jsize len)
 {
     TRACE2("jni", "DefineClass called, name = " << name);
-    assert(tmn_is_suspend_enabled());
+    assert(hythread_is_suspend_enabled());
     Global_Env* env = VM_Global_State::loader_env;
     ClassLoader* cl;
     if (loader != NULL)
@@ -404,7 +405,7 @@ jclass JNICALL DefineClass(JNIEnv *jenv,
 
     if(clss && ld_result)
     {
-        assert(tmn_is_suspend_enabled());
+        assert(hythread_is_suspend_enabled());
         return struct_Class_to_jclass(clss);
     }
     else
@@ -431,6 +432,7 @@ jclass JNICALL DefineClass(JNIEnv *jenv,
 jclass JNICALL FindClass(JNIEnv* env_ext,
                          const char* name)
 {
+    if (exn_raised()) return NULL;
     TRACE2("jni", "FindClass called, name = " << name);
 
     char *ch = strchr(name, '.');
@@ -442,12 +444,13 @@ jclass JNICALL FindClass(JNIEnv* env_ext,
 
     String* cls_name = VM_Global_State::loader_env->string_pool.lookup(name);
     return FindClass(env_ext, cls_name);
+    
 } //FindClass
 
 jclass JNICALL GetSuperclass(JNIEnv * UNREF env, jclass clazz)
 {
     TRACE2("jni", "GetSuperclass called");
-    assert(tmn_is_suspend_enabled());
+    assert(hythread_is_suspend_enabled());
     Class* clss = jclass_to_struct_Class(clazz);
     if(clss) {
         if(class_is_interface(clss)) {
@@ -455,7 +458,7 @@ jclass JNICALL GetSuperclass(JNIEnv * UNREF env, jclass clazz)
         } else {
             Class *super_class = clss->super_class;
             if(super_class) {
-                assert(tmn_is_suspend_enabled());
+                assert(hythread_is_suspend_enabled());
                 return struct_Class_to_jclass(super_class);
             } else {
                 return 0;
@@ -471,7 +474,7 @@ jboolean JNICALL IsAssignableFrom(JNIEnv * UNREF env,
                                   jclass clazz2)
 {
     TRACE2("jni", "IsAssignableFrom called");
-    assert(tmn_is_suspend_enabled());
+    assert(hythread_is_suspend_enabled());
     Class* clss1 = jclass_to_struct_Class(clazz1);
     Class* clss2 = jclass_to_struct_Class(clazz2);
 
@@ -486,7 +489,7 @@ jboolean JNICALL IsAssignableFrom(JNIEnv * UNREF env,
 jint JNICALL Throw(JNIEnv * UNREF env, jthrowable obj)
 {
     TRACE2("jni", "Throw called");
-    assert(tmn_is_suspend_enabled());
+    assert(hythread_is_suspend_enabled());
     if(obj) {
         tmn_suspend_disable();       //---------------------------------v
         set_current_thread_exception(((ObjectHandle)obj)->object);
@@ -500,7 +503,7 @@ jint JNICALL Throw(JNIEnv * UNREF env, jthrowable obj)
 jint JNICALL ThrowNew(JNIEnv *env, jclass clazz, const char *message)
 {
     TRACE2("jni", "ThrowNew called, message = " << (message ? message : "<no message>"));
-    assert(tmn_is_suspend_enabled());
+    assert(hythread_is_suspend_enabled());
     if (!clazz) return -1;
 
     jstring str = (jstring)0;
@@ -544,7 +547,7 @@ jint JNICALL ThrowNew_Quick(JNIEnv *env, const char *classname, const char *mess
 jthrowable JNICALL ExceptionOccurred(JNIEnv * UNREF env)
 {
     TRACE2("jni", "ExceptionOccurred called");
-    assert(tmn_is_suspend_enabled());
+    assert(hythread_is_suspend_enabled());
 #ifdef _DEBUG
     tmn_suspend_disable();
     ManagedObject *obj = get_current_thread_exception();
@@ -569,7 +572,7 @@ jthrowable JNICALL ExceptionOccurred(JNIEnv * UNREF env)
 void JNICALL ExceptionDescribe(JNIEnv * UNREF env)
 {
     TRACE2("jni", "ExceptionDescribe called");
-    assert(tmn_is_suspend_enabled());
+    assert(hythread_is_suspend_enabled());
     if (exn_raised()) {
         tmn_suspend_disable();       //---------------------------------v
         ManagedObject* exn = get_current_thread_exception();
@@ -583,7 +586,7 @@ void JNICALL ExceptionDescribe(JNIEnv * UNREF env)
 void JNICALL ExceptionClear(JNIEnv * UNREF env)
 {
     TRACE2("jni", "ExceptionClear called");
-    assert(tmn_is_suspend_enabled());
+    assert(hythread_is_suspend_enabled());
     tmn_suspend_disable();
 #ifdef _DEBUG
     ManagedObject *obj = get_current_thread_exception();
@@ -603,7 +606,7 @@ void JNICALL ExceptionClear(JNIEnv * UNREF env)
 void JNICALL FatalError(JNIEnv * UNREF env, const char *msg)
 {
     TRACE2("jni", "FatalError called");
-    assert(tmn_is_suspend_enabled());
+    assert(hythread_is_suspend_enabled());
     fprintf(stderr, "\nFATAL error occurred in a JNI native method:\n\t%s\n", msg);
     vm_exit(109);
 } //FatalError
@@ -611,12 +614,12 @@ void JNICALL FatalError(JNIEnv * UNREF env, const char *msg)
 jobject JNICALL NewGlobalRef(JNIEnv * UNREF env, jobject obj)
 {
     TRACE2("jni", "NewGlobalRef called");
-    assert(tmn_is_suspend_enabled());
+    assert(hythread_is_suspend_enabled());
     if(!obj) {
         return 0;
     }
 
-    assert(tmn_is_suspend_enabled());
+    assert(hythread_is_suspend_enabled());
     ObjectHandle new_handle = oh_allocate_global_handle();
     ObjectHandle old_handle = (ObjectHandle)obj;
 
@@ -633,7 +636,7 @@ jobject JNICALL NewGlobalRef(JNIEnv * UNREF env, jobject obj)
 void JNICALL DeleteGlobalRef(JNIEnv * UNREF env, jobject globalRef)
 {
     TRACE2("jni", "DeleteGlobalRef called");
-    assert(tmn_is_suspend_enabled());
+    assert(hythread_is_suspend_enabled());
 #ifdef _DEBUG
     tmn_suspend_disable();
     ObjectHandle h = (ObjectHandle)globalRef;
@@ -648,7 +651,7 @@ void JNICALL DeleteGlobalRef(JNIEnv * UNREF env, jobject globalRef)
 jobject JNICALL NewLocalRef(JNIEnv *env, jobject ref)
 {
     TRACE2("jni", "NewLocalRef called");
-    assert(tmn_is_suspend_enabled());
+    assert(hythread_is_suspend_enabled());
     if (NULL == ref)
         return NULL;
 
@@ -671,7 +674,7 @@ jobject JNICALL NewLocalRef(JNIEnv *env, jobject ref)
 void JNICALL DeleteLocalRef(JNIEnv * UNREF env, jobject localRef)
 {
     TRACE2("jni", "DeleteLocalRef called");
-    assert(tmn_is_suspend_enabled());
+    assert(hythread_is_suspend_enabled());
 #ifdef _DEBUG
     tmn_suspend_disable();
     ObjectHandle h = (ObjectHandle)localRef;
@@ -688,7 +691,7 @@ jboolean JNICALL IsSameObject(JNIEnv * UNREF env,
                               jobject ref2)
 {
     TRACE2("jni-same", "IsSameObject called");
-    assert(tmn_is_suspend_enabled());
+    assert(hythread_is_suspend_enabled());
     if(ref1 == ref2) {
         return JNI_TRUE;
     }
@@ -718,7 +721,7 @@ jboolean JNICALL IsSameObject(JNIEnv * UNREF env,
 VMEXPORT jint JNICALL PushLocalFrame(JNIEnv * UNREF env, jint UNREF cap)
 {
     TRACE2("jni", "PushLocalFrame called");
-    assert(tmn_is_suspend_enabled());
+    assert(hythread_is_suspend_enabled());
     // 20020904: Not good for performance, but we can ignore local frames for now
     return 0;
 }
@@ -726,7 +729,7 @@ VMEXPORT jint JNICALL PushLocalFrame(JNIEnv * UNREF env, jint UNREF cap)
 VMEXPORT jobject JNICALL PopLocalFrame(JNIEnv * UNREF env, jobject res)
 {
     TRACE2("jni", "PopLocalFrame called");
-    assert(tmn_is_suspend_enabled());
+    assert(hythread_is_suspend_enabled());
     // 20020904: Not good for performance, but we can ignore local frames for now
     return res;
 }
@@ -735,7 +738,7 @@ VMEXPORT jobject JNICALL PopLocalFrame(JNIEnv * UNREF env, jobject res)
 jint JNICALL EnsureLocalCapacity(JNIEnv* UNREF env, jint UNREF cap)
 {
     TRACE2("jni", "EnsureLocalCapacity called");
-    assert(tmn_is_suspend_enabled());
+    assert(hythread_is_suspend_enabled());
     return 0;
 }
 
@@ -744,7 +747,7 @@ jobject JNICALL AllocObject(JNIEnv *env,
                             jclass clazz)
 {
     TRACE2("jni", "AllocObject called");
-    assert(tmn_is_suspend_enabled());
+    assert(hythread_is_suspend_enabled());
     assert(clazz);
     Class* clss = jclass_to_struct_Class(clazz);
 
@@ -776,7 +779,7 @@ jobject JNICALL NewObject(JNIEnv *env,
                           ...)
 {
     TRACE2("jni", "NewObject called");
-    assert(tmn_is_suspend_enabled());
+    assert(hythread_is_suspend_enabled());
     va_list args;
     va_start(args, methodID);
     return NewObjectV(env, clazz, methodID, args);
@@ -788,7 +791,7 @@ jobject JNICALL NewObjectV(JNIEnv *env,
                            va_list args)
 {
     TRACE2("jni", "NewObjectV called");
-    assert(tmn_is_suspend_enabled());
+    assert(hythread_is_suspend_enabled());
     jvalue *jvalue_args = get_jvalue_arg_array((Method *)methodID, args);
     jobject result = NewObjectA(env, clazz, methodID, jvalue_args);
     STD_FREE(jvalue_args);
@@ -801,7 +804,7 @@ jobject JNICALL NewObjectA(JNIEnv *env,
                            jvalue *args)
 {
     TRACE2("jni", "NewObjectA called");
-    assert(tmn_is_suspend_enabled());
+    assert(hythread_is_suspend_enabled());
     // Allocate the object.
     jobject new_handle = AllocObject(env, clazz);
 
@@ -821,7 +824,7 @@ jclass JNICALL GetObjectClass(JNIEnv * UNREF env,
                               jobject obj)
 {
     TRACE2("jni", "GetObjectClass called");
-    assert(tmn_is_suspend_enabled());
+    assert(hythread_is_suspend_enabled());
     // The spec guarantees that the reference is not null.
     assert(obj);
     ObjectHandle h = (ObjectHandle)obj;
@@ -845,7 +848,7 @@ jboolean JNICALL IsInstanceOf(JNIEnv *env,
                               jclass clazz)
 {
     TRACE2("jni", "IsInstanceOf called");
-    assert(tmn_is_suspend_enabled());
+    assert(hythread_is_suspend_enabled());
     if(!obj) {
         return JNI_TRUE;
     }
@@ -869,7 +872,7 @@ jstring JNICALL NewString(JNIEnv * UNREF env,
                           jsize length)
 {
     TRACE2("jni", "NewString called, length = " << length);
-    assert(tmn_is_suspend_enabled());
+    assert(hythread_is_suspend_enabled());
     return (jstring)string_create_from_unicode_h(unicodeChars, length);
 } //NewString
 
@@ -877,7 +880,7 @@ jsize JNICALL GetStringLength(JNIEnv * UNREF env,
                               jstring string)
 {
     TRACE2("jni", "GetStringLength called");
-    assert(tmn_is_suspend_enabled());
+    assert(hythread_is_suspend_enabled());
     if(!string) return 0;
     return string_get_length_h((ObjectHandle)string);
 } //GetStringLength
@@ -887,7 +890,7 @@ const jchar *JNICALL GetStringChars(JNIEnv * UNREF env,
                                     jboolean *isCopy)
 {
     TRACE2("jni", "GetStringChars called");
-    assert(tmn_is_suspend_enabled());
+    assert(hythread_is_suspend_enabled());
     assert(string);
 
     tmn_suspend_disable();
@@ -903,7 +906,7 @@ void JNICALL ReleaseStringChars(JNIEnv * UNREF env,
                                 const jchar *chars)
 {
     TRACE2("jni", "ReleaseStringChars called");
-    assert(tmn_is_suspend_enabled());
+    assert(hythread_is_suspend_enabled());
     STD_FREE((void*)chars);
 } //ReleaseStringChars
 
@@ -911,7 +914,7 @@ jstring JNICALL NewStringUTF(JNIEnv * UNREF env,
                              const char *bytes)
 {
     TRACE2("jni", "NewStringUTF called, bytes = " << bytes);
-    assert(tmn_is_suspend_enabled());
+    assert(hythread_is_suspend_enabled());
     return (jstring)string_create_from_utf8_h(bytes, (unsigned)strlen(bytes));
 } //NewStringUTF
 
@@ -919,7 +922,7 @@ jsize JNICALL GetStringUTFLength(JNIEnv * UNREF env,
                                  jstring string)
 {
     TRACE2("jni", "GetStringUTFLength called");
-    assert(tmn_is_suspend_enabled());
+    assert(hythread_is_suspend_enabled());
     return string_get_utf8_length_h((ObjectHandle)string);
 } //GetStringUTFLength
 
@@ -928,7 +931,7 @@ const char *JNICALL GetStringUTFChars(JNIEnv * UNREF env,
                                       jboolean *isCopy)
 {
     TRACE2("jni", "GetStringUTFChars called");
-    assert(tmn_is_suspend_enabled());
+    assert(hythread_is_suspend_enabled());
     if(!string)
         return 0;
     const char* res = string_get_utf8_chars_h((ObjectHandle)string);
@@ -941,7 +944,7 @@ void JNICALL ReleaseStringUTFChars(JNIEnv * UNREF env,
                                    const char *utf)
 {
     TRACE2("jni", "ReleaseStringUTFChars called");
-    assert(tmn_is_suspend_enabled());
+    assert(hythread_is_suspend_enabled());
     STD_FREE((void*)utf);
 } //ReleaseStringUTFChars
 
@@ -951,7 +954,7 @@ jint JNICALL RegisterNatives(JNIEnv * UNREF env,
                              jint nMethods)
 {
     TRACE2("jni", "RegisterNatives called");
-    assert(tmn_is_suspend_enabled());
+    assert(hythread_is_suspend_enabled());
     Class_Handle clss = jclass_to_struct_Class(clazz);
     class_register_methods(clss, methods, nMethods);
     return class_register_methods(clss, methods, nMethods) ? -1 : 0;
@@ -960,7 +963,7 @@ jint JNICALL RegisterNatives(JNIEnv * UNREF env,
 jint JNICALL UnregisterNatives(JNIEnv * UNREF env, jclass clazz)
 {
     TRACE2("jni", "UnregisterNatives called");
-    assert(tmn_is_suspend_enabled());
+    assert(hythread_is_suspend_enabled());
     Class* clss = jclass_to_struct_Class(clazz);
     return class_unregister_methods(clss) ? -1 : 0;
 } //UnregisterNatives
@@ -968,8 +971,8 @@ jint JNICALL UnregisterNatives(JNIEnv * UNREF env, jclass clazz)
 jint JNICALL MonitorEnter(JNIEnv * UNREF env, jobject obj)
 {
     TRACE2("jni", "MonitorEnter called");
-    assert(tmn_is_suspend_enabled());
-    vm_monitor_enter_slow_handle(obj);
+    assert(hythread_is_suspend_enabled());
+    jthread_monitor_enter(obj);
     return exn_raised() ? -1 : 0;
 } //MonitorEnter
 
@@ -978,8 +981,8 @@ jint JNICALL MonitorEnter(JNIEnv * UNREF env, jobject obj)
 jint JNICALL MonitorExit(JNIEnv * UNREF env, jobject obj)
 {
     TRACE2("jni", "MonitorExit called");
-    assert(tmn_is_suspend_enabled());
-    vm_monitor_exit_handle(obj);
+    assert(hythread_is_suspend_enabled());
+    jthread_monitor_exit(obj);
     return exn_raised() ? -1 : 0;
 } //MonitorExit
 
@@ -988,7 +991,7 @@ jint JNICALL MonitorExit(JNIEnv * UNREF env, jobject obj)
 jint JNICALL GetJavaVM(JNIEnv *env_ext, JavaVM **vm)
 {
     TRACE2("jni", "GetJavaVM called");
-    assert(tmn_is_suspend_enabled());
+    assert(hythread_is_suspend_enabled());
     JNIEnv_Internal *env = (JNIEnv_Internal *)env_ext;
     *vm = env->vm;
     return JNI_OK;
@@ -998,7 +1001,7 @@ jint JNICALL GetJavaVM(JNIEnv *env_ext, JavaVM **vm)
 void JNICALL GetStringRegion(JNIEnv * UNREF env, jstring s, jsize off, jsize len, jchar *b)
 {
     TRACE2("jni", "GetStringRegion called");
-    assert(tmn_is_suspend_enabled());
+    assert(hythread_is_suspend_enabled());
     assert(s);
 
     string_get_unicode_region_h((ObjectHandle)s, off, len, b);
@@ -1007,14 +1010,14 @@ void JNICALL GetStringRegion(JNIEnv * UNREF env, jstring s, jsize off, jsize len
 void JNICALL GetStringUTFRegion(JNIEnv * UNREF env, jstring s, jsize off, jsize len, char *b)
 {
     TRACE2("jni", "GetStringUTFRegion called");
-    assert(tmn_is_suspend_enabled());
+    assert(hythread_is_suspend_enabled());
     string_get_utf8_region_h((ObjectHandle)s, off, len, b);
 }
 
 VMEXPORT void* JNICALL GetPrimitiveArrayCritical(JNIEnv* jenv, jarray array, jboolean* isCopy)
 {
     TRACE2("jni", "GetPrimitiveArrayCritical called");
-    assert(tmn_is_suspend_enabled());
+    assert(hythread_is_suspend_enabled());
     tmn_suspend_disable();
     Class* array_clss = ((ObjectHandle)array)->object->vt()->clss;
     tmn_suspend_enable();
@@ -1038,7 +1041,7 @@ VMEXPORT void* JNICALL GetPrimitiveArrayCritical(JNIEnv* jenv, jarray array, jbo
 VMEXPORT void JNICALL ReleasePrimitiveArrayCritical(JNIEnv* jenv, jarray array, void* carray, jint mode)
 {
     TRACE2("jni", "ReleasePrimitiveArrayCritical called");
-    assert(tmn_is_suspend_enabled());
+    assert(hythread_is_suspend_enabled());
     tmn_suspend_disable();
     Class* array_clss = ((ObjectHandle)array)->object->vt()->clss;
     tmn_suspend_enable();
@@ -1063,35 +1066,35 @@ VMEXPORT void JNICALL ReleasePrimitiveArrayCritical(JNIEnv* jenv, jarray array, 
 const jchar* JNICALL GetStringCritical(JNIEnv *env, jstring s, jboolean* isCopy)
 {
     TRACE2("jni", "GetStringCritical called");
-    assert(tmn_is_suspend_enabled());
+    assert(hythread_is_suspend_enabled());
     return GetStringChars(env, s, isCopy);
 }
 
 void JNICALL ReleaseStringCritical(JNIEnv *env, jstring s, const jchar* cstr)
 {
     TRACE2("jni", "ReleaseStringCritical called");
-    assert(tmn_is_suspend_enabled());
+    assert(hythread_is_suspend_enabled());
     ReleaseStringChars(env, s, cstr);
 }
 
 VMEXPORT jweak JNICALL NewWeakGlobalRef(JNIEnv *env, jobject obj)
 {
     TRACE2("jni", "NewWeakGlobalRef called");
-    assert(tmn_is_suspend_enabled());
+    assert(hythread_is_suspend_enabled());
     return NewGlobalRef(env, obj);
 }
 
 VMEXPORT void JNICALL DeleteWeakGlobalRef(JNIEnv *env, jweak obj)
 {
     TRACE2("jni", "DeleteWeakGlobalRef called");
-    assert(tmn_is_suspend_enabled());
+    assert(hythread_is_suspend_enabled());
     DeleteGlobalRef(env, obj);
 }
 
 jboolean JNICALL ExceptionCheck(JNIEnv * UNREF env)
 {
     TRACE2("jni", "ExceptionCheck called, exception status = " << exn_raised());
-    assert(tmn_is_suspend_enabled());
+    assert(hythread_is_suspend_enabled());
     if (exn_raised())
         return JNI_TRUE;
     else
@@ -1262,7 +1265,7 @@ VMEXPORT jint JNICALL DetachCurrentThread(JavaVM*)
 VMEXPORT jint JNICALL GetEnv(JavaVM* vm, void** penv, jint ver)
 {
     TRACE2("jni", "GetEnv called, ver = " << ver);
-    assert(tmn_is_suspend_enabled());
+    assert(hythread_is_suspend_enabled());
 
     if (p_TLS_vmthread == NULL)
         return JNI_EDETACHED;
@@ -1347,7 +1350,7 @@ jdouble gc_double_NEGATIVE_INFINITY = 0;
 
 
 static void check_for_unexpected_exception(){
-    assert(tmn_is_suspend_enabled());
+    assert(hythread_is_suspend_enabled());
     tmn_suspend_disable();
     ManagedObject * exc;
     if ((exc = get_current_thread_exception())) {
@@ -1419,10 +1422,10 @@ void global_object_handles_init(){
     gh_jldouble->object = struct_Class_to_java_lang_Class(jldouble);
     h_jlt->object= struct_Class_to_java_lang_Class(env->java_lang_Throwable_Class);
     tmn_suspend_enable(); //-------------------------------------------------------^
-    assert(tmn_is_suspend_enabled());
+    assert(hythread_is_suspend_enabled());
 
     gid_throwable_traceinfo = jenv->GetFieldID((jclass)h_jlt, "vm_stacktrace", "[J");
-    assert(tmn_is_suspend_enabled());
+    assert(hythread_is_suspend_enabled());
 
     gid_boolean_value = jenv->GetFieldID((jclass)gh_jlboolean, "value", "Z");   
     gid_byte_value = jenv->GetFieldID((jclass)gh_jlbyte, "value", "B");        
@@ -1432,7 +1435,7 @@ void global_object_handles_init(){
     gid_long_value = jenv->GetFieldID((jclass)gh_jllong, "value", "J");       
     gid_float_value = jenv->GetFieldID((jclass)gh_jlfloat, "value", "F");     
     gid_double_value = jenv->GetFieldID((jclass)gh_jldouble, "value", "D");   
-    assert(tmn_is_suspend_enabled());
+    assert(hythread_is_suspend_enabled());
 
     gid_doubleisNaN = jenv->GetStaticMethodID((jclass)gh_jldouble, "isNaN", "(D)Z");
 
@@ -1440,37 +1443,37 @@ void global_object_handles_init(){
     gid_string_field_value = jenv->GetFieldID((jclass)gh_jls, "value", "[C");
     if(env->strings_are_compressed)
         gid_string_field_bvalue = jenv->GetFieldID((jclass)gh_jls, "bvalue", "[B");
-    assert(tmn_is_suspend_enabled());
+    assert(hythread_is_suspend_enabled());
 
     gid_string_field_offset = jenv->GetFieldID((jclass)gh_jls, "offset", "I");
     gid_string_field_count = jenv->GetFieldID((jclass)gh_jls, "count", "I");
-    assert(tmn_is_suspend_enabled());
+    assert(hythread_is_suspend_enabled());
 
     oh_deallocate_global_handle(h_jlt);
-    assert(tmn_is_suspend_enabled());
+    assert(hythread_is_suspend_enabled());
 
 #ifdef USE_NATIVE_ISARRAY
     field_name = env->string_pool.lookup("isArray");
     field_descr = env->string_pool.lookup("()Z");
     gsig_ClassisArray = env->sig_table.lookup(field_name, field_descr);
 #endif //#ifndef USE_NATIVE_ISARRAY
-    assert(tmn_is_suspend_enabled());
+    assert(hythread_is_suspend_enabled());
 }
 
 void unsafe_global_object_handles_init(){
-    assert(!tmn_is_suspend_enabled());
+    assert(!hythread_is_suspend_enabled());
     tmn_suspend_enable();
     JNIEnv_Internal *jenv = jni_native_intf;
    
     jfieldID POSITIVE_INFINITY_id = jenv->GetStaticFieldID((jclass)gh_jldouble, "POSITIVE_INFINITY", "D");
     gc_double_POSITIVE_INFINITY = jenv->GetStaticDoubleField((jclass)gh_jldouble, POSITIVE_INFINITY_id);
     check_for_unexpected_exception();
-    assert(tmn_is_suspend_enabled());
+    assert(hythread_is_suspend_enabled());
     
     jfieldID NEGATIVE_INFINITY_id = jenv->GetStaticFieldID((jclass)gh_jldouble, "NEGATIVE_INFINITY", "D");      
     gc_double_NEGATIVE_INFINITY = jenv->GetStaticDoubleField((jclass)gh_jldouble, NEGATIVE_INFINITY_id);
-    assert(tmn_is_suspend_enabled());
+    assert(hythread_is_suspend_enabled());
      check_for_unexpected_exception();
-     assert(tmn_is_suspend_enabled());
+     assert(hythread_is_suspend_enabled());
     tmn_suspend_disable();
 }

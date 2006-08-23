@@ -29,7 +29,7 @@
  * BEWARE! This code is used in _DEBUG configuration only 
  */
 
-#include "open/thread.h"
+#include "vm_threads.h"
 
 extern int verify_stack_enumeration_period;
 extern int verify_stack_enumeration_counter;
@@ -42,7 +42,7 @@ inline void debug_stack_enumeration()
 {
     // We verify stack enumeration only when the thread
     // is about to enable suspend, or just disabled it
-    if (p_TLS_vmthread->suspend_enabled_status != 1) return;
+    if (hythread_is_suspend_enabled()) return;
 
     // NB: safepoints in suspend enabled mode are ignored
     // such safepoints are used in suspend.cpp to avoid deadlocks

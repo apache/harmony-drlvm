@@ -20,7 +20,7 @@
 
 /**
  * @file This file describes the JNI interface as per the JNI
- * specification 1.4 available from Sun.
+ * specification 1.5 available from Sun.
  */
 
 #ifndef _JNI_H_

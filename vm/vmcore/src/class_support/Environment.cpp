@@ -22,11 +22,12 @@
 #include "cxxlog.h"
 
 #include "environment.h"
+#include "Package.h"
 #include "String_Pool.h"
 #include "Class.h"
 #include "nogc.h"
 #include "GlobalClassLoaderIterator.h"
-#include "open/thread.h"
+
 #include "verifier.h"
 #include "native_overrides.h"
 
@@ -151,6 +152,7 @@ void Global_Env::EnvClearInternals()
     tmn_suspend_disable();
     GlobalClassLoaderIterator ClIterator;
     ClassLoader *cl = ClIterator.first();
+    
     while(cl) {
         ClassLoader* cltmp = cl;
         cl = ClIterator.next();

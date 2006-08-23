@@ -21,12 +21,10 @@
 #define LOG_DOMAIN "kernel"
 #include "cxxlog.h"
 
-#include "thread_generic.h"
-#include "object_handles.h"
-#include "mon_enter_exit.h"
-#include "open/thread.h"
-
 #include "java_lang_VMThreadManager.h"
+#include "open/hythread_ext.h"
+#include "open/jthread.h"
+#include "open/thread_externals.h"
 
 /*
  * Class:     java_lang_VMThreadManager
@@ -34,9 +32,9 @@
  * Signature: ()Ljava/lang/Thread;
  */
 JNIEXPORT jobject JNICALL Java_java_lang_VMThreadManager_currentThread
-  (JNIEnv * UNREF jenv, jclass)
+  (JNIEnv * UNREF jenv, jclass clazz)
 {
-    return thread_current_thread();
+    return jthread_self();
 }
 
 /*
@@ -45,31 +43,20 @@ JNIEXPORT jobject JNICALL Java_java_lang_VMThreadManager_currentThread
  * Signature: (Ljava/lang/Object;)Z
  */
 JNIEXPORT jboolean JNICALL Java_java_lang_VMThreadManager_holdsLock
-  (JNIEnv * UNREF jenv, jclass, jobject lock)
+  (JNIEnv * UNREF jenv, jclass clazz, jobject monitor)
 {
-    //ToDo: the following code will be used.
-    //return thread_holds_lock(thread_current_thread(), lock);
-
-    VM_thread * vm_thread = get_thread_ptr();
-    tmn_suspend_disable();       //---------------------------------v
-
-    ManagedObject *p_obj = (ManagedObject *)(((ObjectHandle)lock)->object);
-    uint16 stack_key = STACK_KEY(p_obj);
-
-    tmn_suspend_enable();        //---------------------------------^
-
-    return (jboolean)((vm_thread -> thread_index == stack_key) ? JNI_TRUE : JNI_FALSE);
+    return false;//jthread_holds_lock(jthread_self(), monitor);
 }
 
 /*
  * Class:     java_lang_VMThreadManager
  * Method:    interrupt
- * Signature: (Ljava/lang/Thread;)V
+ * Signature: (Ljava/lang/Thread;)I
  */
-JNIEXPORT void JNICALL Java_java_lang_VMThreadManager_interrupt
-  (JNIEnv * UNREF jenv, jclass, jobject jthread)
+JNIEXPORT jint JNICALL Java_java_lang_VMThreadManager_interrupt
+  (JNIEnv * UNREF jenv, jclass clazz, jobject jthread)
 {
-    thread_interrupt(jthread);
+    return jthread_interrupt(jthread);
 }
 
 /*
@@ -78,10 +65,9 @@ JNIEXPORT void JNICALL Java_java_lang_VMThreadManager_interrupt
  * Signature: ()Z
  */
 JNIEXPORT jboolean JNICALL Java_java_lang_VMThreadManager_isInterrupted__
-  (JNIEnv * UNREF jenv, jclass)
+  (JNIEnv * UNREF jenv, jclass clazz)
 {
-    jobject thread = thread_current_thread();
-    return thread_is_interrupted(thread, JNI_TRUE);
+    return jthread_is_interrupted(jthread_self());
 }
 
 /*
@@ -90,198 +76,193 @@ JNIEXPORT jboolean JNICALL Java_java_lang_VMThreadManager_isInterrupted__
  * Signature: (Ljava/lang/Thread;)Z
  */
 JNIEXPORT jboolean JNICALL Java_java_lang_VMThreadManager_isInterrupted__Ljava_lang_Thread_2
-  (JNIEnv * UNREF jenv, jclass, jobject jthread)
+  (JNIEnv * UNREF jenv, jclass clazz, jobject thread)
 {
-    return thread_is_interrupted(jthread, JNI_FALSE);
+    return jthread_is_interrupted(thread);
 }
 
 /*
  * Class:     java_lang_VMThreadManager
  * Method:    notify
- * Signature: (Ljava/lang/Object;)V
+ * Signature: (Ljava/lang/Object;)I
  */
-JNIEXPORT void JNICALL Java_java_lang_VMThreadManager_notify
-  (JNIEnv * UNREF jenv, jclass, jobject obj)
+JNIEXPORT jint JNICALL Java_java_lang_VMThreadManager_notify
+  (JNIEnv * UNREF jenv, jclass clazz, jobject monitor)
 {
-    thread_object_notify(obj);
+    return jthread_monitor_notify(monitor);
 }
 
 /*
  * Class:     java_lang_VMThreadManager
  * Method:    notifyAll
- * Signature: (Ljava/lang/Object;)V
+ * Signature: (Ljava/lang/Object;)I
  */
-JNIEXPORT void JNICALL Java_java_lang_VMThreadManager_notifyAll
-  (JNIEnv * UNREF jenv, jclass, jobject obj)
+JNIEXPORT jint JNICALL Java_java_lang_VMThreadManager_notifyAll
+  (JNIEnv * UNREF jenv, jclass clazz, jobject monitor)
 {
-    thread_object_notify_all(obj);
+    return jthread_monitor_notify_all(monitor);
 }
 
 /*
  * Class:     java_lang_VMThreadManager
  * Method:    resume
- * Signature: (Ljava/lang/Thread;)V
+ * Signature: (Ljava/lang/Thread;)I
  */
-JNIEXPORT void JNICALL Java_java_lang_VMThreadManager_resume
-  (JNIEnv * UNREF jenv, jclass, jobject jthread)
+JNIEXPORT jint JNICALL Java_java_lang_VMThreadManager_resume
+  (JNIEnv * UNREF jenv, jclass clazz, jobject thread)
 {
-    thread_resume(jthread);
+    return jthread_resume(thread);
 }
 
 /*
  * Class:     java_lang_VMThreadManager
  * Method:    setPriority
- * Signature: (Ljava/lang/Thread;I)V
+ * Signature: (Ljava/lang/Thread;I)I
  */
-JNIEXPORT void JNICALL Java_java_lang_VMThreadManager_setPriority
-  (JNIEnv * UNREF jenv, jclass, jobject UNREF jthread, jint UNREF priority)
+JNIEXPORT jint JNICALL Java_java_lang_VMThreadManager_setPriority
+  (JNIEnv * UNREF jenv, jclass clazz, jobject UNREF thread, jint UNREF priority)
 {
-    //ToDo: the following code will be used.
-    //thread_set_priority(jthread, priority);
+    return jthread_set_priority(thread, priority);
 }
 
 /*
  * Class:     java_lang_VMThreadManager
  * Method:    sleep
+ * Signature: (JI)I
+ */
+JNIEXPORT jint JNICALL Java_java_lang_VMThreadManager_sleep
+  (JNIEnv * UNREF jenv, jclass clazz, jlong millis, jint nanos)
+{
+    return jthread_sleep(millis, nanos); 
+}
+
+/*
+ * Class:     java_lang_VMThreadManager
+ * Method:    init
  * Signature: (JI)V
  */
-JNIEXPORT void JNICALL Java_java_lang_VMThreadManager_sleep
-  (JNIEnv * UNREF jenv, jclass, jlong millis, jint nanos)
+JNIEXPORT jlong JNICALL Java_java_lang_VMThreadManager_init
+  (JNIEnv *jenv, jclass clazz, jobject thread, jobject ref, jlong oldThread)
 {
-#if defined (__INTEL_COMPILER)   // intel compiler
-  #pragma warning( push )
-  #pragma warning (disable:1682) // explicit conversion of a 64-bit integral type to a smaller integral type
-#elif defined (_MSC_VER)  // MS compiler
-  #pragma warning( push )
-  #pragma warning (disable:4244) // conversion from 'jlong' to 'long', possible loss of data
-#endif
-
-    thread_sleep(thread_current_thread(), millis, nanos); 
-
-#if defined (__INTEL_COMPILER) || defined (_MSC_VER)
- #pragma warning( pop )
-#endif
+    return jthread_thread_init(NULL, jenv, thread, ref, oldThread);
 }
 
 /*
  * Class:     java_lang_VMThreadManager
  * Method:    start
- * Signature: (Ljava/lang/Thread;J)V
+ * Signature: (Ljava/lang/Thread;JZI)I
  */
-JNIEXPORT void JNICALL Java_java_lang_VMThreadManager_start
-  (JNIEnv *jenv, jclass, jobject thread, jlong UNREF stackSize)
+JNIEXPORT jint JNICALL Java_java_lang_VMThreadManager_start
+  (JNIEnv *jenv, jclass clazz, jobject thread, jlong stackSize, jboolean daemon, jint priority)
 {
-    thread_start(jenv, thread);
+    jthread_threadattr_t attrs;
+    attrs.daemon = daemon;
+    attrs.priority = priority; 
+    attrs.stacksize = (jint)stackSize;
+    return (jint)jthread_create(jenv, thread, &attrs);
 }
 
 /*
  * Class:     java_lang_VMThreadManager
  * Method:    stop
- * Signature: (Ljava/lang/Thread;Ljava/lang/Throwable;)V
+ * Signature: (Ljava/lang/Thread;Ljava/lang/Throwable;)I
  */
-JNIEXPORT void JNICALL Java_java_lang_VMThreadManager_stop
-  (JNIEnv *, jclass, jobject UNREF thread, jthrowable UNREF threadDeathException)
+JNIEXPORT jint JNICALL Java_java_lang_VMThreadManager_stop
+  (JNIEnv *env, jclass clazz, jobject UNREF thread, jthrowable UNREF threadDeathException)
 {
-    //ToDo: the following code will be used.
-    //thread_stop(thread, threadDeathException);
+    return jthread_exception_stop(thread, threadDeathException);
 }
 
 /*
  * Class:     java_lang_VMThreadManager
  * Method:    suspend
- * Signature: (Ljava/lang/Thread;)V
+ * Signature: (Ljava/lang/Thread;)I
  */
-JNIEXPORT void JNICALL Java_java_lang_VMThreadManager_suspend
-  (JNIEnv * UNREF jenv, jclass, jobject jthread)
+JNIEXPORT jint JNICALL Java_java_lang_VMThreadManager_suspend
+  (JNIEnv * UNREF jenv, jclass clazz, jobject jthread)
 {
-    thread_suspend(jthread);
+    return jthread_suspend(jthread);
 }
 
 
 /*
  * Class:     java_lang_VMThreadManager
  * Method:    wait
- * Signature: (Ljava/lang/Object;JI)V
+ * Signature: (Ljava/lang/Object;JI)I
  */
-JNIEXPORT void JNICALL Java_java_lang_VMThreadManager_wait
-  (JNIEnv *, jclass, jobject object, jlong millis, jint nanos)
+JNIEXPORT jint JNICALL Java_java_lang_VMThreadManager_wait
+  (JNIEnv *env, jclass clazz, jobject monitor, jlong millis, jint UNREF nanos)
 {
-    thread_object_wait_nanos (object, millis, nanos);
+    return jthread_monitor_timed_wait(monitor, millis, nanos);
 }
 
 /*
  * Class:     java_lang_VMThreadManager
  * Method:    yield
- * Signature: ()V
+ * Signature: ()I
  */
-JNIEXPORT void JNICALL Java_java_lang_VMThreadManager_yield
-  (JNIEnv * UNREF jenv, jclass)
+JNIEXPORT jint JNICALL Java_java_lang_VMThreadManager_yield
+  (JNIEnv * UNREF jenv, jclass clazz)
 {
-    //ToDo: the following code will be used.
-    //thread_yield(thread_current_thread());
-
-    SleepEx(0, false);
+    return jthread_yield();
 }
 
 /*
  * Class:     java_lang_VMThreadManager
- * Method:    isDead
+ * Method:    attach
+ * Signature: ()V
+ */
+JNIEXPORT void JNICALL Java_java_lang_VMThreadManager_attach
+  (JNIEnv * UNREF jenv, jclass clazz, jobject java_thread)
+{
+    jthread_attach(jenv, java_thread);
+}
+
+/*
+ * Class:     java_lang_VMThreadManager
+ * Method:    isAlive
  * Signature: (Ljava/lang/Thread;)Z
  */
-JNIEXPORT jboolean JNICALL Java_java_lang_VMThreadManager_isDead
-  (JNIEnv *jenv, jclass, jobject thread)
+JNIEXPORT jboolean JNICALL Java_java_lang_VMThreadManager_isAlive
+  (JNIEnv *jenv, jclass clazz, jobject thread)
 {
-    //return ! thread_is_alive(thread);
+    hythread_t tm_native_thread;
 
-    VM_thread *p_vmthread = get_vm_thread_ptr_safe(jenv, thread);
-    if ( !p_vmthread ) {
-        return 1; // don't try to isAlive() non-existant thread
-    }   
-    
-    java_state as = p_vmthread->app_status;  
-    // According to JAVA spec, this method should return true, if and
-    // only if the thread has been died. 
-    switch (as) {
-        case thread_is_sleeping:
-        case thread_is_waiting:
-        case thread_is_timed_waiting:
-        case thread_is_blocked:
-        case thread_is_running:
-        case thread_is_birthing:
-            return 0; 
-            //break;
-        case thread_is_dying:
-        case zip:
-            return 1; 
-            //break;
-        default:
-            ABORT("Unexpected thread state");
-            return 1;
-            //break;
+    tm_native_thread = (hythread_t )vm_jthread_get_tm_data((jthread)thread);
+    assert(tm_native_thread);
+    if (hythread_is_alive(tm_native_thread))
+    { 
+        printf("isAlive\n");
+        return true;
     }
-    // must return from inside the switch statement //remark #111: statement is unreachable
+        printf ("isnot\n");
+    return false;
 }
 
 /*
  * Class:     java_lang_VMThreadManager
  * Method:    join
- * Signature: (Ljava/lang/Thread;JI)V
+ * Signature: (Ljava/lang/Thread;JI)I
  */
-JNIEXPORT void JNICALL Java_java_lang_VMThreadManager_join
-  (JNIEnv * UNREF jenv, jclass, jobject thread, jlong millis, jint nanos)
+JNIEXPORT jint JNICALL Java_java_lang_VMThreadManager_join
+  (JNIEnv * UNREF jenv, jclass clazz, jobject thread, jlong millis, jint nanos)
 {
-#if defined (__INTEL_COMPILER)   // intel compiler
-  #pragma warning( push )
-  #pragma warning (disable:1682) // explicit conversion of a 64-bit integral type to a smaller integral type
-#elif defined (_MSC_VER)  // MS compiler
-  #pragma warning( push )
-  #pragma warning (disable:4244) // conversion from 'jlong' to 'long', possible loss of data
-#endif
-
-    thread_join(thread, millis, nanos);
-
-#if defined (__INTEL_COMPILER) || defined (_MSC_VER)
-#pragma warning( pop )
-#endif
+    return jthread_timed_join(thread, millis, nanos);
 }
 
+
+
+/*
+ * Class:     java_lang_VMThreadManager
+ * Method:    yield
+ * Signature: ()I
+ */
+
+/*
+ * ????
+JNIEXPORT jint JNICALL Java_java_lang_VMThreadManager_initVMThreadManager
+  (JNIEnv * UNREF jenv, jclass clazz)
+{
+    return hythread_init();
+}
+*/

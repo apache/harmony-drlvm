@@ -26,6 +26,10 @@
  */
 public class Object {
 
+    private static final int TM_ERROR_NONE = 0;
+    private static final int TM_ERROR_INTERRUPT = 52;
+    private static final int TM_ERROR_ILLEGAL_STATE = 118;
+    
 	public final Class getClass() {
 		return VMClassRegistry.getClass(this);
 	}
@@ -51,18 +55,38 @@ public class Object {
 	}
 
 	public final void notify() {
-		VMThreadManager.notify(this);
+        int status = VMThreadManager.notify(this);
+        if (status == VMThreadManager.TM_ERROR_ILLEGAL_STATE) {
+            throw new IllegalMonitorStateException();
+        } else if (status != VMThreadManager.TM_ERROR_NONE) {
+            throw new InternalError(
+                "Thread Manager internal error " + status);
+        }
 	}
 
 	public final void notifyAll() {
-		VMThreadManager.notifyAll(this);
+        int status = VMThreadManager.notifyAll(this);
+        if (status == VMThreadManager.TM_ERROR_ILLEGAL_STATE) {
+            throw new IllegalMonitorStateException();
+        } else if (status != VMThreadManager.TM_ERROR_NONE) {
+            throw new InternalError(
+                "Thread Manager internal error " + status);
+        }
 	}
 
 	public final void wait(long millis, int nanos) throws InterruptedException {
 		if(millis < 0 || nanos < 0 || nanos > 999999 ){
 			throw new IllegalArgumentException("Arguments don't match the expected range!");
 		}
-		VMThreadManager.wait(this, millis, nanos);
+        int status = VMThreadManager.wait(this, millis, nanos);
+        if (status == VMThreadManager.TM_ERROR_INTERRUPT) {
+            throw new InterruptedException();        
+        } else if (status == VMThreadManager.TM_ERROR_ILLEGAL_STATE) {
+            throw new IllegalMonitorStateException();
+        } else if (status != VMThreadManager.TM_ERROR_NONE) {
+           // throw new InternalError(
+           //     "Thread Manager internal error " + status);
+        }
 	}
 
 	public final void wait(long millis) throws InterruptedException {
@@ -70,7 +94,15 @@ public class Object {
 	}
 
 	public final void wait() throws InterruptedException {
-		VMThreadManager.wait(this, 0, 0);
+        int status = VMThreadManager.wait(this, 0, 0);
+        if (status == VMThreadManager.TM_ERROR_INTERRUPT) {
+            throw new InterruptedException();        
+        } else if (status == VMThreadManager.TM_ERROR_ILLEGAL_STATE) {
+            throw new IllegalMonitorStateException();
+        } else if (status != VMThreadManager.TM_ERROR_NONE) {
+           // throw new InternalError(
+           //     "Thread Manager internal error " + status);
+        }
 	}
 
 	protected void finalize() throws Throwable {

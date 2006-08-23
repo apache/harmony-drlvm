@@ -59,7 +59,7 @@ using namespace std;
 #include "open/types.h"
 #include "open/bytecodes.h"
 #include "open/vm_util.h"
-#include "open/thread.h"
+
 #include "jvmti_interface.h"
 
 #include "compile.h"
@@ -173,10 +173,10 @@ static ManagedObject * rth_ldc_ref_helper(Class *c, unsigned cp_index)
     } 
     else if (cp_is_class(cp, cp_index)) 
     {
-        assert(!tmn_is_suspend_enabled());
-        tmn_suspend_enable();
+        assert(!hythread_is_suspend_enabled());
+        hythread_suspend_enable();
         Class *objClass = class_resolve_class(c, cp_index); 
-        tmn_suspend_disable();
+        hythread_suspend_disable();
         if (objClass) {
             return struct_Class_to_java_lang_Class(objClass);
         }
@@ -696,7 +696,7 @@ static POINTER_SIZE_INT is_class_initialized(Class *clss)
     vm_stats_total.num_is_class_initialized++;
     clss->num_class_init_checks++;
 #endif // VM_STATS
-    assert(!tmn_is_suspend_enabled());
+    assert(!hythread_is_suspend_enabled());
     return clss->state == ST_Initialized;
 } //is_class_initialized
 
@@ -1494,7 +1494,7 @@ static NativeCodePtr rth_get_lil_gc_safe_point(int * dyn_count) {
     if (addr) {
         return addr;
     }
-    void (*tmn_safe_point_ptr)() = tmn_safe_point;
+    void (*hythread_safe_point_ptr)() = hythread_safe_point;
     LilCodeStub* cs = lil_parse_code_stub("entry 0:managed::void;");
     assert(cs);
     if (dyn_count) {
@@ -1507,7 +1507,7 @@ static NativeCodePtr rth_get_lil_gc_safe_point(int * dyn_count) {
         "call %0i;"
         "pop_m2n;"
         "ret;",
-        tmn_safe_point_ptr);
+        hythread_safe_point_ptr);
     assert(cs && lil_is_valid(cs));
     addr = LilCodeGenerator::get_platform()->compile(cs, "rth_gc_safe_point", dump_stubs);
     lil_free_code_stub(cs);
@@ -1515,7 +1515,7 @@ static NativeCodePtr rth_get_lil_gc_safe_point(int * dyn_count) {
 }
 
 static NativeCodePtr rth_get_lil_gc_thread_suspend_flag_ptr(int * dyn_count) {
-    static NativeCodePtr addr = NULL;
+    /*static NativeCodePtr addr = NULL;
     if (addr) {
         return addr;
     }
@@ -1536,7 +1536,9 @@ static NativeCodePtr rth_get_lil_gc_thread_suspend_flag_ptr(int * dyn_count) {
     addr = LilCodeGenerator::get_platform()->compile(cs, 
                         "rth_get_lil_gc_thread_suspend_flag_ptr", dump_stubs);
     lil_free_code_stub(cs);
-    return addr;
+    */
+    //assert(0);
+    return (NativeCodePtr)hythread_self;
 }
 
 static void * rth_resolve(Class_Handle klass, unsigned cp_idx,
@@ -1548,7 +1550,7 @@ static void * rth_resolve(Class_Handle klass, unsigned cp_idx,
     Compile_Handle ch = (Compile_Handle)&comp_handle;
     
     void * ret = NULL;
-    tmn_suspend_enable();
+    hythread_suspend_enable();
     switch(opcode) {
     case OPCODE_INVOKEINTERFACE:
         ret = resolve_interface_method(ch, klass, cp_idx);
@@ -1582,7 +1584,7 @@ static void * rth_resolve(Class_Handle klass, unsigned cp_idx,
                                    opcode == OPCODE_PUTSTATIC);
         if (ret != NULL) {
             Class_Handle that_class = method_get_class((Method_Handle)ret);
-            tmn_suspend_disable();
+            hythread_suspend_disable();
             if (class_needs_initialization(that_class)) {
                 assert(!exn_raised());
                 class_initialize_ex(that_class);
@@ -1594,7 +1596,7 @@ static void * rth_resolve(Class_Handle klass, unsigned cp_idx,
         ret = resolve_static_method(ch, klass, cp_idx);
         if (ret != NULL) {
             Class_Handle that_class = method_get_class((Method_Handle)ret);
-            tmn_suspend_disable();
+            hythread_suspend_disable();
             if (class_needs_initialization(that_class)) {
                 assert(!exn_raised());
                 class_initialize_ex(that_class);
@@ -1605,7 +1607,7 @@ static void * rth_resolve(Class_Handle klass, unsigned cp_idx,
     default:    assert(false);
     } // ~switch(opcode)
     
-    tmn_suspend_disable();
+    hythread_suspend_disable();
     if (ret == NULL) {
         class_throw_linking_error(klass, cp_idx, opcode);
         assert(false); // must be unreachanble
@@ -1831,7 +1833,7 @@ NativeCodePtr rth_get_lil_helper(VM_RT_SUPPORT f)
  */
 void *vm_malloc_with_thread_pointer(
         unsigned size, Allocation_Handle ah, void *tp) {
-    assert(!tmn_is_suspend_enabled());
+    assert(!hythread_is_suspend_enabled());
     void *result = gc_alloc(size,ah,tp);
     if (!result) {
         exn_throw(VM_Global_State::loader_env->java_lang_OutOfMemoryError);
@@ -1851,8 +1853,8 @@ ManagedObject *class_alloc_new_object_or_null(Class * UNREF c)
 
 ManagedObject *class_alloc_new_object(Class *c)
 {
-    assert(!tmn_is_suspend_enabled());
-    //tmn_suspend_disable();
+    assert(!hythread_is_suspend_enabled());
+    //hythread_suspend_disable();
     assert(strcmp(c->name->bytes, "java/lang/Class")); 
 #ifdef VM_STATS
     vm_stats_total.num_class_alloc_new_object++;
@@ -1865,17 +1867,17 @@ ManagedObject *class_alloc_new_object(Class *c)
     if (!o) {
         exn_throw(
             VM_Global_State::loader_env->java_lang_OutOfMemoryError);
-        //tmn_suspend_enable();
+        //hythread_suspend_enable();
         return 0; // whether this return is reached or not is solved via is_unwindable state
     }
-     //tmn_suspend_enable();
+     //hythread_suspend_enable();
      return o;
 } //class_alloc_new_object
 
 
 ManagedObject *class_alloc_new_object_using_vtable(VTable *vtable)
 {
-    assert(!tmn_is_suspend_enabled());
+    assert(!hythread_is_suspend_enabled());
     assert(strcmp(vtable->clss->name->bytes, "java/lang/Class")); 
 #ifdef VM_STATS
     vm_stats_total.num_class_alloc_new_object++;
@@ -1909,7 +1911,7 @@ class_alloc_new_object_and_run_constructor(Class *clss,
                                            Method *constructor,
                                            uint8 *constructor_args)
 {
-    assert(!tmn_is_suspend_enabled());
+    assert(!hythread_is_suspend_enabled());
     assert(strcmp(clss->name->bytes, "java/lang/Class"));
  
     ObjectHandle obj = oh_allocate_local_handle();
@@ -1993,7 +1995,7 @@ class_alloc_new_object_and_run_constructor(Class *clss,
         arg_num++;
         assert(arg_num <= num_args_estimate);
     }
-    assert(!tmn_is_suspend_enabled());
+    assert(!hythread_is_suspend_enabled());
     vm_execute_java_method_array((jmethodID) constructor, 0, args);
     
     if (exn_raised()) {
@@ -2520,7 +2522,7 @@ Boolean class_is_subtype(Class *s, Class *t)
 VMEXPORT // temporary solution for interpreter unplug
 int __stdcall vm_instanceof(ManagedObject *obj, Class *c)
 {
-    assert(!tmn_is_suspend_enabled());
+    assert(!hythread_is_suspend_enabled());
 
 #ifdef VM_STATS
     vm_stats_total.num_instanceof++;
@@ -2680,13 +2682,13 @@ VMEXPORT void * vm_create_helper_for_function(void* (*fptr)(void*))
         "entry 0:stdcall:pint:pint;"    // the single argument is 'void*'
         "push_m2n 0, 0;"                // create m2n frame
         "out stdcall::void;"
-        "call %0i;"                     // call tmn_suspend_enable()
-        "in2out stdcall:pint;"          // reload input arg into output
+        "call %0i;"                     // call hythread_suspend_enable()
+        "in2out stdcall:pint;"          // reloads input arg into output
         "call %1i;"                     // call the foo
         "locals 2;"                     //
         "l0 = r;"                       // save result
         "out stdcall::void;"
-        "call %2i;"                     // call tmn_suspen_disable()
+        "call %2i;"                     // call hythread_suspend_disable()
         "l1 = ts;"
         "ld l1, [l1 + %3i:ref];"
         "jc l1 != 0,_exn_raised;"          // test whether an exception happened
@@ -2698,8 +2700,8 @@ VMEXPORT void * vm_create_helper_for_function(void* (*fptr)(void*))
         "call.noret %4i;";              // re-throw exception
 
     void * fptr_rethrow = (void*)&rethrow_current_thread_exception;
-    void * fptr_suspend_enable = (void*)&tmn_suspend_enable;
-    void * fptr_suspend_disable = (void*)&tmn_suspend_disable;
+    void * fptr_suspend_enable = (void*)&hythread_suspend_enable;
+    void * fptr_suspend_disable = (void*)&hythread_suspend_disable;
 
     LilCodeStub* cs = lil_parse_code_stub(
         lil_stub,

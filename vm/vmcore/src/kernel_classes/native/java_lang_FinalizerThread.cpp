@@ -28,9 +28,10 @@
 
 #include "java_lang_FinalizerThread.h"
 #include "open/gc.h"
-#include "open/thread.h"
+#include "open/hythread_ext.h"
 #include "finalize.h"
 #include "port_sysinfo.h"
+#include "vm_threads.h"
 
 /**
  * Implements getObject(..) method.

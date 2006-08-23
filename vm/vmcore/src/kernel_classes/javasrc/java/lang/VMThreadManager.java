@@ -37,6 +37,13 @@ package java.lang;
 final class VMThreadManager {
 
     /**
+     * Thread Manager functions error codes.
+     */
+    public static final int TM_ERROR_NONE = 0;
+    public static final int TM_ERROR_INTERRUPT = 52;
+    public static final int TM_ERROR_ILLEGAL_STATE = 51;
+
+    /**
      * This class is not supposed to be instantiated.
      */
     private VMThreadManager() {
@@ -79,7 +86,7 @@ final class VMThreadManager {
      * {@link Thread#interrupt() Thread.interrupt()} method. 
      * @api2vm
      */
-    static native void interrupt(Thread thread);
+    static native int interrupt(Thread thread);
 
     /**
      * Checks if the specified thread is dead.
@@ -91,7 +98,7 @@ final class VMThreadManager {
      * @return true if the thread has died already, false otherwise.
      * @api2vm
      */
-    static native boolean isDead(Thread thread);
+    static native boolean isAlive(Thread thread);
 
     /**
      * This method satisfies the requirements of the specification for the
@@ -115,29 +122,28 @@ final class VMThreadManager {
      * must be valid.
      * @api2vm
      */
-    static native void join(Thread thread, long millis, int nanos)
-        throws InterruptedException;
+    static native int join(Thread thread, long millis, int nanos);
 
     /**
      * This method satisfies the requirements of the specification for the
      * {@link Object#notify() Object.notify()} method.
      * @api2vm
      */
-    static native void notify(Object object);
+    static native int notify(Object object);
 
     /**
      * This method satisfies the requirements of the specification for the
      * {@link Object#notifyAll() Object.notifyAll()} method.
      * @api2vm
      */
-    static native void notifyAll(Object object);
+    static native int notifyAll(Object object);
 
     /**
      * This method satisfies the requirements of the specification for the
      * {@link Thread#resume() Thread.resume()} method.
      * @api2vm
      */
-    static native void resume(Thread thread);
+    static native int resume(Thread thread);
 
     /**
      * Changes the priority of the specified thread.
@@ -149,7 +155,7 @@ final class VMThreadManager {
      * @param priority new priority value
      * @api2vm
      */
-    static native void setPriority(Thread thread, int priority);
+    static native int setPriority(Thread thread, int priority);
 
     /**
      * This method satisfies the requirements of the specification for the
@@ -159,8 +165,7 @@ final class VMThreadManager {
      * must be valid.
      * @api2vm
      */
-    static native void sleep(long millis, int nanos)
-        throws InterruptedException;
+    static native int sleep(long millis, int nanos);
 
     /**
      * Starts the specified thread. Causes JVM to start executing
@@ -177,7 +182,7 @@ final class VMThreadManager {
      * @param size the desired stack size in bytes or zero to be ignored
      * @api2vm
      */
-    static native void start(Thread thread, long size);
+    static native int start(Thread thread, long stackSize, boolean daemon, int priority);
 
     /**
      * This method satisfies the requirements of the specification for the
@@ -186,14 +191,14 @@ final class VMThreadManager {
      * exception. The <code>throwable</code> argument must not be null.
      * @api2vm
      */
-    static native void stop(Thread thread, Throwable throwable);
+    static native int stop(Thread thread, Throwable throwable);
 
     /**
      * This method satisfies the requirements of the specification for the
      * {@link Thread#suspend() Thread.suspend()} method.
      * @api2vm
      */
-    static native void suspend(Thread thread);
+    static native int suspend(Thread thread);
 
     /**
      * This method satisfies the requirements of the specification for the
@@ -203,7 +208,7 @@ final class VMThreadManager {
      * must be valid.
      * @api2vm
      */
-    static native void wait(Object object, long millis, int nanos)
+    static native int wait(Object object, long millis, int nanos)
         throws InterruptedException;
 
     /**
@@ -211,5 +216,20 @@ final class VMThreadManager {
      * {@link Thread#yield() Thread.yield()} method.
      * @api2vm
      */
-    static native void yield();
+    static native int yield();
+
+     /**
+      * This method initialize native thread structure as well as inter dependencies
+      * between java thread and native thread.
+      * @api2vm
+      */
+     static native long init(Thread thread, ThreadWeakRef ref, long oldAddr);
+
+     /**
+      * This method attches current thread to vm. Required for main thread construction.
+      * @api2vm
+      */
+     static native int attach(java.lang.Thread thread);
+
 }
+

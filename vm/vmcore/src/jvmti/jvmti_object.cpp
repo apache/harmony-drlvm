@@ -27,7 +27,7 @@
 #include "object_handles.h"
 #include "object_generic.h"
 #include "mon_enter_exit.h"
-#include "open/thread.h"
+
 #include "thread_manager.h"
 #include "suspend_checker.h"
 #include "open/vm.h"
@@ -144,6 +144,7 @@ jvmtiGetObjectMonitorUsage(jvmtiEnv* env,
     /*
      * Check given env & current phase.
      */
+    
     jvmtiPhase phases[] = {JVMTI_PHASE_LIVE};
     CHECK_EVERYTHING();
     CHECK_CAPABILITY(can_get_monitor_info);
@@ -153,63 +154,67 @@ jvmtiGetObjectMonitorUsage(jvmtiEnv* env,
     if (NULL == info_ptr)
         return JVMTI_ERROR_NULL_POINTER;
 
-    ManagedObject * obj;
     int enter_wait_count = 0;
     int notify_wait_count = 0;
-    tm_iterator_t * iterator = tm_iterator_create();
-    VM_thread *thread = tm_iterator_next(iterator);
+    jthread_iterator_t  iterator = jthread_iterator_create();
+    jthread thread = jthread_iterator_next(&iterator);
+    jobject monitor = NULL;
     assert(thread);
     while (thread)
     {
-        obj = mon_enter_array[thread->thread_index].p_obj;
-        if (obj == object->object)
+        jthread_get_contended_monitor(thread, &monitor);
+        if (monitor && monitor->object == object->object)
             enter_wait_count++;
-        obj = mon_wait_array[thread->thread_index].p_obj;
-        if (obj == object->object)
+        jthread_get_wait_monitor(thread, &monitor);
+        if (monitor && monitor->object == object->object)
             notify_wait_count++;
-        thread = tm_iterator_next(iterator);
+        
+        thread = jthread_iterator_next(&iterator);
     }
 
     jthread* enter_wait_array = NULL;
-    jvmtiError jvmti_error = _allocate(sizeof(jthread*) *
-            enter_wait_count, (unsigned char **)&enter_wait_array);
-    if (JVMTI_ERROR_NONE != jvmti_error)
-    {
-        tm_iterator_release(iterator);
-        return jvmti_error;
-    }
+ 	if (enter_wait_count > 0){
+		jvmtiError jvmti_error = _allocate(sizeof(jthread*) *
+				enter_wait_count, (unsigned char **)&enter_wait_array);
+		if (JVMTI_ERROR_NONE != jvmti_error)
+		{
+			jthread_iterator_release(&iterator);
+			return jvmti_error;
+		}
+	}
 
     jthread* notify_wait_array = NULL;
-    jvmti_error = _allocate(sizeof(jthread*) *
-            notify_wait_count, (unsigned char **)&notify_wait_array);
-    if (JVMTI_ERROR_NONE != jvmti_error)
-    {
-        tm_iterator_release(iterator);
-        return jvmti_error;
-    }
+	if (notify_wait_count > 0){
+		jvmtiError jvmti_error = _allocate(sizeof(jthread*) *
+				notify_wait_count, (unsigned char **)&notify_wait_array);
+		if (JVMTI_ERROR_NONE != jvmti_error)
+		{
+			jthread_iterator_release(&iterator);
+			return jvmti_error;
+		}
+	}
 
-    extern jobject get_jobject(VM_thread * thread);
     int ii = 0, jj = 0;
-    int stack_key = STACK_KEY(object->object);
     info_ptr->owner = NULL;
 
-    tm_iterator_reset(iterator);
-    thread = tm_iterator_next(iterator);
+    jthread_iterator_reset(&iterator);
+    thread = jthread_iterator_next(&iterator);
     while (thread)
     {
-        if (stack_key == thread->thread_index)
-            info_ptr->owner = get_jobject(thread);
-        obj = mon_enter_array[thread->thread_index].p_obj;
-        if (obj == object->object)
-            enter_wait_array[ii++] = get_jobject(thread);
-        obj = mon_wait_array[thread->thread_index].p_obj;
-        if (obj == object->object)
-            notify_wait_array[jj++] = get_jobject(thread);
-        thread = tm_iterator_next(iterator);
+        jthread_get_contended_monitor(thread, &monitor);
+        if (monitor && monitor->object == object->object)
+            enter_wait_array[ii++] = thread;
+        
+        jthread_get_wait_monitor(thread, &monitor);
+        if (monitor && monitor->object == object->object)
+            notify_wait_array[jj++] = thread;
+        
+        thread = jthread_iterator_next(&iterator);
     }
-    tm_iterator_release(iterator);
+    jthread_iterator_release(&iterator);
 
-    info_ptr->entry_count = RECURSION(object->object) + (info_ptr->owner != NULL);
+    jthread_get_lock_owner(object, &info_ptr->owner);
+    info_ptr->entry_count = jthread_get_lock_recursion(object, info_ptr->owner) + 1;
     info_ptr->waiter_count = enter_wait_count;
     info_ptr->waiters = enter_wait_array;
     info_ptr->notify_waiter_count = notify_wait_count;

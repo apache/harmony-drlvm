@@ -49,12 +49,9 @@ extern "C" {
 #define WORD unsigned short
 #define DWORD unsigned int
 #define BOOL unsigned int
-typedef pthread_t VmThreadHandle;
 #ifdef POINTER64
-#define VmEventHandle void*
 #define HANDLE void*
 #else
-#define VmEventHandle unsigned int
 #define HANDLE unsigned int
 #endif
 
@@ -109,34 +106,7 @@ typedef    unsigned char boolean;
 #define FMT64 "ll"
 #endif // FMT64
 
-void init_linux_thread_system();
 typedef struct VM_thread VM_thread;
-bool suspend_thread(VM_thread *);
-bool resume_thread(VM_thread *);
-
-#define CRITICAL_SECTION pthread_mutex_t
-#define LPCRITICAL_SECTION pthread_mutex_t *
-
-VOID InitializeCriticalSection(LPCRITICAL_SECTION lpCriticalSection);
-
-VOID DeleteCriticalSection(LPCRITICAL_SECTION lpCriticalSection);
-VOID LeaveCriticalSection(LPCRITICAL_SECTION lpCriticalSection);
-BOOL TryEnterCriticalSection(LPCRITICAL_SECTION lpCriticalSection);
-BOOL EnterCriticalSection(LPCRITICAL_SECTION lpCriticalSection);
-
-VmThreadHandle vm_beginthreadex( void * security, unsigned stack_size, unsigned(__stdcall *start_address)(void *), void *arglist, unsigned initflag, pthread_t *thrdaddr);
-VmThreadHandle vm_beginthread(void (__cdecl *start_address)(void *), unsigned stack_size, void *arglist);
-void vm_endthreadex(int);
-void vm_endthread(void);
-
-#define CreateEvent vm_create_event
-#define SetEvent vm_set_event
-#define ResetEvent vm_reset_event
-#define WaitForSingleObject vm_wait_for_single_object
-#define WaitForMultipleObjects vm_wait_for_multiple_objects
-
-void Sleep(DWORD);
-void SleepEx(DWORD, bool);
 
 /*
  * There are two ways to implement Thread-Specific_Data(TSD or Thread Local 
@@ -227,13 +197,7 @@ inline void *get_specific00(void){
 #define G_S_R_E_H NULL
 #define J_V_M_T_I_E_H NULL
 #define E_H_RECOMP NULL
-#define OS_THREAD_INIT_1()
-#define OS_SYNC_SUPPORT()
-#define OS_THREAD_INIT_2() p_TLS_vmthread = p_vm_thread; 
-#define THREAD_CLEANUP() 
-#define BEGINTHREADEX_SUSPENDSTATE 1
-#define SET_THREAD_DATA_MACRO()
-#define CHECK_HIJACK_SUPPORT_MACRO()
+
 #include "stdlib.h"
 
 #include <assert.h>
@@ -247,10 +211,6 @@ DWORD IJGetLastError(VOID);
 
 void _fpreset(void);
 
-
-VmEventHandle vm_create_event(int *, unsigned int, unsigned int, char *);
-BOOL vm_destroy_event( VmEventHandle );
-
 typedef struct event_wrapper {
   pthread_mutex_t          mutex;
   pthread_cond_t           cond;
@@ -258,18 +218,6 @@ typedef struct event_wrapper {
   __uint32                 state;
   unsigned int             n_wait;
 } event_wrapper;
-
-BOOL vm_reset_event(VmEventHandle hEvent);
-BOOL vm_set_event(VmEventHandle hEvent);
-
-void vm_yield();
-DWORD vm_wait_for_single_object(VmEventHandle hHandle, DWORD dwMilliseconds);
-DWORD vm_wait_for_multiple_objects(DWORD num, const VmEventHandle * handle, BOOL flag, DWORD dwMilliseconds);
-
-
-#define WAIT_TIMEOUT 0x102
-#define WAIT_OBJECT_0 0
-#define WAIT_FAILED (DWORD)0xFFFFFFFF
 
 
 typedef struct _FLOATING_SAVE_AREA {
@@ -567,23 +515,13 @@ typedef CONTEXT *PCONTEXT;
 #define CONTEXT_FLOATING_POINT 2
 #define CONTEXT_INTEGER 3
 #define THREAD_PRIORITY_NORMAL 4
-
+/*
 
 BOOL GetThreadContext(VmThreadHandle hthread, const CONTEXT *lpcontext);
 BOOL SetThreadContext(VmThreadHandle hh, const CONTEXT *cc);
 BOOL SetThreadPriority(VmThreadHandle hh, int pp);
 
-BOOL port_CloseHandle(VmEventHandle hh);
-pthread_t GetCurrentThreadId(void);
-VmEventHandle GetCurrentProcess(void);
-VmEventHandle GetCurrentThread(void);
-
-#define DUPLICATE_SAME_ACCESS 3
-
-BOOL DuplicateHandle(VmEventHandle aa, VmEventHandle bb, 
-                     VmEventHandle cc, VmEventHandle *dd, 
-                     DWORD ee, BOOL ff, DWORD gg);
-
+*/
 #define _MAX_PATH PATH_MAX
 
 struct _finddata_t {
@@ -607,12 +545,11 @@ void * _alloca(int);
 
 __uint64 GetTickCount();
 
-void vm_endthreadex(int);
 typedef void * FARPROC;
 
-inline void vm_terminate_thread(VmThreadHandle thrdaddr) {
+/*inline void vm_terminate_thread(VmThreadHandle thrdaddr) {
     pthread_cancel(thrdaddr);    
-}
+}*/
 #ifdef __cplusplus
 }
 #endif

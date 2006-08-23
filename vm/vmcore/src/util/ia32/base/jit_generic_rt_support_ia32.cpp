@@ -31,7 +31,7 @@
 #include "cxxlog.h"
 
 #include "jit_runtime_support.h"
-#include "open/thread.h"
+
 #include "nogc.h" // for malloc_fixed_code_for_jit()
 #include "encoder.h"
 #include "vm_stats.h"
@@ -52,7 +52,7 @@ extern bool dump_stubs;
 
 static uint64 vm_lshl(unsigned count, uint64 n)
 {
-    assert(!tmn_is_suspend_enabled());
+    assert(!hythread_is_suspend_enabled());
     return n << (count & 0x3f);
 } //vm_lshl
 
@@ -108,7 +108,7 @@ void * getaddress__vm_lshl_naked()
 
 static int64 vm_lshr(unsigned count, int64 n)
 {
-    assert(!tmn_is_suspend_enabled());
+    assert(!hythread_is_suspend_enabled());
     return n >> (count & 0x3f);
 } //vm_lshr
 
@@ -162,7 +162,7 @@ void * getaddress__vm_lshr_naked()
 
 static uint64 vm_lushr(unsigned count, uint64 n)
 {
-    assert(!tmn_is_suspend_enabled());
+    assert(!hythread_is_suspend_enabled());
     return n >> (count & 0x3f);
 } //vm_lushr
 
@@ -218,7 +218,7 @@ static int64 __stdcall vm_lmul(int64 m, int64 n) stdcall__;
 
 static int64 __stdcall vm_lmul(int64 m, int64 n)
 {
-    assert(!tmn_is_suspend_enabled());
+    assert(!hythread_is_suspend_enabled());
 
     return m * n;
 } //vm_lmul
@@ -228,7 +228,7 @@ static int64 __stdcall vm_lmul_const_multiplier(int64 m, int64 n) stdcall__;
 
 static int64 __stdcall vm_lmul_const_multiplier(int64 m, int64 n)
 {
-    assert(!tmn_is_suspend_enabled());
+    assert(!hythread_is_suspend_enabled());
     __asm{
         mov  eax,dword ptr [ebp+0ch]
         mov  ecx,dword ptr [ebp+10h]
@@ -246,7 +246,7 @@ static int64 __stdcall do_lrem(int64 m, int64 n) stdcall__;
 
 static int64 __stdcall do_lrem(int64 m, int64 n)
 {
-    assert(!tmn_is_suspend_enabled());
+    assert(!hythread_is_suspend_enabled());
 
     return m % n;
 } //do_lrem
@@ -701,7 +701,7 @@ static int64 __stdcall vm_d2l(double d) stdcall__;
 
 static int64 __stdcall vm_d2l(double d)
 {
-    assert(!tmn_is_suspend_enabled());
+    assert(!hythread_is_suspend_enabled());
 
 #ifdef VM_STATS
     vm_stats_total.num_d2l++;
@@ -883,7 +883,7 @@ static int64 __stdcall vm_f2l(float f) stdcall__;
 
 static int64 __stdcall vm_f2l(float f)
 {
-    assert(!tmn_is_suspend_enabled());
+    assert(!hythread_is_suspend_enabled());
 
 #ifdef VM_STATS
     vm_stats_total.num_f2l++;

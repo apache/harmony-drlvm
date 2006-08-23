@@ -25,22 +25,19 @@
 #include "ini.h"
 #include "environment.h"
 #include "open/em_vm.h"
-#include "open/thread.h"
+
 
 void
 vm_execute_java_method_array(jmethodID method, jvalue *result, jvalue *args) {
     // TODO: select jit which compiled the method
-    assert(!tmn_is_suspend_enabled());
-         int tmn_suspend_disable_count();    
-    assert(tmn_suspend_disable_count()==1);
-    DEBUG_PUSH_LOCK(JAVA_CODE_PSEUDO_LOCK);
+    assert(!hythread_is_suspend_enabled());
+    //FIXME integration
+    //DEBUG_PUSH_LOCK(JAVA_CODE_PSEUDO_LOCK);
     assert(NULL != VM_Global_State::loader_env);
     assert(NULL != VM_Global_State::loader_env->em_interface);
     assert(NULL != VM_Global_State::loader_env->em_interface->ExecuteMethod);
     VM_Global_State::loader_env->em_interface->ExecuteMethod(method, result, args);
-    DEBUG_POP_LOCK(JAVA_CODE_PSEUDO_LOCK);
-    int tmn_suspend_disable_count();    
-    assert(tmn_suspend_disable_count()==1);
+    //DEBUG_POP_LOCK(JAVA_CODE_PSEUDO_LOCK);
  
 }
 

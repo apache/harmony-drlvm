@@ -136,16 +136,11 @@ uint32* m2n_get_args(M2nFrame* m2nf)
 
 unsigned m2n_ts_to_register_size()
 {
-#ifdef PLATFORM_POSIX
     return 22;
-#else //!PLATFORM_POSIX
-    return 7;
-#endif //!PLATFORM_POSIX
 }
 
 char* m2n_gen_ts_to_register(char* buf, R_Opnd* reg)
 {
-#ifdef PLATFORM_POSIX
     if (reg!=&eax_opnd)
         buf = push(buf,  eax_opnd);
     buf = push(buf,  ecx_opnd);
@@ -157,10 +152,6 @@ char* m2n_gen_ts_to_register(char* buf, R_Opnd* reg)
         buf = mov(buf, *reg,  eax_opnd);
         buf = pop(buf,  eax_opnd);
     }
-#else //!PLATFORM_POSIX
-    buf = prefix(buf, prefix_fs);
-    buf = mov(buf, *reg,  M_Opnd(0x14));
-#endif //!PLATFORM_POSIX
     return buf;
 }
 

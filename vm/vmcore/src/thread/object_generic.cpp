@@ -40,11 +40,13 @@ using namespace std;
 #include "vm_arrays.h"
 
 #include "thread_generic.h"
-#include "open/thread.h"
+
+#include "open/jthread.h"
 #include "thread_manager.h"
 #include "object.h"
 #include "object_generic.h"
 #include "mon_enter_exit.h"
+#include "port_atomic.h"
 
 #include "jit_runtime_support_common.h"
 
@@ -52,272 +54,28 @@ using namespace std;
 #include "interpreter.h"
 #include "vm_log.h"
 
-mon_wait_fields mon_wait_array[MAX_VM_THREADS];
-
-#ifdef _DEBUG
-// loose, approximate counts, full of race conditions
-int max_notifyAll = 0;
-int max_recursion = 0;
-int total_sleep_timeouts = 0;
-int total_sleep_interrupts = 0;
-int total_wait_timeouts = 0;
-int total_wait_interrupts = 0;
-int total_illegal_mon_state_exceptions = 0;
-int iterations_per_thread[MAX_VM_THREADS];
-int max_block_on_mon_enter_loops = 0;
-#endif
-
-static inline bool object_locked_by_current_thread(jobject jobj) {
-    uint16 current_stack_key = get_self_stack_key();
-    bool result = false;
-    assert(!tmn_is_suspend_enabled());
-    result = (STACK_KEY(jobj->object) == current_stack_key);
-    TRACE2("stack_key", "self = " << current_stack_key 
-        << ", locked by " << STACK_KEY(jobj->object)
-        << ", result = " << result);
-    return result;
-}
-
-void notify_internal (jobject jobj, Boolean all)
-{
-
-    tmn_suspend_disable_recursive();
-    assert(jobj->object->vt()->clss->vtable->clss->vtable);
- 
-   if (!object_locked_by_current_thread(jobj)) 
+void set_hash_bits(ManagedObject *p_obj)
     {
-        tmn_suspend_enable_recursive(); 
-        exn_raise_by_name("java/lang/IllegalMonitorStateException");
-        return;
-    }
+    uint8 hb = (uint8) (((POINTER_SIZE_INT)p_obj >> 3) & HASH_MASK)  ;
+    // lowest 3 bits are not random enough so get rid of them
 
-#ifdef _DEBUG
-    int notifyAll_count = 0;
-#endif
+    if (hb == 0)
+        hb = (23 & HASH_MASK);  // NO hash = zero allowed, thus hard map hb = 0 to a fixed prime number
 
-    DWORD stat;
-    int xx;
-
-    for (xx = 1; xx < next_thread_index; xx++)
-    {
-        if (mon_wait_array[xx].p_obj == jobj->object)
-        {
-            stat = vm_set_event(mon_wait_array[xx].p_thr->event_handle_notify_or_interrupt);
-#ifdef _DEBUG
-            if(!stat) {
-                 WARN("set notify event failed: " << IJGetLastError());
-            }
-#endif
-            if (!all)
-                break;
-
-#ifdef _DEBUG
-            notifyAll_count++;
-            if (notifyAll_count > max_notifyAll)
-                max_notifyAll = notifyAll_count;
-#endif
-        }
-    }
-    tmn_suspend_enable_recursive(); 
+    // don't care if the cmpxchg fails -- just means someone else already set the hash
+    port_atomic_cas8(P_HASH_CONTENTION_BYTE(p_obj),hb, 0);
 }
-
-void thread_object_notify (jobject jobj)
-{
-    java_lang_Object_notify (jobj);
-}
-void java_lang_Object_notify (jobject jobj)
-{
-    TRACE2("notify", "Notify " << p_TLS_vmthread->thread_handle << " on " << jobj);
-    //assert(tmn_is_suspend_enabled());
-
-    notify_internal(jobj, false);
-
-    //assert(tmn_is_suspend_enabled());
-    TRACE2("notify", "Finish Notify " << p_TLS_vmthread->thread_handle << " on " << jobj);
-}
-
-void thread_object_notify_all (jobject jobj)
-{
-    java_lang_Object_notifyAll (jobj);
-}
-
-void java_lang_Object_notifyAll (jobject jobj)
-{
-    TRACE2("notify", "Notify all " << p_TLS_vmthread->thread_handle << " on " << jobj);
- 
-    notify_internal(jobj, true);
-
-    TRACE2("notify", "Finish notify all " << p_TLS_vmthread->thread_handle << " on " << jobj);
-}
-
-void thread_object_wait_nanos(jobject jobj, int64 msec, int nanosec) {
-    /*
-	 * We have to do something in the case millis == 0 and nanos > 0,
-	 * because otherwise we'll wait infinitely, also just return whould 
-	 * be incorrect because we have to relese lock for a while:
-	 */
-    msec += (msec==0 && nanosec>0)?1:0;
-    java_lang_Object_wait(jobj, msec);
-}
-
-void thread_object_wait(jobject jobj, int64 msec)
-{
-    java_lang_Object_wait(jobj, msec);
-}
-int java_lang_Object_wait(jobject jobj, int64 msec)
-{
-    assert(tmn_is_suspend_enabled());
- 
-    // ? 2003-06-23.  The lock needs to be unreserved.
-    if (msec < 0) 
-    {
-        exn_raise_by_name("java/lang/IllegalArgumentException");
-        return -1;
-    }
-
-    assert(object_is_valid(jobj));
-    tmn_suspend_disable();
-
-    if (!object_locked_by_current_thread(jobj)) 
-    {
-        tmn_suspend_enable(); 
-        exn_raise_by_name("java/lang/IllegalMonitorStateException");
-        return -1;
-    }
- 
-    VM_thread *p_thr = get_thread_ptr();
-    DWORD stat;
-    // toss stale notifies
-    stat = vm_reset_event(p_thr->event_handle_notify_or_interrupt);
- 
-    // check prior interrupts.
-    if (p_thr->interrupt_a_waiting_thread)
-    {
-        p_thr->interrupt_a_waiting_thread = false;
-        tmn_suspend_enable();
-        exn_raise_by_name("java/lang/InterruptedException");
-
-        return -1;
-    }
-    
-    tmn_suspend_enable(); 
-    assert(tmn_is_suspend_enabled());
-    tm_acquire_tm_lock(); 
-    assert(p_thr->app_status == thread_is_running);
-    if(msec == 0 /*&& nanos == 0 // added for nanos support*/) {
-        p_thr->app_status = thread_is_waiting;
-    } else {
-        p_thr->app_status = thread_is_timed_waiting;
-    }
-    tm_release_tm_lock();
-    tmn_suspend_disable(); 
-    assert(p_thr->notify_recursion_count == 0);
-    assert(mon_wait_array[p_thr->thread_index].p_obj == 0);
-    mon_wait_array[p_thr->thread_index].p_obj = jobj->object;
-    p_thr->notify_recursion_count = RECURSION(jobj->object);
-    RECURSION(jobj->object) = 0;  // leave the recursion at zero for the next lock owner
-
-#ifdef _DEBUG
-    if (p_thr->notify_recursion_count > max_recursion)
-        max_recursion = p_thr->notify_recursion_count;
-#endif
-
-     STACK_KEY(jobj->object) = FREE_MONITOR; // finally, give up the lock
-
-
-    find_an_interested_thread(jobj->object);
-    tmn_suspend_enable();
-
-    TRACE2("wait", "thread going to wait " << p_TLS_vmthread->thread_handle);
-
-    assert(tmn_is_suspend_enabled());
-    p_thr -> is_suspended = true;
-    if (msec == 0)
-    {
-        stat = vm_wait_for_single_object(p_thr->event_handle_notify_or_interrupt, INFINITE);
-        assert(stat == WAIT_OBJECT_0);
-    }
-    else
-    {
-#if defined (__INTEL_COMPILER) 
-#pragma warning( push )
-#pragma warning (disable:1683) // to get rid of remark #1683: explicit conversion of a 64-bit integral type to a smaller integral type
-#endif
-        stat = vm_wait_for_single_object(p_thr->event_handle_notify_or_interrupt, (int)msec); 
-
-#if defined (__INTEL_COMPILER)
-#pragma warning( pop )
-#endif
-
-        assert( (stat == WAIT_OBJECT_0) || (stat == WAIT_TIMEOUT) );
-    }
-    p_thr -> is_suspended = false;
-
-    TRACE2("wait", "thread finished waiting " << p_TLS_vmthread->thread_handle);
-
-#ifdef _DEBUG
-    if (stat == WAIT_OBJECT_0)
-        total_wait_interrupts++;
-    else
-        total_wait_timeouts++;
-#endif
-
-    assert(object_is_valid(jobj));
-    tmn_suspend_disable();
-    //GC may have moved the object sitting in mon_wait_array[], thus reload it
-    assert(mon_wait_array[p_thr->thread_index].p_obj->vt()->clss->vtable->clss->vtable);
-    assert(mon_wait_array[p_thr->thread_index].p_obj == jobj->object); // jobj should have been updated too -salikh
-    
-    mon_wait_array[p_thr->thread_index].p_obj = 0;
-    //do we need to do a p4 sfence here?
-    // lock will do sfence.
-    tmn_suspend_enable();
-    
-    assert(tmn_is_suspend_enabled());
-    tm_acquire_tm_lock();
-
-    assert(p_thr->app_status == thread_is_waiting || p_thr->app_status == thread_is_timed_waiting);
-    p_thr->app_status = thread_is_running;
-
-    // now we need to re-acquire the object lock
-    // since block_on_mon_enter() can block, reload p_obj
-    tm_release_tm_lock(); //with gc_disabled xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
-    tmn_suspend_disable();
-
-    block_on_mon_enter(jobj);
-    assert(jobj->object->vt()->clss->vtable->clss->vtable);
-
-    assert(object_locked_by_current_thread(jobj));
-
-    // re-install the recursion count
-    assert(RECURSION(jobj->object) == 0);
-    RECURSION(jobj->object) = (uint8)p_thr->notify_recursion_count;
-
-    p_thr->notify_recursion_count = 0;
-
-    tmn_suspend_enable(); 
-    if ( (stat == WAIT_OBJECT_0) && (p_thr->interrupt_a_waiting_thread == true) )
-    {
-        p_thr->interrupt_a_waiting_thread = false;
-        exn_raise_by_name("java/lang/InterruptedException");
-    }
-
-    return stat;
-
-    // ready to return to java code 
-}
-
 
 long generic_hashcode(ManagedObject * p_obj)
 {
     if (!p_obj) return 0L;
-    if ( HASH_CONTENTION(p_obj) & HASH_MASK)
-        return HASH_CONTENTION(p_obj) & HASH_MASK;
+    if ( *P_HASH_CONTENTION_BYTE(p_obj) & HASH_MASK)
+        return *P_HASH_CONTENTION_BYTE(p_obj) & HASH_MASK;
 
     set_hash_bits(p_obj);
 
-    if ( HASH_CONTENTION(p_obj) & HASH_MASK)
-        return HASH_CONTENTION(p_obj) & HASH_MASK;    
+    if ( *P_HASH_CONTENTION_BYTE(p_obj) & HASH_MASK)
+        return *P_HASH_CONTENTION_BYTE(p_obj) & HASH_MASK;    
     
     ASSERT(0, "All the possible cases are supposed to be covered before");
     return 0xff;
@@ -338,22 +96,10 @@ jint object_get_generic_hashcode(JNIEnv*, jobject jobj)
     return hash;
 }
 
-#define NEW_ARRAY(X) new_arr = jenv->New##X##Array(length); assert(new_arr);        
-
-#define GET_ARRAY_ELEMENTS(X, Y) src_bytes = jenv->Get##X##ArrayElements((j##Y##Array)jobj, &is_copy); \
-    dst_bytes = jenv->Get##X##ArrayElements((j##Y##Array)new_arr, &is_copy);
-
-#define MEMCPY(X) tmn_suspend_disable(); memcpy(dst_bytes, src_bytes, sizeof(j##X) * length); tmn_suspend_enable();
-
-#define RELEASE_ARRAY_ELEMENTS(X, Y) jenv->Release##X##ArrayElements((j##Y##Array)new_arr, (j##Y *) dst_bytes, 0); \
-    jenv->Release##X##ArrayElements((j##Y##Array)jobj, (j##Y *)src_bytes, JNI_ABORT);
-
-#define HANDLE_TYPE_COPY(A, B) NEW_ARRAY(A) GET_ARRAY_ELEMENTS(A, B) MEMCPY(B) RELEASE_ARRAY_ELEMENTS(A, B)
-
 jobject object_clone(JNIEnv *jenv, jobject jobj)
 {
     ManagedObject *result;
-    assert(tmn_is_suspend_enabled());
+    assert(hythread_is_suspend_enabled());
     if(!jobj) {
         // Throw NullPointerException.
         throw_exception_from_jni(jenv, "java/lang/NullPointerException", 0);

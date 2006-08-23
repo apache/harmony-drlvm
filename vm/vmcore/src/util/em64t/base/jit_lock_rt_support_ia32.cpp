@@ -42,7 +42,7 @@ using namespace std;
 #include "lil_code_generator.h"
 #include "../m2n_em64t_internal.h"
 #include "object_handles.h"
-#include "open/thread.h"
+
 
 extern bool dump_stubs;
 

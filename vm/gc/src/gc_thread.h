@@ -25,6 +25,7 @@
 #include "gc_cout.h"
 #include "faststack.h"
 #include "work_packet_manager.h"
+#include "open/hythread_ext.h"
 
 class Garbage_Collector;
 
@@ -107,7 +108,7 @@ class GC_Thread : public GC_Mark_Activity {
 
 public:
 
-    GC_Thread(Garbage_Collector *, pthread_t);
+    GC_Thread(Garbage_Collector *, int);
 
     virtual ~GC_Thread();
 
@@ -125,15 +126,15 @@ public:
         _task_to_do = task;
     }
 
-    VmThreadHandle get_thread_handle() {
+    hythread_t  get_thread_handle() {
         return _thread_handle;
     }
 
-    inline HANDLE get_gc_thread_work_done_event_handle() {
+    inline hysem_t  get_gc_thread_work_done_event_handle() {
         return _gc_thread_work_done_event;
     }
 
-    inline HANDLE get_gc_thread_start_work_event_handle() {
+    inline hysem_t  get_gc_thread_start_work_event_handle() {
         return _gc_thread_start_work_event;
     }
 
@@ -200,13 +201,11 @@ private:
 #ifdef _DEBUG   
     chunk_sweep_stats _sweep_stats[GC_MAX_CHUNKS];
 #endif
-    VmThreadHandle _thread_handle;
+    hythread_t _thread_handle;
 
-    pthread_t _thread_id;
+    hysem_t  _gc_thread_start_work_event;
 
-    HANDLE _gc_thread_start_work_event;
-
-    HANDLE _gc_thread_work_done_event;
+    hysem_t  _gc_thread_work_done_event;
 
     gc_thread_action _task_to_do;
 

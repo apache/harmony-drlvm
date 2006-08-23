@@ -125,7 +125,7 @@ private:
 
     uint32 tick;
     
-    CriticalSection recompilationLock;
+    hymutex_t recompilationLock;
     std::set<Method_Profile_Handle> methodsInRecompile;
 };
 

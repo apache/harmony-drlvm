@@ -21,7 +21,7 @@
 #define LOG_DOMAIN "vm.core"
 #include "cxxlog.h"
 
-#include "open/thread.h"
+
 #include "Class.h"
 #include "classloader.h"
 #include "environment.h"
@@ -118,7 +118,7 @@ Java_Type Method::get_return_java_type()
 
 Class_Handle method_get_return_type_class(Method_Handle m)
 {
-    assert(tmn_is_suspend_enabled());
+    assert(hythread_is_suspend_enabled());
     Method *method = (Method *)m;
     Global_Env *env = VM_Global_State::loader_env;
     Java_Type UNUSED t = method->get_return_java_type();

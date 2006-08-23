@@ -18,11 +18,8 @@
  * @version $Revision: 1.1.2.1.4.4 $
  */  
 
-
 #include "cxxlog.h"
 #include "method_lookup.h"
-#include "m2n.h"
-#include "open/thread.h"
 #include "Environment.h"
 #include "exceptions.h"
 
@@ -320,8 +317,8 @@ LONG NTAPI vectored_exception_handler(LPEXCEPTION_POINTERS nt_exception)
             run_default_handler = false;
         } else if (code == STATUS_STACK_OVERFLOW) {
             if (is_unwindable()) {
-                if (tmn_is_suspend_enabled()) {
-                    tmn_suspend_disable();
+                if (hythread_is_suspend_enabled()) {
+                    hythread_suspend_disable();
                 }
                 run_default_handler = false;
             } else {
@@ -388,7 +385,7 @@ LONG NTAPI vectored_exception_handler(LPEXCEPTION_POINTERS nt_exception)
     }
 
     // since we are now sure HWE occured in java code, gc should also have been disabled
-    assert(!tmn_is_suspend_enabled());
+    assert(!hythread_is_suspend_enabled());
     
     Global_Env *env = VM_Global_State::loader_env;
     Class *exc_clss = 0;

@@ -1260,9 +1260,10 @@ void Compiler::gen_gc_safe_point()
     m_curr_bb_state->seen_gcpt = true;
 
     veax();
-#ifdef PLATFORM_POSIX
+//#ifdef PLATFORM_POSIX
     gen_call_vm(rt_helper_get_thread_suspend_ptr, 0);
     voper(Mnemonic_CMP, MK_MEM32(RegName_EAX, 0), Imm32_0);
+/*
 #else
     // This is a bit quicker, but tricky way - VM uses TIB to store 
     // thread-specific info, and the offset of suspend request flag is 
@@ -1276,6 +1277,7 @@ void Compiler::gen_gc_safe_point()
                         MK_MEM32(RegName_EAX, rt_suspend_req_flag_offset));
     voper(Mnemonic_TEST, RegName_EAX, RegName_EAX);
 #endif
+*/
     unsigned patch_id = vjcc(ConditionMnemonic_E, InstPrefix_HintTaken);
     //
     gen_mem(MEM_TO_MEM|MEM_VARS|MEM_STACK|MEM_NO_UPDATE);

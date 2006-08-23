@@ -26,12 +26,13 @@
  * java.lang.VMMemoryManager class.
  */
 
-#include "open/thread.h"
+
 #include "open/gc.h"
 #include "jni_utils.h"
 #include "object.h"
 #include "finalize.h"
 #include "cxxlog.h"
+#include "vm_threads.h"
 
 #include "java_lang_VMMemoryManager.h"
 
@@ -126,7 +127,7 @@ JNIEXPORT void JNICALL Java_java_lang_VMMemoryManager_runFinalization
 JNIEXPORT void JNICALL Java_java_lang_VMMemoryManager_runGC
   (JNIEnv *, jclass)
 {
-    assert(tmn_is_suspend_enabled());
+    assert(hythread_is_suspend_enabled());
     // no matter how counter-intuitive,
     // gc_force_gc() expects gc_enabled_status == disabled,
     // but, obviously, at a GC safepoint.

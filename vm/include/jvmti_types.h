@@ -42,8 +42,7 @@ extern "C"
     typedef jobject jthread;
     typedef jlong jlocation;
     typedef jobject jthreadGroup;
-    struct jrawMonitorID_struct;
-    typedef struct jrawMonitorID_struct *jrawMonitorID;
+    typedef int jrawMonitorID;
     typedef struct JNINativeInterface_ jniNativeInterface;
 
 

@@ -23,7 +23,7 @@
 #include "interp_defs.h"
 #include "interp_native.h"
 #include "port_malloc.h"
-#include "open/thread.h"
+
 #include "thread_generic.h"
 
 static jint skip_old_frames(VM_thread *thread)
@@ -38,14 +38,14 @@ static jint skip_old_frames(VM_thread *thread)
         Class *clss = method_get_class(first_frame->method);
         assert(clss);
 
-        if (strcmp(method_get_name(first_frame->method), "run") == 0 &&
+        if (strcmp(method_get_name(first_frame->method), "runImpl") == 0 &&
             strcmp(class_get_name(clss), "java/lang/VMStart$MainThread") == 0)
         {
             return 3;
         }
     }
 
-    return 0;
+    return 1;
 }
 
 jvmtiError
@@ -174,7 +174,7 @@ interpreter_ti_getObject(
         return JVMTI_ERROR_TYPE_MISMATCH;
     }
 
-    assert(tmn_is_suspend_enabled());
+    assert(hythread_is_suspend_enabled());
     tmn_suspend_disable();
     ManagedObject *obj = UNCOMPRESS_REF(frame->locals(slot).cr);
     if (NULL == obj) {
@@ -397,15 +397,15 @@ void method_entry_callback(Method *method) {
 #endif
 
 
-    assert(tmn_is_suspend_enabled());
+    assert(hythread_is_suspend_enabled());
     assert(interpreter_ti_notification_mode & INTERPRETER_TI_METHOD_ENTRY_EVENT);
 
     jvmti_process_method_entry_event((jmethodID) method);
 
-    assert(tmn_is_suspend_enabled());
+    assert(hythread_is_suspend_enabled());
 }
 void method_exit_callback(Method *method, bool was_popped_by_exception, jvalue ret_val) {
-    assert(tmn_is_suspend_enabled());
+    assert(hythread_is_suspend_enabled());
     assert(interpreter_ti_notification_mode & INTERPRETER_TI_METHOD_EXIT_EVENT);
 
     jvmti_process_method_exit_event((jmethodID) method,
@@ -414,7 +414,7 @@ void method_exit_callback(Method *method, bool was_popped_by_exception, jvalue r
 
 void
 frame_pop_callback(FramePopListener *l, Method *method, jboolean was_popped_by_exception) {
-    assert(!tmn_is_suspend_enabled());
+    assert(!hythread_is_suspend_enabled());
     tmn_suspend_enable();
 
     while (l) {
@@ -429,7 +429,7 @@ frame_pop_callback(FramePopListener *l, Method *method, jboolean was_popped_by_e
 
 jvmtiError
 interpreter_ti_pop_frame(jvmtiEnv * UNREF env, VM_thread *thread) {
-    assert(tmn_is_suspend_enabled());
+    assert(hythread_is_suspend_enabled());
     StackFrame *frame = getLastStackFrame(thread);
     if (frame->jvmti_pop_frame == POP_FRAME_AVAILABLE) {
         frame->jvmti_pop_frame = POP_FRAME_NOW;
@@ -445,7 +445,7 @@ interpreter_ti_notify_frame_pop(jvmtiEnv* env,
                                 VM_thread *thread,
                                 int depth)
 {
-    assert(tmn_is_suspend_enabled());
+    assert(hythread_is_suspend_enabled());
     StackFrame *frame = getLastStackFrame(thread);
 
     // skip depth of frames
