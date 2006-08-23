@@ -72,13 +72,19 @@ public final class Strings extends org.mmtk.vm.Strings implements Uninterruptibl
                                      int dstBegin, int dstEnd)
     throws LogicallyUninterruptiblePragma {
   
-    
     int len = src.length();
-    int n = (dstBegin + len <= dstEnd) ? len : (dstEnd - dstBegin);
-      for (int i = 0; i < n; i++) 
-      {
-          Barriers.setArrayNoBarrierStatic(dst, dstBegin + i, src.charAt(i));
-      }
-    return n;
+    int span = 0;
+    if (dstBegin + span <= dstEnd) 
+    {
+        span = len;
+    } else 
+    { 
+        span = dstEnd - dstBegin;
+    }
+    for (int xx = 0; xx < span; xx++) 
+    {
+        Barriers.setArrayNoBarrierStatic(dst, dstBegin + xx, src.charAt(xx) );
+    }
+    return span;
   }
 }

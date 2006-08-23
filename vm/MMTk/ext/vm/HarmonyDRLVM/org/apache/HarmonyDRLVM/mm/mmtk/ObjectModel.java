@@ -18,8 +18,6 @@ package org.apache.HarmonyDRLVM.mm.mmtk;
 
 import org.mmtk.utility.scan.MMType;
 import org.mmtk.utility.Constants;
-import org.mmtk.utility.alloc.Allocator;
-
 import org.vmmagic.unboxed.*;
 import org.vmmagic.pragma.*;
 import org.mmtk.vm.*;

@@ -15,14 +15,11 @@
  */
 
 package org.apache.HarmonyDRLVM.mm.mmtk;
- 
 
 import org.mmtk.plan.TraceLocal;
-import org.mmtk.utility.deque.*;
 import org.mmtk.utility.scan.*;
 import org.mmtk.utility.Constants;
 import org.mmtk.vm.VM;
-
 import org.vmmagic.unboxed.*;
 import org.vmmagic.pragma.*;
 
@@ -38,43 +35,35 @@ public class Scanning extends org.mmtk.vm.Scanning implements Constants, Uninter
 
   /**
    * Delegated scanning of a object, processing each pointer field
-   * encountered. <b>Jikes RVM never delegates, so this is never
-   * executed</b>.
-   *
+   * encountered. 
    * @param object The object to be scanned.
    */
   public final void scanObject(TraceLocal trace, ObjectReference object) 
     throws UninterruptiblePragma, InlinePragma {
-    // Never reached
-    VM.assertions._assert(false);
+    VM.assertions._assert(false);  //debug when you hit this
   }
   
   /**
    * Delegated precopying of a object's children, processing each pointer field
-   * encountered. <b>Jikes RVM never delegates, so this is never
-   * executed</b>.
+   * encountered.
    *
    * @param object The object to be scanned.
    */
   public final void precopyChildren(TraceLocal trace, ObjectReference object) 
     throws UninterruptiblePragma, InlinePragma {
-    // Never reached
-   VM.assertions._assert(false);
+   VM.assertions._assert(false);  //debug when you hit this
   }
   
   /**
    * Delegated enumeration of the pointers in an object, calling back
-   * to a given plan for each pointer encountered. <b>Jikes RVM never
-   * delegates, so this is never executed</b>.
-   *
+   * to a given plan for each pointer encountered. 
    * @param object The object to be scanned.
    * @param _enum the Enumerator object through which the trace
    * is made
    */
   public final void enumeratePointers(ObjectReference object, Enumerator _enum) 
     throws UninterruptiblePragma, InlinePragma {
-    // Never reached
-    VM.assertions._assert(false);
+    VM.assertions._assert(false);  //debug when you hit this
   }
 
   /**

@@ -17,11 +17,7 @@
 
 package org.apache.HarmonyDRLVM.mm.mmtk;
 
-import org.mmtk.policy.Space;
-
-import org.vmmagic.unboxed.*;
 import org.vmmagic.pragma.*;
-
 
 public class Assert extends org.mmtk.vm.Assert implements Uninterruptible {
   
@@ -73,12 +69,6 @@ public class Assert extends org.mmtk.vm.Assert implements Uninterruptible {
         }
     }
 
-
-  /**
-   * <code>true</code> if assertions should be verified
-   */
- /* public static final boolean VerifyAssertions = VM.VerifyAssertions; */
-
   public final void _assert(boolean cond, String s) throws InlinePragma {
       System.out.println("******org.apache.HarmonyDRLVM.mm.mmtk.Assert._assert(): " + s);
       s.notifyAll();  // this should cause a stack trace and exit
@@ -112,10 +102,7 @@ public class Assert extends org.mmtk.vm.Assert implements Uninterruptible {
   }
 
   /**
-   * Checks if the virtual machine is running.  This value changes, so
-   * the call-through to the VM must be a method.  In Jikes RVM, just
-   * returns VM.runningVM.
-   *
+   * Checks if the virtual machine is running.
    * @return <code>true</code> if the virtual machine is running
    */
   public final boolean runningVM() { return true; }

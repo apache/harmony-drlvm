@@ -33,25 +33,8 @@ public final class Options extends org.mmtk.vm.Options {
    * @return the vm specific key.
    */
   public final String getKey(String name) {
-   
     System.out.println("org.apache.HarmonyDRLVM.mm.mmtk.Options.getKey(String) " + name);    
-
-    int space = name.indexOf(' ');
-    if (space < 0) return name.toLowerCase();
-
-    String word = name.substring(0, space); 
-    String key = word.toLowerCase();
-    
-    do {
-      int old = space+1;
-      space = name.indexOf(' ', old);
-      if (space < 0) {
-        key += name.substring(old);
-        return key;
-      }
-      key += name.substring(old, space);
-    } while (true);
-
+    return null;
   }
 
   /**
@@ -84,43 +67,5 @@ public final class Options extends org.mmtk.vm.Options {
   public final void warn(Option o, String message) {
       System.out.println("WARNING: Option '" + o.getKey() + "' : " + 
                     message);
-  }
-
-
-  /**
-   * Take a string (most likely a command-line argument) and try to proccess it
-   * as an option command.  Return true if the string was understood, false 
-   * otherwise.
-   *
-   * @param arg a String to try to process as an option command
-   * @return true if successful, false otherwise
-   */
-  public static boolean process(String arg) {
-
-    // First handle the "option commands"
-    if (arg.equals("help")) {
-       System.out.println("org.apache.HarmonyDRLVM.mm.mmtk.process() help was called"); //printHelp();
-       return true;
-    }
-    if (arg.equals("printOptions")) {
-       System.out.println("org.apache.HarmonyDRLVM.mm.mmtk.process() printOptions was called"); //printHelp();//printOptions();
-       return true;
-    }
-    if (arg.equals("")) {
-      System.out.println("org.apache.HarmonyDRLVM.mm.mmtk.process() <zip> was called"); //printHelp();
-      //printHelp();
-      return true;
-    }
-
-    // Required format of arg is 'name=value'
-    // Split into 'name' and 'value' strings
-    int split = arg.indexOf('=');
-    if (split == -1) {
-      System.out.println("  Illegal option specification!\n  \""+arg+
-                  "\" must be specified as a name-value pair in the form of option=value");
-      return false;
-    }
-
-    return false;
   }
 }

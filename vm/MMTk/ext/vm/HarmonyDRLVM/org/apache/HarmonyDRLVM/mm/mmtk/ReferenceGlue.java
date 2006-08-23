@@ -57,13 +57,7 @@ public final class ReferenceGlue extends org.mmtk.vm.ReferenceGlue implements Un
      * Put this Reference object on its ReferenceQueue (if it has one)
      * when its referent is no longer sufficiently reachable. The
      * definition of "reachable" is defined by the semantics of the
-     * particular subclass of Reference. The implementation of this
-     * routine is determined by the the implementation of
-     * java.lang.ref.ReferenceQueue in GNU classpath. It is in this
-     * class rather than the public Reference class to ensure that Jikes
-     * has a safe way of enqueueing the object, one that cannot be
-     * overridden by the application program.
-     * 
+     * particular subclass of Reference.
      * @see java.lang.ref.ReferenceQueue
      * @param addr the address of the Reference object
      * @param onlyOnce <code>true</code> if the reference has ever

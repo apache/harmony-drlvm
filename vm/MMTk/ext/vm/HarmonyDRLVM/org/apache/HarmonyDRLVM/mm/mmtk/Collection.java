@@ -20,13 +20,8 @@ import org.mmtk.plan.Plan;
 import org.mmtk.plan.CollectorContext;
 import org.mmtk.plan.MutatorContext;
 import org.mmtk.utility.Constants;
-import org.mmtk.utility.Finalizer;
-import org.mmtk.utility.heap.HeapGrowthManager;
-import org.mmtk.utility.ReferenceProcessor;
-import org.mmtk.utility.options.Options;
-import org.mmtk.vm.*;
 
-import org.vmmagic.unboxed.*;
+import org.mmtk.vm.*;
 import org.vmmagic.pragma.*;
 
 public class Collection extends org.mmtk.vm.Collection implements Constants, Uninterruptible {
@@ -45,11 +40,8 @@ public class Collection extends org.mmtk.vm.Collection implements Constants, Uni
    * statics at the completion of this routine will be reflected in
    * the boot image.  Any objects referenced by those statics will be
    * transitively included in the boot image.
-   *
-   * This is called from MM_Interface.
    */
   public static final void init() throws InterruptiblePragma {
-        //wjw NoGC does not have a collector, do nothing for starts
       System.out.println("org.apache.HarmonyDRLVM.mm.mmtk.Collection.init() has been called -1-");
       VM.assertions._assert(false);
   }

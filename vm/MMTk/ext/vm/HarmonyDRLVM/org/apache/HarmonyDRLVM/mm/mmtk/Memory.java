@@ -19,12 +19,10 @@ package org.apache.HarmonyDRLVM.mm.mmtk;
 import org.mmtk.plan.Plan;
 import org.mmtk.policy.ImmortalSpace;
 import org.mmtk.policy.Space;
-import org.mmtk.utility.Constants;
-
 import org.mmtk.vm.VM;
 import org.vmmagic.unboxed.*;
 import org.vmmagic.pragma.*;
-
+import org.mmtk.utility.Constants;
 
 public class Memory extends org.mmtk.vm.Memory
   implements Constants, Uninterruptible {
