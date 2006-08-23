@@ -14,13 +14,6 @@
  *  limitations under the License.
  */
 
-/*
- * (C) Copyright Department of Computer Science,
- * Australian National University. 2004
- *
- * (C) Copyright IBM Corp. 2001, 2003
- */
-
 package org.apache.HarmonyDRLVM.mm.mmtk;
 
 import org.mmtk.utility.Constants;

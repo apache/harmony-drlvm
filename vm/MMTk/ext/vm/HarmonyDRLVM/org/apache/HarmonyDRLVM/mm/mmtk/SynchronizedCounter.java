@@ -14,13 +14,6 @@
  *  limitations under the License.
  */
 
-/*
- * (C) Copyright Department of Computer Science,
- * Australian National University. 2004
- *
- * (C) Copyright IBM Corp. 2001, 2003
- */
-
 package org.apache.HarmonyDRLVM.mm.mmtk;
 
 import org.vmmagic.pragma.*;
@@ -39,23 +32,11 @@ public final class SynchronizedCounter extends org.mmtk.vm.SynchronizedCounter i
   private static Offset offset = Offset.max();
 
   public static void boot() {
-    //offset = VM_Entrypoints.synchronizedCounterField.getOffset();
-      //System.out.println("org.apache.HarmonyDRLVM.mm.mmtk.SynchronizedCounter.boot() -- fix VM_Entrypoints...");
   }
 
   private int count = 0;
 
   public int reset() {
-    //    int offset = VM_Interface.synchronizedCounterOffset;
-    /* int oldValue = count;
-    int actualOldValue = VM_Synchronization.fetchAndAdd(this, offset, -oldValue);
-    if (actualOldValue != oldValue) {
-      VM.sysWriteln("oldValue = ", oldValue);
-      VM.sysWriteln("actualOldValue = ", actualOldValue);
-      VM.sysFail("Concurrent use of SynchronizedCounter.reset");
-    }
-    return oldValue;
-    */
     int oldValue = count;  // unsynchronized access for now, single thread operation only
     count = 0;
     //System.out.println("org.apache.HarmonyDRLVM.mm.mmtk.SynchronizedCounter.reset() oldValue = " + oldValue);
@@ -68,11 +49,6 @@ public final class SynchronizedCounter extends org.mmtk.vm.SynchronizedCounter i
   // Returns the value before the add
   //
   public int increment() {
-    //if (VM.VerifyAssertions) VM._assert(!offset.isMax());
-    //return VM_Synchronization.fetchAndAdd(this, offset, 1);
-      //VM.assertions._assert(false);
-    //return 0;
-
     int oldValue = count;
     count++;
       //if (count == 1)

@@ -14,12 +14,6 @@
  *  limitations under the License.
  */
 
-/*
- * (C) Copyright Department of Computer Science,
- * Australian National University. 2004
- *
- * (C) Copyright IBM Corp. 2001, 2003
- */
 package org.apache.HarmonyDRLVM.mm.mmtk;
 
 import org.mmtk.plan.Plan;
@@ -31,25 +25,6 @@ import org.mmtk.utility.heap.HeapGrowthManager;
 import org.mmtk.utility.ReferenceProcessor;
 import org.mmtk.utility.options.Options;
 import org.mmtk.vm.*;
-
-/*  wjw we will need some analog to the below imports later on, keep the below as a reference
-import com.ibm.JikesRVM.VM;
-import com.ibm.JikesRVM.VM_CompiledMethod;
-import com.ibm.JikesRVM.VM_CompiledMethods;
-import com.ibm.JikesRVM.VM_Constants;
-import com.ibm.JikesRVM.VM_Magic;
-import com.ibm.JikesRVM.VM_Processor;
-import com.ibm.JikesRVM.VM_Scheduler;
-import com.ibm.JikesRVM.VM_Thread;
-import com.ibm.JikesRVM.VM_Time;
-import com.ibm.JikesRVM.classloader.VM_Atom;
-import com.ibm.JikesRVM.classloader.VM_Method;
-import com.ibm.JikesRVM.memoryManagers.mmInterface.VM_CollectorThread;
-import com.ibm.JikesRVM.memoryManagers.mmInterface.MM_Interface;
-import com.ibm.JikesRVM.memoryManagers.mmInterface.SelectedPlan;
-import com.ibm.JikesRVM.memoryManagers.mmInterface.SelectedCollectorContext;
-import com.ibm.JikesRVM.memoryManagers.mmInterface.SelectedMutatorContext;
-*/
 
 import org.vmmagic.unboxed.*;
 import org.vmmagic.pragma.*;
@@ -95,36 +70,6 @@ public class Collection extends org.mmtk.vm.Collection implements Constants, Uni
       cc.collect();
   }
   
-    /* wjw -- toss all of triggerCollectionStatic()
-  public static final void triggerCollectionStatic(int why) throws InterruptiblePragma {
-    if (VM.VerifyAssertions) VM._assert((why >= 0) && (why < TRIGGER_REASONS)); 
-    Plan.collectionInitiated();
-
-    if (Options.verbose.getValue() >= 4) {
-      VM.sysWriteln("Entered VM_Interface.triggerCollection().  Stack:");
-      VM_Scheduler.dumpStack();
-    }
-    if (why == EXTERNAL_GC_TRIGGER) {
-      SelectedPlan.get().userTriggeredGC();
-      if (Options.verbose.getValue() == 1 || Options.verbose.getValue() == 2) 
-        VM.sysWrite("[Forced GC]");
-    }
-    if (Options.verbose.getValue() > 2) 
-      VM.sysWriteln("Collection triggered due to ", triggerReasons[why]);
-    Extent sizeBeforeGC = HeapGrowthManager.getCurrentHeapSize();
-    long start = VM_Time.cycles();
-    VM_CollectorThread.collect(VM_CollectorThread.handshake, why);
-    long end = VM_Time.cycles();
-    double gcTime = VM_Time.cyclesToMillis(end - start);
-    if (Options.verbose.getValue() > 2) VM.sysWriteln("Collection finished (ms): ", gcTime);
-
-    if (SelectedPlan.get().isLastGCFull() && 
-   sizeBeforeGC.EQ(HeapGrowthManager.getCurrentHeapSize()))
-      checkForExhaustion(why, false);
-    
-    Plan.checkForAsyncCollection();
-  }
-  */
 
   /**
    * Triggers a collection without allowing for a thread switch.  This is needed

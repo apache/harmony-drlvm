@@ -14,12 +14,6 @@
  *  limitations under the License.
  */
 
-/*
- * (C) Copyright Department of Computer Science,
- * Australian National University. 2004
- *
- * (C) Copyright IBM Corp. 2001, 2003
- */
 package org.apache.HarmonyDRLVM.mm.mmtk;
 
 import org.mmtk.plan.Plan;
@@ -128,17 +122,7 @@ public class Memory extends org.mmtk.vm.Memory
    */
   public final int mmap(Address start, int size) {
       //System.out.println("org.apache.HarmonyDRLVM.mm.mmtk.Memory.mmap() needs fixing");
-      /*
-    Address result = VM_Memory.mmap(start, Extent.fromIntZeroExtend(size),
-                                       VM_Memory.PROT_READ | VM_Memory.PROT_WRITE | VM_Memory.PROT_EXEC, 
-                                       VM_Memory.MAP_PRIVATE | VM_Memory.MAP_FIXED | VM_Memory.MAP_ANONYMOUS);
-    if (result.EQ(start)) return 0;
-    if (result.GT(Address.fromIntZeroExtend(127))) {
-      VM.sysWrite("mmap with MAP_FIXED on ", start);
-      VM.sysWriteln(" returned some other address", result);
-      VM.sysFail("mmap with MAP_FIXED has unexpected behavior");
-    }
-    */
+  
     return 0;
   }
   
@@ -153,7 +137,7 @@ public class Memory extends org.mmtk.vm.Memory
   public final boolean mprotect(Address start, int size) {
     System.out.println("org.apache.HarmonyDRLVM.mm.mmtk.Memory.mprotect() needs fixing, start = " + Integer.toHexString(start.toInt())
      +   " size = " + size);
-    return false; //return VM_Memory.mprotect(start, Extent.fromIntZeroExtend(size), VM_Memory.PROT_NONE);
+    return false; 
   }
 
   /**
@@ -166,7 +150,7 @@ public class Memory extends org.mmtk.vm.Memory
    */
   public final boolean munprotect(Address start, int size) {
     System.out.println("org.apache.HarmonyDRLVM.mm.mmtk.Memory.mprotect() needs fixing");
-    return false; //VM_Memory.mprotect(start, Extent.fromIntZeroExtend(size), VM_Memory.PROT_READ | VM_Memory.PROT_WRITE | VM_Memory.PROT_EXEC);
+    return false; 
   }
 
   /**

@@ -14,11 +14,6 @@
  *  limitations under the License.
  */
 
-/*
- * (C) Copyright Department of Computer Science,
- * Australian National University. 2005
- */
-
 package org.apache.HarmonyDRLVM.mm.mmtk;
 
 import org.mmtk.plan.nogc.*;

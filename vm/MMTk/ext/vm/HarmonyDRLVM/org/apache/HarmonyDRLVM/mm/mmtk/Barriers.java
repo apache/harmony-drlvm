@@ -14,12 +14,6 @@
  *  limitations under the License.
  */
 
-/*
- * (C) Copyright Department of Computer Science,
- * Australian National University. 2004
- *
- * (C) Copyright IBM Corp. 2001, 2003
- */
 package org.apache.HarmonyDRLVM.mm.mmtk;
 
 import org.vmmagic.unboxed.*;
@@ -44,8 +38,6 @@ public class Barriers extends org.mmtk.vm.Barriers implements Uninterruptible {
     System.out.println("org.apache.HarmonyDRLVM.mm.mmtk.Barriers -- performWriteInBarrier was called" );
     //VM.assertions._assert(false);
 
-    //wjw turn this on when we need it -----> Object obj = ref.toObject();
-    //wjw    VM_Magic.setObjectAtOffset(obj, offset, target.toObject(), locationMetadata);  
   }
 
   /**
@@ -65,15 +57,6 @@ public class Barriers extends org.mmtk.vm.Barriers implements Uninterruptible {
                                            ObjectReference target, Offset offset,
                                            int locationMetadata, int mode)
     throws InlinePragma { 
-     /*  wjw -- turn this on when we get to write barrier debug                         
-    Object obj = ref.toObject();
-    Object newObject = target.toObject();
-    Object oldObject;
-    do {
-      oldObject = VM_Magic.prepareObject(obj, offset);
-    } while (!VM_Magic.attemptObject(obj, offset, oldObject, newObject));
-    return ObjectReference.fromObject(oldObject); 
-    */
     System.out.println("org.apache.HarmonyDRLVM.mm.mmtk.Barriers -- performWriteInBarrierAtomic was called" );
     //VM.assertions._assert(false);
     return ref;  // keep the compiler happy

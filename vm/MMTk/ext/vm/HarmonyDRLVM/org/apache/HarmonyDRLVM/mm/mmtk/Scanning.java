@@ -14,13 +14,6 @@
  *  limitations under the License.
  */
 
-/*
- * (C) Copyright Department of Computer Science,
- * Australian National University. 2004
- *
- * (C) Copyright IBM Corp. 2001, 2003
- */
-
 package org.apache.HarmonyDRLVM.mm.mmtk;
  
 
@@ -154,26 +147,6 @@ public class Scanning extends org.mmtk.vm.Scanning implements Constants, Uninter
    * @param trace The trace object to use to report root locations.
    */
   public final void computeAllRoots(TraceLocal trace) {
-    //boolean processCodeLocations = MM_Interface.MOVES_OBJECTS;
-     /* scan statics */
-    //ScanStatics.scanStatics(trace);
- 
-    /* scan all threads */
-    /* 
-     * while (true) {
-      int threadIndex = threadCounter.increment();
-      if (threadIndex > VM_Scheduler.threadHighWatermark) break;
-      
-      VM_Thread thread = VM_Scheduler.threads[threadIndex];
-      if (thread == null) continue;
-      
-      /* scan the thread (stack etc.) */
-      //ScanThread.scanThread(thread, trace, processCodeLocations);
-
-      /* identify this thread as a root */
-      //trace.addRootLocation(VM_Magic.objectAsAddress(VM_Scheduler.threads).plus(threadIndex<<LOG_BYTES_IN_ADDRESS));
-    //}
-    //VM_CollectorThread.gcBarrier.rendezvous(4200);
     //System.out.println("*****************************org.apache.HarmonyDRLVM.mm.mmtk.Scanning.computeAllRoots() was called TraceLocal = "  + trace);
     /////////////////VM.assertions._assert(false);
       return;

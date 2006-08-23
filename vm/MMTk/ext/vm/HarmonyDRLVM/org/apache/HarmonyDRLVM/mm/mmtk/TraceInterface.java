@@ -14,13 +14,6 @@
  *  limitations under the License.
  */
 
-/*
- * (C) Copyright Department of Computer Science,
- * Australian National University. 2004
- *
- * (C) Copyright IBM Corp. 2001, 2003
- */
-
 package org.apache.HarmonyDRLVM.mm.mmtk;
 
 import org.mmtk.utility.Constants;
@@ -30,12 +23,6 @@ import org.vmmagic.pragma.*;
 /**
  * Class that supports scanning Objects or Arrays for references
  * during tracing, handling those references, and computing death times
- * 
- * $Id: TraceInterface.java,v 1.3 2006/06/05 04:30:57 steveb-oss Exp $
- * 
- * @author <a href="http://www-ali.cs.umass.edu/~hertz">Matthew Hertz</a>
- * @version $Revision: 1.3 $
- * @date $Date: 2006/06/05 04:30:57 $
  */
 public final class TraceInterface extends org.mmtk.vm.TraceInterface implements Uninterruptible {
 
@@ -46,23 +33,6 @@ public final class TraceInterface extends org.mmtk.vm.TraceInterface implements 
   private static byte allocCallMethods[][];
 
   static {
-    /* Build the list of "own methods" */
-      /*
-    allocCallMethods = new byte[13][];
-    allocCallMethods[0] = "postAlloc".getBytes();
-    allocCallMethods[1] = "traceAlloc".getBytes();
-    allocCallMethods[2] = "allocateScalar".getBytes();
-    allocCallMethods[3] = "allocateArray".getBytes();
-    allocCallMethods[4] = "clone".getBytes();
-    allocCallMethods[5] = "alloc".getBytes();
-    allocCallMethods[6] = "buildMultiDimensionalArray".getBytes();
-    allocCallMethods[7] = "resolvedNewScalar".getBytes();
-    allocCallMethods[8] = "resolvedNewArray".getBytes();
-    allocCallMethods[9] = "unresolvedNewScalar".getBytes();
-    allocCallMethods[10] = "unresolvedNewArray".getBytes();
-    allocCallMethods[11] = "cloneScalar".getBytes();
-    allocCallMethods[12] = "cloneArray".getBytes();
-    */
   }
 
   /***********************************************************************
