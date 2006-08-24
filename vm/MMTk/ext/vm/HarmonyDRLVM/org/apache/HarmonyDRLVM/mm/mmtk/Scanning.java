@@ -135,9 +135,15 @@ public class Scanning extends org.mmtk.vm.Scanning implements Constants, Uninter
    *
    * @param trace The trace object to use to report root locations.
    */
+  public static int addressOfTestRoot; // temporary hack, filled in by test.java
   public final void computeAllRoots(TraceLocal trace) {
-    //System.out.println("*****************************org.apache.HarmonyDRLVM.mm.mmtk.Scanning.computeAllRoots() was called TraceLocal = "  + trace);
-    /////////////////VM.assertions._assert(false);
-      return;
+    ///System.out.println("*****************************org.apache.HarmonyDRLVM.mm.mmtk.Scanning.computeAllRoots() was called TraceLocal = "  + trace);
+ 
+      if (addressOfTestRoot != 0)
+        trace.addRootLocation(Address.fromInt(addressOfTestRoot));
+
+      //TODO: somehow get all java threads to enumerate their stacks -- where is this supposed to happen??
+      //TODO: somehow put a barrier at the end of this method so that all java threads must have enumerated before proceeding
+
   }
 }

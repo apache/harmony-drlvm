@@ -102,7 +102,7 @@ public class Barriers extends org.mmtk.vm.Barriers implements Uninterruptible {
   public static final char getArrayNoBarrierStatic(char [] src, int index) {
       if (oneShot2 == false ) 
       {
-          System.out.println("org.apache.HarmonyDRLVM.mm.mmtk.Barriers.getArrayNoBarrier()" );
+          System.out.println("org.apache.HarmonyDRLVM.mm.mmtk.Barriers.getArrayNoBarrierStatic()" );
           //VM.assertions._assert(false);
           oneShot2 = true;
       }
@@ -121,7 +121,7 @@ public class Barriers extends org.mmtk.vm.Barriers implements Uninterruptible {
     return getArrayNoBarrierStatic(src, index);
   }
   public static final byte getArrayNoBarrierStatic(byte [] src, int index) {
-      System.out.println("org.apache.HarmonyDRLVM.mm.mmtk.Barriers.getArrayNoBarrier()" );
+      System.out.println("org.apache.HarmonyDRLVM.mm.mmtk.Barriers.getArrayNoBarrierStatic()" );
       return src[index];
   }
 
@@ -134,7 +134,7 @@ public class Barriers extends org.mmtk.vm.Barriers implements Uninterruptible {
    * @return the new value of element
    */
   public final int getArrayNoBarrier(int [] src, int index) {
-      System.out.println("org.apache.HarmonyDRLVM.mm.mmtk.Barriers.getArrayNoBarrier()" );
+      //System.out.println("org.apache.HarmonyDRLVM.mm.mmtk.Barriers.getArrayNoBarrier()" );
       //VM.assertions._assert(false);
       return src[index];
   }
@@ -148,7 +148,7 @@ public class Barriers extends org.mmtk.vm.Barriers implements Uninterruptible {
    * @return the new value of element
    */
   public final Object getArrayNoBarrier(Object [] src, int index) {
-      System.out.println("org.apache.HarmonyDRLVM.mm.mmtk.Barriers.getArrayNoBarrier()" );
+      //System.out.println("org.apache.HarmonyDRLVM.mm.mmtk.Barriers.getArrayNoBarrier()" );
       //VM.assertions._assert(false);
       return src[index];
   }

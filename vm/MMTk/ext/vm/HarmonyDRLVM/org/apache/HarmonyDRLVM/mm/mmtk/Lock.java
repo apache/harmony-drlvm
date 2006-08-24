@@ -47,11 +47,12 @@ public class Lock extends org.mmtk.vm.Lock implements Uninterruptible {
   public Lock() 
   {
         this("no name lock");
+              //System.out.println("mm.mmtk.Lock --1");
   }
 
   public Lock(String name) {
     this.name = name;
-    
+        //System.out.println("mm.mmtk.Lock --2");  
       try 
       {
           synchronized(criticalSection) 
@@ -66,6 +67,7 @@ public class Lock extends org.mmtk.vm.Lock implements Uninterruptible {
 
   public void setName(String str) {
     name = str;
+            //System.out.println("mm.mmtk.Lock --3");
   }
 
   public void acquire() {
