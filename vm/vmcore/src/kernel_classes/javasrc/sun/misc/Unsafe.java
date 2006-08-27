@@ -163,7 +163,7 @@ public class Unsafe {
      * @param newValue The value to write.
      */
     public void putIntVolatile(Object object, long fieldOffset, int newValue) {
-        throw new UnsupportedOperationException("Not Yet Implemented");
+        Atomics.setIntVolatile(object, fieldOffset, newValue);
     }
 
     /**
@@ -177,7 +177,7 @@ public class Unsafe {
      * @return The value that was read.
      */
     public int getIntVolatile(Object object, long fieldOffset) {
-        throw new UnsupportedOperationException("Not Yet Implemented");
+        return Atomics.getIntVolatile(object, fieldOffset);
     }
 
     /**
@@ -191,7 +191,7 @@ public class Unsafe {
      * @param newValue The value to write.
      */
     public void putLongVolatile(Object object, long fieldOffset, long newValue) {
-        throw new UnsupportedOperationException("Not Yet Implemented");
+        Atomics.setLongVolatile(object, fieldOffset, newValue);
     }
 
     /**
@@ -205,7 +205,7 @@ public class Unsafe {
      * @return The value that was read.
      */
     public long getLongVolatile(Object object, long fieldOffset) {
-        throw new UnsupportedOperationException("Not Yet Implemented");
+        return Atomics.getLongVolatile(object, fieldOffset);
     }
 
     /**
@@ -219,7 +219,7 @@ public class Unsafe {
      * @param newValue The value to write.
      */
     public void putObjectVolatile(Object object, long fieldOffset, Object newValue) {
-        throw new UnsupportedOperationException("Not Yet Implemented");
+        Atomics.setObjectVolatile(object, fieldOffset, newValue);
     }
 
     /**
@@ -233,7 +233,7 @@ public class Unsafe {
      * @param newValue The value to write.
      */
     public Object getObjectVolatile(Object object, long fieldOffset) {
-        throw new UnsupportedOperationException("Not Yet Implemented");
+        return Atomics.getObjectVolatile(object, fieldOffset);
     }
 
     /**

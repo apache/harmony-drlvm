@@ -19,9 +19,61 @@
  */  
 
 #include "jni.h"
+#include "jni_direct.h"
 #include "atomics.h"
 #include "org_apache_harmony_util_concurrent_Atomics.h"
 
+
+JNIEXPORT void JNICALL 
+Java_org_apache_harmony_util_concurrent_Atomics_setIntVolatile__Ljava_lang_Object_2JI(JNIEnv * env, jclass self, 
+    jobject obj, jlong offset, jint value)
+{
+    SetIntFieldOffset(env, obj, (jint)offset, value);
+    MemoryReadWriteBarrier();
+}
+
+
+JNIEXPORT jint JNICALL 
+Java_org_apache_harmony_util_concurrent_Atomics_getIntVolatile__Ljava_lang_Object_2J(JNIEnv * env, jclass self, 
+    jobject obj, jlong offset)
+{
+    MemoryReadWriteBarrier();
+    return GetIntFieldOffset(env, obj, (jint)offset);
+}
+
+JNIEXPORT void JNICALL 
+Java_org_apache_harmony_util_concurrent_Atomics_setLongVolatile__Ljava_lang_Object_2JJ(JNIEnv * env, jclass self, 
+    jobject obj, jlong offset, jlong value)
+{
+    SetLongFieldOffset(env, obj, (jint)offset, value);
+    MemoryReadWriteBarrier();
+}
+
+
+JNIEXPORT jlong JNICALL 
+Java_org_apache_harmony_util_concurrent_Atomics_getLongVolatile__Ljava_lang_Object_2J(JNIEnv * env, jclass self, 
+    jobject obj, jlong offset)
+{
+    MemoryReadWriteBarrier();
+    return GetLongFieldOffset(env, obj, (jint)offset);
+}
+
+JNIEXPORT void JNICALL 
+Java_org_apache_harmony_util_concurrent_Atomics_setObjectVolatile__Ljava_lang_Object_2JLjava_lang_Object_2(JNIEnv * env, jclass self, 
+    jobject obj, jlong offset, jobject value)
+{
+    SetObjectFieldOffset(env, obj, (jint)offset, value);
+    MemoryReadWriteBarrier();
+}
+
+
+JNIEXPORT jobject JNICALL 
+Java_org_apache_harmony_util_concurrent_Atomics_getObjectVolatile__Ljava_lang_Object_2J(JNIEnv * env, jclass self, 
+    jobject obj, jlong offset)
+{
+    MemoryReadWriteBarrier();
+    return GetObjectFieldOffset(env, obj, (jint)offset);
+}
 
 JNIEXPORT jlong JNICALL
 Java_org_apache_harmony_util_concurrent_Atomics_getFieldOffset(JNIEnv * env, jclass self, 

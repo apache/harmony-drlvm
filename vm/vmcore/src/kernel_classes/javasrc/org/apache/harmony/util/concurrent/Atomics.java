@@ -32,6 +32,54 @@ public final class Atomics {
 
     private Atomics() {};
 
+     /*
+      * Writes new value to the object's field (by given offset) in volatile manner
+      * @param obj object which field needs to be set
+      * @param offset the field offset within the given object
+      * @param value value to set
+      */
+    public static native void setIntVolatile(Object obj, long offset, int value);
+
+     /*
+      * Reads value from the object's field (by given offset) in volatile manner
+      * @param obj object which field needs to be read
+      * @param offset the field offset within the given object
+      * @return the field's value
+      */
+    public static native int getIntVolatile(Object obj, long offset);
+
+     /*
+      * Writes new value to the object's field (by given offset) in volatile manner
+      * @param obj object which field needs to be set
+      * @param offset the field offset within the given object
+      * @param value value to set
+      */
+    public static native void setLongVolatile(Object obj, long offset, long value);
+
+     /*
+      * Reads value from the object's field (by given offset) in volatile manner
+      * @param obj object which field needs to be read
+      * @param offset the field offset within the given object
+      * @return the field's value
+      */
+    public static native long getLongVolatile(Object obj, long offset);
+
+         /*
+      * Writes new value to the object's field (by given offset) in volatile manner
+      * @param obj object which field needs to be set
+      * @param offset the field offset within the given object
+      * @param value value to set
+      */
+    public static native void setObjectVolatile(Object obj, long offset, Object value);
+
+     /*
+      * Reads value from the object's field (by given offset) in volatile manner
+      * @param obj object which field needs to be read
+      * @param offset the field offset within the given object
+      * @return the field's value
+      */
+    public static native Object getObjectVolatile(Object obj, long offset);
+
      /**
       * Returns offset of the given field.
       * @param field the field for which offset is returned

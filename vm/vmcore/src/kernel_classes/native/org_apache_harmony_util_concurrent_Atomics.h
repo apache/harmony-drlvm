@@ -41,6 +41,51 @@ extern "C" {
 /* Native methods */
 
 /*
+ * Method: org.apache.harmony.util.concurrent.Atomics.setIntVolatile(Ljava/lang/Object;JI)V
+ */
+JNIEXPORT void JNICALL 
+Java_org_apache_harmony_util_concurrent_Atomics_setIntVolatile__Ljava_lang_Object_2JI(JNIEnv *, jclass, 
+    jobject, jlong, jint);
+
+
+/*
+ * Method: org.apache.harmony.util.concurrent.Atomics.getIntVolatile(Ljava/lang/Object;J)I
+ */
+JNIEXPORT jint JNICALL 
+Java_org_apache_harmony_util_concurrent_Atomics_getIntVolatile__Ljava_lang_Object_2J(JNIEnv *, jclass, 
+    jobject, jlong);
+
+/*
+ * Method: org.apache.harmony.util.concurrent.Atomics.setLongVolatile(Ljava/lang/Object;JJ)V
+ */
+JNIEXPORT void JNICALL 
+Java_org_apache_harmony_util_concurrent_Atomics_setLongVolatile__Ljava_lang_Object_2JJ(JNIEnv *, jclass, 
+    jobject, jlong, jlong);
+
+
+/*
+ * Method: org.apache.harmony.util.concurrent.Atomics.getLongVolatile(Ljava/lang/Object;J)J
+ */
+JNIEXPORT jlong JNICALL 
+Java_org_apache_harmony_util_concurrent_Atomics_getLongVolatile__Ljava_lang_Object_2J(JNIEnv *, jclass, 
+    jobject, jlong);
+
+/*
+ * Method: org.apache.harmony.util.concurrent.Atomics.setObjectVolatile(Ljava/lang/Object;JLjava/lang/Object;)V
+ */
+JNIEXPORT void JNICALL 
+Java_org_apache_harmony_util_concurrent_Atomics_setObjectVolatile__Ljava_lang_Object_2JLjava_lang_Object_2(JNIEnv *, jclass, 
+    jobject, jlong, jobject);
+
+
+/*
+ * Method: org.apache.harmony.util.concurrent.Atomics.getObjectVolatile(Ljava/lang/Object;J)Ljava/lang/Object;
+ */
+JNIEXPORT jobject JNICALL 
+Java_org_apache_harmony_util_concurrent_Atomics_getObjectVolatile__Ljava_lang_Object_2J(JNIEnv *, jclass, 
+    jobject, jlong);
+
+/*
  * Method: org.apache.harmony.util.concurrent.Atomics.getFieldOffset(Ljava/lang/reflect/Field;)J
  */
 JNIEXPORT jlong JNICALL
