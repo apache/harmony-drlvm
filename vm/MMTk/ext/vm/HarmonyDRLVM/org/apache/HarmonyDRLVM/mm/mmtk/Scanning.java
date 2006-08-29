@@ -137,7 +137,7 @@ public class Scanning extends org.mmtk.vm.Scanning implements Constants, Uninter
    */
   public static int addressOfTestRoot; // temporary hack, filled in by test.java
   public final void computeAllRoots(TraceLocal trace) {
-    ///System.out.println("*****************************org.apache.HarmonyDRLVM.mm.mmtk.Scanning.computeAllRoots() was called TraceLocal = "  + trace);
+    //System.out.println("org.apache.HarmonyDRLVM.mm.mmtk.Scanning.computeAllRoots() was called TraceLocal = "  + trace);
  
       if (addressOfTestRoot != 0)
         trace.addRootLocation(Address.fromInt(addressOfTestRoot));

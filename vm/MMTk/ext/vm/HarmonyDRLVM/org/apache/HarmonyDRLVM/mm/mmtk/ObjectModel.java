@@ -194,9 +194,19 @@ get_object_size_bytes(Partial_Reveal_Object *p_obj)
 
   public int getArrayLength(ObjectReference object) 
     throws InlinePragma {
-    //System.out.println("wjw org.apache.HarmonyDRLVM.mm.mmtk.ObjectModel.getArrayLength() was called");
-    VM.assertions._assert(false);
-    return 0;
+     
+      Class clsObj = object.getClass();
+      boolean isArr = clsObj.isArray();
+      if (isArr == false) System.out.println("getArrayLength() -- isArr = false");
+      VM.assertions._assert(isArr == true);     
+      Address addr2 = object.toAddress();
+      int vtblPtr = addr2.loadInt();
+      Address addr3 = addr2.plus(8);
+      int length = addr3.loadInt();
+      if (length != 10) System.out.println("getArrayLength() -- length = " + length);
+      VM.assertions._assert(length == 10);
+    return length;
+
   }
   /**
    * Tests a bit available for memory manager use in an object.
@@ -319,7 +329,6 @@ get_object_size_bytes(Partial_Reveal_Object *p_obj)
    */
   public Address objectStartRef(ObjectReference object)
     throws InlinePragma {
-              //System.out.println("QQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQ");
         //System.out.println("wjw org.apache.HarmonyDRLVM.mm.mmtk.ObjectModel.objectStartRef() was called");
 
     VM.assertions._assert(false);
@@ -358,7 +367,37 @@ get_object_size_bytes(Partial_Reveal_Object *p_obj)
       VM.assertions._assert(false);
       return false;
   }
+    
+    private static Class [] clsArray = new Class[10];
+    private static MMType [] mmtArray = new MMType[10];
 
+    private static MMType getObjTypeLookup(Class clsObj)
+    {
+        for (int xx = 0; xx < 10; xx++) 
+        {
+            if (clsArray[xx] == clsObj) 
+            {
+                return mmtArray[xx];
+            }
+        }
+        return null;
+    }
+
+    private static void getObjectTypeCacheInsert(Class clsObj, MMType mmt)
+    {
+        int xx;
+        for (xx = 0; xx < 10; xx++)
+        {
+            if (clsArray[xx] == clsObj) return;
+            if (clsArray[xx] == null) break;
+        }
+        VM.assertions._assert(xx<10);
+        VM.assertions._assert(clsArray[xx] == null);
+        VM.assertions._assert(mmtArray[xx] == null);
+        clsArray[xx] = clsObj;
+        mmtArray[xx] = mmt;
+        System.out.println("getObjTypeCacheInsert(), inserting  " + clsObj);
+    }
   /**
    * Return the type object for a give object
    *
@@ -367,31 +406,75 @@ get_object_size_bytes(Partial_Reveal_Object *p_obj)
    */
   public MMType getObjectType(ObjectReference object) 
     throws InlinePragma {
-      //System.out.println("wjw org.apache.HarmonyDRLVM.mm.mmtk.ObjectModel.getObjectType() was called");
-    //VM.assertions._assert(false);
-      //public MMType(boolean isDelegated, boolean isReferenceArray,
-                                             //boolean isAcyclic, int allocator, int[] offsets)
+                    Object obj = object.toObject();
+                    //System.out.println("wjw org.apache.HarmonyDRLVM.mm.mmtk.ObjectModel.getObjectType() was called " + obj);
+                    //VM.assertions._assert(false);
       boolean isDelegated = false;  //scanning is *not* delegated to the VM
       
       Class clsObj = object.getClass();
+      MMType mmtc = getObjTypeLookup(clsObj);
+      if (mmtc != null) return mmtc;
+
       boolean isArr = clsObj.isArray();
       boolean isRefArray = false;
       if (isArr) 
       {
           String clsName = clsObj.toString();
-          if (clsName.charAt(1) == '[') isRefArray = true;
-          if (clsName.charAt(1) == 'L') isRefArray = true;
+          //System.out.println("getObjectType() 3:" + clsName  + "_6:" + clsName.charAt(6) +
+          //    "_7:" + clsName.charAt(7) );
+          VM.assertions._assert(clsName.charAt(6) == '[');
+          if (clsName.charAt(7) == '[') isRefArray = true;
+          if (clsName.charAt(7) == 'L') isRefArray = true;
       }
-
       boolean isAcyclic = false;  //wjw -- I don't have a clue what this is...
 
       Space spx = Space.getSpaceForObject(object);
       MutatorContext mc = SelectedPlan.ap.mutator();
-      Allocator alc = mc.getAllocatorFromSpace(spx);
+      Allocator alc = mc.getAllocatorFromSpace(spx);  //but alloc is an "int, not an "Allocator".  Go figure...
   
-      int [] offs = new int[0];
-
+      int [] offs = new int [0];
+      /////888888888888888888888888888888
+      if (isArr == false)   //build the correct offset table
+          {
+              ObjectReference or = ObjectReference.fromObject(object);
+              Address addr2 = or.toAddress();
+              int vtblPtr = addr2.loadInt();
+              Address addrVPtr = Address.fromInt(vtblPtr);
+              int vPtr = addrVPtr.loadInt();
+              //System.out.println("AddrVptr = " + Integer.toHexString(addrVPtr.toInt()) );
+              //System.out.println("vPtr = " + Integer.toHexString(vPtr) );
+              Address addrVPtr_0 = Address.fromInt(vPtr);
+              int vPtr_0 = addrVPtr_0.loadInt();
+              //System.out.println("vPtr_0 = " + Integer.toHexString(vPtr_0) );
+              int vPtr_2c = addrVPtr_0.plus(0x2c).loadInt();
+              //System.out.println("vPtr_2c = " + Integer.toHexString(vPtr_2c) );
+              Address addrElementZero = Address.fromInt(vPtr_2c);
+              int xx = 0;
+              for (xx = 0; xx < 12; xx++ ) 
+              {
+                  int element = addrElementZero.plus(xx*4).loadInt();
+                  //System.out.println("element [" + xx + "] = " + element );
+                  if (element == 0) break;
+              }
+              if (xx > 10) VM.assertions._assert(false); // we ran off in the woods
+              if (xx > 0) 
+              {
+                  offs = new int[xx];
+                  for (int yy = 0; yy < xx; yy++) 
+                  {
+                      int element = addrElementZero.plus(yy*4).loadInt();
+                      offs[yy] = element;            
+                  }
+                  for (int rr = 0; rr < offs.length; rr++) 
+                  {
+                      //System.out.println("offs[" + rr + "] = " + offs[rr] );
+                  } 
+              }
+          }
+      ////////88888888888888888888888
+      //System.out.println("offs length = " + offs.length + " isRefArray = " + isRefArray);
       MMType mmt = new MMType(isDelegated, isRefArray, isAcyclic, Plan.ALLOC_DEFAULT, offs);
+      getObjectTypeCacheInsert(clsObj, mmt);
       return mmt;
   }
 }

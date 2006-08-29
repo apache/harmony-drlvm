@@ -33,7 +33,7 @@ public final class Options extends org.mmtk.vm.Options {
    * @return the vm specific key.
    */
   public final String getKey(String name) {
-    System.out.println("org.apache.HarmonyDRLVM.mm.mmtk.Options.getKey(String) " + name);    
+    //System.out.println("org.apache.HarmonyDRLVM.mm.mmtk.Options.getKey(String) " + name);    
     return null;
   }
 
