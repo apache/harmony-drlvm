@@ -25,6 +25,7 @@ import org.mmtk.policy.Space;
 import org.mmtk.plan.MutatorContext;
 import org.mmtk.utility.alloc.Allocator;
 import org.mmtk.plan.Plan;
+import org.mmtk.plan.CollectorContext;
 
 public final class ObjectModel extends org.mmtk.vm.ObjectModel implements Constants, Uninterruptible {
   /**
@@ -40,28 +41,68 @@ public final class ObjectModel extends org.mmtk.vm.ObjectModel implements Consta
    */
   public ObjectReference copy(ObjectReference from, int allocator)
     throws InlinePragma {
-
-/*
-wjw --- need to call native method to do something like the below to get the object size
-unsigned int
-get_object_size_bytes(Partial_Reveal_Object *p_obj)
-{
-    bool arrayp = is_array (p_obj);
-    unsigned int sz;
-    if (arrayp) {
-        sz = vm_vector_size(p_obj->vt()->get_gcvt()->gc_clss, vector_get_length((Vector_Handle)p_obj));
-        return sz; 
-    } else {
-            return p_obj->vt()->get_gcvt()->gc_allocated_size;
-    }
-}
-
- */
-
-
-      //System.out.println("wjw org.apache.HarmonyDRLVM.mm.mmtk.ObjectModel.copy was called");
-      VM.assertions._assert(false);
-      return from;  //wjw -- keep the compiler happy for now
+      int objSize = 0;     
+      Class clsObj = from.getClass();
+      boolean isArr = clsObj.isArray();
+      if (isArr) 
+      {
+          String clsName = clsObj.toString();
+          VM.assertions._assert(clsName.charAt(6) == '[');
+          int elementSize = 0;
+          if (clsName.charAt(7) == 'B') elementSize = 1;
+          if (clsName.charAt(7) == 'C') elementSize = 1;
+          if (clsName.charAt(7) == 'D') elementSize = 8;
+          if (clsName.charAt(7) == 'F') elementSize = 4;
+          if (clsName.charAt(7) == 'I') elementSize = 4;
+          if (clsName.charAt(7) == 'J') elementSize = 8;
+          if (clsName.charAt(7) == 'L') elementSize = 4;
+          if (clsName.charAt(7) == 'S') elementSize = 2;
+          if (clsName.charAt(7) == 'Z') elementSize = 1;
+          if (clsName.charAt(7) == '[') elementSize = 4;
+          VM.assertions._assert(elementSize != 0);
+          VM.assertions._assert( (clsName.charAt(7) == 'I') || (clsName.charAt(7) == 'L') ); //need to align the byte array properly
+          Address addrObj = from.toAddress();
+          int arrayLenOffset = 8;
+          Address lenAddr = addrObj.plus(arrayLenOffset);
+          int len = lenAddr.loadInt();
+          int sizeOfArrayHeader = 12;  //4 bytes for vtablePtr, 4 for lock bits, 4 for array length
+          objSize = sizeOfArrayHeader + len * elementSize;      
+      }
+      else 
+      {
+          Address addrFrom = from.toAddress();
+          int vtblPtr = addrFrom.loadInt();
+          Address addrVPtr = Address.fromInt(vtblPtr);
+          int vPtr = addrVPtr.loadInt();
+          Address addrVPtr_0 = Address.fromInt(vPtr);
+          int slot_0 = addrVPtr_0.loadInt();
+          int slot_24 = addrVPtr_0.plus(24).loadInt();
+          //System.out.println("slot_24 = " + Integer.toHexString(slot_24) );
+          objSize = slot_24;
+      }
+      //System.out.println("ObjectModel.copy(), allocator = " + allocator);
+      //VM.assertions._assert(allocator == 0);
+      CollectorContext cc = SelectedPlan.ap.collector();
+      Address addrTo = cc.allocCopy(from, objSize,
+          0, /*int align,*/  0, /*int offset,*/ allocator) ;
+      Address addrFrom = from.toAddress();
+      //System.out.println("ObjectModel.copy(), objSize = " + objSize + " addrFrom = " +
+      //    Integer.toHexString(addrFrom.toInt()) + " addrTo = " + Integer.toHexString(addrTo.toInt()) );
+      Address addrCursor = addrTo;
+      for (int xx = 0; xx < objSize; xx++) 
+      {
+            byte bb = addrFrom.loadByte();
+            addrCursor.store(bb);
+            addrCursor = addrCursor.plus(1);
+            addrFrom = addrFrom.plus(1);
+      }
+      // mask off the GC bits (both forwarding and mark bits)
+      Address addrGCBits = addrTo.plus(4);
+      int yy = addrGCBits.loadInt();
+      // the following does not work because of "private" token -- Word ww = org.mmtk.policy.CopySpace.GC_FORWARDED;
+      yy = yy & 0xffFFffFc;  //ugly! but where is MMTk #defines for these bits?
+      addrGCBits.store(yy);
+      return addrTo.toObjectReference();
   }
 
    
@@ -250,9 +291,9 @@ get_object_size_bytes(Partial_Reveal_Object *p_obj)
    */
   public boolean attemptAvailableBits(ObjectReference object,
                                              Word oldVal, Word newVal) {
-    //System.out.print("wjw org.apache.HarmonyDRLVM.mm.mmtk.ObjectModel.attemptAvailableBits() ");
-    //System.out.println("object = " + Integer.toHexString(object.toAddress().toInt()) +
-    //    " oldVal = " + Integer.toHexString(oldVal.toInt() ) + " newVal = " + Integer.toHexString(newVal.toInt() ) );
+     //System.out.print("wjw org.apache.HarmonyDRLVM.mm.mmtk.ObjectModel.attemptAvailableBits() ");
+     //System.out.println("object = " + Integer.toHexString(object.toAddress().toInt()) +
+     //   " oldVal = " + Integer.toHexString(oldVal.toInt() ) + " newVal = " + Integer.toHexString(newVal.toInt() ) );
     
       Address addr = object.toAddress();
       addr = addr.plus(4);  // wjw -- 
@@ -271,13 +312,13 @@ get_object_size_bytes(Partial_Reveal_Object *p_obj)
    * @return the value of the bits
    */
   public Word prepareAvailableBits(ObjectReference object) {
-    //System.out.println("wjw org.apache.HarmonyDRLVM.mm.mmtk.ObjectModel.prepareAvailableBits() was called " +
-        //Integer.toHexString(object.toAddress().toInt()) );
+    //System.out.print("org.apache.HarmonyDRLVM.mm.mmtk.ObjectModel.prepareAvailableBits(), object = " +
+    //    Integer.toHexString(object.toAddress().toInt()) );
 
     Address addr = object.toAddress();
     addr = addr.plus(4);  // wjw -- 
     int xx = addr.loadInt();
-      //System.out.println("prepareAvailableBits() returning = " + Integer.toHexString(xx) );
+     // System.out.println(" return val = " + Integer.toHexString(xx) );
     //VM.assertions._assert(false);
     return Word.fromInt(xx);
   }
@@ -289,8 +330,12 @@ get_object_size_bytes(Partial_Reveal_Object *p_obj)
    * @param val the new value of the bits
    */
   public void writeAvailableBitsWord(ObjectReference object, Word val) {
-    //System.out.println("wjw org.apache.HarmonyDRLVM.mm.mmtk.ObjectModel.attemptAvailableBits() was called");
-    VM.assertions._assert(false);
+    //System.out.println("org.apache.HarmonyDRLVM.mm.mmtk.ObjectModel.attemptAvailableBits(), object ="
+    //    + Integer.toHexString(object.toAddress().toInt()) +
+    //    " val = " + Integer.toHexString(val.toInt())   );
+    Address addrRefPtr = object.toAddress();
+    addrRefPtr = addrRefPtr.plus(4);  // wjw --
+    addrRefPtr.store(val.toInt() );
     return;
   }
 
@@ -301,9 +346,13 @@ get_object_size_bytes(Partial_Reveal_Object *p_obj)
    * @return the value of the bits
    */
   public Word readAvailableBitsWord(ObjectReference object) {
-      //System.out.println("wjw org.apache.HarmonyDRLVM.mm.mmtk.ObjectModel.readAvailableBitsWord() was called");
-      VM.assertions._assert(false);
-      return Word.fromInt(0);
+      //System.out.println("org.apache.HarmonyDRLVM.mm.mmtk.ObjectModel.readAvailableBitsWord(), object ="
+        //  + Integer.toHexString(object.toAddress().toInt()) );
+      Address addrRefPtr = object.toAddress();
+      addrRefPtr = addrRefPtr.plus(4);  // wjw --
+      Word wor = addrRefPtr.loadWord();
+      //System.out.println("org.apache.HarmonyDRLVM.mm.mmtk.ObjectModel.readAvailableBitsWord(), wor =" + Integer.toHexString(wor.toInt()) );
+      return wor;
   }
 
   /**
@@ -396,7 +445,7 @@ get_object_size_bytes(Partial_Reveal_Object *p_obj)
         VM.assertions._assert(mmtArray[xx] == null);
         clsArray[xx] = clsObj;
         mmtArray[xx] = mmt;
-        System.out.println("getObjTypeCacheInsert(), inserting  " + clsObj);
+        //System.out.println("getObjTypeCacheInsert(), inserting  " + clsObj);
     }
   /**
    * Return the type object for a give object

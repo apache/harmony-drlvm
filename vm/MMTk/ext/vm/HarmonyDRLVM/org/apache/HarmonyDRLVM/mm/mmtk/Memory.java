@@ -27,7 +27,7 @@ import org.mmtk.utility.Constants;
 public class Memory extends org.mmtk.vm.Memory
   implements Constants, Uninterruptible {
 
-    static protected int PHONY_JAVA_HEAP_SIZE = 1024 * 1024 * 350;
+    static protected int PHONY_JAVA_HEAP_SIZE = 1024 * 1024 * 450;
     static protected byte [] immortalPinnedScratchObject;  //wjw -- ugly hack, make it static so that it is always enumerated
     static protected int dangerousPointerToStartOfScratchArea;
     static protected int dangerousPointerToEndOfScratchArea;

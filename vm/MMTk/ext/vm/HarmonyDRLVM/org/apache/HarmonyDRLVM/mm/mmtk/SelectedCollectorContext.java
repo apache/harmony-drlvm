@@ -18,15 +18,20 @@ package org.apache.HarmonyDRLVM.mm.mmtk;
 
 import org.mmtk.plan.nogc.*;
 import org.mmtk.plan.marksweep.*;
+import org.mmtk.plan.semispace.*;
 import org.vmmagic.pragma.*;
 import org.mmtk.plan.CollectorContext;
+import org.mmtk.plan.copyms.CopyMSCollector;
+import org.mmtk.plan.generational.marksweep.GenMSCollector;
 
-public final class SelectedCollectorContext implements 
+public final class SelectedCollectorContext extends GenMSCollector implements 
   Uninterruptible {
 
   //public static final CollectorContext singleton = new NoGCCollector();
-  public static final CollectorContext singleton = new  MSCollector();
-  
+  //public static final CollectorContext singleton = new  MSCollector();
+  //public static final CollectorContext singleton = new SSCollector();
+    public static final CollectorContext singleton = new SelectedCollectorContext();
+
   /**
    * Return the instance of the SelectedPlan
    */

@@ -16,19 +16,35 @@
 
 package org.apache.HarmonyDRLVM.mm.mmtk;
 
+import org.mmtk.plan.marksweep.MS;
 import org.mmtk.plan.nogc.*;
-import org.mmtk.plan.marksweep.*;
+import org.mmtk.plan.semispace.SS;
 import org.vmmagic.pragma.*;
 import org.mmtk.plan.Plan;
+import org.mmtk.plan.copyms.*;
+import org.mmtk.plan.generational.marksweep.GenMS;
+
 
 public final class SelectedPlan implements Uninterruptible 
 {
     //public static final Plan singleton = new NoGC();
-    public static final MS singleton = new MS();
+    //public static final MS singleton = new MS();
+    //private static MS singleton;  // work around a DRLVM bug
+    //private static SS singleton;
+    //private static CopyMS singleton;
+    private static GenMS singleton;
+
     public static org.apache.HarmonyDRLVM.mm.mmtk.ActivePlan ap = new org.apache.HarmonyDRLVM.mm.mmtk.ActivePlan();
 
     public static final Plan get() throws InlinePragma 
     {
+        if (SelectedPlan.singleton == null) 
+        {
+            //SelectedPlan.singleton = new MS();
+            //SelectedPlan.singleton = new SS();
+            //SelectedPlan.singleton = new CopyMS();
+            SelectedPlan.singleton = new GenMS();
+        }
         return singleton;
     }
 }

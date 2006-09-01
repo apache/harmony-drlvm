@@ -39,6 +39,7 @@ public final class ActivePlan extends org.mmtk.vm.ActivePlan implements Uninterr
 
   /** @return The active Plan instance. */
   public final Plan global() throws InlinePragma {
+      //System.out.println("ActivePlan.global(), SelectedPlan.get() = " + SelectedPlan.get() );
     return SelectedPlan.get();
   } 
   

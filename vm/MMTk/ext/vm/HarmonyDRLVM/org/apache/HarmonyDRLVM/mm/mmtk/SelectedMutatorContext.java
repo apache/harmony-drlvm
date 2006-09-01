@@ -18,15 +18,21 @@ package org.apache.HarmonyDRLVM.mm.mmtk;
 
 import org.mmtk.plan.nogc.*;
 import org.mmtk.plan.marksweep.*;
+import org.mmtk.plan.semispace.*;
 import org.vmmagic.pragma.*;
 import org.mmtk.plan.MutatorContext;
+import org.mmtk.plan.copyms.CopyMSMutator;
+import org.mmtk.plan.generational.marksweep.GenMSMutator;
 
 public final class SelectedMutatorContext 
   implements Uninterruptible {
 
   //public static final MutatorContext singleton = new NoGCMutator();
-  public static final MutatorContext singleton = new MSMutator();
-  
+  //public static final MutatorContext singleton = new MSMutator();
+  //public static final MutatorContext singleton = new SSMutator();
+  //public static final MutatorContext singleton = new CopyMSMutator();
+  public static final MutatorContext singleton = new GenMSMutator();
+
   /**
    * Return the instance of the SelectedPlan
    */

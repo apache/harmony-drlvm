@@ -98,8 +98,8 @@ public class Scanning extends org.mmtk.vm.Scanning implements Constants, Uninter
    */
   public final void preCopyGCInstances(TraceLocal trace) 
   throws NoInlinePragma {
-        System.out.println("org.apache.HarmonyDRLVM.mm.mmtk.Scanning.preCopyGCInstances() was called");
-        VM.assertions._assert(false);
+        //System.out.println("org.apache.HarmonyDRLVM.mm.mmtk.Scanning.preCopyGCInstances() was called");
+        //VM.assertions._assert(false);
   }
   
  
