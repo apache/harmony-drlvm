@@ -610,6 +610,13 @@ public final class Class<T> implements Serializable, AnnotatedElement, GenericDe
     }
 
     /**
+     *  TODO - fix
+     */
+    public boolean isEnum() {
+        return false;
+    }
+
+    /**
      * @com.intel.drl.spec_ref
      */
     public Object newInstance() throws InstantiationException,
