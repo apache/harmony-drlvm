@@ -72,6 +72,9 @@ public class TestGenMS
             case 4:
                 linkListOfLiveObjectsTest2();
                 break;
+            case 5:
+                writeBarrierLinkListTest();
+                break;
             default:
                 System.out.println("******************** do nothing, invalid test number  ***********************");
                 break;
@@ -198,6 +201,62 @@ public class TestGenMS
             System.out.println("~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ single root test, loop = " + kk + " OK");
         }
     }
+
+    static void writeBarrierDomain(Address addrOfRoot, Address addrShortLivedObj)
+    {
+        System.out.println("writeBarrierDomain, addrOfRoot = " + Integer.toHexString(addrOfRoot.toInt()) +
+            " addrShortLivedObj = " + Integer.toHexString(addrShortLivedObj.toInt()) );
+        System.out.println();
+        ObjectReference orRoot = addrOfRoot.toObjectReference();
+        Green grRoot = (Green)orRoot.toObject(); 
+        ObjectReference orShortLived = addrShortLivedObj.toObjectReference();
+        Green grShortLived = (Green)orShortLived.toObject();
+        grRoot.f3 = grShortLived;  // this should cause a write barrier to happen
+    }
+    static void writeBarrierLinkListTest( )
+    {
+        Green gr = new Green();
+        ObjectReference orGr = ObjectReference.fromObject(gr);
+        Address addrGr = orGr.toAddress();
+        int vtblPtrGreen = addrGr.loadInt();
+
+        Address addrImmortalObj = TestGenMS.mc.alloc(52, 0, 0, Plan.ALLOC_IMMORTAL, 0);
+        addrImmortalObj.store(vtblPtrGreen);
+  
+        Address addrImmortalObjFieldZero = addrImmortalObj.plus(8); // stuff the _address_ of the root into element zero of the immortal array
+
+        Address addrLiveObj = mc.alloc(52, 0, 0, Plan.ALLOC_DEFAULT, 0);
+        addrLiveObj.store(vtblPtrGreen);
+
+        addrImmortalObjFieldZero.store(addrLiveObj);  // stuff the _address_ of the Green instance into the "immortal" obj to test enumeration
+        org.apache.HarmonyDRLVM.mm.mmtk.Scanning.addressOfTestRoot = addrImmortalObjFieldZero.toInt();
+
+        //this should move addrLiveObj into old generation
+        Address addrShortLivedObj = null;
+        for (int kk=0; kk < 40000; kk++) 
+        {
+            addrShortLivedObj = TestGenMS.mc.alloc(52, 0, 0, Plan.ALLOC_DEFAULT, 0);
+            addrShortLivedObj.store(vtblPtrGreen);
+        }
+        // this should cause an old to young ref pointer to happen
+
+        int addrOfAddrOfRoot = org.apache.HarmonyDRLVM.mm.mmtk.Scanning.addressOfTestRoot;
+        Address addrOfRoot = Address.fromInt(addrOfAddrOfRoot).loadAddress();
+        writeBarrierDomain(addrOfRoot, addrShortLivedObj);
+
+        for (int jj=0; jj < 80000; jj++) // cause lots of nursery collections, should force addrShortLivedObj into mature gen
+        {
+            addrShortLivedObj = TestGenMS.mc.alloc(52, 0, 0, Plan.ALLOC_DEFAULT, 0);
+            addrShortLivedObj.store(vtblPtrGreen);
+        }
+       addrOfRoot = Address.fromInt(addrOfAddrOfRoot).loadAddress();
+       Green gr2 = (Green)addrOfRoot.toObjectReference().toObject();
+       System.out.println("gr2 = " + gr2 + " gr2.f3 = " + gr2.f3);
+       System.out.println("Address of gr2 = " + Integer.toHexString(ObjectReference.fromObject(gr2).toAddress().toInt())  );
+       System.out.println("Address of gr3 = " + Integer.toHexString(ObjectReference.fromObject(gr2.f3).toAddress().toInt())  );
+
+    }
+
     static void linkListOfLiveObjectsTest()
     {
         Green gr = new Green();
