@@ -35,9 +35,18 @@ public class Barriers extends org.mmtk.vm.Barriers implements Uninterruptible {
                                            ObjectReference target, Offset offset, 
                                            int locationMetadata, int mode) 
     throws InlinePragma {
-    System.out.println("org.apache.HarmonyDRLVM.mm.mmtk.Barriers -- performWriteInBarrier was called" );
+      /*
+      System.out.println("org.apache.HarmonyDRLVM.mm.mmtk.Barriers.GenMutator.performWriteInBarrier(), ref =" +
+          Integer.toHexString(ref.toAddress().toInt()) + 
+          " slot = " + Integer.toHexString(slot.toInt()) +
+          " target = " + Integer.toHexString(target.toAddress().toInt()) +
+          " offset = " + Integer.toHexString(offset.toInt()) + " locationMetadata = " + 
+          Integer.toHexString(locationMetadata) + " mode = " + Integer.toHexString(mode)
+          );
+          */
     //VM.assertions._assert(false);
-
+    Address addr = ref.toAddress();
+    //JIT should have already done this ---->  addr.store(target, offset);
   }
 
   /**
@@ -58,7 +67,7 @@ public class Barriers extends org.mmtk.vm.Barriers implements Uninterruptible {
                                            int locationMetadata, int mode)
     throws InlinePragma { 
     System.out.println("org.apache.HarmonyDRLVM.mm.mmtk.Barriers -- performWriteInBarrierAtomic was called" );
-    //VM.assertions._assert(false);
+    VM.assertions._assert(false);
     return ref;  // keep the compiler happy
   }
 
@@ -83,7 +92,19 @@ public class Barriers extends org.mmtk.vm.Barriers implements Uninterruptible {
           oneShot = true;
       }
       dst[index] = value;
-      //VM.assertions._assert(false);
+      /*
+      ObjectReference orDst = ObjectReference.fromObject(dst);
+      Address addrDst = orDst.toAddress();
+      Address addrElementZero = addrDst.plus(12);
+      Address addrElementIndex = addrElementZero.plus(index * 1);
+      addrElementIndex.store(value);
+      if (dst[index] != value) 
+      {
+          System.out.println("setArrayNoBarrierStatic() ERROR: dst[index] = " + dst[index]
+            + " value = " + value);
+          VM.assertions._assert(false);
+      }
+      */
   }
 
   /**
