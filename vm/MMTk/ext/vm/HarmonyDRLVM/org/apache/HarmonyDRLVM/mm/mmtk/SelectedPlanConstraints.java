@@ -18,8 +18,11 @@ package org.apache.HarmonyDRLVM.mm.mmtk;
 
 import org.mmtk.plan.nogc.*;
 import org.mmtk.plan.marksweep.*;
+import org.mmtk.plan.semispace.*;
 import org.vmmagic.pragma.*;
 import org.mmtk.plan.PlanConstraints;
+import org.mmtk.plan.copyms.*;
+import org.mmtk.plan.generational.marksweep.GenMSConstraints;
 
 /**
  * This class extends the selected MMTk constraints class. 
@@ -28,7 +31,10 @@ import org.mmtk.plan.PlanConstraints;
 public final class SelectedPlanConstraints implements Uninterruptible 
 {
     //public static final PlanConstraints singleton = new NoGCConstraints();
-    public static final PlanConstraints singleton = new MSConstraints();
+    //public static final PlanConstraints singleton = new MSConstraints();
+    //public static final PlanConstraints singleton = new SSConstraints();
+    //public static final PlanConstraints singleton = new CopyMSConstraints();
+    public static final PlanConstraints singleton = new GenMSConstraints();
 
     public static final PlanConstraints get() throws InlinePragma 
     {
