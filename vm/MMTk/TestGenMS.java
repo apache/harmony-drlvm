@@ -202,6 +202,7 @@ public class TestGenMS
         }
     }
 
+    static int DISTINCTIVE_PATTERN = 0x3945ab3c;
     static void writeBarrierDomain(Address addrOfRoot, Address addrShortLivedObj)
     {
         System.out.println("writeBarrierDomain, addrOfRoot = " + Integer.toHexString(addrOfRoot.toInt()) +
@@ -242,6 +243,10 @@ public class TestGenMS
 
         int addrOfAddrOfRoot = org.apache.HarmonyDRLVM.mm.mmtk.Scanning.addressOfTestRoot;
         Address addrOfRoot = Address.fromInt(addrOfAddrOfRoot).loadAddress();
+        Green gg = (Green)addrShortLivedObj.toObjectReference().toObject();
+        gg.f5 = gg.f6 = gg.f9 = gg.f10 = DISTINCTIVE_PATTERN;
+        gg = null;  // keep this obj away from gcv4!
+
         writeBarrierDomain(addrOfRoot, addrShortLivedObj);
 
         for (int jj=0; jj < 80000; jj++) // cause lots of nursery collections, should force addrShortLivedObj into mature gen
@@ -249,12 +254,27 @@ public class TestGenMS
             addrShortLivedObj = TestGenMS.mc.alloc(52, 0, 0, Plan.ALLOC_DEFAULT, 0);
             addrShortLivedObj.store(vtblPtrGreen);
         }
-       addrOfRoot = Address.fromInt(addrOfAddrOfRoot).loadAddress();
-       Green gr2 = (Green)addrOfRoot.toObjectReference().toObject();
-       System.out.println("gr2 = " + gr2 + " gr2.f3 = " + gr2.f3);
-       System.out.println("Address of gr2 = " + Integer.toHexString(ObjectReference.fromObject(gr2).toAddress().toInt())  );
-       System.out.println("Address of gr3 = " + Integer.toHexString(ObjectReference.fromObject(gr2.f3).toAddress().toInt())  );
-
+        addrOfRoot = Address.fromInt(addrOfAddrOfRoot).loadAddress();
+        Green gr2 = (Green)addrOfRoot.toObjectReference().toObject();
+        System.out.println("gr2 = " + gr2 + " gr2.f3 = " + gr2.f3);
+        System.out.println("Address of gr2 = " + Integer.toHexString(ObjectReference.fromObject(gr2).toAddress().toInt())  );
+        System.out.println("Address of gr2.f3 = " + Integer.toHexString(ObjectReference.fromObject(gr2.f3).toAddress().toInt())  );
+        gr2 = gr2.f3;
+        if ( (gr2.f5 == DISTINCTIVE_PATTERN ) &&
+            (gr2.f6 == DISTINCTIVE_PATTERN ) &&
+            (gr2.f9 == DISTINCTIVE_PATTERN ) &&
+            (gr2.f10 == DISTINCTIVE_PATTERN )          ) 
+        {
+            System.out.println("write barrier test OK");
+        }
+        else 
+        {
+            System.out.println("write barrier test FAILED");
+            System.out.println("gr2.f5 = " + Integer.toHexString(gr2.f5) +
+                " gr2.f5 = " + Integer.toHexString(gr2.f6) +
+                " gr2.f5 = " + Integer.toHexString(gr2.f9) +
+                " gr2.f5 = " + Integer.toHexString(gr2.f10) );
+        }
     }
 
     static void linkListOfLiveObjectsTest()
