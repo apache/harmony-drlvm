@@ -86,16 +86,18 @@ public final class ObjectModel extends org.mmtk.vm.ObjectModel implements Consta
       Address addrTo = cc.allocCopy(from, objSize,
           0, /*int align,*/  0, /*int offset,*/ allocator) ;
       Address addrFrom = from.toAddress();
-      //System.out.println("ObjectModel.copy(), objSize = " + objSize + " addrFrom = " +
-      //    Integer.toHexString(addrFrom.toInt()) + " addrTo = " + Integer.toHexString(addrTo.toInt()) );
+            //System.out.println("ObjectModel.copy(), objSize = " + objSize + " addrFrom = " +
+                //Integer.toHexString(addrFrom.toInt()) + " addrTo = " + Integer.toHexString(addrTo.toInt()) );
       Address addrCursor = addrTo;
       for (int xx = 0; xx < objSize; xx++) 
       {
             byte bb = addrFrom.loadByte();
+                        //System.out.print("_" + Integer.toHexString((int)bb));
             addrCursor.store(bb);
             addrCursor = addrCursor.plus(1);
             addrFrom = addrFrom.plus(1);
       }
+                        //System.out.println("");
       // mask off the GC bits (both forwarding and mark bits)
       Address addrGCBits = addrTo.plus(4);
       int yy = addrGCBits.loadInt();
