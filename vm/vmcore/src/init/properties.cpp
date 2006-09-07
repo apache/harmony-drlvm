@@ -91,7 +91,7 @@ char *predefined_propeties[] =
 
 
 
-#define API_DLL1 "vmcore"
+#define API_DLL1 "harmonyvm"
 #define API_DLL2 "hythr"
 #define API_DLL3 "hysig"
 #define API_DLL4 "hyprt"
@@ -105,8 +105,11 @@ char *predefined_propeties[] =
 #define GC_DLL "gc"
 #define EM_DLL "em"
 
-// Compose a string of file names each of them beginning with path,
-// names separated by PORT_PATH_SEPARATOR
+/**
+ *  Compose a string of file names each of them beginning with path,
+ *  names separated by PORT_PATH_SEPARATOR.  If patch is NULL, no path
+ *  or separator willbe prefixed
+ */
 static char *compose_full_files_path_names_list(const char *path,
                                                 const char **dll_names,
                                                 const int names_number, 
@@ -119,7 +122,17 @@ static char *compose_full_files_path_names_list(const char *path,
         if (is_dll) {
             tmp = port_dso_name_decorate(tmp, prop_pool);
         }
-        tmp = port_filepath_merge(path, tmp, prop_pool);
+        
+        /*
+         *  if the path is non-null, prefix, otherwise do nothing
+         *  to avoid the problem of "/libfoo.so" when we don't want
+         *  a path attached
+         */
+         
+        if (path != NULL) { 
+	        tmp = port_filepath_merge(path, tmp, prop_pool);
+        }
+        
         full_name = apr_pstrcat(prop_pool, full_name, tmp, 
             (iii + 1 < names_number) ? PORT_PATH_SEPARATOR_STR : "", NULL);
     }
@@ -219,8 +232,14 @@ void post_initialize_ee_dlls(PropertiesHandle ph) {
     };
     const char ** dll_files= em_dll_files;
     const int n_dll_files = sizeof(dll_files) / sizeof(char *);
+
+	/*
+	 *  pass NULL for the pathname as we don't want 
+	 *  any path pre-pended
+	 */
+
     char* path_buf = compose_full_files_path_names_list(
-            library_path, dll_files, n_dll_files, true);
+            NULL, dll_files, n_dll_files, true);
 
     assert(path_buf);
     add_pair_to_properties(*properties, "vm.em_dll", path_buf);
@@ -246,9 +265,16 @@ static void define_undefined_predefined_properties(Properties & properties)
     if (NULL == p)
         DIE("Failed to determine executable directory");
     *p = '\0';
-    // vm.boot.library.path initialization, the value is the location of VM executable
-    add_pair_to_properties(properties, "vm.boot.library.path", base_path_buf);
+    
+    /*
+     *  vm.boot.library.path initialization, the value is the location of VM executable
+     * 
+     *  2006-09-06 gmj :  there's no reason to ever believe this is true given how the VM can be 
+     *  launched in a mariad of ways, so just set to empty string.
+     */
+    add_pair_to_properties(properties, "vm.boot.library.path", "");
     TRACE( "vm.boot.library.path = " << base_path_buf);
+    
     // Added for compatibility with the external java JDWP agent
     add_pair_to_properties(properties, "sun.boot.library.path", base_path_buf);
     TRACE( "sun.boot.library.path = " << base_path_buf);
@@ -278,13 +304,25 @@ static void define_undefined_predefined_properties(Properties & properties)
     };
     int n_api_dll_files = sizeof(api_dll_files) / sizeof(char *);
 
+
+	/*
+	 *  pass NULL for the pathname as we don't want 
+	 *  any path pre-pended
+	 */
     path_buf = compose_full_files_path_names_list(
-            base_path_buf, core_dll_files, n_core_dll_files, true);
+            NULL, core_dll_files, n_core_dll_files, true);
+
     add_pair_to_properties(properties, "vm.dlls", path_buf);
     TRACE( "vm.dlls = " << path_buf);
 
+	/*
+	 *  pass NULL for the pathname as we don't want 
+	 *  any path pre-pended
+	 */
+
     path_buf = compose_full_files_path_names_list(
-            base_path_buf, api_dll_files, n_api_dll_files, true);
+            NULL, api_dll_files, n_api_dll_files, true);
+
     add_pair_to_properties(properties, "vm.other_natives_dlls", path_buf);
     TRACE( "vm.other_natives_dlls = " << path_buf);
 

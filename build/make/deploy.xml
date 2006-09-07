@@ -37,8 +37,8 @@ Description of the product deploy folder.
         </em>
 
         <vmcore>
-            <static>bin:vmcore</static>
-            <shared>bin:vmcore</shared>
+            <static>bin:harmonyvm</static>
+            <shared>bin:harmonyvm</shared>
         </vmcore>
 
         <interpreter>

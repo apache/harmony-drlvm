@@ -155,9 +155,23 @@ void DrlEMImpl::deallocateResources() {
 std::string buildDefaultLibPath(const std::string& dll_name) {
     std::string library_path = vm_get_property_value("vm.boot.library.path");
 #ifdef PLATFORM_NT
-    std::string fullPath = library_path + "\\"+ dll_name+".dll";
+    std::string fullPath = dll_name + ".dll";
+    
+    if (!library_path.empty()) { 
+    	fullPath = library_path + "\\" + fullPath;
+    }
+    
 #else
-    std::string fullPath = library_path + "/lib" + dll_name + ".so";
+//  $$$ GMJ
+//
+//    std::string fullPath = library_path + "/lib" + dll_name + ".so";
+
+	std::string fullPath = "lib" + dll_name + ".so";
+	
+    if (!library_path.empty()) {
+  		fullPath = library_path + "/" + fullPath;
+    }
+    
 #endif
     return fullPath;
 }
