@@ -221,6 +221,11 @@ public final class Array {
      */
     public static void set(Object array, int index, Object value)
         throws IllegalArgumentException, ArrayIndexOutOfBoundsException {
+    	
+    	if (array == null) {
+    		throw new NullPointerException();
+    	}
+    	
         try {
             ((Object[])array)[index] = value;
             return;
@@ -254,9 +259,6 @@ public final class Array {
             }
         } catch (ArrayStoreException e) {
             throw new IllegalArgumentException(e.getMessage());
-        }
-        if (value == null) {
-            throw new NullPointerException();
         }
         throw new IllegalArgumentException(
             "Can not assign the specified value to the specified array component");
