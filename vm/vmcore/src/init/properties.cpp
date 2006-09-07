@@ -97,7 +97,7 @@ char *predefined_propeties[] =
 #define API_DLL4 "hyprt"
 #define API_DLL5 "hyzlib"
 #define API_DLL6 "hytext"
-#define API_DLL7 "hypool"
+#define API_DLL7 "hynio"
 #define API_DLL8 "vmi"
 #define API_DLLA "hyluni"
 #define API_DLLB "hyarchive"
@@ -298,6 +298,7 @@ static void define_undefined_predefined_properties(Properties & properties)
         API_DLL4,
         API_DLL5,
         API_DLL6,
+        API_DLL7,
         API_DLL8,
         API_DLLA,
         API_DLLB
