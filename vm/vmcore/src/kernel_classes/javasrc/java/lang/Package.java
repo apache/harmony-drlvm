@@ -212,7 +212,26 @@ public class Package {
                 }
             }
         } catch (NoSuchElementException e) {
+        	
+        	/* 
+        	 * ignore - this seems to be the case when we run out of tokens
+        	 * for desiredVersion
+        	 */
         }
+        
+        /*
+         *   now, if desired is longer than spec, and they have been 
+         *   equal so far (ex.  1.4  <->  1.4.0.0) then the remainder
+         *   better be zeros
+         */
+
+    	while (desiredVersionTokens.hasMoreTokens()) {
+    		if (0 != Integer.parseInt(desiredVersionTokens.nextToken())) {
+        		return false;
+        	}
+    	}
+
+        
         return true;
     }
 
