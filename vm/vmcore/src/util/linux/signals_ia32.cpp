@@ -262,6 +262,17 @@ void init_stack_info() {
 
 void set_guard_stack() {
     int err;
+    
+    /*
+     * have the stack parameters been initialized?
+     * 
+     * TODO - fix this - this probably should be elsewhere
+     */
+
+    if(!p_TLS_vmthread->stack_addr) {
+        init_stack_info();
+    }
+    
     char* stack_addr = (char*) get_stack_addr();
     size_t stack_size = get_stack_size();
     size_t guard_stack_size = get_guard_stack_size();
@@ -270,12 +281,16 @@ void set_guard_stack() {
     err = mprotect(stack_addr - stack_size + guard_page_size + guard_stack_size,
         guard_page_size, PROT_NONE);
 
+    assert(!err);
+    
     stack_t sigalt;
     sigalt.ss_sp = stack_addr - stack_size + guard_page_size;
     sigalt.ss_flags = SS_ONSTACK;
     sigalt.ss_size = guard_stack_size;
 
     err = sigaltstack (&sigalt, NULL);
+    
+    assert(!err);
 }
 
 size_t get_available_stack_size() {

@@ -227,6 +227,17 @@ void init_stack_info() {
 }
 
 void set_guard_stack() {
+    
+    /*
+     * have the stack parameters been initialized?
+     * 
+     * TODO - fix this - this probably should be elsewhere
+     */
+
+    if(!p_TLS_vmthread->stack_addr) {
+        init_stack_info();
+    }
+  
     void* stack_addr = get_stack_addr();
     size_t stack_size = get_stack_size();
     size_t page_size = get_guard_page_size();
