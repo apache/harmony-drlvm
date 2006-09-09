@@ -293,7 +293,7 @@ JNIEXPORT jobjectArray JNICALL Java_org_apache_harmony_vm_VMStack_getStackTrace
     if (!strcmp(method_get_name(method), "runImpl")
         && method->get_class()->name == starter_String) {
         int rem = size - skip-1;
-        size -= rem < 3 ? rem : 3;
+        size -= rem < 2 ? rem : 2;
     }
 
     ASSERT(size >= skip, "Trying to skip " << skip 
