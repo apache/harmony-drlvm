@@ -434,6 +434,15 @@ Version: $Revision: 1.16.2.20 $
                                            deploy.getting_started,
                                            deploy.copy_classlib,
                                            deploy.tweakname">
+    	
+    	<!-- copy our hythr for the launcher to use -->
+    	
+    	<copy todir="${build.deploy.dir}/bin">
+    		<fileset dir="${build.deploy.dir}/bin/default/">
+    			<include name="*hythr*"/>
+    		</fileset>
+    	</copy>
+
         <if>
             <and>
                 <isset property="if.lnx" />
@@ -442,13 +451,14 @@ Version: $Revision: 1.16.2.20 $
             <then>
                 <chmod perm="755">
                     <fileset dir="${build.deploy.dir}/bin">
-                        <include name="eclipse.sh" />
+                        <include name="java" />
                         <include name="*.so" />
                         <include name="*.so.*" />
                     </fileset>
                 </chmod>
             </then>
         </if>
+    	
     </target>
 
     <!-- tweak the names of java -> java.exec and
@@ -479,14 +489,6 @@ Version: $Revision: 1.16.2.20 $
         <copy todir="${canonical.deploy.dir}/jre">
             <fileset dir="${build.deploy.dir}"/>
         </copy>
-
-    	<!-- copy our hythr for the launcher to use -->
-    	
-    	<copy todir="${canonical.deploy.dir}/jre/bin">
-    		<fileset dir="${canonical.deploy.dir}/jre/bin/default/">
-    			<include name="*hythr*"/>
-    		</fileset>
-    	</copy>
     	
         <if>
             <isset property="if.lnx"/>
