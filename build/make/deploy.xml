@@ -24,40 +24,36 @@ Description of the product deploy folder.
 
 <deploy>
     <vm>
-        <vmstart>
-            <executable>bin:java</executable>
-        </vmstart>
-
         <encoder>
-            <static>bin:encoder</static>
+            <static>bin/default:encoder</static>
         </encoder>
 
         <em>
-            <shared>bin:em</shared>
+            <shared>bin/default:em</shared>
         </em>
 
         <vmcore>
-            <static>bin:harmonyvm</static>
-            <shared>bin:harmonyvm</shared>
+            <static>bin/default:harmonyvm</static>
+            <shared>bin/default:harmonyvm</shared>
         </vmcore>
 
         <interpreter>
-            <shared>bin:interpreter</shared>
+            <shared>bin/default:interpreter</shared>
         </interpreter>
 
         <select arch="ia32,ipf">
             <jitrino>
-                <shared>bin:jitrino</shared>
+                <shared>bin/default:jitrino</shared>
             </jitrino>
         </select>
 
         <gc>
-            <shared>bin:gc</shared>
+            <shared>bin/default:gc</shared>
         </gc>
 
         <select arch="ia32">
             <vmi>
-                <shared>bin:vmi</shared>
+                <shared>bin/default:vmi</shared>
             </vmi>
         </select>
 
@@ -66,7 +62,7 @@ Description of the product deploy folder.
         </kernel_classes>
 
         <hythr>
-            <shared>bin:hythr</shared>
+            <shared>bin/default:hythr</shared>
         </hythr>
      </vm>
 
@@ -74,29 +70,23 @@ Description of the product deploy folder.
     <extra>
         <eclipse_script>
             <select os="win">
-                <other>bin:eclipse.bat</other>
+                <other>bin/default:eclipse.bat</other>
             </select>
 
             <select os="lnx">
-                <other>bin:eclipse.sh</other>
+                <other>bin/default:eclipse.sh</other>
             </select>
         </eclipse_script>
         <select os="win">
             <zlib>
-                <shared>bin:zlib1</shared>
+                <shared>bin/default:zlib1</shared>
             </zlib>
         </select>
 
-        <hyplugin>
+<!--        <hyplugin>
             <jar>lib:*</jar>
         </hyplugin>
-
-
-        <java_script>
-            <select os="lnx">
-                <other>bin:java.sh</other>
-            </select>
-        </java_script>
+-->
 
     </extra>
 </deploy>

@@ -36,8 +36,7 @@ Version: $Revision: 1.4.2.4 $
                                                    vm.interpreter,
                                                    vm.hythr,
                                                    vm.jitrino,
-                                                   vm.kernel_classes,
-                                                   vm.vmstart" />
+                                                   vm.kernel_classes" />
         </select>
 
         <!-- ia32 dependence but w/o vm.vmi -->
@@ -48,8 +47,7 @@ Version: $Revision: 1.4.2.4 $
                                                   vm.interpreter,
                                                   vm.hythr,
                                                   vm.jitrino,
-                                                  vm.kernel_classes,
-                                                  vm.vmstart" />
+                                                  vm.kernel_classes" />
         </select>
         
         <!-- ia32 dependence but w/o vm.vmi and vm.jitrino -->
@@ -59,8 +57,7 @@ Version: $Revision: 1.4.2.4 $
                                                   vm.gc, 
                                                   vm.interpreter,
                                                   vm.hythr,
-                                                  vm.kernel_classes,
-                                                  vm.vmstart"  />
+                                                  vm.kernel_classes"  />
         </select>
 
         <property name="test.depends" value="vm.vmcore"/>

@@ -194,6 +194,8 @@ static char *load_full_api_files_path_names_list(const char *path)
         
         full_name = apr_pstrcat(prop_pool, path, PORT_FILE_SEPARATOR_STR,
             BOOTCLASSPATH_KERNEL_JAR, NULL);
+            
+        TRACE2("init", "kernel jar path : " << full_name);
         
         for(int i = 0; i < props_count; i++){
             full_name = apr_pstrcat(prop_pool, full_name, PORT_PATH_SEPARATOR_STR,

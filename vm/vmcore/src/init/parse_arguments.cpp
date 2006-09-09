@@ -74,6 +74,8 @@ extern bool dump_stubs;
 extern bool parallel_jit;
 extern const char * dump_file_name;
 
+static void print_help_on_nonstandard_options();
+
 /**
  * Check if a string begins with another string. Note, even gcc
  * substitutes actual string length instead of strlen
@@ -280,6 +282,16 @@ void parse_vm_arguments(Global_Env *p_env)
         else if (strcmp(option, "_org.apache.harmony.vmi.portlib") == 0) {
             // Store a pointer to the portlib
             p_env->portLib = p_env->vm_arguments.options[i].extraInfo;
+        }
+        else if (strcmp(option, "-help") == 0 
+              || strcmp(option, "-h") == 0
+              || strcmp(option, "-?") == 0) {
+            print_generic_help();
+            LOGGER_EXIT(0);
+        }
+        else if (strcmp(option,"-X") == 0) {
+                print_help_on_nonstandard_options();
+                LOGGER_EXIT(0);
         }
         else {
             ECHO("Unknown option " << option << USE_JAVA_HELP);

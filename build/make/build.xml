@@ -442,8 +442,6 @@ Version: $Revision: 1.16.2.20 $
             <then>
                 <chmod perm="755">
                     <fileset dir="${build.deploy.dir}/bin">
-                        <include name="java.exec" />
-                        <include name="java" />
                         <include name="eclipse.sh" />
                         <include name="*.so" />
                         <include name="*.so.*" />
@@ -457,7 +455,7 @@ Version: $Revision: 1.16.2.20 $
          java.sh -> java so typing "java" works -->
     <target name="deploy.tweakname">
 
-        <if>
+ <!--       <if>
             <isset property="if.lnx"/>
             <then>
                 <move file="${build.deploy.dir}/bin/java"
@@ -466,7 +464,7 @@ Version: $Revision: 1.16.2.20 $
                     tofile="${build.deploy.dir}/bin/java" />
             </then>
         </if>
-
+-->
     </target>
 
     <!-- place things into canonical 'deploy' directory
@@ -482,13 +480,21 @@ Version: $Revision: 1.16.2.20 $
             <fileset dir="${build.deploy.dir}"/>
         </copy>
 
+    	<!-- copy our hythr for the launcher to use -->
+    	
+    	<copy todir="${canonical.deploy.dir}/jre/bin">
+    		<fileset dir="${canonical.deploy.dir}/jre/bin/default/">
+    			<include name="*hythr*"/>
+    		</fileset>
+    	</copy>
+    	
         <if>
             <isset property="if.lnx"/>
             <then>
                 <chmod perm="755">
                     <fileset dir="${canonical.deploy.dir}/jre/bin">
-                        <include name="java.exec" />
                         <include name="java" />
+                        <include name="javaw" />
                         <include name="eclipse.sh" />
                         <include name="*.so" />
                         <include name="*.so.*" />
@@ -504,7 +510,6 @@ Version: $Revision: 1.16.2.20 $
         <copy todir="${build.deploy.dir}">
             <fileset dir="${external.dep.CLASSLIB}/deploy/jdk/jre">
                 <include name="**"/>
-                <exclude name="bin/java*"/>
                 <exclude name="bin/default/**"/>
                 <exclude name="bin/*hythr*"/>
             </fileset>
