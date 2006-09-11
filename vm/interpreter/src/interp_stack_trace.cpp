@@ -220,7 +220,6 @@ interp_enumerate_root_set_single_thread_on_stack(VM_thread *thread) {
         method = method;
 
         if (si->This) {
-            ASSERT_OBJECT(si->This);
             vm_enumerate_root_reference((void**)&si->This, FALSE);
             DEBUG_GC("  [THIS]: " << si->This->vt()->clss->name->bytes << endl);
         }
@@ -255,7 +254,6 @@ interp_enumerate_root_set_single_thread_on_stack(VM_thread *thread) {
                         DEBUG_GC("NULL");
                     } else {
                         DEBUG_GC(obj->vt()->clss->name->bytes << endl);
-                        ASSERT_OBJECT(UNCOMPRESS_REF(*cref));
                         vm_enumerate(cref, FALSE);
                     }
                 }
@@ -272,14 +270,12 @@ interp_enumerate_root_set_single_thread_on_stack(VM_thread *thread) {
                         DEBUG_GC("NULL\n");
                     } else {
                         DEBUG_GC(obj->vt()->clss->name->bytes << endl);
-                        ASSERT_OBJECT(UNCOMPRESS_REF(*cref));
                         vm_enumerate(cref, FALSE);
                     }
                 }
             }
         MonitorList *ml = si->locked_monitors;
         while(ml) {
-            ASSERT_OBJECT(ml->monitor);
             vm_enumerate_root_reference((void**)&ml->monitor, FALSE);
             ml = ml->next;
         }

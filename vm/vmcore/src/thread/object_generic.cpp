@@ -66,7 +66,12 @@ void set_hash_bits(ManagedObject *p_obj)
     port_atomic_cas8(P_HASH_CONTENTION_BYTE(p_obj),hb, 0);
 }
 
-long generic_hashcode(ManagedObject * p_obj)
+long generic_hashcode(ManagedObject *obj) {
+    return (long) gc_get_hashcode(obj);
+}
+
+
+int32 default_hashcode(ManagedObject * p_obj)
 {
     if (!p_obj) return 0L;
     if ( *P_HASH_CONTENTION_BYTE(p_obj) & HASH_MASK)

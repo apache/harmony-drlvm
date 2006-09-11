@@ -13,39 +13,9 @@
  *  See the License for the specific language governing permissions and
  *  limitations under the License.
  */
-/** 
- * @author Intel, Salikh Zakirov, Alexei Fedotov
- * @version $Revision: 1.1.2.1.4.4 $
- */  
-#ifndef _OBJECT_GENERIC_H
-#define _OBJECT_GENERIC_H
+/**
+ * @author Ivan Volosyuk
+ */
 
-#include "object_layout.h"
-
-#ifdef __cplusplus
-extern "C" {
-#endif
-
-void
-java_lang_Object_notifyAll(jobject);
-
-jint
-java_lang_Object_wait(jobject, jlong);
-
-void
-java_lang_Object_notify(jobject);
-
-void
-java_lang_Object_registerNatives(ManagedObject*);
-
-long
-generic_hashcode(ManagedObject*);
-
-int32
-default_hashcode(ManagedObject*);
-
-#ifdef __cplusplus
-}
-#endif
-
-#endif /* _OBJECT_GENERIC_H */
+typedef fast_list<Partial_Reveal_Object**,65536> roots_vector;
+extern roots_vector root_set;

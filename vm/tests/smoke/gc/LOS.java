@@ -77,7 +77,7 @@ public class LOS extends Thread {
         long los_space = allocate_max(large_object_size);
         System.out.println("" + (los_space/1048576) + " Mb available in LOS");
 
-        if (los_space < smos_space - 1048576) {
+        if (los_space * 1.0 < smos_space * 0.8) {
             System.out.println("FAILED, LOS space is too small");
         } else {
             System.out.println("PASSED, LOS available space is on par with SmOS");

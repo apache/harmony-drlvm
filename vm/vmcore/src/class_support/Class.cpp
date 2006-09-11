@@ -403,7 +403,7 @@ Class *java_lang_Class_to_struct_Class(ManagedObject *jlc)
     assert(!hythread_is_suspend_enabled());
     assert(jlc != NULL);
     assert(jlc->vt());
-    assert(jlc->vt()->clss == VM_Global_State::loader_env->JavaLangClass_Class);
+    //assert(jlc->vt()->clss == VM_Global_State::loader_env->JavaLangClass_Class);
 
     assert(VM_Global_State::loader_env->vm_class_offset != 0);
     Class **vm_class_ptr = (Class **)(((Byte *)jlc) + VM_Global_State::loader_env->vm_class_offset);

@@ -32,10 +32,12 @@
 #include "open/vm_util.h"
 #include "environment.h"
 #include "properties.h"
+#include "object_generic.h"
 
 static void default_gc_write_barrier(Managed_Object_Handle);
 static void default_gc_pin_object(Managed_Object_Handle*);
 static void default_gc_unpin_object(Managed_Object_Handle*);
+static int32 default_gc_get_hashcode(Managed_Object_Handle);
 static Managed_Object_Handle default_gc_get_next_live_object(void*);
 static void default_gc_finalize_on_exit();
 static int64 default_gc_max_memory();
@@ -114,6 +116,7 @@ Boolean (*gc_supports_frontier_allocation)(unsigned *offset_of_current, unsigned
 
 void (*gc_pin_object)(Managed_Object_Handle* p_object) = 0;
 void (*gc_unpin_object)(Managed_Object_Handle* p_object) = 0;
+int32 (*gc_get_hashcode)(Managed_Object_Handle obj) = 0;
 Managed_Object_Handle (*gc_get_next_live_object)(void *iterator) = 0;
 
 void (*gc_finalize_on_exit)() = 0;
@@ -232,6 +235,10 @@ void vm_add_gc(const char *dllName)
     gc_unpin_object = (void (*)(Managed_Object_Handle*))
         getFunctionOptional(handle, "gc_unpin_object", dllName,
             (apr_dso_handle_sym_t)default_gc_unpin_object);
+
+    gc_get_hashcode = (int32 (*)(Managed_Object_Handle))
+        getFunctionOptional(handle, "gc_get_hashcode", dllName,
+            (apr_dso_handle_sym_t)default_gc_get_hashcode);
 
     gc_get_next_live_object = (Managed_Object_Handle (*)(void*))
         getFunctionOptional(handle, "gc_get_next_live_object", dllName,
@@ -444,6 +451,11 @@ static void default_gc_pin_object(Managed_Object_Handle*)
 static void default_gc_unpin_object(Managed_Object_Handle*)
 {
     WARN_ONCE("The GC did not provide gc_unpin_object()");
+}
+
+static int32 default_gc_get_hashcode(Managed_Object_Handle obj)
+{
+    return default_hashcode((ManagedObject*) obj);
 }
 
 static Managed_Object_Handle default_gc_get_next_live_object(void*)
