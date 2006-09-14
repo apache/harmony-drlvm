@@ -202,7 +202,7 @@ public:
         //
         //  Prints tag
         //
-	void print(::std::ostream& os) const {
+    void print(::std::ostream& os) const {
             assert(info[tag].tag == tag);
             os << info[tag].name;
             printId(os);
@@ -240,7 +240,7 @@ public:
         }
         bool    hasUnknownId() const {return id.all == UnknownMemoryContextId;}
         uint32  getId() const;
-	void    printId(::std::ostream& os) const;
+    void    printId(::std::ostream& os) const;
         //
         // Fields
         //

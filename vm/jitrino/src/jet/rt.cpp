@@ -14,8 +14,8 @@
  *  limitations under the License.
  */
 /**
- * @author Alexander V. Astapchuk
- * @version $Revision: 1.5.12.2.4.4 $
+ * @author Alexander Astapchuk
+ * @version $Revision$
  */
  
  /**
@@ -25,128 +25,18 @@
 #include "compiler.h"
 #include "trace.h"
 
-#include <jit_import.h>
+#include "jet.h"
+
+#include "jit_import.h"
+#include "jit_intf.h"
+
+#if !defined(_IPF_)
+#include "enc_ia32.h"
+#endif
 
 namespace Jitrino {
 namespace Jet {
 
-MethodInfoBlock::MethodInfoBlock(void)
-{
-    m_data = NULL;
-    //
-    rt_inst_addrs = NULL;
-    //
-    rt_header = &m_header;
-    rt_header->m_code_start = NULL;
-}
-
-void MethodInfoBlock::init(unsigned bc_size, unsigned stack_max, 
-                       unsigned num_locals, unsigned in_slots,
-                       unsigned flags)
-{
-
-    //
-    rt_header->m_bc_size = bc_size;
-    rt_header->m_num_locals = num_locals;
-    rt_header->m_max_stack_depth = stack_max;
-    rt_header->m_in_slots = in_slots;
-    rt_header->m_flags = flags;
-
-    // All the values must be initialized *before* get_dyn_size() !
-    unsigned dyn_size = get_dyn_size();
-    m_data = new char[dyn_size];
-    memset(m_data, 0, dyn_size);
-    rt_inst_addrs = (const char**)m_data;
-    rt_lazy_refs = NULL;
-}
-
-void MethodInfoBlock::save(char * to)
-{
-    memset(to, 0, get_total_size());
-    memcpy(to, rt_header, get_hdr_size());
-    memcpy(to +  get_hdr_size(), m_data, get_dyn_size());
-    rt_inst_addrs = (const char**)(to + get_hdr_size());
-    if (rt_header->m_num_refs != 0) {
-        rt_lazy_refs = rt_inst_addrs + rt_header->m_bc_size;
-    }
-    else {
-        rt_lazy_refs = NULL;
-    }
-}
-
-const char * MethodInfoBlock::get_ip(unsigned pc) const
-{
-    assert(pc < rt_header->m_bc_size);
-    return (char*)rt_inst_addrs[pc];
-}
-
-unsigned MethodInfoBlock::get_pc(const char * ip) const
-{
-    const char ** data = rt_inst_addrs;
-    //
-    // Binary search performed, in its classical form - with 'low' 
-    // and 'high'pointers, and plus additional steps specific to the nature 
-    // of the data stored.
-    // The array where the search is performed, may (and normally does) have
-    // repetitive values: i.e. [ABBBCDEEFFF..]. Each region with the same 
-    // value relate to the same byte code instruction.
-    
-    int l = 0;
-    int max_idx = (int)rt_header->m_bc_size-1;
-    int r = max_idx;
-    int m = 0;
-    const char * val = NULL;
-    //
-    // Step 1.
-    // Find first element which is above or equal to the given IP.
-    //
-    while (l<=r) {
-        m = (r+l)/2;
-        val = *(data+m);
-        assert(val != NULL);
-        if (ip<val) {
-            r = m-1;
-        }
-        else if(ip>val) {
-            l = m+1;
-        }
-        else {
-            break;
-        }
-    }
-    
-    //here, 'val'  is '*(data+m)'
-    
-    // Step 2.
-    // If we found an item which is less or equal than key, then this step
-    // is omitted.
-    // If an item greater than key found, we need small shift to the previous
-    // item: 
-    // [ABBB..] if we find any 'B', which is > key, then we need to step back
-    // to 'A'.
-    //
-    if (val > ip) {
-        // Find very first item of the same IP value (very first 'B' in the 
-        // example) - this is the beginning of the bytecode instruction 
-        while (m && val == *(data+m-1)) {
-            --m;
-        }
-        // here, 'm' points to the first 'B', and 'val' has its value ...
-        if (m) {
-            --m;
-        }
-        // ... and here 'm' points to last 'A'
-        val = *(data+m);
-    }
-    
-    // Step 3.
-    // Find very first item in the range - this is the start of the bytecode 
-    // instruction
-    while (m && val == *(data+m-1)) {
-        --m;
-    }
-    return m;
-}
 
 bool rt_check_method(JIT_Handle jit, Method_Handle method)
 {
@@ -154,24 +44,400 @@ bool rt_check_method(JIT_Handle jit, Method_Handle method)
     return MethodInfoBlock::is_valid_data(pinfo);
 }
 
+static JitFrameContext* dummyCTX = NULL;
+static unsigned sp_off = (char*)devirt(sp, dummyCTX) - (char*)dummyCTX;
+static unsigned ip_off = (char*)devirt(gr_x, dummyCTX) - (char*)dummyCTX;
+
+static const unsigned bp_off = (char*)devirt(bp, dummyCTX) - (char*)dummyCTX;
+static const unsigned bp_idx = ar_idx(bp);
+static const unsigned bp_bytes = word_no(bp_idx)*WORD_SIZE/CHAR_BIT;
+static const unsigned bp_mask  = 1<<bit_no(bp_idx);
+static const int bp_spill_off = ((StackFrame*)NULL)->spill(bp);
+
+#ifdef _IA32_
+//
+static AR ebx = virt(RegName_EBX);
+static const unsigned ebx_idx = ar_idx(ebx);
+static const unsigned ebx_bytes = word_no(ebx_idx)*WORD_SIZE/CHAR_BIT;
+static const unsigned ebx_mask  = 1<<bit_no(ebx_idx);
+static const int      ebx_spill_off = ((StackFrame*)NULL)->spill(ebx);
+//
+static AR esi = virt(RegName_ESI);
+static const unsigned esi_idx = ar_idx(esi);
+static const unsigned esi_bytes = word_no(esi_idx)*WORD_SIZE/CHAR_BIT;
+static const unsigned esi_mask  = 1<<bit_no(esi_idx);
+static const int      esi_spill_off = ((StackFrame*)NULL)->spill(esi);
+//
+static AR edi = virt(RegName_EDI);
+static const unsigned edi_idx = ar_idx(edi);
+static const unsigned edi_bytes = word_no(edi_idx)*WORD_SIZE/CHAR_BIT;
+static const unsigned edi_mask  = 1<<bit_no(edi_idx);
+static const int      edi_spill_off = ((StackFrame*)NULL)->spill(edi);
+//
+#endif // _IA32_
+
+
+/**
+ * @brief Prints out a message to identify a program location.
+ *
+ * The message includes method name and class, IP and PC of the location.
+ * Message is preceded with the specified \c name.
+ * The function uses #dbg and does not print out new-line character.
+ */
+static void rt_trace(const char * name, Method_Handle meth, 
+                     const MethodInfoBlock& infoBlock,
+                     const JitFrameContext * context)
+{
+    void *** pip = devirt(gr_x, context);
+    char * ip = (char*)**pip;
+    char * where = ip;
+    if (context->is_ip_past) {
+        --where;
+    }
+    dbg_rt("%s @ %s::%s @ %p/%u: ", 
+        name,
+        class_get_name(method_get_class(meth)), method_get_name(meth),
+        ip, infoBlock.get_pc(where));
+}
+
+void rt_unwind(JIT_Handle jit, Method_Handle method, 
+               JitFrameContext * context)
+{
+    char * pinfo = (char*)method_get_info_block_jit(method, jit);
+    
+    assert(MethodInfoBlock::is_valid_data(pinfo));
+
+    MethodInfoBlock infoBlock(pinfo);
+    StackFrame sframe(infoBlock.get_num_locals(),
+                      infoBlock.get_stack_max(), 
+                      infoBlock.get_in_slots());
+                      
+    JitFrameContext saveContextForLogs;
+    if (infoBlock.get_flags() & DBG_TRACE_RT) {
+        saveContextForLogs= *context;
+    }
+                      
+    //void ** psp = (void**)devirt(sp, context);
+    void ** psp = (void**)((char*)context + sp_off);
+    char * sp_val = (char*)*psp;
+    
+    // here, gr_x means 'IP'
+    //void *** pip = devirt(gr_x, context);
+    void *** pip = (void***)((char*)context + ip_off);
+    
+    char * where = (char*)**pip;
+    if (context->is_ip_past) {
+        --where;
+    }
+    
+    // A special processing - mostly for StackOverflowError:
+    // if something terrible happens during the stack preparation sequence,
+    // then the registers are not saved yet, so we can't restore them from 
+    // the JitFrameContext. The good news is that the callee-save registers 
+    // are also untouched yet, so we only need to restore SP and IP
+    char * meth_start = infoBlock.get_code_start();
+    unsigned whereLen = where - meth_start;
+    if (whereLen<infoBlock.get_warmup_len()) {
+        *psp = sp_val + sframe.size();
+        // Now, [sp] = retIP
+        sp_val = (char*)*psp;
+        *pip = (void**)sp_val;
+        sp_val += STACK_SLOT_SIZE; // pop out the retIP
+        *psp = sp_val;
+        return;
+    }
+    
+    //void *** pbp = devirt(bp, context);
+    void *** pbp = (void***)((char*)context + bp_off);
+    char * bp_val = (char*)(**pbp);
+    
+    assert(!(infoBlock.get_flags() & JMF_SP_FRAME)); // not yet 
+    
+    // restore sp
+    sp_val = bp_val;
+    // ^^^ now, sp has the same value as it was on method's entrance (points
+    // to retIP)
+    *pip = (void**)sp_val;
+    
+    //
+    // restore callee-save regs
+    //
+#ifdef _DEBUG
+    // presumption: only GP registers can be callee-save
+    static bool do_check = true;
+    for (unsigned i=0; do_check && i<ar_num; i++) {
+        AR ar = _ar(i);
+        assert(!is_callee_save(ar) || is_gr(ar));
+    }
+    do_check = false;
+#endif
+
+#if defined(_EM64T_) || defined(_IPF_)
+    // Common version for all platforms but IA32
+    for (unsigned i=0; i<gr_num; i++) {
+        AR ar = _gr(i);
+        if (infoBlock.is_saved(ar)) {
+            void *** preg = devirt(ar, context);
+            assert(preg && *preg);
+            *preg = (void**)(sp_val+sframe.spill(ar));
+            if (infoBlock.get_flags() & DBG_TRACE_RT) {
+                dbg_rt("\trt.unwind.%s.%s: [%p]=%p\n", 
+                    Encoder::to_str(ar, false).c_str(),
+                    Encoder::to_str(ar, true).c_str(), *preg, **preg);
+            }
+        }
+    }
+#else
+    //
+    // Highly optimized version for IA32 - the loop of 4 callee-save 
+    // register is unrolled, every constant value is precomputed and 
+    // cached.
+    //
+    unsigned map_off, mask;
+    int spill_off;
+    //
+    const char * map = infoBlock.saved_map();
+    //
+    //
+    map_off = bp_bytes; mask = bp_mask; spill_off = bp_spill_off;
+    // bp is always saved
+    assert(*(unsigned*)(map+map_off) & mask);
+    {
+        context->p_ebp = (unsigned*)(sp_val + spill_off);
+    }
+    //
+    //
+    map_off = ebx_bytes; mask = ebx_mask; spill_off = ebx_spill_off;
+    if (*(unsigned*)(map+map_off) & mask) {
+        context->p_ebx = (unsigned*)(sp_val + spill_off);
+    }
+    //
+    //
+    map_off = esi_bytes; mask = esi_mask;  spill_off = esi_spill_off;
+    if (*(unsigned*)(map+map_off) & mask) {
+        context->p_esi = (unsigned*)(sp_val + spill_off);
+    }
+    //
+    //
+    map_off = edi_bytes; mask = edi_mask;  spill_off = edi_spill_off;
+    if (*(unsigned*)(map+map_off) & mask) {
+        context->p_edi = (unsigned*)(sp_val + spill_off);
+    }
+#endif
+
+    sp_val += STACK_SLOT_SIZE; // pop out retIP
+    *psp = sp_val;
+    
+    if (infoBlock.get_flags() & DBG_TRACE_RT) {
+        void *** pip = devirt(gr_x, context);
+        rt_trace("rt.unwind", method, infoBlock, &saveContextForLogs);
+        dbg_rt("\t=>=> %p; SP=%p\n", **pip, sp_val);
+    }
+}
+
+void rt_enum(JIT_Handle jit, Method_Handle method, 
+             GC_Enumeration_Handle henum, JitFrameContext * context)
+{
+    if (!context->is_ip_past) {
+        // The IP pointts directly to the instructions - this must be a 
+        // hardware NPE happened. Check the presumption:
+        assert(method_get_num_handlers(method) == 0);
+#ifdef _DEBUG
+        bool sync = method_is_synchronized(method);
+        bool inst = !method_is_static(method);
+        assert(!(sync && inst));
+#endif
+        // Nothing to report here - the method is about to exit.
+        return;
+    }
+    char * pinfo = (char*)method_get_info_block_jit(method, jit);
+    assert(MethodInfoBlock::is_valid_data(pinfo));
+
+    MethodInfoBlock infoBlock(pinfo);
+    assert(!(infoBlock.get_flags() & JMF_SP_FRAME)); // not yet 
+    
+    void *** pip = (void***)((char*)context + ip_off);
+    char * where = (char*)**pip;
+    char * meth_start = infoBlock.get_code_start();
+    unsigned whereLen = where - meth_start;
+    if (whereLen<infoBlock.get_warmup_len()) {
+        return;
+    }
+
+    if (DBG_TRACE_RT & infoBlock.get_flags()) {
+        rt_trace("rt.enum.start", method, infoBlock, context);
+    }
+    StackFrame frame(infoBlock.get_num_locals(), infoBlock.get_stack_max(), 
+                  infoBlock.get_in_slots() );
+    char * ebp = (char*)**devirt(bp, context);
+    //
+    //
+    //
+    unsigned * map = (unsigned*)(ebp + frame.info_gc_locals());
+    for (unsigned i=0; i<infoBlock.get_num_locals(); i++) {
+        if (!tst(map, i)) {
+            continue;
+        }
+        void **p_obj = (void**)(ebp + frame.local(i));
+        if (DBG_TRACE_RT & infoBlock.get_flags()) {
+            //rt_trace("gc.item", method, infoBlock, context);
+            dbg_rt("\tlocal#%d=>%p (%p)\n", i, p_obj, *p_obj);
+        }
+        vm_enumerate_root_reference(p_obj, FALSE);
+    }
+    //
+    // Report input args with objects in it
+    //    
+    map = (unsigned*)(ebp + frame.info_gc_args());
+    for (unsigned i=0; i<infoBlock.get_in_slots(); i++) {
+        if (!tst(map, i)) {
+            continue;
+        }
+        void **p_obj = (void**)(ebp + frame.inargs()+i*STACK_SLOT_SIZE);
+        if (DBG_TRACE_RT & infoBlock.get_flags()) {
+            dbg_rt("\tin_arg#%d=>%p (%p)\n", i, p_obj, *p_obj);
+        }
+        vm_enumerate_root_reference(p_obj, FALSE);
+    }
+    //
+    //
+    //
+    map = (unsigned*)(ebp + frame.info_gc_regs());
+    unsigned obj_regs = *map;
+    // only one word is allocated to store a GC map for registers
+    assert(gr_num < WORD_SIZE);
+    for (unsigned i=0; i<WORD_SIZE; i++) {
+        if (obj_regs & 1) {
+            AR ar = _ar(i);
+            assert(is_gr(ar) && is_callee_save(ar));
+            void ** p_obj;
+            p_obj = *devirt(ar, context);
+            if (DBG_TRACE_RT & infoBlock.get_flags()) {
+                //rt_trace("gc.item", method, infoBlock, context);
+                dbg_rt("\treg#%s#%s=>%p (%p)\n", 
+                Encoder::to_str(ar, false).c_str(), 
+                Encoder::to_str(ar, true).c_str(),
+                p_obj, *p_obj);
+            }
+            vm_enumerate_root_reference(p_obj, FALSE);
+        }
+        obj_regs >>= 1;
+    }
+    
+    map = (unsigned*)(ebp + frame.info_gc_stack());
+    unsigned rt_stack_depth = *(unsigned*)(ebp+frame.info_gc_stack_depth());
+    
+    for (unsigned i=0; i<rt_stack_depth; i++) {
+        if (!tst(map, i)) {
+            continue;
+        }
+        void ** p_obj;
+        p_obj = (void**)(ebp + frame.stack_slot(i));
+        if (DBG_TRACE_RT & infoBlock.get_flags()) {
+            //rt_trace("gc.item", method, infoBlock, context);
+            dbg_rt("\tstack#%d=>%p (%p)\n", i, p_obj, *p_obj);
+        }
+        vm_enumerate_root_reference(p_obj, FALSE);
+    }
+
+    if (infoBlock.get_flags() & JMF_REPORT_THIS) {
+        void ** p_obj = (void**)rt_get_address_of_this(jit, method, context);
+        if (DBG_TRACE_RT & infoBlock.get_flags()) {
+            //rt_trace("gc.item", method, infoBlock, context);
+            dbg_rt("\tin.this#=>%p (%p)\n", p_obj, *p_obj);
+        }
+        vm_enumerate_root_reference(p_obj, FALSE);
+    }
+    if (DBG_TRACE_RT & infoBlock.get_flags()) {
+        rt_trace("rt.enum.done", method, infoBlock, context);
+    }
+}
+
+void rt_fix_handler_context(JIT_Handle jit, Method_Handle method, 
+                            JitFrameContext * context)
+{
+    char * pinfo = (char*)method_get_info_block_jit(method, jit);
+
+    assert(MethodInfoBlock::is_valid_data(pinfo));
+    //
+    MethodInfoBlock infoBlock(pinfo);
+    assert(!(infoBlock.get_flags() & JMF_SP_FRAME)); // not yet 
+    
+    void *** pip = (void***)((char*)context + ip_off);
+    char * where = (char*)**pip;
+    char * meth_start = infoBlock.get_code_start();
+    unsigned whereLen = where - meth_start;
+    if (whereLen<infoBlock.get_warmup_len()) {
+        return;
+    }
+    
+    StackFrame sframe(infoBlock.get_num_locals(),
+                      infoBlock.get_stack_max(),
+                      infoBlock.get_in_slots());
+
+    unsigned frameSize = sframe.size();
+
+    void ** psp = (void**)devirt(sp, context);
+    void *** pbp = devirt(bp, context);
+    char * bp_val = (char*)(**pbp);
+    char * sp_val = bp_val - frameSize;
+    if (infoBlock.get_flags() & DBG_TRACE_RT) {
+        rt_trace("rt.fix_handler", method, infoBlock, context);
+        dbg_rt("oldESP=%p ; newESP=%p\n", *psp, sp_val);
+    }
+    *psp = sp_val;
+}
+
+void * rt_get_address_of_this(JIT_Handle jit, Method_Handle method,
+                              const JitFrameContext * context)
+{
+    char * pinfo = (char*)method_get_info_block_jit(method, jit);
+
+    assert(MethodInfoBlock::is_valid_data(pinfo));
+    //
+    MethodInfoBlock infoBlock(pinfo);
+    assert(!(infoBlock.get_flags() & JMF_SP_FRAME)); // not yet 
+    
+    void *** pip = (void***)((char*)context + ip_off);
+    char * where = (char*)**pip;
+    char * meth_start = infoBlock.get_code_start();
+    unsigned whereLen = where - meth_start;
+    if (whereLen<infoBlock.get_warmup_len()) {
+        return NULL;
+    }
+    
+    // We did not store 'this' specially
+    if (!(infoBlock.get_flags() & JMF_REPORT_THIS)) {
+        return NULL;
+    }
+    StackFrame stackframe(infoBlock.get_num_locals(),
+                          infoBlock.get_stack_max(),
+                          infoBlock.get_in_slots());
+
+    void *** pbp = devirt(bp, context);
+    char * bp_val = (char*)(**pbp);
+    void ** p_obj = (void**)(bp_val + stackframe.thiz());
+    
+    if (infoBlock.get_flags() & DBG_TRACE_RT) {
+        void ** psp = (void**)devirt(sp, context);
+        char * sp_val = (char*)*psp;
+        rt_trace("rt.get_thiz", method, infoBlock, context);
+        dbg_rt("p_thiz=%p, thiz=%p (sp=%p)\n", p_obj, p_obj ? *p_obj : NULL, sp_val);
+    }
+    return p_obj;
+}
+
 void rt_bc2native(JIT_Handle jit, Method_Handle method, unsigned short bc_pc,
                   void ** pip)
 {
     char * pinfo = (char*)method_get_info_block_jit(method, jit);
-    if (!MethodInfoBlock::is_valid_data(pinfo)) {
-        assert(false);
-        return;
-    }
+    assert(MethodInfoBlock::is_valid_data(pinfo));
 
-    MethodInfoBlock rtinfo;
-    rtinfo.load(pinfo);
-    if (bc_pc >= rtinfo.get_bc_size()) {
-        assert(false);
-        return;
-    };
+    MethodInfoBlock rtinfo(pinfo);
+    assert(bc_pc < rtinfo.get_bc_size());
     *pip = (void*)rtinfo.get_ip(bc_pc); 
     if (rtinfo.get_flags() & DBG_TRACE_RT) {
-        dbg("rt.bc2ip: @ %u => %p\n", bc_pc, *pip);
+        dbg_rt("rt.bc2ip: @ %u => %p\n", bc_pc, *pip);
     }
 }
 
@@ -179,16 +445,104 @@ void rt_native2bc(JIT_Handle jit, Method_Handle method, const void * ip,
                   unsigned short * pbc_pc)
 {
     char * pinfo = (char*)method_get_info_block_jit(method, jit);
-    if (!MethodInfoBlock::is_valid_data(pinfo)) {
-        assert(false);
-        return;
-    }
+    assert(MethodInfoBlock::is_valid_data(pinfo));
     MethodInfoBlock rtinfo(pinfo);
     *pbc_pc = (unsigned short)rtinfo.get_pc((char*)ip);
 
     if (rtinfo.get_flags() & DBG_TRACE_RT) {
-        dbg("rt.ip2bc: @ 0x%p => %d\n", ip, *pbc_pc);
+        dbg_rt("rt.ip2bc: @ 0x%p => %d\n", ip, *pbc_pc);
     }
 }
 
-};};    // ~namespace Jitrino::Jet
+::OpenExeJpdaError rt_get_local_var(JIT_Handle jit, Method_Handle method,
+                                    const ::JitFrameContext *context,
+                                    unsigned var_num, VM_Data_Type var_type,
+                                    void *value_ptr)
+{
+    //
+    //FIXME:
+    // Current implementation will work incorrectly with local variables
+    // cached on registers and with variables that reuse input args slots.
+    //
+    // Need to store regs=>locals into MethodInfo block and also  
+    // locals=>input args (or invent a simple algorithm of how to detect
+    // this mapping during runtime).
+    //
+           
+    char * pinfo = (char*)method_get_info_block_jit(method, jit);
+    assert(MethodInfoBlock::is_valid_data(pinfo));
+    MethodInfoBlock infoBlock(pinfo);
+    if (var_num >= infoBlock.get_num_locals()) {
+        return EXE_ERROR_INVALID_SLOT;
+    }
+    StackFrame frame(infoBlock.get_num_locals(),
+                     infoBlock.get_stack_max(),
+                     infoBlock.get_in_slots());
+
+    char * ebp = (char*)**devirt(bp, context);
+    unsigned * map = (unsigned*)(ebp + frame.info_gc_locals());
+
+    uint64* var_ptr_to_64;
+    uint32* var_ptr_to32;
+
+    switch(var_type) {
+    case VM_DATA_TYPE_INT64:
+    case VM_DATA_TYPE_UINT64:
+    case VM_DATA_TYPE_F8:
+        var_ptr_to_64 = (uint64*)value_ptr;
+        *var_ptr_to_64 = *(uint64*)(ebp + frame.local(var_num));
+        break;
+    case VM_DATA_TYPE_ARRAY:
+    case VM_DATA_TYPE_CLASS:
+        if (!tst(map, var_num)) {
+            return EXE_ERROR_TYPE_MISMATCH;
+        }
+    default:
+        var_ptr_to32 = (uint32*)value_ptr;
+        *var_ptr_to32 = *(uint32*)(ebp + frame.local(var_num));
+    }
+    return EXE_ERROR_NONE;
+}
+
+::OpenExeJpdaError rt_set_local_var(JIT_Handle jit, Method_Handle method,
+                                    const ::JitFrameContext *context,
+                                    unsigned var_num, VM_Data_Type var_type,
+                                    void *value_ptr)
+{
+    char * pinfo = (char*)method_get_info_block_jit(method, jit);
+    assert(MethodInfoBlock::is_valid_data(pinfo));
+    MethodInfoBlock infoBlock(pinfo);
+    if (var_num >= infoBlock.get_num_locals()) {
+        return EXE_ERROR_INVALID_SLOT;
+    }
+    StackFrame frame(infoBlock.get_num_locals(),
+                     infoBlock.get_stack_max(),
+                     infoBlock.get_in_slots());
+
+
+    char * ebp = (char*)**devirt(bp, context);
+    uint64* var_ptr_to_64;
+    uint32* var_ptr_to32;
+    
+    switch(var_type) {
+    case VM_DATA_TYPE_INT64:
+    case VM_DATA_TYPE_UINT64:
+    case VM_DATA_TYPE_F8:
+#ifdef _EM64T_
+    case VM_DATA_TYPE_ARRAY:
+    case VM_DATA_TYPE_CLASS:
+    case VM_DATA_TYPE_STRING:
+#endif
+        var_ptr_to_64 = (uint64*)(ebp + frame.local(var_num));
+        *var_ptr_to_64 = *(uint64*)value_ptr;
+        break;
+    default:
+        var_ptr_to32 = (uint32*)(ebp + frame.local(var_num));
+        *var_ptr_to32 = *(uint32*)value_ptr;
+    }
+
+    return EXE_ERROR_NONE;
+}
+
+}};    // ~namespace Jitrino::Jet
+

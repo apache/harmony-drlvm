@@ -25,6 +25,7 @@
 
 #include "StlPriorityQueue.h"
 #include "Tree.h"
+#include "irmanager.h"
 
 namespace Jitrino {
 
@@ -33,7 +34,7 @@ class IRManager;
 class TypeManager;
 class InstFactory;
 class OpndManager;
-class CFGNode;
+class Node;
 class MethodInst;
 class Inst;
 class Opnd;
@@ -43,24 +44,23 @@ class MethodDesc;
 class DominatorTree;
 class DominatorNode;
 class LoopTree;
-class JitrinoParameterTable;
 class Method_Table;
 
 class InlineNode : public TreeNode {
 public:
-    InlineNode(IRManager& irm, Inst *callInst, CFGNode *callNode) : _irm(irm), _callInst(callInst), _callNode(callNode) {}
+    InlineNode(IRManager& irm, Inst *callInst, Node *callNode) : _irm(irm), _callInst(callInst), _callNode(callNode) {}
     InlineNode* getChild()    {return (InlineNode*) child;}
     InlineNode* getSiblings() {return (InlineNode*) siblings;}
     InlineNode* getParent()   {return (InlineNode*) parent;}
     IRManager&  getIRManager()      { return _irm; }
     Inst*       getCallInst() { return _callInst; }
-    CFGNode*    getCallNode() { return _callNode; }
+    Node*    getCallNode() { return _callNode; }
     void print(::std::ostream& os);
     void printTag(::std::ostream& os);
 private:
     IRManager&  _irm;
     Inst*       _callInst;
-    CFGNode*    _callNode;
+    Node*    _callNode;
 };
 
 class InlineTree : public Tree {
@@ -78,20 +78,19 @@ private:
 class Inliner
 {
 public:
-    Inliner(MemoryManager& mm, IRManager& irm, 
-            bool doProfileOnly=false);
+    Inliner(SessionAction* argSource, MemoryManager& mm, IRManager& irm,  bool doProfileOnly=false);
 
     // Inline this method into the current CFG and process it for further
     // inline candidates.  If the argument is the top level CFG, only processing
     // occurs.
-    void inlineAndProcessRegion(InlineNode* inlineNode, DominatorTree* dtree, LoopTree* ltree);
+    void inlineAndProcessRegion(InlineNode* inlineNode);
 
     // Connect input and return operands of the region to the top-level method.  Do not yet splice.
     void connectRegion(InlineNode* inlineNode);
 
     // Build the flowgraph for the next inline candidate method.  Note, this flowgraph
     // is not yet connected to the top level CFG.   
-    InlineNode* getNextRegionToInline();
+    InlineNode* getNextRegionToInline(CompilationContext& inlineCC);
 
     InlineTree& getInlineTree() { return _inlineTree; } 
 
@@ -102,10 +101,10 @@ public:
 private:
     class CallSite {
     public:
-        CallSite(int32 benefit, CFGNode* callNode, InlineNode* inlineNode) : benefit(benefit), callNode(callNode), inlineNode(inlineNode) {}
+        CallSite(int32 benefit, Node* callNode, InlineNode* inlineNode) : benefit(benefit), callNode(callNode), inlineNode(inlineNode) {}
 
         int32 benefit;
-        CFGNode* callNode;
+        Node* callNode;
         InlineNode* inlineNode;
     };
 
@@ -114,9 +113,11 @@ private:
         bool operator()(const CallSite& site1, const CallSite& site2) { return site1.benefit < site2.benefit; }
     };
 
-    void scaleBlockCounts(CFGNode* callSite, IRManager& inlinedIRM);
+    void scaleBlockCounts(Node* callSite, IRManager& inlinedIRM);
     void processRegion(InlineNode *inlineNode, DominatorTree* dtree, LoopTree* ltree);
     void processDominatorNode(InlineNode *inlineNode, DominatorNode* dtree, LoopTree* ltree);
+
+    void runTranslatorSession(CompilationContext& inlineCC);
 
     // True if this method should be processed for further inlining.  I.e., 
     // can we inline the calls in this method?
@@ -127,17 +128,16 @@ private:
 
     bool isLeafMethod(MethodDesc& methodDesc);
 
-    int32 computeInlineBenefit(CFGNode* node, MethodDesc& methodDesc, InlineNode* parentInlineNode, uint32 loopDepth);
+    int32 computeInlineBenefit(Node* node, MethodDesc& methodDesc, InlineNode* parentInlineNode, uint32 loopDepth);
 
-    MemoryManager& _mm;
+    MemoryManager& _tmpMM;
     IRManager& _toplevelIRM;
     TypeManager& _typeManager;
     InstFactory& _instFactory;
     OpndManager& _opndManager;
 
     bool _hasProfileInfo;
-    bool _useInliningTranslatorCall;
-
+    
     StlPriorityQueue<CallSite, StlVector<CallSite>, CallSiteCompare> _inlineCandidates;
     uint32 _initByteSize;
     uint32 _currentByteSize;
@@ -173,6 +173,9 @@ private:
     uint64 oldMethodId;
 
     bool _usesOptimisticBalancedSync;
+    bool isBCmapRequired;
+    VectorHandler* bc2HIRMapHandler;
+    TranslatorAction* translatorAction;
 };
 
 

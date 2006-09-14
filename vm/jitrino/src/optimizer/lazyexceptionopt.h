@@ -28,10 +28,10 @@
 #include "Inst.h"
 #include "BitSet.h"
 #include "VMInterface.h"
+#include "irmanager.h"
 
 namespace Jitrino {
 
-DEFINE_OPTPASS(LazyExceptionOptPass)
 
 class LazyExceptionOpt {
 public:
@@ -45,13 +45,13 @@ private:
     void fixOptCandidates(BitSet* bs);
     void printOptCandidates(::std::ostream& os);
     bool checkMethodCall(Inst* inst); 
-    void removeNode(CFGNode* node);
+    void removeNode(Node* node);
     bool removeInsts(Inst* oinst,Inst* iinst);
     bool checkField(Inst* inst);
     bool isEqualExceptionNodes(Inst* oi, Inst* ti);
     bool checkInSideEff(Inst* throw_inst, Inst* init_inst);
     bool mayBeNullArg(Inst* call_inst, Inst* src_inst);
-    bool checkArg(CFGNode* node);
+    bool checkArg(Node* node);
 
 private:
     IRManager     &irManager;
@@ -63,14 +63,14 @@ private:
 #ifdef _DEBUG
     MethodDesc* mtdDesc;
 #endif
-    typedef StlList<Inst*> ThrowInsts;	
+    typedef StlList<Inst*> ThrowInsts;  
     struct OptCandidate {
         uint32 opndId;
         Inst* objInst;
         Inst* initInst;
         ThrowInsts* throwInsts;
     };
-    typedef StlList<OptCandidate*> OptCandidates;	
+    typedef StlList<OptCandidate*> OptCandidates;   
     OptCandidates* optCandidates;
     static int level;
     struct NodeSet {
@@ -81,6 +81,9 @@ private:
         Inst* reset_inst;
     };
     NodeSet* nodeSet;
+    // Byte code map info
+    bool isBCmapRequired;
+    VectorHandler* bc2HIRMapHandler;
 };
 
 } // namespace Jitrino

@@ -23,6 +23,8 @@
 #ifndef _TRANSLATOR_INTFC_H_
 #define _TRANSLATOR_INTFC_H_
 
+#include "PMFAction.h"
+
 #include "open/types.h"
 #include <string.h>
 #include <assert.h>
@@ -33,66 +35,58 @@ class MethodDesc;
 class IRBuilder;
 class InstFactory;
 class CompilationInterface;
-class FlowGraph;
+class ControlFlowGraph;
 class Opnd;
 class Inst;
-class CFGNode;
+class Node;
 class ExceptionInfo;
 class IRManager;
 class MemoryManager;
-class JitrinoParameterTable;
 class Method_Table;
 class CompilationContext;
+class SessionAction;
 
     // to select which byte code translator optimizations are done
 struct TranslatorFlags {
-        bool propValues       : 1;    // do value propagation
-        bool inlineMethods    : 1;    // do method inlining
-        bool guardedInlining  : 1;    // a step further for inlining
-        bool genCharArrayCopy : 1;    // generate intrinsic calls to CharArrayCopy
-        bool onlyBalancedSync : 1;    // treat all method synchronization as balanced
-        bool ignoreSync       : 1;    // do not generate monitor enter/exit instructions
-        bool syncAsEnterFence : 1;    // implement monitor enter as enter fence and
-        bool newCatchHandling : 1;    // use fix for catch handler ordering problem
-        bool magicMinMaxAbs   : 1;    // recognize, e.g., java/lang/Math.min/max/abs
-        bool genMinMaxAbs     : 1;    // gen min/max/abs opcodes instead of using select
-        bool genFMinMaxAbs    : 1;    // gen min/max/abs opcodes for floats
-        bool optArrayInit     : 1;    // skip array initializers from optimizations
-        Method_Table* inlineSkipTable; // do not inline these methods
-        char *magicClass;             //  Name of the MagicClass. NULL if no class specified.
-    };
-
-class TranslatorIntfc {
-public:
-
-    virtual ~TranslatorIntfc() {}
-    
-    // all TranslatorIntfc::flags fields are initialized by readTranslatorCommandLineParams()
-    static void readFlagsFromCommandLine(CompilationContext* cs, bool ia32Cg);
-    static void showFlagsFromCommandLine();
-
-    virtual void translateMethod(CompilationInterface&, MethodDesc&, IRBuilder&) = 0;
-    
-    // this is the regular routine to be used to generate IR for a method
-    static void translateByteCodes(IRManager&);
-
-    // for inlining
-    static void translateByteCodesInline(IRManager& irManager,
-                                         uint32 numArgs, Opnd** argOpnds, uint32 inlineDepth);
-
-    // this routine is used for IR inlining and generating IR for a particular method
-    // FG is obtained from irBuilder
-    static void generateMethodIRForInlining(
-                                            CompilationInterface& compilationInterface,
-                                            MethodDesc& methodDesc,
-                                            IRBuilder&        irBuilder,
-                                            uint32            numActualArgs,
-                                            Opnd**            actualArgs,
-                                            Opnd**            returnOpnd,
-                                            CFGNode**         returnNode,
-                                            Inst*             inlineSite,
-                                            uint32 inlineDepth);
+    bool propValues       : 1;    // do value propagation
+    bool inlineMethods    : 1;    // do method inlining
+    bool guardedInlining  : 1;    // a step further for inlining
+    bool genCharArrayCopy : 1;    // generate intrinsic calls to CharArrayCopy
+    bool genArrayCopy     : 1;    // inline java/lang/System::arraycopy call
+    bool onlyBalancedSync : 1;    // treat all method synchronization as balanced
+    bool ignoreSync       : 1;    // do not generate monitor enter/exit instructions
+    bool syncAsEnterFence : 1;    // implement monitor enter as enter fence and
+    bool newCatchHandling : 1;    // use fix for catch handler ordering problem
+    bool magicMinMaxAbs   : 1;    // recognize, e.g., java/lang/Math.min/max/abs
+    bool genMinMaxAbs     : 1;    // gen min/max/abs opcodes instead of using select
+    bool genFMinMaxAbs    : 1;    // gen min/max/abs opcodes for floats
+    bool optArrayInit     : 1;    // skip array initializers from optimizations
+    Method_Table* inlineSkipTable; // do not inline these methods
+    char *magicClass;             //  Name of the MagicClass. NULL if no class specified.
 };
+
+class IRBuilderAction;
+class TranslatorAction: public Action {
+public:
+    void init();
+    const TranslatorFlags& getFlags() const {return flags;}
+    IRBuilderAction* getIRBuilderAction() const {return irbAction;}
+protected:
+    void readFlags();
+    TranslatorFlags flags;
+    IRBuilderAction* irbAction;
+};
+
+class TranslatorSession: public SessionAction {
+public:
+    virtual void run ();
+private:
+    void translate();
+    void postTranslatorCleanup();
+
+    TranslatorFlags flags;
+};
+
 
 class OpndStack {
 public:
@@ -179,7 +173,7 @@ extern void
 IRinline(CompilationInterface&      compilationInterface,
          IRBuilder&                 irBuilder,
          InstFactory&               instFactory,
-         FlowGraph*                 fg);
+         ControlFlowGraph*                 fg);
 
 } //namespace Jitrino 
 

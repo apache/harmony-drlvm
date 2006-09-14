@@ -24,9 +24,7 @@
 #include "Opnd.h"
 #include "Type.h"
 #include "Inst.h"
-#include "IRBuilder.h"
 #include "BitSet.h"
-#include "FlowGraph.h"
 #include "Log.h"
 #include "optimizer.h"
 #include "simplifier.h"
@@ -36,6 +34,8 @@
 #include "reassociate.h"
 #include "irmanager.h"
 #include "CompilationContext.h"
+
+#include "FlowGraph.h"
 
 #include <float.h>
 #include <math.h>
@@ -63,15 +63,14 @@ inline bool isnan(double s) {
 #endif
 
 
-DEFINE_OPTPASS_IMPL(SimplificationPass, simplify, "Simplification")
-
+DEFINE_SESSION_ACTION(SimplificationPass, simplify, "Perform simplification pass");
 void
 SimplificationPass::_run(IRManager& irm) {
     SimplifierWithInstFactory simplifier(irm, false);
     simplifier.simplifyControlFlowGraph();
 }
 
-DEFINE_OPTPASS_IMPL(LateSimplificationPass, latesimplify, "Simplification + Constant Mul/Div Optimization")
+DEFINE_SESSION_ACTION(LateSimplificationPass, latesimplify, "Simplification + Constant Mul/Div Optimization");
 
 void
 LateSimplificationPass::_run(IRManager& irm) {
@@ -138,10 +137,10 @@ Simplifier::isNonNullObject(Opnd* opnd) {
     Inst* inst = opnd->getInst();
     switch (inst->getOpcode()) {
     case Op_NewObj:    case Op_NewArray:    case Op_NewMultiArray:
-    case Op_Box:       case Op_LdString:    case Op_Catch:
+    case Op_Box:       case Op_LdRef:    case Op_Catch:
         return true;
     default:
-	return false;
+    return false;
     }
 }
 
@@ -168,19 +167,19 @@ Simplifier::isExactType(Opnd* opnd) {
     Inst* inst = opnd->getInst();
     switch (inst->getOpcode()) {
     case Op_NewObj:    case Op_NewArray:    case Op_NewMultiArray:
-    case Op_Box:       case Op_LdString:
+    case Op_Box:       case Op_LdRef:
         return true;
     case Op_DefArg:
         return (inst->getDefArgModifier() == SpecializedToExactType);
     default:
-	return false;
+    return false;
     }
 }
 //-----------------------------------------------------------------------------
 // Simplifier class
 //-----------------------------------------------------------------------------
 Simplifier::Simplifier(IRManager& irm, bool latePass, 
-		       Reassociate *reassociate0)
+               Reassociate *reassociate0)
     : irManager(irm), flowGraph(irm.getFlowGraph()),
       isLate(latePass), theReassociate(reassociate0)
 {
@@ -389,7 +388,7 @@ Simplifier::foldConstMultiplyBySubWithConstant(Type* type,
 #ifndef NDEBUG
             bool foldres = 
 #endif
-            	ConstantFolder::foldConstant(type->tag, Op_Mul, 
+                ConstantFolder::foldConstant(type->tag, Op_Mul, 
                                         constInst->getValue(), // c1
                                         otherConstInst->getValue(), // c2
                                         res,
@@ -399,7 +398,7 @@ Simplifier::foldConstMultiplyBySubWithConstant(Type* type,
 #ifndef NDEBUG
             foldres = 
 #endif
-            	ConstantFolder::foldConstant(type->tag, Op_Neg, res, negRes);
+                ConstantFolder::foldConstant(type->tag, Op_Neg, res, negRes);
             assert(foldres);
             if (type->tag == Type::Int32) {
                 negFoldedConst = genLdConstant(negRes.i4)->getDst();
@@ -765,9 +764,9 @@ Simplifier::simplifyAdd(Type* type,
         return opnd;
     //
     if (theReassociate) {
-	opnd = simplifyAddViaReassociation2(type, src1, src2);
-	if (opnd != NULL)
-	    return opnd;
+    opnd = simplifyAddViaReassociation2(type, src1, src2);
+    if (opnd != NULL)
+        return opnd;
     }
     //
     return NULL;
@@ -836,14 +835,14 @@ Simplifier::simplifySub(Type* type, Modifier modifier,
         return opnd;
 
     if (theReassociate) {
-	opnd = simplifySubViaReassociation2(type, src1, src2);
-	if (opnd != NULL)
-	    return opnd;
+    opnd = simplifySubViaReassociation2(type, src1, src2);
+    if (opnd != NULL)
+        return opnd;
     }
 
     opnd = simplifySubViaReassociation(type, src1, src2);
     if (opnd != NULL)
-	return opnd;
+    return opnd;
 
 
     return NULL;
@@ -878,9 +877,9 @@ Simplifier::simplifyNeg(Type* type, Opnd* src) {
     }
 
     if (theReassociate) {
-		Opnd *opnd = simplifyNegViaReassociation2(type, src);
-		if (opnd != NULL)
-	    	return opnd;
+        Opnd *opnd = simplifyNegViaReassociation2(type, src);
+        if (opnd != NULL)
+            return opnd;
     }
 
     return NULL;
@@ -925,10 +924,10 @@ Simplifier::simplifyAnd(Type* theType, Opnd* src1, Opnd* src2) {
                     src2->getInst()->asConstInst(),
                     true);
 
-    OptimizerFlags& optimizerFlags = *irManager.getCompilationContext()->getOptimizerFlags();
+    const OptimizerFlags& optimizerFlags = irManager.getOptimizerFlags();
     // check for And of 0xff with zxt/sxt:i1, etc.
     if (optimizerFlags.do_sxt && 
-	(ConstantFolder::isConstant(src1) || ConstantFolder::isConstant(src2))) {
+    (ConstantFolder::isConstant(src1) || ConstantFolder::isConstant(src2))) {
         Inst *inst2 = src2->getInst();
         Type::Tag typeTag2 = inst2->getType();
         Inst *inst1 = src1->getInst();
@@ -940,73 +939,73 @@ Simplifier::simplifyAnd(Type* theType, Opnd* src1, Opnd* src2) {
             (((typeTag2 == Type::Int8) && (((uint64)val64) <= 0xff)) ||
              ((typeTag2 == Type::Int16) && (((uint64)val64) <= 0xffff)) ||
              ((typeTag2 == Type::Int32) && (((uint64)val64) <= 0xffffffff)))) {
-	    Opnd *src2opnd = inst2->getSrc(0);
-	    if (src2opnd->getType() == src2->getType()) {
-		return genAnd(theType, src1, src2opnd)->getDst();
-	    }
-	} else if (ConstantFolder::isConstant(src2->getInst(), val64) &&
-		   (inst1->getOpcode() == Op_Conv) &&
-		   (((typeTag1 == Type::Int8) && (((uint64)val64) <= 0xff)) ||
-		    ((typeTag2 == Type::Int16) && (((uint64)val64) <= 0xffff)) ||
-		    ((typeTag2 == Type::Int32) && (((uint64)val64) <= 0xffffffff)))) {
-	    Opnd *src1opnd = inst1->getSrc(0);
-	    if (src1opnd->getType() == src1->getType()) {
-		return genAnd(theType, src1opnd, src2)->getDst();
-	    }
-	} else if (ConstantFolder::isConstant(src1->getInst(), val32) &&
-		   (inst2->getOpcode() == Op_Conv) &&
-		   (((typeTag2 == Type::Int8) && (((uint32)val32) <= 0xff)) ||
-		    ((typeTag2 == Type::Int16) && (((uint32)val32) <= 0xffff)) ||
-		    ((typeTag2 == Type::Int32) && (((uint32)val32) <= 0xffffffff)))) {
-	    Opnd *src2opnd = inst2->getSrc(0);
-	    if (src2opnd->getType() == src2->getType()) {
-		return genAnd(theType, src1, src2opnd)->getDst();
-	    }
-	} else if (ConstantFolder::isConstant(src2->getInst(), val32) &&
-		   (inst1->getOpcode() == Op_Conv) &&
-		   (((typeTag1 == Type::Int8) && (((uint32)val32) <= 0xff)) ||
-		    ((typeTag2 == Type::Int16) && (((uint32)val32) <= 0xffff)) ||
-		    ((typeTag2 == Type::Int32) && (((uint32)val32) <= 0xffffffff)))) {
-	    Opnd *src1opnd = inst1->getSrc(0);
-	    if (src1opnd->getType() == src1->getType()) {
-		return genAnd(theType, src1opnd, src2)->getDst();
-	    }
-	}
+        Opnd *src2opnd = inst2->getSrc(0);
+        if (src2opnd->getType() == src2->getType()) {
+        return genAnd(theType, src1, src2opnd)->getDst();
+        }
+    } else if (ConstantFolder::isConstant(src2->getInst(), val64) &&
+           (inst1->getOpcode() == Op_Conv) &&
+           (((typeTag1 == Type::Int8) && (((uint64)val64) <= 0xff)) ||
+            ((typeTag2 == Type::Int16) && (((uint64)val64) <= 0xffff)) ||
+            ((typeTag2 == Type::Int32) && (((uint64)val64) <= 0xffffffff)))) {
+        Opnd *src1opnd = inst1->getSrc(0);
+        if (src1opnd->getType() == src1->getType()) {
+        return genAnd(theType, src1opnd, src2)->getDst();
+        }
+    } else if (ConstantFolder::isConstant(src1->getInst(), val32) &&
+           (inst2->getOpcode() == Op_Conv) &&
+           (((typeTag2 == Type::Int8) && (((uint32)val32) <= 0xff)) ||
+            ((typeTag2 == Type::Int16) && (((uint32)val32) <= 0xffff)) ||
+            ((typeTag2 == Type::Int32) && (((uint32)val32) <= 0xffffffff)))) {
+        Opnd *src2opnd = inst2->getSrc(0);
+        if (src2opnd->getType() == src2->getType()) {
+        return genAnd(theType, src1, src2opnd)->getDst();
+        }
+    } else if (ConstantFolder::isConstant(src2->getInst(), val32) &&
+           (inst1->getOpcode() == Op_Conv) &&
+           (((typeTag1 == Type::Int8) && (((uint32)val32) <= 0xff)) ||
+            ((typeTag2 == Type::Int16) && (((uint32)val32) <= 0xffff)) ||
+            ((typeTag2 == Type::Int32) && (((uint32)val32) <= 0xffffffff)))) {
+        Opnd *src1opnd = inst1->getSrc(0);
+        if (src1opnd->getType() == src1->getType()) {
+        return genAnd(theType, src1opnd, src2)->getDst();
+        }
+    }
 
-	// check for And of 0xff with ld.u1, etc.
+    // check for And of 0xff with ld.u1, etc.
         if (ConstantFolder::isConstant(src1->getInst(), val64) &&
             (inst2->getOpcode() == Op_TauLdInd) &&
             (((typeTag2 == Type::UInt8) && (((uint64)val64) == 0xff)) ||
              ((typeTag2 == Type::UInt16) && (((uint64)val64) == 0xffff)) ||
              ((typeTag2 == Type::UInt32) && (((uint64)val64) == 0xffffffff)))) {
-	    if (theType == src2->getType()) {
-		return src2;
-	    }
-	} else if (ConstantFolder::isConstant(src2->getInst(), val64) &&
-		   (inst1->getOpcode() == Op_TauLdInd) &&
-		   (((typeTag1 == Type::UInt8) && (((uint64)val64) == 0xff)) ||
-		    ((typeTag2 == Type::UInt16) && (((uint64)val64) == 0xffff)) ||
-		    ((typeTag2 == Type::UInt32) && (((uint64)val64) == 0xffffffff)))) {
-	    if (theType == src1->getType()) {
-		return src1;
-	    }
-	} else if (ConstantFolder::isConstant(src1->getInst(), val32) &&
-		   (inst2->getOpcode() == Op_TauLdInd) &&
-		   (((typeTag2 == Type::UInt8) && (((uint32)val32) == 0xff)) ||
-		    ((typeTag2 == Type::UInt16) && (((uint32)val32) == 0xffff)) ||
-		    ((typeTag2 == Type::UInt32) && (((uint32)val32) == 0xffffffff)))) {
-	    if (theType == src2->getType()) {
-		return src2;
-	    }
-	} else if (ConstantFolder::isConstant(src2->getInst(), val32) &&
-		   (inst1->getOpcode() == Op_TauLdInd) &&
-		   (((typeTag1 == Type::UInt8) && (((uint32)val32) == 0xff)) ||
-		    ((typeTag2 == Type::UInt16) && (((uint32)val32) == 0xffff)) ||
-		    ((typeTag2 == Type::UInt32) && (((uint32)val32) == 0xffffffff)))) {
-	    if (theType == src1->getType()) {
-		return src1;
-	    }
-	}
+        if (theType == src2->getType()) {
+        return src2;
+        }
+    } else if (ConstantFolder::isConstant(src2->getInst(), val64) &&
+           (inst1->getOpcode() == Op_TauLdInd) &&
+           (((typeTag1 == Type::UInt8) && (((uint64)val64) == 0xff)) ||
+            ((typeTag2 == Type::UInt16) && (((uint64)val64) == 0xffff)) ||
+            ((typeTag2 == Type::UInt32) && (((uint64)val64) == 0xffffffff)))) {
+        if (theType == src1->getType()) {
+        return src1;
+        }
+    } else if (ConstantFolder::isConstant(src1->getInst(), val32) &&
+           (inst2->getOpcode() == Op_TauLdInd) &&
+           (((typeTag2 == Type::UInt8) && (((uint32)val32) == 0xff)) ||
+            ((typeTag2 == Type::UInt16) && (((uint32)val32) == 0xffff)) ||
+            ((typeTag2 == Type::UInt32) && (((uint32)val32) == 0xffffffff)))) {
+        if (theType == src2->getType()) {
+        return src2;
+        }
+    } else if (ConstantFolder::isConstant(src2->getInst(), val32) &&
+           (inst1->getOpcode() == Op_TauLdInd) &&
+           (((typeTag1 == Type::UInt8) && (((uint32)val32) == 0xff)) ||
+            ((typeTag2 == Type::UInt16) && (((uint32)val32) == 0xffff)) ||
+            ((typeTag2 == Type::UInt32) && (((uint32)val32) == 0xffffffff)))) {
+        if (theType == src1->getType()) {
+        return src1;
+        }
+    }
     }
     return NULL;
 }
@@ -1020,8 +1019,8 @@ Simplifier::simplifyOr(Type* theType, Opnd* src1, Opnd* src2) {
     //
     if (src1 == src2)
         return src1;
-	//
-	// 0 | s2 -> s2
+    //
+    // 0 | s2 -> s2
     //
     if (ConstantFolder::isConstantZero(src1))
         return src2;
@@ -1208,14 +1207,14 @@ Simplifier::simplifyMul(Type* type,
                     bool t = ConstantFolder::isConstant(src1->getInst(), 
                                                         multiplier);
                     if( !t) assert(0);
-					Opnd *product = planMul32(multiplier, src2);
+                    Opnd *product = planMul32(multiplier, src2);
                     return product;
                 } else { // src2isConstant
                     int32 multiplier;
                     bool t = ConstantFolder::isConstant(src2->getInst(), 
                                                         multiplier);
                     if( !t) assert(0);
-					Opnd *product = planMul32(multiplier, src1);
+                    Opnd *product = planMul32(multiplier, src1);
                     return product;
                 }        
 
@@ -1226,14 +1225,14 @@ Simplifier::simplifyMul(Type* type,
                     bool t = ConstantFolder::isConstant(src1->getInst(),
                                                         multiplier);
                     if( !t) assert(0);
-					Opnd *product = planMul64(multiplier, src2);
+                    Opnd *product = planMul64(multiplier, src2);
                     return product;
                 } else { // src2isConstant
                     int64 multiplier;
                     bool t = ConstantFolder::isConstant(src2->getInst(), 
                                                         multiplier);
                     if( !t) assert(0);
-					Opnd *product = planMul64(multiplier, src1);
+                    Opnd *product = planMul64(multiplier, src1);
                     return product;
                 }     
                    
@@ -1267,9 +1266,9 @@ Simplifier::simplifyMul(Type* type,
         return opnd;
     //
     if (theReassociate) {
-	opnd = simplifyMulViaReassociation2(type, src1, src2);
-	if (opnd != NULL)
-	    return opnd;
+    opnd = simplifyMulViaReassociation2(type, src1, src2);
+    if (opnd != NULL)
+        return opnd;
     }
     //
     return NULL;
@@ -1346,7 +1345,7 @@ Simplifier::simplifyMulHi(Type* type,
                     bool t = ConstantFolder::isConstant(src1->getInst(), 
                                                         multiplier);
                     if( !t) assert(0);
-					Type *dstType64 = tm.getInt64Type();
+                    Type *dstType64 = tm.getInt64Type();
                     Opnd *src2_64 = genConv(dstType64, 
                                             (isSigned 
                                              ? Type::Int64 : Type::UInt64), 
@@ -1365,7 +1364,7 @@ Simplifier::simplifyMulHi(Type* type,
                     int32 multiplier;
                     bool t = ConstantFolder::isConstant(src2->getInst(), 
                                                         multiplier);
-					if( !t) assert(0);
+                    if( !t) assert(0);
                     TypeManager &tm = irManager.getTypeManager();
                     Type *dstType64 = tm.getInt64Type();
                     Opnd *src1_64 = genConv(dstType64, 
@@ -1458,7 +1457,7 @@ Simplifier::simplifyTauDiv(Type* dstType,
                     mod.isSigned());
     
 #ifdef _IPF_
-    OptimizerFlags& optimizerFlags = *irManager.getCompilationContext()->getOptimizerFlags();
+    const OptimizerFlags& optimizerFlags = irManager.getOptimizerFlags();
     //
     // further ops only for integers
     //
@@ -1583,7 +1582,7 @@ Simplifier::simplifyTauDiv(Type* dstType,
         }
     }
 #endif
-	return NULL;
+    return NULL;
 }
 
 Opnd*
@@ -1606,7 +1605,7 @@ Simplifier::simplifyTauRem(Type* dstType,
                     src2->getInst()->asConstInst(),
                     mod.isSigned());
 #ifdef _IPF_
-	//
+    //
     // don't simplify floating point further
     //
     switch (dstType->tag) {
@@ -1724,29 +1723,29 @@ Simplifier::simplifyConv(Type* dstType,
                 return genLdConstant(dstType, res)->getDst();
         }
     }
-    OptimizerFlags& optimizerFlags = *irManager.getCompilationContext()->getOptimizerFlags();
+    const OptimizerFlags& optimizerFlags = irManager.getOptimizerFlags();
     if (optimizerFlags.do_sxt && (opndInst->getOpcode() == Op_And)) {
         assert(opndInst->getNumSrcOperands() == 2);
         Opnd *src0 = opndInst->getSrc(0);
         Opnd *src1 = opndInst->getSrc(1);
-	int64 val64;
-	// and with 0xff makes Conv(u8) redundant, etc..
-	if (ConstantFolder::isConstant(src0->getInst(), val64) &&
-	    (((toType == Type::UInt8)
-	      && (((uint64)val64) <= 0xff)) ||
+    int64 val64;
+    // and with 0xff makes Conv(u8) redundant, etc..
+    if (ConstantFolder::isConstant(src0->getInst(), val64) &&
+        (((toType == Type::UInt8)
+          && (((uint64)val64) <= 0xff)) ||
              ((toType == Type::Int8)
               && (((uint64)val64) <= 0x7f)) ||
-	     ((toType == Type::UInt16)
-	      && (((uint64)val64) <= 0x7fff)) ||
-	     ((toType == Type::Int16)
-	      && (((uint64)val64) <= 0xffff)) ||
-	     ((toType == Type::UInt32)
-	      && (((uint64)val64) <= 0xffffffff)) ||
-	     ((toType == Type::Int32)
-	      && (((uint64)val64) <= 0x7fffffff)))) {
-	    if (dstType == src->getType())
-		return src;
-	} else if (ConstantFolder::isConstant(src1->getInst(), val64) &&
+         ((toType == Type::UInt16)
+          && (((uint64)val64) <= 0x7fff)) ||
+         ((toType == Type::Int16)
+          && (((uint64)val64) <= 0xffff)) ||
+         ((toType == Type::UInt32)
+          && (((uint64)val64) <= 0xffffffff)) ||
+         ((toType == Type::Int32)
+          && (((uint64)val64) <= 0x7fffffff)))) {
+        if (dstType == src->getType())
+        return src;
+    } else if (ConstantFolder::isConstant(src1->getInst(), val64) &&
                    (((toType == Type::UInt8)
                      && (((uint64)val64) <= 0xff)) ||
                     ((toType == Type::Int8) 
@@ -1759,41 +1758,41 @@ Simplifier::simplifyConv(Type* dstType,
                      && (((uint64)val64) <= 0xffffffff)) ||
                     ((toType == Type::Int32) 
                      && (((uint64)val64) <= 0x7fffffff)))) {
-	    if (dstType == src->getType())
-		return src;
-	}
-	int32 val32;
-	if (ConstantFolder::isConstant(src0->getInst(), val32) &&
-	    (((toType == Type::UInt8)
-	      && (((uint32)val32) <= 0xff)) ||
+        if (dstType == src->getType())
+        return src;
+    }
+    int32 val32;
+    if (ConstantFolder::isConstant(src0->getInst(), val32) &&
+        (((toType == Type::UInt8)
+          && (((uint32)val32) <= 0xff)) ||
              ((toType == Type::Int8) 
-	      && (((uint32)val32) <= 0x7f)) ||
-	     ((toType == Type::UInt16)
-	      && (((uint32)val32) <= 0xffff)) ||
-	     ((toType == Type::Int16) 
-	      && (((uint32)val32) <= 0x7fff)) ||
-	     ((toType == Type::UInt32)
-	      && (((uint32)val32) <= 0xffffffff)) ||
-	     ((toType == Type::Int32) 
-	      && (((uint32)val32) <= 0x7fffffff)))) {
-	    if (dstType == src->getType())
-		return src;
-	} else if (ConstantFolder::isConstant(src1->getInst(), val32) &&
-	    (((toType == Type::UInt8)
-	      && (((uint32)val32) <= 0xff)) ||
+          && (((uint32)val32) <= 0x7f)) ||
+         ((toType == Type::UInt16)
+          && (((uint32)val32) <= 0xffff)) ||
+         ((toType == Type::Int16) 
+          && (((uint32)val32) <= 0x7fff)) ||
+         ((toType == Type::UInt32)
+          && (((uint32)val32) <= 0xffffffff)) ||
+         ((toType == Type::Int32) 
+          && (((uint32)val32) <= 0x7fffffff)))) {
+        if (dstType == src->getType())
+        return src;
+    } else if (ConstantFolder::isConstant(src1->getInst(), val32) &&
+        (((toType == Type::UInt8)
+          && (((uint32)val32) <= 0xff)) ||
              ((toType == Type::Int8)
               && (((uint32)val32) <= 0x7f)) ||
-	     ((toType == Type::UInt16)
-	      && (((uint32)val32) <= 0xffff)) ||
-	     ((toType == Type::Int16) 
-	      && (((uint32)val32) <= 0x7fff)) ||
-	     ((toType == Type::UInt32)
-	      && (((uint32)val32) <= 0xffffffff)) ||
-	     ((toType == Type::Int32) 
-	      && (((uint32)val32) <= 0x7fffffff)))) {
-	    if (dstType == src->getType())
-		return src;
-	}
+         ((toType == Type::UInt16)
+          && (((uint32)val32) <= 0xffff)) ||
+         ((toType == Type::Int16) 
+          && (((uint32)val32) <= 0x7fff)) ||
+         ((toType == Type::UInt32)
+          && (((uint32)val32) <= 0xffffffff)) ||
+         ((toType == Type::Int32) 
+          && (((uint32)val32) <= 0x7fffffff)))) {
+        if (dstType == src->getType())
+        return src;
+    }
     }
 
 
@@ -2345,13 +2344,13 @@ Simplifier::simplifyCmpOfCmp3(Type::Tag instType,
                 // 0 != test
                 return simplifyCmp3ByResult(src2, true, false, true,
                                             newInstType, newmod, newSrc1, newSrc2);
-			} else if (((val == 1) && (mod == Cmp_NE_Un)) ||
-					   ((val == 0) && (mod == Cmp_GTE))) {
-				// 1 != test
-				// 0 >= test
+            } else if (((val == 1) && (mod == Cmp_NE_Un)) ||
+                       ((val == 0) && (mod == Cmp_GTE))) {
+                // 1 != test
+                // 0 >= test
                 return simplifyCmp3ByResult(src2, true, true, false,
                                             newInstType, newmod, newSrc1, newSrc2);
-			} 
+            } 
         }
     }
     return false;
@@ -2625,7 +2624,7 @@ Simplifier::simplifyCmpToCmp(Type::Tag instType,
                              Opnd* &newSrc2)
 {
     ConstInst::ConstValue valC;
-    OptimizerFlags& optimizerFlags = *irManager.getCompilationContext()->getOptimizerFlags();
+    const OptimizerFlags& optimizerFlags = irManager.getOptimizerFlags();
     if (optimizerFlags.elim_cmp3 && (instType == Type::Int32) &&
         simplifyCmpOfCmp3(instType, mod, src1, src2, newInstType, newmod,
                           newSrc1, newSrc2)) {
@@ -2724,8 +2723,8 @@ Simplifier::canFoldBranch(Type::Tag instType,
         case Cmp_GT_Un: 
             isTaken = false;
             return true;
-	default:
-	    break;
+    default:
+        break;
         }
     }
     return false;
@@ -2841,7 +2840,7 @@ Simplifier::simplifyTauCheckNull(Opnd* opnd, bool &alwaysThrows) {
         return genTauIsNonNull(opnd)->getDst(); // is safe, but only in method
     }
     if (isNullObject(opnd)) {
-        if (Log::cat_opt_sim()->isDebugEnabled()) {
+        if (Log::isEnabled()) {
             Log::out() << "CheckNull of src ";
             opnd->print(Log::out());
             Log::out() << " always throws" << ::std::endl;
@@ -2871,7 +2870,7 @@ Simplifier::simplifyTauCheckBounds(Opnd* arrayLen, Opnd* index, bool &alwaysThro
                 return genTauSafe()->getDst(); // is safe by construction
             } else {
                 // fold to a throwSystemId
-                if (Log::cat_opt_sim()->isDebugEnabled()) {
+                if (Log::isEnabled()) {
                     Log::out() << "Checkbounds of arrayLen ";
                     arrayLen->print(Log::out());
                     Log::out() << " and index ";
@@ -2905,7 +2904,7 @@ Simplifier::simplifyTauCheckLowerBound(Opnd* lb, Opnd *idx, bool &alwaysThrows) 
                                       result)) {
             if (result == 1) {
                 // fold to a throwSystemId
-                if (Log::cat_opt_sim()->isDebugEnabled()) {
+                if (Log::isEnabled()) {
                     Log::out() << "CheckLowerBound of lb ";
                     lb->print(Log::out());
                     Log::out() << " and index ";
@@ -2949,7 +2948,7 @@ Simplifier::simplifyTauCheckUpperBound(Opnd* idx, Opnd* ub, bool &alwaysThrows) 
                 return genTauSafe()->getDst(); // check is safe by construction
             } else {
                 // fold to a throwSystemId
-                if (Log::cat_opt_sim()->isDebugEnabled()) {
+                if (Log::isEnabled()) {
                     Log::out() << "CheckUpperBound of idx ";
                     idx->print(Log::out());
                     Log::out() << " and ub ";
@@ -2979,7 +2978,7 @@ Simplifier::simplifyTauCheckZero(Opnd* opnd, bool &alwaysThrows) {
         if (value != 0)
             return genTauSafe()->getDst(); // check is safe by construction
         else {
-            if (Log::cat_opt_sim()->isDebugEnabled()) {
+            if (Log::isEnabled()) {
                 Log::out() << "CheckZero of opnd ";
                 opnd->print(Log::out());
                 Log::out()<< " always throws" << ::std::endl;
@@ -3229,7 +3228,7 @@ Simplifier::simplifyCompressRef(Opnd* opnd) {
 
 Opnd*
 Simplifier::simplifyAddOffset(Type *ptrType, Opnd* uncompBase, Opnd *offset) {
-    OptimizerFlags& optimizerFlags = *irManager.getCompilationContext()->getOptimizerFlags();
+    const OptimizerFlags& optimizerFlags = irManager.getOptimizerFlags();
     if (optimizerFlags.reduce_compref) {
         Inst *uncompBaseInst = uncompBase->getInst();
         if (uncompBaseInst->getOpcode() == Op_UncompressRef) {
@@ -3284,7 +3283,7 @@ Opnd*
 Simplifier::simplifyAddOffsetPlusHeapbase(Type *ptrType,
                                           Opnd* compBase, 
                                           Opnd *offsetPlusHeapbase) {
-    OptimizerFlags& optimizerFlags = *irManager.getCompilationContext()->getOptimizerFlags();
+    const OptimizerFlags& optimizerFlags = irManager.getOptimizerFlags();
     if (0 && optimizerFlags.reduce_compref && theReassociate) {
         Opnd *opnd = simplifyAddOffsetPlusHeapbaseViaReassociation(compBase,
                                                                    offsetPlusHeapbase); 
@@ -3312,7 +3311,7 @@ SimplifierWithInstFactory::simplifyStoreSrc(Opnd* src, Type::Tag &typetag,
             return srcisrc;
     }
 
-    OptimizerFlags& optimizerFlags = *irManager.getCompilationContext()->getOptimizerFlags();
+    const OptimizerFlags& optimizerFlags = irManager.getOptimizerFlags();
 
     if (compressRef &&
         optimizerFlags.reduce_compref && 
@@ -3338,7 +3337,7 @@ SimplifierWithInstFactory::simplifyStoreSrc(Opnd* src, Type::Tag &typetag,
 void
 Simplifier::simplifyTauStStatic(Inst *inst)
 {
-    if (Log::cat_opt_sim()->isDebugEnabled()) {
+    if (Log::isEnabled()) {
         Log::out() << "Trying to simplify TauStStatic: ";
         inst->print(Log::out());
         Log::out() << ::std::endl;
@@ -3361,7 +3360,7 @@ Simplifier::simplifyTauStStatic(Inst *inst)
 void
 Simplifier::simplifyTauStField(Inst *inst)
 {
-    if (Log::cat_opt_sim()->isDebugEnabled()) {
+    if (Log::isEnabled()) {
         Log::out() << "Trying to simplify StField: ";
         inst->print(Log::out());
         Log::out() << ::std::endl;
@@ -3447,30 +3446,30 @@ Opnd *
 Simplifier::simplifyTauLdInd(Modifier mod, Type* dstType, Type::Tag type, Opnd *ptr,
                              Opnd *tauBaseNonNull, Opnd *tauAddressInRange)
 {
-    OptimizerFlags& optimizerFlags = *irManager.getCompilationContext()->getOptimizerFlags();
+    const OptimizerFlags& optimizerFlags = irManager.getOptimizerFlags();
     if (optimizerFlags.do_sxt && !optimizerFlags.ia32_code_gen) {
-		// simplify signed loads to unsigned
-		Opnd *newLd = 0;
-		switch (type) {
-		case Type::Int8:
-			newLd = genTauLdInd(mod, dstType, Type::UInt8, ptr,
-									tauBaseNonNull, tauAddressInRange)->getDst();
-			break;
-		case Type::Int16:
-			newLd = genTauLdInd(mod, dstType, Type::UInt16, ptr,
-									tauBaseNonNull, tauAddressInRange)->getDst();
-			break;
-		case Type::Int32:
-			newLd = genTauLdInd(mod, dstType, Type::UInt32, ptr,
-									tauBaseNonNull, tauAddressInRange)->getDst();
-			break;
-		default:
-			break;
-		}
-		if (newLd) {
-			Opnd *extOpnd = genConv(dstType, type, Modifier(Overflow_None)|Modifier(Exception_Never)|Modifier(Strict_No), newLd)->getDst();
-			return extOpnd;
-		}
+        // simplify signed loads to unsigned
+        Opnd *newLd = 0;
+        switch (type) {
+        case Type::Int8:
+            newLd = genTauLdInd(mod, dstType, Type::UInt8, ptr,
+                                    tauBaseNonNull, tauAddressInRange)->getDst();
+            break;
+        case Type::Int16:
+            newLd = genTauLdInd(mod, dstType, Type::UInt16, ptr,
+                                    tauBaseNonNull, tauAddressInRange)->getDst();
+            break;
+        case Type::Int32:
+            newLd = genTauLdInd(mod, dstType, Type::UInt32, ptr,
+                                    tauBaseNonNull, tauAddressInRange)->getDst();
+            break;
+        default:
+            break;
+        }
+        if (newLd) {
+            Opnd *extOpnd = genConv(dstType, type, Modifier(Overflow_None)|Modifier(Exception_Never)|Modifier(Strict_No), newLd)->getDst();
+            return extOpnd;
+        }
     }
     if (optimizerFlags.reduce_compref && 
         (mod.getAutoCompressModifier() == AutoCompress_Yes)) {
@@ -3494,20 +3493,20 @@ Simplifier::simplifyTauLdInd(Modifier mod, Type* dstType, Type::Tag type, Opnd *
 
 
 Opnd *
-Simplifier::simplifyLdString(Modifier mod, Type* dstType,
-                             uint32 token, MethodDesc* enclosingMethod)
+Simplifier::simplifyLdRef(Modifier mod, Type* dstType,
+                          uint32 token, MethodDesc* enclosingMethod)
 {
-    OptimizerFlags& optimizerFlags = *irManager.getCompilationContext()->getOptimizerFlags();
+    const OptimizerFlags& optimizerFlags = irManager.getOptimizerFlags();
     if (optimizerFlags.reduce_compref && 
         (mod.getAutoCompressModifier() == AutoCompress_Yes)) {
         
         assert(dstType->isReference());
         assert(!dstType->isCompressedReference());
         Type *compressedType = irManager.getTypeManager().compressType(dstType);
-        Opnd *newLdString = genLdString(AutoCompress_No, compressedType,
-                                        token,
-                                        enclosingMethod)->getDst();
-        Opnd *uncOpnd = genUncompressRef(newLdString)->getDst();
+        Opnd *newLdRef = genLdRef(AutoCompress_No, compressedType,
+                                  token,
+                                  enclosingMethod)->getDst();
+        Opnd *uncOpnd = genUncompressRef(newLdRef)->getDst();
         return uncOpnd;
     }
     return 0;
@@ -3562,9 +3561,7 @@ Simplifier::simplifyTauLdVirtFunAddrSlot(Opnd* vtable, Opnd *tauVtableHasMethod,
 }
 
 Opnd*
-Simplifier::simplifyTauLdIntfcVTableAddr(Opnd* base,
-                                         Opnd *tauBaseHasInterface,
-                                         Type* vtableType) {
+Simplifier::simplifyTauLdIntfcVTableAddr(Opnd* base, Type* vtableType) {
     // Can't really simplify load of an interface vtable
     return NULL;
 }
@@ -3593,7 +3590,7 @@ Simplifier::simplifyTauVirtualCall(MethodDesc* methodDesc,
     // or if the method is final
     //
     if (isExactType(args[0]) || methodDesc->isFinal() || methodDesc->isPrivate()) {
-        if(isExactType(args[0])) {
+        if(isExactType(args[0]) && !args[0]->getType()->isInterface()) {
             methodDesc = irManager.getCompilationInterface().getOverriddenMethod(
                     (NamedType*) args[0]->getType(), methodDesc);
         }
@@ -3729,17 +3726,18 @@ Simplifier::caseBranch(BranchInst* inst) {
 
 Inst*
 Simplifier::caseSwitch(SwitchInst* inst) {
-    uint32 numTarget = inst->getNumTargets();
-    LabelInst** targets = inst->getTargets();
-    LabelInst* defaultTarget = inst->getDefaultTarget();
     Opnd* index = inst->getSrc(0);
     int32 value;
     if(ConstantFolder::isConstant(index->getInst(), value)) {
         foldSwitch(inst, value);
         return NULL;
     } else {
-        if(simplifySwitch(numTarget, targets, defaultTarget, index))
+        uint32 numTarget = inst->getNumTargets();
+        LabelInst** targets = inst->getTargets();
+        LabelInst* defaultTarget = inst->getDefaultTarget();
+        if(simplifySwitch(numTarget, targets, defaultTarget, index)) {
             return NULL;
+        }
     }
     return inst;
 }
@@ -3806,8 +3804,8 @@ Simplifier::propagateCopy(Opnd* opnd) {
 // Simplifier methods that generate instructions
 //-----------------------------------------------------------------------------
 SimplifierWithInstFactory::SimplifierWithInstFactory(IRManager& irm,
-						     bool isLate, 
-						     Reassociate *reassociate0)
+                             bool isLate, 
+                             Reassociate *reassociate0)
     : Simplifier(irm, isLate, reassociate0),
       nextInst(NULL),
       currentCfgNode(NULL),
@@ -3822,23 +3820,23 @@ SimplifierWithInstFactory::SimplifierWithInstFactory(IRManager& irm,
 
 void  
 SimplifierWithInstFactory::foldBranch(BranchInst* br, bool isTaken) {
-    flowGraph.foldBranch(currentCfgNode,br,isTaken);
+    FlowGraph::foldBranch(flowGraph, currentCfgNode,br,isTaken);
 }
 
 void  
 SimplifierWithInstFactory::foldSwitch(SwitchInst* switchInst, uint32 index) {
-    flowGraph.foldSwitch(currentCfgNode,switchInst,index);
+    FlowGraph::foldSwitch(flowGraph, currentCfgNode,switchInst,index);
 }
 
 
 void  
 SimplifierWithInstFactory::eliminateCheck(Inst* checkInst, bool alwaysThrows) {
-    flowGraph.eliminateCheck(currentCfgNode,checkInst,alwaysThrows);
+    FlowGraph::eliminateCheck(flowGraph, currentCfgNode,checkInst,alwaysThrows);
 }
 
 uint32
 SimplifierWithInstFactory::simplifyControlFlowGraph() {
-    if (Log::cat_opt_sim()->isDebugEnabled()) {
+    if (Log::isEnabled()) {
         Log::out() << "Starting simplifyControlFlowGraph" << ::std::endl;
     }
 
@@ -3847,44 +3845,44 @@ SimplifierWithInstFactory::simplifyControlFlowGraph() {
     BitSet* reachableNodes = new (memManager) BitSet(memManager,flowGraph.getMaxNodeId());
     BitSet* unreachableInsts = 
         new (memManager) BitSet(memManager,irManager.getInstFactory().getNumInsts());
-    ::std::vector<CFGNode*> nodes;
+    StlVector<Node*> nodes(memManager);
     nodes.reserve(flowGraph.getMaxNodeId());
     //
     // Compute postorder list.
     //
     flowGraph.getNodesPostOrder(nodes);
     // Use reverse iterator to generate nodes in reverse postorder.
-    ::std::vector<CFGNode*>::reverse_iterator niter = nodes.rbegin();
+    StlVector<Node*>::reverse_iterator niter = nodes.rbegin();
     // mark first node as reachable
     reachableNodes->setBit((*niter)->getId(),true);
     for (niter = nodes.rbegin(); niter != nodes.rend(); ++niter) {
         currentCfgNode = *niter;
-        Inst* headInst = currentCfgNode->getFirstInst();
+        Inst* headInst = (Inst*)currentCfgNode->getFirstInst();
         if (reachableNodes->getBit(currentCfgNode->getId()) == false) {
             // unreachable block
             // mark block's instructions as unreachable
-            for (Inst* inst = headInst->next();inst!=headInst;inst=inst->next()) {
+            for (Inst* inst = headInst->getNextInst();inst!=NULL;inst=inst->getNextInst()) {
                 unreachableInsts->setBit(inst->getId(),true);
             }
             // skip over unreachable block
             continue;
         }
-        for (Inst* inst = headInst->next();inst!=headInst;) {
-            Inst* nextInst = inst->next();
-            if (Log::cat_opt_sim()->isDebugEnabled()) {
+        for (Inst* inst = headInst->getNextInst();inst!=NULL;) {
+            Inst* nextInst = inst->getNextInst();
+            if (Log::isEnabled()) {
                 Log::out() << "Trying to simplify Instruction: ";
                 inst->print(Log::out());
                 Log::out() << ::std::endl;
             }
             Inst* optimizedInst = optimizeInst(inst);
             if (optimizedInst != inst) {
-                if (Log::cat_opt_sim()->isDebugEnabled()) {
+                if (Log::isEnabled()) {
                     Log::out() << "was simplified" << ::std::endl;
                 }
                 // simplification occurred
                 numInstOptimized++;
                 if (optimizedInst != NULL) {
-                    if (Log::cat_opt_sim()->isDebugEnabled()) {
+                    if (Log::isEnabled()) {
                         Log::out() << "replacing with new instruction ";
                         optimizedInst->print(Log::out());
                         Log::out() << ::std::endl;
@@ -3906,10 +3904,13 @@ SimplifierWithInstFactory::simplifyControlFlowGraph() {
                         // dstOpnd is null first.
                         //
                         Inst* copy = irManager.getInstFactory().makeCopy(dstOpnd, srcOpnd);
-                        assert(nextInst);
-                        assert(nextInst->getNode());
-                        copy->insertBefore(nextInst);
-                        if (Log::cat_opt_sim()->isDebugEnabled()) {
+                        if (nextInst) {
+                            assert(nextInst->getNode());
+                            copy->insertBefore(nextInst);
+                        } else {
+                            currentCfgNode->appendInst(copy);
+                        }
+                        if (Log::isEnabled()) {
                             Log::out() << "inserting copy instruction ";
                             copy->print(Log::out());
                             Log::out() << ::std::endl;
@@ -3921,15 +3922,15 @@ SimplifierWithInstFactory::simplifyControlFlowGraph() {
             inst = nextInst;
         }
         // mark successor blocks as reachable
-        CFGEdgeDeque::const_iterator
+        Edges::const_iterator
             i = currentCfgNode->getOutEdges().begin(),
             iend = currentCfgNode->getOutEdges().end();
         for (; i != iend; i++) {
-            CFGNode* succ = (*i)->getTargetNode();
+            Node* succ = (*i)->getTargetNode();
             reachableNodes->setBit(succ->getId(),true);
         }
     }
-    if (Log::cat_opt_sim()->isDebugEnabled()) {
+    if (Log::isEnabled()) {
         Log::out() << "Done simplifyControlFlowGraph" << ::std::endl;
     }
     return numInstOptimized;
@@ -3948,18 +3949,22 @@ SimplifierWithInstFactory::insertInst(Inst* inst) {
 
 void
 SimplifierWithInstFactory::insertInstInHeader(Inst* inst) {
-    CFGNode *head = flowGraph.getEntry();
-    Inst *entryLabel = head->getFirstInst();
+    Node *head = flowGraph.getEntryNode();
+    Inst *entryLabel = (Inst*)head->getFirstInst();
     // first search for one already there
-    Inst *where = entryLabel->next();
-    while (where != entryLabel) {
+    Inst *where = entryLabel->getNextInst();
+    while (where != NULL) {
         if (where->getOpcode() != Op_DefArg) {
             break;
         }
-        where = where->next();
+        where = where->getNextInst();
     }
     // insert before where
-    inst->insertBefore(where);
+    if (where!=NULL) {
+        inst->insertBefore(where);
+    } else {
+       head->appendInst(inst);
+    }
 }
 
 Inst*
@@ -4162,7 +4167,8 @@ SimplifierWithInstFactory::genDirectCall(
                                             numArgs, args, 
                                             methodDesc);
     if ( inlineBuilder ) {
-        inlineBuilder->buildInlineInfoForInst(inst, methodDesc);
+        uint32 callOffset = ILLEGAL_VALUE;
+        inlineBuilder->buildInlineInfoForInst(inst, callOffset, methodDesc);
     }
 
     insertInst(inst);
@@ -4218,12 +4224,12 @@ SimplifierWithInstFactory::genTauLdInd(Modifier mod, Type* type, Type::Tag ldTyp
 }
 
 Inst* 
-SimplifierWithInstFactory::genLdString(Modifier mod, Type* type, 
-                                       uint32 token,
-                                       MethodDesc *methodDesc)
+SimplifierWithInstFactory::genLdRef(Modifier mod, Type* type, 
+                                    uint32 token,
+                                    MethodDesc *methodDesc)
 {
     Opnd* dst = opndManager.createSsaTmpOpnd(type);
-    Inst* inst = instFactory.makeLdString(mod, dst, methodDesc, token);
+    Inst* inst = instFactory.makeLdRef(mod, dst, methodDesc, token);
     insertInst(inst);
     return inst;
 }
@@ -4386,7 +4392,7 @@ Simplifier::simplifyTauCheckCast(Opnd* src, Opnd* tauCheckedNull, Type* castType
     } else if (irManager.getTypeManager().isSubClassOf(opndType, castType)) {
         return genTauHasType(src, castType)->getDst();
     } else if (!irManager.getTypeManager().isSubClassOf(castType, opndType)) {
-        if (Log::cat_opt_sim()->isDebugEnabled()) {
+        if (Log::isEnabled()) {
             Log::out() << "in simplifyTauCheckCast: castToType ";
             castType->print(Log::out());
             Log::out() << " not subtype of source ";
@@ -4404,10 +4410,10 @@ Opnd*
 Simplifier::simplifyTauHasType(Opnd* src, Type* castType)
 {
     // all references have type java/lang/Object
-	if ((castType == irManager.getTypeManager().getSystemObjectType()) ||
-			(castType == irManager.getTypeManager().getCompressedSystemObjectType())) {
-		return genTauSafe()->getDst();
-	}
+    if ((castType == irManager.getTypeManager().getSystemObjectType()) ||
+            (castType == irManager.getTypeManager().getCompressedSystemObjectType())) {
+        return genTauSafe()->getDst();
+    }
     // otherwise, check for constants or casts
 #ifndef NDEBUG
     Type *opndType = src->getType();
@@ -4436,10 +4442,10 @@ Simplifier::simplifyTauHasType(Opnd* src, Type* castType)
                 return tauCastChecked;
             }
             // otherwise, first check whether we can be more precise than this cast
-	    DeadCodeEliminator::copyPropagate(staticCastInst);
+        DeadCodeEliminator::copyPropagate(staticCastInst);
             Opnd *staticCastSrc = staticCastInst->getSrc(0);
             tauCastChecked = staticCastInst->getSrc(1);
-	    
+        
             Opnd *foundRecurse = simplifyTauHasType(staticCastSrc, castType);
             if (foundRecurse) {
                 return foundRecurse;

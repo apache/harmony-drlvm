@@ -1,24 +1,24 @@
 /*
- *  Copyright 2005-2006 The Apache Software Foundation or its licensors, as applicable.
- *
- *  Licensed under the Apache License, Version 2.0 (the "License");
- *  you may not use this file except in compliance with the License.
- *  You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- *  Unless required by applicable law or agreed to in writing, software
- *  distributed under the License is distributed on an "AS IS" BASIS,
- *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- *  See the License for the specific language governing permissions and
- *  limitations under the License.
- */
+*  Copyright 2005-2006 The Apache Software Foundation or its licensors, as applicable.
+*
+*  Licensed under the Apache License, Version 2.0 (the "License");
+*  you may not use this file except in compliance with the License.
+*  You may obtain a copy of the License at
+*
+*     http://www.apache.org/licenses/LICENSE-2.0
+*
+*  Unless required by applicable law or agreed to in writing, software
+*  distributed under the License is distributed on an "AS IS" BASIS,
+*  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+*  See the License for the specific language governing permissions and
+*  limitations under the License.
+*/
 
 /**
- * @author Intel, Mikhail Y. Fursov
- * @version $Revision: 1.14.24.4 $
- *
- */
+* @author Intel, Mikhail Y. Fursov
+* @version $Revision$
+*
+*/
 
 #ifndef _CONTROLFLOWGRAPH_
 #define _CONTROLFLOWGRAPH_
@@ -26,399 +26,407 @@
 #include <assert.h>
 #include <iostream>
 
+#include "Dlink.h"
 #include "Stl.h"
 
 #include "open/types.h"
 
 namespace Jitrino {
 
-const uint32 UINT32_MAX = (uint32) -1;
+class Edge;
+class Node;
+class CFGInst;
+class ControlFlowGraph;
+class Type;
+class DominatorTree;
+class LoopTree;
 
-class ControlFlowGraph
-{
+typedef StlVector<Edge*> Edges;
+typedef StlVector<Node*> Nodes;
+
+class Edge {
+    friend class ControlFlowGraph;
+    friend class ControlFlowGraphFactory;
 public:
-    ControlFlowGraph(MemoryManager& mm) : _entry(NULL), _exit(NULL), 
-        _return(NULL), _unwind(NULL),
-        _nodes(mm), _nodeIDGenerator(0), _edgeIDGenerator(0), _nodeCount(0),
-        _traversalNumber(0), _lastModifiedTraversalNumber(0),  
-        _lastOrderingTraversalNumber(0),
-        _lastEdgeRemovalTraversalNumber(0) { }
-    
-    class Edge;
-    /**
-     * A doubly-linked list of edges.
-     **/ 
-    typedef StlList<Edge*> EdgeList;
-
-    class Node;
-    /**
-     * A doubly-linked list of Nodes.
-     **/
-    typedef StlList<Node*> NodeList;
-    
-    /**
-     * Base class for CFG Edges.  An Edge represents control flow between two nodes: both explicit (branches
-     * and fall-throughs) and implicit (exceptions).  A CFG may contain more than one edge between the two given nodes.
-     **/
-    class Edge {
-        friend class ControlFlowGraph;
-        friend class Node;
-    public:
-        enum Kind {
-            True,           // A taken branch BN->BN
-            False,          // Fall-through after not-taken branch BN->BN
-            Unconditional,  // Jump or fall-through with no branch BN->BN
-            Exception,      // Exception throw (to DispatchNode)   *->DN
-            Catch,          // Exception catch (from DispatchNode to handler)  DN->BN
-            Switch,         // A taken switch  BN->BN  
-            Exit,           // Any edge to the exit node.
-            Unknown
-        };
-
-
-
-		// Get the unique edge ID.  This is unique for all edges in the containing flow graph.
-        // It is constant for the lifetime of this edge.
-        uint32 getId() const { return _id; }
-
-        virtual Kind getKind() = 0; 
-        
-        Node* getSourceNode() { return _source; }
-        Node* getTargetNode() { return _target; }
-        Node* getNode(bool isForward) { return isForward ? _target : _source; }
-        
-    protected:
-        Edge(Node* source, Node* target) : _id(UINT32_MAX), _source(source), _target(target) {}
-        Edge() : _id(UINT32_MAX), _source(NULL), _target(NULL) {}
-
-        virtual ~Edge() {}        
-    private:
-        void setId(uint32 num) { _id = num; }
-        void setSourceNode(Node* source) { _source=source; }
-        void setTargetNode(Node* target) { _target=target; }
-
-        uint32 _id;
-        Node* _source;
-        Node* _target;
+    enum Kind {                  // shortcut: max1: only one edge of this type/node. maxN: multiple edges/node
+        Kind_Dispatch = 1,       // All *->DN edges.  
+        Kind_Unconditional = 2,  // Jump or fall-through with no branch BN->BN, *->EXIT (max1)
+        Kind_False = 4,          // Fall-through after not-taken branch BN->BN, default target of switches (max1)
+        Kind_True = 8,           // A taken branch BN->BN, switch edges (except default) (maxN)
+        Kind_Catch = 16          // All DN->BN edges  (maxN)
     };
 
-    /**
-     * Base class for CFG nodes.  A node may be either a block or dispatch 
-     * node.  A block node represents a basic block and contains a sequence of 
-     * instructions with a single entry point at the beginning and a single
-     * exit at the end.  A block node is explicit; the JIT 
-     * will eventually generate instructions corresponding to this node.
-     * A dispatch node is used to model implicit control flow for throwing and catching 
-     * exceptions.  A dispatch node is implicit; the JIT does not generate code.
-     * Instead, the virtual machine performs the actual dispatch operation.
-     **/
-    class Node {
-        friend class ControlFlowGraph;
-    public:
-        enum Kind {
-            Block,      // Basic block
-            Dispatch,   // Exception Dispatch
-            Exit        // Exit
-        };
+    virtual ~Edge() {}
 
-        // Get the unique node ID.  This is unique for all nodes in the containing flow graph.
-        // It is constant for the lifetime of this node.  This provides a sparse id between 0
-        // and the graph's getMaxNodeId().
-        uint32 getId() const { return _id; }
-        
-        // Get the depth first numbering of this node computed during the last pass.
-        // Use this number as a dense id during a short phase.
-        uint32 getDfNum() const { return _dfNumber; }
-        uint32 getPreNum() const { return _preNumber; }
-        uint32 getPostNum() const { return _postNumber; }
 
-        // Get the traversal number of this node.  This is a monotonically increasing value, 
-        // and always less than or equal to the traversal number of the graph itself.  
-        // The traversal number is used mark a node visited during a particular traversal.
-        uint32 getTraversalNum() const { return _traversalNumber; }
-        void setTraversalNum(uint32 num) { _traversalNumber = num; }
+    // Get the unique edge ID.  This is unique for all edges in the containing flow graph.
+    // It is constant for the lifetime of this edge.
+    uint32 getId() const {return id;}
 
-        bool isBlockNode() const { return _kind==Block; }
-        bool isDispatchNode() const { return _kind==Dispatch; }
-        bool isExitNode() const { return _kind==Exit; }
-        Kind getKind() const { return _kind; }
+    virtual Kind getKind() const;
+    bool isDispatchEdge() const {return getKind() == Edge::Kind_Dispatch;}
+    bool isUnconditionalEdge() const {return getKind() == Edge::Kind_Unconditional;}
+    bool isFalseEdge() const {return getKind() == Edge::Kind_False;}
+    bool isTrueEdge() const {return getKind() == Edge::Kind_True;}
+    bool isCatchEdge() const {return getKind() == Edge::Kind_Catch;}
 
-        const EdgeList& getInEdges() const { return _inEdges; }
-        uint32 getInDegree() const { return (uint32) _inEdges.size(); }
-        // For dispatch nodes, edges will be in control flow order (e.g., first handler to match, second, etc.). 
-        const EdgeList& getOutEdges() const { return _outEdges; }
-        uint32 getOutDegree() const { return (uint32) _outEdges.size(); }
-        const EdgeList& getEdges(bool isForward) const { return isForward ? _outEdges : _inEdges; }
+    Node* getSourceNode() const {return source;}
+    Node* getTargetNode() const {return target;}
+    Node* getNode(bool isForward) const {return isForward ? target : source;}
 
-        // Find the edge corresponding to a particular source or target.  Return NULL if
-        // no such edge is found.
-        Edge* findSource(Node* source);
-        Edge* findTarget(Node* target);
 
-        // Return true if this node contains no instructions
-        virtual bool isEmpty() const = 0;
+    //profile info
+    double getEdgeProb() const {return prob;}
+    void setEdgeProb(double val) {prob = val;}
 
-        // Get unique edge that matches this kind.  Return NULL if no such edge exists.
-        Edge* getTrueEdge() { return getOutEdge(Edge::True); }
-        Edge* getFalseEdge() { return getOutEdge(Edge::False); }
-        Edge* getUnconditionalEdge() { return getOutEdge(Edge::Unconditional); }
-        Edge* getExceptionEdge() { return getOutEdge(Edge::Exception); }
+protected:
+    Edge() : id (MAX_UINT32), source(NULL), target(NULL), prob(0) {}
+    
+    void setId(uint32 _id) {id = _id;}
 
-        class Annotator {
-        public:
-	    virtual ~Annotator() {}
-            virtual void annotateNode(::std::ostream& os, Node* node) = 0;
-        };
+    uint32 id;
+    Node *source;
+    Node *target;
+    double prob;
+};
 
-        virtual void print(::std::ostream& os, Annotator* annotator=NULL);
-        virtual void printLabel(::std::ostream& os);
-        virtual void printInsts(::std::ostream& os, uint32 indent=0) = 0;
+class CFGInst : protected Dlink {
+friend class Node;
+friend class Edge;
+friend class ControlFlowGraph;
+public:
+    virtual ~CFGInst(){}
 
-        class ChainedAnnotator : public Annotator {
-        public:
-            ChainedAnnotator(Annotator* a1=NULL, Annotator* a2=NULL, Annotator* a3=NULL) {
-                add(a1);
-                add(a2);
-                add(a3);
-            }
-	    virtual ~ChainedAnnotator() {};
-            virtual void annotateNode(::std::ostream& os, Node* node) {
-                ::std::list<Annotator*>::iterator i;
-                for(i = _annotators.begin(); i != _annotators.end(); ++i) {
-                    (*i)->annotateNode(os, node);
-                    os << "  ";
-                }
-            }
+    Node* getNode() const {return node;}
+    CFGInst* next() const; 
+    CFGInst* prev() const;
 
-            void add(Annotator* annotator) {
-                if(annotator != NULL)
-                    _annotators.push_back(annotator);
-            }
+    // unlinks inst from node
+    void unlink() {node = NULL; Dlink::unlink();}
+    
+    // inserts 'this' before 'inst'. Assign node to 'this' 
+    // if 'this' inst has next inst, it's also inserted
+    void insertBefore(CFGInst* inst);
+    
+    // inserts 'this' after 'inst'. Assign node to 'this' 
+    // if 'this' inst has next inst, it's also inserted
+    void insertAfter(CFGInst* inst);
 
-            void clear() {
-                _annotators.clear();
-            }
-        private:
-            ::std::list<Annotator*> _annotators; 
-        };
+    virtual bool isHeaderCriticalInst() const {return isLabel();}
+    virtual bool isLabel() const {return false;}
 
-    protected:
-        // Constructs a new node.  If isBlock, the new node is a BlockNode, otherwise
-        // it is a dispatch node.
-        Node(MemoryManager& mm, Kind kind=Block) : 
-          _id(UINT32_MAX), _dfNumber(UINT32_MAX), _preNumber(UINT32_MAX), _postNumber(UINT32_MAX), _traversalNumber(0), _kind(kind),
-          _inEdges(mm), _outEdges(mm) {}
+protected:
+    // called from CFG to detect BB->BB block edges
+    virtual Edge::Kind getEdgeKind(const Edge* edge) const = 0;
+    // called from CFG when edge target is replaced
+    virtual void updateControlTransferInst(Node* oldTarget, Node* newTarget) {}
+    // called from CFG when 2 blocks are merging and one of  the branches is redundant.
+    virtual void removeRedundantBranch(){};
 
-        virtual ~Node() {}
-    private:
-        void setId(uint32 num) { _id = num; }
-        void setDFNum(uint32 num) { _dfNumber = num; }
-        void setPreNum(uint32 num) { _preNumber = num; }
-        void setPostNum(uint32 num) { _postNumber = num; }
+protected:
+    CFGInst() : node(NULL) {}
+    Node* node;
+};
 
-        Edge* getOutEdge(Edge::Kind kind);
-
-        uint32 _id;
-        uint32 _dfNumber;
-        uint32 _preNumber;
-        uint32 _postNumber;
-        uint32 _traversalNumber;
-        Kind _kind;
-
-        // Only blocks ending in switch statements have > 2 out edges.
-        // Using a doubly linked list is pretty heavy weight for this.
-        EdgeList _inEdges;
-        EdgeList _outEdges;
+class Node {
+    friend class ControlFlowGraph;
+    friend class ControlFlowGraphFactory;
+    friend class CFGInst;
+public:
+    enum Kind {
+        Kind_Block,      // Basic block
+        Kind_Dispatch,   // Exception Dispatch
+        Kind_Exit        // Exit
     };
 
-    // Get unique entry node.  This node dominates every other node in the graph.
-    Node* getEntry() { return _entry; }
-    void setEntry(Node* node) { _entry = node; }
+    virtual ~Node() {}
+
+    Kind getKind() const {return kind;}
+
+    // Get the unique node ID.  This is unique for all nodes in the containing flow graph.
+    // It is constant for the lifetime of this node.  This provides a sparse id between 0
+    // and the graph's getMaxNodeId().
+    uint32 getId() const {return id;}
+
+    // Get the depth first numbering of this node computed during the last pass.
+    // Use this number as a dense id during a short phase.
+    uint32 getDfNum() const {return dfNumber;}
+    uint32 getPreNum() const {return preNumber;}
+    uint32 getPostNum() const {return postNumber;}
+
     
-    // Get unique exit node.  This node post-dominates every other node in the graph.
-    Node* getReturn() { return _return; }
-    void setReturn(Node* node) { _return = node; }
+    bool isBlockNode() const {return getKind() == Node::Kind_Block;}
+    bool isDispatchNode() const {return getKind() == Node::Kind_Dispatch;}
+    bool isExitNode() const {return getKind() == Node::Kind_Exit;}
+    bool isCatchBlock() const {return getInDegree() >=1 && getInEdges().front()->isCatchEdge();}
 
-    // Get unique exit node.  This node post-dominates every other node in the graph.
-    Node* getUnwind() { return _unwind; }
-    void setUnwind(Node* node) { _unwind = node; }
+    //edges
+    const Edges& getInEdges() const {return inEdges;}
+    const Edges& getOutEdges() const {return outEdges;}
+    const Edges& getEdges(bool isForward) const {return isForward ? outEdges : inEdges;}
+    
+    // Get the first edge that matches this kind.  
+    // Return NULL if no such edge exists,
+    Edge* getOutEdge(Edge::Kind edgeKind) const;
+    Edge* getUnconditionalEdge() const {return getOutEdge(Edge::Kind_Unconditional);}
+    Edge* getFalseEdge() const {return getOutEdge(Edge::Kind_False);}
+    Edge* getTrueEdge() const {return getOutEdge(Edge::Kind_True);}
+    Edge* getExceptionEdge() const {return getOutEdge(Edge::Kind_Dispatch);}
+    bool  isConnectedTo(bool isForward, Node* node) const {return findEdgeTo(isForward, node)!=NULL;}
+    Edge*  findEdgeTo(bool isForward, Node* node) const;
+    
+    // return target of the first edge with specified kind found.
+    // return NULL if no edge found with specified kind
+    Node* getEdgeTarget(Edge::Kind edgeKind) const {Edge* edge = getOutEdge(edgeKind); return edge == NULL ? NULL : edge->getTargetNode();}
+    Node* getUnconditionalEdgeTarget() const {return getEdgeTarget(Edge::Kind_Unconditional);}
+    Node* getFalseEdgeTarget() const  {return getEdgeTarget(Edge::Kind_False);}
+    Node* getTrueEdgeTarget() const  {return getEdgeTarget(Edge::Kind_True);}
+    Node* getExceptionEdgeTarget() const  {return getEdgeTarget(Edge::Kind_Dispatch);}
+    
+    // Find the edge corresponding to a particular source or target.  Return NULL if
+    // no such edge is found.
+    Edge* findEdge(bool isForward, const Node* node) const;
+    Edge* findSourceEdge(const Node* source) const {return findEdge(false, source);}
+    Edge* findTargetEdge(const Node* target) const {return findEdge(true, target);}
+    
+    uint32 getOutDegree() const {return getOutEdges().size();}
+    uint32 getInDegree() const {return getInEdges().size();}
 
-    // Get unique exit node.  This node post-dominates every other node in the graph.
-    Node* getExit() { return _exit; }
-    void setExit(Node* node) { _exit = node; }
+    bool hasOnlyOneSuccEdge() const {return getOutDegree() == 1;}
+    bool hasOnlyOnePredEdge() const {return getInDegree() == 1;}
+    bool hasTwoOrMoreSuccEdges() const {return getOutDegree() >= 2;}
+    bool hasTwoOrMorePredEdges() const {return getInDegree() >= 2;}
 
-    // Return a list of all nodes in the graph.  The order in the list has no semantic
+
+    
+    // insts 
+
+    // appends inst to the end of node list.
+    // if inst is a list of insts (has next insts) -> the whole list is appended
+    void appendInst(CFGInst* newInst, CFGInst* instBefore = NULL);
+
+    // appends inst to the beginning of node list. Checks "block header critical inst" property
+    // if inst is a list of insts (has next insts) -> the whole list is prepended
+    void prependInst(CFGInst* newInst, CFGInst* instAfter = NULL);
+    
+    // counts number of inst in node. Complexity ~ num of insts
+    uint32 getInstCount(bool ignoreLabels = true) const;
+    bool isEmpty(bool ignoreLabels = true) const {CFGInst* inst = getFirstInst(); return inst == NULL || (ignoreLabels && inst->isLabel() && inst->next() == NULL);}
+    CFGInst* getFirstInst() const {return instsHead->getNext() != instsHead ? (CFGInst*)instsHead->getNext() : NULL;}
+    CFGInst* getLastInst() const {return instsHead->getPrev() != instsHead ? (CFGInst*)instsHead->getPrev() : NULL;}
+
+    //profile info
+    double getExecCount() const {return execCount;}
+    void setExecCount(double val) {execCount = val;}
+
+    //mod count
+    uint32 getTraversalNum() const {return traversalNumber;}
+    void setTraversalNum(uint32 num) {traversalNumber = num;}
+
+    CFGInst* getSecondInst() const {return isEmpty() ? NULL : getFirstInst()->next();}
+    CFGInst* getLabelInst() const {CFGInst* first = getFirstInst(); assert(first==NULL || first->isLabel()); return first;}
+
+protected:
+
+    Node(MemoryManager& mm, Kind _kind);
+    
+    void setId(uint32 _id) {id = _id;}
+    void insertInst(CFGInst* prev, CFGInst* newInst);
+
+    uint32 id;
+    uint32 dfNumber;
+    uint32 preNumber;
+    uint32 postNumber;
+    uint32 traversalNumber;
+    Kind   kind;
+
+    Edges inEdges;
+    Edges outEdges;
+    
+    CFGInst* instsHead;
+    double execCount;
+};
+
+class ControlFlowGraphFactory {
+public:
+    ControlFlowGraphFactory(){}
+    virtual ~ControlFlowGraphFactory(){}
+    virtual Node* createNode(MemoryManager& mm, Node::Kind kind);
+    virtual Edge* createEdge(MemoryManager& mm, Node::Kind srcKind, Node::Kind dstKind);
+};
+
+
+class ControlFlowGraph {
+public:
+
+    ControlFlowGraph(MemoryManager& mm, ControlFlowGraphFactory* factory = NULL);
+    virtual ~ControlFlowGraph(){};
+    
+    // Return a collection of all nodes in the graph.  The order in the list has no semantic
     // value.  Note this also returns unreachable nodes.
-    const NodeList& getNodes() const { return _nodes; }
-
-    Node* createBlockNode() { return _createNode(Node::Block); }
-    Node* createDispatchNode() { return _createNode(Node::Dispatch); }
-    Node* createExitNode() { return _createNode(Node::Exit); }
-    Edge* createEdge(Node* source, Node* target) { return _createEdge(source, target); }
+    const Nodes& getNodes() const {return nodes;}
     
+    // Get unique entry node.  This node dominates every other node in the graph.
+    Node* getEntryNode() const {return entryNode;}
+    void setEntryNode(Node* e) {assert(e!=NULL); entryNode = e; lastModifiedTraversalNumber = traversalNumber;}
+    
+    // Get unique exit node.  This node post-dominates every other node in the graph.
+    Node* getExitNode() const {return exitNode;}
+    void setExitNode(Node* e) {assert(e!=NULL); exitNode = e; lastModifiedTraversalNumber = traversalNumber;}
+
+    // Get unique exit block node.  
+    // This node post-dominates every other block node in the graph.
+    Node* getReturnNode() const {return returnNode; }
+    void setReturnNode(Node* node) {assert(returnNode==NULL); assert(node->isBlockNode()); returnNode = node;}
+        
+    // Get unique unwind node.  This node post-dominates every other dispatch node in the graph.
+    Node* getUnwindNode() const {return unwindNode;}
+    void setUnwindNode(Node* node) {assert(unwindNode==NULL); assert(node->isDispatchNode()); unwindNode = node;}
+
+    uint32 getMaxNodeId() const {return nodeIDGenerator;}
+    
+    Node* createNode(Node::Kind kind, CFGInst* inst = NULL);
+
+    Node* createBlockNode(CFGInst* inst = NULL) {return createNode(Node::Kind_Block, inst);}
+    
+    Node* createDispatchNode(CFGInst* inst = NULL) {return createNode(Node::Kind_Dispatch, inst);}
+
+    Node* createExitNode(CFGInst* inst = NULL) {return createNode(Node::Kind_Exit, inst);}
+        
+    //removes node and all it's in/out edges
     void removeNode(Node* node);
-    void removeNode(NodeList::iterator i);
-    void removeEdge(Edge* edge);
-    void removeEdge(Node* source, Node* target);
 
-    // Replace old edge target with new edge target and update the source branch
-    // instruction if necessary.
-    Edge* replaceEdgeTarget(Edge* edge, Node* newTarget);
+    // Return the number of nodes in the graph that are reachable. Recompute if the graph was modified.
+    uint32 getNodeCount() { if(!hasValidOrdering()) orderNodes(); return nodeCount; }
+    
+    // return cached postorder collection
+    const Nodes& getNodesPostOrder() {if (!hasValidOrdering()) orderNodes(); return postOrderCache;}
+    
+    template <class Container>
+        void getNodes(Container& container) {
+            container.insert(container.begin(), nodes.begin(), nodes.end());
+        }
 
-    // Given an STL container (e.g., vector, List, list), append the nodes of this CFG
-    // in Postorder.  Excluding loop back edges, this will be a reverse topological ordering
-    // of the nodes.  To get Reverse Postorder (topological ordering), use a reverse_iterator.
     template <class Container>
     void getNodesPostOrder(Container& container, bool isForward=true) {
-        _lastOrderingTraversalNumber = ++_traversalNumber;
-        _currentPreNumber = _currentPostNumber = 0;
-        getNodesDFS((Container*) NULL, &container, isForward ? _entry : _exit, isForward);
-        assert(_currentPreNumber == _currentPostNumber);
-        _nodeCount = _currentPreNumber;
+        runDFS((Container*) NULL, &container,  isForward);
     }
 
-    // Given an STL container (e.g., vector, List, list), append the nodes of this CFG
-    // in Preorder.  Note this is sometimes called DepthFirst order.
+
     template <class Container>
     void getNodesPreOrder(Container& container, bool isForward=true) {
-        _lastOrderingTraversalNumber = ++_traversalNumber;
-        _currentPreNumber = _currentPostNumber = 0;
-        getNodesDFS(&container, (Container*) NULL, isForward ? _entry : _exit, isForward);
-        assert(_currentPreNumber == _currentPostNumber);
-        _nodeCount = _currentPreNumber;
-    }    
+        runDFS(&container, (Container*) NULL, isForward);
+    }
 
     void orderNodes(bool isForward=true) {
-        _lastOrderingTraversalNumber = ++_traversalNumber;
-        _currentPreNumber = _currentPostNumber = 0;
-        getNodesDFS((NodeList*) NULL, (NodeList*) NULL, _entry, isForward);
-        assert(_currentPreNumber == _currentPostNumber);
-        _nodeCount = _currentPreNumber;
+        runDFS((Nodes*) NULL, (Nodes*) NULL, isForward);
     }
 
-    // Remove all unreachable nodes from CFG,
-    void purgeUnreachableNodes() {
-        purgeUnreachableNodes((NodeList*) NULL);
-    }
+    //edges:
+    //creates new edge from source to target
+    Edge* addEdge(Node* source, Node* target, double edgeProb = 1.0);
+    uint32 getMaxEdgeId() const {return edgeIDGenerator;}
+    void  removeEdge(Edge* edge);
+    void  removeEdge(Node* source, Node* target) {removeEdge(source->findTargetEdge(target));}
+    
+    Edge* replaceEdgeTarget(Edge* edge, Node *newTarget);
 
-    // Remove all unreachable nodes from CFG.  Add removed nodes to container.
-    template <class Container>
-    void purgeUnreachableNodes(Container& container) {
-        purgeUnreachableNodes(&container);
-    }
+    // adds unconditional edge for BB->BB,BB->E or dispatch edge for *->DN nodes
+      
+    //profile info
+    bool hasEdgeProfile() const {return annotatedWithEdgeProfile;}
+    void setEdgeProfile(bool val) {annotatedWithEdgeProfile = val;}
+    //check if edge profile is consistent. 
+    //Checks only reachable nodes. Recalculates postorder cache if needed.
+    bool isEdgeProfileConsistent(bool checkEdgeProbs = true, bool checkExecCounts = true, bool doAssert=false);
+    //count node exec count from probs
+    void smoothEdgeProfile();
 
-    // Remove all critical edges from Graph
-    // Does not split exception edges (edges to Dispatch nodes)
-    // unless parameter is true.
-    void splitCriticalEdges(bool includeExceptionEdges);
 
-    // Remove all empty nodes from CFG.
-    void purgeEmptyNodes(bool preserveCriticalEdges=true);
-
-    // Combine nodes from CFG that can be folded together.
-    void mergeAdjacentNodes();
-        
     // The traversal number is analogous to a monotonically increasing timestamp.
     // It is updated anytime an ordering traversal is performed on the CFG.
     // If a modification was performed after an ordering, the ordering is invalid.
-    uint32 getTraversalNum() const { return _traversalNumber; }
+    uint32 getTraversalNum() const {return traversalNumber;}
+    void setTraversalNum(uint32 newTraversalNum) {traversalNumber = newTraversalNum;}
 
     // The modification traversal number is the traversal number of the
     // last add/remove of a node/edge in the graph.
-    uint32 getModificationTraversalNum() const { return _lastModifiedTraversalNumber; }
+    uint32 getModificationTraversalNum() const { return lastModifiedTraversalNumber; }
 
     // The modification traversal number is the traversal number of the
     // last remove of an edge in the graph.
-    uint32 getEdgeRemovalTraversalNum() const { return _lastEdgeRemovalTraversalNumber; }
+    uint32 getEdgeRemovalTraversalNum() const { return lastEdgeRemovalTraversalNumber; }
 
     // The ordering traversal number is the traversal number after the last depth
     // first ordering.  Node pre/postnumbers are valid if
     // getOrderingTraversalNum() > getModificationTraversalNum().
-    uint32 getOrderingTraversalNum() const { return _lastOrderingTraversalNumber; }
-    
+    uint32 getOrderingTraversalNum() const { return lastOrderingTraversalNumber; }
+
     // Return true if the current ordering is still valid.
     bool hasValidOrdering() const { return getOrderingTraversalNum() > getModificationTraversalNum(); }
 
-    // Return the number of nodes in the graph.  Recompute if the graph was modified.
-    uint32 getNodeCount() { if(!hasValidOrdering()) orderNodes(); return _nodeCount; }
+    //Memory manager used by graph
+    MemoryManager& getMemoryManager() const {return mm;}
 
-    void setTraversalNum(uint32 traversalNumber) { _traversalNumber=traversalNumber; }
-    uint32  getMaxNodeId() const { return (uint32) _nodeIDGenerator; }
-    uint32  getMaxEdgeId() const { return (uint32) _edgeIDGenerator; }
-    virtual void print(::std::ostream& os, Node::Annotator* annotator=NULL);
+    Node* splitReturnNode(CFGInst* headerInst=NULL) {return splitNode(getReturnNode(), false, headerInst);}
 
+    // this utility splits a node at a particular instruction, leaving the instruction in the
+    // same node and moving all insts (before inst : splitAfter=false/after inst : splitAfter=true 
+    // to the newly created note
+    // returns the new node created
+    Node* splitNodeAtInstruction(CFGInst *inst, bool splitAfter, bool keepDispatch, CFGInst* headerInst);
+
+    Node* spliceBlockOnEdge(Edge* edge, CFGInst* inst = NULL);
+
+    // Inline inlineFG info this CFG after 'instAfter' (splits inst's node if needed)
+    // move all nodes from inlinedFG except exit node to 'this' FG
+    // relies on valid 'return' and 'unwind' nodes on inlinedFG
+    void spliceFlowGraphInline(CFGInst* instAfter, ControlFlowGraph& inlineFG, bool keepDispatch=true);
+    
+    // Inline inlineFG info this CFG moving egde head to inlinedFG prolog
+    // move all nodes from inlinedFG except exit node to 'this' FG
+    // relies on valid 'return' and 'unwind' nodes on inlinedFG
+    void spliceFlowGraphInline(Edge* edge, ControlFlowGraph& inlineFG);
+
+    // Remove all critical edges from Graph
+    // Does not split exception edges (edges to Dispatch nodes)
+    // unless parameter is true.
+    void splitCriticalEdges(bool includeExceptionEdges, Nodes* newNodes = NULL);
+
+    
+    void moveInstructions(Node* fromNode, Node* toNode, bool prepend);
+
+    
+    // Combine nodes from CFG that can be folded together.
+    void mergeAdjacentNodes(bool skipEntry = false, bool mergeByDispatch= false);
+
+    void mergeBlocks(Node* source, Node* target, bool keepFirst=true);
+
+    // Remove all empty nodes from CFG.
+    void purgeEmptyNodes(bool preserveCriticalEdges = false, bool removeEmptyCatchBlocks = false);
+
+    // Remove all unreachable nodes from CFG,
+    void purgeUnreachableNodes() { purgeUnreachableNodes((Nodes*) NULL); }
+
+    // Remove all unreachable nodes from CFG.  Add removed nodes to container.
+    template <class Container> 
+        void purgeUnreachableNodes(Container& container) { purgeUnreachableNodes(&container);}
+
+
+    DominatorTree* getDominatorTree() const {return domTree;}
+    DominatorTree* getPostDominatorTree() const {return postDomTree;}
+    LoopTree* getLoopTree() const {return loopTree;}
+
+    void setDominatorTree(DominatorTree* dom) {domTree = dom;}
+    void setPostDominatorTree(DominatorTree* dom) {domTree = dom;}
+    void setLoopTree(LoopTree* lt) {loopTree= lt;}
+    
 protected:
-	virtual ~ControlFlowGraph() {};
-    // Link the node into the CFG.  The CFG now owns the node.
     void addNode(Node* node);
-    void addNode(NodeList::iterator pos, Node* node);
+    void addEdge(Node* source, Node* target, Edge* edge, double edgeProb);
+    void removeNode(Nodes::iterator i, bool erase);
 
-    // Link the edge into the CFG.
-    void addEdge(Node* source, Node* target, Edge* edge);
-    void setNewEdgeId(Edge* edge) { edge->setId(_edgeIDGenerator++); }
-
-    // Callbacks implemented by subclasses.
-    virtual Node* _createNode(Node::Kind kind) = 0;
-    virtual Edge* _createEdge(Node* source, Node* target) = 0;
-    virtual void _updateBranchInstruction(Node* source, Node* oldTarget, Node* newTarget) = 0;
-    virtual void _removeBranchInstruction(Node* source) = 0;
-    virtual void _moveInstructions(Node* fromNode, Node* toNode, bool prepend) = 0;
-
-    // Helper methods for subclasses.  Subclasses will need to manage
-    // instructions.
-    void mergeNodes(Node* source, Node* target, bool keepFirst=true);
-    Node* splitNode(Node* node, bool newBlockAtEnd=true);
-    Node* splitEdge(Edge* edge);
-
-private:
-    // Helper for getNodesPre/PostOrder above.
-    template <class Container>
-    void getNodesDFS(Container* preOrderContainer, Container* postOrderContainer, Node* node, bool isForward=true) {
-        uint32 marked = _traversalNumber;
-        node->setTraversalNum(marked);
-        if(isForward)
-            node->setDFNum(_currentPreNumber);
-        node->setPreNum(_currentPreNumber++);
-        if(preOrderContainer != NULL)
-            preOrderContainer->push_back(node);
-        EdgeList::const_iterator
-            i = node->getEdges(isForward).begin(),
-            iend = node->getEdges(isForward).end();
-        for(; i != iend; i++) {
-            Node* succ = (*i)->getNode(isForward);
-            if(succ->getTraversalNum() < marked) {
-                getNodesDFS(preOrderContainer, postOrderContainer, succ, isForward);
-            }
-        }
-        node->setPostNum(_currentPostNumber++);
-        if(postOrderContainer != NULL)
-            postOrderContainer->push_back(node);
-    }
-
-    // Remove all nodes unreachable from entry.
-    template <class Container>
-    void purgeUnreachableNodes(Container* container) {
-        if(!hasValidOrdering())
-            orderNodes();
-
-        NodeList::iterator
-            iter = _nodes.begin(),
-            end = _nodes.end();
-        for(; iter != end;) {
-            NodeList::iterator current = iter;
-            Node* node = *iter;
-            ++iter;
-            if(node->_traversalNumber < _traversalNumber) {
-                removeNode(current);
-                if(container != NULL)
-                    container->push_back(node);
-                assert(node != _entry);
-                if (node == _exit) _exit = NULL;
-                if (node == _return) _return = NULL;
-                if (node == _unwind) _unwind = NULL;
-            }
-        }
-    }
+    void setNewEdgeId(Edge* edge) { edge->setId(edgeIDGenerator++); }
 
     void moveInEdges(Node* oldNode, Node* newNode);
     void moveOutEdges(Node* oldNode, Node* newNode);
@@ -426,26 +434,111 @@ private:
     void resetInEdges(Node* node);
     void resetOutEdges(Node* node);
 
-    Node* _entry;
-    Node* _exit;
-    Node* _return;
-    Node* _unwind;
+    //low-level helper methods
+    // WARN: this method does not keep dispatch on original block if newBlockAtEnd=true!
+    // WARN: does not move instructions
+    Node* splitNode(Node* node, bool newBlockAtEnd, CFGInst* inst);
+    Node* splitEdge(Edge* edge, CFGInst* inst);
+    bool ControlFlowGraph::isBlockMergeAllowed(Node* source, Node* target, bool allowMergeDispatch) const;
 
-    NodeList _nodes;
+    // Helper for getNodesPre/PostOrder above.
+    template <class Container>
+    void runDFS(Container* preOrderContainer, Container* postOrderContainer, bool isForward) {
+        Node* startNode;
+        if (isForward) {
+            lastOrderingTraversalNumber = ++traversalNumber;
+            postOrderCache.clear();
+            startNode = entryNode;
+        } else {
+            assert(exitNode!=NULL);
+            startNode = exitNode;
+        }
+        currentPreNumber = currentPostNumber = 0;
+        getNodesDFS(preOrderContainer, postOrderContainer, startNode, isForward);
+        assert(currentPreNumber == currentPostNumber);
+        if (isForward) {
+            nodeCount = currentPreNumber;
+        }
+    }
+    // Helper for getNodesPre/PostOrder above.
+    template <class Container>
+    void getNodesDFS(Container* preOrderContainer, Container* postOrderContainer, Node* node, bool isForward=true) {
+        uint32 marked = traversalNumber;
+        node->setTraversalNum(marked);
+        if(isForward) {
+            node->dfNumber = currentPreNumber;
+        }
+        node->preNumber = currentPreNumber++;
+        if(preOrderContainer != NULL) {
+            preOrderContainer->push_back(node);
+        }
+        Edges::const_iterator i = node->getEdges(isForward).begin(), iend = node->getEdges(isForward).end();
+        for(; i != iend; i++) {
+            Edge* edge = *i;
+            Node* succ = edge->getNode(isForward);
+            if(succ->getTraversalNum() < marked) {
+                getNodesDFS(preOrderContainer, postOrderContainer, succ, isForward);
+            }
+        }
+        node->postNumber = currentPostNumber++;
+        if (postOrderContainer != NULL) {
+            postOrderContainer->push_back(node);
+        }
+        if (isForward) {
+            postOrderCache.push_back(node);
+        }
+    }
 
-    uint32 _nodeIDGenerator;
-    uint32 _edgeIDGenerator;
-    uint32 _nodeCount;
-    uint32 _traversalNumber;
-    uint32 _lastModifiedTraversalNumber;
-    uint32 _lastOrderingTraversalNumber;
-    uint32 _lastEdgeRemovalTraversalNumber;
-    uint32 _currentPreNumber;
-    uint32 _currentPostNumber;
+    // Remove all nodes unreachable from entry.
+    template <class Container>
+        void purgeUnreachableNodes(Container* container) {
+            if(!hasValidOrdering()) {
+                orderNodes();
+            }
+
+            Nodes::iterator iter = nodes.begin(), end = nodes.end();
+            for(; iter != end;) {
+                Nodes::iterator current = iter;
+                Node* node = *iter;
+                ++iter;
+                if(node->traversalNumber < traversalNumber) {
+                    removeNode(current, false);
+                    if(container != NULL) {
+                        container->push_back(node);
+                    }
+                }
+            }
+            nodes.erase(std::remove(nodes.begin(), nodes.end(), (Node*)NULL), nodes.end());
+        }
+
+    MemoryManager& mm;
+    ControlFlowGraphFactory* factory;
+    Node* entryNode;
+    Node* returnNode;
+    Node* exitNode;
+    Node* unwindNode;
+    
+    Nodes nodes;
+    Nodes postOrderCache;
+
+    uint32 nodeIDGenerator;
+    uint32 edgeIDGenerator;
+    uint32 nodeCount;
+    uint32 traversalNumber;
+    uint32 lastModifiedTraversalNumber;
+    uint32 lastOrderingTraversalNumber;
+    uint32 lastEdgeRemovalTraversalNumber;
+    uint32 lastProfileUpdateTraversalNumber;
+    uint32 currentPreNumber;
+    uint32 currentPostNumber;
+
+    bool annotatedWithEdgeProfile;
+
+    DominatorTree* domTree;
+    DominatorTree* postDomTree;
+    LoopTree* loopTree;
 };
 
-typedef ControlFlowGraph::Node ControlFlowNode;
-typedef ControlFlowGraph::Edge ControlFlowEdge;
 
 } //namespace Jitrino 
 

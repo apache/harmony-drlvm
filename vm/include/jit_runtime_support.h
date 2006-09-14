@@ -190,7 +190,7 @@ enum VM_RT_SUPPORT {
     // Acquire the monitor associated with the object.
     // Throw java/lang/NullPointerException if the argument is null.
 
-    VM_RT_MONITOR_ENTER_NO_EXC=304,
+    VM_RT_MONITOR_ENTER_NON_NULL=304,
     // Arguments:
     //  - Object
     // Return value: none.
@@ -356,6 +356,29 @@ enum VM_RT_SUPPORT {
     //
     // This call-back should be used to notify about method exit event.
     // Do a call-back when such capability is requested only.
+
+    VM_RT_JVMTI_FIELD_ACCESS_CALLBACK = 702,
+    // Arguments:
+    //  - handle of the field under access
+    //  - handle of the method, which accesses field
+    //  - location of code which accesses field
+    //  - pointer to the reference of the object, which field is beeng
+    //    accessed or NULL for static field
+    // Return value: none
+    //
+    // Notifies about field access.
+
+    VM_RT_JVMTI_FIELD_MODIFICATION_CALLBACK = 703,
+    // Arguments:
+    // - handle of the field under modification
+    // - handle of the method, which modifies field
+    // - location of code which modifies field
+    // - pointer to the reference of the object, which field is beeng
+    //   modified or NULL for static field
+    // - pointer to the new value for the field
+    // Return value: none
+    //
+    // Notifies about field modification.
 
     //////////////////////////////////////////////////////////////////////////
     // Runtime resolution routine

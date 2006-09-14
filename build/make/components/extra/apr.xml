@@ -88,7 +88,10 @@ Version: $Revision: 1.4.2.5 $
 
         	<!-- simply invoke make to let it build as the APR people suggest  -->
             <!-- we'll need to tune this wrt flags and such                    -->
-        	
+        	<select arch="em64t">
+                <replaceregexp file="${src}/build/apr_rules.mk" match="CFLAGS=" replace="CFLAGS=-fpic " />
+            </select>
+            
         	<exec executable="make" dir="${src}"/>
         	        		
         	<!-- the rest of the build expect the lib to be in _bin  -->

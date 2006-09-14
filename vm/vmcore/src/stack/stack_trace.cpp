@@ -27,44 +27,6 @@
 
 #include "method_lookup.h"
 
-Method_Handle get_method(StackIterator* si)
-{
-    ASSERT_NO_INTERPRETER
-    CodeChunkInfo* cci = si_get_code_chunk_info(si);
-    if (cci)
-        return cci->get_method();
-    else
-        return m2n_get_method(si_get_m2n(si));
-}
-
-uint32 si_get_inline_depth(StackIterator* si)
-{
-    //
-    // Here we assume that JIT data blocks can store only InlineInfo
-    // A better idea is to extend JIT_Data_Block with some type information
-    // Example:
-    //
-    // enum JIT_Data_Block_Type { InlineInfo, Empty }
-    //
-    // struct JIT_Data_Block {
-    //     JIT_Data_Block *next;
-    //     JIT_Data_Block_Type type;
-    //     char bytes[1];
-    // };
-    //
-    // void *Method::allocate_JIT_data_block(size_t size, JIT *jit, JIT_Data_Block_Type)
-    //
-
-    ASSERT_NO_INTERPRETER
-    CodeChunkInfo* cci = si_get_code_chunk_info(si);
-    if ( cci != NULL && cci->has_inline_info()) {
-        return cci->get_jit()->get_inline_depth(
-                cci->get_inline_info(), 
-                (POINTER_SIZE_INT)si_get_ip(si) - (POINTER_SIZE_INT)cci->get_code_block_addr());
-    }
-    return 0;
-}
-
 void get_file_and_line(Method_Handle mh, void *ip, const char **file, int *line) {
     Method *method = (Method*)mh;
     *file = class_get_source_file_name(method_get_class(method));
@@ -104,13 +66,13 @@ void get_file_and_line(Method_Handle mh, void *ip, const char **file, int *line)
 #endif        
 }
 
-unsigned st_get_depth()
+unsigned st_get_depth(VM_thread *p_vmthread)
 {
     ASSERT_NO_INTERPRETER
-    StackIterator* si = si_create_from_native();
+    StackIterator* si = si_create_from_native(p_vmthread);
     unsigned depth = 0;
     while (!si_is_past_end(si)) {
-        if (get_method(si)) {
+        if (si_get_method(si)) {
             depth += 1 + si_get_inline_depth(si);
         }
         si_goto_previous(si);
@@ -128,7 +90,7 @@ bool st_get_frame(unsigned target_depth, StackTraceFrame* stf)
     StackIterator* si = si_create_from_native();
     unsigned depth = 0;
     while (!si_is_past_end(si)) {
-        stf->method = get_method(si);
+        stf->method = si_get_method(si);
         if (stf->method) {
             uint32 inlined_depth = si_get_inline_depth(si);
             if ( (target_depth >= depth) && 
@@ -167,25 +129,25 @@ static inline void *get_this(JIT *jit, Method *method, StackIterator *si) {
     return NULL;
 }
 
-void st_get_trace(unsigned* res_depth, StackTraceFrame** stfs)
+void st_get_trace(VM_thread *p_vmthread, unsigned* res_depth, StackTraceFrame** stfs)
 {
     tmn_suspend_disable();
     if (interpreter_enabled()) {
-        interpreter.interpreter_st_get_trace(res_depth, stfs);
+        interpreter.interpreter_st_get_trace(p_vmthread, res_depth, stfs);
         tmn_suspend_enable();
         return;
     }
 
-    unsigned depth = st_get_depth();
+    unsigned depth = st_get_depth(p_vmthread);
     StackTraceFrame* stf = st_alloc_frames(depth);
     assert(stf);
     *res_depth = depth;
     *stfs = stf;
-    StackIterator* si = si_create_from_native();
+    StackIterator* si = si_create_from_native(p_vmthread);
 
     depth = 0;
     while (!si_is_past_end(si)) {
-        Method_Handle method = get_method(si);
+        Method_Handle method = si_get_method(si);
 
         if (method) {
             NativeCodePtr ip = si_get_ip(si);
@@ -248,7 +210,7 @@ void st_print(FILE* f)
     unsigned depth = 0;
     while (!si_is_past_end(si)) {
         fprintf(f, "  [%p] %p(%c): ", p_TLS_vmthread, si_get_ip(si), (si_is_native(si) ? 'n' : 'm'));
-        Method_Handle m = get_method(si);
+        Method_Handle m = si_get_method(si);
 
         if (m) {
             CodeChunkInfo* cci = si_get_code_chunk_info(si);

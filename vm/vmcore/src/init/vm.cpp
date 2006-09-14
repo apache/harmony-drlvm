@@ -182,7 +182,7 @@ void DestroyVM() {
     ClassLoader::PrintUnloadingStats();
 
 #ifdef VM_STATS
-    vm_stats_total.print();
+    VM_Statistics::get_vm_stats().print();
 #endif //VM_STATS
 
     // Unloads all system native libraries
@@ -251,6 +251,8 @@ static struct VmStandardProperty {
                 true, FALSE},
     {"vm.use_verifier",             "Use verifier.",
                 true, TRUE},
+    {"vm.jvmti.enabled",            "Whether JVMTI mode is enabled.",
+                true, FALSE},
     {"vm.cleanupOnExit",             "Excplicitly free VM resources before exit.",
                 true, FALSE},
     {"vm.bootclasspath.appendclasspath", "Append classpath to the bootclasspath",

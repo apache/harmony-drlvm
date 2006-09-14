@@ -28,11 +28,14 @@
 #define LOG_DOMAIN "tm.suspend"
 
 #include <open/hythread_ext.h>
+#include <open/thread_externals.h>
 #include "thread_private.h"
-#include "apr_thread_ext.h"
-
-
+#include <apr_atomic.h>
+#include <port_atomic.h>
 static void thread_safe_point_impl(hythread_t thread);
+
+int16 atomic16_inc(int16 *value);
+int16 atomic16_dec(int16 *value);
 
 /** @name Safe suspension support
  */
@@ -78,12 +81,13 @@ suspended:
 #else 
     thread=tm_self_tls;
     thread->suspend_disable_count--;
+
 #endif
-    if(!thread->suspend_request  || thread->suspend_disable_count!=0) {
-        return;
-    }
+ //   if(!thread->suspend_request  || thread->suspend_disable_count!=0) {
+   //     return;
+   // }
         
-    hylatch_count_down(thread->safe_region_event);
+   // hylatch_count_down(thread->safe_region_event);
 }
 
 /**
@@ -159,7 +163,7 @@ static void thread_safe_point_impl(hythread_t thread) {
                         apr_memory_rw_barrier();
                         // code for Ipf that support StackIterator and immmediate suspend
                         // notify suspender
-                    hylatch_count_down(thread->safe_region_event);
+                  //  hylatch_count_down(thread->safe_region_event);
 
                 // wait for resume event
             hysem_wait(thread->resume_event);
@@ -177,41 +181,45 @@ static void thread_safe_point_impl(hythread_t thread) {
 // the function do not suspend self.
 static void send_suspend_request(hythread_t thread) {
 
-                assert(thread->suspend_request >=0);
-                // already suspended?
-        if(thread->suspend_request > 0) {
-                        thread->suspend_request++;
-                        return;
-                }               
+    assert(thread->suspend_request >=0);
+    // already suspended?
+    if(thread->suspend_request > 0) {
+        atomic16_inc((int16 *)&(thread->suspend_request));
+         return;
+    }               
                 
-                //we realy need to suspend thread.
+     //we realy need to suspend thread.
 
-                hysem_set(thread->resume_event, 0);
+     hysem_set(thread->resume_event, 0);
                 
-                thread->suspend_request++;
-                apr_memory_rw_barrier();
-            apr_thread_yield_other(thread->os_handle);
+     atomic16_inc((int16 *)&(thread->suspend_request));
 
-        TRACE(("TM: suspend requiest sent: %p request count: %d",thread , thread->suspend_request));
+     apr_thread_yield_other(thread->os_handle);
+
+     TRACE(("TM: suspend requiest sent: %p request count: %d",thread , thread->suspend_request));
 }
 
 
 // the second part of suspention
 // blocked in case was selfsuspended.
-static void wait_safe_region_event(hythread_t thread) {
-                assert(thread->suspend_request >= 1);
-        if(thread->suspend_request > 1 || thread == tm_self_tls) {
-            TRACE(("TM: suspend wait self exit thread: %p request count: %d",thread , thread->suspend_request));
-                        return;
-                }               
- 
+static IDATA wait_safe_region_event(hythread_t thread) {
+    assert(thread->suspend_request >= 1);
+    if(thread->suspend_request > 1 || thread == tm_self_tls) {
+        TRACE(("TM: suspend wait self exit thread: %p request count: %d",thread , thread->suspend_request));
+        return TM_ERROR_NONE;
+    }               
                 // we need to wait for notification only in case the thread is in the unsafe/disable region
-                while (thread->suspend_disable_count) {
-                        // wait for the notification
-                        hylatch_wait_timed(thread->safe_region_event, 50, 0);
-                }
-        TRACE(("TM: suspend wait exit safe region thread: %p request count: %d",thread , thread->suspend_request));
-                thread->state |= TM_THREAD_STATE_SUSPENDED;
+    while (thread->suspend_disable_count) {
+        // HIT cyclic suspend
+        /*if(tm_self_tls->suspend_request > 1) {
+             return TM_ERROR_EBUSY; 
+        }*/
+        // wait for the notification
+        return TM_ERROR_EBUSY;//hythread_yield();
+    }
+    TRACE(("TM: suspend wait exit safe region thread: %p request count: %d",thread , thread->suspend_request));
+    thread->state |= TM_THREAD_STATE_SUSPENDED;
+    return TM_ERROR_NONE; 
 }
 
 /**
@@ -224,11 +232,11 @@ static void wait_safe_region_event(hythread_t thread) {
  * @see hythread_resume
  */
 void VMCALL hythread_suspend() {
-    hythread_t self = tm_self_tls;
-    hythread_global_lock();
-        self->suspend_request++;
-        hythread_global_unlock();
-        hythread_safe_point();
+    hythread_t thread = tm_self_tls;
+
+    atomic16_inc((int16 *)&(thread->suspend_request));
+
+    hythread_safe_point();
 }
 
 
@@ -256,31 +264,27 @@ void VMCALL hythread_suspend() {
  * point where safe suspension is possible.
  *
  * @param[in] thread thread to be suspended
+ * @return TM_ERROR_EBUSY if deadlock, TM_ERROR_NONE if OK  
  */
-void VMCALL hythread_suspend_other(hythread_t thread) {
+IDATA VMCALL hythread_suspend_other(hythread_t thread) {
     hythread_t self;
-    hythread_global_lock();
     self = tm_self_tls;
-    
     TRACE(("TM: suspend one enter thread: %p request count: %d",thread , thread->suspend_request));
     if(self == thread) {
-        hythread_global_unlock();
         hythread_suspend();
-        return; 
+        return TM_ERROR_NONE; 
     }
-    // try to prevent cyclic suspend dead-lock
-    //while(self->suspend_request > 0) {
-    //    hythread_global_unlock();
-    //    thread_safe_point_impl(self);
-    //    hythread_global_lock();
-    //}
-
         send_suspend_request(thread);
-        wait_safe_region_event(thread);
-    hythread_global_unlock();
+        while(wait_safe_region_event(thread)!=TM_ERROR_NONE) {
+            if(self->suspend_request>0)
+            {
+                hythread_resume(thread);
+                return TM_ERROR_EBUSY;
+            }
+        }
     TRACE(("TM: suspend one exit thread: %p request count: %d",thread , thread->suspend_request));
         
-    return;
+    return TM_ERROR_NONE;
 }
 
 /**
@@ -296,12 +300,12 @@ void VMCALL hythread_suspend_other(hythread_t thread) {
  * @see hythread_create, hythread_suspend
  */
 void VMCALL hythread_resume(hythread_t thread) {
-     hythread_global_lock();
         TRACE(("TM: start resuming: %p request count: %d",thread , thread->suspend_request));
     // If there was request for suspension, decrease the request counter
+ //       printf("resume other now lock %d  %d  %d  %d\n",tm_self_tls->thread_id,tm_self_tls->suspend_disable_count,thread->thread_id,thread->suspend_disable_count);
     if(thread->suspend_request > 0) {
-        thread->suspend_request--;
-        // If no more requests left, thread needs to be resumed
+
+        atomic16_dec((int16 *)&(thread->suspend_request));
         if(thread->suspend_request == 0) {  
             // Notify the thread that it may wake up now
             hysem_post(thread->resume_event);            
@@ -309,7 +313,7 @@ void VMCALL hythread_resume(hythread_t thread) {
             thread->state &= ~TM_THREAD_STATE_SUSPENDED;
         }
     }
-    hythread_global_unlock();
+   // printf("resume other now lock-compl %d  %d  %d  %d\n",tm_self_tls->thread_id,tm_self_tls->suspend_disable_count,thread->thread_id,thread->suspend_disable_count);
 }
 
 /**
@@ -351,15 +355,15 @@ IDATA VMCALL hythread_suspend_all(hythread_iterator_t *t, hythread_group_t group
     hythread_t self = tm_self_tls;
     hythread_t next;
     hythread_iterator_t iter;
-    
     TRACE(("TM: suspend all"));
+    
     self = tm_self_tls;
     // try to prevent cyclic suspend dead-lock
     while(self->suspend_request > 0) {
         thread_safe_point_impl(self);
     }
-        
-        iter = hythread_iterator_create(group);
+
+    iter = hythread_iterator_create(group);
         // send suspend requests to all threads
     TRACE(("TM: send suspend requests"));
         while((next = hythread_iterator_next(&iter)) != NULL) {
@@ -367,21 +371,26 @@ IDATA VMCALL hythread_suspend_all(hythread_iterator_t *t, hythread_group_t group
                         send_suspend_request(next);
                 }       
         }
-        
         hythread_iterator_reset(&iter);
         // all threads should be stoped in safepoints or be in safe region.
-    TRACE(("TM: wait suspend responses"));
+        TRACE(("TM: wait suspend responses"));
         while((next = hythread_iterator_next(&iter)) != NULL) {
                 if(next != self) {
-                        wait_safe_region_event(next);
+                        while (wait_safe_region_event(next)!=TM_ERROR_NONE)
+                        {
+                            thread_safe_point_impl(tm_self_tls);
+                            hythread_yield();
+                        }
                 }       
         }
         
         hythread_iterator_reset(&iter);
         hythread_iterator_release(&iter);
-        if(t) {
+        if(t) 
+        {
                 *t=iter;
         }
+       
     return TM_ERROR_NONE;
 }
 
@@ -395,16 +404,17 @@ IDATA VMCALL hythread_suspend_all(hythread_iterator_t *t, hythread_group_t group
 IDATA VMCALL hythread_resume_all(hythread_group_t  group) {
     hythread_t self = tm_self_tls;
     hythread_t next;
-        hythread_iterator_t iter = hythread_iterator_create(group);
+    hythread_iterator_t iter;
+    iter = hythread_iterator_create(group);
     TRACE(("TM: resume all"));
         // send suspend requests to all threads
-        while((next = hythread_iterator_next(&iter)) != NULL) {
-                if(next != self) {
-                        hythread_resume(next);
-                }       
-        }
+    while((next = hythread_iterator_next(&iter)) != NULL) {
+          if(next != self) {
+                hythread_resume(next);
+          }       
+    }
         
-        hythread_iterator_release(&iter);       
+    hythread_iterator_release(&iter); 
     return TM_ERROR_NONE;
 }
 
@@ -416,19 +426,38 @@ int reset_suspend_disable() {
         int dis = self->suspend_disable_count;
         self->suspend_disable_count = 0;
         if(self->suspend_request >0) {   
-        // notify suspender
-        hylatch_count_down(self->safe_region_event);
-    }
+            // notify suspender
+            hylatch_count_down(self->safe_region_event);
+        }
         return dis;
 }
 
 void set_suspend_disable(int count) {
-        hythread_t self = tm_self_tls;
-        assert(count>=0);
+    hythread_t self = tm_self_tls;
+    assert(count>=0);
     self->suspend_disable_count = count;
-        if(count) {
-                thread_safe_point_impl(self);
-        }
+    if(count) {
+           thread_safe_point_impl(self);
+    }
+}
+int16 atomic16_inc(int16 *value)
+{
+    int16 old_value=*value;
+    while(port_atomic_cas16((volatile apr_uint16_t*)value,(apr_uint16_t)(old_value+1),(apr_uint16_t)old_value)!=old_value)
+    {
+        old_value=*value;
+    }
+
+    return old_value+1;
+}
+int16 atomic16_dec(int16 *value)
+{
+    int16 old_value=*value;
+    while(port_atomic_cas16((volatile apr_uint16_t*)value,(apr_uint16_t)(old_value-1),(apr_uint16_t)old_value)!=old_value)
+    {
+        old_value=*value;
+    }
+    return old_value-1;
 }
 
 

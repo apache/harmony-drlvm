@@ -48,23 +48,13 @@ final class VMReflection {
 
     /**
      * This method satisfies the requirements of the specification for the
-     * {@link Member#getDeclaringClass() Member.getDeclaringClass()} method. But
-     * it takes one additional id parameter.
-     * 
-     * @param id an identifier of the caller class.
-     * @api2vm
-     */
-    static native Class getDeclaringClass(Object id);
-
-    /**
-     * This method satisfies the requirements of the specification for the
      * {@link Method#getExceptionTypes() Method.getExceptionTypes()} method. But
      * it takes one additional id parameter.
      * 
      * @param id an identifier of the caller class.
      * @api2vm
      */
-    static native Class[] getExceptionTypes(Object id);
+    static native Class<?>[] getExceptionTypes(long id);
 
     /**
      * This method satisfies the requirements of the specification for the
@@ -74,29 +64,7 @@ final class VMReflection {
      * @param id an identifier of the caller class.
      * @api2vm
      */
-    static native Class getFieldType(Object id);
-
-    /**
-     * Obtaines a value of the field with specified identifier. If the
-     * <code>id</code> argument corresponds to a static field then the
-     * <code>object</code> argument must be null. The value of a static field
-     * will be returned in this case. If the <code>id</code> argument
-     * corresponds to non-static field then object's field value will be
-     * returned.
-     * <p>
-     * This method is used for the {@link Field#get(Object) Field.get(Object obj)}
-     * method implementation.
-     * <p>
-     * <b>Note:</b> Under design yet. Subjected to change.
-     * 
-     * @param object the object to get a field value from.
-     * @param id an identifier of the caller class.
-     * @return a value of the object. The values of primitive type are wrapped
-     *         by corresponding object from the <code>java.lang</code> package.
-     * @throws ExceptionInInitializerError if initialization fails.
-     * @api2vm
-     */
-    static native Object getFieldValue(Object object, Object id);
+    static native Class<?> getFieldType(long id);
 
     /**
      * This method satisfies the requirements of the specification for the
@@ -106,27 +74,7 @@ final class VMReflection {
      * @param id an identifier of the caller class.
      * @api2vm
      */
-    static native Class getMethodReturnType(Object id);
-
-    /**
-     * This method satisfies the requirements of the specification for the
-     * {@link Member#getModifiers() Member.getModifiers()} method. But it takes
-     * one additional id parameter.
-     * 
-     * @param id an identifier of the caller class.
-     * @api2vm
-     */
-    static native int getModifiers(Object id);
-
-    /**
-     * This method satisfies the requirements of the specification for the
-     * {@link Member#getName() Member.getName()} method. But it takes one
-     * additional id parameter.
-     * 
-     * @param id an identifier of the caller class.
-     * @api2vm
-     */
-    static native String getName(Object id);
+    static native Class<?> getMethodReturnType(long id);
 
     /**
      * This method satisfies the requirements of the specification for the
@@ -136,7 +84,7 @@ final class VMReflection {
      * @param id an identifier of the caller class.
      * @api2vm
      */
-    static native Class[] getParameterTypes(Object id);
+    static native Class<?>[] getParameterTypes(long id);
 
     /**
      * This method satisfies the requirements of the specification for the
@@ -164,7 +112,7 @@ final class VMReflection {
      * @param id the identifier of the method to be invoked.
      * @api2vm
      */
-    static native Object invokeMethod(Object object, Object id, Object[] args)
+    static native Object invokeMethod(long id, Object object, Object... args)
         throws InvocationTargetException;
 
     /**
@@ -181,7 +129,7 @@ final class VMReflection {
      * <b>Note:</b> Under design yet. Subjected to change.
      * @api2vm
      */
-    static native Object newArrayInstance(Class type, int[] dimensions);
+    static native Object newArrayInstance(Class<?> type, int[] dimensions);
 
     /**
      * This method satisfies the requirements of the specification for the
@@ -203,28 +151,7 @@ final class VMReflection {
      * @param id the identifier of the method to be invoked.
      * @api2vm
      */
-    static native Object newClassInstance(Object id, Object[] args)
+    static native Object newClassInstance(long id, Object... args)
         throws InvocationTargetException;
 
-    /**
-     * Sets a value for the field with specified identifier. If the
-     * <code>id</code> argument corresponds to a static field then the
-     * <code>object</code> argument must be null. An attempt to set a new value
-     * to a static field will be made in this case. If the <code>id</code>
-     * argument corresponds to a non-static field then an attempt to assign new 
-     * value to object's field will be made.
-     * <p>
-     * This method is used for the {@link Field#set(Object, Object)
-     * Field.set(Object obj, Object value)} method implementation.
-     * <p>
-     * <b>Note:</b> Under design yet. Subjected to change.
-     * 
-     * @param object the object to set a field value in.
-     * @param id an identifier of the caller class.
-     * @param value a new field value. If the field has primitive type then the
-     *        value argument should be unwrapped.
-     * @throws ExceptionInInitializerError if initialization fails.
-     * @api2vm
-     */
-    static native void setFieldValue(Object object, Object id, Object value);
 }

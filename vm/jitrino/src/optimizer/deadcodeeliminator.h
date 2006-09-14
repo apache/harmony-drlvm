@@ -31,15 +31,9 @@ namespace Jitrino {
 class IRManager;
 class Inst;
 class Opnd;
-class FlowGraph;
-class CFGNode;
+class ControlFlowGraph;
+class Node;
 class BitSet;
-
-DEFINE_OPTPASS(DeadCodeEliminationPass)
-
-DEFINE_OPTPASS(UnreachableCodeEliminationPass)
-
-DEFINE_OPTPASS(PurgeEmptyNodesPass)
 
 class DeadCodeEliminator {
 public:
@@ -49,14 +43,14 @@ public:
     static Opnd* copyPropagate(Opnd*);
     bool eliminateUnreachableCode(); // returns true if any node is eliminated
 private:
-    void sweepInst(CFGNode* node, Inst* inst, BitSet& usefulInstSet, BitSet& usefulVarSet, uint8 *usedInstWidth, uint32 minInstId, uint32 maxInstId, bool canRemoveStvars);
-    void sweepInst1(CFGNode* node, Inst* inst, BitSet& usefulInstSet, BitSet& usefulVarSet,
+    void sweepInst(Node* node, Inst* inst, BitSet& usefulInstSet, BitSet& usefulVarSet, uint8 *usedInstWidth, uint32 minInstId, uint32 maxInstId, bool canRemoveStvars);
+    void sweepInst1(Node* node, Inst* inst, BitSet& usefulInstSet, BitSet& usefulVarSet,
                     uint32 minInstId, uint32 maxInstId, bool canRemoveStvars); // if we're skipping instWidth
     static Opnd* findDefiningTemp(Opnd* var);
 
 
     IRManager& irManager;
-    FlowGraph& flowGraph;
+    ControlFlowGraph& flowGraph;
     Opnd* returnOpnd;
     bool preserveCriticalEdges;
 };

@@ -27,10 +27,18 @@
 namespace Jitrino {
 
 class FlowGraph;
-class CFGNode;
-class CFGEdge;
+class Node;
+class Edge;
 
-DEFINE_OPTPASS(StaticProfilerPass)
 
-}
+class StaticProfiler {
+public:
+    
+    // estimates edge probabilities and calculates node frequencies
+    static void estimateGraph(IRManager& irm, double entryFreq, bool cleanOldEstimations=false);
+    
+    static void fixEdgeProbs(IRManager& irm);
+};
+
+}//namespace
 #endif

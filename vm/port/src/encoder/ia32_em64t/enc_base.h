@@ -28,12 +28,15 @@
 
 #include "enc_defs.h"
 
+
 #include <stdlib.h>
 #include <assert.h>
 #include <memory.h>
 
+ENCODER_NAMESPACE_START
 struct MnemonicInfo;
 struct OpcodeInfo;
+struct Rex;
 
 /**
  * @brief Basic facilities for generation of processor's instructions.
@@ -53,7 +56,7 @@ struct OpcodeInfo;
  * Interface is provided through static methods, no instances of EncoderBase
  * to be created.
  * 
- * @note Support for EM64T is dropped in this release.
+ * @todo RIP-based addressing on EM64T - it's not yet supported currently.
  */
 class EncoderBase {
 public:
@@ -212,7 +215,7 @@ public:
          * independent from arguments/sizes/etc (may include opcode size
          * prefix).
          */
-        char        opcode[4];     // 4 bytes
+        char        opcode[5];     // 4 bytes
         unsigned    opcode_len;    // 4
         unsigned    aux0;          // 4
         unsigned    aux1;          // 4
@@ -229,10 +232,6 @@ public:
          *        operands' roles.
          */
         OpndRolesDesc   roles;   // 16
-        /**
-         * @brief Only on EM64T - REX encoding or zero if no REX prefix.
-         */
-        char            rex;     // 1
         /**
          * @brief If not zero, then this is final OpcodeDesc structure in 
          *        the list of opcodes for a given mnemonic.
@@ -254,23 +253,10 @@ public:
         */ 
         Mnemonic        mn;
         /**
-         * @brief true if the operation affects flags.
+        * Various characteristics of mnemonic.
+        * @see MF_
          */
-        bool            affectsFlags;
-        /**
-         * @brief true if the operation uses flags - i.e. conditional 
-         *        operations, ADC/SBB/etc.
-         */
-        bool            usesFlags;
-        /**
-         * @brief true if the operation is conditional - MOVcc/SETcc/Jcc/ETC.
-         */
-        bool            conditional;
-        /**
-         * @brief true if the operation is symmetric - its args can be 
-         *        swapped (ADD/MUL/etc).
-         */
-        bool            symmetric;
+        unsigned    flags;
         /**
          * @brief Operation's operand's count and roles.
          *
@@ -317,9 +303,22 @@ public:
         Operand(RegName reg) : m_kind(getRegKind(reg)), 
                                m_size(getRegSize(reg)), m_reg(reg) 
         {
-            m_base = m_index = RegName_Null; 
-            m_scale = 0; 
-            m_disp = 0;
+            hash_it();
+        }
+        /**
+         * @brief Creates register operand from given RegName and with the
+         *        specified size and kind.
+         *
+         * Used to speedup Operand creation as there is no need to extract
+         * size and kind from the RegName. 
+         * The provided size and kind must match the RegName's ones though.
+         */
+        Operand(OpndSize sz, OpndKind kind, RegName reg) : m_kind(kind), 
+                                                           m_size(sz), 
+                                                           m_reg(reg) 
+        {
+            assert(m_size == getRegSize(reg));
+            assert(m_kind == getRegKind(reg));
             hash_it();
         }
         /**
@@ -328,9 +327,6 @@ public:
         Operand(OpndSize size, long long ival) : m_kind(OpndKind_Imm), 
                                                  m_size(size), m_imm64(ival)
         {
-            m_base = m_index = RegName_Null;
-            m_scale = 0;
-            m_disp = 0;
             hash_it();
         }
         /**
@@ -339,9 +335,6 @@ public:
         Operand(int ival) : m_kind(OpndKind_Imm), m_size(OpndSize_32), 
                             m_imm64(ival)
         {
-            m_base = m_index = RegName_Null;
-            m_scale = 0;
-            m_disp = 0;
             hash_it();
         }
         /**
@@ -350,9 +343,6 @@ public:
         Operand(short ival) : m_kind(OpndKind_Imm), m_size(OpndSize_16), 
                               m_imm64(ival)
         {
-            m_base = m_index = RegName_Null;
-            m_scale = 0;
-            m_disp = 0;
             hash_it();
         }
 
@@ -362,9 +352,6 @@ public:
         Operand(char ival) : m_kind(OpndKind_Imm), m_size(OpndSize_8), 
                              m_imm64(ival)
         {
-            m_base = m_index = RegName_Null;
-            m_scale = 0;
-            m_disp = 0;
             hash_it();
         }
 
@@ -372,7 +359,7 @@ public:
          * @brief Creates memory operand.
          */
         Operand(OpndSize size, RegName base, RegName index, unsigned scale,
-                int disp) : m_kind(OpndKind_Mem), m_size(size), m_imm64(0)
+                int disp) : m_kind(OpndKind_Mem), m_size(size)
         {
             m_base = base;
             m_index = index;
@@ -385,7 +372,7 @@ public:
          * @brief Creates memory operand with only base and displacement.
          */
         Operand(OpndSize size, RegName base, int disp) : 
-                               m_kind(OpndKind_Mem), m_size(size), m_imm64(0)
+                               m_kind(OpndKind_Mem), m_size(size)
         {
             m_base = base;
             m_index = RegName_Null;
@@ -409,6 +396,11 @@ public:
          */
         unsigned hash(void) const { return m_hash; }
         //
+#ifdef _EM64T_
+        bool need_rex(void) const { return m_need_rex; }
+#else
+        bool need_rex(void) const { return false; }
+#endif
         /**
          * @brief Tests whether operand is memory operand.
          */
@@ -479,25 +471,35 @@ public:
         void hash_it(void)
         {
             m_hash = size_hash[m_size] | kind_hash[m_kind];
+#ifdef _EM64T_
+            m_need_rex = false;
+            if (is_reg() && is_em64t_extra_reg(m_reg)) {
+                m_need_rex = true;
+            }
+            else if (is_mem() && (is_em64t_extra_reg(m_base) || 
+                                  is_em64t_extra_reg(m_index))) {
+                m_need_rex = true;
+            }
+#endif
         }
         /**
          * @brief Initializes the instance with empty size and kind.
          */
-        Operand() : m_kind(OpndKind_Null), m_size(OpndSize_Null) {}
+        Operand() : m_kind(OpndKind_Null), m_size(OpndSize_Null), m_need_rex(false) {}
         // general info
-        OpndKind                m_kind;
-        OpndSize                m_size;
+        OpndKind    m_kind;
+        OpndSize    m_size;
         // complex address form support
-        RegName                 m_base;
-        RegName                 m_index;
-        unsigned                m_scale;
-        int                     m_disp;
-        // data
+        RegName     m_base;
+        RegName     m_index;
+        unsigned    m_scale;
         union {
-            long long       m_imm64;
-            RegName         m_reg;
+            int         m_disp;
+            RegName     m_reg;
+            long long   m_imm64;
         };
-        unsigned                m_hash;
+        unsigned    m_hash;
+        bool        m_need_rex;
         friend class EncoderBase::Operands;
     };
     /**
@@ -505,26 +507,25 @@ public:
      */
     class Operands {
     public:
-        Operands(void) : m_count(0)
+        Operands(void) 
         {
-            m_hash = 0;
+            clear();
         }
-        Operands(const Operand& op0) : m_count(1)
+        Operands(const Operand& op0) 
         {
-            m_operands[0] = op0;
-            m_hash = op0.hash();
+            clear();
+            add(op0);
         }
-
-        Operands(const Operand& op0, const Operand& op1) : m_count(2) 
+    
+        Operands(const Operand& op0, const Operand& op1)
         {
-            m_operands[0] = op0;
-            m_operands[1] = op1;
-            m_hash = (op0.hash()<<HASH_BITS_PER_OPERAND) | op1.hash();
+            clear();
+            add(op0); add(op1);
         }
             
         Operands(const Operand& op0, const Operand& op1, const Operand& op2)
-         : m_count(0), m_hash(0) 
         {
+            clear();
             add(op0); add(op1); add(op2);
         }
 
@@ -541,15 +542,22 @@ public:
             assert(m_count < COUNTOF(m_operands));
             m_hash = (m_hash<<HASH_BITS_PER_OPERAND) | op.hash();
             m_operands[m_count++] = op;
+            m_need_rex = m_need_rex || op.m_need_rex;
         }
+#ifdef _EM64T_
+        bool need_rex(void) const { return m_need_rex; }
+#else
+        bool need_rex(void) const { return false; }
+#endif
         void clear(void)
         {
-            m_count = 0; m_hash = 0;
+            m_count = 0; m_hash = 0; m_need_rex = false;
         }
     private:
-        unsigned        m_count;
-        Operand         m_operands[COUNTOF( ((OpcodeDesc*)NULL)->opnds )];
-        unsigned        m_hash;
+        unsigned    m_count;
+        Operand     m_operands[COUNTOF( ((OpcodeDesc*)NULL)->opnds )];
+        unsigned    m_hash;
+        bool        m_need_rex;
     };
 public:
 #ifdef _DEBUG
@@ -569,13 +577,13 @@ private:
      * @brief Encodes mod/rm byte.
      */
     static char* encodeModRM(char* stream, const Operands& opnds,
-                             unsigned idx, const OpcodeDesc * odesc);
+                             unsigned idx, const OpcodeDesc * odesc, Rex * prex);
     /**
      * @brief Encodes special things of opcode description - '/r', 'ib', etc.
      */
     static char* encode_aux(char* stream, unsigned aux, 
                             const Operands& opnds, const OpcodeDesc * odesc,
-                            unsigned * pargsCount);
+                            unsigned * pargsCount, Rex* prex);
 #ifdef _EM64T_
     /**
      * @brief Returns true if the 'reg' argument represents one of the new 
@@ -584,12 +592,34 @@ private:
      * The 64 bits versions of 'old-fashion' registers, i.e. RAX are not 
      * considered as 'extra'.
      */
-    static inline bool is_em64t_extra_reg(const RegName reg)
+    static bool is_em64t_extra_reg(const RegName reg)
+    {
+        if (needs_rex_r(reg)) {
+            return true;
+        }
+        if (RegName_SPL <= reg && reg <= RegName_R15L) {
+            return true;
+        }
+        return false;
+    }
+    static bool needs_rex_r(const RegName reg)
     {
         if (RegName_R8 <= reg && reg <= RegName_R15) {
             return true;
         }
         if (RegName_R8D <= reg && reg <= RegName_R15D) {
+            return true;
+        }
+        if (RegName_R8S <= reg && reg <= RegName_R15S) {
+            return true;
+        }
+        if (RegName_R8L <= reg && reg <= RegName_R15L) {
+            return true;
+        }
+        if (RegName_XMM8D <= reg && reg <= RegName_XMM15D) {
+            return true;
+        }
+        if (RegName_XMM8S <= reg && reg <= RegName_XMM15S) {
             return true;
         }
         return false;
@@ -604,6 +634,15 @@ private:
      */
     static unsigned char getHWRegIndex(const RegName reg) 
     {
+        if (getRegKind(reg) != OpndKind_GPReg) {
+            return getRegIndex(reg);
+        }
+        if (RegName_SPL <= reg && reg<=RegName_DIL) {
+            return getRegIndex(reg);
+        }
+        if (RegName_R8L<= reg && reg<=RegName_R15L) {
+            return getRegIndex(reg) - getRegIndex(RegName_R8L);
+        }
         return is_em64t_extra_reg(reg) ? 
                 getRegIndex(reg)-getRegIndex(RegName_R8D) : getRegIndex(reg);
     }
@@ -611,6 +650,10 @@ private:
     static unsigned char getHWRegIndex(const RegName reg)
     {
         return getRegIndex(reg);
+    }
+    static bool is_em64t_extra_reg(const RegName reg)
+    {
+        return false;
     }
 #endif
 public:
@@ -645,9 +688,6 @@ public:
     /**
      * @brief Array of available opcodes.
      */
-#if defined(__INTEL_COMPILER) || !defined(PLATFORM_POSIX)
-    __declspec(align(16))
-#endif
     static OpcodeDesc opcodes[Mnemonic_Count][MAX_OPCODES];
 
     static int buildTable(void);
@@ -662,5 +702,7 @@ public:
      */
     static int dummy;
 };
+
+ENCODER_NAMESPACE_END
 
 #endif // ifndef __ENC_BASE_H_INCLUDED__

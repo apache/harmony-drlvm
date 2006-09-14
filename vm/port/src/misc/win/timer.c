@@ -1,0 +1,57 @@
+/*
+ *  Copyright 2005-2006 The Apache Software Foundation or its licensors, as applicable.
+ *
+ *  Licensed under the Apache License, Version 2.0 (the "License");
+ *  you may not use this file except in compliance with the License.
+ *  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ *  Unless required by applicable law or agreed to in writing, software
+ *  distributed under the License is distributed on an "AS IS" BASIS,
+ *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ *  See the License for the specific language governing permissions and
+ *  limitations under the License.
+ */
+/** 
+* @author Alexey V. Varlamov
+* @version $Revision$
+*/  
+
+#include <time.h>
+#include <windows.h>
+
+#include "port_timer.h"
+
+#undef LOG_DOMAIN
+#define LOG_DOMAIN "port.timer"
+#include "clog.h"
+
+static LARGE_INTEGER frequency;
+
+static BOOL initNanoTime() {
+    if (QueryPerformanceFrequency(&frequency)) {
+        return TRUE;
+    } else {
+        TRACE(("QueryPerformanceFrequency failed: %u", GetLastError())); 
+        return FALSE;
+    }
+}
+
+APR_DECLARE(apr_nanotimer_t) port_nanotimer() 
+{
+    static BOOL hires_supported;
+    static BOOL init = FALSE;
+    if (!init) {
+        hires_supported = initNanoTime();
+    }
+    if(hires_supported){
+        LARGE_INTEGER count;
+        if (QueryPerformanceCounter(&count)) {
+            return (apr_nanotimer_t)((double)count.QuadPart / frequency.QuadPart * 1E9);
+        } else {
+            TRACE(("QueryPerformanceCounter failed: %u", GetLastError())); 
+        }
+    }
+    return (apr_nanotimer_t)(GetTickCount() * 1E6);
+}

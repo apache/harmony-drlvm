@@ -82,8 +82,8 @@ public:
     //
     // for debug only
     //
-	virtual void    print(::std::ostream&) const {}
-	virtual void    printWithType(::std::ostream& os) const;
+    virtual void    print(::std::ostream&) const {}
+    virtual void    printWithType(::std::ostream& os) const;
 protected:
     //
     // Constructor
@@ -114,7 +114,7 @@ public:
     Inst*           getInst() const     {assert(!isVarOpnd()); return inst;}
     void            setInst(Inst* i)    {assert(!isVarOpnd()); inst = i;}
 public:
-	virtual void    print(::std::ostream&) const;
+    virtual void    print(::std::ostream&) const;
 protected:
     friend class OpndManager;
     Opnd(Type* t,uint32 i) : OpndBase(t,i), isGlobalFlag(false), inst(NULL) {}
@@ -133,7 +133,7 @@ public:
 protected:
     friend class OpndManager;
     SsaOpnd(Type* t,uint32 i) : Opnd(t,i) 
-		{}
+        {}
 
 };
 
@@ -153,7 +153,7 @@ public:
     virtual bool isPiOpnd() const        {return true;};
     const Opnd *getOrg() const { return orgOpnd; };
     Opnd *getOrg() { return orgOpnd; };
-	virtual void    print(::std::ostream&) const;
+    virtual void    print(::std::ostream&) const;
 private:
     friend class OpndManager;
     PiOpnd(Opnd *orgOpnd0, uint32 i) : 
@@ -312,8 +312,9 @@ class OpndRenameTable : public HashTable<Opnd,Opnd> {
 public:
     OpndRenameTable(MemoryManager& mm, uint32 size = 16, bool renameSSA = false): 
         HashTable<Opnd,Opnd>(mm,size) {renameSsaOpnd = renameSSA;}
-    virtual ~OpndRenameTable() {}
     
+    virtual ~OpndRenameTable() {}    
+
     Opnd *getMapping(Opnd *from)   {return lookup(from); }
     void  setMapping(Opnd *from, Opnd *to) {
         insert(from,to);

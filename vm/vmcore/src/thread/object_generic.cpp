@@ -66,13 +66,16 @@ void set_hash_bits(ManagedObject *p_obj)
     port_atomic_cas8(P_HASH_CONTENTION_BYTE(p_obj),hb, 0);
 }
 
+/* $$$ GMJ
 long generic_hashcode(ManagedObject *obj) {
     return (long) gc_get_hashcode(obj);
 }
+*/
 
 
-int32 default_hashcode(ManagedObject * p_obj)
-{
+jint default_hashcode(Managed_Object_Handle obj) {
+    ManagedObject *p_obj = (ManagedObject*) obj;
+
     if (!p_obj) return 0L;
     if ( *P_HASH_CONTENTION_BYTE(p_obj) & HASH_MASK)
         return *P_HASH_CONTENTION_BYTE(p_obj) & HASH_MASK;
@@ -84,6 +87,11 @@ int32 default_hashcode(ManagedObject * p_obj)
     
     ASSERT(0, "All the possible cases are supposed to be covered before");
     return 0xff;
+}
+
+long generic_hashcode(ManagedObject * p_obj)
+{
+    return (long) gc_get_hashcode0((Managed_Object_Handle) p_obj);
 }
 
 
@@ -103,6 +111,7 @@ jint object_get_generic_hashcode(JNIEnv*, jobject jobj)
 
 jobject object_clone(JNIEnv *jenv, jobject jobj)
 {
+    ASSERT_RAISE_AREA;
     ManagedObject *result;
     assert(hythread_is_suspend_enabled());
     if(!jobj) {
@@ -121,7 +130,7 @@ jobject object_clone(JNIEnv *jenv, jobject jobj)
         size = vm_array_size(vt, length);
         result = (ManagedObject *) 
             vm_new_vector_using_vtable_and_thread_pointer(
-                vt->clss->allocation_handle, length, vm_get_gc_thread_local());
+                length, vt->clss->allocation_handle, vm_get_gc_thread_local());
     }
     else
     {
@@ -138,7 +147,7 @@ jobject object_clone(JNIEnv *jenv, jobject jobj)
     }
     if (result == NULL) {
         tmn_suspend_enable(); 
-        exn_throw(VM_Global_State::loader_env->java_lang_OutOfMemoryError);
+        exn_raise_object(VM_Global_State::loader_env->java_lang_OutOfMemoryError);
         return NULL;
     }
     memcpy(result, h->object, size);

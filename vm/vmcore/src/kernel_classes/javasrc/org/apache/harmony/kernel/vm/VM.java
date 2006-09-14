@@ -76,7 +76,7 @@ public final class VM {
 
     /* PACKAGE PRIVATE */
 
-    static final ClassLoader getStackClassLoader(int depth) {
+    public static final ClassLoader getStackClassLoader(int depth) {
         Class clazz = VMStack.getCallerClass(depth);
         return clazz != null ? getClassLoader(clazz) : null;
     }

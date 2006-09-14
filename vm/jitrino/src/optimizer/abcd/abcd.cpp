@@ -20,82 +20,106 @@
  *
  */
 
-#include <assert.h>
-#include <iostream>
-#include <algorithm>
-#include "Stl.h"
-#include "Log.h"
-#include "PropertyTable.h"
-#include "open/types.h"
-#include "Inst.h"
 #include "irmanager.h"
-#include "FlowGraph.h"
 #include "Dominator.h"
 #include "constantfolder.h"
 #include "abcd.h"
 #include "abcdbounds.h"
 #include "abcdsolver.h"
 #include "opndmap.h"
+
+#include "Stl.h"
+#include "Log.h"
+#include "open/types.h"
+#include "Inst.h"
 #include "walkers.h"
+#include "PMFAction.h"
+
+#include <assert.h>
+#include <iostream>
+#include <algorithm>
 
 namespace Jitrino {
 
-DEFINE_OPTPASS_IMPL(ABCDPass, abcd, "Array Bounds Check Elimination")
+//Array Bounds Check Elimination
+class ABCDPass: public SessionAction {
+public:
+    void run();    
+};
+
+ActionFactory<ABCDPass> _abcd("abcd");
 
 void
-ABCDPass::_run(IRManager& irm) {
-    splitCriticalEdges(irm);
-    computeDominators(irm);
+ABCDPass::run() {
+    IRManager& irm = *getCompilationContext()->getHIRManager();
+    OptPass::splitCriticalEdges(irm);
+    OptPass::computeDominators(irm);
     Abcd abcd(irm, irm.getNestedMemoryManager(), *irm.getDominatorTree());
     abcd.runPass();
 }
 
-Abcd::Flags *Abcd::defaultFlags = 0;
-
 void 
-Abcd::readDefaultFlagsFromCommandLine(const JitrinoParameterTable *params)
-{
-    if (!defaultFlags)
-        defaultFlags = new Flags;
-    defaultFlags->partial = params->lookupBool("opt::abcd::partial", false);
-    defaultFlags->dryRun = params->lookupBool("opt::abcd::dry_run", false);
-    defaultFlags->useAliases = params->lookupBool("opt::abcd::use_aliases", true);
-    defaultFlags->useConv = params->lookupBool("opt::abcd::use_conv", true);
-    defaultFlags->remConv = params->lookupBool("opt::abcd::rem_conv", true);
-    defaultFlags->useShr = params->lookupBool("opt::abcd::use_shr", true);
-    defaultFlags->unmaskShifts = params->lookupBool("opt::abcd::unmask_shifts", true);
-    defaultFlags->remBr = params->lookupBool("opt::abcd::rem_br", true);
-    defaultFlags->remCmp = params->lookupBool("opt::abcd::rem_cmp", true);
-    defaultFlags->remOneBound = params->lookupBool("opt::abcd::rem_one_bound", true);
-    defaultFlags->remOverflow = params->lookupBool("opt::abcd::rem_overflow", false);
-    defaultFlags->checkOverflow = params->lookupBool("opt::abcd::check_overflow", false);
-    defaultFlags->useReasons = params->lookupBool("opt::abcd::use_reasons", false);
+Abcd::readFlags(Action* argSource, AbcdFlags* flags ) {
+    IAction::HPipeline p = NULL; //default pipeline for argSource
+    flags->partial = argSource->getBoolArg(p, "abcd.partial", false);
+    flags->dryRun = argSource->getBoolArg(p, "abcd.dry_run", false);
+    flags->useAliases = argSource->getBoolArg(p, "abcd.use_aliases", true);
+    flags->useConv = argSource->getBoolArg(p, "abcd.use_conv", true);
+    flags->remConv = argSource->getBoolArg(p, "abcd.rem_conv", true);
+    flags->useShr = argSource->getBoolArg(p, "abcd.use_shr", true);
+    flags->unmaskShifts = argSource->getBoolArg(p, "abcd.unmask_shifts", true);
+    flags->remBr = argSource->getBoolArg(p, "abcd.rem_br", true);
+    flags->remCmp = argSource->getBoolArg(p, "abcd.rem_cmp", true);
+    flags->remOneBound = argSource->getBoolArg(p, "abcd.rem_one_bound", true);
+    flags->remOverflow = argSource->getBoolArg(p, "abcd.rem_overflow", false);
+    flags->checkOverflow = argSource->getBoolArg(p, "abcd.check_overflow", false);
+    flags->useReasons = argSource->getBoolArg(p, "abcd.use_reasons", false);
 }
 
-void Abcd::showFlagsFromCommandLine()
-{
-    Log::out() << "    opt::abcd::partial[={on|OFF}] = try to eliminate partial ABCs" << ::std::endl;
-    Log::out() << "    opt::abcd::dry_run[={ON|off}] = don't really eliminate checks" << ::std::endl;
-    Log::out() << "    opt::abcd::use_aliases[={ON|off}] = try to use ld/stvar induced aliases" << ::std::endl;
-    Log::out() << "    opt::abcd::use_conv[={ON|off}] = make use of conv info" << ::std::endl;
-    Log::out() << "    opt::abcd::rem_conv[={ON|off}] = remove conv ops in abcd" << ::std::endl;
-    Log::out() << "    opt::abcd::use_shr={ON|off}] = use shr info" << ::std::endl;
-    Log::out() << "    opt::abcd::unmask_shifts={ON|off}] = try to unmask shifts" << ::std::endl;
-    Log::out() << "    opt::abcd::rem_br[={ON|off}] = try to remove branches in abcd" << ::std::endl;
-    Log::out() << "    opt::abcd::rem_cmp[={ON|off}] = try to fold cmps in abcd" << ::std::endl;
-    Log::out() << "    opt::abcd::rem_one_bound[={ON|off}] = eliminate even just upper or lower bound check" << ::std::endl;
-    Log::out() << "    opt::abcd::rem_overflow[={on|OFF}] = try to mark overflow impossible in 32-bit int add/sub";
-    Log::out() << "    opt::abcd::check_overflow[={on|OFF}] = try to mark overflow impossible in checkbounds";
-    Log::out() << "    opt::abcd::use_reasons[={ON|off}] = build more precise taus for eliminated instructions";
+void Abcd::showFlags(std::ostream& os) {
+    os << "  abcd flags:"<<std::endl;
+    os << "    abcd.partial[={on|OFF}]        - try to eliminate partial ABCs" << std::endl;
+    os << "    abcd.dry_run[={ON|off}]        - don't really eliminate checks" << std::endl;
+    os << "    abcd.use_aliases[={ON|off}]    - try to use ld/stvar induced aliases" << std::endl;
+    os << "    abcd.use_conv[={ON|off}]       - make use of conv info" << std::endl;
+    os << "    abcd.rem_conv[={ON|off}]       - remove conv ops in abcd" << std::endl;
+    os << "    abcd.use_shr={ON|off}]         - use shr info" << std::endl;
+    os << "    abcd.unmask_shifts={ON|off}]   - try to unmask shifts" << std::endl;
+    os << "    abcd.rem_br[={ON|off}]         - try to remove branches in abcd" << std::endl;
+    os << "    abcd.rem_cmp[={ON|off}]        - try to fold cmps in abcd" << std::endl;
+    os << "    abcd.rem_one_bound[={ON|off}]  - eliminate even just upper or lower bound check" << std::endl;
+    os << "    abcd.rem_overflow[={on|OFF}]   - try to mark overflow impossible in 32-bit int add/sub";
+    os << "    abcd.check_overflow[={on|OFF}] - try to mark overflow impossible in checkbounds";
+    os << "    abcd.use_reasons[={ON|off}]    - build more precise taus for eliminated instructions";
 }
+
+Abcd::Abcd(IRManager &irManager0,  MemoryManager& memManager, DominatorTree& dom0)
+: irManager(irManager0), 
+mm(memManager),
+ineqGraph(0),
+dominators(dom0),
+piMap(0),
+nextPiOpndId(0),
+solver(0),
+canEliminate(memManager),
+canEliminateUB(memManager),
+canEliminateLB(memManager),
+tauUnsafe(0),
+tauSafe(0),
+blockTauPoint(0),
+lastTauPointBlock(0),
+blockTauEdge(0),
+lastTauEdgeBlock(0),
+flags(*irManager.getOptimizerFlags().abcdFlags)
+{
+};
 
 void Abcd::runPass()
 {
-    if (Log::cat_opt()->isDebugEnabled() || Log::cat_opt_abcd()->isIR2Enabled()) {
-        Log::out() << "IR before ABCD pass" << ::std::endl;
-        irManager.getFlowGraph().printInsts(Log::out(),
-                                            irManager.getMethodDesc());
-        irManager.getFlowGraph().printDotFile(irManager.getMethodDesc(), "beforeabcd", &dominators);
+    if (Log::isEnabled() || Log::isEnabled()) {
+        Log::out() << "IR before ABCD pass" << std::endl;
+        FlowGraph::printHIR(Log::out(), irManager.getFlowGraph(), irManager.getMethodDesc());
+        FlowGraph::printDotFile(irManager.getFlowGraph(), irManager.getMethodDesc(), "beforeabcd");
         dominators.printDotFile(irManager.getMethodDesc(), "beforeabcd.dom");
     }
 
@@ -105,25 +129,22 @@ void Abcd::runPass()
     // WARNING: Pi var live ranges may overlap the original 
     // var live ranges here
 
-    if (Log::cat_opt_abcd()->isIR2Enabled()) {
-        Log::out() << "IR after Pi insertion" << ::std::endl;
-        irManager.getFlowGraph().printInsts(Log::out(),
-                                            irManager.getMethodDesc());
-        irManager.getFlowGraph().printDotFile(irManager.getMethodDesc(), "withpi", &dominators);
+    if (Log::isEnabled()) {
+        Log::out() << "IR after Pi insertion" << std::endl;
+        FlowGraph::printHIR(Log::out(), irManager.getFlowGraph(), irManager.getMethodDesc());
+        FlowGraph::printDotFile(irManager.getFlowGraph(), irManager.getMethodDesc(), "withpi");
     }
 
     removeRedundantBoundsChecks();
-    if (Log::cat_opt()->isDebugEnabled() || Log::cat_opt_abcd()->isIR2Enabled()) {
-        Log::out() << "IR after removeRedundantBoundsChecks" << ::std::endl;
-        irManager.getFlowGraph().printInsts(Log::out(),
-                                            irManager.getMethodDesc());
+    if (Log::isEnabled() || Log::isEnabled()) {
+        Log::out() << "IR after removeRedundantBoundsChecks" << std::endl;
+        FlowGraph::printHIR(Log::out(), irManager.getFlowGraph(), irManager.getMethodDesc());
     }
 
     removePiNodes();
-    if (Log::cat_opt_abcd()->isDebugEnabled()) {
-        Log::out() << "IR after ABCD pass" << ::std::endl;
-        irManager.getFlowGraph().printInsts(Log::out(),
-                                            irManager.getMethodDesc());
+    if (Log::isEnabled()) {
+        Log::out() << "IR after ABCD pass" << std::endl;
+        FlowGraph::printHIR(Log::out(), irManager.getFlowGraph(), irManager.getMethodDesc());
     }
 }
 
@@ -151,7 +172,7 @@ void Abcd::insertPiNodes()
     DomTreeWalk<true, InsertPiWalker>(dominators, insertPiWalker, mm); // pre-order
 }
 
-PiOpnd *Abcd::getNewDestOpnd(CFGNode *block,
+PiOpnd *Abcd::getNewDestOpnd(Node *block,
                              Opnd *org)
 {
     PiOpnd *tmpOp = irManager.getOpndManager().createPiOpnd(org);
@@ -196,67 +217,72 @@ void Abcd::renamePiVariables()
 }
 
 
-void Abcd::insertPiNodeForOpnd(CFGNode *block,
+void Abcd::insertPiNodeForOpnd(Node *block,
                                Opnd *org,
                                const PiCondition &cond,
                                Opnd *tauOpnd)
 {
     if (ConstantFolder::isConstant(org)) {
-        if (Log::cat_opt_abcd()->isDebugEnabled()) {
+        if (Log::isEnabled()) {
             Log::out() << "Skipping Pi Node for opnd ";
             org->print(Log::out());
             Log::out() << " under condition ";
             cond.print(Log::out());
-            Log::out() << " since it is constant" << ::std::endl;
+            Log::out() << " since it is constant" << std::endl;
         }
     } else {
         
         PiOpnd *piOpnd = irManager.getOpndManager().createPiOpnd(org);
-        Inst *headInst = block->getFirstInst();
-        PiCondition *condPtr = 
-            new (irManager.getMemoryManager()) PiCondition(cond);
+        Inst *headInst = (Inst*)block->getFirstInst();
+        PiCondition *condPtr = new (irManager.getMemoryManager()) PiCondition(cond);
         if (tauOpnd == 0)
             tauOpnd = getBlockTauEdge(block);
         Inst *newInst = irManager.getInstFactory().makeTauPi(piOpnd, org, tauOpnd, condPtr);
-        Inst *place = headInst->next();
-        while (place != headInst) {
+        Inst *place = headInst->getNextInst();
+        while (place != NULL) {
             Opcode opc = place->getOpcode();
             if ((opc != Op_Phi) && (opc != Op_TauPoint) && (opc != Op_TauEdge))
                 break;
-            place = place->next();
+            place = place->getNextInst();
         }
-        if (Log::cat_opt_abcd()->isDebugEnabled()) {
+        if (Log::isEnabled()) {
             Log::out() << "Inserting Pi Node for opnd ";
             org->print(Log::out());
             Log::out() << " under condition ";
             cond.print(Log::out());
-            Log::out() << " just before inst ";
-            place->print(Log::out());
-            Log::out() << ::std::endl;
+            if (place!=NULL) {
+                Log::out() << " just before inst ";
+                place->print(Log::out());
+            }
+            Log::out() << std::endl;
         }
-        newInst->insertBefore(place);
+        if (place != NULL) {
+            newInst->insertBefore(place);
+        } else {
+            block->appendInst(newInst);
+        }
     }
 }
 
-void Abcd::insertPiNodeForOpndAndAliases(CFGNode *block,
+void Abcd::insertPiNodeForOpndAndAliases(Node *block,
                                          Opnd *org,
                                          const PiCondition &cond,
                                          Opnd *tauOpnd)
 {
     if (flags.useAliases) {
-        if (Log::cat_opt_abcd()->isDebugEnabled()) {
+        if (Log::isEnabled()) {
             Log::out() << "Inserting Pi Node for opnd ";
             org->print(Log::out());
             Log::out() << " and its aliases";
             Log::out() << " under condition ";
             cond.print(Log::out());
-            Log::out() << ::std::endl;
+            Log::out() << std::endl;
         }            
         AbcdAliases aliases(mm);
         // check for aliases
         insertPiNodeForOpnd(block, org, cond, tauOpnd);
         if (getAliases(org, &aliases, 0)) {
-            if (Log::cat_opt_abcd()->isDebugEnabled()) {
+            if (Log::isEnabled()) {
                 Log::out() << "Has aliases ";
                 AbcdAliasesSet::iterator iter = aliases.theSet.begin();
                 AbcdAliasesSet::iterator end = aliases.theSet.end();
@@ -265,7 +291,7 @@ void Abcd::insertPiNodeForOpndAndAliases(CFGNode *block,
                     alias.print(Log::out());
                     Log::out() << " ";
                 }
-                Log::out() << ::std::endl;
+                Log::out() << std::endl;
             }
             AbcdAliasesSet::iterator iter = aliases.theSet.begin();
             AbcdAliasesSet::iterator end = aliases.theSet.end();
@@ -331,14 +357,14 @@ unsignType(Type::Tag typetag)
     }
 }
 
-void Abcd::insertPiNodesForComparison(CFGNode *block,
+void Abcd::insertPiNodesForComparison(Node *block,
                                       ComparisonModifier mod,
                                       const PiCondition &bounds,
                                       Opnd *op,
                                       bool swap_operands,
                                       bool negate_comparison)
 {
-    if (Log::cat_opt_abcd()->isDebugEnabled()) {
+    if (Log::isEnabled()) {
         Log::out() << "insertPiNodesForComparison(..., ";
         Log::out() << printableComparison(mod);
         Log::out() << ", ";
@@ -348,7 +374,7 @@ void Abcd::insertPiNodesForComparison(CFGNode *block,
         Log::out() << ", ";
         Log::out() << (swap_operands ? "true" : "false");
         Log::out() << (negate_comparison ? "true" : "false");
-        Log::out() << ::std::endl;
+        Log::out() << std::endl;
     }
 
     PiCondition bounds0 = bounds;
@@ -356,10 +382,10 @@ void Abcd::insertPiNodesForComparison(CFGNode *block,
     if (negate_comparison) {
         mod = negateComparison(mod);
         swap_operands = !swap_operands;
-        if (Log::cat_opt_abcd()->isDebugEnabled()) {
+        if (Log::isEnabled()) {
             Log::out() << "insertPiNodesForComparison: negating comparison to " ;
             Log::out() << printableComparison(mod);
-            Log::out() << ::std::endl;
+            Log::out() << std::endl;
         }
     }
     switch (mod) {
@@ -367,8 +393,8 @@ void Abcd::insertPiNodesForComparison(CFGNode *block,
         if (negate_comparison)
             insertPiNodeForOpndAndAliases(block, op, bounds0);
         else {
-            if (Log::cat_opt_abcd()->isDebugEnabled()) {
-                Log::out() << "insertPiNodesForComparison: cannot represent ! Cmp_EQ" << ::std::endl;
+            if (Log::isEnabled()) {
+                Log::out() << "insertPiNodesForComparison: cannot represent ! Cmp_EQ" << std::endl;
             }
         }
         // we can't represent the other case
@@ -377,8 +403,8 @@ void Abcd::insertPiNodesForComparison(CFGNode *block,
         if (!negate_comparison)
             insertPiNodeForOpndAndAliases(block, op, bounds0);
         else {
-            if (Log::cat_opt_abcd()->isDebugEnabled()) {
-                Log::out() << "insertPiNodesForComparison: cannot represent Cmp_NE_Un" << ::std::endl;
+            if (Log::isEnabled()) {
+                Log::out() << "insertPiNodesForComparison: cannot represent Cmp_NE_Un" << std::endl;
             }
         }
         // we can't represent the other case
@@ -400,7 +426,7 @@ void Abcd::insertPiNodesForComparison(CFGNode *block,
                 if (! bounds1.getLb().isUnknown())
                     insertPiNodeForOpndAndAliases(block, op, bounds1);
                 else {
-                    if (Log::cat_opt_abcd()->isDebugEnabled()) {
+                    if (Log::isEnabled()) {
                         Log::out() << "insertPiNodesForComparison(1): bounds1 LB is Unknown;\n\tbounds is ";
                         bounds.print(Log::out());
                         Log::out() << "\n\tbounds0 is ";
@@ -409,7 +435,7 @@ void Abcd::insertPiNodesForComparison(CFGNode *block,
                         bounds1a.print(Log::out());
                         Log::out() << "\n\tbounds1 is ";
                         bounds1.print(Log::out());
-                        Log::out() << ::std::endl;
+                        Log::out() << std::endl;
                     }
                 }
             }
@@ -422,14 +448,14 @@ void Abcd::insertPiNodesForComparison(CFGNode *block,
                 if (! bounds1.getUb().isUnknown())
                     insertPiNodeForOpndAndAliases(block, op, bounds1);
                 else {
-                    if (Log::cat_opt_abcd()->isDebugEnabled()) {
+                    if (Log::isEnabled()) {
                         Log::out() << "insertPiNodesForComparison(2): bounds1 LB is Unknown;\n\tbounds is ";
                         bounds.print(Log::out());
                         Log::out() << "\n\tbounds0 is ";
                         bounds0.print(Log::out());
                         Log::out() << "\n\tbounds1 is ";
                         bounds1.print(Log::out());
-                        Log::out() << ::std::endl;
+                        Log::out() << std::endl;
                     }
                 }
             } else {
@@ -445,14 +471,14 @@ void Abcd::insertPiNodesForComparison(CFGNode *block,
                           (ubConst >= 0)))) {
                         insertPiNodeForOpndAndAliases(block, op, bounds1);
                     } else {
-                        if (Log::cat_opt_abcd()->isDebugEnabled()) {
+                        if (Log::isEnabled()) {
                             Log::out() << "insertPiNodesForComparison(2): bounds1 LB is Unknown;\n\tbounds is ";
                             bounds.print(Log::out());
                             Log::out() << "\n\tbounds0 is ";
                             bounds0.print(Log::out());
                             Log::out() << "\n\tbounds1 is ";
                             bounds1.print(Log::out());
-                            Log::out() << ::std::endl;
+                            Log::out() << std::endl;
                         }
                     }
                 }
@@ -466,7 +492,7 @@ void Abcd::insertPiNodesForComparison(CFGNode *block,
             if (! bounds1.getLb().isUnknown())
                 insertPiNodeForOpndAndAliases(block, op, bounds1);
             else {
-                if (Log::cat_opt_abcd()->isDebugEnabled()) {
+                if (Log::isEnabled()) {
                     Log::out() << "insertPiNodesForComparison(1): bounds1 LB is Unknown;\n\tbounds is ";
                     bounds.print(Log::out());
                     Log::out() << "\n\tbounds0 is ";
@@ -475,7 +501,7 @@ void Abcd::insertPiNodesForComparison(CFGNode *block,
                     bounds1a.print(Log::out());
                     Log::out() << "\n\tbounds1 is ";
                     bounds1.print(Log::out());
-                    Log::out() << ::std::endl;
+                    Log::out() << std::endl;
                 }
             }
         } else { // bounds > op, only an upper bound on op
@@ -483,14 +509,14 @@ void Abcd::insertPiNodesForComparison(CFGNode *block,
             if (! bounds1.getUb().isUnknown())
                 insertPiNodeForOpndAndAliases(block, op, bounds1);
             else {
-                if (Log::cat_opt_abcd()->isDebugEnabled()) {
+                if (Log::isEnabled()) {
                     Log::out() << "insertPiNodesForComparison(2): bounds1 LB is Unknown;\n\tbounds is ";
                     bounds.print(Log::out());
                     Log::out() << "\n\tbounds0 is ";
                     bounds0.print(Log::out());
                     Log::out() << "\n\tbounds1 is ";
                     bounds1.print(Log::out());
-                    Log::out() << ::std::endl;
+                    Log::out() << std::endl;
                 }
             }
         }
@@ -511,12 +537,12 @@ void Abcd::insertPiNodesForComparison(CFGNode *block,
                     insertPiNodeForOpndAndAliases(block, op, 
                                                   bounds0.only_lower_bound());
                 } else {
-                    if (Log::cat_opt_abcd()->isDebugEnabled()) {
+                    if (Log::isEnabled()) {
                         Log::out() << "insertPiNodesForComparison(3): bounds0 LB is Unknown;\n\tbounds is ";
                         bounds.print(Log::out());
                         Log::out() << "\n\tbounds0 is ";
                         bounds0.print(Log::out());
-                        Log::out() << ::std::endl;
+                        Log::out() << std::endl;
                     }
                 }
             }
@@ -529,12 +555,12 @@ void Abcd::insertPiNodesForComparison(CFGNode *block,
                     insertPiNodeForOpndAndAliases(block, op, 
                                                   bounds0.only_upper_bound());
                 else {
-                    if (Log::cat_opt_abcd()->isDebugEnabled()) {
+                    if (Log::isEnabled()) {
                         Log::out() << "insertPiNodesForComparison(4): bounds0 UB is Unknown;\n\tbounds is ";
                         bounds.print(Log::out());
                         Log::out() << "\n\tbounds0 is ";
                         bounds0.print(Log::out());
-                        Log::out() << ::std::endl;
+                        Log::out() << std::endl;
                     }
                 }
             } else {
@@ -549,12 +575,12 @@ void Abcd::insertPiNodesForComparison(CFGNode *block,
                           (ubConst >= 0)))) {
                         insertPiNodeForOpndAndAliases(block, op, bounds0);
                     } else {
-                        if (Log::cat_opt_abcd()->isDebugEnabled()) {
+                        if (Log::isEnabled()) {
                             Log::out() << "insertPiNodesForComparison(2): bounds0 LB is Unknown;\n\tbounds is ";
                             bounds.print(Log::out());
                             Log::out() << "\n\tbounds0 is ";
                             bounds0.print(Log::out());
-                            Log::out() << ::std::endl;
+                            Log::out() << std::endl;
                         }
                     }
                 }
@@ -567,12 +593,12 @@ void Abcd::insertPiNodesForComparison(CFGNode *block,
                 insertPiNodeForOpndAndAliases(block, op, 
                                               bounds0.only_lower_bound());
             } else {
-                if (Log::cat_opt_abcd()->isDebugEnabled()) {
+                if (Log::isEnabled()) {
                     Log::out() << "insertPiNodesForComparison(3): bounds0 LB is Unknown;\n\tbounds is ";
                     bounds.print(Log::out());
                     Log::out() << "\n\tbounds0 is ";
                     bounds0.print(Log::out());
-                    Log::out() << ::std::endl;
+                    Log::out() << std::endl;
                 }
             }
         } else { // bounds >= op, only upper bound on op
@@ -580,12 +606,12 @@ void Abcd::insertPiNodesForComparison(CFGNode *block,
                 insertPiNodeForOpndAndAliases(block, op, 
                                               bounds0.only_upper_bound());
             else {
-                if (Log::cat_opt_abcd()->isDebugEnabled()) {
+                if (Log::isEnabled()) {
                     Log::out() << "insertPiNodesForComparison(4): bounds0 UB is Unknown;\n\tbounds is ";
                     bounds.print(Log::out());
                     Log::out() << "\n\tbounds0 is ";
                     bounds0.print(Log::out());
-                    Log::out() << ::std::endl;
+                    Log::out() << std::endl;
                 }
             }
         }
@@ -596,8 +622,8 @@ void Abcd::insertPiNodesForComparison(CFGNode *block,
         assert(0);
         break;
     default:
-	assert(false);
-	break;
+    assert(false);
+    break;
     }
 }
 
@@ -613,8 +639,8 @@ void Abcd::insertPiNodesForComparison(CFGNode *block,
 //
 // We also must add the new Pi variable to our map.
 // 
-void Abcd::insertPiNodesForBranch(CFGNode *block, BranchInst *branchi, 
-                                  CFGEdge::Kind kind) // True or False only
+void Abcd::insertPiNodesForBranch(Node *block, BranchInst *branchi, 
+                                  Edge::Kind kind) // True or False only
 {
     Type::Tag instTypeTag = branchi->getType();
     if (!Type::isInteger(instTypeTag))
@@ -631,7 +657,7 @@ void Abcd::insertPiNodesForBranch(CFGNode *block, BranchInst *branchi,
                                        zeroBounds,
                                        op0,
                                        false,
-                                       (kind == CFGEdge::False)); // negate if false edge
+                                       (kind == Edge::Kind_False)); // negate if false edge
             break;
         case Cmp_NonZero:
             insertPiNodesForComparison(block,
@@ -639,10 +665,10 @@ void Abcd::insertPiNodesForBranch(CFGNode *block, BranchInst *branchi,
                                        zeroBounds,
                                        op0,
                                        false, 
-                                       (kind == CFGEdge::True)); // but negate if true edge
+                                       (kind == Edge::Kind_True)); // but negate if true edge
             break;
-	default:
-	    break;
+    default:
+        break;
         }
     } else {
         Opnd *op0 = branchi->getSrc(0);
@@ -656,7 +682,7 @@ void Abcd::insertPiNodesForBranch(CFGNode *block, BranchInst *branchi,
                                        bounds0,
                                        op1,
                                        false,
-                                       (kind == CFGEdge::False)); // negate for false edge
+                                       (kind == Edge::Kind_False)); // negate for false edge
         }
         if (!bounds1.isUnknown()) {
             insertPiNodesForComparison(block,
@@ -664,16 +690,16 @@ void Abcd::insertPiNodesForBranch(CFGNode *block, BranchInst *branchi,
                                        bounds1,
                                        op0,
                                        true,
-                                       (kind == CFGEdge::False)); // negate for false edge
+                                       (kind == Edge::Kind_False)); // negate for false edge
         }                                       
     }
 }
 
-SsaTmpOpnd* Abcd::getBlockTauPoint(CFGNode *block) {
+SsaTmpOpnd* Abcd::getBlockTauPoint(Node *block) {
     if ((lastTauPointBlock == block) && blockTauPoint) return blockTauPoint;
-    Inst *firstInst = block->getFirstInst();
-    Inst *inst = firstInst->next();
-    for (; inst != firstInst; inst = inst->next()) {
+    Inst *firstInst = (Inst*)block->getFirstInst();
+    Inst *inst = (Inst*)firstInst->getNextInst();
+    for (; inst != NULL; inst = inst->getNextInst()) {
         if (inst->getOpcode() == Op_TauPoint) {
             blockTauPoint = inst->getDst()->asSsaTmpOpnd();
             assert(blockTauPoint);
@@ -681,7 +707,7 @@ SsaTmpOpnd* Abcd::getBlockTauPoint(CFGNode *block) {
             return blockTauPoint;
         }
     }
-    for (inst = firstInst->next(); inst != firstInst; inst = inst->next()) {
+    for (inst = firstInst->getNextInst(); inst != NULL; inst = inst->getNextInst()) {
         if (inst->getOpcode() != Op_Phi) {
             break; // insert before inst.
         }
@@ -690,24 +716,30 @@ SsaTmpOpnd* Abcd::getBlockTauPoint(CFGNode *block) {
     TypeManager &tm = irManager.getTypeManager();
     SsaTmpOpnd *tauOpnd = irManager.getOpndManager().createSsaTmpOpnd(tm.getTauType());
     Inst* tauPoint = irManager.getInstFactory().makeTauPoint(tauOpnd);
-    if(Log::cat_opt_abcd()->isDebugEnabled()) {
+    if(Log::isEnabled()) {
         Log::out() << "Inserting tauPoint inst ";
         tauPoint->print(Log::out());
-        Log::out() << " before inst ";
-        inst->print(Log::out());
-        Log::out() << ::std::endl;
+        if (inst!=NULL) {
+            Log::out() << " before inst ";
+            inst->print(Log::out());
+        } 
+        Log::out() << std::endl;
     }
-    tauPoint->insertBefore(inst);
+    if (inst!=NULL) {
+        tauPoint->insertBefore(inst);
+    } else {
+        block->appendInst(tauPoint);
+    }
     blockTauPoint = tauOpnd;
     lastTauPointBlock = block;
     return tauOpnd;
 }
 
-SsaTmpOpnd* Abcd::getBlockTauEdge(CFGNode *block) {
+SsaTmpOpnd* Abcd::getBlockTauEdge(Node *block) {
     if ((lastTauEdgeBlock == block) && blockTauEdge) return blockTauEdge;
-    Inst *firstInst = block->getFirstInst();
-    Inst *inst = firstInst->next();
-    for (; inst != firstInst; inst = inst->next()) {
+    Inst *firstInst = (Inst*)block->getFirstInst();
+    Inst *inst = firstInst->getNextInst();
+    for (; inst != NULL; inst = inst->getNextInst()) {
         if (inst->getOpcode() == Op_TauEdge) {
             blockTauEdge = inst->getDst()->asSsaTmpOpnd();
             assert(blockTauEdge);
@@ -715,7 +747,7 @@ SsaTmpOpnd* Abcd::getBlockTauEdge(CFGNode *block) {
             return blockTauEdge;
         }
     }
-    for (inst = firstInst->next(); inst != firstInst; inst = inst->next()) {
+    for (inst = firstInst->getNextInst(); inst != NULL; inst = inst->getNextInst()) {
         if ((inst->getOpcode() != Op_Phi) && (inst->getOpcode() != Op_TauPoint)) {
             break; // insert before inst.
         }
@@ -724,14 +756,20 @@ SsaTmpOpnd* Abcd::getBlockTauEdge(CFGNode *block) {
     TypeManager &tm = irManager.getTypeManager();
     SsaTmpOpnd *tauOpnd = irManager.getOpndManager().createSsaTmpOpnd(tm.getTauType());
     Inst* tauEdge = irManager.getInstFactory().makeTauEdge(tauOpnd);
-    if(Log::cat_opt_abcd()->isDebugEnabled()) {
+    if(Log::isEnabled()) {
         Log::out() << "Inserting tauEdge inst ";
         tauEdge->print(Log::out());
-        Log::out() << " before inst ";
-        inst->print(Log::out());
-        Log::out() << ::std::endl;
+        if (inst!=NULL) {
+            Log::out() << " before inst ";
+            inst->print(Log::out()); 
+        }
+        Log::out() << std::endl;
     }
-    tauEdge->insertBefore(inst);
+    if (inst != NULL) {
+        tauEdge->insertBefore(inst);
+    }  else {
+        block->appendInst(tauEdge);
+    }
     blockTauEdge = tauOpnd;
     lastTauEdgeBlock = block;
     return tauOpnd;
@@ -739,39 +777,45 @@ SsaTmpOpnd* Abcd::getBlockTauEdge(CFGNode *block) {
 
 SsaTmpOpnd* Abcd::getTauUnsafe() {
     if (!tauUnsafe) {
-        CFGNode *head = irManager.getFlowGraph().getEntry();
-        Inst *entryLabel = head->getFirstInst();
+        Node *head = irManager.getFlowGraph().getEntryNode();
+        Inst *entryLabel = (Inst*)head->getFirstInst();
         // first search for one already there
-        Inst *inst = entryLabel->next();
-        while (inst != entryLabel) {
+        Inst *inst = entryLabel->getNextInst();
+        while (inst != NULL) {
             if (inst->getOpcode() == Op_TauUnsafe) {
                 tauUnsafe = inst->getDst()->asSsaTmpOpnd();
                 assert(tauUnsafe);
                 return tauUnsafe;
             }
-            inst = inst->next();
+            inst = inst->getNextInst();
         }
         // need to insert one
         TypeManager &tm = irManager.getTypeManager();
         SsaTmpOpnd *tauOpnd = irManager.getOpndManager().createSsaTmpOpnd(tm.getTauType());
         Inst *tauUnsafeInst = irManager.getInstFactory().makeTauUnsafe(tauOpnd);
         // place after label and Phi instructions
-        inst = entryLabel->next();
-        while (inst != entryLabel) {
+        inst = entryLabel->getNextInst();
+        while (inst != NULL) {
             Opcode opc = inst->getOpcode();
             if ((opc != Op_Phi) && (opc != Op_TauPi) && (opc != Op_TauPoint)) {
                 break;
             }
-            inst = inst->next();
+            inst = inst->getNextInst();
         }
-        if(Log::cat_opt_abcd()->isDebugEnabled()) {
+        if(Log::isEnabled()) {
             Log::out() << "Inserting tauUnsafe inst ";
             tauUnsafeInst->print(Log::out());
-            Log::out() << " before inst ";
-            inst->print(Log::out());
-            Log::out() << ::std::endl;
+            if (inst!=NULL) {
+                Log::out() << " before inst ";
+                inst->print(Log::out());
+            }
+            Log::out() << std::endl;
         }
-        tauUnsafeInst->insertBefore(inst);
+        if (inst!=NULL) {
+            tauUnsafeInst->insertBefore(inst);
+        } else {
+            head->appendInst(tauUnsafeInst);
+        }
         tauUnsafe = tauOpnd;
     }
     return tauUnsafe;
@@ -779,45 +823,51 @@ SsaTmpOpnd* Abcd::getTauUnsafe() {
 
 SsaTmpOpnd* Abcd::getTauSafe() {
     if (!tauSafe) {
-        CFGNode *head = irManager.getFlowGraph().getEntry();
-        Inst *entryLabel = head->getFirstInst();
+        Node *head = irManager.getFlowGraph().getEntryNode();
+        Inst *entryLabel = (Inst*)head->getFirstInst();
         // first search for one already there
-        Inst *inst = entryLabel->next();
-        while (inst != entryLabel) {
+        Inst *inst = entryLabel->getNextInst();
+        while (inst != NULL) {
             if (inst->getOpcode() == Op_TauSafe) {
                 tauSafe = inst->getDst()->asSsaTmpOpnd();
                 assert(tauSafe);
                 return tauSafe;
             }
-            inst = inst->next();
+            inst = inst->getNextInst();
         }
         // need to insert one
         TypeManager &tm = irManager.getTypeManager();
         SsaTmpOpnd *tauOpnd = irManager.getOpndManager().createSsaTmpOpnd(tm.getTauType());
         Inst *tauSafeInst = irManager.getInstFactory().makeTauSafe(tauOpnd);
         // place after label and Phi instructions
-        inst = entryLabel->next();
-        while (inst != entryLabel) {
+        inst = entryLabel->getNextInst();
+        while (inst != NULL) {
             Opcode opc = inst->getOpcode();
             if ((opc != Op_Phi) && (opc != Op_TauPi) && (opc != Op_TauPoint)) {
                 break;
             }
-            inst = inst->next();
+            inst = inst->getNextInst();
         }
-        if(Log::cat_opt_abcd()->isDebugEnabled()) {
+        if(Log::isEnabled()) {
             Log::out() << "Inserting tauSafe inst ";
             tauSafeInst->print(Log::out());
-            Log::out() << " before inst ";
-            inst->print(Log::out());
-            Log::out() << ::std::endl;
+            if (inst!=NULL) {
+                Log::out() << " before inst ";
+                inst->print(Log::out());
+            }
+            Log::out() << std::endl;
         }
-        tauSafeInst->insertBefore(inst);
+        if (inst!=NULL) {
+            tauSafeInst->insertBefore(inst);
+        } else {
+            head->appendInst(tauSafeInst);
+        }
         tauSafe = tauOpnd;
     }
     return tauSafe;
 };
 
-void Abcd::insertPiNodesForUnexceptionalPEI(CFGNode *block, Inst *lasti) 
+void Abcd::insertPiNodesForUnexceptionalPEI(Node *block, Inst *lasti) 
 {
     switch (lasti->getOpcode()) {
     case Op_TauCheckBounds:
@@ -827,10 +877,10 @@ void Abcd::insertPiNodesForUnexceptionalPEI(CFGNode *block, Inst *lasti)
             Opnd *idxOp = lasti->getSrc(1);
             Opnd *boundsOp = lasti->getSrc(0);
 
-            if (Log::cat_opt_abcd()->isDebugEnabled()) {
+            if (Log::isEnabled()) {
                 Log::out() << "Adding info about CheckBounds instruction ";
                 lasti->print(Log::out());
-                Log::out() << ::std::endl;
+                Log::out() << std::endl;
             }
             Type::Tag typetag = idxOp->getType()->tag;
             PiBound lb(typetag, int64(0));
@@ -849,10 +899,10 @@ void Abcd::insertPiNodesForUnexceptionalPEI(CFGNode *block, Inst *lasti)
             // the number of newarray elements must be in [0, MAXINT32]
             assert(lasti->getNumSrcOperands() == 1);
             Opnd *numElemOpnd = lasti->getSrc(0);
-            if (Log::cat_opt_abcd()->isDebugEnabled()) {
+            if (Log::isEnabled()) {
                 Log::out() << "Adding info about NewArray instruction ";
                 lasti->print(Log::out());
-                Log::out() << ::std::endl;
+                Log::out() << std::endl;
             }
             Opnd *tauOpnd = getBlockTauEdge(block); // need to use a TauEdge
             PiCondition bounds0(PiBound(numElemOpnd->getType()->tag, int64(0)),
@@ -866,10 +916,10 @@ void Abcd::insertPiNodesForUnexceptionalPEI(CFGNode *block, Inst *lasti)
             uint32 numOpnds = lasti->getNumSrcOperands();
             assert(numOpnds >= 1);
             StlSet<Opnd *> done(mm);
-            if (Log::cat_opt_abcd()->isDebugEnabled()) {
+            if (Log::isEnabled()) {
                 Log::out() << "Adding info about NewMultiArray instruction ";
                 lasti->print(Log::out());
-                Log::out() << ::std::endl;
+                Log::out() << std::endl;
             }
             Opnd *tauOpnd = 0;
             // the number of newarray elements must be in [0, MAXINT32]
@@ -893,9 +943,9 @@ void Abcd::insertPiNodesForUnexceptionalPEI(CFGNode *block, Inst *lasti)
 // Add a Pi node in the node if it is after
 // a test which tells something about a variable.
 // For now, don't bother with Exception edges.
-void Abcd::insertPiNodes(CFGNode *block)
+void Abcd::insertPiNodes(Node *block)
 {
-    CFGEdge *domEdge = 0;
+    Edge *domEdge = 0;
 
     // see if there is a predecessor block idom such that 
     //  (1) idom dominates this one
@@ -904,16 +954,16 @@ void Abcd::insertPiNodes(CFGNode *block)
     //  (4) idom has only 1 edge to this node
     
     // (1a) if a predecessor dominates it must be idom
-    CFGNode *idom = dominators.getIdom(block);
+    Node *idom = dominators.getIdom(block);
     
     // (3) must exist and have multiple out-edges
     if ((idom == NULL) || (idom->hasOnlyOneSuccEdge())) {
         return;
     }
     
-    if (Log::cat_opt_abcd()->isDebugEnabled()) {
+    if (Log::isEnabled()) {
         Log::out() << "Checking block " << (int)block->getId() << " with idom "
-                   << (int) idom->getId() << ::std::endl;
+                   << (int) idom->getId() << std::endl;
     }
 
     if (block->hasOnlyOnePredEdge()) {
@@ -922,12 +972,12 @@ void Abcd::insertPiNodes(CFGNode *block)
         domEdge = *(block->getInEdges().begin());
     } else { 
         // check (1b) and (2)
-        const CFGEdgeDeque &inedges = block->getInEdges();
-        typedef CFGEdgeDeque::const_iterator EdgeIter;
+        const Edges &inedges = block->getInEdges();
+        typedef Edges::const_iterator EdgeIter;
         EdgeIter eLast = inedges.end();
         for (EdgeIter eIter = inedges.begin(); eIter != eLast; eIter++) {
-            CFGEdge *inEdge = *eIter;
-            CFGNode *predBlock = inEdge->getSourceNode();
+            Edge *inEdge = *eIter;
+            Node *predBlock = inEdge->getSourceNode();
             if (predBlock == idom) {
                 // (1b) found idom
                 if (domEdge) {
@@ -943,19 +993,19 @@ void Abcd::insertPiNodes(CFGNode *block)
     }
 
     if (domEdge) { 
-        CFGEdge *inEdge = domEdge;
-        CFGNode *predBlock = idom;
-        if (Log::cat_opt_abcd()->isDebugEnabled()) {
+        Edge *inEdge = domEdge;
+        Node *predBlock = idom;
+        if (Log::isEnabled()) {
             Log::out() << "Checking branch for " << (int)block->getId() << " with idom "
-                       << (int) idom->getId() << ::std::endl;
+                       << (int) idom->getId() << std::endl;
         }
         if (!predBlock->hasOnlyOneSuccEdge()) {
-            CFGEdge::Kind kind = inEdge->getEdgeType();
+            Edge::Kind kind = inEdge->getKind();
             switch (kind) {
-            case CFGEdge::True:
-            case CFGEdge::False:
+            case Edge::Kind_True:
+            case Edge::Kind_False:
                 {
-                    Inst* branchi1 = predBlock->getLastInst();
+                    Inst* branchi1 = (Inst*)predBlock->getLastInst();
                     assert(branchi1 != NULL);
                     BranchInst* branchi = branchi1->asBranchInst();
                     if (branchi && branchi->isConditionalBranch()) {
@@ -966,15 +1016,15 @@ void Abcd::insertPiNodes(CFGNode *block)
                 }
                 break;
                 
-            case CFGEdge::Exception: 
+            case Edge::Kind_Dispatch: 
                 return;
 
-            case CFGEdge::Unconditional:
+            case Edge::Kind_Unconditional:
                 // Previous block must have a PEI
                 // since it had multiple out-edges.
                 // This is the unexceptional condition.
                 { 
-                    Inst* lasti = predBlock->getLastInst();
+                    Inst* lasti = (Inst*)predBlock->getLastInst();
                     assert(lasti != NULL);
                     insertPiNodesForUnexceptionalPEI(block, lasti);
                 }
@@ -984,18 +1034,16 @@ void Abcd::insertPiNodes(CFGNode *block)
                 // they imply a Pi-like action.
                 break;
                 
-            case CFGEdge::Catch:
-            case CFGEdge::Switch:
-            case CFGEdge::Unknown:
+            case Edge::Kind_Catch:
                 break;
-	    default:
-		break;
+        default:
+        break;
             };
         }
     }
 }
 
-void Abcd::renamePiVariables(CFGNode *block) 
+void Abcd::renamePiVariables(Node *block) 
 {
     // For each variable use in the block, check for a Pi version in
     // the piTable.  Since we are visiting in preorder over dominator
@@ -1005,13 +1053,12 @@ void Abcd::renamePiVariables(CFGNode *block)
     // we are past the Pi instructions
     
     // first process any pi nodes, just the RHSs
-    Inst* headInst = block->getFirstInst();
+    Inst* headInst = (Inst*)block->getFirstInst();
     for (int phase=0; phase < 2; ++phase) {
         // phase 0: remap just Pi node source operands
         // phase 1: add Pi remappings, remap source operands of other instructions
     
-        for (Inst* inst = headInst->next(); 
-             inst != headInst; inst = inst->next()) {
+        for (Inst* inst = headInst->getNextInst(); inst != NULL; inst = inst->getNextInst()) {
             
             if (inst->getOpcode() == Op_TauPi) {
                 if (phase == 1) {
@@ -1026,12 +1073,12 @@ void Abcd::renamePiVariables(CFGNode *block)
                         }
                     }
                     piMap->insert(orgOpnd, dstOpnd);
-                    if (Log::cat_opt_abcd()->isDebugEnabled()) {
+                    if (Log::isEnabled()) {
                         Log::out() << "adding remap for Pi of ";
                         orgOpnd->print(Log::out());
                         Log::out() << " to ";
                         inst->getDst()->print(Log::out());
-                        Log::out() << ::std::endl;
+                        Log::out() << std::endl;
                     }
                     
                     continue; // don't remap Pi sources;
@@ -1057,31 +1104,31 @@ void Abcd::renamePiVariables(CFGNode *block)
 
             if (inst->getOpcode() == Op_TauPi) {
                 // for a Pi, remap variables appearing in the condition as well
-                if (Log::cat_opt_abcd()->isDebugEnabled()) {
+                if (Log::isEnabled()) {
                     Log::out() << "remapping condition in ";
                     inst->print(Log::out());
-                    Log::out() << ::std::endl;
+                    Log::out() << std::endl;
                 }
                 TauPiInst *thePiInst = inst->asTauPiInst();
                 assert(thePiInst);
                 PiCondition *cond = thePiInst->cond;
-                if (Log::cat_opt_abcd()->isDebugEnabled()) {
+                if (Log::isEnabled()) {
                     Log::out() << "  original condition is ";
                     cond->print(Log::out());
-                    Log::out() << ::std::endl;
+                    Log::out() << std::endl;
                 }
                 Opnd *lbRemap = cond->getLb().getVar().the_var;
                 if (lbRemap) {
-                    if (Log::cat_opt_abcd()->isDebugEnabled()) {
+                    if (Log::isEnabled()) {
                         Log::out() << "  has lbRemap=";
                         lbRemap->print(Log::out());
-                        Log::out() << ::std::endl;
+                        Log::out() << std::endl;
                     }
                     if (lbRemap->isPiOpnd())
                         lbRemap = lbRemap->asPiOpnd()->getOrg();
                     Opnd *lbRemapTo = piMap->lookup(lbRemap);
                     if (lbRemapTo) {
-                        if (Log::cat_opt_abcd()->isDebugEnabled()) {
+                        if (Log::isEnabled()) {
                             Log::out() << "adding remap of lbRemap=";
                             lbRemap->print(Log::out());
                             Log::out() << " to lbRemapTo=";
@@ -1090,30 +1137,30 @@ void Abcd::renamePiVariables(CFGNode *block)
                             cond->print(Log::out());
                         }
                         PiCondition remapped(*cond, lbRemap, lbRemapTo);
-                        if (Log::cat_opt_abcd()->isDebugEnabled()) {
+                        if (Log::isEnabled()) {
                             Log::out() << " YIELDS1 ";
                             remapped.print(Log::out());
                         }
                         *cond = remapped;
-                        if (Log::cat_opt_abcd()->isDebugEnabled()) {
+                        if (Log::isEnabled()) {
                             Log::out() << " YIELDS ";
                             cond->print(Log::out());
-                            Log::out() << ::std::endl;
+                            Log::out() << std::endl;
                         }
                     }
                 }
                 Opnd *ubRemap = cond->getUb().getVar().the_var;
                 if (ubRemap && (lbRemap != ubRemap)) {
-                    if (Log::cat_opt_abcd()->isDebugEnabled()) {
+                    if (Log::isEnabled()) {
                         Log::out() << "  has ubRemap=";
                         ubRemap->print(Log::out());
-                        Log::out() << ::std::endl;
+                        Log::out() << std::endl;
                     }
                     if (ubRemap->isPiOpnd())
                         ubRemap = ubRemap->asPiOpnd()->getOrg();
                     Opnd *ubRemapTo = piMap->lookup(ubRemap);
                     if (ubRemapTo) {
-                        if (Log::cat_opt_abcd()->isDebugEnabled()) {
+                        if (Log::isEnabled()) {
                             Log::out() << "adding remap of ubRemap=";
                             ubRemap->print(Log::out());
                             Log::out() << " to ubRemapTo=";
@@ -1122,15 +1169,15 @@ void Abcd::renamePiVariables(CFGNode *block)
                             cond->print(Log::out());
                         }
                         PiCondition remapped(*cond, ubRemap, ubRemapTo);
-                        if (Log::cat_opt_abcd()->isDebugEnabled()) {
+                        if (Log::isEnabled()) {
                             Log::out() << " YIELDS1 ";
                             remapped.print(Log::out());
                         }
                         *cond = remapped;
-                        if (Log::cat_opt_abcd()->isDebugEnabled()) {
+                        if (Log::isEnabled()) {
                             Log::out() << " YIELDS ";
                             cond->print(Log::out());
-                            Log::out() << ::std::endl;
+                            Log::out() << std::endl;
                         }
                     }
                 }
@@ -1166,7 +1213,7 @@ void Abcd::removeRedundantBoundsChecks()
 // a ScopedDomNodeInstWalker, forward/preorder
 class RemovePiWalker {
     Abcd *thePass;
-    CFGNode *block;
+    Node *block;
 public:
     void startNode(DominatorNode *domNode) { block = domNode->getNode(); };
     void applyToInst(Inst *i) { thePass->removePiNodes(block, i); };
@@ -1193,7 +1240,7 @@ void Abcd::removePiNodes()
                                          mm);
 }
 
-void Abcd::removePiNodes(CFGNode *block, Inst *inst)
+void Abcd::removePiNodes(Node *block, Inst *inst)
 {
     AbcdReasons *why;
     if (inst->getOpcode() == Op_TauPi) {
@@ -1208,7 +1255,7 @@ void Abcd::removePiNodes(CFGNode *block, Inst *inst)
         inst->setDst(OpndManager::getNullOpnd());
         Inst* copy = irManager.getInstFactory().makeCopy(dstOpnd,srcOpnd);
         copy->insertBefore(inst);
-        irManager.getFlowGraph().eliminateCheck(block, inst, false);
+        FlowGraph::eliminateCheck(irManager.getFlowGraph(),block, inst, false);
     } else {
         uint32 numOpnds = inst->getNumSrcOperands();
         for (uint32 i=0; i<numOpnds; i++) {
@@ -1274,12 +1321,12 @@ void Abcd::removePiNodes(CFGNode *block, Inst *inst)
                 if (inst->getOverflowModifier() == Overflow_None) {
                     new_check->setOverflowModifier(Overflow_None);
                 }
-                if (Log::cat_opt_abcd()->isDebugEnabled()) {
+                if (Log::isEnabled()) {
                     Log::out() << " inserting ";
                     new_check->print(Log::out());
                     Log::out() << " in place of ";
                     inst->print(Log::out());
-                    Log::out() << ::std::endl;
+                    Log::out() << std::endl;
                 }
                 new_check->insertBefore(inst);
                 inst->unlink();
@@ -1303,14 +1350,14 @@ void Abcd::removePiNodes(CFGNode *block, Inst *inst)
                 if (inst->getOverflowModifier() == Overflow_None) {
                     new_check->setOverflowModifier(Overflow_None);
                 }
-                if (Log::cat_opt_abcd()->isDebugEnabled()) {
+                if (Log::isEnabled()) {
                     Log::out() << " inserting ";
                     ldcInst->print(Log::out());
                     Log::out() << ";";
                     new_check->print(Log::out());
                     Log::out() << "; in place of ";
                     inst->print(Log::out());
-                    Log::out() << ::std::endl;
+                    Log::out() << std::endl;
                 }
                 new_check->insertBefore(inst);
                 ldcInst->insertBefore(new_check);
@@ -1322,9 +1369,9 @@ void Abcd::removePiNodes(CFGNode *block, Inst *inst)
 
 void Abcd::markInstToEliminate(Inst *i)
 {
-    if (Log::cat_opt_abcd()->isDebugEnabled()) {
+    if (Log::isEnabled()) {
         Log::out() << "Can eliminate instruction "; i->print(Log::out());
-        Log::out() << ::std::endl;
+        Log::out() << std::endl;
     }
     typedef StlVector<InstReasonPair>::iterator itertype;
     itertype start = canEliminate.begin();
@@ -1337,9 +1384,9 @@ void Abcd::markInstToEliminate(Inst *i)
 
 void Abcd::markInstToEliminateAndWhy(Inst *i, AbcdReasons *why)
 {
-    if (Log::cat_opt_abcd()->isDebugEnabled()) {
+    if (Log::isEnabled()) {
         Log::out() << "Can eliminate instruction "; i->print(Log::out());
-        Log::out() << ::std::endl;
+        Log::out() << std::endl;
     }
     typedef StlVector<InstReasonPair>::iterator itertype;
     itertype start = canEliminate.begin();
@@ -1349,7 +1396,7 @@ void Abcd::markInstToEliminateAndWhy(Inst *i, AbcdReasons *why)
         canEliminate.insert(lb, InstReasonPair(i, why));
     }
     AbcdReasons *why2;
-	bool ism2e = isMarkedToEliminate(i, why2);
+    bool ism2e = isMarkedToEliminate(i, why2);
     if( !(ism2e && (why == why2)) ) assert(0);
 }
 
@@ -1379,9 +1426,9 @@ bool Abcd::isMarkedToEliminate(Inst *i, AbcdReasons *&why)
 
 void Abcd::markInstToEliminateLB(Inst *i)
 {
-    if (Log::cat_opt_abcd()->isDebugEnabled()) {
+    if (Log::isEnabled()) {
         Log::out() << "Can eliminate LB check in instruction "; i->print(Log::out());
-        Log::out() << ::std::endl;
+        Log::out() << std::endl;
     }
     typedef StlVector<InstReasonPair>::iterator itertype;
     itertype start = canEliminateLB.begin();
@@ -1394,11 +1441,11 @@ void Abcd::markInstToEliminateLB(Inst *i)
 
 void Abcd::markInstToEliminateLBAndWhy(Inst *i, AbcdReasons *why)
 {
-    if (Log::cat_opt_abcd()->isDebugEnabled()) {
+    if (Log::isEnabled()) {
         Log::out() << "Can eliminate LB check in instruction "; i->print(Log::out());
         Log::out() << " for why=" << ::std::hex << (void *) why << ::std::dec << "=";
         why->print(Log::out());
-        Log::out() << ::std::endl;
+        Log::out() << std::endl;
     }
     typedef StlVector<InstReasonPair>::iterator itertype;
     itertype start = canEliminateLB.begin();
@@ -1408,7 +1455,7 @@ void Abcd::markInstToEliminateLBAndWhy(Inst *i, AbcdReasons *why)
         canEliminateLB.insert(lb, InstReasonPair(i, why));
     }
     AbcdReasons *why2;
-	bool ism2eLB = isMarkedToEliminateLB(i, why2);
+    bool ism2eLB = isMarkedToEliminateLB(i, why2);
     if( !(ism2eLB && (why == why2)) ) assert(0);
 }
 
@@ -1438,9 +1485,9 @@ bool Abcd::isMarkedToEliminateLB(Inst *i, AbcdReasons *&why)
 
 void Abcd::markInstToEliminateUB(Inst *i)
 {
-    if (Log::cat_opt_abcd()->isDebugEnabled()) {
+    if (Log::isEnabled()) {
         Log::out() << "Can eliminate UB of instruction "; i->print(Log::out());
-        Log::out() << ::std::endl;
+        Log::out() << std::endl;
     }
     typedef StlVector<InstReasonPair>::iterator itertype;
     itertype start = canEliminateUB.begin();
@@ -1453,9 +1500,9 @@ void Abcd::markInstToEliminateUB(Inst *i)
 
 void Abcd::markInstToEliminateUBAndWhy(Inst *i, AbcdReasons *why)
 {
-    if (Log::cat_opt_abcd()->isDebugEnabled()) {
+    if (Log::isEnabled()) {
         Log::out() << "Can eliminate UB of instruction "; i->print(Log::out());
-        Log::out() << ::std::endl;
+        Log::out() << std::endl;
     }
     typedef StlVector<InstReasonPair>::iterator itertype;
     itertype start = canEliminateUB.begin();
@@ -1465,7 +1512,7 @@ void Abcd::markInstToEliminateUBAndWhy(Inst *i, AbcdReasons *why)
         canEliminateUB.insert(lb, InstReasonPair(i, why));
     }
     AbcdReasons *why2;
-	bool ism2eUB = isMarkedToEliminateUB(i, why2);
+    bool ism2eUB = isMarkedToEliminateUB(i, why2);
     if( !(ism2eUB && (why == why2)) ) assert(0);
 }
 
@@ -1587,33 +1634,32 @@ bool Abcd::getAliases(Opnd *opnd, AbcdAliases *aliases, int64 addend)
 }
 
 template <class inst_fun_type>
-struct NodeInst2NodeFun : ::std::unary_function<CFGNode *, void>
+struct NodeInst2NodeFun : ::std::unary_function<Node *, void>
 {
     inst_fun_type underlying_fun;
     NodeInst2NodeFun(const inst_fun_type &theFun) : underlying_fun(theFun) {};
-    void operator()(CFGNode *theNode) {
-        Inst *first = theNode->getFirstInst();
-        Inst *thisinst = first;
+    void operator()(Node *theNode) {
+        Inst *thisinst = (Inst*)theNode->getFirstInst();
         assert(thisinst);
         do {
             underlying_fun(theNode, thisinst);
-            thisinst = thisinst->next();
-        } while (thisinst != first);
+            thisinst = thisinst->getNextInst();
+        } while (thisinst != NULL);
     }
 };
 
-struct SsaCheckingFun : public ::std::binary_function<CFGNode *, Inst *, void> {
-    void operator()(CFGNode *node, Inst *i) {
+struct SsaCheckingFun : public ::std::binary_function<Node *, Inst *, void> {
+    void operator()(Node *node, Inst *i) {
         if (i->getOpcode() == Op_Phi) {
-            const CFGEdgeDeque& edges2 = node->getInEdges();
+            const Edges& edges2 = node->getInEdges();
             uint32 numEdges = (uint32) edges2.size();
             uint32 numOps = i->getNumSrcOperands();
-			if( !(numOps == numEdges) ) assert(0);
+            if( !(numOps == numEdges) ) assert(0);
         }
     }
 };
 
-void checkSSA(FlowGraph *flowgraph)
+void checkSSA(ControlFlowGraph* flowgraph)
 {
     SsaCheckingFun checkInst;
     NodeInst2NodeFun<SsaCheckingFun> checkNode(checkInst);
@@ -1731,12 +1777,12 @@ SsaTmpOpnd *Abcd::getReasonTau(AbcdReasons *reason,
         SsaTmpOpnd *tauDst = opndManager.createSsaTmpOpnd(typeManager.getTauType());
         Inst *tauAndInst = instFactory.makeTauAnd(tauDst, numReasons, newAndOpnds);
 
-        if (Log::cat_opt_abcd()->isDebugEnabled()) {
+        if (Log::isEnabled()) {
             Log::out() << "Inserting tauAndInst=(";
             tauAndInst->print(Log::out());
             Log::out() << ") before useSite= ";
             useSite->print(Log::out());
-            Log::out() << ")" << ::std::endl;
+            Log::out() << ")" << std::endl;
         }
 
         tauAndInst->insertBefore(useSite);
@@ -1772,9 +1818,9 @@ SsaTmpOpnd *Abcd::makeReasonPhi(Opnd *derefVar, StlVector<AbcdReasons *> &reason
         if (stVarLoc->getOpcode() != Op_StVar) {
             assert(stVarLoc->getOpcode() == Op_Phi);
             // make sure we place stvar in a legal location
-            Inst *nextInst = stVarLoc->next();
+            Inst *nextInst = stVarLoc->getNextInst();
             while ((nextInst->getOpcode() == Op_Phi) && (nextInst->getOpcode() == Op_TauPi)) {
-                nextInst = nextInst->next();
+                nextInst = nextInst->getNextInst();
             }
             stVarLoc = nextInst;
         }
@@ -1785,12 +1831,12 @@ SsaTmpOpnd *Abcd::makeReasonPhi(Opnd *derefVar, StlVector<AbcdReasons *> &reason
         assert(varToStTo);
         Inst *tauStVarInst = instFactory.makeStVar(varToStTo, tauToStVar);
 
-        if (Log::cat_opt_abcd()->isDebugEnabled()) {
+        if (Log::isEnabled()) {
             Log::out() << "Inserting tauStVarInst=(";
             tauStVarInst->print(Log::out());
             Log::out() << ") after stVarLoc= ";
             stVarLoc->print(Log::out());
-            Log::out() << ")" << ::std::endl;
+            Log::out() << ")" << std::endl;
         }
         tauStVarInst->insertAfter(stVarLoc);
     }
@@ -1799,26 +1845,26 @@ SsaTmpOpnd *Abcd::makeReasonPhi(Opnd *derefVar, StlVector<AbcdReasons *> &reason
     Inst *derefVarInst = derefVar->getInst();
     assert(derefVarInst->getOpcode() == Op_Phi);
 
-    if (Log::cat_opt_abcd()->isDebugEnabled()) {
+    if (Log::isEnabled()) {
         Log::out() << "Inserting tauPhiInst=(";
         tauPhiInst->print(Log::out());
         Log::out() << ") before derefVarInst= ";
         derefVarInst->print(Log::out());
-        Log::out() << ")" << ::std::endl;
+        Log::out() << ")" << std::endl;
     }
 
     tauPhiInst->insertBefore(derefVarInst);
     Inst *tauLdVarInst = instFactory.makeLdVar(tauResOpnd, tauPhiDstOpnd);
-    Inst *ldVarLoc = tauPhiInst->next();
-    while ((ldVarLoc->getOpcode() == Op_Phi) || (ldVarLoc->getOpcode() == Op_TauPi)) {
-        ldVarLoc = ldVarLoc->next();
+    Inst *ldVarLoc = tauPhiInst->getNextInst();
+    while (ldVarLoc!=NULL && (ldVarLoc->getOpcode() == Op_Phi) || (ldVarLoc->getOpcode() == Op_TauPi)) {
+        ldVarLoc = ldVarLoc->getNextInst();
     }
-    if (Log::cat_opt_abcd()->isDebugEnabled()) {
+    if (Log::isEnabled()) {
         Log::out() << "Inserting tauLdVarInst=(";
         tauLdVarInst->print(Log::out());
         Log::out() << ") before ldVarLoc= ";
         ldVarLoc->print(Log::out());
-        Log::out() << ")" << ::std::endl;
+        Log::out() << ")" << std::endl;
     }
     tauLdVarInst->insertBefore(ldVarLoc);
     return tauResOpnd;

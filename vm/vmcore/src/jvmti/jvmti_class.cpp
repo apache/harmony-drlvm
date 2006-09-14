@@ -29,6 +29,7 @@
 #include "Class.h"
 #include "object_handles.h"
 #include "jni_utils.h"
+#include "jvmti_internal.h"
 #include "open/vm_util.h"
 #include "vm_strings.h"
 #include "environment.h"
@@ -318,6 +319,9 @@ jvmtiGetClassSignature( jvmtiEnv* env,
 
     CHECK_EVERYTHING();
 
+    if (! is_valid_class_object(handle))
+        return JVMTI_ERROR_INVALID_CLASS;
+
     /**
      * Get class from handle, set error if need it
      */
@@ -376,6 +380,9 @@ jvmtiGetClassStatus(jvmtiEnv* env, jclass handle, jint* status_ptr)
     jvmtiPhase phases[] = {JVMTI_PHASE_START, JVMTI_PHASE_LIVE};
 
     CHECK_EVERYTHING();
+
+    if (! is_valid_class_object(handle))
+        return JVMTI_ERROR_INVALID_CLASS;
 
     Class* cl = get_class_from_handle(env,
             jvmtiPhase (JVMTI_PHASE_START | JVMTI_PHASE_LIVE), handle, status_ptr,
@@ -443,6 +450,9 @@ jvmtiGetSourceFileName(jvmtiEnv* env, jclass handle, char** res)
     CHECK_EVERYTHING();
     CHECK_CAPABILITY(can_get_source_file_name);
 
+    if (! is_valid_class_object(handle))
+        return JVMTI_ERROR_INVALID_CLASS;
+
     Class* cl = get_class_from_handle(env,
             jvmtiPhase (JVMTI_PHASE_START | JVMTI_PHASE_LIVE), handle, res,
             &errorCode);
@@ -483,6 +493,9 @@ jvmtiGetClassModifiers(jvmtiEnv* env, jclass handle, jint* modifiers_ptr)
 
     CHECK_EVERYTHING();
 
+    if (! is_valid_class_object(handle))
+        return JVMTI_ERROR_INVALID_CLASS;
+
     Class* cl = get_class_from_handle(env,
             jvmtiPhase (JVMTI_PHASE_START | JVMTI_PHASE_LIVE), handle, modifiers_ptr,
             &errorCode);
@@ -515,6 +528,9 @@ jvmtiGetClassMethods(jvmtiEnv* env, jclass handle, jint* method_count_ptr,
     jvmtiPhase phases[] = {JVMTI_PHASE_START, JVMTI_PHASE_LIVE};
 
     CHECK_EVERYTHING();
+
+    if (! is_valid_class_object(handle))
+        return JVMTI_ERROR_INVALID_CLASS;
 
     Class* cl = get_class_from_handle(env,
             jvmtiPhase (JVMTI_PHASE_START | JVMTI_PHASE_LIVE), handle, method_count_ptr, methods_ptr,
@@ -557,6 +573,9 @@ jvmtiGetClassFields(jvmtiEnv* env, jclass handle, jint* field_count_ptr,
 
     CHECK_EVERYTHING();
 
+    if (! is_valid_class_object(handle))
+        return JVMTI_ERROR_INVALID_CLASS;
+
     Class* cl = get_class_from_handle(env,
             jvmtiPhase (JVMTI_PHASE_START | JVMTI_PHASE_LIVE), handle,
             field_count_ptr, fields_ptr, &errorCode);
@@ -597,6 +616,9 @@ jvmtiGetImplementedInterfaces(jvmtiEnv* env, jclass klass, jint* interface_count
     jvmtiPhase phases[] = {JVMTI_PHASE_START, JVMTI_PHASE_LIVE};
 
     CHECK_EVERYTHING();
+
+    if (! is_valid_class_object(klass))
+        return JVMTI_ERROR_INVALID_CLASS;
 
     Class* cl = get_class_from_handle(env,
             jvmtiPhase (JVMTI_PHASE_START | JVMTI_PHASE_LIVE), klass,
@@ -647,6 +669,9 @@ jvmtiIsInterface(jvmtiEnv* env, jclass handle, jboolean* is_interface_ptr)
 
     CHECK_EVERYTHING();
 
+    if (! is_valid_class_object(handle))
+        return JVMTI_ERROR_INVALID_CLASS;
+
     Class* cl = get_class_from_handle(env,
                                       jvmtiPhase (JVMTI_PHASE_START | JVMTI_PHASE_LIVE),
                                       handle, is_interface_ptr, &errorCode);
@@ -676,6 +701,9 @@ jvmtiIsArrayClass(jvmtiEnv* env, jclass handle, jboolean* is_array_class_ptr)
 
     CHECK_EVERYTHING();
 
+    if (! is_valid_class_object(handle))
+        return JVMTI_ERROR_INVALID_CLASS;
+
     Class* cl = get_class_from_handle(env,
                                       jvmtiPhase (JVMTI_PHASE_START | JVMTI_PHASE_LIVE),
                                       handle, is_array_class_ptr, &errorCode);
@@ -703,6 +731,9 @@ jvmtiError JNICALL jvmtiGetClassLoader(jvmtiEnv* env, jclass handle, jobject* cl
     jvmtiPhase phases[] = {JVMTI_PHASE_START, JVMTI_PHASE_LIVE};
 
     CHECK_EVERYTHING();
+
+    if (! is_valid_class_object(handle))
+        return JVMTI_ERROR_INVALID_CLASS;
 
     Class* clss = get_class_from_handle(env,
                                       jvmtiPhase (JVMTI_PHASE_START | JVMTI_PHASE_LIVE),
@@ -740,6 +771,9 @@ jvmtiGetSourceDebugExtension(jvmtiEnv* env, jclass handle, char** source_debug_e
     jvmtiPhase phases[] = {JVMTI_PHASE_START, JVMTI_PHASE_LIVE};
 
     CHECK_EVERYTHING();
+
+    if (! is_valid_class_object(handle))
+        return JVMTI_ERROR_INVALID_CLASS;
 
     Class* clss = get_class_from_handle(env,
                                       jvmtiPhase (JVMTI_PHASE_START | JVMTI_PHASE_LIVE),

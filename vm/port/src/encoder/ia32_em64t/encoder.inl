@@ -1,6 +1,21 @@
+/*
+ *  Copyright 2005-2006 The Apache Software Foundation or its licensors, as applicable.
+ *
+ *  Licensed under the Apache License, Version 2.0 (the "License");
+ *  you may not use this file except in compliance with the License.
+ *  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ *  Unless required by applicable law or agreed to in writing, software
+ *  distributed under the License is distributed on an "AS IS" BASIS,
+ *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ *  See the License for the specific language governing permissions and
+ *  limitations under the License.
+ */
 /**
  * @author Alexander V. Astapchuk
- * @version $Revision: 1.1.2.3.4.1 $
+ * @version $Revision$
  */
 #include <stdio.h>
 #include <assert.h>
@@ -36,8 +51,12 @@ inline static Mnemonic map_shift(Shift_Opcode shc) {
     return map_of_shift_opcode_2_mnemonic[shc];
 }
 
-inline static bool fit8( int64 val ) {
+inline static bool fit8(int64 val) {
     return (CHAR_MIN <= val) && (val <= CHAR_MAX);
+}
+
+inline static bool fit32(int64 val) {
+    return val == (int64)(int32)val;
 }
 
 inline static void add_r(EncoderBase::Operands & args, const R_Opnd & r, Opnd_Size sz) {
@@ -293,6 +312,34 @@ ENCODER_DECLARE_EXPORT char * mov(char * stream, const RM_Opnd & rm, const Imm_O
     return (char*)EncoderBase::encode(stream, Mnemonic_MOV, args);
 }
 
+ENCODER_DECLARE_EXPORT char * movd(char * stream, const RM_Opnd & rm, const XMM_Opnd & xmm) {
+    EncoderBase::Operands args;
+    add_rm(args, rm, size_32);
+    add_xmm(args, xmm, false);
+    return (char*)EncoderBase::encode(stream, Mnemonic_MOVD, args);
+}
+
+ENCODER_DECLARE_EXPORT char * movd(char * stream, const XMM_Opnd & xmm, const RM_Opnd & rm) {
+    EncoderBase::Operands args;
+    add_xmm(args, xmm, false);
+    add_rm(args, rm, size_32);
+    return (char*)EncoderBase::encode(stream, Mnemonic_MOVD, args);
+}
+
+ENCODER_DECLARE_EXPORT char * movq(char * stream, const RM_Opnd & rm, const XMM_Opnd & xmm) {
+    EncoderBase::Operands args;
+    add_rm(args, rm, size_64);
+    add_xmm(args, xmm, true);
+    return (char*)EncoderBase::encode(stream, Mnemonic_MOVQ, args);
+}
+
+ENCODER_DECLARE_EXPORT char * movq(char * stream, const XMM_Opnd & xmm, const RM_Opnd & rm) {
+    EncoderBase::Operands args;
+    add_xmm(args, xmm, true);
+    add_rm(args, rm, size_64);
+    return (char*)EncoderBase::encode(stream, Mnemonic_MOVQ, args);
+}
+
 ENCODER_DECLARE_EXPORT char * movsx(char * stream, const R_Opnd & r, const RM_Opnd & rm, Opnd_Size sz) {
     EncoderBase::Operands args;
     add_r(args, r, n_size);
@@ -303,6 +350,9 @@ ENCODER_DECLARE_EXPORT char * movsx(char * stream, const R_Opnd & r, const RM_Op
 ENCODER_DECLARE_EXPORT char * movzx(char * stream, const R_Opnd & r, const RM_Opnd & rm, Opnd_Size sz) {
     EncoderBase::Operands args;
     add_r(args, r, n_size);
+    // movzx r64, r/m32 is not available on em64t
+    // mov r32, r/m32 should zero out upper bytes
+    assert(sz <= size_16);
     add_rm(args, rm, sz);
     return (char*)EncoderBase::encode(stream, Mnemonic_MOVZX, args);
 }
@@ -510,6 +560,7 @@ ENCODER_DECLARE_EXPORT char * wait(char * stream) {
 ENCODER_DECLARE_EXPORT char * loop(char * stream, const Imm_Opnd & imm) {
     EncoderBase::Operands args;
     assert(imm.get_size() == size_8);
+    args.add(RegName_ECX);
     add_imm(args, imm);
     return (char*)EncoderBase::encode(stream, Mnemonic_LOOP, args);
 }
@@ -535,10 +586,28 @@ ENCODER_DECLARE_EXPORT char * jump(char * stream, const RM_Opnd & rm, Opnd_Size 
     return (char*)EncoderBase::encode(stream, Mnemonic_JMP, args);
 }
 
+/**
+ * @note On EM64T: if target lies beyond 2G (does not fit into 32 bit 
+ *       offset) then generates indirect jump using RAX (whose content is
+ *       destroyed).
+ */
 ENCODER_DECLARE_EXPORT char * jump(char * stream, char * target) {
 #ifdef _EM64T_
-//#error "unimplemented functionality !"
-    return NULL;
+    int64 offset = target - stream;
+    if (fit8(offset)) {
+        // sub 2 bytes for the short version
+        offset -= 2;
+        // use 8-bit signed relative form
+        return jump8(stream, Imm_Opnd(size_8, offset));
+    } else if (fit32(offset)) {
+        // sub 5 bytes for the long version
+        offset -= 5;
+        // use 32-bit signed relative form
+        return jump32(stream, Imm_Opnd(size_32, offset));
+    }
+    // need to use absolute indirect jump
+    stream = mov(stream, rax_opnd, Imm_Opnd(size_64, (int64)target), size_64);    
+    return jump(stream, rax_opnd, size_64);
 #else
     int32 offset = target - stream;
     if (fit8(offset)) {
@@ -554,22 +623,11 @@ ENCODER_DECLARE_EXPORT char * jump(char * stream, char * target) {
 #endif
 }
 
-/*
-ENCODER_DECLARE_EXPORT char *jump(char * stream, int32 disp) {
-    // sub 2 bytes for the short version
-    disp -= 2;
-    if (fit8( disp )) {
-        // use 8-bit signed relative form
-        return jump8(stream, Imm_Opnd(size_8, disp));
-    }
-    // use 32-bit signed relative form
-    disp -= 3; // 3 more bytes for the long version
-    return jump32(stream, Imm_Opnd(size_32, disp));
-}
-*/
-
 // branch
-ENCODER_DECLARE_EXPORT char * branch8(char * stream, ConditionCode cond, const Imm_Opnd & imm, InstrPrefix pref) {
+ENCODER_DECLARE_EXPORT char * branch8(char * stream, ConditionCode cond, 
+                                      const Imm_Opnd & imm, 
+                                      InstrPrefix pref)
+{
     if (pref != no_prefix) {
         assert(pref == hint_branch_taken_prefix || pref == hint_branch_taken_prefix);
         stream = prefix(stream, pref);
@@ -581,7 +639,10 @@ ENCODER_DECLARE_EXPORT char * branch8(char * stream, ConditionCode cond, const I
     return (char*)EncoderBase::encode(stream, m, args);
 }
 
-ENCODER_DECLARE_EXPORT char * branch32(char * stream, ConditionCode cond, const Imm_Opnd & imm, InstrPrefix pref) {
+ENCODER_DECLARE_EXPORT char * branch32(char * stream, ConditionCode cond, 
+                                       const Imm_Opnd & imm, 
+                                       InstrPrefix pref)
+{
     if (pref != no_prefix) {
         assert(pref == hint_branch_taken_prefix || pref == hint_branch_taken_prefix);
         stream = prefix(stream, pref);
@@ -602,35 +663,41 @@ return branch8(stream, cc, Imm_Opnd(size_8, (char)offset), is_signed);
 }
 return branch32(stream, cc, Imm_Opnd(size_32, (int)offset), is_signed);
 }
-
-ENCODER_DECLARE_EXPORT char * branch(char * stream, ConditionCode cc, int32 disp, InstrPrefix prefix) {
-// sub 2 bytes for the short version
-disp -= 2;
-if (fit8(disp)) {
-return branch8(stream, cc, Imm_Opnd(size_8, disp), prefix);
-}
-disp -= 4; // 4 more bytes for the long version
-return branch32(stream, cc, Imm_Opnd(size_32, disp), prefix);
-}
 */
 
 // call
-ENCODER_DECLARE_EXPORT char * call(char * stream, const Imm_Opnd & imm) {
+ENCODER_DECLARE_EXPORT char * call(char * stream, const Imm_Opnd & imm)
+{
     EncoderBase::Operands args;
     add_imm(args, imm);
     return (char*)EncoderBase::encode(stream, Mnemonic_CALL, args);
 }
 
-ENCODER_DECLARE_EXPORT char * call(char * stream, const RM_Opnd & rm, Opnd_Size sz) {
+ENCODER_DECLARE_EXPORT char * call(char * stream, const RM_Opnd & rm, 
+                                   Opnd_Size sz)
+{
     EncoderBase::Operands args;
     add_rm(args, rm, sz);
     return (char*)EncoderBase::encode(stream, Mnemonic_CALL, args);
 }
 
-ENCODER_DECLARE_EXPORT char * call(char * stream, const char * target) {
+/**
+* @note On EM64T: if target lies beyond 2G (does not fit into 32 bit 
+*       offset) then generates indirect jump using RAX (whose content is
+*       destroyed).
+*/
+ENCODER_DECLARE_EXPORT char * call(char * stream, const char * target)
+{
 #ifdef _EM64T_
-//#error "unimplemented functionality !"
-    return NULL;
+    int64 offset = target - stream;
+    if (fit32(offset)) {
+        offset -= 5; // sub 5 bytes for this instruction
+        Imm_Opnd imm(size_32, offset);
+        return call(stream, imm);
+    }
+    // need to use absolute indirect call
+    stream = mov(stream, rax_opnd, Imm_Opnd(size_64, (int64)target), size_64);
+    return call(stream, rax_opnd, size_64);
 #else
     int32 offset = target - stream;
     offset -= 5; // sub 5 bytes for this instruction
@@ -640,12 +707,14 @@ ENCODER_DECLARE_EXPORT char * call(char * stream, const char * target) {
 }
 
 // return instruction
-ENCODER_DECLARE_EXPORT char * ret(char * stream) {
+ENCODER_DECLARE_EXPORT char * ret(char * stream)
+{
     EncoderBase::Operands args;
     return (char*)EncoderBase::encode(stream, Mnemonic_RET, args);
 }
 
-ENCODER_DECLARE_EXPORT char * ret(char * stream, const Imm_Opnd & imm) {
+ENCODER_DECLARE_EXPORT char * ret(char * stream, const Imm_Opnd & imm)
+{
     EncoderBase::Operands args;
     // TheManual says imm can be 16-bit only
     //assert(imm.get_size() <= size_16);
@@ -653,14 +722,16 @@ ENCODER_DECLARE_EXPORT char * ret(char * stream, const Imm_Opnd & imm) {
     return (char*)EncoderBase::encode(stream, Mnemonic_RET, args);
 }
 
-ENCODER_DECLARE_EXPORT char * ret(char * stream, unsigned short pop) {
+ENCODER_DECLARE_EXPORT char * ret(char * stream, unsigned short pop)
+{
     // TheManual says it can only be imm16
     EncoderBase::Operands args(EncoderBase::Operand(OpndSize_16, pop));
     return (char*)EncoderBase::encode(stream, Mnemonic_RET, args);
 }
 
 // floating-point instructions
-ENCODER_DECLARE_EXPORT char * fld(char * stream, const M_Opnd & m, bool is_double) {
+ENCODER_DECLARE_EXPORT char * fld(char * stream, const M_Opnd & m, 
+                                  bool is_double) {
     EncoderBase::Operands args;
     // a fake FP register as operand
     add_fp(args, 0, is_double);
@@ -668,7 +739,9 @@ ENCODER_DECLARE_EXPORT char * fld(char * stream, const M_Opnd & m, bool is_doubl
     return (char*)EncoderBase::encode(stream, Mnemonic_FLD, args);
 }
 
-ENCODER_DECLARE_EXPORT char * fist(char * stream, const M_Opnd & mem, bool is_long, bool pop_stk) {
+ENCODER_DECLARE_EXPORT char * fist(char * stream, const M_Opnd & mem, 
+                                   bool is_long, bool pop_stk)
+{
     EncoderBase::Operands args;
     if (pop_stk) {
         add_m(args, mem, is_long ? size_64 : size_32);
@@ -683,18 +756,25 @@ ENCODER_DECLARE_EXPORT char * fist(char * stream, const M_Opnd & mem, bool is_lo
     return (char*)EncoderBase::encode(stream,  Mnemonic_FIST, args);
 }
 
-ENCODER_DECLARE_EXPORT char * fst(char * stream, const M_Opnd & m, bool is_double, bool pop_stk) {
+ENCODER_DECLARE_EXPORT char * fst(char * stream, const M_Opnd & m, 
+                                  bool is_double, bool pop_stk)
+{
     EncoderBase::Operands args;
     add_m(args, m, is_double ? size_64 : size_32);
     // a fake FP register as operand
     add_fp(args, 0, is_double);
-    return (char*)EncoderBase::encode(stream, pop_stk ? Mnemonic_FSTP : Mnemonic_FST, args);
+    return (char*)EncoderBase::encode(stream,
+                                    pop_stk ? Mnemonic_FSTP : Mnemonic_FST, 
+                                    args);
 }
 
-ENCODER_DECLARE_EXPORT char * fst(char * stream, unsigned i, bool pop_stk) {
+ENCODER_DECLARE_EXPORT char * fst(char * stream, unsigned i, bool pop_stk)
+{
     EncoderBase::Operands args;
     add_fp(args, i, true);
-    return (char*)EncoderBase::encode(stream, pop_stk ? Mnemonic_FSTP : Mnemonic_FST, args);
+    return (char*)EncoderBase::encode(stream, 
+                                    pop_stk ? Mnemonic_FSTP : Mnemonic_FST,
+                                    args);
 }
 
 ENCODER_DECLARE_EXPORT char * fldcw(char * stream, const M_Opnd & mem) {
@@ -709,18 +789,23 @@ ENCODER_DECLARE_EXPORT char * fnstcw(char * stream, const M_Opnd & mem) {
     return (char*)EncoderBase::encode(stream, Mnemonic_FNSTCW, args);
 }
 
-ENCODER_DECLARE_EXPORT char * fnstsw(char * stream) {
-    return (char*)EncoderBase::encode(stream, Mnemonic_FNSTCW, EncoderBase::Operands());
+ENCODER_DECLARE_EXPORT char * fnstsw(char * stream)
+{
+    return (char*)EncoderBase::encode(stream, Mnemonic_FNSTCW, 
+                                      EncoderBase::Operands());
 }
 
 // string operations
 ENCODER_DECLARE_EXPORT char * set_d(char * stream, bool set) {
     EncoderBase::Operands args;
-    return (char*)EncoderBase::encode(stream, set ? Mnemonic_STD : Mnemonic_CLD, args);
+    return (char*)EncoderBase::encode(stream, 
+                                      set ? Mnemonic_STD : Mnemonic_CLD, 
+                                      args);
 }
 
-ENCODER_DECLARE_EXPORT char * scas( char * stream, unsigned char prefix ) {
-    EncoderBase::Operands args;
+ENCODER_DECLARE_EXPORT char * scas(char * stream, unsigned char prefix)
+{
+	EncoderBase::Operands args;
     if (prefix != no_prefix) {
         assert(prefix == prefix_repnz || prefix == prefix_repz);
         *stream = prefix;
@@ -729,7 +814,8 @@ ENCODER_DECLARE_EXPORT char * scas( char * stream, unsigned char prefix ) {
     return (char*)EncoderBase::encode(stream, Mnemonic_SCAS, args);
 }
 
-ENCODER_DECLARE_EXPORT char * stos(char * stream, unsigned char prefix) {
+ENCODER_DECLARE_EXPORT char * stos(char * stream, unsigned char prefix)
+{
     if (prefix != no_prefix) {
         assert(prefix == prefix_rep);
         *stream = prefix;
@@ -743,9 +829,11 @@ ENCODER_DECLARE_EXPORT char * stos(char * stream, unsigned char prefix) {
 // Intrinsic FP math functions
 
 ENCODER_DECLARE_EXPORT char * fprem(char * stream) {
-    return (char*)EncoderBase::encode(stream, Mnemonic_FPREM, EncoderBase::Operands());
+    return (char*)EncoderBase::encode(stream, Mnemonic_FPREM, 
+                                      EncoderBase::Operands());
 }
 
 ENCODER_DECLARE_EXPORT char * fprem1(char * stream) {
-    return (char*)EncoderBase::encode(stream, Mnemonic_FPREM1, EncoderBase::Operands());
+    return (char*)EncoderBase::encode(stream, Mnemonic_FPREM1, 
+                                      EncoderBase::Operands());
 }

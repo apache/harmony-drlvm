@@ -18,19 +18,26 @@
  * @version $Revision: 1.1.2.1.4.3 $
  */  
 
-
-
-
-
 #ifndef _VM_STATS_H_
 #define _VM_STATS_H_
 
-#include "simplehashtable.h"
-
 #ifdef VM_STATS
 
-#include "open/types.h"
+#include <apr_hash.h>
+#include <apr_pools.h>
+#include <apr_time.h>
 
+#include "open/types.h"
+#include "simplehashtable.h"
+#include "lock_manager.h"
+
+typedef struct String_Stat {
+    static unsigned int num_embiguity;
+    unsigned int num_lookup;
+    unsigned int num_lookup_collision;
+    POINTER_SIZE_INT raw_hash;
+    bool is_interned;    
+} String_Stat;
 
 class VM_Statistics
 {
@@ -223,12 +230,23 @@ public:
     SimpleHashtable rt_function_requests;
     SimpleHashtable rt_function_calls;
 
-    VM_Statistics();
+    Lock_Manager vm_stats_lock;
+    apr_pool_t * vm_stats_pool;
+
+    ~VM_Statistics();
+
+    static VM_Statistics & get_vm_stats();
 
     void print();
-}; //VM_Statistics
 
-VMEXPORT extern VM_Statistics vm_stats_total;
+private:
+    // get_vm_stats should be used to get instance
+    VM_Statistics();
+
+    void print_rt_function_stats();
+    void print_string_pool_stats();
+
+}; //VM_Statistics
 
 extern bool vm_print_total_stats;
 extern int vm_print_total_stats_level;

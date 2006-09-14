@@ -34,8 +34,8 @@
 
 #include "nogc.h" // for malloc_fixed_code_for_jit()
 #include "encoder.h"
-#include "vm_stats.h"
 #include "vm_arrays.h"
+#include "compile.h"
 
 #ifdef PLATFORM_POSIX
 
@@ -45,10 +45,8 @@
 
 #endif // PLATFORM_POSIX
 
-#ifndef NDEBUG
 #include "dump.h"
-extern bool dump_stubs;
-#endif
+#include "vm_stats.h"
 
 static uint64 vm_lshl(unsigned count, uint64 n)
 {
@@ -91,17 +89,14 @@ void * getaddress__vm_lshl_naked()
     assert((ss - stub) <= stub_size);
 
 
+    compile_add_dynamic_generated_code_chunk("vm_lshl_naked", stub, stub_size);
+
     if (VM_Global_State::loader_env->TI->isEnabled())
-    {
-        jvmti_add_dynamic_generated_code_chunk("vm_lshl_naked", stub, stub_size);
         jvmti_send_dynamic_code_generated_event("vm_lshl_naked", stub, stub_size);
-    }
 
     
-#ifndef NDEBUG
-    if (dump_stubs)
-        dump(stub, "getaddress__vm_lshl_naked", ss - stub);
-#endif
+    DUMP_STUB(stub, "getaddress__vm_lshl_naked", ss - stub);
+
     return addr;
 } //getaddress__vm_lshl_naked
 
@@ -146,16 +141,13 @@ void * getaddress__vm_lshr_naked()
     addr = stub;
     assert((ss - stub) < stub_size);
 
-    if (VM_Global_State::loader_env->TI->isEnabled())
-    {
-        jvmti_add_dynamic_generated_code_chunk("vm_lshr_naked", stub, stub_size);
-        jvmti_send_dynamic_code_generated_event("vm_lshr_naked", stub, stub_size);
-    }
+    compile_add_dynamic_generated_code_chunk("vm_lshr_naked", stub, stub_size);
 
-#ifndef NDEBUG
-    if (dump_stubs)
-        dump(stub, "getaddress__vm_lshr_naked", ss - stub);
-#endif
+    if (VM_Global_State::loader_env->TI->isEnabled())
+        jvmti_send_dynamic_code_generated_event("vm_lshr_naked", stub, stub_size);
+
+    DUMP_STUB(stub, "getaddress__vm_lshr_naked", ss - stub);
+
     return addr;
 } //getaddress__vm_lshr_naked
 
@@ -200,16 +192,13 @@ void * getaddress__vm_lushr_naked()
     addr = stub;
     assert((ss - stub) <= stub_size);
 
-    if (VM_Global_State::loader_env->TI->isEnabled())
-    {
-        jvmti_add_dynamic_generated_code_chunk("vm_lushr_naked", stub, stub_size);
-        jvmti_send_dynamic_code_generated_event("vm_lushr_naked", stub, stub_size);
-    }
+    compile_add_dynamic_generated_code_chunk("vm_lushr_naked", stub, stub_size);
 
-#ifndef NDEBUG
-    if (dump_stubs)
-        dump(stub, "getaddress__vm_lushr_naked", ss - stub);
-#endif
+    if (VM_Global_State::loader_env->TI->isEnabled())
+        jvmti_send_dynamic_code_generated_event("vm_lushr_naked", stub, stub_size);
+
+    DUMP_STUB(stub, "getaddress__vm_lushr_naked", ss - stub);
+
     return addr;
 } //getaddress__vm_lushr_naked
 
@@ -336,16 +325,13 @@ void * getaddress__vm_const_lrem_naked()
     assert((ss - stub) <= stub_size);
     addr = stub;
 
-    if (VM_Global_State::loader_env->TI->isEnabled())
-    {
-        jvmti_add_dynamic_generated_code_chunk("vm_const_lrem_naked", stub, stub_size);
-        jvmti_send_dynamic_code_generated_event("vm_const_lrem_naked", stub, stub_size);
-    }
+    compile_add_dynamic_generated_code_chunk("vm_const_lrem_naked", stub, stub_size);
 
-#ifndef NDEBUG
-    if (dump_stubs)
-        dump( stub, "getaddress__vm_const_lrem_naked", ss - stub);
-#endif
+    if (VM_Global_State::loader_env->TI->isEnabled())
+        jvmti_send_dynamic_code_generated_event("vm_const_lrem_naked", stub, stub_size);
+
+    DUMP_STUB(stub, "getaddress__vm_const_lrem_naked", ss - stub);
+
     return addr;
 } //getaddress__vm_const_lrem_naked
 
@@ -545,16 +531,13 @@ static void *getaddress__vm_const_ldiv_naked()
     assert((ss - stub) <= stub_size);
     addr = stub;
 
-    if (VM_Global_State::loader_env->TI->isEnabled())
-    {
-        jvmti_add_dynamic_generated_code_chunk("vm_const_ldiv_naked", stub, stub_size);
-        jvmti_send_dynamic_code_generated_event("vm_const_ldiv_naked", stub, stub_size);
-    }
+    compile_add_dynamic_generated_code_chunk("vm_const_ldiv_naked", stub, stub_size);
 
-#ifndef NDEBUG
-    if (dump_stubs)
-        dump(stub, "getaddress__vm_const_ldiv_naked", ss - stub);
-#endif
+    if (VM_Global_State::loader_env->TI->isEnabled())
+        jvmti_send_dynamic_code_generated_event("vm_const_ldiv_naked", stub, stub_size);
+
+    DUMP_STUB(stub, "getaddress__vm_const_ldiv_naked", ss - stub);
+
     return addr;
 } //getaddress__vm_ldiv_naked
 
@@ -625,16 +608,13 @@ void *getaddress__vm_d2i()
     addr = stub;
     assert((ss - stub) <= stub_size);
 
-    if (VM_Global_State::loader_env->TI->isEnabled())
-    {
-        jvmti_add_dynamic_generated_code_chunk("vm_d2i", stub, stub_size);
-        jvmti_send_dynamic_code_generated_event("vm_d2i", stub, stub_size);
-    }
+    compile_add_dynamic_generated_code_chunk("vm_d2i", stub, stub_size);
 
-#ifndef NDEBUG
-    if (dump_stubs)
-        dump(stub, "getaddress__vm_d2i", ss - stub);
-#endif
+    if (VM_Global_State::loader_env->TI->isEnabled())
+        jvmti_send_dynamic_code_generated_event("vm_d2i", stub, stub_size);
+
+    DUMP_STUB(stub, "getaddress__vm_d2i", ss - stub);
+
     return addr;    
 } //getaddress__vm_d2i
 
@@ -683,16 +663,13 @@ void *getaddress__vm_d2l()
     addr = stub;
     assert((ss - stub) <= stub_size);
 
-    if (VM_Global_State::loader_env->TI->isEnabled())
-    {
-        jvmti_add_dynamic_generated_code_chunk("vm_d2l", stub, stub_size);
-        jvmti_send_dynamic_code_generated_event("vm_d2l", stub, stub_size);
-    }
+    compile_add_dynamic_generated_code_chunk("vm_d2l", stub, stub_size);
 
-#ifndef NDEBUG
-    if (dump_stubs)
-        dump(stub, "getaddress__vm_d2l", ss - stub);
-#endif
+    if (VM_Global_State::loader_env->TI->isEnabled())
+        jvmti_send_dynamic_code_generated_event("vm_d2l", stub, stub_size);
+
+    DUMP_STUB(stub, "getaddress__vm_d2l", ss - stub);
+
    return addr;       
 } //getaddress__vm_d2l
 
@@ -704,7 +681,7 @@ static int64 __stdcall vm_d2l(double d)
     assert(!hythread_is_suspend_enabled());
 
 #ifdef VM_STATS
-    vm_stats_total.num_d2l++;
+    VM_Statistics::get_vm_stats().num_d2l++;
 #endif
 
     int64 result;
@@ -808,16 +785,13 @@ void *getaddress__vm_f2i()
     addr = stub;
     assert((ss - stub) <= stub_size);
 
-    if (VM_Global_State::loader_env->TI->isEnabled())
-    {
-        jvmti_add_dynamic_generated_code_chunk("vm_f2i", stub, stub_size);
-        jvmti_send_dynamic_code_generated_event("vm_f2i", stub, stub_size);
-    }
+    compile_add_dynamic_generated_code_chunk("vm_f2i", stub, stub_size);
 
-#ifndef NDEBUG
-    if (dump_stubs)
-        dump(stub, "getaddress__vm_f2i", ss - stub);
-#endif
+    if (VM_Global_State::loader_env->TI->isEnabled())
+        jvmti_send_dynamic_code_generated_event("vm_f2i", stub, stub_size);
+
+    DUMP_STUB(stub, "getaddress__vm_f2i", ss - stub);
+
     return addr;    
 } //getaddress__vm_f2i
 
@@ -865,16 +839,13 @@ static void *getaddress__vm_f2l()
     addr = stub;
     assert((ss - stub) < stub_size);
 
-    if (VM_Global_State::loader_env->TI->isEnabled())
-    {
-        jvmti_add_dynamic_generated_code_chunk("vm_f2l", stub, stub_size);
-        jvmti_send_dynamic_code_generated_event("vm_f2l", stub, stub_size);
-    }
+    compile_add_dynamic_generated_code_chunk("vm_f2l", stub, stub_size);
 
-#ifndef NDEBUG
-    if (dump_stubs)
-        dump(stub, "getaddress__vm_f2l", ss - stub);
-#endif
+    if (VM_Global_State::loader_env->TI->isEnabled())
+        jvmti_send_dynamic_code_generated_event("vm_f2l", stub, stub_size);
+
+    DUMP_STUB(stub, "getaddress__vm_f2l", ss - stub);
+
     return addr;    
 } //getaddress__vm_f2l
 
@@ -886,7 +857,7 @@ static int64 __stdcall vm_f2l(float f)
     assert(!hythread_is_suspend_enabled());
 
 #ifdef VM_STATS
-    vm_stats_total.num_f2l++;
+    VM_Statistics::get_vm_stats().num_f2l++;
 #endif
 
     int64 result;
@@ -964,16 +935,13 @@ void *getaddress__vm_frem()
     addr = stub;
     assert((ss - stub) < stub_size);
 
-    if (VM_Global_State::loader_env->TI->isEnabled())
-    {
-        jvmti_add_dynamic_generated_code_chunk("vm_frem", stub, stub_size);
-        jvmti_send_dynamic_code_generated_event("vm_frem", stub, stub_size);
-    }
+    compile_add_dynamic_generated_code_chunk("vm_frem", stub, stub_size);
 
-#ifndef NDEBUG
-    if (dump_stubs)
-        dump(stub, "getaddress__vm_frem", ss - stub);
-#endif
+    if (VM_Global_State::loader_env->TI->isEnabled())
+        jvmti_send_dynamic_code_generated_event("vm_frem", stub, stub_size);
+
+    DUMP_STUB(stub, "getaddress__vm_frem", ss - stub);
+
     return addr;    
 } //getaddress__vm_frem
 
@@ -1016,16 +984,13 @@ void *getaddress__vm_drem()
     addr = stub;
     assert((ss - stub) < stub_size);
 
-    if (VM_Global_State::loader_env->TI->isEnabled())
-    {
-        jvmti_add_dynamic_generated_code_chunk("vm_drem", stub, stub_size);
-        jvmti_send_dynamic_code_generated_event("vm_drem", stub, stub_size);
-    }
+    compile_add_dynamic_generated_code_chunk("vm_drem", stub, stub_size);
 
-#ifndef  NDEBUG
-    if (dump_stubs)
-        dump(stub, "getaddress__vm_drem", ss - stub);
-#endif
+    if (VM_Global_State::loader_env->TI->isEnabled())
+        jvmti_send_dynamic_code_generated_event("vm_drem", stub, stub_size);
+
+    DUMP_STUB(stub, "getaddress__vm_drem", ss - stub);
+
     return addr;    
 } //getaddress__vm_drem
 
@@ -1076,21 +1041,21 @@ static void vm_rt_char_arraycopy_no_exc(ManagedObject *src,
     register uint16 *src_addr = get_vector_element_address_uint16(src, srcOffset);
 
 #ifdef VM_STATS
-    vm_stats_total.num_char_arraycopies++;
+    VM_Statistics::get_vm_stats().num_char_arraycopies++;
     if (dst_addr == src_addr) {
-        vm_stats_total.num_same_array_char_arraycopies++;
+        VM_Statistics::get_vm_stats().num_same_array_char_arraycopies++;
     }
     if (srcOffset == 0) {
-        vm_stats_total.num_zero_src_offset_char_arraycopies++;
+        VM_Statistics::get_vm_stats().num_zero_src_offset_char_arraycopies++;
     }
     if (dstOffset == 0) {
-        vm_stats_total.num_zero_dst_offset_char_arraycopies++;
+        VM_Statistics::get_vm_stats().num_zero_dst_offset_char_arraycopies++;
     }
     if ((((POINTER_SIZE_INT)dst_addr & 0x7) == 0) && (((POINTER_SIZE_INT)src_addr & 0x7) == 0)) {
-        vm_stats_total.num_aligned_char_arraycopies++;
+        VM_Statistics::get_vm_stats().num_aligned_char_arraycopies++;
     }
-    vm_stats_total.total_char_arraycopy_length += length;
-    vm_stats_total.char_arraycopy_count[get_log2(length)]++;
+    VM_Statistics::get_vm_stats().total_char_arraycopy_length += length;
+    VM_Statistics::get_vm_stats().char_arraycopy_count[get_log2(length)]++;
 #endif //VM_STATS
 
     // 20030219 The length threshold 32 here works well for SPECjbb and should be reasonable for other applications.

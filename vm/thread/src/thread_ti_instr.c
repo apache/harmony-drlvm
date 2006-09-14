@@ -303,7 +303,6 @@ IDATA VMCALL jthread_get_state(jthread java_thread, jint *state) {
         tm_native_thread = vm_jthread_get_tm_data(java_thread);
 
         *state = 0;
-
         if (! tm_native_thread) return TM_ERROR_NONE; // Not started yet
 
         if (hythread_is_alive(tm_native_thread)) {*state |= JVMTI_THREAD_STATE_ALIVE;}
@@ -318,6 +317,7 @@ IDATA VMCALL jthread_get_state(jthread java_thread, jint *state) {
         if (hythread_is_suspended(tm_native_thread)) {*state |= JVMTI_THREAD_STATE_SUSPENDED;}
         if (hythread_interrupted(tm_native_thread)) {*state |= JVMTI_THREAD_STATE_INTERRUPTED;}
         if (hythread_is_in_native(tm_native_thread)) {*state |= JVMTI_THREAD_STATE_IN_NATIVE;}
+        if (hythread_is_terminated(tm_native_thread)) {*state |= JVMTI_THREAD_STATE_TERMINATED;}
 
     return TM_ERROR_NONE;
 }
@@ -466,8 +466,8 @@ IDATA VMCALL jthread_get_lock_recursion(jobject monitor, jthread owner) {
     IDATA recursion = 0;
 
         assert(monitor);
-        hythread_suspend_disable();
     given_thread = owner?vm_jthread_get_tm_data(owner):NULL;
+        hythread_suspend_disable();
     
         lockword = vm_object_get_lockword_addr(monitor);
     lock_owner = hythread_thin_monitor_get_owner(lockword);

@@ -23,19 +23,22 @@
 #ifndef _COUNTER_H_
 #define _COUNTER_H_
 
+
+#include <stddef.h>
+
+
 namespace Jitrino 
 {
 
-class CountWriter
-{
+class CountWriter {
 public:
 
-	virtual ~CountWriter ()		{}
+    virtual ~CountWriter ()     {}
 
-	virtual void write (const char* key, const char*  value)    	= 0;
-	virtual void write (const char* key, int          value)		= 0;
-	virtual void write (const char* key, unsigned int value)		= 0;
-	virtual void write (const char* key, double       value)		= 0;
+    virtual void write (const char* key, const char*  value)        = 0;
+    virtual void write (const char* key, int          value)        = 0;
+    virtual void write (const char* key, size_t       value)        = 0;
+    virtual void write (const char* key, double       value)        = 0;
 };
 
 
@@ -43,19 +46,19 @@ class CounterBase
 {
 public:
 
-	CounterBase (const char* s = 0);
-	virtual ~CounterBase ();
+    CounterBase (const char* s = 0);
+    virtual ~CounterBase ();
 
-	void setName (const char* s)					{key = s;}
-	void link ();
-	virtual void write  (CountWriter&)				= 0;
+    void setName (const char* s)                    {key = s;}
+    void link ();
+    virtual void write  (CountWriter&)              = 0;
 
-	const char* key;
+    const char* key;
 
 //protected:
 
-	CounterBase* next;
-	static CounterBase* head;
+    CounterBase* next;
+    static CounterBase* head;
 };
 
 
@@ -64,16 +67,15 @@ class Counter : public CounterBase
 {
 public:
 
-	Counter (const char* s)							: CounterBase(s) {}
-	Counter (const char* s, const T& v)				: CounterBase(s), value(v) {}
+    Counter (const char* s)                         : CounterBase(s) {}
+    Counter (const char* s, const T& v)             : CounterBase(s), value(v) {}
 
-	/*virtual*/void write  (CountWriter& logs)		{logs.write(key, value);}
+    /*virtual*/void write  (CountWriter& logs)      {logs.write(key, value);}
 
-	operator T& ()									{return value;}
+    operator T& ()                                  {return value;}
 
-	T value;
+    T value;
 };
-
 
 
 } //namespace Jitrino 

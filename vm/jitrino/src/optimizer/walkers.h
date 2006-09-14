@@ -32,13 +32,12 @@
 
 #include "Inst.h"
 #include "irmanager.h"
-#include "FlowGraph.h"
 #include "Dominator.h"
 
 namespace Jitrino {
 
 class DominatorNode;
-class CFGNode;
+class Node;
 class DominatorTree;
 
 /* example DomWalker
@@ -64,7 +63,7 @@ void DomTreeWalk(DominatorTree &dTree, DomWalker &walker, MemoryManager &mm)
         
         if (domNode) {
             walker.enterScope(); 
-			// scope is associated with this node and its children
+            // scope is associated with this node and its children
             
             if (preorder) {
                 walker.applyToDominatorNode(domNode); // process node
@@ -76,7 +75,7 @@ void DomTreeWalk(DominatorTree &dTree, DomWalker &walker, MemoryManager &mm)
             // but first deal with this node's children
             dom_stack.push_back(domNode); // push parent
             dom_stack.push_back(domNode->getChild()); 
-					// scope will be exited if no children left
+                    // scope will be exited if no children left
         } else {
             dom_stack.pop_back(); // no children left, exit scope
             if (!dom_stack.empty()) {
@@ -100,19 +99,14 @@ private:
 // walker can modify/insert/unlink anything before i->next() (if forward)
 // or anything after i->prev() (if !forward)
 template <bool forward, class InstWalker>
-void WalkInstsInBlock(CFGNode *node, InstWalker &walker)
+void WalkInstsInBlock(Node *node, InstWalker &walker)
 {
-    Inst* headInst = node->getFirstInst();
-    Inst* firstInst = forward ? headInst : (headInst->prev()); 
-    Inst* lastInst = forward ? headInst->prev() : headInst;
-    Inst* inst = firstInst;
-    Inst *justDid = 0;
-    do {
-        Inst *next = forward ? inst->next() : inst->prev();
+    Inst* inst  =  (Inst*)(forward ? node->getFirstInst() : node->getLastInst());
+    while(inst!=NULL) {
+        Inst *next = forward ? inst->getNextInst() : inst->getPrevInst();
         walker.applyToInst(inst);
-        justDid = inst;
         inst = next;
-    } while (justDid != lastInst);
+    }
 }
 
 /*
@@ -173,12 +167,12 @@ public:
 
 /* example NodeWalker
 class NodeWalker {
-    void applyToCFGNode(CFGNode *node);
+    void applyToCFGNode(Node *node);
 };
 class NodeInstWalker  {
     void applyToInst(Inst *inst);
     void startNode(CFGNOde *node);
-    void finishNode(CFGNode *node);
+    void finishNode(Node *node);
 };
 */
 
@@ -186,7 +180,7 @@ template <bool forward, class NodeInstWalker>
 class NodeInst2NodeWalker {
     NodeInstWalker &instWalker;
 public:
-    void applyToCFGNode(CFGNode *node) {
+    void applyToCFGNode(Node *node) {
         instWalker.startNode(node);
         WalkInstsInBlock<forward, NodeInstWalker>(node, instWalker);
         instWalker.finishNode(node);
@@ -199,7 +193,7 @@ template <bool forward, class InstWalker>
 class Inst2NodeWalker {
     InstWalker &instWalker;
 public:
-    void applyToCFGNode(CFGNode *node) {
+    void applyToCFGNode(Node *node) {
         WalkInstsInBlock<forward, InstWalker>(node, instWalker);
     }
     Inst2NodeWalker(InstWalker &instWalker0) :
@@ -207,9 +201,9 @@ public:
 };
 
 template <class NodeWalker>
-struct NodeWalkDelegate : public ::std::unary_function<CFGNode *, void > {
+struct NodeWalkDelegate : public ::std::unary_function<Node *, void > {
     NodeWalker &realWalker;
-    void operator()(CFGNode *n) {
+    void operator()(Node *n) {
         realWalker.applyToCFGNode(n);
     };
     NodeWalkDelegate(NodeWalker &w) : realWalker(w) {};
@@ -217,19 +211,19 @@ struct NodeWalkDelegate : public ::std::unary_function<CFGNode *, void > {
 
 // walk over flowgraph nodes in any order
 template <class NodeWalker>
-void NodeWalk(FlowGraph &fg, NodeWalker &walker)
+void NodeWalk(ControlFlowGraph &fg, NodeWalker &walker)
 {
     NodeWalkDelegate<NodeWalker> delegate(walker);
-    const CFGNodeDeque &nodes = fg.getNodes();
+    const Nodes &nodes = fg.getNodes();
     ::std::for_each(nodes.begin(), nodes.end(), delegate);
 }
 
 template <class inst_fun_type>
-struct Inst2NodeFun : public ::std::unary_function<CFGNode *, void>
+struct Inst2NodeFun : public ::std::unary_function<Node *, void>
 {
     inst_fun_type underlying_fun;
     Inst2NodeFun(const inst_fun_type &theFun) : underlying_fun(theFun) {};
-    void operator()(CFGNode *theNode) {
+    void operator()(Node *theNode) {
         Inst *first = theNode->getFirstInst();
         Inst *thisinst = first;
         assert(thisinst);
@@ -241,12 +235,12 @@ struct Inst2NodeFun : public ::std::unary_function<CFGNode *, void>
 };
 
 template <class node_fun_type>
-struct Node2FlowgraphFun : public ::std::unary_function<FlowGraph &, void>
+struct Node2FlowgraphFun : public ::std::unary_function<ControlFlowGraph &, void>
 {
     node_fun_type underlying_fun;
     Node2FlowgraphFun(const node_fun_type &theFun) : underlying_fun(theFun) {};
-    void operator()(FlowGraph &fg) {
-        const CFGNodeDeque &nodes = fg.getNodes();
+    void operator()(ControlFlowGraph &fg) {
+        const Nodes &nodes = fg.getNodes();
         ::std::for_each(nodes.begin(), nodes.end(), underlying_fun);
     }
 };

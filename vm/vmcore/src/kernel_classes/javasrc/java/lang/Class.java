@@ -15,8 +15,14 @@
  */
 package java.lang;
 
+import static org.apache.harmony.vm.ClassFormat.ACC_ANNOTATION;
+import static org.apache.harmony.vm.ClassFormat.ACC_ENUM;
+import static org.apache.harmony.vm.ClassFormat.ACC_INTERFACE;
+import static org.apache.harmony.vm.ClassFormat.ACC_SYNTHETIC;
+
 import java.io.InputStream;
 import java.io.Serializable;
+import java.lang.ref.SoftReference;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
 import java.lang.reflect.InvocationTargetException;
@@ -26,9 +32,13 @@ import java.lang.reflect.Modifier;
 
 import java.lang.reflect.AnnotatedElement;
 import java.lang.reflect.GenericDeclaration;
+import java.lang.reflect.GenericSignatureFormatError;
+import java.lang.reflect.MalformedParameterizedTypeException;
+import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.Type;
 import java.lang.reflect.TypeVariable;
 import java.lang.annotation.Annotation;
+import java.lang.annotation.Inherited;
 
 import java.net.URL;
 import java.security.AccessController;
@@ -37,18 +47,42 @@ import java.security.Permissions;
 import java.security.PrivilegedAction;
 import java.security.ProtectionDomain;
 import java.util.ArrayList;
-import java.util.Arrays;
+import java.util.Collection;
 import java.util.HashSet;
 import java.util.LinkedHashSet;
+import java.util.Map;
+
+
+import org.apache.harmony.lang.reflect.parser.InterimClassGenericDecl;
+import org.apache.harmony.lang.reflect.parser.Parser;
+import org.apache.harmony.lang.reflect.parser.Parser.SignatureKind;
+import org.apache.harmony.lang.reflect.parser.InterimParameterizedType;
+import org.apache.harmony.lang.reflect.parser.InterimType;
+import org.apache.harmony.lang.reflect.parser.InterimClassType;
+import org.apache.harmony.lang.reflect.parser.InterimTypeParameter;
+
+import org.apache.harmony.lang.reflect.repository.TypeVariableRepository;
+import org.apache.harmony.lang.reflect.repository.ParameterizedTypeRepository;
+ 
+import org.apache.harmony.lang.reflect.support.AuxiliaryChecker;
+import org.apache.harmony.lang.reflect.support.AuxiliaryLoader;
+import org.apache.harmony.lang.reflect.support.AuxiliaryFinder;
+import org.apache.harmony.lang.reflect.support.AuxiliaryCreator;
+import org.apache.harmony.lang.reflect.support.AuxiliaryUtil;
+ 
+import org.apache.harmony.lang.reflect.implementation.TypeVariableImpl;
+import org.apache.harmony.lang.reflect.implementation.ParameterizedTypeImpl;
+
 
 import org.apache.harmony.lang.RuntimePermissionCollection;
 import org.apache.harmony.lang.reflect.Reflection;
 import org.apache.harmony.vm.VMStack;
+import org.apache.harmony.vm.VMGenericsAndAnnotations;
 
 /**
  * @com.intel.drl.spec_ref
  *
- * @author Evgueni Brevnov
+ * @author Evgueni Brevnov, Serguei S. Zapreyev, Alexey V. Varlamov
  * @version $Revision: 1.1.2.2.4.5 $
  */
 //public final class Class implements Serializable {
@@ -63,6 +97,18 @@ public final class Class<T> implements Serializable, AnnotatedElement, GenericDe
 
     // TODO make it soft reference
     transient ReflectionData reflectionData;
+    transient SoftReference<GACache> softCache;
+    
+    private GACache getCache() {
+        GACache cache = null;
+        if (softCache != null) { 
+            cache = softCache.get();
+        }
+        if (cache == null) {
+            softCache = new SoftReference<GACache>(cache = new GACache());
+        }
+        return cache;
+    }
 
     /**
      * Only VM can instantiate this class.
@@ -73,7 +119,7 @@ public final class Class<T> implements Serializable, AnnotatedElement, GenericDe
     /**
      * @com.intel.drl.spec_ref
      */
-    public static Class forName(String name) throws ClassNotFoundException {
+    public static Class<?> forName(String name) throws ClassNotFoundException {
         return forName(name, true, VMClassRegistry.getClassLoader(VMStack
             .getCallerClass(0)));
     }
@@ -81,7 +127,7 @@ public final class Class<T> implements Serializable, AnnotatedElement, GenericDe
     /**
      * @com.intel.drl.spec_ref
      */
-    public static Class forName(String name, boolean initialize,
+    public static Class<?> forName(String name, boolean initialize,
             ClassLoader classLoader) throws ClassNotFoundException {
         Class clazz = null;
         int i = 0;
@@ -171,57 +217,75 @@ public final class Class<T> implements Serializable, AnnotatedElement, GenericDe
     }
 
     /**
-     * @com.intel.drl.spec_ref
+     * package private to access from the java.lang.ClassLoader class.
+     */
+    static volatile boolean disableAssertions = 
+        VMExecutionEngine.getAssertionStatus(null, false, 0) <= 0;
+
+    /**
+     * @com.intel.drl.spec_ref 
      */
     public boolean desiredAssertionStatus() {
-        if (!ClassLoader.enableAssertions) {
+        if (disableAssertions) {
             return false;
         }
-        ClassLoader classLoader = VMClassRegistry.getClassLoader(this);
-        String topLevelName = getTopLevelClassName();
-        int systemStatus = 0;
-        if (classLoader != null) {
-            synchronized (classLoader.classAssertionStatus) {
-                Object status = classLoader.classAssertionStatus
-                    .get(topLevelName);
-                if (status != null) {
-                    return ((Boolean)status).booleanValue();
-                }
-                systemStatus = VMExecutionEngine
-                    .getAssertionStatus(topLevelName);
-                if (systemStatus != 0) {
-                    return systemStatus > 0;
-                }
-                while ( (topLevelName = getParentName(topLevelName)).length() > 0) {
-                    status = classLoader.packageAssertionStatus
-                        .get(topLevelName);
-                    if (status != null) {
-                        return ((Boolean)status).booleanValue();
-                    }
-                }
-                while ( (topLevelName = getParentName(topLevelName)).length() > 0) {
-                    if ( (systemStatus = VMExecutionEngine
-                        .getAssertionStatus(topLevelName)) != 0) {
-                        return systemStatus > 0;
-                    }
-                }
-                return classLoader.defaultAssertionStatus;
+        
+        ClassLoader loader = VMClassRegistry.getClassLoader(this);
+        if (loader == null) {
+            // system class, status is controlled via cmdline only
+            return VMExecutionEngine.getAssertionStatus(this, true, 0) > 0;
+        } 
+
+        // First check exact class name 
+        String name = null;
+        Map<String, Boolean> m = loader.classAssertionStatus;  
+        if (m != null && m.size() != 0) 
+        {
+            name = getTopLevelClassName();
+            Boolean status = m.get(name);
+            if (status != null) {
+                return status.booleanValue();
             }
         }
-        // classLoader == null
-        do {
-            if ( (systemStatus = VMExecutionEngine
-                .getAssertionStatus(topLevelName)) != 0) {
+        if (!loader.clearAssertionStatus) {
+            int systemStatus = VMExecutionEngine.getAssertionStatus(this, false, 0);
+            if (systemStatus != 0) {
                 return systemStatus > 0;
             }
-        } while ( (topLevelName = getParentName(topLevelName)).length() > 0);
-        return false;
+        }
+        
+        // Next try (super)packages name(s) recursively
+        m = loader.packageAssertionStatus;
+        if (m != null && m.size() != 0) {
+            if (name == null) {
+                name = getName();
+            }
+            name = getParentName(name);
+            // if this class is in the default package, 
+            // it is checked in the 1st iteration
+            do {
+                Boolean status = m.get(name);
+                if (status != null) {
+                    return status.booleanValue();
+                }
+            } while ( (name = getParentName(name)).length() > 0);
+        }
+        if (!loader.clearAssertionStatus) {
+            int systemStatus = VMExecutionEngine.getAssertionStatus(this, true, 
+                    loader.defaultAssertionStatus);
+            if (systemStatus != 0) {
+                return systemStatus > 0;
+            }
+        }
+        
+        // Finally check the default status
+        return loader.defaultAssertionStatus > 0;
     }
 
     /**
      * @com.intel.drl.spec_ref
      *
-     * Note: We don't check member acces permission for each super class.
+     * Note: We don't check member access permission for each super class.
      * Java 1.5 API specification doesn't require this check.
      */
     public Class[] getClasses() {
@@ -229,10 +293,27 @@ public final class Class<T> implements Serializable, AnnotatedElement, GenericDe
             initReflectionData();
         }
         checkMemberAccess(Member.PUBLIC);
-        if (reflectionData.publicClasses == null) {
-            reflectionData.initPublicClasses();
+        Class clss = this;
+        ArrayList<Class> classes = null;
+        while (clss != null) {
+            Class[] declared = VMClassRegistry.getDeclaredClasses(clss);
+            if (declared.length != 0) {
+                if (classes == null) {
+                    classes = new ArrayList<Class>();
+                }
+                for (Class c : declared) {
+                    if (Modifier.isPublic(c.getModifiers())) {
+                        classes.add(c);
+                    }
+                }
+            }
+            clss = clss.getSuperclass();
         }
-        return (Class[])reflectionData.publicClasses.clone();
+        if (classes == null) {
+            return new Class[0];
+        } else {
+            return classes.toArray(new Class[classes.size()]);
+        }
     }
 
     /**
@@ -254,27 +335,27 @@ public final class Class<T> implements Serializable, AnnotatedElement, GenericDe
     /**
      * @com.intel.drl.spec_ref
      */
-    public Class getComponentType() {
+    public Class<?> getComponentType() {
         return VMClassRegistry.getComponentType(this);
     }
 
     /**
      * @com.intel.drl.spec_ref
      */
-    public Constructor getConstructor(Class[] argumentTypes)
+    public Constructor<T> getConstructor(Class... argumentTypes)
         throws NoSuchMethodException {
         if (reflectionData == null) {
             initReflectionData();
         }
         checkMemberAccess(Member.PUBLIC);
-        if (reflectionData.publicConstructors == null) {
-            reflectionData.initPublicConstructors();
-        }
-        for (int i = 0; i < reflectionData.publicConstructors.length; i++) {
-            Constructor c = reflectionData.publicConstructors[i];
-            if (isTypeMatches(argumentTypes, c.getParameterTypes())) {
-                return Reflection.copyConstructor(c);
-            }
+        Constructor<T> ctors[] = reflectionData.getPublicConstructors(); 
+        for (int i = 0; i < ctors.length; i++) {
+            Constructor<T> c = ctors[i];
+            try {
+                if (isTypeMatches(argumentTypes, c.getParameterTypes())) {
+                    return Reflection.copyConstructor(c);
+                }
+            } catch (LinkageError ignore) {}
         }
         throw new NoSuchMethodException(getName()
             + printMethodSignature(argumentTypes));
@@ -289,10 +370,7 @@ public final class Class<T> implements Serializable, AnnotatedElement, GenericDe
             initReflectionData();
         }
         checkMemberAccess(Member.PUBLIC);
-        if (reflectionData.publicConstructors == null) {
-            reflectionData.initPublicConstructors();
-        }
-        return Reflection.copyConstructors(reflectionData.publicConstructors);
+        return Reflection.copyConstructors(reflectionData.getPublicConstructors());
     }
 
     /**
@@ -303,16 +381,13 @@ public final class Class<T> implements Serializable, AnnotatedElement, GenericDe
             initReflectionData();
         }
         checkMemberAccess(Member.DECLARED);
-        if (reflectionData.declaredClasses == null) {
-            reflectionData.initDeclaredClasses();
-        }
-        return (Class[])reflectionData.declaredClasses.clone();
+        return VMClassRegistry.getDeclaredClasses(this);
     }
 
     /**
      * @com.intel.drl.spec_ref
      */
-    public Constructor getDeclaredConstructor(Class[] argumentTypes)
+    public Constructor<T> getDeclaredConstructor(Class... argumentTypes)
         throws NoSuchMethodException {
         if (reflectionData == null) {
             initReflectionData();
@@ -373,7 +448,7 @@ public final class Class<T> implements Serializable, AnnotatedElement, GenericDe
     /**
      * @com.intel.drl.spec_ref
      */
-    public Method getDeclaredMethod(String methodName, Class[] argumentTypes)
+    public Method getDeclaredMethod(String methodName, Class... argumentTypes)
         throws NoSuchMethodException {
         if (reflectionData == null) {
             initReflectionData();
@@ -404,7 +479,7 @@ public final class Class<T> implements Serializable, AnnotatedElement, GenericDe
     /**
      * @com.intel.drl.spec_ref
      */
-    public Class getDeclaringClass() {
+    public Class<?> getDeclaringClass() {
         return VMClassRegistry.getDeclaringClass(this);
     }
 
@@ -416,11 +491,8 @@ public final class Class<T> implements Serializable, AnnotatedElement, GenericDe
             initReflectionData();
         }
         checkMemberAccess(Member.PUBLIC);
-        if (reflectionData.publicFields == null) {
-            reflectionData.initPublicFields();
-        }
-        for (int i = 0; i < reflectionData.publicFields.length; i++) {
-            Field f = reflectionData.publicFields[i];
+        Field[] ff = reflectionData.getPublicFields();
+        for (Field f : ff) {
             if (fieldName.equals(f.getName())) {
                 return Reflection.copyField(f);
             }
@@ -436,10 +508,7 @@ public final class Class<T> implements Serializable, AnnotatedElement, GenericDe
             initReflectionData();
         }
         checkMemberAccess(Member.PUBLIC);
-        if (reflectionData.publicFields == null) {
-            reflectionData.initPublicFields();
-        }
-        return Reflection.copyFields(reflectionData.publicFields);
+        return Reflection.copyFields(reflectionData.getPublicFields());
     }
 
     /**
@@ -452,17 +521,14 @@ public final class Class<T> implements Serializable, AnnotatedElement, GenericDe
     /**
      * @com.intel.drl.spec_ref
      */
-    public Method getMethod(String methodName, Class[] argumentTypes)
+    public Method getMethod(String methodName, Class... argumentTypes)
         throws NoSuchMethodException {
         if (reflectionData == null) {
             initReflectionData();
         }
         checkMemberAccess(Member.PUBLIC);
-        if (reflectionData.publicMethods == null) {
-            reflectionData.initPublicMethods();
-        }
         return Reflection
-            .copyMethod(findMatchingMethod(reflectionData.publicMethods,
+            .copyMethod(findMatchingMethod(reflectionData.getPublicMethods(),
                                            methodName, argumentTypes));
     }
 
@@ -474,24 +540,31 @@ public final class Class<T> implements Serializable, AnnotatedElement, GenericDe
             initReflectionData();
         }
         checkMemberAccess(Member.PUBLIC);
-        if (reflectionData.publicMethods == null) {
-            reflectionData.initPublicMethods();
-        }
-        return Reflection.copyMethods(reflectionData.publicMethods);
+        return Reflection.copyMethods(reflectionData.getPublicMethods());
     }
 
     /**
      * @com.intel.drl.spec_ref
      */
     public int getModifiers() {
-        return VMClassRegistry.getModifiers(this);
+        if (reflectionData == null) {
+            initReflectionData();
+        }
+        int mods = reflectionData.modifiers;
+        if (mods == -1) {
+            mods = reflectionData.modifiers = VMClassRegistry.getModifiers(this); 
+        }
+        return mods;
     }
 
     /**
      * @com.intel.drl.spec_ref
      */
     public String getName() {
-        return VMClassRegistry.getName(this);
+        if (reflectionData == null) {
+            initReflectionData();
+        }
+        return reflectionData.name;
     }
 
     /**
@@ -570,7 +643,7 @@ public final class Class<T> implements Serializable, AnnotatedElement, GenericDe
     /**
      * @com.intel.drl.spec_ref
      */
-    public Class getSuperclass() {
+    public Class<? super T> getSuperclass() {
         return VMClassRegistry.getSuperclass(this);
     }
 
@@ -584,7 +657,7 @@ public final class Class<T> implements Serializable, AnnotatedElement, GenericDe
     /**
      * @com.intel.drl.spec_ref
      */
-    public boolean isAssignableFrom(Class clazz) {
+    public boolean isAssignableFrom(Class<?> clazz) {
         return VMClassRegistry.isAssignableFrom(this, clazz);
     }
 
@@ -599,7 +672,7 @@ public final class Class<T> implements Serializable, AnnotatedElement, GenericDe
      * @com.intel.drl.spec_ref
      */
     public boolean isInterface() {
-        return VMClassRegistry.isInterface(this);
+        return (getModifiers() & ACC_INTERFACE) != 0;
     }
 
     /**
@@ -610,18 +683,11 @@ public final class Class<T> implements Serializable, AnnotatedElement, GenericDe
     }
 
     /**
-     *  TODO - fix
-     */
-    public boolean isEnum() {
-        return false;
-    }
-
-    /**
      * @com.intel.drl.spec_ref
      */
-    public Object newInstance() throws InstantiationException,
+    public T newInstance() throws InstantiationException,
         IllegalAccessException {
-        Object newInstance = null;
+        T newInstance = null;
         if (reflectionData == null) {
             initReflectionData();
         }
@@ -633,9 +699,9 @@ public final class Class<T> implements Serializable, AnnotatedElement, GenericDe
         try {
             if (reflectionData.defaultConstructor == null) {
                 reflectionData.initDefaultConstructor();
-                final Constructor c = reflectionData.defaultConstructor;
+                final Constructor<T> c = reflectionData.defaultConstructor;
                 try {
-                    AccessController.doPrivileged(new PrivilegedAction() {
+                    AccessController.doPrivileged(new PrivilegedAction<Object>() {
 
                         public Object run() {
                             c.setAccessible(true);
@@ -655,7 +721,7 @@ public final class Class<T> implements Serializable, AnnotatedElement, GenericDe
                 reflectionData.defaultConstructor.getDeclaringClass(),
                 reflectionData.defaultConstructor.getModifiers()
             );
-            newInstance = reflectionData.defaultConstructor.newInstance(null);
+            newInstance = reflectionData.defaultConstructor.newInstance();
         } catch (NoSuchMethodException e) {
             throw new InstantiationException(e.getMessage()
                 + " method not found");
@@ -711,12 +777,10 @@ public final class Class<T> implements Serializable, AnnotatedElement, GenericDe
 
 
     String getPackageName() {
-        if (reflectionData != null) {
-            return reflectionData.packageName;
+        if (reflectionData == null) {
+            initReflectionData();
         }
-        String className = getName();
-        int dotPosition = className.lastIndexOf('.');
-        return dotPosition == -1 ? "" : className.substring(0, dotPosition);
+        return reflectionData.packageName;
     }
 
     void setProtectionDomain(ProtectionDomain protectionDomain) {
@@ -733,12 +797,14 @@ public final class Class<T> implements Serializable, AnnotatedElement, GenericDe
                 .getDeclaringClass()) {
                 return matcher;
             }
-            if (methodName.equals(m.getName())
-                && isTypeMatches(argumentTypes, m.getParameterTypes())
-                && (matcher == null || matcher.getReturnType()
-                    .isAssignableFrom(m.getReturnType()))) {
-                matcher = m;
-            }
+            try {
+                if (methodName.equals(m.getName())
+                    && isTypeMatches(argumentTypes, m.getParameterTypes())
+                    && (matcher == null || matcher.getReturnType()
+                        .isAssignableFrom(m.getReturnType()))) {
+                    matcher = m;
+                }
+            } catch (LinkageError ignore) {}
         }
         if (matcher == null) {
             throw new NoSuchMethodException(methodName.toString()
@@ -784,13 +850,13 @@ public final class Class<T> implements Serializable, AnnotatedElement, GenericDe
         return  resource;
     }
 
-    private Constructor getDeclaredConstructorInternal(Class[] argumentTypes)
+    private Constructor<T> getDeclaredConstructorInternal(Class[] argumentTypes)
         throws NoSuchMethodException {
         if (reflectionData.declaredConstructors == null) {
             reflectionData.initDeclaredConstructors();
         }
         for (int i = 0; i < reflectionData.declaredConstructors.length; i++) {
-            Constructor c = reflectionData.declaredConstructors[i];
+            Constructor<T> c = reflectionData.declaredConstructors[i];
             if (isTypeMatches(argumentTypes, c.getParameterTypes())) {
                 return c;
             }
@@ -806,113 +872,350 @@ public final class Class<T> implements Serializable, AnnotatedElement, GenericDe
     }
 
 
-    /* IBM SPECIFIC PART*/
+    /* VMI SPECIFIC PART*/
 
     final ClassLoader getClassLoaderImpl() {
         return VMClassRegistry.getClassLoader(this);
     }
 
-    static final native Class[] getStackClasses(int maxDepth, boolean stopAtPrivileged);
+    static final Class[] getStackClasses(int maxDepth, 
+            boolean stopAtPrivileged) {
+        return VMStack.getClasses(maxDepth, stopAtPrivileged);
+    }
+
+    /* END OF VMI SPECIFIC PART */
 
     /**
-     *  TODO - provide real implementation
-     * @param annotationType
-     * @return
-     */
-    public boolean isAnnotationPresent(Class<? extends Annotation> annotationType) {
-        return false;
+     *
+     *  @com.intel.drl.spec_ref
+     * 
+     **/
+    public Annotation[] getDeclaredAnnotations() {
+        Annotation[] declared = getCache().getDeclaredAnnotations();  
+        Annotation aa[] = new Annotation[declared.length];
+        System.arraycopy(declared, 0, aa, 0, declared.length);
+        return aa;
     }
 
     /**
-     *  TODO - provide real implementation
-     * @param annotationType
-     * @return
-     */
-    public <T extends Annotation> T getAnnotation(Class<T> annotationType) {
+     *
+     *  @com.intel.drl.spec_ref
+     * 
+     **/
+    public Annotation[] getAnnotations() {
+        Annotation[] all = getCache().getAllAnnotations();
+        Annotation aa[] = new Annotation[all.length];
+        System.arraycopy(all, 0, aa, 0, all.length);
+        return aa;
+    }
+
+    /**
+     *
+     *  @com.intel.drl.spec_ref
+     * 
+     **/
+    public <A extends Annotation> A getAnnotation(Class<A> annotationClass) {
+        if(annotationClass == null) {
+            throw new NullPointerException();
+        }
+        for (Annotation aa : getCache().getAllAnnotations()) {
+            if(annotationClass == aa.annotationType()) {
+                return (A)aa;
+            }
+        }
         return null;
     }
 
     /**
-     *  TODO - provide real implementatoin
-     * @return
-     */
-    public Annotation[] getAnnotations() {
-        return new Annotation[0];
+     *
+     *  @com.intel.drl.spec_ref
+     * 
+     **/
+    public boolean isAnnotationPresent(Class<? extends Annotation> annotationClass) {
+        if(annotationClass == null) {
+            throw new NullPointerException();
+        }
+        for (Annotation aa : getCache().getAllAnnotations()) {
+            if(annotationClass == aa.annotationType()) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /**
-     *  TODO - provide real implementatoin
-     * @return
-     */
-    public Annotation[] getDeclaredAnnotations() {
-        return new Annotation[0];
+     *
+     *  @com.intel.drl.spec_ref
+     * 
+     **/
+    @SuppressWarnings("unchecked")
+    public T[] getEnumConstants() {
+        if (isEnum()) {
+            try {
+                final Method values = getMethod("values");
+                AccessController.doPrivileged(new PrivilegedAction() {
+                    public Object run() {
+                        values.setAccessible(true);
+                        return null;
+                    }
+                });
+                return (T[]) values.invoke(null);
+            } catch (Exception ignore) {}
+        }
+        return null;
     }
 
     /**
-     *  TODO - provide real implementatoin
-     * @return
-     */
-    public TypeVariable<?>[] getTypeParameters() {
-        return new TypeVariable<?>[0];
+     *
+     *  @com.intel.drl.spec_ref
+     * 
+     **/
+    public boolean isEnum() {
+        return (getModifiers() & ACC_ENUM) != 0;
     }
 
-    /* END OF IBM SPECIFIC PART */
+    /**
+     *
+     *  @com.intel.drl.spec_ref
+     * 
+     **/
+    public boolean isAnnotation() {
+        return (getModifiers() & ACC_ANNOTATION) != 0;
+    }
+
+    /**
+     *
+     *  @com.intel.drl.spec_ref
+     * 
+     **/
+    @SuppressWarnings("unchecked")
+    public <U> Class<? extends U> asSubclass(Class<U> clazz) throws ClassCastException {
+        if (!VMClassRegistry.isAssignableFrom(clazz, this)) {
+            throw new ClassCastException(toString());
+        }
+
+        return (Class<? extends U>)this;
+    }
+
+    /**
+     *
+     *  @com.intel.drl.spec_ref
+     * 
+     **/
+    @SuppressWarnings("unchecked")
+    public T cast(Object obj) throws ClassCastException {
+        if (obj != null && !VMClassRegistry.isInstance(this, obj)) {
+            throw new ClassCastException(obj.getClass().toString());
+        }
+        return (T) obj;
+    }
+
+    /**
+     *
+     *  @com.intel.drl.spec_ref
+     * 
+     **/
+    public TypeVariable<Class<T>>[] getTypeParameters() throws GenericSignatureFormatError {
+        return (TypeVariable<Class<T>>[])getCache().getTypeParameters().clone();
+    }
+
+    /**
+     *
+     *  @com.intel.drl.spec_ref
+     * 
+     **/
+    public Method getEnclosingMethod() {
+        Member m = VMClassRegistry.getEnclosingMember(this); // see VMClassRegistry.getEnclosingMember() spec
+        return m instanceof Method? (Method)m : null;
+    }
+
+    /**
+     *
+     *  @com.intel.drl.spec_ref
+     * 
+     **/
+    public Constructor<?> getEnclosingConstructor() {
+        Member m = VMClassRegistry.getEnclosingMember(this); // see VMClassRegistry.getEnclosingMember() spec
+        return m instanceof Constructor ? (Constructor<?>)m : null;
+    }
+
+    /**
+     *
+     *  @com.intel.drl.spec_ref
+     * 
+     **/
+    public Type[] getGenericInterfaces() throws GenericSignatureFormatError, TypeNotPresentException, MalformedParameterizedTypeException {
+        if (isArray()) {
+            return new Type[]{Cloneable.class, Serializable.class};
+        }
+        if (isPrimitive()) {
+            return new Type[0];
+        }
+        
+        return (Type[])getCache().getGenericInterfaces().clone();
+    }
+
+    /**
+     *
+     *  @com.intel.drl.spec_ref
+     * 
+     **/
+    public Type getGenericSuperclass() throws GenericSignatureFormatError, TypeNotPresentException, MalformedParameterizedTypeException  {
+        String tmp;
+        if (isInterface() || ((tmp = getCanonicalName()) != null && tmp.equals("java.lang.Object")) || isPrimitive()) {
+            return null;
+        }
+        if (isArray()) {
+            return (Type) Object.class;
+        }
+        
+        Class clazz = getSuperclass();
+        if (clazz.getTypeParameters().length == 0) {
+            return (Type) clazz;
+        }
+        
+        return getCache().getGenericSuperclass();
+    }
+
+    /**
+     *
+     *  @com.intel.drl.spec_ref
+     * 
+     **/
+    public Class<?> getEnclosingClass() {
+        return VMClassRegistry.getEnclosingClass(this); // see VMClassRegistry.getEnclosingClass() spec
+    }
+
+    /**
+     *
+     *  @com.intel.drl.spec_ref
+     * 
+     **/
+    public boolean isMemberClass() {
+        return getDeclaringClass() != null; // see Class.getDeclaringClass() spec
+    }
+
+    /**
+     *
+     *  @com.intel.drl.spec_ref
+     * 
+     **/
+    public boolean isLocalClass() {
+        return VMClassRegistry.getEnclosingMember(this) != null && !isAnonymousClass(); // see CFF spec, #4.8.6, first paragraph and VMClassRegistry.getEnclosingMember() spec
+    }
+    
+    /**
+     *
+     *  @com.intel.drl.spec_ref
+     * 
+     **/
+    public boolean isAnonymousClass() {
+        return getSimpleName().length() == 0;
+    }
+    
+    /**
+     *
+     *  @com.intel.drl.spec_ref
+     * 
+     **/
+    public boolean isSynthetic() {
+        return (getModifiers() & ACC_SYNTHETIC) != 0;
+    }
+
+    /**
+     *
+     *  @com.intel.drl.spec_ref
+     * 
+     **/
+    public String getCanonicalName() {
+        if (isLocalClass() || isAnonymousClass()) {
+            return null;
+        }
+        if (isArray()) {
+            String res = getComponentType().getCanonicalName();
+            return res != null ? res + "[]" : null;
+        }
+        
+        StringBuffer sb = new StringBuffer(getPackageName());
+        ArrayList<String> sympleNames = new ArrayList<String>();
+        Class clss = this;
+        while ((clss = clss.getDeclaringClass()) != null) {
+            if (clss.isLocalClass() || clss.isAnonymousClass()) {
+                return null;
+            }
+            sympleNames.add(clss.getSimpleName());
+        }
+        if (sb.length() > 0) {
+            sb.append(".");
+        }
+        for (int i = sympleNames.size() - 1; i > -1 ; i--) {
+            sb.append(sympleNames.get(i)).append(".");
+        }
+        sb.append(getSimpleName());
+
+        return sb.toString();
+    }
+
+    /**
+     *
+     *  @com.intel.drl.spec_ref
+     * 
+     **/
+    public String getSimpleName() {
+//      TODO: the method result should be reusible
+        return VMClassRegistry.getSimpleName(this);
+    }
+
 
     private final class ReflectionData {
+        
+        String name;
+        
+        int modifiers = -1;
 
-        Class[] declaredClasses;
-
-        Constructor[] declaredConstructors;
+        Constructor<T>[] declaredConstructors;
 
         Field[] declaredFields;
 
         Method[] declaredMethods;
 
-        Constructor defaultConstructor;
-
+        Constructor<T> defaultConstructor;
+        
         String packageName;
 
-        Class[] publicClasses;
-
-        Constructor[] publicConstructors;
+        Constructor<T>[] publicConstructors;
 
         Field[] publicFields;
 
         Method[] publicMethods;
-
+        
         public ReflectionData() {
-            packageName = Class.getParentName(Class.this.getName());
+            name = VMClassRegistry.getName(Class.this);
+            packageName = Class.getParentName(name);
         }
-
-        public synchronized void initDeclaredClasses() {
-            if (declaredClasses == null) {
-                declaredClasses = VMClassRegistry
-                    .getDeclaredClasses(Class.this);
-            }
-        }
-
-        public synchronized void initDeclaredConstructors() {
+        
+        public void initDeclaredConstructors() {
             if (declaredConstructors == null) {
                 declaredConstructors = VMClassRegistry
                     .getDeclaredConstructors(Class.this);
             }
         }
 
-        public synchronized void initDeclaredFields() {
+        public void initDeclaredFields() {
             if (declaredFields == null) {
                 declaredFields = VMClassRegistry
                     .getDeclaredFields(Class.this);
             }
         }
 
-        public synchronized void initDeclaredMethods() {
+        public void initDeclaredMethods() {
             if (declaredMethods == null) {
                 declaredMethods = VMClassRegistry
                     .getDeclaredMethods(Class.this);
             }
         }
 
-        public synchronized void initDefaultConstructor()
+        public void initDefaultConstructor()
             throws NoSuchMethodException {
             if (defaultConstructor == null) {
                 defaultConstructor = Class.this
@@ -920,68 +1223,32 @@ public final class Class<T> implements Serializable, AnnotatedElement, GenericDe
             }
         }
 
-        public synchronized void initPublicClasses() {
-            if (publicClasses != null) {
-                return;
-            }
-            if (declaredClasses == null) {
-                initDeclaredClasses();
-            }
-
-            int size = declaredClasses.length;
-            Class superClass = Class.this.getSuperclass();
-            if (superClass != null) {
-                if (superClass.reflectionData == null) {
-                    superClass.initReflectionData();
-                }
-                if (superClass.reflectionData.publicClasses == null) {
-                    superClass.reflectionData.initPublicClasses();
-                }
-                // most likely this size is enough
-                size += superClass.reflectionData.publicClasses.length;
-            }
-
-            ArrayList classes = new ArrayList(size);
-            for (int i = 0; i < declaredClasses.length; i++) {
-                Class c = declaredClasses[i];
-                if (Modifier.isPublic(c.getModifiers())) {
-                    classes.add(c);
-                }
-            }
-
-            if (superClass != null) {
-                classes.addAll(Arrays
-                    .asList(superClass.reflectionData.publicClasses));
-            }
-
-            publicClasses = (Class[])classes.toArray(new Class[classes.size()]);
-        }
-
-        public synchronized void initPublicConstructors() {
+        public synchronized Constructor<T>[] getPublicConstructors() {
             if (publicConstructors != null) {
-                return;
+                return publicConstructors;
             }
             if (declaredConstructors == null) {
                 initDeclaredConstructors();
             }
-            ArrayList constructors = new ArrayList(declaredConstructors.length);
+            ArrayList<Constructor<T>> constructors = 
+                new ArrayList<Constructor<T>>(declaredConstructors.length);
             for (int i = 0; i < declaredConstructors.length; i++) {
-                Constructor c = declaredConstructors[i];
+                Constructor<T> c = declaredConstructors[i];
                 if (Modifier.isPublic(c.getModifiers())) {
                     constructors.add(c);
                 }
             }
-            publicConstructors = (Constructor[])constructors
-                .toArray(new Constructor[constructors.size()]);
+            return publicConstructors = constructors.toArray(
+                    new Constructor[constructors.size()]);
         }
 
         /**
          * Stores public fields in order they should be searched by
          * getField(name) method.
          */
-        public synchronized void initPublicFields() {
+        public synchronized Field[] getPublicFields() {
             if (publicFields != null) {
-                return;
+                return publicFields;
             }
             if (declaredFields == null) {
                 initDeclaredFields();
@@ -990,118 +1257,247 @@ public final class Class<T> implements Serializable, AnnotatedElement, GenericDe
             // initialize public fields of the super class
             int size = declaredFields.length;
             Class superClass = Class.this.getSuperclass();
+            Field[] superFields = null;
             if (superClass != null) {
                 if (superClass.reflectionData == null) {
                     superClass.initReflectionData();
                 }
-                if (superClass.reflectionData.publicFields == null) {
-                    superClass.reflectionData.initPublicFields();
-                }
-                size += superClass.reflectionData.publicFields.length;
+                superFields = superClass.reflectionData.getPublicFields();
+                size += superFields.length;
             }
 
-            // add public fields of this class
-            LinkedHashSet fields = new LinkedHashSet(size);
-            if (Class.this.isInterface()) {
-                fields.addAll(Arrays.asList(declaredFields));
-            } else {
-                for (int i = 0; i < declaredFields.length; i++) {
-                    Field f = declaredFields[i];
+            // add public fields of this class 
+            Collection<Field> fields = new LinkedHashSet<Field>(size);
+            for (Field f : declaredFields) {
+                if (Modifier.isPublic(f.getModifiers())) {
+                    fields.add(f);
+                }
+            }
+            
+            // initialize and add fields of the super interfaces
+            Class[] interfaces = Class.this.getInterfaces();
+            for (Class ci : interfaces) {
+                if (ci.reflectionData == null) {
+                    ci.initReflectionData();
+                }
+                Field[] fi = ci.reflectionData.getPublicFields();
+                for (Field f : fi) {
+                    fields.add(f);
+                }
+            }        
+            
+            // add public fields of the super class
+            if (superFields != null) {
+                for (Field f : superFields) {
                     if (Modifier.isPublic(f.getModifiers())) {
                         fields.add(f);
                     }
                 }
             }
-
-            // initialize and add fields of the super interfaces
-            Class[] interfaces = Class.this.getInterfaces();
-            for (int j = 0; j < interfaces.length; j++) {
-                Class interf = interfaces[j];
-                if (interf.reflectionData == null) {
-                    interf.initReflectionData();
-                }
-                if (interf.reflectionData.publicFields == null) {
-                    interf.reflectionData.initPublicFields();
-                }
-                fields.addAll(Arrays.asList(interf.reflectionData.publicFields));
-            }
-
-            // add public fields of the super class
-            if (superClass != null) {
-                fields.addAll(Arrays
-                    .asList(superClass.reflectionData.publicFields));
-            }
-
-            publicFields = (Field[])fields.toArray(new Field[fields
-                .size()]);
+            
+            // maybe publicFields better be set atomically 
+            // instead of access synchronization? 
+            return publicFields = fields.toArray(new Field[fields.size()]);
         }
 
-        public synchronized void initPublicMethods() {
+        public synchronized Method[] getPublicMethods() {
             if (publicMethods != null) {
-                return;
+                return publicMethods;
             }
             if (declaredMethods == null) {
                 initDeclaredMethods();
             }
-
+            
             // initialize public methods of the super class
             int size = declaredMethods.length;
             Class superClass = Class.this.getSuperclass();
+            Method[] superPublic = null;
             if (superClass != null) {
                 if (superClass.reflectionData == null) {
                     superClass.initReflectionData();
                 }
-                if (superClass.reflectionData.publicMethods == null) {
-                    superClass.reflectionData.initPublicMethods();
-                }
-                // most likely this size is enough
-                size += superClass.reflectionData.publicMethods.length;
-            }
-
-            // the storage for public methods
-            ArrayList methods = new ArrayList(size);
-            // the set of names of public methods
-            HashSet methodNames = new HashSet(size);
-
-            // add public methods of this class
-            if (Class.this.isInterface()) {
-                // every interface method is public
-                for (int i = 0; i < declaredMethods.length; i++) {
-                    methods.add(declaredMethods[i]);
-                    methodNames.add(declaredMethods[i].getName());
-                }
-            } else {
-                for (int i = 0; i < declaredMethods.length; i++) {
-                    Method m = declaredMethods[i];
-                    if (Modifier.isPublic(m.getModifiers())) {
-                        methods.add(m);
-                        methodNames.add(m.getName());
-                    }
-                }
-            }
-
-            if (superClass != null) {
-                // add public methods of the super class
-                mergeMethods(methodNames, methods,
-                             superClass.reflectionData.publicMethods);
+                superPublic = superClass.reflectionData.getPublicMethods(); 
+                size += superPublic.length;
             }
 
             // add methods of the super interfaces
             Class[] interfaces = Class.this.getInterfaces();
-            for (int j = 0; j < interfaces.length; j++) {
-                Class interf = interfaces[j];
-                if (interf.reflectionData == null) {
-                    interf.initReflectionData();
+            Method[][] intf = null;
+            if (interfaces.length != 0) {
+                intf = new Method[interfaces.length][];
+                for (int i = 0; i < interfaces.length; i++) {
+                    Class ci = interfaces[i];
+                    if (ci.reflectionData == null) {
+                        ci.initReflectionData();
+                    }
+                    intf[i] = ci.reflectionData.getPublicMethods();
+                    size += intf[i].length; 
                 }
-                if (interf.reflectionData.publicMethods == null) {
-                    interf.reflectionData.initPublicMethods();
-                }
-                mergeMethods(methodNames, methods,
-                             interf.reflectionData.publicMethods);
             }
+            // maybe publicMethods better be set atomically 
+            // instead of access synchronization? 
+            return publicMethods = Reflection.mergePublicMethods(declaredMethods, superPublic, intf, size);
+        }        
+    }
 
-            publicMethods = (Method[])methods
-                .toArray(new Method[methods.size()]);
+    private final class GACache {
+    
+        private Annotation[] allAnnotations;
+        private Annotation[] declaredAnnotations;
+        private Type[] genericInterfaces;
+        private Type genericSuperclass;
+        private TypeVariable[] typeParameters;
+        
+        public synchronized Annotation[] getAllAnnotations() {
+            if (allAnnotations != null) {
+                return allAnnotations;
+            }
+            if (declaredAnnotations == null) {
+                declaredAnnotations = VMGenericsAndAnnotations
+                .getDeclaredAnnotations(Class.this);
+            }
+            
+            // look for inherited annotations
+            Class superClass = Class.this.getSuperclass();
+            if (superClass != null) {
+                Annotation[] sa = superClass.getCache().getAllAnnotations();
+                if (sa.length != 0) {
+                    final int size = declaredAnnotations.length;
+                    Annotation[] all = new Annotation[size + sa.length];
+                    System.arraycopy(declaredAnnotations, 0, all, 0, size);
+                    int pos = size;
+                    next: for (Annotation s : sa) {
+                        if (s.annotationType().isAnnotationPresent(Inherited.class)) {
+                            for (int i = 0; i < size; i++) {
+                                if (all[i].annotationType() == s.annotationType()) {
+                                    // overriden by declared annotation
+                                    continue next;
+                                }
+                            }
+                            all[pos++] = s;
+                        }
+                    }
+                    allAnnotations = new Annotation[pos];
+                    System.arraycopy(all, 0, allAnnotations, 0, pos);
+                    return allAnnotations;
+                }
+            }
+            return allAnnotations = declaredAnnotations;
+        }
+
+        public Annotation[] getDeclaredAnnotations() {
+            if (declaredAnnotations == null) {
+                  declaredAnnotations = VMGenericsAndAnnotations
+                      .getDeclaredAnnotations(Class.this);
+            }
+            return declaredAnnotations;
+        }
+        
+        public synchronized Type[] getGenericInterfaces() {
+            if (genericInterfaces != null) {
+                return genericInterfaces;
+            }
+                
+            //So, here it can be only ParameterizedType or ordinary reference class type elements.
+            if (Class.this.isArray()) {
+                return genericInterfaces = new Type[]{Cloneable.class, Serializable.class};
+            }
+            if (genericInterfaces == null) {
+                Object startPoint = (Object) Class.this;  // It should be this class itself because, for example, an interface may be a parameterized type with parameters which are the generic parameters of this class
+                String signature = AuxiliaryUtil.toUTF8(VMGenericsAndAnnotations.getSignature(Class.this)); // getting this class signature
+                if (signature == null) {
+                    return genericInterfaces = Class.this.getInterfaces();
+                }
+                InterimClassGenericDecl decl = (InterimClassGenericDecl) Parser.parseSignature(signature, SignatureKind.CLASS_SIGNATURE, (GenericDeclaration)startPoint); //GenericSignatureFormatError can be thrown here
+                InterimType[] superInterfaces = decl.superInterfaces;
+                if (superInterfaces == null) {
+                    return genericInterfaces =  Class.this.getInterfaces();
+                }
+                int l = superInterfaces.length;
+                genericInterfaces = new Type[l];
+                for (int i = 0; i < l; i++) { 
+                    if (superInterfaces[i] instanceof InterimParameterizedType) {
+                        ParameterizedType pType = ParameterizedTypeRepository.findParameterizedType((InterimParameterizedType) superInterfaces[i], ((InterimParameterizedType) superInterfaces[i]).signature, startPoint);
+                        if (pType == null) {
+                            try {
+                                AuxiliaryFinder.findGenericClassDeclarationForParameterizedType((InterimParameterizedType) superInterfaces[i], startPoint);
+                            } catch(Throwable e) {
+                                throw new TypeNotPresentException(((InterimParameterizedType) superInterfaces[i]).rawType.classTypeName.substring(1).replace('/', '.'), e);
+                            }
+                            //check the correspondence of the formal parameter number and the actual argument number:
+                            AuxiliaryChecker.checkArgsNumber((InterimParameterizedType) superInterfaces[i], startPoint); // the MalformedParameterizedTypeException may raise here
+                            try {
+                                pType = new ParameterizedTypeImpl(AuxiliaryCreator.createTypeArgs((InterimParameterizedType) superInterfaces[i], startPoint), AuxiliaryCreator.createRawType((InterimParameterizedType) superInterfaces[i], startPoint), AuxiliaryCreator.createOwnerType((InterimParameterizedType) superInterfaces[i], startPoint));
+                            } catch(ClassNotFoundException e) {
+                                throw new TypeNotPresentException(e.getMessage(), e);
+                            }
+                            ParameterizedTypeRepository.registerParameterizedType(pType, (InterimParameterizedType) superInterfaces[i], signature, startPoint);
+                        }
+                        genericInterfaces[i] = (Type) pType; 
+                    } else if (superInterfaces[i] instanceof InterimClassType) {
+                        try {
+                            if(Class.this.getClass().getClassLoader() != null){
+                                genericInterfaces[i] = (Type) Class.this.getClass().getClassLoader().findClass(AuxiliaryFinder.transform(((InterimClassType)superInterfaces[i]).classTypeName.substring(1).replace('/', '.'))); // XXX: should we propagate the class loader of initial user's request (Field.getGenericType()) or use this one?
+                            } else {
+                                genericInterfaces[i] = (Type) AuxiliaryLoader.ersatzLoader.findClass(AuxiliaryFinder.transform(((InterimClassType)superInterfaces[i]).classTypeName.substring(1).replace('/', '.'))); // XXX: should we propagate the class loader of initial user's request (Field.getGenericType()) or use this one?
+                            }
+                        } catch (ClassNotFoundException e) {
+                            throw new TypeNotPresentException(((InterimClassType)superInterfaces[i]).classTypeName.substring(1).replace('/', '.'), e);
+                        } catch (ExceptionInInitializerError e) {
+                        } catch (LinkageError e) {
+                        }
+                    } else {
+                        // Internal Error
+                    }
+                }
+            }
+            return genericInterfaces;
+        }
+
+        public Type getGenericSuperclass() {
+            //So, here it can be only ParameterizedType or ordinary reference class type
+            if (genericSuperclass == null) {
+                Object startPoint = (Object) Class.this;  // It should be this class itself because, for example, superclass may be a parameterized type with parameters which are the generic parameters of this class
+                String signature = AuxiliaryUtil.toUTF8(VMGenericsAndAnnotations.getSignature(Class.this)); // getting this class signature
+                if (signature == null) {
+                    return genericSuperclass = Class.this.getSuperclass();
+                }
+                InterimClassGenericDecl decl = (InterimClassGenericDecl) Parser.parseSignature(signature, SignatureKind.CLASS_SIGNATURE, (GenericDeclaration)startPoint); // GenericSignatureFormatError can be thrown here
+                InterimType superClassType = decl.superClass;
+                if (superClassType == null) {
+                    return genericSuperclass = Class.this.getSuperclass();
+                }
+                if (superClassType instanceof InterimParameterizedType) {
+                    ParameterizedType pType = ParameterizedTypeRepository.findParameterizedType((InterimParameterizedType) superClassType, ((InterimParameterizedType) superClassType).signature, startPoint);
+                    if (pType == null) {
+                        try {
+                            AuxiliaryFinder.findGenericClassDeclarationForParameterizedType((InterimParameterizedType) superClassType, startPoint);
+                        } catch(Throwable e) {
+                            throw new TypeNotPresentException(((InterimParameterizedType) superClassType).rawType.classTypeName.substring(1).replace('/', '.'), e);
+                        }
+                        //check the correspondence of the formal parameter number and the actual argument number:
+                        AuxiliaryChecker.checkArgsNumber((InterimParameterizedType) superClassType, startPoint); // the MalformedParameterizedTypeException may raise here
+                        try {
+                            pType = new ParameterizedTypeImpl(AuxiliaryCreator.createTypeArgs((InterimParameterizedType) superClassType, startPoint), AuxiliaryCreator.createRawType((InterimParameterizedType) superClassType, startPoint), AuxiliaryCreator.createOwnerType((InterimParameterizedType) superClassType, startPoint));
+                        } catch(ClassNotFoundException e) {
+                            throw new TypeNotPresentException(e.getMessage(), e);
+                        }
+                        ParameterizedTypeRepository.registerParameterizedType(pType, (InterimParameterizedType) superClassType, signature, startPoint);
+                    }
+                    genericSuperclass = (Type) pType; 
+                } else if (superClassType instanceof InterimClassType) {
+                    try {
+                        genericSuperclass = (Type) Class.this.getClass().getClassLoader().findClass(AuxiliaryFinder.transform(((InterimClassType)superClassType).classTypeName.substring(1).replace('/', '.'))); // XXX: should we propagate the class loader of initial user's request (Field.getGenericType()) or use this one?
+                    } catch (ClassNotFoundException e) {
+                        throw new TypeNotPresentException(((InterimClassType)superClassType).classTypeName.substring(1).replace('/', '.'), e);
+                    } catch (ExceptionInInitializerError e) {
+                    } catch (LinkageError e) {
+                    }
+                } else {
+                    // Internal Error
+                }
+            }
+            return genericSuperclass;
         }
 
         /**
@@ -1138,6 +1534,31 @@ public final class Class<T> implements Serializable, AnnotatedElement, GenericDe
                     names.add(superMethod.getName());
                 }
             }
+        }
+        
+        public synchronized TypeVariable[] getTypeParameters() {
+            //So, here it can be only TypeVariable elements.
+            if (typeParameters == null) {
+                Object startPoint = (Object) Class.this;
+                String signature = AuxiliaryUtil.toUTF8(VMGenericsAndAnnotations.getSignature(Class.this)); // getting this class signature
+                if (signature == null) {
+                    return typeParameters =  new TypeVariable[0];
+                }
+                InterimClassGenericDecl decl = (InterimClassGenericDecl) Parser.parseSignature(signature, SignatureKind.CLASS_SIGNATURE, (GenericDeclaration)startPoint); // GenericSignatureFormatError can be thrown here
+                InterimTypeParameter[] pTypeParameters = decl.typeParameters;
+                if (pTypeParameters == null) {
+                    return typeParameters =  new TypeVariable[0];
+                }
+                int l = pTypeParameters.length;
+                typeParameters = new TypeVariable[l];
+                for (int i = 0; i < l; i++) {
+                    String tvName = pTypeParameters[i].typeParameterName;
+                    TypeVariable variable = new TypeVariableImpl((GenericDeclaration)Class.this, tvName, decl.typeParameters[i]);
+                    TypeVariableRepository.registerTypeVariable(variable, tvName, startPoint);
+                    typeParameters[i] = variable;               
+                }
+            }
+            return typeParameters;
         }
     }
 }

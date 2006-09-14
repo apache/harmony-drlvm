@@ -27,7 +27,6 @@
 #include "open/types.h"
 #include "optpass.h"
 #include "Opcode.h"
-#include "FlowGraph.h"
 #include "Stl.h"
 #include <utility>
 
@@ -39,8 +38,7 @@ class InequalityGraph;
 class DominatorNode;
 class Dominator;
 class DomFrontier;
-class JitrinoParameterTable;
-class CFGNode;
+class Node;
 class Opnd;
 class CSEHashTable;
 class Type;
@@ -49,29 +47,26 @@ class SyncClique;
 class SyncOptDfValue;
 class BuildSyncCliquesWalker;
 
-DEFINE_OPTPASS(SyncOptPass)
+struct SyncOptFlags {
+    bool debug;
+    bool verbose;
+    bool redstore;
+    bool optimistic; // assume we can balance monitorenter/exit around a call
+    bool use_IncRecCount;
+    bool transform;
+    bool transform2;
+    bool balance;
+};
 
 class SyncOpt {
     IRManager& irManager;
     MemoryManager &mm;
 
-public:
-    struct Flags {
-        bool debug;
-        bool verbose;
-        bool redstore;
-        bool optimistic; // assume we can balance monitorenter/exit around a call
-        bool use_IncRecCount;
-        bool transform;
-        bool transform2;
-        bool balance;
-    };
 private:
-    static Flags *defaultFlags;
-    Flags flags;
+    SyncOptFlags flags;
 public:    
-    static void readDefaultFlagsFromCommandLine(const JitrinoParameterTable *params);
-    static void showFlagsFromCommandLine();
+    static void readFlags(Action* argSource, SyncOptFlags* flags);
+    static void showFlags(std::ostream& os);
 
     SyncOpt(IRManager &irManager0, 
             MemoryManager& memManager);
@@ -101,7 +96,7 @@ private:
     void linkStacks(uint32 depth1, SyncClique *stack1,
                     uint32 depth2, SyncClique *stack2,
                     SyncClique *bottomClique);
-    void findBalancedExits_Stage2a(CFGNode *node,
+    void findBalancedExits_Stage2a(Node *node,
                                    uint32 depthIn,
                                    SyncClique *inStack,
                                    uint32 depthOut,
@@ -128,11 +123,11 @@ private:
                           SyncClique *cliqueRoot, SyncClique *bottomRoot);
 
     void insertUnwindMonitorExit(Opnd *syncMethodOpnd,
-                                 CFGNode *&tmpDispatchNode, CFGNode *&tmpCatchNode,
-                                 CFGNode *&tmpRethrowNode);
+                                 Node *&tmpDispatchNode, Node *&tmpCatchNode,
+                                 Node *&tmpRethrowNode);
     void removeUnwindMonitorExit(Opnd *syncMethodOpnd,
-                                 CFGNode *tmpDispatchNode, CFGNode *tmpCatchNode,
-                                 CFGNode *tmpRethrowNode);
+                                 Node *tmpDispatchNode, Node *tmpCatchNode,
+                                 Node *tmpRethrowNode);
 };
 
 } //namespace Jitrino 

@@ -47,6 +47,13 @@ void vm_instanceof_update_stats(ManagedObject *obj, Class *super);
 void vm_checkcast_update_stats(ManagedObject *obj, Class *super);
 void vm_aastore_test_update_stats(ManagedObject *elem, Vector_Handle array);
 
+void vm_rt_class_initialize(Class *clss);
+void vm_rt_class_throw_linking_error(Class_Handle ch, unsigned index, unsigned opcode);
+
+ManagedObject* vm_rt_class_alloc_new_object(Class *c);
+Vector_Handle vm_rt_new_vector(Class *vector_class, int length);
+Vector_Handle vm_rt_new_vector_using_vtable_and_thread_pointer(
+        int length, Allocation_Handle vector_handle, void *tp);
 
 // creates a LIL code stub for checkcast or instanceof
 // can be used by both IA32 and IPF code

@@ -32,13 +32,12 @@ namespace Ia32{
 // class InternalTrace
 //========================================================================================
 /**
-	class InternalTrace inserts trace calls 
-	
+    class InternalTrace inserts trace calls 
+    
 */
-BEGIN_DECLARE_IRTRANSFORMER(InternalTrace, "itrace", "Internal trace")
-	IRTRANSFORMER_CONSTRUCTOR(InternalTrace)
-	void runImpl();
-END_DECLARE_IRTRANSFORMER(InternalTrace)
+class InternalTrace : public SessionAction {
+    void runImpl();
+};
 
 void __stdcall methodExit(const char * methodName) stdcall__; 
 void __stdcall methodEntry(const char * methodName, uint32 argInfoCount, CallingConvention::OpndInfo * argInfos) stdcall__;

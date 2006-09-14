@@ -28,9 +28,6 @@
 
 namespace Jitrino {
 
-DEFINE_OPTPASS(GuardedDevirtualizationPass)
-DEFINE_OPTPASS(GuardRemovalPass)
-
 class Devirtualizer {
 public:
     Devirtualizer(IRManager& irm);
@@ -40,12 +37,12 @@ public:
     void unguardCallsInRegion(IRManager& irm, uint32 safetyLevel=0);
 
 private:
-    void guardCallsInBlock(IRManager& irm, CFGNode* node);
-    void genGuardedDirectCall(IRManager& irm, CFGNode* node, Inst* call, MethodDesc* methodDesc, Opnd *tauNullChecked, Opnd *tauTypesChecked, uint32 argOffset);
+    void guardCallsInBlock(IRManager& irm, Node* node);
+    void genGuardedDirectCall(IRManager& irm, Node* node, Inst* call, MethodDesc* methodDesc, Opnd *tauNullChecked, Opnd *tauTypesChecked, uint32 argOffset);
     bool isGuardableVirtualCall(Inst* inst, MethodInst*& methodInst, Opnd*& base,
                                 Opnd* & tauNullChecked, Opnd*&tauTypesChecked,
                                 uint32 &argOffset);
-    bool doGuard(IRManager& irm, CFGNode* node, MethodDesc& methodDesc);
+    bool doGuard(IRManager& irm, Node* node, MethodDesc& methodDesc);
     bool isPreexisting(Opnd* obj);
 
     bool _hasProfileInfo;

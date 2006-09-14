@@ -23,13 +23,12 @@
 #include "Log.h"
 #include "simplifytaus.h"
 #include "irmanager.h"
-#include "PropertyTable.h"
 #include "Stl.h"
 #include "walkers.h"
 
 namespace Jitrino {
 
-DEFINE_OPTPASS_IMPL(TauSimplificationPass, tausimp, "Tau Simplification")
+DEFINE_SESSION_ACTION(TauSimplificationPass, tausimp, "Tau Simplification")
 
 void
 TauSimplificationPass::_run(IRManager& irm) {
@@ -64,12 +63,12 @@ SimplifyTaus::SimplifyTaus(MemoryManager& memoryManager, IRManager& irManager0)
 class TauHasTypesMap {
     typedef ::std::pair<Opnd *, Type *> OpndXType;
 #ifdef PLATFORM_POSIX
-	struct OpndXTypeHash : public __gnu_cxx::hash<OpndXType> {
+    struct OpndXTypeHash : public __gnu_cxx::hash<OpndXType> {
 #else
     #if !defined(__SGI_STL_PORT)
-	struct OpndXTypeHash : public stdext::hash_compare<OpndXType> {
+    struct OpndXTypeHash : public stdext::hash_compare<OpndXType> {
     #else
-	struct OpndXTypeHash : public ext::hash_compare<OpndXType> {
+    struct OpndXTypeHash : public ext::hash_compare<OpndXType> {
     #endif
 #endif
         size_t operator() (const OpndXType x) const {
@@ -257,7 +256,7 @@ public:
 void
 SimplifyTaus::runPass()
 {
-    FlowGraph &fg = irManager.getFlowGraph();
+    ControlFlowGraph &fg = irManager.getFlowGraph();
     SsaTmpOpnd *tauSafeOpnd = findTauSafeOpnd();
     TauHasTypesMap map(memManager);
     TauHasTypesMap exactmap(memManager);
@@ -301,7 +300,7 @@ SimplifyTaus::runPass()
     for ( ; iter != end; ++iter) {
 #ifdef _NDEBUG
         Inst *remInst = *iter;
-		assert(remInst->next() == remInst);
+        assert(remInst->next() == remInst);
         assert(remInst->prev() == remInst);
 #endif
     }
@@ -310,7 +309,7 @@ SimplifyTaus::runPass()
 Opnd *TauWalkerState::lookupMapping(Opnd *src, Type *type, bool exactType)
 {
     Opnd *found = exactType ? exactMap.lookup(src, type) : map.lookup(src, type);
-    if (Log::cat_opt()->isDebugEnabled()) {
+    if (Log::isEnabled()) {
         if (exactType)
             Log::out() << "found tau exacttype mapping (";
         else
@@ -333,7 +332,7 @@ Opnd *TauWalkerState::lookupMapping(Opnd *src, Type *type, bool exactType)
 
 void TauWalkerState::recordMapping(Opnd *mapTo, Opnd *src, Type *type, bool exactType)
 {
-    if (Log::cat_opt()->isDebugEnabled()) {
+    if (Log::isEnabled()) {
         Log::out() << "recording tau mapping (";
         src->print(Log::out());
         Log::out() << ", ";
@@ -355,7 +354,7 @@ void TauWalkerState::recordMapping(Opnd *mapTo, Opnd *src, Type *type, bool exac
 
 void TauWalkerState::recordCopyMapping(Opnd *mapTo, Opnd *mapFrom)
 {
-    if (Log::cat_opt()->isDebugEnabled()) {
+    if (Log::isEnabled()) {
         Log::out() << "recording tau CopyMapping: ";
         mapFrom->print(Log::out());
         Log::out() << " -> ";
@@ -368,7 +367,7 @@ void TauWalkerState::recordCopyMapping(Opnd *mapTo, Opnd *mapFrom)
 Opnd *TauWalkerState::lookupCopyMapping(Opnd *mapFrom)
 {
     Opnd *found = copyMap.lookup(mapFrom);
-    if (Log::cat_opt()->isDebugEnabled()) {
+    if (Log::isEnabled()) {
         Log::out() << "found CopyMapping: ";
         mapFrom->print(Log::out());
         Log::out() << " -> ";
@@ -383,7 +382,7 @@ Opnd *TauWalkerState::lookupCopyMapping(Opnd *mapFrom)
 
 void TauWalkerState::noteInstToRemove(Inst *tauHasTypeInst)
 {
-    if (Log::cat_opt()->isDebugEnabled()) {
+    if (Log::isEnabled()) {
         Log::out() << "noting inst to remove: ";
         tauHasTypeInst->print(Log::out());
         Log::out() << ::std::endl;
@@ -519,7 +518,7 @@ Opnd *TauWalkerState::findReplacement(Opnd *src, Type *type, bool exactType)
         }
         
     case Op_LdConstant:
-    case Op_LdString:
+    case Op_LdRef:
         {
             return genTauSafe();
         }
@@ -726,18 +725,18 @@ Opnd *TauWalkerState::findReplacement(Opnd *src, Type *type, bool exactType)
 SsaTmpOpnd *SimplifyTaus::findTauSafeOpnd()
 {
     if (!tauSafeOpnd) {
-        CFGNode *head = irManager.getFlowGraph().getEntry();
-        Inst *entryLabel = head->getFirstInst();
+        Node *head = irManager.getFlowGraph().getEntryNode();
+        Inst *entryLabel = (Inst*)head->getFirstInst();
         // first search for one already there
-        Inst *inst = entryLabel->next();
-        while (inst != entryLabel) {
+        Inst *inst = entryLabel->getNextInst();
+        while (inst != NULL) {
             if (inst->getOpcode() == Op_TauSafe) {
                 tauSafeOpnd = inst->getDst()->asSsaTmpOpnd();
-                Inst *prevInst = inst->prev(); // make sure it's before any possible uses
+                Inst *prevInst = inst->getPrevInst(); // make sure it's before any possible uses
                 if ((prevInst != entryLabel) &&
                     (prevInst->getOpcode() != Op_DefArg)) {
                     do {
-                        prevInst = prevInst->prev();
+                        prevInst = prevInst->getPrevInst();
                     } while ((prevInst != entryLabel) &&
                              (prevInst->getOpcode() != Op_DefArg));
                     inst->unlink();
@@ -745,7 +744,7 @@ SsaTmpOpnd *SimplifyTaus::findTauSafeOpnd()
                 }
                 return tauSafeOpnd;
             }
-            inst = inst->next();
+            inst = inst->getNextInst();
         }
         // need to insert one
         TypeManager &tm = irManager.getTypeManager();
@@ -895,7 +894,7 @@ VarOpnd *TauWalkerState::getReductionTauBaseVar(Opnd *opnd, Type *type, bool exa
         if (baseTauVarOpnd) {
             VarOpnd *baseTauVar = baseTauVarOpnd->asVarOpnd();
             assert(baseTauVar);
-            if (Log::cat_opt()->isDebugEnabled()) {
+            if (Log::isEnabled()) {
                 if (exactType)
                     Log::out() << "should reduce exact ssaVarOpnd ";
                 else
@@ -909,7 +908,7 @@ VarOpnd *TauWalkerState::getReductionTauBaseVar(Opnd *opnd, Type *type, bool exa
             }
             return baseTauVar;
         } else {
-            if (Log::cat_opt()->isDebugEnabled()) {
+            if (Log::isEnabled()) {
                 if (exactType)
                     Log::out() << "should not reduce exact ssaVarOpnd ";
                 else
@@ -930,7 +929,7 @@ VarOpnd *TauWalkerState::getReductionTauBaseVar(Opnd *opnd, Type *type, bool exa
             VarOpnd *baseTauVar = baseTauVarOpnd->asVarOpnd();
             assert(baseTauVar);
 
-            if (Log::cat_opt()->isDebugEnabled()) {
+            if (Log::isEnabled()) {
                 if (exactType)
                     Log::out() << "should reduce exact VarOpnd ";
                 else
@@ -942,7 +941,7 @@ VarOpnd *TauWalkerState::getReductionTauBaseVar(Opnd *opnd, Type *type, bool exa
             }
             return baseTauVar;
         } else {
-            if (Log::cat_opt()->isDebugEnabled()) {
+            if (Log::isEnabled()) {
                 if (exactType)
                     Log::out() << "should not reduce exact VarOpnd ";
                 else
@@ -970,7 +969,7 @@ Opnd *TauWalkerState::reduceSsaOpnd(Opnd *opnd, VarOpnd *baseVar, Type *type, bo
             // create one and map it;
             OpndManager &om = irManager.getOpndManager();
             if (opnd->isSsaVarOpnd()) {
-                if (Log::cat_opt()->isDebugEnabled()) {
+                if (Log::isEnabled()) {
                     Log::out() << "creating reducedSsaOpnd for baseVar=";
                     baseVar->print(Log::out());
                     Log::out() << ::std::endl;
@@ -980,7 +979,7 @@ Opnd *TauWalkerState::reduceSsaOpnd(Opnd *opnd, VarOpnd *baseVar, Type *type, bo
                 return baseVar;
             } else {
                 assert(opnd->isSsaTmpOpnd());
-                if (Log::cat_opt()->isDebugEnabled()) {
+                if (Log::isEnabled()) {
                     Log::out() << "creating new tmp for baseVar=";
                     baseVar->print(Log::out());
                     Log::out() << ::std::endl;
@@ -990,7 +989,7 @@ Opnd *TauWalkerState::reduceSsaOpnd(Opnd *opnd, VarOpnd *baseVar, Type *type, bo
             recordMapping(mappedOpnd, opnd, type, exactType);
         }
     }
-    if (Log::cat_opt()->isDebugEnabled()) {
+    if (Log::isEnabled()) {
         Log::out() << "reduceSsaOpnd(";
         opnd->print(Log::out());
         Log::out() << ", ";
@@ -1025,7 +1024,7 @@ void TauWalkerState::reduceVarTaus(Inst *inst)
                 StlVectorSet<Type *> *reduceTypes = shouldReduceSsaOpnd(opnd, exactType);
                 if (reduceTypes) {
 
-                    if (Log::cat_opt()->isDebugEnabled()) {
+                    if (Log::isEnabled()) {
                         Log::out() << "reducing StVar inst ";
                         inst->print(Log::out());
                         Log::out() << ::std::endl;
@@ -1038,7 +1037,7 @@ void TauWalkerState::reduceVarTaus(Inst *inst)
                         Type *type = *iter;
                         VarOpnd *baseTauOpnd = getReductionTauBaseVar(opnd, type, exactType);
                         
-                        if (Log::cat_opt()->isDebugEnabled()) {
+                        if (Log::isEnabled()) {
                             Log::out() << "reducing StVar inst ";
                             inst->print(Log::out());
                             if (exactType)
@@ -1062,7 +1061,7 @@ void TauWalkerState::reduceVarTaus(Inst *inst)
                                 assert(newInst->getDst()->getInst() == newInst);
                                 assert(newDstSsaVarOpnd->getInst()->getDst() == newDstSsaVarOpnd);
                                 newInst->insertAfter(inst);
-                                if (Log::cat_opt()->isDebugEnabled()) {
+                                if (Log::isEnabled()) {
                                     Log::out() << "reduced StVar inst ";
                                     inst->print(Log::out());
                                     Log::out() << " to inst ";
@@ -1070,7 +1069,7 @@ void TauWalkerState::reduceVarTaus(Inst *inst)
                                     Log::out() << ::std::endl;
                                 }
                             } else {
-                                if (Log::cat_opt()->isDebugEnabled()) {
+                                if (Log::isEnabled()) {
                                     Log::out() << "tau opnd ";
                                     newDstSsaVarOpnd->print(Log::out());
                                     Log::out() << " already has an inst ";
@@ -1085,7 +1084,7 @@ void TauWalkerState::reduceVarTaus(Inst *inst)
                             Inst *newInst = irManager.getInstFactory().makeStVar(newDstVarOpnd, 
                                                                                  newSrc);
                             newInst->insertAfter(inst);
-                            if (Log::cat_opt()->isDebugEnabled()) {
+                            if (Log::isEnabled()) {
                                 Log::out() << "reduced StVar inst ";
                                 inst->print(Log::out());
                                 Log::out() << " to inst ";
@@ -1108,7 +1107,7 @@ void TauWalkerState::reduceVarTaus(Inst *inst)
                 StlVectorSet<Type *> *reduceTypes = shouldReduceSsaOpnd(opnd, exactType);
                 if (reduceTypes) {
 
-                    if (Log::cat_opt()->isDebugEnabled()) {
+                    if (Log::isEnabled()) {
                         Log::out() << "reducing Phi inst ";
                         inst->print(Log::out());
                         Log::out() << ::std::endl;
@@ -1121,7 +1120,7 @@ void TauWalkerState::reduceVarTaus(Inst *inst)
                         Type *type = *iter;
                         VarOpnd *baseTauOpnd = getReductionTauBaseVar(opnd, type, exactType);
                         
-                        if (Log::cat_opt()->isDebugEnabled()) {
+                        if (Log::isEnabled()) {
                             Log::out() << "reducing Phi inst ";
                             inst->print(Log::out());
                             if (exactType)
@@ -1147,7 +1146,7 @@ void TauWalkerState::reduceVarTaus(Inst *inst)
                             Inst *newInst = irManager.getInstFactory().makePhi(newDst, numOpnds, newOpnds);
                             newInst->insertAfter(inst);
 
-                            if (Log::cat_opt()->isDebugEnabled()) {
+                            if (Log::isEnabled()) {
                                 Log::out() << "reduced Phi inst ";
                                 inst->print(Log::out());
                                 Log::out() << " to inst ";
@@ -1155,7 +1154,7 @@ void TauWalkerState::reduceVarTaus(Inst *inst)
                                 Log::out() << ::std::endl;
                             }
                         } else {
-                            if (Log::cat_opt()->isDebugEnabled()) {
+                            if (Log::isEnabled()) {
                                 Log::out() << "tau opnd ";
                                 newDst->print(Log::out());
                                 Log::out() << " already has an inst ";

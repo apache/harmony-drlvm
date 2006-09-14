@@ -32,32 +32,11 @@
 
 namespace Jitrino {
 
-DEFINE_OPTPASS_IMPL(LazyExceptionOptPass, lazyexc, "Lazy Exception Throwing Optimization")
+DEFINE_SESSION_ACTION(LazyExceptionOptPass, lazyexc, "Lazy Exception Throwing Optimization")
 
 void LazyExceptionOptPass::_run(IRManager& irm) {
     LazyExceptionOpt le(irm, irm.getMemoryManager());
-
-#ifdef _DEBUG
-    const char* i1=Log::getDotFileDirName();
-    OptimizerFlags& optimizerFlags = *irm.getCompilationContext()->getOptimizerFlags();
-    if (optimizerFlags.dumpdot) {
-        if (strlen(i1)!=0) {
-            FlowGraph& flowGraph = irm.getFlowGraph();
-            DominatorTree* dominatorTree = irm.getDominatorTree();
-            flowGraph.printDotFile(irm.getMethodDesc(), "le1", (dominatorTree && dominatorTree->isValid()) ? dominatorTree : NULL);
-        }
-    }
-#endif
     le.doLazyExceptionOpt();
-#ifdef _DEBUG
-    if (optimizerFlags.dumpdot) {
-        if (strlen(i1)!=0) {
-            FlowGraph& flowGraph = irm.getFlowGraph();
-            DominatorTree* dominatorTree = irm.getDominatorTree();
-            flowGraph.printDotFile(irm.getMethodDesc(), "le2", (dominatorTree && dominatorTree->isValid()) ? dominatorTree : NULL);
-        }
-    }
-#endif
 }
 
 int LazyExceptionOpt::level=0;
@@ -67,6 +46,14 @@ LazyExceptionOpt::LazyExceptionOpt(IRManager &ir_manager, MemoryManager& mem_man
     leMemManager(1024,"LazyExceptionOpt::doLazyExceptionOpt"),
     compInterface(ir_manager.getCompilationInterface()),nodeSet(NULL)
 {
+    if (compInterface.isBCMapInfoRequired()) {
+        isBCmapRequired = true;
+        MethodDesc* meth = compInterface.getMethodToCompile();
+        bc2HIRMapHandler = new VectorHandler(bcOffset2HIRHandlerName, meth);
+    } else {
+        isBCmapRequired = false;
+        bc2HIRMapHandler = NULL;
+    }
 }
 
 void 
@@ -74,22 +61,22 @@ LazyExceptionOpt::doLazyExceptionOpt() {
     MethodDesc &md = irManager.getMethodDesc();
     BitSet excOpnds(leMemManager,irManager.getOpndManager().getNumSsaOpnds());
     StlDeque<Inst*> candidateSet(leMemManager);
-    optCandidates = new OptCandidates(leMemManager);
+    optCandidates = new (leMemManager) OptCandidates(leMemManager);
     CompilationInterface::MethodSideEffect m_sideEff = compInterface.getMethodHasSideEffect(&md); 
 
-    const CFGNodeDeque& nodes = irManager.getFlowGraph().getNodes();
-    CFGNodeDeque::const_iterator niter;
+    const Nodes& nodes = irManager.getFlowGraph().getNodes();
+    Nodes::const_iterator niter;
 
 #ifdef _DEBUG
     mtdDesc=&md;
 #endif
 
 #ifdef _DEBUG
-    if (Log::cat_opt_lazyexc()->isDebugEnabled()) {
+    if (Log::isEnabled()) {
         Log::out() << std::endl;
-        for (int i=0; i<level; i++) Log::cat_opt_lazyexc()->debug << " "; 
-        Log::cat_opt_lazyexc()->debug << "doLE "; md.printFullName(Log::out()); 
-        Log::cat_opt_lazyexc()->debug << " SideEff " << (int)m_sideEff << std::endl; 
+        for (int i=0; i<level; i++) Log::out() << " "; 
+        Log::out() << "doLE "; md.printFullName(Log::out()); 
+        Log::out() << " SideEff " << (int)m_sideEff << std::endl; 
     }
 #endif
 
@@ -104,24 +91,24 @@ LazyExceptionOpt::doLazyExceptionOpt() {
         m_sideEff = CompilationInterface::MSE_NO;
         compInterface.setMethodHasSideEffect(&md,m_sideEff);
 #ifdef _DEBUG
-        if (Log::cat_opt_lazyexc()->isDebugEnabled()) {
-            Log::cat_opt_lazyexc()->debug << "      core api exc "; md.printFullName(Log::out()); 
-            Log::cat_opt_lazyexc()->debug << " SideEff " << (int)m_sideEff << std::endl;
+        if (Log::isEnabled()) {
+            Log::out() << "      core api exc "; md.printFullName(Log::out()); 
+            Log::out() << " SideEff " << (int)m_sideEff << std::endl;
         }
 #endif
     }
 
     for(niter = nodes.begin(); niter != nodes.end(); ++niter) {
-        CFGNode* node = *niter;
-        Inst *headInst = node->getFirstInst();
-        for (Inst* inst=headInst->next();inst!=headInst;inst=inst->next()) {
+        Node* node = *niter;
+        Inst *headInst = (Inst*)node->getFirstInst();
+        for (Inst* inst=headInst->getNextInst();inst!=NULL;inst=inst->getNextInst()) {
 #ifdef _DEBUG
             if (inst->getOpcode()==Op_DefArg && isExceptionInit) {
-                if (Log::cat_opt_lazyexc()->isDebugEnabled()) {
-                    Log::cat_opt_lazyexc()->debug << "    defarg: "; 
-                    inst->print(Log::out()); Log::cat_opt_lazyexc()->debug  << std::endl;
-                    Log::cat_opt_lazyexc()->debug << "            "; 
-                    Log::cat_opt_lazyexc()->debug << (int)(inst->getDefArgModifier()) << " " <<
+                if (Log::isEnabled()) {
+                    Log::out() << "    defarg: "; 
+                    inst->print(Log::out()); Log::out()  << std::endl;
+                    Log::out() << "            "; 
+                    Log::out() << (int)(inst->getDefArgModifier()) << " " <<
                     (inst->getDefArgModifier()==DefArgNoModifier) << " " <<
                     (inst->getDefArgModifier()==NonNullThisArg) << " " <<
                     (inst->getDefArgModifier()==SpecializedToExactType) << " " <<
@@ -136,11 +123,11 @@ LazyExceptionOpt::doLazyExceptionOpt() {
                         excOpnds.setBit(opndId,false); // different exc. edges
 #ifdef _DEBUG
                     if (excOpnds.getBit(opndId)==1) {
-                        if (Log::cat_opt_lazyexc()->isDebugEnabled()) {
-                            Log::cat_opt_lazyexc()->debug << "      add opnd: "; 
-                            inst->print(Log::out()); Log::cat_opt_lazyexc()->debug << std::endl; 
-                            Log::cat_opt_lazyexc()->debug << "      add  obj: "; 
-                            inst->getSrc(0)->getInst()->print(Log::out()); Log::cat_opt_lazyexc()->debug << std::endl; 
+                        if (Log::isEnabled()) {
+                            Log::out() << "      add opnd: "; 
+                            inst->print(Log::out()); Log::out() << std::endl; 
+                            Log::out() << "      add  obj: "; 
+                            inst->getSrc(0)->getInst()->print(Log::out()); Log::out() << std::endl; 
                         }
                     }
 #endif
@@ -150,9 +137,9 @@ LazyExceptionOpt::doLazyExceptionOpt() {
                 if (instSideEffect(inst)) {
                     m_sideEff=compInterface.MSE_YES;
 #ifdef _DEBUG
-                    if (Log::cat_opt_lazyexc()->isDebugEnabled()) {
-                        Log::cat_opt_lazyexc()->debug << "~~~~~~inst sideEff "; 
-                        inst->print(Log::out()); Log::cat_opt_lazyexc()->debug << std::endl; 
+                    if (Log::isEnabled()) {
+                        Log::out() << "~~~~~~inst sideEff "; 
+                        inst->print(Log::out()); Log::out() << std::endl; 
                     }
 #endif
                 }
@@ -162,9 +149,9 @@ LazyExceptionOpt::doLazyExceptionOpt() {
         if (m_sideEff == CompilationInterface::MSE_UNKNOWN)
             if (isExceptionInit && isArgCheckNull) {
 #ifdef _DEBUG
-                if (Log::cat_opt_lazyexc()->isDebugEnabled()) {
-                    Log::cat_opt_lazyexc()->debug << "~~~~~~init sideEff reset: " << m_sideEff << " 3 "; 
-                    md.printFullName(Log::out()); Log::cat_opt_lazyexc()->debug << std::endl; 
+                if (Log::isEnabled()) {
+                    Log::out() << "~~~~~~init sideEff reset: " << m_sideEff << " 3 "; 
+                    md.printFullName(Log::out()); Log::out() << std::endl; 
                 }
 #endif
                 m_sideEff = CompilationInterface::MSE_NULL_PARAM;
@@ -174,10 +161,10 @@ LazyExceptionOpt::doLazyExceptionOpt() {
     } 
 
     for(niter = nodes.begin(); niter != nodes.end(); ++niter) {
-        CFGNode* node = *niter;
-        Inst *headInst = node->getFirstInst();
+        Node* node = *niter;
+        Inst *headInst = (Inst*)node->getFirstInst();
         Opnd* opnd;
-        for (Inst* inst=headInst->next();inst!=headInst;inst=inst->next()) {
+        for (Inst* inst=headInst->getNextInst();inst!=NULL;inst=inst->getNextInst()) {
             uint32 nsrc = inst->getNumSrcOperands();
             for (uint32 i=0; i<nsrc; i++) {
                 if (!(opnd=inst->getSrc(i))->isSsaOpnd())  // check ssa operands
@@ -191,18 +178,18 @@ LazyExceptionOpt::doLazyExceptionOpt() {
                         if (addOptCandidates(opndId,inst)) {
                             excOpnds.setBit(opndId,false);
 #ifdef _DEBUG
-                            if (Log::cat_opt_lazyexc()->isDebugEnabled()) {
-                                Log::cat_opt_lazyexc()->debug << "    - rem opnd " << opnd->getId() << " "; 
-                                inst->print(Log::out()); Log::cat_opt_lazyexc()->debug << std::endl; 
+                            if (Log::isEnabled()) {
+                                Log::out() << "    - rem opnd " << opnd->getId() << " "; 
+                                inst->print(Log::out()); Log::out() << std::endl; 
                             }
 #endif
                         } 
                     } else {
                         excOpnds.setBit(opndId,false);
 #ifdef _DEBUG
-                        if (Log::cat_opt_lazyexc()->isDebugEnabled()) {
-                            Log::cat_opt_lazyexc()->debug << "   -- rem opnd " << opnd->getId() << " "; 
-                            inst->print(Log::out()); Log::cat_opt_lazyexc()->debug << std::endl; 
+                        if (Log::isEnabled()) {
+                            Log::out() << "   -- rem opnd " << opnd->getId() << " "; 
+                            inst->print(Log::out()); Log::out() << std::endl; 
                         }
 #endif
                     }
@@ -210,9 +197,9 @@ LazyExceptionOpt::doLazyExceptionOpt() {
                     if (inst->getOpcode()!=Op_Throw) {
                         excOpnds.setBit(opndId,false);
 #ifdef _DEBUG
-                        if (Log::cat_opt_lazyexc()->isDebugEnabled()) {
-                            Log::cat_opt_lazyexc()->debug << "      rem opnd " << opnd->getId() << " "; 
-                            inst->print(Log::out()); Log::cat_opt_lazyexc()->debug << std::endl; 
+                        if (Log::isEnabled()) {
+                            Log::out() << "      rem opnd " << opnd->getId() << " "; 
+                            inst->print(Log::out()); Log::out() << std::endl; 
                         }
 #endif
                     }
@@ -222,9 +209,9 @@ LazyExceptionOpt::doLazyExceptionOpt() {
     }
     if (!excOpnds.isEmpty()) {
 #ifdef _DEBUG
-        if (Log::cat_opt_lazyexc()->isDebugEnabled()) {
-            Log::cat_opt_lazyexc()->debug << "------LE: "; 
-            md.printFullName(Log::out()); Log::cat_opt_lazyexc()->debug << std::endl;
+        if (Log::isEnabled()) {
+            Log::out() << "------LE: "; 
+            md.printFullName(Log::out()); Log::out() << std::endl;
         }
 #endif
         fixOptCandidates(&excOpnds);
@@ -232,21 +219,26 @@ LazyExceptionOpt::doLazyExceptionOpt() {
 
 level--;
 #ifdef _DEBUG
-    if (Log::cat_opt_lazyexc()->isDebugEnabled()) {
-        for (int i=0; i<level; i++) Log::cat_opt_lazyexc()->debug << " "; 
-        Log::cat_opt_lazyexc()->debug << "done "; md.printFullName(Log::out()); 
-        Log::cat_opt_lazyexc()->debug << " SideEff " << (int)m_sideEff << std::endl; 
+    if (Log::isEnabled()) {
+        for (int i=0; i<level; i++) Log::out() << " "; 
+        Log::out() << "done "; md.printFullName(Log::out()); 
+        Log::out() << " SideEff " << (int)m_sideEff << std::endl; 
     }
 #endif
 };
 
+/*
+*  Returns:
+*      true, if throw cannot be optimized
+*      false, otherwise
+*/
 bool 
 LazyExceptionOpt::addOptCandidates(uint32 id, Inst* inst) {
     OptCandidate* oc = NULL;
     ThrowInsts* thrinst = NULL;
     OptCandidates::iterator it;
     if (optCandidates == NULL)
-        optCandidates = new OptCandidates(leMemManager);
+        optCandidates = new (leMemManager) OptCandidates(leMemManager);
     for (it = optCandidates->begin( ); it != optCandidates->end( ); it++ ) {
         if ((*it)->opndId==id) {
             oc = *it;
@@ -254,17 +246,28 @@ LazyExceptionOpt::addOptCandidates(uint32 id, Inst* inst) {
         }
     }
 #ifdef _DEBUG
-    if (Log::cat_opt_lazyexc()->isDebugEnabled()) {
-        Log::cat_opt_lazyexc()->debug << "    addOptCandidates: "; 
-        inst->print(Log::out()); Log::cat_opt_lazyexc()->debug  << std::endl;
+    if (Log::isEnabled()) {
+        Log::out() << "    addOptCandidates: "; 
+        inst->print(Log::out()); Log::out()  << std::endl;
     }
 #endif
     if (oc == NULL) {
+        if (inst->getOpcode()==Op_Throw) {
+            bool hasFinalize =
+                ((NamedType*)inst->getSrc(0)->getType())->isFinalizable();
+            if (hasFinalize) {
+#ifdef _DEBUG
+                Log::out() << "    isFinalizable: "
+                 << hasFinalize << std::endl;
+#endif
+                return true;
+            }
+        }
         oc = new (leMemManager) OptCandidate;
         oc->opndId = id;
         oc->objInst = inst->getSrc(0)->getInst();
         oc->initInst=NULL;
-        thrinst = new ThrowInsts(leMemManager);
+        thrinst = new (leMemManager) ThrowInsts(leMemManager);
         thrinst->push_back(inst);
         oc->throwInsts = thrinst;
         optCandidates->push_back(oc);
@@ -280,9 +283,9 @@ LazyExceptionOpt::addOptCandidates(uint32 id, Inst* inst) {
             assert(oc->initInst==NULL);
             oc->initInst = inst;
 #ifdef _DEBUG
-            if (Log::cat_opt_lazyexc()->isDebugEnabled()) {
-                Log::cat_opt_lazyexc()->debug << "    addOptCandidates: call checkMC "; 
-                inst->print(Log::out()); Log::cat_opt_lazyexc()->debug  << std::endl;
+            if (Log::isEnabled()) {
+                Log::out() << "    addOptCandidates: call checkMC "; 
+                inst->print(Log::out()); Log::out()  << std::endl;
             }
 #endif
             uint32 nii_id=inst->getId()+1;
@@ -290,9 +293,9 @@ LazyExceptionOpt::addOptCandidates(uint32 id, Inst* inst) {
             for (it1 = oc->throwInsts->begin(); it1 !=oc->throwInsts->end(); it1++) {
                 if ((*it1)->getId() != nii_id) {
 #ifdef _DEBUG
-                    if (Log::cat_opt_lazyexc()->isDebugEnabled()) {
-                        Log::cat_opt_lazyexc()->debug << "??  addOptCandidates: throw "; 
-                        (*it1)->print(Log::out()); Log::cat_opt_lazyexc()->debug  << std::endl;
+                    if (Log::isEnabled()) {
+                        Log::out() << "??  addOptCandidates: throw "; 
+                        (*it1)->print(Log::out()); Log::out()  << std::endl;
                     }
 #endif
                     if (checkInSideEff((*it1),inst))
@@ -309,25 +312,25 @@ LazyExceptionOpt::addOptCandidates(uint32 id, Inst* inst) {
 
 bool 
 LazyExceptionOpt::checkInSideEff(Inst* throw_inst, Inst* init_inst) {
-    CFGNode* node = throw_inst->getNode();
-    Inst* instfirst = node->getFirstInst();;
+    Node* node = throw_inst->getNode();
+    Inst* instfirst = (Inst*)node->getFirstInst();;
     Inst* instlast = throw_inst;
     Inst* inst;
     bool dofind = true;
     bool inSE = false;
     if (throw_inst!=instfirst)
-        instlast=throw_inst->prev();
+        instlast=throw_inst->getPrevInst();
     else {
         node = node->getInEdges().front()->getSourceNode();
-        instlast = node->getLastInst();    
+        instlast = (Inst*)node->getLastInst();    
     } 
     while (dofind && node!=NULL) {
-        instfirst = node->getFirstInst();
-        for (inst = instlast; inst!=instfirst; inst=inst->prev()) {
+        instfirst = (Inst*)node->getFirstInst();
+        for (inst = instlast; inst!=instfirst; inst=inst->getPrevInst()) {
 #ifdef _DEBUG
-            if (Log::cat_opt_lazyexc()->isDebugEnabled()) {
-                Log::cat_opt_lazyexc()->debug << "      checkInSE: see "; 
-                inst->print(Log::out()); Log::cat_opt_lazyexc()->debug << std::endl; 
+            if (Log::isEnabled()) {
+                Log::out() << "      checkInSE: see "; 
+                inst->print(Log::out()); Log::out() << std::endl; 
             }
 #endif
             if (inst==init_inst) {
@@ -338,9 +341,9 @@ LazyExceptionOpt::checkInSideEff(Inst* throw_inst, Inst* init_inst) {
                 if (instSideEffect(inst)) {
                     inSE=true;
 #ifdef _DEBUG
-                    if (Log::cat_opt_lazyexc()->isDebugEnabled()) {
-                        Log::cat_opt_lazyexc()->debug << "      checkInSE: sideEff "; 
-                        inst->print(Log::out()); Log::cat_opt_lazyexc()->debug << std::endl; 
+                    if (Log::isEnabled()) {
+                        Log::out() << "      checkInSE: sideEff "; 
+                        inst->print(Log::out()); Log::out() << std::endl; 
                     }
 #endif
                     break;
@@ -349,7 +352,7 @@ LazyExceptionOpt::checkInSideEff(Inst* throw_inst, Inst* init_inst) {
         }
         if (dofind){
             node = node->getInEdges().front()->getSourceNode();
-            instlast = node->getLastInst();
+            instlast = (Inst*)node->getLastInst();
         }
     }
     if (dofind)
@@ -359,14 +362,14 @@ LazyExceptionOpt::checkInSideEff(Inst* throw_inst, Inst* init_inst) {
 
 bool
 LazyExceptionOpt::isEqualExceptionNodes(Inst* oi, Inst* ti) {
-    CFGEdge* oedge = (CFGEdge*)oi->getNode()->getExceptionEdge();
-    CFGEdge* tedge = (CFGEdge*)ti->getNode()->getExceptionEdge();
+    Edge* oedge = oi->getNode()->getExceptionEdge();
+    Edge* tedge = ti->getNode()->getExceptionEdge();
     if (oedge->getTargetNode()!=tedge->getTargetNode()) {
 #ifdef _DEBUG
-        if (Log::cat_opt_lazyexc()->isDebugEnabled()) {
-            Log::cat_opt_lazyexc()->debug << "    addOptCandidates: diff.exc.edges for obj&throw "; 
-            Log::cat_opt_lazyexc()->debug << oedge->getTargetNode()->getId() << "  ";
-            Log::cat_opt_lazyexc()->debug << tedge->getTargetNode()->getId() << std::endl;
+        if (Log::isEnabled()) {
+            Log::out() << "    addOptCandidates: diff.exc.edges for obj&throw "; 
+            Log::out() << oedge->getTargetNode()->getId() << "  ";
+            Log::out() << tedge->getTargetNode()->getId() << std::endl;
         }
 #endif
         return false;
@@ -435,19 +438,22 @@ LazyExceptionOpt::fixOptCandidates(BitSet* bs) {
             oinst = (*it)->objInst; 
             assert(oinst != NULL);
 #ifdef _DEBUG
-            if (Log::cat_opt_lazyexc()->isDebugEnabled()) {
-                Log::cat_opt_lazyexc()->debug << "  to remove ";
+            if (Log::isEnabled()) {
+                Log::out() << "  to remove ";
                 oinst->print(Log::out());
-                Log::cat_opt_lazyexc()->debug << std::endl;
+                Log::out() << std::endl;
             }
 #endif
             iinst = (*it)->initInst->asMethodCallInst(); 
             assert(iinst != NULL);
+            // inline info from constructor should be propogated to lazy
+            // exception if any
+            InlineInfo* constrInlineInfo = iinst->getInlineInfoPtr();
 #ifdef _DEBUG
-            if (Log::cat_opt_lazyexc()->isDebugEnabled()) {
-                Log::cat_opt_lazyexc()->debug << "  to remove ";
+            if (Log::isEnabled()) {
+                Log::out() << "  to remove ";
                 iinst->print(Log::out());
-                Log::cat_opt_lazyexc()->debug << std::endl;
+                Log::out() << std::endl;
             }
 #endif
             assert((*it)->throwInsts != NULL);
@@ -466,10 +472,10 @@ LazyExceptionOpt::fixOptCandidates(BitSet* bs) {
             }
             Inst* mptinst = irManager.getInstFactory().makeLdFunAddr(mpt,iinst->getMethodDesc());
 #ifdef _DEBUG
-            if (Log::cat_opt_lazyexc()->isDebugEnabled()) {
-                Log::cat_opt_lazyexc()->debug << "  1st      ";
+            if (Log::isEnabled()) {
+                Log::out() << "  1st      ";
                 mptinst->print(Log::out());
-                Log::cat_opt_lazyexc()->debug << std::endl;
+                Log::out() << std::endl;
             }
 #endif
             ThrowInsts::iterator it1;
@@ -477,22 +483,33 @@ LazyExceptionOpt::fixOptCandidates(BitSet* bs) {
                 tinst = *it1;
                 assert(tinst != NULL);
                 tlinst=irManager.getInstFactory().makeVMHelperCall(  
-                        OpndManager::getNullOpnd(), ThrowLazy, opcount, opnds);
+                        OpndManager::getNullOpnd(), ThrowLazy, opcount, 
+                        opnds, constrInlineInfo);
 #ifdef _DEBUG
-                if (Log::cat_opt_lazyexc()->isDebugEnabled()) {
-                    Log::cat_opt_lazyexc()->debug << "  2nd      ";
+                if (Log::isEnabled()) {
+                    Log::out() << "  2nd      ";
                     tlinst->print(Log::out());
-                    Log::cat_opt_lazyexc()->debug << std::endl;
+                    Log::out() << std::endl;
                 }
-                if (Log::cat_opt_lazyexc()->isDebugEnabled()) {
-                    Log::cat_opt_lazyexc()->debug << "  to change ";
+                if (Log::isEnabled()) {
+                    Log::out() << "  to change ";
                     tinst->print(Log::out());
-                    Log::cat_opt_lazyexc()->debug << std::endl;
+                    Log::out() << std::endl;
                 }
 #endif
                 mptinst->insertBefore(tinst); 
                 tlinst->insertBefore(tinst);
                 tinst->unlink();
+
+                if (isBCmapRequired) {
+                    uint64 bcOffset = ILLEGAL_VALUE;
+                    uint64 instID = iinst->getId();
+                    bcOffset = bc2HIRMapHandler->getVectorEntry(instID);
+                    if (bcOffset != ILLEGAL_VALUE) {
+                        bc2HIRMapHandler->setVectorEntry(mptinst->getId(), bcOffset);
+                        bc2HIRMapHandler->setVectorEntry(tlinst->getId(), bcOffset);
+                    }
+                }
             }
             irManager.getFlowGraph().purgeEmptyNodes();
         }
@@ -501,21 +518,21 @@ LazyExceptionOpt::fixOptCandidates(BitSet* bs) {
 
 bool
 LazyExceptionOpt::removeInsts(Inst* oinst,Inst* iinst) {
-    FlowGraph fg = irManager.getFlowGraph();
-    CFGEdge* oedge = (CFGEdge*)oinst->getNode()->getExceptionEdge();
-    CFGEdge* iedge = (CFGEdge*)iinst->getNode()->getExceptionEdge();
-    CFGNode* otn = oedge->getTargetNode();
-    CFGNode* itn = iedge->getTargetNode();
+    ControlFlowGraph& fg = irManager.getFlowGraph();
+    Edge* oedge = oinst->getNode()->getExceptionEdge();
+    Edge* iedge = iinst->getNode()->getExceptionEdge();
+    Node* otn = oedge->getTargetNode();
+    Node* itn = iedge->getTargetNode();
 
     if (otn!=itn) {
 #ifdef _DEBUG
-        if (Log::cat_opt_lazyexc()->isDebugEnabled()) {
-            Log::cat_opt_lazyexc()->debug << "    removeInsts: diff.exc.edges for obj&init "; 
-            Log::cat_opt_lazyexc()->debug << otn->getId() << "  "  << itn->getId() << std::endl;
-            Log::cat_opt_lazyexc()->debug << "   "; oinst->print(Log::out()); 
-            Log::cat_opt_lazyexc()->debug << std::endl;
-            Log::cat_opt_lazyexc()->debug << "   "; iinst->print(Log::out()); 
-            Log::cat_opt_lazyexc()->debug << std::endl;
+        if (Log::isEnabled()) {
+            Log::out() << "    removeInsts: diff.exc.edges for obj&init "; 
+            Log::out() << otn->getId() << "  "  << itn->getId() << std::endl;
+            Log::out() << "   "; oinst->print(Log::out()); 
+            Log::out() << std::endl;
+            Log::out() << "   "; iinst->print(Log::out()); 
+            Log::out() << std::endl;
         }
 #endif
         return false;
@@ -534,10 +551,10 @@ LazyExceptionOpt::removeInsts(Inst* oinst,Inst* iinst) {
 }
 
 void 
-LazyExceptionOpt::removeNode(CFGNode* node) {
-    const CFGEdgeDeque &out_edges = node->getOutEdges();
-    CFGEdgeDeque::const_iterator eit;
-    CFGNode* n; 
+LazyExceptionOpt::removeNode(Node* node) {
+    const Edges &out_edges = node->getOutEdges();
+    Edges::const_iterator eit;
+    Node* n; 
     for (eit = out_edges.begin(); eit != out_edges.end(); ++eit) {
         n = (*eit)->getTargetNode();
         if (n->getInEdges().size() == 1)
@@ -571,27 +588,27 @@ LazyExceptionOpt::checkMethodCall(Inst* inst) {
             cmd = inst->asCallInst()->getFunPtr()->getType()->asMethodPtrType()->getMethodDesc();
         } else {
 #ifdef _DEBUG
-            if (Log::cat_opt_lazyexc()->isDebugEnabled()) {
-                Log::cat_opt_lazyexc()->debug << "    checkMC: no check "; 
-                inst->print(Log::out()); Log::cat_opt_lazyexc()->debug  << std::endl;
+            if (Log::isEnabled()) {
+                Log::out() << "    checkMC: no check "; 
+                inst->print(Log::out()); Log::out()  << std::endl;
             }
 #endif
             return true;
         }
     }
 #ifdef _DEBUG
-    if (Log::cat_opt_lazyexc()->isDebugEnabled()) {
-        Log::cat_opt_lazyexc()->debug << "    checkMC: "; 
-        cmd->printFullName(Log::out()); Log::cat_opt_lazyexc()->debug << std::endl;
+    if (Log::isEnabled()) {
+        Log::out() << "    checkMC: "; 
+        cmd->printFullName(Log::out()); Log::out() << std::endl;
     }
 #endif
     
     mse=compInterface.getMethodHasSideEffect(cmd);
 #ifdef _DEBUG
     if (mse!=CompilationInterface::MSE_UNKNOWN) {
-        if (Log::cat_opt_lazyexc()->isDebugEnabled()) {
-            Log::cat_opt_lazyexc()->debug << "    checkMC: prev.set sideEff " << mse << "  "; 
-            inst->print(Log::out()); Log::cat_opt_lazyexc()->debug << std::endl;
+        if (Log::isEnabled()) {
+            Log::out() << "    checkMC: prev.set sideEff " << mse << "  "; 
+            inst->print(Log::out()); Log::out() << std::endl;
         }
     }
 #endif
@@ -606,9 +623,9 @@ LazyExceptionOpt::checkMethodCall(Inst* inst) {
             && strncmp(cmd->getParentType()->getName(),"java/lang/",10) == 0) {
         compInterface.setMethodHasSideEffect(cmd,CompilationInterface::MSE_NO);
 #ifdef _DEBUG
-        if (Log::cat_opt_lazyexc()->isDebugEnabled()) {
-            Log::cat_opt_lazyexc()->debug << "    checkMC: core api exc "; 
-            inst->print(Log::out()); Log::cat_opt_lazyexc()->debug << std::endl;
+        if (Log::isEnabled()) {
+            Log::out() << "    checkMC: core api exc "; 
+            inst->print(Log::out()); Log::out() << std::endl;
         }
 #endif
         return false;
@@ -616,9 +633,9 @@ LazyExceptionOpt::checkMethodCall(Inst* inst) {
 
     if ( opcode!=Op_DirectCall && !cmd->isFinal() ) {
 #ifdef _DEBUG
-        if (Log::cat_opt_lazyexc()->isDebugEnabled()) {
-            Log::cat_opt_lazyexc()->debug << "    checkMC: not DirCall not final "; 
-            inst->print(Log::out()); Log::cat_opt_lazyexc()->debug << std::endl;
+        if (Log::isEnabled()) {
+            Log::out() << "    checkMC: not DirCall not final "; 
+            inst->print(Log::out()); Log::out() << std::endl;
         }
 #endif
         return true;
@@ -627,12 +644,12 @@ LazyExceptionOpt::checkMethodCall(Inst* inst) {
     if (!isExceptionInit && 
         !(cmd->isInstanceInitializer()&&cmd->getParentType()->isLikelyExceptionType())) {
 #ifdef _DEBUG
-        if (Log::cat_opt_lazyexc()->isDebugEnabled()) {
-            Log::cat_opt_lazyexc()->debug << "    checkMC: no init "; 
-            Log::cat_opt_lazyexc()->debug << isExceptionInit << " ";
-            Log::cat_opt_lazyexc()->debug << cmd->isInstanceInitializer() << " ";
-            Log::cat_opt_lazyexc()->debug << cmd->getParentType()->isLikelyExceptionType() << " ";
-            inst->print(Log::out()); Log::cat_opt_lazyexc()->debug << std::endl;
+        if (Log::isEnabled()) {
+            Log::out() << "    checkMC: no init "; 
+            Log::out() << isExceptionInit << " ";
+            Log::out() << cmd->isInstanceInitializer() << " ";
+            Log::out() << cmd->getParentType()->isLikelyExceptionType() << " ";
+            inst->print(Log::out()); Log::out() << std::endl;
         }
 #endif
         return true;
@@ -640,9 +657,9 @@ LazyExceptionOpt::checkMethodCall(Inst* inst) {
 
     if (cmd->getParentType()->needsInitialization()) {
 #ifdef _DEBUG
-        if (Log::cat_opt_lazyexc()->isDebugEnabled()) {
-            Log::cat_opt_lazyexc()->debug << "    checkMC: need cinit "; 
-            inst->print(Log::out()); Log::cat_opt_lazyexc()->debug << std::endl;
+        if (Log::isEnabled()) {
+            Log::out() << "    checkMC: need cinit "; 
+            inst->print(Log::out()); Log::out() << std::endl;
         }
 #endif
         return true;  // cannot compile <init> before <clinit> (to fix vm)
@@ -650,8 +667,8 @@ LazyExceptionOpt::checkMethodCall(Inst* inst) {
     if (compInterface.compileMethod(cmd)) {
         mse = compInterface.getMethodHasSideEffect(cmd);
 #ifdef _DEBUG
-        if (Log::cat_opt_lazyexc()->isDebugEnabled()) {
-            Log::cat_opt_lazyexc()->debug << "    checkMC: method was compiled, sideEff " 
+        if (Log::isEnabled()) {
+            Log::out() << "    checkMC: method was compiled, sideEff " 
                 << mse << std::endl;
         }
 #endif
@@ -664,9 +681,9 @@ LazyExceptionOpt::checkMethodCall(Inst* inst) {
                 bool mayBeNull;
                 if (nsrc>3) {
 #ifdef _DEBUG
-                    if (Log::cat_opt_lazyexc()->isDebugEnabled()) {
-                        Log::cat_opt_lazyexc()->debug << "    checkMC: exc.init "; 
-                        inst->print(Log::out()); Log::cat_opt_lazyexc()->debug << std::endl;
+                    if (Log::isEnabled()) {
+                        Log::out() << "    checkMC: exc.init "; 
+                        inst->print(Log::out()); Log::out() << std::endl;
                     }
 #endif
                     mayBeNull=false;
@@ -681,11 +698,11 @@ LazyExceptionOpt::checkMethodCall(Inst* inst) {
                         return false;
 #ifdef _DEBUG
                     for (uint32 i=0; i<nsrc; i++) {
-                        if (Log::cat_opt_lazyexc()->isDebugEnabled()) {
-                            Log::cat_opt_lazyexc()->debug << "        "<<i<<" isRef: "<<
+                        if (Log::isEnabled()) {
+                            Log::out() << "        "<<i<<" isRef: "<<
                             inst->getSrc(i)->getType()->isReference()<<" "; 
                             inst->getSrc(i)->getInst()->print(Log::out()); 
-                            Log::cat_opt_lazyexc()->debug << std::endl;
+                            Log::out() << std::endl;
                         }
                     }
 #endif
@@ -693,8 +710,8 @@ LazyExceptionOpt::checkMethodCall(Inst* inst) {
                 } 
 #ifdef _DEBUG
                 else {
-                    if (Log::cat_opt_lazyexc()->isDebugEnabled()) {
-                        Log::cat_opt_lazyexc()->debug << " ?????? MSE_NULL_PARAM & nsrc "<<
+                    if (Log::isEnabled()) {
+                        Log::out() << " ?????? MSE_NULL_PARAM & nsrc "<<
                         nsrc << std::endl;
                     }
                 }
@@ -704,8 +721,8 @@ LazyExceptionOpt::checkMethodCall(Inst* inst) {
         }
     } else {
 #ifdef _DEBUG
-        if (Log::cat_opt_lazyexc()->isDebugEnabled()) {
-            Log::cat_opt_lazyexc()->debug << "    checkMC: method was not compiled " << std::endl;
+        if (Log::isEnabled()) {
+            Log::out() << "    checkMC: method was not compiled " << std::endl;
         }
 #endif
         return true;
@@ -715,12 +732,12 @@ LazyExceptionOpt::checkMethodCall(Inst* inst) {
 bool 
 LazyExceptionOpt::mayBeNullArg(Inst* call_inst, Inst* src_inst) {
     uint32 mnid = irManager.getFlowGraph().getMaxNodeId();
-    CFGNode* node = call_inst->getNode();
+    Node* node = call_inst->getNode();
     bool done = true;
 
     if (nodeSet == NULL) {
         nodeSet = new (leMemManager) NodeSet;
-        nodeSet->nodes=new BitSet(leMemManager,mnid);
+        nodeSet->nodes=new (leMemManager) BitSet(leMemManager,mnid);
     } else {
         nodeSet->nodes->clear();
     }
@@ -731,20 +748,20 @@ LazyExceptionOpt::mayBeNullArg(Inst* call_inst, Inst* src_inst) {
 
     done = checkArg(node);
 #ifdef _DEBUG
-    if (Log::cat_opt_lazyexc()->isDebugEnabled()) {
-        Log::cat_opt_lazyexc()->debug << "        mb0 done " << done << " nodes: " << std::endl; 
+    if (Log::isEnabled()) {
+        Log::out() << "        mb0 done " << done << " nodes: " << std::endl; 
         for(uint32 i = 0; i < mnid; i++) {
             if (nodeSet->nodes->getBit(i)) {
-                Log::cat_opt_lazyexc()->debug << " " << i;
+                Log::out() << " " << i;
             }
         }
-        Log::cat_opt_lazyexc()->debug << std::endl; 
-        Log::cat_opt_lazyexc()->debug << "   arg   node: " << nodeSet->arg_src_inst->getNode()->getId() << std::endl; 
-        Log::cat_opt_lazyexc()->debug << "   call  node: " << nodeSet->call_inst->getNode()->getId() << std::endl; 
+        Log::out() << std::endl; 
+        Log::out() << "   arg   node: " << nodeSet->arg_src_inst->getNode()->getId() << std::endl; 
+        Log::out() << "   call  node: " << nodeSet->call_inst->getNode()->getId() << std::endl; 
         if (nodeSet->check_inst)
-        Log::cat_opt_lazyexc()->debug << "   check node: " << nodeSet->check_inst->getNode()->getId() << std::endl; 
+        Log::out() << "   check node: " << nodeSet->check_inst->getNode()->getId() << std::endl; 
         if (nodeSet->reset_inst)
-        Log::cat_opt_lazyexc()->debug << "   reset node: " << nodeSet->reset_inst->getNode()->getId() << std::endl; 
+        Log::out() << "   reset node: " << nodeSet->reset_inst->getNode()->getId() << std::endl; 
     }
 #endif 
     if (!done)
@@ -760,18 +777,18 @@ LazyExceptionOpt::mayBeNullArg(Inst* call_inst, Inst* src_inst) {
 }
 
 bool 
-LazyExceptionOpt::checkArg(CFGNode* nodeS) {
-    CFGNode* node = nodeS;
-    Inst* instfirst = node->getFirstInst();
-    Inst* instlast = node->getLastInst();
+LazyExceptionOpt::checkArg(Node* nodeS) {
+    Node* node = nodeS;
+    Inst* instfirst = (Inst*)node->getFirstInst();
+    Inst* instlast = (Inst*)node->getLastInst();
     Inst* inst;
     Opnd* arg_opnd = nodeSet->arg_src_inst->getDst();
     bool doneOK = true;
     bool dofind = true;
 
 #ifdef _DEBUG
-        if (Log::cat_opt_lazyexc()->isDebugEnabled()) {
-            Log::cat_opt_lazyexc()->debug << "    checkArg: first node " << node->getId()
+        if (Log::isEnabled()) {
+            Log::out() << "    checkArg: first node " << node->getId()
             << "  inEdges " << node->getInDegree() << "  " << std::endl;
         }
 #endif 
@@ -780,32 +797,32 @@ LazyExceptionOpt::checkArg(CFGNode* nodeS) {
         if ( nodeSet->nodes->getBit(node->getId()) ) {
             if (nodeSet->call_inst->getNode() == node) {
 #ifdef _DEBUG
-                if (Log::cat_opt_lazyexc()->isDebugEnabled()) {
-                    Log::cat_opt_lazyexc()->debug << "        node " << node->getId()
+                if (Log::isEnabled()) {
+                    Log::out() << "        node " << node->getId()
                     << " again in call_inst node " << std::endl; 
                 }
 #endif 
                 doneOK = false;
             }
 #ifdef _DEBUG
-            if (Log::cat_opt_lazyexc()->isDebugEnabled()) {
-                Log::cat_opt_lazyexc()->debug << "        node " << node->getId()
+            if (Log::isEnabled()) {
+                Log::out() << "        node " << node->getId()
                 << "  inEdges " << node->getInDegree() << " was scanned " << std::endl; 
             }
 #endif 
             break;
         }
 #ifdef _DEBUG
-        if (Log::cat_opt_lazyexc()->isDebugEnabled()) {
-            Log::cat_opt_lazyexc()->debug << "        node " << node->getId()
+        if (Log::isEnabled()) {
+            Log::out() << "        node " << node->getId()
             << "  inEdges " << node->getInDegree() << std::endl; 
         }
 #endif 
-        for (inst = instlast; inst!=instfirst; inst=inst->prev()) {
+        for (inst = instlast; inst!=instfirst; inst=inst->getPrevInst()) {
 #ifdef _DEBUG
-            if (Log::cat_opt_lazyexc()->isDebugEnabled()) {
-                Log::cat_opt_lazyexc()->debug << "          "; 
-                inst->print(Log::out()); Log::cat_opt_lazyexc()->debug << std::endl; 
+            if (Log::isEnabled()) {
+                Log::out() << "          "; 
+                inst->print(Log::out()); Log::out() << std::endl; 
             }
 #endif
             if (inst==nodeSet->arg_src_inst) {
@@ -817,8 +834,8 @@ LazyExceptionOpt::checkArg(CFGNode* nodeS) {
                     dofind = false; 
                     doneOK = false; 
 #ifdef _DEBUG
-                    if (Log::cat_opt_lazyexc()->isDebugEnabled()) {
-                        Log::cat_opt_lazyexc()->debug << "  check_inst is not NULL" << std::endl; 
+                    if (Log::isEnabled()) {
+                        Log::out() << "  check_inst is not NULL" << std::endl; 
                     }
 #endif
                 }
@@ -828,8 +845,8 @@ LazyExceptionOpt::checkArg(CFGNode* nodeS) {
             if (inst->getDst()==arg_opnd) {
 #ifdef _DEBUG
                 if (nodeSet->reset_inst != NULL) {
-                    if (Log::cat_opt_lazyexc()->isDebugEnabled()) {
-                        Log::cat_opt_lazyexc()->debug << "  reset_inst is not NULL" << std::endl; 
+                    if (Log::isEnabled()) {
+                        Log::out() << "  reset_inst is not NULL" << std::endl; 
                     }
                 }
 #endif
@@ -848,11 +865,11 @@ LazyExceptionOpt::checkArg(CFGNode* nodeS) {
             }
             if (node->getInDegree()==1) {
                 node = node->getInEdges().front()->getSourceNode();
-                instfirst = node->getFirstInst();
-                instlast = node->getLastInst();
+                instfirst = (Inst*)node->getFirstInst();
+                instlast = (Inst*)node->getLastInst();
             } else {
-                const CFGEdgeDeque &in_edges = node->getInEdges();
-                CFGEdgeDeque::const_iterator eit;
+                const Edges &in_edges = node->getInEdges();
+                Edges::const_iterator eit;
                 for (eit = in_edges.begin(); eit != in_edges.end(); ++eit) {
                      if ( !(checkArg((*eit)->getSourceNode())) ) {
                          doneOK = false;
@@ -874,13 +891,13 @@ LazyExceptionOpt::checkField(Inst* inst) {
     Inst* instDef = insOp->getInst();
     if (instDef->getOpcode() == Op_DefArg) {
 #ifdef _DEBUG
-        if (Log::cat_opt_lazyexc()->isDebugEnabled()) {
-            Log::cat_opt_lazyexc()->debug << "    checkField: "; 
-            inst->print(Log::out()); Log::cat_opt_lazyexc()->debug  << std::endl;
-            Log::cat_opt_lazyexc()->debug << "    checkField: "; 
-            instDef->print(Log::out()); Log::cat_opt_lazyexc()->debug  << std::endl;
-            Log::cat_opt_lazyexc()->debug << "    checkField: "; 
-            Log::cat_opt_lazyexc()->debug << (int)(instDef->getDefArgModifier()) << " " <<
+        if (Log::isEnabled()) {
+            Log::out() << "    checkField: "; 
+            inst->print(Log::out()); Log::out()  << std::endl;
+            Log::out() << "    checkField: "; 
+            instDef->print(Log::out()); Log::out()  << std::endl;
+            Log::out() << "    checkField: "; 
+            Log::out() << (int)(instDef->getDefArgModifier()) << " " <<
             (instDef->getDefArgModifier()==DefArgNoModifier) << " " <<
             (instDef->getDefArgModifier()==NonNullThisArg) << " " <<
             (instDef->getDefArgModifier()==DefArgBothModifiers) << std::endl;
@@ -928,9 +945,9 @@ LazyExceptionOpt::instSideEffect(Inst* inst) {
         case Op_IndirectCall:
         case Op_IndirectMemoryCall:
 #ifdef _DEBUG
-            if (Log::cat_opt_lazyexc()->isDebugEnabled()) {
-                Log::cat_opt_lazyexc()->debug << "    instSideEffect: call checkMC "; 
-                inst->print(Log::out()); Log::cat_opt_lazyexc()->debug  << std::endl;
+            if (Log::isEnabled()) {
+                Log::out() << "    instSideEffect: call checkMC "; 
+                inst->print(Log::out()); Log::out()  << std::endl;
             }
 #endif
             return checkMethodCall(inst);  
@@ -942,7 +959,6 @@ LazyExceptionOpt::instSideEffect(Inst* inst) {
         case Op_Catch:
             return false;
         case Op_Throw:
-        case Op_ThrowLazy:
         case Op_ThrowSystemException:
         case Op_ThrowLinkingException:
             return true;
@@ -959,7 +975,7 @@ LazyExceptionOpt::instSideEffect(Inst* inst) {
             return true;
         case Op_DefArg:
         case Op_LdConstant:
-        case Op_LdString:
+        case Op_LdRef:
         case Op_LdVar:    
         case Op_LdVarAddr:
         case Op_TauLdInd:
@@ -995,11 +1011,11 @@ LazyExceptionOpt::instSideEffect(Inst* inst) {
             {
                 Inst* inst_src1 = inst->getSrc(1)->getInst();
 #ifdef _DEBUG
-                if (Log::cat_opt_lazyexc()->isDebugEnabled()) {
-                    Log::cat_opt_lazyexc()->debug << "    stind: "; 
-                    inst->print(Log::out()); Log::cat_opt_lazyexc()->debug  << std::endl;
-                    Log::cat_opt_lazyexc()->debug << "           "; 
-                    inst_src1->print(Log::out()); Log::cat_opt_lazyexc()->debug  << std::endl;
+                if (Log::isEnabled()) {
+                    Log::out() << "    stind: "; 
+                    inst->print(Log::out()); Log::out()  << std::endl;
+                    Log::out() << "           "; 
+                    inst_src1->print(Log::out()); Log::out()  << std::endl;
                 }
 #endif
                 if (inst_src1->getOpcode()==Op_LdFieldAddr ) 
@@ -1019,11 +1035,11 @@ LazyExceptionOpt::instSideEffect(Inst* inst) {
             {
                 Inst* inst_src = inst->getSrc(0)->getInst();
 #ifdef _DEBUG
-                if (Log::cat_opt_lazyexc()->isDebugEnabled()) {
-                    Log::cat_opt_lazyexc()->debug << "    checknull: "; 
-                    inst->print(Log::out()); Log::cat_opt_lazyexc()->debug  << std::endl;
-                    Log::cat_opt_lazyexc()->debug << "               "; 
-                    inst_src->print(Log::out()); Log::cat_opt_lazyexc()->debug  << std::endl;
+                if (Log::isEnabled()) {
+                    Log::out() << "    checknull: "; 
+                    inst->print(Log::out()); Log::out()  << std::endl;
+                    Log::out() << "               "; 
+                    inst_src->print(Log::out()); Log::out()  << std::endl;
                 }
 #endif
                 if (inst_src->getOpcode()==Op_DefArg && isExceptionInit) {
@@ -1043,10 +1059,10 @@ LazyExceptionOpt::instSideEffect(Inst* inst) {
                 NamedType* nt = inst->getDst()->getType()->asNamedType();
                 if (strncmp(nt->getName(),"java/lang/",10)==0 && nt->isLikelyExceptionType()) {
 #ifdef _DEBUG
-                    if (Log::cat_opt_lazyexc()->isDebugEnabled()) {
-                        Log::cat_opt_lazyexc()->debug << "====newobj "; 
-                        inst->print(Log::out()); Log::cat_opt_lazyexc()->debug  << std::endl;
-                        Log::cat_opt_lazyexc()->debug << "core api exc " << nt->getName() << " "
+                    if (Log::isEnabled()) {
+                        Log::out() << "====newobj "; 
+                        inst->print(Log::out()); Log::out()  << std::endl;
+                        Log::out() << "core api exc " << nt->getName() << " "
                             << strncmp(nt->getName(),"java/lang/",10)
                             << " excType: " << nt->isLikelyExceptionType() << std::endl; 
                     }

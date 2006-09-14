@@ -21,9 +21,8 @@
 #define _INTERPRETER_H_
 
 #include "Class.h"
-#include "exception.h"
+#include "stack_trace.h"
 #include "interpreter_exports.h"
-
 
 extern bool interpreter_enabled();
 

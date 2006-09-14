@@ -56,13 +56,13 @@ inline LoggerString& operator<<(LoggerString& log, const Class* clss) {
 /**
 * The convenience method for logging Method instances.
 */
-inline LoggerString& operator<<(LoggerString& log, const Method* method) {
-    if (method) {
-        log << method->get_class() << "."
-        << method->get_name() 
-        << method->get_descriptor();
+inline LoggerString& operator<<(LoggerString& log, const Class_Member* m) {
+    if (m) {
+        log << m->get_class() << "."
+        << m->get_name() 
+        << m->get_descriptor();
     } else {
-        log << "<null method>";
+        log << "<null member>";
     }
 
     return log;

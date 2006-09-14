@@ -26,6 +26,7 @@
 #include <errno.h>
 #include <stdlib.h>
 
+
 // need to use EM64T-specifics - new registers, defines from enc_prvt, etc...
 #if !defined(_EM64T_)
     #define UNDEF_EM64T
@@ -45,6 +46,8 @@
     #define Mnemonic_POR    Mnemonic_Null
     #define Mnemonic_PSUBQ  Mnemonic_Null
 #endif
+
+ENCODER_NAMESPACE_START
 
 
 EncoderBase::MnemonicDesc EncoderBase::mnemonics[Mnemonic_Count];
@@ -97,15 +100,12 @@ I.e., TheManual reads for DEC:
 
 3. Fill out the mnemonic, opcode parameters parts
 
-    BEGIN_MNEMONIC(DEC, true, false, false, false, DU )
+    BEGIN_MNEMONIC(DEC, MF_AFFECTS_FLAGS, DU)
     BEGIN_OPCODES()
         {OpcodeInfo::all,   {0xFE, _1},         {r_m8},         DU },
         {OpcodeInfo::em64t, {REX_W, 0xFF, _1},  {r_m64},        DU },
 
-    true, false, false, false, DU:
-    ^ true - affects (sets) flags
-            ^ false*3 - does not use flags, not conditional, not symmetric
-                                ^ DU - one argument, it's used and defined
+    DU here - one argument, it's used and defined
 
 4. That's it, that simple !
 
@@ -114,7 +114,6 @@ perform data flow analysis. It also used to store/obtain number of operands.
 
 Special cases are (see the table for details):
 LEA
-SETcc
 Some FPU operations (i.e. FSTP)
 packed things (XORPD, XORPS, CVTDQ2PD, CVTTPD2DQ)
 
@@ -296,22 +295,26 @@ unsigned short EncoderBase::getHash(const OpcodeInfo* odesc)
 }
 
 
-#define BEGIN_MNEMONIC(mn, affflags, ulags, cond, symm, roles)     \
-        { Mnemonic_##mn, affflags, ulags, cond, symm, roles, #mn,
+#define BEGIN_MNEMONIC(mn, flags, roles)     \
+        { Mnemonic_##mn, flags, roles, #mn,
 #define END_MNEMONIC() },
 #define BEGIN_OPCODES() {
 #define END_OPCODES()   { OpcodeInfo::all, {OpcodeByteKind_LAST} }}
+
+//#define BEGIN_MNEMONIC(mn, affflags, ulags, cond, symm, roles)     \
+//        { Mnemonic_##mn, affflags, ulags, cond, symm, roles, #mn,
+
 
 static MnemonicInfo masterEncodingTable[] = {
 //
 // Null
 //
-BEGIN_MNEMONIC(Null, false, false, false, false, N )
+BEGIN_MNEMONIC(Null, MF_NONE, N)
 BEGIN_OPCODES()
 END_OPCODES()
 END_MNEMONIC()
 
-BEGIN_MNEMONIC(LAHF, false, true, false, false, D )
+BEGIN_MNEMONIC(LAHF, MF_USES_FLAGS, D)
 BEGIN_OPCODES()
 // TheManual says it's not always supported in em64t mode, thus excluding it
     {OpcodeInfo::ia32,    {0x9F},         {EAX}, D },
@@ -357,62 +360,62 @@ END_MNEMONIC()
     {OpcodeInfo::all,     {opcode_starts_from+3,  _r},  {r32,   r_m32}, def_use },\
     {OpcodeInfo::em64t,   {REX_W, opcode_starts_from+3, _r},    {r64,   r_m64}, def_use },
 
-BEGIN_MNEMONIC(ADD, true, false, false, true, DU_U )
+BEGIN_MNEMONIC(ADD, MF_AFFECTS_FLAGS|MF_SYMMETRIC, DU_U)
 BEGIN_OPCODES()
     DEFINE_ALU_OPCODES(_0, 0x00, OxOO, DU_U )
 END_OPCODES()
 END_MNEMONIC()
 
-BEGIN_MNEMONIC(OR, true, false, false, true, DU_U )
+BEGIN_MNEMONIC(OR, MF_AFFECTS_FLAGS|MF_SYMMETRIC, DU_U)
 BEGIN_OPCODES()
     DEFINE_ALU_OPCODES(_1, 0x08, 0x08, DU_U )
 END_OPCODES()
 END_MNEMONIC()
 
-BEGIN_MNEMONIC(ADC, true, true, false, true, DU_U )
+BEGIN_MNEMONIC(ADC, MF_AFFECTS_FLAGS|MF_USES_FLAGS|MF_SYMMETRIC, DU_U)
 BEGIN_OPCODES()
     DEFINE_ALU_OPCODES(_2, 0x10, 0x10, DU_U )
 END_OPCODES()
 END_MNEMONIC()
 
-BEGIN_MNEMONIC(SBB, true, true, false, false, DU_U )
+BEGIN_MNEMONIC(SBB, MF_AFFECTS_FLAGS|MF_USES_FLAGS, DU_U)
 BEGIN_OPCODES()
     DEFINE_ALU_OPCODES(_3, 0x18, 0x18, DU_U )
 END_OPCODES()
 END_MNEMONIC()
 
-BEGIN_MNEMONIC(AND, true, false, false, true, DU_U )
+BEGIN_MNEMONIC(AND, MF_AFFECTS_FLAGS|MF_SYMMETRIC, DU_U)
 BEGIN_OPCODES()
     DEFINE_ALU_OPCODES(_4, 0x20, 0x20, DU_U )
 END_OPCODES()
 END_MNEMONIC()
 
 
-BEGIN_MNEMONIC(SUB, true, false, false, false, DU_U )
+BEGIN_MNEMONIC(SUB, MF_AFFECTS_FLAGS|MF_SAME_ARG_NO_USE, DU_U)
 BEGIN_OPCODES()
     DEFINE_ALU_OPCODES(_5, 0x28, 0x28, DU_U )
 END_OPCODES()
 END_MNEMONIC()
 
 
-BEGIN_MNEMONIC(XOR, true, false, false, true, DU_U )
+BEGIN_MNEMONIC(XOR, MF_AFFECTS_FLAGS|MF_SYMMETRIC|MF_SAME_ARG_NO_USE, DU_U)
 BEGIN_OPCODES()
     DEFINE_ALU_OPCODES( _6, 0x30, 0x30, DU_U )
 END_OPCODES()
 END_MNEMONIC()
 
-BEGIN_MNEMONIC(CMP, true, false, false, false, U_U )
+BEGIN_MNEMONIC(CMP, MF_AFFECTS_FLAGS, U_U)
 BEGIN_OPCODES()
     DEFINE_ALU_OPCODES( _7, 0x38, 0x38, U_U )
 END_OPCODES()
 END_MNEMONIC()
 
-BEGIN_MNEMONIC(CMPXCHG, false, false, false, false, DU_DU )
+BEGIN_MNEMONIC(CMPXCHG, MF_NONE, DU_DU )
 BEGIN_OPCODES()
     {OpcodeInfo::all, {0x0F, 0xB0, _r},         {r_m8, r8},     DU_DU },
     {OpcodeInfo::all, {Size16, 0x0F, 0xB1, _r}, {r_m16, r16},   DU_DU },
     {OpcodeInfo::all, {0x0F, 0xB1, _r},         {r_m32, r32},   DU_DU },
-    {OpcodeInfo::em64t, {REX_W, 0x0F, 0xB1, _r},{r_m64, r_m64}, DU_DU },
+    {OpcodeInfo::em64t, {REX_W, 0x0F, 0xB1, _r},{r_m64, r64},   DU_DU },
 END_OPCODES()
 END_MNEMONIC()
 
@@ -420,19 +423,19 @@ END_MNEMONIC()
 //
 //
 //
-BEGIN_MNEMONIC(ADDSD, false, false, false, false, DU_U )
+BEGIN_MNEMONIC(ADDSD, MF_NONE, DU_U)
 BEGIN_OPCODES()
     {OpcodeInfo::all, {0xF2, 0x0F, 0x58, _r},   {xmm64, xmm_m64},   DU_U},
 END_OPCODES()
 END_MNEMONIC()
 
-BEGIN_MNEMONIC(ADDSS, false, false, false, false, DU_U )
+BEGIN_MNEMONIC(ADDSS, MF_NONE, DU_U)
 BEGIN_OPCODES()
     {OpcodeInfo::all, {0xF3, 0x0F, 0x58, _r},   {xmm32, xmm_m32},   DU_U},
 END_OPCODES()
 END_MNEMONIC()
 
-BEGIN_MNEMONIC(CALL, false, false, false, false, U )
+BEGIN_MNEMONIC(CALL, MF_NONE, U )
 BEGIN_OPCODES()
     {OpcodeInfo::all,     {0xE8, cd},        {rel32},     U },
     {OpcodeInfo::ia32,    {0xFF, _2},        {r_m32},     U },
@@ -441,7 +444,7 @@ END_OPCODES()
 END_MNEMONIC()
 
 //TODO: Workaround. Actually, it's D_DU, but Jitrino's CG thinks it's D_U
-BEGIN_MNEMONIC(CDQ, false, false, false, false, D_U )
+BEGIN_MNEMONIC(CDQ, MF_NONE, D_U )
 BEGIN_OPCODES()
     {OpcodeInfo::all,     {0x99},         {DX, AX},       D_U },
     {OpcodeInfo::all,     {0x99},         {EDX, EAX},     D_U },
@@ -450,7 +453,7 @@ END_OPCODES()
 END_MNEMONIC()
 
 #define DEFINE_CMOVcc_MNEMONIC( cc ) \
-        BEGIN_MNEMONIC(CMOV##cc, false, true, true, false, D_U ) \
+        BEGIN_MNEMONIC(CMOV##cc, MF_USES_FLAGS|MF_CONDITIONAL, D_U ) \
 BEGIN_OPCODES() \
     {OpcodeInfo::all,   {Size16, 0x0F, 0x40 + ConditionMnemonic_##cc, _r},  {r16, r_m16},   D_U }, \
     {OpcodeInfo::all,   {0x0F, 0x40 + ConditionMnemonic_##cc, _r},          {r32, r_m32},   D_U }, \
@@ -482,14 +485,14 @@ DEFINE_CMOVcc_MNEMONIC(NLE)
 *****************************************************************************/
 //
 // double -> float
-BEGIN_MNEMONIC(CVTSD2SS, false, false, false, false, D_U )
+BEGIN_MNEMONIC(CVTSD2SS, MF_NONE, D_U )
 BEGIN_OPCODES()
     {OpcodeInfo::all,     {0xF2, 0x0F, 0x5A, _r},   {xmm32, xmm_m64}, D_U },
 END_OPCODES()
 END_MNEMONIC()
 
 // double -> int32
-BEGIN_MNEMONIC(CVTSD2SI, false, false, false, false, D_U )
+BEGIN_MNEMONIC(CVTSD2SI, MF_NONE, D_U )
 BEGIN_OPCODES()
     {OpcodeInfo::all,     {0xF2, 0x0F, 0x2D, _r},      {r32, xmm_m64}, D_U },
     {OpcodeInfo::em64t, {REX_W, 0xF2, 0x0F, 0x2D, _r}, {r64, xmm_m64}, D_U },
@@ -497,7 +500,7 @@ END_OPCODES()
 END_MNEMONIC()
 
 // double [truncated] -> int32
-BEGIN_MNEMONIC(CVTTSD2SI, false, false, false, false, D_U )
+BEGIN_MNEMONIC(CVTTSD2SI, MF_NONE, D_U )
 BEGIN_OPCODES()
     {OpcodeInfo::all,     {0xF2, 0x0F, 0x2C, _r},      {r32, xmm_m64}, D_U },
     {OpcodeInfo::em64t, {REX_W, 0xF2, 0x0F, 0x2C, _r}, {r64, xmm_m64}, D_U },
@@ -505,14 +508,14 @@ END_OPCODES()
 END_MNEMONIC()
 
 // float -> double
-BEGIN_MNEMONIC(CVTSS2SD, false, false, false, false, D_U )
+BEGIN_MNEMONIC(CVTSS2SD, MF_NONE, D_U )
 BEGIN_OPCODES()
     {OpcodeInfo::all,     {0xF3, 0x0F, 0x5A, _r},   {xmm64, xmm_m32}, D_U },
 END_OPCODES()
 END_MNEMONIC()
 
 // float -> int32
-BEGIN_MNEMONIC(CVTSS2SI, false, false, false, false, D_U )
+BEGIN_MNEMONIC(CVTSS2SI, MF_NONE, D_U )
 BEGIN_OPCODES()
     {OpcodeInfo::all,     {0xF3, 0x0F, 0x2D, _r},         {r32, xmm_m32}, D_U},
     {OpcodeInfo::em64t,   {REX_W, 0xF3, 0x0F, 0x2D, _r},  {r64, xmm_m32}, D_U},
@@ -520,7 +523,7 @@ END_OPCODES()
 END_MNEMONIC()
 
 // float [truncated] -> int32
-BEGIN_MNEMONIC(CVTTSS2SI, false, false, false, false, D_U )
+BEGIN_MNEMONIC(CVTTSS2SI, MF_NONE, D_U )
 BEGIN_OPCODES()
     {OpcodeInfo::all,     {0xF3, 0x0F, 0x2C, _r},         {r32, xmm_m32}, D_U},
     {OpcodeInfo::em64t,   {REX_W, 0xF3, 0x0F, 0x2C, _r},  {r64, xmm_m32}, D_U},
@@ -528,7 +531,7 @@ END_OPCODES()
 END_MNEMONIC()
 
 // int32 -> double
-BEGIN_MNEMONIC(CVTSI2SD, false, false, false, false, D_U )
+BEGIN_MNEMONIC(CVTSI2SD, MF_NONE, D_U )
 BEGIN_OPCODES()
     {OpcodeInfo::all,     {0xF2, 0x0F, 0x2A, _r},         {xmm64, r_m32}, D_U},
     {OpcodeInfo::em64t, {REX_W, 0xF2, 0x0F, 0x2A, _r},    {xmm64, r_m64}, D_U},
@@ -536,7 +539,7 @@ END_OPCODES()
 END_MNEMONIC()
 
 // int32 -> float
-BEGIN_MNEMONIC(CVTSI2SS, false, false, false, false, D_U )
+BEGIN_MNEMONIC(CVTSI2SS, MF_NONE, D_U )
 BEGIN_OPCODES()
     {OpcodeInfo::all,     {0xF3, 0x0F, 0x2A, _r},         {xmm32, r_m32}, D_U},
     {OpcodeInfo::em64t,   {REX_W, 0xF3, 0x0F, 0x2A, _r},  {xmm32, r_m64}, D_U},
@@ -547,7 +550,7 @@ END_MNEMONIC()
 // ~ SSE conversions
 //
 
-BEGIN_MNEMONIC(DEC, true, false, false, false, DU )
+BEGIN_MNEMONIC(DEC, MF_AFFECTS_FLAGS, DU )
 BEGIN_OPCODES()
     {OpcodeInfo::all,   {0xFE, _1},         {r_m8},     DU },
 
@@ -561,14 +564,14 @@ END_OPCODES()
 END_MNEMONIC()
 
 
-BEGIN_MNEMONIC(DIVSD, false, false, false, false, DU_U )
+BEGIN_MNEMONIC(DIVSD, MF_NONE, DU_U)
 BEGIN_OPCODES()
     {OpcodeInfo::all, {0xF2, 0x0F, 0x5E, _r},   {xmm64, xmm_m64},   DU_U },
 END_OPCODES()
 END_MNEMONIC()
 
 
-BEGIN_MNEMONIC(DIVSS, false, false, false, false, DU_U )
+BEGIN_MNEMONIC(DIVSS, MF_NONE, DU_U)
 BEGIN_OPCODES()
     {OpcodeInfo::all, {0xF3, 0x0F, 0x5E, _r},   {xmm32, xmm_m32},   DU_U },
 END_OPCODES()
@@ -578,100 +581,100 @@ END_MNEMONIC()
                  ***** FPU operations *****
 ****************************************************************************/
 
-BEGIN_MNEMONIC(FLDCW, false, false, false, false, U )
+BEGIN_MNEMONIC(FLDCW, MF_NONE, U )
 BEGIN_OPCODES()
     {OpcodeInfo::all, {0xD9, _5}, {m16},  U },
 END_OPCODES()
 END_MNEMONIC()
 
-BEGIN_MNEMONIC(FNSTCW, false, false, false, false, D )
+BEGIN_MNEMONIC(FNSTCW, MF_NONE, D)
 BEGIN_OPCODES()
     {OpcodeInfo::all, {0xD9, _7}, {m16},  D },
 END_OPCODES()
 END_MNEMONIC()
 
-BEGIN_MNEMONIC(FSTSW, false, false, false, false, N )
+BEGIN_MNEMONIC(FSTSW, MF_NONE, N)
 BEGIN_OPCODES()
     {OpcodeInfo::all, {0x9B, 0xDF, 0xE0}, {},     N },
 END_OPCODES()
 END_MNEMONIC()
 
-BEGIN_MNEMONIC(FCHS, false, false, false, false, DU )
+BEGIN_MNEMONIC(FCHS, MF_NONE, DU )
 BEGIN_OPCODES()
     {OpcodeInfo::all, {0xD9, 0xE0},       {FP0D}, DU },
     {OpcodeInfo::all, {0xD9, 0xE0},       {FP0S}, DU },
 END_OPCODES()
 END_MNEMONIC()
 
-BEGIN_MNEMONIC(FCLEX, false, false, false, false, N )
+BEGIN_MNEMONIC(FCLEX, MF_NONE, N)
 BEGIN_OPCODES()
     {OpcodeInfo::all, {0x9B, 0xDB, 0xE2}, {},   N },
 END_OPCODES()
 END_MNEMONIC()
 
-BEGIN_MNEMONIC(FNCLEX, false, false, false, false, N )
+BEGIN_MNEMONIC(FNCLEX, MF_NONE, N)
 BEGIN_OPCODES()
     {OpcodeInfo::all, {0xDB, 0xE2},     {},     N },
 END_OPCODES()
 END_MNEMONIC()
 
-//BEGIN_MNEMONIC(FDECSTP, false, false, false, false, N )
+//BEGIN_MNEMONIC(FDECSTP, MF_NONE, N)
 //  BEGIN_OPCODES()
 //          {OpcodeInfo::all, {0xD9, 0xF6},       {},     N },
 //  END_OPCODES()
 //END_MNEMONIC()
 
-BEGIN_MNEMONIC(FILD, false, false, false, false, D_U )
+BEGIN_MNEMONIC(FILD, MF_NONE, D_U )
 BEGIN_OPCODES()
     {OpcodeInfo::all, {0xDF, _5}, {FP0D, m64},    D_U },
 END_OPCODES()
 END_MNEMONIC()
 
-//BEGIN_MNEMONIC(FINCSTP, false, false, false, false, N )
+//BEGIN_MNEMONIC(FINCSTP, MF_NONE, N)
 //  BEGIN_OPCODES()
 //          {OpcodeInfo::all, {0xD9, 0xF7},       {},     N },
 //  END_OPCODES()
 //END_MNEMONIC()
 
-BEGIN_MNEMONIC(FIST, false, false, false, false, D_U )
+BEGIN_MNEMONIC(FIST, MF_NONE, D_U )
 BEGIN_OPCODES()
     {OpcodeInfo::all, {0xDB, _2}, {m32, FP0S},    D_U },
 END_OPCODES()
 END_MNEMONIC()
 
-BEGIN_MNEMONIC(FISTP, false, false, false, false, D_U )
+BEGIN_MNEMONIC(FISTP, MF_NONE, D_U )
 BEGIN_OPCODES()
     {OpcodeInfo::all, {0xDB, _3}, {m32, FP0S},    D_U },
     {OpcodeInfo::all, {0xDF, _7}, {m64, FP0D},    D_U },
 END_OPCODES()
 END_MNEMONIC()
 
-BEGIN_MNEMONIC(FISTTP, false, false, false, false, D_U )
+BEGIN_MNEMONIC(FISTTP, MF_NONE, D_U )
 BEGIN_OPCODES()
     {OpcodeInfo::all, {0xDD, _1}, {m64, FP0D},    D_U },
 END_OPCODES()
 END_MNEMONIC()
 
-BEGIN_MNEMONIC(FLD, false, false, false, false, D_U )
+BEGIN_MNEMONIC(FLD, MF_NONE, D_U )
 BEGIN_OPCODES()
     {OpcodeInfo::all, {0xD9, _0}, {FP0S, m32},    D_U },
     {OpcodeInfo::all, {0xDD, _0}, {FP0D, m64},    D_U },
 END_OPCODES()
 END_MNEMONIC()
 
-BEGIN_MNEMONIC(FPREM, false, false, false, false, N )
+BEGIN_MNEMONIC(FPREM, MF_NONE, N)
   BEGIN_OPCODES()
           {OpcodeInfo::all, {0xD9, 0xF8},       {},     N },
   END_OPCODES()
 END_MNEMONIC()
 
-BEGIN_MNEMONIC(FPREM1, false, false, false, false, N )
+BEGIN_MNEMONIC(FPREM1, MF_NONE, N)
 BEGIN_OPCODES()
     {OpcodeInfo::all, {0xD9, 0xF5},       {},     N },
 END_OPCODES()
 END_MNEMONIC()
 
-BEGIN_MNEMONIC(FST, false, false, false, false, D_U )
+BEGIN_MNEMONIC(FST, MF_NONE, D_U )
 BEGIN_OPCODES()
     {OpcodeInfo::all,   {0xD9, _2},         {m32, FP0S},    D_U },
     {OpcodeInfo::all,   {0xDD, _2},         {m64, FP0D},    D_U },
@@ -683,7 +686,7 @@ BEGIN_OPCODES()
 END_OPCODES()
 END_MNEMONIC()
 
-BEGIN_MNEMONIC(FSTP, false, false, false, false, D_U )
+BEGIN_MNEMONIC(FSTP, MF_NONE, D_U )
 BEGIN_OPCODES()
     {OpcodeInfo::all,   {0xD9, _3},             {m32, FP0S},    D_U },
     {OpcodeInfo::all,   {0xDD, _3},             {m64, FP0D},    D_U },
@@ -699,16 +702,18 @@ END_MNEMONIC()
 // ~ FPU
 //
 
-BEGIN_MNEMONIC(IDIV, true, false, false, false, DU_DU_U )
+BEGIN_MNEMONIC(IDIV, MF_AFFECTS_FLAGS, DU_DU_U)
 BEGIN_OPCODES()
+#if !defined(_EM64T_)
     {OpcodeInfo::all,   {0xF6, _7},         {AH, AL, r_m8},     DU_DU_U },
     {OpcodeInfo::all,   {Size16, 0xF7, _7}, {DX, AX, r_m16},    DU_DU_U },
+#endif
     {OpcodeInfo::all,   {0xF7, _7},         {EDX, EAX, r_m32},  DU_DU_U },
     {OpcodeInfo::em64t, {REX_W, 0xF7, _7},  {RDX, RAX, r_m64},  DU_DU_U },
 END_OPCODES()
 END_MNEMONIC()
 
-BEGIN_MNEMONIC(IMUL, true, false, false, false, D_DU_U )
+BEGIN_MNEMONIC(IMUL, MF_AFFECTS_FLAGS, D_DU_U)
 BEGIN_OPCODES()
     /*{OpcodeInfo::all,   {0xF6, _5},               {AH, AL,        r_m8},  D_DU_U },
     {OpcodeInfo::all,     {Size16, 0xF7, _5},       {DX, AX,        r_m16}, D_DU_U },
@@ -729,7 +734,7 @@ BEGIN_OPCODES()
 END_OPCODES()
 END_MNEMONIC()
 
-BEGIN_MNEMONIC(MUL, true, false, false, false, U )
+BEGIN_MNEMONIC(MUL, MF_AFFECTS_FLAGS, U )
 BEGIN_OPCODES()
     {OpcodeInfo::all,     {0xF6, _4},           {r_m8},            U },
     {OpcodeInfo::all,     {Size16, 0xF7, _4},   {r_m16},           U },
@@ -738,7 +743,7 @@ BEGIN_OPCODES()
 END_OPCODES()
 END_MNEMONIC()
 
-BEGIN_MNEMONIC(INC, true, false, false, false, DU )
+BEGIN_MNEMONIC(INC, MF_AFFECTS_FLAGS, DU )
 BEGIN_OPCODES()
     {OpcodeInfo::all,     {0xFE, _0},           {r_m8},         DU },
     {OpcodeInfo::all,     {Size16, 0xFF, _0},   {r_m16},        DU },
@@ -749,17 +754,17 @@ BEGIN_OPCODES()
 END_OPCODES()
 END_MNEMONIC()
 
-BEGIN_MNEMONIC(INT3, false, false, false, false, N )
+BEGIN_MNEMONIC(INT3, MF_NONE, N)
 BEGIN_OPCODES()
     {OpcodeInfo::all, {0xCC},     {},     N },
 END_OPCODES()
 END_MNEMONIC()
 
 #define DEFINE_Jcc_MNEMONIC( cc ) \
-        BEGIN_MNEMONIC(J##cc, false, true, true, false, U ) \
+        BEGIN_MNEMONIC(J##cc, MF_USES_FLAGS|MF_CONDITIONAL, U ) \
 BEGIN_OPCODES() \
     {OpcodeInfo::all,     {0x70 + ConditionMnemonic_##cc, cb },           { rel8 },       U }, \
-    {OpcodeInfo::ia32,    {0x0F, 0x80 + ConditionMnemonic_##cc, cw},      { rel16 },      U }, \
+    {OpcodeInfo::ia32,    {Size16, 0x0F, 0x80 + ConditionMnemonic_##cc, cw},      { rel16 },      U }, \
     {OpcodeInfo::all,     {0x0F, 0x80 + ConditionMnemonic_##cc, cd},      { rel32 },      U }, \
 END_OPCODES() \
 END_MNEMONIC()
@@ -785,10 +790,10 @@ DEFINE_Jcc_MNEMONIC(NLE)
 
 #undef DEFINE_Jcc_MNEMONIC
 
-BEGIN_MNEMONIC(JMP, false, false, false, false, U )
+BEGIN_MNEMONIC(JMP, MF_NONE, U )
 BEGIN_OPCODES()
     {OpcodeInfo::all,   {0xEB, cb},         {rel8},     U },
-    {OpcodeInfo::ia32,  {0xE9, cw},         {rel16},    U },
+    {OpcodeInfo::ia32,  {Size16, 0xE9, cw}, {rel16},    U },
     {OpcodeInfo::all,   {0xE9, cd},         {rel32},    U },
     {OpcodeInfo::ia32,  {Size16, 0xFF, _4}, {r_m16},    U },
     {OpcodeInfo::ia32,  {0xFF, _4},         {r_m32},    U },
@@ -796,7 +801,7 @@ BEGIN_OPCODES()
 END_OPCODES()
 END_MNEMONIC()
 
-BEGIN_MNEMONIC(LEA, false, false, false, false, D_U )
+BEGIN_MNEMONIC(LEA, MF_NONE, D_U )
 BEGIN_OPCODES()
     /*
     A special case: the LEA instruction itself does not care about size of 
@@ -811,35 +816,35 @@ BEGIN_OPCODES()
         {OpcodeInfo::em64t, {0x8D, _r},               {r64, m},       D_U },
     */
     {OpcodeInfo::all,   {0x8D, _r},     {r32, m8},      D_U },
-    {OpcodeInfo::em64t, {0x8D, _r},     {r64, m8},      D_U },
+    {OpcodeInfo::em64t, {REX_W, 0x8D, _r},     {r64, m8},      D_U },
     {OpcodeInfo::all,   {0x8D, _r},     {r32, m16},     D_U },
-    {OpcodeInfo::em64t, {0x8D, _r},     {r64, m16},     D_U },
+    {OpcodeInfo::em64t, {REX_W, 0x8D, _r},     {r64, m16},     D_U },
     {OpcodeInfo::all,   {0x8D, _r},     {r32, m32},     D_U },
-    {OpcodeInfo::em64t, {0x8D, _r},     {r64, m32},     D_U },
+    {OpcodeInfo::em64t, {REX_W, 0x8D, _r},     {r64, m32},     D_U },
     {OpcodeInfo::all,   {0x8D, _r},     {r32, m64},     D_U },
-    {OpcodeInfo::em64t, {0x8D, _r},     {r64, m64},     D_U },
+    {OpcodeInfo::em64t, {REX_W, 0x8D, _r},     {r64, m64},     D_U },
 END_OPCODES()
 END_MNEMONIC()
 
-BEGIN_MNEMONIC(LOOP, true, true, false, false, DU_U)
+BEGIN_MNEMONIC(LOOP, MF_AFFECTS_FLAGS|MF_USES_FLAGS, DU_U)
 BEGIN_OPCODES()
     {OpcodeInfo::all,     {0xE2, cb},     {ECX, rel8},    DU_U },
 END_OPCODES()
 END_MNEMONIC()
 
-BEGIN_MNEMONIC(LOOPE, true, true, false, false, DU_U )
+BEGIN_MNEMONIC(LOOPE, MF_AFFECTS_FLAGS|MF_USES_FLAGS, DU_U)
 BEGIN_OPCODES()
     {OpcodeInfo::all,     {0xE1, cb},     {ECX, rel8},    DU_U },
 END_OPCODES()
 END_MNEMONIC()
 
-BEGIN_MNEMONIC(LOOPNE, true, true, false, false, DU_U )
+BEGIN_MNEMONIC(LOOPNE, MF_AFFECTS_FLAGS|MF_USES_FLAGS, DU_U)
 BEGIN_OPCODES()
     {OpcodeInfo::all,     {0xE0, cb},     {ECX, rel8},    DU_U },
 END_OPCODES()
 END_MNEMONIC()
 
-BEGIN_MNEMONIC(MOV, false, false, false, false, D_U)
+BEGIN_MNEMONIC(MOV, MF_NONE, D_U)
 BEGIN_OPCODES()
     {OpcodeInfo::all,   {0x88, _r},         {r_m8,r8},      D_U },
 
@@ -865,14 +870,14 @@ BEGIN_OPCODES()
 END_OPCODES()
 END_MNEMONIC()
 
-BEGIN_MNEMONIC(XCHG, false, false, false, false, DU_DU )
+BEGIN_MNEMONIC(XCHG, MF_NONE, DU_DU )
 BEGIN_OPCODES()
     {OpcodeInfo::all,     {0x87, _r},   {r_m32,r32},    DU_DU },
 END_OPCODES()
 END_MNEMONIC()
 
 
-BEGIN_MNEMONIC(MOVQ, false, false, false, false, D_U )
+BEGIN_MNEMONIC(MOVQ, MF_NONE, D_U )
 BEGIN_OPCODES()
 #ifdef _HAVE_MMX_
     {OpcodeInfo::all, {0x0F, 0x6F, _r},   {mm64, mm_m64}, D_U },
@@ -880,6 +885,18 @@ BEGIN_OPCODES()
 #endif
     {OpcodeInfo::all, {0xF3, 0x0F, 0x7E },  {xmm64, xmm_m64},       D_U },
     {OpcodeInfo::all, {0x66, 0x0F, 0xD6 },  {xmm_m64, xmm64},       D_U },
+//    {OpcodeInfo::em64t, {REX_W, 0x66, 0x0F, 0x6E, _r},  {xmm64, r_m64}, D_U },
+//    {OpcodeInfo::em64t, {REX_W, 0x66, 0x0F, 0x7E, _r},  {r_m64, xmm64}, D_U },
+    {OpcodeInfo::em64t, {REX_W, 0x66, 0x0F, 0x6E, _r},  {xmm64, r64}, D_U },
+    {OpcodeInfo::em64t, {REX_W, 0x66, 0x0F, 0x7E, _r},  {r64, xmm64}, D_U },
+END_OPCODES()
+END_MNEMONIC()
+
+
+BEGIN_MNEMONIC(MOVD, MF_NONE, D_U )
+BEGIN_OPCODES()
+    {OpcodeInfo::all,   {0x66, 0x0F, 0x6E, _r}, {xmm32, r_m32}, D_U },
+    {OpcodeInfo::all,   {0x66, 0x0F, 0x7E, _r}, {r_m32, xmm32}, D_U },
 END_OPCODES()
 END_MNEMONIC()
 
@@ -888,31 +905,31 @@ END_MNEMONIC()
 //
 #ifdef _HAVE_MMX_
 
-BEGIN_MNEMONIC(EMMS, false, false, false, false, N )
+BEGIN_MNEMONIC(EMMS, MF_NONE, N)
 BEGIN_OPCODES()
     {OpcodeInfo::all, {0x0F, 0x77},       {},             N },
 END_OPCODES()
 END_MNEMONIC()
 
-BEGIN_MNEMONIC(PADDQ, false, false, false, false, DU_U )
+BEGIN_MNEMONIC(PADDQ, MF_NONE, DU_U)
 BEGIN_OPCODES() 
     {OpcodeInfo::all,   {0x0F, 0xD4, _r},   {mm64, mm_m64}, DU_U },
 END_OPCODES()
 END_MNEMONIC()
 
-BEGIN_MNEMONIC(PAND, false, false, false, false, DU_U )
+BEGIN_MNEMONIC(PAND, MF_NONE, DU_U)
 BEGIN_OPCODES()
     {OpcodeInfo::all,   {0x0F, 0xDB, _r},   {mm64, mm_m64}, DU_U },
 END_OPCODES()
 END_MNEMONIC()
 
-BEGIN_MNEMONIC(POR, false, false, false, false, DU_U )
+BEGIN_MNEMONIC(POR, MF_NONE, DU_U)
 BEGIN_OPCODES() 
     {OpcodeInfo::all,   {0x0F, 0xEB, _r},   {mm64, mm_m64}, DU_U },
 END_OPCODES()
 END_MNEMONIC()
 
-BEGIN_MNEMONIC(PSUBQ, false, false, false, false, DU_U )
+BEGIN_MNEMONIC(PSUBQ, MF_NONE, DU_U)
 BEGIN_OPCODES() 
     {OpcodeInfo::all,   {0x0F, 0xFB, _r},   {mm64, mm_m64}, DU_U },
 END_OPCODES()
@@ -920,7 +937,7 @@ END_MNEMONIC()
 
 #endif  // ~_HAVE_MMX_
 
-BEGIN_MNEMONIC(PXOR, false, false, false, false, DU_U )
+BEGIN_MNEMONIC(PXOR, MF_NONE, DU_U)
 BEGIN_OPCODES() 
 #ifdef _HAVE_MMX_
     {OpcodeInfo::all,   {0x0F, 0xEF, _r},   {mm64, mm_m64}, DU_U },
@@ -930,53 +947,55 @@ END_OPCODES()
 END_MNEMONIC()
 
 
-BEGIN_MNEMONIC(MOVSD, false, false, false, false, D_U )
+BEGIN_MNEMONIC(MOVSD, MF_NONE, D_U )
 BEGIN_OPCODES()
     {OpcodeInfo::all, {0xF2, 0x0F, 0x10, _r},   {xmm64, xmm_m64},   D_U },
     {OpcodeInfo::all, {0xF2, 0x0F, 0x11, _r},   {xmm_m64, xmm64},   D_U },
 END_OPCODES()
 END_MNEMONIC()
 
-BEGIN_MNEMONIC(MOVSS, false, false, false, false, D_U )
+BEGIN_MNEMONIC(MOVSS, MF_NONE, D_U )
 BEGIN_OPCODES()
     {OpcodeInfo::all, {0xF3, 0x0F, 0x10, _r},   {xmm32, xmm_m32}, D_U },
     {OpcodeInfo::all, {0xF3, 0x0F, 0x11, _r},   {xmm_m32, xmm32}, D_U },
 END_OPCODES()
 END_MNEMONIC()
 
-BEGIN_MNEMONIC(MOVSX, false, false, false, false, D_U )
+BEGIN_MNEMONIC(MOVSX, MF_NONE, D_U )
 BEGIN_OPCODES()
     {OpcodeInfo::all,     {Size16, 0x0F, 0xBE, _r}, {r16, r_m8},    D_U },
     {OpcodeInfo::all,     {0x0F, 0xBE, _r},         {r32, r_m8},    D_U },
-
+    {OpcodeInfo::all,     {REX_W, 0x0F, 0xBE, _r},  {r64, r_m8},    D_U },
+    
     {OpcodeInfo::all,     {0x0F, 0xBF, _r},         {r32, r_m16},   D_U },
     {OpcodeInfo::em64t,   {REX_W, 0x0F, 0xBF, _r},  {r64, r_m16},   D_U },
+    
+    {OpcodeInfo::em64t,   {REX_W, 0x63, _r},        {r64, r_m32},   D_U },
 END_OPCODES()
 END_MNEMONIC()
 
-BEGIN_MNEMONIC(MOVZX, false, false, false, false, D_U )
+BEGIN_MNEMONIC(MOVZX, MF_NONE, D_U )
 BEGIN_OPCODES()
     {OpcodeInfo::all,     {Size16, 0x0F, 0xB6, _r}, {r16, r_m8},    D_U },
     {OpcodeInfo::all,     {0x0F, 0xB6, _r},         {r32, r_m8},    D_U },
-
+    {OpcodeInfo::all,     {REX_W, 0x0F, 0xB6, _r},  {r64, r_m8},    D_U },
     {OpcodeInfo::all,     {0x0F, 0xB7, _r},         {r32, r_m16},   D_U },
-    {OpcodeInfo::em64t,   {REX_W, 0x0F, 0xB7, _r},  {r64, r_m16},   D_U },
 END_OPCODES()
 END_MNEMONIC()
 
-BEGIN_MNEMONIC(MULSD, false, false, false, false, DU_U )
+BEGIN_MNEMONIC(MULSD, MF_NONE, DU_U)
 BEGIN_OPCODES()
     {OpcodeInfo::all,   {0xF2, 0x0F, 0x59, _r}, {xmm64, xmm_m64},   DU_U },
 END_OPCODES()
 END_MNEMONIC()
 
-BEGIN_MNEMONIC(MULSS, false, false, false, false, DU_U )
+BEGIN_MNEMONIC(MULSS, MF_NONE, DU_U)
 BEGIN_OPCODES()
     {OpcodeInfo::all,     {0xF3, 0x0F, 0x59, _r}, {xmm32, xmm_m32}, DU_U },
 END_OPCODES()
 END_MNEMONIC()
 
-BEGIN_MNEMONIC(NEG, true, false, false, false, DU )
+BEGIN_MNEMONIC(NEG, MF_AFFECTS_FLAGS, DU )
 BEGIN_OPCODES()
     {OpcodeInfo::all,   {0xF6, _3},         {r_m8},         DU },
 
@@ -986,13 +1005,13 @@ BEGIN_OPCODES()
 END_OPCODES()
 END_MNEMONIC()
 
-BEGIN_MNEMONIC(NOP, false, false, false, false, N )
+BEGIN_MNEMONIC(NOP, MF_NONE, N)
 BEGIN_OPCODES()
     {OpcodeInfo::all,     {0x90}, {},     N },
 END_OPCODES()
 END_MNEMONIC()
 
-BEGIN_MNEMONIC(NOT, true, false, false, false, DU )
+BEGIN_MNEMONIC(NOT, MF_AFFECTS_FLAGS, DU )
 BEGIN_OPCODES()
     {OpcodeInfo::all,     {0xF6, _2},           {r_m8},         DU },
     {OpcodeInfo::all,     {Size16, 0xF7, _2},   {r_m16},        DU },
@@ -1001,7 +1020,7 @@ BEGIN_OPCODES()
 END_OPCODES()
 END_MNEMONIC()
 
-BEGIN_MNEMONIC(POP, false, false, false, false, D )
+BEGIN_MNEMONIC(POP, MF_NONE, D)
 BEGIN_OPCODES()
     {OpcodeInfo::all,   {Size16, 0x8F, _0}, {r_m16},    D },
     {OpcodeInfo::ia32,  {0x8F, _0},         {r_m32},    D },
@@ -1013,13 +1032,13 @@ BEGIN_OPCODES()
 END_OPCODES()
 END_MNEMONIC()
 
-BEGIN_MNEMONIC(POPFD, true, false, false, false, N )
+BEGIN_MNEMONIC(POPFD, MF_AFFECTS_FLAGS, N)
 BEGIN_OPCODES()
     {OpcodeInfo::all,   {0x9D},     {},         N },
 END_OPCODES()
 END_MNEMONIC()
 
-BEGIN_MNEMONIC(PUSH, false, false, false, false, U )
+BEGIN_MNEMONIC(PUSH, MF_NONE, U )
 BEGIN_OPCODES()
     {OpcodeInfo::all,   {Size16, 0xFF, _6}, {r_m16},    U },
     {OpcodeInfo::ia32,  {0xFF, _6},         {r_m32},    U },
@@ -1029,40 +1048,31 @@ BEGIN_OPCODES()
     {OpcodeInfo::ia32,  {0x50|rd },         {r32},      U },
     {OpcodeInfo::em64t, {0x50|rd },         {r64},      U },
 
-    {OpcodeInfo::all,   {0x6A},     {imm8},     U },
-    {OpcodeInfo::all,   {0x68},     {imm16},    U },
-    {OpcodeInfo::ia32,  {0x68},     {imm32},    U },
+    {OpcodeInfo::all,   {0x6A},         {imm8},     U },
+    {OpcodeInfo::all,   {Size16, 0x68}, {imm16},    U },
+    {OpcodeInfo::ia32,  {0x68},         {imm32},    U },
 //          {OpcodeInfo::em64t,   {0x68},   {imm64},    U },
 END_OPCODES()
 END_MNEMONIC()
 
-BEGIN_MNEMONIC(PUSHFD, false, true, false, false, N )
+BEGIN_MNEMONIC(PUSHFD, MF_USES_FLAGS, N)
 BEGIN_OPCODES()
     {OpcodeInfo::all,     {0x9C},             {},        N },
 END_OPCODES()
 END_MNEMONIC()
 
 
-BEGIN_MNEMONIC(RET, false, false, false, false, N )
+BEGIN_MNEMONIC(RET, MF_NONE, N)
 BEGIN_OPCODES()
-    {OpcodeInfo::all, {0xC3},             {},                     N },
-    {OpcodeInfo::all, {0xC2, iw}, {imm16},        U },
+    {OpcodeInfo::all, {0xC3},       {},         N },
+    {OpcodeInfo::all, {0xC2, iw},   {imm16},    U },
 END_OPCODES()
 END_MNEMONIC()
 
-//
-// The very special case: actually, there are no instructions 'SETcc rm32' 
-// (only 'rm8'). The problem is that the Jitrino's InstCodeSelector generates
-// such instructions. Changing the selector's bahaviour would be quite 
-// dangerous thus making this fake record here.
-// See also Ia32::Encoder::buildHolder(), where the special case is processed
-// is a special way.
-//
 #define DEFINE_SETcc_MNEMONIC( cc ) \
-        BEGIN_MNEMONIC(SET##cc, false, true, true, false, D ) \
+        BEGIN_MNEMONIC(SET##cc, MF_USES_FLAGS|MF_CONDITIONAL, D) \
 BEGIN_OPCODES() \
     {OpcodeInfo::all, {0x0F, 0x90 + ConditionMnemonic_##cc}, {r_m8},  D }, \
-    {OpcodeInfo::all, {0x0F, 0x90 + ConditionMnemonic_##cc}, {r_m32}, D }, \
 END_OPCODES() \
 END_MNEMONIC()
 
@@ -1087,7 +1097,7 @@ DEFINE_SETcc_MNEMONIC(NLE)
 #undef DEFINE_SETcc_MNEMONIC
 
 #define DEFINE_SHIFT_MNEMONIC( nam, slash_num ) \
-BEGIN_MNEMONIC(nam, true, false, false, false, DU_U ) \
+BEGIN_MNEMONIC(nam, MF_AFFECTS_FLAGS, DU_U) \
 BEGIN_OPCODES()\
 /*  {OpcodeInfo::all,   {0xD0, slash_num},              {r_m8,  const_1},   DU_U },*/\
     {OpcodeInfo::all,   {0xD2, slash_num},              {r_m8,  CL},        DU_U },\
@@ -1114,34 +1124,34 @@ DEFINE_SHIFT_MNEMONIC(SHR, _5)
 DEFINE_SHIFT_MNEMONIC(ROR, _1)
 
 #undef DEFINE_SHIFT_MNEMONIC
-BEGIN_MNEMONIC(SHLD, true, false, false, false, N )
-// todo: the def/use info is invalid
+BEGIN_MNEMONIC(SHLD, MF_AFFECTS_FLAGS, N)
+// TODO: the def/use info is worng
 BEGIN_OPCODES()
     {OpcodeInfo::all,     {0x0F, 0xA5},   {r_m32, r32, CL}, DU_DU_U },
 END_OPCODES()
 END_MNEMONIC()
 
-BEGIN_MNEMONIC(SHRD, true, false, false, false, N )
-// todo: the def/use info is invalid
+BEGIN_MNEMONIC(SHRD, MF_AFFECTS_FLAGS, N)
+// TODO: the def/use info is wrong
 BEGIN_OPCODES()
     {OpcodeInfo::all,     {0x0F, 0xAD},   {r_m32, r32, CL}, DU_DU_U },
 END_OPCODES()
 END_MNEMONIC()
 
 
-BEGIN_MNEMONIC(SUBSD, false, false, false, false, DU_U )
+BEGIN_MNEMONIC(SUBSD, MF_NONE, DU_U)
 BEGIN_OPCODES()
     {OpcodeInfo::all,     {0xF2, 0x0F, 0x5C, _r}, {xmm64, xmm_m64}, DU_U },
 END_OPCODES()
 END_MNEMONIC()
 
-BEGIN_MNEMONIC(SUBSS, false, false, false, false, DU_U )
+BEGIN_MNEMONIC(SUBSS, MF_NONE, DU_U)
 BEGIN_OPCODES()
     {OpcodeInfo::all,     {0xF3, 0x0F, 0x5C, _r}, {xmm32, xmm_m32}, DU_U },
 END_OPCODES()
 END_MNEMONIC()
 
-BEGIN_MNEMONIC(TEST, true, false, false, false, U_U )
+BEGIN_MNEMONIC(TEST, MF_AFFECTS_FLAGS, U_U)
 BEGIN_OPCODES()
     /*
     {OpcodeInfo::all,     {0xA8, ib},               { AL, imm8},    U_U },
@@ -1164,66 +1174,66 @@ END_OPCODES()
 END_MNEMONIC()
 
 
-BEGIN_MNEMONIC(UCOMISD, true, false, false, false, U_U )
+BEGIN_MNEMONIC(UCOMISD, MF_AFFECTS_FLAGS, U_U)
 BEGIN_OPCODES()
     {OpcodeInfo::all,   {0x66, 0x0F, 0x2E, _r}, {xmm64, xmm_m64}, U_U },
 END_OPCODES()
 END_MNEMONIC()
 
-BEGIN_MNEMONIC(UCOMISS, true, false, false, false, U_U )
+BEGIN_MNEMONIC(UCOMISS, MF_AFFECTS_FLAGS, U_U)
 BEGIN_OPCODES()
     {OpcodeInfo::all,     {0x0F, 0x2E, _r},       {xmm32, xmm_m32}, U_U },
 END_OPCODES()
 END_MNEMONIC()
 
-BEGIN_MNEMONIC(COMISD, true, false, false, false, U_U )
+BEGIN_MNEMONIC(COMISD, MF_AFFECTS_FLAGS, U_U)
 BEGIN_OPCODES()
     {OpcodeInfo::all,     {0x66, 0x0F, 0x2F, _r}, {xmm64, xmm_m64}, U_U },
 END_OPCODES()
 END_MNEMONIC()
 
-BEGIN_MNEMONIC(COMISS, true, false, false, false, U_U )
+BEGIN_MNEMONIC(COMISS, MF_AFFECTS_FLAGS, U_U)
 BEGIN_OPCODES()
     {OpcodeInfo::all,     {0x0F, 0x2F, _r},       {xmm32, xmm_m32}, U_U },
 END_OPCODES()
 END_MNEMONIC()
 
-BEGIN_MNEMONIC(XORPD, false, false, false, false, DU_U )
+BEGIN_MNEMONIC(XORPD, MF_SAME_ARG_NO_USE|MF_SYMMETRIC, DU_U)
 BEGIN_OPCODES()
     //Note: they're actually 128 bits
     {OpcodeInfo::all,   {0x66, 0x0F, 0x57, _r},   {xmm64, xmm_m64},   DU_U },
 END_OPCODES()
 END_MNEMONIC()
 
-BEGIN_MNEMONIC(XORPS, false, false, false, false, DU_U )
+BEGIN_MNEMONIC(XORPS, MF_SAME_ARG_NO_USE|MF_SYMMETRIC, DU_U)
 BEGIN_OPCODES()
     //Note: they're actually 128 bits
-    {OpcodeInfo::all,   {0x0F, 0x57, _r},   {xmm64, xmm_m64},       DU_U },
+    {OpcodeInfo::all,   {0x0F, 0x57, _r},   {xmm32, xmm_m32},       DU_U },
 END_OPCODES()
 END_MNEMONIC()
 
-BEGIN_MNEMONIC(CVTDQ2PD, false, false, false, false, D_U )
+BEGIN_MNEMONIC(CVTDQ2PD, MF_NONE, D_U )
 BEGIN_OPCODES()
     //Note: they're actually 128 bits
     {OpcodeInfo::all,   {0xF3, 0x0F, 0xE6}, {xmm64, xmm_m64},   D_U },
 END_OPCODES()
 END_MNEMONIC()
 
-BEGIN_MNEMONIC(CVTDQ2PS, false, false, false, false, D_U )
+BEGIN_MNEMONIC(CVTDQ2PS, MF_NONE, D_U )
 BEGIN_OPCODES()
     //Note: they're actually 128 bits
     {OpcodeInfo::all,   {0x0F, 0x5B, _r},   {xmm32, xmm_m32},   D_U },
 END_OPCODES()
 END_MNEMONIC()
 
-BEGIN_MNEMONIC(CVTTPD2DQ, false, false, false, false, D_U )
+BEGIN_MNEMONIC(CVTTPD2DQ, MF_NONE, D_U )
 BEGIN_OPCODES()
     //Note: they're actually 128 bits
     {OpcodeInfo::all,   {0x66, 0x0F, 0xE6}, {xmm64, xmm_m64},   D_U },
 END_OPCODES()
 END_MNEMONIC()
 
-BEGIN_MNEMONIC(CVTTPS2DQ, false, false, false, false, D_U )
+BEGIN_MNEMONIC(CVTTPS2DQ, MF_NONE, D_U )
 BEGIN_OPCODES()
     //Note: they're actually 128 bits
     {OpcodeInfo::all,   {0xF3, 0x0F, 0x5B, _r},   {xmm32, xmm_m32},   D_U },
@@ -1233,19 +1243,19 @@ END_MNEMONIC()
 //
 // String operations
 //
-BEGIN_MNEMONIC(STD, true, false, false, false, N )
+BEGIN_MNEMONIC(STD, MF_AFFECTS_FLAGS, N)
 BEGIN_OPCODES()
     {OpcodeInfo::all,     {0xFD},         {},     N },
 END_OPCODES()
 END_MNEMONIC()
 
-BEGIN_MNEMONIC(CLD, true, false, false, false, N )
+BEGIN_MNEMONIC(CLD, MF_AFFECTS_FLAGS, N)
 BEGIN_OPCODES()
     {OpcodeInfo::all,     {0xFC},         {},     N },
 END_OPCODES()
 END_MNEMONIC()
 
-BEGIN_MNEMONIC(SCAS, true, false, false, false, N )
+BEGIN_MNEMONIC(SCAS, MF_AFFECTS_FLAGS, N)
 // to be symmetric, this mnemonic must have either m32 or RegName_EAX
 // but as long, as Jitrino's CG does not use the mnemonic, leaving it
 // in its natural form
@@ -1254,16 +1264,14 @@ BEGIN_OPCODES()
 END_OPCODES()
 END_MNEMONIC()
 
-BEGIN_MNEMONIC(STOS, true, false, false, false, N)
-// to be symmetric, this mnemonic must have either m32 or RegName_EAX
-// but as long, as Jitrino's CG does not use the mnemonic, leaving it
-// in its natural form
+BEGIN_MNEMONIC(STOS, MF_AFFECTS_FLAGS, U_U)
 BEGIN_OPCODES()
-    {OpcodeInfo::all,     {0xAB},         {},     N },
+    {OpcodeInfo::all,   {0xAB},         {EDI, EAX},   U_U },
+    {OpcodeInfo::em64t, {REX_W, 0xAB},  {RDI, RAX},   U_U },
 END_OPCODES()
 END_MNEMONIC()
 
-BEGIN_MNEMONIC(WAIT, true, false, false, false, N )
+BEGIN_MNEMONIC(WAIT, MF_AFFECTS_FLAGS, N)
 BEGIN_OPCODES()
     {OpcodeInfo::all,     {0x9B},         {},       N },
 END_OPCODES()
@@ -1274,8 +1282,12 @@ END_MNEMONIC()
 //
 };      // ~masterEncodingTable[]
 
+ENCODER_NAMESPACE_END
 
 #include <algorithm>
+
+ENCODER_NAMESPACE_START
+
 static bool mnemonic_info_comparator(const MnemonicInfo& one,
                                      const MnemonicInfo& two)
 {
@@ -1307,10 +1319,7 @@ void EncoderBase::buildMnemonicDesc(const MnemonicInfo * minfo)
 {
     MnemonicDesc& mdesc = mnemonics[minfo->mn];
     mdesc.mn = minfo->mn;
-    mdesc.affectsFlags = minfo->affectsFlags;
-    mdesc.usesFlags = minfo->usesFlags;
-    mdesc.conditional = minfo->conditional;
-    mdesc.symmetric = minfo->symmetric;
+    mdesc.flags = minfo->flags;
     mdesc.roles = minfo->roles;
     mdesc.name = minfo->name;
     
@@ -1329,7 +1338,6 @@ void EncoderBase::buildMnemonicDesc(const MnemonicInfo * minfo)
             break;
         }
         odesc.last = 0;
-        odesc.rex = 0;
 #ifdef _EM64T_
         if (oinfo.platf == OpcodeInfo::ia32) { continue; }
 #else
@@ -1339,25 +1347,21 @@ void EncoderBase::buildMnemonicDesc(const MnemonicInfo * minfo)
         // fill out opcodes
         //
         unsigned j = 0;
-#ifdef _EM64T_
-        if (oinfo.opcode[0] == REX_W) {
-            odesc.rex = oinfo.opcode[0];
-            ++j;
-        }
-        else {
-            odesc.opcode[0] = 0;
-        }
-#endif
         odesc.opcode_len = 0;
         for(; oinfo.opcode[j]; j++) {
             unsigned opcod = oinfo.opcode[j];
             unsigned kind = opcod&OpcodeByteKind_KindMask;
-            if(kind != 0 && kind != OpcodeByteKind_ZeroOpcodeByte) {
+            if (kind == OpcodeByteKind_REX_W) {
+              odesc.opcode[odesc.opcode_len++] = (unsigned char)0x48;
+                continue;
+            }
+            else if(kind != 0 && kind != OpcodeByteKind_ZeroOpcodeByte) {
                 break;
             }
             unsigned lowByte = (opcod & OpcodeByteKind_OpcodeMask);
             odesc.opcode[odesc.opcode_len++] = (unsigned char)lowByte;
         }
+        assert(odesc.opcode_len<5);
         odesc.aux0 = odesc.aux1 = 0;
         if (oinfo.opcode[j] != 0) {
             odesc.aux0 = oinfo.opcode[j];
@@ -1394,6 +1398,7 @@ void EncoderBase::buildMnemonicDesc(const MnemonicInfo * minfo)
             if (sz==OpndSize_8) {imm_encode = ib; coff_encode=cb; }
             else if (sz==OpndSize_16) {imm_encode = iw; coff_encode=cw;}
             else if (sz==OpndSize_32) {imm_encode = id; coff_encode=cd; }
+        else if (sz==OpndSize_64) {imm_encode = io; coff_encode=0xCC; }
             else { assert(false); imm_encode=0xCC; coff_encode=0xCC; }
             if (odesc.aux1 == 0) {
                 if (odesc.aux0==0) {
@@ -1475,3 +1480,5 @@ void EncoderBase::buildMnemonicDesc(const MnemonicInfo * minfo)
         ++oindex;
     }
 }
+
+ENCODER_NAMESPACE_END

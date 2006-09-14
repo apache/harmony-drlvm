@@ -26,58 +26,46 @@ using namespace std;
 
 #include <assert.h>
 
-#define LOG_DOMAIN "vm.helpers"
-#include "cxxlog.h"
-
-#include "object_layout.h"
 #include "open/types.h"
-#include "Class.h"
-#include "environment.h"
-#include "lil.h"
-#include "lil_code_generator.h"
-#include "method_lookup.h"
-#include "exceptions.h"
-#include "vm_synch.h"
 #include "open/gc.h"
-#include "ini.h"
-#include "nogc.h"
-#include "encoder.h"
 #include "open/vm_util.h"
+
+#include "environment.h"
+#include "Class.h"
+#include "object_layout.h"
+#include "mon_enter_exit.h"
+#include "vm_threads.h"
 
 #include "open/thread_helpers.h"
 
-#include "vm_threads.h"
-#include "mon_enter_exit.h"
 #include "vm_arrays.h"
+#include "vm_synch.h"
 #include "vm_strings.h"
+#include "ini.h"
+#include "nogc.h"
 #include "compile.h"
-
-#include "mon_enter_exit.h"
-
+#include "method_lookup.h"
+#include "exceptions.h"
+#include "exceptions_jit.h"
 #include "sync_bits.h"
 
-#include "vm_stats.h"
-#include "internal_jit_intf.h"
+#include "encoder.h"
+#include "lil.h"
+#include "lil_code_generator.h"
 #include "jit_runtime_support_common.h"
 #include "jit_runtime_support.h"
-
+#include "internal_jit_intf.h"
+#include "m2n.h"
 #include "../m2n_ia32_internal.h"
 
-#include "open/vm_util.h"
+#define LOG_DOMAIN "vm.helpers"
+#include "cxxlog.h"
 
-#ifndef NDEBUG
 #include "dump.h"
-#endif
-// TODO: remove from global name space
-extern bool dump_stubs;
+#include "vm_stats.h"
 
-// gets the offset of a certain field within a struct or class type
-#define OFFSET(Struct, Field) \
-  ((int) (&(((Struct *) NULL)->Field) - NULL))
-
-// gets the size of a field within a struct or class
-#define SIZE(Struct, Field) \
-  (sizeof(((Struct *) NULL)->Field))
+char * gen_convert_managed_to_unmanaged_null_ia32(char * ss, 
+                                                  unsigned stack_pointer_offset);
 
 void * get_generic_rt_support_addr_ia32(VM_RT_SUPPORT f);
 
@@ -88,21 +76,22 @@ void * get_generic_rt_support_addr_ia32(VM_RT_SUPPORT f);
 
 static void vm_throw_java_lang_ClassCastException()
 {
+    ASSERT_THROW_AREA;
     assert(!hythread_is_suspend_enabled());
-    throw_java_exception("java/lang/ClassCastException");
+    exn_throw_by_name("java/lang/ClassCastException");
     ABORT("The last called function should not return");
 } //vm_throw_java_lang_ClassCastException
 
 #ifdef VM_STATS // exclude remark in release mode (defined but not used)
 static void update_checkcast_stats(ManagedObject *obj, Class *c)
 {
-    vm_stats_total.num_checkcast ++;
+    VM_Statistics::get_vm_stats().num_checkcast ++;
     if (obj == NULL)
-        vm_stats_total.num_checkcast_null ++;
+        VM_Statistics::get_vm_stats().num_checkcast_null ++;
     if (obj != NULL && obj->vt()->clss == c)
-        vm_stats_total.num_checkcast_equal_type ++;
+        VM_Statistics::get_vm_stats().num_checkcast_equal_type ++;
     if (obj != NULL && c->is_suitable_for_fast_instanceof)
-        vm_stats_total.num_checkcast_fast_decision ++;
+        VM_Statistics::get_vm_stats().num_checkcast_fast_decision ++;
 } //update_checkcast_stats
 #endif
 
@@ -117,7 +106,10 @@ static void *getaddress__vm_checkcast_naked()
     }
     if (VM_Global_State::loader_env->use_lil_stubs) {
         LilCodeStub *cs = gen_lil_typecheck_stub(true);
-        addr = LilCodeGenerator::get_platform()->compile(cs, "vm_rt_checkcast", dump_stubs);
+        addr = LilCodeGenerator::get_platform()->compile(cs);
+
+        DUMP_STUB(addr, "vm_rt_checkcast", lil_cs_get_code_size(cs));
+
         lil_free_code_stub(cs);
         return addr;
     }
@@ -174,16 +166,13 @@ static void *getaddress__vm_checkcast_naked()
     addr = stub;
     assert((ss - stub) <= stub_size);
 
-    if (VM_Global_State::loader_env->TI->isEnabled())
-    {
-        jvmti_add_dynamic_generated_code_chunk("vm_rt_checkcast", stub, stub_size);
-        jvmti_send_dynamic_code_generated_event("vm_rt_checkcast", stub, stub_size);
-    }
+    compile_add_dynamic_generated_code_chunk("vm_rt_checkcast", stub, stub_size);
 
-#ifndef NDEBUG
-    if (dump_stubs)
-        dump(stub, "getaddress__vm_checkcast_naked", ss - stub);
-#endif
+    if (VM_Global_State::loader_env->TI->isEnabled())
+        jvmti_send_dynamic_code_generated_event("vm_rt_checkcast", stub, stub_size);
+
+    DUMP_STUB(stub, "getaddress__vm_checkcast_naked", ss - stub);
+
     return addr;
 }  //getaddress__vm_checkcast_naked
 
@@ -204,7 +193,10 @@ static void *getaddress__vm_instanceof()
     {
         LilCodeStub *cs = gen_lil_typecheck_stub(false);
         assert(lil_is_valid(cs));
-        addr = LilCodeGenerator::get_platform()->compile(cs, "vm_instanceof", dump_stubs);
+        addr = LilCodeGenerator::get_platform()->compile(cs);
+
+        DUMP_STUB(addr, "vm_instanceof", lil_cs_get_code_size(cs));
+
         lil_free_code_stub(cs);
         return addr;
     }
@@ -218,7 +210,7 @@ static void *getaddress__vm_instanceof()
 static Boolean is_class_initialized(Class *clss)
 {
 #ifdef VM_STATS
-    vm_stats_total.num_is_class_initialized++;
+    VM_Statistics::get_vm_stats().num_is_class_initialized++;
     clss->num_class_init_checks++;
 #endif // VM_STATS
     assert(!hythread_is_suspend_enabled());
@@ -237,7 +229,8 @@ static void *getaddress__vm_initialize_class_naked()
     if (VM_Global_State::loader_env->use_lil_stubs) {
         LilCodeStub* cs = lil_parse_code_stub(
             "entry 0:managed:pint:void;   // The single argument is a Class_Handle \n"
-            "in2out platform:pint; \
+            "locals 3;\
+             in2out platform:pint; \
              call %0i; \
              jc r=0,not_initialized; \
              ret; \
@@ -246,19 +239,26 @@ static void *getaddress__vm_initialize_class_naked()
              in2out platform:void; \
              call %2i; \
              l1 = ts; \
-             ld l1, [l1 + %3i:ref]; \
-             jc l1 != 0,_exn_raised; \
+             ld l2, [l1 + %3i:ref]; \
+             jc l2 != 0,_exn_raised; \
+             ld l2, [l1 + %4i:ref]; \
+             jc l2 != 0,_exn_raised; \
              pop_m2n; \
              ret; \
              :_exn_raised; \
              out platform::void; \
-             call.noret %4i;",
+             call.noret %5i;",
              (void *)is_class_initialized,
              FRAME_JNI,
              (void *)class_initialize,
-             OFFSET(VM_thread, p_exception_object), (void*)rethrow_current_thread_exception);
+             APR_OFFSETOF(VM_thread, thread_exception.exc_object),
+             APR_OFFSETOF(VM_thread, thread_exception.exc_class),
+	     (void*)exn_rethrow);
         assert(lil_is_valid(cs));
-        addr = LilCodeGenerator::get_platform()->compile(cs, "vm_initialize_class_naked", dump_stubs);
+        addr = LilCodeGenerator::get_platform()->compile(cs);
+
+        DUMP_STUB(addr, "vm_initialize_class_naked", lil_cs_get_code_size(cs));
+        
         lil_free_code_stub(cs);
         return addr;
     }
@@ -283,7 +283,7 @@ static void *getaddress__vm_initialize_class_naked()
     *backpatch_address__class_not_initialized = (char)offset;
     ss = gen_setup_j2n_frame(ss);
     ss = push(ss,  M_Base_Opnd(esp_reg, m2n_sizeof_m2n_frame));
-    ss = call(ss, (char *)class_initialize);
+    ss = call(ss, (char *)vm_rt_class_initialize);
     ss = alu(ss, add_opc,  esp_opnd,  Imm_Opnd(4));
     ss = gen_pop_j2n_frame(ss);
     ss = ret(ss,  Imm_Opnd(4));
@@ -291,16 +291,13 @@ static void *getaddress__vm_initialize_class_naked()
     addr = stub;
     assert((ss - stub) <= stub_size);
 
-    if (VM_Global_State::loader_env->TI->isEnabled())
-    {
-        jvmti_add_dynamic_generated_code_chunk("vm_initialize_class_naked", stub, stub_size);
-        jvmti_send_dynamic_code_generated_event("vm_initialize_class_naked", stub, stub_size);
-    }
+    compile_add_dynamic_generated_code_chunk("vm_initialize_class_naked", stub, stub_size);
 
-#ifndef NDEBUG
-    if (dump_stubs)
-        dump(stub, "getaddress__vm_initialize_class_naked", ss - stub);
-#endif
+    if (VM_Global_State::loader_env->TI->isEnabled())
+        jvmti_send_dynamic_code_generated_event("vm_initialize_class_naked", stub, stub_size);
+
+    DUMP_STUB(stub, "getaddress__vm_initialize_class_naked", ss - stub);
+
     return addr;
 } //getaddress__vm_initialize_class_naked
 
@@ -309,75 +306,6 @@ static void *getaddress__vm_initialize_class_naked()
 //////////////////////////////////////////////////////////////////////
 // Object allocation
 //////////////////////////////////////////////////////////////////////
-
-static void *getaddress__vm_alloc_java_object_resolved_naked()
-{
-    static void *addr = 0;
-    if (addr) {
-        return addr;
-    }
-
-    if (VM_Global_State::loader_env->use_lil_stubs) {
-        LilCodeStub* cs = lil_parse_code_stub(
-            "entry 0:managed:pint:ref;   // The one arg is a ClassHandle for the class of the object we want to create \n"
-            "in2out platform:ref; \
-             call %0i; \
-             jc r=0,fast_alloc_failed; \
-             ret; \
-             :fast_alloc_failed; \
-             push_m2n 0, 0; \
-             in2out platform:ref; \
-             call %1i; \
-             pop_m2n; \
-             ret;",
-            (void *)class_alloc_new_object_or_null,
-            (void *)class_alloc_new_object);
-        assert(lil_is_valid(cs));
-        addr = LilCodeGenerator::get_platform()->compile(cs, "vm_alloc_java_object_resolved_naked", dump_stubs);
-        lil_free_code_stub(cs);
-        return addr;
-    }
-
-    const int stub_size = 44;
-    char *stub = (char *)malloc_fixed_code_for_jit(stub_size, DEFAULT_CODE_ALIGNMENT, CODE_BLOCK_HEAT_MAX/2, CAA_Allocate);
-#ifdef _DEBUG
-    memset(stub, 0xcc /*int 3*/, stub_size);
-#endif
-    char *ss = stub;
-    ss = push(ss,  M_Base_Opnd(esp_reg, 4));
-    ss = call(ss, (char *)class_alloc_new_object_or_null);
-    ss = alu(ss, add_opc,  esp_opnd,  Imm_Opnd(4));
-    ss = alu(ss, or_opc,  eax_opnd,  eax_opnd);
-    ss = branch8(ss, Condition_Z,  Imm_Opnd(size_8, 0));
-    char *backpatch_address__fast_alloc_failed = ((char *)ss) - 1;
-    ss = ret(ss,  Imm_Opnd(4));
-
-    signed offset = (signed)ss - (signed)backpatch_address__fast_alloc_failed - 1;
-    *backpatch_address__fast_alloc_failed = (char)offset;    
-    ss = gen_setup_j2n_frame(ss);
-    ss = push(ss,  M_Base_Opnd(esp_reg, m2n_sizeof_m2n_frame));
-    ss = call(ss, (char *)class_alloc_new_object);
-    ss = alu(ss, add_opc,  esp_opnd,  Imm_Opnd(4));
-    ss = gen_pop_j2n_frame(ss);
-    ss = ret(ss,  Imm_Opnd(4));
-
-    addr = stub;
-    assert((ss - stub) <= stub_size);
-
-    if (VM_Global_State::loader_env->TI->isEnabled())
-    {
-        jvmti_add_dynamic_generated_code_chunk("vm_alloc_java_object_resolved_naked", stub, stub_size);
-        jvmti_send_dynamic_code_generated_event("vm_alloc_java_object_resolved_naked", stub, stub_size);
-    }
-
-#ifndef NDEBUG
-    if (dump_stubs) {
-        dump(stub, "getaddress__vm_alloc_java_object_resolved_naked", ss - stub);
-    }
-#endif
-    return addr;
-} //getaddress__vm_alloc_java_object_resolved_naked
-
 
 static void *generate_object_allocation_stub_with_thread_pointer(char *fast_obj_alloc_proc,
                                                                  char *slow_obj_alloc_proc,
@@ -445,16 +373,13 @@ static void *generate_object_allocation_stub_with_thread_pointer(char *fast_obj_
 
     assert((ss - stub) <= stub_size);
 
-    if (VM_Global_State::loader_env->TI->isEnabled())
-    {
-        jvmti_add_dynamic_generated_code_chunk("object_allocation_stub_with_thread_pointer", stub, stub_size);
-        jvmti_send_dynamic_code_generated_event("object_allocation_stub_with_thread_pointer", stub, stub_size);
-    }
+    compile_add_dynamic_generated_code_chunk("object_allocation_stub_with_thread_pointer", stub, stub_size);
 
-#ifndef NDEBUG
-    if (dump_stubs)
-        dump(stub, stub_name, ss - stub);
-#endif
+    if (VM_Global_State::loader_env->TI->isEnabled())
+        jvmti_send_dynamic_code_generated_event("object_allocation_stub_with_thread_pointer", stub, stub_size);
+
+    DUMP_STUB(stub, stub_name, ss - stub);
+
     return (void *)stub;
 } //generate_object_allocation_stub_with_thread_pointer
 
@@ -493,10 +418,9 @@ static void* vm_aastore_nullpointer()
 
     addr = stub;
     assert((ss - stub) <= stub_size);
-#ifndef NDEBUG
-    if (dump_stubs)
-        dump(stub, "vm_aastore_nullpointer", ss - stub);
-#endif
+
+    DUMP_STUB(stub, "vm_aastore_nullpointer", ss - stub);
+
     return addr;
 } //vm_aastore_nullpointer
 
@@ -521,16 +445,13 @@ static void* vm_aastore_array_index_out_of_bounds()
     addr = stub;
     assert((ss - stub) <= stub_size);
 
-    if (VM_Global_State::loader_env->TI->isEnabled())
-    {
-        jvmti_add_dynamic_generated_code_chunk("vm_aastore_nullpointer", stub, stub_size);
-        jvmti_send_dynamic_code_generated_event("vm_aastore_nullpointer", stub, stub_size);
-    }
+    compile_add_dynamic_generated_code_chunk("vm_aastore_nullpointer", stub, stub_size);
 
-#ifndef NDEBUG
-    if (dump_stubs)
-        dump(stub,"vm_aastore_array_index_out_of_bounds",  ss - stub);
-#endif
+    if (VM_Global_State::loader_env->TI->isEnabled())
+        jvmti_send_dynamic_code_generated_event("vm_aastore_nullpointer", stub, stub_size);
+
+    DUMP_STUB(stub, "vm_aastore_array_index_out_of_bounds",  ss - stub);
+
     return addr;
 } //vm_aastore_array_index_out_of_bounds
 
@@ -557,16 +478,13 @@ static void* vm_aastore_arraystore()
     addr = stub;
     assert((ss - stub) <= stub_size);
 
-    if (VM_Global_State::loader_env->TI->isEnabled())
-    {
-        jvmti_add_dynamic_generated_code_chunk("vm_aastore_arraystore", stub, stub_size);
-        jvmti_send_dynamic_code_generated_event("vm_aastore_arraystore", stub, stub_size);
-    }
+    compile_add_dynamic_generated_code_chunk("vm_aastore_arraystore", stub, stub_size);
 
-#ifndef NDEBUG
-    if (dump_stubs)
-        dump(stub, "vm_aastore_arraystore", ss - stub);
-#endif
+    if (VM_Global_State::loader_env->TI->isEnabled())
+        jvmti_send_dynamic_code_generated_event("vm_aastore_arraystore", stub, stub_size);
+
+    DUMP_STUB(stub, "vm_aastore_arraystore", ss - stub);
+
     return addr;
 } //vm_aastore_arraystore
 
@@ -596,7 +514,7 @@ aastore_ia32(volatile ManagedObject *elem,
 
     assert ((elem == NULL) || (((ManagedObject *)elem)->vt() != NULL));
 #ifdef VM_STATS
-    vm_stats_total.num_aastore++;
+    VM_Statistics::get_vm_stats().num_aastore++;
 #endif // VM_STATS
     void *new_eip = 0;
     if (array == NULL) {
@@ -609,11 +527,11 @@ aastore_ia32(volatile ManagedObject *elem,
             VTable *vt = get_vector_vtable(array);
 #ifdef VM_STATS
             if (vt == cached_object_array_vtable_ptr)
-                vm_stats_total.num_aastore_object_array ++;
+                VM_Statistics::get_vm_stats().num_aastore_object_array ++;
             if (vt->clss->array_element_class->vtable == ((ManagedObject *)elem)->vt())
-                vm_stats_total.num_aastore_equal_type ++;
+                VM_Statistics::get_vm_stats().num_aastore_equal_type ++;
             if (vt->clss->array_element_class->is_suitable_for_fast_instanceof)
-                vm_stats_total.num_aastore_fast_decision ++;
+                VM_Statistics::get_vm_stats().num_aastore_fast_decision ++;
 #endif // VM_STATS
             if(vt == cached_object_array_vtable_ptr ||
                 class_is_subtype_fast(((ManagedObject *)elem)->vt(), vt->clss->array_element_class)) {
@@ -625,7 +543,7 @@ aastore_ia32(volatile ManagedObject *elem,
             // A null reference. No need to check types for a null reference.
             assert(elem == NULL);
 #ifdef VM_STATS
-            vm_stats_total.num_aastore_null ++;
+            VM_Statistics::get_vm_stats().num_aastore_null ++;
 #endif // VM_STATS
             // 20030502 Someone earlier commented out a call to the GC interface function gc_heap_slot_write_ref() and replaced it
             // by code to directly store a NULL in the element without notifying the GC. I've retained that change here but I wonder if
@@ -670,7 +588,10 @@ static void *getaddress__vm_aastore()
         (void *)vm_rt_aastore,
         exn_get_rth_throw_lazy_trampoline());
     assert(lil_is_valid(cs));
-    addr = LilCodeGenerator::get_platform()->compile(cs, "vm_aastore", dump_stubs);
+    addr = LilCodeGenerator::get_platform()->compile(cs);
+
+    DUMP_STUB(addr, "vm_aastore", lil_cs_get_code_size(cs));
+
     lil_free_code_stub(cs);
     return addr;
 } //getaddress__vm_aastore
@@ -712,32 +633,15 @@ static void * gen_new_vector_stub(char *stub_name, char *fast_new_vector_proc, c
 
     assert((ss - stub) <= stub_size);
 
-    if (VM_Global_State::loader_env->TI->isEnabled())
-    {
-        jvmti_add_dynamic_generated_code_chunk("vm_new_vector_naked", stub, stub_size);
-        jvmti_send_dynamic_code_generated_event("vm_new_vector_naked", stub, stub_size);
-    }
+    compile_add_dynamic_generated_code_chunk("vm_new_vector_naked", stub, stub_size);
 
-#ifndef NDEBUG
-    if (dump_stubs)
-        dump(stub, stub_name, ss - stub);
-#endif
+    if (VM_Global_State::loader_env->TI->isEnabled())
+        jvmti_send_dynamic_code_generated_event("vm_new_vector_naked", stub, stub_size);
+
+    DUMP_STUB(stub, stub_name, ss - stub);
+
     return stub;
 } //gen_new_vector_stub
-
-
-static void *getaddress__vm_new_vector_naked()
-{
-    static void *addr = 0;
-    if (addr) {
-        return addr;
-    }
-
-    addr = gen_new_vector_stub("getaddress__vm_new_vector_naked", 
-        (char *)vm_new_vector_or_null, (char *)vm_new_vector);
-    return addr;
-} //getaddress__vm_new_vector_naked
-
 
 static void *getaddress__vm_new_vector_using_vtable_naked() {
     static void *addr = 0;
@@ -745,12 +649,40 @@ static void *getaddress__vm_new_vector_using_vtable_naked() {
         return addr;
     }
     
-    addr = generate_object_allocation_stub_with_thread_pointer((char *)vm_new_vector_or_null_using_vtable_and_thread_pointer,
-        (char *)vm_new_vector_using_vtable_and_thread_pointer,
+    addr = generate_object_allocation_stub_with_thread_pointer(
+        (char *)vm_new_vector_or_null_using_vtable_and_thread_pointer,
+        (char *)vm_rt_new_vector_using_vtable_and_thread_pointer,
         "getaddress__vm_new_vector_using_vtable_naked");
     return addr;
 } //getaddress__vm_new_vector_using_vtable_naked
 
+// this is a helper routine for rth_get_lil_multianewarray(see jit_runtime_support.cpp).
+Vector_Handle
+vm_rt_multianewarray_recursive(Class    *c,
+                             int      *dims_array,
+                             unsigned  dims);
+
+Vector_Handle rth_multianewarrayhelper()
+{
+    ASSERT_THROW_AREA;
+    M2nFrame* m2nf = m2n_get_last_frame();
+    const unsigned max_dim = 255;
+    int lens[max_dim];
+
+#ifdef VM_STATS
+    VM_Statistics::get_vm_stats().num_multianewarray++;  
+#endif
+
+    POINTER_SIZE_INT* p_args = m2n_get_args(m2nf);
+    Class* c = (Class*)p_args[0];
+    unsigned dims = p_args[1];
+    assert(dims<=max_dim);
+    uint32* lens_base = (uint32*)(p_args+2);
+    for(unsigned i = 0; i < dims; i++) {
+        lens[i] = lens_base[dims-i-1];
+    }
+    return vm_rt_multianewarray_recursive(c, lens, dims);
+}
 
 // This is a __cdecl function and the caller must pop the arguments.
 static void *getaddress__vm_multianewarray_resolved_naked()
@@ -796,16 +728,13 @@ static void *getaddress__vm_multianewarray_resolved_naked()
     addr = stub;
     assert((ss - stub) <= stub_size);
 
-    if (VM_Global_State::loader_env->TI->isEnabled())
-    {
-        jvmti_add_dynamic_generated_code_chunk("vm_multinewarray_resolved_naked", stub, stub_size);
-        jvmti_send_dynamic_code_generated_event("vm_multinewarray_resolved_naked", stub, stub_size);
-    }
+    compile_add_dynamic_generated_code_chunk("vm_multinewarray_resolved_naked", stub, stub_size);
 
-#ifndef NDEBUG
-    if (dump_stubs)
-        dump(stub, "getaddress__vm_multianewarray_resolved_naked", ss - stub);
-#endif
+    if (VM_Global_State::loader_env->TI->isEnabled())
+        jvmti_send_dynamic_code_generated_event("vm_multinewarray_resolved_naked", stub, stub_size);
+
+    DUMP_STUB(stub, "getaddress__vm_multianewarray_resolved_naked", ss - stub);
+
     return addr;
 } //getaddress__vm_multianewarray_resolved_naked
 
@@ -834,16 +763,13 @@ static void *getaddress__vm_instantiate_cp_string_naked()
     addr = stub;
     assert((ss - stub) <= stub_size);
 
-    if (VM_Global_State::loader_env->TI->isEnabled())
-    {
-        jvmti_add_dynamic_generated_code_chunk("vm_instantiate_cp_string_naked", stub, stub_size);
-        jvmti_send_dynamic_code_generated_event("vm_instantiate_cp_string_naked", stub, stub_size);
-    }
+    compile_add_dynamic_generated_code_chunk("vm_instantiate_cp_string_naked", stub, stub_size);
 
-#ifndef NDEBUG
-    if (dump_stubs)
-        dump(stub, "getaddress__vm_instantiate_cp_string_naked", ss - stub);
-#endif
+    if (VM_Global_State::loader_env->TI->isEnabled())
+        jvmti_send_dynamic_code_generated_event("vm_instantiate_cp_string_naked", stub, stub_size);
+
+    DUMP_STUB(stub, "getaddress__vm_instantiate_cp_string_naked", ss - stub);
+
     return addr;
 } //getaddress__vm_instantiate_cp_string_naked
 
@@ -851,7 +777,8 @@ static void *getaddress__vm_instantiate_cp_string_naked()
 
 static void vm_throw_java_lang_IncompatibleClassChangeError()
 {
-    throw_java_exception("java/lang/IncompatibleClassChangeError");
+    ASSERT_THROW_AREA;
+    exn_throw_by_name("java/lang/IncompatibleClassChangeError");
     ABORT("The last called function should not return");
 } //vm_throw_java_lang_IncompatibleClassChangeError
 
@@ -909,24 +836,22 @@ void * getaddress__vm_get_interface_vtable_old_naked()  //wjw verify that this w
     addr = stub;
     assert((ss - stub) <= stub_size);
 
-    if (VM_Global_State::loader_env->TI->isEnabled())
-    {
-        jvmti_add_dynamic_generated_code_chunk("vm_get_interface_vtable_old_naked", stub, stub_size);
-        jvmti_send_dynamic_code_generated_event("vm_get_interface_vtable_old_naked", stub, stub_size);
-    }
+    compile_add_dynamic_generated_code_chunk("vm_get_interface_vtable_old_naked", stub, stub_size);
 
-#ifndef NDEBUG
-    if (dump_stubs)
-        dump(stub, "getaddress__vm_get_interface_vtable_old_naked", ss - stub);
-#endif
+    if (VM_Global_State::loader_env->TI->isEnabled())
+        jvmti_send_dynamic_code_generated_event("vm_get_interface_vtable_old_naked", stub, stub_size);
+
+    DUMP_STUB(stub, "getaddress__vm_get_interface_vtable_old_naked", ss - stub);
+
     return addr;
 } //getaddress__vm_get_interface_vtable_old_naked
 
 
 static void vm_throw_java_lang_ArithmeticException()
 {
+    ASSERT_THROW_AREA;
     assert(!hythread_is_suspend_enabled());
-    throw_java_exception("java/lang/ArithmeticException");
+    exn_throw_by_name("java/lang/ArithmeticException");
     ABORT("The last called function should not return");
 } //vm_throw_java_lang_ArithmeticException
 
@@ -953,16 +878,13 @@ static void* getaddress__setup_java_to_native_frame()
     assert((ss - stub) <= stub_size);
     addr = stub;
 
-    if (VM_Global_State::loader_env->TI->isEnabled())
-    {
-        jvmti_add_dynamic_generated_code_chunk("setup_java_to_native_frame", stub, stub_size);
-        jvmti_send_dynamic_code_generated_event("setup_java_to_native_frame", stub, stub_size);
-    }
+    compile_add_dynamic_generated_code_chunk("setup_java_to_native_frame", stub, stub_size);
 
-#ifndef NDEBUG
-    if (dump_stubs)
-        dump(stub, "getaddress__setup_java_to_native_frame", ss - stub);
-#endif
+    if (VM_Global_State::loader_env->TI->isEnabled())
+        jvmti_send_dynamic_code_generated_event("setup_java_to_native_frame", stub, stub_size);
+
+    DUMP_STUB(stub, "getaddress__setup_java_to_native_frame", ss - stub);
+
     return addr;
 } //getaddress__setup_java_to_native_frame
 
@@ -996,16 +918,13 @@ static void* getaddress__pop_java_to_native_frame()
     assert((ss - stub) <= stub_size);
     addr = stub;
 
-    if (VM_Global_State::loader_env->TI->isEnabled())
-    {
-        jvmti_add_dynamic_generated_code_chunk("pop_java_to_native_frame", stub, stub_size);
-        jvmti_send_dynamic_code_generated_event("pop_java_to_native_frame", stub, stub_size);
-    }
+    compile_add_dynamic_generated_code_chunk("pop_java_to_native_frame", stub, stub_size);
 
-#ifndef NDEBUG
-    if (dump_stubs)
-        dump(stub, "getaddress__pop_java_to_native_frame", ss - stub);
-#endif
+    if (VM_Global_State::loader_env->TI->isEnabled())
+        jvmti_send_dynamic_code_generated_event("pop_java_to_native_frame", stub, stub_size);
+
+    DUMP_STUB(stub, "getaddress__pop_java_to_native_frame", ss - stub);
+
     return addr;
 } //getaddress__pop_java_to_native_frame
 
@@ -1028,7 +947,7 @@ vm_throw_linking_exception(Class *clss,
                            unsigned opcode)
 {
     TRACE("vm_throw_linking_exception, idx=" << cp_index << "\n");
-    class_throw_linking_error(clss, cp_index, opcode);
+    vm_rt_class_throw_linking_error(clss, cp_index, opcode);
     ABORT("The last called function should not return");
 } //vm_throw_linking_exception
 
@@ -1056,16 +975,13 @@ void * getaddress__vm_throw_linking_exception_naked()
     addr = stub;
     assert((ss - stub) < stub_size);
 
-    if (VM_Global_State::loader_env->TI->isEnabled())
-    {
-        jvmti_add_dynamic_generated_code_chunk("vm_throw_linking_exception_naked", stub, stub_size);
-        jvmti_send_dynamic_code_generated_event("vm_throw_linking_exception_naked", stub, stub_size);
-    }
+    compile_add_dynamic_generated_code_chunk("vm_throw_linking_exception_naked", stub, stub_size);
 
-#ifndef NDEBUG
-    if (dump_stubs)
-        dump(stub, "getaddress__vm_throw_linking_exception_naked", ss - stub);
-#endif
+    if (VM_Global_State::loader_env->TI->isEnabled())
+        jvmti_send_dynamic_code_generated_event("vm_throw_linking_exception_naked", stub, stub_size);
+
+    DUMP_STUB(stub, "getaddress__vm_throw_linking_exception_naked", ss - stub);
+
     return addr;
 } //getaddress__vm_throw_linking_exception_naked
 
@@ -1106,16 +1022,13 @@ void * getaddress__gc_write_barrier_fastcall()
     addr = stub;
     assert((ss - stub) < stub_size);
 
-    if (VM_Global_State::loader_env->TI->isEnabled())
-    {
-        jvmti_add_dynamic_generated_code_chunk("gc_write_barrier_fastcall", stub, stub_size);
-        jvmti_send_dynamic_code_generated_event("gc_write_barrier_fastcall", stub, stub_size);
-    }
+    compile_add_dynamic_generated_code_chunk("gc_write_barrier_fastcall", stub, stub_size);
 
-#ifndef NDEBUG
-    if (dump_stubs)
-        dump(stub, "getaddress__gc_write_barrier_fastcall", ss - stub);
-#endif
+    if (VM_Global_State::loader_env->TI->isEnabled())
+        jvmti_send_dynamic_code_generated_event("gc_write_barrier_fastcall", stub, stub_size);
+
+    DUMP_STUB(stub, "getaddress__gc_write_barrier_fastcall", ss - stub);
+
     return addr;
 } //getaddress__gc_write_barrier_fastcall
 
@@ -1157,16 +1070,13 @@ void * getaddress__vm_lrem_naked()
     assert((ss - stub) <= stub_size);
     addr = stub;
 
-    if (VM_Global_State::loader_env->TI->isEnabled())
-    {
-        jvmti_add_dynamic_generated_code_chunk("vm_lrem_naked", stub, stub_size);
-        jvmti_send_dynamic_code_generated_event("vm_lrem_naked", stub, stub_size);
-    }
+    compile_add_dynamic_generated_code_chunk("vm_lrem_naked", stub, stub_size);
 
-#ifndef NDEBUG
-    if (dump_stubs)
-        dump(stub, "getaddress__vm_lrem_naked", ss - stub);
-#endif
+    if (VM_Global_State::loader_env->TI->isEnabled())
+        jvmti_send_dynamic_code_generated_event("vm_lrem_naked", stub, stub_size);
+
+    DUMP_STUB(stub, "getaddress__vm_lrem_naked", ss - stub);
+
     return addr;
 } //getaddress__vm_lrem_naked
 
@@ -1207,16 +1117,13 @@ static void *getaddress__vm_ldiv_naked()
     assert((s - stub) <= stub_size);
     addr = stub;
 
-    if (VM_Global_State::loader_env->TI->isEnabled())
-    {
-        jvmti_add_dynamic_generated_code_chunk("vm_ldiv_naked", stub, stub_size);
-        jvmti_send_dynamic_code_generated_event("vm_ldiv_naked", stub, stub_size);
-    }
+    compile_add_dynamic_generated_code_chunk("vm_ldiv_naked", stub, stub_size);
 
-#ifndef NDEBUG
-    if (dump_stubs)
-        dump(stub, "getaddress__vm_ldiv_naked", s - stub);
-#endif
+    if (VM_Global_State::loader_env->TI->isEnabled())
+        jvmti_send_dynamic_code_generated_event("vm_ldiv_naked", stub, stub_size);
+
+    DUMP_STUB(stub, "getaddress__vm_ldiv_naked", s - stub);
+
     return addr;
 } //getaddress__vm_ldiv_naked
 
@@ -1230,7 +1137,7 @@ static void *getaddress__vm_ldiv_naked()
 static void register_request_for_rt_function(VM_RT_SUPPORT f) {
     // Increment the number of times that f was requested by a JIT. This is not the number of calls to that function,
     // but this does tell us how often a call to that function is compiled into JITted code.
-    vm_stats_total.rt_function_requests.add((void *)f, /*value*/ 1, /*value1*/ NULL);
+    VM_Statistics::get_vm_stats().rt_function_requests.add((void *)f, /*value*/ 1, /*value1*/ NULL);
 } //register_request_for_rt_function
 
 #endif //VM_STATS
@@ -1268,14 +1175,10 @@ void *vm_get_rt_support_addr(VM_RT_SUPPORT f)
         return exn_get_rth_throw_lazy();
     case VM_RT_LDC_STRING:
         return getaddress__vm_instantiate_cp_string_naked();
-    case VM_RT_NEW_RESOLVED:
-        return getaddress__vm_alloc_java_object_resolved_naked();
     case VM_RT_NEW_RESOLVED_USING_VTABLE_AND_SIZE:
         return getaddress__vm_alloc_java_object_resolved_using_vtable_and_size_naked(); 
     case VM_RT_MULTIANEWARRAY_RESOLVED:
         return getaddress__vm_multianewarray_resolved_naked();
-    case VM_RT_NEW_VECTOR:
-        return getaddress__vm_new_vector_naked();
     case VM_RT_NEW_VECTOR_USING_VTABLE:
         return getaddress__vm_new_vector_using_vtable_naked();
     case VM_RT_AASTORE:
@@ -1296,7 +1199,7 @@ void *vm_get_rt_support_addr(VM_RT_SUPPORT f)
     return getaddress__vm_instanceof();
 
     case VM_RT_MONITOR_ENTER:
-    case VM_RT_MONITOR_ENTER_NO_EXC:
+    case VM_RT_MONITOR_ENTER_NON_NULL:
         return getaddress__vm_monitor_enter_naked();
 
     case VM_RT_MONITOR_ENTER_STATIC:
@@ -1425,12 +1328,6 @@ void *vm_get_rt_support_addr_optimized(VM_RT_SUPPORT f, Class_Handle c) {
             return vm_get_rt_support_addr(f);
         // break; // remark #111: statement is unreachable
     case VM_RT_INSTANCEOF:
-            return vm_get_rt_support_addr(f);
-        // break;// remark #111: statement is unreachable
-    case VM_RT_NEW_RESOLVED:
-        if (class_is_finalizable(c))
-            return getaddress__vm_alloc_java_object_resolved_naked();
-        else
             return vm_get_rt_support_addr(f);
         // break;// remark #111: statement is unreachable
     case VM_RT_NEW_RESOLVED_USING_VTABLE_AND_SIZE:

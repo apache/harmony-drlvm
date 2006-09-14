@@ -29,11 +29,10 @@
 namespace Jitrino {
 class IRManager;
 class FlowGraph;
-class CFGNode;
+class Node;
 class Inst;
 class TypeInst;
 
-DEFINE_OPTPASS(CodeLoweringPass)
 
 class CodeLowerer : public InstOptimizer {
 public:
@@ -42,7 +41,7 @@ public:
     void doLower();
 
 private:
-    void lowerBlock(CFGNode *node);
+    void lowerBlock(Node *node);
 
     Inst* caseDefault(Inst* inst) {return inst;}
 
@@ -64,7 +63,7 @@ private:
     Inst* caseTauArrayLen(Inst *inst);
 
     Inst* caseTauLdInd(Inst *inst);
-    Inst* caseLdString(TokenInst *inst);
+    Inst* caseLdRef(TokenInst *inst);
     Inst* caseLdNull(ConstInst* inst);
 
     // Numeric compute
@@ -140,9 +139,7 @@ private:
 
     Inst* caseCatch(Inst* inst) {return caseDefault(inst);}
 
-	Inst* caseThrow(Inst* inst) {return caseDefault(inst);}
-
-	Inst* caseThrowLazy(Inst* inst) {return caseDefault(inst);}
+    Inst* caseThrow(Inst* inst) {return caseDefault(inst);}
 
     Inst* caseThrowSystemException(Inst* inst) {return caseDefault(inst);}
 

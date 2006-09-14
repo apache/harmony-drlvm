@@ -27,17 +27,18 @@
 #include "Type.h"
 #include "Jitrino.h"
 #include "VMInterface.h"
-#include "PropertyTable.h"
-#include "Inst.h"
+#include "Stl.h"
 
 
 
 namespace Jitrino
 {
-	class CodeProfiler;
-	// struct ::JitFrameContext;	
-	class CG_OpndHandle {
-};
+class InlineInfo;
+
+    // struct ::JitFrameContext;    
+    class CG_OpndHandle {
+    };
+
 
 // "_Ovf" types are used to support CLI's overflow semantics.  CLI supports 
 // overflow arithmetic.  If an overflow type is used below, generated code must
@@ -162,7 +163,9 @@ class JitHelperCallOp {
 public:
     enum Id {
         InitializeArray,
-        PseudoCanThrow
+        PseudoCanThrow,
+        SaveThisState,
+        ReadThisState
     };
 };
 
@@ -190,7 +193,7 @@ public:
     virtual CG_OpndHandle*  sub(ArithmeticOp::Types,CG_OpndHandle* src1,CG_OpndHandle* src2) = 0;
     virtual CG_OpndHandle*  subRef(RefArithmeticOp::Types,CG_OpndHandle* refSrc, CG_OpndHandle* intSrc) = 0;
     virtual CG_OpndHandle*  diffRef(bool ovf, CG_OpndHandle* ref1,CG_OpndHandle* ref2) = 0;
-    virtual CG_OpndHandle*  scaledDiffRef(CG_OpndHandle* ref1,CG_OpndHandle* ref2) = 0;
+    virtual CG_OpndHandle*  scaledDiffRef(CG_OpndHandle*, CG_OpndHandle*, Type*, Type*) = 0;
     virtual CG_OpndHandle*  mul(ArithmeticOp::Types,CG_OpndHandle* src1,CG_OpndHandle* src2) = 0;
     virtual CG_OpndHandle*  tau_div(DivOp::Types,CG_OpndHandle* src1,CG_OpndHandle* src2,
                                     CG_OpndHandle *tauSrc1NonZero) = 0;
@@ -254,8 +257,7 @@ public:
                                              CG_OpndHandle *tauBaseNonNull) = 0;
     virtual CG_OpndHandle*  getVTableAddr(Type *dstType, ObjectType *base) = 0;
     virtual CG_OpndHandle*  tau_ldIntfTableAddr(Type *dstType, CG_OpndHandle* base, 
-                                                NamedType* vtableType, 
-                                                CG_OpndHandle *tauBaseHasIntf) = 0;
+                                                NamedType* vtableType) = 0;
     virtual CG_OpndHandle*  call(uint32 numArgs, CG_OpndHandle** args, Type* retType,
                                  MethodDesc *desc, InlineInfo* ii = NULL) = 0;
     virtual CG_OpndHandle*  tau_call(uint32 numArgs, CG_OpndHandle** args, Type* retType,
@@ -277,7 +279,7 @@ public:
     virtual CG_OpndHandle*  callhelper(uint32 numArgs, CG_OpndHandle** args, Type* retType,
                                        JitHelperCallOp::Id callId) = 0;
     virtual CG_OpndHandle*  callvmhelper(uint32 numArgs, CG_OpndHandle** args, Type* retType,
-                                         VMHelperCallOp::Id callId) = 0;
+                                         VMHelperCallOp::Id callId, InlineInfo* ii = NULL) = 0;
     virtual CG_OpndHandle*  ldc_i4(uint32 val) = 0;
     virtual CG_OpndHandle*  ldc_i8(uint64 val) = 0;
     virtual CG_OpndHandle*  ldc_s(float val) = 0;
@@ -335,7 +337,7 @@ public:
     virtual CG_OpndHandle*  ldFieldAddr(Type* fieldRefType,CG_OpndHandle* base,FieldDesc *desc) = 0;
     virtual CG_OpndHandle*  ldStaticAddr(Type* fieldRefType,FieldDesc *desc) = 0;
     virtual CG_OpndHandle*  ldElemBaseAddr(CG_OpndHandle* array) = 0;
-    virtual CG_OpndHandle*  addElemIndex(CG_OpndHandle *elemBase,CG_OpndHandle* index) = 0;
+    virtual CG_OpndHandle*  addElemIndex(Type*, CG_OpndHandle *elemBase,CG_OpndHandle* index) = 0;
     virtual CG_OpndHandle*  ldElemAddr(CG_OpndHandle* array,CG_OpndHandle* index) = 0;
     // COMPRESSED_PTR note: 
     // if we are using compressed references, and ptr is Ptr<CompressedRef>, then
@@ -373,9 +375,9 @@ public:
     // COMPRESSED_PTR note: If we are using compressed references, and
     // ptr is Ptr<Compressed Ref>, then
     //   (1) if autoCompressRef, then src should be Ref and CG will compress 
-	//       it on store; type is uncompressedRef type
+    //       it on store; type is uncompressedRef type
     //   (2) if !autoCompressRef, then src should be CompressedRef; type is 
-	//       compressedRef type
+    //       compressedRef type
     virtual void            tau_stInd(CG_OpndHandle* src, CG_OpndHandle* ptr, Type::Tag memType,
                                       bool autoCompressRef,
                                       CG_OpndHandle* tauBaseNonNull,
@@ -402,7 +404,7 @@ public:
     virtual CG_OpndHandle*  newObj(ObjectType* objType) = 0; 
     virtual CG_OpndHandle*  newArray(ArrayType* arrayType, CG_OpndHandle* numElems) = 0;
     virtual CG_OpndHandle*  newMultiArray(ArrayType* arrayType, uint32 numDims, CG_OpndHandle** dims) = 0;
-    virtual CG_OpndHandle*  ldString(MethodDesc* enclosingMethod,uint32 stringToken, bool autouncompress) = 0;
+    virtual CG_OpndHandle*  ldRef(Type* type,MethodDesc* enclosingMethod,uint32 stringToken, bool autouncompress) = 0;
     virtual CG_OpndHandle*  ldToken(Type *dstType,MethodDesc* enclosingMethod,uint32 token) = 0;
     virtual void            incCounter(Type *counterType,uint32 counter) = 0;
 
@@ -453,11 +455,16 @@ public:
     virtual CG_OpndHandle*  catchException(Type * exceptionType) = 0;
     virtual void            prefetch(CG_OpndHandle* refSrc, uint32 offset, int hints) = 0;
 
+    virtual void pseudoInst() = 0;
+
+    virtual void methodEntry(MethodDesc* mDesc) = 0;
+    virtual void methodEnd(MethodDesc* mDesc, CG_OpndHandle* retVallue = NULL) = 0;
+
     // Set the current persistent instruction id associated with any subsequently generated instructions.
     virtual void            setCurrentPersistentId(PersistentInstructionId persistentId) = 0;
 
     // Clear the current persistent instruction id.  
-	// Any subsequently generated instructions have no associated ID.
+    // Any subsequently generated instructions have no associated ID.
     virtual void            clearCurrentPersistentId() = 0;
     // Set current HIR instruction in order to allow Code Generator propagate bc offset info
     virtual void setCurrentHIRInstrID(uint64 HIRInstrID) = 0; 
@@ -472,9 +479,9 @@ public:
     virtual ~VarCodeSelector() {}
     class Callback {
     public:
-    virtual ~Callback() {}
-    virtual uint32 defVar(Type* varType,bool isAddressTaken,bool isPinned) = 0;
-	virtual void setManagedPointerBase(uint32 managedPtrVarNum, uint32 baseVarNum) = 0;
+        virtual ~Callback() {}
+        virtual uint32 defVar(Type* varType,bool isAddressTaken,bool isPinned) = 0;
+        virtual void setManagedPointerBase(uint32 managedPtrVarNum, uint32 baseVarNum) = 0;
     };
     virtual void genCode(Callback&) = 0;
 };
@@ -496,8 +503,8 @@ public:
     virtual ~CFGCodeSelector() {}
     class Callback {
     public:
-	virtual ~Callback() {}
         enum BlockKind {Prolog, InnerBlock, Epilog};
+        virtual ~Callback() {}
         virtual uint32  genDispatchNode(uint32 numInEdges,uint32 numOutEdges,double cnt) = 0;
         virtual uint32  genBlock(uint32 numInEdges,uint32 numOutEdges, BlockKind blockKind,
                                  BlockCodeSelector&, double cnt) = 0;
@@ -511,9 +518,7 @@ public:
         virtual void    genExceptionEdge(uint32 tailNodeId, uint32 headNodeId, double prob) = 0;
         virtual void    genCatchEdge(uint32 tailNodeId,uint32 headNodeId,
                                      uint32 priority,Type* exceptionType, double prob) = 0;
-        virtual void    genExitEdge(uint32 tailNodeId, uint32 headNodeId, double prob) = 0;
-
-        virtual void    setLoopInfo(uint32 nodeId, bool isLoopHeader, bool hasContainingLoopHeader, uint32 headerId) = 0;
+        
         // Set the persistent block ID for a given block.
         virtual void    setPersistentId(uint32 nodeId, uint32 persistentId) = 0;
     };
@@ -524,25 +529,21 @@ public:
 //
 class MethodCodeSelector {
 public:
-    virtual ~MethodCodeSelector() {}
     MethodCodeSelector() {}
     class Callback {
     public:
-	virtual ~Callback() {}
         virtual void    genVars(uint32 numLocals,VarCodeSelector&) = 0;
         virtual void    setMethodDesc(MethodDesc * desc) = 0;
         virtual void    genCFG(uint32 numNodes,CFGCodeSelector&,bool useProfile) = 0;
-		virtual void    setProfileInfo(CodeProfiler *profiler) = 0;
     };
     virtual void selectCode(Callback&) = 0;
 };
 
+class SessionAction;
 class CodeGenerator {
 public:
     virtual ~CodeGenerator() {}
-    virtual bool genCode(MethodCodeSelector&) = 0;
-    static void readFlagsFromCommandLine(CompilationContext* cs, bool ia32Cg);
-    static void showFlagsFromCommandLine(bool ia32Cg);
+    virtual void genCode(SessionAction* sa, MethodCodeSelector&) = 0;
 };
 
 class CodeGeneratorFactory {
@@ -578,6 +579,8 @@ public:
 
     virtual uint32          getInlineDepth(InlineInfoPtr ptr, uint32 offset) { return 0; }
     virtual Method_Handle   getInlinedMethod(InlineInfoPtr ptr, uint32 offset, uint32 inline_depth) { return NULL; }
+    virtual uint16   getInlinedBc(InlineInfoPtr ptr, uint32 offset, uint32 inline_depth)  = 0;
+
 };
 
 class InlineInfoMap {
@@ -597,15 +600,18 @@ public:
     uint32 computeSize() const;
     void write(InlineInfoPtr output);
     static uint32 get_inline_depth(InlineInfoPtr ptr, uint32 offset);
-    static Method_Handle get_inlined_method(InlineInfoPtr ptr, uint32 offset, uint32 inline_depth);
+    static Method_Handle get_inlined_method(InlineInfoPtr ptr, uint32 offset, 
+            uint32 inline_depth);
+    static uint16 get_inlined_bc(InlineInfoPtr ptr, uint32 offset, 
+            uint32 inline_depth);
 private:
-    static uint64 ptr_to_uint64(void *ptr);
-    static Method_Handle uint64_to_mh(uint64 value);
+    static POINTER_SIZE_INT ptr_to_uint64(void *ptr);
+    static Method_Handle uint64_to_mh(POINTER_SIZE_INT value);
     // 
     // returns pointer to serialized data corresponding to offset:
     //   depth mh[depth]
     //
-    static uint64* find_offset(InlineInfoPtr ptr, uint32 offset);
+    static POINTER_SIZE_INT* find_offset(InlineInfoPtr ptr, uint32 offset);
     InlineInfoList list;
     MemoryManager& memManager;
 };

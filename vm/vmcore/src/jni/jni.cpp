@@ -27,7 +27,6 @@
 #include "Class.h"
 #include "classloader.h"
 #include "environment.h"
-#include "exception.h"
 #include "object_handles.h"
 #include "open/types.h"
 #include "open/vm_util.h"
@@ -381,7 +380,57 @@ jclass JNICALL DefineClass(JNIEnv *jenv,
     Global_Env* env = VM_Global_State::loader_env;
     ClassLoader* cl;
     if (loader != NULL)
+    {
+        if(name)
+        {
+            jclass clazz = GetObjectClass(jenv, loader);
+            jmethodID meth_id = GetMethodID(jenv, clazz, "findLoadedClass", "(Ljava/lang/String;)Ljava/lang/Class;");
+            if (NULL == meth_id)
+            {
+                jobject exn = exn_get();
+                tmn_suspend_disable();
+                Class *exn_class = exn->object->vt()->clss;
+                assert(exn_class);
+                bool f = exn_class != env->java_lang_OutOfMemoryError_Class;
+                tmn_suspend_enable();
+                if(f)
+                    DIE("Fatal: an access to findLoadedClass method of java.lang.Class is not provided");
+                // OutOfMemoryError should be rethrown after this JNI method exits
+                return 0;
+            }
+            jstring str = NewStringUTF(jenv, name);
+            if (NULL == str)
+            {
+                // the only OutOfMemoryError can be a reason to be here; it will be rethrown after this JNI method exits
+                return 0;
+            }
+            jobject obj = CallObjectMethod(jenv, loader, meth_id, str);
+            if(obj)
+            {
+                jthrowable exn;
+                if(exn_raised())
+                {
+                    // pending exception will be rethrown after the JNI method exits
+                    return 0;
+                }
+                else
+                {
+                    static const char* mess_templ = "duplicate class definition: ";
+                    static unsigned mess_templ_len = strlen(mess_templ);
+                    unsigned mess_size = mess_templ_len + strlen(name) + 1; // 1 is for trailing '\0'
+                    char* err_mess = (char*)STD_ALLOCA(mess_size);
+                    sprintf(err_mess, "%s%s", mess_templ, name);
+                    exn = exn_create("java/lang/LinkageError", err_mess);
+                }
+
+                assert(exn);
+                jint UNUSED ok = Throw(jenv, exn);
+                assert(ok == 0);
+                return 0;
+            }
+        }
         cl = class_loader_lookup(loader);
+    }
     else
         cl = env->bootstrap_class_loader;
 
@@ -410,21 +459,15 @@ jclass JNICALL DefineClass(JNIEnv *jenv,
     }
     else
     {
-        jthrowable exn;
-        if(exn_raised())
-        {
-            exn = exn_get();
-            exn_clear();
+        if (exn_raised()) {
+            return 0;
+        } else if(res_name) {
+            jthrowable exn = (jthrowable)class_get_error(cl, res_name->bytes);
+            exn_raise_object(exn);
+        } else {
+            exn_raise_by_name("java/lang/LinkageError",
+                "defineClass failed for unnamed class", NULL);
         }
-        else if(res_name)
-            exn = (jthrowable)class_get_error(cl, res_name->bytes);
-        else
-            exn = exn_create("java/lang/LinkageError",
-                "defineClass failed for unnamed class");
-
-        assert(exn);
-        jint UNUSED ok = Throw(jenv, exn);
-        assert(ok == 0);
         return 0;
     }
 } //DefineClass
@@ -438,7 +481,9 @@ jclass JNICALL FindClass(JNIEnv* env_ext,
     char *ch = strchr(name, '.');
     if (NULL != ch)
     {
-        ThrowNew_Quick(env_ext, "java/lang/NoClassDefFoundError", name);
+        ThrowNew_Quick(env_ext,
+            VM_Global_State::loader_env->JavaLangNoClassDefFoundError_String->bytes,
+            name);
         return NULL;
     }
 
@@ -491,9 +536,7 @@ jint JNICALL Throw(JNIEnv * UNREF env, jthrowable obj)
     TRACE2("jni", "Throw called");
     assert(hythread_is_suspend_enabled());
     if(obj) {
-        tmn_suspend_disable();       //---------------------------------v
-        set_current_thread_exception(((ObjectHandle)obj)->object);
-        tmn_suspend_enable();        //---------------------------------^
+        exn_raise_object(obj);
         return 0;
     } else {
         return -1;
@@ -520,12 +563,7 @@ jint JNICALL ThrowNew(JNIEnv *env, jclass clazz, const char *message)
     jobject obj = NewObjectA(env, clazz, init_id, args);
     env->DeleteLocalRef(str);
     if(obj && !ExceptionOccurred(env)) {
-        tmn_suspend_disable();       //---------------------------------v
-
-        ObjectHandle h = (ObjectHandle)obj;
-        set_current_thread_exception(h->object);
-
-        tmn_suspend_enable();        //---------------------------------^
+        exn_raise_object(obj);
         return 0;
     } else {
         return -1;
@@ -544,20 +582,21 @@ jint JNICALL ThrowNew_Quick(JNIEnv *env, const char *classname, const char *mess
     return result;
 } // ThrowNew_Quick
 
+//FIXME LAZY EXCEPTION (2006.05.15)
+// chacks usage of this function and replace by lazy
 jthrowable JNICALL ExceptionOccurred(JNIEnv * UNREF env)
 {
     TRACE2("jni", "ExceptionOccurred called");
     assert(hythread_is_suspend_enabled());
 #ifdef _DEBUG
     tmn_suspend_disable();
-    ManagedObject *obj = get_current_thread_exception();
-    if (NULL == obj)
+    if (!exn_raised())
     {
         TRACE2("jni", "Exception occured, no exception");
     }
     else
     {
-        TRACE2("jni", "Exception occured, class = " << obj->vt()->clss->name->bytes);
+        TRACE2("jni", "Exception occured, class = " << exn_get_name());
     }
     tmn_suspend_enable();
 #endif
@@ -575,10 +614,8 @@ void JNICALL ExceptionDescribe(JNIEnv * UNREF env)
     assert(hythread_is_suspend_enabled());
     if (exn_raised()) {
         tmn_suspend_disable();       //---------------------------------v
-        ManagedObject* exn = get_current_thread_exception();
-        const char *name = exn->vt()->clss->name->bytes;
-        fprintf(stderr, "JNI.ExceptionDescribe: %s:\n", name);
-        exn_print_stack_trace(stderr, exn);
+        fprintf(stderr, "JNI.ExceptionDescribe: %s:\n", exn_get_name());
+        exn_print_stack_trace(stderr, exn_get());
         tmn_suspend_enable();        //---------------------------------^
     }
 } //ExceptionDescribe
@@ -589,17 +626,16 @@ void JNICALL ExceptionClear(JNIEnv * UNREF env)
     assert(hythread_is_suspend_enabled());
     tmn_suspend_disable();
 #ifdef _DEBUG
-    ManagedObject *obj = get_current_thread_exception();
-    if (NULL == obj)
+    if (!exn_raised())
     {
         TRACE2("jni", "Exception clear, no exception");
     }
     else
     {
-        TRACE2("jni", "Exception clear, class = " << obj->vt()->clss->name->bytes);
+        TRACE2("jni", "Exception clear, class = " << exn_get_name());
     }
 #endif
-    clear_current_thread_exception();
+    exn_clear();
     tmn_suspend_enable();
 } //ExceptionClear
 
@@ -660,7 +696,7 @@ jobject JNICALL NewLocalRef(JNIEnv *env, jobject ref)
     if (NULL == h)
     {
         tmn_suspend_enable();
-        exn_raise_only(
+        exn_raise_object(
             (jthrowable)(((JNIEnv_Internal*)env)->vm->vm_env->java_lang_OutOfMemoryError));
         return NULL;
     }
@@ -1108,15 +1144,13 @@ VMEXPORT jmethodID JNICALL FromReflectedMethod(JNIEnv *env, jobject method)
 
     if (clss == VM_Global_State::loader_env->java_lang_reflect_Constructor_Class) 
     {
-        static Method* m = class_lookup_method(clss, "getHandle", "()Ljava/lang/Object;");
-        jobject handle = CallObjectMethodA(env, method, (jmethodID)m, 0);
-        return (jmethodID) reflection_jobject_to_Class_Member(handle, clss);
+        static jmethodID m = (jmethodID)class_lookup_method(clss, "getId", "()J");
+        return (jmethodID) ((POINTER_SIZE_INT) CallLongMethodA(env, method, m, 0));
     } 
     else if (clss == VM_Global_State::loader_env->java_lang_reflect_Method_Class)
     {
-        static Method* m = class_lookup_method(clss, "getHandle", "()Ljava/lang/Object;");
-        jobject handle = CallObjectMethodA(env, method, (jmethodID)m, 0);
-        return (jmethodID) reflection_jobject_to_Class_Member(handle, clss);
+        static jmethodID m = (jmethodID)class_lookup_method(clss, "getId", "()J");
+        return (jmethodID) ((POINTER_SIZE_INT) CallLongMethodA(env, method, m, 0));
     }
     else
         return NULL;
@@ -1129,9 +1163,8 @@ VMEXPORT jfieldID JNICALL FromReflectedField(JNIEnv *env, jobject field)
 
     if (clss == VM_Global_State::loader_env->java_lang_reflect_Field_Class) 
     {
-        static Method* m = class_lookup_method(clss, "getHandle", "()Ljava/lang/Object;");
-        jobject handle = CallObjectMethodA(env, field, (jmethodID)m, 0);
-        return (jfieldID) reflection_jobject_to_Class_Member(handle, clss);
+        static jmethodID m = (jmethodID)class_lookup_method(clss, "getId", "()J");
+        return (jfieldID) ((POINTER_SIZE_INT) CallLongMethodA(env, field, m, 0));
     }
     else
         return NULL;
@@ -1351,15 +1384,12 @@ jdouble gc_double_NEGATIVE_INFINITY = 0;
 
 static void check_for_unexpected_exception(){
     assert(hythread_is_suspend_enabled());
-    tmn_suspend_disable();
-    ManagedObject * exc;
-    if ((exc = get_current_thread_exception())) {
+    if (exn_raised()) {
         fprintf(stderr, "Error initializing java machine\n");
         fprintf(stderr, "Uncaught and unexpected exception\n");
-        print_uncaught_exception_message(stderr, "static initializing", exc);
+        print_uncaught_exception_message(stderr, "static initializing", exn_get());
         vm_exit(1);
     }
-    tmn_suspend_enable();
 }
 
 void global_object_handles_init(){
@@ -1455,7 +1485,7 @@ void global_object_handles_init(){
 #ifdef USE_NATIVE_ISARRAY
     field_name = env->string_pool.lookup("isArray");
     field_descr = env->string_pool.lookup("()Z");
-    gsig_ClassisArray = env->sig_table.lookup(field_name, field_descr);
+    //gsig_ClassisArray = env->sig_table.lookup(field_name, field_descr);
 #endif //#ifndef USE_NATIVE_ISARRAY
     assert(hythread_is_suspend_enabled());
 }

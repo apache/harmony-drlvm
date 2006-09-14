@@ -175,13 +175,6 @@ Java_java_lang_VMClassRegistry_isInstance(JNIEnv *, jclass,
     jclass, jobject);
 
 /*
- * Method: java.lang.VMClassRegistry.isInterface(Ljava/lang/Class;)Z
- */
-JNIEXPORT jboolean JNICALL
-Java_java_lang_VMClassRegistry_isInterface(JNIEnv *, jclass, 
-    jclass);
-
-/*
  * Method: java.lang.VMClassRegistry.isPrimitive(Ljava/lang/Class;)Z
  */
 JNIEXPORT jboolean JNICALL
@@ -209,6 +202,23 @@ JNIEXPORT void JNICALL
 Java_java_lang_VMClassRegistry_loadLibrary(JNIEnv *, jclass, 
     jstring, jobject);
 
+/*
+* Method: java.lang.VMClassRegistry.getEnclosingClass(Ljava/lang/Class;)Ljava/lang/Class;
+*/
+JNIEXPORT jclass JNICALL Java_java_lang_VMClassRegistry_getEnclosingClass
+(JNIEnv *, jclass, jclass);
+
+/*
+* Method: java.lang.VMClassRegistry.getEnclosingMember(Ljava/lang/Class;)Ljava/lang/reflect/Member;
+*/
+JNIEXPORT jobject JNICALL Java_java_lang_VMClassRegistry_getEnclosingMember
+(JNIEnv *, jclass, jclass);
+
+/*
+* Method: java.lang.VMClassRegistry.getSimpleName(Ljava/lang/Class;)Ljava/lang/String;
+*/
+JNIEXPORT jstring JNICALL Java_java_lang_VMClassRegistry_getSimpleName
+(JNIEnv *, jclass, jclass);
 
 #ifdef __cplusplus
 }

@@ -30,11 +30,11 @@
 namespace Jitrino {
 
 class IRManager;
-class FlowGraph;
+class ControlFlowGraph;
 class Inst;
 
 
-DEFINE_OPTPASS(EscapeAnalysisPass)
+//DEFINE_OPTPASS(EscapeAnalysisPass)
 
 //
 // Simple escape analyzer
@@ -77,7 +77,7 @@ class DefUseBuilder {
 public:
     DefUseBuilder(MemoryManager& mm) : memoryManager(mm), defUseTable(mm) {}
 
-    void initialize(FlowGraph& fg);
+    void initialize(ControlFlowGraph& fg);
 
     DefUseLink* getDefUseLinks(Inst* defInst) {
         return defUseTable[defInst];

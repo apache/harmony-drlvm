@@ -28,6 +28,7 @@ Version: $Revision: 1.1.2.7 $
 <project name="extra.jre_libraries">
     <target name="init" >
         <mkdir dir="${build.dir}/_other" />
-         <copy file="${build.VM.home}/vmcore/src/init/bootclasspath.properties" tofile="${build.dir}/_other/bootclasspath.properties"/>
+        <copy file="${build.VM.home}/vmcore/src/init/bootclasspath.properties" tofile="${build.dir}/_other/bootclasspath.properties"/>
+        <fixcrlf srcDir="${build.dir}/_other" includes="bootclasspath.properties" />
     </target>
 </project>

@@ -24,15 +24,15 @@
 // interface to print dot files, you should subclass this class and
 // implement the printBody() method
 //
-#include <stdlib.h>
-#include <fstream>
-#include <iostream>
-#include <streambuf>
-#include <string>
 #include "PrintDotFile.h"
 #include "Inst.h"
 #include "optimizer.h"
 #include "Log.h"
+#include <stdlib.h>
+#include <fstream>
+#include <iostream>
+#include <streambuf>
+
 
 namespace Jitrino {
 
@@ -46,7 +46,7 @@ typedef int int_type;
 class dotbuf : public ::std::streambuf
 {
 public:
-	dotbuf(::std::streambuf* sb) :
+    dotbuf(::std::streambuf* sb) :
       inquotes(false), bracedepth(0), m_sb(sb) {}
 
 protected:
@@ -86,67 +86,37 @@ private:
 class dotstream : public ::std::ostream
 {
 public:
-	dotstream(::std::ostream& out) :
-	  ::std::ostream(&m_buf), m_buf(out.rdbuf()) {}
+    dotstream(::std::ostream& out) :
+      ::std::ostream(&m_buf), m_buf(out.rdbuf()) {}
 
 private:
     dotbuf m_buf;
 };
 
 
-void PrintDotFile::printDotFile(MethodDesc& mh, const char *suffix) {
-    const int name_len = 1024;
-    char filename[name_len];
-    memset(filename, 'a', name_len-1);
-    filename[name_len-1] = '\0';
-    createFileName(mh,filename,suffix);
-    ::std::ofstream fos(filename);
+void PrintDotFile::printDotFile(MethodDesc& mh, const char * suffix) {
+    if (Log::isLogEnabled(LogStream::DOTDUMP)) {
+        if (suffix != 0) {
+            char* fname = Log::makeDotFileName(suffix);
+
+            LogStream logs(fname);
+            printDotFile(mh, logs.out());
+
+            delete [] fname;
+        }
+        else {
+            printDotFile(mh, Log::log(LogStream::DOTDUMP).out());
+        }
+    }
+}
+
+void PrintDotFile::printDotFile(MethodDesc& mh, ::std::ostream& fos) {
     dotstream dos(fos);
     os = &dos;
     printDotHeader(mh);
     printDotBody();
     printDotEnd();
-    fos.close();
 }
-
-void PrintDotFile::createFileName(MethodDesc& mh, char* filename,const char *suffix) {
-    //
-    // create "className::methodNameAndSignature.suffix.dot" in the current dot file directory,
-    // add method's signature later
-    //
-	const char *type_name = mh.getParentType()->getName();
-	const char *meth_name = mh.getName();
-	const char *sgnt_name = mh.getSignatureString();
-	const char *dot_file_dir = Log::getDotFileDirName();
-	assert(dot_file_dir != NULL);
-	const uint32 buf_len = 1024;
-	char buf[buf_len];
-
-#ifndef NDEBUG
-	uint32 len = strlen(type_name) + strlen(meth_name) +
-		strlen(sgnt_name) + strlen(suffix) + strlen(dot_file_dir);
-	assert(len < strlen(filename) - 16  /* all the dots and count */);
-	assert(buf_len > len);
-#endif
-
-    /*if (optimizerFlags.number_dots) {
-        ++count;
-        sprintf(buf, "%s.%s%s.%d.%s.dot",
-                type_name,
-                meth_name,
-                sgnt_name,
-                count,
-                suffix);
-    } else {*/
-        sprintf(buf, "%s.%s%s.%s.dot",
-                type_name,
-                meth_name,
-                sgnt_name,
-                suffix);
-    //}
-    Log::fixFileName(buf);
-    sprintf(filename, "%s/%s", dot_file_dir, buf);
-};
 
 void PrintDotFile::printDotHeader(MethodDesc& mh) {
     *os << "digraph dotgraph {" << ::std::endl

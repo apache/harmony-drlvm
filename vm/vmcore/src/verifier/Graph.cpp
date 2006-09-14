@@ -575,6 +575,7 @@ vf_Graph::DumpGraph( vf_Context_t *ctex )   // verifier context
     VERIFY_DEBUG( "Method: " << class_get_name( ctex->m_class ) << "::"
         << method_get_name( ctex->m_method )
         << method_get_descriptor( ctex->m_method ) << endl );
+    VERIFY_DEBUG( "-- start --" );
     for( unsigned index = 0; index < GetNodeNumber(); index++ ) {
         DumpNode( index, ctex );
     }
@@ -609,13 +610,14 @@ vf_Graph::DumpNode( unsigned num,           // graph node number
     } else if( vf_is_instruction_has_flags( &ctex->m_code[m_node[num].m_start],
                                             VF_FLAG_END_ENTRY ) )
     { // end node
-        VERIFY_DEBUG( "node[" << num << "]: " << m_node[num].m_start << "[-] end\n" );
+        VERIFY_DEBUG( "node[" << num << "]: " << m_node[num].m_start << "[-] end" );
+        VERIFY_DEBUG( "-- end --" );
     } else if( vf_is_instruction_has_flags( &ctex->m_code[m_node[num].m_start],
                                             VF_FLAG_HANDLER ) )
     { // handler node
         VERIFY_DEBUG( "node[" << num << "]: " << num << "handler entry" );
     } else { // another nodes
-        DumpNodeInternal( num, "\n", "\n", cerr, ctex );
+        DumpNodeInternal( num, ctex );
     }
 
     // print node outcoming edges
@@ -635,15 +637,12 @@ vf_Graph::DumpNode( unsigned num,           // graph node number
  */
 void
 vf_Graph::DumpNodeInternal( unsigned num,           // graph node number
-                            char *next_node,        // separator between nodes in stream
-                            char *next_instr,       // separator between intructions in stream
-                            ostream &out,           // output stream
                             vf_Context_t *ctex)     // verifier context
 {
 #if _VERIFY_DEBUG
     // print node header
-    out << "Node #" << num << next_node
-        << "Stack mod: " << m_node[num].m_stack << next_node;
+    VERIFY_DEBUG( "Node #" << num );
+    VERIFY_DEBUG( "Stack mod: " << m_node[num].m_stack );
 
     // get code instructions
     unsigned count = m_node[num].m_end - m_node[num].m_start + 1;
@@ -651,9 +650,9 @@ vf_Graph::DumpNodeInternal( unsigned num,           // graph node number
 
     // print node instructions
     for( unsigned index = 0; index < count; index++, instr++ ) {
-        out << index << ": " << ((instr->m_stack < 0) ? "[" : "[ ")
+        VERIFY_DEBUG( index << ": " << ((instr->m_stack < 0) ? "[" : "[ ")
             << instr->m_stack << "| " << instr->m_minstack << "] "
-            << vf_opcode_names[*(instr->m_addr)] << next_instr;
+            << vf_opcode_names[*(instr->m_addr)] );
     }
 #endif // _VERIFY_DEBUG
     return;
@@ -861,7 +860,6 @@ vf_create_graph( vf_Context_t *ctex )   // verifier context
              nodeCount,
              handlcount,
              *code2node;
-    unsigned char *last_instr;
     vf_Code_t *code,
                *codeInstr;
     vf_Graph_t *vGraph;
@@ -870,8 +868,8 @@ vf_create_graph( vf_Context_t *ctex )   // verifier context
     /** 
      * Get context
      */
-    last_instr = method_get_bytecode( ctex->m_method )
-                 + method_get_code_length( ctex->m_method ) - 1;
+    unsigned char* code_end = method_get_bytecode( ctex->m_method )
+                 + method_get_code_length( ctex->m_method );
     handlcount = method_get_exc_handler_number( ctex->m_method );
     code = ctex->m_code;
     codeNum = ctex->m_codeNum;
@@ -916,7 +914,7 @@ vf_create_graph( vf_Context_t *ctex )   // verifier context
         }
     }
     // set last node with code segment
-    len = last_instr - code[last].m_addr;
+    len = code_end - code[last].m_addr;
     vGraph->SetNode( nodeCount, last, index - 1, len );
     vGraph->SetNodeStackModifier( nodeCount, 
         vf_get_node_stack_deep( &code[last], &code[index - 1] ) );

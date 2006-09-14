@@ -25,6 +25,7 @@
 
 #include "MemoryManager.h"
 #include "Stack.h"
+#include "FlowGraph.h"
 #include "HashTable.h"
 #include "Dominator.h"
 #include "optpass.h"
@@ -35,10 +36,6 @@ class DomFrontier;
 class SparseOpndMap;
 struct OptimizerFlags;
 
-DEFINE_OPTPASS(SSAPass)
-DEFINE_OPTPASS(DeSSAPass)
-DEFINE_OPTPASS(SplitSSAPass)
-DEFINE_OPTPASS(FixupVarsPass)
 
 //
 // There is a VarDefSites for each var that records all CFG nodes in which 
@@ -49,26 +46,26 @@ class VarDefSites {
 public:
     VarDefSites(MemoryManager& m, uint32 max) 
     : stack(m), alreadyRecorded(m, max), insertedPhi(m, max) {}
-    void addDefSite(CFGNode* node) {
+    void addDefSite(Node* node) {
         // avoid pushing the same node twice onto the stack
         if (alreadyRecorded.getBit(node->getDfNum()))
             return;
         alreadyRecorded.setBit(node->getDfNum(),true);
         stack.push(node);
     }
-    CFGNode* removeDefSite() {return stack.pop();}
-    void insertPhiSite(CFGNode* node) {
+    Node* removeDefSite() {return stack.pop();}
+    void insertPhiSite(Node* node) {
         insertedPhi.setBit(node->getDfNum(), true);
         addDefSite(node);
     }
-    bool beenInsertedPhi(CFGNode* node) {
+    bool beenInsertedPhi(Node* node) {
         return insertedPhi.getBit(node->getDfNum());
     }
-    bool isDefSite(CFGNode* node) {
+    bool isDefSite(Node* node) {
         return alreadyRecorded.getBit(node->getDfNum());
     }
 private:
-    Stack<CFGNode> stack;
+    Stack<Node> stack;
     BitSet         alreadyRecorded; // def sites (blocks) been recorded
     BitSet         insertedPhi;     // blocks that have been inserted phi 
 };
@@ -79,7 +76,7 @@ private:
 class DefSites {
 public:
     DefSites(MemoryManager& m, uint32 n) : table(m,32), mm(m), numNodes(n) {}
-    void addVarDefSite(VarOpnd* var, CFGNode* node) {
+    void addVarDefSite(VarOpnd* var, Node* node) {
         if (var == NULL) return;
 
         VarDefSites* varSites = table.lookup(var);
@@ -100,29 +97,29 @@ class RenameStack;
 
 class SSABuilder {
 public:
-    SSABuilder(OpndManager& om, InstFactory& factory, DomFrontier& df, FlowGraph* f, OptimizerFlags& optFlags) 
+    SSABuilder(OpndManager& om, InstFactory& factory, DomFrontier& df, ControlFlowGraph* f, const OptimizerFlags& optFlags) 
     : instFactory(factory), frontier(df), opndManager(om), fg(f), createPhi(false), optimizerFlags(optFlags) {}
     bool convertSSA(MethodDesc& methodDesc);
     bool fixupSSA(MethodDesc& methodDesc, bool useBetterAlg);
-    bool fixupVars(FlowGraph* fg, MethodDesc& methodDesc);
-    static void deconvertSSA(FlowGraph* fg,OpndManager& opndManager);
-    static void splitSsaWebs(FlowGraph* fg,OpndManager& opndManager);
+    bool fixupVars(ControlFlowGraph* fg, MethodDesc& methodDesc);
+    static void deconvertSSA(ControlFlowGraph* fg,OpndManager& opndManager);
+    static void splitSsaWebs(ControlFlowGraph* fg,OpndManager& opndManager);
 private:
     void findDefSites(DefSites& allDefSites);
     void insertPhi(DefSites& allDefSites);
-    void createPhiInst(VarOpnd* var, CFGNode* insertedLoc);
+    void createPhiInst(VarOpnd* var, Node* insertedLoc);
     void addPhiSrc(PhiInst* i, SsaVarOpnd* src);
     void renameNode(RenameStack *rs, DominatorNode* dt,
                     const StlVectorSet<VarOpnd *> *whatVars);
-    void clearPhiSrcs(CFGNode *, const StlVectorSet<VarOpnd *> *whatVars);
-    void clearPhiSrcs2(CFGNode *, 
+    void clearPhiSrcs(Node *, const StlVectorSet<VarOpnd *> *whatVars);
+    void clearPhiSrcs2(Node *, 
                        const StlVectorSet<VarOpnd *> *whatVars,
                        StlVector<VarOpnd *> *changedVars,
                        const StlVectorSet<Opnd *> *removedVars,
-                       StlVector<CFGNode *> &scratchNodeList);
-    bool checkForTrivialPhis(CFGNode *, 
+                       StlVector<Node *> &scratchNodeList);
+    bool checkForTrivialPhis(Node *, 
                              StlVector<VarOpnd *> &changedVars);
-    void checkForTrivialPhis2(CFGNode *node, 
+    void checkForTrivialPhis2(Node *node, 
                               const StlVectorSet<VarOpnd *> *lookatVars,
                               StlVector<VarOpnd *> *changedVars,
                               StlVector<Opnd *> *removedVars);
@@ -130,9 +127,9 @@ private:
     InstFactory& instFactory;
     DomFrontier& frontier;
     OpndManager& opndManager;
-    FlowGraph*   fg;
+    ControlFlowGraph*   fg;
     bool         createPhi;
-    OptimizerFlags& optimizerFlags;
+    const OptimizerFlags& optimizerFlags;
 
     friend class ClearPhiSrcsWalker;
     friend class CheckForTrivialPhisWalker;

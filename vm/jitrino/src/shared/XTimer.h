@@ -25,6 +25,7 @@
 
 #include "Counter.h"
 #include "open/types.h" //typedef unsigned long long in64;
+#include <vector>
 
 
 namespace Jitrino 
@@ -35,22 +36,22 @@ class XTimer
 {
 public:
 
-	XTimer ()									:  totalTime(0), state(0) {}
+    XTimer ()                                   :  totalTime(0), state(0) {}
 
-	static void initialize (bool on);
+    static void initialize (bool on);
 
-	void reset ();
-	void start ();
-	void  stop ();
-	int64  getTotal   () const					{return totalTime;}
-	double getSeconds () const;
+    void reset ();
+    void start ();
+    void  stop ();
+    int64  getTotal   () const                  {return totalTime;}
+    double getSeconds () const;
 
-	//static double getFrequency ();	
+    //static double getFrequency ();    
 
 protected:
 
     int64 startTime,
-		  totalTime;
+          totalTime;
     int   state;
 };
 
@@ -59,10 +60,10 @@ class CountTime : public CounterBase, public XTimer
 {
 public:
 
-	CountTime (const char* s)					: CounterBase(s) {}
-	virtual ~CountTime ()						{}
+    CountTime (const char* name)                : CounterBase(name) {}
+    virtual ~CountTime ()                       {}
 
-	/*virtual*/void write (CountWriter& logs)	{logs.write(key, getSeconds());}
+    /*virtual*/void write (CountWriter& logs)   {logs.write(key, getSeconds());}
 };
 
 
@@ -70,12 +71,22 @@ class AutoTimer
 {
 public:
 
-	AutoTimer (CountTime& c)					:counter(c) {counter.start();}
-	~AutoTimer ()								{counter.stop();}
+    AutoTimer (CountTime& c)                    :counter(c) {counter.start();}
+    ~AutoTimer ()                               {counter.stop();}
 
 protected:
 
-	CountTime& counter;
+    CountTime& counter;
+};
+
+
+struct SummTimes : public std::vector<std::pair<const char*, double> >, public CounterBase
+{
+    SummTimes (const char* name)                : CounterBase(name) {}
+
+    void add (const char* key, double seconds);
+
+    /*virtual*/void write  (CountWriter&);
 };
 
 

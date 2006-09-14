@@ -56,6 +56,12 @@ void m2n_set_last_frame(M2nFrame* lm2nf)
     p_TLS_vmthread->last_m2n_frame = lm2nf;
 }
 
+VMEXPORT
+void m2n_set_last_frame(VM_thread* thread, M2nFrame* lm2nf)
+{
+    thread->last_m2n_frame = lm2nf;
+}
+
 VMEXPORT // temporary solution for interpreter unplug
 M2nFrame* m2n_get_previous_frame(M2nFrame* lm2nf)
 {
@@ -101,19 +107,40 @@ void m2n_set_frame_type(M2nFrame* m2nf, frame_type m2nf_type) {
     m2nf->current_frame_type = m2nf_type;
 }
 
-M2nFrame* m2n_push_suspended_frame(Registers* regs)
+size_t m2n_get_size() {
+    return sizeof(M2nFrame);
+}
+
+void m2n_push_suspended_frame(M2nFrame* m2nf, Registers* regs)
 {
-    M2nFrame* m2nf = (M2nFrame*)STD_MALLOC(sizeof(M2nFrame));
+    m2n_push_suspended_frame(p_TLS_vmthread, m2nf, regs);
+}
+
+void m2n_push_suspended_frame(VM_thread* thread, M2nFrame* m2nf, Registers* regs)
+{
     assert(m2nf);
     m2nf->p_lm2nf = (M2nFrame**)1;
     m2nf->method = NULL;
     m2nf->local_object_handles = NULL;
+    m2nf->current_frame_type = FRAME_UNKNOWN;
 
     m2nf->eip  = regs->eip;
     m2nf->regs = regs;
 
-    m2nf->prev_m2nf = m2n_get_last_frame();
-    m2n_set_last_frame(m2nf);
+    m2nf->prev_m2nf = m2n_get_last_frame(thread);
+    m2n_set_last_frame(thread, m2nf);
+}
+
+M2nFrame* m2n_push_suspended_frame(Registers* regs)
+{
+    return m2n_push_suspended_frame(p_TLS_vmthread, regs);
+}
+
+M2nFrame* m2n_push_suspended_frame(VM_thread* thread, Registers* regs)
+{
+    M2nFrame* m2nf = (M2nFrame*)STD_MALLOC(sizeof(M2nFrame));
+    assert(m2nf);
+    m2n_push_suspended_frame(thread, m2nf, regs);
     return m2nf;
 }
 

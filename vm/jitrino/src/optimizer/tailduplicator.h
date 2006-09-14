@@ -32,12 +32,9 @@ class DominatorTree;
 class DominatorNode;
 class LoopTree;
 class DefUseBuilder;
-class CFGNode;
+class Node;
 class BranchInst;
 
-DEFINE_OPTPASS(RedundantBranchMergingPass)
-
-DEFINE_OPTPASS(HotPathSplittingPass)
 
 class TailDuplicator {
 public:
@@ -49,8 +46,8 @@ public:
 private:
     bool isMatchingBranch(BranchInst* br1, BranchInst* br2);
     void process(DefUseBuilder& defUses, DominatorNode* dnode);
-    void tailDuplicate(DefUseBuilder& defUses, CFGNode* idom, CFGNode* tail);
-    void profileGuidedTailDuplicate(LoopTree* ltree, DefUseBuilder& defUses, CFGNode* node);
+    void tailDuplicate(DefUseBuilder& defUses, Node* idom, Node* tail);
+    void profileGuidedTailDuplicate(LoopTree* ltree, DefUseBuilder& defUses, Node* node);
 
     IRManager& _irm;
     DominatorTree* _dtree;

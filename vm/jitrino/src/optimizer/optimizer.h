@@ -27,109 +27,79 @@
 
 namespace Jitrino {
 
-class CompilationInterface;
-class CompilationContext;
-class IRManager;
-
-bool optimize(IRManager& irManager); // returns success or failure
-
-class JitrinoParameterTable;
-
-void readOptimizerFlagsFromCommandLine(CompilationContext* compilationContext);
-void showOptimizerFlagsFromCommandLine();
+struct MemoptFlags;
+struct AbcdFlags;
+struct GcmFlags;
+struct SyncOptFlags;
+struct LoopBuilderFlags;
 
 struct OptimizerFlags {
-    const char* noopt_path;
-    const char* static_path;
-    const char* dpgo1_path;
-    const char* dpgo2_path;
     
-    const char* inline_path;
-    bool meta_optimize;
-    const char* dump_paths;
-
-    bool skip;
-    bool fast_phase1;
-    bool skip_phase1;
+    //global optimizer flags
     bool dumpdot;
-    bool build_loops;
-    bool do_ssa;
-    bool globals_span_loops;
-    bool do_abcd;
-    bool do_inline;
-    uint32 inline_n;
-    bool do_guarded_devirtualization;
-    bool do_unguard;
-    bool do_peeling;
-    bool elim_cmp3;
-    bool elim_checks;
-    bool do_lower;
-    bool use_profile;
-    bool do_latesimplify;
-    bool use_mulhi;
-    bool lower_divconst;
-    bool do_gcm;
-    bool do_gvn;
-    bool ia32_code_gen;
+
     bool cse_final;
-    bool no_simplify;
-    bool no_hvn;
-    bool do_tail_duplication;
-    bool do_profile_tail_duplication;
-    bool do_early_profile_tail_duplication;
-    bool prune_untaken_edges;
-    uint32 profile_unguarding_level;
-    uint32 profile_threshold;
-    bool check_profile_threshold;
-    bool use_average_threshold;
-    bool use_minimum_threshold;
-    bool use_fixed_threshold;
-    bool do_profile_redundancy_elimination;
-    bool do_prefetching;
-    bool do_memopt;
-    bool brm_debug;
-    bool fixup_ssa;
-    bool number_dots;
-    bool do_sxt;
-    bool do_reassoc;
-    bool do_reassoc_depth;
-    bool do_reassoc_depth2;
-    bool do_prof_red2;
-    bool dce2;
-    bool do_redstore;
-    bool do_syncopt;
-    bool keep_empty_nodes_after_syncopt;
-    bool do_syncopt2;
-    bool do_prof_red2_latesimplify;
-    bool gc_build_var_map;
-    bool reduce_compref;
-    bool split_ssa;
-    bool better_ssa_fixup;
-    bool count_ssa_fixup;
-    bool hvn_exceptions;
-    bool sink_constants;
-    bool sink_constants1;
-    bool gvn_exceptions;
-    bool gvn_aggressive;
-    bool do_reassoc_compref;
+
     uint32 hash_init_factor;
     uint32 hash_resize_factor;
     uint32 hash_resize_to;
     uint32 hash_node_var_factor;
     uint32 hash_node_tmp_factor;
     uint32 hash_node_constant_factor;
+
+    bool sink_constants;
+    bool sink_constants1;
+
+    //simplifier flags
+    bool elim_cmp3;
+    bool use_mulhi;
+    bool lower_divconst;
+    bool ia32_code_gen;
+    bool do_sxt;
+    bool reduce_compref;
+
+
+    //hvn flag
+    bool elim_checks;
+    bool gvn_exceptions;
+    bool gvn_aggressive;
+    bool hvn_exceptions;
     bool hvn_constants;
-    bool simplify_taus;
-    bool early_memopt;
-    bool early_memopt_prof;
-    bool no_peel_inlined;
-    bool hvn_inlined;
-    bool memopt_inlined;
-    bool type_check;
-    bool use_pattern_table2;
-    bool use_fixup_vars;
-    bool pass_profile_to_cg;
-    bool do_lazyexc;
+
+
+    //profiler flags
+    uint32 profile_threshold;
+    bool use_average_threshold;
+    bool use_minimum_threshold;
+    bool use_fixed_threshold;
+
+    //dce flags
+    bool fixup_ssa;
+    bool dce2;
+    bool preserve_critical_edges;
+    
+
+    //ssa
+    bool better_ssa_fixup;
+
+    //statprof
+    bool statprof_do_loop_heuristics_override;
+    const char* statprof_heuristics;
+
+    //gc-mptr-analyzer
+    bool gc_build_var_map;
+
+    //devirt
+    bool devirt_skip_cold_targets;
+    bool devirt_do_aggressive_guarded_devirtualization;
+    bool devirt_devirt_use_cha;
+    bool devirt_devirt_skip_exception_path;
+
+    AbcdFlags*              abcdFlags;
+    GcmFlags*               gcmFlags;
+    MemoptFlags*            memOptFlags;
+    SyncOptFlags*           syncOptFlags;
+    LoopBuilderFlags*       loopBuilderFlags;    
 };
 
 } //namespace Jitrino 

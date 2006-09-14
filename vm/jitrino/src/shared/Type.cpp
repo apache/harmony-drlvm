@@ -31,7 +31,7 @@ uint32 Type::nextTypeId = 1;
 
 bool Type::mayAlias(TypeManager* typeManager, Type* t1, Type* t2)
 {
-	assert(t1 && t2);
+    assert(t1 && t2);
     t1 = t1->getNonValueSupertype();
     t2 = t2->getNonValueSupertype();
     if (t1==t2) return true;
@@ -106,9 +106,9 @@ Type* TypeManager::getPrimitiveType(Type::Tag t)
     case Type::IntPtr:  return getIntPtrType();
     case Type::UIntPtr: return getUIntPtrType();
     case Type::Void: return getVoidType();
-    case Type::Tau:		return getTauType();
-    case Type::Boolean:	return getBooleanType();
-    case Type::Char:	return getCharType();
+    case Type::Tau:     return getTauType();
+    case Type::Boolean: return getBooleanType();
+    case Type::Char:    return getCharType();
     default:            assert(0); return NULL;
     }
 }
@@ -128,12 +128,14 @@ Type* TypeManager::toInternalType(Type* t)
     case Type::Double:
     case Type::Float:
     case Type::SystemObject:
+    case Type::SystemClass:
     case Type::SystemString:
     case Type::NullObject:
     case Type::Array:
     case Type::Object:
     case Type::ManagedPtr:
     case Type::CompressedSystemObject:
+    case Type::CompressedSystemClass:
     case Type::CompressedSystemString:
     case Type::CompressedNullObject:
     case Type::CompressedArray:
@@ -167,6 +169,9 @@ bool TypeManager::isSubTypeOf(Type *type1, Type *type2) {
     if (oneIsCompressed != twoIsCompressed) return false;
 
     switch (type1->tag) {
+    case Type::SystemClass:
+        // java/lang/class has only one ancestor - java/lang/Object
+        return type2->tag == Type::SystemObject;
     case Type::SystemString:
     case Type::Object:
     object_type:
@@ -295,12 +300,14 @@ TypeManager::TypeManager(MemoryManager& mm) :
     typedReference(Type::TypedReference),
     theSystemStringType(NULL), 
     theSystemObjectType(NULL),
+    theSystemClassType(NULL),
     nullObjectType(Type::NullObject), 
     offsetType(Type::Offset),
     offsetPlusHeapbaseType(Type::OffsetPlusHeapbase),
 
     compressedSystemStringType(NULL), 
     compressedSystemObjectType(NULL),
+    compressedSystemClassType(NULL),
     compressedNullObjectType(Type::CompressedNullObject), 
 
     userValueTypes(mm,32), 
@@ -346,7 +353,7 @@ TypeManager::initBuiltinType(Type::Tag tag) {
 
 void
 TypeManager::init(CompilationInterface &compInt) {
-	init();
+    init();
     areReferencesCompressed = compInt.areReferencesCompressed();
 }
 
@@ -355,19 +362,26 @@ TypeManager::init() {
     areReferencesCompressed = false;
     void* systemStringVMTypeHandle = getSystemStringVMTypeHandle();
     void* systemObjectVMTypeHandle = getSystemObjectVMTypeHandle();
+    void* systemClassVMTypeHandle  = getSystemClassVMTypeHandle();
     theSystemStringType = new (memManager) 
         ObjectType(Type::SystemString,systemStringVMTypeHandle,*this);
     theSystemObjectType = new (memManager) 
         ObjectType(Type::SystemObject,systemObjectVMTypeHandle,*this);
+    theSystemClassType = new (memManager) 
+        ObjectType(Type::SystemClass,systemClassVMTypeHandle,*this);
     userObjectTypes.insert(systemStringVMTypeHandle,theSystemStringType);
     userObjectTypes.insert(systemObjectVMTypeHandle,theSystemObjectType);
+    userObjectTypes.insert(systemClassVMTypeHandle,theSystemClassType);
 
     compressedSystemStringType = new (memManager) 
         ObjectType(Type::CompressedSystemString,systemStringVMTypeHandle,*this);
     compressedSystemObjectType = new (memManager) 
         ObjectType(Type::CompressedSystemObject,systemObjectVMTypeHandle,*this);
+    compressedSystemClassType = new (memManager) 
+        ObjectType(Type::CompressedSystemClass,systemClassVMTypeHandle,*this);
     compressedUserObjectTypes.insert(systemStringVMTypeHandle,compressedSystemStringType);
     compressedUserObjectTypes.insert(systemObjectVMTypeHandle,compressedSystemObjectType);
+    compressedUserObjectTypes.insert(systemClassVMTypeHandle,compressedSystemClassType);
 
     tauType = new (memManager) Type(Type::Tau);
     voidType = new (memManager) Type(Type::Void);
@@ -412,7 +426,7 @@ TypeManager::getArrayType(Type* elemType, bool isCompressed, void* arrayVMTypeHa
             type = new (memManager) 
                 ArrayType(elemNamedType,arrayVMTypeHandle,*this, isCompressed);
             if (type->getAllocationHandle()!=0) { // type is resolved
-				lookupTable.insert(elemNamedType,type);
+                lookupTable.insert(elemNamedType,type);
             }
         }
         return type;
@@ -427,7 +441,7 @@ TypeManager::getObjectType(void* vmTypeHandle, bool isCompressed) {
         void* elemClassHandle = getArrayElemVMTypeHandle(vmTypeHandle);
         assert(elemClassHandle != NULL); 
         NamedType* elemType;
-        if (isArrayOfUnboxedElements(vmTypeHandle)) {
+        if (isArrayOfPrimitiveElements(vmTypeHandle)) {
             elemType = getValueType(elemClassHandle);
         } else {
             elemType = getObjectType(elemClassHandle, areReferencesCompressed);
@@ -479,6 +493,12 @@ bool
 NamedType::needsInitialization(){
     return typeManager.needsInitialization(vmTypeHandle);
 }
+
+bool    
+NamedType::isFinalizable(){
+    return typeManager.isFinalizable(vmTypeHandle);
+}
+
 bool    
 NamedType::isBeforeFieldInit() {
     return typeManager.isBeforeFieldInit(vmTypeHandle);
@@ -549,6 +569,8 @@ TypeManager::uncompressType(Type *compRefType)
         }
     case Type::CompressedSystemObject:
         return getSystemObjectType();
+    case Type::CompressedSystemClass:
+        return getSystemClassType();
     case Type::CompressedSystemString:
         return getSystemStringType();
     case Type::CompressedObject:
@@ -578,6 +600,8 @@ TypeManager::compressType(Type *uncompRefType)
         }
     case Type::SystemObject:
         return getCompressedSystemObjectType();
+    case Type::SystemClass:
+        return getCompressedSystemClassType();
     case Type::SystemString:
         return getCompressedSystemStringType();
     case Type::Object:
@@ -724,6 +748,7 @@ void    Type::print(::std::ostream& os) {
     case TypedReference:   s = "typedref"; break;
     case Value:            s = "value"; break;
     case SystemObject:     s = "object"; break;
+    case SystemClass:      s = "class"; break;
     case SystemString:     s = "string"; break;
     case Array:            s = "[]"; break;
     case Object:           s = "object"; break;
@@ -735,6 +760,7 @@ void    Type::print(::std::ostream& os) {
     case MethodPtr:        s = "method"; break;
     case VTablePtr:        s = "vtable"; break;
     case CompressedSystemObject:     s = "cmpobject"; break;
+    case CompressedSystemClass:      s = "cmpclass"; break;
     case CompressedSystemString:     s = "cmpstring"; break;
     case CompressedArray:            s = "cmp[]"; break;
     case CompressedObject:           s = "cmpo"; break;
@@ -855,6 +881,7 @@ Type::getPrintString(Tag t) {
     case TypedReference:  s = "trf"; break;
     case Value:           s = "val"; break;
     case SystemObject:    s = "obj"; break;
+    case SystemClass:     s = "cls"; break;
     case SystemString:    s = "str"; break;
     case NullObject:      s = "nul"; break;
     case Offset:          s = "off"; break;
@@ -866,6 +893,7 @@ Type::getPrintString(Tag t) {
     case MethodPtr:       s = "fun"; break;
     case VTablePtr:       s = "vtb"; break;
     case CompressedSystemObject:    s = "cob"; break;
+    case CompressedSystemClass:     s = "ccl"; break;
     case CompressedSystemString:    s = "cst"; break;
     case CompressedNullObject:      s = "cnl"; break;
     case CompressedArray:           s = "c[]"; break;
@@ -927,6 +955,7 @@ Type* TypeManager::convertToOldType(Type* t)
     case Type::Offset:
     case Type::OffsetPlusHeapbase:
     case Type::SystemObject:
+    case Type::SystemClass:
     case Type::SystemString:
     case Type::NullObject:
     case Type::Array:
@@ -934,6 +963,7 @@ Type* TypeManager::convertToOldType(Type* t)
     case Type::BoxedValue:
     case Type::VTablePtr:
     case Type::CompressedSystemObject:
+    case Type::CompressedSystemClass:
     case Type::CompressedSystemString:
     case Type::CompressedNullObject:
     case Type::CompressedArray:
@@ -994,117 +1024,119 @@ Type* TypeManager::convertToOldType(Type* t)
 /*
 The following structure and array contain a mapping between Type::Tag and its string representation. 
 The array must be
-	ordered by Tag
-	must cover all available Tag-s
+    ordered by Tag
+    must cover all available Tag-s
 The 'tag; field exists only in debug build and is excluded from the release 
 bundle. It's used to control whether the array is arranged properly.
 */
 #ifdef _DEBUG
-#define DECL_TAG_ITEM(tag, printout)	{ Type::tag, #tag, printout }
+#define DECL_TAG_ITEM(tag, printout)    { Type::tag, #tag, printout }
 #else
-	#define DECL_TAG_ITEM(tag, printout)	{ #tag, printout }
+    #define DECL_TAG_ITEM(tag, printout)    { #tag, printout }
 #endif
 
 static const struct {
 #ifdef _DEBUG
-	Type::Tag		tag;
+    Type::Tag       tag;
 #endif
-	const char *	name;
-	// the [5] has no special meaning. That was the max number of 
-	// chars used in the existing code, so I decided to keep the 5. 
-	// it's ok to increae it if neccessary.
-	char		print_name[5];
+    const char *    name;
+    // the [5] has no special meaning. That was the max number of 
+    // chars used in the existing code, so I decided to keep the 5. 
+    // it's ok to increae it if neccessary.
+    char        print_name[5];
 }
 type_tag_names[] = {
 
-	DECL_TAG_ITEM(Tau, "tau "),
-	DECL_TAG_ITEM(Void, "v   "),
-	DECL_TAG_ITEM(Boolean, "b   "),
-	DECL_TAG_ITEM(Char, "chr "),
+    DECL_TAG_ITEM(Tau, "tau "),
+    DECL_TAG_ITEM(Void, "v   "),
+    DECL_TAG_ITEM(Boolean, "b   "),
+    DECL_TAG_ITEM(Char, "chr "),
 
-	DECL_TAG_ITEM(IntPtr, "i   "),
-	DECL_TAG_ITEM(Int8, "i1  "),
-	DECL_TAG_ITEM(Int16, "i2  "),
-	DECL_TAG_ITEM(Int32, "i4  "),
-	DECL_TAG_ITEM(Int64, "i8  "),
-	DECL_TAG_ITEM(UIntPtr, "u   "),
+    DECL_TAG_ITEM(IntPtr, "i   "),
+    DECL_TAG_ITEM(Int8, "i1  "),
+    DECL_TAG_ITEM(Int16, "i2  "),
+    DECL_TAG_ITEM(Int32, "i4  "),
+    DECL_TAG_ITEM(Int64, "i8  "),
+    DECL_TAG_ITEM(UIntPtr, "u   "),
 
-	DECL_TAG_ITEM(UInt8, "u1  "),
-	DECL_TAG_ITEM(UInt16, "u2  "),
-	DECL_TAG_ITEM(UInt32, "u4  "),
-	DECL_TAG_ITEM(UInt64, "u8  "),
+    DECL_TAG_ITEM(UInt8, "u1  "),
+    DECL_TAG_ITEM(UInt16, "u2  "),
+    DECL_TAG_ITEM(UInt32, "u4  "),
+    DECL_TAG_ITEM(UInt64, "u8  "),
 
-	DECL_TAG_ITEM(Single, "r4  "),
-	DECL_TAG_ITEM(Double, "r8  "),
-	DECL_TAG_ITEM(Float, "r  "),
+    DECL_TAG_ITEM(Single, "r4  "),
+    DECL_TAG_ITEM(Double, "r8  "),
+    DECL_TAG_ITEM(Float, "r  "),
 
-	DECL_TAG_ITEM(TypedReference, "trf "),
-	DECL_TAG_ITEM(Value, "val"),
+    DECL_TAG_ITEM(TypedReference, "trf "),
+    DECL_TAG_ITEM(Value, "val"),
 
-	DECL_TAG_ITEM(Offset, "off "),
-	DECL_TAG_ITEM(OffsetPlusHeapbase, "ohb "),
+    DECL_TAG_ITEM(Offset, "off "),
+    DECL_TAG_ITEM(OffsetPlusHeapbase, "ohb "),
 
-	DECL_TAG_ITEM(SystemObject, "obj "),
-	DECL_TAG_ITEM(SystemString, "str "),
-	DECL_TAG_ITEM(NullObject, "nul "),
-	DECL_TAG_ITEM(Array, "[]  "),
-	DECL_TAG_ITEM(Object, "o   "),
-	DECL_TAG_ITEM(BoxedValue, "bval"),
+    DECL_TAG_ITEM(SystemObject, "obj "),
+    DECL_TAG_ITEM(SystemClass,  "cls "),
+    DECL_TAG_ITEM(SystemString, "str "),
+    DECL_TAG_ITEM(NullObject, "nul "),
+    DECL_TAG_ITEM(Array, "[]  "),
+    DECL_TAG_ITEM(Object, "o   "),
+    DECL_TAG_ITEM(BoxedValue, "bval"),
 
-	DECL_TAG_ITEM(UnmanagedPtr, "*   "),
-	DECL_TAG_ITEM(ManagedPtr, "&   "),
-	DECL_TAG_ITEM(MethodPtr, "fun "),
-	DECL_TAG_ITEM(VTablePtr, "vtb "),
+    DECL_TAG_ITEM(UnmanagedPtr, "*   "),
+    DECL_TAG_ITEM(ManagedPtr, "&   "),
+    DECL_TAG_ITEM(MethodPtr, "fun "),
+    DECL_TAG_ITEM(VTablePtr, "vtb "),
 
-	DECL_TAG_ITEM(CompressedSystemObject, "cob "),
-	DECL_TAG_ITEM(CompressedSystemString, "cst "),
-	DECL_TAG_ITEM(CompressedNullObject, "cnl "),
-	DECL_TAG_ITEM(CompressedArray, "c[] "),
-	DECL_TAG_ITEM(CompressedObject, "co  "),
+    DECL_TAG_ITEM(CompressedSystemObject, "cob "),
+    DECL_TAG_ITEM(CompressedSystemClass,  "ccl "),
+    DECL_TAG_ITEM(CompressedSystemString, "cst "),
+    DECL_TAG_ITEM(CompressedNullObject, "cnl "),
+    DECL_TAG_ITEM(CompressedArray, "c[] "),
+    DECL_TAG_ITEM(CompressedObject, "co  "),
 
-	DECL_TAG_ITEM(CompressedMethodPtr, "cfun"),
-	DECL_TAG_ITEM(CompressedVTablePtr, "cvtb"),
-	DECL_TAG_ITEM(OrNull, "ornl"),
+    DECL_TAG_ITEM(CompressedMethodPtr, "cfun"),
+    DECL_TAG_ITEM(CompressedVTablePtr, "cvtb"),
+    DECL_TAG_ITEM(OrNull, "ornl"),
 
-	DECL_TAG_ITEM(VTablePtrObj, "vtb "),
-	DECL_TAG_ITEM(ITablePtrObj, "itb "),
-	DECL_TAG_ITEM(ArrayLength, "len "),
-	DECL_TAG_ITEM(ArrayElementType, "elem"),
-	DECL_TAG_ITEM(Singleton, "ston"),
-	DECL_TAG_ITEM(NumTypeTags, "XXXX"),
+    DECL_TAG_ITEM(VTablePtrObj, "vtb "),
+    DECL_TAG_ITEM(ITablePtrObj, "itb "),
+    DECL_TAG_ITEM(ArrayLength, "len "),
+    DECL_TAG_ITEM(ArrayElementType, "elem"),
+    DECL_TAG_ITEM(Singleton, "ston"),
+    DECL_TAG_ITEM(NumTypeTags, "XXXX"),
 };
 
 static const uint32 type_tag_names_count = sizeof(type_tag_names)/sizeof(type_tag_names[0]);
 
 #ifdef _DEBUG
 static inline void checkArray() {
-	static bool doArrayCheck = true;
-	if( !doArrayCheck ) return;
-	doArrayCheck = false;
-	for( uint32 i=0; i<type_tag_names_count; i++ ) {
-		assert( (uint32)(type_tag_names[i].tag) == i );
-	}
+    static bool doArrayCheck = true;
+    if( !doArrayCheck ) return;
+    doArrayCheck = false;
+    for( uint32 i=0; i<type_tag_names_count; i++ ) {
+        assert( (uint32)(type_tag_names[i].tag) == i );
+    }
 }
 #else
-	#define checkArray()
+    #define checkArray()
 #endif
 
 Type::Tag Type::str2tag(const char * tagname) {
-	checkArray();
+    checkArray();
 
-	for( uint32 i=0; i<type_tag_names_count; i++ ) {
-		if( 0 == strcmpi(type_tag_names[i].name, tagname) ) {
-			return (Tag)i; // the map is ordered, thus '[i].tag == tag'
-		}
-	}
-	return InavlidTag;
+    for( uint32 i=0; i<type_tag_names_count; i++ ) {
+        if( 0 == strcmpi(type_tag_names[i].name, tagname) ) {
+            return (Tag)i; // the map is ordered, thus '[i].tag == tag'
+        }
+    }
+    return InavlidTag;
 }
 
 const char * Type::tag2str(Tag t) {
-	checkArray();
+    checkArray();
 
-	assert( t > 0 && t<NumTypeTags );
-	return t > 0 && t<NumTypeTags ? type_tag_names[t].name : type_tag_names[NumTypeTags].name;
+    assert( t > 0 && t<NumTypeTags );
+    return t > 0 && t<NumTypeTags ? type_tag_names[t].name : type_tag_names[NumTypeTags].name;
 }
 
 

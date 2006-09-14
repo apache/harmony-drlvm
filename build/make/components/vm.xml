@@ -57,10 +57,9 @@ Version: $Revision: 1.4.2.4 $
                                                   vm.gc, 
                                                   vm.interpreter,
                                                   vm.hythr,
+                                                  vm.jitrino,
                                                   vm.kernel_classes"  />
         </select>
-
-        <property name="test.depends" value="vm.vmcore"/>
 
         <property name="smoke.test.depends" value="" />
 

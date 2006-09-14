@@ -197,7 +197,7 @@ class AliasDefSites : public StlHashMap<AliasRep, VarDefSites *> {
 public:
     typedef StlHashMap<AliasRep, VarDefSites *> BaseType;
     AliasDefSites(MemoryManager &m, uint32 n): BaseType(m), mm(m), numNodes(n) {};
-    void addAliasDefSite(const AliasRep &rep, CFGNode* node) {
+    void addAliasDefSite(const AliasRep &rep, Node* node) {
         VarDefSites* aliasSites = (*this)[rep];
         if (!aliasSites) {
             aliasSites = new (mm) VarDefSites(mm, numNodes);
@@ -205,7 +205,7 @@ public:
         }
         aliasSites->addDefSite(node);
     };
-    bool hasAliasDefSite(const AliasRep &rep, CFGNode* node) {
+    bool hasAliasDefSite(const AliasRep &rep, Node* node) {
         iterator aliasSitesIter = this->find(rep);
         if (aliasSitesIter == end()) {
             return false;
@@ -226,7 +226,7 @@ public:
             nodeArray[i] = 0;
         }
     }
-    void addMemPhi(CFGNode *n, const AliasRep &rep) {
+    void addMemPhi(Node *n, const AliasRep &rep) {
         size_t i = n->getDfNum();
         StlVector<AliasRep> *a = nodeArray[i];
         if (!a) {
@@ -235,7 +235,7 @@ public:
         }
         a->push_back(rep);
     }
-    const StlVector<AliasRep> *getMemPhis(CFGNode *n) const {
+    const StlVector<AliasRep> *getMemPhis(Node *n) const {
         size_t i = n->getDfNum();
         return nodeArray[i];
     }

@@ -77,6 +77,8 @@ using namespace std;
 
 #ifdef _IPF_
 #include "java_lang_thread_ipf.h"
+#elif defined _EM64T_
+#include "java_lang_thread_em64t.h"
 #else
 #include "java_lang_thread_ia32.h"
 #endif
@@ -134,6 +136,8 @@ IDATA vm_attach() {
         return status;
 
 	hythread_suspend_disable();
+
+    init_stack_info();
 
     m2n_null_init(p_m2n);
     m2n_set_last_frame(p_m2n);

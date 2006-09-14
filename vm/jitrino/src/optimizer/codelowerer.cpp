@@ -26,13 +26,14 @@
 #include "constantfolder.h"
 #include "optimizer.h"
 #include "Log.h"
+#include "FlowGraph.h"
+#include "PMFAction.h"
 
 namespace Jitrino {
 
-DEFINE_OPTPASS_IMPL(CodeLoweringPass, lower, "Code Lowering / Fast Path Inlining")
+DEFINE_SESSION_ACTION(CodeLoweringPass, lower, "Code Lowering / Fast Path Inlining");
 
-void
-CodeLoweringPass::_run(IRManager& irm) {
+void CodeLoweringPass::_run(IRManager& irm){
     CodeLowerer lowerer(irm);
     lowerer.doLower();
 }
@@ -46,34 +47,31 @@ CodeLowerer::doLower() {
 
     MemoryManager mm(1000, "CodeLowerer.doLower");
 
-    CFGVector nodes(mm);
+    Nodes nodes(mm);
     _irm.getFlowGraph().getNodesPostOrder(nodes);
-    CFGVector::ReverseIterator i;
-
-    for(i = nodes.rbegin(); i != nodes.rend(); ++i) {
-        CFGNode *_currentBlock = *i;
+    
+    for(Nodes::reverse_iterator i = nodes.rbegin(); i != nodes.rend(); ++i) {
+        Node *_currentBlock = *i;
         if(_currentBlock->isBlockNode())
             lowerBlock(_currentBlock);
     }
 }
 
 void
-CodeLowerer::lowerBlock(CFGNode *block) {
+CodeLowerer::lowerBlock(Node *block) {
     assert(block->isBlockNode());
-
-    Inst* first = block->getFirstInst();
-
-    for(Inst* inst = first->next(); inst != first; inst = inst->next()) {
+    for(Inst* inst = (Inst*)block->getFirstInst(); inst != NULL; inst = inst->getNextInst()) {
         inst = optimizeInst(inst);
-        if(inst == NULL)
+        if (inst == NULL) {
             break;
+        }
     }
 }
 
 Inst*
 CodeLowerer::caseTauCast(TypeInst* inst)
 {
-    CFGNode* block = inst->getNode();
+    Node* block = inst->getNode();
     //
     // Perform null and vtable checks to avoid an expensive vm call.
     // The vtable check often succeeds in practice.
@@ -103,16 +101,16 @@ CodeLowerer::caseTauCast(TypeInst* inst)
     //
     // Target is _succ_ if cast succeeds and _fail_ if cast fails.
     // 
-    CFGNode* succ = (CFGNode*) block->getUnconditionalEdge()->getTargetNode();
-    CFGNode* fail = (CFGNode*) block->getExceptionEdge()->getTargetNode();
+    Node* succ = block->getUnconditionalEdge()->getTargetNode();
+    Node* fail = block->getExceptionEdge()->getTargetNode();
     assert(succ->isBlockNode() && fail->isDispatchNode());
 
-    FlowGraph& fg = _irm.getFlowGraph();
+    ControlFlowGraph& fg = _irm.getFlowGraph();
     InstFactory& instFactory = _irm.getInstFactory();
     OpndManager& opndManager = _irm.getOpndManager();
     TypeManager& typeManager = _irm.getTypeManager();
 
-    Inst* succInst = succ->getFirstInst()->next();
+    Inst* succInst = (Inst*)succ->getSecondInst();
     if(succInst->getOpcode() == Op_TauCheckNull) {
         //
         // We have
@@ -126,7 +124,7 @@ CodeLowerer::caseTauCast(TypeInst* inst)
         //    dst = cast src, castType, tauDst2   ---> fail
         //  succ2:
         assert(succInst == succ->getLastInst());
-        CFGNode* fail2 = (CFGNode*) succ->getExceptionEdge()->getTargetNode();
+        Node* fail2 =  succ->getExceptionEdge()->getTargetNode();
         Opnd* src2 = succInst->getSrc(0);
         if(succ->getInDegree() == 1 && fail2 == fail && src2 == dst) {
             // Reorder checknull and checkcast.
@@ -138,8 +136,8 @@ CodeLowerer::caseTauCast(TypeInst* inst)
             inst->unlink();
             succInst->unlink();
 
-            block->append(succInst);
-            succ->append(inst);
+            block->appendInst(succInst);
+            succ->appendInst(inst);
 
             succInst->setSrc(0, src);
             return succInst;
@@ -187,13 +185,13 @@ CodeLowerer::caseTauCast(TypeInst* inst)
     //   succ:
     //     ...
 
-    CFGNode* b1 = fg.createBlockNode();
-    CFGNode* b2 = fg.createBlockNode();
-    CFGNode* b3 = fg.createBlockNode();
-    CFGNode* b3a = fg.createBlockNode();
-    CFGNode* b3b = fg.createBlockNode();
-    CFGNode* b3c = 0;
-    
+    Node* b1 = fg.createBlockNode(instFactory.makeLabel());
+    Node* b2 = fg.createBlockNode(instFactory.makeLabel());
+    Node* b3 = fg.createBlockNode(instFactory.makeLabel());
+    Node* b3a = fg.createBlockNode(instFactory.makeLabel());
+    Node* b3b = fg.createBlockNode(instFactory.makeLabel());
+    Node* b3c = 0;
+
     //
     // Add null check to _block_.
     //
@@ -202,15 +200,14 @@ CodeLowerer::caseTauCast(TypeInst* inst)
     inst->unlink();    
     Inst* test1 = instFactory.makeBranch(Cmp_Zero, src->getType()->tag,
                                          src,
-                                         b3b->getLabel());
-    block->append(test1);
+                                         (LabelInst*)b3b->getFirstInst());
+    block->appendInst(test1);
     fg.addEdge(block, b1);
     fg.addEdge(block, b3b);
     
     // create a new tau for null-checked
-    tauNullChecked = 
-        opndManager.createSsaTmpOpnd(typeManager.getTauType());
-    b1->append(instFactory.makeTauEdge(tauNullChecked));
+    tauNullChecked = opndManager.createSsaTmpOpnd(typeManager.getTauType());
+    b1->appendInst(instFactory.makeTauEdge(tauNullChecked));
 
     //
     // Test direct vtable equality in _b1_ if cast target type is concrete.
@@ -221,10 +218,10 @@ CodeLowerer::caseTauCast(TypeInst* inst)
         ObjectType* srcType = (ObjectType*) src->getType();
         Opnd* vt1 = opndManager.createSsaTmpOpnd(typeManager.getVTablePtrType(srcType));
         Opnd* vt2 = opndManager.createSsaTmpOpnd(typeManager.getVTablePtrType(castType));
-        b1->append(instFactory.makeTauLdVTableAddr(vt1, src, tauNullChecked));
-        b1->append(instFactory.makeGetVTableAddr(vt2, castType));
-        b3c = fg.createBlockNode();
-        b1->append(instFactory.makeBranch(Cmp_EQ, Type::VTablePtr, vt1, vt2, b3c->getLabel()));
+        b1->appendInst(instFactory.makeTauLdVTableAddr(vt1, src, tauNullChecked));
+        b1->appendInst(instFactory.makeGetVTableAddr(vt2, castType));
+        b3c = fg.createBlockNode(instFactory.makeLabel());
+        b1->appendInst(instFactory.makeBranch(Cmp_EQ, Type::VTablePtr, vt1, vt2, (LabelInst*)b3c->getFirstInst()));
         fg.addEdge(b1, b3c);
     }
     fg.addEdge(b1, b2);
@@ -233,7 +230,7 @@ CodeLowerer::caseTauCast(TypeInst* inst)
     // Fall throw to cast call in _b2_.
     //
     Opnd* tauCheckedCast = opndManager.createSsaTmpOpnd(typeManager.getTauType());
-    b2->append(instFactory.makeTauCheckCast(tauCheckedCast, src,
+    b2->appendInst(instFactory.makeTauCheckCast(tauCheckedCast, src,
                                             tauNullChecked,
                                             type));
     fg.addEdge(b2, b3a);
@@ -252,26 +249,26 @@ CodeLowerer::caseTauCast(TypeInst* inst)
         SsaVarOpnd *tauvar4 = opndManager.createSsaVarOpnd(tauHasTypeVar);
         
         // b3a
-        b3a->append(instFactory.makeStVar(tauvar1, tauCheckedCast));
+        b3a->appendInst(instFactory.makeStVar(tauvar1, tauCheckedCast));
         
         // b3b
-        b3b->append(instFactory.makeTauEdge(tau3));
-        b3b->append(instFactory.makeStVar(tauvar2, tau3));
+        b3b->appendInst(instFactory.makeTauEdge(tau3));
+        b3b->appendInst(instFactory.makeStVar(tauvar2, tau3));
         
         if (b3c) {
             // b3c
-            b3c->append(instFactory.makeTauEdge(tau4));
-            b3c->append(instFactory.makeStVar(tauvar3, tau4));
+            b3c->appendInst(instFactory.makeTauEdge(tau4));
+            b3c->appendInst(instFactory.makeStVar(tauvar3, tau4));
         
             // b3
             Opnd* phiOpnds[3] = { tauvar1, tauvar2, tauvar3 };
-            b3->append(instFactory.makePhi(tauvar4, 3, phiOpnds));
-            b3->append(instFactory.makeLdVar(tau2, tauvar4));
+            b3->appendInst(instFactory.makePhi(tauvar4, 3, phiOpnds));
+            b3->appendInst(instFactory.makeLdVar(tau2, tauvar4));
         } else {
             // b3
             Opnd* phiOpnds[3] = { tauvar1, tauvar2 };
-            b3->append(instFactory.makePhi(tauvar4, 2, phiOpnds));
-            b3->append(instFactory.makeLdVar(tau2, tauvar4));
+            b3->appendInst(instFactory.makePhi(tauvar4, 2, phiOpnds));
+            b3->appendInst(instFactory.makeLdVar(tau2, tauvar4));
         }
     } else {
         // not SSA
@@ -282,27 +279,27 @@ CodeLowerer::caseTauCast(TypeInst* inst)
         VarOpnd *tauvar4 = tauHasTypeVar;
         
         // b3a
-        b3a->append(instFactory.makeStVar(tauvar1, tauCheckedCast));
+        b3a->appendInst(instFactory.makeStVar(tauvar1, tauCheckedCast));
         
         // b3b
-        b3b->append(instFactory.makeTauEdge(tau3));
-        b3b->append(instFactory.makeStVar(tauvar2, tau3));
+        b3b->appendInst(instFactory.makeTauEdge(tau3));
+        b3b->appendInst(instFactory.makeStVar(tauvar2, tau3));
         
         if (b3c) {
             // b3c
-            b3c->append(instFactory.makeTauEdge(tau4));
-            b3c->append(instFactory.makeStVar(tauvar4, tau4));
+            b3c->appendInst(instFactory.makeTauEdge(tau4));
+            b3c->appendInst(instFactory.makeStVar(tauvar4, tau4));
         }
 
         // b3
-        b3->append(instFactory.makeLdVar(tau2, tauvar4));
+        b3->appendInst(instFactory.makeLdVar(tau2, tauvar4));
     }
 
     fg.addEdge(b3a, b3);
     fg.addEdge(b3b, b3);
     if (b3c)
         fg.addEdge(b3c, b3);
-    b3->append(instFactory.makeTauStaticCast(dst, src, tau2, type));
+    b3->appendInst(instFactory.makeTauStaticCast(dst, src, tau2, type));
     fg.addEdge(b3, succ);
 
     return test1;
@@ -311,7 +308,7 @@ CodeLowerer::caseTauCast(TypeInst* inst)
 Inst*
 CodeLowerer::caseTauCheckCast(TypeInst* inst)
 {
-    CFGNode* block = inst->getNode();
+    Node* block = inst->getNode();
     //
     // Perform null and vtable checks to avoid an expensive VM call.
     // The vtable check often succeeds in practice.
@@ -334,28 +331,27 @@ CodeLowerer::caseTauCheckCast(TypeInst* inst)
     //
     // Target is _succ_ if cast succeeds and _fail_ if cast fails.
     // 
-    CFGNode* succ = (CFGNode*) block->getUnconditionalEdge()->getTargetNode();
-    CFGNode* fail = (CFGNode*) block->getExceptionEdge()->getTargetNode();
+    Node* succ =  block->getUnconditionalEdge()->getTargetNode();
+    Node* fail =  block->getExceptionEdge()->getTargetNode();
     assert(succ->isBlockNode() && fail->isDispatchNode());
 
-    FlowGraph& fg = _irm.getFlowGraph();
+    ControlFlowGraph& fg = _irm.getFlowGraph();
     InstFactory& instFactory = _irm.getInstFactory();
     OpndManager& opndManager = _irm.getOpndManager();
     TypeManager& typeManager = _irm.getTypeManager();
 
-    Inst* succInst = succ->getFirstInst()->next();
+    Inst* succInst = (Inst*)succ->getSecondInst();
     Inst* succInst2 = 0;
     Opnd* checkNullSrc = 0;
-    if ((succInst->getOpcode() == Op_TauStaticCast) &&
-        (succInst->getSrc(0) == src)) {
+    if (succInst!=NULL && (succInst->getOpcode() == Op_TauStaticCast) && (succInst->getSrc(0) == src)) {
         // if succInst is a static cast, find following inst
         checkNullSrc = succInst->getDst();
         succInst2 = succInst;
-        succInst = succInst->next();
+        succInst = succInst->getNextInst();
     }
-    if(succInst->getOpcode() == Op_TauCheckNull) {
+    if(succInst!=NULL && succInst->getOpcode() == Op_TauCheckNull) {
         assert(succInst == succ->getLastInst());
-        CFGNode* fail2 = (CFGNode*) succ->getExceptionEdge()->getTargetNode();
+        Node* fail2 =  succ->getExceptionEdgeTarget();
         if(succ->getInDegree() == 1 && fail2 == fail && 
            ((succInst->getSrc(0) == src) || 
             (succInst->getSrc(0) == checkNullSrc))) {
@@ -380,7 +376,7 @@ CodeLowerer::caseTauCheckCast(TypeInst* inst)
                 Inst *copyInst = instFactory.makeCopy(tauDst2, tauNullChecked);
                 copyInst->insertBefore(succInst);
 
-                fg.eliminateCheck(succ, succInst, false);
+                FlowGraph::eliminateCheck(fg, succ, succInst, false);
             } else {
                 //
                 // We have
@@ -398,7 +394,7 @@ CodeLowerer::caseTauCheckCast(TypeInst* inst)
                 
                 // Reorder checknull and checkcast.
                 Opnd* tauDst2 = succInst->getDst();
-                CFGNode* succ2 = (CFGNode*) succ->getUnconditionalEdge()->getTargetNode();
+                Node* succ2 =  succ->getUnconditionalEdge()->getTargetNode();
                 
                 assert(inst->getSrc(1)->getType()->tag == Type::Tau);
                 inst->setSrc(1, tauDst2);
@@ -406,27 +402,29 @@ CodeLowerer::caseTauCheckCast(TypeInst* inst)
                 inst->unlink();
                 succInst->unlink();
                 
-                block->append(succInst);
-                succ->append(inst);
+                block->appendInst(succInst);
+                succ->appendInst(inst);
                 
                 succInst->setSrc(0, src); // if it had a static cast
 
                 if (succInst2) {
                     // we had a static cast, insert it in succ2
                     succInst2->unlink();
-                    Inst *succ2HeadInst = succ2->getFirstInst();
-                    Inst *insertBeforeInst = succ2HeadInst->next();
-                    while ((insertBeforeInst->getOpcode() == Op_Phi) ||
-                           (insertBeforeInst->getOpcode() == Op_TauPi)) {
-                        insertBeforeInst = insertBeforeInst->next();
+                    Inst *succ2HeadInst = (Inst*)succ2->getFirstInst();
+                    Inst *insertBeforeInst = succ2HeadInst->getNextInst();
+                    while (insertBeforeInst!=NULL 
+                        && (insertBeforeInst->getOpcode() == Op_Phi) 
+                            || (insertBeforeInst->getOpcode() == Op_TauPi)) 
+                    {
+                        insertBeforeInst = insertBeforeInst->getNextInst();
                     }
                     succInst2->insertBefore(insertBeforeInst);
                 }
 
                 // update our local state so we can apply the next rule
                 block = succ;
-                succ = (CFGNode*) block->getUnconditionalEdge()->getTargetNode();
-                fail = (CFGNode*) block->getExceptionEdge()->getTargetNode();
+                succ =  block->getUnconditionalEdge()->getTargetNode();
+                fail =  block->getExceptionEdge()->getTargetNode();
                 tauNullChecked = tauDst2;
                 nullWasChecked = true;
             }
@@ -474,12 +472,12 @@ CodeLowerer::caseTauCheckCast(TypeInst* inst)
         //   succ:
         //     ...
         
-        CFGNode* b1 = fg.createBlockNode();
-        CFGNode* b2 = fg.createBlockNode();
-        CFGNode* b3 = fg.createBlockNode();
-        CFGNode* b3a = fg.createBlockNode();
-        CFGNode* b3b = fg.createBlockNode();
-        CFGNode* b3c = 0;
+        Node* b1 = fg.createBlockNode(instFactory.makeLabel());
+        Node* b2 = fg.createBlockNode(instFactory.makeLabel());
+        Node* b3 = fg.createBlockNode(instFactory.makeLabel());
+        Node* b3a = fg.createBlockNode(instFactory.makeLabel());
+        Node* b3b = fg.createBlockNode(instFactory.makeLabel());
+        Node* b3c = 0;
         
         //
         // Add null check to _block_.
@@ -489,15 +487,15 @@ CodeLowerer::caseTauCheckCast(TypeInst* inst)
         inst->unlink();    
         Inst* test1 = instFactory.makeBranch(Cmp_Zero, src->getType()->tag,
                                              src,
-                                             b3b->getLabel());
-        block->append(test1);
+                                             (LabelInst*)b3b->getFirstInst());
+        block->appendInst(test1);
         fg.addEdge(block, b1);
         fg.addEdge(block, b3b);
         
         // create a new tau for nullchecked
         tauNullChecked = 
             opndManager.createSsaTmpOpnd(typeManager.getTauType());
-        b1->append(instFactory.makeTauEdge(tauNullChecked));
+        b1->appendInst(instFactory.makeTauEdge(tauNullChecked));
         
         //
         // Test direct vtable equality in _b1_ if cast target type is concrete.
@@ -508,10 +506,10 @@ CodeLowerer::caseTauCheckCast(TypeInst* inst)
             ObjectType* srcType = (ObjectType*) src->getType();
             Opnd* vt1 = opndManager.createSsaTmpOpnd(typeManager.getVTablePtrType(srcType));
             Opnd* vt2 = opndManager.createSsaTmpOpnd(typeManager.getVTablePtrType(castType));
-            b1->append(instFactory.makeTauLdVTableAddr(vt1, src, tauNullChecked));
-            b1->append(instFactory.makeGetVTableAddr(vt2, castType));
-            b3c = fg.createBlockNode();
-            b1->append(instFactory.makeBranch(Cmp_EQ, Type::VTablePtr, vt1, vt2, b3c->getLabel()));
+            b1->appendInst(instFactory.makeTauLdVTableAddr(vt1, src, tauNullChecked));
+            b1->appendInst(instFactory.makeGetVTableAddr(vt2, castType));
+            b3c = fg.createBlockNode(instFactory.makeLabel());
+            b1->appendInst(instFactory.makeBranch(Cmp_EQ, Type::VTablePtr, vt1, vt2, (LabelInst*)b3c->getFirstInst()));
             fg.addEdge(b1, b3c);
         }
         fg.addEdge(b1, b2);
@@ -523,7 +521,7 @@ CodeLowerer::caseTauCheckCast(TypeInst* inst)
         // reuse inst
         inst->setDst(tauCheckedCast);
         inst->setSrc(1, tauNullChecked);
-        b2->append(inst);
+        b2->appendInst(inst);
         fg.addEdge(b2, b3a);
         fg.addEdge(b2, fail);
         
@@ -540,26 +538,26 @@ CodeLowerer::caseTauCheckCast(TypeInst* inst)
             SsaVarOpnd *tauvar4 = opndManager.createSsaVarOpnd(tauHasTypeVar);
             
             // b3a
-            b3a->append(instFactory.makeStVar(tauvar1, tauCheckedCast));
+            b3a->appendInst(instFactory.makeStVar(tauvar1, tauCheckedCast));
             
             // b3b
-            b3b->append(instFactory.makeTauEdge(tau3));
-            b3b->append(instFactory.makeStVar(tauvar2, tau3));
+            b3b->appendInst(instFactory.makeTauEdge(tau3));
+            b3b->appendInst(instFactory.makeStVar(tauvar2, tau3));
             
             if (b3c) {
                 // b3c
-                b3c->append(instFactory.makeTauEdge(tau4));
-                b3c->append(instFactory.makeStVar(tauvar3, tau4));
+                b3c->appendInst(instFactory.makeTauEdge(tau4));
+                b3c->appendInst(instFactory.makeStVar(tauvar3, tau4));
                 
                 // b3
                 Opnd* phiOpnds[3] = { tauvar1, tauvar2, tauvar3 };
-                b3->append(instFactory.makePhi(tauvar4, 3, phiOpnds));
-                b3->append(instFactory.makeLdVar(tau2, tauvar4));
+                b3->appendInst(instFactory.makePhi(tauvar4, 3, phiOpnds));
+                b3->appendInst(instFactory.makeLdVar(tau2, tauvar4));
             } else {
                 // b3
                 Opnd* phiOpnds[3] = { tauvar1, tauvar2 };
-                b3->append(instFactory.makePhi(tauvar4, 2, phiOpnds));
-                b3->append(instFactory.makeLdVar(tau2, tauvar4));
+                b3->appendInst(instFactory.makePhi(tauvar4, 2, phiOpnds));
+                b3->appendInst(instFactory.makeLdVar(tau2, tauvar4));
             }
         } else {
             // not SSA
@@ -570,20 +568,20 @@ CodeLowerer::caseTauCheckCast(TypeInst* inst)
             VarOpnd *tauvar4 = tauHasTypeVar;
             
             // b3a
-            b3a->append(instFactory.makeStVar(tauvar1, tauCheckedCast));
+            b3a->appendInst(instFactory.makeStVar(tauvar1, tauCheckedCast));
             
             // b3b
-            b3b->append(instFactory.makeTauEdge(tau3));
-            b3b->append(instFactory.makeStVar(tauvar2, tau3));
+            b3b->appendInst(instFactory.makeTauEdge(tau3));
+            b3b->appendInst(instFactory.makeStVar(tauvar2, tau3));
             
             if (b3c) {
                 // b3c
-                b3c->append(instFactory.makeTauEdge(tau4));
-                b3c->append(instFactory.makeStVar(tauvar4, tau4));
+                b3c->appendInst(instFactory.makeTauEdge(tau4));
+                b3c->appendInst(instFactory.makeStVar(tauvar4, tau4));
             }
             
             // b3
-            b3->append(instFactory.makeLdVar(tau2, tauvar4));
+            b3->appendInst(instFactory.makeLdVar(tau2, tauvar4));
         }
         
         fg.addEdge(b3a, b3);
@@ -629,11 +627,11 @@ CodeLowerer::caseTauCheckCast(TypeInst* inst)
             return 0;
         }
 
-        CFGNode* b1 = block;
-        CFGNode* b2 = fg.createBlockNode();
-        CFGNode* b3 = fg.createBlockNode();
-        CFGNode* b3a = fg.createBlockNode();
-        CFGNode* b3c = fg.createBlockNode();
+        Node* b1 = block;
+        Node* b2 = fg.createBlockNode(instFactory.makeLabel());
+        Node* b3 = fg.createBlockNode(instFactory.makeLabel());
+        Node* b3a = fg.createBlockNode(instFactory.makeLabel());
+        Node* b3c = fg.createBlockNode(instFactory.makeLabel());
         
         // remove test at the end of block
         inst->unlink();    
@@ -649,9 +647,9 @@ CodeLowerer::caseTauCheckCast(TypeInst* inst)
         Opnd* vt1 = opndManager.createSsaTmpOpnd(typeManager.getVTablePtrType(srcType));
         Opnd* vt2 = opndManager.createSsaTmpOpnd(typeManager.getVTablePtrType(castType));
         Inst* nextInst = instFactory.makeTauLdVTableAddr(vt1, src, tauNullChecked);
-        b1->append(nextInst);
-        b1->append(instFactory.makeGetVTableAddr(vt2, castType));
-        b1->append(instFactory.makeBranch(Cmp_EQ, Type::VTablePtr, vt1, vt2, b3c->getLabel()));
+        b1->appendInst(nextInst);
+        b1->appendInst(instFactory.makeGetVTableAddr(vt2, castType));
+        b1->appendInst(instFactory.makeBranch(Cmp_EQ, Type::VTablePtr, vt1, vt2, (LabelInst*)b3c->getFirstInst()));
         fg.addEdge(b1, b3c);
         fg.addEdge(b1, b2);
         
@@ -662,7 +660,7 @@ CodeLowerer::caseTauCheckCast(TypeInst* inst)
         // reuse inst
         inst->setDst(tauCheckedCast);
         inst->setSrc(1, tauNullChecked);
-        b2->append(inst);
+        b2->appendInst(inst);
         fg.addEdge(b2, b3a);
         fg.addEdge(b2, fail);
         
@@ -678,16 +676,16 @@ CodeLowerer::caseTauCheckCast(TypeInst* inst)
             SsaVarOpnd *tauvar4 = opndManager.createSsaVarOpnd(tauHasTypeVar);
             
             // b3a
-            b3a->append(instFactory.makeStVar(tauvar1, tauCheckedCast));
+            b3a->appendInst(instFactory.makeStVar(tauvar1, tauCheckedCast));
             
             // b3c
-            b3c->append(instFactory.makeTauEdge(tau4));
-            b3c->append(instFactory.makeStVar(tauvar3, tau4));
+            b3c->appendInst(instFactory.makeTauEdge(tau4));
+            b3c->appendInst(instFactory.makeStVar(tauvar3, tau4));
             
             // b3
             Opnd* phiOpnds[2] = { tauvar1, tauvar3 };
-            b3->append(instFactory.makePhi(tauvar4, 2, phiOpnds));
-            b3->append(instFactory.makeLdVar(tau2, tauvar4));
+            b3->appendInst(instFactory.makePhi(tauvar4, 2, phiOpnds));
+            b3->appendInst(instFactory.makeLdVar(tau2, tauvar4));
         } else {
             // not SSA
             
@@ -696,14 +694,14 @@ CodeLowerer::caseTauCheckCast(TypeInst* inst)
             VarOpnd *tauvar4 = tauHasTypeVar;
             
             // b3a
-            b3a->append(instFactory.makeStVar(tauvar1, tauCheckedCast));
+            b3a->appendInst(instFactory.makeStVar(tauvar1, tauCheckedCast));
             
             // b3c
-            b3c->append(instFactory.makeTauEdge(tau4));
-            b3c->append(instFactory.makeStVar(tauvar4, tau4));
+            b3c->appendInst(instFactory.makeTauEdge(tau4));
+            b3c->appendInst(instFactory.makeStVar(tauvar4, tau4));
             
             // b3
-            b3->append(instFactory.makeLdVar(tau2, tauvar4));
+            b3->appendInst(instFactory.makeLdVar(tau2, tauvar4));
         }
         
         fg.addEdge(b3a, b3);
@@ -716,9 +714,9 @@ CodeLowerer::caseTauCheckCast(TypeInst* inst)
 Inst*
 CodeLowerer::caseTauAsType(TypeInst* inst)
 {
-    FlowGraph& fg = _irm.getFlowGraph();
-    CFGNode* block = inst->getNode();
-    CFGNode* succ = fg.splitNodeAtInstruction(inst);
+    ControlFlowGraph& fg = _irm.getFlowGraph();
+    Node* block = inst->getNode();
+    Node* succ = fg.splitNodeAtInstruction(inst, true, false, _irm.getInstFactory().makeLabel());
 
     // Replace:
     //   block:
@@ -763,28 +761,28 @@ CodeLowerer::caseTauAsType(TypeInst* inst)
     Opnd* dst = inst->getDst();
     Type* castType = inst->getTypeInfo();
 
-    CFGNode* b1 = fg.createBlockNode();
-    CFGNode* b2 = fg.createBlockNode();
+    Node* b1 = fg.createBlockNode(instFactory.makeLabel());
+    Node* b2 = fg.createBlockNode(instFactory.makeLabel());
     VarOpnd* var = opndManager.createVarOpnd(castType, false);
 
     if (tauNullChecked->getInst()->getOpcode() == Op_TauUnsafe) {
-        CFGNode* b0 = fg.createBlockNode();
+        Node* b0 = fg.createBlockNode(instFactory.makeLabel());
         // Block
-        block->append(instFactory.makeBranch(Cmp_Zero, src->getType()->tag, src, b2->getLabel()));
+        block->appendInst(instFactory.makeBranch(Cmp_Zero, src->getType()->tag, src, (LabelInst*)b2->getFirstInst()));
         fg.addEdge(block, b0);
         fg.addEdge(block, b2);
         
         // b0
         tauNullChecked = opndManager.createSsaTmpOpnd(typeManager.getTauType());
-        b0->append(instFactory.makeTauEdge(tauNullChecked));
+        b0->appendInst(instFactory.makeTauEdge(tauNullChecked));
 
         block = b0;
     }
     SsaTmpOpnd* t1 = opndManager.createSsaTmpOpnd(typeManager.getBooleanType());
     Inst *instanceOf = instFactory.makeTauInstanceOf(t1, src, tauNullChecked, 
                                                      castType);
-    block->append(instanceOf);
-    block->append(instFactory.makeBranch(Cmp_Zero, t1->getType()->tag, t1, b2->getLabel()));
+    block->appendInst(instanceOf);
+    block->appendInst(instFactory.makeBranch(Cmp_Zero, t1->getType()->tag, t1, (LabelInst*)b2->getFirstInst()));
     fg.addEdge(block, b2);
     fg.addEdge(block, b1);
     
@@ -793,39 +791,39 @@ CodeLowerer::caseTauAsType(TypeInst* inst)
         SsaTmpOpnd* t2 = opndManager.createSsaTmpOpnd(castType);
         SsaTmpOpnd* tau1 = opndManager.createSsaTmpOpnd(typeManager.getTauType());
         SsaVarOpnd *var1 = opndManager.createSsaVarOpnd(var);
-        b1->append(instFactory.makeTauEdge(tau1));
-        b1->append(instFactory.makeTauStaticCast(t2, src, tau1, castType));
-        b1->append(instFactory.makeStVar(var1, t2));
+        b1->appendInst(instFactory.makeTauEdge(tau1));
+        b1->appendInst(instFactory.makeTauStaticCast(t2, src, tau1, castType));
+        b1->appendInst(instFactory.makeStVar(var1, t2));
         
         // B2
         SsaTmpOpnd* t3 = opndManager.createSsaTmpOpnd(castType);
         SsaVarOpnd *var2 = opndManager.createSsaVarOpnd(var);
-        b2->append(instFactory.makeLdNull(t3));
-        b2->append(instFactory.makeStVar(var2, t3));
+        b2->appendInst(instFactory.makeLdNull(t3));
+        b2->appendInst(instFactory.makeStVar(var2, t3));
         
         // succ
         SsaVarOpnd *var3 = opndManager.createSsaVarOpnd(var);
         Opnd* phiOpnds[2] = { var1, var2 };
         Inst* phiInst = instFactory.makePhi(var3, 2, phiOpnds);
         Inst* ldVar = instFactory.makeLdVar(dst, var);
-        succ->prependAfterCriticalInst(ldVar);
-        succ->prepend(phiInst);
+        succ->prependInst(ldVar);
+        succ->prependInst(phiInst);
     } else {
         // B1
         SsaTmpOpnd* t2 = opndManager.createSsaTmpOpnd(castType);
         SsaTmpOpnd* tau1 = opndManager.createSsaTmpOpnd(typeManager.getTauType());
-        b1->append(instFactory.makeTauEdge(tau1));
-        b1->append(instFactory.makeTauStaticCast(t2, src, tau1, castType));
-        b1->append(instFactory.makeStVar(var, t2));
+        b1->appendInst(instFactory.makeTauEdge(tau1));
+        b1->appendInst(instFactory.makeTauStaticCast(t2, src, tau1, castType));
+        b1->appendInst(instFactory.makeStVar(var, t2));
         
         // B2
         SsaTmpOpnd* t3 = opndManager.createSsaTmpOpnd(castType);
-        b2->append(instFactory.makeLdNull(t3));
-        b2->append(instFactory.makeStVar(var, t3));
+        b2->appendInst(instFactory.makeLdNull(t3));
+        b2->appendInst(instFactory.makeStVar(var, t3));
         
         // succ
         Inst* ldVar = instFactory.makeLdVar(dst, var);
-        succ->prepend(ldVar);
+        succ->prependInst(ldVar);
     }
 
     fg.addEdge(b1, succ);
@@ -838,7 +836,7 @@ CodeLowerer::caseTauAsType(TypeInst* inst)
 Inst*
 CodeLowerer::caseTauInstanceOf(TypeInst* inst)
 {
-    CFGNode* block = inst->getNode();
+    Node* block = inst->getNode();
     //
     // Perform null and vtable checks to avoid an expensive vm call.
     // The vtable check often succeeds in practice.
@@ -862,7 +860,7 @@ CodeLowerer::caseTauInstanceOf(TypeInst* inst)
     assert(tauCheckedNull->getType()->tag == Type::Tau);
     Opnd* dst = inst->getDst();
 
-    FlowGraph& fg = _irm.getFlowGraph();
+    ControlFlowGraph& fg = _irm.getFlowGraph();
     InstFactory& instFactory = _irm.getInstFactory();
     OpndManager& opndManager = _irm.getOpndManager();
     TypeManager& typeManager = _irm.getTypeManager();
@@ -878,10 +876,9 @@ CodeLowerer::caseTauInstanceOf(TypeInst* inst)
         // Ensure that dst is only used within a following branch.  If so,
         // dst can be folded.  Else, give up.
         //
-        Inst* label = block->getFirstInst();
         Inst* i;
-        for(i = inst->next(); i != label; i = i->next()) {
-            if(i->getNumSrcOperands() > 0)
+        for(i  = (Inst*)block->getFirstInst(); i != NULL; i = i->getNextInst()) {
+            if (i->getNumSrcOperands() > 0)
                 break;
         }
 
@@ -926,14 +923,14 @@ CodeLowerer::caseTauInstanceOf(TypeInst* inst)
             }
 
             if(src0 == dst) {
-                CFGNode* taken = (CFGNode*) block->getTrueEdge()->getTargetNode();
-                CFGNode* nottaken = (CFGNode*) block->getFalseEdge()->getTargetNode();
+                Node* taken =  block->getTrueEdge()->getTargetNode();
+                Node* nottaken =  block->getFalseEdge()->getTargetNode();
             
                 //
                 // Determine the targets when instanceOf is true (succ) and false (fail).
                 //
-                CFGNode* succ = eq ? nottaken : taken;
-                CFGNode* fail = eq ? taken : nottaken;
+                Node* succ = eq ? nottaken : taken;
+                Node* fail = eq ? taken : nottaken;
 
                 // Lower when we can fold into the following branch and eliminate dst.
                 //
@@ -976,19 +973,19 @@ CodeLowerer::caseTauInstanceOf(TypeInst* inst)
                 branch->unlink();
                 fg.removeEdge(block, succ);
                 
-                CFGNode* b1 = 0;
-                CFGNode* b2 = fg.createBlockNode();
+                Node* b1 = 0;
+                Node* b2 = fg.createBlockNode(instFactory.makeLabel());
 
                 Opnd *tau1 = 0;
                 if (tauCheckedNull->getInst()->getOpcode() == Op_TauUnsafe) {
-                    b1 = fg.createBlockNode();
+                    b1 = fg.createBlockNode(instFactory.makeLabel());
 
                     // block: ... if src == NULL
-                    Inst* test1 = instFactory.makeBranch(Cmp_Zero, src->getType()->tag, src, fail->getLabel());
-                    block->append(test1);
+                    Inst* test1 = instFactory.makeBranch(Cmp_Zero, src->getType()->tag, src, (LabelInst*)fail->getFirstInst());
+                    block->appendInst(test1);
                     fg.addEdge(block, b1);
                     tau1 = opndManager.createSsaTmpOpnd(typeManager.getTauType());
-                    b1->append(instFactory.makeTauEdge(tau1));
+                    b1->appendInst(instFactory.makeTauEdge(tau1));
                     inst->setSrc(1, tau1);
                 } else {
                     // remove the other edge; we add new ones
@@ -1003,15 +1000,15 @@ CodeLowerer::caseTauInstanceOf(TypeInst* inst)
                 ObjectType* srcType = (ObjectType*) src->getType();
                 Opnd* dynamicVTableAddr = opndManager.createSsaTmpOpnd(typeManager.getVTablePtrType(srcType));
                 Opnd* staticVTableAddr = opndManager.createSsaTmpOpnd(typeManager.getVTablePtrType(castType));
-                b1->append(instFactory.makeTauLdVTableAddr(dynamicVTableAddr, src, tau1));
-                b1->append(instFactory.makeGetVTableAddr(staticVTableAddr, castType));
-                b1->append(instFactory.makeBranch(Cmp_EQ, Type::VTablePtr, dynamicVTableAddr, staticVTableAddr, succ->getLabel()));
+                b1->appendInst(instFactory.makeTauLdVTableAddr(dynamicVTableAddr, src, tau1));
+                b1->appendInst(instFactory.makeGetVTableAddr(staticVTableAddr, castType));
+                b1->appendInst(instFactory.makeBranch(Cmp_EQ, Type::VTablePtr, dynamicVTableAddr, staticVTableAddr, (LabelInst*)succ->getFirstInst()));
                 fg.addEdge(b1, succ);
                 fg.addEdge(b1, b2);
                 
                 // b2: var = src instanceOf type
-                b2->append(inst);
-                b2->append(branch);
+                b2->appendInst(inst);
+                b2->appendInst(branch);
                 fg.addEdge(b2, succ);
                 fg.addEdge(b2, fail);
                 
@@ -1023,7 +1020,7 @@ CodeLowerer::caseTauInstanceOf(TypeInst* inst)
     // otherwise, just lower instanceOf, although we don't have a branch
     // to fold it into.
     { 
-        CFGNode* succ = fg.splitNodeAtInstruction(inst);
+        Node* succ = fg.splitNodeAtInstruction(inst, true, false, instFactory.makeLabel());
 
         fg.removeEdge(block, succ);
         inst->unlink();
@@ -1053,8 +1050,8 @@ CodeLowerer::caseTauInstanceOf(TypeInst* inst)
             //     v1.3 = phi(v1.1, v1.2)
             //     dst = ldvar v1.3
             
-            CFGNode* b2 = fg.createBlockNode();
-            CFGNode* b3 = fg.createBlockNode();
+            Node* b2 = fg.createBlockNode(instFactory.makeLabel());
+            Node* b3 = fg.createBlockNode(instFactory.makeLabel());
             
             // block: if src.vtable == type.vtable
             assert(src->getType()->isObject());
@@ -1063,21 +1060,21 @@ CodeLowerer::caseTauInstanceOf(TypeInst* inst)
             Opnd* staticVTableAddr = opndManager.createSsaTmpOpnd(typeManager.getVTablePtrType(castType));
             Inst * ldVTableAddrInst = 
                 instFactory.makeTauLdVTableAddr(dynamicVTableAddr, src, tauCheckedNull);
-            block->append(ldVTableAddrInst);
-            block->append(instFactory.makeGetVTableAddr(staticVTableAddr, castType));
-            block->append(instFactory.makeBranch(Cmp_EQ, Type::VTablePtr, dynamicVTableAddr, staticVTableAddr, b3->getLabel()));
+            block->appendInst(ldVTableAddrInst);
+            block->appendInst(instFactory.makeGetVTableAddr(staticVTableAddr, castType));
+            block->appendInst(instFactory.makeBranch(Cmp_EQ, Type::VTablePtr, dynamicVTableAddr, staticVTableAddr, (LabelInst*)b3->getFirstInst()));
             fg.addEdge(block, b3);
             fg.addEdge(block, b2);
             
             // b2: newDst = instanceOf src, tauCheckedNull, type
             Opnd* newDst = opndManager.createSsaTmpOpnd(dst->getType());
             inst->setDst(newDst);
-            b2->append(inst);
+            b2->appendInst(inst);
             fg.addEdge(b2, succ);
             
             // b3: var = 1
             Opnd* one = opndManager.createSsaTmpOpnd(dst->getType());
-            b3->append(instFactory.makeLdConst(one, (int32) 1));
+            b3->appendInst(instFactory.makeLdConst(one, (int32) 1));
             fg.addEdge(b3, succ);
             
             VarOpnd* dstVar = opndManager.createVarOpnd(dst->getType(), false);
@@ -1090,25 +1087,25 @@ CodeLowerer::caseTauInstanceOf(TypeInst* inst)
                 Opnd* dstSsaVars[3] =  { var1, var2 };
                 
                 // Patch b2
-                b2->append(instFactory.makeStVar(var1, newDst));
+                b2->appendInst(instFactory.makeStVar(var1, newDst));
                 
                 // Patch b3
-                b3->append(instFactory.makeStVar(var2, one));
+                b3->appendInst(instFactory.makeStVar(var2, one));
                 
                 // succ: dst = var ...
-                succ->prependAfterCriticalInst(instFactory.makeLdVar(dst, phiSsaVar));
-                succ->prepend(instFactory.makePhi(phiSsaVar, 2, dstSsaVars));
+                succ->prependInst(instFactory.makeLdVar(dst, phiSsaVar));
+                succ->prependInst(instFactory.makePhi(phiSsaVar, 2, dstSsaVars));
             } else {
                 // no SSA
                 
                 // Patch b2
-                b2->append(instFactory.makeStVar(dstVar, newDst));
+                b2->appendInst(instFactory.makeStVar(dstVar, newDst));
                 
                 // Patch b3
-                b3->append(instFactory.makeStVar(dstVar, one));
+                b3->appendInst(instFactory.makeStVar(dstVar, one));
                 
                 // succ: dst = var ...
-                succ->prependAfterCriticalInst(instFactory.makeLdVar(dst, dstVar));
+                succ->prependInst(instFactory.makeLdVar(dst, dstVar));
             }            
             
             lowerBlock(succ);
@@ -1148,14 +1145,14 @@ CodeLowerer::caseTauInstanceOf(TypeInst* inst)
             //     dst = ldvar v1.4
             //     ...
             
-            CFGNode* b1 = fg.createBlockNode();
-            CFGNode* b2 = fg.createBlockNode();
-            CFGNode* b3 = fg.createBlockNode();
-            CFGNode* b4 = fg.createBlockNode();
+            Node* b1 = fg.createBlockNode(instFactory.makeLabel());
+            Node* b2 = fg.createBlockNode(instFactory.makeLabel());
+            Node* b3 = fg.createBlockNode(instFactory.makeLabel());
+            Node* b4 = fg.createBlockNode(instFactory.makeLabel());
             
             // block: ... if src == NULL
-            Inst* test1 = instFactory.makeBranch(Cmp_Zero, src->getType()->tag, src, b4->getLabel());
-            block->append(test1);
+            Inst* test1 = instFactory.makeBranch(Cmp_Zero, src->getType()->tag, src, (LabelInst*)b4->getFirstInst());
+            block->appendInst(test1);
             fg.addEdge(block, b4);
             fg.addEdge(block, b1);
             
@@ -1165,27 +1162,27 @@ CodeLowerer::caseTauInstanceOf(TypeInst* inst)
             Opnd* dynamicVTableAddr = opndManager.createSsaTmpOpnd(typeManager.getVTablePtrType(srcType));
             Opnd* staticVTableAddr = opndManager.createSsaTmpOpnd(typeManager.getVTablePtrType(castType));
             Opnd* tauNonNull = opndManager.createSsaTmpOpnd(typeManager.getTauType());
-            b1->append(instFactory.makeTauEdge(tauNonNull));
-            b1->append(instFactory.makeTauLdVTableAddr(dynamicVTableAddr, src, tauNonNull));
-            b1->append(instFactory.makeGetVTableAddr(staticVTableAddr, castType));
-            b1->append(instFactory.makeBranch(Cmp_EQ, Type::VTablePtr, dynamicVTableAddr, staticVTableAddr, b3->getLabel()));
+            b1->appendInst(instFactory.makeTauEdge(tauNonNull));
+            b1->appendInst(instFactory.makeTauLdVTableAddr(dynamicVTableAddr, src, tauNonNull));
+            b1->appendInst(instFactory.makeGetVTableAddr(staticVTableAddr, castType));
+            b1->appendInst(instFactory.makeBranch(Cmp_EQ, Type::VTablePtr, dynamicVTableAddr, staticVTableAddr, (LabelInst*)b3->getFirstInst()));
             fg.addEdge(b1, b3);
             fg.addEdge(b1, b2);
             
             // b2: var = src instanceOf type
             Opnd* newDst = opndManager.createSsaTmpOpnd(dst->getType());
             inst->setDst(newDst);
-            b2->append(inst);
+            b2->appendInst(inst);
             fg.addEdge(b2, succ);
             
             // b3: var = 1
             Opnd* one = opndManager.createSsaTmpOpnd(dst->getType());
-            b3->append(instFactory.makeLdConst(one, (int32) 1));
+            b3->appendInst(instFactory.makeLdConst(one, (int32) 1));
             fg.addEdge(b3, succ);
             
             // b4: var = 0
             Opnd* zero = opndManager.createSsaTmpOpnd(dst->getType());
-            b4->append(instFactory.makeLdConst(zero, (int32) 0));
+            b4->appendInst(instFactory.makeLdConst(zero, (int32) 0));
             fg.addEdge(b4, succ);
             
             VarOpnd* dstVar = opndManager.createVarOpnd(dst->getType(), false);
@@ -1199,31 +1196,31 @@ CodeLowerer::caseTauInstanceOf(TypeInst* inst)
                 Opnd* dstSsaVars[3] =  { var1, var2, var3 };
                 
                 // Patch b2
-                b2->append(instFactory.makeStVar(var1, newDst));
+                b2->appendInst(instFactory.makeStVar(var1, newDst));
                 
                 // Patch b3
-                b3->append(instFactory.makeStVar(var2, one));
+                b3->appendInst(instFactory.makeStVar(var2, one));
                 
                 // Patch b4
-                b4->append(instFactory.makeStVar(var3, zero));
+                b4->appendInst(instFactory.makeStVar(var3, zero));
                 
                 // succ: dst = var ...
-                succ->prependAfterCriticalInst(instFactory.makeLdVar(dst, var4));
-                succ->prepend(instFactory.makePhi(var4, 3, dstSsaVars));
+                succ->prependInst(instFactory.makeLdVar(dst, var4));
+                succ->prependInst(instFactory.makePhi(var4, 3, dstSsaVars));
             } else {
                 // no SSA
                 
                 // Patch b2
-                b2->append(instFactory.makeStVar(dstVar, newDst));
+                b2->appendInst(instFactory.makeStVar(dstVar, newDst));
                 
                 // Patch b3
-                b3->append(instFactory.makeStVar(dstVar, one));
+                b3->appendInst(instFactory.makeStVar(dstVar, one));
                 
                 // Patch b4
-                b4->append(instFactory.makeStVar(dstVar, zero));
+                b4->appendInst(instFactory.makeStVar(dstVar, zero));
                 
                 // succ: dst = var ...
-                succ->prependAfterCriticalInst(instFactory.makeLdVar(dst, dstVar));
+                succ->prependInst(instFactory.makeLdVar(dst, dstVar));
             }
             
             lowerBlock(succ);
@@ -1235,7 +1232,7 @@ CodeLowerer::caseTauInstanceOf(TypeInst* inst)
 Inst*
 CodeLowerer::caseTauCheckElemType(Inst* inst)
 {
-    CFGNode* block = inst->getNode();
+    Node* block = inst->getNode();
     //
     // Perform null and vtable checks to avoid an expensive vm call.
     // The vtable check often succeeds in practice.
@@ -1260,8 +1257,8 @@ CodeLowerer::caseTauCheckElemType(Inst* inst)
     //
     // Target is _succ_ if check succeeds and _fail_ if cast fails.
     // 
-    CFGNode* succ = (CFGNode*) block->getUnconditionalEdge()->getTargetNode();
-    CFGNode* fail = (CFGNode*) block->getExceptionEdge()->getTargetNode();
+    Node* succ =  block->getUnconditionalEdge()->getTargetNode();
+    Node* fail =  block->getExceptionEdge()->getTargetNode();
     assert(succ->isBlockNode() && fail->isDispatchNode());
 
     if (tauCheckedNull->getInst()->getOpcode() == Op_TauUnsafe) {
@@ -1273,7 +1270,7 @@ CodeLowerer::caseTauCheckElemType(Inst* inst)
         return 0;
     }
 
-    if (Log::cat_opt()->isDebugEnabled()) {
+    if (Log::isEnabled()) {
         Log::out() << "Reducing checkelemtype: ";
         inst->print(Log::out());
         Log::out() << "block has id " << (int) block->getId() << ::std::endl;
@@ -1319,17 +1316,17 @@ CodeLowerer::caseTauCheckElemType(Inst* inst)
     //      tauResult = ldvar tauvar
     //    succ:
 
-    FlowGraph& fg = _irm.getFlowGraph();
+    ControlFlowGraph& fg = _irm.getFlowGraph();
     InstFactory& instFactory = _irm.getInstFactory();
     OpndManager& opndManager = _irm.getOpndManager();
     TypeManager& typeManager = _irm.getTypeManager();
     
-    CFGNode* b1 = 0;
-    CFGNode* b1a = 0;
-    CFGNode* b2 = fg.createBlockNode();
-    CFGNode* b2a = fg.createBlockNode();
-    CFGNode* b3 = fg.createBlockNode();
-    CFGNode* b0 = fg.createBlockNode();
+    Node* b1 = 0;
+    Node* b1a = 0;
+    Node* b2 = fg.createBlockNode(instFactory.makeLabel());
+    Node* b2a = fg.createBlockNode(instFactory.makeLabel());
+    Node* b3 = fg.createBlockNode(instFactory.makeLabel());
+    Node* b0 = fg.createBlockNode(instFactory.makeLabel());
 
     fg.removeEdge(block, fail);
     fg.removeEdge(block, succ);
@@ -1349,8 +1346,8 @@ CodeLowerer::caseTauCheckElemType(Inst* inst)
     inst->unlink();    
     Inst* test1 = instFactory.makeBranch(Cmp_Zero, src->getType()->tag,
                                          src,
-                                         b3->getLabel());
-    block->append(test1);
+                                         (LabelInst*)b3->getFirstInst());
+    block->appendInst(test1);
 
     assert(array->getType()->isObject());
     ObjectType* arrayType = (ObjectType*) array->getType();
@@ -1358,15 +1355,15 @@ CodeLowerer::caseTauCheckElemType(Inst* inst)
     ObjectType* arrayOfObjectType = typeManager.getArrayType(systemObjectType);
     if(arrayType == arrayOfObjectType) {
         // Check if it's an exact match at runtime.  If so, we can avoid the more expensive elemType check.
-        b1 = fg.createBlockNode();
-        b1a = fg.createBlockNode();
+        b1 = fg.createBlockNode(instFactory.makeLabel());
+        b1a = fg.createBlockNode(instFactory.makeLabel());
         
         opndManager.createSsaTmpOpnd(typeManager.getTauType());
         Opnd* dynamicVTableAddr = opndManager.createSsaTmpOpnd(typeManager.getVTablePtrType(arrayType));
         Opnd* staticVTableAddr = opndManager.createSsaTmpOpnd(typeManager.getVTablePtrType(arrayOfObjectType));
-        b1->append(instFactory.makeTauLdVTableAddr(dynamicVTableAddr, array, tauCheckedNull));
-        b1->append(instFactory.makeGetVTableAddr(staticVTableAddr, arrayOfObjectType));
-        b1->append(instFactory.makeBranch(Cmp_EQ, Type::VTablePtr, dynamicVTableAddr, staticVTableAddr, b1a->getLabel()));
+        b1->appendInst(instFactory.makeTauLdVTableAddr(dynamicVTableAddr, array, tauCheckedNull));
+        b1->appendInst(instFactory.makeGetVTableAddr(staticVTableAddr, arrayOfObjectType));
+        b1->appendInst(instFactory.makeBranch(Cmp_EQ, Type::VTablePtr, dynamicVTableAddr, staticVTableAddr, (LabelInst*)b1a->getFirstInst()));
 
         fg.addEdge(block, b1);
         fg.addEdge(b1, b1a);
@@ -1383,7 +1380,7 @@ CodeLowerer::caseTauCheckElemType(Inst* inst)
     //
     Opnd *tau2 = opndManager.createSsaTmpOpnd(typeManager.getTauType());
     inst->setDst(tau2);
-    b2->append(inst);
+    b2->appendInst(inst);
     
     VarOpnd* tauHasTypeVar = opndManager.createVarOpnd(typeManager.getTauType(), false);
 
@@ -1393,51 +1390,51 @@ CodeLowerer::caseTauCheckElemType(Inst* inst)
         SsaVarOpnd *tauvar3 = opndManager.createSsaVarOpnd(tauHasTypeVar);
             
         // b2a
-        b2a->append(instFactory.makeStVar(tauvar2, tau2));
+        b2a->appendInst(instFactory.makeStVar(tauvar2, tau2));
         
         // b3
         Opnd *tau3 = opndManager.createSsaTmpOpnd(typeManager.getTauType());
-        b3->append(instFactory.makeTauEdge(tau3));
-        b3->append(instFactory.makeStVar(tauvar3, tau3));
+        b3->appendInst(instFactory.makeTauEdge(tau3));
+        b3->appendInst(instFactory.makeStVar(tauvar3, tau3));
             
         if (b1a) {
             // b1a
             SsaVarOpnd *tauvar1 = opndManager.createSsaVarOpnd(tauHasTypeVar);
             Opnd *tau1 = opndManager.createSsaTmpOpnd(typeManager.getTauType());
-            b1a->append(instFactory.makeTauEdge(tau1));
-            b1a->append(instFactory.makeStVar(tauvar1, tau1));
+            b1a->appendInst(instFactory.makeTauEdge(tau1));
+            b1a->appendInst(instFactory.makeStVar(tauvar1, tau1));
             
             // b0
             Opnd* phiOpnds[3] = { tauvar1, tauvar2, tauvar3 };
-            b0->prependAfterCriticalInst(instFactory.makeLdVar(tauResult, tauvar0));
-            b0->prepend(instFactory.makePhi(tauvar0, 3, phiOpnds));
+            b0->prependInst(instFactory.makeLdVar(tauResult, tauvar0));
+            b0->prependInst(instFactory.makePhi(tauvar0, 3, phiOpnds));
         } else {
             // b0
             Opnd* phiOpnds[2] = { tauvar2, tauvar3 };
-            b0->prependAfterCriticalInst(instFactory.makeLdVar(tauResult, tauvar0));
-            b0->prepend(instFactory.makePhi(tauvar0, 2, phiOpnds));
+            b0->prependInst(instFactory.makeLdVar(tauResult, tauvar0));
+            b0->prependInst(instFactory.makePhi(tauvar0, 2, phiOpnds));
         }
     } else {
         // b2a
-        b2a->append(instFactory.makeStVar(tauHasTypeVar, tau2));
+        b2a->appendInst(instFactory.makeStVar(tauHasTypeVar, tau2));
         
         // b3
         Opnd *tau3 = opndManager.createSsaTmpOpnd(typeManager.getTauType());
-        b3->append(instFactory.makeTauEdge(tau3));
-        b3->append(instFactory.makeStVar(tauHasTypeVar, tau3));
+        b3->appendInst(instFactory.makeTauEdge(tau3));
+        b3->appendInst(instFactory.makeStVar(tauHasTypeVar, tau3));
         
         if (b1a) {
             // b1a
             Opnd *tau1 = opndManager.createSsaTmpOpnd(typeManager.getTauType());
-            b1a->append(instFactory.makeTauEdge(tau1));
-            b1a->append(instFactory.makeStVar(tauHasTypeVar, tau1));
+            b1a->appendInst(instFactory.makeTauEdge(tau1));
+            b1a->appendInst(instFactory.makeStVar(tauHasTypeVar, tau1));
         }
         
         // b0
-        b0->prependAfterCriticalInst(instFactory.makeLdVar(tauResult, tauHasTypeVar));
+        b0->prependInst(instFactory.makeLdVar(tauResult, tauHasTypeVar));
     }
     
-    if (Log::cat_opt()->isDebugEnabled()) {
+    if (Log::isEnabled()) {
         Log::out() << "Reducing checkelemtype: ";
         inst->print(Log::out());
         if (b1) {
@@ -1484,7 +1481,7 @@ CodeLowerer::caseLdStaticAddr(FieldAccessInst *inst)
 Inst*
 CodeLowerer::caseLdFieldAddr(FieldAccessInst *inst)
 {
-    OptimizerFlags& optimizerFlags = *_irm.getCompilationContext()->getOptimizerFlags();
+    const OptimizerFlags& optimizerFlags = _irm.getOptimizerFlags();
     if (optimizerFlags.reduce_compref) {
         // reduce this to addoffset(base, ldfieldoffset)
 
@@ -1514,7 +1511,7 @@ CodeLowerer::caseLdFieldAddr(FieldAccessInst *inst)
 Inst*
 CodeLowerer::caseLdElemAddr(TypeInst *inst)
 {
-    OptimizerFlags& optimizerFlags = *_irm.getCompilationContext()->getOptimizerFlags();
+    const OptimizerFlags& optimizerFlags = _irm.getOptimizerFlags();
     if (optimizerFlags.reduce_compref) {
         // reduce this to addoffset(base, ldelemoffset)
         TypeInst *tinst = inst->asTypeInst();
@@ -1550,7 +1547,7 @@ CodeLowerer::caseLdElemAddr(TypeInst *inst)
 Inst*
 CodeLowerer::caseLdArrayBaseAddr(Inst *inst)
 {
-    OptimizerFlags& optimizerFlags = *_irm.getCompilationContext()->getOptimizerFlags();
+    const OptimizerFlags& optimizerFlags = _irm.getOptimizerFlags();
     if (optimizerFlags.reduce_compref) {
         // reduce this to addoffset(base, ldelemoffset)
         TypeInst *tinst = inst->asTypeInst();
@@ -1582,7 +1579,7 @@ CodeLowerer::caseLdArrayBaseAddr(Inst *inst)
 Inst*
 CodeLowerer::caseTauArrayLen(Inst *inst)
 {
-    OptimizerFlags& optimizerFlags = *_irm.getCompilationContext()->getOptimizerFlags(); 
+    const OptimizerFlags& optimizerFlags = _irm.getOptimizerFlags(); 
     if (optimizerFlags.reduce_compref) {
         // reduce this to addoffset(base, ldelemoffset)
 
@@ -1629,7 +1626,7 @@ CodeLowerer::caseTauLdInd(Inst *inst)
 }
 
 Inst*
-CodeLowerer::caseLdString(TokenInst *inst)
+CodeLowerer::caseLdRef(TokenInst *inst)
 {
     // handled in simplifier for now.
     return inst;

@@ -27,7 +27,6 @@
 
 
 
-#include "FlowGraph.h"
 #include "Dominator.h"
 #include "SSA.h"
 #include "Inst.h"
@@ -41,38 +40,38 @@
 
 namespace Jitrino {
 
-DEFINE_OPTPASS_IMPL(FixupVarsPass, fixupvars, "Fixup SSA Vars")
+DEFINE_SESSION_ACTION(FixupVarsPass, fixupvars, "Fixup SSA Vars")
 
 void
 FixupVarsPass::_run(IRManager& irm) {
-    computeDominators(irm);
+    OptPass::computeDominators(irm);
     DominatorTree* dominatorTree = irm.getDominatorTree();
-    FlowGraph& flowGraph = irm.getFlowGraph();
+    ControlFlowGraph& flowGraph = irm.getFlowGraph();
     
     DomFrontier frontier(irm.getNestedMemoryManager(),*dominatorTree,&flowGraph);
-    SSABuilder ssaBuilder(irm.getOpndManager(),irm.getInstFactory(),frontier,&flowGraph, *irm.getCompilationContext()->getOptimizerFlags());
+    SSABuilder ssaBuilder(irm.getOpndManager(),irm.getInstFactory(),frontier,&flowGraph, irm.getOptimizerFlags());
     bool phiInserted = ssaBuilder.fixupVars(&irm.getFlowGraph(), irm.getMethodDesc());
     irm.setInSsa(true);
     if (phiInserted)
         irm.setSsaUpdated();
 }
 
-DEFINE_OPTPASS_IMPL(SSAPass, ssa, "SSA Construction")
+DEFINE_SESSION_ACTION(SSAPass, ssa, "SSA Construction")
 
 void
 SSAPass::_run(IRManager& irm) {
-    computeDominators(irm);
+    OptPass::computeDominators(irm);
     DominatorTree* dominatorTree = irm.getDominatorTree();
-    FlowGraph& flowGraph = irm.getFlowGraph();
+    ControlFlowGraph& flowGraph = irm.getFlowGraph();
    
     DomFrontier frontier(irm.getNestedMemoryManager(),*dominatorTree,&flowGraph);
-    SSABuilder ssaBuilder(irm.getOpndManager(),irm.getInstFactory(),frontier,&flowGraph, *irm.getCompilationContext()->getOptimizerFlags());
+    SSABuilder ssaBuilder(irm.getOpndManager(),irm.getInstFactory(),frontier,&flowGraph, irm.getOptimizerFlags());
     ssaBuilder.convertSSA(irm.getMethodDesc());
     irm.setInSsa(true);
     irm.setSsaUpdated();
 }
 
-DEFINE_OPTPASS_IMPL(DeSSAPass, dessa, "SSA Deconstruction")
+DEFINE_SESSION_ACTION(DeSSAPass, dessa, "SSA Deconstruction")
 
 void
 DeSSAPass::_run(IRManager& irm) {
@@ -80,21 +79,20 @@ DeSSAPass::_run(IRManager& irm) {
     irm.setInSsa(false);
 }
 
-DEFINE_OPTPASS_IMPL(SplitSSAPass, splitssa, "SSA Variable Web Splitting") 
+DEFINE_SESSION_ACTION(SplitSSAPass, splitssa, "SSA Variable Web Splitting") 
 
 void
-SplitSSAPass::_run(IRManager& irm)
-{
+SplitSSAPass::_run(IRManager& irm) {
     SSABuilder::splitSsaWebs(&irm.getFlowGraph(), irm.getOpndManager());
 }
 
 
-// #define DEBUG_SSA
+//#define DEBUG_SSA
 
 class RenameStack : public SparseScopedMap<Opnd *, SsaVarOpnd *> {
 public:
     typedef SparseScopedMap<Opnd *, SsaVarOpnd *> BaseMap;
-    RenameStack(MemoryManager& mm, uint32 n, OptimizerFlags& optimizerFlags)
+    RenameStack(MemoryManager& mm, uint32 n, const OptimizerFlags& optimizerFlags)
         : BaseMap(n, mm,
                   optimizerFlags.hash_init_factor,
                   optimizerFlags.hash_resize_factor,
@@ -108,15 +106,15 @@ public:
 // find def sites (blocks) of var operand
 //
 void SSABuilder::findDefSites(DefSites& allDefSites) {
-    const CFGNodeDeque& nodes = fg->getNodes();
-    CFGNodeDeque::const_iterator niter;
+    const Nodes& nodes = fg->getNodes();
+    Nodes::const_iterator niter;
     for(niter = nodes.begin(); niter != nodes.end(); ++niter) {
-        CFGNode* node = *niter;
-        if (!node->isBasicBlock()) continue;
+        Node* node = *niter;
+        if (!node->isBlockNode()) continue;
 
         // go over each instruction to find var definition
-        Inst* first = node->getFirstInst();
-        for (Inst* inst = first->next(); inst != first; inst = inst->next()) {
+        Inst* first = (Inst*)node->getFirstInst();
+        for (Inst* inst = first->getNextInst(); inst != NULL; inst = inst->getNextInst()) {
             // look for var definitions
             if (!inst->isStVar()) 
                 continue;
@@ -149,11 +147,11 @@ class SsaRenameWalker {
     RenameStack *rs;
     uint32 n;
     const StlVectorSet<VarOpnd *> *whatVars;
-    OptimizerFlags& optimizerFlags;
+    const OptimizerFlags& optimizerFlags;
 public:
     SsaRenameWalker(SSABuilder *builder0,
                     MemoryManager &localMM,
-                    uint32 num, OptimizerFlags& _optimizerFlags)
+                    uint32 num, const OptimizerFlags& _optimizerFlags)
         : localMemManager(localMM),
           ssaBuilder(builder0),
           rs(0),
@@ -187,16 +185,16 @@ void SSABuilder::renameNode(RenameStack *renameStack, DominatorNode* dt,
                             const StlVectorSet<VarOpnd *> *whatVars)
 {
     if (dt == NULL) return;
-    CFGNode* node = dt->getNode();
+    Node* node = dt->getNode();
 
-    Inst* head = node->getFirstInst();
+    Inst* head = (Inst*)node->getFirstInst();
 #ifdef DEBUG_SSA
-    ::std::ostream &cout = Log::out();
-    if (Log::cat_opt()->isDebugEnabled()) {
-        ::std::cout << "renameNode "; node->printLabel(cout); ::std::cout << ::std::endl;
+    std::ostream &cout = Log::out();
+    if (Log::isEnabled()) {
+        cout << "renameNode "; FlowGraph::printLabel(cout, node); cout << std::endl;
     }
 #endif
-    for (Inst* i = head->next(); i != head; i = i->next()) {
+    for (Inst* i = head->getNextInst(); i != NULL; i = i->getNextInst()) {
         if (!i->isPhi()) {
             // replace src with ssa opnd
             uint32 nSrcs = i->getNumSrcOperands();
@@ -225,15 +223,15 @@ void SSABuilder::renameNode(RenameStack *renameStack, DominatorNode* dt,
 
             SsaVarOpnd* ssaDst = opndManager.createSsaVarOpnd((VarOpnd*)dst);
 #ifdef DEBUG_SSA
-            if (Log::cat_opt()->isDebugEnabled()) {
-                ::std::cout << "SSA "; ssaDst->print(cout); ::std::cout << ::std::endl;
+            if (Log::isEnabled()) {
+                cout << "SSA "; ssaDst->print(cout); cout << ::std::endl;
             }
 #endif
             renameStack->insert((VarOpnd*)dst, ssaDst);
             i->setDst(ssaDst);
 #ifdef DEBUG_SSA
-            if (Log::cat_opt()->isDebugEnabled()) {
-                i->print(cout); ::std::cout << ::std::endl;
+            if (Log::isEnabled()) {
+                i->print(cout); cout << ::std::endl;
             }
 #endif
             // record stVar inst
@@ -243,39 +241,39 @@ void SSABuilder::renameNode(RenameStack *renameStack, DominatorNode* dt,
             if (whatVars && !whatVars->has(theVar))
                 continue;
 #ifdef DEBUG_SSA
-            if (Log::cat_opt()->isDebugEnabled()) {
-                ::std::cout << "SSA "; ssaDst->print(cout); ::std::cout << ::std::endl;
+            if (Log::isEnabled()) {
+                cout << "SSA "; ssaDst->print(cout); cout << ::std::endl;
             }
 #endif
             renameStack->insert(ssaDst->getVar(), ssaDst);
 #ifdef DEBUG_SSA
-            if (Log::cat_opt()->isDebugEnabled()) {
-                i->print(cout); ::std::cout << ::std::endl;
+            if (Log::isEnabled()) {
+                i->print(cout); cout << ::std::endl;
             }
 #endif
         }
     }
 
     // add var sources to following phi instructions
-    const CFGEdgeDeque& edges = node->getOutEdges();
-    CFGEdgeDeque::const_iterator 
+    const Edges& edges = node->getOutEdges();
+    Edges::const_iterator 
         eiter = edges.begin(),
         eend = edges.end();
     for(eiter = edges.begin(); eiter != eend; ++eiter) {
-        CFGEdge* e = *eiter;
-        CFGNode* succ = e->getTargetNode();
+        Edge* e = *eiter;
+        Node* succ = e->getTargetNode();
         // Phi insts are inserted to the beginning of the block
         // if succ does not have phi insts, then we can skip  it
-        Inst *phi = succ->getFirstInst()->next();
-        if (!phi->isPhi()) continue;
+        Inst *phi = (Inst*)succ->getSecondInst();
+        if (phi==NULL || !phi->isPhi()) continue;
 
         // node is jth predecessor for succ
         
         
         // replace jth var of phi insts
-        Inst* nextphi = phi->next();
-        for (;phi->isPhi(); phi = nextphi) {
-            nextphi = phi->next();
+        Inst* nextphi = phi->getNextInst();
+        for (;phi!=NULL && phi->isPhi(); phi = nextphi) {
+            nextphi = phi->getNextInst();
             // get var 
             Opnd *theopnd = phi->getDst();
             VarOpnd *thevar = theopnd->asVarOpnd();
@@ -285,7 +283,7 @@ void SSABuilder::renameNode(RenameStack *renameStack, DominatorNode* dt,
                 assert(theSsaVar);
 
 #ifdef DEBUG_SSA
-                if (Log::cat_opt()->isDebugEnabled()) {
+                if (Log::isEnabled()) {
                     Log::out() << "case 2" << ::std::endl;
                 }
 #endif
@@ -298,19 +296,19 @@ void SSABuilder::renameNode(RenameStack *renameStack, DominatorNode* dt,
 
             if (ssa != NULL) {
 #ifdef DEBUG_SSA
-                if (Log::cat_opt()->isDebugEnabled()) {
-                    ::std::cout << "redge";
-                    ::std::cout << (int32)j;
-                    ::std::cout << " with ssa "; ssa->print(cout); ::std::cout << ::std::endl;
+                if (Log::isEnabled()) {
+                    cout << "redge";
+//                    cout << (int32)j;
+                    cout << " with ssa "; ssa->print(cout); cout << ::std::endl;
                 }
 #endif
                 addPhiSrc((PhiInst*)phi,ssa);
             } else {
 #ifdef DEBUG_SSA
-                if (Log::cat_opt()->isDebugEnabled()) {
-                    ::std::cout << "no source for phi of var ";
+                if (Log::isEnabled()) {
+                    cout << "no source for phi of var ";
                     thevar->print(cout);
-                    ::std::cout << ::std::endl;
+                    cout << ::std::endl;
                 }
 #endif
                 // if ssa is NULL, then the phi must be a dead phi inst
@@ -332,16 +330,16 @@ void SSABuilder::insertPhi(DefSites& allDefSites) {
         if (varOpnd->isAddrTaken())
             continue;
 
-        CFGNode* node;
-        CFGNode *returnNode = fg->getReturn();
-        CFGNode *unwindNode = fg->getUnwind();
-        CFGNode *exitNode = fg->getExit();
+        Node* node;
+        Node *returnNode = fg->getReturnNode();
+        Node *unwindNode = fg->getUnwindNode();
+        Node *exitNode = fg->getExitNode();
 
         while ((node = defSites->removeDefSite()) != NULL) {
-            List<CFGNode>* df = frontier.getFrontiersOf(node);
+            List<Node>* df = frontier.getFrontiersOf(node);
             for (; df != NULL; df = df->getNext()) {
                 // block where phi inst is going to be inserted
-                CFGNode* insertedLoc = df->getElem();
+                Node* insertedLoc = df->getElem();
                 // if phi has been inserted, then skip
                 // no need to insert phi inst in the epilog,
                 // return node, or unwind node because
@@ -361,11 +359,11 @@ void SSABuilder::insertPhi(DefSites& allDefSites) {
     }
 }
 
-void SSABuilder::createPhiInst(VarOpnd* var, CFGNode* insertedLoc) {
+void SSABuilder::createPhiInst(VarOpnd* var, Node* insertedLoc) {
     // create phi instruction
     Inst* phi = instFactory.makePhi(var,0, 0);
     // insert to the beginning of insertedLoc
-    insertedLoc->prepend(phi);
+    insertedLoc->prependInst(phi);
     createPhi = true;
 }
 
@@ -398,7 +396,7 @@ class ClearPhiSrcsWalker {
     SSABuilder *thePass;
     const StlVectorSet<VarOpnd *> *whatVars;
 public:
-    void applyToCFGNode(CFGNode *node) { thePass->clearPhiSrcs(node,
+    void applyToCFGNode(Node *node) { thePass->clearPhiSrcs(node,
                                                                whatVars); };
     
     ClearPhiSrcsWalker(SSABuilder *thePass0)
@@ -417,9 +415,9 @@ class ClearPhiSrcsWalker2 {
     const StlVectorSet<VarOpnd *> *oldVars; // vars of interest
     StlVector<VarOpnd *> *newVars; // vars which we have changed
     const StlVectorSet<Opnd *> *removedVars; // vars defined by removed Phis
-    StlVector<CFGNode *> &tmpNodeList;
+    StlVector<Node *> &tmpNodeList;
 public:
-    void applyToCFGNode(CFGNode *node) { thePass->clearPhiSrcs2(node,
+    void applyToCFGNode(Node *node) { thePass->clearPhiSrcs2(node,
                                                                 oldVars,
                                                                 newVars,
                                                                 removedVars,
@@ -428,7 +426,7 @@ public:
                         const StlVectorSet<VarOpnd *> *oldVars0,
                         StlVector<VarOpnd *> *newVars0,
                         const StlVectorSet<Opnd *> *removedVars0,
-                        StlVector<CFGNode *> &tmpNodeList0)
+                        StlVector<Node *> &tmpNodeList0)
         : thePass(thePass0),
           oldVars(oldVars0), newVars(newVars0),
           removedVars(removedVars0),
@@ -446,11 +444,11 @@ public:
     }
 };
 
-void SSABuilder::clearPhiSrcs(CFGNode *node, const StlVectorSet<VarOpnd *> *whatVars)
+void SSABuilder::clearPhiSrcs(Node *node, const StlVectorSet<VarOpnd *> *whatVars)
 {
+    Inst* phi = (Inst*)node->getSecondInst();
     if (whatVars) {
-        Inst* phi = node->getFirstInst()->next();
-        for (;phi->isPhi(); phi = phi->next()) {
+        for (;phi!=NULL && phi->isPhi(); phi = phi->getNextInst()) {
             Opnd *dstOp = phi->getDst();
             VarOpnd *varOpnd = dstOp->asVarOpnd();
             if (!varOpnd) {
@@ -465,8 +463,7 @@ void SSABuilder::clearPhiSrcs(CFGNode *node, const StlVectorSet<VarOpnd *> *what
             }
         }
     } else {
-        Inst* phi = node->getFirstInst()->next();
-        for (;phi->isPhi(); phi = phi->next()) {
+        for (;phi!=NULL && phi->isPhi(); phi = phi->getNextInst()) {
             PhiInst *phiInst = phi->asPhiInst();
             assert(phiInst);
             phiInst->setNumSrcs(0);
@@ -474,17 +471,17 @@ void SSABuilder::clearPhiSrcs(CFGNode *node, const StlVectorSet<VarOpnd *> *what
     }
 }
 
-void SSABuilder::clearPhiSrcs2(CFGNode *node, 
+void SSABuilder::clearPhiSrcs2(Node *node, 
                                const StlVectorSet<VarOpnd *> *whatVars,
                                StlVector<VarOpnd *> *changedVars,
                                const StlVectorSet<Opnd *> *removedVars,
-                               StlVector<CFGNode *> &scratchNodeList)
+                               StlVector<Node *> &scratchNodeList)
 {
     bool needPreds = true;
-    StlVector<CFGNode *> &preds = scratchNodeList;
+    StlVector<Node *> &preds = scratchNodeList;
 
-    Inst* inst = node->getFirstInst()->next();
-    for (;inst->isPhi(); inst = inst->next()) {
+    Inst* inst = (Inst*)node->getSecondInst();
+    for (;inst!=NULL && inst->isPhi(); inst = inst->getNextInst()) {
         Opnd *dstOp =inst->getDst();
         VarOpnd *varOpnd = 0;
         if (whatVars) {
@@ -507,25 +504,25 @@ void SSABuilder::clearPhiSrcs2(CFGNode *node,
                 if (needPreds) {
                     needPreds = false;
                     
-                    const CFGEdgeDeque& edges2 = node->getInEdges();
+                    const Edges& edges2 = node->getInEdges();
                     preds.clear();
                     preds.reserve(edges2.size());
-                    CFGEdgeDeque::const_iterator eiter2;
+                    Edges::const_iterator eiter2;
                     for(eiter2 = edges2.begin(); eiter2 != edges2.end(); ++eiter2){
                         preds.push_back((*eiter2)->getSourceNode());
                     }
                 }
                 DominatorTree &domTree = frontier.getDominator();
                 Inst *thisOpndInst = thisOpnd->getInst();
-                CFGNode *thisOpndInstNode = thisOpndInst->getNode();
+                Node *thisOpndInstNode = thisOpndInst->getNode();
                 if (thisOpndInstNode) {
                     // the operand's source instruction was not already dead.
-                    StlVector<CFGNode *>::const_iterator 
+                    StlVector<Node *>::const_iterator 
                         predIter = preds.begin(),
                         predEnd = preds.end();
                     bool foundDom = false;
                     for ( ; predIter != predEnd; ++predIter) {
-                        CFGNode *predNode = *predIter;
+                        Node *predNode = *predIter;
                         if (domTree.dominates(thisOpndInstNode, predNode)) {
                             // we found it, leave this operand alone.
                             foundDom = true;
@@ -570,7 +567,7 @@ class CheckForTrivialPhisWalker {
     StlVector<VarOpnd *> changedVars;
     StlVectorSet<VarOpnd *> changedVarsSet;
 public:
-    void applyToCFGNode(CFGNode *node) { 
+    void applyToCFGNode(Node *node) { 
         if (thePass->checkForTrivialPhis(node, changedVars)) {
             removedPhi = true; 
             removedPhiRecently = true;
@@ -600,32 +597,31 @@ public:
     };
 };
 
-bool SSABuilder::checkForTrivialPhis(CFGNode *node, 
+bool SSABuilder::checkForTrivialPhis(Node *node, 
                                      StlVector<VarOpnd *> &changedVars)
 {
-    Inst* phi = node->getFirstInst()->next();
-    Inst *nextphi = phi->next();
+    Inst* phi = (Inst*)node->getSecondInst();
     bool removedPhi = false;
 #ifdef DEBUG_SSA
-    if (Log::cat_opt()->isDebugEnabled()) {
+    if (Log::isEnabled()) {
         Log::out() << "Checking node " << (int)node->getId() 
                    << " for trivial phis" << ::std::endl;
     }
 #endif
-            
-    for (;phi->isPhi(); phi = nextphi) {
-        nextphi = phi->next();
+    Inst* nextphi = NULL;            
+    for (;phi!=NULL && phi->isPhi(); phi = nextphi) {
+        nextphi = phi->getNextInst();
 #ifdef _DEBUG
         PhiInst *phiInst = phi->asPhiInst();
-		assert(phiInst);
+        assert(phiInst);
 #endif
         uint32 nSrcs = phi->getNumSrcOperands();
         if (nSrcs <= 1) {
             // phi must be trivial
 #ifdef DEBUG_SSA
             ::std::ostream &cout = Log::out();
-            if (Log::cat_opt()->isDebugEnabled()) {
-                ::std::cout << "removing trivial instruction "; phi->print(cout); ::std::cout << ::std::endl;
+            if (Log::isEnabled()) {
+                cout << "removing trivial instruction "; phi->print(cout); cout << ::std::endl;
             }
 #endif
             Opnd *dstOp = phi->getDst();
@@ -650,7 +646,7 @@ class CheckForTrivialPhisWalker2 {
     StlVector<VarOpnd *> *changedVars; // note which vars are changed
     StlVector<Opnd *> *removedVars; // record dst of removed Phis
 public:
-    void applyToCFGNode(CFGNode *node) { 
+    void applyToCFGNode(Node *node) { 
         thePass->checkForTrivialPhis2(node, lookatVars, changedVars,
                                       removedVars);
     };
@@ -667,32 +663,32 @@ public:
     void setChangedVars(StlVector<VarOpnd *> *vars) { changedVars = vars; }
 };
 
-void SSABuilder::checkForTrivialPhis2(CFGNode *node, 
+void SSABuilder::checkForTrivialPhis2(Node *node, 
                                       const StlVectorSet<VarOpnd *> *lookatVars,
                                       StlVector<VarOpnd *> *changedVars,
                                       StlVector<Opnd *> *removedVars)
 {
-    Inst* phi = node->getFirstInst()->next();
-    Inst *nextphi = phi->next();
+    Inst* phi = (Inst*)node->getSecondInst();
+    Inst *nextphi = NULL;
 #ifdef DEBUG_SSA
-    if (Log::cat_opt()->isDebugEnabled()) {
+    if (Log::isEnabled()) {
         Log::out() << "Checking node " << (int)node->getId() 
                    << " for trivial phis2" << ::std::endl;
     }
 #endif
     for (;phi->isPhi(); phi = nextphi) {
-        nextphi = phi->next();
+        nextphi = phi->getNextInst();
 #ifdef _DEBUG
         PhiInst *phiInst = phi->asPhiInst();
-		assert(phiInst);
+        assert(phiInst);
 #endif
         uint32 nSrcs = phi->getNumSrcOperands();
         if (nSrcs <= 1) {
             // phi must be trivial
 #ifdef DEBUG_SSA
             ::std::ostream &cout = Log::out();
-            if (Log::cat_opt()->isDebugEnabled()) {
-                ::std::cout << "removing trivial2 instruction "; phi->print(cout); ::std::cout << ::std::endl;
+            if (Log::isEnabled()) {
+                cout << "removing trivial2 instruction "; phi->print(cout); cout << ::std::endl;
             }
 #endif
             Opnd *dstOp = phi->getDst();
@@ -717,17 +713,17 @@ bool SSABuilder::fixupSSA(MethodDesc& methodDesc, bool useBetter) {
                           "SSABuilder::fixupSSA::memManager");
 
 #ifdef DEBUG_SSA
-    if (Log::cat_opt()->isDebugEnabled()) {
+    if (Log::isEnabled()) {
         Log::out() << "Starting fixupSSA" << ::std::endl;
         
-        fg->printDotFile(methodDesc, "midfixup-0", 0);
+        FlowGraph::printDotFile(*fg, methodDesc, "midfixup-0");
     }
 #endif
 
     if (useBetter) {
         StlVector<VarOpnd *> newChangedVars(localMM);
         StlVector<Opnd *> removedVars(localMM);
-        StlVector<CFGNode *> tmpNodeList(localMM);
+        StlVector<Node *> tmpNodeList(localMM);
 
         // first cleanup trivial Phis to avoid mess later
         CheckForTrivialPhisWalker2 checkTrivialWalker(this,
@@ -748,7 +744,7 @@ bool SSABuilder::fixupSSA(MethodDesc& methodDesc, bool useBetter) {
         NodeWalk<ClearPhiSrcsWalker2>(*fg, clearPhisWalker2);
         if (newChangedVars.empty()) {
 #ifdef DEBUG_SSA
-            if (Log::cat_opt()->isDebugEnabled()) {
+            if (Log::isEnabled()) {
                 Log::out() << "newChangedVars is empty" << ::std::endl;
             }
 #endif
@@ -777,7 +773,7 @@ bool SSABuilder::fixupSSA(MethodDesc& methodDesc, bool useBetter) {
             // lather, rinse, repeat
 
 #ifdef DEBUG_SSA
-            if (Log::cat_opt()->isDebugEnabled()) {
+            if (Log::isEnabled()) {
                 Log::out() << "beginning iteration" << ::std::endl;
             }
 #endif
@@ -807,7 +803,7 @@ bool SSABuilder::fixupSSA(MethodDesc& methodDesc, bool useBetter) {
             NodeWalk<CheckForTrivialPhisWalker2>(*fg, checkTrivialWalker);
         }
 #ifdef DEBUG_SSA
-        if (Log::cat_opt()->isDebugEnabled()) {
+        if (Log::isEnabled()) {
             Log::out() << "done iteration" << ::std::endl;
         }
 #endif
@@ -817,8 +813,8 @@ bool SSABuilder::fixupSSA(MethodDesc& methodDesc, bool useBetter) {
         NodeWalk<ClearPhiSrcsWalker>(*fg, clearPhisWalker);
         
 #ifdef DEBUG_SSA
-        if (Log::cat_opt()->isDebugEnabled()) {
-            fg->printDotFile(methodDesc, "midfixup-1", 0);
+        if (Log::isEnabled()) {
+            FlowGraph::printDotFile(*fg, methodDesc, "midfixup-1");
         }
 #endif
         
@@ -830,8 +826,8 @@ bool SSABuilder::fixupSSA(MethodDesc& methodDesc, bool useBetter) {
                              localMM);
         
 #ifdef DEBUG_SSA
-        if (Log::cat_opt()->isDebugEnabled()) {
-            fg->printDotFile(methodDesc, "midfixup-2", 0);
+        if (Log::isEnabled()) {
+            FlowGraph::printDotFile(*fg, methodDesc, "midfixup-2");
         }
 #endif
 
@@ -839,21 +835,21 @@ bool SSABuilder::fixupSSA(MethodDesc& methodDesc, bool useBetter) {
         NodeWalk<CheckForTrivialPhisWalker>(*fg, checkTrivialWalker);
 
 #ifdef DEBUG_SSA
-        if (Log::cat_opt()->isDebugEnabled()) {
+        if (Log::isEnabled()) {
             Log::out() << "before iteration" << ::std::endl;
         }
 #endif
         while (checkTrivialWalker.foundTrivial()) {
 #ifdef DEBUG_SSA
-            if (Log::cat_opt()->isDebugEnabled()) {
+            if (Log::isEnabled()) {
                 Log::out() << "starting iteration" << ::std::endl;
             }
 #endif
 
             // we deleted some Phi instruction(s)
 #ifdef DEBUG_SSA
-            if (Log::cat_opt()->isDebugEnabled()) {
-                fg->printDotFile(methodDesc, "midfixup-3", 0);
+            if (Log::isEnabled()) {
+                FlowGraph::printDotFile(*fg, methodDesc, "midfixup-3");
             }
 #endif
             // clear all other Phis for that var(s)
@@ -871,14 +867,14 @@ bool SSABuilder::fixupSSA(MethodDesc& methodDesc, bool useBetter) {
             NodeWalk<CheckForTrivialPhisWalker>(*fg, checkTrivialWalker);
         }
 #ifdef DEBUG_SSA
-        if (Log::cat_opt()->isDebugEnabled()) {
+        if (Log::isEnabled()) {
             Log::out() << "done iteration" << ::std::endl;
         }
 #endif
     }        
 #ifdef DEBUG_SSA
-    if (Log::cat_opt()->isDebugEnabled()) {
-        fg->printDotFile(methodDesc, "midfixup-4", 0);
+    if (Log::isEnabled()) {
+        FlowGraph::printDotFile(*fg, methodDesc, "midfixup-4");
         
         Log::out() << "Finished fixupSSA" << ::std::endl;
     }
@@ -988,17 +984,17 @@ public:
 
 // check for new Vars which are not in SSA form; if there are any, fix up all occurrences of 
 // that var, put into SSA form.
-bool SSABuilder::fixupVars(FlowGraph *fg, MethodDesc& methodDesc) {
+bool SSABuilder::fixupVars(ControlFlowGraph*fg, MethodDesc& methodDesc) {
     // clear out all Phi args
     int sizeEstimate = opndManager.getNumVarOpnds()+opndManager.getNumSsaOpnds();
     MemoryManager localMM(64*sizeEstimate,
                           "SSABuilder::fixupVars::memManager");
 
 #ifdef DEBUG_SSA
-    if (Log::cat_opt()->isDebugEnabled()) {
+    if (Log::isEnabled()) {
         Log::out() << "Starting fixupVars" << ::std::endl;
         
-        fg->printDotFile(methodDesc, "midfixupvars-0", 0);
+        FlowGraph::printDotFile(*fg, methodDesc, "midfixupvars-0");
     }
 #endif
 
@@ -1022,8 +1018,8 @@ bool SSABuilder::fixupVars(FlowGraph *fg, MethodDesc& methodDesc) {
         // now all vars in usedOutOfSsa are not used in SSA form, and have no Phis.
         
 #ifdef DEBUG_SSA
-        if (Log::cat_opt()->isDebugEnabled()) {
-            fg->printDotFile(methodDesc, "midfixupvars-1", 0);
+        if (Log::isEnabled()) {
+            FlowGraph::printDotFile(*fg,methodDesc, "midfixupvars-1");
         }
 #endif
 
@@ -1032,8 +1028,8 @@ bool SSABuilder::fixupVars(FlowGraph *fg, MethodDesc& methodDesc) {
     }
 
 #ifdef DEBUG_SSA
-    if (Log::cat_opt()->isDebugEnabled()) {
-        fg->printDotFile(methodDesc, "midfixupvars-3", 0);
+    if (Log::isEnabled()) {
+        FlowGraph::printDotFile(*fg, methodDesc, "midfixupvars-3");
         
         Log::out() << "Finished fixupVars" << ::std::endl;
     }
@@ -1054,14 +1050,14 @@ bool SSABuilder::fixupVars(FlowGraph *fg, MethodDesc& methodDesc) {
  */
 
 
-void SSABuilder::deconvertSSA(FlowGraph* fg,OpndManager& opndManager) {
-    const CFGNodeDeque& nodes = fg->getNodes();
-    CFGNodeDeque::const_iterator niter;
+void SSABuilder::deconvertSSA(ControlFlowGraph* fg,OpndManager& opndManager) {
+    const Nodes& nodes = fg->getNodes();
+    Nodes::const_iterator niter;
     for(niter = nodes.begin(); niter != nodes.end(); ++niter) {
-        CFGNode* node = *niter;
-        Inst *headInst = node->getFirstInst();
-        for (Inst *inst = headInst->next(); inst != headInst; ) {
-            Inst *nextInst = inst->next();
+        Node* node = *niter;
+        Inst *headInst = (Inst*)node->getFirstInst();
+        for (Inst *inst = headInst->getNextInst(); inst != NULL; ) {
+            Inst *nextInst = inst->getNextInst();
             if (inst->isPhi()) {
                 inst->unlink();
             } else {
@@ -1100,19 +1096,19 @@ struct SsaVarClique : private UnionFind {
 
 // rename vars to make un-overlapping live ranges of a variable into
 // different variables.
-void SSABuilder::splitSsaWebs(FlowGraph* fg,OpndManager& opndManager) {
+void SSABuilder::splitSsaWebs(ControlFlowGraph* fg,OpndManager& opndManager) {
     uint32 numSsaOpnds = opndManager.getNumSsaOpnds();
     MemoryManager localMM(16*numSsaOpnds,
                           "SSABuilder::splitSsaWebs::memManager");
     SsaVarClique *cliques = new (localMM) SsaVarClique[numSsaOpnds];
     
-    const CFGNodeDeque& nodes = fg->getNodes();
-    CFGNodeDeque::const_iterator niter;
+    const Nodes& nodes = fg->getNodes();
+    Nodes::const_iterator niter;
     for(niter = nodes.begin(); niter != nodes.end(); ++niter) {
-        CFGNode* node = *niter;
-        Inst *headInst = node->getFirstInst();
-        for (Inst *inst = headInst->next(); inst != headInst; ) {
-            Inst *nextInst = inst->next();
+        Node* node = *niter;
+        Inst *headInst = (Inst*)node->getFirstInst();
+        for (Inst *inst = headInst->getNextInst(); inst != NULL; ) {
+            Inst *nextInst = inst->getNextInst();
             if (inst->isPhi()) {
                 // do something
                 VarOpnd *var0 = 0;
@@ -1155,10 +1151,10 @@ void SSABuilder::splitSsaWebs(FlowGraph* fg,OpndManager& opndManager) {
     }
 
     for(niter = nodes.begin(); niter != nodes.end(); ++niter) {
-        CFGNode* node = *niter;
-        Inst *headInst = node->getFirstInst();
-        for (Inst *inst = headInst->next(); inst != headInst; ) {
-            Inst *nextInst = inst->next();
+        Node* node = *niter;
+        Inst *headInst = (Inst*)node->getFirstInst();
+        for (Inst *inst = headInst->getNextInst(); inst != NULL; ) {
+            Inst *nextInst = inst->getNextInst();
 
             for (uint32 i = 0; i < inst->getNumSrcOperands(); i++) {
                 Opnd *opnd = inst->getSrc(i);

@@ -24,7 +24,7 @@
 #include <string>
 #include <functional>
 #include "Type.h"
-#include "Timer.h"
+//#include "Timer.h"
 
 #define QUAL_NAME_LENGTH 1024
 
@@ -179,6 +179,26 @@ uint64 getMapHandlerSize(const char* name, MethodDesc* meth) {
 
     return (uint64)mapHandler->size();
 }
+void incVectorHandlerSize(const char* name, MethodDesc* meth, size_t incSize) {
+    StlHashMap< POINTER_SIZE_INT, void* >* handleMap;
+    handleMap = (StlHashMap< POINTER_SIZE_INT, void* >*) meth->getHandleMap();
+    POINTER_SIZE_INT keyVal = (POINTER_SIZE_INT) name;
+    //KeyPair keyVal((POINTER_SIZE_INT)name, (POINTER_SIZE_INT) meth);
+
+    assert(handleMap->find(keyVal) != handleMap->end());
+    StlVector<uint64>* vector = (StlVector<uint64>*)handleMap->find(keyVal)->second;  
+    vector->resize(vector->size() + incSize, ILLEGAL_VALUE);
+}
+uint64 getVectorSize(const char* name, MethodDesc* meth) {
+    StlHashMap< POINTER_SIZE_INT, void* >* handleMap;
+    handleMap = (StlHashMap< POINTER_SIZE_INT, void* >*) meth->getHandleMap();
+    POINTER_SIZE_INT keyVal = (POINTER_SIZE_INT) name;
+    //KeyPair keyVal((POINTER_SIZE_INT)name, (POINTER_SIZE_INT) meth);
+
+    assert(handleMap->find(keyVal) != handleMap->end());
+    StlVector<uint64>* vector = (StlVector<uint64>*)handleMap->find(keyVal)->second;  
+    return (uint64)vector->size();
+}
 void enumerateHandlMap(MethodDesc* meth) {  
     StlHashMap< POINTER_SIZE_INT, void* >* handleMap;
     handleMap = (StlHashMap< POINTER_SIZE_INT, void* >*) meth->getHandleMap();
@@ -239,6 +259,7 @@ void removeVectorEntry(void* vectorHandler, uint64 key) {
     StlVector<uint64>* theVector = (StlVector<uint64>*) vectorHandler;
     (*theVector)[(size_t)key] = (uint64)ILLEGAL_VALUE;
 }
+
 /************************************************************************/
 //void addMapHandler(void* mapHandler, const char* name) {
 //    assert(handlMap->find(name) == handlMap->end());

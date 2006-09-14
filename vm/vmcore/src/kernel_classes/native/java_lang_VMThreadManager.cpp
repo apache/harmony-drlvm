@@ -22,8 +22,10 @@
 #include "cxxlog.h"
 
 #include "java_lang_VMThreadManager.h"
+#include "open/ti_thread.h"
 #include "open/hythread_ext.h"
 #include "open/jthread.h"
+#include "open/ti_thread.h"
 #include "open/thread_externals.h"
 
 /*
@@ -45,7 +47,7 @@ JNIEXPORT jobject JNICALL Java_java_lang_VMThreadManager_currentThread
 JNIEXPORT jboolean JNICALL Java_java_lang_VMThreadManager_holdsLock
   (JNIEnv * UNREF jenv, jclass clazz, jobject monitor)
 {
-    return false;//jthread_holds_lock(jthread_self(), monitor);
+	return jthread_holds_lock(jthread_self(), monitor);
 }
 
 /*
@@ -67,7 +69,7 @@ JNIEXPORT jint JNICALL Java_java_lang_VMThreadManager_interrupt
 JNIEXPORT jboolean JNICALL Java_java_lang_VMThreadManager_isInterrupted__
   (JNIEnv * UNREF jenv, jclass clazz)
 {
-    return jthread_is_interrupted(jthread_self());
+    return jthread_clear_interrupted(jthread_self());
 }
 
 /*
@@ -156,6 +158,7 @@ JNIEXPORT jint JNICALL Java_java_lang_VMThreadManager_start
   (JNIEnv *jenv, jclass clazz, jobject thread, jlong stackSize, jboolean daemon, jint priority)
 {
     jthread_threadattr_t attrs;
+    
     attrs.daemon = daemon;
     attrs.priority = priority; 
     attrs.stacksize = (jint)stackSize;
@@ -250,6 +253,21 @@ JNIEXPORT jint JNICALL Java_java_lang_VMThreadManager_join
     return jthread_timed_join(thread, millis, nanos);
 }
 
+/*
+ * Class:     java_lang_VMThreadManager
+ * Method:    getState
+ * Signature: (Ljava/lang/Thread;)I
+ */
+JNIEXPORT jint JNICALL Java_java_lang_VMThreadManager_getState
+  (JNIEnv * UNREF jenv, jclass clazz, jobject jthread)
+{
+    jint state;	
+    int stat;
+    
+    stat = jthread_get_state(jthread, &state);
+    assert(stat == TM_ERROR_NONE);
+    return state;
+}
 
 
 /*

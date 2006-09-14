@@ -31,6 +31,7 @@ extern "C" {
 
 // Return the generic hashcode for an object
 jint object_get_generic_hashcode(JNIEnv*, jobject);
+jint default_hashcode(Managed_Object_Handle obj);
 
 jobject object_clone(JNIEnv*, jobject);
 

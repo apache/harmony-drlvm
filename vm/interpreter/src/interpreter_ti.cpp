@@ -175,7 +175,7 @@ interpreter_ti_getObject(
     }
 
     assert(hythread_is_suspend_enabled());
-    tmn_suspend_disable();
+    hythread_suspend_disable();
     ManagedObject *obj = UNCOMPRESS_REF(frame->locals(slot).cr);
     if (NULL == obj) {
         *value_ptr = NULL;
@@ -184,7 +184,7 @@ interpreter_ti_getObject(
         handle->object = obj;
         *value_ptr = (jobject) handle;
     }
-    tmn_suspend_enable();
+    hythread_suspend_enable();
     return JVMTI_ERROR_NONE;
 }
 
@@ -354,7 +354,7 @@ uint8
 Opcode_BREAKPOINT(StackFrame& frame) {
     Method *m = frame.method;
     jlocation l = frame.ip - (uint8*)m->get_byte_code_addr();
-    return (uint8) (POINTER_SIZE_INT) jvmti_process_breakpoint_event((jmethodID)m, l);
+    return (uint8) (POINTER_SIZE_INT) jvmti_process_interpreter_breakpoint_event((jmethodID)m, l);
 }
 
 void* interpreter_ti_set_breakpoint(jmethodID method, jlocation location) {
@@ -380,6 +380,10 @@ void interpreter_ti_set_notification_mode(jvmtiEvent event_type, bool UNREF enab
         case JVMTI_EVENT_METHOD_ENTRY: new_mask = INTERPRETER_TI_METHOD_ENTRY_EVENT; break;
         case JVMTI_EVENT_METHOD_EXIT: new_mask = INTERPRETER_TI_METHOD_EXIT_EVENT; break;
         case JVMTI_EVENT_SINGLE_STEP: new_mask = INTERPRETER_TI_SINGLE_STEP_EVENT; break;
+        case JVMTI_EVENT_FIELD_ACCESS: new_mask = INTERPRETER_TI_FIELD_ACCESS; break;
+        case JVMTI_EVENT_FIELD_MODIFICATION: new_mask = INTERPRETER_TI_FIELD_MODIFICATION; break;
+        case JVMTI_EVENT_EXCEPTION_CATCH: new_mask = INTERPRETER_TI_OTHER; break;
+        case JVMTI_EVENT_EXCEPTION: new_mask = INTERPRETER_TI_OTHER; break;
         default: break;
     }
 
@@ -396,26 +400,27 @@ void method_entry_callback(Method *method) {
             method->get_descriptor()->bytes);
 #endif
 
-
-    assert(hythread_is_suspend_enabled());
+    assert(!hythread_is_suspend_enabled());
     assert(interpreter_ti_notification_mode & INTERPRETER_TI_METHOD_ENTRY_EVENT);
 
     jvmti_process_method_entry_event((jmethodID) method);
 
-    assert(hythread_is_suspend_enabled());
+    assert(!hythread_is_suspend_enabled());
 }
 void method_exit_callback(Method *method, bool was_popped_by_exception, jvalue ret_val) {
-    assert(hythread_is_suspend_enabled());
+    assert(!hythread_is_suspend_enabled());
     assert(interpreter_ti_notification_mode & INTERPRETER_TI_METHOD_EXIT_EVENT);
 
     jvmti_process_method_exit_event((jmethodID) method,
             was_popped_by_exception, ret_val);
+
+    assert(!hythread_is_suspend_enabled());
 }
 
 void
 frame_pop_callback(FramePopListener *l, Method *method, jboolean was_popped_by_exception) {
     assert(!hythread_is_suspend_enabled());
-    tmn_suspend_enable();
+    hythread_suspend_enable();
 
     while (l) {
         jvmtiEnv *env = (jvmtiEnv*) l->listener;
@@ -424,7 +429,7 @@ frame_pop_callback(FramePopListener *l, Method *method, jboolean was_popped_by_e
         l = l->next;
         STD_FREE((void*)prev);
     }
-    tmn_suspend_disable();
+    hythread_suspend_disable();
 }
 
 jvmtiError
@@ -485,11 +490,136 @@ interpreter_ti_notify_frame_pop(jvmtiEnv* env,
 void single_step_callback(StackFrame &frame) {
     uint8 ip0 = *frame.ip;
     if (ip0 == OPCODE_BREAKPOINT) return;
-    tmn_suspend_enable();
+    hythread_suspend_enable();
     Method *method = frame.method;
     
     jvmti_process_single_step_event((jmethodID) method,
             frame.ip - (uint8*)method->get_byte_code_addr());
 
+    hythread_suspend_disable();
+}
+
+////////////////////////////////////////
+//  Interpreter frames iteration
+FrameHandle* interpreter_get_last_frame(class VM_thread *thread)
+{
+    return (FrameHandle*)getLastStackFrame(thread);
+}
+
+FrameHandle* interpreter_get_prev_frame(FrameHandle* frame)
+{
+	if (frame == NULL)
+		return NULL;
+
+	return (FrameHandle*)(((StackFrame*)frame)->prev);
+}
+
+bool is_frame_in_native_frame(FrameHandle* frame, void* begin, void* end)
+{
+	return (frame >= begin && frame < end);
+}
+
+/////////////////////////////////
+/// Field Watch functionality
+//
+static inline bool field_event_mask(Field *field, bool modify) {
+    char *flag, mask;
+    if (modify) {
+        field_get_track_modification_flag(field, &flag, &mask);
+    } else {
+        field_get_track_access_flag(field, &flag, &mask);
+    }
+    return ((*flag & mask) != 0);
+}
+
+
+static inline void field_access_callback(Field *field, StackFrame& frame, ManagedObject *obj) {
+    Method *method = frame.method;
+    jlocation pc = frame.ip - (uint8*)method->get_code_addr();
+
+    M2N_ALLOC_MACRO;
+    ObjectHandle handle = oh_allocate_local_handle();
+    handle->object = obj;
+
+    tmn_suspend_enable();
+    jvmti_process_field_access_event(field, (jmethodID) method, pc, &handle);
+    tmn_suspend_disable();
+    M2N_FREE_MACRO;
+}
+
+static inline void field_modification_callback(Field *field, StackFrame& frame, jobject obj, jvalue val) {
+    Method *method = frame.method;
+    jlocation pc = frame.ip - (uint8*)method->get_code_addr();
+    tmn_suspend_enable();
+    jvmti_process_field_modification_event(field, (jmethodID) method, pc, &obj, val);
     tmn_suspend_disable();
 }
+
+void getfield_callback(Field *field, StackFrame& frame) {
+    if (!field_event_mask(field, false)) return;
+
+    CREF cref = frame.stack.pick(0).cr;
+    ManagedObject *obj = UNCOMPRESS_REF(cref);
+    field_access_callback(field, frame, obj);
+}
+
+void getstatic_callback(Field *field, StackFrame& frame) {
+    if (!field_event_mask(field, false)) return;
+
+    field_access_callback(field, frame, NULL);
+}
+
+jvalue new_field_value(Field *field, StackFrame& frame) {
+    jvalue val;
+    val.l = 0;
+    switch (field->get_java_type()) {
+        case VM_DATA_TYPE_BOOLEAN: val.z = (uint8) frame.stack.pick().u; break;
+        case VM_DATA_TYPE_CHAR: val.c = (uint16) frame.stack.pick().u; break;
+        case VM_DATA_TYPE_INT8: val.b = (int8) frame.stack.pick().i; break;
+        case VM_DATA_TYPE_INT16: val.s = (int16) frame.stack.pick().i; break;
+        case VM_DATA_TYPE_INT32: val.i = frame.stack.pick().i; break;
+        case VM_DATA_TYPE_INT64: val.j = frame.stack.getLong(0).i64; break;
+        case VM_DATA_TYPE_F8: val.d = frame.stack.getLong(0).d; break;
+        case VM_DATA_TYPE_ARRAY:
+        case VM_DATA_TYPE_CLASS:
+        {
+            ObjectHandle h = oh_allocate_local_handle();
+            h->object = UNCOMPRESS_REF(frame.stack.pick().cr);
+            val.l = h;
+        }
+            break;
+        default:
+            ABORT("Unexpected data type");
+    }
+    return val;
+}
+
+void putstatic_callback(Field *field, StackFrame& frame) {
+    if (!field_event_mask(field, true)) return;
+
+    M2N_ALLOC_MACRO;
+    jvalue val = new_field_value(field, frame);
+    field_modification_callback(field, frame, NULL, val);
+    M2N_FREE_MACRO;
+}
+
+void putfield_callback(Field *field, StackFrame& frame) {
+    if (!field_event_mask(field, true)) return;
+
+    Java_Type type = field->get_java_type();
+    CREF cref;
+
+    if (type == VM_DATA_TYPE_INT64 || type == VM_DATA_TYPE_F8) {
+        cref = frame.stack.pick(2).cr;
+    } else {
+        cref = frame.stack.pick(1).cr;
+    }
+
+    M2N_ALLOC_MACRO;
+    ObjectHandle handle = oh_allocate_local_handle();
+    handle->object = UNCOMPRESS_REF(cref);
+    jvalue val = new_field_value(field, frame);
+    field_modification_callback(field, frame, handle, val);
+    M2N_FREE_MACRO;
+}
+

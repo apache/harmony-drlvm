@@ -103,6 +103,23 @@ APR_DECLARE(apr_status_t) apr_thread_times(apr_thread_t *thread,
     return APR_SUCCESS; 
 }
 
+APR_DECLARE(apr_status_t) apr_get_thread_time(apr_thread_t *thread, unsigned long long* nanos_ptr)
+{
+    HANDLE *os_thread;
+    apr_status_t status;   
+    FILETIME creation_time, exit_time, kernel_time, user_time;
+    if (status = apr_os_thread_get(&((apr_os_thread_t *)os_thread), thread)!=APR_SUCCESS) {
+        return status;
+    }
+    GetThreadTimes(os_thread, &creation_time, 
+        &exit_time, &kernel_time, 
+        &user_time);
+
+    *nanos_ptr=(Int64ShllMod32((&user_time)->dwHighDateTime, 32)|(&user_time)->dwLowDateTime);//*100;
+   // *nanos_ptr = user_time * 100; // convert to nanos
+    return APR_SUCCESS;
+}
+
 APR_DECLARE(apr_status_t) apr_thread_cancel(apr_thread_t *thread) {
     HANDLE *os_thread;
     apr_status_t status;   

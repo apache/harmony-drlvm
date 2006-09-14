@@ -163,8 +163,7 @@ void JNICALL Java_java_lang_Runtime_00024SubProcess_createProcess0 (JNIEnv *env,
          if (envp != NULL) {
              lenEnvp += env->GetArrayLength(envp);
          }
-         int lenstrEnvpBeginAA = lenEnvp + 1;
-         char *strEnvpBeginAA[lenstrEnvpBeginAA];
+         char *strEnvpBeginAA[lenEnvp + 1];
          if (envp != NULL) {
              for ( i = 0; i < lenEnvp; i++ ) {
                  jo = env->GetObjectArrayElement((jobjectArray)((jobject)envp), (jsize) i);
@@ -177,14 +176,34 @@ void JNICALL Java_java_lang_Runtime_00024SubProcess_createProcess0 (JNIEnv *env,
              }
          }
 
-         strEnvpBeginAA[lenstrEnvpBeginAA] = (char *) 0; // NULL pointer
+         strEnvpBeginAA[lenEnvp] = (char *) 0; // NULL pointer
 
          if (lenEnvp == 0) {
              execvp(argv[0], argv);
          } else {
              execve(argv[0], argv, strEnvpBeginAA);
-             // FIXME: fixme not strictly correct
-             execvp(argv[0], argv);
+             if(strchr(argv[0], '/') == NULL) {
+                 char* curDir = NULL;
+                 char* cmdPath = NULL;
+                 char* dirs = NULL;
+                 if ((dirs = getenv("PATH")) != NULL) {
+                     int len = 0;
+                     curDir = strtok(dirs, ":");
+                     while(curDir != NULL) {
+                         if((len = strlen(curDir)) != 0) {
+                             cmdPath = (char *)malloc(len+1+strlen(argv[0])+1);
+                             *cmdPath = '\0';
+                             strcat(strcat(strcat(cmdPath, curDir), "/"), argv[0]);
+                             if (fopen(cmdPath, "r") != NULL) {
+                                 execve(cmdPath, argv, strEnvpBeginAA);
+                                 //XXX: should we inform only of a last error among all possible execve atempts?
+                             }
+                             free(cmdPath);
+                         }
+                         curDir = strtok(NULL, ":");
+                     }
+                 }
+             }
          }
          write(fildesInfo[1], &errno, sizeof(int));
          INFO("Process initiation failed: " << strerror(errno));

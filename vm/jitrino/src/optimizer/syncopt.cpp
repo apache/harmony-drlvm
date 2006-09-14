@@ -25,11 +25,9 @@
 #include <algorithm>
 #include "Stl.h"
 #include "Log.h"
-#include "PropertyTable.h"
 #include "open/types.h"
 #include "Inst.h"
 #include "irmanager.h"
-#include "FlowGraph.h"
 #include "Dominator.h"
 #include "Loop.h"
 #include "Opcode.h"
@@ -38,12 +36,14 @@
 #include "dataflow.h"
 #include "unionfind.h"
 #include "syncopt.h"
+#include "FlowGraph.h"
+#include "PMFAction.h"
 
 namespace Jitrino {
 
 #define EXTRA_DEBUGGING 0
 
-DEFINE_OPTPASS_IMPL(SyncOptPass, syncopt, "Synchronization Optimization")
+DEFINE_SESSION_ACTION(SyncOptPass, syncopt, "Synchronization Optimization")
 
 void
 SyncOptPass::_run(IRManager& irm) {
@@ -51,18 +51,16 @@ SyncOptPass::_run(IRManager& irm) {
     opt.runPass();
 }
 
-SyncOpt::Flags *SyncOpt::defaultFlags = 0;
 
 SyncOpt::SyncOpt(IRManager &irManager0, 
                  MemoryManager& memManager)
     : irManager(irManager0),
       mm(memManager),
-      flags(*defaultFlags),
+      flags(*irManager.getOptimizerFlags().syncOptFlags),
       lockType(0),
       lockAddrType(0),
       lockVar(memManager)
 {
-    assert(defaultFlags);
 }
 
 SyncOpt::~SyncOpt()
@@ -70,26 +68,22 @@ SyncOpt::~SyncOpt()
 }
 
 void 
-SyncOpt::readDefaultFlagsFromCommandLine(const JitrinoParameterTable *params)
-{
-    if (!defaultFlags)
-        defaultFlags = new Flags;
-
-    defaultFlags->optimistic = params->lookupBool("opt::sync::optimistic", false);
-    defaultFlags->use_IncRecCount 
-        = params->lookupBool("opt::sync::use_increccount", false);
-    defaultFlags->balance = params->lookupBool("opt::sync::balance", true);
-    defaultFlags->transform = params->lookupBool("opt::sync::transform", true);
-    defaultFlags->transform2 = params->lookupBool("opt::sync::transform2", true);
+SyncOpt::readFlags(Action* argSource, SyncOptFlags* flags) {
+    IAction::HPipeline p = NULL; //default pipeline for argSource
+    flags->optimistic = argSource->getBoolArg(p, "sync.optimistic", false);
+    flags->use_IncRecCount = argSource->getBoolArg(p, "sync.use_increccount", false);
+    flags->balance = argSource->getBoolArg(p, "sync.balance", true);
+    flags->transform = argSource->getBoolArg(p, "sync.transform", true);
+    flags->transform2 = argSource->getBoolArg(p, "sync.transform2", true);
 }
 
-void SyncOpt::showFlagsFromCommandLine()
-{
-    Log::out() << "    opt::sync::optimistic[={OFF|on}] = convert region with a call to optimistic balanced enter/exit" << ::std::endl;
-    Log::out() << "    opt::sync::use_increccount[={OFF|on}]  = use increccount [not working yet]" << ::std::endl;
-    Log::out() << "    opt::sync::balance[={off|ON}] = do balancing" << ::std::endl;
-    Log::out() << "    opt::sync::transform[={off|ON}] = do rewriting that facilitates balancing" << ::std::endl;
-    Log::out() << "    opt::sync::transform2[={OFF|on}] = give dispatch nodes a dispatch succ" << ::std::endl;
+void SyncOpt::showFlags(std::ostream& os) {
+    os << "  syncopt flags:"<<std::endl;
+    os << "    sync.optimistic[={OFF|on}] - convert region with a call to optimistic balanced enter/exit" << std::endl;
+    os << "    sync.use_increccount[={OFF|on}] - use increccount [not working yet]" << std::endl;
+    os << "    sync.balance[={off|ON}]    - do balancing" << ::std::endl;
+    os << "    sync.transform[={off|ON}]  - do rewriting that facilitates balancing" << std::endl;
+    os << "    sync.transform2[={OFF|on}] - give dispatch nodes a dispatch succ" << std::endl;
 }
 
 
@@ -99,69 +93,69 @@ protected:
     SyncOpt *thePass;
     IRManager &irm;
     MemoryManager &mm;
-    FlowGraph &fg;
-    CFGNode *unwind;
+    ControlFlowGraph &fg;
+    Node *unwind;
 public:
     FixupSyncEdgesWalker(IRManager &irm0,
                          MemoryManager& mm0)
         : irm(irm0), mm(mm0), fg(irm0.getFlowGraph()), unwind(0)
     {
-        unwind = fg.getUnwind();
+        unwind = fg.getUnwindNode();
     };
 
-    void applyToCFGNode(CFGNode *node);
-    bool applyToNode1(CFGNode *node);
-    bool applyToNode2(CFGNode *node);
-    bool applyToNode3(CFGNode *node);
+    void applyToCFGNode(Node *node);
+    bool applyToNode1(Node *node);
+    bool applyToNode2(Node *node);
+    bool applyToNode3(Node *node);
     
-    bool isDispatchNode(CFGNode *node) { return node->isDispatchNode(); };
-    bool isCatchAll(CFGNode *node, Opnd *&caughtOpnd, CFGNode *&catchInstNode);
-    bool isMonExit(CFGNode *node, Opnd *&monOpnd, CFGNode *&dispatchNode,
-                   CFGEdge *&dispatchEdge);
-    bool isCatchAllAndMonExit(CFGNode *node, Opnd *&caughtOpnd, Opnd *&monOpnd, CFGNode *&dispatchNode,
-                              CFGEdge *&dispatchEdge,
-                              CFGNode *&catchInstNode);
-    bool isJustThrow(CFGNode *node, Opnd *&thrownOpnd, CFGNode *&dispatchNode);
-    bool isUnwind(CFGNode *node) { return (node == unwind); };
-    CFGNode *getFirstCatchNode(CFGNode *dispatchNode);
+    bool isDispatchNode(Node *node) { return node->isDispatchNode(); };
+    bool isCatchAll(Node *node, Opnd *&caughtOpnd, Node *&catchInstNode);
+    bool isMonExit(Node *node, Opnd *&monOpnd, Node *&dispatchNode,
+                   Edge *&dispatchEdge);
+    bool isCatchAllAndMonExit(Node *node, Opnd *&caughtOpnd, Opnd *&monOpnd, Node *&dispatchNode,
+                              Edge *&dispatchEdge,
+                              Node *&catchInstNode);
+    bool isJustThrow(Node *node, Opnd *&thrownOpnd, Node *&dispatchNode);
+    bool isUnwind(Node *node) { return (node == unwind); };
+    Node *getFirstCatchNode(Node *dispatchNode);
 };
 
-bool FixupSyncEdgesWalker::isCatchAll(CFGNode *node, Opnd *&caughtOpnd,
-                                      CFGNode *&catchInstNode)
+bool FixupSyncEdgesWalker::isCatchAll(Node *node, Opnd *&caughtOpnd,
+                                      Node *&catchInstNode)
 {
-    Inst *firstInst = node->getFirstInst();
+    Inst *firstInst = (Inst*)node->getFirstInst();
     if (!firstInst->isCatchLabel()) return false;
     CatchLabelInst *catchLabelInst = firstInst->asCatchLabelInst();
     Type *exceptionType = catchLabelInst->getExceptionType();
     if (exceptionType != irm.getTypeManager().getSystemObjectType()) {
-        if (Log::cat_opt_sync()->isDebugEnabled()) {
+        if (Log::isEnabled()) {
             Log::out() << " isCatchAll case 1" << ::std::endl;
         }
         return false;
     }
 
-    Inst *nextInst = firstInst->next();
-    CFGNode *ciNode = node;
+    Inst *nextInst = firstInst->getNextInst();
+    Node *ciNode = node;
     int counter = 0;
     while (nextInst->getOpcode() != Op_Catch) {
         if (nextInst == firstInst) {
             if (++counter > 3) {
-                if (EXTRA_DEBUGGING && Log::cat_opt_sync()->isDebugEnabled()) {
+                if (EXTRA_DEBUGGING && Log::isEnabled()) {
                     Log::out() << " isCatchAll case 5" << ::std::endl;
                 }
                 // don't think this is possible, but bound the loop just in case.
                 return false;
             }
             if (!ciNode->hasOnlyOneSuccEdge()) {
-                if (EXTRA_DEBUGGING && Log::cat_opt_sync()->isDebugEnabled()) {
+                if (EXTRA_DEBUGGING && Log::isEnabled()) {
                     Log::out() << " isCatchAll case 4" << ::std::endl;
                 }
                 return false;
             }
-            CFGNode *succ = (*(ciNode->getOutEdges().begin()))->getTargetNode();
+            Node *succ = (*(ciNode->getOutEdges().begin()))->getTargetNode();
             ciNode = succ;
-            firstInst = succ->getFirstInst();
-            nextInst = firstInst->next();
+            firstInst = (Inst*)succ->getFirstInst();
+            nextInst = firstInst->getNextInst();
         }
     }
     Opnd *opnd = nextInst->getDst();
@@ -170,38 +164,38 @@ bool FixupSyncEdgesWalker::isCatchAll(CFGNode *node, Opnd *&caughtOpnd,
         // yes
         catchInstNode = ciNode;
         caughtOpnd = opnd;
-        if (EXTRA_DEBUGGING && Log::cat_opt_sync()->isDebugEnabled()) {
+        if (EXTRA_DEBUGGING && Log::isEnabled()) {
             Log::out() << " isCatchAll case 2" << ::std::endl;
         }
         return true;
     }
-    if (EXTRA_DEBUGGING && Log::cat_opt_sync()->isDebugEnabled()) {
+    if (EXTRA_DEBUGGING && Log::isEnabled()) {
         Log::out() << " isCatchAll case 3" << ::std::endl;
     }
     return false;
 }
 
-bool FixupSyncEdgesWalker::isMonExit(CFGNode *node, Opnd *&monOpnd, CFGNode *&dispatchNode,
-                                     CFGEdge *&dispatchEdge)
+bool FixupSyncEdgesWalker::isMonExit(Node *node, Opnd *&monOpnd, Node *&dispatchNode,
+                                     Edge *&dispatchEdge)
 {
-    Inst *lastInst = node->getLastInst();
+    Inst *lastInst = (Inst*)node->getLastInst();
     Opcode opcode = lastInst->getOpcode();
     if (!((opcode == Op_TauMonitorExit) ||
           (opcode == Op_OptimisticBalancedMonitorExit))) {
-        if (EXTRA_DEBUGGING && Log::cat_opt_sync()->isDebugEnabled()) {
+        if (EXTRA_DEBUGGING && Log::isEnabled()) {
             Log::out() << "isMonExit opcode is " << (int) opcode << ::std::endl;
         }
         return false;
     }
 
     monOpnd = lastInst->getSrc(0);
-    const CFGEdgeDeque &outEdges = node->getOutEdges();
-    CFGEdgeDeque::const_iterator
+    const Edges &outEdges = node->getOutEdges();
+    Edges::const_iterator
         eiter = outEdges.begin(),
         eend = outEdges.end();
     for ( ; eiter != eend; ++eiter) {
-        CFGEdge *e = *eiter;
-        CFGNode *target = e->getTargetNode();
+        Edge *e = *eiter;
+        Node *target = e->getTargetNode();
         if (target->isDispatchNode()) {
             dispatchNode = target;
             dispatchEdge = e;
@@ -212,23 +206,23 @@ bool FixupSyncEdgesWalker::isMonExit(CFGNode *node, Opnd *&monOpnd, CFGNode *&di
     return false;
 }
 
-bool FixupSyncEdgesWalker::isCatchAllAndMonExit(CFGNode *node, Opnd *&caughtOpnd,
-                                                Opnd *&monOpnd, CFGNode *&dispatchNode,
-                                                CFGEdge *&dispatchEdge,
-                                                CFGNode *&catchInstNode)
+bool FixupSyncEdgesWalker::isCatchAllAndMonExit(Node *node, Opnd *&caughtOpnd,
+                                                Opnd *&monOpnd, Node *&dispatchNode,
+                                                Edge *&dispatchEdge,
+                                                Node *&catchInstNode)
 {
     catchInstNode = 0;
     if (isCatchAll(node, caughtOpnd, catchInstNode) &&
         isMonExit(catchInstNode, monOpnd, dispatchNode, dispatchEdge)) {
         // make sure that's all it is
         assert(catchInstNode);
-        Inst *labelInst = catchInstNode->getFirstInst();
-        Inst *catchInst = labelInst->next();
+        Inst *labelInst = (Inst*)catchInstNode->getFirstInst();
+        Inst *catchInst = labelInst->getNextInst();
         // with DPGO, we may see an incCounter here
-        Inst *thirdInst = catchInst->next(); // monexit or tausafe or incCounter
-        Inst *fourthInst = thirdInst->next(); // label or monexit or tausafe or incCounter
-        Inst *fifthInst = fourthInst->next(); // label or taumonexit(tausafe)
-        Inst *sixthInst = fifthInst->next(); // .. or label
+        Inst *thirdInst = catchInst->getNextInst(); // monexit or tausafe or incCounter
+        Inst *fourthInst = thirdInst->getNextInst(); // label or monexit or tausafe or incCounter
+        Inst *fifthInst = fourthInst->getNextInst(); // label or taumonexit(tausafe)
+        Inst *sixthInst = fifthInst->getNextInst(); // .. or label
         return ((labelInst == fourthInst)
                 || ((labelInst == fifthInst) && 
                     ((thirdInst->getOpcode() == Op_TauSafe) ||
@@ -243,21 +237,21 @@ bool FixupSyncEdgesWalker::isCatchAllAndMonExit(CFGNode *node, Opnd *&caughtOpnd
     return false;
 }
 
-bool FixupSyncEdgesWalker::isJustThrow(CFGNode *node, Opnd *&thrownOpnd, CFGNode *&dispatchNode)
+bool FixupSyncEdgesWalker::isJustThrow(Node *node, Opnd *&thrownOpnd, Node *&dispatchNode)
 {
-    Inst *lastInst = node->getLastInst();
+    Inst *lastInst = (Inst*)node->getLastInst();
     Opcode opcode = lastInst->getOpcode();
     if (opcode != Op_Throw) {
         return false;
     }
-    Inst *prevInst = lastInst->prev();
+    Inst *prevInst = lastInst->getPrevInst();
     if (prevInst->isLabel()) {
         // check for dispatchNode
         assert(node->hasOnlyOneSuccEdge());
-        const CFGEdgeDeque &outEdges = node->getOutEdges();
+        const Edges &outEdges = node->getOutEdges();
         assert(outEdges.size() == 1);
-        CFGEdge *e = *(outEdges.begin());
-        CFGNode *target = e->getTargetNode();
+        Edge *e = *(outEdges.begin());
+        Node *target = e->getTargetNode();
         assert((target == unwind) || (target->isDispatchNode()));
 
         thrownOpnd = lastInst->getSrc(0);
@@ -267,16 +261,16 @@ bool FixupSyncEdgesWalker::isJustThrow(CFGNode *node, Opnd *&thrownOpnd, CFGNode
     return false;
 }
 
-CFGNode *FixupSyncEdgesWalker::getFirstCatchNode(CFGNode *dispatchNode)
+Node *FixupSyncEdgesWalker::getFirstCatchNode(Node *dispatchNode)
 {
     assert(dispatchNode->isDispatchNode());
-    const CFGEdgeDeque &outEdges = dispatchNode->getOutEdges();
-    CFGEdgeDeque::const_iterator
+    const Edges &outEdges = dispatchNode->getOutEdges();
+    Edges::const_iterator
         eiter = outEdges.begin(),
         eend = outEdges.end();
     for ( ; eiter != eend; ++eiter) {
-        CFGEdge *e = *eiter;
-        CFGNode *target = e->getTargetNode();
+        Edge *e = *eiter;
+        Node *target = e->getTargetNode();
         if (!target->isDispatchNode()) {
             return target;
         }
@@ -294,58 +288,58 @@ CFGNode *FixupSyncEdgesWalker::getFirstCatchNode(CFGNode *dispatchNode)
 
 
 bool 
-FixupSyncEdgesWalker::applyToNode1(CFGNode *node)
+FixupSyncEdgesWalker::applyToNode1(Node *node)
 {
-    if (EXTRA_DEBUGGING && Log::cat_opt_sync()->isDebugEnabled()) {
-        Log::out() << "applyToNode1 examining node"; node->print(Log::out()); Log::out() << ::std::endl;
+    if (EXTRA_DEBUGGING && Log::isEnabled()) {
+        Log::out() << "applyToNode1 examining node"; FlowGraph::print(Log::out(), node); Log::out() << ::std::endl;
     }
 
-    CFGNode *dispatch1 = 0;
-    CFGEdge *dispatch1edge = 0;
+    Node *dispatch1 = 0;
+    Edge *dispatch1edge = 0;
     Opnd *monOpnd1 = 0;
     if (!isMonExit(node, monOpnd1, dispatch1, dispatch1edge)) {
-        if (EXTRA_DEBUGGING && Log::cat_opt_sync()->isDebugEnabled()) {
+        if (EXTRA_DEBUGGING && Log::isEnabled()) {
             Log::out() << "    case 1" << ::std::endl;
         }
         return false;
     }
-    if (EXTRA_DEBUGGING && Log::cat_opt_sync()->isDebugEnabled()) {
+    if (EXTRA_DEBUGGING && Log::isEnabled()) {
         Log::out() << "    case 1b" << ::std::endl;
     }
 
-    CFGNode *catchNode = getFirstCatchNode(dispatch1);
+    Node *catchNode = getFirstCatchNode(dispatch1);
     Opnd *caughtOpnd = 0;
     Opnd *monOpnd2 = 0;
-    CFGNode *dispatchNode2ignore = 0;
-    CFGEdge *dispatchEdge2ignore = 0;
-    CFGNode *catchInstNode = 0;
+    Node *dispatchNode2ignore = 0;
+    Edge *dispatchEdge2ignore = 0;
+    Node *catchInstNode = 0;
     if (!isCatchAllAndMonExit(catchNode, caughtOpnd, monOpnd2, 
                               dispatchNode2ignore,
                               dispatchEdge2ignore,
                               catchInstNode)) {
-        if (EXTRA_DEBUGGING && Log::cat_opt_sync()->isDebugEnabled()) {
+        if (EXTRA_DEBUGGING && Log::isEnabled()) {
             Log::out() << "    case 2" << ::std::endl;
         }
         return false;
     }
 
-    CFGEdge *outEdge = (CFGEdge *)catchInstNode->getUnconditionalEdge();
+    Edge *outEdge = (Edge *)catchInstNode->getUnconditionalEdge();
     assert(outEdge);
 
-    CFGNode *nextNode = outEdge->getTargetNode();
+    Node *nextNode = outEdge->getTargetNode();
     Opnd *thrownOpnd = 0;
-    CFGNode *dispatch2 = 0;
+    Node *dispatch2 = 0;
     if (!isJustThrow(nextNode, thrownOpnd, dispatch2)) {
-        if (EXTRA_DEBUGGING && Log::cat_opt_sync()->isDebugEnabled()) {
+        if (EXTRA_DEBUGGING && Log::isEnabled()) {
             Log::out() << "    case 3, nextNode is ";
-            nextNode->print(Log::out());
+            FlowGraph::print(Log::out(), nextNode);
             Log::out() << ::std::endl;
         }
         return false;
     }
 
     if (!((monOpnd1 == monOpnd2) && (caughtOpnd == thrownOpnd))) {
-        if (EXTRA_DEBUGGING && Log::cat_opt_sync()->isDebugEnabled()) {
+        if (EXTRA_DEBUGGING && Log::isEnabled()) {
             Log::out() << "    case 4" << ::std::endl;
         }
         return false;
@@ -354,13 +348,13 @@ FixupSyncEdgesWalker::applyToNode1(CFGNode *node)
     // found it
     if (dispatch1 == dispatch2) {
         // it's a self-loop
-        if (EXTRA_DEBUGGING && Log::cat_opt_sync()->isDebugEnabled()) {
+        if (EXTRA_DEBUGGING && Log::isEnabled()) {
             Log::out() << "    case 5" << ::std::endl;
         }
         assert(0);
     }
 
-    if (EXTRA_DEBUGGING && Log::cat_opt_sync()->isDebugEnabled()) {
+    if (EXTRA_DEBUGGING && Log::isEnabled()) {
         Log::out() << "    case 6" << ::std::endl;
     }
     fg.replaceEdgeTarget(dispatch1edge, dispatch2);
@@ -369,34 +363,34 @@ FixupSyncEdgesWalker::applyToNode1(CFGNode *node)
 
 // check for  Dispatch -> catchall, eliminate any exception edge on the dispatch
 bool
-FixupSyncEdgesWalker::applyToNode2(CFGNode *node)
+FixupSyncEdgesWalker::applyToNode2(Node *node)
 {
-    if (EXTRA_DEBUGGING && Log::cat_opt_sync()->isDebugEnabled()) {
-        Log::out() << "applyToNode2 examining node"; node->print(Log::out()); Log::out() << ::std::endl;
+    if (EXTRA_DEBUGGING && Log::isEnabled()) {
+    Log::out() << "applyToNode2 examining node"; FlowGraph::print(Log::out(), node); Log::out() << ::std::endl;
     }
 
     if (node == unwind) {
-        if (EXTRA_DEBUGGING && Log::cat_opt_sync()->isDebugEnabled()) {
+        if (EXTRA_DEBUGGING && Log::isEnabled()) {
             Log::out() << "    case 1" << ::std::endl;
         }
         return false;
     }
     if (!node->isDispatchNode()) {
-        if (EXTRA_DEBUGGING && Log::cat_opt_sync()->isDebugEnabled()) {
+        if (EXTRA_DEBUGGING && Log::isEnabled()) {
             Log::out() << "    case 2" << ::std::endl;
         }
         return false;
     }
 
-    const CFGEdgeDeque &outEdges = node->getOutEdges();
-    CFGEdge *dispatchEdge = 0;
+    const Edges &outEdges = node->getOutEdges();
+    Edge *dispatchEdge = 0;
 
-    CFGEdgeDeque::const_iterator
+    Edges::const_iterator
         eiter = outEdges.begin(),
         eend = outEdges.end();
     for ( ; eiter != eend; ++eiter) {
-        CFGEdge *e = *eiter;
-        CFGNode *target = e->getTargetNode();
+        Edge *e = *eiter;
+        Node *target = e->getTargetNode();
         if (target->isDispatchNode()) {
             assert(!dispatchEdge);
             dispatchEdge = e;
@@ -404,35 +398,35 @@ FixupSyncEdgesWalker::applyToNode2(CFGNode *node)
     }
 
     if (!dispatchEdge) {
-        if (EXTRA_DEBUGGING && Log::cat_opt_sync()->isDebugEnabled()) {
+        if (EXTRA_DEBUGGING && Log::isEnabled()) {
             Log::out() << "    case 3" << ::std::endl;
         }
         return false;
     }
 
-    CFGEdge *catchEdge = 0;
+    Edge *catchEdge = 0;
     for (eiter = outEdges.begin() ; eiter != eend; ++eiter) {
-        CFGEdge *e = *eiter;
-        if (e->getKind() == CFGEdge::Catch) {
+        Edge *e = *eiter;
+        if (e->getKind() == Edge::Kind_Catch) {
             catchEdge = e;
 
-            CFGNode *catchNode = catchEdge->getTargetNode();
+            Node *catchNode = catchEdge->getTargetNode();
             Opnd *scratch;
-            CFGNode *catchInstNode;
+            Node *catchInstNode;
             if (!isCatchAll(catchNode, scratch, catchInstNode)) {
                 continue;
             }
             
             // dispatch node has a catch-all, doesn't need fall-through
             fg.removeEdge(dispatchEdge);
-            if (EXTRA_DEBUGGING && Log::cat_opt_sync()->isDebugEnabled()) {
+            if (EXTRA_DEBUGGING && Log::isEnabled()) {
                 Log::out() << "    case 6" << ::std::endl;
             }
             return true;
         }
     }
 
-    if (EXTRA_DEBUGGING && Log::cat_opt_sync()->isDebugEnabled()) {
+    if (EXTRA_DEBUGGING && Log::isEnabled()) {
         Log::out() << "    case 4" << ::std::endl;
     }
     return false;
@@ -444,41 +438,41 @@ FixupSyncEdgesWalker::applyToNode2(CFGNode *node)
 //    monexit t1 --> Dispatch2 --> Catch(t2:object); --> L1': goto L1'
 
 bool 
-FixupSyncEdgesWalker::applyToNode3(CFGNode *node)
+FixupSyncEdgesWalker::applyToNode3(Node *node)
 {
 
-    if (EXTRA_DEBUGGING && Log::cat_opt_sync()->isDebugEnabled()) {
-        Log::out() << "applyToNode3 examining node"; node->print(Log::out()); Log::out() << ::std::endl;
+    if (EXTRA_DEBUGGING && Log::isEnabled()) {
+      Log::out() << "applyToNode3 examining node"; FlowGraph::print(Log::out(), node); Log::out() << ::std::endl;
     }
 
-    CFGNode *catchNode = node;
+    Node *catchNode = node;
     Opnd *caughtOpnd = 0;
     Opnd *monOpnd2 = 0;
-    CFGNode *dispatchNode1 = 0;
-    CFGEdge *dispatchEdge1 = 0;
-    CFGNode *catchInstNode = 0;
+    Node *dispatchNode1 = 0;
+    Edge *dispatchEdge1 = 0;
+    Node *catchInstNode = 0;
     if (!isCatchAllAndMonExit(catchNode, caughtOpnd, monOpnd2, 
                               dispatchNode1,
                               dispatchEdge1,
                               catchInstNode)) {
-        if (EXTRA_DEBUGGING && Log::cat_opt_sync()->isDebugEnabled()) {
+        if (EXTRA_DEBUGGING && Log::isEnabled()) {
             Log::out() << "    case 1" << ::std::endl;
         }
         return false;
     }
     
-    Inst *catchNodeFirstInst = catchNode->getFirstInst();
+    Inst *catchNodeFirstInst = (Inst*)catchNode->getFirstInst();
     CatchLabelInst *catchLabelInst = catchNodeFirstInst->asCatchLabelInst();
     assert(catchLabelInst);
 
-    if (EXTRA_DEBUGGING && Log::cat_opt_sync()->isDebugEnabled()) {
+    if (EXTRA_DEBUGGING && Log::isEnabled()) {
         Log::out() << "    case 2" << ::std::endl;
     }
 
     // must be high-priority catch node
     uint32 order = catchLabelInst->getOrder();
     if (order != 0) {
-        if (EXTRA_DEBUGGING && Log::cat_opt_sync()->isDebugEnabled()) {
+        if (EXTRA_DEBUGGING && Log::isEnabled()) {
             Log::out() << "    case 3" << ::std::endl;
         }
         return false;
@@ -488,41 +482,40 @@ FixupSyncEdgesWalker::applyToNode3(CFGNode *node)
 
     // must be only exception edge to this dispatch
     if (dispatchNode1->getInEdges().size() != 1) {
-        if (EXTRA_DEBUGGING && Log::cat_opt_sync()->isDebugEnabled()) {
+        if (EXTRA_DEBUGGING && Log::isEnabled()) {
             Log::out() << "    case 4" << ::std::endl;
         }
         return false;
     }
 
     // find the catch node edge
-    const CFGEdgeDeque &outEdges = dispatchNode1->getOutEdges();
-    CFGEdgeDeque::const_iterator
+    const Edges &outEdges = dispatchNode1->getOutEdges();
+    Edges::const_iterator
         eiter = outEdges.begin(),
         eend = outEdges.end();
     for ( ; eiter != eend; ++eiter) {
-        CFGEdge *e = *eiter;
-        CFGNode *target = e->getTargetNode();
+        Edge *e = *eiter;
+        Node *target = e->getTargetNode();
         if (target == catchNode) {
 
-            if (EXTRA_DEBUGGING && Log::cat_opt_sync()->isDebugEnabled()) {
+            if (EXTRA_DEBUGGING && Log::isEnabled()) {
                 Log::out() << "    case 5" << ::std::endl;
             }
 
             TypeManager &typeManager = irm.getTypeManager();
             InstFactory &instFactory = irm.getInstFactory();
             OpndManager &opndManager = irm.getOpndManager();
-            Opnd* ex = 
-                opndManager.createSsaTmpOpnd(typeManager.getSystemObjectType());
-            CFGNode *newCatchNode = fg.createCatchNode(0, ex->getType());
-            newCatchNode->append(instFactory.makeCatch(ex));
+            Opnd* ex = opndManager.createSsaTmpOpnd(typeManager.getSystemObjectType());
+            Node *newCatchNode = fg.createBlockNode(instFactory.makeCatchLabel(0, ex->getType()));
+            newCatchNode->appendInst(instFactory.makeCatch(ex));
 
-            CFGNode *newLoopNode = fg.createBlockNode();
+            Node *newLoopNode = fg.createBlockNode(instFactory.makeLabel());
 #ifdef _DEBUG
-            Inst *newLoopFirstInst = newLoopNode->getFirstInst();
+            Inst *newLoopFirstInst = (Inst*)newLoopNode->getFirstInst();
             assert(newLoopFirstInst);
             LabelInst *newLoopLabelInst = newLoopFirstInst->asLabelInst();
 #endif
-			assert(newLoopLabelInst);
+            assert(newLoopLabelInst);
 
             fg.replaceEdgeTarget(e, newCatchNode);
             fg.addEdge(newCatchNode, newLoopNode);
@@ -530,14 +523,14 @@ FixupSyncEdgesWalker::applyToNode3(CFGNode *node)
             return true;
         }
     }
-    if (EXTRA_DEBUGGING && Log::cat_opt_sync()->isDebugEnabled()) {
+    if (EXTRA_DEBUGGING && Log::isEnabled()) {
         Log::out() << "    case 6" << ::std::endl;
     }
     return false;
 }
 
 void
-FixupSyncEdgesWalker::applyToCFGNode(CFGNode *node)
+FixupSyncEdgesWalker::applyToCFGNode(Node *node)
 {
     applyToNode1(node);
     applyToNode2(node);
@@ -552,19 +545,19 @@ public:
     {
     };
     ~FixupSyncEdgesWalker2() {};
-    void applyToCFGNode(CFGNode *node);
+    void applyToCFGNode(Node *node);
 };
 
-void FixupSyncEdgesWalker2::applyToCFGNode(CFGNode *node)
+void FixupSyncEdgesWalker2::applyToCFGNode(Node *node)
 {
     if (node->isDispatchNode() && (node != unwind)) {
-        const CFGEdgeDeque &outEdges = node->getOutEdges();
-        CFGEdgeDeque::const_iterator
+        const Edges &outEdges = node->getOutEdges();
+        Edges::const_iterator
             eiter = outEdges.begin(),
             eend = outEdges.end();
         for ( ; eiter != eend; ++eiter) {
-            CFGEdge *e = *eiter;
-            CFGNode *target = e->getTargetNode();
+            Edge *e = *eiter;
+            Node *target = e->getTargetNode();
             if (target->isDispatchNode()) {
                 return;
             }
@@ -577,22 +570,22 @@ void FixupSyncEdgesWalker2::applyToCFGNode(CFGNode *node)
 
 void SyncOpt::runPass()
 {
-    if (Log::cat_opt_sync()->isDebugEnabled()) {
+    if (Log::isEnabled()) {
         Log::out() << "Starting SyncOpt Pass" << ::std::endl;
         Log::out() << "  MemManager bytes_allocated= "
                    << (int) mm.bytes_allocated() << ::std::endl;
     }
 
     {
-        const CFGNodeDeque &nodes =  irManager.getFlowGraph().getNodes();
-        CFGNodeDeque::const_iterator 
+        const Nodes &nodes =  irManager.getFlowGraph().getNodes();
+        Nodes::const_iterator 
             iter = nodes.begin(),
             end = nodes.end();
         for (; iter != end; ++iter) {
-            CFGNode *node = *iter;
-            Inst *firstInst = node->getFirstInst();
-            Inst *inst = firstInst->next();
-            while (inst != firstInst) {
+            Node *node = *iter;
+            Inst *firstInst = (Inst*)node->getFirstInst();
+            Inst *inst = firstInst->getNextInst();
+            while (inst != NULL) {
                 Opcode opcode = inst->getOpcode();
                 switch (opcode) {
                 case Op_TauMonitorEnter:
@@ -605,10 +598,10 @@ void SyncOpt::runPass()
                 default:
                     break;
                 }
-                inst = inst->next();
+                inst = inst->getNextInst();
             }
         }
-        if (Log::cat_opt_sync()->isDebugEnabled()) {
+        if (Log::isEnabled()) {
             Log::out() << "No sync found, skipping SyncOpt Pass" << ::std::endl;
             Log::out() << "  MemManager bytes_allocated= "
                        << (int) mm.bytes_allocated() << ::std::endl;
@@ -619,18 +612,18 @@ void SyncOpt::runPass()
     }
 
     if (flags.transform) {
-        if (Log::cat_opt_sync()->isDebugEnabled()) {
+        if (Log::isEnabled()) {
             Log::out() << "Preprocessing graph to reduce monExit->monExit loops" << ::std::endl;
             Log::out() << "PRINTING LOG: IR before sync exception edge fixup" << ::std::endl;
-            irManager.getFlowGraph().printInsts(Log::out(), irManager.getMethodDesc());
+            FlowGraph::printHIR(Log::out(), irManager.getFlowGraph(), irManager.getMethodDesc());
         }
         
         FixupSyncEdgesWalker fixupEdges(irManager, mm);
         NodeWalk<FixupSyncEdgesWalker>(irManager.getFlowGraph(), fixupEdges);
         
-        if (Log::cat_opt_sync()->isDebugEnabled()) {
+        if (Log::isEnabled()) {
             Log::out() << "PRINTING LOG: IR after sync exception edge fixup" << ::std::endl;
-            irManager.getFlowGraph().printInsts(Log::out(), irManager.getMethodDesc());
+            FlowGraph::printHIR(Log::out(), irManager.getFlowGraph(), irManager.getMethodDesc());
         }
     }
 
@@ -666,38 +659,38 @@ void SyncOpt::runPass()
         // BalancedMonitorEnter().  On any path leading from a BalancedMonitorEnter without a 
         // following BalancedMonitorExit, insert an IncRecCount()
 
-        if (Log::cat_opt_sync()->isDebugEnabled()) {
+        if (Log::isEnabled()) {
             Log::out() << "PRINTING LOG: IR before sync pass 1" << ::std::endl;
-            irManager.getFlowGraph().printInsts(Log::out(), irManager.getMethodDesc());
+            FlowGraph::printHIR(Log::out(), irManager.getFlowGraph(), irManager.getMethodDesc());
         }
 
         findBalancedExits(false, false); // not optimistic, no increccount
 
-        if (Log::cat_opt_sync()->isDebugEnabled()) {
+        if (Log::isEnabled()) {
             Log::out() << "PRINTING LOG: IR after sync pass 1" << ::std::endl;
-            irManager.getFlowGraph().printInsts(Log::out(), irManager.getMethodDesc());
+            FlowGraph::printHIR(Log::out(), irManager.getFlowGraph(), irManager.getMethodDesc());
         }
 
         if (flags.optimistic) {
             Opnd *syncMethodOpnd = 0;
-            CFGNode *tmpDispatchNode = 0;
-            CFGNode *tmpCatchNode = 0;
-            CFGNode *tmpRethrowNode = 0;
+            Node *tmpDispatchNode = 0;
+            Node *tmpCatchNode = 0;
+            Node *tmpRethrowNode = 0;
 
             MethodDesc &desc = irManager.getMethodDesc();
             if (desc.isSynchronized() && !desc.isStatic()) {
                 // synchronized on first param
-                FlowGraph &fg = irManager.getFlowGraph();
-                CFGNode *entry = fg.getEntry();
-                Inst *firstInst = entry->getFirstInst();
-                Inst *inst = firstInst->next();
-                while (inst != firstInst) {
+                ControlFlowGraph &fg = irManager.getFlowGraph();
+                Node *entry = fg.getEntryNode();
+                Inst *firstInst = (Inst*)entry->getFirstInst();
+                Inst *inst = firstInst->getNextInst();
+                while (inst != NULL) {
                     if (inst->getOpcode() == Op_DefArg) {
                         break;
                     }
-                    inst = inst->next();
+                    inst = inst->getNextInst();
                 }
-                assert((inst != firstInst) && (inst->getOpcode() == Op_DefArg));
+                assert((inst != NULL) && (inst->getOpcode() == Op_DefArg));
                 Opnd *thisOpnd = inst->getDst();
                 
                 assert(!syncMethodOpnd);
@@ -705,7 +698,7 @@ void SyncOpt::runPass()
             } else {
             }
 
-            bool needToPatchUnwind = syncMethodOpnd && (irManager.getFlowGraph().getUnwind() != NULL);
+            bool needToPatchUnwind = syncMethodOpnd && (irManager.getFlowGraph().getUnwindNode() != NULL);
             if (needToPatchUnwind) {
                 insertUnwindMonitorExit(syncMethodOpnd, tmpDispatchNode, tmpCatchNode,
                                         tmpRethrowNode);
@@ -716,30 +709,30 @@ void SyncOpt::runPass()
                 removeUnwindMonitorExit(syncMethodOpnd, tmpDispatchNode, tmpCatchNode,
                                         tmpRethrowNode);
             }
-            if (Log::cat_opt_sync()->isDebugEnabled()) {
+            if (Log::isEnabled()) {
                 Log::out() << "PRINTING LOG: IR after sync pass 2" << ::std::endl;
-                irManager.getFlowGraph().printInsts(Log::out(), irManager.getMethodDesc());
+                FlowGraph::printHIR(Log::out(), irManager.getFlowGraph(), irManager.getMethodDesc());
             }
         }
     }
 
     if (flags.transform2) {
-        if (Log::cat_opt_sync()->isDebugEnabled()) {
+        if (Log::isEnabled()) {
             Log::out() << "Postrocessing graph to add dispatch edges" << ::std::endl;
             Log::out() << "PRINTING LOG: IR before dispatch edge fixup" << ::std::endl;
-            irManager.getFlowGraph().printInsts(Log::out(), irManager.getMethodDesc());
+            FlowGraph::printHIR(Log::out(), irManager.getFlowGraph(), irManager.getMethodDesc());
         }
         
         FixupSyncEdgesWalker2 fixupEdges(irManager, mm);
         NodeWalk<FixupSyncEdgesWalker2>(irManager.getFlowGraph(), fixupEdges);
         
-        if (Log::cat_opt_sync()->isDebugEnabled()) {
+        if (Log::isEnabled()) {
             Log::out() << "PRINTING LOG: IR after dispatch edge fixup" << ::std::endl;
-            irManager.getFlowGraph().printInsts(Log::out(), irManager.getMethodDesc());
+            FlowGraph::printHIR(Log::out(), irManager.getFlowGraph(), irManager.getMethodDesc());
         }
     }
     
-    if (Log::cat_opt_sync()->isDebugEnabled()) {
+    if (Log::isEnabled()) {
         Log::out() << "Finished SyncOpt Pass" << ::std::endl;
         Log::out() << "  MemManager bytes_allocated= "
                    << (int) mm.bytes_allocated() << ::std::endl;
@@ -817,7 +810,7 @@ public:
         }
     };
     void invalidateMonitors(bool optimistic, bool use_IncRecCount) { 
-        if (Log::cat_opt_sync()->isDebugEnabled()) {
+        if (Log::isEnabled()) {
             Log::out() << " before invalidateMonitors(): ";
             print(Log::out());
             Log::out() << ::std::endl;
@@ -827,14 +820,14 @@ public:
         } else {
             state = Bottom; depth = 0;
         }
-        if (Log::cat_opt_sync()->isDebugEnabled()) {
+        if (Log::isEnabled()) {
             Log::out() << " after invalidateMonitors(): ";
             print(Log::out());
             Log::out() << ::std::endl;
         }
     };
     void openMonitor(Inst *monitorEnter, Opnd *obj) {
-        if (Log::cat_opt_sync()->isDebugEnabled()) {
+        if (Log::isEnabled()) {
             Log::out() << " before openMonitor(" 
                        << (int) monitorEnter->getId()
                        << "): ";
@@ -855,7 +848,7 @@ public:
                 depth = 0;
             }
         }
-        if (Log::cat_opt_sync()->isDebugEnabled()) {
+        if (Log::isEnabled()) {
             Log::out() << " after openMonitor(" 
                        << (int) monitorEnter->getId()
                        << "): ";
@@ -864,7 +857,7 @@ public:
         }
     }
     void closeMonitor(Inst *monitorExit, Opnd *obj) { 
-        if (Log::cat_opt_sync()->isDebugEnabled()) {
+        if (Log::isEnabled()) {
             Log::out() << " before closeMonitor(";
             monitorExit->print(Log::out());
             Log::out() << ", ";
@@ -879,7 +872,7 @@ public:
                 state = Bottom;
             }
         }
-        if (Log::cat_opt_sync()->isDebugEnabled()) {
+        if (Log::isEnabled()) {
             Log::out() << " after closeMonitor(";
             obj->print(Log::out());
             Log::out() << "): ";
@@ -890,7 +883,7 @@ public:
     // applies given inst to this value
     void apply(Inst *i, MemoryManager &mm, bool optimistic,
                bool use_IncRecCount) {
-        if (Log::cat_opt_sync()->isDebugEnabled()) {
+        if (Log::isEnabled()) {
             Log::out() << "SyncOptDfValue visiting instr "; 
             i->print(Log::out()); 
             Log::out() << ::std::endl;
@@ -926,11 +919,11 @@ public:
 
 class SyncOptTfValue : public DataflowTF<SyncOptDfValue> {
     MemoryManager &mem;
-    CFGNode *node;
+    Node *node;
     bool optimistic;
     bool use_IncRecCount;
 public:
-    SyncOptTfValue(MemoryManager &mm, CFGNode *theNode, bool optimistic0,
+    SyncOptTfValue(MemoryManager &mm, Node *theNode, bool optimistic0,
                    bool use_IncRecCount0)
         : mem(mm), node(theNode), 
           optimistic(optimistic0), 
@@ -938,16 +931,16 @@ public:
     // returns true if changed
     bool apply(const SyncOptDfValue &in, SyncOptDfValue &out) { 
         SyncOptDfValue res = in;
-        Inst* firstInst = node->getFirstInst();
+        Inst* firstInst = (Inst*)node->getFirstInst();
         Inst * inst = firstInst;
         do {
-            if (Log::cat_opt_sync()->isDebugEnabled()) {
+            if (Log::isEnabled()) {
                 Log::out() << "visiting instr "; inst->print(Log::out()); 
                 Log::out() << ::std::endl;
             }
             res.apply(inst, mem, optimistic, use_IncRecCount);
-            inst = inst->next();
-        } while (inst != firstInst);
+            inst = inst->getNextInst();
+        } while (inst != NULL);
         
         return out.meetWith(res);
     }
@@ -963,7 +956,7 @@ public:
     {};
 
     typedef SyncOptDfValue ValueType;
-    DataflowTF<SyncOptDfValue> *getNodeBehavior(CFGNode *node) {
+    DataflowTF<SyncOptDfValue> *getNodeBehavior(Node *node) {
         SyncOptTfValue *res = new (mm) SyncOptTfValue(mm, node, 
                                                       optimistic, use_IncRecCount);
         return res;
@@ -1013,7 +1006,7 @@ public:
         return new (mem) SyncClique(obj);
     };
     void applyToInst(Inst *i) {
-        if (Log::cat_opt_sync()->isDebugEnabled()) {
+        if (Log::isEnabled()) {
             Log::out() << "SyncOptDfValue visiting instr "; 
             i->print(Log::out()); 
             Log::out() << ::std::endl;
@@ -1047,7 +1040,7 @@ public:
         }
     }
     void invalidateMonitors(Inst *i) {
-        if (Log::cat_opt_sync()->isDebugEnabled()) {
+        if (Log::isEnabled()) {
             Log::out() << " before invalidateMonitors("
                        << (int) i->getId()
                        << "), depth="
@@ -1068,7 +1061,7 @@ public:
                 } else {
                     for (uint32 i=0; i<currentDepth; ++i) {
                         // invalidate all open monitors
-                        if (Log::cat_opt_sync()->isDebugEnabled()) {
+                        if (Log::isEnabled()) {
                             Log::out() << " linking01 ";
                             (*currentStack)[i]->print(Log::out());
                             Log::out() << " to ";
@@ -1081,7 +1074,7 @@ public:
                 }
             }
         }
-        if (Log::cat_opt_sync()->isDebugEnabled()) {
+        if (Log::isEnabled()) {
             Log::out() << " after invalidateMonitors("
                        << (int) i->getId()
                        << "), depth="
@@ -1090,7 +1083,7 @@ public:
         }
     };
     void openMonitor(Inst *monitorEnter, Opnd *obj) {
-        if (Log::cat_opt_sync()->isDebugEnabled()) {
+        if (Log::isEnabled()) {
             Log::out() << " before openMonitor(" 
                        << (int) monitorEnter->getId()
                        << ", ";
@@ -1107,7 +1100,7 @@ public:
         (*currentStack)[currentDepth] = clique;
         currentDepth += 1;
             
-        if (Log::cat_opt_sync()->isDebugEnabled()) {
+        if (Log::isEnabled()) {
             Log::out() << " after openMonitor(" 
                        << (int) monitorEnter->getId()
                        << ", ";
@@ -1118,7 +1111,7 @@ public:
         }
     }
     void closeMonitor(Inst *monitorExit, Opnd *obj) {
-        if (Log::cat_opt_sync()->isDebugEnabled()) {
+        if (Log::isEnabled()) {
             Log::out() << " before closeMonitor("
                        << (int) monitorExit->getId()
                        << ", ";
@@ -1132,7 +1125,7 @@ public:
             assert(currentStack);
             SyncClique *currentMonitor = (*currentStack)[currentDepth-1];
             currentMonitor = currentMonitor->find();
-            if (Log::cat_opt_sync()->isDebugEnabled()) {
+            if (Log::isEnabled()) {
                 Log::out() << " setting monitorCliques["
                            << (int) monitorExit->getId()
                            << "] = ";
@@ -1158,13 +1151,13 @@ public:
                 needRecCount[monitorExit] = openSet;
             }
         } else {
-            if (Log::cat_opt_sync()->isDebugEnabled()) {
+            if (Log::isEnabled()) {
                 Log::out() << " currentDepth is 0 at monitorExit; setting "
                            << " monitorCliques[monitorExit] = bottom" << ::std::endl;
             }
             monitorCliques[monitorExit] = bottomClique;
         }
-        if (Log::cat_opt_sync()->isDebugEnabled()) {
+        if (Log::isEnabled()) {
             Log::out() << " after closeMonitor("
                        << (int) monitorExit->getId()
                        << ", ";
@@ -1194,13 +1187,13 @@ SyncOpt::getLockVar(Opnd *obj)
         Inst *objDef = obj->getInst();
         if (objDef->getOperation().mustEndBlock()) {
             // can't insert right after objectdef
-            CFGNode *objDefNode = objDef->getNode();
-            CFGEdge *outEdge = (CFGEdge*) objDefNode->getUnconditionalEdge();
+            Node *objDefNode = objDef->getNode();
+            Edge *outEdge = objDefNode->getUnconditionalEdge();
             assert(outEdge);
-            CFGNode *nextNode = outEdge->getTargetNode();
-            Inst *nextInst = nextNode->getFirstInst()->next();
-            while (nextInst->getOpcode() == Op_Phi) {
-                nextInst = nextInst->next();
+            Node *nextNode = outEdge->getTargetNode();
+            Inst *nextInst = (Inst*)nextNode->getSecondInst();
+            while (nextInst!=NULL && nextInst->getOpcode() == Op_Phi) {
+                nextInst = nextInst->getNextInst();
             }
             ldLockInst->insertBefore(nextInst);
         } else {
@@ -1238,11 +1231,10 @@ uint32 SyncOpt::findBalancedExits_Stage1(bool optimistic, bool use_IncRecCount, 
 {
     SyncOptForwardInstance findBalancedExits(mm, optimistic, use_IncRecCount);
     
-    FlowGraph &fg = irManager.getFlowGraph();
+    ControlFlowGraph &fg = irManager.getFlowGraph();
     solve<SyncOptDfValue>(&fg, findBalancedExits, true, // forwards
                           mm, 
-                          entrySolution, exitSolution,
-                          Log::cat_opt_sync(), true); // ignore exception edges
+                          entrySolution, exitSolution, true); // ignore exception edges
     uint32 numCliques = 0;
     {
         for (uint32 i = 0; i<numNodes; i++) {
@@ -1263,7 +1255,7 @@ void SyncOpt::linkStacks(uint32 depth1, SyncClique *stack1,
     uint32 mindepth = ::std::min(depth1, depth2);
     uint32 i = 0;
     for ( ; i < mindepth; ++i) {
-        if (Log::cat_opt_sync()->isDebugEnabled()) {
+        if (Log::isEnabled()) {
             Log::out() << " linking02 ";
             stack2[depth2-1-i].print(Log::out());
             Log::out() << " with ";
@@ -1273,7 +1265,7 @@ void SyncOpt::linkStacks(uint32 depth1, SyncClique *stack1,
         stack2[depth2-1-i].link(&stack1[depth1-1-i]);
     }
     for ( ; i < depth1; ++i) {
-        if (Log::cat_opt_sync()->isDebugEnabled()) {
+        if (Log::isEnabled()) {
             Log::out() << " linking03 ";
             stack1[depth1-1-i].print(Log::out());
             Log::out() << " with bottom (";
@@ -1283,7 +1275,7 @@ void SyncOpt::linkStacks(uint32 depth1, SyncClique *stack1,
         stack1[depth1-1-i].link(bottomClique);
     }
     for ( ; i < depth2; ++i) {
-        if (Log::cat_opt_sync()->isDebugEnabled()) {
+        if (Log::isEnabled()) {
             Log::out() << " linking04 ";
             stack2[depth2-1-i].print(Log::out());
             Log::out() << " with bottom (";
@@ -1296,7 +1288,7 @@ void SyncOpt::linkStacks(uint32 depth1, SyncClique *stack1,
 
 // starting with cliques in inStack[0..depthIn-1], walk node with walker
 // and union result with outStack[0..depthOut-1].  stackspace is available for scratch.
-void SyncOpt::findBalancedExits_Stage2a(CFGNode *node,
+void SyncOpt::findBalancedExits_Stage2a(Node *node,
                                         uint32 depthIn,
                                         SyncClique *inStack,
                                         uint32 depthOut,
@@ -1312,7 +1304,7 @@ void SyncOpt::findBalancedExits_Stage2a(CFGNode *node,
         }
     }
     assert(&walker.mem == &mm);
-    if (Log::cat_opt_sync()->isDebugEnabled()) {
+    if (Log::isEnabled()) {
         Log::out() << "  Before walk, depthIn=" << (int) depthIn 
                    << ", stack = ";
         for (uint32 i=0; i<depthIn; i++) {
@@ -1331,7 +1323,7 @@ void SyncOpt::findBalancedExits_Stage2a(CFGNode *node,
     StlVector<SyncClique *> *currentStack = walker.getStack();
     assert(currentStack);
     
-    if (Log::cat_opt_sync()->isDebugEnabled()) {
+    if (Log::isEnabled()) {
         Log::out() << "  After walk of node #"
                    << (int) node->getId()
                    << ", currentDepth=" 
@@ -1345,7 +1337,7 @@ void SyncOpt::findBalancedExits_Stage2a(CFGNode *node,
     }
     
     uint32 mindepth = ::std::min(currentDepth, depthOut);
-    if (Log::cat_opt_sync()->isDebugEnabled()) {
+    if (Log::isEnabled()) {
         Log::out() << "  Linking05 with outstack of depth " 
                    << (int) depthOut
                    << ", outstack = ";
@@ -1358,7 +1350,7 @@ void SyncOpt::findBalancedExits_Stage2a(CFGNode *node,
     {
         uint32 i = 0;
         for ( ; i < mindepth; ++i) {
-            if (Log::cat_opt_sync()->isDebugEnabled()) {
+            if (Log::isEnabled()) {
                 Log::out() << " linking06 ";
                 (*currentStack)[currentDepth-1-i]->print(Log::out());
                 Log::out() << " with ";
@@ -1368,7 +1360,7 @@ void SyncOpt::findBalancedExits_Stage2a(CFGNode *node,
             (*currentStack)[currentDepth-1-i]->link(&outStack[depthOut-1-i]);
         }
         for ( ; i < currentDepth; ++i) {
-            if (Log::cat_opt_sync()->isDebugEnabled()) {
+            if (Log::isEnabled()) {
                 Log::out() << " linking07 ";
                 (*currentStack)[currentDepth-1-i]->print(Log::out());
                 Log::out() << " with bottom (";
@@ -1378,7 +1370,7 @@ void SyncOpt::findBalancedExits_Stage2a(CFGNode *node,
             (*currentStack)[currentDepth-1-i]->link(bottomClique);
         }
         for ( ; i < depthOut; ++i) {
-            if (Log::cat_opt_sync()->isDebugEnabled()) {
+            if (Log::isEnabled()) {
                 Log::out() << " linking08 ";
                 outStack[depthOut-1-i].print(Log::out());
                 Log::out() << " with bottom (";
@@ -1407,22 +1399,22 @@ void SyncOpt::findBalancedExits_Stage2(bool optimistic, bool use_IncRecCount,
                                   needRecCount);
     StlVector<SyncClique *>stackspace(mm, SYNC_STACK_TOP_DEPTH+1, 0);
         
-    FlowGraph &fg = irManager.getFlowGraph();
-    const CFGNodeDeque &nodes =  fg.getNodes();
+    ControlFlowGraph &fg = irManager.getFlowGraph();
+    const Nodes &nodes =  fg.getNodes();
     assert(&walker.mem == &mm);
-    CFGNodeDeque::const_iterator 
+    Nodes::const_iterator 
         iter = nodes.begin(),
         end = nodes.end();
     for (; iter != end; ++iter) {
-        CFGNode *node = *iter;
+        Node *node = *iter;
         uint32 nodeId = node->getId();
         uint32 depthIn = entrySolution[nodeId].getDepth();
-        if (Log::cat_opt_sync()->isDebugEnabled()) {
+        if (Log::isEnabled()) {
             Log::out() << "Considering node " << (int) nodeId 
                        << " with depthIn=" << (int) depthIn
                        << ::std::endl;
         }
-        if (Log::cat_opt_sync()->isDebugEnabled()) {
+        if (Log::isEnabled()) {
             if (!entrySolution[nodeId].isTop()) {
                 Log::out() << "Node solution is not Top" << ::std::endl;
             } else {
@@ -1439,21 +1431,21 @@ void SyncOpt::findBalancedExits_Stage2(bool optimistic, bool use_IncRecCount,
                                   walker, stackspace, bottomClique);
         
         // link with every successor except for exception edges from MonitorExit
-        const CFGEdgeDeque &outEdges = node->getOutEdges();
-        CFGEdgeDeque::const_iterator
+        const Edges &outEdges = node->getOutEdges();
+        Edges::const_iterator
             eiter = outEdges.begin(),
             eend = outEdges.end();
         for ( ; eiter != eend; ++eiter) {
-            CFGEdge *e = *eiter;
-            CFGNode *target = e->getTargetNode();
+            Edge *e = *eiter;
+            Node *target = e->getTargetNode();
             
             // skip any exception edge from a MonitorExit unless optimistic
             if (!optimistic && target->isDispatchNode()) {
-                Inst *lastInst = node->getLastInst();
+                Inst *lastInst = (Inst*)node->getLastInst();
                 if ((lastInst->getOpcode() == Op_TauMonitorExit) ||
                     (lastInst->getOpcode() == Op_OptimisticBalancedMonitorExit)) {
                     
-                    if (Log::cat_opt_sync()->isDebugEnabled()) {
+                    if (Log::isEnabled()) {
                         Log::out() << "Skipping monitor exception edge from node #" 
                                    << (int) nodeId
                                    << " to dispatch node #"
@@ -1471,7 +1463,7 @@ void SyncOpt::findBalancedExits_Stage2(bool optimistic, bool use_IncRecCount,
             SyncClique *targetStack = entryCliques[targetId];
             uint32 targetDepth = entrySolution[targetId].getDepth();
 
-            if (Log::cat_opt_sync()->isDebugEnabled()) {
+            if (Log::isEnabled()) {
                 Log::out() << "Linking09 output of node #" 
                            << (int) nodeId
                            << " with input of node #"
@@ -1485,12 +1477,12 @@ void SyncOpt::findBalancedExits_Stage2(bool optimistic, bool use_IncRecCount,
     }
     // link any open monitor at the exit node with bottom
     {
-        CFGNode *exitNode = fg.getExit();
+        Node *exitNode = fg.getExitNode();
         uint32 exitId = exitNode->getId();
         uint32 depthIn = entrySolution[exitId].getDepth();
         SyncClique *exitStack = entryCliques[exitId];
         for (uint32 i=0; i< depthIn; ++i) {
-            if (Log::cat_opt_sync()->isDebugEnabled()) {
+            if (Log::isEnabled()) {
                 Log::out() << " for exit node: i="
                            << (int) i;
                 Log::out() << " linking10 ";
@@ -1506,7 +1498,7 @@ void SyncOpt::findBalancedExits_Stage2(bool optimistic, bool use_IncRecCount,
 
 bool SyncOpt::monitorExitIsBad(Inst *monExit, SyncClique *clique, 
                                SyncClique *cliqueRoot, SyncClique *bottomCliqueRoot) {
-    if (Log::cat_opt_sync()->isDebugEnabled()) {
+    if (Log::isEnabled()) {
         Log::out() << "Considering monitorExit instruction: ";
         monExit->print(Log::out());
         Log::out() << " with ";
@@ -1517,17 +1509,17 @@ bool SyncOpt::monitorExitIsBad(Inst *monExit, SyncClique *clique,
     }
     
     if (cliqueRoot == bottomCliqueRoot) {
-        if (Log::cat_opt_sync()->isDebugEnabled()) {
+        if (Log::isEnabled()) {
             Log::out() << "  clique == bottom" << ::std::endl;
         }
         return true;
     } else if (!cliqueRoot->opnd) {
-        if (Log::cat_opt_sync()->isDebugEnabled()) {
+        if (Log::isEnabled()) {
             Log::out() << "  cliqueRoot->opnd = NULL" << ::std::endl;
         }
         return true;
     } else if (cliqueRoot->opnd != monExit->getSrc(0)) {
-        if (Log::cat_opt_sync()->isDebugEnabled()) {
+        if (Log::isEnabled()) {
             Log::out() << "  clique->opnd != monitorExit->opnd:" << ::std::endl;
             Log::out() << "    Clique=";
             if (cliqueRoot->opnd)
@@ -1591,7 +1583,7 @@ void SyncOpt::findBalancedExits_Stage3(bool optimistic, bool use_IncRecCount,
     StlVector<Inst *> newBadMonitorExits(mm);
     SyncClique *bottomCliqueRoot = bottomClique->find();
     
-    if (Log::cat_opt_sync()->isDebugEnabled()) {
+    if (Log::isEnabled()) {
         Log::out() << " beginning Stage3" << ::std::endl;
     }
 
@@ -1599,7 +1591,7 @@ void SyncOpt::findBalancedExits_Stage3(bool optimistic, bool use_IncRecCount,
     while (needToCheckAgain) {
         needToCheckAgain = false;
 
-        if (Log::cat_opt_sync()->isDebugEnabled()) {
+        if (Log::isEnabled()) {
             Log::out() << "  beginning Stage3 iteration" << ::std::endl;
         }
 
@@ -1640,7 +1632,7 @@ void SyncOpt::findBalancedExits_Stage3(bool optimistic, bool use_IncRecCount,
             }
         }
 
-        if (Log::cat_opt_sync()->isDebugEnabled()) {
+        if (Log::isEnabled()) {
             Log::out() << "  done Stage3a" << ::std::endl;
         }
 
@@ -1652,7 +1644,7 @@ void SyncOpt::findBalancedExits_Stage3(bool optimistic, bool use_IncRecCount,
             Inst *monExit = *monExitIter;
             
             SyncClique *clique = monitorCliques[monExit];
-            if (Log::cat_opt_sync()->isDebugEnabled()) {
+            if (Log::isEnabled()) {
                 Log::out() << "  linking11 badMonitor ";
                 clique->print(Log::out());
                 Log::out() << " with bottom (";
@@ -1663,7 +1655,7 @@ void SyncOpt::findBalancedExits_Stage3(bool optimistic, bool use_IncRecCount,
         }
         bottomCliqueRoot = bottomCliqueRoot->find();
 
-        if (Log::cat_opt_sync()->isDebugEnabled()) {
+        if (Log::isEnabled()) {
             Log::out() << "  done Stage3b" << ::std::endl;
         }
 
@@ -1678,7 +1670,7 @@ void SyncOpt::findBalancedExits_Stage3(bool optimistic, bool use_IncRecCount,
             if (depMonRoot != bottomCliqueRoot) {
                 foundDependentMonitor = true;                // we need to re-iterate
 
-                if (Log::cat_opt_sync()->isDebugEnabled()) {
+                if (Log::isEnabled()) {
                     Log::out() << "  linking12 depMonRoot ";
                     depMonRoot->print(Log::out());
                     Log::out() << " with bottom (";
@@ -1691,7 +1683,7 @@ void SyncOpt::findBalancedExits_Stage3(bool optimistic, bool use_IncRecCount,
             }
         }
 
-        if (Log::cat_opt_sync()->isDebugEnabled()) {
+        if (Log::isEnabled()) {
             Log::out() << "  done Stage3c" << ::std::endl;
         }
 
@@ -1704,12 +1696,12 @@ void SyncOpt::findBalancedExits_Stage3(bool optimistic, bool use_IncRecCount,
                 newBadExitEnd = newBadMonitorExits.end();
             for ( ; newBadExitIter != newBadExitEnd; ++newBadExitIter) {
                 Inst *newBadExit = *newBadExitIter;
-                CFGNode *node = newBadExit->getNode();
+                Node *node = newBadExit->getNode();
                 uint32 nodeId = node->getId();
                 uint32 nodeDepth = exitSolution[nodeId].getDepth();
                 
-                CFGEdge *e = (CFGEdge *)node->getExceptionEdge();
-                CFGNode *target = e->getTargetNode();
+                Edge *e = (Edge *)node->getExceptionEdge();
+                Node *target = e->getTargetNode();
                 uint32 targetId = target->getId();
                 uint32 targetDepth = entrySolution[targetId].getDepth();
                 
@@ -1727,7 +1719,7 @@ void SyncOpt::findBalancedExits_Stage3(bool optimistic, bool use_IncRecCount,
                         }
                     }
                 }
-                if (Log::cat_opt_sync()->isDebugEnabled()) {
+                if (Log::isEnabled()) {
                     Log::out() << "Linking13 exception edge from bad monexit at node #" 
                                << (int) nodeId
                                << " to dispatch node #"
@@ -1740,7 +1732,7 @@ void SyncOpt::findBalancedExits_Stage3(bool optimistic, bool use_IncRecCount,
             }            
         }
 
-        if (Log::cat_opt_sync()->isDebugEnabled()) {
+        if (Log::isEnabled()) {
             Log::out() << "  done Stage3d" << ::std::endl;
         }
 
@@ -1749,7 +1741,7 @@ void SyncOpt::findBalancedExits_Stage3(bool optimistic, bool use_IncRecCount,
         
         needToCheckAgain = differs;
 
-        if (Log::cat_opt_sync()->isDebugEnabled()) {
+        if (Log::isEnabled()) {
             Log::out() << "  done Stage3 iteration" << ::std::endl;
         }
     }
@@ -1761,13 +1753,13 @@ void SyncOpt::findBalancedExits(bool optimistic, bool use_IncRecCount)
     OpndManager &opndManager = irManager.getOpndManager();
     InstFactory &instFactory = irManager.getInstFactory();
 
-    FlowGraph &fg = irManager.getFlowGraph();
+    ControlFlowGraph &fg = irManager.getFlowGraph();
     uint32 numNodes = fg.getMaxNodeId();
     SyncOptDfValue *entrySolution, *exitSolution;
     uint32 numCliques = findBalancedExits_Stage1(optimistic, use_IncRecCount, numNodes,
                                                  entrySolution, exitSolution);
 
-    if (Log::cat_opt_sync()->isDebugEnabled()) {
+    if (Log::isEnabled()) {
         Log::out() << "numNodes is " << (int) numNodes << ::std::endl;
         Log::out() << "numCliques is " << (int) numCliques << ::std::endl;
     }
@@ -1786,7 +1778,7 @@ void SyncOpt::findBalancedExits(bool optimistic, bool use_IncRecCount)
             exitCliques[i] = &cliquesHeap[cliqueHeapIndex];
             cliqueHeapIndex += lout;
 
-            if (Log::cat_opt_sync()->isDebugEnabled()) {
+            if (Log::isEnabled()) {
                 Log::out() << "  node " << (int) i << " has " << (int) lin << " cliques in: [ ";
                 for (uint32 j = 0; j<lin; ++j) { 
                     entryCliques[i][j].print(Log::out());
@@ -1805,12 +1797,12 @@ void SyncOpt::findBalancedExits(bool optimistic, bool use_IncRecCount)
     }
     assert(cliqueHeapIndex <= numCliques);
 
-    if (Log::cat_opt_sync()->isDebugEnabled()) {
+    if (Log::isEnabled()) {
         Log::out() << "finished dataflow solution" << ::std::endl;
     }
 
     SyncClique *bottomClique = new (mm) SyncClique();
-    if (Log::cat_opt_sync()->isDebugEnabled()) {
+    if (Log::isEnabled()) {
         Log::out() << "Bottom clique is ";
         bottomClique->print(Log::out());
         Log::out() << ::std::endl;
@@ -1831,7 +1823,7 @@ void SyncOpt::findBalancedExits(bool optimistic, bool use_IncRecCount)
     // also, needRecCount[monitorExit]=cliques to be invalidated if monitorExit opnd
     //    doesn't match, or if the monitorExit clique is/was invalidated
     SyncClique *bottomCliqueRoot = bottomClique->find();
-    if (Log::cat_opt_sync()->isDebugEnabled()) {
+    if (Log::isEnabled()) {
         Log::out() << "Bottom clique root is ";
         bottomCliqueRoot->print(Log::out());
         Log::out() << ::std::endl;
@@ -1860,7 +1852,7 @@ void SyncOpt::findBalancedExits(bool optimistic, bool use_IncRecCount)
             Inst *inst = (*miter).first;
             SyncClique *clique = (*miter).second;
 
-            if (Log::cat_opt_sync()->isDebugEnabled()) {
+            if (Log::isEnabled()) {
                 Log::out() << "Considering balancing instruction: ";
                 inst->print(Log::out());
                 Log::out() << " with ";
@@ -1870,7 +1862,7 @@ void SyncOpt::findBalancedExits(bool optimistic, bool use_IncRecCount)
 
             clique = clique->find();
             if ((clique == bottomCliqueRoot)) {
-                if (Log::cat_opt_sync()->isDebugEnabled()) {
+                if (Log::isEnabled()) {
                     Log::out() << "  Clique == bottom" << ::std::endl;
                 }
                 continue;
@@ -1934,8 +1926,8 @@ void SyncOpt::findBalancedExits(bool optimistic, bool use_IncRecCount)
 
                         if (!optimistic) {
                             // remove exception edge
-                            CFGNode *node = inst->getNode();
-                            CFGEdge* edge = (CFGEdge *)node->getExceptionEdge();
+                            Node *node = inst->getNode();
+                            Edge* edge = (Edge *)node->getExceptionEdge();
                             assert(edge != NULL);
                             fg.removeEdge(edge);
                         }
@@ -1943,8 +1935,8 @@ void SyncOpt::findBalancedExits(bool optimistic, bool use_IncRecCount)
                         inst->unlink();
                     }
                     break;
-		default:
-		    break;
+        default:
+            break;
                 }
             }
         }
@@ -1959,7 +1951,7 @@ void SyncOpt::findBalancedExits(bool optimistic, bool use_IncRecCount)
             StlVectorSet<SyncClique *> *cliques = (*miter).second;
             assert(cliques);
             
-            if (Log::cat_opt_sync()->isDebugEnabled()) {
+            if (Log::isEnabled()) {
                 Log::out() << "Considering increccount for instruction: ";
                 invalidatingInst->print(Log::out());
                 Log::out() << ::std::endl;
@@ -1997,40 +1989,40 @@ void SyncOpt::findBalancedExits(bool optimistic, bool use_IncRecCount)
 }
 
 void SyncOpt::insertUnwindMonitorExit(Opnd *syncMethodOpnd,
-                                      CFGNode *&tmpDispatchNode, CFGNode *&tmpCatchNode,
-                                      CFGNode *&tmpRethrowNode)
+                                      Node *&tmpDispatchNode, Node *&tmpCatchNode,
+                                      Node *&tmpRethrowNode)
 {
     assert(flags.optimistic);
     assert(syncMethodOpnd);
     InstFactory &instFactory = irManager.getInstFactory();
     OpndManager &opndManager = irManager.getOpndManager();
     TypeManager &typeManager = irManager.getTypeManager();
-    FlowGraph &fg = irManager.getFlowGraph();
-    CFGNode *unwind = fg.getUnwind();
+    ControlFlowGraph &fg = irManager.getFlowGraph();
+    Node *unwind = fg.getUnwindNode();
     assert(unwind); // use it if we have an unwind node only
 
-    CFGNode *newDispatchNode = fg.createDispatchNode();
+    Node *newDispatchNode = fg.createDispatchNode(instFactory.makeLabel());
 
     Opnd* ex = opndManager.createSsaTmpOpnd(typeManager.getSystemObjectType());
-    CFGNode *newCatchNode = fg.createCatchNode(0, ex->getType());
-    newCatchNode->append(instFactory.makeCatch(ex));
+    Node *newCatchNode = fg.createBlockNode(instFactory.makeCatchLabel(0, ex->getType()));
+    newCatchNode->appendInst(instFactory.makeCatch(ex));
     bool insertedMethodExit = false;
 
-    CFGNode *rethrowNode = fg.createBlockNode();
-    rethrowNode->append(instFactory.makeThrow(Throw_NoModifier, ex));
+    Node *rethrowNode = fg.createBlockNode(instFactory.makeLabel());
+    rethrowNode->appendInst(instFactory.makeThrow(Throw_NoModifier, ex));
     
     // Redirect exception exits that aren't from a node whose successor's successor
     // is return, to newDispatchNode
-    const CFGEdgeDeque& unwindEdges = unwind->getInEdges();
-    CFGEdgeDeque::const_iterator eiter;
+    const Edges& unwindEdges = unwind->getInEdges();
+    Edges::const_iterator eiter;
     for(eiter = unwindEdges.begin(); eiter != unwindEdges.end(); ) {
         bool redirectEdge = true;
-        CFGEdge* edge = *eiter;
+        Edge* edge = *eiter;
         ++eiter;
-        CFGNode *source = edge->getSourceNode();
+        Node *source = edge->getSourceNode();
         
         // check whether source is a return-path monitorExit(this)
-        Inst *sourceLastInst = source->getLastInst();
+        Inst *sourceLastInst = (Inst*)source->getLastInst();
         if (((sourceLastInst->getOpcode() == Op_TauMonitorExit) ||
              (sourceLastInst->getOpcode() == Op_OptimisticBalancedMonitorExit)) &&
             (sourceLastInst->getSrc(0) == syncMethodOpnd)) {
@@ -2041,28 +2033,28 @@ void SyncOpt::insertUnwindMonitorExit(Opnd *syncMethodOpnd,
                 if (sourceLastInst->getOpcode() == Op_TauMonitorExit) {
                     Opnd *tauSrcNonNull = sourceLastInst->getSrc(1);
                     assert(tauSrcNonNull->getType()->tag == Type::Tau);
-                    newCatchNode->append(instFactory.makeTauMonitorExit(syncMethodOpnd, tauSrcNonNull));
+                    newCatchNode->appendInst(instFactory.makeTauMonitorExit(syncMethodOpnd, tauSrcNonNull));
                 } else {
                     Opnd *lockAddrOpnd = sourceLastInst->getSrc(1);
                     Opnd *oldValueOpnd = sourceLastInst->getSrc(1);
-                    newCatchNode->append(instFactory.makeOptimisticBalancedMonitorExit(syncMethodOpnd,
+                    newCatchNode->appendInst(instFactory.makeOptimisticBalancedMonitorExit(syncMethodOpnd,
                                                                                        lockAddrOpnd,
                                                                                        oldValueOpnd));
                 }
             }
             
             // now check whether other successor is a return node
-            const CFGEdgeDeque& sourceEdges = source->getOutEdges();
-            CFGEdgeDeque::const_iterator 
+            const Edges& sourceEdges = source->getOutEdges();
+            Edges::const_iterator 
                 sourceEdgesIter = sourceEdges.begin(),
                 sourceEdgesEnd = sourceEdges.end();
             for(; sourceEdgesIter != sourceEdgesEnd; ++sourceEdgesIter) {
-                CFGEdge *sourceEdge = *sourceEdgesIter;
-                CFGNode *target = sourceEdge->getTargetNode();
+                Edge *sourceEdge = *sourceEdgesIter;
+                Node *target = sourceEdge->getTargetNode();
                 if (target == unwind) continue;
                 
                 // check if it ends in return
-                Inst *targetLastInst = target->getLastInst();
+                Inst *targetLastInst = (Inst*)target->getLastInst();
                 if (targetLastInst->getOpcode() == Op_Return) {
                     // do not redirect
                     redirectEdge = false;
@@ -2090,18 +2082,18 @@ void SyncOpt::insertUnwindMonitorExit(Opnd *syncMethodOpnd,
 }
 
 void SyncOpt::removeUnwindMonitorExit(Opnd *syncMethodOpnd, 
-                                      CFGNode *tmpDispatchNode, CFGNode *tmpCatchNode,
-                                      CFGNode *tmpRethrowNode)
+                                      Node *tmpDispatchNode, Node *tmpCatchNode,
+                                      Node *tmpRethrowNode)
 {
     assert(flags.optimistic);
     assert(syncMethodOpnd);
-    FlowGraph &fg = irManager.getFlowGraph();
-    CFGNode *unwind = fg.getUnwind();
+    ControlFlowGraph &fg = irManager.getFlowGraph();
+    Node *unwind = fg.getUnwindNode();
 
-    const CFGEdgeDeque& tmpDispatchInEdges = tmpDispatchNode->getInEdges();
-    CFGEdgeDeque::const_iterator eiter;
+    const Edges& tmpDispatchInEdges = tmpDispatchNode->getInEdges();
+    Edges::const_iterator eiter;
     for(eiter = tmpDispatchInEdges.begin(); eiter != tmpDispatchInEdges.end(); ) {
-        CFGEdge* edge = *eiter;
+        Edge* edge = *eiter;
         ++eiter;
         fg.replaceEdgeTarget(edge, unwind);
     }

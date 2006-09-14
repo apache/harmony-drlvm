@@ -22,14 +22,15 @@ import java.util.NoSuchElementException;
  * @author Evgueni Brevnov, Roman S. Bushmanov
  * @version $Revision: 1.1.6.4 $
  */
-public class EmptyEnum implements Enumeration {
+public class EmptyEnum<T> implements Enumeration<T> {
 
     private static EmptyEnum emptyEnum;
     
     private EmptyEnum() {
     }
 
-    public static Enumeration getInstance() {
+    @SuppressWarnings("unchecked")
+    public static <U> Enumeration<U> getInstance() {
         if (emptyEnum == null) {
             emptyEnum = new EmptyEnum();
         }
@@ -40,7 +41,7 @@ public class EmptyEnum implements Enumeration {
         return false;
     }
 
-    public Object nextElement() throws NoSuchElementException {
+    public T nextElement() throws NoSuchElementException {
         throw new NoSuchElementException();
     }
 }

@@ -27,6 +27,7 @@
 // This file names all types commonly used in the VM.
 // It defines those types that have no other logical place, other types are defined in header files appropriate to them.
 
+struct String;
 struct Class;
 class Class_Member;
 struct Field;

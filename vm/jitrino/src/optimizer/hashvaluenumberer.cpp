@@ -40,7 +40,7 @@
 
 namespace Jitrino {
 
-DEFINE_OPTPASS_IMPL(HashValueNumberingPass,hvn,"Hash Value Numbering (CSE)")
+DEFINE_SESSION_ACTION(HashValueNumberingPass,hvn,"Hash Value Numbering (CSE)")
 
 void
 HashValueNumberingPass::_run(IRManager& irm) {
@@ -68,7 +68,7 @@ public:
     }
 
     void enterScope() {
-        if(Log::cat_opt_vn()->isDebugEnabled()) {
+        if(Log::isEnabled()) {
             Log::out() << "Entering VN scope" << ::std::endl;
         }
         cseHashTable.enter_scope();
@@ -79,7 +79,7 @@ public:
         if (constantTable)
             constantTable->exit_scope();
         cseHashTable.exit_scope();
-        if(Log::cat_opt_vn()->isDebugEnabled()) {
+        if(Log::isEnabled()) {
             Log::out() << "Exiting VN scope" << ::std::endl;
         }
     };
@@ -89,12 +89,12 @@ public:
                       DominatorTree &domTree0,
                       MemoryOpt *mopt,
                       bool cse_final0,
-                      FlowGraph &fg0,
+                      ControlFlowGraph &fg0,
                       bool is_scoped)
         : memoryManager(memoryManager0),
           cseHashTable(fg0.getNodes().size() * 
-                       irm.getCompilationContext()->getOptimizerFlags()->hash_node_tmp_factor,
-                       memoryManager, *irm.getCompilationContext()->getOptimizerFlags()),
+                       irm.getOptimizerFlags().hash_node_tmp_factor,
+                       memoryManager, irm.getOptimizerFlags()),
           constantTable(0),
           irManager(irm),
           tauUnsafe(0),
@@ -104,7 +104,7 @@ public:
           cse_final(cse_final0),
           fg(fg0)
     {
-        OptimizerFlags& optimizerFlags = *irm.getCompilationContext()->getOptimizerFlags();
+        const OptimizerFlags& optimizerFlags = irm.getOptimizerFlags();
         if (is_scoped && optimizerFlags.hvn_constants) {
             constantTable 
                 = new (memoryManager) SparseOpndMap(fg0.getNodes().size() * optimizerFlags.hash_node_constant_factor,
@@ -169,7 +169,7 @@ public:
     // control flow
     Inst* caseBranch(BranchInst* inst) { 
         Inst *res = lookupInst(inst);
-        if(Log::cat_opt_vn()->isDebugEnabled()) {
+        if(Log::isEnabled()) {
             Log::out() << "caseBranch ";
             inst->print(Log::out());
             Log::out() << " yields ";
@@ -205,9 +205,7 @@ public:
     
     Inst* caseCatch(Inst* inst) { return caseDefault(inst); }
     
-	Inst* caseThrow(Inst* inst) { return caseDefault(inst); }
-
-	Inst* caseThrowLazy(Inst* inst) { return caseDefault(inst); }
+    Inst* caseThrow(Inst* inst) { return caseDefault(inst); }
 
     Inst* caseThrowSystemException(Inst* inst) { return caseDefault(inst); }
     
@@ -237,9 +235,9 @@ public:
     caseDefArg(Inst* inst) { return caseDefault(inst); }
     
     // load of constants
-    Inst* caseLdConstant(ConstInst* inst)           { return hashInst(inst); }
-    Inst* caseLdNull(ConstInst* inst)               { return hashInst(inst); }
-    Inst* caseLdString(TokenInst* inst)             { return hashInst(inst); }
+    Inst* caseLdConstant(ConstInst* inst)   { return hashInst(inst); }
+    Inst* caseLdNull(ConstInst* inst)       { return hashInst(inst); }
+    Inst* caseLdRef(TokenInst* inst)        { return hashInst(inst); }
     
     // variable access
     Inst* caseLdVar(Inst* inst) {
@@ -284,7 +282,7 @@ public:
             (memOpt && !is_volatile)) {
             Inst *res = lookupInst(inst);
             Operation op = inst->getOperation();
-            if (Log::cat_opt_vn()->isDebugEnabled()) {
+            if (Log::isEnabled()) {
                 Log::out() << "Ldind looking for "
                            << (int) op.encodeForHashing()
                            << ", "
@@ -292,7 +290,7 @@ public:
                            << ::std::endl;
             }
             if (res != inst) {
-                if (Log::cat_opt_vn()->isDebugEnabled()) {
+                if (Log::isEnabled()) {
                     Log::out() << "found hash" << ::std::endl;
                 }
                 if (res->getOpcode() == Op_TauLdInd) {
@@ -310,7 +308,7 @@ public:
             }
             // if previous cases fail,
             {
-                if (Log::cat_opt_vn()->isDebugEnabled()) {
+                if (Log::isEnabled()) {
                     Log::out() << "not found" << ::std::endl;
                 }
                 Type::Tag tag = inst->getType();
@@ -332,14 +330,14 @@ public:
                     Operation newop = inst->getOperation();
                     newop.setType(otherTag);
                     CSEHashKey key = getKey(newop, inst->getSrc(0)->getId());
-                    if (Log::cat_opt_vn()->isDebugEnabled()) {
+                    if (Log::isEnabled()) {
                         Log::out() << "Ldind looking for changed-sign form "
                                    << (int) newop.encodeForHashing()
                                    << ::std::endl;
                     }
                     Inst *res = lookupInst(inst, key);
                     if (res != inst) {
-                        if (Log::cat_opt_vn()->isDebugEnabled()) {
+                        if (Log::isEnabled()) {
                             Log::out() << "found hash" << ::std::endl;
                         }
                         Opnd *dataOpnd = 0;
@@ -364,7 +362,7 @@ public:
                                                                     dstType->tag,
                                                                     newDst,
                                                                     dataOpnd);
-                            if (Log::cat_opt_vn()->isDebugEnabled()) {
+                            if (Log::isEnabled()) {
                                 Log::out() << "Ldind replaced by convInst ";
                                 convInst->print(Log::out());
                                 Log::out() << ::std::endl;
@@ -373,7 +371,7 @@ public:
                             return convInst;
                         }
                     }
-                    if (Log::cat_opt_vn()->isDebugEnabled()) {
+                    if (Log::isEnabled()) {
                         Log::out() << "not found" << ::std::endl;
                     }
                 }
@@ -546,7 +544,7 @@ public:
             Opnd *addrOp = inst->getSrc(1);
             Type::Tag typetag = inst->getType();
             Operation op(Op_TauLdInd, typetag);
-            if (Log::cat_opt_vn()->isDebugEnabled()) {
+            if (Log::isEnabled()) {
                 Log::out() << "Stind hashing Ldind : "
                            << (int) op.encodeForHashing()
                            << ", "
@@ -1155,7 +1153,7 @@ private:
     }
     Inst* setHashToInst(Inst* inst, const CSEHashKey &key) {
         if (!key.isNull()) {
-            if (Log::cat_opt_vn()->isDebugEnabled()) {
+            if (Log::isEnabled()) {
                 Log::out() << "setting hash ";
                 key.print(Log::out());
                 Log::out() << " to inst ";
@@ -1170,7 +1168,7 @@ private:
         if (!key.isNull()) {
             Inst* newInst = cseHashTable.lookup(key);
             if (newInst != NULL) {
-                if (Log::cat_opt_vn()->isDebugEnabled()) {
+                if (Log::isEnabled()) {
                     Log::out() << "looking for hash ";
                     key.print(Log::out());
                     Log::out() << " found inst ";
@@ -1179,7 +1177,7 @@ private:
                 }
                 return newInst;
             } else {
-                if (Log::cat_opt_vn()->isDebugEnabled()) {
+                if (Log::isEnabled()) {
                     Log::out() << "looking for hash ";
                     key.print(Log::out());
                     Log::out() << " found NULL" << ::std::endl;
@@ -1219,7 +1217,7 @@ private:
     }
     Inst* lookupInst(BranchInst* inst) {
         Inst *res = lookupInst(inst, getKey(inst));
-        if(Log::cat_opt_vn()->isDebugEnabled()) {
+        if(Log::isEnabled()) {
             Log::out() << "lookupInst(Branch ";
             inst->print(Log::out());
             Log::out() << " with hashcode "
@@ -1248,9 +1246,9 @@ private:
 public:
     void addBranchConditions(DominatorNode* domNode);
 private:
-    void addInfoFromBranch(CFGNode* targetNode, BranchInst *branchi, bool isTrueEdge);
-    void addInfoFromPredBranch(CFGNode* targetNode, BranchInst *branchi, bool isTrueEdge);
-    void addInfoFromBranchCompare(CFGNode* targetNode, 
+    void addInfoFromBranch(Node* targetNode, BranchInst *branchi, bool isTrueEdge);
+    void addInfoFromPredBranch(Node* targetNode, BranchInst *branchi, bool isTrueEdge);
+    void addInfoFromBranchCompare(Node* targetNode, 
                                   ComparisonModifier mod,
                                   Type::Tag comparisonType,
                                   bool isTrueEdge,
@@ -1268,52 +1266,61 @@ protected:
     DominatorTree      &domTree;
     MemoryOpt           *memOpt;
     bool                cse_final;
-    FlowGraph          &fg;
+    ControlFlowGraph    &fg;
 public:
     Inst* getTauUnsafe() {
         if (!tauUnsafe) {
-            CFGNode *head = fg.getEntry();
-            Inst *entryLabel = head->getFirstInst();
+            Node *head = fg.getEntryNode();
+            Inst *entryLabel = (Inst*)head->getFirstInst();
             // first search for one already there
-            Inst *inst = entryLabel->next();
-            while (inst != entryLabel) {
+            Inst *inst = entryLabel->getNextInst();
+            while (inst != NULL) {
                 if (inst->getOpcode() == Op_TauUnsafe) {
                     tauUnsafe = inst;
                     return tauUnsafe;
                 }
-                inst = inst->next();
+                inst = inst->getNextInst();
             }
             TypeManager &tm = irManager.getTypeManager();
             Opnd *tauOpnd = irManager.getOpndManager().createSsaTmpOpnd(tm.getTauType());
             tauUnsafe = irManager.getInstFactory().makeTauUnsafe(tauOpnd);
             // place after label and Phi instructions
-            inst = entryLabel->next();
-            while (inst != entryLabel) {
+            inst = entryLabel->getNextInst();
+            while (inst != NULL) {
                 Opcode opc = inst->getOpcode();
                 if ((opc != Op_Phi) && (opc != Op_TauPi) && (opc != Op_TauPoint)
                     && (opc != Op_TauEdge))
                     break;
-                inst = inst->next();
+                inst = inst->getNextInst();
             }
-            if(Log::cat_opt_vn()->isDebugEnabled()) {
+            if(Log::isEnabled()) {
                 Log::out() << "Inserting tauUnsafe inst ";
                 tauUnsafe->print(Log::out());
-                Log::out() << " before inst ";
-                inst->print(Log::out());
+                if (inst!=NULL) {
+                    Log::out() << " before inst ";
+                    inst->print(Log::out());
+                }
                 Log::out() << ::std::endl;
             }
-            tauUnsafe->insertBefore(inst);
+            if (inst != NULL) {
+                tauUnsafe->insertBefore(inst);
+            } else {
+                head->appendInst(tauUnsafe);
+            }
+            
         }
         return tauUnsafe;
     };
 
-    Opnd* getBlockTauPoint(CFGNode *block) {
-        Inst *firstInst = block->getFirstInst();
-        Inst *inst = firstInst->next();
-        for (; inst != firstInst; inst = inst->next()) {
-            if (inst->getOpcode() == Op_TauPoint) return inst->getDst();
+    Opnd* getBlockTauPoint(Node *block) {
+        Inst *firstInst = (Inst*)block->getFirstInst();
+        Inst *inst = firstInst->getNextInst();
+        for (; inst != NULL; inst = inst->getNextInst()) {
+            if (inst->getOpcode() == Op_TauPoint) {
+                return inst->getDst();
+            }
         }
-        for (inst = firstInst->next(); inst != firstInst; inst = inst->next()) {
+        for (inst = firstInst->getNextInst(); inst != NULL; inst = inst->getNextInst()) {
             if (inst->getOpcode() != Op_Phi) {
                 break; // insert before inst.
             }
@@ -1322,25 +1329,32 @@ public:
         TypeManager &tm = irManager.getTypeManager();
         Opnd *tauOpnd = irManager.getOpndManager().createSsaTmpOpnd(tm.getTauType());
         Inst* tauPoint = irManager.getInstFactory().makeTauPoint(tauOpnd);
-        if(Log::cat_opt_vn()->isDebugEnabled()) {
+        if(Log::isEnabled()) {
             Log::out() << "Inserting tauPoint ";
             tauPoint->print(Log::out());
-            Log::out() << " before inst ";
-            inst->print(Log::out());
+            if (inst!=NULL) {
+                Log::out() << " before inst ";
+                inst->print(Log::out());
+            }
             Log::out() << ::std::endl;
         }
-        tauPoint->insertBefore(inst);
+        if (inst!=NULL) {
+            tauPoint->insertBefore(inst);
+        } else {
+            block->appendInst(tauPoint);
+        }
         return tauOpnd;
     }
-    Opnd* getBlockTauEdge(CFGNode *block) {
-        Inst *firstInst = block->getFirstInst();
-        Inst *inst = firstInst->next();
-        for (; inst != firstInst; inst = inst->next()) {
-            if (inst->getOpcode() == Op_TauEdge) return inst->getDst();
+    Opnd* getBlockTauEdge(Node *block) {
+        Inst *firstInst = (Inst*)block->getFirstInst();
+        Inst *inst = firstInst->getNextInst();
+        for (; inst != NULL; inst = inst->getNextInst()) {
+            if (inst->getOpcode() == Op_TauEdge) {
+                return inst->getDst();
+            }
         }
-        for (inst = firstInst->next(); inst != firstInst; inst = inst->next()) {
-            if ((inst->getOpcode() != Op_Phi) 
-                && (inst->getOpcode() != Op_TauPoint)) {
+        for (inst = firstInst->getNextInst(); inst != NULL; inst = inst->getNextInst()) {
+            if ((inst->getOpcode() != Op_Phi) && (inst->getOpcode() != Op_TauPoint)) {
                 break; // insert before inst.
             }
         }
@@ -1348,14 +1362,20 @@ public:
         TypeManager &tm = irManager.getTypeManager();
         Opnd *tauOpnd = irManager.getOpndManager().createSsaTmpOpnd(tm.getTauType());
         Inst* tauEdge = irManager.getInstFactory().makeTauEdge(tauOpnd);
-        if(Log::cat_opt_vn()->isDebugEnabled()) {
+        if(Log::isEnabled()) {
             Log::out() << "Inserting tauEdge ";
             tauEdge->print(Log::out());
-            Log::out() << " before inst ";
-            inst->print(Log::out());
+            if (inst!=NULL) {
+                Log::out() << " before inst ";
+                inst->print(Log::out());
+            }
             Log::out() << ::std::endl;
         }
-        tauEdge->insertBefore(inst);
+        if (inst != NULL) {
+            tauEdge->insertBefore(inst);
+        } else {
+            block->appendInst(tauEdge);
+        }
         return tauOpnd;
     }
     bool allowsConstantPropagation(ComparisonModifier mod, Type::Tag comparisonType,
@@ -1373,9 +1393,9 @@ InstValueNumberer::addBranchConditions(DominatorNode* domNode)
     if (!parent) return; // first node, no predecessors
 
     // check for a dominating edge
-    CFGNode *block = domNode->getNode();
-    CFGNode *idom = parent->getNode();
-    CFGEdge *domEdge = 0;
+    Node *block = domNode->getNode();
+    Node *idom = parent->getNode();
+    Edge *domEdge = 0;
     if (idom->hasOnlyOneSuccEdge())
         return; // no conditional branch there, no info to obtain
 
@@ -1384,12 +1404,12 @@ InstValueNumberer::addBranchConditions(DominatorNode* domNode)
     } else {
         // idom must be a predecessor,
         // and every other predecessor must be dominated by this block
-        const CFGEdgeDeque &inedges = block->getInEdges();
-        typedef CFGEdgeDeque::const_iterator EdgeIter;
+        const Edges &inedges = block->getInEdges();
+        typedef Edges::const_iterator EdgeIter;
         EdgeIter eLast = inedges.end();
         for (EdgeIter eIter = inedges.begin(); eIter != eLast; eIter++) {
-            CFGEdge *inEdge = *eIter;
-            CFGNode *predBlock = inEdge->getSourceNode();
+            Edge *inEdge = *eIter;
+            Node *predBlock = inEdge->getSourceNode();
             if (predBlock == idom) {
                 if (domEdge)
                     return; // can't deal with more than one dominating edge
@@ -1407,22 +1427,22 @@ InstValueNumberer::addBranchConditions(DominatorNode* domNode)
     }
 
     if (!domEdge) return; // only take easy info for now.
-    CFGEdge::Kind kind = domEdge->getEdgeType();
+    Edge::Kind kind = domEdge->getKind();
 
-    CFGNode *predBlock = idom;
+    Node *predBlock = idom;
     bool taken = false;
     switch(kind) {
-    case CFGEdge::True:
+    case Edge::Kind_True:
         taken = true;
-    case CFGEdge::False:
+    case Edge::Kind_False:
         {
-            Inst* branchi1 = predBlock->getLastInst();
+            Inst* branchi1 = (Inst*)predBlock->getLastInst();
             assert(branchi1 != NULL);
             BranchInst* branchi = branchi1->asBranchInst();
             if (branchi) {
                 if (branchi->getOpcode() == Op_PredBranch) {
                     addInfoFromPredBranch(block, branchi, taken);
-                } else {
+                } else if (branchi->getOpcode() != Op_Switch || !taken) {
                     addInfoFromBranch(block, branchi, taken);
                 }
             } else {
@@ -1430,20 +1450,18 @@ InstValueNumberer::addBranchConditions(DominatorNode* domNode)
             }
         }
     break;
-    case CFGEdge::Exception:
+    case Edge::Kind_Dispatch:
         taken = true;
-    case CFGEdge::Unconditional:
+    case Edge::Kind_Unconditional:
         // remember the predecessor has multiple out edges, so ut must
         // be non-exception case of a PEI
         { 
-            Inst* lasti = predBlock->getLastInst();
+            Inst* lasti = (Inst*)predBlock->getLastInst();
             assert(lasti != NULL);
             addInfoFromPEI(lasti, taken);
         }
     break;
-    case CFGEdge::Catch:
-    case CFGEdge::Switch:
-    case CFGEdge::Unknown:
+    case Edge::Kind_Catch:
         break;
     default: break;
     }
@@ -1485,11 +1503,12 @@ bool allowsAnyZeroElimination(ComparisonModifier mod, Type::Tag comparisonType,
             case Type::IntPtr: 
             case Type::UIntPtr:
             case Type::ManagedPtr: case Type::UnmanagedPtr:
-            case Type::SystemObject: case Type::SystemString:
+            case Type::SystemObject: case Type::SystemClass: case Type::SystemString:
             case Type::Array: case Type::Object: 
             case Type::BoxedValue:
             case Type::MethodPtr: case Type::VTablePtr:
             case Type::CompressedSystemObject: 
+            case Type::CompressedSystemClass: 
             case Type::CompressedSystemString:
             case Type::CompressedArray: case Type::CompressedObject:
                 canelim = (notEqual ? (cv.i == 0) : (cv.i != 0)); break;
@@ -1577,10 +1596,11 @@ bool allowsAnyZeroElimination(ComparisonModifier mod, Type::Tag comparisonType,
             case Type::IntPtr: 
             case Type::UIntPtr:
             case Type::ManagedPtr: case Type::UnmanagedPtr:
-            case Type::SystemObject: case Type::SystemString:
+            case Type::SystemObject: case Type::SystemClass: case Type::SystemString:
             case Type::Array: case Type::Object: case Type::BoxedValue:
             case Type::MethodPtr: case Type::VTablePtr:
             case Type::CompressedSystemObject: 
+            case Type::CompressedSystemClass: 
             case Type::CompressedSystemString:
             case Type::CompressedArray: case Type::CompressedObject:
                 canelim = positive ^ isTrueEdge; break;
@@ -1760,7 +1780,7 @@ bool allowsCheckCastElimination(ComparisonModifier mod, Type::Tag comparisonType
     assert(tinst != NULL);
     *opnd = tinst->getSrc(0);
     *type = tinst->getTypeInfo();
-    if(Log::cat_opt_vn()->isDebugEnabled()) {
+    if(Log::isEnabled()) {
         Log::out() << "CheckCast Elim: ";
         (*opnd)->print(Log::out());
         Log::out() << ::std::endl;
@@ -1823,12 +1843,12 @@ ComparisonModifier negateComparison(ComparisonModifier mod, bool isfloat)
     return Cmp_EQ;
 }
 
-void InstValueNumberer::addInfoFromBranch(CFGNode* targetNode, BranchInst *branchi, bool isTrueEdge)
+void InstValueNumberer::addInfoFromBranch(Node* targetNode, BranchInst *branchi, bool isTrueEdge)
 {
-    OptimizerFlags& optimizerFlags = *irManager.getCompilationContext()->getOptimizerFlags();   
+    const OptimizerFlags& optimizerFlags = irManager.getOptimizerFlags();   
     if (!optimizerFlags.elim_checks) return;
 
-    if (Log::cat_opt_vn()->isDebugEnabled()) {
+    if (Log::isEnabled()) {
         Log::out() << "addInfoFromBranch " << (isTrueEdge ? "taken " : "notTaken ");
         branchi->print(Log::out());
         Log::out() << ::std::endl;
@@ -1844,13 +1864,13 @@ void InstValueNumberer::addInfoFromBranch(CFGNode* targetNode, BranchInst *branc
                              (numSrcs==2 ? branchi->getSrc(1) : 0));
 }
 
-void InstValueNumberer::addInfoFromPredBranch(CFGNode* targetNode, BranchInst *branchi, 
+void InstValueNumberer::addInfoFromPredBranch(Node* targetNode, BranchInst *branchi, 
                                               bool isTrueEdge)
 {
-    OptimizerFlags& optimizerFlags = *irManager.getCompilationContext()->getOptimizerFlags();     
+    const OptimizerFlags& optimizerFlags = irManager.getOptimizerFlags();     
     if (!optimizerFlags.elim_checks) return;
 
-    if (Log::cat_opt_vn()->isDebugEnabled()) {
+    if (Log::isEnabled()) {
         Log::out() << "addInfoFromPredBranch " << (isTrueEdge ? "taken " : "notTaken ");
         branchi->print(Log::out());
         Log::out() << ::std::endl;
@@ -1862,7 +1882,7 @@ void InstValueNumberer::addInfoFromPredBranch(CFGNode* targetNode, BranchInst *b
         return; 
     }
 
-    	pcmpi->getComparisonModifier();
+        pcmpi->getComparisonModifier();
     uint32 numSrcs = pcmpi->getNumSrcOperands();
     addInfoFromBranchCompare(targetNode, 
                              pcmpi->getComparisonModifier(),
@@ -1915,7 +1935,7 @@ void InstValueNumberer::recordHasTypeTau(Opnd *opnd,
     }
 }
 
-void InstValueNumberer::addInfoFromBranchCompare(CFGNode* targetNode, 
+void InstValueNumberer::addInfoFromBranchCompare(Node* targetNode, 
                                                  ComparisonModifier mod,
                                                  Type::Tag comparisonType,
                                                  bool isTrueEdge,
@@ -1940,7 +1960,7 @@ void InstValueNumberer::addInfoFromBranchCompare(CFGNode* targetNode,
     switch (numSrcOperands) {
     case 1:
         {
-            if (Log::cat_opt_vn()->isDebugEnabled()) {
+            if (Log::isEnabled()) {
                 Log::out() << "adding true comparison: ";
                 switch (modhere) {
                 case Cmp_Zero: Log::out() << "Cmp_Zero "; break;
@@ -1964,7 +1984,7 @@ void InstValueNumberer::addInfoFromBranchCompare(CFGNode* targetNode,
             setHashToInst(tauEdge, getKey(cmpOperation, src0->getId()));
             setHashToInst(tauEdge, getKey(predCmpOperation, src0->getId()));
             
-            if (Log::cat_opt_vn()->isDebugEnabled()) {
+            if (Log::isEnabled()) {
                 Log::out() << "adding false comparison: ";
                 switch (negModhere) {
                 case Cmp_Zero: Log::out() << "Cmp_Zero "; break;
@@ -1996,7 +2016,7 @@ void InstValueNumberer::addInfoFromBranchCompare(CFGNode* targetNode,
             Opnd *negSrc0 = isTrueEdge ? src1 : src0;
             Opnd *negSrc1 = isTrueEdge ? src0 : src1;
 
-            if (Log::cat_opt_vn()->isDebugEnabled()) {
+            if (Log::isEnabled()) {
                 Log::out() << "adding true comparison: ";
                 switch (modhere) {
                 case Cmp_EQ: Log::out() << "Cmp_EQ "; break;
@@ -2021,7 +2041,7 @@ void InstValueNumberer::addInfoFromBranchCompare(CFGNode* targetNode,
             setHashToInst(tauEdge,
                           getKey(predCmpOperation, posSrc0->getId(), posSrc1->getId()));
 
-            if (Log::cat_opt_vn()->isDebugEnabled()) {
+            if (Log::isEnabled()) {
                 Log::out() << "adding false comparison: ";
                 switch (negModhere) {
                 case Cmp_EQ: Log::out() << "Cmp_EQ "; break;
@@ -2060,7 +2080,7 @@ void InstValueNumberer::addInfoFromBranchCompare(CFGNode* targetNode,
     if (allowsCheckZeroElimination(mod, comparisonType, src0, src1, isTrueEdge, 
                                    &opnd)) {
         assert(opnd);
-        if (Log::cat_opt_vn()->isDebugEnabled()) {
+        if (Log::isEnabled()) {
             Log::out() << "can eliminate checkzero of ";
             opnd->print(Log::out());
             Log::out() << ::std::endl;
@@ -2079,7 +2099,7 @@ void InstValueNumberer::addInfoFromBranchCompare(CFGNode* targetNode,
             repeat_it = false;
 
             assert(opnd);
-            if (Log::cat_opt_vn()->isDebugEnabled()) {
+            if (Log::isEnabled()) {
                 Log::out() << "can eliminate checknull of ";
                 opnd->print(Log::out());
                 Log::out() << ::std::endl;
@@ -2107,7 +2127,7 @@ void InstValueNumberer::addInfoFromBranchCompare(CFGNode* targetNode,
                                      &opnd, &opnd2)) {
         assert(opnd);
         assert(opnd2);
-        if (Log::cat_opt_vn()->isDebugEnabled()) {
+        if (Log::isEnabled()) {
             Log::out() << "can eliminate checkbounds of ";
             opnd->print(Log::out());
             Log::out() << ", ";
@@ -2127,7 +2147,7 @@ void InstValueNumberer::addInfoFromBranchCompare(CFGNode* targetNode,
             repeat_it = false;
             assert(opnd);
             assert(type);
-            if (Log::cat_opt_vn()->isDebugEnabled()) {
+            if (Log::isEnabled()) {
                 Log::out() << "can eliminate checkcast of ";
                 opnd->print(Log::out());
                 Log::out() << ", ";
@@ -2138,7 +2158,7 @@ void InstValueNumberer::addInfoFromBranchCompare(CFGNode* targetNode,
             opnd2 = irManager.getOpndManager().createSsaTmpOpnd(type);
             Inst* scast = irManager.getInstFactory().makeTauStaticCast(opnd2, opnd,
                                                                        tauEdge->getDst(), type);
-            if(Log::cat_opt_vn()->isDebugEnabled()) {
+            if(Log::isEnabled()) {
                 Log::out() << "Inserting staticCast inst ";
                 scast->print(Log::out());
                 Log::out() << " after tauEdge ";
@@ -2168,7 +2188,7 @@ void InstValueNumberer::addInfoFromBranchCompare(CFGNode* targetNode,
             repeat_it = false;
             assert(opnd);
             assert(opnd2);
-            if (Log::cat_opt_vn()->isDebugEnabled()) {
+            if (Log::isEnabled()) {
                 Log::out() << "can eliminate checkelemtype of ";
                 opnd->print(Log::out());
                 Log::out() << ", ";
@@ -2294,10 +2314,10 @@ void InstValueNumberer::addInfoFromPEI(Inst *pei, bool isExceptionEdge)
 
 class ValueNumberingWalker {
     IRManager &irManager;
-    FlowGraph &fg;
+    ControlFlowGraph &fg;
     InstValueNumberer ivn;
     DominatorNode *domNode;
-    CFGNode *block;
+    Node *block;
     int depth;
     bool isScoped;
     bool useBranches;
@@ -2313,17 +2333,17 @@ public:
         block = domNode->getNode();
         if (dispatchDepth <= 0) {
             if (skipDispatches && block->isDispatchNode()) {
-                if (Log::cat_opt_vn()->isDebugEnabled()) {
+                if (Log::isEnabled()) {
                     Log::out() << "Skipping dispatch node ";
-                    block->print(Log::out());
+                    FlowGraph::print(Log::out(), block);
                     Log::out() << " and dominated nodes";
                     Log::out() << ::std::endl;
                 }    
                 dispatchDepth = 1;
             } else {
-                if (Log::cat_opt_vn()->isDebugEnabled()) {
+                if (Log::isEnabled()) {
                     Log::out() << "Begin hashvaluenumbering of block";
-                    block->print(Log::out());
+                    FlowGraph::print(Log::out(), block);
                     Log::out() << ::std::endl;
                 }    
                 if (useBranches)
@@ -2332,7 +2352,7 @@ public:
         }
     };
     void applyToInst(Inst *inst) { 
-        if (Log::cat_opt_vn()->isDebugEnabled()) {
+        if (Log::isEnabled()) {
             Log::out() << "VN examining instruction ";
             inst->print(Log::out());
             Log::out() << ::std::endl;
@@ -2349,7 +2369,7 @@ public:
                 if (ssaOpnd) {
                     Opnd *mapped = opndMap->lookup(ssaOpnd);
                     if (mapped) {
-                        if (Log::cat_opt_vn()->isDebugEnabled()) {
+                        if (Log::isEnabled()) {
                             Log::out() << "VN remapped opnd " << (int) i
                                        << " of inst " << (int) inst->getId() 
                                        << " from ";
@@ -2366,7 +2386,7 @@ public:
         if (dispatchDepth > 0) return;
 
         Opcode instOpcode = inst->getOpcode();
-        if (Log::cat_opt_vn()->isDebugEnabled()) {
+        if (Log::isEnabled()) {
             Log::out() << "VN point 1" << ::std::endl;
         }
         if (!isScoped) {
@@ -2377,12 +2397,12 @@ public:
                 return;
         } else {
         }
-        if (Log::cat_opt_vn()->isDebugEnabled()) {
+        if (Log::isEnabled()) {
             Log::out() << "VN point 2" << ::std::endl;
         }
         Inst* optimizedInst = ivn.optimizeInst(inst);
         Opcode optimizedOpcode = optimizedInst->getOpcode();
-        if (Log::cat_opt_vn()->isDebugEnabled()) {
+        if (Log::isEnabled()) {
             Log::out() << "VN point 3, optimizedInst = ";
             if (optimizedInst) {
                 optimizedInst->print(Log::out());
@@ -2394,7 +2414,7 @@ public:
         if (optimizedInst != inst) {
             // CSE was found!
             numInstOptimized++;
-            if (Log::cat_opt_vn()->isDebugEnabled()) {
+            if (Log::isEnabled()) {
                 Log::out() << "VN optimized instruction ";
                 inst->print(Log::out());
                 Log::out() << " to ";
@@ -2410,9 +2430,9 @@ public:
             BranchInst *branchi = inst->asBranchInst();
             if (branchi) {
                 if (optimizedOpcode == Op_TauUnsafe) {
-                    fg.foldBranch(block, branchi, false); // not taken
+                    FlowGraph::foldBranch(fg, block, branchi, false); // not taken
                 } else {
-                    fg.foldBranch(block, branchi, true); // taken
+                    FlowGraph::foldBranch(fg, block, branchi, true); // taken
                 }
                 return;
             }
@@ -2439,7 +2459,7 @@ public:
                     copy = irManager.getInstFactory().makeCopy(dstOpnd,srcOpnd);
                 }
                 
-                if(Log::cat_opt_vn()->isDebugEnabled()) {
+                if(Log::isEnabled()) {
                     Log::out() << "Inserting copy inst ";
                     copy->print(Log::out());
                     Log::out() << " before inst ";
@@ -2460,14 +2480,14 @@ public:
                 // they have corresponding exceptions edges in the control flow 
                 // graph.  You must remove exception edges when you remove
                 // a potentially exception throwing check instruction.
-                if(Log::cat_opt_vn()->isDebugEnabled()) {
+                if(Log::isEnabled()) {
                     Log::out() << "Removing redundant check inst ";
                     inst->print(Log::out());
                     Log::out() << ::std::endl;
                 }
-                fg.eliminateCheck(block,inst,false);
+                FlowGraph::eliminateCheck(fg, block,inst,false);
             } else {
-                if(Log::cat_opt_vn()->isDebugEnabled()) {
+                if(Log::isEnabled()) {
                     Log::out() << "Removing redundant inst ";
                     inst->print(Log::out());
                     Log::out() << ::std::endl;
@@ -2478,7 +2498,7 @@ public:
     };
     void finishNode(DominatorNode *domNode) { 
         if (dispatchDepth > 0) return;
-        if (Log::cat_opt_vn()->isDebugEnabled()) {
+        if (Log::isEnabled()) {
             Log::out() << "Done hashvaluenumbering of block";
             domNode->print(Log::out());
             Log::out() << ::std::endl;
@@ -2488,7 +2508,7 @@ public:
         if ((isScoped && (dispatchDepth == 0)) || (depth == 0)) {
             ivn.enterScope();
             if (opndMap) opndMap->enter_scope();
-            if (Log::cat_opt_vn()->isDebugEnabled()) {
+            if (Log::isEnabled()) {
                 Log::out() << "Entering scope" << depth << ::std::endl;
             }
         }
@@ -2501,7 +2521,7 @@ public:
         }
         depth -= 1;
         if ((isScoped && (dispatchDepth == 0)) || (depth == 0)) {
-            if (Log::cat_opt_vn()->isDebugEnabled()) {
+            if (Log::isEnabled()) {
                 Log::out() << "Exiting scope" << depth << ::std::endl;
             }
             ivn.exitScope();
@@ -2510,7 +2530,7 @@ public:
         if (dispatchDepth == 1) dispatchDepth = 0;
     };
     ValueNumberingWalker(MemoryManager &mm0, IRManager &irm, 
-                         FlowGraph &fg0,
+                         ControlFlowGraph &fg0,
                          DominatorTree &domtree,
                          MemoryOpt *mopt,
                          bool isScoped0,
@@ -2518,7 +2538,7 @@ public:
                          bool skipDispatches0,
                          bool cacheOpnds0)
         : irManager(irm), fg(fg0),
-          ivn(mm0, irm, domtree, mopt, irManager.getCompilationContext()->getOptimizerFlags()->cse_final && isScoped0,
+          ivn(mm0, irm, domtree, mopt, irManager.getOptimizerFlags().cse_final && isScoped0,
               fg0, isScoped0),
           domNode(0), depth(0), isScoped(isScoped0),
           useBranches(useBranches0),
@@ -2527,7 +2547,7 @@ public:
           opndMap(0), numInstOptimized(0)
     {
         if (cacheOpnds) {
-            OptimizerFlags& optimizerFlags = *irManager.getCompilationContext()->getOptimizerFlags();
+            const OptimizerFlags& optimizerFlags = irManager.getOptimizerFlags();
             opndMap = 
                 new (mm0) SparseScopedMap<Opnd *, Opnd *>(fg.getNodes().size() *
                                                           (optimizerFlags.
@@ -2543,10 +2563,10 @@ HashValueNumberer::doGlobalValueNumbering(MemoryOpt *mopt) {
     MemoryManager localMM(sizeof(InstValueNumberer)+10000, 
                           "HashValueNumberer::doGlobalValueNumbering");
 
-    if (Log::cat_opt_vn()->isDebugEnabled()) {
+    if (Log::isEnabled()) {
         Log::out() << "Starting unscoped value numbering pass" << ::std::endl;
     }
-    OptimizerFlags& optimizerFlags = *irManager.getCompilationContext()->getOptimizerFlags();
+    const OptimizerFlags& optimizerFlags = irManager.getOptimizerFlags();
     ValueNumberingWalker walker(localMM, irManager, fg, dominators, mopt,
                                 false, false, // un-scoped, no branches
                                 !optimizerFlags.gvn_exceptions,
@@ -2578,7 +2598,7 @@ HashValueNumberer::doGlobalValueNumbering(MemoryOpt *mopt) {
         NodeWalk<ValueNumberingNodeWalker>(fg, nodeWalker);
     }
 
-    if (Log::cat_opt_vn()->isDebugEnabled()) {
+    if (Log::isEnabled()) {
         Log::out() << "Finished unscoped value numbering pass" << ::std::endl;
     }
 }
@@ -2589,11 +2609,11 @@ HashValueNumberer::doValueNumbering(MemoryOpt *mopt) {
     MemoryManager localMM(sizeof(InstValueNumberer)+10000, 
                           "HashValueNumberer::doValueNumbering");
 
-    if (Log::cat_opt_vn()->isDebugEnabled()) {
+    if (Log::isEnabled()) {
         Log::out() << "Starting scoped value numbering pass" << ::std::endl;
     }
 
-    OptimizerFlags& optimizerFlags = *irManager.getCompilationContext()->getOptimizerFlags();
+    const OptimizerFlags& optimizerFlags = irManager.getOptimizerFlags();
     ValueNumberingWalker walker(localMM, irManager, fg, dominators, mopt,
                                 true, true,  // scoped, use branches
                                 !optimizerFlags.hvn_exceptions,
@@ -2609,7 +2629,7 @@ HashValueNumberer::doValueNumbering(MemoryOpt *mopt) {
     DomTreeWalk<true, ValueNumberingDomWalker>(dominators, domWalker, 
                                                localMM);
 
-    if (Log::cat_opt_vn()->isDebugEnabled()) {
+    if (Log::isEnabled()) {
         Log::out() << "Finished scoped value numbering pass" << ::std::endl;
     }
 }

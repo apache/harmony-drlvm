@@ -29,12 +29,14 @@
 #define LOG_DOMAIN "kernel.stack"
 #include "cxxlog.h"
 
+#include "open/jthread.h"
 #include "stack_trace.h"
 #include "jni_direct.h"
 #include "jni_utils.h"
 #include "environment.h"
 #include "exceptions.h"
 #include "vm_strings.h"
+#include "thread_generic.h"
 
 #include "java_lang_VMClassRegistry.h"
 
@@ -130,7 +132,7 @@ JNIEXPORT jobjectArray JNICALL Java_org_apache_harmony_vm_VMStack_getClasses
     assert(hythread_is_suspend_enabled());
     unsigned size;
     StackTraceFrame* frames;
-    st_get_trace(&size, &frames);
+    st_get_trace(get_thread_ptr(), &size, &frames);
 
     // The caller of the caller of this method is stored as a first element of the array.
     // For details look at the org/apache/harmony/vm/VMStack.java file. Thus skipping 2 frames.
@@ -196,7 +198,7 @@ JNIEXPORT jobject JNICALL Java_org_apache_harmony_vm_VMStack_getStackState
 {
     unsigned size;
     StackTraceFrame* frames;
-    st_get_trace(&size, &frames);
+    st_get_trace(get_thread_ptr(), &size, &frames);
     unsigned data_size = size * sizeof(StackTraceFrame);
 
     // pack trace into long[] array
@@ -227,6 +229,7 @@ JNIEXPORT jobject JNICALL Java_org_apache_harmony_vm_VMStack_getStackState
 JNIEXPORT jobjectArray JNICALL Java_org_apache_harmony_vm_VMStack_getStackTrace
   (JNIEnv * jenv_ext, jclass, jobject state)
 {
+    ASSERT_RAISE_AREA;
     if (NULL == state)
         return NULL;
 
@@ -378,4 +381,109 @@ JNIEXPORT jobject JNICALL Java_org_apache_harmony_vm_VMStack_getClassLoader
 {
     // reuse similar method in VMClassRegistry
     return Java_java_lang_VMClassRegistry_getClassLoader(jenv, NULL, clazz);
+}
+
+/*
+* Class:     org_apache_harmony_vm_VMStack
+* Method:    getThreadStackTrace
+* Signature: (Ljava/lang/Thread;)[Ljava/lang/StackTraceElement;
+*/
+JNIEXPORT jobjectArray JNICALL Java_org_apache_harmony_vm_VMStack_getThreadStackTrace
+  (JNIEnv *jenv, jclass, jobject thread)
+{
+    unsigned size = 0;
+    StackTraceFrame* frames;
+
+    VM_thread *p_thread = get_vm_thread_ptr_safe(jenv, thread);
+    if (p_thread != NULL) {
+        if (p_thread == get_thread_ptr()) {
+            st_get_trace(p_thread, &size, &frames);
+        } else {
+            jthread_suspend(thread);
+            st_get_trace(p_thread, &size, &frames);
+            jthread_resume(thread);
+        }
+    }
+
+    if (0 == size)
+        return NULL;
+
+    Global_Env* genv = VM_Global_State::loader_env;
+
+    // skip the VMStart$MainThread if one exits from the bottom of the stack
+    // along with 2 reflection frames used to invoke method main
+    static String* starter_String = genv->string_pool.lookup("java/lang/VMStart$MainThread");
+    Method_Handle method = frames[size-1].method;
+    assert(method);
+    // skip only for main application thread
+    if (!strcmp(method_get_name(method), "run")
+        && method->get_class()->name == starter_String) {
+            size -= size < 3 ? size : 3;
+        }
+
+        assert(hythread_is_suspend_enabled());
+        jclass ste = struct_Class_to_java_lang_Class_Handle(genv->java_lang_StackTraceElement_Class);
+        assert(ste);
+
+        static jmethodID init = (jmethodID) class_lookup_method(
+            genv->java_lang_StackTraceElement_Class, genv->Init_String, 
+            genv->string_pool.lookup("(Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;I)V"));
+
+        jarray arr = jenv->NewObjectArray(size, ste, NULL);
+        if (!arr) {
+            assert(exn_raised());
+            return NULL;
+        }
+
+        tmn_suspend_disable();
+        ObjectHandle strMethodName = oh_allocate_local_handle();
+        ObjectHandle strClassName = oh_allocate_local_handle();
+        tmn_suspend_enable();
+
+        for(unsigned i = 0; i < size; i++) {
+            Method_Handle method = frames[i].method;
+            NativeCodePtr ip = frames[i].ip;
+            int lineNumber;
+            const char* fileName;
+
+            get_file_and_line(method, ip, &fileName, &lineNumber);
+            if (fileName == NULL) fileName = "";
+
+            jstring strFileName = jenv->NewStringUTF(fileName);
+            if (!strFileName) {
+                assert(exn_raised());
+                return NULL;
+            }
+
+            tmn_suspend_disable();
+            // class name
+            String* className = class_get_java_name(method->get_class(), 
+                VM_Global_State::loader_env);
+            strClassName->object = vm_instantiate_cp_string_resolved(className);
+            if (!strClassName->object) {
+                tmn_suspend_enable();
+                assert(exn_raised());
+                return NULL;
+            }
+            // method name
+            strMethodName->object = vm_instantiate_cp_string_resolved(method->get_name());
+            if (!strMethodName->object) {
+                tmn_suspend_enable();
+                assert(exn_raised());
+                return NULL;
+            }
+            tmn_suspend_enable();
+
+            // creating StackTraceElement object
+            jobject obj = jenv->NewObject(ste, init, strClassName, strMethodName, 
+                strFileName, lineNumber);
+            if (!obj) {
+                assert(exn_raised());
+                return NULL;
+            }
+
+            jenv->SetObjectArrayElement(arr, i, obj);
+        }
+        core_free(frames);
+        return arr;
 }

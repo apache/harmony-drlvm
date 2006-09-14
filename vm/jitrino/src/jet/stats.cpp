@@ -14,13 +14,13 @@
  *  limitations under the License.
  */
 /**
- * @author Alexander V. Astapchuk
- * @version $Revision: 1.3.12.3.4.4 $
+ * @author Alexander Astapchuk
+ * @version $Revision$
  */
  
 /**
  * @file
- * @brief Implementation of statistics and measurement utilities.
+ * @brief Implementation of statistics utilities declared in stats.h.
  */
  
 #include <stdio.h>
@@ -34,100 +34,43 @@
 namespace Jitrino {
 namespace Jet {
 
-Timer   Timers::totalExec       (".jet::total.execution");
-Timer   Timers::compTotal       (".jet::comp.total");
-Timer   Timers::vmResolve       (".jet::vm.resolve");
-Timer   Timers::compInit        (".jet::comp.init");
-Timer   Timers::compMarkBBs     (".jet::comp.mark-bbs");
-Timer   Timers::compCodeGen     (".jet::comp.code-gen");
-Timer   Timers::compCodeLayout  (".jet::comp.code-layout");
-Timer   Timers::compCodePatch   (".jet::comp.code-patch");
-Timer   Timers::compEhandlers   (".jet::comp.code-patch");
+// Variables placed on new line to avoid Doxygen warning " 
+// 'Found ';' while parsing initializer list!'
 
-
-STATS_ITEM(unsigned)        Stats::methodsCompiled((unsigned)0);
-STATS_ITEM(unsigned)        Stats::methodsCompiledSeveralTimes((unsigned)0);
-STATS_ITEM(unsigned)        Stats::methodsWOCatchHandlers((unsigned)0);
-STATS_ITEM(unsigned)        Stats::opcodesSeen[OPCODE_COUNT];
-STATS_ITEM(unsigned)        Stats::npesEliminated((unsigned)0);
-STATS_ITEM(unsigned)        Stats::npesPerformed((unsigned)0);
+STATS_ITEM(unsigned)    
+        Stats::methodsCompiled = 0;
+STATS_ITEM(unsigned)
+        Stats::methodsCompiledSeveralTimes = 0;
+STATS_ITEM(unsigned)
+        Stats::methodsWOCatchHandlers = 0;
+STATS_ITEM(unsigned)
+        Stats::opcodesSeen[OPCODE_COUNT];
+STATS_ITEM(unsigned)
+        Stats::npesEliminated = 0;
+STATS_ITEM(unsigned)
+        Stats::npesPerformed = 0;
 
 
 const char * Stats::g_name_filter = NULL;
 
-DEF_MIN_MAX_VALUE( bc_size );
-DEF_MIN_MAX_VALUE( code_size );
-DEF_MIN_MAX_VALUE( native_per_bc_ratio );
-DEF_MIN_MAX_VALUE( jstack );
-DEF_MIN_MAX_VALUE( locals );
-DEF_MIN_MAX_VALUE( bbs );
-DEF_MIN_MAX_VALUE( bb_size );
-DEF_MIN_MAX_VALUE( patchItemsToBcSizeRatioX1000 );
+DEF_MIN_MAX_VALUE(bc_size);
+DEF_MIN_MAX_VALUE(code_size);
+DEF_MIN_MAX_VALUE(native_per_bc_ratio);
+DEF_MIN_MAX_VALUE(jstack);
+DEF_MIN_MAX_VALUE(locals);
+DEF_MIN_MAX_VALUE(bbs);
+DEF_MIN_MAX_VALUE(bb_size);
+DEF_MIN_MAX_VALUE(patchItemsToBcSizeRatioX1000);
 
-#ifdef JIT_TIMING
-
-Timer * Timer::first = NULL;
-Timer * Timer::last = NULL;
-unsigned long long Timer::freq = 0;
-unsigned long long Timer::correction = 0;
-
-//
-//
-//
-void Timer::init(void)
-{
-    // query frequency
-    LARGE_INTEGER get_freq;
-    QueryPerformanceFrequency(&get_freq);
-    Timer::freq = get_freq.QuadPart;
-
-    //
-    // count start/stop overhead
-    //
-    Timer atimer;
-
-    // no mathematics beyond this number, simple estimation
-    static const unsigned NUM_TIMES = 10;
-
-    unsigned long long timeSpent = 0; // keep the Timer::correction zero during the loop
-    for(unsigned i=0; i<NUM_TIMES; i++ ) {
-        atimer.startTimer();
-        atimer.stopTimer();
-        timeSpent += atimer.getTime();
-        // let others to work
-        Sleep(0);
-    }
-    Timer::correction = timeSpent/NUM_TIMES;
-}
-
-void Timer::dump(void)
-{
-    dbg("==================== timers ====================\n");
-    Timer * ptimer = Timer::getFirst();
-    while (ptimer) {
-        static const unsigned PRECISION = 1000;
-        unsigned data = (unsigned)ptimer->getSeconds(PRECISION);
-        unsigned secs = data/PRECISION;
-        unsigned parts = data-secs*PRECISION;
-        dbg("%-35s: %4d.%03d %s\n", 
-            ptimer->getName(), secs, parts,
-            !ptimer->recursionCount ? "" : "?? start/stop not balanced !");
-        ptimer = ptimer->getNext();
-    }
-    dbg("================================================\n");
-}
-
-
-#endif  // ~JIT_TIMING
 
 #ifdef JIT_STATS
 
-bool 
-opcode_stat_comparator(const ::std::pair<unsigned, unsigned>& one,
-                       const ::std::pair<unsigned, unsigned>& two)
+bool opcode_stat_comparator(const ::std::pair<unsigned, unsigned>& one,
+                            const ::std::pair<unsigned, unsigned>& two)
 {
     return one.first > two.first;
 }
+
 
 void Stats::dump(void)
 {
@@ -200,7 +143,7 @@ void Stats::dump(void)
     else {
         dbg("name filter: %s\n", g_name_filter);
     }
-}
+};
 
 #endif  //#ifdef JIT_STATS
 

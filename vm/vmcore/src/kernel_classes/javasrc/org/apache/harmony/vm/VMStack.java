@@ -119,4 +119,6 @@ public final class VMStack {
      * @api2vm
      */
     static native ClassLoader getClassLoader(Class<?> clazz);
+
+    public static native StackTraceElement[] getThreadStackTrace(Thread t);
 }

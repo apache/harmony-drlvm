@@ -25,36 +25,34 @@
 #include <algorithm>
 #include "Stl.h"
 #include "Log.h"
-#include "PropertyTable.h"
 #include "open/types.h"
 #include "Inst.h"
 #include "irmanager.h"
-#include "FlowGraph.h"
 #include "Dominator.h"
 #include "Loop.h"
 #include "Opcode.h"
 #include "walkers.h"
-
+#include "optpass.h"
 #include "opndmap.h"
 
 #include "memoryopt.h"
 #include "aliasanalyzer.h"
 #include "memoryoptrep.h"
 #include "./ssa/SSA.h"
-#include "Timer.h"
+#include "XTimer.h"
 #include "hashvaluenumberer.h"
 
 namespace Jitrino {
 
-DEFINE_OPTPASS_IMPL(MemoryValueNumberingPass, memopt, "Redundant Ld-St Elimination")
+DEFINE_SESSION_ACTION(MemoryValueNumberingPass, memopt, "Redundant Ld-St Elimination")
 
 void
-MemoryValueNumberingPass::_run(IRManager& irm) {
+MemoryValueNumberingPass::_run(IRManager& irm) { 
     computeDominators(irm);
     DominatorTree* dominatorTree = irm.getDominatorTree();
     assert(dominatorTree && dominatorTree->isValid());
     LoopTree* loopTree = irm.getLoopTree();
-    FlowGraph& flowGraph = irm.getFlowGraph();
+    ControlFlowGraph& flowGraph = irm.getFlowGraph();
     MemoryManager& memoryManager = irm.getNestedMemoryManager();
 
     DomFrontier frontier(memoryManager,*dominatorTree,&flowGraph);
@@ -65,13 +63,11 @@ MemoryValueNumberingPass::_run(IRManager& irm) {
 
     HashValueNumberer valueNumberer(irm, *dominatorTree);
     valueNumberer.doValueNumbering(&mopt);
-    bool do_redstore = irm.getParameterTable().lookupBool("opt::do_redstore", true);
+    bool do_redstore = irm.getOptimizerFlags().memOptFlags->do_redstore;
     if (do_redstore) {
         mopt.eliminateRedStores();
     }
 }
-
-MemoryOpt::Flags *MemoryOpt::defaultFlags = 0;
 
 MemoryOpt::MemoryOpt(IRManager &irManager0, 
                      MemoryManager& memManager,
@@ -92,9 +88,8 @@ MemoryOpt::MemoryOpt(IRManager &irManager0,
       renameMap(0),
       memUseDefs(memManager),
       memDefUses(memManager),
-      flags(*defaultFlags)
+      flags(*irManager.getOptimizerFlags().memOptFlags)
 {
-    assert(defaultFlags);
     assert(aliasManager);
 
     uint32 numNodes = df0.getNumNodes();
@@ -110,67 +105,69 @@ MemoryOpt::~MemoryOpt()
 }
 
 void 
-MemoryOpt::readDefaultFlagsFromCommandLine(const JitrinoParameterTable *params)
+MemoryOpt::readFlags(Action* argSource, MemoptFlags* flags)
 {
-    if (!defaultFlags)
-        defaultFlags = new Flags;
-    const char *res = params->lookup("opt::mm");
-    defaultFlags->model = Model_Default;
+    IAction::HPipeline p = NULL; //default pipeline for argSource
+
+    const char *res = argSource->getStringArg(p, "memopt.mm", NULL);
+    flags->model = Model_Default;
     if (res) {
         if (strncmp(res,"strict",7)==0) {
-            defaultFlags->model = Model_Strict;
+            flags->model = Model_Strict;
         } else if (strncmp(res,"reads_kill",11)==0) {
-            defaultFlags->model = Model_ReadsKill;
+            flags->model = Model_ReadsKill;
         } else if (strncmp(res,"cse_final",9)==0) {
-            defaultFlags->model = Model_CseFinal;
+            flags->model = Model_CseFinal;
         }
     }
-    res = params->lookup("opt::synch");
-    defaultFlags->synch = Synch_Default;
+    res = argSource->getStringArg(p, "memopt.synch", NULL);
+    flags->synch = Synch_Default;
     if (res) {
         if (strncmp(res,"fence", 6)==0) {
-            defaultFlags->synch = Synch_Fence;
+            flags->synch = Synch_Fence;
         } else if (strncmp(res,"moveable", 9)==0) {
-            defaultFlags->synch = Synch_Moveable;
+            flags->synch = Synch_Moveable;
         } else if (strncmp(res,"only_lock", 10)==0) {
-            defaultFlags->synch = Synch_OnlyLock;
+            flags->synch = Synch_OnlyLock;
         } else if (strncmp(res,"one_thread", 11)==0) {
-            defaultFlags->synch = Synch_OneThread;
+            flags->synch = Synch_OneThread;
         }
     }
-    defaultFlags->debug = params->lookupBool("opt::mem::debug", false);
-    defaultFlags->verbose = params->lookupBool("opt::mem::verbose", false);
-    defaultFlags->redstore = params->lookupBool("opt::mem::redstore", false);
-    defaultFlags->syncopt = params->lookupBool("opt::mem::syncopt", false);
+    flags->debug = argSource->getBoolArg(p, "memopt.debug", false);
+    flags->verbose = argSource->getBoolArg(p, "memopt.verbose", false);
+    flags->redstore = argSource->getBoolArg(p, "memopt.redstore", false);
+    flags->syncopt = argSource->getBoolArg(p, "memopt.syncopt", false);
+    flags->do_redstore = argSource->getBoolArg(p, "memopt.do_redstore", true);
+
 }
 
-void MemoryOpt::showFlagsFromCommandLine()
-{
-    Log::out() << "    opt::mm=strict     = no memory optimizations" << ::std::endl;
-    Log::out() << "    opt::mm=reads_kill = reads kill" << ::std::endl;
-    Log::out() << "    opt::mm=cse_final  = allow final field CSEing, maybe hoisting" << ::std::endl;
-    Log::out() << "    opt::synch=fence      = no memory ops move past lock/unlock" << ::std::endl;
-    Log::out() << "    opt::synch=moveable   = load/store movement into locks allowed" << ::std::endl;
-    Log::out() << "    opt::synch=only_lock  = eliminable local objects not treated as fence" << ::std::endl;
-    Log::out() << "    opt::synch=one_thread = locks and fences elided freely" << ::std::endl;
-    Log::out() << "    opt::mem::debug[={ON,off}]  = debug memory opts" << ::std::endl;
-    Log::out() << "    opt::mem::verbose[={ON,off}]  = verbose memory opt output" << ::std::endl;
-    Log::out() << "    opt::mem::redstore[={on,OFF}]  = try to eliminate redundant stores" << ::std::endl;
-    Log::out() << "    opt::mem::syncopt[={on,OFF}]  = turn exit/enter into fences" << ::std::endl;
+void MemoryOpt::showFlags(std::ostream& os) {
+    os << "  memopt flags:"<<std::endl;
+    os << "    memopt.mm=strict           - no memory optimizations" << std::endl;
+    os << "    memopt.mm=reads_kill       - reads kill" << std::endl;
+    os << "    memopt.mm=cse_final        - allow final field CSEing, maybe hoisting" << std::endl;
+    os << "    memopt.synch=fence         - no memory ops move past lock/unlock" << std::endl;
+    os << "    memopt.synch=moveable      - load/store movement into locks allowed" << std::endl;
+    os << "    memopt.synch=only_lock     - eliminable local objects not treated as fence" << std::endl;
+    os << "    memopt.synch=one_thread    - locks and fences elided freely" << std::endl;
+    os << "    memopt.debug[={ON,off}]    - debug memory opts" << std::endl;
+    os << "    memopt.verbose[={ON,off}]  - verbose memory opt output" << std::endl;
+    os << "    memopt.redstore[={on,OFF}] - try to eliminate redundant stores" << std::endl;
+    os << "    memopt.syncopt[={on,OFF}]  - turn exit/enter into fences" << std::endl;
 }
 
-static Timer *memoptPhase1Timer = 0; // not thread-safe
-static Timer *memoptPhase2Timer = 0; // not thread-safe
-static Timer *memoptPhase3Timer = 0; // not thread-safe
+static CountTime memoptPhase1Timer("opt::mem::phase1"); // not thread-safe
+static CountTime memoptPhase2Timer("opt::mem::phase2"); // not thread-safe
+static CountTime memoptPhase3Timer("opt::mem::phase3"); // not thread-safe
 
 void MemoryOpt::runPass()
 {
-    if (Log::cat_opt_mem()->isDebugEnabled()) {
-        Log::out() << "Starting MemoryOpt Pass" << ::std::endl;
+    if (Log::isEnabled()) {
+        Log::out() << "Starting MemoryOpt Pass" << std::endl;
     }
     // initialize iDef, iUse for each instr, build initial set of locations
     {
-        PhaseTimer t(memoptPhase1Timer, "opt::mem::phase1"); 
+        AutoTimer t(memoptPhase1Timer); 
         initMemoryOperations(); 
     }
 
@@ -194,47 +191,47 @@ void MemoryOpt::runPass()
     //         
     // 
     if (flags.redstore) {
-        if (Log::cat_opt_mem()->isDebugEnabled()) {
-            Log::out() << "Trying redundant store elimination" << ::std::endl;
+        if (Log::isEnabled()) {
+            Log::out() << "Trying redundant store elimination" << std::endl;
         }
-        PhaseTimer t(memoptPhase2Timer, "opt::mem::phase2"); 
+        AutoTimer t(memoptPhase2Timer); 
         eliminateRedStores();
     }
-    if (Log::cat_opt_mem()->isDebugEnabled()) {
-        Log::out() << "Finished MemoryOpt Pass" << ::std::endl;
+    if (Log::isEnabled()) {
+        Log::out() << "Finished MemoryOpt Pass" << std::endl;
     }
 
     if (flags.syncopt) {
-        PhaseTimer t(memoptPhase3Timer, "opt::mem::phase3"); 
-        if (Log::cat_opt_mem()->isDebugEnabled()) {
-            Log::out() << "Trying synchronization optimization" << ::std::endl;
+        AutoTimer t(memoptPhase3Timer); 
+        if (Log::isEnabled()) {
+            Log::out() << "Trying synchronization optimization" << std::endl;
         }
         doSyncOpt();
     }
-    if (Log::cat_opt_mem()->isDebugEnabled()) {
-        Log::out() << "Finished synchronization optimization" << ::std::endl;
+    if (Log::isEnabled()) {
+        Log::out() << "Finished synchronization optimization" << std::endl;
     }
 }
 
 // a NodeInstWalker, backwards over instructions
 class MemoryOptInitWalker {
     MemoryOpt *thePass;
-    CFGNode *n;
+    Node *n;
 public:
     MemoryOptInitWalker(MemoryOpt *thePass0) :
         thePass(thePass0), n(0)
     { };
-    void startNode(CFGNode *node) { n = node; };
+    void startNode(Node *node) { n = node; };
     void applyToInst(Inst *inst);
-    void finishNode(CFGNode *node) {};
+    void finishNode(Node *node) {};
 };
 
 // Phase 1: for each memory access, get an description of the set of
 // memory locations which must be considered with it.
 
-static Timer *memoptPhase1bTimer = 0; // not thread-safe
-static Timer *memoptPhase1cTimer = 0; // not thread-safe
-static Timer *memoptPhase1dTimer = 0; // not thread-safe
+static CountTime memoptPhase1bTimer("opt::mem::phase1b"); // not thread-safe
+static CountTime memoptPhase1cTimer("opt::mem::phase1c"); // not thread-safe
+static CountTime memoptPhase1dTimer("opt::mem::phase1d"); // not thread-safe
 
 void MemoryOpt::initMemoryOperations()
 {
@@ -243,37 +240,37 @@ void MemoryOpt::initMemoryOperations()
     typedef NodeInst2NodeWalker<false, MemoryOptInitWalker> InitNodeWalker;
     InitNodeWalker initNodeWalker(initWalker);
 
-    if (Log::cat_opt_mem()->isDebugEnabled()) {
-        Log::out() << ::std::endl << "Instruction Memory Effects:" << ::std::endl;
+    if (Log::isEnabled()) {
+        Log::out() << std::endl << "Instruction Memory Effects:" << std::endl;
     }
 
     {
-        PhaseTimer t(memoptPhase1bTimer, "opt::mem::phase1b"); 
+        AutoTimer t(memoptPhase1bTimer); 
     // have the first inst, define Any for renaming walk
     DominatorNode *domRoot = dominators.getDominatorRoot();
-    CFGNode *cfgRoot = domRoot->getNode();
-    Inst *firstInst = cfgRoot->getFirstInst();
+    Node *cfgRoot = domRoot->getNode();
+    Inst *firstInst = (Inst*)cfgRoot->getFirstInst();
     assert(firstInst->isLabel());
     AliasRep escapingMem = aliasManager->getAny();
     renameMap->insert(escapingMem, firstInst);
     }
 
     {
-        PhaseTimer t(memoptPhase1cTimer, "opt::mem::phase1c"); 
+        AutoTimer t(memoptPhase1cTimer); 
     // walk over all instructions, inserting memory effects
     NodeWalk<InitNodeWalker>(fg, initNodeWalker);
-    if (Log::cat_opt_mem()->isDebugEnabled()) {
-        Log::out() << ::std::endl << "END of Instruction Memory Effects" << ::std::endl;
+    if (Log::isEnabled()) {
+        Log::out() << std::endl << "END of Instruction Memory Effects" << std::endl;
     }
     insertMemPhi();
     }    
 
-    if (Log::cat_opt_mem()->isDebugEnabled()) {
+    if (Log::isEnabled()) {
         aliasManager->dumpAliasReps(Log::out());
     }
 
     {
-        PhaseTimer t(memoptPhase1dTimer, "opt::mem::phase1d"); 
+        AutoTimer t(memoptPhase1dTimer); 
     createUsesMap();
     }
 }
@@ -337,7 +334,7 @@ MemoryOpt::getOrCreateInstEffect(Inst *i)
 }
 
 // R/W anything that escapes or is global
-void MemoryOpt::effectAnyGlobal(CFGNode *n, Inst *i)
+void MemoryOpt::effectAnyGlobal(Node *n, Inst *i)
 {
     AliasRep anyGlobal = aliasManager->getAnyGlobal();
     addUseToInstruction(n, i, anyGlobal);
@@ -345,92 +342,92 @@ void MemoryOpt::effectAnyGlobal(CFGNode *n, Inst *i)
 }
 
 // writes opnd.vptr
-void MemoryOpt::effectWriteVtable(CFGNode *n, Inst *i, Opnd *opnd)
+void MemoryOpt::effectWriteVtable(Node *n, Inst *i, Opnd *opnd)
 {
     AliasRep vtblMemory = aliasManager->getVtableOf(opnd);
     addDefToInstruction(n, i, vtblMemory);
 }
 
-void MemoryOpt::effectReadVtable(CFGNode *n, Inst *i, Opnd *opnd)
+void MemoryOpt::effectReadVtable(Node *n, Inst *i, Opnd *opnd)
 {
     AliasRep vtblMemory = aliasManager->getVtableOf(opnd);
     addUseToInstruction(n, i, vtblMemory);
 }
 
-void MemoryOpt::effectReadMethodPtr(CFGNode *n, Inst *i, Opnd *obj, MethodDesc *desc)
+void MemoryOpt::effectReadMethodPtr(Node *n, Inst *i, Opnd *obj, MethodDesc *desc)
 {
     AliasRep methodPtrMem = aliasManager->getMethodPtr(obj, desc);
     addUseToInstruction(n, i, methodPtrMem);
 }
 
-void MemoryOpt::effectReadMethodPtr(CFGNode *n, Inst *i, MethodDesc *desc)
+void MemoryOpt::effectReadMethodPtr(Node *n, Inst *i, MethodDesc *desc)
 {
     NamedType *theType = desc->getParentType();
     AliasRep typeVtable = aliasManager->getVtableOf(theType);
     addUseToInstruction(n, i, typeVtable);
 }
 
-void MemoryOpt::effectReadFunPtr(CFGNode *n, Inst *i, Opnd *fnptr)
+void MemoryOpt::effectReadFunPtr(Node *n, Inst *i, Opnd *fnptr)
 {
 
 }
 
-void MemoryOpt::effectExit(CFGNode *n, Inst *i)
+void MemoryOpt::effectExit(Node *n, Inst *i)
 {
     AliasRep escapingMem = aliasManager->getAnyEscaping();
     addUseToInstruction(n, i, escapingMem);
 }
 
-void MemoryOpt::effectInit(CFGNode *n, Inst *i)
+void MemoryOpt::effectInit(Node *n, Inst *i)
 {
     AliasRep escapingMem = aliasManager->getAny();
     addDefToInstruction(n, i, escapingMem);
 }
 
-void MemoryOpt::effectEntry(CFGNode *n, Inst *i)
+void MemoryOpt::effectEntry(Node *n, Inst *i)
 {
     AliasRep escapingMem = aliasManager->getAnyEscaping();
     addDefToInstruction(n, i, escapingMem);
 }
 
-void MemoryOpt::effectRead(CFGNode *n, Inst *i, Opnd *addr)
+void MemoryOpt::effectRead(Node *n, Inst *i, Opnd *addr)
 {
     AliasRep thisMem = aliasManager->getReference(addr);
     addUseToInstruction(n, i, thisMem);
 }
 
-void MemoryOpt::effectWrite(CFGNode *n, Inst *i, Opnd *addr)
+void MemoryOpt::effectWrite(Node *n, Inst *i, Opnd *addr)
 {
     AliasRep thisMem = aliasManager->getReference(addr);
     addDefToInstruction(n, i, thisMem);
 }
 
-void MemoryOpt::effectReadClassVtable(CFGNode *n, Inst *i, NamedType *t)
+void MemoryOpt::effectReadClassVtable(Node *n, Inst *i, NamedType *t)
 {
     AliasRep vtblMemory = aliasManager->getVtableOf(t);
     addDefToInstruction(n, i, vtblMemory);
 }
 
-void MemoryOpt::effectWriteArrayLength(CFGNode *n, Inst *i, Opnd *opnd)
+void MemoryOpt::effectWriteArrayLength(Node *n, Inst *i, Opnd *opnd)
 {
     AliasRep arrayLenMem = aliasManager->getArrayLen(opnd);
     addDefToInstruction(n, i, arrayLenMem);
 }
 
-void MemoryOpt::effectReadArrayLength(CFGNode *n, Inst *i, Opnd *opnd)
+void MemoryOpt::effectReadArrayLength(Node *n, Inst *i, Opnd *opnd)
 {
     AliasRep arrayLenMem = aliasManager->getArrayLen(opnd);
     addUseToInstruction(n, i, arrayLenMem);
 }
 
-void MemoryOpt::effectWriteArrayElements(CFGNode *n, Inst *i, Opnd *array,
+void MemoryOpt::effectWriteArrayElements(Node *n, Inst *i, Opnd *array,
                                          Opnd *offset, Opnd *length)
 {
     AliasRep arrayElemMem = aliasManager->getArrayElements(array, offset, length);
     addDefToInstruction(n, i, arrayElemMem);
 }
 
-void MemoryOpt::effectReadArrayElements(CFGNode *n, Inst *i, Opnd *array,
+void MemoryOpt::effectReadArrayElements(Node *n, Inst *i, Opnd *array,
                                         Opnd *offset, Opnd *length)
 {
     AliasRep arrayElemMem = aliasManager->getArrayElements(array, offset, length);
@@ -439,46 +436,46 @@ void MemoryOpt::effectReadArrayElements(CFGNode *n, Inst *i, Opnd *array,
 
 // creates an object/array, returned in opnd:
 //   writes array length, etc.
-void MemoryOpt::effectNew(CFGNode *n, Inst *i, Opnd *dstop)
+void MemoryOpt::effectNew(Node *n, Inst *i, Opnd *dstop)
 {
     AliasRep objInitMem = aliasManager->getObjectNew(dstop);
     addDefToInstruction(n, i, objInitMem);
 }
 
 // make sure object's vtable are visible to others before publishing this
-void MemoryOpt::effectReleaseObject(CFGNode *n, Inst *i, Opnd *obj)
+void MemoryOpt::effectReleaseObject(Node *n, Inst *i, Opnd *obj)
 {
     addReleaseToInstruction(n, i);
 }
 
 // make sure object's vtable is available to all
-void MemoryOpt::effectInitType(CFGNode *n, Inst *i, NamedType *type)
+void MemoryOpt::effectInitType(Node *n, Inst *i, NamedType *type)
 {
     AliasRep typeInitMem = aliasManager->getTypeNew(type);
     addDefToInstruction(n, i, typeInitMem);
 }
 
 // make sure object's vtable is available to all
-void MemoryOpt::effectFinishObject(CFGNode *n, Inst *i, Opnd *obj)
+void MemoryOpt::effectFinishObject(Node *n, Inst *i, Opnd *obj)
 {
     AliasRep objFinishMem = aliasManager->getFinishObject(obj);
     addDefToInstruction(n, i, objFinishMem);
 }
 
 // make sure object's vtable is available to all
-void MemoryOpt::effectFinishType(CFGNode *n, Inst *i, NamedType *type)
+void MemoryOpt::effectFinishType(Node *n, Inst *i, NamedType *type)
 {
     AliasRep typeFinishMem = aliasManager->getFinishType(type);
     addDefToInstruction(n, i, typeFinishMem);
 }
 
 // can commute with any ops, but not be added/removed:
-void MemoryOpt::effectIncCounter(CFGNode *n, Inst *i)
+void MemoryOpt::effectIncCounter(Node *n, Inst *i)
 {
 }
 
 // object may be 0 if lock has been removed
-void MemoryOpt::effectIncRecCount(CFGNode *n, Inst *i, Opnd *object)
+void MemoryOpt::effectIncRecCount(Node *n, Inst *i, Opnd *object)
 {
     if (object) {
         AliasRep thisMem = aliasManager->getLock(object);
@@ -489,7 +486,7 @@ void MemoryOpt::effectIncRecCount(CFGNode *n, Inst *i, Opnd *object)
 }
 
 // object may be 0 if lock has been removed
-void MemoryOpt::effectMonitorEnter(CFGNode *n, Inst *i, Opnd *object)
+void MemoryOpt::effectMonitorEnter(Node *n, Inst *i, Opnd *object)
 {
     if (object) {
         AliasRep thisMem = aliasManager->getLock(object);
@@ -500,7 +497,7 @@ void MemoryOpt::effectMonitorEnter(CFGNode *n, Inst *i, Opnd *object)
     addAcquireToInstruction(n, i);
 }
 
-void MemoryOpt::effectMonitorExit(CFGNode *n, Inst *i, Opnd *object)
+void MemoryOpt::effectMonitorExit(Node *n, Inst *i, Opnd *object)
 {
     if (object) {
         AliasRep thisMem = aliasManager->getLock(object);
@@ -512,7 +509,7 @@ void MemoryOpt::effectMonitorExit(CFGNode *n, Inst *i, Opnd *object)
 }
 
 // object may be 0 if lock has been removed
-void MemoryOpt::effectTypeMonitorEnter(CFGNode *n, Inst *i, Type *type)
+void MemoryOpt::effectTypeMonitorEnter(Node *n, Inst *i, Type *type)
 {
     assert(type);
 
@@ -523,7 +520,7 @@ void MemoryOpt::effectTypeMonitorEnter(CFGNode *n, Inst *i, Type *type)
     addAcquireToInstruction(n, i);
 }
 
-void MemoryOpt::effectTypeMonitorExit(CFGNode *n, Inst *i, Type *type)
+void MemoryOpt::effectTypeMonitorExit(Node *n, Inst *i, Type *type)
 {
     assert(type);
 
@@ -533,17 +530,17 @@ void MemoryOpt::effectTypeMonitorExit(CFGNode *n, Inst *i, Type *type)
     addReleaseToInstruction(n, i);
 }
 
-void MemoryOpt::addDefToInstruction(CFGNode *n, Inst *i, const AliasRep &thisMem)
+void MemoryOpt::addDefToInstruction(Node *n, Inst *i, const AliasRep &thisMem)
 {
     InstMemBehavior *b = getOrCreateInstEffect(i);
     b->defs.insert(thisMem);
 
-    if (Log::cat_opt_mem()->isDebugEnabled()) {
+    if (Log::isEnabled()) {
         Log::out() << "Inserting def for ";
         thisMem.print(Log::out());
         Log::out() << " at node ";
-        n->printLabel(Log::out());
-        Log::out() << ::std::endl;
+        FlowGraph::printLabel(Log::out(), n);
+        Log::out() << std::endl;
     }
 
     // if there is already a definition of an ancestor of this one, then it 
@@ -555,14 +552,14 @@ void MemoryOpt::addDefToInstruction(CFGNode *n, Inst *i, const AliasRep &thisMem
     for ( ; iter != endIter; ++iter) {
         AliasRep anc = *iter;
         if (aliasDefSites->hasAliasDefSite(anc, n)) {
-            if (Log::cat_opt_mem()->isDebugEnabled()) {
+            if (Log::isEnabled()) {
                 Log::out() << "Not recording def for ";
                 thisMem.print(Log::out());
                 Log::out() << " at node ";
-                n->printLabel(Log::out());
+                FlowGraph::printLabel(Log::out(), n);
                 Log::out() << " because ancestor ";
                 anc.print(Log::out());
-                Log::out() << " has def there" << ::std::endl;
+                Log::out() << " has def there" << std::endl;
             }
             return;
         }
@@ -571,19 +568,19 @@ void MemoryOpt::addDefToInstruction(CFGNode *n, Inst *i, const AliasRep &thisMem
     aliasDefSites->addAliasDefSite(thisMem, n);
 }
 
-void MemoryOpt::addUseToInstruction(CFGNode *n, Inst *i, const AliasRep &thisMem)
+void MemoryOpt::addUseToInstruction(Node *n, Inst *i, const AliasRep &thisMem)
 {
     InstMemBehavior *b = getOrCreateInstEffect(i);
     b->uses.insert(thisMem);
 }
 
-void MemoryOpt::addReleaseToInstruction(CFGNode *n, Inst *i)
+void MemoryOpt::addReleaseToInstruction(Node *n, Inst *i)
 {
     InstMemBehavior *b = getOrCreateInstEffect(i);
     b->release = true;
 }
 
-void MemoryOpt::addAcquireToInstruction(CFGNode *n, Inst *i)
+void MemoryOpt::addAcquireToInstruction(Node *n, Inst *i)
 {
     InstMemBehavior *b = getOrCreateInstEffect(i);
     b->acquire = true;
@@ -626,11 +623,11 @@ MemoryOptInitWalker::applyToInst(Inst *i)
                     assert(calli->getNumSrcOperands() == 7);
 #ifndef NDEBUG
                     Opnd *tauNullChecked = calli->getSrc(0);
-					assert(tauNullChecked->getType()->tag == Type::Tau);
+                    assert(tauNullChecked->getType()->tag == Type::Tau);
                     Opnd *tauTypesChecked = calli->getSrc(1);
                     assert(tauTypesChecked->getType()->tag == Type::Tau);
 #endif
-					Opnd *srcarray = calli->getSrc(2);
+                    Opnd *srcarray = calli->getSrc(2);
                     Opnd *srcoffset = calli->getSrc(3);
                     Opnd *dstarray = calli->getSrc(4);
                     Opnd *dstoffset = calli->getSrc(5);
@@ -669,6 +666,8 @@ MemoryOptInitWalker::applyToInst(Inst *i)
             switch (callId) {
             case InitializeArray:
             case PseudoCanThrow:
+            case SaveThisState:
+            case ReadThisState:
                 break;
             default:
                 assert(0);
@@ -678,7 +677,6 @@ MemoryOptInitWalker::applyToInst(Inst *i)
         break;
     case Op_Return:
     case Op_Throw:
-    case Op_ThrowLazy:
     case Op_ThrowSystemException:
     case Op_ThrowLinkingException:
     case Op_Leave:
@@ -931,7 +929,7 @@ MemoryOptInitWalker::applyToInst(Inst *i)
     case Op_Shr: case Op_Cmp: case Op_Cmp3: 
     case Op_Branch: case Op_Jump: case Op_Switch:
     case Op_LdConstant: 
-    case Op_LdString: // just reads method string pool, no memory effect.
+    case Op_LdRef: // helper call to load a constant, no memory effect.
 
     case Op_Copy:
     case Op_StVar:
@@ -984,9 +982,9 @@ MemoryOptInitWalker::applyToInst(Inst *i)
         assert(0);
         break;
     }
-    if (Log::cat_opt_mem()->isDebugEnabled()) {
+    if (Log::isEnabled()) {
         Log::out() << "Inst "; i->print(Log::out());
-        Log::out() << ::std::endl;
+        Log::out() << std::endl;
         InstMemBehavior *b = thePass->getInstEffect(i);
         if (b) {
             StlVectorSet<AliasRep>::iterator 
@@ -999,7 +997,7 @@ MemoryOptInitWalker::applyToInst(Inst *i)
                     rep.dump(Log::out());
                     Log::out() << " ";
                 }
-                Log::out() << ::std::endl;
+                Log::out() << std::endl;
             }
             StlVectorSet<AliasRep>::iterator 
                 iter2 = b->uses.begin(),
@@ -1011,7 +1009,7 @@ MemoryOptInitWalker::applyToInst(Inst *i)
                     rep.dump(Log::out());
                     Log::out() << " ";
                 }
-                Log::out() << ::std::endl;
+                Log::out() << std::endl;
             }
         }
     }
@@ -1190,12 +1188,12 @@ AliasManager::isDuplicate(const AliasRep &a, const AliasRep &b) {
 void 
 AliasManager::sawDuplicate(const AliasRep &ar, const AliasRep &canon)
 {
-    if (Log::cat_opt_mem()->isDebugEnabled()) {
-	Log::out() << "Saw duplicate of ";
-	canon.print(Log::out());
-	Log::out() << " : ";
-	ar.print(Log::out());
-	Log::out() << ::std::endl;
+    if (Log::isEnabled()) {
+        Log::out() << "Saw duplicate of ";
+        canon.print(Log::out());
+        Log::out() << " : ";
+        ar.print(Log::out());
+        Log::out() << std::endl;
     }
     StlVectorSet<AliasRep> *theset = canon2others[canon];
     if (!theset) {
@@ -1273,8 +1271,8 @@ AliasRep AliasManager::getReference(Opnd *addr)
     case Op_AddScaledIndex:
         {
             Type *eltType = NULL;
-			Opnd *thePtr = addri->getSrc(0);
-			Type *theType = thePtr->getType();
+            Opnd *thePtr = addri->getSrc(0);
+            Type *theType = thePtr->getType();
             if (theType->isManagedPtr()) {
                 PtrType *thePtrType = (PtrType *) theType;
                 eltType = thePtrType->getPointedToType();
@@ -1518,7 +1516,7 @@ AliasRep AliasManager::getObjectField(Opnd *obj, TypeMemberDesc *field)
 void
 AliasManager::dumpAliasReps(::std::ostream &os) const
 {
-    os << "Alias Sets:" << ::std::endl;
+    os << "Alias Sets:" << std::endl;
     AliasList::const_iterator 
         iter = allAliasReps.begin(),
         end = allAliasReps.end();
@@ -1544,9 +1542,9 @@ AliasManager::dumpAliasReps(::std::ostream &os) const
         } else {
             os << "--null--";
         }
-        os << ::std::endl;
+        os << std::endl;
     }
-    os << "End of Alias Sets" << ::std::endl;
+    os << "End of Alias Sets" << std::endl;
 }
 
 // yields a list of ancestors in some order
@@ -1585,10 +1583,10 @@ AliasManager::computeAncestors(const AliasRep &a,
     case AliasRep::ObjectFieldKind:
         {
             FieldDesc *field = (FieldDesc *) a.desc;
-	    if (a.opnd) {
-		result->push_back(getObjectField(0, field));
-	    }
-	    if (field->isInitOnly()) {
+        if (a.opnd) {
+        result->push_back(getObjectField(0, field));
+        }
+        if (field->isInitOnly()) {
                 result->push_back(getFinishObject(a.opnd));
             } else {
                 if ((a.opnd == 0) || analyzer->mayEscape(a.opnd)) {
@@ -1675,7 +1673,7 @@ void MemoryOpt::insertPhiFor(const AliasRep &theRep, VarDefSites* defSites,
                              StlList<VarDefSites *> &ancestorDefSites)
 {
     StlList<VarDefSites *>::iterator ancEnd = ancestorDefSites.end();
-    CFGNode* node;
+    Node* node;
     while ((node = defSites->removeDefSite()) != NULL) {
         bool done = false;
         // if an ancestor has a def there, skip it
@@ -1684,36 +1682,36 @@ void MemoryOpt::insertPhiFor(const AliasRep &theRep, VarDefSites* defSites,
             VarDefSites *ancSites = *ancIter;
             if (ancSites->isDefSite(node)) {
                 done = true;
-                if (Log::cat_opt_mem()->isDebugEnabled()) {
+                if (Log::isEnabled()) {
                     Log::out() << "Skipping node ";
-                    node->printLabel(Log::out());
-                    Log::out() << " because ancestor has def there" << ::std::endl;
+                    FlowGraph::printLabel(Log::out(), node);
+                    Log::out() << " because ancestor has def there" << std::endl;
                 }
                 break;
             }
         }
         if (done) continue;
 
-        if (Log::cat_opt_mem()->isDebugEnabled()) {
+        if (Log::isEnabled()) {
             Log::out() << "Consider def at node ";
-            node->printLabel(Log::out());
-            Log::out() << ::std::endl;
+            FlowGraph::printLabel(Log::out(), node);
+            Log::out() << std::endl;
         }
 
-        List<CFGNode>* dflist = df.getFrontiersOf(node);
+        List<Node>* dflist = df.getFrontiersOf(node);
         for (; dflist != NULL; dflist = dflist->getNext()) {
             // block where phi inst is going to be inserted
-            CFGNode* insertedLoc = dflist->getElem();
+            Node* insertedLoc = dflist->getElem();
             // if phi has been inserted, then skip
             // no need to insert phi inst in the epilog because
             // there is no var use in the epilog
             if (!defSites->beenInsertedPhi(insertedLoc) &&
                 !insertedLoc->getOutEdges().empty())  {
 
-                if (Log::cat_opt_mem()->isDebugEnabled()) {
+                if (Log::isEnabled()) {
                     Log::out() << "Queuing DF node ";
-                    insertedLoc->printLabel(Log::out());
-                    Log::out() << ::std::endl;
+                    FlowGraph::printLabel(Log::out(), insertedLoc);
+                    Log::out() << std::endl;
                 }
                 // create a new phi instruction for varOpnd
                 createMemPhiInst(theRep,insertedLoc);
@@ -1734,10 +1732,10 @@ void MemoryOpt::insertMemPhi() {
         VarDefSites* defSites = (*iter).second;
 
         if (defSites) {
-            if (Log::cat_opt_mem()->isDebugEnabled()) {
+            if (Log::isEnabled()) {
                 Log::out() << "BEGIN Inserting Phis for ";
                 aliasRep.print(Log::out());
-                Log::out() << ::std::endl;
+                Log::out() << std::endl;
             }
 
             const AliasManager::AliasList *alist = aliasManager->getAncestors(aliasRep);
@@ -1755,31 +1753,31 @@ void MemoryOpt::insertMemPhi() {
             }
             insertPhiFor(aliasRep, defSites, ancestorDefSites);
 
-            if (Log::cat_opt_mem()->isDebugEnabled()) {
+            if (Log::isEnabled()) {
                 Log::out() << "DONE Inserting Phis for ";
                 aliasRep.print(Log::out());
-                Log::out() << ::std::endl;
+                Log::out() << std::endl;
             }
         } else {
-            if (Log::cat_opt_mem()->isDebugEnabled()) {
+            if (Log::isEnabled()) {
                 Log::out() << "NO Phis for ";
                 aliasRep.print(Log::out());
-                Log::out() << " because it has no defs" << ::std::endl;
+                Log::out() << " because it has no defs" << std::endl;
             }
         }
     }
 }
 
-void MemoryOpt::createMemPhiInst(const AliasRep &aliasRep, CFGNode *node)
+void MemoryOpt::createMemPhiInst(const AliasRep &aliasRep, Node *node)
 {
-    if (Log::cat_opt_mem()->isDebugEnabled()) {
+    if (Log::isEnabled()) {
         Log::out() << "Insert MemPhi for ";
         aliasRep.print(Log::out());
         Log::out() << " at node ";
-        node->printLabel(Log::out());
-        Log::out() << ::std::endl;
+        FlowGraph::printLabel(Log::out(), node);
+        Log::out() << std::endl;
     }
-    Inst *firstInst = node->getFirstInst();
+    Inst *firstInst = (Inst*)node->getFirstInst();
     assert(firstInst->isLabel());
 
     InstMemBehavior *b = getOrCreateInstEffect(firstInst);
@@ -1831,10 +1829,10 @@ void MemoryOpt::addMemUseDef(Inst *use, Inst *def)
 
 void MemoryOpt::remMemInst(Inst *theInst)
 {
-    if (Log::cat_opt_mem()->isDebugEnabled()) {
+    if (Log::isEnabled()) {
         Log::out() << "Eliminating redundant memory instruction: ";
         theInst->print(Log::out());
-        Log::out() << ::std::endl;
+        Log::out() << std::endl;
     }
 
     // get defs used by theInst
@@ -1895,21 +1893,21 @@ void MemoryOpt::remMemInst(Inst *theInst)
             }
         }
     }
-    if (Log::cat_opt_mem()->isDebugEnabled()) {
+    if (Log::isEnabled()) {
         Log::out() << "Finished eliminating redundant memory instruction: ";
         theInst->print(Log::out());
-        Log::out() << ::std::endl;
+        Log::out() << std::endl;
     }
 }
 
 void MemoryOpt::replaceMemInst(Inst *oldInst, Inst *newInst)
 {
-    if (Log::cat_opt_mem()->isDebugEnabled()) {
+    if (Log::isEnabled()) {
         Log::out() << "Replacing memory instruction ";
         oldInst->print(Log::out());
         Log::out() << " by ";
         newInst->print(Log::out());
-        Log::out() << ::std::endl;
+        Log::out() << std::endl;
     }
 
     // get defs used by theInst
@@ -1972,7 +1970,7 @@ void MemoryOpt::replaceMemInst(Inst *oldInst, Inst *newInst)
 bool MemoryOpt::hasSameReachingDefs(Inst *i1, Inst *i2)
 {
     assert(i1 != i2);
-    if (Log::cat_opt_mem()->isDebugEnabled()) {
+    if (Log::isEnabled()) {
         Log::out() << "checking use2defs(" << (int)i1->getId() << ")==use2defs("
                    << (int)i2->getId() << "): ";
     }
@@ -1989,8 +1987,8 @@ bool MemoryOpt::hasSameReachingDefs(Inst *i1, Inst *i2)
         assert(defs1 && defs2);
         result = (*defs1 == *defs2);
     }
-    if (Log::cat_opt_mem()->isDebugEnabled()) {
-        Log::out() << (result ? " == > TRUE" : " == > FALSE") << ::std::endl;
+    if (Log::isEnabled()) {
+        Log::out() << (result ? " == > TRUE" : " == > FALSE") << std::endl;
     }
     return result;
 }
@@ -2022,12 +2020,12 @@ MemoryRenameWalker::addDef(Inst *inst, const AliasRep &rep)
 void
 MemoryRenameWalker::addUse(Inst *inst, const AliasRep &rep)
 {
-    if (Log::cat_opt_mem()->isDebugEnabled()) {
+    if (Log::isEnabled()) {
         Log::out() << "Adding Use of aliasRep ";
         rep.print(Log::out());
         Log::out() << " to inst ";
         inst->print(Log::out());
-        Log::out() << ::std::endl;
+        Log::out() << std::endl;
     }
 
     AliasRenameMap::DefsSet defs(thePass->mm);
@@ -2047,10 +2045,10 @@ MemoryRenameWalker::applyToInst(Inst *inst)
 {
     InstMemBehavior *b = thePass->getInstEffect(inst);
 
-    if (Log::cat_opt_mem()->isDebugEnabled()) {
+    if (Log::isEnabled()) {
         Log::out() << "applying renaming to Inst ";
         inst->print(Log::out());
-        Log::out() << ::std::endl;
+        Log::out() << std::endl;
     }
     if (b) {
         // compute uses here
@@ -2070,10 +2068,10 @@ MemoryRenameWalker::applyToInst(Inst *inst)
                 end = b->uses.end();
             for ( ; iter != end; ++iter) {
                 AliasRep rep = *iter;
-                if (Log::cat_opt_mem()->isDebugEnabled()) {
+                if (Log::isEnabled()) {
                     Log::out() << "  has use of ";
                     rep.print(Log::out());
-                    Log::out() << ::std::endl;
+                    Log::out() << std::endl;
                 }
                 addUse(inst, rep);
             }
@@ -2087,10 +2085,10 @@ MemoryRenameWalker::applyToInst(Inst *inst)
                 end = b->defs.end();
             for ( ; iter != end; ++iter) {
                 AliasRep rep = *iter;
-                if (Log::cat_opt_mem()->isDebugEnabled()) {
+                if (Log::isEnabled()) {
                     Log::out() << "  has def of ";
                     rep.print(Log::out());
-                    Log::out() << ::std::endl;
+                    Log::out() << std::endl;
                 }
                 addDef(inst, rep);
             }
@@ -2101,23 +2099,23 @@ MemoryRenameWalker::applyToInst(Inst *inst)
 void
 MemoryRenameWalker::finishNode(DominatorNode *domNode)
 {
-    CFGNode *node = domNode->getNode(); 
+    Node *node = domNode->getNode(); 
 
-    if (Log::cat_opt_mem()->isDebugEnabled()) {
+    if (Log::isEnabled()) {
         Log::out() << "finishing renaming for Node ";
-        node->printLabel(Log::out());
-        Log::out() << ::std::endl;
+        FlowGraph::printLabel(Log::out(), node);
+        Log::out() << std::endl;
     }
 
-    const CFGEdgeDeque& edges = node->getOutEdges();
-    CFGEdgeDeque::const_iterator eiter;
+    const Edges& edges = node->getOutEdges();
+    Edges::const_iterator eiter;
     for(eiter = edges.begin(); eiter != edges.end(); ++eiter) {
-        CFGEdge* e = *eiter;
-        CFGNode* succ = e->getTargetNode();
+        Edge* e = *eiter;
+        Node* succ = e->getTargetNode();
 
         const StlVector<AliasRep> *memPhis = thePass->memPhiSites->getMemPhis(succ);
         if (memPhis) {
-            Inst *succLabel = succ->getFirstInst();
+            Inst *succLabel = (Inst*)succ->getFirstInst();
             assert(succLabel->isLabel());
             
             StlVector<AliasRep>::const_iterator
@@ -2131,10 +2129,10 @@ MemoryRenameWalker::finishNode(DominatorNode *domNode)
         }
     }
 
-    if (Log::cat_opt_mem()->isDebugEnabled()) {
+    if (Log::isEnabled()) {
         Log::out() << "finished renaming for Node ";
-        node->printLabel(Log::out());
-        Log::out() << ::std::endl;
+        FlowGraph::printLabel(Log::out(), node);
+        Log::out() << std::endl;
     }
 }
 
@@ -2145,15 +2143,15 @@ public:
     MemoryDebugWalker(MemoryOpt *thePass0) :
         thePass(thePass0)
     { };
-    void startNode(CFGNode *node) { };
+    void startNode(Node *node) { };
     void applyToInst(Inst *inst);
-    void finishNode(CFGNode *node) {};
+    void finishNode(Node *node) {};
 };
 
 void MemoryDebugWalker::applyToInst(Inst *inst)
 {
     inst->print(Log::out());
-    Log::out() << ::std::endl;
+    Log::out() << std::endl;
     MemoryOpt::Use2DefsMap::iterator 
         found = thePass->memUseDefs.find(inst),
         end = thePass->memUseDefs.end();
@@ -2169,7 +2167,7 @@ void MemoryDebugWalker::applyToInst(Inst *inst)
             thisDep->print(Log::out());
             Log::out() << " ";
         }
-        Log::out() << ::std::endl;
+        Log::out() << std::endl;
     }
 }
 
@@ -2186,7 +2184,7 @@ void MemoryOpt::createUsesMap()
     DomTreeWalk<true, MemoryRenameDomWalker>(dominators, domRenameWalker, 
                                              mm);
 
-    if (Log::cat_opt_mem()->isDebugEnabled()) {
+    if (Log::isEnabled()) {
         MemoryDebugWalker debugWalker(this);
 
         // adapt the forwards NodeInstWalker to a NodeWalker
@@ -2218,11 +2216,11 @@ void AliasRenameMap::insert(const AliasRep &rep, Inst *defInst)
     uint32 timeNow = ++timeCount;
     AliasBinding newBinding(defInst, timeNow);
 
-    if (Log::cat_opt_mem()->isDebugEnabled()) {
+    if (Log::isEnabled()) {
         Log::out() << "  adding def of ";
         rep.print(Log::out());
         Log::out() << " at time " << (int) timeNow << " to inst " 
-                   << (int) defInst->getId() << ::std::endl;
+                   << (int) defInst->getId() << std::endl;
     }
 
     // first, set this value
@@ -2270,16 +2268,16 @@ void AliasRenameMap::lookup(const AliasRep &rep, DefsSet &defs)
     {    
         
         if (!bestInst) {
-            if (Log::cat_opt_mem()->isDebugEnabled()) {
+            if (Log::isEnabled()) {
                 Log::out() << "aliasRep ";
                 rep.print(Log::out());
-                Log::out() << " has no binding" << ::std::endl;
+                Log::out() << " has no binding" << std::endl;
             }
         } else {
-            if (Log::cat_opt_mem()->isDebugEnabled()) {
+            if (Log::isEnabled()) {
                 Log::out() << "aliasRep ";
                 rep.print(Log::out());
-                Log::out() << " has binding at time " << (int) bestWhen << ::std::endl;
+                Log::out() << " has binding at time " << (int) bestWhen << std::endl;
             }
         }
 
@@ -2288,16 +2286,16 @@ void AliasRenameMap::lookup(const AliasRep &rep, DefsSet &defs)
         AliasManager::AliasList::const_iterator
             iter = alist->begin(),
             end = alist->end();
-        if (Log::cat_opt_mem()->isDebugEnabled()) {
+        if (Log::isEnabled()) {
             if (iter != end) {
-                Log::out() << "trying ancestors: " << ::std::endl;
+                Log::out() << "trying ancestors: " << std::endl;
             } else {
-                Log::out() << "has no ancestors" << ::std::endl;
+                Log::out() << "has no ancestors" << std::endl;
             }
         }
         for ( ; iter != end; ++iter) {
             AliasRep thisAncestor = *iter;
-            if (Log::cat_opt_mem()->isDebugEnabled()) {
+            if (Log::isEnabled()) {
                 thisAncestor.print(Log::out());
                 Log::out() << " ";
             }
@@ -2305,31 +2303,31 @@ void AliasRenameMap::lookup(const AliasRep &rep, DefsSet &defs)
             Inst *thisInst = newFound.inst;
             if (thisInst) {
                 uint32 thisWhen = newFound.when;
-                if (Log::cat_opt_mem()->isDebugEnabled()) {
+                if (Log::isEnabled()) {
                     Log::out() << "    ";
                     thisAncestor.print(Log::out());
-                    Log::out() << " has binding at time " << (int) thisWhen << ::std::endl;
+                    Log::out() << " has binding at time " << (int) thisWhen << std::endl;
                 }
                 if (newFound.when > bestWhen) {
                     bestWhen = thisWhen;
                     bestInst = thisInst;
-                    if (Log::cat_opt_mem()->isDebugEnabled()) {
+                    if (Log::isEnabled()) {
                         Log::out() << ", replaces bestInst";
                     }
                 }
-                if (Log::cat_opt_mem()->isDebugEnabled()) {
-                    Log::out() << ::std::endl;
+                if (Log::isEnabled()) {
+                    Log::out() << std::endl;
                 }
             } else {
-                if (Log::cat_opt_mem()->isDebugEnabled()) {
+                if (Log::isEnabled()) {
                     Log::out() << "    ";
                     thisAncestor.print(Log::out());
-                    Log::out() << " has no binding " << ::std::endl;
+                    Log::out() << " has no binding " << std::endl;
                 }
             }
         }
-        if (Log::cat_opt_mem()->isDebugEnabled()) {
-            Log::out() << ::std::endl;
+        if (Log::isEnabled()) {
+            Log::out() << std::endl;
         }
     }        
     assert(bestInst);
@@ -2432,11 +2430,11 @@ MemoryRedStoreWalker::applyToInst(Inst *inst)
                     FieldDesc *instDesc = finst->getFieldDesc();
                     FieldDesc *usingDesc = fusing->getFieldDesc();
                     
-					usingDesc = instDesc;
+                    usingDesc = instDesc;
                     if ((usingBase == thisBase) &&
                         usingDesc &&
                         ( getBitWidth(usingInst->getType()) 
-							>= getBitWidth(inst->getType()) )) {
+                            >= getBitWidth(inst->getType()) )) {
                         // eliminate inst;
                         thePass->remMemInst(inst);
                         inst->unlink();
@@ -2450,10 +2448,10 @@ MemoryRedStoreWalker::applyToInst(Inst *inst)
                     FieldDesc *instDesc = finst->getFieldDesc();
                     FieldDesc *usingDesc = fusing->getFieldDesc();
                     
-					usingDesc = instDesc;
+                    usingDesc = instDesc;
                     if (usingDesc &&
                         (getBitWidth(usingInst->getType()) 
-							>= getBitWidth(inst->getType()))) {
+                            >= getBitWidth(inst->getType()))) {
                         // eliminate inst;
                         thePass->remMemInst(inst);
                         inst->unlink();
@@ -2497,8 +2495,8 @@ void MemoryOpt::eliminateRedStores()
     // do the walk over nodes in arbitrary order
     NodeWalk<MemoryRedStoreNodeWalker>(fg, redStoreNodeWalker);
 
-    if (Log::cat_opt_mem()->isDebugEnabled()) {
-        Log::out() << "After red store elimination: " << ::std::endl;
+    if (Log::isEnabled()) {
+        Log::out() << "After red store elimination: " << std::endl;
 
         MemoryDebugWalker debugWalker(this);
 
@@ -2542,10 +2540,10 @@ MemorySyncOptWalker::applyToInst(Inst *inst)
     newlyInvolved.insert(inst);
 
     Opnd *obj = inst->getSrc(0);
-    if (Log::cat_opt_mem()->isDebugEnabled()) {
+    if (Log::isEnabled()) {
         Log::out() << "Checking instruction ";
         inst->print(Log::out());
-        Log::out() << ::std::endl;
+        Log::out() << std::endl;
     }
 
     Opnd *enterLockAddrOpnd = 0;
@@ -2560,10 +2558,10 @@ MemorySyncOptWalker::applyToInst(Inst *inst)
             // don't have it, insert it
             involved.insert(monitorInst);
             
-            if (Log::cat_opt_mem()->isDebugEnabled()) {
+            if (Log::isEnabled()) {
                 Log::out() << "Is involved with instruction ";
                 monitorInst->print(Log::out());
-                Log::out() << ::std::endl;
+                Log::out() << std::endl;
             }
             if (monitorInst->isLabel()) {
                 // acting as memory phi, match both ways
@@ -2718,8 +2716,8 @@ MemorySyncOptWalker::applyToInst(Inst *inst)
 
     // turn them into fences 
 
-    if (Log::cat_opt_mem()->isDebugEnabled()) {
-        Log::out() << "Can convert to fence: " << ::std::endl;
+    if (Log::isEnabled()) {
+        Log::out() << "Can convert to fence: " << std::endl;
     }
 
     InstFactory &instFactory = thePass->irManager.getInstFactory();
@@ -2753,12 +2751,12 @@ MemorySyncOptWalker::applyToInst(Inst *inst)
         default:
             assert(0);
         }
-        if (Log::cat_opt_mem()->isDebugEnabled()) {
-            Log::out() << "Instruction " << ::std::endl << "    ";
+        if (Log::isEnabled()) {
+            Log::out() << "Instruction " << std::endl << "    ";
             invInst->print(Log::out());
-            Log::out() << ::std::endl << "  becomes " << ::std::endl << "    ";
+            Log::out() << std::endl << "  becomes " << std::endl << "    ";
             newI->print(Log::out());
-            Log::out() << ::std::endl;
+            Log::out() << std::endl;
         }
         newI->insertAfter(invInst);
         invInst->unlink();
@@ -2778,8 +2776,8 @@ void MemoryOpt::doSyncOpt()
     // do the walk over nodes in arbitrary order
     NodeWalk<MemorySyncOptNodeWalker>(fg, memSyncOptNodeWalker);
 
-    if (Log::cat_opt_mem()->isDebugEnabled()) {
-        Log::out() << "After mem syncopt: " << ::std::endl;
+    if (Log::isEnabled()) {
+        Log::out() << "After mem syncopt: " << std::endl;
 
         MemoryDebugWalker debugWalker(this);
 

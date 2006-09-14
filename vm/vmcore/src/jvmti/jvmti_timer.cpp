@@ -27,6 +27,27 @@
 #include "cxxlog.h"
 #include "port_sysinfo.h"
 #include "suspend_checker.h"
+#include "jvmti_internal.h"
+#include "open/jthread.h"
+#include "jvmti.h"
+#include <apr_time.h>
+
+/**
+* Sets field values to provided jvmtiTimerInfo structure.
+*/
+static inline void fill_timer_info(jvmtiTimerInfo* info_ptr)
+{
+    info_ptr->max_value = 0xffffffffffffffffULL;    // max unsigned long long
+    info_ptr->may_skip_forward = JNI_FALSE;
+    info_ptr->may_skip_backward = JNI_FALSE;
+
+#ifdef PLATFORM_POSIX
+    // linux api provides only total cpu time measurement :(
+    info_ptr->kind = JVMTI_TIMER_TOTAL_CPU;
+#elif PLATFORM_NT
+    info_ptr->kind = JVMTI_TIMER_USER_CPU;
+#endif
+}
 
 /*
  * Get Current Thread CPU Timer Information
@@ -45,6 +66,7 @@ jvmtiGetCurrentThreadCpuTimerInfo(jvmtiEnv* env,
                                   jvmtiTimerInfo* UNREF info_ptr)
 {
     TRACE2("jvmti.timer", "GetCurrentThreadCpuTimerInfo called");
+  //  TRACE("GetCurrentThreadCpuTimerInfo called");
     SuspendEnabledChecker sec;
     /*
      * Check given env & current phase.
@@ -53,9 +75,14 @@ jvmtiGetCurrentThreadCpuTimerInfo(jvmtiEnv* env,
 
     CHECK_EVERYTHING();
 
-    //TBD
+    CHECK_CAPABILITY(can_get_current_thread_cpu_time);
 
-    return JVMTI_NYI;
+    if (NULL == info_ptr)
+        return JVMTI_ERROR_NULL_POINTER;
+
+    fill_timer_info(info_ptr);
+
+    return JVMTI_ERROR_NONE;
 }
 
 /*
@@ -70,17 +97,23 @@ jvmtiGetCurrentThreadCpuTime(jvmtiEnv* env,
                              jlong* UNREF nanos_ptr)
 {
     TRACE2("jvmti.timer", "GetCurrentThreadCpuTime called");
+    IDATA status;
     SuspendEnabledChecker sec;
     /*
      * Check given env & current phase.
      */
     jvmtiPhase phases[] = {JVMTI_PHASE_START, JVMTI_PHASE_LIVE};
-
     CHECK_EVERYTHING();
 
-    //TBD
+    CHECK_CAPABILITY(can_get_current_thread_cpu_time);
 
-    return JVMTI_NYI;
+    if (NULL == nanos_ptr)
+        return JVMTI_ERROR_NULL_POINTER;
+    status=jthread_get_thread_cpu_time(jthread_self(),nanos_ptr);
+    if (status!=TM_ERROR_NONE)
+        return JVMTI_ERROR_INTERNAL;
+
+    return JVMTI_ERROR_NONE;
 }
 
 /*
@@ -105,9 +138,14 @@ jvmtiGetThreadCpuTimerInfo(jvmtiEnv* env,
 
     CHECK_EVERYTHING();
 
-    //TBD
+    CHECK_CAPABILITY(can_get_thread_cpu_time);
 
-    return JVMTI_NYI;
+    if (NULL == info_ptr)
+        return JVMTI_ERROR_NULL_POINTER;
+
+    fill_timer_info(info_ptr);
+
+    return JVMTI_ERROR_NONE;
 }
 
 /*
@@ -123,7 +161,8 @@ jvmtiGetThreadCpuTime(jvmtiEnv* env,
                       jlong* UNREF nanos_ptr)
 {
     TRACE2("jvmti.timer", "GetThreadCpuTime called");
-     SuspendEnabledChecker sec;
+    IDATA status;
+    SuspendEnabledChecker sec;
    /*
      * Check given env & current phase.
      */
@@ -131,9 +170,44 @@ jvmtiGetThreadCpuTime(jvmtiEnv* env,
 
     CHECK_EVERYTHING();
 
-    //TBD
+    CHECK_CAPABILITY(can_get_thread_cpu_time);
 
-    return JVMTI_NYI;
+    if (NULL == nanos_ptr)
+        return JVMTI_ERROR_NULL_POINTER;
+
+    if (NULL != thread)
+    {
+        if (!is_valid_thread_object(thread))
+            return JVMTI_ERROR_INVALID_THREAD;
+    }
+    else
+        thread = jthread_self();
+
+    // lock thread manager to avoid occasional change of thread state
+    hythread_global_lock(); 
+    
+    int state;// =thread_get_thread_state(thread);
+    jvmtiError err=jvmtiGetThreadState(env,thread,&state);
+    if (err != JVMTI_ERROR_NONE){
+   	   return err; 
+	} 
+    switch (state)
+    {
+    case JVMTI_THREAD_STATE_TERMINATED:     // thread is terminated
+    case JVMTI_JAVA_LANG_THREAD_STATE_NEW:  // thread is new
+        hythread_global_unlock(); 
+        return JVMTI_ERROR_THREAD_NOT_ALIVE;
+    default:    // thread is alive
+        status=jthread_get_thread_cpu_time(thread,nanos_ptr);
+
+        break;
+    }
+
+    hythread_global_unlock(); 
+    if (status!=TM_ERROR_NONE)
+        return JVMTI_ERROR_INTERNAL;
+
+    return JVMTI_ERROR_NONE;
 }
 
 /*
@@ -159,9 +233,12 @@ jvmtiGetTimerInfo(jvmtiEnv* env,
 
     CHECK_EVERYTHING();
 
-    //TBD
+    if (NULL == info_ptr)
+        return JVMTI_ERROR_NULL_POINTER;
 
-    return JVMTI_NYI;
+    fill_timer_info(info_ptr);
+
+    return JVMTI_ERROR_NONE;
 }
 
 /*
@@ -188,12 +265,10 @@ jvmtiGetTime(jvmtiEnv* env,
     {
         return JVMTI_ERROR_NULL_POINTER;
     }
+    // get time in milliseconds
+    apr_time_t apr_time = apr_time_now();
 
-    time_t value = 0;
-
-    time( &value );
-
-    *nanos_ptr = value * 1000000000UL;
+    *nanos_ptr = ((jlong) apr_time) * 1000ULL; // convert to nanos
 
     return JVMTI_ERROR_NONE;
 }

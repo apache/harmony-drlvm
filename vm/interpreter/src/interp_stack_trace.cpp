@@ -102,8 +102,8 @@ interpreter_st_get_frame(unsigned target_depth, StackTraceFrame* stf) {
 }
 
 static inline unsigned
-interp_st_get_depth() {
-    StackIterator_interp* si = interp_si_create_from_native();
+interp_st_get_depth(VM_thread *p_thread) {
+    StackIterator_interp* si = interp_si_create_from_native(p_thread);
     unsigned depth = 0;
     while (!interp_si_is_past_end(si)) {
         if (interp_si_get_method(si))
@@ -112,55 +112,6 @@ interp_st_get_depth() {
     }
     interp_si_free(si);
     return depth;
-}
-
-void 
-interpreter_st_get_interrupted_method(Method ** method_ptr, jlocation *location_ptr) {
-
-    StackFrame *frame = getLastStackFrame();
-
-    *method_ptr = NULL;
-    *location_ptr = 0;
-    
-    if (frame){
-        *method_ptr = frame->method;
-        *location_ptr = frame->ip - (uint8*)(*method_ptr)->get_byte_code_addr();
-    }
- }
-
-void 
-interpreter_st_get_catch_method(Method ** method_ptr, 
-                                jlocation *location_ptr, jobject exn) {
-    StackFrame *frame = NULL;
-    StackIterator_interp* si = interp_si_create_from_native();
-    *method_ptr = NULL;
-    *location_ptr = 0;
-    
-    while(!interp_si_is_past_end(si)){
-        frame = (StackFrame*) si;
-        if( frame->method->is_native())
-        {
-            interp_si_goto_previous(si);
-            continue;
-        }
-        Handler *h;
-
-        if(findExceptionHandler(*frame, &exn->object, &h)) {
-            *method_ptr = frame->method;
-            *location_ptr = frame->ip - (uint8*)(*method_ptr)->get_byte_code_addr();
-            break;
-        }
-
-        if (frame->exception) {
-            // FIXME: needs investigation, very specific condition
-            *method_ptr = NULL;
-            *location_ptr = 0;
-            frame->exception = NULL;
-            break;
-        }
-
-        interp_si_goto_previous(si);
-    }
 }
 
 unsigned  
@@ -173,14 +124,14 @@ interpreter_st_get_interrupted_method_native_bit(VM_thread *thread) {
     return method -> is_native();
  }
 
-/*extern*/ void
-interpreter_st_get_trace(unsigned* res_depth, StackTraceFrame** stfs) {
-    unsigned depth = interp_st_get_depth();
+void
+interpreter_st_get_trace(VM_thread *p_vmthread, unsigned* res_depth, StackTraceFrame** stfs) {
+    unsigned depth = interp_st_get_depth(p_vmthread);
     StackTraceFrame* stf = st_alloc_frames(depth);
     assert(stf);
     *res_depth = depth;
     *stfs = stf;
-    StackIterator_interp* si = interp_si_create_from_native();
+    StackIterator_interp* si = interp_si_create_from_native(p_vmthread);
     depth = 0;
     while (!interp_si_is_past_end(si)) {
         Method_Handle method = interp_si_get_method(si);
@@ -224,10 +175,9 @@ interp_enumerate_root_set_single_thread_on_stack(VM_thread *thread) {
             DEBUG_GC("  [THIS]: " << si->This->vt()->clss->name->bytes << endl);
         }
 
-        if (si->exception) {
-            ASSERT_OBJECT(si->exception);
-            vm_enumerate_root_reference((void**)&si->exception, FALSE);
-            DEBUG_GC("  [EXCEPTION]: " << si->exception->vt()->clss->name->bytes << endl);
+        if (si->exc) {
+            vm_enumerate_root_reference((void**)&si->exc, FALSE);
+            DEBUG_GC("  [EXCEPTION]: " << si->exc->vt()->clss->name->bytes << endl);
         }
 
         if (method->is_native()) {

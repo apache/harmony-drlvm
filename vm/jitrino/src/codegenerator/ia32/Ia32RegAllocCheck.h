@@ -34,15 +34,15 @@ namespace Ia32
 // class RegAllocCheck
 //========================================================================================
 /**
- *	This class used for debug purposes;
+ *  This class used for debug purposes;
  *
- *	(1) It checks that there are no two operands which are assigned to the same 
+ *  (1) It checks that there are no two operands which are assigned to the same 
  *      regsiter and both are alive at some instruction.
  *
  *  (2) It checks that the operand assignment is consistent with the operand constraint.
  *
- *	(3) (if enabled by 'checkloc' argument) It checks that all operands are  assigned 
- *		to memory or register.
+ *  (3) (if enabled by 'checkloc' argument) It checks that all operands are  assigned 
+ *      to memory or register.
  *
  */
 
@@ -50,29 +50,28 @@ class RegAllocCheck
 {
 
 public:
-	
-	RegAllocCheck (const IRManager& x)		:irm(x), mm(1000, "RegAllocCheck") {}
+    
+    RegAllocCheck (const IRManager& x)      :irm(x), mm(1000, "RegAllocCheck") {}
 
-	bool run (bool checkloc);
+    bool run (bool checkloc);
 
 protected:
 
-	typedef uint32 RegMask;
+    typedef uint32 RegMask;
 
-	const IRManager& irm;
-	MemoryManager     mm;
-	size_t    opandcount;
-	const BasicBlock* bblock;
-	const Insts*      binsts;
-	const BasicBlock* lastbb;
-	bool headprinted;
-	int  errors;
+    const IRManager& irm;
+    MemoryManager     mm;
+    size_t    opandcount;
+    const Node*  bblock;
+    const Node*  lastbb;
+    bool headprinted;
+    int  errors;
 
-	void checkLiveness    ();
-	void checkLocations   ();
-	void checkConstraints ();
-	::std::ostream& error ();
-	::std::ostream& header ();
+    void checkLiveness    ();
+    void checkLocations   ();
+    void checkConstraints ();
+    ::std::ostream& error ();
+    ::std::ostream& header ();
 };
 
 

@@ -23,26 +23,26 @@ package java.lang.ref;
 /**
  * @com.intel.drl.spec_ref 
  */
-public class SoftReference extends Reference {
+public class SoftReference<T> extends Reference<T> {
 
     /**
      * @com.intel.drl.spec_ref 
      */
-	public SoftReference(Object referent) {
+	public SoftReference(T referent) {
 		super(referent);
 	}
 
     /**
      * @com.intel.drl.spec_ref 
      */
-	public SoftReference(Object referent, ReferenceQueue q) {
+	public SoftReference(T referent, ReferenceQueue<? super T> q) {
 		super(referent, q);
 	}
 
     /**
      * @com.intel.drl.spec_ref 
      */
-	public Object get() {
+	public T get() {
 		return super.get();
 	}
 }

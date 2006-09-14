@@ -31,7 +31,7 @@ public class ClassLoaderInfo {
         if (parentClassLoader == null) {
             systemLoaders = new ClassLoader[] { systemClassLoader };
         } else {
-            ArrayList loaders = new ArrayList();
+            ArrayList<ClassLoader> loaders = new ArrayList<ClassLoader>();
             loaders.add(systemClassLoader);
             do {
                 loaders.add(parentClassLoader);
@@ -72,7 +72,7 @@ public class ClassLoaderInfo {
      *         loader or on of its ancestors, false otherwise. This method
      *         returns true if defining class loader is null.
      */
-    public static boolean hasSystemClassLoader(Class clazz) {
+    public static boolean hasSystemClassLoader(Class<?> clazz) {
         for (int i = 0; i < systemLoaders.length; i++) {
             ClassLoader loader = clazz.getClassLoader();
             if (loader == null || loader == systemLoaders[i]) {

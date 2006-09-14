@@ -469,10 +469,9 @@ IDATA jthread_exception_stop(jthread java_thread, jobject excn) {
     IDATA status;
         JNIEnv* env;
 
-        tm_native_thread = jthread_get_native_thread(java_thread);
-
-    hythread_suspend_other(tm_native_thread);
-
+    tm_native_thread = jthread_get_native_thread(java_thread);
+    status=hythread_suspend_other(tm_native_thread);
+    if (status != TM_ERROR_NONE) return status;
         tm_java_thread = hythread_get_private_data(tm_native_thread);
         
     // Install safepoint callback that would throw exception

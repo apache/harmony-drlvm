@@ -23,19 +23,19 @@ package java.lang.ref;
 /**
  * @com.intel.drl.spec_ref 
  */
-public class PhantomReference extends Reference {
+public class PhantomReference<T> extends Reference<T> {
 
     /**
      * @com.intel.drl.spec_ref 
      */
-	public PhantomReference(Object referent, ReferenceQueue q) {
+	public PhantomReference(T referent, ReferenceQueue<? super T> q) {
 		super(referent, q);
 	}
 	
     /**
      * @com.intel.drl.spec_ref 
      */
-	public Object get() {
+	public T get() {
 		return null;
 	}
 }

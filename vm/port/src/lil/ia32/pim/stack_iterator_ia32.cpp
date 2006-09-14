@@ -13,9 +13,10 @@
  *  See the License for the specific language governing permissions and
  *  limitations under the License.
  */
+
 /** 
  * @author Intel, Pavel Afremov
- * @version $Revision: 1.1.2.1.4.4 $
+ * @version $Revision$
  */  
 
 
@@ -32,10 +33,7 @@
 
 #include "clog.h"
 
-#ifndef NDEBUG
 #include "dump.h"
-extern bool dump_stubs;
-#endif
 
 // Invariants:
 //   Native frames:
@@ -64,7 +62,7 @@ struct StackIterator {
 static void si_unwind_from_m2n(StackIterator* si)
 {
 #ifdef VM_STATS
-    vm_stats_total.num_unwind_native_frames_all++;
+    VM_Statistics::get_vm_stats().num_unwind_native_frames_all++;
 #endif
 
     M2nFrame* m2nfl = si->m2nfl;
@@ -155,10 +153,9 @@ static transfer_control_stub_type gen_transfer_control_stub()
 
     addr = (transfer_control_stub_type)stub;
     assert(ss-stub <= stub_size);
-#ifndef NDEBUG
-    if (dump_stubs)
-        dump(stub, "getaddress__transfer_control", ss - stub);
-#endif
+
+    DUMP_STUB(stub, "getaddress__transfer_control", ss - stub);
+
     return addr;
 }
 
@@ -325,6 +322,11 @@ M2nFrame* si_get_m2n(StackIterator* si)
 {
     ASSERT_NO_INTERPRETER
     return si->m2nfl;
+}
+
+void** si_get_return_pointer(StackIterator* si)
+{
+    return (void**) si->c.p_eax;
 }
 
 void si_set_return_pointer(StackIterator* si, void** return_value)

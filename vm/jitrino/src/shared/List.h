@@ -28,30 +28,30 @@
 template <class T> 
 class List {
 public:
-	List(T* i, List* t) : elem(i), tl(t) {}
-	List*	getNext()	{return tl;}
-	T*		getElem()	{return elem;}
+    List(T* i, List* t) : elem(i), tl(t) {}
+    List*   getNext()   {return tl;}
+    T*      getElem()   {return elem;}
 private:
-	T*		elem;
-	List*	tl;
+    T*      elem;
+    List*   tl;
 };
 
 template <class T>
 class ListIter {
 public:
-	ListIter(List<T>* hd) {next = hd;}
-	bool	hasNext()	{return next != NULL;}
-	T*	    getNext()	{
-		if (hasNext() == false) {
-			assert(0);
-			return NULL;
-		}
-		T* elem = next->getElem();
-		next = next->getNext();
-		return elem;
-	}
+    ListIter(List<T>* hd) {next = hd;}
+    bool    hasNext()   {return next != NULL;}
+    T*      getNext()   {
+        if (hasNext() == false) {
+            assert(0);
+            return NULL;
+        }
+        T* elem = next->getElem();
+        next = next->getNext();
+        return elem;
+    }
 private:
-	List<T>*	next;
+    List<T>*    next;
 };
 
 #endif // _LIST_H_

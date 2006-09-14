@@ -20,6 +20,7 @@
 #include <math.h>
 
 #include "exceptions.h"
+#include "exceptions_int.h"
 #include "vm_arrays.h"
 #include "vm_strings.h"
 #include "jit_runtime_support_common.h"
@@ -31,6 +32,7 @@
 #include "compile.h"
 
 #include "thread_manager.h"
+#include <sstream>
 
 // ppervov: HACK: allows using STL modifiers (dec/hex) and special constants (endl)
 using namespace std;
@@ -136,14 +138,14 @@ static void throwNPE() {
     interp_throw_exception("java/lang/NullPointerException");
 }
 
-static void throwAME() {
+static void throwAME(const char *msg) {
     DEBUG("****** AbstractMethodError ******\n");
-    interp_throw_exception("java/lang/AbstractMethodError");
+    interp_throw_exception("java/lang/AbstractMethodError", msg);
 }
 
-static void throwIAE() {
+static void throwIAE(const char *msg) {
     DEBUG("****** IllegalAccessError ******\n");
-    interp_throw_exception("java/lang/IllegalAccessError");
+    interp_throw_exception("java/lang/IllegalAccessError", msg);
 }
 
 static inline void
@@ -711,21 +713,21 @@ Opcode_D2I(StackFrame& frame) {
     Value2 arg;
     Value res;
     arg = frame.stack.getLong(0);
-    if (arg.d < 2147483647.) {
-        if (arg.d > -2147483648.) {
-            res.i = (int32) arg.d;
+
+    int64 val = arg.i64;
+    int64 exponent = val & ((int64)0x7FF << 52);
+    int64 max_exp = ((int64)0x3FF + 31) << 52;
+
+    if (exponent < max_exp) {
+        res.i = (int) arg.d;
+    } else {
+        if (arg.d > 0) {
+            res.i = (int32)2147483647;
         } else {
             res.i = (int32)2147483648u;
         }
-    } else {
-        if (arg.d >= 2147483647.) {
-            // +inf
-            res.i = (int32)2147483647;
-        } else {
-            // nan
-            res.i = 0;
-        }
     }
+
     frame.stack.pop();
     frame.stack.pick() = res;
     frame.ip++;
@@ -735,19 +737,17 @@ static inline void
 Opcode_F2I(StackFrame& frame) {
     Value& arg = frame.stack.pick(0);
 
-    if (arg.f < 2147483647.f) {
-        if (arg.f > -2147483648.f) {
-            arg.i = (int32) arg.f;
-        } else {
-            arg.i = (int32)2147483648u;
-        }
+    int val = arg.i;
+    int exponent = val & (0xFF << 23);
+    int max_exp = (0x7F + 31) << 23;
+
+    if (exponent < max_exp) {
+        arg.i = (int32) arg.f;
     } else {
-        if (arg.f >= 2147483647.f) {
-            // +inf
+        if (arg.f > 0) {
             arg.i = (int32)2147483647;
         } else {
-            // nan
-            arg.i = 0;
+            arg.i = (int32)2147483648u;
         }
     }
     frame.ip++;
@@ -758,21 +758,21 @@ Opcode_D2L(StackFrame& frame) {
     Value2 arg;
     Value2 res;
     arg = frame.stack.getLong(0);
-    if (arg.d <= 4611686018427387903.) {
-        if (arg.d >= -4611686018427387904.) {
-            res.i64 = (int64) arg.d;
+
+    int64 val = arg.i64;
+    int64 exponent = val & ((int64)0x7FF << 52);
+    int64 max_exp = ((int64)0x3FF + 63) << 52;
+
+    if (exponent < max_exp) {
+        res.i64 = (int64) arg.d;
+    } else {
+        if (arg.d > 0) {
+            res.i64 = (int64)(((uint64)(int64)-1) >> 1); // 7FFFF......
         } else {
             res.i64 = ((int64)-1) << 63; // 80000......
         }
-    } else {
-        if (arg.d > 4611686018427387903.) {
-            // +inf
-            res.i64 = -((((int64)-1) << 63) + 1); // 7FFFF.....
-        } else {
-            // nan
-            res.i64 = 0;
-        }
     }
+
     frame.stack.setLong(0, res);
     frame.ip++;
 }
@@ -782,21 +782,21 @@ Opcode_F2L(StackFrame& frame) {
     Value arg;
     Value2 res;
     arg = frame.stack.pick(0);
-    if (arg.f <= 4611686018427387903.) {
-        if (arg.f >= -4611686018427387904.) {
-            res.i64 = (int64) arg.f;
+
+    int val = arg.i;
+    int exponent = val & (0xFF << 23);
+    int max_exp = (0x7F + 63) << 23;
+
+    if (exponent < max_exp) {
+        res.i64 = (int64) arg.f;
+    } else {
+        if (arg.f > 0) {
+            res.i64 = (int64)(((uint64)(int64)-1) >> 1); // 7FFFF......
         } else {
             res.i64 = ((int64)-1) << 63; // 80000......
         }
-    } else {
-        if (arg.f > 4611686018427387903.) {
-            // +inf
-            res.i64 = -((((int64)-1) << 63) + 1); // 7FFFF.....
-        } else {
-            // nan
-            res.i64 = 0;
-        }
     }
+
     frame.stack.push();
     frame.stack.setLong(0, res);
     frame.ip++;
@@ -979,7 +979,7 @@ ldc(StackFrame& frame, uint32 index) {
         // FIXME: only compressed references
         frame.stack.pick().cr = COMPRESS_REF(vm_instantiate_cp_string_resolved(str));
         frame.stack.ref() = FLAG_OBJECT;
-        return !exn_raised();
+        return !check_current_thread_exception();
     } 
     else if (cp_is_class(cp, index)) 
     {
@@ -1071,7 +1071,7 @@ Opcode_NEWARRAY(StackFrame& frame) {
     }
 
     Vector_Handle array  = vm_new_vector_primitive(clazz,length);
-    if (exn_raised()) { 
+    if (check_current_thread_exception()) {
         // OutOfMemoryError occured
         return;
     }
@@ -1102,7 +1102,7 @@ Opcode_ANEWARRAY(StackFrame& frame) {
 
 
     Vector_Handle array = vm_new_vector(arrayClass, length);
-    if (exn_raised()) { 
+    if (check_current_thread_exception()) {
         // OutOfMemoryError occured
         return;
     }
@@ -1154,7 +1154,7 @@ allocDimensions(StackFrame& frame, Class *arrayClass, int depth) {
 
     // init root element
     ManagedObject* array = (ManagedObject*) vm_new_vector(clss[0], length[0]);
-    if (exn_raised()) { 
+    if (check_current_thread_exception()) {
         // OutOfMemoryError occured
         return false;
     }
@@ -1166,7 +1166,7 @@ allocDimensions(StackFrame& frame, Class *arrayClass, int depth) {
     // allocation dimensions
     while(true) {
         ManagedObject *element = (ManagedObject*) vm_new_vector(clss[d], length[d]);
-        if (exn_raised()) { 
+        if (check_current_thread_exception()) {
             // OutOfMemoryError occured
             return false;
         }
@@ -1231,13 +1231,13 @@ Opcode_NEW(StackFrame& frame) {
 
     class_initialize(objClass);
 
-    if (exn_raised()) {
+    if (check_current_thread_exception()) {
         return;
     }
 
     ManagedObject *obj = class_alloc_new_object(objClass);
 
-    if (exn_raised()) {
+    if (check_current_thread_exception()) {
         // OutOfMemoryError occured
         return;
     }
@@ -1589,19 +1589,27 @@ static inline void
 Opcode_PUTSTATIC(StackFrame& frame) {
     uint32 fieldId = read_uint16(frame.ip + 1);
     Class *clazz = frame.method->get_class();
-    
+
     Field *field = interp_resolve_static_field(clazz, fieldId, true);
     if (!field) return; // exception
-    
+
+    // FIXME: is it possible to move the code into !cp_is_resolved condition above?
     class_initialize(field->get_class());
 
-    if (exn_raised()) {
+    if (check_current_thread_exception()) {
         return;
     }
 
+    if (interpreter_ti_notification_mode
+            & INTERPRETER_TI_FIELD_MODIFICATION) {
+        Method *method = frame.method;
+        putstatic_callback(field, frame);
+    }
+
+
     if (field->is_final()) {
         if (frame.method->get_class()->state != ST_Initializing) {
-            throwIAE();
+            throwIAE(field_get_name(field));
             return;
         }
     }
@@ -1680,10 +1688,17 @@ Opcode_GETSTATIC(StackFrame& frame) {
     Field *field = interp_resolve_static_field(clazz, fieldId, false);
     if (!field) return; // exception
 
+    // FIXME: is it possible to move the code into !cp_is_resolved condition above?
     class_initialize(field->get_class());
 
-    if (exn_raised()) {
+    if (check_current_thread_exception()) {
         return;
+    }
+
+    if (interpreter_ti_notification_mode
+            & INTERPRETER_TI_FIELD_ACCESS) {
+        Method *method = frame.method;
+        getstatic_callback(field, frame);
     }
 
     void *addr = field->get_address();
@@ -1752,9 +1767,15 @@ Opcode_PUTFIELD(StackFrame& frame) {
     Field *field = interp_resolve_nonstatic_field(clazz, fieldId, true);
     if (!field) return; // exception
     
+    if (interpreter_ti_notification_mode
+            & INTERPRETER_TI_FIELD_MODIFICATION) {
+        Method *method = frame.method;
+        putfield_callback(field, frame);
+    }
+
     if (field->is_final()) {
         if (!frame.method->is_init()) {
-            throwIAE();
+            throwIAE(field_get_name(field));
             return;
         }
     }
@@ -1915,6 +1936,12 @@ Opcode_GETFIELD(StackFrame& frame) {
     Field *field = interp_resolve_nonstatic_field(clazz, fieldId, false);
     if (!field) return; // exception
 
+    if (interpreter_ti_notification_mode
+            & INTERPRETER_TI_FIELD_ACCESS) {
+        Method *method = frame.method;
+        getfield_callback(field, frame);
+    }
+
     CREF cref = frame.stack.pick(0).cr;
     if (cref == 0) {
         throwNPE();
@@ -2036,9 +2063,10 @@ Opcode_INVOKESTATIC(StackFrame& frame) {
             << method->get_name()->bytes << "/"
             << method->get_descriptor()->bytes << endl);
 
+    // FIXME: is it possible to move the code into !cp_is_resolved condition above?
     class_initialize(method->get_class());
 
-    if (exn_raised()) {
+    if (check_current_thread_exception()) {
         return;
     }
 
@@ -2225,7 +2253,7 @@ Opcode_MONITOREXIT(StackFrame& frame) {
     vm_monitor_exit_wrapper(UNCOMPRESS_REF(cr));
     M2N_FREE_MACRO;
 
-    if (get_current_thread_exception())
+    if (check_current_thread_exception())
         return;
     
     MonitorList *ml = frame.locked_monitors;
@@ -2262,7 +2290,7 @@ Opcode_ATHROW(StackFrame& frame) {
 
 bool
 findExceptionHandler(StackFrame& frame, ManagedObject **exception, Handler **hh) {
-    assert(!exn_raised());
+    assert(!check_current_thread_exception());
     assert(!hythread_is_suspend_enabled());
 
     Method *m = frame.method;
@@ -2299,8 +2327,6 @@ findExceptionHandler(StackFrame& frame, ManagedObject **exception, Handler **hh)
 
             if (!obj) {
                 // possible if verifier is disabled
-                frame.exception = get_current_thread_exception();
-                clear_current_thread_exception();
                 return false;
             }
 
@@ -2324,6 +2350,28 @@ processExceptionHandler(StackFrame& frame, ManagedObject **exception) {
     }
     return false;
 }
+
+void 
+findCatchMethod(ManagedObject **exception, Method **catch_method, jlocation *catch_location) {
+    StackFrame *frame = getLastStackFrame();
+    *catch_method = NULL;
+    *catch_location = 0;
+
+    for(StackFrame *frame = getLastStackFrame(); frame; frame = frame->prev) {
+        Method *method = frame->method;
+        if (method->is_native()) continue;
+
+        Handler *h;
+
+        if(findExceptionHandler(*frame, exception, &h)) {
+            *catch_method = frame->method;
+            *catch_location = frame->ip - (uint8*)(*catch_method)->get_byte_code_addr();
+            return;
+        }
+        clear_current_thread_exception();
+    }
+}
+
 
 static inline void
 stackDump(StackFrame& frame) {
@@ -2404,15 +2452,13 @@ void
 method_exit_callback_with_frame(Method *method, StackFrame& frame) {
     NativeObjectHandles handles;
     
-    bool exc = exn_raised();
+    bool exc = check_current_thread_exception();
     jvalue val;
 
     val.j = 0;
 
     if (exc) {
-        hythread_suspend_enable();
         method_exit_callback(method, true, val);
-        hythread_suspend_disable();
         return;
     }
 
@@ -2463,7 +2509,7 @@ interpreter(StackFrame &frame) {
             << frame.method->get_descriptor()->bytes << endl);
 
     M2N_ALLOC_MACRO;
-    assert(!exn_raised());
+    assert(!check_current_thread_exception());
     assert(!hythread_is_suspend_enabled());
     
     uint8 *first = (uint8*) get_thread_ptr()->firstFrame;
@@ -2481,16 +2527,15 @@ interpreter(StackFrame &frame) {
         }
     }
 
+    frame.ip = (uint8*) frame.method->get_byte_code_addr();
+
     if (interpreter_ti_notification_mode
             & INTERPRETER_TI_METHOD_ENTRY_EVENT) {
         M2N_ALLOC_MACRO;
-        hythread_suspend_enable();
         method_entry_callback(frame.method);
-        hythread_suspend_disable();
         M2N_FREE_MACRO;
     }
 
-    frame.ip = (uint8*) frame.method->get_byte_code_addr();
     if (frame.method->is_synchronized()) {
         MonitorList *ml = (MonitorList*) ALLOC_FRAME(sizeof(MonitorList));
         frame.locked_monitors = ml;
@@ -2505,7 +2550,6 @@ interpreter(StackFrame &frame) {
     }
 
     while (true) {
-        ManagedObject *exc;
         uint8 ip0 = *frame.ip;
 
         DEBUG_BYTECODE(endl << "(" << frame.stack.getIndex()
@@ -2525,6 +2569,11 @@ restart:
                     & INTERPRETER_TI_SINGLE_STEP_EVENT) {
                 single_step_callback(frame);
             }
+            assert(!exn_raised());
+            if (get_thread_ptr()->p_exception_object_ti) {
+                frame.exc = get_current_thread_exception();
+                goto got_exception;
+            }
         }
 
 #ifdef INTERPRETER_DEEP_DEBUG
@@ -2532,6 +2581,8 @@ restart:
 #endif
 
         assert(!hythread_is_suspend_enabled());
+        assert(&frame == getLastStackFrame());
+        assert(!exn_raised());
         switch(ip0) {
             case OPCODE_NOP:
                 Opcode_NOP(frame); break;
@@ -2711,7 +2762,7 @@ restart:
 
             case OPCODE_ATHROW:
                                 Opcode_ATHROW(frame);
-                                exc = get_current_thread_exception();
+                                frame.exc = get_current_thread_exception();
                                 goto got_exception;
 
             case OPCODE_MONITORENTER:
@@ -2726,8 +2777,8 @@ restart:
                                     new_ml->monitor = NULL;
                                     frame.locked_monitors = new_ml;
                                     Opcode_MONITORENTER(frame);
-                                    exc = get_current_thread_exception();
-                                    if (exc != 0) {
+                                    frame.exc = get_current_thread_exception();
+                                    if (frame.exc != 0) {
                                         frame.locked_monitors = new_ml->next;
                                         new_ml->next = frame.free_monitors;
                                         frame.free_monitors = new_ml;
@@ -2781,29 +2832,29 @@ restart:
                                 goto check_exception;
             case OPCODE_INVOKESTATIC:
                                 Opcode_INVOKESTATIC(frame);
-                                exc = get_current_thread_exception();
-                                if (exc != 0) goto got_exception;
+                                frame.exc = get_current_thread_exception();
+                                if (frame.exc != 0) goto got_exception;
                                 frame.ip += 3;
                                 break;
 
             case OPCODE_INVOKESPECIAL:
                                 Opcode_INVOKESPECIAL(frame);
-                                exc = get_current_thread_exception();
-                                if (exc != 0) goto got_exception;
+                                frame.exc = get_current_thread_exception();
+                                if (frame.exc != 0) goto got_exception;
                                 frame.ip += 3;
                                 break;
 
             case OPCODE_INVOKEVIRTUAL:
                                 Opcode_INVOKEVIRTUAL(frame);
-                                exc = get_current_thread_exception();
-                                if (exc != 0) goto got_exception;
+                                frame.exc = get_current_thread_exception();
+                                if (frame.exc != 0) goto got_exception;
                                 frame.ip += 3;
                                 break;
 
             case OPCODE_INVOKEINTERFACE:
                                 Opcode_INVOKEINTERFACE(frame);
-                                exc = get_current_thread_exception();
-                                if (exc != 0) goto got_exception;
+                                frame.exc = get_current_thread_exception();
+                                if (frame.exc != 0) goto got_exception;
                                 frame.ip += 5;
                                 break;
 
@@ -2886,43 +2937,67 @@ restart:
                      stackDump(frame);
                      ABORT("Unexpected bytecode");
         }
+        assert(&frame == getLastStackFrame());
         continue;
 
 check_exception:
-        exc = get_current_thread_exception();
-        if (exc == 0) continue;
+        frame.exc = get_current_thread_exception();
+        if (frame.exc == 0) continue;
 got_exception:
-        if (get_thread_ptr()->ti_exception_callback_pending) {
-
-            assert(exn_raised());
-            assert(!hythread_is_suspend_enabled());
-            jvmti_interpreter_exception_event_callback_call();
-            assert(!hythread_is_suspend_enabled());
-
-            exc = get_current_thread_exception();
-
-            // is exception cleared in JVMTI?
-            if (!exc) continue;
-        }
-
-        frame.exception = exc;
+        assert(&frame == getLastStackFrame());
         clear_current_thread_exception();
 
-        if (processExceptionHandler(frame, &frame.exception)) {
+        if (interpreter_ti_notification_mode) {
+            frame.exc_catch = (ManagedObject*) get_thread_ptr()->p_exception_object_ti;
+            p_TLS_vmthread->p_exception_object_ti = NULL;
+
+            if (frame.exc != frame.exc_catch) {
+
+                Method *method = frame.method;
+                jlocation loc = frame.ip - method->get_byte_code_addr();
+
+                if (frame.exc_catch != NULL) {
+
+                    // EXCEPTION_CATCH should be generated for frame.exc_catch
+                    jvmti_interpreter_exception_catch_event_callback_call(
+                            frame.exc_catch, method, loc);
+
+                    assert(!exn_raised());
+
+                    // event is sent
+                    frame.exc_catch = NULL;
+
+                    // if no pending exception continue execution
+                    if (frame.exc == NULL) continue;
+                }
+
+                // EXCEPTION event to be generated
+                assert(frame.exc);
+                Method *catch_method;
+                jlocation catch_location;
+                findCatchMethod(&frame.exc, &catch_method, &catch_location);
+                jvmti_interpreter_exception_event_callback_call(frame.exc, method, loc, catch_method, catch_location);
+                assert(!exn_raised());
+                p_TLS_vmthread->p_exception_object_ti = (volatile ManagedObject*) frame.exc;
+            }
+        }
+
+        if (processExceptionHandler(frame, &frame.exc)) {
             frame.stack.clear();
             frame.stack.push();
-            frame.stack.pick().cr = COMPRESS_REF(frame.exception);
+            frame.stack.pick().cr = COMPRESS_REF(frame.exc);
             frame.stack.ref() = FLAG_OBJECT;
-            frame.exception = 0;
+            frame.exc = NULL;
             continue;
         }
-        set_current_thread_exception(frame.exception);
-        p_TLS_vmthread->ti_exception_callback_pending = false;
+
+        set_current_thread_exception(frame.exc);
         
         if (frame.locked_monitors) {
             vm_monitor_exit_wrapper(frame.locked_monitors->monitor);
             assert(!frame.locked_monitors->next);
         }
+
         DEBUG_TRACE("<EXCEPTION> ");
         if (interpreter_ti_notification_mode
                 & INTERPRETER_TI_METHOD_EXIT_EVENT)
@@ -2930,6 +3005,7 @@ got_exception:
 
         if (frame.framePopListener)
             frame_pop_callback(frame.framePopListener, frame.method, true);
+
         M2N_FREE_MACRO;
         assert(!hythread_is_suspend_enabled());
         return;
@@ -3063,7 +3139,7 @@ interpreter_execute_method(
         resultPtr->l = 0; //clear it  
     }
                                                      
-    if (exn_raised()) {
+    if (check_current_thread_exception()) {
         setLastStackFrame(frame.prev);
         DEBUG_TRACE("<EXCEPTION> interpreter_invoke }}}\n");
         return;
@@ -3167,7 +3243,7 @@ interpreterInvokeStatic(StackFrame& prevFrame, Method *method) {
 
     prevFrame.stack.popClearRef(args);
 
-    if (exn_raised()) {
+    if (check_current_thread_exception()) {
         setLastStackFrame(frame.prev);
         DEBUG_TRACE("<EXCEPTION> invoke_static }}}\n");
         return;
@@ -3256,7 +3332,7 @@ interpreterInvoke(StackFrame& prevFrame, Method *method, int args, ManagedObject
 
     prevFrame.stack.popClearRef(args);
 
-    if (exn_raised()) {
+    if (check_current_thread_exception()) {
         setLastStackFrame(frame.prev);
         return;
     }
@@ -3315,7 +3391,10 @@ interpreterInvokeVirtual(StackFrame& prevFrame, Method *method) {
     method = objClass->vtable_descriptors[method->get_index()];
 
     if (method->is_abstract()) {
-        throwAME();
+        ostringstream str;
+        str << class_get_name(method_get_class(method)) << "." <<
+            method_get_name(method) << method_get_descriptor(method);
+        throwAME(str.str().c_str());
         return;
     }
 
@@ -3359,12 +3438,18 @@ interpreterInvokeInterface(StackFrame& prevFrame, Method *method) {
     method = found_method;
 
     if (method->is_abstract()) {
-        throwAME();
+        ostringstream str;
+        str << class_get_name(method_get_class(method)) << "." <<
+            method_get_name(method) << method_get_descriptor(method);
+        throwAME(str.str().c_str());
         return;
     }
 
     if (!method->is_public()) {
-        throwIAE();
+        ostringstream str;
+        str << class_get_name(method_get_class(method)) << "." <<
+            method_get_name(method) << method_get_descriptor(method);
+        throwIAE(str.str().c_str());
         return;
     }
 
@@ -3390,7 +3475,10 @@ interpreterInvokeSpecial(StackFrame& prevFrame, Method *method) {
     }
 
     if (method->is_abstract()) {
-        throwAME();
+        ostringstream str;
+        str << class_get_name(method_get_class(method)) << "." <<
+            method_get_name(method) << method_get_descriptor(method);
+        throwAME(str.str().c_str());
         return;
     }
 
@@ -3441,7 +3529,7 @@ interpreterInvokeSpecial(StackFrame& prevFrame, Method *method) {
 
     prevFrame.stack.popClearRef(args);
 
-    if (exn_raised()) {
+    if (check_current_thread_exception()) {
         setLastStackFrame(frame.prev);
         DEBUG_TRACE("<EXCEPTION> invoke_special }}}\n");
         return;

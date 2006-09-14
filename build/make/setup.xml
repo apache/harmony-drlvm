@@ -90,7 +90,8 @@ Version: $Revision: 1.5.2.33 $
                                                       download.remote.files,
                                                       unzip.resources,
                                                       check.unzipped.externals,
-                                                      copy.nessessary.jars">
+                                                      copy.nessessary.jars,
+                                                      apply.patches">
     </target>
 
 
@@ -106,6 +107,8 @@ Version: $Revision: 1.5.2.33 $
         <property name="ECLIPSE.check.file" value="plugins/org.eclipse.jdt.core_3.1.1.jar" />
         <property name="XALAN.check.file" value="xalan.jar" />
         <property name="VM.check.file" value="vmcore/src/init/vm_main.cpp" />
+		<property name="ANTLR.check.file" value="antlr-2.7.5.jar" />
+        <property name="PATCHES.check.file" value="README.txt" />
     </target>
 
 
@@ -191,7 +194,7 @@ Version: $Revision: 1.5.2.33 $
 
 
     <target name="setup.resources" depends="plugin.antcontrib">
-        <property name="common.resources" value="LOG4CXX,HYPLUGIN,CPPTASKS,XALAN,VM" />
+        <property name="common.resources" value="LOG4CXX,HYPLUGIN,CPPTASKS,XALAN,VM,ANTLR,PATCHES" />
         <property name="build.resources" value="CPPTASKS,ECLIPSE" />
         <if>
             <isset property="if.lnx" />
@@ -337,12 +340,14 @@ Version: $Revision: 1.5.2.33 $
         <property name="jars.checked" value="true" />
     </target>
 
-    <target name="apply.patches" depends="plugin.antcontrib,
-                                          check.ant.version,
-                                          download.remote.files,
-                                          unzip.resources,
-                                          check.unzipped.externals,
-                                          generate.internal.variables">
+    <target name="apply.patches" depends="get.antcontrib, 
+                                                      plugin.antcontrib,
+                                                      check.ant.version,
+                                                      download.remote.files,
+                                                      unzip.resources,
+                                                      check.unzipped.externals,
+                                                      copy.nessessary.jars,
+                                                      generate.internal.variables">
         <for param="resource" list="${os.resources}" delimiter=",">
             <sequential>
                 <if>

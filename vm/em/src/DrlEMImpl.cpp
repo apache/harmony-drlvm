@@ -21,6 +21,7 @@
 #include "DrlEMImpl.h"
 
 #include "EBProfileCollector.h"
+#include "EdgeProfileCollector.h"
 
 #include "jit_import.h"
 #include "em_intf.h"
@@ -34,9 +35,13 @@
 #include <fstream>
 
 
-#define DEFAULT_JIT_DLL "jitrino"
 #define DEFAULT_INTERPRETER_DLL "interpreter"
 #define LOG_DOMAIN "em"
+
+#define EDGE_PROFILER_STR  "EDGE_PROFILER"
+#define ENTRY_BACKEDGE_PROFILER_STR  "EB_PROFILER"
+
+#define EM_CONFIG_EXT std::string(".emconf")
 
 DrlEMImpl* DrlEMFactory::emInstance = NULL;
 
@@ -67,8 +72,7 @@ void DrlEMFactory::deinitEMInstance() {
 static EM_PCTYPE get_pc_type(EM_Handle _this, PC_Handle pc) {
     assert(_this!=NULL);
     assert(pc!=NULL);
-    assert(((ProfileCollector*)pc)->type == EM_PCTYPE_ENTRY_BACKEDGE);
-    return EM_PCTYPE_ENTRY_BACKEDGE;
+    return ((ProfileCollector*)pc)->type;
 }
 
 static PC_Handle get_pc(EM_Handle _this,  EM_PCTYPE profile_type,  JIT_Handle jh,  EM_JIT_PC_Role jit_role) {
@@ -96,14 +100,13 @@ RStep::RStep(JIT_Handle _jit, const std::string& _jitName, RChain* _chain)
 
 
 //todo!! replace inlined strings with defines!!
-DrlEMImpl::DrlEMImpl() : jh(NULL), _execute_method(NULL), interpreterMode(false) {
+DrlEMImpl::DrlEMImpl() : jh(NULL), _execute_method(NULL), 
+        interpreterMode(false), jitTiMode(false) {
     nMethodsCompiled=0;
     nMethodsRecompiled=0;
     tick=0;
     hymutex_create(&recompilationLock, TM_MUTEX_NESTED);
-#ifndef _EM64T_
     initProfileAccess();
-#endif
 }
 
 DrlEMImpl::~DrlEMImpl() {
@@ -124,7 +127,20 @@ void DrlEMImpl::initProfileAccess() {
     profileAccessInterface.eb_profiler_get_entry_threshold = eb_profiler_get_entry_threshold;
     profileAccessInterface.eb_profiler_sync_mode_callback = (void (*)(Method_Profile_Handle))vm_create_helper_for_function((void *(*)(void *))eb_profiler_sync_mode_callback);
     profileAccessInterface.eb_profiler_get_backedge_threshold = eb_profiler_get_backedge_threshold;
+
+    
+    //EDGE profile
+    profileAccessInterface.edge_profiler_create_profile = edge_profiler_create_profile;
+    profileAccessInterface.edge_profiler_get_num_counters = edge_profiler_get_num_counters;
+    profileAccessInterface.edge_profiler_get_checksum = edge_profiler_get_checksum;
+    profileAccessInterface.edge_profiler_get_counter_addr = edge_profiler_get_counter_addr;
+    profileAccessInterface.edge_profiler_get_entry_counter_addr = edge_profiler_get_entry_counter_addr;
+    profileAccessInterface.edge_profiler_get_entry_threshold = edge_profiler_get_entry_threshold;
+    profileAccessInterface.edge_profiler_get_backedge_threshold = edge_profiler_get_backedge_threshold;
+    
+    return;
 }
+
 
 
 void DrlEMImpl::deallocateResources() {
@@ -151,7 +167,9 @@ void DrlEMImpl::deallocateResources() {
 //_____________________________________________________________________
 // Reading and parsing configuration
 
-
+/*
+ *  deprecated
+ */
 std::string buildDefaultLibPath(const std::string& dll_name) {
     std::string library_path = vm_get_property_value("vm.boot.library.path");
 #ifdef PLATFORM_NT
@@ -175,6 +193,43 @@ std::string buildDefaultLibPath(const std::string& dll_name) {
 #endif
     return fullPath;
 }
+
+
+static bool endsWith(const std::string& str, const std::string& suffix) {
+    if (str.length() < suffix.length()) {
+        return false;
+    }
+    return std::equal(suffix.rbegin(), suffix.rend(), str.rbegin());
+}
+
+std::string prepareLibPath(const std::string& origPath) {
+#ifdef PLATFORM_NT
+    std::string separator("\\"), libPrefix(""), libSuffix(".dll");
+#else
+    std::string separator("/"), libPrefix("lib"), libSuffix(".so");
+#endif
+
+    std::string path = origPath;
+    if (path.find('/') == path.npos && path.find('\\') == path.npos ) {
+// $$$ GMJ        std::string dir = vm_get_property_value("vm.boot.library.path");
+        std::string dir = vm_get_property_value("org.apache.harmony.vm.vmdir");
+        if (libPrefix.length() > 0 && !startsWith(path, libPrefix)) {
+            path = libPrefix + path;
+        }
+        
+        if (!dir.empty()) {
+            path = dir + separator + path;
+        }
+    }
+    if (!endsWith(path, libSuffix)) {
+        path+=libSuffix;
+    }
+    
+    TRACE2("init",  path.c_str()); 
+    return path;
+  }
+
+
 
 static std::string getParam(const std::string& config, const std::string& name) {
     std::istringstream is(config);
@@ -227,95 +282,53 @@ static StringList getAllParamsAsList(const std::string& config, const std::strin
     return res;
 }
 
-static std::string single2Chain(const string& pathToDll, const std::string& jitName) {
-    return "chains=chain1\nchain1.jits="+jitName+"\n"+jitName+".file="+pathToDll+"\n";
-}
 
-static std::string dpgo2Chain(const string& pathToDll, bool async) {
-    std::string res = std::string("chains=chain1,chain2\n")
-        +"chain1.jits=JET_CLINIT\n"
-        +"chain2.jits=JET_DPGO,OPT\n"
-
-        +"chain1.filter=+::<clinit>\n"
-        +"chain1.filter=-\n"
-
-        +"JET_CLINIT.file="+pathToDll+"\n"
-        +"JET_DPGO.file="+pathToDll+"\n"
-        +"OPT.file="+pathToDll+"\n"
-
-        +"JET_DPGO.genProfile=JET_DPGO_PROFILE\n"
-        +"JET_DPGO_PROFILE.profilerType=ENTRY_BACKEDGE_PROFILER\n"
-        +"OPT.useProfile=JET_DPGO_PROFILE\n"
-
-        +"JET_DPGO_PROFILE.mode="+(async ? "ASYNC" : "SYNC")+"\n"
-        +"JET_DPGO_PROFILE.entryThreshold=10000\n"
-        +"JET_DPGO_PROFILE.backedgeThreshold=100000\n"
-        +"JET_DPGO_PROFILE.tbsTimeout=5\n"
-        +"JET_DPGO_PROFILE.tbsInitialTimeout=0\n";
-
-    return res;
-}
-
-static std::string readEMConfiguration() {
-    std::string prop = vm_get_property_value("em.properties");
+static std::string readFile(const std::string& fileName) {
     std::string config;
-    bool isJet=false, isOpt = false;
-    if (prop.empty()) {
-#ifdef _IPF_
-        config = single2Chain(buildDefaultLibPath(std::string(DEFAULT_JIT_DLL)), std::string("JIT"));
-#else
-        config = dpgo2Chain(buildDefaultLibPath(std::string(DEFAULT_JIT_DLL)), false);
-//        config = single2Chain(buildDefaultLibPath(std::string(DEFAULT_JIT_DLL)), std::string("JIT"));
-#endif
-    } else if (startsWith(prop, "single:") 
-        || (isOpt = startsWith(prop, "opt:") || prop == "opt") 
-        || (isJet = startsWith(prop, "jet:") || prop == "jet")) {
-        
-        if (isJet) {
-            prop = std::string("single:")+ "JET:" + (prop.length() > 4 ? prop.substr(4) : std::string(""));
-        } else  if (isOpt) {
-            prop = std::string("single:")+ "OPT:" + (prop.length() > 4 ? prop.substr(4) : std::string(""));
+    std::ifstream configFile;
+    configFile.open(fileName.c_str(), std::ios::in);
+    bool rc = false;
+    if (configFile.is_open()) {
+        std::string line;
+        size_t idx = std::string::npos;
+        while (getline(configFile, line)) {
+            if (startsWith(line, "#")) {
+                continue;
+            } else if (startsWith(line, "-D") && (idx = line.find('=')) != std::string::npos) {
+                std::string name = line.substr(2, idx-2);                   
+                std::string value = line.substr(idx+1);
+                const char* old_value = vm_get_property_value(name.c_str());
+                if (old_value == NULL || *old_value == 0) {
+                    vm_properties_set_value(name.c_str(), value.c_str());
+                }
+                continue;
+            } 
+            config+=line + "\n";
         }
-        std::string jitName, fileName;
-        size_t jitNameStartIdx = strlen("single:");
-        size_t jitNameEndIdx = prop.find(':', jitNameStartIdx);
-        if (jitNameEndIdx!=std::string::npos) {
-            jitName = prop.substr(jitNameStartIdx, jitNameEndIdx - jitNameStartIdx);
-            fileName = prop.substr(jitNameEndIdx+1);
-        } 
-        if (fileName.empty()) {
-            fileName = buildDefaultLibPath(std::string(DEFAULT_JIT_DLL));
-        }
-        config = single2Chain(fileName, jitName);
-    } else if (startsWith(prop, "dpgo:")   || prop == "dpgo" 
-        || startsWith(prop, "dpgo_sync:")  || prop == "dpgo_sync" 
-        || startsWith(prop, "dpgo_async:") || prop == "dpgo_async" )
-    {
-        bool async = startsWith(prop, "dpgo_async");
-        std::string jitPath;
-        size_t colonPos = prop.find(':');
-        if (colonPos!= std::string::npos && prop.length() > colonPos) {
-            jitPath = prop.substr(colonPos+1);
-        } else {
-            jitPath = buildDefaultLibPath(DEFAULT_JIT_DLL);
-        }
-        config = dpgo2Chain(jitPath, async);
-    } else {
-        std::ifstream configFile;
-        configFile.open(prop.c_str(), std::ios::in);
-        bool rc = false;
-        if (configFile.is_open()) {
-            std::string line;
-            while (getline(configFile, line)) {
-                config+=line+"\n";
-            }
-            rc = !config.empty();
-        } 
-        if (!rc) {
-            std::string errMsg = "EM: Can't read configuration from '" + prop + "'";
-            ECHO(errMsg.c_str());
-        }
+        rc = !config.empty();
+    } 
+    if (!rc) {
+        std::string errMsg = "EM: Can't read configuration from '" + fileName+ "'";
+        ECHO(errMsg.c_str());
     }
+    return config;
+}
+
+std::string DrlEMImpl::readConfiguration() {
+    std::string  configFileName = vm_get_property_value("em.properties");
+    if (configFileName.empty()) {
+        configFileName = jitTiMode ? "ti" : "client";
+    } 
+        if (!endsWith(configFileName, EM_CONFIG_EXT)) {
+            configFileName = configFileName+EM_CONFIG_EXT;
+        }
+
+        if (configFileName.find('/') == configFileName.npos && configFileName.find('\\') == configFileName.npos ) {
+//  $$$ GMJ          std::string defaultConfigDir = vm_get_property_value("vm.boot.library.path");
+            std::string defaultConfigDir = vm_get_property_value("org.apache.harmony.vm.vmdir");
+            configFileName = defaultConfigDir + "/" + configFileName;
+        }
+    std::string config = readFile(configFileName);
     return config;
 }
 
@@ -324,9 +337,10 @@ static std::string readEMConfiguration() {
 
 bool DrlEMImpl::init() {
     interpreterMode = vm_get_boolean_property_value_with_default("vm.use_interpreter");
+    jitTiMode = vm_get_property_value_boolean("vm.jvmti.enabled", false);
     if (interpreterMode) {
         apr_dso_handle_t* libHandle;
-        std::string interpreterLib = buildDefaultLibPath(DEFAULT_INTERPRETER_DLL); 
+        std::string interpreterLib = prepareLibPath(DEFAULT_INTERPRETER_DLL); 
         jh = vm_load_jit(interpreterLib.c_str(), &libHandle);
 
         if (jh == NULL) {
@@ -345,7 +359,7 @@ bool DrlEMImpl::init() {
     }
     //normal mode with recompilation chains..
     _execute_method = JIT_execute_method_default;
-	std::string config = readEMConfiguration();
+    std::string config = readConfiguration();
     if (!config.empty()) {
         buildChains(config);
     }
@@ -382,6 +396,15 @@ bool DrlEMImpl::initJIT(const std::string& libName, apr_dso_handle_t* libHandle,
     return true;
 }
 
+std::string DrlEMImpl::getJITLibFromCmdLine(const std::string& jitName) const {
+    std::string propName = std::string("em.")+jitName+".jitPath";
+    std::string jitLib  = vm_get_property_value(propName.c_str());
+    if (jitLib.empty()) {
+        jitLib = vm_get_property_value("em.jitPath");
+    }
+    return jitLib;
+}
+
 void DrlEMImpl::buildChains(std::string& config) {
     bool loggingEnabled =  is_info_enabled(LOG_DOMAIN);
     StringList chainNames = getParamAsList(config, "chains", ',', true);
@@ -401,16 +424,20 @@ void DrlEMImpl::buildChains(std::string& config) {
         StringList jitsInChain= getParamAsList(config, chainName + ".jits", ',', true);
         for (StringList::const_iterator jitIt = jitsInChain.begin(), jitEnd = jitsInChain.end(); jitIt!=jitEnd; ++jitIt) {
             std::string jitName= *jitIt;
-            std::string libName = getParam(config, jitName+".file");
-            if (libName.empty()) {
-                ECHO(("EM: No JIT library specified for JIT :'"  + jitName+ "'").c_str());
+            std::string jitLib = getJITLibFromCmdLine(jitName);
+            if (jitLib.empty()) {
+                jitLib = getParam(config, jitName+".file");
+            } 
+            if (jitLib.empty()) {
+                ECHO(("EM: No JIT library specified for JIT :'"  + jitLib + "'").c_str());
                 failed = true;
                 break;
             }
+            std::string fullJitLibPath = prepareLibPath(jitLib);
             apr_dso_handle_t* libHandle;
-            JIT_Handle jh = vm_load_jit(libName.c_str(), &libHandle); //todo: do not load the same dll twice!!!
+            JIT_Handle jh = vm_load_jit(fullJitLibPath.c_str(), &libHandle); //todo: do not load the same dll twice!!!
             if (jh == NULL) {
-                ECHO(("EM: JIT library loading error:'"  + libName + "'").c_str());
+                ECHO(("EM: JIT library loading error:'"  + fullJitLibPath + "'").c_str());
                 failed = true;
                 break;
             }
@@ -418,7 +445,7 @@ void DrlEMImpl::buildChains(std::string& config) {
             step->loggingEnabled = loggingEnabled || is_info_enabled(step->catName.c_str());
             chain->steps.push_back(step);
 
-            if (!initJIT(libName, libHandle, *step)) {
+            if (!initJIT(fullJitLibPath, libHandle, *step)) {
                 failed = true;
                 break;
             }
@@ -529,12 +556,13 @@ ProfileCollector* DrlEMImpl::createProfileCollector(const std::string& profilerN
         return NULL;
     }    
     std::string profilerType = getParam(config, profilerName+".profilerType");
-    if (profilerType!="ENTRY_BACKEDGE_PROFILER") {
+    if (profilerType!=ENTRY_BACKEDGE_PROFILER_STR && profilerType!=EDGE_PROFILER_STR) {
         ECHO("EM: Unsupported profiler type");
         return NULL;
     }
     EBProfileCollector::EB_ProfilerMode ebMode = EBProfileCollector::EB_PCMODE_SYNC;
-    std::string mode = getParam(config, profilerName+".mode");
+    std::string mode = profilerType==EDGE_PROFILER_STR ? "ASYNC" : getParam(config, profilerName+".mode");
+    
     if (mode == "ASYNC") {
         ebMode = EBProfileCollector::EB_PCMODE_ASYNC;
     }  else if (mode!="SYNC") {
@@ -566,7 +594,11 @@ ProfileCollector* DrlEMImpl::createProfileCollector(const std::string& profilerN
             return NULL;
         }
     }
+    if (profilerType == EDGE_PROFILER_STR) {
+        pc = new EdgeProfileCollector(this, profilerName, step->jit, tbsInitialTimeout, tbsTimeout, eThreshold, bThreshold);
+    } else {
     pc = new EBProfileCollector(this, profilerName, step->jit, ebMode, eThreshold, bThreshold, tbsInitialTimeout, tbsTimeout);
+    }
     return pc;
 }
 
@@ -734,7 +766,7 @@ void DrlEMImpl::tbsTimeout() {
 
 
 int DrlEMImpl::getTbsTimeout() const {
-	return 100;
-}              
+    return 100;
+}   
 
- 
+

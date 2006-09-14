@@ -24,7 +24,6 @@ import java.util.ArrayList;
 /**
  * Try large object allocation after filling the heap with small objects.
  *
- * @keyword gc X_ipf_bug_5195
  */
 public class LOS extends Thread {
 

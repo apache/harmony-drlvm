@@ -13,10 +13,10 @@
  *  See the License for the specific language governing permissions and
  *  limitations under the License.
  */
-/** 
+/**
  *  @author Gregory Shimansky
  *  @version $Revision: 1.1.2.1.4.4 $
- */  
+ */
 
 #ifndef _JVMTI_INTF_H
 #define _JVMTI_INTF_H
@@ -41,6 +41,39 @@ void jvmti_method_enter_callback(Method_Handle method);
  * @param return_value - the return value of the method if method is not void
  */
 void jvmti_method_exit_callback(Method_Handle method, jvalue* return_value);
+
+/**
+ * Field access callback which is called from JITted code compiled with <field access> flag whenever
+ * access of field which has <field access mask> set occures.
+ * Garbage collector must be enabled.
+ * @param field - handle of the field under access
+ * @param method - handle of the method, which accesses field
+ * @param location - location of code which accesses field
+ * @param object - pointer to the reference of the object, which field is beeng
+ *      accessed or NULL for static field
+ */
+void jvmti_field_access_callback(Field_Handle field,
+                                       Method_Handle method,
+                                       jlocation location,
+                                       jobject* object);
+
+/**
+ * Field modification callback which is called from JITted code compiled with <field modification> flag whenever
+ * modification of field which has <field modification mask> set occures.
+ * Garbage collector must be enabled.
+ * @param field - handle of the field under modification
+ * @param method - handle of the method, which modifies field
+ * @param location - location of code which modifies field
+ * @param object - pointer to the reference of the object, which field is beeng
+ *      modified or NULL for static field
+ * @param new_value - pointer to the new value for the field
+ */
+void jvmti_field_modification_callback(Field_Handle field,
+                                       Method_Handle method,
+                                       jlocation location,
+                                       jobject* object,
+                                       jvalue* new_value);
+
 
 #ifdef __cplusplus
 }

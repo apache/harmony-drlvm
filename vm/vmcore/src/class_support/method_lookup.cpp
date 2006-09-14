@@ -176,14 +176,14 @@ CodeChunkInfo *Method_Lookup_Table::find(void *addr, bool is_ip_past)
         void *guess_end   = ((char *)guess->get_code_block_addr()) + guess->get_code_block_size();
         if ((addr >= guess_start) && (addr < guess_end)) {
 #ifdef VM_STATS
-            vm_stats_total.num_method_lookup_cache_hit++;
+            VM_Statistics::get_vm_stats().num_method_lookup_cache_hit++;
 #endif //VM_STATS
             return guess;
         }
     }
 #endif //USE_METHOD_LOOKUP_CACHE
 #ifdef VM_STATS
-    vm_stats_total.num_method_lookup_cache_miss++;
+    VM_Statistics::get_vm_stats().num_method_lookup_cache_miss++;
 #endif //VM_STATS
 
     p_meth_addr_table_lock->_lock();

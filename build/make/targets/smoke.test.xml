@@ -26,7 +26,9 @@ Version: $Revision: 1.4.2.11 $
             <isset property="smoke.test.javasrc" />
             <then>
                 <mkdir dir="${build.dir}/_smoke.tests/classes" />
-                <javac includeJavaRuntime="yes" srcdir="${smoke.test.javasrc}" compiler="org.eclipse.jdt.core.JDTCompilerAdapter" destdir="${build.dir}/_smoke.tests/classes">
+                <javac includeJavaRuntime="yes" srcdir="${smoke.test.javasrc}" 
+                destdir="${build.dir}/_smoke.tests/classes" 
+                target="${javac.target}" debug="${java.debug.option}">
                     <patternset refid="smoke.test.java.pattern" />
                     <bootclasspath>
                         <fileset dir="${java.home}" includes="**/*.jar" />

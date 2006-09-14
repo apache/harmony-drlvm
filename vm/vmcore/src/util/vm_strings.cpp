@@ -232,6 +232,7 @@ static void string_set_fields_separate(ManagedObject* str, unsigned length, unsi
 // Return: str gets the string object, buf points to buffer
 static void string_create(unsigned unicode_length, bool eight_bit, ManagedObject** str, StringBuffer* buf)
 {
+    ASSERT_RAISE_AREA;
     assert(!hythread_is_suspend_enabled());
 
     Global_Env *global_env = VM_Global_State::loader_env;
@@ -245,7 +246,7 @@ static void string_create(unsigned unicode_length, bool eight_bit, ManagedObject
     Vector_Handle array = gc_alloc(sz, clss->allocation_handle, vm_get_gc_thread_local());
     if (!array) { // OutOfMemory should be thrown
         *str = NULL;
-        exn_throw(VM_Global_State::loader_env->java_lang_OutOfMemoryError);
+        exn_raise_object(VM_Global_State::loader_env->java_lang_OutOfMemoryError);
         return;
     }
 #ifdef VM_STATS
@@ -282,6 +283,7 @@ static void string_create(unsigned unicode_length, bool eight_bit, ManagedObject
 // GC must be disabled, but at a GC safe point
 ManagedObject* string_create_from_utf8(const char* buf, unsigned length)
 {
+    ASSERT_RAISE_AREA;
     assert(buf && buf[length]=='\0');
     int unicode_length = get_unicode_length_of_utf8(buf);
     if (unicode_length < 0) // data error
@@ -311,6 +313,7 @@ static bool is_compressible_jchar_array(const uint16* unicodeChars, unsigned len
 // GC must be disabled, but at a GC safe point
 ManagedObject* string_create_from_unicode(const uint16* buf, unsigned length)
 {
+    ASSERT_RAISE_AREA;
     Global_Env *global_env = VM_Global_State::loader_env;
     bool compress = global_env->strings_are_compressed && is_compressible_jchar_array(buf, length);
     ManagedObject* str;
@@ -330,6 +333,7 @@ ManagedObject* string_create_from_unicode(const uint16* buf, unsigned length)
 
 ObjectHandle string_create_from_utf8_h(const char* buf, unsigned length)
 {
+    ASSERT_RAISE_AREA;
     assert(hythread_is_suspend_enabled());
     tmn_suspend_disable();
     ObjectHandle res = oh_allocate_local_handle();
@@ -340,6 +344,7 @@ ObjectHandle string_create_from_utf8_h(const char* buf, unsigned length)
 
 ObjectHandle string_create_from_unicode_h(const uint16* buf, unsigned length)
 {
+    ASSERT_RAISE_AREA;
     assert(hythread_is_suspend_enabled());
     tmn_suspend_disable();
     ObjectHandle res = oh_allocate_local_handle();
@@ -534,6 +539,7 @@ void string_get_utf8_region_h(ObjectHandle str, unsigned offset, unsigned count,
 VMEXPORT // temporary solution for interpreter unplug
 Java_java_lang_String *vm_instantiate_cp_string_resolved(String *str)
 {
+    ASSERT_RAISE_AREA;
     assert(!hythread_is_suspend_enabled());
     Global_Env *env = VM_Global_State::loader_env;
     if (env->compress_references) {
@@ -545,50 +551,14 @@ Java_java_lang_String *vm_instantiate_cp_string_resolved(String *str)
             return str->intern.raw_ref;
         }
     }
-
-    volatile Java_java_lang_String* lang_string = string_create_from_utf8(str->bytes, str->len);
-    if (!lang_string) { // if OutOfMemory
-        return NULL;
-    }
-    assert(!hythread_is_suspend_enabled());
-
-    // Atomically update the string structure since some other thread might be trying to make the same update.
-    // The GC won't be able to enumerate here since GC is disabled, so there are no race conditions with GC.
-    if (env->compress_references) {
-        COMPRESSED_REFERENCE compressed_lang_string = (COMPRESSED_REFERENCE)((POINTER_SIZE_INT)lang_string - (POINTER_SIZE_INT)Class::heap_base);
-        assert(is_compressed_reference(compressed_lang_string));     
-        assert(sizeof(LONG) == sizeof(uint32));
-        uint32 result = apr_atomic_cas32(
-            /*destination*/ (volatile uint32 *)&str->intern.compressed_ref, 
-            /*exchange*/    compressed_lang_string,  
-            /*comparand*/   0);    
-        if (result == 0) {
-            // Note the successful write of the object. 
-            gc_heap_write_global_slot_compressed((COMPRESSED_REFERENCE *)&str->intern.compressed_ref, (Managed_Object_Handle)lang_string);
-        }
-        // Some other thread may have beaten us to the slot.
-        lang_string = (volatile Java_java_lang_String *)uncompress_compressed_reference(str->intern.compressed_ref);
-    } else {
-        volatile void *result =
-            (volatile void *)apr_atomic_casptr(
-            /*destination*/ (volatile void **)&str->intern.raw_ref, 
-            /*exchange*/    (void *)lang_string, 
-            /*comparand*/   (void *)NULL);    
-        if (result == NULL) {
-            // Note the successful write of the object. 
-            gc_heap_write_global_slot((Managed_Object_Handle *)&str->intern.raw_ref, (Managed_Object_Handle)lang_string);
-        }
-        // Some other thread may have beaten us to the slot.
-        lang_string = str->intern.raw_ref;
-    }
-
-    return (Java_java_lang_String *)lang_string;
+    return env->string_pool.intern(str);
 } //vm_instantiate_cp_string_resolved
 
 // Interning of strings
 
 VMEXPORT jstring string_intern(JNIEnv *jenv, jobject jstr_obj)
 {
+    ASSERT_RAISE_AREA;
     jboolean is_copy;
     const char* val = jenv->GetStringUTFChars(jstr_obj, &is_copy);
     String* str = VM_Global_State::loader_env->string_pool.lookup(val);
@@ -601,8 +571,10 @@ VMEXPORT jstring string_intern(JNIEnv *jenv, jobject jstr_obj)
 
 jstring String_to_interned_jstring(String* str)
 {
+    ASSERT_RAISE_AREA;
     tmn_suspend_disable();
     Java_java_lang_String *jstr = vm_instantiate_cp_string_resolved(str);
+
     if (jstr == NULL) {
         tmn_suspend_enable();
         assert(exn_raised());
@@ -619,8 +591,9 @@ jstring String_to_interned_jstring(String* str)
 Java_java_lang_String *
 vm_instantiate_cp_string_slow(Class *c, unsigned cp_index)
 {
+    ASSERT_THROW_AREA;
 #ifdef VM_STATS
-    vm_stats_total.num_instantiate_cp_string_slow++;
+    VM_Statistics::get_vm_stats().num_instantiate_cp_string_slow++;
 #endif
 
     Java_java_lang_String *result;
@@ -629,7 +602,11 @@ vm_instantiate_cp_string_slow(Class *c, unsigned cp_index)
 
     String *str = cp[cp_index].CONSTANT_String.string;
     assert(cp_is_constant(cp, cp_index));
+
+    BEGIN_RAISE_AREA;
     result = vm_instantiate_cp_string_resolved(str);
+    END_RAISE_AREA;
+    exn_rethrow_if_pending();
 
     return result;
 } //vm_instantiate_cp_string_slow

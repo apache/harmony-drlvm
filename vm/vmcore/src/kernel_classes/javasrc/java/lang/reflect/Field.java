@@ -14,18 +14,151 @@
  *  limitations under the License.
  */
 /**
- * @author Evgueni Brevnov
+ * @author Evgueni Brevnov, Serguei S. Zapreyev, Alexey V. Varlamov
  * @version $Revision: 1.1.2.2.4.4 $
  */
 
 package java.lang.reflect;
 
+import static org.apache.harmony.vm.ClassFormat.ACC_ENUM;
+import static org.apache.harmony.vm.ClassFormat.ACC_SYNTHETIC;
+
+import java.lang.annotation.Annotation;
+
+import org.apache.harmony.lang.reflect.parser.InterimFieldGenericDecl;
+import org.apache.harmony.lang.reflect.parser.Parser;
+import org.apache.harmony.lang.reflect.parser.Parser.SignatureKind;
+import org.apache.harmony.lang.reflect.parser.InterimParameterizedType;
+import org.apache.harmony.lang.reflect.parser.InterimTypeVariable;
+import org.apache.harmony.lang.reflect.parser.InterimGenericArrayType;
+import org.apache.harmony.lang.reflect.parser.InterimGenericType;
+
+import org.apache.harmony.lang.reflect.repository.TypeVariableRepository;
+import org.apache.harmony.lang.reflect.repository.ParameterizedTypeRepository;
+
+import org.apache.harmony.lang.reflect.support.AuxiliaryFinder;
+import org.apache.harmony.lang.reflect.support.AuxiliaryCreator;
+import org.apache.harmony.lang.reflect.support.AuxiliaryChecker;
+import org.apache.harmony.lang.reflect.support.AuxiliaryUtil;
+
+import org.apache.harmony.lang.reflect.implementation.ParameterizedTypeImpl;
+
 import org.apache.harmony.vm.VMStack;
+import org.apache.harmony.vm.VMGenericsAndAnnotations;
 
 /**
- * @com.intel.drl.spec_ref 
- */
+* @com.intel.drl.spec_ref 
+*/
 public final class Field extends AccessibleObject implements Member {
+
+    /**
+    *  @com.intel.drl.spec_ref
+    */
+    public Annotation[] getDeclaredAnnotations() {
+        Annotation a[] = data.getAnnotations();
+        Annotation aa[] = new Annotation[a.length];
+        System.arraycopy(a, 0, aa, 0, a.length);
+        return aa;
+    }
+
+    /**
+    *  @com.intel.drl.spec_ref
+    */
+    public <T extends Annotation> T getAnnotation(Class<T> annotationClass) {
+        if(annotationClass == null) {
+            throw new NullPointerException();
+        }
+        Annotation aa[] = data.getAnnotations();
+        for (int i = 0; i < aa.length; i++) {
+            if(aa[i].annotationType() == annotationClass) {
+                return (T) aa[i];
+            }
+        }
+        return null;
+    }
+
+    /**
+    *  @com.intel.drl.spec_ref
+    */
+    public Type getGenericType() throws GenericSignatureFormatError, TypeNotPresentException, MalformedParameterizedTypeException {
+        if (data.genericType == null) {
+            Object startPoint = data.declaringClass;
+            String signature = AuxiliaryUtil.toUTF8(VMGenericsAndAnnotations.getSignature(data.vm_member_id));
+            if (signature == null) {
+                return data.genericType = (Type)data.getType();
+            }
+            InterimFieldGenericDecl decl =  (InterimFieldGenericDecl) Parser.parseSignature(signature, SignatureKind.FIELD_SIGNATURE, (GenericDeclaration)startPoint);
+            InterimGenericType fldType = decl.fieldType;
+            if (fldType instanceof InterimTypeVariable) {
+                String tvName = ((InterimTypeVariable) fldType).typeVariableName;
+                TypeVariable variable = TypeVariableRepository.findTypeVariable(tvName, startPoint);
+                if (variable == null) {
+                    variable =  AuxiliaryFinder.findTypeVariable(tvName, startPoint);
+                    if (variable == null) {
+                        return (Type) null;
+                    }
+                }
+                data.genericType = (Type) variable;
+                return (Type) variable;
+            } else if (fldType instanceof InterimParameterizedType) {
+                ParameterizedType pType = ParameterizedTypeRepository.findParameterizedType((InterimParameterizedType) fldType, ((InterimParameterizedType) fldType).signature, startPoint);
+                if (pType == null) {
+                    try {
+                        AuxiliaryFinder.findGenericClassDeclarationForParameterizedType((InterimParameterizedType) fldType, startPoint);
+                    } catch(Throwable e) {
+                        throw new TypeNotPresentException(((InterimParameterizedType) fldType).rawType.classTypeName.substring(1).replace('/', '.'), e);
+                    }
+                    // check the correspondence of the formal parameter number and the actual argument number:
+                    AuxiliaryChecker.checkArgsNumber((InterimParameterizedType) fldType, startPoint); // the MalformedParameterizedTypeException may raise here
+                    try {
+                        pType = new ParameterizedTypeImpl(AuxiliaryCreator.createTypeArgs((InterimParameterizedType) fldType, startPoint), AuxiliaryCreator.createRawType((InterimParameterizedType) fldType, startPoint), AuxiliaryCreator.createOwnerType((InterimParameterizedType) fldType, startPoint));
+                    } catch(ClassNotFoundException e) {
+                        throw new TypeNotPresentException(e.getMessage(), e);
+                    }
+                    ParameterizedTypeRepository.registerParameterizedType(pType, (InterimParameterizedType) fldType, ((InterimParameterizedType) fldType).signature, startPoint);
+                }
+                data.genericType = (Type) pType;
+                return pType; 
+            } else if (fldType instanceof InterimGenericArrayType) {
+                return AuxiliaryCreator.createGenericArrayType((InterimGenericArrayType) fldType, startPoint); 
+            } else {
+                return data.genericType = (Type)data.getType();
+            }
+        }
+        return data.genericType;
+    }
+
+    /**
+    * @com.intel.drl.spec_ref 
+    */
+    public String toGenericString() {
+        StringBuilder sb = new StringBuilder(80);
+        // append modifiers if any
+        int modifier = getModifiers();
+        if (modifier != 0) {
+            sb.append(Modifier.toString(modifier)).append(' ');
+        }
+        // append generic type
+        appendGenericType(sb, getGenericType());
+        sb.append(' ');
+        // append full field name
+        sb.append(getDeclaringClass().getName()).append('.').append(getName());
+        return sb.toString();
+    }
+
+    /**
+    * @com.intel.drl.spec_ref 
+    */
+    public boolean isSynthetic() {
+        return (getModifiers() & ACC_SYNTHETIC) != 0;
+    }
+
+    /**
+    * @com.intel.drl.spec_ref 
+    */
+    public boolean isEnumConstant() {
+        return (getModifiers() & ACC_ENUM) != 0;
+    }
 
     /**
      * cache of the field data
@@ -44,19 +177,11 @@ public final class Field extends AccessibleObject implements Member {
 
     /**
      * Only VM should call this constructor.
-     * 
-     * @param obj field handler
+     * String parameters must be interned.
      * @api2vm
      */
-    Field(Object obj) {
-        data = new FieldData(obj);
-    }
-
-    /**
-     *  TODO : fix gmj
-     */
-    public boolean isSynthetic() {
-        return false;
+    Field(long id, Class clss, String name, String desc, int m) {
+        data = new FieldData(id, clss, name, desc, m);
     }
     
     /**
@@ -65,21 +190,21 @@ public final class Field extends AccessibleObject implements Member {
      * @return handle for this field
      * @api2vm
      */
-    Object getHandle() {
-        return data.id;
+    long getId() {
+        return data.vm_member_id;
     }
 
     /**
      * @com.intel.drl.spec_ref 
      */
     public boolean equals(Object obj) {
-        try {
-            // Sole comparison by id is not enought because there are fields created 
-            // through JNI. That fields have different ids. 
-            return data.id == ((Field)obj).data.id
-                || (getDeclaringClass().equals( ((Field)obj).getDeclaringClass()) 
-                    && getName().equals( ((Field)obj).getName()));
-        } catch (RuntimeException e) {
+        if (obj instanceof Field) {
+            Field that = (Field)obj;
+            if (data.vm_member_id == that.data.vm_member_id) {
+                assert getDeclaringClass() == that.getDeclaringClass()
+                    && getName() == that.getName();
+                return true;
+            }
         }
         return false;
     }
@@ -90,7 +215,7 @@ public final class Field extends AccessibleObject implements Member {
     public Object get(Object obj) throws IllegalArgumentException,
         IllegalAccessException {
         obj = checkGet(VMStack.getCallerClass(0), obj);
-        return VMReflection.getFieldValue(obj, data.id);
+        return VMField.getObject(obj, data.vm_member_id);
     }
 
     /**
@@ -99,10 +224,7 @@ public final class Field extends AccessibleObject implements Member {
     public boolean getBoolean(Object obj) throws IllegalArgumentException,
         IllegalAccessException {
         obj = checkGet(VMStack.getCallerClass(0), obj);
-        if (getType() == Boolean.TYPE) {
-            return ((Boolean)VMReflection.getFieldValue(obj, data.id)).booleanValue();
-        }
-        throw getIllegalArgumentException(Boolean.TYPE);
+        return VMField.getBoolean(obj, data.vm_member_id);
     }
 
     /**
@@ -111,10 +233,7 @@ public final class Field extends AccessibleObject implements Member {
     public byte getByte(Object obj) throws IllegalArgumentException,
         IllegalAccessException {
         obj = checkGet(VMStack.getCallerClass(0), obj);
-        if (getType() == Byte.TYPE) {
-            return ((Number)VMReflection.getFieldValue(obj, data.id)).byteValue();
-        }
-        throw getIllegalArgumentException(Byte.TYPE);
+        return VMField.getByte(obj, data.vm_member_id);    
     }
 
     /**
@@ -123,19 +242,13 @@ public final class Field extends AccessibleObject implements Member {
     public char getChar(Object obj) throws IllegalArgumentException,
         IllegalAccessException {
         obj = checkGet(VMStack.getCallerClass(0), obj);
-        if (getType() == Character.TYPE) {
-            return ((Character)VMReflection.getFieldValue(obj, data.id)).charValue();
-        }
-        throw getIllegalArgumentException(Character.TYPE);
+        return VMField.getChar(obj, data.vm_member_id);    
     }
 
     /**
      * @com.intel.drl.spec_ref 
      */
-    public Class getDeclaringClass() {
-        if (data.declaringClass == null) {
-            data.initDeclaringClass();
-        }
+    public Class<?> getDeclaringClass() {
         return data.declaringClass;
     }
 
@@ -145,14 +258,7 @@ public final class Field extends AccessibleObject implements Member {
     public double getDouble(Object obj) throws IllegalArgumentException,
         IllegalAccessException {
         obj = checkGet(VMStack.getCallerClass(0), obj);
-        Class type = getType();
-        if (type.isPrimitive() && type != Boolean.TYPE) {
-            if (type == Character.TYPE) {
-                return ((Character)VMReflection.getFieldValue(obj, data.id)).charValue();
-            }
-            return ((Number)VMReflection.getFieldValue(obj, data.id)).doubleValue();
-        }
-        throw getIllegalArgumentException(Double.TYPE);
+        return VMField.getDouble(obj, data.vm_member_id);    
     }
 
     /**
@@ -161,14 +267,7 @@ public final class Field extends AccessibleObject implements Member {
     public float getFloat(Object obj) throws IllegalArgumentException,
         IllegalAccessException {
         obj = checkGet(VMStack.getCallerClass(0), obj);
-        Class type = getType();
-        if (type.isPrimitive() && type != Double.TYPE && type != Boolean.TYPE) {
-            if (type == Character.TYPE) {
-                return ((Character)VMReflection.getFieldValue(obj, data.id)).charValue();
-            }
-            return ((Number)VMReflection.getFieldValue(obj, data.id)).floatValue();
-        }
-        throw getIllegalArgumentException(Float.TYPE);
+        return VMField.getFloat(obj, data.vm_member_id);    
     }
 
     /**
@@ -177,14 +276,7 @@ public final class Field extends AccessibleObject implements Member {
     public int getInt(Object obj) throws IllegalArgumentException,
         IllegalAccessException {
         obj = checkGet(VMStack.getCallerClass(0), obj);
-        Class type = getType();
-        if (type == Integer.TYPE || type == Short.TYPE || type == Byte.TYPE) {
-            return ((Number)VMReflection.getFieldValue(obj, data.id)).intValue();
-        }
-        if (type == Character.TYPE) {
-            return ((Character)VMReflection.getFieldValue(obj, data.id)).charValue();
-        }
-        throw getIllegalArgumentException(Integer.TYPE);
+        return VMField.getInt(obj, data.vm_member_id);    
     }
 
     /**
@@ -193,24 +285,13 @@ public final class Field extends AccessibleObject implements Member {
     public long getLong(Object obj) throws IllegalArgumentException,
         IllegalAccessException {
         obj = checkGet(VMStack.getCallerClass(0), obj);
-        Class type = getType();
-        if (type == Long.TYPE || type == Integer.TYPE || type == Short.TYPE
-            || type == Byte.TYPE) {
-            return ((Number)VMReflection.getFieldValue(obj, data.id)).longValue();
-        }
-        if (type == Character.TYPE) {
-            return ((Character)VMReflection.getFieldValue(obj, data.id)).charValue();
-        }
-        throw getIllegalArgumentException(Long.TYPE);
+        return VMField.getLong(obj, data.vm_member_id);    
     }
 
     /**
      * @com.intel.drl.spec_ref 
      */
     public int getModifiers() {
-        if (data.modifiers == -1) {
-            data.initModifiers();
-        }
         return data.modifiers;
     }
 
@@ -218,9 +299,6 @@ public final class Field extends AccessibleObject implements Member {
      * @com.intel.drl.spec_ref 
      */
     public String getName() {
-        if (data.name == null) {
-            data.initName();
-        }
         return data.name;
     }
 
@@ -230,21 +308,14 @@ public final class Field extends AccessibleObject implements Member {
     public short getShort(Object obj) throws IllegalArgumentException,
         IllegalAccessException {
         obj = checkGet(VMStack.getCallerClass(0), obj);
-        Class type = getType();
-        if (type == Short.TYPE || type == Byte.TYPE) {
-            return ((Number)VMReflection.getFieldValue(obj, data.id)).shortValue();
-        }
-        throw getIllegalArgumentException(Short.TYPE);
+        return VMField.getShort(obj, data.vm_member_id);    
     }
 
     /**
      * @com.intel.drl.spec_ref 
      */
-    public Class getType() {
-        if (data.type == null) {
-            data.initType();
-        }
-        return data.type;
+    public Class<?> getType() {
+        return data.getType();
     }
 
     /**
@@ -259,50 +330,8 @@ public final class Field extends AccessibleObject implements Member {
      */
     public void set(Object obj, Object value) throws IllegalArgumentException,
         IllegalAccessException {
-        // check that input is valid
         obj = checkSet(VMStack.getCallerClass(0), obj);
-        // is this field primitive?
-        if (!getType().isPrimitive()) {
-            //can this value be converted to the type of the field?
-            //(The null reference can always be converted to any reference type.)
-            if (value == null || getType().isInstance(value)) {
-                VMReflection.setFieldValue(obj, data.id, value);
-                return;
-            }
-        } else { // this field is primitive
-            if (value instanceof Number) {
-                if (value instanceof Integer) {
-                    setIntNoObjectCheck(obj, ((Integer)value).intValue());
-                    return;
-                } else if (value instanceof Float) {
-                    setFloatNoObjectCheck(obj, ((Float)value).floatValue());
-                    return;
-                } else if (value instanceof Double) {
-                    setDoubleNoObjectCheck(obj, ((Double)value).doubleValue());
-                    return;
-                } else if (value instanceof Long) {
-                    setLongNoObjectCheck(obj, ((Long)value).longValue());
-                    return;
-                } else if (value instanceof Short) {
-                    setShortNoObjectCheck(obj, ((Short)value).shortValue());
-                    return;
-                } else if (value instanceof Byte) {
-                    setByteNoObjectCheck(obj, ((Byte)value).byteValue());
-                    return;
-                }
-            } else if (value instanceof Boolean) {
-                setBooleanNoObjectCheck(obj, ((Boolean)value).booleanValue());
-                return;
-            } else if (value instanceof Character) {
-                setCharNoObjectCheck(obj, ((Character)value).charValue());
-                return;
-            }
-        }
-        // the specified value doesn't correspond to any primitive type
-        throw new IllegalArgumentException(
-            "The specified value can not be converted to a "
-                + getType().getName()
-                + " type by an unwrapping, identity and widening conversions");
+        VMField.setObject(obj, data.vm_member_id, value);
     }
 
     /**
@@ -311,7 +340,7 @@ public final class Field extends AccessibleObject implements Member {
     public void setBoolean(Object obj, boolean value)
         throws IllegalArgumentException, IllegalAccessException {        
         obj = checkSet(VMStack.getCallerClass(0), obj);
-        setBooleanNoObjectCheck(obj, value);
+        VMField.setBoolean(obj, data.vm_member_id, value);
     }
     
     /**
@@ -320,7 +349,7 @@ public final class Field extends AccessibleObject implements Member {
     public void setByte(Object obj, byte value)
         throws IllegalArgumentException, IllegalAccessException {
         obj = checkSet(VMStack.getCallerClass(0), obj);
-        setByteNoObjectCheck(obj, value);
+        VMField.setByte(obj, data.vm_member_id, value);
     }
     
     /**
@@ -329,7 +358,7 @@ public final class Field extends AccessibleObject implements Member {
     public void setChar(Object obj, char value)
         throws IllegalArgumentException, IllegalAccessException {
         obj = checkSet(VMStack.getCallerClass(0), obj);
-        setCharNoObjectCheck(obj, value);
+        VMField.setChar(obj, data.vm_member_id, value);
     }
 
     /**
@@ -338,7 +367,7 @@ public final class Field extends AccessibleObject implements Member {
     public void setDouble(Object obj, double value)
         throws IllegalArgumentException, IllegalAccessException {
         obj = checkSet(VMStack.getCallerClass(0), obj);
-        setDoubleNoObjectCheck(obj, value);
+        VMField.setDouble(obj, data.vm_member_id, value);
     }
 
     /**
@@ -347,7 +376,7 @@ public final class Field extends AccessibleObject implements Member {
     public void setFloat(Object obj, float value)
         throws IllegalArgumentException, IllegalAccessException {
         obj = checkSet(VMStack.getCallerClass(0), obj);
-        setFloatNoObjectCheck(obj, value);
+        VMField.setFloat(obj, data.vm_member_id, value);
     }
 
     /**
@@ -356,7 +385,7 @@ public final class Field extends AccessibleObject implements Member {
     public void setInt(Object obj, int value) throws IllegalArgumentException,
         IllegalAccessException {
         obj = checkSet(VMStack.getCallerClass(0), obj);
-        setIntNoObjectCheck(obj, value);
+        VMField.setInt(obj, data.vm_member_id, value);
     }
 
     /**
@@ -365,7 +394,7 @@ public final class Field extends AccessibleObject implements Member {
     public void setLong(Object obj, long value)
         throws IllegalArgumentException, IllegalAccessException {
         obj = checkSet(VMStack.getCallerClass(0), obj);
-        setLongNoObjectCheck(obj, value);
+        VMField.setLong(obj, data.vm_member_id, value);
     }
 
     /**
@@ -374,14 +403,14 @@ public final class Field extends AccessibleObject implements Member {
     public void setShort(Object obj, short value)
         throws IllegalArgumentException, IllegalAccessException {
         obj = checkSet(VMStack.getCallerClass(0), obj);
-        setShortNoObjectCheck(obj, value);
+        VMField.setShort(obj, data.vm_member_id, value);
     }
 
     /**
      * @com.intel.drl.spec_ref 
      */
     public String toString() {
-        StringBuffer sb = new StringBuffer();
+        StringBuilder sb = new StringBuilder(80);
         // append modifiers if any
         int modifier = getModifiers();
         if (modifier != 0) {
@@ -443,237 +472,55 @@ public final class Field extends AccessibleObject implements Member {
     }
 
     /**
-     * Constructs IllegalArgumentException
-     * 
-     * @param targetType type to construct exception for
-     * @return constructed exception
-     */
-    private IllegalArgumentException getIllegalArgumentException(Class targetType) {
-        return new IllegalArgumentException(
-            "The field value can not be converted to a \""
-                + targetType.getName() + "\" type by a widening conversion");
-    }
-
-    /**
-     * Sets boolean value with out obj checking 
-     * 
-     * @param obj object
-     * @param value new value
-     * @throws IllegalArgumentException if value is not valid
-     */
-    private void setBooleanNoObjectCheck(Object obj, boolean value)
-        throws IllegalArgumentException {
-        if (getType() == Boolean.TYPE) {
-            VMReflection.setFieldValue(obj, data.id, Boolean.valueOf(value));
-            return;
-        }
-        throw new IllegalArgumentException(
-            "The specified value can not be assigned to the field of a \""
-                + getType().getName() + "\" type");
-    }
-
-    /**
-     * Sets byte value with out obj checking 
-     * 
-     * @param obj object
-     * @param value new value
-     * @throws IllegalArgumentException if value is not valid
-     */
-    private void setByteNoObjectCheck(Object obj, byte value)
-        throws IllegalArgumentException {
-        if (getType() == Byte.TYPE) {
-            VMReflection.setFieldValue(obj, data.id, new Byte(value));
-            return;
-        }
-        setShortNoObjectCheck(obj, value);
-    }
-
-    /**
-     * Sets char value with out obj checking 
-     * 
-     * @param obj object
-     * @param value new value
-     * @throws IllegalArgumentException if value is not valid
-     */
-    private void setCharNoObjectCheck(Object obj, char value)
-        throws IllegalArgumentException {
-        if (getType() == Character.TYPE) {
-            VMReflection.setFieldValue(obj, data.id, new Character(value));
-            return;
-        }
-        setIntNoObjectCheck(obj, value);
-    }
-
-    /**
-     * Sets double value with out obj checking 
-     * 
-     * @param obj object
-     * @param value new value
-     * @throws IllegalArgumentException if value is not valid
-     */
-    private void setDoubleNoObjectCheck(Object obj, double value)
-        throws IllegalArgumentException {
-        if (getType() == Double.TYPE) {
-            VMReflection.setFieldValue(obj, data.id, new Double(value));
-            return;
-        }
-        throw new IllegalArgumentException(
-            "The specified value can not be converted to a \""
-                + getType().getName()
-                + "\" type by a primitive widening conversion");
-    }
-
-    /**
-     * Sets float value with out obj checking 
-     * 
-     * @param obj object
-     * @param value new value
-     * @throws IllegalArgumentException if value is not valid
-     */
-    private void setFloatNoObjectCheck(Object obj, float value)
-        throws IllegalArgumentException {
-        if (getType() == Float.TYPE) {
-            VMReflection.setFieldValue(obj, data.id, new Float(value));
-            return;
-        }
-        setDoubleNoObjectCheck(obj, value);
-    }
-
-    /**
-     * Sets int value with out obj checking 
-     * 
-     * @param obj object
-     * @param value new value
-     * @throws IllegalArgumentException if value is not valid
-     */
-    private void setIntNoObjectCheck(Object obj, int value)
-        throws IllegalArgumentException {
-        if (getType() == Integer.TYPE) {
-            VMReflection.setFieldValue(obj, data.id, new Integer(value));
-            return;
-        }
-        setLongNoObjectCheck(obj, value);
-    }
-
-    /**
-     * Sets long value with out obj checking 
-     * 
-     * @param obj object
-     * @param value new value
-     * @throws IllegalArgumentException if value is not valid
-     */
-    private void setLongNoObjectCheck(Object obj, long value)
-        throws IllegalArgumentException {
-        if (getType() == Long.TYPE) {
-            VMReflection.setFieldValue(obj, data.id, new Long(value));
-            return;
-        }
-        setFloatNoObjectCheck(obj, value);
-    }
-
-    /**
-     * Sets short value with out obj checking 
-     * 
-     * @param obj object
-     * @param value new value
-     * @throws IllegalArgumentException if value is not valid
-     */
-    private void setShortNoObjectCheck(Object obj, short value)
-        throws IllegalArgumentException {
-        if (getType() == Short.TYPE) {
-            VMReflection.setFieldValue(obj, data.id, new Short(value));
-            return;
-        }
-        setIntNoObjectCheck(obj, value);
-    }
-
-    /**
-     * Reconstructs the signature of this field.
+     * This method is used by serialization mechanism.
      * 
      * @return the signature of the field 
      */
     String getSignature() {
-        //XXX: May it be more effective to realize this request via
-        //API2VM interface, i.e. just to obtain the signature of the field descriptor
-        //from the class file?
-        if (data.type == null) {
-            data.initType();
-        }
-        return getClassSignature(data.type);
+        return data.descriptor;
     }
 
     /**
      * Keeps an information about this field
      */
-    private class FieldData {
+    private static class FieldData {
+        
+        final String name;
+        final Class declaringClass;
+        final int modifiers;
+        private Class<?> type;
+        private Annotation[] declaredAnnotations;
+        Type genericType;
+        final String descriptor;
 
         /**
          * field handle which is used to retrieve all necessary information
          * about this field object
          */
-        final Object id;
+        final long vm_member_id;
 
-        /**
-         * declaring class
-         */
-        Class declaringClass;
-
-        /**
-         * field modifiers
-         */
-        int modifiers = -1;
-
-        /**
-         * field name
-         */
-        String name;
-
-        /**
-         * field type
-         */
-        Class type;
-
-        /**
-|         * @param obj field handler
-         */
-        public FieldData(Object obj) {
-            id = obj;
+        FieldData(long vm_id, Class clss, String name, String desc, int mods) {
+            vm_member_id = vm_id;
+            declaringClass = clss;
+            this.name = name;
+            modifiers = mods;
+            descriptor = desc;
         }
         
-        /**
-         * initializes declaring class
-         */
-        public synchronized void initDeclaringClass() {
-            if (declaringClass == null) {
-                declaringClass = VMReflection.getDeclaringClass(id);
+        Annotation[] getAnnotations() {
+            if (declaredAnnotations == null) {
+                declaredAnnotations = VMGenericsAndAnnotations
+                .getDeclaredAnnotations(vm_member_id);
             }
+            return declaredAnnotations;
         }
-
-        /**
-         * initializes modifiers
-         */
-        public synchronized void initModifiers() {
-            if (modifiers == -1) {
-                modifiers = VMReflection.getModifiers(id);
-            }
-        }
-
-        /**
-         * initializes name
-         */
-        public synchronized void initName() {
-            if (name == null) {
-                name = VMReflection.getName(id);
-            }
-        }
-
-        /**
-         * initializes type
-         */
-        public synchronized void initType() {
+        
+        Class<?> getType() {
             if (type == null) {
-                type = VMReflection.getFieldType(id);
+                type = VMReflection.getFieldType(vm_member_id);
             }
+            return type;
         }
     }
+
 }

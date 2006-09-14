@@ -348,7 +348,7 @@ void create_vm(Global_Env *p_env, JavaVMInitArgs* vm_arguments)
     initialize_properties(p_env, env.properties);
 
     // Enable interpreter by default if TI should be enabled
-    p_env->TI->setInterpreterState(p_env);
+    p_env->TI->setExecutionMode(p_env);
 
     parse_vm_arguments(p_env);
 
@@ -624,13 +624,14 @@ void interrupt_handler(int UNREF x)
 }
 
 JIT_Handle vm_load_jit(const char* file_name, apr_dso_handle_t** handle) {
-    if (vm_is_a_jit_dll(file_name)) {
+    //if (vm_is_a_jit_dll(file_name)) {
         Dll_JIT* jit = new Dll_JIT(file_name);
         handle[0]=jit->get_lib_handle();
         vm_add_jit(jit);
         return (JIT_Handle)jit;
         
-    }
+    /*}
+    printf("not a jit\n");
     handle[0]=NULL;
-    return 0;
+    return 0;*/
 }

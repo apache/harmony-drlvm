@@ -26,6 +26,9 @@
 namespace Jitrino {
 
 class Dlink {
+protected:
+    // add vtable to Dlink to see Dlink successors fields in VS debugger
+    virtual void vtable_stub() const {} 
 public:
     Dlink() {
         _next = _prev = this;
@@ -93,15 +96,15 @@ protected:
 
 class DlinkElem : public Dlink {
 public:
-	DlinkElem(void* e) : elem(e) {}
-	DlinkElem()					{elem = NULL;}
-	DlinkElem*	getNext()		{return (DlinkElem*)Dlink::getNext();}
-	DlinkElem*	getPrev()		{return (DlinkElem*)Dlink::getPrev();}
-	void*		getElem()		{return elem;}
-	void		setElem(void* e){elem = e;}
+    DlinkElem(void* e) : elem(e) {}
+    DlinkElem()                 {elem = NULL;}
+    DlinkElem*  getNext()       {return (DlinkElem*)Dlink::getNext();}
+    DlinkElem*  getPrev()       {return (DlinkElem*)Dlink::getPrev();}
+    void*       getElem()       {return elem;}
+    void        setElem(void* e){elem = e;}
     void        moveTo(DlinkElem *head) {Dlink::moveTo((Dlink *) head);}
 private:
-	void* elem;
+    void* elem;
 };
 
 } //namespace Jitrino 

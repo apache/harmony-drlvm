@@ -20,10 +20,13 @@
 //
 
 
-#include "platform.h"
 
 //MVM
 #include <iostream>
+
+#ifdef PLATFORM_POSIX
+#include <unistd.h>
+#endif
 
 using namespace std;
 
@@ -33,66 +36,49 @@ using namespace std;
 #include <float.h>
 #include <math.h>
 
-#define LOG_DOMAIN "vm.helpers"
-#include "cxxlog.h"
-
-#include "object_layout.h"
 #include "open/types.h"
-#include "Class.h"
+#include "open/gc.h"
+#include "open/vm_util.h"
+
+#include "platform.h"
 #include "environment.h"
+#include "Class.h"
+#include "object_generic.h"
+#include "object_layout.h"
+#include "mon_enter_exit.h"
+#include "ini.h"
+#include "nogc.h"
+#include "compile.h"
 #include "method_lookup.h"
+#include "exceptions.h"
+#include "vm_strings.h"
+#include "vm_arrays.h"
+#include "vm_threads.h"
+#include "vm_synch.h"
+#include "port_malloc.h"
+#include "jni_utils.h" // This is for readInternal override
+
+#include "lil.h"
+#include "lil_code_generator.h"
+#include "jit_runtime_support_common.h"
+#include "jit_runtime_support.h"
 #include "m2n.h"
 #include "../m2n_ipf_internal.h"
-#include "exceptions.h"
-#include "vm_synch.h"
-#include "open/gc.h" 
-#include "ini.h"
-#include "open/vm_util.h"
-#include "vm_strings.h"
-#include "vm_threads.h"
-
-#include "vm_stats.h"
 #include "merced.h"
 #include "Code_Emitter.h"
 #include "stub_code_utils.h"
 #include "vm_ipf.h"
-#include "nogc.h"
-#include "vm_arrays.h"
-#include "lil.h"
-#include "lil_code_generator.h"
 
-#include "jit_runtime_support_common.h"
-#include "jit_runtime_support.h"
-#include "mon_enter_exit.h"
-#include "compile.h"
-#include "object_generic.h"
+#define LOG_DOMAIN "vm.helpers"
+#include "cxxlog.h"
 
+#include "dump.h"
+#include "vm_stats.h"
 
-#include "jni_utils.h" // This is for readInternal override
-
-
-#ifdef DUMP_JIT
-#include "dump_jit.h"
-#include "disasm.h"
-#endif // DUMP_JIT
-
-#ifdef PLATFORM_POSIX
-#include <unistd.h>
-#endif
-#include "port_malloc.h"
-
-
-// gets the offset of a certain field within a struct or class type
-#define OFFSET(Struct, Field) \
-  ((POINTER_SIZE_SINT) (&(((Struct *) NULL)->Field) - NULL))
-
-// gets the size of a field within a struct or class
-#define SIZE(Struct, Field) \
-  (sizeof(((Struct *) NULL)->Field))
-
-
-
-extern bool dump_stubs;
+void gen_convert_managed_to_unmanaged_null_ipf(Emitter_Handle emitter,
+                                               unsigned reg);
+void gen_convert_unmanaged_to_managed_null_ipf(Emitter_Handle emitter,
+                                               unsigned reg);
 
 ///////// begin arithmetic helpers
 
@@ -170,14 +156,38 @@ extern "C" ManagedObject *vm_rt_new_resolved(Class *c)
     assert(!hythread_is_suspend_enabled());
     assert(strcmp(c->name->bytes, "java/lang/Class")); 
 #ifdef VM_STATS
-    vm_stats_total.num_class_alloc_new_object++;
+    VM_Statistics::get_vm_stats().num_class_alloc_new_object++;
     c->num_allocations++;
     c->num_bytes_allocated += get_instance_data_size(c);
 #endif //VM_STATS
     return (ManagedObject *)vm_malloc_with_thread_pointer(c->instance_data_size, c->allocation_handle, vm_get_gc_thread_local());
 } //vm_rt_new_resolved
  
+// this is a helper routine for rth_get_lil_multianewarray(see jit_runtime_support.cpp).
+Vector_Handle
+vm_rt_multianewarray_recursive(Class    *c,
+                             int      *dims_array,
+                             unsigned  dims);
 
+Vector_Handle rth_multianewarrayhelper()
+{
+    ASSERT_THROW_AREA;
+    M2nFrame* m2nf = m2n_get_last_frame();
+    const unsigned max_dim = 255;
+    int lens[max_dim];
+
+#ifdef VM_STATS
+    VM_Statistics::get_vm_stats().num_multianewarray++;  
+#endif
+
+    Class* c = (Class*)*m2n_get_arg_word(m2nf, 0);
+    unsigned dims = (unsigned)(*m2n_get_arg_word(m2nf, 1) & 0xFFFFffff);
+    assert(dims <= max_dim);
+    for(unsigned i = 0; i < dims; i++) {
+        lens[dims-i-1] = (int)(*m2n_get_arg_word(m2nf, i+2) & 0xFFFFffff);
+    }
+    return vm_rt_multianewarray_recursive(c, lens, dims);
+}
 
 static void *vm_rt_multianewarray_resolved(Class *arr_clss,
                                             int dims,
@@ -398,7 +408,7 @@ static void get_vm_rt_new_vector_with_thread_pointer_compactor(Merced_Code_Emitt
     {
         int out0, save_pfs, save_b0, save_gp;
         const int num_in_args = 2, num_out_args = 3;
-        void (*p_vm_new_vector_update_stats)(Allocation_Handle vector_handle, POINTER_SIZE_INT length, void *tp);
+        void (*p_vm_new_vector_update_stats)(int length, Allocation_Handle vector_handle, void *tp);
         p_vm_new_vector_update_stats = vm_new_vector_update_stats;
         emit_alloc_for_single_call(emitter, num_in_args, num_out_args,
             (void **)p_vm_new_vector_update_stats,
@@ -477,19 +487,7 @@ static void *generate_object_allocation_with_thread_pointer_stub_compactor(void 
     sync_i_cache();
 
 
-#ifdef DUMP_JIT
-    if (dump_stubs) {
-        FILE *out = acquire_dump_jit_file(NULL);
-        fprintf(out, "Stub: %s (non-LIL)\n", stub_name);
-        if (!disasm_to_file((Byte *) addr, (unsigned) stub_size, out)) {
-            fprintf(out, "Error in disassembling stub\n");
-            release_dump_jit_file();
-            ASSERT(0, "Error in disassembling stub");
-        }
-        fprintf(out, "End stub %s\n", stub_name);
-        release_dump_jit_file();
-    }
-#endif // DUMP_JIT
+    DUMP_STUB(addr, stub_name, stub_size);
 
     return addr;
 } //generate_object_allocation_with_thread_pointer_stub_compactor
@@ -543,10 +541,13 @@ static void *get_vm_rt_new_resolved_using_vtable_address_and_size(bool inlining_
 } //get_vm_rt_new_resolved_using_vtable_address_and_size
 
 
+// newarray/anewarray helper
+
 // Create a new array (of either primitive or ref type)
 // Returns -1 if there is a negative size
 static Vector_Handle rth_newarrayhelper()
 {
+    ASSERT_THROW_AREA;
     M2nFrame* m2nf = m2n_get_last_frame();
     int len = (int)(*m2n_get_arg_word(m2nf, 1) & 0xFFFFffff);
     if (len < 0) return (Vector_Handle)-1;
@@ -554,11 +555,9 @@ static Vector_Handle rth_newarrayhelper()
     VTable *vector_vtable = ManagedObject::allocation_handle_to_vtable(vh);
     Class* c = vector_vtable->clss;
 
-    return vm_new_vector(c, len);
+    return vm_rt_new_vector(c, len);
 }
 
-
-// newarray/anewarray helper
 static void *get_vm_rt_new_vector__using_vtable_address()
 {
     static void *addr = 0;
@@ -581,19 +580,22 @@ static void *get_vm_rt_new_vector__using_vtable_address()
             rth_newarrayhelper, (POINTER_SIZE_INT)-1, 
             lil_npc_to_fp(exn_get_rth_throw_negative_array_size()));
         assert(cs && lil_is_valid(cs));
-        addr = LilCodeGenerator::get_platform()->compile(cs, "rth_newarrayhelper", dump_stubs);
+        addr = LilCodeGenerator::get_platform()->compile(cs);
+
+        DUMP_STUB( addr, "rth_newarrayhelper", lil_cs_get_code_size(cs));
+
         lil_free_code_stub(cs);
 
     } else {
 
-        Vector_Handle (*p_vm_new_vector_or_null_using_vtable_and_thread_pointer)(Allocation_Handle vector_handle, int length, void *tp);
-        Vector_Handle (*p_vm_new_vector_using_vtable_and_thread_pointer)(Allocation_Handle vector_handle, int length, void *tp);
+        Vector_Handle (*p_vm_new_vector_or_null_using_vtable_and_thread_pointer)(int length, Allocation_Handle vector_handle, void *tp);
+        Vector_Handle (*p_vm_rt_new_vector_using_vtable_and_thread_pointer)(int length, Allocation_Handle vector_handle, void *tp);
         p_vm_new_vector_or_null_using_vtable_and_thread_pointer = vm_new_vector_or_null_using_vtable_and_thread_pointer;
-        p_vm_new_vector_using_vtable_and_thread_pointer = vm_new_vector_using_vtable_and_thread_pointer;
+        p_vm_rt_new_vector_using_vtable_and_thread_pointer = vm_rt_new_vector_using_vtable_and_thread_pointer;
 
         addr = generate_object_allocation_with_thread_pointer_stub_compactor(
             (void **) p_vm_new_vector_or_null_using_vtable_and_thread_pointer,
-            (void **) p_vm_new_vector_using_vtable_and_thread_pointer,
+            (void **) p_vm_rt_new_vector_using_vtable_and_thread_pointer,
             "rt_new_vector_using_vtable",
             true,
             true);  
@@ -865,7 +867,10 @@ static void *get_vm_rt_checkcast_address_compactor()
     if (VM_Global_State::loader_env->use_lil_stubs) {
         LilCodeStub *cs = gen_lil_typecheck_stub(true);
         assert(lil_is_valid(cs));
-        addr = LilCodeGenerator::get_platform()->compile(cs, "vm_rt_checkcast", dump_stubs);
+        addr = LilCodeGenerator::get_platform()->compile(cs);
+
+        DUMP_STUB( addr, "vm_rt_checkcast", lil_cs_get_code_size(cs));
+
         lil_free_code_stub(cs);
         return addr;
     }
@@ -903,23 +908,11 @@ static void *get_vm_rt_checkcast_address_compactor()
     addr = (void *)malloc_fixed_code_for_jit(stub_size, DEFAULT_CODE_ALIGNMENT, CODE_BLOCK_HEAT_MAX/2, CAA_Allocate);
     emitter.copy((char *)addr);
 
-#ifdef DUMP_JIT
-    if (dump_stubs) {
-        FILE *out = acquire_dump_jit_file(NULL);
-        fprintf(out, "Stub: vm_rt_checkcast (non-LIL)\n");
-        if (!disasm_to_file((Byte *) addr, (unsigned) stub_size, out)) {
-            fprintf(out, "Error in disassembling stub\n");
-            release_dump_jit_file();
-            ASSERT(0, "Error in disassembling stub");
-        }
-        fprintf(out, "End stub vm_rt_checkcast\n");
-        release_dump_jit_file();
-    }
-#endif // DUMP_JIT
 
     flush_hw_cache((Byte *)addr, stub_size);
     sync_i_cache();
 
+    DUMP_STUB(addr, "vm_rt_checkcast", stub_size);
 
     return addr;
 } //get_vm_rt_checkcast_address_compactor
@@ -935,7 +928,10 @@ static void *get_vm_rt_instanceof_address_compactor()
     if (VM_Global_State::loader_env->use_lil_stubs) {
         LilCodeStub *cs = gen_lil_typecheck_stub(false);
         assert(lil_is_valid(cs));
-        addr = LilCodeGenerator::get_platform()->compile(cs, "vm_rt_instanceof", dump_stubs);
+        addr = LilCodeGenerator::get_platform()->compile(cs);
+
+        DUMP_STUB( addr, "vm_rt_instanceof", lil_cs_get_code_size(cs));
+
         lil_free_code_stub(cs);
         return addr;
     }
@@ -968,23 +964,11 @@ static void *get_vm_rt_instanceof_address_compactor()
     addr = (void *)malloc_fixed_code_for_jit(stub_size, DEFAULT_CODE_ALIGNMENT, CODE_BLOCK_HEAT_MAX/2, CAA_Allocate);
     emitter.copy((char *)addr);
 
-#ifdef DUMP_JIT
-    if (dump_stubs) {
-        FILE *out = acquire_dump_jit_file(NULL);
-        fprintf(out, "Stub: vm_rt_instanceof (non-LIL)\n");
-        if (!disasm_to_file((Byte *) addr, (unsigned) stub_size, out)) {
-            fprintf(out, "Error in disassembling stub\n");
-            release_dump_jit_file();
-            ASSERT(0, Error in disassembling stub);
-        }
-        fprintf(out, "End stub vm_rt_instanceof\n");
-        release_dump_jit_file();
-    }
-#endif // DUMP_JIT
 
     flush_hw_cache((Byte *)addr, stub_size);
     sync_i_cache();
 
+    DUMP_STUB(addr, "vm_rt_instanceof", stub_size);
 
     return addr;
 } //get_vm_rt_instanceof_address_compactor
@@ -1102,7 +1086,7 @@ static void *get_vm_rt_initialize_class_compactor()
     Class *dummy = NULL;
 
 #ifdef VM_STATS
-    increment_stats_counter(emitter, &vm_stats_total.num_is_class_initialized);
+    increment_stats_counter(emitter, &VM_Statistics::get_vm_stats().num_is_class_initialized);
     // Update the per-class counter.
     // reg0 = in0 + offset(num_class_init_checks)
     // reg1 = [reg0]
@@ -1126,7 +1110,7 @@ static void *get_vm_rt_initialize_class_compactor()
     unsigned out_arg0 = m2n_gen_push_m2n(&emitter, NULL, FRAME_JNI, false, 0, 0, 1);
     emitter.ipf_mov(out_arg0+0, IN_REG0);
     void (*p_class_initialize)(Class *clss);
-    p_class_initialize = class_initialize;
+    p_class_initialize = vm_rt_class_initialize;
     emit_call_with_gp(emitter, (void **)p_class_initialize);
     // pop m2n frame and return
     m2n_gen_pop_m2n(&emitter, false, MPR_None);
@@ -1187,7 +1171,7 @@ static void gen_vm_rt_monitorenter_fast_path(Merced_Code_Emitter &emitter, bool 
     // We do not implement the IA32 lazy lock scheme that speeds up single-threaded applications since we want to optimize 
     // IPF performance for the multithreaded applications that we expect to be typical of servers. 
 #ifdef VM_STATS
-    increment_stats_counter(emitter, &vm_stats_total.num_monitor_enter);
+    increment_stats_counter(emitter, &VM_Statistics::get_vm_stats().num_monitor_enter);
 #endif
 
     // Set object_stack_key_addr_reg to the address of the object's stack key field.
@@ -1196,11 +1180,11 @@ static void gen_vm_rt_monitorenter_fast_path(Merced_Code_Emitter &emitter, bool 
     if (check_null) {
         // Set SCRATCH_PRED_REG2 to 1 if the object reference is non-null.
 #ifdef VM_STATS
-        increment_stats_counter(emitter, &vm_stats_total.num_monitor_enter_null_check);
+        increment_stats_counter(emitter, &VM_Statistics::get_vm_stats().num_monitor_enter_null_check);
 #endif
         emitter.ipf_cmp(icmp_eq, cmp_none, SCRATCH_PRED_REG, SCRATCH_PRED_REG2, IN_REG0, 0);
 #ifdef VM_STATS
-        increment_stats_counter(emitter, &vm_stats_total.num_monitor_enter_is_null, SCRATCH_PRED_REG);
+        increment_stats_counter(emitter, &VM_Statistics::get_vm_stats().num_monitor_enter_is_null, SCRATCH_PRED_REG);
 #endif
 
         // ==== Instructions below are only executed if the object reference is non-null ====
@@ -1235,7 +1219,7 @@ static void gen_vm_rt_monitorenter_fast_path(Merced_Code_Emitter &emitter, bool 
     }
 
 #ifdef VM_STATS
-    increment_stats_counter(emitter, &vm_stats_total.num_monitor_enter_fastcall, SCRATCH_PRED_REG3);
+    increment_stats_counter(emitter, &VM_Statistics::get_vm_stats().num_monitor_enter_fastcall, SCRATCH_PRED_REG3);
 #endif
     enforce_calling_conventions(&emitter, SCRATCH_PRED_REG3);
     emitter.ipf_brret(br_many, br_sptk, br_none, BRANCH_RETURN_LINK_REG, SCRATCH_PRED_REG3);
@@ -1264,18 +1248,18 @@ static void gen_vm_rt_monitorexit_fast_path(Merced_Code_Emitter &emitter, bool c
     const int header_offset = ManagedObject::header_offset();
 
 #ifdef VM_STATS
-    increment_stats_counter(emitter, &vm_stats_total.num_monitor_exit);
+    increment_stats_counter(emitter, &VM_Statistics::get_vm_stats().num_monitor_exit);
 #endif
     unsigned end_of_monitorexit_fast_path_target = 1;
 
     if (check_null) {
         // Branch around the rest of the code emitted by this procedure if the object reference is null. 
 #ifdef VM_STATS
-        increment_stats_counter(emitter, &vm_stats_total.num_monitor_exit_null_check);
+        increment_stats_counter(emitter, &VM_Statistics::get_vm_stats().num_monitor_exit_null_check);
 #endif
         emitter.ipf_cmp(icmp_eq, cmp_none, SCRATCH_PRED_REG, SCRATCH_PRED_REG2, IN_REG0, 0);
 #ifdef VM_STATS
-        increment_stats_counter(emitter, &vm_stats_total.num_monitor_exit_is_null, SCRATCH_PRED_REG);
+        increment_stats_counter(emitter, &VM_Statistics::get_vm_stats().num_monitor_exit_is_null, SCRATCH_PRED_REG);
 #endif
         emitter.ipf_br(br_cond, br_few, br_sptk, br_none, end_of_monitorexit_fast_path_target, SCRATCH_PRED_REG);
     }
@@ -1290,7 +1274,7 @@ static void gen_vm_rt_monitorexit_fast_path(Merced_Code_Emitter &emitter, bool c
     emitter.ipf_cmp(icmp_eq, cmp_none, SCRATCH_PRED_REG, SCRATCH_PRED_REG2, object_lock_info_reg, SCRATCH_GENERAL_REG2);
     emitter.ipf_st(int_mem_size_4, mem_st_rel, mem_none, SCRATCH_GENERAL_REG, 0, SCRATCH_PRED_REG);
 #ifdef VM_STATS
-    increment_stats_counter(emitter, &vm_stats_total.num_monitor_exit_fastestcall, SCRATCH_PRED_REG);
+    increment_stats_counter(emitter, &VM_Statistics::get_vm_stats().num_monitor_exit_fastestcall, SCRATCH_PRED_REG);
 #endif
     emitter.ipf_brret(br_many, br_sptk, br_none, BRANCH_RETURN_LINK_REG, SCRATCH_PRED_REG);
 
@@ -1302,7 +1286,7 @@ static void gen_vm_rt_monitorexit_fast_path(Merced_Code_Emitter &emitter, bool c
     emitter.ipf_ld(int_mem_size_2, mem_ld_none, mem_none, SCRATCH_GENERAL_REG, object_stack_key_addr_reg);
     emitter.ipf_cmp(icmp_ne, cmp_none, SCRATCH_PRED_REG, SCRATCH_PRED_REG2, thread_stack_key_reg, SCRATCH_GENERAL_REG);
 #ifdef VM_STATS
-    increment_stats_counter(emitter, &vm_stats_total.num_monitor_exit_unowned_object, SCRATCH_PRED_REG);
+    increment_stats_counter(emitter, &VM_Statistics::get_vm_stats().num_monitor_exit_unowned_object, SCRATCH_PRED_REG);
 #endif
     emitter.ipf_br(br_cond, br_few, br_sptk, br_none, end_of_monitorexit_fast_path_target, SCRATCH_PRED_REG);
 
@@ -1314,7 +1298,7 @@ static void gen_vm_rt_monitorexit_fast_path(Merced_Code_Emitter &emitter, bool c
     emitter.ipf_cmpi(icmp_eq, cmp_none, SCRATCH_PRED_REG, SCRATCH_PRED_REG2, 0, object_lock_info_reg);
     emitter.ipf_st(int_mem_size_2, mem_st_rel, mem_none, object_stack_key_addr_reg, 0, SCRATCH_PRED_REG);
 #ifdef VM_STATS
-    increment_stats_counter(emitter, &vm_stats_total.num_monitor_exit_fastcall, SCRATCH_PRED_REG);
+    increment_stats_counter(emitter, &VM_Statistics::get_vm_stats().num_monitor_exit_fastcall, SCRATCH_PRED_REG);
 #endif
     emitter.ipf_brret(br_many, br_sptk, br_none, BRANCH_RETURN_LINK_REG, SCRATCH_PRED_REG);
 
@@ -1327,13 +1311,13 @@ static void gen_vm_rt_monitorexit_fast_path(Merced_Code_Emitter &emitter, bool c
     emitter.ipf_adds(object_recur_count_addr_reg, (header_offset + RECURSION_OFFSET), IN_REG0, SCRATCH_PRED_REG);
     emitter.ipf_st(int_mem_size_1, mem_st_rel, mem_none, object_recur_count_addr_reg, SCRATCH_GENERAL_REG, SCRATCH_PRED_REG);
 #ifdef VM_STATS
-    increment_stats_counter(emitter, &vm_stats_total.num_monitor_exit_decr_rec_count, SCRATCH_PRED_REG);
+    increment_stats_counter(emitter, &VM_Statistics::get_vm_stats().num_monitor_exit_decr_rec_count, SCRATCH_PRED_REG);
 #endif
     emitter.ipf_brret(br_many, br_sptk, br_none, BRANCH_RETURN_LINK_REG, SCRATCH_PRED_REG);
 
     // Slowest path. The contention bit is nonzero. Fall through to call vm_monitor_exit() to release the lock...
 #ifdef VM_STATS
-    increment_stats_counter(emitter, &vm_stats_total.num_monitor_exit_very_slow_path);
+    increment_stats_counter(emitter, &VM_Statistics::get_vm_stats().num_monitor_exit_very_slow_path);
 #endif
 
     // If the object reference is null or the current thread doesn't own the object, we branch to here.
@@ -2272,28 +2256,28 @@ static void collect_char_arraycopy_stats(ManagedObject *src,
 
     uint16 *dst_addr = get_vector_element_address_uint16(dst, (int32)dstOffset);
     uint16 *src_addr = get_vector_element_address_uint16(src, (int32)srcOffset);
-    vm_stats_total.num_char_arraycopies++;
+    VM_Statistics::get_vm_stats().num_char_arraycopies++;
     if (dst_addr == src_addr) {
-        vm_stats_total.num_same_array_char_arraycopies++;
+        VM_Statistics::get_vm_stats().num_same_array_char_arraycopies++;
     }
     if (srcOffset == 0) {
-        vm_stats_total.num_zero_src_offset_char_arraycopies++;
+        VM_Statistics::get_vm_stats().num_zero_src_offset_char_arraycopies++;
     }
     if (dstOffset == 0) {
-        vm_stats_total.num_zero_dst_offset_char_arraycopies++;
+        VM_Statistics::get_vm_stats().num_zero_dst_offset_char_arraycopies++;
     }
     if ((((POINTER_SIZE_INT)dst_addr & 0x7) == 0) && (((POINTER_SIZE_INT)src_addr & 0x7) == 0)) {
-        vm_stats_total.num_aligned_char_arraycopies++;
+        VM_Statistics::get_vm_stats().num_aligned_char_arraycopies++;
     }
-    vm_stats_total.total_char_arraycopy_length += length;
-    vm_stats_total.char_arraycopy_count[get_log2((int)length)]++;
+    VM_Statistics::get_vm_stats().total_char_arraycopy_length += length;
+    VM_Statistics::get_vm_stats().char_arraycopy_count[get_log2((int)length)]++;
     bool both_aligned = (((POINTER_SIZE_INT)dst_addr & 0x7) == 0) && (((POINTER_SIZE_INT)src_addr & 0x7) == 0);
     if (both_aligned && (src != dst) && (length < 32)) {
         uint64 num_bytes_to_copy  = 2*length;
         uint64 num_uint64_to_copy = num_bytes_to_copy/sizeof(uint64);
-        vm_stats_total.num_fast_char_arraycopies++;
-        vm_stats_total.total_fast_char_arraycopy_uint64_copies += num_uint64_to_copy;
-        vm_stats_total.char_arraycopy_uint64_copies[get_log2((int)num_uint64_to_copy)]++;
+        VM_Statistics::get_vm_stats().num_fast_char_arraycopies++;
+        VM_Statistics::get_vm_stats().total_fast_char_arraycopy_uint64_copies += num_uint64_to_copy;
+        VM_Statistics::get_vm_stats().char_arraycopy_uint64_copies[get_log2((int)num_uint64_to_copy)]++;
     }
 #endif // VM_STATS
 }
@@ -2467,13 +2451,13 @@ static void increment_helper_count(VM_RT_SUPPORT f) {
     if (print_helper_info) {
         int   num_args;
         char *fn_name;
-        vm_stats_total.rt_function_map.lookup((void *)f, &num_args, (void **)&fn_name);
+        VM_Statistics::get_vm_stats().rt_function_map.lookup((void *)f, &num_args, (void **)&fn_name);
         printf("Calling helper %s, %d args\n", fn_name, num_args);
     }
 #endif // _DEBUG
 
     // Increment the number of times that f was called by a JIT. 
-    vm_stats_total.rt_function_calls.add((void *)f, /*value*/ 1, /*value1*/ NULL);
+    VM_Statistics::get_vm_stats().rt_function_calls.add((void *)f, /*value*/ 1, /*value1*/ NULL);
 } //increment_helper_count
 
 
@@ -2558,7 +2542,7 @@ void *emit_counting_wrapper_for_jit_helper(VM_RT_SUPPORT f, void *helper, int nu
 static void register_rt_support_addr_request(VM_RT_SUPPORT f) {
     // Increment the number of times that f was requested by a JIT. This is not the number of calls to that function,
     // but this does tell us how often a call to that function is compiled into JITted code.
-    vm_stats_total.rt_function_requests.add((void *)f, /*value*/ 1, /*value1*/ NULL);
+    VM_Statistics::get_vm_stats().rt_function_requests.add((void *)f, /*value*/ 1, /*value1*/ NULL);
 } //register_rt_support_addr_request
 
 #endif //VM_STATS
@@ -2735,7 +2719,7 @@ void *vm_get_rt_support_addr(VM_RT_SUPPORT f)
     if (true) {
         int   num_args = 0;
         char *helper_name = NULL;
-        bool found = vm_stats_total.rt_function_map.lookup((void *)f, &num_args, (void **)&helper_name);
+        bool found = VM_Statistics::get_vm_stats().rt_function_map.lookup((void *)f, &num_args, (void **)&helper_name);
         assert(found);  // else changes were made to the enum VM_RT_SUPPORT in jit_runtime_support.h.
 
         void *wrapper = emit_counting_wrapper_for_jit_helper(f, helper, num_args, helper_name);

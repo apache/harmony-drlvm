@@ -26,63 +26,25 @@
 
 /**
  * @file
- * @brief Implementation of methods for bytecode processing - fetching for 
- *        analysis and handling for code generation.
+ * @brief Mostly a huge switch(OPCODE), separated to several groups.
  */
 
 namespace Jitrino {
 namespace Jet {
 
 
-void Compiler::handle_inst(const JInst& jinst)
+void Compiler::handle_inst(void)
 {
-    m_next_bb_is_multiref = false;
     // is it last instruction in basic block ?
-    const bool last = m_curr_bb->last_pc == jinst.pc;
-    const bool has_fall_through = !(jinst.flags & OPF_DEAD_END);
-    const bool is_jsr = jinst.opcode == OPCODE_JSR || 
-                        jinst.opcode == OPCODE_JSR_W;
-    // Test whether the next basic block will be multiref
-    if (last) {
-        if( jinst.is_branch() || jinst.is_switch()) {
-            for (unsigned i=0; i<jinst.get_num_targets(); i++) {
-                unsigned target = jinst.get_target(i);
-                const BBInfo& targetbb = m_bbs[target];
-                m_next_bb_is_multiref = m_next_bb_is_multiref || 
-                                        (targetbb.ref_count > 1);
-            }
-            if (jinst.is_switch()) {
-                unsigned target = jinst.get_def_target();
-                const BBInfo& targetbb = m_bbs[target];
-                m_next_bb_is_multiref = m_next_bb_is_multiref || 
-                                        (targetbb.ref_count > 1);
-            }
-        }
-        // this is last instruction in this BB,
-        // test whether it has fall-through pass and whether it happens
-        // to be multi-referenced basic block
-        if (has_fall_through) {
-            // next instr must:
-            // ... exist
-            assert(m_curr_bb->next_bb != NOTHING);
-            // ... be multi-ref
-            const BBInfo& nextbb = m_bbs[m_curr_bb->next_bb];
-            m_next_bb_is_multiref = m_next_bb_is_multiref || 
-                                    (nextbb.ref_count > 1);
-        }
-    }
+    //const bool last = m_bbinfo->last_pc == jinst.pc;
+    const JInst& jinst = m_insts[m_pc];
+    unsigned bc_size = m_infoBlock.get_bc_size();
+    bool last = jinst.next>=bc_size || (m_insts[jinst.next].flags & OPF_STARTS_BB);
     
-#ifdef _DEBUG
-    // Perform stack check - store stack pointer before and check it after
-    // the instruction. It must be the same.
-    // Skip checks for those who do not have fall-through block, and also 
-    // for conditional branches
-    bool do_stack_check = (m_infoBlock.get_flags() & DBG_CHECK_STACK) &&
-                          has_fall_through && !jinst.is_branch();
-    if (do_stack_check) {
+    if (is_set(DBG_CHECK_STACK)) {
         gen_dbg_check_stack(true);
     }
-#endif
+
     const InstrDesc& idesc = instrs[jinst.opcode];
     switch (idesc.ik) {
     case ik_a:
@@ -107,28 +69,20 @@ void Compiler::handle_inst(const JInst& jinst)
         handle_ik_stack(jinst);
         break;
     case ik_throw:
-        handle_ik_throw(jinst);
+        gen_athrow();
         break;
     default:
         assert(jinst.opcode == OPCODE_NOP);
         break;
     };
     
-#ifdef _DEBUG
-    if (do_stack_check) {
+    if (is_set(DBG_CHECK_STACK)) {
         gen_dbg_check_stack(false);
     }
-#endif
-    
-    m_curr_bb_state->seen_gcpt = m_curr_bb_state->seen_gcpt || 
-                                 (jinst.flags & OPF_GC_PT);
-    // has_fall_through - also cuts off switch
-    if (last && m_next_bb_is_multiref && has_fall_through && 
-        (is_jsr || !jinst.is_branch())) {
-        // Unload vars
-        gen_mem(MEM_TO_MEM|MEM_VARS|MEM_UPDATE);
-        // Upload stack
-        gen_mem(MEM_FROM_MEM|MEM_STACK|MEM_UPDATE);
+
+    const bool has_fall_through = !(jinst.flags & OPF_DEAD_END);
+    if (last && has_fall_through && jinst.get_num_targets() == 0) {
+        gen_bb_leave(jinst.next);
     }
 }
 
@@ -399,12 +353,7 @@ void Compiler::handle_ik_ls(const JInst& jinst) {
         gen_ld(jobj, jinst.opcode-OPCODE_ALOAD_0);
         break;
     case OPCODE_ACONST_NULL:
-        gen_push(jobj, NULL);
-        break;
-    case OPCODE_IASTORE:
-        gen_check_null(2);
-        gen_check_bounds(2,1);
-        gen_astore(i32);
+        gen_push(jobj, NULL_REF);
         break;
     default:    assert(false); break;
     }
@@ -423,64 +372,42 @@ void Compiler::handle_ik_meth(const JInst& jinst) {
         bool is_static = opkod == OPCODE_INVOKESTATIC;
         get_args_info(is_static, jinst.op0, args, &retType);
         
-        if (!is_static) {
-            unsigned thizDepth = count_slots(args)-1;
-            gen_check_null(thizDepth);
-        }
-        
         Method_Handle meth = NULL;
-        if (!(m_infoBlock.get_flags() & JMF_LAZY_RESOLUTION)) {
-            if (opkod == OPCODE_INVOKESTATIC) {
-                Timers::vmResolve.start();
-                    meth = resolve_static_method(m_compileHandle, m_klass,
-                                                 jinst.op0);
-                Timers::vmResolve.stop();
-                if (meth != NULL) {
-                    Class_Handle klass = method_get_class(meth);
-                    if (class_needs_initialization(klass)) {
-                        gen_call_vm(rt_helper_init_class, 1, klass);
-                    }
+
+        if (opkod == OPCODE_INVOKESTATIC) {
+            meth = resolve_static_method(m_compileHandle, m_klass,
+                                            jinst.op0);
+            if (meth != NULL) {
+                Class_Handle klass = method_get_class(meth);
+                if (class_needs_initialization(klass)) {
+                    gen_call_vm(ci_helper_o, rt_helper_init_class, 0, klass);
                 }
             }
-            else if (opkod == OPCODE_INVOKEVIRTUAL) {
-                Timers::vmResolve.start();
-                    meth = resolve_virtual_method(m_compileHandle, m_klass,
-                                                  jinst.op0);
-                Timers::vmResolve.stop();
+        }
+        else if (opkod == OPCODE_INVOKEVIRTUAL) {
+            meth = resolve_virtual_method(m_compileHandle, m_klass,
+                                            jinst.op0);
+        }
+        else if (opkod == OPCODE_INVOKEINTERFACE) {
+            // BUG and HACK - all in one:
+            // An 'org/eclipse/ui/keys/KeyStroke::hashCode' (e3.0) does
+            // invokeinterface on java/util/SortedSet::hashCode(), but the
+            // entry get resolved into the 'java/lang/Object::hashCode' !
+            // later: for eclipse 3.1.1 the same problem happens with 
+            // org/eclipse/jdt/internal/core/JavaProject::equals
+            // which tries to resolve 
+            //  'org/eclipse/core/resources/IProject::equals (Ljava/lang/Object;)Z'
+            meth = resolve_interface_method(m_compileHandle, m_klass, jinst.op0);
+            //assert(class_property_is_interface2(method_get_class(meth)));
+            //
+            //*** workaround here:
+            if (meth != NULL && 
+                !class_property_is_interface2(method_get_class(meth))) {
+                opkod = OPCODE_INVOKEVIRTUAL;
             }
-            else if (opkod == OPCODE_INVOKEINTERFACE) {
-                // Workaround:
-                // When an interface has a method with the same signature as
-                // in java/lang/Object, then resolve_interface_method returns 
-                // this method from Object. A further call to VM's helper
-                // get_vtable with this Method_Handle results to 
-                // unpredictable behavior.
-                // An examples are:
-                // org/eclipse/ui/keys/KeyStroke::hashCode' of E3.0
-                // For E3.1 - 
-                // org/eclipse/jdt/internal/core/JavaProject::equals which 
-                // tries to resolve in 
-                // org/eclipse/core/resources/IProject::equals (Ljava/lang/Object;)Z'
-                // 
-                // So, doing workaround by replacing INVOKEINTERFACE with 
-                // INVOKEVIRTUAL
-                Timers::vmResolve.start();
-                    meth = resolve_interface_method(m_compileHandle, m_klass, jinst.op0);
-                Timers::vmResolve.stop();
-                //assert(class_property_is_interface2(method_get_class(meth)));
-                //
-                //*** workaround here:
-                if (meth != NULL && 
-                    !class_property_is_interface2(method_get_class(meth))) {
-                    opkod = OPCODE_INVOKEVIRTUAL;
-                }
-            }
-            else {
-                assert(opkod == OPCODE_INVOKESPECIAL);
-                Timers::vmResolve.start();
-                    meth = resolve_special_method(m_compileHandle, m_klass, jinst.op0);
-                Timers::vmResolve.stop();
-            }
+        }
+        else {
+            meth = resolve_virtual_method(m_compileHandle, m_klass, jinst.op0);
         }
         gen_invoke(opkod, meth, args, retType);
         return;
@@ -528,22 +455,15 @@ void Compiler::handle_ik_obj(const JInst& jinst) {
     case OPCODE_CALOAD:     jt = u16;       break;
     case OPCODE_SASTORE:    store = true;
     case OPCODE_SALOAD:     jt = i16;       break;
-    default:    break;
+    default: break;
     }
     if (jt != jvoid) {
         // that was indeed *aload/*astore
         if (store) {
-            bool big = jt == dbl64 || jt == i64;
-            // stack: [.., aref, idx, val]
-            gen_check_null(big ? 3 : 2);
-            gen_check_bounds(big ? 3 : 2, big ? 2 : 1);
-            gen_astore(jt);
+            gen_arr_store(jt);
         }
         else {
-            // stack: [.., aref, idx]
-            gen_check_null(1);
-            gen_check_bounds(1, 0);
-            gen_aload(jt);
+            gen_arr_load(jt);
         }
         return;
     }
@@ -551,140 +471,102 @@ void Compiler::handle_ik_obj(const JInst& jinst) {
     switch(jinst.opcode) {
     case OPCODE_NEW:
         {
-            Class_Handle klass = NULL;
-            if (!(m_infoBlock.get_flags() & JMF_LAZY_RESOLUTION)) {
-                Timers::vmResolve.start();
-                klass = vm_resolve_class_new(m_compileHandle, m_klass, 
-                                             jinst.op0);
-                Timers::vmResolve.stop();
-            }
-            gen_new(klass);
+        Class_Handle klass;
+        klass = vm_resolve_class_new(m_compileHandle, m_klass, jinst.op0);
+        gen_new(klass);
         }
         break;
     case OPCODE_PUTSTATIC:
     case OPCODE_GETSTATIC:
         {
-            jtype jt = to_jtype(class_get_cp_field_type(
-                                        m_klass, (unsigned short)jinst.op0));
-            Field_Handle fld = NULL;
-            const bool is_put = jinst.opcode == OPCODE_PUTSTATIC;
-            if (!(m_infoBlock.get_flags() & JMF_LAZY_RESOLUTION)) {
-                Timers::vmResolve.start();
-                fld = resolve_static_field(m_compileHandle, m_klass, 
-                                           jinst.op0, is_put);
-                Timers::vmResolve.stop();
-                if (fld && !field_is_static(fld)) {
-                    fld = NULL;
-                }
-                if (fld) {
-                    Class_Handle klass = field_get_class(fld);
-                    if (class_needs_initialization(klass)) {
-                        gen_call_vm(rt_helper_init_class, 1, klass);
-                    }
-                }
+        jtype jt = to_jtype(class_get_cp_field_type(
+                                    m_klass, (unsigned short)jinst.op0));
+        const bool is_put = jinst.opcode == OPCODE_PUTSTATIC;
+        Field_Handle fld;
+        fld = resolve_static_field(m_compileHandle, m_klass, 
+                                    jinst.op0, is_put);
+        if (fld && !field_is_static(fld)) {
+            fld = NULL;
+        }
+        if (fld != NULL) {
+            Class_Handle klass = field_get_class(fld);
+            assert(klass);
+            if (klass != m_klass && class_needs_initialization(klass)) {
+                gen_call_vm(ci_helper_o, rt_helper_init_class, 0, klass);
             }
-            gen_static_op(jinst.opcode, jt, fld);
+        }
+        gen_static_op(jinst.opcode, jt, fld);
         }
         break;
     case OPCODE_PUTFIELD:
     case OPCODE_GETFIELD:
         // stack: [objref, value] ; op0 -
         {
+        jtype jt = to_jtype(class_get_cp_field_type(
+                                    m_klass, (unsigned short)jinst.op0));
+        bool is_put = jinst.opcode == OPCODE_PUTFIELD;
         
-            jtype jt = to_jtype(class_get_cp_field_type(
-                                        m_klass, (unsigned short)jinst.op0));
-            bool is_put = jinst.opcode == OPCODE_PUTFIELD;
-            
-            Field_Handle fld = NULL;
-            if (!(m_infoBlock.get_flags() & JMF_LAZY_RESOLUTION)) {
-                Timers::vmResolve.start();
-                fld = resolve_nonstatic_field(m_compileHandle, m_klass, 
-                                            jinst.op0, is_put);
-                Timers::vmResolve.stop();
-            }
-            // for GETFIELD, check instance @ depth = 0
-            // for PUTFIELD, the depth depends on the value width
-            gen_check_null(is_put ? (is_wide(jt) ? 2 : 1) : 0);
-            gen_field_op(jinst.opcode, jt, fld);
-        };
+        Field_Handle fld = NULL;
+        fld = resolve_nonstatic_field(m_compileHandle, m_klass, 
+                                    jinst.op0, is_put);
+        gen_field_op(jinst.opcode, jt, fld);
+        }
         break;
     case OPCODE_ARRAYLENGTH:
-        gen_check_null(0);
         gen_array_length();
         break;
     case OPCODE_ANEWARRAY:
         {
-            Allocation_Handle ah = 0;
-            if (!(m_infoBlock.get_flags() & JMF_LAZY_RESOLUTION)) {
-                Timers::vmResolve.start();
-                Class_Handle klass = resolve_class(m_compileHandle, m_klass, 
-                                                   jinst.op0);
-                Timers::vmResolve.stop();
-                if (klass != NULL) {
-                    klass = class_get_array_of_class(klass);
-                }
-                if (klass != NULL) {
-                    ah = class_get_allocation_handle(klass);
-                }
-            }
-            gen_new_array(ah);
+        Allocation_Handle ah = 0;
+        Class_Handle klass = resolve_class(m_compileHandle, m_klass, 
+                                           jinst.op0);
+        if (klass != NULL) {
+            klass = class_get_array_of_class(klass);
+        }
+        if (klass != NULL) {
+            ah = class_get_allocation_handle(klass);
+        }
+        gen_new_array(ah);
         }
         break;
     case OPCODE_NEWARRAY:
         {
-            VM_Data_Type atype;
-            switch(jinst.op0) {
-            case 4: atype = VM_DATA_TYPE_BOOLEAN; break;
-            case 5: atype = VM_DATA_TYPE_CHAR; break;
-            case 6: atype = VM_DATA_TYPE_F4; break;
-            case 7: atype = VM_DATA_TYPE_F8; break;
-            case 8: atype = VM_DATA_TYPE_INT8; break;
-            case 9: atype = VM_DATA_TYPE_INT16; break;
-            case 10: atype = VM_DATA_TYPE_INT32; break;
-            case 11: atype = VM_DATA_TYPE_INT64; break;
-            default:    assert(false); atype = VM_DATA_TYPE_INVALID; break;
-            }
-            Class_Handle elem_class = class_get_class_of_primitive_type(atype);
-            Class_Handle array_class = class_get_array_of_class(elem_class);
-            Allocation_Handle ah = class_get_allocation_handle(array_class);
-            gen_new_array(ah);
+        VM_Data_Type atype;
+        switch(jinst.op0) {
+        case 4: atype = VM_DATA_TYPE_BOOLEAN; break;
+        case 5: atype = VM_DATA_TYPE_CHAR; break;
+        case 6: atype = VM_DATA_TYPE_F4; break;
+        case 7: atype = VM_DATA_TYPE_F8; break;
+        case 8: atype = VM_DATA_TYPE_INT8; break;
+        case 9: atype = VM_DATA_TYPE_INT16; break;
+        case 10: atype = VM_DATA_TYPE_INT32; break;
+        case 11: atype = VM_DATA_TYPE_INT64; break;
+        default:    assert(false); atype = VM_DATA_TYPE_INVALID; break;
+        }
+        Class_Handle elem_class = class_get_class_of_primitive_type(atype);
+        Class_Handle array_class = class_get_array_of_class(elem_class);
+        Allocation_Handle ah = class_get_allocation_handle(array_class);
+        gen_new_array(ah);
         }
         break;
     case OPCODE_MULTIANEWARRAY:
-        // op0 - cp index ; op1 - number of dimensions
-        // [..., count1, [..count2] ] => arrayref
         {
-            Class_Handle klass = NULL;
-            if (!(m_infoBlock.get_flags() & JMF_LAZY_RESOLUTION)) {
-                Timers::vmResolve.start();
-                klass = resolve_class(m_compileHandle, m_klass, jinst.op0);
-                Timers::vmResolve.stop();
-            }
-            gen_multianewarray(klass, jinst.op1);
-            //m_jframe->stack_attrs(0, SA_NZ);
-        };
+        Class_Handle klass = NULL;
+        klass = resolve_class(m_compileHandle, m_klass, jinst.op0);
+        gen_multianewarray(klass, jinst.op1);
+        }
         break;
     case OPCODE_MONITORENTER:
     case OPCODE_MONITOREXIT:
-        {
-            gen_check_null(0);
-            static const jtype args[1] = {jobj};
-            gen_stack_to_args(true, 1, args);
-            gen_call_vm(jinst.opcode == OPCODE_MONITORENTER ? 
-                        rt_helper_monitor_enter : rt_helper_monitor_exit, 0);
-        }
+        gen_monitor_ee();
         break;
     case OPCODE_CHECKCAST:
     case OPCODE_INSTANCEOF:
         {
-            const bool chk = jinst.opcode == OPCODE_CHECKCAST;
-            Class_Handle klazz = NULL;
-            if (!(m_infoBlock.get_flags() & JMF_LAZY_RESOLUTION)) {
-                Timers::vmResolve.start();
-                klazz = resolve_class(m_compileHandle, m_klass, jinst.op0);
-                Timers::vmResolve.stop();
-            }
-            gen_instanceof_cast(chk, klazz);
+        const bool chk = jinst.opcode == OPCODE_CHECKCAST;
+        Class_Handle klazz = NULL;
+        klazz = resolve_class(m_compileHandle, m_klass, jinst.op0);
+        gen_instanceof_cast(chk, klazz);
         }
         break;
     default: assert(false); break;
@@ -694,7 +576,7 @@ void Compiler::handle_ik_obj(const JInst& jinst) {
 void Compiler::handle_ik_stack(const JInst& jinst) {
     switch(jinst.opcode) {
     case OPCODE_POP:
-        gen_pop(m_jframe->top(), NULL);
+        gen_pop(m_jframe->top());
         break;
     case OPCODE_POP2:
         gen_pop2();
@@ -711,15 +593,6 @@ void Compiler::handle_ik_stack(const JInst& jinst) {
     default: assert(false); break;
     }
 }
-
-void Compiler::handle_ik_throw(const JInst& jinst)
-{
-    assert(jinst.opcode == OPCODE_ATHROW);
-    static const jtype args[1] = {jobj};
-    gen_stack_to_args(true, 1, args);
-    gen_call_vm(rt_helper_throw, 0);
-}
-
 
 }
 } // ~namespace Jitrino::Jet

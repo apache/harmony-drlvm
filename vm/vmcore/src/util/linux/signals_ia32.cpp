@@ -55,6 +55,7 @@
 #include "open/gc.h"
  
 #include "exceptions.h"
+#include "exceptions_jit.h"
 #include "vm_synch.h"
 #include "vm_threads.h"
 #include "open/vm_util.h"
@@ -69,12 +70,13 @@
 #include "exception_filter.h"
 #include "interpreter.h"
 #include "crash_handler.h"
+#include "stack_dump.h"
 
 // Variables used to locate the context from the signal handler
 static int sc_nest = -1;
 static uint32 exam_point;
 
-static void linux_sigcontext_to_regs(Registers* regs, ucontext_t *uc)
+void linux_ucontext_to_regs(Registers* regs, ucontext_t *uc)
 {
     regs->eax = uc->uc_mcontext.gregs[REG_EAX];
     regs->ecx = uc->uc_mcontext.gregs[REG_ECX];
@@ -87,7 +89,7 @@ static void linux_sigcontext_to_regs(Registers* regs, ucontext_t *uc)
     regs->esp = uc->uc_mcontext.gregs[REG_ESP];
 }
 
-static void linux_regs_to_sigcontext(ucontext_t *uc, Registers* regs)
+void linux_regs_to_ucontext(ucontext_t *uc, Registers* regs)
 {
     uc->uc_mcontext.gregs[REG_EAX] = regs->eax;
     uc->uc_mcontext.gregs[REG_ECX] = regs->ecx;
@@ -100,14 +102,62 @@ static void linux_regs_to_sigcontext(ucontext_t *uc, Registers* regs)
     uc->uc_mcontext.gregs[REG_ESP] = regs->esp;
 }
 
+// exception catch support for JVMTI
+extern "C" {
+    static void __attribute__ ((used, cdecl)) jvmti_exception_catch_callback_wrapper(Registers regs){
+        jvmti_exception_catch_callback(&regs);
+    }
+}
+
+static void __attribute__ ((cdecl)) asm_jvmti_exception_catch_callback() {
+    //naked_jvmti_exception_catch_callback:
+    asm (
+        "addl $-36, %%esp;\n"
+        "movl %%eax, -36(%%ebp);\n"
+        "movl %%ebx, -32(%%ebp);\n"
+        "movl %%ecx, -28(%%ebp);\n"
+        "movl %%edx, -24(%%ebp);\n"
+        "movl %%esp, %%eax;\n"
+        "movl (%%ebp), %%ebx;\n"
+        "movl 4(%%ebp), %%ecx;\n"
+        "addl $44, %%eax;\n"
+        "movl %%edi, -20(%%ebp);\n"
+        "movl %%esi, -16(%%ebp);\n"
+        "movl %%ebx, -12(%%ebp);\n"
+        "movl %%eax, -8(%%ebp);\n"
+        "movl %%ecx, -4(%%ebp);\n"
+        "call jvmti_exception_catch_callback_wrapper;\n"
+        "movl -36(%%ebp), %%eax;\n"
+        "movl -32(%%ebp), %%ebx;\n"
+        "movl -28(%%ebp), %%ecx;\n"
+        "movl -24(%%ebp), %%edx;\n"
+        "addl $36, %%esp;\n"
+        "leave;\n"
+        "ret;\n"
+        : /* no output operands */
+        : /* no input operands */
+    );
+}
+
 static void throw_from_sigcontext(ucontext_t *uc, Class* exc_clss)
 {
     Registers regs;
-    linux_sigcontext_to_regs(&regs, uc);
+    linux_ucontext_to_regs(&regs, uc);
+
+    uint32 exception_esp = regs.esp;
+    DebugUtilsTI* ti = VM_Global_State::loader_env->TI;
 
     exn_athrow_regs(&regs, exc_clss);
 
-    linux_regs_to_sigcontext(uc, &regs);
+    assert(exception_esp <= regs.esp);
+    if (ti->get_global_capability(DebugUtilsTI::TI_GC_ENABLE_EXCEPTION_EVENT)) {
+        regs.esp = regs.esp - 4;
+        *((uint32*) regs.esp) = regs.eip;
+        regs.eip = ((uint32)asm_jvmti_exception_catch_callback);
+        //regs.eip = ((uint32)naked_jvmti_exception_catch_callback);
+    }
+
+    linux_regs_to_ucontext(uc, &regs);
 }
 
 static bool java_throw_from_sigcontext(ucontext_t *uc, Class* exc_clss)
@@ -258,6 +308,8 @@ void init_stack_info() {
     common_stack_size = find_stack_size();
     common_guard_stack_size = find_guard_stack_size();
     common_guard_page_size =find_guard_page_size();
+
+    set_guard_stack();
 }
 
 void set_guard_stack() {
@@ -281,7 +333,7 @@ void set_guard_stack() {
     err = mprotect(stack_addr - stack_size + guard_page_size + guard_stack_size,
         guard_page_size, PROT_NONE);
 
-    assert(!err);
+/* $$$ GMJ    assert(!err);  */
     
     stack_t sigalt;
     sigalt.ss_sp = stack_addr - stack_size + guard_page_size;
@@ -343,7 +395,7 @@ bool check_stack_overflow(siginfo_t *info, ucontext_t *uc) {
     char* fault_addr = (char*)(info->si_addr);
     //char* esp_value = (char*)(uc->uc_mcontext.gregs[REG_ESP]);
 
-    return((guard_page_begin <= fault_addr) && (fault_addr <= guard_page_end));
+    return((guard_page_begin <= fault_addr) && (fault_addr < guard_page_end));
 }
 
 /*
@@ -364,7 +416,7 @@ void stack_overflow_handler(int signum, siginfo_t* UNREF info, void* context)
     } else {
         if (is_unwindable()) {
             if (hythread_is_suspend_enabled()) {
-                hythread_suspend_disable();
+                tmn_suspend_disable();
             }
             throw_from_sigcontext(
                 uc, env->java_lang_StackOverflowError_Class);
@@ -381,6 +433,9 @@ void null_java_reference_handler(int signum, siginfo_t* UNREF info, void* contex
     ucontext_t *uc = (ucontext_t *)context;
     Global_Env *env = VM_Global_State::loader_env;
 
+    TRACE2("signals", "NPE or SOE detected at " <<
+        (void *)uc->uc_mcontext.gregs[REG_EIP]);
+
     if (check_stack_overflow(info, uc)) {
         stack_overflow_handler(signum, info, context);
         return;
@@ -392,13 +447,14 @@ void null_java_reference_handler(int signum, siginfo_t* UNREF info, void* contex
         if (java_throw_from_sigcontext(
                     uc, env->java_lang_NullPointerException_Class)) {
             return;
-        } else {
-            fprintf(stderr, "SIGSEGV in VM code.\n");
-            return;
         }
     }
 
-    // crash with default handler
+    fprintf(stderr, "SIGSEGV in VM code.\n");
+    Registers regs;
+    linux_ucontext_to_regs(&regs, uc);
+    st_print_stack(&regs);
+
     signal(signum, 0);
 }
 
@@ -407,6 +463,9 @@ void null_java_divide_by_zero_handler(int signum, siginfo_t* UNREF info, void* c
 {
     ucontext_t *uc = (ucontext_t *)context;
     Global_Env *env = VM_Global_State::loader_env;
+
+    TRACE2("signals", "ArithmeticException detected at " <<
+        (void *)uc->uc_mcontext.gregs[REG_EIP]);
 
     if (env->shutting_down != 0) {
         fprintf(stderr, "null_java_divide_by_zero_handler(): called in shutdown stage\n");
@@ -417,7 +476,32 @@ void null_java_divide_by_zero_handler(int signum, siginfo_t* UNREF info, void* c
         }
     }
 
+    fprintf(stderr, "SIGFPE in VM code.\n");
+    Registers regs;
+    linux_ucontext_to_regs(&regs, uc);
+    st_print_stack(&regs);
+
     // crash with default handler
+    signal(signum, 0);
+}
+
+void jvmti_jit_breakpoint_handler(int signum, siginfo_t* UNREF info, void* context)
+{
+    ucontext_t *uc = (ucontext_t *)context;
+    Registers regs;
+
+    linux_ucontext_to_regs(&regs, uc);
+    TRACE2("signals", "JVMTI breakpoint detected at " <<
+        (void *)regs.eip);
+    assert(!interpreter_enabled());
+
+    bool handled = jvmti_send_jit_breakpoint_event(&regs);
+    if (handled)
+        linux_regs_to_ucontext(uc, &regs);
+
+    fprintf(stderr, "SIGINT in VM code.\n");
+    linux_ucontext_to_regs(&regs, uc);
+    st_print_stack(&regs);
     signal(signum, 0);
 }
 
@@ -509,9 +593,13 @@ void locate_sigcontext(int UNREF signum)
  * @note call stacks may be used for debugging
  */
 void abort_handler (int signum, siginfo_t* UNREF info, void* context) {
-    // crash with default handle.
+    fprintf(stderr, "SIGABRT in VM code.\n");
+    Registers regs;
+    ucontext_t *uc = (ucontext_t *)context;
+    linux_ucontext_to_regs(&regs, uc);
+    st_print_stack(&regs);
+
     signal(signum, 0);
-    fprintf(stderr, "abort_handler()\n");
 }
 
 /*
@@ -573,7 +661,12 @@ void initialize_signals()
     sigaction(SIGUSR2, &sa, NULL);
 */
     sigemptyset(&sa.sa_mask);
-    sa.sa_flags = SA_SIGINFO | SA_ONSTACK;
+    sa.sa_flags = SA_SIGINFO;
+    sa.sa_sigaction = &jvmti_jit_breakpoint_handler;
+    sigaction(SIGTRAP, &sa, NULL);
+    
+    sigemptyset(&sa.sa_mask);
+    sa.sa_flags = SA_SIGINFO | SA_ONSTACK;;
     sa.sa_sigaction = &null_java_reference_handler;
     sigaction(SIGSEGV, &sa, NULL);
 
@@ -581,7 +674,7 @@ void initialize_signals()
     sa.sa_flags = SA_SIGINFO;
     sa.sa_sigaction = &null_java_divide_by_zero_handler;
     sigaction(SIGFPE, &sa, NULL);
-    
+
     extern void interrupt_handler(int);
     signal(SIGINT, (void (*)(int)) interrupt_handler);
     extern void quit_handler(int);

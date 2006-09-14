@@ -60,18 +60,22 @@ public class ThreadGroup implements Thread.UncaughtExceptionHandler{
     /**
      * List of subgroups of this thread group
      */
-    private LinkedList groups = new LinkedList();
+    private LinkedList<ThreadGroup> groups = new LinkedList<ThreadGroup>();
 
     /**
      * Parent thread group of this thread group.
      *
+     * FIXME: this field must be private. It is changed to package-private 
+     * to be accessible from FT SecurityManager class. Both SecurityManager
+     * and ThreadGroup are considered as non-Kernel by FT, but ThreadGroup
+     * is Kernel now in DRL.
      */
     ThreadGroup parent;
 
     /**
      * All threads in the group.
      */
-    private WeakHashMap threads = new WeakHashMap();
+    private WeakHashMap<Thread, ThreadGroup> threads = new WeakHashMap<Thread, ThreadGroup>();
 
     /**
      * @com.intel.drl.spec_ref
@@ -92,15 +96,16 @@ public class ThreadGroup implements Thread.UncaughtExceptionHandler{
         this.name = name;
         this.parent = parent;
         this.daemon = parent.daemon;
+        this.maxPriority = parent.maxPriority;
         parent.add(this);
     }
 
     /**
-     * This constructor is used to create main thread group
+     * This constructor is used to create the system thread group
      */
     ThreadGroup() {
         this.parent = null;
-        this.name = "System";
+        this.name = "system";
         this.daemon = false;
     }
 
@@ -178,9 +183,13 @@ public class ThreadGroup implements Thread.UncaughtExceptionHandler{
 			throw new IllegalThreadStateException(
 					"The thread group " + name + " is already destroyed!");
 		}
-        nonsecureDestroy();
-        if (parent != null) {
-            parent.remove(this);
+        if (!nonsecureDestroy()) {
+            throw new IllegalThreadStateException("The thread group " + name + 
+                    " contains non-empty subgroups");
+        } else {
+            if (parent != null) {
+                parent.remove(this);
+            }
         }
     }
 
@@ -302,12 +311,15 @@ public class ThreadGroup implements Thread.UncaughtExceptionHandler{
     /**
      * @com.intel.drl.spec_ref
      */
-    public final void setMaxPriority(int priority) {
+    public synchronized final void setMaxPriority(int priority) {
         checkAccess();
         if (priority > Thread.MAX_PRIORITY || priority < Thread.MIN_PRIORITY) {
             return;
         }
-        nonsecureSetMaxPriority(priority);
+        this.maxPriority = (parent != null && parent.maxPriority < priority)
+                            ? parent.maxPriority
+                            : priority;
+        nonsecureSetMaxPriority(this.maxPriority);
     }
 
     /**
@@ -512,19 +524,29 @@ public class ThreadGroup implements Thread.UncaughtExceptionHandler{
 
     /**
      * Destroys this thread group without any security checks. We add this
-     * method to avoid calls to the checkAccess() method on subgroups
+     * method to avoid calls to the checkAccess() method on subgroups.
+     * All non-empty subgroups are removed recursievely.
+     * If at least one subgroup is not empty, IllegalThreadStateException 
+     * will be thrown.
+     * @return false if this ThreadGroup is not empty
      */
-    private synchronized void nonsecureDestroy() {
-		if (!threads.isEmpty()) {
-			throw new IllegalThreadStateException(
-					"The thread group " + name + " is not empty!");
-		}
-		for (Iterator it = ((List)groups.clone()).iterator(); it.hasNext();) {
-			((ThreadGroup) it.next()).nonsecureDestroy();
-			it.remove();
-		}
-		destroyed = true;
-	}
+    private synchronized boolean nonsecureDestroy() {
+        boolean thisGroupIsEmpty = true;
+        if (!threads.isEmpty()) {
+            return false;
+        }
+        for (Iterator<ThreadGroup> it = groups.iterator(); it.hasNext();) {
+            if (it.next().nonsecureDestroy()) {
+                it.remove();
+            } else {
+                thisGroupIsEmpty = false;
+            }
+        }
+        if (groups.isEmpty()) {
+            destroyed = true;
+        }
+        return thisGroupIsEmpty;
+    }
 
     /**
      * Interrupts this thread group without any security checks. We add this
@@ -558,16 +580,11 @@ public class ThreadGroup implements Thread.UncaughtExceptionHandler{
      * Sets the maximum priority allowed for this thread group and its subgroups.
      * We add this method to avoid calls to the checkAccess() method on subgroups
      */
-    private void nonsecureSetMaxPriority(int priority) {
-        maxPriority = (parent != null && parent.maxPriority < priority)
-            ? parent.maxPriority : priority;
-        List groupsListCopy = null; // a copy of subgroups list
-        synchronized (this) {
-            groupsListCopy = (List)groups.clone();
+    private synchronized void nonsecureSetMaxPriority(int priority) {
+        for (Iterator it = ((List)groups.clone()).iterator(); it.hasNext();) {
+            ((ThreadGroup)it.next()).nonsecureSetMaxPriority(priority);
         }
-        for (Iterator it = groupsListCopy.iterator(); it.hasNext();) {
-            ((ThreadGroup)it.next()).setMaxPriority(maxPriority);
-        }
+        this.maxPriority = priority;
     }
 
     /**

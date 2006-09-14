@@ -27,8 +27,8 @@
 #include <jni.h>
 /* Header for class java.lang.VMThreadManager */
 
-#ifndef _JAVA_LANG_VMTHREADMANAGER_H
-#define _JAVA_LANG_VMTHREADMANAGER_H
+#ifndef _Included_java_lang_VMThreadManager
+#define _Included_java_lang_VMThreadManager
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -45,6 +45,12 @@ JNIEXPORT jobject JNICALL Java_java_lang_VMThreadManager_currentThread
  * Method: java.lang.VMThreadManager.holdsLock(Ljava/lang/Object;)Z
  */
 JNIEXPORT jboolean JNICALL Java_java_lang_VMThreadManager_holdsLock
+    (JNIEnv *, jclass, jobject);
+
+/*
+ * Method: java.lang.VMThreadManager.getState(Ljava/lang/Thread;)I
+ */
+JNIEXPORT jint JNICALL Java_java_lang_VMThreadManager_getState
     (JNIEnv *, jclass, jobject);
 
 /*

@@ -91,8 +91,6 @@ protected:
 
     void            linearizeCfgImpl();
 private:
-    void            startBlockLayout();
-    void            endBlockLayout();
     BasicBlock *    pickLayoutCandidate();
     void            layoutBlock(BasicBlock *blk);
 

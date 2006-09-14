@@ -14,8 +14,8 @@
  *  limitations under the License.
  */
 /**
- * @author Intel, Vyacheslav P. Shakin
- * @version $Revision: 1.6.22.4 $
+ * @author Vyacheslav P. Shakin
+ * @version $Revision$
  */
 
 #ifndef _IA32_CODE_SELECTOR_H_
@@ -25,11 +25,12 @@
 #include "CodeGenIntfc.h"
 #include "Ia32IRManager.h"
 #include "Ia32CFG.h"
-#include "Timer.h"
+
 namespace Jitrino
 {
-class CodeProfiler;
 class CompilationInterface;
+class EdgeMethodProfile;
+
 namespace Ia32{
 
 
@@ -37,10 +38,6 @@ namespace Ia32{
 //  Forward delcarations
 //========================================================================================================
 
-class CFG;
-class Node;
-class BasicBlock;
-class DispatchNode;
 class Inst;
 
 
@@ -67,11 +64,11 @@ public:
     //  CFGCodeSelector::Callback methods
     //
     CfgCodeSelector(CompilationInterface& compIntfc,
-						 MethodCodeSelector& methodCodeSel, 
+                         MethodCodeSelector& methodCodeSel, 
                          MemoryManager& codeSelectorMM, uint32 nNodes, 
                          IRManager& irM);
 
-	uint32  genDispatchNode(uint32 numInEdges, uint32 numOutEdges, double cnt);
+    uint32  genDispatchNode(uint32 numInEdges, uint32 numOutEdges, double cnt);
     uint32  genBlock(uint32 numInEdges, uint32 numOutEdges, BlockKind blockKind,
                      BlockCodeSelector& codeSelector,
                      double cnt);
@@ -79,64 +76,61 @@ public:
     uint32  genExitNode(uint32 numInEdges, double cnt);
     void    genUnconditionalEdge(uint32 tailNodeId,uint32 headNodeId, double prob);
     void    genTrueEdge(uint32 tailNodeId,uint32 headNodeId, double prob);
+    void    genTrueEdge(Node* tailNode, Node* headNode, double prob);
     void    genFalseEdge(uint32 tailNodeId,uint32 headNodeId, double prob);
+    void    genFalseEdge(Node* tailNode, Node* headNode, double prob);
     void    genSwitchEdges(uint32 tailNodeId, uint32 numTargets, uint32 *targets, 
                            double *probs, uint32 defaultTarget);
     void    genExceptionEdge(uint32 tailNodeId, uint32 headNodeId, double prob);
     void    genCatchEdge(uint32 headNodeId,uint32 tailNodeId,
                          uint32 priority,Type* exceptionType, double prob);
-    void    genExitEdge(uint32 tailNodeId, uint32 headNodeId, double prob);
-
-    void    setLoopInfo(uint32 nodeId, bool isLoopHeader, bool hasContainingLoopHeader, uint32 headerId);
+    
     void    setPersistentId(uint32 nodeId, uint32 persistentId) {
-		nodes[nodeId]->setPersistentId(persistentId);
+        ((CGNode*)nodes[nodeId])->setPersistentId(persistentId);
     }
 
-	Opnd * getMethodReturnOpnd(){
-		return returnOperand;
-	}
+    Opnd * getMethodReturnOpnd(){
+        return returnOperand;
+    }
 
-	void setMethodReturnOpnd(Opnd * retOp){
-		returnOperand=retOp;
-	}
-	
-	void	fixNodeInfo();
+    void setMethodReturnOpnd(Opnd * retOp){
+        returnOperand=retOp;
+    }
+    
+    void    fixNodeInfo();
 
-	//
+    //
     // Used to differenciate between instrumented and uninstrumented cfgs
     //
     void markAsInstrumented() {
     }
 
-	//    Callbacks for the instruction code selector
+    //    Callbacks for the instruction code selector
     void    methodHasCalls(bool nonExceptionCall);
 private:
     //
     //    Methods
     //
-    void    genSwitchBlock(BasicBlock *originalBlock, uint32 numTargets, 
+    void    genSwitchBlock(Node *originalBlock, uint32 numTargets, 
                            Opnd *switchSrc);
     void    genEpilogNode();
-    Inst *  findExceptionInst(BasicBlock * block);
-    BasicBlock * getCurrentBlock() {return currBlock;}
+    Inst *  findExceptionInst(Node* block);
+    Node* getCurrentBlock() {return currBlock;}
     //
     //  Fields
     //
-    Node**					nodes;
-    uint32					numNodes;
-    uint32					nextNodeId;
-    CompilationInterface&	compilationInterface;
-	MethodCodeSelector&		methodCodeSelector;
-    MemoryManager&			irMemManager;           // for data live after code selection
-    MemoryManager&			codeSelectorMemManager; // for data dead after code selection
-    IRManager&				irManager;
-    bool					hasDispatchNodes;
-    BasicBlock *			currBlock;
+    Node**                  nodes;
+    uint32                  numNodes;
+    uint32                  nextNodeId;
+    CompilationInterface&   compilationInterface;
+    MethodCodeSelector&     methodCodeSelector;
+    MemoryManager&          irMemManager;           // for data live after code selection
+    MemoryManager&          codeSelectorMemManager; // for data dead after code selection
+    IRManager&              irManager;
+    bool                    hasDispatchNodes;
+    Node*                   currBlock;
 
-	Opnd *					returnOperand;
-
-	static Timer *			instTimer;
-	static Timer *			blockTimer;
+    Opnd *                  returnOperand;
 
     //
     // bc map info
@@ -144,7 +138,7 @@ private:
     VectorHandler* bc2HIRmapHandler;
     VectorHandler* bc2LIRmapHandler;
 
-	friend class InstCodeSelector;
+    friend class InstCodeSelector;
 };
 
 //========================================================================================================
@@ -160,22 +154,17 @@ drives IR lowering for a whole method
 
 class MethodCodeSelector : public ::Jitrino::MethodCodeSelector::Callback {
 public:
-    MethodCodeSelector(CompilationInterface& compIntfc,
-                            MemoryManager&          irMM,
-                            MemoryManager&          codeSelectorMM,
-                            IRManager&			irM)
-        : compilationInterface(compIntfc),
-          irMemManager(irMM), codeSelectorMemManager(codeSelectorMM),
-          irManager(irM),
-		  codeProfiler(NULL),
-          methodDesc(NULL){  }
+    MethodCodeSelector(CompilationInterface&    compIntfc,
+                            MemoryManager&      irMM,
+                            MemoryManager&      codeSelectorMM,
+                            IRManager&          irM,
+                            bool                slowLoadString = false);
+     
 
-	  void                genVars(uint32 numVars, ::Jitrino::VarCodeSelector& varCodeSelector);
+      void                genVars(uint32 numVars, ::Jitrino::VarCodeSelector& varCodeSelector);
     void                setMethodDesc(MethodDesc * desc) {methodDesc = desc;}
-	void                genCFG(uint32 numNodes, ::Jitrino::CFGCodeSelector& codeSelector, bool useDynamicProfile);
+    void                genCFG(uint32 numNodes, ::Jitrino::CFGCodeSelector& codeSelector, bool useDynamicProfile);
     
-	void                setProfileInfo(CodeProfiler *profiler) {codeProfiler = profiler;}
-	CodeProfiler *      getProfileInfo() {return codeProfiler;}
     MethodDesc *        getMethodDesc() {return methodDesc;}
 private:
     //
@@ -190,18 +179,17 @@ private:
     CompilationInterface& compilationInterface;
     MemoryManager&      irMemManager;           // for data live after code selection
     MemoryManager&      codeSelectorMemManager; // for data dead after code selection 
-    IRManager&			irManager;
-	CodeProfiler *	codeProfiler;
+    IRManager&          irManager;
+    
     MethodDesc *        methodDesc;
 
-	static Timer *		selectionTimer;
-	static Timer *		blockMergingTimer;
-	static Timer *		fixNodeInfoTimer;
-	static Timer *		varTimer;
+    EdgeMethodProfile*  edgeProfile;
 
-	friend class CFGCodeSelector;
-	friend class VarGenerator;
-	friend class InstCodeSelector;
+    bool                slowLdString; // 'false' by default
+
+    friend class CFGCodeSelector;
+    friend class VarGenerator;
+    friend class InstCodeSelector;
 };
 
 //========================================================================================================
@@ -222,11 +210,11 @@ public:
      : nextVarId(0), irManager(irM), methodCodeSelector(methodCodeSel) {
     }
     uint32    defVar(Type* varType, bool isAddressTaken, bool isPinned);
-	void	  setManagedPointerBase(uint32 managedPtrVarNum, uint32 baseVarNum);
+    void      setManagedPointerBase(uint32 managedPtrVarNum, uint32 baseVarNum);
 private:
     uint32                  nextVarId;
-    IRManager&				irManager;
-	MethodCodeSelector&		methodCodeSelector;
+    IRManager&              irManager;
+    MethodCodeSelector&     methodCodeSelector;
 };
 
 

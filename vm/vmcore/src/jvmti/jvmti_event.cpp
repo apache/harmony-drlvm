@@ -13,10 +13,10 @@
  *  See the License for the specific language governing permissions and
  *  limitations under the License.
  */
-/** 
+/**
  * @author Gregory Shimansky
  * @version $Revision: 1.1.2.2.4.5 $
- */  
+ */
 /*
  * JVMTI events API
  */
@@ -35,6 +35,7 @@
 #include "suspend_checker.h"
 #include "jit_intf_cpp.h"
 #include "vm_log.h"
+#include "compile.h"
 
 /*
  * Set Event Callbacks
@@ -448,19 +449,6 @@ void jvmti_send_dynamic_code_generated_event(const char *name, const void *addre
     }
 }
 
-void jvmti_add_dynamic_generated_code_chunk(const char *name, const void *address, jint length)
-{
-    DynamicCode *dcList = VM_Global_State::loader_env->TI->getDynamicCodeList();
-    // FIXME linked list modification without synchronization
-    DynamicCode *dc = (DynamicCode *)STD_MALLOC(sizeof(DynamicCode));
-    assert(dc);
-    dc->name = name;
-    dc->address = address;
-    dc->length = length;
-    dc->next = dcList;
-    dcList = dc;
-}
-
 /*
  * Generate Events
  *
@@ -563,7 +551,7 @@ jvmtiGenerateEvents(jvmtiEnv* env,
     else
     {
         // FIXME: linked list usage without sync
-        for (DynamicCode *dcList = ((TIEnv *)env)->vm->vm_env->TI->getDynamicCodeList();
+        for (DynamicCode *dcList = compile_get_dynamic_code_list();
             NULL != dcList; dcList = dcList->next)
             jvmti_send_dynamic_code_generated_event(dcList->name, dcList->address, dcList->length);
     }
@@ -573,6 +561,8 @@ jvmtiGenerateEvents(jvmtiEnv* env,
 
 VMEXPORT void
 jvmti_process_method_entry_event(jmethodID method) {
+    SuspendDisabledChecker sdc;
+
     DebugUtilsTI *ti = VM_Global_State::loader_env->TI;
     if (!ti->isEnabled() )
         return;
@@ -583,6 +573,7 @@ jvmti_process_method_entry_event(jmethodID method) {
     if (!ti->get_global_capability(DebugUtilsTI::TI_GC_ENABLE_METHOD_ENTRY))
         return;
 
+    tmn_suspend_enable();
     jvmtiEvent event_type = JVMTI_EVENT_METHOD_ENTRY;
     hythread_t curr_thread = hythread_self();
 
@@ -618,10 +609,13 @@ jvmti_process_method_entry_event(jmethodID method) {
 
         ti_env = next_env;
     }
+    tmn_suspend_disable();
 }
 
 VMEXPORT void
 jvmti_process_method_exit_event(jmethodID method, jboolean was_popped_by_exception, jvalue ret_val) {
+    SuspendDisabledChecker sdc;
+
     DebugUtilsTI *ti = VM_Global_State::loader_env->TI;
     if (!ti->isEnabled() )
         return;
@@ -632,6 +626,7 @@ jvmti_process_method_exit_event(jmethodID method, jboolean was_popped_by_excepti
     if (!ti->get_global_capability(DebugUtilsTI::TI_GC_ENABLE_METHOD_EXIT))
         return;
 
+    tmn_suspend_enable();
     jvmtiEvent event_type = JVMTI_EVENT_METHOD_EXIT;
     hythread_t curr_native_thread = hythread_self();
 
@@ -666,11 +661,18 @@ jvmti_process_method_exit_event(jmethodID method, jboolean was_popped_by_excepti
     }
 
     if (interpreter_enabled())
+    {
+        tmn_suspend_disable();
         return;
+    }
 
 
     if (!ti->get_global_capability(DebugUtilsTI::TI_GC_ENABLE_FRAME_POP_NOTIFICATION))
+    {
+        tmn_suspend_disable();
         return;
+    }
+
     VM_thread *curr_thread = p_TLS_vmthread;
     jvmti_frame_pop_listener *fpl = curr_thread->frame_pop_listener;
     jvmti_frame_pop_listener **prev_fpl = &curr_thread->frame_pop_listener;
@@ -691,6 +693,8 @@ jvmti_process_method_exit_event(jmethodID method, jboolean was_popped_by_excepti
         prev_fpl = &fpl->next;
         fpl = fpl->next;
     }
+
+    tmn_suspend_disable();
 }
 
 VMEXPORT void
@@ -759,6 +763,126 @@ jvmti_process_single_step_event(jmethodID method, jlocation location) {
     }
 }
 
+VMEXPORT void jvmti_process_field_access_event(Field_Handle field,
+    jmethodID method, jlocation location, jobject* object)
+{
+    DebugUtilsTI *ti = VM_Global_State::loader_env->TI;
+    if (!ti->isEnabled() )
+        return;
+
+    if (JVMTI_PHASE_LIVE != ti->getPhase())
+        return;
+
+    if (!ti->get_global_capability(DebugUtilsTI::TI_GC_ENABLE_FIELD_ACCESS_EVENT))
+        return;
+
+    // get field class
+    //Type_Info_Handle field_type = field_get_type_info_of_field_value(field);
+    //Class_Handle clss = type_info_get_class(field_type);
+    //ASSERT(clss, "Can't get class handle for field type.");
+    //jclass field_klass = struct_Class_to_java_lang_Class_Handle(clss);
+
+    // field_klass seems to be declaring class, not the field type
+    jclass field_klass = struct_Class_to_java_lang_Class_Handle(field->get_class());
+
+    jvmtiEvent event_type = JVMTI_EVENT_FIELD_ACCESS;
+    hythread_t curr_thread = hythread_self();
+    TIEnv *ti_env = ti->getEnvironments();
+    TIEnv *next_env;
+    while (NULL != ti_env)
+    {
+        next_env = ti_env->next;
+        // check that event is enabled in this environment.
+        if (!ti_env->global_events[event_type - JVMTI_MIN_EVENT_TYPE_VAL]) {
+            TIEventThread *thr = ti_env->event_threads[event_type - JVMTI_MIN_EVENT_TYPE_VAL];
+            while (thr)
+            {
+                if (thr->thread == curr_thread)
+                    break;
+                thr = thr->next;
+            }
+
+            if (!thr)
+            {
+                ti_env = next_env;
+                continue;
+            }
+        }
+
+        // event is enabled in this environment
+        jthread thread = getCurrentThread();
+        JNIEnv *jni_env = (JNIEnv *)jni_native_intf;
+        jvmtiEnv *jvmti_env = (jvmtiEnv*) ti_env;
+
+        if (NULL != ti_env->event_table.FieldAccess)
+            ti_env->event_table.FieldAccess(jvmti_env, jni_env, thread,
+                    method, location, field_klass, *object, (jfieldID) field);
+        ti_env = next_env;
+    }
+} // jvmti_process_field_access_event
+
+VMEXPORT void jvmti_process_field_modification_event(Field_Handle field,
+    jmethodID method, jlocation location, jobject* object, jvalue new_value)
+{
+    DebugUtilsTI *ti = VM_Global_State::loader_env->TI;
+    if (!ti->isEnabled() )
+        return;
+
+    if (JVMTI_PHASE_LIVE != ti->getPhase())
+        return;
+
+    if (!ti->get_global_capability(DebugUtilsTI::TI_GC_ENABLE_FIELD_MODIFICATION_EVENT))
+        return;
+
+    // get field class
+    //Type_Info_Handle field_type = field_get_type_info_of_field_value(field);
+    //Class_Handle clss = type_info_get_class(field_type);
+    //ASSERT(clss, "Can't get class handle for field type.");
+    //jclass field_klass = struct_Class_to_java_lang_Class_Handle(clss);
+
+    // field_klass seems to be declaring class, not the field type
+    jclass field_klass = struct_Class_to_java_lang_Class_Handle(field->get_class());
+
+    // get signature type
+    char signature_type = (char) field->get_java_type();
+
+    jvmtiEvent event_type = JVMTI_EVENT_FIELD_MODIFICATION;
+    hythread_t curr_thread = hythread_self();
+    TIEnv *ti_env = ti->getEnvironments();
+    TIEnv *next_env;
+    while (NULL != ti_env)
+    {
+        next_env = ti_env->next;
+        // check that event is enabled in this environment.
+        if (!ti_env->global_events[event_type - JVMTI_MIN_EVENT_TYPE_VAL]) {
+            TIEventThread *thr = ti_env->event_threads[event_type - JVMTI_MIN_EVENT_TYPE_VAL];
+            while (thr)
+            {
+                if (thr->thread == curr_thread)
+                    break;
+                thr = thr->next;
+            }
+
+            if (!thr)
+            {
+                ti_env = next_env;
+                continue;
+            }
+        }
+
+        // event is enabled in this environment
+        jthread thread = getCurrentThread();
+        JNIEnv *jni_env = (JNIEnv *)jni_native_intf;
+        jvmtiEnv *jvmti_env = (jvmtiEnv*) ti_env;
+
+        if (NULL != ti_env->event_table.FieldModification)
+            ti_env->event_table.FieldModification(jvmti_env, jni_env, thread,
+                    method, location, field_klass, *object, (jfieldID) field,
+                    signature_type, new_value);
+        ti_env = next_env;
+    }
+} // jvmti_process_field_modification_event
+
 /*
  * Send Exception event
  */
@@ -789,7 +913,7 @@ void jvmti_send_exception_event(jthrowable exn_object,
         next_env = ti_env->next;
         if (!ti_env->global_events[JVMTI_EVENT_EXCEPTION -
                 JVMTI_MIN_EVENT_TYPE_VAL]) {
-            // No global event set; then check thread specific events. 
+            // No global event set; then check thread specific events.
             TIEventThread *thr =
                 ti_env->event_threads[JVMTI_EVENT_EXCEPTION -
                 JVMTI_MIN_EVENT_TYPE_VAL];
@@ -823,17 +947,16 @@ void jvmti_send_exception_event(jthrowable exn_object,
         }
         ti_env = next_env;
     }
-
-    curr_thread->ti_exception_callback_pending = false;
 }
 
-void jvmti_interpreter_exception_event_callback_call(void)
+void jvmti_interpreter_exception_event_callback_call(
+        ManagedObject *exc, Method *method, jlocation location,
+        Method *catch_method, jlocation catch_location)
 {
-    assert(exn_raised());
+    assert(!exn_raised());
     SuspendDisabledChecker sdc;
 
     VM_thread *curr_thread = p_TLS_vmthread;
-    curr_thread->ti_exception_callback_pending = false;
 
     DebugUtilsTI *ti = VM_Global_State::loader_env->TI;
     if (!ti->isEnabled())
@@ -845,30 +968,23 @@ void jvmti_interpreter_exception_event_callback_call(void)
     if (!ti->get_global_capability(DebugUtilsTI::TI_GC_ENABLE_EXCEPTION_EVENT))
         return;
 
-    jthrowable exn_object = exn_get();
+    assert(!exn_raised());
 
-    clear_current_thread_exception();
+    ObjectHandle exception = oh_allocate_local_handle();
+    exception->object = exc;
 
-    jlocation location, catch_location;
-    Method *method, *catch_method;
-
-    interpreter.interpreter_st_get_interrupted_method(&method,
-        &location);
-    interpreter.interpreter_st_get_catch_method(&catch_method,
-        &catch_location, exn_object);
-
-    jvmti_send_exception_event(exn_object, method, location,
+    jvmti_send_exception_event((jthrowable) exception, method, location,
         catch_method, catch_location);
     assert(!hythread_is_suspend_enabled());
 
-    if (!exn_raised())
-        set_current_thread_exception(exn_object->object);
+    assert(!exn_raised());
 }
 
 ManagedObject *jvmti_jit_exception_event_callback_call(ManagedObject *exn_object,
     JIT *jit, Method *method, NativeCodePtr native_location,
     JIT *catch_jit, Method *catch_method, NativeCodePtr native_catch_location)
 {
+    assert(!exn_raised());
     SuspendDisabledChecker sdc;
 
     DebugUtilsTI *ti = VM_Global_State::loader_env->TI;
@@ -925,6 +1041,173 @@ ManagedObject *jvmti_jit_exception_event_callback_call(ManagedObject *exn_object
 
     assert(!hythread_is_suspend_enabled());
     return exception->object;
+}
+
+ManagedObject *jvmti_exception_catch_event_callback_call(ManagedObject *exn,
+    Method *catch_method, jlocation catch_location)
+{
+    assert(!exn_raised());
+    SuspendDisabledChecker sec;
+
+    DebugUtilsTI *ti = VM_Global_State::loader_env->TI;
+    assert(ti->isEnabled());
+
+    hythread_t curr_thread = hythread_self();
+
+    // Create local handles frame
+    JNIEnv *jni_env = (JNIEnv *)jni_native_intf;
+
+    ObjectHandle exn_object = oh_allocate_local_handle();
+    exn_object->object = exn;
+
+    ObjectHandle hThread = oh_allocate_local_handle();
+    hThread->object = (Java_java_lang_Thread *)jthread_get_java_thread(hythread_self())->object;
+
+    TIEnv *ti_env = ti->getEnvironments();
+    TIEnv *next_env;
+    while (NULL != ti_env)
+    {
+        next_env = ti_env->next;
+        if (!ti_env->global_events[JVMTI_EVENT_EXCEPTION_CATCH -
+                JVMTI_MIN_EVENT_TYPE_VAL]) {
+            // No global event set; then check thread specific events.
+            TIEventThread *thr =
+                ti_env->event_threads[JVMTI_EVENT_EXCEPTION_CATCH -
+                JVMTI_MIN_EVENT_TYPE_VAL];
+
+            while (thr)
+            {
+                if (thr->thread == curr_thread)
+                    break;
+                thr = thr->next;
+            }
+
+            if (!thr)
+            {
+                ti_env = next_env;
+                continue;
+            }
+        }
+        jvmtiEventExceptionCatch func =
+            (jvmtiEventExceptionCatch)ti_env->get_event_callback(JVMTI_EVENT_EXCEPTION_CATCH);
+        if (NULL != func) {
+
+            tmn_suspend_enable();
+            assert(hythread_is_suspend_enabled());
+
+            func((jvmtiEnv *)ti_env, jni_env,
+                reinterpret_cast<jthread>(hThread),
+                reinterpret_cast<jmethodID>(catch_method),
+                catch_location, exn_object);
+            tmn_suspend_disable();
+        }
+        ti_env = next_env;
+    }
+
+    return exn_object->object;
+}
+
+ManagedObject *jvmti_jit_exception_catch_event_callback_call(ManagedObject *exn_object,
+    JIT *catch_jit, Method *catch_method, NativeCodePtr native_catch_location)
+{
+    assert(!exn_raised());
+    SuspendDisabledChecker sdc;
+
+    DebugUtilsTI *ti = VM_Global_State::loader_env->TI;
+    if (!ti->isEnabled())
+        return exn_object;
+
+ if (JVMTI_PHASE_LIVE != ti->getPhase())
+        return exn_object;
+
+    if (!ti->get_global_capability(DebugUtilsTI::TI_GC_ENABLE_EXCEPTION_EVENT))
+        return exn_object;
+
+    uint16 bc = 0;
+    jlocation catch_location;
+
+    OpenExeJpdaError result = catch_jit->get_bc_location_for_native(
+        catch_method, native_catch_location, &bc);
+    TRACE2("jvmti.event.exn",
+        "Exception method = " << (Method_Handle)catch_method << " location " << bc);
+    if (EXE_ERROR_NONE != result)
+        WARN("JIT " << catch_jit <<
+            " get_bc_location_for_native returned error " <<
+            result << " for exception method " << (Method_Handle)catch_method <<
+            " location " << native_catch_location);
+    catch_location = bc;
+
+    exn_object = jvmti_exception_catch_event_callback_call(exn_object,
+        catch_method, catch_location);
+
+    return exn_object;
+}
+
+void jvmti_interpreter_exception_catch_event_callback_call(
+    ManagedObject *exc, Method *catch_method, jlocation catch_location)
+{
+    assert(!exn_raised());
+    SuspendDisabledChecker sdc;
+
+    DebugUtilsTI *ti = VM_Global_State::loader_env->TI;
+    if (!ti->isEnabled())
+        return;
+
+    if (JVMTI_PHASE_LIVE != ti->getPhase())
+        return;
+
+    if (!ti->get_global_capability(DebugUtilsTI::TI_GC_ENABLE_EXCEPTION_EVENT))
+        return;
+
+    jvmti_exception_catch_event_callback_call(exc, catch_method, catch_location);
+    assert(!exn_raised());
+}
+
+void jvmti_send_contended_enter_or_entered_monitor_event(jobject obj,
+    bool isEnter)
+{
+    assert(hythread_is_suspend_enabled());
+    DebugUtilsTI *ti = VM_Global_State::loader_env->TI;
+    if (!ti->isEnabled()) {
+        return;
+    }
+
+    JNIEnv *jni_env = (JNIEnv *)jni_native_intf;
+
+    tmn_suspend_disable();
+    // Create local handles frame
+    NativeObjectHandles lhs;
+    ObjectHandle hThread = oh_allocate_local_handle();
+    hThread->object = (Java_java_lang_Thread *)jthread_get_java_thread(hythread_self())->object;
+    tmn_suspend_enable();
+
+    TIEnv *ti_env = ti->getEnvironments();
+    TIEnv *next_env;
+    while (NULL != ti_env)
+    {
+        next_env = ti_env->next;
+        if (isEnter && ti_env->global_events[JVMTI_EVENT_MONITOR_CONTENDED_ENTER -
+                JVMTI_MIN_EVENT_TYPE_VAL])
+        {
+            jvmtiEventMonitorContendedEnter func = (jvmtiEventMonitorContendedEnter)
+                ti_env->get_event_callback(JVMTI_EVENT_MONITOR_CONTENDED_ENTER);
+            if (NULL != func)
+            {
+                func((jvmtiEnv*)ti_env, jni_env, (jthread)hThread, obj);
+            }
+        }
+        else if (! isEnter && ti_env->global_events[JVMTI_EVENT_MONITOR_CONTENDED_ENTERED -
+                JVMTI_MIN_EVENT_TYPE_VAL])
+        {
+            jvmtiEventMonitorContendedEntered func = (jvmtiEventMonitorContendedEntered)
+                ti_env->get_event_callback(JVMTI_EVENT_MONITOR_CONTENDED_ENTERED);
+            if (NULL != func)
+            {
+                func((jvmtiEnv*)ti_env, jni_env, (jthread)hThread, obj);
+            }
+        }
+        ti_env = next_env;
+    }
 }
 
 void jvmti_send_class_load_event(const Global_Env* env, Class* clss)
@@ -1033,7 +1316,7 @@ void jvmti_send_class_file_load_hook_event(const Global_Env* env,
                     input_len, input_class, &output_len, &output_class);
                 // make redefined class an input for the next agent
                 if( output_class ) {
-                    input_len = output_len; 
+                    input_len = output_len;
                     input_class = last_redef = output_class;
                     output_len = 0;
                     output_class = NULL;
@@ -1226,7 +1509,6 @@ void jvmti_send_waited_monitor_event(jobject monitor, jboolean is_timed_out) {
     TRACE2("jvmti.monitor.waited", "Monitor wait event, monitor = " << monitor);
     process_jvmti_event(JVMTI_EVENT_MONITOR_WAITED, 1, monitor, is_timed_out);
     }
-
 
 void jvmti_send_contended_enter_or_entered_monitor_event(jobject monitor,
     int isEnter) {

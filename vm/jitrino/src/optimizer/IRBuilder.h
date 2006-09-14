@@ -23,75 +23,55 @@
 #ifndef _IRBUILDER_H_
 #define _IRBUILDER_H_
 
-#include <iostream>
 #include "MemoryManager.h"
 #include "Opcode.h"
 #include "Inst.h"
 #include "CSEHash.h"
 #include "simplifier.h"
 #include "InlineInfo.h"
+#include "IRBuilderFlags.h"
+#include "PMFAction.h"
+
+
+#include <iostream>
 
 namespace Jitrino {
 
-class JitrinoParameterTable;
 class PiCondition;
 class VectorHandler;
 class MapHandler;
 class CompilationContext;
+class SessionAction;
+struct TranslatorFlags;
 
-    //
-    // flags that control how the IRBuilder expands and optimizes IR instructions
-    //
-struct IRBuilderFlags {
-    IRBuilderFlags () {
-        expandMemAddrs = expandNullChecks = false;
-            expandCallAddrs = expandVirtualCallAddrs = false;
-            expandElemAddrs = expandElemTypeChecks = false;
-            doSimplify = doCSE = false;
-            insertMethodLabels = insertWriteBarriers = false;
-            suppressCheckBounds = false;
-            compressedReferences = false;
-            genMinMaxAbs = false;
-            genFMinMaxAbs = false;
-            useNewTypeSystem = false;
-            isBCMapinfoRequired = false;
-        }
-        /* expansion flags */
-        bool expandMemAddrs      : 1;    // expand field/array element accesses
-        bool expandElemAddrs     : 1;    // expand array elem address computation
-        bool expandCallAddrs     : 1;    // expand fun address computation for direct calls
-        bool expandVirtualCallAddrs : 1; // expand fun address computation for virtual calls
-        bool expandNullChecks    : 1;    // explicit null checks
-        bool expandElemTypeChecks: 1;    // explicit array elem type checks for stores
-        /* optimization flags */
-        bool doCSE               : 1;    // common subexpression elimination
-        bool doSimplify          : 1;    // simplification
-        /* label & debug insertion */
-        bool insertMethodLabels  : 1;    // insert method entry/exit labels
-        bool insertWriteBarriers : 1;    // insert write barriers to mem stores
-        bool suppressCheckBounds : 1;
-        bool compressedReferences: 1;    // are refs in heap compressed?
-        bool genMinMaxAbs        : 1;
-        bool genFMinMaxAbs       : 1;
-        // LBS Project flags
-        bool useNewTypeSystem    : 1;    // Use the new LBS type system rather than the old one
-        bool isBCMapinfoRequired : 1;     // Produce HIR bc map info
-    };
 
-class IRBuilder {
+#define IRBUILDER_ACTION_NAME "irbuilder"
+
+class IRBuilderAction : public Action {
 public:
-    static void readFlagsFromCommandLine(CompilationContext* cs);
-    static void showFlagsFromCommandLine();
-    //
-    // constructor
-    //
-    IRBuilder(IRManager& irm);
+    void init();
+    const IRBuilderFlags& getFlags() const {return irBuilderFlags;}
+private:
+    void readFlags();
+    
+    IRBuilderFlags    irBuilderFlags;
+};
 
-    IRManager&      getIRManager()      {return irManager;}
-    InstFactory&    getInstFactory()    {return instFactory;}
-    TypeManager&    getTypeManager()    {return typeManager;}
-    OpndManager&    getOpndManager()    {return opndManager;}
-    FlowGraph&      getFlowGraph()      {return flowGraph;}
+
+class IRBuilder : public SessionAction {
+public:
+    IRBuilder();
+    void init(IRManager* irm, TranslatorFlags* traFlags, MemoryManager& tmpMM);
+    
+    //this session can't be placed into PMF path
+    void run(){assert(0);}
+
+    IRManager*          getIRManager()   const  { return irManager;}
+    InstFactory*        getInstFactory() const  {return instFactory;}
+    TypeManager*        getTypeManager() const  {return typeManager;}
+    OpndManager*        getOpndManager() const  {return opndManager;}
+    ControlFlowGraph*   getFlowGraph() const  {return flowGraph;}
+    TranslatorFlags*    getTranslatorFlags() const {return translatorFlags;}
 
     // 
     // used to map bytecode offsets to instructions by JavaByteCodeTranslator
@@ -203,13 +183,15 @@ public:
     Opnd*      genLdFloatConstant(double val);//TR
     Opnd*      genLdNull();//TR
 
-    Opnd*      genLdString(MethodDesc* enclosingMethod, uint32 stringToken);//TR
+    Opnd*      genLdRef(MethodDesc* enclosingMethod, uint32 stringToken, Type* type);//TR
     Opnd*      genLdVar(Type* dstType, VarOpnd* var);//TR
     Opnd*      genLdVarAddr(VarOpnd* var);//TR
     Opnd*      genLdInd(Type*, Opnd* ptr); // for use by front-ends, but not simplifier//TR
     Opnd*      genLdField(Type*, Opnd* base, FieldDesc* fieldDesc); //TR
     Opnd*      genLdStatic(Type*, FieldDesc* fieldDesc);//TR
     Opnd*      genLdElem(Type* elemType, Opnd* array, Opnd* index); //TR
+    Opnd*      genLdElem(Type* elemType, Opnd* array, Opnd* index,
+                         Opnd* tauNullCheck, Opnd* tauAddressInRange);
     Opnd*      genLdFieldAddr(Type* fieldType, Opnd* base, FieldDesc* fieldDesc); //TR
     Opnd*      genLdStaticAddr(Type* fieldType, FieldDesc* fieldDesc);//TR
     Opnd*      genLdElemAddr(Type* elemType, Opnd* array, Opnd* index);//TR
@@ -221,6 +203,8 @@ public:
     void       genStField(Type*, Opnd* base, FieldDesc* fieldDesc, Opnd* src);//TR
     void       genStStatic(Type*, FieldDesc* fieldDesc, Opnd* src);//TR
     void       genStElem(Type*, Opnd* array, Opnd* index, Opnd* src);//TR
+    void       genStElem(Type*, Opnd* array, Opnd* index, Opnd* src,
+                         Opnd* tauNullCheck, Opnd* tauBaseTypeCheck, Opnd* tauAddressInRange);
     void       genStInd(Type*, Opnd* ptr, Opnd* src);//TR
     // checks
     Opnd*      genTauCheckNull(Opnd* base);
@@ -255,8 +239,8 @@ public:
     // method entry/exit
     LabelInst* genMethodEntryLabel(MethodDesc* methodDesc);//TR
     void       genMethodEntryMarker(MethodDesc* methodDesc);//TR
-    void       genMethodEndMarker(MethodDesc* methodDesc, Opnd *obj);//TR
-    void       genMethodEndMarker(MethodDesc* methodDesc);//TR
+    void       genMethodEndMarker(MethodDesc* methodDesc, Opnd *obj, Opnd *retOpnd);//TR
+    void       genMethodEndMarker(MethodDesc* methodDesc, Opnd *retOpnd);//TR
     // value object instructions
     Opnd*      genLdObj(Type* type, Opnd* addrOfValObj);//TR
     void       genStObj(Opnd* addrOfDstVal, Opnd* srcVal, Type* type);//TR
@@ -301,7 +285,7 @@ public:
     Opnd* genShladd(Type* dstType, Opnd* value, Opnd* shiftAmount, Opnd* addto); //SI
     // Control flow
     // load, store & move
-    Opnd* genLdString(Modifier mod, Type *dstType,//TR //SI
+    Opnd* genLdRef(Modifier mod, Type *dstType,//TR //SI
                       uint32 token, MethodDesc *enclosingMethod); // for simplifier use
     Opnd* genTauLdInd(Modifier mod, Type *dstType, Type::Tag ldType, Opnd *ptr, //SI
                       Opnd *tauNonNullBase, Opnd *tauAddressInRange); // for simplifier use
@@ -385,6 +369,9 @@ protected:
     void appendInstUpdateInlineInfo(Inst* inst, InlineInfoBuilder* builder, MethodDesc* target_md);
 
 private:
+
+    void readFlagsFromCommandLine(SessionAction* argSource, const char* argPrefix);
+
     // RECURSIVE GEN
     // additional gen methods used only recursively
     Opnd*      genPredCmp(Type *dstType, Type::Tag instType, ComparisonModifier mod,
@@ -416,259 +403,32 @@ private:
     void     insertHash(uint32 opc, Opnd* op1, Opnd* op2, Opnd* op3, Inst*i) { insertHash(opc, op1->getId(), op2->getId(), op3->getId(), i); };
     void     invalid();    // called when the builder detects invalid IR
     void setBcOffset(uint32 bcOffset) {  offset =  bcOffset; };
+    uint32 getBcOffset() {  return offset; };
 
-   	friend class	JavaByteCodeTranslator;
-    //
-    // private classes
-    //
-    class _Simplifier : public Simplifier {
-    public:
-        _Simplifier(IRManager &irm, IRBuilder* irb)
-            : Simplifier(irm, false, 0), irBuilder(*irb)
-        {
-        }
-    protected:
-        // numeric
-        virtual Inst*
-        genAdd(Type* type, Modifier mod, Opnd* src1, Opnd* src2){
-            return irBuilder.genAdd(type, mod, src1, src2)->getInst();
-        }
-        virtual Inst*
-        genSub(Type* type, Modifier mod, Opnd* src1, Opnd* src2) {
-            return irBuilder.genSub(type, mod, src1, src2)->getInst();
-        }
-        virtual Inst* 
-        genNeg(Type* type, Opnd* src) {
-            return irBuilder.genNeg(type, src)->getInst();
-        }
-        virtual Inst*
-        genMul(Type* type, Modifier mod, Opnd* src1, Opnd* src2){
-            return irBuilder.genMul(type, mod, src1, src2)->getInst();
-        }
-        virtual Inst*
-        genMulHi(Type* type, Modifier mod, Opnd* src1, Opnd* src2){
-            return irBuilder.genMulHi(type, mod, src1, src2)->getInst();
-        }
-        virtual Inst*
-        genMin(Type* type, Opnd* src1, Opnd* src2){
-            return irBuilder.genMin(type, src1, src2)->getInst();
-        }
-        virtual Inst*
-        genMax(Type* type, Opnd* src1, Opnd* src2){
-            return irBuilder.genMax(type, src1, src2)->getInst();
-        }
-        virtual Inst*
-        genAbs(Type* type, Opnd* src1){
-            return irBuilder.genAbs(type, src1)->getInst();
-        }
-        // bitwise
-        virtual Inst*
-        genAnd(Type* type, Opnd* src1, Opnd* src2){
-            return irBuilder.genAnd(type, src1, src2)->getInst();
-        }
-        virtual Inst*
-        genOr(Type* type, Opnd* src1, Opnd* src2){
-            return irBuilder.genOr(type, src1, src2)->getInst();
-        }
-        virtual Inst*
-        genXor(Type* type, Opnd* src1, Opnd* src2){
-            return irBuilder.genXor(type, src1, src2)->getInst();
-        }
-        virtual Inst*
-        genNot(Type* type, Opnd* src1){
-            return irBuilder.genNot(type, src1)->getInst();
-        }
-        virtual Inst*
-        genSelect(Type* type,
-                  Opnd* src1, Opnd* src2, Opnd* src3){
-            return irBuilder.genSelect(type, src1, src2, src3)->getInst();
-        }
-        // conversion
-        virtual Inst*
-        genConv(Type* dstType, Type::Tag toType, Modifier ovfMod, Opnd* src){
-            return irBuilder.genConv(dstType, toType, ovfMod, src)->getInst();
-        }
-        // shifts
-        virtual Inst*
-        genShladd(Type* type,
-                  Opnd* src1, Opnd* src2, Opnd *src3){
-            return irBuilder.genShladd(type, src1, src2, src3)->getInst();
-        }
-        virtual Inst*
-        genShl(Type* type, Modifier smmod,
-               Opnd* src1, Opnd* src2){
-            return irBuilder.genShl(type, smmod, src1, src2)->getInst();
-        }
-        virtual Inst*
-        genShr(Type* type, Modifier mods,
-               Opnd* src1, Opnd* src2){
-            return irBuilder.genShr(type, mods, src1, src2)->getInst();
-        }
-        // comparison
-        virtual Inst*
-        genCmp(Type* type, Type::Tag insttype,
-               ComparisonModifier mod, Opnd* src1, Opnd* src2){
-            return irBuilder.genCmp(type, insttype, mod, src1, src2)->getInst();
-        }
-        // control flow
-        virtual void
-        genJump(LabelInst* label) {
-            irBuilder.genJump(label);
-        }
-        virtual void
-        genBranch(Type::Tag instType, ComparisonModifier mod, 
-                  LabelInst* label, Opnd* src1, Opnd* src2) {
-            irBuilder.genBranch(instType, mod, label, src1, src2);
-        }
-        virtual void
-        genBranch(Type::Tag instType, ComparisonModifier mod, 
-                  LabelInst* label, Opnd* src1) {
-            irBuilder.genBranch(instType, mod, label, src1);
-        }
-        virtual Inst* 
-        genDirectCall(MethodDesc* methodDesc,
-                      Type* returnType,
-                      Opnd* tauNullCheckedFirstArg,
-                      Opnd* tauTypesChecked,
-                      uint32 numArgs,
-                      Opnd* args[],
-                      InlineInfoBuilder* inlineBuilder)
-        {
-            irBuilder.genDirectCall(methodDesc, returnType,
-                                    tauNullCheckedFirstArg, tauTypesChecked, 
-                                    numArgs, args, inlineBuilder);
-            return irBuilder.getCurrentLabel()->prev();
-        }
-        // load, store & mov
-        virtual Inst*
-        genLdConstant(int32 val) {
-            return irBuilder.genLdConstant(val)->getInst();
-        }
-        virtual Inst*
-        genLdConstant(int64 val) {
-            return irBuilder.genLdConstant(val)->getInst();
-        }
-        virtual Inst*
-        genLdConstant(float val) {
-            return irBuilder.genLdConstant(val)->getInst();
-        }
-        virtual Inst*
-        genLdConstant(double val) {
-            return irBuilder.genLdConstant(val)->getInst();
-        }
-        virtual Inst*
-        genLdConstant(Type *type, ConstInst::ConstValue val) {
-            return irBuilder.genLdConstant(type, val)->getInst();
-        }
-        virtual Inst*
-        genTauLdInd(Modifier mod, Type* dstType, Type::Tag ldType, Opnd* src,
-                    Opnd *tauNonNullBase, Opnd *tauAddressInRange) {
-            return irBuilder.genTauLdInd(mod, dstType, ldType, src,
-                                         tauNonNullBase, tauAddressInRange)->getInst();
-        }
-        virtual Inst*
-        genLdString(Modifier mod, Type* dstType,
-                    uint32 token, MethodDesc *enclosingMethod) {
-            return irBuilder.genLdString(mod, dstType,
-                                         token, enclosingMethod)->getInst();
-        }
-        virtual Inst* 
-        genLdFunAddrSlot(MethodDesc* methodDesc) {
-            return irBuilder.genLdFunAddrSlot(methodDesc)->getInst();
-        }
-        virtual Inst* 
-        genGetVTableAddr(ObjectType* type) {
-            return irBuilder.genGetVTable(type)->getInst();
-        }
-        // compressed references
-        virtual Inst* genCompressRef(Opnd *uncompref){
-            return irBuilder.genCompressRef(uncompref)->getInst();
-        }
-        virtual Inst* genUncompressRef(Opnd *compref){
-            return irBuilder.genUncompressRef(compref)->getInst();
-        }
-        virtual Inst *genLdFieldOffsetPlusHeapbase(FieldDesc* fd) {
-            return irBuilder.genLdFieldOffsetPlusHeapbase(fd)->getInst();
-        }
-        virtual Inst *genLdArrayBaseOffsetPlusHeapbase(Type *elemType) {
-            return irBuilder.genLdArrayBaseOffsetPlusHeapbase(elemType)->getInst();
-        }
-        virtual Inst *genLdArrayLenOffsetPlusHeapbase(Type *elemType) {
-            return irBuilder.genLdArrayLenOffsetPlusHeapbase(elemType)->getInst();
-        }
-        virtual Inst *genAddOffsetPlusHeapbase(Type *ptrType, Opnd *compRef, 
-                                               Opnd *offsetPlusHeapbase) {
-            return irBuilder.genAddOffsetPlusHeapbase(ptrType, compRef, 
-                                                      offsetPlusHeapbase)->getInst();
-        }
-        virtual Inst *genTauSafe() {
-            return irBuilder.genTauSafe()->getInst();
-        }
-        virtual Inst *genTauMethodSafe() {
-            return irBuilder.genTauMethodSafe()->getInst();
-        }
-        virtual Inst *genTauUnsafe() {
-            return irBuilder.genTauUnsafe()->getInst();
-        }
-        virtual Inst* genTauStaticCast(Opnd *src, Opnd *tauCheckedCast, Type *castType) {
-            return irBuilder.genTauStaticCast(src, tauCheckedCast, castType)->getInst();
-        }
-        virtual Inst* genTauHasType(Opnd *src, Type *castType) {
-            return irBuilder.genTauHasType(src, castType)->getInst();
-        }
-        virtual Inst* genTauHasExactType(Opnd *src, Type *castType) {
-            return irBuilder.genTauHasExactType(src, castType)->getInst();
-        }
-        virtual Inst* genTauIsNonNull(Opnd *src) {
-            return irBuilder.genTauIsNonNull(src)->getInst();
-        }
-        // helper for store simplification, builds/finds simpler src, possibly
-        // modifies typetag or store modifier. 
-        virtual Opnd*
-        simplifyStoreSrc(Opnd *src, Type::Tag &typetag, Modifier &mod,
-                         bool compressRef) {
-            return 0;
-        }
-        
-        virtual void  
-        foldBranch(BranchInst* br, bool isTaken) {
-            assert(0);
-        }
-        virtual void  
-        foldSwitch(SwitchInst* sw, uint32 index) {
-            assert(0);
-        }
-        virtual void  
-        eliminateCheck(Inst* checkInst, bool alwaysThrows) {
-            assert(0);
-        }    
-        virtual void genThrowSystemException(CompilationInterface::SystemExceptionId id) {
-            irBuilder.genThrowSystemException(id);
-        }
-    private:
-        IRBuilder&  irBuilder;
-    };
+    friend class    JavaByteCodeTranslator;
+    
     //
     // private fields
     //
     // references to other translation objects
     //
-    IRManager&          irManager;
-    OpndManager&        opndManager;        // generates operands
-    TypeManager&        typeManager;        // generates types
-    InstFactory&        instFactory;        // generates instructions
-    FlowGraph&          flowGraph;          // generates blocks
-    IRBuilderFlags&     irBuilderFlags;     // flags that control translation 
+    IRManager*          irManager;
+    OpndManager*        opndManager;        // generates operands
+    TypeManager*        typeManager;        // generates types
+    InstFactory*        instFactory;        // generates instructions
+    ControlFlowGraph*   flowGraph;          // generates blocks
+    IRBuilderFlags      irBuilderFlags;     // flags that control translation 
+    TranslatorFlags*    translatorFlags;
     //
     // translation state
     //
-    MemoryManager       tempMemoryManager;  // for use ONLY by IRBuilder
     LabelInst*          currentLabel;       // current header label
-    CSEHashTable        cseHashTable;       // hash table for CSE
+    CSEHashTable*        cseHashTable;       // hash table for CSE
+    
     //
     // simplifier to fold constants etc.
     //
-    _Simplifier simplifier;
+    Simplifier* simplifier;
     //
     // method-safe operand
     Opnd*               tauMethodSafeOpnd;

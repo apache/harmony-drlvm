@@ -76,15 +76,17 @@ int vector_length_offset()
 static Vector_Handle vm_anewarray_resolved_array_type(Class *arr_clss, int length)
 {
 #ifdef VM_STATS
-    vm_stats_total.num_anewarray++;  
+    VM_Statistics::get_vm_stats().num_anewarray++;  
 #endif
+    ASSERT_RAISE_AREA;
     assert(!hythread_is_suspend_enabled());
     assert(!arr_clss->is_array_of_primitives);
 
     if (length < 0) {
         tmn_suspend_enable();
-        throw_java_exception("java/lang/NegativeArraySizeException");
+        exn_raise_by_name("java/lang/NegativeArraySizeException");
         tmn_suspend_disable();
+        return NULL;
     }
 
     unsigned sz = vm_array_size(arr_clss->vtable, length);
@@ -93,10 +95,10 @@ static Vector_Handle vm_anewarray_resolved_array_type(Class *arr_clss, int lengt
         // VM does not support arrays of length >= MAXINT>>2
         // GC does not support objects of length >= 1Gb
         tmn_suspend_enable();
-        throw_java_exception("java/lang/OutOfMemoryError", 
+        exn_raise_by_name("java/lang/OutOfMemoryError",
             "VM doesn't support arrays of the requested size");
         tmn_suspend_disable();
-        return NULL; // may be reached on interpreter or when called from jni
+        return NULL;
     }
 
     Vector_Handle object_array = (Vector_Handle )gc_alloc(sz, arr_clss->allocation_handle, vm_get_gc_thread_local());
@@ -106,9 +108,9 @@ static Vector_Handle vm_anewarray_resolved_array_type(Class *arr_clss, int lengt
 #endif //VM_STATS
 
     if (NULL == object_array) {
-        exn_throw(
+        exn_raise_object(
             VM_Global_State::loader_env->java_lang_OutOfMemoryError);
-        return NULL; // may be reached on interpreter or when called from jni
+        return NULL;
     }
 
     set_vector_length(object_array, length);
@@ -128,14 +130,15 @@ static Vector_Handle vm_anewarray_resolved_array_type(Class *arr_clss, int lengt
 
 VMEXPORT // temporary solution for interpreter unplug
 Vector_Handle vm_new_vector_primitive(Class *vector_class, int length) {
+    ASSERT_RAISE_AREA;
     assert(!hythread_is_suspend_enabled());
     // VM does not support arrays of length >= MAXINT>>2
     if (length & TWO_HIGHEST_BITS_SET_MASK) {
         tmn_suspend_enable();
         if (length < 0) {
-            throw_java_exception("java/lang/NegativeArraySizeException");
+            exn_raise_by_name("java/lang/NegativeArraySizeException");
         } else {
-            throw_java_exception("java/lang/OutOfMemoryError", 
+            exn_raise_by_name("java/lang/OutOfMemoryError",
                 "VM doesn't support arrays of the requested size");
         }
         tmn_suspend_disable();
@@ -152,9 +155,9 @@ Vector_Handle vm_new_vector_primitive(Class *vector_class, int length) {
 #endif //VM_STATS
 
     if (NULL == vector) {
-        exn_throw(
+        exn_raise_object(
             VM_Global_State::loader_env->java_lang_OutOfMemoryError);
-        return 0; // may be reached when interpreter is used
+        return 0;
     }
 
     set_vector_length(vector, length);
@@ -165,11 +168,16 @@ Vector_Handle vm_new_vector_primitive(Class *vector_class, int length) {
 VMEXPORT // temporary solution for interpreter unplug
 Vector_Handle vm_new_vector(Class *vector_class, int length)
 {
+    ASSERT_RAISE_AREA;
+    Vector_Handle returned_vector;
+
     if(vector_class->is_array_of_primitives) {
-        return vm_new_vector_primitive(vector_class,length);
+        returned_vector = vm_new_vector_primitive(vector_class,length);
     } else {
-        return vm_anewarray_resolved_array_type(vector_class, length);
+        returned_vector = vm_anewarray_resolved_array_type(vector_class, length);
     }
+
+    return returned_vector;
 }
 
 
@@ -183,7 +191,7 @@ Vector_Handle vm_new_vector_or_null(Class * UNREF vector_class, int UNREF length
 
 
 
-void vm_new_vector_update_stats(Allocation_Handle vector_handle, POINTER_SIZE_INT length, void * UNREF tp)
+void vm_new_vector_update_stats(int length, Allocation_Handle vector_handle, void * UNREF tp)
 {
 #ifdef VM_STATS
     if (0 != (length&TWO_HIGHEST_BITS_SET_MASK)) return;
@@ -193,23 +201,22 @@ void vm_new_vector_update_stats(Allocation_Handle vector_handle, POINTER_SIZE_IN
     vector_vtable->clss->num_bytes_allocated += sz;
     if (!get_prop_non_ref_array(vector_vtable->class_properties))
     {
-        vm_stats_total.num_anewarray++;
+        VM_Statistics::get_vm_stats().num_anewarray++;
     }
 #endif //VM_STATS
 }
 
 
-
-Vector_Handle vm_new_vector_using_vtable_and_thread_pointer(Allocation_Handle vector_handle, int length, void *tp)
+Vector_Handle vm_new_vector_using_vtable_and_thread_pointer(int length, Allocation_Handle vector_handle, void *tp)
 {
     assert( ! hythread_is_suspend_enabled());
     // VM does not support arrays of length >= MAXINT>>2
     if (length & TWO_HIGHEST_BITS_SET_MASK) {
         tmn_suspend_enable();
         if (length < 0) {
-            throw_java_exception("java/lang/NegativeArraySizeException");
+            exn_raise_by_name("java/lang/NegativeArraySizeException");
         } else {
-            throw_java_exception("java/lang/OutOfMemoryError", 
+            exn_raise_by_name("java/lang/OutOfMemoryError",
                 "VM doesn't support arrays of the requested size");
         }
         tmn_suspend_disable();
@@ -227,9 +234,9 @@ Vector_Handle vm_new_vector_using_vtable_and_thread_pointer(Allocation_Handle ve
     assert( ! hythread_is_suspend_enabled());
     
     if (NULL == vector) {
-        exn_throw(
+        exn_raise_object(
             VM_Global_State::loader_env->java_lang_OutOfMemoryError);
-        return 0; // should never be reached
+        return NULL;
     }
 
     set_vector_length(vector, length);
@@ -239,7 +246,7 @@ Vector_Handle vm_new_vector_using_vtable_and_thread_pointer(Allocation_Handle ve
 
 
 
-Vector_Handle vm_new_vector_or_null_using_vtable_and_thread_pointer(Allocation_Handle vector_handle, int length, void *tp)
+Vector_Handle vm_new_vector_or_null_using_vtable_and_thread_pointer(int length, Allocation_Handle vector_handle, void *tp)
 {
     // VM does not support arrays of length >= MAXINT>>2
     if (0 != (length&TWO_HIGHEST_BITS_SET_MASK)) {
@@ -259,7 +266,7 @@ Vector_Handle vm_new_vector_or_null_using_vtable_and_thread_pointer(Allocation_H
     vector_vtable->clss->num_bytes_allocated += sz;
     if (!get_prop_non_ref_array(vector_vtable->class_properties))
     {
-        vm_stats_total.num_anewarray++;
+        VM_Statistics::get_vm_stats().num_anewarray++;
     }
 #endif //VM_STATS
     
@@ -275,6 +282,7 @@ vm_multianewarray_recursive(Class    *c,
                              int      *dims_array,
                              unsigned  dims)
 {
+    ASSERT_RAISE_AREA;
     assert(!hythread_is_suspend_enabled());
     Global_Env *global_env = VM_Global_State::loader_env;
     int length = *dims_array;
@@ -283,12 +291,11 @@ vm_multianewarray_recursive(Class    *c,
     assert(c->name->bytes[0] == '[');
     assert(c->name->len > 1);
 
+    volatile Vector_Handle object_array = (Vector_Handle) vm_new_vector(c, length);
+
     if(dims == 1) {
-        return (Vector_Handle)vm_new_vector(c, length);
+        return object_array;
     } else {
-        // Allocate an array of arrays.
-        volatile Vector_Handle object_array =
-            (Vector_Handle) vm_new_vector(c, length);
         assert(!hythread_is_suspend_enabled());
         // Alexei
         // Since this function is called from a managed code
@@ -350,8 +357,9 @@ vm_multianewarray_recursive(Class    *c,
 //
 Vector_Handle vm_multianewarray_resolved(Class *cc, unsigned dims, ...)
 {
+ASSERT_THROW_AREA;
 #ifdef VM_STATS
-    vm_stats_total.num_multianewarray++;  
+    VM_Statistics::get_vm_stats().num_multianewarray++;  
 #endif
     assert(!hythread_is_suspend_enabled());
 
@@ -364,13 +372,17 @@ Vector_Handle vm_multianewarray_resolved(Class *cc, unsigned dims, ...)
     for(unsigned i = 0; i < dims; i++) {
         int d = va_arg(args, int);
         if (d < 0) {
-            throw_java_exception("java/lang/NegativeArraySizeException");
+            exn_throw_by_name("java/lang/NegativeArraySizeException");
         }
         dims_array[(dims - 1) - i] = d;
     }
     va_end(args);
 
-    Vector_Handle arr = vm_multianewarray_recursive(cc, dims_array, dims);
+    Vector_Handle arr;
+    BEGIN_RAISE_AREA;
+    arr = vm_multianewarray_recursive(cc, dims_array, dims);
+    END_RAISE_AREA;
+    exn_rethrow_if_pending();
     return arr;
 } //vm_multianewarray_resolved
 
@@ -435,7 +447,7 @@ ArrayCopyResult array_copy(ManagedObject *src, int32 srcOffset, ManagedObject *d
             register uint16 *src_addr = get_vector_element_address_uint16(src, srcOffset);
 
 #ifdef VM_STATS
-            increment_array_copy_counter(vm_stats_total.num_arraycopy_char);
+            increment_array_copy_counter(VM_Statistics::get_vm_stats().num_arraycopy_char);
 #endif // VM_STATS
 
             // 20030219 The length threshold 32 here works well for SPECjbb and should be reasonable for other applications.
@@ -460,7 +472,7 @@ ArrayCopyResult array_copy(ManagedObject *src, int32 srcOffset, ManagedObject *d
         break;
     case 'B':
 #ifdef VM_STATS
-        increment_array_copy_counter(vm_stats_total.num_arraycopy_byte);
+        increment_array_copy_counter(VM_Statistics::get_vm_stats().num_arraycopy_byte);
 #endif
         memmove(get_vector_element_address_int8(dst, dstOffset),
                 get_vector_element_address_int8(src, srcOffset),
@@ -468,7 +480,7 @@ ArrayCopyResult array_copy(ManagedObject *src, int32 srcOffset, ManagedObject *d
         break;
     case 'Z':
 #ifdef VM_STATS
-        increment_array_copy_counter(vm_stats_total.num_arraycopy_bool);
+        increment_array_copy_counter(VM_Statistics::get_vm_stats().num_arraycopy_bool);
 #endif
         memmove(get_vector_element_address_bool(dst, dstOffset),
                 get_vector_element_address_bool(src, srcOffset),
@@ -476,7 +488,7 @@ ArrayCopyResult array_copy(ManagedObject *src, int32 srcOffset, ManagedObject *d
         break;
     case 'S':
 #ifdef VM_STATS
-        increment_array_copy_counter(vm_stats_total.num_arraycopy_short);
+        increment_array_copy_counter(VM_Statistics::get_vm_stats().num_arraycopy_short);
 #endif
         memmove(get_vector_element_address_int16(dst, dstOffset),
                 get_vector_element_address_int16(src, srcOffset),
@@ -484,7 +496,7 @@ ArrayCopyResult array_copy(ManagedObject *src, int32 srcOffset, ManagedObject *d
         break;
     case 'I':
 #ifdef VM_STATS
-        increment_array_copy_counter(vm_stats_total.num_arraycopy_int);
+        increment_array_copy_counter(VM_Statistics::get_vm_stats().num_arraycopy_int);
 #endif // VM_STATS
         memmove(get_vector_element_address_int32(dst, dstOffset),
                 get_vector_element_address_int32(src, srcOffset),
@@ -492,7 +504,7 @@ ArrayCopyResult array_copy(ManagedObject *src, int32 srcOffset, ManagedObject *d
         break;
     case 'J':
 #ifdef VM_STATS
-        increment_array_copy_counter(vm_stats_total.num_arraycopy_long);
+        increment_array_copy_counter(VM_Statistics::get_vm_stats().num_arraycopy_long);
 #endif // VM_STATS
         memmove(get_vector_element_address_int64(dst, dstOffset),
                 get_vector_element_address_int64(src, srcOffset),
@@ -500,7 +512,7 @@ ArrayCopyResult array_copy(ManagedObject *src, int32 srcOffset, ManagedObject *d
         break;
     case 'F':
 #ifdef VM_STATS
-        increment_array_copy_counter(vm_stats_total.num_arraycopy_float);
+        increment_array_copy_counter(VM_Statistics::get_vm_stats().num_arraycopy_float);
 #endif // VM_STATS
         memmove(get_vector_element_address_f32(dst, dstOffset),
                 get_vector_element_address_f32(src, srcOffset),
@@ -508,7 +520,7 @@ ArrayCopyResult array_copy(ManagedObject *src, int32 srcOffset, ManagedObject *d
         break;
     case 'D':
 #ifdef VM_STATS
-        increment_array_copy_counter(vm_stats_total.num_arraycopy_double);
+        increment_array_copy_counter(VM_Statistics::get_vm_stats().num_arraycopy_double);
 #endif // VM_STATS
         memmove(get_vector_element_address_f64(dst, dstOffset),
                 get_vector_element_address_f64(src, srcOffset),
@@ -518,7 +530,7 @@ ArrayCopyResult array_copy(ManagedObject *src, int32 srcOffset, ManagedObject *d
     case '[':
         {
 #ifdef VM_STATS
-            increment_array_copy_counter(vm_stats_total.num_arraycopy_object);
+            increment_array_copy_counter(VM_Statistics::get_vm_stats().num_arraycopy_object);
 #endif // VM_STATS
             ManagedObject **src_body =
                 (ManagedObject **)get_vector_element_address_ref(src, srcOffset);
@@ -528,7 +540,7 @@ ArrayCopyResult array_copy(ManagedObject *src, int32 srcOffset, ManagedObject *d
             if(src_class == dst_class) {
                 // If the types of arrays are the same, no type conflicts of array elements are possible.
 #ifdef VM_STATS
-                increment_array_copy_counter(vm_stats_total.num_arraycopy_object_same_type);
+                increment_array_copy_counter(VM_Statistics::get_vm_stats().num_arraycopy_object_same_type);
 #endif // VM_STATS
                 if (VM_Global_State::loader_env->compress_references) {
                     memmove(dst_body, src_body, length * sizeof(COMPRESSED_REFERENCE));
@@ -538,7 +550,7 @@ ArrayCopyResult array_copy(ManagedObject *src, int32 srcOffset, ManagedObject *d
             } else {
                 // If the types are different, the arrays are different and no overlap of the source and destination is possible.
 #ifdef VM_STATS
-                increment_array_copy_counter(vm_stats_total.num_arraycopy_object_different_type);
+                increment_array_copy_counter(VM_Statistics::get_vm_stats().num_arraycopy_object_different_type);
 #endif // VM_STATS
                 Class *dst_elem_clss = dst_class->array_element_class;
                 assert(dst_elem_clss);

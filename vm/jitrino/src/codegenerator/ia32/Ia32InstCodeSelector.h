@@ -23,7 +23,6 @@
 
 #include "CodeGenIntfc.h"
 #include "Ia32CodeSelector.h"
-#include "Timer.h"
 #include "CGSupport.h"
 namespace Jitrino
 {
@@ -46,13 +45,13 @@ class InstCodeSelector : public InstructionCallback {
 public:
     virtual void throwLinkingException(Class_Handle encClass, uint32 cp_ndx, uint32 opcode);
 
-	static void onCFGInit(IRManager& irManager);
+    static void onCFGInit(IRManager& irManager);
 
-    InstCodeSelector(CompilationInterface&			compIntfc,
-                        CfgCodeSelector&			codeSel,
-                        IRManager&					irM,
-						BasicBlock *				currentBasicBlock
-						); 
+    InstCodeSelector(CompilationInterface&          compIntfc,
+                        CfgCodeSelector&            codeSel,
+                        IRManager&                  irM,
+                        Node *                      currentBasicBlock
+                        ); 
     
     virtual ~InstCodeSelector () {}
 
@@ -81,7 +80,7 @@ public:
     CG_OpndHandle* sub(ArithmeticOp::Types,CG_OpndHandle* src1,CG_OpndHandle* src2);
     CG_OpndHandle* subRef(RefArithmeticOp::Types,CG_OpndHandle* refSrc, CG_OpndHandle* intSrc);
     CG_OpndHandle* diffRef(bool ovf, CG_OpndHandle* ref1,CG_OpndHandle* ref2);
-    CG_OpndHandle* scaledDiffRef(CG_OpndHandle* ref1,CG_OpndHandle* ref2);
+    CG_OpndHandle* scaledDiffRef(CG_OpndHandle* ref1,CG_OpndHandle* ref2, Type*, Type*);
     CG_OpndHandle* mul(ArithmeticOp::Types,CG_OpndHandle* src1,CG_OpndHandle* src2);
     CG_OpndHandle* tau_div(DivOp::Types,CG_OpndHandle* src1,CG_OpndHandle* src2,CG_OpndHandle *tauSrc1NonZero);
     CG_OpndHandle* tau_rem(DivOp::Types,CG_OpndHandle* src1,CG_OpndHandle* src2,CG_OpndHandle *tauSrc2NonZero);
@@ -110,7 +109,7 @@ public:
     void           jump() { // do nothing
     }
 
-	void           tableSwitch(CG_OpndHandle* src, uint32 nTargets);       
+    void           tableSwitch(CG_OpndHandle* src, uint32 nTargets);       
     void           throwException(CG_OpndHandle* exceptionObj, bool createStackTrace);
     void            throwSystemException(CompilationInterface::SystemExceptionId);
     CG_OpndHandle* convToInt(ConvertToIntOp::Types,bool isSigned,
@@ -151,9 +150,9 @@ public:
     CG_OpndHandle* ldFieldAddr(Type* fieldRefType,CG_OpndHandle* base,FieldDesc *desc);
     CG_OpndHandle* ldStaticAddr(Type* fieldRefType,FieldDesc *desc); 
     CG_OpndHandle* ldElemBaseAddr(CG_OpndHandle *array);
-    CG_OpndHandle* addElemIndex(CG_OpndHandle *elemBase,CG_OpndHandle* index);
+    CG_OpndHandle* addElemIndex(Type*, CG_OpndHandle *elemBase,CG_OpndHandle* index);
     CG_OpndHandle* ldElemAddr(CG_OpndHandle* array,CG_OpndHandle* index) {
-        return addElemIndex(ldElemBaseAddr(array),index);
+        return addElemIndex(NULL,ldElemBaseAddr(array),index);
     }
     CG_OpndHandle* tau_ldInd(Type* dstType, CG_OpndHandle* ptr, Type::Tag memType, 
                          bool autoUncompressRef,bool speculative,
@@ -186,7 +185,7 @@ public:
     CG_OpndHandle* newObj(ObjectType* objType);     
     CG_OpndHandle* newArray(ArrayType* arrayType, CG_OpndHandle* numElems);
     CG_OpndHandle* newMultiArray(ArrayType* arrayType, uint32 numDims, CG_OpndHandle** dims);
-    CG_OpndHandle* ldString(MethodDesc* enclosingMethod,uint32 stringToken, bool uncompress);
+    CG_OpndHandle* ldRef(Type *dstType, MethodDesc* enclosingMethod,uint32 stringToken, bool uncompress);
     CG_OpndHandle* ldToken(Type *dstType,MethodDesc* enclosingMethod,uint32 token);
 
     void           incCounter(Type *counterType,uint32 counter);
@@ -199,8 +198,7 @@ public:
                                 MethodDesc *desc, CG_OpndHandle *tauVtableHasDesc);
     CG_OpndHandle* tau_ldVTableAddr(Type *dstType, CG_OpndHandle* base, CG_OpndHandle *tauBaseNonNull);
     CG_OpndHandle* getVTableAddr(Type *dstType, ObjectType *base);
-    CG_OpndHandle* tau_ldIntfTableAddr(Type *dstType, CG_OpndHandle* base,NamedType* vtableTypeDesc,
-                                       CG_OpndHandle *tauBaseHasIntf);
+    CG_OpndHandle* tau_ldIntfTableAddr(Type *dstType, CG_OpndHandle* base,NamedType* vtableTypeDesc);
     CG_OpndHandle* calli(uint32 numArgs,CG_OpndHandle** args, Type* retType,
                          CG_OpndHandle* methodPtr, InlineInfo* ii = NULL);
     CG_OpndHandle* tau_calli(uint32 numArgs,CG_OpndHandle** args, Type* retType,
@@ -211,11 +209,12 @@ public:
     CG_OpndHandle* tau_call(uint32 numArgs, CG_OpndHandle** args, Type* retType,
                             MethodDesc *desc, CG_OpndHandle *nonNullFirstArgTau,
                             CG_OpndHandle *tauTypesChecked, InlineInfo* ii = NULL);
-    CG_OpndHandle* tau_callvirt(uint32 numArgs,CG_OpndHandle** args, Type* retType, MethodDesc *desc, CG_OpndHandle* tauNullChecked, CG_OpndHandle* tauTypesChecked, InlineInfo* ii = NULL);
+    CG_OpndHandle* tau_callvirt(uint32 numArgs,CG_OpndHandle** args, Type* retType, MethodDesc *desc,             CG_OpndHandle* tauNullChecked, CG_OpndHandle* tauTypesChecked, InlineInfo* ii = NULL);
     CG_OpndHandle* callintr(uint32 numArgs, CG_OpndHandle** args, Type* retType,IntrinsicCallOp::Id callId);
-    CG_OpndHandle* tau_callintr(uint32 numArgs, CG_OpndHandle** args, Type* retType,IntrinsicCallOp::Id callId, CG_OpndHandle *tauNullsChecked, CG_OpndHandle *tauTypesChecked);
+    CG_OpndHandle* tau_callintr(uint32 numArgs, CG_OpndHandle** args, Type* retType,IntrinsicCallOp::Id callId,      CG_OpndHandle *tauNullsChecked, CG_OpndHandle *tauTypesChecked);
     CG_OpndHandle* callhelper(uint32 numArgs, CG_OpndHandle** args, Type* retType,JitHelperCallOp::Id callId);
-    CG_OpndHandle* callvmhelper(uint32 numArgs, CG_OpndHandle** args, Type* retType,VMHelperCallOp::Id callId);
+    CG_OpndHandle* callvmhelper(uint32 numArgs, CG_OpndHandle** args, Type* retType,
+                VMHelperCallOp::Id callId, InlineInfo* ii = NULL);
     CG_OpndHandle* box(ObjectType * boxedType, CG_OpndHandle* val);
     CG_OpndHandle* unbox(Type * dstType, CG_OpndHandle* objHandle);
     CG_OpndHandle* ldValueObj(Type* objType, CG_OpndHandle *srcAddr);
@@ -254,6 +253,12 @@ public:
     CG_OpndHandle* catchException(Type * exceptionType);
     CG_OpndHandle* copy(CG_OpndHandle *src);
     void           prefetch(CG_OpndHandle *src, uint32 offset, int hints);
+
+    void pseudoInst();
+
+    void methodEntry(MethodDesc* mDesc);
+    void methodEnd(MethodDesc* mDesc, CG_OpndHandle* retOpnd = NULL);
+
     //
     //  Set/clear current persistent id to be assigned to the generated instructions
     //
@@ -273,6 +278,7 @@ public:
                       CompilationInterface::RuntimeHelperId helper,
                       Type *typeArgument,
                       Opnd * nonNullFirstArgTau);
+    void genExitHelper(Opnd* retOpnd, MethodDesc* meth);
 
     //
     //  Block information instructions
@@ -299,35 +305,36 @@ private:
     //
     uint64 currentHIRInstrID;
 
-	Opnd *	convertIntToInt(Opnd * srcOpnd, Type * dstType, Opnd * dstOpnd=NULL);
-	Opnd *	convertIntToFp(Opnd * srcOpnd, Type * dstType, Opnd * dstOpnd=NULL);
-	Opnd *	convertFpToInt(Opnd * srcOpnd, Type * dstType, Opnd * dstOpnd=NULL);
-	Opnd *	convertFpToFp(Opnd * srcOpnd, Type * dstType, Opnd * dstOpnd=NULL);
+    Opnd *  convertIntToInt(Opnd * srcOpnd, Type * dstType, Opnd * dstOpnd=NULL);
+    Opnd *  convertIntToFp(Opnd * srcOpnd, Type * dstType, Opnd * dstOpnd=NULL);
+    Opnd *  convertFpToInt(Opnd * srcOpnd, Type * dstType, Opnd * dstOpnd=NULL);
+    Opnd *  convertFpToFp(Opnd * srcOpnd, Type * dstType, Opnd * dstOpnd=NULL);
 
-	bool	isIntegerType(Type * type)
-	{ return type->isInteger()||type->isBoolean()||type->isChar(); }
-    void	copyOpnd(Opnd *dst, Opnd *src);
-    void	copyOpndTrivialOrTruncatingConversion(Opnd *dst, Opnd *src);
+    bool    isIntegerType(Type * type)
+    { return type->isInteger()||type->isBoolean()||type->isChar(); }
+    void    copyOpnd(Opnd *dst, Opnd *src);
+    void    copyOpndTrivialOrTruncatingConversion(Opnd *dst, Opnd *src);
 
-	Opnd * convert(CG_OpndHandle * oph, Type * dstType, Opnd * dstOpnd=NULL);
+    Opnd * convert(CG_OpndHandle * oph, Type * dstType, Opnd * dstOpnd=NULL);
 
-	Opnd * simpleOp_I8(Mnemonic mn, Type * dstType, Opnd * src1, Opnd * src2);
+    Opnd * simpleOp_I8(Mnemonic mn, Type * dstType, Opnd * src1, Opnd * src2);
 
-	Opnd * simpleOp_I4(Mnemonic mn, Type * dstType, Opnd * src1, Opnd * src2);
-	Opnd * fpOp(Mnemonic mn, Type * dstType, Opnd * src1, Opnd * src2);	
+    Opnd * simpleOp_I4(Mnemonic mn, Type * dstType, Opnd * src1, Opnd * src2);
+    
+    Opnd * fpOp(Mnemonic mn, Type * dstType, Opnd * src1, Opnd * src2); 
 
-	Opnd * createResultOpnd(Type * dstType);
+    Opnd * createResultOpnd(Type * dstType);
 
-	Opnd * divOp(DivOp::Types   op, bool rem, Opnd * src1, Opnd * src2);
+    Opnd * divOp(DivOp::Types   op, bool rem, Opnd * src1, Opnd * src2);
 
-	Opnd * minMaxOp(NegOp::Types   opType, bool max, Opnd * src1, Opnd * src2);
+    Opnd * minMaxOp(NegOp::Types   opType, bool max, Opnd * src1, Opnd * src2);
 
-	Opnd * shiftOp(IntegerOp::Types opType, Mnemonic mn, Opnd * value, Opnd * shiftAmount);
+    Opnd * shiftOp(IntegerOp::Types opType, Mnemonic mn, Opnd * value, Opnd * shiftAmount);
 
-	bool cmpToEflags(CompareOp::Operators cmpOp, CompareOp::Types opType,
-									Opnd * src1, Opnd * src2
-									);
-	//
+    bool cmpToEflags(CompareOp::Operators cmpOp, CompareOp::Types opType,
+                                    Opnd * src1, Opnd * src2
+                                    );
+    //
     // Enums
     //
     enum XmulKind {XmulKind_Low, XmulKind_High, XmulKind_HighUnsigned};
@@ -338,13 +345,12 @@ private:
 
     MethodDesc *     getMethodDesc() { return codeSelector.methodCodeSelector.getMethodDesc();  }
 
-	CodeProfiler * getCodeProfiler(){ return codeSelector.methodCodeSelector.getProfileInfo(); }
-	MemoryManager& getCodeSelectorMemoryManager(){ return codeSelector.methodCodeSelector.codeSelectorMemManager; }
-	
+    MemoryManager& getCodeSelectorMemoryManager(){ return codeSelector.methodCodeSelector.codeSelectorMemManager; }
+    
     Type * getMethodReturnType() { return getMethodDesc()->getMethodSig()->getReturnType(); }
 
-    Opnd *				sxtInt32(Opnd *opnd);
-    Opnd *				zxtInt32(Opnd *opnd);
+    Opnd *              sxtInt32(Opnd *opnd);
+    Opnd *              zxtInt32(Opnd *opnd);
     void                sxtOneInt32(Opnd*& opnd1, Opnd*& opnd2);
     void                zxtOneInt32(Opnd*& opnd1, Opnd*& opnd2);
     bool                opndIsFoldableImm(Opnd * opnd, uint32  nbits,
@@ -370,7 +376,7 @@ private:
                                     bool autoCompressRef, Opnd *baseTau, Opnd *offsetAndTypeTau);
     Type *              getFieldRefType(Type *dstType, Type::Tag memType);
     void                simplifyTypeTag(Type::Tag& tag,Type *ptr);
-	Opnd **			createReturnArray(Type * retType, uint32& numRegRet);
+    Opnd **         createReturnArray(Type * retType, uint32& numRegRet);
     void                assignCallArgs(CallInst *call, uint32 numArgs, CG_OpndHandle **args, 
                                        Type *retType, bool isHelperCall);
     CG_OpndHandle*      assignCallRet(CallInst *call, Type *retType, bool isHelperCall);
@@ -384,13 +390,13 @@ private:
                                           CG_OpndHandle* src);
     CG_OpndHandle *            genTauSplit(BranchInst * br);
 
-    Type *              getRuntimeIdType() {return typeManager.getIntPtrType();}
+    Type *              getRuntimeIdType() {return typeManager.getUnmanagedPtrType(typeManager.getIntPtrType());}
 
-	//  Check if we should inline synchronization
+    //  Check if we should inline synchronization
     bool                inlineSync(CompilationInterface::ObjectSynchronizationInfo& syncInfo);
 
-	//  Check if we should generate tau instructions
-	bool                suppressTauInsts(){ return true; }; 
+    //  Check if we should generate tau instructions
+    bool                suppressTauInsts(){ return true; }; 
     //
     //  Synchronization fence flag
     //
@@ -410,36 +416,33 @@ private:
     Opnd *         createIntReg(Type * type);
     Opnd *         createFloatReg(Type * type);
 
-	CG_OpndHandle*    getTauUnsafe()const
-	{ 	return (CG_OpndHandle*)&_tauUnsafe; }
+    CG_OpndHandle*    getTauUnsafe()const
+    {   return (CG_OpndHandle*)&_tauUnsafe; }
 
-
-	//
+    //
     // Fields
     //
-    CompilationInterface&			compilationInterface;
-    CfgCodeSelector&				codeSelector;
-	IRManager&						irManager;
-	TypeManager&					typeManager;
-    MemoryManager					memManager; // for local data
-	BasicBlock *					currentBasicBlock;
-    Opnd **							vars;
-    uint32							inArgPos;
-    int								persistentId;
+    CompilationInterface&           compilationInterface;
+    CfgCodeSelector&                codeSelector;
+    IRManager&                      irManager;
+    TypeManager&                    typeManager;
+    MemoryManager                   memManager; // for local data
+    Node*                           currentBasicBlock;
+    Opnd **                         vars;
+    uint32                          inArgPos;
+    int                             persistentId;
 #ifdef _DEBUG
-    uint32							nextInArg;
+    uint32                          nextInArg;
 #endif
-    bool							seenReturn;
-    Opnd *							switchSrcOpnd;
-    uint32							switchNumTargets;
-    PersistentInstructionId			currPersistentId;
-    Opnd *							currPredOpnd;
-	static CompilationInterface::RuntimeHelperId
+    bool                            seenReturn;
+    Opnd *                          switchSrcOpnd;
+    uint32                          switchNumTargets;
+    PersistentInstructionId         currPersistentId;
+    Opnd *                          currPredOpnd;
+    static CompilationInterface::RuntimeHelperId
                                  divOpHelperIds[],
                                  remOpHelperIds[];
-
-
-	static uint32 _tauUnsafe;
+    static uint32 _tauUnsafe;
 };
 
 

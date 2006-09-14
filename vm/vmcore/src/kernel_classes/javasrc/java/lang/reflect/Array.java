@@ -196,7 +196,7 @@ public final class Array {
     /**
      * @com.intel.drl.spec_ref 
      */
-    public static Object newInstance(Class componentType, int length)
+    public static Object newInstance(Class<?> componentType, int length)
         throws NegativeArraySizeException {
         return newInstance(componentType, new int[] { length });
     }
@@ -204,7 +204,7 @@ public final class Array {
     /**
      * @com.intel.drl.spec_ref 
      */
-    public static Object newInstance(Class componentType, int[] dimensions)
+    public static Object newInstance(Class<?> componentType, int[] dimensions)
         throws IllegalArgumentException, NegativeArraySizeException {
         if (componentType == null) {
             throw new NullPointerException();

@@ -18,13 +18,24 @@
  * @version $Revision: 1.16.8.2.4.3 $
  */
 
-#include "Ia32DCE.h"
+#include "Ia32IRManager.h"
 #include "Ia32CodeGenerator.h"
 
 namespace Jitrino
 {
 namespace Ia32{
 
+/**
+    class DCE performs Dead code elimination
+*/
+class DCE : public SessionAction {
+public:
+    void runImpl();
+    uint32 getSideEffects() const {return 0;}
+    uint32 getNeedInfo()const {return 0;}
+};
+
+static ActionFactory<DCE> _dce("cg_dce");
 
 
 //========================================================================================
@@ -33,25 +44,24 @@ namespace Ia32{
 
 //_________________________________________________________________________________________________
 void DCE::runImpl()
-{	
-	if (parameters && !irManager.getCGFlags()->earlyDCEOn) {
-		return;
-	}
+{   
+    bool early = false;
+    getArg("early", early);
+    if (early && !irManager->getCGFlags()->earlyDCEOn) {
+        return;
+    }
 
-	IRManager & irm=getIRManager();
-    irm.updateLivenessInfo();
-    irm.calculateOpndStatistics();
-	LiveSet ls(irm.getMemoryManager(), irm.getOpndCount());
-    const Nodes& nodes = irm.getNodesPostorder();
+    irManager->updateLivenessInfo();
+    irManager->calculateOpndStatistics();
+    BitSet ls(irManager->getMemoryManager(), irManager->getOpndCount());
+    const Nodes& nodes = irManager->getFlowGraph()->getNodesPostOrder();
     for (Nodes::const_iterator it = nodes.begin(),end = nodes.end();it!=end; ++it) {
         Node* node = *it;
-        if (node->hasKind(Node::Kind_BasicBlock)){
-            irm.getLiveAtExit(node, ls);
-			BasicBlock * bb=(BasicBlock *)node;
-			const Insts& insts=bb->getInsts();
-			for (Inst * inst=insts.getLast(), * prevInst=NULL; inst!=NULL; inst=prevInst){
-				prevInst=insts.getPrev(inst);
-				bool deadInst=!inst->hasSideEffect();
+        if (node->isBlockNode()){
+            irManager->getLiveAtExit(node, ls);
+            for (Inst * inst=(Inst*)node->getLastInst(), * prevInst=NULL; inst!=NULL; inst=prevInst){
+                prevInst=inst->getPrevInst();
+                bool deadInst=!inst->hasSideEffect();
                 if (deadInst){
                     if (inst->hasKind(Inst::Kind_CopyPseudoInst)){
                         Opnd * opnd=inst->getOpnd(1);
@@ -60,11 +70,11 @@ void DCE::runImpl()
                         }
                     }
                     if (deadInst){
-						Inst::Opnds opnds(inst, Inst::OpndRole_All);
-						for (Inst::Opnds::iterator it = opnds.begin(); it != opnds.end(); it = opnds.next(it)){
-							Opnd * opnd = inst->getOpnd(it);
-                            if ((ls.isLive(opnd) && (inst->getOpndRoles(it) & Inst::OpndRole_Def)) ||
-								(((opnd->getMemOpndKind()&(MemOpndKind_Heap|MemOpndKind_StackManualLayout))!=0) && (inst->getMnemonic() != Mnemonic_LEA))) {
+                        Inst::Opnds opnds(inst, Inst::OpndRole_All);
+                        for (Inst::Opnds::iterator ito = opnds.begin(); ito != opnds.end(); ito = opnds.next(ito)){
+                            Opnd * opnd = inst->getOpnd(ito);
+                            if ((ls.getBit(opnd->getId()) && (inst->getOpndRoles(ito) & Inst::OpndRole_Def)) ||
+                                (((opnd->getMemOpndKind()&(MemOpndKind_Heap|MemOpndKind_StackManualLayout))!=0) && (inst->getMnemonic() != Mnemonic_LEA))) {
                                 deadInst=false;
                                 break;
                             }
@@ -72,17 +82,23 @@ void DCE::runImpl()
                     }
                 }
                 if (deadInst) {
-                	bb->removeInst(inst);
+                    inst->unlink();
                 } else {
-					irm.updateLiveness(inst, ls);
+                    irManager->updateLiveness(inst, ls);
                 }
-			}
-			irm.getLiveAtEntry(node)->copyFrom(ls);
-		}
-	}
-	irm.eliminateSameOpndMoves();
-    irManager.packOpnds();
-    irm.invalidateLivenessInfo();
+            }
+            irManager->getLiveAtEntry(node)->copyFrom(ls);
+        }
+    }
+
+    irManager->eliminateSameOpndMoves();
+
+    irManager->getFlowGraph()->purgeEmptyNodes();
+    irManager->getFlowGraph()->mergeAdjacentNodes(true, false);
+    irManager->getFlowGraph()->purgeUnreachableNodes();
+
+    irManager->packOpnds();
+    irManager->invalidateLivenessInfo();
 }
 
 }}; //namespace Ia32

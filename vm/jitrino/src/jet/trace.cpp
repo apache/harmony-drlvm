@@ -14,28 +14,31 @@
  *  limitations under the License.
  */
 /**
- * @author Alexander V. Astapchuk
- * @version $Revision: 1.4.12.3.4.4 $
+ * @author Alexander Astapchuk
+ * @version $Revision$
  */
  
 /**
  * @file
- * @brief Implementation of debug tracing utilities.
+ * @brief Implementation of tracing and logging utilities.
  */
 #include "trace.h"
 #include "compiler.h"
-#include "cg_ia32.h"
 
+#include "../shared/mkernel.h"
 #include "jit_intf.h"
 
-#if !defined(PLATFORM_POSIX)
+#ifdef _WIN32
     #include <windows.h>
+    #define snprintf    _snprintf
 #else
     #include <dlfcn.h>
-#endif // !defined(PLATFORM_POSIX)
+#endif // defined(_WIN32)
 
 #include <stdio.h>
 #include <stdarg.h>
+#include "enc.h"
+#include "Log.h"
 
 
 namespace Jitrino
@@ -43,11 +46,44 @@ namespace Jitrino
 namespace Jet
 {
 
+unsigned g_tbreak_id = NOTHING;
+
+
+/**
+ * @defgroup LWDIS Disassembling routine for Jitrino.JET
+ *
+ * Jitrino.JET does not include disassembler. Instead, it may call 
+ * external disassembling routine provided via exported function in 
+ * dynamic library.
+ *
+ * To add such possibility, the library must export \e stdcall (where 
+ * applicable) routine with the given signature.
+ * 
+ * The library must be named lwdis (which is lwdis.dll on Windows and 
+ * <b>lib</b>lwdis.so on Linux). The library must be accessible via regular
+ * library loading routines. On Windows it's normally PATH, System32 or 
+ * application main module's folder. On Linux it's LD_LIBRARY_PATH.
+ * 
+ * Also, on Linux an attempt will be made to load the library from the 
+ * application main module's folder first (regardless of LD_LIBRARY_PATH).
+ *
+ * lwdis stands for <b>l</b>ight-<b>w</b>eight <b>dis</b>assembler.
+ * 
+ * @see DISFUNC
+ * @{
+ * @}
+ */
 /**
  * @brief Disassembling function prototype.
- * @todo document lwdis library usage
+ * 
+ * @param[in] kode - code buffer to disassemble
+ * @param[out] buf - buffer to write disassembled string into
+ * @param buf_len - max length of the \c buf
+ * @return length of disassembled instruction, or 0 to indicate error.
+ * @see LWDIS
  */
 typedef unsigned (*DISFUNC)(const char *kode, char *buf, unsigned buf_len);
+
 
 /**
  * @brief Returns directory of currently running module, ended with file 
@@ -63,8 +99,8 @@ typedef unsigned (*DISFUNC)(const char *kode, char *buf, unsigned buf_len);
  * The function always returns the same address which points to internal 
  * static buffer. The buffer get initialized once, on the first call. 
  *
- * @note If called from within dynamic library, the function returns path for
- *       the 'main' executable module, not for the library itself.
+ * @note If called from within dynamic library, the function returns path
+ *       for the 'main' executable module, not for the library itself.
  * 
  * @return directory of currently running module, ended with file separator
  */
@@ -112,25 +148,57 @@ const char * get_exe_dir(void)
 
 void dbg(const char *frmt, ...)
 {
+    /* due to PMF integration
     static FILE *fout = fopen(LOG_FILE_NAME, "w");
     assert(fout != NULL);
     va_list valist;
     va_start(valist, frmt);
     vfprintf(fout, frmt, valist);
     fflush(fout);
-    //vprintf(frmt, valist);
+    */
+    char buf[1024];
+    va_list valist;
+    va_start(valist, frmt);
+    vsnprintf(buf, sizeof(buf)-1, frmt, valist);
+    LogStream& log = Log::log(LogStream::CT);
+    log.printf(buf);
+    log.flush();
 }
 
-void __stdcall rt_dbg(const char *msg)
+/* due to PMF integration
+static FILE *rtf = NULL;
+static Mutex rtf_mutex;
+*/
+static int cnt = 0;
+static int depth = 0;
+
+void dbg_rt(const char * frmt, ...) 
 {
-    static FILE *f = NULL;
-    if (f == NULL) {
-        f = fopen(RUNTIME_LOG_FILE_NAME, "w");
-        assert(f);
+    char buf[1024];
+    va_list valist;
+    va_start(valist, frmt);
+    int len = vsnprintf(buf, sizeof(buf)-1, frmt, valist);
+    
+    if (buf[len-1] < ' ') {
+        buf[len-1] = ' ';
     }
-    static int cnt = 0;
+    if (buf[len-2] < ' ') {
+        buf[len-2] = ' ';
+    }
+    dbg_rt_out(buf);
+}
+
+void __stdcall dbg_rt_out(const char *msg)
+{
+    /* due to PMF integration
+    if (rtf == NULL) {
+        rtf_mutex.lock();
+        rtf = fopen(RUNTIME_LOG_FILE_NAME, "w");
+        rtf_mutex.unlock();
+        assert(rtf);
+    }
+    */
     ++cnt;
-    static int depth = 0;
     if (!strncmp(msg, "enter", 5)) {
         ++depth;
     }
@@ -138,13 +206,25 @@ void __stdcall rt_dbg(const char *msg)
     // [call depth] message <total count>
     // precede the whole string with several spaces, so elements 
     // with big differences in the depth will be visually separated
-    fprintf(f, "%*c [%u] %s <%u>\n", depth%10, ' ', depth, msg, cnt);
-    fflush(f);
+    /* due to PMF integration
+    fprintf(rtf, "%*c [%u] %s <%u>\n", depth%10, ' ', depth, msg, cnt);
+    fflush(rtf);
+    */
+    char buf[1024*5];
+    snprintf(buf, sizeof(buf)-1, "%*c [%u] %s <%u>\n", 
+             depth%10, ' ', depth, msg, cnt);
+    LogStream& log = Log::log(LogStream::RT);
+    log.printf(buf);
+    log.flush();
+        
     if (!strncmp(msg, "exit", 4)) {
         --depth;
     }
     if (depth<0) {
         depth = 0;
+    }
+    if (g_tbreak_id != NOTHING && g_tbreak_id == (unsigned)cnt) {
+        Encoder::debug();
     }
 }
 
@@ -167,6 +247,10 @@ static DISFUNC get_disfunc(void)
         char buf[PATH_MAX+1];
         snprintf(buf, sizeof(buf), "%sliblwdis.so", get_exe_dir());
         void * handle = dlopen(buf, RTLD_NOW);
+        // An access with full path failed - let's try LD_LIBRARY_PATH.
+        if (handle==NULL) {
+            handle = dlopen("liblwdis.so", RTLD_NOW);
+        }
         disfunc = handle == NULL ? NULL : dlsym(handle, "disasm");
         load_done = true;
     }
@@ -174,104 +258,79 @@ static DISFUNC get_disfunc(void)
     return (DISFUNC)disfunc;
 }
 
-/**
- * @brief Formats a string to describe the passed Slot.
- * 
- * Returns a string formatted with a description of a slot passed.
- * The string contains 3 numbers: \b vslot.regid.id and some characters
- * which describe the state of the slot.
- * 
- * The following legend is used:
- *
- *   - * - an item was changed, need to be sync-ed to memeory
- *   - mem - an item is currently swapped to the memory
- *   - {} - an item represents a high part of a wide type (#dbl64 or #i64)
- *   - + - an item is positive or zero
- *   - nz - an item was tested against zero (for int-s) or against null 
- *           (for jobj)
- *   - ! - an item need swapping (i.e. an overflow in stack regs cache 
- *         happend)
- */
-static ::std::string toStr2(const JFrame::Slot & s, bool stackSlot)
+static ::std::string toStr(int i)
+{
+    char buf[20];
+    snprintf(buf, sizeof(buf)-1, "%d", i);
+    return buf;
+}
+
+::std::string CodeGen::toStr2(const Val& s, bool is_stack) const
 {
     ::std::string str;
-    if (s.jt == jvoid) {
+    if (false && s.jt() == jvoid) {
         str = "[x]";
         return str;
     }
-    str = "[";
+    str += "[";
 
-    //if( s.half )    str += '{';
-    if (s.state() & SS_HI_PART) {
-        str += '{';
-    }
-
-    if (s.attrs() & SA_NOT_NEG) {
+    if (s.has(VA_NOT_NEG)) {
         str += '+';
     };
-    str += jtypes[s.jt].name;
-
-    str += ',';
-    if (s.state() & SS_SWAPPED) {
-        str += "mem";
+    if (s.jt() != jvoid) {
+        str += jtypes[s.jt()].name;
     }
     
-    if (s.state() & SS_NEED_SWAP) {
-        str += '!';
-    }
-    
-    if (s.state() & SS_CHANGED) {
-        str += '*';
-    }
-    
-    if (s.attrs() & SA_NZ) {
-        str += "nz";
-    }
-
-    str += "#";
-    char buf[30];
-    if (s.vslot() == -1) {
-        str += "_";
-    }
-    else {
-        sprintf(buf, "%d", s.vslot());
-        str += buf;
-    }
-
-    str += '/';
-    if (s.regid() == -1) {
-        str += "_";
-    }
-    else if (!(s.state() & SS_SWAPPED)) {
-        const RegName * regs;
-        regs = is_f(s.type()) ? Compiler::g_frnames : Compiler::g_irnames;
-        if (!stackSlot) {
-            regs += is_f(s.type()) ? 
-                   Compiler::F_STACK_REGS : Compiler::I_STACK_REGS;
+    if (s.is_imm()) {
+        str += ",imm=";
+        char buf[50] = {0};
+        if (s.jt()<=i32) { snprintf(buf, sizeof(buf), "%d(0x%X)", s.ival(), s.ival()); }
+        if (s.jt()==flt32) { snprintf(buf, sizeof(buf), "%g", (double)s.fval()); }
+        if (s.jt()==dbl64) { snprintf(buf, sizeof(buf), "%g", s.dval()); }
+        if (s.jt()==jobj) { snprintf(buf, sizeof(buf), "%p", s.pval()); }
+        if (s.jt()==i64) {
+            if (is_big(i64)) {
+                snprintf(buf, sizeof(buf), "%d(0x%X)", s.ival(), s.ival());
+            }
+            else {
+                snprintf(buf, sizeof(buf), "%ld(0x%LX)", (long int)s.lval(), (long long)s.lval());
+            }
         }
-        sprintf(buf, "%s", getRegNameString(regs[s.regid()]));
         str += buf;
+        if (s.caddr() != NULL) {
+            snprintf(buf, sizeof(buf), "[@%p]", s.caddr());
+            str += buf;
+        }
+    }
+    else if (s.is_reg()) {
+        str += "@";
+        str += Encoder::to_str(s.reg());
     }
     else {
-        sprintf(buf, "%d", s.regid());
-        str += buf;
+        assert(s.is_mem());
+        int l = vvar_idx(s);
+        if (s.is_dummy()) {
+            str += "----";
+        }
+        if (is_stack && l != -1) {
+            str += "@var#" + toStr(l);
+        }
+        else if (vis_stack(s) && is_stack) {
+            // no op - do not printout stack's offset
+        }
+        else if (l != -1 && !is_stack) {
+            // no op - do not printout local's offset
+        }
+        else {
+            str += "@";
+            str += Encoder::to_str(s.base(), s.disp(), s.index(), s.scale());
+        }
     }
-
-    str += '/';
-    if (s.id() == (unsigned) -1) {
-        str += "_";
+        
+    if (s.has(VA_NZ)) {
+        str += ",nz";
     }
-    else {
-        sprintf(buf, "%d", s.id());
-        str += buf;
-    }
-
-    //if (s.changed) str += '*';
-    //if (s.swapped) str += '!';
-    //if (s.half) str += '}';
-    if (s.state() & SS_HI_PART) {
-        str += '}';
-    }
+    
     str += "]";
     return str;
 }
@@ -294,17 +353,51 @@ static ::std::string toStr2(const JFrame::Slot & s, bool stackSlot)
     return s;
 }
 
-void dump_frame(char *ptr)
+void dump_frame(const JitFrameContext* ctx, const MethodInfoBlock& info)
 {
-    // outdated
-    assert(false);  // also need method_get_info_block() to collect the complete data
+    assert(false); // obsolete, need update
+    StackFrame sframe(info.get_num_locals(),
+                      info.get_stack_max(), 
+                      info.get_in_slots());
+    // Not yet implemented
+    assert(!(info.get_flags() & JMF_SP_FRAME));
     
-    // presuming we have a EBP value
-    MethodInfoBlock rtinfo(NULL);
-    StackFrame stackframe(rtinfo.get_num_locals(),
-                rtinfo.get_stack_max(), rtinfo.get_in_slots());
-    int *p = (int *) ptr;
-
+    void *** pbp = devirt(bp, ctx);
+    char * bp_val = (char*)(**pbp);
+    
+    dbg_rt("****************************************");
+#define PRN(nam, frmt, type, meth_nam)  \
+    dbg_rt(#nam "= " #frmt "\n", *(type*)(bp_val+sframe.meth_nam()))
+    
+    PRN(retIP, %p, void*, ret);
+    PRN(info_gc_stack_depth, %d, int, info_gc_stack_depth);
+    PRN(info_gc_locals, %d, int, info_gc_locals);
+    PRN(thiz, %p, void*, thiz);
+    
+    unsigned num_locals = info.get_num_locals();
+    for (unsigned i=0; i<num_locals; i++) {
+        //dbg_rt("local#%d = %p (%d)\n", i, )
+    }
+    
+#undef PRN
+    //int ret(void) const
+    //unsigned size(void) const
+    //int spill(unsigned i) const
+    //int (void) const
+    //int (void) const
+    //int info_gc_args(void) const
+    //int info_gc_stack(void) const
+    //int info_gc_regs(void) const
+    //int (void) const
+    //int scratch(void) const
+    //int scratch(AR ar) const
+    //int dbg_sp(void) const
+    //int local(unsigned i) const
+    //int stack_bot(void) const
+    //int stack_slot(unsigned Val) const
+    //int stack_max(void) const
+    //int native_stack_bot(void) const
+#if 0
     unsigned num_locals = rtinfo.get_num_locals();
     unsigned stack_max = rtinfo.get_stack_max();
 
@@ -367,13 +460,14 @@ void dump_frame(char *ptr)
                 *(p + stackframe.native_stack_bot() + i));
     }
     dbg("===========================\n");
+#endif
 }
 
 void Compiler::dbg_trace_comp_start(void)
 {
     // start ; counter ; klass::method ; bytecode size ; signature
     dbg("start |%5d| %s::%s | bc.size=%d | %s\n",
-        g_methodsSeen,
+        m_methID,
         class_get_name(m_klass), method_get_name(m_method),
         method_get_byte_code_size(m_method),
         method_get_descriptor(m_method));
@@ -385,11 +479,11 @@ void Compiler::dbg_trace_comp_end(bool success, const char * reason)
     //          [REJECTED][code start ; code end ; code size] ; signature
 
     dbg("end   |%5d| %s::%s | ", 
-        g_methodsSeen, class_get_name(m_klass), method_get_name(m_method));
+        m_methID, class_get_name(m_klass), method_get_name(m_method));
         
     if (success) {
-        void * start = method_get_code_block_addr_jit(m_method, jit_handle);
-        unsigned size = method_get_code_block_size_jit(m_method, jit_handle);
+        unsigned size = method_get_code_block_size_jit(m_method, m_hjit);
+        void * start = size ? method_get_code_block_addr_jit(m_method, m_hjit) : NULL;
         
         dbg("code.start=%p | code.end=%p | code.size=%d", 
              start, (char*)start + size, size);    
@@ -403,10 +497,8 @@ void Compiler::dbg_trace_comp_end(bool success, const char * reason)
 
 ::std::string Compiler::toStr(const JInst & jinst, bool show_names)
 {
-    char buf[10240], tmp0[1024] = { 0 }, tmp1[1024] = { 0 };
+    char tmp0[1024] = { 0 }, tmp1[1024] = { 0 };
     
-    const InstrDesc & idesc = instrs[jinst.opcode];
-
     if (jinst.op0 != (int) NOTHING) {
         const char * lpClass = NULL;
         const char * lpItem = NULL;
@@ -462,71 +554,94 @@ void Compiler::dbg_trace_comp_end(bool success, const char * reason)
     if (jinst.op1 != (int) NOTHING) {
         sprintf(tmp1, " %d ", jinst.op1);
     }
-
-    snprintf(buf, sizeof(buf)-1, "%c%2d) %-15s %-6s %-6s",
-        idesc.flags & OPF_GC_PT ? '*' : ' ', jinst.pc, idesc.name,
-        tmp0, tmp1);
-
-    return::std::string(buf);
+    
+    char total[10240] = {0}, buf0[10240] = {0}, buf1[100] = {0};
+    snprintf(buf0, sizeof(buf0)-1, "%c%2d) %-15s %-6s %-6s",
+        jinst.flags & OPF_STARTS_BB ? '@' : ' ', 
+        jinst.pc, instrs[jinst.opcode].name, tmp0, tmp1);
+        
+    if (jinst.ref_count != 1 && jinst.ref_count != 0) {
+        //snprintf(buf1, sizeof(buf1)-1, "| id=%2d, rc=%d", jinst.id, jinst.ref_count);
+        snprintf(buf1, sizeof(buf1)-1, "| rc=%d", jinst.ref_count);
+    }
+    else {
+        //snprintf(buf1, sizeof(buf1)-1, "| id=%2d", jinst.id);
+        //snprintf(buf1, sizeof(buf1)-1, "| id=%2d", jinst.id);
+    }
+    snprintf(total, sizeof(total)-1, "%-40s %s", buf0, buf1);
+    return ::std::string(total);
 }
 
 void Compiler::dbg_dump_bbs(void)
 {
     static const char *bb_delim = "======================================\n";
 
-    BBInfo bb = m_bbs[0];
-    JInst jinst;
-    unsigned pc = 0;
-    while (NOTHING != (pc = fetch(pc, jinst))) {
-        bool bb_head = m_bbs.find(jinst.pc) != m_bbs.end();
-        char jmptarget = ' ';
+    const unsigned bc_size = m_infoBlock.get_bc_size();
+    for (unsigned pc=0; pc<bc_size; pc++) {
+        JInst& jinst = m_insts[pc];
+        if (jinst.id == 0) continue;
+        bool bb_head = jinst.flags & OPF_STARTS_BB;
+        bool jsr_target = false;
         if (bb_head) {
-            bb = m_bbs[jinst.pc];
-            if (bb.jmp_target) {
-                jmptarget = '>';
-            }
+            assert(m_bbs.find(jinst.pc) != m_bbs.end());
             dbg(bb_delim);
+            jsr_target = m_bbs[jinst.pc].jsr_target;
         }
         if (bb_head) {
-            const BBInfo& bbinfo = m_bbs[jinst.pc];
-            dbg("ref.count=%d, %s, last=%u, next=%u\n", bbinfo.ref_count, 
-                bbinfo.jsr_target ? "#JSR#" : "",
-                bbinfo.last_pc, bbinfo.next_bb);
-            dbg("%c%s\n", jmptarget, toStr(jinst, false).c_str());
+            dbg("ref.count=%d, %s\n", jinst.ref_count, 
+                                      jsr_target ? "#JSR#" : "");
         }
-        else {
-            dbg("%c%s\n", jmptarget, toStr(jinst, false).c_str());
-        }
+        dbg("%s\n", toStr(jinst, true).c_str());
     }
     dbg(bb_delim);
 }
 
-void dbg_dump_jframe(const char *name, const JFrame * pjframe)
+void CodeGen::dbg_dump_state(const char *name, BBState * pState)
 {
-    const JFrame& jframe = *pjframe;
-    dbg("\n;; frame.%s, need_update=%d\n;;\n", name, jframe.need_update());
+    JFrame& jframe = pState->jframe;
+    dbg("\n;;State: %s\n;;\n", name);
     //
     unsigned num_locals = jframe.num_vars();
     dbg(";; locals.total=%d\n;; ", num_locals);
     
-    // Dump local variables first
+    // Dump local variables first - by 5 in a row ...
     for (unsigned i = 0; i < num_locals; i++) {
         if (i && !(i % 5)) {
             dbg("\n;;  ");
         }
-        const JFrame::Slot & s = jframe.get_var(i);
-        dbg(" %s", toStr2(s, false).c_str());
+        Val& s = jframe.var(i);
+        dbg(" %d)%s", i, toStr2(s, false).c_str());
+        if (i>=128) {
+            dbg("\ntoo many locals, enough to dump.\n");
+            break;
+        }
     }
     
     dbg("\n;;\n");
     // ... and stack after that
     dbg(";; stack.size=%d\n;;  ", jframe.size());
     for (unsigned i = 0; i < jframe.size(); i++) {
-        if (i && !(i % 5)) {
-            dbg("\n;;  ");
-        }
-        const JFrame::Slot & s = jframe.get_stack(i);
+        //if (i && !(i % 5)) {
+        //    dbg("\n;;  ");
+        //}
+        const Val& s = jframe.at(i);
         dbg(" %s", toStr2(s, true).c_str());
+        dbg("\n;;  ");
+    }
+    dbg("\n;;\n");
+    dbg(";; regs: ");
+    bool not_first = false;
+    for (unsigned i=0; i<ar_num; i++) {
+        AR ar = _ar(i);
+        if (rrefs(ar) != 0 || rlocks(ar) != 0) {
+            if (not_first) {
+                dbg(",");
+            }
+            if (rlocks(ar)!=0) { dbg(">"); }
+            dbg("%s[%d]", Encoder::to_str(ar).c_str(), rrefs(ar));
+            if (rlocks(ar)!=0) { dbg("<,%d", rlocks(ar)); }
+            not_first = true;
+        }
     }
     dbg("\n;;\n");
 }
@@ -543,9 +658,16 @@ void Compiler::dbg_dump_code(const char *code, unsigned length,
     for (unsigned i = 0; i < length; /**/) {
         char buf[1024];
         unsigned bytes = (disf) (code + i, buf, sizeof(buf));
-        assert(bytes);  // cant be 0, or we'll fall into infinite loop
-        i += bytes ? bytes : 1;
-        dbg("\t%s\n", buf);
+        if (bytes==0) {
+            // unknown instruction
+            unsigned char b = *(unsigned char*)(code+i);
+            dbg("\tdb 0x%x (%d, %c)\n", b, b, b<33 || b>127 ? '.' : b);
+            i += 1; // cant be 0, or we'll fall into infinite loop
+        }
+        else {
+            dbg("\t%s\n", buf);
+            i += bytes;
+        }
     }
     }
     else {
@@ -571,23 +693,27 @@ void Compiler::dbg_dump_code(const char *code, unsigned length,
     }
 }
 
-void Compiler::dbg_dump_code(void)
+void Compiler::dbg_dump_code_bc(const char * code, unsigned codeLen)
 {
-    const char * code = (const char*)
-                        method_get_code_block_addr_jit(m_method, jit_handle);
-    const unsigned codeLen = 
-                        method_get_code_block_size_jit(m_method, jit_handle);
+    if (codeLen == 0) {
+        dbg("no code\n");
+        return;
+    }
     unsigned pc = NOTHING;
     DISFUNC disf = get_disfunc();
+    const char * first_inst = m_infoBlock.get_ip(0);
+        
     for (unsigned i=0; i<codeLen; /**/) {
         const char * ip = code + i;
         unsigned tmp = m_infoBlock.get_pc(ip);
-        if (pc != tmp) {
+        if (ip>=first_inst && pc != tmp) {
             // we just passed to a new byte code instruction, print it out
             pc = tmp;
             JInst jinst;
+            memset(&jinst, 0, sizeof(jinst));
             unsigned next_pc = fetch(pc, jinst);
             dbg(";; %s\n", toStr(jinst, true).c_str());
+            // Dump all instructions that do have the same IP.
             // check whether we have a code for this instruction - read next
             // item and compare its IP. If they are the same, then 'jinst' 
             // represents an empty instruction with no real code - NOP, POP, 
@@ -598,6 +724,7 @@ void Compiler::dbg_dump_code(void)
                 if (next_ip != ip) {
                     break;
                 }
+                memset(&jinst, 0, sizeof(jinst));
                 next_pc = fetch(next_pc, jinst);
                 dbg(";; %s\n", toStr(jinst, true).c_str());
             }
@@ -605,9 +732,17 @@ void Compiler::dbg_dump_code(void)
         if (disf) {
             char buf[1024];
             unsigned bytes = disf(code + i, buf, sizeof(buf));
-            assert(bytes != 0); // cant be 0
-            dbg("%p\t%s\n", code + i, buf);
-            i += bytes;
+            if (bytes==0) {
+                // unknown instruction
+                unsigned char b = *(unsigned char*)(code+i);
+                dbg("0x%p\tdb 0x%x (%d, %c)\n", code+i, b, b, b<33 || b>127 ? '.' : b);
+                i += 1; // cant be 0, or we'll fall into infinite loop
+            }
+            else {
+                dbg("0x%p\t%s\n", code + i, buf);
+                i += bytes;
+            }
+            
         }
         else {
             i += 1;

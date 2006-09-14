@@ -38,70 +38,70 @@ namespace Jitrino {
 template<class KEY, class ELEM> 
 class MapSet : public StlMap<KEY, ELEM> {
 public:
-	typedef StlMap<KEY,ELEM> Map;
+    typedef StlMap<KEY,ELEM> Map;
 #ifdef PLATFORM_POSIX
     typedef typename Map::const_iterator const_iterator;
     typedef typename Map::iterator iterator;
     typedef typename Map::value_type value_type;
 #endif
 
-	//
-	// Constructor
-	//
+    //
+    // Constructor
+    //
     MapSet(MemoryManager& memManager) : Map(memManager) {
     }
-	//
-	//	Copy constructor
-	//
-	MapSet(MemoryManager& memManager, const MapSet<KEY,ELEM> &set)
+    //
+    //  Copy constructor
+    //
+    MapSet(MemoryManager& memManager, const MapSet<KEY,ELEM> &set)
         : Map(memManager) {
         const_iterator iter = set.begin(),
                         end = set.end();
-		for (; iter != end; iter++) {
-			value_type val = *iter;
+        for (; iter != end; iter++) {
+            value_type val = *iter;
             insert(val.first, val.second);
-		}
-	}
+        }
+    }
     //
     //  Returns number of elements in the set
     //
     uint32 getSize() const {return (uint32) size();}
-	//
-	//  Returns true if set contains the element, false otherwise
-	//
-	bool contains(KEY key) const {
+    //
+    //  Returns true if set contains the element, false otherwise
+    //
+    bool contains(KEY key) const {
         return find(key) != end();
-	}
-	//
-	//  Inserts element into the set
-	//
+    }
+    //
+    //  Inserts element into the set
+    //
     void insert(KEY key, ELEM elem) {(*this)[key] = elem;}
     //
     //  Removes element from the set
     //
     void remove(KEY key) {erase(key);}
-	
+    
 
-	//
-	//	Checks if set is empty
-	//
+    //
+    //  Checks if set is empty
+    //
     bool isEmpty() {return empty();}
-	//
-	//	Copies another set
-	//
-	void copyFrom(const MapSet<KEY,ELEM>& set) {
-		if (this != &set) {
+    //
+    //  Copies another set
+    //
+    void copyFrom(const MapSet<KEY,ELEM>& set) {
+        if (this != &set) {
             clear();
             const_iterator iter = set.begin(),
                      end = set.end();
             for (; iter != end; iter++)
                 insert(iter->first, iter->second);
-		}
-	}
-	//
-	//	Unions with another set
-	//
-	void unionWith(const MapSet<KEY,ELEM>& set) {
+        }
+    }
+    //
+    //  Unions with another set
+    //
+    void unionWith(const MapSet<KEY,ELEM>& set) {
         const_iterator iter = set.begin(),
                               setend  = set.end();
         for (; iter != setend; iter++) {
@@ -110,11 +110,11 @@ public:
             if (iter2 == end())
                 insert(iter->first, iter->second);
         }
-	}
-	//
-	//	Intersects with another set
-	//
-	void intersectWith(const MapSet<KEY,ELEM>& set) {
+    }
+    //
+    //  Intersects with another set
+    //
+    void intersectWith(const MapSet<KEY,ELEM>& set) {
         //
         // Find elements that are in this set bat are not in 'set' and
         // write them into 'removeList'.
@@ -133,16 +133,16 @@ public:
         //
         for (uint32 i = 0; i < removeListSize; i++)
             erase(removeList[i]);
-	}
-	//
-	//	Subtracts another set
-	//
-	void subtract(const MapSet<KEY,ELEM>& set) {
+    }
+    //
+    //  Subtracts another set
+    //
+    void subtract(const MapSet<KEY,ELEM>& set) {
         const_iterator iter = set.begin(),
                               setend  = set.end();
         for (; iter != setend; iter++) 
             erase(iter->first);
-	}
+    }
     //
     //  Checks if the set is subset of another set
     //
@@ -166,9 +166,9 @@ public:
         }
         return true;
     }
-	//
-	//	Checks if the set is equal to another set
-	//
+    //
+    //  Checks if the set is equal to another set
+    //
     bool isEqual(const MapSet<KEY,ELEM>& set) {
         return isSubset(set) && set.isSubset(*this);
     }

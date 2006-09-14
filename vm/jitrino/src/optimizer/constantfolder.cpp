@@ -43,11 +43,11 @@ inline int isFinite(double s) {
 }
 
 inline float _chgsign(float f) {
-		return copysignf(f, signbit(f) ? (float)1.0 : (float)-1.0 );
+        return copysignf(f, signbit(f) ? (float)1.0 : (float)-1.0 );
 }
 
 inline double _chgsign(double d) {
-		return copysign(d, signbit(d) ? 1.0 : -1.0 );
+        return copysign(d, signbit(d) ? 1.0 : -1.0 );
 }
 
 // isnan(double s) is declared in float.h
@@ -189,7 +189,7 @@ ConstantFolder::isConstantZero(Opnd* opnd) {
     case Type::Object:
         return value.i == 0;
     default:
-	return false;
+    return false;
     }
 }
 
@@ -205,7 +205,7 @@ ConstantFolder::isConstantOne(Opnd* opnd) {
     case Type::Int64:
         return value.i8 == 1;
     default:
-	return false;
+    return false;
     }
 }
 
@@ -221,7 +221,7 @@ ConstantFolder::isConstantAllOnes(Opnd* opnd) {
     case Type::Int64:
         return value.i8 == (int64) -1;
     default:
-	return false;
+    return false;
     }
 }
 
@@ -298,7 +298,7 @@ ConstantFolder::fold8(Opcode opc, int8 c1, int8 c2, int32& result, bool is_signe
     case Op_Max:
         result = ::std::max(c1,c2); return true;
     default:
-	return true;
+    return true;
     }
 }
 bool
@@ -339,7 +339,7 @@ ConstantFolder::fold16(Opcode opc, int16 c1, int16 c2, int32& result, bool is_si
     case Op_Max:
         result = ::std::max(c1,c2); return true;
     default:
-	return true;
+    return true;
     }
 }
 
@@ -363,10 +363,10 @@ ConstantFolder::fold32(Opcode opc, int32 c1, int32 c2, int32& result, bool is_si
     case Op_TauDiv:    
         if (c2 == (int32)0) return false;
         if (is_signed) {
-			if ((c1 == (int32)0x80000000) && (c2 == -1)) {
-				result = c1; 
-				return true;
-			}
+            if ((c1 == (int32)0x80000000) && (c2 == -1)) {
+                result = c1; 
+                return true;
+            }
 
             result = c1 / c2; return true;
         } else {
@@ -375,10 +375,10 @@ ConstantFolder::fold32(Opcode opc, int32 c1, int32 c2, int32& result, bool is_si
     case Op_TauRem:
         if (c2 == (int32)0) return false;
         if (is_signed) {
-			if ((c1 == (int32)0x80000000) && (c2 == -1)) {
-				result = 0; 
-				return true;
-			}
+            if ((c1 == (int32)0x80000000) && (c2 == -1)) {
+                result = 0; 
+                return true;
+            }
 
             result = c1 % c2; return true;
         } else {
@@ -419,6 +419,11 @@ ConstantFolder::fold64(Opcode opc, int64 c1, int64 c2, int64& result, bool is_si
         // for div and rem, be careful c2 not be 0
     case Op_TauDiv:
         if (c2 == (int64)0) return false;
+        // LONG.MIN_VALUE / -1 == LONG.MIN_VALUE
+        if ((c2 == (int64)-1) && (c1 == ((int64)1<<63))) {
+            result = c1;
+            return true;
+        }
         if (is_signed) {
             result = c1 / c2;
         } else {
@@ -427,6 +432,11 @@ ConstantFolder::fold64(Opcode opc, int64 c1, int64 c2, int64& result, bool is_si
         return true;
     case Op_TauRem:
         if (c2 == (int64)0) return false;
+        // LONG.MIN_VALUE % -1 == 0
+        if ((c2 == (int64)-1) && (c1 == ((int64)1<<63))) {
+            result = 0;
+            return true;
+        }
         if (is_signed) {
             result = c1 % c2;
         } else {
@@ -531,8 +541,8 @@ ConstantFolder::fold64(Opcode opc, int64 c, int64& result) {
 bool
 ConstantFolder::foldSingle(Opcode opc, float c, float& result) {
     if( Op_Neg == opc) {
-		result = (float)_chgsign(c);
-		return true;
+        result = (float)_chgsign(c);
+        return true;
     }
     return false;
 }
@@ -540,8 +550,8 @@ ConstantFolder::foldSingle(Opcode opc, float c, float& result) {
 bool
 ConstantFolder::foldDouble(Opcode opc, double c, double& result) {
     if( Op_Neg == opc) {
-		result = _chgsign(c);
-		return true;
+        result = _chgsign(c);
+        return true;
     }
     return false;
 }
@@ -553,7 +563,7 @@ bool ConstantFolder::foldConv(Type::Tag fromType, Type::Tag toType, Modifier mod
     bool ovfm = (mod.getOverflowModifier()!=Overflow_None);
     switch (toType) {
     case Type::Int32:
-		switch (fromType) {
+        switch (fromType) {
         case Type::Int32:
             res.i4 = src.i4; return true;
         case Type::UInt32:
@@ -896,7 +906,7 @@ ConstantFolder::foldConstant(Type::Tag type,
     case Type::UInt64: return fold64(opc, val1.i8, val2.i8, result.i8, is_signed);
     case Type::IntPtr:
     case Type::UIntPtr: {
-    	int psi = sizeof(POINTER_SIZE_INT);
+        int psi = sizeof(POINTER_SIZE_INT);
         switch (psi) {
         case 1: return fold8(opc, (int8)val1.i4, (int8)val2.i4, result.i4, is_signed);
         case 2: return fold16(opc, (int16)val1.i4, (int16)val2.i4, result.i4, is_signed);

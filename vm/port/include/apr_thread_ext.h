@@ -23,5 +23,6 @@ APR_DECLARE(apr_status_t) apr_thread_times(apr_thread_t *thread,
 
 APR_DECLARE(apr_status_t) apr_thread_cancel(apr_thread_t *thread);
 
+APR_DECLARE(apr_status_t) apr_get_thread_time(apr_thread_t *thread, unsigned long long* nanos_ptr);
 
 #endif  /* APR_EXT_H */

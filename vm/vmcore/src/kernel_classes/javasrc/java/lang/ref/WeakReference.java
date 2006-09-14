@@ -23,19 +23,19 @@ package java.lang.ref;
 /**
  * @com.intel.drl.spec_ref 
  */
-public class WeakReference extends Reference {
+public class WeakReference<T> extends Reference<T> {
 
     /**
      * @com.intel.drl.spec_ref 
      */
-	public WeakReference(Object referent) {
+	public WeakReference(T referent) {
 		super(referent);
 	}
 
     /**
      * @com.intel.drl.spec_ref 
      */
-	public WeakReference(Object referent, ReferenceQueue q) {
+	public WeakReference(T referent, ReferenceQueue<? super T> q) {
 		super(referent, q);
 	}
 }

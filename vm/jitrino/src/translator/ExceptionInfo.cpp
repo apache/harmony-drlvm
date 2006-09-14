@@ -27,10 +27,10 @@
 namespace Jitrino {
 
 CatchHandler::CatchHandler(uint32 id,
-  						   uint32 beginOffset,
-						   uint32 endOffset,
-						   CatchBlock* tryBlock,
-						   Type* excType)  
+                           uint32 beginOffset,
+                           uint32 endOffset,
+                           CatchBlock* tryBlock,
+                           Type* excType)  
 : Handler(id,beginOffset,endOffset,tryBlock), 
   exceptionType(excType), nextHandler(NULL) {}
 

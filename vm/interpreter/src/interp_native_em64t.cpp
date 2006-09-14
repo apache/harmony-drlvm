@@ -22,10 +22,10 @@
 #include "interpreter_exports.h"
 #include "interpreter_imports.h"
 
-#include "find_natives.h"
+//#include "find_natives.h"
 #include "exceptions.h"
 #include "mon_enter_exit.h"
-
+#include "open/jthread.h"
 #include "interp_native.h"
 #include "interp_defs.h"
 #include "ini.h"
@@ -84,7 +84,7 @@ interpreter_execute_native_method(
         return;
     }
     M2N_ALLOC_MACRO;
-    tmn_suspend_enable();
+    hythread_suspend_enable();
 
     int sz = method->get_num_arg_bytes() >> 2;
 
@@ -192,7 +192,7 @@ interpreter_execute_native_method(
     switch(ret_type) {
         case JAVA_TYPE_VOID:
             invokeJNI(out_args, n_fps, n_stacks, f);
-            tmn_suspend_disable();
+            hythread_suspend_disable();
             M2N_FREE_MACRO;
             break;
 
@@ -201,7 +201,7 @@ interpreter_execute_native_method(
         case JAVA_TYPE_STRING:
             {
                 jobject obj = (jobject) invokeJNI_Obj(out_args, n_fps, n_stacks, f);
-                tmn_suspend_disable();
+                hythread_suspend_disable();
                 ManagedObject *ref = obj->object;
                 M2N_FREE_MACRO;
                 ObjectHandle new_handle = oh_allocate_local_handle();
@@ -216,25 +216,25 @@ interpreter_execute_native_method(
         case JAVA_TYPE_SHORT:
         case JAVA_TYPE_INT:
             resultPtr->i = invokeJNI_Int(out_args, n_fps, n_stacks, f);
-            tmn_suspend_disable();
+            hythread_suspend_disable();
             M2N_FREE_MACRO;
             break;
 
         case JAVA_TYPE_FLOAT:
             resultPtr->f = invokeJNI_Float(out_args, n_fps, n_stacks, f);
-            tmn_suspend_disable();
+            hythread_suspend_disable();
             M2N_FREE_MACRO;
             break;
 
         case JAVA_TYPE_LONG:
             resultPtr->j = invokeJNI(out_args, n_fps, n_stacks, f);
-            tmn_suspend_disable();
+            hythread_suspend_disable();
             M2N_FREE_MACRO;
             break;
 
         case JAVA_TYPE_DOUBLE:
             resultPtr->d = invokeJNI_Double(out_args, n_fps, n_stacks, f);
-            tmn_suspend_disable();
+            hythread_suspend_disable();
             M2N_FREE_MACRO;
             break;
 
@@ -255,12 +255,12 @@ interpreter_execute_native_method(
 
     if (interpreter_ti_notification_mode
             & INTERPRETER_TI_METHOD_EXIT_EVENT) {
-        tmn_suspend_enable();
+        hythread_suspend_enable();
         jvalue val;
         method_exit_callback(method,
                 exn_raised(),
                 resultPtr != 0 ? *resultPtr : (val.j = 0, val));
-        tmn_suspend_disable();
+        hythread_suspend_disable();
     }
 
     DEBUG_TRACE("interpreter_invoke_native >>>\n");
@@ -409,22 +409,22 @@ interpreterInvokeStaticNative(StackFrame& prevFrame, StackFrame& frame, Method *
 
     if (interpreter_ti_notification_mode
             & INTERPRETER_TI_METHOD_ENTRY_EVENT) {
-        tmn_suspend_enable();
+        hythread_suspend_enable();
         method_entry_callback(method);
-        tmn_suspend_disable();
+        hythread_suspend_disable();
     }
 
     if (method->is_synchronized()) {
         vm_monitor_enter_wrapper(frame.This);
     }
 
-    tmn_suspend_enable();
+    hythread_suspend_enable();
 
     switch(method->get_return_java_type()) {
         case JAVA_TYPE_VOID:
             {
                 invokeJNI(out_args, n_fps, n_stacks, f);
-                tmn_suspend_disable();
+                hythread_suspend_disable();
                 prevFrame.stack.popClearRef(sz);
             }
             break;
@@ -434,7 +434,7 @@ interpreterInvokeStaticNative(StackFrame& prevFrame, StackFrame& frame, Method *
         case JAVA_TYPE_STRING:
             {
                 ManagedObject **ref = invokeJNI_Ref(out_args, n_fps, n_stacks, f);
-                tmn_suspend_disable();
+                hythread_suspend_disable();
                 prevFrame.stack.popClearRef(sz);
 
                 prevFrame.stack.push();
@@ -461,7 +461,7 @@ interpreterInvokeStaticNative(StackFrame& prevFrame, StackFrame& frame, Method *
         case JAVA_TYPE_BYTE:
             {
                 int8 res = invokeJNI_Byte(out_args, n_fps, n_stacks, f);
-                tmn_suspend_disable();
+                hythread_suspend_disable();
                 prevFrame.stack.popClearRef(sz);
 
                 prevFrame.stack.push();
@@ -472,7 +472,7 @@ interpreterInvokeStaticNative(StackFrame& prevFrame, StackFrame& frame, Method *
         case JAVA_TYPE_CHAR:
             {
                 uint16 res = invokeJNI_Char(out_args, n_fps, n_stacks, f);
-                tmn_suspend_disable();
+                hythread_suspend_disable();
                 prevFrame.stack.popClearRef(sz);
 
                 prevFrame.stack.push();
@@ -483,7 +483,7 @@ interpreterInvokeStaticNative(StackFrame& prevFrame, StackFrame& frame, Method *
         case JAVA_TYPE_SHORT:
             {
                 int16 res = invokeJNI_Short(out_args, n_fps, n_stacks, f);
-                tmn_suspend_disable();
+                hythread_suspend_disable();
                 prevFrame.stack.popClearRef(sz);
 
                 prevFrame.stack.push();
@@ -495,7 +495,7 @@ interpreterInvokeStaticNative(StackFrame& prevFrame, StackFrame& frame, Method *
             {
                 Value res;
                 res.i = invokeJNI_Int(out_args, n_fps, n_stacks, f);
-                tmn_suspend_disable();
+                hythread_suspend_disable();
                 prevFrame.stack.popClearRef(sz);
 
                 prevFrame.stack.push();
@@ -507,7 +507,7 @@ interpreterInvokeStaticNative(StackFrame& prevFrame, StackFrame& frame, Method *
             {
                 Value res;
                 res.f = invokeJNI_Float(out_args, n_fps, n_stacks, f);
-                tmn_suspend_disable();
+                hythread_suspend_disable();
                 prevFrame.stack.popClearRef(sz);
 
                 prevFrame.stack.push();
@@ -519,7 +519,7 @@ interpreterInvokeStaticNative(StackFrame& prevFrame, StackFrame& frame, Method *
             {
                 Value2 res;
                 res.i64 = invokeJNI(out_args, n_fps, n_stacks, f);
-                tmn_suspend_disable();
+                hythread_suspend_disable();
                 prevFrame.stack.popClearRef(sz);
 
                 prevFrame.stack.push(2);
@@ -531,7 +531,7 @@ interpreterInvokeStaticNative(StackFrame& prevFrame, StackFrame& frame, Method *
             {
                 Value2 res;
                 res.d = invokeJNI_Double(out_args, n_fps, n_stacks, f);
-                tmn_suspend_disable();
+                hythread_suspend_disable();
                 prevFrame.stack.popClearRef(sz);
 
                 prevFrame.stack.push(2);
@@ -692,22 +692,22 @@ interpreterInvokeVirtualNative(StackFrame& prevFrame, StackFrame& frame, Method 
 
     if (interpreter_ti_notification_mode
             & INTERPRETER_TI_METHOD_ENTRY_EVENT) {
-        tmn_suspend_enable();
+        hythread_suspend_enable();
         method_entry_callback(method);
-        tmn_suspend_disable();
+        hythread_suspend_disable();
     }
 
     if (method->is_synchronized()) {
         vm_monitor_enter_wrapper(frame.This);
     }
     
-    tmn_suspend_enable();
+    hythread_suspend_enable();
 
     switch(method->get_return_java_type()) {
         case JAVA_TYPE_VOID:
             {
                 invokeJNI(out_args, n_fps, n_stacks, f);
-                tmn_suspend_disable();
+                hythread_suspend_disable();
                 prevFrame.stack.popClearRef(sz);
             }
             break;
@@ -717,7 +717,7 @@ interpreterInvokeVirtualNative(StackFrame& prevFrame, StackFrame& frame, Method 
         case JAVA_TYPE_STRING:
             {
                 ManagedObject ** ref = invokeJNI_Ref(out_args, n_fps, n_stacks, f);
-                tmn_suspend_disable();
+                hythread_suspend_disable();
                 prevFrame.stack.popClearRef(sz);
 
                 prevFrame.stack.push();
@@ -745,7 +745,7 @@ interpreterInvokeVirtualNative(StackFrame& prevFrame, StackFrame& frame, Method 
         case JAVA_TYPE_BYTE:
             {
                 int8 res = invokeJNI_Byte(out_args, n_fps, n_stacks, f);
-                tmn_suspend_disable();
+                hythread_suspend_disable();
                 prevFrame.stack.popClearRef(sz);
 
                 prevFrame.stack.push();
@@ -756,7 +756,7 @@ interpreterInvokeVirtualNative(StackFrame& prevFrame, StackFrame& frame, Method 
         case JAVA_TYPE_CHAR:
             {
                 uint16 res = invokeJNI_Char(out_args, n_fps, n_stacks, f);
-                tmn_suspend_disable();
+                hythread_suspend_disable();
                 prevFrame.stack.popClearRef(sz);
 
                 prevFrame.stack.push();
@@ -767,7 +767,7 @@ interpreterInvokeVirtualNative(StackFrame& prevFrame, StackFrame& frame, Method 
         case JAVA_TYPE_SHORT:
             {
                 int16 res = invokeJNI_Short(out_args, n_fps, n_stacks, f);
-                tmn_suspend_disable();
+                hythread_suspend_disable();
                 prevFrame.stack.popClearRef(sz);
 
                 prevFrame.stack.push();
@@ -779,7 +779,7 @@ interpreterInvokeVirtualNative(StackFrame& prevFrame, StackFrame& frame, Method 
             {
                 Value res;
                 res.i = invokeJNI_Int(out_args, n_fps, n_stacks, f);
-                tmn_suspend_disable();
+                hythread_suspend_disable();
                 prevFrame.stack.popClearRef(sz);
 
                 prevFrame.stack.push();
@@ -791,7 +791,7 @@ interpreterInvokeVirtualNative(StackFrame& prevFrame, StackFrame& frame, Method 
             {
                 Value res;
                 res.f = invokeJNI_Float(out_args, n_fps, n_stacks, f);
-                tmn_suspend_disable();
+                hythread_suspend_disable();
                 prevFrame.stack.popClearRef(sz);
 
                 prevFrame.stack.push();
@@ -803,7 +803,7 @@ interpreterInvokeVirtualNative(StackFrame& prevFrame, StackFrame& frame, Method 
             {
                 Value2 res;
                 res.i64 = invokeJNI(out_args, n_fps, n_stacks, f);
-                tmn_suspend_disable();
+                hythread_suspend_disable();
                 prevFrame.stack.popClearRef(sz);
 
                 prevFrame.stack.push(2);
@@ -815,7 +815,7 @@ interpreterInvokeVirtualNative(StackFrame& prevFrame, StackFrame& frame, Method 
             {
                 Value2 res;
                 res.d = invokeJNI_Double(out_args, n_fps, n_stacks, f);
-                tmn_suspend_disable();
+                hythread_suspend_disable();
                 prevFrame.stack.popClearRef(sz);
 
                 prevFrame.stack.push(2);

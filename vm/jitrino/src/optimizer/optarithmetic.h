@@ -110,10 +110,10 @@ getMagic(inttype d, inttype *magicNum, inttype *shiftBy)
     uinttype anc = t - 1 - (t%ad);                // anc = |nc|
 
     // initial value, we try values from [width-1, 2*width]
-    uinttype p = width-1;		          // power of 2 to divide by
+    uinttype p = width-1;                 // power of 2 to divide by
 
     // these are maintained incrementally in loop as p is changed
-    uinttype q1 = hiBitSet / anc;	          // q1 = 2**p/|nc|
+    uinttype q1 = hiBitSet / anc;             // q1 = 2**p/|nc|
     uinttype r1 = hiBitSet - q1*anc;              // r1 = rem(2**p, |nc|)
     uinttype q2 = hiBitSet / ad;                  // q2 = 2**p /|d|
     uinttype r2 = hiBitSet - q2*ad;               // r2 = rem(2**p, |d|)

@@ -27,7 +27,6 @@
 #include "BitSet.h"
 #include "Log.h"
 #include "Stl.h"
-#include "FlowGraph.h"
 
 namespace Jitrino {
 
@@ -48,17 +47,17 @@ class DataflowInstance {
 public:
     virtual ~DataflowInstance() {}
     typedef DataflowValue ValueType;
-    virtual DataflowTF<DataflowValue> *getNodeBehavior(CFGNode *node) = 0;
+    virtual DataflowTF<DataflowValue> *getNodeBehavior(Node *node) = 0;
     virtual DataflowValue getEntryValue() = 0;
 };
 
 template <typename DataflowValue>
 void
-solve(FlowGraph *fg, DataflowInstance<DataflowValue> &instance, bool forwards, 
+solve(ControlFlowGraph*fg, DataflowInstance<DataflowValue> &instance, bool forwards, 
       MemoryManager &mm, DataflowValue *&solutionBeforeNode, DataflowValue *&solutionAfterNode,
-      Category *logCategory, bool ignoreExceptionEdges)
+      bool ignoreExceptionEdges)
 {
-    StlVector<CFGNode *> nodes(mm);
+    StlVector<Node *> nodes(mm);
     fg->getNodesPostOrder(nodes, forwards);
     uint32 numNodes = fg->getMaxNodeId();
     DataflowValue *beforeNode = new (mm) DataflowValue[numNodes];
@@ -70,38 +69,38 @@ solve(FlowGraph *fg, DataflowInstance<DataflowValue> &instance, bool forwards,
     solutionBeforeNode = beforeNode;
     solutionAfterNode = afterNode;
 
-    StlDeque<CFGNode *> queue(mm);
+    StlDeque<Node *> queue(mm);
     BitSet inQueue(mm, numNodes);
     DataflowTF<DataflowValue> **nodeTFs= new (mm) DataflowTF<DataflowValue>*[numNodes];
     // compute TFs and initialize queue
-    StlVector<CFGNode *>::reverse_iterator
+    StlVector<Node *>::reverse_iterator
         riter = nodes.rbegin(),
         rend = nodes.rend();
     for ( ; riter != rend; ++riter) {
-        CFGNode *node = *riter;
+        Node *node = *riter;
         uint32 nodeId = node->getId();
         nodeTFs[nodeId] = instance.getNodeBehavior(node);
         queue.push_back(node);
         inQueue.setBit(nodeId);
     }
 
-    CFGNode *entryNode = fg->getEntry();
-    CFGNode *exitNode = fg->getExit();
+    Node *entryNode = fg->getEntryNode();
+    Node *exitNode = fg->getExitNode();
     uint32 inId = forwards ? entryNode->getId() : exitNode->getId();
-	uint32 firstId = queue[0]->getId();
+    uint32 firstId = queue[0]->getId();
     if( !(firstId == inId) ) assert(0);
     beforeNode[firstId] = instance.getEntryValue();
 
     while (!queue.empty()) {
-        CFGNode *node = queue.front();
+        Node *node = queue.front();
         queue.pop_front();
         inQueue.setBit(false);
         uint32 nodeId = node->getId();
         DataflowTF<DataflowValue> *nodeTF = nodeTFs[nodeId];
-        if (logCategory->isDebugEnabled()) {
+        if (Log::isEnabled()) {
             Log::out() << "solve: visiting node " << (int) nodeId << ::std::endl;
         }
-        if (logCategory->isDebugEnabled()) {
+        if (Log::isEnabled()) {
             Log::out() << "  in was: "; beforeNode[nodeId].print(Log::out());
             Log::out() << ::std::endl << "  out was: "; 
             afterNode[nodeId].print(Log::out());
@@ -109,23 +108,23 @@ solve(FlowGraph *fg, DataflowInstance<DataflowValue> &instance, bool forwards,
         }
         if (nodeTF->apply(beforeNode[nodeId], afterNode[nodeId])) {
             // check whether to update successors
-            if (logCategory->isDebugEnabled()) {
+            if (Log::isEnabled()) {
                 Log::out() << "  node changed" << ::std::endl;
                 Log::out() << "  in became: "; beforeNode[nodeId].print(Log::out());
                 Log::out() << ::std::endl << "  out became: "; 
                 afterNode[nodeId].print(Log::out());
                 Log::out() << ::std::endl;
             }
-            const CFGEdgeDeque &outEdges = node->getOutEdges();
-            CFGEdgeDeque::const_iterator
+            const Edges &outEdges = node->getOutEdges();
+            Edges::const_iterator
                 eiter = outEdges.begin(),
                 eend = outEdges.end();
             for ( ; eiter != eend; ++eiter) {
-                CFGEdge *e = *eiter;
-                CFGNode *target = e->getTargetNode();
+                Edge *e = *eiter;
+                Node *target = e->getTargetNode();
                 if (ignoreExceptionEdges && target->isDispatchNode()) continue;
                 uint32 targetId = target->getId();
-                if (logCategory->isDebugEnabled()) {
+                if (Log::isEnabled()) {
                     Log::out() << "    (checking successor " 
                                << (int) targetId << ", was ";
                     beforeNode[targetId].print(Log::out());
@@ -133,7 +132,7 @@ solve(FlowGraph *fg, DataflowInstance<DataflowValue> &instance, bool forwards,
                 }
                 if (beforeNode[targetId].meetWith(afterNode[nodeId])) {
                     // value at successor has changed
-                    if (logCategory->isDebugEnabled()) {
+                    if (Log::isEnabled()) {
                         Log::out() << "    (changed successor " 
                                    << (int) targetId << ", now ";
                         beforeNode[targetId].print(Log::out());
@@ -141,14 +140,14 @@ solve(FlowGraph *fg, DataflowInstance<DataflowValue> &instance, bool forwards,
                     }
                     if (!inQueue.getBit(targetId)) {
                         // if so, add it to queue
-                        if (logCategory->isDebugEnabled()) {
+                        if (Log::isEnabled()) {
                             Log::out() << "    (queuing " 
                                        << (int) targetId << ")" << ::std::endl;
                         }
                         queue.push_back(target);
                         inQueue.setBit(targetId);
                     } else {
-                        if (logCategory->isDebugEnabled()) {
+                        if (Log::isEnabled()) {
                             Log::out() << "    (already in queue: " 
                                        << (int) targetId << ")" << ::std::endl;
                         }
@@ -156,7 +155,7 @@ solve(FlowGraph *fg, DataflowInstance<DataflowValue> &instance, bool forwards,
                 }
             }
         } else {
-            if (logCategory->isDebugEnabled()) {
+            if (Log::isEnabled()) {
                 Log::out() << "  no change:" << ::std::endl;
             }
         }

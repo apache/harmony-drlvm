@@ -41,6 +41,9 @@ void vm_monitor_init();
 // Does a monitorexit operation.
 extern void (*vm_monitor_exit)(ManagedObject *p_obj);
 extern void (*vm_monitor_enter)(ManagedObject *p_obj);
+extern uint32 (*vm_monitor_try_enter)(ManagedObject *p_obj);
+extern uint32 (*vm_monitor_try_exit)(ManagedObject *p_obj);
+
 #define HASH_MASK 0x7e
 
 #ifdef __cplusplus

@@ -13,10 +13,10 @@
  *  See the License for the specific language governing permissions and
  *  limitations under the License.
  */
-/** 
+/**
  * @author Intel, Alexei Fedotov
  * @version $Revision: 1.1.2.2.4.3 $
- */  
+ */
 
 
 //
@@ -62,6 +62,10 @@ typedef struct ChaMethodIterator {
 // Returns a handle for the object class.  For Java applications, it's
 // java.lang.Object.
 VMEXPORT Class_Handle get_system_object_class();
+
+// Returns a handle for the class class.  For Java applications, it's
+// java.lang.Class.
+VMEXPORT Class_Handle get_system_class_class();
 
 // Returns a handle for the string class.  For Java applications, it's
 // java.lang.String.
@@ -319,6 +323,32 @@ VMEXPORT Boolean field_is_volatile(Field_Handle fh);
 // Returns TRUE if the field is private.
 VMEXPORT Boolean field_is_private(Field_Handle fh);
 
+/**
+ * Returns the address and bit mask, for the flag which determine whether field
+ * access event should be sent. JIT may use the following expression to
+ * determine if specified field access should be tracked:
+ * ( **address & *mask != 0 )
+ * @param field - handle of the field
+ * @param[out] address - pointer to the address of the byte which contains the flag
+ * @param[out] mask - pointer to the bit mask of the flag
+ */
+VMEXPORT void
+field_get_track_access_flag(Field_Handle field, char** address, char* mask);
+
+/**
+ * Returns the address and bit mask, for the flag which determine whether field
+ * modification event should be sent. JIT may use the following expression to
+ * determine if specified field modification should be tracked:
+ * ( **address & *mask != 0 )
+ * @param field - handle of the field
+ * @param[out] address - pointer to the address of the byte which contains the flag
+ * @param[out] mask - pointer to the bit mask of the flag
+ */
+VMEXPORT void
+field_get_track_modification_flag(Field_Handle field, char** address,
+                                  char* mask);
+
+
 // end field-related functions.
 /////////////////////////////////////////////////////////////////
 
@@ -389,7 +419,7 @@ VMEXPORT Boolean method_is_require_security_object(Method_Handle mh);
 // and query the type of the method result.
 VMEXPORT Method_Signature_Handle method_get_signature(Method_Handle mh);
 
-// Class ch is a subclass of method_get_class(mh).  The function returns a method handle 
+// Class ch is a subclass of method_get_class(mh).  The function returns a method handle
 // for an accessible method overriding mh in ch or in its closest superclass that overrides mh.
 // Class ch must be a class not an interface.
 VMEXPORT Method_Handle method_find_overridden_method(Class_Handle ch, Method_Handle mh);
@@ -507,7 +537,7 @@ VMEXPORT Boolean type_info_is_unboxed(Type_Info_Handle tih);
 // type_info_is_unboxed-->type_info_get_class-->class_is_primitive).
 VMEXPORT Boolean type_info_is_primitive(Type_Info_Handle tih);
 
-// If TRUE, then 
+// If TRUE, then
 // type_info_get_type_info returns the type info that the pointer
 // points to.
 VMEXPORT Boolean type_info_is_unmanaged_pointer(Type_Info_Handle tih);
@@ -528,7 +558,7 @@ VMEXPORT Boolean type_info_is_vector(Type_Info_Handle tih);
 VMEXPORT Boolean type_info_is_general_array(Type_Info_Handle tih);
 
 // Get the class if type_info_is_reference or type_info_is_unboxed
-// returned TRUE. If the type info is a vector or a general array, return the 
+// returned TRUE. If the type info is a vector or a general array, return the
 // class handle for the array type (not the element type).
 VMEXPORT Class_Handle type_info_get_class(Type_Info_Handle tih);
 
@@ -559,7 +589,7 @@ VMEXPORT VM_Data_Type type_info_get_type(Type_Info_Handle tih);
 // begin vector layout functions.
 
 // Vectors are one-dimensional, zero-based arrays.  All Java "arrays" are
-// vectors.  
+// vectors.
 // Functions provided in this section do not work on multidimensional or
 // non-zero based arrays (i.e. arrays with a lower bound that is non-zero
 // for at least one of the dimensions.
@@ -620,7 +650,7 @@ VMEXPORT unsigned vm_vector_size(Class_Handle vector_class, int length);
 // begin miscellaneous functions.
 
 
-// Returns TRUE if references within objects and vector elements are 
+// Returns TRUE if references within objects and vector elements are
 // to be treated as offsets rather than raw pointers.
 VMEXPORT Boolean vm_references_are_compressed();
 
@@ -658,11 +688,32 @@ VMEXPORT void free_string_buffer(char *buffer);
 // command line argument.
 VMEXPORT const char *vm_get_property_value(const char *property_name);
 
+VMEXPORT void vm_properties_set_value(const char* name, const char* value);
+
+typedef void *PropertiesIteratorHandle;
+
+// Create iterator for system properties.
+// All iterators created with this method call 
+// must be destroyed with vm_properties_iterator_destroy 
+VMEXPORT PropertiesIteratorHandle vm_properties_iterator_create();
+
+// Destroy iterator created by vm_properties_iterator_create
+VMEXPORT void vm_properties_iterator_destroy(PropertiesIteratorHandle props_iter);
+
+// Advance iterator to a next property.
+// Return false if no more properties left to iterate
+VMEXPORT Boolean vm_properties_iterator_advance(PropertiesIteratorHandle props_iter);
+
+// Return a name of the current property
+VMEXPORT const char* vm_properties_get_name(PropertiesIteratorHandle props_iter);
+
+// Return a value of the current property
+VMEXPORT const char* vm_properties_get_string_value(PropertiesIteratorHandle props_iter);
+
 // Return the boolean value of the property
 VMEXPORT Boolean vm_get_property_value_boolean(const char* property, Boolean default_value);
 
-VMEXPORT Boolean vm_get_boolean_property_value_with_default(
-    const char *property_name);
+VMEXPORT Boolean vm_get_boolean_property_value_with_default(const char *property_name);
 
 // Exit and perform the necessary cleanup.
 VMEXPORT void vm_exit(int exit_code);

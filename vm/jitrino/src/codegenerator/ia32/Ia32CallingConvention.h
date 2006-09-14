@@ -24,6 +24,7 @@
 #include "open/types.h"
 #include "Type.h"
 #include "Ia32IRConstants.h"
+#include "Ia32Constraint.h"
 
 
 namespace Jitrino
@@ -46,49 +47,50 @@ Implementers of this interface are used as arguments to some IRManager methods
 
 */
 class CallingConvention
-{	
-public:	
-        virtual ~CallingConvention() {}
-	//--------------------------------------------------------------
+{   
+public: 
+    //--------------------------------------------------------------
 
-	struct OpndInfo
-	{
-		uint32				typeTag;
-		uint32				slotCount;
-		RegName 			slots[4];
-	};
+    struct OpndInfo
+    {
+        uint32              typeTag;
+        uint32              slotCount;
+        bool                isReg;
+        uint32              slots[4];
+    };
 
-	//--------------------------------------------------------------
-	enum ArgKind
-	{
-		ArgKind_InArg,
-		ArgKind_RetArg
-	};
+    //--------------------------------------------------------------
+    enum ArgKind
+    {
+        ArgKind_InArg,
+        ArgKind_RetArg
+    };
 
+    virtual ~CallingConvention() {}
 
-	/** Fills the infos array with information how incoming arguments or return values are passed 
-	according to this calling convention 
-	*/
-	virtual void	getOpndInfo(ArgKind kind, uint32 argCount, OpndInfo * infos) const =0;
+    /** Fills the infos array with information how incoming arguments or return values are passed 
+    according to this calling convention 
+    */
+    virtual void    getOpndInfo(ArgKind kind, uint32 argCount, OpndInfo * infos) const =0;
 
-	/** Returns a mask describing registers of regKind which are to be preserved by a callee
-	*/
-	virtual uint32	getCalleeSavedRegs(OpndKind regKind) const =0;
-	
-	/** Returns true if restoring arg stack is callee's responsibility
-	*/
-	virtual bool	calleeRestoresStack() const =0;
+    /** Returns a mask describing registers of regKind which are to be preserved by a callee
+    */
+    virtual Constraint  getCalleeSavedRegs(OpndKind regKind) const =0;
+    
+    /** Returns true if restoring arg stack is callee's responsibility
+    */
+    virtual bool    calleeRestoresStack() const =0;
 
-	/** True arguments are pushed from the last to the first, false in the other case
-	*/
-	virtual bool	pushLastToFirst()const =0;
-	/**
-	 * Maps a string representation of CallingConvention to the 
-	 * appropriate CallingConvention_* item. 
-	 * If cc_name is NULL, then default for this platform convention 
-	 * is returned.
-	 */
-	static const CallingConvention * str2cc(const char * cc_name);
+    /** True arguments are pushed from the last to the first, false in the other case
+    */
+    virtual bool    pushLastToFirst()const =0;
+    /**
+     * Maps a string representation of CallingConvention to the 
+     * appropriate CallingConvention_* item. 
+     * If cc_name is NULL, then default for this platform convention 
+     * is returned.
+     */
+    static const CallingConvention * str2cc(const char * cc_name);
 };
 
 
@@ -102,13 +104,18 @@ typedef StlVector<const CallingConvention *> CallingConventionVector;
 */
 
 class STDCALLCallingConvention: public CallingConvention
-{	
-public:	
-        virtual ~STDCALLCallingConvention() {}
-	virtual void	getOpndInfo(ArgKind kind, uint32 argCount, OpndInfo * infos)const;
-	virtual uint32	getCalleeSavedRegs(OpndKind regKind)const;
-	virtual bool	calleeRestoresStack()const{ return true; }
-	virtual bool	pushLastToFirst()const{ return true; }
+{   
+public: 
+    
+    virtual ~STDCALLCallingConvention() {}
+    virtual void    getOpndInfo(ArgKind kind, uint32 argCount, OpndInfo * infos)const;
+    virtual Constraint  getCalleeSavedRegs(OpndKind regKind)const;
+#ifdef _EM64T_
+    virtual bool    calleeRestoresStack()const{ return false; }
+#else
+    virtual bool    calleeRestoresStack()const{ return true; }
+#endif
+    virtual bool    pushLastToFirst()const{ return true; }
 
 };
 
@@ -118,10 +125,10 @@ public:
 /** Implementation of CallingConvention for the DRL IA32 calling convention
 */
 class DRLCallingConvention: public STDCALLCallingConvention
-{	
-public:	
-        virtual ~DRLCallingConvention() {}
-	virtual bool	pushLastToFirst()const{ return false; }
+{   
+public: 
+    virtual ~DRLCallingConvention() {}
+    virtual bool    pushLastToFirst()const{ return false; }
 
 };
 
@@ -131,15 +138,19 @@ public:
 /** Implementation of CallingConvention for the CDECL calling convention
 */
 class CDECLCallingConvention: public STDCALLCallingConvention
-{	
-public:	
-        virtual ~CDECLCallingConvention() {}
-	virtual bool	calleeRestoresStack()const{ return false; }
+{   
+public: 
+    virtual ~CDECLCallingConvention() {}
+    virtual bool    calleeRestoresStack()const{ return false; }
+#ifdef _EM64T_
+    virtual void    getOpndInfo(ArgKind kind, uint32 argCount, OpndInfo * infos)const;
+    virtual bool    pushLastToFirst()const{ return true; }
+#endif
 };
 
-extern STDCALLCallingConvention		CallingConvention_STDCALL;
-extern DRLCallingConvention			CallingConvention_DRL;
-extern CDECLCallingConvention		CallingConvention_CDECL;
+extern STDCALLCallingConvention     CallingConvention_STDCALL;
+extern DRLCallingConvention         CallingConvention_DRL;
+extern CDECLCallingConvention       CallingConvention_CDECL;
 
 }; // namespace Ia32
 }

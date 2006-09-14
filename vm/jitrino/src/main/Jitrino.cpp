@@ -27,24 +27,31 @@
 #include "MemoryEstimates.h"
 #include "TranslatorIntfc.h"
 #include "CodeGenIntfc.h"
-#include "PropertyTable.h"
 #include "Log.h"
-#include "Profiler.h"
-//TODO remove
-#include "Timer.h"
 #include "CountWriters.h"
 #include "XTimer.h"
+#include "DrlVMInterface.h"
+
 #ifndef PLATFORM_POSIX
-#include <windows.h>
-#endif
+    #pragma pack(push)
+    #include <windows.h>
+    #define vsnprintf _vsnprintf
+    #pragma pack(pop)
+#else
+    #include <stdarg.h>
+    #include <sys/stat.h>
+    #include <sys/types.h>
+#endif //PLATFORM_POSIX
 #include "CGSupport.h"
 #include "PlatformDependant.h"
+#include "JITInstanceContext.h"
+#include "PMF.h"
+#include "PMFAction.h"
 
 #if defined(_IPF_)
-	#include "ipf/IpfRuntimeInterface.h"
+    #include "IpfRuntimeInterface.h"
 #else
-	#include "ia32/Ia32RuntimeInterface.h"
-	#include "ia32/Ia32InternalProfiler.h"
+    #include "ia32/Ia32RuntimeInterface.h"
 #endif
 
 #include <ostream>
@@ -55,42 +62,11 @@ namespace Jitrino {
 // the JIT runtime interface
 RuntimeInterface* Jitrino::runtimeInterface = NULL;
 
-JITModes Jitrino::jitModes;
+JITInstances* Jitrino::jitInstances = NULL;
 
 struct Jitrino::Flags Jitrino::flags;
 
 
-void Jitrino::readFlagsFromCommandLine(const JitrinoParameterTable *globalTable, const JitrinoParameterTable *methodTable)
-{
-    //const char* cg = params->lookup("CG");
-
-#if defined(_IPF_)
-	flags.codegen = CG_IPF;
-#else
-	flags.codegen = CG_IA32;
-#endif
-
-    flags.debugging_level = globalTable->lookupInt("debugging_level", -1);
-#ifdef SUPPRESS_TOP_SKIP
-    flags.skip = false;
-#else
-    flags.skip = methodTable->lookupBool("top::skip", false);
-#endif
-    flags.gen_code = methodTable->lookupBool("top::gen_code", true);
-    flags.optimize = methodTable->lookupBool("top::optimize", true);
-    flags.time = methodTable->lookupBool("time", false);
-    flags.code_mapping_supported = methodTable->lookupBool("bc_maps", false);
-}
-
-void Jitrino::showFlagsFromCommandLine()
-{
-//    Log::out() << "    CG={IA32|ipf} = codegen target, currently ignored" << ::std::endl;
-    Log::out() << "    debugging_level=int   = ?" << ::std::endl;
-    Log::out() << "    top::optimize[={ON,off}] = do optimizations" << ::std::endl;
-    Log::out() << "    top::gen_code[={ON,off}] = do codegen" << ::std::endl;
-    Log::out() << "    top::skip[={on,OFF}] = do not jit this method" << ::std::endl;
-    Log::out() << "    time[={on,OFF}] = dump phase timing at end of run" << ::std::endl;
-}
 
 // some demo parameters
 bool print_hashtable_info = false;
@@ -98,316 +74,220 @@ char which_char = 'a';
 
 // read in some flags to test mechanism
 bool initialized_parameters = false;
-void initialize_parameters(CompilationInterface* ci, MethodDesc &md)
+void initialize_parameters(CompilationContext* compilationContext, MethodDesc &md)
 {
-
-    JitrinoParameterTable* parameterTable = Jitrino::getParameterTable(ci->getJitHandle());
-    JitrinoParameterTable *thisPT = parameterTable->getTableForMethod(md);
-
-    CompilationContext* compilationContext = ci->getCompilationContext();
-    compilationContext->setThisParameterTable(thisPT);
-
-    Jitrino::readFlagsFromCommandLine(parameterTable, thisPT); // must be first
-
-    TranslatorIntfc::readFlagsFromCommandLine(compilationContext, Jitrino::flags.codegen != Jitrino::CG_IPF);
-    IRBuilder::readFlagsFromCommandLine(compilationContext);
-    readOptimizerFlagsFromCommandLine(compilationContext);
-    CodeGenerator::readFlagsFromCommandLine(compilationContext, Jitrino::flags.codegen != Jitrino::CG_IPF);
-    
-    // set logging levels
-    Log::initializeCategories();
-    Log::initializeThresholds(thisPT->lookup("LOG"));
+    // BCMap Info Required
+    ((DrlVMCompilationInterface*)(compilationContext->getVMCompilationInterface()))->setBCMapInfoRequired(true);
 
     // do onetime things
     if (!initialized_parameters) {
         initialized_parameters = true;
-        
-
-        if(Log::cat_root()->isDebugEnabled()) {
-            ::std::cerr << "\n***\nJitrino parameters:\n";
-            parameterTable->print(::std::cerr);
-            ::std::cerr << "***\n";
-        }
-        
-
-        if (parameterTable->lookup("help")) {
-            Log::out() << ::std::endl 
-                       << "Jitrino command line parameters are:" << ::std::endl;
-            Jitrino::showFlagsFromCommandLine();
-            TranslatorIntfc::showFlagsFromCommandLine();
-            showOptimizerFlagsFromCommandLine();
-            IRBuilder::showFlagsFromCommandLine();
-            CodeGenerator::showFlagsFromCommandLine(Jitrino::flags.codegen != Jitrino::CG_IPF);
-        }
     }
 }
-
-extern bool genCode(IRManager& irManager,
-                    CompilationInterface& compilationInterface,
-                    MethodDesc*    methodDesc,
-                    FlowGraph*,
-                    OpndManager&,
-                    Jitrino::Backend cgFlag,
-                    bool sinkConstants,
-                    bool sinkConstantsOne);
 
 MemoryManager* Jitrino::global_mm = 0; 
 
-Timer* Jitrino::timers = 0; //TODO remove
 static CountWriter* countWriter = 0;
-static CountTime globalTimer("timer:Total-Compilation"),
-				 codegenTimer("timer:Code-generator"),
-				 optimizerTimer("timer:Optimizer"),
-				 translatorTimer("timer:Translator"),
-				 typecheckerTimer("timer:Typechecker");
+static CountTime globalTimer("total-compilation time");
+static SummTimes summtimes("action times");
 
 void Jitrino::crash (const char* msg)
 {
-	std::cerr << std::endl << "Jitrino crashed" << std::endl;
-	if (msg != 0)
-		std::cerr << msg << std::endl;
+    std::cerr << std::endl << "Jitrino crashed" << std::endl;
+    if (msg != 0)
+        std::cerr << msg << std::endl;
 
-	exit(11);
+    exit(11);
 }
+void crash (const char* fmt, ...)
+{
+    va_list args;
+    va_start(args, fmt);
+
+    char buff[1024];
+    vsnprintf(buff, sizeof(buff), fmt, args);
+
+    std::cerr << buff;
+    exit(11);
+}
+
+
 bool Jitrino::Init(JIT_Handle jh, const char* name)
 {
     //check for duplicate initialization
-    JitrinoParameterTable* parameterTable = getParameterTable(jh);
-    if (parameterTable!=NULL) {
+    JITInstanceContext* jitInstance = getJITInstanceContext(jh);
+    if (jitInstance!=NULL) {
         assert(0);
         return false;
     }
-    // check if modeName is already in use
-    for (JITModes::const_iterator it = jitModes.begin(), end = jitModes.end(); it!=end; ++it) {
-        JITModeData* modeData = *it;
-        if (modeData->getModeName() == name) {
-            assert(0);
-            return false;
-        }
-    }
+    // check if jitName is already in use
 
-    bool firstJITInit = global_mm == 0;
-    if (firstJITInit) {
+    if (jitInstances) {
+        for (JITInstances::const_iterator it = jitInstances->begin(), end = jitInstances->end(); it!=end; ++it) {
+            JITInstanceContext* jitContext = *it;
+            if (jitContext->getJITName() == name) {
+                assert(0);
+                return false;
+            }
+        }
+    }else {
         global_mm = new MemoryManager(0,"Jitrino::Init.global_mm"); 
 #if defined(_IPF_)
-        runtimeInterface = new IPF::IpfRuntimeInterface;
+        runtimeInterface = new IPF::RuntimeInterface;
+        flags.codegen = CG_IPF;
 #else
         runtimeInterface = new Ia32::RuntimeInterface;
-
+        flags.codegen = CG_IA32;
 #endif
-        Log::initializeCategories();
+        jitInstances = new (*global_mm) JITInstances(*global_mm);
+
+        flags.time=false;
     }
 
-    parameterTable = new (*global_mm) JitrinoParameterTable(*global_mm, 1024);
-    JITModeData*  modeData = new (*global_mm)JITModeData(jh, name, parameterTable);
-    jitModes.push_back(modeData);
+    jitInstance = new (*global_mm) JITInstanceContext(*global_mm, jh, name);
+    jitInstances->push_back(jitInstance);
+
+    jitInstance->getPMF().init(jitInstances->size() == 1);
+
+    if (countWriter == 0 && jitInstance->getPMF().getBoolArg(0, "time", false)) {
+        countWriter = new CountWriterFile(0);
+        XTimer::initialize(true);
+    }
 
     return true;
 }
 
-void Jitrino::DeInit()
+void Jitrino::DeInit(JIT_Handle jh)
 {
-//TODO remove
-    //deinits all modes..
-//    if( flags.time )
-//        dumpTimers();
+    JITInstanceContext* jitInstance = getJITInstanceContext(jh);
+    if (jitInstance==NULL) {
+        assert(0);
+        return;
+    }
 
-	if (countWriter != 0)
-	{
-		delete countWriter;
-		countWriter = 0;
-	}
+    if (countWriter != 0) {
+        jitInstance->getPMF().summTimes(summtimes);
+    }
+        jitInstance->getPMF().deinit();
 
-#ifndef _IPF_
-	Ia32::InternalProfiler::deinit();
-#endif
+    killJITInstanceContext(jitInstance);
+
+    if (jitInstances->empty()) {
+        if (countWriter != 0)  {
+        delete countWriter;
+        countWriter = 0;
+    }
+    }
 }
 
-void Jitrino::NextCommandLineArgument(JIT_Handle jit, const char *name, const char *arg)
-{
-    if (strnicmp(name, "-xjit", 5) == 0) {
-        size_t argLen = strlen(arg);
-        JITModeData* paramMode = NULL;
-        for (JITModes::const_iterator it = jitModes.begin(), end = jitModes.end(); it!=end; ++it) {
-            JITModeData* mode = *it;
-            std::string modeName = mode ->getModeName();
-            if (argLen + 2 < modeName.length() && !strncmp(modeName.c_str(), arg, argLen)
-                && !strncmp(modeName.c_str() + argLen, "::", 2))
-            {
-                paramMode = mode;
-                arg = arg + argLen + 2;
-                break;
-            }
+class FalseSessionAction: public SessionAction {
+public:
+    virtual void run () {getCompilationContext()->setCompilationFailed(true);}
+
+};
+static ActionFactory<FalseSessionAction> _false("false");
+
+class LockMethodSessionAction : public SessionAction {
+public:
+    virtual void run () {
+        CompilationContext* cc = getCompilationContext();
+        CompilationInterface* ci = cc->getVMCompilationInterface();
+        ci->lockMethodData();
+        MethodDesc* methDesc = ci->getMethodToCompile();
+        if (methDesc->getCodeBlockSize(0) > 0 || methDesc->getCodeBlockSize(1) > 0){
+            cc->setCompilationFinished(true);
+            ci->unlockMethodData();
         }
-        JITModeData* currentJitMode = getJITModeData(jit);
-        if (paramMode == NULL || paramMode == currentJitMode) {
-            currentJitMode->setParameterTable(currentJitMode->getParameterTable()->insertFromCommandLine(arg));
+    }
+};
+static ActionFactory<LockMethodSessionAction> _lock_method("lock_method");
+
+class UnlockMethodSessionAction : public SessionAction {
+public:
+    virtual void run () {
+        getCompilationContext()->getVMCompilationInterface()->unlockMethodData();
+    }
+};
+static ActionFactory<UnlockMethodSessionAction> _unlock_method("unlock_method");
+
+
+void runPipeline(CompilationContext* c) {
+
+    globalTimer.start();
+
+    PMF::PipelineIterator pit((PMF::Pipeline*)c->getPipeline());
+    while (pit.next()) {
+        SessionAction* sa = pit.getSessionAction();
+        sa->setCompilationContext(c);
+        c->setCurrentSessionAction(sa);
+        c->stageId++;
+        sa->start();
+        sa->run();
+        sa->stop();
+        c->setCurrentSessionAction(0);
+        if (c->isCompilationFailed() || c->isCompilationFinished()) {
+            break;
         }
     }
-    return;
+
+    globalTimer.stop();
 }
 
-static void postTranslator(IRManager& irManager)
-{
-    FlowGraph& flowGraph = irManager.getFlowGraph();
-    MethodDesc& methodDesc = irManager.getMethodDesc();
-    if (Log::cat_fe()->isIREnabled()) {
-        Log::out() << "PRINTING LOG: After Translator" << ::std::endl;
-        flowGraph.printInsts(Log::out(), methodDesc);
-    }
-    flowGraph.cleanupPhase();
-    if (Log::cat_fe()->isIR2Enabled()) {
-        Log::out() << "PRINTING LOG: After Cleanup" << ::std::endl;
-        flowGraph.printInsts(Log::out(), methodDesc);
-    }
-}
-
-bool compileMethod(CompilationInterface& compilationInterface) {
-	
+bool compileMethod(CompilationContext* cc) {
+    
     if(Jitrino::flags.skip) {
         return false;
-	}
+    }
 
     //
     // IRManager contains the method's IR for the global optimizer.
     // It contains a memory manager that is live during optimization
     //
-    JitrinoParameterTable* parameterTable = Jitrino::getParameterTable(compilationInterface.getJitHandle());
-    JitrinoParameterTable* methodParameterTable = parameterTable->getTableForMethod(*compilationInterface.getMethodToCompile());
-    IRManager   irManager(compilationInterface, *methodParameterTable);
     
-    MethodDesc* methDesc = compilationInterface.getMethodToCompile();
-    MemoryManager& ir_mmgr = irManager.getMemoryManager();
+    MethodDesc* methDesc = cc->getVMCompilationInterface()->getMethodToCompile();
+    MemoryManager& ir_mmgr = cc->getCompilationLevelMemoryManager();
     
-    // init global map for handlers
     initHandleMap(ir_mmgr, methDesc);
-    // 
+
     // add bc <-> HIR code map handler
     StlVector<uint64> *bc2HIRMap;
-    
-    if (compilationInterface.isBCMapInfoRequired()) {
+    if (cc->getVMCompilationInterface()->isBCMapInfoRequired()) {
         bc2HIRMap = new(ir_mmgr) StlVector<uint64>(ir_mmgr, methDesc->getByteCodeSize() 
-                * (ESTIMATED_HIR_SIZE_PER_BYTECODE) + 5);
+                * (ESTIMATED_HIR_SIZE_PER_BYTECODE) + 5, ILLEGAL_VALUE);
         addContainerHandler(bc2HIRMap, bcOffset2HIRHandlerName, methDesc);
     }
 
-	if (countWriter == 0)
-	{
-		const char* arg = parameterTable->lookup("counters");
-		if (arg != 0)  // can be empty string ""
-		{
-#ifdef _WIN32
-			if (strnicmp(arg, "mail:", 5) == 0)
-				countWriter = new CountWriterMail(arg+5);
-			else
-#endif
-				countWriter = new CountWriterFile(arg);
-		}
-		else if (Jitrino::flags.time)
-			countWriter = new CountWriterFile(0);
-
-		XTimer::initialize(countWriter != 0);
-	}
-
-    //
-    // translate the method
-    //
-    globalTimer.start();
-    translatorTimer.start();
-    TranslatorIntfc::translateByteCodes(irManager);
-
-    translatorTimer.stop();
-    postTranslator(irManager);
-    //
-    // optimize it
-    //
-    optimizerTimer.start();
-	
-    if (Jitrino::flags.optimize) {
-        if (!optimize(irManager)) {
-            globalTimer.stop();
-            optimizerTimer.stop();
-            return FALSE; // failure optimizing
-        }
-    }
-
-	optimizerTimer.stop();
-
-    //
-    // generate code
-    //
-    bool success = false;
-    codegenTimer.start();
-    if (Jitrino::flags.gen_code) {
-        // Modification of data only happens during the codegen stage.
-        // The lock must not surround a code where managed code execution 
-        // may happen. 
-        // It's not expected that code gen phase will lead to a resolution 
-        // (and thus to execution of managed code), so it should be safe to 
-        // lock here.
-        // Though there is a very little chance that that the resolution (and 
-        // managed code execution) happen in code gen. In this case will
-        // need to move the lock into code gen code.
-#if !defined(_IPF_) // on IPF, the whole compilation session protected by lock
-        compilationInterface.lockMethodData();
-#endif
-
-        if (methDesc->getCodeBlockSize(0) > 0 || methDesc->getCodeBlockSize(1)){
-            success = true;
-        }
-        else {
-            OptimizerFlags& optimizerFlags = *irManager.getCompilationContext()->getOptimizerFlags();
-            success = genCode(irManager, 
-                              compilationInterface, 
-                              &irManager.getMethodDesc(), 
-                              &irManager.getFlowGraph(),
-                              irManager.getOpndManager(),
-                              Jitrino::flags.codegen,
-                              optimizerFlags.sink_constants,
-                              optimizerFlags.sink_constants1);
-        }
-#if !defined(_IPF_) // on IPF, the whole compilation session protected by lock
-        compilationInterface.unlockMethodData();
-#endif
-    }
-    codegenTimer.stop();
-    globalTimer.stop();
-
+    runPipeline(cc);
+    
     // remove bc <-> HIR code map handler
-    if (compilationInterface.isBCMapInfoRequired()) {
+    if (cc->getVMCompilationInterface()->isBCMapInfoRequired()) {
         removeContainerHandler(bcOffset2HIRHandlerName, methDesc);
     }
+    
+    bool success = !cc->isCompilationFailed();
     return success;
 }
 
 
-bool Jitrino::CompileMethod(CompilationInterface* compilationInterface) {
+bool Jitrino::CompileMethod(CompilationContext* cc) {
+    CompilationInterface* compilationInterface = cc->getVMCompilationInterface();
 #ifdef _IPF_ //IPF CG params are not safe -> add them to CompilationContext and remove this lock
     compilationInterface->lockMethodData();
 #endif
     bool success = false;
     MethodDesc& methodDesc = *compilationInterface->getMethodToCompile();
-    const char* methodName = methodDesc.getName();
-    const char* methodTypeName = methodDesc.getParentType()->getName();
-    const char* methodSignature=methodDesc.getSignatureString();
-
-    Log::pushSettings();
-
-    initialize_parameters(compilationInterface, methodDesc);
-	Log::setMethodToCompile(methodTypeName, methodName, methodSignature, methodDesc.getByteCodeSize());
+    initialize_parameters(cc, methodDesc);
     
     if (methodDesc.getByteCodeSize() <= 0) {
-        Log::cat_root()->error << " ... Skipping because of 0 byte codes ..." << ::std::endl;
+        Log::out() << " ... Skipping because of 0 byte codes ..." << ::std::endl;
         assert(0);
     } else {
-		success = compileMethod(*compilationInterface);
+        success = compileMethod(cc);
     }
-	Log::clearMethodToCompile(success, compilationInterface);
-	Log::popSettings(); // discard current and restore previous log settings
 #ifdef _IPF_
     compilationInterface->unlockMethodData();
 #endif
-	return success;
+    return success;
 }
 
 void
@@ -433,6 +313,12 @@ Method_Handle
 Jitrino::GetInlinedMethod(InlineInfoPtr ptr, uint32 offset, uint32 inline_depth)
 {
     return runtimeInterface->getInlinedMethod(ptr, offset, inline_depth);
+}
+
+uint16
+Jitrino::GetInlinedBc(InlineInfoPtr ptr, uint32 offset, uint32 inline_depth)
+{
+    return runtimeInterface->getInlinedBc(ptr, offset, inline_depth);
 }
 
 bool
@@ -476,43 +362,24 @@ Jitrino::GetNativeLocationForBc(MethodDesc* method, uint16 bc_pc, uint64 *native
     return runtimeInterface->getNativeLocationForBc(method, bc_pc, native_pc);
 }
 
-//TODO remove
-Timer *
-Jitrino::addTimer(const char *name)
-{
-    Timer *newTimer = new (*global_mm) Timer(name, timers);
-    timers = newTimer;
-    return newTimer;    
-}
-
-//TODO remove
-void 
-Jitrino::dumpTimers()
-{
-    Timer *timer = timers;
-    if (timer) {
-        Log::out() << ::std::endl;
-        Log::out() << "Timers: " << ::std::endl;
-        while (timer) {
-            timer->print(Log::out());
-            timer = timer->getNext();
+JITInstanceContext* Jitrino::getJITInstanceContext(JIT_Handle jitHandle) {
+    if (jitInstances)
+        for (JITInstances::const_iterator it = jitInstances->begin(), end = jitInstances->end(); it!=end; ++it) {
+            JITInstanceContext* jit= *it;
+            if (jit->getJitHandle() == jitHandle) {
+                return jit;
+            }
         }
-    }
-}
-
-JITModeData* Jitrino::getJITModeData(JIT_Handle jit) {
-    for (JITModes::const_iterator it = jitModes.begin(), end = jitModes.end(); it!=end; ++it) {
-        JITModeData* modeData = *it;
-        if (modeData->getJitHandle() == jit) {
-            return modeData;
-        }
-    }
     return NULL;
 }
 
-JitrinoParameterTable* Jitrino::getParameterTable(JIT_Handle jit) {
-    JITModeData* modeData = getJITModeData(jit);
-    return modeData!=NULL?modeData->getParameterTable(): NULL;
+void Jitrino::killJITInstanceContext(JITInstanceContext* jit) {
+    for (JITInstances::iterator it = jitInstances->begin(), end = jitInstances->end(); it!=end; ++it) {
+        if (*it == jit) {
+            jitInstances->erase(it);
+            return;
+        }
+    }
 }
 
 
@@ -530,37 +397,30 @@ JitrinoParameterTable* Jitrino::getParameterTable(JIT_Handle jit) {
 
 extern "C" bool __stdcall DllMain(void *dll_handle, uint32 reason, void *reserved) {
 
-	switch (reason) { 
-	case DLL_PROCESS_ATTACH: 
-		// allocate a TLS index.
-		if ((Jitrino::tlsLogKey = TlsAlloc()) == TLS_OUT_OF_INDEXES) {
-			assert(false);
-			return false;
-			}
-	// fall through, the new process creates a new thread
+    switch (reason) { 
+    case DLL_PROCESS_ATTACH: 
+        // allocate a TLS index.
+        // fall through, the new process creates a new thread
 
-	case DLL_THREAD_ATTACH: 
-		// notify interested parties (only one now)
-		Jitrino::Log::notifyThreadStart(&Jitrino::tlsLogKey);
-		break; 
+    case DLL_THREAD_ATTACH: 
+        // notify interested parties (only one now)
+        break; 
 
-	case DLL_THREAD_DETACH: 
-		// notify interested parties (only one now)
-		Jitrino::Log::notifyThreadFinish(&Jitrino::tlsLogKey);
-		break; 
+    case DLL_THREAD_DETACH: 
+        // notify interested parties (only one now)
+        Jitrino::Tls::threadDetach();
+        break; 
 
-	case DLL_PROCESS_DETACH: 
-		// notify interested parties (only one now)
-		Jitrino::Log::notifyThreadFinish(&Jitrino::tlsLogKey);
-		// release the TLS index
-		TlsFree(Jitrino::tlsLogKey); 
-		Jitrino::tlsLogKey = TLS_OUT_OF_INDEXES;
-		break; 
+    case DLL_PROCESS_DETACH: 
+        // notify interested parties (only one now)
+        // release the TLS index
+        Jitrino::Tls::threadDetach();
+        break; 
 
-	default:
-		break; 
-		} 
-return TRUE; 
-	}
+    default:
+        break; 
+    } 
+    return TRUE; 
+}
 
 #endif // defined(_WIN32) || defined(_WIN64)

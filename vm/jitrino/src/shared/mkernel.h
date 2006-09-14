@@ -27,17 +27,33 @@
 #if !defined(__MKERNEL_H_INCLUDED__)
 #define __MKERNEL_H_INCLUDED__
 
-#ifdef PLATFORM_POSIX
-#include <pthread.h>
-#include <semaphore.h>
+#ifdef _WIN32
+    // windows.h include introduces min/max defines, which conflicts
+    // with STL's min/max used in many other places. This define prevents
+    // them to appear.
+    #define NOMINMAX 1
+    // windows.h enforces its own aligment, which may conflict with 
+    // currently used default one.
+    // Note: EVERY inclusion of windows.h in Jitrino must be surrounded
+    // with \#pragma pack(push/pop)
+    #pragma pack(push)
+    // <winsock2.h> must be included before <windows.h> to avoid 
+    // compile-time errors with winsock.h. For more details, see:
+    //www.microsoft.com/msdownload/platformsdk/ ..
+    // ..     sdkupdate/2600.2180.7/contents.htm
+        #include <winsock2.h>
+        #include <windows.h>
+        #define vsnprintf _vsnprintf
+    #pragma pack(pop)
+    // ... well, just to be absolutely sure...
+    #undef min
+    #undef max
 #else
-// <winsock2.h> must be included before <windows.h> to avoid compile-time 
-// errors with winsock.h. For more details, see:
-//www.microsoft.com/msdownload/platformsdk/sdkupdate/2600.2180.7/contents.htm
-#include <winsock2.h>
-#include <windows.h>
-
+    #include <pthread.h>
+    #include <semaphore.h>
 #endif
+#include <assert.h>
+
 
 namespace Jitrino { 
 
@@ -64,7 +80,7 @@ namespace Jitrino {
  * @note On Windows platform the underlying OS object is not Mutex, but 
  *       CriticalSection instead, as it's a bit lighter and faster.
  *
- * @see #AutoUnlock
+ * @see AutoUnlock
  */
 class Mutex {
 #ifdef PLATFORM_POSIX 
@@ -125,7 +141,8 @@ private:
 };
 
 /**
- * @brief Automatically unlocks a #Mutex when goes out of scope.
+ * @brief Automatically unlocks a Mutex when AutoLock object goes out of 
+ * scope.
  *
  * Class AutoUnlock is an utility class to handy acquire and [automagically]
  * release Mutex lock.
@@ -240,6 +257,314 @@ private:
     Runtime& operator=(const Runtime&);
 };
 
+/**
+ * @brief Key used to identify data in TLS.
+ */
+typedef unsigned long TlsKey;
+
+/**
+ * @brief Basic thread local storage (TLS) functionality.
+ *
+ * The functionality is made similar to the POSIX one - when a TLS key 
+ * allocated, user may specify a function (<i>release function</i>) which 
+ * will be called on thread's death to release the data stored in TLS.
+ * 
+ * With POSIX threads this functionality is by design. On Windows, this 
+ * functionality is emulated by the Tls class.
+ *
+ * The emulation's behavior was made as much close to the one specified by
+ * POSIX, though some differences still exist.
+ *
+ * - the release function is called only if data currently stored in TLS 
+ *  is not NULL
+ * - NULL value is associated with TLS key before calling release function
+ * - (the difference) if release function re-associates a data with the TLS 
+ *  key, this data is ignored (in other words, release function is called 
+ *  no more than once for each thread)
+ * 
+ * @note Emulation on Windows requires external support - currently special
+ * method Tls::threadEnd is called on DLL_THREAD_DETACH. As our code lives 
+ * in dll it's enough for all our needs. If the code (and especially the 
+ * release function behaviour) need to be reused for a threads in process, 
+ * the Tls::threadEnd() must be called at the end of thread function.
+ */
+class Tls {
+public:
+    /**
+     * @brief Allocates a key for TLS.
+     *
+     * Initial value associated with each key in NULL.
+     *
+     * @param free_func - a function will be called when thread is about to
+     * finish, so it can free up the data stored in TLS. See Tls class 
+     * comments.
+     */
+    static TlsKey allocKey(void (*free_func) (void *) = NULL);
+    /**
+     * @brief Releases the TlsKey.
+     */
+    static void releaseKey(TlsKey key);
+#ifdef _WIN32
+    /**
+     * @brief Special-purpose method - used to emulate POSIX-like behavior 
+     * with release function that may free up a data stored in TLS.
+     *
+     * Must be called when thread is about to finish.
+     */
+    static void threadDetach(void);
+    /**
+     * @brief Special-purpose method - used to cleanup dynamically 
+     * allocated map.
+     *
+     * Must be called when thread is about to finish.
+     */
+    static void processDetach(void);
+#endif
+    /**
+     * @brief Puts \c data into TLS.
+     */
+    static void put(TlsKey key, void* data);
+    /**
+     * @brief Gets \c data from TLS.
+     *
+     * If there were no preceding put() operations in the current thread, 
+     * NULL returned.
+     */
+    static void* get(TlsKey key);
+};
+
+/**
+ * A handy wrapper to organize TLS storage, with auto-<i>magic</i> release
+ * of allocated data.
+ * 
+ * TlsStorage is used to manage a thread-local copy of data that exists 
+ * in a <i>single copy per each thread</i>. Here it differs from TlsList 
+ * and TlsStack that organize a thread local stack storage of several 
+ * instances of a data.
+ * 
+ * The TlsStore presumes that a data stored in it is dynamically allocated
+ * using <code>global operator new</code>. Upon a thread termination, a
+ * non-<b>NULL</b> data is deallocated using <code>global operator 
+ * delete</code>.
+ * 
+ *
+ * Usage example:
+ * <pre>
+ * <code>
+ * static TlsStore<SomeStruct> globalStore;
+ *
+ * foo()
+ * {
+ *      SomeStruct* data = globalStore.get();
+ *      if (data == NULL) {
+ *          data = new SomeStru();
+ *          data->init();
+ *          globalStore.put(data);
+ *      }
+ *      
+ * }
+ * </code>
+ * </pre>
+ */
+template <class T> struct TlsStore {
+    /**
+     * @brief Allocates a TlsKey to be used for TLS manipulations.
+     */
+    TlsStore()
+    {
+        m_key = Tls::allocKey(free);
+    }
+    
+    /**
+     * @brief Releases TlsKey.
+     */
+    ~TlsStore()
+    {
+        Tls::releaseKey(m_key);
+    }
+    
+    /**
+     * @brief Returns the stored data or NULL if there were no data stored.
+     */
+    T* get(void) const
+    {
+        return (T*)Tls::get(m_key);
+    }
+    /**
+     * @brief Stores the data into TLS, \b NULL-s are ok.
+     * 
+     * If there were a data stored before, the previous data is freed.
+     */
+    void put(T* pt) const
+    {
+        T* prev = get();
+        if (prev != NULL) {
+            free(prev);
+        }
+        Tls::put(m_key, pt);
+    }
+    /**
+     * Releases the data (calls delete)
+     * 
+     * The method is invoked upon a thread termination to deallocate 
+     * data stored in TLS.
+     */
+    static void free(void* p)
+    {
+        delete (T*)p;
+    }
+private:
+    TlsKey m_key;
+};
+
+
+/**
+ * @brief Provides basic functionality to organize stack of infos in TLS.
+ *
+ * <code>
+ * <pre>
+ *  TlsKey globalKey = Tls::allocKey(NULL);
+ *  foo()
+ *  {
+ *      SomeStru fooLocalData;
+ *      TlsList::push(globalKey, &fooLocalData);
+ *      boo();
+ *      TlsList::pop(globalKey);
+ *  }
+ *
+ *  boo()
+ *  {
+ *      SomeStru* data = (SomeStru*)TlsList::get(globalKey);
+ *      // do something
+ *  }
+ * </pre>
+ * </code>
+ *
+ * \c foo() may be called in the same thread several times, and every time
+ * the latest data will be available for \c boo().
+ * 
+ * @note Number of \c pop()-s must be strictly balanced with the number of 
+ * push()-es, or a memory leak occurs.
+ *
+ * @note TlsList really stores its special data into TLS, so never mix 
+ * calls of Tls::put()/Tls::get() with TlsList's methods with the same 
+ * key.
+ * 
+ * Normally, the TlsList may be used to store a pointer to general data,
+ * while for a particular data structures the template class TlsStack may 
+ * be more convinient.
+ *
+ * @see TlsStack
+ */
+class TlsList {
+public:
+public:
+    /**
+     * @brief Pushes the \c data onto TLS stack.
+     */
+    static void  push(TlsKey key, void* data);
+    /**
+     * @brief Pops out the \c data from TLS stack.
+     */
+    static void* pop(TlsKey key);
+    /**
+     * @brief Returns top data item from TLS stack and leaves it on stack.
+     */
+    static void* get(TlsKey key);
+private:
+    /**
+     * Helper structure to organize linked list of datas in TLS.
+     */
+    struct ListItem
+    {
+        ListItem(ListItem* _prev, void* _data)
+        {
+            prev = _prev;
+            data = _data;
+#ifdef _DEBUG            
+            magic = MAGIC;
+#endif
+        }
+    
+#ifdef _DEBUG
+        /**
+         * @brief A signature, used to verify data integrity.
+         */
+        unsigned    magic;
+        static const unsigned MAGIC = 0x4C495354; // 'LIST' in hex
+        ~ListItem()
+        {
+            assert(magic == MAGIC);
+        }
+#endif
+        void * data;
+        ListItem* prev;
+    };
+};
+
+/**
+ * @brief Handy wrapper for TlsList.
+ *
+ * Use as following:
+ *
+ * <code>
+ *  TlsStack<SomeStruct> globalSomeStructStack; // must be static global
+ * </code>
+ *
+ * @note Note the declaration in the example. It's the type itself, and not 
+ * the pointer - methods os TlsStack do \b not copy data. Instead only 
+ * pointer to the specified data is stored.
+ *
+ * The result is that the stored data must be have it's scope not less than
+ * appropriate push/pop sequence.
+ */
+template<class AType> class TlsStack {
+public:
+    /**
+     * @brief Allocates a TlsKey to be used for TLS manipulations.
+     */
+    TlsStack(void)
+    {
+        m_key = Tls::allocKey();
+    }
+    /**
+     * @brief Releases TlsKey.
+     */
+    ~TlsStack()
+    {
+        Tls::releaseKey(m_key);
+    }
+    /**
+     * @brief Pushes the \c item onto TLS stack.
+     */
+    void push(AType& item)
+    {
+        push(&item);
+    }
+    /**
+     * @brief Pushes the \c pitem onto TLS stack.
+     */
+    void push(AType* pitem)
+    {
+        TlsList::push(m_key, pitem);
+    }
+    /**
+     * @brief Returns top data item from TLS stack and leaves it on stack.
+     */
+    AType* get(void)
+    {
+        return (AType*)TlsList::get(m_key);
+    }
+    /**
+     * @brief Pops out the an item from TLS stack.
+     */
+    AType* pop(void)
+    {
+        return (AType*)TlsList::pop(m_key);
+    }
+private:
+    TlsKey m_key;
+};
 
 }; // ~namespace Jitrino
 

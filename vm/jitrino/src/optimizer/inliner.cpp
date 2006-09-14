@@ -21,7 +21,6 @@
  */
 
 #include "Log.h"
-#include "PropertyTable.h"
 #include "methodtable.h"
 #include "inliner.h"
 #include "irmanager.h"
@@ -29,22 +28,25 @@
 #include "Inst.h"
 #include "Dominator.h"
 #include "Loop.h"
-#include "Profiler.h"
 #include "simplifier.h"
 #include "JavaByteCodeParser.h"
-#include "PropertyTable.h"
+#include "EdgeProfiler.h"
+#include "StaticProfiler.h"
+#include "optimizer.h"
 
 namespace Jitrino {
-
-#define MAX_INLINE_GROWTH_FACTOR_PROF 500
-#define MIN_INLINE_STOP_PROF 100
-#define MIN_BENEFIT_THRESHOLD_PROF 100
-#define INLINE_LARGE_THRESHOLD_PROF 150
 
 #define MAX_INLINE_GROWTH_FACTOR 170
 #define MIN_INLINE_STOP 50
 #define MIN_BENEFIT_THRESHOLD 200
 #define INLINE_LARGE_THRESHOLD 70
+
+
+#define MAX_INLINE_GROWTH_FACTOR_PROF 500
+#define MIN_INLINE_STOP_PROF 100
+// no negative profile benefit for nodes with freq >= 1/10 of entry freq
+#define MIN_BENEFIT_THRESHOLD_PROF (MIN_BENEFIT_THRESHOLD / 10) 
+#define INLINE_LARGE_THRESHOLD_PROF 150
 
 
 #define CALL_COST 1
@@ -62,64 +64,75 @@ namespace Jitrino {
 #define INLINE_EXACT_ALL_BONUS 0
 #define INLINE_SKIP_EXCEPTION_PATH true
 
-Inliner::Inliner(MemoryManager& mm, IRManager& irm, bool doProfileOnly) 
-    : _mm(mm), _toplevelIRM(irm), 
+
+DEFINE_SESSION_ACTION(InlinePass, inline, "Method Inlining");
+
+Inliner::Inliner(SessionAction* argSource, MemoryManager& mm, IRManager& irm, bool doProfileOnly) 
+    : _tmpMM(mm), _toplevelIRM(irm), 
       _typeManager(irm.getTypeManager()), _instFactory(irm.getInstFactory()),
       _opndManager(irm.getOpndManager()),
       _hasProfileInfo(irm.getFlowGraph().hasEdgeProfile()),
-      _useInliningTranslatorCall(!irm.getFlowGraph().hasEdgeProfile()),
       _inlineCandidates(mm), _initByteSize(irm.getMethodDesc().getByteCodeSize()), 
-      
       _currentByteSize(irm.getMethodDesc().getByteCodeSize()), 
-      
-      _inlineTree(new (mm) InlineNode(irm, 0, 0)) {
-    JitrinoParameterTable& propertyTable = irm.getParameterTable();
+      _inlineTree(new (mm) InlineNode(irm, 0, 0)),
+      translatorAction(NULL)
+{
     
+    if (irm.getCompilationInterface().isBCMapInfoRequired()) {
+        isBCmapRequired = true;
+        MethodDesc* meth = irm.getCompilationInterface().getMethodToCompile();
+        bc2HIRMapHandler = new VectorHandler(bcOffset2HIRHandlerName, meth);
+    } else {
+        isBCmapRequired = false;
+        bc2HIRMapHandler = NULL;
+    }
+
+    const char* translatorName = argSource->getStringArg("translatorActionName", "translator");
+    translatorAction = (TranslatorAction*)PMF::getAction(argSource->getPipeline(), translatorName);
+    assert(translatorAction);
+
     _doProfileOnlyInlining = doProfileOnly;
     _useInliningTranslator = !doProfileOnly;
     
-    _maxInlineGrowthFactor = ((double) propertyTable.lookupInt("opt::inline::growth_factor", doProfileOnly ? MAX_INLINE_GROWTH_FACTOR_PROF : MAX_INLINE_GROWTH_FACTOR)) / 100;
-    _minInlineStop = propertyTable.lookupUint("opt::inline::min_stop", doProfileOnly ? MIN_INLINE_STOP_PROF : MIN_INLINE_STOP);
-    _minBenefitThreshold = propertyTable.lookupInt("opt::inline::min_benefit_threshold", 
-                                                   doProfileOnly ? MIN_BENEFIT_THRESHOLD_PROF : MIN_BENEFIT_THRESHOLD);
+    _maxInlineGrowthFactor = ((double)argSource->getIntArg("growth_factor", doProfileOnly ? MAX_INLINE_GROWTH_FACTOR_PROF : MAX_INLINE_GROWTH_FACTOR)) / 100;
+    _minInlineStop = argSource->getIntArg("min_stop", doProfileOnly ? MIN_INLINE_STOP_PROF : MIN_INLINE_STOP);
+    _minBenefitThreshold = argSource->getIntArg("min_benefit_threshold", doProfileOnly ? MIN_BENEFIT_THRESHOLD_PROF : MIN_BENEFIT_THRESHOLD);
     
-    _inlineSmallMaxByteSize = propertyTable.lookupUint("opt::inline::small_method_max_size", INLINE_SMALL_THRESHOLD);
-    _inlineSmallBonus = propertyTable.lookupInt("opt::inline::small_method_bonus", INLINE_SMALL_BONUS);
+    _inlineSmallMaxByteSize = argSource->getIntArg("inline_small_method_max_size", INLINE_SMALL_THRESHOLD);
+    _inlineSmallBonus = argSource->getIntArg("inline_small_method_bonus", INLINE_SMALL_BONUS);
     
-    _inlineMediumMaxByteSize = propertyTable.lookupUint("opt::inline::medium_method_max_size", INLINE_MEDIUM_THRESHOLD);
-    _inlineMediumBonus = propertyTable.lookupInt("opt::inline::medium_method_bonus", INLINE_MEDIUM_BONUS);
+    _inlineMediumMaxByteSize = argSource->getIntArg("medium_method_max_size", INLINE_MEDIUM_THRESHOLD);
+    _inlineMediumBonus = argSource->getIntArg("medium_method_bonus", INLINE_MEDIUM_BONUS);
     
-    _inlineLargeMinByteSize = propertyTable.lookupUint("opt::inline::large_method_min_size", doProfileOnly ? INLINE_LARGE_THRESHOLD_PROF : INLINE_LARGE_THRESHOLD);
-    _inlineLargePenalty = propertyTable.lookupInt("opt::inline::large_method_penalty", INLINE_LARGE_PENALTY);
+    _inlineLargeMinByteSize = argSource->getIntArg("large_method_min_size", doProfileOnly ? INLINE_LARGE_THRESHOLD_PROF : INLINE_LARGE_THRESHOLD);
+    _inlineLargePenalty = argSource->getIntArg("large_method_penalty", INLINE_LARGE_PENALTY);
 
-    _inlineLoopBonus = propertyTable.lookupInt("opt::inline::loop_bonus", INLINE_LOOP_BONUS);
-    _inlineLeafBonus = propertyTable.lookupInt("opt::inline::leaf_bonus", INLINE_LEAF_BONUS);
-    _inlineSynchBonus = propertyTable.lookupInt("opt::inline::synch_bonus", INLINE_SYNCH_BONUS);
-    _inlineRecursionPenalty = propertyTable.lookupInt("opt::inline::recursion_penalty", INLINE_RECURSION_PENALTY);
-    _inlineExactArgBonus = propertyTable.lookupInt("opt::inline::exact_single_parameter_bonus", INLINE_EXACT_ARG_BONUS);
-    _inlineExactAllBonus = propertyTable.lookupInt("opt::inline::exact_all_parameter_bonus", INLINE_EXACT_ALL_BONUS);
+    _inlineLoopBonus = argSource->getIntArg("loop_bonus", INLINE_LOOP_BONUS);
+    _inlineLeafBonus = argSource->getIntArg("leaf_bonus", INLINE_LEAF_BONUS);
+    _inlineSynchBonus = argSource->getIntArg("synch_bonus", INLINE_SYNCH_BONUS);
+    _inlineRecursionPenalty = argSource->getIntArg("recursion_penalty", INLINE_RECURSION_PENALTY);
+    _inlineExactArgBonus = argSource->getIntArg("exact_single_parameter_bonus", INLINE_EXACT_ARG_BONUS);
+    _inlineExactAllBonus = argSource->getIntArg("exact_all_parameter_bonus", INLINE_EXACT_ALL_BONUS);
 
-    _inlineSkipExceptionPath = propertyTable.lookupBool("opt::inline::skip_exception_path", INLINE_SKIP_EXCEPTION_PATH);
-    const char* skipMethods = propertyTable.lookup("opt::inline::skip_methods");
+    _inlineSkipExceptionPath = argSource->getBoolArg("skip_exception_path", INLINE_SKIP_EXCEPTION_PATH);
+    const char* skipMethods = argSource->getStringArg("skip_methods", NULL);
     if(skipMethods == NULL) {
         _inlineSkipMethodTable = NULL;
     } else {
-        ::std::string skipMethodsStr = skipMethods;
-        _inlineSkipMethodTable = new (_mm) Method_Table(skipMethodsStr.c_str(), "SKIP_METHODS", true);
+        std::string skipMethodsStr = skipMethods;
+        _inlineSkipMethodTable = new (_tmpMM) Method_Table(skipMethodsStr.c_str(), "SKIP_METHODS", true);
     }
 
-    _usesOptimisticBalancedSync = (propertyTable.lookupBool("opt::sync::optimistic", false)
-                                   ? propertyTable.lookupBool("opt::sync::optcatch", true)
-                                   : false);
+    _usesOptimisticBalancedSync = argSource->getBoolArg("sync_optimistic", false) ? argSource->getBoolArg("sync_optcatch", true) : false;
 }
 
 int32 
-Inliner::computeInlineBenefit(CFGNode* node, MethodDesc& methodDesc, InlineNode* parentInlineNode, uint32 loopDepth) 
+Inliner::computeInlineBenefit(Node* node, MethodDesc& methodDesc, InlineNode* parentInlineNode, uint32 loopDepth) 
 {
     int32 benefit = 0;
 
-    if (Log::cat_opt_inline()->isDebugEnabled()) {
-        Log::cat_opt_inline()->debug << "Computing Inline benefit for "
+    if (Log::isEnabled()) {
+        Log::out() << "Computing Inline benefit for "
                                << methodDesc.getParentType()->getName()
                                << "." << methodDesc.getName() << ::std::endl;
     }
@@ -127,28 +140,28 @@ Inliner::computeInlineBenefit(CFGNode* node, MethodDesc& methodDesc, InlineNode*
     // Size impact
     //
     uint32 size = methodDesc.getByteCodeSize();
-    Log::cat_opt_inline()->debug << "  size is " << (int) size << ::std::endl;
+    Log::out() << "  size is " << (int) size << ::std::endl;
     if(size < _inlineSmallMaxByteSize) {
         // Large bonus for smallest methods
         benefit += _inlineSmallBonus;
-        Log::cat_opt_inline()->debug << "  isSmall, benefit now = " << benefit << ::std::endl;
+        Log::out() << "  isSmall, benefit now = " << benefit << ::std::endl;
     } else if(size < _inlineMediumMaxByteSize) {
         // Small bonus for somewhat small methods
         benefit += _inlineMediumBonus;
-        Log::cat_opt_inline()->debug << "  isMedium, benefit now = " << benefit << ::std::endl;
+        Log::out() << "  isMedium, benefit now = " << benefit << ::std::endl;
     } else if(size > _inlineLargeMinByteSize) {
         // Penalty for large methods
         benefit -= _inlineLargePenalty * (loopDepth+1); 
-        Log::cat_opt_inline()->debug << "  isLarge, benefit now = " << benefit << ::std::endl;
+        Log::out() << "  isLarge, benefit now = " << benefit << ::std::endl;
     }
     benefit -= size;
-    Log::cat_opt_inline()->debug << "  Subtracting size, benefit now = " << benefit << ::std::endl;
+    Log::out() << "  Subtracting size, benefit now = " << benefit << ::std::endl;
 
     //
     // Loop depth impact - add bonus for deep call sites
     //
     benefit += _inlineLoopBonus*loopDepth;
-    Log::cat_opt_inline()->debug << "  Loop Depth is " << (int) loopDepth
+    Log::out() << "  Loop Depth is " << (int) loopDepth
                            << ", benefit now = " << benefit << ::std::endl;
 
     //
@@ -156,7 +169,7 @@ Inliner::computeInlineBenefit(CFGNode* node, MethodDesc& methodDesc, InlineNode*
     //
     if(methodDesc.isSynchronized()){
         benefit += _inlineSynchBonus;
-        Log::cat_opt_inline()->debug << "  Method is synchronized, benefit now = " << benefit << ::std::endl;
+        Log::out() << "  Method is synchronized, benefit now = " << benefit << ::std::endl;
     }
     //
     // Recursion penalty - discourage recursive inlining
@@ -164,7 +177,7 @@ Inliner::computeInlineBenefit(CFGNode* node, MethodDesc& methodDesc, InlineNode*
     for(; parentInlineNode != NULL; parentInlineNode = parentInlineNode->getParent()) {
         if(&methodDesc == &(parentInlineNode->getIRManager().getMethodDesc())) {
             benefit -= _inlineRecursionPenalty;
-            Log::cat_opt_inline()->debug << "  Subtracted one recursion level, benefit now = " << benefit << ::std::endl;
+            Log::out() << "  Subtracted one recursion level, benefit now = " << benefit << ::std::endl;
         }
     }
     
@@ -173,13 +186,13 @@ Inliner::computeInlineBenefit(CFGNode* node, MethodDesc& methodDesc, InlineNode*
     //
     if(isLeafMethod(methodDesc)) {
         benefit += _inlineLeafBonus;
-        Log::cat_opt_inline()->debug << "  Added leaf bonus, benefit now = " << benefit << ::std::endl;
+        Log::out() << "  Added leaf bonus, benefit now = " << benefit << ::std::endl;
     }
 
     //
     // Exact argument bonus - may introduce specialization opportunities
     //
-    Inst* last = node->getLastInst();
+    Inst* last = (Inst*)node->getLastInst();
     if(last->getOpcode() == Op_DirectCall) {
         MethodCallInst* call = last->asMethodCallInst();
         assert(call != NULL);
@@ -193,21 +206,21 @@ Inliner::computeInlineBenefit(CFGNode* node, MethodDesc& methodDesc, InlineNode*
             assert(arg->getType()->tag != Type::Tau);
             if(arg->getInst()->isConst()) {
                 benefit += _inlineExactArgBonus;
-                Log::cat_opt_inline()->debug << "  Src " << (int) i
+                Log::out() << "  Src " << (int) i
                                        << " is const, benefit now = " << benefit << ::std::endl;
             } else if(arg->getType()->isObject() && Simplifier::isExactType(arg)) {
                 benefit += _inlineExactArgBonus;
-                Log::cat_opt_inline()->debug << "  Src " << (int) i
+                Log::out() << "  Src " << (int) i
                                        << " is exacttype, benefit now = " << benefit << ::std::endl;
             }  else {
                 exact = false;
-                Log::cat_opt_inline()->debug << "  Src " << (int) i
+                Log::out() << "  Src " << (int) i
                                        << " is inexact, benefit now = " << benefit << ::std::endl;
             }
         }
         if(call->getNumSrcOperands() > 2 && exact) {
             benefit += _inlineExactAllBonus;
-            Log::cat_opt_inline()->debug << "  Added allexact bonus, benefit now = " << benefit << ::std::endl;
+            Log::out() << "  Added allexact bonus, benefit now = " << benefit << ::std::endl;
         }
     }        
     
@@ -216,8 +229,8 @@ Inliner::computeInlineBenefit(CFGNode* node, MethodDesc& methodDesc, InlineNode*
     //
     if(_doProfileOnlyInlining && _toplevelIRM.getFlowGraph().hasEdgeProfile()) {
         double heatThreshold = _toplevelIRM.getHeatThreshold();
-        double nodeCount = node->getFreq();
-        double scale = nodeCount / heatThreshold;
+        double nodeCount = node->getExecCount();
+        double scale =   nodeCount / heatThreshold;
         if(scale > 100)
             scale = 100;
         // Remove any loop bonus as this is already accounted for in block count
@@ -225,7 +238,7 @@ Inliner::computeInlineBenefit(CFGNode* node, MethodDesc& methodDesc, InlineNode*
         // Scale by call site 'hotness'.
         benefit = (uint32) ((double) benefit * scale);
 
-        Log::cat_opt_inline()->debug << "  HeatThreshold=" << heatThreshold
+        Log::out() << "  HeatThreshold=" << heatThreshold
                                << ", nodeCount=" << nodeCount
                                << ", scale=" << scale
                                << "; benefit now = " << benefit
@@ -417,7 +430,6 @@ Inliner::reset()
 {
     _hasProfileInfo = true; // _irm.getFlowGraph().hasEdgeProfile();
     _inlineCandidates.clear();
-    _useInliningTranslatorCall = false;
 }
 
 bool
@@ -427,7 +439,7 @@ Inliner::canInlineFrom(MethodDesc& methodDesc)
     // Test if calls in this method should be inlined
     //
     bool doInline = !methodDesc.isClassInitializer() && !methodDesc.getParentType()->isLikelyExceptionType();
-    Log::cat_opt_inline()->debug << "Can inline from " << methodDesc.getParentType()->getName() << "." << methodDesc.getName() << " == " << doInline << ::std::endl;
+    Log::out() << "Can inline from " << methodDesc.getParentType()->getName() << "." << methodDesc.getName() << " == " << doInline << ::std::endl;
     return doInline;
 }
 
@@ -439,9 +451,9 @@ Inliner::canInlineInto(MethodDesc& methodDesc)
     //
     bool doSkip = (_inlineSkipMethodTable == NULL) ? false : _inlineSkipMethodTable->accept_this_method(methodDesc);
     if(doSkip)
-        Log::cat_opt_inline()->debug << "Skipping inlining of " << methodDesc.getParentType()->getName() << "." << methodDesc.getName() << ::std::endl;    
+        Log::out() << "Skipping inlining of " << methodDesc.getParentType()->getName() << "." << methodDesc.getName() << ::std::endl;    
     bool doInline = !doSkip && !methodDesc.isNative() && !methodDesc.isNoInlining() && !methodDesc.getParentType()->isLikelyExceptionType();
-    Log::cat_opt_inline()->debug << "Can inline this " << methodDesc.getParentType()->getName() << "." << methodDesc.getName() << " == " << doInline << ::std::endl;
+    Log::out() << "Can inline this " << methodDesc.getParentType()->getName() << "." << methodDesc.getName() << " == " << doInline << ::std::endl;
     return doInline;
 }
 
@@ -451,12 +463,9 @@ Inliner::connectRegion(InlineNode* inlineNode) {
         // This is the top level graph.
         return;
     
-    if(_useInliningTranslatorCall)
-        // Inlining translator connects the region during translation
-        return;
-
+    
     IRManager &inlinedIRM = inlineNode->getIRManager();
-    FlowGraph &inlinedFlowGraph = inlinedIRM.getFlowGraph();
+    ControlFlowGraph &inlinedFlowGraph = inlinedIRM.getFlowGraph();
     Inst *callInst = inlineNode->getCallInst();
     MethodDesc &methodDesc = inlinedIRM.getMethodDesc();
     
@@ -476,11 +485,11 @@ Inliner::connectRegion(InlineNode* inlineNode) {
         &methodDesc, obj)
         : _instFactory.makeMethodMarker(MethodMarkerInst::Exit, 
         &methodDesc);
-    CFGNode* entry = inlinedFlowGraph.getEntry();
-    entry->prependAfterCriticalInst(entryMarker);
-    CFGNode* retNode = inlinedFlowGraph.getReturn();
+    Node* entry = inlinedFlowGraph.getEntryNode();
+    entry->prependInst(entryMarker);
+    Node* retNode = inlinedFlowGraph.getReturnNode();
     if(retNode != NULL)
-        retNode->append(exitMarker);
+        retNode->appendInst(exitMarker);
     
     // Fuse callsite arguments with incoming parameters
     uint32 numArgs = callInst->getNumSrcOperands() - 2; // omit taus
@@ -488,11 +497,19 @@ Inliner::connectRegion(InlineNode* inlineNode) {
     Opnd *tauTypesChecked = callInst->getSrc(1);
     assert(tauNullChecked->getType()->tag == Type::Tau);
     assert(tauTypesChecked->getType()->tag == Type::Tau);
-    Inst* first = entry->getFirstInst();
+
+    // Mark tauNullChecked def inst as nonremovable
+    // tauSafe can be here. this is not our case.
+    Inst* tauNullCheckInst = tauNullChecked->getInst();
+    if(tauNullCheckInst->getOpcode() == Op_TauCheckNull) {
+        tauNullCheckInst->setDefArgModifier(NonNullThisArg);
+    }
+
+    Inst* first = (Inst*)entry->getFirstInst();
     Inst* inst;
     Opnd* thisPtr = 0;
     uint32 j;
-    for(j = 0, inst = first->next(); j < numArgs && inst != first;) {
+    for(j = 0, inst = first->getNextInst(); j < numArgs && inst != NULL;) {
         switch (inst->getOpcode()) {
         case Op_DefArg:
             {
@@ -544,7 +561,7 @@ Inliner::connectRegion(InlineNode* inlineNode) {
         default:
             break;
         }
-        inst = inst->next();
+        inst = inst->getNextInst();
     }
     assert(j == numArgs);
     
@@ -562,11 +579,11 @@ Inliner::connectRegion(InlineNode* inlineNode) {
         bool isSsa = inlinedIRM.getInSsa();
         Opnd** phiArgs = isSsa ? new (_toplevelIRM.getMemoryManager()) Opnd*[retNode->getInDegree()] : NULL;
         uint32 phiCount = 0;
-        const CFGEdgeDeque& inEdges = retNode->getInEdges();
-        CFGEdgeDeque::const_iterator eiter;
+        const Edges& inEdges = retNode->getInEdges();
+        Edges::const_iterator eiter;
         for(eiter = inEdges.begin(); eiter != inEdges.end(); ++eiter) {
-            CFGNode* retSite = (*eiter)->getSourceNode();
-            Inst* ret = retSite->getLastInst();
+            Node* retSite = (*eiter)->getSourceNode();
+            Inst* ret = (Inst*)retSite->getLastInst();
             assert(ret->getOpcode() == Op_Return);
             if(retVar != NULL) {
                 Opnd* tmp = ret->getSrc(0);
@@ -574,24 +591,24 @@ Inliner::connectRegion(InlineNode* inlineNode) {
                 if(isSsa) {
                     SsaVarOpnd* ssaVar = _opndManager.createSsaVarOpnd(retVar);
                     phiArgs[phiCount++] = ssaVar;
-                    retSite->append(_instFactory.makeStVar(ssaVar, tmp));
+                    retSite->appendInst(_instFactory.makeStVar(ssaVar, tmp));
                 } else {
-                    retSite->append(_instFactory.makeStVar(retVar, tmp));
+                    retSite->appendInst(_instFactory.makeStVar(retVar, tmp));
                 }
             }
             ret->unlink();
         }
         if(retVar != NULL) {
             // Insert phi and ldVar after call site
-            CFGNode* joinNode = inlinedFlowGraph.splitReturnNode();
-            joinNode->setFreq(retNode->getFreq());
-            ((CFGEdge*) joinNode->findTarget(retNode))->setEdgeProb(1.0);
+            Node* joinNode = inlinedFlowGraph.splitReturnNode(_instFactory.makeLabel());
+            joinNode->setExecCount(retNode->getExecCount());
+            joinNode->findTargetEdge(retNode)->setEdgeProb(1.0);
             if(isSsa) {
                 SsaVarOpnd* ssaVar = _opndManager.createSsaVarOpnd(retVar);
-                joinNode->append(_instFactory.makePhi(ssaVar, phiCount, phiArgs));
-                joinNode->append(_instFactory.makeLdVar(dst, ssaVar));
+                joinNode->appendInst(_instFactory.makePhi(ssaVar, phiCount, phiArgs));
+                joinNode->appendInst(_instFactory.makeLdVar(dst, ssaVar));
             } else {
-                joinNode->append(_instFactory.makeLdVar(dst, retVar));
+                joinNode->appendInst(_instFactory.makeLdVar(dst, retVar));
             }
 
             // Set return operand.
@@ -603,28 +620,26 @@ Inliner::connectRegion(InlineNode* inlineNode) {
     //
     // Insert explicit catch_all/monitor_exit/rethrow at exception exits for a synchronized inlined region
     //
-    if(methodDesc.isSynchronized() && inlinedIRM.getFlowGraph().getUnwind()) {
+    if(methodDesc.isSynchronized() && inlinedIRM.getFlowGraph().getUnwindNode()) {
         // Add monitor exit to unwind.
-        CFGNode* unwind = inlinedFlowGraph.getUnwind();
-        const CFGEdgeDeque& unwindEdges = unwind->getInEdges();
-        
+        Node* unwind = inlinedFlowGraph.getUnwindNode();
         // Test if an exception exit exists
-        if(!unwindEdges.empty()) {
-            CFGNode* dispatch = inlinedFlowGraph.createDispatchNode();
+        if(unwind->getInDegree() > 0) {
+            Node* dispatch = inlinedFlowGraph.createDispatchNode(_instFactory.makeLabel());
             
             // Insert catch all
             Opnd* ex = _opndManager.createSsaTmpOpnd(_typeManager.getSystemObjectType());
-            CFGNode* handler = inlinedFlowGraph.createCatchNode(0, ex->getType());
-            handler->append(_instFactory.makeCatch(ex));
+            Node* handler = inlinedFlowGraph.createBlockNode(inlinedIRM.getInstFactory().makeCatchLabel(0, ex->getType()));
+            handler->appendInst(_instFactory.makeCatch(ex));
             if(methodDesc.isStatic()) {
                 // Release class monitor
-                handler->append(_instFactory.makeTypeMonitorExit(methodDesc.getParentType()));
+                handler->appendInst(_instFactory.makeTypeMonitorExit(methodDesc.getParentType()));
             } else {
                 // Release object monitor
                 assert(callInst->getNumSrcOperands() > 2);
                 Opnd* obj = callInst->getSrc(2); // object is arg 2;
-                TranslatorFlags& translatorFlags = *inlinedIRM.getCompilationContext()->getTranslatorFlags();
-                if (!translatorFlags.ignoreSync && !translatorFlags.syncAsEnterFence) {
+                const TranslatorFlags& traFlags = translatorAction->getFlags();
+                if (!traFlags.ignoreSync && !traFlags.syncAsEnterFence) {
                     if (_usesOptimisticBalancedSync) {
                         // We may need to insert an optimistically balanced monitorexit.
                         // Note that we shouldn't have an un-optimistic balanced monitorexit,
@@ -632,30 +647,30 @@ Inliner::connectRegion(InlineNode* inlineNode) {
                         // prevented balancing for a synchronized method, which would have
                         // a missing monitorexit on the exception path.
                         
-                        CFGNode *aRetNode = retNode;
+                        Node *aRetNode = retNode;
                         bool done = false;
                         int count = 0;
                         // We should have an optbalmonexit on a return path
                         while (!done && aRetNode != NULL && !aRetNode->getInEdges().empty()) {
-                            const CFGEdgeDeque& retEdges = aRetNode->getInEdges();
+                            const Edges& retEdges = aRetNode->getInEdges();
                             if (!retEdges.empty()) {
-                                CFGEdge *anEdgeToReturn = *retEdges.begin();
-                                CFGNode *aMonexitNode = anEdgeToReturn->getSourceNode();
-                                Inst *lastInst = aMonexitNode->getLastInst();
-                                Inst *firstInst = aMonexitNode->getFirstInst();
+                                Edge *anEdgeToReturn = *retEdges.begin();
+                                Node *aMonexitNode = anEdgeToReturn->getSourceNode();
+                                Inst *lastInst = (Inst*)aMonexitNode->getLastInst();
+                                Inst *firstInst = (Inst*)aMonexitNode->getFirstInst();
                                 while (lastInst != firstInst) {
                                     if (lastInst->getOpcode() == Op_OptimisticBalancedMonitorExit) {
                                         Opnd *srcObj = lastInst->getSrc(0);
                                         Opnd *lockAddr = lastInst->getSrc(1);
                                         Opnd *enterDst = lastInst->getSrc(2);
                                         
-                                        handler->append(_instFactory.makeOptimisticBalancedMonitorExit(srcObj,
+                                        handler->appendInst(_instFactory.makeOptimisticBalancedMonitorExit(srcObj,
                                                                                                        lockAddr,
                                                                                                        enterDst));
                                         done = true;
                                         break;
                                     }
-                                    lastInst = lastInst->prev();
+                                    lastInst = lastInst->getPrevInst();
                                 }
                                 if (!done) {
                                     // we may have empty nodes or something, so try a predecessor.
@@ -673,24 +688,21 @@ Inliner::connectRegion(InlineNode* inlineNode) {
                         assert(done);
                     } else {
                         Opnd* tauSafe = _opndManager.createSsaTmpOpnd(_typeManager.getTauType());
-                        handler->append(_instFactory.makeTauSafe(tauSafe)); // monenter success guarantees non-null
-                        handler->append(_instFactory.makeTauMonitorExit(obj, tauSafe));
+                        handler->appendInst(_instFactory.makeTauSafe(tauSafe)); // monenter success guarantees non-null
+                        handler->appendInst(_instFactory.makeTauMonitorExit(obj, tauSafe));
                     }
                 }
             }
             
             // Insert rethrow
-            CFGNode* rethrow = inlinedFlowGraph.createBlockNode();
-            rethrow->append(_instFactory.makeThrow(Throw_NoModifier, ex));
+            Node* rethrow = inlinedFlowGraph.createBlockNode(_instFactory.makeLabel());
+            rethrow->appendInst(_instFactory.makeThrow(Throw_NoModifier, ex));
             
             // Redirect exception exits to monitor_exit
-            CFGEdgeDeque::const_iterator eiter;
-            for(eiter = unwindEdges.begin(); eiter != unwindEdges.end(); ) {
-                CFGEdge* edge = *eiter;
-                ++eiter;
+            while (!unwind->getInEdges().empty()) {
+                Edge* edge = unwind->getInEdges().front();
                 inlinedFlowGraph.replaceEdgeTarget(edge, dispatch);
             }
-            assert(unwindEdges.empty());
             inlinedFlowGraph.addEdge(dispatch, handler);
             inlinedFlowGraph.addEdge(handler, rethrow);
             inlinedFlowGraph.addEdge(handler, unwind);
@@ -703,24 +715,31 @@ Inliner::connectRegion(InlineNode* inlineNode) {
     //
     if ((methodDesc.isStatic() || methodDesc.isInstanceInitializer()) &&
         methodDesc.getParentType()->needsInitialization()) {
-        // initialize type for static methods
-        Inst* initType = _instFactory.makeInitType(methodDesc.getParentType());
-        entry->prepend(initType);
-        inlinedFlowGraph.splitNodeAtInstruction(initType);
-        inlinedFlowGraph.addEdge(entry, inlinedFlowGraph.getUnwind());
-    }
+            // initialize type for static methods
+            Inst* initType = _instFactory.makeInitType(methodDesc.getParentType());
+            entry->prependInst(initType);
+            inlinedFlowGraph.splitNodeAtInstruction(initType, true, false, _instFactory.makeLabel());
+            Node* unwind = inlinedFlowGraph.getUnwindNode();
+            if (unwind == NULL) {
+                unwind = inlinedFlowGraph.createDispatchNode(_instFactory.makeLabel());
+                inlinedFlowGraph.setUnwindNode(unwind);
+                inlinedFlowGraph.addEdge(unwind, inlinedFlowGraph.getExitNode());
+            }
+            inlinedFlowGraph.addEdge(entry, unwind);
+        }
 }
 
 void
-Inliner::inlineAndProcessRegion(InlineNode* inlineNode,
-                                DominatorTree* dtree, LoopTree* ltree) {
+Inliner::inlineAndProcessRegion(InlineNode* inlineNode) {
     IRManager &inlinedIRM = inlineNode->getIRManager();
-    FlowGraph &inlinedFlowGraph = inlinedIRM.getFlowGraph();
-    CFGNode *callNode = inlineNode->getCallNode();
+    DominatorTree* dtree = inlinedIRM.getDominatorTree();
+    LoopTree* ltree = inlinedIRM.getLoopTree();
+    ControlFlowGraph &inlinedFlowGraph = inlinedIRM.getFlowGraph();
+    Node *callNode = inlineNode->getCallNode();
     Inst *callInst = inlineNode->getCallInst();
     MethodDesc &methodDesc = inlinedIRM.getMethodDesc();
     
-    if (Log::cat_opt_inline()->isDebugEnabled()) {
+    if (Log::isEnabled()) {
         Log::out() << "inlineAndProcessRegion "
                    << methodDesc.getParentType()->getName() << "."
                    << methodDesc.getName() << ::std::endl;
@@ -741,7 +760,7 @@ Inliner::inlineAndProcessRegion(InlineNode* inlineNode,
     // If top level flowgraph 
     //
     if (inlineNode == _inlineTree.getRoot()) {
-        Log::cat_opt_inline()->debug << "inlineNode is root" << ::std::endl;
+        Log::out() << "inlineNode is root" << ::std::endl;
         return;
     }
 
@@ -749,10 +768,10 @@ Inliner::inlineAndProcessRegion(InlineNode* inlineNode,
     // Splice region into top level flowgraph at call site
     //
     assert(callInst->getOpcode() == Op_DirectCall);
-    Log::cat_opt_inline()->ir << "Inlining " << methodDesc.getParentType()->getName() 
+    Log::out() << "Inlining " << methodDesc.getParentType()->getName() 
         << "." << methodDesc.getName() << ::std::endl;
 
-    Log::cat_opt_inline()->ir 
+    Log::out() 
         << "callee = " << methodDesc.getParentType()->getName() << "." << methodDesc.getName() 
         << ::std::endl
         << "caller = " << inlinedIRM.getParent()->getMethodDesc().getParentType()->getName() << "."
@@ -763,22 +782,22 @@ Inliner::inlineAndProcessRegion(InlineNode* inlineNode,
     // update inlining-related information in all 'call' instructions of the inlined method
     //
     
-    const CFGNodeDeque& nodes = inlinedFlowGraph.getNodes();
-    CFGNodeDeque::const_iterator niter;
+    const Nodes& nodes = inlinedFlowGraph.getNodes();
+    Nodes::const_iterator niter;
     uint16 count = 0;
 
     assert(callInst->isMethodCall());
     InlineInfo& call_ii = *callInst->asMethodCallInst()->getInlineInfoPtr();
 
-    call_ii.printLevels(Log::cat_opt_inline()->ir);
-    Log::cat_opt_inline()->ir << ::std::endl;
+    call_ii.printLevels(Log::out());
+    Log::out() << ::std::endl;
 
     for(niter = nodes.begin(); niter != nodes.end(); ++niter) {
-        CFGNode* node = *niter;
+        Node* node = *niter;
 
-        Inst* first = node->getFirstInst();
+        Inst* first = (Inst*)node->getFirstInst();
         Inst* i;
-        for(i=first->next(); i != first; i=i->next()) {
+        for(i=first->getNextInst(); i != NULL; i=i->getNextInst()) {
             InlineInfo *ii = i->getCallInstInlineInfoPtr();
             // ii should be non-null for each call instruction
             if ( ii ) {
@@ -786,12 +805,27 @@ Inliner::inlineAndProcessRegion(InlineNode* inlineNode,
                 // InlineInfo order is parent-first 
                 //     (ii might be non-empty when translation-level inlining is on)
                 //
-                ii->prependLevel(&methodDesc);
+                uint32 bcOff = ILLEGAL_VALUE;
+
+                if (isBCmapRequired) {
+                    uint64 callIinstID = (uint64) callInst->getId();
+                    uint64 iinstID = (uint64) i->getId();
+                    bcOff = (uint32)bc2HIRMapHandler->getVectorEntry(iinstID);
+                    if (iinstID != callIinstID) {
+                        uint32 inlinedBcOff = ILLEGAL_VALUE;
+                        inlinedBcOff = (uint32)bc2HIRMapHandler->getVectorEntry(callIinstID);
+                        bc2HIRMapHandler->setVectorEntry(iinstID, inlinedBcOff);
+                    }
+                }
+
+                ii->prependLevel(&methodDesc, bcOff);
+                // appropriate byte code offset instead of 0 should be propogated here
+                // to enable correct inline info
                 ii->prependInlineChain(call_ii);
                 // ii->inlineChain remains at the end
                 
-                Log::cat_opt_inline()->ir << "      call No." << count++ << " ";
-                ii->printLevels(Log::cat_opt_inline()->ir);
+                Log::out() << "      call No." << count++ << " ";
+                ii->printLevels(Log::out());
             }
         }
     }
@@ -801,17 +835,32 @@ Inliner::inlineAndProcessRegion(InlineNode* inlineNode,
     //
     IRManager* parent = inlinedIRM.getParent();
     assert(parent);
-    parent->getFlowGraph().spliceFlowGraphInline(callNode, callInst, inlinedFlowGraph);
+    
+    Edge* edgeToInlined = callNode->getUnconditionalEdge();
+    ControlFlowGraph& parentCFG = parent->getFlowGraph();
+    parentCFG.spliceFlowGraphInline(edgeToInlined, inlinedFlowGraph);
+    parentCFG.removeEdge(callNode->getExceptionEdge());
+    callInst->unlink();
+
+}
+
+
+void Inliner::runTranslatorSession(CompilationContext& inlineCC) {
+    TranslatorSession* traSession = (TranslatorSession*)translatorAction->createSession(inlineCC.getCompilationLevelMemoryManager());
+    traSession->setCompilationContext(&inlineCC);
+    inlineCC.setCurrentSessionAction(traSession);
+    traSession->run();
+    inlineCC.setCurrentSessionAction(NULL);
 }
 
 InlineNode*
-Inliner::getNextRegionToInline() {
+Inliner::getNextRegionToInline(CompilationContext& inlineCC) {
     // If in DPGO profiling mode, don't inline if profile information is not available.
     if(_doProfileOnlyInlining && !_toplevelIRM.getFlowGraph().hasEdgeProfile()) {
         return NULL;
     }
     
-    CFGNode* callNode = 0;
+    Node* callNode = 0;
     InlineNode* inlineParentNode = 0;
     MethodCallInst* call = 0;
     MethodDesc* methodDesc = 0;
@@ -827,7 +876,7 @@ Inliner::getNextRegionToInline() {
         inlineParentNode = _inlineCandidates.top().inlineNode;
         _inlineCandidates.pop();
         
-        call = callNode->getLastInst()->asMethodCallInst();
+        call = ((Inst*)callNode->getLastInst())->asMethodCallInst();
         assert(call != NULL);
         methodDesc = call->getMethodDesc();
         
@@ -841,8 +890,8 @@ Inliner::getNextRegionToInline() {
            || (methodByteSize < _inlineSmallMaxByteSize)) {
             found = true;
         } else {
-            Log::cat_opt_inline()->debug << "Skip inlining " << methodDesc->getParentType()->getName() << "." << methodDesc->getName() << ::std::endl;
-            Log::cat_opt_inline()->debug << "methodByteSize=" 
+            Log::out() << "Skip inlining " << methodDesc->getParentType()->getName() << "." << methodDesc->getName() << ::std::endl;
+            Log::out() << "methodByteSize=" 
                                    << (int)methodByteSize
                                    << ", newByteSize = " << (int)newByteSize
                                    << ", factor=" << factor
@@ -853,14 +902,14 @@ Inliner::getNextRegionToInline() {
     if(!found) {
         // No more candidates.  Done with inlining.
         assert(_inlineCandidates.empty());
-        Log::cat_opt_inline()->debug << "Done inlining " << ::std::endl;
+        Log::out() << "Done inlining " << ::std::endl;
         return NULL;
     }
     
     //
     // Set candidate as current inlined region
     //
-    Log::cat_opt_inline()->info2 << "Opt:   Inline " << methodDesc->getParentType()->getName() << "." << methodDesc->getName() << 
+    Log::out() << "Opt:   Inline " << methodDesc->getParentType()->getName() << "." << methodDesc->getName() << 
         methodDesc->getSignatureString() << ::std::endl;
     
     // Generate flowgraph for new region
@@ -868,79 +917,24 @@ Inliner::getNextRegionToInline() {
     uint32 id = methodDesc->getUniqueId();
     _instFactory.setMethodId(((uint64)id)<<32);
     
-    Opnd *returnOpnd = 0;
-    if (_useInliningTranslatorCall) {
-        if(call->getDst()->isNull())
-            returnOpnd = _opndManager.getNullOpnd();
-        else 
-            returnOpnd = _opndManager.createSsaTmpOpnd(call->getDst()->getType());
-    }        
-    IRManager* inlinedIRM = new (_mm) IRManager(_toplevelIRM, *methodDesc, returnOpnd);
-    FlowGraph* inlinedFG = &inlinedIRM->getFlowGraph();
+    
+    IRManager* inlinedIRM = new (_tmpMM) IRManager(_tmpMM, _toplevelIRM, *methodDesc, NULL);
     
     // Augment inline tree
-    InlineNode *inlineNode = new (_mm) InlineNode(*inlinedIRM, call, callNode);
+    InlineNode *inlineNode = new (_tmpMM) InlineNode(*inlinedIRM, call, callNode);
     
     inlineParentNode->addChild(inlineNode);
     
-    if(_useInliningTranslatorCall) {
-        // Use inlining translator.       
-        
-        uint32 numArgs = call->getNumSrcOperands() - 2; // pass taus separately
-        MemoryManager localMemManager(numArgs*sizeof(Opnd*), "FlowGraph::inlineMethod.localMemManager");
-#ifndef NDEBUG
-        Opnd* tauNullChecked = call->getSrc(0);
-        assert(tauNullChecked->getType()->tag == Type::Tau);
-        Opnd* tauTypesChecked = call->getSrc(1);
-        assert(tauTypesChecked->getType()->tag == Type::Tau);
-#endif
-		Opnd** argOpnds = new (localMemManager) Opnd*[numArgs];
-        for(uint32 j = 0; j < numArgs; ++j) {
-            Opnd *arg = call->getSrc(j+2); // skip taus
-            assert(arg->getType()->tag != Type::Tau);
-            argOpnds[j] = arg;
-        }
-
-
-        TranslatorIntfc::translateByteCodesInline(*inlinedIRM,
-                                                  numArgs, argOpnds, 0);
-        returnOpnd = inlinedIRM->getReturnOpnd();
-        if(returnOpnd && !returnOpnd->isNull()) {
-            Inst *copyInst = _instFactory.makeCopy(call->getDst(), returnOpnd);
-            CFGNode *fgReturnNode = inlinedFG->getReturn();
-            assert(fgReturnNode != NULL);
-            if (Log::cat_opt_inline()->isDebugEnabled()) {
-                Log::out() << "Adding copy instruction: ";
-                copyInst->print(Log::out());
-                Log::out() << ::std::endl << " to block" << ::std::endl;
-                fgReturnNode->print(Log::out());
-                Log::out() << ::std::endl;
-            }
-            fgReturnNode->append(copyInst);
-            inlinedIRM->setReturnOpnd(call->getDst());
-            if (Log::cat_opt_inline()->isDebugEnabled()) {
-                Log::out() << "After block changed: " << ::std::endl;
-                fgReturnNode->print(Log::out());
-                Log::out() << ::std::endl;
-            }
-        }
-        
-        if ((methodDesc->isStatic() || methodDesc->isInstanceInitializer()) &&
-            methodDesc->getParentType()->needsInitialization()) {
-            // initialize type for static methods
-            Inst* initType = _instFactory.makeInitType(methodDesc->getParentType());
-            inlinedFG->getEntry()->prepend(initType);
-            inlinedFG->splitNodeAtInstruction(initType);
-            inlinedFG->addEdge(inlinedFG->getEntry(), inlinedFG->getUnwind());
-        }
-    } else {
-        // Call regular translator - this must be used to annotate profile information onto the 
-        // inlined region
-        TranslatorIntfc::translateByteCodes(*inlinedIRM);
+    // Call a translator 
+    if (isBCmapRequired) {
+        uint32 methodByteSize = methodDesc->getByteCodeSize();
+        size_t incSize = methodByteSize * ESTIMATED_HIR_SIZE_PER_BYTECODE;
+        MethodDesc* parentMethod = _toplevelIRM.getCompilationInterface().getMethodToCompile();
+        incVectorHandlerSize(bcOffset2HIRHandlerName, parentMethod, incSize);
     }
 
-    // Cleanup
-    inlinedFG->cleanupPhase();
+    inlineCC.setHIRManager(inlinedIRM);
+    runTranslatorSession(inlineCC);
 
     // Save state.
     _currentByteSize = newByteSize;
@@ -956,29 +950,29 @@ Inliner::processDominatorNode(InlineNode *inlineNode, DominatorNode* dnode, Loop
     //
     // Process this node for inline candidates
     //
-    CFGNode* node = dnode->getNode();
+    Node* node = dnode->getNode();
     if(node->isBlockNode()) {
         // Search for call site
-        Inst* last = node->getLastInst();
+        Inst* last =(Inst*)node->getLastInst();
         if(last->getOpcode() == Op_DirectCall) {
             // Process call site
             MethodCallInst* call = last->asMethodCallInst();
             assert(call != NULL);
             MethodDesc* methodDesc = call->getMethodDesc();
 
-            Log::cat_opt_inline()->debug << "Considering inlining instruction I"
+            Log::out() << "Considering inlining instruction I"
                                    << (int)call->getId() << ::std::endl;
             if(canInlineInto(*methodDesc)) {
                 uint32 size = methodDesc->getByteCodeSize();
                 int32 benefit = computeInlineBenefit(node, *methodDesc, inlineNode, ltree->getLoopDepth(node));
                 assert(size > 0);
-                Log::cat_opt_inline()->debug << "Inline benefit " << methodDesc->getParentType()->getName() << "." << methodDesc->getName() << " == " << (int) benefit << ::std::endl;
+                Log::out() << "Inline benefit " << methodDesc->getParentType()->getName() << "." << methodDesc->getName() << " == " << (int) benefit << ::std::endl;
                 if(0 < size && benefit > _minBenefitThreshold) {
                     // Inline candidate
-                    Log::cat_opt_inline()->debug << "Add to queue" << ::std::endl;
+                    Log::out() << "Add to queue" << ::std::endl;
                     _inlineCandidates.push(CallSite(benefit, node, inlineNode));
                 } else {
-                    Log::cat_opt_inline()->debug << "Will not inline" << ::std::endl;
+                    Log::out() << "Will not inline" << ::std::endl;
                 }
             }
         }
@@ -1008,34 +1002,34 @@ Inliner::processRegion(InlineNode* inlineNode, DominatorTree* dtree, LoopTree* l
 }
 
 void 
-Inliner::scaleBlockCounts(CFGNode* callSite, IRManager& inlinedIRM) {
-    Log::cat_opt_inline()->debug << "Scaling block counts for callsite in block "
+Inliner::scaleBlockCounts(Node* callSite, IRManager& inlinedIRM) {
+    Log::out() << "Scaling block counts for callsite in block "
                            << (int) callSite->getId() << ::std::endl;
     if(!_toplevelIRM.getFlowGraph().hasEdgeProfile()) {
         // No profile information to scale
-        Log::cat_opt_inline()->debug << "No profile information to scale!" << ::std::endl;
+        Log::out() << "No profile information to scale!" << ::std::endl;
         return;
     }
 
     //
     // Compute scale from call site count and inlined method count
     //
-    double callFreq = callSite->getFreq();
-    FlowGraph &inlinedRegion = inlinedIRM.getFlowGraph();
-    double methodFreq = inlinedRegion.getEntry()->getFreq();
+    double callFreq = callSite->getExecCount();
+    ControlFlowGraph &inlinedRegion = inlinedIRM.getFlowGraph();
+    double methodFreq = inlinedRegion.getEntryNode()->getExecCount();
     double scale = callFreq / ((methodFreq != 0.0) ? methodFreq : 1.0);
 
-    Log::cat_opt_inline()->debug << "callFreq=" << callFreq
+    Log::out() << "callFreq=" << callFreq
                            << ", methodFreq=" << methodFreq
                            << ", scale=" << scale << ::std::endl;
     //
     // Apply scale to each block in inlined region
     //
-    const CFGNodeDeque& nodes = inlinedRegion.getNodes();
-    CFGNodeDeque::const_iterator i;
+    const Nodes& nodes = inlinedRegion.getNodes();
+    Nodes::const_iterator i;
     for(i = nodes.begin(); i != nodes.end(); ++i) {
-        CFGNode* node = *i;
-        node->setFreq(node->getFreq()*scale);
+        Node* node = *i;
+        node->setExecCount(node->getExecCount()*scale);
     }
 }
 
@@ -1045,19 +1039,13 @@ Inliner::getProfileMethodCount(CompilationInterface& compileIntf, MethodDesc& me
     //
     // Get the entry count for a given method 
     //
-    if ( compileIntf.isDynamicProfiling() ) {
+    CompilationContext* cc = compileIntf.getCompilationContext();
+    if ( cc->hasDynamicProfileToUse() ) {
         // Online
-        MemoryManager mm(1024, "Inliner::getProfileMethodCount.mm");
-        EdgeProfile* profile = new (mm) EdgeProfile(mm, methodDesc);
-
-        return profile->getEntryFreq();
+        double res = cc->getProfilingInterface()->getProfileMethodCount(methodDesc);
+        return res;
     } else {
-        // Offline
-        EdgeProfile* profile =  profileCtrl.readProfileFromFile(methodDesc);
-        if(profile == NULL)
-            return 0;
-
-        return profile->getEntryFreq();
+        return 0;
     }
 }
 
@@ -1095,6 +1083,82 @@ InlineTree::computeCheckSum(InlineNode* node) {
     sum += computeCheckSum(node->getChild());
     return (uint32) sum;
 }
+
+static void runInlinerPipeline(CompilationContext& inlineCC, const char* pipeName) {
+    PMF::HPipeline p = inlineCC.getCurrentJITContext()->getPMF().getPipeline(pipeName);
+    assert(p!=NULL);
+    PMF::PipelineIterator pit(p);
+    while (pit.next()) {
+        SessionAction* sa = pit.getSessionAction();
+        sa->setCompilationContext(&inlineCC);
+        inlineCC.setCurrentSessionAction(sa);
+        inlineCC.stageId++;
+        sa->run();
+        inlineCC.setCurrentSessionAction(0);
+        assert(!inlineCC.isCompilationFailed() &&  !inlineCC.isCompilationFinished());
+    }
+}
+
+void InlinePass::_run(IRManager& irm) {
+
+    computeDominatorsAndLoops(irm);
+
+   
+    CompilationContext* cc = getCompilationContext();
+    MemoryManager& mm = cc->getCompilationLevelMemoryManager() ;
+    CompilationInterface* ci = cc->getVMCompilationInterface();
+    JITInstanceContext* jit = cc->getCurrentJITContext();
+
+    // Set up Inliner
+    bool connectEarly = getBoolArg("connect_early", true);
+    const char* pipeName = getStringArg("pipeline", "inliner_pipeline");
+
+    MemoryManager tmpMM(1024, "Inliner::tmp_mm");
+    Inliner inliner(this, tmpMM, irm, irm.getFlowGraph().hasEdgeProfile());
+    InlineNode* rootRegionNode = (InlineNode*) inliner.getInlineTree().getRoot();
+    inliner.inlineAndProcessRegion(rootRegionNode);
+
+    // Inline calls
+    do {
+        CompilationContext inlineCC(mm, ci, jit);
+        inlineCC.setPipeline(cc->getPipeline());
+        InlineNode* regionNode = inliner.getNextRegionToInline(inlineCC);
+        if (regionNode == NULL) {
+            break;
+        }
+        assert(regionNode != rootRegionNode);
+        IRManager &regionManager = regionNode->getIRManager();
+        assert(inlineCC.getHIRManager() == &regionManager);
+
+        // Connect region arguments to top-level flowgraph
+        if(connectEarly) {
+            inliner.connectRegion(regionNode);
+        }
+
+        // Optimize inlined region before splicing
+        inlineCC.stageId = cc->stageId;
+        runInlinerPipeline(inlineCC, pipeName);
+        cc->stageId = inlineCC.stageId;
+        
+        // Splice into flow graph and find next region.
+        if(!connectEarly) {
+            inliner.connectRegion(regionNode);
+        }
+        OptPass::computeDominatorsAndLoops(regionManager);
+        inliner.inlineAndProcessRegion(regionNode);
+    } while (true);
+    const OptimizerFlags& optimizerFlags = irm.getOptimizerFlags();
+    // Print the results to logging / dot file
+    if(optimizerFlags.dumpdot) {
+        inliner.getInlineTree().printDotFile(irm.getMethodDesc(), "inlinetree");
+    }
+    if(Log::isEnabled()) {
+        Log::out() << indent(irm) << "Opt: Inline Tree" << ::std::endl;
+        inliner.getInlineTree().printIndentedTree(Log::out(), "  ");
+    }
+   Log::out() << "Inline Checksum == " << (int) inliner.getInlineTree().computeCheckSum() << ::std::endl;
+}
+
 
 } //namespace Jitrino
  

@@ -234,6 +234,7 @@ typedef enum {
     VF_CHECK_ACCESS_METHOD,
     VF_CHECK_DIRECT_SUPER,
     VF_CHECK_INVOKESPECIAL,
+    VF_CHECK_UNINITIALIZED_THIS,
     VF_CHECK_NUM
 } vf_CheckConstraint_t;
 
@@ -271,7 +272,7 @@ typedef enum {
  * Code instruction flags enum.
  */
 typedef enum {
-    VF_FLAG_NONE,
+    VF_FLAG_NONE = 0,
     VF_FLAG_BEGIN_BASIC_BLOCK = 1,
     VF_FLAG_START_ENTRY = 2,
     VF_FLAG_END_ENTRY = 4,
@@ -342,10 +343,6 @@ typedef struct {
     };
     unsigned short m_type : 5;      ///< stack map type @see vf_MapType_t
     unsigned short m_ctype : 4;     ///< constraint type @see vf_CheckConstraint_t
-    unsigned short m_need_init : 2; ///< initialization flag
-                                    ///< 0 - reference can be uninitialized
-                                    ///< 1 - reference must be init
-                                    ///< 2 - reference can be uninitialized this
     unsigned short m_is_local : 1;  ///< local variable modify flag
                                     ///< true - modify local, false - modify stack
 } vf_MapEntry_t;
@@ -754,18 +751,12 @@ public:
     /**
      * Function prints graph node instruction in stream.
      * @param node_num   - number of graph node
-     * @param next_node  - separator between nodes in stream
-     * @param next_instr - separator between intructions in stream
-     * @param out        - output stream
      * @param context    - current verifier context
      * @note Function is valid in debug mode.
      * @note Assertion is raised if <i>node_num</i> is out of range.
      * @see vf_Context_t
      */
     void DumpNodeInternal( unsigned node_num,
-                           char *next_node,
-                           char *next_instr,
-                           ostream &out,
                            vf_Context_t *context);
 
     /**
@@ -1121,6 +1112,8 @@ public:
         vf_ValidType_t *m_throwable;    ///< context java/lang/Throwable valid type
         vf_ValidType_t *m_object;       ///< context java/lang/Object valid type
         vf_ValidType_t *m_array;        ///< context [Ljava/lang/Object; valid type
+        vf_ValidType_t *m_clone;        ///< context java/lang/Cloneable valid type
+        vf_ValidType_t *m_serialize;    ///< context java/io/Serializable valid type
     } m_vtype;
 
     /**

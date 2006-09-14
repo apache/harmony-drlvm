@@ -18,6 +18,29 @@
  * @version $Revision: 1.1.2.1.4.3 $
  */  
 
+/**
+ *@file
+ * Mechanism for iterating over stack frames
+ * of Java and native code.
+ *
+ * This stack iterator handle is a black box.
+ *
+ * The iteractor supports iterating over:
+ * <ul>
+ * <li>Managed code frames corresponding to Java
+ * code
+ * <li>Managed-to-native frames (M2N) for transferring
+ * data and control between managed and native frames
+ *
+ * Native frames iteration is not currently supported. To iterate over
+ * native frames, use OS-provided tools.
+ * </ul>
+ * This iterator uses the order from the most recently pushed frame
+ * to the first frame pushed.
+ * With the stack iterator, you can also resume a frame in the current thread and
+ * transfer execution and control to this frame.
+ */
+
 #ifndef _STACK_ITERATOR_H_
 #define _STACK_ITERATOR_H_
 
@@ -25,97 +48,242 @@
 #include "open/types.h"
 #include "vm_core_types.h"
 
-// This module is for a "stack iterator" abstraction.
-// A stack iterator allows other code to iterator over the managed and m2n
-// frames of a thread in order from most recently pushed to first pushed.
-// It also allows for resuming a frame in the current thread.
-
 struct StackIterator;
 
-// Create a new stack iterator for the current thread assuming the thread
-// is currently in native code.
+/**
+ * Creates a new stack iterator for the given thread.
+ *
+ * @note The function assumes that the thread is currently in native code.
+ */
 StackIterator* si_create_from_native();
 
-// Create a new stack iterator for the given thread assuming it is currently
-// in native code. Note that the thread can run concurrently with the stack
-// iterator, but it should not pop (return past) the most recent M2nFrame at
-// the time the iterator is called. Also note that creation is not atomic with
-// respect to pushing/popping of m2n frames; the client should ensure that such
-// operations are serialized.
-StackIterator* si_create_from_native(VM_thread*);
+/**
+ * Creates a new stack iterator for the given thread.
+ *
+ * The thread can run concurrently with the stack iterator,
+ * but it must not pop (return past) the most recent M2N frame when the iterator is called.
+ *
+ * Creation is not atomic with respect to pushing/popping of M2N frames.
+ * The client code must ensure that such operations are serialized.
+ *
+ * @param[in] thread - the pointer to the thread, the stack of which must be enumerated
+ *
+ * @note The function assumes that the given thread is currently in native code.
+ */
+StackIterator* si_create_from_native(VM_thread* thread);
 
-// Create a new stack iterator for a thread assuming it is currently suspended
-// from managed code. See also note in previous function. The registers
-// arguments contains the values of the registers at the point of suspension,
-// is_ip_past is described in the JIT frame context structure, and the M2nFrame
-// should be the one immediately prior to the suspended frame.
-StackIterator* si_create_from_registers(Registers*, bool is_ip_past, M2nFrame*);
+/**
+ * Creates a new stack iterator for the suspended thread.
+ *
+ * The thread can run concurrently with the stack iterator,
+ * but it must not pop (return past) the most recent M2N frame when the iterator is called.
+ *
+ * Creation is not atomic with respect to pushing/popping of M2N frames.
+ * The client code must ensure that such operations are serialized.
+ *
+ * @param[in] regs        -  values of the registers at the point of suspension
+ * @param[in] is_ip_past  -  indicate is ip past or not
+ * @param[in] m2nf        -  the pointer to the M2N frame that must be the one immediately
+ *                           prior to the suspended frame
+ *
+ * @note The function assumes that iterated thread is currently suspended from managed code.
+ */
+StackIterator* si_create_from_registers(Registers* regs, bool is_ip_past, M2nFrame* m2nf);
 
-// The implementation of stack iterators and m2n frames may not track all
-// preserved registers needed for resuming a frame, but may instead track
-// enough for root-set enumeration and stack walking. The following function
-// and a corresponding addition stub generator for m2n frames allow all such
-// registers to be tracked for exception propagation. Ensure that all
-// preserved registers are transferred from the m2n frame to the iterator.
-// This function should only be called when the iterator is at an M2nFrame
-// that has all preserved registers saved.
-void si_transfer_all_preserved_registers(StackIterator*);
+/**
+ * Makes a copy of the given stack iterator.
+ *
+ * @param[in] si -  the pointer to the stack iterator to be copied
+ */
+StackIterator* si_dup(StackIterator* si);
 
-// Return if the iterator is past all the frames.
-bool si_is_past_end(StackIterator*);
+/**
+ * Frees the stack iterator.
+ *
+ * @param[in] si -  the pointer to the stack iterator to be freed
+ */
+void si_free(StackIterator* si);
 
-// Goto the frame previous to the current one.
-void si_goto_previous(StackIterator*);
+/**
+ * Ensures that all preserved registers are transferred from the M2N frame
+ * to the iterator.
+ *
+ * Depending on the platform, the implementation of stack iterators and M2N frames
+ * may not track all preserved registers required for resuming a frame, but may instead track
+ * enough for root set enumeration and stack walking.
+ *
+ * This function and the corresponding additional stub generator for M2N frames
+ * allow all registers to be tracked for exception propagation.
+ *
+ * @param[in] si -  the poiter to the stack iterator that will contain all preserved
+ *                  registers
+ *
+ * @note Only call the function when the iterator is at an M2N frame
+ *       that has all preserved registers saved.
+ */
+void si_transfer_all_preserved_registers(StackIterator* si);
 
-// Make a copy of a stack iterator
-StackIterator* si_dup(StackIterator*);
+/**
+ * Checks whether the stack iterator has passed all the frames.
+ *
+ * @param[in] si -  the poiter to a StackIterator which should be tested is past all
+ *                  the frames or not.
+ * @return <code>TRUE</code> if the transferred stack iterator has passed all the frames;
+ *         otherwise, <code>FALSE</code>.
+ */
+bool si_is_past_end(StackIterator* si );
 
-// Free the iterator.
-void si_free(StackIterator*);
+/**
+ * Goes to the frame previous to the current one.
+ *
+ * @param[in] si -  the pointer to the stack iterator that will be iterated to the previous
+ *                  frame
+ */
+void si_goto_previous(StackIterator* si);
 
-// Return the ip for the current frame.
-NativeCodePtr si_get_ip(StackIterator*);
+/**
+ * Gets the instruction pointer for the current frame.
+ *
+ * @param[in] si -  the pointer to the stack iterator indicating the current frame
+ *
+ * @return The instruction pointer for the current frame.
+ */
+NativeCodePtr si_get_ip(StackIterator* si);
 
-// Set the ip for the current frame
-void si_set_ip(StackIterator*, NativeCodePtr,
+/**
+ * Sets the instruction pointer for the current frame.
+ *
+ * @param[in] si                        -  the pointer to the stack iterator indicating
+ *                                         the current frame
+ * @param[in] ip                        -  the instruction pointer for the current frame
+ * @param[in] also_update_stack_itself  -  the flag indicating whether the function must update
+ *                                         data on the stack or only in the iterator
+ *
+ * @return If <i>also_update_stack_itself</i> is <code>TRUE</code>,
+ *         updates the instruction pointer in the stack; otherwise, the new
+ *         value stored in the stack iterator only.
+ */
+void si_set_ip(StackIterator* si, NativeCodePtr ip,
                bool also_update_stack_itself = false);
 
-// 20040713 Experimental: set the code chunk in the stack iterator
-void si_set_code_chunk_info(StackIterator*, CodeChunkInfo*);
+/**
+ * Sets the code chunk for the current frame of the stack indicated by the iterator.
+ *
+ * @param[in] si  -  the pointer to the stack iterator indicating the current frame
+ * @param[in] cci -  the pointer to CodeChunkInfo to be set for the current frame
+ *
+ * @note The function assumes that the thread is iterated in a managed frame.
+ */
+void si_set_code_chunk_info(StackIterator* si, CodeChunkInfo* cci);
 
-// Return the code chunk information for the current frame.
-// Returns NULL for M2nFrames.
-CodeChunkInfo* si_get_code_chunk_info(StackIterator*);
+/**
+ * Gets the code chunk information for the current frame.
+ *
+ * @param[in] si  -  the pointer to the stack iterator indicating the current frame
+ *
+ * @return The pointer to the code chunk information for managed frames and <code>NULL</code>
+ * for M2N frames.
+ */
+CodeChunkInfo* si_get_code_chunk_info(StackIterator* si);
 
-// Return the JIT frame context for the current frame. This can be mutated to
-// reflect changes in registers desired in transfer control.
-JitFrameContext* si_get_jit_context(StackIterator*);
+/**
+ * Gets the JIT frame context for the current frame.
+ *
+ * @param[in] si -  the pointer to the stack iterator indicating the current frame
+ *
+ * @return The JIT frame context for the current frame.
+ */
+JitFrameContext* si_get_jit_context(StackIterator* si);
 
-// Return if the current frame is an M2nFrame.
-bool si_is_native(StackIterator*);
+/**
+ * Checks whether the current frame is an M2N frame.
+ *
+ * @param[in] si -  the pointer to the stack iterator indicating the current frame
+ *
+ * @return <code>TRUE</code> if the current thread is an M2N frame;
+ *         otherwise, <code>FALSE</code>.
+ */
+bool si_is_native(StackIterator* si);
 
-// Return the M2nFrame if the current frame is an M2nFrame.
-// Should only be called if si_is_native is true.
-M2nFrame* si_get_m2n(StackIterator*);
+/**
+ * Gets the pointer to the M2N frame if the current frame is M2N.
+ *
+ * @param[in] si -  the pointer to the stack iterator indicating the current frame
+ *
+ * @return The pointer to the the M2N frame if the current frame is M2N; otherwise,
+ *         <code>NULL</code>.
+ */
+M2nFrame* si_get_m2n(StackIterator* si);
 
-// Set the return register appropriate for a pointer. If transfer control is
-// subsequently called, the resumed frame will see this change.
-// The argument points to the pointer to return.
-void si_set_return_pointer(StackIterator*, void** return_value);
+/**
+ * Gets the pointer to the value of the return register.
+ *
+ * If transfer control is called, the resumed frame will see this value.
+ *
+ * @param[in] si           -  the pointer to the stack iterator indicating the current frame
+ *
+ * @return  the pointer to the pointer to the return value.
+ */
+void** si_get_return_pointer(StackIterator* si);
 
-// Resume execution in the current frame of the iterator.
-// Should only be called for an iterator on the current thread's frames.
-// Does not return and frees the stack iterator.
-void si_transfer_control(StackIterator*);
+/**
+ * Sets the pointer to the value of the return register.
+ *
+ * If the transfer control is subsequently called, the resumed frame has data on this change.
+ *
+ * @param[in] si           -  the pointer to the stack iterator indicating the current frame
+ * @param[in] return_value -  the pointer to the pointer to the return value that will be set
+ */
+void si_set_return_pointer(StackIterator* si, void** return_value);
 
-// Copy the stack iterators current frame value into the given registers, so
-// that resumption of these registers would transfer control to the current frame.
-void si_copy_to_registers(StackIterator*, Registers*);
+/**
+ * Thransfers control and resumes execution in the current frame of the iterator.
+ * Returns no values and frees the stack iterator.
+ *
+ * @param[in] si -  the pointer to the stack iterator indicating the current frame
+ *
+ * @note This function must only be called for the iterator on the current thread's frames.
+ */
+void si_transfer_control(StackIterator* si);
 
-// On architectures with register stacks, ensure that the register stack of
-// the current thread is consistent with its backing store, as the backing
-// store might have been modified by stack walking code.
-// On other architectures do nothing.
+/**
+ * Copies the value of the stack iterators' current frame into the given registers.
+ *
+ * This way, resuming these registers transfers control to the current frame.
+ *
+ * @param[in] si    -  the pointer to the stack iterator indicating the current frame
+ * @param[out] regs -  the pointer to the registers where the registers' values
+ *               from the stack iterator will be copied
+ */
+void si_copy_to_registers(StackIterator* si, Registers* regs);
+
+/**
+ * Reloads registers from the register stack.
+ *
+ *
+ * @note On architectures with register stacks, ensure that the register stack of
+ *       the current thread is consistent with its backing store. This is done because the backing
+ *       store might have been modified by the stack walking code.
+ */
 void si_reload_registers();
+
+/**
+ * Gets the method handle for the frame iterated by the stack iterator.
+ *
+ * @param[in] si - the pointer to the stack iterator indicating the current frame
+ *
+ * @return The method handle corresponding to the given stack iterator.
+ */
+Method_Handle si_get_method(StackIterator* si);
+
+/**
+ * Gets the number of inlined methods corresponding to the current frame
+ * iterated by stack iterator.
+ *
+ * @param[in] si - the pointer to the stack iterator indicating the current frame
+ *
+ * @return The number of inlined methods.
+ */
+uint32 si_get_inline_depth(StackIterator* si);
 
 #endif //!_STACK_ITERATOR_H_

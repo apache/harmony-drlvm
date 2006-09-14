@@ -58,6 +58,8 @@ VMEXPORT Boolean class_is_subclass(Class_Handle subclss, Class_Handle superclss)
 }
 #endif
 
+bool ensure_initialised(JNIEnv* jenv, Class* clss);
+
 jobject create_default_instance(Class* clss);
 
 jobject CreateNewThrowable(JNIEnv* jenv, Class* clazz, const char * message, jthrowable cause);

@@ -130,8 +130,8 @@ const Mnemonic map_of_alu_opcode_2_mnemonic[] = {
 
 const Mnemonic map_of_shift_opcode_2_mnemonic[] = {
     //shld_opc, shrd_opc,
-    // shl_opc, shr_opc, sar_opc, ror_opc, max_shift_opcode=6, 
-    //n_shift = 6
+    // shl_opc, shr_opc, sar_opc, ror_opc, max_shift_opcode=6,
+    // n_shift = 6
     Mnemonic_SHLD,  Mnemonic_SHRD,  
     Mnemonic_SHL,   Mnemonic_SHR,   Mnemonic_SAR, Mnemonic_ROR
 };

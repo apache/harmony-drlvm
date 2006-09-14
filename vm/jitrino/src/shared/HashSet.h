@@ -38,63 +38,63 @@ template<class KEY, class ELEM> class HashSet {
 public:
     typedef StlHashMap<KEY,ELEM>::iterator iterator;
     typedef StlHashMap<KEY,ELEM>::const_iterator const_iterator;
-	//
-	// Constructor
-	//
+    //
+    // Constructor
+    //
     HashSet(MemoryManager& memManager) : map(memManager) {
     }
-	//
-	//	Copy constructor
-	//
-	HashSet(MemoryManager& memManager, const HashSet<KEY,ELEM> &set)
+    //
+    //  Copy constructor
+    //
+    HashSet(MemoryManager& memManager, const HashSet<KEY,ELEM> &set)
         : map(memManager) {
         const_iterator iter = set.map.begin(),
                         end = set.map.end();
         for (; iter != end; iter++)
             map.insert(*iter);
-	}
+    }
     //
     //  Returns number of elements in the set
     //
     uint32 getSize() const {return (uint32)map.size();}
-	//
-	//  Returns true if set contains the element, false otherwise
-	//
-	bool contains(KEY key) const {
+    //
+    //  Returns true if set contains the element, false otherwise
+    //
+    bool contains(KEY key) const {
         return map.find(key) != map.end();
-	}
-	//
-	//  Inserts element into the set
-	//
+    }
+    //
+    //  Inserts element into the set
+    //
     void insert(KEY key, ELEM elem) {map[key] = elem;}
     //
     //  Removes element from the set
     //
     void remove(KEY key) {map.erase(key);}
-	//
-	//	Removes all element from the set
-	//
+    //
+    //  Removes all element from the set
+    //
     void clear() {map.clear();}
-	//
-	//	Checks if set is empty
-	//
+    //
+    //  Checks if set is empty
+    //
     bool isEmpty() {return map.empty();}
-	//
-	//	Copies another set
-	//
-	void copyFrom(const HashSet<KEY,ELEM>& set) {
-		if (this != &set) {
+    //
+    //  Copies another set
+    //
+    void copyFrom(const HashSet<KEY,ELEM>& set) {
+        if (this != &set) {
             map.clear();
             const_iterator iter = set.map.begin(),
                      end = set.map.end();
             for (; iter != end; iter++)
                 map.insert(*iter);
-		}
-	}
-	//
-	//	Unions with another set
-	//
-	void unionWith(const HashSet<KEY,ELEM>& set) {
+        }
+    }
+    //
+    //  Unions with another set
+    //
+    void unionWith(const HashSet<KEY,ELEM>& set) {
         const_iterator iter = set.map.begin(),
                               end  = set.map.end();
         for (; iter != end; iter++) {
@@ -102,11 +102,11 @@ public:
             assert((iter2 == map.end()) || (iter2->second == iter->second));
             map.insert(*iter);
         }
-	}
-	//
-	//	Intersects with another set
-	//
-	void intersectWith(const HashSet<KEY,ELEM>& set) {
+    }
+    //
+    //  Intersects with another set
+    //
+    void intersectWith(const HashSet<KEY,ELEM>& set) {
         //
         // Find elements that are in this set but are not in 'set' and
         // write them into 'removeList'.
@@ -125,16 +125,16 @@ public:
         //
         for (uint32 i = 0; i < removeListSize; i++)
             map.erase(removeList[i]);
-	}
-	//
-	//	Subtracts another set
-	//
-	void subtract(const HashSet<KEY,ELEM>& set) {
+    }
+    //
+    //  Subtracts another set
+    //
+    void subtract(const HashSet<KEY,ELEM>& set) {
         const_iterator iter = set.map.begin(),
                               end  = set.map.end();
         for (; iter != end; iter++) 
             map.erase(iter->first);
-	}
+    }
     //
     //  Checks if set is subset of another set
     //
@@ -159,9 +159,9 @@ public:
         }
         return true;
     }
-	//
-	//	Checks if set is equal to another set
-	//
+    //
+    //  Checks if set is equal to another set
+    //
     bool isEqual(const HashSet<KEY,ELEM>& set) {
         return isSubset(set) && set.isSubset(*this);
     }

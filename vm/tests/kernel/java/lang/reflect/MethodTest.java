@@ -1,0 +1,304 @@
+/*
+ *  Copyright 2005-2006 The Apache Software Foundation or its licensors, as applicable.
+ *
+ *  Licensed under the Apache License, Version 2.0 (the "License");
+ *  you may not use this file except in compliance with the License.
+ *  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ *  Unless required by applicable law or agreed to in writing, software
+ *  distributed under the License is distributed on an "AS IS" BASIS,
+ *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ *  See the License for the specific language governing permissions and
+ *  limitations under the License.
+ */
+
+/**
+ * @author Serguei S.Zapreyev
+ * @version $Revision$
+ * 
+ * This MethodTest class ("Software") is furnished under license and may only be
+ * used or copied in accordance with the terms of that license.
+ *  
+ */
+
+package java.lang.reflect;
+
+import junit.framework.TestCase;
+
+/*
+ * Created on 01.28.2006
+ */
+
+@SuppressWarnings(value={"all"}) public class MethodTest extends TestCase {
+
+    /**
+     *  
+     */
+    public void test_equals_Obj() {
+        class X {
+            public int m() {
+                return 777;
+            }
+        }
+        class Y {
+            public int m() {
+                return 777;
+            }
+        }
+        try {
+            Method m1 = X.class.getDeclaredMethod("m", (Class[]) null);
+            Method m2 = Y.class.getDeclaredMethod("m", (Class[]) null);
+            assertEquals("Error1: equal methods should coincide", m1, m1);
+            assertTrue("Error2: coincidence of the unequal methods is detected",
+                    !m1.equals(m2));
+        } catch (NoSuchMethodException _) {
+            fail("Error3: unfound method");
+        }
+    }
+
+    /**
+     *  
+     */
+    public void test_getDeclaringClass_V() {
+        class X {
+            public int m() {
+                return 777;
+            }
+        }
+        new X();
+        try {
+            Method m = X.class.getDeclaredMethod("m", (Class[]) null);
+            assertEquals("Error1", "java.lang.reflect.MethodTest$2X", 
+                    m.getDeclaringClass().getName());
+        } catch (NoSuchMethodException _) {
+            fail("Error2");
+        }
+    }
+
+    /**
+     *  
+     */
+    public void test_getExceptionTypes_V() {
+        class X {
+            class Y extends Throwable {
+                private static final long serialVersionUID = 0L;
+            };
+
+            public int m() throws Throwable, Y {
+                return 777;
+            }
+
+            public int m2() {
+                return 777;
+            }
+        }
+        new X();
+        try {
+            Method m = X.class.getDeclaredMethod("m", (Class[]) null);
+            assertTrue("Error1", (m.getExceptionTypes()[0].getName().equals(
+                    "java.lang.reflect.MethodTest$3X$Y") || m
+                    .getExceptionTypes()[0].getName().equals(
+                    "java.lang.Throwable"))
+                    && (m.getExceptionTypes()[1].getName().equals(
+                            "java.lang.reflect.MethodTest$3X$Y") || m
+                            .getExceptionTypes()[1].getName().equals(
+                            "java.lang.Throwable")));
+        } catch (Exception e) {
+            fail("Error2" + e.toString());
+        }
+        try {
+            Method m = X.class.getDeclaredMethod("m2", (Class[]) null);
+            assertEquals("Error3", 0, m.getExceptionTypes().length);
+        } catch (Exception e) {
+            fail("Error4" + e.toString());
+        }
+    }
+
+    /**
+     *  
+     */
+    public void test_getModifiers_V() {
+        class X {
+            public int m() {
+                return 777;
+            }
+
+            final int m2() {
+                return 777;
+            }
+        }
+        new X();
+        try {
+            Method m = X.class.getDeclaredMethod("m", (Class[]) null);
+            assertTrue("Error1", java.lang.reflect.Modifier.isPublic(m
+                    .getModifiers()));
+            m = X.class.getDeclaredMethod("m2", (Class[]) null);
+            assertTrue("Error2", java.lang.reflect.Modifier.isFinal(m
+                    .getModifiers()));
+        } catch (Exception e) {
+            fail("Error3" + e.toString());
+        }
+    }
+
+    /**
+     *  
+     */
+    public void test_getName_V() {
+        class X {
+            public int first() {
+                return 777;
+            }
+
+            final int second() {
+                return 777;
+            }
+        }
+        new X();
+        try {
+            Method af[] = X.class.getDeclaredMethods();
+            int res = 0;
+            for (int i = 0; i < af.length; i++) {
+                if (af[i].getName().equals("first")
+                        || af[i].getName().equals("second"))
+                    res++;
+            }
+            assertTrue("Error1", res == 2);
+        } catch (Exception e) {
+            fail("Error2" + e.toString());
+        }
+    }
+
+    /**
+     *  
+     */
+    public void test_getParameterTypes_V() {
+        class X {
+            public int m(boolean a1, byte a2, char a3, double a4, float a5,
+                    int a6, long a7, short a8, X a9, MethodTest a10) {
+                return 777;
+            }
+        }
+        new X();
+        try {
+            Class ac[] = X.class.getDeclaredMethod(
+                    "m",
+                    new Class[] { boolean.class, byte.class, char.class,
+                            double.class, float.class, int.class, long.class,
+                            short.class, X.class, MethodTest.class })
+                    .getParameterTypes();
+            int res = 0;
+            for (int i = 0; i < ac.length; i++) {
+                if (ac[i].getName().equals("boolean"))
+                    res += 1;
+                if (ac[i].getName().equals("byte"))
+                    res += 10;
+                if (ac[i].getName().equals("char"))
+                    res += 100;
+                if (ac[i].getName().equals("double"))
+                    res += 1000;
+                if (ac[i].getName().equals("float"))
+                    res += 10000;
+                if (ac[i].getName().equals("int"))
+                    res += 100000;
+                if (ac[i].getName().equals("long"))
+                    res += 1000000;
+                if (ac[i].getName().equals("short"))
+                    res += 10000000;
+                if (ac[i].getName().equals("java.lang.reflect.MethodTest$6X"))
+                    res += 100000000;
+                if (ac[i].getName().equals("java.lang.reflect.MethodTest"))
+                    res += 1000000000;
+            }
+            assertEquals("Error1", 1111111111, res);
+        } catch (Exception e) {
+            fail("Error2: " + e.toString());
+        }
+    }
+
+    /**
+     *  
+     */
+    public void test_getReturnType_V() {
+        class X {
+            public X m(X a9) {
+                return a9;
+            }
+        }
+        new X();
+        try {
+            assertEquals("Error1", 
+                    "java.lang.reflect.MethodTest$7X", 
+                    X.class.getDeclaredMethod("m", new Class[] { X.class })
+                    .getReturnType().getName());
+        } catch (Exception e) {
+            fail("Error2: " + e.toString());
+        }
+    }
+
+    /**
+     *  
+     */
+    public void test_hashCode_V() {
+        class X {
+            public X first(X a9) {
+                return a9;
+            }
+        }
+        try {
+            Method m = X.class.getDeclaredMethod("first",
+                    new Class[] { X.class });
+            assertEquals("Error1", m.getDeclaringClass().getName().hashCode()
+                    ^ m.getName().hashCode(), m.hashCode());
+        } catch (NoSuchMethodException _) {
+            fail("Error2");
+        }
+    }
+
+    /**
+     *  
+     */
+//Commented because of the drlvm issue
+/*
+    public void test_invoke_Obj_Obj() {
+
+        class X {
+            public X first(X a9) {
+                return a9;
+            }
+        }
+        X x = new X();
+        try {
+            Method m = X.class.getDeclaredMethod("first",
+                    new Class[] { X.class });
+            Object o = m.invoke(x, new Object[] { new X() });
+            assertTrue("Error1", o instanceof X);
+        } catch (Exception e) {
+            fail("Error2: " + e.toString());
+        }
+    }
+*/
+    /**
+     *  
+     */
+    public void test_toString_Obj() {
+        class X {
+            public X first(X a9) {
+                return a9;
+            }
+        }
+        new X();
+        try {
+            Method m = X.class.getDeclaredMethod("first",
+                    new Class[] { X.class });
+            assertEquals("Error1 ",
+                    "public java.lang.reflect.MethodTest$9X " +
+                        "java.lang.reflect.MethodTest$9X.first(" +
+                        "java.lang.reflect.MethodTest$9X)",
+                    m.toString());
+        } catch (Exception e) {
+            fail("Error2: " + e.toString());
+        }
+    }
+}

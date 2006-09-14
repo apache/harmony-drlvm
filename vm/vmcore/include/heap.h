@@ -107,7 +107,7 @@ Vector_Handle vm_new_vector_or_null(Class *array_class, int length);
  *       and control is returned.
  */
 Vector_Handle vm_new_vector_using_vtable_and_thread_pointer(
-    Allocation_Handle vector_handle, int length, void *tp);
+    int length, Allocation_Handle vector_handle, void *tp);
 
 /**
  * allocates new vector.
@@ -118,7 +118,7 @@ Vector_Handle vm_new_vector_using_vtable_and_thread_pointer(
  * @note XXX The purpose of this function is not clear. -salikh
  */
 Vector_Handle vm_new_vector_or_null_using_vtable_and_thread_pointer(
-    Allocation_Handle vector_handle, int length, void *tp);
+    int length, Allocation_Handle vector_handle, void *tp);
 
 /**
  * alocates new multidimensional array recursively.
@@ -150,7 +150,7 @@ Vector_Handle vm_multianewarray_resolved(
  * @note XXX is it used in debug version only? -salikh
  */
 void vm_new_vector_update_stats(
-    Allocation_Handle vector_handle, POINTER_SIZE_INT length, void *tp);
+    int length, Allocation_Handle vector_handle, void *tp);
 
 /**
  * allocate new object using its Class structure.
@@ -188,14 +188,5 @@ ManagedObject *class_alloc_new_object_and_run_default_constructor(
  */
 ManagedObject *class_alloc_new_object_and_run_constructor(
     Class * clss, Method * constructor, uint8 * constructor_args);
-
-/**
- * allocates new object.
- *
- * @copydoc class_alloc_new_object()
- * @note XXX exception and out of memory semantics are not specified -salikh
- * @note XXX does it use non-unwinding sematics?
- */
-ManagedObject *class_alloc_new_object_or_null(Class *clss);
 
 #endif /* #ifndef _HEAP_H */

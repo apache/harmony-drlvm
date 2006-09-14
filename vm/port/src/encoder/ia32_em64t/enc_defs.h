@@ -20,6 +20,17 @@
 #ifndef _ENCODER_DEFS_H_
 #define _ENCODER_DEFS_H_
 
+
+// Used to isolate experimental or being tuned encoder into a separate 
+// namespace so it can coexist with a stable one in the same bundle.
+#ifdef ENCODER_ISOLATE
+    #define ENCODER_NAMESPACE_START namespace enc_ia32 {
+    #define ENCODER_NAMESPACE_END };
+#else
+    #define ENCODER_NAMESPACE_START
+    #define ENCODER_NAMESPACE_END
+#endif
+
 #include <assert.h>
 
 #ifndef COUNTOF
@@ -49,6 +60,8 @@
     #define MAX_REGS        8
 #endif
 
+ENCODER_NAMESPACE_START
+
 /**
  * 'int_ptr' is a signed integer type which has the 
  * same size as a pointer on the target platform.
@@ -58,7 +71,7 @@ typedef long int_ptr;
 /**
  * A number of bytes 'eaten' by an ordinary PUSH/POP.
  */
-#define STACK_SLOT_SIZE (sizeof(long))
+#define STACK_SLOT_SIZE (sizeof(void*))
 
 
 /**
@@ -225,10 +238,26 @@ enum RegName {
     RegName_CL=REGNAME(OpndKind_GPReg,OpndSize_8,1),
     RegName_DL=REGNAME(OpndKind_GPReg,OpndSize_8,2),
     RegName_BL=REGNAME(OpndKind_GPReg,OpndSize_8,3),
+    // Used in enc_tabl.cpp
     RegName_AH=REGNAME(OpndKind_GPReg,OpndSize_8,4),
+#if !defined(_EM64T_)    
     RegName_CH=REGNAME(OpndKind_GPReg,OpndSize_8,5),
     RegName_DH=REGNAME(OpndKind_GPReg,OpndSize_8,6),
     RegName_BH=REGNAME(OpndKind_GPReg,OpndSize_8,7),
+#else
+    RegName_SPL=REGNAME(OpndKind_GPReg,OpndSize_8,4),
+    RegName_BPL=REGNAME(OpndKind_GPReg,OpndSize_8,5),
+    RegName_SIL=REGNAME(OpndKind_GPReg,OpndSize_8,6),
+    RegName_DIL=REGNAME(OpndKind_GPReg,OpndSize_8,7),
+    RegName_R8L=REGNAME(OpndKind_GPReg,OpndSize_8,8),
+    RegName_R9L=REGNAME(OpndKind_GPReg,OpndSize_8,9),
+    RegName_R10L=REGNAME(OpndKind_GPReg,OpndSize_8,10),
+    RegName_R11L=REGNAME(OpndKind_GPReg,OpndSize_8,11),
+    RegName_R12L=REGNAME(OpndKind_GPReg,OpndSize_8,12),
+    RegName_R13L=REGNAME(OpndKind_GPReg,OpndSize_8,13),
+    RegName_R14L=REGNAME(OpndKind_GPReg,OpndSize_8,14),
+    RegName_R15L=REGNAME(OpndKind_GPReg,OpndSize_8,15),
+#endif
 
     RegName_ES=REGNAME(OpndKind_SReg,OpndSize_16,0),
     RegName_CS=REGNAME(OpndKind_SReg,OpndSize_16,1),
@@ -298,15 +327,16 @@ enum RegName {
     RegName_XMM5S=REGNAME(OpndKind_XMMReg,OpndSize_32,5),
     RegName_XMM6S=REGNAME(OpndKind_XMMReg,OpndSize_32,6),
     RegName_XMM7S=REGNAME(OpndKind_XMMReg,OpndSize_32,7),
-
-    RegName_XMM8S=REGNAME(OpndKind_XMMReg,OpndSize_32,0), 
-    RegName_XMM9S=REGNAME(OpndKind_XMMReg,OpndSize_32,1),
-    RegName_XMM10S=REGNAME(OpndKind_XMMReg,OpndSize_32,2),
-    RegName_XMM11S=REGNAME(OpndKind_XMMReg,OpndSize_32,3),
-    RegName_XMM12S=REGNAME(OpndKind_XMMReg,OpndSize_32,4),
-    RegName_XMM13S=REGNAME(OpndKind_XMMReg,OpndSize_32,5),
-    RegName_XMM14S=REGNAME(OpndKind_XMMReg,OpndSize_32,6),
-    RegName_XMM15S=REGNAME(OpndKind_XMMReg,OpndSize_32,7),
+#ifdef _EM64T_
+    RegName_XMM8S=REGNAME(OpndKind_XMMReg,OpndSize_32,8), 
+    RegName_XMM9S=REGNAME(OpndKind_XMMReg,OpndSize_32,9),
+    RegName_XMM10S=REGNAME(OpndKind_XMMReg,OpndSize_32,10),
+    RegName_XMM11S=REGNAME(OpndKind_XMMReg,OpndSize_32,11),
+    RegName_XMM12S=REGNAME(OpndKind_XMMReg,OpndSize_32,12),
+    RegName_XMM13S=REGNAME(OpndKind_XMMReg,OpndSize_32,13),
+    RegName_XMM14S=REGNAME(OpndKind_XMMReg,OpndSize_32,14),
+    RegName_XMM15S=REGNAME(OpndKind_XMMReg,OpndSize_32,15),
+#endif // ifdef _EM64T_
     RegName_XMM0D=REGNAME(OpndKind_XMMReg,OpndSize_64,0), 
     RegName_XMM1D=REGNAME(OpndKind_XMMReg,OpndSize_64,1),
     RegName_XMM2D=REGNAME(OpndKind_XMMReg,OpndSize_64,2),
@@ -315,14 +345,16 @@ enum RegName {
     RegName_XMM5D=REGNAME(OpndKind_XMMReg,OpndSize_64,5),
     RegName_XMM6D=REGNAME(OpndKind_XMMReg,OpndSize_64,6),
     RegName_XMM7D=REGNAME(OpndKind_XMMReg,OpndSize_64,7),
-    RegName_XMM8D=REGNAME(OpndKind_XMMReg,OpndSize_64,0), 
-    RegName_XMM9D=REGNAME(OpndKind_XMMReg,OpndSize_64,1),
-    RegName_XMM10D=REGNAME(OpndKind_XMMReg,OpndSize_64,2),
-    RegName_XMM11D=REGNAME(OpndKind_XMMReg,OpndSize_64,3),
-    RegName_XMM12D=REGNAME(OpndKind_XMMReg,OpndSize_64,4),
-    RegName_XMM13D=REGNAME(OpndKind_XMMReg,OpndSize_64,5),
-    RegName_XMM14D=REGNAME(OpndKind_XMMReg,OpndSize_64,6),
-    RegName_XMM15D=REGNAME(OpndKind_XMMReg,OpndSize_64,7),
+#ifdef _EM64T_
+    RegName_XMM8D=REGNAME(OpndKind_XMMReg,OpndSize_64,8), 
+    RegName_XMM9D=REGNAME(OpndKind_XMMReg,OpndSize_64,9),
+    RegName_XMM10D=REGNAME(OpndKind_XMMReg,OpndSize_64,10),
+    RegName_XMM11D=REGNAME(OpndKind_XMMReg,OpndSize_64,11),
+    RegName_XMM12D=REGNAME(OpndKind_XMMReg,OpndSize_64,12),
+    RegName_XMM13D=REGNAME(OpndKind_XMMReg,OpndSize_64,13),
+    RegName_XMM14D=REGNAME(OpndKind_XMMReg,OpndSize_64,14),
+    RegName_XMM15D=REGNAME(OpndKind_XMMReg,OpndSize_64,15),
+#endif // ifdef _EM64T_
 #ifdef _HAVE_MMX_
     RegName_MMX0=REGNAME(OpndKind_MMXReg,OpndSize_64,0),
     RegName_MMX1=REGNAME(OpndKind_MMXReg,OpndSize_64,1),
@@ -481,6 +513,7 @@ Mnemonic_LOOPNE, Mnemonic_LOOPNZ = Mnemonic_LOOPNE, // Loop according to ECX
 Mnemonic_LAHF,                          // Load Flags into AH
 Mnemonic_MOV,                           // Move
 Mnemonic_MOVQ,                          // Move Quadword
+Mnemonic_MOVD,                          // Move Double word
 Mnemonic_MOVSD,                         // Move Scalar Double-Precision Floating-Point Value
 Mnemonic_MOVSS,                         // Move Scalar Single-Precision Floating-Point Values
 Mnemonic_MOVSX,                         // Move with Sign-Extension
@@ -527,14 +560,14 @@ Mnemonic_SETcc,                         // Set Byte on Condition
 
 Mnemonic_SAL, Mnemonic_SHL=Mnemonic_SAL,// Shift left
 Mnemonic_SAR,                           // Unsigned shift right
-Mnemonic_ROR,                           // rotate right
+Mnemonic_ROR,                           // Rotate right
 Mnemonic_SHR,                           // Signed shift right
 Mnemonic_SHRD,                          // Double Precision Shift Right
 Mnemonic_SHLD,                          // Double Precision Shift Left
 
 Mnemonic_SBB,                           // Integer Subtraction with Borrow
 Mnemonic_SUB,                           // Subtract
-Mnemonic_SUBSD,                         // Subtract Scalar Single-Precision Floating-Point Values
+Mnemonic_SUBSD,                         // Subtract Scalar Double-Precision Floating-Point Values
 Mnemonic_SUBSS,                         // Subtract Scalar Single-Precision Floating-Point Values
 
 Mnemonic_TEST,                          // Logical Compare
@@ -704,8 +737,10 @@ inline RegName getAliasReg(RegName reg, OpndSize sz)
  */
 inline bool equals(RegName r0, RegName r1)
 {
-    assert(getRegKind(r0) == getRegKind(r1));
-    return getRegIndex(r0) == getRegIndex(r1);
+    return getRegKind(r0) == getRegKind(r1) && 
+           getRegIndex(r0) == getRegIndex(r1);
 }
+
+ENCODER_NAMESPACE_END
 
 #endif  // ifndef _ENCODER_DEFS_H_

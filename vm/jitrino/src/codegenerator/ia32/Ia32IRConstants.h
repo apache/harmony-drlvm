@@ -36,7 +36,7 @@ namespace Ia32{
 #define UNREFERENCED(p) p
 
 #undef  offsetof
-#define offsetof(cls, field)  ((uint32)&(((cls*)4)->field)-4)
+#define offsetof(cls, field)  ((POINTER_SIZE_INT)&(((cls*)4)->field)-4)
 
 const uint32 EmptyUint32=((uint32)-1);
 const uint32 UnknownId=EmptyUint32;
@@ -46,19 +46,6 @@ const uint32 IRMaxNativeOpnds=4;
 const uint32 IRMaxInstOpnds=512;
 
 const uint32 IRMaxOperandByteSize = 16;
-
-//=========================================================================================================
-/** enum Direction is widely used in CFG methods to indicate 
-directions or a particular end of a CFG nodes and edges */
-enum Direction
-{
-	Direction_Backward=0x0, 
-		Direction_Tail=Direction_Backward, 
-		Direction_In=Direction_Backward,
-	Direction_Forward=0x1, 
-		Direction_Head=Direction_Forward, 
-		Direction_Out=Direction_Forward
-};
 
 
 //=========================================================================================================
@@ -70,36 +57,36 @@ const uint32 IRMaxRegNames=IRMaxRegNamesSameKind*IRMaxRegKinds;
 //=========================================================================================================
 enum MemOpndKind
 {
-	MemOpndKind_Null=0, 
-		MemOpndKind_StackAutoLayout=0xf,
-		MemOpndKind_StackManualLayout=0x10,
-	MemOpndKind_Stack=0x1f,
-	MemOpndKind_Heap=0x20,
-	MemOpndKind_ConstantArea=0x40,
-	MemOpndKind_Any=0xff,
+    MemOpndKind_Null=0, 
+        MemOpndKind_StackAutoLayout=0xf,
+        MemOpndKind_StackManualLayout=0x10,
+    MemOpndKind_Stack=0x1f,
+    MemOpndKind_Heap=0x20,
+    MemOpndKind_ConstantArea=0x40,
+    MemOpndKind_Any=0xff,
 };
 
 //=========================================================================================================
 enum MemOpndSubOpndKind {
-	MemOpndSubOpndKind_Base=0,
-	MemOpndSubOpndKind_Index,
-	MemOpndSubOpndKind_Scale,
-	MemOpndSubOpndKind_Displacement,
-	MemOpndSubOpndKind_Count
+    MemOpndSubOpndKind_Base=0,
+    MemOpndSubOpndKind_Index,
+    MemOpndSubOpndKind_Scale,
+    MemOpndSubOpndKind_Displacement,
+    MemOpndSubOpndKind_Count
 };
-uint32				countOnes(uint32 mask);
+uint32              countOnes(uint32 mask);
 
 //=========================================================================================================
 
-inline uint32		getByteSize(OpndSize size)
+inline uint32       getByteSize(OpndSize size)
 { return size <= OpndSize_64 ? size : size == OpndSize_128 ? 16 : size==OpndSize_80 ? 10 : 0; }
 
-ConditionMnemonic	reverseConditionMnemonic(ConditionMnemonic cm);
-ConditionMnemonic	swapConditionMnemonic(ConditionMnemonic cm);
+ConditionMnemonic   reverseConditionMnemonic(ConditionMnemonic cm);
+ConditionMnemonic   swapConditionMnemonic(ConditionMnemonic cm);
 
 /** returns base condition mnemonic like Jcc for JNZ, SETcc for SETZ, etc. */
-Mnemonic			getBaseConditionMnemonic(Mnemonic mn);
-inline Mnemonic		getMnemonic(Mnemonic mnBase, ConditionMnemonic cm){ return (Mnemonic)(mnBase+cm); }
+Mnemonic            getBaseConditionMnemonic(Mnemonic mn);
+inline Mnemonic     getMnemonic(Mnemonic mnBase, ConditionMnemonic cm){ return (Mnemonic)(mnBase+cm); }
 
 }}; // namespace Ia32
 

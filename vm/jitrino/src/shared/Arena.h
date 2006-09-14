@@ -34,7 +34,7 @@ namespace Jitrino {
 typedef struct Arena {
     struct Arena *next_arena; // next arena
     char         *next_byte;  // next byte available in arena
-    char         *last_byte;  // end of arena	space
+    char         *last_byte;  // end of arena   space
     char         bytes[1];    // start of arena space
 } Arena;
 

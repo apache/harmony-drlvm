@@ -46,17 +46,17 @@ namespace Ia32 {
 
         void registerInsts(IRManager& irm);
 
-        uint32 getByteSize() const ;
-        static uint32 readByteSize(const Byte* input);
+        POINTER_SIZE_INT getByteSize() const ;
+        static POINTER_SIZE_INT readByteSize(const Byte* input);
         void write(Byte*);
         const GCSafePointsInfo* getGCSafePointsInfo() const {return offsetsInfo;}
         
-        static const uint32* findGCSafePointStart(const uint32* image, uint32 ip);
+        static const POINTER_SIZE_INT* findGCSafePointStart(const POINTER_SIZE_INT* image, POINTER_SIZE_INT ip);
         static void checkObject(DrlVMTypeManager& tm, const void* p);
 
     private:
-        void processBasicBlock(IRManager& irm, const BasicBlock* block);
-        void registerGCSafePoint(IRManager& irm, const LiveSet& ls, Inst* inst);
+        void processBasicBlock(IRManager& irm, const Node* block);
+        void registerGCSafePoint(IRManager& irm, const BitSet& ls, Inst* inst);
         void registerHardwareExceptionPoint(Inst* inst);
         bool isHardwareExceptionPoint(const Inst* inst) const;
 
@@ -72,28 +72,28 @@ namespace Ia32 {
         friend class GCMap;
         typedef StlVector<GCSafePointOpnd*> GCOpnds;
     public:
-        GCSafePoint(MemoryManager& mm, uint32 _ip):gcOpnds(mm), ip(_ip) {
+        GCSafePoint(MemoryManager& mm, POINTER_SIZE_INT _ip):gcOpnds(mm), ip(_ip) {
 #ifdef _DEBUG
             instId = 0;
             hardwareExceptionPoint = false;
 #endif
         }
-        GCSafePoint(MemoryManager& mm, const uint32* image);
+        GCSafePoint(MemoryManager& mm, const POINTER_SIZE_INT* image);
 
-        uint32 getUint32Size() const;
-        void write(uint32* image) const;
+        POINTER_SIZE_INT getUint32Size() const;
+        void write(POINTER_SIZE_INT* image) const;
         uint32 getNumOpnds() const {return gcOpnds.size();}
-        static uint32 getIP(const uint32* image);
+        static POINTER_SIZE_INT getIP(const POINTER_SIZE_INT* image);
 
         void enumerate(GCInterface* gcInterface, const JitFrameContext* c, const StackInfo& stackInfo) const;
     
     private:
         //return address in memory where opnd value is saved
-        uint32 getOpndSaveAddr(const JitFrameContext* ctx, const StackInfo& sInfo,const GCSafePointOpnd* gcOpnd) const;
+        POINTER_SIZE_INT getOpndSaveAddr(const JitFrameContext* ctx, const StackInfo& sInfo,const GCSafePointOpnd* gcOpnd) const;
         GCOpnds gcOpnds;
-        uint32 ip;
+        POINTER_SIZE_INT ip;
 #ifdef _DEBUG
-        uint32 instId;
+        POINTER_SIZE_INT instId;
         bool hardwareExceptionPoint;
     public: 
         bool isHardwareExceptionPoint() const {return hardwareExceptionPoint;}
@@ -104,18 +104,26 @@ namespace Ia32 {
         friend class GCSafePoint;
         static const uint32 OBJ_MASK  = 0x1;
         static const uint32 REG_MASK  = 0x2;
+#ifdef _EM64T_
+        static const uint32 COMPRESSED_MASK  = 0x4;
+#endif
 
 #ifdef _DEBUG
         // flags + val + mptrOffset + firstId
         static const uint32 IMAGE_SIZE_UINT32 = 4; //do not use sizeof due to the potential struct layout problems
 #else 
         // flags + val + mptrOffset 
-        static const uint32 IMAGE_SIZE_UINT32 = 3;
+        static const POINTER_SIZE_INT IMAGE_SIZE_UINT32 = 3;
 #endif 
 
     public:
         
+#ifdef _EM64T_
+        GCSafePointOpnd(bool isObject, bool isOnRegister, int32 _val, int32 _mptrOffset, bool isCompressed=false) : val(_val), mptrOffset(_mptrOffset) {
+            flags = flags | (isCompressed ? COMPRESSED_MASK: 0);
+#else
         GCSafePointOpnd(bool isObject, bool isOnRegister, int32 _val, int32 _mptrOffset) : val(_val), mptrOffset(_mptrOffset) {
+#endif
             flags = isObject ? OBJ_MASK : 0;
             flags = flags | (isOnRegister ? REG_MASK: 0);
 #ifdef _DEBUG
@@ -129,6 +137,9 @@ namespace Ia32 {
         bool isOnRegister() const { return (flags & REG_MASK)!=0;}
         bool isOnStack() const {return !isOnRegister();}
         
+#ifdef _EM64T_
+        bool isCompressed() const { return (flags & COMPRESSED_MASK)!=0;}
+#endif      
         RegName getRegName() const { assert(isOnRegister()); return RegName(val);}
         int32 getDistFromInstESP() const { assert(isOnStack()); return val;}
 
@@ -149,60 +160,24 @@ namespace Ia32 {
     };
 
 
-	BEGIN_DECLARE_IRTRANSFORMER(GCMapCreator, "gcmap", "GC map creation")
-		IRTRANSFORMER_CONSTRUCTOR(GCMapCreator)
-		void runImpl();
-		uint32 getNeedInfo()const{ return NeedInfo_LivenessInfo;}
+    class GCMapCreator : public SessionAction {
+        void runImpl();
+        uint32 getNeedInfo()const{ return NeedInfo_LivenessInfo;}
 #ifdef  GC_MAP_DUMP_ENABLED
-        uint32 getSideEffects() {return Log::cat_cg()->isIREnabled();}
+        uint32 getSideEffects() {return Log::isEnabled();}
         bool isIRDumpEnabled(){ return true;}
 #else 
         uint32 getSideEffects() {return 0;}
         bool isIRDumpEnabled(){ return false;}
 #endif
-        
-	END_DECLARE_IRTRANSFORMER(GCMapCreator) 
+    };        
 
-	BEGIN_DECLARE_IRTRANSFORMER(InfoBlockWriter, "info", "Creation of method info block")
-		IRTRANSFORMER_CONSTRUCTOR(InfoBlockWriter)
-		void runImpl()
-		{ 
-            StackInfo * stackInfo = (StackInfo*)irManager.getInfo("stackInfo");
-            assert(stackInfo != NULL);
-            GCMap * gcMap = (GCMap*)irManager.getInfo("gcMap");
-            assert(gcMap != NULL);
-            BcMap *bcMap = (BcMap*)irManager.getInfo("bcMap");
-            assert(bcMap != NULL);
-			InlineInfoMap * inlineInfo = (InlineInfoMap*)irManager.getInfo("inlineInfo");
-			assert(inlineInfo !=NULL);
-            
-            CompilationInterface& compIntf = irManager.getCompilationInterface();
-
-			if ( !inlineInfo->isEmpty() ) {
-				inlineInfo->write(compIntf.allocateJITDataBlock(inlineInfo->computeSize(), 8));
-			}
-
-            uint32 stackInfoSize = stackInfo->getByteSize();
-            uint32 gcInfoSize = gcMap->getByteSize();
-            uint32 bcMapSize = bcMap->getByteSize(); // we should write at least the size of map  in the info block
-            assert(bcMapSize >= 4);                              // so  bcMapSize should be more than 4 for ia32
-            
-			Byte* infoBlock = compIntf.allocateInfoBlock(stackInfoSize + gcInfoSize + bcMapSize);
-            stackInfo->write(infoBlock);
-            gcMap->write(infoBlock+stackInfoSize);
-
-            if (compIntf.isBCMapInfoRequired()) {
-                 bcMap->write(infoBlock + stackInfoSize + gcInfoSize);
-            } else {
-                 // if no bc info write size equal to zerro
-                 // this will make possible handle errors in case
-                 bcMap->writeZerroSize(infoBlock + stackInfoSize + gcInfoSize);
-            } 
-		}
-		uint32 getNeedInfo()const{ return 0; }
-		uint32 getSideEffects()const{ return 0; }
-		bool isIRDumpEnabled(){ return false; }
-	END_DECLARE_IRTRANSFORMER(InfoBlockWriter) 
+    class InfoBlockWriter : public SessionAction {
+        void runImpl();
+        uint32 getNeedInfo()const{ return 0; }
+        uint32 getSideEffects()const{ return 0; }
+        bool isIRDumpEnabled(){ return false; }
+    };
 
 }} //namespace
 

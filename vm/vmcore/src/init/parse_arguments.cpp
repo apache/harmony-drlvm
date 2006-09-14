@@ -34,6 +34,7 @@
 #include "Class.h"
 #include "properties.h"
 #include "environment.h"
+#include "assertion_registry.h"
 
 #include "open/gc.h"
  
@@ -112,13 +113,45 @@ void print_generic_help()
         "                  load JVMTI agent library, library name is platform dependent\n"
         "    -verify\n"
         "                  do full bytecode verification\n"
-        "    -enableassertions[:<package>|:<class>]\n"
-        "    -ea[:<package>|:<class>]\n"
-        "                  enable assertions - NOT SUPPORTED\n"
+        "    -enableassertions[:<package>...|:<class>]\n"
+        "    -ea[:<package>...|:<class>]\n"
+        "                  enable assertions\n"
+        "    -disableassertions[:<package>...|:<class>]\n"
+        "    -da[:<package>...|:<class>]\n"
+        "                  disable assertions\n"
+        "    -esa | -enablesystemassertions\n"
+        "                  enable system assertions\n"
+        "    -dsa | -disablesystemassertions\n"
+        "                  disable system assertions\n"
         "    -? -help      print this help message\n"
         "    -help properties\n"
         "                  help on system properties\n"
         "    -X            print help on non-standard options");
+}
+
+static inline Assertion_Registry* get_assert_reg(Global_Env *p_env) {
+    if (!p_env->assert_reg) {
+        void * mem = p_env->mem_pool.alloc(sizeof(Assertion_Registry));
+        p_env->assert_reg = new (mem) Assertion_Registry(); 
+    }
+    return p_env->assert_reg;
+}
+
+static void add_assert_rec(Global_Env *p_env, const char* option, const char* cmdname, bool value) {
+    const char* arg = option + strlen(cmdname);
+    if ('\0' == arg[0]) {
+        get_assert_reg(p_env)->enable_all = value ? ASRT_ENABLED : ASRT_DISABLED;
+    } else if (':' != arg[0]) {
+        ECHO("Unknown option " << option << USE_JAVA_HELP);
+        LOGGER_EXIT(1);
+    } else {
+        unsigned len = strlen(++arg);
+        if (len >= 3 && strncmp("...", arg + len - 3, 3) == 0) {
+            get_assert_reg(p_env)->add_package(p_env, arg, len - 3, value);
+        } else {
+            get_assert_reg(p_env)->add_class(p_env, arg, len, value);
+        }
+    }
 }
 
 void parse_vm_arguments(Global_Env *p_env)
@@ -293,6 +326,29 @@ void parse_vm_arguments(Global_Env *p_env)
                 print_help_on_nonstandard_options();
                 LOGGER_EXIT(0);
         }
+        else if (begins_with(option, "-enableassertions")) {
+            add_assert_rec(p_env, option, "-enableassertions", true);
+        }
+        else if (begins_with(option, "-ea")) { 
+            add_assert_rec(p_env, option, "-ea", true);
+        }
+        else if (begins_with(option, "-disableassertions")) { 
+            add_assert_rec(p_env, option, "-disableassertions", false);
+        }
+        else if (begins_with(option, "-da")) { 
+            add_assert_rec(p_env, option, "-da", false);
+        }
+        else if (strcmp(option, "-esa") == 0 
+            || strcmp(option, "-enablesystemassertions") == 0) {
+            get_assert_reg(p_env)->enable_system = true;
+        }
+        else if (strcmp(option, "-dsa") == 0 
+            || strcmp(option, "-disablesystemassertions") == 0) {
+                if (p_env->assert_reg) {
+                    p_env->assert_reg->enable_system = false;
+                }
+        }
+
         else {
             ECHO("Unknown option " << option << USE_JAVA_HELP);
             LOGGER_EXIT(1);
@@ -463,6 +519,12 @@ static const cmd_arg supported_parameters[] =
     {false, "-fullversion",                  strlen("-fullversion"),                  0},
     {true,  "-ea",                           strlen("-ea"),                           0},
     {true,  "-enableassertions",             strlen("-enableassertions"),             0},
+    {true,  "-da",                           strlen("-da"),                           0},
+    {true,  "-disableassertions",            strlen("-disableassertions"),            0},
+    {false, "-dsa",                          strlen("-esa"),                          0},
+    {false, "-esa",                          strlen("-dsa"),                          0},
+    {false, "-enablesystemassertions",       strlen("-enablesystemassertions"),       0},
+    {false, "-disablesystemassertions",      strlen("-disablesystemassertions"),      0},
     {false, "-Xgc",                          strlen("-Xgc"),                          1},
     {true,  "-Xem",                          strlen("-Xem"),                          1},
     {true,  "-Xms",                          strlen("-Xms"),                          0},
@@ -483,17 +545,17 @@ static const cmd_arg supported_parameters[] =
     {true,  "-Xcategory",                    strlen("-Xcategory"),                    0},
     {true,  "-Xtimestamp",                   strlen("-Xtimestamp"),                   0},
     {true,  "-Xwarn",                        strlen("-Xwarn"),                        0},
-    {true,  "-Xfunction",                    strlen("-Xfunction"),                        0},
+    {true,  "-Xfunction",                    strlen("-Xfunction"),                    0},
 #ifdef _DEBUG
     {true,  "-Xtrace",                       strlen("-Xtrace"),                       0},
     {true,  "-Xlog",                         strlen("-Xlog"),                         0},
 #endif //_DEBUG
     {true,  "-D",                            strlen("-D"),                            0},
     {false, "-Xdumpstubs",                   strlen("-Xdumpstubs"),                   0},
-    {false, "-Xparallel_jit",                strlen("-Xparallel_jit"),                 0},
+    {false, "-Xparallel_jit",                strlen("-Xparallel_jit"),                0},
     {false, "-Xno_parallel_jit",             strlen("-Xno_parallel_jit"),             0},
     {false, "-Xdumpfile",                    strlen("-Xdumpfile"),                    1},
-    {false, "-XcleanupOnExit",               strlen("-XcleanupOnExit"),                0},
+    {false, "-XcleanupOnExit",               strlen("-XcleanupOnExit"),               0},
     {false, "-jar",                          strlen("-jar"),                          0}
 }; //supported_parameters
 
@@ -723,14 +785,6 @@ static int parse_vm_option(JavaVMInitArgs* vm_arguments, int argc, char *argv[],
             strcpy(option, argv[i]);
             strcat(option, ":");
             strcat(option, argv[i + 1]);
-        }
-        else if (strncmp(argv[i], "-enableassertions", 
-                strlen("-enableassertions")) == 0 || 
-                strncmp(argv[i], "-ea", strlen("-ea")) == 0) 
-        {
-            ECHO("Error: Assertions are not supported.\n"
-                << " please invoke VM without -ea and -enableassertions options...");
-            LOGGER_EXIT(1);
         }
         else
         {

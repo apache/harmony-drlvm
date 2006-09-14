@@ -29,9 +29,9 @@ class IndexOutOfBoundsException {
 public:
     IndexOutOfBoundsException() : msg("") { assert(0); }
     IndexOutOfBoundsException(const char* message) : msg(message) { assert(0); }
-	const char* getMessage() {return msg;}
+    const char* getMessage() {return msg;}
 private:
-	const char* msg;
+    const char* msg;
 };
 
 class TranslationException {

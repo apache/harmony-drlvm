@@ -53,6 +53,8 @@ using namespace std;
 
 #include "exceptions.h"
 
+void gen_convert_managed_to_unmanaged_null_ipf(Emitter_Handle emitter,
+                                               unsigned reg);
 
 extern "C" void vm_rt_athrow(volatile ManagedObject *exc_obj,
                               uint64 *bsp_arg,

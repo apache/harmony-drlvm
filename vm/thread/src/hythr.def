@@ -111,6 +111,7 @@ hymutex_destroy
 
 hythread_wait_for_all_nondaemon_threads
 hythread_is_alive
+hythread_is_terminated
 hythread_init
 countdown_nondaemon_threads
 increase_nondaemon_threads_count

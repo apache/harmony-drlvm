@@ -26,10 +26,11 @@
 #include <iostream>
 #include "open/types.h"
 #include "Opcode.h"
-#include "FlowGraph.h"
 #include "Stl.h"
 #include "optpass.h"
 #include <utility>
+
+#include "ControlFlowGraph.h"
 
 namespace Jitrino {
 
@@ -38,8 +39,7 @@ class MemoryManager;
 class InequalityGraph;
 class DominatorNode;
 class Dominator;
-class JitrinoParameterTable;
-class CFGNode;
+class Node;
 class Opnd;
 class CSEHashTable;
 class Type;
@@ -55,14 +55,6 @@ struct OpndWithPriority {
 };
 bool operator < (const OpndWithPriority &a, const OpndWithPriority &b);
 
-DEFINE_OPTPASS(ReassociationPass)
-
-DEFINE_OPTPASS(DepthReassociationPass)
-
-DEFINE_OPTPASS(LateDepthReassociationPass)
-
-class Simplifier;
-
 //
 // Try to re-associate expressions to either
 //    - reduce expression height
@@ -72,17 +64,12 @@ class Reassociate {
     IRManager& irManager;
     MemoryManager &mm;
 public:
-    struct Flags {
-    };
+    
 private:
-    static Flags *defaultFlags;
-    Flags flags;
 public:    
-    static void readDefaultFlagsFromCommandLine(const JitrinoParameterTable *params);
-    static void showFlagsFromCommandLine();
-
+ 
     Reassociate(IRManager &irManager0, 
-		MemoryManager& memManager);
+        MemoryManager& memManager);
 
     ~Reassociate();
 
@@ -97,18 +84,18 @@ private:
 
     void addAddAssoc(StlDeque<OpndWithPriority> &opnds, 
                      bool negated,
-		     Type* type, Opnd* opnd);
+             Type* type, Opnd* opnd);
     void addMulAssoc(StlDeque<OpndWithPriority> &opnds, 
                      bool negated,
-		     Type* type, Opnd* opnd);
+             Type* type, Opnd* opnd);
     void addAddOffsetAssoc(StlDeque<OpndWithPriority> &opnds, 
                            bool compressed,
                            Type* type, Opnd* opnd);
     
     Opnd* simplifyReassociatedAdd(Type *type, 
-				  StlDeque<OpndWithPriority> &opnds);
+                  StlDeque<OpndWithPriority> &opnds);
     Opnd* simplifyReassociatedMul(Type *type, 
-				  StlDeque<OpndWithPriority> &opnds);
+                  StlDeque<OpndWithPriority> &opnds);
 
     Opnd* simplifyMulViaReassociation2(Type* type, Opnd* src1, Opnd* src2);
 
@@ -120,7 +107,7 @@ private:
     
 private:
     // we compute Reverse-Postorder numbers for CFGnodes:
-    StlHashMap<CFGNode *, uint32> cfgRpoNum;
+    StlHashMap<Node *, uint32> cfgRpoNum;
 
     StlHashMap<Opnd *, uint32> priority;
     uint32 getPriority(Opnd *opnd); // computes if not in the hash map
@@ -130,8 +117,8 @@ private:
 
     uint32 costOfAdd, costOfSub, 
         costOfNeg, costOfMul, costOfConv, costOfBoolOp,
-	costOfNot, costOfShladd, costOfShift, costOfMisc, 
-	priorityFactorOfBlock, priorityFactorOfPosition;
+    costOfNot, costOfShladd, costOfShift, costOfMisc, 
+    priorityFactorOfBlock, priorityFactorOfPosition;
     uint32 numBlocks;
     
     bool minDepth;

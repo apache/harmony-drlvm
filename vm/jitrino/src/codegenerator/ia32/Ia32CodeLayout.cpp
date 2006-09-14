@@ -28,65 +28,86 @@ namespace Jitrino
 {
 namespace Ia32 {
 
-#define ACCEPTABLE_DOUBLE_PRECISION_LOSS  0.000000000001 
+static ActionFactory <Layouter> _layout("layout");
+
+#define ACCEPTABLE_DOUBLE_PRECISION_LOSS  0.000000001 
 
 Linearizer::Linearizer(IRManager* irMgr) : irManager(irMgr) {
 }
 
 
 
+static Edge* findEdgeToAddJump(BasicBlock* block) {
+    Inst* lastInst = (Inst*)block->getLastInst();
+    BasicBlock* layoutSuccessor = block->getLayoutSucc();
+    if (lastInst && lastInst->hasKind(Inst::Kind_BranchInst)) {
+        BranchInst* br = (BranchInst*)lastInst;
+        if (br->isDirect() && br->getFalseTarget() != layoutSuccessor) {
+            return block->getFalseEdge();
+        }
+        return NULL;
+    }
+    if (lastInst && lastInst->hasKind(Inst::Kind_ControlTransferInst) && !lastInst->hasKind(Inst::Kind_CallInst)) { 
+        //unconditional jumps (jump inst, ret, switch)
+        return NULL;
+    }
+    
+    if (block->getOutDegree() == 1 && block->getExceptionEdge()!=NULL) {
+        return NULL; //throw
+    }
+
+    Edge* uncondEdge = block->getUnconditionalEdge();
+    assert(uncondEdge);
+    return uncondEdge->getTargetNode() == layoutSuccessor ? NULL : uncondEdge;
+}
+
+
 /**  Fix branches to work with the code layout */
 void Linearizer::fixBranches() {
-    const Nodes& nodes = irManager->getNodes();
+    const Nodes& nodes = irManager->getFlowGraph()->getNodes();
     for (Nodes::const_iterator it = nodes.begin(), end = nodes.end(); it!=end; ++it)  {
         Node* node = *it;
-        if (node->hasKind(Node::Kind_BasicBlock)) {
-            fixBranches((BasicBlock*)node);
-        }
-    }
-}
-
-void Linearizer::fixBranches(BasicBlock* block) { 
-    BasicBlock* succBlock = block->getLayoutSucc();
-    // If block ends with branch to its layout successor reverse
-    // the branch to fallthrough to the layout successor
-    if (!block->isEmpty()) {
-        Inst * lastInst = block->getInsts().getLast();
-        if (lastInst->hasKind(Inst::Kind_BranchInst)) {
-            BranchInst* bInst =  ((BranchInst *)lastInst);
-            if (bInst->isDirect()) {
-                BasicBlock* target =bInst->getDirectBranchTarget();
-                if (target == succBlock) {
-                    reverseBranchIfPossible(block);
+        if (node->isBlockNode()) {
+            BasicBlock* block = (BasicBlock*)node;
+            BasicBlock* layoutSuccessor = block->getLayoutSucc();
+            
+            // If block ends with true branch to its layout successor reverse
+            // the branch to fallthrough to the layout successor
+            Inst * lastInst = (Inst*)block->getLastInst();
+            if (lastInst!=NULL && lastInst->hasKind(Inst::Kind_BranchInst)) {
+                BranchInst* bInst =  (BranchInst *)lastInst;
+                if (bInst->isDirect()) {
+                    Node * target = bInst->getTrueTarget();
+                    if (target == layoutSuccessor) {
+                        reverseBranchIfPossible(block);
+                    }
                 }
             }
+            
+            //check for every out edge that additional jump block is needed
+            Edge* edge = findEdgeToAddJump(block);
+            if (edge!=NULL) {
+                BasicBlock * jmpBlk = addJumpBlock(edge);
+                //  Put jump block after the block in code layout
+                jmpBlk->setLayoutSucc(layoutSuccessor);
+                block->setLayoutSucc(jmpBlk);
+            }   
         }
     }
-
-    //  If block's fallthrough successor is not its layout successor
-    //  add new block with a jump
-    Edge * fallEdge = block->getFallThroughEdge();
-    if (fallEdge != NULL && fallEdge->getNode(Direction_Head) != succBlock) {
-        BasicBlock * jmpBlk = addJumpBlock(fallEdge);
-        //  Put jump block after the block in code layout
-        jmpBlk->setLayoutSucc(succBlock);
-        block->setLayoutSucc(jmpBlk);
-    }
 }
-
 
 
 /**  Reverse branch predicate. 
      We assume that branch is the last instruction in the node.
   */
-bool Linearizer::reverseBranchIfPossible(BasicBlock * bb) {
+bool Linearizer::reverseBranchIfPossible(Node * bb) {
     //  Last instruction of the basic block should be predicated branch:
     //      (p1) br  N
     //  Find p2 in (p1,p2) or (p2,p1) produced by the compare.
-    assert(!bb->isEmpty() && bb->getInsts().getLast()->hasKind(Inst::Kind_BranchInst));
-    BranchInst * branch = (BranchInst *)bb->getInsts().getLast();
+    assert(bb->isBlockNode() && !bb->isEmpty() && ((Inst*)bb->getLastInst())->hasKind(Inst::Kind_BranchInst));
+    BranchInst * branch = (BranchInst *)bb->getLastInst();
     assert(branch->isDirect());
-    Edge* edge = bb->getDirectBranchEdge();
+    Edge* edge = bb->getTrueEdge();
     if (canEdgeBeMadeToFallThrough(edge)) {
         branch->reverse(irManager);
     }
@@ -97,52 +118,11 @@ bool Linearizer::reverseBranchIfPossible(BasicBlock * bb) {
  /**  Add block containing jump instruction to the fallthrough successor
   *  after this block
   */
-BasicBlock * Linearizer::addJumpBlock(Edge * fallEdge) {
-    //  Create basic block for jump inst and add this block to the CFG
-    Node* block = fallEdge->getNode(Direction_Tail);
-    Node* targetNode= fallEdge->getNode(Direction_Head);
-    assert(targetNode->hasKind(Node::Kind_BasicBlock));
-    bool loopInfoIsValidOnStart = irManager->isLoopInfoValid();
-    Node* loopHeader = loopInfoIsValidOnStart ?  (targetNode->isLoopHeader()? targetNode : targetNode->getLoopHeader()):NULL;//cache in advance
-    bool livenessInfoIsValidOnStart = irManager->hasLivenessInfo();
-    BasicBlock* targetBlock = (BasicBlock*)targetNode;
-    BasicBlock* jumpBlock = irManager->newBasicBlock(fallEdge->getProbability() * block->getExecCnt());
-    jumpBlock->setPersistentId(targetBlock->getPersistentId());
-
-    //  Add jump instruction to the created block
-    BranchInst * jumpInst = irManager->newBranchInst(Mnemonic_JMP);
-    jumpBlock->appendInsts(jumpInst);
-    irManager->newDirectBranchEdge(jumpBlock, targetBlock, 1.0);
-    
-    //  Retarget head of fallthrough edge to the jumpBlock
-    irManager->retargetEdge(Direction_Head, fallEdge, jumpBlock);
-    
-    // now fix liveness and loop infos
-    if (livenessInfoIsValidOnStart) {        //fixing liveness info
-        assert(jumpInst->getOpndCount() == 1); 
-        uint32 nOpnds = irManager->getOpndCount();
-#ifdef _DEBUG
-        Opnd* opnd = jumpInst->getOpnd(0);
-        assert(opnd->getId() == nOpnds - 1);
-#endif
-        const Nodes& nodes = irManager->getNodes();
-        for (Nodes::const_iterator it = nodes.begin(), itEnd = nodes.end(); it!=itEnd; it++) {
-            Node* node = *it;
-            LiveSet* liveSet = irManager->getLiveAtEntry(node);
-            assert(node == jumpBlock || liveSet->getSetSize() == nOpnds - 1);
-            liveSet->resize(nOpnds); //fills new opnd info with 0
-        }
-        LiveSet* jumpBlockLiveness = irManager->getLiveAtEntry(jumpBlock);
-        irManager->getLiveAtExit(jumpBlock, *jumpBlockLiveness); // get liveness from child nodes
-        irManager->updateLiveness(jumpInst, *irManager->getLiveAtEntry(jumpBlock)); // and add local info to it
-        assert(irManager->ensureLivenessInfoIsValid());
-    }
-
-    if (loopInfoIsValidOnStart) {    //fixing loop info if needed
-        jumpBlock->setLoopInfo(false, loopHeader);
-        irManager->forceLoopInfoIsValid();
-    }
-    return jumpBlock;
+BasicBlock* Linearizer::addJumpBlock(Edge * fallEdge) {
+    irManager->invalidateLivenessInfo();
+    Inst* jumpInst = irManager->newJumpInst();
+    Node* jumpBlock = irManager->getFlowGraph()->spliceBlockOnEdge(fallEdge, jumpInst);
+    return (BasicBlock*)jumpBlock;
 }
 
 
@@ -150,27 +130,27 @@ BasicBlock * Linearizer::addJumpBlock(Edge * fallEdge) {
 // Returns true if edge can be converted to a fall-through edge (i.e. an edge
 // not requiring a branch) assuming the edge's head block is laid out after the tail block. 
 bool Linearizer::canEdgeBeMadeToFallThrough(Edge *edge) {
-    BranchInst *br = edge->getBranch();
-    if (br == NULL) {
-        return TRUE;
-    } 
-    return br->canReverse();
+    assert(edge->isTrueEdge());
+    Inst *br = (Inst*)edge->getSourceNode()->getLastInst();
+    assert(br!=NULL);
+    assert(br->hasKind(Inst::Kind_BranchInst));
+    return ((BranchInst*)br)->canReverse();
 }
 
 bool Linearizer::isBlockLayoutDone() {
-    bool lastBlockFound = FALSE;
-    const Nodes& nodes = irManager->getNodes();
+    bool lastBlockFound = false;
+    const Nodes& nodes = irManager->getFlowGraph()->getNodes();
     for (Nodes::const_iterator it = nodes.begin(), end = nodes.end(); it!=end; ++it)  {
         Node* node = *it;
-        if (!node->hasKind(Node::Kind_BasicBlock)) {
+        if (!node->isBlockNode()) {
             continue;
         }
         BasicBlock* block  = (BasicBlock*)node;
         if (block->getLayoutSucc()==NULL) {
            if (lastBlockFound) {
-               return FALSE; //two blocks without layout successor found
+               return false; //two blocks without layout successor found
            }
-           lastBlockFound = TRUE;
+           lastBlockFound = true;
         }
     }
     return lastBlockFound;
@@ -183,12 +163,13 @@ void Linearizer::linearizeCfg() {
 #endif
     
     linearizeCfgImpl();
+
+    fixBranches();
     
     assert(isBlockLayoutDone());
-    irManager->setIsLaidOut();
+    irManager->setLaidOut(true);
 #ifdef _DEBUG
-    assert(hasValidLayout(irManager));
-    assert(hasValidFallthroughEdges(irManager));
+    checkLayout(irManager);
     if (livenessIsOkOnStart) {
         assert(irManager->ensureLivenessInfoIsValid());
     }
@@ -210,160 +191,118 @@ void Linearizer::doLayout(LinearizerType t, IRManager* irManager) {
     }
 }
 
-bool Linearizer::hasValidLayout(IRManager* irm) {
-    uint32 maxNodes = irm->getMaxNodeId();
-    StlVector<uint32> numVisits(irm->getMemoryManager(), maxNodes); 
-    StlVector<bool> isBB(irm->getMemoryManager(), maxNodes);
-    uint32 i;
-
-    for (i = 0; i < maxNodes; i++) {
-        numVisits[i] = 0;
-        isBB[i] = FALSE;
-    }
-    //    Find basic blocks
-    bool foundExit = FALSE;
-    const Nodes& nodes = irm->getNodes();
+void Linearizer::checkLayout(IRManager* irm) {
+#ifdef _DEBUG
+    uint32 maxNodes = irm->getFlowGraph()->getMaxNodeId();
+    StlVector<uint32> numVisits(irm->getMemoryManager(), maxNodes, 0); 
+    StlVector<bool> isBB(irm->getMemoryManager(), maxNodes, false);
+    
+    // Find basic blocks
+    bool wasLast = false;
+    const Nodes& nodes = irm->getFlowGraph()->getNodes();
     for (Nodes::const_iterator it = nodes.begin(), end = nodes.end(); it!=end; ++it)  {
         Node *node = *it;
-        if (node->hasKind(Node::Kind_BasicBlock)) {
-            isBB[node->getId()] = TRUE;
+        if (node->isBlockNode()) {
+            isBB[node->getId()] = true;
             BasicBlock* layoutSucc =((BasicBlock*)node)->getLayoutSucc();
             if (layoutSucc==NULL )  {
-                if (foundExit) {
-                    if (Log::cat_cg()->isWarnEnabled()) {
-                        Log::out() << "two blocks without layout successor\n";
-                    }
-                    return FALSE;
-                } else {
-                    foundExit = TRUE;
-                }
+                assert(!wasLast);
+                wasLast = true;
             } else {
                 uint32 id = layoutSucc->getId();
                 numVisits[id]++;
-                if (numVisits[id] > 1) {
-                    return FALSE;
-                }
+                assert(numVisits[id] == 1);
             }
         }
     }
 
     
-    //    Check that every basic block has been visited once
-    bool foundEntry = FALSE;
-    for (i = 0; i < maxNodes; i++) {
+    // Check that every basic block has been visited once
+    bool wasFirst = false;
+    for (uint32 i = 0; i < maxNodes; i++) {
         uint32 correctNumVisits = isBB[i] ? 1 : 0;
         if (numVisits[i] != correctNumVisits) {
-            if (isBB[i] && numVisits[i] == 0 && !foundEntry) {
-                foundEntry = TRUE;
+            if (isBB[i] && numVisits[i] == 0 && !wasFirst) {
+                wasFirst = true;
             } else {
-                if (Log::cat_cg()->isWarnEnabled()) {
-                    Log::out() << "numVisits[" << (int) i << "] = ";
-                    Log::out() << (int) numVisits[i];
-                    Log::out() << " expected " << (int) correctNumVisits << ::std::endl;
-                }
-                return FALSE;
+                assert(0);
             }
         }
     }
-    return TRUE;
-}
 
-bool Linearizer::hasValidFallthroughEdges(IRManager* irm) {
-    const Nodes& nodes = irm->getNodes();
+    //check fallthru successors
     for (Nodes::const_iterator it = nodes.begin(), end = nodes.end(); it!=end; ++it)  {
         Node *node = *it;
-        if (node->hasKind(Node::Kind_BasicBlock)) {
+        if (node->isBlockNode()) {
             BasicBlock* block = (BasicBlock*)node;
-            Edge * fallEdge = block->getFallThroughEdge();
-            if (fallEdge != NULL && fallEdge->getNode(Direction_Head) != block->getLayoutSucc()) {
-                return FALSE;
+            BasicBlock* layoutSucc = block->getLayoutSucc();
+            Edge* fallEdge = layoutSucc==NULL ? NULL : block->findEdgeTo(true, layoutSucc);
+            if (fallEdge == NULL) {
+                Inst *inst = (Inst*)block->getLastInst();
+                assert(!inst->hasKind(Inst::Kind_BranchInst)); //false edge must be fallthru
+                bool ok = inst->hasKind(Inst::Kind_ControlTransferInst) && !inst->hasKind(Inst::Kind_CallInst);
+                ok = ok || (block->getOutDegree() == 1 && block->getExceptionEdge() != NULL);
+                assert(ok);
+            } else {
+                assert(fallEdge->isUnconditionalEdge() || fallEdge->isFalseEdge());
             }
-        } 
+        }
     }
-    return TRUE;
+
+#endif 
 }
 
 
-void Linearizer::ensureProfileIsValid() const {
-    const Nodes& nodes = irManager->getNodes();
-    for (Nodes::const_iterator it = nodes.begin(), end = nodes.end(); it!=end; ++it) {
-        Node* node = *it;
-        const Edges& inEdges = node->getEdges(Direction_In);
 
-#ifdef _DEBUG
-        double myFreq = node->getExecCnt();
-        assert(myFreq>0);
-#endif
-        
-        
-        if (node!=irManager->getPrologNode()) { // checking in-edges, sum freq=myFreq
-            double inFreq = 0;
-            for (Edge *e = inEdges.getFirst(); e; e = inEdges.getNext(e)) {
-                Node* fromNode = e->getNode(Direction_Tail);
-                double edgeProb = e->getProbability();
-                double dfreq =  edgeProb * fromNode->getExecCnt();
-                inFreq+=dfreq;
-            }
-            assert ((double(abs(int(myFreq -  inFreq))) / myFreq) < ACCEPTABLE_DOUBLE_PRECISION_LOSS); 
-        }
-
-        if (node!=irManager->getExitNode()) { //checking out edges -> sum prob == 100%
-            const Edges& outEdges = node->getEdges(Direction_Out);
-            double prob = 0.0;
-            for (Edge *e = outEdges.getFirst(); e; e = outEdges.getNext(e)) {
-                double dprob = e->getProbability();
-                prob+=dprob;
-            }
-            assert ((double(abs(int(1 -  prob)))) < ACCEPTABLE_DOUBLE_PRECISION_LOSS); 
-        }
-    }
-}
 
 /////////////////////////////////////////////////////////////////////
 /////////////////// TOPOLOGICAL LAYOUT //////////////////////////////
 
 void TopologicalLayout::linearizeCfgImpl() {
     BasicBlock* prev = NULL;
-    CFG::NodeIterator it(*irManager, CFG::OrderType_Topological);
-    for (; it.getNode()!=NULL; ++it) {
-        Node* node = it.getNode();
-        if (!node->hasKind(Node::Kind_BasicBlock)) {
+    const Nodes& postOrderedNodes = irManager->getFlowGraph()->getNodesPostOrder();
+    for (Nodes::const_reverse_iterator it = postOrderedNodes.rbegin(), end = postOrderedNodes.rend(); it!=end; ++it) {
+        Node* node = *it;    
+        if (!node->isBlockNode()) {
             continue;
         }
         BasicBlock* block = (BasicBlock*)node;
         if (prev!= NULL) {
             prev->setLayoutSucc(block);
         } else {
-            assert(block == irManager->getPrologNode());
+            assert(block == irManager->getFlowGraph()->getEntryNode());
         }
         prev=block; 
     }
-    fixBranches();
 }
 
 //////////////////////////////////////////////////////////////////////////
 ///////////////////IRTransformer impl ////////////////////////////////////
 void Layouter::runImpl() {
-    const char* params = getParameters();
-    Linearizer::LinearizerType type = irManager.hasEdgeProfile() ? Linearizer::BOTTOM_UP : Linearizer::TOPOLOGICAL;
+    const char* params = getArg("type");
+    ControlFlowGraph* fg = irManager->getFlowGraph();
+    bool hasEdgeProfile = fg->hasEdgeProfile();
+    bool isClinit = irManager->getMethodDesc().isClassInitializer();
+    Linearizer::LinearizerType type = hasEdgeProfile && !isClinit ? Linearizer::BOTTOM_UP : Linearizer::TOPOLOGICAL;
     if (params != NULL) {
         if (!strcmp(params, "bottomup")) {
             type = Linearizer::BOTTOM_UP;
         } else if (!strcmp(params, "topdown")) {
             type = Linearizer::TOPDOWN;
         } else if (!strcmp(params, "mixed")) {
-            type = irManager.hasLoops() ? Linearizer::BOTTOM_UP  : Linearizer::TOPDOWN;
+            LoopTree* lt = fg->getLoopTree();
+            type = lt->hasLoops() ? Linearizer::BOTTOM_UP  : Linearizer::TOPDOWN;
         } else if (!strcmp(params, "topological")) {
             type = Linearizer::TOPOLOGICAL;
         } else {
-            if (Log::cat_cg()->isWarnEnabled()) {
+            if (Log::isEnabled()) {
                 Log::out() << "Layout: unsupported layout type: '"<<params<<"' using default\n";;
             }
         }
     }
-    if (type != Linearizer::TOPOLOGICAL && !irManager.hasEdgeProfile()) {
+    if (type != Linearizer::TOPOLOGICAL && !hasEdgeProfile) {
         type = Linearizer::TOPOLOGICAL;
-        if (Log::cat_cg()->isWarnEnabled()) {
+        if (Log::isEnabled()) {
             Log::out() << "Layout: not edge profile found: '"<<params<<"' using topological layout\n";;
         }
     }

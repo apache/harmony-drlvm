@@ -1,0 +1,67 @@
+/*
+ *  Copyright 2005-2006 The Apache Software Foundation or its licensors, as applicable.
+ *
+ *  Licensed under the Apache License, Version 2.0 (the "License");
+ *  you may not use this file except in compliance with the License.
+ *  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ *  Unless required by applicable law or agreed to in writing, software
+ *  distributed under the License is distributed on an "AS IS" BASIS,
+ *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ *  See the License for the specific language governing permissions and
+ *  limitations under the License.
+ */
+
+/**
+ * @author Intel, Konstantin M. Anisimov, Igor V. Chebykin
+ * @version $Revision$
+ *
+ */
+
+#ifndef IPFRUNTIMEINTERFACE_H_
+#define IPFRUNTIMEINTERFACE_H_
+
+#include "CodeGenIntfc.h"
+
+namespace Jitrino {
+namespace IPF {
+
+//========================================================================================//
+// RuntimeInterface
+//========================================================================================//
+
+class RuntimeInterface : public ::Jitrino::RuntimeInterface {
+public:
+    void           unwindStack(MethodDesc*, JitFrameContext*, bool) ;
+    bool           canEnumerate(MethodDesc*, NativeCodePtr);
+    void           getGCRootSet(MethodDesc*, GCInterface*, const JitFrameContext*, bool);
+    uint32         getInlineDepth(InlineInfoPtr, uint32);
+    Method_Handle  getInlinedMethod(InlineInfoPtr, uint32, uint32);
+    void           fixHandlerContext(MethodDesc*, JitFrameContext*, bool);
+    void           *getAddressOfThis(MethodDesc*, const JitFrameContext*, bool);
+    void           *getAddressOfSecurityObject(MethodDesc*, const JitFrameContext*);
+    bool           recompiledMethodEvent(BinaryRewritingInterface&, MethodDesc*, void*);
+    bool           getBcLocationForNative(MethodDesc*, uint64, uint16*);
+    bool           getNativeLocationForBc(MethodDesc*, uint16, uint64*);
+    uint16         getInlinedBc(void *v, unsigned int i1, unsigned int i2) { return 0; } // TODO
+
+protected:
+
+    // getGCRootSet support
+    Byte           *findSafePoint(Byte*, uint32, uint64);
+    void           enumerateRootSet(GCInterface*, const JitFrameContext*, Byte*);
+    void           **getContextValue(int32);
+    void           reportMptr(int32, int32);
+    void           reportBase(int32);
+    bool           isMptr(int32);
+    
+    GCInterface    *gcInterface;
+    const JitFrameContext *context;
+};
+
+} // IPF
+} // Jitrino 
+
+#endif /*IPFRUNTIMEINTERFACE_H_*/

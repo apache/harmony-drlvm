@@ -26,13 +26,24 @@
  * java.lang.VMExecutionEngine class.
  */
 
+#define LOG_DOMAIN "vm.kernel"
+#include "cxxlog.h"
+
+#include <apr_env.h>
 #include <apr_file_io.h>
-#include "environment.h"
+#include <apr_time.h>
+
+#include "port_dso.h"
+#include "port_env.h"
 #include "port_filepath.h"
 #include "port_sysinfo.h"
+#include "port_timer.h"
+#include "environment.h"
 #include "jni_utils.h"
 #include "properties.h"
+#include "exceptions.h"
 #include "java_lang_VMExecutionEngine.h"
+#include "assertion_registry.h"
 
 /*
  * Class:     java_lang_VMExecutionEngine
@@ -66,12 +77,53 @@ JNIEXPORT void JNICALL Java_java_lang_VMExecutionEngine_exit__IZ_3Ljava_lang_Run
 /*
  * Class:     java_lang_VMExecutionEngine
  * Method:    getAssertionStatus
- * Signature: (Ljava/lang/String;)I
+ * Signature: (Ljava/lang/Class;ZI)I
  */
 JNIEXPORT jint JNICALL Java_java_lang_VMExecutionEngine_getAssertionStatus
-  (JNIEnv *, jclass, jstring)
+  (JNIEnv * jenv, jclass, jclass jclss, jboolean recursive, jint defaultStatus)
 {
-    return 0;
+    Assertion_Status status = ASRT_UNSPECIFIED;
+    Global_Env* genv = ((JNIEnv_Internal*)jenv)->vm->vm_env;
+    Assertion_Registry* reg = genv->assert_reg;
+    if (!reg) {
+        return status;
+    }
+
+    if(jclss) {
+        Class* clss = jclass_to_struct_Class(jclss);
+        while (clss->declaringclass_index) {
+            clss = class_get_declaring_class((Class_Handle)clss);
+        }
+        const char* name = class_get_java_name(clss, genv)->bytes;
+        bool system = (((void*)clss->class_loader) == ((void*)genv->bootstrap_class_loader));
+        TRACE("check assert status for " << name << " system=" << system);
+        if (system || !recursive) {
+            status = reg->get_class_status(name);
+        } 
+        TRACE("name checked: " << status);
+        if (recursive || system) {
+            if (status == ASRT_UNSPECIFIED) {
+                status = reg->get_package_status(name);
+            }
+            TRACE("pkg checked: " << status);
+            if (status == ASRT_UNSPECIFIED) {
+                if (defaultStatus != ASRT_UNSPECIFIED) {
+                    status = (Assertion_Status)defaultStatus;
+                } else {
+                    status = reg->is_enabled(system);
+                }
+            }
+            TRACE("default checked: " << status);
+        }
+    } else {
+        if (reg->classes || reg->packages || reg->enable_system) {
+            status = ASRT_ENABLED;
+        } else {
+            status = reg->enable_all;
+        }
+    }
+    TRACE("Resulting assertion status: " << status);
+    return status;
 }
 
 /*
@@ -88,10 +140,12 @@ JNIEXPORT jint JNICALL Java_java_lang_VMExecutionEngine_getAvailableProcessors
 /**
  * Adds property specified by key and val parameters to given Properties object.
  */
-static void PropPut(JNIEnv* jenv, jobject properties, const char* key, const char* val)
+static bool PropPut(JNIEnv* jenv, jobject properties, const char* key, const char* val)
 {
     jobject key_string = NewStringUTF(jenv, key);
+    if (!key_string) return false;
     jobject val_string = val ? NewStringUTF(jenv, val) : NULL;
+    if (val && !val_string) return false;
 
     static jmethodID put_method = NULL;
     if (!put_method) {
@@ -103,35 +157,14 @@ static void PropPut(JNIEnv* jenv, jobject properties, const char* key, const cha
     }
 
     CallObjectMethod(jenv, properties, put_method, key_string, val_string);
+    return !exn_raised();
 }
 
-static void insertSystemProperties(JNIEnv *jenv, jobject pProperties)
+static void insertSystemProperties(JNIEnv *jenv, jobject pProperties, apr_pool_t *pp)
 {
-    static apr_pool_t *pp;
-    if (!pp) {
-        apr_pool_create(&pp, 0);
-    }
-
-    // Now, insert all the default properties.
-    PropPut(jenv, pProperties, "user.language", "en");
-    PropPut(jenv, pProperties, "user.region", "US");
-    PropPut(jenv, pProperties, "file.encoding", "8859_1");
-    //PropPut(jenv, pProperties, "file.encoding", apr_os_default_encoding(p));
-
-    PropPut(jenv, pProperties, "file.separator", PORT_FILE_SEPARATOR_STR);
-    PropPut(jenv, pProperties, "path.separator", PORT_PATH_SEPARATOR_STR);
-    PropPut(jenv, pProperties, "line.separator", APR_EOL_STR);
-    PropPut(jenv, pProperties, "os.arch", port_CPU_architecture());
-
-    char *os_name, *os_version;
+    char *os_name, *os_version, *path;
     port_OS_name_version(&os_name, &os_version, pp);
-    PropPut(jenv, pProperties, "os.name", os_name);
-    PropPut(jenv, pProperties, "os.version", os_version);
-    PropPut(jenv, pProperties, "java.vendor.url", "http://www.intel.com/");
-
-    char *path;
     apr_filepath_get(&path, APR_FILEPATH_NATIVE, pp);
-    PropPut(jenv, pProperties, "user.dir", path);
     const char *tmp;
     if (APR_SUCCESS != apr_temp_dir_get(&tmp, pp)) {
         tmp = ".";
@@ -145,14 +178,33 @@ static void insertSystemProperties(JNIEnv *jenv, jobject pProperties)
     // TODO : fix this - it should come from Class.h
     PropPut(jenv, pProperties, "java.class.version", "49.0");
 
-    //VM specified/APP specified properties are supported here.
+    // First, insert all the default properties.
+    if (!PropPut(jenv, pProperties, "user.language", "en")
+        || !PropPut(jenv, pProperties, "user.region", "US")
+        || !PropPut(jenv, pProperties, "file.encoding", "8859_1")
+        //PropPut(jenv, pProperties, "file.encoding", apr_os_default_encoding(p));
+        || !PropPut(jenv, pProperties, "file.separator", PORT_FILE_SEPARATOR_STR)
+        || !PropPut(jenv, pProperties, "path.separator", PORT_PATH_SEPARATOR_STR)
+        || !PropPut(jenv, pProperties, "line.separator", APR_EOL_STR)
+        || !PropPut(jenv, pProperties, "os.arch", port_CPU_architecture())
+        || !PropPut(jenv, pProperties, "os.name", os_name)
+        || !PropPut(jenv, pProperties, "os.version", os_version)
+        || !PropPut(jenv, pProperties, "java.vendor.url", "http://www.intel.com/")
+        || !PropPut(jenv, pProperties, "user.dir", path)
+        || !PropPut(jenv, pProperties, "java.tmpdir", tmp)
+        || !PropPut(jenv, pProperties, "java.class.version", "49.0") )
+    {
+        return;
+    }
+
+    // Next, add runtime specified properties.
     Properties::Iterator *iterator = VM_Global_State::loader_env->properties.getIterator();
     const Prop_entry *next = NULL;
     while((next = iterator->next())){
-        PropPut(jenv, pProperties, next->key, ((Prop_String*)next->value)->value);
+        if (!PropPut(jenv, pProperties, next->key, ((Prop_String*)next->value)->value)){
+            break;
+        }
     }
-    
-    apr_pool_clear(pp);
 } //insertSystemProperties
 
 /*
@@ -166,8 +218,13 @@ JNIEXPORT jobject JNICALL Java_java_lang_VMExecutionEngine_getProperties
     jobject jprops = create_default_instance(
         VM_Global_State::loader_env->java_util_Properties_Class);
 
-    // set default VM properties
-    insertSystemProperties(jenv, jprops);
+    if (jprops) {
+        apr_pool_t *pp;
+        if (APR_SUCCESS == apr_pool_create(&pp, 0)) {
+            insertSystemProperties(jenv, jprops, pp);
+            apr_pool_destroy(pp);
+        }
+    }
 
     return jprops;
 }
@@ -178,8 +235,9 @@ JNIEXPORT jobject JNICALL Java_java_lang_VMExecutionEngine_getProperties
  * Signature: (Z)V
  */
 JNIEXPORT void JNICALL Java_java_lang_VMExecutionEngine_traceInstructions
-  (JNIEnv *, jclass, jboolean)
+  (JNIEnv *jenv, jclass, jboolean)
 {
+    //ThrowNew_Quick(jenv, "java/lang/UnsupportedOperationException", NULL);
     return;
 }
 
@@ -189,7 +247,102 @@ JNIEXPORT void JNICALL Java_java_lang_VMExecutionEngine_traceInstructions
  * Signature: (Z)V
  */
 JNIEXPORT void JNICALL Java_java_lang_VMExecutionEngine_traceMethodCalls
-  (JNIEnv *, jclass, jboolean)
+  (JNIEnv *jenv, jclass, jboolean)
 {
+    //ThrowNew_Quick(jenv, "java/lang/UnsupportedOperationException", NULL);
     return;
+}
+
+/*
+* Class:     java_lang_VMExecutionEngine
+* Method:    currentTimeMillis
+* Signature: ()J
+*/
+JNIEXPORT jlong JNICALL Java_java_lang_VMExecutionEngine_currentTimeMillis
+(JNIEnv *, jclass) {
+    return apr_time_now()/1000;
+}
+
+/*
+* Class:     java_lang_VMExecutionEngine
+* Method:    nanoTime
+* Signature: ()J
+*/
+JNIEXPORT jlong JNICALL Java_java_lang_VMExecutionEngine_nanoTime
+(JNIEnv *, jclass) {
+    return port_nanotimer();
+}
+
+/*
+* Class:     java_lang_VMExecutionEngine
+* Method:    getenv
+* Signature: (Ljava/lang/String;)Ljava/lang/String;
+*/
+JNIEXPORT jstring JNICALL Java_java_lang_VMExecutionEngine_getenv__Ljava_lang_String_2
+(JNIEnv *jenv, jclass, jstring jname) {
+    jstring res = NULL;
+    if(jname) {
+        const char* key = GetStringUTFChars(jenv, jname, NULL);
+        apr_pool_t *pp;
+        char* value;
+        if (APR_SUCCESS == apr_pool_create(&pp, 0) 
+            && APR_SUCCESS == apr_env_get(&value, key, pp)) {
+            res = NewStringUTF(jenv, value);
+            apr_pool_destroy(pp);
+        }
+        ReleaseStringUTFChars(jenv, jname, key);
+    }
+    return res;
+}
+
+/*
+* Class:     java_lang_VMExecutionEngine
+* Method:    getenv
+* Signature: ()Ljava/util/Map;
+*/
+JNIEXPORT jobject JNICALL Java_java_lang_VMExecutionEngine_getenv__
+(JNIEnv *jenv, jclass) {
+    Global_Env * genv = VM_Global_State::loader_env;
+    Class* mapClass = genv->LoadCoreClass("java/util/HashMap");
+    jmethodID put = (jmethodID)class_lookup_method_recursive(mapClass, "put", 
+        "(Ljava/lang/Object;Ljava/lang/Object;)Ljava/lang/Object;");
+    jobject jmap = create_default_instance(mapClass);
+    if (jmap) {
+        apr_pool_t *pp;
+        if (APR_SUCCESS == apr_pool_create(&pp, 0)) {
+            for (char **e = port_env_all(pp) ; *e; ++e){
+                size_t idx = strcspn(*e, "=");
+                char* key = apr_pstrndup(pp, *e, idx);
+                jobject jkey = NewStringUTF(jenv, key);
+                if (!jkey) break;
+                jobject jval = NewStringUTF(jenv, *e+idx+1);
+                if (!jval) break;
+                CallObjectMethod(jenv, jmap, put, jkey, jval); 
+                assert(!exn_raised());
+            }
+            apr_pool_destroy(pp);
+        }
+    }
+
+    return jmap;
+}
+
+/*
+* Class:     java_lang_VMExecutionEngine
+* Method:    mapLibraryName
+* Signature: (Ljava/lang/String;)Ljava/lang/String;
+*/
+JNIEXPORT jstring JNICALL Java_java_lang_VMExecutionEngine_mapLibraryName
+(JNIEnv *jenv, jclass, jstring jlibname) {
+    jstring res = NULL;
+    if(jlibname) {
+        const char* libname = GetStringUTFChars(jenv, jlibname, NULL);
+        apr_pool_t *pp;
+        if (APR_SUCCESS == apr_pool_create(&pp, 0)) {
+            res = NewStringUTF(jenv, port_dso_name_decorate(libname, pp));
+            apr_pool_destroy(pp);
+        }
+        ReleaseStringUTFChars(jenv, jlibname, libname);
+    }
+    return res;
 }

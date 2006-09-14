@@ -74,6 +74,12 @@ JNIEXPORT jobject JNICALL
 Java_org_apache_harmony_vm_VMStack_getClassLoader(JNIEnv *, jclass, 
     jclass);
 
+/*
+ * Method: org_apache_harmony_vm_VMStack.getThreadStackTrace(Ljava/lang/Thread;)[Ljava/lang/StackTraceElement;
+ */
+JNIEXPORT jobjectArray JNICALL 
+Java_org_apache_harmony_vm_VMStack_getThreadStackTrace(JNIEnv *, jclass, 
+    jobject);
 
 #ifdef __cplusplus
 }

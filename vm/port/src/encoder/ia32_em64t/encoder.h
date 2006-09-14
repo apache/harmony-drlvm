@@ -313,7 +313,7 @@ public:
     M_Opnd(int32 disp, Reg_No rbase, Reg_No rindex, unsigned scale):
         RM_Opnd(Mem), m_disp(disp), m_scale(scale), m_index(rindex), m_base(rbase) {}
     M_Opnd(const M_Opnd & that) : RM_Opnd(Mem), 
-        m_disp(that.m_disp.get_value()), m_scale(that.m_scale.get_value()),
+        m_disp((int)that.m_disp.get_value()), m_scale((int)that.m_scale.get_value()),
         m_index(that.m_index.reg_no()), m_base(that.m_base.reg_no())
         {}
     //
@@ -476,6 +476,11 @@ ENCODER_DECLARE_EXPORT char * mov(char * stream, const RM_Opnd & rm, const Imm_O
 
 ENCODER_DECLARE_EXPORT char * movsx( char * stream, const R_Opnd & r, const RM_Opnd & rm, Opnd_Size sz = size_platf);
 ENCODER_DECLARE_EXPORT char * movzx( char * stream, const R_Opnd & r, const RM_Opnd & rm, Opnd_Size sz = size_platf);
+
+ENCODER_DECLARE_EXPORT char * movd(char * stream, const RM_Opnd & rm, const XMM_Opnd & xmm);
+ENCODER_DECLARE_EXPORT char * movd(char * stream, const XMM_Opnd & xmm, const RM_Opnd & rm);
+ENCODER_DECLARE_EXPORT char * movq(char * stream, const RM_Opnd & rm, const XMM_Opnd & xmm);
+ENCODER_DECLARE_EXPORT char * movq(char * stream, const XMM_Opnd & xmm, const RM_Opnd & rm);
 
 // sse mov
 ENCODER_DECLARE_EXPORT char * sse_mov(char * stream, const XMM_Opnd & xmm, const M_Opnd & mem, bool dbl);

@@ -173,7 +173,7 @@ bool JarFile::Parse( const char* fileName )
 
     lseek(fp, offsetCD, SEEK_SET);
 
-    buf = (unsigned char *)STD_ALLOCA(fsize - offsetCD);
+    buf = (unsigned char *)STD_MALLOC(fsize - offsetCD);
     fsize = read(fp, buf, fsize - offsetCD);
 
     off = 0;
@@ -189,6 +189,7 @@ bool JarFile::Parse( const char* fileName )
         m_entries.insert(make_pair(GetHashValue(je.m_fileName), je));
         off += JAR_DIRECTORYENTRY_LEN + je.m_nameLength + je.m_extraLength;
     }
+    STD_FREE(buf);
 
     // read and parse manifest from archive
     m_manifest = new Manifest( this );

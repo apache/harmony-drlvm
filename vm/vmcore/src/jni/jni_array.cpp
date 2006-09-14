@@ -64,6 +64,7 @@ jarray JNICALL NewObjectArray(JNIEnv * UNREF env,
                               jclass elementClass,
                               jobject initialElement)
 {
+    ASSERT_RAISE_AREA;
     TRACE2("jni", "NewObjectArray called");
     assert(hythread_is_suspend_enabled());
     ObjectHandle elem_handle = (ObjectHandle)initialElement;

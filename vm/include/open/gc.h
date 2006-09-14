@@ -584,6 +584,7 @@ extern void (*gc_test_safepoint)();
 extern void (*gc_pin_object)(Managed_Object_Handle* p_object);
 extern void (*gc_unpin_object)(Managed_Object_Handle* p_object);
 extern int32 (*gc_get_hashcode)(Managed_Object_Handle);
+extern int32 (*gc_get_hashcode0) (Managed_Object_Handle p_object);
 extern Managed_Object_Handle (*gc_get_next_live_object)(void *iterator);
 
 extern void (*gc_finalize_on_exit)();
@@ -743,6 +744,11 @@ GCExport void gc_unpin_object (Managed_Object_Handle* p_object);
  * Get identity hashcode.
  */
 GCExport int32 gc_get_hashcode (Managed_Object_Handle object);
+
+/**
+ *  * Get object hashcode
+ *   */
+GCExport int32 gc_get_hashcode (Managed_Object_Handle p_object);
 
 /**
  * Iterate all live objects in heap.

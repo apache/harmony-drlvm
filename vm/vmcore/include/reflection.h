@@ -30,22 +30,9 @@ jobjectArray reflection_get_class_interfaces(JNIEnv*, jclass);
 jobjectArray reflection_get_class_fields(JNIEnv*, jclass);
 jobjectArray reflection_get_class_constructors(JNIEnv*, jclass);
 jobjectArray reflection_get_class_methods(JNIEnv* jenv, jclass clazz);
-jobjectArray reflection_get_parameter_types(JNIEnv *jenv, Class* type, jobject jmethod, Method* method = 0);
-
-enum reflection_fields{
-    PARAMETERS,
-    EXCEPTIONS,
-    DECLARING_CLASS,
-    NAME, 
-    TYPE,
-    VM_MEMBER,
-    FIELDS_NUMBER
-}; 
-
-Field* get_reflection_field(Class* clss, reflection_fields descriptor);
-
-Class_Member* reflection_jobject_to_Class_Member(jobject jmember, Class* type);
-
+jobjectArray reflection_get_parameter_types(JNIEnv *jenv, Method* method);
+jobject reflection_get_enum_value(JNIEnv *jenv, Class* enum_type, String* name);
 bool jobjectarray_to_jvaluearray(JNIEnv* jenv, jvalue** output, Method* method, jobjectArray input);
+jclass descriptor_to_jclass(Type_Info_Handle desc);
 
 #endif // !_REFLECTION_H_

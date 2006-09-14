@@ -21,11 +21,10 @@ import java.io.InputStream;
 import java.lang.reflect.Constructor;
 import java.net.MalformedURLException;
 import java.net.URL;
+import java.nio.ByteBuffer;
 import java.net.URLClassLoader;
 import java.security.AccessController;
 import java.security.CodeSource;
-import java.security.PermissionCollection;
-import java.security.Policy;
 import java.security.PrivilegedActionException;
 import java.security.PrivilegedExceptionAction;
 import java.security.ProtectionDomain;
@@ -56,11 +55,6 @@ public abstract class ClassLoader {
     private ProtectionDomain defaultDomain;
 
     /**
-     * package private to access from the java.lang.Class class.
-     */
-    static boolean enableAssertions = false;
-
-    /**
      * system default class loader. It is initialized while
      * getSystemClassLoader(..) method is executing.
      */
@@ -80,53 +74,55 @@ public abstract class ClassLoader {
     /**
      * package private to access from the java.lang.Class class. The following
      * mapping is used <String name, Boolean flag>, where name - class name,
-     * flag - true if assertion is enabled, false if desabled.
+     * flag - true if assertion is enabled, false if disabled.
      */
-    HashMap classAssertionStatus = null;
+    Hashtable<String, Boolean> classAssertionStatus;
 
     /**
      * package private to access from the java.lang.Class class. The following
      * mapping is used <String name, Object[] signers>, where name - class name,
      * signers - array of signers.
      */
-    Hashtable classSigners = null;
+    Hashtable<String, Object[]> classSigners;
 
     /**
      * package private to access from the java.lang.Class class.
      */
-    boolean defaultAssertionStatus = false;
+    int defaultAssertionStatus;
+    boolean clearAssertionStatus;
 
     /**
      * package private to access from the java.lang.Class class. The following
      * mapping is used <String name, Boolean flag>, where name - package name,
-     * flag - true if assertion is enabled, false if desabled.
+     * flag - true if assertion is enabled, false if disabled.
      */
-    HashMap packageAssertionStatus = new HashMap();
+    Hashtable<String, Boolean> packageAssertionStatus;
 
     /**
      * packages defined by this class loader are stored in this hash. The
      * following mapping is used <String name, Package pkg>, where name -
      * package name, pkg - corresponding package.
      */
-    private final HashMap definedPackages = new HashMap();
+    private final HashMap<String, Package> definedPackages;
+
+    /**
+     * The following mapping is used <String binaryClassName, Class clazz>, where binaryClassName - class name,
+     * clazz - corresponding class.
+     */
+    private Hashtable<String, Class<?>> initiatedClasses = new Hashtable<String, Class<?>>();
 
     /**
      * package private to access from the java.lang.Class class. The following
      * mapping is used <String name, Certificate[] certificates>, where name -
      * the name of a package, certificates - array of certificates.
      */
-    private final Hashtable packageCertificates = new Hashtable();
+    private final Hashtable<String, Certificate[]> packageCertificates = 
+        new Hashtable<String, Certificate[]>();
 
     /**
      * parent class loader
      */
     private final ClassLoader parentClassLoader;
-
-    static {
-        // Check whether we should enable assertions
-        enableAssertions = VMExecutionEngine.getAssertionStatus(null) > 0
-            ? true : false;
-    }
 
     /**
      * @com.intel.drl.spec_ref 
@@ -149,7 +145,7 @@ public abstract class ClassLoader {
         parentClassLoader = parent;
         // this field is used to determine whether class loader was initialized
         // properly.
-        classAssertionStatus = new HashMap();
+        definedPackages = new HashMap<String, Package>();
     }
 
     /**
@@ -206,7 +202,7 @@ public abstract class ClassLoader {
     /**
      * @com.intel.drl.spec_ref 
      */
-    public static Enumeration getSystemResources(String name)
+    public static Enumeration<URL> getSystemResources(String name)
         throws IOException {
         //assert systemClassLoader != null;
         // TODO XXX: use systemClassLoader field instead of
@@ -218,11 +214,10 @@ public abstract class ClassLoader {
      * @com.intel.drl.spec_ref 
      */
     public void clearAssertionStatus() {
-        synchronized (classAssertionStatus) {
-            defaultAssertionStatus = false;
-            packageAssertionStatus = new HashMap();
-            classAssertionStatus = new HashMap();
-        }
+        clearAssertionStatus = true;
+        defaultAssertionStatus = -1;
+        packageAssertionStatus = null;
+        classAssertionStatus = null;
     }
 
     /**
@@ -267,11 +262,12 @@ public abstract class ClassLoader {
     /**
      * @com.intel.drl.spec_ref 
      */
-    public final Enumeration getResources(String name) throws IOException {
+    public Enumeration<URL> getResources(String name) throws IOException {
         checkInitialized();
         ClassLoader cl = this;
-        final ArrayList foundResources = new ArrayList();
-        Enumeration resourcesEnum;
+        final ArrayList<Enumeration<URL>> foundResources = 
+            new ArrayList<Enumeration<URL>>();
+        Enumeration<URL> resourcesEnum;
         do {
             resourcesEnum = cl.findResources(name);
             if (resourcesEnum != null && resourcesEnum.hasMoreElements()) {
@@ -282,7 +278,7 @@ public abstract class ClassLoader {
         if (resourcesEnum != null && resourcesEnum.hasMoreElements()) {
             foundResources.add(resourcesEnum);
         }
-        return new Enumeration() {
+        return new Enumeration<URL>() {
 
                 private int position = foundResources.size() - 1;
 
@@ -297,10 +293,10 @@ public abstract class ClassLoader {
                     return false;
                 }
 
-                public Object nextElement() {
+                public URL nextElement() {
                     while (position >= 0) {
                         try {
-                            return ((Enumeration)foundResources.get(position))
+                            return (foundResources.get(position))
                             .nextElement();
                         } catch (NoSuchElementException e) {                            
                         }
@@ -314,7 +310,7 @@ public abstract class ClassLoader {
     /**
      * @com.intel.drl.spec_ref 
      */
-    public Class loadClass(String name) throws ClassNotFoundException {
+    public Class<?> loadClass(String name) throws ClassNotFoundException {
         return loadClass(name, false);
     }
 
@@ -323,10 +319,13 @@ public abstract class ClassLoader {
      */
     public void setClassAssertionStatus(String name, boolean flag) {
         if (name != null) {
-            synchronized (classAssertionStatus) {
-                enableAssertions = true;
-                classAssertionStatus.put(name, Boolean.valueOf(flag));
+            Class.disableAssertions = false;
+            synchronized (definedPackages) {
+                if (classAssertionStatus == null) {
+                    classAssertionStatus = new Hashtable<String, Boolean>();
+                }
             }
+            classAssertionStatus.put(name, Boolean.valueOf(flag));
         }
     }
 
@@ -334,10 +333,10 @@ public abstract class ClassLoader {
      * @com.intel.drl.spec_ref 
      */
     public void setDefaultAssertionStatus(boolean flag) {
-        synchronized (classAssertionStatus) {
-            enableAssertions = true;
-            defaultAssertionStatus = flag;
+        if (flag) {
+            Class.disableAssertions = false;
         }
+        defaultAssertionStatus = flag ? 1 : -1;
     }
 
     /**
@@ -349,16 +348,19 @@ public abstract class ClassLoader {
         if (name == null) {
             name = "";
         }
-        synchronized (classAssertionStatus) {
-            enableAssertions = true;
-            packageAssertionStatus.put(name, Boolean.valueOf(flag));
+        Class.disableAssertions = false;
+        synchronized (definedPackages) {
+            if (packageAssertionStatus == null) {
+                packageAssertionStatus = new Hashtable<String, Boolean>();
+            }
         }
+        packageAssertionStatus.put(name, Boolean.valueOf(flag));
     }
 
     /**
      * @com.intel.drl.spec_ref
      */
-    protected final Class defineClass(byte[] data, int offset, int len)
+    protected final Class<?> defineClass(byte[] data, int offset, int len)
         throws ClassFormatError {
         return defineClass(null, data, offset, len);
     }
@@ -366,7 +368,7 @@ public abstract class ClassLoader {
     /**
      * @com.intel.drl.spec_ref
      */
-    protected final Class defineClass(String name, byte[] data, int offset, int len)
+    protected final Class<?> defineClass(String name, byte[] data, int offset, int len)
         throws ClassFormatError {
         return defineClass(name, data, offset, len, null);
     }
@@ -374,13 +376,23 @@ public abstract class ClassLoader {
     /**
      * @com.intel.drl.spec_ref
      */
-    protected final synchronized Class defineClass(String name, byte[] data,
+    protected final Class<?> defineClass(String name, ByteBuffer b, ProtectionDomain protectionDomain)
+        throws ClassFormatError {
+		byte[] data = b.array();
+        return defineClass(name, data, 0, data.length, protectionDomain);
+    }
+
+    /**
+     * @com.intel.drl.spec_ref
+     */
+    protected final synchronized Class<?> defineClass(String name, byte[] data,
                                              int offset, int len,
                                              ProtectionDomain domain)
         throws ClassFormatError {
         checkInitialized();
         if (offset < 0 || len < 0 || offset + len > data.length) {
-            throw new IndexOutOfBoundsException("Check your arguments");
+            throw new IndexOutOfBoundsException(
+                "Either offset or len is outside of the data array");
         }
         if (domain == null) {
             if (defaultDomain == null) {
@@ -394,13 +406,13 @@ public abstract class ClassLoader {
         if (name != null) {
             if (name.startsWith("java.")) {
                 throw new SecurityException(
-                    "It is not allowed to define classes inside the java.* package");
+                    "It is not allowed to define classes inside the java.* package: " + name);
             }
             int lastDot = name.lastIndexOf('.');
             packageName = lastDot == -1 ? "" : name.substring(0, lastDot);
             certs = getCertificates(packageName, domain.getCodeSource());
         }
-        Class clazz = VMClassRegistry
+        Class<?> clazz = VMClassRegistry
             .defineClass(name, this, data, offset, len);
         clazz.setProtectionDomain(domain);
         if (certs != null) {
@@ -421,7 +433,7 @@ public abstract class ClassLoader {
             throw new IllegalArgumentException("Package " + name
                 + "has been already defined.");
         }
-        Package pkg = new Package(name, specTitle, specVersion, specVendor,
+        Package pkg = new Package(this, name, specTitle, specVersion, specVendor,
             implTitle, implVersion, implVendor, sealBase);
         synchronized (definedPackages) {
             definedPackages.put(name, pkg);
@@ -432,7 +444,7 @@ public abstract class ClassLoader {
     /**
      * @com.intel.drl.spec_ref
      */
-    protected Class findClass(String name) throws ClassNotFoundException {
+    protected Class<?> findClass(String name) throws ClassNotFoundException {
         throw new ClassNotFoundException("Can not find class " + name);
     }
 
@@ -446,8 +458,8 @@ public abstract class ClassLoader {
     /**
      * @com.intel.drl.spec_ref
      */
-    protected final Class findLoadedClass(String name) {
-        return VMClassRegistry.findLoadedClass(name, this);
+    protected final Class<?> findLoadedClass(String name) {
+        return initiatedClasses.get(name);
     }
 
     /**
@@ -460,14 +472,14 @@ public abstract class ClassLoader {
     /**
      * @com.intel.drl.spec_ref
      */
-    protected Enumeration findResources(String name) throws IOException {
+    protected Enumeration<URL> findResources(String name) throws IOException {
         return EmptyEnum.getInstance();
     }
 
     /**
      * @com.intel.drl.spec_ref
      */
-    protected final Class findSystemClass(String name)
+    protected final Class<?> findSystemClass(String name)
         throws ClassNotFoundException {
         // assert systemClassLoader != null;
         // TODO XXX: use systemClassLoader field instead of
@@ -502,18 +514,18 @@ public abstract class ClassLoader {
      */
     protected Package[] getPackages() {
         checkInitialized();
-        ArrayList packages = new ArrayList();
+        ArrayList<Package> packages = new ArrayList<Package>();
         fillPackages(packages);
-        return (Package[])packages.toArray(new Package[packages.size()]);
+        return packages.toArray(new Package[packages.size()]);
     }
 
     /**
      * @com.intel.drl.spec_ref
      */
-    protected Class loadClass(String name, boolean resolve)
+    protected Class<?> loadClass(String name, boolean resolve)
         throws ClassNotFoundException {
         checkInitialized();
-        Class clazz = findLoadedClass(name);
+        Class<?> clazz = findLoadedClass(name);
         if (clazz == null) {
             if (parentClassLoader == null) {
                 clazz = VMClassRegistry.findLoadedClass(name, null);
@@ -525,18 +537,22 @@ public abstract class ClassLoader {
             }
             if (clazz == null) {
                 clazz = findClass(name);
+                if (clazz == null) {
+                    throw new ClassNotFoundException(name);
+                }
             }
         }
         if (resolve) {
             resolveClass(clazz);
         }
+        initiatedClasses.put(clazz.getName(), clazz);
         return clazz;
     }
 
     /**
      * @com.intel.drl.spec_ref
      */
-    protected final void resolveClass(Class clazz) {
+    protected final void resolveClass(Class<?> clazz) {
         if (clazz == null) {
             throw new NullPointerException();
         }
@@ -546,13 +562,13 @@ public abstract class ClassLoader {
     /**
      * @com.intel.drl.spec_ref
      */
-    protected final void setSigners(Class clazz, Object[] signers) {
+    protected final void setSigners(Class<?> clazz, Object[] signers) {
         checkInitialized();
         String name = clazz.getName();
         try {
             ClassLoader classLoader = VMClassRegistry.getClassLoader(clazz);
             if (classLoader.classSigners == null) {
-                classLoader.classSigners = new Hashtable();
+                classLoader.classSigners = new Hashtable<String, Object[]>();
             }
             classLoader.classSigners.put(name, signers);
         } catch (NullPointerException e) {
@@ -578,7 +594,7 @@ public abstract class ClassLoader {
      * actions.
      */
     private void checkInitialized() {
-        if (classAssertionStatus == null) {
+        if (definedPackages == null) {
             throw new SecurityException(
                 "Class loader was not initialized properly.");
         }
@@ -625,19 +641,18 @@ public abstract class ClassLoader {
         String className = System.getProperty("java.system.class.loader");
         if (className != null) {
             try {
-                final Class userClassLoader = systemClassLoader
+                final Class<?> userClassLoader = systemClassLoader
                     .loadClass(className);
                 if (ClassLoader.class.isAssignableFrom(userClassLoader)) {
                     throw new Error(userClassLoader.toString()
                         + " must inherit java.lang.ClassLoader");
                 }
-                systemClassLoader = (ClassLoader)AccessController
-                    .doPrivileged(new PrivilegedExceptionAction() {
-                        public Object run() throws Exception {
+                systemClassLoader = AccessController
+                    .doPrivileged(new PrivilegedExceptionAction<ClassLoader>() {
+                        public ClassLoader run() throws Exception {
                             Constructor c = userClassLoader
-                                .getConstructor(new Class[] { ClassLoader.class });
-                            return c
-                                .newInstance(new Object[] { systemClassLoader });
+                                .getConstructor(ClassLoader.class);
+                            return (ClassLoader)c.newInstance(systemClassLoader);
                         }
                     });
             } catch (ClassNotFoundException e) {
@@ -651,7 +666,7 @@ public abstract class ClassLoader {
     /**
      * Helper method for the getPackages() method.
      */
-    private void fillPackages(ArrayList packages) {
+    private void fillPackages(ArrayList<Package> packages) {
         if (parentClassLoader == null) {
             packages.addAll(BootstrapLoader.getPackages());
         } else {
@@ -697,7 +712,7 @@ public abstract class ClassLoader {
         if (str.length() == 0) {
             return new String[0];
         }
-        ArrayList res = new ArrayList();
+        ArrayList<String> res = new ArrayList<String>();
         int in = 0;
         int curPos = 0;
         int i = str.indexOf(sep);
@@ -717,13 +732,13 @@ public abstract class ClassLoader {
             res.add(s);
         }
 
-        return (String[]) res.toArray(new String[in]);
+        return res.toArray(new String[in]);
     }
    
     /* IBM SPECIFIC PART */
     
     static final ClassLoader getStackClassLoader(int depth) {
-        Class clazz = VMStack.getCallerClass(depth);
+        Class<?> clazz = VMStack.getCallerClass(depth);
         return clazz != null ? VMClassRegistry.getClassLoader(clazz) : null;
     }
     
@@ -777,7 +792,8 @@ public abstract class ClassLoader {
 
         private static URLClassLoader resourceFinder = null;
 
-        private static final HashMap systemPackages = new HashMap();
+        private static final HashMap<String, Package> systemPackages = 
+            new HashMap<String, Package>();
 
         /**
          * This class contains static methods only. So it should not be
@@ -793,7 +809,7 @@ public abstract class ClassLoader {
             return resourceFinder.findResource(name);
         }
 
-        public static Enumeration findResources(String name) throws IOException {
+        public static Enumeration<URL> findResources(String name) throws IOException {
             if (resourceFinder == null) {
                 initResourceFinder();
             }
@@ -807,7 +823,7 @@ public abstract class ClassLoader {
             }
         }
 
-        public static Collection getPackages() {
+        public static Collection<Package> getPackages() {
             synchronized (systemPackages) {
                 updatePackages();
                 return systemPackages.values();
@@ -823,7 +839,7 @@ public abstract class ClassLoader {
                 // like we do below:
                 String st[] = fracture(bootstrapPath, File.pathSeparator);
                 int l = st.length;
-                ArrayList urlList = new ArrayList();
+                ArrayList<URL> urlList = new ArrayList<URL>();
                 for (int i = 0; i < l; i++) {
                     try {
                         urlList.add(new File(st[i]).toURI().toURL());
@@ -849,7 +865,7 @@ public abstract class ClassLoader {
                 }             
                 
                 String jarURL = packages[i][1];             
-                systemPackages.put(name, new Package(name, jarURL));
+                systemPackages.put(name, new Package(null, name, jarURL));
             }
         }
     }
@@ -859,7 +875,7 @@ public abstract class ClassLoader {
         private static URLClassLoader instance;
 
         static {
-            ArrayList urlList = new ArrayList();
+            ArrayList<URL> urlList = new ArrayList<URL>();
             // TODO avoid security checking?
             String extDirs = System.getProperty("java.ext.dirs", "");
 
@@ -889,6 +905,7 @@ public abstract class ClassLoader {
                     }
                     urlList.add(new File(st[i]).toURI().toURL());
                 } catch (MalformedURLException e) {
+                    assert false: e.toString();
                 }
             }
             instance = URLClassLoader.newInstance((URL[])urlList

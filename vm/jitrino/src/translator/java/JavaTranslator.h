@@ -24,11 +24,13 @@
 #define _JAVATRANSLATOR_H_
 
 #include "TranslatorIntfc.h"
-#include "InlineInfo.h"
+#include "Stl.h"
 
 namespace Jitrino {
 class Opnd;
 class JavaFlowGraphBuilder;
+class Inst;
+class InlineInfoBuilder;
 
 typedef StlMultiMap<Inst*, Inst*> JsrEntryInstToRetInstMap;
 typedef std::pair<JsrEntryInstToRetInstMap::const_iterator, 
@@ -48,25 +50,12 @@ extern Opnd* JavaCompileMethodInline(
                                 InlineInfoBuilder* parentInlineInfoBuilder,
                                 JsrEntryInstToRetInstMap* parentJsrEntryMap);
 
-// version for IR inlining
-void
-JavaTranslateMethodForIRInlining(
-                            CompilationInterface& compilationInterface,
-                            MethodDesc& methodDesc,
-                            IRBuilder&        irBuilder,
-                            uint32            numActualArgs,
-                            Opnd**            actualArgs,
-                            Opnd**            returnOpnd,
-                            CFGNode**         returnNode,
-                            Inst*             inlineSite,
-                            uint32 inlineDepth);
 
-class JavaTranslator : public TranslatorIntfc {
+class JavaTranslator {
 public:
+    
     // translates into the IRBuilder object's flow graph.
-    void translateMethod(CompilationInterface&,
-                         MethodDesc&,
-                         IRBuilder&);
+    static void translateMethod(CompilationInterface& ci, MethodDesc& methodDesc, IRBuilder& irBuilder);
 };
 
 } //namespace Jitrino 

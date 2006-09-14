@@ -436,7 +436,6 @@ vf_check_access(vf_MapEntry_t *source,    // stack map entry
 static inline Verifier_Result
 vf_check_entry_refs( vf_MapEntry_t *source,    // stack map entry
                      vf_MapEntry_t *target,    // required map entry
-                     unsigned short init_flag, // source initialization flag
                      vf_Context_t *ctex)       // verifier context
 {
     // check entries type
@@ -457,10 +456,14 @@ vf_check_entry_refs( vf_MapEntry_t *source,    // stack map entry
         return VER_OK;
     }
     // check initialization
-    if( source->m_type == SM_UNINITIALIZED ) {
-        if( init_flag == 2 && !source->m_new ) {
+    if( source->m_type == SM_UNINITIALIZED && target->m_type != SM_UNINITIALIZED) {
+        if( source->m_new == 0                                  // SM_UNINITIALIZED_THIS
+            && (target->m_ctype == VF_CHECK_UNINITIALIZED_THIS  // astore/aload
+                || target->m_ctype == VF_CHECK_ACCESS_FIELD ) ) // putfield/getfield
+        {
             // uninitialized this could be used in getfield/putfield
-        } else if( init_flag ) {
+            // and aload/astore instructions
+        } else {
             VERIFY_REPORT( ctex, "(class: " << class_get_name( ctex->m_class ) 
                 << ", method: " << method_get_name( ctex->m_method )
                 << method_get_descriptor( ctex->m_method )
@@ -474,7 +477,8 @@ vf_check_entry_refs( vf_MapEntry_t *source,    // stack map entry
     switch( target->m_ctype )
     {
     case VF_CHECK_NONE:
-    case VF_CHECK_PARAM:    // check method invocation convertion
+    case VF_CHECK_UNINITIALIZED_THIS:
+    case VF_CHECK_PARAM:                // check method invocation convertion
         if( target->m_vtype != NULL ) {
             is_error = ctex->m_type->CheckTypes( target->m_vtype,
                             source->m_vtype, 0, VF_CHECK_PARAM );
@@ -538,8 +542,7 @@ vf_check_entry_types( vf_MapEntry_t *entry1,    // stack map entry
     case SM_REF:
         // check reference entries
         {
-            Verifier_Result result = vf_check_entry_refs( entry1, entry2, 
-                entry2->m_need_init, ctex );
+            Verifier_Result result = vf_check_entry_refs( entry1, entry2, ctex );
             *need_copy = true;
             return result;
         }
@@ -783,18 +786,15 @@ vf_check_instruction_in_vector( vf_MapEntry_t *stack,       // stack map vector
             // check reference array element
             assert( index > 0 );
             newvector = &buf[index];
-            if( ctex->m_dump.m_verify ) {
-                // check is in progress if full verification flag is set
-                // check assignment conversion
-                vf_set_array_element_type( newvector, vector, &buf[0], ctex );
+            // check assignment conversion
+            vf_set_array_element_type( newvector, vector, &buf[0], ctex );
+            if( newvector->m_vtype ) {
                 newvector->m_ctype = VF_CHECK_ASSIGN_WEAK;
             } else {
-                // check if stored element is reference
-                newvector->m_type = SM_REF;
-                newvector->m_vtype = NULL;
+                newvector->m_ctype = VF_CHECK_NONE;
             }
             // check entry types
-            result = vf_check_entry_refs( entry, newvector, 1, ctex );
+            result = vf_check_entry_refs( entry, newvector, ctex );
             if( result != VER_OK ) {
                 VERIFY_REPORT( ctex, "(class: " << class_get_name( ctex->m_class ) 
                     << ", method: " << method_get_name( ctex->m_method )
@@ -805,19 +805,21 @@ vf_check_instruction_in_vector( vf_MapEntry_t *stack,       // stack map vector
             break;
         case SM_REF:
             // check entry references
-            result = vf_check_entry_refs( entry, vector, vector->m_need_init, ctex );
+            result = vf_check_entry_refs( entry, vector, ctex );
             if( result != VER_OK ) {
-                VERIFY_REPORT( ctex, "(class: " << class_get_name( ctex->m_class ) 
-                    << ", method: " << method_get_name( ctex->m_method )
-                    << method_get_descriptor( ctex->m_method )
-                    << ") Data flow analysis error (uninitialized)" );
+                if( !ctex->m_error ) {
+                    VERIFY_REPORT( ctex, "(class: " << class_get_name( ctex->m_class ) 
+                        << ", method: " << method_get_name( ctex->m_method )
+                        << method_get_descriptor( ctex->m_method )
+                        << ") Data flow analysis error" );
+                }
                 return result;
             }
             copy = true;
             break;
         case SM_UNINITIALIZED:
             // check entry references
-            if( entry->m_type != SM_UNINITIALIZED ) {
+            if( entry->m_type == SM_REF ) {
                 // double initialization
                 VERIFY_REPORT( ctex, "(class: " << class_get_name( ctex->m_class ) 
                     << ", method: " << method_get_name( ctex->m_method )
@@ -825,7 +827,7 @@ vf_check_instruction_in_vector( vf_MapEntry_t *stack,       // stack map vector
                     << ") Double initialization of object reference" );
                 return VER_ErrorDataFlow;
             }
-            result = vf_check_entry_refs( entry, vector, 0, ctex );
+            result = vf_check_entry_refs( entry, vector, ctex );
             if( result != VER_OK ) {
                 VERIFY_REPORT( ctex, "(class: " << class_get_name( ctex->m_class ) 
                     << ", method: " << method_get_name( ctex->m_method )
@@ -834,7 +836,7 @@ vf_check_instruction_in_vector( vf_MapEntry_t *stack,       // stack map vector
                 return result;
             }
             // check initialization class in constructor
-            if( entry->m_new == 0 ) {
+            if( entry->m_type == SM_UNINITIALIZED && entry->m_new == 0 ) {
                 // initialization of this reference in class construction
                 assert( entry->m_vtype->number == 1 );
                 if( vector->m_vtype->string[0] != entry->m_vtype->string[0] ) {

@@ -30,6 +30,8 @@
 #include "open/em_vm.h"
 
 typedef struct NSOTableItem NSOTableItem;
+typedef struct DynamicCode DynamicCode;
+typedef struct Assertion_Registry Assertion_Registry;
 
 struct Global_Env {
  public:
@@ -42,7 +44,8 @@ struct Global_Env {
     DebugUtilsTI*             TI;
     NSOTableItem*             nsoTable;
     void*                     portLib;  // Classlib's port library
-    
+    DynamicCode*              dcList;
+    Assertion_Registry*       assert_reg;
     //
     // globals
     //
@@ -64,15 +67,10 @@ struct Global_Env {
     String* Init_String;
     String* Clinit_String;
     String* FinalizeName_String;
+    String* EnqueueName_String;
     String* VoidVoidDescriptor_String;
-    String* ByteDescriptor_String;
-    String* CharDescriptor_String;
-    String* DoubleDescriptor_String;
-    String* FloatDescriptor_String;
-    String* IntDescriptor_String;
-    String* LongDescriptor_String;
-    String* ShortDescriptor_String;
-    String* BooleanDescriptor_String;
+    String* VoidIntegerDescriptor_String;
+    String* VoidBooleanDescriptor_String;
     String* Clonable_String;
     String* Serializable_String;
 
@@ -85,7 +83,9 @@ struct Global_Env {
     String* JavaNioByteBuffer_String;
     String* JavaLangArrayIndexOutOfBoundsException_String;
     String* JavaLangThrowable_String;
+    String* JavaLangNoClassDefFoundError_String;
     String* JavaLangString_String;
+    String* JavaLangStringBuffer_String;
 
     String* Length_String;
     String* LoadClass_String;
@@ -198,6 +198,7 @@ struct Global_Env {
 
     //load a class via bootstrap classloader
     Class* LoadCoreClass(const String* name);
+    Class* LoadCoreClass(const char* name);
 
     /** 
     * Set "Ready For Exceptions" state.

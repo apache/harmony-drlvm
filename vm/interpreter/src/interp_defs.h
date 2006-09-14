@@ -223,7 +223,6 @@ struct StackFrame {
     StackFrame *prev;
     FramePopListener *framePopListener;
     ManagedObject *This;
-    ManagedObject *exception;
     struct MonitorList *locked_monitors;
     struct MonitorList *free_monitors;
     PopFrameState jvmti_pop_frame;
@@ -234,6 +233,8 @@ struct StackFrame {
     uint8 last_bytecodes[8];
     int n_last_bytecode;
 #endif
+    ManagedObject *exc;
+    ManagedObject *exc_catch;
 };
 
 /********* PROTOTYPES ********/
@@ -252,6 +253,10 @@ extern void interpreter_execute_method(
 void method_entry_callback(Method *method);
 void method_exit_callback(Method *method, bool was_popped_by_exception, jvalue ret_val);
 void method_exit_callback_with_frame(Method *method, StackFrame& frame);
+void putfield_callback(Field *field, StackFrame& frame);
+void getfield_callback(Field *field, StackFrame& frame);
+void putstatic_callback(Field *field, StackFrame& frame);
+void getstatic_callback(Field *field, StackFrame& frame);
 void frame_pop_callback(FramePopListener *l, Method *method, jboolean was_popped_by_exception);
 void single_step_callback(StackFrame &frame);
 bool findExceptionHandler(StackFrame& frame, ManagedObject **exception, Handler **h);
@@ -418,7 +423,10 @@ enum interpreter_ti_events {
     INTERPRETER_TI_METHOD_ENTRY_EVENT = 1,
     INTERPRETER_TI_METHOD_EXIT_EVENT  = 2,
     INTERPRETER_TI_SINGLE_STEP_EVENT  = 4,
-    INTERPRETER_TI_POP_FRAME_EVENT = 8
+    INTERPRETER_TI_POP_FRAME_EVENT = 8,
+    INTERPRETER_TI_FIELD_ACCESS = 16,
+    INTERPRETER_TI_FIELD_MODIFICATION = 32,
+    INTERPRETER_TI_OTHER = 64 /* EXCEPTION, EXCEPTION_CATCH */
 };
 
 /**

@@ -34,7 +34,7 @@
  * @param[in] initial_count initial semaphore count
  * @param[in] max_count  maximum semaphore count
  */
-IDATA VMCALL hysem_create(hysem_t *sem, unsigned initial_count, unsigned max_count) {
+IDATA VMCALL hysem_create(hysem_t *sem, UDATA initial_count, UDATA max_count) {
     hysem_t l;
     apr_pool_t *pool = get_local_pool(); 
         apr_status_t apr_status;
@@ -203,7 +203,7 @@ IDATA VMCALL hysem_set(hysem_t sem, IDATA count) {
  * @param[out] count semaphore count
  * @param[in] sem semaphore
  */
-IDATA VMCALL hysem_getvalue(int *count, hysem_t sem) {
+IDATA VMCALL hysem_getvalue(IDATA *count, hysem_t sem) {
         IDATA status;
         
         status = hymutex_lock(sem->mutex);

@@ -46,8 +46,6 @@ IDATA VMCALL hycond_create (hycond_t *cond) {
     return TM_ERROR_NONE;
 }
 
-/*
- */
 IDATA condvar_wait_impl(hycond_t cond, hymutex_t mutex, I_64 ms, IDATA nano, IDATA interruptable) {
         apr_status_t apr_status;
         int disable_count;

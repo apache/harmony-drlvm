@@ -14,11 +14,13 @@
  *  limitations under the License.
  */
 /**
- * @author Evgueni Brevnov
+ * @author Evgueni Brevnov, Serguei S. Zapreyev
  * @version $Revision: 1.1.2.2.4.4 $
  */
 
 package java.lang.reflect;
+
+import java.lang.annotation.Annotation;
 
 import org.apache.harmony.lang.reflect.ReflectPermissionCollection;
 import org.apache.harmony.lang.reflect.Reflection;
@@ -26,7 +28,42 @@ import org.apache.harmony.lang.reflect.Reflection;
 /**
  * @com.intel.drl.spec_ref 
  */
-public class AccessibleObject {
+public class AccessibleObject implements AnnotatedElement {
+    /**
+    *
+    *  @com.intel.drl.spec_ref
+    * 
+    **/
+    public boolean isAnnotationPresent(Class<? extends Annotation> annotationClass) {
+        return getAnnotation(annotationClass) == null ? false : true; // it seems to be correct for Method, Constructor, Field type object
+    }
+
+    /**
+    *
+    *  @com.intel.drl.spec_ref
+    * 
+    **/
+    public Annotation[] getAnnotations() {
+        return getDeclaredAnnotations(); // it seems to be correct for Method, Constructor, Field type object
+    }
+
+    /**
+    *
+    *  @com.intel.drl.spec_ref
+    * 
+    **/
+    public Annotation[] getDeclaredAnnotations() {
+        return (Annotation[]) null; // because of the method is overwritten in the Method, Constructor, Field classes
+    }
+
+    /**
+    *
+    *  @com.intel.drl.spec_ref
+    * 
+    **/
+    public <T extends Annotation> T getAnnotation(Class<T> annotationClass) {
+        return (T) null; // because of the method is overwritten in the Method, Constructor, Field classes
+    }
 
     /**
      * one dimensional array
@@ -133,7 +170,7 @@ public class AccessibleObject {
      * @param obj the class which name should be appended to the buffer
      * @throws NullPointerException if any of the arguments is null 
      */
-    void appendArrayType(StringBuffer sb, Class obj) {
+    void appendArrayType(StringBuilder sb, Class<?> obj) {
         Class simplified = obj.getComponentType();
         if (simplified == null) {
             sb.append(obj.getName());
@@ -172,13 +209,85 @@ public class AccessibleObject {
      * @param objs array of classes to print the names
      * @throws NullPointerException if any of the arguments is null 
      */
-    void appendArrayType(StringBuffer sb, Class[] objs) {
+    void appendArrayType(StringBuilder sb, Class[] objs) {
         if (objs.length > 0) {
             appendArrayType(sb, objs[0]);
             for (int i = 1; i < objs.length; i++) {
                 sb.append(',');
                 appendArrayType(sb, objs[i]);
             }
+        }
+    }
+
+    /**
+     * Appends names of the specified array classes to the buffer. The array
+     * elements may represent a simple type, a reference type or an array type.
+     * Output format: java.lang.Object[], java.io.File, void
+     * 
+     * @param sb buffer
+     * @param objs array of classes to print the names
+     * @throws NullPointerException if any of the arguments is null 
+     */
+    void appendArrayGenericType(StringBuilder sb, Type[] objs) {
+        if (objs.length > 0) {
+            appendGenericType(sb, objs[0]);
+            for (int i = 1; i < objs.length; i++) {
+                sb.append(',');
+                appendGenericType(sb, objs[i]);
+            }
+        }
+    }
+
+    /**
+     * Appends the generic type representation to the buffer.
+     * 
+     * @param sb buffer
+     * @param obj the generic type which representation should be appended to the buffer
+     * @throws NullPointerException if any of the arguments is null 
+     */
+    void appendGenericType(StringBuilder sb, Type obj) {
+        if (obj instanceof TypeVariable) {
+            sb.append(((TypeVariable)obj).getName());
+		} else if (obj instanceof ParameterizedType) {
+            sb.append(obj.toString());
+		} else if (obj instanceof GenericArrayType) { //XXX: is it a working branch?
+			Type simplified = ((GenericArrayType)obj).getGenericComponentType();
+            appendGenericType(sb, simplified);
+            sb.append("[]");
+		} else if (obj instanceof Class) {
+			Class c = ((Class<?>)obj);
+			if (c.isArray()){
+				String as[] = c.getName().split("\\[");
+				int len = as.length-1;
+			    if (as[len].length() > 1){
+				    sb.append(as[len].substring(1, as[len].length()-1));
+			    } else {
+					char ch = as[len].charAt(0);
+				    if (ch == 'I')
+				        sb.append("int");
+				    else if (ch == 'B')
+				        sb.append("byte");
+				    else if (ch == 'J')
+				        sb.append("long");
+				    else if (ch == 'F')
+				        sb.append("float");
+				    else if (ch == 'D')
+				        sb.append("double");
+				    else if (ch == 'S')
+				        sb.append("short");
+				    else if (ch == 'C')
+				        sb.append("char");
+				    else if (ch == 'Z')
+				        sb.append("boolean");
+					else if (ch == 'V') //XXX: is it a working branch?
+				        sb.append("void");
+			    }
+				for (int i = 0; i < len; i++){
+					sb.append("[]");
+				}
+			} else {
+				sb.append(c.getName());
+			}
         }
     }
 
@@ -193,7 +302,7 @@ public class AccessibleObject {
      * @param objs array of classes to print the names
      * @throws NullPointerException if any of the arguments is null 
      */
-    void appendSimpleType(StringBuffer sb, Class[] objs) {
+    void appendSimpleType(StringBuilder sb, Class<?>[] objs) {
         if (objs.length > 0) {
             sb.append(objs[0].getName());
             for (int i = 1; i < objs.length; i++) {
@@ -212,49 +321,13 @@ public class AccessibleObject {
      */
     private void setAccessible0(boolean flag) throws SecurityException {
         if (flag && this instanceof Constructor
-            && ((Constructor)this).getDeclaringClass() == Class.class) {
+            && ((Constructor<?>)this).getDeclaringClass() == Class.class) {
             throw new SecurityException(
                 "Can not make the java.lang.Class class constructor accessible");
         }
         isAccessible = flag;
     }
 
-    /**
-     * Returns the signature-alike name representation of the class or interface.
-     * 
-     * @param c class to request the signature
-     * @return the signature-alike name of the class or interface 
-     */
-    static String getClassSignature(Class c) {
-        StringBuffer buf = new StringBuffer();
-        while (c.isArray()) {
-            buf.append('[');
-            c = c.getComponentType();
-        }
-
-        if (!c.isPrimitive())
-            buf.append('L').append(c.getName().replace('.', '/')).append(';');
-        else if (c == int.class)
-            buf.append('I');
-        else if (c == byte.class)
-            buf.append('B');
-        else if (c == long.class)
-            buf.append('J');
-        else if (c == float.class)
-            buf.append('F');
-        else if (c == double.class)
-            buf.append('D');
-        else if (c == short.class)
-            buf.append('S');
-        else if (c == char.class)
-            buf.append('C');
-        else if (c == boolean.class)
-            buf.append('Z');
-        else if (c == void.class)
-            buf.append('V');
-        return buf.toString();
-    }
-    
     /**
      * Ensures that actual parameters are compartible with types of
      * formal parameters. For reference types, argument can be either 
@@ -264,7 +337,7 @@ public class AccessibleObject {
      * @param args runtime arguments
      * @throws IllegalArgumentException if arguments are incompartible
      */
-    static void checkInvokationArguments(Class[] types, Object[] args) {
+    static void checkInvokationArguments(Class<?>[] types, Object[] args) {
         if ((args == null) ? types.length != 0
                 : args.length != types.length) {
             throw new IllegalArgumentException(

@@ -22,11 +22,10 @@
 
 #include "pidgenerator.h"
 #include "irmanager.h"
-#include "FlowGraph.h"
 
 namespace Jitrino {
 
-DEFINE_OPTPASS_IMPL(PersistentInstIdGenerationPass, pidgen, "Persistent Instruction Id Generation Pass")
+DEFINE_SESSION_ACTION(PersistentInstIdGenerationPass, pidgen, "Persistent Instruction Id Generation Pass")
 
 void
 PersistentInstIdGenerationPass::_run(IRManager& irm) {
@@ -40,14 +39,14 @@ PersistentInstructionIdGenerator::runPass(IRManager& irm) {
     
     MethodDesc& methodDesc = irm.getMethodDesc();
 
-    StlVector<CFGNode*> nodes(mm);
+    StlVector<Node*> nodes(mm);
     irm.getFlowGraph().getNodesPostOrder(nodes);
 
-    StlVector<CFGNode*>::reverse_iterator i;
+    StlVector<Node*>::reverse_iterator i;
     for(i = nodes.rbegin(); i != nodes.rend(); ++i) {
-        CFGNode* node = *i;
-        Inst* label = node->getFirstInst();
-        for(Inst* inst = label->next(); inst != label; inst = inst->next())
+        Node* node = *i;
+        Inst* label = (Inst*)node->getFirstInst();
+        for(Inst* inst = label->getNextInst(); inst != NULL; inst = inst->getNextInst())
             inst->setPersistentInstructionId(PersistentInstructionId(&methodDesc, inst->getId() - irm.getMinimumInstId()));
     }
 }

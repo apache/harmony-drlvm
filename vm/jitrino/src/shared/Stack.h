@@ -31,36 +31,36 @@ namespace Jitrino {
 class stackImpl
 { 
 public:
-	stackImpl(MemoryManager& m) : mm(m) {}
-	void* pop() {
-		if (isEmpty()) return NULL;
-		stackElem* e = workList.next();
-		free(e); // put it back to freeList
-		return e->elem;
-	}
-	void  push(void *elem) {
-		stackElem* se = getFreeStackElem();
-		if (se == NULL)
-			se = new (mm) stackElem();
-		se->elem = elem;
-		se->insertAfter(&workList);
-	};
-	// if stack is empty, NULL is returned
-	void* top() {return workList.next()->elem;}
-	// returns true if empty
-	bool  isEmpty() {return workList.next() == &workList;}
+    stackImpl(MemoryManager& m) : mm(m) {}
+    void* pop() {
+        if (isEmpty()) return NULL;
+        stackElem* e = workList.next();
+        free(e); // put it back to freeList
+        return e->elem;
+    }
+    void  push(void *elem) {
+        stackElem* se = getFreeStackElem();
+        if (se == NULL)
+            se = new (mm) stackElem();
+        se->elem = elem;
+        se->insertAfter(&workList);
+    };
+    // if stack is empty, NULL is returned
+    void* top() {return workList.next()->elem;}
+    // returns true if empty
+    bool  isEmpty() {return workList.next() == &workList;}
 private:
-	class stackElem : public Dlink 
-	{
-	public:
-		void     *elem;
+    class stackElem : public Dlink 
+    {
+    public:
+        void     *elem;
 
-		stackElem() : elem(NULL) {}
-		stackElem* next() {return (stackElem*)_next;}
-		stackElem* prev() {return (stackElem*)_prev;}
-	};
+        stackElem() : elem(NULL) {}
+        stackElem* next() {return (stackElem*)_next;}
+        stackElem* prev() {return (stackElem*)_prev;}
+    };
 
-	MemoryManager& mm;
+    MemoryManager& mm;
     stackElem freeList;
     stackElem workList; 
 
@@ -73,7 +73,7 @@ private:
         if (n != &freeList) // there is a free node
         {
             n->unlink();
-			n->elem = NULL;
+            n->elem = NULL;
             return n;
         }
         return NULL;
@@ -83,10 +83,10 @@ private:
 template <class T>
 class Stack : public stackImpl {
 public:
-	Stack(MemoryManager& m) : stackImpl(m) {}
-	T*    pop()         {return (T*)stackImpl::pop();}
-	void  push(T* elem) {stackImpl::push(elem);}
-	T*    top()			{return (T*)stackImpl::top();}
+    Stack(MemoryManager& m) : stackImpl(m) {}
+    T*    pop()         {return (T*)stackImpl::pop();}
+    void  push(T* elem) {stackImpl::push(elem);}
+    T*    top()         {return (T*)stackImpl::top();}
 };
 
 } //namespace Jitrino 

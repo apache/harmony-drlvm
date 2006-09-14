@@ -32,40 +32,35 @@ namespace Ia32 {
 
 BottomUpLayout::BottomUpLayout(IRManager* irm) : 
 Linearizer(irm), 
-mm(40*irm->getMaxNodeId(), "Ia32::bottomUpLayout"), 
-firstInChain(mm,irManager->getMaxNodeId(), false),
-lastInChain(mm,irManager->getMaxNodeId(), false),
-prevInLayoutBySuccessorId(mm, irManager->getMaxNodeId(), NULL)
+mm(40*irm->getFlowGraph()->getNodeCount(), "Ia32::bottomUpLayout"), 
+firstInChain(mm, irm->getFlowGraph()->getNodeCount(), false),
+lastInChain(mm, irm->getFlowGraph()->getNodeCount(), false),
+prevInLayoutBySuccessorId(mm, irm->getFlowGraph()->getNodeCount(), NULL)
 {
 }
 
 
 struct edge_comparator {
     bool operator() (const Edge* e1, const Edge* e2) const { //true -> e1 is first
-        ExecCntValue v1 = getEdgeExecCount(e1);
-        ExecCntValue v2 = getEdgeExecCount(e2);
+        double v1 = getEdgeExecCount(e1);
+        double v2 = getEdgeExecCount(e2);
         return   v1 > v2 ? true : (v1 < v2 ? false: e1 < e2);
     }
-    static ExecCntValue getEdgeExecCount(const Edge* e) { 
-        return e->getNode(Direction_Tail)->getExecCnt() * e->getProbability();
+    static double getEdgeExecCount(const Edge* e) { 
+        return e->getSourceNode()->getExecCount() * e->getEdgeProb();
     }
 
 };
 
 void BottomUpLayout::linearizeCfgImpl() {
-    irManager->updateExecCounts();
-#ifdef _DEBUG
-    ensureProfileIsValid();
-#endif
+    assert(irManager->getFlowGraph()->isEdgeProfileConsistent());
     StlVector<Edge*> sortedEdges(mm);
-    const Nodes& nodes = irManager->getNodes();
+    const Nodes& nodes = irManager->getFlowGraph()->getNodes();
     sortedEdges.reserve(nodes.size() * 3);
     for (Nodes::const_iterator it = nodes.begin(), end = nodes.end(); it!=end; ++it)  {
         Node* node = *it;
-        const Edges& edges = node->getEdges(Direction_Out);
-        for (Edge *e = edges.getFirst(); e; e = edges.getNext(e)) {
-            sortedEdges.push_back(e);
-        }
+        const Edges& edges = node->getOutEdges();
+        sortedEdges.insert(sortedEdges.end(), edges.begin(), edges.end());
     }
     std::sort(sortedEdges.begin(), sortedEdges.end(), edge_comparator());
     for(StlVector<Edge*>::const_iterator it = sortedEdges.begin(), itEnd = sortedEdges.end(); it!=itEnd; it++) {
@@ -76,25 +71,24 @@ void BottomUpLayout::linearizeCfgImpl() {
     //these blocks are dispatch successors or are blocks connected by in/out edges to already laid out chains
     for (Nodes::const_iterator it = nodes.begin(), end = nodes.end(); it!=end; ++it)  {
         Node* node = *it;
-        if (node->hasKind(Node::Kind_BasicBlock)) {
+        if (node->isBlockNode()) {
             BasicBlock* block = (BasicBlock*)node;
-            if (block->getLayoutSucc() == NULL && !lastInChain[block->getId()]) {
-                firstInChain[block->getId()] = true;
-                lastInChain[block->getId()] = true;
+            if (block->getLayoutSucc() == NULL && !lastInChain[block->getDfNum()]) {
+                firstInChain[block->getDfNum()] = true;
+                lastInChain[block->getDfNum()] = true;
             }
         }
     }
     combineChains();
-    fixBranches();
 }
 
 void  BottomUpLayout::layoutEdge(Edge *edge) {
-    Node* tailNode = edge->getNode(Direction_Tail);
-    Node* headNode = edge->getNode(Direction_Head);
-    if (!headNode->hasKind(Node::Kind_BasicBlock) || !tailNode->hasKind(Node::Kind_BasicBlock)) {
+    Node* tailNode = edge->getSourceNode();
+    Node* headNode = edge->getTargetNode();
+    if (!headNode->isBlockNode() || !tailNode->isBlockNode()) {
         return;
     }
-    if (headNode == irManager->getPrologNode()) { //prolog node should be first in layout
+    if (headNode == irManager->getFlowGraph()->getEntryNode()) { //prolog node should be first in layout
         return;
     }
     if (tailNode == headNode) {
@@ -105,10 +99,10 @@ void  BottomUpLayout::layoutEdge(Edge *edge) {
         return;  //tailBlock is layout predecessor for another successor
     }
     BasicBlock* headBlock = (BasicBlock*)headNode;
-    if (prevInLayoutBySuccessorId[headBlock->getId()]!=NULL) {
+    if (prevInLayoutBySuccessorId[headBlock->getDfNum()]!=NULL) {
         return; // head was already laid out (in other chain)
     }
-    if (lastInChain[tailBlock->getId()] && firstInChain[headBlock->getId()]) {
+    if (lastInChain[tailBlock->getDfNum()] && firstInChain[headBlock->getDfNum()]) {
         BasicBlock* tailOfHeadChain = headBlock;
         while (tailOfHeadChain->getLayoutSucc()!=NULL) {
             tailOfHeadChain = tailOfHeadChain->getLayoutSucc();
@@ -119,22 +113,22 @@ void  BottomUpLayout::layoutEdge(Edge *edge) {
     }
 
     tailBlock->setLayoutSucc(headBlock);
-    prevInLayoutBySuccessorId[headBlock->getId()] = tailBlock;
+    prevInLayoutBySuccessorId[headBlock->getDfNum()] = tailBlock;
 
-    BasicBlock* tailPred = prevInLayoutBySuccessorId[tailBlock->getId()];
+    BasicBlock* tailPred = prevInLayoutBySuccessorId[tailBlock->getDfNum()];
     if (tailPred) {
-        assert(lastInChain[tailBlock->getId()]);
-        lastInChain[tailBlock->getId()] = false;
+        assert(lastInChain[tailBlock->getDfNum()]);
+        lastInChain[tailBlock->getDfNum()] = false;
     } else {
-        firstInChain[tailBlock->getId()] = true;
+        firstInChain[tailBlock->getDfNum()] = true;
     }// here we have valid first
-    firstInChain[headBlock->getId()] = false;
+    firstInChain[headBlock->getDfNum()] = false;
 
     BasicBlock* newLast = headBlock;
     while (newLast->getLayoutSucc()!=NULL) {
         newLast = newLast->getLayoutSucc();
     }
-    lastInChain[newLast->getId()] = true;
+    lastInChain[newLast->getDfNum()] = true;
 }
 
 
@@ -153,8 +147,8 @@ struct chains_comparator{
         if (c2 == prolog) {
             return false;
         }
-        ExecCntValue fromC1ToC2 = calcEdgesWeight(c1, c2);
-        ExecCntValue fromC2ToC1 = calcEdgesWeight(c2, c1);
+        double fromC1ToC2 = calcEdgesWeight(c1, c2);
+        double fromC2ToC1 = calcEdgesWeight(c2, c1);
         if (fromC1ToC2 > fromC2ToC1) {
             return true; //c1 is first in topological order
         } else if (fromC1ToC2 < fromC2ToC1) {
@@ -163,19 +157,20 @@ struct chains_comparator{
         return c1 > c2; //any stable order..
     }
 
-    ExecCntValue calcEdgesWeight(const BasicBlock* c1, const BasicBlock* c2) const {
-        ExecCntValue d = 0.0;
+    double calcEdgesWeight(const BasicBlock* c1, const BasicBlock* c2) const {
+        double d = 0.0;
         //distance is sum of exec count of c1 blocks out edges c1 to c2;
         for (const BasicBlock* b = c1; b!=NULL; b = b->getLayoutSucc()) {
-            const Edges& outEdges = b->getEdges(Direction_Out);
-            for (Edge* e = outEdges.getFirst(); e!=NULL; e = outEdges.getNext(e)) {
-                Node* node = e->getNode(Direction_Head);
-                if (node != b->getLayoutSucc() && node->hasKind(Node::Kind_BasicBlock)) {
+            const Edges& outEdges = b->getOutEdges();
+            for (Edges::const_iterator ite = outEdges.begin(), ende = outEdges.end(); ite!=ende; ++ite) {
+                Edge* e= *ite;
+                Node* node = e->getTargetNode();
+                if (node != b->getLayoutSucc() && node->isBlockNode()) {
                     const BasicBlock* targetBlock = (BasicBlock*)node;
                     //look if node is in c2 chain
                     const BasicBlock* targetChain = findChain(targetBlock);
                     if (targetChain == c2) {
-                        ExecCntValue dd = b->getExecCnt() * e->getProbability();
+                        double dd = b->getExecCount() * e->getEdgeProb();
                         d+=dd;
                     }
                 }
@@ -186,7 +181,7 @@ struct chains_comparator{
 
     const BasicBlock* findChain(const BasicBlock* bb) const  {
         const BasicBlock* prev  = bb;
-        while ((prev = prevInLayoutBySuccessorId[bb->getId()])!=NULL) {
+        while ((prev = prevInLayoutBySuccessorId[bb->getDfNum()])!=NULL) {
             bb = prev;
         }
         return bb;
@@ -197,18 +192,19 @@ struct chains_comparator{
 
 void BottomUpLayout::combineChains() {
     StlVector<BasicBlock*> chains(mm);
-    const Nodes& nodes = irManager->getNodes();
+    const Nodes& nodes = irManager->getFlowGraph()->getNodes();
     for (Nodes::const_iterator it = nodes.begin(), end = nodes.end(); it!=end; ++it)  {
         Node* node = *it;
-        if (firstInChain[node->getId()]) {
-            assert(node->hasKind(Node::Kind_BasicBlock));
+        if (firstInChain[node->getDfNum()]) {
+            assert(node->isBlockNode());
             chains.push_back((BasicBlock*)node);
         }
     }
-    std::sort(chains.begin(), chains.end(), chains_comparator(prevInLayoutBySuccessorId, irManager->getPrologNode()));
-    assert(*chains.begin() ==irManager->getPrologNode());
+    std::sort(chains.begin(), chains.end(), 
+        chains_comparator(prevInLayoutBySuccessorId, (BasicBlock*)irManager->getFlowGraph()->getEntryNode()));
+    assert(*chains.begin() ==irManager->getFlowGraph()->getEntryNode());
 
-    assert(*chains.begin() == irManager->getPrologNode());
+    assert(*chains.begin() == irManager->getFlowGraph()->getEntryNode());
     for (uint32 i = 0, n = chains.size()-1; i<n;i++) {
         BasicBlock* firstChain = chains[i];
         BasicBlock* secondChain= chains[i+1];

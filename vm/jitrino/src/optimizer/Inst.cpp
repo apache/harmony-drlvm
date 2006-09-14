@@ -25,7 +25,7 @@
 #include "Inst.h"
 #include "Type.h"
 #include "IRBuilder.h"
-#include "FlowGraph.h"
+
 
 namespace Jitrino {
 
@@ -34,13 +34,13 @@ namespace Jitrino {
 //-----------------------------------------------------------------------------
 
 Inst::Inst(Opcode opcode, Modifier mod, Type::Tag type, Opnd* dst_)
-    : operation(opcode, type, mod), numSrcs(0), dst(0), id((uint32)-1), node(0)
+    : operation(opcode, type, mod), numSrcs(0), dst(0)
 {
     setDst(dst_);
 }
 
 Inst::Inst(Opcode opcode, Modifier mod, Type::Tag type, Opnd* dst_, Opnd* src)
-    : operation(opcode, type, mod), numSrcs(1), dst(0), id((uint32)-1), node(0)
+    : operation(opcode, type, mod), numSrcs(1), dst(0)
 {
     setDst(dst_);
     srcs[0] = src;
@@ -48,7 +48,7 @@ Inst::Inst(Opcode opcode, Modifier mod, Type::Tag type, Opnd* dst_, Opnd* src)
 
 Inst::Inst(Opcode opcode, Modifier mod, Type::Tag type, Opnd* dst_,
            Opnd* src1, Opnd* src2)
-    : operation(opcode, type, mod), numSrcs(2), dst(0), id((uint32)-1), node(0)
+    : operation(opcode, type, mod), numSrcs(2), dst(0)
 {
     setDst(dst_);
     srcs[0] = src1;
@@ -56,7 +56,7 @@ Inst::Inst(Opcode opcode, Modifier mod, Type::Tag type, Opnd* dst_,
 }
 
 Inst::Inst(Opcode opcode, Modifier mod, Type::Tag type, Opnd* dst_, uint32 nSrcs)
-    : operation(opcode, type, mod), numSrcs(nSrcs), dst(0), id((uint32)-1), node(0)
+    : operation(opcode, type, mod), numSrcs(nSrcs), dst(0)
 {
     setDst(dst_);
 }
@@ -67,15 +67,48 @@ Opnd* Inst::getSrcExtended(uint32 srcIndex) const {
 }
 
 bool Inst::isThrow() const {
-    return ((getOpcode() == Op_Throw) || (getOpcode() == Op_ThrowLazy) ||
-        (getOpcode() == Op_ThrowSystemException) || (getOpcode() == Op_ThrowLinkingException) ||
+    return ((getOpcode() == Op_Throw) || (getOpcode() == Op_ThrowSystemException) || 
+        (getOpcode() == Op_ThrowLinkingException) ||
         ( (getOpcode() == Op_VMHelperCall) ?
             (asVMHelperCallInst()->isThrowLazy()) : false ) );
 }
 
+
+Edge::Kind Inst::getEdgeKind(const Edge* edge) const {
+#ifdef _DEBUG
+    Node* node = edge->getSourceNode();
+    Node* succ = edge->getTargetNode();
+    assert(node->isBlockNode());
+    assert(succ->isBlockNode());
+    assert(node->getLastInst() == this);
+    assert(node->getOutDegree() <= 2); //uncond + exception
+#endif
+    return Edge::Kind_Unconditional;// jump
+}
+
+void Inst::removeRedundantBranch() {
+    if (getOpcode() == Op_Branch || isSwitch()) {
+        unlink();
+    }
+}
+
+
 //-----------------------------------------------------------------------------
 // BranchInst utilities
 //-----------------------------------------------------------------------------
+
+void BranchInst::updateControlTransferInst(Node *oldTarget, Node* newTarget ) {
+    assert(oldTarget->getKind() == newTarget->getKind());
+
+    LabelInst*  oldLabel = (LabelInst*)oldTarget->getFirstInst();
+    LabelInst*  newLabel = (LabelInst*)newTarget->getFirstInst();
+
+    // Update source nodes branch instruction
+    if(getTargetLabel() == oldLabel) {
+        assert(newTarget->isBlockNode());
+        replaceTargetLabel(newLabel);
+    }
+}
 
 // the following utility for conditional branches will make the fallthrough the target and
 // the target the fallthrough, changing the branch condition in the process
@@ -106,34 +139,45 @@ void  BranchInst::swapTargets(LabelInst *target) {
     replaceTargetLabel(target);
 }
 
+Edge::Kind BranchInst::getEdgeKind(const Edge* edge) const {
+    Node* succ = edge->getTargetNode();
+#ifdef _DEBUG
+    Node* node = edge->getSourceNode();
+    assert(node->isBlockNode());
+    assert(succ->isBlockNode());
+    assert(node->getLastInst() == this);
+    assert(node->getOutDegree() == 2 || (node->getOutDegree() == 3 && node->getExceptionEdge()!=NULL));
+#endif
+    Edge::Kind kind =  getTargetLabel() == succ->getFirstInst() ? Edge::Kind_True : Edge::Kind_False;
+    return kind;
+}
+
 // the following utility for conditional branches will return the taken edge based on the
 // incoming condition. This will ignore exception edges
 
-CFGEdge* BranchInst::getTakenEdge(uint32 result) {
+Edge* BranchInst::getTakenEdge(uint32 result) {
     // find the node for this branch instruction
-    Inst *label = this->next();
-    assert(label->isLabel());
-    CFGNode *node = ((LabelInst*)label)->getCFGNode();
+    Node *node = getNode();
+    assert(node->getFirstInst()->isLabel());
     LabelInst *targetLabel = getTargetLabel();
-    CFGEdge* edge = NULL;
-    const CFGEdgeDeque& edges = node->getOutEdges();
-    CFGEdgeDeque::const_iterator eiter;
-    for(eiter = edges.begin(); eiter != edges.end(); ++eiter) {
+    Edge* edge = NULL;
+    const Edges& edges = node->getOutEdges();
+    for(Edges::const_iterator eiter = edges.begin(); eiter != edges.end(); ++eiter) {
         edge = *eiter;
-        CFGNode * tar = edge->getTargetNode();
+        Node * tar = edge->getTargetNode();
         if (!tar->isDispatchNode() &&
             ((result == 0) && (tar->getFirstInst() != targetLabel)) ||
             ((result == 1) && (tar->getFirstInst() == targetLabel)) ) {
             break;
         }
     }
-    if (edge == NULL)  {
-		::std::cout << "WARNING, useless branch\n";
-        if(node->getOutEdges().empty())
-            return NULL;
-        else
-            return node->getOutEdges().front();
-    }
+    assert(edge != NULL); 
+        // was:
+        // std::cout << "WARNING, useless branch\n";
+        // if(node->getOutEdges().empty())
+        //    return NULL;
+        // else
+        //     return node->getOutEdges().front();
     return edge;
 }
 
@@ -147,7 +191,7 @@ void Inst::print(::std::ostream& os) const {
     InlineInfo* ii = getCallInstInlineInfoPtr();
     if ( ii && !ii->isEmpty() ) {
         os << " has II: ";
-        ii->printLevels(Log::cat_opt_inline()->ir);
+        ii->printLevels(Log::out());
     }
 }
 
@@ -409,6 +453,10 @@ void JitHelperCallInst::handlePrintEscape(::std::ostream& os, char code) const {
         os << "InitializeArray"; break;
     case PseudoCanThrow:
         os << "PseudoCanThrow"; break;
+    case SaveThisState:
+        os << "SaveThisState"; break;
+    case ReadThisState:
+        os << "ReadThisState"; break;
     default:
         assert(0); break;
         }
@@ -446,6 +494,37 @@ void TypeInst::handlePrintEscape(::std::ostream& os, char code) const {
         Inst::handlePrintEscape(os, code);
         break;
     }
+}
+
+void SwitchInst::updateControlTransferInst(Node *oldTarget, Node* newTarget ) {
+    assert(oldTarget->getKind() == newTarget->getKind());
+
+    LabelInst*  oldLabel = (LabelInst*)oldTarget->getFirstInst();
+    LabelInst*  newLabel = (LabelInst*)newTarget->getFirstInst();
+
+    if (getDefaultTarget() == oldLabel) {
+        assert(newTarget->isBlockNode());
+        replaceDefaultTargetLabel(newLabel);
+    }
+    uint32 n = getNumTargets();
+    for (uint32 i = 0; i < n; i++) {
+        if (getTarget(i) == oldLabel) {
+            assert(newTarget->isBlockNode());
+            replaceTargetLabel(i, newLabel);
+        }
+    }
+}
+
+Edge::Kind SwitchInst::getEdgeKind(const Edge* edge) const {
+    Node* succ = edge->getTargetNode();
+#ifdef _DEBUG
+    Node* node = edge->getSourceNode();
+    assert(node->isBlockNode());
+    assert(succ->isBlockNode());
+    assert(node->getLastInst() == this);
+#endif
+    Edge::Kind kind = getDefaultTarget() == succ->getFirstInst()? Edge::Kind_False : Edge::Kind_True;
+    return kind;
 }
 
 void SwitchInst::handlePrintEscape(::std::ostream& os, char code) const {
@@ -1205,9 +1284,18 @@ InstFactory::makeMethodEntryInst(uint32 labelId, MethodDesc* md)  {
 
 MethodMarkerInst*
 InstFactory::makeMethodMarkerInst(MethodMarkerInst::Kind k, MethodDesc* md,
-                                  Opnd *obj) {
+        Opnd *obj, Opnd *retOpnd) {
     assert(obj && !obj->isNull());
-    MethodMarkerInst* inst = new (memManager) MethodMarkerInst(k, md, obj);
+    MethodMarkerInst* inst = new (memManager) MethodMarkerInst(k, md, obj, retOpnd);
+    inst->id = numInsts++;
+    inst->methodId = numMethodInsts++;
+    return inst;
+}
+
+MethodMarkerInst*
+InstFactory::makeMethodMarkerInst(MethodMarkerInst::Kind k, MethodDesc* md, 
+        Opnd *retOpnd) {
+    MethodMarkerInst* inst = new (memManager) MethodMarkerInst(k, md, retOpnd);
     inst->id       = numInsts++;
     inst->methodId = numMethodInsts++;
     return inst;
@@ -1381,7 +1469,8 @@ InstFactory::makeTypeInst(Opcode op, Modifier mod, Type::Tag ty, Opnd* dst,
 TypeInst*
 InstFactory::makeTypeInst(Opcode op, Modifier mod, Type::Tag ty, Opnd* dst,
     Opnd* src1, Opnd* src2, Opnd* src3, Type* td) {
-    Opnd* srcs[3] = { src1, src2, src3 };
+    Opnd* srcs_local[3] = { src1, src2, src3 };
+    Opnd** srcs = copyOpnds(srcs_local, 3);
     TypeInst* inst = new (memManager) TypeInst(op, mod, ty, dst, 3, srcs, td);
     inst->id       = numInsts++;
     inst->methodId = numMethodInsts++;
@@ -1390,7 +1479,8 @@ InstFactory::makeTypeInst(Opcode op, Modifier mod, Type::Tag ty, Opnd* dst,
 TypeInst*
 InstFactory::makeTypeInst(Opcode op, Modifier mod, Type::Tag ty, Opnd* dst,
     Opnd* src1, Opnd* src2, Opnd* src3, Opnd* src4, Type* td) {
-    Opnd* srcs[4] = { src1, src2, src3, src4 };
+    Opnd* srcs_local[4] = { src1, src2, src3, src4 };
+    Opnd** srcs = copyOpnds(srcs_local, 4);
     TypeInst* inst = new (memManager) TypeInst(op, mod, ty, dst, 4, srcs, td);
     inst->id       = numInsts++;
     inst->methodId = numMethodInsts++;
@@ -1565,11 +1655,13 @@ InstFactory::makeVMHelperCallInst(Opcode op,
                                     Opnd* dst,
                                     uint32 nArgs,
                                     Opnd** args_,
-                                    VMHelperCallId id) {
+                                    VMHelperCallId id,
+                                    InlineInfo* inlInfo) {
     VMHelperCallInst * inst = 
         new (memManager) VMHelperCallInst(op, mod, type, dst, nArgs, args_, id);
     inst->id       = numInsts++;
     inst->methodId = numMethodInsts++;
+    inst->inlInfo = inlInfo;
     return inst;
 }
 
@@ -1670,9 +1762,17 @@ InstFactory::makeMethodEntryLabel(MethodDesc* methodDesc) {
 
 Inst*
 InstFactory::makeMethodMarker(MethodMarkerInst::Kind kind, MethodDesc* methodDesc,
-                              Opnd *obj) {
+        Opnd *obj, Opnd *retOpnd) {
     assert(obj && !obj->isNull());
-    return makeMethodMarkerInst(kind, methodDesc, obj);
+    return makeMethodMarkerInst(kind, methodDesc, obj, 
+            retOpnd != NULL ? retOpnd : OpndManager::getNullOpnd());
+}
+
+Inst*
+InstFactory::makeMethodMarker(MethodMarkerInst::Kind kind, MethodDesc* methodDesc,
+        Opnd *retOpnd) {
+    return makeMethodMarkerInst(kind, methodDesc, 
+            retOpnd != NULL ? retOpnd : OpndManager::getNullOpnd());
 }
 
 Inst*
@@ -1861,10 +1961,6 @@ Inst* InstFactory::makeThrow(ThrowModifier mod, Opnd* exceptionObj) {
     return makeInst(Op_Throw, Modifier(mod), Type::Void, OpndManager::getNullOpnd(), exceptionObj);
 }
 
-Inst* InstFactory::makeThrowLazy(ThrowModifier mod, uint32 numArgs, Opnd **args, MethodDesc *constructor) {
-	return makeMethodInst(Op_ThrowLazy, mod, Type::Void, OpndManager::getNullOpnd(), numArgs, args, constructor);
-}
-
 Inst* InstFactory::makeThrowSystemException(CompilationInterface::SystemExceptionId exceptionId) {
     MethodDesc* enclosingMethod = 0;
     return makeTokenInst(Op_ThrowSystemException, Modifier(), Type::Void, 
@@ -1987,11 +2083,12 @@ InstFactory::makeJitHelperCall(Opnd* dst, JitHelperCallId id, uint32 numArgs, Op
 }
 
 Inst*
-InstFactory::makeVMHelperCall(Opnd* dst, VMHelperCallId id, uint32 numArgs, Opnd** args) {
+InstFactory::makeVMHelperCall(Opnd* dst, VMHelperCallId id, uint32 numArgs,
+                              Opnd** args, InlineInfo* inlInfo) {
     Type::Tag returnType = dst->isNull()? Type::Void : dst->getType()->tag;
     args = copyOpnds(args, numArgs);
     return makeVMHelperCallInst(Op_VMHelperCall, Modifier(Exception_Sometimes), 
-                                returnType, dst, numArgs, args, id);
+                                returnType, dst, numArgs, args, id, inlInfo);
 }
 
 // load, store, & move
@@ -2136,11 +2233,9 @@ Inst* InstFactory::makeTauLdVirtFunAddrSlot(Opnd* dst, Opnd* vtable, Opnd *tauVt
 }
 
 Inst* InstFactory::makeTauLdIntfcVTableAddr(Opnd* dst, Opnd* base, 
-                                            Opnd *tauVtableHasIntfc, 
                                             Type* vtableType) {
-    assert(tauVtableHasIntfc->getType()->tag == Type::Tau);
     return makeTypeInst(Op_TauLdIntfcVTableAddr, Modifier(), dst->getType()->tag, dst, base, 
-                        tauVtableHasIntfc, vtableType);
+        vtableType);
 }
 
 Inst* InstFactory::makeTauLdVTableAddr(Opnd* dst, Opnd* base, 
@@ -2417,8 +2512,8 @@ Inst* InstFactory::makeLdToken(Opnd* dst, MethodDesc* enclosingMethod, uint32 me
     return makeTokenInst(Op_LdToken, Modifier(), Type::Object, dst, metadataToken, enclosingMethod);
 }
 
-Inst* InstFactory::makeLdString(Modifier mod, Opnd* dst, MethodDesc* enclosingMethod, uint32 stringToken) {
-    return makeTokenInst(Op_LdString, mod, Type::SystemString, dst, stringToken, enclosingMethod);
+Inst* InstFactory::makeLdRef(Modifier mod, Opnd* dst, MethodDesc* enclosingMethod, uint32 token) {
+    return makeTokenInst(Op_LdRef, mod, dst->getType()->tag, dst, token, enclosingMethod);
 }
 
 // type checking
@@ -2661,7 +2756,6 @@ InstOptimizer::dispatch(Inst* inst) {
     case Op_Return:             return caseReturn(inst);
     case Op_Catch:              return caseCatch(inst);
     case Op_Throw:              return caseThrow(inst);
-	case Op_ThrowLazy:          return caseThrowLazy(inst);
     case Op_ThrowSystemException: return caseThrowSystemException(inst);
     case Op_ThrowLinkingException: return caseThrowLinkingException(inst);
     case Op_Leave:              return caseLeave(inst);
@@ -2674,7 +2768,7 @@ InstOptimizer::dispatch(Inst* inst) {
     case Op_Copy:               return caseCopy(inst);
     case Op_DefArg:             return caseDefArg(inst);
     case Op_LdConstant:         return caseLdConstant(inst->asConstInst());
-    case Op_LdString:           return caseLdString(inst->asTokenInst());
+    case Op_LdRef:              return caseLdRef(inst->asTokenInst());
     case Op_LdVar:              return caseLdVar(inst);
     case Op_LdVarAddr:          return caseLdVarAddr(inst);
     case Op_TauLdInd:              return caseTauLdInd(inst);
@@ -2794,22 +2888,41 @@ Inst::getCallInstInlineInfoPtr() const
     return ii;
 }
 
-void
-InlineInfoBuilder::buildInlineInfoForInst(Inst* inst, MethodDesc* target_md)
+uint32
+InlineInfoBuilder::buildInlineInfoForInst(Inst* inst, uint32 currOffset, MethodDesc* target_md)
 {
     InlineInfo* ii = inst->getCallInstInlineInfoPtr();
     if ( ii ) {
-        buildInlineInfo(ii);
-        if ( Log::cat_opt_inline()->isDebugEnabled() ) {
-            Log::cat_opt_inline()->ir << "InlineInfoBuiler: inlined call to ";
-            if ( target_md ) {
-                Log::cat_opt_inline()->ir << target_md->getName();
-            }else{
-                Log::cat_opt_inline()->ir << "[some method]";
-            }
-            Log::cat_opt_inline()->ir << ", chain: "; 
-            ii->printLevels(Log::cat_opt_inline()->ir);
+        //buildInlineInfo(ii, currOffset);
+        InlineInfoBuilder* parBuilder = parent;
+        uint32 parOffset = getCurrentBcOffset();
+        ii->prependLevel(getCurrentMd(), currOffset);
+        while (parBuilder) {
+            ii->prependLevel(parBuilder->getCurrentMd(), parOffset);
+            parOffset = parBuilder->getCurrentBcOffset();
+            parBuilder = parBuilder->parent;
         }
+        if ( Log::isEnabled() ) {
+            Log::out() << "InlineInfoBuiler: inlined call to ";
+            if ( target_md ) {
+                Log::out() << target_md->getName();
+            }else{
+                Log::out() << "[some method]";
+            }
+            Log::out() << ", chain: "; 
+            ii->printLevels(Log::out());
+        }
+        return parOffset;
+    }
+    return currOffset;
+}
+void
+InlineInfoBuilder::buildInlineInfo(InlineInfo* ii, uint32 offset) // ii must be non-NULL
+{
+    if ( parent ) {
+        parent->buildInlineInfo(ii, offset);
+    } else {
+        addCurrentLevel(ii, getCurrentBcOffset());
     }
 }
 

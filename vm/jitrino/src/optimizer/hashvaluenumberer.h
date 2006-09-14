@@ -24,7 +24,6 @@
 #define _HASHVALUENUMBER_H_
 
 #include "irmanager.h"
-#include "optpass.h"
 
 namespace Jitrino {
 
@@ -34,7 +33,6 @@ class DominatorTree;
 class MemoryOpt;
 class FlowGraph;
 
-DEFINE_OPTPASS(HashValueNumberingPass)
 
 class HashValueNumberer {
 public:
@@ -51,7 +49,7 @@ public:
 private:
     IRManager&      irManager;
     DominatorTree&  dominators;
-    FlowGraph&  fg;
+    ControlFlowGraph&  fg;
     bool  useBranches; // do we try to take account of in-edge conditions in a block?
 };
 

@@ -54,12 +54,15 @@ _get_native_location_for_bc(NULL),
 _get_local_var(NULL),
 _set_local_var(NULL)
 {
+    apr_status_t stat;
+    char buf[1024];
     memset((void *) &jit_flags, 0, sizeof(JIT_Flags));
     apr_pool_create(&pool, 0);
     apr_dso_handle_t *handle;
-    if (apr_dso_load(&handle, dll_filename, pool) != APR_SUCCESS)
+    if ((stat = apr_dso_load(&handle, dll_filename, pool)) != APR_SUCCESS)
     {
-        WARN("Failure to open JIT dll " << dll_filename);
+        WARN("Failure to open JIT dll " << dll_filename << stat);
+        printf("apr code: %s\n", apr_dso_error(handle, buf, 1024));
         return;
     }
 

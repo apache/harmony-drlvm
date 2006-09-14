@@ -15,7 +15,7 @@
  */
 /** 
  * @author Gregory Shimansky
- * @version $Revision: 1.1.2.1.4.5 $
+ * @version $Revision$
  */  
 /*
  * JVMTI extensions API
@@ -40,13 +40,25 @@ static const jint extensions_number = 0;
 static void free_allocated_extension_array(jvmtiExtensionFunctionInfo *array,
                                            jint number)
 {
-    for (int iii = 0; iii < number; iii++)
+    for (int iii = 0; iii <= number; iii++)
     {
-        _deallocate((unsigned char *)array[iii].id);
-        _deallocate((unsigned char *)array[iii].short_description);
-        _deallocate((unsigned char *)array[iii].params->name);
-        _deallocate((unsigned char *)array[iii].params);
-        _deallocate((unsigned char *)array[iii].errors);
+        if (array[iii].id)
+            _deallocate((unsigned char *)array[iii].id);
+        if (array[iii].short_description)
+            _deallocate((unsigned char *)array[iii].short_description);
+        if (array[iii].errors)
+            _deallocate((unsigned char *)array[iii].errors);
+
+        if (array[iii].params)
+        {
+            for (int jjj = 0; jjj < array[iii].param_count; jjj++)
+            {
+                if (array[iii].params[jjj].name)
+                    _deallocate((unsigned char *)array[iii].params[jjj].name);
+            }
+
+            _deallocate((unsigned char *)array[iii].params);
+        }
     }
     _deallocate((unsigned char *)array);
 }
@@ -84,89 +96,89 @@ jvmtiGetExtensionFunctions(jvmtiEnv* env,
     *extension_count_ptr = extensions_number;
 
     if (0 == extensions_number)
-        *extensions = NULL;
-    else
     {
-        jvmtiExtensionFunctionInfo *array;
-        errorCode = _allocate(sizeof(jvmtiExtensionFunctionInfo) *
-                              extensions_number, (unsigned char **)&array);
-
-        if (JVMTI_ERROR_NONE != errorCode)
-            return errorCode;
-
-        JvmtiExtension *ex = jvmti_extension_list;
-        for (int iii = 0; iii < extensions_number; iii++)
-        {
-            jvmtiExtensionFunctionInfo *info = &ex->info;
-
-            array[iii].func = info->func;
-            array[iii].param_count = info->param_count;
-            array[iii].error_count = info->error_count;
-
-            errorCode = _allocate(strlen(info->id) + 1,
-                                  (unsigned char **)&(array[iii].id));
-            if (JVMTI_ERROR_NONE != errorCode)
-            {
-                free_allocated_extension_array(array, iii);
-                return errorCode;
-            }
-
-            errorCode = _allocate(strlen(info->short_description) + 1,
-                                  (unsigned char **)&(array[iii].short_description));
-            if (JVMTI_ERROR_NONE != errorCode)
-            {
-                _deallocate((unsigned char *)array[iii].id);
-                free_allocated_extension_array(array, iii);
-                return errorCode;
-            }
-
-            errorCode = _allocate(info->param_count * sizeof(jvmtiParamInfo),
-                                  (unsigned char **)&(array[iii].params));
-            if (JVMTI_ERROR_NONE != errorCode)
-            {
-                _deallocate((unsigned char *)array[iii].id);
-                _deallocate((unsigned char *)array[iii].short_description);
-                free_allocated_extension_array(array, iii);
-                return errorCode;
-            }
-
-            errorCode = _allocate(strlen(info->params->name) + 1,
-                                  (unsigned char **)&(array[iii].params->name));
-            if (JVMTI_ERROR_NONE != errorCode)
-            {
-                _deallocate((unsigned char *)array[iii].id);
-                _deallocate((unsigned char *)array[iii].short_description);
-                _deallocate((unsigned char *)array[iii].params);
-                free_allocated_extension_array(array, iii);
-                return errorCode;
-            }
-
-            errorCode = _allocate(info->error_count * sizeof(jvmtiError),
-                                  (unsigned char **)&(array[iii].errors));
-            if (JVMTI_ERROR_NONE != errorCode)
-            {
-                _deallocate((unsigned char *)array[iii].id);
-                _deallocate((unsigned char *)array[iii].short_description);
-                _deallocate((unsigned char *)array[iii].params->name);
-                _deallocate((unsigned char *)array[iii].params);
-                free_allocated_extension_array(array, iii);
-                return errorCode;
-            }
-
-            strcpy(array[iii].id, info->id);
-            strcpy(array[iii].short_description, info->short_description);
-            strcpy(array[iii].params->name, info->params->name);
-            memcpy(array[iii].params, info->params,
-                   info->param_count * sizeof(jvmtiParamInfo));
-            memcpy(array[iii].errors, info->errors,
-                   info->error_count * sizeof(jvmtiError));
-
-            ex = ex->next;
-        }
-
-        *extensions = array;
+        *extensions = NULL;
+        return JVMTI_ERROR_NONE;
     }
 
+    jvmtiExtensionFunctionInfo *array;
+    size_t arr_size = sizeof(jvmtiExtensionFunctionInfo)*extensions_number;
+    errorCode = _allocate(arr_size, (unsigned char **)&array);
+
+    if (JVMTI_ERROR_NONE != errorCode)
+        return errorCode;
+
+    memset(array, 0, arr_size);
+
+    JvmtiExtension *ex = jvmti_extension_list;
+    for (int iii = 0; iii < extensions_number; iii++)
+    {
+        jvmtiExtensionFunctionInfo *info = &ex->info;
+
+        array[iii].func = info->func;
+        array[iii].param_count = info->param_count;
+        array[iii].error_count = info->error_count;
+
+        errorCode = _allocate(strlen(info->id) + 1,
+            (unsigned char **)&(array[iii].id));
+        if (JVMTI_ERROR_NONE != errorCode)
+        {
+            free_allocated_extension_array(array, iii);
+            return errorCode;
+        }
+
+        errorCode = _allocate(strlen(info->short_description) + 1,
+            (unsigned char **)&(array[iii].short_description));
+        if (JVMTI_ERROR_NONE != errorCode)
+        {
+            free_allocated_extension_array(array, iii);
+            return errorCode;
+        }
+
+        errorCode = _allocate(info->param_count * sizeof(jvmtiParamInfo),
+            (unsigned char **)&(array[iii].params));
+        if (JVMTI_ERROR_NONE != errorCode)
+        {
+            free_allocated_extension_array(array, iii);
+            return errorCode;
+        }
+
+        errorCode = _allocate(info->error_count * sizeof(jvmtiError),
+            (unsigned char **)&(array[iii].errors));
+        if (JVMTI_ERROR_NONE != errorCode)
+        {
+            free_allocated_extension_array(array, iii);
+            return errorCode;
+        }
+
+        memset(array[iii].params, 0,
+            info->param_count * sizeof(jvmtiParamInfo));
+
+        for (int jjj = 0; jjj < info->param_count; jjj++)
+        {
+            array[iii].params[jjj] = info->params[jjj];
+
+            errorCode = _allocate(strlen(info->params[jjj].name) + 1,
+                (unsigned char **)&(array[iii].params[jjj].name));
+            if (JVMTI_ERROR_NONE != errorCode)
+            {
+                array[iii].params[jjj].name = NULL;
+                free_allocated_extension_array(array, iii);
+                return errorCode;
+            }
+
+            strcpy(array[iii].params[jjj].name, info->params[jjj].name);
+        }
+
+        strcpy(array[iii].id, info->id);
+        strcpy(array[iii].short_description, info->short_description);
+        memcpy(array[iii].errors, info->errors,
+            info->error_count * sizeof(jvmtiError));
+
+        ex = ex->next;
+    }
+
+    *extensions = array;
     return JVMTI_ERROR_NONE;
 }
 
@@ -183,12 +195,23 @@ static const jint extensions_events_number = 0;
 static void free_allocated_extension_event_array(jvmtiExtensionEventInfo *array,
                                                  jint number)
 {
-    for (int iii = 0; iii < number; iii++)
+    for (jint iii = 0; iii <= number; iii++)
     {
-        _deallocate((unsigned char *)array[iii].id);
-        _deallocate((unsigned char *)array[iii].short_description);
-        _deallocate((unsigned char *)array[iii].params->name);
-        _deallocate((unsigned char *)array[iii].params);
+        if (array[iii].id)
+            _deallocate((unsigned char *)array[iii].id);
+        if (array[iii].short_description)
+            _deallocate((unsigned char *)array[iii].short_description);
+
+        if (array[iii].params)
+        {
+            for (jint jjj = 0; jjj < array[iii].param_count; jjj++)
+            {
+                if (array[iii].params[jjj].name)
+                    _deallocate((unsigned char *)array[iii].params[jjj].name);
+            }
+
+            _deallocate((unsigned char *)array[iii].params);
+        }
     }
     _deallocate((unsigned char *)array);
 }
@@ -226,74 +249,78 @@ jvmtiGetExtensionEvents(jvmtiEnv* env,
     *extension_count_ptr = extensions_events_number;
 
     if (0 == extensions_events_number)
-        *extensions = NULL;
-    else
     {
-        jvmtiExtensionEventInfo *array;
-        errorCode = _allocate(sizeof(jvmtiExtensionEventInfo) *
-                              extensions_events_number, (unsigned char **)&array);
-
-        if (JVMTI_ERROR_NONE != errorCode)
-            return errorCode;
-
-        JvmtiExcensionEvent *ex = jvmti_exntension_event_list;
-        for (int iii = 0; iii < extensions_events_number; iii++)
-        {
-            jvmtiExtensionEventInfo *info = &ex->info;
-
-            array[iii].extension_event_index = info->extension_event_index;
-            array[iii].param_count = info->param_count;
-
-            errorCode = _allocate(strlen(info->id) + 1,
-                (unsigned char **)&(array[iii].id));
-            if (JVMTI_ERROR_NONE != errorCode)
-            {
-                free_allocated_extension_event_array(array, iii);
-                return errorCode;
-            }
-
-            errorCode = _allocate(strlen(info->short_description) + 1,
-                (unsigned char **)&(array[iii].short_description));
-            if (JVMTI_ERROR_NONE != errorCode)
-            {
-                _deallocate((unsigned char *)array[iii].id);
-                free_allocated_extension_event_array(array, iii);
-                return errorCode;
-            }
-
-            errorCode = _allocate(info->param_count * sizeof(jvmtiParamInfo),
-                                  (unsigned char **)&(array[iii].params));
-            if (JVMTI_ERROR_NONE != errorCode)
-            {
-                _deallocate((unsigned char *)array[iii].id);
-                _deallocate((unsigned char *)array[iii].short_description);
-                free_allocated_extension_event_array(array, iii);
-                return errorCode;
-            }
-
-            errorCode = _allocate(strlen(info->params->name) + 1,
-                (unsigned char **)&(array[iii].params->name));
-            if (JVMTI_ERROR_NONE != errorCode)
-            {
-                _deallocate((unsigned char *)array[iii].id);
-                _deallocate((unsigned char *)array[iii].short_description);
-                _deallocate((unsigned char *)array[iii].params);
-                free_allocated_extension_event_array(array, iii);
-                return errorCode;
-            }
-
-            strcpy(array[iii].id, info->id);
-            strcpy(array[iii].short_description, info->short_description);
-            strcpy(array[iii].params->name, info->params->name);
-            memcpy(array[iii].params, info->params,
-                info->param_count * sizeof(jvmtiParamInfo));
-
-            ex = ex->next;
-        }
-
-        *extensions = array;
+        *extensions = NULL;
+        return JVMTI_ERROR_NONE;
     }
 
+    jvmtiExtensionEventInfo *array;
+    size_t arr_size = sizeof(jvmtiExtensionEventInfo)*extensions_events_number;
+    errorCode = _allocate(arr_size, (unsigned char **)&array);
+
+    if (JVMTI_ERROR_NONE != errorCode)
+        return errorCode;
+
+    memset(array, 0, arr_size);
+
+    JvmtiExcensionEvent *ex = jvmti_exntension_event_list;
+    for (int iii = 0; iii < extensions_events_number; iii++)
+    {
+        jvmtiExtensionEventInfo *info = &ex->info;
+
+        array[iii].extension_event_index = info->extension_event_index;
+        array[iii].param_count = info->param_count;
+
+        errorCode = _allocate(strlen(info->id) + 1,
+            (unsigned char **)&(array[iii].id));
+        if (JVMTI_ERROR_NONE != errorCode)
+        {
+            free_allocated_extension_event_array(array, iii);
+            return errorCode;
+        }
+
+        errorCode = _allocate(strlen(info->short_description) + 1,
+            (unsigned char **)&(array[iii].short_description));
+        if (JVMTI_ERROR_NONE != errorCode)
+        {
+            free_allocated_extension_event_array(array, iii);
+            return errorCode;
+        }
+
+        errorCode = _allocate(info->param_count * sizeof(jvmtiParamInfo),
+            (unsigned char **)&(array[iii].params));
+        if (JVMTI_ERROR_NONE != errorCode)
+        {
+            free_allocated_extension_event_array(array, iii);
+            return errorCode;
+        }
+
+        memset(array[iii].params, 0,
+            info->param_count * sizeof(jvmtiParamInfo));
+
+        for (int jjj = 0; jjj < info->param_count; jjj++)
+        {
+            array[iii].params[jjj] = info->params[jjj];
+
+            errorCode = _allocate(strlen(info->params[jjj].name) + 1,
+                (unsigned char **)&(array[iii].params[jjj].name));
+            if (JVMTI_ERROR_NONE != errorCode)
+            {
+                array[iii].params[jjj].name = NULL;
+                free_allocated_extension_event_array(array, iii);
+                return errorCode;
+            }
+
+            strcpy(array[iii].params[jjj].name, info->params[jjj].name);
+        }
+
+        strcpy(array[iii].id, info->id);
+        strcpy(array[iii].short_description, info->short_description);
+
+        ex = ex->next;
+    }
+
+    *extensions = array;
     return JVMTI_ERROR_NONE;
 }
 

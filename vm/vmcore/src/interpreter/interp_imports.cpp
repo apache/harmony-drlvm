@@ -21,6 +21,7 @@
 #include "mon_enter_exit.h"
 #include "interpreter.h"
 #include "interpreter_imports.h"
+#include "jit_intf.h"
 
 VMEXPORT void vm_monitor_enter_wrapper(ManagedObject *obj) {
     vm_monitor_enter(obj);
@@ -28,6 +29,11 @@ VMEXPORT void vm_monitor_enter_wrapper(ManagedObject *obj) {
 
 VMEXPORT void vm_monitor_exit_wrapper(ManagedObject *obj) {
     vm_monitor_exit(obj);
+}
+
+VMEXPORT void class_throw_linking_error_for_interpreter(Class_Handle ch,
+        unsigned index, unsigned opcode) {
+    class_throw_linking_error(ch, index, opcode);
 }
 
 extern struct JNIEnv_Internal *jni_native_intf;

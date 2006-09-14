@@ -22,12 +22,11 @@
 
 #include "Jitrino.h"
 #include "CodeGenIntfc.h"
-#include "FlowGraph.h"
 
 #if defined(_IPF_)
-	#include "ipf/IpfCodeGenerator.h"
+    #include "IpfCodeGenerator.h"
 #else
-	#include "ia32/Ia32CodeGenerator.h"
+    #include "ia32/Ia32CodeGenerator.h"
 #endif
 
 #include "Type.h"
@@ -38,8 +37,17 @@
 #include "constantfolder.h"
 #include "optimizer.h"
 #include "../../vm/drl/DrlVMInterface.h"
+#include "PMFAction.h"
 
 namespace Jitrino {
+
+
+class HIR2LIRSelectorSessionAction: public SessionAction {
+public:
+    virtual void run ();
+};
+static ActionFactory<HIR2LIRSelectorSessionAction> _hir2lir("hir2lir");
+
 
 class _VarCodeSelector : public VarCodeSelector {
 public:
@@ -56,7 +64,7 @@ public:
                     varIdMap[v->getId()] = 
                         callback.defVar(v->getType(),v->isAddrTaken(),
                                         v->isPinned());
-                    if(Log::cat_opt_gc()->isDebugEnabled()) {
+                    if(Log::isEnabled()) {
                         Log::out() << "Opt var ";
                         v->print(Log::out());
                         Log::out() << " is CG var " << (int) varIdMap[v->getId()] << ::std::endl;
@@ -68,7 +76,7 @@ public:
 
         GCBasePointerMap::iterator i;
         for(i = gcMap.begin(); i != gcMap.end(); ++i) {
-            if(Log::cat_opt_gc()->isDebugEnabled()) {
+            if(Log::isEnabled()) {
                 Log::out() << "Set GC base of ";
                 i->first->print(Log::out());
                 Log::out() << "(" << (int) varIdMap[i->first->getId()] << ") to ";
@@ -101,7 +109,7 @@ private:
 
 class _BlockCodeSelector : public BlockCodeSelector {
 public:
-    _BlockCodeSelector(MemoryManager& mm, IRManager& irmanager, CFGNode* b,CG_OpndHandle** map,
+    _BlockCodeSelector(MemoryManager& mm, IRManager& irmanager, Node* b,CG_OpndHandle** map,
                        uint32* varMap, bool sinkConstants0, bool sinkConstantsOne0) 
         : irmanager(irmanager), memManager(mm), opndToCGInstMap(map), 
           localOpndToCGInstMap(mm), varIdMap(varMap), block(b),
@@ -407,7 +415,7 @@ public:
             return ConvertToIntOp::SignedOvf;
         case Overflow_Unsigned:
             return ConvertToIntOp::UnsignedOvf;
-	default: assert(0);
+    default: assert(0);
         }
         return ConvertToIntOp::NoOvf;    // to keep the compiler quiet
     }
@@ -425,6 +433,8 @@ public:
         switch(callId) {
         case InitializeArray: return JitHelperCallOp::InitializeArray;
         case PseudoCanThrow: return JitHelperCallOp::PseudoCanThrow;
+        case SaveThisState: return JitHelperCallOp::SaveThisState;
+        case ReadThisState: return JitHelperCallOp::ReadThisState;
         }
         assert(0);
         return JitHelperCallOp::InitializeArray; // to keep compiler quiet
@@ -455,7 +465,7 @@ public:
     void genInstCode(InstructionCallback& instructionCallback,
                      Inst *inst, bool genConsts)
     {
-        if(Log::cat_opt()->isIREnabled()) {
+        if(Log::isEnabled()) {
             Log::out() << "genInstCode ";
             inst->print(Log::out());
             if (genConsts) {
@@ -891,7 +901,7 @@ public:
                 JitHelperCallId callId = call->getJitHelperId();
 
                 if( callId == PseudoCanThrow ){
-                    cgInst = NULL;
+                    instructionCallback.pseudoInst();
 
                 } else {
                     cgInst = 
@@ -1003,7 +1013,7 @@ public:
                 isConstant = true;
             }
             break;
-        case Op_LdString:
+        case Op_LdRef:
             {
                 if (!genConsts) break;
 
@@ -1011,8 +1021,9 @@ public:
                 
                 TokenInst *tokenInst = (TokenInst *)inst;
                 uint32 token = tokenInst->getToken();
-                cgInst = instructionCallback.ldString(tokenInst->getEnclosingMethod(),token,
-                                                      acmod==AutoCompress_Yes);
+                cgInst = instructionCallback.ldRef(inst->getDst()->getType(),
+                                                   tokenInst->getEnclosingMethod(),
+                                                   token, acmod==AutoCompress_Yes);
                 isConstant = true;
             }
             break;
@@ -1222,19 +1233,14 @@ public:
             break;
         case Op_TauLdIntfcVTableAddr:
             {
-                assert(inst->getNumSrcOperands() == 2);
+                assert(inst->getNumSrcOperands() == 1);
                 TypeInst *typeInst = (TypeInst*)inst;
                 Type * vtableType = typeInst->getTypeInfo();
                 assert(vtableType->isUserObject());
                 Opnd *base = inst->getSrc(0);
-                Opnd *tauBaseHasInterface = inst->getSrc(1);
-
-                assert(tauBaseHasInterface->getType()->tag == Type::Tau);
-
                 cgInst = instructionCallback.tau_ldIntfTableAddr(inst->getDst()->getType(),
                                                                  getCGInst(base),
-                                                                 (NamedType*)vtableType,
-                                                                 getCGInst(tauBaseHasInterface));
+                                                                 (NamedType*)vtableType);
             }
             break;
         case Op_TauArrayLen:
@@ -1270,8 +1276,12 @@ public:
             // Add a scaled index to an array element address
         case Op_AddScaledIndex:    
             {
+                PtrType* arrType = (PtrType*) inst->getSrc(0)->getType();
+                Type*    refType = arrType->getPointedToType();
+
                 assert(inst->getNumSrcOperands() == 2);
-                cgInst = instructionCallback.addElemIndex(getCGInst(inst->getSrc(0)),
+                cgInst = instructionCallback.addElemIndex(refType,
+                                                          getCGInst(inst->getSrc(0)),
                                                           getCGInst(inst->getSrc(1)));
             }
             break;
@@ -1280,7 +1290,9 @@ public:
             {
                 assert(inst->getNumSrcOperands() == 2);
                 cgInst = instructionCallback.scaledDiffRef(getCGInst(inst->getSrc(0)),
-                                                           getCGInst(inst->getSrc(1)));
+                                                           getCGInst(inst->getSrc(1)),
+                                                           (Type *)inst->getSrc(0)->getType(),
+                                                           (Type *)inst->getSrc(1)->getType());
             }
             break;
         case Op_UncompressRef:
@@ -1524,7 +1536,7 @@ public:
             {
                 assert(inst->getNumSrcOperands() == 1);
                 if ( inst->getDefArgModifier() == NonNullThisArg ) {
-                    if(Log::cat_opt()->isDebugEnabled()) {
+                    if(Log::isEnabled()) {
                         Log::out() << " chknull_NonNullThisArg_check" << ::std::endl;
                     }
                     cgInst = instructionCallback.tau_checkNull(getCGInst(inst->getSrc(0)), true);
@@ -1745,8 +1757,22 @@ public:
         case Op_Label:
             break;      // nothing to do
         case Op_MethodEntry:
+            {  
+                assert(inst->isMethodMarker());
+                MethodMarkerInst* methEntryInst = inst->asMethodMarkerInst();
+                instructionCallback.methodEntry(methEntryInst->getMethodDesc());
+            }
             break;      // nothing to do
         case Op_MethodEnd:
+            {  
+                assert(inst->isMethodMarker());
+                MethodMarkerInst* methEntryInst = inst->asMethodMarkerInst();
+                // check that inst->getSrc(0) is really retOpnd and not thisOpnd
+                CG_OpndHandle* ret_val = inst->getNumSrcOperands()==0 ? NULL : 
+                        getCGInst(inst->getSrc(0));
+                instructionCallback.methodEnd(methEntryInst->getMethodDesc(), 
+                        ret_val);
+            }
             break;      // nothing to do
         case Op_SourceLineNumber: 
             {
@@ -1853,7 +1879,7 @@ public:
             {
                 TokenInst *counterInst = (TokenInst *)inst;
                 uint32 counter = counterInst->getToken();
-                instructionCallback.incCounter(irmanager.getTypeManager().getInt32Type(), counter);
+                instructionCallback.incCounter(irmanager.getTypeManager().getUInt32Type(), counter);
             }
             break;
         case Op_Prefetch:
@@ -1970,7 +1996,7 @@ public:
         } // end switch
 
         if (cgInst) { // record mapping from dst
-            if(Log::cat_opt()->isIREnabled()) {
+            if(Log::isEnabled()) {
                 Log::out() << "genInstCode ";
                 inst->print(Log::out());
                 if (genConsts) {
@@ -1983,23 +2009,23 @@ public:
 
             assert(dst);
             if (isConstant) {
-                if(Log::cat_opt()->isDebugEnabled()) {
+                if(Log::isEnabled()) {
                     Log::out() << " isConstant" << ::std::endl;
                 }
                 assert(genConsts);
                 if (sinkConstants) {
-                    if(Log::cat_opt()->isDebugEnabled()) {
+                    if(Log::isEnabled()) {
                         Log::out() << " sinkConstants=true" << ::std::endl;
                     }
                     setLocalCGInst(cgInst, dst);
                 } else {
-                    if(Log::cat_opt()->isDebugEnabled()) {
+                    if(Log::isEnabled()) {
                         Log::out() << " sinkConstants=false" << ::std::endl;
                     }
                     setCGInst(cgInst, dst);
                 }
             } else {
-                if(Log::cat_opt()->isDebugEnabled()) {
+                if(Log::isEnabled()) {
                     Log::out() << " isConstant=false" << ::std::endl;
                 }
                 setCGInst(cgInst, dst);
@@ -2009,7 +2035,7 @@ public:
                 }
             }            
         } else {
-            if(Log::cat_opt()->isIREnabled()) {
+            if(Log::isEnabled()) {
                 Log::out() << "genInstCode ";
                 inst->print(Log::out());
                 if (genConsts) {
@@ -2027,10 +2053,10 @@ public:
         //
         // go through instructions
         //
-        Inst*    labelInst = block->getFirstInst();
-        Inst*    inst = labelInst->next();
-        while (inst != labelInst) {
-            if(Log::cat_opt()->isIREnabled()) {
+        Inst*    labelInst = (Inst*)block->getFirstInst();
+        Inst*    inst = labelInst->getNextInst();
+        while (inst != NULL) {
+            if(Log::isEnabled()) {
                 Log::out() << "Code select ";
                 inst->print(Log::out());
                 Log::out() << ::std::endl;
@@ -2041,7 +2067,7 @@ public:
                 instructionCallback.setCurrentHIRInstrID(instID);
             }
             genInstCode(instructionCallback, inst, !sinkConstants);
-            inst = inst->next();
+            inst = inst->getNextInst();
         }
     }
 private:
@@ -2079,7 +2105,7 @@ private:
     CG_OpndHandle**         opndToCGInstMap;
     StlMap<uint32, CG_OpndHandle*> localOpndToCGInstMap;
     uint32*                 varIdMap;
-    CFGNode*                block;
+    Node*                   block;
     InstructionCallback*    callback;
     bool                    sinkConstants;
     bool                    sinkConstantsOne;
@@ -2088,22 +2114,17 @@ private:
 
 class _CFGCodeSelector : public CFGCodeSelector {
 public:
-    _CFGCodeSelector(MemoryManager& mm, IRManager& irmanager, FlowGraph* fg,CG_OpndHandle** map,
+    _CFGCodeSelector(MemoryManager& mm, IRManager& irmanager, ControlFlowGraph* fg,CG_OpndHandle** map,
                      uint32 *varMap, bool sinkConstants0, bool sinkConstantsOne0)
         : irmanager(irmanager), opndToCGInstMap(map), varIdMap(varMap), 
           flowGraph(fg), numNodes(0), memManager(mm), sinkConstants(sinkConstants0),
-          sinkConstantsOne(sinkConstantsOne0){
-        numNodes = flowGraph->assignDepthFirstNum();
+          sinkConstantsOne(sinkConstantsOne0)
+    {
+        flowGraph->orderNodes();
+        numNodes = flowGraph->getNodeCount();
     }
     void genCode(Callback& callback) {
         bool    hasEdgeProfile = flowGraph->hasEdgeProfile();
-        //
-        //  If the flags direct us not to pass profile information
-        //  to the code generator, ignore the profile
-        //
-        OptimizerFlags& optimizerFlags = *irmanager.getCompilationContext()->getOptimizerFlags(); 
-        if (optimizerFlags.pass_profile_to_cg == false)
-            hasEdgeProfile = false;
         //
         // go through nodes in flow graph and call genDispatchNode for nodes
         // that are handlers (dispatchers) and genBlock for nodes that are blocks.
@@ -2115,26 +2136,26 @@ public:
         // node id returned by the code selector
         //
         uint32*    nodeMapTable = new (memManager) uint32[numNodes];
-        ::std::vector<CFGNode*> nodes;
+        ::std::vector<Node*> nodes;
         nodes.reserve(numNodes);
 
         // Compute postorder list to get only reachable nodes.
         flowGraph->getNodesPostOrder(nodes);
 
-        assert(flowGraph->getExit()->getTraversalNum() == flowGraph->getTraversalNum());
-        CFGNode* unwind = flowGraph->getUnwind();
-        CFGNode* exit = flowGraph->getExit();
+        assert(flowGraph->getExitNode()->getTraversalNum() == flowGraph->getTraversalNum());
+        Node* unwind = flowGraph->getUnwindNode();
+        Node* exit = flowGraph->getExitNode();
         // Use reverse iterator to generate nodes in reverse postorder.
-        ::std::vector<CFGNode*>::reverse_iterator niter;
+        ::std::vector<Node*>::reverse_iterator niter;
         for(niter = nodes.rbegin(); niter != nodes.rend(); ++niter) {
-            CFGNode* node = *niter;
+            Node* node = *niter;
             //
             // Count in and out edges
             //
             uint32 numOutEdges = node->getOutDegree();
             uint32 numInEdges = node->getInDegree();
             uint32 nodeId = MAX_UINT32;
-            double cnt = (hasEdgeProfile? node->getFreq() : -1.0);
+            double cnt = (hasEdgeProfile? node->getExecCount() : -1.0);
 
             if (node == exit) {
                 nodeId = callback.genExitNode(numInEdges,cnt);
@@ -2142,7 +2163,7 @@ public:
             else if (node == unwind) {
                 nodeId = callback.genUnwindNode(numInEdges,numOutEdges,cnt);
             }
-            else if (node->isBasicBlock()) {
+            else if (node->isBlockNode()) {
                 _BlockCodeSelector    blockCodeSelector(memManager,
                                                         irmanager,
                                                         node,
@@ -2156,9 +2177,9 @@ public:
                 //  Derive the block kind (prolog, epilog, inner block)
                 //
                 CFGCodeSelector::Callback::BlockKind blockKind;
-                if (node == flowGraph->getEntry())
+                if (node == flowGraph->getEntryNode())
                     blockKind = CFGCodeSelector::Callback::Prolog;
-                else if (node == flowGraph->getReturn())
+                else if (node == flowGraph->getReturnNode())
                     blockKind = CFGCodeSelector::Callback::Epilog;
                 else
                     blockKind = CFGCodeSelector::Callback::InnerBlock;
@@ -2180,22 +2201,22 @@ public:
         //
         for(niter = nodes.rbegin(); niter != nodes.rend(); ++niter) {
             double    prob;
-            CFGNode* tailNode = *niter;
+            Node* tailNode = *niter;
             uint32 tailNodeId = nodeMapTable[tailNode->getDfNum()];
-            if (tailNode->getLastInst()->isSwitch()) { 
+            if (((Inst*)tailNode->getLastInst())->isSwitch()) { 
                 //
                 //  Generate switch edges
                 //
                 SwitchInst* sw = (SwitchInst *)tailNode->getLastInst();
-                CFGNode *defaultNode = sw->getDefaultTarget()->getCFGNode();
+                Node *defaultNode = sw->getDefaultTarget()->getNode();
                 uint32 defaultNodeId = nodeMapTable[defaultNode->getDfNum()];
                 uint32 numTargets = sw->getNumTargets();
                 uint32 * targetNodeIds = new (memManager) uint32[numTargets];
                 double * targetProbs = new (memManager) double[numTargets];
                 uint32 i;
                 for (i = 0; i < numTargets; i++) {
-                    CFGNode *headNode = sw->getTarget(i)->getCFGNode();
-                    CFGEdge *edge = (CFGEdge *) tailNode->findTarget(headNode);
+                    Node *headNode = sw->getTarget(i)->getNode();
+                    Edge *edge = (Edge *) tailNode->findTargetEdge(headNode);
                     targetNodeIds[i] = nodeMapTable[headNode->getDfNum()];
                     targetProbs[i] = (hasEdgeProfile? edge->getEdgeProb() : -1.0);
                 }
@@ -2204,10 +2225,10 @@ public:
                 //
                 //  Generate an exception edge if it exists
                 //
-                CFGEdge* throwEdge = (CFGEdge*) tailNode->getExceptionEdge();
+                Edge* throwEdge = (Edge*) tailNode->getExceptionEdge();
                 if(throwEdge != NULL) {
                     assert(0);
-                    CFGNode *succNode = throwEdge->getTargetNode();
+                    Node *succNode = throwEdge->getTargetNode();
                     assert(succNode->isDispatchNode());
                     uint32 headNodeId = nodeMapTable[succNode->getDfNum()];
                     prob = (hasEdgeProfile? throwEdge->getEdgeProb() : -1.0);
@@ -2218,30 +2239,30 @@ public:
                 //
                 // Gen edges for a node that does not end with a switch
                 //
-                const CFGEdgeDeque& edges = tailNode->getOutEdges();
-                CFGEdgeDeque::const_iterator eiter;
+                const Edges& edges = tailNode->getOutEdges();
+                Edges::const_iterator eiter;
                 for(eiter = edges.begin(); eiter != edges.end(); ++eiter) {
-                    CFGEdge* edge = *eiter;
+                    Edge* edge = *eiter;
                     prob = (hasEdgeProfile? edge->getEdgeProb() : -1.0);
-                    CFGNode * headNode = (CFGNode*)edge->getTargetNode();
+                    Node * headNode = edge->getTargetNode();
                     uint32 headNodeId = nodeMapTable[headNode->getDfNum()];
-                    CFGEdge::Kind edgeKind = edge->getEdgeType();
+                    Edge::Kind edgeKind = edge->getKind();
                     switch (edgeKind) {
-                    case CFGEdge::Unconditional:
+                    case Edge::Kind_Unconditional:
                         callback.genUnconditionalEdge(tailNodeId,headNodeId,prob);
                         break;
-                    case CFGEdge::True:
+                    case Edge::Kind_True:
                         callback.genTrueEdge(tailNodeId,headNodeId,prob);
                         break;
-                    case CFGEdge::False:
+                    case Edge::Kind_False:
                         callback.genFalseEdge(tailNodeId,headNodeId,prob);
                         break;
-                    case CFGEdge::Exception:
+                    case Edge::Kind_Dispatch:
                         callback.genExceptionEdge(tailNodeId,headNodeId,prob);
                         break;
-                    case CFGEdge::Catch:
+                    case Edge::Kind_Catch:
                         {
-                            Inst* first = headNode->getFirstInst();
+                            Inst* first = (Inst*)headNode->getFirstInst();
                             assert(first->isLabel() && 
                                    ((LabelInst*)first)->isCatchLabel());
                             CatchLabelInst * label = (CatchLabelInst *)first;
@@ -2251,30 +2272,11 @@ public:
                                                   prob);
                             break;
                         }
-                    case CFGEdge::Exit:
-                        callback.genExitEdge(tailNodeId,headNodeId,prob);
-                        break;
                     default:
                         assert(0);
                     }
                 }
             }
-        }
-
-        LoopTree& loopInfo = *(irmanager.getLoopTree());
-        assert(loopInfo.isValid());
-        for(niter = nodes.rbegin(); niter != nodes.rend(); ++niter) {
-            CFGNode* node = *niter;
-            uint32 dfNum = node->getDfNum();
-            uint32 nodeid = nodeMapTable[dfNum];
-            bool isHeader = loopInfo.isLoopHeader(node);
-            // A loop header should have two in edges - one entry and one back edge.
-            assert(!isHeader || (node->getInDegree() == 2));
-            bool hasHeader = loopInfo.hasContainingLoopHeader(node);
-            uint32 headerid = (uint32) -1;
-            if(hasHeader)
-                headerid = nodeMapTable[loopInfo.getContainingLoopHeader(node)->getDfNum()];
-            callback.setLoopInfo(nodeid, isHeader, hasHeader, headerid);
         }
     }
     uint32    getNumNodes() {return numNodes;}
@@ -2282,7 +2284,7 @@ private:
     IRManager&         irmanager;
     CG_OpndHandle**    opndToCGInstMap;
     uint32*         varIdMap;
-    FlowGraph*        flowGraph;
+    ControlFlowGraph*        flowGraph;
     uint32            numNodes;
     MemoryManager&    memManager;
     bool              sinkConstants;
@@ -2294,7 +2296,7 @@ public:
     _MethodCodeSelector(IRManager& irmanager,
                         MethodDesc *desc,
                         VarOpnd* opnds,
-                        FlowGraph* fg,
+                        ControlFlowGraph* fg,
                         OpndManager& opndManager,
                         bool sinkConstants0,
                         bool sinkConstantsOne0) 
@@ -2322,16 +2324,9 @@ public:
         }
         _CFGCodeSelector    cfgCodeSelector(localMemManager,irmanager,flowGraph,opndToCGInstMap,
                                             varIdMap, sinkConstants, sinkConstantsOne);
-        callback.setProfileInfo(irmanager.getCodeProfiler());
 
         bool    hasEdgeProfile = flowGraph->hasEdgeProfile();
-        //
-        //  If the flags direct us not to pass profile information
-        //  to the code generator, ignore the profile
-        //
-        OptimizerFlags& optimizerFlags = *irmanager.getCompilationContext()->getOptimizerFlags();
-        if (optimizerFlags.pass_profile_to_cg == false)
-            hasEdgeProfile = false;
+
         callback.genCFG(cfgCodeSelector.getNumNodes(),cfgCodeSelector, hasEdgeProfile);
     }
 private:
@@ -2340,7 +2335,7 @@ private:
     uint32      numArgs;
     uint32      numVars;
     VarOpnd*    varOpnds;
-    FlowGraph*  flowGraph;
+    ControlFlowGraph*  flowGraph;
     MethodDesc* methodDesc;
     bool        sinkConstants;
     bool        sinkConstantsOne;
@@ -2349,44 +2344,38 @@ private:
 //
 // code generator entry point
 //
-bool 
-genCode(IRManager&            irManager,
-        CompilationInterface& compilationInterface,
-        MethodDesc*           methodDesc, 
-        FlowGraph*            flowGraph,
-        OpndManager&          opndManager,
-        Jitrino::Backend      cgFlag,
-        bool                  sinkConstants,
-        bool                  sinkConstantsOne) {
-
+void HIR2LIRSelectorSessionAction::run() {
+    CompilationContext* cc = getCompilationContext();
+    IRManager& irManager = *cc->getHIRManager();
+    CompilationInterface* ci = cc->getVMCompilationInterface();
+    MethodDesc* methodDesc  = ci->getMethodToCompile();
+    OpndManager& opndManager = irManager.getOpndManager();
+    const OptimizerFlags& optFlags = irManager.getOptimizerFlags();
     VarOpnd* varOpnds   = opndManager.getVarOpnds();
-    uint32 byteCodeSize = methodDesc->getByteCodeSize();
-    MemoryManager    codegenMemManager(byteCodeSize * 128, "genCode.codegenMemManager"); 
+    MemoryManager& mm  = cc->getCompilationLevelMemoryManager();
 
-    _MethodCodeSelector  methodCodeSelector(irManager,methodDesc,varOpnds,flowGraph,opndManager,
-                                            sinkConstants, sinkConstantsOne);
+    MethodCodeSelector* mcs = new (mm) _MethodCodeSelector(irManager,methodDesc,varOpnds,&irManager.getFlowGraph(),
+        opndManager, optFlags.sink_constants, optFlags.sink_constants1);
 #if defined(_IPF_)
-	IPF::IpfCodeGenerator ipfCodeGenerator(codegenMemManager,compilationInterface);
-        return ipfCodeGenerator.genCode(methodCodeSelector);
+    IPF::CodeGenerator cg(mm, *ci);
 #else
-	Ia32::CodeGenerator ia32CodeGenerator(codegenMemManager,compilationInterface);
-        return ia32CodeGenerator.genCode(methodCodeSelector);
+    Ia32::CodeGenerator cg;
 #endif
-
+    cg.genCode(this, *mcs);
 }
 
-uint64
+POINTER_SIZE_INT
 InlineInfoMap::ptr_to_uint64(void *ptr)
 {
 #ifdef POINTER64
-    return (uint64)ptr;
+    return (POINTER_SIZE_INT)ptr;
 #else
-    return (uint32)ptr;
+    return (POINTER_SIZE_INT)ptr;
 #endif
 }
 
 Method_Handle
-InlineInfoMap::uint64_to_mh(uint64 value)
+InlineInfoMap::uint64_to_mh(POINTER_SIZE_INT value)
 {
 #ifdef POINTER64
     return (Method_Handle)value;
@@ -2416,7 +2405,7 @@ InlineInfoMap::isEmpty() const
 // size increased for better portability,
 // everybody is welcome to optimize this storage
 // 
-// size = 8 * (2 * offset_cnt + 1 + total_mh_cnt)
+// size = sizeof(POINTER_SIZE_INT) * (2 * offset_cnt + 1 + total_mh_cnt * 2)
 //
 uint32
 InlineInfoMap::computeSize() const
@@ -2428,7 +2417,7 @@ InlineInfoMap::computeSize() const
         total_mh_cnt += it->inline_info->countLevels();
         offset_cnt++;
     }
-    return 8 * (2 * offset_cnt + 1 + total_mh_cnt);
+    return sizeof(POINTER_SIZE_INT) * (2 * offset_cnt + 1 + total_mh_cnt * 2);
 }
 
 void
@@ -2436,20 +2425,22 @@ InlineInfoMap::write(InlineInfoPtr output)
 {
 //    assert(((uint64)ptr_to_uint64(output) & 0x7) == 0);
 
-    uint64* ptr = (uint64 *)output;
-    *ptr++ = (uint64)list.size(); // offset_cnt
+    POINTER_SIZE_INT* ptr = (POINTER_SIZE_INT *)output;
+    *ptr++ = (POINTER_SIZE_INT)list.size(); // offset_cnt
 
     InlineInfoList::iterator it = list.begin();
     for (; it != list.end(); it++) {
-        *ptr++ = (uint64) it->offset;
-        uint64 depth = 0;
-        uint64* depth_ptr = ptr++;
+        *ptr++ = (POINTER_SIZE_INT) it->offset;
+        POINTER_SIZE_INT depth = 0;
+        POINTER_SIZE_INT* depth_ptr = ptr++;
         assert(it->inline_info->countLevels() > 0);
-        InlineInfo::MethodDescList::iterator desc_it = it->inline_info->inlineChain->begin();
+        InlineInfo::InlinePairList::iterator desc_it = it->inline_info->inlineChain->begin();
         for (; desc_it != it->inline_info->inlineChain->end(); desc_it++) {
-            MethodDesc* mdesc = *desc_it;
+            MethodDesc* mdesc = (MethodDesc*)(*desc_it)->first;
+            uint32 bcOffset = (uint32)(*desc_it)->second;
             //assert(dynamic_cast<DrlVMMethodDesc*>(mdesc)); // <-- some strange warning on Win32 here
             *ptr++ = ptr_to_uint64(((DrlVMMethodDesc*)mdesc)->getDrlVMMethod());
+            *ptr++ = (POINTER_SIZE_INT)bcOffset;
             depth++;
         }
         assert(depth == it->inline_info->countLevels());
@@ -2458,20 +2449,20 @@ InlineInfoMap::write(InlineInfoPtr output)
     assert((POINTER_SIZE_INT)ptr == (POINTER_SIZE_INT)output + computeSize());
 }
 
-uint64*
+POINTER_SIZE_INT*
 InlineInfoMap::find_offset(InlineInfoPtr ptr, uint32 offset)
 {
-    assert(((uint64)ptr_to_uint64(ptr) & 0x7) == 0);
+    assert(((POINTER_SIZE_INT)ptr_to_uint64(ptr) & 0x7) == 0);
 
-    uint64* tmp_ptr = (uint64 *)ptr;
-    uint64 offset_cnt = *tmp_ptr++;
+    POINTER_SIZE_INT* tmp_ptr = (POINTER_SIZE_INT *)ptr;
+    POINTER_SIZE_INT offset_cnt = *tmp_ptr++;
 
     for (uint32 i = 0; i < offset_cnt; i++) {
-        uint64 curr_offs = *tmp_ptr++ ;
+        POINTER_SIZE_INT curr_offs = *tmp_ptr++ ;
         if ( offset == curr_offs ) {
             return tmp_ptr;
         }
-        uint64 curr_depth  = *tmp_ptr++ ;
+        POINTER_SIZE_INT curr_depth  = (*tmp_ptr++)*2 ;
         tmp_ptr += curr_depth;
     }
 
@@ -2481,7 +2472,7 @@ InlineInfoMap::find_offset(InlineInfoPtr ptr, uint32 offset)
 uint32
 InlineInfoMap::get_inline_depth(InlineInfoPtr ptr, uint32 offset)
 {
-    uint64* tmp_ptr = find_offset(ptr, offset);
+    POINTER_SIZE_INT* tmp_ptr = find_offset(ptr, offset);
     if ( tmp_ptr != NULL ) {
         return (uint32)*tmp_ptr;
     }
@@ -2491,14 +2482,28 @@ InlineInfoMap::get_inline_depth(InlineInfoPtr ptr, uint32 offset)
 Method_Handle
 InlineInfoMap::get_inlined_method(InlineInfoPtr ptr, uint32 offset, uint32 inline_depth)
 {
-    uint64* tmp_ptr = find_offset(ptr, offset);
+    POINTER_SIZE_INT* tmp_ptr = find_offset(ptr, offset);
     if ( tmp_ptr != NULL ) {
-        uint64 depth = *tmp_ptr++;
+        POINTER_SIZE_INT depth = *tmp_ptr++;
         assert(inline_depth < depth);
-        tmp_ptr += (depth - 1) - inline_depth;
+        tmp_ptr += ((depth - 1) - inline_depth ) * 2;
         return uint64_to_mh(*tmp_ptr);
     }
     return NULL;
 }
+
+uint16
+InlineInfoMap::get_inlined_bc(InlineInfoPtr ptr, uint32 offset, uint32 inline_depth)
+{
+    POINTER_SIZE_INT* tmp_ptr = find_offset(ptr, offset);
+    if ( tmp_ptr != NULL ) {
+        POINTER_SIZE_INT depth = *tmp_ptr++;
+        assert(inline_depth < depth);
+        tmp_ptr += ((depth - 1) - inline_depth) * 2 + 1;
+        return (uint16)(*tmp_ptr);
+    }
+    return 0;
+}
+
 
 } //namespace Jitrino 

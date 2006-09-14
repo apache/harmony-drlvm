@@ -203,11 +203,10 @@ static Class* _resolve_class(Global_Env *env,
 
 static bool class_can_instantiate(Class* clss, bool _throw)
 {
+    ASSERT_RAISE_AREA;
     bool fail = class_is_abstract(clss);
     if(fail && _throw) {
-        tmn_suspend_enable();
-        exn_throw_by_name("java/lang/InstantiationError", clss->name->bytes);
-        tmn_suspend_disable();
+        exn_raise_by_name("java/lang/InstantiationError", clss->name->bytes);
     }
     return !fail;
 }
@@ -216,8 +215,13 @@ static bool class_can_instantiate(Class* clss, bool _throw)
 Class* _resolve_class_new(Global_Env *env, Class *clss,
                           unsigned cp_index)
 {
+    ASSERT_RAISE_AREA;
+
     Class *new_clss = _resolve_class(env,clss,cp_index);
-    if (new_clss && !class_can_instantiate(new_clss, false)) {
+    if (!new_clss) return NULL;
+    bool can_instantiate = class_can_instantiate(new_clss, false);
+
+    if (new_clss && !can_instantiate) {
         return NULL;
     }
     return new_clss;
@@ -464,12 +468,11 @@ static Field* _resolve_field(Global_Env *env, Class *clss, unsigned cp_index)
 
 bool field_can_link(Class* clss, Field* field, bool _static, bool putfield, bool _throw)
 {
+    ASSERT_RAISE_AREA;
     if(_static?(!field->is_static()):(field->is_static())) {
         if(_throw) {
-            tmn_suspend_enable();
-            exn_throw_by_name("java/lang/IncompatibleClassChangeError",
+            exn_raise_by_name("java/lang/IncompatibleClassChangeError",
                 field->get_class()->name->bytes);
-            tmn_suspend_disable();
         }
         return false;
     }
@@ -480,13 +483,12 @@ bool field_can_link(Class* clss, Field* field, bool _static, bool putfield, bool
             }
         }
         if(_throw) {
-            tmn_suspend_enable();
             unsigned buf_size = clss->name->len + field->get_class()->name->len + field->get_name()->len + 15;
             char* buf = (char*)STD_ALLOCA(buf_size);
             memset(buf, 0, buf_size);
             sprintf(buf, " from %s to %s.%s", clss->name->bytes, field->get_class()->name->bytes, field->get_name()->bytes);
-            exn_throw_by_name("java/lang/IllegalAccessError", buf);
-            tmn_suspend_disable();
+            jthrowable exc_object = exn_create("java/lang/IllegalAccessError", buf);
+            exn_raise_object(exc_object);
         }
         return false;
     }
@@ -505,6 +507,8 @@ static Field* _resolve_static_field(Global_Env *env,
                                   unsigned cp_index,
                                   bool putfield)
 {
+    ASSERT_RAISE_AREA;
+
     Field *field = _resolve_field(env,clss,cp_index);
     if(field && !field_can_link(clss, field, CAN_LINK_FROM_STATIC, putfield, LINK_NO_THROW)) {
         return NULL;
@@ -519,6 +523,8 @@ static Field* _resolve_nonstatic_field(Global_Env *env,
                                        unsigned cp_index,
                                        unsigned putfield)
 {
+    ASSERT_RAISE_AREA;
+
     Field *field = _resolve_field(env, clss, cp_index);
     if(field && !field_can_link(clss, field, CAN_LINK_FROM_FIELD, putfield, LINK_NO_THROW)) {
         return NULL;
@@ -629,12 +635,12 @@ static Method* _resolve_method(Global_Env *env, Class *clss, unsigned cp_index)
 
 
 static bool method_can_link_static(Class* clss, unsigned index, Method* method, bool _throw) {
+    ASSERT_RAISE_AREA;
+
     if (!method->is_static()) {
         if(_throw) {
-            tmn_suspend_enable();
-            exn_throw_by_name("java/lang/IncompatibleClassChangeError",
+            exn_raise_by_name("java/lang/IncompatibleClassChangeError",
                 method->get_class()->name->bytes);
-            tmn_suspend_disable();
         }
         return false;
     }
@@ -645,6 +651,8 @@ static Method* _resolve_static_method(Global_Env *env,
                                       Class *clss,
                                       unsigned cp_index)
 {
+    ASSERT_RAISE_AREA;
+
     Method* method = _resolve_method(env, clss, cp_index);
     if(method && !method_can_link_static(clss, cp_index, method, LINK_NO_THROW))
         return NULL;
@@ -654,24 +662,23 @@ static Method* _resolve_static_method(Global_Env *env,
 
 static bool method_can_link_virtual(Class* clss, unsigned cp_index, Method* method, bool _throw)
 {
+    ASSERT_RAISE_AREA;
+
     if(method->is_static()) {
         if(_throw) {
-            tmn_suspend_enable();
-            exn_throw_by_name("java/lang/IncompatibleClassChangeError",
+            exn_raise_by_name("java/lang/IncompatibleClassChangeError",
                 method->get_class()->name->bytes);
-            tmn_suspend_disable();
         }
         return false;
     }
     if(class_is_interface(method->get_class())) {
         if(_throw) {
-            tmn_suspend_enable();
             char* buf = (char*)STD_ALLOCA(clss->name->len
                 + method->get_name()->len + method->get_descriptor()->len + 2);
             sprintf(buf, "%s.%s%s", clss->name->bytes,
                 method->get_name()->bytes, method->get_descriptor()->bytes);
-            exn_throw_by_name("java/lang/AbstractMethodError", buf);
-            tmn_suspend_disable();
+            jthrowable exc_object = exn_create("java/lang/AbstractMethodError", buf);
+            exn_raise_object(exc_object);
         }
         return false;
     }
@@ -761,6 +768,8 @@ Method_Handle resolve_virtual_method(Compile_Handle h,
 
 static bool method_can_link_special(Class* clss, unsigned index, Method* method, bool _throw)
 {
+    ASSERT_RAISE_AREA;
+
     unsigned class_idx = clss->const_pool[index].CONSTANT_ref.class_index;
     unsigned class_name_idx = clss->const_pool[class_idx].CONSTANT_Class.name_index;
     String* ref_class_name = clss->const_pool[class_name_idx].CONSTANT_String.string;
@@ -769,20 +778,16 @@ static bool method_can_link_special(Class* clss, unsigned index, Method* method,
         && method->get_class()->name != ref_class_name)
     {
         if(_throw) {
-            tmn_suspend_enable();
-            exn_throw_by_name("java/lang/NoSuchMethodError",
+            exn_raise_by_name("java/lang/NoSuchMethodError",
                 method->get_name()->bytes);
-            tmn_suspend_disable();
         }
         return false;
     }
     if(method->is_static())
     {
         if(_throw) {
-            tmn_suspend_enable();
-            exn_throw_by_name("java/lang/IncompatibleClassChangeError",
+            exn_raise_by_name("java/lang/IncompatibleClassChangeError",
                 method->get_class()->name->bytes);
-            tmn_suspend_disable();
         }
         return false;
     }
@@ -794,7 +799,8 @@ static bool method_can_link_special(Class* clss, unsigned index, Method* method,
             char* buf = (char*)STD_ALLOCA(buf_size);
             memset(buf, 0, buf_size);
             sprintf(buf, "%s.%s%s", clss->name->bytes, method->get_name()->bytes, method->get_descriptor()->bytes);
-            exn_throw_by_name("java/lang/AbstractMethodError", buf);
+            jthrowable exc_object = exn_create("java/lang/AbstractMethodError", buf);
+            exn_raise_object(exc_object);
             tmn_suspend_disable();
         }
         return false;
@@ -810,6 +816,8 @@ Method_Handle resolve_special_method_env(Global_Env *env,
                                          Class_Handle curr_clss,
                                          unsigned index)
 {
+    ASSERT_RAISE_AREA;
+
     Method* method = _resolve_method(env, curr_clss, index);
     if(!method) {
         return NULL;
@@ -907,9 +915,11 @@ Class_Handle resolve_class(Compile_Handle h,
 
 void class_throw_linking_error(Class_Handle ch, unsigned index, unsigned opcode)
 {
+    ASSERT_RAISE_AREA;
+
     Const_Pool* cp = ch->const_pool;
     if(cp_in_error(cp, index)) {
-        exn_throw((jthrowable)(&(cp[index].error.cause)));
+        exn_raise_object((jthrowable)(&(cp[index].error.cause)));
         return; // will return in interpreter mode
     }
 
@@ -953,7 +963,7 @@ void class_throw_linking_error(Class_Handle ch, unsigned index, unsigned opcode)
             // FIXME Potentially this can be any RuntimeException or Error
             // The most probable case is OutOfMemoryError.
             WARN("**Java exception occured during resolution under compilation");
-            exn_throw(VM_Global_State::loader_env->java_lang_OutOfMemoryError);
+            exn_raise_object(VM_Global_State::loader_env->java_lang_OutOfMemoryError);
             //ASSERT(0, "Unexpected opcode: " << opcode);
             break;
     }

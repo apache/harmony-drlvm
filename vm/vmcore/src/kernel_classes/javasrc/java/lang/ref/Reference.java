@@ -23,24 +23,22 @@ package java.lang.ref;
 /**
  * @com.intel.drl.spec_ref
  */
-public abstract class Reference {
+public abstract class Reference<T> {
 
-    volatile Object referent;
+    private volatile T referent;
 
-    ReferenceQueue queue;
+    ReferenceQueue<? super T> queue;
 
     Reference next;
 
-    Reference(Object referent) {
-        initReference(referent);
+    Reference(T referent) {
+        this.referent = referent;
     }
 
-    Reference(Object referent, ReferenceQueue q) {
+    Reference(T referent, ReferenceQueue<? super T> q) {
         this.queue = q;
-        initReference(referent);
+        this.referent = referent; 
    }
-
-    native void initReference(Object referent);
 
     /**
      * @com.intel.drl.spec_ref
@@ -64,7 +62,7 @@ public abstract class Reference {
     /**
      * @com.intel.drl.spec_ref
      */
-    public Object get() {
+    public T get() {
         return referent;
     }
 

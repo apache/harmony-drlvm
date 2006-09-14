@@ -413,7 +413,7 @@ void free_local_object_handles(ObjectHandle head, ObjectHandle tail)
     ObjectHandlesOld* h = (ObjectHandlesOld*)head;
     while(h!=(ObjectHandlesOld*)tail) {
 #ifdef VM_STATS
-        vm_stats_total.num_local_jni_handles++;
+        VM_Statistics::get_vm_stats().num_local_jni_handles++;
 #endif //VM_STATS
         ObjectHandlesOld* next = h->next;
         STD_FREE(h);
@@ -425,16 +425,16 @@ void free_local_object_handles3(ObjectHandles* head)
 {
     ObjectHandlesNew* h = (ObjectHandlesNew*)head;
 #ifdef VM_STATS
-    vm_stats_total.num_free_local_called++;
+    VM_Statistics::get_vm_stats().num_free_local_called++;
     if(h != NULL)
-        vm_stats_total.num_free_local_called_free++;
+        VM_Statistics::get_vm_stats().num_free_local_called_free++;
 #endif //VM_STATS
     while(h) {
 #ifdef VM_STATS
         unsigned size = h->size;
-        vm_stats_total.num_local_jni_handles += size;
-        vm_stats_total.num_jni_handles_freed++;
-        vm_stats_total.num_jni_handles_wasted_refs += (h->capacity - size);
+        VM_Statistics::get_vm_stats().num_local_jni_handles += size;
+        VM_Statistics::get_vm_stats().num_jni_handles_freed++;
+        VM_Statistics::get_vm_stats().num_jni_handles_wasted_refs += (h->capacity - size);
 #endif //VM_STATS
         ObjectHandlesNew* next = h->next;
         STD_FREE(h);
@@ -448,23 +448,23 @@ void free_local_object_handles2(ObjectHandles* head)
     ObjectHandlesNew* h = (ObjectHandlesNew*)head;
     assert(h);
 #ifdef VM_STATS
-    vm_stats_total.num_free_local_called++;
+    VM_Statistics::get_vm_stats().num_free_local_called++;
     if(h->next != NULL)
-        vm_stats_total.num_free_local_called_free++;
+        VM_Statistics::get_vm_stats().num_free_local_called_free++;
 #endif //VM_STATS
     while(h->next) {
 #ifdef VM_STATS
         unsigned size = h->size;
-        vm_stats_total.num_local_jni_handles += size;
-        vm_stats_total.num_jni_handles_freed++;
-        vm_stats_total.num_jni_handles_wasted_refs += (h->capacity - size);
+        VM_Statistics::get_vm_stats().num_local_jni_handles += size;
+        VM_Statistics::get_vm_stats().num_jni_handles_freed++;
+        VM_Statistics::get_vm_stats().num_jni_handles_wasted_refs += (h->capacity - size);
 #endif //VM_STATS
         ObjectHandlesNew* next = h->next;
         STD_FREE(h);
         h = next;
     }
 #ifdef VM_STATS
-    vm_stats_total.num_jni_handles_wasted_refs += (h->capacity - h->size);
+    VM_Statistics::get_vm_stats().num_jni_handles_wasted_refs += (h->capacity - h->size);
 #endif //VM_STATS
 }
 
@@ -524,8 +524,8 @@ LilCodeStub* oh_gen_init_handle(LilCodeStub* cs, char* base_var, unsigned handle
     unsigned offset = oh_get_handle_offset(handle_indx);
     if (null_check && VM_Global_State::loader_env->compress_references) {
         sprintf(buf,
-                "jc %s=%d:ref,%%n; st [%s+%d:ref],%s; j %%o; :%%g; st [%s+%d:ref],0; :%%g;",
-                val, (unsigned)(POINTER_SIZE_INT)Class::heap_base, base_var, offset, val, base_var, offset);
+                "jc %s=%p:ref,%%n; st [%s+%d:ref],%s; j %%o; :%%g; st [%s+%d:ref],0; :%%g;",
+                val, Class::heap_base, base_var, offset, val, base_var, offset);
     } else {
         sprintf(buf, "st [%s+%d:ref],%s;", base_var, offset, val);
     }

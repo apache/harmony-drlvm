@@ -23,40 +23,47 @@
 #ifndef _JAVAFLOWGRAPHBUILDER_
 #define _JAVAFLOWGRAPHBUILDER_
 
-#include "FlowGraph.h"
+#include "MemoryManager.h"
+#include "ControlFlowGraph.h"
 
 namespace Jitrino {
-
 
 class JavaFlowGraphBuilder {
 public:
     // regular version
     JavaFlowGraphBuilder(MemoryManager&, IRBuilder &);
     // version for IR inlining
-    JavaFlowGraphBuilder(MemoryManager&, IRBuilder &, CFGNode *, FlowGraph *);
-    CFGNode*     genBlock(LabelInst* blockLabel);
-    CFGNode*     genBlockAfterCurrent(LabelInst *label);
+    JavaFlowGraphBuilder(MemoryManager&, IRBuilder &, Node *, ControlFlowGraph *);
+    Node*     genBlock(LabelInst* blockLabel);
+    Node*     genBlockAfterCurrent(LabelInst *label);
     void         build();
-    void         buildIRinline(Opnd *ret, FlowGraph *, Inst *callsite); // version for IR inlining
-    CFGNode*     createDispatchNode();
-    FlowGraph*   getCFG() { return fg; }
+    void         buildIRinline(Opnd *ret, ControlFlowGraph*, Inst *callsite); // version for IR inlining
+    ControlFlowGraph*   getCFG() { return fg; }
+    Node* createDispatchNode();
 private:
     void         createCFGEdges();
-    CFGNode*     edgesForBlock(CFGNode* block);
-    void         edgesForHandler(CFGNode* entry);
-    void         edgeForFallthrough(CFGNode* block);
+    Node*        edgesForBlock(Node* block);
+    void         edgesForHandler(Node* entry);
+    void         edgeForFallthrough(Node* block);
     void         eliminateUnnestedLoopsOnDispatch();
-    bool         lastInstIsMonitorExit(CFGNode* node);
+    bool         lastInstIsMonitorExit(Node* node);
     void         resolveWhileTrue();
-    void         reverseDFS( StlVector<int8>& state, CFGNode* targetNode, uint32* NodesCounter );
-    void         forwardDFS( StlVector<int8>& state, CFGNode* srcNode );
+    void         reverseDFS( StlVector<int8>& state, Node* targetNode, uint32* NodesCounter );
+    void         forwardDFS( StlVector<int8>& state, Node* srcNode, Edges& edges);
+
+    Node* createBlockNodeOrdered(LabelInst* label = NULL);
+    Node* createBlockNodeAfter(Node* node, LabelInst* label = NULL);
+    void addEdge(Node* source, Node* target);
+
     //
     // private fields
     //
     MemoryManager&  memManager;
-    CFGNode*        currentBlock;
-    FlowGraph*      fg;
+    Node*        currentBlock;
+    ControlFlowGraph*      fg;
     IRBuilder&      irBuilder;
+typedef StlList<Node*> NodeList;
+    NodeList fallThruNodes;
 };
 
 

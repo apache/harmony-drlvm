@@ -14,8 +14,8 @@
  *  limitations under the License.
  */
 /**
- * @author Alexander V. Astapchuk
- * @version $Revision: 1.4.12.3.4.4 $
+ * @author Alexander Astapchuk
+ * @version $Revision$
  */
  
 /**
@@ -26,27 +26,37 @@
 #if !defined(__TRACE_H_INCLUDED__)
 #define __TRACE_H_INCLUDED__
 
-#include "../shared/PlatformDependant.h"
+#include "mib.h"
+#include "jit_export_rt.h" // for JitFrameContext
 
 #include <string>
+using std::string;
 
 namespace Jitrino {
 namespace Jet {
 
 class JFrame;
 
+#ifdef _DEBUG
 /**
  * @def LOG_FILE_NAME
  * @brief Name of the file where the \link #dbg debug output \endlink goes.
  */
-#define LOG_FILE_NAME           "jet.log"
+    #define LOG_FILE_NAME           "jet.dbg.log"
+#else
+    #define LOG_FILE_NAME           "jet.log"
+#endif
 
-/**
- * @def RUNTIME_LOG_FILE_NAME
- * @brief Name of the file where the \link #rt_dbg debug output from the 
- *        managed code \endlink goes.
- */
-#define RUNTIME_LOG_FILE_NAME   "jet.rt.log"
+#ifdef _DEBUG
+    /**
+     * @def RUNTIME_LOG_FILE_NAME
+     * @brief Name of the file where the \link #rt_dbg debug output from the 
+     *        managed code \endlink goes.
+     */
+    #define RUNTIME_LOG_FILE_NAME   "jet.dbg.rt.log"
+#else
+    #define RUNTIME_LOG_FILE_NAME   "jet.rt.log"
+#endif
 
 /**
  * @brief Performs debugging output, logged to file #LOG_FILE_NAME
@@ -87,39 +97,37 @@ void dbg(const char * frmt, ...);
  *
  * @note Use with caution in multi-threaded environment. The function itself
  *       is thread-safe, but counters work is perfromed without interlocked 
- *       operations, somay be inadequate and may show different values from 
+ *       operations, so may be inadequate and may show different values from 
  *       one run to another for multiple threads.
  * @note The depth counter does not reflect if method finishes abruptly.
  *
  * @param msg - message to print out
  */
-void __stdcall rt_dbg(const char * msg) stdcall__;
+void __stdcall dbg_rt_out(const char * msg) stdcall__;
+
+/**
+ * Same as dbg(), but the output goes into #RUNTIME_LOG_FILE_NAME.
+ *
+ * The output goes through #dbg_rt_out and is processed accordingly.
+ */
+void dbg_rt(const char * frmt, ...);
 
 /**
  * @brief Dumps the native stack frame, addressed by \c addr.
  * @note implementation is obsolete, need update.
  * @todo implementation is obsolete, need update.
  */
-void dump_frame(char * ptr);
-
-/**
- * @brief Prints out the state of the JFrame.
- * @param name - a name to print out before the JFrame dump, to identify the 
- *        dump in the trace log
- * @param pjframe - a JFrame instance to dump
- */
-void dbg_dump_jframe(const char * name, const JFrame * pjframe);
-
-
+void dump_frame(const JitFrameContext* ctx, const MethodInfoBlock& info);
 
  /**
   * @brief Removes leading and trailing white spaces.
   */
 ::std::string trim(const char * p);
 
+extern unsigned g_tbreak_id;
 
 }
 }; // ~namespace Jitrino::Jet
 
 
-#endif		// ~__TRACE_H_INCLUDED__
+#endif      // ~__TRACE_H_INCLUDED__

@@ -27,8 +27,8 @@ import org.apache.harmony.lang.reflect.ReflectAccessor;
  */
 class ReflectExporter implements ReflectAccessor {
 
-    public Constructor copyConstructor(Constructor c) {
-        return new Constructor(c);
+    public <T> Constructor<T> copyConstructor(Constructor<T> c) {
+        return new Constructor<T>(c);
     }
 
     public Field copyField(Field f) {
@@ -38,6 +38,46 @@ class ReflectExporter implements ReflectAccessor {
     public Method copyMethod(Method m) {
         return new Method(m);
     }
+    
+    public Method[] mergePublicMethods(Method[] declared, 
+            Method[] superPublic, Method[][] intf, int estimate) {
+        Method[] store = new Method[estimate];
+        int size = 0;
+        for (Method m : declared) {
+            if (Modifier.isPublic(m.getModifiers())) {
+                store[size++] = m;
+            }
+        }
+        if (superPublic != null) {
+            nextSuper: for (Method m : superPublic) {
+                for (int i = 0; i < size; i++) {
+                    if (m.getName() == store[i].getName() 
+                            && m.getSignature() == store[i].getSignature()) {
+                        continue nextSuper;
+                    }
+                }
+                store[size++] = m;
+            }
+        }
+        if (intf != null) {
+            for (Method[] mi : intf) {
+                nextIntf: for (Method m : mi) {
+                    for (int i = 0; i < size; i++) {
+                        if (m.getName() == store[i].getName() 
+                                && m.getSignature() == store[i].getSignature()) {
+                            continue nextIntf;
+                        }
+                    }
+                    store[size++] = m;                
+                }
+            }
+        }
+        Method[] real = new Method[size];
+        System.arraycopy(store, 0, real, 0, size);
+
+        return real;
+    }
+
 
     public void checkMemberAccess(Class callerClass, Class declaringClass,
                                   Class runtimeClass, int memberModifiers)
@@ -55,8 +95,8 @@ class ReflectExporter implements ReflectAccessor {
      * NON EXPORTED 
      */
     
-    private boolean allowAccess(Class callerClass, Class declaringClass,
-                                Class runtimeClass, int memberModifiers) {
+    private boolean allowAccess(Class<?> callerClass, Class<?> declaringClass,
+                                Class<?> runtimeClass, int memberModifiers) {
         // it is allways safe to access members from the class declared in the
         // same top level class as the declaring class        
         if (hasSameTopLevelClass(declaringClass, callerClass)) {
@@ -92,7 +132,7 @@ class ReflectExporter implements ReflectAccessor {
 
         // check access to protected members through hierarchy
         if (Modifier.isProtected(memberModifiers)) {            
-            Class outerClass = callerClass;
+            Class<?> outerClass = callerClass;
             // scan from the caller to the top level class
             do {
                 // find closest enclouser class which extends declaring class
@@ -112,7 +152,7 @@ class ReflectExporter implements ReflectAccessor {
         return false;
     }
 
-    private boolean allowClassAccess(Class callee, Class caller) {
+    private boolean allowClassAccess(Class<?> callee, Class<?> caller) {
         if (callee == null || callee == caller) {
             return true;
         }
@@ -126,7 +166,7 @@ class ReflectExporter implements ReflectAccessor {
         return false;
     }
 
-    private boolean hasSameTopLevelClass(Class class1, Class class2) {
+    private boolean hasSameTopLevelClass(Class<?> class1, Class<?> class2) {
         Class topClass;
         while ( (topClass = class1.getDeclaringClass()) != null) {
             class1 = topClass;
@@ -137,7 +177,7 @@ class ReflectExporter implements ReflectAccessor {
         return class1 == class2;
     }
 
-    private boolean hasSamePackage(Class class1, Class class2) {
+    private boolean hasSamePackage(Class<?> class1, Class<?> class2) {
         final String pkg1 = class1.getName();
         final String pkg2 = class2.getName();
         int i1 = pkg1.lastIndexOf('.');

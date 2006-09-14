@@ -367,11 +367,11 @@ Method_Table::Method_Table(const char *default_envvar,
 }
   
 bool Method_Table::accept_this_method(MethodDesc &md) {
-	const char* classname = md.getParentType()->getName();
-	const char *methodname = md.getName();
-	const char *signature = md.getSignatureString();
+    const char* classname = md.getParentType()->getName();
+    const char *methodname = md.getName();
+    const char *signature = md.getSignatureString();
 
-	return accept_this_method(classname, methodname, signature);
+    return accept_this_method(classname, methodname, signature);
 }
 
 bool Method_Table::accept_this_method(const char* classname, const char *methodname, const char *signature)
@@ -415,7 +415,7 @@ bool Method_Table::accept_this_method(const char* classname, const char *methodn
 }
 
 bool Method_Table::is_in_list_generation_mode() {
-	return _dump_to_file;
+    return _dump_to_file;
 }
 
 } //namespace Jitrino 

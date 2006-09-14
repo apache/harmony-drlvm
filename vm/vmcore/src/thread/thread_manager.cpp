@@ -59,13 +59,13 @@ using namespace std;
 #include "open/vm_util.h"
 #include "suspend_checker.h"
 
+#ifdef PLATFORM_NT
 // wjw -- following lines needs to be generic for all OSs
-#ifndef PLATFORM_POSIX
 #include "java_lang_thread_nt.h"
-#endif
-
-#ifdef _IPF_
+#elif defined _IPF_
 #include "java_lang_thread_ipf.h"
+#elif defined _EM64T_
+//#include "java_lang_thread_em64t.h"
 #else
 #include "java_lang_thread_ia32.h"
 #endif
@@ -147,15 +147,17 @@ VM_thread *get_vm_thread_ptr_safe(JNIEnv *jenv, jobject jThreadObj)
 
 VM_thread *get_thread_ptr_stub()
 {   
-
- return NULL;
+ return get_vm_thread(hythread_self());
 }
   
 vm_thread_accessor* get_thread_ptr = get_thread_ptr_stub;
 void init_TLS_data() {
     hythread_tls_alloc(&TLS_key_pvmthread);
+#ifndef _EM64T_
     get_thread_ptr = (vm_thread_accessor*) get_tls_helper(TLS_key_pvmthread);
     //printf ("init fast call %p\n", get_thread_ptr);
+#endif
+
 }
   
 void set_TLS_data(VM_thread *thread) {
@@ -164,7 +166,9 @@ void set_TLS_data(VM_thread *thread) {
 }
 
 IDATA jthread_throw_exception(char* name, char* message) {
-    exn_throw_by_name(name);
+    ASSERT_RAISE_AREA;
+    jobject jthe = exn_create(name);
+    exn_raise_object(jthe);
     return 0;
 }
 

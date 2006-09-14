@@ -34,10 +34,6 @@
 #include "vm_threads.h"
 #include "encoder.h"
 
-#ifndef NDEBUG
-#include "dump.h"
-#endif
-
 // Strategy:
 //   Up to 2 standard places
 //   Up to 4 32-bit quantities can be used as locals
@@ -1464,17 +1460,13 @@ static void main_pass(LilCodeStub* cs, tl::MemoryPool* mem, NativeCodePtr _buf,
 }
 
 
-NativeCodePtr LilCodeGeneratorIa32::compile_main(LilCodeStub* cs, size_t* stub_size, const char *stub_name, bool dump_stub)
+NativeCodePtr LilCodeGeneratorIa32::compile_main(LilCodeStub* cs, size_t* stub_size)
 {
     LcgIa32PrePassInfo* data;
     tl::MemoryPool mem;
     size_t size = pre_pass(cs, &mem, &data);
     NativeCodePtr buf = allocate_memory(size);
     main_pass(cs, &mem, buf, data, stub_size);
-#ifndef NDEBUG
-    if (dump_stub)
-        dump((char *)buf, stub_name, *stub_size);
-#endif
     return buf;
 }
 

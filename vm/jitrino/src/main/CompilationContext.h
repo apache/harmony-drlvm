@@ -25,53 +25,86 @@ namespace Jitrino {
 
 class MemoryManager;
 class CompilationInterface;
-class JitrinoParameterTable;
-struct OptimizerFlags;
-struct TranslatorFlags;
-struct IRBuilderFlags;
-class JITModeData;
+class JITInstanceContext;
+class ProfilingInterface;
+class IRManager;
+class SessionAction;
+class LogStreams;
+class HPipeline;
+
 #ifdef _IPF_
 #else 
 namespace Ia32{
-    struct CGFlags;
+    class IRManager;
 }
 #endif
 
 class CompilationContext {
 public:
-    CompilationContext(MemoryManager& mm, CompilationInterface* ci, JITModeData* mode);
-
-    CompilationInterface* getCompilationInterface() const  {return compilationInterface;}
+    // Context of the current compilation
+    // Exists only during a compilation of method
+    // This class uses destructor and must not be created on MemoryManager
+    CompilationContext(MemoryManager& mm, CompilationInterface* ci, JITInstanceContext* jit);
+    ~CompilationContext();
+    
+    CompilationInterface* getVMCompilationInterface() const  {return compilationInterface;}
     MemoryManager& getCompilationLevelMemoryManager() const {return mm;}
 
-    JitrinoParameterTable* getThisParameterTable() const { return thisPT;}
-    void setThisParameterTable(JitrinoParameterTable* _thisPT) { assert(!thisPT); thisPT = _thisPT;}
+    JITInstanceContext* getCurrentJITContext() const {return jitContext;}
+    ProfilingInterface* getProfilingInterface() const;
 
+    bool hasDynamicProfileToUse() const;
 
-    OptimizerFlags* getOptimizerFlags() const {return optFlags;};
-    TranslatorFlags* getTranslatorFlags() const {return transFlags;}
-    IRBuilderFlags* getIRBuilderFlags() const  {return irbFlags;}
+    bool isCompilationFailed() const {return compilationFailed;}
+    void setCompilationFailed(bool f) {compilationFailed = f;}
 
-    JITModeData* getCurrentModeData() const {return modeData;}
+    bool isCompilationFinished() const {return compilationFinished;}
+    void setCompilationFinished(bool f) {compilationFinished = f;}
+    
+    IRManager* getHIRManager() const {return hirm;}
+    void setHIRManager(IRManager* irm) {hirm = irm;}
+
+    SessionAction* getCurrentSessionAction() const {return currentSessionAction;}
+    void setCurrentSessionAction(SessionAction* sa) {currentSessionAction = sa;}
+
+    void setCurrentSessionNum(int num) {currentSessionNum = num;}
+    int getCurrentSessionNum() const {return currentSessionNum;}
+
+    void setCurrentLogs(LogStreams* lsp) {currentLogStreams = lsp;}
+    LogStreams* getCurrentLogs() const {return currentLogStreams;}
+
+    void setPipeline(HPipeline* pipe) {pipeline = pipe;}
+    HPipeline* getPipeline () const {return pipeline;}
+
+    static CompilationContext* getCurrentContext();
+
 #ifdef _IPF_
 #else
-    Ia32::CGFlags* getIa32CGFlags() const {return ia32CGFlags;}
+    Ia32::IRManager* getLIRManager() const {return lirm;}
+    void setLIRManager(Ia32::IRManager* irm) {lirm = irm;}
 #endif
 
 private:
     MemoryManager&          mm;
     CompilationInterface*   compilationInterface;
-    JitrinoParameterTable* thisPT;
+    bool                    compilationFailed;
+    bool                    compilationFinished;
 
-    OptimizerFlags*         optFlags;
-    TranslatorFlags*        transFlags;
-    IRBuilderFlags*         irbFlags;
-    JITModeData*            modeData;
+    JITInstanceContext*     jitContext;
+    IRManager*              hirm;
 #ifdef _IPF_
 #else
-    Ia32::CGFlags*            ia32CGFlags;
+    Ia32::IRManager*        lirm;
 #endif
-};
+    SessionAction*          currentSessionAction;
+    int                     currentSessionNum;
+    LogStreams*             currentLogStreams;
+    HPipeline*              pipeline;
 
-}
+    void initCompilationMode();
+
+public:
+    int stageId;
+};
+}//namespace
 #endif

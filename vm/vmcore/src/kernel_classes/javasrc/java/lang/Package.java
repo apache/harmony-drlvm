@@ -14,7 +14,7 @@
  *  limitations under the License.
  */
 /**
- * @author Evgueni Brevnov, Alexey V. Varlamov
+ * @author Evgueni Brevnov, Alexey V. Varlamov, Serguei S. Zapreyev
  * @version $Revision: 1.1.2.2.4.4 $
  */
 
@@ -31,33 +31,94 @@ import java.util.NoSuchElementException;
 import java.util.StringTokenizer;
 import java.util.jar.Attributes;
 import java.util.jar.Manifest;
+import java.lang.ref.SoftReference;
+import java.lang.reflect.AnnotatedElement;
+import java.lang.annotation.Annotation;
 
+import org.apache.harmony.vm.VMGenericsAndAnnotations;
 import org.apache.harmony.vm.VMStack;
 
 /**
  * @com.intel.drl.spec_ref 
  */
-public class Package {
+public class Package implements AnnotatedElement {
+    
+	/**
+	 *
+	 *  @com.intel.drl.spec_ref
+	 * 
+	 **/
+    public Annotation[] getDeclaredAnnotations() {
+		Class pc = null;
+		try {
+            //default package cannot be annotated
+			pc = Class.forName(getName() + ".package-info", false, loader);
+		} catch (ClassNotFoundException _) {
+			return new Annotation[0];
+		}
+		return VMGenericsAndAnnotations.getDeclaredAnnotations(pc); // get all annotations directly present on this element
+    }
+
+	/**
+	 *
+	 *  @com.intel.drl.spec_ref
+	 * 
+	 **/
+    public Annotation[] getAnnotations() {
+		return getDeclaredAnnotations();
+    }
+
+	/**
+	 *
+	 *  @com.intel.drl.spec_ref
+	 * 
+	 **/
+    public <A extends Annotation> A getAnnotation(Class<A> annotationClass) {
+		if(annotationClass == null) {
+			throw new NullPointerException();
+		}
+		Annotation aa[] = getAnnotations();
+		for (int i = 0; i < aa.length; i++) {
+			if(aa[i].annotationType().equals(annotationClass)) {
+				return (A) aa[i];
+			}
+		}
+		return null;
+    }
+
+	/**
+	 *
+	 *  @com.intel.drl.spec_ref
+	 * 
+	 **/
+    public boolean isAnnotationPresent(Class<? extends Annotation> annotationClass) {
+		return getAnnotation(annotationClass) != null;
+    }
+    
+    /**
+     * The defining loader.
+     */
+    private final ClassLoader loader;
     
     /**
      * A map of {url<String>, attrs<Manifest>} pairs for caching 
      * attributes of bootsrap jars.
      */
-    private static final Map jarCache = new Hashtable();
+    private static SoftReference<Map<String, Manifest>> jarCache;
 
     /**
      * An url of a source jar, for deffered attributes initialization.
      * After the initialization, if any, is reset to null.
      */
     private String jar;  
-    
+
     private String implTitle;
 
     private String implVendor;
 
     private String implVersion;
 
-    private String name;
+    private final String name;
 
     private URL sealBase;
 
@@ -68,10 +129,11 @@ public class Package {
     private String specVersion;
 
     /**
-     * name can not be null.
+     * Name must not be null.
      */
-    Package(String packageName, String sTitle, String sVersion, String sVendor,
+    Package(ClassLoader ld, String packageName, String sTitle, String sVersion, String sVendor,
             String iTitle, String iVersion, String iVendor, URL base) {
+        loader = ld;
         name = packageName;
         specTitle = sTitle;
         specVersion = sVersion;
@@ -87,7 +149,8 @@ public class Package {
      * resolve optional attributes only if such value is requested. 
      * Name must not be null.
      */
-    Package(String packageName, String jar) {
+    Package(ClassLoader ld, String packageName, String jar) {
+        loader = ld;
         name = packageName;
         this.jar = jar;
     }
@@ -109,7 +172,7 @@ public class Package {
         ClassLoader callerLoader = VMClassRegistry.getClassLoader(VMStack
                 .getCallerClass(0));
         if (callerLoader == null) {
-            Collection pkgs = ClassLoader.BootstrapLoader.getPackages();
+            Collection<Package> pkgs = ClassLoader.BootstrapLoader.getPackages();
             return (Package[]) pkgs.toArray(new Package[pkgs.size()]);
         }
         return callerLoader.getPackages();
@@ -272,22 +335,33 @@ public class Package {
      */
     private void init() {
         try {
-            final URL sealURL = new URL(jar);
-            Manifest manifest = (Manifest)jarCache.get(jar);
+            Map<String, Manifest> map = null;
+            Manifest manifest = null;
+            URL sealURL = null;
+            if (jarCache != null && (map = jarCache.get()) != null) {
+                manifest = map.get(jar); 
+            }
             if (manifest == null) {
-                manifest = (Manifest)AccessController.doPrivileged(
-                    new PrivilegedAction() {
-                        public Object run()
+                final URL url = sealURL = new URL(jar);
+                manifest = AccessController.doPrivileged(
+                    new PrivilegedAction<Manifest>() {
+                        public Manifest run()
                         {
                             try {
-                                return ((JarURLConnection)sealURL
+                                return ((JarURLConnection)url
                                         .openConnection()).getManifest();
                             } catch (Exception e) {
                                 return new Manifest();
                             }
                         }
                     });
-                jarCache.put(jar, manifest);
+                if (map == null) {
+                    map = new Hashtable<String, Manifest>();
+                    if (jarCache == null) {
+                        jarCache = new SoftReference<Map<String, Manifest>>(map);
+                    }
+                }
+                map.put(jar, manifest);
             }
 
             Attributes mainAttrs = manifest.getMainAttributes();
@@ -320,8 +394,9 @@ public class Package {
             String sealed = (sealed = pkgAttrs
                     .getValue(Attributes.Name.SEALED)) == null ? mainAttrs
                     .getValue(Attributes.Name.SEALED) : sealed;
-            sealBase = Boolean.valueOf(sealed).booleanValue() ? sealURL
-                    : null;
+            if (Boolean.valueOf(sealed).booleanValue()) {
+                sealBase = sealURL != null ? sealURL : new URL(jar); 
+            }
         } catch (Exception e) {}
         jar = null;
     }

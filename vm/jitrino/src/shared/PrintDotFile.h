@@ -30,9 +30,8 @@
 // interface to print dot files, you should subclass this class and
 // implement the printBody() method
 //
-#include <stdlib.h>
+
 #include <fstream>
-#include <string.h>
 
 namespace Jitrino {
 
@@ -44,17 +43,16 @@ public:
     //
     // dump out to a filename composed of the method descriptor and a suffix
     //
-    virtual void printDotFile(MethodDesc& mh, const char *suffix);
+    virtual void printDotFile(MethodDesc& mh, const char * /*suffix*/);
 
     virtual void printDotHeader(MethodDesc& mh);
     virtual void printDotEnd   ();
     virtual void printDotBody  ();
 protected:
-	virtual ~PrintDotFile() {};
-	::std::ostream* os;
+    void printDotFile(MethodDesc& mh, ::std::ostream& fos);
+    virtual ~PrintDotFile() {};
+    ::std::ostream* os;
     int count;
-private:
-    void createFileName(MethodDesc& mh, char* filename,const char *suffix);
 };
 } //namespace Jitrino 
 

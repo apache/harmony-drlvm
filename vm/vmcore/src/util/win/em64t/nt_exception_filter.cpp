@@ -42,6 +42,32 @@
 // Afremov Pavel 20050117
 #include "../m2n_em64t_internal.h"
 
+void nt_to_vm_context(PCONTEXT pcontext, Registers* regs)
+{
+    regs->rax = pcontext->Eax;
+    regs->rcx = pcontext->Ecx;
+    regs->rdx = pcontext->Edx;
+    regs->rdi = pcontext->Edi;
+    regs->rsi = pcontext->Esi;
+    regs->rbx = pcontext->Ebx;
+    regs->rbp = pcontext->Ebp;
+    regs->rip = pcontext->Eip;
+    regs->rsp = pcontext->Esp;
+}
+
+void vm_to_nt_context(Registers* regs, PCONTEXT pcontext)
+{
+    pcontext->Esp = regs->rsp;
+    pcontext->Eip = regs->rip;
+    pcontext->Ebp = regs->rbp;
+    pcontext->Ebx = regs->rbx;
+    pcontext->Esi = regs->rsi;
+    pcontext->Edi = regs->rdi;
+    pcontext->Eax = regs->rax;
+    pcontext->Ecx = regs->rcx;
+    pcontext->Edx = regs->rdx;
+}
+
 int NT_exception_filter(LPEXCEPTION_POINTERS p_NT_exception) 
 {
 
@@ -97,27 +123,12 @@ int NT_exception_filter(LPEXCEPTION_POINTERS p_NT_exception)
     }
 
     Registers regs;
-    regs.rax = p_NT_exception->ContextRecord->Eax;
-    regs.rcx = p_NT_exception->ContextRecord->Ecx;
-    regs.rdx = p_NT_exception->ContextRecord->Edx;
-    regs.rdi = p_NT_exception->ContextRecord->Edi;
-    regs.rsi = p_NT_exception->ContextRecord->Esi;
-    regs.rbx = p_NT_exception->ContextRecord->Ebx;
-    regs.rbp = p_NT_exception->ContextRecord->Ebp;
-    regs.rip = p_NT_exception->ContextRecord->Eip;
-    regs.rsp = p_NT_exception->ContextRecord->Esp;
+
+    nt_to_vm_context(p_NT_exception->ContextRecord, &regs);
 
     exn_athrow_regs(&regs, exc_clss);
 
-    p_NT_exception->ContextRecord->Esp = regs.rsp;
-    p_NT_exception->ContextRecord->Eip = regs.rip;
-    p_NT_exception->ContextRecord->Ebp = regs.rbp;
-    p_NT_exception->ContextRecord->Ebx = regs.rbx;
-    p_NT_exception->ContextRecord->Esi = regs.rsi;
-    p_NT_exception->ContextRecord->Edi = regs.rdi;
-    p_NT_exception->ContextRecord->Eax = regs.rax;
-    p_NT_exception->ContextRecord->Ecx = regs.rcx;
-    p_NT_exception->ContextRecord->Edx = regs.rdx;
+    vm_to_nt_context(&regs, p_NT_exception->ContextRecord);
 
     return EXCEPTION_CONTINUE_EXECUTION;
 } //NT_exception_filter

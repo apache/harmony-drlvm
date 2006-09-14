@@ -26,6 +26,7 @@
 #include "object_handles.h"
 #include "vm_strings.h"
 #include "jvmti_utils.h"
+#include "jvmti_internal.h"
 #include "cxxlog.h"
 
 #include "suspend_checker.h"
@@ -55,7 +56,9 @@ jvmtiGetFieldName(jvmtiEnv* env,
 
     CHECK_EVERYTHING();
 
-    if( !klass ) return JVMTI_ERROR_NULL_POINTER;
+    if (! is_valid_class_object(klass))
+        return JVMTI_ERROR_INVALID_CLASS;
+
     if( !field ) return JVMTI_ERROR_INVALID_FIELDID; // (25)
 
     char* fld_name;
@@ -119,7 +122,9 @@ jvmtiGetFieldDeclaringClass(jvmtiEnv* env,
 
     CHECK_EVERYTHING();
 
-    if( !klass ) return JVMTI_ERROR_NULL_POINTER;
+    if (! is_valid_class_object(klass))
+        return JVMTI_ERROR_INVALID_CLASS;
+
     if( !field ) return JVMTI_ERROR_INVALID_FIELDID;
     if( !declaring_class_ptr ) return JVMTI_ERROR_NULL_POINTER;
 
@@ -156,7 +161,9 @@ jvmtiGetFieldModifiers(jvmtiEnv* env,
 
     CHECK_EVERYTHING();
 
-    if( !klass ) return JVMTI_ERROR_NULL_POINTER;
+    if (! is_valid_class_object(klass))
+        return JVMTI_ERROR_INVALID_CLASS;
+
     if( !field ) return JVMTI_ERROR_INVALID_FIELDID;
     if( !modifiers_ptr ) return JVMTI_ERROR_NULL_POINTER;
 
@@ -198,7 +205,9 @@ jvmtiIsFieldSynthetic(jvmtiEnv* env,
     CHECK_EVERYTHING();
     CHECK_CAPABILITY(can_get_synthetic_attribute);
 
-    if( !klass ) return JVMTI_ERROR_NULL_POINTER;
+    if (! is_valid_class_object(klass))
+        return JVMTI_ERROR_INVALID_CLASS;
+
     if( !field ) return JVMTI_ERROR_INVALID_FIELDID;
     if( !is_synthetic_ptr ) return JVMTI_ERROR_NULL_POINTER;
 

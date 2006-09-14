@@ -22,6 +22,7 @@
 #include "nogc.h"
 #include "jvmti_direct.h"
 #include "environment.h"
+#include "compile.h"
 
 #include "jit_intf.h"
 #include "lil.h"
@@ -52,17 +53,16 @@ LilCodeGenerator::LilCodeGenerator()
 {
 }
 
-NativeCodePtr LilCodeGenerator::compile(LilCodeStub* cs, const char* name, bool dump_stub)
+NativeCodePtr LilCodeGenerator::compile(LilCodeStub* cs)
 {
     size_t stub_size;
-    NativeCodePtr stub = compile_main(cs, &stub_size, name, dump_stub);
+    NativeCodePtr stub = compile_main(cs, &stub_size);
     lil_cs_set_code_size(cs, stub_size);
     
+    compile_add_dynamic_generated_code_chunk("unknown", stub, stub_size);
+
     if (VM_Global_State::loader_env->TI->isEnabled())
-    {
-        jvmti_add_dynamic_generated_code_chunk(name, stub, stub_size);
-        jvmti_send_dynamic_code_generated_event(name, stub, stub_size);
-    }
+        jvmti_send_dynamic_code_generated_event("unknown", stub, stub_size);
 
     return stub;
 }

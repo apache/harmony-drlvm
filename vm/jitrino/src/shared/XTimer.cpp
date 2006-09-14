@@ -23,10 +23,19 @@
 #include "XTimer.h"
 
 #ifdef _WIN32
-#include <windows.h>
+#pragma pack(push)
+  #include <windows.h>
+  #define snprintf _snprintf
+#pragma pack(pop)
+
+#include <algorithm>
+
 #define TIMERS_IMPLEMENTED
 //#define USE_THREAD_TIMER
 #endif
+
+
+using namespace std;
 
 
 namespace Jitrino 
@@ -41,28 +50,28 @@ void XTimer::initialize (bool on)
 {
 #ifdef TIMERS_IMPLEMENTED
 
-	if (!enabled && on)
-	{
-		enabled = true;
+    if (!enabled && on)
+    {
+        enabled = true;
 
 #ifdef USE_THREAD_TIMER
-		frequency = 10000000;
+        frequency = 10000000;
 #else
-		LARGE_INTEGER freq;
-		QueryPerformanceFrequency(&freq);
-		frequency = (double)freq.QuadPart;
+        LARGE_INTEGER freq;
+        QueryPerformanceFrequency(&freq);
+        frequency = (double)freq.QuadPart;
 #endif
 
-		XTimer xt;
-		correction = 0;
-		xt.start(); xt.stop();
-		xt.start(); xt.stop();
-		xt.start(); xt.stop();
-		xt.start(); xt.stop();
-		correction = xt.totalTime/4;
-	}
+        XTimer xt;
+        correction = 0;
+        xt.start(); xt.stop();
+        xt.start(); xt.stop();
+        xt.start(); xt.stop();
+        xt.start(); xt.stop();
+        correction = xt.totalTime/4;
+    }
 
-	enabled = on;
+    enabled = on;
 
 #endif //#ifdef TIMERS_IMPLEMENTED
 }
@@ -108,9 +117,9 @@ void XTimer::reset ()
 //
 void XTimer::start () 
 {
-	if (enabled)
-	    if (state++ == 0)
-		  startTime = getCounter();
+    if (enabled)
+        if (state++ == 0)
+          startTime = getCounter();
 }
 
 
@@ -119,18 +128,18 @@ void XTimer::start ()
 //
 void XTimer::stop () 
 {
-	if (enabled)
-	    if (--state == 0) 
-	        totalTime += getCounter() - startTime - correction;
+    if (enabled)
+        if (--state == 0) 
+            totalTime += getCounter() - startTime - correction;
 }
 
 
 double XTimer::getSeconds() const
 {
-	if (enabled)
-	    return (((double)totalTime) / frequency);
-	else
-		return 0;
+    if (enabled)
+        return (((double)totalTime) / frequency);
+    else
+        return 0;
 }
 
 
@@ -142,4 +151,40 @@ double XTimer::getFrequency()
 */
 
 
+void SummTimes::add (const char* key, double seconds)
+{
+    for (iterator ptr = begin(); ptr != end(); ++ptr)
+        if (strcmp(ptr->first, key) == 0)
+        {
+            ptr->second += seconds;
+            return;
+        }
+
+        push_back(value_type(key, seconds));
+}
+
+
+#ifdef _WIN32
+static bool compare (SummTimes::value_type& a, SummTimes::value_type& b)
+{
+    return strcmp(a.first, b.first) < 0;
+}
+#endif
+
+
+void SummTimes::write  (CountWriter& logs)
+{
+#ifdef _WIN32
+    sort(begin(), end(), compare);
+#endif
+
+    char temp[100];
+    for (iterator ptr = begin(); ptr != end(); ++ptr)
+    {
+        snprintf(temp, sizeof(temp), "action %s time", ptr->first);
+        logs.write(temp, ptr->second);
+    }
+}
+
+ 
 } //namespace Jitrino 

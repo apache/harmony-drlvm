@@ -23,10 +23,18 @@
 #include "open/types.h"
 #include "jvmti.h"
 
+typedef struct FrameHandle FrameHandle;
+
 typedef struct {
     bool (*interpreter_st_get_frame) (unsigned target_depth, struct StackTraceFrame* stf);
-    void (*interpreter_st_get_trace) (unsigned* res_depth, struct StackTraceFrame** stfs);
+    void (*interpreter_st_get_trace) (class VM_thread *thread, unsigned* res_depth, struct StackTraceFrame** stfs);
     void (*interpreter_enumerate_thread) (class VM_thread *thread);
+
+    FrameHandle* (*interpreter_get_last_frame) (class VM_thread *thread);
+    FrameHandle* (*interpreter_get_prev_frame) (FrameHandle* frame);
+	// 'end' is not inclusive
+    bool (*is_frame_in_native_frame) (struct FrameHandle* frame, void* begin, void* end);
+
 #ifdef _IPF_
     uint64* (*interpreter_get_stacked_register_address) (uint64* bsp, unsigned reg);
 #endif
@@ -42,8 +50,6 @@ typedef struct {
     jvmtiError (*interpreter_ti_setLocal64) ( jvmtiEnv*, class VM_thread*, int, int, int64);
     jvmtiError (*interpreter_ti_setObject) ( jvmtiEnv*, class VM_thread*, int, int, struct _jobject *);
     unsigned int (*interpreter_st_get_interrupted_method_native_bit) (class VM_thread *);
-    void (*interpreter_st_get_interrupted_method) (struct Method**, int64 *);
-    void (*interpreter_st_get_catch_method) (struct Method**, int64 *, struct _jobject *);
 
     // Open interfaces part begins
 

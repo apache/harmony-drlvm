@@ -67,7 +67,7 @@ ProofLattice AbcdSolver::prove(bool prove_lower_bound,
     pushindent saveindent(this);
     if (prove_lower_bound) {
         ConstBound negC = -c;
-        if (Log::cat_opt_abcd()->isDebugEnabled()) {
+        if (Log::isEnabled()) {
             Log::out() << indent.c_str() << "Trying to prove ";
             var2.print(Log::out());
             Log::out() << " - ";
@@ -90,7 +90,7 @@ ProofLattice AbcdSolver::prove(bool prove_lower_bound,
     } else {
         MemoizedBounds &mb 
             = cache[::std::make_pair(var2, var1)]; // bounds on (var2-var1)
-        if (Log::cat_opt_abcd()->isDebugEnabled()) {
+        if (Log::isEnabled()) {
             Log::out() << indent.c_str() << "Trying to prove ";
             var2.print(Log::out());
             Log::out() << " - ";
@@ -100,7 +100,7 @@ ProofLattice AbcdSolver::prove(bool prove_lower_bound,
             Log::out() << " : ";
         }
         if (mb.leastTrueUB <= c) { // already proved a lower UB.
-            if (Log::cat_opt_abcd()->isDebugEnabled()) {
+            if (Log::isEnabled()) {
                 Log::out() << "Case 1: mb.leastTrueUB ==";
                 mb.leastTrueUB.print(Log::out());
                 Log::out() << " => TRUE" << ::std::endl;
@@ -113,14 +113,14 @@ ProofLattice AbcdSolver::prove(bool prove_lower_bound,
             }
             return ProofLattice::ProvenTrue;
         } else if (mb.greatestFalseUB >= c) { // already disproved a higher UB
-            if (Log::cat_opt_abcd()->isDebugEnabled()) {
+            if (Log::isEnabled()) {
                 Log::out() << "Case 2: mb.greatestFalseUB ==";
                 mb.greatestFalseUB.print(Log::out());
                 Log::out() << " => FALSE" << ::std::endl;
             }                
             return ProofLattice::ProvenFalse;
         } else if (mb.leastReducedUB <= c) { // has cycle with lower UB
-            if (Log::cat_opt_abcd()->isDebugEnabled()) {
+            if (Log::isEnabled()) {
                 Log::out() << "Case 3: mb.leastReducedUB ==";
                 mb.leastReducedUB.print(Log::out());
                 Log::out() << " => REDUCED" << ::std::endl;
@@ -134,7 +134,7 @@ ProofLattice AbcdSolver::prove(bool prove_lower_bound,
             return ProofLattice::ProvenReduced;
         } else if ((var1 == var2) && 
                    (c >= ConstBound(int32(0)))) { // reached source:
-            if (Log::cat_opt_abcd()->isDebugEnabled()) {
+            if (Log::isEnabled()) {
                 Log::out() << "Case 4: => TRUE" << ::std::endl;
             }                
             // don't need a reason, it's self-evident
@@ -145,11 +145,11 @@ ProofLattice AbcdSolver::prove(bool prove_lower_bound,
         ConstBound &active_var = active[::std::make_pair(var1,var2)];
         
         if (!active_var.isNull()) { // a cycle
-            if (Log::cat_opt_abcd()->isDebugEnabled()) {
+            if (Log::isEnabled()) {
                 Log::out() << "Case 5" << ::std::endl;
             }                
             if (c < active_var) {
-                if (Log::cat_opt_abcd()->isDebugEnabled()) {
+                if (Log::isEnabled()) {
                     Log::out() << indent.c_str() << "Case 5a : active[";
                     var1.print(Log::out());
                     Log::out() << ", ";
@@ -161,7 +161,7 @@ ProofLattice AbcdSolver::prove(bool prove_lower_bound,
                 // skip memorization step below by returning immediately
                 return ProofLattice::ProvenFalse; // a reducing cycle for lb
             } else {
-                if (Log::cat_opt_abcd()->isDebugEnabled()) {
+                if (Log::isEnabled()) {
                     Log::out() << indent.c_str() << "Case 5b : active[";
                     var1.print(Log::out());
                     Log::out() << ", ";
@@ -174,12 +174,12 @@ ProofLattice AbcdSolver::prove(bool prove_lower_bound,
                 return ProofLattice::ProvenReduced;
             }
         } else {
-            if (Log::cat_opt_abcd()->isDebugEnabled()) {
+            if (Log::isEnabled()) {
                 Log::out() << "Case 5c: => ..." << ::std::endl;
             }
         }
         
-        if (Log::cat_opt_abcd()->isDebugEnabled()) {
+        if (Log::isEnabled()) {
             Log::out() << indent.c_str() << "  Setting active[";
             var1.print(Log::out());
             Log::out() << ", ";
@@ -222,7 +222,7 @@ ProofLattice AbcdSolver::prove(bool prove_lower_bound,
             // 
             // Note that we are safe from infinite recursion since we
             // don't move to var2 until var1 is blocked.
-			//
+            //
             bool ignore;
             result =
                 proveForPredecessors(var1, var2, 
@@ -235,7 +235,7 @@ ProofLattice AbcdSolver::prove(bool prove_lower_bound,
         }
     
         active_var.setNull(); // reset it to Null
-        if (Log::cat_opt_abcd()->isDebugEnabled()) {
+        if (Log::isEnabled()) {
             Log::out() << indent.c_str() << "Finished trying to prove ";
             var2.print(Log::out());
             Log::out() << " - ";
@@ -246,7 +246,7 @@ ProofLattice AbcdSolver::prove(bool prove_lower_bound,
         }
         switch (result.value) {
         case ProofLattice::ProvenTrue:
-            if (Log::cat_opt_abcd()->isDebugEnabled()) {
+            if (Log::isEnabled()) {
                 Log::out() << " TRUE " << ::std::endl;
             }
             if (c < mb.leastTrueUB) {
@@ -262,14 +262,14 @@ ProofLattice AbcdSolver::prove(bool prove_lower_bound,
                 mb.leastTrueUB = c; break;
             }
         case ProofLattice::ProvenFalse:
-            if (Log::cat_opt_abcd()->isDebugEnabled()) {
+            if (Log::isEnabled()) {
                 Log::out() << " FALSE " << ::std::endl;
             }
             if (c > mb.greatestFalseUB) {
                 mb.greatestFalseUB = c; break;
             }
         case ProofLattice::ProvenReduced:
-            if (Log::cat_opt_abcd()->isDebugEnabled()) {
+            if (Log::isEnabled()) {
                 Log::out() << " REDUCED " << ::std::endl;
             }
             if (c < mb.leastReducedUB) {
@@ -298,7 +298,7 @@ void AbcdSolver::tryToEliminate(Inst *theInst)
         Opnd *arrayOp = theInst->getSrc(0);
         Opnd *idxOp = theInst->getSrc(1);
 
-        if (Log::cat_opt_abcd()->isDebugEnabled()) {
+        if (Log::isEnabled()) {
             Log::out() << "Checking checkbounds instruction ";
             theInst->print(Log::out());
             Log::out() << " for redundancy" << ::std::endl;
@@ -315,7 +315,7 @@ void AbcdSolver::tryToEliminate(Inst *theInst)
                         VarBound(idxOp),   // may want upper bound of range
                         -1,
                         why)) {
-            if (Log::cat_opt_abcd()->isDebugEnabled()) {
+            if (Log::isEnabled()) {
                 Log::out() << "We can eliminate UB check of ";
                 theInst->print(Log::out());
                 if (thePass->flags.useReasons) {
@@ -325,7 +325,7 @@ void AbcdSolver::tryToEliminate(Inst *theInst)
                 Log::out() << ::std::endl;
             }
         } else {
-            if (Log::cat_opt_abcd()->isDebugEnabled()) {
+            if (Log::isEnabled()) {
                 Log::out() << "We cannot eliminate UB check of ";
                 theInst->print(Log::out());
                 Log::out() << ::std::endl;
@@ -340,7 +340,7 @@ void AbcdSolver::tryToEliminate(Inst *theInst)
                         VarBound(),      // upper bound of 0
                         0,
                         why)) {
-            if (Log::cat_opt_abcd()->isDebugEnabled()) {
+            if (Log::isEnabled()) {
                 Log::out() << "We can eliminate LB check of ";
                 theInst->print(Log::out());
                 if (thePass->flags.useReasons) {
@@ -350,7 +350,7 @@ void AbcdSolver::tryToEliminate(Inst *theInst)
                 Log::out() << ::std::endl;
             }
         } else {
-            if (Log::cat_opt_abcd()->isDebugEnabled()) {
+            if (Log::isEnabled()) {
                 Log::out() << "We cannot eliminate LB check of ";
                 theInst->print(Log::out());
                 Log::out() << ::std::endl;
@@ -359,7 +359,7 @@ void AbcdSolver::tryToEliminate(Inst *theInst)
         }
         if (successUB) {
             if (successLB) {
-                if (Log::cat_opt_abcd()->isDebugEnabled()) {
+                if (Log::isEnabled()) {
                     Log::out() << "!!! We can eliminate boundscheck of ";
                     theInst->print(Log::out());
                     if (thePass->flags.useReasons) {
@@ -375,7 +375,7 @@ void AbcdSolver::tryToEliminate(Inst *theInst)
                     else
                         thePass->markCheckToEliminate(theInst);
             } else {
-                if (Log::cat_opt_abcd()->isDebugEnabled()) {
+                if (Log::isEnabled()) {
                     Log::out() << "!!! We can eliminate UB check of ";
                     theInst->print(Log::out());
                     if (thePass->flags.useReasons) {
@@ -393,7 +393,7 @@ void AbcdSolver::tryToEliminate(Inst *theInst)
             }
         } else {
             if (successLB) {
-                if (Log::cat_opt_abcd()->isDebugEnabled()) {
+                if (Log::isEnabled()) {
                     Log::out() << "!!! We can eliminate LB check of ";
                     theInst->print(Log::out());
                     if (thePass->flags.useReasons) {
@@ -444,14 +444,14 @@ void AbcdSolver::tryToEliminate(Inst *theInst)
             (srcOp->getType()->tag == dstOp->getType()->tag) &&
             !thePass->isMarkedToEliminate(theInst, ignore)) {
             
-            if (Log::cat_opt_abcd()->isDebugEnabled()) {
+            if (Log::isEnabled()) {
                 Log::out() << "Checking conv instruction ";
                 theInst->print(Log::out());
                 Log::out() << " for redundancy" << ::std::endl;
             }
 
             if (Abcd::convPassesSource(dstOp)) {
-                if (Log::cat_opt_abcd()->isDebugEnabled()) {
+                if (Log::isEnabled()) {
                     Log::out() << "We can trivially remove conv instruction ";
                     theInst->print(Log::out());
                     Log::out() << ::std::endl;
@@ -497,7 +497,7 @@ void AbcdSolver::tryToEliminate(Inst *theInst)
                 if (res1 != ProofLattice::ProvenFalse) {
                     // note that though these are constant bounds, 
                     // they can result in reduced proofs
-                    if (Log::cat_opt_abcd()->isDebugEnabled()) {
+                    if (Log::isEnabled()) {
                         Log::out() << "!!! We can eliminate conversion: ";
                         theInst->print(Log::out());
                         if (thePass->flags.useReasons) {
@@ -523,7 +523,7 @@ void AbcdSolver::tryToEliminate(Inst *theInst)
         AbcdReasons *ignore;
         if (Abcd::hasCheckableType(shiftByOp) &&
             !thePass->isMarkedToEliminate(theInst, ignore)) {
-            if (Log::cat_opt_abcd()->isDebugEnabled()) {
+            if (Log::isEnabled()) {
                 Log::out() << "Checking shift instruction ";
                 theInst->print(Log::out());
                 Log::out() << " to eliminate mask" << ::std::endl;
@@ -557,7 +557,7 @@ void AbcdSolver::tryToEliminate(Inst *theInst)
                     if (res2 != ProofLattice::ProvenFalse) {
                         // note that though these are constant bounds, 
                         // they can result in reduced proofs
-                        if (Log::cat_opt_abcd()->isDebugEnabled()) {
+                        if (Log::isEnabled()) {
                             Log::out() << "!!! We can eliminate shift mask: ";
                             theInst->print(Log::out());
                             if (thePass->flags.useReasons) {
@@ -627,7 +627,7 @@ void AbcdSolver::tryToEliminate(Inst *theInst)
 #ifndef NDEBUG
                     Type::Tag constInstType = constInst->getType();
 #endif
-					assert(isSigned ?
+                    assert(isSigned ?
                            ((constInstType == Type::Int8)||(constInstType == Type::Int16)||
                             (constInstType == Type::Int32)) :
                            ((constInstType == Type::UInt8)||
@@ -717,13 +717,13 @@ void AbcdSolver::tryToEliminate(Inst *theInst)
                         } else {
                             newmod.setOverflowModifier(Overflow_Unsigned);
                         }
-                        if (Log::cat_opt_abcd()->isDebugEnabled()) {
+                        if (Log::isEnabled()) {
                             Log::out() << "Disproved overflow of add/sub instruction ";
                             theInst->print(Log::out());
                             Log::out() << " so marking it overflow but exception-free" << ::std::endl;
                         }
                     } else {
-                        if (Log::cat_opt_abcd()->isDebugEnabled()) {
+                        if (Log::isEnabled()) {
                             Log::out() << "Disproved overflow of add/sub instruction ";
                             theInst->print(Log::out());
                             Log::out() << " so marking it exception-free" << ::std::endl;
@@ -777,7 +777,7 @@ void AbcdSolver::tryToEliminate(Inst *theInst)
                            ((constInstType == Type::UInt8)||
                             (constInstType == Type::UInt16)||(constInstType == Type::UInt32)));
 #endif
-					ConstInst::ConstValue constValue = constInst->getValue();
+                    ConstInst::ConstValue constValue = constInst->getValue();
                     int32 constValue32 = constValue.i4;
                     int64 varlb, varub;
                     if (isSigned) {
@@ -864,13 +864,13 @@ void AbcdSolver::tryToEliminate(Inst *theInst)
                         } else {
                             newmod.setOverflowModifier(Overflow_Unsigned);
                         }
-                        if (Log::cat_opt_abcd()->isDebugEnabled()) {
+                        if (Log::isEnabled()) {
                             Log::out() << "Disproved overflow of mul instruction ";
                             theInst->print(Log::out());
                             Log::out() << " so marking it overflow but exception-free" << ::std::endl;
                         }
                     } else {
-                        if (Log::cat_opt_abcd()->isDebugEnabled()) {
+                        if (Log::isEnabled()) {
                             Log::out() << "Disproved overflow of mul instruction ";
                             theInst->print(Log::out());
                             Log::out() << " so marking it exception-free" << ::std::endl;
@@ -900,7 +900,7 @@ ProofLattice AbcdSolver::proveForSpecialCases(const VarBound &var1,
     const VarBound &otherVar = (checkVar1 ? var2 : var1);
     ProofLattice result = ProofLattice::ProvenFalse;
 
-    if (Log::cat_opt_abcd()->isDebugEnabled()) {
+    if (Log::isEnabled()) {
         Log::out() << indent.c_str() << "Checking special cases for: ";
         theVar.print(Log::out());
         Log::out() << ::std::endl;
@@ -915,7 +915,7 @@ ProofLattice AbcdSolver::proveForSpecialCases(const VarBound &var1,
             assert(theVar.the_var != 0);
             Inst *the_inst = theVar.the_var->getInst();
             
-            if (Log::cat_opt_abcd()->isDebugEnabled()) {
+            if (Log::isEnabled()) {
                 Log::out() << indent.c_str() << "ConvexFunction: ";
                 the_inst->print(Log::out());
                 Log::out() << ::std::endl;
@@ -989,7 +989,7 @@ ProofLattice AbcdSolver::proveForSpecialCases(const VarBound &var1,
         assert(theVar.the_var != 0);
         Inst *the_inst = theVar.the_var->getInst();
         
-        if (Log::cat_opt_abcd()->isDebugEnabled()) {
+        if (Log::isEnabled()) {
             Log::out() << indent.c_str() << "Have conv : ";
             the_inst->print(Log::out());
             Log::out() << ::std::endl;
@@ -999,14 +999,14 @@ ProofLattice AbcdSolver::proveForSpecialCases(const VarBound &var1,
         AbcdReasons *markedWhy = 0;
         bool alreadyMarked = thePass->isMarkedToEliminate(the_inst, markedWhy);
         if (passesSource) {
-            if (Log::cat_opt_abcd()->isDebugEnabled()) {
+            if (Log::isEnabled()) {
                 Log::out() << indent.c_str() << "Passes Source: ";
                 the_inst->print(Log::out());
                 Log::out() << ::std::endl;
             }
         };
         if (alreadyMarked) {
-            if (Log::cat_opt_abcd()->isDebugEnabled()) {
+            if (Log::isEnabled()) {
                 Log::out() << indent.c_str() << "Already marked : ";
                 the_inst->print(Log::out());
                 Log::out() << ::std::endl;
@@ -1047,7 +1047,7 @@ ProofLattice AbcdSolver::proveForSpecialCases(const VarBound &var1,
             // check whether source is in range
             PiCondition convBounds = PiCondition::convBounds(theVar);
             
-            if (Log::cat_opt_abcd()->isDebugEnabled()) {
+            if (Log::isEnabled()) {
                 Log::out() << indent.c_str() << "Checking for source in range : ";
                 the_inst->print(Log::out());
                 Log::out() << ::std::endl;
@@ -1083,7 +1083,7 @@ ProofLattice AbcdSolver::proveForSpecialCases(const VarBound &var1,
             }
             if (res1 != ProofLattice::ProvenFalse) {
                 
-                if (Log::cat_opt_abcd()->isDebugEnabled()) {
+                if (Log::isEnabled()) {
                     Log::out() << indent.c_str() << "Source is in range, passing constraint: ";
                     the_inst->print(Log::out());
                     if (thePass->flags.useReasons) {
@@ -1112,7 +1112,7 @@ ProofLattice AbcdSolver::proveForSpecialCases(const VarBound &var1,
                                    c,
                                    subWhy);
 
-                if (Log::cat_opt_abcd()->isDebugEnabled()) {
+                if (Log::isEnabled()) {
                     Log::out() << indent.c_str() << "Special case conv result = ";
                     result.print(Log::out());
                     Log::out() << ::std::endl;
@@ -1129,7 +1129,7 @@ ProofLattice AbcdSolver::proveForSpecialCases(const VarBound &var1,
         }
     }
     noneApply = true;
-    if (Log::cat_opt_abcd()->isDebugEnabled()) {
+    if (Log::isEnabled()) {
         Log::out() << indent.c_str() << "NoneApply, special case conv result = ";
         result.print(Log::out());
         Log::out() << ::std::endl;
@@ -1159,7 +1159,7 @@ ProofLattice AbcdSolver::proveForPredecessors(const VarBound &var1,
     VarBound derefVar = (derefVar1 ? var1 : var2);
     bool boundDirection = derefVar1; // preds are lower bounds, MIN acts like PHI
     if (preds.isEmpty()) {
-        if (Log::cat_opt_abcd()->isDebugEnabled()) {
+        if (Log::isEnabled()) {
             Log::out() << indent.c_str() << "    Predecessors of ";
             if (derefVar1) {
                 Log::out() << "var1=";
@@ -1173,7 +1173,7 @@ ProofLattice AbcdSolver::proveForPredecessors(const VarBound &var1,
         predsAreEmpty = true;
     } else {
         if (derefVar.isPhiVar()) {
-            if (Log::cat_opt_abcd()->isDebugEnabled()) {
+            if (Log::isEnabled()) {
                 Log::out() << indent.c_str()
                            << "  Case 5c : Phi function" << ::std::endl;
             }                
@@ -1256,7 +1256,7 @@ ProofLattice AbcdSolver::proveForPredecessors(const VarBound &var1,
                 = ((andConditions && thePass->flags.useReasons)
                    ? new (thePass->mm) StlVector<AbcdReasons *>(thePass->mm)
                    : 0);
-            if (Log::cat_opt_abcd()->isDebugEnabled()) {
+            if (Log::isEnabled()) {
                 Log::out() << indent.c_str()
                            << "  Case 5d : non-Phi" << ::std::endl;
             }                
@@ -1337,7 +1337,7 @@ ProofLattice AbcdSolver::proveForPredecessors(const VarBound &var1,
                     }
                 }
             }
-            if (Log::cat_opt_abcd()->isDebugEnabled()) {
+            if (Log::isEnabled()) {
                 Log::out() << indent.c_str()
                            << "  returning ";
                 result.print(Log::out());
@@ -1360,7 +1360,7 @@ ProofLattice AbcdSolver::proveForPredecessors(const VarBound &var1,
             return result;
         }
     }
-    if (Log::cat_opt_abcd()->isDebugEnabled()) {
+    if (Log::isEnabled()) {
         Log::out() << indent.c_str()
                    << "  returning FALSE";
         Log::out() << ::std::endl;

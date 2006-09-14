@@ -41,21 +41,18 @@ Description of the product deploy folder.
             <shared>bin/default:interpreter</shared>
         </interpreter>
 
-        <select arch="ia32,ipf">
-            <jitrino>
-                <shared>bin/default:jitrino</shared>
-            </jitrino>
-        </select>
+        <jitrino>
+            <shared>bin/default:jitrino</shared>
+            <other>bin/default:*</other>
+        </jitrino>
 
         <gc>
             <shared>bin/default:gc</shared>
         </gc>
 
-        <select arch="ia32">
-            <vmi>
-                <shared>bin/default:vmi</shared>
-            </vmi>
-        </select>
+        <vmi>
+            <shared>bin/default:vmi</shared>
+        </vmi>
 
         <kernel_classes>
             <jar>lib/boot:kernel</jar>

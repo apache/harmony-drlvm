@@ -1,6 +1,7 @@
 #include "apr_thread_ext.h"
 //#include "apr_arch_threadproc.h"
 #include <pthread.h>
+#define __USE_XOPEN2K 1
 #include <semaphore.h>
 
 int convert_priority(apr_int32_t priority);
@@ -57,6 +58,9 @@ static void init_thread_yield_other () {
 APR_DECLARE(apr_status_t) apr_thread_yield_other(apr_thread_t* thread) {
     apr_status_t status;
     pthread_t *os_thread;
+    struct timespec timeout;
+    timeout.tv_sec = 1;
+    timeout.tv_nsec = 0;
 
     pthread_mutex_lock(&yield_other_mutex);
     if (!yield_other_init_flag) {
@@ -68,8 +72,12 @@ APR_DECLARE(apr_status_t) apr_thread_yield_other(apr_thread_t* thread) {
         pthread_mutex_unlock(&yield_other_mutex);
         return status;
     }
-    if(!(pthread_kill(*os_thread, SIGUSR2))) {
-       sem_wait(&yield_other_sem);
+    if((pthread_kill(*os_thread, SIGUSR2))) {
+    } else 
+    {
+        // let's do timed wait to workaroud missed signals
+        // sem_wait(&yield_other_sem);
+        sem_timedwait(&yield_other_sem,&timeout);
     }
     pthread_mutex_unlock(&yield_other_mutex);    
     return APR_SUCCESS; 
@@ -127,6 +135,38 @@ APR_DECLARE(apr_status_t) apr_thread_times(apr_thread_t *thread,
 
     return APR_SUCCESS; 
 }
+
+APR_DECLARE(apr_status_t) apr_get_thread_time(apr_thread_t *thread, unsigned long long* nanos_ptr)
+{
+    clockid_t clock_id;
+    pthread_t *os_thread;
+    struct timespec tp;
+    apr_status_t status;
+    int res;
+    if (!thread)
+        return APR_DETACH;
+    status = apr_os_thread_get((apr_os_thread_t**)&os_thread, thread); 
+    if(status!=APR_SUCCESS)
+    {
+        return status;
+    }
+    
+	res = pthread_getcpuclockid(*os_thread, &clock_id);
+    if (0 != res) 
+    {
+        return APR_ENOTIME;
+    }
+    res = clock_gettime(clock_id, &tp);
+
+    if (0 != res) 
+    {
+        return APR_ENOTIME;
+    }
+
+    *nanos_ptr = tp.tv_sec * 1000000000ULL + tp.tv_nsec;
+    return APR_SUCCESS;
+}
+
 
 APR_DECLARE(apr_status_t) apr_thread_cancel(apr_thread_t *thread) {
     apr_os_thread_t *os_thread;

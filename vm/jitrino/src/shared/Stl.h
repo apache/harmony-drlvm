@@ -47,6 +47,7 @@
 #include <ext/stl_hash_fun.h>
 #endif
 
+
 #else
 
 #undef _STDEXT_BEGIN
@@ -357,7 +358,7 @@ public:
   StlMultiSet(Allocator const& a) : MultiSet(Traits(), a) {}
   StlMultiSet(Traits const& t, Allocator const& a) : MultiSet(t, a) {}
 
-  bool has(const KeyT& k) const { return (find(k) != StlMultiSet<KeyT>::end()); };
+  bool has(const KeyT& k) const { return (find(k) != StlMultiSet<KeyT>::end()); };  
 };
 
 /**
@@ -442,7 +443,7 @@ public:
   StlHashSet(Allocator const& a, size_type n, HashFun const& h) : HashSet(n, h, CompareFun(), a) {}
   StlHashSet(Allocator const& a, size_type n, HashFun const& h, CompareFun const& c) : HashSet(n, h, c, a) {}
 
-  bool has(const T& k) const { return (find(k) != end()); };
+  bool has(const T& k) const { return (find(k) != StlHashSet<T,HashCompareFun,Allocator>::end()); };
 };
 #endif
 
@@ -473,7 +474,7 @@ public:
   StlHashMultiSet(Allocator const& a, size_type n, HashFun const& h) : HashMultiSet(n, h, CompareFun(), a) {}
   StlHashMultiSet(Allocator const& a, size_type n, HashFun const& h, CompareFun const& c) : HashMultiSet(n, h, c, a) {}
 
-  bool has(const T& k) const { return (find(k) != end()); };
+  bool has(const T& k) const { return (find(k) != StlHashMultiSet<T,HashCompareFun,Allocator>::end()); };
 };
 #endif
 
@@ -505,7 +506,7 @@ public:
   StlHashMap(Allocator const& a, size_type n, HashFun const& h) : HashMap(n, h, CompareFun(), a) {}
   StlHashMap(Allocator const& a, size_type n, HashFun const& h, CompareFun const& c) : HashMap(n, h, c, a) {}
 
-  bool has(const KeyT& k) const { return (find(k) != end()); };
+  bool has(const KeyT& k) const { return (find(k) != StlHashMap<KeyT,ValueT,HashCompareFun,Allocator>::end()); };
 };
 #endif
 
@@ -536,7 +537,7 @@ public:
   StlHashMultiMap(Allocator const& a, size_type n, HashFun const& h) : HashMultiMap(n, h, CompareFun(), a) {}
   StlHashMultiMap(Allocator const& a, size_type n, HashFun const& h, CompareFun const& c) : HashMultiMap(n, h, c, a) {}
 
-  bool has(const KeyT& k) const { return (find(k) != end()); };
+  bool has(const KeyT& k) const { return (find(k) != StlHashMultiMap<KeyT,ValueT,HashCompareFun,Allocator>::end()); };
 };
 #endif
 

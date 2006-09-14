@@ -113,7 +113,8 @@ class_verify_constraints(const Global_Env* env, Class* clss)
         clss->m_lock->_unlock();
         if( result == VER_ErrorLoadClass ) {
             REPORT_FAILED_CLASS_CLASS(clss->class_loader, clss,
-                "java/lang/NoClassDefFoundError", error);
+            VM_Global_State::loader_env->JavaLangNoClassDefFoundError_String->bytes,
+            error);
         } else {
             REPORT_FAILED_CLASS_CLASS(clss->class_loader, clss,
                 "java/lang/VerifyError", error);

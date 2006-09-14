@@ -29,26 +29,37 @@
 #include "Ia32Inst.h"
 #include "Ia32CFG.h"
 #include "BitSet.h"
-#include "Timer.h"
 #include "XTimer.h"
 #include "Log.h"
 #include "../../shared/PlatformDependant.h"
 #include "CGSupport.h"
 #include "CompilationContext.h"
+#include "JITInstanceContext.h"
+#include "PMFAction.h"
+#include "Ia32CodeGeneratorFlags.h"
+
+#include "LoopTree.h"
 
 namespace Jitrino
 {
-namespace Ia32{
+namespace Ia32
+{
 
 const char * newString(MemoryManager& mm, const char * str, uint32 length=EmptyUint32);
+#ifdef _EM64T_
+    #define STACK_REG RegName_RSP
+#else
+    #define STACK_REG RegName_ESP
+#endif
+
 
 //========================================================================================
 // STL aux classes (need to be moved somewhere)
 //========================================================================================
 struct ConstCharStringLess
-{	
-	bool operator()(const char * l, const char * r) const
-	{ return (l==0?(r==0?0:-1):r==0?1:strcmp(l,r))<0; }
+{   
+    bool operator()(const char * l, const char * r) const
+    { return (l==0?(r==0?0:-1):r==0?1:strcmp(l,r))<0; }
 };
 
 
@@ -56,255 +67,273 @@ struct ConstCharStringLess
 // class IRManager
 //========================================================================================
 /**
-	class IRManager is used to create elements of the LIR, to change the LIR's structure,
-	and to access various information which is considered worth to be tracked LIR-wide
-	
+    class IRManager is used to create elements of the LIR, to change the LIR's structure,
+    and to access various information which is considered worth to be tracked LIR-wide
+    
 */
-class IRManager: public CFG
+class IRManager  : protected ControlFlowGraphFactory
 {
 public:
 
-	typedef StlMap<const char *, void *, ConstCharStringLess>	ConstCharStringToVoidPtrMap;
+    ControlFlowGraph* getFlowGraph() const {return fg;}
 
-	struct InternalHelperInfo
-	{
-		const void * pfn;
-		const CallingConvention * callingConvention;
-		InternalHelperInfo(const void * _pfn=NULL, const CallingConvention * _callingConvention=NULL)
-			:pfn(_pfn), callingConvention(_callingConvention){}
-	};
+    typedef StlMap<const char *, void *, ConstCharStringLess>   ConstCharStringToVoidPtrMap;
 
-	typedef StlMap<const char *, InternalHelperInfo, ConstCharStringLess>	InternalHelperInfos;
+    struct InternalHelperInfo
+    {
+        const void * pfn;
+        const CallingConvention * callingConvention;
+        InternalHelperInfo(const void * _pfn=NULL, const CallingConvention * _callingConvention=NULL)
+            :pfn(_pfn), callingConvention(_callingConvention){}
+    };
 
-	//---------------------------------------------------------------------------------------
-	/**	Creates IRManager */
-	
-	IRManager(MemoryManager& memManager, TypeManager& tm, MethodDesc& md, 
-		CompilationInterface& compIface);
+    typedef StlMap<const char *, InternalHelperInfo, ConstCharStringLess>   InternalHelperInfos;
 
-	//-------------------------------------------------------------------------------------
+    //---------------------------------------------------------------------------------------
+    /** Creates IRManager */
+    
+    IRManager(MemoryManager& memManager, TypeManager& tm, MethodDesc& md, CompilationInterface& compIface);
 
-	/** Returns the type manager used for LIR */
-	TypeManager& getTypeManager()const{ return typeManager; }
+    //-------------------------------------------------------------------------------------
 
-	/** Returns the MethodDesc for the method represented by this IR */
-	MethodDesc& getMethodDesc()const{ return methodDesc; }
+    /** Returns the type manager used for LIR */
+    TypeManager& getTypeManager()const{ return typeManager; }
 
-	/** Returns the CompilationInterface for this compilation session */
-	CompilationInterface& getCompilationInterface()const{ return compilationInterface; }
+    /** Returns the MethodDesc for the method represented by this IR */
+    MethodDesc& getMethodDesc()const{ return methodDesc; }
+
+    MemoryManager& getMemoryManager() const {return memoryManager;}
+
+    /** Returns the CompilationInterface for this compilation session */
+    CompilationInterface& getCompilationInterface()const{ return compilationInterface; }
     
     CompilationContext* getCompilationContext()const{ return compilationInterface.getCompilationContext();}
-    CGFlags* getCGFlags() const {return getCompilationContext()->getIa32CGFlags();}
+    JITInstanceContext* getCurrentJITContext() const {return getCompilationContext()->getCurrentJITContext();}
+    ProfilingInterface* getProfilingInterface()const{ return getCurrentJITContext()->getProfilingInterface();}
+    CGFlags* getCGFlags() {return &flags;}
 
-	//-----------------------------------------------------------------------------------------------
-	void setInfo(const char * key, void * info)
-	{ infoMap[newInternalString(key)]=info; }
+    //-----------------------------------------------------------------------------------------------
+    void setInfo(const char * key, void * info)
+    { infoMap[newInternalString(key)]=info; }
 
-	const void * getInfo(const char * key)
-	{ ConstCharStringToVoidPtrMap::const_iterator it=infoMap.find(key); return it!=infoMap.end()?it->second:NULL; }
+    const void * getInfo(const char * key)
+    { ConstCharStringToVoidPtrMap::const_iterator it=infoMap.find(key); return it!=infoMap.end()?it->second:NULL; }
 
-	//-------------------------------------------------------------------------------------
-	struct AliasRelation
-	{
-		Opnd * outerOpnd;
-		uint32 offset;
-		AliasRelation(Opnd * oo =0, uint32 offs=0)
-			:outerOpnd(oo), offset(offs){}
-	};
+    //-------------------------------------------------------------------------------------
+    struct AliasRelation
+    {
+        Opnd * outerOpnd;
+        uint32 offset;
+        AliasRelation(Opnd * oo =0, uint32 offs=0)
+            :outerOpnd(oo), offset(offs){}
+    };
 
-	//-------------------------------------------------------------------------------------
-	/** Creates a new unassigned operand (virtual register) of type ta*/
-	Opnd * newOpnd(Type * type);
-	/** Creates a new unassigned operand (virtual register) of type ta, with additional constraint c */
-	Opnd * newOpnd(Type * type, Constraint c);
+    //-------------------------------------------------------------------------------------
+    /** Creates a new unassigned operand (virtual register) of type ta*/
+    Opnd * newOpnd(Type * type);
+    /** Creates a new unassigned operand (virtual register) of type ta, with additional constraint c */
+    Opnd * newOpnd(Type * type, Constraint c);
 
-	/** Creates a new operand assigned with immediate value */
-	Opnd * newImmOpnd(Type * type, int64 immediate);
+    /** Creates a new operand assigned with immediate value */
+    Opnd * newImmOpnd(Type * type, int64 immediate);
 
-	/** Creates a new immediate operand associated with 
-	runtime info of the specified kind */
-	Opnd * newImmOpnd(Type * type, Opnd::RuntimeInfo::Kind kind, void * arg0=0, void * arg1=0, void * arg2=0, void * arg3=0);
+    /** Creates a new immediate operand associated with 
+    runtime info of the specified kind */
+    Opnd * newImmOpnd(Type * type, Opnd::RuntimeInfo::Kind kind, void * arg0=0, void * arg1=0, void * arg2=0, void * arg3=0);
 
-	ConstantAreaItem *	newConstantAreaItem(float f);
-	ConstantAreaItem *	newConstantAreaItem(double d);
-	ConstantAreaItem *	newSwitchTableConstantAreaItem(uint32 numTargets);
-	ConstantAreaItem *	newInternalStringConstantAreaItem(const char * str);
-	ConstantAreaItem *	newBinaryConstantAreaItem(uint32 size, const void * pv);
+    ConstantAreaItem *  newConstantAreaItem(float f);
+    ConstantAreaItem *  newConstantAreaItem(double d);
+    ConstantAreaItem *  newSwitchTableConstantAreaItem(uint32 numTargets);
+    ConstantAreaItem *  newInternalStringConstantAreaItem(const char * str);
+    ConstantAreaItem *  newBinaryConstantAreaItem(uint32 size, const void * pv);
 
-	Opnd * newFPConstantMemOpnd(float f);
-	Opnd * newFPConstantMemOpnd(double f);
-	Opnd * newSwitchTableConstantMemOpnd(uint32 numTargets, Opnd * index);
+    Opnd * newFPConstantMemOpnd(float f, Opnd * baseOpnd=0, BasicBlock * bb=0);
+    Opnd * newFPConstantMemOpnd(double f, Opnd * baseOpnd=0, BasicBlock * bb=0);
+    Opnd * newSwitchTableConstantMemOpnd(uint32 numTargets, Opnd * index);
 
-	Opnd * newInternalStringConstantImmOpnd(const char * str);
-	Opnd * newBinaryConstantImmOpnd(uint32 size, const void * pv);
+    Opnd * newInternalStringConstantImmOpnd(const char * str);
+    Opnd * newBinaryConstantImmOpnd(uint32 size, const void * pv);
 
-	/** Creates a new operand assigned to a physical register */
-	Opnd * newRegOpnd(Type * type, RegName reg);
+    /** Creates a new operand assigned to a physical register */
+    Opnd * newRegOpnd(Type * type, RegName reg);
 
-	/** Creates a new operand assigned to a memory location of kind k */
-	Opnd * newMemOpnd(Type * type, MemOpndKind k, Opnd * base, Opnd * index=0, Opnd * scale=0, Opnd * displacement=0, RegName baseReg=RegName_Null);
-	/** Shortcut: Creates a new operand assigned to a memory location of kind Heap */
-	Opnd * newMemOpnd(Type * type, Opnd * base, Opnd * index=0, Opnd * scale=0, Opnd * displacement=0, RegName baseReg=RegName_Null);
-	/** Shortcut: Creates a new operand assigned to a memory location of kind k */
-	Opnd * newMemOpnd(Type * type, MemOpndKind k, Opnd * base, int32 displacement, RegName baseReg=RegName_Null);
+    /** Creates a new operand assigned to a memory location of kind k */
+    Opnd * newMemOpnd(Type * type, MemOpndKind k, Opnd * base, Opnd * index=0, Opnd * scale=0, Opnd * displacement=0, RegName segReg=RegName_Null);
+    /** Shortcut: Creates a new operand assigned to a memory location of kind Heap */
+    Opnd * newMemOpnd(Type * type, Opnd * base, Opnd * index=0, Opnd * scale=0, Opnd * displacement=0, RegName segReg=RegName_Null);
+    /** Shortcut: Creates a new operand assigned to a memory location of kind k */
+    Opnd * newMemOpnd(Type * type, MemOpndKind k, Opnd * base, int32 displacement, RegName segReg=RegName_Null);
 
-	Opnd * newMemOpndAutoKind(Type * type, MemOpndKind k, Opnd * opnd0, Opnd * opnd1=0, Opnd * opnd2=0);
-	Opnd * newMemOpndAutoKind(Type * type, Opnd * opnd0, Opnd * opnd1=0, Opnd * opnd2=0)
-	{ return newMemOpndAutoKind(type, MemOpndKind_Heap, opnd0, opnd1, opnd2); }
+    Opnd * newMemOpndAutoKind(Type * type, MemOpndKind k, Opnd * opnd0, Opnd * opnd1=0, Opnd * opnd2=0);
+    Opnd * newMemOpndAutoKind(Type * type, Opnd * opnd0, Opnd * opnd1=0, Opnd * opnd2=0)
+    { return newMemOpndAutoKind(type, MemOpndKind_Heap, opnd0, opnd1, opnd2); }
 
-	//-------------------------------------------------------------------------------------
-	/** Creates a new Native Inst defined by mnemonic with up to 8 operands */
-	Inst * newInst(Mnemonic mnemonic, Opnd * opnd0=0, Opnd * opnd1=0, Opnd * opnd2=0);
+    //-------------------------------------------------------------------------------------
+    /** Creates a new Native Inst defined by mnemonic with up to 8 operands */
+    Inst * newInst(Mnemonic mnemonic, Opnd * opnd0=0, Opnd * opnd1=0, Opnd * opnd2=0);
 
-	Inst * newInst(Mnemonic mnemonic, 
-		Opnd * opnd0, Opnd * opnd1, Opnd * opnd2, Opnd * opnd3, 
-		Opnd * opnd4, Opnd * opnd5=0, Opnd * opnd6=0, Opnd * opnd7=0
-		);
+    Inst * newInst(Mnemonic mnemonic, 
+        Opnd * opnd0, Opnd * opnd1, Opnd * opnd2, Opnd * opnd3, 
+        Opnd * opnd4, Opnd * opnd5=0, Opnd * opnd6=0, Opnd * opnd7=0
+        );
 
-	/** Creates a new Extended Inst defined by mnemonic with up to 8 operands */
-	Inst * newInstEx(Mnemonic mnemonic, uint32 defCount, Opnd * opnd0=0, Opnd * opnd1=0, Opnd * opnd2=0);
+    /** Creates a new Extended Inst defined by mnemonic with up to 8 operands */
+    Inst * newInstEx(Mnemonic mnemonic, uint32 defCount, Opnd * opnd0=0, Opnd * opnd1=0, Opnd * opnd2=0);
 
-	Inst * newInstEx(Mnemonic mnemonic, uint32 defCount, 
-		Opnd * opnd0, Opnd * opnd1, Opnd * opnd2, Opnd * opnd3, 
-		Opnd * opnd4, Opnd * opnd5=0, Opnd * opnd6=0, Opnd * opnd7=0
-		);
+    Inst * newInstEx(Mnemonic mnemonic, uint32 defCount, 
+        Opnd * opnd0, Opnd * opnd1, Opnd * opnd2, Opnd * opnd3, 
+        Opnd * opnd4, Opnd * opnd5=0, Opnd * opnd6=0, Opnd * opnd7=0
+        );
 
-	/** Creates a new branch instruction
-		The source of the targetMemOpnd can be defined by its RuntimInfo
+    /** Creates a new branch instruction
+        The source of the targetMemOpnd can be defined by its RuntimInfo
 
-		if the targetOpnd is null, implicit immediate operand is created and initialized to 0, 
-		meaning that the branch is direct. Branch address will be updated during code emission
-	*/
-	BranchInst * newBranchInst(Mnemonic mnemonic, Opnd * targetOpnd=0); 
+        if the targetOpnd is null, implicit immediate operand is created and initialized to 0, 
+        meaning that the branch is direct. Branch address will be updated during code emission
+    */
+    BranchInst * newBranchInst(Mnemonic mnemonic, Node* trueTarget, Node* falseTarget, Opnd * targetOpnd=0); 
 
-	SwitchInst * newSwitchInst(uint32 numTargets, Opnd * index);
+    SwitchInst * newSwitchInst(uint32 numTargets, Opnd * index);
 
-	/** Creates a CallInst instance. */
-	CallInst *	newCallInst(Opnd * targetOpnd, const CallingConvention * cc, 
-		uint32 numArgs, Opnd ** args, Opnd * retOpnd, InlineInfo* ii = NULL);
+    JumpInst * newJumpInst(Opnd * targetOpnd=0); 
 
-	/** A specialization of the newCallInst to create a VM Helper CallInst. */
-	CallInst *	newRuntimeHelperCallInst(CompilationInterface::RuntimeHelperId helperId, 
-		uint32 numArgs, Opnd ** args, Opnd * retOpnd);
-	/** A specialization of the newCallInst to create an internal helper CallInst. */
-	CallInst *	newInternalRuntimeHelperCallInst(const char * internalHelperID, uint32 numArgs, Opnd ** args, Opnd * retOpnd);
+    /** Creates a CallInst instance. */
+    CallInst *  newCallInst(Opnd * targetOpnd, const CallingConvention * cc, 
+        uint32 numArgs, Opnd ** args, Opnd * retOpnd, InlineInfo* ii = NULL);
 
-	void registerInternalHelperInfo(const char * internalHelperID, const InternalHelperInfo& info);
-	const InternalHelperInfo *	getInternalHelperInfo(const char * internalHelperID)const
-	{ InternalHelperInfos::const_iterator it=internalHelperInfos.find(internalHelperID); return it!=internalHelperInfos.end()?&it->second:NULL; }
+    /** A specialization of the newCallInst to create a VM Helper CallInst. */
+    CallInst *  newRuntimeHelperCallInst(CompilationInterface::RuntimeHelperId helperId, 
+        uint32 numArgs, Opnd ** args, Opnd * retOpnd, InlineInfo* ii = NULL);
+    /** A specialization of the newCallInst to create an internal helper CallInst. */
+    CallInst *  newInternalRuntimeHelperCallInst(const char * internalHelperID, uint32 numArgs, Opnd ** args, Opnd * retOpnd);
 
-	const char * newInternalString(const char * originalString)const
-	{ return newString(memoryManager, originalString); }
+    void registerInternalHelperInfo(const char * internalHelperID, const InternalHelperInfo& info);
+    const InternalHelperInfo *  getInternalHelperInfo(const char * internalHelperID)const
+    { InternalHelperInfos::const_iterator it=internalHelperInfos.find(internalHelperID); return it!=internalHelperInfos.end()?&it->second:NULL; }
 
-	AliasPseudoInst * newAliasPseudoInst(Opnd * targetOpnd, Opnd * sourceOpnd, uint32 offset);
-	AliasPseudoInst * newAliasPseudoInst(Opnd * targetOpnd, uint32 sourceOpndCount, Opnd ** sourceOpnds);
+    const char * newInternalString(const char * originalString)const
+    { return newString(memoryManager, originalString); }
 
-	CatchPseudoInst * newCatchPseudoInst(Opnd * exception);
+    AliasPseudoInst * newAliasPseudoInst(Opnd * targetOpnd, Opnd * sourceOpnd, uint32 offset);
+    AliasPseudoInst * newAliasPseudoInst(Opnd * targetOpnd, uint32 sourceOpndCount, Opnd ** sourceOpnds);
 
-	Inst * newI8PseudoInst(Mnemonic mnemonic, uint32 defCount,
-			Opnd * opnd0, Opnd * opnd1=0, Opnd * opnd2=0, Opnd * opnd3=0
-		);
+    CatchPseudoInst * newCatchPseudoInst(Opnd * exception);
+
+    Inst * newI8PseudoInst(Mnemonic mnemonic, uint32 defCount,
+            Opnd * opnd0, Opnd * opnd1=0, Opnd * opnd2=0, Opnd * opnd3=0
+        );
 
     GCInfoPseudoInst* newGCInfoPseudoInst(const StlVector<Opnd*>& basesAndMptr);
 
-	SystemExceptionCheckPseudoInst* newSystemExceptionCheckPseudoInst(CompilationInterface::SystemExceptionId exceptionId, Opnd * opnd0, Opnd * opnd1=0, bool checksThisForInlinedMethod=false);
+    SystemExceptionCheckPseudoInst* newSystemExceptionCheckPseudoInst(CompilationInterface::SystemExceptionId exceptionId, Opnd * opnd0, Opnd * opnd1=0, bool checksThisForInlinedMethod=false);
 
-	Inst * newCopyPseudoInst(Mnemonic mn, Opnd * opnd0, Opnd * opnd1=NULL);
+    Inst * newCopyPseudoInst(Mnemonic mn, Opnd * opnd0, Opnd * opnd1=NULL);
 
-	/** Creates the ret instruction 
-	using the primary calling convention associated with this method in IRManager's constructor
-	*/
-	RetInst * newRetInst(Opnd * retOpnd);
+    /** Creates the ret instruction 
+    using the primary calling convention associated with this method in IRManager's constructor
+    */
+    RetInst * newRetInst(Opnd * retOpnd);
 
-	/** Creates an EntryPointPseudoInst pseudo instruction representing the entry point of a method.
-	*/
-	EntryPointPseudoInst * newEntryPointPseudoInst(const CallingConvention * cc);
+    /** Creates an EntryPointPseudoInst pseudo instruction representing the entry point of a method.
+    */
+    EntryPointPseudoInst * newEntryPointPseudoInst(const CallingConvention * cc);
 
- 	Inst * newCopySequence(Mnemonic mn, Opnd * opnd0, Opnd * opnd1=NULL, uint32 regUsageMask=(uint32)~0);
+    Inst * newCopySequence(Mnemonic mn, Opnd * opnd0, Opnd * opnd1=NULL, uint32 regUsageMask=(uint32)~0, uint32 flagsRegUsageMask=(uint32)~0);
 
-	//---------------------------------------------------------------------------------------
-	void setHasCalls(){ hasCalls=true; }
-	bool getHasCalls()const{ return hasCalls; }
-	void setHasNonExceptionCalls(){ hasNonExceptionCalls=true; }
-	bool getHasNonExceptionCalls()const{ return hasNonExceptionCalls; }
-	//-----------------------------------------------------------------------------------------------
-	const CallingConvention * getCallingConvention(CompilationInterface::RuntimeHelperId helperId)const;
+    /** Creates an EmptyPseudoInst instruction to fill BB, which shoud not be cosidered as an empty one.
+    */
+    Inst* IRManager::newEmptyPseudoInst();
 
-	const CallingConvention * getCallingConvention(MethodDesc * methodDesc)const;
+    /** Creates an MethodEntryPseudoInst pseudo instruction representing the inlined method entry/end markers.
+    */
+    MethodMarkerPseudoInst* newMethodEntryPseudoInst(MethodDesc* mDesc);
+    MethodMarkerPseudoInst* newMethodEndPseudoInst(MethodDesc* mDesc);
+    //---------------------------------------------------------------------------------------
+    void setHasCalls(){ hasCalls=true; }
+    bool getHasCalls()const{ return hasCalls; }
+    void setHasNonExceptionCalls(){ hasNonExceptionCalls=true; }
+    bool getHasNonExceptionCalls()const{ return hasNonExceptionCalls; }
+    //-----------------------------------------------------------------------------------------------
+    const CallingConvention * getCallingConvention(CompilationInterface::RuntimeHelperId helperId)const;
 
-	const CallingConvention * getDefaultManagedCallingConvention() const { return &CallingConvention_DRL; }
+    const CallingConvention * getCallingConvention(MethodDesc * methodDesc)const;
 
-	EntryPointPseudoInst * getEntryPointInst()const { return entryPointInst; }
+    const CallingConvention * getDefaultManagedCallingConvention() const { return &CallingConvention_DRL; }
 
-	const CallingConvention * getCallingConvention()const { assert(NULL!=entryPointInst); return getEntryPointInst()->getCallingConventionClient().getCallingConvention(); }
+    EntryPointPseudoInst * getEntryPointInst()const { return entryPointInst; }
 
-	Opnd * defArg(Type * type, uint32 position);
+    const CallingConvention * getCallingConvention()const { assert(NULL!=entryPointInst); return getEntryPointInst()->getCallingConventionClient().getCallingConvention(); }
 
-	void applyCallingConventions();
+    Opnd * defArg(Type * type, uint32 position);
 
-	uint32 getMaxInstId() { return instId; }
+    void applyCallingConventions();
 
-	//-----------------------------------------------------------------------------------------------
-	/** Updates operands resolving their RuntimeInfo */
+    uint32 getMaxInstId() { return instId; }
+
+    //-----------------------------------------------------------------------------------------------
+    /** Updates operands resolving their RuntimeInfo */
     void resolveRuntimeInfo();
     void resolveRuntimeInfo(Opnd* opnd) const;
 
 
-	/** AOT support: serializes inst into stream */
-	Byte * serialize(Byte * stream, Inst * inst);
-	/** AOT support: deserializes inst from stream */
-	Byte * deserialize(Byte * stream, Inst *& inst);
+    /** AOT support: serializes inst into stream */
+    Byte * serialize(Byte * stream, Inst * inst);
+    /** AOT support: deserializes inst from stream */
+    Byte * deserialize(Byte * stream, Inst *& inst);
 
-	//-----------------------------------------------------------------------------------------------
-	/** calculate liveness information */
-	void calculateLivenessInfo();
+    //-----------------------------------------------------------------------------------------------
+    /** calculate liveness information */
+    void calculateLivenessInfo();
 
-	void fixLivenessInfo( uint32 * map = NULL );
+    void fixLivenessInfo( uint32 * map = NULL );
 
     bool hasLivenessInfo()const
-	{ 
-		if (!_hasLivenessInfo)
-			return false;
-		LiveSet * ls = getPrologNode()->getLiveAtEntry(); 
-		return ls != NULL && ls->getSetSize()==getOpndCount();
-	}
+    { 
+        if (!_hasLivenessInfo)
+            return false;
+        BitSet * ls = ((CGNode*)fg->getEntryNode())->getLiveAtEntry(); 
+        return ls != NULL && ls->getSetSize()==getOpndCount();
+    }
 
     /** calculate liveness information if needed*/
     void updateLivenessInfo() { if (!hasLivenessInfo()) calculateLivenessInfo();}
 
-	void invalidateLivenessInfo(){ _hasLivenessInfo=false; }
+    void invalidateLivenessInfo(){ _hasLivenessInfo=false; }
+
+    void updateLoopInfo() const {fg->getLoopTree()->rebuild(false);}
+    void invalidateLoopInfo() {/*do nothing*/}
 
 
-	/** returns the live set for node entry */
-	LiveSet * getLiveAtEntry(const Node * node)const
-	{ return node->getLiveAtEntry(); }
-	/** initializes ls with liveness info at node exit */
-	void getLiveAtExit(const Node * node, LiveSet & ls)const;
-	/** use this function to update ls in a single bakrward pass through a node when liveness info is calculated */
-	void updateLiveness(const Inst * inst, LiveSet & ls)const;
+    /** returns the live set for node entry */
+    BitSet * getLiveAtEntry(const Node * node)const
+    { return ((const CGNode*)node)->getLiveAtEntry(); }
+    /** initializes ls with liveness info at node exit */
+    void getLiveAtExit(const Node * node, BitSet & ls)const;
+    /** use this function to update ls in a single bakrward pass through a node when liveness info is calculated */
+    void updateLiveness(const Inst * inst, BitSet & ls)const;
 
-	/** returns the reg usage information for node entry 
-	as uint32containing bit mask for used registers */
-	uint32 getRegUsageAtEntry(const Node * node, OpndKind regKind)const
-	{	return getRegUsageFromLiveSet(getLiveAtEntry(node), regKind);	}
+    /** returns the reg usage information for node entry 
+    as uint32containing bit mask for used registers */
+    uint32 getRegUsageAtEntry(const Node * node, OpndKind regKind)const
+    {   return getRegUsageFromLiveSet(getLiveAtEntry(node), regKind);   }
 
-	/** returns the reg usage information for node exit 
-	as uint32 containing bit mask for used registers */
-	void getRegUsageAtExit(const Node * node, OpndKind regKind, uint32 & mask)const;
+    /** returns the reg usage information for node exit 
+    as uint32 containing bit mask for used registers */
+    void getRegUsageAtExit(const Node * node, OpndKind regKind, uint32 & mask)const;
 
     /** use this function to update reg usage in a single postorder pass when liveness info is calculated */
-	void updateRegUsage(const Inst * inst, OpndKind regKind, uint32 & mask)const;
+    void updateRegUsage(const Inst * inst, OpndKind regKind, uint32 & mask)const;
 
-	uint32 getRegUsageFromLiveSet(LiveSet * ls, OpndKind regKind)const;
+    uint32 getRegUsageFromLiveSet(BitSet * ls, OpndKind regKind)const;
 
-	/** returns Constraint containing bit mask for all registers used in the method */
-	uint32 getTotalRegUsage(OpndKind regKind)const;
+    /** returns Constraint containing bit mask for all registers used in the method */
+    uint32 getTotalRegUsage(OpndKind regKind)const;
 
-	void calculateTotalRegUsage(OpndKind regKind);
+    void calculateTotalRegUsage(OpndKind regKind);
 
-	static bool isGCSafePoint(const Inst* inst)  {return inst->getMnemonic() == Mnemonic_CALL;}
+    static bool isGCSafePoint(const Inst* inst)  {return inst->getMnemonic() == Mnemonic_CALL;}
 
-	static bool isThreadInterruptablePoint(const Inst* inst) {
+    static bool isThreadInterruptablePoint(const Inst* inst) {
         if ( inst->getMnemonic() == Mnemonic_CALL ) {
             Opnd::RuntimeInfo* ri = inst->getOpnd(((ControlTransferInst*)inst)->getTargetOpndIndex())->getRuntimeInfo();
             return ri ? ri->getKind() == Opnd::RuntimeInfo::Kind_HelperAddress : false;
@@ -313,154 +342,183 @@ public:
         }
     }
 
-	//-----------------------------------------------------------------------------------------------
-	bool isOnlyPrologSuccessor(BasicBlock * bb) ;
+    //-----------------------------------------------------------------------------------------------
+    bool isOnlyPrologSuccessor(Node * bb) ;
 
-	/** expands SystemExceptionCheckPseudoInst */
-	void expandSystemExceptions(uint32 reservedForFlags);
+    /** returns true if the specified node is an epilog basic block 
+    A node is considered epilog if it is a basic block and is connected to the exit node of the CFG 
+    */
+    bool            isEpilog(const Node * node) const
+    { return node->isBlockNode() && node->isConnectedTo(true, fg->getExitNode());}
 
-	/** changes all Extended insts to Native form by calling makeInstNative */
-	void translateToNativeForm();
 
-	void eliminateSameOpndMoves();
+    /** fix edge profile
+        if CFG is not annotated with edge profile assigns heuristics based (loops-only) 
+        profile to CFG.
+        CFG has valid profile after this method call.
+    */
+    void fixEdgeProfile();
 
-	//-----------------------------------------------------------------------------------------------
-	/**this function performs the following things in a single postorder pass:
-		1) indexes instruction in topological (reverse post-order)
-		2) (re-)calculates operand statistics (ref counts)
-		3) If reindex is true it sets new sequential Opnd::id 
-		for all operands with refcount>0(used for packOpnds)*/
-	uint32 calculateOpndStatistics(bool reindex=false);
+    /** returns true if the CFG has been laid out 
+    (layout successor attributes of nodes are valid) */
+    bool isLaidOut() const {return laidOut;}
+    void setLaidOut(bool v) {laidOut = true;}
 
-	/** this function performs the following:
-		1) calls calculateOpndStatistics().
-		2) removes operands with zero ref counts from the internal
-		array of all operands accessed via IRManager::getOpnd(uint32).
-	*/
-	void packOpnds();
+    /** returns the pointer to the native code for this basic block */
+    void * getCodeStartAddr() const {return codeStartAddr;}
+    void   setCodeStartAddr(void* addr) {codeStartAddr = addr;} 
 
-	/** returns the number of operands in the internal
-		array of all operands accessed via IRManager::getOpnd(uint32).
-		This number is affected by packOpnds which removes from the array all operands which
-		are no longer in the LIR.
-	*/
-	uint32 getOpndCount()const
-	{ return opnds.size(); }
+    ControlFlowGraph* createSubCFG(bool withReturn, bool withUnwind);
 
-	/** returns an operand from the internal array of all operands by its ID. */
-	Opnd * getOpnd(uint32 id)const
-	{ 
-		assert(id<opnds.size()); return opnds[id]; 
-	}
+    /** expands SystemExceptionCheckPseudoInst */
+    void expandSystemExceptions(uint32 reservedForFlags);
 
-	/** sets the the Calculateable opnd constraints to Initial ones */
-	void resetOpndConstraints();
-	void addToOpndCalculatedConstraints(Constraint c);
+    /** changes all Extended insts to Native form by calling makeInstNative */
+    void translateToNativeForm();
 
-	//-----------------------------------------------------------------------------------------------
-	uint32 assignInnerMemOpnd(Opnd * outerOpnd, Opnd* innerOpnds, uint32 offset);
-	void assignInnerMemOpnds(Opnd * outerOpnd, Opnd** innerOpnds, uint32 innerOpndCount);
-	void layoutAliasPseudoInstOpnds(AliasPseudoInst * inst);
-	void getAliasRelations(AliasRelation * relations);
-	void layoutAliasOpnds();
-	uint32 getLayoutOpndAlignment(Opnd * opnd);
-	void finalizeCallSites();
-	void removeRedundantStackOperations();
+    void eliminateSameOpndMoves();
 
-	/** Calculates dislacement from stack entry point
-		for every instruction.
-	*/
-	void calculateStackDepth();
-	//-----------------------------------------------------------------------------------------------
-	bool verify();
-	bool verifyLiveness();
-	bool verifyHeapAddressTypes();
+    //-----------------------------------------------------------------------------------------------
+    /**this function performs the following things in a single postorder pass:
+        1) indexes instruction in topological (reverse post-order)
+        2) (re-)calculates operand statistics (ref counts)
+        3) If reindex is true it sets new sequential Opnd::id 
+        for all operands with refcount>0(used for packOpnds)*/
+    uint32 calculateOpndStatistics(bool reindex=false);
 
-	//-----------------------------------------------------------------------------------------------
-	/** Assigns all instructions in the CFG sequential indexes ordering them by order 
-		The index can be obtained using Inst::getIndex()
-	*/
-	void indexInsts(OrderType order);
+    /** this function performs the following:
+        1) calls calculateOpndStatistics().
+        2) removes operands with zero ref counts from the internal
+        array of all operands accessed via IRManager::getOpnd(uint32).
+    */
+    void packOpnds();
 
-	//-----------------------------------------------------------------------------------------------
-	/** space optimization: return a pre-existent operand representing physical register regName */
-	Opnd * getRegOpnd(RegName regName);
-	bool isPreallocatedRegOpnd(Opnd * opnd);
-	//-----------------------------------------------------------------------------------------------
-	/** returns the initial constraint for the given type */
-	Constraint getInitialConstraint(Type * type)const
-	{ return initialConstraints[type->tag]; }
+    /** returns the number of operands in the internal
+        array of all operands accessed via IRManager::getOpnd(uint32).
+        This number is affected by packOpnds which removes from the array all operands which
+        are no longer in the LIR.
+    */
+    uint32 getOpndCount()const
+    { return opnds.size(); }
 
-	/** converts Type::Tag into pointer to Type instance */
-	Type * getTypeFromTag(Type::Tag)const;
+    /** returns an operand from the internal array of all operands by its ID. */
+    Opnd * getOpnd(uint32 id)const
+    { 
+        assert(id<opnds.size()); return opnds[id]; 
+    }
 
-	Type * getManagedPtrType(Type * sourceType);
+    /** sets the the Calculateable opnd constraints to Initial ones */
+    void resetOpndConstraints();
 
-	/** returns the size of location occupied by an operand of type type */
-	static OpndSize getTypeSize(Type::Tag tag);
-	static OpndSize getTypeSize(Type * type){ return getTypeSize(type->tag); }
+    //-----------------------------------------------------------------------------------------------
+    uint32 assignInnerMemOpnd(Opnd * outerOpnd, Opnd* innerOpnds, uint32 offset);
+    void assignInnerMemOpnds(Opnd * outerOpnd, Opnd** innerOpnds, uint32 innerOpndCount);
+    void layoutAliasPseudoInstOpnds(AliasPseudoInst * inst);
+    void getAliasRelations(AliasRelation * relations);
+    void layoutAliasOpnds();
+    uint32 getLayoutOpndAlignment(Opnd * opnd);
+    void finalizeCallSites();
+
+    /** Calculates dislacement from stack entry point
+        for every instruction.
+    */
+    void calculateStackDepth();
+    //-----------------------------------------------------------------------------------------------
+    bool verify();
+    bool verifyLiveness();
+    bool verifyHeapAddressTypes();
+
+    //-----------------------------------------------------------------------------------------------
+    /** Assigns all instructions in the CFG sequential indexes ordering them in topological order
+    */
+    void indexInsts();
+
+    
+    //-----------------------------------------------------------------------------------------------
+    /** space optimization: return a pre-existent operand representing physical register regName */
+    Opnd * getRegOpnd(RegName regName);
+    bool isPreallocatedRegOpnd(Opnd * opnd);
+    //-----------------------------------------------------------------------------------------------
+    /** returns the initial constraint for the given type */
+    Constraint getInitialConstraint(Type * type)const
+    { return initialConstraints[type->tag]; }
+
+    /** converts Type::Tag into pointer to Type instance */
+    Type * getTypeFromTag(Type::Tag)const;
+
+    Type * getManagedPtrType(Type * sourceType);
+
+    /** returns the size of location occupied by an operand of type type */
+    static OpndSize getTypeSize(Type::Tag tag);
+    static OpndSize getTypeSize(Type * type){ return getTypeSize(type->tag); }
 
     /** checks loop info, returns FALSE if loop info is not valid,
         should be used in debug assert checks*/
     bool ensureLivenessInfoIsValid();
 
-	/** returns true if regs of kind regKind cannot be assigned anymore to operands
-	This means reg allocations is done and the new assignment can conflict with existing ones
-	*/
-	bool isRegisterSetLocked(OpndKind regKind){ return true; } 
-	void lockRegisterSet(OpndKind regKind){ } 
+    /** returns true if regs of kind regKind cannot be assigned anymore to operands
+    This means reg allocations is done and the new assignment can conflict with existing ones
+    */
+    bool isRegisterSetLocked(OpndKind regKind){ return true; } 
+    void lockRegisterSet(OpndKind regKind){ } 
 
-	void setVerificationLevel(uint32 v){ verificationLevel=v; }
-	uint32 getVerificationLevel()const{ return verificationLevel; }
-
-
-	static void selfUnitTest(TypeManager & tm, MethodDesc & md, CompilationInterface & compInterface);
+    void setVerificationLevel(uint32 v){ verificationLevel=v; }
+    uint32 getVerificationLevel()const{ return verificationLevel; }
 
 protected:
 
-	void addOpnd(Opnd * opnd);
+    //control flow graph factory methods
+    virtual Node* createNode(MemoryManager& mm, Node::Kind kind);
+    virtual Edge* createEdge(MemoryManager& mm, Node::Kind srcKind, Node::Kind dstKind);
 
-	void addAliasRelation(AliasRelation * relations, Opnd * opndOuter, Opnd * opndInner, uint32 offset);
+    void addOpnd(Opnd * opnd);
 
- 	Inst * newCopySequence(Opnd * targetOpnd, Opnd * sourceOpnd, uint32 regUsageMask=(uint32)~0);
- 	Inst * newPushPopSequence(Mnemonic mn, Opnd * opnd, uint32 regUsageMask=(uint32)~0);
- 	Inst * newMemMovSequence(Opnd * targetOpnd, Opnd * sourceOpnd, uint32 regUsageMask, bool checkSource=false);
+    void addAliasRelation(AliasRelation * relations, Opnd * opndOuter, Opnd * opndInner, uint32 offset);
 
-	void initInitialConstraints();
-	Constraint createInitialConstraint(Type::Tag t)const;
+    Inst * newCopySequence(Opnd * targetOpnd, Opnd * sourceOpnd, uint32 regUsageMask=(uint32)~0, uint32 flagsRegUsageMask=(uint32)~0);
+    Inst * newPushPopSequence(Mnemonic mn, Opnd * opnd, uint32 regUsageMask=(uint32)~0);
+    Inst * newMemMovSequence(Opnd * targetOpnd, Opnd * sourceOpnd, uint32 regUsageMask, bool checkSource=false);
 
-	//-------------------------------------------------------------------------------------
-	TypeManager				&		typeManager;
+    void initInitialConstraints();
+    Constraint createInitialConstraint(Type::Tag t)const;
 
-	MethodDesc				&		methodDesc;
-	CompilationInterface	&		compilationInterface;
+    //-------------------------------------------------------------------------------------
+    MemoryManager&                  memoryManager;
+    ControlFlowGraph*               fg;
+    TypeManager             &       typeManager;
 
-	uint32							opndId;
-	uint32							instId;
+    MethodDesc              &       methodDesc;
+    CompilationInterface    &       compilationInterface;
 
-	OpndVector						opnds;
+    uint32                          opndId;
+    uint32                          instId;
 
-	uint32							gpTotalRegUsage;
+    OpndVector                      opnds;
 
-	EntryPointPseudoInst *			entryPointInst;
+    uint32                          gpTotalRegUsage;
 
-	Opnd *							regOpnds[IRMaxRegNames];
+    EntryPointPseudoInst *          entryPointInst;
 
-	bool							_hasLivenessInfo;
+    Opnd *                          regOpnds[IRMaxRegNames];
 
-	InternalHelperInfos				internalHelperInfos;
+    bool                            _hasLivenessInfo;
 
-	ConstCharStringToVoidPtrMap		infoMap;
+    InternalHelperInfos             internalHelperInfos;
 
-	uint32							verificationLevel;
+    ConstCharStringToVoidPtrMap     infoMap;
 
-	bool							hasCalls;
-	bool							hasNonExceptionCalls;
+    uint32                          verificationLevel;
 
-	Constraint						initialConstraints[Type::NumTypeTags];
+    bool                            hasCalls;
+    bool                            hasNonExceptionCalls;
+
+    Constraint                      initialConstraints[Type::NumTypeTags];
+    bool                            laidOut;
+    void *                          codeStartAddr;
+    CGFlags                         flags;
 };
 
-#define VERIFY_OUT(s) { if (Log::cat_cg()->isFailEnabled()) Log::out() << s; ::std::cerr << s; }
+#define VERIFY_OUT(s) { if (Log::isEnabled()) Log::out() << s; std::cerr << s; }
 
 /** MapHandler is auxilary class to eliminate direct usage of map handlers between HLO and codegenerator */
 
@@ -503,175 +561,81 @@ private:
 
 
 //========================================================================================
-// class IRTransformer
+// class Ia32::SessionAction
 //========================================================================================
 /** 
-	class IRTransformer is the base class for all IR transformations external to IRManager:
-	optimizations, etc.
+    class Ia32::SessionAction is the base class for all IR transformations external to IRManager:
+    optimizations, etc.
 */
 
-class IRTransformer
+class SessionAction : public ::Jitrino::SessionAction
 {
-	//=============================================================================
 public:
-	typedef IRTransformer * (*CreateFunction)(IRManager& irm, const char * params);
-	const static uint32 MaxIRTransformers=100;
-	
-	const static uint32 MaxTagLength=31;
 
-	struct IRTransformerRecord
-	{
-		const char *	tag;
-		CreateFunction	createFunction;
+    enum SideEffect
+    {
+        SideEffect_InvalidatesLivenessInfo=0x1,
+        SideEffect_InvalidatesLoopInfo=0x2,
+    };
 
-		XTimer xtimer;
+    enum NeedInfo
+    {
+        NeedInfo_LivenessInfo=0x1,
+        NeedInfo_LoopInfo=0x2,
+    };
 
-		IRTransformerRecord(const char * _tag=NULL, CreateFunction _createFunction=NULL)
-			:tag(_tag), createFunction(_createFunction)
-		{
-		}
-	};
 
-	static uint32 registerIRTransformer(const char * tag, CreateFunction pfn);
+    SessionAction ()                    :irManager(0) {}
 
-	static IRTransformerRecord * findIRTransformer(const char * tag);
+    void run ();
 
-	static IRTransformer *	newIRTransformer(const char * tag, IRManager& irm, const char * params);
+    IRManager& getIRManager() const     {return *getCompilationContext()->getLIRManager();}
 
-private:
+    const char * getTagName() const     {return getName();}
 
-	static IRTransformerRecord table[];
-	static uint32 tableLength;
+protected:
 
-	//=============================================================================
-public:
-	enum SideEffect
-	{
-		SideEffect_InvalidatesLivenessInfo=0x1,
-		SideEffect_InvalidatesLoopInfo=0x2,
-	};
+    /** Implementors override run() to perform all operations of the pass
 
-	enum NeedInfo
-	{
-		NeedInfo_LivenessInfo=0x1,
-		NeedInfo_LoopInfo=0x2,
-	};
-
-    IRTransformer(IRManager & irm, const char * params=0) 
-		: irManager(irm), parameters(params), stageId(0), record(NULL){}
-	virtual ~IRTransformer(){};
-	virtual void destroy(){};
-
-    void run();
+    Required */
+    virtual void runImpl () = 0;
     
-    IRManager& getIRManager()const{ return irManager; }
+    
+    /** Implementors override getNeedInfo() to indicate what info 
+    must be up to date for the pass.
 
-	const char *	getParameters()const {return parameters; }
+    The returned value is |-ed from the NeedInfo enum
 
-	/** Implementors override getName() to return the full 
-	printable name of the pass. 
-	
-	Required */
-	virtual const char * getName()=0;
-	
-	/** Implementors override getTagName() to return the short tag
-	name of the pass (used in log file names). 
-	
-	Required */
-	virtual const char * getTagName()=0;
-	
-protected:
-	/** Implementors override runImpl() to perform all operations of the pass
+    Optional, defaults to all possible info */
+    virtual uint32 getNeedInfo()const;
 
-	Required */
-    virtual void runImpl()=0;
+    /** Implementors override getSideEffects() to indicate the side effect 
+    of the pass (currently in terms of common info like liveness, loop, etc.)
+    
+    The returned value is |-ed from the SideEffect enum
 
-	/** Implementors override getNeedInfo() to indicate what info 
-	must be up to date for the pass.
+    Optional, defaults to all possible side effects */
+    virtual uint32 getSideEffects()const;
 
-	The returned value is |-ed from the NeedInfo enum
+    virtual bool verify(bool force=false);
 
-	Optional, defaults to all possible info */
-	virtual uint32 getNeedInfo()const;
+    virtual void debugOutput(const char * subKind);
+    
+    virtual void dumpIR(const char * subKind1, const char * subKind2=0);
+    virtual void printDot(const char * subKind1, const char * subKind2=0);
 
-	/** Implementors override getSideEffects() to indicate the side effect 
-	of the pass (currently in terms of common info like liveness, loop, etc.)
-	
-	The returned value is |-ed from the SideEffect enum
+    virtual bool isIRDumpEnabled(){ return true; }
 
-	Optional, defaults to all possible side effects */
-	virtual uint32 getSideEffects()const;
+    int getVerificationLevel() const 
+    {
+        return getIntArg("verify", irManager->getVerificationLevel());
+    }
 
-	virtual bool verify(bool force=false);
 
-	virtual void debugOutput(const char * subKind);
-	
-	virtual void dumpIR(const char * subKind1, const char * subKind2=0);
-	virtual void printDot(const char * subKind1, const char * subKind2=0);
+    IRManager * irManager;
 
-	void printIRDumpBegin(const char * subKind);
-	void printIRDumpEnd(const char * subKind);
-
-	virtual bool isIRDumpEnabled(){ return true; }
-protected:
-
-	IRManager &		irManager;
-	const char *	parameters;
-
-	uint32		stageId;
-
-private:
-	IRTransformerRecord * record;
-
-friend struct IRTimers;
-
+    uint32      stageId;
 };
-
-
-//========================================================================================
-#define IRTRANSFORMER_CONSTRUCTOR(cls) \
-	cls(IRManager& irm, const char * params=0): IRTransformer(irm, params){} \
-
-
-
-#define BEGIN_DECLARE_IRTRANSFORMER(cls, tag, name) \
-class cls: public IRTransformer \
-{ \
-public:	\
-	static const char * getMyTag(){ return tag; } \
-	static cls * create(IRManager & irm, const char * params){ return new cls(irm, params); } \
-	void  destroy(){ delete this; } \
-	const char * getName(){ return name; } \
-	const char * getTagName(){ return getMyTag(); } \
-
-
-
-
-#ifdef IRTRANSFORMER_REGISTRATION_ON
-
-IRTransformer::IRTransformerRecord IRTransformer::table[IRTransformer::MaxIRTransformers]={};
-uint32 IRTransformer::tableLength=0;
-
-#define REGISTER_IRTRANSFORMER(cls) \
-uint32 _register_##cls = IRTransformer::registerIRTransformer(cls::getMyTag(), (IRTransformer::CreateFunction)&cls::create);
-
-#else
-
-#define REGISTER_IRTRANSFORMER(cls) 
-
-#endif
-
-#define END_DECLARE_IRTRANSFORMER(cls) \
-}; \
-REGISTER_IRTRANSFORMER(cls)
-
-
-
-#define DECLARE_IRTRANSFORMER(cls, tag, name) \
-	BEGIN_DECLARE_IRTRANSFORMER(cls, tag, name) \
-		IRTRANSFORMER_CONSTRUCTOR(cls) \
-		void runImpl(); \
-	END_DECLARE_IRTRANSFORMER(cls)
 
 
 

@@ -25,20 +25,19 @@
 #include <algorithm>
 #include "Stl.h"
 #include "Log.h"
-#include "PropertyTable.h"
 #include "open/types.h"
 #include "Inst.h"
 #include "irmanager.h"
-#include "FlowGraph.h"
 #include "reassociate.h"
 #include "CSEHash.h"
 #include "Opcode.h"
 #include "constantfolder.h"
 #include "simplifier.h"
+#include "FlowGraph.h"
 
 namespace Jitrino {
 
-DEFINE_OPTPASS_IMPL(ReassociationPass, reassoc, "Reassociation")
+DEFINE_SESSION_ACTION(ReassociationPass, reassoc, "Reassociation")
 
 void
 ReassociationPass::_run(IRManager& irm) {
@@ -46,7 +45,7 @@ ReassociationPass::_run(IRManager& irm) {
     pass.runPass(false);
 }
 
-DEFINE_OPTPASS_IMPL(DepthReassociationPass, reassocdepth, "Reassociation with Minimum Depth")
+DEFINE_SESSION_ACTION(DepthReassociationPass, reassocdepth, "Reassociation with Minimum Depth")
 
 void
 DepthReassociationPass::_run(IRManager& irm) {
@@ -54,7 +53,7 @@ DepthReassociationPass::_run(IRManager& irm) {
     pass.runPass(true);
 }
 
-DEFINE_OPTPASS_IMPL(LateDepthReassociationPass, latereassocdepth, "Reassociation with Minimum Depth + Constant Mul/Div Optimization")
+DEFINE_SESSION_ACTION(LateDepthReassociationPass, latereassocdepth, "Reassociation with Minimum Depth + Constant Mul/Div Optimization")
 
 void
 LateDepthReassociationPass::_run(IRManager& irm) {
@@ -84,34 +83,20 @@ inline bool operator < (const OpndWithPriority &a, const OpndWithPriority &b)
     return false;
 }
 
-Reassociate::Flags *Reassociate::defaultFlags = 0;
-
 Reassociate::Reassociate(IRManager &irManager0, 
-			 MemoryManager& memManager)
+             MemoryManager& memManager)
     : irManager(irManager0), 
       mm(memManager),
-      flags(*defaultFlags),
       cfgRpoNum(memManager),
       priority(memManager),
       minDepth(false)
 {
-    assert(defaultFlags);
 }
 
 Reassociate::~Reassociate()
 {
 }
 
-void 
-Reassociate::readDefaultFlagsFromCommandLine(const JitrinoParameterTable *params)
-{
-    if (!defaultFlags)
-        defaultFlags = new Flags;
-}
-
-void Reassociate::showFlagsFromCommandLine()
-{
-}
 
 uint32 Reassociate::getPriority(Opnd *opnd)
 {
@@ -122,80 +107,80 @@ uint32 Reassociate::getPriority(Opnd *opnd)
     Opcode opc = operation.getOpcode();
     switch (opc) {
     case Op_LdConstant:
-	opriority = 0; break;
+    opriority = 0; break;
     case Op_Copy:
-	opriority = getPriority(inst->getSrc(0)); break;
+    opriority = getPriority(inst->getSrc(0)); break;
     case Op_LdVar:
-	{
-	    Opnd *var = inst->getSrc(0);
-	    SsaVarOpnd *ssaVarOpnd = var->asSsaVarOpnd();
-	    assert(ssaVarOpnd);
-	    opriority = getPriority(ssaVarOpnd);
-	}
-	break;
+    {
+        Opnd *var = inst->getSrc(0);
+        SsaVarOpnd *ssaVarOpnd = var->asSsaVarOpnd();
+        assert(ssaVarOpnd);
+        opriority = getPriority(ssaVarOpnd);
+    }
+    break;
     case Op_Add:
         opriority = computePriority(costOfAdd, getPriority(inst->getSrc(0)), 
                                     getPriority(inst->getSrc(1)));
-	break;
+    break;
     case Op_Sub:
-	opriority = computePriority(costOfSub, getPriority(inst->getSrc(0)), 
+    opriority = computePriority(costOfSub, getPriority(inst->getSrc(0)), 
                                     getPriority(inst->getSrc(1)));
-	break;
+    break;
     case Op_Neg:
-	opriority = computePriority(costOfNeg, getPriority(inst->getSrc(0)));
-	break;
+    opriority = computePriority(costOfNeg, getPriority(inst->getSrc(0)));
+    break;
     case Op_Mul: 
-	opriority = computePriority(costOfMul, getPriority(inst->getSrc(0)), 
+    opriority = computePriority(costOfMul, getPriority(inst->getSrc(0)), 
                                     getPriority(inst->getSrc(1)));
-	break;
+    break;
     case Op_Conv: 
-	opriority = computePriority(costOfConv, getPriority(inst->getSrc(0)));
-	break;
+    opriority = computePriority(costOfConv, getPriority(inst->getSrc(0)));
+    break;
     case Op_And:
     case Op_Or:
     case Op_Xor:
-	opriority = computePriority(costOfBoolOp, getPriority(inst->getSrc(0)), 
+    opriority = computePriority(costOfBoolOp, getPriority(inst->getSrc(0)), 
                                     getPriority(inst->getSrc(1)));
-	break;
+    break;
     case Op_Not:
-	opriority = computePriority(costOfNot, getPriority(inst->getSrc(0)));
-	break;
+    opriority = computePriority(costOfNot, getPriority(inst->getSrc(0)));
+    break;
     case Op_Shladd:
-	opriority = computePriority(costOfShladd,getPriority(inst->getSrc(0)), 
+    opriority = computePriority(costOfShladd,getPriority(inst->getSrc(0)), 
                                     getPriority(inst->getSrc(1)),
                                     getPriority(inst->getSrc(2)));
-	break;
+    break;
     case Op_Shr:
     case Op_Shl:
-	opriority = computePriority(costOfShift, getPriority(inst->getSrc(0)), 
+    opriority = computePriority(costOfShift, getPriority(inst->getSrc(0)), 
                                     getPriority(inst->getSrc(1)));
-	break;
+    break;
     default:
-	if (operation.isMovable()) {
-	    uint32 numOpnds = inst->getNumSrcOperands();
-	    opriority = 0;
+    if (operation.isMovable()) {
+        uint32 numOpnds = inst->getNumSrcOperands();
+        opriority = 0;
 
-	    for (uint32 i = 0; i<numOpnds; i++) {
+        for (uint32 i = 0; i<numOpnds; i++) {
                 Opnd *opndi = inst->getSrc(i);
                 uint32 argpriority = getPriority(opndi);
                 opriority = ::std::max(opriority, argpriority);
-	    }
-	    opriority = computePriority(costOfMisc, opriority);
-	} else {
-	    Inst *previ = inst->prev();
-	    uint32 ipriority = 1;
-	    while (!previ->isLabel()) {
-		++ipriority;
-		previ = previ->prev();
-	    }
-	    CFGNode *block = previ->asLabelInst()->getCFGNode();
-	    uint32 bpriority = cfgRpoNum[block];
-	    opriority = ((bpriority * priorityFactorOfBlock)
+        }
+        opriority = computePriority(costOfMisc, opriority);
+    } else {
+        Inst *previ = inst->getPrevInst();
+        uint32 ipriority = 1;
+        while (!previ->isLabel()) {
+        ++ipriority;
+        previ = previ->getPrevInst();
+        }
+        Node *block = previ->asLabelInst()->getNode();
+        uint32 bpriority = cfgRpoNum[block];
+        opriority = ((bpriority * priorityFactorOfBlock)
                          + ipriority)*priorityFactorOfPosition;
-	}
-	break;
     }
-    if (Log::cat_opt_reassoc()->isDebugEnabled()) {
+    break;
+    }
+    if (Log::isEnabled()) {
         Log::out() << "Priority of ";
         opnd->print(Log::out());
         Log::out() << " computed is " << (int) opriority << ::std::endl;
@@ -208,59 +193,57 @@ void Reassociate::runPass(bool minimizeDepth, bool isLate)
 {
     minDepth = minimizeDepth;
     if (minimizeDepth) {
-	costOfAdd = 1;
-	costOfSub = 1;
-	costOfNeg = 1;
-	costOfMul = 15;
-	costOfConv = 1;
-	costOfBoolOp = 1;
-	costOfNot = 1;
-	costOfShladd = 1;
-	costOfShift = 1;
-	costOfMisc = 1; 
-	priorityFactorOfBlock = 64;
-	priorityFactorOfPosition = 2;
+    costOfAdd = 1;
+    costOfSub = 1;
+    costOfNeg = 1;
+    costOfMul = 15;
+    costOfConv = 1;
+    costOfBoolOp = 1;
+    costOfNot = 1;
+    costOfShladd = 1;
+    costOfShift = 1;
+    costOfMisc = 1; 
+    priorityFactorOfBlock = 64;
+    priorityFactorOfPosition = 2;
     } else {
-	costOfAdd = 0;
-	costOfSub = 0;
-	costOfNeg = 0;
-	costOfMul = 0;
-	costOfConv = 0;
-	costOfBoolOp = 0;
-	costOfNot = 0;
-	costOfShladd = 0;
-	costOfShift = 0;
-	costOfMisc = 0; 
-	priorityFactorOfBlock = 64;
-	priorityFactorOfPosition = 1;
+    costOfAdd = 0;
+    costOfSub = 0;
+    costOfNeg = 0;
+    costOfMul = 0;
+    costOfConv = 0;
+    costOfBoolOp = 0;
+    costOfNot = 0;
+    costOfShladd = 0;
+    costOfShift = 0;
+    costOfMisc = 0; 
+    priorityFactorOfBlock = 64;
+    priorityFactorOfPosition = 1;
     }
 
-    if (Log::cat_opt_reassoc()->isIR2Enabled()) {
+    if (Log::isEnabled()) {
         Log::out() << "IR before Reassociation pass" << ::std::endl;
-        irManager.getFlowGraph().printInsts(Log::out(),
-                                            irManager.getMethodDesc());
-        irManager.getFlowGraph().printDotFile(irManager.getMethodDesc(), 
- 					      "beforereassoc", 0);
+        FlowGraph::printHIR(Log::out(),  irManager.getFlowGraph(), irManager.getMethodDesc());
+        FlowGraph::printDotFile(irManager.getFlowGraph(), irManager.getMethodDesc(), "beforereassoc");
     }
 
     // first, assign Reverse-PostOrder numbers to flowGraph nodes
-    StlVector<CFGNode *> postOrderNodes(mm);
-    FlowGraph &fg = irManager.getFlowGraph();
+    StlVector<Node *> postOrderNodes(mm);
+    ControlFlowGraph &fg = irManager.getFlowGraph();
     fg.getNodesPostOrder(postOrderNodes);
-    StlVector<CFGNode *>::reverse_iterator 
-	riter = postOrderNodes.rbegin(),
-	rend = postOrderNodes.rend();
+    StlVector<Node *>::reverse_iterator 
+    riter = postOrderNodes.rbegin(),
+    rend = postOrderNodes.rend();
     uint32 i = 0;
     while (riter != rend) {
-	CFGNode *node = *riter;
-	if (Log::cat_opt_reassoc()->isDebugEnabled()) {
-	    Log::out() << "RPO[";
-	    node->printLabel(Log::out());
-	    Log::out() << "] = " << (int) i;
-	    Log::out() << ::std::endl;
-	}
-	cfgRpoNum[node] = i++;
-	++riter;
+    Node *node = *riter;
+    if (Log::isEnabled()) {
+        Log::out() << "RPO[";
+        FlowGraph::printLabel(Log::out(), node);
+        Log::out() << "] = " << (int) i;
+        Log::out() << ::std::endl;
+    }
+    cfgRpoNum[node] = i++;
+    ++riter;
     }
     numBlocks = i;
     
@@ -268,26 +251,24 @@ void Reassociate::runPass(bool minimizeDepth, bool isLate)
     theSimp = &simplifier;
     simplifier.simplifyControlFlowGraph();
     
-    if (Log::cat_opt_reassoc()->isIR2Enabled()) {
+    if (Log::isEnabled()) {
         Log::out() << "IR after Reassociation pass" << ::std::endl;
-        irManager.getFlowGraph().printInsts(Log::out(),
-                                            irManager.getMethodDesc());
-        irManager.getFlowGraph().printDotFile(irManager.getMethodDesc(), 
- 					      "afterreassoc", 0);
+        FlowGraph::printHIR(Log::out(),  irManager.getFlowGraph(), irManager.getMethodDesc());
+        FlowGraph::printDotFile(irManager.getFlowGraph(), irManager.getMethodDesc(), "afterreassoc");
     }
 }
 
 void
 Reassociate::addAddAssoc(StlDeque<OpndWithPriority> &opnds, 
                          bool negated,
-			 Type* type, Opnd* opnd)
+             Type* type, Opnd* opnd)
 {
     Inst *inst = opnd->getInst();
     if (inst->getType() == type->tag) {
-	switch(inst->getOpcode()) {
-	case Op_Add:
-	    if (inst->getOverflowModifier() != Overflow_None) break;
-            if (Log::cat_opt_reassoc()->isDebugEnabled()) {
+    switch(inst->getOpcode()) {
+    case Op_Add:
+        if (inst->getOverflowModifier() != Overflow_None) break;
+            if (Log::isEnabled()) {
                 Log::out() << "addAddAssoc of operand ";
                 opnd->print(Log::out());
                 Log::out() << " is Add(";
@@ -296,22 +277,22 @@ Reassociate::addAddAssoc(StlDeque<OpndWithPriority> &opnds,
                 inst->getSrc(1)->print(Log::out());
                 Log::out() << "), checking opnds" << ::std::endl;
             }
-	    addAddAssoc(opnds, negated, type, inst->getSrc(0));
-	    addAddAssoc(opnds, negated, type, inst->getSrc(1));
-	    return;
-	case Op_Neg:
-            if (Log::cat_opt_reassoc()->isDebugEnabled()) {
+        addAddAssoc(opnds, negated, type, inst->getSrc(0));
+        addAddAssoc(opnds, negated, type, inst->getSrc(1));
+        return;
+    case Op_Neg:
+            if (Log::isEnabled()) {
                 Log::out() << "addAddAssoc of operand ";
                 opnd->print(Log::out());
                 Log::out() << " is Neg(";
                 inst->getSrc(0)->print(Log::out());
                 Log::out() << "), checking opnd" << ::std::endl;
             }
-	    addAddAssoc(opnds, !negated, type, inst->getSrc(0));
-	    return;
-	case Op_Sub:
-	    if (inst->getOverflowModifier() != Overflow_None) break;
-            if (Log::cat_opt_reassoc()->isDebugEnabled()) {
+        addAddAssoc(opnds, !negated, type, inst->getSrc(0));
+        return;
+    case Op_Sub:
+        if (inst->getOverflowModifier() != Overflow_None) break;
+            if (Log::isEnabled()) {
                 Log::out() << "addAddAssoc of operand ";
                 opnd->print(Log::out());
                 Log::out() << " is Sub(";
@@ -320,24 +301,24 @@ Reassociate::addAddAssoc(StlDeque<OpndWithPriority> &opnds,
                 inst->getSrc(1)->print(Log::out());
                 Log::out() << "), checking opnds" << ::std::endl;
             }
-	    addAddAssoc(opnds, negated, type, inst->getSrc(0));
-	    addAddAssoc(opnds, !negated, type, inst->getSrc(1));
-	    return;
+        addAddAssoc(opnds, negated, type, inst->getSrc(0));
+        addAddAssoc(opnds, !negated, type, inst->getSrc(1));
+        return;
         case Op_Copy:
-            if (Log::cat_opt_reassoc()->isDebugEnabled()) {
+            if (Log::isEnabled()) {
                 Log::out() << "addAddAssoc of operand ";
                 opnd->print(Log::out());
                 Log::out() << " is Copy(";
                 inst->getSrc(0)->print(Log::out());
                 Log::out() << "), checking opnd" << ::std::endl;
             }
-	    addAddAssoc(opnds, negated, type, inst->getSrc(0));
-	    return;
-	default:
-	    break;
-	}
+        addAddAssoc(opnds, negated, type, inst->getSrc(0));
+        return;
+    default:
+        break;
     }
-    if (Log::cat_opt_reassoc()->isDebugEnabled()) {
+    }
+    if (Log::isEnabled()) {
         Log::out() << "addAddAssoc of operand ";
         opnd->print(Log::out());
         Log::out() << " is terminal, adding" << ::std::endl;
@@ -348,22 +329,22 @@ Reassociate::addAddAssoc(StlDeque<OpndWithPriority> &opnds,
 void
 Reassociate::addMulAssoc(StlDeque<OpndWithPriority> &opnds, 
                          bool negated,
-			 Type* type, Opnd* opnd)
+             Type* type, Opnd* opnd)
 {
     Inst *inst = opnd->getInst();
     if (inst->getType() == type->tag) {
-	switch(inst->getOpcode()) {
-	case Op_Mul:
-	    if (inst->getOverflowModifier() != Overflow_None) break;
-	    addMulAssoc(opnds, negated, type, inst->getSrc(0));
-	    addMulAssoc(opnds, negated, type, inst->getSrc(1));
-	    return;
+    switch(inst->getOpcode()) {
+    case Op_Mul:
+        if (inst->getOverflowModifier() != Overflow_None) break;
+        addMulAssoc(opnds, negated, type, inst->getSrc(0));
+        addMulAssoc(opnds, negated, type, inst->getSrc(1));
+        return;
         case Op_Copy:
             addAddAssoc(opnds, negated, type, inst->getSrc(0));
-	    return;
-	default:
-	    break;
-	}
+        return;
+    default:
+        break;
+    }
     }
     opnds.push_back(OpndWithPriority(opnd, getPriority(opnd), negated));
 }
@@ -375,15 +356,15 @@ Reassociate::addAddOffsetAssoc(StlDeque<OpndWithPriority> &opnds,
 {
     Inst *inst = opnd->getInst();
     if (inst->getType() == type->tag) {
-	switch(inst->getOpcode()) {
-	case Op_AddOffset:
-	    addAddOffsetAssoc(opnds, compressed, type, inst->getSrc(0));
-	    addAddOffsetAssoc(opnds, compressed, type, inst->getSrc(1));
-	    return;
-	case Op_AddOffsetPlusHeapbase:
-	    addAddOffsetAssoc(opnds, compressed, type, inst->getSrc(0));
-	    addAddOffsetAssoc(opnds, compressed, type, inst->getSrc(1));
-	    return;
+    switch(inst->getOpcode()) {
+    case Op_AddOffset:
+        addAddOffsetAssoc(opnds, compressed, type, inst->getSrc(0));
+        addAddOffsetAssoc(opnds, compressed, type, inst->getSrc(1));
+        return;
+    case Op_AddOffsetPlusHeapbase:
+        addAddOffsetAssoc(opnds, compressed, type, inst->getSrc(0));
+        addAddOffsetAssoc(opnds, compressed, type, inst->getSrc(1));
+        return;
         case Op_UncompressRef:
         case Op_CompressRef:
         case Op_Copy:
@@ -395,9 +376,9 @@ Reassociate::addAddOffsetAssoc(StlDeque<OpndWithPriority> &opnds,
         case Op_AddScaledIndex:
         case Op_ScaledDiffRef:
         case Op_TauArrayLen:
-	default:
-	    break;
-	}
+    default:
+        break;
+    }
     }
     opnds.push_back(OpndWithPriority(opnd, getPriority(opnd), compressed));
 }
@@ -406,24 +387,24 @@ Reassociate::addAddOffsetAssoc(StlDeque<OpndWithPriority> &opnds,
 // maybe this stuff should be in simplifier.
 Opnd*
 Reassociate::simplifyReassociatedAdd(Type *type, 
-				     StlDeque<OpndWithPriority> &opnds)
+                     StlDeque<OpndWithPriority> &opnds)
 {
     typedef StlDeque<OpndWithPriority> VectType;
 
     ::std::sort(opnds.begin(), opnds.end());
 
-    if (Log::cat_opt_reassoc()->isDebugEnabled()) {
-	VectType::iterator 
-	    iter = opnds.begin(),
-	    end = opnds.end();
-	Log::out() << "BEGIN simplifyReassociatedAdd: ";
-	for ( ; iter != end ; iter++) {
-	    OpndWithPriority &owd = *iter;
-	    Log::out() << (owd.negate ? "-" : "+") << "(";
-	    owd.opnd->print(Log::out());
-	    Log::out() << ", " << (int)owd.priority << ") ";
-	}
-	Log::out() << ::std::endl;
+    if (Log::isEnabled()) {
+    VectType::iterator 
+        iter = opnds.begin(),
+        end = opnds.end();
+    Log::out() << "BEGIN simplifyReassociatedAdd: ";
+    for ( ; iter != end ; iter++) {
+        OpndWithPriority &owd = *iter;
+        Log::out() << (owd.negate ? "-" : "+") << "(";
+        owd.opnd->print(Log::out());
+        Log::out() << ", " << (int)owd.priority << ") ";
+    }
+    Log::out() << ::std::endl;
     }
 
     // algorithm:
@@ -505,7 +486,7 @@ Reassociate::simplifyReassociatedAdd(Type *type,
         OpndWithPriority newelt(newOpnd, newPriority, newNegated);
         opnds.push_front(newelt);
         size += 1;
-        if (Log::cat_opt_reassoc()->isDebugEnabled()) {
+        if (Log::isEnabled()) {
             Log::out() << "    new " << (newNegated ? "-" : "+") << "(";
             newOpnd->print(Log::out());
             Log::out() << ", " << (int) newPriority << ") = " << debug_op << "(";
@@ -530,42 +511,42 @@ Reassociate::simplifyReassociatedAdd(Type *type,
         assert(opnds[0].negate);
         // need to neg result
         Opnd *newres = theSimp->genNeg(type, res)->getDst();
-        if (Log::cat_opt_reassoc()->isDebugEnabled()) {
+        if (Log::isEnabled()) {
             Log::out() << "    negated: ";
             newres->print(Log::out());
             Log::out() << " = neg(";
             res->print(Log::out());
             Log::out() << ")" << ::std::endl;
         }
-	res = newres;
+    res = newres;
     } else {
         assert(!opnds[0].negate);
     }
-    if (Log::cat_opt_reassoc()->isDebugEnabled()) {
-	Log::out() << "FINISHED simplifyReassociatedAdd: ";
-	res->print(Log::out());
-	Log::out() << ::std::endl;
+    if (Log::isEnabled()) {
+    Log::out() << "FINISHED simplifyReassociatedAdd: ";
+    res->print(Log::out());
+    Log::out() << ::std::endl;
     }
     return res;
 }
 
 Opnd*
 Reassociate::simplifyReassociatedMul(Type *type, 
-				     StlDeque<OpndWithPriority> &opnds)
+                     StlDeque<OpndWithPriority> &opnds)
 {
     typedef StlDeque<OpndWithPriority> VectType;
-    if (Log::cat_opt_reassoc()->isDebugEnabled()) {
-	VectType::iterator 
-	    iter = opnds.begin(),
-	    end = opnds.end();
-	Log::out() << "BEGIN simplifyReassociatedMul: ";
-	for ( ; iter != end ; iter++) {
-	    OpndWithPriority &owd = *iter;
-	    Log::out() << "(";
-	    owd.opnd->print(Log::out());
-	    Log::out() << ", " << (int)owd.priority << ") ";
-	}
-	Log::out() << ::std::endl;
+    if (Log::isEnabled()) {
+    VectType::iterator 
+        iter = opnds.begin(),
+        end = opnds.end();
+    Log::out() << "BEGIN simplifyReassociatedMul: ";
+    for ( ; iter != end ; iter++) {
+        OpndWithPriority &owd = *iter;
+        Log::out() << "(";
+        owd.opnd->print(Log::out());
+        Log::out() << ", " << (int)owd.priority << ") ";
+    }
+    Log::out() << ::std::endl;
     }
 
     ::std::sort(opnds.begin(), opnds.end());
@@ -610,7 +591,7 @@ Reassociate::simplifyReassociatedMul(Type *type,
                                     false // negs negate each other
                                     ); 
             
-            if (Log::cat_opt_reassoc()->isDebugEnabled()) {
+            if (Log::isEnabled()) {
                 Log::out() << "    new (";
                 newOpnd1->print(Log::out());
                 Log::out() << ", " << (int) priorityNew1 << ") = sqr(mul(";
@@ -639,7 +620,7 @@ Reassociate::simplifyReassociatedMul(Type *type,
             uint32 priority = computePriority(costOfMul, priority0, priority1);
             OpndWithPriority newelt(newOpnd, priority, neg0 ^ neg1);
             
-            if (Log::cat_opt_reassoc()->isDebugEnabled()) {
+            if (Log::isEnabled()) {
                 Log::out() << "    new (";
                 newOpnd->print(Log::out());
                 Log::out() << ", " << (int) priority << ") = mul((";
@@ -660,15 +641,15 @@ Reassociate::simplifyReassociatedMul(Type *type,
                     break;
                 }
             }
-	}
     }
-    if (Log::cat_opt_reassoc()->isDebugEnabled()) {
-	VectType::iterator 
-	    iter = opnds.begin(),
-	    end = opnds.end();
-	Log::out() << "FINISHED simplifyReassociatedMul: ";
-	opnds[0].opnd->print(Log::out());
-	Log::out() << ::std::endl;
+    }
+    if (Log::isEnabled()) {
+    VectType::iterator 
+        iter = opnds.begin(),
+        end = opnds.end();
+    Log::out() << "FINISHED simplifyReassociatedMul: ";
+    opnds[0].opnd->print(Log::out());
+    Log::out() << ::std::endl;
     }
     return opnds[0].opnd;
 }
@@ -681,18 +662,18 @@ Reassociate::simplifyReassociatedAddOffset(Type *type,
 
     ::std::sort(opnds.begin(), opnds.end());
 
-    if (Log::cat_opt_reassoc()->isDebugEnabled()) {
-	VectType::iterator 
-	    iter = opnds.begin(),
-	    end = opnds.end();
-	Log::out() << "BEGIN simplifyReassociatedAddOffset: ";
-	for ( ; iter != end ; iter++) {
-	    OpndWithPriority &owd = *iter;
-	    Log::out() << (owd.negate ? "-" : "+") << "(";
-	    owd.opnd->print(Log::out());
-	    Log::out() << ", " << (int)owd.priority << ") ";
-	}
-	Log::out() << ::std::endl;
+    if (Log::isEnabled()) {
+    VectType::iterator 
+        iter = opnds.begin(),
+        end = opnds.end();
+    Log::out() << "BEGIN simplifyReassociatedAddOffset: ";
+    for ( ; iter != end ; iter++) {
+        OpndWithPriority &owd = *iter;
+        Log::out() << (owd.negate ? "-" : "+") << "(";
+        owd.opnd->print(Log::out());
+        Log::out() << ", " << (int)owd.priority << ") ";
+    }
+    Log::out() << ::std::endl;
     }
 
     assert(0);
@@ -776,7 +757,7 @@ Reassociate::simplifyReassociatedAddOffset(Type *type,
         OpndWithPriority newelt(newOpnd, newPriority, newNegated);
         opnds.push_front(newelt);
         size += 1;
-        if (Log::cat_opt_reassoc()->isDebugEnabled()) {
+        if (Log::isEnabled()) {
             Log::out() << "    new " << (newNegated ? "-" : "+") << "(";
             newOpnd->print(Log::out());
             Log::out() << ", " << (int) newPriority << ") = " << debug_op << "(";
@@ -801,21 +782,21 @@ Reassociate::simplifyReassociatedAddOffset(Type *type,
         assert(opnds[0].negate);
         // need to neg result
         Opnd *newres = theSimp->genNeg(type, res)->getDst();
-        if (Log::cat_opt_reassoc()->isDebugEnabled()) {
+        if (Log::isEnabled()) {
             Log::out() << "    negated: ";
             newres->print(Log::out());
             Log::out() << " = neg(";
             res->print(Log::out());
             Log::out() << ")" << ::std::endl;
         }
-	res = newres;
+    res = newres;
     } else {
         assert(!opnds[0].negate);
     }
-    if (Log::cat_opt_reassoc()->isDebugEnabled()) {
-	Log::out() << "FINISHED simplifyReassociatedAdd: ";
-	res->print(Log::out());
-	Log::out() << ::std::endl;
+    if (Log::isEnabled()) {
+    Log::out() << "FINISHED simplifyReassociatedAdd: ";
+    res->print(Log::out());
+    Log::out() << ::std::endl;
     }
     return res;
 }
@@ -828,7 +809,7 @@ Simplifier::simplifyAddViaReassociation2(Type* type, Opnd* src1, Opnd* src2) {
     assert(theReassociate);
     StlDeque<OpndWithPriority> opnds(theReassociate->mm);
 
-    if (Log::cat_opt_reassoc()->isDebugEnabled()) {
+    if (Log::isEnabled()) {
         Log::out() << "simplifyAddViaReassociation2 Add(";
         src1->print(Log::out());
         Log::out() << ", ";
@@ -848,7 +829,7 @@ Simplifier::simplifyNegViaReassociation2(Type* type, Opnd* src1) {
     assert(theReassociate);
     StlDeque<OpndWithPriority> opnds(theReassociate->mm);
 
-    if (Log::cat_opt_reassoc()->isDebugEnabled()) {
+    if (Log::isEnabled()) {
         Log::out() << "simplifyNegViaReassociation2 Neg(";
         src1->print(Log::out());
         Log::out() << "): " << ::std::endl;
@@ -865,7 +846,7 @@ Simplifier::simplifySubViaReassociation2(Type* type, Opnd* src1, Opnd *src2) {
     assert(theReassociate);
     StlDeque<OpndWithPriority> opnds(theReassociate->mm);
 
-    if (Log::cat_opt_reassoc()->isDebugEnabled()) {
+    if (Log::isEnabled()) {
         Log::out() << "simplifySubViaReassociation2 Sub(";
         src1->print(Log::out());
         Log::out() << ", ";
@@ -885,7 +866,7 @@ Simplifier::simplifyMulViaReassociation2(Type* type, Opnd* src1, Opnd* src2) {
     assert(theReassociate);
     StlDeque<OpndWithPriority> opnds(theReassociate->mm);
 
-    if (Log::cat_opt_reassoc()->isDebugEnabled()) {
+    if (Log::isEnabled()) {
         Log::out() << "simplifyMulViaReassociation2 Mul(";
         src1->print(Log::out());
         Log::out() << ", ";
@@ -906,7 +887,7 @@ Simplifier::simplifyAddOffsetViaReassociation(Opnd* uncompBase,
     assert(theReassociate);
     StlDeque<OpndWithPriority> opnds(theReassociate->mm);
 
-    if (Log::cat_opt_reassoc()->isDebugEnabled()) {
+    if (Log::isEnabled()) {
         Log::out() << "simplifyAddOffsetViaReassociation AddOffset(";
         uncompBase->print(Log::out());
         Log::out() << ", ";
@@ -926,7 +907,7 @@ Simplifier::simplifyAddOffsetPlusHeapbaseViaReassociation(Opnd* compBase,
     assert(theReassociate);
     StlDeque<OpndWithPriority> opnds(theReassociate->mm);
 
-    if (Log::cat_opt_reassoc()->isDebugEnabled()) {
+    if (Log::isEnabled()) {
         Log::out() << "simplifyAddViaReassociation2 Add(";
         compBase->print(Log::out());
         Log::out() << ", ";

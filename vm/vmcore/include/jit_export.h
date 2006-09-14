@@ -91,17 +91,11 @@ typedef struct OpenMethodExecutionParams {
     /** call corresponding VM helper upon exit from the managed method */
     Boolean  exe_notify_method_exit : 1;
 
-    /** call corresponding VM helper upon reading a value of any instance field */
-    Boolean  exe_notify_instance_field_read  : 1;
+    /** call corresponding VM helper upon reading a value of a field which has <field access mask> set */
+    Boolean  exe_notify_field_access  : 1;
 
-    /** call corresponding VM helper upon setting a value of any instance field */
-    Boolean  exe_notify_instance_field_write : 1;
-
-    /** call corresponding VM helper upon reading a value of any static field */
-    Boolean  exe_notify_static_field_read : 1;
-
-    /** call corresponding VM helper upon setting a value of any static field */
-    Boolean  exe_notify_static_field_write : 1;
+    /** call corresponding VM helper upon setting a value of a field which has <field modification mask> set */
+    Boolean  exe_notify_field_modification : 1;
 
     /**
     * call corresponding VM helper upon exception throw,

@@ -97,7 +97,7 @@ void VariableIncarnation::mergeIncarnations(Type* t, TypeManager* tm)
     // return if there is only one incarnation in chain.
     if (!(t || vi->_next)) return;
 
-    if(Log::cat_fe()->isDebugEnabled()) {
+    if(Log::isEnabled()) {
         Log::out() << "Merging incarnations:" << ::std::endl;
         if (t) {
             Log::out() << "    assigning common type:";
@@ -120,7 +120,7 @@ void VariableIncarnation::mergeIncarnations(Type* t, TypeManager* tm)
         varType = tm->getCommonType(varType, vi->getDeclaredType());
     }
     assert(varType);
-    if(Log::cat_fe()->isDebugEnabled()) {
+    if(Log::isEnabled()) {
         Log::out() << "    ;;set common type: ";
         varType->print(Log::out());
         Log::out() << ::std::endl;
@@ -215,7 +215,7 @@ void VariableIncarnation::createVarOpnd(IRBuilder* irBuilder)
     if (opnd) return;
     opnd = irBuilder->genVarDef(declaredType, false);
 
-    if(Log::cat_fe()->isDebugEnabled()) {
+    if(Log::isEnabled()) {
         Log::out() << "Create operand for VarIncarnation:" << ::std::endl;
         Log::out() << "    opnd:"; opnd->print(Log::out()); Log::out() << ::std::endl;
         Log::out() << "    VarInc:"; print(Log::out()); Log::out() << ::std::endl;
@@ -302,7 +302,7 @@ public:
             exceptionType = prepass.typeManager.getSystemObjectType();
         }
         jitrino_assert(compilationInterface, exceptionType);
-        Log::cat_fe()->debug << "Catch Exception Type = " << exceptionType->getName() << ::std::endl;
+        Log::out() << "Catch Exception Type = " << exceptionType->getName() << ::std::endl;
 
         CatchHandler* handler = new (memManager) 
             CatchHandler(nextRegionId++,
@@ -353,7 +353,7 @@ public:
                             uint32 handlerLength,
                             uint32 exceptionTypeToken)  {
  
-        Log::cat_fe()->debug << "CatchBlock @ " << (int)tryOffset << "," << (int)tryOffset+(int)tryLength
+        Log::out() << "CatchBlock @ " << (int)tryOffset << "," << (int)tryOffset+(int)tryLength
              << " handler @ " << (int)handlerOffset << "," << (int)handlerOffset+(int)handlerLength
              << " exception type " << (int)exceptionTypeToken << ","
              << " numCatch " << numCatch << ::std::endl;
@@ -386,7 +386,7 @@ public:
                 if ( block->offsetSplits(tryOffset) || block->offsetSplits(endOffset) ) {
                     if ( !unnested_try_regions_found ) {
                         unnested_try_regions_found = true;
-                        Log::cat_fe()->debug << "unnested try-regions encountered" << std::endl;
+                        Log::out() << "unnested try-regions encountered" << std::endl;
                     }
                 }
                 assert(tryOffset < endOffset);
@@ -498,7 +498,7 @@ JavaLabelPrepass::JavaLabelPrepass(MemoryManager& mm,
             // inlined version
             Opnd *actual = actualArgs[i];
             type = actual->getType();
-            if(Log::cat_fe()->isDebugEnabled()) {
+            if(Log::isEnabled()) {
                 Log::out() << "PARAM " << (int)i << " sig: ";
                 methodSig->getParamType(i)->print(Log::out());
                 Log::out() << " actual: ";
@@ -520,7 +520,7 @@ JavaLabelPrepass::JavaLabelPrepass(MemoryManager& mm,
 }
 
 void JavaLabelPrepass::offset(uint32 offset) {
-    Log::cat_fe()->debug << ::std::endl << "PREPASS OFFSET " << (int32)offset << ", blockNo=" << blockNumber << ::std::endl;
+    Log::out() << std::endl << "PREPASS OFFSET " << (int32)offset << ", blockNo=" << blockNumber << std::endl;
     bytecodevisited->setBit(offset,true);
     if (offset==0)
         stateTable->restoreStateInfo(&stateInfo, offset);
@@ -529,11 +529,11 @@ void JavaLabelPrepass::offset(uint32 offset) {
             stateTable->restoreStateInfo(&stateInfo, offset);
         setStackVars();
         if (!linearPassDone) {
-            Log::cat_fe()->debug << "LINEAR " << ::std::endl;
+            Log::out() << "LINEAR " << std::endl;
             propagateStateInfo(offset,isFallThruLabel);
             isFallThruLabel = true;
         }
-        Log::cat_fe()->debug << "BASICBLOCK " << (int32)offset << " " << blockNumber << ::std::endl;
+        Log::out() << "BASICBLOCK " << (int32)offset << " " << blockNumber << std::endl;
         ++blockNumber;
         visited->setBit(offset,true);
         stateTable->restoreStateInfo(&stateInfo,offset);
@@ -549,7 +549,7 @@ void JavaLabelPrepass::offset(uint32 offset) {
                     break;
                 }
             }
-            if(Log::cat_fe()->isDebugEnabled()) { 
+            if(Log::isEnabled()) { 
                 Log::out() << "CATCH " << (int32) offset << " "; 
                 handlerExceptionType->print(Log::out()); 
                 Log::out() << ::std::endl;
@@ -568,7 +568,7 @@ void JavaLabelPrepass::offset(uint32 offset) {
 void JavaLabelPrepass::setLabel(uint32 offset) {
     if (labels->getBit(offset)) // this label is already seen
         return;
-    Log::cat_fe()->debug << "SET LABEL " << (int) offset << " " << (int) numLabels << ::std::endl;
+    Log::out() << "SET LABEL " << (int) offset << " " << (int) numLabels << ::std::endl;
     labels->setBit(offset,true);
     numLabels++;
 }
@@ -697,14 +697,14 @@ void    JavaLabelPrepass::pushType(struct StateInfo::SlotInfo slot) {
 
 
 void JavaLabelPrepass::setStackVars() {
-    if(Log::cat_fe()->isDebugEnabled()) {
+    if(Log::isEnabled()) {
         Log::out() << "SET STACK VARS:" << ::std::endl;
     }
 
     for (int i=numVars; i < stateInfo.stackDepth; i++) {
         struct StateInfo::SlotInfo* slot = &stateInfo.stack[i];
 
-        if(Log::cat_fe()->isDebugEnabled()) {
+        if(Log::isEnabled()) {
             Log::out() << "SLOT " << i << ":" << ::std::endl;
             Log::out() << "       type = ";
             if (slot->type)
@@ -733,7 +733,7 @@ void JavaLabelPrepass::setStackVars() {
             slot->vars = new (memManager) SlotVar(var);
         }
 
-        if(Log::cat_fe()->isDebugEnabled()) {
+        if(Log::isEnabled()) {
             Log::out() << "AFTER" << ::std::endl;
             Log::out() << "       type = ";
             if (slot->type)
@@ -749,7 +749,7 @@ void JavaLabelPrepass::setStackVars() {
             Log::out() << ::std::endl;
         }
     }
-    if(Log::cat_fe()->isDebugEnabled()) {
+    if(Log::isEnabled()) {
         Log::out() << "SET STACK VARS DONE." << ::std::endl;
     }
 }
@@ -1123,9 +1123,6 @@ void JavaLabelPrepass::dcmpg()                             { genCompare(doubleTy
 
 void JavaLabelPrepass::new_(uint32 constPoolIndex)         { 
     StateInfo::SlotInfo slot;
-    slot.slotFlags = 0;
-    slot.varNumber = 0;
-    slot.jsrLabelOffset = 0;
     StateInfo::setNonNull(&slot);
     StateInfo::setExactType(&slot);
     Type* nType = resolveTypeNew(constPoolIndex);
@@ -1165,10 +1162,6 @@ void JavaLabelPrepass::newarray(uint8 etype)                {
 void JavaLabelPrepass::anewarray(uint32 constPoolIndex)    { 
     popAndCheck(int32Type); 
     StateInfo::SlotInfo slot;
-    slot.slotFlags = 0;
-    slot.varNumber = 0;
-    slot.jsrLabelOffset = 0;
-
     StateInfo::setNonNull(&slot);
     StateInfo::setExactType(&slot);
     Type* type = resolveType(constPoolIndex);
@@ -1267,8 +1260,8 @@ void JavaLabelPrepass::ldc(uint32 constPoolIndex)          {
     // load 32-bit quantity or string from constant pool
     Type* constantType =
                 compilationInterface.getConstantType(&methodDesc,constPoolIndex);
-    if (constantType->isSystemString()) {
-        pushType(typeManager.getSystemStringType());
+    if (constantType->isSystemString() || constantType->isSystemClass()) {
+        pushType(constantType);
     } else if (constantType->isInt4()) {
         pushType(int32Type);
     } else if (constantType->isSingle()) {
@@ -1660,7 +1653,7 @@ void JavaLabelPrepass::genTypeStore(uint32 index, uint32 offset) {
     VariableIncarnation* offset_varinc = getOrCreateVarInc(offset, index, type, NULL/*prevVar*/);
     offset_varinc->setDeclaredType(typeManager.getCommonType(type, offset_varinc->getDeclaredType()));
     stateInfo.stack[index].vars = new (memManager) SlotVar(offset_varinc);
-    if(Log::cat_fe()->isDebugEnabled()) {
+    if(Log::isEnabled()) {
         Log::out() << "genTypeStore: offset=" << offset 
                    << " index=" << index
                    << " vars: ";
@@ -1814,7 +1807,7 @@ void StateTable::copySlotInfo(StateInfo::SlotInfo& to, StateInfo::SlotInfo& from
 }
 
 void  StateTable::setStateInfo(StateInfo *inState, uint32 offset, bool isFallThru) {
-    if(Log::cat_fe()->isDebugEnabled()) {
+    if(Log::isEnabled()) {
         Log::out() << "SETSTATE offset=" <<(int)offset << " depth=" << inState->stackDepth << ::std::endl;
         printState(inState);
     }
@@ -1837,7 +1830,7 @@ void  StateTable::setStateInfo(StateInfo *inState, uint32 offset, bool isFallThr
 
             CatchBlock* except = *it;
             if ( except->hasOffset(offset) ) {
-                Log::cat_fe()->debug << "try-region begin=" << (int)except->getBeginOffset() 
+                Log::out() << "try-region begin=" << (int)except->getBeginOffset() 
                                      << " end=" << (int)except->getEndOffset() << ::std::endl;
                 ExceptionInfo *prev = state->exceptionInfo;
                 bool found  = false;
@@ -1870,7 +1863,7 @@ void  StateTable::setStateInfo(StateInfo *inState, uint32 offset, bool isFallThr
     int stackDepth = inState->stackDepth;
     if (stackDepth > 0) {
         if (maxDepth < stackDepth) maxDepth = stackDepth;
-        Log::cat_fe()->debug << "MAXDEPTH " << maxDepth << ::std::endl;
+        Log::out() << "MAXDEPTH " << maxDepth << ::std::endl;
         struct StateInfo::SlotInfo *stack = state->stack;
         if (stack == NULL) {
             stack = new (memManager) StateInfo::SlotInfo[stackDepth+1];
@@ -1881,14 +1874,14 @@ void  StateTable::setStateInfo(StateInfo *inState, uint32 offset, bool isFallThr
             state->stackDepth = stackDepth;
         } else { // needs to merge the states
             assert(state->stackDepth == stackDepth);
-            if(Log::cat_fe()->isDebugEnabled()) {
+            if(Log::isEnabled()) {
                 Log::out() << " before\n";
                 printState(state);
             }
             for (int i=0; i < stackDepth; i++) {
                 struct StateInfo::SlotInfo *inSlot = &inState->stack[i];
                 struct StateInfo::SlotInfo *slot   = &stack[i];
-                if(Log::cat_fe()->isDebugEnabled()) {
+                if(Log::isEnabled()) {
                     Log::out() << " i = " << i << ::std::endl;
                     Log::out() << "inSlot->type: ";
                     if (inSlot->type) {
@@ -1914,7 +1907,7 @@ void  StateTable::setStateInfo(StateInfo *inState, uint32 offset, bool isFallThr
                 mergeSlots(inSlot, slot, offset, i < numVars);
             }
         }
-        if(Log::cat_fe()->isDebugEnabled()) {
+        if(Log::isEnabled()) {
             Log::out() << " after\n";
             printState(state);
         }
@@ -1948,7 +1941,7 @@ void StateTable::mergeSlots(StateInfo::SlotInfo* inSlot, StateInfo::SlotInfo* sl
     Type* new_type = typeManager.getCommonType(in_type,type);
     if (new_type != NULL) {
         if (vars) {
-            if(Log::cat_fe()->isDebugEnabled()) {
+            if(Log::isEnabled()) {
                 Log::out() << "addVarIncarnations to SlotVar:" << ::std::endl;
                 Log::out() << "   vars: ";
                 vars->print(Log::out());
@@ -1961,7 +1954,7 @@ void StateTable::mergeSlots(StateInfo::SlotInfo* inSlot, StateInfo::SlotInfo* sl
             if (!isVar) {
                  vars->mergeVarIncarnations(&typeManager);
             }
-            if(Log::cat_fe()->isDebugEnabled()) {
+            if(Log::isEnabled()) {
                 Log::out() << "result_vars: ";
                 vars->print(Log::out());
             }
@@ -1978,7 +1971,7 @@ void StateTable::mergeSlots(StateInfo::SlotInfo* inSlot, StateInfo::SlotInfo* sl
 
 
 void  StateTable::setStateInfoFromFinally(StateInfo *inState, uint32 offset) {
-    if(Log::cat_fe()->isDebugEnabled()) {
+    if(Log::isEnabled()) {
         Log::out() << "SETSTATE FROM FINALLY offset=" <<(int)offset << " depth=" << inState->stackDepth << ::std::endl;
         printState(inState);
     }
@@ -1987,14 +1980,14 @@ void  StateTable::setStateInfoFromFinally(StateInfo *inState, uint32 offset) {
     int stackDepth = inState->stackDepth;
     if (stackDepth > 0) {
         if (maxDepth < stackDepth) maxDepth = stackDepth;
-        Log::cat_fe()->debug << "MAXDEPTH " << maxDepth << ::std::endl;
+        Log::out() << "MAXDEPTH " << maxDepth << ::std::endl;
         struct StateInfo::SlotInfo *stack = state->stack;
         if (stack == NULL) {
             // stack must be propagated from JSR to jsrNext earlier
             assert(0);
         }
         assert(state->stackDepth == stackDepth);
-        if(Log::cat_fe()->isDebugEnabled()) {
+        if(Log::isEnabled()) {
             Log::out() << " before\n";
             printState(state);
         }
@@ -2003,7 +1996,7 @@ void  StateTable::setStateInfoFromFinally(StateInfo *inState, uint32 offset) {
             struct StateInfo::SlotInfo *slot   = &stack[i];
             Type *intype = inSlot->type;
             Type *type  = slot->type;
-            Log::cat_fe()->debug << "STACK " << i << ": "<< type << ::std::endl;
+            Log::out() << "STACK " << i << ": "<< type << ::std::endl;
             if (!type && intype) {  // don't merge, just rewrite!
                 slot->type      = intype;
                 // Consider copying not pointers but SlotVat structures.
@@ -2017,7 +2010,7 @@ void  StateTable::setStateInfoFromFinally(StateInfo *inState, uint32 offset) {
                 mergeSlots(inSlot, slot, offset, i < numVars);
             }
         }
-        if(Log::cat_fe()->isDebugEnabled()) {
+        if(Log::isEnabled()) {
             Log::out() << " after\n";
             printState(state);
         }
@@ -2056,7 +2049,7 @@ void JavaLabelPrepass::propagateLocalVarToHandlers(uint32 varIndex)
 
                         uint32 handler_offset = handler->getBeginOffset();
                         struct StateInfo::SlotInfo *slot = &stateTable->getStateInfo(handler_offset)->stack[varIndex];
-                        Log::cat_fe()->debug << "HANDLER SLOT " << varIndex << " merged to offset " << handler_offset << ::std::endl;
+                        Log::out() << "HANDLER SLOT " << varIndex << " merged to offset " << handler_offset << ::std::endl;
                         stateTable->mergeSlots(inSlot, slot, handler_offset, true);
                     }
             }

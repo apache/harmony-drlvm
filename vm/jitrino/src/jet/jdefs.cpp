@@ -14,8 +14,8 @@
  *  limitations under the License.
  */
 /**
- * @author Alexander V. Astapchuk
- * @version $Revision: 1.3.12.3.4.4 $
+ * @author Alexander Astapchuk
+ * @version $Revision$
  */
 #include "jdefs.h"
 #include <assert.h>
@@ -67,37 +67,36 @@ const InstrDesc instrs[OPCODE_COUNT] = {
     OPCODE(BIPUSH, ik_ls, 2, OPF_NONE)
     OPCODE(SIPUSH, ik_ls, 3, OPF_NONE)
 
-    OPCODE(LDC, ik_ls, 2, OPF_GC_PT)
-    OPCODE(LDC_W, ik_ls, 3, OPF_GC_PT)
-    OPCODE(LDC2_W, ik_ls, 3, OPF_GC_PT)
+    OPCODE(LDC, ik_ls, 2, OPF_NONE)
+    OPCODE(LDC_W, ik_ls, 3, OPF_NONE)
+    OPCODE(LDC2_W, ik_ls, 3, OPF_NONE)
 
-    OPCODE(ILOAD, ik_ls, 2, OPF_NONE)
-    OPCODE(LLOAD, ik_ls, 2, OPF_NONE)
-    OPCODE(FLOAD, ik_ls, 2, OPF_NONE)
-    OPCODE(DLOAD, ik_ls, 2, OPF_NONE)
+    OPCODE(ILOAD, ik_ls, 2, OPF_VAR_USE|OPF_VAR_OP0|OPF_VAR_TYPE_I32)
+    OPCODE(LLOAD, ik_ls, 2, OPF_VAR_USE|OPF_VAR_OP0|OPF_VAR_TYPE_I64)
+    OPCODE(FLOAD, ik_ls, 2, OPF_VAR_USE|OPF_VAR_OP0|OPF_VAR_TYPE_FLT)
+    OPCODE(DLOAD, ik_ls, 2, OPF_VAR_USE|OPF_VAR_OP0|OPF_VAR_TYPE_DBL)
+    OPCODE(ALOAD, ik_ls, 2, OPF_VAR_USE|OPF_VAR_OP0|OPF_VAR_TYPE_OBJ)
 
-    OPCODE(ALOAD, ik_ls, 2, OPF_NONE)
-
-    OPCODE(ILOAD_0, ik_ls, 1, OPF_NONE)
-    OPCODE(ILOAD_1, ik_ls, 1, OPF_NONE)
-    OPCODE(ILOAD_2, ik_ls, 1, OPF_NONE)
-    OPCODE(ILOAD_3, ik_ls, 1, OPF_NONE)
-    OPCODE(LLOAD_0, ik_ls, 1, OPF_NONE)
-    OPCODE(LLOAD_1, ik_ls, 1, OPF_NONE)
-    OPCODE(LLOAD_2, ik_ls, 1, OPF_NONE)
-    OPCODE(LLOAD_3, ik_ls, 1, OPF_NONE)
-    OPCODE(FLOAD_0, ik_ls, 1, OPF_NONE)
-    OPCODE(FLOAD_1, ik_ls, 1, OPF_NONE)
-    OPCODE(FLOAD_2, ik_ls, 1, OPF_NONE)
-    OPCODE(FLOAD_3, ik_ls, 1, OPF_NONE)
-    OPCODE(DLOAD_0, ik_ls, 1, OPF_NONE)
-    OPCODE(DLOAD_1, ik_ls, 1, OPF_NONE)
-    OPCODE(DLOAD_2, ik_ls, 1, OPF_NONE)
-    OPCODE(DLOAD_3, ik_ls, 1, OPF_NONE)
-    OPCODE(ALOAD_0, ik_ls, 1, OPF_NONE)
-    OPCODE(ALOAD_1, ik_ls, 1, OPF_NONE)
-    OPCODE(ALOAD_2, ik_ls, 1, OPF_NONE)
-    OPCODE(ALOAD_3, ik_ls, 1, OPF_NONE)
+    OPCODE(ILOAD_0, ik_ls, 1, OPF_VAR_USE|OPF_VAR0|OPF_VAR_TYPE_I32)
+    OPCODE(ILOAD_1, ik_ls, 1, OPF_VAR_USE|OPF_VAR1|OPF_VAR_TYPE_I32)
+    OPCODE(ILOAD_2, ik_ls, 1, OPF_VAR_USE|OPF_VAR2|OPF_VAR_TYPE_I32)
+    OPCODE(ILOAD_3, ik_ls, 1, OPF_VAR_USE|OPF_VAR3|OPF_VAR_TYPE_I32)
+    OPCODE(LLOAD_0, ik_ls, 1, OPF_VAR_USE|OPF_VAR0|OPF_VAR_TYPE_I64)
+    OPCODE(LLOAD_1, ik_ls, 1, OPF_VAR_USE|OPF_VAR1|OPF_VAR_TYPE_I64)
+    OPCODE(LLOAD_2, ik_ls, 1, OPF_VAR_USE|OPF_VAR2|OPF_VAR_TYPE_I64)
+    OPCODE(LLOAD_3, ik_ls, 1, OPF_VAR_USE|OPF_VAR3|OPF_VAR_TYPE_I64)
+    OPCODE(FLOAD_0, ik_ls, 1, OPF_VAR_USE|OPF_VAR0|OPF_VAR_TYPE_FLT)
+    OPCODE(FLOAD_1, ik_ls, 1, OPF_VAR_USE|OPF_VAR1|OPF_VAR_TYPE_FLT)
+    OPCODE(FLOAD_2, ik_ls, 1, OPF_VAR_USE|OPF_VAR2|OPF_VAR_TYPE_FLT)
+    OPCODE(FLOAD_3, ik_ls, 1, OPF_VAR_USE|OPF_VAR3|OPF_VAR_TYPE_FLT)
+    OPCODE(DLOAD_0, ik_ls, 1, OPF_VAR_USE|OPF_VAR0|OPF_VAR_TYPE_DBL)
+    OPCODE(DLOAD_1, ik_ls, 1, OPF_VAR_USE|OPF_VAR1|OPF_VAR_TYPE_DBL)
+    OPCODE(DLOAD_2, ik_ls, 1, OPF_VAR_USE|OPF_VAR2|OPF_VAR_TYPE_DBL)
+    OPCODE(DLOAD_3, ik_ls, 1, OPF_VAR_USE|OPF_VAR3|OPF_VAR_TYPE_DBL)
+    OPCODE(ALOAD_0, ik_ls, 1, OPF_VAR_USE|OPF_VAR0|OPF_VAR_TYPE_OBJ)
+    OPCODE(ALOAD_1, ik_ls, 1, OPF_VAR_USE|OPF_VAR1|OPF_VAR_TYPE_OBJ)
+    OPCODE(ALOAD_2, ik_ls, 1, OPF_VAR_USE|OPF_VAR2|OPF_VAR_TYPE_OBJ)
+    OPCODE(ALOAD_3, ik_ls, 1, OPF_VAR_USE|OPF_VAR3|OPF_VAR_TYPE_OBJ)
 
     OPCODE(IALOAD, ik_obj, 1, OPF_NONE)
     OPCODE(LALOAD, ik_obj, 1, OPF_NONE)
@@ -108,33 +107,33 @@ const InstrDesc instrs[OPCODE_COUNT] = {
     OPCODE(CALOAD, ik_obj, 1, OPF_NONE)
     OPCODE(SALOAD, ik_obj, 1, OPF_NONE)
 
-    OPCODE(ISTORE, ik_ls, 2, OPF_NONE)
-    OPCODE(LSTORE, ik_ls, 2, OPF_NONE)
-    OPCODE(FSTORE, ik_ls, 2, OPF_NONE)
-    OPCODE(DSTORE, ik_ls, 2, OPF_NONE)
-    OPCODE(ASTORE, ik_ls, 2, OPF_NONE)
+    OPCODE(ISTORE, ik_ls, 2, OPF_VAR_DEF|OPF_VAR_OP0|OPF_VAR_TYPE_I32)
+    OPCODE(LSTORE, ik_ls, 2, OPF_VAR_DEF|OPF_VAR_OP0|OPF_VAR_TYPE_I64)
+    OPCODE(FSTORE, ik_ls, 2, OPF_VAR_DEF|OPF_VAR_OP0|OPF_VAR_TYPE_FLT)
+    OPCODE(DSTORE, ik_ls, 2, OPF_VAR_DEF|OPF_VAR_OP0|OPF_VAR_TYPE_DBL)
+    OPCODE(ASTORE, ik_ls, 2, OPF_VAR_DEF|OPF_VAR_OP0|OPF_VAR_TYPE_OBJ)
 
-    OPCODE(ISTORE_0, ik_ls, 1, OPF_NONE)
-    OPCODE(ISTORE_1, ik_ls, 1, OPF_NONE)
-    OPCODE(ISTORE_2, ik_ls, 1, OPF_NONE)
-    OPCODE(ISTORE_3, ik_ls, 1, OPF_NONE)
-    OPCODE(LSTORE_0, ik_ls, 1, OPF_NONE)
-    OPCODE(LSTORE_1, ik_ls, 1, OPF_NONE)
-    OPCODE(LSTORE_2, ik_ls, 1, OPF_NONE)
-    OPCODE(LSTORE_3, ik_ls, 1, OPF_NONE)
-    OPCODE(FSTORE_0, ik_ls, 1, OPF_NONE)
-    OPCODE(FSTORE_1, ik_ls, 1, OPF_NONE)
-    OPCODE(FSTORE_2, ik_ls, 1, OPF_NONE)
-    OPCODE(FSTORE_3, ik_ls, 1, OPF_NONE)
-    OPCODE(DSTORE_0, ik_ls, 1, OPF_NONE)
-    OPCODE(DSTORE_1, ik_ls, 1, OPF_NONE)
-    OPCODE(DSTORE_2, ik_ls, 1, OPF_NONE)
-    OPCODE(DSTORE_3, ik_ls, 1, OPF_NONE)
+    OPCODE(ISTORE_0, ik_ls, 1, OPF_VAR_DEF|OPF_VAR0|OPF_VAR_TYPE_I32)
+    OPCODE(ISTORE_1, ik_ls, 1, OPF_VAR_DEF|OPF_VAR1|OPF_VAR_TYPE_I32)
+    OPCODE(ISTORE_2, ik_ls, 1, OPF_VAR_DEF|OPF_VAR2|OPF_VAR_TYPE_I32)
+    OPCODE(ISTORE_3, ik_ls, 1, OPF_VAR_DEF|OPF_VAR3|OPF_VAR_TYPE_I32)
+    OPCODE(LSTORE_0, ik_ls, 1, OPF_VAR_DEF|OPF_VAR0|OPF_VAR_TYPE_I64)
+    OPCODE(LSTORE_1, ik_ls, 1, OPF_VAR_DEF|OPF_VAR1|OPF_VAR_TYPE_I64)
+    OPCODE(LSTORE_2, ik_ls, 1, OPF_VAR_DEF|OPF_VAR2|OPF_VAR_TYPE_I64)
+    OPCODE(LSTORE_3, ik_ls, 1, OPF_VAR_DEF|OPF_VAR3|OPF_VAR_TYPE_I64)
+    OPCODE(FSTORE_0, ik_ls, 1, OPF_VAR_DEF|OPF_VAR0|OPF_VAR_TYPE_FLT)
+    OPCODE(FSTORE_1, ik_ls, 1, OPF_VAR_DEF|OPF_VAR1|OPF_VAR_TYPE_FLT)
+    OPCODE(FSTORE_2, ik_ls, 1, OPF_VAR_DEF|OPF_VAR2|OPF_VAR_TYPE_FLT)
+    OPCODE(FSTORE_3, ik_ls, 1, OPF_VAR_DEF|OPF_VAR3|OPF_VAR_TYPE_FLT)
+    OPCODE(DSTORE_0, ik_ls, 1, OPF_VAR_DEF|OPF_VAR0|OPF_VAR_TYPE_DBL)
+    OPCODE(DSTORE_1, ik_ls, 1, OPF_VAR_DEF|OPF_VAR1|OPF_VAR_TYPE_DBL)
+    OPCODE(DSTORE_2, ik_ls, 1, OPF_VAR_DEF|OPF_VAR2|OPF_VAR_TYPE_DBL)
+    OPCODE(DSTORE_3, ik_ls, 1, OPF_VAR_DEF|OPF_VAR3|OPF_VAR_TYPE_DBL)
 
-    OPCODE(ASTORE_0, ik_ls, 1, OPF_NONE)
-    OPCODE(ASTORE_1, ik_ls, 1, OPF_NONE)
-    OPCODE(ASTORE_2, ik_ls, 1, OPF_NONE)
-    OPCODE(ASTORE_3, ik_ls, 1, OPF_NONE)
+    OPCODE(ASTORE_0, ik_ls, 1, OPF_VAR_DEF|OPF_VAR0|OPF_VAR_TYPE_OBJ)
+    OPCODE(ASTORE_1, ik_ls, 1, OPF_VAR_DEF|OPF_VAR1|OPF_VAR_TYPE_OBJ)
+    OPCODE(ASTORE_2, ik_ls, 1, OPF_VAR_DEF|OPF_VAR2|OPF_VAR_TYPE_OBJ)
+    OPCODE(ASTORE_3, ik_ls, 1, OPF_VAR_DEF|OPF_VAR3|OPF_VAR_TYPE_OBJ)
 
     OPCODE(IASTORE, ik_obj, 1, OPF_NONE)
     OPCODE(LASTORE, ik_obj, 1, OPF_NONE)
@@ -202,7 +201,7 @@ const InstrDesc instrs[OPCODE_COUNT] = {
     OPCODE(IXOR, ik_a, 1, OPF_NONE)
     OPCODE(LXOR, ik_a, 1, OPF_NONE)
 
-    OPCODE(IINC, ik_a, 3, OPF_NONE)
+    OPCODE(IINC, ik_a, 3, OPF_VAR_DEF|OPF_VAR_USE|OPF_VAR_OP0|OPF_VAR_TYPE_I32)
 
     OPCODE(I2L, ik_cnv, 1, OPF_NONE)
     OPCODE(I2F, ik_cnv, 1, OPF_NONE)
@@ -243,17 +242,17 @@ const InstrDesc instrs[OPCODE_COUNT] = {
 
     OPCODE(GOTO, ik_cf, 3, OPF_ENDS_BB|OPF_DEAD_END)
     OPCODE(JSR, ik_cf, 3, OPF_ENDS_BB)
-    OPCODE(RET, ik_cf, 2, OPF_ENDS_BB|OPF_DEAD_END)
+    OPCODE(RET, ik_cf, 2, OPF_ENDS_BB|OPF_DEAD_END) // no _USE here, its intentional
 
     OPCODE(TABLESWITCH, ik_cf, 0, OPF_ENDS_BB|OPF_DEAD_END)
     OPCODE(LOOKUPSWITCH, ik_cf, 0, OPF_ENDS_BB|OPF_DEAD_END)
 
-    OPCODE(IRETURN, ik_meth, 1, OPF_ENDS_BB|OPF_DEAD_END|OPF_EXIT)
-    OPCODE(LRETURN, ik_meth, 1, OPF_ENDS_BB|OPF_DEAD_END|OPF_EXIT)
-    OPCODE(FRETURN, ik_meth, 1, OPF_ENDS_BB|OPF_DEAD_END|OPF_EXIT)
-    OPCODE(DRETURN, ik_meth, 1, OPF_ENDS_BB|OPF_DEAD_END|OPF_EXIT)
-    OPCODE(ARETURN, ik_meth, 1, OPF_ENDS_BB|OPF_DEAD_END|OPF_EXIT)
-    OPCODE(RETURN,  ik_meth, 1, OPF_ENDS_BB|OPF_DEAD_END|OPF_EXIT)
+    OPCODE(IRETURN, ik_meth, 1, OPF_ENDS_BB|OPF_DEAD_END|OPF_RETURN)
+    OPCODE(LRETURN, ik_meth, 1, OPF_ENDS_BB|OPF_DEAD_END|OPF_RETURN)
+    OPCODE(FRETURN, ik_meth, 1, OPF_ENDS_BB|OPF_DEAD_END|OPF_RETURN)
+    OPCODE(DRETURN, ik_meth, 1, OPF_ENDS_BB|OPF_DEAD_END|OPF_RETURN)
+    OPCODE(ARETURN, ik_meth, 1, OPF_ENDS_BB|OPF_DEAD_END|OPF_RETURN)
+    OPCODE(RETURN,  ik_meth, 1, OPF_ENDS_BB|OPF_DEAD_END|OPF_RETURN)
 
     OPCODE(GETSTATIC, ik_obj, 3, OPF_NONE)
     OPCODE(PUTSTATIC, ik_obj, 3, OPF_NONE)
@@ -267,18 +266,18 @@ const InstrDesc instrs[OPCODE_COUNT] = {
 
     UNDEFINED_OPCODE_HERE()
 
-    OPCODE(NEW, ik_obj, 3, OPF_GC_PT)
-    OPCODE(NEWARRAY, ik_obj, 2, OPF_GC_PT)
-    OPCODE(ANEWARRAY, ik_obj, 3, OPF_GC_PT)
+    OPCODE(NEW, ik_obj, 3, OPF_NONE)
+    OPCODE(NEWARRAY, ik_obj, 2, OPF_NONE)
+    OPCODE(ANEWARRAY, ik_obj, 3, OPF_NONE)
 
     OPCODE(ARRAYLENGTH, ik_obj, 1, OPF_NONE)
-    OPCODE(ATHROW, ik_throw, 1, OPF_ENDS_BB|OPF_DEAD_END|OPF_GC_PT|OPF_EXIT)
-    OPCODE(CHECKCAST, ik_obj, 3, OPF_GC_PT)
-    OPCODE(INSTANCEOF, ik_obj, 3, OPF_GC_PT)
-    OPCODE(MONITORENTER, ik_obj, 1, OPF_GC_PT)
-    OPCODE(MONITOREXIT, ik_obj, 1, OPF_GC_PT)
+    OPCODE(ATHROW, ik_throw, 1, OPF_ENDS_BB|OPF_DEAD_END|OPF_NONE)
+    OPCODE(CHECKCAST, ik_obj, 3, OPF_NONE)
+    OPCODE(INSTANCEOF, ik_obj, 3, OPF_NONE)
+    OPCODE(MONITORENTER, ik_obj, 1, OPF_NONE)
+    OPCODE(MONITOREXIT, ik_obj, 1, OPF_NONE)
     OPCODE(WIDE, ik_none, 0, OPF_NONE)
-    OPCODE(MULTIANEWARRAY, ik_obj, 4, OPF_GC_PT)
+    OPCODE(MULTIANEWARRAY, ik_obj, 4, OPF_NONE)
 
     OPCODE(IFNULL, ik_cf, 3, OPF_ENDS_BB)
     OPCODE(IFNONNULL, ik_cf, 3, OPF_ENDS_BB)
@@ -297,7 +296,7 @@ JTypeDesc jtypes[num_jtypes] = {
     {dbl64, 8,              0, "dbl"    },
     {jobj,  sizeof(void*),  0, "jobj"   },
     {jvoid, 0,              0, "void"   },
-    {jretAddr, 0,           0, "retAddr"},
+    {jretAddr,sizeof(void*),0, "retAddr"},
 };
 
 #ifdef _DEBUG
@@ -316,8 +315,10 @@ static bool dbg_startup_check( void ) {
 static bool dummy = dbg_startup_check();
 #endif
 
+
 jtype to_jtype(VM_Data_Type vmtype)
 {
+    //todo: can we simply table-tize it ?
     switch (vmtype) {
     case VM_DATA_TYPE_F8:       return dbl64;
     case VM_DATA_TYPE_F4:       return flt32;
@@ -335,29 +336,7 @@ jtype to_jtype(VM_Data_Type vmtype)
         assert(false);
     }
     return i8;
-}
-
-RefType toRefType(JavaByteCodes opcode)
-{
-    switch(opcode) {
-    case OPCODE_INVOKEINTERFACE:    return RefType_InterfaceMeth;
-    case OPCODE_INVOKEVIRTUAL:      return RefType_VirtMethod;
-    case OPCODE_INVOKESPECIAL:      return RefType_SpecMeth;
-    case OPCODE_INSTANCEOF:
-    case OPCODE_CHECKCAST:
-    case OPCODE_MULTIANEWARRAY:     return RefType_Class;
-    case OPCODE_ANEWARRAY:          return RefType_ArrayClass;
-    case OPCODE_NEW:                return RefType_ClassNew;
-    case OPCODE_GETFIELD:
-    case OPCODE_PUTFIELD:           return RefType_Field;
-    case OPCODE_PUTSTATIC:
-    case OPCODE_GETSTATIC:          return RefType_StaticField;
-    case OPCODE_INVOKESTATIC:       return RefType_StaticMeth;
-    default:    assert(false);
-    } // ~switch(opcode)
-    return RefType_Count;
-}
-
+};
 
 };};    // ~namespace Jitrino::Jet
 

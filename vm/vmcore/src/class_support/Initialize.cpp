@@ -35,6 +35,7 @@
 
 static void class_initialize1(Class *clss)
 {
+    ASSERT_RAISE_AREA;
     assert(!exn_raised());
     assert(!hythread_is_suspend_enabled());
 
@@ -57,9 +58,8 @@ static void class_initialize1(Class *clss)
         (clss->state == ST_Initializing) ) {
         // thread_object_wait had been expecting the only unsafe reference
         // to be its parameter, so enable_gc() should be safe here -salikh
-         jthread_monitor_wait(jlc);
-        jthrowable exc = exn_get();
-        if (exc) {
+        jthread_monitor_wait(jlc);
+        if (exn_raised()) {
              jthread_monitor_exit(jlc);
             return;
         }
@@ -84,11 +84,8 @@ static void class_initialize1(Class *clss)
     if (clss->state == ST_Error) {
         jthread_monitor_exit(jlc);
         tmn_suspend_enable();
-        jthrowable exn = exn_create("java/lang/NoClassDefFoundError",
-            clss->name->bytes);
+        exn_raise_by_name("java/lang/NoClassDefFoundError", clss->name->bytes);
         tmn_suspend_disable();
-        exn_raise_only(exn);
-       
         return;
     }
 
@@ -202,8 +199,8 @@ static void class_initialize1(Class *clss)
     // ---  step 10  ----------------------------------------------------------
 
     if(p_error_object) {
-       assert(!hythread_is_suspend_enabled());
-        clear_current_thread_exception();
+        assert(!hythread_is_suspend_enabled());
+        exn_clear();
         Class *p_error_class = p_error_object->object->vt()->clss;
         Class *jle = VM_Global_State::loader_env->java_lang_Error_Class;
         while(p_error_class && p_error_class != jle) {
@@ -234,7 +231,7 @@ static void class_initialize1(Class *clss)
         assert(!hythread_is_suspend_enabled());
         jthread_monitor_notify_all(jlc);
         jthread_monitor_exit(jlc);
-        exn_raise_only(p_error_object);
+        exn_raise_object(p_error_object);
     }
     // end of 11 step class initialization program
 } //class_initialize1
@@ -247,13 +244,14 @@ extern "C" {
 #endif
 void class_initialize_from_jni(Class *clss)
 {
+    ASSERT_RAISE_AREA;
     assert(hythread_is_suspend_enabled());
 
     // check verifier constraints
     if(!class_verify_constraints(VM_Global_State::loader_env, clss)) {
         if (!exn_raised()) {
             tmn_suspend_disable();
-            exn_throw(class_get_error(clss->class_loader, clss->name->bytes));
+            exn_raise_object(class_get_error(clss->class_loader, clss->name->bytes));
             tmn_suspend_enable();
         }
         return;
@@ -272,13 +270,13 @@ void class_initialize_from_jni(Class *clss)
 // VMEXPORT
 void class_initialize(Class *clss)
 {
+    ASSERT_RAISE_AREA;
     class_initialize_ex(clss);
 }
 
-
-
 void class_initialize_ex(Class *clss)
 {
+    ASSERT_RAISE_AREA;
     assert(!hythread_is_suspend_enabled());
 
     // check verifier constraints
@@ -286,7 +284,7 @@ void class_initialize_ex(Class *clss)
     if(!class_verify_constraints(VM_Global_State::loader_env, clss)) {
         if (!exn_raised()) {
             tmn_suspend_disable();
-            exn_throw(class_get_error(clss->class_loader, clss->name->bytes));
+            exn_raise_object(class_get_error(clss->class_loader, clss->name->bytes));
         }
         return;
     }

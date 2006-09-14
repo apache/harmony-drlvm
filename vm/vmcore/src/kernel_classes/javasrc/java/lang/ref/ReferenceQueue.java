@@ -23,9 +23,9 @@ package java.lang.ref;
 /**
  * @com.intel.drl.spec_ref 
  */
-public class ReferenceQueue extends Object {
+public class ReferenceQueue<T> extends Object {
 
-    private Reference firstReference;
+    private Reference<? extends T> firstReference;
 
     /**
      * @com.intel.drl.spec_ref 
@@ -36,10 +36,11 @@ public class ReferenceQueue extends Object {
     /**
      * @com.intel.drl.spec_ref 
      */
-    public synchronized Reference poll() {
+    @SuppressWarnings("unchecked")
+    public synchronized Reference<? extends T> poll() {
         if (firstReference == null)
             return null;
-        Reference ref = firstReference;
+        Reference<? extends T> ref = firstReference;
         firstReference = (firstReference.next == firstReference ? null
                 : firstReference.next);
         ref.next = null;
@@ -49,13 +50,14 @@ public class ReferenceQueue extends Object {
     /**
      * @com.intel.drl.spec_ref 
      */
-    public synchronized Reference remove(long timeout)
+    @SuppressWarnings("unchecked")
+    public synchronized Reference<? extends T> remove(long timeout)
             throws IllegalArgumentException, InterruptedException {
         if (firstReference == null)
             wait(timeout);
         if (firstReference == null)
             return null;
-        Reference ref = firstReference;
+        Reference<? extends T> ref = firstReference;
         firstReference = (firstReference.next == firstReference ? null
                 : firstReference.next);
         ref.next = null;
@@ -65,11 +67,11 @@ public class ReferenceQueue extends Object {
     /**
      * @com.intel.drl.spec_ref 
      */
-    public Reference remove() throws InterruptedException {
+    public Reference<? extends T> remove() throws InterruptedException {
         return remove(0L);
     }
 
-    synchronized boolean enqueue(Reference ref) {
+    synchronized boolean enqueue(Reference<? extends T> ref) {
         ref.next = (firstReference == null ? ref : firstReference);
         firstReference = ref;
         notify();

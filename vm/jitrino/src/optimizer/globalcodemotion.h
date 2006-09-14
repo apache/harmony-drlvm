@@ -26,9 +26,7 @@
 #include <iostream>
 #include "open/types.h"
 #include "Opcode.h"
-#include "FlowGraph.h"
 #include "Stl.h"
-#include "optpass.h"
 #include <utility>
 
 namespace Jitrino {
@@ -40,42 +38,37 @@ class MemoryManager;
 class InequalityGraph;
 class DominatorNode;
 class Dominator;
-class JitrinoParameterTable;
-class CFGNode;
+class Node;
 class Opnd;
 class CSEHashTable;
 class Type;
 class LoopTree;
+
+struct GcmFlags {
+    bool dry_run;
+    bool sink_stvars;
+    bool min_cut;
+    bool sink_constants;
+};
+
 
 /*
  * Implementation of Global Code Motion,
  * [C.Click. Global Code Motion, Global Value Numbering. PLDI 1995]
  */
  
-DEFINE_OPTPASS(GlobalCodeMotionPass)
-
-DEFINE_OPTPASS(GlobalValueNumberingPass)
-
 class GlobalCodeMotion {
     IRManager& irManager;
-    FlowGraph& fg;
+    ControlFlowGraph& fg;
     MethodDesc& methodDesc;
     MemoryManager &mm;
     DominatorTree& dominators;
     LoopTree *loopTree;
-public:
-    struct Flags {
-        bool dry_run;
-        bool sink_stvars;
-        bool min_cut;
-        bool sink_constants;
-    };
 private:
-    static Flags *defaultFlags;
-    Flags flags;
+    GcmFlags& flags;
 public:    
-    static void readDefaultFlagsFromCommandLine(const JitrinoParameterTable *params);
-    static void showFlagsFromCommandLine();
+    static void readFlags(Action* argSource, GcmFlags* flags);
+    static void showFlags(std::ostream& os);
 
     GlobalCodeMotion(IRManager &irManager0, 
                      MemoryManager& memManager,
@@ -97,7 +90,7 @@ private:
     UsesMap uses;
 
     void scheduleAllEarly();
-    void scheduleBlockEarly(CFGNode *n);
+    void scheduleBlockEarly(Node *n);
     void scheduleEarly(DominatorNode *domNode, Inst *i);
 
     void scheduleAllLate();

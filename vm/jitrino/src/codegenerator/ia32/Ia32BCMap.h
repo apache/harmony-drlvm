@@ -45,41 +45,41 @@ public:
 #endif
     }
 
-    uint32 getByteSize() {
-        uint32 mapSize = theMap->size();
+    POINTER_SIZE_INT getByteSize() {
+        POINTER_SIZE_INT mapSize = theMap->size();
 
         return  (mapSize * (byteCodeOffsetSize + wordSize) + wordSize);
     }
 
     void write(Byte* output) {
-        uint32* data = (uint32*)output;
+        POINTER_SIZE_INT* data = (POINTER_SIZE_INT*)output;
         StlHashMap<uint64, uint64>::const_iterator citer;
-        uint32 mapSize;
-        uint32 i = 0;
+        POINTER_SIZE_INT mapSize;
+        POINTER_SIZE_INT i = 0;
 
         mapSize = theMap->size();
         data[0] = mapSize; //store map size
         data = data + 1;
 
         for (citer = theMap->begin(); citer != theMap->end(); citer++) {
-            data[i*2] = (uint32)citer->first;  // write key i.e. native addr
-            data[i*2+1] = (uint32)citer->second;  // write value i.e. bc offset
+            data[i*2] = (POINTER_SIZE_INT)citer->first;  // write key i.e. native addr
+            data[i*2+1] = (POINTER_SIZE_INT)citer->second;  // write value i.e. bc offset
             i++;
         }
         return;
     }
 
-    uint32 readByteSize(const Byte* input) const {
-        uint32* data = (uint32*)input;
-        uint32 sizeOfMap = data[0];
+    POINTER_SIZE_INT readByteSize(const Byte* input) const {
+        POINTER_SIZE_INT* data = (POINTER_SIZE_INT*)input;
+        POINTER_SIZE_INT sizeOfMap = data[0];
 
         return (sizeOfMap * (byteCodeOffsetSize + wordSize) + wordSize);
     }
     /** read is deprecated method since creating HashMap is too cost */
     void read(const Byte* output) {
-        uint32* data = (uint32*)output;
-        uint32 mapSize;
-        uint32 i = 0;
+        POINTER_SIZE_INT* data = (POINTER_SIZE_INT*)output;
+        POINTER_SIZE_INT mapSize;
+        POINTER_SIZE_INT i = 0;
 
         mapSize = data[0]; //read map size
         data = data + 1;
@@ -94,7 +94,7 @@ public:
     }
 
     void writeZerroSize(Byte* output) {
-        uint32* data = (uint32*)(output);
+        POINTER_SIZE_INT* data = (POINTER_SIZE_INT*)(output);
         data[0] = 0;
 
         return;
@@ -115,11 +115,11 @@ public:
     }
 
     static uint64 get_bc_location_for_native(uint64 ncAddress, Byte* output) {
-        uint32* data = (uint32*)output;
-        uint32 mapSize;
-        uint32 i = 0;
+        POINTER_SIZE_INT* data = (POINTER_SIZE_INT*)output;
+        POINTER_SIZE_INT mapSize;
+        POINTER_SIZE_INT i = 0;
 
-        mapSize = data[0]; //read map size
+        mapSize = data[0]; //read map size 
         data = data + 1;
 
         for (i = 0; i < mapSize; i++) {
@@ -132,17 +132,17 @@ public:
     }
 
     static uint64 get_native_location_for_bc(uint64 bcOff, Byte* output) {
-        uint32* data = (uint32*)output;
-        uint32 mapSize;
-        uint32 i = 0;
+        POINTER_SIZE_INT* data = (POINTER_SIZE_INT*)output;
+        POINTER_SIZE_INT mapSize;
+        POINTER_SIZE_INT i = 0;
 
-        mapSize = data[0]; //read map size
+        mapSize = data[0]; //read map size 
         data = data + 1;
 
         uint64 ncAddress = ILLEGAL_VALUE;
 
         for (i = 0; i < mapSize; i++) {
-            uint32 ncAddr, bcOffset;
+            POINTER_SIZE_INT ncAddr, bcOffset;
             ncAddr = data[i * 2];
             bcOffset = data[i * 2 + 1];
             if (bcOffset == bcOff) ncAddress = ncAddr;
@@ -155,15 +155,15 @@ public:
     uint64 get_native_location_for_bc_prev(uint64 bcOff, Byte* output) {
         uint64 ncAddress = ILLEGAL_VALUE;
 #ifdef _DEBUG
-        uint32* data = (uint32*)output;
-        uint32 mapSize;
-        uint32 i = 0;
+        POINTER_SIZE_INT* data = (POINTER_SIZE_INT*)output;
+        POINTER_SIZE_INT mapSize;
+        POINTER_SIZE_INT i = 0;
 
         mapSize = data[0]; //read map size
         data = data + 1;
 
         for (i = 0; i < mapSize; i++) {
-            uint32 ncAddr, bcOffset;
+            POINTER_SIZE_INT ncAddr, bcOffset;
             ncAddr = data[i * 2];
             bcOffset = data[i * 2 + 1];
             setEntry(ncAddr, bcOffset);  // read key i.e. native addr and read value i.e. bc offset
@@ -185,12 +185,12 @@ public:
     }
 protected:
 private:
-    uint32 sizeInBytes;
-    uint32 mapSize;
+    POINTER_SIZE_INT sizeInBytes;
+    POINTER_SIZE_INT mapSize;
     StlHashMap<uint64, uint64>* theMap;
     StlHashMultiMap<uint64, uint64>* revMultiMap;
-    const static int wordSize = 4; // 4 bytes for ia32
-    const static int byteCodeOffsetSize = 4; // byteCodeAddrSize should be 2, 4 will allow easy mem alignment
+    const static int wordSize = sizeof(POINTER_SIZE_INT); // 4 bytes for ia32
+    const static int byteCodeOffsetSize = sizeof(POINTER_SIZE_INT); // byteCodeAddrSize should be 2, 4 will allow easy mem alignment
     typedef ::std::pair <uint64, uint64> IntPair;
 };
 

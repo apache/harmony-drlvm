@@ -31,8 +31,8 @@
 static const jvmtiCapabilities jvmti_supported_interpreter_capabilities =
 {
     0, // can_tag_objects
-    0, // can_generate_field_modification_events
-    0, // can_generate_field_access_events
+    1, // can_generate_field_modification_events
+    1, // can_generate_field_access_events
     1, // can_get_bytecodes
     1, // can_get_synthetic_attribute
     1, // can_get_owned_monitor_info
@@ -52,8 +52,8 @@ static const jvmtiCapabilities jvmti_supported_interpreter_capabilities =
     1, // can_generate_breakpoint_events
     1, // can_suspend
     0, // can_redefine_any_class
-    0, // can_get_current_thread_cpu_time
-    0, // can_get_thread_cpu_time
+    1, // can_get_current_thread_cpu_time
+    1, // can_get_thread_cpu_time
     1, // can_generate_method_entry_events
     1, // can_generate_method_exit_events
     1, // can_generate_all_class_hook_events
@@ -68,8 +68,8 @@ static const jvmtiCapabilities jvmti_supported_interpreter_capabilities =
 static const jvmtiCapabilities jvmti_supported_jit_capabilities =
 {
     0, // can_tag_objects
-    0, // can_generate_field_modification_events
-    0, // can_generate_field_access_events
+    1, // can_generate_field_modification_events
+    1, // can_generate_field_access_events
     1, // can_get_bytecodes
     1, // can_get_synthetic_attribute
     1, // can_get_owned_monitor_info
@@ -86,13 +86,13 @@ static const jvmtiCapabilities jvmti_supported_jit_capabilities =
     0, // can_generate_single_step_events
     1, // can_generate_exception_events
     1, // can_generate_frame_pop_events
-    0, // can_generate_breakpoint_events
+    1, // can_generate_breakpoint_events
     1, // can_suspend
     0, // can_redefine_any_class
-    0, // can_get_current_thread_cpu_time
-    0, // can_get_thread_cpu_time
-    0, // can_generate_method_entry_events
-    0, // can_generate_method_exit_events
+    1, // can_get_current_thread_cpu_time
+    1, // can_get_thread_cpu_time
+    1, // can_generate_method_entry_events
+    1, // can_generate_method_exit_events
     1, // can_generate_all_class_hook_events
     1, // can_generate_compiled_method_load_events
     0, // can_generate_monitor_events
@@ -128,8 +128,8 @@ static const jvmtiCapabilities jvmti_enable_on_live_flags =
     0, // can_generate_breakpoint_events
     1, // can_suspend
     0, // can_redefine_any_class
-    0, // can_get_current_thread_cpu_time
-    0, // can_get_thread_cpu_time
+    1, // can_get_current_thread_cpu_time
+    1, // can_get_thread_cpu_time
     0, // can_generate_method_entry_events
     0, // can_generate_method_exit_events
     1, // can_generate_all_class_hook_events
@@ -266,6 +266,12 @@ jvmtiAddCapabilities(jvmtiEnv* env,
     if (capabilities_ptr->can_generate_exception_events)
         ti->set_global_capability(DebugUtilsTI::TI_GC_ENABLE_EXCEPTION_EVENT);
 
+    if (capabilities_ptr->can_generate_field_access_events)
+        ti->set_global_capability(DebugUtilsTI::TI_GC_ENABLE_FIELD_ACCESS_EVENT);
+
+    if (capabilities_ptr->can_generate_field_modification_events)
+        ti->set_global_capability(DebugUtilsTI::TI_GC_ENABLE_FIELD_MODIFICATION_EVENT);
+
     return JVMTI_ERROR_NONE;
 }
 
@@ -309,6 +315,7 @@ jvmtiRelinquishCapabilities(jvmtiEnv* env,
     }
 
     DebugUtilsTI* ti = ti_env->vm->vm_env->TI;
+    ti->TIenvs_lock._lock();
     ti_env = ti->getEnvironments();
 
     while (NULL != ti_env)
@@ -323,6 +330,8 @@ jvmtiRelinquishCapabilities(jvmtiEnv* env,
         ti_env = next_env;
     }
 
+    ti->TIenvs_lock._unlock();
+    
     // Now removed_ptr contains capabilities removed from all environments
     if (removed_caps.can_generate_method_entry_events)
         ti->reset_global_capability(DebugUtilsTI::TI_GC_ENABLE_METHOD_ENTRY);
@@ -341,6 +350,12 @@ jvmtiRelinquishCapabilities(jvmtiEnv* env,
 
     if (removed_caps.can_generate_exception_events)
         ti->reset_global_capability(DebugUtilsTI::TI_GC_ENABLE_EXCEPTION_EVENT);
+
+    if (removed_caps.can_generate_field_access_events)
+        ti->reset_global_capability(DebugUtilsTI::TI_GC_ENABLE_FIELD_ACCESS_EVENT);
+
+    if (removed_caps.can_generate_field_modification_events)
+        ti->reset_global_capability(DebugUtilsTI::TI_GC_ENABLE_FIELD_MODIFICATION_EVENT);
 
     return JVMTI_ERROR_NONE;
 }

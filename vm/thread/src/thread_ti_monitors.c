@@ -169,7 +169,7 @@ IDATA VMCALL jthread_raw_monitor_exit(jrawMonitorID mon_ptr) {
  *      TM_ERROR_INTERRUPT          wait was interrupted
  *      TM_ERROR_INVALID_MONITOR    current thread isn't the owner
  */
-IDATA VMCALL jthread_raw_monitor_wait(jrawMonitorID mon_ptr, int64 millis) {
+IDATA VMCALL jthread_raw_monitor_wait(jrawMonitorID mon_ptr, I_64 millis) {
     hythread_monitor_t monitor;
     if (!(monitor = (hythread_monitor_t)array_get(jvmti_monitor_table, (UDATA)mon_ptr))) {
         return TM_ERROR_INVALID_MONITOR;

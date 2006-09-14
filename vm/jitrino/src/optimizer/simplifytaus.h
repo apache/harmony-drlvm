@@ -39,7 +39,6 @@ class FlowGraph;
 class Opnd;
 class SsaTmpOpnd;
 
-DEFINE_OPTPASS(TauSimplificationPass)
 
 class SimplifyTaus {
 public:

@@ -137,10 +137,12 @@ static int disasm_sprint_default(void * stream, const char * fmt, ...) {
 }
 
 static int disasm_fprint_default(void * stream, const char * fmt, ...) {
+    
+    port_disassembler_t * disassembler = (port_disassembler_t *)stream;
     va_list args;
     va_start(args, fmt);
-    port_disassembler_t * disassembler = (port_disassembler_t *)stream;
     int required_length = apr_vsnprintf(NULL, 0, fmt, args);
+    va_end(args);
     // insure space
     if (required_length >= disassembler->num_bytes_total -
             disassembler->num_bytes_used) {
@@ -150,10 +152,15 @@ static int disasm_fprint_default(void * stream, const char * fmt, ...) {
     }
     while (required_length >= disassembler->num_bytes_total -
             disassembler->num_bytes_used) {
+        apr_pool_clear(disassembler->user_pool);
         disassembler->num_bytes_total *= 2;
+        disassembler->real_stream = apr_palloc(disassembler->user_pool,
+            disassembler->num_bytes_total);
     }
+    va_start(args, fmt);
     apr_vsnprintf(disassembler->real_stream + disassembler->num_bytes_used,
         required_length + 1, fmt, args);
+    va_end(args);
     disassembler->num_bytes_used += required_length;
     return 0;
 }

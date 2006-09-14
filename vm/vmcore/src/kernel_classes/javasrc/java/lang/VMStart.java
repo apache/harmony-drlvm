@@ -126,7 +126,8 @@ class VMStart {
                     throw new NoSuchMethodError(
                         "The method main must be declared public, static, and void.");
                 }
-                AccessController.doPrivileged(new PrivilegedAction() {
+                // the class itself may be non-public
+                AccessController.doPrivileged(new PrivilegedAction<Object>() {
                     public Object run() {
                         mainMethod.setAccessible(true);
                         return null;

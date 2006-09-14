@@ -41,7 +41,6 @@
 #include "Inst.h"
 #include "IRBuilder.h"
 #include "BitSet.h"
-#include "FlowGraph.h"
 #include "Log.h"
 #include "optimizer.h"
 #include "simplifier.h"
@@ -219,7 +218,7 @@ public:
         if (sp != 1) {
             ::std::cerr << ::std::endl;
             ::std::cerr << "sp != 1 after applying: ";
-			printOps(::std::cerr); ::std::cerr << ::std::endl;
+            printOps(::std::cerr); ::std::cerr << ::std::endl;
             assert(0);
         }
         if (latency) { *latency = when[0]; }
@@ -335,7 +334,7 @@ public:
         if (sp != 1) {
             ::std::cerr << ::std::endl;
             ::std::cerr << "sp != 1 after applying: ";
-			printOps(::std::cerr); ::std::cerr << ::std::endl;
+            printOps(::std::cerr); ::std::cerr << ::std::endl;
             assert(0);
         }
 
@@ -808,7 +807,7 @@ void planMulCompound(MulMethod &m, inttype d, int depth) {
             
             int rightzeros = ((d & 1)!=0) ? 0 : deltaright+1;
 #ifndef NDEBUG
-			int leftzeros = ((d & ((inttype)1<<(width-1))) != 0) ? 0 : deltaleft;
+            int leftzeros = ((d & ((inttype)1<<(width-1))) != 0) ? 0 : deltaleft;
 #endif
             assert((rightzeros == ntz<inttype, width>(d)));
             assert((leftzeros == nlz<inttype, width>(d)));
@@ -1017,10 +1016,10 @@ void planMulLookup(MulMethod &m, inttype d, int depth) {
 Opnd *
 Simplifier::planMul32(int32 multiplier, Opnd *opnd)
 {
-    OptimizerFlags& optimizerFlags = *irManager.getCompilationContext()->getOptimizerFlags();
+    const OptimizerFlags& optimizerFlags = irManager.getOptimizerFlags();
     MulMethod method(!optimizerFlags.ia32_code_gen);
     planMul<int32, 32>(method, multiplier, 1);
-    if (Log::cat_opt()->isDebugEnabled()) {
+    if (Log::isEnabled()) {
         Log::out() << "in multiply(" << (int) multiplier << ", ";
         opnd->print(Log::out());
         Log::out() << "), method is ";
@@ -1032,10 +1031,10 @@ Simplifier::planMul32(int32 multiplier, Opnd *opnd)
 Opnd *
 Simplifier::planMul64(int64 multiplier, Opnd *opnd)
 {
-    OptimizerFlags& optimizerFlags = *irManager.getCompilationContext()->getOptimizerFlags();
+    const OptimizerFlags& optimizerFlags = irManager.getOptimizerFlags();
     MulMethod method(!optimizerFlags.ia32_code_gen);
     planMul<int64, 64>(method, multiplier, 1);
-    if (Log::cat_opt()->isDebugEnabled()) {
+    if (Log::isEnabled()) {
         Log::out() << "in multiply(" << (int) multiplier << ", ";
         opnd->print(Log::out());
         Log::out() << "), method is ";

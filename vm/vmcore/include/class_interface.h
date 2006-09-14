@@ -460,6 +460,30 @@ method_get_exc_handler_info( method_handler method, unsigned short index,
                              unsigned short *handler_pc, unsigned short *catch_type );
 
 /**
+ * Gets number of exceptions a method can throw.
+ * Parameter <i>hmethod</i> must not equal to <code>NULL</code>.
+ *
+ * @param hmethod   method handle
+ *
+ * @return          number of exceptions
+ */
+unsigned short
+method_get_number_exc_method_can_throw( method_handler hmethod );
+
+/**
+ * Gets name of exception a method can throw.
+ * Parameter <i>hmethod</i> must not equal to <code>NULL</code>.
+ * If parameter <i>index</i> is out of range, returns <code>NULL</code>.
+ *
+ * @param hmethod   method handle
+ * @param index     index of exception
+ *
+ * @return          name of exception
+ */
+const char *
+method_get_exc_method_can_throw( method_handler hmethod, unsigned short index );
+
+/**
  * Class loader interface
  */
 

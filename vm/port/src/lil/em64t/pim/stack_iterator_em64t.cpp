@@ -30,14 +30,10 @@
 #include "nogc.h"
 #include "interpreter.h" // for ASSERT_NO_INTERPRETER
 
-#include "cxxlog.h"
-
-#ifndef NDEBUG
-#include "vm_stats.h"
 #include "dump.h"
-extern bool dump_stubs;
-#endif
+#include "vm_stats.h"
 
+#include "cxxlog.h"
 
 // see stack_iterator_ia32.cpp
 struct StackIterator {
@@ -88,7 +84,7 @@ static void init_context_from_registers(JitFrameContext & context,
 // Goto the managed frame immediately prior to m2nfl
 static void si_unwind_from_m2n(StackIterator * si) {
 #ifdef VM_STATS
-    vm_stats_total.num_unwind_native_frames_all++;
+    VM_Statistics::get_vm_stats().num_unwind_native_frames_all++;
 #endif
 
     M2nFrame * current_m2n_frame = si->m2n_frame;
@@ -111,7 +107,7 @@ static void si_unwind_from_m2n(StackIterator * si) {
         // rsp is implicitly address just beyond the frame,
         // callee saves registers in M2nFrame
         
-        si->jit_frame_context.rsp = (uint64) m2n_get_frame_base(current_m2n_frame);
+        si->jit_frame_context.rsp = (uint64)((uint64*) m2n_get_frame_base(current_m2n_frame) + 1);
         
         si->jit_frame_context.p_rbp = &current_m2n_frame->rbp;
         si->jit_frame_context.p_rip = &current_m2n_frame->rip;
@@ -141,8 +137,7 @@ static transfer_control_stub_type gen_transfer_control_stub()
         return addr;
     }
 
-    // FIXME: check real size of the stub
-    const int STUB_SIZE = 1;
+    const int STUB_SIZE = 68;
     char * stub = (char *)malloc_fixed_code_for_jit(STUB_SIZE,
         DEFAULT_CODE_ALIGNMENT, CODE_BLOCK_HEAT_COLD, CAA_Allocate);
     char * ss = stub;
@@ -153,15 +148,14 @@ static transfer_control_stub_type gen_transfer_control_stub()
     //
     // ************* LOW LEVEL DEPENDENCY! ***************
     // This code sequence must be atomic.  The "atomicity" effect is achieved by
-    // changing the esp at the very end of the sequence.
+    // changing the rsp at the very end of the sequence.
 
     // rdx holds the pointer to the stack iterator (skip return ip)
-    ss = mov(ss, rdx_opnd, M_Base_Opnd(rsp_reg, GR_STACK_SIZE));
+    ss = mov(ss, rdx_opnd, rdi_opnd); //M_Base_Opnd(rsp_reg, GR_STACK_SIZE));
 
     // restore eax (return value)
     ss = get_reg(ss, rax_opnd, rdx_reg,
         (int64)&((StackIterator*)0)->jit_frame_context.p_rax);
-    
     // Restore callee saves registers
     ss = get_reg(ss, r15_opnd, rdx_reg,
         (int64)&((StackIterator*)0)->jit_frame_context.p_r15);
@@ -173,7 +167,8 @@ static transfer_control_stub_type gen_transfer_control_stub()
         (int64)&((StackIterator*)0)->jit_frame_context.p_r12);
     ss = get_reg(ss, rbx_opnd, rdx_reg,
         (int64)&((StackIterator*)0)->jit_frame_context.p_rbx);
-
+    ss = get_reg(ss, rbp_opnd, rdx_reg,
+        (int64)&((StackIterator*)0)->jit_frame_context.p_rbp);
     // cut the stack
     ss = mov(ss,  rsp_opnd,  M_Base_Opnd(rdx_reg,
         (int64)&((StackIterator *)0)->jit_frame_context.rsp));
@@ -185,11 +180,9 @@ static transfer_control_stub_type gen_transfer_control_stub()
 
     addr = (transfer_control_stub_type)stub;
     assert(ss-stub <= STUB_SIZE);
-#ifndef NDEBUG
-    if (dump_stubs) {
-        dump(stub, "getaddress__transfer_control", ss-stub);
-    }
-#endif
+
+    DUMP_STUB(stub, "getaddress__transfer_control", ss-stub);
+
     return addr;
 }
 

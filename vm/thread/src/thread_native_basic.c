@@ -316,16 +316,19 @@ void VMCALL hythread_yield() {
  * @see hythread_attach
  *
  */
-extern "C"
 hythread_t hythread_self() {
     hythread_t  thread;
     apr_status_t UNUSED apr_status;
     
     // Extract hythread_t from TLS
-        apr_status = apr_threadkey_private_get((void **)(&thread), TM_THREAD_KEY);            
+    apr_status = apr_threadkey_private_get((void **)(&thread), TM_THREAD_KEY);            
     assert(apr_status == APR_SUCCESS);
     
     return thread;
+}
+
+static void thread_set_self(hythread_t  thread) {
+    apr_threadkey_private_set(thread, TM_THREAD_KEY);
 }
 #else 
 #ifdef FS14_TLS_USE
@@ -374,13 +377,15 @@ static void thread_set_self(hythread_t  thread) {
 #endif
 #endif
 
-/*
- */
 IDATA thread_sleep_impl(I_64 millis, IDATA nanos, IDATA interruptable) {
     IDATA status;
     
     hythread_t thread = tm_self_tls;
     
+    if(nanos == 0 && millis == 0) {
+        hythread_yield();
+        return TM_ERROR_NONE;
+    }         
     // Report error in case current thread is not attached
     if (!thread) return TM_ERROR_UNATTACHED_THREAD;
     
@@ -413,7 +418,7 @@ IDATA VMCALL hythread_sleep_interruptable(I_64 millis, IDATA nanos) {
  *
  * @see hythread_sleep_interruptable
  */
-IDATA VMCALL hythread_sleep(int64 millis) {
+IDATA VMCALL hythread_sleep(I_64 millis) {
     return thread_sleep_impl(millis, 0, WAIT_NONINTERRUPTABLE);
 }
 
@@ -489,7 +494,7 @@ IDATA thread_destroy(hythread_t thread) {
     thread->next->prev = thread->prev;
     thread->group->threads_count--;
 
-    fast_thread_array[thread->thread_id] = NULL;
+    //fast_thread_array[thread->thread_id] = NULL;
 
     status =hythread_global_unlock(NULL);
     if (status != TM_ERROR_NONE) return status;
@@ -706,7 +711,7 @@ static void* APR_THREAD_FUNC thread_start_proc(apr_thread_t* thd, void *p_args) 
     
     // Cleanup TLS after thread completes
     thread_set_self(NULL); 
-    return (void *)apr_thread_exit(thd, APR_SUCCESS);
+    return (void *)(IDATA)apr_thread_exit(thd, APR_SUCCESS);
 }
 
 apr_pool_t* get_local_pool() {

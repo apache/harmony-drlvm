@@ -124,7 +124,7 @@ public:
     }
     bool isNull() const { return ((opcode == 0) && (opnd1 == 0) 
                             && (opnd2 == 0) && (opnd3 == 0)); };
-	void print (::std::ostream &os) const { 
+    void print (::std::ostream &os) const { 
         os << "(" << (int) opcode << ","
            << (int) opnd1 << ","
            << (int) opnd2 << ","
@@ -155,6 +155,7 @@ class CSEHashTable {
 public:
     CSEHashTable(MemoryManager& mm) 
         : numCSE(0), hashTable(mm, CSE_HASH_TABLE_SIZE) {}
+    
     virtual ~CSEHashTable() {}
 
     void    kill() {hashTable.removeAll();}
@@ -211,10 +212,10 @@ private:
 
 class ScopedCSEHashTable : public CSEHashTable {
 public:
-    virtual ~ScopedCSEHashTable() {}
     ScopedCSEHashTable(MemoryManager& mm, ScopedCSEHashTable* outerScope) 
-        : CSEHashTable(mm), _outerScope(outerScope) {
-    }
+        : CSEHashTable(mm), _outerScope(outerScope) {}
+
+    virtual ~ScopedCSEHashTable() {}
     Inst*  lookupKey(CSEHashKey* key) {
         ScopedCSEHashTable* table = this;
         Inst* inst = NULL;

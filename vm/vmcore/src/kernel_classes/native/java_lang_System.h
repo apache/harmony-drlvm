@@ -41,18 +41,6 @@ extern "C" {
 /* Native methods */
 
 /*
- * Method: java.lang.System.currentTimeMillis()J
- */
-JNIEXPORT jlong JNICALL
-Java_java_lang_System_currentTimeMillis(JNIEnv *, jclass);
-
-/*
- * Method: java.lang.System.nanoTime()J
- */
-JNIEXPORT jlong JNICALL
-Java_java_lang_System_nanoTime(JNIEnv *, jclass);
-
-/*
  * Method: java.lang.System.setErrUnsecure(Ljava/io/PrintStream;)V
  */
 JNIEXPORT void JNICALL
@@ -72,25 +60,6 @@ Java_java_lang_System_setInUnsecure(JNIEnv *, jclass,
 JNIEXPORT void JNICALL
 Java_java_lang_System_setOutUnsecure(JNIEnv *, jclass, 
     jobject);
-
-/*
- * Method: java.lang.System.getenvUnsecure()Ljava/util/Map;
- */
-JNIEXPORT jobject JNICALL
-Java_java_lang_System_getenvUnsecure__(JNIEnv *, jclass);
-
-/*
- * Method: java.lang.System.getenvUnsecure(Ljava/lang/String;)Ljava/lang/String;
- */
-JNIEXPORT jstring JNICALL
-Java_java_lang_System_getenvUnsecure__Ljava_lang_String_2(JNIEnv *, jclass, 
-    jstring);
-
-/*
- * Method: java.lang.System.initNanoTime()V
- */
-JNIEXPORT void JNICALL
-Java_java_lang_System_initNanoTime(JNIEnv *, jclass);
 
 /*
  * Method: java.lang.System.rethrow(Ljava/lang/Throwable;)V

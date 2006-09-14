@@ -108,6 +108,9 @@ Version: $Revision: 1.6.2.6 $
                 </select>
             </select>
 
+            <select cxx="icc,icl">                  
+                <compilerarg value="-mp" />
+            </select>
 
             <select cfg="release">
                 <select os="win" cxx="icl">
@@ -203,12 +206,12 @@ Version: $Revision: 1.6.2.6 $
             <select os="win">
                 <syslibset libs="advapi32,odbc32,userenv,ws2_32,mswsock" />
             </select>
-            <select os="lnx">
+            <select os="lnx" arch="ia32">
                 <syslibset type="static" libs="z,pthread,xml2" />
-                <syslibset type="shared" libs="m,dl,stdc++" />
+                <syslibset type="shared" libs="m,dl,stdc++,rt" />
             </select>
-            <select os="lnx" cxx="gcc">
-                <syslibset type="shared" libs="gcc_s" />
+            <select os="lnx" cxx="gcc" arch="ia32">
+                <linkerarg value="-lgcc_s" />
             </select>
         </linker>
 

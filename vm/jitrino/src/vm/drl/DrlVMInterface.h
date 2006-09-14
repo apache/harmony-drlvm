@@ -22,16 +22,16 @@
 #ifndef _DRLVMINTERFACEIMPL_H_
 #define _DRLVMINTERFACEIMPL_H_
 
-#include <stdio.h>
-#include <stdlib.h>
 #include "Type.h"
 #include "VMInterface.h"
-#include "open/em_profile_access.h"
 #include "jit_export.h"
 #include "jit_import.h"
 #include "jit_runtime_support.h"
 #include "jit_intf.h"
 #include "mkernel.h"
+
+#include <stdio.h>
+#include <stdlib.h>
 
 namespace Jitrino {
 
@@ -46,6 +46,7 @@ extern Mutex g_compileLock;
 class DrlVMCompilationInterface;
 
 uint32 flagTLSSuspendRequestOffset();
+uint32 flagTLSThreadStateOffset();
 
 class DrlVMTypeManager : public TypeManager {
 public:
@@ -57,6 +58,7 @@ public:
     //
     void*       getBuiltinValueTypeVMTypeHandle(Type::Tag);
     void*       getSystemObjectVMTypeHandle();
+    void*       getSystemClassVMTypeHandle();
     void*       getSystemStringVMTypeHandle();
     void*       getArrayVMTypeHandle(void* elemVMTypeHandle,bool isUnboxed);
     const char* getTypeName(void* vmTypeHandle);
@@ -69,7 +71,7 @@ public:
     bool        isArrayType(void* vmTypeHandle) {
         return class_is_array((Class_Handle)vmTypeHandle)?true:false;
     }
-    bool        isArrayOfUnboxedElements(void* vmTypeHandle);
+    bool        isArrayOfPrimitiveElements(void* vmTypeHandle);
     bool        isEnumType(void* vmTypeHandle);
     bool        isValueType(void* vmTypeHandle);
     bool        isLikelyExceptionType(void* vmTypeHandle);
@@ -85,9 +87,13 @@ public:
     }
     bool        isSystemStringType(void* vmTypeHandle);
     bool        isSystemObjectType(void* vmTypeHandle);
+    bool        isSystemClassType(void* vmTypeHandle);
     bool        isBeforeFieldInit(void* vmTypeHandle);
     bool        needsInitialization(void* vmTypeHandle) {
         return class_needs_initialization((Class_Handle)vmTypeHandle)?true:false;
+    }
+    bool        isFinalizable(void* vmTypeHandle) {
+        return class_is_finalizable((Class_Handle)vmTypeHandle)?true:false;
     }
     bool        isInitialized(void* vmTypeHandle) {
         return class_is_initialized((Class_Handle)vmTypeHandle)?true:false;
@@ -112,14 +118,14 @@ public:
     }
 
     uint32      getVTableOffset()
-	{
+    {
         return object_get_vtable_offset();
-	}
+    }
 
-	void*       getTypeHandleFromAllocationHandle(void* vmAllocationHandle)
-	{
-		return allocation_handle_get_class((Allocation_Handle)vmAllocationHandle);
-	}
+    void*       getTypeHandleFromAllocationHandle(void* vmAllocationHandle)
+    {
+        return allocation_handle_get_class((Allocation_Handle)vmAllocationHandle);
+    }
 
 
     bool        isSubClassOf(void* vmTypeHandle1,void* vmTypeHandle2);
@@ -132,28 +138,31 @@ public:
     FieldDesc*  getUnboxedFieldDesc(void* vmTypeHandle,uint32 index);
     uint32      getArrayLengthOffset();
     Type*       getUnderlyingType(void* enumVMTypeHandle);
+
     Type*       getTypeFromPrimitiveDrlVMDataType(VM_Data_Type drlDataType) {
-    switch (drlDataType) {
-       case VM_DATA_TYPE_INT8:    return getInt8Type();
-       case VM_DATA_TYPE_UINT8:   return getUInt8Type();
-       case VM_DATA_TYPE_INT16:   return getInt16Type();
-       case VM_DATA_TYPE_UINT16:  return getUInt16Type();
-       case VM_DATA_TYPE_INT32:   return getInt32Type();
-       case VM_DATA_TYPE_UINT32:  return getUInt32Type();
-       case VM_DATA_TYPE_INT64:   return getInt64Type();
-       case VM_DATA_TYPE_UINT64:  return getUInt64Type();
-       case VM_DATA_TYPE_INTPTR:  return getIntPtrType();
-       case VM_DATA_TYPE_UINTPTR: return getUIntPtrType();
-       case VM_DATA_TYPE_F8:      return getDoubleType();
-       case VM_DATA_TYPE_F4:      return getSingleType();
-       case VM_DATA_TYPE_BOOLEAN: return getBooleanType();
-       case VM_DATA_TYPE_CHAR:    return getCharType();
-       default: assert(0);
+        switch (drlDataType) {
+            case VM_DATA_TYPE_INT8:    return getInt8Type();
+            case VM_DATA_TYPE_UINT8:   return getUInt8Type();
+            case VM_DATA_TYPE_INT16:   return getInt16Type();
+            case VM_DATA_TYPE_UINT16:  return getUInt16Type();
+            case VM_DATA_TYPE_INT32:   return getInt32Type();
+            case VM_DATA_TYPE_UINT32:  return getUInt32Type();
+            case VM_DATA_TYPE_INT64:   return getInt64Type();
+            case VM_DATA_TYPE_UINT64:  return getUInt64Type();
+            case VM_DATA_TYPE_INTPTR:  return getIntPtrType();
+            case VM_DATA_TYPE_UINTPTR: return getUIntPtrType();
+            case VM_DATA_TYPE_F8:      return getDoubleType();
+            case VM_DATA_TYPE_F4:      return getSingleType();
+            case VM_DATA_TYPE_BOOLEAN: return getBooleanType();
+            case VM_DATA_TYPE_CHAR:    return getCharType();
+            default: assert(0);
        }
        return NULL;
     }
+
 private:
     void*        systemObjectVMTypeHandle;
+    void*        systemClassVMTypeHandle;
     void*        systemStringVMTypeHandle;
 };
 
@@ -185,7 +194,7 @@ public:
     uint32        getId()          {return id;}
     const char*   getName()        {return field_get_name(drlField);}
     const char*   getSignatureString() { return field_get_descriptor(drlField); }
-	void          printFullName(::std::ostream &os) { os<<getParentType()->getName()<<"::"<<field_get_name(drlField); }
+    void          printFullName(::std::ostream &os) { os<<getParentType()->getName()<<"::"<<field_get_name(drlField); }
     NamedType*    getParentType();
     bool          isPrivate()      {return field_is_private(drlField)?true:false;}
     bool          isStatic()       {return field_is_static(drlField)?true:false;}
@@ -237,7 +246,7 @@ public:
     uint32       getId()           {return id;}
     const char*  getName()         {return method_get_name(drlMethod);}
     const char*  getSignatureString() {return method_get_descriptor(drlMethod); }
-	void         printFullName(::std::ostream& os) {
+    void         printFullName(::std::ostream& os) {
                            os<<getParentType()->getName()<<"::"<<getName()<<method_get_descriptor(drlMethod);}
     NamedType*   getParentType();
     bool         isPrivate()       {return method_is_private(drlMethod)?true:false;}
@@ -361,22 +370,25 @@ class DrlVMCompilationInterface : public CompilationInterface {
 public:
     DrlVMCompilationInterface(Compile_Handle c,
                             Method_Handle m,
+                            JIT_Handle jit,
                             MemoryManager& mm,
-                            JITModeData* _modeData, 
-                            JIT_Flags flags) 
-        : memManager(mm), fieldDescs(mm,32), methodDescs(mm,32),
-          dataInterface(), typeManager(mm)
+                            OpenMethodExecutionParams& comp_params, 
+                            CompilationContext* cc) 
+        : CompilationInterface(cc), memManager(mm), fieldDescs(mm,32), methodDescs(mm,32),
+          dataInterface(), typeManager(mm), compilation_params(comp_params)
     {
-        modeData = _modeData;
-        jitFlags = flags;
-        jitFlags.insert_write_barriers = false;
-        compilation_params.exe_do_code_mapping = false;
         compileHandle = c;
         nextMemberId = 0;
         typeManager.init(*this);
-        methodToCompile = getMethodDesc(m);
+        methodToCompile = NULL;
+        methodToCompile = getMethodDesc(m, jit);
         flushToZeroAllowed = !methodToCompile->isJavaByteCodes();
     }
+
+    void setCompilationContext(CompilationContext* cc) {
+        compilationContext = cc;
+    }
+
     // returns the method to compile
     MethodDesc*    getMethodToCompile()    {return methodToCompile;}
 
@@ -446,9 +458,9 @@ public:
     Type*       getFieldType(MethodDesc* enclosingMethodDesc, uint32 entryCPIndex);
     const char* methodSignatureString(MethodDesc* enclosingMethodDesc, uint32 methodToken);
 
-		// resolve-by-name methods
-	virtual ObjectType *	resolveSystemClass( const char * klassName );
-	virtual MethodPtrType * resolveMethod( ObjectType * klass, const char * methodName, const char * methodSig);
+        // resolve-by-name methods
+    virtual ObjectType *    resolveSystemClass( const char * klassName );
+    virtual MethodPtrType * resolveMethod( ObjectType * klass, const char * methodName, const char * methodSig);
 
     void*        loadStringObject(MethodDesc* enclosingMethod,
                                  uint32 stringToken);
@@ -511,26 +523,38 @@ public:
     void         setNotifyWhenMethodIsOverridden(MethodDesc * methodDesc, void * callbackData);
     void         setNotifyWhenMethodIsRecompiled(MethodDesc * methodDesc, void * callbackData);
 
-    //
-    // accessors for dynamic profiling flags 
-    //
-    bool        isDynamicProfiling() { return jitFlags.dynamic_profile; }
-    uint32      getOptimizationLevel() { return ((uint32) jitFlags.opt_level); }
     
-    
-    
-
     
     // write barriers stuff
     bool         insertWriteBarriers() {
-        return jitFlags.insert_write_barriers;
+        return compilation_params.exe_insert_write_barriers;
     }
 
     bool isBCMapInfoRequired() {
-        return compilation_params.exe_do_code_mapping;
+        bool res = compilation_params.exe_do_code_mapping;
+        // exe_do_code_mapping should be used for different ti related byte code
+        // mapping calculations
+        // full byte code mapping could be enabled by IRBuilder flag now 
+        // this method used to access to byte code low level maps and
+        // enables byte codes for stack traces only
+//        res = true;
+        return res;
     }
     void setBCMapInfoRequired(bool is_supported) {
         compilation_params.exe_do_code_mapping = is_supported;
+    }
+
+    bool isCompileLoadEventRequired() {
+        // additional compilation param is needed to handle this event
+        return false;
+    }
+
+    virtual void sendCompiledMethodLoadEvent(MethodDesc * methodDesc, 
+        uint32 codeSize, void* codeAddr, uint32 mapLength, 
+        AddrLocation* addrLocationMap, void* compileInfo);
+
+    virtual OpenMethodExecutionParams& getCompilationParams() { 
+        return compilation_params;
     }
 
     // should flush to zero be allowed for floating-point operations ?
@@ -557,11 +581,11 @@ public:
     }
     VmCallingConvention getRuntimeHelperCallingConvention(RuntimeHelperId id);
 
-	bool compileMethod(MethodDesc *method);
+    bool compileMethod(MethodDesc *method);
 
-	void* getRuntimeMethodHandle(MethodDesc *method) {
-		return ((DrlVMMethodDesc*)method)->getDrlVMMethod();
-	}
+    void* getRuntimeMethodHandle(MethodDesc *method) {
+        return ((DrlVMMethodDesc*)method)->getDrlVMMethod();
+    }
 
     //
     // for internal use
@@ -580,34 +604,35 @@ public:
         return fieldDesc;
     }
     DrlVMMethodDesc*    getMethodDesc(Method_Handle method) {
+        return getMethodDesc(method, getJitHandle());
+    }
+
+    DrlVMMethodDesc*    getMethodDesc(Method_Handle method, JIT_Handle jit) {
         assert(method);
         DrlVMMethodDesc* methodDesc = methodDescs.lookup(method);
         if (methodDesc == NULL) {
             methodDesc = new (memManager)
-                DrlVMMethodDesc(method,this,nextMemberId++,getJitHandle());
+                DrlVMMethodDesc(method,this,nextMemberId++, jit);
             methodDescs.insert(method,methodDesc);
         }
         return methodDesc;
     }
-    JITModeData* getModeData() const {return modeData;}
-    JIT_Handle getJitHandle() const;
 
 private:
     Type*  getTypeFromDrlVMTypeHandle(Type_Info_Handle);
     VM_RT_SUPPORT translateHelperId(RuntimeHelperId runtimeHelperId);
+    JIT_Handle getJitHandle() const;
 
     MemoryManager&               memManager;
-    JITModeData*                 modeData;
     PtrHashTable<DrlVMFieldDesc>   fieldDescs;
     PtrHashTable<DrlVMMethodDesc>  methodDescs;
     DrlVMDataInterface             dataInterface;
     DrlVMTypeManager               typeManager;
     DrlVMMethodDesc*               methodToCompile;
     Compile_Handle               compileHandle;
-    JIT_Flags                    jitFlags;
     bool                         flushToZeroAllowed;
     uint32                       nextMemberId;
-    OpenMethodExecutionParams   compilation_params;
+    OpenMethodExecutionParams&   compilation_params;
 };
 
 class DrlVMGCInterface : public GCInterface {
@@ -669,52 +694,6 @@ public:
     DrlVMBinaryRewritingInterface() {}
     virtual void rewriteCodeBlock(Byte* codeBlock, Byte* newCode, size_t size);
 };
-
-
-class DrlProfilingInterface : public ProfilingInterface {
-public:
-    DrlProfilingInterface(EM_Handle _em, JIT_Handle _jit, EM_ProfileAccessInterface* emProfileAccess)
-        : emHandle(_em), pcHandle(NULL), jitHandle(_jit), profileAccessInterface(emProfileAccess), 
-        jitRole(JITProfilingRole_USE), profilingEnabled(false){}
-    
-    virtual MethodProfile* getMethodProfile(MemoryManager& mm, ProfileType type, MethodDesc& md, JITProfilingRole role=JITProfilingRole_USE) const;
-    virtual bool hasMethodProfile(ProfileType type, MethodDesc& md, JITProfilingRole role=JITProfilingRole_USE) const;
-    
-    virtual bool enableProfiling(PC_Handle pc, JITProfilingRole role);
-    virtual bool isProfilingEnabled(ProfileType pcType, JITProfilingRole jitRole) const ;
-
-    virtual EntryBackedgeMethodProfile* createEBMethodProfile(MemoryManager& mm, MethodDesc& md);
-    virtual uint32 getEBProfilerMethodEntryThreshold() const;
-    virtual uint32 getEBProfilerBackedgeThreshold() const;
-    virtual bool   isEBProfilerInSyncMode() const;
-    virtual PC_Callback_Fn* getEBProfilerSyncModeCallback() const;
-
-private:
-    EM_Handle emHandle;
-    PC_Handle pcHandle;
-    JIT_Handle jitHandle;
-    EM_ProfileAccessInterface* profileAccessInterface;
-    //M1 specific -> only one profile supported:
-    JITProfilingRole jitRole;
-    bool profilingEnabled;
-};
-
-class DrlEntryBackedgeMethodProfile : public EntryBackedgeMethodProfile {
-public:
-    DrlEntryBackedgeMethodProfile(Method_Profile_Handle mph, MethodDesc& md, uint32* _entryCounter, uint32 *_backedgeCounter)
-        : EntryBackedgeMethodProfile(mph, md),  entryCounter(_entryCounter), backedgeCounter(_backedgeCounter){}
-
-    virtual uint32 getEntryExecCount() const {return *entryCounter;}
-    virtual uint32 getBackedgeExecCount() const {return *backedgeCounter;}
-    virtual uint32* getEntryCounter() const {return entryCounter;}
-    virtual uint32* getBackedgeCounter() const {return backedgeCounter;}
-
-private:
-    uint32* entryCounter;
-    uint32* backedgeCounter;
-};
-
-
 
 } //namespace Jitrino
 

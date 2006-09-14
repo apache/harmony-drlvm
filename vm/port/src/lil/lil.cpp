@@ -691,6 +691,7 @@ static bool lil_parse_address(const char** src, LilVarArgs* va, LilInstruction* 
         if (!lil_parse_number(src, va, &n)) return false;
     } else {
         i->u.ldst.is_index = false;
+        i->u.ldst.scale = 0;
     }
     i->u.ldst.offset = sign * (POINTER_SIZE_SINT) n;
     if (!lil_parse_kw(src, ":")) return false;

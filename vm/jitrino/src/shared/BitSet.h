@@ -31,174 +31,174 @@
 
 namespace Jitrino
 {
-	
+    
 class BitSet  
 {
 
 public:
-	//
-	// Constructors
-	//
-	BitSet(MemoryManager&, uint32 size);
-	//
-	//	copy constructors
-	//
-	BitSet(MemoryManager&, const BitSet&);
-	BitSet(const BitSet&);
+    //
+    // Constructors
+    //
+    BitSet(MemoryManager&, uint32 size);
+    //
+    //  copy constructors
+    //
+    BitSet(MemoryManager&, const BitSet&);
+    BitSet(const BitSet&);
     //
     //  This constructor is useful when a bit set needs to be expanded into a larger one
     //
     BitSet(MemoryManager&, const BitSet&, uint32 size);
-	//
-	// assignment operator (resizes the set if necessary)
-	//
-	BitSet& operator = (const BitSet&);
-	//
+    //
+    // assignment operator (resizes the set if necessary)
+    //
+    BitSet& operator = (const BitSet&);
+    //
     // resizes BitSet. Sets new bits to FALSE
-	//
+    //
     void resize(uint32 newSetSize);
-	//
+    //
     // resizes BitSet. Sets all bits to FALSE
-	//
+    //
     void resizeClear(uint32 newSetSize);
-	//
-	// returns the size of the set
-	//
-	uint32 getSetSize() const {return setSize;}
-	//
-	// returns the value of the bit
-	//
-	bool getBit(uint32 bitNumber) const
-	{
-		assert(words != 0 && bitNumber < setSize);
-		return (reinterpret_cast<char*>(words)[bitNumber >> 3] & (1 << (bitNumber & 7))) != 0;
-	}
-	//
-	// sets a bit to the given value and returns old value of bit
-	//
-	bool setBit(uint32 bitNumber, bool value = true)
-	{
-		assert(words != 0 && bitNumber < setSize);
-		char& wd = reinterpret_cast<char*>(words)[bitNumber >> 3];
-		char  mk = (char)(1 << (bitNumber & 7));
+    //
+    // returns the size of the set
+    //
+    uint32 getSetSize() const {return setSize;}
+    //
+    // returns the value of the bit
+    //
+    bool getBit(uint32 bitNumber) const
+    {
+        assert(words != 0 && bitNumber < setSize);
+        return (reinterpret_cast<char*>(words)[bitNumber >> 3] & (1 << (bitNumber & 7))) != 0;
+    }
+    //
+    // sets a bit to the given value and returns old value of bit
+    //
+    bool setBit(uint32 bitNumber, bool value = true)
+    {
+        assert(words != 0 && bitNumber < setSize);
+        char& wd = reinterpret_cast<char*>(words)[bitNumber >> 3];
+        char  mk = (char)(1 << (bitNumber & 7));
 
-		bool old = (wd & mk) != 0;
-		if (value)
-			wd |= mk;
-		else
-			wd &= ~mk;
+        bool old = (wd & mk) != 0;
+        if (value)
+            wd |= mk;
+        else
+            wd &= ~mk;
 
-		return old;
-	}
-	//
-	//	Sets all bits to false
-	//
-	void clear();
-	//
-	//	Sets all bits to true
-	//
-	void setAll();
-	//
-	//	Checks if set has any bits set to true
-	//
-	bool isEmpty() const;
-	//
-	//	Sets 32 bits to values indicated by a bit mask and returns old values
-	//
-	uint32 set32Bits(uint32 firstBitNumber, uint32 value);
-	//
-	//	Returns values of 32 bits encoded as a bit mask
-	//
-	uint32 get32Bits(uint32 firstBitNumber);
-	//
-	//	Copies another set
-	//
-	void copyFrom(const BitSet& set);
-	//
-	//	Copies from a smaller set to another set
-	//
-	void copyFromSmallerSet(const BitSet& set);
-	//
-	//	Unions with another set
-	//
-	void unionWith(const BitSet& set);
-	//
-	//	Intersects with another set
-	//
-	void intersectWith(const BitSet& set);
-	//
-	//	Subtracts another set
-	//
-	void subtract(const BitSet& set);
-	//
-	//	Checks if set is equal to another set
-	//
-	bool isEqual(const BitSet& set);
-	//
-	//	Checks if set is disjoint from another set
-	//
-	bool isDisjoint(const BitSet& set);
-	//
-	//	Checks if every bit in a set is less than or equal to every bit in another set (where false < true).
-	//
-	bool isLessOrEqual(const BitSet& set);
+        return old;
+    }
+    //
+    //  Sets all bits to false
+    //
+    void clear();
+    //
+    //  Sets all bits to true
+    //
+    void setAll();
+    //
+    //  Checks if set has any bits set to true
+    //
+    bool isEmpty() const;
+    //
+    //  Sets 32 bits to values indicated by a bit mask and returns old values
+    //
+    uint32 set32Bits(uint32 firstBitNumber, uint32 value);
+    //
+    //  Returns values of 32 bits encoded as a bit mask
+    //
+    uint32 get32Bits(uint32 firstBitNumber);
+    //
+    //  Copies another set
+    //
+    void copyFrom(const BitSet& set);
+    //
+    //  Copies from a smaller set to another set
+    //
+    void copyFromSmallerSet(const BitSet& set);
+    //
+    //  Unions with another set
+    //
+    void unionWith(const BitSet& set);
+    //
+    //  Intersects with another set
+    //
+    void intersectWith(const BitSet& set);
+    //
+    //  Subtracts another set
+    //
+    void subtract(const BitSet& set);
+    //
+    //  Checks if set is equal to another set
+    //
+    bool isEqual(const BitSet& set);
+    //
+    //  Checks if set is disjoint from another set
+    //
+    bool isDisjoint(const BitSet& set);
+    //
+    //  Checks if every bit in a set is less than or equal to every bit in another set (where false < true).
+    //
+    bool isLessOrEqual(const BitSet& set);
 
 
-	class Visitor;
+    class Visitor;
 
-	void visitElems(Visitor& visitor) const;
+    void visitElems(Visitor& visitor) const;
 
     class Printer;
 
-	void print(::std::ostream& os);
+    void print(::std::ostream& os);
 
 
-	class IterB;
+    class IterB;
 
 private:
 
-	//
-	// makes initial allocation
-	//
-	void alloc(uint32 size);
-	void copy (uint32* src);
-	//
+    //
+    // makes initial allocation
+    //
+    void alloc(uint32 size);
+    void copy (uint32* src);
+    //
     // zero bits that out of setSize
-	//
+    //
     void clearTrailingBits();
-	//
-	// words containing the set's bits; 
-	//
-	uint32* words;
-	//
-	// size of set (in bits)
-	//
-	uint32 setSize;
-	//
+    //
+    // words containing the set's bits; 
+    //
+    uint32* words;
+    //
+    // size of set (in bits)
+    //
+    uint32 setSize;
+    //
     // number of words reserved
-	//
+    //
     uint32 wordsCapacity; 
-	//
-	// mem manager used to resize the set
-	//
+    //
+    // mem manager used to resize the set
+    //
     MemoryManager& mm;
 };
 
 
 class BitSet::Visitor {
 public:
-        virtual ~Visitor() {}
-	virtual void visit(uint32 elem) = 0;
+    virtual ~Visitor() {}
+    virtual void visit(uint32 elem) = 0;
 };
 
 
 class BitSet::Printer : public BitSet::Visitor {
 public:
-	Printer(::std::ostream & _os) : os(_os) {}
-        virtual ~Printer() {}
-        void visit(uint32 i) { os << " " << (int) i;}
+    Printer(::std::ostream & _os) : os(_os) {}
+    virtual ~Printer() {}
+    void visit(uint32 i) { os << " " << (int) i;}
 private:
-	::std::ostream & os;
+    ::std::ostream & os;
 };
 
 
@@ -206,16 +206,16 @@ class BitSet::IterB
 {
 public:
 
-	IterB (const BitSet& set);
+    IterB (const BitSet& set);
 
-	void init (const BitSet& set);
-	int  getNext ();
+    void init (const BitSet& set);
+    int  getNext ();
 
 protected:
 
-	uint32 * ptr, * end;
-	uint32 mask;
-	int idx;
+    uint32 * ptr, * end;
+    uint32 mask;
+    int idx;
 };
 
 

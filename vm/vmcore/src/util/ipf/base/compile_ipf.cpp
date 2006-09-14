@@ -73,15 +73,8 @@ using namespace std;
 #include "lil_code_generator.h"
 #include "stub_code_utils.h"
 
-#ifndef NDEBUG
 #include "dump.h"
-#endif
-
-extern bool dump_stubs;
-
-#ifdef VM_STATS
 #include "vm_stats.h"
-#endif
 
 void emit_hashcode_override(Emitter_Handle eh, Method *method);
 void emit_arraycopy_override(Emitter_Handle eh, Method *method);
@@ -95,26 +88,22 @@ void flush_hw_cache(Byte *addr, size_t len)
     }
 } //flush_hw_cache
 
-//////////////////////////////////////////////////////////
-// begin utilities to convert between managed and unmanaged nulls
 
+/*    BEGIN UTILITIES TO CONVERT BETWEEN MANAGED AND UNMANAGED NULLS    */
 
 // Convert a reference in register "reg", if null, from a managed null (heap_base) to an unmanaged one (NULL/0). Uses SCRATCH_GENERAL_REG.
-void gen_convert_managed_to_unmanaged_null_ipf(Emitter_Handle emitter, unsigned reg)
-{
+void gen_convert_managed_to_unmanaged_null_ipf(Emitter_Handle emitter, unsigned reg) {
     assert(reg != SCRATCH_GENERAL_REG);
     assert(reg != SCRATCH_GENERAL_REG2); // because of the call to increment_stats_counter()
     if (VM_Global_State::loader_env->compress_references) {
         Merced_Code_Emitter *mce = (Merced_Code_Emitter *)emitter;
 #ifdef VM_STATS
-        increment_stats_counter(*mce, &vm_stats_total.num_convert_null_m2u);
+        increment_stats_counter(*mce, &VM_Statistics::get_vm_stats().num_convert_null_m2u);
 #endif
         gen_compare_to_managed_null(*mce, SCRATCH_PRED_REG, SCRATCH_PRED_REG2, reg, SCRATCH_GENERAL_REG);
         mce->ipf_mov(reg, 0, SCRATCH_PRED_REG);
     } 
-} //gen_convert_managed_to_unmanaged_null_ipf
-
-
+}
 
 // Convert a reference in "reg", if null, from an unmanaged null (NULL/0) to an managed one (heap_base). 
 // If a null must be translated, will rewrite rewrite "reg".
@@ -125,24 +114,20 @@ void gen_convert_unmanaged_to_managed_null_ipf(Emitter_Handle emitter, unsigned 
     if (VM_Global_State::loader_env->compress_references) {
         Merced_Code_Emitter *mce = (Merced_Code_Emitter *)emitter;
 #ifdef VM_STATS
-        increment_stats_counter(*mce, &vm_stats_total.num_convert_null_u2m);
+        increment_stats_counter(*mce, &VM_Statistics::get_vm_stats().num_convert_null_u2m);
 #endif
         mce->ipf_cmp(icmp_eq, cmp_none, SCRATCH_PRED_REG, SCRATCH_PRED_REG2, reg, 0);
         emit_mov_imm_compactor(*mce, reg, (uint64)Class::heap_base, SCRATCH_PRED_REG);
     } 
 } //gen_convert_unmanaged_to_managed_null_ipf
 
+/*    END UTILITIES TO CONVERT BETWEEN MANAGED AND UNMANAGED NULLS    */
 
-// end utilities to convert between managed and unmanaged nulls
-//////////////////////////////////////////////////////////
 
-/////////////////////////////////////////////////////////////////
-// begin Support for stub override code sequences 
-
+/*    BEGIN SUPPORT FOR STUB OVERRIDE CODE SEQUENCES    */
 
 // Override for the RNI method java_lang_Class.newInstance(Java_java_lang_Class *clss).
-static void emit_newinstance_override(Emitter_Handle eh, Method *method)
-{
+static void emit_newinstance_override(Emitter_Handle eh, Method *method) {
     Merced_Code_Emitter *mce = (Merced_Code_Emitter *)eh;
     Merced_Code_Emitter &emitter = *mce;
     // Emit code to examine the argument class (a java_lang_Class instance) and allocate an instance using fast inline code
@@ -223,10 +208,9 @@ static void emit_newinstance_override(Emitter_Handle eh, Method *method)
         emitter.ipf_st(int_mem_size_8, mem_st_none, mem_none, SCRATCH_GENERAL_REG,  SCRATCH_GENERAL_REG4, SCRATCH_PRED_REG3);
         emitter.ipf_brret(br_many, br_sptk, br_none, BRANCH_RETURN_LINK_REG, SCRATCH_PRED_REG3);   
     }
-} //emit_newinstance_override
+}
 
-static void emit_convertToByteArray_override(Emitter_Handle eh, Method *method)
-{
+static void emit_convertToByteArray_override(Emitter_Handle eh, Method *method) {
     Merced_Code_Emitter *mce = (Merced_Code_Emitter *)eh;
     Merced_Code_Emitter &emitter = *mce;
     const int v0 = RETURN_VALUE_REG;
@@ -315,8 +299,7 @@ static void emit_convertToByteArray_override(Emitter_Handle eh, Method *method)
     emitter.set_target(target_fail);
     emitter.ipf_mov(v0, 0);
     emitter.ipf_br(br_cond, br_few, br_sptk, br_none, target_end);
-} // emit_convertToByteArray_override
-
+}
 
 static unsigned default_override_size(Method *m)
 {
@@ -337,31 +320,26 @@ Stub_Override_Entry *stub_override_entries = &(_stub_override_entries_base[0]);
 
 int sizeof_stub_override_entries = sizeof(_stub_override_entries_base) / sizeof(_stub_override_entries_base[0]);
 
+/*    END SUPPORT FOR STUB OVERRIDE CODE SEQUENCES    */
 
-// end Support for stub override code sequences
-/////////////////////////////////////////////////////////////////
 
-void compile_flush_generated_code_block(Byte* b, size_t sz)
-{
+void compile_flush_generated_code_block(Byte* b, size_t sz) {
     flush_hw_cache(b, sz);
 }
 
 extern "C" void do_mf_asm();
 
-extern "C" void do_mf()
-{
+extern "C" void do_mf() {
     do_mf_asm();
-} //do_mf
+}
 
-void compile_flush_generated_code()
-{
+void compile_flush_generated_code() {
     sync_i_cache();
     do_mf();
 }
 
 // 20030711: This function might not be compressed references safe
-static void protect_value_type(Class_Handle c, uint64* start, GcFrame* gc)
-{
+static void protect_value_type(Class_Handle c, uint64* start, GcFrame* gc) {
     ABORT("It is supposed that the function is never called");
     assert(!hythread_is_suspend_enabled());
     unsigned num_fields = class_num_instance_fields_recursive(c);
@@ -396,8 +374,7 @@ static void protect_value_type(Class_Handle c, uint64* start, GcFrame* gc)
     }
 }
 
-void compile_protect_arguments(Method_Handle method, GcFrame* gc)
-{
+void compile_protect_arguments(Method_Handle method, GcFrame* gc) {
     assert(!hythread_is_suspend_enabled());
     Method_Signature_Handle msh = method_get_signature(method);
     unsigned num_args = method_args_get_number(msh);
@@ -446,16 +423,9 @@ void compile_protect_arguments(Method_Handle method, GcFrame* gc)
             ABORT("Unexpected data type");
         }
     }
-
 }
 
-// end compile-me stubs
-//////////////////////////////////////////////////////////
-
-
-
-void patch_code_with_threads_suspended(Byte *code_block, Byte *new_code, size_t size)
-{
+void patch_code_with_threads_suspended(Byte *code_block, Byte *new_code, size_t size) {
     // Check that the code being modified is one or more complete bundles on IPF.
     assert((((size_t)code_block) % 16) == 0);  // else did not start at a possible bundle address
 
@@ -478,26 +448,18 @@ void patch_code_with_threads_suspended(Byte *code_block, Byte *new_code, size_t 
     assert(original_inst0 == new_inst0);
 
     memcpy(code_block, new_code, size);
-} //patch_code_with_threads_suspended
+}
 
 
-char *create_unboxer(Method *method) 
-{
-    assert(0);
-    return 0;
-} //create_unboxer
+/*    BEGIN COMPILE-ME STUBS    */
 
-//////////////////////////////////////////////////////////////////////////
-// Compile-Me Stubs
+NativeCodePtr compile_jit_a_method(Method * method);
 
-NativeCodePtr compile_jit_a_method(Method* method);
-
-static NativeCodePtr compile_get_compile_me_generic()
-{
+static NativeCodePtr compile_get_compile_me_generic() {
     static NativeCodePtr addr = NULL;
     if (!addr) {
-        unsigned eoo = (unsigned)(POINTER_SIZE_INT)&((VM_thread*)NULL)->p_exception_object;
         NativeCodePtr (*p_jitter)(Method*) = compile_jit_a_method;
+        NativeCodePtr (*p_rethrow)(Method*) = exn_rethrow_if_pending;
         LilCodeStub* cs = lil_parse_code_stub(
             "entry 1:managed:arbitrary;"
             "push_m2n 0, %0i;"
@@ -506,18 +468,22 @@ static NativeCodePtr compile_get_compile_me_generic()
             "o0=sp0;"
             "call %1i;"
             "pop_m2n;"
-            "tailcall r;",
-            FRAME_COMPILATION, p_jitter, eoo, rethrow_current_thread_exception);
+	    "locals 1;"
+	    "l0 = r;"
+            "call %2i;"
+            "tailcall l0;",
+            FRAME_COMPILATION, p_jitter, p_rethrow);
         assert(cs && lil_is_valid(cs));
-        addr = LilCodeGenerator::get_platform()->compile(cs, "compile_me_generic", dump_stubs);
+        addr = LilCodeGenerator::get_platform()->compile(cs);
+
+        DUMP_STUB(addr, "compile_me_generic", lil_cs_get_code_size(cs));
+
         lil_free_code_stub(cs);
     }
     return addr;
-} //compile_get_compile_me_generic
+}
 
-
-NativeCodePtr compile_gen_compile_me(Method_Handle method)
-{
+NativeCodePtr compile_gen_compile_me(Method_Handle method) {
     LilCodeStub * cs = lil_parse_code_stub(
         "entry 0:managed:arbitrary;"
         "std_places 1;"
@@ -527,7 +493,7 @@ NativeCodePtr compile_gen_compile_me(Method_Handle method)
 
     assert(cs && lil_is_valid(cs));
     
-    NativeCodePtr addr = LilCodeGenerator::get_platform()->compile(cs, "", false);
+    NativeCodePtr addr = LilCodeGenerator::get_platform()->compile(cs);
 #ifndef NDEBUG
     static unsigned done = 0;
     // dump first 10 compileme stubs
@@ -540,12 +506,12 @@ NativeCodePtr compile_gen_compile_me(Method_Handle method)
         buf = (char *)STD_MALLOC(sz);
         sprintf(buf, "compileme.%s.%s%s", c, m, d);
         assert(strlen(buf) < sz);
-        dump((char *)addr, buf, lil_cs_get_code_size(cs));
+        DUMP_STUB(addr, buf, lil_cs_get_code_size(cs));
         STD_FREE(buf);
     }
 #endif
     lil_free_code_stub(cs);
     return addr;
-} //compile_gen_compile_me
+}
 
-
+/*    END COMPILE-ME STUBS    */

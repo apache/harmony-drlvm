@@ -56,26 +56,7 @@ NativeCodePtr compile_gen_compile_me(Method_Handle method);
 
 void patch_code_with_threads_suspended(Byte *code_block, Byte *new_code, size_t size);
 
-
-// On IPF this type is actually a Merced_Code_Emitter*, while on IA32 it is a char* pointer to a code block for the stub.
-typedef void *Emitter_Handle;
-
-// The following function is IA32 only.
-// If reference on the stack is null, throw a null pointer exception.
-Emitter_Handle gen_throw_if_managed_null_ia32(Emitter_Handle emitter, unsigned stack_pointer_offset);
-// The following two null reference conversion procedures are IA32 only.
-// Convert a reference on the stack, if null, from a managed (heap_base) to an unmanaged null (NULL/0).
-Emitter_Handle gen_convert_managed_to_unmanaged_null_ia32(Emitter_Handle emitter, unsigned stack_pointer_offset);
-// Convert a reference on the stack, if null, from an unmanaged (NULL/0) to an managed null (heap_base).
-Emitter_Handle gen_convert_unmanaged_to_managed_null_ia32(Emitter_Handle emitter, unsigned stack_pointer_offset);
-
-// The following two null reference conversion procedures are IPF only.
-// Convert a reference in register "reg", if null, from a managed null (heap_base) to an unmanaged one (NULL/0). Uses SCRATCH_GENERAL_REG.
-void gen_convert_managed_to_unmanaged_null_ipf(Emitter_Handle emitter, unsigned reg);
-// Convert a reference in a register, if null, from an unmanaged null (NULL/0) to an managed one (heap_base).
-void gen_convert_unmanaged_to_managed_null_ipf(Emitter_Handle emitter, unsigned reg);
-
-
+typedef char * Emitter_Handle;
 
 struct Compilation_Handle {
     Global_Env* env;
@@ -93,31 +74,6 @@ NativeCodePtr interpreter_compile_create_lil_jni_stub(Method_Handle method, void
 
 // Create a LIL stub for PINVOKE interfacing
 NativeCodePtr compile_create_lil_pinvoke_stub(Method_Handle method, void* func, NativeStubOverride nso);
-
-
-// The final action taken by a create_call_native_proc_stub() stub after calling "proc_addr". For example, methods are JITed 
-// by having the stub jump to the new method's code (CNP_JmpToRetAddrFinalAction) after jit_a_method finishes compiling it.
-enum CNP_FinalAction {
-    CNP_ReturnFinalAction,        // return after calling the native procedure (e.g. delegate Invoke)
-    CNP_JmpToRetAddrFinalAction  // branch to the procedure whose address is returned by "proc_addr" (e.g. JIT compile method)
-};
-
-
-// If CNP_Final_Action is CNP_ReturnFinalAction, the type returned by the called "proc_addr". 
-// NB: "proc_addr" MUST return any result in eax/edx as a long (int64) value; The CNP_ReturnType determines 
-// what registers to set.from this value.
-enum CNP_ReturnType {
-    CNP_VoidReturnType,
-    CNP_IntReturnType,           // leave the int32/int64 result in eax/edx
-    CNP_FloatReturnType,         // move the float32 value in eax to ST(0), the top of the FP stack
-    CNP_DoubleReturnType,        // move the float64 value in eax/edx to ST(0), the top of the FP stack
-    CNP_NumberOfReturnTypes      // must be last
-};
-
-
-// create_call_native_proc_stub() creates a semi-customized stub that can be used to call a native procedure from managed code.
-void *create_call_native_proc_stub(char *proc_addr, char *stub_name, CNP_FinalAction final_action, CNP_ReturnType return_type);
-
 
 //
 // Support for stub override code sequences 
@@ -155,5 +111,20 @@ NativeCodePtr compile_do_instrumentation(CodeChunkInfo *callee, MethodInstrument
 
 // A MethodInstrumentationProc that records the number of calls from the caller code chunk to the callee.
 void count_method_calls(CodeChunkInfo *callee);
+
+struct DynamicCode
+{
+    const char *name;
+    const void *address;
+    jint length;
+    DynamicCode *next;
+};
+
+// Adding dynamic generated code info to global list
+// Is used in JVMTI and native frames interface
+DynamicCode* compile_get_dynamic_code_list(void);
+// Adding dynamic generated code info to global list
+void compile_add_dynamic_generated_code_chunk(const char* name, const void* address, jint length);
+void compile_clear_dynamic_code_list(DynamicCode* list);
 
 #endif

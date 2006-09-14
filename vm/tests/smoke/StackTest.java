@@ -14,8 +14,9 @@
  *  limitations under the License.
  */
 
-/**
- * @keyword XXX_fails
+/*
+ *  $$$ GMJ
+ *  @keyword XXX_StackOverflowBroken
  */
 public class StackTest {
 

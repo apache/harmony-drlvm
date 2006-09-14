@@ -64,7 +64,7 @@ public final class AccessControlContext {
         }
         if (context.length != 0) {
             // remove dup entries
-            ArrayList a = new ArrayList();
+            ArrayList<ProtectionDomain> a = new ArrayList<ProtectionDomain>();
             for (int i = 0; i < context.length; i++) {
                 if (context[i] != null && !a.contains(context[i])) {
                     a.add(context[i]);

@@ -55,11 +55,19 @@ vm.hythr" />
              <select os="lnx">
                 <defineset define="LINUX" />
             </select>
+            
+            <select os="lnx" arch="em64t,ipf">
+                <defineset define="LINUX64" />
+                <defineset define="LINUXPPC64" />
+			</select>
+            
             <defineset define="BUILDING_VM" />
              <defineset define="APR_DECLARE_STATIC" />
         </compiler>
 
-         <compiler id="cpp.compiler" extends="common.cpp.compiler">
+<!--This will compile asm helpers which works only on ia32-->
+        <select arch="ia32">
+        <compiler id="cpp.compiler" extends="common.cpp.compiler">
             <includepath>
               <pathelement location="${extra.apr.includes}" />
               <pathelement location="${extra.apr.includes}/apr-1" />
@@ -85,6 +93,7 @@ vm.hythr" />
                 <compilerarg value="-fno-exceptions" />
             </select>
         </compiler>
+        </select>
 
         <linker id="linker" extends="common.linker">
 

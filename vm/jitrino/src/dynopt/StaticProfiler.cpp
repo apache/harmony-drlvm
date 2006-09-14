@@ -21,42 +21,30 @@
  */
 
 #include "StaticProfiler.h"
-#include "FlowGraph.h"
+#include "ControlFlowGraph.h"
 #include "Dominator.h"
 #include "Loop.h"
 #include "constantfolder.h"
-
-
-#ifdef OLD_FREQ_ALG
-#include "Profiler.h"
-#endif
-
+#include "mkernel.h"
+#include "Stl.h"
+#include "FlowGraph.h"
 
 /** see article:  "Static Branch Frequency and Program Profile Analysis / Wu, Laurus, IEEE/ACM 1994" */
 
 namespace Jitrino{
 
-DEFINE_OPTPASS_IMPL(StaticProfilerPass, statprof, "Static Profiler")
+DEFINE_SESSION_ACTION(StaticProfilerPass, statprof, "Perform edge annotation pass based on static heuristics");
 
+class StaticProfilerContext;
 
-struct StaticProfilerContext {
-    FlowGraph* fg;
-    CFGNode* node;
-    CFGEdge* edge1; //trueEdge
-    CFGEdge* edge2; //falseEdge
-    DominatorTree* domTree;
-    DominatorTree* postDomTree;
-    LoopTree* loopTree;
-};
 
 #define MAX(a,b) (((a) > (b)) ? (a) : (b))
 #define ABS(a) (((a) > (0)) ? (a) : -(a))
 
 //probabilities of taken branch
+#define PROB_ALL_EXCEPTIONS         0.0000001
 #define PROB_HEURISTIC_FAIL         0.50
-#define PROB_ALL_EXCEPTIONS         0.001
-#define PROB_UNCONDITIONAL          (1 - PROB_ALL_EXCEPTIONS)
-#define PROB_BACKEDGE               0.88
+#define PROB_LOOP_EXIT              0.10
 #define PROB_OPCODE_HEURISTIC       0.84
 #define PROB_CALL_HEURISTIC         0.78
 #define PROB_LOOP_HEADER_HEURISTIC  0.75
@@ -70,9 +58,9 @@ struct StaticProfilerContext {
 #define DEFAULT_ENTRY_NODE_FREQUENCY 10000
 
 /** returns edge1 probability 
-    Explicit parameters used here help to avoid code duplication in impl functions
+Explicit parameters used here help to avoid code duplication in impl functions
 */
-typedef double(*HeuristicFn) (const StaticProfilerContext*);
+typedef double(*HeuristicsFn) (const StaticProfilerContext*);
 
 static double callHeuristic(const StaticProfilerContext*);
 static double returnHeuristic(const StaticProfilerContext*);
@@ -81,43 +69,130 @@ static double opcodeHeuristic(const StaticProfilerContext*);
 static double storeHeuristic(const StaticProfilerContext*);
 static double referenceHeuristic(const StaticProfilerContext*);
 static double devirtGuardHeuristic(const StaticProfilerContext*);
+static void setHeatThreshold(IRManager& irm);
+typedef std::vector<std::string> StringList;
+static void splitString(const char* string, StringList& result, char separator, bool notEmptyTokensOnly);
 
-static HeuristicFn heuristics[] = {
-    loopHeaderHeuristic,
-    callHeuristic, 
-    returnHeuristic, 
-    opcodeHeuristic,
-    storeHeuristic,
-    referenceHeuristic,
-    devirtGuardHeuristic,
-    NULL
+struct Heuristics {
+    std::string name;
+    HeuristicsFn fn;
+    
+    Heuristics(const std::string& _name, HeuristicsFn _fn) : name(_name), fn(_fn){}
+    Heuristics(){name="", fn=NULL;}
 };
 
-static void estimateNode(StaticProfilerContext* c);
-static void countFrequenciesFromProbs(FlowGraph* fg, LoopTree* lt);
+Heuristics HEURISTICS[] =  {
+    Heuristics("loop", loopHeaderHeuristic),
+    Heuristics("call", callHeuristic), 
+    Heuristics("ret", returnHeuristic), 
+    Heuristics("opcode", opcodeHeuristic),
+    Heuristics("store", storeHeuristic),
+    Heuristics("ref", referenceHeuristic),
+    Heuristics("guard", devirtGuardHeuristic),
+    Heuristics("", NULL)
+};
 
-static inline CFGNode* findLoopHeader(LoopTree* lt, CFGNode* node, bool outerLoop = false) {
-    CFGNode* header = NULL;
-    if (!outerLoop && lt->isLoopHeader(node)) {
-        header = node;
-    } else if (lt->hasContainingLoopHeader(node)) {
-        header = lt->getContainingLoopHeader(node);
+static Heuristics* findHeuristicsByName(const std::string& name) {
+    for (int i=0;;i++) {
+        Heuristics* h = &HEURISTICS[i];
+        if (h->name == name) {
+            return h;
+        }
+        if (h->name.empty()) {
+            break;
+        }
     }
-    return header;
+    return NULL;
 }
+
+class StaticProfilerContext {
+public:
+    IRManager& irm;
+    ControlFlowGraph* fg;
+    Node* node;
+    Edge* edge1; //trueEdge
+    Edge* edge2; //falseEdge
+    DominatorTree* domTree;
+    DominatorTree* postDomTree;
+    LoopTree* loopTree;
+    StlVector<Heuristics*> heuristics;
+    bool doLoopHeuristicsOverride;
+    
+    StaticProfilerContext(IRManager& _irm) 
+        : irm(_irm), fg (&_irm.getFlowGraph()), node(NULL), edge1(NULL), edge2(NULL), 
+        domTree(NULL), postDomTree(NULL), loopTree(NULL), 
+        heuristics(_irm.getMemoryManager()), doLoopHeuristicsOverride(true)
+    { 
+        initDefaultHeuristics();
+        
+        OptPass::computeDominatorsAndLoops(irm, false);
+        
+        loopTree = irm.getLoopTree();
+        domTree = irm.getDominatorTree();
+        postDomTree = DominatorBuilder().computePostdominators(irm.getNestedMemoryManager(), fg, true);
+        fillActiveHeuristicsList();
+    }
+
+private:
+    void fillActiveHeuristicsList() {
+        const OptimizerFlags& optFlags = irm.getOptimizerFlags();
+        doLoopHeuristicsOverride = optFlags.statprof_do_loop_heuristics_override;
+        const char* heuristicsNamesList = optFlags.statprof_heuristics;
+        if (heuristicsNamesList == NULL) {
+            heuristics.resize(defaultHeuristics.size());
+            std::copy(defaultHeuristics.begin(), defaultHeuristics.end(), heuristics.begin());
+        } else {
+            getHeuristicsByNamesList(heuristicsNamesList, heuristics);
+        }
+
+    }
+  
+    static void initDefaultHeuristics() {
+        static Mutex initMutex;
+        static bool defaultHeuristicsInited = false;
+        if (!defaultHeuristicsInited) {
+            initMutex.lock();
+            if (!defaultHeuristicsInited) {
+                getHeuristicsByNamesList("loop,ret,guard", defaultHeuristics);
+            }
+            initMutex.unlock();
+        }
+    }
+    
+    template <class Container> 
+    static void getHeuristicsByNamesList(const char* list, Container result) {
+        StringList nameList;
+        splitString(list, nameList, ',', true);
+        for (StringList::const_iterator it = nameList.begin(), end = nameList.end(); it!=end; ++it) {
+            const std::string& name = *it;
+            Heuristics* h = findHeuristicsByName(name);
+            assert(h!=NULL);
+            result.push_back(h);
+        }
+    }
+
+private:
+    static std::vector<Heuristics*> defaultHeuristics;
+    
+};
+
+std::vector<Heuristics*> StaticProfilerContext::defaultHeuristics;
+
+
+static void estimateNode(StaticProfilerContext* c);
 
 /** looks for unconditional path to inner loop header.
  */
-static bool hasUncondPathToInnerLoopHeader(CFGNode* parentLoopHeader, LoopTree* loopTree,  CFGEdge* edge) {
-    CFGNode* node = edge->getTargetNode();
-    if (!node->isBasicBlock() || node == parentLoopHeader) {
+static bool hasUncondPathToInnerLoopHeader(Node* parentLoopHeader, LoopTree* loopTree,  Edge* edge) {
+    Node* node = edge->getTargetNode();
+    if (!node->isBlockNode() || node == parentLoopHeader) {
         return false;
     }
 
     if (loopTree->isLoopHeader(node)) {
         return true;
     }
-    CFGEdge* uncondEdge = (CFGEdge*)node->getUnconditionalEdge();
+    Edge* uncondEdge = node->getUnconditionalEdge();
     if (uncondEdge==NULL) {
         return false;
     }
@@ -129,17 +204,17 @@ static bool hasUncondPathToInnerLoopHeader(CFGNode* parentLoopHeader, LoopTree* 
  *  2) if lookForDirectPath == TRUE returns isBackedge(edge->targetNode->targetUncondOutEdge ) 
  *    if targetUncondOutEdge is the only unconditional edge of targetNode
  */
-static inline bool isBackedge(LoopTree* loopTree, CFGEdge* e, bool lookForDirectPath) {
-    CFGNode* loopHeader = findLoopHeader(loopTree, e->getSourceNode());
+static inline bool isBackedge(LoopTree* loopTree, Edge* e, bool lookForDirectPath) {
+    Node* loopHeader = loopTree->getLoopHeader(e->getSourceNode(), false);
     if (loopHeader == NULL) {
         return false;
     }
-    CFGNode* targetNode = e->getTargetNode();
+    Node* targetNode = e->getTargetNode();
     if (targetNode == loopHeader) {
         return true;
     }
     if (lookForDirectPath) {
-        CFGEdge* targetUncondOutEdge = (CFGEdge*)targetNode->getUnconditionalEdge();
+        Edge* targetUncondOutEdge = targetNode->getUnconditionalEdge();
         if (targetUncondOutEdge !=NULL) {
             return isBackedge(loopTree, targetUncondOutEdge, lookForDirectPath);
         }
@@ -147,58 +222,105 @@ static inline bool isBackedge(LoopTree* loopTree, CFGEdge* e, bool lookForDirect
     return false;
 }
 
-static bool isLoopExit(LoopTree* loopTree, CFGEdge* e) {
-    CFGNode* loopHeader = findLoopHeader(loopTree, e->getSourceNode());
-    return loopHeader!= NULL && !loopTree->loopContains(loopHeader ,e->getTargetNode());
-}
-
 static bool isLoopHeuristicAcceptable(StaticProfilerContext* c) {
-    bool edge1IsLoopExit = isLoopExit(c->loopTree, c->edge1);
-    bool edge2IsLoopExit = isLoopExit(c->loopTree, c->edge2);
+    bool edge1IsLoopExit = c->loopTree->isLoopExit(c->edge1);
+    bool edge2IsLoopExit = c->loopTree->isLoopExit(c->edge2);
     assert (!(edge1IsLoopExit && edge2IsLoopExit)); //both edges could not be loop exits at the same time
     return edge1IsLoopExit || edge2IsLoopExit;
 }
 
-void StaticProfilerPass::_run(IRManager& irm) {
-    computeDominatorsAndLoops(irm);
-    
-    StaticProfilerContext c;
-    c.fg = &irm.getFlowGraph();
-    c.loopTree = irm.getLoopTree();
-    c.domTree = irm.getDominatorTree();
-    c.postDomTree = DominatorBuilder().computePostdominators(irm.getNestedMemoryManager(), c.fg);
-    
-    const CFGNodeDeque& nodes = c.fg->getNodes();
-    for (CFGNodeDeque::const_iterator it = nodes.begin(), end = nodes.end(); it!=end; ++it) {
-        CFGNode* node = *it;
-        c.node = node;
-        c.edge1 = NULL;
-        c.edge2 = NULL;
-        estimateNode(&c);
+void StaticProfiler::estimateGraph( IRManager& irm, double entryFreq, bool cleanOldEstimations) {
+    assert(entryFreq >= 0);
+    if (entryFreq == 0) {
+        entryFreq = DEFAULT_ENTRY_NODE_FREQUENCY;
     }
-    countFrequenciesFromProbs(c.fg, c.loopTree);
-    c.fg->setEdgeProfile(true);
+    if (irm.getFlowGraph().hasEdgeProfile() && !cleanOldEstimations) {
+        fixEdgeProbs(irm);
+    } else {
+        StaticProfilerContext c(irm);
+        const Nodes& nodes = c.fg->getNodes();
+        for (Nodes::const_iterator it = nodes.begin(), end = nodes.end(); it!=end; ++it) {
+            Node* node = *it;
+            c.node = node;
+            c.edge1 = NULL;
+            c.edge2 = NULL;
+            estimateNode(&c);
+        }
+        c.fg->getEntryNode()->setExecCount(entryFreq);
+        c.fg->setEdgeProfile(true);
+    }
+    irm.getFlowGraph().smoothEdgeProfile();
+
+    if (irm.getHeatThreshold()<=0) {
+        setHeatThreshold(irm);
+    }
 }
 
-void estimateNode(StaticProfilerContext* c) {
-    const CFGEdgeDeque& edges =  c->node->getOutEdges();
+static void setHeatThreshold(IRManager& irm) {
+    const OptimizerFlags& optimizerFlags = irm.getOptimizerFlags();
+    ControlFlowGraph& flowGraph = irm.getFlowGraph();
+    double profile_threshold = optimizerFlags.profile_threshold;
+    if(optimizerFlags.use_average_threshold) {
+        // Keep a running average of method counts.
+        static uint32 count = 0;
+        static double total = 0.0;
+        count++;
+        double methodFreq = flowGraph.getEntryNode()->getExecCount();
+        assert(methodFreq > 0);
+        total += methodFreq;
+        irm.setHeatThreshold(total / count);
+    } else if(optimizerFlags.use_minimum_threshold) {
+        double methodFreq = flowGraph.getEntryNode()->getExecCount();
+        if(methodFreq < profile_threshold) {
+            methodFreq = profile_threshold;
+        }
+        irm.setHeatThreshold(methodFreq);
+    } else if(optimizerFlags.use_fixed_threshold) {
+        irm.setHeatThreshold(profile_threshold);
+    } else {
+        // Use the method entry
+        irm.setHeatThreshold(flowGraph.getEntryNode()->getExecCount());
+    }
+    if (Log::isEnabled())  {
+        Log::out() << "Heat threshold = " << irm.getHeatThreshold() << std::endl; 
+    }
+}
+
+
+void StaticProfilerPass::_run(IRManager& irm) {
+    OptPass::computeDominatorsAndLoops(irm, false);
+    StaticProfiler::estimateGraph(irm, DEFAULT_ENTRY_NODE_FREQUENCY);
+}
+
+static void estimateNode(StaticProfilerContext* c) {
+    const Edges& edges =  c->node->getOutEdges();
     if (edges.empty()) {
         return;
     } else if (edges.size() == 1) {
         (*edges.begin())->setEdgeProb(1.0);
         return;
+    } else {
+        for (Edges::const_iterator it = edges.begin(), itEnd = edges.end(); it!=itEnd; it++) {
+            Edge* e = *it;
+            e->setEdgeProb(0.0);
+        }
     }
-    CFGEdge* falseEdge = (CFGEdge*)c->node->getFalseEdge();
-    CFGEdge* trueEdge = (CFGEdge*)c->node->getTrueEdge();
+    Edge* falseEdge = c->node->getFalseEdge();
+    Edge* trueEdge = c->node->getTrueEdge();
     double probLeft = 1.0;
     uint32 edgesLeft = edges.size();
     if (falseEdge == NULL || trueEdge == NULL) { // can't apply general heuristics.
-        CFGEdge* uncondEdge = (CFGEdge*)c->node->getUnconditionalEdge();
+        Edge* uncondEdge = c->node->getUnconditionalEdge();
         if (uncondEdge) {
-            uncondEdge->setEdgeProb(PROB_UNCONDITIONAL);
-            probLeft-=PROB_UNCONDITIONAL;
+            uncondEdge->setEdgeProb(1 - PROB_ALL_EXCEPTIONS);
+            probLeft-=uncondEdge->getEdgeProb();
             edgesLeft--;
         }
+    } else if (((Inst*)c->node->getLastInst())->isSwitch()) {
+        assert(c->node->getExceptionEdge() == 0);
+        falseEdge->setEdgeProb(0.5);
+        probLeft = 0.5;
+        edgesLeft--;
     } else {
         assert(falseEdge->getTargetNode()!=trueEdge->getTargetNode());
 
@@ -207,18 +329,19 @@ void estimateNode(StaticProfilerContext* c) {
         // separate back-edge heuristic from others heuristics (the way it's done in article)
         c->edge1 = trueEdge;
         c->edge2 = falseEdge;
-        if (isLoopHeuristicAcceptable(c)) {
-            prob = isLoopExit(c->loopTree, trueEdge) ? 1 - PROB_BACKEDGE : PROB_BACKEDGE;
+        if (c->doLoopHeuristicsOverride && isLoopHeuristicAcceptable(c)) {
+            prob = c->loopTree->isLoopExit(trueEdge) ? PROB_LOOP_EXIT : 1 - PROB_LOOP_EXIT;
         } else {
             // from this point we can apply general heuristics
-            for (HeuristicFn* fn = heuristics; *fn!=NULL; fn++) {
+            for (StlVector<Heuristics*>::const_iterator it = c->heuristics.begin(), end = c->heuristics.end(); it!=end; ++it) {
+                Heuristics* h = *it;
+                HeuristicsFn fn = h->fn;
                 double dprob = (*fn)(c);
                 if (dprob!=PROB_HEURISTIC_FAIL) {
                     prob = prob * dprob / (prob*dprob + (1-prob)*(1-dprob));
                 }
             }
         }
-
         // all other edges (exception, catch..) have lower probability
         double othersProb = edges.size() == 2 ? 0.0 : PROB_ALL_EXCEPTIONS;
         trueEdge->setEdgeProb(MAX(PROB_ALL_EXCEPTIONS, prob - othersProb/2));
@@ -229,8 +352,8 @@ void estimateNode(StaticProfilerContext* c) {
     
     if (edgesLeft != 0) {
         double probPerEdge = probLeft / edgesLeft;
-        for (CFGEdgeDeque::const_iterator it = edges.begin(), itEnd = edges.end(); it!=itEnd; it++) {
-            CFGEdge* e = *it;
+        for (Edges::const_iterator it = edges.begin(), itEnd = edges.end(); it!=itEnd; it++) {
+            Edge* e = *it;
             if (e->getEdgeProb()==0.0) {
                 e->setEdgeProb(probPerEdge);
             }
@@ -239,8 +362,8 @@ void estimateNode(StaticProfilerContext* c) {
     
 #ifdef _DEBUG //debug check
     double probe = 0;
-    for (CFGEdgeDeque::const_iterator it = edges.begin(), itEnd = edges.end(); it!=itEnd; it++) {
-        CFGEdge* e = *it;
+    for (Edges::const_iterator it = edges.begin(), itEnd = edges.end(); it!=itEnd; it++) {
+        Edge* e = *it;
         double dprob = e->getEdgeProb();
         assert (dprob!=0.0);
         probe+=dprob;
@@ -253,25 +376,22 @@ void estimateNode(StaticProfilerContext* c) {
 /** looks for Inst with opcode in specified range (both bounds are included) 
   * in specified node and it's unconditional successors.
   */
-static inline Inst* findInst(CFGNode* node, Opcode opcodeFrom, Opcode opcodeTo) {
-    for (Inst *i = node->getFirstInst(), *last = node->getLastInst(); ; i = i->next()) {
+static inline Inst* findInst(Node* node, Opcode opcodeFrom, Opcode opcodeTo) {
+    for (Inst *i = (Inst*)node->getFirstInst(); i!=NULL ; i = i->getNextInst()) {
         Opcode opcode = i->getOpcode();
         if (opcode>=opcodeFrom && opcode<=opcodeTo) {
             return i;
         }
-        if (i == last) {
-            break;
-        }
     }
     
-    CFGEdge* uncondEdge = (CFGEdge*)node->getUnconditionalEdge(); 
+    Edge* uncondEdge = node->getUnconditionalEdge(); 
     if (uncondEdge!=NULL && uncondEdge->getTargetNode()->getInEdges().size() == 1) {
         return findInst(uncondEdge->getTargetNode(), opcodeFrom, opcodeTo);
     }
     return NULL;
 }
 
-static inline Inst* findInst(CFGNode* node, Opcode opcode) {
+static inline Inst* findInst(Node* node, Opcode opcode) {
     return findInst(node, opcode, opcode);
 }
 
@@ -281,8 +401,8 @@ static inline Inst* findInst(CFGNode* node, Opcode opcode) {
  *  a call and does not post-dominate will not be taken.
  */
 static double callHeuristic(const StaticProfilerContext* c) {
-    CFGNode* node1 = c->edge1->getTargetNode();
-    CFGNode* node2 = c->edge2->getTargetNode();
+    Node* node1 = c->edge1->getTargetNode();
+    Node* node2 = c->edge2->getTargetNode();
     bool node1HasCall = findInst(node1, Op_DirectCall, Op_IntrinsicCall)!=NULL;
     bool node2HasCall = findInst(node2, Op_DirectCall, Op_IntrinsicCall)!=NULL;
     
@@ -332,7 +452,7 @@ static double returnHeuristic(const StaticProfilerContext* c) {
  *   and does not post-dominate will be taken
  */
 static double loopHeaderHeuristic(const StaticProfilerContext* c) {
-    CFGNode* parentLoopHeader = findLoopHeader(c->loopTree, c->node, true);
+    Node* parentLoopHeader = c->loopTree->getLoopHeader(c->node, true);
     
     bool edge1Accepted = hasUncondPathToInnerLoopHeader(parentLoopHeader, c->loopTree, c->edge1) 
         && !c->postDomTree->dominates(c->edge1->getTargetNode(), c->node);
@@ -352,7 +472,7 @@ static double loopHeaderHeuristic(const StaticProfilerContext* c) {
  *  less than or equal to zero or equal to a constant, will fail.
  */
 static double opcodeHeuristic(const StaticProfilerContext* c) {
-    Inst* inst = c->node->getLastInst();
+    Inst* inst = (Inst*)c->node->getLastInst();
     if (!(inst->getOpcode() == Op_Branch && inst->getSrc(0)->getType()->isInteger())) {
         return PROB_HEURISTIC_FAIL;
     }
@@ -432,8 +552,8 @@ static double opcodeHeuristic(const StaticProfilerContext* c) {
 *  and does not post dominate will not be taken
 */
 static double storeHeuristic(const StaticProfilerContext* c) {
-    CFGNode* node1 = c->edge1->getTargetNode();
-    CFGNode* node2 = c->edge2->getTargetNode();
+    Node* node1 = c->edge1->getTargetNode();
+    Node* node2 = c->edge2->getTargetNode();
     bool node1Accepted = findInst(node1, Op_TauStInd)!=NULL;
     bool node2Accepted = findInst(node2, Op_TauStInd)!=NULL;
     if (!node1Accepted && !node2Accepted) {
@@ -454,7 +574,7 @@ static double storeHeuristic(const StaticProfilerContext* c) {
  *  against null or two references will fail
  */
 static double referenceHeuristic(const StaticProfilerContext *c) {
-    Inst* inst = c->node->getLastInst();
+    Inst* inst = (Inst*)c->node->getLastInst();
     if (inst->getOpcode() != Op_Branch || !inst->getSrc(0)->getType()->isObject()) {
         return PROB_HEURISTIC_FAIL;
     }
@@ -475,7 +595,7 @@ static double referenceHeuristic(const StaticProfilerContext *c) {
   * Predict that comparison of VTablePtr will succeed
   */
 static double devirtGuardHeuristic(const StaticProfilerContext *c) {
-    Inst* inst = c->node->getLastInst();
+    Inst* inst = (Inst*)c->node->getLastInst();
     if (inst->getOpcode() != Op_Branch || !inst->getSrc(0)->getType()->isVTablePtr()) {
         return PROB_HEURISTIC_FAIL;
     }
@@ -485,179 +605,90 @@ static double devirtGuardHeuristic(const StaticProfilerContext *c) {
 }
 
 
+void StaticProfiler::fixEdgeProbs(IRManager& irm) {
+    assert(irm.getFlowGraph().hasEdgeProfile());
 
-/************************************************************************/
-/************************************************************************/
-/*  FREQUENCY CALCULATION                                               */
-/************************************************************************/
-/************************************************************************/
+    double minProb = PROB_ALL_EXCEPTIONS;
 
-class CountFreqsContext {
-public:
-    FlowGraph* fg;
-    MemoryManager& mm;
-    LoopTree* loopTree;
-    bool useCyclicFreqs;
-    double* cyclicFreqs;
-    bool* visitInfo;
-    StlVector<CFGEdge*> exitEdges;
 
-    CountFreqsContext(MemoryManager& _mm, FlowGraph* _fg, LoopTree* _lt)  :
-        fg(_fg), mm(_mm), loopTree(_lt), useCyclicFreqs(false), exitEdges(mm)
-    {
-        uint32 n = fg->getMaxNodeId();
-        cyclicFreqs = new (mm) double[n];
-        visitInfo = new (mm) bool[n];
-        for (uint32 i=0; i< n; i++) {
-            cyclicFreqs[i]=1;
+    //fix edge-probs, try to reuse old probs as much as possible..    
+    const Nodes& nodes = irm.getFlowGraph().getNodes();
+    StaticProfilerContext* c = NULL;
+    for (Nodes::const_iterator it = nodes.begin(), end = nodes.end(); it!=end; ++it) {
+        Node* node = *it;
+        double sumProb = 0;
+        uint32 nNotEstimated = 0;
+        const Edges& outEdges = node->getOutEdges();
+        for(Edges::const_iterator eit = outEdges.begin(), eend = outEdges.end(); eit!=eend; ++eit) {
+            Edge* e = *eit;
+            double prob = e->getEdgeProb();
+            sumProb+=prob;
+            if (prob <= 0)  {
+                nNotEstimated++;
+            } 
         }
-    }
-
-    inline void resetVisitInfo() {
-        memset(visitInfo, false, fg->getMaxNodeId());
-    }
-};
-
-static void checkFrequencies(FlowGraph* fg);
-static void countLinearFrequency(const CountFreqsContext* c, CFGNode* node);
-static void estimateCyclicFrequencies(CountFreqsContext* c, LoopNode* loopHead);
-static void findLoopExits(CountFreqsContext* c, LoopNode* loopHead);
-
-void countFrequenciesFromProbs(FlowGraph* fg, LoopTree* lt) {
-    MemoryManager& mm = fg->getIRManager()->getMemoryManager();
-#ifdef OLD_FREQ_ALG
-    fg->getEntry()->setFreq(DEFAULT_ENTRY_NODE_FREQUENCY);
-    EdgeProfile p(mm, fg->getIRManager()->getMethodDesc(), true);
-    p.smoothProfile(*fg);
-#else
-    CountFreqsContext c(mm, fg, lt);
-    c.resetVisitInfo();
-    countLinearFrequency(&c, fg->getEntry());
-    LoopNode* topLevelLoop = (LoopNode*)lt->getRoot();
-    if (topLevelLoop != NULL && topLevelLoop->getChild()!=NULL) { //if there are loops in method
-        c.useCyclicFreqs = true;
-        for (LoopNode* loopHead = topLevelLoop->getChild(); loopHead!=NULL; loopHead = loopHead->getSiblings()) {
-            estimateCyclicFrequencies(&c, loopHead);
-        }
-        c.resetVisitInfo();
-        countLinearFrequency(&c, fg->getEntry());
-    }
-#endif   
-    checkFrequencies(fg);
-}
-
-static void checkFrequencies(FlowGraph* fg) {
+        if (nNotEstimated==0 && ABS(1 - sumProb) <= ACCEPTABLE_DOUBLE_PRECISION_LOSS) {
+            continue; //ok, nothing to fix
+        }   
+        if (nNotEstimated == outEdges.size()) { //apply all active heuristics
+            if (c == NULL) {
+                c = new (irm.getMemoryManager()) StaticProfilerContext(irm);
+            }
+            c->node = node;
+            c->edge1 = NULL;
+            c->edge2 = NULL;
+            estimateNode(c);
+        } else { //assign min.possible prob for all not-estimated edges and scale probs to have sum == 1.
+           double scale = 1;
+            if (nNotEstimated == 0) { //do scaling only.
+                scale = 1 / sumProb;        
+            } else { //assign a min possible probs for all not estimated edges, calculate scale
+                sumProb = 0;
+                for(Edges::const_iterator eit = outEdges.begin(), eend = outEdges.end(); eit!=eend; ++eit) {
+                    Edge* e = *eit;
+                    double prob = e->getEdgeProb();
+                    if (prob <= 0) {
+                        prob = minProb;
+                        e->setEdgeProb(prob);
+                    }
+                    sumProb+=prob;
+                }
+                scale = 1 / sumProb;
+            }
+            sumProb = 0;
+            for(Edges::const_iterator eit = outEdges.begin(), eend = outEdges.end(); eit!=eend; ++eit) {
+                Edge* e = *eit;
+                double prob = e->getEdgeProb();
+                prob = prob * scale;
+                assert(prob > 0);
+                e->setEdgeProb(prob);
 #ifdef _DEBUG
-    const CFGNodeDeque& nodes = fg->getNodes();
-    for (CFGNodeDeque::const_iterator it = nodes.begin(), itEnd = nodes.end(); it!=itEnd; it++) {
-        CFGNode* node = *it;
-        assert(node->getFreq() > 0);
-        const CFGEdgeDeque& inEdges = node->getInEdges();
-        if (inEdges.empty()) {
-            assert(node == fg->getEntry());
-            continue;
-        }
-        double freq = 0.0;
-        for(CFGEdgeDeque::const_iterator it = inEdges.begin(), itEnd = inEdges.end(); it!=itEnd; it++) {
-            CFGEdge* edge = *it;
-            CFGNode* fromNode = edge->getSourceNode();
-            double fromFreq = fromNode->getFreq();
-            assert(fromFreq > 0);
-            freq += fromFreq * edge->getEdgeProb();
-        }
-        assert(ABS(node->getFreq()- freq)/freq  < ACCEPTABLE_DOUBLE_PRECISION_LOSS);
-    }
-    CFGNode* exitNode = fg->getExit();
-    double exitFreq = exitNode->getFreq();
-    assert(ABS(exitFreq - DEFAULT_ENTRY_NODE_FREQUENCY) < ACCEPTABLE_DOUBLE_PRECISION_LOSS * DEFAULT_ENTRY_NODE_FREQUENCY);
-#endif
-}
-
-
-static void countLinearFrequency(const CountFreqsContext* c, CFGNode* node) {
-    const CFGEdgeDeque& inEdges = node->getInEdges();
-    if (inEdges.empty()) { //node is entry
-        node->setFreq(DEFAULT_ENTRY_NODE_FREQUENCY);
-    } else {
-        double freq = 0.0;
-        LoopNode* loopHead = c->loopTree->isLoopHeader(node) ? c->loopTree->getLoopNode(node): NULL;
-        for(CFGEdgeDeque::const_iterator it = inEdges.begin(), itEnd = inEdges.end(); it!=itEnd; it++) {
-            CFGEdge* edge = *it;
-            CFGNode* fromNode = edge->getSourceNode();
-            if (loopHead!=NULL && loopHead->inLoop(fromNode)) { //backedge
-                continue; //only linear freq estimation
+                sumProb+=prob;
+#endif          
             }
-            if (c->visitInfo[fromNode->getId()] == false) {
-                return;
+            assert(ABS(1-sumProb) < ACCEPTABLE_DOUBLE_PRECISION_LOSS);
+        }
+    }
+    setHeatThreshold(irm);
+}
+
+static void splitString(const char* string, StringList& result, char separator, bool notEmptyTokensOnly) {
+    std::string token;
+    for (const char* suffix = string; *suffix!=0; ++suffix) {
+        char c = *suffix;
+        if (c == separator) {
+            if (token.empty() && notEmptyTokensOnly) {
+                continue;
             }
-            double fromFreq = fromNode->getFreq();
-            freq += fromFreq * edge->getEdgeProb();
-        }
-        if (c->useCyclicFreqs && c->loopTree->isLoopHeader(node)) {
-            freq *= c->cyclicFreqs[node->getId()];
-        }
-        node->setFreq(freq);
-    }
-    c->visitInfo[node->getId()] = true;
-    CFGNode* outerLoopHead = findLoopHeader(c->loopTree, node, true);
-    const CFGEdgeDeque& outEdges = node->getOutEdges();
-    for(CFGEdgeDeque::const_iterator it = outEdges.begin(), itEnd = outEdges.end(); it!=itEnd; it++) {
-        CFGEdge* edge = *it;
-        CFGNode* toNode = edge->getTargetNode();
-        if (toNode == node || toNode == outerLoopHead) { //backedge
-            continue;//do only linear freq estimation
-        }
-        if (c->visitInfo[toNode->getId()] == false ) {
-            countLinearFrequency(c, toNode);
+            result.push_back(token);
+            token.clear();
+        } else {
+            token.push_back(c);
         }
     }
-}    
-
-static void estimateCyclicFrequencies(CountFreqsContext* c, LoopNode* loopHead) {
-    //process all child loops first
-    bool hasChildLoop = loopHead->getChild()!=NULL;
-    if (hasChildLoop) {
-        for (LoopNode* childHead = loopHead->getChild(); childHead!=NULL; childHead = childHead->getSiblings()) {
-            estimateCyclicFrequencies(c, childHead);
-        }
-    }
-    findLoopExits(c, loopHead);
-    if (hasChildLoop) {
-        c->resetVisitInfo();
-        countLinearFrequency(c, c->fg->getEntry());
-    }
-    CFGNode* cfgLoopHead = loopHead->getHeader();
-    double inFlow = cfgLoopHead->getFreq(); //node has linear freq here
-    double exitsFlow = 0;
-    //sum all exits flow
-    for (StlVector<CFGEdge*>::const_iterator it = c->exitEdges.begin(), end = c->exitEdges.end(); it!=end; ++it) {
-        CFGEdge* edge = *it;
-        CFGNode* fromNode = edge->getSourceNode();
-        exitsFlow += edge->getEdgeProb() * fromNode->getFreq();
-    }
-    // if loop will make multiple iteration exitsFlow becomes equals to inFlow
-    double loopCycles = inFlow / exitsFlow;
-    assert(loopCycles > 1);
-    c->cyclicFreqs[cfgLoopHead->getId()] = loopCycles;
-}
-
-static void findLoopExits(CountFreqsContext* c, LoopNode* loopHead) {
-    c->exitEdges.clear();
-    const CFGNodeDeque& nodes = c->fg->getNodes();
-    for (CFGNodeDeque::const_iterator it = nodes.begin(), end = nodes.end(); it!=end; ++it) {
-        CFGNode* node = *it;
-        if (!loopHead->inLoop(node)) {
-            continue;
-        }
-        const CFGEdgeDeque& outEdges = node->getOutEdges();
-        for(CFGEdgeDeque::const_iterator eit = outEdges.begin(), eend = outEdges.end(); eit!=eend; ++eit) {
-            CFGEdge* edge = *eit;
-            CFGNode* targetNode = edge->getTargetNode();
-            if (!loopHead->inLoop(targetNode)) {
-                c->exitEdges.push_back(edge);
-            }
-        }
+    if (!token.empty()) { //last value
+        result.push_back(token);
     }
 }
 
-}
+} //namespace

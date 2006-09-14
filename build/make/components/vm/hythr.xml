@@ -60,14 +60,22 @@ vm.port,extra.log4cxx, extra.aprutil" />
             <select os="lnx">
                 <defineset define="LINUX" />
             </select>
-
-             <defineset define="APR_DECLARE_STATIC" />
+			<select os="lnx" arch="em64t,ipf">
+                <defineset define="LINUX64" />
+                <defineset define="LINUXPPC64" />
+			</select>
+            <!--
+            <select os="lnx">
+                <compilerarg value="-Wno-deprecated" />
+                <compilerarg value="-fno-exceptions" />
+            </select>
+            -->
+            <defineset define="APR_DECLARE_STATIC" />
         </compiler>
 
-
         <linker id="linker" extends="common.linker">
-           <libset libs="${vm.port.lib}"
-                   dir="${vm.port.libdir}" />
+            <libset libs="${vm.port.lib}"
+                    dir="${vm.port.libdir}" />
 
             <libset libs="${extra.log4cxx.lib}"
                     dir="${extra.log4cxx.libdir}" />
@@ -77,7 +85,7 @@ vm.port,extra.log4cxx, extra.aprutil" />
 
             <libset libs="${extra.apr.lib}"
                     dir="${extra.apr.libdir}" />
-
+                    
             <select os="win">
                 <linkerarg value="/DEF:${src}/thread/src/hythr.def" />
             </select>

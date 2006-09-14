@@ -20,7 +20,6 @@
  */
 
 #include "Log.h"
-#include "PropertyTable.h"
 #include "open/types.h"
 
 #include "walkers.h"

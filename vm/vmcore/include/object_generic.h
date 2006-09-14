@@ -41,8 +41,10 @@ java_lang_Object_registerNatives(ManagedObject*);
 long
 generic_hashcode(ManagedObject*);
 
+/* $$$ GMJ - collides w/ a defn elsewhere
 int32
 default_hashcode(ManagedObject*);
+*/
 
 #ifdef __cplusplus
 }

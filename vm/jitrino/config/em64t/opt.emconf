@@ -1,0 +1,28 @@
+# EM configuration file for CS_OPT-only mode of Jitrino. This is 'client static' mode
+
+chains=chain1
+chain1.jits=CS_OPT
+CS_OPT.file=jitrino
+
+
+# Options to be passed to JIT
+
+-Djit.CS_OPT.path=opt_init,translator,optimizer,hir2lir,codegen
+
+-Djit.CS_OPT.path.optimizer=ssa,devirt,inline,purge,simplify,uce,dce,memopt,simplify,uce,dce,lower,dessa,statprof,markglobals
+-Djit.CS_OPT.path.codegen=lock_method,bbp,gcpoints,cafl,dce1,i8l-,early_prop-,itrace-,native,constraints,dce2,regalloc,spillgen,layout,copy,rce-,stack,break-,iprof-,emitter!,si_insts,gcmap,info,unlock_method
+-Djit.CS_OPT.path.dce1=cg_dce
+-Djit.CS_OPT.path.dce2=cg_dce
+-Djit.CS_OPT.path.regalloc=bp_regalloc1,bp_regalloc2
+-Djit.CS_OPT.path.bp_regalloc1=bp_regalloc
+-Djit.CS_OPT.path.bp_regalloc2=bp_regalloc
+
+#inliner configuration
+-Djit.CS_OPT.CS_OPT_inliner_pipeline.filter=-
+-Djit.CS_OPT.CS_OPT_inliner_pipeline.path=ssa,devirt
+-Djit.CS_OPT.arg.optimizer.inline.pipeline=CS_OPT_inliner_pipeline
+
+
+-Djit.CS_OPT.arg.codegen.dce1.early=yes
+-Djit.CS_OPT.arg.codegen.regalloc.bp_regalloc1.regs=ALL_GP
+-Djit.CS_OPT.arg.codegen.regalloc.bp_regalloc2.regs=ALL_XMM

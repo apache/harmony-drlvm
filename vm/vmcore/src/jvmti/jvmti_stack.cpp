@@ -54,7 +54,7 @@ jint get_thread_stack_depth(VM_thread *thread, jint* pskip)
 
     while (!si_is_past_end(si))
     {
-        method = get_method(si);
+        method = si_get_method(si);
 
         if (method)
             depth += 1 + si_get_inline_depth(si);
@@ -69,10 +69,10 @@ jint get_thread_stack_depth(VM_thread *thread, jint* pskip)
         Class *clss = method_get_class(method);
         assert(clss);
 
-        if (strcmp(method_get_name(method), "runImpl") == 0 &&
+        if (strcmp(method_get_name(method), "run") == 0 &&
             strcmp(class_get_name(clss), "java/lang/VMStart$MainThread") == 0)
         {
-            skip = 4;
+            skip = 3;
         }
     }
 
@@ -186,14 +186,14 @@ jvmtiGetStackTrace(jvmtiEnv* env,
         StackIterator *si = si_create_from_native(vm_thread);
         jint count = 0;
         jint stack_depth = 0;
-        jint max_depth = depth - skip;
+        jint max_depth = depth;
         while (!si_is_past_end(si) && count < max_frame_count &&
                count < max_depth)
         {
             jint inlined_depth = si_get_inline_depth(si);
             if (stack_depth + inlined_depth >= start)
             {
-                Method *method = get_method(si);
+                Method *method = si_get_method(si);
                 if (NULL != method)
                 {
                     CodeChunkInfo *cci = si_get_code_chunk_info(si);
@@ -249,9 +249,10 @@ jvmtiGetStackTrace(jvmtiEnv* env,
                             reinterpret_cast<jmethodID>(method);
                         count++;
                     }
+
+                    stack_depth++;
                 }
             }
-            stack_depth++;
             si_goto_previous(si);
         }
 
@@ -693,7 +694,7 @@ jvmtiGetFrameLocation(jvmtiEnv* env,
             jint inlined_depth = si_get_inline_depth(si);
             if (stack_depth + inlined_depth >= depth)
             {
-                Method *method = get_method(si);
+                Method *method = si_get_method(si);
                 if (NULL != method)
                 {
                     CodeChunkInfo *cci = si_get_code_chunk_info(si);
@@ -744,10 +745,11 @@ jvmtiGetFrameLocation(jvmtiEnv* env,
                         frame_found = true;
                         break;
                     }
+
+                    stack_depth++;
                 }
             }
 
-            stack_depth++;
             si_goto_previous(si);
         }
 
@@ -836,7 +838,7 @@ jvmtiNotifyFramePop(jvmtiEnv* env,
         jint current_depth = 0;
         while (!si_is_past_end(si) && current_depth < depth)
         {
-            if (get_method(si))
+            if (si_get_method(si))
                 current_depth += 1 + si_get_inline_depth(si);
 
             si_goto_previous(si);
@@ -853,7 +855,7 @@ jvmtiNotifyFramePop(jvmtiEnv* env,
 
         while (!si_is_past_end(si))
         {
-            if (get_method(si))
+            if (si_get_method(si))
                 current_depth += 1 + si_get_inline_depth(si);
 
             si_goto_previous(si);

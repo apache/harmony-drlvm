@@ -17,11 +17,11 @@
  * @author Alexander V. Astapchuk
  * @version $Revision: 1.3.12.4.4.4 $
  */
-/**
- * @file
- * @brief Implementation of arithmetic helpers.
- */
-
+ /**
+  * @file
+  * @brief Implementation of arithmetic helpers declared in arith_rt.h.
+  */
+ 
 #include "arith_rt.h"
 
 #include <stdlib.h>
@@ -33,6 +33,12 @@
     #define isnan   _isnan
     #define finite  _finite
 #endif
+#include "trace.h"
+
+
+#undef isnan
+#define isnan(x)    ((x) != (x))
+
 
 namespace Jitrino {
 namespace Jet {
@@ -57,32 +63,32 @@ int __stdcall rt_h_neg_i32(int v)
     return -v;
 }
 
-int __stdcall rt_h_lcmp(jlong v2, jlong v1)
+int __stdcall rt_h_lcmp(jlong v1, jlong v2)
 {
-    if (v1 > v2 )   return 1;
-    if (v1 < v2 )   return -1;
+    if (v1 > v2)   return 1;
+    if (v1 < v2)   return -1;
     return 0;
 }
 
-int __stdcall rt_h_fcmp_g(float v2, float v1)
+int __stdcall rt_h_fcmp_g(float v1, float v2)
 {
     if (isnan(v1) || isnan(v2)) {
         return 1;
     }
-    if (v1 > v2 )   return 1;
-    if (v1 < v2 )   return -1;
+    if (v1 > v2)   return 1;
+    if (v1 < v2)   return -1;
     return 0;
 }
 
-int __stdcall rt_h_fcmp_l(float v2, float v1)
+int __stdcall rt_h_fcmp_l(float v1, float v2)
 {
     if (isnan(v1) || isnan(v2)) {
         return -1;
     }
-    return rt_h_fcmp_g(v2,v1);
+    return rt_h_fcmp_g(v1,v2);
 }
 
-int __stdcall rt_h_dcmp_g(double v2, double v1)
+int __stdcall rt_h_dcmp_g(double v1, double v2)
 {
     if (isnan(v1) || isnan(v2)) {
         return 1;
@@ -96,14 +102,15 @@ int __stdcall rt_h_dcmp_g(double v2, double v1)
     return 0;
 }
 
-int __stdcall rt_h_dcmp_l(double v2, double v1)
+int __stdcall rt_h_dcmp_l(double v1, double v2)
 {
     if (isnan(v1) || isnan(v2)) { return -1; }
-    return rt_h_dcmp_g(v2,v1);
+    return rt_h_dcmp_g(v1,v2);
 }
 
-double __stdcall rt_h_dbl_a(JavaByteCodes op, double v2, double v1)
+double __stdcall rt_h_dbl_a(double v1, double v2, JavaByteCodes op)
 {
+    //rt_dbg_out("d%s: %f %f", instrs[op].name, v1, v2);
     switch(op) {
     case OPCODE_IADD:
         return v1 + v2;
@@ -133,8 +140,9 @@ double __stdcall rt_h_dbl_a(JavaByteCodes op, double v2, double v1)
     return fmod(v1,v2);
 }
 
-float __stdcall rt_h_flt_a(JavaByteCodes op, float v2, float v1)
+float __stdcall rt_h_flt_a(float v1, float v2, JavaByteCodes op)
 {
+    //dbg_rt("f%s: %f %f", instrs[op].name, v1, v2);
     switch( op) {
     case OPCODE_IADD:
         return v1 + v2;
@@ -164,7 +172,7 @@ float __stdcall rt_h_flt_a(JavaByteCodes op, float v2, float v1)
     return fmod(v1,v2);
 }
 
-jlong __stdcall rt_h_i64_shift(JavaByteCodes op, int v2, jlong v1)
+jlong __stdcall rt_h_i64_shift(jlong v1, int v2, JavaByteCodes op)
 {
     switch(op) {
     case OPCODE_ISHL:
@@ -181,9 +189,9 @@ jlong __stdcall rt_h_i64_shift(JavaByteCodes op, int v2, jlong v1)
     return 0;
 }
 
-jlong __stdcall rt_h_i64_a( JavaByteCodes op, jlong v2, jlong v1)
+jlong __stdcall rt_h_i64_a(jlong v1, jlong v2, JavaByteCodes op)
 {
-    switch( op) {
+    switch(op) {
     case OPCODE_IADD:
         return v1 + v2;
     case OPCODE_ISUB:
@@ -208,9 +216,10 @@ jlong __stdcall rt_h_i64_a( JavaByteCodes op, jlong v2, jlong v1)
     return 0;
 }
 
-int __stdcall rt_h_i32_a( JavaByteCodes op, int v2, int v1)
+int __stdcall rt_h_i32_a(int v1, int v2, JavaByteCodes op)
 {
-    switch( op) {
+    //dbg_rt("i%s: %u %u", instrs[op].name, v1, v2);
+    switch(op) {
     case OPCODE_IADD:
         return v1 + v2;
     case OPCODE_ISUB:
@@ -232,8 +241,14 @@ int __stdcall rt_h_i32_a( JavaByteCodes op, int v2, int v1)
                           (v1 >> (v2&0x1F)) + (2 << ~(v2&0x1F));
     // special cases according to JVM Spec
     case OPCODE_IDIV:
+        // With v2==0 may be called from gen_a(). In this case, the return 
+        // value will be ignoread anyway.    
+        if (v2 == 0) return -1;
         return (v2 == -1 && v1 == INT_MIN) ? v1 : v1 / v2;
     case OPCODE_IREM:
+        // With v2==0 may be called from gen_a(). In this case, the return 
+        // value will be ignoread anyway.    
+        if (v2 == 0) return -1;
         return (v2 == -1 && v1 == INT_MIN) ? 0 : v1 % v2;
     default:
         break;
@@ -270,7 +285,7 @@ jlong   __stdcall rt_h_flt_2_i64(float i)
         return 0;
     }
     return i<(double)jLONG_MIN ? 
-                   jLONG_MIN : (i>=(double)jLONG_MAX ? jLONG_MAX : (jlong)i);
+                jLONG_MIN : (i>=(double)jLONG_MAX? jLONG_MAX : (jlong)i);
 }
 
 double  __stdcall rt_h_flt_2_dbl(float i)
@@ -317,3 +332,5 @@ const void * cnv_matrix_impls[num_jtypes][num_jtypes] = {
 };
 
 }}; // ~namespace Jitrino::Jet
+
+

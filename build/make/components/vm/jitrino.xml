@@ -37,6 +37,8 @@ Version: $Revision: 1.6.2.8 $
         <property name="libdir" location="${build.semi.dir}/vm/jitrino/_bin" />
         <property name="jardir" location="${build.semi.dir}/vm/jitrino/_jar" />
 
+        <mkdir dir="${build.semi.dir}/vm/jitrino/_other"/>
+
         <fileset id="c.fileset" dir="." includes="empty_fileset"/>
         <fileset id="cpp.fileset" dir="." includes="empty_fileset"/>
         <fileset id="asm.fileset" dir="." includes="empty_fileset"/>        
@@ -275,18 +277,15 @@ Version: $Revision: 1.6.2.8 $
 
             <select arch="em64t">
                 <defineset define="_EM64T_" />
-            </select>
-
-            <select arch="ipf">
-                <defineset define="_IPF_" />
                 <defineset define="POINTER64" />
                 <select os="win">
                     <compilerarg value="-D_WIN64" />
                 </select>
             </select>
 
-            <select arch="em64t">
-                <defineset define="_IPF_,POINTER64" />
+            <select arch="ipf">
+                <defineset define="_IPF_" />
+                <defineset define="POINTER64" />
                 <select os="win">
                     <compilerarg value="-D_WIN64" />
                 </select>
@@ -335,5 +334,15 @@ Version: $Revision: 1.6.2.8 $
                 <linkerarg value="-lm" />
             </select>
         </linker>
+
+        <echo message="Copying the configuration jitrino files..."/>
+ 
+        <copy todir="${build.semi.dir}/vm/jitrino/_other" 
+              flatten="true" 
+              includeEmptyDirs="false">
+              <fileset dir="${build.VM.home}/jitrino/config">
+                   <include name="${build.arch}/**" />
+              </fileset>
+        </copy>
     </target>
 </project>

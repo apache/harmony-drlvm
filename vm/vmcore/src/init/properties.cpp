@@ -67,6 +67,54 @@ read_properties(char *fname, Properties & prop)
     apr_file_close(f);
 }
 
+void 
+properties_set_string_property(PropertiesHandle ph, const char* key, const char* value) 
+{
+    Properties* p = (Properties*)ph;
+    add_pair_to_properties(*p, key, value);
+}
+
+PropertiesIteratorHandle
+properties_iterator_create(PropertiesHandle ph) 
+{
+    Properties* p = (Properties*)ph;
+    Properties::Iterator* it = p->getNewIterator();
+    it->next();
+    return (PropertiesIteratorHandle)it;
+}
+
+void
+properties_iterator_destroy(PropertiesHandle ph, PropertiesIteratorHandle pih) 
+{
+    Properties* p = (Properties*)ph;
+    Properties::Iterator* it = (Properties::Iterator*)pih;
+    p->destroyIterator(it);
+}
+
+Boolean 
+properties_iterator_advance(PropertiesIteratorHandle pih) 
+{
+    Properties::Iterator* it = (Properties::Iterator*)pih;
+    return it->next()!=NULL;
+}
+
+const char* 
+properties_get_name(PropertiesIteratorHandle pih) 
+{
+    Properties::Iterator* it = (Properties::Iterator*)pih;
+    Prop_entry* p = it->currentEntry();
+    return p->key;
+}
+
+const char* 
+properties_get_string_value(PropertiesIteratorHandle pih)
+{
+    
+    Properties::Iterator* it = (Properties::Iterator*)pih;
+    Prop_entry* p = it->currentEntry();
+    return p->value->as_string();
+}
+
 char *predefined_propeties[] =
 {
     // The following properties are added in define_undefined_predefined_properties
@@ -77,7 +125,7 @@ char *predefined_propeties[] =
     "java.vm.specification.version=1.0",
     "java.vm.specification.vendor=Sun Microsystems Inc.",
     "java.vm.specification.name=Java Virtual Machine Specification",
-    "java.specification.version=1.4",
+    "java.specification.version=1.5",
     "java.specification.vendor=Sun Microsystems Inc.",
     "java.specification.name=Java Platform API Specification",
     "java.version=11.2.0",
@@ -174,15 +222,21 @@ static char *load_full_api_files_path_names_list(const char *path)
                     array_size *= 2;
                     props = (char**)STD_REALLOC(props, array_size*sizeof(char*));
                 }
+                unsigned length;
                 char_pos = strchr(jre_file_name, 0x0D);
-                if (char_pos != NULL) {
-                    *char_pos = '\0';
-                } else {
+                if (!char_pos) {
                     char_pos = strchr(jre_file_name, 0x0A);
-                    *char_pos = '\0';
                 }
-	            int length = char_pos - jre_file_name + 1;
+                if (char_pos) {
+                    *char_pos = '\0';
+                    length = char_pos - jre_file_name + 1;
+                } else {
+                    length = strlen(jre_file_name) + 1;
+                }
                 char_pos = strchr(jre_file_name, '=');
+                if (!char_pos) {
+                    DIE("Malformed bootclasspath entry: " << jre_file_name);
+                }
                 *char_pos = '\0';
                 props[props_count] = (char*)STD_MALLOC(length * sizeof(char));
                 memcpy(props[props_count], jre_file_name, length);

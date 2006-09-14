@@ -24,11 +24,11 @@
 #include "gcmanagedpointeranalyzer.h"
 #include "irmanager.h"
 #include "deadcodeeliminator.h"
-#include "PropertyTable.h"
+#include "FlowGraph.h"
 
 namespace Jitrino {
 
-DEFINE_OPTPASS_IMPL(GCManagedPointerAnalysisPass, gcmap, "GC Managed Pointer to Base Map Construction")
+DEFINE_SESSION_ACTION(GCManagedPointerAnalysisPass, opt_gcmap, "GC Managed Pointer to Base Map Construction")
 
 void
 GCManagedPointerAnalysisPass::_run(IRManager& irm) {
@@ -44,7 +44,7 @@ _baseMap(*_pBaseMap),
 _pVarMap(&irManager.getGCBasePointerMap()),
 _varMap(*_pVarMap),
 _mapsComputed(false),
-_rematerializeMode(!irManager.getParameterTable().lookupBool("opt::gc::build_var_map", true))
+_rematerializeMode(!irManager.getOptimizerFlags().gc_build_var_map)
 {
 }
 
@@ -71,13 +71,13 @@ void
 GCManagedPointerAnalyzer::computeBaseMaps()
 {
     assert(_mapsComputed == false);
-    FlowGraph& fg = _irManager.getFlowGraph();
-    MemoryManager mm(fg.getNodeCount()*sizeof(CFGNode*), "GCManagedPointerAnalyzer::computeBaseMaps.mm");
+    ControlFlowGraph& fg = _irManager.getFlowGraph();
+    MemoryManager mm(fg.getNodes().size()*sizeof(Node*), "GCManagedPointerAnalyzer::computeBaseMaps.mm");
     
     // List of nodes in RPO
-    StlVector<CFGNode*> nodes(mm);
+    StlVector<Node*> nodes(mm);
     fg.getNodesPostOrder(nodes);
-    StlVector<CFGNode*>::reverse_iterator niter;
+    StlVector<Node*>::reverse_iterator niter;
     
     // List of known static (i.e., non-heap) managed pointers.  We can ignore these. 
     StlHashSet<SsaOpnd*> _staticMap(mm);
@@ -85,19 +85,19 @@ GCManagedPointerAnalyzer::computeBaseMaps()
 #ifndef NDEBUG
     uint32 iterCount = 0;
 #endif
-	bool done = false;
+    bool done = false;
     while(!done) {
         assert(++iterCount <= 2);
         done = true;
         for(niter = nodes.rbegin(); niter != nodes.rend(); ++niter) {
-            CFGNode* node = *niter;
-            if(Log::cat_opt_gc()->isDebugEnabled()) {
+            Node* node = *niter;
+            if(Log::isEnabled()) {
                 Log::out() << "Consider block ";
-                node->printLabel(Log::out()); 
+                FlowGraph::printLabel(Log::out(), node);
                 Log::out() << ::std::endl;
             }
-            Inst* first = node->getFirstInst();
-            for(Inst* inst = first->next(); inst != first; inst = inst->next()) {
+            Inst* first = (Inst*)node->getFirstInst();
+            for(Inst* inst = first->getNextInst(); inst != NULL; inst = inst->getNextInst()) {
                 Opnd* dst_ = inst->getDst();
                 if(!dst_->isNull() && dst_->getType()->isManagedPtr()) {
                     //
@@ -141,7 +141,7 @@ GCManagedPointerAnalyzer::computeBaseMaps()
                         }
                     case Op_Phi:
                         {
-                            if(Log::cat_opt_gc()->isDebugEnabled()) {
+                            if(Log::isEnabled()) {
                                 Log::out() << "Consider phi ";
                                 inst->print(Log::out()); 
                                 Log::out() << ::std::endl;
@@ -172,7 +172,7 @@ GCManagedPointerAnalyzer::computeBaseMaps()
                                 } else {
                                     // Not recorded - uninitialized input - need another iteration
                                     done = false;
-                                    if(Log::cat_opt_gc()->isDebugEnabled()) {
+                                    if(Log::isEnabled()) {
                                         Log::out() << "Undefined arg ";
                                         src->print(Log::out()); 
                                         Log::out() << " - redo" << ::std::endl;
@@ -190,9 +190,9 @@ GCManagedPointerAnalyzer::computeBaseMaps()
                                 _baseMap[dst] = base;
                             }
                         } // case Op_Phi
-			break;
-		    default:
-			break;
+            break;
+            default:
+            break;
                     } // switch(inst->getOpcode()) {
                 } // if(!dst_->isNull() && dst_->getType()->isManagedPtr())
             }
@@ -210,7 +210,7 @@ GCManagedPointerAnalyzer::addBaseVarDefs()
     
     BaseMap::iterator i;
     for(i = _baseMap.begin(); i != _baseMap.end(); ++i) {
-        if(Log::cat_opt_gc()->isDebugEnabled()) {
+        if(Log::isEnabled()) {
             Log::out() << "Add def for ";
             i->first->print(Log::out());
             Log::out() << ::std::endl;
@@ -224,7 +224,7 @@ GCManagedPointerAnalyzer::addBaseVarDefs()
 SsaVarOpnd*
 GCManagedPointerAnalyzer::insertVarDef(SsaVarOpnd* ptr)
 {
-    if(Log::cat_opt_gc()->isDebugEnabled()) {
+    if(Log::isEnabled()) {
         Log::out() << "Insert var def for ";
         ptr->print(Log::out());
         Log::out() << ::std::endl;
@@ -288,15 +288,15 @@ GCManagedPointerAnalyzer::analyzeManagedPointers()
         computeBaseMaps();
         addBaseVarDefs();
     } else {
-        FlowGraph& fg = _irManager.getFlowGraph();
-        MemoryManager mm(fg.getNodeCount()*sizeof(CFGNode*), "GCManagedPointerAnalyzer::analyzeManagedPointers.mm");
+        ControlFlowGraph& fg = _irManager.getFlowGraph();
+        MemoryManager mm(fg.getNodes().size()*sizeof(Node*), "GCManagedPointerAnalyzer::analyzeManagedPointers.mm");
         
-        StlVector<CFGNode*> nodes(mm);
+        StlVector<Node*> nodes(mm);
         fg.getNodesPostOrder(nodes);
         
         StlHashSet<SsaOpnd*> _staticMap(mm);
         
-        StlVector<CFGNode*>::reverse_iterator niter;
+        StlVector<Node*>::reverse_iterator niter;
         
 #ifndef NDEBUG
         uint32 k = 0;
@@ -306,14 +306,14 @@ GCManagedPointerAnalyzer::analyzeManagedPointers()
             assert((++k) <= 3);
             done = true;
             for(niter = nodes.rbegin(); niter != nodes.rend(); ++niter) {
-                CFGNode* node = *niter;
-                if(Log::cat_opt_gc()->isDebugEnabled()) {
+                Node* node = *niter;
+                if(Log::isEnabled()) {
                     Log::out() << "Consider block ";
-                    node->printLabel(Log::out()); 
+                    FlowGraph::printLabel(Log::out(), node);
                     Log::out() << ::std::endl;
                 }
-                Inst* first = node->getFirstInst();
-                for(Inst* inst = first->next(); inst != first; inst = inst->next()) {
+                Inst* first = (Inst*)node->getFirstInst();
+                for(Inst* inst = first->getNextInst(); inst != NULL; inst = inst->getNextInst()) {
                     Opnd* dst_ = inst->getDst();
                     if(!dst_->isNull() && dst_->getType()->isManagedPtr()) {
                         //
@@ -349,7 +349,7 @@ GCManagedPointerAnalyzer::analyzeManagedPointers()
                                 } else {
                                     assert(0);
                                     if(inst->getOpcode() == Op_AddScaledIndex) {
-                                        fg.printDotFile(_irManager.getMethodDesc(), "error", NULL);
+                                        FlowGraph::printDotFile(fg, _irManager.getMethodDesc(), "error");
                                     }
                                     assert(inst->getOpcode() != Op_AddScaledIndex);
                                 }
@@ -357,7 +357,7 @@ GCManagedPointerAnalyzer::analyzeManagedPointers()
                             }
                         case Op_Phi:
                             {
-                                if(Log::cat_opt_gc()->isDebugEnabled()) {
+                                if(Log::isEnabled()) {
                                     Log::out() << "Consider phi ";
                                     inst->print(Log::out()); 
                                     Log::out() << ::std::endl;
@@ -379,7 +379,7 @@ GCManagedPointerAnalyzer::analyzeManagedPointers()
                                     } else {
                                         if(_staticMap.find(src) == _staticMap.end()) {
                                             // Not recorded as a static
-                                            if(Log::cat_opt_gc()->isDebugEnabled()) {
+                                            if(Log::isEnabled()) {
                                                 Log::out() << "Undefined arg ";
                                                 src->print(Log::out()); 
                                                 Log::out() << " - redo" << ::std::endl;
@@ -394,12 +394,12 @@ GCManagedPointerAnalyzer::analyzeManagedPointers()
                                     if(base != NULL)
                                         _baseMap[dst] = base;
                                 } else {
-                                    if(Log::cat_opt_gc()->isDebugEnabled()) {
+                                    if(Log::isEnabled()) {
                                         Log::out() << "Converting " << ::std::endl;
-                                        node->print(Log::out());
+                                        FlowGraph::print(Log::out(), node);
                                         Log::out() << "Rematerialize for " << ::std::endl;
                                         phi->print(Log::out());
-                                        Log::out() << ::std::endl;
+                                        Log::out() << std::endl;
                                     }
                                     Opcode opcode = NumOpcodes;
                                     FieldDesc* fieldDesc = NULL;
@@ -419,7 +419,7 @@ GCManagedPointerAnalyzer::analyzeManagedPointers()
                                         assert(defs.size() == i);
                                         defs.push_back(def);
                                         Inst* defInst = def->getInst();
-                                        if(Log::cat_opt_gc()->isDebugEnabled()) {
+                                        if(Log::isEnabled()) {
                                             Log::out() << "Process input " << ::std::endl;
                                             defInst->print(Log::out());
                                             Log::out() << ::std::endl;
@@ -441,7 +441,7 @@ GCManagedPointerAnalyzer::analyzeManagedPointers()
                                             for(uint32 j = 0; j < numArgs; ++j) {
                                                 SsaTmpOpnd* arg = defInst->getSrc(j)->asSsaTmpOpnd();
                                                 assert(arg != NULL);
-                                                if(Log::cat_opt_gc()->isDebugEnabled()) {
+                                                if(Log::isEnabled()) {
                                                     Log::out() << "Initializing ";
                                                     arg->print(Log::out());
                                                     Log::out() << ::std::endl;
@@ -466,13 +466,13 @@ GCManagedPointerAnalyzer::analyzeManagedPointers()
                                             }
                                             for(uint32 j = 0; j < numArgs; ++j) {
                                                 SsaTmpOpnd* arg = defInst->getSrc(j)->asSsaTmpOpnd();
-                                                if(Log::cat_opt_gc()->isDebugEnabled()) {
+                                                if(Log::isEnabled()) {
                                                     Log::out() << "Recording ";
                                                     arg->print(Log::out());
                                                     Log::out() << ::std::endl;
                                                 }
                                                 if(args[j] != arg) {
-                                                    Log::cat_opt_gc()->debug << "Must create phi for arg " << (int) j << ::std::endl;
+                                                    Log::out() << "Must create phi for arg " << (int) j << ::std::endl;
                                                     args[j] = NULL;
                                                     argTypes[j] = _irManager.getTypeManager().getCommonType(argTypes[j], arg->getType());
                                                 }
@@ -485,7 +485,7 @@ GCManagedPointerAnalyzer::analyzeManagedPointers()
                                     for(uint32 j = 0; j < numArgs; ++j) {
                                         if(args[j] == NULL) {
                                             VarOpnd* var = opndManager.createVarOpnd(argTypes[j], false);
-                                            if(Log::cat_opt_gc()->isDebugEnabled()) {
+                                            if(Log::isEnabled()) {
                                                 Log::out() << "Creating ";
                                                 var->print(Log::out());
                                                 Log::out() << " for arg " << (int) j << ::std::endl;
@@ -505,7 +505,7 @@ GCManagedPointerAnalyzer::analyzeManagedPointers()
                                                         _baseMap[ssaVar] = _baseMap[src];
                                                     }
                                                     else {
-                                                        if(Log::cat_opt_gc()->isDebugEnabled()) {
+                                                        if(Log::isEnabled()) {
                                                             Log::out() << "Can't find base for ";
                                                             src->print(Log::out()); 
                                                             Log::out() << " - redo" << ::std::endl;
@@ -554,12 +554,12 @@ GCManagedPointerAnalyzer::analyzeManagedPointers()
                                     last = redo;
                                     Inst* stVar = instFactory.makeStVar(dst, tmp);
                                     stVar->insertAfter(last);
-                                    Inst* prev = inst->prev();
+                                    Inst* prev = inst->getPrevInst();
                                     inst->unlink();
                                     inst = prev;
-                                    if(Log::cat_opt_gc()->isDebugEnabled()) {
+                                    if(Log::isEnabled()) {
                                         Log::out() << "to " << ::std::endl;
-                                        node->print(Log::out());
+                                        FlowGraph::print(Log::out(), node);
                                     }
                                 }
                                 break;

@@ -110,9 +110,8 @@ jvmtiGetThreadGroupInfo(jvmtiEnv* env,
 
     CHECK_EVERYTHING();
 
-    if (group == NULL)
-    { // TBD group is not a thread object
-        return JVMTI_ERROR_INVALID_THREAD;
+    if (! is_valid_thread_group_object(group)) {
+        return JVMTI_ERROR_INVALID_THREAD_GROUP;
     }
 
     if (info_ptr == NULL)
@@ -161,8 +160,8 @@ jvmtiGetThreadGroupChildren(jvmtiEnv* env,
 
     CHECK_EVERYTHING();
 
-    if (group == NULL){ // TBD group is not a thread object
-        return JVMTI_ERROR_INVALID_THREAD;
+    if (! is_valid_thread_group_object(group)) {
+        return JVMTI_ERROR_INVALID_THREAD_GROUP;
     }
 
     if (thread_count_ptr == NULL || threads_ptr == NULL ||

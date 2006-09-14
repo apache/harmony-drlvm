@@ -43,6 +43,28 @@ final class VMThreadManager {
     public static final int TM_ERROR_INTERRUPT = 52;
     public static final int TM_ERROR_ILLEGAL_STATE = 51;
 
+
+    /**
+     * JVMTI constants
+     */
+    public static final int JVMTI_THREAD_STATE_ALIVE = 0x0001;
+    public static final int JVMTI_THREAD_STATE_TERMINATED = 0x0002;
+    public static final int JVMTI_THREAD_STATE_RUNNABLE = 0x0004;
+    public static final int JVMTI_THREAD_STATE_BLOCKED_ON_MONITOR_ENTER = 0x0400;
+    public static final int JVMTI_THREAD_STATE_WAITING = 0x0080;
+    public static final int JVMTI_THREAD_STATE_WAITING_INDEFINITELY = 0x0010;
+    public static final int JVMTI_THREAD_STATE_WAITING_WITH_TIMEOUT = 0x0020;
+    public static final int JVMTI_THREAD_STATE_SLEEPING	= 0x0040;
+    public static final int JVMTI_THREAD_STATE_IN_OBJECT_WAIT = 0x0100;
+    public static final int JVMTI_THREAD_STATE_PARKED = 0x0200;
+    public static final int JVMTI_THREAD_STATE_SUSPENDED = 0x100000;
+    public static final int JVMTI_THREAD_STATE_INTERRUPTED = 0x200000;
+    public static final int JVMTI_THREAD_STATE_IN_NATIVE = 0x400000;
+    public static final int JVMTI_THREAD_STATE_VENDOR_1 = 0x10000000;
+    public static final int JVMTI_THREAD_STATE_VENDOR_2 = 0x20000000;
+    public static final int JVMTI_THREAD_STATE_VENDOR_3 = 0x40000000;
+
+
     /**
      * This class is not supposed to be instantiated.
      */
@@ -231,5 +253,10 @@ final class VMThreadManager {
       */
      static native int attach(java.lang.Thread thread);
 
+    /**
+     * Returns the state of the given thread as described by JVMTI spec
+     * @api2vm
+     */
+    static native int getState(java.lang.Thread thread);
 }
 

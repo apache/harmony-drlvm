@@ -30,6 +30,7 @@
 
 #include "verifier.h"
 #include "native_overrides.h"
+#include "compile.h"
 
 Global_Env::Global_Env(tl::MemoryPool & mp, Properties & prop):
 mem_pool(mp),
@@ -39,7 +40,16 @@ properties(prop),
 bootstrapping(false),
 ready_for_exceptions(false)
 {
+    JavaLangString_String = string_pool.lookup("java/lang/String");
+    JavaLangStringBuffer_String = string_pool.lookup("java/lang/StringBuffer");
+    JavaLangObject_String = string_pool.lookup("java/lang/Object");
+    JavaLangClass_String = string_pool.lookup("java/lang/Class");
+    VoidVoidDescriptor_String = string_pool.lookup("()V");
+    VoidBooleanDescriptor_String = string_pool.lookup("()Z");
+    VoidIntegerDescriptor_String = string_pool.lookup("()I");
     JavaLangThrowable_String = string_pool.lookup("java/lang/Throwable");
+    JavaLangNoClassDefFoundError_String = string_pool.lookup("java/lang/NoClassDefFoundError");
+
     JavaLangArrayIndexOutOfBoundsException_String = string_pool.lookup("java/lang/ArrayIndexOutOfBoundsException");
     JavaNioByteBuffer_String = string_pool.lookup("java/nio/ByteBuffer");
     JavaLangIllegalArgumentException_String = string_pool.lookup("java/lang/IllegalArgumentException");
@@ -48,21 +58,12 @@ ready_for_exceptions(false)
     JavaLangReflectMethod_String = string_pool.lookup("java/lang/reflect/Method");
     JavaLangUnsatisfiedLinkError_String = string_pool.lookup("java/lang/UnsatisfiedLinkError");
     JavaLangNullPointerException_String = string_pool.lookup("java/lang/NullPointerException");
-    JavaLangString_String = string_pool.lookup("java/lang/String");
-    JavaLangObject_String = string_pool.lookup("java/lang/Object");
-    JavaLangClass_String = string_pool.lookup("java/lang/Class");
+
+
     Init_String = string_pool.lookup("<init>");
     Clinit_String = string_pool.lookup("<clinit>");
     FinalizeName_String = string_pool.lookup("finalize");
-    VoidVoidDescriptor_String = string_pool.lookup("()V");
-    ByteDescriptor_String = string_pool.lookup("B");
-    CharDescriptor_String = string_pool.lookup("C");
-    DoubleDescriptor_String = string_pool.lookup("D");
-    FloatDescriptor_String = string_pool.lookup("F");
-    IntDescriptor_String = string_pool.lookup("I");
-    LongDescriptor_String = string_pool.lookup("J");
-    ShortDescriptor_String = string_pool.lookup("S");
-    BooleanDescriptor_String = string_pool.lookup("Z");
+    EnqueueName_String = string_pool.lookup("enqueue");
     Clonable_String = string_pool.lookup("java/lang/Cloneable");
     Serializable_String = string_pool.lookup("java/io/Serializable");
 
@@ -144,6 +145,8 @@ ready_for_exceptions(false)
 
 
     nsoTable = nso_init_lookup_table(&this->string_pool);
+
+    dcList = NULL;
 }       //Global_Env::Global_Env
 
 void Global_Env::EnvClearInternals()
@@ -166,6 +169,9 @@ void Global_Env::EnvClearInternals()
 
     nso_clear_lookup_table(nsoTable);
     nsoTable = NULL;
+
+    compile_clear_dynamic_code_list(dcList);
+    dcList = NULL;
 }
 
 Class* Global_Env::LoadCoreClass(const String* s)
@@ -178,4 +184,9 @@ Class* Global_Env::LoadCoreClass(const String* s)
         LOGGER_EXIT(1);
     }
     return clss;
+}
+
+Class* Global_Env::LoadCoreClass(const char* s)
+{
+    return LoadCoreClass(this->string_pool.lookup(s));
 }

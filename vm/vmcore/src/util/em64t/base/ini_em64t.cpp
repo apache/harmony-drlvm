@@ -25,41 +25,39 @@
 #include "jni_types.h"
 #include "jit_intf.h"
 #include "open/types.h"
-#include "open/thread.h"
 #include "open/em.h"
 
+#include "environment.h"
 #include "Class.h"
 #include "object_handles.h"
 #include "nogc.h"
 
-#define LOG_DOMAIN "vm.helpers"
 #include "port_malloc.h"
-#include "cxxlog.h"
 #include "tl/memory_pool.h"
 #include "encoder.h"
 #include "lil_code_generator_utils.h"
 
-#ifndef NDEBUG
+#define LOG_DOMAIN "vm.helpers"
+#include "cxxlog.h"
+
 #include "dump.h"
-extern bool dump_stubs;
-#endif
 
-typedef int64 ( * invoke_native_func_int_t) (
+typedef int64 ( * invoke_managed_func_int_t) (
     // six fake parameters should be passed over GR
     void *, void *, void *, void *, void *, void *,
     const void * const method_entry_point,
-    int gr_nargs, int fr_nargs, int stack_nargs,
+    int64 gr_nargs, int64 fr_nargs, int64 stack_nargs,
     uint64 gr_args[], double fr_args[], uint64 stack_args[]);
 
-typedef double ( * invoke_native_func_double_t)(
+typedef double ( * invoke_managed_func_double_t)(
     // six fake parameters should be passed over GR
     void *, void *, void *, void *, void *, void *,
     const void * const method_entry_point,
-    int gr_nargs, int fr_nargs, int stack_nargs,
+    int64 gr_nargs, int64 fr_nargs, int64 stack_nargs,
     uint64 gr_args[], double fr_args[], uint64 stack_args[]);
 
-static invoke_native_func_int_t gen_invoke_native_func() {
-    static invoke_native_func_int_t func = NULL;
+static invoke_managed_func_int_t gen_invoke_managed_func() {
+    static invoke_managed_func_int_t func = NULL;
     if (func) {
         return func;
     }
@@ -67,6 +65,7 @@ static invoke_native_func_int_t gen_invoke_native_func() {
     const char * MOVE_STACK_ARGS_BEGIN = "move_stack_args_begin";
     const char * MOVE_STACK_ARGS_END = "move_stack_args_end";
     const char * MOVE_FR_ARGS_END = "move_fr_args_end";
+    const char * COMPUTE_ADDRESS = "compute_address";
 
     // [rbp + 16] - method_entry_point
     // [rbp + 24] - gr_nargs
@@ -83,8 +82,7 @@ static invoke_native_func_int_t gen_invoke_native_func() {
     const int32 FR_ARGS_OFFSET = 56;
     const int32 STACK_ARGS_OFFSET = 64;
     
-    // FIXME: why 124
-    const int STUB_SIZE = 124;
+    const int STUB_SIZE = 200;
     char * stub = (char *) malloc_fixed_code_for_jit(STUB_SIZE,
         DEFAULT_CODE_ALIGNMENT, CODE_BLOCK_HEAT_DEFAULT, CAA_Allocate);
 #ifdef _DEBUG
@@ -94,52 +92,57 @@ static invoke_native_func_int_t gen_invoke_native_func() {
     tl::MemoryPool pool;
     LilCguLabelAddresses labels(&pool, stub);
     
-    func = (invoke_native_func_int_t) stub;
+    func = (invoke_managed_func_int_t) stub;
     stub = push(stub, rbp_opnd);
     stub = mov(stub, rbp_opnd, rsp_opnd);
 
-    // 1) preserve callee-saves registers
-    stub = push(stub, r15_opnd);
-    stub = push(stub, r14_opnd);
-    stub = push(stub, r13_opnd);
-    stub = push(stub, r12_opnd);
-    stub = push(stub, rbx_opnd);
-    
-    // 2) push stacked arguments in reverse (right-to-left) order
+    // 1) move stacked arguments in reverse (right-to-left) order
     stub  = mov(stub, rcx_opnd, M_Base_Opnd(rbp_reg, STACK_NARGS_OFFSET));
     stub = alu(stub, or_opc, rcx_opnd, rcx_opnd);
     stub = branch8(stub, Condition_Z, Imm_Opnd(size_8, 0));
     labels.add_patch_to_label(MOVE_STACK_ARGS_END, stub - 1, LPT_Rel8);
+    
+    // align stack if required (rsp % 16 == 0)
+    stub = alu(stub, and_opc, rcx_opnd, Imm_Opnd(size_64, 1));
+    stub = branch8(stub, Condition_Z, Imm_Opnd(size_8, 0));
+    labels.add_patch_to_label(COMPUTE_ADDRESS, stub - 1, LPT_Rel8);
+    stub = push(stub, rax_opnd);
+    
     // compute effective address of the last stacked argument
+    labels.define_label(COMPUTE_ADDRESS, stub, false);
+    
     stub = mov(stub, r10_opnd, M_Base_Opnd(rbp_reg, STACK_ARGS_OFFSET));
     stub = lea(stub, r10_opnd, M_Index_Opnd(r10_reg, rcx_reg, -8, 8));
     stub = alu(stub, sub_opc, r10_opnd, rsp_opnd);
+    
     // iterate through the arguments
     labels.define_label(MOVE_STACK_ARGS_BEGIN, stub, false);
-    stub = push(stub, M_Index_Opnd(r10_reg, rsp_reg, 0, 1));
+    
+    stub = push(stub, M_Index_Opnd(rsp_reg, r10_reg, 0, 1));
     stub = loop(stub, Imm_Opnd(size_8, 0));
     labels.add_patch_to_label(MOVE_STACK_ARGS_BEGIN, stub - 1, LPT_Rel8);
+    
     labels.define_label(MOVE_STACK_ARGS_END, stub, false);
 
-    // 3) move from fr_args to registers
+    // 2) move from fr_args to registers
     stub = mov(stub, rcx_opnd, M_Base_Opnd(rbp_reg, FR_NARGS_OFFSET));
     stub = alu(stub, or_opc, rcx_opnd, rcx_opnd);
     stub = branch8(stub, Condition_Z, Imm_Opnd(size_8, 0));
     labels.add_patch_to_label(MOVE_FR_ARGS_END, stub - 1, LPT_Rel8);
 
     stub = mov(stub, r10_opnd, M_Base_Opnd(rbp_reg, FR_ARGS_OFFSET));
-    stub = sse_mov(stub, xmm0_opnd, M_Base_Opnd(r10_reg, 0 * FR_STACK_SIZE), true);
-    stub = sse_mov(stub, xmm1_opnd, M_Base_Opnd(r10_reg, 1 * FR_STACK_SIZE), true);
-    stub = sse_mov(stub, xmm2_opnd, M_Base_Opnd(r10_reg, 2 * FR_STACK_SIZE), true);
-    stub = sse_mov(stub, xmm3_opnd, M_Base_Opnd(r10_reg, 3 * FR_STACK_SIZE), true);
-    stub = sse_mov(stub, xmm4_opnd, M_Base_Opnd(r10_reg, 4 * FR_STACK_SIZE), true);
-    stub = sse_mov(stub, xmm5_opnd, M_Base_Opnd(r10_reg, 5 * FR_STACK_SIZE), true);
-    stub = sse_mov(stub, xmm6_opnd, M_Base_Opnd(r10_reg, 6 * FR_STACK_SIZE), true);
-    stub = sse_mov(stub, xmm7_opnd, M_Base_Opnd(r10_reg, 7 * FR_STACK_SIZE), true);
+    stub = movq(stub, xmm0_opnd, M_Base_Opnd(r10_reg, 0 * FR_STACK_SIZE));
+    stub = movq(stub, xmm1_opnd, M_Base_Opnd(r10_reg, 1 * FR_STACK_SIZE));
+    stub = movq(stub, xmm2_opnd, M_Base_Opnd(r10_reg, 2 * FR_STACK_SIZE));
+    stub = movq(stub, xmm3_opnd, M_Base_Opnd(r10_reg, 3 * FR_STACK_SIZE));
+    stub = movq(stub, xmm4_opnd, M_Base_Opnd(r10_reg, 4 * FR_STACK_SIZE));
+    stub = movq(stub, xmm5_opnd, M_Base_Opnd(r10_reg, 5 * FR_STACK_SIZE));
+    stub = movq(stub, xmm6_opnd, M_Base_Opnd(r10_reg, 6 * FR_STACK_SIZE));
+    stub = movq(stub, xmm7_opnd, M_Base_Opnd(r10_reg, 7 * FR_STACK_SIZE));
 
     labels.define_label(MOVE_FR_ARGS_END, stub, false);
     
-    // 4) unconditionally move from gr_args to registers
+    // 3) unconditionally move from gr_args to registers
     stub = mov(stub, r10_opnd, M_Base_Opnd(rbp_reg, GR_ARGS_OFFSET));
     stub = mov(stub, rdi_opnd, M_Base_Opnd(r10_reg, 0 * GR_STACK_SIZE));
     stub = mov(stub, rsi_opnd, M_Base_Opnd(r10_reg, 1 * GR_STACK_SIZE));
@@ -148,28 +151,18 @@ static invoke_native_func_int_t gen_invoke_native_func() {
     stub = mov(stub, r8_opnd, M_Base_Opnd(r10_reg, 4 * GR_STACK_SIZE));
     stub = mov(stub, r9_opnd, M_Base_Opnd(r10_reg, 5 * GR_STACK_SIZE));
 
-    // 5) transfer control
+    // 4) transfer control
     stub = mov(stub, r10_opnd, M_Base_Opnd(rbp_reg, METHOD_ENTRY_POINT_OFFSET));
     stub = call(stub, r10_opnd);
 
-    // 6) restore calles-saves registers
-    stub = lea(stub, rsp_opnd, M_Base_Opnd(rbp_reg, -5 * GR_STACK_SIZE));
-    stub = pop(stub, rbx_opnd);
-    stub = pop(stub, r12_opnd);
-    stub = pop(stub, r13_opnd);
-    stub = pop(stub, r14_opnd);
-    stub = pop(stub, r15_opnd);
-
-    // 7) leave current frame
+    // 5) leave current frame
+    stub = mov(stub, rsp_opnd, rbp_opnd);
     stub = pop(stub, rbp_opnd);
     stub = ret(stub);
 
     assert(stub - (char *)func <= STUB_SIZE);
-#ifndef NDEBUG
-    if (dump_stubs) {
-        dump((char *)func, "gen_invoke_native_func", stub - (char *)func);
-    }
-#endif
+
+    DUMP_STUB(func, "invoke_managed_func", stub - (char *)func);
 
     return func;
 }
@@ -177,10 +170,10 @@ static invoke_native_func_int_t gen_invoke_native_func() {
 void JIT_execute_method_default(JIT_Handle jh, jmethodID methodID,
                                 jvalue * result, jvalue * args) {
     
-    assert(!tmn_is_suspend_enabled());
+    assert(!hythread_is_suspend_enabled());
 
-    static const invoke_native_func_int_t invoke_managed_func = 
-        (invoke_native_func_int_t) gen_invoke_native_func();
+    static const invoke_managed_func_int_t invoke_managed_func = 
+        (invoke_managed_func_int_t) gen_invoke_managed_func();
     // maximum number of GP registers for inputs
     const int MAX_GR = 6;
     // maximum number of FP registers for inputs
@@ -189,7 +182,7 @@ void JIT_execute_method_default(JIT_Handle jh, jmethodID methodID,
     uint64 gr_args[MAX_GR];
     // holds arguments that should be placed in FR's
     double fr_args[MAX_FR];
-    // gen_invoke_native_func assumes such size
+    // gen_invoke_managed_func assumes such size
     assert(sizeof(double) == 8);
 
     Method * const method = (Method *)methodID;
@@ -199,10 +192,10 @@ void JIT_execute_method_default(JIT_Handle jh, jmethodID methodID,
     // hold arguments that should be placed on the memory stack
     uint64 * const stack_args = (uint64 *) STD_MALLOC(sizeof(uint64) * method->get_num_args());
     
-    int gr_nargs = 0;
-    int fr_nargs = 0;
-    int stack_nargs = 0;
-    int arg_num = 0;
+    int64 gr_nargs = 0;
+    int64 fr_nargs = 0;
+    int64 stack_nargs = 0;
+    int64 arg_num = 0;
 
     TRACE2("invoke", "enter method "
         << method->get_class()->name->bytes << " "
@@ -213,7 +206,9 @@ void JIT_execute_method_default(JIT_Handle jh, jmethodID methodID,
     if(!method->is_static()) {
         ObjectHandle handle = (ObjectHandle) args[arg_num++].l;
         assert(handle);
-        // TODO: check if there is no need to convert from native to managed null
+        // only compressed references are supported yet
+        assert(VM_Global_State::loader_env->compress_references);
+        // convert from native to managed NULL
         gr_args[gr_nargs++] = handle->object != NULL
             ? (uint64) handle->object : (uint64) Class::managed_null;
     }
@@ -227,7 +222,9 @@ void JIT_execute_method_default(JIT_Handle jh, jmethodID methodID,
         case JAVA_TYPE_ARRAY: {
             ObjectHandle handle = (ObjectHandle) args[arg_num++].l;
             uint64 ref = handle ? (uint64) handle->object : 0;
-            // TODO: check if there is no need to convert from native to managed null
+            // only compressed references are supported yet
+            assert(VM_Global_State::loader_env->compress_references);
+            // convert from native to managed NULL
             ref = ref ? ref : (uint64) Class::managed_null;
             if (gr_nargs < MAX_GR) {
                 gr_args[gr_nargs++] = ref;
@@ -306,7 +303,6 @@ void JIT_execute_method_default(JIT_Handle jh, jmethodID methodID,
         iter = advance_arg_iterator(iter);
     }
 
-
     // Save the result
     type = method->get_return_java_type();
     switch(type) {
@@ -323,11 +319,10 @@ void JIT_execute_method_default(JIT_Handle jh, jmethodID methodID,
             method_entry_point,
             gr_nargs,  fr_nargs, stack_nargs,
             gr_args, fr_args, stack_args);
-        // TODO: check if there is no need to convert from native to managed null
-        // Convert a null reference in managed code to the
-        // representation of null in unmanaged code
-        ref = is_compressed_reference(ref) && is_null_compressed_reference(ref)
-            ? (uint64) NULL : ref;
+        // only compressed references are supported yet
+        assert(VM_Global_State::loader_env->compress_references);
+        // convert from managed to native NULL
+        ref = ref != (uint64) Class::managed_null ? ref : (uint64) NULL;
         if (ref) {
             handle = oh_allocate_local_handle();
             handle->object = (ManagedObject*) ref;
@@ -348,7 +343,7 @@ void JIT_execute_method_default(JIT_Handle jh, jmethodID methodID,
         break;
     case JAVA_TYPE_DOUBLE:
     case JAVA_TYPE_FLOAT:
-        result->d = (invoke_native_func_double_t(invoke_managed_func))(
+        result->d = (invoke_managed_func_double_t(invoke_managed_func))(
             NULL, NULL, NULL, NULL, NULL, NULL,
             method_entry_point,
             gr_nargs,  fr_nargs, stack_nargs,
@@ -357,6 +352,8 @@ void JIT_execute_method_default(JIT_Handle jh, jmethodID methodID,
     default:
         DIE("INTERNAL ERROR: Unexpected return type: " << type);
     }
+
+    STD_FREE(stack_args);
 
     TRACE2("invoke", "exit method "
         << method->get_class()->name->bytes << " "

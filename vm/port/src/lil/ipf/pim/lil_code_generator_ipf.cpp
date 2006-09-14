@@ -13,9 +13,10 @@
  *  See the License for the specific language governing permissions and
  *  limitations under the License.
  */
+
 /** 
  * @author Intel, Evgueni Brevnov, Ivan Volosyuk
- * @version $Revision: 1.1.2.1.4.4 $
+ * @version $Revision$
  */  
 
 #include <assert.h>
@@ -2111,7 +2112,7 @@ LilCodeGeneratorIpf::LilCodeGeneratorIpf()
 {
 }
 
-NativeCodePtr LilCodeGeneratorIpf::compile_main(LilCodeStub* cs, size_t* stub_size, const char* stub_name, bool dump_stubs) {
+NativeCodePtr LilCodeGeneratorIpf::compile_main(LilCodeStub* cs, size_t* stub_size) {
 
     // start a memory manager
     tl::MemoryPool m;
@@ -2133,11 +2134,7 @@ NativeCodePtr LilCodeGeneratorIpf::compile_main(LilCodeStub* cs, size_t* stub_si
     emitter.copy((char*)buffer);
     flush_hw_cache((Byte*)buffer, *stub_size);
     sync_i_cache();
-
-#ifndef NDEBUG
-    if (dump_stubs)
-        dump((char *)buffer, stub_name, *stub_size);
-#endif
+    
     return buffer;
 }  // compile_main
 

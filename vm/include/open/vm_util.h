@@ -45,27 +45,6 @@ typedef struct String String;
 // #include "object_layout.h"
 #include "vm_threads.h"
 
-// This class encapsulates a set of OS/HW specific registers associated with a thread.
-class VmRegisterContext
-{
-public:
-    VmRegisterContext();
-    ~VmRegisterContext();
-    enum ContextFlag {
-        CF_FloatingPoint,
-            CF_Integer,
-            CF_Control,
-            CF_Debug,
-            CF_Segment
-    };
-    void setFlag(ContextFlag flag);
-    void getContext(VM_thread *thread);
-    void setContext(VM_thread *thread);
-    void getBspAndRnat(VM_thread* p_thr, uint64** bspstore, uint64* rnat); // for IPF only
-private:
-    void *_pcontext; // this would be a pointer to CONTEXT on NT
-};
-
 VMEXPORT void vm_exit(int exit_code);
 
 unsigned sizeof_java_lang_class();

@@ -22,13 +22,12 @@
 
 #include "devirtualizer.h"
 #include "Log.h"
-#include "PropertyTable.h"
 #include "Dominator.h"
 #include "inliner.h"
 
 namespace Jitrino {
 
-DEFINE_OPTPASS_IMPL(GuardedDevirtualizationPass, devirt, "Guarded Devirtualization of Virtual Calls")
+DEFINE_SESSION_ACTION(GuardedDevirtualizationPass, devirt, "Guarded Devirtualization of Virtual Calls")
 
 void
 GuardedDevirtualizationPass::_run(IRManager& irm) {
@@ -38,7 +37,7 @@ GuardedDevirtualizationPass::_run(IRManager& irm) {
     pass.guardCallsInRegion(irm, dominatorTree);
 }
 
-DEFINE_OPTPASS_IMPL(GuardRemovalPass, unguard, "Removal of Cold Guards")
+DEFINE_SESSION_ACTION(GuardRemovalPass, unguard, "Removal of Cold Guards")
 
 void
 GuardRemovalPass::_run(IRManager& irm) {
@@ -50,14 +49,12 @@ Devirtualizer::Devirtualizer(IRManager& irm)
 : _hasProfileInfo(irm.getFlowGraph().hasEdgeProfile()), 
   _typeManager(irm.getTypeManager()), 
   _instFactory(irm.getInstFactory()), _opndManager (irm.getOpndManager()) {
-    JitrinoParameterTable& propertyTable = irm.getParameterTable();
     
-    bool doProfileOnly = OptPass::inDPGOMode(irm);
-    _skipColdTargets = propertyTable.lookupBool("opt::devirt::skip_cold", true);
-    _doAggressiveGuardedDevirtualization = !doProfileOnly || propertyTable.lookupBool("opt::devirt::aggressive", true);
-    _doProfileOnlyGuardedDevirtualization = !_doAggressiveGuardedDevirtualization;
-    _devirtUseCHA = propertyTable.lookupBool("opt::devirt::useCHA", false);
-    _devirtSkipExceptionPath = propertyTable.lookupBool("opt::devirt::skip_exception_path", true);
+    const OptimizerFlags& optFlags = irm.getOptimizerFlags();
+    _skipColdTargets = optFlags.devirt_skip_cold_targets;
+    _doAggressiveGuardedDevirtualization = !_hasProfileInfo || optFlags.devirt_do_aggressive_guarded_devirtualization;
+    _devirtUseCHA = optFlags.devirt_devirt_use_cha;
+    _devirtSkipExceptionPath = optFlags.devirt_devirt_skip_exception_path;
 }
 
 bool
@@ -135,7 +132,7 @@ Devirtualizer::guardCallsInRegion(IRManager& regionIRM, DominatorTree* dtree) {
     StlDeque<DominatorNode *> dom_stack(regionIRM.getMemoryManager());
 
     dom_stack.push_back(dtree->getDominatorRoot());
-    CFGNode* node = NULL;
+    Node* node = NULL;
     DominatorNode *domNode = NULL;
     while (!dom_stack.empty()) {
 
@@ -164,20 +161,20 @@ Devirtualizer::guardCallsInRegion(IRManager& regionIRM, DominatorTree* dtree) {
 
 
 void
-Devirtualizer::genGuardedDirectCall(IRManager &regionIRM, CFGNode* node, Inst* call, MethodDesc* methodDesc, Opnd *tauNullChecked, Opnd *tauTypesChecked, uint32 argOffset) {
-    FlowGraph &regionFG = regionIRM.getFlowGraph();
+Devirtualizer::genGuardedDirectCall(IRManager &regionIRM, Node* node, Inst* call, MethodDesc* methodDesc, Opnd *tauNullChecked, Opnd *tauTypesChecked, uint32 argOffset) {
+    ControlFlowGraph &regionFG = regionIRM.getFlowGraph();
     assert(!methodDesc->isStatic());
     assert(call == node->getLastInst());
 
-    Log::cat_opt_inline()->ir << "Generating guarded direct call to " << methodDesc->getParentType()->getName() 
+    Log::out() << "Generating guarded direct call to " << methodDesc->getParentType()->getName() 
         << "." << methodDesc->getName() << ::std::endl;
-    Log::cat_opt_inline()->debug << "Guarded call bytecode size=" << (int) methodDesc->getByteCodeSize() << ::std::endl;
+    Log::out() << "Guarded call bytecode size=" << (int) methodDesc->getByteCodeSize() << ::std::endl;
 
     //
     // Compute successors of call site
     //
-    CFGNode* next = (CFGNode*) node->getUnconditionalEdge()->getTargetNode();
-    CFGNode* dispatch = (CFGNode*) node->getExceptionEdge()->getTargetNode();
+    Node* next =  node->getUnconditionalEdge()->getTargetNode();
+    Node* dispatch =  node->getExceptionEdge()->getTargetNode();
 
     //
     // Disconnect edges from call.
@@ -189,10 +186,10 @@ Devirtualizer::genGuardedDirectCall(IRManager &regionIRM, CFGNode* node, Inst* c
     //
     // Create nodes for guard, direct call, virtual call, and merge.
     //
-    CFGNode* guard = node;
-    CFGNode* directCallBlock = regionFG.createBlockNode();
-    CFGNode* virtualCallBlock = regionFG.createBlockNode();
-    CFGNode* merge = next;
+    Node* guard = node;
+    Node* directCallBlock = regionFG.createBlockNode(_instFactory.makeLabel());
+    Node* virtualCallBlock = regionFG.createBlockNode(_instFactory.makeLabel());
+    Node* merge = next;
 
     //
     // Reconnect graph with new nodes.  Connect to merge point later.
@@ -201,7 +198,7 @@ Devirtualizer::genGuardedDirectCall(IRManager &regionIRM, CFGNode* node, Inst* c
     regionFG.addEdge(guard, virtualCallBlock);
     regionFG.addEdge(directCallBlock, dispatch);
     regionFG.addEdge(virtualCallBlock, dispatch);
-    directCallBlock->setFreq(guard->getFreq());
+    directCallBlock->setExecCount(guard->getExecCount());
 
     //
     // Create direct call instruction
@@ -225,7 +222,7 @@ Devirtualizer::genGuardedDirectCall(IRManager &regionIRM, CFGNode* node, Inst* c
     assert(call_ii && new_ii);
     new_ii->getInlineChainFrom(*call_ii);
     
-    directCallBlock->append(directCall);
+    directCallBlock->appendInst(directCall);
 
     //
     // Create virtual call
@@ -246,10 +243,10 @@ Devirtualizer::genGuardedDirectCall(IRManager &regionIRM, CFGNode* node, Inst* c
         Inst* ldSlot2 = _instFactory.makeTauLdVirtFunAddrSlot(funPtr2, vtable,
                                                              tauVtableHasDesc,
                                                              ldSlot->getMethodDesc());
-        virtualCallBlock->append(ldSlot2);
+        virtualCallBlock->appendInst(ldSlot2);
         icall->setSrc(0, funPtr2);
     }
-    virtualCallBlock->append(virtualCall);
+    virtualCallBlock->appendInst(virtualCall);
 
     //
     // Promote a return operand (if one exists) of the call from a ssa temp to a var.
@@ -262,16 +259,16 @@ Devirtualizer::genGuardedDirectCall(IRManager &regionIRM, CFGNode* node, Inst* c
         
         VarOpnd* returnVar = _opndManager.createVarOpnd(dst->getType(), false);
         
-        CFGNode* directStVarBlock = regionFG.createBlockNode();
-        directStVarBlock->setFreq(directCallBlock->getFreq());
+        Node* directStVarBlock = regionFG.createBlockNode(_instFactory.makeLabel());
+        directStVarBlock->setExecCount(directCallBlock->getExecCount());
         regionFG.addEdge(directCallBlock, directStVarBlock)->setEdgeProb(1.0);
         Inst* stVar1 = _instFactory.makeStVar(returnVar, ssaTmp1);
-        directStVarBlock->append(stVar1);
+        directStVarBlock->appendInst(stVar1);
         
-        CFGNode* virtualStVarBlock = regionFG.createBlockNode();
+        Node* virtualStVarBlock = regionFG.createBlockNode(_instFactory.makeLabel());
         regionFG.addEdge(virtualCallBlock, virtualStVarBlock);
         Inst* stVar2 = _instFactory.makeStVar(returnVar, ssaTmp2);
-        virtualStVarBlock->append(stVar2);
+        virtualStVarBlock->appendInst(stVar2);
         
         Inst* ldVar = _instFactory.makeLdVar(dst, returnVar);
         Inst* phi = NULL;
@@ -292,7 +289,7 @@ Devirtualizer::genGuardedDirectCall(IRManager &regionIRM, CFGNode* node, Inst* c
         //
         bool needPhiBlock = (merge->getInDegree() > 0);
         if (needPhiBlock) {
-            CFGNode* phiBlock = regionFG.createBlockNode();
+            Node* phiBlock = regionFG.createBlockNode(_instFactory.makeLabel());
             regionFG.addEdge(phiBlock, merge);
             regionFG.addEdge(directStVarBlock, phiBlock)->setEdgeProb(1.0);
             regionFG.addEdge(virtualStVarBlock, phiBlock);
@@ -302,9 +299,9 @@ Devirtualizer::genGuardedDirectCall(IRManager &regionIRM, CFGNode* node, Inst* c
             regionFG.addEdge(virtualStVarBlock, merge);
         }
 
-        merge->prepend(ldVar);
+        merge->prependInst(ldVar);
         if(phi != NULL) 
-            merge->prepend(phi);
+            merge->prependInst(phi);
     } else{
         // Connect calls directly to merge.
         regionFG.addEdge(directCallBlock, merge)->setEdgeProb(1.0);
@@ -319,18 +316,17 @@ Devirtualizer::genGuardedDirectCall(IRManager &regionIRM, CFGNode* node, Inst* c
     ObjectType* baseType = (ObjectType*) base->getType();
     Opnd* dynamicVTableAddr = _opndManager.createSsaTmpOpnd(_typeManager.getVTablePtrType(baseType));
     Opnd* staticVTableAddr = _opndManager.createSsaTmpOpnd(_typeManager.getVTablePtrType(baseType));
-    guard->append(_instFactory.makeTauLdVTableAddr(dynamicVTableAddr, base,
+    guard->appendInst(_instFactory.makeTauLdVTableAddr(dynamicVTableAddr, base,
                                                   tauNullChecked));
-    guard->append(_instFactory.makeGetVTableAddr(staticVTableAddr, baseType));
-    guard->append(_instFactory.makeBranch(Cmp_EQ, Type::VTablePtr, dynamicVTableAddr, staticVTableAddr, directCallBlock->getLabel()));
+    guard->appendInst(_instFactory.makeGetVTableAddr(staticVTableAddr, baseType));
+    guard->appendInst(_instFactory.makeBranch(Cmp_EQ, Type::VTablePtr, dynamicVTableAddr, staticVTableAddr, (LabelInst*)directCallBlock->getFirstInst()));
 }
 
 bool
-Devirtualizer::doGuard(IRManager& irm, CFGNode* node, MethodDesc& methodDesc) {
-    double methodCount = Inliner::getProfileMethodCount(irm.getCompilationInterface(), methodDesc);
-    double blockCount = node->getFreq();
+Devirtualizer::doGuard(IRManager& irm, Node* node, MethodDesc& methodDesc) {
+    
 
-    if(_skipColdTargets && _hasProfileInfo && methodCount == 0)
+    if(_skipColdTargets && _hasProfileInfo && irm.getFlowGraph().getEntryNode()->getExecCount() == 0)
         return false;
 
     //
@@ -344,8 +340,6 @@ Devirtualizer::doGuard(IRManager& irm, CFGNode* node, MethodDesc& methodDesc) {
         return true;
     }
 
-
-
     //
     // Only de-virtualize if there's profile information for this
     // node and the apparent target.
@@ -353,18 +347,19 @@ Devirtualizer::doGuard(IRManager& irm, CFGNode* node, MethodDesc& methodDesc) {
     if(!_hasProfileInfo)
         return false;
 
-
-    return (blockCount <= methodCount);
+    double methodCount = irm.getFlowGraph().getEntryNode()->getExecCount();
+    double blockCount = node->getExecCount();
+    return (blockCount >= methodCount / 10.0);
 }
 
 void
-Devirtualizer::guardCallsInBlock(IRManager& regionIRM, CFGNode* node) {
+Devirtualizer::guardCallsInBlock(IRManager& regionIRM, Node* node) {
 
     //
     // Search node for guardian call
     //
     if(node->isBlockNode()) {
-        Inst* last = node->getLastInst();
+        Inst* last = (Inst*)node->getLastInst();
         MethodInst* methodInst = 0;
         Opnd* base = 0;
         Opnd* tauNullChecked = 0;
@@ -389,14 +384,14 @@ Devirtualizer::guardCallsInBlock(IRManager& regionIRM, CFGNode* node) {
 
                     if(!iterator->hasNext()) {
                         // No candidate
-						Log::cat_opt_inline()->fail << "CHA no candidate " << baseType->getName() << "::" << methodDesc->getName() << methodDesc->getSignatureString() << ::std::endl;
+                        Log::out() << "CHA no candidate " << baseType->getName() << "::" << methodDesc->getName() << methodDesc->getSignatureString() << ::std::endl;
                         jitrino_assert(regionIRM.getCompilationInterface(),0);
                     }
                 
                     MethodDesc* newMethodDesc = iterator->getNext();
                     if(!iterator->hasNext()) {
                         // Only one candidate
-                        Log::cat_opt_inline()->debug << "CHA devirtualize " << baseType->getName() << "::" << methodDesc->getName() << methodDesc->getSignatureString() << ::std::endl;
+                        Log::out() << "CHA devirtualize " << baseType->getName() << "::" << methodDesc->getName() << methodDesc->getSignatureString() << ::std::endl;
                         if(!baseType->isNullObject() && (!baseType->isAbstract() || baseType->isArray()) && !baseType->isInterface()) {
                             assert(newMethodDesc == methodDesc);
                         }
@@ -423,7 +418,7 @@ Devirtualizer::guardCallsInBlock(IRManager& regionIRM, CFGNode* node) {
                         new_ii->getInlineChainFrom(*call_ii);
 
                         last->unlink();
-                        node->append(directCall);
+                        node->appendInst(directCall);
                         done = true;
                     }
                 }
@@ -447,12 +442,12 @@ Devirtualizer::guardCallsInBlock(IRManager& regionIRM, CFGNode* node) {
                         // Try to guard this call
                         //
                         if(doGuard(regionIRM, node, *methodDesc)) {
-                            Log::cat_opt_inline()->debug << "Guard call to " << baseType->getName() << "::" << methodDesc->getName() << ::std::endl;
+                            Log::out() << "Guard call to " << baseType->getName() << "::" << methodDesc->getName() << ::std::endl;
                             genGuardedDirectCall(regionIRM, node, last, methodDesc, tauNullChecked,
                                                  tauTypesChecked, argOffset);
-                            Log::cat_opt_inline()->debug << "Done guarding call to " << baseType->getName() << "::" << methodDesc->getName() << ::std::endl;
+                            Log::out() << "Done guarding call to " << baseType->getName() << "::" << methodDesc->getName() << ::std::endl;
                         } else {
-                            Log::cat_opt_inline()->debug << "Don't guard call to " << baseType->getName() << "::" << methodDesc->getName() << ::std::endl;
+                            Log::out() << "Don't guard call to " << baseType->getName() << "::" << methodDesc->getName() << ::std::endl;
                         }
                     }
                 }
@@ -485,28 +480,28 @@ Devirtualizer::isPreexisting(Opnd* obj) {
 
 void
 Devirtualizer::unguardCallsInRegion(IRManager& regionIRM, uint32 safetyLevel) {
-    FlowGraph &regionFG = regionIRM.getFlowGraph();
+    ControlFlowGraph &regionFG = regionIRM.getFlowGraph();
     if(!regionFG.hasEdgeProfile())
         return;
 
     //
     // Search for previously guarded virtual calls
     //
-    MemoryManager mm(regionFG.getMaxNodeId()*sizeof(CFGNode*), "Devirtualizer::unguardCallsInRegion.mm");
-    StlVector<CFGNode*> nodes(mm);
+    MemoryManager mm(regionFG.getMaxNodeId()*sizeof(Node*), "Devirtualizer::unguardCallsInRegion.mm");
+    Nodes nodes(mm);
     regionFG.getNodesPostOrder(nodes);
-    StlVector<CFGNode*>::reverse_iterator i;
+    StlVector<Node*>::reverse_iterator i;
     for(i = nodes.rbegin(); i != nodes.rend(); ++i) {
-        CFGNode* node = *i;
-        Inst* last = node->getLastInst();
+        Node* node = *i;
+        Inst* last = (Inst*)node->getLastInst();
         if(last->isBranch()) {
             //
             // Check if branch is a guard
             //
             assert(last->getOpcode() == Op_Branch);
             BranchInst* branch = last->asBranchInst();
-            CFGNode* dCallNode = (CFGNode*) node->getTrueEdge()->getTargetNode(); 
-            CFGNode* vCallNode = (CFGNode*) node->getFalseEdge()->getTargetNode(); 
+            Node* dCallNode =  node->getTrueEdge()->getTargetNode(); 
+            Node* vCallNode =  node->getFalseEdge()->getTargetNode(); 
 
             if(branch->getComparisonModifier() != Cmp_EQ)
                 continue;
@@ -519,8 +514,8 @@ Devirtualizer::unguardCallsInRegion(IRManager& regionIRM, uint32 safetyLevel) {
             if(src0->getInst()->getOpcode() != Op_TauLdVTableAddr || src1->getInst()->getOpcode() != Op_GetVTableAddr)
                 continue;
 
-            Inst* ldvfnslot = vCallNode->getFirstInst()->next();
-            Inst* callimem = ldvfnslot->next();
+            Inst* ldvfnslot = (Inst*)vCallNode->getSecondInst();
+            Inst* callimem = ldvfnslot->getNextInst();
             if(ldvfnslot->getOpcode() != Op_TauLdVirtFunAddrSlot || callimem->getOpcode() != Op_IndirectMemoryCall)
                 continue;
 
@@ -529,10 +524,10 @@ Devirtualizer::unguardCallsInRegion(IRManager& regionIRM, uint32 safetyLevel) {
             //
             bool fold = false;
             bool foldDirect = false;
-            if(node->getFreq() == 0) {
+            if(node->getExecCount() == 0) {
                 fold = true;
                 foldDirect = false;
-            } else if(vCallNode->getFreq() == 0) {
+            } else if(vCallNode->getExecCount() == 0) {
                 if(safetyLevel == 0) {
                     fold = false;
                 } else if(safetyLevel == 1) {
@@ -543,7 +538,7 @@ Devirtualizer::unguardCallsInRegion(IRManager& regionIRM, uint32 safetyLevel) {
                     fold = true;
                 }
                 foldDirect = true;
-            } else if(dCallNode->getFreq() == 0) {
+            } else if(dCallNode->getExecCount() == 0) {
                 fold = true;
                 foldDirect = false;
             }

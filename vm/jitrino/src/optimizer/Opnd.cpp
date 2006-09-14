@@ -88,7 +88,7 @@ void  OpndManager::deleteVar(VarOpnd *var) {
     while (inst != NULL) {
         VarOpnd *instVar = inst->getBaseVar();
         if (!instVar || (instVar == var)) {
-            if (Log::cat_opt_vn()->isDebugEnabled()) {
+            if (Log::isEnabled()) {
                 Log::out() << "Removing inst ";
                 inst->print(Log::out());
                 Log::out() << " for deleted var ";
@@ -97,7 +97,7 @@ void  OpndManager::deleteVar(VarOpnd *var) {
             }
             inst->unlink();
         } else {
-            if (Log::cat_opt_vn()->isDebugEnabled()) {
+            if (Log::isEnabled()) {
                 Log::out() << "Found misfiled varAccessInst ";
                 inst->print(Log::out());
                 Log::out() << " for deleted var ";
@@ -108,7 +108,7 @@ void  OpndManager::deleteVar(VarOpnd *var) {
             if (instVar->isDeadFlag) {
                 // looks already deleted;
                 inst->unlink();
-                if (Log::cat_opt_vn()->isDebugEnabled()) {
+                if (Log::isEnabled()) {
                     Log::out() << "Correct var looks already deleted, so removing inst anyway."
                                << ::std::endl;
                 }
@@ -151,10 +151,12 @@ OpndManager::getOpndTypeFromLdType(Type* ldType) {
     case Type::Float:
         return typeManager.getFloatType();
         // object types
-    case Type::CompressedSystemObject:    case Type::CompressedSystemString:
+    case Type::CompressedSystemObject:
+    case Type::CompressedSystemClass:
+    case Type::CompressedSystemString:
     case Type::CompressedArray:           case Type::CompressedObject:
     case Type::CompressedNullObject:
-    case Type::SystemObject:    case Type::SystemString:
+    case Type::SystemObject:    case Type::SystemClass:    case Type::SystemString:
     case Type::Array:           case Type::Object:
     case Type::NullObject:
     case Type::Offset:  case Type::OffsetPlusHeapbase:

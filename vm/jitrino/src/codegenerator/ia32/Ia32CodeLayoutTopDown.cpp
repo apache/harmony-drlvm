@@ -33,15 +33,15 @@ namespace Ia32 {
 
 TopDownLayout::TopDownLayout(IRManager* irm) 
 : Linearizer(irm), 
-memManager(40*irm->getMaxNodeId(), "ia32::topdown_layout"),
+memManager(40*irm->getFlowGraph()->getMaxNodeId(), "ia32::topdown_layout"),
 lastBlk(NULL), 
 neighboursBlocks(memManager),
-blockInfos(memManager, irm->getMaxNodeId()+1, NULL)
+blockInfos(memManager, irm->getFlowGraph()->getMaxNodeId(), NULL)
 {
-    const Nodes& nodes = irManager->getNodes();
+    const Nodes& nodes = irManager->getFlowGraph()->getNodes();
     for (Nodes::const_iterator it = nodes.begin(), end = nodes.end(); it!=end; ++it)  {
         Node * node=*it;
-        if (node->hasKind(Node::Kind_BasicBlock)){
+        if (node->isBlockNode()){
             TopDownLayoutBlockInfo* info = new (memManager) TopDownLayoutBlockInfo();
             info->block = (BasicBlock*)node;
             blockInfos[node->getId()]= info;
@@ -51,41 +51,29 @@ blockInfos(memManager, irm->getMaxNodeId()+1, NULL)
 
 //  Do complete top down code layout
 void TopDownLayout::linearizeCfgImpl() {
-    irManager->updateExecCounts();
-#ifdef _DEBUG
-    ensureProfileIsValid();
-#endif
+    assert(irManager->getFlowGraph()->isEdgeProfileConsistent());
     BasicBlock * blk;
-    startBlockLayout();
-    while ((blk = pickLayoutCandidate()) != NULL) {
-        layoutBlock(blk);
-    }
-    endBlockLayout();
-}
 
-
-// Start top down block layout
-void TopDownLayout::startBlockLayout() {
     lastBlk = NULL;
 
     // Check that nodes have no layout successors set
 #ifdef _DEBUG
-    for (CFG::NodeIterator it(*irManager, CFG::OrderType_Postorder); it.getNode()!=NULL; ++it){
-        Node * node=it.getNode();
-        if (node->hasKind(Node::Kind_BasicBlock)){
+    const Nodes& postOrderNodes = irManager->getFlowGraph()->getNodesPostOrder();
+    for (Nodes::const_iterator it = postOrderNodes.begin(), end = postOrderNodes.end(); it!=end; ++it) {
+        Node* node = *it;
+        if (node->isBlockNode()){
             assert(((BasicBlock *)node)->getLayoutSucc()==NULL);
         }
     }
 #endif
-}
 
-// Called at the end of top down layout
-void TopDownLayout::endBlockLayout() {
-
-	if (lastBlk) {
-        fixBranches(lastBlk);
+    while ((blk = pickLayoutCandidate()) != NULL) {
+        layoutBlock(blk);
     }
 }
+
+
+
 
 
 
@@ -93,10 +81,10 @@ void TopDownLayout::endBlockLayout() {
 void TopDownLayout::layoutBlock(BasicBlock *blk) {
     TopDownLayoutBlockInfo* bInfo = blockInfos[blk->getId()];
     assert(!bInfo->isLayouted());
-    if (Log::cat_cg()->isDebugEnabled()) {
+    if (Log::isEnabled()) {
         Log::out() << "layoutBlock(";
         IRPrinter::printNodeName(Log::out(), blk);
-        Log::out() << ")" << ::std::endl;
+        Log::out() << ")" << std::endl;
     }
     // Remove the block from the localityMap if it is there
     if (bInfo->isLayoutNeighbour()) {
@@ -106,11 +94,9 @@ void TopDownLayout::layoutBlock(BasicBlock *blk) {
 
     if (lastBlk) {
         lastBlk->setLayoutSucc(blk);
-        // Add/fix any branches due to this layout decision.
-        fixBranches(lastBlk);
     } else {
         // Check our assumption that the first block laid-out is the entry block.
-        assert(blk== irManager->getPrologNode());
+        assert(blk== irManager->getFlowGraph()->getEntryNode());
     }
     lastBlk = blk;
 }
@@ -123,7 +109,7 @@ void TopDownLayout::layoutBlock(BasicBlock *blk) {
 BasicBlock * TopDownLayout::pickLayoutCandidate() {
     if (lastBlk == NULL) {
         // Layout the entry block
-        return irManager->getPrologNode();
+        return (BasicBlock*)irManager->getFlowGraph()->getEntryNode();
     }
     // Return most likely successor of lastBlk if it has not already been placed
     // and if branch inversion is either not needed or is possible 
@@ -131,28 +117,28 @@ BasicBlock * TopDownLayout::pickLayoutCandidate() {
     // successors, pick the one that is not a Join block. This will help 
     // reduce taken branches.
     Edge *bestEdge = NULL;
-    const Edges& outEdges=lastBlk->getEdges(Direction_Out);
-    for(Edge* edge = outEdges.getFirst(); edge!=NULL; edge = outEdges.getNext(edge)) {
-        Node *succ = edge->getNode(Direction_Head);
-        if (!succ->hasKind(Node::Kind_BasicBlock)) {
+    const Edges& outEdges=lastBlk->getOutEdges();
+    for (Edges::const_iterator ite = outEdges.begin(), ende = outEdges.end(); ite!=ende; ++ite) {
+        Edge* edge = *ite;
+        Node *succ = edge->getTargetNode();
+        if (!succ->isBlockNode()) {
             continue;
         }
         TopDownLayoutBlockInfo* info =  blockInfos[succ->getId()];
         if (info->isLayouted() ) {
             continue;
         }
-        if (!edge->isFallThroughEdge() && !canEdgeBeMadeToFallThrough(edge)) {
+        if (!edge->isFalseEdge() && !canEdgeBeMadeToFallThrough(edge)) {
             continue;
         }
         if (bestEdge == NULL) {
             bestEdge = edge;
         }
-        double bestEdgeWeight = bestEdge->getProbability();
-        double edgeWeight = edge->getProbability();
+        double bestEdgeWeight = bestEdge->getEdgeProb();
+        double edgeWeight = edge->getEdgeProb();
 
         if ( edgeWeight > bestEdgeWeight || (edgeWeight >= bestEdgeWeight * PROB_SIMILAR_FACTOR 
-            && edge->getNode(Direction_Head)->getEdges(Direction_In).getCount() == 1 
-            &&  bestEdge->getNode(Direction_Head)->getEdges(Direction_In).getCount() > 1)) 
+            && edge->getTargetNode()->getInDegree() == 1 && bestEdge->getTargetNode()->getInDegree() > 1)) 
         {
             bestEdge = edge;
         }
@@ -161,7 +147,7 @@ BasicBlock * TopDownLayout::pickLayoutCandidate() {
     // Before returning or choosing a block from the connectivity map, update 
     // the layoutValue information to successors not chosen or already laid out. 
     if (bestEdge) {
-        BasicBlock* headBlock = (BasicBlock*)bestEdge->getNode(Direction_Head);
+        BasicBlock* headBlock = (BasicBlock*)bestEdge->getTargetNode();
         processSuccLayoutValue(lastBlk, headBlock);
         return headBlock;
     }
@@ -178,7 +164,7 @@ BasicBlock * TopDownLayout::pickLayoutCandidate() {
         prevInfo = bInfo;
     }
 #endif
-    if (Log::cat_cg()->isDebugEnabled()) {
+    if (Log::isEnabled()) {
         printConnectedBlkMap(Log::out());
     }
 
@@ -188,7 +174,7 @@ BasicBlock * TopDownLayout::pickLayoutCandidate() {
 
     TopDownLayoutBlockInfo* info = *neighboursBlocks.begin();
     BasicBlock * locBlk = info->block;
-    if (Log::cat_cg()->isDebugEnabled()) {
+    if (Log::isEnabled()) {
         Log::out() << "Picking ";
         IRPrinter::printNodeName(Log::out(), locBlk);
         Log::out() << " " << info->layoutValue<< ::std::endl;
@@ -202,30 +188,29 @@ BasicBlock * TopDownLayout::pickLayoutCandidate() {
 // If a successor is a dispatch node, recursively process its successors, since 
 // dispatch nodes are not being laid out.
 void TopDownLayout::processSuccLayoutValue(Node *node,  BasicBlock * layoutSucc) {
-    const Edges& outEdges = node->getEdges(Direction_Out);
-    for (Edge *edge = outEdges.getFirst();edge; edge = outEdges.getNext(edge)) {
-        Node *succ = edge->getNode(Direction_Head);
-        if (succ->hasKind(Node::Kind_DispatchNode)) {
+    const Edges& outEdges = node->getOutEdges();
+    for (Edges::const_iterator ite = outEdges.begin(), ende = outEdges.end(); ite!=ende; ++ite) {
+        Edge* edge = *ite;
+        Node *succ = edge->getTargetNode();
+        if (succ->isDispatchNode()) {
             processSuccLayoutValue(succ, layoutSucc);
-        } else if (succ->hasKind(Node::Kind_BasicBlock)) {
+        } else if (succ->isBlockNode()) {
             TopDownLayoutBlockInfo* succInfo = blockInfos[succ->getId()];
             if (succ != layoutSucc && !succInfo->isLayouted()) {
                 if (succInfo->isLayoutNeighbour()) { //remove from sorted map and insert latter to sort again.
                     neighboursBlocks.erase(succInfo);
                 } 
-                succInfo->layoutValue+=node->getExecCnt() * edge->getProbability();
+                succInfo->layoutValue+=node->getExecCount() * edge->getEdgeProb();
                 succInfo->state = TopDownLayoutBlockInfo::LAYOUT_NEIGHBOUR;
                 neighboursBlocks.insert(succInfo);
 
-                if (Log::cat_cg()->isDebugEnabled()) {
+                if (Log::isEnabled()) {
                     Log::out() << "Block ";
                     IRPrinter::printNodeName(Log::out(), succInfo->block);
-                    Log::out() << " is in neighbors set." << ::std::endl;
+                    Log::out() << " is in neighbors set." << std::endl;
                 }
             }
-        } else  {
-            assert(succ->hasKind(Node::Kind_UnwindNode) || succ->hasKind(Node::Kind_ExitNode));
-        }
+        } 
     }
 }
 

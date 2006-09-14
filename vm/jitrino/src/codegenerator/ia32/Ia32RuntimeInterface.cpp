@@ -30,8 +30,12 @@ namespace Jitrino
 namespace Ia32{
 
 void RuntimeInterface::unwindStack(MethodDesc* methodDesc, JitFrameContext* context, bool isFirst) {
-	StackInfo stackInfo;
+    StackInfo stackInfo;
+#ifdef _EM64T_
+    stackInfo.read(methodDesc, *context->p_rip, isFirst);
+#else
     stackInfo.read(methodDesc, *context->p_eip, isFirst);
+#endif
     stackInfo.unwind(methodDesc, context, isFirst);
 }
 
@@ -41,19 +45,28 @@ void* RuntimeInterface::getAddressOfThis(MethodDesc * methodDesc, const JitFrame
         static const uint64 default_this=0;
         return (void*)&default_this;
     }
-	assert(context);
-	StackInfo stackInfo;
+    assert(context);
+    StackInfo stackInfo;
+#ifdef _EM64T_
+    stackInfo.read(methodDesc, *context->p_rip, isFirst);
+    assert(isFirst || (POINTER_SIZE_INT)context->p_rip+8 == context->rsp);
+    return (void *)(context->rsp + stackInfo.getStackDepth() + (int)stackInfo.getOffsetOfThis());
+#else
     stackInfo.read(methodDesc, *context->p_eip, isFirst);
-	 
-	assert(isFirst || (uint32)context->p_eip+4 == context->esp);
-	return (void *)(context->esp + stackInfo.getStackDepth() + stackInfo.getOffsetOfThis());
+    assert(isFirst || (uint32)context->p_eip+4 == context->esp);
+    return (void *)(context->esp + stackInfo.getStackDepth() + stackInfo.getOffsetOfThis());
+#endif
 }
 
 void  RuntimeInterface::fixHandlerContext(MethodDesc* methodDesc, JitFrameContext* context, bool isFirst)
 {
-	StackInfo stackInfo;
+    StackInfo stackInfo;
+#ifdef _EM64T_
+    stackInfo.read(methodDesc, *context->p_rip, isFirst);
+#else
     stackInfo.read(methodDesc, *context->p_eip, isFirst);
-	stackInfo.fixHandlerContext(context);
+#endif
+    stackInfo.fixHandlerContext(context);
 }
 
 bool RuntimeInterface::getBcLocationForNative(MethodDesc* method, uint64 native_pc, uint16 *bc_pc)
@@ -70,9 +83,9 @@ bool RuntimeInterface::getBcLocationForNative(MethodDesc* method, uint64 native_
     if (bcOffset != ILLEGAL_VALUE) {
         *bc_pc = (uint16)bcOffset;
         return true;
-    } else if (Log::cat_rt()->isWarnEnabled()) {
+    } else if (Log::isLogEnabled(LogStream::RT)) {
         methName = method->getName();
-        Log::cat_rt()->out() << "Byte code for method: " << methName << " IP = " << native_pc 
+        Log::log(LogStream::RT) << "Byte code for method: " << methName << " IP = " << native_pc 
                 << " not found " << std::endl;
     }
     return false;
@@ -90,21 +103,26 @@ bool RuntimeInterface::getNativeLocationForBc(MethodDesc* method, uint16 bc_pc, 
     if (ncAddr != ILLEGAL_VALUE) {
         *native_pc =  ncAddr;
         return true;
-    } else if (Log::cat_rt()->isWarnEnabled()) {
+    } else if (Log::isLogEnabled(LogStream::RT)) {
         methName = method->getName();
-        Log::cat_rt()->out() << "Byte code for method: " << methName << " IP = " << native_pc 
+        Log::log(LogStream::RT) << "Byte code for method: " << methName << " IP = " << native_pc 
                 << " not found " << std::endl;
     }
     return false;
 }
 
-uint32	RuntimeInterface::getInlineDepth(InlineInfoPtr ptr, uint32 offset) {
+uint32  RuntimeInterface::getInlineDepth(InlineInfoPtr ptr, uint32 offset) {
     return InlineInfoMap::get_inline_depth(ptr, offset);
 }
 
-Method_Handle	RuntimeInterface::getInlinedMethod(InlineInfoPtr ptr, uint32 offset, uint32 inline_depth) {
+Method_Handle   RuntimeInterface::getInlinedMethod(InlineInfoPtr ptr, uint32 offset, uint32 inline_depth) {
     return InlineInfoMap::get_inlined_method(ptr, offset, inline_depth);
 }
+
+uint16 RuntimeInterface::getInlinedBc(InlineInfoPtr ptr, uint32 offset, uint32 inline_depth) {
+    return InlineInfoMap::get_inlined_bc(ptr, offset, inline_depth);
+}
+
 
 }}; //namespace Ia32
 

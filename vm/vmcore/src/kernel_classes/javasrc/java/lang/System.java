@@ -22,15 +22,16 @@ import java.io.FileOutputStream;
 import java.io.FilterOutputStream;
 import java.io.InputStream;
 import java.io.PrintStream;
+import java.io.IOException;
 import java.security.SecurityPermission;
 import java.util.Collections;
-import java.util.Hashtable;
 import java.util.Map;
 import java.util.Properties;
 import java.util.PropertyPermission;
+import java.nio.channels.spi.SelectorProvider;
+import java.nio.channels.Channel;
 
 import org.apache.harmony.lang.RuntimePermissionCollection;
-import org.apache.harmony.misc.SystemUtils;
 import org.apache.harmony.vm.VMStack;
 
 /**
@@ -40,10 +41,6 @@ import org.apache.harmony.vm.VMStack;
  * @version $Revision: 1.1.2.2.4.3 $
  */
 public final class System {
-
-    static {
-        initNanoTime();
-    }
 
     /**
      * This class can not be instantiated.
@@ -87,7 +84,9 @@ public final class System {
     /**
      * @com.intel.drl.spec_ref
      */
-    public static native long currentTimeMillis();
+    public static long currentTimeMillis() {
+        return VMExecutionEngine.currentTimeMillis();
+    }
 
     /**
      * @com.intel.drl.spec_ref
@@ -108,29 +107,24 @@ public final class System {
      */
     public static String getenv(String name) {
         if (name == null) {
-            throw new NullPointerException();
+            throw new NullPointerException("name should not be null");
         }
         SecurityManager sm = securityManager;
         if (sm != null) {
             sm.checkPermission(new RuntimePermission("getenv." + name));
         }
-        return getenvUnsecure(name);
+        return VMExecutionEngine.getenv(name);
     }
 
-    // FIXME: MODIFY THE SIGNATURE FOR 1.5
     /**
      * @com.intel.drl.spec_ref
      */
-    public static Map getenv() {
+    public static Map<String, String> getenv() {
         SecurityManager sm = securityManager;
         if (sm != null) {
             sm.checkPermission(RuntimePermissionCollection.GETENV_PERMISSION);
         }
-        Map envMap = getenvUnsecure();
-        if (envMap == null) {
-            envMap = new Hashtable();
-        }
-        return Collections.unmodifiableMap(envMap);
+        return Collections.unmodifiableMap(VMExecutionEngine.getenv());
     }
 
     /**
@@ -192,18 +186,9 @@ public final class System {
         return VMMemoryManager.getIdentityHashCode(object);
     }
 
-/*
-//	#########################################################################################
-//	############################### 1.5 extention start #####################################
-//	#########################################################################################
-
-//import java.nio.channels.spi.SelectorProvider; //move this above later
-//import java.nio.channels.Channel;              //move this above later
-//import java.io.IOException;                    //move this above later
-
-    / **
+    /**
      * @com.intel.drl.spec_ref
-     * /
+     */
     public static Channel inheritedChannel() throws IOException{
     	//XXX:does it mean the permission of the "access to the channel"?
     	//If YES then this checkPermission must be removed because it should be presented into java.nio.channels.spi.SelectorProvider.inheritedChannel()
@@ -216,49 +201,39 @@ public final class System {
         return SelectorProvider.provider().inheritedChannel();
     }
 
-//	#########################################################################################
-//	############################### 1.5 extention end #######################################
-//	#########################################################################################
-*/
-
     /**
      * @com.intel.drl.spec_ref
      */
     public static void load(String filename) {
         Runtime.getRuntime().load0(
-                                   filename,
-                                   VMClassRegistry.getClassLoader(VMStack
-                                       .getCallerClass(0)), true);
+                filename,
+                VMClassRegistry.getClassLoader(VMStack.getCallerClass(0)), 
+                true);
     }
 
     public static void loadLibrary(String libname) {
         Runtime.getRuntime().loadLibrary0(
-                                          libname,
-                                          VMClassRegistry
-                                              .getClassLoader(VMStack
-                                                  .getCallerClass(0)), true);
+                libname,
+                VMClassRegistry.getClassLoader(VMStack.getCallerClass(0)), 
+                true);
     }
 
     /**
-     * @com.intel.drl.spec_ref Note: Only Windows and Linux operating systems
-     *                         are supported by current version
+     * @com.intel.drl.spec_ref
      */
     public static String mapLibraryName(String libname) {
-        switch (SystemUtils.getOS()) {
-        case SystemUtils.OS_WINDOWS:
-            return libname + ".dll";
-        case SystemUtils.OS_LINUX:
-            return "lib" + libname + ".so";
-        default:
-            throw new UnsupportedOperationException(
-                "The operation is supported for Windows and Linux operating systems only");
+        if (libname == null) {
+            throw new NullPointerException("libname should not be empty");
         }
+        return VMExecutionEngine.mapLibraryName(libname);
     }
   
     /**
      * @com.intel.drl.spec_ref
      */
-    public static native long nanoTime();
+    public static long nanoTime() {
+        return VMExecutionEngine.nanoTime();
+    }
 
     /**
      * @com.intel.drl.spec_ref
@@ -310,9 +285,10 @@ public final class System {
     /**
      * @com.intel.drl.spec_ref
      */
-    public static synchronized void setProperties(Properties props) {
-        if (securityManager != null) {
-            securityManager.checkPropertiesAccess();
+    public static void setProperties(Properties props) {
+        SecurityManager sm = securityManager;
+        if (sm != null) {
+            sm.checkPropertiesAccess();
         }
         systemProperties = props;
     }
@@ -368,7 +344,7 @@ public final class System {
         // crash while initialization of main Thread object
         //
         // Correct fix of the problem is closing out and err print streams on VM
-        // exit for example, in Runtime.exit(). Another bug prevents us of doing
+        // exit for example, in Runtime.exit(). Another bug	 prevents us of doing
         // such thing
         return new PrintStream(new FilterOutputStream(new FileOutputStream(
             FileDescriptor.err)), true);
@@ -398,11 +374,12 @@ public final class System {
      * Returns system properties without security checks. Initializes the system
      * properties if it isn't done yet.
      */
-    private static synchronized Properties getPropertiesUnsecure() {
-        if (systemProperties == null) {
-            systemProperties = VMExecutionEngine.getProperties();
+    private static Properties getPropertiesUnsecure() {
+        Properties sp = systemProperties;
+        if (sp == null) {
+            systemProperties = sp = VMExecutionEngine.getProperties();
         }
-        return systemProperties;
+        return sp;
     }
 
     /**
@@ -420,25 +397,12 @@ public final class System {
      */
     private static native void setOutUnsecure(PrintStream out);
 
-    // FIXME: MODIFY THE SIGNATURE FOR 1.5
     /**
-     * Returns enviromnent variables to values map without any security checks
-     */
-    private static native Map getenvUnsecure();
-
-    /**
-     * Returns the value of the environment variable specified by
-     * <code>name</code> argument or <code>null</code> if it is not set
-     */
-    private static native String getenvUnsecure(String name);
-
-    /**
-     * Initializes nanosecond system timer
-     */
-    private static native void initNanoTime();
-
-    /**
-     *  To rethrow without mentioning within throws clause.
+     *  Helps to throw an arbitrary throwable without mentioning within 
+     *  <code>throw</code> clause and so bypass 
+     *  exception checking by a compiler.
+     *  
+     *  @see java.lang.Class#newInstance()
      */
     native static void rethrow(Throwable tr);
 }

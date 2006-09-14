@@ -334,13 +334,9 @@ void Objects_To_Finalize::run_finalizers()
     tmn_suspend_enable();
 
     if (exn_raised()) {
-        jobject exc = exn_get();
-        tmn_suspend_disable();
-        assert(exc->object->vt()->clss);
         INFO2("finalize", "Uncaught exception "
-            << class_get_name(exc->object->vt()->clss)
+            << exn_get_name()
             << " while running a wakeFinalization in FinalizerThread");
-        tmn_suspend_enable();
         exn_clear();
     }
     p_TLS_vmthread->finalize_thread_flags &= ~FINALIZER_STARTER;
@@ -389,19 +385,20 @@ int Objects_To_Finalize::do_finalization(int quantity) {
             continue;
         }
         
-        Method *finalize = class_lookup_method_recursive(clss, "finalize", "()V");
+        Method *finalize = class_lookup_method_recursive(clss,
+            VM_Global_State::loader_env->FinalizeName_String,
+            VM_Global_State::loader_env->VoidVoidDescriptor_String);
+
         assert(finalize);
         TRACE2("finalize", "finalize object " << class_get_name(handle->object->vt()->clss));
         vm_execute_java_method_array( (jmethodID) finalize, 0, args);
         tmn_suspend_enable();
         
         if (exn_raised()) {
-            jobject exc = exn_get();
             tmn_suspend_disable();
-            assert(exc->object->vt()->clss);
             assert(handle->object->vt()->clss);
             INFO2("finalize", "Uncaught exception "
-                << class_get_name(exc->object->vt()->clss)
+                << exn_get_name()
                 << " while running a finalize of the object"
                 << class_get_name(object->vt()->clss) << ".");
             tmn_suspend_enable();
@@ -436,18 +433,18 @@ void References_To_Enqueue::enqueue_references()
         assert(handle->object->vt()->clss);
         Class *clss = handle->object->vt()->clss;
         TRACE2("ref","Enqueueing reference " << (handle->object));
-        Method *enqueue = class_lookup_method_recursive(clss, "enqueue", "()Z");
+        Method *enqueue = class_lookup_method_recursive(clss,
+            VM_Global_State::loader_env->EnqueueName_String,
+            VM_Global_State::loader_env->VoidBooleanDescriptor_String);
         assert(enqueue);
         vm_execute_java_method_array( (jmethodID) enqueue, &r, args);
         tmn_suspend_enable();
 
         if (exn_raised()) {
-            jobject exc = exn_get();
             tmn_suspend_disable();
-            assert(exc->object->vt()->clss);
             assert(object->vt()->clss);
             INFO2("ref", "Uncaught exception "
-                << class_get_name(exc->object->vt()->clss)
+                << exn_get_name()
                 << " while running a enqueue method of the object"
                 << class_get_name(object->vt()->clss) << ".");
             tmn_suspend_enable();

@@ -38,41 +38,11 @@
 #include "interpreter_exports.h"
 #include "environment.h"
 #include "suspend_checker.h"
+#include "stack_iterator.h"
 
 
 #define MAX_JVMTI_ENV_NUMBER 10
 static JNIEnv * jvmti_test_jenv = jni_native_intf;
-
-Boolean is_valid_thread_object(jthread thread)
-{
-    if (NULL == thread){
-        return false;
-    }
-
-    tmn_suspend_disable();       //---------------------------------v
-    ObjectHandle h = (ObjectHandle)thread;
-    ManagedObject *mo = h->object;
-
-    // Check that reference pointer points to the heap
-    if (mo < (ManagedObject *)Class::heap_base ||
-        mo > (ManagedObject *)Class::heap_end){
-        tmn_suspend_enable();
-        return false;
-    }
-
-    // Check that object is an instance of java.lang.Thread or extends it
-    if (mo->vt() == NULL){
-        tmn_suspend_enable();
-        return false;
-    }
-
-    Class *object_clss = mo->vt()->clss;
-    Class *thread_class = VM_Global_State::loader_env->java_lang_Thread_Class;
-    Boolean result = class_is_subtype_fast(object_clss->vtable, thread_class);
-    tmn_suspend_enable();        //---------------------------------^
-
-    return result;
-}
 
 /*
  * Get Thread State
@@ -832,7 +802,7 @@ jvmtiGetThreadLocalStorage(jvmtiEnv* env,
     }
     if ((state & JVMTI_THREAD_STATE_ALIVE) == 0){
         return JVMTI_ERROR_THREAD_NOT_ALIVE;
-}
+    }
 
     *data_ptr = NULL;
 
@@ -863,3 +833,4 @@ jvmtiGetThreadLocalStorage(jvmtiEnv* env,
 
     return JVMTI_ERROR_NONE;
 }
+

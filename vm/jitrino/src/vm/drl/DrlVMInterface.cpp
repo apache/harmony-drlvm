@@ -25,8 +25,9 @@
 #include <assert.h>
 
 #include "DrlVMInterface.h"
+#include "CompilationContext.h"
 #include "Log.h"
-#include "Jitrino.h"
+#include "JITInstanceContext.h"
 #include "jit_intf.h"
 
 
@@ -79,6 +80,11 @@ flagTLSSuspendRequestOffset(){
         return thread_get_suspend_request_offset();
 }
 
+uint32
+flagTLSThreadStateOffset() {
+    return thread_get_thread_state_flag_offset();
+}
+
 //////////////////////////////////////////////////////////////////////////////
 ///////////////////////// DrlVMTypeManager /////////////////////////////////////
 //////////////////////////////////////////////////////////////////////////////
@@ -116,6 +122,11 @@ DrlVMTypeManager::getSystemObjectVMTypeHandle() {
 }
 
 void*
+DrlVMTypeManager::getSystemClassVMTypeHandle() {
+    return get_system_class_class();
+}
+
+void*
 DrlVMTypeManager::getSystemStringVMTypeHandle() {
     return get_system_string_class();
 }
@@ -142,13 +153,13 @@ const char* DrlVMTypeManager::getTypeName(void* vmTypeHandle) {
 }
 
 bool
-DrlVMTypeManager::isArrayOfUnboxedElements(void* vmClassHandle) {
-    return type_info_is_unboxed(class_get_element_type_info((Class_Handle) vmClassHandle))?true:false;
+DrlVMTypeManager::isArrayOfPrimitiveElements(void* vmClassHandle) {
+    return type_info_is_primitive(class_get_element_type_info((Class_Handle) vmClassHandle))?true:false;
 }
 
 bool
 DrlVMTypeManager::isEnumType(void* vmTypeHandle) {
-	return false;
+    return false;
 }
 
 bool
@@ -171,6 +182,7 @@ DrlVMTypeManager::getMethodName(MethodDesc* methodDesc) {
     return methodDesc->getName();
 }
 
+
 bool
 DrlVMTypeManager::isSystemStringType(void* vmTypeHandle) {
     // We should also be looking at namespace
@@ -192,8 +204,22 @@ DrlVMTypeManager::isSystemObjectType(void* vmTypeHandle) {
         return true;
     const char* name = getTypeName(vmTypeHandle);
     if (systemObjectVMTypeHandle == NULL && strcmp(name,"Object") == 0) {
-        // Built-in System.String type
+        // Built-in System.Object type
         systemObjectVMTypeHandle = vmTypeHandle;
+        return true;
+    }
+    return false;
+}
+
+bool
+DrlVMTypeManager::isSystemClassType(void* vmTypeHandle) {
+    // We should also be looking at namespace
+    if (vmTypeHandle == systemClassVMTypeHandle)
+        return true;
+    const char* name = getTypeName(vmTypeHandle);
+    if (systemClassVMTypeHandle == NULL && strcmp(name,"Class") == 0) {
+        // Built-in System.Class type
+        systemClassVMTypeHandle = vmTypeHandle;
         return true;
     }
     return false;
@@ -223,7 +249,7 @@ DrlVMTypeManager::isSubClassOf(void* vmTypeHandle1,void* vmTypeHandle2) {
 
 uint32
 DrlVMTypeManager::getUnboxedOffset(void* vmTypeHandle) {
-	assert(false); return 0;
+    assert(false); return 0;
 }
 
 uint32
@@ -233,7 +259,7 @@ DrlVMTypeManager::getBoxedSize(void * vmTypeHandle) {
 
 uint32
 DrlVMTypeManager::getUnboxedSize(void* vmTypeHandle) {
-	assert(false); return 0;
+    assert(false); return 0;
 }
 
 uint32
@@ -315,7 +341,7 @@ NamedType*
 DrlVMMethodDesc::getParentType()    {
     TypeManager& typeManager = compilationInterface->getTypeManager();
     Class_Handle parentClassHandle = method_get_class(drlMethod);
-	if (class_is_primitive(parentClassHandle))
+    if (class_is_primitive(parentClassHandle))
         return typeManager.getValueType(parentClassHandle);
     return typeManager.getObjectType(parentClassHandle);
 }
@@ -334,7 +360,7 @@ DrlVMMethodDesc::parseJavaHandlers(ExceptionCallback& callback) {
 
 void 
 DrlVMMethodDesc::parseCliHandlers(ExceptionCallback& callback) {
-	assert(false);
+    assert(false);
 
 }
 
@@ -368,7 +394,7 @@ DrlVMMethodDesc::getUniqueId()
     return 0;
 #else
     Method_Handle       mh = getDrlVMMethod();
-    return (uint32)mh;
+    return (POINTER_SIZE_INT)mh;
 #endif
 }
 
@@ -412,7 +438,7 @@ NamedType*
 DrlVMFieldDesc::getParentType()    {
     TypeManager& typeManager = compilationInterface->getTypeManager();
     Class_Handle parentClassHandle = field_get_class(drlField);
-	if (class_is_primitive(parentClassHandle))
+    if (class_is_primitive(parentClassHandle))
         return typeManager.getValueType(parentClassHandle);
     return typeManager.getObjectType(parentClassHandle);
 }
@@ -429,7 +455,7 @@ DrlVMFieldDesc::getOffset() {
         return field_get_offset(drlField);
     }
     else {
-		assert(false); return 0;
+        assert(false); return 0;
     }
 }
 
@@ -471,19 +497,6 @@ DrlVMCompilationInterface::getTypeFromDrlVMTypeHandle(Type_Info_Handle typeHandl
         if (!pointedToType)
             return NULL;
         type = typeManager.getManagedPtrType(pointedToType);
-    } else if (type_info_is_unmanaged_pointer(typeHandle)) {
-        Type* pointedToType = NULL;
-        if (type_info_is_void(typeHandle)) {
-            // void*
-            pointedToType = typeManager.getVoidType();
-        } else {
-            // T*
-            pointedToType = 
-                getTypeFromDrlVMTypeHandle(type_info_get_type_info(typeHandle),false);
-        }
-        if (!pointedToType)
-            return NULL;
-        type = typeManager.getUnmanagedPtrType(pointedToType);
     } else if (type_info_is_void(typeHandle)) {
         // void return type
         type = typeManager.getVoidType();
@@ -492,7 +505,7 @@ DrlVMCompilationInterface::getTypeFromDrlVMTypeHandle(Type_Info_Handle typeHandl
         if (!classHandle)
             return NULL;
         type = typeManager.getObjectType(classHandle);
-    } else if (type_info_is_unboxed(typeHandle)) {
+    } else if (type_info_is_primitive(typeHandle)) {
         // value type
         Class_Handle valueTypeHandle = type_info_get_class(typeHandle);
         if (!valueTypeHandle)
@@ -507,9 +520,6 @@ DrlVMCompilationInterface::getTypeFromDrlVMTypeHandle(Type_Info_Handle typeHandl
         type = typeManager.getArrayType(elemType);
     } else if (type_info_is_general_array(typeHandle)) {
         assert(0);
-    } else if (type_info_is_method_pointer(typeHandle)) {
-        // method pointer
-        assert(0);
     } else {
         // should not get here
         assert(0);
@@ -522,12 +532,10 @@ VM_RT_SUPPORT DrlVMCompilationInterface::translateHelperId(RuntimeHelperId runti
     switch (runtimeHelperId) {
     case Helper_NewObj_UsingVtable:    vmHelperId = VM_RT_NEW_RESOLVED_USING_VTABLE_AND_SIZE; break; 
     case Helper_NewVector_UsingVtable: vmHelperId = VM_RT_NEW_VECTOR_USING_VTABLE; break;
-    case Helper_NewObj:                vmHelperId = VM_RT_NEW_RESOLVED; break;
-    case Helper_NewVector:             vmHelperId = VM_RT_NEW_VECTOR; break;
     case Helper_NewMultiArray:         vmHelperId = VM_RT_MULTIANEWARRAY_RESOLVED; break;
     case Helper_LdInterface:           vmHelperId = VM_RT_GET_INTERFACE_VTABLE_VER0; break;
-    case Helper_LdString:              vmHelperId = VM_RT_LDC_STRING; break;
-    case Helper_ObjMonitorEnter:       vmHelperId = VM_RT_MONITOR_ENTER_NO_EXC; break;
+    case Helper_LdRef:                 vmHelperId = VM_RT_LDC_STRING; break;
+    case Helper_ObjMonitorEnter:       vmHelperId = VM_RT_MONITOR_ENTER_NON_NULL; break;
     case Helper_ObjMonitorExit:        vmHelperId = VM_RT_MONITOR_EXIT_NON_NULL; break;
     case Helper_TypeMonitorEnter:      vmHelperId = VM_RT_MONITOR_ENTER_STATIC; break;
     case Helper_TypeMonitorExit:       vmHelperId = VM_RT_MONITOR_EXIT_STATIC; break;
@@ -566,6 +574,8 @@ VM_RT_SUPPORT DrlVMCompilationInterface::translateHelperId(RuntimeHelperId runti
     case Helper_ConvStoI64:            vmHelperId = VM_RT_F2L; break;
     case Helper_ConvDtoI32:            vmHelperId = VM_RT_D2I; break;
     case Helper_ConvDtoI64:            vmHelperId = VM_RT_D2L; break;
+    case Helper_MethodEntry:           vmHelperId = VM_RT_JVMTI_METHOD_ENTER_CALLBACK; break;
+    case Helper_MethodExit:             vmHelperId = VM_RT_JVMTI_METHOD_EXIT_CALLBACK; break;
     default:
         assert(0);
     }
@@ -634,8 +644,8 @@ DrlVMCompilationInterface::getRuntimeHelperCallingConvention(RuntimeHelperId id)
     case Helper_ShlI64:                
     case Helper_ShrI64:                
     case Helper_ShruI64:
-	case Helper_Throw_Lazy:
-	case Helper_Throw_LinkingException:
+    case Helper_Throw_Lazy:
+    case Helper_Throw_LinkingException:
         return CallingConvention_Drl;
     default:
         return CallingConvention_Stdcall;
@@ -644,13 +654,13 @@ DrlVMCompilationInterface::getRuntimeHelperCallingConvention(RuntimeHelperId id)
 
 bool
 DrlVMCompilationInterface::compileMethod(MethodDesc *method) {
-	if (Log::cat_root()->isInfo3Enabled()) {
-		Log::out() << "Jitrino requested compilation of " <<
-			method->getParentType()->getName() << "::" <<
-			method->getName() << method->getSignatureString() << ::std::endl;
-	}
-	JIT_Result res = vm_compile_method(getJitHandle(), ((DrlVMMethodDesc*)method)->getDrlVMMethod());
-	return res == JIT_SUCCESS ? true : false;
+    if (Log::isEnabled()) {
+        Log::out() << "Jitrino requested compilation of " <<
+            method->getParentType()->getName() << "::" <<
+            method->getName() << method->getSignatureString() << ::std::endl;
+    }
+    JIT_Result res = vm_compile_method(getJitHandle(), ((DrlVMMethodDesc*)method)->getDrlVMMethod());
+    return res == JIT_SUCCESS ? true : false;
 }
 
 void        
@@ -715,7 +725,7 @@ DrlVMCompilationInterface::resolveFieldByIndex(NamedType* klass, int index, Name
     fh = class_get_instance_field_recursive(ch,index);
     ::std::cerr << "load field "<< class_get_name((Class_Handle) klass->getVMTypeHandle()) << ".";
     ::std::cerr << field_get_name(fh) << " as ";
-	(*fieldType)->print(::std::cerr); ::std::cerr << ::std::endl;
+    (*fieldType)->print(::std::cerr); ::std::cerr << ::std::endl;
     return getFieldDesc(fh);
 }
 
@@ -788,7 +798,7 @@ DrlVMCompilationInterface::resolveNamedType(MethodDesc* enclosingMethodDesc,
     Class_Handle ch = 
         resolve_class(compileHandle,enclosingDrlVMClass,typeToken);
     if (!ch) return NULL;
-	if (class_is_primitive(ch))
+    if (class_is_primitive(ch))
         return typeManager.getValueType(ch);
     return typeManager.getObjectType(ch);
 }
@@ -849,7 +859,7 @@ DrlVMCompilationInterface::loadStringObject(MethodDesc* enclosingMethodDesc,
 //
 void*
 DrlVMCompilationInterface::loadToken(MethodDesc* enclosingMethodDesc,uint32 token) {
-	assert(false); return 0;
+    assert(false); return 0;
 }
 
 Type*
@@ -859,6 +869,7 @@ DrlVMCompilationInterface::getConstantType(MethodDesc* enclosingMethodDesc,
     Java_Type drlType = (Java_Type)class_get_const_type(enclosingDrlVMClass,constantToken);
     switch (drlType) {
     case JAVA_TYPE_STRING:   return typeManager.getSystemStringType(); 
+    case JAVA_TYPE_CLASS:    return typeManager.getSystemClassType(); 
     case JAVA_TYPE_DOUBLE:   return typeManager.getDoubleType();
     case JAVA_TYPE_FLOAT:    return typeManager.getSingleType();
     case JAVA_TYPE_INT:      return typeManager.getInt32Type();
@@ -954,6 +965,19 @@ bool DrlVMCompilationInterface::mayInlineObjectSynchronization(ObjectSynchroniza
     return mayInline == TRUE;
 }
 
+void DrlVMCompilationInterface::sendCompiledMethodLoadEvent(MethodDesc * methodDesc, 
+        uint32 codeSize, void* codeAddr, uint32 mapLength, 
+        AddrLocation* addrLocationMap, void* compileInfo) {
+    // VM-JIT interface function should be called here instead of logging
+    if (Log::isEnabled()) {
+        Log::out() << "   ** Inlined method: " 
+                << methodDesc->getName() << std::endl;
+        Log::out() << "   ** Number of locations:" << mapLength 
+                << std::endl;
+    }
+    
+}
+
 bool DrlVMDataInterface::areReferencesCompressed() {
     return (vm_references_are_compressed() != 0);
 }
@@ -972,101 +996,28 @@ void DrlVMBinaryRewritingInterface::rewriteCodeBlock(Byte* codeBlock, Byte*  new
 
 
 ObjectType * DrlVMCompilationInterface::resolveSystemClass( const char * klassName ) {
-	Class_Handle cls = class_load_class_by_name_using_system_class_loader(klassName);
-	if( NULL == cls ) {
-		return NULL;
-	}
-	return getTypeManager().getObjectType(cls);
+    Class_Handle cls = class_load_class_by_name_using_system_class_loader(klassName);
+    if( NULL == cls ) {
+        return NULL;
+    }
+    return getTypeManager().getObjectType(cls);
 };
 
 
 MethodPtrType * DrlVMCompilationInterface::resolveMethod( ObjectType* klass, const char * methodName, const char * methodSig) {
-	Class_Handle cls = (Class_Handle)klass->getVMTypeHandle();
-	assert( NULL != cls );	
-	Method_Handle mh = class_lookup_method_recursively( cls, methodName, methodSig);
-	if( NULL == mh ) {
-		return NULL;
-	}
-	return getTypeManager().getMethodPtrType(getMethodDesc(mh));
+    Class_Handle cls = (Class_Handle)klass->getVMTypeHandle();
+    assert( NULL != cls );  
+    Method_Handle mh = class_lookup_method_recursively( cls, methodName, methodSig);
+    if( NULL == mh ) {
+        return NULL;
+    }
+    return getTypeManager().getMethodPtrType(getMethodDesc(mh));
 };
 
 JIT_Handle
 DrlVMCompilationInterface::getJitHandle() const {
-    return modeData->getJitHandle();
+    return getCompilationContext()->getCurrentJITContext()->getJitHandle();
 }
 
-
-MethodProfile* DrlProfilingInterface::getMethodProfile(MemoryManager& mm, ProfileType type, MethodDesc& md, JITProfilingRole role) const {
-    assert(type == ProfileType_EntryBackedge);
-    Method_Profile_Handle mpHandle = profileAccessInterface->get_method_profile(emHandle, pcHandle, ((DrlVMMethodDesc&)md).getDrlVMMethod());
-    if (mpHandle==0) {
-        return NULL;
-    }
-    uint32* eCounter = (uint32*)profileAccessInterface->eb_profiler_get_entry_counter_addr(mpHandle);
-    uint32* bCounter = (uint32*)profileAccessInterface->eb_profiler_get_backedge_counter_addr(mpHandle);
-
-    DrlEntryBackedgeMethodProfile* p = new (mm) DrlEntryBackedgeMethodProfile(mpHandle, md, eCounter, bCounter);
-    return p;
-}
-
-bool DrlProfilingInterface::hasMethodProfile(ProfileType type, MethodDesc& md, JITProfilingRole role) const {
-    if (profileAccessInterface != NULL) {
-            Method_Profile_Handle mpHandle = profileAccessInterface->get_method_profile(emHandle, pcHandle, ((DrlVMMethodDesc&)md).getDrlVMMethod());
-            return mpHandle!=0;
-        }
-    return false;
-}
-
-bool DrlProfilingInterface::enableProfiling(PC_Handle pc, JITProfilingRole role) {
-    assert(!profilingEnabled); //for M1 only
-    assert(profileAccessInterface->get_pc_type(emHandle, pc) == EM_PCTYPE_ENTRY_BACKEDGE);
-    JITModeData* jitMode = Jitrino::getJITModeData(jitHandle);
-    if (role == JITProfilingRole_GEN) {
-        profilingEnabled = jitMode->isJet();
-    } else {
-        profilingEnabled = !jitMode->isJet();
-    }
-    if (profilingEnabled) {
-        jitRole = role;       
-        pcHandle = pc;
-    }
-    return profilingEnabled;
-}
-
-bool DrlProfilingInterface::isProfilingEnabled(ProfileType pcType, JITProfilingRole role) const {
-    return profilingEnabled && jitRole == role;
-}
-
-EntryBackedgeMethodProfile* DrlProfilingInterface::createEBMethodProfile(MemoryManager& mm, MethodDesc& md) {
-    assert(isProfilingEnabled(ProfileType_EntryBackedge, JITProfilingRole_GEN));
-    Method_Profile_Handle mpHandle = profileAccessInterface->eb_profiler_create_profile(pcHandle, ((DrlVMMethodDesc&)md).getDrlVMMethod());
-    assert(mpHandle!=0);
-    uint32* eCounter = (uint32*)profileAccessInterface->eb_profiler_get_entry_counter_addr(mpHandle);
-    uint32* bCounter = (uint32*)profileAccessInterface->eb_profiler_get_backedge_counter_addr(mpHandle);
-
-    DrlEntryBackedgeMethodProfile* p = new (mm) DrlEntryBackedgeMethodProfile(mpHandle, md, eCounter, bCounter);
-    return p;
-}
-
-uint32 DrlProfilingInterface::getEBProfilerMethodEntryThreshold() const {
-    assert(pcHandle!=NULL);
-    return profileAccessInterface->eb_profiler_get_entry_threshold(pcHandle);
-}
-
-uint32 DrlProfilingInterface::getEBProfilerBackedgeThreshold() const {
-    assert(pcHandle!=NULL);
-    return profileAccessInterface->eb_profiler_get_backedge_threshold(pcHandle);
-}
-
-bool   DrlProfilingInterface::isEBProfilerInSyncMode() const {
-    assert(pcHandle!=NULL);
-    return profileAccessInterface->eb_profiler_is_in_sync_mode(pcHandle)!=0;
-}
-
-PC_Callback_Fn* DrlProfilingInterface::getEBProfilerSyncModeCallback() const {
-    assert(pcHandle!=NULL);
-    assert(profileAccessInterface->eb_profiler_sync_mode_callback!=NULL);
-    return (PC_Callback_Fn*)profileAccessInterface->eb_profiler_sync_mode_callback;
-}
 
 } //namespace Jitrino

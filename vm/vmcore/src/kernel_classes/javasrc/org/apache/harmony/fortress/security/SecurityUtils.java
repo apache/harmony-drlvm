@@ -41,7 +41,8 @@ public final class SecurityUtils {
     // A map used to store inherited contexts.<br>
     // A thread is used as a key for the map and AccessControlContext 
     // passed to the putContext is used as a value.
-    private static WeakHashMap map = new WeakHashMap();
+    private static WeakHashMap<Thread, AccessControlContext> map = 
+        new WeakHashMap<Thread, AccessControlContext>();
 
     /**
      * This method to be invoked in the Thread's constructor. The first argument
@@ -104,8 +105,7 @@ public final class SecurityUtils {
          */
 
         synchronized (map) {
-            AccessControlContext ctx = (AccessControlContext) map.get(thread);
-            return ctx;
+            return map.get(thread);
         }
     }
 }

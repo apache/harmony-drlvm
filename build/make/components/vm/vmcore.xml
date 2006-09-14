@@ -92,6 +92,7 @@ Version: $Revision: 1.5.2.3 $
 
             <fileset dir="${build.vm.home}">
                 <include name="port/src/lil/*.cpp" />
+                <include name="port/src/lil/pim/*.cpp" />
                 <include name="vmstart/src/compmgr/*.cpp" />
 
                 <select arch="ipf">
@@ -144,17 +145,21 @@ Version: $Revision: 1.5.2.3 $
                     <include name="util/linux/os_wrapper.cpp" />
                     <include name="util/linux/stubs.cpp" />
                     <include name="util/linux/crash_handler.cpp" />
+                    <include name="util/linux/native_modules.cpp" />
 
                     <select arch="ia32">
                         <include name="util/linux/signals_ia32.cpp" />
+                        <include name="util/linux/native_modules_ia32.cpp" />
                     </select>
 
                     <select arch="em64t">
                         <include name="util/linux/signals_em64t.cpp" />
+                        <include name="util/linux/native_modules_em64t.cpp" />
                     </select>
 
                     <select arch="ipf">
                         <include name="util/linux/signals_ipf.cpp" />
+                        <include name="util/linux/native_modules_ipf.cpp" />
                     </select>
                 </select>
             </fileset>
@@ -270,6 +275,9 @@ Version: $Revision: 1.5.2.3 $
             <libset libs="${vm.jthread.lib}"
                     dir="${vm.jthread.libdir}" />
 
+            <libset libs="${vm.port.lib}"
+                    dir="${vm.port.libdir}" />
+
             <select os="win">
                 <libset libs="${extra.zlib.lib}"
                         dir="${extra.zlib.libdir}" />
@@ -280,13 +288,14 @@ Version: $Revision: 1.5.2.3 $
             </select>
 
             <select os="lnx">
+                <syslibset type="shared" libs="m,dl,stdc++,z,xml2,pthread,gcc_s,rt" /> 
                 <linkerarg value="--export-dynamic" />
-                <linkerarg value="-lz" />
+                <!--linkerarg value="-lz" />
                 <linkerarg value="-lxml2" />
                 <linkerarg value="-lm" />
                 <linkerarg value="-ldl" />
                 <linkerarg value="-lpthread" />
-                <linkerarg value="-lstdc++" />
+                <linkerarg value="-lstdc++" /-->
             </select>
         </linker>
 

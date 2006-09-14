@@ -25,13 +25,16 @@ import java.lang.reflect.Method;
  */
 public interface ReflectAccessor {
 
-    public Constructor copyConstructor(Constructor c);
+    public <T> Constructor<T> copyConstructor(Constructor<T> c);
 
     public Field copyField(Field f);
 
     public Method copyMethod(Method m);
 
-    public void checkMemberAccess(Class callerClass, Class declaringClass,
-                                  Class runtimeClass, int memberModifiers)
+    public void checkMemberAccess(Class<?> callerClass, Class<?> declaringClass,
+                                  Class<?> runtimeClass, int memberModifiers)
         throws IllegalAccessException;
+
+    public Method[] mergePublicMethods(Method[] declared, 
+            Method[] superPublic, Method[][] intf, int estimate);
 }

@@ -23,6 +23,7 @@
 #define _VMINTERFACE_H_
 
 #include <cstring>
+#include <string>
 #ifdef __GNUC__
 typedef ::std::size_t size_t;
 #endif
@@ -39,7 +40,7 @@ namespace Jitrino {
 
 // external declarations
 class TypeManager;
-class JITModeData;
+class JITInstanceContext;
 class Type;
 class NamedType;
 class ObjectType;
@@ -47,6 +48,7 @@ class MethodPtrType;
 class PersistentInstructionId;
 class MemoryManager;
 class CompilationContext;
+struct AddrLocation;
 
 ///////////////////////////////////////////////////////////////////////////////////////
 ///////////////////////////////////////////////////////////////////////////////////////
@@ -56,8 +58,8 @@ class CompilationContext;
 
 class ExceptionCallback {
 public:
-
     virtual ~ExceptionCallback() {}
+
     virtual void catchBlock(uint32 tryOffset,
                             uint32 tryLength,
                             uint32 handlerOffset,
@@ -84,6 +86,7 @@ public:
 class MethodSignatureDesc {
 public:
     virtual ~MethodSignatureDesc() {}
+
     virtual uint32   getNumParams()                  = 0;
     virtual Type**   getParamTypes()                 = 0;
     virtual Type*    getParamType(uint32 paramIndex) = 0;
@@ -93,9 +96,10 @@ public:
 class TypeMemberDesc {
 public:
     virtual ~TypeMemberDesc() {}
+
     virtual const char* getName()            = 0;
     virtual const char* getSignatureString() = 0;
-	virtual void  printFullName(::std::ostream& os) = 0;
+    virtual void  printFullName(::std::ostream& os) = 0;
     virtual NamedType*  getParentType()      = 0;
     virtual uint32      getId()              = 0;
     virtual bool        isPrivate()          = 0;
@@ -105,6 +109,7 @@ public:
 class FieldDesc : public TypeMemberDesc {
 public:
     virtual ~FieldDesc() {}
+
     //
     // this field is constant after it is initialized
     // can only be mutated by constructor (instance fields) or
@@ -126,6 +131,7 @@ public:
 class MethodDesc : public TypeMemberDesc {
 public:
     virtual ~MethodDesc() {}
+
     virtual bool isNative()              = 0;
     virtual bool isSynchronized()        = 0;
     virtual bool isNoInlining()          = 0;
@@ -213,6 +219,7 @@ inline ::std::ostream& operator<<(::std::ostream& os, const PersistentInstructio
 class ClassHierarchyIterator {
 public:
     virtual ~ClassHierarchyIterator() {}
+
     virtual bool isValid() = 0; // true if iterator is valid
     virtual bool hasNext() = 0; // true if iterator is not done 
     virtual ObjectType* getNext() = 0; // return next class in iterator and advance iterator
@@ -228,7 +235,10 @@ public:
 
 class CompilationInterface {
 public:
+
+    CompilationInterface(CompilationContext* cc) : compilationContext(cc){}
     virtual ~CompilationInterface() {}
+
     virtual TypeManager&  getTypeManager() = 0;
     //
     // returns the method to compile
@@ -273,17 +283,17 @@ public:
                                              uint32 constantToken) = 0;
     virtual const void* getConstantValue(MethodDesc* enclosingMethod,
                                               uint32 constantToken) = 0;
-		// resolve-by-name methods
-	/**
-	 * Resolve a system class by its name. 
-	 * Returns NULL if no such class found.
-	 */
-	virtual ObjectType *	resolveSystemClass( const char * klassName ) = 0;
-	/**
-	 * Recursively looks up for a given method with a given signature in the given class.
-	 * Returns NULL if no such method found.
-	 */
-	virtual MethodPtrType * resolveMethod( ObjectType * klass, const char * methodName, const char * methodSig) = 0;
+        // resolve-by-name methods
+    /**
+     * Resolve a system class by its name. 
+     * Returns NULL if no such class found.
+     */
+    virtual ObjectType *    resolveSystemClass( const char * klassName ) = 0;
+    /**
+     * Recursively looks up for a given method with a given signature in the given class.
+     * Returns NULL if no such method found.
+     */
+    virtual MethodPtrType * resolveMethod( ObjectType * klass, const char * methodName, const char * methodSig) = 0;
 
     // Class type is a subclass of ch=mh->getParentType()  The function returns
     // a method description for a method overriding mh in type or in the closest
@@ -320,7 +330,7 @@ public:
         Helper_NewVector,          // Vector* vec    = f(uint32 numElem, void* arrTypeRuntimeId)
         Helper_NewMultiArray,      // Array * arr    = f(void* arrTypeRuntimeId,uint32 numDims, uint32 dimN, ...,uint32 dim1)    
         Helper_LdInterface,        // Vtable* vtable = f(Object* obj, void* interfRuntimeId)
-        Helper_LdString,           // String* str    = f(void* classRuntimeId, uint32 strToken)
+        Helper_LdRef,           // [String|Ref]* str = f(void* classRuntimeId, uint32 strToken)
         Helper_ObjMonitorEnter,    //                = f(Object* obj)
         Helper_ObjMonitorExit,     //                = f(Object* obj)
         Helper_TypeMonitorEnter,   //                = f(void* typeRuntimeId)
@@ -330,8 +340,8 @@ public:
         Helper_InitType,           //                = f(void* typeRutimeId)
         Helper_IsValidElemType,    // [1(yes)/0(no)] = f(Object* elem, Object* array)
         Helper_Throw_KeepStackTrace, //                f(Object* exceptionObj)
-		Helper_Throw_SetStackTrace, //                 f(Object* exceptionObj)
-		Helper_Throw_Lazy,          //                 f(MethodHandle /*of the <init>*/, .../*<init> params*/, ClassHandle)
+        Helper_Throw_SetStackTrace, //                 f(Object* exceptionObj)
+        Helper_Throw_Lazy,          //                 f(MethodHandle /*of the <init>*/, .../*<init> params*/, ClassHandle)
         Helper_EndCatch,
         Helper_NullPtrException,   //                  f()
         Helper_ArrayBoundsException,//                 f()
@@ -361,6 +371,8 @@ public:
         Helper_ConvDtoI64,    // int64  x        = f(double x) 
         Helper_EnableThreadSuspension,//           f()
         Helper_GetSuspReqFlag,// int *           = f()
+        Helper_MethodEntry, // f(MethodHandle)
+        Helper_MethodExit,   // f(MethodHandle, void* ret_value)
         Num_Helpers
     };
     //
@@ -375,12 +387,12 @@ public:
     virtual void*        getRuntimeHelperAddress(RuntimeHelperId) = 0;
     virtual void*        getRuntimeHelperAddressForType(RuntimeHelperId id, Type* type) = 0;
     static const char*   getRuntimeHelperName(RuntimeHelperId helperId);
-	/**
-	 * Returns RuntimeHelperId by its string representation. Name comparison 
-	 * is case-sensitive.
-	 * If the helperName is unknown, then Helper_Null is returned.
-	 */
-	static RuntimeHelperId str2rid( const char * helperName );
+    /**
+     * Returns RuntimeHelperId by its string representation. Name comparison 
+     * is case-sensitive.
+     * If the helperName is unknown, then Helper_Null is returned.
+     */
+    static RuntimeHelperId str2rid( const char * helperName );
 
     //
     // method side effects (for lazy exception throwing optimization)
@@ -479,11 +491,7 @@ public:
                                                          void *       callbackData) = 0; 
 
     //
-    // accessors for dynamic profiling flags 
-    //
-    virtual bool        isDynamicProfiling() = 0;
-    virtual uint32      getOptimizationLevel() = 0;
- 
+    
     // write barrier instructions
     virtual bool         insertWriteBarriers()        = 0;
 
@@ -492,6 +500,16 @@ public:
 
     // produce BC to native map info
     virtual bool isBCMapInfoRequired() = 0;
+
+    virtual bool isCompileLoadEventRequired() = 0;
+
+    // send compile
+    virtual void sendCompiledMethodLoadEvent(MethodDesc * methodDesc, 
+        uint32 codeSize, void* codeAddr, uint32 mapLength, 
+        AddrLocation* addrLocationMap, void* compileInfo) = 0;
+
+    // get compilation params
+    virtual OpenMethodExecutionParams& getCompilationParams() = 0;
 
     // synchronization inlining
     struct ObjectSynchronizationInfo {
@@ -521,26 +539,22 @@ public:
     virtual VmCallingConvention getManagedCallingConvention() = 0;
     virtual VmCallingConvention getRuntimeHelperCallingConvention(RuntimeHelperId id) = 0;
 
-	/**
-	 * Requests VM to request this JIT to synchronously (in the same thread) compile given method.
-	 * @param method method to compile
-	 * @return true on successful compilation, false otherwise
-	 */
-	virtual bool compileMethod(MethodDesc *method) = 0;
+    /**
+     * Requests VM to request this JIT to synchronously (in the same thread) compile given method.
+     * @param method method to compile
+     * @return true on successful compilation, false otherwise
+     */
+    virtual bool compileMethod(MethodDesc *method) = 0;
 
-	/**
-	 * @param method JIT internal method descriptor
-	 * @return runtime handle of the corresponding VM object for the method 
-	 */
-	virtual void* getRuntimeMethodHandle(MethodDesc *method) = 0;
+    /**
+     * @param method JIT internal method descriptor
+     * @return runtime handle of the corresponding VM object for the method 
+     */
+    virtual void* getRuntimeMethodHandle(MethodDesc *method) = 0;
+    
+    virtual CompilationContext* getCompilationContext() const {return compilationContext;}
 
-    virtual JITModeData* getModeData() const = 0;
-    virtual JIT_Handle getJitHandle() const = 0;
-
-    void setCompilationContext(CompilationContext* s) {compilationContext = s;}
-    CompilationContext* getCompilationContext() const {return compilationContext;}
-
-private:
+protected:
     /** Settings per compilation session: vminterface + optimizer flags and so on..
       * Today we pass compilation interface through the all compilation. To avoid global
       * changes in JIT subcomponents interfaces CompilationContext struct is placed here.
@@ -548,9 +562,16 @@ private:
     CompilationContext* compilationContext;
 };
 
+// AddrLocation data structure should be put in VM-JIT interface
+struct AddrLocation {
+    void* start_addr;
+    uint16 location;
+};
+
 class DataInterface {
 public:
     virtual ~DataInterface() {}
+
     //
     // returns true if instance fields that are references are compressed
     //
@@ -565,6 +586,7 @@ public:
 class GCInterface {
 public:
     virtual ~GCInterface() {}
+
     virtual void enumerateRootReference(void** reference) = 0;
     virtual void enumerateCompressedRootReference(uint32* reference) = 0;
     virtual void enumerateRootManagedReference(void** slotReference, int slotOffset) = 0;
@@ -577,76 +599,19 @@ public:
 class BinaryRewritingInterface {
 public:
     virtual ~BinaryRewritingInterface() {}
+
     virtual void rewriteCodeBlock(Byte* codeBlock, Byte* newCode, size_t length) = 0;
 };
 
 class Compiler {
 public:
     virtual ~Compiler() {}
+
     //
     //  Return true if the method has been successfully compiled,
     //  false - otherwise
     //
     virtual bool compileMethod(CompilationInterface*) = 0;
-};
-
-enum ProfileType {
-    ProfileType_Invalid =0,
-    ProfileType_EntryBackedge =1
-};
-
-enum JITProfilingRole{
-    JITProfilingRole_GEN =1,
-    JITProfilingRole_USE =2
-};
-
-//M1 implementation of profiling interfaces
-class MethodProfile;
-class MemoryManager;
-class EntryBackedgeMethodProfile;
-
-typedef void PC_Callback_Fn(Method_Profile_Handle);
-
-class ProfilingInterface {
-public:
-    virtual ~ProfilingInterface() {}
-    
-    virtual MethodProfile* getMethodProfile(MemoryManager& mm, ProfileType type, MethodDesc& md, JITProfilingRole role=JITProfilingRole_USE) const = 0;
-    virtual bool hasMethodProfile(ProfileType type, MethodDesc& md, JITProfilingRole role=JITProfilingRole_USE) const = 0;
-    virtual bool enableProfiling(PC_Handle pc, JITProfilingRole role) = 0;
-    virtual bool isProfilingEnabled(ProfileType pcType, JITProfilingRole jitRole) const = 0;
-
-    
-    virtual EntryBackedgeMethodProfile* createEBMethodProfile(MemoryManager& mm, MethodDesc& md) =0;
-    virtual uint32 getEBProfilerMethodEntryThreshold() const = 0;
-    virtual uint32 getEBProfilerBackedgeThreshold() const = 0;
-    virtual bool   isEBProfilerInSyncMode() const = 0;
-    virtual PC_Callback_Fn* getEBProfilerSyncModeCallback() const = 0;
-
-};
-
-class MethodProfile {
-public:
-    MethodProfile(Method_Profile_Handle _handle, ProfileType _type, MethodDesc& _md)
-        : handle(_handle), type(_type), md(_md){}
-    virtual ~MethodProfile(){};
-    Method_Profile_Handle getHandle() const { return handle;} 
-    MethodDesc& getMethod() const {return md;}
-    ProfileType getProfileType() const {return type;}
-private:
-    Method_Profile_Handle handle;
-    ProfileType type;
-    MethodDesc& md;
-};
-
-class EntryBackedgeMethodProfile : public MethodProfile {
-public:
-    EntryBackedgeMethodProfile (Method_Profile_Handle handle, MethodDesc& md): MethodProfile(handle, ProfileType_EntryBackedge, md){}
-
-    virtual uint32 getEntryExecCount() const = 0;
-    virtual uint32 getBackedgeExecCount() const = 0;
-    virtual uint32* getEntryCounter() const = 0;
-    virtual uint32* getBackedgeCounter() const = 0;
 };
 
 // assert which works even in release mode

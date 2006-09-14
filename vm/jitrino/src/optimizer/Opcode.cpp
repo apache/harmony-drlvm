@@ -104,12 +104,11 @@ static OpcodeInfo opcodeTable[] = {
     { Op_IndirectCall,          true,  MB::Call,          MK::Exception,                             "calli",         "calli     [%0](%a) ((%1,%2)) -) %l",     },
     { Op_IndirectMemoryCall,    true,  MB::Call,          MK::Exception,                             "callimem",      "callimem  [%0](%a) ((%1,%2)) -) %l",     },
     { Op_IntrinsicCall,         true,  MB::Call,          MK::Exception,                             "callintr",      "callintr  %d(%p) ((%0,%1)) -) %l",       },
-    { Op_JitHelperCall,         true,  MB::Call,          MK::Exception,                             "callhelper",    "callhelper %d(%p) ((%0,%1)) -) %l",       },
+    { Op_JitHelperCall,         true,  MB::Call,          MK::Exception,                             "callhelper",    "callhelper %d(%s) -) %l",       },
     { Op_VMHelperCall,          true,  MB::Call,          MK::Exception,                             "callvmhelper",  "callvmhelper %d(%s) -) %l",    },
     { Op_Return,                true,  MB::ControlFlow,   MK::None,                                  "return",        "return    %s",                 },
     { Op_Catch,                 true,  MB::ControlFlow,   MK::None,                                  "catch",         "catch        -) %l",           },
     { Op_Throw,                 true,  MB::Exception,     MK::Throw,                                 "throw ",        "throw     %0",                 },               
-	{ Op_ThrowLazy,             true,  MB::Exception,     MK::None,                                  "throwlazy ",    "throwlazy %d (%s)",   },               
     { Op_ThrowSystemException,  true,  MB::Exception,     MK::None,                                  "throwsys ",        "throwsys %d",               },
     { Op_ThrowLinkingException, true,  MB::Exception,     MK::None,                                  "throwLink ",        "throwLink",                },
     { Op_Leave,                 true,  MB::ControlFlow,   MK::None,                                  "leave ",        "leave %l",                     }, // CLI only -- DELETE
@@ -124,7 +123,7 @@ static OpcodeInfo opcodeTable[] = {
     { Op_DefArg,                true,  MB::None,          MK::DefArg,                                "defarg",        "defarg%m -) %l",               },
     // Load instructions                                                                                               
     { Op_LdConstant,            false, MB::Movable,       MK::None,                                  "ldc   ",        "ldc%t    #%c -) %l",           },
-    { Op_LdString,              false, MB::Movable,       MK::AutoCompress,                          "ldstr ",        "ldstr%m (%d) -) %l",           },
+    { Op_LdRef,                 false, MB::Movable,       MK::AutoCompress,                          "ldref ",        "ldref%m (%d) -) %l",           },
     { Op_LdVar,                 false, MB::None,          MK::None,                                  "ldvar ",        "ldvar     %0 -) %l",           },
     { Op_LdVarAddr,             false, MB::Movable,       MK::None,                                  "ldvara",        "ldvara    %0 -) %l",           },
     { Op_TauLdInd,              false, MB::Load,          MK::AutoCompress_Speculative,              "ldind",         "ldind%m:%t [%0] ((%1,%2)) -) %l",          },
@@ -135,7 +134,7 @@ static OpcodeInfo opcodeTable[] = {
     { Op_LdStaticAddr,          false, MB::Movable,       MK::None,                                  "ldsflda",       "ldsflda   [%d] -) %l",         },
     { Op_LdElemAddr,            false, MB::Movable,       MK::None,                                  "ldelema",       "ldelema   [%0[%1]] -) %l",     },
     { Op_TauLdVTableAddr,       false, MB::Movable,       MK::None,                                  "ldvtable",      "ldvtable  %0 ((%1)) -) %l",           },
-    { Op_TauLdIntfcVTableAddr,  false, MB::Movable,       MK::None,                                  "ldintfcvt",     "ldintfcvt %0,%d ((%1)) -) %l",        }, 
+    { Op_TauLdIntfcVTableAddr,  false, MB::Movable,       MK::None,                                  "ldintfcvt",     "ldintfcvt %0,%d -) %l",        }, 
     { Op_TauLdVirtFunAddr,      false, MB::CSEable,       MK::None,                                  "ldvfn ",        "ldvfn     [%0.%d] ((%1)) -) %l",      },   
     { Op_TauLdVirtFunAddrSlot,  false, MB::CSEable,       MK::None,                                  "ldvfnslot",     "ldvfnslot [%0.%d] ((%1)) -) %l",      },
     { Op_LdFunAddr,             false, MB::CSEable,       MK::None,                                  "ldfn  ",        "ldfn      [%d] -) %l",         },
@@ -180,7 +179,7 @@ static OpcodeInfo opcodeTable[] = {
     { Op_TauInstanceOf,         false, MB::Movable,       MK::None,                                  "instanceof",    "instanceof %0,%d ((%1)) -) %l",       }, // returns true if argument is an instance of type T, tau opnd isNonNull
     { Op_InitType,              true,  MB::CSEable,       MK::None,                                  "inittype",      "inittype  %d",                 }, // REVIEW: can this throw an exception?
     { Op_Label,                 true,  MB::None,          MK::None,                                  "label ",        "%l:",                          }, // special label instructions for branch labels, finally, catch
-    { Op_MethodEntry,           true,  MB::None,          MK::None,                                  "methodentry",   "--- %d: (%s)",                 }, // method entry label
+    { Op_MethodEntry,           true,  MB::None,          MK::None,                                  "methodentry",   "--- MethodEntry(%d): (%s)",                 }, // method entry label
     { Op_MethodEnd,             true,  MB::None,          MK::None,                                  "methodend",     "+++ MethodEnd(%d) (%s)",       }, // end of a method
     { Op_SourceLineNumber,      true,  MB::None,          MK::None,                                  "lineno",        "???",                          }, // change to source position
     { Op_LdObj,                 false, MB::Load,          MK::None,                                  "ldobj ",        "ldobj     [%0] -) %l",         }, // load a value type to the stack
@@ -264,7 +263,7 @@ unsigned short Modifier::encode(Opcode opcode, uint32 numbits) const
     assert(bitsused <= numbits);
     unsigned short usencoded = (unsigned short) encoded;
     assert(encoded == (uint32) usencoded);
-    if (0 && Log::cat_opt()->isDebugEnabled()) {
+    if (0 && Log::isEnabled()) {
         Log::out() << ::std::endl << "Modifier " << ::std::hex << (int) value << " and Opcode " 
                    << (int) opcode << " encoded as " << (int) usencoded << ::std::dec << ::std::endl;
     }
@@ -293,7 +292,7 @@ Modifier::Modifier(Opcode opcode, uint32 encoding) : value(0)
 
     assert(bitsused <= OPERATION_MODIFIER_BITS);
 
-    if (0 && Log::cat_opt()->isDebugEnabled()) {
+    if (0 && Log::isEnabled()) {
         Log::out() << ::std::endl << "Opcode " << ::std::hex << (int) opcode << " and bits " << (int) encoding 
                    << " decoded to Modifier " << (int) value << ::std::dec << ::std::endl;
     }
@@ -559,13 +558,13 @@ Operation::getModifierString() const {
                 switch(smod) {
                 case Speculative_Yes: return ".s";
                 case Speculative_No:  return "";
-		default: assert(false);
+        default: assert(false);
                 }
             case AutoCompress_No: 
                 switch(smod) {
                 case Speculative_Yes: return ".s.unc";
                 case Speculative_No:  return ".unc";
-		default: assert(false);
+        default: assert(false);
                 }
             default: assert(0);
             }
@@ -661,9 +660,8 @@ bool Operation::canThrow() const
         return true;
     }
     
-//    if (!optimizerFlags.brm_debug) {
-        if (opcode == Op_InitType) return true; 
-//    }
+    if (opcode == Op_InitType) return true; 
+
     Modifier mod = getModifier();
     if (mod.hasExceptionModifier()) {
         enum ExceptionModifier emod = mod.getExceptionModifier();
@@ -729,7 +727,7 @@ bool Operation::isStoreOrSync() const {
     case MB::StoreOrSync:
         return true;
     default:
-	break;
+    break;
     }
     return false;
 }
@@ -803,7 +801,7 @@ bool Operation::isConstant() const
 {
     switch (opcode) {
     case Op_LdConstant:
-    case Op_LdString:
+    case Op_LdRef:
     case Op_LdVarAddr:
     case Op_GetVTableAddr:
     case Op_LdFieldOffset:

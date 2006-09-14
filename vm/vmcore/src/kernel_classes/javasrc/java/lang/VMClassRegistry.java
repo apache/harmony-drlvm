@@ -23,6 +23,8 @@ package java.lang;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
+import java.lang.reflect.Member;
+
 
 /**
  * Provides the class information methods required for the
@@ -39,6 +41,46 @@ import java.lang.reflect.Method;
  * @api2vm
  */
 final class VMClassRegistry {
+    /**
+     * This method satisfies the requirements of the specification for the
+     * {@link Class#getSimpleName() Class.getSimpleName()}
+     * method.
+     * 
+     * @param clazz a class to perform an operation on.
+     * @return the simple name of the specified class 
+     * 
+     * @api2vm
+     */
+    static native String getSimpleName(Class<?> clazz);
+
+    /**
+     * Returns the nearest enclosing class of the specified Class instance, 
+     * or <code>null</code> if the specified class is a top-level class.
+     * <br>This information is gathered from corresponding class-file structures 
+     * (either EnclosingMethod or InnerClasses attribute, if any present). 
+     * 
+     * @param clazz a class to perform an operation on.
+     * @return the immediately enclosing class of the specified class or null 
+     * 
+     * @api2vm
+     */    
+    static native Class getEnclosingClass(Class<?> clazz);
+
+    /**
+     * If the specified class is a local or anonymous class defined 
+     * within a method or constructor, returns that closest
+     * enclosing reflection member. Otherwise returns <code>null</code>.
+     * Note, instance initializers and static initializers 
+     * are not reflectable and will never be considered.
+     * <br>This information is gathered from corresponding class-file structure 
+     * (EnclosingMethod attribute, if present). 
+     * 
+     * @param clazz a class to perform an operation on.
+     * @return the immediately enclosing member for the specified class or null 
+     * 
+     * @api2vm
+     */
+    static native Member getEnclosingMember(Class<?> clazz);
 
     /**
      * This class is not supposed to be instantiated.
@@ -64,7 +106,7 @@ final class VMClassRegistry {
      *         name defined in the data array.
      * @api2vm
      */
-    static native Class defineClass(String name, ClassLoader classLoader,
+    static native Class<?> defineClass(String name, ClassLoader classLoader,
         byte[] data, int off, int len) throws ClassFormatError;
 
     /**
@@ -84,28 +126,28 @@ final class VMClassRegistry {
      *        class loader will be searched.
      * @api2vm
      */
-    static native Class findLoadedClass(String name, ClassLoader loader);
+    static native Class<?> findLoadedClass(String name, ClassLoader loader);
 
     /**
      * This method satisfies the requirements of the specification for the
      * {@link Object#getClass() Object.getClass()} method.
      * @api2vm
      */
-    static native Class getClass(Object obj);
+    static native Class<? extends Object> getClass(Object obj);
 
     /**
      * This method satisfies the requirements of the specification for the
      * {@link Class#getClassLoader() Class.getClassLoader()} method.
      * @api2vm
      */
-    static native ClassLoader getClassLoader(Class clazz);
+    static native ClassLoader getClassLoader(Class<?> clazz);
 
     /**
      * This method satisfies the requirements of the specification for the
      * {@link Class#getComponentType() Class.getComponentType()} method.
      * @api2vm
      */
-    static native Class getComponentType(Class clazz);
+    static native Class<?> getComponentType(Class clazz);
 
     /**
      * This method satisfies the requirements of the specification for the
@@ -121,7 +163,7 @@ final class VMClassRegistry {
      * method.
      * @api2vm
      */
-    static native Constructor[] getDeclaredConstructors(Class clazz);
+    static native <U> Constructor<U>[] getDeclaredConstructors(Class<U> clazz);
 
     /**
      * This method satisfies the requirements of the specification for the
@@ -142,7 +184,7 @@ final class VMClassRegistry {
      * {@link Class#getDeclaringClass() Class.getDeclaringClass()} method.
      * @api2vm
      */
-    static native Class getDeclaringClass(Class clazz);
+    static native Class<?> getDeclaringClass(Class clazz);
 
     /**
      * This method satisfies the requirements of the specification for the
@@ -170,7 +212,7 @@ final class VMClassRegistry {
      * {@link Class#getSuperclass() Class.getSuperclass()} method.
      * @api2vm
      */
-    static native Class getSuperclass(Class clazz);
+    static native <U> Class<? super U> getSuperclass(Class<U> clazz);
 
     /**
      * This method returns a list describing the system packages, 
@@ -215,7 +257,7 @@ final class VMClassRegistry {
      * Class.isAssignableFrom(Class cls)} method.
      * @api2vm
      */
-    static native boolean isAssignableFrom(Class clazz, Class fromClazz);
+    static native boolean isAssignableFrom(Class clazz, Class<?> fromClazz); //XXX: does it have any sense?
 
     /**
      * This method satisfies the requirements of the specification for the
@@ -224,13 +266,6 @@ final class VMClassRegistry {
      * @api2vm
      */
     static native boolean isInstance(Class clazz, Object obj);
-
-    /**
-     * This method satisfies the requirements of the specification for the
-     * {@link Class#isInterface() Class.isInterface()} method.
-     * @api2vm
-     */
-    static native boolean isInterface(Class clazz);
 
     /**
      * This method satisfies the requirements of the specification for the
@@ -249,7 +284,7 @@ final class VMClassRegistry {
      * @throws LinkageError if linking fails.
      * @api2vm
      */
-    static native void linkClass(Class clazz);
+    static native void linkClass(Class<?> clazz);
 
     /**
      * This method is used for the

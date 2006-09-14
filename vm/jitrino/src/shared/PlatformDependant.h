@@ -30,11 +30,11 @@
 #else
     #pragma warning( push, 4 )
     #pragma warning( disable : 4100 4127 4201 4511 4512 )
-	#pragma conform( forScope, on )
+    #pragma conform( forScope, on )
 #endif //_MSC_VER
 
 #undef stdcall__
-#undef cdecl_		
+#undef cdecl_       
 #ifdef PLATFORM_POSIX
 
 #ifndef  __stdcall
@@ -45,11 +45,29 @@
     #define _cdecl
 #endif
     
-    #define stdcall__    __attribute__ ((__stdcall__))
     #define cdecl_       __attribute__ ((__cdecl__))
+#ifdef _EM64T_
+   #define stdcall__
+#else
+    #define stdcall__    __attribute__ ((__stdcall__))
+#endif
+
 #else
     #define stdcall__
-    #define cdecl_		
+    #define cdecl_      
+
+    //--signbit implementation for windows platform
+    #include <float.h>
+
+    inline int signbit(double d) {
+        return _copysign(1, d) < 0;
+    }
+
+    inline int signbit(float f) {
+        return _copysign(1, f) < 0;
+    }
+    //----
+
 #endif
 
 #endif // _PLATFORMDEPENDANT_H_

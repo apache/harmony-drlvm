@@ -251,6 +251,9 @@ VMEXPORT Boolean        class_get_array_num_dimensions(Class_Handle cl);
 VMEXPORT ClassLoaderHandle class_get_class_loader(Class_Handle c);
 
 VMEXPORT void
+class_throw_linking_error_for_jit(Class_Handle ch, unsigned cp_index, unsigned opcode);
+
+void
 class_throw_linking_error(Class_Handle ch, unsigned cp_index, unsigned opcode);
 
 VMEXPORT Class_Handle
@@ -303,6 +306,8 @@ VMEXPORT const char  *const_pool_get_interface_method_descriptor(Class_Handle cl
                                                                   unsigned index);
 
 VMEXPORT unsigned thread_get_suspend_request_offset();
+
+VMEXPORT unsigned thread_get_thread_state_flag_offset(); //temporary: for EscapeAnalysis prototype
 
 VMEXPORT Compile_Handle jit_get_comp_handle(JIT_Handle j);
 

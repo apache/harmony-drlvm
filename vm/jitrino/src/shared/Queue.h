@@ -85,7 +85,7 @@ public:
     Queue(MemoryManager& m) : queueImpl(m) {}
     T*    pop()         {return (T*)queueImpl::pop();}
     void  push(T* elem) {queueImpl::push(elem);}
-    T*    top()			{return (T*)queueImpl::top();}
+    T*    top()         {return (T*)queueImpl::top();}
 };
 
 } //namespace Jitrino 

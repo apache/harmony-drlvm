@@ -80,6 +80,10 @@ jvmtiDisposeEnvironment(jvmtiEnv* env)
 
     CHECK_EVERYTHING();
 
+    TIEnv *p_env = (TIEnv *)env;
+    DebugUtilsTI *ti = p_env->vm->vm_env->TI;
+    LMAutoUnlock lock(&ti->TIenvs_lock);
+
     // Disable all global events for this environment
     int iii;
     for (iii = JVMTI_MIN_EVENT_TYPE_VAL; iii < JVMTI_MAX_EVENT_TYPE_VAL; iii++)
@@ -102,8 +106,12 @@ jvmtiDisposeEnvironment(jvmtiEnv* env)
         _deallocate((unsigned char *)threads);
     }
 
+    // Remove all breakpoints set by this environment
+    ti->brkpntlst_lock._lock();
+    ti->remove_all_breakpoints_env(p_env);
+    ti->brkpntlst_lock._unlock();
+
     // Remove all capabilities for this environment
-    TIEnv *p_env = (TIEnv *)env;
     jvmtiRelinquishCapabilities(env, &p_env->posessed_capabilities);
 
     // Remove environment from the global list

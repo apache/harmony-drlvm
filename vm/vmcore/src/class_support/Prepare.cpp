@@ -44,6 +44,8 @@
 #include "jvmti_direct.h"
 #endif
 
+#include "dump.h"
+
 static void class_initialize_if_no_side_effects(Class *clss);
 
 
@@ -432,6 +434,7 @@ void assign_offsets_to_class_fields(Class *clss)
 // Required for reflection. See class_prepare STEP20 for further explanation.
 bool assign_values_to_class_static_final_fields(Class *clss)
 {
+    ASSERT_RAISE_AREA;
     bool do_field_compaction = Class::compact_fields;
 
     for (int i=0; i<clss->n_fields; i++) {
@@ -463,6 +466,7 @@ bool assign_values_to_class_static_final_fields(Class *clss)
                         tmn_suspend_disable();
                         // ------------------------------------------------------------vv
                         Java_java_lang_String *str = vm_instantiate_cp_string_resolved(cvalue.string);
+
                         if (!str) {
                             assert(exn_raised());
                             tmn_suspend_enable();
@@ -914,6 +918,7 @@ void assign_offsets_to_class_methods(Class *clss)
 
 bool initialize_static_fields_for_interface(Class *clss)
 {
+    ASSERT_RAISE_AREA;
     tmn_suspend_disable();
     // Initialize static fields
     clss->state = ST_Prepared;
@@ -951,7 +956,9 @@ bool initialize_static_fields_for_interface(Class *clss)
                 // compress static reference fields.
                 // It must be a String
                 assert(strcmp(field.get_descriptor()->bytes, "Ljava/lang/String;") == 0);
-                Java_java_lang_String *str = vm_instantiate_cp_string_resolved(field_const_value.string);
+                Java_java_lang_String *str
+                        = vm_instantiate_cp_string_resolved(field_const_value.string);
+
                 if (!str) {
                     assert(exn_raised());
                     tmn_suspend_enable();
@@ -1066,6 +1073,7 @@ void point_class_vtable_entries_to_stubs(Class *clss)
 
 extern bool dump_stubs;
 
+// It's a rutime helper. So should be named as rth_prepare_throw_abstract_method_error
 void prepare_throw_abstract_method_error(Class_Handle clss, Method_Handle method)
 {
     char* buf = (char*)STD_ALLOCA(clss->name->len + method->get_name()->len
@@ -1073,6 +1081,8 @@ void prepare_throw_abstract_method_error(Class_Handle clss, Method_Handle method
     sprintf(buf, "%s.%s%s", clss->name->bytes,
         method->get_name()->bytes, method->get_descriptor()->bytes);
     tmn_suspend_enable();
+
+    // throw exception here because it's a helper
     exn_throw_by_name("java/lang/AbstractMethodError", buf);
     tmn_suspend_disable();
 }
@@ -1091,12 +1101,16 @@ NativeCodePtr prepare_gen_throw_abstract_method_error(Class_Handle clss, Method_
         "call.noret %2i;",
         clss, method, p_throw_ame);
     assert(cs && lil_is_valid(cs));
-    addr = LilCodeGenerator::get_platform()->compile(cs, "prepare_throw_abstract_method_error", dump_stubs);
+    addr = LilCodeGenerator::get_platform()->compile(cs);
+    
+    DUMP_STUB(addr, "prepare_throw_abstract_method_error", lil_cs_get_code_size(cs));
+
     lil_free_code_stub(cs);
 
     return addr;
 }
 
+// It's a rutime helper. So should be named as rth_prepare_throw_illegal_access_error
 void prepare_throw_illegal_access_error(Class_Handle to, Method_Handle from)
 {
     char* buf = (char*)STD_ALLOCA(from->get_class()->name->len
@@ -1106,6 +1120,8 @@ void prepare_throw_illegal_access_error(Class_Handle to, Method_Handle from)
         to->name->bytes,
         from->get_name()->bytes, from->get_descriptor()->bytes);
     tmn_suspend_enable();
+
+    // throw exception here because it's a helper
     exn_throw_by_name("java/lang/IllegalAccessError", buf);
     tmn_suspend_disable();
 }
@@ -1124,7 +1140,10 @@ NativeCodePtr prepare_gen_throw_illegal_access_error(Class_Handle to, Method_Han
         "call.noret %2i;",
         to, from, p_throw_iae);
     assert(cs && lil_is_valid(cs));
-    addr = LilCodeGenerator::get_platform()->compile(cs, "rth_throw_linking_exception", dump_stubs);
+    addr = LilCodeGenerator::get_platform()->compile(cs);
+    
+    DUMP_STUB(addr, "rth_throw_linking_exception", lil_cs_get_code_size(cs));
+
     lil_free_code_stub(cs);
 
     return addr;
@@ -1242,6 +1261,7 @@ static void initialize_regular_class_data(Global_Env* env, Class *clss)
 
 bool class_prepare(Global_Env* env, Class *clss)
 {
+    ASSERT_RAISE_AREA;
     // fast path
     switch(clss->state)
     {
@@ -1291,7 +1311,7 @@ bool class_prepare(Global_Env* env, Class *clss)
         }
         if(!class_prepare(env, clss->superinterfaces[i].clss)) {
             REPORT_FAILED_CLASS_CLASS(clss->class_loader, clss,
-                "java/lang/NoClassDefFoundError",
+                VM_Global_State::loader_env->JavaLangNoClassDefFoundError_String->bytes,
                 clss->name->bytes << ": error preparing superinterface "
                 << clss->superinterfaces[i].clss->name->bytes);
             return false;
@@ -1309,7 +1329,7 @@ bool class_prepare(Global_Env* env, Class *clss)
         // Regular class with super-class.
         if(!class_prepare(env, clss->super_class)) {
             REPORT_FAILED_CLASS_CLASS(clss->class_loader, clss,
-                "java/lang/NoClassDefFoundError",
+                VM_Global_State::loader_env->JavaLangNoClassDefFoundError_String->bytes,
                 clss->name->bytes << ": error preparing superclass "
                 << clss->super_class->name->bytes);
             return false;
@@ -1624,7 +1644,7 @@ bool class_prepare(Global_Env* env, Class *clss)
     // before java.lang.Class: java.lang.Object and java.io.Serializable.
     if(clss->name == env->JavaLangClass_String) {
         String *name   = env->string_pool.lookup("vm_class");
-        String* desc   = env->LongDescriptor_String;
+        String* desc   = env->string_pool.lookup("J");
         Field *vm_class_field = class_lookup_field(clss, name, desc);
         assert(vm_class_field != NULL);
         env->vm_class_offset = vm_class_field->get_offset();

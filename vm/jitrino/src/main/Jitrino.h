@@ -26,9 +26,7 @@
 #include "open/types.h"
 #include "jit_export.h"
 #include "VMInterface.h"
-
-#include <vector>
-#include <string>
+#include "Stl.h"
 #include <assert.h>
 
 // this 'ifndef' makes Jitrino (in jitrino_dev branch) build successfully both on 
@@ -42,21 +40,21 @@ typedef void * InlineInfoPtr;
 
 namespace Jitrino {
 
-class JitrinoParameterTable;
-class MemoryManager;
-class Timer;
-class RuntimeInterface;
+void crash (const char* fmt, ...);
 
-class JITModeData;
-typedef std::vector<JITModeData*> JITModes;
+class MemoryManager;
+class RuntimeInterface;
+class ProfilingInterface;
+
+class JITInstanceContext;
+typedef StlVector<JITInstanceContext*> JITInstances;
 
 class Jitrino {
 public:
-	static void crash (const char* msg);
+    static void crash (const char* msg);
     static bool Init(JIT_Handle jit, const char* name);
-    static void DeInit();
-    static void  NextCommandLineArgument(JIT_Handle jit, const char *name, const char *arg);
-    static bool  CompileMethod(CompilationInterface* compilationInterface);
+    static void DeInit(JIT_Handle jit);
+    static bool  CompileMethod(CompilationContext* compilationContext);
     static void  UnwindStack(MethodDesc* methodDesc, ::JitFrameContext* context, bool isFirst);
     static void  GetGCRootSet(MethodDesc* methodDesc, GCInterface* gcInterface, const ::JitFrameContext* context, bool isFirst);
     static bool  CanEnumerate(MethodDesc* methodDesc, NativeCodePtr eip);
@@ -74,67 +72,30 @@ public:
 
     static uint32 GetInlineDepth(InlineInfoPtr ptr, uint32 offset);
     static Method_Handle GetInlinedMethod(InlineInfoPtr ptr, uint32 offset, uint32 inline_depth);
+    static uint16 GetInlinedBc(InlineInfoPtr ptr, uint32 offset, uint32 inline_depth);
 
     enum Backend {
         CG_IPF,
         CG_IA32,
-        CG_IA
     };
 
     struct Flags {
-        int debugging_level;
-
         bool skip;
-        bool optimize;
-        bool gen_code;
         Backend codegen;
         bool time;
-        bool code_mapping_supported;
     };
     // Global Jitrino Flags (are set on initialization, not modified at runtime)
     static struct Flags flags;
+    static JITInstanceContext* getJITInstanceContext(JIT_Handle jitHandle);
+    static void killJITInstanceContext(JITInstanceContext* jit);
 
-    static void readFlagsFromCommandLine(const JitrinoParameterTable *globalTable, const JitrinoParameterTable *methodTable);
-    static void showFlagsFromCommandLine();
-
-    static Timer *addTimer(const char *);
-    static void dumpTimers();
-    static JITModeData* getJITModeData(JIT_Handle jit);
-    static JitrinoParameterTable* getParameterTable(JIT_Handle jit);
 private:
     static MemoryManager *global_mm; 
-    static Timer *timers; 
     static RuntimeInterface* runtimeInterface;
-	
-    static JITModes jitModes;
+    
+    static JITInstances* jitInstances;
 };
 
-class JITModeData {
-public:
-    
-    JITModeData(JIT_Handle _jitHandle, const char* _modeName, JitrinoParameterTable* _params) 
-        : jitHandle(_jitHandle), modeName(_modeName), parameterTable(_params), profInterface(NULL)
-    {useJet = isJetModeName(_modeName);}
-
-    JIT_Handle getJitHandle() const {return jitHandle;}
-    
-    const std::string& getModeName() const {return modeName;}
-
-    JitrinoParameterTable* getParameterTable() const {return parameterTable;}
-    void setParameterTable(JitrinoParameterTable* pTable) {parameterTable = pTable;}
-
-    ProfilingInterface* getProfilingInterface() const {return profInterface;}
-    void setProfilingInterface(ProfilingInterface* pi) {assert(profInterface == NULL); profInterface = pi;}
-    
-    bool isJet() const {return useJet;}
-    static bool isJetModeName(const char* modeName) {return strlen(modeName)>=3 && !strncmp(modeName, "JET", 3);}
-private:
-    JIT_Handle      jitHandle;
-    std::string     modeName;
-    JitrinoParameterTable* parameterTable;
-    ProfilingInterface* profInterface;
-    bool useJet;
-};
 
 } //namespace Jitrino 
 

@@ -36,45 +36,45 @@
 // Afremov Pavel 20050117 
 #include "../m2n_ipf_internal.h"
 
-static void nt_to_vm_context(LPEXCEPTION_POINTERS p_NT_exception, Registers* regs)
+void nt_to_vm_context(PCONTEXT pcontext, Registers* regs)
 {
     ABORT("The function is never called");
     // 20030402: This code is broken
-    regs->pfs        = (uint64)(p_NT_exception->ContextRecord->RsPFS);
-    regs->ip         = (uint64)(p_NT_exception->ContextRecord->StIIP);
-    regs->bsp        = (uint64*) (p_NT_exception->ContextRecord->RsBSP);
+    regs->pfs        = (uint64)(pcontext->RsPFS);
+    regs->ip         = (uint64)(pcontext->StIIP);
+    regs->bsp        = (uint64*) (pcontext->RsBSP);
 
-    regs->gr[  1]   = (uint64)(p_NT_exception->ContextRecord->IntGp);
-    regs->gr[  2]   = (uint64)(p_NT_exception->ContextRecord->IntT0);
-    regs->gr[  3]   = (uint64)(p_NT_exception->ContextRecord->IntT1);
-    regs->gr[  4]   = (uint64)(p_NT_exception->ContextRecord->IntS0);
-    regs->gr[  5]   = (uint64)(p_NT_exception->ContextRecord->IntS1);
-    regs->gr[  6]   = (uint64)(p_NT_exception->ContextRecord->IntS2);
-    regs->gr[  7]   = (uint64)(p_NT_exception->ContextRecord->IntS3);
-    regs->gr[  8]   = (uint64)(p_NT_exception->ContextRecord->IntV0);
-    regs->gr[  9]   = (uint64)(p_NT_exception->ContextRecord->IntT2);
-    regs->gr[ 10]   = (uint64)(p_NT_exception->ContextRecord->IntT3);
-    regs->gr[ 11]   = (uint64)(p_NT_exception->ContextRecord->IntT4);
-    regs->gr[ 12]   = (uint64)(p_NT_exception->ContextRecord->IntSp);
-    regs->gr[ 13]   = (uint64)(p_NT_exception->ContextRecord->IntTeb);
-    regs->gr[ 14]   = (uint64)(p_NT_exception->ContextRecord->IntT5);
-    regs->gr[ 15]   = (uint64)(p_NT_exception->ContextRecord->IntT6);
-    regs->gr[ 16]   = (uint64)(p_NT_exception->ContextRecord->IntT7);
-    regs->gr[ 17]   = (uint64)(p_NT_exception->ContextRecord->IntT8);
-    regs->gr[ 18]   = (uint64)(p_NT_exception->ContextRecord->IntT9);
-    regs->gr[ 19]   = (uint64)(p_NT_exception->ContextRecord->IntT10);
-    regs->gr[ 20]   = (uint64)(p_NT_exception->ContextRecord->IntT11);
-    regs->gr[ 21]   = (uint64)(p_NT_exception->ContextRecord->IntT12);
-    regs->gr[ 22]   = (uint64)(p_NT_exception->ContextRecord->IntT13);
-    regs->gr[ 23]   = (uint64)(p_NT_exception->ContextRecord->IntT14);
-    regs->gr[ 24]   = (uint64)(p_NT_exception->ContextRecord->IntT15);
-    regs->gr[ 25]   = (uint64)(p_NT_exception->ContextRecord->IntT16);
-    regs->gr[ 26]   = (uint64)(p_NT_exception->ContextRecord->IntT17);
-    regs->gr[ 27]   = (uint64)(p_NT_exception->ContextRecord->IntT18);
-    regs->gr[ 28]   = (uint64)(p_NT_exception->ContextRecord->IntT19);
-    regs->gr[ 29]   = (uint64)(p_NT_exception->ContextRecord->IntT20);
-    regs->gr[ 30]   = (uint64)(p_NT_exception->ContextRecord->IntT21);
-    regs->gr[ 31]   = (uint64)(p_NT_exception->ContextRecord->IntT22);
+    regs->gr[  1]   = (uint64)(pcontext->IntGp);
+    regs->gr[  2]   = (uint64)(pcontext->IntT0);
+    regs->gr[  3]   = (uint64)(pcontext->IntT1);
+    regs->gr[  4]   = (uint64)(pcontext->IntS0);
+    regs->gr[  5]   = (uint64)(pcontext->IntS1);
+    regs->gr[  6]   = (uint64)(pcontext->IntS2);
+    regs->gr[  7]   = (uint64)(pcontext->IntS3);
+    regs->gr[  8]   = (uint64)(pcontext->IntV0);
+    regs->gr[  9]   = (uint64)(pcontext->IntT2);
+    regs->gr[ 10]   = (uint64)(pcontext->IntT3);
+    regs->gr[ 11]   = (uint64)(pcontext->IntT4);
+    regs->gr[ 12]   = (uint64)(pcontext->IntSp);
+    regs->gr[ 13]   = (uint64)(pcontext->IntTeb);
+    regs->gr[ 14]   = (uint64)(pcontext->IntT5);
+    regs->gr[ 15]   = (uint64)(pcontext->IntT6);
+    regs->gr[ 16]   = (uint64)(pcontext->IntT7);
+    regs->gr[ 17]   = (uint64)(pcontext->IntT8);
+    regs->gr[ 18]   = (uint64)(pcontext->IntT9);
+    regs->gr[ 19]   = (uint64)(pcontext->IntT10);
+    regs->gr[ 20]   = (uint64)(pcontext->IntT11);
+    regs->gr[ 21]   = (uint64)(pcontext->IntT12);
+    regs->gr[ 22]   = (uint64)(pcontext->IntT13);
+    regs->gr[ 23]   = (uint64)(pcontext->IntT14);
+    regs->gr[ 24]   = (uint64)(pcontext->IntT15);
+    regs->gr[ 25]   = (uint64)(pcontext->IntT16);
+    regs->gr[ 26]   = (uint64)(pcontext->IntT17);
+    regs->gr[ 27]   = (uint64)(pcontext->IntT18);
+    regs->gr[ 28]   = (uint64)(pcontext->IntT19);
+    regs->gr[ 29]   = (uint64)(pcontext->IntT20);
+    regs->gr[ 30]   = (uint64)(pcontext->IntT21);
+    regs->gr[ 31]   = (uint64)(pcontext->IntT22);
 
     uint32 gr_cursor = 32;
     uint64 *bsp_cursor = regs->bsp;
@@ -93,21 +93,21 @@ static void nt_to_vm_context(LPEXCEPTION_POINTERS p_NT_exception, Registers* reg
 }
 
 
-static void vm_to_nt_context(LPEXCEPTION_POINTERS p_NT_exception, Registers* regs)
+void vm_to_nt_context(Registers* regs, PCONTEXT pcontext)
 {
     ABORT("The function is never called");
     // 20030402: This code is broken
-    p_NT_exception->ContextRecord->RsPFS    = regs->pfs;
-    p_NT_exception->ContextRecord->StIIP    = regs->ip;
-    p_NT_exception->ContextRecord->RsBSP    = (uint64)regs->bsp;
-    p_NT_exception->ContextRecord->IntGp    = regs->gr[  1];
-    p_NT_exception->ContextRecord->IntS0    = regs->gr[  4];
-    p_NT_exception->ContextRecord->IntS1    = regs->gr[  5];
-    p_NT_exception->ContextRecord->IntS2    = regs->gr[  6];
-    p_NT_exception->ContextRecord->IntS3    = regs->gr[  7];
-    p_NT_exception->ContextRecord->IntV0    = regs->gr[  8];
-    p_NT_exception->ContextRecord->IntSp    = regs->gr[ 12];
-    p_NT_exception->ContextRecord->IntTeb   = regs->gr[ 13];
+    pcontext->RsPFS    = regs->pfs;
+    pcontext->StIIP    = regs->ip;
+    pcontextRsBSP    = (uint64)regs->bsp;
+    pcontextIntGp    = regs->gr[  1];
+    pcontextIntS0    = regs->gr[  4];
+    pcontext->IntS1    = regs->gr[  5];
+    pcontext->IntS2    = regs->gr[  6];
+    pcontext->IntS3    = regs->gr[  7];
+    pcontext->IntV0    = regs->gr[  8];
+    pcontext->IntSp    = regs->gr[ 12];
+    pcontext->IntTeb   = regs->gr[ 13];
 }
 
 
@@ -181,13 +181,13 @@ int NT_exception_filter(LPEXCEPTION_POINTERS p_NT_exception)
     }
 
     Registers regs;
-    nt_to_vm_context(p_NT_exception, &regs);
+    nt_to_vm_context(p_NT_exception->ContextRecord, &regs);
 
     // The exception object of class exc_clss will be created by vm_null_ptr_throw.
     assert(exc_clss);
     exn_athrow_regs(&regs, exc_clss);
 
-    vm_to_nt_context(p_NT_exception, &regs);
+    vm_to_nt_context(&regs, p_NT_exception->ContextRecord);
 
     return EXCEPTION_CONTINUE_EXECUTION;
 } //NT_exception_filter

@@ -27,7 +27,6 @@
 
 namespace Jitrino {
 
-DEFINE_OPTPASS(PersistentInstIdGenerationPass)
 
 class PersistentInstructionIdGenerator {
 public:

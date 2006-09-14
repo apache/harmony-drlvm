@@ -427,13 +427,13 @@ jvmtiGetLocalVariableTable(jvmtiEnv* env,
      */
     for( index = 0; index < count; index++)
     {
-        String *name, *type;
+        String *name, *type, *generic_type;
         jvmtiLocalVariableEntry* entry = *table_ptr + index;
         method_ptr->get_local_var_entry(index,
             &(entry->start_location),
             &(entry->length),
             &(entry->slot),
-            &name, &type);
+            &name, &type, &generic_type);
         // allocate memory for name
         len = get_utf8_length_of_8bit( (const uint8*)name->bytes, name->len);
         result = _allocate( len + 1, (unsigned char**)&pointer );
@@ -456,8 +456,20 @@ jvmtiGetLocalVariableTable(jvmtiEnv* env,
         entry->signature = pointer;
         // set variable slot
 
-        // set variable generic_signature
-        entry->generic_signature = NULL;
+        if (generic_type) {
+            // allocate memory for generic_signature
+            len = get_utf8_length_of_8bit( (const uint8*)generic_type->bytes, generic_type->len);
+            result = _allocate( len + 1, (unsigned char**)&pointer );
+            if( result != JVMTI_ERROR_NONE ) {
+                return result;
+            }
+            // copy variable generic_signature
+            utf8_from_8bit( pointer, (const uint8*)generic_type->bytes, generic_type->len);
+            // set variable generic_signature
+            entry->generic_signature = pointer;
+        } else {
+            entry->generic_signature = NULL;
+        }
     }
 
     return JVMTI_ERROR_NONE;
@@ -515,10 +527,11 @@ jvmtiGetBytecodes(jvmtiEnv* env,
     TIEnv *p_env = (TIEnv *)env;
     DebugUtilsTI *ti = p_env->vm->vm_env->TI;
 
+    LMAutoUnlock lock(&ti->brkpntlst_lock);
+
     if (!ti->have_breakpoint(method))
         return JVMTI_ERROR_NONE;
 
-    // There are breakpoint in this method
     for (BreakPoint* bpt = ti->find_first_bpt(method); bpt;
          bpt = ti->find_next_bpt(bpt, method))
     {
@@ -664,6 +677,14 @@ void jvmti_method_enter_callback(Method_Handle method)
 
 void jvmti_method_exit_callback(Method_Handle method, jvalue* return_value)
 {
-    jvmti_process_method_exit_event(reinterpret_cast<jmethodID>(method),
-        JNI_FALSE, *return_value);
+    Method *m = reinterpret_cast<Method *>(method);
+    jmethodID mid = reinterpret_cast<jmethodID>(method);
+
+    if (m->get_return_java_type() != JAVA_TYPE_VOID)
+        jvmti_process_method_exit_event(mid, JNI_FALSE, *return_value);
+    else
+    {
+        jvalue jv = { 0 };
+        jvmti_process_method_exit_event(mid, JNI_FALSE, jv);
+    }
 }

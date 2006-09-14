@@ -26,10 +26,11 @@
 #include "Dominator.h"
 #include "Loop.h"
 #include "escapeanalyzer.h"
+#include "FlowGraph.h"
 
 namespace Jitrino {
 
-DEFINE_OPTPASS_IMPL(RedundantBranchMergingPass, taildup, "Redundant Branch Merging/Factoring")
+DEFINE_SESSION_ACTION(RedundantBranchMergingPass, taildup, "Redundant Branch Merging/Factoring")
 
 void
 RedundantBranchMergingPass::_run(IRManager& irm) {
@@ -40,7 +41,7 @@ RedundantBranchMergingPass::_run(IRManager& irm) {
     tm.doTailDuplication();
 }
 
-DEFINE_OPTPASS_IMPL(HotPathSplittingPass, hotpath, "Profile Guided Hot Path Splitting")
+DEFINE_SESSION_ACTION(HotPathSplittingPass, hotpath, "Profile Guided Hot Path Splitting")
 
 void
 HotPathSplittingPass::_run(IRManager& irm) {
@@ -71,32 +72,32 @@ TailDuplicator::process(DefUseBuilder& defUses, DominatorNode* dnode) {
         process(defUses, child);
     }
 
-    CFGNode* node = dnode->getNode();
-    BranchInst* branch = node->getLastInst()->asBranchInst();
+    Node* node = dnode->getNode();
+    BranchInst* branch = ((Inst*)node->getLastInst())->asBranchInst();
     if(branch == NULL)
         return;
 
     // Tail duplicate redundant branches in dominated nodes.
     for(child = dnode->getChild(); child != NULL; child = child->getSiblings()) {
-        CFGNode* cnode = child->getNode();
-        BranchInst* branch2 = cnode->getLastInst()->asBranchInst();
-        if(branch2 != NULL && node->findTarget(cnode) == NULL && isMatchingBranch(branch, branch2))
+        Node* cnode = child->getNode();
+        BranchInst* branch2 = ((Inst*)cnode->getLastInst())->asBranchInst();
+        if(branch2 != NULL && node->findTargetEdge(cnode) == NULL && isMatchingBranch(branch, branch2))
             tailDuplicate(defUses, node, cnode);
     }
 }
 
 void
-TailDuplicator::tailDuplicate(DefUseBuilder& defUses, CFGNode* idom, CFGNode* tail) 
+TailDuplicator::tailDuplicate(DefUseBuilder& defUses, Node* idom, Node* tail) 
 {
     if(tail->getInDegree() != 2)
         return;
-    CFGNode* t1 = (CFGNode*) idom->getTrueEdge()->getTargetNode();
-    CFGNode* f1 = (CFGNode*) idom->getFalseEdge()->getTargetNode();
+    Node* t1 =  idom->getTrueEdge()->getTargetNode();
+    Node* f1 =  idom->getFalseEdge()->getTargetNode();
     
-    CFGNode* p1 = (CFGNode*) tail->getInEdges().front()->getSourceNode();
-    CFGNode* p2 = (CFGNode*) tail->getInEdges().back()->getSourceNode();
+    Node* p1 =  tail->getInEdges().front()->getSourceNode();
+    Node* p2 =  tail->getInEdges().back()->getSourceNode();
 
-    CFGNode* t2;
+    Node* t2;
 
     if(_dtree->dominates(t1, p1) && _dtree->dominates(f1, p2)) {
         t2 = p1;
@@ -106,22 +107,22 @@ TailDuplicator::tailDuplicate(DefUseBuilder& defUses, CFGNode* idom, CFGNode* ta
         return;
     }
 
-    if(Log::cat_opt_td()->isDebugEnabled()) {
+    if(Log::isEnabled()) {
         Log::out() << "Tail duplicate ";
-        tail->printLabel(Log::out());
+        FlowGraph::printLabel(Log::out(), tail);
         Log::out() << ::std::endl;
     }
 
-    FlowGraph& fg = _irm.getFlowGraph();
-    CFGNode* copy = fg.tailDuplicate(t2, tail, defUses);
-    fg.foldBranch(copy, copy->getLastInst()->asBranchInst(), true);
-    fg.foldBranch(tail, tail->getLastInst()->asBranchInst(), false);
+    ControlFlowGraph& fg = _irm.getFlowGraph();
+    Node* copy = FlowGraph::tailDuplicate(_irm, t2, tail, defUses);
+    FlowGraph::foldBranch(fg, copy, ((Inst*)copy->getLastInst())->asBranchInst(), true);
+    FlowGraph::foldBranch(fg, tail, ((Inst*)tail->getLastInst())->asBranchInst(), false);
 }
 
 void
 TailDuplicator::doTailDuplication() {
     MemoryManager mm(0, "TailDuplicator::doTailDuplication.mm");
-    FlowGraph& fg = _irm.getFlowGraph();
+    ControlFlowGraph& fg = _irm.getFlowGraph();
 
     DefUseBuilder defUses(mm);
     defUses.initialize(fg);
@@ -132,8 +133,8 @@ TailDuplicator::doTailDuplication() {
 }
 
 void
-TailDuplicator::profileGuidedTailDuplicate(LoopTree* ltree, DefUseBuilder& defUses, CFGNode* node) {
-    FlowGraph& fg = _irm.getFlowGraph();
+TailDuplicator::profileGuidedTailDuplicate(LoopTree* ltree, DefUseBuilder& defUses, Node* node) {
+    ControlFlowGraph& fg = _irm.getFlowGraph();
     
     if(node->getInDegree() < 2)
         // Nothing to duplicate
@@ -141,39 +142,39 @@ TailDuplicator::profileGuidedTailDuplicate(LoopTree* ltree, DefUseBuilder& defUs
 
     double heatThreshold = _irm.getHeatThreshold();
     
-    double nodeCount = node->getFreq();
-    Log::cat_opt_td()->debug << "Try nodeCount = " << nodeCount << ::std::endl;
+    double nodeCount = node->getExecCount();
+    Log::out() << "Try nodeCount = " << nodeCount << ::std::endl;
     if(nodeCount < 0.90 * heatThreshold)
         return;
     
-    const CFGEdgeDeque& inEdges = node->getInEdges();
+    const Edges& inEdges = node->getInEdges();
 
-    CFGNode* hotPred = NULL;
-    CFGEdge* hotEdge = NULL;
-    CFGEdgeDeque::const_iterator j;
+    Node* hotPred = NULL;
+    Edge* hotEdge = NULL;
+    Edges::const_iterator j;
     for(j = inEdges.begin(); j != inEdges.end(); ++j) {
-        CFGEdge* edge = *j;
-        CFGNode* pred = edge->getSourceNode();
-        if(!pred->isBasicBlock()) {
+        Edge* edge = *j;
+        Node* pred = edge->getSourceNode();
+        if(!pred->isBlockNode()) {
             hotPred = NULL;
             break;
         }
-        if(pred->getFreq() > 0.90 * nodeCount) {
+        if(pred->getExecCount() > 0.90 * nodeCount) {
             hotPred = pred;
             hotEdge = edge;
         }
     }
 
     if(hotPred != NULL) {
-        Log::cat_opt_td()->debug << "Duplicate " << ::std::endl;
+        Log::out() << "Duplicate " << ::std::endl;
         double hotProb = hotEdge->getEdgeProb();
-        double hotFreq = hotPred->getFreq() * hotProb;
-        if(Log::cat_opt_td()->isDebugEnabled()) {
+        double hotFreq = hotPred->getExecCount() * hotProb;
+        if(Log::isEnabled()) {
             Log::out() << "Hot Pred = ";
-            hotPred->printLabel(Log::out());
+            FlowGraph::printLabel(Log::out(), hotPred);
             Log::out() << ::std::endl;
             Log::out() << "HotPredProb = " << hotProb << ::std::endl;
-            Log::out() << "HotPredFreq = " << hotPred->getFreq() << ::std::endl;
+            Log::out() << "HotPredFreq = " << hotPred->getExecCount() << ::std::endl;
             Log::out() << "HotFreq = " << hotFreq << ::std::endl;
         }
         if(hotFreq > 1.10 * nodeCount)
@@ -182,45 +183,45 @@ TailDuplicator::profileGuidedTailDuplicate(LoopTree* ltree, DefUseBuilder& defUs
             hotFreq = nodeCount;
         else if(hotFreq < 0.75 * nodeCount)
             return;
-        CFGNode* newNode = fg.tailDuplicate(hotPred, node, defUses);
-        if(Log::cat_opt_td()->isDebugEnabled()) {
+        Node* newNode = FlowGraph::tailDuplicate(_irm, hotPred, node, defUses);
+        if(Log::isEnabled()) {
             Log::out() << "New node = ";
-            newNode->printLabel(Log::out());
+            FlowGraph::printLabel(Log::out(), newNode);
             Log::out() << ::std::endl;
         }
-        newNode->setFreq(hotFreq);
-        CFGEdge* stBlockEdge = (CFGEdge*) newNode->getUnconditionalEdge();
+        newNode->setExecCount(hotFreq);
+        Edge* stBlockEdge = newNode->getUnconditionalEdge();
         if(stBlockEdge != NULL) {
-            CFGNode* stBlock = (CFGNode*) stBlockEdge->getTargetNode();
+            Node* stBlock =  stBlockEdge->getTargetNode();
             if(stBlock->getId() > newNode->getId())
-                stBlock->setFreq(newNode->getFreq());
+                stBlock->setExecCount(newNode->getExecCount());
         }
-        node->setFreq(nodeCount-hotFreq);
-        ((CFGEdge*) hotPred->findTarget(newNode))->setEdgeProb(hotProb);
+        node->setExecCount(nodeCount-hotFreq);
+        hotPred->findTargetEdge(newNode)->setEdgeProb(hotProb);
 
         // Test if node is source of back edge.
-        CFGNode* loopHeader = NULL;
-        const CFGEdgeDeque& outEdges = node->getOutEdges();
+        Node* loopHeader = NULL;
+        const Edges& outEdges = node->getOutEdges();
         for(j = outEdges.begin(); j != outEdges.end(); ++j) {
-            CFGEdge* edge = *j;
-            CFGNode* succ = edge->getTargetNode();
-            if(succ->getDfNum() != UINT32_MAX && ltree->isLoopHeader(succ) && succ->getDfNum() < node->getDfNum()) {
+            Edge* edge = *j;
+            Node* succ = edge->getTargetNode();
+            if(succ->getDfNum() != MAX_UINT32 && ltree->isLoopHeader(succ) && succ->getDfNum() < node->getDfNum()) {
                 loopHeader = succ;
             }
         }
         
         if(loopHeader != NULL) {
             // Create new loop header:
-            CFGNode* newHeader = fg.createBlockNode();
+            Node* newHeader = fg.createBlockNode(_irm.getInstFactory().makeLabel());
 
-            const CFGEdgeDeque& loopInEdges = loopHeader->getInEdges();
+            const Edges& loopInEdges = loopHeader->getInEdges();
             for(j = loopInEdges.begin(); j != loopInEdges.end();) {
-                CFGEdge* edge = *j;
+                Edge* edge = *j;
                 ++j;
-                CFGNode* pred = edge->getSourceNode();
+                Node* pred = edge->getSourceNode();
                 if(pred != newNode) {
                     fg.replaceEdgeTarget(edge, newHeader);
-                    newHeader->setFreq(newHeader->getFreq()+pred->getFreq()*edge->getEdgeProb());
+                    newHeader->setExecCount(newHeader->getExecCount()+pred->getExecCount()*edge->getEdgeProb());
                 }
             }
             fg.addEdge(newHeader, loopHeader);            
@@ -231,24 +232,24 @@ TailDuplicator::profileGuidedTailDuplicate(LoopTree* ltree, DefUseBuilder& defUs
 void 
 TailDuplicator::doProfileGuidedTailDuplication(LoopTree* ltree) {
     MemoryManager mm(0, "TailDuplicator::doProfileGuidedTailDuplication.mm");
-    FlowGraph& fg = _irm.getFlowGraph();
+    ControlFlowGraph& fg = _irm.getFlowGraph();
     if(!fg.hasEdgeProfile())
         return;
 
     DefUseBuilder defUses(mm);
     defUses.initialize(fg);
 
-    StlVector<CFGNode*> nodes(mm);
+    Nodes nodes(mm);
     fg.getNodesPostOrder(nodes);
-    StlVector<CFGNode*>::reverse_iterator i;
+    Nodes::reverse_iterator i;
     for(i = nodes.rbegin(); i != nodes.rend(); ++i) {
-        CFGNode* node = *i;
-        if(Log::cat_opt_td()->isDebugEnabled()) {
+        Node* node = *i;
+        if(Log::isEnabled()) {
             Log::out() << "Consider ";
-            node->printLabel(Log::out());
+            FlowGraph::printLabel(Log::out(), node);
             Log::out() << ::std::endl;
         }
-        if(!node->isBlockNode() || node == fg.getReturn())
+        if(!node->isBlockNode() || node == fg.getReturnNode())
             continue;
 
         if(ltree->isLoopHeader(node))

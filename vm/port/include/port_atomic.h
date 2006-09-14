@@ -151,6 +151,7 @@ INLINE uint16 port_atomic_cas16(volatile uint16 * data , uint16 value, uint16 co
 INLINE uint64 port_atomic_cas64(volatile uint64 * data , uint64 value, uint64 comp) {
 #if defined(_IA32_)
     __asm__ __volatile__(
+        "push %%ebx;\n\t"
         "lea %0, %%esi;\n\t"
         "mov (%%esi), %%eax;\n\t"
         "mov 4(%%esi), %%edx;\n\t"
@@ -161,10 +162,11 @@ INLINE uint64 port_atomic_cas64(volatile uint64 * data , uint64 value, uint64 co
         "lock cmpxchg8b (%%esi);\n\t"
         "lea %0, %%esi;\n\t"
         "mov %%eax, (%%esi);\n\t"
-        "mov %%edx, 4(%%esi)"
+        "mov %%edx, 4(%%esi);\n\t"
+        "pop %%ebx"
         : /* no outputs (why not comp?)*/
         :"m"(comp), "m"(value), "m"(data) /* inputs */
-        :"%eax", "%ebx", "%ecx", "%edx", "%esi" /* clobbers */
+        :"%eax", "%ecx", "%edx", "%esi" /* clobbers */
     );
     return comp;
 #elif defined(_EM64T_) // defined(_IA32_)

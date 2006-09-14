@@ -94,9 +94,9 @@ static void allocate_pool_storage(Pool_Descriptor *p_pool, size_t size, size_t p
     p_pool->num_pool_allocations++;
     p_pool->total_pool_size += size;
     if (is_code) {
-        vm_stats_total.codemgr_total_code_pool_size += size;
+        VM_Statistics::get_vm_stats().codemgr_total_code_pool_size += size;
     } else {
-        vm_stats_total.codemgr_total_data_pool_size += size;
+        VM_Statistics::get_vm_stats().codemgr_total_data_pool_size += size;
     }
 #endif //VM_STATS
 
@@ -182,9 +182,9 @@ static void *allocate_from_pool(Pool_Descriptor *p_pool, size_t size, size_t ali
     p_pool->num_allocations++;
     p_pool->total_size_allocated += size;
     if (p_pool->is_code) {
-        vm_stats_total.codemgr_total_code_allocated += size;
+        VM_Statistics::get_vm_stats().codemgr_total_code_allocated += size;
     } else {
-        vm_stats_total.codemgr_total_data_allocated += size;
+        VM_Statistics::get_vm_stats().codemgr_total_data_allocated += size;
     }
 #endif //VM_STATS
     return p;
@@ -270,10 +270,10 @@ void vm_init_mem_alloc()
     assert(initial_code_pool_size);
 
 #ifdef VM_STATS
-    vm_stats_total.codemgr_total_code_pool_size = 0;
-    vm_stats_total.codemgr_total_code_allocated = 0;
-    vm_stats_total.codemgr_total_data_pool_size = 0;
-    vm_stats_total.codemgr_total_data_allocated = 0;
+    VM_Statistics::get_vm_stats().codemgr_total_code_pool_size = 0;
+    VM_Statistics::get_vm_stats().codemgr_total_code_allocated = 0;
+    VM_Statistics::get_vm_stats().codemgr_total_data_pool_size = 0;
+    VM_Statistics::get_vm_stats().codemgr_total_data_allocated = 0;
 #endif //VM_STATS
 
     init_pools(page_size_for_allocation);

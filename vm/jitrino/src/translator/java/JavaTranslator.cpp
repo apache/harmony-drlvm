@@ -30,31 +30,30 @@
 #include "JavaByteCodeTranslator.h"
 #include "MemoryEstimates.h"
 #include "Log.h"
+#include "CGSupport.h"
+#include "FlowGraph.h"
 
 namespace Jitrino {
 
-void
-JavaTranslator::translateMethod(CompilationInterface& compilationInterface,
-                                MethodDesc& methodDesc,
-                                IRBuilder& irBuilder) {
+void JavaTranslator::translateMethod(CompilationInterface& ci, MethodDesc& methodDesc, IRBuilder& irBuilder) {
+    
     uint32 byteCodeSize = methodDesc.getByteCodeSize();
     const unsigned char* byteCodes = methodDesc.getByteCodes();
-    MemoryManager    
-        translatorMemManager(byteCodeSize*ESTIMATED_TRANSLATOR_MEMORY_PER_BYTECODE,
+    MemoryManager  translatorMemManager(byteCodeSize*ESTIMATED_TRANSLATOR_MEMORY_PER_BYTECODE,
                              "JavaTranslator::translateMethod.translatorMemManager");
 
-    JavaFlowGraphBuilder cfgBuilder(irBuilder.getInstFactory().getMemManager(),irBuilder);
+    JavaFlowGraphBuilder cfgBuilder(irBuilder.getInstFactory()->getMemManager(),irBuilder);
 
     ByteCodeParser parser((const uint8*)byteCodes,byteCodeSize);
     // generate code
-    JavaByteCodeTranslator translator(compilationInterface,
+    JavaByteCodeTranslator translator(ci,
                               translatorMemManager,
                               irBuilder,
                               parser,
                               methodDesc, 
-                              irBuilder.getTypeManager(),
+                              *irBuilder.getTypeManager(),
                               cfgBuilder);
-							  // isInlined
+                              // isInlined
     parser.parse(&translator);
     cfgBuilder.build();
 }
@@ -86,65 +85,20 @@ JavaCompileMethodInline(CompilationInterface& compilationInterface,
                               irBuilder,
                               parser,
                               methodDesc,
-                              irBuilder.getTypeManager(),
+                              *irBuilder.getTypeManager(),
                               cfgBuilder,
                               numActualArgs,actualArgs,NULL,NULL,
                               (ExceptionInfo*)irBuilder.getCurrentLabel()->getState(),
                               inlineDepth,false /* startNewBlock */,
                               parentInlineInfoBuilder,
                               parentJsrEntryMap);  // isInlined=true for this c-tor
+    if ( compilationInterface.isBCMapInfoRequired()) {
+        size_t incSize = byteCodeSize * ESTIMATED_HIR_SIZE_PER_BYTECODE;
+        MethodDesc* parentMethod = compilationInterface.getMethodToCompile();
+        incVectorHandlerSize(bcOffset2HIRHandlerName, parentMethod, incSize);
+    }
     parser.parse(&translator);
     return translator.getResultOpnd();
-}
-
-// version for IR inlining
-void
-JavaTranslateMethodForIRInlining(
-                            CompilationInterface& compilationInterface,
-                            MethodDesc& methodDesc,
-                            IRBuilder&        irBuilder,
-                            uint32            numActualArgs,
-                            Opnd**            actualArgs,
-                            Opnd**            returnOpnd,
-                            CFGNode**         returnNode,
-                            Inst*             inlineSite,
-                            uint32 inlineDepth) {
-    uint32 byteCodeSize = methodDesc.getByteCodeSize();
-    const unsigned char* byteCodes = methodDesc.getByteCodes();
-    MemoryManager
-        translatorMemManager(byteCodeSize*ESTIMATED_TRANSLATOR_MEMORY_PER_BYTECODE,
-                             "JavaTranslator::translateMethod.translatorMemManager");
-
-
-    JavaFlowGraphBuilder cfgBuilder(irBuilder.getInstFactory().getMemManager(),
-                                    irBuilder);
-
-    ByteCodeParser parser((const uint8*)byteCodes,byteCodeSize);
-    // generate code
-    ExceptionInfo *exceptionInfo = NULL; 
-    JavaByteCodeTranslator translator(compilationInterface,
-                              translatorMemManager,
-                              irBuilder,
-                              parser,
-                              methodDesc,
-                              irBuilder.getTypeManager(),
-                              cfgBuilder,
-                              numActualArgs,actualArgs,
-                              returnOpnd,returnNode,
-                              exceptionInfo,
-                              inlineDepth,true /* startNewBlock */,
-                              NULL /* parentInlineInfoBuilder */,
-                              NULL /* parentJsrEntryMap */);  // isInlined=true for this c-tor
-
-    translator.setNoInlineInfoBuilder();
-
-    parser.parse(&translator);
-    cfgBuilder.build();
-    if(Log::cat_opt()->isDebugEnabled()) {
-        FlowGraph &ojo = irBuilder.getFlowGraph();
-        Log::out() << "INLINED\n";
-        ojo.printInsts(Log::out(),methodDesc);
-    }
 }
 
 

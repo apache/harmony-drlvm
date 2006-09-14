@@ -25,17 +25,14 @@
 
 class IRManager;
 class Dominator;
-class CFGNode;
+class Node;
 class Inst;
 class LoopTree;
 
 #include "Stl.h"
 #include "irmanager.h"
-#include "optpass.h"
 
 namespace Jitrino {
-
-DEFINE_OPTPASS(GlobalOperandAnalysisPass)
 
 //
 //  Global operand analyzer marks temporaries whose live range spans
@@ -43,20 +40,19 @@ DEFINE_OPTPASS(GlobalOperandAnalysisPass)
 //
 class GlobalOpndAnalyzer {
 public:
-    GlobalOpndAnalyzer(IRManager& irm, FlowGraph* region=NULL) 
-        : irManager(irm), flowGraph((region != NULL) ? *region : irm.getFlowGraph())
+    GlobalOpndAnalyzer(IRManager& irm, ControlFlowGraph* region=NULL) 
+        : irManager(irm), flowGraph((region != NULL) ? *region : irm.getFlowGraph()), nodes(irm.getMemoryManager())
     {
     }
     void doAnalysis();
     virtual ~GlobalOpndAnalyzer() {};
 protected:
-    void getNodesInPostorder();
     void resetGlobalBits();
     virtual void markGlobals();
 
     IRManager&            irManager;
-    FlowGraph&            flowGraph;
-    ::std::vector<CFGNode*> nodes;
+    ControlFlowGraph&            flowGraph;
+    Nodes nodes;
 };
 
 //
@@ -71,7 +67,6 @@ public:
     {}
     virtual ~AdvancedGlobalOpndAnalyzer() {};
 private:
-    bool cfgContainsLoops();
     void analyzeInst(Inst* inst, uint32 loopHeader, uint32 timeStamp);
     void unmarkFalseGlobals();
     void markManagedPointerBases();

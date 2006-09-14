@@ -158,6 +158,16 @@ static uint32 exam_point;
 bool SuspendThread(unsigned xx){ return 0; }
 bool ResumeThread(unsigned xx){ return 1; }
 
+void linux_ucontext_to_regs(Registers* regs, ucontext_t* uc)
+{
+//TODO: ADD Copying of IPF registers here like it was done on ia32!!
+}
+
+void linux_regs_to_ucontext(ucontext_t* uc, Registers* regs)
+{
+//TODO: ADD Copying of IPF registers here like it was done on ia32!!
+}
+
 static void linux_sigcontext_to_regs(Registers* regs, sigcontext* sc)
 {
 //TODO: ADD Copying of IPF registers here like it was done on ia32!!
@@ -189,10 +199,10 @@ static void linux_throw_from_sigcontext(uint32* top_ebp, Class* exc_clss)
     assert(vm_identify_eip((void *)sc->sc_ip) == VM_TYPE_JAVA);
 
     Registers regs;
-    linux_sigcontext_to_regs(&regs, sc);
+//    linux_sigcontext_to_regs(&regs, sc); // FIXME: transfer to linux_ucontext_to_regs
     exn_athrow_regs(&regs, exc_clss);
-    linux_regs_to_sigcontext(sc, &regs);
-    linux_regs_to_sigcontext(top_sc, &regs);
+//    linux_regs_to_sigcontext(sc, &regs); // FIXME: transfer to linux_regs_to_ucontext
+//    linux_regs_to_sigcontext(top_sc, &regs); // FIXME: transfer to linux_regs_to_ucontext
 }
 
 /*

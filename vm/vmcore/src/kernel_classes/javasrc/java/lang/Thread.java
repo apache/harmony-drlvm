@@ -111,7 +111,7 @@ public class Thread implements Runnable {
      * Maps <code>ThreadLocal</code> object to value. Lazy initialization is
      * used to avoid circular dependance.
      */
-    private Map localValues = null;
+    private Map<ThreadLocal<Object>, Object> localValues = null;
 
     /**
      * Uncaught exception handler for this thread
@@ -381,8 +381,6 @@ public class Thread implements Runnable {
     /**
      * @com.intel.drl.spec_ref
      */
-/*    
-  // XXX for 5.0: wait for VM interfaces implemented
     public static Map<Thread, StackTraceElement[]> getAllStackTraces() {
         SecurityManager securityManager = System.getSecurityManager();
         if (securityManager != null) {
@@ -391,22 +389,37 @@ public class Thread implements Runnable {
             securityManager
                 .checkPermission(RuntimePermissionCollection.MODIFY_THREAD_GROUP_PERMISSION);
         }
-        Map<Thread, StackTraceElement[]> map = new HashMap<Thread, StackTraceElement[]>(liveThreads.length);
-        Thread[] liveThreads = VMThreadManager.getLiveThreads();
-        for (int i = 0; i < liveThreads.length; i++) {
-            Object stackHandler = VMStack.getStackState(liveThreads[i]);
-            StackTraceElement[] ste = VMStack.getStackTrace(stackHandler);
-            if (liveThreads[i].isAlive()) { 
-                StackTraceElement[] ste = VMStack.getStackTrace(stackHandler);
-                if (ste == null) {
-                    ste = new StackTraceElement[0];
-                } 
+        
+        // find the initial ThreadGroup in the tree
+        ThreadGroup parent = new ThreadGroup(currentThread().getThreadGroup(), "Temporary");
+        ThreadGroup newParent = parent.getParent();
+        parent.destroy();
+        while (newParent != null) {
+            parent = newParent;
+            newParent = parent.getParent();
+        }
+        int threadsCount = parent.activeCount() + 1;
+        int count;
+        Thread[] liveThreads;
+        while (true) {
+            liveThreads = new Thread[threadsCount];
+            count = parent.enumerate(liveThreads);
+            if (count == threadsCount) {
+                threadsCount *= 2;
+            } else {
+                break;
+            }
+        }
+        Map<Thread, StackTraceElement[]> map = new HashMap<Thread, StackTraceElement[]>(count + 1);
+        for (int i = 0; i < count; i++) {
+            StackTraceElement[] ste = liveThreads[i].getStackTrace();
+            if (ste.length != 0) {
                 map.put(liveThreads[i], ste);
             }
         }
         return map;
     }
-*/    
+
     /**
      * @com.intel.drl.spec_ref
      */
@@ -467,15 +480,12 @@ public class Thread implements Runnable {
                     .checkPermission(RuntimePermissionCollection.GET_STACK_TRACE_PERMISSION);
             }
         }
-        if (!this.isAlive()) {
-            return new StackTraceElement[0];
+        StackTraceElement ste[] = VMStack.getThreadStackTrace(this);
+        if (ste != null) {
+            return ste;
+        } else {
+            return  new StackTraceElement[0];
         }
-        // TODO: correct after the interfaces to VM for 1.5 are approved.
-        // For now VMStack.getStackState() returns
-        // stack information of the currently executing thread.
-        // Here we need VMStack.getStackState(this);
-        Object stackHandler = VMStack.getStackState();
-        return VMStack.getStackTrace(stackHandler);
     }
     
     /**
@@ -703,8 +713,7 @@ public class Thread implements Runnable {
 
     
 
-// for 5.0
-/*    public enum State {
+    public enum State {
         NEW,
         RUNNABLE,
         BLOCKED,
@@ -713,13 +722,29 @@ public class Thread implements Runnable {
         TERMINATED
     }
 
-    *//**
+    /**
      * @com.intel.drl.spec_ref
-     *//*
-    public State getState() {
-        return VMThreadManager.getState();
+     */
+    public Thread.State  getState() {
+        
+        int state = (VMThreadManager.getState(this));
+
+        if (0 != (state & VMThreadManager.JVMTI_THREAD_STATE_TERMINATED)) {         
+            return State.TERMINATED;
+        } else if  (0 != (state & VMThreadManager.JVMTI_THREAD_STATE_WAITING_WITH_TIMEOUT)) {
+            return State.TIMED_WAITING;
+        } else if (0 != (state & VMThreadManager.JVMTI_THREAD_STATE_WAITING) 
+                || 0 != (state & VMThreadManager.JVMTI_THREAD_STATE_PARKED)) {
+            return State.WAITING;
+        } else if (0 != (state & VMThreadManager.JVMTI_THREAD_STATE_BLOCKED_ON_MONITOR_ENTER)) {
+            return State.BLOCKED;
+        } else if (0 != (state & VMThreadManager.JVMTI_THREAD_STATE_ALIVE)) {
+            return State.RUNNABLE;
+        } else { 
+            return State.NEW;
+        }
     }
-*/
+
     /**
      * @com.intel.drl.spec_ref
      */
@@ -822,9 +847,9 @@ public class Thread implements Runnable {
      * This nethod is designed to provide <code>ThreadLocal</code>
      * functionality.
      */
-    void setThreadLocal(ThreadLocal local, Object value) {
+    void setThreadLocal(ThreadLocal<Object> local, Object value) {
         if (localValues == null) {
-            localValues = new HashMap();
+            localValues = new HashMap<ThreadLocal<Object>, Object>();
         }
         localValues.put(local, value);
     }
@@ -837,10 +862,10 @@ public class Thread implements Runnable {
      * This nethod is designed to provide <code>ThreadLocal</code>
      * functionality.
      */
-    Object getThreadLocal(ThreadLocal local) {
+    Object getThreadLocal(ThreadLocal<Object> local) {
         Object value;
         if (localValues == null) {
-            localValues = new HashMap();
+            localValues = new HashMap<ThreadLocal<Object>, Object>();
             value = local.initialValue();
             localValues.put(local, value);
             return value;
@@ -859,7 +884,7 @@ public class Thread implements Runnable {
      * This nethod is designed to provide <code>ThreadLocal</code>
      * functionality.
      */
-    void removeLocalValue(ThreadLocal local) {
+    void removeLocalValue(ThreadLocal<Object> local) {
         if (localValues != null) {
             localValues.remove(local);
         }
@@ -874,17 +899,17 @@ public class Thread implements Runnable {
      * This method should be called from <code>Thread</code>'s constructor.
      */
     private void initializeInheritableLocalValues(Thread parent) {
-        Map parentLocalValues = parent.localValues;
+        Map<ThreadLocal<Object>, Object> parentLocalValues = parent.localValues;
         if (parentLocalValues == null) {
-            return;
+           return;
         }
-        localValues = new HashMap(parentLocalValues.size());
-        for (Iterator it = parentLocalValues.keySet().iterator(); it.hasNext();) {
-            Object local = it.next();
+        localValues = new HashMap<ThreadLocal<Object>, Object>(parentLocalValues.size());
+        for (Iterator<ThreadLocal<Object>> it = parentLocalValues.keySet().iterator(); it.hasNext();) {
+            ThreadLocal<Object> local = it.next();
             if (local instanceof InheritableThreadLocal) {
                 Object parentValue = parentLocalValues.get(local);
-                localValues.put(local, ((InheritableThreadLocal)local)
-                    .childValue(parentValue));
+                InheritableThreadLocal<Object> iLocal = (InheritableThreadLocal<Object>) local;
+                localValues.put(local, iLocal.childValue(parentValue));
             }
         }
     }

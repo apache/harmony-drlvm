@@ -120,7 +120,7 @@ inline bool isComparisonModifierSigned(enum ComparisonModifier mod)
     case Cmp_EQ: case Cmp_GT: case Cmp_GTE: return true;
     case Cmp_NE_Un: case Cmp_GT_Un: case Cmp_GTE_Un: return false;
     default:
-	break;
+    break;
     }
     assert(((int)SignedOp <= (int)mod) && ((int)mod <= (int)UnsignedOp));
     return ((int)mod != (int)UnsignedOp);
@@ -194,7 +194,7 @@ enum StoreModifier {
 };
 
 enum ExceptionModifier {
-    Exception_Sometimes     = 0x1 << 17,	// the default
+    Exception_Sometimes     = 0x1 << 17,    // the default
     Exception_Always        = 0x2 << 17,
     Exception_Never         = 0x3 << 17,
     Exception_Mask          = 0x3 << 17,
@@ -268,7 +268,9 @@ enum IntrinsicCallId {
 
 enum JitHelperCallId {
     InitializeArray,
-    PseudoCanThrow
+    PseudoCanThrow,
+    SaveThisState,
+    ReadThisState
 };
 
 enum VMHelperCallId {
@@ -313,7 +315,6 @@ enum Opcode {
     // Exception processing
     Op_Catch,
     Op_Throw,               
-	Op_ThrowLazy,                   // generate a call to special VM helper which constructs exc. object only if necessary
     Op_ThrowSystemException,        // takes a CompilationInterface::SystemExceptionId parameter
     Op_ThrowLinkingException,       // generate a call to Helper_Throw_LinkingException
     Op_Leave,                       
@@ -331,7 +332,7 @@ enum Opcode {
     Op_DefArg,                      // DefArgModifier
     // Load instructions
     Op_LdConstant,
-    Op_LdString,
+    Op_LdRef,                       // String or reference
     Op_LdVar,    
     Op_LdVarAddr,
     Op_TauLdInd,

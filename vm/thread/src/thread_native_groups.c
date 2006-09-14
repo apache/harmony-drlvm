@@ -28,7 +28,7 @@
 #include "thread_private.h"
 
 extern hythread_group_t group_list;  // list of thread groups
-extern int groups_count;        // number of thread groups
+extern IDATA groups_count;        // number of thread groups
 
    
 /** @name Thread groups support
@@ -80,6 +80,7 @@ IDATA VMCALL hythread_group_create(hythread_group_t *group) {
     (*group)->threads_count = 0;
     
     groups_count++;
+    
     status=hythread_global_unlock();
 
     return status;
@@ -113,28 +114,28 @@ IDATA VMCALL hythread_group_release(hythread_group_t group) {
  * @param[out] list thread group array
  * @param[out] size array size
  */
-IDATA VMCALL hythread_group_get_list(hythread_group_t **list, int* size) {
-    hythread_group_t cur;
-    int i=0;
-    hythread_group_t *array_for_list;
-    IDATA status;
-    status=hythread_global_lock();
-    if (status != TM_ERROR_NONE) 
-        return status;
-    (*size) = groups_count;
-    array_for_list=(hythread_group_t*)malloc(sizeof(hythread_group_t)*groups_count);
-    if(array_for_list==NULL)
-    { 
-        status=hythread_global_unlock();
-        return TM_ERROR_OUT_OF_MEMORY;
-    }
-    for (cur = group_list->next; cur != group_list; cur = cur->next)
-    {
-        array_for_list[i++]=cur;
-    }
-    (*list)=array_for_list;
-    status=hythread_global_unlock();
-    return status;   
+ IDATA VMCALL hythread_group_get_list(hythread_group_t **list, int* size) {
+     hythread_group_t cur;
+     int i=0;
+     hythread_group_t *array_for_list;
+     IDATA status;
+     status=hythread_global_lock();
+     if (status != TM_ERROR_NONE) 
+         return status;
+     (*size) = groups_count;
+     array_for_list=(hythread_group_t*)malloc(sizeof(hythread_group_t)*groups_count);
+     if(array_for_list==NULL)
+     { 
+         status=hythread_global_unlock();
+         return TM_ERROR_OUT_OF_MEMORY;
+     }
+     for (cur = group_list->next; cur != group_list; cur = cur->next)
+     {
+         array_for_list[i++]=cur;
+     }
+     (*list)=array_for_list;
+     status=hythread_global_unlock();
+     return status;   
 }
 
 //@}

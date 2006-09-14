@@ -45,7 +45,9 @@ public final class Compiler {
      * 
      * @api2vm
      */
-    public static native Object command(Object obj);
+    public static Object command(Object obj) {
+        throw new UnsupportedOperationException("Not implemented");
+    }
 
     /**
      * This method satisfies the requirements of the specification for the
@@ -54,7 +56,9 @@ public final class Compiler {
      * 
      * @api2vm
      */
-    public static native boolean compileClass(Class clazz);
+    public static boolean compileClass(Class<?> clazz) {
+        throw new UnsupportedOperationException("Not implemented");
+    }
 
     /**
      * This method satisfies the requirements of the specification for the
@@ -63,7 +67,9 @@ public final class Compiler {
      * 
      * @api2vm
      */
-    public static native boolean compileClasses(String name);
+    public static boolean compileClasses(String name){
+        throw new UnsupportedOperationException("Not implemented");
+    }
 
     /**
      * This method satisfies the requirements of the specification for the
@@ -71,7 +77,9 @@ public final class Compiler {
      * 
      * @api2vm
      */
-    public static native void disable();
+    public static void disable() {
+        throw new UnsupportedOperationException("Not implemented");
+    }
 
     /**
      * This method satisfies the requirements of the specification for the
@@ -79,5 +87,7 @@ public final class Compiler {
      * 
      * @api2vm
      */
-    public static native void enable();
+    public static void enable() {
+       throw new UnsupportedOperationException("Not implemented");
+    }
 }

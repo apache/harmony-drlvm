@@ -30,75 +30,75 @@ namespace Ia32{
 //_________________________________________________________________________________________________
 ConditionMnemonic reverseConditionMnemonics[ConditionMnemonic_Count]=
 {
-	ConditionMnemonic_NO,
-	ConditionMnemonic_O,
-	ConditionMnemonic_NB,
-	ConditionMnemonic_NAE,
-	ConditionMnemonic_NZ,
-	ConditionMnemonic_Z,
-	ConditionMnemonic_NBE,
-	ConditionMnemonic_NA,
+    ConditionMnemonic_NO,
+    ConditionMnemonic_O,
+    ConditionMnemonic_NB,
+    ConditionMnemonic_NAE,
+    ConditionMnemonic_NZ,
+    ConditionMnemonic_Z,
+    ConditionMnemonic_NBE,
+    ConditionMnemonic_NA,
 
-	ConditionMnemonic_NS,
-	ConditionMnemonic_S,
-	ConditionMnemonic_NP,
-	ConditionMnemonic_P,
-	ConditionMnemonic_NL,
-	ConditionMnemonic_NGE,
-	ConditionMnemonic_NLE,
-	ConditionMnemonic_NG,
+    ConditionMnemonic_NS,
+    ConditionMnemonic_S,
+    ConditionMnemonic_NP,
+    ConditionMnemonic_P,
+    ConditionMnemonic_NL,
+    ConditionMnemonic_NGE,
+    ConditionMnemonic_NLE,
+    ConditionMnemonic_NG,
 };
 
 //_________________________________________________________________________________________________
 ConditionMnemonic swappedConditionMnemonics[ConditionMnemonic_Count]=
 {
-	ConditionMnemonic_NO,
-	ConditionMnemonic_O,
-	ConditionMnemonic_A,
-	ConditionMnemonic_BE,
-	ConditionMnemonic_Z,
-	ConditionMnemonic_NZ,
-	ConditionMnemonic_AE,
-	ConditionMnemonic_B,
+    ConditionMnemonic_NO,
+    ConditionMnemonic_O,
+    ConditionMnemonic_A,
+    ConditionMnemonic_BE,
+    ConditionMnemonic_Z,
+    ConditionMnemonic_NZ,
+    ConditionMnemonic_AE,
+    ConditionMnemonic_B,
 
-	ConditionMnemonic_NS,
-	ConditionMnemonic_S,
-	ConditionMnemonic_P,
-	ConditionMnemonic_NP,
-	ConditionMnemonic_G,
-	ConditionMnemonic_LE,
-	ConditionMnemonic_GE,
-	ConditionMnemonic_L,
+    ConditionMnemonic_NS,
+    ConditionMnemonic_S,
+    ConditionMnemonic_P,
+    ConditionMnemonic_NP,
+    ConditionMnemonic_G,
+    ConditionMnemonic_LE,
+    ConditionMnemonic_GE,
+    ConditionMnemonic_L,
 };
 
 //_________________________________________________________________________________________________
-Mnemonic			getBaseConditionMnemonic(Mnemonic mn)
+Mnemonic            getBaseConditionMnemonic(Mnemonic mn)
 {
-	return 
-		mn>=Mnemonic_Jcc && mn<Mnemonic_Jcc+16?Mnemonic_Jcc:
-		mn>=Mnemonic_CMOVcc && mn<Mnemonic_CMOVcc+16?Mnemonic_CMOVcc:
-		mn>=Mnemonic_SETcc && mn<Mnemonic_SETcc+16?Mnemonic_SETcc:
-		Mnemonic_NULL;
+    return 
+        mn>=Mnemonic_Jcc && mn<Mnemonic_Jcc+16?Mnemonic_Jcc:
+        mn>=Mnemonic_CMOVcc && mn<Mnemonic_CMOVcc+16?Mnemonic_CMOVcc:
+        mn>=Mnemonic_SETcc && mn<Mnemonic_SETcc+16?Mnemonic_SETcc:
+        Mnemonic_NULL;
 }
 
 //_________________________________________________________________________________________________
-ConditionMnemonic	reverseConditionMnemonic(ConditionMnemonic cm)
+ConditionMnemonic   reverseConditionMnemonic(ConditionMnemonic cm)
 {
-	return reverseConditionMnemonics[cm];
+    return reverseConditionMnemonics[cm];
 }
 
 //_________________________________________________________________________________________________
-ConditionMnemonic	swapConditionMnemonic(ConditionMnemonic cm)
+ConditionMnemonic   swapConditionMnemonic(ConditionMnemonic cm)
 {
-	return swappedConditionMnemonics[cm];
+    return swappedConditionMnemonics[cm];
 }
 
 //_________________________________________________________________________________________________
 uint32 countOnes(uint32 mask)
 {
-	uint32 count=0;
-	for (uint32 m=1; m; m<<=1) if ((mask & m)!=0) count++;
-	return count;
+    uint32 count=0;
+    for (uint32 m=1; m; m<<=1) if ((mask & m)!=0) count++;
+    return count;
 }
 
 }}; // namespace Ia32

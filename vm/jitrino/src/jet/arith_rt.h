@@ -20,15 +20,16 @@
  
 /**
  * @file 
- * @brief Contains various arithmetic helpers.
+ * @brief Various arithmetic helpers declaration.
  *
  * The helpers normally used to implement complex computations (i.e. float 
- * point remainder) which is not worth to generate inlined. A call to a 
- * helper inserted instead.
- * The set of helpers is wider than single float-point remainder, because 
- * they are also used for quick start while porting to a new platfrom - 
- * again, calls to the helpers generated instead of inlining them. Thus, 
- * the file also includes type conversion utilities.
+ * point remainder) which do not worth to be inlined. A call to a helper 
+ * inserted instead. The set of helpers is wider than single float-point 
+ * remainder, because they are also used for quick start while porting to a
+ * new platfrom - again, calls to the helpers generated instead of inlining
+ * them.
+ *
+ * The file also includes type conversion utilities.
  *
  * All the helpers from this file follow the contract:
  *  - guaranteed not to invoke GC
@@ -40,9 +41,6 @@
 
 
 #include "jdefs.h"
-
-// resides in Jitrino's share/. Needed for proper stdcall__ definition.
-#include "../shared/PlatformDependant.h" 
 
 namespace Jitrino {
 namespace Jet {
@@ -119,10 +117,10 @@ extern const void * cnv_matrix_impls[num_jtypes][num_jtypes];
  * @{
  */
 
-int    __stdcall rt_h_i32_a(JavaByteCodes op, int v2, int v1)       stdcall__;
-jlong  __stdcall rt_h_i64_a(JavaByteCodes op, jlong v2, jlong v1)   stdcall__;
-double __stdcall rt_h_dbl_a(JavaByteCodes op, double v2, double v1) stdcall__;
-float  __stdcall rt_h_flt_a(JavaByteCodes op, float v2, float v1)   stdcall__;
+int    __stdcall rt_h_i32_a(int v2, int v1, JavaByteCodes op)       stdcall__;
+jlong  __stdcall rt_h_i64_a(jlong v2, jlong v1, JavaByteCodes op)   stdcall__;
+double __stdcall rt_h_dbl_a(double v2, double v1, JavaByteCodes op) stdcall__;
+float  __stdcall rt_h_flt_a(float v2, float v1, JavaByteCodes op)   stdcall__;
 
 //
 // Some operations implemented via separate functions, as they have a bit 
@@ -139,7 +137,7 @@ int     __stdcall rt_h_fcmp_l(float v2, float v1)   stdcall__;
 int     __stdcall rt_h_dcmp_g(double v2, double v1) stdcall__;
 int     __stdcall rt_h_dcmp_l(double v2, double v1) stdcall__;
 
-jlong   __stdcall rt_h_i64_shift(JavaByteCodes op, int v2, jlong v1) stdcall__;
+jlong   __stdcall rt_h_i64_shift(jlong v1, int v2, JavaByteCodes op) stdcall__;
 
 /*@}*/  // ~group of RUNTIME_ARITHMETIC_HELPERS
 

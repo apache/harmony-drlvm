@@ -22,30 +22,14 @@
 
 #include "CodeGenIntfc.h"
 #if defined (_IPF_)
-	#include "ipf/IpfCodeGenerator.h"
+    #include "IpfCodeGenerator.h"
 #else
-	#include "ia32/Ia32CodeGenerator.h"
+    #include "ia32/Ia32CodeGenerator.h"
 #endif
+
 
 namespace Jitrino {
-	
-void CodeGenerator::readFlagsFromCommandLine(CompilationContext* cs, bool ia32Cg)
-{
-#if defined(_IPF_)
-	IPF::IpfCodeGenerator::readFlagsFromCommandLine(cs);
-#else
-	Ia32::CodeGenerator::readFlagsFromCommandLine(cs);
-#endif
-}
-
-void CodeGenerator::showFlagsFromCommandLine(bool ia32Cg)
-{
-#if defined (_IPF_)
-	IPF::IpfCodeGenerator::showFlagsFromCommandLine();
-#else
-	Ia32::CodeGenerator::showFlagsFromCommandLine();
-#endif
-}
+    
 
 }
 

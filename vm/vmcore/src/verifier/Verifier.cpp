@@ -18,7 +18,9 @@
  * @version $Revision: 1.1.2.3.4.4 $
  */  
 
+#include <limits.h>
 #include "ver_real.h"
+
 
 /**
  * Debug flag macros
@@ -322,88 +324,89 @@ vf_get_instruction_branch( vf_Instr_t *code,        // instruction
 } // vf_get_instruction_branch
 
 /**
- * Function receives 2 bytes instruction branch offset value from bytecode array.
+ * Function receives half word (2 bytes) instruction branch offset
+ * value from bytecode array.
  */
 static inline int
-vf_get_word_offset( unsigned instr_num,         // instruction offset in bytecode array
-                    unsigned char *bytecode,    // bytecode array
-                    unsigned *index_p)          // offset index in bytecode array
+vf_get_hword_offset( unsigned code_pc,           // instruction offset in bytecode array
+                     unsigned char *bytecode,    // bytecode array
+                     unsigned *index_p)          // offset index in bytecode array
 {
     // get first branch offset
-    int offset = (int)instr_num
+    int offset = (int)code_pc
         + (short)( (bytecode[(*index_p)] << 8)|(bytecode[(*index_p) + 1]) );
     // skip parameter (s2)
     (*index_p) += 2;
     return offset;
-} // vf_get_2word_offset
+} // vf_get_hword_offset
 
 /**
- * Function receives 4 bytes instruction branch offset value from bytecode array.
+ * Function receives word (4 bytes) instruction branch offset value from bytecode array.
  */
 static inline int
-vf_get_2word_offset( unsigned instr_num,        // instruction offset in bytecode array
-                     unsigned char *bytecode,   // bytecode array
-                     unsigned *index_p)         // offset index in bytecode array
+vf_get_word_offset( unsigned code_pc,          // instruction offset in bytecode array
+                    unsigned char *bytecode,   // bytecode array
+                    unsigned *index_p)         // offset index in bytecode array
 {
     // get switch branch offset
-    int offset = (int)instr_num
+    int offset = (int)code_pc
         + (int)( (bytecode[(*index_p)]    << 24)|(bytecode[(*index_p) + 1] << 16)
                 |(bytecode[(*index_p) + 2] << 8)|(bytecode[(*index_p) + 3]      ) );
     // skip parameter (s4) 
     (*index_p) += 4;
     return offset;
-} // vf_get_2word_offset
+} // vf_get_word_offset
 
 /**
- * Function receives 2 bytes branch offset from bytecode array,
+ * Function receives half word (2 bytes) branch offset from bytecode array,
  * sets into instruction and returns it.
  */
 static inline int
-vf_get_single_branch_offset( vf_Instr_t *code,          // instruction
-                             unsigned instr_num,        // instruction offset in bytecode array
-                             unsigned char *bytecode,   // bytecode array
-                             unsigned *index_p,         // offset index in bytecode array
-                             vf_VerifyPool_t * pool)    // memory pool
-{
-    // get first branch offset
-    int offset = vf_get_word_offset( instr_num, bytecode, index_p );
-    // create and set edge branch for instruction
-    vf_set_single_instruction_offset( code, offset, pool );
-    return offset;
-} // vf_get_single_branch_offset
-
-/**
- * Function receives 4 bytes branch offset from bytecode array,
- * sets into instruction and returns it.
- */
-static inline int
-vf_get_single_2word_branch_offset( vf_Instr_t *code,        // instruction
-                                   unsigned instr_num,      // offset in bytecode array
+vf_get_single_hword_branch_offset( vf_Instr_t *code,        // instruction
+                                   unsigned code_pc,        // offset in bytecode array
                                    unsigned char *bytecode, // bytecode array
                                    unsigned *index_p,       // offset index in bytecode array
                                    vf_VerifyPool_t * pool)  // memory pool
 {
     // get first branch offset
-    int offset = vf_get_2word_offset( instr_num, bytecode, index_p );
+    int offset = vf_get_hword_offset( code_pc, bytecode, index_p );
     // create and set edge branch for instruction
     vf_set_single_instruction_offset( code, offset, pool );
     return offset;
-} // vf_get_single_2word_branch_offset
+} // vf_get_single_hword_branch_offset
 
 /**
- * Function receives 2 bytes branch offset from bytecode array and
+ * Function receives word (4 bytes) branch offset from bytecode array,
+ * sets into instruction and returns it.
+ */
+static inline int
+vf_get_single_word_branch_offset( vf_Instr_t *code,        // instruction
+                                  unsigned code_pc,        // offset in bytecode array
+                                  unsigned char *bytecode, // bytecode array
+                                  unsigned *index_p,       // offset index in bytecode array
+                                  vf_VerifyPool_t * pool)  // memory pool
+{
+    // get first branch offset
+    int offset = vf_get_word_offset( code_pc, bytecode, index_p );
+    // create and set edge branch for instruction
+    vf_set_single_instruction_offset( code, offset, pool );
+    return offset;
+} // vf_get_single_word_branch_offset
+
+/**
+ * Function receives half word (2 bytes) branch offset from bytecode array and
  * sets reseived offset and next instruction offset into instruction.
  * Function returns recieved offset.
  */
 static inline int
 vf_get_double_branch_offset( vf_Instr_t *code,          // instruction
-                             unsigned instr_num,        // instruction offset in bytcode array
+                             unsigned code_pc,          // instruction offset in bytcode array
                              unsigned char *bytecode,   // bytecode array
                              unsigned *index_p,         // offset index in bytecode array
                              vf_VerifyPool_t *pool)     // memory pool
 {
     // get first branch offset
-    int offset = vf_get_word_offset( instr_num, bytecode, index_p );
+    int offset = vf_get_hword_offset( code_pc, bytecode, index_p );
     // create and set edge branchs for instruction
     vf_create_instruction_offset( code, 2, pool );
     // set first edge branch for instruction
@@ -420,13 +423,13 @@ vf_get_double_branch_offset( vf_Instr_t *code,          // instruction
  */
 static inline int
 vf_get_tableswitch_alternative( vf_Instr_t *code,           // instruction
-                                unsigned instr_num,         // offset in bytcode array
+                                unsigned code_pc,           // offset in bytcode array
                                 unsigned alternative,       // number of tableswitch branch
                                 unsigned char *bytecode,    // bytecode array
                                 unsigned *index_p)          // offset index in bytecode array
 {
     // get first branch offset
-    int offset = vf_get_2word_offset( instr_num, bytecode, index_p );
+    int offset = vf_get_word_offset( code_pc, bytecode, index_p );
     // set first edge branch for instruction
     vf_set_instruction_offset( code, alternative, offset );
     return offset;
@@ -439,10 +442,10 @@ vf_get_tableswitch_alternative( vf_Instr_t *code,           // instruction
  */
 static inline int
 vf_set_tableswitch_offsets( vf_Instr_t *code,           // instruction
-                            unsigned instr_num,         // instruction offset in bytcode array
-                            unsigned char *bytecode,    // bytecode array
+                            unsigned code_pc,           // instruction offset in bytecode array
                             unsigned *index_p,          // offset index in bytecode array
-                            vf_VerifyPool_t * pool)     // memory pool
+                            unsigned char *bytecode,    // bytecode array
+                            vf_VerifyPool_t *pool)      // memory pool
 {
     // skip padding
     unsigned default_off = ((*index_p) + 0x3)&(~0x3U);
@@ -450,16 +453,16 @@ vf_set_tableswitch_offsets( vf_Instr_t *code,           // instruction
     // skip default offset
     index += 4;
     // get low and high tableswitch values
-    int low = vf_get_2word_offset( instr_num, bytecode, &index );
-    int high = vf_get_2word_offset( instr_num, bytecode, &index );
+    int low = vf_get_word_offset( code_pc, bytecode, &index );
+    int high = vf_get_word_offset( code_pc, bytecode, &index );
     int number = high - low + 2;
     // create tableswitch branches
     vf_create_instruction_offset( code, number, pool );
     // set default offset
-    vf_get_tableswitch_alternative( code, instr_num, 0, bytecode, &default_off );
+    vf_get_tableswitch_alternative( code, code_pc, 0, bytecode, &default_off );
     // set another instruction offsets
     for( int count = 1; count < number; count++ ) {
-        vf_get_tableswitch_alternative( code, instr_num, count, bytecode, 
+        vf_get_tableswitch_alternative( code, code_pc, count, bytecode, 
                                         &index );
     }
     // set index next instruction
@@ -472,12 +475,13 @@ vf_set_tableswitch_offsets( vf_Instr_t *code,           // instruction
  * sets them into instruction.
  * Function returns number of alternatives.
  */
-static inline int
-vf_set_lookupswitch_offsets( vf_Instr_t *code,
-                             unsigned instr_num,
-                             unsigned char *bytecode,
-                             unsigned *index_p,
-                             vf_VerifyPool_t * pool)
+static inline Verifier_Result
+vf_set_lookupswitch_offsets( vf_Instr_t *code,          // inctruction
+                             unsigned code_pc,          // instruction offset in bytecode
+                             unsigned *index_p,         // offset index in bytecode array
+                             unsigned char *bytecode,   // array of bytecode
+                             unsigned *branch_p,        // number of alternatives
+                             vf_Context_t *ctex)        // verifier context
 {
     // skip padding
     unsigned default_off = ((*index_p) + 0x3)&(~0x3U);
@@ -485,21 +489,33 @@ vf_set_lookupswitch_offsets( vf_Instr_t *code,
     // skip default offset
     index += 4;
     // get alternative number of lookupswitch (add default alternative)
-    int number = vf_get_2word_offset( 0, bytecode, &index ) + 1;
+    int number = vf_get_word_offset( 0, bytecode, &index ) + 1;
+    *branch_p = number;
     // create and tableswitch branches
-    vf_create_instruction_offset( code, number, pool );
+    vf_create_instruction_offset( code, number, ctex->m_pool );
     // set default offset
-    vf_get_tableswitch_alternative( code, instr_num, 0, bytecode, &default_off );
+    vf_get_tableswitch_alternative( code, code_pc, 0, bytecode, &default_off );
     // set another instruction offsets
+    int old_key = INT_MIN;
     for( int count = 1; count < number; count++ ) {
-        // skip branch key value
-        index += 4;
-        vf_get_tableswitch_alternative( code, instr_num, count, bytecode, 
+        // get and check branch key value
+        int key = vf_get_word_offset( 0, bytecode, &index );
+        if( old_key < key ) {
+            old_key = key;
+        } else if( key != INT_MIN ) {
+            VERIFY_REPORT( ctex, "(class: " << class_get_name( ctex->m_class )
+                << ", method: " << method_get_name( ctex->m_method )
+                << method_get_descriptor( ctex->m_method )
+                << ") Instruction lookupswitch has unsorted key values" );
+            return VER_ErrorInstruction;
+        }
+        // get lookupswitch alternative and set offset to instruction
+        vf_get_tableswitch_alternative( code, code_pc, count, bytecode, 
                                         &index );
     }
     // set index next instruction
     (*index_p) = index;
-    return number;
+    return VER_OK;
 } // vf_set_lookupswitch_offsets
 
 /************************************************************
@@ -557,17 +573,6 @@ vf_set_vector_type( vf_MapEntry_t *vector,              // stack map vector
 {
     assert( type < SM_NUMBER );
     vector[num].m_type = type;
-} // vf_set_vector_type
-
-/**
- * Function sets a given data type to stack map vector entry.
- */
-static inline void
-vf_set_vector_init_flag( vf_MapEntry_t *vector,              // stack map vector
-                         unsigned num,                       // vector entry number
-                         unsigned short init_flag)           // reference initialization flag
-{
-    vector[num].m_need_init = init_flag;
 } // vf_set_vector_type
 
 /**
@@ -1361,7 +1366,6 @@ vf_set_description_vector( const char *descr,           // descriptor
             do {
                 index++;
             } while( descr[index] != ';' );
-            vf_set_vector_init_flag( *vector, vector_index, 1 );
             if( !array ) {
                 // set vector reference entry
                 valid = ctex->m_type->NewType( type, index - count );
@@ -1661,7 +1665,6 @@ vf_check_cp_method( unsigned short index,       // constant pool entry index
         cp_parse->method.m_inlen += 1;
         vf_ValidType_t *type = vf_create_class_valid_type( class_name, ctex );
         vf_set_vector_stack_entry_ref( cp_parse->method.m_invector, 0, type );
-        vf_set_vector_init_flag( cp_parse->method.m_invector, 0, 1 );
     } else {
         vf_set_description_vector( descr, cp_parse->method.m_inlen, 0 /* only vector */, 
             cp_parse->method.m_outlen, &cp_parse->method.m_invector,
@@ -1706,8 +1709,6 @@ vf_check_cp_field( unsigned short index,    // constant pool entry index
         cp_parse->field.f_vlen += 1;
         vf_ValidType_t *type = vf_create_class_valid_type( class_name, ctex );
         vf_set_vector_stack_entry_ref( cp_parse->field.f_vector, 0, type );
-        // uninitialized this could be used for putfield/getfield
-        vf_set_vector_init_flag( cp_parse->field.f_vector, 0, 2 );
     } else {
         vf_set_description_vector( descr, cp_parse->field.f_vlen, 0 /* only vector */, 
             0, &cp_parse->field.f_vector, NULL, ctex);
@@ -2071,6 +2072,7 @@ vf_opcode_aloadx( vf_Code_t *code,              // code instruction
     // create in vector
     vf_new_in_vector( code, 1, pool );
     vf_set_in_vector_local_var_ref( code, 0, NULL, local );
+    vf_set_vector_check( code->m_invector, 0, VF_CHECK_UNINITIALIZED_THIS );
     // create out vector
     vf_new_out_vector( code, 1, pool );
     vf_set_out_vector_type( code, 0, SM_COPY_0 );
@@ -2370,6 +2372,7 @@ vf_opcode_astorex( vf_Code_t *code,             // code instruction
     // create in vector
     vf_new_in_vector( code, 1, pool );
     vf_set_in_vector_stack_entry_ref( code, 0, NULL );
+    vf_set_vector_check( code->m_invector, 0, VF_CHECK_UNINITIALIZED_THIS );
     // create out vector
     vf_new_out_vector( code, 1, pool );
     vf_set_out_vector_local_var_type( code, 0, SM_COPY_0, local );
@@ -4242,9 +4245,7 @@ vf_parse_bytecode( vf_Context_t *ctex )     // verifier context
             constIndex = (unsigned short)( (bytecode[index] << 8)|(bytecode[index + 1]) );
             // skip constant pool index (u2)
             index += 2;
-            result = vf_opcode_ldcx( code, 
-                        (bytecode[instr] == OPCODE_LDC_W ? 1 : 2), 
-                        constIndex,  ctex );
+            result = vf_opcode_ldcx( code, bytecode[instr] - OPCODE_LDC, constIndex,  ctex );
             if( result != VER_OK ) {
                 goto labelEnd_vf_parse_bytecode;
             }
@@ -4700,7 +4701,7 @@ vf_parse_bytecode( vf_Context_t *ctex )     // verifier context
                                  &codeInstr[index], pool );
             break;
         case OPCODE_GOTO:           /* 0xa7 + s2 */
-            offset = vf_get_single_branch_offset( &codeInstr[instr], 
+            offset = vf_get_single_hword_branch_offset( &codeInstr[instr], 
                             instr, bytecode, &index, pool );
             result = vf_check_branch_offset( offset, len, ctex );
             if( result != VER_OK ) {
@@ -4724,7 +4725,7 @@ vf_parse_bytecode( vf_Context_t *ctex )     // verifier context
         case OPCODE_TABLESWITCH:    /* 0xaa + pad + s4 * (3 + N) */
             vf_opcode_switch( code, pool );
             branches = vf_set_tableswitch_offsets( &codeInstr[instr],
-                                    instr, bytecode, &index, pool);
+                                    instr, &index, bytecode, pool);
             // check tableswitch branches and set begin of basic blocks
             for( count = 0; count < branches; count++ )
             {
@@ -4741,8 +4742,11 @@ vf_parse_bytecode( vf_Context_t *ctex )     // verifier context
             break;
         case OPCODE_LOOKUPSWITCH:   /* 0xab + pad + s4 * 2 * (N + 1) */
             vf_opcode_switch( code, pool );
-            branches = vf_set_lookupswitch_offsets( &codeInstr[instr],
-                                    instr, bytecode, &index, pool);
+            result = vf_set_lookupswitch_offsets( &codeInstr[instr],
+                                    instr, &index, bytecode, &branches, ctex);
+            if( result != VER_OK ) {
+                goto labelEnd_vf_parse_bytecode;
+            }
             // check tableswitch branches and set begin of basic blocks
             for( count = 0; count < branches; count++ )
             {
@@ -4994,7 +4998,7 @@ vf_parse_bytecode( vf_Context_t *ctex )     // verifier context
                                &codeInstr[index], pool );
             break;
         case OPCODE_GOTO_W:         /* 0xc8 + s4 */
-            offset = vf_get_single_2word_branch_offset( &codeInstr[instr], 
+            offset = vf_get_single_word_branch_offset( &codeInstr[instr], 
                             instr, bytecode, &index, pool );
             result = vf_check_branch_offset( offset, len, ctex );
             if( result != VER_OK ) {
@@ -5116,6 +5120,20 @@ vf_parse_bytecode( vf_Context_t *ctex )     // verifier context
                 // set handler branch
                 code[instr].m_handler[index] = 1;
             }
+        }
+    }
+
+    // set constraints for class exceptions a method can throw
+    count = method_get_number_exc_method_can_throw( ctex->m_method );
+    for( index = 0; index < count; index++ ) {
+        // create valid type for exception class
+        const char* name = method_get_exc_method_can_throw( ctex->m_method, index );
+        vf_ValidType_t *type = vf_create_class_valid_type( name, ctex );
+
+        // set restriction for handler class
+        if( ctex->m_vtype.m_throwable->string[0] != type->string[0] ) {
+            ctex->m_type->SetRestriction( ctex->m_vtype.m_throwable->string[0],
+                type->string[0], 0, VF_CHECK_SUPER );
         }
     }
 
@@ -5300,6 +5318,8 @@ vf_verify_class( class_handler klass,      // verified class
     context.m_vtype.m_throwable = context.m_type->NewType( "Ljava/lang/Throwable", 20 );
     context.m_vtype.m_object = context.m_type->NewType( "Ljava/lang/Object", 17 );
     context.m_vtype.m_array = context.m_type->NewType( "[Ljava/lang/Object", 18 );
+    context.m_vtype.m_clone = context.m_type->NewType( "Ljava/lang/Cloneable", 20 );
+    context.m_vtype.m_serialize = context.m_type->NewType( "Ljava/io/Serializable", 21 );
 
     /**
      * Set verification level flag

@@ -34,63 +34,21 @@
 #include "heap.h"
 #include "primitives_support.h"
 
-Field* get_reflection_field(Class* clss, reflection_fields descriptor) 
-{
-    Global_Env* genv = VM_Global_State::loader_env;
-    static String* extra_strings[][2] = {
-        {genv->string_pool.lookup("parameterTypes"), genv->string_pool.lookup("[Ljava/lang/Class;")},
-        {genv->string_pool.lookup("exceptionTypes"), genv->string_pool.lookup("[Ljava/lang/Class;")},
-        {genv->string_pool.lookup("declaringClass"), genv->string_pool.lookup("Ljava/lang/Class;")},
-        {genv->string_pool.lookup("name"), genv->string_pool.lookup("Ljava/lang/String;")},
-        {genv->string_pool.lookup("type"), genv->string_pool.lookup("Ljava/lang/Class;")},
-        {genv->string_pool.lookup("vm_member"), genv->string_pool.lookup("J")},
-    };
-
-    static Field* resolved[FIELDS_NUMBER];
-
-    Field *field = resolved[descriptor];
-    if (!field) {
-        String* name = extra_strings[descriptor][0];
-        String* sig = extra_strings[descriptor][1];
-        TRACE("Resolving special class field : " << name->bytes);
-        field = class_lookup_field_recursive(clss, name, sig);
-        ASSERT(field, "Cannot find special class field : " << name->bytes << " / " << sig->bytes);
-        resolved[descriptor] = field;
-    }
-
-    return field;
-}
-
-Class_Member* reflection_jobject_to_Class_Member(jobject jmember, Class* type)
-{
-    Field *field = get_reflection_field(type, VM_MEMBER);
-
-    tmn_suspend_disable();
-    Byte *java_ref = (Byte *)jmember->object;
-    jlong member = *(jlong *)(java_ref + field->get_offset());
-    tmn_suspend_enable(); 
-    assert(member);
-
-    return (Class_Member*) ((POINTER_SIZE_INT) member);
-}
-
-static Class_Handle get_class(Type_Info_Handle type_info) {
-    Class_Handle clss = type_info_get_class(type_info);
+jclass descriptor_to_jclass(Type_Info_Handle desc){
+    Class_Handle clss = type_info_get_class(desc);
 
     if (!clss) {
         if (!exn_raised()) {
-            exn_raise_only((jthrowable) type_info_get_loading_error(type_info));
+            exn_raise_object((jthrowable) type_info_get_loading_error(desc));
         }
+        return NULL;
     }
-    return clss;
+    return struct_Class_to_java_lang_Class_Handle(clss);
 }
 
 // Set parameterTypes and exceptionTypes fields for Method or Constructor object
-jobjectArray reflection_get_parameter_types(JNIEnv *jenv, Class* type, jobject jmethod, Method* method)
+jobjectArray reflection_get_parameter_types(JNIEnv *jenv, Method* method)
 {
-    if (!method) {
-        method = (Method*)reflection_jobject_to_Class_Member(jmethod, type);
-    }
     jclass jlc_class = struct_Class_to_java_lang_Class_Handle(VM_Global_State::loader_env->JavaLangClass_Class);
 
     // Create an array of the argument types
@@ -109,144 +67,68 @@ jobjectArray reflection_get_parameter_types(JNIEnv *jenv, Class* type, jobject j
     for (i = 0; i < nparams; i++) 
     {
         Type_Info_Handle arg_type = method_args_get_type_info(msh, i+start);
-        Class_Handle arg_clss = get_class(arg_type);
+        jclass arg_clss = descriptor_to_jclass(arg_type);
         if (!arg_clss) return NULL;
-        SetObjectArrayElement(jenv, arg_types, i, struct_Class_to_java_lang_Class_Handle(arg_clss));
+        SetObjectArrayElement(jenv, arg_types, i, arg_clss);
     }
-
-    // Set paramaterTypes field
-    //jfieldID parameterTypes_id = (jfieldID)get_reflection_field(type, PARAMETERS);
-    //SetObjectField(jenv, jmethod, parameterTypes_id, arg_types);
 
     return arg_types;
 }
 
-// Set name field for Method or Field object
-static bool set_name_field(JNIEnv *jenv, String* value, jobject jmember, Class* type)
-{    
-    jstring name = String_to_interned_jstring(value);
-    if (name == NULL) {
-        assert(exn_raised());
-        return false;
-    }
-
-    jfieldID name_id = (jfieldID)get_reflection_field(type, NAME);
-    SetObjectField(jenv, jmember, name_id, name);
-    
-    return true;
-}
-
-// Set type field for Method or Field object
-static bool set_type_field(JNIEnv *jenv, jobject jmember, Class* type, Type_Info_Handle type_info)
-{
-    Class_Handle clss = get_class(type_info);
-    if (!clss) {
-        return false;
-    }
-    jfieldID type_id = (jfieldID)get_reflection_field(type, TYPE);
-    SetObjectField(jenv, jmember, type_id, struct_Class_to_java_lang_Class_Handle(clss));
-    return true;
-}
-
 // Construct object of member_class (Constructor, Field, Method). 
-// Set declaringClass field.
 static jobject reflect_member(JNIEnv *jenv, Class_Member* member, Class* type)
 {
-    Global_Env* genv = VM_Global_State::loader_env;
-    // Construct member object
-    tmn_suspend_disable();
-    jobject jmember = oh_allocate_local_handle();
-    ManagedObject *new_obj = class_alloc_new_object(type);
-    if (!new_obj) {
-        tmn_suspend_enable();
+    ASSERT_RAISE_AREA;
+    static Global_Env* genv = VM_Global_State::loader_env;
+    static String* desc = genv->string_pool.lookup(
+        "(JLjava/lang/Class;Ljava/lang/String;Ljava/lang/String;I)V");
+    Method* member_constr = class_lookup_method(type, genv->Init_String, desc);
+
+    jstring jname = String_to_interned_jstring(member->get_name());
+    if (jname == NULL) {
+        assert(exn_raised());
         return NULL;
     }
-    jmember->object = new_obj;
-    tmn_suspend_enable(); 
-
-    // Call constructor of member class on newly allocated object 
-    // passing this object itself as a parameter
-    static String* descr = genv->string_pool.lookup("(Ljava/lang/Object;)V");
-    Method* member_constr = class_lookup_method(type, genv->Init_String, descr);
-    jvalue args;
-    args.l = jmember;
-    CallVoidMethodA(jenv, jmember, (jmethodID)member_constr, &args);
-    if (exn_raised())
+    jstring jdesc = String_to_interned_jstring(member->get_descriptor());
+    if (jdesc == NULL) {
+        assert(exn_raised());
         return NULL;
+    }
 
-    // Set vm_member field
-    jfieldID member_id = (jfieldID)get_reflection_field(type, VM_MEMBER);
-    jlong long_member = (jlong) ((POINTER_SIZE_INT) member);
-    SetLongField(jenv, jmember, member_id, long_member);
-    
-    // Set declaringClass field
-    jfieldID clazz_id = (jfieldID)get_reflection_field(type, DECLARING_CLASS);
-    SetObjectField(jenv, jmember, clazz_id, struct_Class_to_java_lang_Class_Handle(member->get_class()));
+    jvalue args[5];
+    args[0].j = (jlong) ((POINTER_SIZE_INT) member);
+    args[1].l = struct_Class_to_java_lang_Class_Handle(member->get_class());
+    args[2].l = jname;
+    args[3].l = jdesc;
+    args[4].i = (jint)member->get_access_flags();
+    jobject jmember = NewObjectA(jenv, struct_Class_to_java_lang_Class_Handle(type), 
+        (jmethodID)member_constr, args);
+    if (!jmember) {
+        assert(exn_raised());
+    }
 
     return jmember;
 } //reflect_member
 
 jobject reflection_reflect_method(JNIEnv *jenv, Method_Handle method)
 {
-    // Construct a java.lang.reflect.Method object
-    Class* type = VM_Global_State::loader_env->java_lang_reflect_Method_Class;
-    jobject jmethod = reflect_member(jenv, method, type);
-    if (!jmethod) {
-        assert(exn_raised());
-        return NULL;
-    }
-
-    if (!set_name_field(jenv, method->get_name(), jmethod, type)) {
-        assert(exn_raised());
-        return NULL;
-    }
-
-    //Too early to try load classes for PARAMETERS and return TYPE.
-    //No need to set EXCEPTIONS in advance - it is almost never requested.
-
-    return jmethod;
+    return reflect_member(jenv, method, 
+        VM_Global_State::loader_env->java_lang_reflect_Method_Class);
 }
 
 jobject reflection_reflect_constructor(JNIEnv *jenv, Method_Handle constructor)
 {
-    // Construct a java.lang.reflect.Constructor object
-    Class* type = VM_Global_State::loader_env->java_lang_reflect_Constructor_Class;
-    jobject jconst = reflect_member(jenv, constructor, type);
-    if (!jconst) 
-        return NULL;
-
-    //Too early to try load classes for PARAMETERS.
-    //No need to set EXCEPTIONS in advance - it is almost never requested.
-    //No need to set name in advance - it is useless for constructors.
-
-    return jconst;
+    return reflect_member(jenv, constructor, 
+        VM_Global_State::loader_env->java_lang_reflect_Constructor_Class);
 }
 
 jobject reflection_reflect_field(JNIEnv *jenv, Field_Handle field)
 {
-    assert(field);
-
     // We do not reflect injected fields
-    if (field_is_injected(field)) return NULL;
-    
-    // Construct a java.lang.reflect.Field object
-    Class* type = VM_Global_State::loader_env->java_lang_reflect_Field_Class;
-    jobject jfield = reflect_member(jenv, field, type);
-    if (!jfield) 
-        return NULL;
+    //if (field_is_injected(field)) return NULL;
 
-    if (!set_name_field(jenv, field->get_name(), jfield, type))
-        return NULL;
-
-    // Get type 
-    Type_Info_Handle field_type = field_get_type_info_of_field_value(field);
-
-    if (!set_type_field(jenv, jfield, type, field_type)) {
-        assert(exn_raised());
-        return NULL;
-    }
-
-    return jfield;
+    return reflect_member(jenv, field, 
+        VM_Global_State::loader_env->java_lang_reflect_Field_Class);
 }
 
 jobjectArray reflection_get_class_interfaces(JNIEnv* jenv, jclass clazz)
@@ -264,10 +146,8 @@ jobjectArray reflection_get_class_interfaces(JNIEnv* jenv, jclass clazz)
 
     // Fill the array
     for (unsigned i = 0; i < intf_number; i++) {
-        jclass intf = jni_class_from_handle(jenv, class_get_implements(clss, i));
+        jclass intf = struct_Class_to_java_lang_Class_Handle(class_get_implements(clss, i));
         SetObjectArrayElement(jenv, arr, i, intf);
-        if (exn_raised()) 
-            return NULL;
     }
 
     return arr;
@@ -287,7 +167,7 @@ jobjectArray reflection_get_class_fields(JNIEnv* jenv, jclass clazz)
     for (i = 0; i < num_fields; i++) {
         Field_Handle fh = class_get_field(clss, i);
         if (field_is_injected(fh)) continue;
-        if (class_is_array(clss) && 0 == strcmp("length", field_get_name(fh))) continue;
+        //if (class_is_array(clss) && 0 == strcmp("length", field_get_name(fh))) continue;
         num_res_fields++;
     }
 
@@ -303,9 +183,13 @@ jobjectArray reflection_get_class_fields(JNIEnv* jenv, jclass clazz)
     for(i = 0; i < num_fields; i++) {
         Field_Handle fh = class_get_field(clss, i);
         if (field_is_injected(fh)) continue;
-        if (class_is_array(clss) && 0 == strcmp("length", field_get_name(fh))) continue;
+        //if (class_is_array(clss) && 0 == strcmp("length", field_get_name(fh))) continue;
 
         jobject jfield = reflection_reflect_field(jenv, fh);
+        if (!jfield){
+            assert(exn_raised());
+            return NULL;
+        }
         SetObjectArrayElement(jenv, farray, num_res_fields, jfield);
         if (exn_raised()) return NULL;
         num_res_fields++;
@@ -342,6 +226,10 @@ jobjectArray reflection_get_class_constructors(JNIEnv* jenv, jclass clazz)
         if (strcmp(method_get_name(mh), "<init>") != 0) continue;
 
         jobject jconst = reflection_reflect_constructor(jenv, mh);
+        if (!jconst){
+            assert(exn_raised());
+            return NULL;
+        }
         SetObjectArrayElement(jenv, carray, n_consts++, jconst);
         if (exn_raised()) return NULL;
     }
@@ -384,6 +272,10 @@ jobjectArray reflection_get_class_methods(JNIEnv* jenv, jclass clazz)
             continue;
 
         jobject member = reflection_reflect_method(jenv, mh);
+        if (!member){
+            assert(exn_raised());
+            return NULL;
+        }
         SetObjectArrayElement(jenv, member_array, member_i, member);
         if (exn_raised()) 
             return NULL;
@@ -435,3 +327,30 @@ bool jobjectarray_to_jvaluearray(JNIEnv *jenv, jvalue **output, Method *method, 
 
     return true;
 } //jobjectarray_to_jvaluearray
+
+jobject reflection_get_enum_value(JNIEnv *jenv, Class* enum_type, String* name) 
+{
+    ASSERT(class_is_enum(enum_type), "Requested Class is not ENUM: " 
+        << enum_type->name->bytes);
+
+    for (unsigned i=0; i<enum_type->n_fields; i++) {
+        if (enum_type->fields[i].get_name() == name) {
+#ifndef NDEBUG
+            ASSERT(enum_type->fields[i].is_enum(), "Requested field is not ENUM: " << name->bytes);
+            const String* type = enum_type->name;
+            const String* desc = enum_type->fields[i].get_descriptor();
+            if (desc->len != (type->len + 2)
+                || desc->bytes[0] != 'L' 
+                || strncmp(desc->bytes + 1, type->bytes, type->len)
+                || desc->bytes[type->len + 1] != ';')
+            {
+                DIE("Invalid enum field descriptor: " << desc->bytes);
+            }
+#endif
+            return GetStaticObjectField(jenv, 0, (jfieldID)(enum_type->fields + i));
+        }
+    }
+    //public EnumConstantNotPresentException(Class<? extends Enum> enumType,String constantName)
+    //ThrowNew_Quick(jenv, "java.lang.EnumConstantNotPresentException", name->bytes);
+    return NULL;
+}

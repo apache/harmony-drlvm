@@ -14,13 +14,13 @@
  *  limitations under the License.
  */
 /**
- * @author Alexander V. Astapchuk
- * @version $Revision: 1.5.12.3.4.4 $
+ * @author Alexander Astapchuk
+ * @version $Revision$
  */
 
 /**
  * @file
- * @brief Declaration of main interface functions provided by Jitirno.JET.
+ * @brief Declaration of main interfaces provided by Jitirno.JET.
  */
 
 #if !defined(__JET_H_INCLUDED__)
@@ -70,8 +70,7 @@ bool rt_check_method(JIT_Handle jit, Method_Handle method);
  * given method. The rt_unwind function updates JitFrameContext:
  *  - 'restores' registers (if necessary)
  *  - sets IP pointer to point to the return addres
- *  - updates stack pointer - to pop out input args (in case of stack-based 
- *      calling convention) and to pop out caller's address
+ *  - sets SP to 'pop out' IP from stack
  *
  * @param jit - JIT handle
  * @param method - method handle
@@ -98,9 +97,9 @@ void rt_enum(JIT_Handle jit, Method_Handle method,
  * @brief 'Fixes' a catch handler context to prepare for the control to be 
  * transferred to the handler.
  *
- * 'fix handler context' for a given IP means to correct stack depth, so 
- * a control can be transferred from the IP to appropriate handler (in the 
- * same method ?).
+ * 'fix handler context' for a given IP means to correct stack pointer, so 
+ * a control can be transferred from the IP to appropriate handler <b>in 
+ * the same method</b>.
  *
  * @param jit - JIT handle
  * @param method - method handle
@@ -130,7 +129,7 @@ void * rt_get_address_of_this(JIT_Handle jit, Method_Handle method,
  * The function finds Java byte code's program counter (PC) for a given 
  * address of a native instruction (IP).
  * @note If the given IP does not belong to the method, the behavior is 
- *       unpredictable.
+ *       not specified.
  *
  * @param jit - JIT handle
  * @param method - method handle
@@ -190,8 +189,9 @@ void rt_bc2native(JIT_Handle jit, Method_Handle method,
  * @brief Initialization routine, normally called from the JIT_init().
  *
  * @param hjit - JIT handle passed from VM to JIT_init()
+ * @param name - name assigned to JIT
  */
-void setup(JIT_Handle hjit);
+void setup(JIT_Handle hjit, const char* name);
 
 /**
  * @brief Cleanup routine, normally called from the JIT_deinit().
@@ -208,8 +208,15 @@ void cleanup(void);
 void cmd_line_arg(JIT_Handle jit, const char * name, const char * arg);
 
 /**
+ * @brief Returns true if Jitrino.JET supports compressed references on 
+ *        the current platform.
+ */
+bool supports_compresed_refs(void);
+
+/**
  * @brief Performs compilation of the method.
  * @returns \b true if the method was compiled, \b false otherwise
+ * @deprecated Use compile_with_params instead.
  */
 JIT_Result compile(JIT_Handle jit, Compile_Handle compile,
                    Method_Handle method, JIT_Flags flags);
@@ -236,4 +243,4 @@ OpenMethodExecutionParams get_exe_capabilities();
 
 }}; // ~namespace Jitrino::Jet
 
-#endif	// ~__JET_H_INCLUDED__
+#endif  // ~__JET_H_INCLUDED__

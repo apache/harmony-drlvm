@@ -497,6 +497,29 @@ method_get_exc_handler_info( method_handler hmethod, unsigned short index,
 } // method_get_exc_handler_info
 
 /**
+ * Gets number of exceptions a method can throw.
+ */
+unsigned short
+method_get_number_exc_method_can_throw( method_handler hmethod )
+{
+    assert( hmethod );
+    Method *method = (Method*)hmethod;
+    return method->num_exceptions_method_can_throw();
+} // method_get_number_exc_method_can_throw
+
+/**
+ * Gets name of exception a method can throw.
+ */
+const char *
+method_get_exc_method_can_throw( method_handler hmethod,
+                                 unsigned short index)
+{
+    assert( hmethod );
+    Method *method = (Method*)hmethod;
+    return method->get_exception_name( index )->bytes;
+} // method_get_exc_method_can_throw
+
+/**
  * Function sets verify data in class loader.
  */
 void

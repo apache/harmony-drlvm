@@ -13,11 +13,40 @@
  *  See the License for the specific language governing permissions and
  *  limitations under the License.
  */
+
 /** 
  * @author Evgueni Brevnov
- * @version $Revision: 1.1.2.1.4.4 $
+ * @version $Revision$
  */  
 
+/**
+ * Stack frame layout created by LIL CG on EM64T
+ *  
+ *    |--------------------------|
+ *    | Extra inputs             |
+ *    |--------------------------| <--- previouse stack frame bottom
+ *    | Return ip                |
+ *    |==========================| <--- current stack frame top
+ *    | M2N frame | callee saved |
+ *    |--------------------------|
+ *    | GR inputs save area      |
+ *    |--------------------------|
+ *    | FR inputs save area      |
+ *    |--------------------------|
+ *    | Dynamicly allocated area |
+ *    | (includes stack padding) |
+ *    |--------------------------|
+ *    | Extra outputs            |
+ *    |==========================| <--- current stack frame bottom
+ *
+ * Note:
+ *     EM64T architecture requires stack frame bottom address
+ *     to be aligned on 16 byte boundary (rsp % 16 == 0)
+ *
+ * Register usage:
+ *    r12-r15 are used for lil local variables (l0-l3)
+ *    r10-r11 are used for lil standard places (sp0-sp1)
+ */
 
 #ifndef _LIL_CODE_GENERATOR_EM64T_
 #define _LIL_CODE_GENERATOR_EM64T_
@@ -75,7 +104,7 @@ public:
     static const unsigned GR_SIZE = 8;
     // size of FR in bytes
     // TODO: Think about using FR_STACK_SIZE
-    static const unsigned FR_SIZE = 16;
+    static const unsigned FR_SIZE = 8;
 
     // offsets for the REG_MAP array
     static const unsigned STD_PLACES_OFFSET = 0;
@@ -91,9 +120,9 @@ public:
 
 private:
 
-    LilCodeStub             * cs; // the code stub
-    tl::MemoryPool          & mem; // a memory manager
-    LilInstructionIterator  iter; // instruction iterator
+    LilCodeStub             * cs;   // the code stub
+    tl::MemoryPool          & mem;  // a memory manager
+    LilInstructionIterator  iter;   // instruction iterator
 
     unsigned n_inputs;     // total number of inputs
     unsigned n_gr_inputs;  // total number of GRs reserved for inputs
@@ -103,23 +132,22 @@ private:
     unsigned n_gr_outputs; // total number of GRs reserved for outputs
     unsigned n_fr_outputs; // total number of FRs reserved for outputs
 
+    unsigned stk_m2n_size;              // size reserved for the m2n frame
     unsigned stk_input_gr_save_size;    // size reserved for saving GR inputs
     unsigned stk_input_fr_save_size;    // size reserved for saving FR inputs
-    unsigned stk_alloc_size;   // size of allocatable memory on the stack
-    unsigned stk_m2n_size;  // size reserved for the m2n frame
-    unsigned stk_output_size;  // bytes needed for outgoing params on the stack
-    unsigned stk_size;     // total size of the memory stack frame (in bytes)
+    unsigned stk_alloc_size;            // size of allocatable memory on the stack
+    unsigned stk_output_size;           // bytes needed for outgoing params on the stack
+    unsigned stk_size;                  // total size of the memory stack frame (in bytes)
 
-    Method_Handle m2n_method; // method handle of the m2n frame
-    frame_type m2n_frame_type; // m2n frame type 
+    Method_Handle m2n_method;   // method handle of the m2n frame
+    frame_type m2n_frame_type;  // m2n frame type 
 
-    bool m2n_handles; // true if m2n contains local handles
-    bool does_normal_calls;  // true if the stub contains "normal" calls
-    bool does_tail_calls;    // true if the stub contains tail calls
+    bool m2n_handles;       // true if m2n contains local handles
+    bool does_normal_calls; // true if the stub contains "normal" calls
+    bool does_tail_calls;   // true if the stub contains tail calls
     bool calls_unmanaged_code;  // true if the stub calls calls code with a calling convention other than managed
-    bool has_m2n;            // true if the stub contains push_m2n/pop_m2n instructions
-    bool save_inputs; // true if inputs are accessed after a normal call
-    bool uses_returns;  // true if return value is ever accessed
+    bool has_m2n;           // true if the stub contains push_m2n/pop_m2n instructions
+    bool save_inputs;       // true if inputs are accessed after a normal call
 
 public:
 
@@ -166,7 +194,7 @@ public:
     /**
      * an association between register number and index in the REG_MAP array
      */
-    static const unsigned get_index_in_map(const Reg_No reg) {
+    static unsigned get_index_in_map(const Reg_No reg) {
         static const unsigned INDEX_MAP[] = {
             //  rax_reg,                rbx_reg,            rcx_reg,
             GR_RETURNS_OFFSET, GR_LOCALS_OFFSET + 5, GR_OUTPUTS_OFFSET + 3,
@@ -252,13 +280,6 @@ public:
     }
 
     /**
-     * if returns are ever accessed
-     */
-    bool is_uses_returns() const {
-        return uses_returns;
-    }
-
-    /**
      * true if type represents floating point value
      */
     bool is_fp_type(LilType t) const {
@@ -286,6 +307,11 @@ public:
         return m2n_handles;
     }
 
+    // returns the offset of the start of the m2n frame
+    unsigned get_m2n_offset() const {
+        return get_input_gr_save_offset() + stk_input_gr_save_size;
+    }
+
     // returns the offset of the start of the gr input register save space
     unsigned get_input_gr_save_offset() const {
         return get_input_fr_save_offset() + stk_input_fr_save_size;
@@ -298,11 +324,6 @@ public:
 
     // returns the offset of the first "allocatable" byte
     unsigned get_alloc_start_offset() const {
-        return get_m2n_offset() + stk_m2n_size;
-    }
-
-    // returns the offset of the start of the m2n frame
-    unsigned get_m2n_offset() const {
         return get_output_offset() + stk_output_size;
     }
 
@@ -354,18 +375,13 @@ private:
                 // arbitrary stubs should not access inputs
                 assert(!lil_sig_is_arbitrary(lil_cs_get_sig(cs)));
                 // check if we use inputs after normal call
-                if (does_normal_calls && !lvalue) {
+                if (does_normal_calls) {
                     save_inputs = true;
                 }
                 break;
             case LVK_Out:
                 if (lvalue) {
                     save_inputs = true;
-                }
-                break;
-            case LVK_Ret:
-                if (!lvalue) {
-                    uses_returns = true;
                 }
                 break;
             default:;
@@ -511,6 +527,10 @@ private:
 
     void in2out(LilSig * sig) {
         assert(!lil_sig_is_arbitrary(lil_cs_get_sig(cs)));
+        // check if we need to save inputs
+        if (does_normal_calls) {
+            save_inputs = true;
+        }
         out(sig);
     }
 
@@ -561,25 +581,25 @@ public:
     LcgEM64TLocKind kind;
     int64 addr;  // register number or SP-relative offset
 
-    LcgEM64TLoc(LcgEM64TLocKind k, int64 a): kind(k), addr(a) {}\
+    LcgEM64TLoc(LcgEM64TLocKind k, int64 a): kind(k), addr(a) {}
 
-        void * operator new(size_t sz, tl::MemoryPool & m) {
-            return m.alloc(sz);
-        }
+    bool operator==(const LcgEM64TLoc & loc) const {
+        return (kind == loc.kind && addr == loc.addr);
+    }
+    
+    bool operator!=(const LcgEM64TLoc & loc)  {
+        return (kind != loc.kind || addr != loc.addr);
+    }
 
-        void operator delete (void * p, tl::MemoryPool & m) {}
-
-        bool operator==(const LcgEM64TLoc & loc) {
-            return (kind == loc.kind && addr == loc.addr);
-        }
-
-        bool operator!=(const LcgEM64TLoc& loc) {
-            return (kind != loc.kind || addr != loc.addr);
-        }
-
+    void * operator new(size_t sz, tl::MemoryPool & m) {
+        return m.alloc(sz);
+    }
+    
+    void operator delete (void * p, tl::MemoryPool & m) {}
+    
 private:
     LcgEM64TLoc(LcgEM64TLoc &);  // disable copying
-    LcgEM64TLoc &operator=(LcgEM64TLoc &); // disable copying
+    LcgEM64TLoc & operator=(LcgEM64TLoc &); // disable copying
 };
 
 class LilCodeGeneratorEM64T : public LilCodeGenerator {
@@ -588,7 +608,7 @@ class LilCodeGeneratorEM64T : public LilCodeGenerator {
     LilCodeGeneratorEM64T();
 
  protected:
-    NativeCodePtr compile_main(LilCodeStub* , size_t*, const char*, bool);
+    NativeCodePtr compile_main(LilCodeStub* , size_t*);
 };
 
 #endif // _LIL_CODE_GENERATOR_EM64T_

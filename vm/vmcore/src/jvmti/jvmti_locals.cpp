@@ -102,33 +102,38 @@ GetLocal_checkArgs(jvmtiEnv* env,
     return JVMTI_ERROR_NONE;
 }
 
-#define GET_JIT_FRAME_CONTEXT                                               \
-    StackIterator *si = si_create_from_native(vm_thread);                   \
-    while (depth > 0 && !si_is_past_end(si))                                \
-    {                                                                       \
-        if (get_method(si))                                                 \
-            depth -= 1 + si_get_inline_depth(si);                           \
-        si_goto_previous(si);                                               \
-    }                                                                       \
-    if (si_is_native(si))                                                   \
-    {                                                                       \
-        if (thread_suspended)                                               \
-            jthread_resume(thread);                                          \
-        si_free(si);                                                        \
-        return JVMTI_ERROR_OPAQUE_FRAME;                                    \
-    }                                                                       \
-                                                                            \
-    if (si_is_past_end(si))                                                 \
-    {                                                                       \
-        if (thread_suspended)                                               \
-            jthread_resume(thread);                                          \
-        si_free(si);                                                        \
-        return JVMTI_ERROR_NO_MORE_FRAMES;                                  \
-    }                                                                       \
-                                                                            \
-    JitFrameContext *jfc = si_get_jit_context(si);                          \
-    CodeChunkInfo *cci = si_get_code_chunk_info(si);                        \
-    JIT *jit = cci->get_jit();                                              \
+#define GET_JIT_FRAME_CONTEXT                               \
+    StackIterator *si = si_create_from_native(vm_thread);   \
+                                                            \
+    if (!si_get_method(si)) /* Skip native VM frame */      \
+        si_goto_previous(si);                               \
+                                                            \
+    while (depth > 0 && !si_is_past_end(si))                \
+    {                                                       \
+        if (si_get_method(si))                              \
+            depth -= 1 + si_get_inline_depth(si);           \
+        si_goto_previous(si);                               \
+    }                                                       \
+                                                            \
+    if (si_is_past_end(si))                                 \
+    {                                                       \
+        if (thread_suspended)                               \
+            jthread_resume(thread);                         \
+        si_free(si);                                        \
+        return JVMTI_ERROR_NO_MORE_FRAMES;                  \
+    }                                                       \
+                                                            \
+    if (si_is_native(si))                                   \
+    {                                                       \
+        if (thread_suspended)                               \
+            jthread_resume(thread);                         \
+        si_free(si);                                        \
+        return JVMTI_ERROR_OPAQUE_FRAME;                    \
+    }                                                       \
+                                                            \
+    JitFrameContext *jfc = si_get_jit_context(si);          \
+    CodeChunkInfo *cci = si_get_code_chunk_info(si);        \
+    JIT *jit = cci->get_jit();                              \
     Method *method = cci->get_method();
 
 jvmtiError JNICALL
@@ -183,7 +188,7 @@ jvmtiGetLocalObject(jvmtiEnv* env,
     else
     {
         GET_JIT_FRAME_CONTEXT;
-        ObjectHandle obj;
+        ManagedObject *obj;
 
         tmn_suspend_disable();
         OpenExeJpdaError result = jit->get_local_var(method, jfc, slot,
@@ -193,7 +198,7 @@ jvmtiGetLocalObject(jvmtiEnv* env,
         if (result == EXE_ERROR_NONE)
         {
             ObjectHandle oh = oh_allocate_local_handle();
-            oh->object = obj->object;
+            oh->object = obj;
             *value_ptr = oh;
         }
         tmn_suspend_enable();

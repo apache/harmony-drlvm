@@ -33,7 +33,7 @@ namespace Jitrino {
 
 class MemoryManager {
 public:
-    MemoryManager(size_t initial_estimate,char* name);
+    MemoryManager(size_t initial_estimate, const char* name);
     virtual ~MemoryManager();
     void *alloc(size_t size);
     size_t bytes_allocated() { return _bytes_allocated; }

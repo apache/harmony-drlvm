@@ -24,10 +24,6 @@
 #ifndef _INST_H_
 #define _INST_H_
 
-#include <assert.h>
-#include <stdio.h>
-#include <iostream>
-#include "open/types.h"
 #include "MemoryManager.h"
 #include "Stl.h"
 #include "VMInterface.h"
@@ -37,14 +33,18 @@
 #include "Opnd.h"
 #include "Log.h"
 #include "InlineInfo.h"
+#include "ControlFlowGraph.h"
+
+#include "open/types.h"
+
+#include <assert.h>
+#include <stdio.h>
+#include <iostream>
 
 namespace Jitrino {
 
-class   CFGNode;
 class   OpndRenameTable;
 class   IRBuilder;
-class   FlowGraph;
-class   CFGEdge;
 class   IRManager;
 class   InstFactory;
 class   PiCondition;
@@ -111,58 +111,49 @@ public:
 //
 #define MAX_INST_SRCS 2
 
-class Inst : private Dlink {
+class Inst : public CFGInst {
 public:
     virtual ~Inst() {}
-    // modified Dlink methods
-    void unlink() {
-        Dlink::unlink(); 
-        node = 0;
-    }
-    void insertAfter(Inst *prev_inst) {
-        Dlink::insertAfter(prev_inst);
-        node = prev_inst->node;
-    }
-    void insertBefore(Inst *next_inst) {
-        Dlink::insertBefore(next_inst);
-        node = next_inst->node;
-    }
-    void moveTo(Inst *head) {
-        Inst *otheri = next();
-        CFGNode *newnode = head->node;
-        while (otheri != this) {
-            otheri->node = newnode;
-            otheri = otheri->next();
-        }
-        Dlink::moveTo(head);
-    }
-    void moveTailTo(Inst *oldhead, Inst* newhead) {
-        Dlink::moveTailTo(oldhead, newhead);
-    }
-public:
+
+    Inst* getNextInst() const {return (Inst*)next();}
+    Inst* getPrevInst() const {return (Inst*)prev();}
+
+    bool isHeaderCriticalInst() const {return getOpcode() == Op_Catch || isLabel();}
+
     Type::Tag    getType() const {
         return operation.getType();
     }
+
     Opcode      getOpcode() const   {
         return operation.getOpcode();
     }
+
     Modifier    getModifier() const {
         return operation.getModifier();
     }
+
     Operation getOperation() const {return operation;}
+
     uint32 getId() const {return id;}
+
     uint64 getMethodId() const {return methodId; }
+
     void   setMethodId(uint64 id) {methodId = id; }
+
     PersistentInstructionId getPersistentInstructionId() const {return pid; }
+
     void   setPersistentInstructionId(PersistentInstructionId id) {pid = id; }
+
     Opnd*  getDst() const {return dst;}
 
     void setType(Type::Tag newType) {
         operation.setType(newType);
     }
+
     void setModifier(Modifier newMod) {
         operation.setModifier(newMod);
     }
+
     void setDst(Opnd* newDst) {
         if (dst && dst->isNull() == false && dst->isVarOpnd() == false && (dst->getInst() == this))
             dst->setInst(0);
@@ -170,13 +161,16 @@ public:
         if (dst && dst->isNull() == false && dst->isVarOpnd() == false)
             dst->setInst(this);
     }
+
     uint32  getNumSrcOperands() const    {return numSrcs;}
+
     Opnd*   getSrc(uint32 srcIndex) const {
         assert(srcIndex < numSrcs);
         if (srcIndex >= MAX_INST_SRCS)
             return getSrcExtended(srcIndex);
         return srcs[srcIndex];
     }
+
     void  setSrc(uint32 srcIndex, Opnd* src) {
         assert(srcIndex < numSrcs);
         if (srcIndex >= MAX_INST_SRCS)
@@ -258,14 +252,6 @@ public:
     bool        isSigned() const {
         return operation.isSigned();
     }
-    //
-    CFGNode *getNode() { return node; };
-    CFGNode *getNodeFwd() { return node; };
-    void setNode(CFGNode *n) { node = n; };
-    //
-    //
-    Inst*   prev() {return (Inst*)_prev;}
-    Inst*   next() {return (Inst*)_next;}
 
     virtual bool isBranch() const { return false; };
     virtual bool isCall() const { return false; };
@@ -276,7 +262,6 @@ public:
     virtual bool isIntrinsicCallInst() const { return false; };
     virtual bool isJitHelperCallInst() const { return false; };
     virtual bool isVMHelperCallInst() const { return false; };
-    virtual bool isLabel() const { return false; };
     virtual bool isMethodCall() const { return false; };
     virtual bool isMethodEntry() const { return false; };
     virtual bool isMethod() const { return false; };
@@ -403,7 +388,13 @@ protected:
     uint64  methodId;
     PersistentInstructionId pid;
     uint32  id;
-    CFGNode *node;
+    
+    
+    // called from CFG to detect BB->BB block edges
+    virtual Edge::Kind getEdgeKind(const Edge* edge) const;
+    
+    virtual void removeRedundantBranch();
+
     //
     // protected accessor methods that deriving classes should override
     //
@@ -422,15 +413,6 @@ public:
     bool      isLabel() const               {return true;}
     virtual bool isDispatchLabel() const    {return false;}
     virtual bool isCatchLabel() const       {return false;}
-    void      setCFGNode(CFGNode* n)   {
-        node = n;
-        Inst *i = next();
-        while (i != this) { 
-            i->setNode(n);
-            i = i->next();
-        };
-    }
-    CFGNode *getCFGNode() { return node; };
     void      setState(void *stat)     {state = stat;} 
     void *    getState()               {return state;}
     void visit(InstFormatVisitor& visitor)  {visitor.accept(this);}
@@ -447,7 +429,7 @@ private:
     friend class InstFactory;
     uint32   labelId;
     
-	void*    state;     
+    void*    state;     
 };
 
 class DispatchLabelInst: public LabelInst {
@@ -501,19 +483,31 @@ public:
 
     void removeOpnd() {
         setSrc(0, OpndManager::getNullOpnd());
-        numSrcs = 0;
+        if (numSrcs) numSrcs--;
     }
+
 protected:
     virtual void handlePrintEscape(::std::ostream&, char code) const;
 private:
     friend class InstFactory;
+
     MethodMarkerInst(Kind k, MethodDesc* md) :
-    Inst(k==Entry? Op_MethodEntry : Op_MethodEnd, Modifier(), Type::Void, OpndManager::getNullOpnd()), kind(k), methodDesc(md) {}
-    MethodMarkerInst(Kind k, MethodDesc* md, Opnd *obj) :
+            Inst(k==Entry? Op_MethodEntry : Op_MethodEnd, Modifier(), Type::Void, 
+            OpndManager::getNullOpnd()), kind(k), methodDesc(md), retOpnd(NULL) {}
+
+    MethodMarkerInst(Kind k, MethodDesc* md, Opnd *resOpnd) :
+            Inst(k==Entry? Op_MethodEntry : Op_MethodEnd, Modifier(), Type::Void, 
+            OpndManager::getNullOpnd()), kind(k), methodDesc(md), retOpnd(resOpnd) {}
+
+    MethodMarkerInst(Kind k, MethodDesc* md, Opnd *obj, Opnd *resOpnd) :
     Inst(k==Entry? Op_MethodEntry : Op_MethodEnd, Modifier(), Type::Void, OpndManager::getNullOpnd(),
-                                    obj), kind(k), methodDesc(md) { assert(obj && !obj->isNull()); }
+            obj), kind(k), methodDesc(md), retOpnd(resOpnd) { 
+        assert(obj && !obj->isNull()); 
+
+    }
     Kind        kind;
     MethodDesc* methodDesc;
+    Opnd* retOpnd;
 };
 
 //
@@ -526,11 +520,13 @@ public:
     void visit(InstFormatVisitor& visitor)  {visitor.accept(this);}
 
     void       replaceTargetLabel(LabelInst* target) {targetLabel = target;}
-    LabelInst* getTargetLabel()      {return targetLabel;}
+    LabelInst* getTargetLabel() const      {return targetLabel;}
     void       swapTargets(LabelInst *target);
-    CFGEdge       *getTakenEdge(uint32 condition);
+    Edge       *getTakenEdge(uint32 condition);
 protected:
     virtual void handlePrintEscape(::std::ostream&, char code) const;
+    virtual Edge::Kind getEdgeKind(const Edge* edge) const;
+    virtual void updateControlTransferInst(Node* oldTarget, Node* newTarget); 
 private:
     friend class InstFactory;
     BranchInst(Opcode op, LabelInst* target)
@@ -563,7 +559,7 @@ public:
     LabelInst** getTargets() { return targetInsts; }
     void visit(InstFormatVisitor& visitor)  {visitor.accept(this);}
     bool isSwitch() const {return true;}
-    LabelInst* getDefaultTarget() {return defaultTargetInst;}
+    LabelInst* getDefaultTarget() const {return defaultTargetInst;}
     uint32     getNumTargets() {return numTargets;}
     void       replaceTargetLabel(uint32 i, LabelInst* target) {
         assert(i < numTargets);
@@ -573,6 +569,8 @@ public:
 
 protected:
     virtual void handlePrintEscape(::std::ostream&, char code) const;
+    virtual Edge::Kind getEdgeKind(const Edge* edge) const;
+    virtual void updateControlTransferInst(Node* oldTarget, Node* newTarget); 
 private:
     friend class InstFactory;
     SwitchInst(Opnd* src, LabelInst** targets, uint32 nTargets, LabelInst* defTarget)
@@ -1034,6 +1032,7 @@ public:
             return NULL;
     }
     bool isThrowLazy() const {return vmHelperId == ThrowLazy;}
+InlineInfo* getInlineInfoPtr() { return inlInfo; }
 private:
     virtual void handlePrintEscape(::std::ostream&, char code) const;
     friend class InstFactory;
@@ -1044,7 +1043,7 @@ private:
                      uint32 nArgs,
                      Opnd** args_,
                      VMHelperCallId id) : Inst(op, mod, type, dst, nArgs),
-                                          vmHelperId(id) {
+                                          vmHelperId(id), inlInfo(NULL) {
         args = args_;
         switch (nArgs) {
         default:
@@ -1061,6 +1060,7 @@ private:
     }
     Opnd**    args;
     VMHelperCallId vmHelperId;
+    InlineInfo* inlInfo;
 };
 
 // phi instructions
@@ -1075,6 +1075,7 @@ private:
         : MultiSrcInst(Op_Phi, Modifier(), type, dst, nArgs, args_)
     {
     }
+    bool isHeaderCriticalInst() const {return true;}
 };
 
 // pi instructions
@@ -1151,17 +1152,14 @@ public:
                                Opnd* tauNullChecked, Opnd* tauTypesChecked, 
                                uint32 numArgs, Opnd** args);
     Inst*    makeJitHelperCall(Opnd* dst, JitHelperCallId id, uint32 numArgs, Opnd** args);
-    Inst*    makeVMHelperCall(Opnd* dst, VMHelperCallId id, uint32 numArgs, Opnd** args);
+    Inst*    makeVMHelperCall(Opnd* dst, VMHelperCallId id, uint32 numArgs,
+                               Opnd** args, InlineInfo* inlInfo = NULL);
     Inst*    makeReturn(Opnd* src);
     Inst*    makeReturn();    // void return type
     Inst*    makeCatch(Opnd* dst);
     Inst*    makeCatchLabel(uint32 labelId, uint32 exceptionOrder, Type* exceptionType);
     CatchLabelInst*    makeCatchLabel(uint32 exceptionOrder, Type* exceptionType);
     Inst*    makeThrow(ThrowModifier mod, Opnd* exceptionObj);
-	Inst*    makeThrowLazy(ThrowModifier mod,
-		                   uint32 numArgs,
-						   Opnd **args,
-						   MethodDesc *constructor);
     Inst*    makeThrowSystemException(CompilationInterface::SystemExceptionId exceptionId);
     Inst*    makeThrowLinkingException(Class_Handle encClass, uint32 CPIndex, uint32 operation);
     Inst*    makeLeave(LabelInst* labelInst);
@@ -1180,7 +1178,7 @@ public:
     Inst*    makeLdConst(Opnd* dst, double val);
     Inst*    makeLdConst(Opnd* dst, ConstInst::ConstValue val);
     Inst*    makeLdNull(Opnd* dst);
-    Inst*    makeLdString(Modifier mod, Opnd* dst, MethodDesc* enclosingMethod, uint32 stringToken);
+    Inst*    makeLdRef(Modifier mod, Opnd* dst, MethodDesc* enclosingMethod, uint32 token);
     Inst*    makeLdVar(Opnd* dst, VarOpnd* var);
     Inst*    makeLdVar(Opnd* dst, SsaVarOpnd* var);
     Inst*    makeLdVarAddr(Opnd* dst, VarOpnd* var);
@@ -1196,9 +1194,7 @@ public:
     Inst*    makeLdStaticAddr(Opnd* dst, FieldDesc*);
     Inst*    makeLdElemAddr(Type* type, Opnd* dst, Opnd* array, Opnd* index);
     Inst*    makeTauLdVTableAddr(Opnd* dst, Opnd* base, Opnd *tauBaseNonNull);
-    Inst*    makeTauLdIntfcVTableAddr(Opnd* dst, Opnd* base,
-                                      Opnd *tauBaseHasInterface, 
-                                      Type* vtableType);
+    Inst*    makeTauLdIntfcVTableAddr(Opnd* dst, Opnd* base, Type* vtableType);
     Inst*    makeTauLdVirtFunAddr(Opnd* dst, Opnd* vtable, 
                                   Opnd *tauVtableHasDesc,
                                   MethodDesc*);
@@ -1268,7 +1264,9 @@ public:
     LabelInst*  makeLabel();
     // method entry/exit
     LabelInst*    makeMethodEntryLabel(MethodDesc* methodDesc);
-    Inst*    makeMethodMarker(MethodMarkerInst::Kind kind, MethodDesc* methodDesc, Opnd *obj);
+    Inst*    makeMethodMarker(MethodMarkerInst::Kind kind, MethodDesc* methodDesc, 
+            Opnd *obj, Opnd *retOpnd);
+    Inst*    makeMethodMarker(MethodMarkerInst::Kind kind, MethodDesc* methodDesc, Opnd *retOpnd);
     Inst*    makeMethodMarker(MethodMarkerInst::Kind kind, MethodDesc* methodDesc);
 
 
@@ -1393,7 +1391,9 @@ private:
                                        uint32 ord,
                                        Type *exceptionType);
     MethodEntryInst*    makeMethodEntryInst(uint32 labelId, MethodDesc*) ;
-    MethodMarkerInst*   makeMethodMarkerInst(MethodMarkerInst::Kind, MethodDesc*, Opnd *obj);
+    MethodMarkerInst*   makeMethodMarkerInst(MethodMarkerInst::Kind, MethodDesc*, 
+            Opnd *obj, Opnd *retOpnd);
+    MethodMarkerInst*   makeMethodMarkerInst(MethodMarkerInst::Kind, MethodDesc*, Opnd *retOpnd);
     MethodMarkerInst*   makeMethodMarkerInst(MethodMarkerInst::Kind, MethodDesc*);
 
     BranchInst* makeBranchInst(Opcode, LabelInst* target);
@@ -1537,7 +1537,8 @@ private:
                                            Opnd* dst,
                                            uint32 nArgs,
                                            Opnd** args_,
-                                           VMHelperCallId id);
+                                           VMHelperCallId id,
+                                           InlineInfo* inlInfo = NULL);
 
     PhiInst* makePhiInst(Type::Tag type, Opnd* dst, uint32 nArgs, Opnd** args_);
 
@@ -1680,9 +1681,6 @@ public:
     virtual Inst*
     caseThrow(Inst* inst)=0;//              {return caseDefault(inst);}
 
-	virtual Inst*
-	caseThrowLazy(Inst* inst)=0;//          {return caseDefault(inst);}
-
     virtual Inst*
     caseThrowSystemException(Inst* inst)=0;// {return caseDefault(inst);}
 
@@ -1724,7 +1722,7 @@ public:
     caseLdNull(ConstInst* inst)=0;//        {return caseDefault(inst);}
 
     virtual Inst*
-    caseLdString(TokenInst* inst)=0;//      {return caseDefault(inst);}
+    caseLdRef(TokenInst* inst)=0;//         {return caseDefault(inst);}
 
     virtual Inst*
     caseLdVar(Inst* inst)=0;//              {return caseDefault(inst);}

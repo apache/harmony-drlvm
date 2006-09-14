@@ -70,7 +70,7 @@ void mark_classloader(ClassLoader* cl)
 {
     if(cl->GetLoader() && cl->NotMarked()) {
         TRACE2("classloader.unloading.markloader", "  Marking loader "
-            << cl << " (" << cl->GetLoader() << " : "
+            << cl << " (" << (void*)cl->GetLoader() << " : "
             << ((VTable*)(*(unsigned**)(cl->GetLoader())))->clss->name->bytes << ")");
         cl->Mark();
     }
@@ -220,7 +220,7 @@ void ClassLoader::LoadingClass::RemoveWaitingThread(VM_thread* thread, ClassLoad
 Class* ClassLoader::NewClass(const Global_Env* env, const String* name)
 {
     Class *clss = NULL;
-    TRACE2("classloader.newclass", "allocating Class for \"" << name->bytes << "\"\n" );
+    TRACE2("classloader.newclass", "allocating Class for \"" << name->bytes << "\"" );
 
     if(env->InBootstrap() && name == env->JavaLangClass_String) {
         assert(env->JavaLangClass_Class == NULL);
@@ -246,16 +246,14 @@ Class* ClassLoader::DefineClass(Global_Env* env, const char* class_name,
 {
     const String *className;
 
-    TRACE2("classloader.defineclass", "Defining class " << class_name << " with loader " << this);
+    LOG2("classloader.defineclass", "Defining class " << class_name << " with loader " << this);
     if(class_name) {
         className = env->string_pool.lookup(class_name);
     } else {
         className = class_extract_name(env, bytecode, offset, length);
         if(className == NULL) {
-            jthrowable exn = exn_create("java/lang/LinkageError",
-                "DefineClass was called without class name and "
-                "class name could not be extracted from provided class data");
-            exn_raise_only(exn);
+            exn_raise_by_name("java/lang/ClassFormatError",
+                "class name could not be extracted from provided class data", NULL);
             return NULL;
         }
     }
@@ -751,6 +749,7 @@ void ClassLoader::ReallocateTable( unsigned int new_capacity )
 
 Class* ClassLoader::StartLoadingClass(Global_Env* UNREF env, const String* className)
 {
+    TRACE2("classloader.loading", "StartLoading class " << className << " with loader " << this);
     Class** pklass = NULL;
     Class* klass = NULL;
 
@@ -822,10 +821,11 @@ Class* ClassLoader::StartLoadingClass(Global_Env* UNREF env, const String* class
 
 void ClassLoader::FailedLoadingClass(const String* className)
 {
+    LOG2("classloader", "Failed loading class " << className << " with loader " << this);
     LMAutoUnlock aulock( &m_lock );
 
     LoadingClass* lc = m_loadingClasses->Lookup(className);
-    if(lc) {
+    if (lc) {
         lc->SignalLoading();
         RemoveLoadingClass(className, lc);
     }
@@ -910,7 +910,7 @@ Class* ClassLoader::WaitDefinition(Global_Env* env, const String* className)
             std::stringstream ss;
             ss << "class " << clss->name->bytes << " is defined second time";
             jthrowable exn = exn_create("java/lang/LinkageError", ss.str().c_str());
-            exn_raise_only(exn);
+            exn_raise_object(exn);
             return NULL;
         }
 
@@ -973,7 +973,9 @@ Class* ClassLoader::SetupAsArray(Global_Env* env, const String* classNameString)
                              baseType[nameLen] != 0; nameLen++);
             if(!baseType[nameLen]) {
                 FailedLoadingClass(classNameString);
-                REPORT_FAILED_CLASS_NAME(this, className, "java/lang/NoClassDefFoundError", className);
+                REPORT_FAILED_CLASS_NAME(this, className,
+                    VM_Global_State::loader_env->JavaLangNoClassDefFoundError_String->bytes,
+                    className);
                 return NULL;
             }
             baseClass = LoadVerifyAndPrepareClass(env, env->string_pool.lookup(baseType, nameLen));
@@ -988,7 +990,8 @@ Class* ClassLoader::SetupAsArray(Global_Env* env, const String* classNameString)
     default:
         FailedLoadingClass(classNameString);
         REPORT_FAILED_CLASS_NAME(this, className,
-            "java/lang/NoClassDefFoundError", className);
+            VM_Global_State::loader_env->JavaLangNoClassDefFoundError_String->bytes,
+            className);
         return NULL;
     }
     ClassLoader* baseLoader = baseClass->class_loader;
@@ -1050,9 +1053,11 @@ Class* ClassLoader::SetupAsArray(Global_Env* env, const String* classNameString)
         // insert Java field, required by spec - 'length'
         klass->n_fields = 1;
         klass->fields = new Field[1];
-        klass->fields[0].set(klass, env->Length_String, env->IntDescriptor_String, ACC_PUBLIC|ACC_FINAL);
+        klass->fields[0].set(klass, env->Length_String,
+            env->string_pool.lookup("I"), ACC_PUBLIC|ACC_FINAL);
         klass->fields[0].set_field_type_desc(
             type_desc_create_from_java_descriptor("I", NULL));
+        klass->fields[0].set_injected();
 
         klass->super_name = env->JavaLangObject_String;
 
@@ -1093,17 +1098,6 @@ Class* ClassLoader::AllocateAndReportInstance(const Global_Env* env, Class* clss
     assert(name);
 
     if (env->InBootstrap()) {
-    	
-    	/*
-    	 *  AnnotatedElement, GenericDeclaration, Type are there becuase in 
-    	 *  Java 5, Class implements them in addition to Serializable
-    	 */
-        assert((clss->name == env->JavaLangObject_String)
-             || (strcmp(clss->name->bytes, "java/io/Serializable") == 0)
-             || (clss->name == env->JavaLangClass_String)
-             || (strcmp(clss->name->bytes, "java/lang/reflect/AnnotatedElement") == 0)
-             || (strcmp(clss->name->bytes, "java/lang/reflect/GenericDeclaration") == 0)
-             || (strcmp(clss->name->bytes, "java/lang/reflect/Type") == 0));
         clss->class_handle = NULL;
     } else {
         Class* root_class = env->JavaLangClass_Class;
@@ -1118,7 +1112,7 @@ Class* ClassLoader::AllocateAndReportInstance(const Global_Env* env, Class* clss
             tmn_suspend_enable();
             // couldn't allocate java.lang.Class instance for this class
             // ppervov: TODO: throw OutOfMemoryError
-            exn_raise_only(
+            exn_raise_object(
                 VM_Global_State::loader_env->java_lang_OutOfMemoryError);
             return NULL;
         }
@@ -1213,9 +1207,29 @@ void ClassLoader::FieldClearInternals(Class* clss)
 
 void ClassLoader::LoadNativeLibrary( const char *name )
 {
+    // Translate library path to full canonical path to ensure that
+    // natives_support:search_library_list() will recognize all loaded libraries
+    apr_pool_t* tmp_pool;
+    apr_status_t stat = apr_pool_create(&tmp_pool, this->pool);
+    // FIXME: process failure properly
+    
+   //
+   // $$$ GMJ - we don't want it to be where we're running from, but
+   //    where everything else came from.  For now, let it be
+   //    so that apr_dso_load() will do the right thing, but we need
+   //    to prefix with vm_get_property_value("org.apache.harmony.vm.vmdir");
+   //    and I'm too lazy to grok how/why I need apr pools for strcat().
+   //
+   // const char* canoname = port_filepath_canonical(name, tmp_pool); 
+    
+    const char *canoname = name;
+    
     // get library name from string pool
     Global_Env *env = VM_Global_State::loader_env;
-    const String *lib_name = env->string_pool.lookup( name );
+    const String *lib_name = env->string_pool.lookup( canoname );
+
+    // free temporary pool
+    apr_pool_destroy(tmp_pool);
 
     // lock class loader
     LMAutoUnlock cl_lock( &m_lock );
@@ -1236,7 +1250,7 @@ void ClassLoader::LoadNativeLibrary( const char *name )
     // load native library
     bool just_loaded;
     NativeLoadStatus status;
-    NativeLibraryHandle handle = natives_load_library(name, &just_loaded, &status);
+    NativeLibraryHandle handle = natives_load_library(lib_name->bytes, &just_loaded, &status);
     if( !handle || !just_loaded ) {
         // create error message
         char apr_error_message[1024];
@@ -1244,7 +1258,7 @@ void ClassLoader::LoadNativeLibrary( const char *name )
                 sizeof(apr_error_message));
 
         std::stringstream message_stream;
-        message_stream << "Failed loading library \"" << name << "\": " 
+        message_stream << "Failed loading library \"" << lib_name->bytes << "\": " 
                 << apr_error_message;
 
         // trace
@@ -1261,7 +1275,7 @@ void ClassLoader::LoadNativeLibrary( const char *name )
 
     // trace
     TRACE2("classloader.native", "Loader (" << this
-        << ") loaded native library: " << name);
+        << ") loaded native library: " << lib_name->bytes);
 
     // allocate memory
     info = (NativeLibInfo*)Alloc(sizeof(NativeLibInfo));
@@ -1317,7 +1331,8 @@ GenericFunctionPointer ClassLoader::LookupNative(Method* method)
         << method_name->bytes << method_desc->bytes);
 
     // raise exception
-    exn_raise_by_name( "java/lang/UnsatisfiedLinkError", error );
+    jthrowable exc_object = exn_create( "java/lang/UnsatisfiedLinkError", error);
+    exn_raise_object(exc_object);
 
     return NULL;
 }
@@ -1599,6 +1614,7 @@ Class* BootstrapClassLoader::LoadClass(Global_Env* UNREF env,
 
 Class* UserDefinedClassLoader::LoadClass(Global_Env* env, const String* className)
 {
+    ASSERT_RAISE_AREA;
     assert(m_loader != NULL);
 
     Class* klass = StartLoadingClass(env, className);
@@ -1620,19 +1636,16 @@ Class* UserDefinedClassLoader::LoadClass(Global_Env* env, const String* classNam
     }
 
     // Replace '/' with '.'
-    unsigned class_name_len = className->len + 1;
-    char* class_name_buf = new char[class_name_len]; // !!! replace with MM allocation
-    for(unsigned i = 0; i < class_name_len; i++) {
-        char c = className->bytes[i];
-        if(c == '/') {
-            class_name_buf[i] = '.';
-        } else {
-            class_name_buf[i] = c;
-        }
+    unsigned len = className->len + 1;
+    char* name = (char*) STD_ALLOCA(len);
+    char* tmp_name = name;
+    memcpy(name, className->bytes, len);
+    while (tmp_name = strchr(tmp_name, '/')) {
+        *tmp_name = '.';
+        ++tmp_name;
     }
-    assert(env);
-    String* class_name_with_dots  = env->string_pool.lookup( class_name_buf );
-    delete[] class_name_buf;
+    String* class_name_with_dots =
+        VM_Global_State::loader_env->string_pool.lookup(name);
 
     // call the version that takes the resolve flag
     // some subclasses of ClassLoader do NOT overload the (Ljava/lang/String;) version of the method
@@ -1729,7 +1742,9 @@ Class* UserDefinedClassLoader::LoadClass(Global_Env* env, const String* classNam
         //       class was not loaded but exception was not thrown
         tmn_suspend_enable();
         FailedLoadingClass(className);
-        REPORT_FAILED_CLASS_NAME(this, className->bytes, "java/lang/NoClassDefFoundError", className->bytes);
+        REPORT_FAILED_CLASS_NAME(this, className->bytes,
+            VM_Global_State::loader_env->JavaLangNoClassDefFoundError_String->bytes,
+            className->bytes);
         return NULL;
     }
     ObjectHandle oh = (ObjectHandle) res.l;
@@ -1813,8 +1828,9 @@ Class* BootstrapClassLoader::LoadFromFile(const String* class_name)
         }
         assert(clss == NULL);
     }
-    REPORT_FAILED_CLASS_NAME(this, class_name->bytes, 
-        "java/lang/NoClassDefFoundError", class_name->bytes);
+    REPORT_FAILED_CLASS_NAME(this, class_name->bytes,
+        VM_Global_State::loader_env->JavaLangNoClassDefFoundError_String->bytes,
+        class_name->bytes);
     FailedLoadingClass(class_name);
     return NULL;
 } // BootstrapClassLoader::LoadFromFile
@@ -1921,7 +1937,8 @@ classloader_find_native(const Method_Handle method)
 void ClassLoader::ReportException(const char* exn_name, std::stringstream& message_stream)
 {
     // raise exception
-    exn_raise_by_name(exn_name, message_stream.str().c_str());
+    jthrowable exn = exn_create(exn_name, message_stream.str().c_str());
+    exn_raise_object(exn);
 }
 
 void BootstrapClassLoader::ReportException(const char* exn_name, std::stringstream& message_stream)

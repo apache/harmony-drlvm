@@ -38,33 +38,281 @@ static void UNIMPLEMENTED(char* fun) {
 #pragma warning(disable : 4355)
 #endif
 
-IRBuilder::IRBuilder(IRManager& irm)
-    : irManager(irm),
-      opndManager(irm.getOpndManager()),
-      typeManager(irm.getTypeManager()),
-      instFactory(irm.getInstFactory()),
-      flowGraph(irm.getFlowGraph()),
-      irBuilderFlags(*irm.getCompilationContext()->getIRBuilderFlags()),
-      tempMemoryManager(0, "IRBuilder::tempMemoryManager"),
-      cseHashTable(tempMemoryManager),
-      simplifier(irm, this),
-      tauMethodSafeOpnd(0),
-      offset(0)
+static const char* help = \
+    "  expansion flags:\n"\
+    "    expandMemAddrs[={ON|off}]\n"\
+    "    expandElemAddrs[={ON|off}]\n"\
+    "    expandCallAddrs[={on|OFF}]\n"\
+    "    expandVirtualCallAddrs[={ON|off}]\n"\
+    "    expandNullChecks[={ON|off}]\n"\
+    "    expandElemTypeChecks[={ON|off}]\n"\
+    "  translation-time optimizations:\n"\
+    "    doCSE[={ON|off}]\n"\
+    "    doSimplify[={ON|off}]\n"\
+    "    suppressCheckBounds[={on|OFF}] - omit all bounds checks\n"\
+    "    insertMethodLabels[={on|OFF}]\n"\
+    "    compressedReferences[={on|OFF}] - force compressed references\n";
+
+
+static ActionFactory<IRBuilder, IRBuilderAction> _irbuilder(IRBUILDER_ACTION_NAME, help);
+
+
+class IRBuilderSimplifier : public Simplifier {
+public:
+    IRBuilderSimplifier(IRBuilder& irb) 
+        : Simplifier(*irb.getIRManager(), false), irBuilder(irb) 
+    {}
+protected:
+    // numeric
+    virtual Inst* genAdd(Type* type, Modifier mod, Opnd* src1, Opnd* src2){
+        return irBuilder.genAdd(type, mod, src1, src2)->getInst();
+    }
+    virtual Inst* genSub(Type* type, Modifier mod, Opnd* src1, Opnd* src2) {
+        return irBuilder.genSub(type, mod, src1, src2)->getInst();
+    }
+    virtual Inst* genNeg(Type* type, Opnd* src) {
+        return irBuilder.genNeg(type, src)->getInst();
+    }
+    virtual Inst* genMul(Type* type, Modifier mod, Opnd* src1, Opnd* src2){
+        return irBuilder.genMul(type, mod, src1, src2)->getInst();
+    }
+    virtual Inst* genMulHi(Type* type, Modifier mod, Opnd* src1, Opnd* src2){
+        return irBuilder.genMulHi(type, mod, src1, src2)->getInst();
+    }
+    virtual Inst* genMin(Type* type, Opnd* src1, Opnd* src2){
+        return irBuilder.genMin(type, src1, src2)->getInst();
+    }
+    virtual Inst* genMax(Type* type, Opnd* src1, Opnd* src2){
+        return irBuilder.genMax(type, src1, src2)->getInst();
+    }
+    virtual Inst* genAbs(Type* type, Opnd* src1){
+        return irBuilder.genAbs(type, src1)->getInst();
+    }
+    // bitwise
+    virtual Inst* genAnd(Type* type, Opnd* src1, Opnd* src2){
+        return irBuilder.genAnd(type, src1, src2)->getInst();
+    }
+    virtual Inst* genOr(Type* type, Opnd* src1, Opnd* src2){
+        return irBuilder.genOr(type, src1, src2)->getInst();
+    } 
+    virtual Inst* genXor(Type* type, Opnd* src1, Opnd* src2){
+        return irBuilder.genXor(type, src1, src2)->getInst();
+    }
+    virtual Inst* genNot(Type* type, Opnd* src1){
+        return irBuilder.genNot(type, src1)->getInst();
+    }
+    virtual Inst* genSelect(Type* type, Opnd* src1, Opnd* src2, Opnd* src3){
+        return irBuilder.genSelect(type, src1, src2, src3)->getInst();
+    }
+    // conversion
+    virtual Inst* genConv(Type* dstType, Type::Tag toType, Modifier ovfMod, Opnd* src){
+        return irBuilder.genConv(dstType, toType, ovfMod, src)->getInst();
+    }
+    // shifts
+    virtual Inst* genShladd(Type* type, Opnd* src1, Opnd* src2, Opnd *src3){
+        return irBuilder.genShladd(type, src1, src2, src3)->getInst();
+    }
+    virtual Inst* genShl(Type* type, Modifier smmod, Opnd* src1, Opnd* src2){
+        return irBuilder.genShl(type, smmod, src1, src2)->getInst();
+    }
+    virtual Inst* genShr(Type* type, Modifier mods, Opnd* src1, Opnd* src2){
+        return irBuilder.genShr(type, mods, src1, src2)->getInst();
+    }
+    // comparison
+    virtual Inst* genCmp(Type* type, Type::Tag insttype, ComparisonModifier mod, Opnd* src1, Opnd* src2){
+        return irBuilder.genCmp(type, insttype, mod, src1, src2)->getInst();
+    }
+    // control flow
+    virtual void genJump(LabelInst* label) {
+        irBuilder.genJump(label);
+    }
+    virtual void genBranch(Type::Tag instType, ComparisonModifier mod, LabelInst* label, Opnd* src1, Opnd* src2) {
+        irBuilder.genBranch(instType, mod, label, src1, src2);
+    }
+    virtual void genBranch(Type::Tag instType, ComparisonModifier mod,  LabelInst* label, Opnd* src1) {
+        irBuilder.genBranch(instType, mod, label, src1);
+    }
+    virtual Inst* genDirectCall(MethodDesc* methodDesc,Type* returnType,Opnd* tauNullCheckedFirstArg,
+        Opnd* tauTypesChecked,uint32 numArgs,Opnd* args[],InlineInfoBuilder* inlineBuilder)
+    {
+        irBuilder.genDirectCall(methodDesc, returnType, tauNullCheckedFirstArg, tauTypesChecked, 
+            numArgs, args, inlineBuilder);
+        return (Inst*)irBuilder.getCurrentLabel()->getNode()->getLastInst();
+    }
+    // load, store & mov
+    virtual Inst* genLdConstant(int32 val) {
+        return irBuilder.genLdConstant(val)->getInst();
+    }
+    virtual Inst* genLdConstant(int64 val) {
+        return irBuilder.genLdConstant(val)->getInst();
+    }
+    virtual Inst* genLdConstant(float val) {
+        return irBuilder.genLdConstant(val)->getInst();
+    }
+    virtual Inst* genLdConstant(double val) {
+        return irBuilder.genLdConstant(val)->getInst();
+    }
+    virtual Inst* genLdConstant(Type *type, ConstInst::ConstValue val) {
+        return irBuilder.genLdConstant(type, val)->getInst();
+    }
+    virtual Inst* genTauLdInd(Modifier mod, Type* dstType, Type::Tag ldType, Opnd* src,
+        Opnd *tauNonNullBase, Opnd *tauAddressInRange) 
+    {
+            return irBuilder.genTauLdInd(mod, dstType, ldType, src, tauNonNullBase, tauAddressInRange)->getInst();
+    }
+    
+    virtual Inst* genLdRef(Modifier mod, Type* dstType, uint32 token, MethodDesc *enclosingMethod) {
+        return irBuilder.genLdRef(mod, dstType, token, enclosingMethod)->getInst();
+    }
+    virtual Inst* genLdFunAddrSlot(MethodDesc* methodDesc) {
+        return irBuilder.genLdFunAddrSlot(methodDesc)->getInst();
+    }
+    virtual Inst* genGetVTableAddr(ObjectType* type) {
+        return irBuilder.genGetVTable(type)->getInst();
+    }
+    // compressed references
+    virtual Inst* genCompressRef(Opnd *uncompref){
+        return irBuilder.genCompressRef(uncompref)->getInst();
+    }
+    virtual Inst* genUncompressRef(Opnd *compref){
+        return irBuilder.genUncompressRef(compref)->getInst();
+    }
+    virtual Inst *genLdFieldOffsetPlusHeapbase(FieldDesc* fd) {
+        return irBuilder.genLdFieldOffsetPlusHeapbase(fd)->getInst();
+    }
+    virtual Inst *genLdArrayBaseOffsetPlusHeapbase(Type *elemType) {
+        return irBuilder.genLdArrayBaseOffsetPlusHeapbase(elemType)->getInst();
+    }
+    virtual Inst *genLdArrayLenOffsetPlusHeapbase(Type *elemType) {
+        return irBuilder.genLdArrayLenOffsetPlusHeapbase(elemType)->getInst();
+    }
+    virtual Inst *genAddOffsetPlusHeapbase(Type *ptrType, Opnd *compRef, Opnd *offsetPlusHeapbase) {
+        return irBuilder.genAddOffsetPlusHeapbase(ptrType, compRef, offsetPlusHeapbase)->getInst();
+    }
+    virtual Inst *genTauSafe() {
+        return irBuilder.genTauSafe()->getInst();
+    }
+    virtual Inst *genTauMethodSafe() {
+        return irBuilder.genTauMethodSafe()->getInst();
+    }
+    virtual Inst *genTauUnsafe() {
+        return irBuilder.genTauUnsafe()->getInst();
+    }
+    virtual Inst* genTauStaticCast(Opnd *src, Opnd *tauCheckedCast, Type *castType) {
+        return irBuilder.genTauStaticCast(src, tauCheckedCast, castType)->getInst();
+    }
+    virtual Inst* genTauHasType(Opnd *src, Type *castType) {
+        return irBuilder.genTauHasType(src, castType)->getInst();
+    }
+    virtual Inst* genTauHasExactType(Opnd *src, Type *castType) {
+        return irBuilder.genTauHasExactType(src, castType)->getInst();
+    }
+    virtual Inst* genTauIsNonNull(Opnd *src) {
+        return irBuilder.genTauIsNonNull(src)->getInst();
+    }
+    // helper for store simplification, builds/finds simpler src, possibly
+    // modifies typetag or store modifier. 
+    virtual Opnd* simplifyStoreSrc(Opnd *src, Type::Tag &typetag, Modifier &mod, bool compressRef) {
+        return 0;
+    }
+    virtual void  foldBranch(BranchInst* br, bool isTaken) {
+        assert(0);
+    }
+    virtual void  foldSwitch(SwitchInst* sw, uint32 index) {
+        assert(0);
+    }
+    virtual void  eliminateCheck(Inst* checkInst, bool alwaysThrows) {
+        assert(0);
+    }    
+    virtual void genThrowSystemException(CompilationInterface::SystemExceptionId id) {
+        irBuilder.genThrowSystemException(id);
+    }
+private:
+    IRBuilder&  irBuilder;
+};
+    
+void IRBuilderAction::init() {
+    readFlags();
+}
+
+void IRBuilderAction::readFlags() {
+    // IRBuilder expansion flags
+    //
+    irBuilderFlags.expandMemAddrs         = getBoolArg("expandMemAddrs", true);
+    irBuilderFlags.expandElemAddrs        = getBoolArg("expandElemAddrs", true);
+    irBuilderFlags.expandCallAddrs        = getBoolArg("expandCallAddrs", false);
+    irBuilderFlags.expandVirtualCallAddrs = getBoolArg("expandVirtualCallAddrs", true);
+    irBuilderFlags.expandNullChecks       = getBoolArg("expandNullChecks", true);
+    irBuilderFlags.expandElemTypeChecks   = getBoolArg("expandElemTypeChecks", true);
+    irBuilderFlags.fullBcMap              = getBoolArg("fullBcMap", false);
+
+    //
+    // IRBuilder translation-time optimizations
+    //
+    irBuilderFlags.doCSE                  = getBoolArg("doCSE", true);
+    irBuilderFlags.doSimplify             = getBoolArg("doSimplify", true);
+
+    irBuilderFlags.suppressCheckBounds    = getBoolArg("suppressCheckBounds", false);
+
+    irBuilderFlags.insertMethodLabels     = getBoolArg("insertMethodLabels", true);
+    irBuilderFlags.compressedReferences   = getBoolArg("compressedReferences", false);
+
+    irBuilderFlags.genMinMaxAbs           = getBoolArg("genMinMaxAbs", false);
+    irBuilderFlags.genFMinMaxAbs          = getBoolArg("genFMinMaxAbs", false);
+
+    irBuilderFlags.useNewTypeSystem       = getBoolArg("useNewTypeSystem", false);
+}
+
+
+    
+
+IRBuilder::IRBuilder() :
+irManager(NULL),
+opndManager(NULL),
+typeManager(NULL),
+instFactory(NULL),
+flowGraph(NULL),
+translatorFlags(NULL),
+currentLabel(NULL),
+cseHashTable(NULL),
+simplifier(NULL),
+tauMethodSafeOpnd(NULL),
+offset(0),
+bc2HIRmapHandler(NULL),
+lostBCMapOffsetHandler(NULL)
 {
-    currentLabel = NULL;
-    irBuilderFlags.isBCMapinfoRequired = irm.getCompilationInterface().isBCMapInfoRequired();
+    
+}
+
+void IRBuilder::init(IRManager* irm, TranslatorFlags* traFlags, MemoryManager& tmpMM) {
+    IRBuilderAction* myAction = (IRBuilderAction*)getAction();
+    irBuilderFlags = myAction->getFlags(); //copy of flags
+
+    irManager=irm;
+    opndManager=&irm->getOpndManager();
+    typeManager = &irm->getTypeManager();
+    instFactory = &irm->getInstFactory();
+    flowGraph = &irm->getFlowGraph();
+    translatorFlags = traFlags;
+    MemoryManager& mm = irm->getMemoryManager();
+    cseHashTable = new (tmpMM) CSEHashTable(mm);
+    
+    simplifier  = new (mm) IRBuilderSimplifier(*this);
+    
+    CompilationInterface* ci = getCompilationContext()->getVMCompilationInterface();
+    irBuilderFlags.insertWriteBarriers    = ci->insertWriteBarriers();
+    irBuilderFlags.isBCMapinfoRequired = ci->isBCMapInfoRequired();
+    irBuilderFlags.compressedReferences   = irBuilderFlags.compressedReferences || ci->areReferencesCompressed();
 
     if (irBuilderFlags.isBCMapinfoRequired) {
-        MethodDesc* meth = irm.getCompilationInterface().getMethodToCompile();
-        bc2HIRmapHandler = new(irm.getMemoryManager()) VectorHandler(bcOffset2HIRHandlerName, meth);
-//#ifdef _DEBUG
-//        lostBCMapOffsetHandler = new(tempMemoryManager) MapHandler(lostBCOffsetHandlerName, meth);
-//#endif
+        MethodDesc* meth = irm->getCompilationInterface().getMethodToCompile();
+        bc2HIRmapHandler = new(irm->getMemoryManager()) VectorHandler(bcOffset2HIRHandlerName, meth);
     }
 }
 
+
 void IRBuilder::invalid() {
-    Log::cat_opt()->error << " !!!! ---- IRBuilder::invalid ---- !!!! " << ::std::endl;
+    Log::out() << " !!!! ---- IRBuilder::invalid ---- !!!! " << ::std::endl;
     assert(0);
 }
 
@@ -73,13 +321,17 @@ Inst* IRBuilder::appendInst(Inst* inst) {
     if (irBuilderFlags.isBCMapinfoRequired) {
         //POINTER_SIZE_INT instAddr = (POINTER_SIZE_INT) inst;
         uint64 instID = inst->getId();
-        bc2HIRmapHandler->setVectorEntry(instID, offset);
+        if (irBuilderFlags.fullBcMap) {
+            bc2HIRmapHandler->setVectorEntry(instID, offset);
+        } else if (inst->asMethodCallInst()) {
+            bc2HIRmapHandler->setVectorEntry(instID, offset);
+        }
 //#ifdef _DEBUG
 //        lostBCMapOffsetHandler->setMapEntry((uint64) offset, 0x01);
 //#endif
     }
-    inst->insertBefore(currentLabel);
-    if(Log::cat_opt()->isDebugEnabled()) {
+    currentLabel->getNode()->appendInst(inst);
+    if(Log::isEnabled()) {
         inst->print(Log::out());
         Log::out() << ::std::endl;
         Log::out().flush();
@@ -88,13 +340,13 @@ Inst* IRBuilder::appendInst(Inst* inst) {
 }
 
 void IRBuilder::killCSE() {
-    cseHashTable.kill();
+    cseHashTable->kill();
 }
 
 void IRBuilder::genLabel(LabelInst* labelInst) {
-    cseHashTable.kill();
+    cseHashTable->kill();
     currentLabel = labelInst;
-    if(Log::cat_opt()->isDebugEnabled()) {
+    if(Log::isEnabled()) {
         currentLabel->print(Log::out());
         Log::out() << ::std::endl;
         Log::out().flush();
@@ -103,7 +355,7 @@ void IRBuilder::genLabel(LabelInst* labelInst) {
 
 void IRBuilder::genFallThroughLabel(LabelInst* labelInst) {
     currentLabel = labelInst;
-    if(Log::cat_opt()->isDebugEnabled()) {
+    if(Log::isEnabled()) {
         currentLabel->print(Log::out());
         Log::out() << ::std::endl;
         Log::out().flush();
@@ -111,22 +363,21 @@ void IRBuilder::genFallThroughLabel(LabelInst* labelInst) {
 }
 
 LabelInst* IRBuilder::createLabel() {
-    currentLabel = (LabelInst*)instFactory.makeLabel();
+    currentLabel = (LabelInst*)instFactory->makeLabel();
     return currentLabel;
 }
 
 void IRBuilder::createLabels(uint32 numLabels, LabelInst** labels) {
     for (uint32 i=0; i<numLabels; i++) {
-        labels[i] = (LabelInst*)instFactory.makeLabel();
+        labels[i] = (LabelInst*)instFactory->makeLabel();
     }
 }
 
 LabelInst* IRBuilder::genMethodEntryLabel(MethodDesc* methodDesc) {
-    LabelInst* labelInst =
-        instFactory.makeMethodEntryLabel(methodDesc);
+    LabelInst* labelInst = instFactory->makeMethodEntryLabel(methodDesc);
     currentLabel = labelInst;
 
-    if(Log::cat_opt()->isDebugEnabled()) {
+    if(Log::isEnabled()) {
         currentLabel->print(Log::out());
         Log::out() << ::std::endl;
         Log::out().flush();
@@ -137,20 +388,20 @@ LabelInst* IRBuilder::genMethodEntryLabel(MethodDesc* methodDesc) {
 void IRBuilder::genMethodEntryMarker(MethodDesc* methodDesc) {
     if (! irBuilderFlags.insertMethodLabels)
         return;
-    appendInst(instFactory.makeMethodMarker(MethodMarkerInst::Entry, methodDesc));
+    appendInst(instFactory->makeMethodMarker(MethodMarkerInst::Entry, methodDesc));
 }
 
-void IRBuilder::genMethodEndMarker(MethodDesc* methodDesc, Opnd *obj) {
+void IRBuilder::genMethodEndMarker(MethodDesc* methodDesc, Opnd *obj, Opnd *retOpnd) {
     if (! irBuilderFlags.insertMethodLabels)
         return;
     assert(obj && !obj->isNull());
-    appendInst(instFactory.makeMethodMarker(MethodMarkerInst::Exit, methodDesc, obj));
+    appendInst(instFactory->makeMethodMarker(MethodMarkerInst::Exit, methodDesc, obj, retOpnd));
 }
 
-void IRBuilder::genMethodEndMarker(MethodDesc* methodDesc) {
+void IRBuilder::genMethodEndMarker(MethodDesc* methodDesc, Opnd *retOpnd) {
     if (! irBuilderFlags.insertMethodLabels)
         return;
-    appendInst(instFactory.makeMethodMarker(MethodMarkerInst::Exit, methodDesc));
+    appendInst(instFactory->makeMethodMarker(MethodMarkerInst::Exit, methodDesc, retOpnd));
 }
 
 // compute instructions
@@ -164,11 +415,11 @@ IRBuilder::genAdd(Type* dstType, Modifier mod, Opnd* src1, Opnd* src2) {
     if (dst) return dst;
 
     if (irBuilderFlags.doSimplify) {
-        dst = simplifier.simplifyAdd(dstType, mod, src1, src2);
+        dst = simplifier->simplifyAdd(dstType, mod, src1, src2);
     }
     if (!dst) {
         dst = createOpnd(dstType);
-        Inst *newi = instFactory.makeAdd(mod, dst, src1, src2);
+        Inst *newi = instFactory->makeAdd(mod, dst, src1, src2);
         appendInst(newi);
     }
     insertHash(hashcode, src1, src2, dst->getInst());
@@ -185,11 +436,11 @@ IRBuilder::genMul(Type* dstType, Modifier mod, Opnd* src1, Opnd* src2) {
     if (dst) return dst;
 
     if (irBuilderFlags.doSimplify) {
-        dst = simplifier.simplifyMul(dstType, mod, src1, src2);
+        dst = simplifier->simplifyMul(dstType, mod, src1, src2);
     }
     if (!dst) {
         dst = createOpnd(dstType);
-        appendInst(instFactory.makeMul(mod, dst, src1, src2));
+        appendInst(instFactory->makeMul(mod, dst, src1, src2));
     }
     insertHash(hashcode, src1, src2, dst->getInst());
     return dst;
@@ -205,11 +456,11 @@ IRBuilder::genSub(Type* dstType, Modifier mod, Opnd* src1, Opnd* src2) {
     if (dst) return dst;
 
     if (irBuilderFlags.doSimplify) {
-        dst = simplifier.simplifySub(dstType, mod, src1, src2);
+        dst = simplifier->simplifySub(dstType, mod, src1, src2);
     }
     if (!dst) {
         dst = createOpnd(dstType);
-        appendInst(instFactory.makeSub(mod, dst, src1, src2));
+        appendInst(instFactory->makeSub(mod, dst, src1, src2));
     }
     insertHash(hashcode, src1, src2, dst->getInst());
     return dst;
@@ -230,11 +481,11 @@ IRBuilder::genDiv(Type* dstType, Modifier mod, Opnd* src1, Opnd* src2) {
     if (dst) return dst;
 
     if (irBuilderFlags.doSimplify) {
-        dst = simplifier.simplifyTauDiv(dstType, mod, src1, src2, tauDivOk);
+        dst = simplifier->simplifyTauDiv(dstType, mod, src1, src2, tauDivOk);
     }
     if (!dst) {
         dst = createOpnd(dstType);
-        appendInst(instFactory.makeTauDiv(mod, dst, src1, src2, tauDivOk));
+        appendInst(instFactory->makeTauDiv(mod, dst, src1, src2, tauDivOk));
     }
     insertHash(hashcode, src1, src2, dst->getInst()); // tauDivOk is not needed in hash
     return dst;
@@ -265,11 +516,11 @@ IRBuilder::genCliDiv(Type* dstType, Modifier mod, Opnd* src1, Opnd* src2) {
         tauDivOk = genTauSafe(); // safe by construction
     }
     if (irBuilderFlags.doSimplify) {
-        dst = simplifier.simplifyTauDiv(dstType, mod, src1, src2, tauDivOk);
+        dst = simplifier->simplifyTauDiv(dstType, mod, src1, src2, tauDivOk);
     }
     if (!dst) {
         dst = createOpnd(dstType);
-        appendInst(instFactory.makeTauDiv(mod, dst, src1, src2, tauDivOk));
+        appendInst(instFactory->makeTauDiv(mod, dst, src1, src2, tauDivOk));
     }
     insertHash(hashcode, src1, src2, dst->getInst()); // tauDivOk is not needed in hash
     return dst;
@@ -293,11 +544,11 @@ IRBuilder::genRem(Type* dstType, Modifier mod, Opnd* src1, Opnd* src2) {
         tauDivOk = genTauSafe(); // safe by construction
 
     if (irBuilderFlags.doSimplify) {
-        dst = simplifier.simplifyTauRem(dstType, mod, src1, src2, tauDivOk);
+        dst = simplifier->simplifyTauRem(dstType, mod, src1, src2, tauDivOk);
     }
     if (!dst) {
         dst = createOpnd(dstType);
-        appendInst(instFactory.makeTauRem(mod, dst, src1, src2, tauDivOk));
+        appendInst(instFactory->makeTauRem(mod, dst, src1, src2, tauDivOk));
     }
     insertHash(hashcode, src1, src2, dst->getInst()); // tauDivOk is not needed in hash
     return dst;
@@ -329,12 +580,12 @@ IRBuilder::genCliRem(Type* dstType, Modifier mod, Opnd* src1, Opnd* src2) {
         tauDivOk = genTauSafe(); // safe by construction
 
     if (irBuilderFlags.doSimplify) {
-        dst = simplifier.simplifyTauRem(dstType, mod, src1, src2, tauDivOk);
+        dst = simplifier->simplifyTauRem(dstType, mod, src1, src2, tauDivOk);
     }
 
     if (!dst) {
         dst = createOpnd(dstType);
-        appendInst(instFactory.makeTauRem(mod, dst, src1, src2, tauDivOk));
+        appendInst(instFactory->makeTauRem(mod, dst, src1, src2, tauDivOk));
     }
     insertHash(hashcode, src1, src2, dst->getInst()); // tauDivOk is not needed in hash
     return dst;
@@ -349,11 +600,11 @@ IRBuilder::genNeg(Type* dstType, Opnd* src) {
     if (dst) return dst;
 
     if (irBuilderFlags.doSimplify) {
-        dst = simplifier.simplifyNeg(dstType, src);
+        dst = simplifier->simplifyNeg(dstType, src);
     }
     if (!dst) {
         dst = createOpnd(dstType);
-        appendInst(instFactory.makeNeg(dst, src));
+        appendInst(instFactory->makeNeg(dst, src));
     }
     insertHash(Op_Neg, src, dst->getInst());
     return dst;
@@ -369,11 +620,11 @@ IRBuilder::genMulHi(Type* dstType, Modifier mod, Opnd* src1, Opnd* src2) {
     if (dst) return dst;
 
     if (irBuilderFlags.doSimplify) {
-        dst = simplifier.simplifyMulHi(dstType, mod, src1, src2);
+        dst = simplifier->simplifyMulHi(dstType, mod, src1, src2);
     }
     if (!dst) {
         dst = createOpnd(dstType);
-        appendInst(instFactory.makeMulHi(mod, dst, src1, src2));
+        appendInst(instFactory->makeMulHi(mod, dst, src1, src2));
     }
     insertHash(hashcode, src1, src2, dst->getInst());
     return dst;
@@ -393,18 +644,18 @@ IRBuilder::genMin(Type* dstType, Opnd* src1, Opnd* src2) {
         if (dst) return dst;
         
         if (irBuilderFlags.doSimplify) {
-            dst = simplifier.simplifyMin(dstType, src1, src2);
+            dst = simplifier->simplifyMin(dstType, src1, src2);
         }
         if (!dst) {
             dst = createOpnd(dstType);
-            appendInst(instFactory.makeMin(dst, src1, src2));
+            appendInst(instFactory->makeMin(dst, src1, src2));
         }
         insertHash(hashcode, src1, src2, dst->getInst());
         return dst;
     } else {
         // hand-build it
 
-        Type* cmpDstType = typeManager.getInt32Type();
+        Type* cmpDstType = typeManager->getInt32Type();
         Type::Tag typeTag = dstType->tag;
         switch (typeTag) {
         case Type::Int32:
@@ -476,17 +727,17 @@ IRBuilder::genMax(Type* dstType, Opnd* src1, Opnd* src2) {
         if (dst) return dst;
         
         if (irBuilderFlags.doSimplify) {
-            dst = simplifier.simplifyMax(dstType, src1, src2);
+            dst = simplifier->simplifyMax(dstType, src1, src2);
         }
         if (!dst) {
             dst = createOpnd(dstType);
-            appendInst(instFactory.makeMax(dst, src1, src2));
+            appendInst(instFactory->makeMax(dst, src1, src2));
         }
         insertHash(hashcode, src1, src2, dst->getInst());
         return dst;
     } else {
         Type::Tag typeTag = dstType->tag;
-        Type* cmpDstType = typeManager.getInt32Type();
+        Type* cmpDstType = typeManager->getInt32Type();
         switch (typeTag) {
         case Type::Int32:
         case Type::Int64:
@@ -548,11 +799,11 @@ IRBuilder::genAbs(Type* dstType, Opnd* src1) {
         if (dst) return dst;
         
         if (irBuilderFlags.doSimplify) {
-            dst = simplifier.simplifyAbs(dstType, src1);
+            dst = simplifier->simplifyAbs(dstType, src1);
         }
         if (!dst) {
             dst = createOpnd(dstType);
-            appendInst(instFactory.makeAbs(dst, src1));
+            appendInst(instFactory->makeAbs(dst, src1));
         }
         insertHash(hashcode, src1, dst->getInst());
         return dst;
@@ -560,7 +811,7 @@ IRBuilder::genAbs(Type* dstType, Opnd* src1) {
         // hand-build it
 
         Type::Tag typeTag = src1->getType()->tag;
-        Type* cmpDstType = typeManager.getInt32Type();
+        Type* cmpDstType = typeManager->getInt32Type();
         switch (typeTag) {
         case Type::Int32:
         case Type::Int64:
@@ -607,11 +858,11 @@ IRBuilder::genAnd(Type* dstType, Opnd* src1, Opnd* src2) {
     if (dst) return dst;
 
     if (irBuilderFlags.doSimplify) {
-        dst = simplifier.simplifyAnd(dstType, src1, src2);
+        dst = simplifier->simplifyAnd(dstType, src1, src2);
     }
     if (!dst) {
         dst = createOpnd(dstType);
-        appendInst(instFactory.makeAnd(dst, src1, src2));
+        appendInst(instFactory->makeAnd(dst, src1, src2));
     }
     insertHash(Op_And, src1, src2, dst->getInst());
     return dst;
@@ -624,11 +875,11 @@ IRBuilder::genOr(Type* dstType, Opnd* src1, Opnd* src2) {
     if (dst) return dst;
 
     if (irBuilderFlags.doSimplify) {
-        dst = simplifier.simplifyOr(dstType, src1, src2);
+        dst = simplifier->simplifyOr(dstType, src1, src2);
     }
     if (!dst) {
         dst = createOpnd(dstType);
-        appendInst(instFactory.makeOr(dst, src1, src2));
+        appendInst(instFactory->makeOr(dst, src1, src2));
     }
     insertHash(Op_Or, src1, src2, dst->getInst());
     return dst;
@@ -641,11 +892,11 @@ IRBuilder::genXor(Type* dstType, Opnd* src1, Opnd* src2) {
     if (dst) return dst;
 
     if (irBuilderFlags.doSimplify) {
-        dst = simplifier.simplifyXor(dstType, src1, src2);
+        dst = simplifier->simplifyXor(dstType, src1, src2);
     }
     if (!dst) {
         dst = createOpnd(dstType);
-        appendInst(instFactory.makeXor(dst, src1, src2));
+        appendInst(instFactory->makeXor(dst, src1, src2));
     }
     insertHash(Op_Xor, src1, src2, dst->getInst());
     return dst;
@@ -657,11 +908,11 @@ IRBuilder::genNot(Type* dstType, Opnd* src) {
     if (dst) return dst;
 
     if (irBuilderFlags.doSimplify) {
-        dst = simplifier.simplifyNot(dstType, src);
+        dst = simplifier->simplifyNot(dstType, src);
     }
     if (!dst) {
         dst = createOpnd(dstType);
-        appendInst(instFactory.makeNot(dst, src));
+        appendInst(instFactory->makeNot(dst, src));
     }
     insertHash(Op_Not, src, dst->getInst());
     return dst;
@@ -677,11 +928,11 @@ IRBuilder::genSelect(Type* dstType, Opnd* src1, Opnd* src2, Opnd* src3) {
     if (dst) return dst;
 
     if (irBuilderFlags.doSimplify) {
-        dst = simplifier.simplifySelect(dstType, src1, src2, src3);
+        dst = simplifier->simplifySelect(dstType, src1, src2, src3);
     }
     if (!dst) {
         dst = createOpnd(dstType);
-        appendInst(instFactory.makeSelect(dst, src1, src2, src3));
+        appendInst(instFactory->makeSelect(dst, src1, src2, src3));
     }
     insertHash(Op_Select, src1, src2, src3, dst->getInst());
     return dst;
@@ -700,11 +951,11 @@ IRBuilder::genConv(Type* dstType,
     if (dst) return dst;
 
     if (irBuilderFlags.doSimplify) {
-        dst = simplifier.simplifyConv(dstType, toType, ovfMod, src);
+        dst = simplifier->simplifyConv(dstType, toType, ovfMod, src);
     }
     if (!dst) {
         dst = createOpnd(dstType);
-        appendInst(instFactory.makeConv(ovfMod, toType, dst, src));
+        appendInst(instFactory->makeConv(ovfMod, toType, dst, src));
     }
     insertHash(hashcode, src->getId(), dst->getInst());
     return dst;
@@ -723,11 +974,11 @@ IRBuilder::genShladd(Type* dstType,
     if (dst) return dst;
 
     if (irBuilderFlags.doSimplify) {
-        dst = simplifier.simplifyShladd(dstType, value, shiftAmount, addTo);
+        dst = simplifier->simplifyShladd(dstType, value, shiftAmount, addTo);
     }
     if (!dst) {
         dst = createOpnd(dstType);
-        appendInst(instFactory.makeShladd(dst, value, shiftAmount, addTo));
+        appendInst(instFactory->makeShladd(dst, value, shiftAmount, addTo));
     }
     insertHash(Op_Shladd, value, shiftAmount, addTo, dst->getInst());
     return dst;
@@ -747,11 +998,11 @@ IRBuilder::genShl(Type* dstType,
     if (dst) return dst;
 
     if (irBuilderFlags.doSimplify) {
-        dst = simplifier.simplifyShl(dstType, mod, value, shiftAmount);
+        dst = simplifier->simplifyShl(dstType, mod, value, shiftAmount);
     }
     if (!dst) {
         dst = createOpnd(dstType);
-        appendInst(instFactory.makeShl(mod, dst, value, shiftAmount));
+        appendInst(instFactory->makeShl(mod, dst, value, shiftAmount));
     }
     insertHash(hashcode, value, shiftAmount, dst->getInst());
     return dst;
@@ -771,11 +1022,11 @@ IRBuilder::genShr(Type* dstType,
     if (dst) return dst;
 
     if (irBuilderFlags.doSimplify) {
-        dst = simplifier.simplifyShr(dstType, mods, value, shiftAmount);
+        dst = simplifier->simplifyShr(dstType, mods, value, shiftAmount);
     }
     if (!dst) {
         dst = createOpnd(dstType);
-        appendInst(instFactory.makeShr(mods, dst, value, shiftAmount));
+        appendInst(instFactory->makeShr(mods, dst, value, shiftAmount));
     }
     insertHash(hashcode, value, shiftAmount, dst->getInst());
     return dst;
@@ -797,12 +1048,12 @@ IRBuilder::genPredCmp(Type* dstType,
     if (dst) return dst;
     
     if (irBuilderFlags.doSimplify) {
-        dst = simplifier.simplifyPredCmp(dstType, instType, mod, src1, src2);
+        dst = simplifier->simplifyPredCmp(dstType, instType, mod, src1, src2);
     }
     if (!dst) {
         // result of comparison is always a 32-bit int
         dst = createOpnd(dstType);
-        Inst *i = instFactory.makePredCmp(mod, instType, dst, src1, src2);
+        Inst *i = instFactory->makePredCmp(mod, instType, dst, src1, src2);
         appendInst(i);
     }
     insertHash(hashcode, src1, src2, dst->getInst());
@@ -825,12 +1076,12 @@ IRBuilder::genCmp(Type* dstType,
     if (dst) return dst;
 
     if (irBuilderFlags.doSimplify) {
-        dst = simplifier.simplifyCmp(dstType, instType, mod, src1, src2);
+        dst = simplifier->simplifyCmp(dstType, instType, mod, src1, src2);
     }
     if (!dst) {
         // result of comparison is always a 32-bit int
         dst = createOpnd(dstType);
-        Inst *i = instFactory.makeCmp(mod, instType, dst, src1, src2);
+        Inst *i = instFactory->makeCmp(mod, instType, dst, src1, src2);
         appendInst(i);
     }
     insertHash(hashcode, src1, src2, dst->getInst());
@@ -857,13 +1108,13 @@ IRBuilder::genCmp3(Type* dstType,
     if (dst) return dst;
 
     if (irBuilderFlags.doSimplify) {
-        dst = simplifier.simplifyCmp3(dstType, instType, mod, 
+        dst = simplifier->simplifyCmp3(dstType, instType, mod, 
                                       src1, src2);
     }
     if (!dst) {
         // result of comparison is always a 32-bit int
         dst = createOpnd(dstType);
-        Inst* i = instFactory.makeCmp3(mod, instType, dst, src1, src2);
+        Inst* i = instFactory->makeCmp3(mod, instType, dst, src1, src2);
         appendInst(i);
     }
     insertHash(hashcode, src1, src2, dst->getInst());
@@ -883,12 +1134,12 @@ IRBuilder::genBranch(Type::Tag instType,
         // bad modifier
         invalid();
     if (irBuilderFlags.doSimplify) {
-        if (simplifier.simplifyBranch(instType, mod, label, src1, src2)) {
+        if (simplifier->simplifyBranch(instType, mod, label, src1, src2)) {
             // simplified branch was emitted;
             return;
         }
     }
-    appendInst(instFactory.makeBranch(mod, instType, src1, src2, label));
+    appendInst(instFactory->makeBranch(mod, instType, src1, src2, label));
 }
 
 void
@@ -901,12 +1152,12 @@ IRBuilder::genBranch(Type::Tag instType,
         // bad modifier
         invalid();
     if (irBuilderFlags.doSimplify) {
-        if (simplifier.simplifyBranch(instType, mod, label, src)) {
+        if (simplifier->simplifyBranch(instType, mod, label, src)) {
             // simplified branch was emitted;
             return;
         }
     }
-    appendInst(instFactory.makeBranch(mod, instType, src, label));
+    appendInst(instFactory->makeBranch(mod, instType, src, label));
 }
 
 void
@@ -914,23 +1165,23 @@ IRBuilder::genPredBranch(LabelInst* label,
                          Opnd* src) {
     src = propagateCopy(src);
     if (irBuilderFlags.doSimplify) {
-        if (simplifier.simplifyPredBranch(label, src)) {
+        if (simplifier->simplifyPredBranch(label, src)) {
             // simplified branch was emitted;
             return;
         }
     }
-    appendInst(instFactory.makePredBranch(src, label));
+    appendInst(instFactory->makePredBranch(src, label));
 }
 
 
 void
 IRBuilder::genJump(LabelInst* label) {
-    appendInst(instFactory.makeJump(label));
+    appendInst(instFactory->makeJump(label));
 }
 
 void
 IRBuilder::genJSR(LabelInst* label) {
-    appendInst(instFactory.makeJSR(label));
+    appendInst(instFactory->makeJSR(label));
 }
 
 void
@@ -939,63 +1190,63 @@ IRBuilder::genSwitch(uint32 nLabels,
                      LabelInst* defaultLabel,
                      Opnd* src) {
     src = propagateCopy(src);
-    appendInst(instFactory.makeSwitch(src, nLabels, labelInsts, defaultLabel));
+    appendInst(instFactory->makeSwitch(src, nLabels, labelInsts, defaultLabel));
 }
 
 void
 IRBuilder::genThrow(ThrowModifier mod, Opnd* exceptionObj) {
     exceptionObj = propagateCopy(exceptionObj);
-    appendInst(instFactory.makeThrow(mod, exceptionObj));
+    appendInst(instFactory->makeThrow(mod, exceptionObj));
 }
 
 void
 IRBuilder::genThrowSystemException(CompilationInterface::SystemExceptionId id) {
-    appendInst(instFactory.makeThrowSystemException(id));
+    appendInst(instFactory->makeThrowSystemException(id));
 }
 
 void
 IRBuilder::genThrowLinkingException(Class_Handle encClass, uint32 CPIndex, uint32 operation) {
-    appendInst(instFactory.makeThrowLinkingException(encClass, CPIndex, operation));
+    appendInst(instFactory->makeThrowLinkingException(encClass, CPIndex, operation));
 }
 
 Opnd*
 IRBuilder::genCatch(Type* exceptionType) {
     Opnd* dst = createOpnd(exceptionType);
-    appendInst(instFactory.makeCatch(dst));
+    appendInst(instFactory->makeCatch(dst));
     return dst;
 }
 
 Opnd*
 IRBuilder::genSaveRet() {
-    Opnd *dst = createOpnd(typeManager.getIntPtrType());
-    appendInst(instFactory.makeSaveRet(dst));
+    Opnd *dst = createOpnd(typeManager->getIntPtrType());
+    appendInst(instFactory->makeSaveRet(dst));
     return dst;
 }
 
 void
 IRBuilder::genEndFinally() {
-    appendInst(instFactory.makeEndFinally());
+    appendInst(instFactory->makeEndFinally());
 }
 
 void
 IRBuilder::genEndFilter() {
-    appendInst(instFactory.makeEndFilter());
+    appendInst(instFactory->makeEndFilter());
 }
 
 void
 IRBuilder::genEndCatch() {
-    appendInst(instFactory.makeEndCatch());
+    appendInst(instFactory->makeEndCatch());
 }
 
 void
 IRBuilder::genLeave(LabelInst* label) {
-    appendInst(instFactory.makeLeave(label));
+    appendInst(instFactory->makeLeave(label));
 }
 
 Opnd*
 IRBuilder::genPrefetch(Opnd *base, Opnd *offset, Opnd *hints) {
-    Opnd *dst = createOpnd(typeManager.getVoidType());
-    appendInst(instFactory.makePrefetch(propagateCopy(base), propagateCopy(offset),
+    Opnd *dst = createOpnd(typeManager->getVoidType());
+    appendInst(instFactory->makePrefetch(propagateCopy(base), propagateCopy(offset),
                                         propagateCopy(hints)));
     return dst;
 }
@@ -1008,7 +1259,7 @@ IRBuilder::genDirectCall(MethodDesc* methodDesc,
                          Opnd* tauTypesChecked,
                          uint32 numArgs,
                          Opnd* args[],
-                      	 InlineInfoBuilder* inlineInfoBuilder)      // NULL if this call is not inlined
+                         InlineInfoBuilder* inlineInfoBuilder)      // NULL if this call is not inlined
 {
     if (!tauNullCheckedFirstArg)
         tauNullCheckedFirstArg = genTauUnsafe();
@@ -1029,7 +1280,7 @@ IRBuilder::genDirectCall(MethodDesc* methodDesc,
         args[i] = propagateCopy(args[i]);
     }
     Opnd* dst = createOpnd(returnType);
-    appendInstUpdateInlineInfo(instFactory.makeDirectCall(dst,
+    appendInstUpdateInlineInfo(instFactory->makeDirectCall(dst,
                                           tauNullCheckedFirstArg, tauTypesChecked,
                                           numArgs, args,
                                           methodDesc),
@@ -1048,7 +1299,7 @@ IRBuilder::genTauVirtualCall(MethodDesc* methodDesc,
                              Opnd* tauTypesChecked,
                              uint32 numArgs,
                              Opnd* args[],
-                      		 InlineInfoBuilder* inlineInfoBuilder)      // NULL if this call is not inlined
+                             InlineInfoBuilder* inlineInfoBuilder)      // NULL if this call is not inlined
 {
     if(!methodDesc->isVirtual())
         // Must de-virtualize - no vtable
@@ -1075,13 +1326,13 @@ IRBuilder::genTauVirtualCall(MethodDesc* methodDesc,
         tauTypesChecked = propagateCopy(tauTypesChecked);
     }
     if (irBuilderFlags.doSimplify) {
-        Opnd *dst = simplifier.simplifyTauVirtualCall(methodDesc,
-                                                      returnType,
-                                                      tauNullCheckedFirstArg,
-                                                      tauTypesChecked,
-                                                      numArgs,
-                                                      args,
-                                                      inlineInfoBuilder);
+        Opnd *dst = simplifier->simplifyTauVirtualCall(methodDesc,
+                                                            returnType,
+                                                            tauNullCheckedFirstArg,
+                                                            tauTypesChecked,
+                                                            numArgs,
+                                                            args,
+                                                            inlineInfoBuilder);
         if (dst) return dst;
     }
     
@@ -1096,7 +1347,7 @@ IRBuilder::genTauVirtualCall(MethodDesc* methodDesc,
                                      inlineInfoBuilder);
     }
     Opnd *dst = createOpnd(returnType);
-    appendInstUpdateInlineInfo(instFactory.makeTauVirtualCall(dst, 
+    appendInstUpdateInlineInfo(instFactory->makeTauVirtualCall(dst, 
                                               tauNullCheckedFirstArg,
                                               tauTypesChecked,
                                               numArgs, args, 
@@ -1128,7 +1379,7 @@ IRBuilder::genIntrinsicCall(IntrinsicCallId intrinsicId,
         tauTypesChecked = propagateCopy(tauTypesChecked);
     }
 
-    appendInst(instFactory.makeIntrinsicCall(dst, intrinsicId, 
+    appendInst(instFactory->makeIntrinsicCall(dst, intrinsicId, 
                                              tauNullCheckedRefArgs,
                                              tauTypesChecked,
                                              numArgs, args));
@@ -1144,7 +1395,7 @@ IRBuilder::genJitHelperCall(JitHelperCallId helperId,
         args[i] = propagateCopy(args[i]);
     }
     Opnd * dst = createOpnd(returnType);
-    appendInst(instFactory.makeJitHelperCall(dst, helperId, numArgs, args));
+    appendInst(instFactory->makeJitHelperCall(dst, helperId, numArgs, args));
     return dst;
 }
 
@@ -1157,7 +1408,7 @@ IRBuilder::genVMHelperCall(VMHelperCallId helperId,
         args[i] = propagateCopy(args[i]);
     }
     Opnd * dst = createOpnd(returnType);
-    appendInst(instFactory.makeVMHelperCall(dst, helperId, numArgs, args));
+    appendInst(instFactory->makeVMHelperCall(dst, helperId, numArgs, args));
     return dst;
 }
 
@@ -1170,8 +1421,8 @@ IRBuilder::genTauTypeCompare(Opnd *arg0, MethodDesc *methodDesc, LabelInst *targ
     // Note that we use the methodDesc's type to obtain the vtable which contains the pointer
     // to the method.  This may be an interface vtable.  genLdVTable figures out which.
     Opnd* vtableThis = genLdVTable(arg0, type);
-    Opnd* vtableClass = createOpnd(typeManager.getVTablePtrType(type));
-    appendInst(instFactory.makeGetVTableAddr(vtableClass, (ObjectType*)type));
+    Opnd* vtableClass = createOpnd(typeManager->getVTablePtrType(type));
+    appendInst(instFactory->makeGetVTableAddr(vtableClass, (ObjectType*)type));
 
     genBranch(Type::VTablePtr, Cmp_EQ, target, vtableThis, vtableClass);
 }
@@ -1195,11 +1446,11 @@ IRBuilder::genIndirectCall(Type* returnType,
     else 
         tauNullCheckedFirstArg = propagateCopy(tauNullCheckedFirstArg);
     if (!tauTypesChecked)
-		tauTypesChecked = genTauUnsafe(); 
+        tauTypesChecked = genTauUnsafe(); 
     else
         tauTypesChecked = propagateCopy(tauTypesChecked);
 
-    appendInstUpdateInlineInfo(instFactory.makeIndirectCall(dst, funAddr, 
+    appendInstUpdateInlineInfo(instFactory->makeIndirectCall(dst, funAddr, 
                                             tauNullCheckedFirstArg, tauTypesChecked,
                                             numArgs, 
                                             args),
@@ -1231,7 +1482,7 @@ IRBuilder::genIndirectMemoryCall(Type* returnType,
         tauTypesChecked = propagateCopy(tauTypesChecked);
 
     Opnd* dst = createOpnd(returnType);
-    appendInstUpdateInlineInfo(instFactory.makeIndirectMemoryCall(dst, funAddr, 
+    appendInstUpdateInlineInfo(instFactory->makeIndirectMemoryCall(dst, funAddr, 
                                                   tauNullCheckedFirstArg, 
                                                   tauTypesChecked,
                                                   numArgs, 
@@ -1244,22 +1495,22 @@ IRBuilder::genIndirectMemoryCall(Type* returnType,
 void
 IRBuilder::genReturn(Opnd* src, Type* retType) {
     src = propagateCopy(src);
-    if(Log::cat_opt()->isDebugEnabled()) {
+    if(Log::isEnabled()) {
         if (retType != src->getType()) {
             UNIMPLEMENTED("ret type check");
         }
     }
-    appendInst(instFactory.makeReturn(src));
+    appendInst(instFactory->makeReturn(src));
 }
 
 void
 IRBuilder::genReturn() {
-    appendInst(instFactory.makeReturn());
+    appendInst(instFactory->makeReturn());
 }
 
 void
 IRBuilder::genRet(Opnd* src) {
-    appendInst(instFactory.makeRet(src));
+    appendInst(instFactory->makeRet(src));
 }
 
 // Move instruction
@@ -1267,7 +1518,7 @@ Opnd*
 IRBuilder::genCopy(Opnd* src) {
     src = propagateCopy(src);
     Opnd* dst = createOpnd(src->getType());
-    appendInst(instFactory.makeCopy(dst, src));
+    appendInst(instFactory->makeCopy(dst, src));
     return dst;
 }
 
@@ -1282,8 +1533,8 @@ IRBuilder::genArgCoercion(Type* argType, Opnd* actualArg) {
 // actual parameter and variable definitions
 Opnd*
 IRBuilder::genArgDef(Modifier mod, Type* type) {
-    Opnd* dst = opndManager.createArgOpnd(type);
-    appendInst(instFactory.makeDefArg(mod, dst));
+    Opnd* dst = opndManager->createArgOpnd(type);
+    appendInst(instFactory->makeDefArg(mod, dst));
     DefArgModifier defMod = mod.getDefArgModifier();
     switch (defMod) {
     case NonNullThisArg:
@@ -1307,7 +1558,7 @@ IRBuilder::genArgDef(Modifier mod, Type* type) {
 
 VarOpnd*
 IRBuilder::genVarDef(Type* type, bool isPinned) {
-    return opndManager.createVarOpnd(type, isPinned);
+    return opndManager->createVarOpnd(type, isPinned);
 }
 
 // Phi-node instruction
@@ -1317,7 +1568,7 @@ IRBuilder::genPhi(uint32 numArgs, Opnd* args[]) {
         args[i] = propagateCopy(args[i]);
     }
     Opnd* dst = createOpnd(args[0]->getType());
-    appendInst(instFactory.makePhi(dst, numArgs, args));
+    appendInst(instFactory->makePhi(dst, numArgs, args));
     return dst;
 }
 
@@ -1327,7 +1578,7 @@ IRBuilder::genTauPi(Opnd *src, Opnd *tau, PiCondition *cond) {
     src = propagateCopy(src);
     tau = propagateCopy(tau);
     PiOpnd* dst = createPiOpnd(src);
-    appendInst(instFactory.makeTauPi(dst, src, tau, cond));
+    appendInst(instFactory->makeTauPi(dst, src, tau, cond));
     return dst;
 }
 
@@ -1338,8 +1589,8 @@ IRBuilder::genLdConstant(int32 val) {
     uint32 hashcode = operation.encodeForHashing();
     Opnd* dst = lookupHash(hashcode, (uint32) val);
     if (dst) return dst;
-    dst = createOpnd(typeManager.getInt32Type());
-    appendInst(instFactory.makeLdConst(dst, val));
+    dst = createOpnd(typeManager->getInt32Type());
+    appendInst(instFactory->makeLdConst(dst, val));
     insertHash(hashcode, (uint32) val, dst->getInst());
     return dst;
 }
@@ -1349,8 +1600,8 @@ IRBuilder::genLdConstant(int64 val) {
     uint32 hashcode = operation.encodeForHashing();
     Opnd* dst = lookupHash(hashcode, (uint32) (val >> 32), (uint32) (val & 0xffffffff));
     if (dst) return dst;
-    dst = createOpnd(typeManager.getInt64Type());
-    appendInst(instFactory.makeLdConst(dst, val));
+    dst = createOpnd(typeManager->getInt64Type());
+    appendInst(instFactory->makeLdConst(dst, val));
     insertHash(hashcode, (uint32) (val >> 32), (uint32) (val & 0xffffffff), dst->getInst());
     return dst;
 }
@@ -1363,8 +1614,8 @@ Opnd* IRBuilder::genLdConstant(float val) {
     uint32 hashcode = operation.encodeForHashing();
     Opnd* dst = lookupHash(hashcode, word1, word2);
     if (dst) return dst;
-    dst = createOpnd(typeManager.getSingleType());
-    appendInst(instFactory.makeLdConst(dst, val));
+    dst = createOpnd(typeManager->getSingleType());
+    appendInst(instFactory->makeLdConst(dst, val));
     insertHash(hashcode, word1, word2, dst->getInst());
     return dst;
 }
@@ -1378,8 +1629,8 @@ IRBuilder::genLdConstant(double val) {
     uint32 hashcode = operation.encodeForHashing();
     Opnd* dst = lookupHash(hashcode, word1, word2);
     if (dst) return dst;
-    dst = createOpnd(typeManager.getDoubleType());
-    appendInst(instFactory.makeLdConst(dst, val));
+    dst = createOpnd(typeManager->getDoubleType());
+    appendInst(instFactory->makeLdConst(dst, val));
     insertHash(hashcode, word1, word2, dst->getInst());
     return dst;
 }
@@ -1392,7 +1643,7 @@ IRBuilder::genLdConstant(Type *ptrtype, ConstInst::ConstValue val) {
     Opnd* dst = lookupHash(hashcode, word1, word2);
     if (dst) return dst;
     dst = createOpnd(ptrtype);
-    appendInst(instFactory.makeLdConst(dst, val));
+    appendInst(instFactory->makeLdConst(dst, val));
     insertHash(hashcode, word1, word2, dst->getInst());
     return dst;
 }
@@ -1406,8 +1657,8 @@ IRBuilder::genLdFloatConstant(double val) {
     uint32 hashcode = operation.encodeForHashing();
     Opnd* dst = lookupHash(hashcode, word1, word2);
     if (dst) return dst;
-    dst = createOpnd(typeManager.getFloatType());
-    appendInst(instFactory.makeLdConst(dst, val));
+    dst = createOpnd(typeManager->getFloatType());
+    appendInst(instFactory->makeLdConst(dst, val));
     insertHash(hashcode, word1, word2, dst->getInst());
     return dst;
 }
@@ -1423,8 +1674,8 @@ IRBuilder::genLdFloatConstant(float val) {
     uint32 hashcode = operation.encodeForHashing();
     Opnd* dst = lookupHash(hashcode, word1, word2);
     if (dst) return dst;
-    dst = createOpnd(typeManager.getFloatType());
-    appendInst(instFactory.makeLdConst(dst, val));
+    dst = createOpnd(typeManager->getFloatType());
+    appendInst(instFactory->makeLdConst(dst, val));
     insertHash(hashcode, word1, word2, dst->getInst());
     return dst;
 }
@@ -1434,27 +1685,27 @@ IRBuilder::genLdNull() {
     uint32 hashcode = operation.encodeForHashing();
     Opnd* dst = lookupHash(hashcode);
     if (dst) return dst;
-    dst = createOpnd(typeManager.getNullObjectType());
-    appendInst(instFactory.makeLdNull(dst));
+    dst = createOpnd(typeManager->getNullObjectType());
+    appendInst(instFactory->makeLdNull(dst));
     insertHash(hashcode, dst->getInst());
     return dst;
 }
 
 Opnd*
-IRBuilder::genLdString(MethodDesc* enclosingMethod, uint32 stringToken) {
+IRBuilder::genLdRef(MethodDesc* enclosingMethod, uint32 stringToken, Type* type) {
     bool uncompress = irBuilderFlags.compressedReferences;
 
     Modifier mod = uncompress ? AutoCompress_Yes : AutoCompress_No;
-    Opnd* dst = createOpnd(typeManager.getSystemStringType());
+    Opnd* dst = createOpnd(type);
 
-    appendInst(instFactory.makeLdString(mod, dst, enclosingMethod, stringToken));
+    appendInst(instFactory->makeLdRef(mod, dst, enclosingMethod, stringToken));
     return dst;
 }
 
 Opnd*
 IRBuilder::genLdToken(MethodDesc* enclosingMethod, uint32 metadataToken) {
-    Opnd* dst = createOpnd(typeManager.getSystemObjectType());
-    appendInst(instFactory.makeLdToken(dst, enclosingMethod, metadataToken));
+    Opnd* dst = createOpnd(typeManager->getSystemObjectType());
+    appendInst(instFactory->makeLdToken(dst, enclosingMethod, metadataToken));
     return dst;
 }
 
@@ -1465,12 +1716,12 @@ IRBuilder::genLdVar(Type* dstType, VarOpnd* var) {
         if (dst) return dst;
 
         dst = createOpnd(dstType);
-        appendInst(instFactory.makeLdVar(dst, var));
+        appendInst(instFactory->makeLdVar(dst, var));
         insertHash(Op_LdVar, var, dst->getInst());
         return dst;
     } else {
         Opnd *dst = createOpnd(dstType);
-        appendInst(instFactory.makeLdVar(dst, var));
+        appendInst(instFactory->makeLdVar(dst, var));
         return dst;
     }
 }
@@ -1482,8 +1733,8 @@ IRBuilder::genLdVarAddr(VarOpnd* var) {
 
 
     var->setAddrTaken();
-    dst = createOpnd(typeManager.getManagedPtrType(var->getType()));
-    appendInst(instFactory.makeLdVarAddr(dst, var));
+    dst = createOpnd(typeManager->getManagedPtrType(var->getType()));
+    appendInst(instFactory->makeLdVarAddr(dst, var));
     insertHash(Op_LdVarAddr, var, dst->getInst());
     return dst;
 }
@@ -1511,17 +1762,17 @@ IRBuilder::genTauLdInd(Modifier mod, Type* type, Type::Tag ldType, Opnd* ptr,
     tauBaseNonNull = propagateCopy(tauBaseNonNull);
     tauAddressInRange = propagateCopy(tauAddressInRange);
     Opnd* dst = createOpnd(type);
-    appendInst(instFactory.makeTauLdInd(mod, ldType, dst, ptr, 
+    appendInst(instFactory->makeTauLdInd(mod, ldType, dst, ptr, 
                                         tauBaseNonNull, tauAddressInRange));
     return dst;
 }
 
 Opnd*
-IRBuilder::genLdString(Modifier mod, Type* type, 
-                       uint32 token, MethodDesc *enclosingMethod)
+IRBuilder::genLdRef(Modifier mod, Type* type, 
+                    uint32 token, MethodDesc *enclosingMethod)
 {
     Opnd* dst = createOpnd(type);
-    appendInst(instFactory.makeLdString(mod, dst, enclosingMethod, token));
+    appendInst(instFactory->makeLdRef(mod, dst, enclosingMethod, token));
     return dst;
 }
 
@@ -1547,7 +1798,7 @@ IRBuilder::genLdField(Type* type, Opnd* base, FieldDesc* fieldDesc) {
     }
 
     Opnd* dst = createOpnd(type);
-    appendInst(instFactory.makeTauLdField(mod, type, dst, base, 
+    appendInst(instFactory->makeTauLdField(mod, type, dst, base, 
                                           tauNullCheck, tauAddressInRange, 
                                           fieldDesc));
     return dst;
@@ -1561,7 +1812,7 @@ IRBuilder::genInitType(NamedType* type) {
     if (opnd) return; // no need to re-initialize
 
     insertHash(Op_InitType, type->getId(), 
-               appendInst(instFactory.makeInitType(type)));
+               appendInst(instFactory->makeInitType(type)));
 }
 
 Opnd*
@@ -1581,13 +1832,17 @@ IRBuilder::genLdStatic(Type* type, FieldDesc* fieldDesc) {
     }
 
     Opnd* dst = createOpnd(type);
-    appendInst(instFactory.makeLdStatic(mod, type, dst, fieldDesc));
+    appendInst(instFactory->makeLdStatic(mod, type, dst, fieldDesc));
     return dst;
 }
 
 
 Opnd*
-IRBuilder::genLdElem(Type* type, Opnd* array, Opnd* index) {
+IRBuilder::genLdElem(Type* type, Opnd* array, Opnd* index, Opnd* tauNullChecked, Opnd* tauAddressInRange) {
+
+    assert(tauNullChecked);
+    assert(tauAddressInRange);
+
     array = propagateCopy(array);
     index = propagateCopy(index);
 
@@ -1598,20 +1853,29 @@ IRBuilder::genLdElem(Type* type, Opnd* array, Opnd* index) {
     }
     Modifier mod = uncompress ? AutoCompress_Yes : AutoCompress_No;
 
-    Opnd *tauNullCheck = genTauCheckNull(array);
-    Opnd *tauBoundsChecked = genTauCheckBounds(array, index, tauNullCheck);
-    Opnd *tauBaseTypeChecked = genTauHasType(array, array->getType());
-    Opnd *tauAddressInRange = genTauAnd(tauBoundsChecked, tauBaseTypeChecked);
-    
     if (irBuilderFlags.expandMemAddrs) {
         return genTauLdInd(mod, type, type->tag, 
                            genLdElemAddrNoChecks(type, array, index),
-                           tauNullCheck, tauAddressInRange);
+                           tauNullChecked, tauAddressInRange);
     }
     Opnd* dst = createOpnd(type);
-    appendInst(instFactory.makeTauLdElem(mod, type, dst, array, index,
-                                         tauNullCheck, tauAddressInRange));
+    appendInst(instFactory->makeTauLdElem(mod, type, dst, array, index,
+                                         tauNullChecked, tauAddressInRange));
     return dst;
+}
+
+Opnd*
+IRBuilder::genLdElem(Type* type, Opnd* array, Opnd* index) {
+
+    array = propagateCopy(array);
+    index = propagateCopy(index);
+
+    Opnd *tauNullChecked = genTauCheckNull(array);
+    Opnd *tauBoundsChecked = genTauCheckBounds(array, index, tauNullChecked);
+    Opnd *tauBaseTypeChecked = genTauHasType(array, array->getType());
+    Opnd *tauAddressInRange = genTauAnd(tauBoundsChecked, tauBaseTypeChecked);
+    
+    return genLdElem(type,array,index,tauNullChecked,tauAddressInRange);
 }
 
 // this is now used just for CLI; the tauNonNull operand is ignored, but the
@@ -1635,18 +1899,18 @@ IRBuilder::genLdFieldAddr(Type* type, Opnd* base, FieldDesc* fieldDesc) {
 
     if (base->getType()->isIntPtr()) {
         // unmanaged pointer
-        dst = createOpnd(typeManager.getIntPtrType());
+        dst = createOpnd(typeManager->getIntPtrType());
     } else if (irBuilderFlags.compressedReferences && type->isObject()) {
         // until VM type system is upgraded,
         // fieldDesc type will have uncompressed ref type;
         // compress it
         assert(!type->isCompressedReference());
-        Type *compressedType = typeManager.compressType(type);
-        dst = createOpnd(typeManager.getManagedPtrType(compressedType));
+        Type *compressedType = typeManager->compressType(type);
+        dst = createOpnd(typeManager->getManagedPtrType(compressedType));
     } else {
-        dst = createOpnd(typeManager.getManagedPtrType(type));
+        dst = createOpnd(typeManager->getManagedPtrType(type));
     }
-    appendInst(instFactory.makeLdFieldAddr(dst, base, fieldDesc));
+    appendInst(instFactory->makeLdFieldAddr(dst, base, fieldDesc));
     insertHash(Op_LdFieldAddr, base->getId(), fieldDesc->getId(), 
                dst->getInst());
     return dst;
@@ -1667,18 +1931,18 @@ IRBuilder::genLdFieldAddrNoChecks(Type* type, Opnd* base, FieldDesc* fieldDesc) 
 
     if (base->getType()->isIntPtr()) {
         // unmanaged pointer
-        dst = createOpnd(typeManager.getIntPtrType());
+        dst = createOpnd(typeManager->getIntPtrType());
     } else if (irBuilderFlags.compressedReferences && type->isObject()) {
         // until VM type system is upgraded,
         // fieldDesc type will have uncompressed ref type;
         // compress it
         assert(!type->isCompressedReference());
-        Type *compressedType = typeManager.compressType(type);
-        dst = createOpnd(typeManager.getManagedPtrType(compressedType));
+        Type *compressedType = typeManager->compressType(type);
+        dst = createOpnd(typeManager->getManagedPtrType(compressedType));
     } else {
-        dst = createOpnd(typeManager.getManagedPtrType(type));
+        dst = createOpnd(typeManager->getManagedPtrType(type));
     }
-    appendInst(instFactory.makeLdFieldAddr(dst, base, fieldDesc));
+    appendInst(instFactory->makeLdFieldAddr(dst, base, fieldDesc));
     insertHash(Op_LdFieldAddr, base->getId(), fieldDesc->getId(), 
                dst->getInst());
     return dst;
@@ -1698,18 +1962,18 @@ IRBuilder::genLdStaticAddrNoChecks(Type* type, FieldDesc* fieldDesc) {
 
     if (fieldDesc->isUnmanagedStatic()) {
         // can't mark an unmanaged pointer as non-null
-        dst = createOpnd(typeManager.getIntPtrType());
+        dst = createOpnd(typeManager->getIntPtrType());
     } else if (irBuilderFlags.compressedReferences && type->isObject()) {
         // until VM type system is upgraded,
         // fieldDesc type will have uncompressed ref type;
         // compress it
         assert(!type->isCompressedReference());
-        Type *compressedType = typeManager.compressType(type);
-        dst = createOpnd(typeManager.getManagedPtrType(compressedType));
+        Type *compressedType = typeManager->compressType(type);
+        dst = createOpnd(typeManager->getManagedPtrType(compressedType));
     } else {
-        dst = createOpnd(typeManager.getManagedPtrType(type));
+        dst = createOpnd(typeManager->getManagedPtrType(type));
     }
-    appendInst(instFactory.makeLdStaticAddr(dst, fieldDesc));
+    appendInst(instFactory->makeLdStaticAddr(dst, fieldDesc));
     insertHash(Op_LdStaticAddr, fieldDesc->getId(), dst->getInst());
     return dst;
 }
@@ -1746,12 +2010,12 @@ IRBuilder::genLdElemAddrNoChecks(Type* elemType, Opnd* array, Opnd* index) {
             // fieldDesc type will have uncompressed ref type;
             // compress it
             assert(!elemType->isCompressedReference());
-            Type *compressedType = typeManager.compressType(elemType);
-            dst = createOpnd(typeManager.getManagedPtrType(compressedType));
+            Type *compressedType = typeManager->compressType(elemType);
+            dst = createOpnd(typeManager->getManagedPtrType(compressedType));
         } else {
-            dst = createOpnd(typeManager.getManagedPtrType(elemType));
+            dst = createOpnd(typeManager->getManagedPtrType(elemType));
         }
-        appendInst(instFactory.makeLdElemAddr(elemType, dst, array, index));
+        appendInst(instFactory->makeLdElemAddr(elemType, dst, array, index));
         insertHash(Op_LdElemAddr, array, index, dst->getInst());
     }
 
@@ -1763,8 +2027,8 @@ IRBuilder::genLdFunAddr(MethodDesc* methodDesc) {
     Opnd* dst = lookupHash(Op_LdFunAddr, methodDesc->getId());
     if (dst) return dst;
 
-    dst = createOpnd(typeManager.getMethodPtrType(methodDesc));
-    appendInst(instFactory.makeLdFunAddr(dst, methodDesc));
+    dst = createOpnd(typeManager->getMethodPtrType(methodDesc));
+    appendInst(instFactory->makeLdFunAddr(dst, methodDesc));
     insertHash(Op_LdFunAddr, methodDesc->getId(), dst->getInst());
     return dst;
 }
@@ -1775,8 +2039,8 @@ IRBuilder::genLdFunAddrSlot(MethodDesc* methodDesc) {
     if (dst) return dst;
 
 
-    dst = createOpnd(typeManager.getMethodPtrType(methodDesc));
-    appendInst(instFactory.makeLdFunAddrSlot(dst, methodDesc));
+    dst = createOpnd(typeManager->getMethodPtrType(methodDesc));
+    appendInst(instFactory->makeLdFunAddrSlot(dst, methodDesc));
     insertHash(Op_LdFunAddrSlot, methodDesc->getId(), dst->getInst());
     return dst;
 }
@@ -1803,11 +2067,11 @@ IRBuilder::genTauLdVTable(Opnd* base, Opnd *tauNullChecked, Type* type) {
         if (irBuilderFlags.useNewTypeSystem) {
             NamedType* iType = type->asNamedType();
             assert(iType);
-            dst = createOpnd(typeManager.getITablePtrObjType(obj, iType));
+            dst = createOpnd(typeManager->getITablePtrObjType(obj, iType));
         } else {
-            dst = createOpnd(typeManager.getVTablePtrType(type));
+            dst = createOpnd(typeManager->getVTablePtrType(type));
         }
-        appendInst(instFactory.makeTauLdIntfcVTableAddr(dst, base, tauNullChecked, type));
+        appendInst(instFactory->makeTauLdIntfcVTableAddr(dst, base, type));
         insertHash(Op_TauLdIntfcVTableAddr, base->getId(), type->getId(),
                    dst->getInst());
     } else if (type->isClass()) {
@@ -1815,11 +2079,11 @@ IRBuilder::genTauLdVTable(Opnd* base, Opnd *tauNullChecked, Type* type) {
         if (dst) return dst;
 
         if (irBuilderFlags.useNewTypeSystem) {
-            dst = createOpnd(typeManager.getVTablePtrObjType(obj));
+            dst = createOpnd(typeManager->getVTablePtrObjType(obj));
         } else {
-            dst = createOpnd(typeManager.getVTablePtrType(base->getType()));
+            dst = createOpnd(typeManager->getVTablePtrType(base->getType()));
         }
-        appendInst(instFactory.makeTauLdVTableAddr(dst, base, tauNullChecked));
+        appendInst(instFactory->makeTauLdVTableAddr(dst, base, tauNullChecked));
         insertHash(Op_TauLdVTableAddr, base, dst->getInst());
     } else {
         assert(0); // shouldn't happen
@@ -1833,8 +2097,8 @@ IRBuilder::genGetVTable(ObjectType* type) {
     Opnd* dst = lookupHash(Op_GetVTableAddr, type->getId());
     if (dst) return dst;
 
-    dst = createOpnd(typeManager.getVTablePtrType(type));
-    appendInst(instFactory.makeGetVTableAddr(dst, type));
+    dst = createOpnd(typeManager->getVTablePtrType(type));
+    appendInst(instFactory->makeGetVTableAddr(dst, type));
     insertHash(Op_GetVTableAddr, type->getId(), dst->getInst());
     return dst;
 }
@@ -1851,8 +2115,8 @@ IRBuilder::genLdVirtFunAddr(Opnd* base, MethodDesc* methodDesc) {
     Opnd* vtableOpnd = genTauLdVTable(base, tauNullChecked, methodType);
     Opnd *tauVtableHasMethod = genTauHasType(base, methodType);
 
-    dst = createOpnd(typeManager.getMethodPtrType(methodDesc));
-    appendInst(instFactory.makeTauLdVirtFunAddr(dst, vtableOpnd, 
+    dst = createOpnd(typeManager->getMethodPtrType(methodDesc));
+    appendInst(instFactory->makeTauLdVirtFunAddr(dst, vtableOpnd, 
                                                 tauVtableHasMethod,
                                                 methodDesc));
     insertHash(Op_TauLdVirtFunAddr, vtableOpnd->getId(), methodDesc->getId(), 
@@ -1874,11 +2138,11 @@ IRBuilder::genTauLdVirtFunAddrSlot(Opnd* base, Opnd *tauOk, MethodDesc* methodDe
     if (irBuilderFlags.useNewTypeSystem) {
         SsaOpnd* obj = base->asSsaOpnd();
         assert(obj);
-        dst = createOpnd(typeManager.getMethodPtrObjType(obj, methodDesc));
+        dst = createOpnd(typeManager->getMethodPtrObjType(obj, methodDesc));
     } else {
-        dst = createOpnd(typeManager.getMethodPtrType(methodDesc));
+        dst = createOpnd(typeManager->getMethodPtrType(methodDesc));
     }
-    appendInst(instFactory.makeTauLdVirtFunAddrSlot(dst, vtableOpnd, 
+    appendInst(instFactory->makeTauLdVirtFunAddrSlot(dst, vtableOpnd, 
                                                     tauVtableHasMethod,
                                                     methodDesc));
     insertHash(Op_TauLdVirtFunAddrSlot, vtableOpnd->getId(), 
@@ -1894,7 +2158,7 @@ IRBuilder::genArrayLen(Type* dstType, Type::Tag type, Opnd* array) {
     if (dst) return dst;
     
     if (irBuilderFlags.doSimplify) {
-        dst = simplifier.simplifyTauArrayLen(dstType, type, array);
+        dst = simplifier->simplifyTauArrayLen(dstType, type, array);
         if (dst) return dst;
     }
 
@@ -1913,12 +2177,12 @@ IRBuilder::genTauArrayLen(Type* dstType, Type::Tag type, Opnd* array,
     if (dst) return dst;
 
     if (irBuilderFlags.doSimplify) {
-        dst = simplifier.simplifyTauArrayLen(dstType, type, array, tauNullChecked,
+        dst = simplifier->simplifyTauArrayLen(dstType, type, array, tauNullChecked,
                                              tauTypeChecked);
         if (dst) return dst;
     }
     dst = createOpnd(dstType);
-    appendInst(instFactory.makeTauArrayLen(dst, type, array, tauNullChecked,
+    appendInst(instFactory->makeTauArrayLen(dst, type, array, tauNullChecked,
                                            tauTypeChecked));
     insertHash(Op_TauArrayLen, array->getId(), dst->getInst());
     
@@ -1935,7 +2199,7 @@ IRBuilder::genLdArrayBaseAddr(Type* elemType, Opnd* array) {
     if (irBuilderFlags.useNewTypeSystem) {
         SsaOpnd* arrayVal = array->asSsaOpnd();
         assert(arrayVal);
-        Type* baseType = typeManager.getArrayBaseType(arrayVal);
+        Type* baseType = typeManager->getArrayBaseType(arrayVal);
         dst = createOpnd(baseType);
     } else {
         if (irBuilderFlags.compressedReferences && elemType->isObject()) {
@@ -1943,13 +2207,13 @@ IRBuilder::genLdArrayBaseAddr(Type* elemType, Opnd* array) {
             // fieldDesc type will have uncompressed ref type;
             // compress it
             assert(!elemType->isCompressedReference());
-            Type *compressedType = typeManager.compressType(elemType);
-            dst = createOpnd(typeManager.getManagedPtrType(compressedType));
+            Type *compressedType = typeManager->compressType(elemType);
+            dst = createOpnd(typeManager->getManagedPtrType(compressedType));
         } else {        
-            dst = createOpnd(typeManager.getManagedPtrType(elemType));
+            dst = createOpnd(typeManager->getManagedPtrType(elemType));
         }
     }
-    appendInst(instFactory.makeLdArrayBaseAddr(elemType, dst, array));
+    appendInst(instFactory->makeLdArrayBaseAddr(elemType, dst, array));
     insertHash(Op_LdArrayBaseAddr, array, dst->getInst());
     return dst;
 }
@@ -1966,13 +2230,13 @@ IRBuilder::genAddScaledIndex(Opnd* ptr, Opnd* index) {
         assert(ptrType);
         SsaOpnd* indexVar = index->asSsaOpnd();
         assert(indexVar);
-        Type* dstType = typeManager.getArrayIndexType(ptrType->getArrayName(), indexVar);
+        Type* dstType = typeManager->getArrayIndexType(ptrType->getArrayName(), indexVar);
         dst = createOpnd(dstType);
     } else {
         dst = createOpnd(ptr->getType());
     }
 
-    appendInst(instFactory.makeAddScaledIndex(dst, ptr, index));
+    appendInst(instFactory->makeAddScaledIndex(dst, ptr, index));
     insertHash(Op_AddScaledIndex, ptr, index, dst->getInst());
     return dst;
 }
@@ -1984,8 +2248,8 @@ IRBuilder::genScaledDiffRef(Opnd* src1, Opnd* src2) {
     Opnd* dst = lookupHash(Op_ScaledDiffRef, src1, src2);
     if (dst) return dst;
 
-    dst = createOpnd(typeManager.getInt32Type());
-    appendInst(instFactory.makeScaledDiffRef(dst, src1, src2));
+    dst = createOpnd(typeManager->getInt32Type());
+    appendInst(instFactory->makeScaledDiffRef(dst, src1, src2));
     insertHash(Op_ScaledDiffRef, src1, src2, dst->getInst());
     return dst;
 }
@@ -2000,8 +2264,8 @@ IRBuilder::genUncompressRef(Opnd *compref)
     Type *comprefType = compref->getType();
     assert(comprefType->isCompressedReference());
 
-    dst = createOpnd(typeManager.uncompressType(comprefType));
-    appendInst(instFactory.makeUncompressRef(dst, compref));
+    dst = createOpnd(typeManager->uncompressType(comprefType));
+    appendInst(instFactory->makeUncompressRef(dst, compref));
     insertHash(Op_UncompressRef, compref, dst->getInst());
     return dst;
 }
@@ -2018,8 +2282,8 @@ IRBuilder::genCompressRef(Opnd *uncompref)
     uncomprefType = uncompref->getType();
     assert(uncomprefType->isReference() && !uncomprefType->isCompressedReference());
     
-    dst = createOpnd(typeManager.compressType(uncomprefType));
-    appendInst(instFactory.makeCompressRef(dst, uncompref));
+    dst = createOpnd(typeManager->compressType(uncomprefType));
+    appendInst(instFactory->makeCompressRef(dst, uncompref));
     insertHash(Op_CompressRef, uncompref, dst->getInst());
     return dst;
 }
@@ -2033,8 +2297,8 @@ IRBuilder::genLdFieldOffset(FieldDesc* fieldDesc)
     if (dst) return dst;
 
 
-    dst = createOpnd(typeManager.getOffsetType());
-    appendInst(instFactory.makeLdFieldOffset(dst, fieldDesc));
+    dst = createOpnd(typeManager->getOffsetType());
+    appendInst(instFactory->makeLdFieldOffset(dst, fieldDesc));
     insertHash(Op_LdFieldOffset, fieldDesc->getId(), dst->getInst());
     return dst;
 }
@@ -2048,8 +2312,8 @@ IRBuilder::genLdFieldOffsetPlusHeapbase(FieldDesc* fieldDesc)
     if (dst) return dst;
 
 
-    dst = createOpnd(typeManager.getOffsetPlusHeapbaseType());
-    appendInst(instFactory.makeLdFieldOffsetPlusHeapbase(dst, fieldDesc));
+    dst = createOpnd(typeManager->getOffsetPlusHeapbaseType());
+    appendInst(instFactory->makeLdFieldOffsetPlusHeapbase(dst, fieldDesc));
     insertHash(Op_LdFieldOffsetPlusHeapbase, fieldDesc->getId(), dst->getInst());
     return dst;
 }
@@ -2060,8 +2324,8 @@ IRBuilder::genLdArrayBaseOffset(Type *elemType)
     Opnd* dst = lookupHash(Op_LdArrayBaseOffset, elemType->getId());
     if (dst) return dst;
 
-    dst = createOpnd(typeManager.getOffsetType());
-    appendInst(instFactory.makeLdArrayBaseOffset(dst, elemType));
+    dst = createOpnd(typeManager->getOffsetType());
+    appendInst(instFactory->makeLdArrayBaseOffset(dst, elemType));
     insertHash(Op_LdArrayBaseOffset, elemType->getId(), dst->getInst());
     return dst;
 }
@@ -2072,8 +2336,8 @@ IRBuilder::genLdArrayBaseOffsetPlusHeapbase(Type *elemType)
     Opnd* dst = lookupHash(Op_LdArrayBaseOffsetPlusHeapbase, elemType->getId());
     if (dst) return dst;
 
-    dst = createOpnd(typeManager.getOffsetPlusHeapbaseType());
-    appendInst(instFactory.makeLdArrayBaseOffsetPlusHeapbase(dst, elemType));
+    dst = createOpnd(typeManager->getOffsetPlusHeapbaseType());
+    appendInst(instFactory->makeLdArrayBaseOffsetPlusHeapbase(dst, elemType));
     insertHash(Op_LdArrayBaseOffsetPlusHeapbase, elemType->getId(), dst->getInst());
     return dst;
 }
@@ -2084,8 +2348,8 @@ IRBuilder::genLdArrayLenOffset(Type *elemType)
     Opnd* dst = lookupHash(Op_LdArrayLenOffset, elemType->getId());
     if (dst) return dst;
 
-    dst = createOpnd(typeManager.getOffsetType());
-    appendInst(instFactory.makeLdArrayLenOffset(dst, elemType));
+    dst = createOpnd(typeManager->getOffsetType());
+    appendInst(instFactory->makeLdArrayLenOffset(dst, elemType));
     insertHash(Op_LdArrayLenOffset, elemType->getId(), dst->getInst());
     return dst;
 }
@@ -2096,8 +2360,8 @@ IRBuilder::genLdArrayLenOffsetPlusHeapbase(Type *elemType)
     Opnd* dst = lookupHash(Op_LdArrayLenOffsetPlusHeapbase, elemType->getId());
     if (dst) return dst;
 
-    dst = createOpnd(typeManager.getOffsetPlusHeapbaseType());
-    appendInst(instFactory.makeLdArrayLenOffsetPlusHeapbase(dst, elemType));
+    dst = createOpnd(typeManager->getOffsetPlusHeapbaseType());
+    appendInst(instFactory->makeLdArrayLenOffsetPlusHeapbase(dst, elemType));
     insertHash(Op_LdArrayLenOffsetPlusHeapbase, elemType->getId(), dst->getInst());
     return dst;
 }
@@ -2115,7 +2379,7 @@ IRBuilder::genAddOffset(Type *ptrType, Opnd* ref, Opnd* offset)
     assert(offset->getType()->isOffset());
 
     dst = createOpnd(ptrType);
-    appendInst(instFactory.makeAddOffset(dst, ref, offset));
+    appendInst(instFactory->makeAddOffset(dst, ref, offset));
     insertHash(Op_AddOffset, ref, offset, dst->getInst());
     return dst;
 }
@@ -2133,7 +2397,7 @@ IRBuilder::genAddOffsetPlusHeapbase(Type *ptrType, Opnd* compref, Opnd* offset)
     assert(offset->getType()->isOffsetPlusHeapbase());
     
     dst = createOpnd(ptrType);
-    appendInst(instFactory.makeAddOffsetPlusHeapbase(dst, compref, offset));
+    appendInst(instFactory->makeAddOffsetPlusHeapbase(dst, compref, offset));
     insertHash(Op_AddOffsetPlusHeapbase, compref, offset, dst->getInst());
     return dst;
 }
@@ -2142,7 +2406,7 @@ IRBuilder::genAddOffsetPlusHeapbase(Type *ptrType, Opnd* compref, Opnd* offset)
 void
 IRBuilder::genStVar(VarOpnd* var, Opnd* src) {
     src = propagateCopy(src);
-    appendInst(instFactory.makeStVar(var, src));
+    appendInst(instFactory->makeStVar(var, src));
     if (irBuilderFlags.doCSE) {
         insertHash(Op_LdVar, var->getId(), src->getInst());
     }
@@ -2166,12 +2430,12 @@ IRBuilder::genStInd(Type* type,
     Opnd *tauUnsafe = genTauUnsafe();
 
     if (irBuilderFlags.insertWriteBarriers) {
-        appendInst(instFactory.makeTauStInd((Modifier(Store_WriteBarrier)|
+        appendInst(instFactory->makeTauStInd((Modifier(Store_WriteBarrier)|
                                              compressMod),
                                             type->tag, src, ptr, 
                                             tauUnsafe, tauUnsafe, tauUnsafe));
     } else {
-        appendInst(instFactory.makeTauStInd((Modifier(Store_NoWriteBarrier)|
+        appendInst(instFactory->makeTauStInd((Modifier(Store_NoWriteBarrier)|
                                              compressMod),
                                             type->tag, src, ptr,
                                             tauUnsafe, tauUnsafe, tauUnsafe));
@@ -2200,12 +2464,12 @@ IRBuilder::genTauStInd(Type* type,
                                     : AutoCompress_No);
     
     if (irBuilderFlags.insertWriteBarriers) {
-        appendInst(instFactory.makeTauStInd((Modifier(Store_WriteBarrier)|
+        appendInst(instFactory->makeTauStInd((Modifier(Store_WriteBarrier)|
                                              compressMod),
                                             type->tag, src, ptr, 
                                             tauBaseNonNull, tauAddressInRange, tauElemTypeChecked));
     } else {
-        appendInst(instFactory.makeTauStInd((Modifier(Store_NoWriteBarrier)|
+        appendInst(instFactory->makeTauStInd((Modifier(Store_NoWriteBarrier)|
                                              compressMod),
                                             type->tag, src, ptr,
                                             tauBaseNonNull, tauAddressInRange, tauElemTypeChecked));
@@ -2235,13 +2499,13 @@ IRBuilder::genTauStRef(Type* type, Opnd *objectbase, Opnd* ptr, Opnd* src,
                                     : AutoCompress_No);
 
     if (irBuilderFlags.insertWriteBarriers) {
-        appendInst(instFactory.makeTauStRef((Modifier(Store_WriteBarrier)|
+        appendInst(instFactory->makeTauStRef((Modifier(Store_WriteBarrier)|
                                              compressMod),
                                             type->tag, src, objectbase, ptr,
                                             tauBaseNonNull, tauAddressInRange, 
                                             tauElemTypeChecked));
     } else {
-        appendInst(instFactory.makeTauStRef((Modifier(Store_NoWriteBarrier)|
+        appendInst(instFactory->makeTauStRef((Modifier(Store_NoWriteBarrier)|
                                              compressMod),
                                             type->tag, src, objectbase, ptr,
                                             tauBaseNonNull, tauAddressInRange, 
@@ -2255,7 +2519,7 @@ IRBuilder::genStField(Type* type,
                       FieldDesc* fieldDesc,
                       Opnd* src) {
     if (fieldDesc->isStatic()) {
-		assert(0); 
+        assert(0); 
         genStStatic(type, fieldDesc, src);
         return;
     }
@@ -2263,9 +2527,9 @@ IRBuilder::genStField(Type* type,
     src = propagateCopy(src);
     Opnd *tauBaseNonNull = genTauCheckNull(base);
     Opnd *tauBaseTypeIsOk = genTauHasType(base, fieldDesc->getParentType());
-    Type *fieldType = fieldDesc->getFieldType();
-    Opnd *tauStoredTypeIsOk = (fieldType->isObject()
-                               ? genTauHasType(src, fieldType)
+//    Type *fieldType = fieldDesc->getFieldType();
+    Opnd *tauStoredTypeIsOk = (type->isObject()
+                               ? genTauHasType(src, type)
                                : genTauSafe()); // safe, not an object
     if (irBuilderFlags.expandMemAddrs) { // do not expand ldField of stack values
         Opnd *ptr = genLdFieldAddr(type, base, fieldDesc);
@@ -2283,7 +2547,7 @@ IRBuilder::genStField(Type* type,
     } else {
         if (irBuilderFlags.insertWriteBarriers &&
             base->getType()->isValue()==false) {
-            appendInst(instFactory.makeTauStField((Modifier(Store_WriteBarrier)|
+            appendInst(instFactory->makeTauStField((Modifier(Store_WriteBarrier)|
                                                    Modifier(AutoCompress_Yes)), 
                                                   type->tag, src, base,
                                                   tauBaseNonNull, 
@@ -2291,7 +2555,7 @@ IRBuilder::genStField(Type* type,
                                                   tauStoredTypeIsOk,
                                                   fieldDesc));
         } else {
-            appendInst(instFactory.makeTauStField((Modifier(Store_NoWriteBarrier)|
+            appendInst(instFactory->makeTauStField((Modifier(Store_NoWriteBarrier)|
                                                    Modifier(AutoCompress_Yes)), 
                                                   type->tag, src, base,
                                                   tauBaseNonNull, 
@@ -2307,9 +2571,9 @@ IRBuilder::genStStatic(Type* type, FieldDesc* fieldDesc, Opnd* src) {
     src = propagateCopy(src);
     genInitType(fieldDesc->getParentType());
     Opnd *tauOk = genTauSafe(); // address is always ok
-    Type *fieldType = fieldDesc->getFieldType();
-    Opnd *tauTypeIsOk = (fieldType->isObject() 
-                         ? genTauHasType(src, fieldType)
+//    Type *fieldType = fieldDesc->getFieldType();
+    Opnd *tauTypeIsOk = (type->isObject() 
+                         ? genTauHasType(src, type)
                          : genTauSafe()); // safe, not an object
     if (irBuilderFlags.expandMemAddrs) {
         genTauStInd(type, genLdStaticAddr(type, fieldDesc), src,
@@ -2320,13 +2584,13 @@ IRBuilder::genStStatic(Type* type, FieldDesc* fieldDesc, Opnd* src) {
         return;
     }
     if (irBuilderFlags.insertWriteBarriers) {
-        appendInst(instFactory.makeTauStStatic((Modifier(Store_WriteBarrier)|
+        appendInst(instFactory->makeTauStStatic((Modifier(Store_WriteBarrier)|
                                                 Modifier(AutoCompress_Yes)),
                                                type->tag, src,
                                                tauTypeIsOk,
                                                fieldDesc));
     } else {
-        appendInst(instFactory.makeTauStStatic((Modifier(Store_NoWriteBarrier)|
+        appendInst(instFactory->makeTauStStatic((Modifier(Store_NoWriteBarrier)|
                                                 Modifier(AutoCompress_Yes)), 
                                                type->tag, src,
                                                tauTypeIsOk,
@@ -2338,17 +2602,15 @@ void
 IRBuilder::genStElem(Type* elemType,
                      Opnd* array,
                      Opnd* index,
-                     Opnd* src) {
+                     Opnd* src,
+                     Opnd* tauNullChecked,
+                     Opnd* tauBaseTypeChecked,
+                     Opnd* tauAddressInRange) {
     array = propagateCopy(array);
     src = propagateCopy(src);
     index = propagateCopy(index);
-    // check elem type
-    Opnd *tauNullChecked = genTauCheckNull(array);
-    Opnd *tauBaseTypeChecked = genTauHasType(array, array->getType());
-    Opnd *tauElemTypeChecked = 0;
-    Opnd *tauBoundsChecked = genTauCheckBounds(array, index, tauNullChecked);
-    Opnd *tauAddressInRange = genTauAnd(tauBaseTypeChecked,
-                                        tauBoundsChecked);
+    
+    Opnd *tauElemTypeChecked = NULL;
     if (elemType->isObject()) {
         tauElemTypeChecked = genTauCheckElemType(array, src, tauNullChecked,
                                                  tauBaseTypeChecked);
@@ -2356,7 +2618,12 @@ IRBuilder::genStElem(Type* elemType,
         tauElemTypeChecked = genTauSafe(); // src type is ok if non-object
     }
     if (irBuilderFlags.expandMemAddrs) {
-        Opnd *ptr = genLdElemAddr(elemType, array, index);
+        Opnd *ptr = NULL;
+        if (tauNullChecked && tauAddressInRange) {
+            ptr = genLdElemAddrNoChecks(elemType, array, index);
+        } else {
+            ptr = genLdElemAddr(elemType, array, index);
+        }
         if (irBuilderFlags.insertWriteBarriers) {
             genTauStRef(elemType, array, ptr, src, tauNullChecked, tauAddressInRange,
                         tauElemTypeChecked);
@@ -2366,14 +2633,14 @@ IRBuilder::genStElem(Type* elemType,
         }
     } else {
         if (irBuilderFlags.insertWriteBarriers) {
-            appendInst(instFactory.makeTauStElem((Modifier(Store_WriteBarrier)|
+            appendInst(instFactory->makeTauStElem((Modifier(Store_WriteBarrier)|
                                                   Modifier(AutoCompress_Yes)), 
                                                  elemType->tag, src, array, index,
                                                  tauNullChecked, 
                                                  tauAddressInRange,
                                                  tauElemTypeChecked));
         } else {
-            appendInst(instFactory.makeTauStElem((Modifier(Store_NoWriteBarrier)|
+            appendInst(instFactory->makeTauStElem((Modifier(Store_NoWriteBarrier)|
                                                   Modifier(AutoCompress_Yes)), 
                                                  elemType->tag, src, array, index,
                                                  tauNullChecked, 
@@ -2383,18 +2650,41 @@ IRBuilder::genStElem(Type* elemType,
     }
 }
 
+void
+IRBuilder::genStElem(Type* elemType,
+                     Opnd* array,
+                     Opnd* index,
+                     Opnd* src) {
+
+    array = propagateCopy(array);
+    src = propagateCopy(src);
+    index = propagateCopy(index);
+
+    Opnd *tauNullChecked = NULL;
+    Opnd *tauAddressInRange = NULL;
+    Opnd *tauBaseTypeChecked = NULL;
+
+    // prepare checks
+    tauNullChecked = genTauCheckNull(array);
+    tauBaseTypeChecked = genTauHasType(array, array->getType());
+    Opnd *tauBoundsChecked = genTauCheckBounds(array, index, tauNullChecked);
+    tauAddressInRange = genTauAnd(tauBaseTypeChecked, tauBoundsChecked);
+
+    genStElem(elemType,array,index,src,tauNullChecked,tauBaseTypeChecked,tauAddressInRange);
+}
+
 Opnd*
 IRBuilder::genNewObj(Type* type) {
     Opnd* dst = createOpnd(type);
-    appendInst(instFactory.makeNewObj(dst, type));
+    appendInst(instFactory->makeNewObj(dst, type));
     return dst;
 }
 
 Opnd*
 IRBuilder::genNewArray(NamedType* elemType, Opnd* numElems) {
     numElems = propagateCopy(numElems);
-    Opnd* dst = createOpnd(typeManager.getArrayType(elemType));
-    appendInst(instFactory.makeNewArray(dst, numElems, elemType));
+    Opnd* dst = createOpnd(typeManager->getArrayType(elemType));
+    appendInst(instFactory->makeNewArray(dst, numElems, elemType));
     return dst;
 }
 
@@ -2408,7 +2698,7 @@ IRBuilder::genMultianewarray(NamedType* arrayType,
         elemType = ((ArrayType*)elemType)->getElementType();
     }
     Opnd* dst = createOpnd(arrayType);
-    appendInst(instFactory.makeNewMultiArray(dst, dimensions, numElems, elemType));
+    appendInst(instFactory->makeNewMultiArray(dst, dimensions, numElems, elemType));
     return dst;
 }
 
@@ -2416,14 +2706,14 @@ void
 IRBuilder::genMonitorEnter(Opnd* src) {
     src = propagateCopy(src);
     Opnd *tauNullChecked = genTauCheckNull(src);
-    appendInst(instFactory.makeTauMonitorEnter(src, tauNullChecked));
+    appendInst(instFactory->makeTauMonitorEnter(src, tauNullChecked));
 }
 
 void
 IRBuilder::genMonitorExit(Opnd* src) {
     src = propagateCopy(src);
     Opnd *tauNullChecked = genTauCheckNull(src);
-    appendInst(instFactory.makeTauMonitorExit(src, tauNullChecked));
+    appendInst(instFactory->makeTauMonitorExit(src, tauNullChecked));
 }
 
 Opnd*
@@ -2433,7 +2723,7 @@ IRBuilder::genLdLockAddr(Type* dstType, Opnd* obj) {
     if (dst) return dst;
 
     dst = createOpnd(dstType);
-    appendInst(instFactory.makeLdLockAddr(dst, obj));
+    appendInst(instFactory->makeLdLockAddr(dst, obj));
     insertHash(Op_LdLockAddr, obj, dst->getInst());
     return dst;
 }               
@@ -2442,7 +2732,7 @@ void
 IRBuilder::genIncRecCount(Opnd* obj, Opnd *oldLock) {
     obj = propagateCopy(obj);
     oldLock = propagateCopy(oldLock);
-    appendInst(instFactory.makeLdLockAddr(obj, oldLock));
+    appendInst(instFactory->makeLdLockAddr(obj, oldLock));
 }               
 
 
@@ -2462,7 +2752,7 @@ IRBuilder::genTauBalancedMonitorEnter(Type* dstType, Opnd* src, Opnd *lockAddr,
     src = propagateCopy(src);
     lockAddr = propagateCopy(lockAddr);
     Opnd *dst = createOpnd(dstType);
-    appendInst(instFactory.makeTauBalancedMonitorEnter(dst, src, lockAddr,
+    appendInst(instFactory->makeTauBalancedMonitorEnter(dst, src, lockAddr,
                                                        tauNullChecked));
     return dst;
 }
@@ -2471,7 +2761,7 @@ void
 IRBuilder::genBalancedMonitorExit(Opnd* src, Opnd *lockAddr, Opnd *oldValue) {
     // src should already have been checked for null
     src = propagateCopy(src);
-    appendInst(instFactory.makeBalancedMonitorExit(src, lockAddr, oldValue));
+    appendInst(instFactory->makeBalancedMonitorExit(src, lockAddr, oldValue));
 }
 
 Opnd*
@@ -2482,7 +2772,7 @@ IRBuilder::genTauOptimisticBalancedMonitorEnter(Type* dstType, Opnd* src,
     src = propagateCopy(src);
     lockAddr = propagateCopy(lockAddr);
     Opnd *dst = createOpnd(dstType);
-    appendInst(instFactory.makeTauOptimisticBalancedMonitorEnter(dst, src, 
+    appendInst(instFactory->makeTauOptimisticBalancedMonitorEnter(dst, src, 
                                                                  lockAddr,
                                                                  tauNullChecked));
     return dst;
@@ -2491,23 +2781,23 @@ IRBuilder::genTauOptimisticBalancedMonitorEnter(Type* dstType, Opnd* src,
 void
 IRBuilder::genMonitorEnterFence(Opnd* src) {
     src = propagateCopy(src);
-    appendInst(instFactory.makeMonitorEnterFence(src));
+    appendInst(instFactory->makeMonitorEnterFence(src));
 }
 
 void
 IRBuilder::genMonitorExitFence(Opnd* src) {
     src = propagateCopy(src);
-    appendInst(instFactory.makeMonitorExitFence(src));
+    appendInst(instFactory->makeMonitorExitFence(src));
 }
 
 void
 IRBuilder::genTypeMonitorEnter(Type* type) {
-    appendInst(instFactory.makeTypeMonitorEnter(type));
+    appendInst(instFactory->makeTypeMonitorEnter(type));
 }
 
 void
 IRBuilder::genTypeMonitorExit(Type* type) {
-    appendInst(instFactory.makeTypeMonitorExit(type));
+    appendInst(instFactory->makeTypeMonitorExit(type));
 }
 
 
@@ -2543,14 +2833,14 @@ IRBuilder::genTauCheckCast(Opnd* src, Opnd *tauNullChecked, Type* castType) {
 
     if (irBuilderFlags.doSimplify) {
         bool alwaysThrows = false;
-        dst = simplifier.simplifyTauCheckCast(src, tauNullChecked, castType, alwaysThrows);
+        dst = simplifier->simplifyTauCheckCast(src, tauNullChecked, castType, alwaysThrows);
         if (dst) {
             return dst;
         }
     }
     
-    dst = createOpnd(typeManager.getTauType());
-    appendInst(instFactory.makeTauCheckCast(dst, src, tauNullChecked, castType));
+    dst = createOpnd(typeManager->getTauType());
+    appendInst(instFactory->makeTauCheckCast(dst, src, tauNullChecked, castType));
     insertHash(Op_TauCheckCast, src->getId(), castType->getId(), dst->getInst());
     return dst;
 }
@@ -2559,7 +2849,7 @@ IRBuilder::genTauCheckCast(Opnd* src, Opnd *tauNullChecked, Type* castType) {
 Opnd*
 IRBuilder::genAsType(Opnd* src, Type* type) {
     if (type->isUserValue()) {
-		assert(0);    
+        assert(0);    
     }
     src = propagateCopy(src);
 
@@ -2569,11 +2859,11 @@ IRBuilder::genAsType(Opnd* src, Type* type) {
     if (dst) return dst;
 
     if (irBuilderFlags.doSimplify) {
-        dst = simplifier.simplifyTauAsType(src, tauCheckedNull, type);
+        dst = simplifier->simplifyTauAsType(src, tauCheckedNull, type);
         if (dst) return dst;
     }
     dst = createOpnd(type);
-    appendInst(instFactory.makeTauAsType(dst, src, tauCheckedNull, type));
+    appendInst(instFactory->makeTauAsType(dst, src, tauCheckedNull, type));
     insertHash(Op_TauAsType, src->getId(), tauCheckedNull->getId(), type->getId(), dst->getInst());
     return dst;
 }
@@ -2589,12 +2879,12 @@ IRBuilder::genInstanceOf(Opnd* src, Type* type) {
     if (dst) return dst;
 
     if (irBuilderFlags.doSimplify) {
-        dst = simplifier.simplifyTauInstanceOf(src, tauNullChecked, type);
+        dst = simplifier->simplifyTauInstanceOf(src, tauNullChecked, type);
         if (dst) return dst;
     }
 
-    dst = createOpnd(typeManager.getInt32Type());
-    appendInst(instFactory.makeTauInstanceOf(dst, src, tauNullChecked, type));
+    dst = createOpnd(typeManager->getInt32Type());
+    appendInst(instFactory->makeTauInstanceOf(dst, src, tauNullChecked, type));
     insertHash(Op_TauInstanceOf, src->getId(), type->getId(), 
                tauNullChecked->getId(), dst->getInst());
     return dst;
@@ -2602,8 +2892,8 @@ IRBuilder::genInstanceOf(Opnd* src, Type* type) {
 
 Opnd*
 IRBuilder::genSizeOf(Type* type) {
-    Opnd* dst = createOpnd(typeManager.getUInt32Type());
-    appendInst(instFactory.makeSizeof(dst, type));
+    Opnd* dst = createOpnd(typeManager->getUInt32Type());
+    appendInst(instFactory->makeSizeof(dst, type));
     return dst;
 }
 
@@ -2612,9 +2902,9 @@ IRBuilder::genUnbox(Type* type, Opnd* obj) {
     assert(type->isValue());
     Opnd *src = propagateCopy(obj);
     genTauCheckNull(obj);
-    Opnd *two = genCast(src, typeManager.getObjectType(((NamedType*)type)->getVMTypeHandle()));
-    Opnd* dst = createOpnd(typeManager.getManagedPtrType(type));
-    appendInst(instFactory.makeUnbox(dst, two, type));
+    Opnd *two = genCast(src, typeManager->getObjectType(((NamedType*)type)->getVMTypeHandle()));
+    Opnd* dst = createOpnd(typeManager->getManagedPtrType(type));
+    appendInst(instFactory->makeUnbox(dst, two, type));
     return dst;
 }
 
@@ -2622,31 +2912,31 @@ Opnd*
 IRBuilder::genBox(Type* type, Opnd* val) {
     assert(type->isValue());
     val = propagateCopy(val);
-    Opnd* dst = createOpnd(typeManager.getObjectType(((NamedType*)type)->getVMTypeHandle()));
-    appendInst(instFactory.makeBox(dst, val, type));
+    Opnd* dst = createOpnd(typeManager->getObjectType(((NamedType*)type)->getVMTypeHandle()));
+    appendInst(instFactory->makeBox(dst, val, type));
     return dst;
 }
 
 void
 IRBuilder::genCopyObj(Type* type, Opnd* dstValPtr, Opnd* srcValPtr) {
-    appendInst(instFactory.makeCopyObj(dstValPtr, srcValPtr, type));
+    appendInst(instFactory->makeCopyObj(dstValPtr, srcValPtr, type));
 }
 
 void
 IRBuilder::genInitObj(Type* type, Opnd* valPtr) {
-    appendInst(instFactory.makeInitObj(valPtr, type));
+    appendInst(instFactory->makeInitObj(valPtr, type));
 }
 
 Opnd*
 IRBuilder::genLdObj(Type* type, Opnd* addrOfValObj) {
     Opnd* dst = createOpnd(type);
-    appendInst(instFactory.makeLdObj(dst, addrOfValObj, type));
+    appendInst(instFactory->makeLdObj(dst, addrOfValObj, type));
     return dst;
 }
 
 void
 IRBuilder::genStObj(Opnd* addrOfDstVal, Opnd* srcVal, Type* type) {
-    appendInst(instFactory.makeStObj(addrOfDstVal, srcVal, type));
+    appendInst(instFactory->makeStObj(addrOfDstVal, srcVal, type));
 }
 
 void
@@ -2696,17 +2986,17 @@ IRBuilder::genRefAnyVal(Type* type, Opnd* typedRef) {
 //-----------------------------------------------------------------------------
 Opnd*
 IRBuilder::propagateCopy(Opnd* opnd) {
-    return simplifier.propagateCopy(opnd);
+    return simplifier->propagateCopy(opnd);
 }
 
 Opnd*    IRBuilder::createOpnd(Type* type) {
     if (type->tag == Type::Void)
         return OpndManager::getNullOpnd();
-    return opndManager.createSsaTmpOpnd(type);
+    return opndManager->createSsaTmpOpnd(type);
 }
 
 PiOpnd*    IRBuilder::createPiOpnd(Opnd *org) {
-    return opndManager.createPiOpnd(org);
+    return opndManager->createPiOpnd(org);
 }
 
 Opnd* IRBuilder::genTauCheckNull(Opnd* base) {
@@ -2722,10 +3012,10 @@ Opnd* IRBuilder::genTauCheckNull(Opnd* base) {
     // Not advisable to turn off simplification of checknull because
     // IRBuilder calls genTauCheckNull redundantly many times
     bool alwaysThrows = false;
-    res = simplifier.simplifyTauCheckNull(base, alwaysThrows);
+    res = simplifier->simplifyTauCheckNull(base, alwaysThrows);
     if (res && (res->getInst()->getOpcode() != Op_TauUnsafe)) return res;
-    Opnd* dst = createOpnd(typeManager.getTauType());
-    Inst *inst = appendInst(instFactory.makeTauCheckNull(dst, base));
+    Opnd* dst = createOpnd(typeManager->getTauType());
+    Inst *inst = appendInst(instFactory->makeTauCheckNull(dst, base));
     insertHash(Op_TauCheckNull, base, inst);
 
     // We can make the type init for the base object available here
@@ -2742,11 +3032,11 @@ Opnd* IRBuilder::genTauCheckZero(Opnd* src) {
     if (res) return res;
 
     bool alwaysThrows = false;
-    res = simplifier.simplifyTauCheckZero(src, alwaysThrows);
+    res = simplifier->simplifyTauCheckZero(src, alwaysThrows);
     if (res && (res->getInst()->getOpcode() != Op_TauUnsafe)) return res;
 
-    Opnd* dst = createOpnd(typeManager.getTauType());
-    appendInst(instFactory.makeTauCheckZero(dst, src));
+    Opnd* dst = createOpnd(typeManager->getTauType());
+    appendInst(instFactory->makeTauCheckZero(dst, src));
     insertHash(Op_TauCheckZero, src, dst->getInst());
     return dst;
 }
@@ -2760,11 +3050,11 @@ Opnd *IRBuilder::genTauCheckDivOpnds(Opnd* src1, Opnd *src2) {
     if (res) return res;
 
     bool alwaysThrows = false;
-    res = simplifier.simplifyTauCheckDivOpnds(src1, src2, alwaysThrows);
+    res = simplifier->simplifyTauCheckDivOpnds(src1, src2, alwaysThrows);
     if (res && (res->getInst()->getOpcode() != Op_TauUnsafe)) return res;
 
-    Opnd* dst = createOpnd(typeManager.getTauType());
-    Inst *inst = appendInst(instFactory.makeTauCheckDivOpnds(dst, src1, src2));
+    Opnd* dst = createOpnd(typeManager->getTauType());
+    Inst *inst = appendInst(instFactory->makeTauCheckDivOpnds(dst, src1, src2));
     insertHash(Op_TauCheckDivOpnds, src1, src2, inst);
     return dst;
 }
@@ -2783,7 +3073,7 @@ Opnd *IRBuilder::genTauCheckBounds(Opnd* array, Opnd* index, Opnd *tauNullChecke
     if (res) return res;
 
     Opnd *tauArrayTypeChecked = genTauHasType(array, array->getType());
-    Opnd* arrayLen = genTauArrayLen(typeManager.getInt32Type(), Type::Int32, array, 
+    Opnd* arrayLen = genTauArrayLen(typeManager->getInt32Type(), Type::Int32, array, 
                                     tauNullChecked, tauArrayTypeChecked);
 
     Opnd* dst = genTauCheckBounds(arrayLen, index);
@@ -2805,11 +3095,11 @@ IRBuilder::genTauCheckElemType(Opnd* array, Opnd* src, Opnd *tauNullChecked,
 
     if (irBuilderFlags.doSimplify) {
         bool alwaysThrows = false;
-        res = simplifier.simplifyTauCheckElemType(array, src, alwaysThrows);
+        res = simplifier->simplifyTauCheckElemType(array, src, alwaysThrows);
         if (res && (res->getInst()->getOpcode() != Op_TauUnsafe)) return res;
     }
-    Opnd* dst = createOpnd(typeManager.getTauType());
-    Inst* inst = appendInst(instFactory.makeTauCheckElemType(dst, array, src, 
+    Opnd* dst = createOpnd(typeManager->getTauType());
+    Inst* inst = appendInst(instFactory->makeTauCheckElemType(dst, array, src, 
                                                              tauNullChecked,
                                                              tauIsArray));
     insertHash(Op_TauCheckElemType, array, src, inst);
@@ -2826,13 +3116,13 @@ IRBuilder::genTauCheckBounds(Opnd* ub, Opnd *index) {
 
     if (irBuilderFlags.doSimplify) {
         bool alwaysThrows = false;
-        dst = simplifier.simplifyTauCheckBounds(ub, index, alwaysThrows);
+        dst = simplifier->simplifyTauCheckBounds(ub, index, alwaysThrows);
     }
 
     if (!(dst && (dst->getInst()->getOpcode() != Op_TauUnsafe))) {
         // need to create one
-        dst = createOpnd(typeManager.getTauType());
-        appendInst(instFactory.makeTauCheckBounds(dst, ub, index));
+        dst = createOpnd(typeManager->getTauType());
+        appendInst(instFactory->makeTauCheckBounds(dst, ub, index));
     }
     insertHash(Op_TauCheckBounds, ub, index, dst->getInst());
     return dst;
@@ -2853,12 +3143,12 @@ IRBuilder::genTauCheckFinite(Opnd* src) {
 
     if (irBuilderFlags.doSimplify) {
         bool alwaysThrows = false;
-        dst = simplifier.simplifyTauCheckFinite(src, alwaysThrows);
+        dst = simplifier->simplifyTauCheckFinite(src, alwaysThrows);
         if (dst && (dst->getInst()->getOpcode() != Op_TauUnsafe)) return dst;
     }
     
-    dst = createOpnd(typeManager.getTauType());
-    appendInst(instFactory.makeTauCheckFinite(dst, src));
+    dst = createOpnd(typeManager->getTauType());
+    appendInst(instFactory->makeTauCheckFinite(dst, src));
     insertHash(Op_TauCheckFinite, src, dst->getInst());
     return dst;
 }
@@ -2871,7 +3161,7 @@ IRBuilder::genTauCheckFinite(Opnd* src) {
 Opnd* IRBuilder::lookupHash(uint32 opc) {
     if (! irBuilderFlags.doCSE)
         return NULL;
-    Inst* inst = cseHashTable.lookup(opc);
+    Inst* inst = cseHashTable->lookup(opc);
     if (inst) 
         return inst->getDst();
     else 
@@ -2881,7 +3171,7 @@ Opnd* IRBuilder::lookupHash(uint32 opc) {
 Opnd* IRBuilder::lookupHash(uint32 opc, uint32 op) {
     if (! irBuilderFlags.doCSE)
         return NULL;
-    Inst* inst =  cseHashTable.lookup(opc, op);
+    Inst* inst =  cseHashTable->lookup(opc, op);
     if (inst)
         return inst->getDst();
     else
@@ -2891,7 +3181,7 @@ Opnd* IRBuilder::lookupHash(uint32 opc, uint32 op) {
 Opnd* IRBuilder::lookupHash(uint32 opc, uint32 op1, uint32 op2) {
     if (! irBuilderFlags.doCSE)
         return NULL;
-    Inst* inst = cseHashTable.lookup(opc, op1, op2);
+    Inst* inst = cseHashTable->lookup(opc, op1, op2);
     if (inst)
         return inst->getDst();
     else
@@ -2901,7 +3191,7 @@ Opnd* IRBuilder::lookupHash(uint32 opc, uint32 op1, uint32 op2) {
 Opnd* IRBuilder::lookupHash(uint32 opc, uint32 op1, uint32 op2, uint32 op3) {
     if (! irBuilderFlags.doCSE)
         return NULL;
-    Inst* inst = cseHashTable.lookup(opc, op1, op2, op3);
+    Inst* inst = cseHashTable->lookup(opc, op1, op2, op3);
     if (inst)
         return inst->getDst();
     else
@@ -2911,26 +3201,26 @@ Opnd* IRBuilder::lookupHash(uint32 opc, uint32 op1, uint32 op2, uint32 op3) {
 void IRBuilder::insertHash(uint32 opc, Inst* inst) {
     if (! irBuilderFlags.doCSE)
         return;
-    cseHashTable.insert(opc, inst);
+    cseHashTable->insert(opc, inst);
 }
 
 void IRBuilder::insertHash(uint32 opc, uint32 op1, Inst* inst) {
     if (! irBuilderFlags.doCSE)
         return;
-    cseHashTable.insert(opc, op1, inst);
+    cseHashTable->insert(opc, op1, inst);
 }
 
 void IRBuilder::insertHash(uint32 opc, uint32 op1, uint32 op2, Inst* inst) {
     if (! irBuilderFlags.doCSE)
         return;
-    cseHashTable.insert(opc, op1, op2, inst);
+    cseHashTable->insert(opc, op1, op2, inst);
 }
 
 void IRBuilder::insertHash(uint32 opc, uint32 op1, uint32 op2, uint32 op3,
                            Inst* inst) {
     if (! irBuilderFlags.doCSE)
         return;
-    cseHashTable.insert(opc, op1, op2, op3, inst);
+    cseHashTable->insert(opc, op1, op2, op3, inst);
 }
 
 // tau instructions
@@ -2939,8 +3229,8 @@ IRBuilder::genTauSafe() {
     Opnd* dst = lookupHash(Op_TauSafe);
     if (dst) return dst;
 
-    dst = createOpnd(typeManager.getTauType());
-    appendInst(instFactory.makeTauSafe(dst));
+    dst = createOpnd(typeManager->getTauType());
+    appendInst(instFactory->makeTauSafe(dst));
 
     insertHash(Op_TauSafe, dst->getInst());
     return dst;
@@ -2952,18 +3242,18 @@ IRBuilder::genTauMethodSafe() {
     Opnd* dst = tauMethodSafeOpnd;
     if (dst) return dst;
     
-    dst = createOpnd(typeManager.getTauType());
-    Inst *inst = instFactory.makeTauPoint(dst);
+    dst = createOpnd(typeManager->getTauType());
+    Inst *inst = instFactory->makeTauPoint(dst);
 
-    CFGNode *head = getFlowGraph().getEntry();
-    Inst *entryLabel = head->getFirstInst();
+    Node *head = flowGraph->getEntryNode();
+    Inst *entryLabel = (Inst*)head->getFirstInst();
     // first search for one already there
-    Inst *where = entryLabel->next();
-    while (where != entryLabel) {
+    Inst *where = entryLabel->getNextInst();
+    while (where != NULL) {
         if (where->getOpcode() != Op_DefArg) {
             break;
         }
-        where = where->next();
+        where = where->getNextInst();
     }
     // insert before where
     inst->insertBefore(where);
@@ -2978,8 +3268,8 @@ IRBuilder::genTauUnsafe() {
     Opnd* dst = lookupHash(Op_TauUnsafe);
     if (dst) return dst;
     
-    dst = createOpnd(typeManager.getTauType());
-    appendInst(instFactory.makeTauUnsafe(dst));
+    dst = createOpnd(typeManager->getTauType());
+    appendInst(instFactory->makeTauUnsafe(dst));
 
     insertHash(Op_TauUnsafe, dst->getInst());
     return dst;
@@ -2993,7 +3283,7 @@ IRBuilder::genTauStaticCast(Opnd *src, Opnd *tauCheckedCast, Type *castType) {
     if (dst) return dst;
     
     dst = createOpnd(castType);
-    appendInst(instFactory.makeTauStaticCast(dst, src, tauCheckedCast, castType));
+    appendInst(instFactory->makeTauStaticCast(dst, src, tauCheckedCast, castType));
     
     insertHash(hashcode, src->getId(), tauCheckedCast->getId(), castType->getId(), dst->getInst());
     Operation hasTypeOperation(Op_TauHasType, castType->tag, Modifier());
@@ -3010,8 +3300,8 @@ IRBuilder::genTauHasType(Opnd *src, Type *castType) {
     Opnd* dst = lookupHash(hashcode, src->getId(), castType->getId());
     if (dst) return dst;
     
-    dst = createOpnd(typeManager.getTauType());
-    appendInst(instFactory.makeTauHasType(dst, src, castType));
+    dst = createOpnd(typeManager->getTauType());
+    appendInst(instFactory->makeTauHasType(dst, src, castType));
     
     insertHash(hashcode, src->getId(), castType->getId(), dst->getInst());
     return dst;
@@ -3024,8 +3314,8 @@ IRBuilder::genTauHasExactType(Opnd *src, Type *castType) {
     Opnd* dst = lookupHash(hashcode, src->getId(), castType->getId());
     if (dst) return dst;
     
-    dst = createOpnd(typeManager.getTauType());
-    appendInst(instFactory.makeTauHasExactType(dst, src, castType));
+    dst = createOpnd(typeManager->getTauType());
+    appendInst(instFactory->makeTauHasExactType(dst, src, castType));
     
     insertHash(hashcode, src->getId(), castType->getId(), dst->getInst());
     return dst;
@@ -3037,8 +3327,8 @@ IRBuilder::genTauIsNonNull(Opnd *src) {
     Opnd* dst = lookupHash(hashcode, src->getId());
     if (dst) return dst;
     
-    dst = createOpnd(typeManager.getTauType());
-    appendInst(instFactory.makeTauIsNonNull(dst, src));
+    dst = createOpnd(typeManager->getTauType());
+    appendInst(instFactory->makeTauIsNonNull(dst, src));
     
     insertHash(hashcode, src->getId(), dst->getInst());
 
@@ -3060,9 +3350,9 @@ IRBuilder::genTauAnd(Opnd *src1, Opnd *src2) {
     Opnd* dst = lookupHash(Op_TauAnd, src1, src2);
     if (dst) return dst;
 
-    dst = createOpnd(typeManager.getTauType());
+    dst = createOpnd(typeManager->getTauType());
     Opnd* srcs[2] = { src1, src2 };
-    appendInst(instFactory.makeTauAnd(dst, 2, srcs));
+    appendInst(instFactory->makeTauAnd(dst, 2, srcs));
     
     insertHash(Op_TauAnd, src1->getId(), src2->getId(), dst->getInst());
     return dst;
@@ -3074,13 +3364,14 @@ IRBuilder::appendInstUpdateInlineInfo(Inst* inst, InlineInfoBuilder* builder, Me
     assert(inst->getCallInstInlineInfoPtr());
 
     if ( builder ) {
-        builder->buildInlineInfoForInst(inst, target_md);
+        offset = builder->buildInlineInfoForInst(inst, offset, target_md);
     }
+    
     appendInst(inst);
 }
 
 Inst* IRBuilder::getLastGeneratedInst() {
-    return currentLabel->prev();
+    return (Inst*)currentLabel->getNode()->getLastInst();
 }
 
 } //namespace Jitrino 

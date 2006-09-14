@@ -145,6 +145,7 @@ hythread_is_sleeping;
 hythread_is_waiting_with_timeout;
 hythread_is_waiting_indefinitely;
 hythread_is_runnable;
+hythread_is_terminated;
 hythread_thin_monitor_get_recursion;
 array_add;
 array_create;

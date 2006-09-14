@@ -54,6 +54,9 @@ hythread_monitor_t p_global_monitor;
 hythread_group_t TM_DEFAULT_GROUP;
 hythread_group_t group_list;
 
+hythread_monitor_t *lock_table = NULL;
+int table_size = 8024;
+
 IDATA       groups_count;
 
 IDATA       nondaemon_thread_count;
@@ -99,21 +102,24 @@ void VMCALL hythread_init(hythread_library_t lib){
         if(TM_LOCK) {
                 return;
         }
- 
-   apr_status = apr_initialize();
-   assert(apr_status == APR_SUCCESS);
-   apr_status = apr_pool_create(&TM_POOL, NULL);
-   assert(apr_status == APR_SUCCESS);
-   status = hymutex_create(&TM_LOCK, TM_MUTEX_NESTED);
-   assert (status == TM_ERROR_NONE);
-   status = hymutex_create(&TM_START_LOCK, TM_MUTEX_NESTED);
-   assert (status == TM_ERROR_NONE);
-   status = hymutex_create(&FAT_MONITOR_TABLE_LOCK, TM_MUTEX_NESTED);
-   assert (status == TM_ERROR_NONE);
-   apr_status = apr_threadkey_private_create(&TM_THREAD_KEY, NULL, TM_POOL);
-   assert(apr_status == APR_SUCCESS);
-   status = init_group_list();
-   assert (status == TM_ERROR_NONE);
+     
+    apr_status = apr_initialize();
+    assert(apr_status == APR_SUCCESS);
+    apr_status = apr_pool_create(&TM_POOL, NULL);
+    assert(apr_status == APR_SUCCESS);
+
+    apr_status = apr_threadkey_private_create(&TM_THREAD_KEY, NULL, TM_POOL);
+    assert(apr_status == APR_SUCCESS);
+    
+    status = hymutex_create(&TM_LOCK, TM_MUTEX_NESTED);
+    assert (status == TM_ERROR_NONE);
+    status = hymutex_create(&TM_START_LOCK, TM_MUTEX_NESTED);
+    assert (status == TM_ERROR_NONE);
+    status = hymutex_create(&FAT_MONITOR_TABLE_LOCK, TM_MUTEX_NESTED);
+    assert (status == TM_ERROR_NONE);
+    
+    status = init_group_list();
+    assert (status == TM_ERROR_NONE);
 
     // Create default group - hosts any thread crated with NULL group
     status = hythread_group_create(&TM_DEFAULT_GROUP);
@@ -124,6 +130,9 @@ void VMCALL hythread_init(hythread_library_t lib){
     nondaemon_thread_count = 0;
     status = hycond_create(&nondaemon_thread_cond);
     assert (status == TM_ERROR_NONE);
+    
+    lock_table = (hythread_monitor_t *)malloc(sizeof(hythread_monitor_t)*table_size);
+    assert(lock_table);
     
     // init global monitor
     status=hythread_monitor_init_with_name(&p_global_monitor, 0, "Thread Global Monitor");
@@ -174,8 +183,7 @@ IDATA VMCALL hythread_global_unlock() {
     return hymutex_unlock(TM_LOCK);
 }
 
-/*
- */
+
 IDATA increase_nondaemon_threads_count() {
     IDATA status;
         
@@ -186,8 +194,7 @@ IDATA increase_nondaemon_threads_count() {
         status = hymutex_unlock(TM_LOCK);
         return status;
 }
-/*
- */
+
 IDATA countdown_nondaemon_threads() {
     IDATA status;
         
@@ -236,14 +243,10 @@ IDATA VMCALL hythread_wait_for_all_nondaemon_threads() {
     return status;
 }
 
-/*
- */
 hythread_group_t  get_java_thread_group(void){
     return TM_DEFAULT_GROUP;
 }
 
-/*
- */
 static IDATA init_group_list() {
     // Initial group, does not contain any actual group, but serves 
     //as a head and a tail of this list;
@@ -261,8 +264,6 @@ static IDATA init_group_list() {
     return TM_ERROR_NONE;
 }
 
-/*
- */
 static IDATA destroy_group_list() {
     hythread_group_t cur;
     IDATA status,status2;
@@ -287,14 +288,10 @@ static IDATA destroy_group_list() {
     return status;
 }
 
-/*
- */
 IDATA acquire_start_lock() {
     return hymutex_lock(TM_START_LOCK);
 }
 
-/*
- */
 IDATA release_start_lock() {
     return hymutex_unlock(TM_START_LOCK);
 }
@@ -307,7 +304,7 @@ IDATA release_start_lock() {
 */
 #define  TABLE_SIZE 256
 char *names [TABLE_SIZE];
-unsigned data [TABLE_SIZE];
+UDATA data [TABLE_SIZE];
 int size = 0;
 
 /*

@@ -132,7 +132,7 @@ typedef struct HyThreadGroup *hythread_group_t;
 typedef struct HyThread *hythread_iterator_t;
 typedef struct HyThreadLibrary *hythread_library_t;
 
-typedef IDATA  hythread_thin_monitor_t;
+typedef I_32  hythread_thin_monitor_t;
 
 typedef void (*hythread_event_callback_proc)(void);
 
@@ -147,9 +147,6 @@ typedef void (*hythread_event_callback_proc)(void);
 IDATA VMCALL hythread_global_lock();
 IDATA VMCALL hythread_global_unlock();
 void VMCALL hythread_init (hythread_library_t lib);
-IDATA VMCALL hythread_shutdown();
-IDATA VMCALL hythread_wait_for_all_nondaemon_threads();
-UDATA* VMCALL hythread_global (char* name);
 
 //@}
 /** @name  Basic manipulation 
@@ -196,7 +193,7 @@ IDATA VMCALL hycond_destroy (hycond_t cond);
  void hythread_suspend_enable();
  void hythread_suspend_disable();
  void hythread_safe_point();
-void VMCALL hythread_suspend_other(hythread_t thread);
+ IDATA VMCALL hythread_suspend_other(hythread_t thread);
 
 IDATA VMCALL hythread_set_safepoint_callback(hythread_t thread, hythread_event_callback_proc callback);
 hythread_event_callback_proc VMCALL hythread_get_safepoint_callback(hythread_t t);
@@ -235,13 +232,10 @@ IDATA VMCALL hythread_iterator_size(hythread_iterator_t iterator);
 //@{
 
  IDATA hysem_create(hysem_t *sem, UDATA initial_count, UDATA max_count);
-IDATA VMCALL hysem_wait(hysem_t sem);
 IDATA VMCALL hysem_wait_timed(hysem_t sem, I_64 ms, IDATA nano);
 IDATA VMCALL hysem_wait_interruptable(hysem_t sem, I_64 ms, IDATA nano);
 IDATA VMCALL hysem_getvalue(IDATA *count, hysem_t sem);
  IDATA hysem_set(hysem_t sem, IDATA count);
-IDATA VMCALL hysem_post(hysem_t sem);
-IDATA VMCALL hysem_destroy(hysem_t sem);
 
 //@}
 /** @name Mutex

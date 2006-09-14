@@ -14,8 +14,8 @@
  *  limitations under the License.
  */
 /**
- * @author Intel, Mikhail Y. Fursov
- * @version $Revision: 1.11.12.1.4.4 $
+ * @author Mikhail Y. Fursov
+ * @version $Revision$
  */
 
 
@@ -28,14 +28,14 @@ namespace Jitrino
 namespace Ia32 {
 
 
-BEGIN_DECLARE_IRTRANSFORMER(GCPointsBaseLiveRangeFixer, "gcpoints", "GC Safe Points Info")
-    GCPointsBaseLiveRangeFixer(IRManager& irm, const char * params=0): IRTransformer(irm, params), sideEffect(0){} 
+class GCPointsBaseLiveRangeFixer: public SessionAction {
+public:
     void runImpl();
     uint32 getSideEffects() const {return sideEffect;}
     uint32 getNeedInfo()const{ return 0;}
 private:
-    uint32 sideEffect;    	
-END_DECLARE_IRTRANSFORMER(GCPointsBaseLiveRangeFixer) 
+    uint32 sideEffect;    
+};
 
 class GCSafePointsInfo;
 
@@ -75,7 +75,7 @@ public:
         if (offset!=p.offset) {
             return offset < p.offset;
         }
-        return &(*this) < &p;
+        return false;
     }
     
     inline bool equalBaseAndMptr(const MPtrPair& p) const {return  p.mptr == mptr && p.base == base;}
@@ -112,9 +112,9 @@ public:
 
     static bool isGCSafePoint(const Inst* inst)  {return IRManager::isGCSafePoint(inst);}
     static bool graphHasSafePoints(const IRManager& irm);
-    static bool blockHasSafePoints(const BasicBlock* b);
+    static bool blockHasSafePoints(const Node* b);
     /** if pairs!=NULL counts only gcpoints with non-empty pairs*/
-    static uint32 getNumSafePointsInBlock(const BasicBlock* b, const GCSafePointPairsMap* pairsMap = NULL);
+    static uint32 getNumSafePointsInBlock(const Node* b, const GCSafePointPairsMap* pairsMap = NULL);
     static MPtrPair* findPairByMPtrOpnd(GCSafePointPairs& pairs, const Opnd* mptr);
         
 private:
@@ -123,7 +123,7 @@ private:
     void calculateMPtrs();
     void filterLiveMPtrsOnGCSafePoints();
 
-    void checkPairsOnNodeExits(const Nodes& nodes) const ;
+    void checkPairsOnNodeExits() const ;
     void checkPairsOnGCSafePoints() const ;
 
     /** fills res with pairs on 'node' entry, merges equal pairs and resolves ambiguous mptrs.
@@ -131,7 +131,7 @@ private:
      */
     void derivePairsOnEntry(const Node* node, GCSafePointPairs& res);
     void updatePairsOnInst(Inst* inst, GCSafePointPairs& res) ;
-    void addAllLive(const LiveSet* ls, GCSafePointPairs& res, const GCSafePointPairs& predBlockPairs) const ;
+    void addAllLive(const BitSet* ls, GCSafePointPairs& res, const GCSafePointPairs& predBlockPairs) const ;
     void processStaticFieldMptr(Opnd* opnd, Opnd* from, bool forceStatic);
     
     bool hasEqualElements(GCSafePointPairs& p1, GCSafePointPairs& p2) const  {
@@ -143,8 +143,8 @@ private:
         return std::equal(p1.begin(), p1.end(), p2.begin());
     };
 
-    void setLivenessFilter(const Inst* inst, const LiveSet* ls);
-    const LiveSet* findLivenessFilter(const Inst* inst) const;
+    void setLivenessFilter(const Inst* inst, const BitSet* ls);
+    const BitSet* findLivenessFilter(const Inst* inst) const;
     void removePairByMPtrOpnd(GCSafePointPairs& pairs, const Opnd* mptr) const;
     void runLivenessFilter(Inst* inst, GCSafePointPairs& res) const;
     Opnd* getBaseAccordingMode(Opnd* opnd) const;
@@ -156,9 +156,9 @@ private:
     IRManager&      irm;
     
     
-    StlVector<GCSafePointPairs*> pairsByNodeId;
+    StlVector<GCSafePointPairs*> pairsByNode;
     GCSafePointPairsMap         pairsByGCSafePointInstId;
-    StlMap<const Inst*, const LiveSet*> livenessFilter;
+    StlMap<const Inst*, const BitSet*> livenessFilter;
     StlMap<Inst*, Opnd*> ambiguityFilters;
     StlSet<Opnd*> staticMptrs;
     bool allowMerging;

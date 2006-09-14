@@ -28,223 +28,118 @@
 #include "irmanager.h"
 #include "IRBuilder.h"
 #include "simplifier.h"
-#include "PropertyTable.h"
 #include "Log.h"
 #include "methodtable.h"
 #include "CompilationContext.h"
+#include "FlowGraph.h"
 
 namespace Jitrino {
 
-void TranslatorIntfc::readFlagsFromCommandLine(CompilationContext* cs, bool ia32Cg)
-{
-    JitrinoParameterTable* params = cs->getThisParameterTable();
-    TranslatorFlags& flags = *cs->getTranslatorFlags();
-    flags.propValues = params->lookupBool("tra::propValues", true);
-    bool defaultGenCharArrayCopy = ia32Cg ? false : true;
-    flags.genCharArrayCopy = params->lookupBool("tra::genCharArrayCopy", 
-                                                 defaultGenCharArrayCopy); 
-    flags.onlyBalancedSync = params->lookupBool("tra::balancedSync", false);
-                          
-#ifdef _IPF_            
-    flags.optArrayInit = params->lookupBool("tra::optArrayInit", false);
-#else
-    flags.optArrayInit = params->lookupBool("tra::optArrayInit", true);
-#endif
-    flags.ignoreSync       = params->lookupBool("tra::ignoreSync",false);
-    flags.syncAsEnterFence = params->lookupBool("tra::syncAsEnterFence",false);
-    flags.newCatchHandling = params->lookupBool("tra::newCatchHandling",true);
-	flags.inlineMethods = params->lookupBool("tra::inlineMethods", true);
-    
-    flags.guardedInlining = params->lookupBool("tra::guardedInlining", true);
-    //
-    // see optimizer.cpp for additional info about the "client" option
-    //
-    if ( params->lookupBool("client", false) ) {
-        flags.guardedInlining = false;
-    }
 
-    flags.magicMinMaxAbs = params->lookupBool("tra::magicMinMaxAbs", false);
-    flags.genMinMaxAbs = params->lookupBool("tra::genMinMaxAbs", false);
-    flags.genFMinMaxAbs = params->lookupBool("tra::genFMinMaxAbs", false);
-    const char* skipMethods = params->lookup("opt::inline::skip_methods");
+void TranslatorSession::run () {
+    TranslatorAction* action = (TranslatorAction*)getAction();
+    flags = action->getFlags();
+
+    translate();
+    postTranslatorCleanup();
+}
+
+// this is the regular routine to be used to generate IR for a method
+void TranslatorSession::translate() {
+    CompilationContext* cc = getCompilationContext();
+    IRManager* irm = cc->getHIRManager();
+    assert(irm);
+    MethodDesc& methodDesc = irm->getMethodDesc();
+    if (methodDesc.isJavaByteCodes()) {
+        //create IRBuilder
+        MemoryManager& mm = cc->getCompilationLevelMemoryManager();
+        TranslatorAction* myAction = (TranslatorAction*)getAction();
+        IRBuilder* irb = (IRBuilder*)myAction->getIRBuilderAction()->createSession(mm);
+        irb->setCompilationContext(cc);
+        MemoryManager tmpMM(1024, "IRBuilder::tmpMM");
+        irb->init(irm, &flags, tmpMM);
+        JavaTranslator::translateMethod(*cc->getVMCompilationInterface(), methodDesc, *irb);
+    } else {
+        assert(false);
+    }
+}
+
+
+void TranslatorSession::postTranslatorCleanup() {
+    IRManager* irm = getCompilationContext()->getHIRManager();
+    ControlFlowGraph& flowGraph = irm->getFlowGraph();
+    MethodDesc& methodDesc = irm->getMethodDesc();
+    if (Log::isEnabled()) {
+        Log::out() << "PRINTING LOG: After Translator" << std::endl;
+        FlowGraph::printHIR(Log::out(), flowGraph, methodDesc);
+    }
+    FlowGraph::doTranslatorCleanupPhase(*irm);
+    if (Log::isEnabled()) {
+        Log::out() << "PRINTING LOG: After Cleanup" << std::endl;
+        FlowGraph::printHIR(Log::out(), flowGraph,  methodDesc);
+    }
+}
+
+
+static const char* help = \
+    "  inlineMethods[={ON|off}] - bytecode inlining\n"\
+    "  propValues[={ON|off}]    -  propagate values during translation\n"\
+    "  guardedInlining[={on|OFF}]  - do guarded inlining during translation\n"\
+    "  genCharArrayCopy[={on|off}] - generate intrinsic calls to char array copy\n"\
+    "  genArrayCopy[={ON|off}] - inline java/lang/System::arraycopy call\n"\
+    "  useMagicMethods[={MagicClass name}] - use magic methods with magic class named MagicClass\n"\
+    "  balancedSync[={on|OFF}] - treat all synchronization as balanced\n"\
+    "  ignoreSync[={on|OFF}]   - do not generate synchronization\n"\
+    "  syncAsEnterFence[={on|OFF}] - implement synchronization as monitor enter fence\n"\
+    "  magicMinMaxAbs[={on|OFF}] - treat java/lang/Math::min and max as magic\n"\
+    "  genMinMaxAbs[={on|OFF}]   - use special opcodes for Min/Max/Abs\n"\
+    "  genFMinMaxAbs[={on|OFF}]  - also use opcodes for float Min/Max/Abs\n";
+
+
+
+
+static ActionFactory<TranslatorSession, TranslatorAction> _translator("translator", help);
+
+void TranslatorAction::init() {
+    readFlags();
+    MemoryManager& mm = getJITInstanceContext().getGlobalMemoryManager();
+    irbAction = (IRBuilderAction*)createAuxAction(mm, IRBUILDER_ACTION_NAME, "irbuilder");
+    irbAction->init();
+}    
+
+void TranslatorAction::readFlags() {
+    flags.propValues = getBoolArg("propValues", true);
+#if defined(_IPF_)
+    flags.genCharArrayCopy = getBoolArg("genCharArrayCopy", true); 
+    flags.optArrayInit = getBoolArg("optArrayInit", false);
+#else
+    flags.genCharArrayCopy = getBoolArg("genCharArrayCopy", false); 
+    flags.optArrayInit = getBoolArg("optArrayInit", true);
+#endif
+    flags.genArrayCopy = getBoolArg("genArrayCopy", true); 
+    flags.onlyBalancedSync = getBoolArg("balancedSync", false);
+
+    flags.ignoreSync       = getBoolArg("ignoreSync",false);
+    flags.syncAsEnterFence = getBoolArg("syncAsEnterFence",false);
+    flags.newCatchHandling = getBoolArg("newCatchHandling",true);
+
+    flags.inlineMethods  = getBoolArg("inlineMethods", false);
+    flags.guardedInlining = getBoolArg("guardedInlining", false);
+
+    flags.magicMinMaxAbs = getBoolArg("magicMinMaxAbs", false);
+    flags.genMinMaxAbs = getBoolArg("genMinMaxAbs", false);
+    flags.genFMinMaxAbs = getBoolArg("genFMinMaxAbs", false);
+ 
+    const char* skipMethods = getStringArg("skipMethods", NULL);
     if(skipMethods == NULL) {
         flags.inlineSkipTable = NULL;
     } else {
         flags.inlineSkipTable = new Method_Table(strdup(skipMethods), "SKIP_METHODS", true);
-	}
-
-    flags.magicClass=(char *)params->lookup("tra::useMagicMethods"); //NULL if not specified
-
-}
-
-void TranslatorIntfc::showFlagsFromCommandLine()
-{
-    Log::out() << "    tra::inlineMethods[={ON|off}] = bytecode inlining" << ::std::endl;
-    Log::out() << "    tra::propValues[={ON|off}] =  propagate values during translation" << ::std::endl;
-    Log::out() << "    tra::guardedInlining[={on|OFF}] = do guarded inlining during translation" << ::std::endl;
-    Log::out() << "    tra::genCharArrayCopy[={on|off}] = generate intrinsic calls to char array copy" << ::std::endl;
-    Log::out() << "    tra::useMagicMethods[={MagicClass name}] = use magic methods with magic class named MagicClass"<< ::std::endl;
-    Log::out() << "    tra::balancedSync[={on|OFF}] = treat all synchronization as balanced" << ::std::endl;
-    Log::out() << "    tra::ignoreSync[={on|OFF}] = do not generate synchronization" << ::std::endl;
-    Log::out() << "    tra::syncAsEnterFence[={on|OFF}] = implement synchronization as monitor enter fence" << ::std::endl;
-    Log::out() << "    tra::magicMinMaxAbs[={on|OFF}] = treat java/lang/Math::min and max as magic"<< ::std::endl;
-    Log::out() << "    tra::genMinMaxAbs[={on|OFF}] = use special opcodes for Min/Max/Abs, rather than using Select"<< ::std::endl;
-    Log::out() << "    tra::genFMinMaxAbs[={on|OFF}] = also use opcodes for float Min/Max/Abs, rather than using Select"<< ::std::endl;
-}
-
-
-void IRBuilder::readFlagsFromCommandLine(CompilationContext* cs)
-{
-    JitrinoParameterTable* params = cs->getThisParameterTable();
-    IRBuilderFlags &irBuilderFlags = *cs->getIRBuilderFlags();
-    
-    //
-    // IRBuilder expansion flags
-    //
-    irBuilderFlags.expandMemAddrs         = params->lookupBool("irb::expandMemAddrs", true);
-    irBuilderFlags.expandElemAddrs        = params->lookupBool("irb::expandElemAddrs", true);
-    irBuilderFlags.expandCallAddrs        = params->lookupBool("irb::expandCallAddrs", false);
-    irBuilderFlags.expandVirtualCallAddrs = params->lookupBool("irb::expandVirtualCallAddrs", true);
-    irBuilderFlags.expandNullChecks       = params->lookupBool("irb::expandNullChecks", true);
-    irBuilderFlags.expandElemTypeChecks   = params->lookupBool("irb::expandElemTypeChecks", true);
-
-    //
-    // IRBuilder translation-time optimizations
-    //
-    irBuilderFlags.doCSE                  = params->lookupBool("irb::doCSE", true);
-    irBuilderFlags.doSimplify             = params->lookupBool("irb::doSimplify", true);
-
-    irBuilderFlags.suppressCheckBounds = params->lookupBool("irb::suppressCheckBounds", false);
-
-	irBuilderFlags.insertMethodLabels     = params->lookupBool("irb::insertMethodLabels", true);
-    irBuilderFlags.compressedReferences = params->lookupBool("irb::compressedReferences", false);
-
-    irBuilderFlags.genMinMaxAbs = params->lookupBool("tra::genMinMaxAbs", false);
-    irBuilderFlags.genFMinMaxAbs = params->lookupBool("tra::genFMinMaxAbs", false);
-
-    irBuilderFlags.useNewTypeSystem = params->lookupBool("tra::useNewTypeSystem", false);
-}
-
-void IRBuilder::showFlagsFromCommandLine()
-{
-    //
-    // IRBuilder expansion flags
-    //
-    Log::out() << "    irb::expandMemAddrs[={ON|off}] = ?" << ::std::endl;
-    Log::out() << "    irb::expandElemAddrs[={ON|off}] = ?" << ::std::endl;
-    Log::out() << "    irb::expandCallAddrs[={on|OFF}]  = ?" << ::std::endl;
-    Log::out() << "    irb::expandVirtualCallAddrs[={ON|off}] = ?" << ::std::endl;
-    Log::out() << "    irb::expandNullChecks[={ON|off}] = ?" << ::std::endl;
-    Log::out() << "    irb::expandElemTypeChecks[={ON|off}] = ?" << ::std::endl;
-
-    //
-    // IRBuilder translation-time optimizations
-    //
-    Log::out() << "    irb::doCSE[={ON|off}] = ?" << ::std::endl;
-    Log::out() << "    irb::doSimplify[={ON|off}] = ?" << ::std::endl;
-
-    Log::out() << "    irb::suppressCheckBounds[={on|OFF}] = omit all bounds checks" << ::std::endl;
-
-    Log::out() << "    irb::insertMethodLabels[={on|OFF}]  = ?" << ::std::endl;
-    Log::out() << "    irb::compressedReferences[={on|OFF}] = force compressed references\n";
-}
-
-static void 
-InitIRBuilderFlags(CompilationInterface& compilationInterface,
-                   MethodDesc&  methodDesc) {
-    //
-    // Flags from compilation environment
-    //
-    IRBuilderFlags& irBuilderFlags = *compilationInterface.getCompilationContext()->getIRBuilderFlags();
-    irBuilderFlags.insertWriteBarriers    = compilationInterface.insertWriteBarriers();
-    irBuilderFlags.compressedReferences   = irBuilderFlags.compressedReferences || compilationInterface.areReferencesCompressed();
-}
-
-//
-// this is the regular routine to be used to generate IR for a method
-//
-void
-TranslatorIntfc::translateByteCodes(IRManager& irManager) {
-    CompilationInterface& compilationInterface = irManager.getCompilationInterface();
-    MethodDesc &methodDesc = irManager.getMethodDesc();
-
-    //assert(flags);
-    //assert(IRBuilder::flagsFromCommandLine);
-    InitIRBuilderFlags(compilationInterface,irManager.getMethodDesc());
-
-    IRBuilder irBuilder(irManager);
-    if (methodDesc.isJavaByteCodes()) {
-        JavaTranslator javaTranslator;
-        javaTranslator.translateMethod(compilationInterface,
-                                       methodDesc,
-                                       irBuilder);
-    } else {
-		assert(false);
-	}
-}
-
-//
-// this is the routine to be used to generate IR for an inlined method
-//
-void
-TranslatorIntfc::translateByteCodesInline(IRManager& irManager,
-                                          uint32 numArgs, Opnd** argOpnds, uint32 inlineDepth) {
-    CompilationInterface& compilationInterface = irManager.getCompilationInterface();
-    MethodDesc& methodDesc = irManager.getMethodDesc();
-
-    InitIRBuilderFlags(compilationInterface,methodDesc);
-
-    IRBuilder irBuilder(irManager);
-
-    if (methodDesc.isJavaByteCodes()) {
-        Opnd* returnOpnd = irManager.getReturnOpnd();
-        JavaTranslateMethodForIRInlining(
-            compilationInterface,
-            methodDesc,
-            irBuilder,
-            numArgs,
-            argOpnds,
-            returnOpnd ? &returnOpnd : 0,
-            NULL,
-            NULL,
-            inlineDepth);
-        if (returnOpnd != irManager.getReturnOpnd())
-            irManager.setReturnOpnd(returnOpnd);
-    } else {
-        assert(0);
     }
+
+    flags.magicClass=(char *)getStringArg("useMagicMethods", NULL);
 }
 
-//
-// this routine is used for IR inlining, generating IR for a particular method
-//
-void
-TranslatorIntfc::generateMethodIRForInlining(
-         CompilationInterface& compilationInterface,
-         MethodDesc& methodDesc,
-         IRBuilder&        irBuilder,
-         uint32            numActualArgs,
-         Opnd**            actualArgs,
-         Opnd**            returnOpnd,
-         CFGNode**         returnNode,
-         Inst*             inlineSite,
-         uint32 inlineDepth) {
-
-    if (methodDesc.isJavaByteCodes()) {
-        JavaTranslateMethodForIRInlining(
-                                         compilationInterface,
-                                         methodDesc,
-                                         irBuilder,
-                                         numActualArgs,
-                                         actualArgs,
-                                         returnOpnd,
-                                         returnNode,
-                                         inlineSite,
-                                         inlineDepth);
-    } else {
-        assert(0); 
-    }
-}
 
 OpndStack::OpndStack(MemoryManager& memManager,uint32 slots) 
     : maxSlots(slots) 

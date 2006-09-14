@@ -21,9 +21,7 @@
  */
 
 #include "deadcodeeliminator.h"
-#include "FlowGraph.h"
 #include "irmanager.h"
-#include "PropertyTable.h"
 #include "Inst.h"
 #include "Stl.h"
 #include "BitSet.h"
@@ -31,47 +29,48 @@
 #include "Log.h"
 #include "constantfolder.h"
 #include "optimizer.h"
-#include "Timer.h"
+#include "XTimer.h"
+#include "PMFAction.h"
 
 namespace Jitrino {
 
 // Timer.h includes windows.h, which has a broken #def of min:
 #undef min
 
-DEFINE_OPTPASS_IMPL(DeadCodeEliminationPass, dce, "Dead Code Elimination")
+DEFINE_SESSION_ACTION(DeadCodeEliminationPass, dce, "Dead Code Elimination")
 
 void
-DeadCodeEliminationPass::_run(IRManager& irm) {
+DeadCodeEliminationPass::_run(IRManager& irm){
     DeadCodeEliminator dce(irm);
     {
-        static Timer* justDceTimer = NULL;
-        PhaseTimer t(justDceTimer, "opt::dce::justDce"); 
         dce.eliminateDeadCode(false);
     }
 }
 
-DEFINE_OPTPASS_IMPL(UnreachableCodeEliminationPass, uce, "Unreachable Code Elimination")
+DEFINE_SESSION_ACTION(UnreachableCodeEliminationPass, uce, "Unreachable Code Elimination");
 
-void
+void 
 UnreachableCodeEliminationPass::_run(IRManager& irm) {
     DeadCodeEliminator dce(irm);
     {
-        static Timer* justUceTimer = NULL;
-        PhaseTimer t(justUceTimer, "opt::dce::justUce"); 
         dce.eliminateUnreachableCode();
     }
-    bool fixup_ssa = irm.getParameterTable().lookupBool("opt::fixup_ssa", true);
+    bool fixup_ssa = irm.getOptimizerFlags().fixup_ssa;
     if (irm.getInSsa() && fixup_ssa) {
-        static Timer* edcFixupTimer = NULL;
-        PhaseTimer t(edcFixupTimer, "opt::dce::edcFixup"); 
-        fixupSsa(irm);
+        OptPass::fixupSsa(irm);
     }
 }
 
-DEFINE_OPTPASS_IMPL(PurgeEmptyNodesPass, purge, "Empty Node Removal")
+//Empty Node Removal
+class PurgeEmptyNodesPass: public SessionAction {
+public:
+    void run();    
+};
+ActionFactory<PurgeEmptyNodesPass> _purge("purge");
 
 void
-PurgeEmptyNodesPass::_run(IRManager& irm) {
+PurgeEmptyNodesPass::run() {
+    IRManager& irm = *getCompilationContext()->getHIRManager();
     irm.getFlowGraph().purgeEmptyNodes(false);
 }
 
@@ -243,16 +242,17 @@ usesBitsOfOpnd(uint8 dst_bits, Inst* inst, uint32 opnd_num) {
     return res1;
 }
 
-DeadCodeEliminator::DeadCodeEliminator(IRManager& irm)
-    : irManager(irm), flowGraph(irm.getFlowGraph()), returnOpnd(irm.getReturnOpnd()) {
-    preserveCriticalEdges = irManager.getParameterTable().lookupBool("opt::dce::preserve_critical_edges", true);
+DeadCodeEliminator::DeadCodeEliminator(IRManager& irm) 
+: irManager(irm), flowGraph(irm.getFlowGraph()), returnOpnd(irm.getReturnOpnd()) 
+{
+    preserveCriticalEdges = irManager.getOptimizerFlags().preserve_critical_edges;
 }
 
 Opnd*
 DeadCodeEliminator::findDefiningTemp(Opnd* var) {
     SsaVarOpnd* ssaVarOpnd = var->asSsaVarOpnd();
     if(ssaVarOpnd == NULL) {
-        Log::cat_opt_dc()->debug << "Nothing found: Not SSA" << ::std::endl;
+        Log::out() << "Nothing found: Not SSA" << ::std::endl;
         return NULL; // not an SsaVarOpnd
     }
     Inst* inst = ssaVarOpnd->getInst();
@@ -260,7 +260,7 @@ DeadCodeEliminator::findDefiningTemp(Opnd* var) {
     if(inst->getOpcode() == Op_StVar) {
         // propagate src of copy recursively
         copyPropagate(inst);
-        if(Log::cat_opt_dc()->isDebugEnabled()) {
+        if(Log::isEnabled()) {
             Log::out() << "Found: ";
             Inst* def = inst->getSrc(0)->getInst();
             if(def != NULL) {
@@ -296,7 +296,7 @@ DeadCodeEliminator::findDefiningTemp(Opnd* var) {
 
         return tmp;
     }
-    Log::cat_opt_dc()->debug << "Nothing found: Not stVar or phi instruction" << ::std::endl;
+    Log::out() << "Nothing found: Not stVar or phi instruction" << ::std::endl;
     return NULL;
 }
 
@@ -360,7 +360,7 @@ markLiveInst1(Inst* inst,
 
     uint8 dstWidth = 255;
 
-    if (Log::cat_opt_dc()->isDebugEnabled()) {
+    if (Log::isEnabled()) {
         Log::out() << "Found dstwidth of " << (int) dstWidth
                    << " for inst ";
         inst->print(Log::out());
@@ -386,7 +386,7 @@ markLiveInst1(Inst* inst,
                 // was already marked as live, check old width.
                 uint8 oldOpndWidth = 255;
 
-                if (Log::cat_opt_dc()->isDebugEnabled()) {
+                if (Log::isEnabled()) {
                     Log::out() << "Found dstwidth of " << (int) oldOpndWidth
                                << " for inst ";
                     def->print(Log::out());
@@ -394,7 +394,7 @@ markLiveInst1(Inst* inst,
                 }
 
                 if (opndWidth > oldOpndWidth) {
-                    if (Log::cat_opt_dc()->isDebugEnabled()) {
+                    if (Log::isEnabled()) {
                         Log::out() << "Setting dstwidth to " << (int) opndWidth
                                    << " for inst ";
                         def->print(Log::out());
@@ -403,7 +403,7 @@ markLiveInst1(Inst* inst,
                     workSet.pushFront(def);                    
                 }
             } else {
-                if (Log::cat_opt_dc()->isDebugEnabled()) {
+                if (Log::isEnabled()) {
                     Log::out() << "Setting dstwidth to " << (int) opndWidth
                                << " for inst ";
                     def->print(Log::out());
@@ -432,7 +432,7 @@ markLiveInst1(Inst* inst,
 // Deletes instructions that are not marked as useful
 //
 void
-DeadCodeEliminator::sweepInst1(CFGNode* node, 
+DeadCodeEliminator::sweepInst1(Node* node, 
                                Inst* inst,
                                BitSet& usefulInstSet,
                                BitSet& usefulVarSet,
@@ -458,14 +458,17 @@ DeadCodeEliminator::sweepInst1(CFGNode* node,
                     (srcId < maxInstId) &&
                     (usefulInstSet.getBit(srcId-minInstId) == false)) {
                     MethodMarkerInst *mmi = inst->asMethodMarkerInst();
+                    // Method marker could contain retOpnd
+                    if (!mmi->getMethodDesc()->isStatic()) {
                     mmi->removeOpnd();
                 }
             }
         }            
+        }            
     } else if ((minInstId <= instId) && (instId < maxInstId) &&
                usefulInstSet.getBit(instId-minInstId) == false) {
         // inst is a useless instruction
-        if (Log::cat_opt_dc()->isDebugEnabled()) {
+        if (Log::isEnabled()) {
             Log::out() << "Useless inst found, removing: ";
             inst->print(Log::out());
             Log::out() << ::std::endl;
@@ -495,7 +498,7 @@ DeadCodeEliminator::sweepInst1(CFGNode* node,
             //
             // store to a useless variable
             //
-            if (Log::cat_opt_dc()->isDebugEnabled()) {
+            if (Log::isEnabled()) {
                 Log::out() << "Removing store to useless var: ";
                 inst->print(Log::out());
                 Log::out() << ::std::endl;
@@ -527,7 +530,7 @@ markLiveInst(Inst* inst,
     assert((instId >= minInstId) && (instId < maxInstId));
     uint8 dstWidth = usedInstWidth[instId-minInstId];
 
-    if (Log::cat_opt_dc()->isDebugEnabled()) {
+    if (Log::isEnabled()) {
         Log::out() << "Found dstwidth of " << (int) dstWidth
                    << " for inst ";
         inst->print(Log::out());
@@ -553,7 +556,7 @@ markLiveInst(Inst* inst,
             if (!((minInstId <= defId) && (defId < maxInstId))) {
                 // this instruction is out of the region, skip it.
                 
-                if (Log::cat_opt_dc()->isDebugEnabled()) {
+                if (Log::isEnabled()) {
                     Log::out() << "Skipping outside-region inst ";
                     def->print(Log::out());
                     Log::out() << ::std::endl;
@@ -562,7 +565,7 @@ markLiveInst(Inst* inst,
                 // was already marked as live, check old width.
                 uint8 oldOpndWidth = usedInstWidth[defId-minInstId];
 
-                if (Log::cat_opt_dc()->isDebugEnabled()) {
+                if (Log::isEnabled()) {
                     Log::out() << "Found dstwidth of " << (int) oldOpndWidth
                                << " for inst ";
                     def->print(Log::out());
@@ -570,7 +573,7 @@ markLiveInst(Inst* inst,
                 }
 
                 if (opndWidth > oldOpndWidth) {
-                    if (Log::cat_opt_dc()->isDebugEnabled()) {
+                    if (Log::isEnabled()) {
                         Log::out() << "Setting dstwidth to " << (int) opndWidth
                                    << " for inst ";
                         def->print(Log::out());
@@ -580,7 +583,7 @@ markLiveInst(Inst* inst,
                     workSet.pushFront(def);                    
                 }
             } else {
-                if (Log::cat_opt_dc()->isDebugEnabled()) {
+                if (Log::isEnabled()) {
                     Log::out() << "Setting dstwidth to " << (int) opndWidth
                                << " for inst ";
                     def->print(Log::out());
@@ -610,7 +613,7 @@ markLiveInst(Inst* inst,
 // Deletes instructions that are not marked as useful
 //
 void
-DeadCodeEliminator::sweepInst(CFGNode* node, 
+DeadCodeEliminator::sweepInst(Node* node, 
                               Inst* inst,
                               BitSet& usefulInstSet,
                               BitSet& usefulVarSet,
@@ -637,14 +640,17 @@ DeadCodeEliminator::sweepInst(CFGNode* node,
                 if ((minInstId <= srcId) && (srcId < maxInstId) &&
                     (usefulInstSet.getBit(srcId-minInstId) == false)) {
                     MethodMarkerInst *mmi = inst->asMethodMarkerInst();
+                    // Method marker could contain retOpnd which should be preserved
+                    if (!mmi->getMethodDesc()->isStatic()) {
                     mmi->removeOpnd();
                 }
             }
         }            
+        }            
     } else if ((minInstId <= instId) && (instId < maxInstId) &&
                usefulInstSet.getBit(instId-minInstId) == false) {
         // inst is a useless instruction
-        if (Log::cat_opt_dc()->isDebugEnabled()) {
+        if (Log::isEnabled()) {
             Log::out() << "Useless inst found, removing: ";
             inst->print(Log::out());
             Log::out() << ::std::endl;
@@ -689,7 +695,7 @@ DeadCodeEliminator::sweepInst(CFGNode* node,
                 assert((minInstId <= instId) && (instId < maxInstId));
                 uint8 usedDstSize = usedInstWidth[instId-minInstId];
 
-                if (Log::cat_opt_dc()->isDebugEnabled()) {
+                if (Log::isEnabled()) {
                     Log::out() << "Found dstwidth of " << (int) usedDstSize
                                << " for inst ";
                     inst->print(Log::out());
@@ -699,19 +705,18 @@ DeadCodeEliminator::sweepInst(CFGNode* node,
                 if ((srcSize >= convSize) &&
                     (usedDstSize <= convSize)) {
                     // convert to a copy.
-                    if (Log::cat_opt_dc()->isDebugEnabled()) {
+                    if (Log::isEnabled()) {
                         Log::out() << "Eliminating redundant conv ";
                         inst->print(Log::out());
                         Log::out() << ::std::endl;
                     }
                     InstFactory &factory = irManager.getInstFactory();
-                    Inst *copyInst =
-                        factory.makeCopy(inst->getDst(), inst->getSrc(0));
+                    Inst *copyInst = factory.makeCopy(inst->getDst(), inst->getSrc(0));
                     copyInst->insertAfter(inst);
                     inst->unlink();
                     // copyInst doesn't appear in bitmaps, but we won't walk
                     // over it, so it is only tested for a MethodMarker Inst 
-					// operand above, and we are careful there
+                    // operand above, and we are careful there
                 }
             }
             break;
@@ -730,7 +735,7 @@ DeadCodeEliminator::sweepInst(CFGNode* node,
             //
             // store to a useless variable
             //
-            if (Log::cat_opt_dc()->isDebugEnabled()) {
+            if (Log::isEnabled()) {
                 Log::out() << "Removing store to useless var: ";
                 inst->print(Log::out());
                 Log::out() << ::std::endl;
@@ -749,8 +754,8 @@ DeadCodeEliminator::eliminateUnreachableCode() {
     MemoryManager memManager(1000,"DeadCodeEliminator::eliminateUnreachableCode");
 
     // Purge unreachable nodes from CFG.
-    StlVector<CFGNode*> unreachableNodes(memManager);
-    flowGraph.purgeUnreachableNodes((StlVector<ControlFlowNode*>&) unreachableNodes);   
+    Nodes unreachableNodes(memManager);
+    irManager.getFlowGraph().purgeUnreachableNodes(unreachableNodes);   
 
     // If no unreachable nodes, return
     if(unreachableNodes.empty())
@@ -759,15 +764,15 @@ DeadCodeEliminator::eliminateUnreachableCode() {
     // Clear the set of unreachable definitions.
     StlHashSet<uint32> unreachableDefSet(memManager);
 
-    StlVector<CFGNode*>::iterator niter;
+    StlVector<Node*>::iterator niter;
     for(niter = unreachableNodes.begin(); niter != unreachableNodes.end(); ++niter) {
-        CFGNode* node = *niter;
+        Node* node = *niter;
 
         // Find unreachable defs.  Note, only SsaVarOpnds can be used 
         // in later reachable nodes.
-        Inst* headInst = node->getFirstInst();
+        Inst* headInst = (Inst*)node->getFirstInst();
         assert(headInst->getNode());
-        for (Inst* inst = headInst->next();inst!=headInst;inst=inst->next()) {
+        for (Inst* inst = headInst->getNextInst();inst!=NULL;inst=inst->getNextInst()) {
             assert(inst->getNode());
             SsaVarOpnd* dst = inst->getDst()->asSsaVarOpnd();
             if(dst != NULL) {
@@ -783,20 +788,20 @@ DeadCodeEliminator::eliminateUnreachableCode() {
 
 
     // Cleanup up phi instructions.
-    const CFGNodeDeque& nodes = flowGraph.getNodes();
-    CFGNodeDeque::const_iterator niter2;
+    const Nodes& nodes = flowGraph.getNodes();
+    Nodes::const_iterator niter2;
     for(niter2 = nodes.begin(); niter2 != nodes.end(); ++niter2) {
-        CFGNode* node = *niter2;
-        Inst* headInst = node->getFirstInst();
+        Node* node = *niter2;
+        Inst* headInst = (Inst*)node->getFirstInst();
         assert(headInst->getNode());
-        for (Inst* inst = headInst->next();inst!=headInst;inst=inst->next()) {
+        for (Inst* inst = headInst->getNextInst();inst!=NULL;inst=inst->getNextInst()) {
             assert(inst->getNode());
             if(inst->getOpcode() == Op_Phi) {
 #ifndef NDEBUG
                 SsaVarOpnd* dst = inst->getDst()->asSsaVarOpnd();
                 assert(dst!=NULL);
 #endif
-				uint32 numSrc = inst->getNumSrcOperands();
+                uint32 numSrc = inst->getNumSrcOperands();
                 uint32 numKill = 0;
                 for(uint32 i = 0; i < numSrc; ++i) {
                     SsaVarOpnd* src = inst->getSrc(i)->asSsaVarOpnd();
@@ -819,12 +824,12 @@ DeadCodeEliminator::eliminateUnreachableCode() {
     return true;
 }
 
-static Timer *dcePhase1Timer = 0; // not thread-safe
-static Timer *dcePhase2Timer = 0; // not thread-safe
-static Timer *dcePhase3Timer = 0; // not thread-safe
-static Timer *dcePhase4Timer = 0; // not thread-safe
-static Timer *dcePhase5Timer = 0; // not thread-safe
-static Timer *dcePhase6Timer = 0; // not thread-safe
+static CountTime dcePhase1Timer("opt::dce::phase1");
+static CountTime dcePhase2Timer("opt::dce::phase2");
+static CountTime dcePhase3Timer("opt::dce::phase3");
+static CountTime dcePhase4Timer("opt::dce::phase4");
+static CountTime dcePhase5Timer("opt::dce::phase5");
+static CountTime dcePhase6Timer("opt::dce::phase6");
 
 //
 // Performs dead code elimination
@@ -840,18 +845,18 @@ DeadCodeEliminator::eliminateDeadCode(bool keepEmptyNodes) {
     MemoryManager memManager(numInsts*20,
                              "DeadCodeEliminator::eliminateDeadCode");
     InstDeque workSet(memManager);
-    CFGVector nodes(memManager,flowGraph.getMaxNodeId());
+    Nodes nodes(memManager);
     flowGraph.getNodesPostOrder(nodes);
-    CFGVector::ReverseIterator niter;
+    Nodes::reverse_iterator niter;
 
     // set of useful instructions & variables; initially everything is useless
     BitSet usefulInstSet(memManager,numInsts+1);
     BitSet usefulVarSet(memManager,numOpnds+1);
-    OptimizerFlags& optimizerFlags = *irManager.getCompilationContext()->getOptimizerFlags();
+    const OptimizerFlags& optimizerFlags = irManager.getOptimizerFlags();
     uint8 *usedInstWidth = optimizerFlags.dce2 ? new (memManager) uint8[numInsts] : 0;
 
     {
-        PhaseTimer t(dcePhase1Timer, "opt::dce::phase1"); 
+        AutoTimer t(dcePhase1Timer); 
         
     //
     // first propagate copies and initialize the work list with 
@@ -859,10 +864,10 @@ DeadCodeEliminator::eliminateDeadCode(bool keepEmptyNodes) {
     //
     if (usedInstWidth) {
         for (niter = nodes.rbegin(); niter != nodes.rend(); ++niter) {
-            CFGNode* node = *niter;
-            Inst* headInst = node->getFirstInst();
+            Node* node = *niter;
+            Inst* headInst = (Inst*)node->getFirstInst();
             assert(headInst->getNode());
-            for (Inst* inst = headInst->next();inst!=headInst;inst=inst->next()) {
+            for (Inst* inst = headInst->getNextInst();inst!=NULL;inst=inst->getNextInst()) {
                 assert(inst->getNode());
                 // copy propagate all sources of this instruction
                 copyPropagate(inst);
@@ -878,7 +883,7 @@ DeadCodeEliminator::eliminateDeadCode(bool keepEmptyNodes) {
                     usefulInstSet.setBit(instId-minInstId, true);
                     if (usedInstWidth) {
                         uint8 usedWidth = getBitWidth(inst->getType());
-                        if (Log::cat_opt_dc()->isDebugEnabled()) {
+                        if (Log::isEnabled()) {
                             Log::out() << "Setting dstwidth to " << (int) usedWidth
                                        << " for inst ";
                             inst->print(Log::out());
@@ -892,10 +897,10 @@ DeadCodeEliminator::eliminateDeadCode(bool keepEmptyNodes) {
         }
     } else {
         for (niter = nodes.rbegin(); niter != nodes.rend(); ++niter) {
-            CFGNode* node = *niter;
-            Inst* headInst = node->getFirstInst();
+            Node* node = *niter;
+            Inst* headInst = (Inst*)node->getFirstInst();
             assert(headInst->getNode());
-            for (Inst* inst = headInst->next();inst!=headInst;inst=inst->next()) {
+            for (Inst* inst = headInst->getNextInst();inst!=NULL;inst=inst->getNextInst()) {
                 assert(inst->getNode());
                 // copy propagate all sources of this instruction
                 copyPropagate(inst);
@@ -916,7 +921,7 @@ DeadCodeEliminator::eliminateDeadCode(bool keepEmptyNodes) {
     }
 
     {
-        PhaseTimer t(dcePhase2Timer, "opt::dce::phase2"); 
+        AutoTimer t(dcePhase2Timer); 
 
     //
     // Iteratively mark all useful instructions by computing slices
@@ -936,30 +941,30 @@ DeadCodeEliminator::eliminateDeadCode(bool keepEmptyNodes) {
 
     {
         const bool canRemoveStVars = (irManager.getParent() == NULL); // we can remove a useless var
-        PhaseTimer t(dcePhase3Timer, "opt::dce::phase3"); 
+        AutoTimer t(dcePhase3Timer); 
         //
         // Now cleanup all the dead code
         //
         if (usedInstWidth) {
             for (niter = nodes.rbegin(); niter != nodes.rend(); ++niter) {
-                CFGNode* node = *niter;
-                Inst* headInst = node->getFirstInst();
+                Node* node = *niter;
+                Inst* headInst = (Inst*)node->getFirstInst();
                 assert(headInst->getNode());
-                for (Inst* inst = headInst->next(); inst != headInst; ) {
+                for (Inst* inst = headInst->getNextInst(); inst != NULL; ) {
                     assert(inst->getNode());
-                    Inst *nextInst = inst->next();
+                    Inst *nextInst = inst->getNextInst();
                     sweepInst(node, inst,usefulInstSet,usefulVarSet,usedInstWidth,minInstId,maxInstId,canRemoveStVars);
                     inst = nextInst;
                 }
             }
         } else {
             for (niter = nodes.rbegin(); niter != nodes.rend(); ++niter) {
-                CFGNode* node = *niter;
-                Inst* headInst = node->getFirstInst();
+                Node* node = *niter;
+                Inst* headInst = (Inst*)node->getFirstInst();
                 assert(headInst->getNode());
-                for (Inst* inst = headInst->next(); inst != headInst; ) {
+                for (Inst* inst = headInst->getNextInst(); inst != NULL; ) {
                     assert(inst->getNode());
-                    Inst *nextInst = inst->next();
+                    Inst *nextInst = inst->getNextInst();
                     sweepInst1(node, inst,usefulInstSet,usefulVarSet,minInstId,maxInstId,canRemoveStVars);
                     inst = nextInst;
                 }
@@ -970,7 +975,7 @@ DeadCodeEliminator::eliminateDeadCode(bool keepEmptyNodes) {
     {
         const bool canUnlink = (irManager.getParent() == NULL); // we can unlink an unused var
 
-        PhaseTimer t(dcePhase4Timer, "opt::dce::phase4"); 
+        AutoTimer t(dcePhase4Timer); 
         //
         // delete dead variables
         //
@@ -990,7 +995,7 @@ DeadCodeEliminator::eliminateDeadCode(bool keepEmptyNodes) {
                     varOpnd->setDeadFlag(true); // mark as dead
                     
                     if (canUnlink) {
-                        if (Log::cat_opt_dc()->isDebugEnabled()) {
+                        if (Log::isEnabled()) {
                             Log::out() << "removing dead VarOpnd ";
                             varOpnd->print(Log::out());
                             Log::out() << ::std::endl;
@@ -1017,7 +1022,7 @@ DeadCodeEliminator::eliminateDeadCode(bool keepEmptyNodes) {
 
                         varOpnd->setDeadFlag(true); // mark as dead
                         if (canUnlink) {
-                            if (Log::cat_opt_dc()->isDebugEnabled()) {
+                            if (Log::isEnabled()) {
                                 Log::out() << "removing dead VarOpnd ";
                                 varOpnd->print(Log::out());
                                 Log::out() << ::std::endl;
@@ -1032,12 +1037,11 @@ DeadCodeEliminator::eliminateDeadCode(bool keepEmptyNodes) {
     }
 
     {
-        PhaseTimer t(dcePhase6Timer, "opt::dce::phase6"); 
-        
+        AutoTimer t(dcePhase6Timer); 
         flowGraph.mergeAdjacentNodes();       
     }
     {
-        PhaseTimer t(dcePhase5Timer, "opt::dce::phase5"); 
+        AutoTimer t(dcePhase5Timer); 
         if (!keepEmptyNodes) {
             //
             // Purge empty nodes.

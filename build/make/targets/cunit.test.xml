@@ -169,8 +169,8 @@ Version: $Revision$
                                     <linkerarg value="/NODEFAULTLIB:libcmt.lib" />
                                 </select>
 
-                                <select os="lnx" cxx="gcc">
-                                    <syslibset type="shared" libs="stdc++, gcc_s, pthread" />
+                                <select os="lnx">
+                                    <syslibset type="shared" libs="stdc++, gcc_s, pthread, rt" />
                                 </select>
                             </linker>
                         </cc>

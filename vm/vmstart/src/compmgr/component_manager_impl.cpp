@@ -702,6 +702,7 @@ CmLoadComponent(const char* path,
     int ret = LoadLib(&lib, path);
     if (APR_SUCCESS != ret) {
         PORT_VERIFY_SUCCESS(apr_thread_rwlock_unlock(global_lock));
+        printf("failed to load: %d %s\n", ret, path);
         return ret;
     }
     
@@ -711,6 +712,7 @@ CmLoadComponent(const char* path,
         /* Ignore error */
         ReleaseLib(lib);
         PORT_VERIFY_SUCCESS(apr_thread_rwlock_unlock(global_lock));
+        printf("failed to init: %d\n", ret);
         return ret;
     }
 

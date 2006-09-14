@@ -20,79 +20,76 @@
  *
  */
 
-#include <stdlib.h>
-#include <string.h>
 #include "Log.h"
 #include "Opcode.h"
 #include "Type.h"
-#include "FlowGraph.h"
 #include "Stack.h"
 #include "IRBuilder.h"
 #include "ExceptionInfo.h"
 #include "JavaFlowGraphBuilder.h"
 #include "TranslatorIntfc.h"
 #include "irmanager.h"
+#include "FlowGraph.h"
+
+#include <stdlib.h>
+#include <string.h>
 
 namespace Jitrino {
 
 
-CFGNode* JavaFlowGraphBuilder::genBlock(LabelInst* label) {
+Node* JavaFlowGraphBuilder::genBlock(LabelInst* label) {
     if (currentBlock == NULL) {
-        currentBlock = fg->createBlock(label);
-        assert(fg->getEntry()==NULL);
-        fg->setEntry(currentBlock);
+        currentBlock = createBlockNodeOrdered(label);
+        assert(fg->getEntryNode()==NULL);
+        fg->setEntryNode(currentBlock);
     } else {
-        currentBlock = fg->createBlock(label);
+        currentBlock = createBlockNodeOrdered(label);
     }
     return currentBlock;
 }
 
-CFGNode* JavaFlowGraphBuilder::genBlockAfterCurrent(LabelInst *label) {
+Node* JavaFlowGraphBuilder::genBlockAfterCurrent(LabelInst *label) {
     // hidden exception info
     void *exceptionInfo = ((LabelInst*)currentBlock->getFirstInst())->getState();
-    currentBlock = fg->createBlockAfter(label,currentBlock);
+    currentBlock = createBlockNodeAfter(currentBlock, label);
     label->setState(exceptionInfo);
     return currentBlock;
 }
 
-CFGNode *JavaFlowGraphBuilder::createDispatchNode() {
-    return fg->createDispatchNode();
-}
 
 
-void JavaFlowGraphBuilder::edgeForFallthrough(CFGNode* block) {
+void JavaFlowGraphBuilder::edgeForFallthrough(Node* block) {
     //
     // find fall through basic block; skip handler nodes
     //
-    const CFGNodeDeque& nodes = fg->getNodes();
-    CFGNodeDeque::const_iterator niter = ::std::find(nodes.begin(), nodes.end(), block);
-    assert(niter != nodes.end());
-    TranslatorFlags& translatorFlags = *irBuilder.getIRManager().getCompilationContext()->getTranslatorFlags();
-    for(++niter; niter != nodes.end(); ++niter) {
-        if (translatorFlags.newCatchHandling) {
-            CFGNode* node = *niter;
-            if(node->isBasicBlock() && !node->getLabel()->isCatchLabel())
+    NodeList::const_iterator niter = std::find(fallThruNodes.begin(), fallThruNodes.end(), block);
+    assert(niter != fallThruNodes.end());
+    TranslatorFlags* translatorFlags = irBuilder.getTranslatorFlags();
+    for(++niter; niter != fallThruNodes.end(); ++niter) {
+        Node* node = *niter;
+        if (translatorFlags->newCatchHandling) {
+            if (node->isBlockNode() && !((LabelInst*)node->getFirstInst())->isCatchLabel()) {
                 break;
-        } else {
-            if((*niter)->isBasicBlock())
+            }
+        } else if (node->isBlockNode()) {
                 break;
         }
     }
-    assert(niter != nodes.end());
-    CFGNode* fallthrough = *niter;
-    fg->addEdge(block,fallthrough);
+    assert(niter != fallThruNodes.end());
+    Node* fallthrough = *niter;
+    addEdge(block,fallthrough);
 }
 
-CFGNode * JavaFlowGraphBuilder::edgesForBlock(CFGNode* block) {
+Node * JavaFlowGraphBuilder::edgesForBlock(Node* block) {
     //
     // find if this block has any region that could catch the exception
     //
-    CFGNode *dispatch = NULL;
+    Node *dispatch = NULL;
     ExceptionInfo *exceptionInfo = (CatchBlock*)((LabelInst*)block->getFirstInst())->getState();
     if (exceptionInfo != NULL) {
-        dispatch = exceptionInfo->getLabelInst()->getCFGNode();
+        dispatch = exceptionInfo->getLabelInst()->getNode();
     }else{
-        dispatch = fg->getUnwind();
+        dispatch = fg->getUnwindNode();
     }
     assert(dispatch->isDispatchNode());
 
@@ -100,15 +97,18 @@ CFGNode * JavaFlowGraphBuilder::edgesForBlock(CFGNode* block) {
     // split the block so that 
     //      each potentially-exceptional instruction ends a block
     //
-    Inst* first = block->getFirstInst();
-    Inst* last = block->getLastInst();
+    Inst* first = (Inst*)block->getFirstInst();
+    Inst* last = (Inst*)block->getLastInst();
     Inst* lastExceptionalInstSeen = NULL;
-    for (Inst* inst = first->next(); inst != first; inst = inst->next()) {
+    for (Inst* inst = first->getNextInst(); inst != NULL; inst = inst->getNextInst()) {
         if (lastExceptionalInstSeen != NULL) {
             // start a new basic block
-            CFGNode *newblock = fg->createBlockAfter(block);
-            Inst *ins = lastExceptionalInstSeen->next();
-            ins->moveTailTo(first, newblock->getFirstInst());
+            Node *newblock = createBlockNodeAfter(block); 
+            for (Inst *ins = lastExceptionalInstSeen->getNextInst(), *nextIns = NULL; ins!=NULL; ins = nextIns) {
+                nextIns = ins->getNextInst();
+                ins->unlink();
+                newblock->appendInst(ins);
+            }
 
             // now fix up the CFG, duplicating edges
             if (!lastExceptionalInstSeen->isThrow())
@@ -116,16 +116,14 @@ CFGNode * JavaFlowGraphBuilder::edgesForBlock(CFGNode* block) {
             //
             // add an edge to handler entry node
             //
-            assert(!block->findTarget(dispatch));
+            assert(!block->findTargetEdge(dispatch));
             fg->addEdge(block,dispatch);
             block = newblock;
-            first = block->getFirstInst();
             lastExceptionalInstSeen = NULL;
         } 
         if (inst->getOperation().canThrow()) {
             lastExceptionalInstSeen = inst;
         }
-        inst->setNode(block);
     }
 
     // 
@@ -134,17 +132,16 @@ CFGNode * JavaFlowGraphBuilder::edgesForBlock(CFGNode* block) {
     switch(last->getOpcode()) {
     case Op_Jump:
         {
-        fg->addEdge(block,((BranchInst*)last)->getTargetLabel()->getCFGNode());
+        fg->addEdge(block,((BranchInst*)last)->getTargetLabel()->getNode());
         last->unlink();
         }
         break;
     case Op_Branch:
     case Op_JSR:
-        fg->addEdge(block,((BranchInst*)last)->getTargetLabel()->getCFGNode());
+        addEdge(block, ((BranchInst*)last)->getTargetLabel()->getNode());
         edgeForFallthrough(block);
         break;
     case Op_Throw:
-    case Op_ThrowLazy:
     case Op_ThrowSystemException:
     case Op_ThrowLinkingException:
         // throw/rethrow creates an edge to a handler that catches the exception
@@ -152,7 +149,7 @@ CFGNode * JavaFlowGraphBuilder::edgesForBlock(CFGNode* block) {
         assert(lastExceptionalInstSeen == last);
         break;
     case Op_Return:
-        fg->addEdge(block,fg->getReturn());
+        addEdge(block, fg->getReturnNode());
         break;
     case Op_Ret:
         break; // do  not do anything
@@ -161,18 +158,20 @@ CFGNode * JavaFlowGraphBuilder::edgesForBlock(CFGNode* block) {
             SwitchInst *sw = (SwitchInst*)last;
             uint32 num = sw->getNumTargets();
             for (uint32 i = 0; i < num; i++) {
-                CFGNode* target = sw->getTarget(i)->getCFGNode();
+                Node* target = sw->getTarget(i)->getNode();
                 // two switch values may go to the same block
-                if (!block->findTarget(target))
+                if (!block->findTargetEdge(target)) {
                     fg->addEdge(block,target);
+                }
             }
-            CFGNode* target = sw->getDefaultTarget()->getCFGNode();
-            if (!block->findTarget(target))
+            Node* target = sw->getDefaultTarget()->getNode();
+            if (!block->findTargetEdge(target)) {
                 fg->addEdge(block,target);
+            }
         }
         break;
-    default:
-        if (block != fg->getReturn()) { // a fallthrough edge is needed
+    default:;
+        if (block != fg->getReturnNode()) { // a fallthrough edge is needed
            // if the basic block does not have any outgoing edge, add one fall through edge
            if (block->getOutEdges().empty())
                edgeForFallthrough(block);
@@ -181,14 +180,14 @@ CFGNode * JavaFlowGraphBuilder::edgesForBlock(CFGNode* block) {
     //
     // add an edge to handler entry node
     //
-    if (lastExceptionalInstSeen != NULL &&  !block->findTarget(dispatch))
+    if (lastExceptionalInstSeen != NULL &&  !block->findTargetEdge(dispatch))
         fg->addEdge(block,dispatch);
     return block;
 }
 
-void JavaFlowGraphBuilder::edgesForHandler(CFGNode* entry) {
+void JavaFlowGraphBuilder::edgesForHandler(Node* entry) {
     CatchBlock *catchBlock = (CatchBlock*)((LabelInst*)entry->getFirstInst())->getState();
-    if(entry == fg->getUnwind())
+    if(entry == fg->getUnwindNode())
         // No local handlers for unwind.
         return;
     //
@@ -196,34 +195,33 @@ void JavaFlowGraphBuilder::edgesForHandler(CFGNode* entry) {
     //
     CatchHandler * handlers = catchBlock->getHandlers();
     for (;handlers != NULL; handlers = handlers->getNextHandler())  {
-        fg->addEdge(entry,handlers->getLabelInst()->getCFGNode());
+        fg->addEdge(entry,handlers->getLabelInst()->getNode());
     }
     // edges for uncaught exception
     ExceptionInfo *nextBlock = NULL;
     for (nextBlock = catchBlock->getNextExceptionInfoAtOffset();
-         nextBlock != NULL; nextBlock = nextBlock->getNextExceptionInfoAtOffset()) {
+        nextBlock != NULL; nextBlock = nextBlock->getNextExceptionInfoAtOffset()) 
+    {
         if (nextBlock->isCatchBlock()) {
-            CFGNode *next = nextBlock->getLabelInst()->getCFGNode();
+            Node *next = nextBlock->getLabelInst()->getNode();
             fg->addEdge(entry,next);
             break;
         }
     }
     if(nextBlock == NULL) {
-        fg->addEdge(entry,fg->getUnwind());
+        fg->addEdge(entry,fg->getUnwindNode());
     }
 }
 
 void JavaFlowGraphBuilder::createCFGEdges() {
-    const CFGNodeDeque& nodes = fg->getNodes();
-    CFGNodeDeque::const_iterator niter;
-    for(niter = nodes.begin(); niter != nodes.end(); ++niter) {
-        CFGNode* node = *niter;
-        if (node->isBasicBlock())
+    for (NodeList::iterator it = fallThruNodes.begin(); it!=fallThruNodes.end(); ++it) {
+        Node* node = *it;
+        if (node->isBlockNode())
             node = edgesForBlock(node);
         else if (node->isDispatchNode())
             edgesForHandler(node);
         else
-            assert(node == fg->getExit());
+            assert(node == fg->getExitNode());
     }
 }
 
@@ -235,18 +233,18 @@ void JavaFlowGraphBuilder::createCFGEdges() {
 // that are reachable from exit node with BLACK.
 //
 void JavaFlowGraphBuilder::reverseDFS( StlVector<int8>& state,
-                                       CFGNode* targetNode,
+                                       Node* targetNode,
                                        uint32* nodesCounter )
 {
-    const CFGEdgeDeque& in_edges = targetNode->getInEdges();
+    const Edges& in_edges = targetNode->getInEdges();
 
     assert( state[targetNode->getId()] == WHITE );
     state[targetNode->getId()] = BLACK;
 
     *nodesCounter += 1;
 
-    for( CFGEdgeDeque::const_iterator in_iter = in_edges.begin(); in_iter != in_edges.end(); in_iter++ ){
-        CFGNode* srcNode = (*in_iter)->getSourceNode();
+    for( Edges::const_iterator in_iter = in_edges.begin(); in_iter != in_edges.end(); in_iter++ ){
+        Node* srcNode = (*in_iter)->getSourceNode();
 
         if( state[srcNode->getId()] != BLACK ){
             reverseDFS( state, srcNode, nodesCounter );
@@ -261,56 +259,26 @@ void JavaFlowGraphBuilder::reverseDFS( StlVector<int8>& state,
 // for while(true){;} loops, if they exist.
 //
 void JavaFlowGraphBuilder::forwardDFS( StlVector<int8>& state,
-                                       CFGNode* srcNode )
+                                       Node* srcNode,
+                                       Edges& edgesForSplicing)
 {
     // Flip the state, so the same node will not be visited more than twice.
     state[srcNode->getId()] = ~state[srcNode->getId()];
 
-    const CFGEdgeDeque& out_edges = srcNode->getOutEdges();
+    const Edges& out_edges = srcNode->getOutEdges();
 
-    for( CFGEdgeDeque::const_iterator out_iter = out_edges.begin(); out_iter != out_edges.end(); out_iter++ ){
+    for( Edges::const_iterator out_iter = out_edges.begin(); out_iter != out_edges.end(); out_iter++ ){
 
-        CFGNode* targetNode = (*out_iter)->getTargetNode();
+        Node* targetNode = (*out_iter)->getTargetNode();
         const int32 targetState = state[targetNode->getId()];
 
         if( targetState == BLACK ||
             targetState == WHITE ){
             // Keep searching ...
-            forwardDFS( state, targetNode );
-
-        } else if( targetState == ~WHITE &&
-                   srcNode->hasOnlyOneSuccEdge() ){
-            // Find an infinite loop that will never reach exit node.
-            assert( state[srcNode->getId()] == ~WHITE );
-            irBuilder.genLabel( (LabelInst*)targetNode->getFirstInst() );
-            Opnd* args[] = { irBuilder.genTauSafe(), irBuilder.genTauSafe() };
-            Type* returnType = irBuilder.getTypeManager().getVoidType();
-  
-            irBuilder.genJitHelperCall( PseudoCanThrow,
-                                        returnType,
-                                        sizeof(args) / sizeof(args[0]),
-                                        args );
-
-            ExceptionInfo* exceptionInfo =
-                (CatchBlock*)((LabelInst*)targetNode->getFirstInst())->getState();
-            CFGNode* dispatch = NULL;
-
-            if( exceptionInfo != NULL) {
-                dispatch = exceptionInfo->getLabelInst()->getCFGNode();
-            } else {
-                dispatch = fg->getUnwind();
-            }
-
-            assert( !targetNode->findTarget(dispatch) );
-            fg->addEdge( targetNode, dispatch );
+            forwardDFS( state, targetNode, edgesForSplicing );
+        } else if( targetState == ~WHITE){
             state[targetNode->getId()] = ~BLACK;  // Now it can reach exit node.
-
-            if( Log::cat_fe()->isIREnabled() ){
-                MethodDesc &methodDesc = irBuilder.getIRManager().getMethodDesc();
-                Log::out() << "PRINTING LOG: After resolveWhileTrue" << ::std::endl;
-                targetNode->print( Log::out() );
-                fg->printInsts( Log::out(), methodDesc );
-            }
+            edgesForSplicing.push_back((*out_iter));
         }
     }
 
@@ -334,20 +302,81 @@ void JavaFlowGraphBuilder::resolveWhileTrue()
     // Pass 1: Identify all the nodes that are reachable from exit node.
     //
     uint32 nodesAffected = 0;
-    reverseDFS( state, fg->getExit(), &nodesAffected );
+    reverseDFS( state, fg->getExitNode(), &nodesAffected );
 
     //
     // Pass 2: Add dispatches for while(true){;} loops, if they exist.
     //
     if( nodesAffected < fg->getNodes().size() ){
-        forwardDFS( state, fg->getEntry() );
+        Edges edgesForSplicing(mm);
+        forwardDFS( state, fg->getEntryNode(), edgesForSplicing );
+        for (uint32 i=0; i < edgesForSplicing.size(); i++) {
+            Edge* e= edgesForSplicing[i];
+            Node* targetNode = e->getTargetNode();
+            LabelInst* newLabel = irBuilder.createLabel();
+            Node* node = fg->spliceBlockOnEdge(e, newLabel);
+            irBuilder.genLabel(newLabel);
+
+            Opnd* args[] = { irBuilder.genTauSafe(), irBuilder.genTauSafe() };
+            Type* returnType = irBuilder.getTypeManager()->getVoidType();
+            irBuilder.genJitHelperCall( PseudoCanThrow,
+                                        returnType,
+                                        sizeof(args) / sizeof(args[0]),
+                                        args );
+
+            ExceptionInfo* exceptionInfo =
+                (CatchBlock*)((LabelInst*)targetNode->getFirstInst())->getState();
+            Node* dispatch = NULL;
+
+            if( exceptionInfo != NULL) {
+                dispatch = exceptionInfo->getLabelInst()->getNode();
+            } else {
+                dispatch = fg->getUnwindNode();
     }
 
-    return;
+            fg->addEdge(node, dispatch);
+        }
+        if( Log::isEnabled() ){
+            MethodDesc &methodDesc = irBuilder.getIRManager()->getMethodDesc();
+            Log::out() << "PRINTING LOG: After resolveWhileTrue" << ::std::endl;
+            FlowGraph::printHIR(Log::out(), *fg, methodDesc );
+        }
+
+    }
 }
 
+Node* JavaFlowGraphBuilder::createBlockNodeOrdered(LabelInst* label) {
+    if (label == NULL) {
+        label = irBuilder.getInstFactory()->makeLabel();
+    }
+    Node* node = fg->createBlockNode(label);
+    fallThruNodes.push_back(node);
+    return node;
+}
 
+Node* JavaFlowGraphBuilder::createBlockNodeAfter(Node* node, LabelInst* label) {
+    NodeList::iterator it = std::find(fallThruNodes.begin(), fallThruNodes.end(), node);
+    assert(it!=fallThruNodes.end());
+    if (label == NULL) {
+        label = irBuilder.getInstFactory()->makeLabel();
+    }
+    label->setState(((LabelInst*)node->getFirstInst())->getState());
+    Node* newNode = fg->createBlockNode(label);
+    fallThruNodes.insert(++it, newNode);
+    return newNode;
+}
 
+Node* JavaFlowGraphBuilder::createDispatchNode() {
+    Node* node = fg->createDispatchNode(irBuilder.getInstFactory()->makeLabel());
+    fallThruNodes.push_back(node);
+    return node;
+}
+
+void JavaFlowGraphBuilder::addEdge(Node* source, Node* target) {
+    if  (source->findTargetEdge(target) == NULL) {
+        fg->addEdge(source, target);
+    }
+}
 
 //
 // construct flow graph
@@ -356,11 +385,12 @@ void JavaFlowGraphBuilder::build() {
     //
     // create epilog, unwind, and exit
     //
-    fg->setReturn(fg->createBlockNode());
-    fg->setUnwind(fg->createDispatchNode());
-    fg->setExit(fg->createExitNode());
-    fg->addEdge(fg->getReturn(), fg->getExit());
-    fg->addEdge(fg->getUnwind(), fg->getExit());
+    InstFactory* instFactory = irBuilder.getInstFactory();
+    fg->setReturnNode(createBlockNodeOrdered());
+    fg->setUnwindNode(createDispatchNode());
+    fg->setExitNode(fg->createNode(Node::Kind_Exit, instFactory->makeLabel()));
+    fg->addEdge(fg->getReturnNode(), fg->getExitNode());
+    fg->addEdge(fg->getUnwindNode(), fg->getExitNode());
     //
     // second phase: construct edges
     //
@@ -371,6 +401,7 @@ void JavaFlowGraphBuilder::build() {
     resolveWhileTrue();
 
     eliminateUnnestedLoopsOnDispatch();
+
 }
 
 
@@ -419,20 +450,20 @@ void JavaFlowGraphBuilder::build() {
 //
 void JavaFlowGraphBuilder::eliminateUnnestedLoopsOnDispatch()
 {
-    MemoryManager matched_nodes_mm(3*sizeof(CFGNode*), "unnested_loops_mm");
-    CFGNodeDeque matched_dispatches(matched_nodes_mm);
+    MemoryManager matched_nodes_mm(3*sizeof(Node*), "unnested_loops_mm");
+    Nodes matched_dispatches(matched_nodes_mm);
     bool found_goto_into_loop_warning = false;
-    const CFGNodeDeque& nodes = fg->getNodes();
-    CFGNodeDeque::const_iterator niter;
+    const Nodes& nodes = fg->getNodes();
+    Nodes::const_iterator niter;
     for (niter = nodes.begin(); niter != nodes.end(); ++niter) {
-        CFGNode* dispatch = *niter;
+        Node* dispatch = *niter;
         if ( dispatch->isDispatchNode() && dispatch->getInDegree() > 1 ) {
-            const CFGEdgeDeque& out_edges =  dispatch->getOutEdges();
-            for (CFGEdgeDeque::const_iterator out_iter = out_edges.begin();
+            const Edges& out_edges =  dispatch->getOutEdges();
+            for (Edges::const_iterator out_iter = out_edges.begin();
                 out_iter != out_edges.end();
                 out_iter++) {
 
-                CFGNode* catch_node = (*out_iter)->getTargetNode();
+                Node* catch_node = (*out_iter)->getTargetNode();
                 if ( !catch_node->isCatchBlock() ) {
                     continue;
                 }
@@ -441,18 +472,18 @@ void JavaFlowGraphBuilder::eliminateUnnestedLoopsOnDispatch()
                 //assert(catch_node->hasOnlyOneSuccEdge());
                 //assert(catch_node->hasOnlyOnePredEdge());
 
-                CFGNode* catch_target = (*(catch_node->getOutEdges().begin()))->getTargetNode();
+                Node* catch_target = (*(catch_node->getOutEdges().begin()))->getTargetNode();
                 if ( catch_target->getInDegree() <= 1 ) {
                     continue;
                 }
                 bool found_monitorexit = false;
                 bool dispatch_is_after_target = false;
                 bool monitorexit_after_catch_target = false;
-                const CFGEdgeDeque& in_edges = dispatch->getInEdges();
-                for (CFGEdgeDeque::const_iterator in_iter = in_edges.begin();
+                const Edges& in_edges = dispatch->getInEdges();
+                for (Edges::const_iterator in_iter = in_edges.begin();
                      in_iter != in_edges.end();
                      in_iter++) {
-                    CFGNode* pre_dispatch = (*in_iter)->getSourceNode();
+                    Node* pre_dispatch = (*in_iter)->getSourceNode();
                     if ( pre_dispatch == catch_target ) {
                         dispatch_is_after_target = true;
                     }
@@ -476,14 +507,14 @@ void JavaFlowGraphBuilder::eliminateUnnestedLoopsOnDispatch()
                     }else if ( dispatch->getInDegree() > 2 ) {
                         // goto into loop found
                         matched_dispatches.push_back(dispatch);
-                        if ( Log::cat_fe()->isDebugEnabled() ) {
+                        if ( Log::isEnabled() ) {
                             Log::out() << "goto into loop found, fixing..." << std::endl;
                         }
                         break;
                     }
                 }
                 if ( !found_goto_into_loop_warning ) {
-                    if ( Log::cat_fe()->isDebugEnabled() ) {
+                    if ( Log::isEnabled() ) {
                         Log::out() << "warning: maybe goto into loop with exception" 
                                    << std::endl;
                     }
@@ -492,40 +523,41 @@ void JavaFlowGraphBuilder::eliminateUnnestedLoopsOnDispatch()
             }
         }
     }
-    for ( CFGNodeDeque::const_iterator dispatch_iter = matched_dispatches.begin();
+    InstFactory* instFactory = irBuilder.getInstFactory();
+    for ( Nodes::const_iterator dispatch_iter = matched_dispatches.begin();
           dispatch_iter != matched_dispatches.end();
           dispatch_iter++ ) {
         
-        CFGNode* dispatch = (*dispatch_iter);
-        const CFGEdgeDeque& in_edges = dispatch->getInEdges();
-        CFGEdgeDeque::const_iterator in_edge_iter = in_edges.begin();
+        Node* dispatch = (*dispatch_iter);
+        const Edges& in_edges = dispatch->getInEdges();
         assert(dispatch->getInDegree() > 1);
-        for (in_edge_iter++; in_edge_iter != in_edges.end(); in_edge_iter++) {
-           CFGEdge* in_edge = *in_edge_iter;
-           CFGNode* dup_dispatch = createDispatchNode();
+        while (in_edges.size() > 1) {
+           Edge* in_edge = *(++in_edges.begin());
+           Node* dup_dispatch = createDispatchNode();
            fg->replaceEdgeTarget(in_edge, dup_dispatch);
-           const CFGEdgeDeque& out_edges = dispatch->getOutEdges();
-           for (CFGEdgeDeque::const_iterator out_edge_iter = out_edges.begin(); 
+           const Edges& out_edges = dispatch->getOutEdges();
+           for (Edges::const_iterator out_edge_iter = out_edges.begin(); 
                 out_edge_iter != out_edges.end();
                 out_edge_iter++) {
-               CFGNode* dispatch_target = (*out_edge_iter)->getTargetNode();
+               Node* dispatch_target = (*out_edge_iter)->getTargetNode();
                if ( !dispatch_target->isCatchBlock() ) {
                    fg->addEdge(dup_dispatch, dispatch_target);
                }else{
-                   CatchLabelInst* catch_label = (CatchLabelInst*)dispatch_target->getLabel();
-                   CFGNode* dup_catch = fg->createCatchNode(catch_label->getOrder(), catch_label->getExceptionType());
+                   CatchLabelInst* catch_label = (CatchLabelInst*)dispatch_target->getFirstInst();
+                   Node* dup_catch = createBlockNodeOrdered(instFactory->makeCatchLabel(catch_label->getOrder(), catch_label->getExceptionType()));
                    fg->addEdge(dup_dispatch, dup_catch);
                    assert(dispatch_target->getOutDegree() == 1);
                    fg->addEdge(dup_catch, (*dispatch_target->getOutEdges().begin())->getTargetNode());
                }
+
            }
         }
     }
 }
 
-bool JavaFlowGraphBuilder::lastInstIsMonitorExit(CFGNode* node)
+bool JavaFlowGraphBuilder::lastInstIsMonitorExit(Node* node)
 {
-    Inst* last = node->getLastInst();
+    Inst* last = (Inst*)node->getLastInst();
     if ( last->getOpcode() == Op_TypeMonitorExit ||
          last->getOpcode() == Op_TauMonitorExit ) {
         return true;
@@ -534,9 +566,9 @@ bool JavaFlowGraphBuilder::lastInstIsMonitorExit(CFGNode* node)
 }
 
 JavaFlowGraphBuilder::JavaFlowGraphBuilder(MemoryManager& mm, IRBuilder &irB) : 
-    memManager(mm), currentBlock(NULL), irBuilder(irB)
+    memManager(mm), currentBlock(NULL), irBuilder(irB), fallThruNodes(mm)
 {
-    fg = &irBuilder.getFlowGraph();
+    fg = irBuilder.getFlowGraph();
 }
 
 } //namespace Jitrino 

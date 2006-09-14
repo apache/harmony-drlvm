@@ -33,28 +33,27 @@ using namespace std;
 #include "vm_synch.h"
 #include "open/vm_util.h"
 #include "encoder.h"
-#include "vm_stats.h"
 #include "nogc.h"
 #include "compile.h"
 
-#include "exceptions.h"
+#include "exceptions_jit.h"
 #include "lil.h"
 #include "lil_code_generator.h"
 #include "../m2n_ia32_internal.h"
 #include "object_handles.h"
 #include "Class.h"
-
-#ifdef VM_STATS
 #include "jit_runtime_support.h"
-#endif
 
-#ifndef NDEBUG
 #include "dump.h"
-extern bool dump_stubs;
-#endif
+#include "vm_stats.h"
+
+
+char * gen_convert_managed_to_unmanaged_null_ia32(char * ss, 
+                                                  unsigned stack_pointer_offset);
+
 #define INPUT_ARG_OFFSET 4
-char *gen_setup_j2n_frame(char *s);
-char *gen_pop_j2n_frame(char *s);
+char * gen_setup_j2n_frame(char * s);
+char * gen_pop_j2n_frame(char * s);
 
 
 
@@ -89,7 +88,7 @@ static char * gen_restore_monitor_enter(char *ss, char *patch_addr_null_arg)
     signed offset;
     assert(header_offset);
 #ifdef VM_STATS
-    ss = inc(ss,  M_Opnd((unsigned)&(vm_stats_total.num_monitor_enter)));
+    ss = inc(ss,  M_Opnd((unsigned)&(VM_Statistics::get_vm_stats().num_monitor_enter)));
 #endif
     ss = mov(ss,  ecx_opnd,  M_Base_Opnd(esp_reg, INPUT_ARG_OFFSET));
     
@@ -146,10 +145,9 @@ void * restore__vm_monitor_enter_naked(void * code_addr)
     ss = gen_restore_monitor_enter(ss, /*patch_addr_null_arg*/ NULL);
 
     assert((ss - stub) < stub_size);
-#ifndef NDEBUG
-    if (dump_stubs)
-        dump(stub, "getaddress__vm_monitor_enter_naked_mt", ss - stub);
-#endif
+
+    DUMP_STUB(stub, "getaddress__vm_monitor_enter_naked_mt", ss - stub);
+
     return code_addr;
 } //restore__vm_monitor_enter_naked
 
@@ -169,10 +167,9 @@ void * restore__vm_monitor_enter_static_naked(void * code_addr)
     ss = gen_restore_monitor_enter(ss, patch_addr_null_arg);
 
     assert((ss - stub) < stub_size);
-#ifndef NDEBUG
-    if (dump_stubs)
-        dump(stub, "getaddress__vm_monitor_enter_static_naked_mt", ss - stub);
-#endif
+
+    DUMP_STUB(stub, "getaddress__vm_monitor_enter_static_naked_mt", ss - stub);
+
     return code_addr;
 } //restore__vm_monitor_enter_static_naked
 
@@ -182,7 +179,7 @@ static char * gen_restore_monitor_exit(char *ss, char *patch_addr_null_arg)
 
     const unsigned header_offset = ManagedObject::header_offset();
 #ifdef VM_STATS
-    ss = inc(ss,  M_Opnd((unsigned)&(vm_stats_total.num_monitor_enter)));
+    ss = inc(ss,  M_Opnd((unsigned)&(VM_Statistics::get_vm_stats().num_monitor_enter)));
 #endif
 
     ss = mov(ss,  ecx_opnd,  M_Base_Opnd(esp_reg, INPUT_ARG_OFFSET));
@@ -229,10 +226,9 @@ void * restore__vm_monitor_exit_naked(void * code_addr)
     ss = gen_restore_monitor_exit(ss, /*patch_addr_null_arg*/ NULL);
 
     assert((ss - stub) < stub_size);
-#ifndef NDEBUG
-    if (dump_stubs)
-        dump(stub, "getaddress__vm_monitor_exit_naked_mt", ss - stub);
-#endif
+
+    DUMP_STUB(stub, "getaddress__vm_monitor_exit_naked_mt", ss - stub);
+
     return code_addr; 
 } //restore__vm_monitor_exit_naked
 
@@ -252,10 +248,9 @@ void * restore__vm_monitor_exit_static_naked(void * code_addr)
     ss = gen_restore_monitor_exit(ss, patch_addr_null_arg);
 
     assert((ss - stub) < stub_size);
-#ifndef NDEBUG
-    if (dump_stubs)
-        dump(stub, "getaddress__vm_monitor_exit_static_naked_mt", ss - stub);
-#endif
+
+    DUMP_STUB(stub, "getaddress__vm_monitor_exit_static_naked_mt", ss - stub);
+
     return code_addr; 
 } //restore__vm_monitor_exit_static_naked
 
@@ -275,7 +270,7 @@ void * getaddress__vm_monitor_enter_naked()
     char *ss = stub;
 
 #ifdef VM_STATS
-    int * value = vm_stats_total.rt_function_calls.lookup_or_add((void*)VM_RT_MONITOR_ENTER, 0, NULL);
+    int * value = VM_Statistics::get_vm_stats().rt_function_calls.lookup_or_add((void*)VM_RT_MONITOR_ENTER, 0, NULL);
     ss = inc(ss,  M_Opnd((unsigned)value));
 #endif
 
@@ -284,17 +279,13 @@ void * getaddress__vm_monitor_enter_naked()
     addr = stub;
     assert((ss - stub) < stub_size);
 
+    compile_add_dynamic_generated_code_chunk("vm_monitor_enter_naked", stub, stub_size);
+
     if (VM_Global_State::loader_env->TI->isEnabled())
-    {
-        jvmti_add_dynamic_generated_code_chunk("vm_monitor_enter_naked", stub, stub_size);
         jvmti_send_dynamic_code_generated_event("vm_monitor_enter_naked", stub, stub_size);
-    }
 
+    DUMP_STUB(stub, "getaddress__vm_monitor_enter_naked", ss - stub);
 
-#ifndef NDEBUG
-    if (dump_stubs) 
-        dump(stub, "getaddress__vm_monitor_enter_naked", ss - stub);
-#endif
     return addr;
 }
 
@@ -314,7 +305,7 @@ void * getaddress__vm_monitor_enter_static_naked()
     char *ss = stub;
 
 #ifdef VM_STATS
-    int * value = vm_stats_total.rt_function_calls.lookup_or_add((void*)VM_RT_MONITOR_ENTER_STATIC, 0, NULL);
+    int * value = VM_Statistics::get_vm_stats().rt_function_calls.lookup_or_add((void*)VM_RT_MONITOR_ENTER_STATIC, 0, NULL);
     ss = inc(ss,  M_Opnd((unsigned)value));
 #endif
 
@@ -325,19 +316,17 @@ void * getaddress__vm_monitor_enter_static_naked()
     addr = stub;
     assert((ss - stub) < stub_size);
 
-    if (VM_Global_State::loader_env->TI->isEnabled())
-    {
-        jvmti_add_dynamic_generated_code_chunk("vm_monitor_enter_static_naked", stub, stub_size);
-        jvmti_send_dynamic_code_generated_event("vm_monitor_enter_static_naked", stub, stub_size);
-    }
+    compile_add_dynamic_generated_code_chunk("vm_monitor_enter_static_naked", stub, stub_size);
 
-    
-#ifndef NDEBUG
-    if (dump_stubs)
-        dump(stub, "getaddress__vm_monitor_enter_static_naked", ss - stub);
-#endif
+    if (VM_Global_State::loader_env->TI->isEnabled())
+        jvmti_send_dynamic_code_generated_event("vm_monitor_enter_static_naked", stub, stub_size);
+
+    DUMP_STUB(stub, "getaddress__vm_monitor_enter_static_naked", ss - stub);
+
     return addr;
 } //getaddress__vm_monitor_enter_static_naked
+
+
 
 
 void * getaddress__vm_monitor_exit_naked()
@@ -352,26 +341,23 @@ void * getaddress__vm_monitor_exit_naked()
     char *ss = stub;
 
 #ifdef VM_STATS
-    int * value = vm_stats_total.rt_function_calls.lookup_or_add((void*)VM_RT_MONITOR_EXIT, 0, NULL);
+    int * value = VM_Statistics::get_vm_stats().rt_function_calls.lookup_or_add((void*)VM_RT_MONITOR_EXIT, 0, NULL);
     ss = inc(ss,  M_Opnd((unsigned)value));
 #endif
 
-    ss = (char *)gen_convert_managed_to_unmanaged_null_ia32((Emitter_Handle)ss, /*stack_pointer_offset*/ INPUT_ARG_OFFSET);
+    ss = gen_convert_managed_to_unmanaged_null_ia32((Emitter_Handle)ss, /*stack_pointer_offset*/ INPUT_ARG_OFFSET);
     ss = gen_restore_monitor_exit(ss, /*patch_addr_null_arg*/ NULL);
 
     addr = stub;
     assert((ss - stub) < stub_size);
 
-    if (VM_Global_State::loader_env->TI->isEnabled())
-    {
-        jvmti_add_dynamic_generated_code_chunk("vm_monitor_enter_naked", stub, stub_size);
-        jvmti_send_dynamic_code_generated_event("vm_monitor_enter_naked", stub, stub_size);
-    }
+    compile_add_dynamic_generated_code_chunk("vm_monitor_enter_naked", stub, stub_size);
 
-#ifndef NDEBUG
-    if (dump_stubs)
-        dump(stub, "getaddress__vm_monitor_exit_naked", ss - stub);
-#endif
+    if (VM_Global_State::loader_env->TI->isEnabled())
+        jvmti_send_dynamic_code_generated_event("vm_monitor_enter_naked", stub, stub_size);
+
+    DUMP_STUB(stub, "getaddress__vm_monitor_exit_naked", ss - stub);
+
     return addr;
 } //getaddress__vm_monitor_exit_naked
 
@@ -388,7 +374,7 @@ void * getaddress__vm_monitor_exit_static_naked()
     char *ss = stub;
 
 #ifdef VM_STATS
-    int * value = vm_stats_total.rt_function_calls.lookup_or_add((void*)VM_RT_MONITOR_EXIT_STATIC, 0, NULL);
+    int * value = VM_Statistics::get_vm_stats().rt_function_calls.lookup_or_add((void*)VM_RT_MONITOR_EXIT_STATIC, 0, NULL);
     ss = inc(ss,  M_Opnd((unsigned)value));
 #endif
 
@@ -399,16 +385,13 @@ void * getaddress__vm_monitor_exit_static_naked()
     addr = stub;
     assert((ss - stub) < stub_size);
 
-    if (VM_Global_State::loader_env->TI->isEnabled())
-    {
-        jvmti_add_dynamic_generated_code_chunk("vm_monitor_exit_static_naked", stub, stub_size);
-        jvmti_send_dynamic_code_generated_event("vm_monitor_exit_static_naked", stub, stub_size);
-    }
+    compile_add_dynamic_generated_code_chunk("vm_monitor_exit_static_naked", stub, stub_size);
 
-#ifndef NDEBUG
-    if (dump_stubs)
-        dump(stub, "getaddress__vm_monitor_exit_static_naked", ss - stub);
-#endif
+    if (VM_Global_State::loader_env->TI->isEnabled())
+        jvmti_send_dynamic_code_generated_event("vm_monitor_exit_static_naked", stub, stub_size);
+
+    DUMP_STUB(stub, "getaddress__vm_monitor_exit_static_naked", ss - stub);
+
     return addr;
 } //getaddress__vm_monitor_exit_static_naked
 

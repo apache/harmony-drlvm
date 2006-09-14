@@ -262,6 +262,7 @@ jint JNICALL create_jvmti_environment(JavaVM *vm_ext, void **env, jint version)
     memset(&newenv->global_events, 0, sizeof(newenv->global_events));
     memset(&newenv->event_threads, 0, sizeof(newenv->event_threads));
 
+    LMAutoUnlock lock(&vm->vm_env->TI->TIenvs_lock);
     vm->vm_env->TI->addEnvironment(newenv);
     *env = newenv;
     TRACE2("jvmti", "New environment added: " << newenv);
@@ -269,7 +270,7 @@ jint JNICALL create_jvmti_environment(JavaVM *vm_ext, void **env, jint version)
     return JNI_OK;
 }
 
-void DebugUtilsTI::setInterpreterState(Global_Env *p_env)
+void DebugUtilsTI::setExecutionMode(Global_Env *p_env)
 {
     const char *interp_property =
         properties_get_string_property((PropertiesHandle)&p_env->properties, "vm.use_interpreter");
@@ -287,8 +288,9 @@ void DebugUtilsTI::setInterpreterState(Global_Env *p_env)
                 !strncmp(option, "-agentpath:", 11) ||
                 !strncmp(option, "-Xrun", 5))
             {
-                TRACE2("jvmti", "Enabling interpreter by default because jvmti is enabled");
-                add_pair_to_properties(p_env->properties, "vm.use_interpreter", "true");
+                TRACE2("jvmti", "Enabling EM JVMTI mode");
+                // add_pair_to_properties(p_env->properties, "vm.use_interpreter", "true");
+                add_pair_to_properties(p_env->properties, "vm.jvmti.enabled", "true");
                 break;
             }
         }
@@ -297,10 +299,11 @@ void DebugUtilsTI::setInterpreterState(Global_Env *p_env)
 DebugUtilsTI::DebugUtilsTI() :
     agent_counter(1),
     brkpntlst(NULL),
+    access_watch_list(NULL),
+    modification_watch_list(NULL),
     status(false),
     agents(NULL),
     p_TIenvs(NULL),
-    dcList(NULL),
     MAX_NOTIFY_LIST(1000),
     loadListNumber(0),
     prepareListNumber(0),
@@ -723,3 +726,22 @@ jvmtiError jvmti_translate_jit_error(OpenExeJpdaError error)
         return JVMTI_ERROR_INTERNAL;
     }
 }
+
+void jvmti_get_compilation_flags(OpenMethodExecutionParams *flags)
+{
+    DebugUtilsTI *ti = VM_Global_State::loader_env->TI;
+
+    if (!ti->isEnabled())
+        return;
+
+    flags->exe_do_code_mapping = flags->exe_do_local_var_mapping = 1;
+
+    if (ti->get_global_capability(DebugUtilsTI::TI_GC_ENABLE_METHOD_ENTRY))
+        flags->exe_notify_method_entry = 1;
+
+    if (ti->get_global_capability(DebugUtilsTI::TI_GC_ENABLE_METHOD_EXIT) ||
+        ti->get_global_capability(DebugUtilsTI::TI_GC_ENABLE_FRAME_POP_NOTIFICATION))
+        flags->exe_notify_method_exit = 1;
+
+}
+

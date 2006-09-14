@@ -1,0 +1,266 @@
+<!--
+    Copyright 2006 The Apache Software Foundation or its licensors, as applicable.
+  
+    Licensed under the Apache License, Version 2.0 (the "License");
+    you may not use this file except in compliance with the License.
+    You may obtain a copy of the License at
+  
+       http://www.apache.org/licenses/LICENSE-2.0
+  
+    Unless required by applicable law or agreed to in writing, software
+    distributed under the License is distributed on an "AS IS" BASIS,
+    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+    See the License for the specific language governing permissions and
+    limitations under the License.
+-->
+
+<project name="KERNEL TESTS">
+
+    <property name="kernel.test.javasrc" location="${build.VM.home}/tests/kernel" />
+    <property name="kernel.test.dir" location="${build.semi.dir}/kernel.tests"/>
+    <property name="test.resource.path" location="${kernel.test.dir}/resources"/>
+    <property name="test.class.path" location="${kernel.test.dir}/classes"/>
+
+
+    <patternset id="kernel.test.java.pattern">
+        <include name="org/apache/harmony/**/*Test.java" />
+        <include name="java/lang/**/*Test*.java" />
+
+        <!-- These tests are too slow -->
+        <exclude name="java/lang/RuntimeAdditionalTest*.java" />
+
+        <!-- These tests are unstable and hang often -->
+        <exclude name="java/lang/RuntimeAdditionalTest11.java" />
+        <exclude name="java/lang/RuntimeAdditionalTest34.java" />
+        <exclude name="java/lang/RuntimeAdditionalTest39.java" />
+        <exclude name="java/lang/RuntimeAdditionalTest40.java" />
+        <exclude name="java/lang/RuntimeAdditionalTest41.java" />
+        <exclude name="java/lang/RuntimeAdditionalTest42.java" />
+
+	<!-- This test fails -->
+	<exclude name="java/lang/ThreadTest.java" />
+    </patternset>
+
+    <property name="vm.use_verifier" value="1" />
+    <property name="kernel.test.timeout" value="180000" />
+    
+    <target name="kernel.test" depends="-pre-kernel-test">
+        <property name="test.mode" value="jet+opt+int" />
+        <if>
+            <contains string="${test.mode}" substring="batch" />
+            <then>
+                <antcallback target="-run-kernel-test-batch"
+                    return="batch.status">
+                </antcallback>
+            </then>
+        </if>
+        <if>
+            <contains string="${test.mode}" substring="jet" />
+            <then>
+                <antcallback target="-run-kernel-test" 
+                    return="jit.jet.status">
+                    <param name="jit.or.interpreter" value="jitrino.jet" />
+                    <param name="int.or.jit.arg" value="-Dem.properties=jet" />
+                </antcallback>
+            </then>
+        </if>
+        <if>
+            <contains string="${test.mode}" substring="opt" />
+            <then>
+                <antcallback target="-run-kernel-test" 
+                    return="jit.opt.status">
+                    <param name="jit.or.interpreter" value="jitrino.opt" />
+                    <param name="int.or.jit.arg" value="-Dem.properties=opt" />
+                </antcallback>
+            </then>
+        </if>
+        <if>
+            <contains string="${test.mode}" substring="int" />
+            <then>
+                <antcallback target="-run-kernel-test" 
+                    return="interpreter.status">
+                    <param name="jit.or.interpreter" value="interpreter" />
+                    <param name="int.or.jit.arg" value="-Xint" />
+                </antcallback>
+            </then>
+        </if>
+        <if>
+            <or>
+                <contains string="${jit.jet.status}" substring="FAILED" />
+                <contains string="${jit.opt.status}" substring="FAILED" />
+                <contains string="${interpreter.status}" substring="FAILED" />
+                <contains string="${batch.status}" substring="FAILED" />
+            </or>
+            <then>
+                <fail message="Kernel tests FAILED" />
+            </then>
+        </if>
+    </target>
+    
+    <target name="compile-kernel-tests" depends="">
+        <mkdir dir="${test.resource.path}" />
+        <javac srcdir="${kernel.test.javasrc}/../kernel_resources" 
+            destdir="${test.resource.path}" 
+            source="1.5" target="1.5" debug="true">
+        </javac>
+        <mkdir dir="${test.class.path}" />
+        <javac srcdir="${kernel.test.javasrc}" 
+            destdir="${test.class.path}" 
+            source="1.5" target="1.5" debug="true">
+        </javac>
+        <delete quiet="true" dir="${test.class.path}/notfound" />
+    </target>
+    
+    <target name="-pre-kernel-test" depends="compile-kernel-tests">
+        <condition property="junit.jar" value="${junit.home}/junit.jar">
+            <isset property="junit.home" />
+        </condition>
+        <property name="junit.jar" location="${external.dep.CLASSLIB}/depends/jars/junit_3.8.2/junit.jar"/>
+        <if>
+            <not>
+                <available file="${junit.jar}"/>
+            </not>
+            <then>
+                <echo>
+                ==============================================
+                Please set the classpath of junit as follows:
+                build.bat -Djunit.jar=%JUNIT_HOME% test"
+                ==============================================
+                </echo>
+                <fail message="Kernel tests misconfigured" />
+            </then>
+        </if>
+        
+        <delete quiet="true" dir="${kernel.test.dir}/reports" />
+        <delete quiet="true" dir="${kernel.test.dir}/ref-reports" />
+        <mkdir dir="${kernel.test.dir}/reports" />
+        <mkdir dir="${kernel.test.dir}/ref-reports" />
+        
+    </target>
+    
+    <target name="-run-kernel-test-batch">
+        <property name="report.dir"
+            location="${kernel.test.dir}/reports/batch.mode"/>
+        <mkdir dir="${report.dir}" />
+        
+        <junit fork="yes" forkmode="once" timeout="${kernel.test.timeout}"
+            haltonfailure="no" failureproperty="batch.failed"
+            filtertrace="no" printsummary="on"
+            jvm="${build.deploy.dir}/bin/java">
+            <jvmarg value="-Dtest.resource.path=${test.resource.path}"/>
+            <jvmarg value="-Dvm.assert_dialog=0" />
+            <jvmarg value="-Xbootclasspath/a:${junit.jar}${path.separator}${test.class.path}" />
+            <formatter type="brief"/>
+            <batchtest todir="${report.dir}">
+                <fileset dir="${kernel.test.javasrc}"> 
+                    <patternset refid="kernel.test.java.pattern"/>
+                </fileset>
+            </batchtest>
+        </junit>
+        
+        <condition property="batch.status" value="FAILED" else="PASSED">
+            <isset property="batch.failed" />
+        </condition>
+    </target>
+
+
+    <target name="-run-kernel-test">     
+        <echo>
+		==================================
+		Run kernel tests using ${jit.or.interpreter}
+		==================================
+		</echo>
+
+        <property name="report.dir" 
+            location="${kernel.test.dir}/reports/${jit.or.interpreter}"/>
+        <mkdir dir="${report.dir}" />
+        
+        <for param="test">
+            <fileset dir="${kernel.test.javasrc}">
+                <patternset refid="kernel.test.java.pattern" />
+            </fileset>
+            <sequential>
+
+                <basename property="last.dir" file="${kernel.test.javasrc}" />
+                <propertyregex property="class.name" override="true" input="@{test}" regexp="(.)+${last.dir}\${file.separator}" replace="" defaultValue="@{test}" />
+                <propertyregex property="class.name" override="true" input="${class.name}" regexp="\.java" replace="" defaultValue="${class.name}" />
+                <propertyregex property="class.name" override="true" input="${class.name}" regexp="\${file.separator}" replace="." global="true" defaultValue="${class.name}" />
+                <echo message="RUNNING : ${class.name}" />
+                
+                <junit fork="yes" failureproperty="@{test}.failed"
+                    timeout="${kernel.test.timeout}" newenvironment="yes" filtertrace="no"
+                    jvm="${build.deploy.dir}/bin/java">
+                    <!--env key="LD_LIBRARY_PATH" value="${build.deploy.dir}/bin:${env.LD_LIBRARY_PATH}" /-->
+                    <env key="SYSTEMDRIVE" value="${env.SystemDrive}" />
+                    <env key="HOME" value="${env.HOME}" />
+                    <env key="PATH" value="${env.PATH}" />
+                    <jvmarg value="-Dtest.resource.path=${test.resource.path}"/>
+                    <jvmarg value="-Demma.coverage.out.file=${emma.coverage.out}" />
+                    <jvmarg value="-Demma.coverage.out.merge=true" />
+                    <jvmarg value="-Xbootclasspath/p:${emma.coverage.ip}${path.separator}${emma.jar}" />
+                    <jvmarg value="-Dvm.use_verifier=${vm.use_verifier}" />
+                    <jvmarg value="-Dvm.assert_dialog=0" />
+                    <jvmarg value="-Xbootclasspath/a:${junit.jar}${path.separator}${test.class.path}" />
+                    <jvmarg value="${int.or.jit.arg}" />
+                    <jvmarg value="-ea:java.lang.reflect..." />                    
+                    <formatter type="brief"/>
+                    <formatter type="xml" />
+                    <test name="${class.name}" todir="${report.dir}"/>
+                </junit>
+                <condition property="${jit.or.interpreter}.status" value="FAILED">
+                    <isset property="@{test}.failed" />
+                </condition>
+                
+                <if>
+                    <or>
+                        <isset property="@{test}.failed" />
+                        <isset property="kernel.test.reference" />
+                    </or>
+                    <then>
+                        <junit fork="yes" failureproperty="@{test}.ref.failed" 
+                            timeout="${kernel.test.timeout}" 
+                            newenvironment="yes" filtertrace="no">
+                            <!--env key="LD_LIBRARY_PATH" value="${build.deploy.dir}/bin:${env.LD_LIBRARY_PATH}" /-->
+                            <env key="SYSTEMDRIVE" value="${env.SystemDrive}" />
+                            <env key="HOME" value="${env.HOME}" />
+                            <env key="PATH" value="${env.PATH}" />
+                            <jvmarg value="-Dtest.resource.path=${test.resource.path}"/>
+                            <jvmarg value="-Xbootclasspath/a:${junit.jar}${path.separator}${test.class.path}" />
+                            <formatter type="brief"/>
+                            <formatter type="xml" />
+                            <test name="${class.name}" todir="${kernel.test.dir}/ref-reports"/>
+                        </junit>
+
+                        <if>
+                            <isset property="@{test}.ref.failed" />
+                            <then>
+                                <echo message="   **** FAILED on reference JRE ****" />
+                            </then>
+                        </if>
+                    </then>
+                </if>
+            </sequential>
+        </for>
+
+        <junitreport todir="${report.dir}">
+            <fileset dir="${report.dir}">
+                <include name="TEST-*.xml" />
+            </fileset>
+            <report format="frames" todir="${report.dir}/html" />
+        </junitreport>
+        <junitreport todir="${kernel.test.dir}/ref-reports">
+            <fileset dir="${kernel.test.dir}/ref-reports">
+                <include name="TEST-*.xml" />
+            </fileset>
+            <report format="frames" todir="${kernel.test.dir}/ref-reports/html" />
+        </junitreport>
+        <property name="${jit.or.interpreter}.status" value="PASSED"/>
+        <propertycopy name="status" from="${jit.or.interpreter}.status"/>
+        <echo message="" />
+        <echo message="==============================================" />
+        <echo message="Kernel tests ${status} using ${jit.or.interpreter}. Please find the detailed results here:" />
+        <echo message="${report.dir}${file.separator}html${file.separator}index.html" />
+        <echo message="==============================================" />
+
+    </target>
+</project>

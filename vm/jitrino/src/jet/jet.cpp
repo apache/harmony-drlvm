@@ -14,9 +14,122 @@
  *  limitations under the License.
  */
 /**
- * @author Alexander V. Astapchuk
- * @version $Revision: 1.7.12.3.4.4 $
+ * @author Alexander Astapchuk
+ * @version $Revision: 1.7.12.4.2.8 $
  */
+ /**
+  * @file
+  * @brief Main Jitrino.JET's interface implementation.
+  */
+  
+/**
+ * @mainpage
+ * @section sec_intro Introduction
+ * <center>
+ * Jitrino.JET: <b>J</b>itrino's <b>e</b>xpress compilation pa<b>t</b>h
+ * </center>
+ * 
+ * Jitrino.JET is a simple baseline compiler for %Jitrino JIT.
+ *
+ * It's primarily targeted for fast compilation to ensure quick start for 
+ * client applications and to support optimizing engine of main %Jitrino 
+ * (instrumentation, profile generation, etc.).
+ *
+ * Jitrino.JET performs 2 passes over bytecode. On the first pass, basic 
+ * blocks boundaries are found. On the second pass code is generated.
+ *
+ * The code is generated targeting an abstract CPU that is armed with 
+ * registers, memory, memory stack and can perform several operations like
+ * move between memory/register, ALU operations, branch and call, etc 
+ * (class Encoder generates primitive operations of this abstract CPU).
+ *
+ * Technically, Jitrino.JET generates a code that simulates stack-based 
+ * operations of Java byte code using a register CPU. Every method 
+ * compiled by Jitrino.JET creates a stack frame with a structure similar 
+ * to the frame described by JVM spec (3.6). The stack frame contains local
+ * variables array and an area for operand stack plus some other auxilary
+ * items. Class StackFrame describes the stack frame structure.
+ * 
+ * The compilation engine consists of two main classes - Compiler and 
+ * CodeGen.
+ *
+ * Though the separation is quite relative, the main idea is that class 
+ * Compiler processes high level method items, like basic blocks, whole 
+ * method's data, code layout etc. The class CodeGen is more targeted to 
+ * process instruction-level things (e.g. the byte code instructions 
+ * themselves). Compiler organizes pass over the byte code, instruments
+ * CodeGen's fields with actual data (current compiler state, PC, etc) and 
+ * invokes CodeGen's methods to generate code for each instruction.<br>
+ * Some bytecode instruction (like GOTO) need to deal with basic blocks
+ * information, thus their generation is placed into Compiler rather than
+ * in CodeGen.
+ *
+ *
+ * Class Compiler is based on CodeGen which in turn inherits from classes 
+ * StaticConsts, Encoder and MethInfo.  The StaticConsts class has no 
+ * funtional interface, it's just used to keep static constants separately.
+ * Class Encoder represents generation of CPU operations.
+ * MethInfo provides an interface to obtain various info about method being
+ * compiled.
+ * 
+ * As it was stated above, two passes over the byte code is performed.
+ *
+ * The first pass is linear scan of byte code (Compiler::comp_parse_bytecode) 
+ * - it decodes all byte code instructions, finds boundaries of basic 
+ * blocks, counts references for instructions and collects statistics about 
+ * usage of local variabled. The reference count for instruction is number
+ * of incoming edges of control flow. For instructions inside basic block, 
+ * the reference count is 1. For instructions that are basic block leaders, 
+ * it may be more than 1. Reference count of zero means dead code.
+ *
+ * Then, a simple global register allocation performed 
+ * (Compiler::comp_alloc_regs) basing on the info collected in 
+ * Compiler::comp_parse_bytecode(). Local (per-basic block) register 
+ * allocation is done during code generation (pass 2) via 
+ * CodeGen::valloc(jtype) calls.
+ * 
+ * The second pass is performed in depth-first search (DFS) order, and the 
+ * code is generated (Compiler::comp_gen_code_bb). The code at first is 
+ * generated into internal buffer (CodeGen::m_codeStream), and then a code 
+ * layout is performed (Compiler::comp_layout_code) so the layout of 
+ * generated code becomes exactly the same as byte code layout.
+ * 
+ * During compilation, Jitrino.JET mimics Java operand stack operations 
+ * (class JFrame), so its state is known for every byte code instruction.
+ * This mimic stack is used to get a GC info and eliminate many unnecessary 
+ * temporary operations caused by stack-based nature of byte code (e.g. 
+ * ICONST_0, ISTORE_1 => mov [local#1], 0). The JFrame class also contains 
+ * local variables array. Both operand stack and local variables array in 
+ * JFrame are used to track item locations (register, memory), known 
+ * attributes (i.e. tested against null).
+ *
+ * Instance of JFrame is part of BBState class which is used to maintain 
+ * per-basic block state of compiler.
+ * 
+ * A special code is generated for GC support. During runtime 2 GC maps 
+ * are maintained. GC map is a set of bits which shows whether an item 
+ * contains a reference. GC map for local variables is build complitely 
+ * during runtime. That is when a write to a local variable is generated,
+ * the code to set or clear approprate bit in GC map is also generated (see 
+ * CodeGen::gen_gc_mark_local()).
+ * 
+ * GC map for operand stack is semi-runtime. That is the operand stack 
+ * state is maintaned duirng compilation. Before generate code for a call 
+ * site special code is generated that updates GC map and operand stack 
+ * depth at the given point (CodeGen::gen_gc_stack).
+ *
+ * To be accurate, there is on more GC map maintained - the GC map for
+ * callee-save registers. The code for this is also generated in 
+ * CodeGen::gen_gc_mark_local(), as only local variables may reside on
+ * such regisers with current approach.
+ *
+ * When GC enumeration start, the runtime support code extracts these GC 
+ * maps method's stack frame, and then objects are reported accordingly (
+ * see rt_enum()).
+ *
+ * 
+ */
+
 #include "jet.h"
 #include "compiler.h"
 #include "stats.h"
@@ -24,48 +137,214 @@
 #include <jit_export_jpda.h>
 
 #include <assert.h>
+#include "trace.h"
+#include "../shared/mkernel.h"
 
-/**
- * @file
- * @brief Main interface provided by Jitrino.JET.
- */
- 
-/**
- * @mainpage
- * @section sec_intro Introduction
- * Jitrino.Jet: Jitrino's Express compilation paTh
- * 
- * Jitrino.JET is a simble baseline compiler for Jitrino JIT.
- *
- * The main goal is fast compilation (to provide quick start for client
- * applications) and to produce neccessary support for optimising engine of
- * mian Jitrino (instrumentation, profile generation, etc.).
- *
- */
+#include <set>
+#include <string>
+using std::set;
+using std::string;
+
 
 namespace Jitrino {
 namespace Jet {
 
-void setup(JIT_Handle jit)
+
+static void process_global_args(void);
+
+static PMF* g_pmf = NULL;
+
+void setup(JIT_Handle jit, const char * name)
 {
-#if defined(_DEBUG) && defined(JET_PROTO)
-//    shared_jit_handle = jit;
-#endif
-    Timer::init();
-    Timers::totalExec.start();
+    g_pmf = &JITInstanceContext::getContextForJIT(jit)->getPMF();
+    process_global_args();
 }
 
 void cleanup(void)
 {
-    Timers::totalExec.stop();
-    //Timer::dump();
-    //Stats::dump();
+#ifdef JIT_STATS
+    const char * lp = g_pmf->getArg(NULL, "stats");
+    if (lp != NULL && to_bool(lp)) {
+        Stats::dump();
+    }
+#endif  // ~JIT_STATS
+    g_pmf->deinit();
 }
 
-void get_id_string(char * buf, unsigned len)
+
+bool supports_compresed_refs(void)
 {
-    const char revision[] = "$Revision: 1.7.12.3.4.4 $";
-    const char branch[] = "$Name:  $";
+#if defined(_EM64T_) || defined(_IPF_)
+    return true;
+#else
+    return false;
+#endif
+}
+
+const char *args[][2] = 
+{
+//-------------------------------------------------------------------------
+{"show", 
+ "    =help - prints out this text                                      \n"
+ "    =info                                                             \n"
+ "    =id                                                               \n"
+ "    =version - prints out build info                                  \n"
+ "    =all     - help,version                                           \n"
+ "    =<empty> - same as all                                            \n"
+},
+//-------------------------------------------------------------------------
+{"log", 
+ "The following categories are supported:                               \n"
+ "Compilation:                                                          \n"
+ "(don't forget to add 'log=ct'. default is code+sum)                   \n"
+ " sum    - prints out short summary about compiled method              \n"
+ " cg     - trace every stage of code generation                        \n"
+ " code   - dump resulting code                                         \n"
+ " layout - addresses of generated basic blocks                         \n"
+ "Runtime:                                                              \n"
+ "(don't forget to add 'log=rt'!)                                       \n"
+ " rtsupp - prints out runtime support events (unwind, GC enum, etc)    \n"
+ " ee     - logs method's enter and exit events                         \n"
+ " bc     - logs execution of each bytecode instruction                 \n"
+ "                                                                      \n"
+ "Examples:                                                             \n"
+ "        -Djit.jet.arg.log=ct,sum,code                                 \n"
+ "        -Djit.jet.arg.log=ct   (same as log=ct,sum,cg)                \n"
+ "        -Djit.jet.arg.log=rt -Djit.jet.filterName.arg.log=ee          \n"
+},
+//-------------------------------------------------------------------------
+{"break", 
+ NULL
+},
+{"brk", 
+ "type: bool or uint; default: off; scope: method                       \n"
+ "brk=on - triggers software breakpoint at the beginning of the method  \n"
+ "brk=PC - triggers software breakpoint at bytecode @ PC                \n"
+},
+//-------------------------------------------------------------------------
+{"tbreak", 
+ "type: uint; default: none; scope: global                              \n"
+ "Break into debugger when counter in dbg_rt reaches the specified      \n"
+ "value.                                                                \n"
+},
+//-------------------------------------------------------------------------
+{"checkstack", 
+ "type: bool; default: off; scope: method                               \n"
+ "generates code to verify stack integrity before and after each        \n"
+ "bytecode instruction.                                                 \n"
+},
+//-------------------------------------------------------------------------
+{"checkmem", 
+ "type: bool; default: off; scope: method                               \n"
+ "Enforces memory checks before and after compilation of a method.      \n"
+ "Implementation is platform-dependent and may be no op on some         \n"
+ "platforms/build configurations. Currently, only Windows/debug build   \n"
+ "the check implemented.                                                \n"
+},
+//-------------------------------------------------------------------------
+{"emulate", 
+ "type: bool; default: off; scope: method                               \n"
+ "Performs compilation, but do not register compiled code in VM.        \n"
+ "Return JIT_FAILURE after compilation.                                 \n"
+},
+//-------------------------------------------------------------------------
+{"accept", 
+ NULL,
+},
+{"reject", 
+ "both accept and reject:\n"
+ "type: range of [uint][-uint]; default: none; scope: global            \n"
+ "reject only:                                                          \n"
+ "type: bool; default: off; scope: method                               \n"
+ "On global scope defines a range of compilation ids of methods to be   \n"
+ "accepted or rejected for compilation. Any part of range may be omitted.\n"
+},
+//-------------------------------------------------------------------------
+{"list", 
+ "type: string; default: none; scope: global                            \n"
+ "Sets name of file with list of fully qualified names of methods.      \n"
+ "Any method not in the list will be rejected.                          \n"
+},
+//-------------------------------------------------------------------------
+{"bbp", 
+ "type: bool; default: on; scope: method                                \n"
+ "turns on and off generation of back branches polling code               "
+},
+
+//-------------------------------------------------------------------------
+{"hwnpe",
+ "type: bool; default: on; scope: method                                \n"
+ "Controls whether to generate hardware NPE checks instead of explicit  \n"
+ "software checks                                                       \n"
+},
+   
+#ifdef JIT_STATS
+{"stats", 
+ "type: bool; default: off; scope: global                               \n"
+ "Collects and shows various statistics about compiled methods.         \n"
+ "Note: you may need to pass -XcleanupOnExit to VM to view the stats.   \n"
+},
+#endif  // ~JIT_STATS
+//-------------------------------------------------------------------------
+ "                                                                      \n"
+// "                                                                      \n"
+};
+
+static void print_id(void);
+
+static void print_help(void)
+{
+    static bool help_printed = false;
+    if (help_printed) return;
+    print_id();
+    for (unsigned i=0; i<COUNTOF(args); i++) {
+        printf("%s\n", args[i][0]);
+        if (args[i][1] != NULL) {
+            printf("%s\n", args[i][1]);
+        }
+    }
+    help_printed = true;
+}
+#ifdef _DEBUG
+static std::set<string> checked;
+static Mutex checkedLock;
+#endif
+void check_arg_has_doc(const char* key)
+{
+#ifdef _DEBUG
+    //
+    checkedLock.lock();
+    if (checked.find(key) == checked.end()) {
+        checkedLock.unlock();
+        return;
+    }
+    checked.insert(key);
+    checkedLock.unlock();
+    //
+    bool found = false;
+    for (unsigned i=0; i<COUNTOF(args); i++) {
+        if (!strcmp(args[i][0], key)) {
+            found = true;
+            break;
+        }
+    }
+    if (!found) {
+        printf(
+          "WARNING: an argument named '%s' has no documentation !\n", key);
+        printf(
+            "Please, add appropriate description into \n\t" __FILE__ "\n");
+    }
+#endif  // ifdef _DEBUG
+}
+
+static const char *get_id_string(void)
+{
+    static char buf[80] = {0};
+    if (buf[0] != 0) return buf;
+    unsigned len = sizeof(buf)-1;
+    
+    const char revision[] = "$Revision$";
+    const char branch[] = "$Name$";
 
 #ifdef PROJECT_JET
     #define ALONE_STR   ", alone"
@@ -99,71 +378,106 @@ void get_id_string(char * buf, unsigned len)
         "Jitrino.JET" DBG_STR COMP_STR ALONE_STR ": "
         "Built: " __DATE__ " " __TIME__ 
         ".%s%s", branch_buf, revision_buf);
+        
+    return buf;
 }
 
-static bool id_done = false;
+static void print_id(void)
+{
+    static bool id_printed = false;
+    if (id_printed) return;
+    puts(get_id_string());
+    id_printed = true;
+}
+
+static void parse_range(const char* str, unsigned* pStart, unsigned *pEnd)
+{
+    if (str[0] != '-' && !isdigit(str[0])) {
+        // wrong or empty params. print warning ?
+        return;
+    }
+    if (str[0] != '-') {
+        //'0-1' or '0'  version
+        sscanf(str, "%u", pStart);
+    }
+    const char * pdash = strchr(str, '-');
+    if (pdash != NULL) {
+        sscanf(pdash+1, "%u", pEnd);
+    }
+}
+
+static void process_global_args(void)
+{
+    const char * lp;
+    lp = g_pmf->getArg(NULL, "show");
+    if (lp != NULL) {
+        // empty string means 'all';
+        bool show_all = lp[0] == 0 || !strcmpi(lp, "all"); 
+        bool show_help = show_all || (NULL!=strstr(lp, "help"));
+        bool show_id = show_all || 
+                        (NULL!=strstr(lp, "id")) || 
+                        (NULL!=strstr(lp, "info")) || 
+                        (NULL!=strstr(lp, "version"));
+        if (show_help) {
+            print_help();
+        }
+        if (show_id) {
+            print_id();
+        }
+    }
+    lp = g_pmf->getArg(NULL, "accept");
+    if (lp != NULL) {
+        parse_range(lp, &Compiler::g_acceptStartID, &
+                    Compiler::g_acceptEndID);
+    }
+    lp = g_pmf->getArg(NULL, "reject");
+    if (lp != NULL) {
+        parse_range(lp, &Compiler::g_rejectStartID, &
+                    Compiler::g_rejectEndID);
+    }
+    lp = g_pmf->getArg(NULL, "tbreak");
+    if (lp != NULL) {
+        g_tbreak_id = NOTHING;
+        sscanf(lp, "%u", &g_tbreak_id);
+    }
+}
+
 
 void cmd_line_arg(JIT_Handle jit, const char* name, const char* arg)
 {
-    static const char help_data[] = {
-"                                                                         \n"
-"  jet::help                - prints out this text                        \n"
-"  jet::info, jet::id       - prints out build info                       \n"
-"  jet::lazyres, jet::lr    - generate code with lazy (runtime) resolution\n"
-#ifdef JET_PROTO
-"  jet::stackalign, jet::sa - generate methods with stack alignment       \n"
-#endif
-"  jet::no_bbpooling, jet::no_bbp - do not generate back branches pooling \n"
-"                             code                                        \n"
-    };
-    
-    const char
-        key_invalid[] = "jet::",
-        key_help[] = "jet::help",
-        key_info[] = "jet::info",
-        key_id[] = "jet::id",
-        key_lazyres[] = "jet::lazyres", key_lr[] = "jet::lr",
-#ifdef JET_PROTO
-        key_stackalign[] = "jet::stackalign", key_sa[] = "jet::sa",
-#endif
-        key_no_bbpooling[] = "jet::no_bbpooling", key_no_bbp[] = "jet::no_bbp";
-
-    if (!strncmp(arg, key_help, sizeof(key_help)-1)) {
-		if (!id_done) {
-	        char buf[81];
-    	    get_id_string(buf, sizeof(buf)-1);
-	        puts(buf);
-			id_done = true;
-		}
-        puts(help_data);
+    if (!strcmp(arg, "jet::help")) {
+        print_help();
     }
-    else if (!strncmp(arg, key_id, sizeof(key_id)-1) || 
-             !strncmp(arg, key_info, sizeof(key_info)-1)) {
-		if (!id_done) {
-	        char buf[81];
-    	    get_id_string(buf, sizeof(buf)-1);
-	        puts(buf);
-			id_done = true;
-		}
+    else if (!strcmp(arg, "jet::id")) {
+        print_id();
     }
-    else if (!strncmp(arg, key_lazyres, sizeof(key_lazyres)-1) || 
-             !strncmp(arg, key_lr, sizeof(key_lr)-1)) {
-        Compiler::defaultFlags |= JMF_LAZY_RESOLUTION;
+    else if (!strcmp(arg, "jet::info")) {
+        print_id();
+        print_help();
     }
-#ifdef JET_PROTO
-    else if (!strncmp(arg, key_stackalign, sizeof(key_stackalign)-1) || 
-             !strncmp(arg, key_sa, sizeof(key_sa)-1)) {
-        Compiler::defaultFlags |= JMF_ALIGN_STACK;
-    }
-#endif
-    else if (!strncmp(arg, key_no_bbpooling, sizeof(key_no_bbpooling)-1) || 
-             !strncmp(arg, key_no_bbp, sizeof(key_no_bbp)-1)) {
-        Compiler::defaultFlags &= ~JMF_BBPOOLING;
-    }
-    else if (!strncmp(arg, key_invalid, sizeof(key_invalid)-1)) {
-        printf("Warning: unknown flag - %s\n", arg);
+    else if (!strncmp(arg, "jet::", 5)) {
+        static bool warning_printed = false;
+        if (!warning_printed) {
+        puts(
+"*********************************************************************\n"
+"*                            WARNING !                              *\n"
+"* Command line options in form of -Xjit jet::arg are deprecated !   *\n"
+"*                                                                   *\n"
+"* The jet:: parameters are IGNORED                                  *\n"
+"*                                                                   *\n"
+"* To pass arguments to Jitrino.JET use                              *\n"
+"*          -Djit.<jit_name>.arg=value                               *\n"
+"* Use                                                               *\n"
+"*          -Djit.<jit_name>.show=help                               *\n"
+"* to get the list of supported args.                                *\n"
+"*********************************************************************\n"
+        );
+        warning_printed = true;
+        }
     }
 }
+
+
 
 OpenMethodExecutionParams get_exe_capabilities()
 {
@@ -171,10 +485,8 @@ OpenMethodExecutionParams get_exe_capabilities()
         true,  // exe_notify_method_entry
         true,  // exe_notify_method_exit
         
-        false, // exe_notify_instance_field_read
-        false, // exe_notify_instance_field_write
-        false, // exe_notify_static_field_read
-        false, // exe_notify_static_field_write
+        false, // exe_notify_field_access
+        false, // exe_notify_field_modification 
         false, // exe_notify_exception_throw
         false, // exe_notify_exception_catch
         false, // exe_notify_monitor_enter
@@ -191,41 +503,20 @@ OpenMethodExecutionParams get_exe_capabilities()
     return supported;
 }
 
-JIT_Result compile(JIT_Handle jitHandle, Compile_Handle ch, Method_Handle method, 
-                   JIT_Flags flags)
+JIT_Result compile(JIT_Handle jitHandle, Compile_Handle ch, 
+                   Method_Handle method, JIT_Flags flags)
 {
-    static const OpenMethodExecutionParams compileArgs = {
-        false,  // exe_notify_method_entry
-        false,  // exe_notify_method_exit
-        
-        false, // exe_notify_instance_field_read
-        false, // exe_notify_instance_field_write
-        false, // exe_notify_static_field_read
-        false, // exe_notify_static_field_write
-        false, // exe_notify_exception_throw
-        false, // exe_notify_exception_catch
-        false, // exe_notify_monitor_enter
-        false, // exe_notify_monitor_exit
-        false, // exe_notify_contended_monitor_enter
-        false, // exe_notify_contended_monitor_exit
-        false, // exe_do_method_inlining
-        
-        true,  // exe_do_code_mapping
-        true,  // exe_do_local_var_mapping
-        
-        false, // exe_insert_write_barriers
-    };
-
-    ::Jitrino::Jet::Compiler jit(jitHandle, compileArgs);
-    return jit.compile(ch, method);
+    // this function is obsolet
+    assert(false);
+    return JIT_FAILURE;
 }
 
 JIT_Result compile_with_params(JIT_Handle jit_handle, Compile_Handle ch, 
                                Method_Handle method, 
                                OpenMethodExecutionParams params)
 {
-    ::Jitrino::Jet::Compiler jit(jit_handle, params);
-    return jit.compile(ch, method);
+    ::Jitrino::Jet::Compiler jit(jit_handle);
+    return jit.compile(ch, method, params);
 }
 
 
@@ -247,20 +538,147 @@ JIT_Result compile_with_params(JIT_Handle jit_handle, Compile_Handle ch,
  *
  * @{
  */
+ 
+#include <map>
+using std::map;
+#include "../main/Log.h"
+#include "../main/LogStream.h"
+//
+// PMF and JitInstanceContext things uses various stuff from Jitrino::.
+// Define it here to allow standalone .jet build.
+// 
+namespace Jitrino {
+void crash(const char* fmt, ...)
+{
+    va_list valist;
+    va_start(valist, fmt);
+    vprintf(fmt, valist);
+    exit(0);
+}
+//
+// JITInstanceContex stub
+//
+typedef map<JIT_Handle, JITInstanceContext*> JITCTXLIST;
+static JITCTXLIST jitContextList;
+
+JITInstanceContext* Jitrino::getJITInstanceContext(JIT_Handle jitHandle)
+{
+    assert(jitContextList.find(jitHandle) != jitContextList.end());
+    return jitContextList[jitHandle];
+}
+
+//
+// CompilationContext stub
+//
+
+class CompilationContext {
+public:
+    CompilationContext(JIT_Handle jitHandle, Method_Handle meth);
+    ~CompilationContext();
+    static CompilationContext* getCurrentContext(void);
+    JITInstanceContext* getCurrentJITContext(void)
+    {
+        return jitContext;
+    } 
+    //
+    JITInstanceContext*     jitContext;
+};
+
+static TlsStack<CompilationContext> ccTls;
+static MemoryManager g_mm(4026, "global MM");
+
+CompilationContext* CompilationContext::getCurrentContext() {
+    CompilationContext* currentCC = ccTls.get();
+    return currentCC;
+}
+
+CompilationContext::CompilationContext(JIT_Handle jitHandle, 
+                                       Method_Handle meth)
+{
+    jitContext = Jitrino::getJITInstanceContext(jitHandle);
+    ccTls.push(this);
+    Class_Handle klass = method_get_class(meth);
+    const char* kname = class_get_name(klass);
+    const char* mname = method_get_name(meth);
+    const char* msig = method_get_descriptor(meth);
+    LogStreams::current(jitContext).beginMethod(kname, mname, msig);
+}
+
+CompilationContext::~CompilationContext()
+{
+    LogStreams::current(jitContext).endMethod();
+#ifdef _DEBUG
+    CompilationContext* last = ccTls.pop();
+    assert(this == last);
+#else 
+    ccTls.pop();
+#endif
+}
+
+//
+// LogStream::current()
+//
+
+static size_t threadnb = 0;
+
+struct TlsLogStreams {
+    MemoryManager mm;
+    LogStreams logstreams;
+    TlsLogStreams (PMF& pmf)   
+        :mm(0, "TlsLogStreams"), logstreams(mm, pmf, ++threadnb) {}
+    ~TlsLogStreams () 
+        {}
+};
+
+static TlsStore<TlsLogStreams> tlslogstreams;
+
+LogStreams& LogStreams::current(JITInstanceContext* jitContext) {
+    TlsLogStreams* sp = tlslogstreams.get();
+    if (sp == NULL)
+    {   // new thread
+        if (jitContext == NULL) {
+            jitContext = 
+            CompilationContext::getCurrentContext()->getCurrentJITContext(); 
+        }
+        sp = new TlsLogStreams(jitContext->getPMF());
+        tlslogstreams.put(sp);
+    }
+    return sp->logstreams;
+}
+
+//
+// Fake XTimer
+void XTimer::initialize(bool) {}
+double XTimer::getSeconds(void)const { return 0.0; }
+
+
+}; // ~namespace Jitrino
+
+using Jitrino::JITInstanceContext;
+using Jitrino::MemoryManager;
+using Jitrino::jitContextList;
+using Jitrino::g_mm;
 
 /**
  * @see setup
  */
 extern "C" JITEXPORT
-void JIT_init(JIT_Handle jit, const char* name) {
-    Jitrino::Jet::setup(jit);
+void JIT_init(JIT_Handle jit, const char* name)
+{
+    JITInstanceContext* jic = 
+                new(g_mm) JITInstanceContext(g_mm, jit, name);
+    assert(Jitrino::jitContextList.find(jit) == Jitrino::jitContextList.end());
+    jitContextList[jit] = jic;
+    jic->getPMF().init();
+    Jitrino::Jet::setup(jit, name);
 }
 
 /**
  * @see cleanup
  */
 extern "C" JITEXPORT
-void JIT_deinit(JIT_Handle jit) {
+void JIT_deinit(JIT_Handle jit)
+{
     Jitrino::Jet::cleanup();
 }
 
@@ -268,8 +686,30 @@ void JIT_deinit(JIT_Handle jit) {
  * @see cmd_line_arg
  */
 extern "C" JITEXPORT
-void JIT_next_command_line_argument(JIT_Handle jit, const char *name, const char *arg) {
+void JIT_next_command_line_argument(JIT_Handle jit, const char *name, 
+                                    const char *arg)
+{
     Jitrino::Jet::cmd_line_arg(jit, name, arg);
+}
+
+
+extern "C" JITEXPORT
+JIT_Result JIT_compile_method(JIT_Handle jit, Compile_Handle ch,
+                              Method_Handle method,
+                              JIT_Flags flags)
+{
+    Jitrino::CompilationContext ctx(jit, method);
+    return Jitrino::Jet::compile(jit, ch, method, flags);
+}
+
+extern "C" JITEXPORT 
+JIT_Result JIT_compile_method_with_params(JIT_Handle jit, 
+                                          Compile_Handle ch, 
+                                          Method_Handle method, 
+                                          OpenMethodExecutionParams params)
+{
+    Jitrino::CompilationContext ctx(jit, method);
+    return Jitrino::Jet::compile_with_params(jit, ch, method, params);
 }
 
 /**
@@ -296,27 +736,6 @@ JIT_Result JIT_gen_method_info(JIT_Handle jit, Compile_Handle compilation,
 {
     assert(0);
     return JIT_FAILURE;
-}
-
-
-extern "C" JITEXPORT
-JIT_Result JIT_compile_method(JIT_Handle jit, Compile_Handle ch,
-                              Method_Handle method,
-                              JIT_Flags flags)
-{
-    return Jitrino::Jet::compile(jit, ch, method, flags);
-}
-
-extern "C" JITEXPORT 
-JIT_Result JIT_compile_method_with_params(JIT_Handle hjit, 
-                                          Compile_Handle compilation, 
-                                          Method_Handle method, 
-                                          OpenMethodExecutionParams params)
-{
-    ::Jitrino::Jet::Compiler jit(hjit, params);
-    JIT_Flags flags;
-    flags.insert_write_barriers = false;
-    return jit.compile(compilation, method);
 }
 
 
@@ -461,12 +880,13 @@ void * JIT_get_address_of_var(JIT_Handle jit, ::JitFrameContext *context,
 }
 
 /**
- * @returns \b false
+ * @returns \b Whether Jitrino.JET support compressed references on current
+ * platform.
  */
 extern "C" JITEXPORT
 Boolean JIT_supports_compressed_references(JIT_Handle jit)
 {
-    return false;
+    return ::Jitrino::Jet::supports_compresed_refs();
 }
 
 
@@ -533,6 +953,5 @@ OpenExeJpdaError set_local_var(JIT_Handle jit,
 
 /// @} // ~ defgroup JITRINO_JET_STANDALONE
 
-
-#endif	// ~ifdef PROJECT_JET	// standalone interface
+#endif  // ~ifdef PROJECT_JET   // standalone interface
 

@@ -35,20 +35,20 @@ class CountWriterFile : public CountWriter
 {
 public:
 
-	CountWriterFile (const char* = 0);
-	/*virtual*/ ~CountWriterFile ();
+    CountWriterFile (const char* = 0);
+    /*virtual*/ ~CountWriterFile ();
 
-	bool open  (const char*);
-	void close ();
+    bool open  (const char*);
+    void close ();
 
-	/*virtual*/ void write (const char* key, const char*	value);
-	/*virtual*/ void write (const char* key, int			value);
-	/*virtual*/ void write (const char* key, unsigned 		value);
-	/*virtual*/ void write (const char* key, double			value);
+    /*virtual*/ void write (const char* key, const char*    value);
+    /*virtual*/ void write (const char* key, int            value);
+    /*virtual*/ void write (const char* key, size_t         value);
+    /*virtual*/ void write (const char* key, double         value);
 
 protected:
 
-	std::ofstream* file;
+    std::ofstream* file;
     std::ostream* os;
 };
 
@@ -60,22 +60,22 @@ class CountWriterMail : public CountWriter
 {
 public:
 
-	CountWriterMail (const char* = 0);
-	/*virtual*/ ~CountWriterMail ();
+    CountWriterMail (const char* = 0);
+    /*virtual*/ ~CountWriterMail ();
 
-	bool open  (const char*);
-	void close ();
+    bool open  (const char*);
+    void close ();
 
-	/*virtual*/ void write (const char* key, const char*	value);
-	/*virtual*/ void write (const char* key, int			value);
-	/*virtual*/ void write (const char* key, unsigned 		value);
-	/*virtual*/ void write (const char* key, double			value);
+    /*virtual*/ void write (const char* key, const char*    value);
+    /*virtual*/ void write (const char* key, int            value);
+    /*virtual*/ void write (const char* key, size_t         value);
+    /*virtual*/ void write (const char* key, double         value);
 
 protected:
 
-	void mail (const char*, size_t);
+    void mail (const char*, size_t);
 
-	void* sloth;
+    void* sloth;
 };
 
 #endif //#ifdef _WIN32

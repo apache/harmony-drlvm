@@ -21,6 +21,7 @@
 #include "cxxlog.h"
 #include "vm_log.h"
 
+#include "apr_strings.h"
 #include "lock_manager.h"
 #include "classloader.h"
 #include "method_lookup.h"
@@ -29,24 +30,17 @@
 #include "jit_intf_cpp.h"
 #include "em_intf.h"
 #include "heap.h"
- 
-
-#include "vm_stats.h"
 #include "vm_strings.h"
-
 #include "compile.h"
 #include "jit_runtime_support.h"
 #include "lil_code_generator.h"
 #include "stack_iterator.h"
 #include "interpreter.h"
 
-extern bool parallel_jit;
-
-#ifndef NDEBUG
+#include "vm_stats.h"
 #include "dump.h"
-extern bool dump_stubs;
-#endif
 
+extern bool parallel_jit;
 
 #define METHOD_NAME_BUF_SIZE 512
 
@@ -363,7 +357,7 @@ NativeCodePtr compile_create_lil_jni_stub(Method_Handle method, void* func, Nati
 #endif
 
     // Push M2nFrame
-    cs = lil_parse_onto_end(cs, "push_m2n %0i, %1i, handles; locals 2;", method, FRAME_JNI);
+    cs = lil_parse_onto_end(cs, "push_m2n %0i, %1i, handles; locals 3;", method, FRAME_JNI);
     assert(cs);
 
     // Allocate space for handles
@@ -518,8 +512,8 @@ NativeCodePtr compile_create_lil_jni_stub(Method_Handle method, void* func, Nati
                 lil_npc_to_fp(vm_get_rt_support_addr(VM_RT_MONITOR_EXIT_STATIC)));
         } else {
             cs = lil_parse_onto_end(cs,
-                "ld i0,[l0+%0i:ref];"
-                "out managed:ref:void; o0=i0; call %1i;",
+                "ld l0,[l0+%0i:ref];"
+                "out managed:ref:void; o0=l0; call %1i;",
                 oh_get_handle_offset(0),
                 lil_npc_to_fp(vm_get_rt_support_addr(VM_RT_MONITOR_EXIT)));
         }
@@ -543,16 +537,20 @@ NativeCodePtr compile_create_lil_jni_stub(Method_Handle method, void* func, Nati
     }
 
     //***** Part 11: Rethrow exception
-    unsigned eoo = (unsigned)(POINTER_SIZE_INT)&((VM_thread*)0)->p_exception_object;
+    unsigned eoo = (unsigned)(POINTER_SIZE_INT)&((VM_thread*)0)->thread_exception.exc_object;
+    unsigned eco = (unsigned)(POINTER_SIZE_INT)&((VM_thread*)0)->thread_exception.exc_class;
     cs = lil_parse_onto_end(cs,
                             "l0=ts;"
-                            "ld l0,[l0+%0i:ref];"
-                            "jc l0=0,no_exn;"
+                            "ld l2,[l0+%0i:ref];"
+                            "jc l2!=0,_exn_raised;"
+                            "ld l2,[l0+%1i:ref];"
+                            "jc l2=0,_no_exn;"
+                            ":_exn_raised;"
                             "m2n_save_all;"
                             "out platform::void;"
-                            "call.noret %1i;"
-                            ":no_exn;",
-                            eoo, rethrow_current_thread_exception);
+                            "call.noret %2i;"
+                            ":_no_exn;",
+                            eoo, eco, exn_rethrow);
     assert(cs);
 
     //***** Part 12: Restore return variable, pop_m2n, return
@@ -568,15 +566,16 @@ NativeCodePtr compile_create_lil_jni_stub(Method_Handle method, void* func, Nati
     //***** Now generate code
 
     assert(lil_is_valid(cs));
+    NativeCodePtr addr = LilCodeGenerator::get_platform()->compile(cs);
 
 #ifndef NDEBUG
-    NativeCodePtr addr = LilCodeGenerator::get_platform()->compile(cs, "jni_stub", dump_stubs);
-#else
-    NativeCodePtr addr = LilCodeGenerator::get_platform()->compile(cs, "", false);
+    char buf[100];
+    apr_snprintf(buf, sizeof(buf)-1, "jni_stub.%s::%s", class_get_name(clss), method_get_name(method));
+    DUMP_STUB(addr, buf, lil_cs_get_code_size(cs));
 #endif
 
 #ifdef VM_STATS
-    vm_stats_total.jni_stub_bytes += lil_cs_get_code_size(cs);
+    VM_Statistics::get_vm_stats().jni_stub_bytes += lil_cs_get_code_size(cs);
 #endif
 
     lil_free_code_stub(cs);
@@ -641,7 +640,7 @@ static JIT_Result compile_prepare_native_method(Method* method, JIT_Flags flags)
 {
     TRACE2("compile", "compile_prepare_native_method(" << method_get_name(method) << ")");
 #ifdef VM_STATS
-    vm_stats_total.num_native_methods++;
+    VM_Statistics::get_vm_stats().num_native_methods++;
 #endif
     assert(method->is_native());
 
@@ -689,7 +688,17 @@ JIT_Result compile_do_compilation_jit(Method* method, JIT* jit)
     }
 
     OpenMethodExecutionParams flags = {0}; 
+    jvmti_get_compilation_flags(&flags);
     flags.exe_insert_write_barriers = gc_requires_barriers();
+
+    DebugUtilsTI *ti = VM_Global_State::loader_env->TI;
+    if ( ti->isEnabled() ) {
+        if (ti->get_global_capability(DebugUtilsTI::TI_GC_ENABLE_FIELD_ACCESS_EVENT))
+            flags.exe_notify_field_access = true;
+        if (ti->get_global_capability(DebugUtilsTI::TI_GC_ENABLE_FIELD_MODIFICATION_EVENT))
+            flags.exe_notify_field_modification = true;
+    }
+
     Compilation_Handle ch;
     ch.env = VM_Global_State::loader_env;
     ch.jit = jit;
@@ -724,7 +733,6 @@ JIT_Result compile_do_compilation_jit(Method* method, JIT* jit)
     }
 
     // Call TI callbacks
-    DebugUtilsTI *ti = VM_Global_State::loader_env->TI;
     if (ti->isEnabled() && ti->getPhase() == JVMTI_PHASE_LIVE) {
         jvmti_send_compiled_method_load_event(method);
     }
@@ -735,6 +743,7 @@ JIT_Result compile_do_compilation_jit(Method* method, JIT* jit)
 // Assumes that GC is disabled, but a GC-safe point
 static JIT_Result compile_do_compilation(Method* method, JIT_Flags flags)
 {
+    ASSERT_RAISE_AREA;
     assert(hythread_is_suspend_enabled());
     tmn_suspend_disable();
     class_initialize_ex(method->get_class());
@@ -748,9 +757,13 @@ static JIT_Result compile_do_compilation(Method* method, JIT_Flags flags)
         method->unlock();
         return JIT_SUCCESS;
     } else if (method->get_state()==Method::ST_NotCompiled && exn_raised()) {
+        method->unlock();
         return JIT_FAILURE;
+#ifndef _EM64T_	
     } else if(!check_available_stack_size(get_default_stack_size()/100)) {
+        method->unlock();
         return JIT_FAILURE;
+#endif
     }
 
     if (method->is_native()) {
@@ -776,66 +789,32 @@ static JIT_Result compile_do_compilation(Method* method, JIT_Flags flags)
 // otherwise we create with default constructor.
 // Then we try to set the cause of the exception to the current thread exception if there is one.
 // In all cases we ignore any further sources of exceptions and try to proceed anyway.
-static ManagedObject* compile_make_exception(const char* name, Method* method)
-{ // FIXME: prototype should be changed to getrid of managed objects as parameters.
+static jthrowable compile_make_exception(const char* name, Method* method)
+{ // FIXME: prototype should be changed to getrid of managed objects .
   // Now it works in gc disabled mode because of prototype.
     assert(!hythread_is_suspend_enabled());
-    ObjectHandle old_exn = oh_allocate_local_handle();
-    old_exn->object = get_current_thread_exception();
-    clear_current_thread_exception();
-    Global_Env* env = VM_Global_State::loader_env;
-    String* exc_str = env->string_pool.lookup(name);
+    jthrowable old_exc = exn_get();
+    exn_clear();
 
-    tmn_suspend_enable();
-    Class *exc_clss = env->bootstrap_class_loader->LoadVerifyAndPrepareClass(env, exc_str);
-    assert(exc_clss);
-    Method* constr = class_lookup_method(exc_clss, env->Init_String, env->FromStringConstructorDescriptor_String);
-    tmn_suspend_disable();
+    const char* c = method->get_class()->name->bytes;
+    const char* m = method->get_name()->bytes;
+    const char* d = method->get_descriptor()->bytes;
+    size_t sz = 25+strlen(c)+strlen(m)+strlen(d);
+    char* msg_raw = (char*)STD_MALLOC(sz);
+    assert(msg_raw);
+    sprintf(msg_raw, "Error compiling method %s.%s%s", c, m, d);
+    assert(strlen(msg_raw) < sz);
 
-    jvalue args[2];
-    ObjectHandle msg = oh_allocate_local_handle();
-    ObjectHandle res = oh_allocate_local_handle();
+    jthrowable new_exc = exn_create(name, msg_raw, old_exc);
+    exn_clear();
+    STD_FREE(msg_raw);
 
-    if (constr) {
-        const char* c = method->get_class()->name->bytes;
-        const char* m = method->get_name()->bytes;
-        const char* d = method->get_descriptor()->bytes;
-        size_t sz = 25+strlen(c)+strlen(m)+strlen(d);
-        char* msg_raw = (char*)STD_MALLOC(sz);
-        assert(msg_raw);
-        sprintf(msg_raw, "Error compiling method %s.%s%s", c, m, d);
-        assert(strlen(msg_raw) < sz);
-        
-        msg->object = string_create_from_utf8(msg_raw, (unsigned)strlen(msg_raw));
-        assert(msg->object);
-        STD_FREE(msg_raw);
-        res->object = class_alloc_new_object(exc_clss);
-        assert(res->object);
-        args[0].l = (jobject) res;
-        args[1].l = (jobject) msg;
-        vm_execute_java_method_array((jmethodID)constr, 0, args);
-    } else {
-        res->object = class_alloc_new_object_and_run_default_constructor(exc_clss);
-        assert(res->object);
-    }
-    // Ignore any exceptions from constructor
-    clear_current_thread_exception();
-    if (old_exn->object) {
-        Method* init = class_lookup_method_recursive(exc_clss, env->InitCause_String, env->InitCauseDescriptor_String);
-        if (init) {
-            args[0].l = res;
-            args[1].l = old_exn;
-            vm_execute_java_method_array((jmethodID) init, 0, args);
-        }
-        // Ignore any exceptions from setting cause
-        clear_current_thread_exception();
-    }
-    return res->object;
+    return new_exc;
 }
 
 NativeCodePtr compile_jit_a_method(Method* method)
 {
-    { // Start of block with GcFrames
+    ASSERT_RAISE_AREA;
     TRACE2("compile", "compile_jit_a_method " << method );
  
     ASSERT_NO_INTERPRETER;
@@ -857,6 +836,9 @@ NativeCodePtr compile_jit_a_method(Method* method)
         assert(&gc == p_TLS_vmthread->gc_frames); 
         INFO2("compile.code", "Compiled method " << method
                 << ", entry " << method->get_code_addr());
+
+        if (method->get_pending_breakpoints() != 0)
+            jvmti_set_pending_breakpoints(method);
         return entry_point;
     }
 
@@ -865,21 +847,16 @@ NativeCodePtr compile_jit_a_method(Method* method)
     INFO2("compile", "Could not compile " << method);
     const char* exn_class;
 
-
-    ManagedObject *cause = get_current_thread_exception();
-    if (!cause) {
+    if (!exn_raised()) {
         if (method->is_native()) {
             method->set_state(Method::ST_NotCompiled);
             exn_class = "java/lang/UnsatisfiedLinkError";
         } else {
             exn_class = "java/lang/InternalError";
         }
-        ManagedObject* exn = compile_make_exception(exn_class, method);
-        set_current_thread_exception(exn);
+        jthrowable exn = compile_make_exception(exn_class, method);
+        exn_raise_object(exn);
     }
-    } // GcFrames destroyed here, should be before rethrowing exception
-    rethrow_current_thread_exception();
-    ASSERT(0, "Control flow should never reach this point");
     return NULL;
 } //compile_jit_a_method
 
@@ -907,13 +884,10 @@ NativeCodePtr compile_do_instrumentation(CodeChunkInfo *callee,
     assert(cs && lil_is_valid(cs));
     // TODO: 2 & 3 parameters should be removed from the method signature
     // since it makes sense for debugging only
-#ifndef NDEBUG
-    NativeCodePtr addr = LilCodeGenerator::get_platform()->compile(cs,
-        "compile_do_instrumentation", dump_stubs);
-#else
-    NativeCodePtr addr = LilCodeGenerator::get_platform()->compile(cs,
-        "compile_do_instrumentation", false);
-#endif
+    NativeCodePtr addr = LilCodeGenerator::get_platform()->compile(cs);
+
+    DUMP_STUB(addr, "compile_do_instrumentation", lil_cs_get_code_size(cs));
+
     lil_free_code_stub(cs);
     return addr;
 } //compile_do_instrumentation
@@ -938,5 +912,36 @@ void count_method_calls(CodeChunkInfo *callee)
     }
 } //count_method_calls
 
+
+// Adding dynamic generated code info to global list
+// Is used in JVMTI and native frames interface
+DynamicCode* compile_get_dynamic_code_list(void)
+{
+    return VM_Global_State::loader_env->dcList;
+}
+
+// Adding dynamic generated code info to global list
+void compile_add_dynamic_generated_code_chunk(const char* name, const void* address, jint length)
+{
+    DynamicCode** pdcList = &VM_Global_State::loader_env->dcList;
+    // FIXME linked list modification without synchronization
+    DynamicCode *dc = (DynamicCode *)STD_MALLOC(sizeof(DynamicCode));
+    assert(dc);
+    dc->name = name;
+    dc->address = address;
+    dc->length = length;
+    dc->next = *pdcList;
+    *pdcList = dc;
+}
+
+void compile_clear_dynamic_code_list(DynamicCode* list)
+{
+    while (list)
+    {
+        DynamicCode* next = list->next;
+        STD_FREE(list);
+        list = next;
+    }
+}
 
 //////////////////////////////////////////////////////////////////////////

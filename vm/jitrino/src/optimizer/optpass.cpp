@@ -23,40 +23,50 @@
 #include "Log.h"
 #include "optpass.h"
 #include "irmanager.h"
-#include "Timer.h"
 #include "Dominator.h"
 #include "Loop.h"
 #include "./ssa/SSA.h"
-#include "Profiler.h"
-#include "CompilationContext.h"
+#include "EMInterface.h"
 #include "optimizer.h"
+#include "FlowGraph.h"
+#include "StaticProfiler.h"
+
+#ifdef _WIN32
+  #define snprintf _snprintf
+#endif
+
 
 namespace Jitrino {
 
 void 
-OptPass::run(IRManager& irm) 
+OptPass::run() 
 {
-	id=Log::getNextStageId();
+    IRManager& irm = *getCompilationContext()->getHIRManager();
+    id = Log::getStageId();
 
-	if (Log::cat_opt()->isIREnabled()){
-		Log::printStageBegin(id, "HLO", getName(), getTagName());
-	}
+    LogStream& irdump  = log(LogStream::IRDUMP);
+    LogStream& dotdump = log(LogStream::DOTDUMP);
 
-	Log::cat_opt()->info3 << indent(irm) << "Opt:   Running " << getName() << ::std::endl;
-    printHIR(irm, genIRBefore(irm), "before");
-    printDotFile(irm, genDotFileBefore(irm), "before");
-    {
-        CompilationMode mode = getCompilationMode(irm);
-        PhaseTimer modeTimer(getModeTimer(mode), getModeTimerName(mode));
-        PhaseTimer timer(getTimer(), getTimerName());
-        _run(irm);
+    if (irdump.isEnabled()) {
+        Log::printStageBegin(irdump.out(), id, "HLO", getName(), getTagName());
+        irdump << indent(irm) << "Opt:   Running " << getName() << ::std::endl;
+        printHIR(irm, "before");
     }
-    printHIR(irm, genIRAfter(irm), "after");
-    printDotFile(irm, genDotFileAfter(irm), "after");
 
-	if (Log::cat_opt()->isIREnabled()){
-		Log::printStageEnd(id, "HLO", getName(), getTagName());
-	}
+    if (dotdump.isEnabled()) {
+        printDotFile(irm, id, getTagName(), "before");
+    }
+
+        _run(irm);
+
+    if (dotdump.isEnabled()) {
+        printDotFile(irm, id, getTagName(), "after");
+    }
+
+    if (irdump.isEnabled()) {
+        printHIR(irm, "after");
+        Log::printStageEnd(irdump.out(), id, "HLO", getName(), getTagName());
+    }
 }
 
 void
@@ -66,9 +76,9 @@ OptPass::computeDominators(IRManager& irm) {
         // Already valid.
         return;
     }
-    Log::cat_opt()->info3 << indent(irm) << "Opt:   Compute Dominators" << ::std::endl;
-    static Timer *computeDominatorsTimer = 0; // not thread-safe
-    PhaseTimer t(computeDominatorsTimer, "opt::helper::computeDominators"); 
+    Log::out() << indent(irm) << "Opt:   Compute Dominators" << ::std::endl;
+    static CountTime computeDominatorsTimer("opt::helper::computeDominators");
+    AutoTimer tm(computeDominatorsTimer);
     DominatorBuilder db;
     dominatorTree = db.computeDominators(irm.getNestedMemoryManager(), &(irm.getFlowGraph()),false,true);
     irm.setDominatorTree(dominatorTree);
@@ -76,47 +86,44 @@ OptPass::computeDominators(IRManager& irm) {
 
 
 void
-OptPass::computeLoops(IRManager& irm) {
-    LoopTree* loopTree = irm.getLoopTree();
-    if(loopTree != NULL && loopTree->isValid())
-        // Already valid.
+OptPass::computeLoops(IRManager& irm, bool normalize) {
+    LoopTree* lt = irm.getLoopTree();
+    if (lt!=NULL && lt->isValid() && (lt->isNormalized() || !normalize)) {
         return;
-    Log::cat_opt()->info3 << indent(irm) << "Opt:   Compute Loop Tree" << ::std::endl;
-    static Timer *computeLoopsTimer = 0; // not thread-safe
-    PhaseTimer t(computeLoopsTimer, "opt::helper::computeLoops"); 
-    assert(irm.getDominatorTree()->isValid());
-    LoopBuilder lb(irm.getNestedMemoryManager(),
-                   irm, *(irm.getDominatorTree()),false);
-    loopTree = lb.computeAndNormalizeLoops();
+    }
+    Log::out() << indent(irm) << "Opt:   Compute Loop Tree" << ::std::endl;
+    static CountTime computeLoopsTimer("opt::helper::computeLoops");
+    AutoTimer tm(computeLoopsTimer);
+    LoopBuilder lb(irm.getNestedMemoryManager(), irm, *(irm.getDominatorTree()),false);
+    lb.computeLoops(normalize);
     if (lb.needSsaFixup()) {
         fixupSsa(irm);
     }
-    irm.setLoopTree(loopTree);
 }
 
 void
-OptPass::computeDominatorsAndLoops(IRManager& irm) {
+OptPass::computeDominatorsAndLoops(IRManager& irm, bool normalizeLoops) {
     computeDominators(irm);
-    computeLoops(irm);
+    computeLoops(irm, normalizeLoops);
     computeDominators(irm);
 }
 
 void
 OptPass::fixupSsa(IRManager& irm) {
-    static Timer* fixupSsaTimer = 0;
+    static CountTime fixupSsaTimer("opt::helper::fixupSsa");
     static uint32 globalSsaFixupCounter = 0;
 
     if(!irm.isSsaUpdated()) {
-        PhaseTimer t(fixupSsaTimer, "opt::helper::fixupSsa");
-        Log::cat_opt()->info3 << indent(irm) << "Opt:   SSA Fixup" << ::std::endl;
+        AutoTimer tm(fixupSsaTimer);
+        Log::out() << indent(irm) << "Opt:   SSA Fixup" << ::std::endl;
     
         computeDominators(irm);
         DominatorTree* dominatorTree = irm.getDominatorTree();
-        FlowGraph& flowGraph = irm.getFlowGraph();
+        ControlFlowGraph& flowGraph = irm.getFlowGraph();
         MemoryManager& memoryManager = irm.getNestedMemoryManager();
         DomFrontier frontier(memoryManager,*dominatorTree,&flowGraph);
-        SSABuilder ssaBuilder(irm.getOpndManager(),irm.getInstFactory(),frontier,&flowGraph, *irm.getCompilationContext()->getOptimizerFlags());
-        bool better_ssa_fixup = irm.getParameterTable().lookupBool("opt::better_ssa_fixup", false);
+        SSABuilder ssaBuilder(irm.getOpndManager(),irm.getInstFactory(),frontier,&flowGraph, irm.getOptimizerFlags());
+        bool better_ssa_fixup = irm.getOptimizerFlags().better_ssa_fixup;
  
         ssaBuilder.fixupSSA(irm.getMethodDesc(), better_ssa_fixup);
         globalSsaFixupCounter += 1;
@@ -128,163 +135,62 @@ OptPass::fixupSsa(IRManager& irm) {
 void
 OptPass::splitCriticalEdges(IRManager& irm) {
     if(!irm.areCriticalEdgesSplit()) {
-        irm.getFlowGraph().splitCriticalEdges(false);
+        Nodes newNodes(irm.getMemoryManager());
+        irm.getFlowGraph().splitCriticalEdges(false, &newNodes);
+        for (Nodes::const_iterator it = newNodes.begin(), end = newNodes.end(); it!=end; ++it) {
+            Node* node = *it;
+            if(node->isEmpty(false)) {
+                assert(node->isBlockNode() && !node->isCatchBlock());
+                node->appendInst(irm.getInstFactory().makeLabel());
+            }
+        }
         irm.setCriticalEdgesSplit();
     }
 }
 
-bool
-OptPass::inDPGOMode(IRManager& irm) {
-    return irm.getParameterTable().lookupBool("opt::use_profile", irm.getCompilationInterface().isDynamicProfiling() 
-        || profileCtrl.useProf() || profileCtrl.getInstrumentGen());
-}
-
-CompilationMode
-OptPass::getCompilationMode(IRManager& irm) {
-    if ( irm.getCompilationContext()->getOptimizerFlags()->skip ) {
-        return CM_NO_OPT;
-    }
-    MethodDesc& md = irm.getMethodDesc();
-
-    switch(irm.getCompilationInterface().getOptimizationLevel()) {
-    case 0:
-		if (md.isClassInitializer()) {
-			return CM_NO_OPT;
-		} else {
-			return CM_STATIC;
-		}
-    case 1:
-        return inDPGOMode(irm) ? (profileCtrl.useProf() ? CM_DPGO2 : CM_DPGO1) : CM_STATIC;
-    case 2:
-        return CM_DPGO2;    
-    default:
-        assert(0);
-        return CM_NUM_MODES;
-    }
-}
-
-const char* 
-OptPass::getCompilationModeName(CompilationMode mode) {
-    switch(mode) {
-    case CM_NO_OPT: return "noopt";
-    case CM_STATIC: return "static";
-    case CM_DPGO1: return "dpgo1";
-    case CM_DPGO2: return "dpgo2";
-    default: break;
-    }
-    assert(0);
-    return NULL;
-}
 
 void
 OptPass::initialize() {
-    timer = NULL;
-    timerName = ::std::string("opt::")+getTagName();
-    for(uint32 i = 0; i < CM_NUM_MODES; ++i) {
-        modeTimers[i] = NULL;
-        modeTimerNames[i] = ::std::string("opt::")+getCompilationModeName((CompilationMode) i)+"::"+getTagName();
-    }
 }
 
-const char*
-OptPass::getModeTimerName(CompilationMode mode) {
-    return modeTimerNames[mode].c_str();
-}
-
-Timer*&
-OptPass::getTimer() {
-    return timer;
-}
-
-Timer*&
-OptPass::getModeTimer(CompilationMode mode) {
-    return modeTimers[mode];
-}
 
 bool 
 OptPass::isProfileConsistent(IRManager& irm) {
-    char    methodStr[MaxMethodStringLength];
-    genMethodString(irm.getMethodDesc(), methodStr, MaxMethodStringLength);
-    return irm.getFlowGraph().isProfileConsistent(methodStr, profileCtrl.getDebugCtrl()>0);
+    return irm.getFlowGraph().isEdgeProfileConsistent();
 }
 
 void 
 OptPass::smoothProfile(IRManager& irm) { 
     if (isProfileConsistent(irm) == false) {
-        if (profileCtrl.getDebugCtrl() > 0)
-            ::std::cerr << "Optimizer detects profile inconsistency! Ready for smoothing!" << ::std::endl;
-        irm.getFlowGraph().smoothProfile(irm.getMethodDesc());
+        StaticProfiler::fixEdgeProbs(irm);
+        irm.getFlowGraph().smoothEdgeProfile();
     }
-}
-
-bool OptPass::genIRBefore(IRManager& irm) {
-    return Log::cat_opt()->isDebugEnabled();
-}
-bool OptPass::genIRAfter(IRManager& irm) {
-    return Log::cat_opt()->isIR2Enabled();
-}
-bool OptPass::genDotFileBefore(IRManager& irm) {
-    return false; 
-}
-bool OptPass::genDotFileAfter(IRManager& irm) {
-    return false; 
 }
 
 void
 OptPass::printHIR(IRManager& irm) {
-    FlowGraph& flowGraph = irm.getFlowGraph();
-    DominatorTree* dominatorTree = irm.getDominatorTree();
-    LoopTree* loopTree = irm.getLoopTree();
-    
-    CFGNode::ChainedAnnotator annotator;
-    CFGNode::ProfileAnnotator profileAnnotator;
-    if(dominatorTree && dominatorTree->isValid())
-        annotator.add(dominatorTree);
-    if(loopTree && loopTree->isValid())
-        annotator.add(loopTree);
-    if(flowGraph.hasEdgeProfile()) {
-        annotator.add(&profileAnnotator);
-    }
-    flowGraph.printInsts(Log::out(),irm.getMethodDesc(), &annotator);
+    FlowGraph::printHIR(Log::log(LogStream::IRDUMP).out(), irm.getFlowGraph(), irm.getMethodDesc());
 }
 
 void
-OptPass::printHIR(IRManager& irm, bool condition, const char* when) {
-    if(condition) {
-		Log::printIRDumpBegin(id, getName(), when);
-        printHIR(irm);
-		Log::printIRDumpEnd(id, getName(), when);
-    }
+OptPass::printHIR(IRManager& irm, const char* when) {
+    std::ostream& out = Log::log(LogStream::IRDUMP).out();
+    Log::printIRDumpBegin(out, id, getName(), when);
+    printHIR(irm);
+    Log::printIRDumpEnd(out, id, getName(), when);
+}
+
+void
+OptPass::printDotFile(IRManager& irm, int id, const char* name,  const char* suffix) {
+    char temp[128];
+    snprintf(temp, sizeof(temp), "%.2i.%s.%s", id, name, suffix);
+    printDotFile(irm, temp);
 }
 
 void
 OptPass::printDotFile(IRManager& irm, const char* name) {
-    FlowGraph& flowGraph = irm.getFlowGraph();
-    DominatorTree* dominatorTree = irm.getDominatorTree();
-    flowGraph.printDotFile(irm.getMethodDesc(), name, (dominatorTree && dominatorTree->isValid()) ? dominatorTree : NULL);
-}
-
-void OptPass::composeDotFileName(char * name, const char * suffix)
-{
-	name[0] = 0;
-	strcat(name, getTagName());
-	strcat(name, ".");
-	char idString[10];
-	sprintf(idString, "%d", (int)id);
-	strcat(name, idString);
-	strcat(name, ".");
-	strcat(name, suffix);
-}
-
-void
-OptPass::printDotFile(IRManager& irm, bool condition, const char* suffix) {
-    if(condition) {
-        assert(strlen(getTagName()) < 30);
-        assert(strlen(suffix) < 30);
-		char name[128];
-		composeDotFileName(name, suffix);
-        printDotFile(irm, name);
-    }
+    ControlFlowGraph& flowGraph = irm.getFlowGraph();
+    FlowGraph::printDotFile(flowGraph, irm.getMethodDesc(), name);
 }
 
 const char*

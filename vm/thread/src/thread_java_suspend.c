@@ -82,8 +82,8 @@ IDATA VMCALL jthread_resume_all(jvmtiError* results, jint count, const jthread* 
  */
 IDATA VMCALL jthread_suspend(jthread java_thread) {
         hythread_t tm_native_thread = vm_jthread_get_tm_data(java_thread);
-        hythread_suspend_other(tm_native_thread);
-    return TM_ERROR_NONE;
+        return hythread_suspend_other(tm_native_thread);
+    
 }
 
 /**

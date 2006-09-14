@@ -23,16 +23,17 @@
 #ifndef _JAVABYTECODETRANSLATOR_H_
 #define _JAVABYTECODETRANSLATOR_H_
 
-#include "VMInterface.h"
-#include "TranslatorIntfc.h"
+#include "JavaTranslator.h"
 #include "IRBuilder.h"
-#include "Opnd.h"
-#include "FlowGraph.h"
 #include "JavaByteCodeParser.h"
 #include "JavaLabelPrepass.h"
 #include "JavaFlowGraphBuilder.h"
 
+#include "VMInterface.h"
+
 namespace Jitrino {
+
+class Opnd;
 
 class JavaByteCodeTranslator : public JavaByteCodeParserCallback {
 public:
@@ -57,7 +58,7 @@ public:
                     TypeManager& typeManager,
                     JavaFlowGraphBuilder& cfg,
                     uint32 numActualArgs,Opnd **actualArgs,
-                    Opnd **returnOpnd, CFGNode **returnNode,
+                    Opnd **returnOpnd, Node **returnNode,
                     ExceptionInfo *exceptionInfo, // propagated exception info
                     uint32 inlineDepth, bool startNewBlock,
                     InlineInfoBuilder* parent,
@@ -237,17 +238,25 @@ private:
 
     class JavaInlineInfoBuilder : public InlineInfoBuilder {
     public:
-        JavaInlineInfoBuilder(InlineInfoBuilder* parent, MethodDesc& thisMethodDesc) :
-            InlineInfoBuilder(parent), methodDesc(thisMethodDesc)
+        JavaInlineInfoBuilder(InlineInfoBuilder* parent, 
+                MethodDesc& thisMethodDesc, uint32 byteCodeOffset) :
+            InlineInfoBuilder(parent), methodDesc(thisMethodDesc), 
+                bcOffset(byteCodeOffset)
         {}
 
+    virtual uint32 getCurrentBcOffset() { return bcOffset; }; 
+    virtual MethodDesc* getCurrentMd() { return &methodDesc; }; 
+
     private:
-        virtual void addCurrentLevel(InlineInfo* ii)
+        virtual void addCurrentLevel(InlineInfo* ii, uint32 currOffset)
         {
-            ii->addLevel(&methodDesc);
+            ii->addLevel(&methodDesc, currOffset);
         }
+        virtual void setCurrentBcOffset(uint32 offSet) { bcOffset = offSet; };
+
 
         MethodDesc& methodDesc;
+        uint32 bcOffset;
     };
 
     static uint32 MaxSelfSizeForInlining; // in bytes
@@ -307,6 +316,7 @@ private:
     void    genInvokeStatic(MethodDesc * methodDesc,uint32 numArgs,Opnd ** srcOpnds,Type * returnType);
 
     bool    genCharArrayCopy(MethodDesc * methodDesc,uint32 numArgs,Opnd ** srcOpnds, Type * returnType);
+    bool    genArrayCopy(MethodDesc * methodDesc,uint32 numArgs,Opnd ** srcOpnds, Type * returnType);
     bool    genMinMax(MethodDesc * methodDesc,uint32 numArgs,Opnd ** srcOpnds, Type * returnType);
     void    newFallthroughBlock();
 
@@ -355,7 +365,7 @@ private:
     MethodDesc*      resolveInterfaceMethod(uint32 cpIndex);
     NamedType*       resolveType(uint32 cpIndex);
     NamedType*       resolveTypeNew(uint32 cpIndex);
-    Type*            getFieldType(FieldDesc* fieldDesc);
+    Type*            getFieldType(FieldDesc* fieldDesc,uint32 cpIndex);
     const char*      methodSignatureString(uint32 cpIndex);
     //
     //
@@ -393,7 +403,7 @@ private:
     ByteCodeParser&          parser;
     TypeManager&             typeManager;
     IRBuilder&               irBuilder;
-    TranslatorFlags&         translationFlags;
+    TranslatorFlags   translationFlags;
     JavaFlowGraphBuilder&   cfgBuilder;
     //
     // byte code parsing state
@@ -408,13 +418,13 @@ private:
     // used for IR inlining
     //
     Opnd**              returnOpnd;         // if non-null, used this operand
-    CFGNode **          returnNode;         // returns the node where the return is located
+    Node **          returnNode;         // returns the node where the return is located
     //
     // method state
     //
     bool                isInlinedMethod;    // is this method being inlined?
     ExceptionInfo*      inliningExceptionInfo; // instruction where inlining begins
-    CFGNode*            inliningNodeBegin;  // used by inlining of synchronized methods
+    Node*            inliningNodeBegin;  // used by inlining of synchronized methods
     uint32              numLabels;          // number of labels in this method
     uint32              numVars;            // number of variables in this method
     uint32              numStackVars;       // number of non-empty stack locations in this method

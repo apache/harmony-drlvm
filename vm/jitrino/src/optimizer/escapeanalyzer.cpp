@@ -21,7 +21,6 @@
  */
 
 #include "escapeanalyzer.h"
-#include "FlowGraph.h"
 #include "irmanager.h"
 #include "Inst.h"
 #include "Stl.h"
@@ -29,10 +28,10 @@
 
 namespace Jitrino {
 
-DEFINE_OPTPASS_IMPL(EscapeAnalysisPass, escape, "Escape Analysis")
+DEFINE_SESSION_ACTION(OldEscapeAnalysisPass, old_escape, "Old Escape Analysis")
 
 void
-EscapeAnalysisPass::_run(IRManager& irm) {	
+OldEscapeAnalysisPass::_run(IRManager& irm) {   
     EscapeAnalyzer ea(irm);
     ea.doAnalysis();
 }
@@ -42,7 +41,7 @@ isEscapeOptimizationCandidate(Inst* inst) {
     switch (inst->getOpcode()) {
     case Op_Catch:  
         return false;
-    case Op_LdString:   case Op_NewObj: case Op_NewArray:
+    case Op_LdRef:   case Op_NewObj: case Op_NewArray:
         return true;
     case Op_NewMultiArray:
     case Op_Box:
@@ -57,7 +56,7 @@ isEscapeOptimizationCandidate(Inst* inst) {
     case Op_DefArg:
         return false;
     default:
-	return false;
+    return false;
     }
 //    return false;
 }
@@ -72,7 +71,7 @@ isPotentiallyEscapingInst(Inst* inst) {
     case Op_DirectCall:     case Op_TauVirtualCall:
     case Op_IndirectCall:   case Op_IndirectMemoryCall: 
     case Op_IntrinsicCall:
-	case Op_Return:         case Op_Throw:
+    case Op_Return:         case Op_Throw:
     case Op_TauStInd:       case Op_TauStRef:  
     case Op_TauStField:     case Op_TauStElem:     case Op_TauStStatic:
         return true;
@@ -165,7 +164,7 @@ markEscapingInst(Inst* inst,BitSet& escapingInsts) {
         // 
     case Op_LdVar:
         break;
-    case Op_Catch:  case Op_DefArg: case Op_LdString:   case Op_LdConstant:
+    case Op_Catch:  case Op_DefArg: case Op_LdRef:   case Op_LdConstant:
     case Op_NewObj: case Op_NewArray:
         // no src operands to mark
         break;
@@ -211,16 +210,16 @@ EscapeAnalyzer::doAnalysis() {
     StlDeque<Inst*> candidateSet(memManager);
     BitSet escapingInsts(memManager,irManager.getInstFactory().getNumInsts());
 
-    const CFGNodeDeque& nodes = irManager.getFlowGraph().getNodes();
-    CFGNodeDeque::const_iterator niter;
+    const Nodes& nodes = irManager.getFlowGraph().getNodes();
+    Nodes::const_iterator niter;
     //
     // Clear all marks on instructions
     // Collect instructions that are candidate for escape optimizations
     //
     for(niter = nodes.begin(); niter != nodes.end(); ++niter) {
-        CFGNode* node = *niter;
-        Inst *headInst = node->getFirstInst();
-        for (Inst* inst=headInst->next();inst!=headInst;inst=inst->next()) {
+        Node* node = *niter;
+        Inst *headInst = (Inst*)node->getFirstInst();
+        for (Inst* inst=headInst->getNextInst();inst!=NULL;inst=inst->getNextInst()) {
             if (isEscapeOptimizationCandidate(inst))
                 candidateSet.push_back(inst);
         }
@@ -229,9 +228,9 @@ EscapeAnalyzer::doAnalysis() {
     // Iteratively mark instructions whose results escape the method
     //
     for(niter = nodes.begin(); niter != nodes.end(); ++niter) {
-        CFGNode* node = *niter;
-        Inst *headInst = node->getFirstInst();
-        for (Inst* inst=headInst->next();inst!=headInst;inst=inst->next()) {
+        Node* node = *niter;
+        Inst *headInst = (Inst*)node->getFirstInst();
+        for (Inst* inst=headInst->getNextInst();inst!=NULL;inst=inst->getNextInst()) {
             if (isPotentiallyEscapingInst(inst) == false)
                 continue;
             escapingInsts.setBit(inst->getId(),true);
@@ -311,7 +310,7 @@ initialize(Inst* inst,
     case Op_Phi:    
         break;
     default:
-	break;
+    break;
     }
     //
     // initialize work list according to:
@@ -385,8 +384,8 @@ initialize(Inst* inst,
                 workList.push_back(inst->getSrc(0)->getInst());            
             }
             break;
-	default:
-	    break;
+    default:
+        break;
         }
     }
 }
@@ -416,13 +415,13 @@ EscapeAnalyzer::doAggressiveAnalysis() {
     //
     // Initialization step
     //
-    const CFGNodeDeque& nodes = irManager.getFlowGraph().getNodes();
-    CFGNodeDeque::const_iterator niter;
+    const Nodes& nodes = irManager.getFlowGraph().getNodes();
+    Nodes::const_iterator niter;
     Opnd *returnOpnd = irManager.getReturnOpnd();
     for(niter = nodes.begin(); niter != nodes.end(); ++niter) {
-        CFGNode* node = *niter;
-        Inst *headInst = node->getFirstInst();
-        for (Inst* inst=headInst->next();inst!=headInst; inst=inst->next()) {
+        Node* node = *niter;
+        Inst *headInst = (Inst*)node->getFirstInst();
+        for (Inst* inst=headInst->getNextInst();inst!=NULL; inst=inst->getNextInst()) {
             initialize(inst,freeWorkList,defUseBuilder,returnOpnd);
         }
     }
@@ -437,12 +436,13 @@ EscapeAnalyzer::doAggressiveAnalysis() {
 }
 
 void
-DefUseBuilder::initialize(FlowGraph& fg) {
-    const CFGNodeDeque& nodes = fg.getNodes();
-    CFGNodeDeque::const_iterator i;
+DefUseBuilder::initialize(ControlFlowGraph& fg) {
+    const Nodes& nodes = fg.getNodes();
+    Nodes::const_iterator i;
     for(i = nodes.begin(); i != nodes.end(); ++i) {
-        Inst* label = (*i)->getFirstInst();
-        for(Inst* inst = label->next(); inst != label; inst = inst->next())
+        Node* node = *i;
+        Inst* label = (Inst*)node->getFirstInst();
+        for(Inst* inst = label->getNextInst(); inst != NULL; inst = inst->getNextInst())
             addUses(inst);
     }
 }

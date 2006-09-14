@@ -1,0 +1,27 @@
+# EM configuration file for OPT-only mode of Jitrino with server optimization path. This is 'server static' mode
+
+chains=chain1
+chain1.jits=SS_OPT
+SS_OPT.file=jitrino
+
+
+# Options to be passed to JIT
+
+-Djit.SS_OPT.path=opt_init,translator,optimizer,hir2lir,codegen
+
+-Djit.SS_OPT.path.optimizer=ssa,simplify,uce,dce,statprof,devirt,inline,purge,simplify,uce,dce,hvn,uce,dce,dessa,statprof,peel,ssa,hvn,simplify,uce,dce,lower,uce,dce,memopt,reassoc,uce,dce,hvn,uce,dce,abcd,uce,dce,gcm,dessa,statprof,markglobals
+-Djit.SS_OPT.path.codegen=lock_method,bbp,gcpoints,cafl,dce1,i8l-,early_prop-,itrace-,native,constraints,dce2,regalloc,spillgen,layout,copy,rce-,stack,break-,iprof-,emitter!,si_insts,gcmap,info,unlock_method
+-Djit.SS_OPT.path.dce1=cg_dce
+-Djit.SS_OPT.path.dce2=cg_dce
+-Djit.SS_OPT.path.regalloc=bp_regalloc1,bp_regalloc2
+-Djit.SS_OPT.path.bp_regalloc1=bp_regalloc
+-Djit.SS_OPT.path.bp_regalloc2=bp_regalloc
+
+#inliner configuration
+-Djit.SS_OPT.SS_OPT_inliner_pipeline.filter=-
+-Djit.SS_OPT.SS_OPT_inliner_pipeline.path=ssa,simplify,uce,dce,statprof,devirt
+-Djit.SS_OPT.arg.optimizer.inline.pipeline=SS_OPT_inliner_pipeline
+
+-Djit.SS_OPT.arg.codegen.dce1.early=yes
+-Djit.SS_OPT.arg.codegen.regalloc.bp_regalloc1.regs=ALL_GP
+-Djit.SS_OPT.arg.codegen.regalloc.bp_regalloc2.regs=ALL_XMM

@@ -223,9 +223,9 @@ public:
             return ConstBound(false); // MinusInfinity;
         case Const_MinusInfinity:
             return ConstBound(true); // PlusInfinity
-	default:
-	    assert(0);
-	    break;
+    default:
+        assert(0);
+        break;
         }
         return *this;
     }
@@ -379,13 +379,13 @@ public:
     bool isLessEq(const PiBound &other) const;
     // Return x such that [x, infinity] includes the union of
     // the intervals [this, infinity] and [other, infinity].
-    PiBound min(const PiBound &other) const;
+//    PiBound min(const PiBound &other) const;
 
     // Does the range [-infinity, this] include [-infinity, other]?
     bool isGreaterEq(const PiBound &other) const;
     // Return x such that [-infinity, x] includes the union of
     // the intervals [-infinity, this] and [-infinity, other].
-    PiBound max(const PiBound &other) const;
+//    PiBound max(const PiBound &other) const;
 
     PiBound invert(VarBound vb) const {
         if (isUnknown() || isUndefined()) return *this;

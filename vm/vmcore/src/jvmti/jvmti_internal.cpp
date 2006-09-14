@@ -1,0 +1,74 @@
+/*
+ *  Copyright 2005-2006 The Apache Software Foundation or its licensors, as applicable.
+ *
+ *  Licensed under the Apache License, Version 2.0 (the "License");
+ *  you may not use this file except in compliance with the License.
+ *  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ *  Unless required by applicable law or agreed to in writing, software
+ *  distributed under the License is distributed on an "AS IS" BASIS,
+ *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ *  See the License for the specific language governing permissions and
+ *  limitations under the License.
+ */
+/**
+ * @author Gregory Shimansky
+ * @version $Revision:  $
+ */
+/*
+ * JVMTI internal functions
+ */
+
+#define LOG_DOMAIN "jvmti.internal"
+#include "cxxlog.h"
+
+#include "environment.h"
+#include "jvmti_internal.h"
+
+static Boolean is_valid_instance(jobject obj, Class* clss)
+{
+    if (NULL == obj)
+        return false;
+
+    tmn_suspend_disable();       //---------------------------------v
+    ObjectHandle h = (ObjectHandle)obj;
+    ManagedObject *mo = h->object;
+
+    // Check that reference pointer points to the heap
+    if (mo < (ManagedObject *)Class::heap_base ||
+        mo > (ManagedObject *)Class::heap_end)
+    {
+        tmn_suspend_enable();
+        return false;
+    }
+
+    // Check that object is an instance of java.lang.Thread or extends it
+    if (mo->vt() == NULL)
+    {
+        tmn_suspend_enable();
+        return false;
+    }
+
+    Class *object_clss = mo->vt()->clss;
+    Boolean result = class_is_subtype_fast(object_clss->vtable, clss);
+    tmn_suspend_enable();        //---------------------------------^
+
+    return result;
+}
+
+Boolean is_valid_thread_object(jthread thread)
+{
+    return is_valid_instance(thread, VM_Global_State::loader_env->java_lang_Thread_Class);
+}
+
+Boolean is_valid_thread_group_object(jthreadGroup group)
+{
+    return is_valid_instance(group, VM_Global_State::loader_env->java_lang_ThreadGroup_Class);
+}
+
+Boolean is_valid_class_object(jclass klass)
+{
+    return is_valid_instance(klass, VM_Global_State::loader_env->JavaLangClass_Class);
+}

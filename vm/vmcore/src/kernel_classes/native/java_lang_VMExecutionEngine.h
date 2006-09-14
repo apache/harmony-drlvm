@@ -53,10 +53,10 @@ JNIEXPORT void JNICALL Java_java_lang_VMExecutionEngine_exit__IZ_3Ljava_lang_Run
   (JNIEnv *, jclass, jint, jboolean, jobjectArray);
 
 /*
- * Method: java.lang.VMExecutionEngine.getAssertionStatus(Ljava/lang/String;)I
+ * Method: java.lang.VMExecutionEngine.getAssertionStatus(Ljava/lang/Class;ZI)I
  */
 JNIEXPORT jint JNICALL Java_java_lang_VMExecutionEngine_getAssertionStatus
-  (JNIEnv *, jclass, jstring);
+  (JNIEnv *, jclass, jclass, jboolean, jint);
 
 /*
  * Method: java.lang.VMExecutionEngine.getAvailableProcessors()I
@@ -89,6 +89,46 @@ JNIEXPORT void JNICALL Java_java_lang_VMExecutionEngine_traceMethodCalls
   (JNIEnv *, jclass, jboolean);
 
 
+
+/*
+* Class:     java_lang_VMExecutionEngine
+* Method:    currentTimeMillis
+* Signature: ()J
+*/
+JNIEXPORT jlong JNICALL Java_java_lang_VMExecutionEngine_currentTimeMillis
+(JNIEnv *, jclass);
+
+/*
+* Class:     java_lang_VMExecutionEngine
+* Method:    nanoTime
+* Signature: ()J
+*/
+JNIEXPORT jlong JNICALL Java_java_lang_VMExecutionEngine_nanoTime
+(JNIEnv *, jclass);
+
+/*
+* Class:     java_lang_VMExecutionEngine
+* Method:    getenv
+* Signature: (Ljava/lang/String;)Ljava/lang/String;
+*/
+JNIEXPORT jstring JNICALL Java_java_lang_VMExecutionEngine_getenv__Ljava_lang_String_2
+(JNIEnv *, jclass, jstring);
+
+/*
+* Class:     java_lang_VMExecutionEngine
+* Method:    getenv
+* Signature: ()Ljava/util/Map;
+*/
+JNIEXPORT jobject JNICALL Java_java_lang_VMExecutionEngine_getenv__
+(JNIEnv *, jclass);
+
+/*
+* Class:     java_lang_VMExecutionEngine
+* Method:    mapLibraryName
+* Signature: (Ljava/lang/String;)Ljava/lang/String;
+*/
+JNIEXPORT jstring JNICALL Java_java_lang_VMExecutionEngine_mapLibraryName
+(JNIEnv *, jclass, jstring);
 
 #ifdef __cplusplus
 }

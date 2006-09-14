@@ -28,6 +28,7 @@
 
 #include <apr_dso.h>
 #include "vm_core_types.h"
+#include "String_Pool.h"
 #include "jni_types.h"
 
 /**

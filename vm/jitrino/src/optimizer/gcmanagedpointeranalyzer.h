@@ -25,7 +25,6 @@
 
 #include "open/types.h"
 #include "Stl.h"
-#include "optpass.h"
 
 namespace Jitrino {
 
@@ -37,7 +36,6 @@ class VarOpnd;
 class SsaVarOpnd;
 class Type;
 
-DEFINE_OPTPASS(GCManagedPointerAnalysisPass)
 
 class GCManagedPointerAnalyzer {
 public:

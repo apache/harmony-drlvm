@@ -198,6 +198,7 @@ public:
             prop = prop_;
         }
     public:
+        Prop_entry *currentEntry() const {return current;}
         void reset()
         {
             current = NULL;
@@ -211,9 +212,11 @@ public:
             for(; i < prop->BUCKET_SIZE; i++)
                 if(prop->bucket[i])
                     break;
-            if(i == prop->BUCKET_SIZE)
-                return NULL;
-            current = prop->bucket[i];
+            if(i == prop->BUCKET_SIZE) {
+                current = NULL;
+            } else {
+                current = prop->bucket[i];
+            }
             idx = i;
             return current;
         }
@@ -247,7 +250,12 @@ public:
         iter->reset();
         return iter;
     }
-
+    void destroyIterator(Iterator* it)
+    {
+        assert(it!=iterator);
+        assert(it->prop == this);
+        delete it;
+    }
     void add(const char* k, Prop_Value* v);     /*Caller delete k and v*/
 #ifdef USE_MEM_MANAGER_FOR_ALLOCATION 
     void add(const char* k, Prop_Value* v, tl::MemoryPool& m);
@@ -290,6 +298,12 @@ public:
 typedef struct _properties* PropertiesHandle;
 
 VMEXPORT const char* properties_get_string_property(PropertiesHandle prop, const char* key);
+VMEXPORT void properties_set_string_property(PropertiesHandle ph, const char* key, const char* value);
+VMEXPORT PropertiesIteratorHandle properties_iterator_create(PropertiesHandle ph);
+VMEXPORT void properties_iterator_destroy(PropertiesHandle ph, PropertiesIteratorHandle pih);
+VMEXPORT Boolean properties_iterator_advance(PropertiesIteratorHandle pih);
+VMEXPORT const char* properties_get_name(PropertiesIteratorHandle pih);
+VMEXPORT const char* properties_get_string_value(PropertiesIteratorHandle pih);
 
 inline int Properties::index_of(const char *key)
 {

@@ -32,7 +32,8 @@
 #include "open/vm_util.h"
 #include "environment.h"
 #include "properties.h"
-#include "object_generic.h"
+/* $$$ GMJ #include "object_generic.h" */
+#include "object.h"
 
 static void default_gc_write_barrier(Managed_Object_Handle);
 static void default_gc_pin_object(Managed_Object_Handle*);
@@ -61,6 +62,7 @@ static void default_gc_add_root_set_entry_managed_pointer(void **slot,
 static void *default_gc_heap_base_address();
 static void *default_gc_heap_ceiling_address();
 static void default_gc_test_safepoint();
+/* $$$ GMJ static int32 default_gc_get_hashcode(Managed_Object_Handle); */
 
 static Boolean default_gc_supports_frontier_allocation(unsigned *offset_of_current, unsigned *offset_of_limit);
 
@@ -118,6 +120,7 @@ void (*gc_pin_object)(Managed_Object_Handle* p_object) = 0;
 void (*gc_unpin_object)(Managed_Object_Handle* p_object) = 0;
 int32 (*gc_get_hashcode)(Managed_Object_Handle obj) = 0;
 Managed_Object_Handle (*gc_get_next_live_object)(void *iterator) = 0;
+int32 (*gc_get_hashcode0) (Managed_Object_Handle p_object) = 0;
 
 void (*gc_finalize_on_exit)() = 0;
 
@@ -247,6 +250,8 @@ void vm_add_gc(const char *dllName)
     gc_finalize_on_exit = (void (*)())
         getFunctionOptional(handle, "gc_finalize_on_exit", dllName,
             (apr_dso_handle_sym_t)default_gc_finalize_on_exit);
+    gc_get_hashcode0 = (int32 (*)(Managed_Object_Handle))
+        getFunctionOptional(handle, "gc_get_hashcode", dllName, (apr_dso_handle_sym_t) default_gc_get_hashcode);
 
     gc_vm_initialized = (void (*)()) getFunction(handle, "gc_vm_initialized", dllName);
     gc_requires_barriers = (Boolean (*)()) 
@@ -417,6 +422,9 @@ static Boolean default_gc_supports_frontier_allocation(unsigned * UNREF offset_o
     return FALSE;
 }
 
+static int32 default_gc_get_hashcode(Managed_Object_Handle obj) {
+    return default_hashcode(obj);
+}
 
 static void *default_gc_heap_ceiling_address()
 {
@@ -453,10 +461,12 @@ static void default_gc_unpin_object(Managed_Object_Handle*)
     WARN_ONCE("The GC did not provide gc_unpin_object()");
 }
 
+/* $$$ GMJ
 static int32 default_gc_get_hashcode(Managed_Object_Handle obj)
 {
     return default_hashcode((ManagedObject*) obj);
 }
+*/
 
 static Managed_Object_Handle default_gc_get_next_live_object(void*)
 {

@@ -36,6 +36,7 @@
 #include "vm_core_types.h"
 #include "object_layout.h"
 #include "open/vm_gc.h"
+#include "exceptions_type.h"
 #include "jvmti.h"
 
 
@@ -69,7 +70,15 @@ public:
 
     // In case exception is thrown, Exception object is put here
     // TODO: Needs to be replaced with jobject!
-    volatile ManagedObject*           p_exception_object;
+    //volatile ManagedObject*           p_exception_object;
+    volatile Exception thread_exception;
+
+    // For support of JVMTI events: EXCEPTION, EXCEPTION_CATCH
+    // If p_exception_object is set and p_exception_object_ti is not
+    //    - EXCEPTION event should be generated
+    // If p_exception_object_ti is set and p_exception_object is not
+    //    - EXCEPTION_CATCH even should be generated
+    volatile ManagedObject*           p_exception_object_ti;
 
     // flag which indicate that guard page on the stak should be restored
     bool restore_guard_page;
@@ -87,6 +96,10 @@ public:
     bool                              is_stoped;
 
     JVMTILocalStorage                 jvmti_local_storage;
+    // Buffer used to create instructions instead of original instruction
+    // to transfer execution control back to the code after breakpoint
+    // has been processed
+    jbyte                             jvmti_jit_breakpoints_handling_buffer[50];
     jvmti_frame_pop_listener          *frame_pop_listener;
 
     // CPU registers.

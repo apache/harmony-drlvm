@@ -38,21 +38,35 @@ class DominatorNode;
 class Dominator;
 class SparseOpndMap;
 class PiCondition;
-class JitrinoParameterTable;
-class CFGNode;
+class Node;
 class Opnd;
 class BranchInst;
 class AbcdSolver;
 class AbcdAliases;
 class AbcdReasons;
 
-DEFINE_OPTPASS(ABCDPass)
 
 typedef ::std::pair<Inst *, AbcdReasons *> InstReasonPair;
 
 inline bool operator <(const InstReasonPair &pair1, const InstReasonPair &pair2) {
     return (pair1.first < pair2.first);
 }
+
+struct AbcdFlags {
+    bool partial;
+    bool dryRun;
+    bool useAliases;
+    bool useConv;
+    bool remConv;
+    bool useShr;
+    bool unmaskShifts;
+    bool remBr;
+    bool remCmp;
+    bool remOneBound;
+    bool remOverflow;
+    bool checkOverflow;
+    bool useReasons;
+};
 
 class Abcd {
     IRManager& irManager;
@@ -69,54 +83,16 @@ class Abcd {
     SsaTmpOpnd *tauUnsafe;
     SsaTmpOpnd *tauSafe;
     SsaTmpOpnd *blockTauPoint;
-    CFGNode *lastTauPointBlock;
+    Node *lastTauPointBlock;
     SsaTmpOpnd *blockTauEdge;
-    CFGNode *lastTauEdgeBlock;
-public:
-    struct Flags {
-        bool partial;
-        bool dryRun;
-        bool useAliases;
-        bool useConv;
-        bool remConv;
-        bool useShr;
-        bool unmaskShifts;
-        bool remBr;
-        bool remCmp;
-        bool remOneBound;
-        bool remOverflow;
-        bool checkOverflow;
-        bool useReasons;
-    };
-private:
-    static Flags *defaultFlags;
-    Flags flags;
-public:    
-    static void readDefaultFlagsFromCommandLine(const JitrinoParameterTable *params);
-    static void showFlagsFromCommandLine();
+    Node *lastTauEdgeBlock;
     
-    Abcd(IRManager &irManager0, 
-         MemoryManager& memManager,
-         DominatorTree& dom0)
-        : irManager(irManager0), 
-          mm(memManager),
-          ineqGraph(0),
-          dominators(dom0),
-          piMap(0),
-          nextPiOpndId(0),
-          solver(0),
-          canEliminate(memManager),
-          canEliminateUB(memManager),
-          canEliminateLB(memManager),
-          tauUnsafe(0),
-          tauSafe(0),
-          blockTauPoint(0),
-          lastTauPointBlock(0),
-          blockTauEdge(0),
-          lastTauEdgeBlock(0),
-          flags(*defaultFlags)
-    {
-    };
+    AbcdFlags& flags;
+public:    
+    static void readFlags(Action* argSource, AbcdFlags* flags);
+    static void showFlags(std::ostream& os);
+    
+    Abcd(IRManager &irManager0, MemoryManager& memManager, DominatorTree& dom0);
     
     ~Abcd() {
     };
@@ -125,32 +101,32 @@ public:
 private:
     void insertPiNodes(); // insert and rename over whole tree;
     void insertPiNodes(DominatorNode *domBlock); // for each dominator
-    void insertPiNodes(CFGNode *block); // for each dominator
-    void insertPiNodesForUnexceptionalPEI(CFGNode *block, Inst *pei);
-    void insertPiNodesForBranch(CFGNode *block, BranchInst *branchi, 
-                                CFGEdge::Kind kind);
-    void insertPiNodesForComparison(CFGNode *block,
+    void insertPiNodes(Node *block); // for each dominator
+    void insertPiNodesForUnexceptionalPEI(Node *block, Inst *pei);
+    void insertPiNodesForBranch(Node *block, BranchInst *branchi, 
+                                Edge::Kind kind);
+    void insertPiNodesForComparison(Node *block,
                                     ComparisonModifier mod,
                                     const PiCondition &bounds,
                                     Opnd *op,
                                     bool swap_operands,
                                     bool negate_comparison);
-    void insertPiNodeForOpnd(CFGNode *block, Opnd *org, 
+    void insertPiNodeForOpnd(Node *block, Opnd *org, 
                              const PiCondition &cond,
                              Opnd *tauOpnd = 0);
     // checks for aliases of opnd, inserts them.
-    void insertPiNodeForOpndAndAliases(CFGNode *block, Opnd *org, 
+    void insertPiNodeForOpndAndAliases(Node *block, Opnd *org, 
                                        const PiCondition &cond,
                                        Opnd *tauOpnd = 0);
-    PiOpnd *getNewDestOpnd(CFGNode *block, Opnd *org);
+    PiOpnd *getNewDestOpnd(Node *block, Opnd *org);
 
     Opnd *getConstantOpnd(Opnd *opnd); // dereferencing through Pis, 0 if not constant.
     void renamePiVariables();
-    void renamePiVariables(CFGNode *block);
+    void renamePiVariables(Node *block);
     void renamePiVariables(DominatorNode *block);
 
     void removePiNodes();
-    void removePiNodes(CFGNode *block, Inst *i);
+    void removePiNodes(Node *block, Inst *i);
 
     void updateSsaForm();
     void buildInequalityGraph();
@@ -174,8 +150,8 @@ private:
     void markInstToEliminateUBAndWhy(Inst *, AbcdReasons *);
     bool isMarkedToEliminateUB(Inst *, AbcdReasons *&why);
 
-    SsaTmpOpnd *getBlockTauPoint(CFGNode *block);
-    SsaTmpOpnd *getBlockTauEdge(CFGNode *block);
+    SsaTmpOpnd *getBlockTauPoint(Node *block);
+    SsaTmpOpnd *getBlockTauEdge(Node *block);
     SsaTmpOpnd *getTauUnsafe();
     SsaTmpOpnd *getTauSafe();
     SsaTmpOpnd *getReasonTau(AbcdReasons *reason,

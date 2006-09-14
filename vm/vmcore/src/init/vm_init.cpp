@@ -89,6 +89,7 @@ static Class* preload_primitive_class(Global_Env* env, const char* classname)
 
 static Class *class_initialize_by_name(const char *classname)
 {
+    ASSERT_RAISE_AREA;
     Global_Env* env = VM_Global_State::loader_env;
 
     String *s = env->string_pool.lookup(classname);
@@ -105,6 +106,7 @@ static Class *class_initialize_by_name(const char *classname)
 
 void lib_dependent_opts()
 {
+    ASSERT_RAISE_AREA;
     class_initialize_by_name("java/lang/Math");
 } //lib_dependent_opts
 
@@ -134,42 +136,31 @@ static void bootstrap_initial_java_classes(Global_Env *env)
      * j.l.reflect.AnnotatedElement, GenericDeclaration and Type as per Java 5
      */
     env->StartVMBootstrap();
-    Class *class_java_lang_Object   = preload_class(env, env->JavaLangObject_String);
+    env->JavaLangObject_Class       = preload_class(env, env->JavaLangObject_String);
     env->java_io_Serializable_Class = preload_class(env, env->Serializable_String);
-    Class *AnnotatedElement_Class   = preload_class(env, "java/lang/reflect/AnnotatedElement");
-    Class *GenericDeclaration_Class = preload_class(env, "java/lang/reflect/GenericDeclaration");
-    Class *Type_Class               = preload_class(env, "java/lang/reflect/Type");
     env->JavaLangClass_Class        = preload_class(env, env->JavaLangClass_String);
-    env->JavaLangObject_Class       = class_java_lang_Object;
     env->FinishVMBootstrap();
 
-    // Now create the java_lang_Class instances for these three classes.
+    // Now create the java_lang_Class instance.
     create_instance_for_class(env, env->JavaLangClass_Class);
-    create_instance_for_class(env, env->java_io_Serializable_Class);
-    create_instance_for_class(env, AnnotatedElement_Class);
-    create_instance_for_class(env, GenericDeclaration_Class);
-    create_instance_for_class(env, Type_Class);
-    create_instance_for_class(env, env->JavaLangObject_Class);
 
-    // during bootstrapping suspend status never matters,
-    // so we can enable or disable any way we like. -salikh 2005-05-10
-    jvmti_send_class_load_event(env, env->JavaLangObject_Class);
-    jvmti_send_class_prepare_event(env->JavaLangObject_Class);
-    jvmti_send_class_load_event(env, env->java_io_Serializable_Class);
-    jvmti_send_class_prepare_event(env->java_io_Serializable_Class);
-    jvmti_send_class_load_event(env, AnnotatedElement_Class);
-    jvmti_send_class_prepare_event(AnnotatedElement_Class);
-    jvmti_send_class_load_event(env, GenericDeclaration_Class);
-    jvmti_send_class_prepare_event(GenericDeclaration_Class);
-    jvmti_send_class_load_event(env, Type_Class);
-    jvmti_send_class_prepare_event(Type_Class);
-    jvmti_send_class_load_event(env, env->JavaLangClass_Class);
-    jvmti_send_class_prepare_event(env->JavaLangClass_Class);
+    ClassTable* table = env->bootstrap_class_loader->GetLoadedClasses();
+    unsigned num = 0;
+    for (ClassTable::const_iterator it = table->begin(), end = table->end(); 
+        it != end; ++it, ++num)
+    {
+        Class* booted = (*it).second;
+        if (booted != env->JavaLangClass_Class) {
+            create_instance_for_class(env, booted);
+        }
+        jvmti_send_class_load_event(env, booted);
+        jvmti_send_class_prepare_event(booted);
+    }    
 
-#ifdef VM_STATS
-    // Account for the 3 classes loaded before env->JavaLangObject_Class is set.
-    env->JavaLangObject_Class->num_allocations += 6;
-    env->JavaLangObject_Class->num_bytes_allocated += (6 * env->JavaLangClass_Class->instance_data_size);
+  #ifdef VM_STATS
+      // Account for the classes loaded before env->JavaLangObject_Class is set.
+    env->JavaLangObject_Class->num_allocations += num;
+    env->JavaLangObject_Class->num_bytes_allocated += (num * env->JavaLangClass_Class->instance_data_size);
 #endif //VM_STATS
     TRACE2("init", "bootstrapping initial java classes complete");
 } // bootstrap_initial_java_classes
@@ -189,7 +180,7 @@ static bool initialize_system_class_loader(JNIEnv* jenv)
         return false;
 
     jobject scl = jenv->CallStaticObjectMethod(cl, gcl);
-    if (exn_get())
+    if (exn_raised())
         return false;
 
     if(scl) {
@@ -205,6 +196,8 @@ static bool init_thread_object(JNIEnv *);
 
 bool vm_init(Global_Env *env)
 {
+    ASSERT_RAISE_AREA;
+
     if(vm_is_initialized)
         return false;
     assert(hythread_is_suspend_enabled());
@@ -420,12 +413,9 @@ bool vm_init(Global_Env *env)
     if(!res) {
         WARN("Fail to initialize system class loader.");
     }
-    if(exn_get()) {
-        tmn_suspend_disable();
-        Java_java_lang_Throwable *exc = ((ObjectHandle)exn_get())->object;
+    if(exn_raised()) {
         print_uncaught_exception_message(stderr, 
-                "system class loader initialisation", exc);
-        tmn_suspend_enable();
+                "system class loader initialisation", exn_get());
     }
     exn_clear(); // Ignore any exception that might have occured
     TRACE2("init", "system class loader initialized");

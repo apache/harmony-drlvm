@@ -14,20 +14,174 @@
  *  limitations under the License.
  */
 /**
- * @author Evgueni Brevnov
+ * @author Evgueni Brevnov, Serguei S. Zapreyev, Alexey V. Varlamov
  * @version $Revision: 1.1.2.2.4.4 $
  */
 
 package java.lang.reflect;
 
+import static org.apache.harmony.vm.ClassFormat.ACC_VARARGS;
+import static org.apache.harmony.vm.ClassFormat.ACC_SYNTHETIC;
+
+import java.lang.annotation.Annotation;
 import java.util.Arrays;
 
+import org.apache.harmony.lang.reflect.parser.Parser;
+import org.apache.harmony.lang.reflect.parser.Parser.SignatureKind;
+import org.apache.harmony.lang.reflect.parser.InterimParameterizedType;
+import org.apache.harmony.lang.reflect.parser.InterimTypeVariable;
+import org.apache.harmony.lang.reflect.parser.InterimType;
+import org.apache.harmony.lang.reflect.parser.InterimClassType;
+import org.apache.harmony.lang.reflect.parser.InterimTypeParameter;
+import org.apache.harmony.lang.reflect.parser.InterimGenericArrayType;
+import org.apache.harmony.lang.reflect.parser.InterimConstructorGenericDecl;
+
+import org.apache.harmony.lang.reflect.repository.TypeVariableRepository;
+import org.apache.harmony.lang.reflect.repository.ParameterizedTypeRepository;
+
+import org.apache.harmony.lang.reflect.support.AuxiliaryFinder;
+import org.apache.harmony.lang.reflect.support.AuxiliaryCreator;
+import org.apache.harmony.lang.reflect.support.AuxiliaryChecker;
+import org.apache.harmony.lang.reflect.support.AuxiliaryLoader;
+import org.apache.harmony.lang.reflect.support.AuxiliaryUtil;
+
+import org.apache.harmony.lang.reflect.implementation.TypeVariableImpl;
+import org.apache.harmony.lang.reflect.implementation.ParameterizedTypeImpl;
+
 import org.apache.harmony.vm.VMStack;
+import org.apache.harmony.vm.VMGenericsAndAnnotations;
 
 /**
- * @com.intel.drl.spec_ref 
- */
-public final class Constructor extends AccessibleObject implements Member {
+* @com.intel.drl.spec_ref 
+*/
+public final class Constructor<T> extends AccessibleObject implements Member, GenericDeclaration {
+
+    /**
+    *  @com.intel.drl.spec_ref
+    */
+    public boolean isVarArgs() {
+        return (getModifiers() & ACC_VARARGS) != 0;
+    }
+
+    /**
+    *  @com.intel.drl.spec_ref
+    */
+    public Annotation[][] getParameterAnnotations() {
+        Annotation a[][] = data.getParameterAnnotations();
+        Annotation aa[][] = new Annotation[a.length][]; 
+        for (int i = 0; i < a.length; i++ ) {
+            aa[i] = new Annotation[a[i].length];
+            System.arraycopy(a[i], 0, aa[i], 0, a[i].length);
+        }
+        return aa;
+    }
+
+    /**
+    *  @com.intel.drl.spec_ref
+    */
+    public Annotation[] getDeclaredAnnotations() {
+        Annotation a[] = data.getDeclaredAnnotations();
+        Annotation aa[] = new Annotation[a.length];
+        System.arraycopy(a, 0, aa, 0, a.length);
+        return aa;
+    }
+
+    /**
+    *  @com.intel.drl.spec_ref
+    */
+    public <A extends Annotation> A getAnnotation(Class<A> annotationClass) {
+        if(annotationClass == null) {
+            throw new NullPointerException();
+        }
+        Annotation aa[] = data.getDeclaredAnnotations();
+        for (int i = 0; i < aa.length; i++) {
+            if(aa[i].annotationType() == annotationClass) {
+                return (A) aa[i];
+            }
+        }
+        return null;
+    }
+
+    /**
+    *  @com.intel.drl.spec_ref
+    */
+    public Type[] getGenericExceptionTypes() throws GenericSignatureFormatError, TypeNotPresentException, MalformedParameterizedTypeException {
+        if (data.genericExceptionTypes == null) {
+            data.initGenericExceptionTypes();
+        }
+
+        return (Type[])data.genericExceptionTypes.clone();
+    }
+
+    /**
+    *  @com.intel.drl.spec_ref
+    */
+    public Type[] getGenericParameterTypes() throws GenericSignatureFormatError, TypeNotPresentException, MalformedParameterizedTypeException {
+        if (data.genericParameterTypes == null) {
+            data.initGenericParameterTypes();
+        }
+
+        return (Type[])data.genericParameterTypes.clone();
+    }
+
+    /**
+    *  @com.intel.drl.spec_ref
+    */
+    public TypeVariable<Constructor<T>>[] getTypeParameters() throws GenericSignatureFormatError {
+        if (data.typeParameters == null) {
+            data.initTypeParameters();
+        }
+        return (TypeVariable<Constructor<T>>[])data.typeParameters.clone();
+    }
+
+    /**
+    * @com.intel.drl.spec_ref 
+    */
+    public String toGenericString() {
+        StringBuilder sb = new StringBuilder(80);
+        // data initialization
+        if (data.genericParameterTypes == null) {
+            data.initGenericParameterTypes();
+        }
+        if (data.genericExceptionTypes == null) {
+            data.initGenericExceptionTypes();
+        }
+        // append modifiers if any
+        int modifier = getModifiers();
+        if (modifier != 0) {
+            sb.append(Modifier.toString(modifier & ~ACC_VARARGS)).append(' ');
+        }
+        // append type parameters
+        if (data.typeParameters != null && data.typeParameters.length > 0) {
+            sb.append('<');
+            for (int i = 0; i < data.typeParameters.length; i++) {
+                appendGenericType(sb, data.typeParameters[i]);
+                if (i < data.typeParameters.length - 1) {
+                    sb.append(", ");
+                }
+            }
+            sb.append("> ");
+        }
+        // append constructor name
+        appendArrayType(sb, getDeclaringClass());
+        // append parameters
+        sb.append('(');
+        appendArrayGenericType(sb, data.genericParameterTypes);
+        sb.append(')');
+        // append exeptions if any
+        if (data.genericExceptionTypes.length > 0) {
+            sb.append(" throws ");
+            appendArrayGenericType(sb, data.genericExceptionTypes);
+        }
+        return sb.toString();
+    }
+
+    /**
+    * @com.intel.drl.spec_ref 
+    */
+    public boolean isSynthetic() {
+        return (getModifiers() & ACC_SYNTHETIC) != 0;
+    }   
 
     /**
      * cache of the constructor data
@@ -39,52 +193,41 @@ public final class Constructor extends AccessibleObject implements Member {
      * 
      * @param c original constructor
      */
-    Constructor(Constructor c) {
+    Constructor(Constructor <T> c) {
         data = c.data;
         isAccessible = c.isAccessible;
     }
 
     /**
-     * Only VM should call this constructor
-     * 
-     * @param obj constructor handler
+     * Only VM should call this constructor.
+     * String parameters must be interned.
      * @api2vm
      */
-    Constructor(Object obj) {
-        data = new ConstructorData(obj);
+    Constructor(long id, Class<T> clss, String name, String desc, int m) {
+        data = new ConstructorData(id, clss, name, desc, m);
     }
 
-    /**
-     *  TODO : fix gmj
-     */
-    public boolean isSynthetic() {
-        return false;
-    }
-    
     /**
      * Called by VM to obtain this constructor's handle.
      * 
      * @return handle for this constructor
      * @api2vm
      */
-    Object getHandle() {
-        return data.id;
+    long getId() {
+        return data.vm_member_id;
     }
 
     /**
      * @com.intel.drl.spec_ref 
      */
     public boolean equals(Object obj) {
-        try {
-            // Sole comparison by id is not enough because there are constructors
-            // created through JNI. That constructors have different ids.
+        if (obj instanceof Constructor) {
             Constructor another = (Constructor)obj;
-            if (data.id == another.data.id){
+            if (data.vm_member_id == another.data.vm_member_id){
+                assert getDeclaringClass() == another.getDeclaringClass()
+                && Arrays.equals(getParameterTypes(), another.getParameterTypes());
                 return true;
             }
-            return getDeclaringClass().equals(another.getDeclaringClass())
-                && Arrays.equals(getParameterTypes(), another.getParameterTypes());
-        } catch (RuntimeException e) {
         }
         return false;
     }
@@ -92,30 +235,21 @@ public final class Constructor extends AccessibleObject implements Member {
     /**
      * @com.intel.drl.spec_ref 
      */
-    public Class getDeclaringClass() {
-        if (data.declaringClass == null) {
-            data.initDeclaringClass();
-        }
+    public Class<T> getDeclaringClass() {
         return data.declaringClass;
     }
 
     /**
      * @com.intel.drl.spec_ref 
      */
-    public Class[] getExceptionTypes() {
-        if (data.exceptionTypes == null) {
-            data.initExceptionTypes();
-        }
-        return (Class[])data.exceptionTypes.clone();
+    public Class<?>[] getExceptionTypes() {
+        return (Class[])data.getExceptionTypes().clone();
     }
 
     /**
      * @com.intel.drl.spec_ref 
      */
     public int getModifiers() {
-        if (data.modifiers == -1) {
-            data.initModifiers();
-        }
         return data.modifiers;
     }
 
@@ -123,20 +257,14 @@ public final class Constructor extends AccessibleObject implements Member {
      * @com.intel.drl.spec_ref 
      */
     public String getName() {
-        if (data.name == null) {
-            data.initName();
-        }
-        return data.name;
+        return data.getName();
     }
 
     /**
      * @com.intel.drl.spec_ref 
      */
-    public Class[] getParameterTypes() {
-        if (data.parameterTypes == null) {
-            data.initParameterTypes();
-        }
-        return (Class[])data.parameterTypes.clone();
+    public Class<?>[] getParameterTypes() {
+        return (Class[])data.getParameterTypes().clone();
     }
 
     /**
@@ -149,7 +277,7 @@ public final class Constructor extends AccessibleObject implements Member {
     /**
      * @com.intel.drl.spec_ref 
      */
-    public Object newInstance(Object[] args) throws InstantiationException,
+    public T newInstance(Object... args) throws InstantiationException,
         IllegalAccessException, IllegalArgumentException,
         InvocationTargetException {
         if (Modifier.isAbstract(getDeclaringClass().getModifiers())) {
@@ -158,10 +286,7 @@ public final class Constructor extends AccessibleObject implements Member {
         }
         
         // check parameter validity
-        if (data.parameterTypes == null) {
-            data.initParameterTypes();
-        }
-        checkInvokationArguments(data.parameterTypes, args);
+        checkInvokationArguments(data.getParameterTypes(), args);
         
         if (!isAccessible) {
             reflectExporter.checkMemberAccess(VMStack.getCallerClass(0),
@@ -169,36 +294,32 @@ public final class Constructor extends AccessibleObject implements Member {
                                               getDeclaringClass(),
                                               getModifiers());
         }
-        return VMReflection.newClassInstance(data.id, args);
+        return (T)VMReflection.newClassInstance(data.vm_member_id, args);
     }
 
     /**
      * @com.intel.drl.spec_ref 
      */
     public String toString() {
-        StringBuffer sb = new StringBuffer();
-        // data initialization
-        if (data.parameterTypes == null) {
-            data.initParameterTypes();
-        }
-        if (data.exceptionTypes == null) {
-            data.initExceptionTypes();
-        }
+        StringBuilder sb = new StringBuilder(80);
         // append modifiers if any
         int modifier = getModifiers();
         if (modifier != 0) {
-            sb.append(Modifier.toString(modifier)).append(' ');
+            // VARARGS incorrectly recognized
+            final int MASK = ~ACC_VARARGS;  
+            sb.append(Modifier.toString(modifier & MASK)).append(' ');            
         }
         // append constructor name
         appendArrayType(sb, getDeclaringClass());
         // append parameters
         sb.append('(');
-        appendArrayType(sb, data.parameterTypes);
+        appendArrayType(sb, data.getParameterTypes());
         sb.append(')');
         // append exeptions if any
-        if (data.exceptionTypes.length > 0) {
+        Class[] exn = data.getExceptionTypes();
+        if (exn.length > 0) {
             sb.append(" throws ");
-            appendSimpleType(sb, data.exceptionTypes);
+            appendSimpleType(sb, exn);
         }
         return sb.toString();
     }
@@ -206,22 +327,12 @@ public final class Constructor extends AccessibleObject implements Member {
     /* NON API SECTION */
 
     /**
-     * Reconstructs the signature of this constructor.
+     * This method is used by serialization mechanism.
      * 
      * @return the signature of the constructor 
      */
     String getSignature() {
-        //XXX: seems, it may be more effective to realize this request via 
-        //API2VM interface, i.e. just to obtain the signature of the constructor descriptor
-        //from the class file.
-        StringBuffer buf = new StringBuffer().append('(');
-        if (data.parameterTypes == null) {
-            data.initParameterTypes();
-        }
-        for (int i = 0; i < data.parameterTypes.length; i++)
-            buf.append(getClassSignature(data.parameterTypes[i]));
-        buf.append(")V");
-        return buf.toString().replace('/','.');
+        return data.descriptor;
     }
 
     /**
@@ -233,82 +344,264 @@ public final class Constructor extends AccessibleObject implements Member {
          * constructor handle which is used to retrieve all necessary
          * information about this constructor object
          */
-        final Object id;
+        final long vm_member_id;
+        
+        /**
+         * constructor generic signature
+         */
+        String constrSignature;
 
         /**
-         * declaring class
+         * constructor generic declaration
          */
-        Class declaringClass;
+        InterimConstructorGenericDecl constrGenDecl;
 
-        /**
-         * constructor exceptions
-         */
-        Class[] exceptionTypes;
+        Annotation[] declaredAnnotations;
 
-        /**
-         * constructor modifiers
-         */
-        int modifiers = -1;
+        final Class<T> declaringClass;
 
-        /**
-         * constructor name
-         */
+        Class<?>[] exceptionTypes;
+
+        Type[] genericExceptionTypes;
+
+        Type[] genericParameterTypes;
+
+        final int modifiers;
+
         String name;
 
-        /**
-         * constructor parameters
-         */
-        Class[] parameterTypes;
+        Annotation[][] parameterAnnotations;
+
+        Class<?>[] parameterTypes;
+
+        TypeVariable<Constructor<T>>[] typeParameters;
+        final String descriptor;
 
         /**
          * @param obj constructor handler 
          */
-        public ConstructorData(Object obj) {
-            id = obj;
+        public ConstructorData(long vm_id, Class<T> clss, String name, String desc, int mods) {
+            vm_member_id = vm_id;
+            declaringClass = clss;
+            this.name = null;
+            modifiers = mods;
+            descriptor = desc;
         }
-
-        /**
-         * initializes declaring class
-         */        
-        public synchronized void initDeclaringClass() {
-            if (declaringClass == null) {
-                declaringClass = VMReflection.getDeclaringClass(id);
+        
+        String getName() {
+            if (name == null) {
+                name = declaringClass.getName();
             }
+            return name;
+        }
+        
+        public Annotation[] getDeclaredAnnotations() {
+            if (declaredAnnotations == null) {
+                declaredAnnotations = VMGenericsAndAnnotations
+                    .getDeclaredAnnotations(vm_member_id);
+            }
+            return declaredAnnotations;
         }
 
         /**
          * initializes exeptions
          */
-        public synchronized void initExceptionTypes() {
+        public Class[] getExceptionTypes() {
             if (exceptionTypes == null) {
-                exceptionTypes = VMReflection.getExceptionTypes(id);
+                exceptionTypes = VMReflection.getExceptionTypes(vm_member_id);
+            }
+            return exceptionTypes;
+        }
+
+        /**
+         * initializes generalized exeptions
+         */
+        public synchronized void initGenericExceptionTypes() {
+			//So, here it can be ParameterizedType or TypeVariable or ordinary reference class type elements.
+            if (genericExceptionTypes == null) {
+				Object startPoint = Constructor.this; 
+				if (constrSignature == null) {
+                    constrSignature = AuxiliaryUtil.toUTF8(VMGenericsAndAnnotations.getSignature(vm_member_id)); // getting this method signature
+					if (constrSignature == null) {
+						genericExceptionTypes = getExceptionTypes();
+						return;
+					}
+				}
+				if (constrGenDecl == null) {
+					// constrSignature&constrGenDecl is also the "hard" way to rethrow GenericSignatureFormatError each time for a while
+                    constrGenDecl =  (InterimConstructorGenericDecl) Parser.parseSignature(constrSignature, SignatureKind.CONSTRUCTOR_SIGNATURE, (GenericDeclaration)startPoint); // GenericSignatureFormatError can be thrown here
+				}
+                InterimType[] throwns = constrGenDecl.throwns;
+				if (throwns == null) {
+					genericExceptionTypes = getExceptionTypes();
+					return;
+				}
+				int l = throwns.length;
+				genericExceptionTypes = new Type[l];
+				for (int i = 0; i < l; i++) {
+                    if (throwns[i] instanceof InterimParameterizedType) {
+                        ParameterizedType pType = ParameterizedTypeRepository.findParameterizedType((InterimParameterizedType) throwns[i], ((InterimParameterizedType) throwns[i]).signature, startPoint);
+						if (pType == null) {
+							try {
+                                AuxiliaryFinder.findGenericClassDeclarationForParameterizedType((InterimParameterizedType) throwns[i], startPoint);
+							} catch(Throwable e) {
+                                throw new TypeNotPresentException(((InterimParameterizedType) throwns[i]).rawType.classTypeName.substring(1).replace('/', '.'), e);
+							}
+							//check the correspondence of the formal parameter number and the actual argument number:
+                            AuxiliaryChecker.checkArgsNumber((InterimParameterizedType) throwns[i], startPoint); // the MalformedParameterizedTypeException may raise here
+							try {
+                                pType = new ParameterizedTypeImpl(AuxiliaryCreator.createTypeArgs((InterimParameterizedType) throwns[i], startPoint), AuxiliaryCreator.createRawType((InterimParameterizedType) throwns[i], startPoint), AuxiliaryCreator.createOwnerType((InterimParameterizedType) throwns[i], startPoint));
+							} catch(ClassNotFoundException e) {
+								throw new TypeNotPresentException(e.getMessage(), e);
+							}
+                            ParameterizedTypeRepository.registerParameterizedType(pType, (InterimParameterizedType) throwns[i], ((InterimParameterizedType) throwns[i]).signature, startPoint);
+						}
+						genericExceptionTypes[i] = (Type) pType; 
+                    } else if (throwns[i] instanceof InterimClassType) {
+						try {
+                            genericExceptionTypes[i] = (Type) AuxiliaryLoader.ersatzLoader.findClass(((InterimClassType)throwns[i]).classTypeName.substring(1).replace('/', '.')); // XXX: should we propagate the class loader of initial user's request (Field.getGenericType()) or use this one?
+						} catch (ClassNotFoundException e) {
+                            throw new TypeNotPresentException(((InterimClassType)throwns[i]).classTypeName.substring(1).replace('/', '.'), e);
+						} catch (ExceptionInInitializerError e) {
+						} catch (LinkageError e) {
+						}
+                    } else if (throwns[i] instanceof InterimTypeVariable) {
+                        String tvName = ((InterimTypeVariable) throwns[i]).typeVariableName;
+                        TypeVariable variable = TypeVariableRepository.findTypeVariable(tvName, startPoint);
+						if (variable == null) {
+                            variable =  AuxiliaryFinder.findTypeVariable(tvName, startPoint);
+							if (variable == null) {
+								genericExceptionTypes[i] = (Type) null;
+								break;
+							}
+						}
+						genericExceptionTypes[i] = (Type) variable;
+					} else {
+						// Internal Error
+					}
+				}
             }
         }
 
         /**
-         * initializes modifiers
+         * initializes generalized parameters
          */
-        public synchronized void initModifiers() {
-            if (modifiers == -1) {
-                modifiers = VMReflection.getModifiers(id);
+        public synchronized void initGenericParameterTypes() {
+			//So, here it can be ParameterizedType or TypeVariable or ordinary reference class type elements.
+            if (genericParameterTypes == null) {
+				Object startPoint = Constructor.this;
+				if (constrSignature == null) {
+                    constrSignature = AuxiliaryUtil.toUTF8(VMGenericsAndAnnotations.getSignature(vm_member_id)); // getting this method signature
+					if (constrSignature == null) {
+						genericParameterTypes = getParameterTypes();
+						return;
+					}
+				}
+				if (constrGenDecl == null) {
+                    constrGenDecl =  (InterimConstructorGenericDecl) Parser.parseSignature(constrSignature, SignatureKind.CONSTRUCTOR_SIGNATURE, (GenericDeclaration)startPoint); // GenericSignatureFormatError can be thrown here
+				}
+                InterimType[] methodParameters = constrGenDecl.methodParameters;
+				if (methodParameters == null) {
+					genericParameterTypes = new Type[0];
+					return;
+				}
+				int l = methodParameters.length;
+				genericParameterTypes = new Type[l];
+				for (int i = 0; i < l; i++) {
+                    if (methodParameters[i] instanceof InterimParameterizedType) {
+                        ParameterizedType pType = ParameterizedTypeRepository.findParameterizedType((InterimParameterizedType) methodParameters[i], ((InterimParameterizedType) methodParameters[i]).signature, startPoint);
+						if (pType == null) {
+							try {
+                                AuxiliaryFinder.findGenericClassDeclarationForParameterizedType((InterimParameterizedType) methodParameters[i], startPoint);
+							} catch(Throwable e) {
+                                throw new TypeNotPresentException(((InterimParameterizedType) methodParameters[i]).rawType.classTypeName.substring(1).replace('/', '.'), e);
+							}
+							//check the correspondence of the formal parameter number and the actual argument number:
+                            AuxiliaryChecker.checkArgsNumber((InterimParameterizedType) methodParameters[i], startPoint); // the MalformedParameterizedTypeException may raise here
+							try {
+                                pType = new ParameterizedTypeImpl(AuxiliaryCreator.createTypeArgs((InterimParameterizedType) methodParameters[i], startPoint), AuxiliaryCreator.createRawType((InterimParameterizedType) methodParameters[i], startPoint), AuxiliaryCreator.createOwnerType((InterimParameterizedType) methodParameters[i], startPoint));
+							} catch(ClassNotFoundException e) {
+								throw new TypeNotPresentException(e.getMessage(), e);
+							}
+                            ParameterizedTypeRepository.registerParameterizedType(pType, (InterimParameterizedType) methodParameters[i], ((InterimParameterizedType) methodParameters[i]).signature, startPoint);
+						}
+						genericParameterTypes[i] = (Type) pType; 
+                    } else if (methodParameters[i] instanceof InterimClassType) {
+						try {
+                            genericParameterTypes[i] = (Type) AuxiliaryLoader.ersatzLoader.findClass(((InterimClassType)methodParameters[i]).classTypeName.substring((((InterimClassType)methodParameters[i]).classTypeName.charAt(0)=='L'? 1 : 0)).replace('/', '.')); // XXX: should we propagate the class loader of initial user's request (Field.getGenericType()) or use this one?
+						} catch (ClassNotFoundException e) {
+                            throw new TypeNotPresentException(((InterimClassType)methodParameters[i]).classTypeName.substring((((InterimClassType)methodParameters[i]).classTypeName.charAt(0)=='L'? 1 : 0)).replace('/', '.'), e);
+						} catch (ExceptionInInitializerError e) {
+						} catch (LinkageError e) {
+						}
+                    } else if (methodParameters[i] instanceof InterimTypeVariable) {
+                        String tvName = ((InterimTypeVariable) methodParameters[i]).typeVariableName;
+                        TypeVariable variable = TypeVariableRepository.findTypeVariable(tvName, startPoint);
+						if (variable == null) {
+                            variable =  AuxiliaryFinder.findTypeVariable(tvName, startPoint);
+							if (variable == null) {
+								genericParameterTypes[i] = (Type) null;
+								continue;
+							}
+						}
+						genericParameterTypes[i] = (Type) variable;
+                    } else if (methodParameters[i] instanceof InterimGenericArrayType) {
+                        genericParameterTypes[i] = AuxiliaryCreator.createGenericArrayType((InterimGenericArrayType) methodParameters[i], startPoint); 
+					} else {
+						// Internal Error
+					}
+				}
             }
         }
 
-        /**
-         * initializes name 
-         */
-        public synchronized void initName() {
-            if (name == null) {
-                name = VMReflection.getName(id);
+        public Annotation[][] getParameterAnnotations() {
+            if (parameterAnnotations == null) {
+                parameterAnnotations = VMGenericsAndAnnotations
+                    .getParameterAnnotations(vm_member_id);
             }
+            return parameterAnnotations;
         }
 
         /**
          * initializes parameters
          */
-        public synchronized void initParameterTypes() {
+        public Class[] getParameterTypes() {
             if (parameterTypes == null) {
-                parameterTypes = VMReflection.getParameterTypes(id);
+                parameterTypes = VMReflection.getParameterTypes(vm_member_id);
+            }
+            return parameterTypes;
+        }
+
+        /**
+         * initializes type parameters
+         */
+		public synchronized void initTypeParameters() {
+			//So, here it can be only TypeVariable elements.
+            if (typeParameters == null) {
+				Object startPoint = Constructor.this;
+				if (constrSignature == null) {
+                    constrSignature = AuxiliaryUtil.toUTF8(VMGenericsAndAnnotations.getSignature(vm_member_id)); // getting this method signature
+					if (constrSignature == null) {
+						typeParameters =  new TypeVariable[0];
+						return;
+					}
+				}
+				if (constrGenDecl == null) {
+                    constrGenDecl =  (InterimConstructorGenericDecl) Parser.parseSignature(constrSignature, SignatureKind.CONSTRUCTOR_SIGNATURE, (GenericDeclaration)startPoint); // GenericSignatureFormatError can be thrown here
+				}
+                InterimTypeParameter[] pTypeParameters = constrGenDecl.typeParameters;
+				if (pTypeParameters == null) {
+					typeParameters =  new TypeVariable[0];
+					return;
+				}
+				int l = pTypeParameters.length;
+				typeParameters = new TypeVariable[l];
+				for (int i = 0; i < l; i++) {
+					String tvName = pTypeParameters[i].typeParameterName;
+                    TypeVariable variable = new TypeVariableImpl((GenericDeclaration)Constructor.this, tvName, constrGenDecl.typeParameters[i]);
+                    TypeVariableRepository.registerTypeVariable(variable, tvName, startPoint);
+					typeParameters[i] = variable;				
+				}
             }
         }
     }

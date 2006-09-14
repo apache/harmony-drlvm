@@ -81,7 +81,7 @@ jthread VMCALL jthread_iterator_next(jthread_iterator_t *it) {
  * 
  * @param[in] iterator
  */
-int32 VMCALL jthread_iterator_size(jthread_iterator_t iterator) {
+IDATA VMCALL jthread_iterator_size(jthread_iterator_t iterator) {
         jthread res;
         IDATA status;
         int count=0;

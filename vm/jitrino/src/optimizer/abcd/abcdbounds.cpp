@@ -414,7 +414,7 @@ VarBound::isConvexFunction() const {
         assert(mod.hasSignedModifier());
         if ((mod.getSignedModifier() == SignedOp) && ConstantFolder::isConstant(the_inst->getSrc(1)) ) {
                 return true;
-	}
+    }
     }
     return false;
 }
@@ -447,48 +447,48 @@ VarBound::getConvexInputBound(bool isLB, ConstBound outputBound,
                     // must be signed
                     switch (typetag) {
                     case Type::Int32: 
-                    	{
-	                        int32 bound = outputBound.getInt32();
-	                        if (the_inst->getShiftMaskModifier() == ShiftMask_Masked)
-	                            shiftBy = shiftBy & 31;
-	                        int32 input = bound << shiftBy;
-	                        if (!isLB) {
-	                            if (shiftBy < 31) {
-	                                input = input + ((int32(1) << shiftBy) - 1);
-	                            } else {
-	                                input = 0xffffffff;
-	                            }
-	                        }
-	                        if (bound < 0) {
-	                            input = input | 0x80000000;
-	                        } else {
-	                            input = input & 0x7fffffff;
-	                        }
-	                        inputVar = VarBound(inputOpnd);
-	                        return ConstBound(input);
-	                    } 
+                        {
+                            int32 bound = outputBound.getInt32();
+                            if (the_inst->getShiftMaskModifier() == ShiftMask_Masked)
+                                shiftBy = shiftBy & 31;
+                            int32 input = bound << shiftBy;
+                            if (!isLB) {
+                                if (shiftBy < 31) {
+                                    input = input + ((int32(1) << shiftBy) - 1);
+                                } else {
+                                    input = 0xffffffff;
+                                }
+                            }
+                            if (bound < 0) {
+                                input = input | 0x80000000;
+                            } else {
+                                input = input & 0x7fffffff;
+                            }
+                            inputVar = VarBound(inputOpnd);
+                            return ConstBound(input);
+                        } 
 
                     case Type::Int64: 
-                    	{
-	                        int64 bound = outputBound.getInt64();
-	                        if (the_inst->getShiftMaskModifier() == ShiftMask_Masked)
-	                            shiftBy = shiftBy & 63;
-	                        int64 input = bound << shiftBy;
-	                        if (!isLB) {
-	                            if (shiftBy < 64) {
-	                                input = input + ((int64(1) << shiftBy) - 1);
-	                            } else {
-	                                input = __INT64_C(0xffffffffffffffff);
-	                            }
-	                        }
-	                        if (bound < 0) {
-	                            input = input | __INT64_C(0x8000000000000000);
-	                        } else {
-	                            input = input & __INT64_C(0x7fffffffffffffff);
-	                        }
-	                        inputVar = VarBound(inputOpnd);
-	                        return ConstBound(input);
-	                    }
+                        {
+                            int64 bound = outputBound.getInt64();
+                            if (the_inst->getShiftMaskModifier() == ShiftMask_Masked)
+                                shiftBy = shiftBy & 63;
+                            int64 input = bound << shiftBy;
+                            if (!isLB) {
+                                if (shiftBy < 64) {
+                                    input = input + ((int64(1) << shiftBy) - 1);
+                                } else {
+                                    input = __INT64_C(0xffffffffffffffff);
+                                }
+                            }
+                            if (bound < 0) {
+                                input = input | __INT64_C(0x8000000000000000);
+                            } else {
+                                input = input & __INT64_C(0x7fffffffffffffff);
+                            }
+                            inputVar = VarBound(inputOpnd);
+                            return ConstBound(input);
+                        }
 
                     default:
                         break;
@@ -677,7 +677,7 @@ void PiBoundIter::setCurrent()
 #ifndef NDEBUG
                 Opnd *op0 = instr->getSrc(0);
 #endif
-				Opnd *op1 = constOpnd;
+                Opnd *op1 = constOpnd;
                 // now op1 should be constant
                 // I assume we've done folding first
                 assert(!getConstantOpnd(op0));

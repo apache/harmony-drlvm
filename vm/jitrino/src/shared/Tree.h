@@ -24,6 +24,9 @@
 #define _TREE_H_
 
 #include "PrintDotFile.h"
+#include "open/types.h"
+
+#include <assert.h>
 #include <string>
 
 namespace Jitrino {
@@ -116,8 +119,7 @@ public:
         if(child != NULL) {
             i = child->getHeight();
 
-            TreeNode *siblings = child->siblings;
-            while (siblings != NULL) {
+            for (TreeNode *siblings = child->siblings; siblings!=NULL; siblings = siblings->siblings) {
                 uint32 j = siblings->getHeight();
                 if(j > i) i = j;
             }
@@ -133,9 +135,20 @@ public:
             i += siblings->getCount();
         return i;
     }
+    
+    //return number of parents
+    uint32 getDepth() const {
+        return parent != NULL ? parent->getDepth() + 1 : 0; 
+    }
 
     uint32 getPreNum() const { return preNum; }
     uint32 getPostNum() const { return postNum; }
+
+    // Return true if this is a proper ancestor of n.
+    bool isAncestorOf(TreeNode* n) {
+        return (preNum < n->preNum) && (postNum > n->postNum); 
+    }
+
 protected:
     TreeNode* child;
     TreeNode* siblings;
@@ -155,6 +168,7 @@ public:
         PrintDotFile::printDotFile(mh,suffix);
     }
     virtual void printDotBody() {
+        if (root == NULL) return;
         root->printDotTreeNode(*os);
         //
         // lay out ranks
@@ -167,11 +181,11 @@ public:
         root->printIndentedNode(os, indentstr);
     }
 
-    uint32 getHeight() const { return root->getHeight(); }
-    uint32 getCount() const { return root->getCount(); }
+    uint32 getHeight() const { return root==NULL ? 0 : root->getHeight(); }
+    uint32 getCount() const { return root == NULL ? 0: root->getCount(); }
 
     // Return true if n1 is a proper ancestor of n2.
-    bool isAncestor(TreeNode* n1, TreeNode* n2) {
+    bool isAncestor(const TreeNode* n1, const TreeNode* n2) const {
         return (n1->preNum < n2->preNum) && (n1->postNum > n2->postNum); 
     }
 

@@ -128,7 +128,7 @@ public:
         uint16 slotFlags;
         SlotVar *vars;
         uint32 jsrLabelOffset;
-	SlotInfo() : type(0), varNumber(0), slotFlags(0), vars(0), jsrLabelOffset(0) {}
+        SlotInfo() : type(NULL), varNumber(0), slotFlags(0), vars(NULL), jsrLabelOffset(0){}
     };
 
     // remove all slots containing returnAddress for RET instruction with jsrNexOffset == offset
@@ -290,6 +290,7 @@ public:
         case Type::NullObject:
         case Type::SystemString:
         case Type::SystemObject:
+        case Type::SystemClass:
         case Type::CompressedArray:           
         case Type::CompressedObject:
         case Type::CompressedNullObject:
@@ -561,7 +562,7 @@ public:
             state = new (memManager) StateInfo();
             hashtable[offset] = state;
         }
-        if(Log::cat_fe()->isDebugEnabled()) {
+        if(Log::isEnabled()) {
             Log::out() << "CREATESTATE " <<(int)offset << " depth " << state->stackDepth << ::std::endl;
             printState(state);
         }
@@ -574,7 +575,7 @@ public:
     void  setStateInfoFromFinally(StateInfo *inState, uint32 offset);
 
     void restoreStateInfo(StateInfo *stateInfo, uint32 offset) {
-        if(Log::cat_fe()->isDebugEnabled()) {
+        if(Log::isEnabled()) {
             Log::out() << "INIT_STATE_FOR_BLOCK " <<(int)offset << " depth " << stateInfo->stackDepth << ::std::endl;
             printState(stateInfo);
         }
@@ -593,7 +594,7 @@ public:
                 for (CatchHandler *handler = block->getHandlers(); handler != NULL;
                      handler = handler->getNextHandler()) {
                     int cstart = handler->getBeginOffset();
-                    Log::cat_fe()->debug << "SETCATCHINFO "<<(int)cstart<<" "<<(int)prepass.getNumVars()<< ::std::endl;
+                    Log::out() << "SETCATCHINFO "<<(int)cstart<<" "<<(int)prepass.getNumVars()<< ::std::endl;
                     prepass.pushCatchLabel(cstart);
                     int stackDepth = stateInfo->stackDepth;
                     stateInfo->stackDepth = prepass.getNumVars();

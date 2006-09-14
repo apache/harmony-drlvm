@@ -35,7 +35,7 @@ Inst*    CSEHashTable::lookupKeyBase(CSEHashKey* key) {
     Inst* inst = (Inst*)hashTable.lookup(key);
     if (inst != NULL) {
         numCSE++;
-        if(Log::cat_opt()->isDebugEnabled()) {
+        if(Log::isEnabled()) {
             Log::out() << "***** CSEHashTable::Lookup succeeded: ";
             inst->print(Log::out());
             Log::out() << ::std::endl;

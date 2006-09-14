@@ -23,39 +23,38 @@
 #ifndef _IRMANAGER_H_
 #define _IRMANAGER_H_
 
+#include "JavaTranslator.h"
 #include "CompilationContext.h"
 #include "MemoryManager.h"
 #include "MemoryEstimates.h"
 #include "Opnd.h"
 #include "Inst.h"
-#include "FlowGraph.h"
 #include "VMInterface.h"
 #include "CGSupport.h"
+#include "JITInstanceContext.h"
+#include "ControlFlowGraph.h"
+#include "optimizer.h"
+#include "PMFAction.h"
 
 namespace Jitrino {
 
-class CodeProfiler;
 class MethodDesc;
 class TypeManager;
-class JitrinoParameterTable;
-class CompilationContext;
+class ProfilingInterface;
+class LoopTree;
 typedef StlHashMap<VarOpnd*, VarOpnd*> GCBasePointerMap;
 
 class IRManager {
 public:
     // Top-level IRManager
-    IRManager(CompilationInterface& compilationInterface, JitrinoParameterTable& parameterTable) 
+    IRManager(MemoryManager& mm, CompilationInterface& compilationInterface, OptimizerFlags& optFlags) 
         : _parent(0),
-          _memoryManagerBase(compilationInterface.getMethodToCompile()->getByteCodeSize()*
-                             ESTIMATED_MEMORY_PER_BYTECODE,
-                             "IRManager::memoryManager"),
-          _memoryManager(_memoryManagerBase),
+          _memoryManagerBase(mm),
+          _memoryManager(mm),
           _opndManager(*(new (_memoryManager) OpndManager(compilationInterface.getTypeManager(),_memoryManager))), 
           _instFactory(*(new (_memoryManager) InstFactory(_memoryManager,
                          *compilationInterface.getMethodToCompile()))), 
-          _flowGraph(*(new (_memoryManager) FlowGraph(_memoryManager,_instFactory,_opndManager))),
-          _dominatorTree(NULL),
-          _loopTree(NULL),
+          _flowGraph(*(new (_memoryManager) ControlFlowGraph(_memoryManager))),
           _inlinedReturnOpnd(0),
           _inlineOptPath(NULL),
           _gcBasePointerMap(*(new (_memoryManager) GCBasePointerMap(_memoryManager))),
@@ -66,26 +65,21 @@ public:
           _heatThreshold(0),
           _abort(false),
           _compilationInterface(compilationInterface),
-          _parameterTable(parameterTable),
-          _codeProfiler(NULL),
           _typeManager(compilationInterface.getTypeManager()), 
           _methodDesc(*compilationInterface.getMethodToCompile()),
-          _jsrEntryMap(NULL)
+          _jsrEntryMap(NULL),
+          _optFlags(optFlags)
     {
-        _flowGraph.setIRManager(this);
     }
 
-    // Nested IRManager for inlined region
-    IRManager(IRManager& containingIRManager, MethodDesc& regionMethodDesc, 
-              Opnd *returnOpnd) 
+    // Nested IRManager for inlined region. 
+    IRManager(MemoryManager& tmpMM, IRManager& containingIRManager, MethodDesc& regionMethodDesc, Opnd *returnOpnd) 
         : _parent(&containingIRManager),
-          _memoryManagerBase(0, "IRManager::memoryManagerBase"),
+          _memoryManagerBase(tmpMM),
           _memoryManager(containingIRManager.getMemoryManager()),
           _opndManager(containingIRManager.getOpndManager()), 
           _instFactory(containingIRManager.getInstFactory()), 
-          _flowGraph(*(new (_memoryManagerBase) FlowGraph(_memoryManager, _instFactory, _opndManager))),
-          _dominatorTree(NULL),
-          _loopTree(NULL),
+          _flowGraph(*(new (_memoryManagerBase) ControlFlowGraph(_memoryManager))),
           _inlinedReturnOpnd(returnOpnd),
           _inlineOptPath(_parent->getInlineOptPath()),
           _gcBasePointerMap(_memoryManagerBase),
@@ -96,21 +90,17 @@ public:
           _heatThreshold(containingIRManager.getHeatThreshold()),
           _abort(_parent->getAbort()),
           _compilationInterface(containingIRManager.getCompilationInterface()),
-          _parameterTable(containingIRManager.getParameterTable()),
-          _codeProfiler(NULL),
           _typeManager(_compilationInterface.getTypeManager()), 
           _methodDesc(regionMethodDesc),
-          _jsrEntryMap(NULL)
+          _jsrEntryMap(NULL),
+          _optFlags(containingIRManager._optFlags)
     {
-        _flowGraph.setIRManager(this);
     }
 
     // The compilation interface to the VM
     CompilationInterface&   getCompilationInterface() {return _compilationInterface;}
 
-    // The parameter table for the top-level method
-    JitrinoParameterTable&  getParameterTable() {return _parameterTable;}
-
+    
     // The memory manager for the top-level HIR
     MemoryManager&  getMemoryManager()  {return _memoryManager; }
 
@@ -131,15 +121,15 @@ public:
     InstFactory&    getInstFactory()    {return _instFactory;}
 
     // The flowgraph for this region
-    FlowGraph&      getFlowGraph()      {return _flowGraph;}
+    ControlFlowGraph&      getFlowGraph()      {return _flowGraph;}
 
     // The dominator tree for this region - may be NULL or invalid
-    DominatorTree*  getDominatorTree()  {return _dominatorTree;}
-    void            setDominatorTree(DominatorTree* tree) { _dominatorTree = tree; }
+    DominatorTree*  getDominatorTree()  {return getFlowGraph().getDominatorTree();}
+    void            setDominatorTree(DominatorTree* tree) { getFlowGraph().setDominatorTree(tree); }
 
     // The loop tree for this region - may be NULL or invalid    
-    LoopTree*       getLoopTree()       {return _loopTree;}
-    void            setLoopTree(LoopTree* tree) { _loopTree = tree; }
+    LoopTree*       getLoopTree()       {return getFlowGraph().getLoopTree();}
+    void            setLoopTree(LoopTree* tree) { getFlowGraph().setLoopTree(tree);}
 
     // The return operand for this region
     Opnd*           getReturnOpnd()     { return _inlinedReturnOpnd; }
@@ -167,10 +157,6 @@ public:
     // The minimum Instruction Id in this region.
     uint32          getMinimumInstId() { return _minRegionInstId; }
 
-    // The DPGO Code Profile
-    CodeProfiler*   getCodeProfiler()   {return _codeProfiler;}
-    void            setCodeProfiler(CodeProfiler* profiler) { _codeProfiler = profiler; }
-
     // The DPGO threshold for hotness - blocks with a execution count 
     // greater than this threshold should be considered hot
     double          getHeatThreshold()  {return _heatThreshold;}
@@ -190,15 +176,18 @@ public:
     // The HIR typechecker main entry point
     enum OptimizerPhase { OP_FrontEnd, OP_Optimizer };
 
-    CompilationContext* getCompilationContext()  {return getCompilationInterface().getCompilationContext();}
+    CompilationContext* getCompilationContext() {return getCompilationInterface().getCompilationContext();}
+    JITInstanceContext* getCurrentJITContext()  {return getCompilationContext()->getCurrentJITContext();}
+    ProfilingInterface* getProfilingInterface() {return getCurrentJITContext()->getProfilingInterface();}
+    const OptimizerFlags&     getOptimizerFlags() const {return _optFlags;}
 
 private:
     IRManager*       _parent;
-    MemoryManager    _memoryManagerBase;
+    MemoryManager&    _memoryManagerBase;
     MemoryManager&   _memoryManager;
     OpndManager&     _opndManager;
     InstFactory&     _instFactory;
-    FlowGraph&       _flowGraph;
+    ControlFlowGraph& _flowGraph;
     DominatorTree*   _dominatorTree;
     LoopTree*        _loopTree;
     Opnd*            _inlinedReturnOpnd;
@@ -212,11 +201,10 @@ private:
     bool             _abort;
 
     CompilationInterface&   _compilationInterface;
-    JitrinoParameterTable&  _parameterTable;
-    CodeProfiler*           _codeProfiler;
     TypeManager&            _typeManager;
     MethodDesc&             _methodDesc;
     JsrEntryInstToRetInstMap* _jsrEntryMap;
+    OptimizerFlags&          _optFlags;
 };
 
 /** MapHandler is auxilary class to eliminate direct usage of map hanlers between HLO and codegenerator */

@@ -1,0 +1,56 @@
+#EM configuration file for 'client' mode of Jitrino
+
+chains=chain1,chain2
+chain1.jits=JET_CLINIT
+chain2.jits=JET_DPGO,CD_OPT
+
+
+# JET_CLINIT compiles only <clinit> methods, all other methods compiled with JET_DPGO 
+# which does entry/backedge instrumentation
+
+chain1.filter=+::<clinit>
+chain1.filter=-
+
+JET_CLINIT.file=jitrino
+JET_DPGO.file=jitrino
+CD_OPT.file=jitrino
+
+#Confuguration of profile collector and recompilation
+JET_DPGO.genProfile=EB_PROF
+EB_PROF.profilerType=EB_PROFILER
+CD_OPT.useProfile=EB_PROF
+
+
+EB_PROF.mode=SYNC
+EB_PROF.entryThreshold=10000
+EB_PROF.backedgeThreshold=100000
+
+# these options are used only in ASYNC profiler mode
+#EB_PROF.tbsTimeout=5
+#EB_PROF.tbsInitialTimeout=0
+
+
+
+# Options to be passed to JIT
+
+-Djit.JET_CLINIT.path=
+-Djit.JET_DPGO.path=
+
+-Djit.CD_OPT.path=opt_init,translator,optimizer,hir2lir,codegen
+
+-Djit.CD_OPT.path.optimizer=ssa,devirt,inline,purge,simplify,uce,dce,lazyexc,memopt,simplify,uce,dce,lower,dessa,statprof,markglobals
+-Djit.CD_OPT.path.codegen=lock_method,bbp,gcpoints,cafl,dce1,i8l,early_prop,itrace-,native,constraints,dce2,regalloc,spillgen,layout,copy,rce+,stack,break-,iprof-,emitter!,si_insts,gcmap,info,unlock_method
+-Djit.CD_OPT.path.dce1=cg_dce
+-Djit.CD_OPT.path.dce2=cg_dce
+-Djit.CD_OPT.path.regalloc=bp_regalloc1,bp_regalloc2
+-Djit.CD_OPT.path.bp_regalloc1=bp_regalloc
+-Djit.CD_OPT.path.bp_regalloc2=bp_regalloc
+
+#inliner configuration
+-Djit.CD_OPT.CD_OPT_inliner_pipeline.filter=-
+-Djit.CD_OPT.CD_OPT_inliner_pipeline.path=ssa,devirt
+-Djit.CD_OPT.arg.optimizer.inline.pipeline=CD_OPT_inliner_pipeline
+
+-Djit.CD_OPT.arg.codegen.dce1.early=yes
+-Djit.CD_OPT.arg.codegen.regalloc.bp_regalloc1.regs=ALL_GP
+-Djit.CD_OPT.arg.codegen.regalloc.bp_regalloc2.regs=ALL_XMM

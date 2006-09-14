@@ -43,7 +43,7 @@ public:
     // The stub_name is for vtune support
     // Dump an ascii version of the compiled stub to stdout if dump_stub
     // If cs_stats is nonnull add the number of bytes of the compiled code to *cs_stats
-    NativeCodePtr compile(LilCodeStub* cs, const char* stub_name, bool dump_stub);
+    NativeCodePtr compile(LilCodeStub* cs);
 
 protected:
     LilCodeGenerator();
@@ -60,7 +60,7 @@ protected:
     // Each subclass of LilCodeGenerator should provide a platform-dependent
     // implementation of compile_main().  The memory area that holds the
     // compiled code should be allocated by calling allocate_memory().
-    virtual NativeCodePtr compile_main(LilCodeStub* cs, size_t* stub_size, const char *stub_name, bool dump_stub) = 0;
+    virtual NativeCodePtr compile_main(LilCodeStub* cs, size_t* stub_size) = 0;
 };
 
 #endif // _LIL_CODE_GENERATOR_H_

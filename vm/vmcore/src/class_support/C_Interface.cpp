@@ -13,10 +13,10 @@
  *  See the License for the specific language governing permissions and
  *  limitations under the License.
  */
-/** 
+/**
  * @author Intel, Alexei Fedotov
  * @version $Revision: 1.1.2.6.2.1.2.4 $
- */  
+ */
 
 #define LOG_DOMAIN "vm.core"
 #include "cxxlog.h"
@@ -171,7 +171,17 @@ Class_Handle field_get_class(Field_Handle f)
     return ((Field *)f)->get_class();
 } //field_get_class
 
+void field_get_track_access_flag(Field_Handle f, char** address,
+                                 char* mask)
+{
+    return ((Field *)f)->get_track_access_flag(address, mask);
+}
 
+void field_get_track_modification_flag(Field_Handle f, char** address,
+                                 char* mask)
+{
+    return ((Field *)f)->get_track_modification_flag(address, mask);
+}
 
 Boolean method_is_static(Method_Handle m)
 {
@@ -290,7 +300,7 @@ method_allocate_code_block(Method_Handle m,
 
     JIT *jit = (JIT *)j;
     assert(jit);
-    
+
     Byte *code_block = NULL;
     // the following method is safe to call from multiple threads
     code_block = (Byte *) method->allocate_code_block_mt(size, alignment, jit, heat, id, action);
@@ -516,7 +526,6 @@ char* class_get_java_name(Class_Handle ch)
     assert(ch);
     return class_get_java_name((Class *)ch, VM_Global_State::loader_env)->bytes;
 }
-
 unsigned class_get_flags(Class_Handle cl)
 {
     assert(cl);
@@ -544,7 +553,7 @@ int class_get_depth(Class_Handle cl)
 } //class_get_depth
 //#endif
 
-VMEXPORT 
+VMEXPORT
 Class_Handle vtable_get_class(VTable_Handle vh) {
     return vh->clss;
 }
@@ -579,6 +588,7 @@ Boolean class_has_non_default_finalizer(Class_Handle cl)
 Class_Handle class_get_super_class(Class_Handle cl)
 {
     assert(cl);
+//sundr    printf("class %p %p\n", cl, cl->super_class);
     return (Class_Handle)((Class *)cl)->super_class;
 } //class_get_super_class
 
@@ -650,6 +660,7 @@ Boolean class_hint_is_exceptiontype(Class_Handle ch)
         if(ch == exc_base_clss) {
             return TRUE;
         }
+        //sundr printf("class name before super: %s %p\n", ch->name->bytes, ch);
         ch = class_get_super_class(ch);
     }
     return FALSE;
@@ -707,7 +718,7 @@ Class_Handle class_get_class_of_primitive_type(VM_Data_Type typ)
         clss = NULL;    // ts07.09.02 - to allow star jit initialization
         break;
     default:
-        ABORT("Unknown vm data type");          // We need a better way to indicate an internal error 
+        ABORT("Unknown vm data type");          // We need a better way to indicate an internal error
     }
     return clss;
 } //class_get_class_of_primitive_type
@@ -722,7 +733,7 @@ VTable_Handle class_get_vtable(Class_Handle cl)
 const char *class_get_source_file_name(Class_Handle cl)
 {
     if (cl == 0) return 0;
-    if (  ((Class *)cl)->src_file_name == 0  ) 
+    if (  ((Class *)cl)->src_file_name == 0  )
         return 0;
     return ((Class *)cl)->src_file_name->bytes;
 } //class_get_source_file_name
@@ -755,7 +766,7 @@ const char *class_get_const_string(Class_Handle cl, unsigned index)
 
 
 // Returns the address where the interned version of the string is stored: this will be the address
-// of a slot containing a Java_java_lang_String* or a uint32 compressed reference. Also interns the 
+// of a slot containing a Java_java_lang_String* or a uint32 compressed reference. Also interns the
 // string so that the JIT can load a reference to the interned string without checking if it is null.
 void *class_get_const_string_intern_addr(Class_Handle cl, unsigned index)
 {
@@ -775,9 +786,11 @@ void *class_get_const_string_intern_addr(Class_Handle cl, unsigned index)
         // vm_instantiate_cp_string_resolved assumes that GC is disabled
         tmn_suspend_disable();
         // Discard the result. We are only interested in the side-effect of setting str->intern.
+        BEGIN_RAISE_AREA;
         vm_instantiate_cp_string_resolved(str);
+        END_RAISE_AREA;
         tmn_suspend_enable();
-        
+
     }
 
     if (env->compress_references) {
@@ -808,7 +821,7 @@ VM_Data_Type class_get_cp_field_type(Class_Handle src_class, unsigned short cp_i
     // TODO: check that cp_index is valid for src_class; assert for now
     assert(cp_index < ((Class*)src_class)->cp_size);
     assert(cp_is_fieldref(((Class*)src_class)->const_pool, cp_index));
-    
+
     char class_id = (class_get_cp_entry_signature(src_class, cp_index))[0];
     switch(class_id)
     {
@@ -865,7 +878,7 @@ Arg_List_Iterator method_get_argument_list(Method_Handle m)
 
 
 
-Class_Handle 
+Class_Handle
 vm_resolve_class(Compile_Handle h,
                   Class_Handle c,
                  unsigned index)
@@ -876,7 +889,7 @@ vm_resolve_class(Compile_Handle h,
 
 
 
-Class_Handle 
+Class_Handle
 vm_resolve_class_new(Compile_Handle h,
                      Class_Handle c,
                      unsigned index)
@@ -942,11 +955,7 @@ class_load_class_by_descriptor(const char *descr,
     case 'L':
         {
             int len = (int) strlen(descr);
-            //char *name = new char[len];
-            //memcpy(name, descr + 1, len - 2);
-            //name[len - 2] = 0;
             n = env->string_pool.lookup(descr + 1, len - 2);
-            //delete []name;
         }
         break;
     case 'B':
@@ -996,11 +1005,12 @@ Class_Handle class_find_loaded(ClassLoaderHandle loader, const char* name)
 
 Class_Handle class_find_class_from_loader(ClassLoaderHandle loader, const char* n, Boolean init)
 {
+    ASSERT_RAISE_AREA;
     assert(hythread_is_suspend_enabled()); // -salikh
     char *new_name = strdup(n);
     char *p = new_name;
     while (*p) {
-        if (*p == '.') *p = '/'; 
+        if (*p == '.') *p = '/';
         p++;
     }
     String* name = VM_Global_State::loader_env->string_pool.lookup(new_name);
@@ -1016,9 +1026,15 @@ Class_Handle class_find_class_from_loader(ClassLoaderHandle loader, const char* 
     if (!ch) return NULL;
     // All initialization from jni should not propagate exceptions and
     // should return to calling native method.
-    if(init) class_initialize_from_jni(ch);
+    if(init) {
+        class_initialize_from_jni(ch);
 
-    if(exn_get()) {
+        if (exn_raised()) {
+            return NULL;
+        }
+    }
+
+    if(exn_raised()) {
         return 0;
     }
 
@@ -1191,7 +1207,7 @@ Class_Handle method_get_throws(Method_Handle mh, unsigned idx)
     Class *c =
         class_loader->LoadVerifyAndPrepareClass(VM_Global_State::loader_env, exn_name);
     if (!c && !exn_raised()) {
-        exn_raise_only(class_loader->GetClassError(exn_name->bytes));
+        exn_raise_object(class_loader->GetClassError(exn_name->bytes));
     }
     return (Class_Handle)c;
 }
@@ -1333,6 +1349,14 @@ Class_Handle get_system_object_class()
 
 
 
+Class_Handle get_system_class_class()
+{
+    Global_Env *env = VM_Global_State::loader_env;
+    return env->JavaLangClass_Class;
+} //get_system_class_class
+
+
+
 Class_Handle get_system_string_class()
 {
     Global_Env *env = VM_Global_State::loader_env;
@@ -1441,12 +1465,10 @@ Boolean class_is_compact_field()
 }
 #endif
 
-// 20020220 TO DO:
-// 1. Add the is_enum field to the Java build of VM?
 Boolean class_is_enum(Class_Handle ch)
 {
     assert(ch);
-    return FALSE;
+    return ((ch->access_flags & ACC_ENUM) == 0) ? FALSE : TRUE;
 } //class_is_enum
 
 
@@ -1488,7 +1510,7 @@ static Class *class_get_array_of_primitive_type(VM_Data_Type typ)
     case VM_DATA_TYPE_INTPTR:
     case VM_DATA_TYPE_UINTPTR:
     default:
-        ABORT("Unexpected vm data type");          // We need a better way to indicate an internal error 
+        ABORT("Unexpected vm data type");          // We need a better way to indicate an internal error
         break;
     }
     return clss;
@@ -1503,7 +1525,7 @@ Class_Handle class_get_array_of_unboxed(Class_Handle ch)
         VM_Data_Type typ = class_get_primitive_type_of_class(ch);
         return class_get_array_of_primitive_type(typ);
     } else {
-        // 20020319 This should never happen for Java. 
+        // 20020319 This should never happen for Java.
         ABORT("The given class handle does not represent a primitive type");
         return 0;
     }
@@ -1761,7 +1783,7 @@ Class_Handle field_get_class_of_field_value(Field_Handle fh)
 {
     assert(hythread_is_suspend_enabled());
     assert(fh);
-    Class_Handle ch = class_load_class_by_descriptor(field_get_descriptor(fh), 
+    Class_Handle ch = class_load_class_by_descriptor(field_get_descriptor(fh),
                                           field_get_class(fh));
     if(!class_verify(VM_Global_State::loader_env, ch))
         return NULL;
@@ -1959,7 +1981,7 @@ Boolean type_info_is_unmanaged_pointer(Type_Info_Handle tih)
 
 Boolean type_info_is_void(Type_Info_Handle tih)
 {
-    TypeDesc* td = (TypeDesc*)tih;    
+    TypeDesc* td = (TypeDesc*)tih;
     assert(td);
     return td->get_kind()==K_Void;
 } //type_info_is_void
@@ -2014,6 +2036,10 @@ Class_Handle type_info_get_class(Type_Info_Handle tih)
 
 Managed_Object_Handle* type_info_get_loading_error(Type_Info_Handle tih) {
     TypeDesc* td = (TypeDesc*) tih;
+    if (td->is_vector()) {
+        Managed_Object_Handle* err = type_info_get_loading_error((Type_Info_Handle)td->get_element_type());
+        if (err) return err;
+    }
     const String* name = td->get_type_name();
     ClassLoader* cl = td->get_classloader();
     jthrowable ex = class_get_error(cl, name->bytes);
@@ -2135,7 +2161,7 @@ WeakReferenceType class_is_reference(Class_Handle clss)
 
 int class_get_referent_offset(Class_Handle ch)
 {
-    Field_Handle referent = 
+    Field_Handle referent =
         class_lookup_field_recursive(ch, "referent", "Ljava/lang/Object;");
     if (!referent) {
         DIE("Class " << class_get_name(ch) << " have no 'Object referent' field");
@@ -2163,7 +2189,7 @@ unsigned class_get_alignment_unboxed(Class_Handle ch)
 
 //
 // Returns the size of an element in the array class.
-// 
+//
 unsigned class_element_size(Class_Handle ch)
 {
     assert(ch);
@@ -2220,7 +2246,7 @@ Boolean method_is_require_security_object(Method_Handle mh)
 
 #define QUAL_NAME_BUFF_SIZE 128
 
-// Class ch is a subclass of method_get_class(mh).  The function returns a method handle 
+// Class ch is a subclass of method_get_class(mh).  The function returns a method handle
 // for an accessible method overriding mh in ch or in its closest superclass that overrides mh.
 // Class ch must be a class not an interface.
 Method_Handle method_find_overridden_method(Class_Handle ch, Method_Handle mh)
@@ -2428,14 +2454,14 @@ int vm_max_fast_instanceof_depth()
 
 
 ////////////////////////////////////////////////////////////////////////////////////
-// Direct call-related functions that allow a JIT to be notified whenever a VM data 
+// Direct call-related functions that allow a JIT to be notified whenever a VM data
 // structure changes that would require code patching or recompilation.
 ////////////////////////////////////////////////////////////////////////////////////
 
-// Called by a JIT in order to be notified whenever the given class (or any of its subclasses?) 
-// is extended. The callback_data pointer will be passed back to the JIT during the callback. 
+// Called by a JIT in order to be notified whenever the given class (or any of its subclasses?)
+// is extended. The callback_data pointer will be passed back to the JIT during the callback.
 // The callback function is JIT_extended_class_callback.
-void vm_register_jit_extended_class_callback(JIT_Handle jit, Class_Handle clss, 
+void vm_register_jit_extended_class_callback(JIT_Handle jit, Class_Handle clss,
                                               void *callback_data)
 {
     assert(clss);
@@ -2445,10 +2471,10 @@ void vm_register_jit_extended_class_callback(JIT_Handle jit, Class_Handle clss,
 } //vm_register_jit_extended_class_callback
 
 
-// Called by a JIT in order to be notified whenever the given method is overridden by a newly 
-// loaded class. The callback_data pointer will be passed back to the JIT during the callback.  
+// Called by a JIT in order to be notified whenever the given method is overridden by a newly
+// loaded class. The callback_data pointer will be passed back to the JIT during the callback.
 // The callback function is JIT_overridden_method_callback.
-void vm_register_jit_overridden_method_callback(JIT_Handle jit, Method_Handle method, 
+void vm_register_jit_overridden_method_callback(JIT_Handle jit, Method_Handle method,
                                                  void *callback_data)
 {
     assert(method);
@@ -2458,7 +2484,7 @@ void vm_register_jit_overridden_method_callback(JIT_Handle jit, Method_Handle me
 } //vm_register_jit_overridden_method_callback
 
 
-// Called by a JIT in order to be notified whenever the given method is recompiled or 
+// Called by a JIT in order to be notified whenever the given method is recompiled or
 // initially compiled. The callback_data pointer will be passed back to the JIT during the callback.
 // The callback method is JIT_recompiled_method_callback.
 void vm_register_jit_recompiled_method_callback(JIT_Handle jit, Method_Handle method,
@@ -2478,8 +2504,8 @@ void vm_patch_code_block(Byte *code_block, Byte *new_code, size_t size)
 
     // 20030203 We ensure that no thread is executing code that is simultaneously being patched.
     // We do this in part by stopping the other threads. This ensures that no thread will try to
-    // execute code while it is being patched. Also, we take advantage of restrictions on the 
-    // patches done by JIT on IPF: it replaces the branch offset in a single bundle containing 
+    // execute code while it is being patched. Also, we take advantage of restrictions on the
+    // patches done by JIT on IPF: it replaces the branch offset in a single bundle containing
     // a branch long. Note that this function does not synchronize the I- or D-caches.
 
     // Run through list of active threads and suspend the other ones.
@@ -2491,10 +2517,10 @@ void vm_patch_code_block(Byte *code_block, Byte *new_code, size_t size)
 } //vm_patch_code_block
 
 
-// Called by a JIT to have the VM recompile a method using the specified JIT. After 
-// recompilation, the corresponding vtable entries will be updated, and the necessary 
-// callbacks to JIT_recompiled_method_callback will be made. It is a requirement that 
-// the method has not already been compiled by the given JIT; this means that multiple 
+// Called by a JIT to have the VM recompile a method using the specified JIT. After
+// recompilation, the corresponding vtable entries will be updated, and the necessary
+// callbacks to JIT_recompiled_method_callback will be made. It is a requirement that
+// the method has not already been compiled by the given JIT; this means that multiple
 // instances of a JIT may need to be active at the same time. (See vm_clone_jit.)
 void vm_recompile_method(JIT_Handle jit, Method_Handle method)
 {
@@ -2606,7 +2632,7 @@ void method_iterator_advance(ChaMethodIterator *chaClassIterator)
         return;
 
     // Move the class iterator forward until a class is found that
-    // implements the method, such that the method handle's class 
+    // implements the method, such that the method handle's class
     // is equal to the current class of the iterator.
     Method *m = (Method *) chaClassIterator->_method;
     const String *name = m->get_name();
@@ -2639,4 +2665,49 @@ unsigned thread_get_suspend_request_offset() {
     //FIXME: 
     //return APR_OFFSETOF(VM_thread, suspend_request);
     return 0;
+}
+
+
+    //temporary: for EscapeAnalysis prototype
+unsigned thread_get_thread_state_flag_offset() { 
+    return 0;//APR_OFFSETOF(hythread_t, state);
+}
+
+
+
+void vm_properties_set_value(const char* name, const char* value) 
+{
+    PropertiesHandle ph = (PropertiesHandle)&VM_Global_State::loader_env->properties;
+    properties_set_string_property(ph, name, value);
+}
+
+// Create iterator for system properties.
+// All iterators created with this method call 
+// must be destroyed with vm_properties_iterator_destroy 
+PropertiesIteratorHandle vm_properties_iterator_create() {
+    PropertiesHandle ph = (PropertiesHandle)&VM_Global_State::loader_env->properties;
+    return properties_iterator_create(ph);
+}
+
+// Destroy iterator created by vm_properties_iterator_create
+void vm_properties_iterator_destroy(PropertiesIteratorHandle props_iter) {
+    PropertiesHandle ph = (PropertiesHandle)&VM_Global_State::loader_env->properties;
+    properties_iterator_destroy(ph, props_iter);
+}
+
+// Advance iterator to a next property.
+// Return false if no more properties left to iterate
+Boolean vm_properties_iterator_advance(PropertiesIteratorHandle props_iter) {
+    return properties_iterator_advance(props_iter);
+}
+
+// Return a name of the current property
+const char* vm_properties_get_name(PropertiesIteratorHandle props_iter) {
+    return properties_get_name(props_iter);
+
+}
+
+// Return a value of the current property
+const char* vm_properties_get_string_value(PropertiesIteratorHandle props_iter) {
+    return properties_get_string_value(props_iter);
 }

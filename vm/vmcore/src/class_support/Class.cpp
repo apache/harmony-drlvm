@@ -21,6 +21,8 @@
 #define LOG_DOMAIN "class"
 #include "cxxlog.h"
 
+#include <cctype>
+
 #include "Class.h"
 #include "environment.h"
 #include "lock_manager.h"
@@ -221,6 +223,11 @@ Method::Method()
 
     _line_number_table = NULL;
     _local_vars_table = NULL;
+    _num_param_annotations = 0;
+    _param_annotations = NULL;
+    _default_value = NULL;
+
+    pending_breakpoints = 0;
 } //Method::Method
 
 void Method::MethodClearInternals()
@@ -249,11 +256,11 @@ void Method::MethodClearInternals()
         _byte_codes = NULL;
     }
 
-    if (_local_vars_table != NULL)
+    /*if (_local_vars_table != NULL)
     {
         STD_FREE(_local_vars_table);
         _local_vars_table = NULL;
-    }
+    }*/
 
     if (_handlers != NULL)
     {
@@ -316,6 +323,7 @@ void Method::unlock()
 //
 ManagedObject *struct_Class_to_java_lang_Class(Class *clss)
 {
+//sundr    printf("struct to class %s, %p, %p\n", clss->name->bytes, clss, clss->super_class);
     assert(!hythread_is_suspend_enabled());
     assert(clss);
     ManagedObject** hjlc = clss->class_handle;
@@ -344,7 +352,7 @@ jobject struct_Class_to_java_lang_Class_Handle(Class *clss) {
     assert(*(clss->class_handle));
     ManagedObject* UNUSED jlc = *(clss->class_handle);
     assert(jlc->vt());
-    assert(jlc->vt()->clss == VM_Global_State::loader_env->JavaLangClass_Class);
+    //assert(jlc->vt()->clss == VM_Global_State::loader_env->JavaLangClass_Class);
   #ifndef NDEBUG
     // gc disabling was needed only to protect assertions
    tmn_suspend_enable_recursive();
@@ -463,17 +471,58 @@ jthrowable class_get_linking_error(Class* clss, unsigned index)
 
 String* class_get_java_name(Class* clss, Global_Env* env) 
 {
-    if (!clss->java_name) {
-        unsigned len = clss->name->len + 1;
-        char* name = (char*) STD_ALLOCA(len);
-        memcpy(name, clss->name->bytes, len);
-        for(char *p = name; *p; ++p) {
-            if (*p=='/') *p='.';
-        }
-        String* str = env->string_pool.lookup(name);
-        clss->java_name = str;
+    unsigned len = clss->name->len + 1;
+    char * name = (char*) STD_ALLOCA(len);
+    char * tmp_name = name;
+    memcpy(name, clss->name->bytes, len);
+    while (tmp_name = strchr(tmp_name, '/')) {
+        *tmp_name = '.';
+        ++tmp_name;
     }
-    return clss->java_name;
+    return VM_Global_State::loader_env->string_pool.lookup(name);
+}
+
+String* class_get_simple_name(Class* clss, Global_Env* env)
+{
+    if (!clss->simple_name) 
+    {
+        if (clss->is_array) 
+        {
+            String* simple_base_name = class_get_simple_name(clss->array_base_class, env);
+            unsigned len = simple_base_name->len;
+            unsigned dims = clss->n_dimensions;
+            char * buf = (char*)STD_ALLOCA(dims * 2 + len);
+            strcpy(buf, simple_base_name->bytes);
+            while (dims-- > 0) {
+                buf[len++] = '[';
+                buf[len++] = ']';
+            }
+            clss->simple_name = env->string_pool.lookup(buf, len);
+        } 
+        else 
+        {
+            const char* fn = clss->name->bytes;
+            const char* start;
+            if (clss->enclosing_class_index) 
+            {
+                const char* enclosing_name = const_pool_get_class_name(clss, 
+                    clss->enclosing_class_index);
+                start = fn + strlen(enclosing_name);
+                while (*start == '$' || isdigit(*start)) start++;
+            } 
+            else 
+            {
+                start = strrchr(fn, '/');
+            }
+
+            if (start) {
+                clss->simple_name = env->string_pool.lookup(start + 1);
+            } else {
+                clss->simple_name = const_cast<String*> (clss->name);
+            }
+        }
+    }
+    return clss->simple_name;
 }
 
 void vm_notify_live_object_class(Class_Handle clss)
@@ -659,7 +708,8 @@ class_register_methods(Class_Handle klass,
                 << klass->name->bytes << "." << name->bytes << desc->bytes);
 
             // raise an exception
-            exn_raise_by_name( "java/lang/NoSuchMethodError", error );
+            jthrowable exc_object = exn_create("java/lang/NoSuchMethodError", error);
+            exn_raise_object(exc_object);
             return true;
         }
     }

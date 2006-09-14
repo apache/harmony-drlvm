@@ -1,0 +1,188 @@
+/*
+ *  Copyright 2005-2006 The Apache Software Foundation or its licensors, as applicable.
+ *
+ *  Licensed under the Apache License, Version 2.0 (the "License");
+ *  you may not use this file except in compliance with the License.
+ *  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ *  Unless required by applicable law or agreed to in writing, software
+ *  distributed under the License is distributed on an "AS IS" BASIS,
+ *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ *  See the License for the specific language governing permissions and
+ *  limitations under the License.
+ */
+/**
+ * @author Vyacheslav P. Shakin
+ * @version $Revision$
+ */
+
+#include <fstream>
+#include "Stl.h"
+#include "Log.h"
+#include "Ia32IRManager.h"
+#include "Ia32Printer.h"
+
+namespace Jitrino
+{
+namespace Ia32
+{
+
+//========================================================================================
+// class EarlyPropagation
+//========================================================================================
+/**
+ *  class EarlyPropagation implements a simple algorithm of constant and copy propagation.
+ *  It works only with operands which have single defintions. 
+ *  In addition to constants it also propagates heap reads.
+ *  
+ *  The main goal of the pass is to reduce register pressure.
+ *  
+ */
+class EarlyPropagation : public SessionAction {
+
+    struct OpndInfo
+    {
+        uint32 defCount;
+        Inst * sourceInst;
+        uint32 sourceOpndId;
+        uint32 sourceOpndDefCountAtCopy;
+        OpndInfo()
+            :defCount(0), sourceInst(NULL), sourceOpndId(EmptyUint32), sourceOpndDefCountAtCopy(0){}
+    };
+    
+    void runImpl();
+    uint32 getNeedInfo()const{ return 0; }
+};
+
+static ActionFactory<EarlyPropagation> _early_prop("early_prop");
+
+//___________________________________________________________________________________________________
+void EarlyPropagation::runImpl()
+{ 
+        irManager->updateLoopInfo();
+        uint32 opndCount=irManager->getOpndCount();
+
+        MemoryManager mm(0x100 + sizeof(OpndInfo) * opndCount + sizeof(Opnd*) * opndCount, "early_prop");
+        OpndInfo * opndInfos = new(mm) OpndInfo[opndCount];
+        Node * currentLoopHeader = NULL;
+
+        bool anyInstHandled=false;
+
+        LoopTree* lt = irManager->getFlowGraph()->getLoopTree();
+        const Nodes& postOrdered = irManager->getFlowGraph()->getNodesPostOrder();
+        for (Nodes::const_reverse_iterator it = postOrdered.rbegin(), end = postOrdered.rend(); it!=end; ++it) {
+            Node * node=*it;
+            if (!node->isBlockNode())  {
+                continue;
+            }
+            Node * loopHeader = lt->getLoopHeader(node, false);
+            if (currentLoopHeader != loopHeader){
+                currentLoopHeader = loopHeader;
+                for (uint32 i = 0; i < opndCount; ++i)
+                    if (opndInfos[i].sourceOpndId != EmptyUint32)
+                        opndInfos[i].defCount++;
+            }
+
+            for (Inst * inst = (Inst*)node->getFirstInst(); inst != NULL; inst=inst->getNextInst()){
+                bool assignedOpndPropagated = false;
+                Inst::Opnds opnds(inst, Inst::OpndRole_All);
+                for (Inst::Opnds::iterator it = opnds.begin(); it != opnds.end(); it = opnds.next(it)){
+                    Opnd * opnd=inst->getOpnd(it);
+                    uint32 roles=inst->getOpndRoles(it);
+                    uint32 opndId = opnd->getId();
+                    OpndInfo& opndInfo = opndInfos[opndId];
+
+                    uint32 mask = 0;
+
+                    if (roles & Inst::OpndRole_Def){
+                        ++opndInfo.defCount;
+                    }else if (roles & Inst::OpndRole_Use){
+                        if (opndInfo.sourceOpndId != EmptyUint32){
+                            if (opndInfo.sourceOpndDefCountAtCopy < opndInfos[opndInfo.sourceOpndId].defCount)
+                                opndInfo.sourceOpndId = EmptyUint32;
+                            else{
+                                Opnd * srcOpnd = irManager->getOpnd(opndInfo.sourceOpndId);
+                                Constraint co = srcOpnd->getConstraint(Opnd::ConstraintKind_Location);
+                                if (co.getKind() == OpndKind_Mem){
+                                    mask = (1<<it)-1;
+                                    if ((roles & Inst::OpndRole_Explicit) == 0 ||
+                                        inst->hasKind(Inst::Kind_PseudoInst) || irManager->isGCSafePoint(inst) ||
+                                        opndInfo.sourceInst != inst->getPrevInst() || assignedOpndPropagated ||
+                                    (inst->getConstraint(it, mask, co.getSize())&co).isNull()
+                                    )
+                                        opndInfo.sourceOpndId = EmptyUint32;
+                                    assignedOpndPropagated = true;
+                                }
+                            }
+                        }
+                    }
+                    if (opndInfo.defCount > 1){
+                        opndInfo.sourceOpndId = EmptyUint32;
+                    }
+                }
+                bool isCopy = inst->getMnemonic() == Mnemonic_MOV ||(
+                        (inst->getMnemonic() == Mnemonic_ADD || inst->getMnemonic() == Mnemonic_SUB) && 
+                        inst->getOpnd(3)->isPlacedIn(OpndKind_Imm) && inst->getOpnd(3)->getImmValue()==0
+                        && inst->getOpnd(3)->getRuntimeInfo()==NULL
+                    );
+
+                if (isCopy){ // CopyPseudoInst or mov
+                    Opnd * defOpnd = inst->getOpnd(0);
+                    Opnd * srcOpnd = inst->getOpnd(1);
+                    uint32 defOpndId = defOpnd->getId();
+                    OpndInfo * opndInfo = opndInfos + defOpndId;
+                    bool instHandled=false;
+                    if (opndInfo->defCount == 1 && ! srcOpnd->isPlacedIn(OpndKind_Reg)){
+                        if (!defOpnd->hasAssignedPhysicalLocation()){
+                            opndInfo->sourceInst = inst;
+                            opndInfo->sourceOpndId = srcOpnd->getId();
+                            instHandled=true;
+                        }
+                    }
+                    if (instHandled){
+                        if (opndInfos[opndInfo->sourceOpndId].sourceOpndId != EmptyUint32)
+                            opndInfo->sourceOpndId = opndInfos[opndInfo->sourceOpndId].sourceOpndId;
+                        opndInfo->sourceOpndDefCountAtCopy = opndInfos[opndInfo->sourceOpndId].defCount;
+                        anyInstHandled=true;
+                    }
+                }
+            }
+        }
+
+        if (anyInstHandled){
+            Opnd ** replacements = new(mm) Opnd* [opndCount];
+            memset(replacements, 0, sizeof(Opnd*) * opndCount);
+            bool hasReplacements = false;
+            for (uint32 i = 0; i < opndCount; ++i){
+                if (opndInfos[i].sourceOpndId != EmptyUint32){
+                    Inst * inst = opndInfos[i].sourceInst;
+                    if (inst !=NULL){
+                        inst->unlink();
+                    }
+                    if (opndInfos[i].sourceOpndId != i){
+                        replacements[i] = irManager->getOpnd(opndInfos[i].sourceOpndId);
+                        hasReplacements = true;
+                    }
+                }
+            }
+
+            if (hasReplacements){
+                const Nodes& postOrdered = irManager->getFlowGraph()->getNodesPostOrder();
+                for (Nodes::const_reverse_iterator it = postOrdered.rbegin(), end = postOrdered.rend(); it!=end; ++it) {
+                    Node * node=*it;
+                    if (!node->isBlockNode())  {
+                        continue;
+                    }
+                    for (Inst * inst = (Inst*)node->getFirstInst(); inst != NULL; inst=inst->getNextInst()){
+                        inst->replaceOpnds(replacements);
+                    }   
+                }
+            }
+        }
+}
+
+
+}}
+

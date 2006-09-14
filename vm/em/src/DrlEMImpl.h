@@ -96,18 +96,20 @@ public:
 
     virtual bool needTbsThreadSupport() const;
     virtual void tbsTimeout();
-	virtual int getTbsTimeout() const;
+    virtual int getTbsTimeout() const;
 
 //EM PC access interface
     ProfileCollector* getProfileCollector(EM_PCTYPE type, JIT_Handle jh, EM_JIT_PC_Role jitRole) const;
 
 private:
     void initProfileAccess();
+    std::string readConfiguration();
     void buildChains(std::string& config);
     bool initJIT(const std::string& libName, apr_dso_handle_t* libHandle, RStep& step);
     bool initProfileCollectors(RChain* chain, const std::string& config);
     ProfileCollector* createProfileCollector(const std::string& profilerName, const std::string& config, RStep* step);
     ProfileCollector* getProfileCollector(const std::string& name) const;
+    std::string getJITLibFromCmdLine(const std::string& jitName) const;
 
     void deallocateResources();
     
@@ -115,6 +117,7 @@ private:
     JIT_Handle jh;
     void (*_execute_method) (JIT_Handle jit, jmethodID method, jvalue *return_value, jvalue *args);
     bool interpreterMode;
+    bool jitTiMode;
     RChains chains;
     size_t nMethodsCompiled, nMethodsRecompiled;
     

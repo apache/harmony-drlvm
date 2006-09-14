@@ -53,12 +53,8 @@ TypeDesc* type_desc_create_from_java_descriptor(const char* d, ClassLoader* load
                 en++;
             }
             unsigned len = (unsigned)(en-sn);
-            char* name = (char*)STD_MALLOC(len+1);
-            memcpy( name, sn, len );
-            name[len] = '\0';
-            
-            String* str = env->string_pool.lookup(name);
-            STD_FREE(name);
+            String* str = env->string_pool.lookup(sn, len);
+
             assert(loader);
             loader->LockTypesCache();
             TypeDesc** tdres = loader->GetJavaTypes()->Lookup(str);

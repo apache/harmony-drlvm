@@ -13,19 +13,23 @@
  *  See the License for the specific language governing permissions and
  *  limitations under the License.
  */
+
 /** 
  * @author Intel, Pavel Afremov
- * @version $Revision: 1.1.2.2.4.3 $
+ * @version $Revision$
  */  
-
 
 #define LOG_DOMAIN "port.old"
 #include "cxxlog.h"
 
+#include <ostream.h>
+#include <pthread.h>
+#include <signal.h>
 #include <assert.h>
 
-#include <ostream>
 using namespace std;
+
+#include "open/types.h"
 #include "jit_intf_cpp.h"
 #include "m2n.h"
 #include "m2n_ipf_internal.h"
@@ -33,21 +37,12 @@ using namespace std;
 #include "nogc.h"
 #include "vm_ipf.h"
 #include "vm_threads.h"
-#include "vm_stats.h"
-#include "open/types.h"
 #include "stack_iterator.h"
 #include "stub_code_utils.h"
 #include "root_set_enum_internal.h"
 
-
-
-#include <pthread.h>
-#include <signal.h>
-
-#ifndef NDEBUG
 #include "dump.h"
-extern bool dump_stubs;
-#endif
+#include "vm_stats.h"
 
 // Invariants:
 //   Note that callee saves and stacked registers below means both the pointers and the corresponding nat bits in nats_lo and nats_hi
@@ -138,7 +133,7 @@ static void si_setup_stacked_registers(StackIterator* si)
 static void si_unwind_from_m2n(StackIterator* si)
 {
 #ifdef VM_STATS
-    vm_stats_total.num_unwind_native_frames_all++;
+    VM_Statistic::get_vm_stats().num_unwind_native_frames_all++;
 #endif
     // First setup the stack registers for the m2n frame
     si->bsp = m2n_get_bsp(si->m2nfl);
@@ -318,10 +313,8 @@ static transfer_control_stub_type gen_transfer_control_stub()
     flush_hw_cache((Byte*)fp.addr, stub_size);
     sync_i_cache();
 
-#ifndef NDEBUG
-    if (dump_stubs)
-        dump((char *)fp.addr, "transfer_control_stub (non-LIL)", stub_size);
-#endif
+    DUMP_STUB(fp.addr, "transfer_control_stub (non-LIL)", stub_size);
+
     fp.gp = get_vm_gp_value();
 
     return (transfer_control_stub_type)&fp;
@@ -332,7 +325,7 @@ static transfer_control_stub_type gen_transfer_control_stub()
 
 StackIterator* si_create_from_native()
 {
-    tmn_suspend_disable_recursive();
+    hythread_suspend_disable();
     // Allocate iterator
     StackIterator* res = (StackIterator*)STD_MALLOC(sizeof(StackIterator));
     assert(res);
@@ -347,7 +340,7 @@ StackIterator* si_create_from_native()
     res->m2nfl = m2n_get_last_frame();
     res->ip = 0;
     res->c.p_eip = &res->ip;
-    tmn_suspend_enable_recursive();
+    hythread_suspend_enable();
     return res;
 }
 
@@ -365,43 +358,46 @@ StackIterator* si_create_from_native(VM_thread* thread)
     } else {
         assert(thread->suspend_request > 0);
 
-        TRACE2("SIGNALLING", "thread state before " << thread << " " << thread->t[0] << " " <<  thread->t[1] << " " << thread->suspended_state);
-        //if (thread->suspended_state == NOT_SUSPENDED)
-         {
-            TRACE2("SIGNALLING", "sending SIGUSR2 to thread " << thread);
-            assert(thread->thread_id != 0);
-
-            if (sem_init(&thread->suspend_self, 0, 0) != 0) {
-                 DIE("sem_init() failed" <<  strerror(errno));
-            }
+        TRACE2("SIGNALLING", "thread state before " << thread << " " <<
+            thread->t[0] << " " << thread->t[1] << " " << thread->suspended_state);
+        //if (thread->suspended_state == NOT_SUSPENDED) {
+        TRACE2("SIGNALLING", "sending SIGUSR2 to thread " << thread);
+        assert(thread->thread_id != 0);
+        
+        if (sem_init(&thread->suspend_self, 0, 0) != 0) {
+            DIE("sem_init() failed" <<  strerror(errno));
+        }
         
         thread->t[0] = NOT_VALID;
         thread->t[1] = NOT_VALID;
+        
+        TRACE2("SIGNALLING", "BEFORE KILL thread = " << thread << " killing " << thread->thread_id);
 
-            TRACE2("SIGNALLING", "BEFORE KILL thread = " << thread << " killing " << thread->thread_id);
         if (pthread_kill(thread->thread_id, SIGUSR2) != 0) {
             DIE("pthread_kill(" << thread->thread_id << ", SIGUSR2) failed :" << strerror(errno));
-            }
-            si_reload_registers();
-            TRACE2("SIGNALLING", "BEFORE WAIT thread = " << thread);
-            int ret;
-            do
-            {
-                ret = sem_wait(&thread->suspend_self);
-                TRACE2("SIGNALLING", "sem_wait " << (&thread->suspend_self) <<
-                    " exited, errno = " << errno);
-            }
-            while((ret != 0) && (errno == EINTR));
-            TRACE2("SIGNALLING", "AFTER WAIT thread = " << thread);
-            sem_destroy(&thread->suspend_self);
+        }
+        
+        si_reload_registers();
+        
+        TRACE2("SIGNALLING", "BEFORE WAIT thread = " << thread);
+        
+        int ret;
+        do {
+            ret = sem_wait(&thread->suspend_self);
+            TRACE2("SIGNALLING", "sem_wait " << (&thread->suspend_self) <<
+                " exited, errno = " << errno);
+        } while((ret != 0) && (errno == EINTR));
+        
+        TRACE2("SIGNALLING", "AFTER WAIT thread = " << thread);
+        
+        sem_destroy(&thread->suspend_self);
         assert(thread->suspended_state == SUSPENDED_IN_SIGNAL_HANDLER);
         thread->suspended_state = NOT_SUSPENDED;
-       // assert(thread->t[0] != NOT_VALID);
-       // assert(thread->t[1] != NOT_VALID);
-
-        }
-        TRACE2("SIGNALLING", "thread state after " << thread << " " << thread->t[0] << " " <<  thread->t[1] << " " << m2n_get_last_frame(thread));
-}
+        // assert(thread->t[0] != NOT_VALID);
+        // assert(thread->t[1] != NOT_VALID);
+    }
+    
+    TRACE2("SIGNALLING", "thread state after " << thread << " " << thread->t[0] << " " <<  thread->t[1] << " " << m2n_get_last_frame(thread));
 
     TRACE2("SIGNALLING", "stack iterator: create from native, rnat, bsp/bspstore " << thread->t[0] << " " <<  thread->t[1]);
 
@@ -427,13 +423,13 @@ StackIterator* si_create_from_native(VM_thread* thread)
 
 // Get the bspstore and rnat values of another thread from the OS.
 // Hopefully this will also flush the RSE of the other stack enough for our purposes.
-static void get_bsp_and_rnat_from_os(VM_thread* p_thr, uint64** bspstore, uint64* rnat)
-{
-    VmRegisterContext context;
-    context.setFlag(VmRegisterContext::CF_FloatingPoint);
-    context.setFlag(VmRegisterContext::CF_Integer);
-    context.setFlag(VmRegisterContext::CF_Control);
-    context.getBspAndRnat(p_thr, bspstore, rnat);
+static void get_bsp_and_rnat_from_os(VM_thread * thread, uint64 ** bspstore, uint64 * rnat) {
+    CONTEXT ctx;
+    ctx.ContextFlags |= CONTEXT_INTEGER;
+    BOOL UNREF stat = GetThreadContext(thread->thread_handle, &ctx));
+    assert(stat);
+    *bspstore = (uint64*)ctx.RsBSPSTORE;
+    *rnat = ctx->RsRNAT;
 }
 
 StackIterator* si_create_from_native(VM_thread* thread)
@@ -462,7 +458,7 @@ StackIterator* si_create_from_native(VM_thread* thread)
 }
 
 #else
-#error
+#error Stack iterator is not implemented for the given platform
 #endif
 
 // On IPF stack iterators must be created from threads (suspended) in native code.

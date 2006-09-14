@@ -22,6 +22,7 @@
 
 #include "enc_base.h"
 
+ENCODER_NAMESPACE_START
 /*
  * @file
  * @brief Contains some definitions/constants and other stuff used by the
@@ -149,6 +150,11 @@ enum OpcodeByteKind {
     #define RDX     { OpndKind_GPReg, OpndSize_64, RegName_RDX }
 #endif
 
+#define EDI         {OpndKind_GPReg, OpndSize_32, RegName_EDI}
+#ifdef _EM64T_
+    #define RDI     { OpndKind_GPReg, OpndSize_64, RegName_RDI }
+#endif
+
 #define r8          {OpndKind_GPReg, OpndSize_8, RegName_Null}
 #define r16         {OpndKind_GPReg, OpndSize_16, RegName_Null}
 #define r32         {OpndKind_GPReg, OpndSize_32, RegName_Null}
@@ -202,7 +208,6 @@ enum OpcodeByteKind {
 
 #endif
 
-#ifdef _EM64T_
 /** 
  * @brief Represents the REX part of instruction.
  */
@@ -214,7 +219,6 @@ struct  Rex {
     unsigned char dummy : 4;        // must be '0100'b
     unsigned int  :24;
 };
-#endif
 
 /** 
  * @brief Describes SIB (scale,index,base) byte.
@@ -251,36 +255,58 @@ struct OpcodeInfo {
 };
 
 /**
-* @see same structure as EncoderBase::MnemonicDesc, but carries MnemonicInfo::OpcodeInfo[] 
-* instead of OpcodeDesc[].
-* Only used during prebuilding the encoding tables, thus it's hidden under 
-* the appropriate define.
+ * @defgroup MF_ Mnemonic flags
 */
+
+    /**
+ * Operation has no special properties.
+    */ 
+#define MF_NONE             (0x00000000)
+    /**
+ * Operation affects flags
+    */
+#define MF_AFFECTS_FLAGS    (0x00000001)
+    /**
+ * Operation uses flags - conditional operations, ADC/SBB/ETC
+    */
+#define MF_USES_FLAGS       (0x00000002)
+    /**
+ * Operation is conditional - MOVcc/SETcc/Jcc/ETC
+    */
+#define MF_CONDITIONAL      (0x00000004)
+/**
+ * Operation is symmetric - its args can be swapped (ADD/MUL/etc).
+ */
+#define MF_SYMMETRIC        (0x00000008)
+/**
+ * Operation is XOR-like - XOR, SUB - operations of 'arg,arg' is pure def, 
+ * without use.
+ */
+#define MF_SAME_ARG_NO_USE  (0x00000010)
+
+///@} // ~MNF
+
+/**
+ * @see same structure as EncoderBase::MnemonicDesc, but carries 
+ * MnemonicInfo::OpcodeInfo[] instead of OpcodeDesc[].
+ * Only used during prebuilding the encoding tables, thus it's hidden under 
+ * the appropriate define.
+ */
 struct MnemonicInfo {
     /**
     * The mnemonic itself
     */ 
-    Mnemonic                                mn;
+    Mnemonic    mn;
     /**
-    * true if the operation affects flags
-    */
-    bool                                    affectsFlags;
-    /**
-    * true if the operation analyzes flags - conditional operations, ADC/SBB/ETC
-    */
-    bool                                    usesFlags;
-    /**
-    * true if the operation is conditional - MOVcc/SETcc/Jcc/ETC
-    */
-    bool                                    conditional;
-    /**
-     * true if operation is symmetric - its args can be swapped (ADD/MUL/etc).
+     * Various characteristics of mnemonic.
+     * @see MF_
      */
-    bool                                    symmetric;
+    unsigned    flags;
     /**
-     * Number of args/des/uses/roles for the operation. For the operations which 
-     * may use different number of operands (i.e. IMUL/SHL) use the most common
-     * value, or leave '0' if you are sure this info is not required.
+     * Number of args/des/uses/roles for the operation. For the operations 
+     * which may use different number of operands (i.e. IMUL/SHL) use the 
+     * most common value, or leave '0' if you are sure this info is not 
+     * required.
      */
     EncoderBase::OpndRolesDesc              roles;
     /**
@@ -289,13 +315,14 @@ struct MnemonicInfo {
     const char *                            name;
     /**
      * Array of opcodes.
-     * The terminating opcode description always have OpcodeByteKind_LAST at 
-     * the opcodes[i].opcode[0].
+     * The terminating opcode description always have OpcodeByteKind_LAST
+     * at the opcodes[i].opcode[0].
      * The size of '20' has nothing behind it, just counted the max 
      * number of opcodes currently used.
      */
     OpcodeInfo                              opcodes[20];
 };
 
+ENCODER_NAMESPACE_END
 
 #endif  // ~__ENC_PRVT_H_INCLUDED__

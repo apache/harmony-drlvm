@@ -14,16 +14,13 @@
  *  limitations under the License.
  */
 /**
- * @author Alexander V. Astapchuk
- * @version $Revision: 1.3.12.3.4.4 $
+ * @author Alexander Astapchuk
+ * @version $Revision$
  */
  
 /**
  * @file
- * @brief Common definitions used across the Jitrino.JET.
- * 
- * Contains common definitions used across the Jitrino.JET - VM types, some 
- * constants and related data and methods.
+ * @brief Common definitions and constants used across the Jitrino.JET.
  */
  
 #if !defined(__JDEFS_H_INCLUDED__)
@@ -33,29 +30,89 @@
 #include "open/bytecodes.h"
 #include <assert.h>
 #include <climits>
+#include <string.h>
+
+//
+// This file is normally included (explicitly or not) in all .jet files,
+// so here are some project-wide definitions.
+//
+
+// PROJECT_JET (standalone version of Jitrino.JET) implies JET_PROTO. 
+#if defined(PROJECT_JET) && !defined(JET_PROTO)
+    #define JET_PROTO 1
+#endif
+
+// _DEBUG also implies JET_PROTO. 
+#if defined(_DEBUG) && !defined(JET_PROTO)
+    #define JET_PROTO 1
+#endif
 
 /**
- * @def MAX_REGS
- * @brief maximum number of registers (of any kind) available on the current 
- *        platform.
+ * JET_PROTO - turns on debugging, tracing and experimental features that 
+ * are normally out of production build.
+ *
+ * JET_PROTO at least implies logging (JIT_LOGS), statistics collection 
+ * (JIT_STATS) and various tracings (JIT_TRACE - XXX used ?).
  */
-#define MAX_REGS    8 // todo: move to encoder
+#ifdef JET_PROTO
+    #if !defined(JIT_LOGS)
+        #define JIT_LOGS
+    #endif
+    #if !defined(JIT_STATS)
+        #define JIT_STATS
+    #endif
+    #if !defined(JIT_TRACE)
+        #define JIT_TRACE
+    #endif
+#endif
 
-
-namespace Jitrino {
-namespace Jet {
-
-#ifdef PLATFORM_POSIX
+#ifdef _WIN32
+    #define stdcall__
     /**
      * @brief Defines int64 constant.
      */
-    #define MK_I64(a)   ((jlong)(a ## LL))
-#else
     #define MK_I64(a)   ((jlong)(a ## L))
     #define snprintf    _snprintf
     #define vsnprintf    _vsnprintf
+    #ifndef strcasecmp
+        #define strcasecmp  stricmp
+    #endif
+#else
+    // stdcall has no meaning on platforms other than Lin32
+    #undef stdcall__
+    #if defined(_IA32_) && !defined(stdcall__)
+        #define stdcall__    __attribute__ ((__stdcall__))
+    #else
+    #define stdcall__
+    #endif
+    #define __stdcall
+    #define MK_I64(a)   ((jlong)(a ## LL))
+#endif
+//
+// gcc def on EM64T
+#if defined(__x86_64__) && !defined(_EM64T_)
+    #define _EM64T_  1
+    #undef  _IA32_
 #endif
 
+#if defined(__i386__) && !defined(_IA32_)
+    #undef  _EM64T_
+    #define _IA32_ 1
+#endif
+
+#if !defined(_EM64T_) && !defined(_IPF_) && !defined(_IA32_)
+    // presuming we're working on ia-32
+    #define _IA32_ 1
+#endif
+
+
+/**
+ * @brief Number of elements in array.
+ */
+#define COUNTOF(a) (sizeof(a)/sizeof(a[0]))
+
+namespace Jitrino {
+namespace Jet {
 
 // Nothing (?) portable is defined by lib.c.limits for 64bit integers, thus 
 // declaring our own.
@@ -84,6 +141,22 @@ typedef long long   jlong;
 #define NOTHING                   (~(unsigned)0)
 
 /**
+ * @brief Tests whether the value fits into 8 bits.
+ */
+inline bool fits_i8(int val)
+{
+    return (CHAR_MIN <= val && val <= CHAR_MAX);
+}
+
+/**
+ * @brief Tests whether the value fits into 16 bits.
+ */
+inline bool fits_i16(int val)
+{
+    return (SHRT_MIN <= val && val <= SHRT_MAX);
+}
+
+/**
  * @brief Extracts lower 32 bits from the given 64 bits value.
  */
 inline int lo32(jlong jl) { return (int)(jl & 0xFFFFFFFF); };
@@ -94,9 +167,14 @@ inline int lo32(jlong jl) { return (int)(jl & 0xFFFFFFFF); };
 inline int hi32(jlong jl) { return (int)(jl>>32); };
 
 /**
+ * @brief Composes a 64bit value from 2 32 bit values.
+ */
+inline jlong mk_i64(int hi, int lo) { return ((jlong)hi)<<32 | lo; };
+
+/*
  * @brief Size of the platform's machine word, in bits.
  */
-const unsigned WORD_SIZE = sizeof(long)*CHAR_BIT;
+const unsigned WORD_SIZE = sizeof(unsigned)*CHAR_BIT;
 
 /**
  * @brief Returns word index for a given index in bit array.
@@ -116,17 +194,14 @@ inline unsigned bit_no(unsigned idx)
 /**
  * @brief Returns number of words needed to store the given number of bits.
  */
-inline unsigned words(unsigned num)
-{
-    return (num+WORD_SIZE-1)/WORD_SIZE;
-}
+#define words(num)  ((num+WORD_SIZE-1)/WORD_SIZE)
 
 /**
  * @brief Sets a bit in the bit array at the specified position.
  * @param p - pointer the the bit array
  * @param idx - index of the bit
  */
-inline void set(long * p, unsigned idx)
+inline void set(unsigned * p, unsigned idx)
 {
     p[ word_no(idx) ] |= 1<<bit_no(idx);
 }
@@ -136,7 +211,7 @@ inline void set(long * p, unsigned idx)
  * @param p - pointer the the bit array
  * @param idx - index of the bit
  */
-inline void clr(long * p, unsigned idx)
+inline void clr(unsigned * p, unsigned idx)
 {
     p[ word_no(idx) ] &= ~(1<<bit_no(idx));
 }
@@ -147,61 +222,27 @@ inline void clr(long * p, unsigned idx)
  * @param idx - index of the bit
  * @return \b true if the bit set, \b false otherwise
  */
-inline bool tst(const long * p, unsigned idx)
+inline bool tst(const unsigned * p, unsigned idx)
 {
     return 0 != (p[word_no(idx)] & (1<<bit_no(idx)));
 }
 
 /**
- * @defgroup JITRINO_JET_MEM_TRANSF_FLAGS Flags that control spill to and \
- *           uploading from memory.
- * 
- * A bunch of flags controlling \link Jitrino::Jet::Compiler::gen_mem a 
- * function \endlink which generates unloading and uploading of registers 
- * to/from the memory.
+ * @brief Converts string to bool.
  *
- * @{
+ * The following strings (case-insensitive) are considered as \c true:
+ * on, true, t, yes, y. Any other means \c false.
  */
-
-/**
- * @brief Unload registers to memory.
- */
-#define MEM_TO_MEM      (0x00000001)
-/**
- * @brief Upload registers from memory.
- */
-#define MEM_FROM_MEM    (0x00000002)
-/**
- * @brief Process local variables.
- */
-#define MEM_VARS        (0x00000004)
-/**
- * @brief Process stack items.
- */
-#define MEM_STACK       (0x00000008)
-/**
- * @brief Update state of the processed item.
- */
-#define MEM_UPDATE      (0x00000010)
-/**
- * @brief Do not update state of the processed item.
- */
-#define MEM_NO_UPDATE   (0x00000020)
-/**
- * @brief Inverse an order in which items are selected for update.
- *
- * Can only be used with MEM_FROM_MEM and MEM_NO_UPDATE.
- *
- * When specified, an items marked as 'on register' are \b uploaded
- * from the memory.
- */
-#define MEM_INVERSE     (0x00000040)
+inline bool to_bool(const char * val)
+{
+    return  !strcasecmp(val, "on") ||
+            !strcasecmp(val, "yes") || !strcasecmp(val, "y") ||
+            !strcasecmp(val, "true") || !strcasecmp(val, "t");
+}
 
 
-///@} // ~ JITRINO_JET_MEM_TRANSF_FLAGS
-
 /**
- * @defgroup JITRINO_JET_JAVA_METHOD_FLAGS Compilation control flags
+ * @defgroup JMF_ Compilation control flags
  *
  * A bunch of flags, a Java method may be compiled with. Some of them also
  * affect runtime of the method.
@@ -212,39 +253,48 @@ inline bool tst(const long * p, unsigned idx)
  * JMF_ stands for Java method's flag.
  */
  
-/// @{ 
+/// @{
 
 /** @brief Method reports 'this' during root set enumeration.*/
 #define JMF_REPORT_THIS     (0x00000001)
 
-/** @brief Generate code to perform a GC pooling on back branches.*/
-#define JMF_BBPOOLING       (0x00000002)
+/** @brief Generate code to perform a GC polling on back branches.*/
+#define JMF_BBPOLLING       (0x00000002)
 
 /** @brief Generate profiling code for back branches and method entry.*/
 #define JMF_PROF_ENTRY_BE   (0x00000004)
-
-/** @brief Resolve classes during runtime instead of compile time. */
-#define JMF_LAZY_RESOLUTION (0x00000008)
-
-#ifdef JET_PROTO
-/** @brief Aligns stack */
-#define JMF_ALIGN_STACK     (0x00000010)
-#else
-// experimental feature, not for production build
-#define JMF_ALIGN_STACK     (0)	
-#endif
-
-/** @brief Empty root set - method reports nothing to GC.*/
-#define JMF_EMPTY_RS        (0x00000020)
 
 /**
  * @brief Generate code so back branches and method entry counters get
  *        checked synchronously, during runtime, at method entrance. 
  */
-#define JMF_PROF_SYNC_CHECK (0x00000040)
+#define JMF_PROF_SYNC_CHECK (0x00000008)
+
+#ifdef JET_PROTO
+#define JMF_ALIGN_STACK     (0x00010000)
+#define JMF_SP_FRAME        (0x00020000)
+#define JMF_STATIC_GC_MAP   (0x00040000)
+#else
+/** 
+ * @brief Aligns stack
+ * @note Experimental feature, not for production build.
+ */
+#define JMF_ALIGN_STACK     (0) 
+/** 
+ * @brief Use sp-based stack frame instead of bp-based.
+ * @note Experimental feature, not for production build.
+ */
+#define JMF_SP_FRAME        (0)
+/** 
+ * @brief Use static (computed at compile-time) GC-map for operand stack, 
+ * rather than dynamic (updated at runtime).
+ * @note Experimental feature, not for production build.
+ */
+#define JMF_STATIC_GC_MAP   (0)
+#endif
 
 /**
- * @defgroup JITRINO_JET_DEBUG_METHOD_FLAGS Debugging flags
+ * @defgroup DBG_ Debugging flags
  *
  * These flags are also 'Java method's flags' but used for the debugging 
  * purposes only.
@@ -257,50 +307,59 @@ inline bool tst(const long * p, unsigned idx)
  *
  * @{
  */
-#if defined(_DEBUG) || defined(JIT_LOGS) || defined(JET_PROTO)
-    /** @brief Break at method's entry.*/
+// The latest PMF/Log are working well without noticeable overhead, 
+// may have the tracing functionality turned on always.
+#if 1 //defined(JIT_LOGS) || defined(JET_PROTO)
     #define DBG_BRK             (0x00100000)
-    /** @brief Trace method's enter/exit.*/
     #define DBG_TRACE_EE        (0x00200000)
-    /** @brief Trace execution of each bytecode instruction. */
     #define DBG_TRACE_BC        (0x00400000)
+    #define DBG_TRACE_RT        (0x00800000)
+    #define DBG_DUMP_BBS        (0x01000000)
+    #define DBG_TRACE_CG        (0x02000000)
+    #define DBG_TRACE_LAYOUT    (0x04000000)
+    #define DBG_DUMP_CODE       (0x08000000)
+    #define DBG_TRACE_SUMM      (0x10000000)
+    #define DBG_CHECK_STACK     (0x20000000)
+#else
+    /** @brief Break at method's entry.*/
+    #define DBG_BRK             (0x00000000)
+    /** 
+     * @brief Trace method's enter/exit.
+     * 
+     * Turns on tracing of input args and return value for a method.
+     * Also turns on tracing of values returned from a method or a helper
+     * call.
+     * @see CodeGen::gen_save_ret
+     */
+    #define DBG_TRACE_EE        (0x00000000)
+    /** @brief Trace execution of each bytecode instruction. */
+    #define DBG_TRACE_BC        (0x00000000)
     /** 
      * @brief Trace runtime support events - stack unwinding, root set 
      * enumeration, byte code <-> native code mapping, etc.
      */
-    #define DBG_TRACE_RT        (0x00800000)
-    /** @brief Dump basic blocks, before code generation phase.*/
-    #define DBG_DUMP_BBS        (0x01000000)
-    /** @brief Trace code generation.*/
-    #define DBG_TRACE_CG        (0x02000000)
-    /** @brief Trace code layout (address ranges).*/
-    #define DBG_TRACE_LAYOUT    (0x04000000)
-    /** @brief Dump whole code after it's done.*/
-    #define DBG_DUMP_CODE       (0x08000000)
-    /** @brief Trace short summary about compiled method.*/
-    #define DBG_TRACE_SUMM      (0x10000000)
-    /** @brief Generates code to ensure stack integrity.*/
-    #define DBG_CHECK_STACK     (0x20000000)
-#else
-    #define DBG_BRK             (0x00000000)
-    #define DBG_TRACE_EE        (0x00000000)
-    #define DBG_TRACE_BC        (0x00000000)
     #define DBG_TRACE_RT        (0x00000000)
+    /** @brief Dump basic blocks, before code generation phase.*/
     #define DBG_DUMP_BBS        (0x00000000)
+    /** @brief Trace code generation.*/
     #define DBG_TRACE_CG        (0x00000000)
+    /** @brief Trace code layout (address ranges).*/
     #define DBG_TRACE_LAYOUT    (0x00000000)
+    /** @brief Dump whole code after it's done.*/
     #define DBG_DUMP_CODE       (0x00000000)
+    /** @brief Trace short summary about compiled method.*/
     #define DBG_TRACE_SUMM      (0x00000000)
+    /** @brief Generates code to ensure stack integrity.*/
     #define DBG_CHECK_STACK     (0x00000000)
 #endif
-/// @{  //~JITRINO_JET_DEBUG_METHOD_FLAGS
+/// @{  //~DBG_
 
-/// @}  //~JITRINO_JET_JAVA_METHOD_FLAGS
+/// @}  //~JMF_
 
 
 /**
- * @brief Describes a kind/group of bytecode instruction, according to 
- *        the JVM Spec.
+ * Enum which describes a kind/group of bytecode instruction, according to 
+ * the JVM Spec.
  */
 enum InstrKind  {
     /// arithmetics
@@ -325,33 +384,106 @@ enum InstrKind  {
 };
 
 /**
- * @brief (OPF stands for OPcode Flag) No special flags for the given opcode.
+ * @defgroup OPF_ Opcode flags - various traits of byte code instructions.
+ * @{
  */
 
+/**
+ * @brief (OPF stands for OPcode Flag) No special flags for the given opcode.
+ */
 #define OPF_NONE        (0x00000000)
 
 /** 
- * @brief Opcode ends basic block (ATHROW/GOTOs/etc).
+ * Opcode ends basic block (ATHROW/GOTOs/conditional branch, etc).
  */
-#define OPF_ENDS_BB     (0x00000001)
-
+#define OPF_ENDS_BB     (0x00001000)
 /** 
- * @brief Opcode is a dead end in the control flow - no fall through - RET,
- *        GOTO, RETURN, ATHROW.
+ * Opcode has no fall through pass (ATHROW/GOTO/RETURN/etc).
  */
-#define OPF_DEAD_END    (0x00000002)
+#define OPF_DEAD_END    (0x00002000)
+/**
+ * An instruction is one of return opcodes.
+ */
+#define OPF_RETURN      (0x00004000)
+/**
+ * An instruction starts a basic block.
+ *
+ * @note This is not a trait of an opcode, but rather of an instruction on 
+ *       a particular control flow. It's placed into OPF_ section as it's 
+ *       stored in the same field of JInst.
+ */
+#define OPF_STARTS_BB   (0x00008000)
+/**
+ * Instruction uses or defines local variable #0.
+ */
+#define OPF_VAR0            (0x00000000)
+/**
+ * Instruction uses or defines local variable #1.
+ */
+#define OPF_VAR1            (0x00000001)
+/**
+ * Instruction uses or defines local variable #2.
+ */
+#define OPF_VAR2            (0x00000002)
+/**
+ * Instruction uses or defines local variable #3.
+ */
+#define OPF_VAR3            (0x00000003)
+/**
+ * Instruction uses or defines local variable whose index defined by first
+ * instruction operand (JInst::op0).
+ */
+#define OPF_VAR_OP0         (0x00000004)
+/**
+ * Mask used to extract the OPF_VAR_ index.
+ */
+#define OPF_VAR_IDX_MASK    (0x0000000F)
 
 /**
- * @brief GC may happen on this instruction (calls to VM, method calls).
+ * Mask used to extract def-use info from opcode flags.
  */
-#define OPF_GC_PT       (0x00000004)
+#define OPF_VAR_DU_MASK     (0x00000300)
 /**
- * @brief Instruction terminates method (xRETURN or ATHROW).
+ * If set, then opcode defines a local variable an index given by its first
+ * operand (JInst::op0).
  */
-#define OPF_EXIT        (0x00000008)
+#define OPF_VAR_DEF         (0x00000100)
+/**
+ * If set, then opcode uses a local variable an index given by its first
+ * operand (JInst::op0).
+ */
+#define OPF_VAR_USE         (0x00000200)
+/**
+ * Mask used to extract from opcode flags a type of operation performed by 
+ * the opcode.
+ */
+#define OPF_VAR_TYPE_MASK   (0x000000F0)
+#define OPF_VAR_TYPE_SHIFT  (4)
+/**
+ * Instruction operates with #i32 (or lesser) type.
+ */
+#define OPF_VAR_TYPE_I32    (i32<<OPF_VAR_TYPE_SHIFT)
+/**
+ * Instruction operates with #jobj type.
+ */
+#define OPF_VAR_TYPE_OBJ    (jobj<<OPF_VAR_TYPE_SHIFT)
+/**
+ * Instruction operates with #i64 type.
+ */
+#define OPF_VAR_TYPE_I64    (i64<<OPF_VAR_TYPE_SHIFT)
+/**
+ * Instruction operates with #flt32 type.
+ */
+#define OPF_VAR_TYPE_FLT    (flt32<<OPF_VAR_TYPE_SHIFT)
+/**
+ * Instruction operates with #dbl64 type.
+ */
+#define OPF_VAR_TYPE_DBL    (dbl64<<OPF_VAR_TYPE_SHIFT)
+
+/// @} // ~OPF_
 
 /**
- * @brief An info associated with a byte code instruction.
+ * @brief An info associated with an bytecode instruction.
  */
 struct InstrDesc  {
     /**
@@ -379,7 +511,7 @@ struct InstrDesc  {
      * @brief Printable name of the opcode.
      */
     const char *    name;
-    char            padding[32-20];
+    char            adding[32-20];
 };
 
 extern const InstrDesc instrs[OPCODE_COUNT];
@@ -388,6 +520,7 @@ extern const InstrDesc instrs[OPCODE_COUNT];
  * @brief Enumerates possible Java types
  *
  * The values are ordered by complexity ascending.
+ * The following is intentionally \b true: <code>i8<i16<u16<i32<i64</code>.
  */
 enum jtype {
     /// signed 8 bits integer - Java's \c boolean or \c byte
@@ -411,7 +544,9 @@ enum jtype {
     /// jretAddr - a very special type for JSR things
     jretAddr,
     /// max number of types
-    num_jtypes,
+    jtypes_count, 
+    /// max number of types
+    num_jtypes = jtypes_count,
 #ifdef _EM64T_
     iplatf=i64,
 #else
@@ -420,26 +555,20 @@ enum jtype {
 #endif
 };
 
-/**
- * @brief Info about #jtype.
- */
+/// Info associated with #jtype.
 struct JTypeDesc {
-    /**
-     * @brief #jtype this info refers to.
-     */
+    /// jtype itself
     jtype        jt;
     /**
-     * @brief Size of an item of given #jtype, in bytes.
+     * size in bytes of the type on current platform.
+     * @note: for #jobj, the size of uncompressed reference is specified.
      */
     unsigned     size;
-    /**
-     * @brief Offset of this #jtype items in arrays, in bytes.
-     * @see vector_first_element_offset_unboxed
+    /** 
+     * offset, in bytes, of first item in an array of items of the type
      */
     unsigned     rt_offset;
-    /**
-     * @brief Print name.
-     */
+    /// human-readable name of the type 
     const char * name;
 };
 
@@ -449,7 +578,7 @@ struct JTypeDesc {
 extern JTypeDesc jtypes[num_jtypes];
 
 /**
- * @brief Tests whether specified #jtype represents floating point value.
+ *@brief Tests whether specified #jtype represents floating point value.
  */
 inline bool is_f( jtype jt )
 {
@@ -465,18 +594,7 @@ inline bool is_wide(jtype jt)
 }
 
 /**
- * @brief Tests whether specified #jtype is too big to fit into a single 
- *        register on the current platform.
- * 
- * The only case currently is i64 on IA32.
- */
-inline bool is_big(jtype jt)
-{
-    return jt==i64;
-}
-
-/**
- * @brief Converts a VM_Data_Type into #jtype.
+ * @brief Converts a #VM_Data_Type into #jtype.
  *
  * Java's byte (VM_DATA_TYPE_INT8) and boolean (VM_DATA_TYPE_BOOLEAN) are 
  * both returned as #i8.
@@ -485,63 +603,6 @@ inline bool is_big(jtype jt)
  * mapped onto #jobj.
  */
 jtype to_jtype(VM_Data_Type vmtype);
-
-/**
- * @brief Types used in lazy resolution scheme.
- *
- * Each RefType associated with an item to be resolved during runtime.
- * For example, RefType_StaticMeth associated with a values returned by 
- * resolve_static_method function. Composed with constant pool index, 
- * RefType values form an unique key which may be used to avoid resolving
- * the same item several times.
- */
-enum RefType {
-    /// Static method
-    RefType_StaticMeth,
-    /// Interface method
-    RefType_InterfaceMeth,
-    /// Special method
-    RefType_SpecMeth,
-    /// Virtual method
-    RefType_VirtMethod,
-    /// Class
-    RefType_Class,
-    /// Array calls
-    RefType_ArrayClass,
-    /// Class item, resolved via resolve_class_new
-    RefType_ClassNew,
-    /// Special case, used to make a key for object's size for new
-    RefType_Size,
-    /// Non-static field
-    RefType_Field,
-    /// Static field
-    RefType_StaticField,
-    /// Number of RefType-s in total
-    RefType_Count
-};
-
-/**
- * @brief Composes a single int-sized key from the given RefType and
- *        constant pool index.
- * @note Although \c cp_idx is of unsigned type, it's treated as 'unsigned 
- *       short'.
- * @param type - one of RefType constants
- * @param cp_idx - constant pool index
- * @see toRefType()
- * @see ResState
- * @deprecated Used in lazy resolution scheme, not a production feature.
- */
-inline unsigned ref_key(RefType type, unsigned cp_idx) {
-    assert(type<RefType_Count);
-    assert(cp_idx<USHRT_MAX);
-    return (unsigned)((type<<16)|(cp_idx&0xFFFF));
-}
-
-/**
- * @brief Returns #RefType to be used for a given opcode.
- * @deprecated Used in lazy resolution scheme, not a production feature.
- */
-RefType toRefType(JavaByteCodes opcode);
 
 }
 };    // ~namespace Jitrino::Jet

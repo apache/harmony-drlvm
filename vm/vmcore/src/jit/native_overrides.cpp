@@ -50,10 +50,7 @@
 // *** This is for the newInstance override
 #include "exceptions.h"
 
-#ifndef NDEBUG
 #include "dump.h"
-extern bool dump_stubs;
-#endif
 
 int readinternal_override_lil(JNIEnv *jenv,
                               Java_java_io_FileInputStream * UNREF pThis,
@@ -301,10 +298,9 @@ static NativeCodePtr fast_array_copy()
 
     addr = (NativeCodePtr)stub;
     assert(stub_size >= (unsigned)(s-stub));
-#ifndef NDEBUG
-    if (dump_stubs)
-        dump(stub, "stub.fast_array_copy", s - stub);
-#endif
+
+    DUMP_STUB(stub, "stub.fast_array_copy", s - stub);
+
     return addr;
 }
 

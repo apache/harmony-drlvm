@@ -157,6 +157,18 @@ static char* name_list[] =
 }
 
 
+static inline bool is_name_lowercase(const char* name)
+{
+    for(; *name; name++)
+    {
+        if (isalpha(*name) && !islower(*name))
+            return false;
+    }
+
+    return true;
+}
+
+
 // Function loads native library with a given name.
 NativeLibraryHandle
 natives_load_library(const char* library_name, bool* just_loaded,
@@ -164,6 +176,9 @@ natives_load_library(const char* library_name, bool* just_loaded,
 {
     assert(NULL != library_name);
     assert(NULL != pstatus);
+#ifdef PLATFORM_NT
+    assert(is_name_lowercase(library_name));
+#endif
 
     jni_libs.lock._lock();
 

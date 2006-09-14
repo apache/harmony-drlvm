@@ -755,11 +755,7 @@ vf_is_param_valid( class_handler source,    // checked class
                    class_handler target)    // required class
 {
     // check if target class is array
-    if( class_is_array( target ) ) {
-        if( !class_is_array( source ) ) {
-            // source class must be array too
-            return false;
-        }
+    if( class_is_array( target ) && class_is_array( source ) ) {
         // get array element classes
         return vf_is_param_valid( class_get_array_element_class( source ),
                                   class_get_array_element_class( target ));
@@ -937,15 +933,15 @@ vf_is_assign_valid( class_handler source,   // checked class
         // source class is array
         if( class_is_interface_( target ) ) {
             // target class is interface
-            if( !strcmp( class_get_name( target ), "java/lang/Cloneable" )
-                || !strcmp( class_get_name( target ), "java/io/Serializable" ) )
+            if( !memcmp( class_get_name( target ), "java/lang/Cloneable", 20 )
+                || !memcmp( class_get_name( target ), "java/io/Serializable", 21 ) )
             {
                 // target class is Cloneable or Serializable
                 return true;
             }
         } else {
             // target class is class
-            if( !strcmp( class_get_name( target ), "java/lang/Object" ) ) {
+            if( !memcmp( class_get_name( target ), "java/lang/Object", 17 ) ) {
                 // target class is object
                 return true;
             } else if ( class_is_array( target ) ) {
@@ -962,7 +958,7 @@ vf_is_assign_valid( class_handler source,   // checked class
             return vf_is_super_interface( source, target );
         } else {
             // target class is class
-            if( !strcmp( class_get_name( target ), "java/lang/Object" ) ) {
+            if( !memcmp( class_get_name( target ), "java/lang/Object", 17 ) ) {
                 // target class is object
                 return true;
             }
@@ -1011,19 +1007,10 @@ vf_is_valid( class_handler source,              // checked class
         return class_is_same_class( class_get_super_class( source ), target );
     case VF_CHECK_ACCESS_FIELD:     // protected field access
     case VF_CHECK_ACCESS_METHOD:    // protected method acceess
-        if( class_is_same_package( source, current )
-            || vf_is_super_class( source, current ) )
-        {
-            return true;
-        }
-        return false;
-    case VF_CHECK_INVOKESPECIAL:
-        if( vf_is_super_class( source, current ) 
-            && vf_is_super_class( current, target ) )
-        {
-            return true;
-        }
-        return false;
+        return vf_is_super_class( source, current );
+    case VF_CHECK_INVOKESPECIAL:    // check object for invokespecial instruction
+        return vf_is_super_class( source, current )
+                    && vf_is_super_class( current, target );
     default:
         DIE( "Verifier: vf_is_valid: invalid check type" );
         return false;
@@ -1031,6 +1018,71 @@ vf_is_valid( class_handler source,              // checked class
     // unreachable code
     assert(0);
 } // vf_is_valid
+
+/**
+ * Sets verifier error.
+ */
+static inline void
+vf_set_error( method_handler method,        // failed method
+              unsigned check,               // failed check
+              vf_Context_t *ctex)           // verifier context
+{
+    switch( check )
+    {
+    case VF_CHECK_PARAM:
+        VERIFY_REPORT( ctex, "(class: " << class_get_name( ctex->m_class ) 
+            << ", method: " << method_get_name( method )
+            << method_get_descriptor( method )
+            << ") Incompatible argument for function" );
+        break;
+    case VF_CHECK_ASSIGN:
+        VERIFY_REPORT( ctex, "(class: " << class_get_name( ctex->m_class ) 
+            << ", method: " << method_get_name( method )
+            << method_get_descriptor( method )
+            << ") Incompatible types for field assignment" );
+        break;
+    case VF_CHECK_ASSIGN_WEAK:
+        VERIFY_REPORT( ctex, "(class: " << class_get_name( ctex->m_class ) 
+            << ", method: " << method_get_name( method )
+            << method_get_descriptor( method )
+            << ") Incompatible types for array assignment" );
+        break;
+    case VF_CHECK_SUPER:
+        VERIFY_REPORT( ctex, "(class: " << class_get_name( ctex->m_class ) 
+            << ", method: " << method_get_name( method )
+            << method_get_descriptor( method )
+            << ") Exception class not a subclass of Throwable" );
+        break;
+    case VF_CHECK_ACCESS_FIELD:
+        VERIFY_REPORT( ctex, "(class: " << class_get_name( ctex->m_class ) 
+            << ", method: " << method_get_name( method )
+            << method_get_descriptor( method )
+            << ") Bad access to protected field" );
+        break;
+    case VF_CHECK_ACCESS_METHOD:
+        VERIFY_REPORT( ctex, "(class: " << class_get_name( ctex->m_class ) 
+            << ", method: " << method_get_name( method )
+            << method_get_descriptor( method )
+            << ") Bad access to protected method" );
+        break;
+    case VF_CHECK_DIRECT_SUPER:
+        VERIFY_REPORT( ctex, "(class: " << class_get_name( ctex->m_class ) 
+            << ", method: " << method_get_name( method )
+            << method_get_descriptor( method )
+            << ") Call to wrong initialization method" );
+        break;
+    case VF_CHECK_INVOKESPECIAL:
+        VERIFY_REPORT( ctex, "(class: " << class_get_name( ctex->m_class ) 
+            << ", method: " << method_get_name( method )
+            << method_get_descriptor( method )
+            << ") Incompatible object argument for invokespecial" );
+        break;
+    default:
+        DIE( "Verifier: vf_set_error: unknown check type" );
+        break;
+    }
+    return;
+} // vf_set_error
 
 /**
  * Checks some constraints without loading of needed classes.
@@ -1074,8 +1126,39 @@ vf_check_without_loading( vf_TypeConstraint_t *restriction,  // checked constrat
             // no need to check
             return VER_OK;
         }
+
+        /**
+         * Extension for java/lang/Cloneable and java/io/Serializable
+         * interfaces doesn't check because it's expected all arrays extend it.
+         * Just check is source array.
+         */
+        if( (restriction->target == ctex->m_vtype.m_clone->string[0] 
+             || restriction->target == ctex->m_vtype.m_serialize->string[0])
+            && restriction->source[0] == '[' )
+        {
+            // no need to check
+            return VER_OK;
+        }
+
+        /**
+         * If method invocation conversion takes place between array and
+         * non-array reference, return error.
+         */
+        if( (restriction->target[0] != '[' && restriction->source[0] == '[')
+            || (restriction->target[0] != '[' && restriction->source[0] == '[') )
+        {
+            vf_set_error( ctex->m_method, VF_CHECK_PARAM, ctex );
+            return VER_ErrorIncompatibleArgument;
+        }
         break;
 
+    case VF_CHECK_ASSIGN_WEAK:
+        // check assignment weak reference conversions
+        if( restriction->source[0] == 'L' ) {
+            return VER_OK;
+        }
+        assert(restriction->source[0] == '[');
+        // go to the next check...
     case VF_CHECK_ASSIGN:
         // check assignment reference conversions
         if( restriction->source[0] == '[' ) {
@@ -1091,10 +1174,7 @@ vf_check_without_loading( vf_TypeConstraint_t *restriction,  // checked constrat
                 return VER_OK;
             } else if ( restriction->target[0] != '[' ) {
                 // target class isn't array class
-                VERIFY_REPORT( ctex, "(class: " << class_get_name( ctex->m_class ) 
-                    << ", method: " << method_get_name( ctex->m_method )
-                    << method_get_descriptor( ctex->m_method )
-                    << ") Incompatible types for field assignment" );
+                vf_set_error( ctex->m_method, restriction->check_type, ctex );
                 return VER_ErrorIncompatibleArgument;
             }
         }
@@ -1140,57 +1220,7 @@ vf_check_constraint( vf_TypeConstraint_t *restriction,  // checked constratint
     // check restriction
     if( !vf_is_valid( source, target, ctex->m_class, restriction->check_type ) ) {
         // return error
-        switch( restriction->check_type )
-        {
-        case VF_CHECK_PARAM:
-            VERIFY_REPORT( ctex, "(class: " << class_get_name( ctex->m_class ) 
-                << ", method: " << method_get_name( ctex->m_method )
-                << method_get_descriptor( ctex->m_method )
-                << ") Incompatible argument for function" );
-            break;
-        case VF_CHECK_ASSIGN:
-            VERIFY_REPORT( ctex, "(class: " << class_get_name( ctex->m_class ) 
-                << ", method: " << method_get_name( ctex->m_method )
-                << method_get_descriptor( ctex->m_method )
-                << ") Incompatible types for field assignment" );
-            break;
-        case VF_CHECK_ASSIGN_WEAK:
-            VERIFY_REPORT( ctex, "(class: " << class_get_name( ctex->m_class ) 
-                << ", method: " << method_get_name( ctex->m_method )
-                << method_get_descriptor( ctex->m_method )
-                << ") Incompatible types for array assignment" );
-            break;
-        case VF_CHECK_SUPER:
-            VERIFY_REPORT( ctex, "(class: " << class_get_name( ctex->m_class ) 
-                << ", method: " << method_get_name( ctex->m_method )
-                << method_get_descriptor( ctex->m_method )
-                << ") Exception class not a subclass of Throwable" );
-            break;
-        case VF_CHECK_ACCESS_FIELD:
-            VERIFY_REPORT( ctex, "(class: " << class_get_name( ctex->m_class ) 
-                << ", method: " << method_get_name( ctex->m_method )
-                << method_get_descriptor( ctex->m_method )
-                << ") Bad access to protected field" );
-            break;
-        case VF_CHECK_ACCESS_METHOD:
-            VERIFY_REPORT( ctex, "(class: " << class_get_name( ctex->m_class ) 
-                << ", method: " << method_get_name( ctex->m_method )
-                << method_get_descriptor( ctex->m_method )
-                << ") Bad access to protected method" );
-            break;
-        case VF_CHECK_DIRECT_SUPER:
-            VERIFY_REPORT( ctex, "(class: " << class_get_name( ctex->m_class ) 
-                << ", method: " << method_get_name( ctex->m_method )
-                << method_get_descriptor( ctex->m_method )
-                << ") Call to wrong initialization method" );
-            break;
-        default:
-            VERIFY_REPORT( ctex, "(class: " << class_get_name( ctex->m_class ) 
-                << ", method: " << method_get_name( ctex->m_method )
-                << method_get_descriptor( ctex->m_method )
-                << ") Incompatible argument" );
-            break;
-        }
+        vf_set_error( ctex->m_method, restriction->check_type, ctex );
         return VER_ErrorIncompatibleArgument;
     }
     return VER_OK;
@@ -1213,6 +1243,13 @@ vf_check_access_constraint( const char *super_name,             // name of super
     class_handler super_class = vf_resolve_class( super_name, false, ctex );
     if( !super_class || !vf_is_super_class( ctex->m_class, super_class ) ) {
         // obtained class isn't super class of a given class, no need to check
+        return VER_OK;
+    }
+
+    // check if a class and a parent class is in the same package
+    if( class_is_same_package( ctex->m_class, super_class ) ) {
+        // class and parent class is in the same package,
+        // no need check access to protect members
         return VER_OK;
     }
 
@@ -1262,26 +1299,9 @@ vf_check_access_constraint( const char *super_name,             // name of super
     }
 
     // check access constraint
-    if( !vf_is_valid( instance, NULL, ctex->m_class, check_type ) )
-    {
+    if( !vf_is_valid( instance, NULL, ctex->m_class, check_type ) ) {
         // return error
-        switch( check_type )
-        {
-        case VF_CHECK_ACCESS_FIELD:
-            VERIFY_REPORT( ctex, "(class: " << class_get_name( ctex->m_class ) 
-                << ", method: " << method_get_name( ctex->m_method )
-                << method_get_descriptor( ctex->m_method )
-                << ") Bad access to protected field" );
-            break;
-        case VF_CHECK_ACCESS_METHOD:
-            VERIFY_REPORT( ctex, "(class: " << class_get_name( ctex->m_class ) 
-                << ", method: " << method_get_name( ctex->m_method )
-                << method_get_descriptor( ctex->m_method )
-                << ") Bad access to protected method" );
-            break;
-        default:
-            vf_error();
-        }
+        vf_set_error( ctex->m_method, check_type, ctex );
         return VER_ErrorIncompatibleArgument;
     }
     return VER_OK;
@@ -1367,6 +1387,16 @@ vf_force_check_constraint( vf_TypeConstraint_t *constraint,     // class constra
         return VER_ErrorLoadClass;
     }
 
+    // check if constraint is already verified
+    if( constraint->check_type == VF_CHECK_NONE ) {
+        // already verified
+        VERIFY_TRACE( "constraint.checked", "verify constraint: have \""
+            << constraint->source << "\" need \"" << constraint->target 
+            << "\" already done (check #2) for class "
+            << class_get_name( ctex->m_class ) );
+        return VER_OK;
+    }
+
     /**
      * Verifier which is built on Java VM Specification 2nd Edition (4.9.2)
      * recommendation of verification proccess doesn't check interfaces usage.
@@ -1375,7 +1405,9 @@ vf_force_check_constraint( vf_TypeConstraint_t *constraint,     // class constra
      * checks only if -Xverify option is present in command line.
      */
     if( !ctex->m_dump.m_verify && class_is_interface_( target ) ) {
-        // no need to check
+        // skip constraint check
+        // reset constraint to successful
+        constraint->check_type = VF_CHECK_NONE;
         return VER_OK;
     }
 
@@ -1384,7 +1416,7 @@ vf_force_check_constraint( vf_TypeConstraint_t *constraint,     // class constra
         // already verified
         VERIFY_TRACE( "constraint.checked", "verify constraint: have \""
             << constraint->source << "\" need \"" << constraint->target 
-            << "\" already done (check #2) for class "
+            << "\" already done (check #3) for class "
             << class_get_name( ctex->m_class ) );
         return VER_OK;
     }
@@ -1407,7 +1439,7 @@ vf_force_check_constraint( vf_TypeConstraint_t *constraint,     // class constra
         return VER_ErrorLoadClass;
     }
 
-    // store constraint check type (it could be changed during loading classes)
+    // store constraint check type (it could be changed during validation check)
     vf_CheckConstraint_t check = (vf_CheckConstraint_t)constraint->check_type;
 
     // check if constraint is already verified
@@ -1415,69 +1447,18 @@ vf_force_check_constraint( vf_TypeConstraint_t *constraint,     // class constra
         // already verified
         VERIFY_TRACE( "constraint.checked", "verify constraint: have \""
             << constraint->source << "\" need \"" << constraint->target 
-            << "\" already done (check #3) for class "
+            << "\" already done (check #4) for class "
             << class_get_name( ctex->m_class ) );
         return VER_OK;
     }
 
     // check restriction
-    if( !vf_is_valid( source, target, ctex->m_class, check ) )
-    {
-        switch( check )
-        {
-        case VF_CHECK_PARAM:
-            VERIFY_REPORT( ctex, "(class: " << class_get_name( ctex->m_class ) 
-                << ", method: " << method_get_name( constraint->method )
-                << method_get_descriptor( constraint->method )
-                << ") Incompatible argument for function" );
-            break;
-        case VF_CHECK_ASSIGN:
-            VERIFY_DEBUG( "has " << constraint->source << " need " << constraint->target );
-            VERIFY_REPORT( ctex, "(class: " << class_get_name( ctex->m_class ) 
-                << ", method: " << method_get_name( constraint->method )
-                << method_get_descriptor( constraint->method )
-                << ") Incompatible types for field assignment" );
-            break;
-        case VF_CHECK_ASSIGN_WEAK:
-            VERIFY_DEBUG( "has " << constraint->source << " need " << constraint->target );
-            VERIFY_REPORT( ctex, "(class: " << class_get_name( ctex->m_class ) 
-                << ", method: " << method_get_name( constraint->method )
-                << method_get_descriptor( constraint->method )
-                << ") Incompatible types for array assignment" );
-            break;
-        case VF_CHECK_SUPER:
-            VERIFY_REPORT( ctex, "(class: " << class_get_name( ctex->m_class ) 
-                << ", method: " << method_get_name( constraint->method )
-                << method_get_descriptor( constraint->method )
-                << ") Exception class not a subclass of Throwable" );
-            break;
-        case VF_CHECK_ACCESS_FIELD:
-            VERIFY_REPORT( ctex, "(class: " << class_get_name( ctex->m_class ) 
-                << ", method: " << method_get_name( constraint->method )
-                << method_get_descriptor( constraint->method )
-                << ") Bad access to protected field" );
-            break;
-        case VF_CHECK_ACCESS_METHOD:
-            VERIFY_REPORT( ctex, "(class: " << class_get_name( ctex->m_class ) 
-                << ", method: " << method_get_name( constraint->method )
-                << method_get_descriptor( constraint->method )
-                << ") Bad access to protected method" );
-            break;
-        case VF_CHECK_DIRECT_SUPER:
-            VERIFY_REPORT( ctex, "(class: " << class_get_name( ctex->m_class ) 
-                << ", method: " << method_get_name( constraint->method )
-                << method_get_descriptor( constraint->method )
-                << ") Call to wrong initialization method" );
-            break;
-        default:
-            VERIFY_REPORT( ctex, "(class: " << class_get_name( ctex->m_class ) 
-                << ", method: " << method_get_name( constraint->method )
-                << method_get_descriptor( constraint->method )
-                << ") Incompatible argument" );
-            break;
-        }
+    if( !vf_is_valid( source, target, ctex->m_class, check ) ) {
+        // return error
+        vf_set_error( constraint->method, check, ctex );
         return VER_ErrorIncompatibleArgument;
     }
+    // reset constraint to successful
     constraint->check_type = VF_CHECK_NONE;
     return VER_OK;
 } // vf_force_check_constraint

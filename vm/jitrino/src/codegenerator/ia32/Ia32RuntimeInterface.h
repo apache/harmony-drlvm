@@ -39,14 +39,14 @@ stack unwinding, root set enumeration, and code patching.
 */
 
 
-	class RuntimeInterface : public ::Jitrino::RuntimeInterface {
+    class RuntimeInterface : public ::Jitrino::RuntimeInterface {
 public:
     virtual void  unwindStack(MethodDesc* methodDesc, JitFrameContext* context, bool isFirst) ;
 
     virtual void  getGCRootSet(MethodDesc* methodDesc, GCInterface* gcInterface, 
-		const JitFrameContext* context, bool isFirst);
+        const JitFrameContext* context, bool isFirst);
 
-	virtual bool  canEnumerate(MethodDesc* methodDesc, NativeCodePtr eip);
+    virtual bool  canEnumerate(MethodDesc* methodDesc, NativeCodePtr eip);
 
     virtual void  fixHandlerContext(MethodDesc* methodDesc, JitFrameContext* context, bool isFirst);
 
@@ -63,6 +63,7 @@ public:
 
     virtual uint32          getInlineDepth(InlineInfoPtr ptr, uint32 offset);
     virtual Method_Handle   getInlinedMethod(InlineInfoPtr ptr, uint32 offset, uint32 inline_depth);
+    virtual uint16  getInlinedBc(InlineInfoPtr ptr, uint32 offset, uint32 inline_depth);
 
 };
 

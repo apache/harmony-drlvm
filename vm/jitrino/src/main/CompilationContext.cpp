@@ -19,30 +19,151 @@
  */
 #include "CompilationContext.h"
 
-#include "optimizer.h"
-#include "IRBuilder.h"
 #include "MemoryManager.h"
-
-#ifdef _IPF_
-#else 
-#include "ia32/Ia32CodeGenerator.h"
-#endif
+#include "EMInterface.h"
+#include "JITInstanceContext.h"
+#include "Type.h"
+#include "PMF.h"
+#include "PMFAction.h"
+#include "mkernel.h"
 
 namespace Jitrino {
 
-CompilationContext::CompilationContext(MemoryManager& _mm, CompilationInterface* ci, JITModeData* mode) 
-: mm(_mm), compilationInterface(ci) 
+static TlsStack<CompilationContext> ccTls;
+
+CompilationContext::CompilationContext(MemoryManager& _mm, CompilationInterface* ci, JITInstanceContext* _jitContext) 
+: mm(_mm), compilationInterface(ci), compilationFailed(false), compilationFinished(false)
+, currentLogStreams(0), pipeline(0), stageId(0)
 {
-    thisPT = NULL;
-    optFlags = new (mm) OptimizerFlags;
-    transFlags = new (mm) TranslatorFlags;
-    irbFlags  = new (mm) IRBuilderFlags();
-    modeData = mode;
+    jitContext = _jitContext;
+    hirm = NULL;
 #ifdef _IPF_
 #else 
-    ia32CGFlags = new (mm) Ia32::CGFlags();
+    lirm = NULL;
+#endif
+    currentSessionAction = NULL;
+    currentSessionNum = 0;
+
+    ccTls.push((CompilationContext*)this);
+}
+
+CompilationContext::~CompilationContext() {
+#ifdef _DEBUG
+    CompilationContext* last = ccTls.pop();
+    assert(this == last);
+#else 
+    ccTls.pop();
 #endif
 }
-
+    
+ProfilingInterface* CompilationContext::getProfilingInterface() const {
+    return getCurrentJITContext()->getProfilingInterface();
 }
 
+bool CompilationContext::hasDynamicProfileToUse() const  {
+    ProfilingInterface* pi = getProfilingInterface();
+    return pi->hasMethodProfile(ProfileType_Edge, *compilationInterface->getMethodToCompile()) 
+        || pi->hasMethodProfile(ProfileType_EntryBackedge, *compilationInterface->getMethodToCompile());
+}
+
+CompilationContext* CompilationContext::getCurrentContext() {
+    CompilationContext* currentCC = ccTls.get();
+    return currentCC;
+}
+
+static int thread_nb = 0;
+
+struct TlsLogStreams {
+
+    int threadnb;
+    MemoryManager mm;
+
+    typedef std::pair<JITInstanceContext*, LogStreams*> Jit2Log;
+
+    typedef StlVector<Jit2Log> Jit2Logs;
+    Jit2Logs jit2logs;
+
+    TlsLogStreams ()   
+        :threadnb(thread_nb), mm(0, "TlsLogStreams"), jit2logs(mm) {}
+
+    ~TlsLogStreams ();
+};
+
+
+TlsLogStreams::~TlsLogStreams () 
+{
+    Jit2Logs::iterator ptr = jit2logs.begin(),
+                       end = jit2logs.end();
+    for (; ptr != end; ++ptr)
+        ptr->second->~LogStreams();
+}
+
+
+static TlsStore<TlsLogStreams> tlslogstreams;
+
+
+/*
+    Because CompilationContext is a transient object (it created on start of compilation 
+    and destroyed on end of compilation for every method), LogStreams table cannot reside
+    in it. Thread-local storage (TLS) is used to keep LogStreams.
+    On the other hand, different Jits can run on the same thread, so several LogStreams
+    have to be keept for single thread.
+    To optimize access, pointer to LogStreams is cached in CompilationContext.
+
+ */
+LogStreams& LogStreams::current(JITInstanceContext* jitContext) {
+
+    CompilationContext* ccp = CompilationContext::getCurrentContext();
+    LogStreams* cls = ccp->getCurrentLogs();
+    if (cls != 0) 
+        return *cls;
+
+//  No cached pointer is available for this CompilationContext.
+//  Find TLS for this thread.
+
+    TlsLogStreams* sp = tlslogstreams.get();
+    if (sp == 0)
+    {   // new thread
+        ++thread_nb;
+        sp = new TlsLogStreams();
+        tlslogstreams.put(sp);
+    }
+
+//  Find which Jit is running now.
+
+    if (jitContext == 0)
+        jitContext = ccp->getCurrentJITContext(); 
+
+//  Was LogStreams created for this Jit already?
+
+    TlsLogStreams::Jit2Logs::iterator ptr = sp->jit2logs.begin(),
+                                      end = sp->jit2logs.end();
+    for (; ptr != end; ++ptr)
+        if (ptr->first == jitContext) {
+        //  yes, it was - store pointer in the CompilationContext
+            ccp->setCurrentLogs(cls = ptr->second);
+            return *cls; 
+        }
+
+//  This is the first logger usage by the running Jit in the current thread. 
+//  Create LogStreams now.
+
+    cls = new (sp->mm) LogStreams(sp->mm, jitContext->getPMF(), sp->threadnb);
+    sp->jit2logs.push_back(TlsLogStreams::Jit2Log(jitContext, cls));
+    ccp->setCurrentLogs(cls);
+
+    return *cls;
+}
+
+
+LogStream& LogStream::log (SID sid, HPipeline* hp)
+{
+    if (hp == 0)
+        hp = CompilationContext::getCurrentContext()->getPipeline();
+    Str name = ((PMF::Pipeline*)hp)->name;
+    return LogStream::log(sid, name.ptr, name.count);
+}
+
+
+
+} //namespace

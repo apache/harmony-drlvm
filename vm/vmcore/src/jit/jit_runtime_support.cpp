@@ -40,6 +40,7 @@ using namespace std;
 #include "Class.h"
 #include "environment.h"
 #include "exceptions.h"
+#include "exceptions_jit.h"
 #include "open/gc.h"
 #include "ini.h"
 #include "jit_runtime_support.h"
@@ -52,7 +53,6 @@ using namespace std;
 #include "object_layout.h"
 #include "object_handles.h"
 #include "vm_arrays.h"
-#include "vm_stats.h"
 #include "vm_strings.h"
 #include "vm_synch.h"
 #include "vm_threads.h"
@@ -61,19 +61,10 @@ using namespace std;
 #include "open/vm_util.h"
 
 #include "jvmti_interface.h"
-
 #include "compile.h"
 
-// TODO: FIXME: We should not include internal stuff
-#ifdef _IPF_
-#include "../m2n_ipf_internal.h"
-#elif defined _EM64T_
-#include "../m2n_em64t_internal.h"
-#else
-#include "../m2n_ia32_internal.h"
-#endif
-
-extern bool dump_stubs;
+#include "dump.h"
+#include "vm_stats.h"
 
 // macro that gets the offset of a certain field within a struct or class type
 #define OFFSET(Struct, Field) \
@@ -88,48 +79,44 @@ extern bool dump_stubs;
 
 ///////////////////////////////////////////////////////////
 // New Object and New Array
+Vector_Handle vm_rt_new_vector(Class *vector_class, int length) {
+    ASSERT_THROW_AREA;
+    Vector_Handle result;
+    BEGIN_RAISE_AREA;
+    result = vm_new_vector(vector_class, length);
+    END_RAISE_AREA;
+    exn_rethrow_if_pending();
+    return result;
+}
+
+Vector_Handle
+vm_rt_multianewarray_recursive(Class    *c,
+                             int      *dims_array,
+                             unsigned  dims)
+{
+    ASSERT_THROW_AREA;
+    Vector_Handle result;
+    BEGIN_RAISE_AREA;
+    result = vm_multianewarray_recursive(c, dims_array, dims);
+    END_RAISE_AREA;
+    exn_rethrow_if_pending();
+    return result;
+}
+
+Vector_Handle vm_rt_new_vector_using_vtable_and_thread_pointer(
+        int length, Allocation_Handle vector_handle, void *tp) {
+    ASSERT_THROW_AREA;
+    Vector_Handle result;
+    BEGIN_RAISE_AREA;
+    result = vm_new_vector_using_vtable_and_thread_pointer(length, vector_handle, tp);
+    END_RAISE_AREA;
+    exn_rethrow_if_pending();
+    return result;
+}
 
 // Create a multidimensional array
-// The M2nFrame arguments holds the number of dimensions and lengths for each one
-// Returns -1 if there is a negative size
-static Vector_Handle rth_multianewarrayhelper()
-{
-#ifdef VM_STATS
-    vm_stats_total.num_multianewarray++;  
-#endif
-
-#ifdef _EM64T_
-    return (Vector_Handle)NULL;
-#else
-    M2nFrame* m2nf = m2n_get_last_frame();
-    const unsigned max_dim = 255;
-    int lens[max_dim];
-
-#ifdef _IPF_
-    Class* c = (Class*)*m2n_get_arg_word(m2nf, 0);
-    unsigned dims = (unsigned)(*m2n_get_arg_word(m2nf, 1) & 0xFFFFffff);
-    assert(dims<=max_dim);
-    for(unsigned i=0; i<dims; i++) {
-        int len = (int)(*m2n_get_arg_word(m2nf, i+2) & 0xFFFFffff);
-        if (len<0) return (Vector_Handle)-1;
-        lens[dims-i-1] = (int)len;
-    }
-#else
-    // FIXME: em64t not tested
-    POINTER_SIZE_INT* p_args = m2n_get_args(m2nf);
-    unsigned dims = p_args[1];
-    assert(dims<=max_dim);
-    uint32* lens_base = (uint32*)(p_args+2);
-    for(unsigned i=0; i<dims; i++) {
-        int len = lens_base[dims-i-1];
-        if (len<0) return (Vector_Handle)-1;
-        lens[i] = len;
-    }
-    Class* c = (Class*)p_args[0];
-#endif
-    return vm_multianewarray_recursive(c, lens, dims);
-#endif // _EM64T_
-}
+// Doesn't return if exception occured
+Vector_Handle rth_multianewarrayhelper();
 
 // Multianewarray helper
 static NativeCodePtr rth_get_lil_multianewarray(int* dyn_count)
@@ -143,18 +130,19 @@ static NativeCodePtr rth_get_lil_multianewarray(int* dyn_count)
             cs = lil_parse_onto_end(cs, "inc [%0i:pint];", dyn_count);
             assert(cs);
         }
-         cs = lil_parse_onto_end(cs,
+        cs = lil_parse_onto_end(cs,
             "push_m2n 0, 0;"
             "out platform::ref;"
             "call %0i;"
             "pop_m2n;"
-            "jc r=%1i:ref,negsize;"
-            "ret;"
-            ":negsize;"
-            "tailcall %2i;",
-            rth_multianewarrayhelper, (POINTER_SIZE_INT)-1, lil_npc_to_fp(exn_get_rth_throw_negative_array_size()));
+            "ret;",
+            rth_multianewarrayhelper);
         assert(cs && lil_is_valid(cs));
-        addr = LilCodeGenerator::get_platform()->compile(cs, "rth_multianewarray", dump_stubs);
+        
+        addr = LilCodeGenerator::get_platform()->compile(cs);
+
+        DUMP_STUB(addr, "multianewarray", lil_cs_get_code_size(cs));
+
         lil_free_code_stub(cs);
     }
 
@@ -166,6 +154,7 @@ static NativeCodePtr rth_get_lil_multianewarray(int* dyn_count)
 
 static ManagedObject * rth_ldc_ref_helper(Class *c, unsigned cp_index) 
     {
+    ASSERT_THROW_AREA;
     Const_Pool *cp = c->const_pool;
     if (cp_is_string(cp, cp_index)) 
     {
@@ -175,15 +164,22 @@ static ManagedObject * rth_ldc_ref_helper(Class *c, unsigned cp_index)
     {
         assert(!hythread_is_suspend_enabled());
         hythread_suspend_enable();
-        Class *objClass = class_resolve_class(c, cp_index); 
+
+        Class *objClass = NULL;
+        BEGIN_RAISE_AREA;
+        objClass = class_resolve_class(c, cp_index);
+        END_RAISE_AREA;
+
         hythread_suspend_disable();
         if (objClass) {
             return struct_Class_to_java_lang_Class(objClass);
         }
         if (!exn_raised()) {
+            BEGIN_RAISE_AREA;
             class_throw_linking_error(c, cp_index, 0);
+            END_RAISE_AREA;
         } else {
-            exn_throw(exn_get());
+            exn_rethrow();
         }
     }
     exn_throw_by_name("java/lang/InternalError", "Unsupported ldc argument");
@@ -212,7 +208,10 @@ static NativeCodePtr rth_get_lil_ldc_ref(int* dyn_count)
             "ret;",
             p_instantiate_ref);
         assert(cs && lil_is_valid(cs));
-        addr = LilCodeGenerator::get_platform()->compile(cs, "rth_ldc_ref", dump_stubs);
+        addr = LilCodeGenerator::get_platform()->compile(cs);
+
+        DUMP_STUB(addr, "ldc_ref", lil_cs_get_code_size(cs));
+
         lil_free_code_stub(cs);
     }
 
@@ -236,28 +235,28 @@ enum RthTypeTestNull { RTTN_NoNullCheck, RTTN_NullMember, RTTN_NullNotMember };
 enum RthTypeTestResult { RTTR_ReturnOutcome, RTTR_ThrowStub, RTTR_ThrowInline };
 typedef void (*RthTypeTestStatsUpdate)(ManagedObject*, Class*);
 
-static LilCodeStub* rth_gen_lil_type_test(LilCodeStub* cs, RthTypeTestNull null, RthTypeTestResult res, Class* type,
-                                          int* dyn_count, RthTypeTestStatsUpdate update_fn)
+static LilCodeStub* rth_gen_lil_type_test(LilCodeStub* cs, RthTypeTestNull null,
+                                          RthTypeTestResult res, Class* type)
 {
     // We need to get the vtable in more than one place below
     // Here are some macros to helper smooth over the compressed vtables
     const POINTER_SIZE_INT vtable_off = object_get_vtable_offset();
     const POINTER_SIZE_INT vtable_add = vm_vtable_pointers_are_compressed() ? vm_get_vtable_base() : 0;
-    // Update Stats
-#ifdef VM_STATS
-    assert(dyn_count);
-    cs = lil_parse_onto_end(cs, "inc [%0i:pint]; in2out platform:void; call %1i;", dyn_count, update_fn);
-    if (!cs) return NULL;
-#endif
 
     // Setup locals
     cs = lil_parse_onto_end(cs, (type ? "locals 1;" : "locals 2;"));
-    if (!cs) return NULL;
+    assert(cs);
 
     // Null check
     if (null!=RTTN_NoNullCheck) {
-        cs = lil_parse_onto_end(cs, (null==RTTN_NullMember ? "jc i0=%0i:ref,success;" : "jc i0=%0i:ref,failed;"), Class::managed_null);
-        if (!cs) return NULL;
+        if (null==RTTN_NullMember) {
+            cs = lil_parse_onto_end(cs, "jc i0!=%0i:ref,null_check_faild;", Class::managed_null);
+            cs = lil_parse_onto_end(cs, (res==RTTR_ReturnOutcome ? "r=1:g4; ret;" : "r=i0; ret;"));
+            cs = lil_parse_onto_end(cs, ":null_check_faild;");
+        } else {
+            cs = lil_parse_onto_end(cs, "jc i0=%0i:ref,failed;", Class::managed_null);
+        }
+        assert(cs);
     }
 
     // Fast sequence
@@ -265,19 +264,18 @@ static LilCodeStub* rth_gen_lil_type_test(LilCodeStub* cs, RthTypeTestNull null,
     const POINTER_SIZE_INT depth_off = (POINTER_SIZE_INT)&((Class*)NULL)->depth;
     const POINTER_SIZE_INT supertable_off = (POINTER_SIZE_INT)&((VTable*)NULL)->superclasses;
     bool do_slow = true;
-    bool success_before = false;
     if (type) {
         if (type->is_suitable_for_fast_instanceof) {
             cs = lil_parse_onto_end(cs,
                 vm_vtable_pointers_are_compressed() ? "ld l0,[i0+%0i:g4],zx;" : "ld l0,[i0+%0i:pint];",
-                vtable_off);
-            if (!cs) return NULL;
+                vtable_off);            
+            assert(cs);
             cs = lil_parse_onto_end(cs,
                 "ld l0,[l0+%1i:pint];"
                 "jc l0!=%2i,failed;",
                 vtable_add+supertable_off+sizeof(Class*)*(type->depth-1), type);
-            if (!cs) return NULL;
             do_slow = false;
+            assert(cs);
         }
     } else {
         cs = lil_parse_onto_end(cs,
@@ -285,24 +283,21 @@ static LilCodeStub* rth_gen_lil_type_test(LilCodeStub* cs, RthTypeTestNull null,
             "jc l0=0,slowpath;"
             "ld l1,[i1+%1i:g4],zx;",
             is_fast_off, depth_off);
-        if (!cs) return NULL;
+        assert(cs);
         cs = lil_parse_onto_end(cs,
             vm_vtable_pointers_are_compressed() ? "ld l0,[i0+%0i:g4],zx;" : "ld l0,[i0+%0i:pint];",
             vtable_off);
-        if (!cs) return NULL;
+        assert(cs);
         cs = lil_parse_onto_end(cs,
             "ld l0,[l0+%0i*l1+%1i:pint];"
             "jc l0!=i1,failed;",
             sizeof(Class*), vtable_add+supertable_off-sizeof(Class*));  // -4/8 because we want to index with depth-1
-        if (!cs) return NULL;
-        success_before = true;
+        assert(cs);
     }
 
-    //*** Success, if before slowpath
-    if (success_before) {
-        cs = lil_parse_onto_end(cs, (res==RTTR_ReturnOutcome ? ":success; r=1:g4; ret;" : ":success; r=i0; ret;"));
-        if (!cs) return NULL;
-    }
+    //*** Success, before slow path
+    cs = lil_parse_onto_end(cs, (res==RTTR_ReturnOutcome ? "r=1:g4; ret;" : "r=i0; ret;"));
+    assert(cs);
 
     //*** Slow sequence
     const POINTER_SIZE_INT clss_off = (POINTER_SIZE_INT)&((VTable*)NULL)->clss;
@@ -311,25 +306,24 @@ static LilCodeStub* rth_gen_lil_type_test(LilCodeStub* cs, RthTypeTestNull null,
         cs = lil_parse_onto_end(cs,
             ":slowpath;"
             "out platform:pint,pint:g4;");
-        if (!cs) return NULL;
+        assert(cs);
         cs = lil_parse_onto_end(cs,
             vm_vtable_pointers_are_compressed() ? "ld l0,[i0+%0i:g4],zx;" : "ld l0,[i0+%0i:pint];",
             vtable_off);
-        if (!cs) return NULL;
+        assert(cs);
         cs = lil_parse_onto_end(cs,
             "ld o0,[l0+%0i:pint];"
             "o1=i1;"
             "call %1i;",
             vtable_add+clss_off, p_subclass);
-        if (!cs) return NULL;
-        cs = lil_parse_onto_end(cs, (res==RTTR_ReturnOutcome ? "ret;" : success_before ? "jc r!=0,success;" : "jc r=0,failed;"));
-        if (!cs) return NULL;
-    }
-
-    //*** Success, if after slowpath
-    if (!success_before) {
-        cs = lil_parse_onto_end(cs, (res==RTTR_ReturnOutcome ? ":success; r=1:g4; ret;" : ":success; r=i0; ret;"));
-        if (!cs) return NULL;
+        assert(cs);
+        if (res==RTTR_ReturnOutcome) {
+            cs = lil_parse_onto_end(cs, "ret;");
+        } else {
+            cs = lil_parse_onto_end(cs, "jc r=0,failed;");
+            cs = lil_parse_onto_end(cs, "r=i0; ret;");
+        }
+        assert(cs);
     }
 
     //*** Failure
@@ -339,45 +333,59 @@ static LilCodeStub* rth_gen_lil_type_test(LilCodeStub* cs, RthTypeTestNull null,
         GenericFunctionPointer thrw = lil_npc_to_fp(exn_get_rth_throw_class_cast_exception());
         cs = lil_parse_onto_end(cs, (res==RTTR_ThrowStub ? ":failed; tailcall %0i;" : ":failed; call.noret %0i;"), thrw);
     }
-    if (!cs) return NULL;
+    assert(cs && lil_is_valid(cs));
 
     return cs;
 }
 
-// General stats update
 #ifdef VM_STATS
+// General stats update
 static void rth_type_test_update_stats(VTable* sub, Class* super)
 {
-    vm_stats_total.num_type_checks ++;
+    VM_Statistics::get_vm_stats().num_type_checks ++;
     if (sub->clss == super)
-        vm_stats_total.num_type_checks_equal_type ++;
+        VM_Statistics::get_vm_stats().num_type_checks_equal_type ++;
     if (super->is_suitable_for_fast_instanceof)
-        vm_stats_total.num_type_checks_fast_decision ++;
+        VM_Statistics::get_vm_stats().num_type_checks_fast_decision ++;
     else if (super->is_array)
-        vm_stats_total.num_type_checks_super_is_array ++;
+        VM_Statistics::get_vm_stats().num_type_checks_super_is_array ++;
     else if (class_is_interface(super))
-        vm_stats_total.num_type_checks_super_is_interface ++;
+        VM_Statistics::get_vm_stats().num_type_checks_super_is_interface ++;
     else if (super->depth >= vm_max_fast_instanceof_depth())
-        vm_stats_total.num_type_checks_super_is_too_deep ++;
+        VM_Statistics::get_vm_stats().num_type_checks_super_is_too_deep ++;
 }
-#endif
 
 // Checkcast stats update
 static void rth_update_checkcast_stats(ManagedObject* o, Class* super)
 {
-#ifdef VM_STATS
-    vm_stats_total.num_checkcast ++;
+    VM_Statistics::get_vm_stats().num_checkcast ++;
     if (o == (ManagedObject*)Class::managed_null) {
-        vm_stats_total.num_checkcast_null++;
+        VM_Statistics::get_vm_stats().num_checkcast_null++;
     } else {
         if (o->vt()->clss == super)
-            vm_stats_total.num_checkcast_equal_type ++;
+            VM_Statistics::get_vm_stats().num_checkcast_equal_type ++;
         if (super->is_suitable_for_fast_instanceof)
-            vm_stats_total.num_checkcast_fast_decision ++;
+            VM_Statistics::get_vm_stats().num_checkcast_fast_decision ++;
         rth_type_test_update_stats(o->vt(), super);
     }
-#endif // VM_STATS
 }
+
+// Instanceof stats update
+static void rth_update_instanceof_stats(ManagedObject* o, Class* super)
+{
+    VM_Statistics::get_vm_stats().num_instanceof++;
+    super->num_instanceof_slow++;
+    if (o == (ManagedObject*)Class::managed_null) {
+        VM_Statistics::get_vm_stats().num_instanceof_null++;
+    } else {
+        if (o->vt()->clss == super)
+            VM_Statistics::get_vm_stats().num_instanceof_equal_type ++;
+        if (super->is_suitable_for_fast_instanceof)
+            VM_Statistics::get_vm_stats().num_instanceof_fast_decision ++;
+        rth_type_test_update_stats(o->vt(), super);
+    }
+}
+#endif // VM_STATS
 
 // Checkcast helper
 static NativeCodePtr rth_get_lil_checkcast(int* dyn_count)
@@ -386,31 +394,24 @@ static NativeCodePtr rth_get_lil_checkcast(int* dyn_count)
 
     if (!addr) {
         LilCodeStub* cs = lil_parse_code_stub("entry 0:rth:ref,pint:ref;");
-        cs = rth_gen_lil_type_test(cs, RTTN_NullMember, RTTR_ThrowStub, NULL, dyn_count, rth_update_checkcast_stats);
+
+#ifdef VM_STATS
+        if (dyn_count) {
+            cs = lil_parse_onto_end(cs, "inc [%0i:pint]; in2out platform:void; call %1i;", dyn_count, rth_update_checkcast_stats);
+            assert(cs);
+        }
+#endif
+
+        cs = rth_gen_lil_type_test(cs, RTTN_NullMember, RTTR_ThrowStub, NULL);
         assert(cs && lil_is_valid(cs));
-        addr = LilCodeGenerator::get_platform()->compile(cs, "rth_checkcast", dump_stubs);
+        addr = LilCodeGenerator::get_platform()->compile(cs);
+
+        DUMP_STUB(addr, "rth_checkcast", lil_cs_get_code_size(cs));
+
         lil_free_code_stub(cs);
     }
 
     return addr;
-}
-
-// Instanceof stats update
-static void rth_update_instanceof_stats(ManagedObject* o, Class* super)
-{
-#ifdef VM_STATS
-    vm_stats_total.num_instanceof++;
-    super->num_instanceof_slow++;
-    if (o == (ManagedObject*)Class::managed_null) {
-        vm_stats_total.num_instanceof_null++;
-    } else {
-        if (o->vt()->clss == super)
-            vm_stats_total.num_instanceof_equal_type ++;
-        if (super->is_suitable_for_fast_instanceof)
-            vm_stats_total.num_instanceof_fast_decision ++;
-        rth_type_test_update_stats(o->vt(), super);
-    }
-#endif // VM_STATS
 }
 
 // Instanceof Helper
@@ -420,9 +421,17 @@ static NativeCodePtr rth_get_lil_instanceof(int* dyn_count)
 
     if (!addr) {
         LilCodeStub* cs = lil_parse_code_stub("entry 0:rth:ref,pint:g4;");
-        cs = rth_gen_lil_type_test(cs, RTTN_NullNotMember, RTTR_ReturnOutcome, NULL, dyn_count, rth_update_instanceof_stats);
+#ifdef VM_STATS
+        assert(dyn_count);
+        cs = lil_parse_onto_end(cs, "inc [%0i:pint]; in2out platform:void; call %1i;", dyn_count, rth_update_instanceof_stats);
+        assert(cs);
+#endif
+        cs = rth_gen_lil_type_test(cs, RTTN_NullNotMember, RTTR_ReturnOutcome, NULL);
         assert(cs && lil_is_valid(cs));
-        addr = LilCodeGenerator::get_platform()->compile(cs, "rth_instanceof", dump_stubs);
+        addr = LilCodeGenerator::get_platform()->compile(cs);
+
+        DUMP_STUB(addr, "rth_instanceof", lil_cs_get_code_size(cs));
+
         lil_free_code_stub(cs);
     }
 
@@ -437,7 +446,7 @@ static NativeCodePtr rth_get_lil_instanceof(int* dyn_count)
 static Class* rth_aastore(ManagedObject* elem, int idx, Vector_Handle array)
 {
 #ifdef VM_STATS
-    vm_stats_total.num_aastore ++;
+    VM_Statistics::get_vm_stats().num_aastore ++;
 #endif // VM_STATS
 
     Global_Env *env = VM_Global_State::loader_env;
@@ -454,11 +463,11 @@ static Class* rth_aastore(ManagedObject* elem, int idx, Vector_Handle array)
 #ifdef VM_STATS
         VTable* vt = get_vector_vtable(array);
         if (vt == cached_object_array_vtable_ptr)
-            vm_stats_total.num_aastore_test_object_array++;
+            VM_Statistics::get_vm_stats().num_aastore_test_object_array++;
         if (elem->vt()->clss == array_class->array_element_class)
-            vm_stats_total.num_aastore_equal_type ++;
+            VM_Statistics::get_vm_stats().num_aastore_equal_type ++;
         if (array_class->array_element_class->is_suitable_for_fast_instanceof)
-            vm_stats_total.num_aastore_fast_decision ++;
+            VM_Statistics::get_vm_stats().num_aastore_fast_decision ++;
 #endif // VM_STATS
         if (class_is_subtype_fast(elem->vt(), array_class->array_element_class)) {
             STORE_REFERENCE((ManagedObject*)array, get_vector_element_address_ref(array, idx), (ManagedObject*)elem);
@@ -468,7 +477,7 @@ static Class* rth_aastore(ManagedObject* elem, int idx, Vector_Handle array)
     } else {
         // elem is null. We don't have to check types for a null reference. We also don't have to record stores of null references.
 #ifdef VM_STATS
-        vm_stats_total.num_aastore_null ++;
+        VM_Statistics::get_vm_stats().num_aastore_null ++;
 #endif // VM_STATS
         if (VM_Global_State::loader_env->compress_references) {
             COMPRESSED_REFERENCE* elem_ptr = (COMPRESSED_REFERENCE*)get_vector_element_address_ref(array, idx);
@@ -507,7 +516,10 @@ static NativeCodePtr rth_get_lil_aastore(int * dyn_count)
             p_aastore,
             lil_npc_to_fp(exn_get_rth_throw_lazy_trampoline()));
         assert(cs && lil_is_valid(cs));
-        addr = LilCodeGenerator::get_platform()->compile(cs, "rth_aastore", dump_stubs);
+        addr = LilCodeGenerator::get_platform()->compile(cs);
+
+        DUMP_STUB(addr, "rth_aastore", lil_cs_get_code_size(cs));
+
         lil_free_code_stub(cs);
     }
 
@@ -517,7 +529,7 @@ static NativeCodePtr rth_get_lil_aastore(int * dyn_count)
 static bool rth_aastore_test(ManagedObject* elem, Vector_Handle array)
 {
 #ifdef VM_STATS
-    vm_stats_total.num_aastore_test++;
+    VM_Statistics::get_vm_stats().num_aastore_test++;
 #endif // VM_STATS
 
     ManagedObject* null_ref = (ManagedObject*)Class::managed_null;
@@ -526,7 +538,7 @@ static bool rth_aastore_test(ManagedObject* elem, Vector_Handle array)
     }
     if (elem == null_ref) {
 #ifdef VM_STATS
-        vm_stats_total.num_aastore_test_null++;
+        VM_Statistics::get_vm_stats().num_aastore_test_null++;
 #endif // VM_STATS
         return true;
     }
@@ -534,7 +546,7 @@ static bool rth_aastore_test(ManagedObject* elem, Vector_Handle array)
     VTable* vt = get_vector_vtable(array);
     if (vt == cached_object_array_vtable_ptr) {
 #ifdef VM_STATS
-        vm_stats_total.num_aastore_test_object_array++;
+        VM_Statistics::get_vm_stats().num_aastore_test_object_array++;
 #endif // VM_STATS
         return true;
     }
@@ -545,9 +557,9 @@ static bool rth_aastore_test(ManagedObject* elem, Vector_Handle array)
 
 #ifdef VM_STATS
     if (elem->vt()->clss == array_class->array_element_class)
-        vm_stats_total.num_aastore_test_equal_type ++;
+        VM_Statistics::get_vm_stats().num_aastore_test_equal_type ++;
     if (array_class->array_element_class->is_suitable_for_fast_instanceof)
-        vm_stats_total.num_aastore_test_fast_decision ++;
+        VM_Statistics::get_vm_stats().num_aastore_test_fast_decision ++;
 #endif // VM_STATS
     return (class_is_subtype_fast(elem->vt(), array_class->array_element_class) ? true : false);
 } //rth_aastore_test
@@ -572,7 +584,10 @@ static NativeCodePtr rth_get_lil_aastore_test(int * dyn_count)
             "ret;",
             p_aastore_test);
         assert(cs && lil_is_valid(cs));
-        addr = LilCodeGenerator::get_platform()->compile(cs, "rth_aastore_test", dump_stubs);
+        addr = LilCodeGenerator::get_platform()->compile(cs);
+
+        DUMP_STUB(addr, "rth_aastore_test", lil_cs_get_code_size(cs));
+
         lil_free_code_stub(cs);
     }
 
@@ -592,7 +607,7 @@ static NativeCodePtr rth_get_lil_throw_linking_exception(int* dyn_count)
 
     if (!addr) {
         void (*p_throw_linking_error)(Class_Handle ch, unsigned index, unsigned opcode) =
-            class_throw_linking_error;
+            vm_rt_class_throw_linking_error;
         LilCodeStub* cs = lil_parse_code_stub("entry 0:managed:pint,g4,g4:void;");
         assert(cs);
         if (dyn_count) {
@@ -606,7 +621,10 @@ static NativeCodePtr rth_get_lil_throw_linking_exception(int* dyn_count)
             "call.noret %0i;",
             p_throw_linking_error);
         assert(cs && lil_is_valid(cs));
-        addr = LilCodeGenerator::get_platform()->compile(cs, "rth_throw_linking_exception", dump_stubs);
+        addr = LilCodeGenerator::get_platform()->compile(cs);
+
+        DUMP_STUB(addr, "rth_throw_linking_exception", lil_cs_get_code_size(cs));
+
         lil_free_code_stub(cs);
     }
 
@@ -625,26 +643,26 @@ static void* rth_get_interface_vtable(ManagedObject* obj, Class* iid)
     assert(clss);
     unsigned num_intfc = clss->n_intfc_table_entries;
 #ifdef VM_STATS
-    vm_stats_total.num_invokeinterface_calls++;
+    VM_Statistics::get_vm_stats().num_invokeinterface_calls++;
     switch(num_intfc) {
-    case 1:  vm_stats_total.num_invokeinterface_calls_size_1++;    break;
-    case 2:  vm_stats_total.num_invokeinterface_calls_size_2++;    break;
-    default: vm_stats_total.num_invokeinterface_calls_size_many++; break;
+    case 1:  VM_Statistics::get_vm_stats().num_invokeinterface_calls_size_1++;    break;
+    case 2:  VM_Statistics::get_vm_stats().num_invokeinterface_calls_size_2++;    break;
+    default: VM_Statistics::get_vm_stats().num_invokeinterface_calls_size_many++; break;
     }
-    if(num_intfc > vm_stats_total.invokeinterface_calls_size_max)
-        vm_stats_total.invokeinterface_calls_size_max = num_intfc;
+    if(num_intfc > VM_Statistics::get_vm_stats().invokeinterface_calls_size_max)
+        VM_Statistics::get_vm_stats().invokeinterface_calls_size_max = num_intfc;
 #endif
     for(unsigned i = 0; i < num_intfc; i++) {
         Class* intfc = clss->intfc_table_descriptors[i];
         if(intfc == iid) {
 #ifdef VM_STATS
             switch(i) {
-            case 0:  vm_stats_total.num_invokeinterface_calls_searched_1++;    break;
-            case 1:  vm_stats_total.num_invokeinterface_calls_searched_2++;    break;
-            default: vm_stats_total.num_invokeinterface_calls_searched_many++; break;
+            case 0:  VM_Statistics::get_vm_stats().num_invokeinterface_calls_searched_1++;    break;
+            case 1:  VM_Statistics::get_vm_stats().num_invokeinterface_calls_searched_2++;    break;
+            default: VM_Statistics::get_vm_stats().num_invokeinterface_calls_searched_many++; break;
             }
-            if(i > vm_stats_total.invokeinterface_calls_searched_max)
-                vm_stats_total.invokeinterface_calls_searched_max = i;
+            if(i > VM_Statistics::get_vm_stats().invokeinterface_calls_searched_max)
+                VM_Statistics::get_vm_stats().invokeinterface_calls_searched_max = i;
 #endif
             unsigned char **table = clss->vtable->intfc_table->entry[i].table;
             return (void *)table;
@@ -679,7 +697,10 @@ static NativeCodePtr rth_get_lil_get_interface_vtable(int* dyn_count)
             "ret;",
             Class::managed_null, p_get_ivtable, lil_npc_to_fp(exn_get_rth_throw_incompatible_class_change_exception()));
         assert(cs && lil_is_valid(cs));
-        addr = LilCodeGenerator::get_platform()->compile(cs, "rth_get_interface_vtable", dump_stubs);
+        addr = LilCodeGenerator::get_platform()->compile(cs);
+
+        DUMP_STUB(addr, "rth_get_interface_vtable", lil_cs_get_code_size(cs));
+
         lil_free_code_stub(cs);
     }
 
@@ -693,12 +714,32 @@ static NativeCodePtr rth_get_lil_get_interface_vtable(int* dyn_count)
 static POINTER_SIZE_INT is_class_initialized(Class *clss)
 {
 #ifdef VM_STATS
-    vm_stats_total.num_is_class_initialized++;
+    VM_Statistics::get_vm_stats().num_is_class_initialized++;
     clss->num_class_init_checks++;
 #endif // VM_STATS
     assert(!hythread_is_suspend_enabled());
     return clss->state == ST_Initialized;
 } //is_class_initialized
+
+void vm_rt_class_initialize(Class *clss)
+{
+    ASSERT_THROW_AREA;
+    BEGIN_RAISE_AREA;
+    class_initialize(clss);
+    END_RAISE_AREA;
+    exn_rethrow_if_pending();
+}
+
+// It's a rutime helper. So exception throwed from it.
+void vm_rt_class_throw_linking_error(Class_Handle ch, unsigned index, unsigned opcode)
+{
+    ASSERT_THROW_AREA;
+    BEGIN_RAISE_AREA;
+    class_throw_linking_error(ch, index, opcode);
+    END_RAISE_AREA;
+    exn_rethrow_if_pending();
+}
+
 
 // Initialise class helper
 static NativeCodePtr rth_get_lil_initialize_class(int* dyn_count)
@@ -708,13 +749,14 @@ static NativeCodePtr rth_get_lil_initialize_class(int* dyn_count)
     if (!addr) {
         POINTER_SIZE_INT (*p_is_inited)(Class*) = is_class_initialized;
         void (*p_init)(Class*) = class_initialize;
-        void (*p_rethrow)() = rethrow_current_thread_exception;
+        void (*p_rethrow)() = exn_rethrow;
         LilCodeStub* cs = lil_parse_code_stub("entry 0:rth:pint:void;");
         assert(cs);
-        if (dyn_count) {
-            cs = lil_parse_onto_end(cs, "inc [%0i:pint];", dyn_count);
-            assert(cs);
-        }
+#ifdef VM_STATS
+        assert(dyn_count);
+        cs = lil_parse_onto_end(cs, "inc [%0i:pint];", dyn_count);
+        assert(cs);
+#endif 
         cs = lil_parse_onto_end(cs,
             "in2out platform:pint;"
             "call %0i;"
@@ -725,19 +767,26 @@ static NativeCodePtr rth_get_lil_initialize_class(int* dyn_count)
             "m2n_save_all;"
             "in2out platform:void;"
             "call %2i;"
-            "locals 1;"
+            "locals 2;"
             "l0 = ts;"
-            "ld l0, [l0 + %3i:ref];"
-            "jc l0 != 0,_exn_raised;"
+            "ld l1, [l0 + %3i:ref];"
+            "jc l1 != 0,_exn_raised;"
+            "ld l1, [l0 + %4i:ref];"
+            "jc l1 != 0,_exn_raised;"
             "pop_m2n;"
             "ret;"
             ":_exn_raised;"
             "out platform::void;"
-            "call.noret %4i;",
+            "call.noret %5i;",
             p_is_inited, FRAME_JNI, p_init,
-            OFFSET(VM_thread, p_exception_object), p_rethrow);
+            OFFSET(VM_thread, thread_exception.exc_object),
+            OFFSET(VM_thread, thread_exception.exc_class),
+            p_rethrow);
         assert(cs && lil_is_valid(cs));
-        addr = LilCodeGenerator::get_platform()->compile(cs, "rth_get_initialize_class", dump_stubs);
+        addr = LilCodeGenerator::get_platform()->compile(cs);
+        
+        DUMP_STUB(addr, "rth_get_initialize_class", lil_cs_get_code_size(cs));
+
         lil_free_code_stub(cs);
     }
 
@@ -780,7 +829,10 @@ static NativeCodePtr rth_get_lil_f2i(int* dyn_count)
             "ret;",
             p_f2i);
         assert(cs && lil_is_valid(cs));
-        addr = LilCodeGenerator::get_platform()->compile(cs, "rth_f2i", dump_stubs);
+        addr = LilCodeGenerator::get_platform()->compile(cs);
+
+        DUMP_STUB(addr, "rth_f2i", lil_cs_get_code_size(cs));
+
         lil_free_code_stub(cs);
     }
 
@@ -830,7 +882,10 @@ static NativeCodePtr rth_get_lil_f2l(int* dyn_count)
             "ret;",
             p_f2l);
         assert(cs && lil_is_valid(cs));
-        addr = LilCodeGenerator::get_platform()->compile(cs, "rth_f2l", dump_stubs);
+        addr = LilCodeGenerator::get_platform()->compile(cs);
+
+        DUMP_STUB(addr, "rth_f2l", lil_cs_get_code_size(cs));
+
         lil_free_code_stub(cs);
     }
 
@@ -872,7 +927,10 @@ static NativeCodePtr rth_get_lil_d2i(int* dyn_count)
             "ret;",
             p_d2i);
         assert(cs && lil_is_valid(cs));
-        addr = LilCodeGenerator::get_platform()->compile(cs, "rth_d2i", dump_stubs);
+        addr = LilCodeGenerator::get_platform()->compile(cs);
+
+        DUMP_STUB(addr, "rth_d2i", lil_cs_get_code_size(cs));
+
         lil_free_code_stub(cs);
     }
 
@@ -922,7 +980,10 @@ static NativeCodePtr rth_get_lil_d2l(int* dyn_count)
             "ret;",
             p_d2l);
         assert(cs && lil_is_valid(cs));
-        addr = LilCodeGenerator::get_platform()->compile(cs, "rth_d2l", dump_stubs);
+        addr = LilCodeGenerator::get_platform()->compile(cs);
+
+        DUMP_STUB(addr, "rth_d2l", lil_cs_get_code_size(cs));
+
         lil_free_code_stub(cs);
     }
 
@@ -952,7 +1013,10 @@ static NativeCodePtr rth_get_lil_lshl(int* dyn_count)
             "ret;",
             p_lshl);
         assert(cs && lil_is_valid(cs));
-        addr = LilCodeGenerator::get_platform()->compile(cs, "rth_lshl", dump_stubs);
+        addr = LilCodeGenerator::get_platform()->compile(cs);
+
+        DUMP_STUB(addr, "rth_lshl", lil_cs_get_code_size(cs));
+
         lil_free_code_stub(cs);
     }
 
@@ -982,7 +1046,10 @@ static NativeCodePtr rth_get_lil_lshr(int* dyn_count)
             "ret;",
             p_lshr);
         assert(cs && lil_is_valid(cs));
-        addr = LilCodeGenerator::get_platform()->compile(cs, "rth_lshr", dump_stubs);
+        addr = LilCodeGenerator::get_platform()->compile(cs);
+
+        DUMP_STUB(addr, "rth_lshr", lil_cs_get_code_size(cs));
+
         lil_free_code_stub(cs);
     }
 
@@ -1012,7 +1079,10 @@ static NativeCodePtr rth_get_lil_lushr(int* dyn_count)
             "ret;",
             p_lushr);
         assert(cs && lil_is_valid(cs));
-        addr = LilCodeGenerator::get_platform()->compile(cs, "rth_lushr", dump_stubs);
+        addr = LilCodeGenerator::get_platform()->compile(cs);
+
+        DUMP_STUB(addr, "rth_lushr", lil_cs_get_code_size(cs));
+
         lil_free_code_stub(cs);
     }
 
@@ -1042,7 +1112,10 @@ static NativeCodePtr rth_get_lil_lmul(int* dyn_count)
             "ret;",
             p_lmul);
         assert(cs && lil_is_valid(cs));
-        addr = LilCodeGenerator::get_platform()->compile(cs, "rth_lmul", dump_stubs);
+        addr = LilCodeGenerator::get_platform()->compile(cs);
+
+        DUMP_STUB(addr, "rth_lmul", lil_cs_get_code_size(cs));
+
         lil_free_code_stub(cs);
     }
 
@@ -1076,7 +1149,10 @@ static NativeCodePtr rth_get_lil_lrem(int* dyn_count)
             "tailcall %1i;",
             p_lrem, lil_npc_to_fp(exn_get_rth_throw_arithmetic()));
         assert(cs && lil_is_valid(cs));
-        addr = LilCodeGenerator::get_platform()->compile(cs, "rth_lrem", dump_stubs);
+        addr = LilCodeGenerator::get_platform()->compile(cs);
+
+        DUMP_STUB(addr, "rth_lrem", lil_cs_get_code_size(cs));
+
         lil_free_code_stub(cs);
     }
 
@@ -1110,7 +1186,10 @@ static NativeCodePtr rth_get_lil_ldiv(int* dyn_count)
             "tailcall %1i;",
             p_ldiv, lil_npc_to_fp(exn_get_rth_throw_arithmetic()));
         assert(cs && lil_is_valid(cs));
-        addr = LilCodeGenerator::get_platform()->compile(cs, "rth_ldiv", dump_stubs);
+        addr = LilCodeGenerator::get_platform()->compile(cs);
+
+        DUMP_STUB(addr, "rth_ldiv", lil_cs_get_code_size(cs));
+
         lil_free_code_stub(cs);
     }
 
@@ -1144,7 +1223,10 @@ static NativeCodePtr rth_get_lil_ludiv(int* dyn_count)
             "tailcall %1i;",
             p_ludiv, lil_npc_to_fp(exn_get_rth_throw_arithmetic()));
         assert(cs && lil_is_valid(cs));
-        addr = LilCodeGenerator::get_platform()->compile(cs, "rth_ludiv", dump_stubs);
+        addr = LilCodeGenerator::get_platform()->compile(cs);
+
+        DUMP_STUB(addr, "rth_ludiv", lil_cs_get_code_size(cs));
+
         lil_free_code_stub(cs);
     }
 
@@ -1173,7 +1255,10 @@ static NativeCodePtr rth_get_lil_ldiv_const(int* dyn_count)
             "ret;",
             divisor_offset, p_ldiv);
         assert(cs && lil_is_valid(cs));
-        addr = LilCodeGenerator::get_platform()->compile(cs, "rth_ldiv_const", dump_stubs);
+        addr = LilCodeGenerator::get_platform()->compile(cs);
+
+        DUMP_STUB(addr, "rth_ldiv_const", lil_cs_get_code_size(cs));
+
         lil_free_code_stub(cs);
     }
 
@@ -1202,7 +1287,10 @@ static NativeCodePtr rth_get_lil_lrem_const(int* dyn_count)
             "ret;",
             divisor_offset, p_lrem);
         assert(cs && lil_is_valid(cs));
-        addr = LilCodeGenerator::get_platform()->compile(cs, "rth_lrem_const", dump_stubs);
+        addr = LilCodeGenerator::get_platform()->compile(cs);
+
+        DUMP_STUB(addr, "rth_lrem_const", lil_cs_get_code_size(cs));
+
         lil_free_code_stub(cs);
     }
 
@@ -1232,7 +1320,10 @@ static NativeCodePtr rth_get_lil_imul(int* dyn_count)
             "ret;",
             p_imul);
         assert(cs && lil_is_valid(cs));
-        addr = LilCodeGenerator::get_platform()->compile(cs, "rth_imul", dump_stubs);
+        addr = LilCodeGenerator::get_platform()->compile(cs);
+
+        DUMP_STUB(addr, "rth_imul", lil_cs_get_code_size(cs));
+
         lil_free_code_stub(cs);
     }
 
@@ -1266,7 +1357,10 @@ static NativeCodePtr rth_get_lil_irem(int* dyn_count)
             "tailcall %1i;",
             p_irem, lil_npc_to_fp(exn_get_rth_throw_arithmetic()));
         assert(cs && lil_is_valid(cs));
-        addr = LilCodeGenerator::get_platform()->compile(cs, "rth_irem", dump_stubs);
+        addr = LilCodeGenerator::get_platform()->compile(cs);
+
+        DUMP_STUB(addr, "rth_irem", lil_cs_get_code_size(cs));
+
         lil_free_code_stub(cs);
     }
 
@@ -1300,7 +1394,10 @@ static NativeCodePtr rth_get_lil_idiv(int* dyn_count)
             "tailcall %1i;",
             p_idiv, lil_npc_to_fp(exn_get_rth_throw_arithmetic()));
         assert(cs && lil_is_valid(cs));
-        addr = LilCodeGenerator::get_platform()->compile(cs, "rth_idiv", dump_stubs);
+        addr = LilCodeGenerator::get_platform()->compile(cs);
+
+        DUMP_STUB(addr, "rth_idiv", lil_cs_get_code_size(cs));
+
         lil_free_code_stub(cs);
     }
 
@@ -1361,7 +1458,10 @@ static NativeCodePtr rth_get_lil_frem(int* dyn_count)
             "ret;",
             p_frem);
         assert(cs && lil_is_valid(cs));
-        addr = LilCodeGenerator::get_platform()->compile(cs, "rth_frem", dump_stubs);
+        addr = LilCodeGenerator::get_platform()->compile(cs);
+
+        DUMP_STUB(addr, "rth_frem", lil_cs_get_code_size(cs));
+
         lil_free_code_stub(cs);
     }
 
@@ -1391,7 +1491,10 @@ static NativeCodePtr rth_get_lil_fdiv(int* dyn_count)
             "ret;",
             p_fdiv);
         assert(cs && lil_is_valid(cs));
-        addr = LilCodeGenerator::get_platform()->compile(cs, "rth_fdiv", dump_stubs);
+        addr = LilCodeGenerator::get_platform()->compile(cs);
+
+        DUMP_STUB(addr, "rth_fdiv", lil_cs_get_code_size(cs));
+
         lil_free_code_stub(cs);
     }
 
@@ -1421,7 +1524,10 @@ static NativeCodePtr rth_get_lil_drem(int* dyn_count)
             "ret;",
             p_drem);
         assert(cs && lil_is_valid(cs));
-        addr = LilCodeGenerator::get_platform()->compile(cs, "rth_drem", dump_stubs);
+        addr = LilCodeGenerator::get_platform()->compile(cs);
+
+        DUMP_STUB(addr, "rth_drem", lil_cs_get_code_size(cs));
+
         lil_free_code_stub(cs);
     }
 
@@ -1451,7 +1557,10 @@ static NativeCodePtr rth_get_lil_ddiv(int* dyn_count)
             "ret;",
             p_ddiv);
         assert(cs && lil_is_valid(cs));
-        addr = LilCodeGenerator::get_platform()->compile(cs, "rth_ddiv", dump_stubs);
+        addr = LilCodeGenerator::get_platform()->compile(cs);
+
+        DUMP_STUB(addr, "rth_ddiv", lil_cs_get_code_size(cs));
+
         lil_free_code_stub(cs);
     }
 
@@ -1479,7 +1588,10 @@ static NativeCodePtr rth_wrap_exn_throw(int* dyncount, const char* name, NativeC
         "tailcall %1i;",
         dyncount, lil_npc_to_fp(stub));
     assert(cs && lil_is_valid(cs));
-    wrapper = LilCodeGenerator::get_platform()->compile(cs, name, dump_stubs);
+    wrapper = LilCodeGenerator::get_platform()->compile(cs);
+
+    DUMP_STUB(wrapper, name, lil_cs_get_code_size(cs));
+
     lil_free_code_stub(cs);
 
     wrappers.add(stub, 0, wrapper);
@@ -1509,7 +1621,10 @@ static NativeCodePtr rth_get_lil_gc_safe_point(int * dyn_count) {
         "ret;",
         hythread_safe_point_ptr);
     assert(cs && lil_is_valid(cs));
-    addr = LilCodeGenerator::get_platform()->compile(cs, "rth_gc_safe_point", dump_stubs);
+    addr = LilCodeGenerator::get_platform()->compile(cs);
+
+    DUMP_STUB(addr, "rth_gc_safe_point", lil_cs_get_code_size(cs));
+
     lil_free_code_stub(cs);
     return addr;
 }
@@ -1533,8 +1648,10 @@ static NativeCodePtr rth_get_lil_gc_thread_suspend_flag_ptr(int * dyn_count) {
         "ret;",
         thread_get_suspend_request_offset());
     assert(cs && lil_is_valid(cs));
-    addr = LilCodeGenerator::get_platform()->compile(cs, 
-                        "rth_get_lil_gc_thread_suspend_flag_ptr", dump_stubs);
+    addr = LilCodeGenerator::get_platform()->compile(cs);
+
+    DUMP_STUB(addr, "rth_get_lil_gc_thread_suspend_flag_ptr", lil_cs_get_code_size(cs));
+
     lil_free_code_stub(cs);
     */
     //assert(0);
@@ -1544,6 +1661,8 @@ static NativeCodePtr rth_get_lil_gc_thread_suspend_flag_ptr(int * dyn_count) {
 static void * rth_resolve(Class_Handle klass, unsigned cp_idx,
                           JavaByteCodes opcode)
 {
+    ASSERT_THROW_AREA;
+
     Compilation_Handle comp_handle;
     comp_handle.env = VM_Global_State::loader_env;
     comp_handle.jit = NULL;
@@ -1587,7 +1706,7 @@ static void * rth_resolve(Class_Handle klass, unsigned cp_idx,
             hythread_suspend_disable();
             if (class_needs_initialization(that_class)) {
                 assert(!exn_raised());
-                class_initialize_ex(that_class);
+                vm_rt_class_initialize(that_class);
             }
             return ret;
         }
@@ -1599,7 +1718,7 @@ static void * rth_resolve(Class_Handle klass, unsigned cp_idx,
             hythread_suspend_disable();
             if (class_needs_initialization(that_class)) {
                 assert(!exn_raised());
-                class_initialize_ex(that_class);
+                vm_rt_class_initialize(that_class);
             }
             return ret;
         }
@@ -1609,7 +1728,7 @@ static void * rth_resolve(Class_Handle klass, unsigned cp_idx,
     
     hythread_suspend_disable();
     if (ret == NULL) {
-        class_throw_linking_error(klass, cp_idx, opcode);
+        vm_rt_class_throw_linking_error(klass, cp_idx, opcode);
         assert(false); // must be unreachanble
     }
     return ret;
@@ -1636,16 +1755,19 @@ static NativeCodePtr rth_get_lil_resolve(int * dyn_count)
         "ret;",
         (void*)&rth_resolve);
     assert(cs && lil_is_valid(cs));
-    addr = LilCodeGenerator::get_platform()->compile(cs, "rth_resolve", dump_stubs);
+    addr = LilCodeGenerator::get_platform()->compile(cs);
+
+    DUMP_STUB(addr, "rth_resolve", lil_cs_get_code_size(cs));
+
     lil_free_code_stub(cs);
     return addr;
 }
 
 static NativeCodePtr rth_get_lil_jvmti_method_enter_callback(int * dyn_count) {
-        static NativeCodePtr addr = NULL;
-        if (addr) {
-                return addr;
-            }
+    static NativeCodePtr addr = NULL;
+    if (addr) {
+            return addr;
+    }
     void (*jvmti_method_enter_callback_ptr)(Method_Handle) = jvmti_method_enter_callback;
     LilCodeStub* cs = lil_parse_code_stub("entry 0:managed:pint:void;");
     assert(cs);
@@ -1661,7 +1783,10 @@ static NativeCodePtr rth_get_lil_jvmti_method_enter_callback(int * dyn_count) {
         "ret;",
         jvmti_method_enter_callback_ptr);
     assert(cs && lil_is_valid(cs));
-    addr = LilCodeGenerator::get_platform()->compile(cs, "rth_jvmti_method_enter_callback", dump_stubs);
+    addr = LilCodeGenerator::get_platform()->compile(cs);
+
+    DUMP_STUB(addr, "rth_jvmti_method_enter_callback", lil_cs_get_code_size(cs));
+
     lil_free_code_stub(cs);
     return addr;
 }
@@ -1688,30 +1813,120 @@ static NativeCodePtr rth_get_lil_jvmti_method_exit_callback(int * dyn_count) {
         "ret;",
         jvmti_method_exit_callback_ptr);
     assert(cs && lil_is_valid(cs));
-    addr = LilCodeGenerator::get_platform()->compile(cs, "rth_jvmti_method_exit_callback", dump_stubs);
+    addr = LilCodeGenerator::get_platform()->compile(cs);
+
+    DUMP_STUB(addr, "rth_jvmti_method_exit_callback", lil_cs_get_code_size(cs));
+
     lil_free_code_stub(cs);
     return addr;
 }
 
+static NativeCodePtr rth_get_lil_jvmti_field_access_callback(int * dyn_count) {
+    static NativeCodePtr addr = NULL;
+    if (addr) {
+        return addr;
+        }
+    void (*jvmti_field_access_callback_ptr)(Field_Handle, Method_Handle,
+            jlocation, jobject*) = jvmti_field_access_callback;
+
+    LilCodeStub* cs = lil_parse_code_stub("entry 0:managed:pint,pint,g8,pint:void;");
+    assert(cs);
+    if (dyn_count) {
+        cs = lil_parse_onto_end(cs, "inc [%0i:pint];", dyn_count);
+        assert(cs);
+    }
+    cs = lil_parse_onto_end(cs,
+            "push_m2n 0, 0;"
+            "in2out platform:void;"
+            "call %0i;"
+            "pop_m2n;"
+            "ret;",
+             jvmti_field_access_callback_ptr);
+    assert(cs && lil_is_valid(cs));
+    addr = LilCodeGenerator::get_platform()->compile(cs);
+
+    DUMP_STUB(addr, "rth_jvmti_field_access_callback", lil_cs_get_code_size(cs));
+
+    lil_free_code_stub(cs);
+    return addr;
+
+    //static NativeCodePtr addr = NULL;
+    //if (addr) {
+    //        return addr;
+    //    }
+    //LilCodeStub* cs = lil_parse_code_stub(
+    //    "entry 0:managed:pint,pint,g8,pint:void;"
+    //    "push_m2n 0, 0;"
+    //    "in2out platform:void;"
+    //    "call %0i;"
+    //    "pop_m2n;"
+    //    "ret;",
+    //    jvmti_field_access_callback);
+    //assert(cs && lil_is_valid(cs));
+    //addr = LilCodeGenerator::get_platform()->compile(cs, "rth_jvmti_field_access_callback", dump_stubs);
+    //lil_free_code_stub(cs);
+    //return addr;
+}
+
+static NativeCodePtr rth_get_lil_jvmti_field_modification_callback(int * dyn_count) {
+    static NativeCodePtr addr = NULL;
+    if (addr) {
+        return addr;
+        }
+void (*jvmti_field_modification_callback_ptr)(Field_Handle, Method_Handle,
+                                              jlocation, jobject*, jvalue*) = jvmti_field_modification_callback;
+    LilCodeStub* cs = lil_parse_code_stub("entry 0:managed:pint,pint,g8,pint,pint:void;");
+    assert(cs);
+    if (dyn_count) {
+        cs = lil_parse_onto_end(cs, "inc [%0i:pint];", dyn_count);
+        assert(cs);
+        }
+    cs = lil_parse_onto_end(cs,
+            "push_m2n 0, 0;"
+            "in2out platform:void;"
+            "call %0i;"
+            "pop_m2n;"
+            "ret;",
+            jvmti_field_modification_callback_ptr);
+    assert(cs && lil_is_valid(cs));
+    addr = LilCodeGenerator::get_platform()->compile(cs);
+
+    DUMP_STUB(addr, "rth_jvmti_field_modification_callback", lil_cs_get_code_size(cs));
+
+    lil_free_code_stub(cs);
+    return addr;
+
+    //static NativeCodePtr addr = NULL;
+    //if (addr) {
+    //    return addr;
+    //}
+    //LilCodeStub* cs = lil_parse_code_stub(
+    //    "entry 0:managed:pint,pint,g8,pint,pint:void;"
+    //    "push_m2n 0, 0;"
+    //    "in2out platform:void;"
+    //    "call %0i;"
+    //    "pop_m2n;"
+    //    "ret;",
+    //    jvmti_field_modification_callback);
+    //assert(cs && lil_is_valid(cs));
+    //addr = LilCodeGenerator::get_platform()->compile(cs, "rth_jvmti_field_modification_callback", dump_stubs);
+    //lil_free_code_stub(cs);
+    //return addr;
+}
 
 NativeCodePtr rth_get_lil_helper(VM_RT_SUPPORT f)
 {
     int* dyn_count = NULL;
 #ifdef VM_STATS
-    dyn_count = vm_stats_total.rt_function_calls.lookup_or_add((void*)f, 0, NULL);
+    dyn_count = VM_Statistics::get_vm_stats().rt_function_calls.lookup_or_add((void*)f, 0, NULL);
 #endif
 
     switch(f) {
-        // Object creation
-    case VM_RT_NEW_RESOLVED_USING_VTABLE_AND_SIZE:
-            return NULL;
-    case VM_RT_NEW_VECTOR_USING_VTABLE:
-            return NULL;
     case VM_RT_MULTIANEWARRAY_RESOLVED:
         return rth_get_lil_multianewarray(dyn_count);
     case VM_RT_LDC_STRING:
         return rth_get_lil_ldc_ref(dyn_count);
-        // Exceptions
+    // Exceptions
     case VM_RT_THROW:
     case VM_RT_THROW_SET_STACK_TRACE:
         return rth_wrap_exn_throw(dyn_count, "rth_throw", exn_get_rth_throw());
@@ -1727,18 +1942,7 @@ NativeCodePtr rth_get_lil_helper(VM_RT_SUPPORT f)
         return rth_wrap_exn_throw(dyn_count, "rth_throw_array_store", exn_get_rth_throw_array_store());
     case VM_RT_THROW_LINKING_EXCEPTION:
         return rth_get_lil_throw_linking_exception(dyn_count);
-        // Synchronisation
-    case VM_RT_MONITOR_ENTER:
-    case VM_RT_MONITOR_ENTER_NO_EXC:
-            return NULL;
-    case VM_RT_MONITOR_EXIT:
-    case VM_RT_MONITOR_EXIT_NON_NULL:
-            return NULL;
-    case VM_RT_MONITOR_ENTER_STATIC:
-            return NULL;
-    case VM_RT_MONITOR_EXIT_STATIC:
-            return NULL;
-        // Type tests
+    // Type tests
     case VM_RT_CHECKCAST:
         return rth_get_lil_checkcast(dyn_count);
     case VM_RT_INSTANCEOF:
@@ -1747,23 +1951,25 @@ NativeCodePtr rth_get_lil_helper(VM_RT_SUPPORT f)
         return rth_get_lil_aastore(dyn_count);
     case VM_RT_AASTORE_TEST:
         return rth_get_lil_aastore_test(dyn_count);
-        // Misc
+    // Misc
     case VM_RT_GET_INTERFACE_VTABLE_VER0:
         return rth_get_lil_get_interface_vtable(dyn_count);
     case VM_RT_INITIALIZE_CLASS:
         return rth_get_lil_initialize_class(dyn_count);
-    case VM_RT_GC_HEAP_WRITE_REF:
-        return NULL;
     case VM_RT_GC_SAFE_POINT:
         return rth_get_lil_gc_safe_point(dyn_count);
     case VM_RT_GC_GET_THREAD_SUSPEND_FLAG_PTR:
         return rth_get_lil_gc_thread_suspend_flag_ptr(dyn_count);
-        // JVMTI
+    // JVMTI
     case VM_RT_JVMTI_METHOD_ENTER_CALLBACK:
         return rth_get_lil_jvmti_method_enter_callback(dyn_count);
     case VM_RT_JVMTI_METHOD_EXIT_CALLBACK:
         return rth_get_lil_jvmti_method_exit_callback(dyn_count);
-        // Non-VM
+    case VM_RT_JVMTI_FIELD_ACCESS_CALLBACK:
+        return rth_get_lil_jvmti_field_access_callback(dyn_count);
+    case VM_RT_JVMTI_FIELD_MODIFICATION_CALLBACK:
+        return rth_get_lil_jvmti_field_modification_callback(dyn_count);
+    // Non-VM
     case VM_RT_F2I:
         return rth_get_lil_f2i(dyn_count);
     case VM_RT_F2L:
@@ -1807,12 +2013,9 @@ NativeCodePtr rth_get_lil_helper(VM_RT_SUPPORT f)
         return rth_get_lil_drem(dyn_count);
     case VM_RT_DDIV:
         return rth_get_lil_ddiv(dyn_count);
-    case VM_RT_CHAR_ARRAYCOPY_NO_EXC:
-        return NULL;
     case VM_RT_RESOLVE:
         return rth_get_lil_resolve(dyn_count);
     default:
-        ABORT("Unexpected helper id");
         return NULL;
     }
 }
@@ -1827,37 +2030,42 @@ NativeCodePtr rth_get_lil_helper(VM_RT_SUPPORT f)
 // begin Java object allocation
 
 /**
- * intermediary function for allocation slow path to check
- * for out of memory conditions. Throws OutOfMemoryError
- * if allocation function returns null.
+ * Intermediary function called from rintime helpers for
+ * slow path allocation to check for out of memory conditions.
+ * Throws OutOfMemoryError if allocation function returns null.
  */
 void *vm_malloc_with_thread_pointer(
         unsigned size, Allocation_Handle ah, void *tp) {
+    ASSERT_THROW_AREA;
     assert(!hythread_is_suspend_enabled());
     void *result = gc_alloc(size,ah,tp);
     if (!result) {
-        exn_throw(VM_Global_State::loader_env->java_lang_OutOfMemoryError);
+        exn_throw_object(VM_Global_State::loader_env->java_lang_OutOfMemoryError);
         return 0; // whether this return is reached or not is solved via is_unwindable state
     }
     return result;
 }
 
-
-
-// This function is deprecated.
-ManagedObject *class_alloc_new_object_or_null(Class * UNREF c)
+ManagedObject* vm_rt_class_alloc_new_object(Class *c)
 {
-    return NULL;
-} //class_alloc_new_object_or_null
+    ASSERT_THROW_AREA;
+    ManagedObject* result;
+    BEGIN_RAISE_AREA;
+    result = class_alloc_new_object(c);
+    END_RAISE_AREA;
+    exn_rethrow_if_pending();
+    return result;
+}
 
 
 ManagedObject *class_alloc_new_object(Class *c)
 {
+    ASSERT_RAISE_AREA;
     assert(!hythread_is_suspend_enabled());
     //hythread_suspend_disable();
     assert(strcmp(c->name->bytes, "java/lang/Class")); 
 #ifdef VM_STATS
-    vm_stats_total.num_class_alloc_new_object++;
+    VM_Statistics::get_vm_stats().num_class_alloc_new_object++;
     c->num_allocations++;
     c->num_bytes_allocated += get_instance_data_size(c);
 #endif //VM_STATS
@@ -1865,7 +2073,7 @@ ManagedObject *class_alloc_new_object(Class *c)
         gc_alloc(c->instance_data_size, 
             c->allocation_handle, vm_get_gc_thread_local());
     if (!o) {
-        exn_throw(
+        exn_raise_object(
             VM_Global_State::loader_env->java_lang_OutOfMemoryError);
         //hythread_suspend_enable();
         return 0; // whether this return is reached or not is solved via is_unwindable state
@@ -1874,13 +2082,13 @@ ManagedObject *class_alloc_new_object(Class *c)
      return o;
 } //class_alloc_new_object
 
-
 ManagedObject *class_alloc_new_object_using_vtable(VTable *vtable)
 {
+    ASSERT_RAISE_AREA;
     assert(!hythread_is_suspend_enabled());
     assert(strcmp(vtable->clss->name->bytes, "java/lang/Class")); 
 #ifdef VM_STATS
-    vm_stats_total.num_class_alloc_new_object++;
+    VM_Statistics::get_vm_stats().num_class_alloc_new_object++;
     vtable->clss->num_allocations++;
     vtable->clss->num_bytes_allocated += vtable->allocated_size;
 #endif //VM_STATS
@@ -1889,28 +2097,24 @@ ManagedObject *class_alloc_new_object_using_vtable(VTable *vtable)
         gc_alloc(vtable->allocated_size, 
             vtable->clss->allocation_handle, vm_get_gc_thread_local());
     if (!o) {
-        exn_throw(
+        exn_raise_object(
             VM_Global_State::loader_env->java_lang_OutOfMemoryError);
         return NULL; // reached by interpreter and from JNI
     }
     return o;
 } //class_alloc_new_object_using_vtable
 
-
-
 ManagedObject *class_alloc_new_object_and_run_default_constructor(Class *clss)
 {
     return class_alloc_new_object_and_run_constructor(clss, 0, 0);
 } //class_alloc_new_object_and_run_default_constructor
-
-
-
 
 ManagedObject *
 class_alloc_new_object_and_run_constructor(Class *clss,
                                            Method *constructor,
                                            uint8 *constructor_args)
 {
+    ASSERT_RAISE_AREA;
     assert(!hythread_is_suspend_enabled());
     assert(strcmp(clss->name->bytes, "java/lang/Class"));
  
@@ -1918,7 +2122,7 @@ class_alloc_new_object_and_run_constructor(Class *clss,
     obj->object = (ManagedObject*)
         gc_alloc(clss->instance_data_size, clss->allocation_handle, vm_get_gc_thread_local());
     if (!obj->object) {
-        exn_throw_only(
+        exn_raise_object(
             VM_Global_State::loader_env->java_lang_OutOfMemoryError);
         return 0; // should never be reached
     }
@@ -2020,33 +2224,33 @@ class_alloc_new_object_and_run_constructor(Class *clss,
 static void update_general_type_checking_stats(VTable *sub, Class *super)
 {
 #ifdef VM_STATS
-    vm_stats_total.num_type_checks ++;
+    VM_Statistics::get_vm_stats().num_type_checks ++;
     if (sub->clss == super)
-        vm_stats_total.num_type_checks_equal_type ++;
+        VM_Statistics::get_vm_stats().num_type_checks_equal_type ++;
     if (super->is_suitable_for_fast_instanceof)
-        vm_stats_total.num_type_checks_fast_decision ++;
+        VM_Statistics::get_vm_stats().num_type_checks_fast_decision ++;
     else if (super->is_array)
-        vm_stats_total.num_type_checks_super_is_array ++;
+        VM_Statistics::get_vm_stats().num_type_checks_super_is_array ++;
     else if (class_is_interface(super))
-        vm_stats_total.num_type_checks_super_is_interface ++;
+        VM_Statistics::get_vm_stats().num_type_checks_super_is_interface ++;
     else if (super->depth >= vm_max_fast_instanceof_depth())
-        vm_stats_total.num_type_checks_super_is_too_deep ++;
+        VM_Statistics::get_vm_stats().num_type_checks_super_is_too_deep ++;
 #endif // VM_STATS
 }
 
 void vm_instanceof_update_stats(ManagedObject *obj, Class *super)
 {
 #ifdef VM_STATS
-    vm_stats_total.num_instanceof++;
+    VM_Statistics::get_vm_stats().num_instanceof++;
     super->num_instanceof_slow++;
     if (obj == (ManagedObject *)Class::managed_null)
-        vm_stats_total.num_instanceof_null++;
+        VM_Statistics::get_vm_stats().num_instanceof_null++;
     else
     {
         if (obj->vt()->clss == super)
-            vm_stats_total.num_instanceof_equal_type ++;
+            VM_Statistics::get_vm_stats().num_instanceof_equal_type ++;
         if (super->is_suitable_for_fast_instanceof)
-            vm_stats_total.num_instanceof_fast_decision ++;
+            VM_Statistics::get_vm_stats().num_instanceof_fast_decision ++;
         update_general_type_checking_stats(obj->vt(), super);
     }
 #endif
@@ -2055,15 +2259,15 @@ void vm_instanceof_update_stats(ManagedObject *obj, Class *super)
 void vm_checkcast_update_stats(ManagedObject *obj, Class *super)
 {
 #ifdef VM_STATS
-    vm_stats_total.num_checkcast ++;
+    VM_Statistics::get_vm_stats().num_checkcast ++;
     if (obj == (ManagedObject *)Class::managed_null)
-        vm_stats_total.num_checkcast_null++;
+        VM_Statistics::get_vm_stats().num_checkcast_null++;
     else
     {
         if (obj->vt()->clss == super)
-            vm_stats_total.num_checkcast_equal_type ++;
+            VM_Statistics::get_vm_stats().num_checkcast_equal_type ++;
         if (super->is_suitable_for_fast_instanceof)
-            vm_stats_total.num_checkcast_fast_decision ++;
+            VM_Statistics::get_vm_stats().num_checkcast_fast_decision ++;
         update_general_type_checking_stats(obj->vt(), super);
     }
 #endif
@@ -2406,23 +2610,23 @@ LilCodeStub *gen_lil_typecheck_stub_specialized(bool is_checkcast,
 void vm_aastore_test_update_stats(ManagedObject *elem, Vector_Handle array)
 {
 #ifdef VM_STATS
-    vm_stats_total.num_aastore_test++;
+    VM_Statistics::get_vm_stats().num_aastore_test++;
     if (elem == (ManagedObject *)Class::managed_null)
     {
-        vm_stats_total.num_aastore_test_null ++;
+        VM_Statistics::get_vm_stats().num_aastore_test_null ++;
         return;
     }
     VTable *vt = get_vector_vtable(array);
     if (vt == cached_object_array_vtable_ptr)
     {
-        vm_stats_total.num_aastore_test_object_array++;
+        VM_Statistics::get_vm_stats().num_aastore_test_object_array++;
         return;
     }
     Class *array_class = vt->clss;
     if (elem->vt()->clss == array_class->array_element_class)
-        vm_stats_total.num_aastore_test_equal_type ++;
+        VM_Statistics::get_vm_stats().num_aastore_test_equal_type ++;
     if (array_class->array_element_class->is_suitable_for_fast_instanceof)
-        vm_stats_total.num_aastore_test_fast_decision ++;
+        VM_Statistics::get_vm_stats().num_aastore_test_fast_decision ++;
     update_general_type_checking_stats(elem->vt(), array_class->array_element_class);
 #endif
 }
@@ -2525,23 +2729,23 @@ int __stdcall vm_instanceof(ManagedObject *obj, Class *c)
     assert(!hythread_is_suspend_enabled());
 
 #ifdef VM_STATS
-    vm_stats_total.num_instanceof++;
+    VM_Statistics::get_vm_stats().num_instanceof++;
     c->num_instanceof_slow++;
 #endif
 
     ManagedObject *null_ref = (ManagedObject *)Class::managed_null;
     if (obj == null_ref) {
 #ifdef VM_STATS
-        vm_stats_total.num_instanceof_null++;
+        VM_Statistics::get_vm_stats().num_instanceof_null++;
 #endif
         return 0;
     }
     assert(obj->vt());
 #ifdef VM_STATS
     if (obj->vt()->clss == c)
-        vm_stats_total.num_instanceof_equal_type ++;
+        VM_Statistics::get_vm_stats().num_instanceof_equal_type ++;
     if (c->is_suitable_for_fast_instanceof)
-        vm_stats_total.num_instanceof_fast_decision ++;
+        VM_Statistics::get_vm_stats().num_instanceof_fast_decision ++;
 #endif // VM_STATS
     return class_is_subtype_fast(obj->vt(), c);
 } //vm_instanceof
@@ -2562,7 +2766,7 @@ vm_aastore_test(ManagedObject *elem,
                  Vector_Handle array)
 {
 #ifdef VM_STATS
-    vm_stats_total.num_aastore_test++;
+    VM_Statistics::get_vm_stats().num_aastore_test++;
 #endif // VM_STATS
 
     ManagedObject *null_ref = (ManagedObject *)Class::managed_null;
@@ -2571,7 +2775,7 @@ vm_aastore_test(ManagedObject *elem,
     }
     if (elem == null_ref) {
 #ifdef VM_STATS
-        vm_stats_total.num_aastore_test_null++;
+        VM_Statistics::get_vm_stats().num_aastore_test_null++;
 #endif // VM_STATS
         return 1;
     }
@@ -2579,7 +2783,7 @@ vm_aastore_test(ManagedObject *elem,
     VTable *vt = get_vector_vtable(array);
     if (vt == cached_object_array_vtable_ptr) {
 #ifdef VM_STATS
-        vm_stats_total.num_aastore_test_object_array++;
+        VM_Statistics::get_vm_stats().num_aastore_test_object_array++;
 #endif // VM_STATS
         return 1;
     }
@@ -2590,9 +2794,9 @@ vm_aastore_test(ManagedObject *elem,
 
 #ifdef VM_STATS
     if (elem->vt()->clss == array_class->array_element_class)
-        vm_stats_total.num_aastore_test_equal_type ++;
+        VM_Statistics::get_vm_stats().num_aastore_test_equal_type ++;
     if (array_class->array_element_class->is_suitable_for_fast_instanceof)
-        vm_stats_total.num_aastore_test_fast_decision ++;
+        VM_Statistics::get_vm_stats().num_aastore_test_fast_decision ++;
 #endif // VM_STATS
     return class_is_subtype_fast(elem->vt(), array_class->array_element_class);
 } //vm_aastore_test
@@ -2604,7 +2808,7 @@ void * __stdcall
 vm_rt_aastore(ManagedObject *elem, int idx, Vector_Handle array)
 {
 #ifdef VM_STATS
-    vm_stats_total.num_aastore ++;
+    VM_Statistics::get_vm_stats().num_aastore ++;
 #endif // VM_STATS
 
     Global_Env *env = VM_Global_State::loader_env;
@@ -2618,11 +2822,11 @@ vm_rt_aastore(ManagedObject *elem, int idx, Vector_Handle array)
         assert(array_class);
         assert(array_class->is_array);
 #ifdef VM_STATS
-        // XXX - Should update vm_stats_total.num_aastore_object_array
+        // XXX - Should update VM_Statistics::get_vm_stats().num_aastore_object_array
         if (elem->vt()->clss == array_class->array_element_class)
-            vm_stats_total.num_aastore_equal_type ++;
+            VM_Statistics::get_vm_stats().num_aastore_equal_type ++;
         if (array_class->array_element_class->is_suitable_for_fast_instanceof)
-            vm_stats_total.num_aastore_fast_decision ++;
+            VM_Statistics::get_vm_stats().num_aastore_fast_decision ++;
 #endif // VM_STATS
         if (class_is_subtype_fast(elem->vt(), array_class->array_element_class)) {
             STORE_REFERENCE((ManagedObject *)array, get_vector_element_address_ref(array, idx), (ManagedObject *)elem);
@@ -2631,7 +2835,7 @@ vm_rt_aastore(ManagedObject *elem, int idx, Vector_Handle array)
         }
     } else {
 #ifdef VM_STATS
-        vm_stats_total.num_aastore_null ++;
+        VM_Statistics::get_vm_stats().num_aastore_null ++;
 #endif // VM_STATS
         // elem is null. We don't have to check types for a null reference. We also don't have to record stores of null references.
         if (VM_Global_State::loader_env->compress_references) {
@@ -2680,36 +2884,42 @@ VMEXPORT void * vm_create_helper_for_function(void* (*fptr)(void*))
 {
     static const char * lil_stub =
         "entry 0:stdcall:pint:pint;"    // the single argument is 'void*'
-        "push_m2n 0, 0;"                // create m2n frame
+        "push_m2n 0, %0i;"              // create m2n frame
         "out stdcall::void;"
-        "call %0i;"                     // call hythread_suspend_enable()
+        "call %1i;"                     // call hythread_suspend_enable()
         "in2out stdcall:pint;"          // reloads input arg into output
-        "call %1i;"                     // call the foo
-        "locals 2;"                     //
+        "call %2i;"                     // call the foo
+        "locals 3;"                     //
         "l0 = r;"                       // save result
         "out stdcall::void;"
-        "call %2i;"                     // call hythread_suspend_disable()
+        "call %3i;"                     // call hythread_suspend_disable()
         "l1 = ts;"
-        "ld l1, [l1 + %3i:ref];"
-        "jc l1 != 0,_exn_raised;"          // test whether an exception happened
+        "ld l2, [l1 + %4i:ref];"
+        "jc l2 != 0,_exn_raised;"       // test whether an exception happened
+        "ld l2, [l1 + %5i:ref];"
+        "jc l2 != 0,_exn_raised;"       // test whether an exception happened
         "pop_m2n;"                      // pop out m2n frame
         "r = l0;"                       // no exceptions pending, restore ..
         "ret;"                          // ret value and exit
         ":_exn_raised;"                 //
         "out platform::void;"           //
-        "call.noret %4i;";              // re-throw exception
+        "call.noret %6i;";              // re-throw exception
 
-    void * fptr_rethrow = (void*)&rethrow_current_thread_exception;
+    void * fptr_rethrow = (void*)&exn_rethrow;
     void * fptr_suspend_enable = (void*)&hythread_suspend_enable;
     void * fptr_suspend_disable = (void*)&hythread_suspend_disable;
 
     LilCodeStub* cs = lil_parse_code_stub(
-        lil_stub,
+        lil_stub, FRAME_COMPILATION,
         fptr_suspend_enable, (void*)fptr, fptr_suspend_disable,
-        OFFSET(VM_thread, p_exception_object), fptr_rethrow);
+        OFFSET(VM_thread, thread_exception.exc_object),
+        OFFSET(VM_thread, thread_exception.exc_class),
+        fptr_rethrow);
     assert(lil_is_valid(cs));
-    void * addr = LilCodeGenerator::get_platform()->compile(cs,
-                                            "generic_wrapper", dump_stubs);
+    void * addr = LilCodeGenerator::get_platform()->compile(cs);
+    
+    DUMP_STUB(addr, "generic_wrapper", lil_cs_get_code_size(cs));
+
     lil_free_code_stub(cs);
     return addr;
 };

@@ -22,19 +22,15 @@
 #include "method_lookup.h"
 #include "Environment.h"
 #include "exceptions.h"
+#include "exceptions_jit.h"
+#include "interpreter_exports.h"
+#include "stack_dump.h"
 
 // Windows specific
 #include <string>
 #include <excpt.h>
 
-// TODO - fix temporarily comment to solve win2k's lack of dbghelp.lib problem
-//    search for $$WIN2k for other related mods for this to undo
-//
-// #include <dbghelp.h>
-// #include <windows.h>
-// #pragma comment(linker, "/defaultlib:dbghelp.lib")
-
-static inline void nt_to_vm_context(PCONTEXT context, Registers* regs)
+void nt_to_vm_context(PCONTEXT context, Registers* regs)
 {
     regs->eax = context->Eax;
     regs->ecx = context->Ecx;
@@ -47,7 +43,7 @@ static inline void nt_to_vm_context(PCONTEXT context, Registers* regs)
     regs->esp = context->Esp;
 }
 
-static inline void vm_to_nt_context(Registers* regs, PCONTEXT context)
+void vm_to_nt_context(Registers* regs, PCONTEXT context)
 {
     context->Esp = regs->esp;
     context->Eip = regs->eip;
@@ -86,73 +82,14 @@ static void print_state(LPEXCEPTION_POINTERS nt_exception, const char *msg)
     fprintf(stderr, "    EIP: 0x%08x\n", nt_exception->ContextRecord->Eip);
 }
 
-/*  todo - resolve problem for win2k  $$WIN2k
 
-// CallStack print
-#define CALLSTACK_DEPTH_LIMIT 100 // max stack length is 100 to prevent getting into loop
-
-static void print_callstack(LPEXCEPTION_POINTERS nt_exception)
-{
+static void print_callstack(LPEXCEPTION_POINTERS nt_exception) {
     PCONTEXT context = nt_exception->ContextRecord;
-    STACKFRAME StackFrm;
-    // initialize STACKFRAME 
-    memset(&StackFrm, 0, sizeof(STACKFRAME));
-    StackFrm.AddrPC.Offset       = context->Eip;
-    StackFrm.AddrPC.Mode         = AddrModeFlat;
-    StackFrm.AddrStack.Offset    = context->Esp;
-    StackFrm.AddrStack.Mode      = AddrModeFlat;
-    StackFrm.AddrFrame.Offset    = context->Ebp;
-    StackFrm.AddrFrame.Mode      = AddrModeFlat;
-
-    // init sym handler for GetCurrentProcess() process
-    if (!SymInitialize(GetCurrentProcess(), NULL, true))
-    {
-        fprintf(stderr, "CallStack is inaccessible due to dbghelp library initialization failed.\n");
-        return;
-    }
-    fprintf(stderr, "CallStack:\n");
-
-    // try to go throuh the stack
-    for (int counter = 0; counter < CALLSTACK_DEPTH_LIMIT; counter++)
-    {
-        if (!StackWalk(IMAGE_FILE_MACHINE_I386, GetCurrentProcess(), GetCurrentThread(),  &StackFrm,  
-                                context, NULL, SymFunctionTableAccess, SymGetModuleBase, NULL)) {
-            // no STACKFRAME found any more
-            break;
-        }
-
-        // try to get function name
-        BYTE smBuf[sizeof(SYMBOL_INFO) + 2048];
-        PSYMBOL_INFO pSymb = (PSYMBOL_INFO)smBuf;
-        pSymb->SizeOfStruct = sizeof(smBuf);
-        pSymb->MaxNameLen = 2048;
-
-        DWORD64 funcDispl;
-        if (SymFromAddr(GetCurrentProcess(), StackFrm.AddrPC.Offset, &funcDispl, pSymb)) {
-            fprintf(stderr, "    %s ", pSymb->Name);
-        }
-        else {
-            fprintf(stderr, "    No name ");
-        }
-
-        // try to get file name and line number
-        DWORD lineOffset;
-        IMAGEHLP_LINE lineInfo;
-        if (SymGetLineFromAddr(GetCurrentProcess(), StackFrm.AddrPC.Offset, &lineOffset, &lineInfo))
-        {
-            fprintf(stderr, " (File: %s Line: %d )\n", lineInfo.FileName, lineInfo.LineNumber);
-        }
-        else
-        {
-            // skip functions w/o file name and line number
-            fprintf(stderr, " (File: ?? Line: ?? )");
-        }
-    }
-
+    Registers regs;
+    nt_to_vm_context(context, &regs);
+    st_print_stack(&regs);
     fflush(stderr);
 }
-
-*/
 
 /*
  * Information about stack
@@ -285,6 +222,11 @@ static void __cdecl exception_catch_callback_wrapper(){
     exception_catch_callback();
 }
 
+// exception catch support for JVMTI
+static void __cdecl jvmti_exception_catch_callback_wrapper(Registers regs){
+    jvmti_exception_catch_callback(&regs);
+}
+
 static void __declspec(naked) __stdcall naked_exception_catch_callback() {
     __asm {
         push ebp
@@ -298,6 +240,35 @@ static void __declspec(naked) __stdcall naked_exception_catch_callback() {
         pop ecx
         pop ebx
         pop eax
+        leave
+        ret
+    }
+}
+
+static void __declspec(naked) __stdcall naked_jvmti_exception_catch_callback() {
+    __asm {
+        push ebp
+        mov ebp, esp
+        add esp, -36
+        mov [ebp-36], eax
+        mov [ebp-32], ebx
+        mov [ebp-28], ecx
+        mov [ebp-24], edx
+        mov eax, esp
+        mov ebx, [ebp]
+        mov ecx, [ebp+4]
+        add eax, 44
+        mov [ebp-20], edi
+        mov [ebp-16], esi
+        mov [ebp-12], ebx
+        mov [ebp-8], eax
+        mov [ebp-4], ecx
+        call jvmti_exception_catch_callback_wrapper
+        mov eax, [ebp-36]
+        mov ebx, [ebp-32]
+        mov ecx, [ebp-28]
+        mov edx, [ebp-24]
+        add esp, 36
         leave
         ret
     }
@@ -321,15 +292,17 @@ LONG NTAPI vectored_exception_handler(LPEXCEPTION_POINTERS nt_exception)
         // exception, we first make sure the exception was thrown inside a Java
         // method else crash handler or default handler is executed, this means that
         // it was thrown by VM C/C++ code.
-        if ((code == STATUS_ACCESS_VIOLATION
-                || code == STATUS_INTEGER_DIVIDE_BY_ZERO
-                || code == STATUS_STACK_OVERFLOW)
-                && vm_identify_eip((void *)context->Eip) == VM_TYPE_JAVA) {
+        if (((code == STATUS_ACCESS_VIOLATION ||
+                code == STATUS_INTEGER_DIVIDE_BY_ZERO ||
+                code == STATUS_STACK_OVERFLOW) &&
+                vm_identify_eip((void *)context->Eip) == VM_TYPE_JAVA) ||
+            code == STATUS_BREAKPOINT)
+        {
             run_default_handler = false;
         } else if (code == STATUS_STACK_OVERFLOW) {
             if (is_unwindable()) {
                 if (hythread_is_suspend_enabled()) {
-                    hythread_suspend_disable();
+                    tmn_suspend_disable();
                 }
                 run_default_handler = false;
             } else {
@@ -387,8 +360,7 @@ LONG NTAPI vectored_exception_handler(LPEXCEPTION_POINTERS nt_exception)
         if (!vm_get_boolean_property_value_with_default("vm.assert_dialog")) {
             print_state(nt_exception, msg);
 
-            // TODO fix for win2k runtime problem  $$WIN2k
-            // print_callstack(nt_exception);
+            print_callstack(nt_exception);
             LOGGER_EXIT(-1);
 
         }
@@ -396,7 +368,13 @@ LONG NTAPI vectored_exception_handler(LPEXCEPTION_POINTERS nt_exception)
     }
 
     // since we are now sure HWE occured in java code, gc should also have been disabled
-    assert(!hythread_is_suspend_enabled());
+
+    // gregory - this is not true since for debugging we may use int3
+    // in VM code which produces BREAKPOINT exception. JVMTI has
+    // assertions for breakpoints which it has set in Java inside of
+    // breakpoint handling function. Otherwise this assert should not
+    // fail in case _CrtDbgBreak() was added somewhere in VM.
+    assert(!hythread_is_suspend_enabled() || code == STATUS_BREAKPOINT);
     
     Global_Env *env = VM_Global_State::loader_env;
     Class *exc_clss = 0;
@@ -433,6 +411,22 @@ LONG NTAPI vectored_exception_handler(LPEXCEPTION_POINTERS nt_exception)
             exc_clss = env->java_lang_ArithmeticException_Class;
         }
         break;
+    case STATUS_BREAKPOINT:
+        // JVMTI breakpoint in JITted code
+        {
+            Registers regs;
+            nt_to_vm_context(context, &regs);
+            TRACE2("signals", "JVMTI breakpoint detected at " <<
+                (void *)regs.eip);
+            bool handled = jvmti_send_jit_breakpoint_event(&regs);
+            if (handled)
+            {
+                vm_to_nt_context(&regs, context);
+                return EXCEPTION_CONTINUE_EXECUTION;
+            }
+            else
+                return EXCEPTION_CONTINUE_SEARCH;
+        }
     default: assert(false);
     }
 
@@ -445,16 +439,15 @@ LONG NTAPI vectored_exception_handler(LPEXCEPTION_POINTERS nt_exception)
 
     exn_athrow_regs(&regs, exc_clss);
 
-    if (exception_esp < regs.esp) {
-        if (p_TLS_vmthread->restore_guard_page) {
-            regs.esp = regs.esp - 4;
-            *((uint32*) regs.esp) = regs.eip;
-            regs.eip = ((uint32)naked_exception_catch_callback);
-        }
-    } else {
-        // should be unreachable code
-        //jvmti_exception_catch_callback(&regs);
-        assert(0);
+    assert(exception_esp <= regs.esp);
+    if (ti->get_global_capability(DebugUtilsTI::TI_GC_ENABLE_EXCEPTION_EVENT)) {
+        regs.esp = regs.esp - 4;
+        *((uint32*) regs.esp) = regs.eip;
+        regs.eip = ((uint32)naked_jvmti_exception_catch_callback);
+    } else if (p_TLS_vmthread->restore_guard_page) {
+        regs.esp = regs.esp - 4;
+        *((uint32*) regs.esp) = regs.eip;
+        regs.eip = ((uint32)naked_exception_catch_callback);
     }
 
     vm_to_nt_context(&regs, context);

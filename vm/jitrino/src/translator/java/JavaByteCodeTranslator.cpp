@@ -19,10 +19,7 @@
  * @version $Revision: 1.34.8.4.4.4 $
  */
 
-#include <assert.h>
-#include <stdio.h>
 #include "Stl.h"
-#include "JavaByteCodeParser.h"
 #include "JavaByteCodeTranslator.h"
 #include "JavaTranslator.h"
 #include "Log.h"
@@ -33,6 +30,10 @@
 #include "open/bytecodes.h"
 #include "irmanager.h"
 #include "Jitrino.h"
+#include "EMInterface.h"
+
+#include <assert.h>
+#include <stdio.h>
 
 namespace Jitrino {
 
@@ -49,24 +50,14 @@ float JavaByteCodeTranslator::MaxRelativeInlineHotness = 0.5;
 bool JavaByteCodeTranslator::isProfileAllowsInlining(MethodDesc* inlinee) {
     //do not inline methods with not initialized classes -> these paths are cold!
     CompilationContext* ctx = compilationInterface.getCompilationContext();
-    JITModeData* modeData = ctx->getCurrentModeData();
-    ProfilingInterface* pi = modeData->getProfilingInterface();
+    ProfilingInterface* pi = ctx->getProfilingInterface();
     if (pi==NULL || !pi->isProfilingEnabled(ProfileType_EntryBackedge, JITProfilingRole_USE)) {
         return true;
     }
-    MemoryManager& mm = ctx->getCompilationLevelMemoryManager();
-    EntryBackedgeMethodProfile* inlineeProfile = 
-        (EntryBackedgeMethodProfile*)pi->getMethodProfile(mm, ProfileType_EntryBackedge, *inlinee, JITProfilingRole_USE);
-    if (inlineeProfile != NULL) {
-        MethodDesc* inliner = &methodToCompile;
-        EntryBackedgeMethodProfile* inlinerProfile = 
-            (EntryBackedgeMethodProfile*)pi->getMethodProfile(mm, ProfileType_EntryBackedge, *inliner, JITProfilingRole_USE);
-        if (inlinerProfile!=NULL) {
-        //inlinerProfile could be NULL even in DPGO mode! -> LazyExceptionOpt compilation to detect side-effects
-            if (inlineeProfile->getEntryExecCount() >= inlinerProfile->getEntryExecCount() * MaxRelativeInlineHotness) {
-                return true;
-            }
-        }
+    uint32 inlineeHotness = pi->getProfileMethodCount(*inlinee);
+    uint32 myHotness = pi->getProfileMethodCount(methodToCompile);
+    if (inlineeHotness >= myHotness * MaxRelativeInlineHotness) {
+        return true;
     }
     return false;
 }
@@ -77,7 +68,7 @@ JavaByteCodeTranslator::inlineMethod(MethodDesc* methodDesc) {
         return false;
     bool doSkip = (translationFlags.inlineSkipTable == NULL) ? false : translationFlags.inlineSkipTable->accept_this_method(*methodDesc);
     if(doSkip) {
-        Log::cat_opt_inline()->info << "Skipping inlining of " << methodDesc->getParentType()->getName() << "." << methodDesc->getName() << ::std::endl;    
+       Log::out() << "Skipping inlining of " << methodDesc->getParentType()->getName() << "." << methodDesc->getName() << ::std::endl;    
         return false;
     }
     ObjectType * methodClass = (ObjectType*)methodDesc->getParentType();
@@ -95,14 +86,14 @@ JavaByteCodeTranslator::inlineMethod(MethodDesc* methodDesc) {
         || methodDesc->isPrivate() || methodClass->isFinalClass());
 
     if(!doInline) {
-        Log::cat_opt_inline()->info << "Cannot inline " << methodDesc->getParentType()->getName() << "." << methodDesc->getName() << ::std::endl;
+       Log::out() << "Cannot inline " << methodDesc->getParentType()->getName() << "." << methodDesc->getName() << ::std::endl;
         return false;
     }
     uint32 numByteCodes = methodDesc->getByteCodeSize();
     bool result = (numByteCodes > 0 && numByteCodes < MaxInlineSize) && 
         (inlineDepth < MaxInlineDepth);
     if(result)
-        Log::cat_opt_inline()->info << "Translator inline " << methodDesc->getParentType()->getName() << "." << methodDesc->getName() << ::std::endl;    
+       Log::out() << "Translator inline " << methodDesc->getParentType()->getName() << "." << methodDesc->getName() << ::std::endl;    
     return result;
 }
 
@@ -141,9 +132,9 @@ JavaByteCodeTranslator::JavaByteCodeTranslator(CompilationInterface& ci,
       compilationInterface(ci), 
       methodToCompile(methodDesc), 
       parser(bcp), 
-      typeManager(irb.getTypeManager()), 
+      typeManager(*irb.getTypeManager()), 
       irBuilder(irb),
-      translationFlags(*ci.getCompilationContext()->getTranslatorFlags()),
+      translationFlags(*irb.getTranslatorFlags()),
       cfgBuilder(cfg),
       // CHECK ? for static sync methods must ensure at least one slot on stack for monitor enter/exit code
       opndStack(mm,methodDesc.getMaxStack()+1),
@@ -154,13 +145,13 @@ JavaByteCodeTranslator::JavaByteCodeTranslator(CompilationInterface& ci,
       inlineDepth(0),
       prepass(memManager,
               typeManager,
-              irBuilder.getInstFactory().getMemManager(),
+              irBuilder.getInstFactory()->getMemManager(),
               methodDesc,
               ci,
               NULL),
       lockAddr(NULL), 
       oldLockValue(NULL),
-      thisLevelBuilder(NULL, methodDesc),
+      thisLevelBuilder(NULL, methodDesc,irb.getBcOffset()),
       inlineBuilder(NULL),
       jsrEntryMap(NULL),
       retOffsets(mm),
@@ -224,7 +215,7 @@ JavaByteCodeTranslator::JavaByteCodeTranslator(CompilationInterface& ci,
                                  uint32 numActualArgs, 
                                  Opnd** actualArgs,
                                  Opnd** returnopnd, // non-null for IR inlining
-                                 CFGNode** returnnode, // returns the block where is a return
+                                 Node** returnnode, // returns the block where is a return
                                                        // (only one for inlined methods)
                                  ExceptionInfo *inliningexceptinfo,
                                  uint32 inlDepth, bool startNewBlock,
@@ -234,9 +225,9 @@ JavaByteCodeTranslator::JavaByteCodeTranslator(CompilationInterface& ci,
       compilationInterface(ci),
       methodToCompile(methodDesc),
       parser(bcp),
-      typeManager(irb.getTypeManager()),
+      typeManager(*irb.getTypeManager()),
       irBuilder(irb),
-      translationFlags(*ci.getCompilationContext()->getTranslatorFlags()),
+      translationFlags(*irb.getTranslatorFlags()),
       cfgBuilder(cfg),
       // CHECK ? for static sync methods must ensure at least one slot on stack for monitor enter/exit code
       opndStack(mm,methodDesc.getMaxStack()+1),
@@ -247,13 +238,13 @@ JavaByteCodeTranslator::JavaByteCodeTranslator(CompilationInterface& ci,
       inlineDepth(inlDepth),
       prepass(memManager,
               typeManager,
-              irBuilder.getInstFactory().getMemManager(),
+              irBuilder.getInstFactory()->getMemManager(),
               methodDesc,
               ci,
               actualArgs),
       lockAddr(NULL), 
       oldLockValue(NULL),
-      thisLevelBuilder(parent, methodDesc),
+      thisLevelBuilder(parent, methodDesc, irb.getBcOffset()),
       inlineBuilder(&thisLevelBuilder),
       jsrEntryMap(parentJsrEntryMap),
       retOffsets(mm),
@@ -267,9 +258,9 @@ JavaByteCodeTranslator::JavaByteCodeTranslator(CompilationInterface& ci,
         // create a new basic block
         LabelInst *label = irBuilder.createLabel();
         cfgBuilder.genBlock(label);
-        inliningNodeBegin = label->getCFGNode();
+        inliningNodeBegin = label->getNode();
     } else {
-        inliningNodeBegin = irBuilder.getCurrentLabel()->getCFGNode();
+        inliningNodeBegin = irBuilder.getCurrentLabel()->getNode();
     }
     // create a prolog instruction
     irBuilder.genMethodEntryMarker(&methodDesc);
@@ -305,7 +296,7 @@ JavaByteCodeTranslator::JavaByteCodeTranslator(CompilationInterface& ci,
 void 
 JavaByteCodeTranslator::initJsrEntryMap()
 {
-    MemoryManager& ir_mem_manager = irBuilder.getIRManager().getMemoryManager();
+    MemoryManager& ir_mem_manager = irBuilder.getIRManager()->getMemoryManager();
     jsrEntryMap = new (ir_mem_manager) JsrEntryInstToRetInstMap(ir_mem_manager);
 }
 
@@ -548,7 +539,7 @@ JavaByteCodeTranslator::offset(uint32 offset) {
     }
 
     // start a new basic block
-    Log::cat_fe()->debug << "TRANSLATOR BASICBLOCK " << (int32)offset << " " << ::std::endl;
+    Log::out() << "TRANSLATOR BASICBLOCK " << (int32)offset << " " << ::std::endl;
 
     // finish the previous basic block, if any work was required
     if (!lastInstructionWasABranch) {
@@ -577,22 +568,22 @@ JavaByteCodeTranslator::offset(uint32 offset) {
          exceptionInfo = exceptionInfo->getNextExceptionInfoAtOffset()) {
         if (exceptionInfo->isCatchBlock()) {
             CatchBlock* catchBlock = (CatchBlock*)exceptionInfo;
-            Log::cat_fe()->debug << "TRY REGION " << (int)exceptionInfo->getBeginOffset() 
+            Log::out() << "TRY REGION " << (int)exceptionInfo->getBeginOffset() 
                 << " " << (int)exceptionInfo->getEndOffset() << ::std::endl;
             CatchHandler *first = ((CatchBlock*)exceptionInfo)->getHandlers();
-            if (Log::cat_fe()->isDebugEnabled()) {
+            if (Log::isEnabled()) {
                 for (; first != NULL; first = first->getNextHandler()) {
-                    Log::cat_fe()->debug << " handler " << (int)first->getBeginOffset() << ::std::endl;
+                    Log::out() << " handler " << (int)first->getBeginOffset() << ::std::endl;
                 }
             }
             if (catchBlock->getLabelInst() == NULL) {
-                CFGNode *dispatchNode = cfgBuilder.createDispatchNode();
+                Node *dispatchNode = cfgBuilder.createDispatchNode();
                 catchBlock->setLabelInst((LabelInst*)dispatchNode->getFirstInst());
                 ((LabelInst*)dispatchNode->getFirstInst())->setState(catchBlock);
             }
             if (labelInst->getState() == NULL) 
                 labelInst->setState(catchBlock);
-            if(Log::cat_fe()->isDebugEnabled()) {
+            if(Log::isEnabled()) {
                 Log::out() << "LABEL "; labelInst->print(Log::out()); Log::out() << labelInst->getState();
                 Log::out() << "CATCH ";catchBlock->getLabelInst()->print(Log::out()); Log::out() << ::std::endl;
             }
@@ -600,7 +591,7 @@ JavaByteCodeTranslator::offset(uint32 offset) {
             // catch handler block
             isCatchHandler = true;
             CatchHandler* handler = (CatchHandler*)exceptionInfo;
-            Log::cat_fe()->debug << "CATCH REGION " << (int)exceptionInfo->getBeginOffset() 
+            Log::out() << "CATCH REGION " << (int)exceptionInfo->getBeginOffset() 
                 << " " << (int)exceptionInfo->getEndOffset() << ::std::endl;
             if (translationFlags.newCatchHandling) {
                 handlerExceptionType = (handlerExceptionType == NULL) ?
@@ -614,13 +605,13 @@ JavaByteCodeTranslator::offset(uint32 offset) {
 
             if (translationFlags.newCatchHandling) {
                 labelInst = (LabelInst*)
-                    irBuilder.getInstFactory().makeCatchLabel(
+                    irBuilder.getInstFactory()->makeCatchLabel(
                                              handler->getExceptionOrder(),
                                              handler->getExceptionType());
                 catchLabels.push_back(labelInst);
             } else {
                 labelInst = (LabelInst*)
-                    irBuilder.getInstFactory().makeCatchLabel(
+                    irBuilder.getInstFactory()->makeCatchLabel(
                                              labelInst->getLabelId(),
                                              handler->getExceptionOrder(),
                                              handlerExceptionType);
@@ -628,7 +619,7 @@ JavaByteCodeTranslator::offset(uint32 offset) {
             }
             labelInst->setState(oldLabel->getState());
             exceptionInfo->setLabelInst(labelInst);
-            if(Log::cat_fe()->isDebugEnabled()) {
+            if(Log::isEnabled()) {
                 Log::out() << "LABEL "; labelInst->print(Log::out()); Log::out() << labelInst->getState();
                 Log::out() << "CATCH "; handler->getLabelInst()->print(Log::out()); Log::out() << ::std::endl;
             }
@@ -654,15 +645,13 @@ JavaByteCodeTranslator::offset(uint32 offset) {
             // empty out the stack operand
             opndStack.makeEmpty();
         }
-        CFGNode* node = cfgBuilder.genBlock(labelInst);
-        for(::std::vector<LabelInst*>::iterator iter = oldLabels.begin(); iter != oldLabels.end(); ++iter)
-            (*iter)->setCFGNode(node);
+        cfgBuilder.genBlock(labelInst);
     }
     //
     // Load var operands where current basic block begins
     //
     for (uint32 k=numVars; k < (uint32)stateInfo->stackDepth; k++) {
-        if(Log::cat_fe()->isDebugEnabled()) {
+        if(Log::isEnabled()) {
             Log::out() << "STACK ";stateInfo->stack[k].type->print(Log::out()); Log::out() << ::std::endl;
         }
 
@@ -705,17 +694,17 @@ JavaByteCodeTranslator::parseDone()
         Inst* entry_inst = entry_inst_i->second;
         jsrEntryMap->insert(std::make_pair(entry_inst, ret_inst));
     }
-    irBuilder.getIRManager().setJsrEntryMap(jsrEntryMap);
+    irBuilder.getIRManager()->setJsrEntryMap(jsrEntryMap);
 
     if (isInlinedMethod) {
         CatchBlock *catchSyncBlock = NULL;
         if (methodToCompile.isSynchronized()) {
             // generate fake exception info to catch any exception in the code
             catchSyncBlock = new (memManager) CatchBlock(0,0,methodToCompile.getByteCodeSize(), MAX_UINT32);
-            const CFGNodeDeque& nodes = cfgBuilder.getCFG()->getNodes();
-            CFGNodeDeque::const_iterator niter = ::std::find(nodes.begin(), nodes.end(), inliningNodeBegin);
+            const Nodes& nodes = cfgBuilder.getCFG()->getNodes();
+            Nodes::const_iterator niter = ::std::find(nodes.begin(), nodes.end(), inliningNodeBegin);
             for(; niter != nodes.end(); ++niter) {
-                CFGNode* node = *niter;
+                Node* node = *niter;
                 LabelInst *first = (LabelInst*)node->getFirstInst();
                 if (node->isDispatchNode()) continue;
                 ExceptionInfo *existingInfo = (ExceptionInfo*)first->getState();
@@ -740,11 +729,11 @@ JavaByteCodeTranslator::parseDone()
 
         // propagate exception info to the inlined basic blocks
         if (exceptionInfo != NULL) {
-            const CFGNodeDeque& nodes = cfgBuilder.getCFG()->getNodes();
-            CFGNodeDeque::const_iterator niter = ::std::find(nodes.begin(), nodes.end(), inliningNodeBegin);
+            const Nodes& nodes = cfgBuilder.getCFG()->getNodes();
+            Nodes::const_iterator niter = ::std::find(nodes.begin(), nodes.end(), inliningNodeBegin);
             for(++niter; niter != nodes.end(); ++niter) {
-                CFGNode* node = *niter;
-                LabelInst *first = (LabelInst*)((CFGNode*)node)->getFirstInst();
+                Node* node = *niter;
+                LabelInst *first = (LabelInst*)(node)->getFirstInst();
                 ExceptionInfo *existingInfo = (ExceptionInfo*)first->getState();
                 if (existingInfo == NULL) {
                     first->setState(exceptionInfo);   
@@ -766,7 +755,7 @@ JavaByteCodeTranslator::parseDone()
         // fix synchronized methods
         if (methodToCompile.isSynchronized()) {
             // generate fake exception dispatch node
-            CFGNode *dispatchNode = cfgBuilder.createDispatchNode();
+            Node *dispatchNode = cfgBuilder.createDispatchNode();
             // propagate exception info (if any)
             exceptionInfo = inliningExceptionInfo;
             catchSyncBlock->setLabelInst((LabelInst*)dispatchNode->getFirstInst());
@@ -779,14 +768,14 @@ JavaByteCodeTranslator::parseDone()
 
 
             labelInst =  (CatchLabelInst*)
-            irBuilder.getInstFactory().makeCatchLabel(
+            irBuilder.getInstFactory()->makeCatchLabel(
                                                       label->getLabelId(),
                                                       0/*order*/,
                                                       exceptionType);
 
             // generate a catch handler to handle any exception
             CatchHandler* 
-                handler = new (irBuilder.getInstFactory().getMemManager())
+                handler = new (irBuilder.getInstFactory()->getMemManager())
                                CatchHandler(0,0,0,catchSyncBlock,exceptionType);
             catchSyncBlock->addHandler(handler);
             // propagate exception info (if any)
@@ -841,11 +830,14 @@ JavaByteCodeTranslator::parseDone()
             }
         }
         // end the method scope
-        if (numArgs > 0) {
+        if ((numArgs > 0) && (!methodToCompile.isStatic())) {
             Opnd *thisOpnd = args[0];
-            irBuilder.genMethodEndMarker(&methodToCompile, thisOpnd);
+            // resultOpnd is needed to produce method exit event
+            irBuilder.genMethodEndMarker(&methodToCompile, thisOpnd, 
+                    returnOpnd != NULL ? *returnOpnd : NULL);
         } else {
-            irBuilder.genMethodEndMarker(&methodToCompile);
+            irBuilder.genMethodEndMarker(&methodToCompile, 
+                    returnOpnd != NULL ? *returnOpnd : NULL);
         }
     }
 }
@@ -893,8 +885,8 @@ JavaByteCodeTranslator::ldc(uint32 constPoolIndex) {
     Type* constantType = 
         compilationInterface.getConstantType(&methodToCompile,constPoolIndex);
     Opnd* opnd = NULL;
-    if (constantType->isSystemString()) {
-        opnd = irBuilder.genLdString(&methodToCompile,constPoolIndex);
+    if (constantType->isSystemString() || constantType->isSystemClass()) {
+        opnd = irBuilder.genLdRef(&methodToCompile,constPoolIndex,constantType);
     } else {
         const void* constantAddress =
            compilationInterface.getConstantValue(&methodToCompile,constPoolIndex);
@@ -980,15 +972,26 @@ JavaByteCodeTranslator::astore(uint16 varIndex,uint32 off) {
 //-----------------------------------------------------------------------------
 // field access byte codes
 //-----------------------------------------------------------------------------
+Type* 
+JavaByteCodeTranslator::getFieldType(FieldDesc* field, uint32 constPoolIndex) {
+    Type* fieldType = field->getFieldType();
+    if (!fieldType) {
+        // some problem with fieldType class handle. Let's try the constant_pool.
+        // (For example if the field type class is deleted, the field is beeing resolved successfully
+        // but field->getFieldType() returns NULL in this case)
+        fieldType = compilationInterface.getFieldType(&methodToCompile,constPoolIndex);
+    }
+    return fieldType;
+}
+
 void 
 JavaByteCodeTranslator::getstatic(uint32 constPoolIndex) {
     FieldDesc* field = resolveStaticField(constPoolIndex, false);
     if (field && field->isStatic()) {
-        Type* fieldType = field->getFieldType();
-        if (fieldType) {
-            pushOpnd(irBuilder.genLdStatic(fieldType,field));
-            return;
-        }
+        Type* fieldType = getFieldType(field,constPoolIndex);
+        assert(fieldType);
+        pushOpnd(irBuilder.genLdStatic(fieldType,field));
+        return;
     }
     // generate helper call for throwing respective exception
     linkingException(constPoolIndex, OPCODE_GETSTATIC);
@@ -999,11 +1002,10 @@ void
 JavaByteCodeTranslator::putstatic(uint32 constPoolIndex) {
     FieldDesc* field = resolveStaticField(constPoolIndex, true);
     if (field && field->isStatic()) {
-        Type* fieldType = field->getFieldType();
-        if (fieldType) {
-            irBuilder.genStStatic(fieldType,field,popOpnd());
-            return;
-        }
+        Type* fieldType = getFieldType(field,constPoolIndex);
+        assert(fieldType);
+        irBuilder.genStStatic(fieldType,field,popOpnd());
+        return;
     }
     // generate helper call for throwing respective exception
     linkingException(constPoolIndex, OPCODE_PUTSTATIC);
@@ -1014,11 +1016,10 @@ void
 JavaByteCodeTranslator::getfield(uint32 constPoolIndex) {
     FieldDesc* field = resolveField(constPoolIndex, false);
     if (field && !field->isStatic()) {
-        Type* fieldType = field->getFieldType();
-        if (fieldType) {
-            pushOpnd(irBuilder.genLdField(fieldType,popOpnd(),field));
-            return;
-        }
+        Type* fieldType = getFieldType(field,constPoolIndex);
+        assert(fieldType);
+        pushOpnd(irBuilder.genLdField(fieldType,popOpnd(),field));
+        return;
     }
     // generate helper call for throwing respective exception
     linkingException(constPoolIndex, OPCODE_GETFIELD);
@@ -1030,13 +1031,12 @@ void
 JavaByteCodeTranslator::putfield(uint32 constPoolIndex) {
     FieldDesc* field = resolveField(constPoolIndex, true);
     if (field && !field->isStatic()) {
-        Type* fieldType = field->getFieldType();
-        if (fieldType) {
-            Opnd* value = popOpnd();
-            Opnd* ref = popOpnd();
-            irBuilder.genStField(fieldType,ref,field,value);
-            return;
-        }
+        Type* fieldType = getFieldType(field,constPoolIndex);
+        assert(fieldType);
+        Opnd* value = popOpnd();
+        Opnd* ref = popOpnd();
+        irBuilder.genStField(fieldType,ref,field,value);
+        return;
     }
     // generate helper call for throwing respective exception
     linkingException(constPoolIndex, OPCODE_PUTFIELD);
@@ -1718,7 +1718,7 @@ JavaByteCodeTranslator::invokevirtual(uint32 constPoolIndex) {
     Opnd *tauNullChecked = irBuilder.genTauCheckNull(srcOpnds[0]);
     Opnd* thisOpnd = srcOpnds[0];
     if (methodDesc->getParentType() != thisOpnd->getType()) {
-        if(Log::cat_fe()->isDebugEnabled()) {
+        if(Log::isEnabled()) {
             Log::out()<<"CHECKVIRTUAL "; thisOpnd->printWithType(Log::out()); Log::out() << " : ";
             methodDesc->getParentType()->print(Log::out());
             Log::out() <<"."<<methodDesc->getName()<<" "<< (int)methodDesc->getByteCodeSize()<< ::std::endl;
@@ -1738,7 +1738,7 @@ JavaByteCodeTranslator::invokevirtual(uint32 constPoolIndex) {
     if (returnType) {
         if ((isExactTypeOpnd(thisOpnd) || methodDesc->isFinal()) 
             && inlineMethod(methodDesc)) {
-            if (Log::cat_fe()->isDebugEnabled()) {
+            if (Log::isEnabled()) {
                 Log::out() << "XXX inline virtual:"; methodDesc->printFullName(Log::out()); Log::out() << ::std::endl;
             }
             if(methodDesc->isInstanceInitializer()) {
@@ -1764,16 +1764,16 @@ JavaByteCodeTranslator::invokevirtual(uint32 constPoolIndex) {
             }
             return;
         } else if (guardedInlineMethod(methodDesc)) { 
-            if (Log::cat_fe()->isDebugEnabled()) {
+            if (Log::isEnabled()) {
                 Log::out() << "XXX guarded inline:"; methodDesc->printFullName(Log::out()); Log::out() << ::std::endl;
             }
             VarOpnd *retVar = NULL;
             if (returnType->tag != Type::Void)
                 retVar =irBuilder.genVarDef(returnType,false); 
 
-            LabelInst *inlined = (LabelInst*)irBuilder.getInstFactory().makeLabel();
-            LabelInst *target  = (LabelInst*)irBuilder.getInstFactory().makeLabel();
-            LabelInst *merge   = (LabelInst*)irBuilder.getInstFactory().makeLabel();
+            LabelInst *inlined = (LabelInst*)irBuilder.getInstFactory()->makeLabel();
+            LabelInst *target  = (LabelInst*)irBuilder.getInstFactory()->makeLabel();
+            LabelInst *merge   = (LabelInst*)irBuilder.getInstFactory()->makeLabel();
 
             irBuilder.genTauTypeCompare(thisOpnd,methodDesc,target,
                                         tauNullChecked);
@@ -1858,7 +1858,7 @@ JavaByteCodeTranslator::invokespecial(uint32 constPoolIndex) {
     Opnd* dst;
     
     if (returnType && inlineMethod(methodDesc)) {
-        if(Log::cat_fe()->isDebugEnabled()) {
+        if(Log::isEnabled()) {
             Log::out() << "XXX inline special:";methodDesc->printFullName(Log::out()); Log::out() << ::std::endl;
         }
         if(methodDesc->isInstanceInitializer() || methodDesc->isClassInitializer())
@@ -1925,7 +1925,10 @@ JavaByteCodeTranslator::invokestatic(uint32 constPoolIndex) {
     //
     //  Try to match to charArrayCopy
     //
-    if (translationFlags.genCharArrayCopy == true &&
+    if (translationFlags.genArrayCopy == true &&
+        genArrayCopy(methodDesc,numArgs,srcOpnds,returnType)) {
+        return;
+    } else if (translationFlags.genCharArrayCopy == true &&
         genCharArrayCopy(methodDesc,numArgs,srcOpnds,returnType)) {
         return;
     } else if (translationFlags.genMinMaxAbs == true &&
@@ -1969,7 +1972,7 @@ JavaByteCodeTranslator::invokeinterface(uint32 constPoolIndex,uint32 count) {
     }
     if (returnType && (isExactTypeOpnd(thisOpnd) || methodDesc->isFinal())
         && inlineMethod(methodDesc))  {
-        if(Log::cat_fe()->isDebugEnabled()) {
+        if(Log::isEnabled()) {
             Log::out() << "XXX inline interface:"; methodDesc->printFullName(Log::out()); Log::out() << ::std::endl;
         }
         dst =  JavaCompileMethodInline(compilationInterface,
@@ -2195,7 +2198,7 @@ JavaByteCodeTranslator::needsReturnLabel(uint32 off) {
     if (!moreThanOneReturn && methodToCompile.getByteCodeSize()-1 != off) {
         if (!jumpToTheEnd) {
            // allocate one more label
-           labels[numLabels++] = (LabelInst*)irBuilder.getInstFactory().makeLabel();
+           labels[numLabels++] = (LabelInst*)irBuilder.getInstFactory()->makeLabel();
         }
         jumpToTheEnd      = true;
         moreThanOneReturn = true;
@@ -2428,7 +2431,7 @@ JavaByteCodeTranslator::genTypeArrayLoad() {
             pushOpnd(irBuilder.genLdNull());
             return;
         }
-        if (Log::cat_fe()->isDebugEnabled()) {
+        if (Log::isEnabled()) {
             Log::out() << "Array type is ";
             type->print(Log::out()); Log::out() << ::std::endl;
             stateInfo->stack[5].type->print(Log::out()); Log::out() << ::std::endl;
@@ -2602,7 +2605,7 @@ JavaByteCodeTranslator::genInvokeStatic(MethodDesc * methodDesc,
         ::std::cerr << "Unknown Magic " << methodName << ::std::endl;
     }
     if (inlineMethod(methodDesc)) {
-        if(Log::cat_fe()->isDebugEnabled()) {
+        if(Log::isEnabled()) {
             Log::out() << "XXX inline static:"; methodDesc->printFullName(Log::out()); Log::out() << ::std::endl;
         }
         irBuilder.genTauSafe(); // always safe, is a static method call
@@ -2639,6 +2642,301 @@ JavaByteCodeTranslator::newFallthroughBlock() {
 }
 
 bool
+JavaByteCodeTranslator::genArrayCopy(MethodDesc * methodDesc, 
+                                     uint32       numArgs,
+                                     Opnd **      srcOpnds,
+                                     Type *       returnType) {
+
+    //
+    //  Check if method is java/lang/System.arraycopy
+    //  (Object src, int srcPos, Object dst, int dstPos, int len)
+    //
+    if (strcmp(methodDesc->getName(),"arraycopy") != 0 ||
+        strcmp(methodDesc->getParentType()->getName(),"java/lang/System") !=0)
+          return false;
+
+    //
+    //  an ArrayStoreException is thrown and the destination is not modified: 
+    //  
+    //  - The src argument refers to an object that is not an array. 
+    //  - The dest argument refers to an object that is not an array. 
+    //  - The src argument and dest argument refer to arrays whose component types are different primitive types. 
+    //  - The src argument refers to an array with a primitive component type and the dest argument
+    //    refers to an array with a reference component type. 
+    //  - The src argument refers to an array with a reference component type and the dest argument
+    //    refers to an array with a primitive component type. 
+    //
+    assert(numArgs == 5);
+    Opnd * src = srcOpnds[0];
+    Opnd * srcPos = srcOpnds[1];
+    Type * srcType = src->getType();
+    Type * srcPosType = srcPos->getType();
+    Opnd * dst = srcOpnds[2];
+    Opnd * dstPos = srcOpnds[3];
+    Type * dstType = dst->getType();
+    Type * dstPosType = dstPos->getType();
+    Opnd * len = srcOpnds[4];
+    assert(srcType->isObject() &&
+           srcPosType->isInt4() &&
+           dstType->isObject() &&
+           dstPosType->isInt4() &&
+           len->getType()->isInt4());
+
+    bool throwsASE = false;
+    bool srcIsArray = srcType->isArray();
+    bool dstIsArray = dstType->isArray();
+    ArrayType* srcAsArrayType = srcType->asArrayType();
+    ArrayType* dstAsArrayType = dstType->asArrayType();
+    bool srcIsArrOfPrimitive = srcIsArray && typeManager.isArrayOfPrimitiveElements(srcAsArrayType->getVMTypeHandle());
+    bool dstIsArrOfPrimitive = dstIsArray && typeManager.isArrayOfPrimitiveElements(dstAsArrayType->getVMTypeHandle());
+    if ( !(srcIsArray && dstIsArray) ) {
+         throwsASE = true;
+    } else if ( srcIsArrOfPrimitive ) {
+        if( !dstIsArrOfPrimitive || srcType != dstType )
+            throwsASE = true;
+    } else if( dstIsArrOfPrimitive ) {
+         throwsASE = true;
+    } else { // the both are of objects
+        // Here is some inaccuracy. If src is a subclass of dst there is no ASE for sure.
+        // If it is not, we should check the assignability of each element being copied.
+        // To avoid this we just reject the inlining of System::arraycopy call in this case.
+        NamedType* srcElemType = srcAsArrayType->getElementType();
+        NamedType* dstElemType = dstAsArrayType->getElementType();
+        throwsASE = ! typeManager.isSubClassOf(srcElemType->getVMTypeHandle(),dstElemType->getVMTypeHandle());
+    }
+    if ( throwsASE )
+        return false; // reject the inlining of System::arraycopy call
+
+    if (Log::isEnabled()) {
+        Log::out() << "XXX array copy: "; methodDesc->printFullName(Log::out()); Log::out() << ::std::endl;
+    }
+    //
+    //  Generate exception condition checks:
+    //      chknull src
+    //      chknull dst
+    //      cmpbr srcPos < 0, boundsException
+    //      cmpbr dstPos < 0, boundsException
+    //      cmpbr len < 0, boundsException
+    //      srcEnd = add srcPos, len
+    //      srcLen = src.length
+    //      cmpbr srcEnd > srcLen, boundsException
+    //      dstEnd = add dstPos, len
+    //      dstLen = dst.length
+    //      cmpbr dstEnd > dstLen, boundsException
+    //
+    //      diff = Cmp3(dstPos,srcPos)
+    //          //  1 if dstPos > srcPos
+    //          //  0 if dstPos == srcPos
+    //          // -1 if dstPos < srcPos
+    //      if (src == dst && diff == 0)  // nothing to do
+    //          goto L1:
+    //
+    //      if (diff > 0)
+    //          goto reverseCopying:
+    //
+    //      indexSrc = srcPos
+    //      indexDst = dstPos
+    //      increment = 1
+    //  copyDirectLoopHeader:
+    //      if (indexSrc == srcEnd)
+    //          goto L1:
+    //      dst[indexDst] = src[indexSrc]
+    //      indexSrc += increment
+    //      indexDst += increment
+    //      goto copyDirectLoopHeader:
+    //
+    //  reverseCopying:
+    //      indexSrc = srcPos + len - 1
+    //      indexDst = dstPos + len - 1
+    //      decrement = 1
+    //  copyReverseLoopHeader:
+    //      if (indexSrc < srcPos)
+    //          goto L1:
+    //      dst[indexDst] = src[indexSrc]
+    //      indexSrc -= decrement
+    //      indexDst -= decrement
+    //      goto copyReverseLoopHeader:
+    //
+    //  boundsException:
+    //      chkbounds -1, src
+    //  L1:
+    //
+    Opnd *tauSrcNullChecked = irBuilder.genTauCheckNull(src);
+    Opnd *tauDstNullChecked = irBuilder.genTauCheckNull(dst);
+    
+    LabelInst * reverseCopying = irBuilder.createLabel();
+    LabelInst * boundsException = irBuilder.createLabel();
+    LabelInst * L1 = irBuilder.createLabel();
+    Type * intType = typeManager.getInt32Type();
+
+    newFallthroughBlock();
+    Opnd * zero = irBuilder.genLdConstant((int32)0);
+    Opnd * one  = irBuilder.genLdConstant((int32)1);
+    irBuilder.genBranch(Type::Int32,Cmp_GT,boundsException,zero,srcPos);        
+
+    newFallthroughBlock();
+    irBuilder.genBranch(Type::Int32,Cmp_GT,boundsException,zero,dstPos);
+
+    newFallthroughBlock();
+    irBuilder.genBranch(Type::Int32,Cmp_GT,boundsException,zero,len);
+
+    Modifier mod = Modifier(Overflow_None)|Modifier(Exception_Never)|Modifier(Strict_No);
+
+    newFallthroughBlock();   
+    Opnd * srcLen = irBuilder.genArrayLen(intType,Type::Int32,src);
+    Opnd * srcEnd = irBuilder.genAdd(intType,mod,srcPos,len);
+    irBuilder.genBranch(Type::Int32,Cmp_GT,boundsException,srcEnd,srcLen);
+    
+    newFallthroughBlock();
+    Opnd * dstEnd = irBuilder.genAdd(intType,mod,dstPos,len);
+    Opnd * dstLen = irBuilder.genArrayLen(intType,Type::Int32,dst);
+    irBuilder.genBranch(Type::Int32,Cmp_GT,boundsException,dstEnd,dstLen);
+
+    newFallthroughBlock();
+
+    // The case of same arrays and same positions
+    Opnd * diff = irBuilder.genCmp3(intType,Type::Int32,Cmp_GT,dstPos,srcPos);
+    Opnd * sameArrays = irBuilder.genCmp(intType,Type::IntPtr,Cmp_EQ,src,dst);
+    Opnd * zeroDiff = irBuilder.genCmp(intType,Type::Int32,Cmp_EQ,diff,zero);
+    Opnd * nothingToCopy = irBuilder.genAnd(intType,sameArrays,zeroDiff);
+    irBuilder.genBranch(Type::Int32,Cmp_GT,L1,nothingToCopy,zero);
+
+    newFallthroughBlock();
+
+    // Choosing direction
+
+    irBuilder.genBranch(Type::Int32,Cmp_GT,reverseCopying,diff,zero);
+
+    newFallthroughBlock();
+
+    {   //Direct Copying
+
+    // indexes for using inside the loop
+    VarOpnd* srcPosVar = irBuilder.genVarDef(srcPosType, false);
+    VarOpnd* dstPosVar = irBuilder.genVarDef(dstPosType, false);
+
+    irBuilder.genStVar(srcPosVar, srcPos);
+    irBuilder.genStVar(dstPosVar, dstPos);
+
+    Opnd* srcPosOpnd = NULL;
+    Opnd* dstPosOpnd = NULL;
+
+    // Loop Header
+    LabelInst * loopHead = irBuilder.createLabel();
+    irBuilder.genLabel(loopHead);
+    cfgBuilder.genBlockAfterCurrent(loopHead);
+
+    // loop exit condition (srcIndex = srcStartIndex + len)
+    srcPosOpnd = irBuilder.genLdVar(srcPosType,srcPosVar);
+    irBuilder.genBranch(Type::Int32,Cmp_EQ,L1,srcPosOpnd,srcEnd);
+
+    newFallthroughBlock();
+    // array bounds have been checked directly 
+    // the types have been checked above so tauAddressInRange is tauSafe
+    Opnd *tauSrcAddressInRange = irBuilder.genTauSafe();
+    Opnd *tauDstAddressInRange = irBuilder.genTauSafe();
+    Opnd *tauDstBaseTypeChecked = irBuilder.genTauSafe();
+
+    // load indexes
+    srcPosOpnd = irBuilder.genLdVar(srcPosType,srcPosVar);
+    dstPosOpnd = irBuilder.genLdVar(dstPosType,dstPosVar);
+
+    Type* srcElemType = srcType->asArrayType()->getElementType();
+    Type* dstElemType = dstType->asArrayType()->getElementType();
+
+    // copy element
+    // (Checks are performed before the loop)
+    Opnd* elem = irBuilder.genLdElem(srcElemType,src,srcPosOpnd,
+                                     tauSrcNullChecked, tauSrcAddressInRange);
+    irBuilder.genStElem(dstElemType,dst,dstPosOpnd,elem,
+                        tauDstNullChecked, tauDstBaseTypeChecked, tauDstAddressInRange);
+
+    // increment indexes
+    srcPosOpnd = irBuilder.genAdd(srcPosType,mod,srcPosOpnd,one);
+    dstPosOpnd = irBuilder.genAdd(dstPosType,mod,dstPosOpnd,one);
+
+    // store indexes
+    irBuilder.genStVar(srcPosVar, srcPosOpnd);
+    irBuilder.genStVar(dstPosVar, dstPosOpnd);
+
+    // back edge
+    irBuilder.genJump(loopHead);
+    
+    }   // End of Direct Copying
+
+    {   //Reverse Copying
+    irBuilder.genLabel(reverseCopying);
+    cfgBuilder.genBlockAfterCurrent(reverseCopying);
+
+    // indexes for using inside the loop
+    VarOpnd* srcPosVar = irBuilder.genVarDef(srcPosType, false);
+    VarOpnd* dstPosVar = irBuilder.genVarDef(dstPosType, false);
+
+    Opnd* lastSrcIdx = irBuilder.genSub(srcPosType,mod,srcEnd,one);
+    Opnd* lastDstIdx = irBuilder.genSub(dstPosType,mod,dstEnd,one);
+
+    irBuilder.genStVar(srcPosVar, lastSrcIdx);
+    irBuilder.genStVar(dstPosVar, lastDstIdx);
+
+    Opnd* srcPosOpnd = NULL;
+    Opnd* dstPosOpnd = NULL;
+
+    // Loop Header
+    LabelInst * loopHead = irBuilder.createLabel();
+    irBuilder.genLabel(loopHead);
+    cfgBuilder.genBlockAfterCurrent(loopHead);
+
+    // loop exit condition (srcIndex < srcPos)
+    srcPosOpnd = irBuilder.genLdVar(srcPosType,srcPosVar);
+    irBuilder.genBranch(Type::Int32,Cmp_GT,L1,srcPos,srcPosOpnd);
+
+    newFallthroughBlock();
+    // array bounds have been checked directly 
+    // the types have been checked above so tauAddressInRange is tauSafe
+    Opnd *tauSrcAddressInRange = irBuilder.genTauSafe();
+    Opnd *tauDstAddressInRange = irBuilder.genTauSafe();
+    Opnd *tauDstBaseTypeChecked = irBuilder.genTauSafe();
+
+    // load indexes
+    srcPosOpnd = irBuilder.genLdVar(srcPosType,srcPosVar);
+    dstPosOpnd = irBuilder.genLdVar(dstPosType,dstPosVar);
+
+    Type* srcElemType = srcType->asArrayType()->getElementType();
+    Type* dstElemType = dstType->asArrayType()->getElementType();
+
+    // copy element
+    // (Checks are performed before the loop)
+    Opnd* elem = irBuilder.genLdElem(srcElemType,src,srcPosOpnd,
+                                     tauSrcNullChecked, tauSrcAddressInRange);
+    irBuilder.genStElem(dstElemType,dst,dstPosOpnd,elem,
+                        tauDstNullChecked, tauDstBaseTypeChecked, tauDstAddressInRange);
+
+    // decrement indexes
+    srcPosOpnd = irBuilder.genSub(srcPosType,mod,srcPosOpnd,one);
+    dstPosOpnd = irBuilder.genSub(dstPosType,mod,dstPosOpnd,one);
+
+    // store indexes
+    irBuilder.genStVar(srcPosVar, srcPosOpnd);
+    irBuilder.genStVar(dstPosVar, dstPosOpnd);
+
+    // back edge
+    irBuilder.genJump(loopHead);
+
+    }   // End of Reverse Copying
+
+
+    irBuilder.genLabel(boundsException);
+    cfgBuilder.genBlockAfterCurrent(boundsException);
+    Opnd * minusOne = irBuilder.genLdConstant((int32)-1);
+    irBuilder.genTauCheckBounds(src,minusOne,tauSrcNullChecked);
+
+    irBuilder.genLabel(L1);
+    cfgBuilder.genBlockAfterCurrent(L1);
+
+    return true;
+}
+
+bool
 JavaByteCodeTranslator::genCharArrayCopy(MethodDesc * methodDesc, 
                                          uint32       numArgs,
                                          Opnd **      srcOpnds,
@@ -2671,7 +2969,7 @@ JavaByteCodeTranslator::genCharArrayCopy(MethodDesc * methodDesc,
          ((ArrayType *)dstType)->getElementType()->isChar()))
          return false;
 
-    if (Log::cat_fe()->isDebugEnabled()) {
+    if (Log::isEnabled()) {
         Log::out() << "XXX char array copy: "; methodDesc->printFullName(Log::out()); Log::out() << ::std::endl;
     }
     //
@@ -2759,9 +3057,9 @@ JavaByteCodeTranslator::genMinMax(MethodDesc * methodDesc,
             Type *type = src0->getType();
             assert(type == src1->getType());
 
-            IRManager& irm = irBuilder.getIRManager();
+            IRManager& irm = *irBuilder.getIRManager();
             MethodDesc& md = irm.getMethodDesc();
-            if (Log::cat_fe()->isDebugEnabled()) {
+            if (Log::isEnabled()) {
                 Log::out() << "Saw call to java/lang/Math::min from "
                            << md.getParentType()->getName()
                            << "::"
@@ -2780,9 +3078,9 @@ JavaByteCodeTranslator::genMinMax(MethodDesc * methodDesc,
             Type *type = src0->getType();
             assert(type == src1->getType());
             
-            IRManager& irm = irBuilder.getIRManager();
+            IRManager& irm = *irBuilder.getIRManager();
             MethodDesc& md = irm.getMethodDesc();
-            if (Log::cat_fe()->isDebugEnabled()) {
+            if (Log::isEnabled()) {
                 Log::out() << "Saw call to java/lang/Math::max from "
                            << md.getParentType()->getName()
                            << "::"
@@ -2801,9 +3099,9 @@ JavaByteCodeTranslator::genMinMax(MethodDesc * methodDesc,
             Opnd *src0 = srcOpnds[0];
             Type *type = src0->getType();
             
-            IRManager& irm = irBuilder.getIRManager();
+            IRManager& irm = *irBuilder.getIRManager();
             MethodDesc& md = irm.getMethodDesc();
-            if (Log::cat_fe()->isDebugEnabled()) {
+            if (Log::isEnabled()) {
                 Log::out() << "Saw call to java/lang/Math::abs from "
                            << md.getParentType()->getName()
                            << "::"

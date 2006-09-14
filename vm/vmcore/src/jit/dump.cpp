@@ -31,22 +31,22 @@
 const char * dump_file_name = "file.dump";
 
 int dump(const char * code, const char * name, unsigned int length) {
-    apr_pool_t * pool;
-    port_disassembler_t * disassembler;
-    apr_file_t * file;
+    static apr_pool_t * pool  = NULL;
+    static port_disassembler_t * disassembler;
+    static apr_file_t * file = NULL;
     apr_status_t stat;
     
-    if ((stat = apr_pool_create(&pool, NULL)) != APR_SUCCESS) {
+    if (!pool && (stat = apr_pool_create(&pool, NULL)) != APR_SUCCESS) {
         return stat;
     }
 
-    if ((stat = port_disassembler_create(&disassembler, pool)) != APR_SUCCESS) {
+    if (!disassembler && (stat = port_disassembler_create(&disassembler, pool)) != APR_SUCCESS) {
         apr_pool_destroy(pool);
         return stat;
     }
 
-    if ((stat = apr_file_open(&file, dump_file_name,
-            APR_FOPEN_READ | APR_FOPEN_WRITE | APR_FOPEN_CREATE | APR_FOPEN_APPEND,
+    if (!file && (stat = apr_file_open(&file, dump_file_name,
+            APR_FOPEN_READ | APR_FOPEN_WRITE | APR_FOPEN_CREATE /*| APR_FOPEN_APPEND*/,
             APR_FPROT_UREAD | APR_FPROT_UWRITE, pool)) != APR_SUCCESS) {
         apr_pool_destroy(pool);
         return stat;
@@ -56,7 +56,7 @@ int dump(const char * code, const char * name, unsigned int length) {
     port_disasm_to_file(disassembler, code, length, file);
     apr_file_printf(file, "Function dump end: %s\n", name);
 
-    apr_pool_destroy(pool);
+//    apr_pool_destroy(pool);
     return APR_SUCCESS;
 }
 

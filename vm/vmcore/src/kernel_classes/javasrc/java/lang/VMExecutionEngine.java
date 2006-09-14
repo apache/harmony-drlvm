@@ -19,6 +19,7 @@
  */
 package java.lang;
 
+import java.util.Map;
 import java.util.Properties;
 import java.util.Vector;
 
@@ -37,7 +38,7 @@ final class VMExecutionEngine {
     /**
      * keeps Runnable objects of the shutdown sequence 
      */
-    private static Vector shutdownActions = new Vector(); 
+    private static Vector<Runnable> shutdownActions = new Vector<Runnable>(); 
 
     /**
      * This class is not supposed to be instantiated.
@@ -68,8 +69,7 @@ final class VMExecutionEngine {
      * @api2vm
      */
     static void exit(int status, boolean needFinalization) {
-        exit(status, needFinalization, (Runnable[])shutdownActions
-            .toArray(new Runnable[shutdownActions.size()]));
+        exit(status, needFinalization, shutdownActions.toArray(new Runnable[0]));
     }
 
 
@@ -97,22 +97,28 @@ final class VMExecutionEngine {
     
     /**
      * This method provides an information about the assertion status specified
-     * via command line options. 
+     * via command line options.
      * <p>
-     * The name parameter can be either fully qualified class name or package
-     * name. Null argument can be used to check if any assertion was
-     * specified through command line options. This method should not perform
-     * recursive checking (parent packages shouldn't be searched).
-     * <p>
-     * <b>Note:</b> This method is used for the
-     * {@link Class#desiredAssertionStatus() Class.desiredAssertionStatus()}
-     * method implementation.
+     *  
+     * @see java.lang.Class#desiredAssertionStatus()
      * 
-     * @param name fully qualified class or package name delimited by dots
+     * @param clss the class to be initialized with the assertion status. Note, 
+     * assertion status is applicable to top-level classes only, therefore
+     * any member/local class passed is a subject to conversion to corresponding
+     * top-level declaring class. Also, <code>null</code> argument can be used to 
+     * check if any assertion was specified through command line options.
+     * @param recursive controls whether this method should check exact match
+     * with name of the class, or check (super)packages recursively 
+     * (most specific one has precedence).
+     * @param defaultStatus if no specific package setting found, 
+     * this value may override command-line defaults. This parameter is
+     * actual only when <code>recursive == true</code>. 
+     * @see java.lang.ClassLoader#setDefaultAssertionStatus(boolean) 
      * @return 0 - unspecified, &lt; 0 - false, &gt; 0 - true
      * @api2vm
      */
-    static native int getAssertionStatus(String name);
+    static native int getAssertionStatus(Class clss, boolean recursive, 
+            int defaultStatus);
 
     /**
      * This method satisfies the requirements of the specification for the
@@ -168,4 +174,38 @@ final class VMExecutionEngine {
      * @api2vm
      */
     static native void traceMethodCalls(boolean enable);
+
+    /**
+     * Returns the current system time in milliseconds since 
+     * the Unix epoch (midnight, 1 Jan, 1970).
+     * @api2vm
+     */
+    static native long currentTimeMillis();
+
+    /**
+     * Returns the current value of a system timer with the best accuracy
+     * the OS can provide, in nanoseconds.
+     * @api2vm
+     */
+    static native long nanoTime();
+    
+    /**
+     * Returns the value of the environment variable specified by
+     * <code>name</code> argument or <code>null</code> if it is not set.
+     * @api2vm
+     */
+    static native String getenv(String name);
+    
+    /**
+     * Returns the whole environment as a name-value mapping.
+     * May return empty map.
+     * @api2vm
+     */
+    static native Map<String, String> getenv();
+    
+    /**
+     * Returns platform-specific name of the specified library.
+     * @api2vm
+     */
+    static native String mapLibraryName(String libname);
 }

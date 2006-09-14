@@ -30,11 +30,15 @@
 #include "Stl.h"
 #include "Log.h"
 #include "Type.h"
+#include "CGSupport.h"
 
 namespace Jitrino {
 
+class Inst;
+
 class InlineInfo {
-    typedef StlList<MethodDesc*>   MethodDescList;
+    typedef ::std::pair<MethodDesc*, uint32> InlinePair;
+    typedef StlList<InlinePair*>   InlinePairList;
 public:
 
     InlineInfo(MemoryManager& mm) :
@@ -47,10 +51,10 @@ public:
     {
         if ( ii.inlineChain ) {
             init();
-            MethodDescList::const_reverse_iterator it(ii.inlineChain->end());
-            MethodDescList::const_reverse_iterator last(ii.inlineChain->begin());
+            InlinePairList::const_reverse_iterator it(ii.inlineChain->end());
+            InlinePairList::const_reverse_iterator last(ii.inlineChain->begin());
             for (; it != last; ++it) {
-                MethodDesc* md = (*it);
+                InlinePair* md = (*it);
                 inlineChain->push_front(md);
             }
         }
@@ -60,9 +64,9 @@ public:
     {
         if ( ii.inlineChain ) {
             init();
-            MethodDescList::const_iterator it = ii.inlineChain->begin();
+            InlinePairList::const_iterator it = ii.inlineChain->begin();
             for (; it != ii.inlineChain->end(); ++it) {
-                MethodDesc* md = (*it);
+                InlinePair* md = (*it);
                 addLevelFast(md);
             }
         }else{
@@ -74,27 +78,31 @@ public:
     // adds a new level to the chain of inlined methods
     // convention is to add in 'parent-first' order
     //
-    void addLevel(MethodDesc* md) 
+    void addLevel(MethodDesc* md, uint32 bcOff)
     { 
         init();
-        addLevelFast(md);
+        InlinePair* inlPair = new(memMgr) InlinePair(md, bcOff);
+        addLevelFast(inlPair);
     }
 
-    void prependLevel(MethodDesc* md)
+    void prependLevel(MethodDesc* md, uint32 bcOff)
     {
         init();
-        inlineChain->push_front(md);
+        InlinePair* inlPair = new(memMgr) InlinePair(md, bcOff);
+        inlineChain->push_front(inlPair);
     }
 
-    void printLevels(CategoryStream<LogIR>& os) const
+    void printLevels(std::ostream& os) const
     {
         if ( isEmpty() ) {
             return;
         }
-        MethodDescList::const_iterator it = inlineChain->begin();
+        InlinePairList::const_iterator it = inlineChain->begin();
         for (; it != inlineChain->end(); ++it) {
-            MethodDesc* md = (*it);
-            os << md->getParentType()->getName() << "." << md->getName() << " ";
+            InlinePair* md = (*it);
+            os << ((MethodDesc*)md->first)->getParentType()->getName() << "." 
+                    << ((MethodDesc*)md->first)->getName() << " " << " bcOff " 
+                    << md->second << " ";
         }
         os << ::std::endl;
     }
@@ -109,14 +117,16 @@ protected:
     void init() 
     { 
         if ( !isInitialized() ) {
-            inlineChain = new (memMgr) MethodDescList(memMgr); 
+            inlineChain = new (memMgr) InlinePairList(memMgr); 
         }
     }
 
-    void addLevelFast(MethodDesc* md) { inlineChain->push_back(md); }
+    void addLevelFast(InlinePair* inlPair) { 
+        inlineChain->push_back(inlPair); 
+    }
 private:
     MemoryManager&  memMgr;
-    MethodDescList* inlineChain;
+    InlinePairList* inlineChain;
 };
 
 // 
@@ -133,18 +143,15 @@ public:
 
     void setParentBuilder(InlineInfoBuilder* builder) { parent = builder; }
 
-    void buildInlineInfo(InlineInfo* ii) // ii must be non-NULL
-    {
-        if ( parent ) {
-             parent->buildInlineInfo(ii);
-        }
-        addCurrentLevel(ii);
-    }
-    void buildInlineInfoForInst(Inst* inst, MethodDesc* target_md = NULL);
-private:
-
-    virtual void addCurrentLevel(InlineInfo* ii) = 0; // ii must be non-NULL
+    void buildInlineInfo(InlineInfo* ii, uint32 offset); // ii must be non-NULL
+    uint32 buildInlineInfoForInst(Inst* inst, uint32 offset, MethodDesc* target_md = NULL);
+    virtual uint32 getCurrentBcOffset() = 0;
+    virtual MethodDesc* getCurrentMd() = 0;
+protected:
     InlineInfoBuilder* parent;
+private:
+    virtual void addCurrentLevel(InlineInfo* ii, uint32 offset) = 0; // ii must be non-NULL
+    virtual void setCurrentBcOffset(uint32 offSet) = 0;
 };
 
 } //namespace Jitrino 

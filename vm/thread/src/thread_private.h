@@ -49,20 +49,26 @@
 #define MAX_OWNED_MONITOR_NUMBER 200 //FIXME: switch to dynamic resize
 #define FAST_LOCAL_STORAGE_SIZE 10
 
+#if !defined (_EM64T_) && !defined (_IPF_)
 //use lock reservation
 #define LOCK_RESERVATION
 // spin with try_lock SPIN_COUNT times
 #define SPIN_COUNT 5
 
-//use optimized asm monitor enter and exit 
-#define ASM_MONITOR_HELPER
+#endif //!defined (_EM64T_) && !defined (_IPF_)
 
-// TLS access options
 #ifdef WIN32
+//use optimized asm monitor enter and exit helpers 
+#define ASM_MONITOR_HELPER
+// FS14_TLS_USE define turns on windows specific TLS access optimization 
+// We use free TIB slot with 14 offset, see following article for details 
+// http://www.microsoft.com/msj/archive/S2CE.aspx
 #define FS14_TLS_USE
 #endif
-//#define APR_TLS_USE
 
+#ifdef _EM64T_
+#define APR_TLS_USE
+#endif
 
 
 #ifdef __cplusplus
@@ -70,12 +76,15 @@ extern "C" {
 #endif /* __cplusplus */
 // optimization code
 #if !defined (APR_TLS_USE ) && !defined (FS14_TLS_USE) 
+
 #ifdef PLATFORM_POSIX
 extern __thread hythread_t tm_self_tls;
 #else
 extern __declspec(thread) hythread_t tm_self_tls;
-#endif
+#endif //PLATFORM_POSIX
+
 #else
+#if defined (WIN32) && defined (FS14_TLS_USE)
 
 __forceinline hythread_t tmn_self_macro() {
     register hythread_t t;
@@ -88,8 +97,13 @@ __forceinline hythread_t tmn_self_macro() {
 
 #define store_tm_self(self)  (__asm(mov self, fs:[0x14]))
 #define tm_self_tls (tmn_self_macro())
+#endif 
+
 #endif
 
+#ifdef APR_TLS_USE
+#define tm_self_tls (hythread_self())
+#endif
 
 /**
   * get_local_pool() function return apr pool asociated with the current thread.
@@ -151,7 +165,11 @@ typedef struct HyThread {
     /**
      * Number of suspend requests made for this thread.
      */
-    IDATA suspend_request;
+    int32 suspend_request;
+    /**
+     * Field reserved for JIT proprietary needs.
+     */
+    int32 jit_private_data; 
 
     /**
      * Flag indicating that thread can safely be suspended.
@@ -536,7 +554,7 @@ typedef struct HySemaphore {
 // Global variables 
 
 extern hythread_group_t group_list; // list of thread groups
-extern int groups_count; // number of thread groups
+extern IDATA groups_count; // number of thread groups
 
 extern apr_pool_t *TM_POOL;           //global APR pool for thread manager
 
@@ -565,11 +583,11 @@ void set_suspend_disable(int count);
 /* thin monitor functions used java monitor
  */
 IDATA is_fat_lock(hythread_thin_monitor_t lockword);
-IDATA owns_thin_lock(hythread_t thread, IDATA lockword);
+IDATA owns_thin_lock(hythread_t thread, I_32 lockword);
 hythread_monitor_t inflate_lock(hythread_thin_monitor_t *lockword_ptr);
-IDATA unreserve_lock(IDATA *lockword_ptr);
+IDATA unreserve_lock(hythread_thin_monitor_t *lockword_ptr);
 
-
+IDATA VMCALL hythread_get_group(hythread_group_t *group, hythread_t thread);
 /**
  *  Auxiliary function to throw java.lang.InterruptedException
  */
@@ -596,7 +614,7 @@ IDATA acquire_start_lock(void);
 IDATA release_start_lock(void);
 
 IDATA thread_destroy(hythread_t thread);
-IDATA VMCALL hythread_get_group(hythread_group_t *group, hythread_t thread);
+
 IDATA thread_sleep_impl(I_64 millis, IDATA nanos, IDATA interruptable);
 IDATA condvar_wait_impl(hycond_t cond, hymutex_t mutex, I_64 ms, IDATA nano, IDATA interruptable);
 IDATA monitor_wait_impl(hythread_monitor_t mon_ptr, I_64 ms, IDATA nano, IDATA interruptable);

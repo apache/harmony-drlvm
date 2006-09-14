@@ -20,121 +20,98 @@
  *
  */
 
-#include <algorithm>
+
+#include "escapeanalyzer.h"
 #include "Log.h"
-#include "FlowGraph.h"
 #include "Inst.h"
 #include "Dominator.h"
 #include "Loop.h"
 #include "globalopndanalyzer.h"
 #include "optimizer.h"
-#include "escapeanalyzer.h"
+#include "FlowGraph.h"
+
+#include <algorithm>
 
 namespace Jitrino {
 
-DEFINE_OPTPASS_IMPL(LoopPeelingPass, peel, "Loop Peeling")
+DEFINE_SESSION_ACTION(LoopPeelingPass, peel, "Loop Peeling")
 
 void
 LoopPeelingPass::_run(IRManager& irm) {
     computeDominators(irm);
     DominatorTree* dominatorTree = irm.getDominatorTree();
     assert(dominatorTree->isValid());
-    LoopBuilder lb(irm.getNestedMemoryManager(),
-                   irm, *dominatorTree, irm.getFlowGraph().hasEdgeProfile());
-    LoopTree* loopTree = lb.computeAndNormalizeLoops(true);
-    if (lb.needSsaFixup()) {
-        fixupSsa(irm);
-    }
-    irm.setLoopTree(loopTree);
-    smoothProfile(irm);
+    LoopBuilder lb(irm.getNestedMemoryManager(), irm, *dominatorTree, irm.getFlowGraph().hasEdgeProfile());
+    lb.computeLoops(true);
+    lb.peelLoops();
 }
 
 LoopBuilder::LoopBuilder(MemoryManager& mm, IRManager& irm, 
                          DominatorTree& d, bool useProfile) 
     : loopMemManager(mm), dom(d), irManager(irm), 
       instFactory(irm.getInstFactory()), fg(irm.getFlowGraph()), info(NULL), root(NULL), 
-      useProfile(useProfile), needsSsaFixup(false) 
+      useProfile(useProfile), needsSsaFixup(false), flags(*irm.getOptimizerFlags().loopBuilderFlags)
 {
-    JitrinoParameterTable& params = irManager.getParameterTable();
-    flags.hoist_loads = params.lookupBool("opt::loop::hoist_loads", false);
-    flags.invert = params.lookupBool("opt::loop::invert", false);
-    flags.peel = params.lookupBool("opt::loop::peel", true);
-    flags.insideout_peeling = params.lookupBool("opt::loop::insideout_peeling", false);
-    flags.old_static_peeling = params.lookupBool("opt::loop::old_static_peeling", false);
-    flags.aggressive_peeling = params.lookupBool("opt::loop::aggressive_peeling", true);
-    flags.peel_upto_branch = params.lookupBool("opt::loop::peel_upto_branch", true);
-    flags.peeling_threshold = params.lookupUint("opt::loop::peeling_threshold", 2);
-    flags.fullpeel = params.lookupBool("opt::loop::fullpeel", false);
-    flags.fullpeel_max_inst = params.lookupUint("opt::loop::fullpeel_max_inst", 40);
-    flags.unroll = params.lookupBool("opt::loop::unroll", false);
-    flags.unroll_count = params.lookupUint("opt::loop::unroll_count", 4);
-    flags.unroll_threshold = params.lookupUint("opt::loop::unroll_threshold", 10);
-    flags.eliminate_critical_back_edge = params.lookupBool("opt::loop::eliminate_critical_back_edge", false);
-    flags.peel_upto_branch_no_instanceof = params.lookupBool("opt::loop::peel_upto_branch::no_instanceof", true);
 }
 
-void LoopBuilder::showFlagsFromCommandLine()
-{
-    Log::out() << "    opt::loop::hoist_loads[={on|OFF}] = peel assuming load hoisting" << ::std::endl;
-    Log::out() << "    opt::loop::invert[={on|OFF}] = try to invert loops to reduce branches" << ::std::endl;
-    Log::out() << "    opt::loop::peel[={ON|off}] = do peeling" << ::std::endl;
-    Log::out() << "    opt::loop::insideout_peeling[={on|OFF}] = ?" << ::std::endl;
-    Log::out() << "    opt::loop::aggressive_peeling[={ON|off}] = be aggressive about peeling" << ::std::endl;
-    Log::out() << "    opt::loop::peel_upto_branch[={on|OFF}] = peel only up to a branch" << ::std::endl;
-    Log::out() << "    opt::loop::old_static_peeling[={on|OFF}] = use old-style peeling for static runs" << ::std::endl;
-    Log::out() << "    opt::loop::peeling_threshold[=int] = ? (default 2)" << ::std::endl;
-    Log::out() << "    opt::loop::unroll[={on|OFF}] = ?" << ::std::endl;
-    Log::out() << "    opt::loop::unroll_count[=int] = ? (default 4)" << ::std::endl;
-    Log::out() << "    opt::loop::unroll_threshold[=int] = ? (default 10)" << ::std::endl;
-    Log::out() << "    opt::loop::eliminate_critical_back_edge[={on|OFF}] = ?" << ::std::endl;
-    Log::out() << "    opt::loop::peel_upto_branch::no_instanceof[={on|OFF}] = with peel_upto_branch, peel only up to a branch or instanceof" << ::std::endl;
+void LoopBuilder::readFlags(Action* argSource, LoopBuilderFlags* flags) {
+    IAction::HPipeline p = NULL; //default pipeline for argSource
+    flags->hoist_loads = argSource->getBoolArg(p, "loop.hoist_loads", false);
+    flags->invert = argSource->getBoolArg(p, "loop.invert", false);
+    flags->peel = argSource->getBoolArg(p, "loop.peel", true);
+    flags->insideout_peeling = argSource->getBoolArg(p, "loop.insideout_peeling", false);
+    flags->old_static_peeling = argSource->getBoolArg(p, "loop.old_static_peeling", false);
+    flags->aggressive_peeling = argSource->getBoolArg(p, "loop.aggressive_peeling", true);
+    flags->peel_upto_branch = argSource->getBoolArg(p, "loop.peel_upto_branch", true);
+    flags->peeling_threshold = argSource->getIntArg(p, "loop.peeling_threshold", 2);
+    flags->fullpeel = argSource->getBoolArg(p, "loop.fullpeel", false);
+    flags->fullpeel_max_inst = argSource->getIntArg(p, "loop.fullpeel_max_inst", 40);
+    flags->unroll = argSource->getBoolArg(p, "loop.unroll", false);
+    flags->unroll_count = argSource->getIntArg(p, "loop.unroll_count", 4);
+    flags->unroll_threshold = argSource->getIntArg(p, "loop.unroll_threshold", 10);
+    flags->peel_upto_branch_no_instanceof = argSource->getBoolArg(p, "loop.peel_upto_branch_no_instanceof", true);
+
 }
 
-//
-// If loop A is contained in loop B, then B's header must dominate 
-// A's header.  We sort loop edges based on headers' dfn so as to
-// construct loops from the outermost to the innermost
-//
-void LoopBuilder::formLoopHierarchy(StlVector<CFGEdge*>& edges,
-                                      uint32 numLoops) {
-    if (numLoops == 0)
-        return;
-
-    // new blocks are created, recompute df num
-    uint32 numBlocks = fg.getNodeCount();
-
-    // create a root loop containing all loops within the method
-    createLoop(NULL,NULL,numBlocks);
-
-    fg.getNodeCount();
-
-    // create loops in df num order
-    for (uint32 j = 0; j < numLoops; j++) 
-        createLoop(edges[j]->getTargetNode(), edges[j]->getSourceNode(), numBlocks);
-
+void LoopBuilder::showFlags(std::ostream& os) {
+    os << "  loop builder flags:"<<std::endl;
+    os << "    loop.hoist_loads[={on|OFF}] - peel assuming load hoisting" << std::endl;
+    os << "    loop.invert[={on|OFF}]      - try to invert loops to reduce branches" << std::endl;
+    os << "    loop.peel[={ON|off}]        - do peeling" << std::endl;
+    os << "    loop.insideout_peeling[={on|OFF}]" << std::endl;
+    os << "    loop.aggressive_peeling[={ON|off}] - be aggressive about peeling" << std::endl;
+    os << "    loop.peel_upto_branch[={on|OFF}]   - peel only up to a branch" << std::endl;
+    os << "    loop.old_static_peeling[={on|OFF}] - use old-style peeling for static runs" << std::endl;
+    os << "    loop.peeling_threshold[=int]  - (default 2)" << std::endl;
+    os << "    loop.unroll[={on|OFF}]" << std::endl;
+    os << "    loop.unroll_count[=int] - (default 4)" << std::endl;
+    os << "    loop.unroll_threshold[=int] - (default 10)" << std::endl;
+    os << "    loop.peel_upto_branch_no_instanceof[={on|OFF}] - with peel_upto_branch, peel only up to a branch or instanceof" << std::endl;
 }
 
 template <class IDFun>
 class LoopMarker {
 public:
-    static uint32 markNodesOfLoop(StlBitVector& nodesInLoop, CFGNode* header, CFGNode* tail);
+    static uint32 markNodesOfLoop(StlBitVector& nodesInLoop, Node* header, Node* tail);
 private:
-    static uint32 backwardMarkNode(StlBitVector& nodesInLoop, CFGNode* node, StlBitVector& visited);
-    static uint32 countInsts(CFGNode* node);
+    static uint32 backwardMarkNode(StlBitVector& nodesInLoop, Node* node, StlBitVector& visited);
+    static uint32 countInsts(Node* node);
 };
 
 template <class IDFun>
-uint32 LoopMarker<IDFun>::countInsts(CFGNode* node) {
+uint32 LoopMarker<IDFun>::countInsts(Node* node) {
     uint32 count = 0;
-    Inst* first = node->getFirstInst();
-    for(Inst* inst = first->next(); inst != first; inst = inst->next())
-        ++count;
+    Inst* first = (Inst*)node->getFirstInst();
+    if (first != NULL) {
+        for(Inst* inst = first->getNextInst(); inst != NULL; inst = inst->getNextInst())
+            ++count;
+    }
     return count;
 }
 
 template <class IDFun>
 uint32 LoopMarker<IDFun>::backwardMarkNode(StlBitVector& nodesInLoop, 
-                                CFGNode* node, 
+                                Node* node, 
                                 StlBitVector& visited) {
     static IDFun getId;
     if(visited.setBit(node->getId()))
@@ -143,10 +120,10 @@ uint32 LoopMarker<IDFun>::backwardMarkNode(StlBitVector& nodesInLoop,
     uint32 count = countInsts(node);
     nodesInLoop.setBit(getId(node));
 
-    const CFGEdgeDeque& inEdges = node->getInEdges();
-    CFGEdgeDeque::const_iterator eiter;
+    const Edges& inEdges = node->getInEdges();
+    Edges::const_iterator eiter;
     for(eiter = inEdges.begin(); eiter != inEdges.end(); ++eiter) {
-        CFGEdge* e = *eiter;
+        Edge* e = *eiter;
         count += backwardMarkNode(nodesInLoop, e->getSourceNode(), visited);
     }
     return count;
@@ -157,8 +134,8 @@ uint32 LoopMarker<IDFun>::backwardMarkNode(StlBitVector& nodesInLoop,
 //
 template <class IDFun>
 uint32 LoopMarker<IDFun>::markNodesOfLoop(StlBitVector& nodesInLoop,
-                               CFGNode* header,
-                               CFGNode* tail) {
+                               Node* header,
+                               Node* tail) {
     static IDFun getId;
     uint32 maxSize = ::std::max(getId(header), getId(tail));
     MemoryManager tmm(maxSize >> 3, "LoopBuilder::markNodesOfLoop.tmm");
@@ -173,11 +150,6 @@ uint32 LoopMarker<IDFun>::markNodesOfLoop(StlBitVector& nodesInLoop,
     return count + backwardMarkNode(nodesInLoop, tail, visited);
 }
 
-uint32 LoopBuilder::markNodesOfLoop(StlBitVector& nodesInLoop,
-                               CFGNode* header,
-                               CFGNode* tail) {
-    return LoopMarker<IdentifyByDFN>::markNodesOfLoop(nodesInLoop, header, tail);
-}
 
 
 //
@@ -185,7 +157,7 @@ uint32 LoopBuilder::markNodesOfLoop(StlBitVector& nodesInLoop,
 // we traverse descendants to find who contains the header and return the 
 // descendant loop
 //
-LoopNode* LoopBuilder::findEnclosingLoop(LoopNode* loop, CFGNode* header) {
+LoopNode* LoopBuilder::findEnclosingLoop(LoopNode* loop, Node* header) {
     for (LoopNode* l = loop->getChild(); l != NULL; l = l->getSiblings())
         if (l->inLoop(header))
             return findEnclosingLoop(l, header);
@@ -194,157 +166,15 @@ LoopNode* LoopBuilder::findEnclosingLoop(LoopNode* loop, CFGNode* header) {
     return loop;
 }
 
-void LoopBuilder::createLoop(CFGNode* header, 
-                          CFGNode* tail,
-                          uint32   numBlocks) {
-    if (header == NULL)  // root loop
-        root = new (loopMemManager) LoopNode(NULL, NULL); 
-    else {
-        // walk up the hierarchy to find which loop contains it
-        StlBitVector* nodesInLoop = new (loopMemManager) StlBitVector(loopMemManager,numBlocks);
-        LoopNode* loop = new (loopMemManager) LoopNode(header, nodesInLoop);
-        findEnclosingLoop((LoopNode*) root, header)->addChild(loop);
-        
-        // make blocks within the loop using backward depth first
-        // search starting from tail
-        markNodesOfLoop(*nodesInLoop, header, tail);
-    }
-}
 
-// numLoopEdges loops share the same header
-// create a new block that sinks all loop edges (the edges are no longer
-// loop edges).  create a new loop edge <block,header>.
-// return the newly created block.
-//
-CFGEdge* LoopBuilder::coalesceEdges(StlVector<CFGEdge*>& edges,
-                                    uint32 numEdges) {
-    CFGNode* header = edges.back()->getTargetNode();
 
-    // create a new block and re-target all loop edges to the block
-    CFGNode* block = fg.createBlock(instFactory.makeLabel());
-    
-    for (uint32 nE=numEdges; nE != 0; nE--) {
-        // remove edge <pred,header>
-        CFGEdge* e = edges.back();
-        edges.pop_back();
-        assert(e->getTargetNode() == header);  // must share the same header
-
-        fg.replaceEdgeTarget(e, block);
-        block->setFreq(block->getFreq()+e->getSourceNode()->getFreq()*e->getEdgeProb());
-    }
-    if (numEdges > 1) {
-        // copy any phi nodes from successor
-        Inst* phi = header->getFirstInst()->next();
-        for (; phi->isPhi(); phi = phi->next()) {
-            Opnd *orgDst = phi->getDst();
-            SsaVarOpnd *ssaOrgDst = orgDst->asSsaVarOpnd();
-            assert(ssaOrgDst);
-            VarOpnd *theVar = ssaOrgDst->getVar();
-            assert(theVar);
-            SsaVarOpnd* newDst = irManager.getOpndManager().createSsaVarOpnd(theVar);
-            Inst *newInst = instFactory.makePhi(newDst, 0, 0);
-            PhiInst *newPhiInst = newInst->asPhiInst();
-            assert(newPhiInst);
-            uint32 n = phi->getNumSrcOperands();
-            for (uint32 i=0; i<n; i++) {
-                instFactory.appendSrc(newPhiInst, phi->getSrc(i));
-            }
-            PhiInst *phiInst = phi->asPhiInst();
-            assert(phiInst);
-            instFactory.appendSrc(phiInst, newDst);
-            block->prependAfterCriticalInst(newInst);
-            needsSsaFixup = true;
-        }
-    }
-    // create factored edge <block,header>
-    CFGEdge* edge = fg.addEdge(block,header);
-    edge->setEdgeProb(1.0);
-    return edge;
-}
-
-//
-// check each header to see if multiple loops share the head
-// if found, coalesce those loop edges.
-// return number of found loops 
-uint32 LoopBuilder::findLoopEdges(MemoryManager&     mm,
-                               StlVector<CFGNode*>&  headers,      // in
-                               StlVector<CFGEdge*>& loopEdges) {  // out
-    uint32 numLoops = 0;
-    while (!headers.empty()) {
-        MemoryManager tmm(16*sizeof(CFGEdge*)*2,"LoopBuilder::findLoopEdges.tmm");
-        StlVector<CFGEdge*> entryEdges(tmm);
-        
-        CFGNode* head = headers.back();
-        headers.pop_back();
-
-        uint32 numLoopEdges = 0;
-        uint32 numEntryEdges = 0;
-        // if n dominates its predecessor, then the edge is an loop back edge
-        const CFGEdgeDeque& inEdges = head->getInEdges();
-        CFGEdgeDeque::const_iterator eiter;
-        for(eiter = inEdges.begin(); eiter != inEdges.end(); ++eiter) {
-            CFGNode* pred = (*eiter)->getSourceNode();
-            if (dom.dominates(head, pred)) {
-                loopEdges.push_back(*eiter);
-                numLoopEdges++;
-            } else {
-                entryEdges.push_back(*eiter);
-                numEntryEdges++;
-            }
-        }
-        assert(numLoopEdges != 0 && numEntryEdges != 0); 
-        numLoops++;
-
-        if (head->isBasicBlock()) {
-            // Create unique preheader if 
-            // a) more than one entry edge or
-            // b) the one entry edge is a critical edge 
-            if ((numEntryEdges > 1) || (entryEdges.front()->getSourceNode()->getOutDegree() > 1)) {
-                coalesceEdges(entryEdges, numEntryEdges);
-            }
-
-            // Create unique tail if
-            // a) more than one back edge or
-            // b) the one back edge is a critical edge
-            if ((numLoopEdges > 1) || (flags.eliminate_critical_back_edge && (loopEdges.front()->getSourceNode()->getOutDegree() > 1))) {
-                CFGEdge* backEdge = coalesceEdges(loopEdges, numLoopEdges);
-                loopEdges.push_back(backEdge);
-            }
-        }
-    }
-    return numLoops;
-}
-
-// 
-// we find loop headers and then find loop edges because coalesceLoops 
-// introduces new blocks and edges into the flow graph.  dom does not
-// dominator information for the newly created blocks.
-//
-void LoopBuilder::findLoopHeaders(StlVector<CFGNode*>& headers) { // out
-    const CFGNodeDeque& nodes = fg.getNodes();
-    CFGNodeDeque::const_iterator niter;
+bool noStoreOrSynch(ControlFlowGraph& fg) {
+    const Nodes& nodes = fg.getNodes();
+    Nodes::const_iterator niter;
     for(niter = nodes.begin(); niter != nodes.end(); ++niter) {
-        CFGNode* n = *niter;
-        // if n dominates its predecessor, then the edge is an loop back edge
-        const CFGEdgeDeque& edges = n->getInEdges();
-        CFGEdgeDeque::const_iterator eiter;
-        for(eiter = edges.begin(); eiter != edges.end(); ++eiter) {
-            CFGNode* pred = (*eiter)->getSourceNode();
-            if (pred->isBlockNode() && dom.dominates(n, pred)) {
-                headers.push_back(n);
-                break;
-            }
-        }
-    }
-}
-
-bool noStoreOrSynch(FlowGraph& fg) {
-    const CFGNodeDeque& nodes = fg.getNodes();
-    CFGNodeDeque::const_iterator niter;
-    for(niter = nodes.begin(); niter != nodes.end(); ++niter) {
-        CFGNode* n = *niter;
-        Inst* first = n->getFirstInst();
-        for(Inst* inst = first->next(); inst != first; inst = inst->next()) {
+        Node* n = *niter;
+        Inst* first = (Inst*)n->getFirstInst();
+        for(Inst* inst = first->getNextInst(); inst != NULL; inst = inst->getNextInst()) {
             if (inst->getOperation().isStoreOrSync()) {
                 return false;
             }
@@ -375,7 +205,7 @@ bool LoopBuilder::isVariantInst(Inst* inst, StlHashSet<Opnd*>& variantOpnds) {
     Opcode op = operation.getOpcode();
 
     bool isfinalload = false;
-    OptimizerFlags& optimizerFlags = *irManager.getCompilationContext()->getOptimizerFlags();
+    const OptimizerFlags& optimizerFlags = irManager.getOptimizerFlags();
     if (optimizerFlags.cse_final) {
         switch (inst->getOpcode()) {
         case Op_TauLdInd: 
@@ -471,7 +301,7 @@ bool LoopBuilder::isVariantInst(Inst* inst, StlHashSet<Opnd*>& variantOpnds) {
     return false;
 }
 
-void LoopBuilder::hoistHeaderInvariants(CFGNode* preheader, CFGNode* header, StlVector<Inst*>& invariantInsts) {
+void LoopBuilder::hoistHeaderInvariants(Node* preheader, Node* header, StlVector<Inst*>& invariantInsts) {
     assert(preheader->getOutDegree() == 1 && preheader->getOutEdges().front()->getTargetNode() == header);
 
     StlVector<Inst*>::iterator iiter;
@@ -482,26 +312,27 @@ void LoopBuilder::hoistHeaderInvariants(CFGNode* preheader, CFGNode* header, Stl
             break;
         }
         inst->unlink();
-        preheader->append(inst);
+        preheader->appendInst(inst);
     }
 }
 
 
-bool LoopBuilder::isInversionCandidate(CFGNode* originalHeader, CFGNode* header, StlBitVector& nodesInLoop, CFGNode*& next, CFGNode*& exit) {
-    if(Log::cat_opt_loop()->isDebugEnabled()) {
+bool LoopBuilder::isInversionCandidate(Node* originalHeader, Node* header, StlBitVector& nodesInLoop, Node*& next, Node*& exit) {
+    if(Log::isEnabled()) {
         Log::out() << "Consider rotating ";
-        header->printLabel(Log::out());
-        Log::out() << "  df = (" << (int) header->getDfNum() << ")" << ::std::endl;
+        FlowGraph::printLabel(Log::out(), header);
+        Log::out() << "  df = (" << (int) header->getDfNum() << ")" << std::endl;
     }
     assert(nodesInLoop.getBit(header->getId()));
 
     if (flags.aggressive_peeling) {
         if (header->getOutDegree() == 1) {
             next = header->getOutEdges().front()->getTargetNode();
-            if(next->getInDegree() > 1 && next != originalHeader
-			) {
+            if(next->getInDegree() > 1 && next != originalHeader) {
                 // A pre-header for an inner loop - do not peel.
-                Log::cat_opt_loop()->debug << "Stop peeling node at L" << (int) header->getLabelId() << ": preheader for inner loop. " << ::std::endl;
+                if (Log::isEnabled()) {
+                    Log::out() << "Stop peeling node at ";FlowGraph::printLabel(Log::out(), header); Log::out()<<": preheader for inner loop. " << std::endl;
+                }
                 return false;
             }
             exit = NULL;
@@ -510,12 +341,14 @@ bool LoopBuilder::isInversionCandidate(CFGNode* originalHeader, CFGNode* header,
     }
 
     if (header->getOutDegree() != 2) {
-        Log::cat_opt_loop()->debug << "Stop peeling node at L" << (int) header->getLabelId() << ": no exit. " << ::std::endl;
+        if (Log::isEnabled()) {
+            Log::out() << "Stop peeling node at L";  FlowGraph::printLabel(Log::out(), header); Log::out() << ": no exit. " << std::endl;
+        }
         return false;
     }
 
-    CFGNode* succ1 = header->getOutEdges().front()->getTargetNode();
-    CFGNode* succ2 = header->getOutEdges().back()->getTargetNode();
+    Node* succ1 = header->getOutEdges().front()->getTargetNode();
+    Node* succ2 = header->getOutEdges().back()->getTargetNode();
     
     // Check if either succ is an exit.
     if(nodesInLoop.getBit(succ1->getId())) {
@@ -524,7 +357,9 @@ bool LoopBuilder::isInversionCandidate(CFGNode* originalHeader, CFGNode* header,
             exit = succ2;
         } else {
             // Both succ's are in loop, no inversion.
-            Log::cat_opt_loop()->debug << "Stop peeling node at L" << (int) header->getLabelId() << ": no exit. " << ::std::endl;
+            if (Log::isEnabled()) {
+                Log::out() << "Stop peeling node at L";  FlowGraph::printLabel(Log::out(), header); Log::out()<< ": no exit. " << std::endl;
+            }
             return false;
         }
     } else {
@@ -534,11 +369,12 @@ bool LoopBuilder::isInversionCandidate(CFGNode* originalHeader, CFGNode* header,
         exit = succ1;
     }
 
-    if(next->getInDegree() > 1 && next != originalHeader
-	) {
+    if(next->getInDegree() > 1 && next != originalHeader ) {
         // If next has more than one in edge, it must be the header
         // of an inner loop.  Do not peel its preheader.
-        Log::cat_opt_loop()->debug << "Stop peeling node at L" << (int) header->getLabelId() << ": preheader for inner loop. " << ::std::endl;
+        if (Log::isEnabled()) {
+            Log::out()<< "Stop peeling node at L" ; FlowGraph::printLabel(Log::out(), header); Log::out() << ": preheader for inner loop. " << std::endl;
+        }
         return false;
     }
     
@@ -546,7 +382,7 @@ bool LoopBuilder::isInversionCandidate(CFGNode* originalHeader, CFGNode* header,
 }
 
 // Perform loop inversion for each recorded loop.
-void LoopBuilder::peelLoops(StlVector<CFGEdge*>& loopEdgesIn) {
+void LoopBuilder::peelLoops(StlVector<Edge*>& loopEdgesIn) {
     // Mark the temporaries that are local to a given basic block
     GlobalOpndAnalyzer globalOpndAnalyzer(irManager);
     globalOpndAnalyzer.doAnalysis();
@@ -562,35 +398,35 @@ void LoopBuilder::peelLoops(StlVector<CFGEdge*>& loopEdgesIn) {
     // Threshold at which a block is considered hot
     double heatThreshold = irManager.getHeatThreshold();
 
-    StlVector<CFGEdge*> loopEdges(peelmem);
+    StlVector<Edge*> loopEdges(peelmem);
     if(flags.insideout_peeling) {
-        StlVector<CFGEdge*>::reverse_iterator i = loopEdgesIn.rbegin(); while (i != loopEdgesIn.rend()) {
+        StlVector<Edge*>::reverse_iterator i = loopEdgesIn.rbegin(); while (i != loopEdgesIn.rend()) {
             loopEdges.insert(loopEdges.end(), *i);
             i++;
         }
     } else {
-        StlVector<CFGEdge*>::iterator i = loopEdgesIn.begin();
+        StlVector<Edge*>::iterator i = loopEdgesIn.begin();
         while (i != loopEdgesIn.end()) {
             loopEdges.insert(loopEdges.end(), *i);
             i++;
         }
     }
 
-    StlVector<CFGEdge*>::iterator i;
+    StlVector<Edge*>::iterator i;
     for(i = loopEdges.begin(); i != loopEdges.end(); ++i) {
         // The current back-edge
-        CFGEdge* backEdge = *i;
+        Edge* backEdge = *i;
 
         // The initial header
-        CFGNode* header = backEdge->getTargetNode();
+        Node* header = backEdge->getTargetNode();
         assert(header->getInDegree() == 2);
-        CFGNode* originalInvertedHeader = header;
+        Node* originalInvertedHeader = header;
 
         // The initial loop end
-        CFGNode* tail = backEdge->getSourceNode();
+        Node* tail = backEdge->getSourceNode();
 
         // The initial preheader
-        CFGNode* preheader = header->getInEdges().front()->getSourceNode();
+        Node* preheader = header->getInEdges().front()->getSourceNode();
         if (preheader == tail)
             preheader = header->getInEdges().back()->getSourceNode();
 
@@ -607,34 +443,34 @@ void LoopBuilder::peelLoops(StlVector<CFGEdge*>& loopEdgesIn) {
 
         // Perform loop inversion until header has no exit condition or 
         // until one iteration is peeled.
-        CFGNode* next;
-        CFGNode* exit;
+        Node* next;
+        Node* exit;
 
         if (useProfile || !flags.old_static_peeling) {
             //
             // Only peel hot loops
             //
             if(useProfile) {
-                double preheaderFreq = preheader->getFreq();
-                if(header->getFreq() < heatThreshold || header->getFreq() < preheaderFreq*flags.peeling_threshold || header->getFreq() == 0)
+                double preheaderFreq = preheader->getExecCount();
+                if(header->getExecCount() < heatThreshold || header->getExecCount() < preheaderFreq*flags.peeling_threshold || header->getExecCount() == 0)
                     continue;
             }
             
             //
             // Rotate loop one more time if the tail is not a branch (off by default)
             //
-            Opcode op1 = tail->getLastInst()->getOpcode();
-            Opcode op2 = header->getLastInst()->getOpcode();
+            Opcode op1 = ((Inst*)tail->getLastInst())->getOpcode();
+            Opcode op2 = ((Inst*)header->getLastInst())->getOpcode();
             if(flags.invert && (op1 != Op_Branch) && (op1 != Op_PredBranch)
                && (op2 != Op_Branch) && (op2 != Op_PredBranch)) {
                 if(isInversionCandidate(originalInvertedHeader, header, nodesInLoop, next, exit)) {
-                    preheader = fg.tailDuplicate(preheader, header, defUses); 
+                    preheader = FlowGraph::tailDuplicate(irManager, preheader, header, defUses); 
                     tail = header;
                     header = next;
-                    assert(tail->findTarget(header) != NULL && preheader->findTarget(header) != NULL);
-                    if(tail->findTarget(header) == NULL) {
-                        tail = (CFGNode*) tail->getUnconditionalEdge()->getTargetNode();
-                        assert(tail != NULL && tail->findTarget(header) != NULL);
+                    assert(tail->findTargetEdge(header) != NULL && preheader->findTargetEdge(header) != NULL);
+                    if(tail->findTargetEdge(header) == NULL) {
+                        tail =  tail->getUnconditionalEdge()->getTargetNode();
+                        assert(tail != NULL && tail->findTargetEdge(header) != NULL);
                     }
                     originalInvertedHeader = header;
                 }
@@ -643,8 +479,8 @@ void LoopBuilder::peelLoops(StlVector<CFGEdge*>& loopEdgesIn) {
             //
             // Compute blocks to peel
             //
-            CFGNode* newHeader = header;
-            CFGNode* newTail = NULL;
+            Node* newHeader = header;
+            Node* newTail = NULL;
             StlBitVector nodesToPeel(tmm, maxSize);
             if(flags.fullpeel) {
                 if(loopSize <= flags.fullpeel_max_inst) {
@@ -653,16 +489,16 @@ void LoopBuilder::peelLoops(StlVector<CFGEdge*>& loopEdgesIn) {
                 }
             } else {
                 while(isInversionCandidate(originalInvertedHeader, newHeader, nodesInLoop, next, exit)) {
-                    if(Log::cat_opt_loop()->isDebugEnabled()) {
+                    if(Log::isEnabled()) {
                         Log::out() << "Peel ";
-                        newHeader->printLabel(Log::out());
-                        Log::out() << ::std::endl;
+                        FlowGraph::printLabel(Log::out(), newHeader);
+                        Log::out() << std::endl;
                     }
                     newTail = newHeader;
                     nodesToPeel.setBit(newHeader->getId());
                     newHeader = next;
                     if(newHeader == originalInvertedHeader) {
-                        Log::cat_opt_loop()->debug << "One iteration peeled" << ::std::endl;
+                        Log::out() << "One iteration peeled" << std::endl;
                         break;
                     }
                 }
@@ -674,29 +510,28 @@ void LoopBuilder::peelLoops(StlVector<CFGEdge*>& loopEdgesIn) {
                     // Break final header at branch to peel more instructions
                     //
                     if(header != originalInvertedHeader) {
-                        Inst* last = header->getLastInst();
+                        Inst* last = (Inst*)header->getLastInst();
                         if(header->getOutDegree() > 1)
-                            last = last->prev();
+                            last = last->getPrevInst();
                         if (flags.peel_upto_branch_no_instanceof) {
-                            Inst *first = header->getFirstInst();
-                            while ((first != last) &&
-                                   (first->getOpcode() != Op_TauInstanceOf)) {
-                                first = first->next();
+                            Inst *first = (Inst*)header->getFirstInst();
+                            while ((first != last) && (first->getOpcode() != Op_TauInstanceOf)) {
+                                first = first->getNextInst();
                             }
                             last = first;
                         }
-                        CFGNode* sinkNode = fg.splitNodeAtInstruction(last);
+                        Node* sinkNode = fg.splitNodeAtInstruction(last, true, false, instFactory.makeLabel());
                         newTail = header;
                         nodesToPeel.resize(sinkNode->getId()+1);
                         nodesToPeel.setBit(header->getId());
-                        if(Log::cat_opt_loop()->isDebugEnabled()) {
+                        if(Log::isEnabled()) {
                             Log::out() << "Sink Node = ";
-                            sinkNode->printLabel(Log::out());
+                            FlowGraph::printLabel(Log::out(), sinkNode);
                             Log::out() << ", Header = ";
-                            header->printLabel(Log::out());
+                            FlowGraph::printLabel(Log::out(), header);
                             Log::out() << ", Original Header = ";
-                            originalInvertedHeader->printLabel(Log::out());
-                            Log::out() << ::std::endl;
+                            FlowGraph::printLabel(Log::out(), originalInvertedHeader);
+                            Log::out() << std::endl;
                         }
                         header = sinkNode;
                     }
@@ -706,17 +541,17 @@ void LoopBuilder::peelLoops(StlVector<CFGEdge*>& loopEdgesIn) {
                 // Peel the nodes
                 //
                 if(newTail != NULL) {
-                    CFGEdge* entryEdge = (CFGEdge*) preheader->findTarget(originalInvertedHeader);
-                    double peeledFreq = preheader->getFreq() * entryEdge->getEdgeProb(); 
-                    CFGNode* peeled = fg.duplicateRegion(originalInvertedHeader, nodesToPeel, defUses, peeledFreq);
+                    Edge* entryEdge = preheader->findTargetEdge(originalInvertedHeader);
+                    double peeledFreq = preheader->getExecCount() * entryEdge->getEdgeProb(); 
+                    Node* peeled = FlowGraph::duplicateRegion(irManager, originalInvertedHeader, nodesToPeel, defUses, peeledFreq);
                     fg.replaceEdgeTarget(entryEdge, peeled);
-                    if(newTail->findTarget(header) == NULL) {
+                    if(newTail->findTargetEdge(header) == NULL) {
                         //
                         // An intervening stVar block was added to promote a temp to a var 
                         // in the duplicated block.  The new tail should be the stVar block.
                         //
-                        tail = (CFGNode*) newTail->getUnconditionalEdge()->getTargetNode();
-                        assert(tail != NULL && tail->findTarget(header) != NULL);
+                        tail =  newTail->getUnconditionalEdge()->getTargetNode();
+                        assert(tail != NULL && tail->findTargetEdge(header) != NULL);
                     } else {
                         tail = newTail;
                     }
@@ -727,19 +562,19 @@ void LoopBuilder::peelLoops(StlVector<CFGEdge*>& loopEdgesIn) {
                 }            
             }
 
-            if(flags.unroll && newHeader == originalInvertedHeader && newTail != NULL && header->getFreq() >= heatThreshold && (header->getFreq() >= flags.unroll_threshold * preheader->getFreq())) {
+            if(flags.unroll && newHeader == originalInvertedHeader && newTail != NULL && header->getExecCount() >= heatThreshold && (header->getExecCount() >= flags.unroll_threshold * preheader->getExecCount())) {
                 header = newHeader;
                 // n is the number of times to unroll the loop
-                uint32 n = ::std::min(flags.unroll_count, (uint32) (header->getFreq() / preheader->getFreq()));
-                double headerFreq = header->getFreq();
-                CFGNode* backTarget = header;
-                CFGEdge* backEdge = (CFGEdge*) tail->findTarget(header);
-                double noEarlyExitProb = (tail->getFreq() * backEdge->getEdgeProb()) / header->getFreq();
+                uint32 n = ::std::min(flags.unroll_count, (uint32) (header->getExecCount() / preheader->getExecCount()));
+                double headerFreq = header->getExecCount();
+                Node* backTarget = header;
+                Edge* backEdge = tail->findTargetEdge(header);
+                double noEarlyExitProb = (tail->getExecCount() * backEdge->getEdgeProb()) / header->getExecCount();
                 if(!(noEarlyExitProb > 0 && noEarlyExitProb <= 1)) {
-					Log::cat_opt_loop()->fail << "headerFreq=" << headerFreq << ::std::endl;
-                    Log::cat_opt_loop()->fail << "tailFreq=" << tail->getFreq() << ::std::endl;
-                    Log::cat_opt_loop()->fail << "backProb=" << backEdge->getEdgeProb() << ::std::endl;
-                    Log::cat_opt_loop()->fail << "noEarlyExit=" << noEarlyExitProb << ::std::endl;
+                    Log::out() << "headerFreq=" << headerFreq << std::endl;
+                    Log::out() << "tailFreq=" << tail->getExecCount() << std::endl;
+                    Log::out() << "backProb=" << backEdge->getEdgeProb() << std::endl;
+                    Log::out() << "noEarlyExit=" << noEarlyExitProb << std::endl;
                     assert(0);
                 }
 
@@ -752,17 +587,17 @@ void LoopBuilder::peelLoops(StlVector<CFGEdge*>& loopEdgesIn) {
                     sum += scale;
                 }
                 for(k = 0; k < (n-1); ++k) {
-                    CFGNode* unrolled = fg.duplicateRegion(header, nodesToPeel, defUses, headerFreq * scale / sum);
+                    Node* unrolled = FlowGraph::duplicateRegion(irManager, header, nodesToPeel, defUses, headerFreq * scale / sum);
                     scale /= noEarlyExitProb;
-                    backEdge = (CFGEdge*) tail->findTarget(backTarget);
+                    backEdge = tail->findTargetEdge(backTarget);
                     if(backEdge == NULL) {
                         //
                         // An intervening stVar block was added to promote a temp to a var 
                         // in the duplicated block.  The new tail should be the stVar block.
                         //
-                        tail = (CFGNode*) tail->getUnconditionalEdge()->getTargetNode();
+                        tail =  tail->getUnconditionalEdge()->getTargetNode();
                         assert(tail != NULL);
-                        CFGEdge* backEdge = (CFGEdge*) tail->findTarget(backTarget);
+                        Edge* backEdge = tail->findTargetEdge(backTarget);
                         if( !(backEdge != NULL) ) assert(0);
                     }
                     fg.replaceEdgeTarget(backEdge, unrolled);
@@ -774,40 +609,42 @@ void LoopBuilder::peelLoops(StlVector<CFGEdge*>& loopEdgesIn) {
                     tail = header->getInEdges().back()->getSourceNode();
             }
             if(preheader->getOutDegree() > 1) {
-                CFGEdge* edge = (CFGEdge*) preheader->findTarget(header);
+                Edge* edge = preheader->findTargetEdge(header);
                 assert(edge != NULL);
-                preheader = fg.spliceBlockOnEdge(edge);
+                preheader = fg.spliceBlockOnEdge(edge, instFactory.makeLabel());
             }
 
         } else {            
             while(isInversionCandidate(header, header, nodesInLoop, next, exit)) {
-                Log::cat_opt_loop()->debug << "Consider peeling node at L" << (int) header->getLabelId() << ::std::endl;
+                if(Log::isEnabled()) {
+                    Log::out() << "Consider peeling node at L"; FlowGraph::printLabel(Log::out(), header); Log::out() << std::endl;
+                }
                 assert(header->isBlockNode());
                 assert(header->getInDegree() == 2);            
-                assert(header->findSource(preheader) != NULL);
-                assert(header->findSource(tail) != NULL);
+                assert(header->findSourceEdge(preheader) != NULL);
+                assert(header->findSourceEdge(tail) != NULL);
                 
                 // Find variant instructions.  Invariant instructions need not be duplicated.
                 StlVector<Inst*> variantInsts(tmm);
                 StlHashSet<Opnd*> variantOpnds(tmm);
                 StlVector<Inst*> invariantInsts(tmm);
-                Inst* first = header->getFirstInst();
+                Inst* first = (Inst*)header->getFirstInst();
                 Inst* inst;
-                for(inst = first->next(); inst != first; inst = inst->next()) {
+                for(inst = first->getNextInst(); inst != NULL; inst = inst->getNextInst()) {
                     if (isVariantInst(inst, variantOpnds)) {
-                        if (Log::cat_opt_loop()->isDebugEnabled()) {
+                        if (Log::isEnabled()) {
                             Log::out() << "Inst ";
                             inst->print(Log::out());
-                            Log::out() << " is variant" << ::std::endl;
+                            Log::out() << " is variant" << std::endl;
                         }
                         variantInsts.push_back(inst);
                         Opnd* dst = inst->getDst();
                         variantOpnds.insert(dst);
                     } else {
-                        if (Log::cat_opt_loop()->isDebugEnabled()) {
+                        if (Log::isEnabled()) {
                             Log::out() << "Inst ";
                             inst->print(Log::out());
-                            Log::out() << " is invariant" << ::std::endl;
+                            Log::out() << " is invariant" << std::endl;
                         }
                         invariantInsts.push_back(inst);
                     }
@@ -815,17 +652,17 @@ void LoopBuilder::peelLoops(StlVector<CFGEdge*>& loopEdgesIn) {
                 
                 // Heuristic #0: If no invariant in header, don't peel.
                 if (invariantInsts.empty()) {
-                    Log::cat_opt_loop()->debug << "Peeling heuristic #0, no invariant" << ::std::endl;
+                    Log::out() << "Peeling heuristic #0, no invariant" << std::endl;
                     break;
                 }
                 
                 // Heuristic #1: If the last instruction is a variant check, stop peeling.
-                Inst* last = header->getLastInst();
+                Inst* last = (Inst*)header->getLastInst();
                 if (last->getOperation().isCheck() && !variantInsts.empty() && last == variantInsts.back() &&
                    !(last->getDst()->isNull() 
                      || (last->getDst()->getType()->tag == Type::Tau))) {
                     hoistHeaderInvariants(preheader, header, invariantInsts);
-                    Log::cat_opt_loop()->debug << "Peeling heuristic #1, last inst is variant check" << ::std::endl;
+                    Log::out() << "Peeling heuristic #1, last inst is variant check" << std::endl;
                     break;
                 }
                 // Heuristic #2: If a defined tmp may be live on exit, don't peel this node.
@@ -833,7 +670,7 @@ void LoopBuilder::peelLoops(StlVector<CFGEdge*>& loopEdgesIn) {
                 StlVector<Inst*> globalInsts(tmm);
                 Opnd* unhandledGlobal = NULL;
                 bool hasExit = exit != NULL;
-                bool exitIsUnwind = hasExit && (exit == fg.getUnwind());
+                bool exitIsUnwind = hasExit && (exit == fg.getUnwindNode());
                 bool exitIsNotDominated = !hasExit || dom.hasDomInfo(header) && dom.hasDomInfo(exit)
                     && !dom.dominates(header, exit);
                 StlVector<Inst*>::iterator iiter;
@@ -851,64 +688,69 @@ void LoopBuilder::peelLoops(StlVector<CFGEdge*>& loopEdgesIn) {
                     }
                 }
                 if (unhandledGlobal != NULL) {
-                    if (Log::cat_opt_loop()->isDebugEnabled()) {
-                        Log::out() << "Stop peeling node at L" << (int) header->getLabelId() << ": unhandled global operand. ";
+                    if (Log::isEnabled()) {
+                        Log::out() << "Stop peeling node at " ; FlowGraph::printLabel(Log::out(), header); Log::out() << ": unhandled global operand. ";
                         unhandledGlobal->print(Log::out());
-                        Log::out() << ::std::endl;
+                        Log::out() << std::endl;
                     }
                     hoistHeaderInvariants(preheader, header, invariantInsts);
                     break;
                 }
                 
                 // Duplicate instructions
-                CFGNode* peeled = fg.createBlockNode();
-                Log::cat_opt_loop()->debug << "Peeling node L" << (int) header->getLabelId() << " as L" << (int) peeled->getLabelId() << ::std::endl;
+                Node* peeled = fg.createBlockNode(instFactory.makeLabel());
+                if (Log::isEnabled()) {
+                    Log::out() << "Peeling node "; FlowGraph::printLabel(Log::out(), header); Log::out() << " as ";  FlowGraph::printLabel(Log::out(), peeled); Log::out() << std::endl;
+                }
                 Inst* nextInst;
                 // Peel instructions to peeled block.  Leave clones of variant insts.
-                for(inst = first->next(), iiter = variantInsts.begin(); inst != first; inst = nextInst) {
-                    nextInst = inst->next();
+                for(inst = first->getNextInst(), iiter = variantInsts.begin(); inst != NULL; inst = nextInst) {
+                    nextInst = inst->getNextInst();
                     if (iiter != variantInsts.end() && inst == *iiter) {
                         // Make clone in place.
                         ++iiter;
                         Inst* clone = instFactory.clone(inst, opndManager, duplicateTable);
                         clone->insertBefore(nextInst);
                         inst->unlink();
-                        if (Log::cat_opt_loop()->isDebugEnabled()) {
+                        if (Log::isEnabled()) {
                             Log::out() << "Peeling: copying ";
                             inst->print(Log::out());
                             Log::out() << " to ";
                             clone->print(Log::out());
-                            Log::out() << ::std::endl;
+                            Log::out() << std::endl;
                         }
                     } else {
                         if(inst->getOperation().canThrow())
-                            fg.eliminateCheck(header, inst, false);
+                            FlowGraph::eliminateCheck(fg, header, inst, false);
                         else
                             inst->unlink();
-                        if (Log::cat_opt_loop()->isDebugEnabled()) {
+                        if (Log::isEnabled()) {
                             Log::out() << "Peeling: not copying ";
                             inst->print(Log::out());
-                            Log::out() << ::std::endl;
+                            Log::out() << std::endl;
                         }
                     }
-                    peeled->append(inst);
+                    peeled->appendInst(inst);
                 }
                 assert(iiter == variantInsts.end());
                 
-                fg.replaceEdgeTarget(preheader->findTarget(header), peeled);
-                if (hasExit)
+                fg.replaceEdgeTarget(preheader->findTargetEdge(header), peeled);
+                if (hasExit) {
                     fg.addEdge(peeled, exit);
+                }
                 fg.addEdge(peeled, next);
                 if (!globalInsts.empty()) {
                     OpndRenameTable* patchTable = new (tmm) OpndRenameTable(tmm);
                     
                     // Need to patch global defs.  Create store blocks and merge at next
-                    Log::cat_opt_loop()->debug << "Merging global temps in node L" << (int) header->getLabelId() << " and L" << (int) peeled->getLabelId() << ::std::endl;
-                    CFGNode* newpreheaderSt = fg.createBlockNode();
-                    CFGNode* newtailSt = fg.createBlockNode();
-                    fg.replaceEdgeTarget(peeled->findTarget(next), newpreheaderSt);
+                    if (Log::isEnabled()) {
+                        Log::out() << "Merging global temps in node ";FlowGraph::printLabel(Log::out(), header); Log::out()<<" and ";FlowGraph::printLabel(Log::out(), peeled);Log::out()<<std::endl;
+                    }
+                    Node* newpreheaderSt = fg.createBlockNode(instFactory.makeLabel());
+                    Node* newtailSt = fg.createBlockNode(instFactory.makeLabel());
+                    fg.replaceEdgeTarget(peeled->findTargetEdge(next), newpreheaderSt);
                     fg.addEdge(newpreheaderSt, next);
-                    fg.replaceEdgeTarget(header->findTarget(next), newtailSt);
+                    fg.replaceEdgeTarget(header->findTargetEdge(next), newtailSt);
                     fg.addEdge(newtailSt, next);
                     
                     StlVector<Inst*>::iterator i;
@@ -928,17 +770,17 @@ void LoopBuilder::peelLoops(StlVector<CFGEdge*>& loopEdgesIn) {
                             // Create a new var and initialize it the original and duplicated blocks.
                             dstVar = opndManager.createVarOpnd(dst->getType(), false);
                             Inst* stPreheader = instFactory.makeStVar(dstVar, dstPreheader);
-                            newpreheaderSt->append(stPreheader);
+                            newpreheaderSt->appendInst(stPreheader);
                             Inst* stTail = instFactory.makeStVar(dstVar, dstTail);
-                            newtailSt->append(stTail);
+                            newtailSt->appendInst(stTail);
                         }
                         
                         Inst* ldVar = instFactory.makeLdVar(dst, dstVar);
-                        next->prepend(ldVar);
+                        next->prependInst(ldVar);
                         
                         patchTable->setMapping(dst, dstPreheader);
                     }
-                    fg.renameOperandsInNode(peeled, patchTable);
+                    FlowGraph::renameOperandsInNode(peeled, patchTable);
                     
                     // Rotate
                     preheader = newpreheaderSt;
@@ -946,8 +788,8 @@ void LoopBuilder::peelLoops(StlVector<CFGEdge*>& loopEdgesIn) {
                 } else {
                     if (peeled->getOutDegree() > 1) {
                         // Remove critical edge
-                        preheader = fg.createBlockNode();
-                        fg.replaceEdgeTarget(peeled->findTarget(next), preheader);
+                        preheader = fg.createBlockNode(instFactory.makeLabel());
+                        fg.replaceEdgeTarget(peeled->findTargetEdge(next), preheader);
                         fg.addEdge(preheader, next);
                     } else {
                         preheader = peeled;
@@ -959,7 +801,9 @@ void LoopBuilder::peelLoops(StlVector<CFGEdge*>& loopEdgesIn) {
                 header = next;
                 if (flags.aggressive_peeling) {
                     if (header == originalInvertedHeader) {
-                        Log::cat_opt_loop()->debug << "Stop peeling node at L" << (int) header->getLabelId() << ": peeled one iteration" << ::std::endl;
+                        if (Log::isEnabled()) {
+                            Log::out()<<"Stop peeling node at ";FlowGraph::printLabel(Log::out(), header); Log::out() << ": peeled one iteration" << std::endl;
+                        }
                         break;
                     }
                 } else {
@@ -968,20 +812,20 @@ void LoopBuilder::peelLoops(StlVector<CFGEdge*>& loopEdgesIn) {
             }
         }
         assert(header->getInDegree() == 2);
-        backEdge = (CFGEdge*) header->findSource(tail);
+        backEdge = header->findSourceEdge(tail);
         assert(backEdge != NULL);
         *i = backEdge;
     }
     loopEdgesIn.clear();
 
     if(flags.insideout_peeling) {
-        StlVector<CFGEdge*>::reverse_iterator i = loopEdges.rbegin();
+        StlVector<Edge*>::reverse_iterator i = loopEdges.rbegin();
         while (i != loopEdges.rend()) {
             loopEdgesIn.insert(loopEdgesIn.end(), *i);
             i++;
         }
     } else {
-        StlVector<CFGEdge*>::iterator i = loopEdges.begin();
+        StlVector<Edge*>::iterator i = loopEdges.begin();
         while (i != loopEdges.end()) {
             loopEdgesIn.insert(loopEdgesIn.end(), *i);
             i++;
@@ -989,34 +833,88 @@ void LoopBuilder::peelLoops(StlVector<CFGEdge*>& loopEdgesIn) {
     }
 }
 
-LoopTree* LoopBuilder::computeAndNormalizeLoops(bool doPeelLoops) {
-    // find all loop headers
-    MemoryManager tmm(16*sizeof(CFGNode*)*2,"LoopBuilder::computeAndNormalizeLoops.tmm");
-    StlVector<CFGNode*> headers(tmm);
-    findLoopHeaders(headers);
-    assert(dom.isValid());
-
-    StlVector<CFGEdge*> loopEdges(tmm);
-    uint32 numLoops = findLoopEdges(tmm, headers, loopEdges);
-    //
-    // build loop hierarchy
-    //
-    // sort loop edges based on their depth first number
-    ::std::sort(loopEdges.begin(), loopEdges.end(), CompareDFN());
-
-    if (doPeelLoops) {
-        peelLoops(loopEdges);
-        if (Log::cat_opt_loop()->isDebugEnabled()) 
-            fg.printInsts(Log::out(), irManager.getMethodDesc());
+class EdgeCoalescerCallbackImpl : public EdgeCoalescerCallback {
+friend class LoopBuilder;
+public:
+    EdgeCoalescerCallbackImpl(IRManager& _irm) : ssaAffected(false), irm(_irm){}
+    
+    virtual void coalesce(Node* header, Node* newPreHeader, uint32 numEdges) {
+        InstFactory& instFactory = irm.getInstFactory();
+        OpndManager& opndManager = irm.getOpndManager();
+        Inst* labelInst = (Inst*)header->getFirstInst();
+        assert(labelInst->isLabel() && !labelInst->isCatchLabel());
+        newPreHeader->appendInst(instFactory.makeLabel());
+        if (numEdges > 1 ) {
+            for (Inst* phi = labelInst->getNextInst();phi!=NULL && phi->isPhi(); phi = phi->getNextInst()) {
+                Opnd *orgDst = phi->getDst();
+                SsaVarOpnd *ssaOrgDst = orgDst->asSsaVarOpnd();
+                assert(ssaOrgDst);
+                VarOpnd *theVar = ssaOrgDst->getVar();
+                assert(theVar);
+                SsaVarOpnd* newDst = opndManager.createSsaVarOpnd(theVar);
+                Inst *newInst = instFactory.makePhi(newDst, 0, 0);
+                PhiInst *newPhiInst = newInst->asPhiInst();
+                assert(newPhiInst);
+                uint32 n = phi->getNumSrcOperands();
+                for (uint32 i=0; i<n; i++) {
+                    instFactory.appendSrc(newPhiInst, phi->getSrc(i));
+                }
+                PhiInst *phiInst = phi->asPhiInst();
+                assert(phiInst);
+                instFactory.appendSrc(phiInst, newDst);
+                newPreHeader->appendInst(newInst);
+                ssaAffected = true;
+            }
+        }
     }
 
-    if (!fg.hasValidOrdering())
-        fg.orderNodes();
-    formLoopHierarchy(loopEdges, numLoops);
-    info = new (loopMemManager) LoopTree(loopMemManager, &fg);
-    info->process((LoopNode*) root);
-    return info;
+private:
+    bool ssaAffected;
+    IRManager& irm;
+};
+
+void LoopBuilder::computeLoops(bool normalize) {
+    // find all loop headers
+    LoopTree* lt = irManager.getLoopTree();
+    if (lt == NULL) {
+        MemoryManager& mm = irManager.getMemoryManager();
+        EdgeCoalescerCallbackImpl* c = new (mm) EdgeCoalescerCallbackImpl(irManager);
+        lt = new LoopTree(irManager.getMemoryManager(), &irManager.getFlowGraph(),c);
+        irManager.setLoopTree(lt);
+    }
+    EdgeCoalescerCallbackImpl* callback = (EdgeCoalescerCallbackImpl*)lt->getCoalesceCallback();
+    callback->ssaAffected = false;
+    lt->rebuild(normalize);
+    needsSsaFixup = callback->ssaAffected;
 }
 
+void LoopBuilder::peelLoops() {
+    LoopTree*lt = irManager.getLoopTree();
+    if (!lt->hasLoops())  {
+        return;
+    }
 
-} //namespace Jitrino 
+    MemoryManager tmm(1024,"LoopBuilder::peelLoops");
+    Edges loopEdges(tmm);
+    const Nodes& nodes = irManager.getFlowGraph().getNodes();
+    for (Nodes::const_iterator it = nodes.begin(), end = nodes.end(); it!=end; ++it) {
+        Node* node = *it;
+        const Edges& edges = node->getOutEdges();
+        for (Edges::const_iterator ite = edges.begin(), ende = edges.end(); ite!=ende; ++ite) {
+            Edge* edge = *ite;
+            if (lt->isBackEdge(edge)) {
+                loopEdges.push_back(edge);
+            }
+        }
+    }
+    peelLoops(loopEdges);
+    if (Log::isEnabled()) 
+        FlowGraph::printHIR(Log::out(), irManager.getFlowGraph(), irManager.getMethodDesc());
+
+
+    if (needSsaFixup()) {
+        OptPass::fixupSsa(irManager);
+    }
+    OptPass::smoothProfile(irManager);
+}
+}//namespace Jitrino 

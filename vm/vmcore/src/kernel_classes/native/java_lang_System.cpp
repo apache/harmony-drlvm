@@ -18,8 +18,6 @@
  * @version $Revision: 1.1.2.1.4.3 $
  */
 
-#include <stdlib.h>
-#include <string.h>
 #include "java_lang_System.h"
 
 JNIEXPORT void JNICALL Java_java_lang_System_setErrUnsecure
@@ -38,36 +36,6 @@ JNIEXPORT void JNICALL Java_java_lang_System_setOutUnsecure
 (JNIEnv *env, jclass clazz, jobject out){
     jfieldID field_id = env->GetStaticFieldID(clazz, "out", "Ljava/io/PrintStream;");
     env->SetStaticObjectField(clazz, field_id, out);
-}
-
-extern char **environ;
-
-JNIEXPORT jobject JNICALL Java_java_lang_System_getenvUnsecure__
-(JNIEnv *env, jclass clazz){
-    jclass cls = env->FindClass("java/util/Hashtable");
-    jmethodID ctr = env->GetMethodID(cls, "<init>", "()V");
-    jmethodID mtd = env->GetMethodID(cls, "put", "(Ljava/lang/Object;Ljava/lang/Object;)Ljava/lang/Object;");
-    jobject ret = env->NewObject(cls, ctr);
-    for (char **e = environ ; *e; ++e){
-        int idx = strcspn(*e, "=");
-        char* key = new char[idx+1];
-        strncpy(key, *e, idx);
-        key[idx]='\0';
-        env->CallObjectMethod(ret, mtd, env->NewStringUTF(key), env->NewStringUTF(*e+idx+1)); 
-        delete [] key;
-    }
-    return ret;
-}
-
-JNIEXPORT jstring JNICALL Java_java_lang_System_getenvUnsecure__Ljava_lang_String_2
-(JNIEnv *env, jclass clazz, jstring name){
-    const char *str = env->GetStringUTFChars(name, 0);
-    char *buf = getenv(str);
-    env->ReleaseStringUTFChars(name, str);
-    if (buf == NULL){
-        return 0;
-    }
-    return env->NewStringUTF(buf);
 }
 
 JNIEXPORT void JNICALL Java_java_lang_System_rethrow

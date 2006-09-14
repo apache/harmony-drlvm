@@ -27,9 +27,12 @@ struct ManagedObject;
 typedef struct ManagedObject ManagedObject;
 VMEXPORT void vm_monitor_enter_wrapper(ManagedObject *obj);
 VMEXPORT void vm_monitor_exit_wrapper(ManagedObject *obj);
+VMEXPORT void class_throw_linking_error_for_interpreter(Class_Handle ch,
+        unsigned cp_index, unsigned opcode);
+
 VMEXPORT struct JNIEnv_Internal* get_jni_native_intf();
 
-VMEXPORT void* jvmti_process_breakpoint_event(jmethodID method, jlocation loc);
+VMEXPORT void* jvmti_process_interpreter_breakpoint_event(jmethodID method, jlocation loc);
 VMEXPORT void jvmti_process_single_step_event(jmethodID method, jlocation location);
 
 VMEXPORT void jvmti_process_frame_pop_event(jvmtiEnv *env,

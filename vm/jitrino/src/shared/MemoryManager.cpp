@@ -26,11 +26,15 @@
 #include <assert.h>
 #include "MemoryManager.h"
 
+//#define JIT_MEM_CHECK
+
+#ifdef JIT_MEM_CHECK
+#include "mkernel.h"
+#endif
 
 namespace Jitrino {
 
 
-//#define JIT_MEM_CHECK
 
 #ifdef JIT_MEM_CHECK
 
@@ -38,7 +42,7 @@ namespace Jitrino {
 #define JIT_MEM_CHECK_DEFAULT_VAL 'x'
 #define JIT_MEM_CHECK_PADDING_VAL 'p'
 
-
+static Mutex checkPointsMutex;
 typedef std::map<const Arena*, std::vector<size_t>*> CheckPointsByArena;
 static CheckPointsByArena checkPointsByArena;
 
@@ -62,7 +66,7 @@ static ::std::ostream& traceStream = ::std::cerr;
 
 static const uint32 mm_default_next_arena_size = 4096-ARENA_HEADER_SIZE;
 
-MemoryManager::MemoryManager(size_t initial_estimate, char* name)
+MemoryManager::MemoryManager(size_t initial_estimate, const char* name)
 {
     _arena = NULL;
     _bytes_allocated = 0;
@@ -119,7 +123,9 @@ void MemoryManager::_alloc_arena(size_t size)
     assert(((POINTER_SIZE_INT)_arena->next_byte & BITS_TO_CLEAR) == 0);
 
 #ifdef JIT_MEM_CHECK
+    checkPointsMutex.lock();
     checkPointsByArena[_arena] = new std::vector<size_t>();
+    checkPointsMutex.unlock();
     size_t allocated_size = _arena->last_byte - _arena->bytes; 
     memset(_arena->bytes, JIT_MEM_CHECK_DEFAULT_VAL, allocated_size);
 #endif
@@ -132,12 +138,14 @@ void MemoryManager::_free_arenas(Arena *a)
         Arena* last = a;
         a = a->next_arena;
 #ifdef JIT_MEM_CHECK
+        checkPointsMutex.lock();
         _check_arena_paddings(last);
         CheckPointsByArena::iterator it = checkPointsByArena.find(last);
         m_assert(it!=checkPointsByArena.end());
         std::vector<size_t>* v = it->second;
         checkPointsByArena.erase(it);
         delete v;
+        checkPointsMutex.unlock();
 #endif
         free_arena(last);
     }
@@ -224,6 +232,7 @@ void *MemoryManager::alloc(size_t size)
     assert(((POINTER_SIZE_INT)_arena->next_byte & BITS_TO_CLEAR) == 0);
 
 #ifdef JIT_MEM_CHECK
+    checkPointsMutex.lock();
     _check_arena_default_val_on_alloc(_arena, mem  - _arena->bytes, size);
     CheckPointsByArena::iterator it = checkPointsByArena.find(_arena);
     assert(it!=checkPointsByArena.end());
@@ -231,6 +240,7 @@ void *MemoryManager::alloc(size_t size)
     //push offset of the current padding from the start of arena
     v->push_back((_arena->next_byte - _arena->bytes) - JIT_MEM_CHECK_PADDING_SIZE); 
     memset(mem + size - JIT_MEM_CHECK_PADDING_SIZE, JIT_MEM_CHECK_PADDING_VAL, JIT_MEM_CHECK_PADDING_SIZE);
+    checkPointsMutex.unlock();
 #endif
 
 

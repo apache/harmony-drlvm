@@ -65,8 +65,6 @@ LcgEM64TContext::LcgEM64TContext(LilCodeStub * stub, tl::MemoryPool & m):
     calls_unmanaged_code = false;
     has_m2n = false;
     save_inputs = false;
-    uses_returns = false;
-
 
     /*    2) SCAN THE CODE STUB FOR THE INFORMATION    */
 
@@ -100,7 +98,7 @@ LcgEM64TContext::LcgEM64TContext(LilCodeStub * stub, tl::MemoryPool & m):
     /*    4) INITILIZE STACK INFORMATION    */
 
     if (has_m2n) {
-        stk_m2n_size = get_size_of_m2n();
+        stk_m2n_size = m2n_get_size();
     } else {
         // preserve space for callee-saves registers
         stk_m2n_size = lil_cs_get_max_locals(stub) * GR_SIZE;
@@ -113,21 +111,26 @@ LcgEM64TContext::LcgEM64TContext(LilCodeStub * stub, tl::MemoryPool & m):
         stk_input_fr_save_size = n_fr_inputs * FR_SIZE;
     }
 
-    // stk_alloc_size & stk_output_size has been initialized during phase 3)
-    // so just align
-    stk_alloc_size = align_16(stk_alloc_size);
-    stk_output_size = align_16(stk_output_size);
-
-
     // determine the size of the stack frame
     stk_size =
+        stk_m2n_size +              // memory for m2n frame
         stk_input_gr_save_size +    // GR input spill space
         stk_input_fr_save_size +    // FR input spill space
-        stk_alloc_size +            // memory for dynamic allocation
-        stk_m2n_size +              // memory for m2n frame
+        stk_alloc_size +            // memory for dynamic allocation        
         stk_output_size;            // outputs on the stack
+    
+    // allign stack
+    if (stk_size % 16 == 0) {
+        stk_size += 8;
+        stk_alloc_size +=8;
+    }
 }
 
+/**
+ * Implementation notes:
+ *     1) Current implementation doesn't correctly processes back branches when
+ *        input arguments are accessed
+ */
 class LcgEM64TCodeGen: public LilInstructionVisitor {
 
     static const size_t     MAX_CODE_LENGTH = 1024; // maximum length of the generated code
@@ -149,8 +152,6 @@ class LcgEM64TCodeGen: public LilInstructionVisitor {
     const LcgEM64TLoc       * rsp_loc; // location denoting rsp register
     bool                    take_inputs_from_stack; // true if inputs were preserved on the stack
                                                     // and should be taken from that location
-    uint32                  current_rsp_offset; // number of bytes to the current position of rsp from
-                                                // the bottom of activation frame
     unsigned                current_alloc;  // keeps track of memory allocation
 
 private:
@@ -172,7 +173,7 @@ private:
             // registers in the following order:
             // ret, std0, std1, out0, out1, out2, out3, out4, out5
             unsigned cur_tmp_reg = 0;
-            if (!context.is_uses_returns()) {
+            if (lil_ic_get_ret_type(ic) == LT_Void) {
                 if (cur_tmp_reg == get_num_used_reg()) {
                     _reg_no = context.get_reg_from_map(LcgEM64TContext::GR_RETURNS_OFFSET).reg_no(); // should be rax
                     ++get_num_used_reg();
@@ -251,9 +252,9 @@ private:
         /*
         assert(n < context.get_num_fr_locals());
         if (does_normal_calls) {
-        return new(mem) LcgEM64TLoc(LLK_FStk, context.get_local_fr_offset() + n * FR_SIZE);
+            return new(mem) LcgEM64TLoc(LLK_FStk, context.get_local_fr_offset() + n * FR_SIZE);
         else {
-        return new(mem) LcgEM64TLoc(LLK_Fr, LcgEM64TContext::FR_LOCALS_OFFSET + n);
+            return new(mem) LcgEM64TLoc(LLK_Fr, LcgEM64TContext::FR_LOCALS_OFFSET + n);
         }
         */
     }
@@ -300,16 +301,12 @@ private:
         LilType t;
         unsigned fp_param_cnt = 0;
         unsigned gp_param_cnt = 0;
-        unsigned fp_param_size = 0;
-        unsigned gp_param_size = 0;
         for (unsigned i = 0; i < n; i++) {
             t = lil_sig_get_arg_type(lil_cs_get_sig(cs), i);
             if (context.is_fp_type(t)) {
                 ++fp_param_cnt;
-                fp_param_size += get_num_bytes_on_stack(t);
             } else {
                 ++gp_param_cnt;
-                gp_param_size += get_num_bytes_on_stack(t);
             }
         }
 
@@ -320,8 +317,8 @@ private:
             if (fp_param_cnt < LcgEM64TContext::MAX_FR_OUTPUTS) {
                 if (take_inputs_from_stack) {
                     // compute rsp-relative offset of the bottom of FR save area
-                    int32 offset = context.get_input_fr_save_offset() +                        
-                        n * LcgEM64TContext::FR_SIZE - current_rsp_offset;
+                    int32 offset = context.get_input_fr_save_offset() +
+                        fp_param_cnt * LcgEM64TContext::FR_SIZE;
                     return new(mem) LcgEM64TLoc(LLK_FStk, offset);
                 } else {
                     return new(mem) LcgEM64TLoc(LLK_Fr,
@@ -335,19 +332,19 @@ private:
                     ? (fp_param_cnt - LcgEM64TContext::MAX_FR_OUTPUTS)
                     * LcgEM64TContext::FR_SIZE : 0;
                 // compute rsp-relative offset of the top of the activation frame
-                int32 offset = context.get_stk_size() - current_rsp_offset;
+                int32 offset = context.get_stk_size();
                 // skip rip
                 offset += LcgEM64TContext::GR_SIZE;
                 // skip size allocated for preceding inputs
                 offset += gp_on_stack + fp_on_stack ;
                 return new(mem) LcgEM64TLoc(LLK_FStk, offset);
             }
-        } else {
+        } else { // if (context.is_fp_type(t))
             if (gp_param_cnt < LcgEM64TContext::MAX_GR_OUTPUTS) {
                 if (take_inputs_from_stack) {
                     // compute rsp-relative offset of the bottom of GR save area
                     int32 offset = context.get_input_gr_save_offset() +
-                        n * LcgEM64TContext::GR_SIZE - current_rsp_offset;
+                        gp_param_cnt * LcgEM64TContext::GR_SIZE;
                     return new(mem) LcgEM64TLoc(LLK_GStk, offset);
                 } else {
                     return new(mem) LcgEM64TLoc(LLK_Gr,
@@ -361,7 +358,7 @@ private:
                     ? (fp_param_cnt - LcgEM64TContext::MAX_FR_OUTPUTS)
                     * LcgEM64TContext::FR_SIZE : 0;
                 // compute rsp-relative offset of the top of the activation frame
-                int32 offset = context.get_stk_size() - current_rsp_offset;
+                int32 offset = context.get_stk_size();
                 // skip rip
                 offset += LcgEM64TContext::GR_SIZE;
                 // skip size allocated for preceding inputs
@@ -379,16 +376,12 @@ private:
         LilType t;
         unsigned fp_param_cnt = 0;
         unsigned gp_param_cnt = 0;
-        unsigned fp_param_size = 0;
-        unsigned gp_param_size = 0;
         for (unsigned i = 0; i < n; i++) {
             t = lil_sig_get_arg_type(out_sig, i);
             if (context.is_fp_type(t)) {
                 ++fp_param_cnt;
-                gp_param_size += get_num_bytes_on_stack(t);
             } else {
                 ++gp_param_cnt;
-                fp_param_size += get_num_bytes_on_stack(t);
             }
         }
 
@@ -406,7 +399,7 @@ private:
                 unsigned fp_on_stack = fp_param_cnt > LcgEM64TContext::MAX_FR_OUTPUTS
                     ? (fp_param_cnt - LcgEM64TContext::MAX_FR_OUTPUTS)
                     * LcgEM64TContext::FR_SIZE : 0;
-                int32 offset = gp_on_stack + fp_on_stack - current_rsp_offset;
+                int32 offset = gp_on_stack + fp_on_stack;
                 return new(mem) LcgEM64TLoc(LLK_FStk, offset);
             }
         } else {
@@ -420,7 +413,7 @@ private:
                 unsigned fp_on_stack = fp_param_cnt > LcgEM64TContext::MAX_FR_OUTPUTS
                     ? (fp_param_cnt - LcgEM64TContext::MAX_FR_OUTPUTS)
                     * LcgEM64TContext::FR_SIZE : 0;
-                int32 offset = gp_on_stack + fp_on_stack - current_rsp_offset;
+                int32 offset = gp_on_stack + fp_on_stack;
                 return new(mem) LcgEM64TLoc(LLK_GStk, offset);
             }
         }
@@ -456,15 +449,18 @@ private:
             return get_output(index, out_sig);
         }
         case LVK_Local: {
-            LilType t = is_lvalue
-                ? lil_instruction_get_dest_type(cs, inst, ic)
-                : lil_ic_get_local_type(ic, index);
-            return context.is_fp_type(t) ? get_fp_local(index) : get_gp_local(index);
+            //LilType t = is_lvalue
+            //    ? lil_instruction_get_dest_type(cs, inst, ic)
+            //    : lil_ic_get_local_type(ic, index);
+            //return context.is_fp_type(t) ? get_fp_local(index) : get_gp_local(index);
+            // no support for fp locals
+            return get_gp_local(index);
         }
         case LVK_Ret: {
-            LilType t = is_lvalue
-                ? lil_instruction_get_dest_type(cs, inst, ic)
-                : lil_ic_get_ret_type(ic);
+            //LilType t = is_lvalue
+            //    ? lil_instruction_get_dest_type(cs, inst, ic)
+            //    : lil_ic_get_ret_type(ic);
+            LilType t = lil_ic_get_ret_type(ic);
             return context.is_fp_type(t)
                 ? new(mem) LcgEM64TLoc(LLK_Fr, LcgEM64TContext::FR_RETURNS_OFFSET)
                 : new(mem) LcgEM64TLoc(LLK_Gr, LcgEM64TContext::GR_RETURNS_OFFSET);
@@ -524,7 +520,6 @@ private:
     inline void adjust_stack_pointer(int32 offset) {
         if (offset != 0) {
             buf = alu(buf, add_opc, rsp_opnd, get_imm_opnd(offset), size_64);
-            current_rsp_offset += offset;
         }
     }
 
@@ -536,45 +531,57 @@ private:
 
     // move between two register or stack locations
     void move_rm(const LcgEM64TLoc* dest, const LcgEM64TLoc* src) {
-        if (dest == src) {
+        if (*dest == *src) {
             return; // nothing to be done
         }
         if (dest->kind == LLK_Gr || dest->kind == LLK_GStk) {
-            assert(src->kind == LLK_Gr || src->kind == LLK_GStk);
-            if (dest->kind == LLK_Gr) {
-                buf = mov(buf, get_r_opnd(dest), get_rm_opnd(src), size_64);
-                return;
-            }
-            // dest->kind != LLK_Gr
-            if (src->kind == LLK_Gr) {
-                buf = mov(buf, get_m_opnd(dest), get_r_opnd(src), size_64);
-                return;
-            }
-            // src->kind != LLK_Gr
-            // use temporary register
-            Tmp_GR_Opnd tmp_reg(context, ic);
-            buf = mov(buf, tmp_reg, get_m_opnd(src), size_64);
-            buf = mov(buf, get_m_opnd(dest), tmp_reg, size_64);
-        } else { //dest->kind == LLK_Fr || dest->kind == LLK_FStk
-            assert(src->kind == LLK_Fr || src->kind == LLK_FStk);
-            if (dest->kind == LLK_Fr) {
-                if (src->kind == LLK_Fr) {
-                    buf = sse_mov(buf, get_xmm_r_opnd(dest), get_xmm_r_opnd(src), true);
-                } else {
-                    buf = sse_mov(buf, get_xmm_r_opnd(dest), get_m_opnd(src), true);
+            if (src->kind == LLK_Gr || src->kind == LLK_GStk) {
+                if (dest->kind == LLK_Gr) {
+                    buf = mov(buf, get_r_opnd(dest), get_rm_opnd(src), size_64);
+                    return;
                 }
+                // dest->kind != LLK_Gr
+                if (src->kind == LLK_Gr) {
+                    buf = mov(buf, get_m_opnd(dest), get_r_opnd(src), size_64);
+                    return;
+                }
+                // src->kind != LLK_Gr
+                // use temporary register
+                Tmp_GR_Opnd tmp_reg(context, ic);
+                buf = mov(buf, tmp_reg, get_m_opnd(src), size_64);
+                buf = mov(buf, get_m_opnd(dest), tmp_reg, size_64);
+            } else { // src->kind == LLK_Fr || src->kind == LLK_FStk
+                // src->kind == LLK_Fr supported only
+                assert(src->kind == LLK_Fr);
+                buf = movq(buf, get_rm_opnd(dest), get_xmm_r_opnd(src));
                 return;
             }
-            // dest->kind != LLK_Gr
-            if (src->kind == LLK_Fr) {
-                buf = sse_mov(buf, get_m_opnd(dest), get_xmm_r_opnd(src), true);
+        } else { // dest->kind == LLK_Fr || dest->kind == LLK_FStk
+            if (src->kind == LLK_Fr || src->kind == LLK_FStk) {
+                if (dest->kind == LLK_Fr) {
+                    if (src->kind == LLK_Fr) {
+                        buf = sse_mov(buf, get_xmm_r_opnd(dest), get_xmm_r_opnd(src), true);
+                    } else {
+                        buf = sse_mov(buf, get_xmm_r_opnd(dest), get_m_opnd(src), true);
+                    }
+                    return;
+                }
+                // dest->kind != LLK_Gr
+                if (src->kind == LLK_Fr) {
+                    buf = sse_mov(buf, get_m_opnd(dest), get_xmm_r_opnd(src), true);
+                    return;
+                }
+                // src->kind != LLK_Gr
+                // use temporary register
+                Tmp_FR_Opnd tmp_reg(ic);
+                buf = sse_mov(buf, tmp_reg, get_m_opnd(src), true);
+                buf = sse_mov(buf, get_m_opnd(dest), tmp_reg, true);
+            } else { // src->kind == LLK_Gr || src->kind == LLK_GStk
+                // dest->kind == LLK_Fr supported only
+                assert(dest->kind == LLK_Fr);
+                buf = movq(buf, get_xmm_r_opnd(dest), get_rm_opnd(src));
                 return;
             }
-            // src->kind != LLK_Gr
-            // use temporary register
-            Tmp_FR_Opnd tmp_reg(ic);
-            buf = sse_mov(buf, tmp_reg, get_m_opnd(src), true);
-            buf = sse_mov(buf, get_m_opnd(dest), tmp_reg, true);
         }
     }
 
@@ -589,7 +596,12 @@ private:
     void shift_op_rm_imm(const LcgEM64TLoc * dest, const LcgEM64TLoc * src, int32 imm_val) {
         const Imm_Opnd & imm = get_imm_opnd(imm_val);
         if (src->kind == LLK_Gr) {
-            buf = shift(buf, shl_opc, get_rm_opnd(dest), get_r_opnd(src), imm);
+        if (dest->kind == LLK_Gr) {
+            buf = mov(buf, get_r_opnd(dest), get_r_opnd(src), size_64);
+            } else {
+                buf = mov(buf, get_m_opnd(dest), get_r_opnd(src), size_64);
+            }
+            buf = shift(buf, shl_opc, get_rm_opnd(dest), imm);
             return;
         }
         // src->kind != LLK_Gr
@@ -601,7 +613,8 @@ private:
         // dest->kind != LLK_Gr
         Tmp_GR_Opnd tmp_reg(context, ic);
         buf = mov(buf, tmp_reg, get_m_opnd(src), size_64);
-        buf = shift(buf, shl_opc, get_m_opnd(dest), tmp_reg, imm);
+        buf = shift(buf, shl_opc, tmp_reg, imm);
+        buf = mov(buf, get_m_opnd(dest), tmp_reg);
     }
 
     // subtract op where the first op is immediate
@@ -619,7 +632,7 @@ private:
         assert(dest->kind == LLK_Gr || dest->kind == LLK_GStk);
         assert(src->kind == LLK_Gr || src->kind == LLK_GStk);
         const Imm_Opnd & imm = get_imm_opnd(imm_val);
-        if (dest == src) {
+        if (*dest == *src) {
             buf = alu(buf, alu_opc, get_rm_opnd(dest), imm, size_64);
             return;
         }
@@ -631,8 +644,8 @@ private:
         }
         // dest->kind != LLK_Gr
         if (src->kind == LLK_Gr) {
-            buf = alu(buf, alu_opc, get_r_opnd(src), imm, size_64);
             buf = mov(buf, get_m_opnd(dest), get_r_opnd(src), size_64);
+            buf = alu(buf, alu_opc, get_m_opnd(dest), imm, size_64);
             return;
         }
         // src->kind == LLK_Gr
@@ -648,7 +661,7 @@ private:
         assert(src1->kind == LLK_Gr || src1->kind == LLK_GStk);
         assert(src2->kind == LLK_Gr || src2->kind == LLK_GStk);
 
-        if (dest == src1) {
+        if (*dest == *src1) {
             if (dest->kind == LLK_Gr) {
                 buf = alu(buf, alu_opc, get_r_opnd(dest), get_rm_opnd(src2));
                 return;
@@ -693,7 +706,7 @@ private:
         case LO_SgMul: {
             const Imm_Opnd & imm = get_imm_opnd(imm_val);
             if (dest->kind == LLK_Gr) {
-                if (dest == src) {
+                if (*dest == *src) {
                     buf = imul(buf, get_r_opnd(dest), imm);
                 } else {
                     buf = imul(buf, get_r_opnd(dest), get_rm_opnd(src), imm);
@@ -796,7 +809,9 @@ private:
             buf = movzx(buf, dest_reg, get_rm_opnd(src), size_16);
             break;
         case LO_Zx4:
-            buf = movzx(buf, dest_reg, get_rm_opnd(src), size_32);
+            // movzx r64, r/m32 is not available on em64t
+            // mov r32, r/m32 should zero out upper bytes
+            buf = mov(buf, dest_reg, get_rm_opnd(src), size_32);
             break;
         default:
             ASSERT(0, "Unexpected operation");  // control should never reach this point
@@ -811,14 +826,15 @@ private:
     const M_Opnd & get_effective_addr(LilVariable * base, unsigned scale,
                                            LilVariable * index, int64 offset,
                                            const R_Opnd & tmp_reg) {
-        const bool is_offset32 = fit32(offset);
         void * const M_Index_Opnd_mem = mem.alloc(sizeof(M_Index_Opnd));
         // handle special case
-        if (is_offset32 && base == NULL && (index == NULL || scale == 0)) {
-            return *(new(M_Index_Opnd_mem) M_Index_Opnd(n_reg, n_reg, offset, 0));
+        if (base == NULL && (index == NULL || scale == 0)) {
+            buf = mov(buf, tmp_reg, Imm_Opnd(size_64, offset));
+            return *(new(M_Index_Opnd_mem) M_Index_Opnd(tmp_reg.reg_no(), n_reg, 0, 0));
         }
 
         // initialize locations
+        const bool is_offset32 = fit32(offset);
         const LcgEM64TLoc * base_loc = base != NULL ? get_var_loc(base, false) : NULL;
         const LcgEM64TLoc * index_loc = index != NULL && scale != 0 ? get_var_loc(index, false) : NULL;
         const bool is_base_in_mem = base_loc != NULL && base_loc->kind == LLK_GStk;
@@ -853,7 +869,7 @@ private:
         const LcgEM64TLoc * ret_loc =
             new(mem) LcgEM64TLoc(LLK_Gr, LcgEM64TContext::get_index_in_map(tmp_reg.reg_no()));
         if (index_loc != NULL) {
-            int32 shift = scale / 2;
+            int32 shift = scale / 4 + 1;
             bin_op_rm_imm(LO_Shl, ret_loc, index_loc, shift);
             if (base_loc != NULL) {
                 bin_op_rm_rm(LO_Add, ret_loc, ret_loc, base_loc);
@@ -884,42 +900,33 @@ private:
         return *(new(M_Index_Opnd_mem) M_Base_Opnd(get_r_opnd(ret_loc).reg_no(), (uint32)offset));
     }
 
-    // sets up the stack frame
-    void save_callee_saves() {        
+    // sets up stack frame
+    void prolog() {        
+        // push callee-saves registers on the stack
         if (lil_cs_get_max_locals(cs) > 0) {
             assert(context.get_stk_size() != 0);
-            // compute the rsp-relative offset of the top of m2n frame
-            int32 offset = context.get_m2n_offset() + context.get_stk_m2n_size() -
-                current_rsp_offset;
-            // adjust rsp if required
-            adjust_stack_pointer(offset);
-            // push callee-saves registers on the stack
             for (unsigned i = 0; i < lil_cs_get_max_locals(cs); i++) {
                 const LcgEM64TLoc * loc = get_gp_local(i);
                 assert(loc->kind == LLK_Gr);
-                assert(LcgEM64TContext::GR_SIZE == 8);
                 buf = push(buf, get_r_opnd(loc), size_64);
-                current_rsp_offset -= LcgEM64TContext::GR_SIZE;
             }
         }
+        adjust_stack_pointer(lil_cs_get_max_locals(cs) * LcgEM64TContext::GR_SIZE -
+            context.get_stk_size());
     }
 
     // unsets the stack frame
-    void restore_callee_saves() {
+    void epilog() {
+        adjust_stack_pointer(context.get_stk_size() -
+            lil_cs_get_max_locals(cs) * LcgEM64TContext::GR_SIZE);
+
         if (lil_cs_get_max_locals(cs) > 0) {
             assert(context.get_stk_size() != 0);
-            // compute the rsp-relative offset of the last callee-saves register
-            int32 offset = (int32)(context.get_m2n_offset() + context.get_stk_m2n_size() -
-                lil_cs_get_max_locals(cs) * LcgEM64TContext::GR_SIZE - current_rsp_offset);
-            // adjust rsp if required
-            adjust_stack_pointer(offset);
             // pop callee-saves registers from the stack
             for (int i = lil_cs_get_max_locals(cs) - 1; i >= 0; i--) {
                 const LcgEM64TLoc * loc = get_gp_local(i);
                 assert(loc->kind == LLK_Gr);
-                assert(LcgEM64TContext::GR_SIZE == 8);
                 buf = pop(buf, get_r_opnd(loc), size_64);
-                current_rsp_offset += LcgEM64TContext::GR_SIZE;
             }
         }
     }
@@ -930,27 +937,27 @@ private:
             return;
         }  
 
-        // check the rsp position
-        assert(context.get_input_gr_save_offset() +
-            context.get_stk_input_gr_save_size() - current_rsp_offset == 0);
+        // compute the rsp-relative offset of the top of the GR save area
+        int32 offset = (int32)context.get_input_gr_save_offset() +
+            context.get_stk_input_gr_save_size();
         // store GR inputs to the computed locations
         for (int i = context.get_num_gr_inputs() - 1; i >= 0; i--) {
             const R_Opnd & r_opnd =
                 LcgEM64TContext::get_reg_from_map(LcgEM64TContext::GR_OUTPUTS_OFFSET + i);
-            assert(LcgEM64TContext::GR_SIZE == 8);
-            buf = push(buf, r_opnd, size_64);
-            current_rsp_offset -= LcgEM64TContext::GR_SIZE;
+            offset -= LcgEM64TContext::GR_SIZE;
+            const M_Opnd dest(rsp_reg, offset);
+            buf = mov(buf, dest, r_opnd);
         }
         // compute the rsp-relative offset of the top of the FR save area
-        int32 fr_offset = (int32)context.get_input_fr_save_offset() +
-            context.get_stk_input_fr_save_size() - current_rsp_offset;
+        offset = (int32)context.get_input_fr_save_offset() +
+            context.get_stk_input_fr_save_size();
         // store FR inputs to the computed locations
         for (int i = context.get_num_fr_inputs() - 1; i >= 0; i--) {
             const XMM_Opnd & r_opnd =
                 LcgEM64TContext::get_xmm_reg_from_map(LcgEM64TContext::FR_OUTPUTS_OFFSET + i);
-            const M_Opnd dest(rsp_reg, fr_offset);
+            offset -= LcgEM64TContext::FR_SIZE;
+            const M_Opnd dest(rsp_reg, offset);
             buf = sse_mov(buf, dest, r_opnd, true);
-            fr_offset -= LcgEM64TContext::FR_SIZE;
         }
     }
 
@@ -961,25 +968,24 @@ private:
             return;
         }
         // compute the rsp-relative offset of the bottom of the FR save area
-        int32 fr_offset = (int32)context.get_input_fr_save_offset() - current_rsp_offset;
+        int32 offset = (int32)context.get_input_fr_save_offset();
         // restore FR inputs
-        for (unsigned i = 0; i < context.get_num_inputs(); i++) {
+        for (unsigned i = 0; i < context.get_num_fr_inputs(); i++) {
             const XMM_Opnd & r_opnd =
                 LcgEM64TContext::get_xmm_reg_from_map(LcgEM64TContext::FR_OUTPUTS_OFFSET + i);
-            const M_Opnd src(rsp_reg, fr_offset);
+            const M_Opnd src(rsp_reg, offset);
             buf = sse_mov(buf, r_opnd, src, true);
-            fr_offset += LcgEM64TContext::FR_SIZE;
+            offset += LcgEM64TContext::FR_SIZE;
         }
         // compute the rsp-relative offset of the bottom of the GR save area
-        int32 gr_offset = (int32)context.get_input_gr_save_offset() - current_rsp_offset;
-        adjust_stack_pointer(gr_offset);
+        offset = (int32)context.get_input_gr_save_offset();
         // restore GR inputs
         for (unsigned i = 0; i < context.get_num_gr_inputs(); i++) {
             const R_Opnd & r_opnd =
                 LcgEM64TContext::get_reg_from_map(LcgEM64TContext::GR_OUTPUTS_OFFSET + i);
-            assert(LcgEM64TContext::GR_SIZE == 8);
-            buf = pop(buf, r_opnd, size_64);
-            current_rsp_offset += LcgEM64TContext::GR_SIZE;
+            const M_Opnd src(rsp_reg, offset);
+            buf = mov(buf, r_opnd, src, size_64);
+            offset += LcgEM64TContext::GR_SIZE;
         }
     }
 
@@ -1008,12 +1014,12 @@ public:
     LcgEM64TCodeGen(LilCodeStub * cs, LcgEM64TContext & c, tl::MemoryPool & m):
         buf_beg((char *)m.alloc(MAX_CODE_LENGTH)), buf(buf_beg),
         labels(&m, buf_beg), cs(cs), context(c), mem(m), iter(cs, true), ic(NULL), inst(NULL),        
-        rsp_loc(new(m) LcgEM64TLoc(LLK_Gr, rsp_reg)), take_inputs_from_stack(false),
-        current_rsp_offset(context.get_stk_size()), current_alloc(0) {
+        rsp_loc(new(m) LcgEM64TLoc(LLK_Gr, LcgEM64TContext::RSP_OFFSET)), take_inputs_from_stack(false),
+        current_alloc(0) {
 
         // emit entry code
-        move_inputs();
-        save_callee_saves();
+        prolog();
+        move_inputs();        
 
         // go through the instructions
         while (!iter.at_end()) {
@@ -1064,7 +1070,7 @@ public:
     }
 
     void alloc(LilVariable * var, unsigned sz) {
-        int32 alloc_offset = context.get_alloc_start_offset() + current_alloc - current_rsp_offset;
+        int32 alloc_offset = context.get_alloc_start_offset() + current_alloc;
         // the actual size allocated will always be a multiple of 8
         current_alloc += align_8(sz);
         // var = sp + alloc_offset
@@ -1181,33 +1187,35 @@ public:
     void ts(LilVariable * var) {
         const LcgEM64TLoc * var_loc = get_var_loc(var, true);
         assert(var_loc->kind == LLK_Gr || var_loc->kind == LLK_GStk);
+
         if (var_loc->kind == LLK_Gr) {
             buf = m2n_gen_ts_to_register(buf, &get_r_opnd(var_loc),
-                lil_cs_get_max_locals(cs), lil_ic_get_num_std_places(ic),
-                context.is_uses_returns() ? 1 : 0, true);
+                lil_ic_get_num_locals(ic), lil_cs_get_max_locals(cs),
+                lil_ic_get_num_std_places(ic), lil_ic_get_ret_type(ic) == LT_Void ? 0 : 1);
         } else {
             const Tmp_GR_Opnd tmp(context, ic);
             buf = m2n_gen_ts_to_register(buf, &tmp,
-                lil_cs_get_max_locals(cs), lil_ic_get_num_std_places(ic),
-                context.is_uses_returns() ? 1 : 0, true);
+                lil_ic_get_num_locals(ic), lil_cs_get_max_locals(cs),
+                lil_ic_get_num_std_places(ic), lil_ic_get_ret_type(ic) == LT_Void ? 0 : 1);
             buf = mov(buf, get_m_opnd(var_loc), tmp, size_64);
         }
+
         take_inputs_from_stack = true;
     }
         
     void handles(LilOperand * op) {
         if (lil_operand_is_immed(op)) {
             buf = m2n_gen_set_local_handles_imm(buf,
-                context.get_m2n_offset() - current_rsp_offset, &get_imm_opnd(op));
+                context.get_m2n_offset(), &get_imm_opnd(op));
         } else {
             const LcgEM64TLoc * loc = get_op_loc(op, false);
             if (loc->kind == LLK_Gr) {
-                buf = m2n_gen_set_local_handles_r(buf, context.get_m2n_offset() -
-                    current_rsp_offset, &get_r_opnd(loc));
+                buf = m2n_gen_set_local_handles_r(buf,
+                    context.get_m2n_offset(), &get_r_opnd(loc));
             } else {
                 const Tmp_GR_Opnd tmp(context, ic);
-                buf = m2n_gen_set_local_handles_r(buf, context.get_m2n_offset() -
-                    current_rsp_offset, &tmp);
+                buf = m2n_gen_set_local_handles_r(buf,
+                    context.get_m2n_offset(), &tmp);
                 buf = mov(buf, get_m_opnd(loc), tmp, size_64);
             }
         }
@@ -1253,7 +1261,13 @@ public:
         assert(size != n_size);
 
         if (ext == LLX_Zero) {
-            buf = movzx(buf, *dest_reg, addr, size);
+            // movzx r64, r/m32 is not available on em64t
+            // mov r32, r/m32 should zero out upper bytes
+            if (size == size_32) {
+                buf = mov(buf, *dest_reg, addr, size);
+            } else {
+                buf = movzx(buf, *dest_reg, addr, size);
+            }
         } else {
             buf = movsx(buf, *dest_reg, addr, size);
         }
@@ -1477,12 +1491,10 @@ move_to_destination:
     void call(LilOperand * target, LilCallKind kind) {
         switch (kind) {
         case LCK_TailCall: {
-            // restore callee_saves registers from the stack
-            restore_callee_saves();
             // restore input FR & GR
             unmove_inputs();
-            // old stacked arguments should become visible
-            assert(current_rsp_offset == context.get_stk_size());
+            // unwind current stack frame
+            epilog();
             // jump (instead of calling)
             if (lil_operand_is_immed(target)) {
                 // check if we can perform relative call
@@ -1518,8 +1530,6 @@ move_to_destination:
         }
         case LCK_Call:
         case LCK_CallNoRet: {
-            // rsp should point to the bottom of the activation frame before issuing call
-            adjust_stack_pointer(-current_rsp_offset);
             if (lil_operand_is_immed(target)) {
                 // check if we can perform relative call
                 int64 target_value = lil_operand_get_immed(target);
@@ -1560,8 +1570,8 @@ move_to_destination:
     }
 
     void ret() {
-        restore_callee_saves();
-        adjust_stack_pointer(context.get_stk_size() - current_rsp_offset);
+        // unwind current stack frame
+        epilog();
         buf = ::ret(buf);
     }
 
@@ -1570,13 +1580,11 @@ move_to_destination:
     void push_m2n(Method_Handle method, frame_type current_frame_type, bool handles) {
         take_inputs_from_stack = true;
 
-        // rsp-relative offset of the bottom of the m2n frame
-        int32 offset = context.get_m2n_offset() - current_rsp_offset;
+        // rsp-relative offset of the top of the m2n frame
+        int32 offset = context.get_m2n_offset() + context.get_stk_m2n_size();
 
         buf = m2n_gen_push_m2n(buf, method, current_frame_type, handles,
             lil_cs_get_max_locals(cs), lil_ic_get_num_std_places(ic), offset);
-
-        current_rsp_offset = context.get_m2n_offset();
     }
 
     void m2n_save_all() {
@@ -1585,11 +1593,8 @@ move_to_destination:
     void pop_m2n() {
         buf = m2n_gen_pop_m2n(buf, context.m2n_has_handles(), lil_cs_get_max_locals(cs),
             // TODO: FIXME: need to define proper return registers to be preserved
-            context.get_m2n_offset() - current_rsp_offset, 1);
+            context.get_m2n_offset(), 1);
         // after m2n_gen_pop_m2n rsp points to the last callee-saves register
-        // set current rsp offset
-        current_rsp_offset = context.get_m2n_offset() + context.get_stk_m2n_size() -
-            lil_cs_get_max_locals(cs) * LcgEM64TContext::GR_SIZE;
     }
 
     void print(char * str, LilOperand * o) {
@@ -1616,8 +1621,7 @@ move_to_destination:
 
 LilCodeGeneratorEM64T::LilCodeGeneratorEM64T(): LilCodeGenerator() {}
 
-NativeCodePtr LilCodeGeneratorEM64T::compile_main(LilCodeStub * cs, size_t * stub_size,
-                                                  const char* stub_name, bool dump_stubs) {
+NativeCodePtr LilCodeGeneratorEM64T::compile_main(LilCodeStub * cs, size_t * stub_size) {
     // start a memory manager
     tl::MemoryPool m;
     // get context
@@ -1629,11 +1633,6 @@ NativeCodePtr LilCodeGeneratorEM64T::compile_main(LilCodeStub * cs, size_t * stu
     NativeCodePtr buffer = allocate_memory(*stub_size);
     codegen.copy_stub(buffer);
 
-#ifndef NDEBUG
-    if (dump_stubs) {
-        dump((char *)buffer, stub_name, *stub_size);
-    }
-#endif
     return buffer;
 }
 

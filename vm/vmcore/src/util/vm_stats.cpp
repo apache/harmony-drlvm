@@ -19,7 +19,8 @@
  */  
 
 #ifdef VM_STATS
-#define LOG_DOMAIN "stats"
+
+#define LOG_DOMAIN "vm.stats"
 #include "cxxlog.h"
 
 #include "platform.h"
@@ -34,12 +35,8 @@
 #include "vm_stats.h"
 #include "GlobalClassLoaderIterator.h"
 
-VM_Statistics vm_stats_total;
-
 bool vm_print_total_stats = false;
 int vm_print_total_stats_level = 0;
-
-
 
 // 20030425 The list of JIT support functions below must be kept in synch with the enum VM_RT_SUPPORT in jit_runtime_support.h.
 typedef struct JIT_RT_Function_Entry {
@@ -64,7 +61,7 @@ static JIT_RT_Function_Entry _jit_rt_function_entries_base[] = {
     {VM_RT_THROW_SET_STACK_TRACE,              "VM_RT_THROW_SET_STACK_TRACE",              1},
 
     {VM_RT_MONITOR_ENTER,                      "VM_RT_MONITOR_ENTER",                      1},
-    {VM_RT_MONITOR_ENTER_NO_EXC,               "VM_RT_MONITOR_ENTER_NO_EXC",               1},
+    {VM_RT_MONITOR_ENTER_NON_NULL,             "VM_RT_MONITOR_ENTER_NON_NULL",             1},
     {VM_RT_MONITOR_EXIT,                       "VM_RT_MONITOR_EXIT",                       1},
     {VM_RT_MONITOR_EXIT_NON_NULL,              "VM_RT_MONITOR_EXIT_NON_NULL",              1},
     {VM_RT_MONITOR_ENTER_STATIC,               "VM_RT_MONITOR_ENTER_STATIC",               1},
@@ -84,6 +81,8 @@ static JIT_RT_Function_Entry _jit_rt_function_entries_base[] = {
 
     {VM_RT_JVMTI_METHOD_ENTER_CALLBACK,        "VM_RT_JVMTI_METHOD_ENTER_CALLBACK",        1},
     {VM_RT_JVMTI_METHOD_EXIT_CALLBACK,         "VM_RT_JVMTI_METHOD_EXIT_CALLBACK",         2},
+    {VM_RT_JVMTI_FIELD_ACCESS_CALLBACK,        "VM_RT_JVMTI_FIELD_ACCESS__CALLBACK",       4},
+    {VM_RT_JVMTI_FIELD_MODIFICATION_CALLBACK,  "VM_RT_JVMTI_FIELD_MODIFICATION_CALLBACK",  5},
 
     {VM_RT_RESOLVE,                            "VM_RT_RESOLVE",                            3},
 
@@ -113,8 +112,6 @@ static JIT_RT_Function_Entry _jit_rt_function_entries_base[] = {
 
     {VM_RT_CHAR_ARRAYCOPY_NO_EXC,              "VM_RT_CHAR_ARRAYCOPY_NO_EXC",              5},
 
-    {VM_RT_NEW_RESOLVED,                       "VM_RT_NEW_RESOLVED",                       1},
-    {VM_RT_NEW_VECTOR,                         "VM_RT_NEW_VECTOR",                         2},
     {VM_RT_WRITE_BARRIER_FASTCALL,             "VM_RT_WRITE_BARRIER_FASTCALL",             2},
 };
 
@@ -313,9 +310,19 @@ VM_Statistics::VM_Statistics()
         num_args  = jit_rt_function_entries[i].number_of_args;
         rt_function_map.add((void *)fn_number, num_args, fn_name);
     }
+
+    apr_pool_create(&vm_stats_pool, 0);    
 } //VM_Statistics::VM_Statistics
 
+VM_Statistics::~VM_Statistics() {
+   apr_pool_destroy(vm_stats_pool);
+}
 
+VM_Statistics & VM_Statistics::get_vm_stats() {
+    static StaticInitializer initializer = StaticInitializer();
+    static VM_Statistics vm_stats = VM_Statistics();
+    return vm_stats;
+}
 
 static void print_classes()
 {
@@ -557,23 +564,23 @@ static void print_array_distribution(char *caption, uint64 *array)
 
 
 
-static void print_rt_function_stats(VM_Statistics *stats)
+void VM_Statistics::print_rt_function_stats()
 {
     int num_entries, i;
 
     printf("\nJIT runtime support functions requested:\n");
-    num_entries = stats->rt_function_requests.size();
+    num_entries = rt_function_requests.size();
     if (num_entries > 0)
     {
         PairEntry **pair_array = (PairEntry **)STD_MALLOC(num_entries * sizeof(PairEntry *));
-        dump(stats->rt_function_requests, pair_array, num_entries, /*threshold*/ 1);
+        dump(rt_function_requests, pair_array, num_entries, /*threshold*/ 1);
         // Sort by increasing number of requests.
         quick_sort(pair_array, 0, num_entries-1);
         for (i = 0;  i < num_entries;  i++) {
             VM_RT_SUPPORT fn_number = (VM_RT_SUPPORT)((POINTER_SIZE_INT)(pair_array[i]->key));       
             int   num_args = 0;
             char *fn_name = NULL;
-            bool UNUSED found = stats->rt_function_map.lookup((void *)fn_number, &num_args, (void **)&fn_name);
+            bool UNUSED found = rt_function_map.lookup((void *)fn_number, &num_args, (void **)&fn_name);
             assert(found);  // else changes were made to the enum VM_RT_SUPPORT in jit_runtime_support.h.
             printf("%11d :::: %s\n", pair_array[i]->value, fn_name);
         }
@@ -581,27 +588,71 @@ static void print_rt_function_stats(VM_Statistics *stats)
         printf("\n");
     }
 
-#ifdef VM_STATS
-    num_entries = stats->rt_function_calls.size();
+    num_entries = rt_function_calls.size();
     if (num_entries > 0) {
         printf("\nJIT runtime support functions called:\n");
         PairEntry **pair_array = (PairEntry **)STD_MALLOC(num_entries * sizeof(PairEntry *));
-        dump(stats->rt_function_calls, pair_array, num_entries, /*threshold*/ 1);
+        dump(rt_function_calls, pair_array, num_entries, /*threshold*/ 1);
         // Sort by increasing number of calls.
         quick_sort(pair_array, 0, num_entries-1);
         for (i = 0;  i < num_entries;  i++) {
             VM_RT_SUPPORT fn_number = (VM_RT_SUPPORT)((POINTER_SIZE_INT)(pair_array[i]->key));       
             int   num_args = 0;
             char *fn_name = NULL;
-            bool found = stats->rt_function_map.lookup((void *)fn_number, &num_args, (void **)&fn_name);
+            bool found = rt_function_map.lookup((void *)fn_number, &num_args, (void **)&fn_name);
             assert(found);  // else changes were made to the enum VM_RT_SUPPORT in jit_runtime_support.h.
             printf("%11d :::: %s\n", pair_array[i]->value, fn_name);
         }
         printf("\n");
     }
-#endif //VM_STATS
 } //print_rt_function_stats
 
+void VM_Statistics::print_string_pool_stats() {
+    printf("\nBegin: Virtual Machine String Pool Statistics\n");
+    //printf("\tname\ttotal lookups\ttotal collisions\n");
+    unsigned long num_lookup_total = 0;
+    unsigned long num_lookup_collision_total = 0;
+    String_Pool & string_pool = VM_Global_State::loader_env->string_pool;
+    for (apr_hash_index_t * index =
+        apr_hash_first(vm_stats_pool, string_pool.string_stat);
+        index != NULL; index = apr_hash_next(index)) {
+            char * key;
+            apr_ssize_t key_len;
+            String_Stat * key_stats;
+            
+            apr_hash_this(index, (const void **)&key, &key_len, (void **)&key_stats);
+
+            num_lookup_total += key_stats->num_lookup;
+            num_lookup_collision_total += key_stats->num_lookup_collision;
+            
+            bool is_interned = false;
+            String * string = string_pool.lookup(key, key_len);
+            if (VM_Global_State::loader_env->compress_references) {
+                if (string->intern.compressed_ref) {
+                    is_interned = true;
+                }
+            } else {
+                if (string->intern.raw_ref) {
+                    is_interned = true;
+                }
+            }
+
+            char * str = key;
+            // replace '\n' literal with space
+            while(str = strchr(str, '\n')) {
+                *str = ' ';
+                ++str;
+            }
+            printf("%s#%i#%i#%s\n", key, key_stats->num_lookup,
+                key_stats->num_lookup_collision, is_interned == 0 ? "uninterned" : "interned");
+    }
+    int num_elements = apr_hash_count(string_pool.string_stat);
+    float hash_quality = ((float)(num_elements) - string_pool.num_ambiguity ) / num_elements;
+
+    printf("Total lookups/lookup collisions/conflicting elements/hash quality:#%i#%i#%i#%f\n",
+        num_lookup_total, num_lookup_collision_total, string_pool.num_ambiguity, hash_quality);
+    printf("\n End: Virtual Machine String Pool Statistics\n");
+}
 
 void VM_Statistics::print()
 {
@@ -865,11 +916,13 @@ void VM_Statistics::print()
         printf("%11" FMT64 "u ::::    num_resizes\n",          vtable_data_pool->num_resizes);
         printf("%11" FMT64 "u ::::    current_alloc_size\n",   uint64(vtable_data_pool->current_alloc_size));
     }
-#endif // VM_STATS
     
     fflush(stdout);
 
-    print_rt_function_stats(this);
+    print_rt_function_stats();
+
+    print_string_pool_stats();
+#endif // VM_STATS
 
     printf("==== end VM statistics\n");
 } //VM_Statistics::print

@@ -51,7 +51,7 @@ CompileMethod(Method_Handle method_handle)
 static void
 ProfilerThreadTimeout() 
 {
-	DrlEMFactory::getEMInstance()->tbsTimeout();
+    DrlEMFactory::getEMInstance()->tbsTimeout();
 }
 
 static const char*
@@ -66,7 +66,7 @@ GetEmVersion() {
 
 static const char*
 GetDescription() {
-    return "Execution manager supports Jitrino.JET, Jitrino.OPT and dynamic recompilation";
+    return "Execution manager ...";
 }
 
 static const char*

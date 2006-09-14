@@ -45,12 +45,13 @@ public final class AccessController {
      * stored. ((ArrayList)contexts.get(Thread.currentThread())).lastElement() - 
      * is reference to the latest context passed to the doPrivileged() call.
      */
-    private static final WeakHashMap contexts = new WeakHashMap();
+    private static final WeakHashMap<Thread, ArrayList<AccessControlContext>> 
+    contexts = new WeakHashMap<Thread, ArrayList<AccessControlContext>>();
     
     /**
      * @com.intel.drl.spec_ref 
      */
-    public static Object doPrivileged(PrivilegedAction action) {
+    public static <T> T doPrivileged(PrivilegedAction<T> action) {
         if (action == null) {
             throw new NullPointerException("action can not be null");
         }
@@ -60,7 +61,7 @@ public final class AccessController {
     /**
      * @com.intel.drl.spec_ref 
      */
-    public static Object doPrivileged(PrivilegedAction action,
+    public static <T> T doPrivileged(PrivilegedAction<T> action,
             AccessControlContext context) {
         if (action == null) {
             throw new NullPointerException("action can not be null");
@@ -71,7 +72,7 @@ public final class AccessController {
     /**
      * @com.intel.drl.spec_ref 
      */
-    public static Object doPrivileged(PrivilegedExceptionAction action)
+    public static <T> T doPrivileged(PrivilegedExceptionAction<T> action)
             throws PrivilegedActionException {
         if (action == null) {
             throw new NullPointerException("action can not be null");
@@ -82,7 +83,7 @@ public final class AccessController {
     /**
      * @com.intel.drl.spec_ref 
      */
-    public static Object doPrivileged(PrivilegedExceptionAction action,
+    public static <T> T doPrivileged(PrivilegedExceptionAction<T> action,
             AccessControlContext context) throws PrivilegedActionException {
         if (action == null) {
             throw new NullPointerException("action can not be null");
@@ -97,19 +98,19 @@ public final class AccessController {
      * The pushed context is then investigated in the {@link getContext()}
      * which is called in the {@link checkPermission}.
      */
-    private static Object doPrivilegedImpl(PrivilegedExceptionAction action,
+    private static <T> T doPrivilegedImpl(PrivilegedExceptionAction<T> action,
             AccessControlContext context) throws PrivilegedActionException {
 
         Thread currThread = Thread.currentThread();
 
-        ArrayList a = null;
+        ArrayList<AccessControlContext> a = null;
         try {
             // currThread==null means that VM warm up is in progress
             if (currThread != null && contexts != null) {
                 synchronized (contexts) {
-                    a = (ArrayList) contexts.get(currThread);
+                    a = contexts.get(currThread);
                     if (a == null) {
-                        a = new ArrayList();
+                        a = new ArrayList<AccessControlContext>();
                         contexts.put(currThread, a);
                     }
                 }
@@ -148,7 +149,7 @@ public final class AccessController {
      * The pushed context is then investigated in the {@link getContext()} 
      * which is called in the {@link checkPermission}.  
      */
-    private static Object doPrivilegedImpl(PrivilegedAction action,
+    private static <T> T doPrivilegedImpl(PrivilegedAction<T> action,
             AccessControlContext context) {
 
         Thread currThread = Thread.currentThread();
@@ -163,12 +164,12 @@ public final class AccessController {
             return action.run();
         }
 
-        ArrayList a = null;
+        ArrayList<AccessControlContext> a = null;
         try {
             synchronized (contexts) {
-                a = (ArrayList) contexts.get(currThread);
+                a = contexts.get(currThread);
                 if (a == null) {
-                    a = new ArrayList();
+                    a = new ArrayList<AccessControlContext>();
                     contexts.put(currThread, a);
                 }
             }
@@ -227,7 +228,7 @@ public final class AccessController {
      */
     private static AccessControlContext buildContext(Class[] trace) {
 
-        ArrayList a = new ArrayList();
+        ArrayList<ProtectionDomain> a = new ArrayList<ProtectionDomain>();
         for (int i = 0; i < trace.length; i++) {
             ProtectionDomain pd = DoSecure.doSecure_getProtectionDomain(trace[i]);
             
@@ -239,18 +240,18 @@ public final class AccessController {
         ProtectionDomain[] stack = new ProtectionDomain[a.size()];
         a.toArray(stack);
 
-        AccessControlContext that;
-
         Thread currThread = Thread.currentThread();
         if (currThread == null || contexts == null) {
             // Big boo time. No need to check anything ? 
             return new AccessControlContext(stack);
         }
 
-        ArrayList threadContexts;
+        ArrayList<AccessControlContext> threadContexts;
         synchronized (contexts) {
-            threadContexts = (ArrayList) contexts.get(currThread);
+            threadContexts = contexts.get(currThread);
         }
+        
+        AccessControlContext that;
         if ((threadContexts == null) || (threadContexts.size() == 0)) {
             // We were not in doPrivileged method, so
             // have inherited context here
@@ -258,8 +259,7 @@ public final class AccessController {
         } else {
             // We were in doPrivileged method, so
             // Use context passed to the doPrivileged()
-            that = (AccessControlContext) threadContexts
-                                .get(threadContexts.size() - 1);
+            that = threadContexts.get(threadContexts.size() - 1);
         }
 
         if (that != null && that.combiner != null) {
@@ -297,7 +297,7 @@ public final class AccessController {
          * @param klass
          * @return klass.getProtectionDomain()
          */
-        private static ProtectionDomain doSecure_getProtectionDomain(Class klass) {
+        private static ProtectionDomain doSecure_getProtectionDomain(Class<?> klass) {
             return klass.getProtectionDomain();
         }
     }

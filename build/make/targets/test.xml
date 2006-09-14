@@ -18,6 +18,6 @@ Author:  Marina V. Goldburt
 Version: $Revision: 1.3.2.2 $
 -->
 <project name="ALL TESTS">
-    <target name="test" depends="unit.test, smoke.test, cunit.test" />
+    <target name="test" depends="cunit.test, smoke.test, kernel.test,unit.test" />
 </project>
 

@@ -65,6 +65,11 @@ M2nFrame* m2n_get_last_frame();
 VMEXPORT // temporary solution for interpreter unplug
 void m2n_set_last_frame(M2nFrame *);
 
+// Set the most recent M2nFrame of given thread
+// The caller must ensure the frame is on the thread's activation stack
+VMEXPORT
+void m2n_set_last_frame(VM_thread *, M2nFrame *);
+
 // Get the most recent M2nFrame of the given thread
 VMEXPORT // temporary solution for interpreter unplug
 M2nFrame* m2n_get_last_frame(VM_thread *);
@@ -99,15 +104,32 @@ frame_type m2n_get_frame_type(M2nFrame *);
 // Sets type of noted m2n frame
 void m2n_set_frame_type(M2nFrame *, frame_type);
 
+// Returns size of m2n frame
+size_t m2n_get_size();
+
 // Push a special M2nFrame for managed code suspended by the OS in say
 // a signal handler or exception filter.
 // The frame can be popped by setting the last frame to a prior frame
-// and then calling free on the frame.
+void m2n_push_suspended_frame(M2nFrame* m2nf, Registers* regs);
+
+// Push a special M2nFrame for managed code suspended by the OS in say
+// a signal handler or exception filter.
+// The frame can be popped by setting the last frame to a prior frame
+void m2n_push_suspended_frame(VM_thread* thread, M2nFrame* m2nf, Registers* regs);
+
+// Push a special M2nFrame for managed code suspended by the OS in say
+// a signal handler or exception filter. The frame is allocated in the heap.
+// It can be popped by setting the last frame to a prior frame
+// and then calling free on the frame pointer.
 M2nFrame* m2n_push_suspended_frame(Registers *);
+
+// Push a special M2nFrame for managed code suspended by the OS in
+// signal handler or exception filter. The frame is allocated in the heap.
+// The frame can be popped by setting the last frame to a prior frame
+// and then calling free on the frame.
+M2nFrame* m2n_push_suspended_frame(VM_thread *, Registers *);
 
 // answers true if passed in m2n frame represents suspended frame
 bool m2n_is_suspended_frame(M2nFrame *);
 
-// returns the the beginning address of specified frame
-void * m2n_get_frame_base(M2nFrame *);
 #endif //!_M2N_H_

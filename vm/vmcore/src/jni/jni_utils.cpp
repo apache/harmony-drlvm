@@ -41,7 +41,6 @@
 #include "m2n.h"
 
 
-#include "exception.h"
 #include "stack_trace.h"
 
 Class_Handle jni_get_class_handle(JNIEnv* UNREF jenv, jclass clazz)
@@ -59,15 +58,15 @@ jclass jni_class_from_handle(JNIEnv* UNREF jenv, Class_Handle clss)
 jobject jni_class_loader_from_handle(JNIEnv*, ClassLoaderHandle clh)
 {
     if (!clh) return NULL;
-    tmn_suspend_disable();
+    hythread_suspend_disable();
     ManagedObject* obj = clh->GetLoader();
     if( !obj ) {
-        tmn_suspend_enable();
+        hythread_suspend_enable();
         return NULL;
     }
     ObjectHandle res = oh_allocate_local_handle();
     res->object = obj;
-    tmn_suspend_enable();
+    hythread_suspend_enable();
     return (jobject)res;
 }
 
@@ -77,9 +76,9 @@ ClassLoaderHandle class_loader_lookup(jobject loader)
 
     ObjectHandle h = (ObjectHandle)loader;
 
-    tmn_suspend_disable();       //---------------------------------v
+    hythread_suspend_disable();       //---------------------------------v
     ClassLoader* cl = ClassLoader::LookupLoader(h->object);
-    tmn_suspend_enable();        //---------------------------------^
+    hythread_suspend_enable();        //---------------------------------^
 
     return cl;
 } //class_loader_lookup
@@ -95,9 +94,9 @@ ClassLoaderHandle class_loader_find_if_exists(jobject loader)
 {
     ObjectHandle h = (ObjectHandle)loader;
 
-    tmn_suspend_disable();       //---------------------------------v
+    hythread_suspend_disable();       //---------------------------------v
     ClassLoader* cl = ClassLoader::FindByObject(h->object);
-    tmn_suspend_enable();        //---------------------------------^
+    hythread_suspend_enable();        //---------------------------------^
 
     return cl;
 } //class_loader_find_if_exists
@@ -251,7 +250,7 @@ char* ParameterTypesToMethodSignature (JNIEnv* env, jobjectArray parameterTypes,
 
     if (NULL == sig) {
         //throw_exception_from_jni (env, "java/lang/OutOfMemoryError", name);
-        exn_raise_only(VM_Global_State::loader_env->java_lang_OutOfMemoryError);
+        exn_raise_object(VM_Global_State::loader_env->java_lang_OutOfMemoryError);
         return (char *)0;
     }
 
@@ -597,11 +596,11 @@ jboolean IsNullRef(jobject jobj)
 
     ObjectHandle h = (ObjectHandle)jobj;
 
-    tmn_suspend_disable();       //---------------------------------v
+    hythread_suspend_disable();       //---------------------------------v
 
     jboolean ret = (h->object == NULL) ? true : false;
 
-    tmn_suspend_enable();        //---------------------------------^
+    hythread_suspend_enable();        //---------------------------------^
 
     return ret;
 }
@@ -652,13 +651,13 @@ void throw_exception_from_jni(JNIEnv *jenv, const char *exc, const char *msg)
 void array_copy_jni(JNIEnv* jenv, jobject src, jint src_off, jobject dst, jint dst_off, jint count)
 {
     ArrayCopyResult res;
-    tmn_suspend_disable();
+    hythread_suspend_disable();
     if (src && dst) {
         res = array_copy(((ObjectHandle)src)->object, src_off, ((ObjectHandle)dst)->object, dst_off, count);
     } else {
         res = ACR_NullPointer;
     }
-    tmn_suspend_enable();
+    hythread_suspend_enable();
     jclass tclass = NULL;
     switch (res) {
     case ACR_Okay:
@@ -683,6 +682,7 @@ Boolean class_is_subclass(Class_Handle subclss, Class_Handle superclss)
 
 jclass FindClass(JNIEnv* env_ext, String* name)
 {
+    ASSERT_RAISE_AREA;
     TRACE2("jni", "FindClass called, name = " << name->bytes);
 
 #ifdef _DEBUG
@@ -774,9 +774,9 @@ jobject CreateNewThrowable(JNIEnv* jenv, Class* clazz,
         jvalue res;
 
         assert(hythread_is_suspend_enabled());
-        tmn_suspend_disable();
+        hythread_suspend_disable();
         vm_execute_java_method_array((jmethodID) initCause, &res, initArgs);
-        tmn_suspend_enable();
+        hythread_suspend_enable();
     }
 
     return obj;
@@ -784,15 +784,35 @@ jobject CreateNewThrowable(JNIEnv* jenv, Class* clazz,
 
 jobject create_default_instance(Class* clss) 
 {    
-    tmn_suspend_disable();
+    hythread_suspend_disable();
     jobject h = oh_allocate_local_handle();
     ManagedObject *new_obj = class_alloc_new_object_and_run_default_constructor(clss);
     if (new_obj == NULL) {
-        tmn_suspend_enable();
+        hythread_suspend_enable();
         assert(exn_raised());
         return NULL;
     }
     h->object = new_obj;
-    tmn_suspend_enable();
+    hythread_suspend_enable();
     return h;
+}
+
+bool ensure_initialised(JNIEnv* env, Class* clss)
+{
+    ASSERT_RAISE_AREA;
+    assert(hythread_is_suspend_enabled());
+
+    if(clss->state != ST_Initialized) {
+        class_initialize_from_jni(clss);
+        if(clss->state == ST_Error) {
+            // If exception is already raised, no need to
+            // throw new one, just return instead
+            if (!exn_raised()) 
+            {
+                env->Throw(class_get_error_cause(clss));
+            }
+            return false;
+        }
+    }
+    return true;
 }

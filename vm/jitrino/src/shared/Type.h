@@ -83,7 +83,7 @@ public:
         TypedReference, // typed reference
         
         //     (1.2) User-defined un-boxed value type
-		Value, // user-defined value type
+        Value, // user-defined value type
 
         // Offset type
         Offset,             // offset into an object
@@ -95,6 +95,7 @@ public:
 
         //     (2.1.1) Built-in object types
         SystemObject, // System.Object
+        SystemClass,  // System.Class
         SystemString, // System.String
 
         // special null object reference
@@ -121,6 +122,7 @@ public:
 
         //     (2.1.1) Built-in object types
         CompressedSystemObject, // System.Object
+        CompressedSystemClass,  // System.Class
         CompressedSystemString, // System.String
 
         // special null object reference
@@ -144,10 +146,11 @@ public:
         Singleton,
 
         NumTypeTags,
-		InavlidTag = NumTypeTags
+        InavlidTag = NumTypeTags
     };
     Type(Tag t) : tag(t), id(++nextTypeId) {}
     virtual ~Type() {}
+
     const Tag tag;
     bool    isBuiltinValue()   {return isBuiltinValue(tag); }
     bool    isNumeric()        {return isNumeric(tag);      }
@@ -175,6 +178,7 @@ public:
     bool    isOffset()         {return (tag == Type::Offset);       }
     bool    isOffsetPlusHeapbase()         {return (tag == Type::OffsetPlusHeapbase);       }
     bool    isSystemObject()   {return isSystemObject(tag); }
+    bool    isSystemClass()    {return isSystemClass(tag); }
     bool    isSystemString()   {return (tag == Type::SystemString);}
     bool    isSignedInteger()  {return isSignedInteger(tag);}
     bool    isFloatingPoint()  {return isFloatingPoint(tag);}
@@ -272,6 +276,7 @@ public:
     static Tag compressReference(Tag tag) {
         switch (tag) {
         case SystemObject: return CompressedSystemObject;
+        case SystemClass:  return CompressedSystemClass;
         case SystemString: return CompressedSystemString;
         case NullObject:   return CompressedNullObject;
         case Array:        return CompressedArray;
@@ -285,6 +290,7 @@ public:
     static Tag unCompressReference(Tag tag) {
         switch (tag) {
         case CompressedSystemObject: return SystemObject;
+        case CompressedSystemClass:  return SystemClass;
         case CompressedSystemString: return SystemString;
         case CompressedNullObject:   return NullObject;
         case CompressedArray:        return Array;
@@ -306,10 +312,13 @@ public:
         return ((tag == Array) || (tag == CompressedArray));;
     }
     static bool isBuiltinObject(Tag tag) {
-        return (isSystemObject(tag) || isSystemString(tag));
+        return (isSystemObject(tag) || isSystemClass(tag) || isSystemString(tag));
     }
     static bool isSystemObject(Tag tag) {
         return ((tag == SystemObject) || (tag == CompressedSystemObject));
+    }
+    static bool isSystemClass(Tag tag) {
+        return ((tag == SystemClass) || (tag == CompressedSystemClass));
     }
     static bool isSystemString(Tag tag) {
         return ((tag == SystemString)||(tag == CompressedSystemString));
@@ -333,18 +342,18 @@ public:
         return ((tag == VTablePtr)||(tag == CompressedVTablePtr));
     }
     static const char* getPrintString(Tag);
-	/**
-	 * Converts a string representation of a Tag to appropriate Tag. 
-	 * The search is case insensitive.
-	 * Returns Tag::InavlidTag if no mapping found.
-	 */
-	static Tag str2tag(const char * tagname);
-	/**
-	 * Converts a Tag into its string representation, i.e. "Void" or "UInt32".
-	 * Never returns NULL, but pointer to string like "invalid type tag" instead.
-	 * Don't mess with getPrintString() which returns a short 4-symbol abbreviation.
-	 */
-	static const char * tag2str(Tag tag);
+    /**
+     * Converts a string representation of a Tag to appropriate Tag. 
+     * The search is case insensitive.
+     * Returns Tag::InavlidTag if no mapping found.
+     */
+    static Tag str2tag(const char * tagname);
+    /**
+     * Converts a Tag into its string representation, i.e. "Void" or "UInt32".
+     * Never returns NULL, but pointer to string like "invalid type tag" instead.
+     * Don't mess with getPrintString() which returns a short 4-symbol abbreviation.
+     */
+    static const char * tag2str(Tag tag);
 
     // Could locations containing values of these types be the same?
     static bool mayAlias(TypeManager*, Type*, Type*);
@@ -369,8 +378,9 @@ class PtrType : public Type {
 public:
     PtrType(Type* t,bool isManagedPtr,ValueName array=NULL, ValueName index=NULL) 
         : Type(isManagedPtr ? ManagedPtr : UnmanagedPtr), pointedToType(t), array(array), index(index) {}
-    PtrType* asPtrType() { return this; }
     virtual ~PtrType() {}
+
+    PtrType* asPtrType() { return this; }
     Type*   getPointedToType()            {return pointedToType;}
     ValueName getArrayName() { return array; }
     ValueName getIndexName() { return index; }
@@ -384,8 +394,9 @@ private:
 class FunctionPtrType : public Type {
 public:
     FunctionPtrType(bool isCompressed=false) : Type(isCompressed ? CompressedMethodPtr : MethodPtr) { }
-    FunctionPtrType* asFunctionPtrType() { return this; }
     virtual ~FunctionPtrType() {}
+
+    FunctionPtrType* asFunctionPtrType() { return this; }
     virtual uint32 getNumParams() = 0;
     virtual Type* getParamType(uint32) = 0;
     virtual Type* getReturnType() = 0;
@@ -397,6 +408,7 @@ public:
     MethodPtrType(MethodDesc* md, TypeManager& tm, bool isCompressed=false, ValueName obj=NULL) 
         : FunctionPtrType(isCompressed), methodDesc(md), methodSig(md->getMethodSig()), typeManager(tm), object(obj) {}
     virtual ~MethodPtrType() {}
+
     MethodPtrType* asMethodPtrType() { return this; }
     uint32 getNumParams() { return methodSig->getNumParams(); }
     Type* getParamType(uint32 i);
@@ -417,6 +429,7 @@ public:
     VTablePtrType(Type* t, bool isCompressed=false) : Type(isCompressed? CompressedVTablePtr : VTablePtr), 
                                                       baseType(t) {}
     virtual ~VTablePtrType() {}
+
     Type*          getBaseType()            {return baseType;}
     virtual void   print(::std::ostream& os);
 private:
@@ -438,6 +451,7 @@ public:
 
     NamedType* asNamedType() { return this; }
     bool needsInitialization();
+    bool isFinalizable();
     bool isBeforeFieldInit();
     bool isLikelyExceptionType();
     bool isVariableSizeType();
@@ -465,6 +479,7 @@ class UserValueType : public NamedType {
 public:
     UserValueType(void* td,TypeManager& tm) : NamedType(Value,td,tm) {}
     virtual ~UserValueType() {}
+
     virtual const char* getName();
     virtual const char* getNameQualifier();
     //
@@ -635,6 +650,7 @@ class TypeManager {
 public:
     TypeManager(MemoryManager& mm);
     virtual ~TypeManager() {}
+
     void    init(CompilationInterface &compInt);
     void    init();
     MemoryManager&  getMemManager()        {return memManager;}
@@ -667,10 +683,12 @@ public:
     Type*         getOffsetPlusHeapbaseType()   {return &offsetPlusHeapbaseType;}
     ObjectType*   getSystemStringType()    {return theSystemStringType;}
     ObjectType*   getSystemObjectType()    {return theSystemObjectType;}
+    ObjectType*   getSystemClassType()     {return theSystemClassType;}
 
     Type*         getCompressedNullObjectType()  {return &compressedNullObjectType;}
     ObjectType*   getCompressedSystemStringType(){return compressedSystemStringType;}
     ObjectType*   getCompressedSystemObjectType(){return compressedSystemObjectType;}
+    ObjectType*   getCompressedSystemClassType() {return compressedSystemClassType;}
 
     NamedType*    getValueType(void* vmTypeHandle);
     ObjectType*   getObjectType(void* vmTypeHandle, bool isCompressed=false);
@@ -700,7 +718,7 @@ public:
         }
         return type;
     }
-	Type*    getFunPtrType(Type* retType,uint32 numParams,Type** paramTypes) {
+    Type*    getFunPtrType(Type* retType,uint32 numParams,Type** paramTypes) {
         assert(0);
         return NULL;
     }
@@ -802,17 +820,17 @@ public:
     Type * convertToOldType(Type*);
 
     ObjectType*   getObjectTypeFromAllocationHandle(void* vmAllocationHandle, bool isCompressed=false)
-	{
-		if (vmAllocationHandle==NULL)
-			return NULL;
-		void * vmTypeHandle = getTypeHandleFromAllocationHandle(vmAllocationHandle);
-		if ( vmTypeHandle==NULL 
-				|| vmTypeHandle>(void*)-100
-				|| ((POINTER_SIZE_INT)vmTypeHandle&0x3)!=0 ) {
-			return NULL;
-		}
-		return getObjectType(vmTypeHandle, isCompressed);
-	}
+    {
+        if (vmAllocationHandle==NULL)
+            return NULL;
+        void * vmTypeHandle = getTypeHandleFromAllocationHandle(vmAllocationHandle);
+        if ( vmTypeHandle==NULL 
+                || vmTypeHandle>(void*)-100
+                || ((POINTER_SIZE_INT)vmTypeHandle&0x3)!=0 ) {
+            return NULL;
+        }
+        return getObjectType(vmTypeHandle, isCompressed);
+    }
 
 private:
     MemoryManager& memManager;
@@ -837,11 +855,13 @@ private:
     ValueType     typedReference;
     ObjectType*   theSystemStringType;
     ObjectType*   theSystemObjectType;
+    ObjectType*   theSystemClassType;
     Type          nullObjectType;
     Type          offsetType;
     Type          offsetPlusHeapbaseType;
     ObjectType*   compressedSystemStringType;
     ObjectType*   compressedSystemObjectType;
+    ObjectType*   compressedSystemClassType;
     Type          compressedNullObjectType;
     // hashtable for user-defined object and value types
     PtrHashTable<NamedType>        userValueTypes;
@@ -878,6 +898,7 @@ public:
     //
     virtual void*       getBuiltinValueTypeVMTypeHandle(Type::Tag) = 0;
     virtual void*       getSystemObjectVMTypeHandle() = 0;
+    virtual void*       getSystemClassVMTypeHandle() = 0;
     virtual void*       getSystemStringVMTypeHandle() = 0;
     virtual void*       getArrayVMTypeHandle(void* elemVMTypeHandle,bool isUnboxed) = 0;
     virtual const char* getTypeName(void* vmTypeHandle) = 0;
@@ -886,7 +907,7 @@ public:
     virtual const char* getMethodName(MethodDesc*) = 0;
     virtual void*       getArrayElemVMTypeHandle(void* vmTypeHandle) = 0;
     virtual bool        isArrayType(void* vmTypeHandle) = 0;
-    virtual bool        isArrayOfUnboxedElements(void* vmTypeHandle) = 0;
+    virtual bool        isArrayOfPrimitiveElements(void* vmTypeHandle) = 0;
     virtual bool        isEnumType(void* vmTypeHandle) = 0;
     virtual bool        isValueType(void* vmTypeHandle) = 0;
     virtual bool        isFinalType(void* vmTypeHandle) = 0;
@@ -895,7 +916,9 @@ public:
     virtual bool        isAbstractType(void* vmTypeHandle) = 0;
     virtual bool        isSystemStringType(void* vmTypeHandle) = 0;
     virtual bool        isSystemObjectType(void* vmTypeHandle) = 0;
+    virtual bool        isSystemClassType(void* vmTypeHandle) = 0;
     virtual bool        needsInitialization(void* vmTypeHandle) = 0;
+    virtual bool        isFinalizable(void* vmTypeHandle) = 0;
     virtual bool        isBeforeFieldInit(void* vmTypeHandle) = 0;
     virtual bool        isInitialized(void* vmTypeHandle) = 0;
     virtual bool        isVariableSizeType(void* vmTypeHandle) = 0;
@@ -915,7 +938,7 @@ public:
 
     virtual uint32      getVTableOffset() = 0;
     virtual void*       getTypeHandleFromAllocationHandle(void* vmAllocationHandle) = 0;
-	
+    
 };
 
 } //namespace Jitrino 

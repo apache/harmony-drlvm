@@ -34,7 +34,7 @@
 #endif
 
 #define ESTIMATED_LIR_SIZE_PER_HIR 0x3
-#define ESTIMATED_HIR_SIZE_PER_BYTECODE 0x6
+#define ESTIMATED_HIR_SIZE_PER_BYTECODE 0x8
 
 namespace Jitrino {
 
@@ -58,6 +58,9 @@ void addContainerHandler(void* contHandler, const char* name, MethodDesc* meth);
 void removeContainerHandler(const char* name, MethodDesc* meth);
 void* getContainerHandler(const char* name, MethodDesc* meth);
 bool isContainerHandlerExist(const char* name, MethodDesc* meth);
+
+void incVectorHandlerSize(const char* name, MethodDesc* meth, size_t incSize);
+uint64 getVectorSize(const char* name, MethodDesc* meth);
 
 uint64 getMapHandlerSize(const char* name, MethodDesc* meth);
 

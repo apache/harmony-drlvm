@@ -31,12 +31,12 @@ public class Reflection {
         reflectAccessor = accessor;
     }
     
-    public static Constructor copyConstructor(Constructor c) {
+    public static <T> Constructor<T> copyConstructor(Constructor<T> c) {
         return reflectAccessor.copyConstructor(c);
     }
 
-    public static Constructor[] copyConstructors(Constructor[] cs) {
-        Constructor[] ret = new Constructor[cs.length];
+    public static <T> Constructor<T>[] copyConstructors(Constructor<T>[] cs) {
+        Constructor<T>[] ret = new Constructor[cs.length];
         for (int i = 0; i < cs.length; i++) {
             ret[i] = reflectAccessor.copyConstructor(cs[i]);
         }
@@ -75,4 +75,10 @@ public class Reflection {
         reflectAccessor.checkMemberAccess(callerClass, declarinClass,
                                           runtimeClass, memberModifiers);
     }
+    
+    public static Method[] mergePublicMethods(Method[] declared, 
+            Method[] superPublic, Method[][] intf, int estimate) {
+        return reflectAccessor.mergePublicMethods(declared, superPublic, intf, estimate);
+    }
+
 }

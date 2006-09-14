@@ -13,9 +13,10 @@
  *  See the License for the specific language governing permissions and
  *  limitations under the License.
  */
+
 /** 
  * @author Evgueni Brevnov
- * @version $Revision: 1.1.2.1.4.3 $
+ * @version $Revision$
  */  
 
 #ifndef _M2N_EM64T_INTERNAL_H_
@@ -29,6 +30,8 @@
 #include "m2n.h"
 #include "open/types.h"
 #include "encoder.h"
+
+const unsigned m2n_sizeof_m2n_frame = 96;
 
 typedef struct M2nFrame M2nFrame;
 
@@ -65,19 +68,23 @@ struct M2nFrame {
 /**
  * returns size of m2n frame in bytes
  */
-inline const size_t get_size_of_m2n() {
-    // omit regs & rip 
+inline size_t m2n_get_size() {
+    // omit regs
     return sizeof(M2nFrame) - 16;
 }
 
-// Generate code to put the thread local storage pointer into a given register
-// It destroys outputs.
-char * m2n_gen_ts_to_register(char * buf, const R_Opnd * reg, unsigned num_callee_saves,
-                              unsigned num_std_need_to_save, unsigned num_ret_need_to_save,
-                              bool use_callee_saves);
+/**
+ * Generate code to put the thread local storage pointer into a given register.
+ * It destroys outputs.
+ */
+char * m2n_gen_ts_to_register(char * buf, const R_Opnd * reg,
+                              unsigned num_callee_saves_used, unsigned num_callee_saves_max,
+                              unsigned num_std_need_to_save, unsigned num_ret_need_to_save);
 
-// Generate code to set the local handles of an M2nFrame
-// The M2nFrame is located bytes_to_m2n above rsp, and src_reg has the address of the frames.
+/**
+ * Generate code to set the local handles of an M2nFrame.
+ * The M2nFrame is located bytes_to_m2n above rsp, and src_reg has the address of the frames.
+ */
 char * m2n_gen_set_local_handles_r(char * buf, unsigned bytes_to_m2n, const R_Opnd * src_reg);
 char * m2n_gen_set_local_handles_imm(char * buf, unsigned bytes_to_m2n, const Imm_Opnd * imm);
 
@@ -88,19 +95,27 @@ char * m2n_gen_set_local_handles_imm(char * buf, unsigned bytes_to_m2n, const Im
  * The order for callee saves is r12, r13, r14, r15, rbp, rbx.
  * It destroys returns (rax) and outputs.
  * After the sequence, rsp points to the M2nFrame.
- * handles: indicates whether the stub will want local handles or not
- * bytes_to_m2n: number of bytes to the  beginning of m2n frame relative to the current rsp value.
- *     negative value means that current rsp is above m2n bottom
+ *
+ * @param handles Indicates whether the stub will want local handles or not
+ * @param bytes_to_m2n_top Number of bytes to the  beginning of m2n frame relative to the current rsp value.
+                           Negative value means that current rsp is above m2n bottom.
  */
 char * m2n_gen_push_m2n(char * buf, Method_Handle method, frame_type current_frame_type, bool handles,
-                        unsigned num_callee_saves, unsigned num_std_need_to_save, int32 bytes_to_m2n);
+                        unsigned num_callee_saves, unsigned num_std_need_to_save, int32 bytes_to_m2n_top);
 
-// Generate code to pop an M2nFrame off the stack.
-// num_callee_saves: the number of callee saves registers to leave on the stack as at the entry to push_m2n.
-// bytes_to_m2n: the number of bytes between rsp and the bottom of the M2nFrame.
-// preserve_ret: the number of return registers to preserve, 0 means none, 1 means rax, 2 means rax & rdx.
-// handles: as for push_m2n, frees the handles if true.
+/**
+ * Generate code to pop an M2nFrame off the stack.
+ * @param num_callee_saves Number of callee saves registers to leave
+ *                         on the stack as at the entry to push_m2n.
+ * @param bytes_to_m2n_bottom Number of bytes between rsp and the bottom of the M2nFrame.
+ * @param preserve_ret Number of return registers to preserve, 0 means none,
+ *                     1 means rax, 2 means rax & rdx.
+ * @param handles As for push_m2n, frees the handles if true.
+ */
 char * m2n_gen_pop_m2n(char * buf, bool handles, unsigned num_callee_saves,
-                       unsigned bytes_to_m2n, unsigned preserve_ret);
+                       int32 bytes_to_m2n_bottom, unsigned preserve_ret);
+
+// returns top of the specified frame on the stack (it should point to return ip)
+void * m2n_get_frame_base(M2nFrame *);
 
 #endif // _M2N_EM64T_INTERNAL_H_

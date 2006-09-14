@@ -24,17 +24,16 @@
 #include "Ia32CodeSelector.h"
 #include "Ia32CFG.h"
 #include "Ia32InstCodeSelector.h"
+#include "EMInterface.h"
+#include "XTimer.h"
+
 namespace Jitrino
 {
 namespace Ia32{
 
-Timer *		MethodCodeSelector::selectionTimer=NULL;
-Timer *		MethodCodeSelector::blockMergingTimer=NULL;
-Timer *		MethodCodeSelector::fixNodeInfoTimer=NULL;
-Timer *		MethodCodeSelector::varTimer=NULL;
-
-Timer *		CfgCodeSelector::instTimer=NULL;
-Timer *		CfgCodeSelector::blockTimer=NULL;
+CountTime     selectionTimer("ia32::selector::selection");
+CountTime     blockMergingTimer("ia32::selector::blockMerging");
+CountTime     fixNodeInfoTimer("ia32::selector::fixNodeInfo");
 
 
 //_______________________________________________________________________________________________________________
@@ -46,12 +45,12 @@ Timer *		CfgCodeSelector::blockTimer=NULL;
 //_______________________________________________________________________________________________
 /**  Construct CFG builder */
 
-CfgCodeSelector::CfgCodeSelector(CompilationInterface&		compIntfc,
-											MethodCodeSelector& methodCodeSel,
-											MemoryManager&			codeSelectorMM, 
-											uint32					nNodes, 
-											IRManager&			irM
-										)
+CfgCodeSelector::CfgCodeSelector(CompilationInterface&      compIntfc,
+                                            MethodCodeSelector& methodCodeSel,
+                                            MemoryManager&          codeSelectorMM, 
+                                            uint32                  nNodes, 
+                                            IRManager&          irM
+                                        )
     : numNodes(nNodes), nextNodeId(0), compilationInterface(compIntfc), methodCodeSelector(methodCodeSel),
       irMemManager(irM.getMemoryManager()), 
       codeSelectorMemManager(codeSelectorMM),  irManager(irM),
@@ -78,7 +77,9 @@ uint32 CfgCodeSelector::genDispatchNode(uint32 numInEdges,uint32 numOutEdges, do
 {
     assert(nextNodeId < numNodes);
     uint32 nodeId = nextNodeId++;
-    nodes[nodeId] = irManager.newDispatchNode(cnt);
+    Node* node = irManager.getFlowGraph()->createDispatchNode();
+    node->setExecCount(cnt);
+    nodes[nodeId] = node;
     hasDispatchNodes = true;
     return nodeId;
 }
@@ -94,30 +95,29 @@ uint32 CfgCodeSelector::genBlock(uint32              numInEdges,
 {
     assert(nextNodeId < numNodes);
     uint32 nodeId = nextNodeId++;
-    BasicBlock *bb = irManager.newBasicBlock(cnt);
+    Node* bb = irManager.getFlowGraph()->createBlockNode();
+    bb->setExecCount(cnt);
     nodes[nodeId] = bb;
     InstCodeSelector instCodeSelector(compilationInterface, *this, irManager, bb);
     currBlock = bb;
-	{ 
-//		PhaseTimer tm(instTimer, "ia32::selector::blocks::insts");
-		codeSelector.genCode(instCodeSelector);
-	}
+    { 
+        codeSelector.genCode(instCodeSelector);
+    }
 
-	currBlock = NULL;
+    currBlock = NULL;
     //  Set prolog or epilog node
     switch (blockKind) {
     case Prolog:
         {
         //  Copy execution count into IA32 CFG prolog node and
         //  create an edge from IA32 CFG prolog node to optimizer's prolog node
-		BasicBlock * prolog = irManager.getPrologNode();
-        prolog->setExecCnt(cnt);
-        irManager.newFallThroughEdge(prolog,bb,1.0);
+        Node* prolog = irManager.getFlowGraph()->getEntryNode();
+        prolog->setExecCount(cnt);
+        irManager.getFlowGraph()->addEdge(prolog, bb, 1.0);
         break;
         }
     case Epilog:
         {
-        //irManager.newEdge(bb, irManager.getExitNode(), 1.0);
         assert(bb->isEmpty());
         break;
         }
@@ -137,9 +137,9 @@ uint32 CfgCodeSelector::genBlock(uint32              numInEdges,
 
 //_______________________________________________________________________________________________
 /**
-	Create unwind node.
-	This is a temporary node that exists only during code selection.
-	We create it using code selector memory manager and insert it into its own CFG.
+    Create unwind node.
+    This is a temporary node that exists only during code selection.
+    We create it using code selector memory manager and insert it into its own CFG.
 */
 
 uint32  CfgCodeSelector::genUnwindNode(uint32 numInEdges, 
@@ -148,7 +148,11 @@ uint32  CfgCodeSelector::genUnwindNode(uint32 numInEdges,
 {
     assert(nextNodeId < numNodes);
     uint32 nodeId = nextNodeId++;
-    nodes[nodeId] = irManager.newUnwindNode(cnt);
+    ControlFlowGraph* fg = irManager.getFlowGraph();
+    Node* unwindNode = fg->createDispatchNode();
+    fg->setUnwindNode(unwindNode);
+    unwindNode->setExecCount(cnt);
+    nodes[nodeId] = unwindNode;
     return nodeId;
 }
 
@@ -159,24 +163,29 @@ uint32 CfgCodeSelector::genExitNode(uint32 numInEdges, double cnt)
 {
     assert(nextNodeId < numNodes);
     uint32 nodeId = nextNodeId++;
-    nodes[nodeId] = irManager.getExitNode();
+    ControlFlowGraph* fg = irManager.getFlowGraph();
+    Node* exitNode = fg->createExitNode();
+    exitNode->setExecCount(cnt);
+    fg->setExitNode(exitNode);
+    nodes[nodeId] = exitNode;
     return nodeId;
 }
 
 //_______________________________________________________________________________________________
 /**  Create a block for a switch statement */
 
-void CfgCodeSelector::genSwitchBlock(BasicBlock *originalBlock,
+void CfgCodeSelector::genSwitchBlock(Node *originalBlock,
                                         uint32         numTargets, 
                                         Opnd *      switchSrc) 
 {
-    BasicBlock *bb = irManager.newBasicBlock(originalBlock->getExecCnt());
+    Node *bb = irManager.getFlowGraph()->createBlockNode();
+    bb->setExecCount(originalBlock->getExecCount());
     InstCodeSelector instSelector(compilationInterface, *this, irManager, bb);
-	{ 
-		instSelector.genSwitchDispatch(numTargets,switchSrc);
-	}
+    { 
+        instSelector.genSwitchDispatch(numTargets,switchSrc);
+    }
     // Create an edge from the original block to bb
-    irManager.newFallThroughEdge(originalBlock,bb,1.0);
+    genFalseEdge(originalBlock, bb, 1.0);
 }
 
 //_______________________________________________________________________________________________
@@ -184,11 +193,20 @@ void CfgCodeSelector::genSwitchBlock(BasicBlock *originalBlock,
 
 void CfgCodeSelector::genTrueEdge(uint32 tailNodeId,uint32 headNodeId, double prob) 
 {
-	assert(nodes[tailNodeId]->hasKind(Node::Kind_BasicBlock));
-    assert(nodes[headNodeId]->hasKind(Node::Kind_BasicBlock));
-    BasicBlock * tailBlock = (BasicBlock *)nodes[tailNodeId];
-    BasicBlock * headBlock = (BasicBlock *)nodes[headNodeId];
-    irManager.newDirectBranchEdge(tailBlock, headBlock, prob);
+    Node* tailNode= nodes[tailNodeId];
+    Node * headNode = nodes[headNodeId];
+    genTrueEdge(tailNode, headNode, prob);
+}
+
+void CfgCodeSelector::genTrueEdge(Node* tailNode, Node* headNode, double prob) {
+    assert(tailNode->isBlockNode() && headNode->isBlockNode());
+
+    Inst* inst = (Inst*)tailNode->getLastInst();
+    assert(inst!=NULL && inst->hasKind(Inst::Kind_BranchInst));
+    BranchInst* br = (BranchInst*)inst;
+    br->setTrueTarget(headNode);
+
+    irManager.getFlowGraph()->addEdge(tailNode, headNode, prob);
 }
 
 //_______________________________________________________________________________________________
@@ -196,9 +214,20 @@ void CfgCodeSelector::genTrueEdge(uint32 tailNodeId,uint32 headNodeId, double pr
 
 void CfgCodeSelector::genFalseEdge(uint32 tailNodeId,uint32 headNodeId, double prob) 
 {
-    assert(nodes[tailNodeId]->hasKind(Node::Kind_BasicBlock));
-    assert(nodes[headNodeId]->hasKind(Node::Kind_BasicBlock));
-    irManager.newFallThroughEdge((BasicBlock*)nodes[tailNodeId], (BasicBlock*)nodes[headNodeId], prob);
+    Node* tailNode = nodes[tailNodeId];
+    Node* headNode = nodes[headNodeId];
+    genFalseEdge(tailNode, headNode, prob);
+}    
+
+void CfgCodeSelector::genFalseEdge(Node* tailNode,Node* headNode, double prob) {
+    assert(tailNode->isBlockNode() && headNode->isBlockNode());
+
+    Inst* inst = (Inst*)tailNode->getLastInst();
+    assert(inst!=NULL && inst->hasKind(Inst::Kind_BranchInst));
+    BranchInst* br = (BranchInst*)inst;
+    br->setFalseTarget(headNode);
+
+    irManager.getFlowGraph()->addEdge(tailNode, headNode, prob);
 }
 
 //_______________________________________________________________________________________________
@@ -208,13 +237,16 @@ void CfgCodeSelector::genUnconditionalEdge(uint32 tailNodeId,uint32 headNodeId, 
 {
     Node * tailNode = nodes[tailNodeId];
     Node * headNode = nodes[headNodeId];
-    assert(tailNode->hasKind(Node::Kind_BasicBlock));
-    assert(headNode->hasKind(Node::Kind_BasicBlock) || headNode == irManager.getExitNode());
-	if (headNode == irManager.getExitNode()){
-		irManager.newEdge(tailNode, headNode, 1.0);
-	}else{
-		irManager.newFallThroughEdge((BasicBlock*)tailNode,(BasicBlock*)headNode, prob);
-	}
+    assert(tailNode->isBlockNode());
+    assert(headNode->isBlockNode() || headNode == irManager.getFlowGraph()->getExitNode());
+    Inst* lastInst = (Inst*)tailNode->getLastInst();
+    if (lastInst!=NULL && lastInst->hasKind(Inst::Kind_BranchInst)) {
+        BranchInst* br = (BranchInst*)lastInst;
+        assert(br->getTrueTarget() != NULL);
+        assert(br->getFalseTarget() == NULL);
+        br->setFalseTarget(headNode);
+    }
+    irManager.getFlowGraph()->addEdge(tailNode, headNode, prob);
 }
 
 //_______________________________________________________________________________________________
@@ -224,8 +256,8 @@ void CfgCodeSelector::genSwitchEdges(uint32 tailNodeId, uint32 numTargets,
                                         uint32 *targets, double *probs, 
                                         uint32 defaultTarget) 
 {
-	// 
-	//  Switch structure:
+    // 
+    //  Switch structure:
     //                              
     //      origBlock                                       switchBlock
     //     ===========                  Fallthrough        =============          
@@ -234,15 +266,14 @@ void CfgCodeSelector::genSwitchEdges(uint32 tailNodeId, uint32 numTargets,
     //         jmp defaultTarget                            
     //  
     Node * origBlock = nodes[tailNodeId];
-	const Edges& outEdges=origBlock->getEdges(Direction_Out);
-    assert(outEdges.getCount() == 1);
-    Node * switchNode = outEdges.getFirst()->getNode(Direction_Head);
-	assert(switchNode->hasKind(Node::Kind_BasicBlock));
-    BasicBlock * switchBlock = (BasicBlock *)switchNode;
-	assert(switchBlock->getInsts().getLast()->hasKind(Inst::Kind_SwitchInst));
-    SwitchInst * swInst = (SwitchInst *)switchBlock->getInsts().getLast();
+    const Edges& outEdges=origBlock->getOutEdges();
+    assert(outEdges.size() == 1);
+    Node * switchBlock= outEdges.front()->getTargetNode();
+    assert(switchBlock->isBlockNode());
+    assert(((Inst*)switchBlock->getLastInst())->hasKind(Inst::Kind_SwitchInst));
+    SwitchInst * swInst = (SwitchInst *)switchBlock->getLastInst();
 
-	double    defaultEdgeProb = 1.0;
+    double    defaultEdgeProb = 1.0;
     defaultEdgeProb = 1.0;
     for (uint32 i = 0; i < numTargets; i++) {
         uint32 targetId = targets[i];
@@ -253,27 +284,28 @@ void CfgCodeSelector::genSwitchEdges(uint32 tailNodeId, uint32 numTargets,
         if (std::find(targets, targets+i, targetId)!=targets+i) {
             continue; //repeated target
         }
-        if (probs[i] == EdgeProbValue_Unknown) {
-            defaultEdgeProb = EdgeProbValue_Unknown;
+        if (probs[i] < 0) {
+            defaultEdgeProb = 0;
             break;
         } 
         defaultEdgeProb -= 1.0/(numTargets+1);
     }
 
-	genTrueEdge(tailNodeId, defaultTarget, defaultEdgeProb);
+    genTrueEdge(tailNodeId, defaultTarget, defaultEdgeProb);
+
     //  Fix probability of fallthrough edge
-    if (defaultEdgeProb!=EdgeProbValue_Unknown) {
-        origBlock->getEdges(Direction_Out).getFirst()->setProbability(1.0 - defaultEdgeProb);
+    if (defaultEdgeProb!=0) {
+        origBlock->getOutEdges().front()->setEdgeProb(1.0 - defaultEdgeProb);
     }
     //  Generate edges from switchBlock to switch targets
     for (uint32 i = 0; i < numTargets; i++) {
         Node * targetNode = nodes[targets[i]];
         // Avoid generating duplicate edges. Jump table however needs all entries
-        if (! switchBlock->isConnectedTo(Direction_Out, targetNode)) 
-            irManager.newEdge(switchBlock, targetNode, probs[i]);
-        assert(targetNode->hasKind(Node::Kind_BasicBlock));
-        swInst->setTarget(i, (BasicBlock *)targetNode);
-	}
+        if (! switchBlock->isConnectedTo(true, targetNode)) {
+            irManager.getFlowGraph()->addEdge(switchBlock, targetNode, probs[i]);
+        }
+        swInst->setTarget(i, targetNode);
+    }
 }
 
 //_______________________________________________________________________________________________
@@ -283,8 +315,8 @@ void CfgCodeSelector::genExceptionEdge(uint32 tailNodeId, uint32 headNodeId, dou
 {
     Node * headNode = nodes[headNodeId];
     Node * tailNode = nodes[tailNodeId];
-	assert(headNode->hasKind(Node::Kind_DispatchNode) || headNode->hasKind(Node::Kind_UnwindNode) ); 
-    irManager.newEdge(tailNode, headNode, prob);
+    assert(headNode->isDispatchNode() || headNode->isExitNode()); 
+    irManager.getFlowGraph()->addEdge(tailNode, headNode, prob);
 }
 
 //_______________________________________________________________________________________________
@@ -298,38 +330,13 @@ void CfgCodeSelector::genCatchEdge(uint32 tailNodeId,
 {
     Node * headNode = nodes[headNodeId];
     Node * tailNode = nodes[tailNodeId];
-    assert(tailNode->hasKind(Node::Kind_DispatchNode));
-    assert(headNode->hasKind(Node::Kind_BasicBlock));
-    irManager.newCatchEdge((DispatchNode*)tailNode, (BasicBlock*)headNode, exceptionType, priority, prob);
+    assert(tailNode->isDispatchNode());
+    assert(headNode->isBlockNode());
+    CatchEdge* edge = (CatchEdge*)irManager.getFlowGraph()->addEdge(tailNode, headNode, prob);
+    edge->setType(exceptionType);
+    edge->setPriority(priority);
 }
 
-//_______________________________________________________________________________________________
-/**  Create an edge to the exit node */
-
-void CfgCodeSelector::genExitEdge(uint32 tailNodeId,
-                                     uint32 headNodeId,
-                                     double prob) 
-{
-    Node * headNode = nodes[headNodeId];
-    Node * tailNode = nodes[tailNodeId];
-    assert(headNode == irManager.getExitNode());
-    if (tailNode!=irManager.getUnwindNode()) { // unwind->exit edge is auto-generated 
-        irManager.newEdge(tailNode, headNode, prob);
-    }
-}
-
-//_______________________________________________________________________________________________
-/**  Set node loop info */
-
-void CfgCodeSelector::setLoopInfo(uint32 nodeId, 
-                                     bool   isLoopHeader, 
-                                     bool   hasContainingLoopHeader, 
-                                     uint32 headerId) 
-{
-    Node * node = nodes[nodeId];
-    Node * header = hasContainingLoopHeader ? nodes[headerId] : NULL;
-    node->setLoopInfo(isLoopHeader,header);
-}
 
 //_______________________________________________________________________________________________
 /**  Cfg code selector is notified that method contains calls */
@@ -350,8 +357,8 @@ void CfgCodeSelector::methodHasCalls(bool nonExceptionCall)
 //_______________________________________________________________________________________________
 uint32 VarGenerator::defVar(Type* varType, bool isAddressTaken, bool isPinned) 
 {
-	Opnd * opnd=irManager.newOpnd(varType);
-	return opnd->getId(); 
+    Opnd * opnd=irManager.newOpnd(varType);
+    return opnd->getId(); 
 }
 
 //_______________________________________________________________________________________________
@@ -384,51 +391,57 @@ void MethodCodeSelector::updateRegUsage()
 }
 
 //_______________________________________________________________________________________________
-/** Set loop info, persistent ids, and others for nodes that exist only in the code generator CFG */
+/** Set persistent ids, and others for nodes that exist only in the code generator CFG */
 
 void CfgCodeSelector::fixNodeInfo() 
 {
-// connect throw nodes added during inst code selection to corresponding dispatch or unwind nodes
-	for (CFG::NodeIterator it(irManager); it!=NULL; ++it){
-		Node * node=it;
-		if (node->hasKind(Node::Kind_BasicBlock)){
-			BasicBlock * bb=(BasicBlock*)node;
+    ControlFlowGraph* fg = irManager.getFlowGraph();
+    const Nodes& nodes = fg->getNodes();
+    for (Nodes::const_iterator it = nodes.begin(), end = nodes.end(); it!=end; ++it) {
+        Node* node = *it;
+        // connect throw nodes added during inst code selection to corresponding dispatch or unwind nodes
+        if (node->isBlockNode()){
+            Inst * lastInst = (Inst*)node->getLastInst();
+            if (lastInst) {
+                Inst * prevInst = lastInst->getPrevInst();
+                if(prevInst && prevInst->getKind() == Inst::Kind_BranchInst) {
+                    Edge * ftEdge = node->getFalseEdge();
+                    Edge * dbEdge = node->getTrueEdge();
+                    assert(ftEdge && dbEdge);
 
-			const Insts & insts = bb->getInsts();
-			Inst * lastInst = insts.getLast();
-			if (lastInst) {
-				Inst * prevInst = insts.getPrev(lastInst);
-				if(prevInst && prevInst->getKind() == Inst::Kind_BranchInst) {
-					Edge * ftEdge = bb->getFallThroughEdge();
-					Edge * dbEdge = bb->getDirectBranchEdge();
-					if (ftEdge && dbEdge) {
-						BasicBlock * newBB = irManager.newBasicBlock(0);
-						BasicBlock * nextFT = (BasicBlock *)ftEdge->getNode(Direction_Head);
-						irManager.removeEdge(ftEdge);
-						irManager.newFallThroughEdge(newBB, nextFT, 0.001);
-						newBB->appendInsts(irManager.newBranchInst(lastInst->getMnemonic()));
-						bb->removeInst(lastInst);
-						BasicBlock * nextDB = (BasicBlock *)dbEdge->getNode(Direction_Head);
-						irManager.removeEdge(dbEdge);
-						irManager.newDirectBranchEdge(bb, nextDB, 0.001);
-						irManager.newDirectBranchEdge(newBB, nextDB, 0.001);
-						irManager.newFallThroughEdge(bb, newBB, 0.001);
-					} else {
-						assert(0);
-					}
-				}
-			}
-			if (bb->getEdges(Direction_Out).getCount()==0){ // throw node
-				assert(bb->getEdges(Direction_In).getCount()==1);
-				BasicBlock * bbIn=(BasicBlock*)bb->getNode(Direction_In, Node::Kind_BasicBlock);
-				assert(bbIn!=NULL);
-				Node * target=bbIn->getNode(Direction_Out, (Node::Kind)(Node::Kind_DispatchNode|Node::Kind_UnwindNode));
-				assert(target!=NULL);
-				irManager.newEdge(bb, target, 1.0);
-			}
-		}
-	}
-	irManager.updateLoopInfo();
+                    Node* newBB =  fg->createBlockNode();
+                    Node* nextFT =  ftEdge->getTargetNode();
+                    Node* nextDB = dbEdge->getTargetNode();
+
+                    fg->removeEdge(ftEdge);
+                    fg->removeEdge(dbEdge);
+
+                    newBB->appendInst(irManager.newBranchInst(lastInst->getMnemonic(), nextDB, nextFT));
+                    lastInst->unlink();
+
+                    //now fix prev branch successors
+                    BranchInst* prevBranch = (BranchInst*)prevInst;
+                    assert(prevBranch->getTrueTarget() == NULL && prevBranch->getFalseTarget() == NULL);
+                    prevBranch->setTrueTarget(nextDB);
+                    prevBranch->setFalseTarget(newBB);
+              
+                    
+                    fg->addEdge(node, nextDB, 0);
+                    fg->addEdge(node, newBB, 0);
+                    fg->addEdge(newBB, nextDB, 0); 
+                    fg->addEdge(newBB, nextFT, 0);
+                }
+            }
+            if (node->getOutDegree() == 0){ // throw node
+                assert(node->getInDegree()==1);
+                Node* bbIn = node->getInEdges().front()->getSourceNode();
+                assert(bbIn!=NULL);
+                Node * target=bbIn->getExceptionEdgeTarget();
+                assert(target!=NULL);
+                fg->addEdge(node, target, 1.0);
+            }
+        }
+    }
 }
 
 //_______________________________________________________________________________________________
@@ -441,31 +454,53 @@ void MethodCodeSelector::genHeapBase()
 //_______________________________________________________________________________________________
 /** Generate control flow graph */
 
+MethodCodeSelector::MethodCodeSelector(CompilationInterface& compIntfc,
+                   MemoryManager&          irMM,
+                   MemoryManager&          codeSelectorMM,
+                   IRManager&              irM,
+                   bool                    slowLoadString)
+: compilationInterface(compIntfc),
+irMemManager(irMM), codeSelectorMemManager(codeSelectorMM),
+irManager(irM),
+methodDesc(NULL),
+edgeProfile(NULL),
+slowLdString(slowLoadString)
+{  
+    ProfilingInterface* pi = irManager.getProfilingInterface();
+    if (pi!=NULL && pi->isProfilingEnabled(ProfileType_Edge, JITProfilingRole_GEN)) {
+        edgeProfile = pi->getEdgeMethodProfile(irMM, irM.getMethodDesc(), JITProfilingRole_GEN);
+    }
+
+}
+
+
 void MethodCodeSelector::genCFG(uint32 numNodes, CFGCodeSelector& codeSelector, 
                                    bool useEdgeProfile) 
 {
-	irManager.setHasEdgeProfile(useEdgeProfile);
+    ControlFlowGraph* fg = irManager.getFlowGraph();
+    fg->setEdgeProfile(useEdgeProfile);
 
     CfgCodeSelector cfgCodeSelector(compilationInterface, *this,
-						codeSelectorMemManager,numNodes,
-						irManager);
-	{ 
-		PhaseTimer tm(selectionTimer, "ia32::selector::selection"); 
-		if( NULL == irManager.getEntryPointInst() ) {
-			irManager.newEntryPointPseudoInst( irManager.getDefaultManagedCallingConvention() );
-		}
-		codeSelector.genCode(cfgCodeSelector);
-	}
-	{
-		PhaseTimer tm(fixNodeInfoTimer, "ia32::selector::fixNodeInfo"); 
-		irManager.expandSystemExceptions(0);
-		cfgCodeSelector.fixNodeInfo();
-	}
-	{
-		PhaseTimer tm(blockMergingTimer, "ia32::selector::blockMerging"); 
-		irManager.mergeSequentialBlocks();
-		irManager.purgeEmptyBlocks();
-	}
+                        codeSelectorMemManager,numNodes,
+                        irManager);
+    { 
+        AutoTimer tm(selectionTimer); 
+        if( NULL == irManager.getEntryPointInst() ) {
+            irManager.newEntryPointPseudoInst( irManager.getDefaultManagedCallingConvention() );
+        }
+        codeSelector.genCode(cfgCodeSelector);
+    }
+    {
+        AutoTimer tm(fixNodeInfoTimer); 
+        irManager.expandSystemExceptions(0);
+        cfgCodeSelector.fixNodeInfo();
+    }
+    {
+        AutoTimer tm(blockMergingTimer); 
+        fg->purgeEmptyNodes(false, true);
+        fg->mergeAdjacentNodes(true, false);
+        fg->purgeUnreachableNodes();
+    }
 }
 
 //_______________________________________________________________________________________________

@@ -13,10 +13,10 @@
  *  See the License for the specific language governing permissions and
  *  limitations under the License.
  */
-/** 
+/**
  * @author Pavel Pervov
  * @version $Revision: 1.1.2.7.2.1.2.5 $
- */  
+ */
 #ifndef _CLASS_H_
 #define _CLASS_H_
 /**
@@ -70,7 +70,7 @@ union Const_Java_Value {
     double d;
     String *string;
     void *object;
-    Const_Java_Value() {l.lo_bytes=l.hi_bytes=0;}
+    //Const_Java_Value() {l.lo_bytes=l.hi_bytes=0;}
 };
 
 
@@ -120,6 +120,49 @@ VMEXPORT ManagedObject        *get_raw_reference_pointer(ManagedObject **slot_ad
 
 
 ///////////////////////////////////////////////////////////////////////////////
+// class file attributes
+///////////////////////////////////////////////////////////////////////////////
+enum Attributes {
+    ATTR_SourceFile,            // Class (no more than 1 in each class file)
+    ATTR_InnerClasses,          // Class
+    ATTR_ConstantValue,         // Field (no more than 1 for each field)
+    ATTR_Code,                  // Method
+    ATTR_Exceptions,            // Method
+    ATTR_LineNumberTable,       // Code
+    ATTR_LocalVariableTable,    // Code
+    ATTR_Synthetic,             // Class/Field/Method
+    ATTR_Deprecated,            // Class/Field/Method
+    ATTR_SourceDebugExtension,  // Class (no more than 1 in each class file)
+    ATTR_Signature,             // Class/Field/Method (spec does not limit number???)
+    ATTR_EnclosingMethod,       // Class (1 at most)
+    ATTR_LocalVariableTypeTable,    // Code
+    ATTR_RuntimeVisibleAnnotations,             // Class/Field/Method (at most 1 per entity)
+    ATTR_RuntimeInvisibleAnnotations,           // Class/Field/Method
+    ATTR_RuntimeVisibleParameterAnnotations,    // Method
+    ATTR_RuntimeInvisibleParameterAnnotations,  // Method
+    ATTR_AnnotationDefault,     // Method (spec does not limit number???)
+    N_ATTR,
+    ATTR_UNDEF,
+    ATTR_ERROR
+};
+
+#define N_COMMON_ATTR    5
+#define N_FIELD_ATTR    1
+#define N_METHOD_ATTR   5
+#define N_CODE_ATTR     3
+#define N_CLASS_ATTR    4
+
+//
+// magic number, and major/minor version numbers of class file
+//
+#define CLASSFILE_MAGIC 0xCAFEBABE
+#define CLASSFILE_MAJOR 45
+// Supported class files up to this version
+#define CLASSFILE_MAJOR_MAX 49
+#define CLASSFILE_MINOR 3
+
+
+///////////////////////////////////////////////////////////////////////////////
 // Constant pool entries.
 ///////////////////////////////////////////////////////////////////////////////
 
@@ -160,7 +203,7 @@ union Const_Pool {
     uint32      int_value;          // CONSTANT_Integer
     float       float_value;        // CONSTANT_Float
     struct {
-        uint32 low_bytes;   // each Const_Pool element is 64bit in this case 
+        uint32 low_bytes;   // each Const_Pool element is 64bit in this case
         uint32 high_bytes;  // we pack all 8 bytes of long/double in one
                             // Const_Pool element (and leave the second
                             // Const_Pool element of the long/double unused)
@@ -177,7 +220,82 @@ union Const_Pool {
     } CONSTANT_Utf8;
 };
 
+enum AnnotationValueType {
+  //  'B', 'C', 'D', 'F', 'I', 'J', 'S', and 'Z' 's' 'e' 'c' '@' '['
+    AVT_BYTE    = 'B',
+    AVT_CHAR    = 'C',
+    AVT_DOUBLE  = 'D',
+    AVT_FLOAT   = 'F',
+    AVT_INT     = 'I',
+    AVT_LONG    = 'J',
+    AVT_SHORT   = 'S',
+    AVT_BOOLEAN = 'Z',
+    AVT_STRING  = 's',
+    AVT_ENUM    = 'e',
+    AVT_CLASS   = 'c',
+    AVT_ANNOTN  = '@',
+    AVT_ARRAY   = '['
+};
 
+struct Annotation; // forward declaration
+
+// element-value pair of an annotation
+struct AnnotationValue {
+    union {
+        Const_Java_Value const_value;
+        String* class_name;
+        Annotation * nested;
+        struct {
+            String* type;
+            String* name;
+        } enum_const;
+        struct {
+            AnnotationValue* items;
+            uint16 length;
+        } array;
+    };
+    AnnotationValueType tag;
+};
+
+struct AnnotationElement {
+    String* name;
+    AnnotationValue value;
+};
+
+struct Annotation {
+    String* type;
+    AnnotationElement* elements;
+    uint16 num_elements;
+};
+
+struct AnnotationTable {
+    uint16 length;
+    Annotation * table[1];
+};
+
+struct Line_Number_Entry {
+    uint16 start_pc;
+    uint16 line_number;
+};
+
+struct Line_Number_Table {
+    uint16 length;
+    Line_Number_Entry table[1];
+};
+
+struct Local_Var_Entry {
+    uint16 start_pc;
+    uint16 length;
+    uint16 index;
+    String* name;
+    String* type;
+    String* generic_type;
+};
+
+struct Local_Var_Table {
+    uint16 length;
+    Local_Var_Entry table[1];
+};
 
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -266,7 +384,7 @@ typedef struct Intfc_Table  {
 #define GC_BYTES_IN_VTABLE (sizeof(void *))
 
 typedef struct VTable {
-    
+
     Byte _gc_private_information[GC_BYTES_IN_VTABLE];
 
     Class           *clss;          // the class - see above before change
@@ -346,7 +464,8 @@ typedef struct Class {
     };
 
     const String * name;   // class name in internal (VM, class-file) format
-    String * java_name;    // class canonical (Java) name
+    //String * java_name;    // class canonical (Java) name
+    String * Signature;    // generic type information (since 1.5)
 
     //
     // See the masks in vm_for_gc.h.
@@ -361,7 +480,7 @@ typedef struct Class {
     unsigned int allocated_size;
 
     unsigned int array_element_size;
- 
+
 
 /////////////////////////////////////////////////////////////////////
 //////// Fields above this point can not be moved without redefining
@@ -426,13 +545,13 @@ typedef struct Class {
     //
     // number of dimensions in array; current VM limitation is 255
     //
-    // Note, that you can derive the base component type of the array 
+    // Note, that you can derive the base component type of the array
     // by looking at name->bytes[n_dimensions].
     //
     unsigned char n_dimensions;
 
     //
-    // for non-primitive arrays only, array_base_class is the base class 
+    // for non-primitive arrays only, array_base_class is the base class
     // of an array
     //
     Class *array_base_class;
@@ -448,10 +567,16 @@ typedef struct Class {
     uint16 n_static_fields;
     uint16 n_methods;
 
-    // for inner class support  
+    // for inner class support
     uint16 declaringclass_index;
+    uint16 enclosing_class_index;
+    uint16 enclosing_method_index;
     uint16 n_innerclasses;
     uint16 *innerclass_indexes;
+
+    // simple name of the class as given in the source code
+    // empty string if anonymous
+    String * simple_name; 
 
     Const_Pool *const_pool; // constant pool array; size is cp_size
     Field   *fields;            // array of fields; size is n_fields
@@ -464,14 +589,15 @@ typedef struct Class {
     //
     Class_Superinterface *superinterfaces;
 
-    const String    *class_file_name;   // string name of file from which 
+    const String    *class_file_name;   // string name of file from which
                                         // this class has been loaded
-    const String    *src_file_name;     // string name of file from which 
+    const String    *src_file_name;     // string name of file from which
                                         // this class has been compiled
     Class_State   state;                // state of this class
 
     Package *package;           // package to which this class belongs
 
+    bool deprecated;
     //
     // the following sizes are all in bytes
     //
@@ -496,15 +622,15 @@ typedef struct Class {
     unsigned char **static_method_block;    // array of pointers to code of
                                             // static methods
 
-    // This is the size of an instance without any alignment padding. 
+    // This is the size of an instance without any alignment padding.
     // It can be used while calculating the field offsets of subclasses.
     // It does not include the OBJECT_HEADER_SIZE but does include the
     // OBJECT_VTABLE_POINTER_SIZE.
     // The allocated_size field will be this field properly aligned.
     unsigned unpadded_instance_data_size;
 
-    // Size of java/lang/Class instances in bytes. This variable is used during bootstrapping to allocate 
-    // the three classes (i.e. Class instances) loaded before java.lang.Class: java.lang.Object, 
+    // Size of java/lang/Class instances in bytes. This variable is used during bootstrapping to allocate
+    // the three classes (i.e. Class instances) loaded before java.lang.Class: java.lang.Object,
     // java.io.Serializable and java.lang.Class.
     //static unsigned sizeof_class_class;
 
@@ -513,11 +639,11 @@ typedef struct Class {
     //
     // The next to high bit is set if allocation needs to consider class_properties.
     // (mumble->instance_data_size & NEXT_TO_HIGH_BIT_CLEAR_MASK) will always return the
-    // actual size of and instance of class mumble. 
+    // actual size of and instance of class mumble.
     // Use get_instance_data_size() to get the actual size of an instance.
     // Use set_instance_data_size_constraint_bit() to set this bit.
 
-    unsigned instance_data_size;    // For most classes the size of a class instance's 
+    unsigned instance_data_size;    // For most classes the size of a class instance's
                                     // data block. This is what is passed to the GC.
                                     // See above for details.
     // ppervov: FIXME: the next two should be joined into a union
@@ -562,7 +688,7 @@ typedef struct Class {
     uint64 num_bytes_allocated;
 #endif
 
-    // Number of "padding" bytes curently added per class instance to its fields to 
+    // Number of "padding" bytes curently added per class instance to its fields to
     // make each field at least 32 bits.
     uint32 num_field_padding_bytes;
 
@@ -571,12 +697,12 @@ typedef struct Class {
     // and the num_field_padding_bytes field will reflect those alignment padding bytes.
     static bool compact_fields;
 
-    // If set true by the "-sort_fields" command line option, the VM will sort fields by size before 
+    // If set true by the "-sort_fields" command line option, the VM will sort fields by size before
     // assigning their offset during class preparation.
     static bool sort_fields;
 
     // Notify JITs whenever this class is extended by calling their JIT_extended_class_callback callback function,
-    Class_Extended_Notification_Record *notify_extended_records;   
+    Class_Extended_Notification_Record *notify_extended_records;
 
     int depth;
     // The field is_suitable_for_fast_instanceof should be 0 if depth==0 or depth>=vm_max_fast_instanceof_depth()
@@ -596,7 +722,7 @@ typedef struct Class {
     static Byte *managed_null;
 
 //#ifdef VM_STATS
-    // 20020923 Total number of allocations and total number of bytes for class-related data structures. 
+    // 20020923 Total number of allocations and total number of bytes for class-related data structures.
     // This includes any rounding added to make each item aligned (current alignment is to the next 16 byte boundary).
     // Might need to make these uint64 for some data structures.
     static unsigned num_statics_allocations;
@@ -621,7 +747,7 @@ typedef struct Class {
 
     // class operations lock
     Lock_Manager* m_lock;
-    
+
     // List of constant pool entries, which resolution had failed
     // Required for fast enumeration of error objects
     Const_Pool* m_failedResolution;
@@ -631,6 +757,8 @@ typedef struct Class {
 
     // verify data
     void *verify_data;
+
+    AnnotationTable * annotations;
 } Class; // typedef struct Class
 
 
@@ -653,6 +781,7 @@ void class_set_error_cause(Class *c, jthrowable exn);
 jthrowable class_get_error_cause(Class *c);
 
 String* class_get_java_name(Class* clss, Global_Env* env);
+String* class_get_simple_name(Class* clss, Global_Env* env);
 //
 // access modifiers
 //
@@ -661,6 +790,7 @@ String* class_get_java_name(Class* clss, Global_Env* env);
 #define class_is_super(clss)        ((clss)->access_flags & ACC_SUPER)
 #define class_is_interface(clss)    ((clss)->access_flags & ACC_INTERFACE)
 #define class_is_abstract(clss)     ((clss)->access_flags & ACC_ABSTRACT)
+#define class_is_annotation(clss)     ((clss)->access_flags & ACC_ANNOTATION)
 
 //
 // Look up of methods and fields in class.
@@ -761,13 +891,13 @@ public:
     //
     // access modifiers
     //
-    bool is_public()            {return (_access_flags&ACC_PUBLIC)?true:false;} 
-    bool is_private()           {return (_access_flags&ACC_PRIVATE)?true:false;} 
-    bool is_protected()         {return (_access_flags&ACC_PROTECTED)?true:false;} 
-    bool is_static()            {return (_access_flags&ACC_STATIC)?true:false;} 
-    bool is_final()             {return (_access_flags&ACC_FINAL)?true:false;} 
+    bool is_public()            {return (_access_flags&ACC_PUBLIC)?true:false;}
+    bool is_private()           {return (_access_flags&ACC_PRIVATE)?true:false;}
+    bool is_protected()         {return (_access_flags&ACC_PROTECTED)?true:false;}
+    bool is_static()            {return (_access_flags&ACC_STATIC)?true:false;}
+    bool is_final()             {return (_access_flags&ACC_FINAL)?true:false;}
     bool is_strict()            {return (_access_flags&ACC_STRICT)?true:false;}
-    bool is_synthetic()         {return _synthetic;}
+    bool is_synthetic()         {return (_access_flags&ACC_SYNTHETIC)?true:_synthetic;}
     bool is_deprecated()        {return _deprecated;}
     unsigned get_access_flags() {return _access_flags;}
 
@@ -780,6 +910,9 @@ public:
 
     // Get the type descriptor (Sec. 4.3.2)
     String *get_descriptor() const {return _descriptor;}
+    String *get_signature() const {return _signature;}
+
+    AnnotationTable* get_declared_annotations() const {return _annotations;}
 
     friend void assign_instance_field_offset(Class *clss, Field *field, bool do_field_compaction);
     friend void assign_offsets_to_static_fields(Class *clss, Field **field_ptrs, bool do_field_compaction);
@@ -794,7 +927,7 @@ public:
     void* Alloc(size_t size);
 
 protected:
-    Class_Member() 
+    Class_Member()
     {
         _access_flags = 0;
         _class = NULL;
@@ -804,8 +937,9 @@ protected:
         num_slow_accesses = 0;
 #endif
         _synthetic = _deprecated = false;
+        _annotations = NULL;
+        _signature = NULL;
     }
-
 
     // offset of class member; 
     //   for virtual  methods, the method's offset within the vtable
@@ -814,20 +948,30 @@ protected:
     //   for static   data,    offset within the class' static data block
     unsigned _offset;
 
+    bool _synthetic;
+    bool _deprecated;
+    AnnotationTable * _annotations;
 
     uint16 _access_flags;
-    String      *_name;
-    String      *_descriptor; // descriptor
-    Class       *_class;
+    String * _name;
+    String * _descriptor;
+    String * _signature;
+    Class  * _class;
+
     bool parse(Class* clss, Const_Pool* cp, unsigned cp_size, ByteReader& cfs);
+
+   /* 
+    * returns ATTR_ERROR if attribute was recognized but parsing failed;
+    * returns ATTR_UNDEF if attribute was not recognized 
+    * otherwise returns passed attr value
+    */
+    Attributes process_common_attribute(Attributes attr, uint32 attr_len, ByteReader& cfs);
 
 public:
 #ifdef VM_STATS
     uint64 num_accesses;
     uint64 num_slow_accesses;
 #endif
-    bool _synthetic;
-    bool _deprecated;
 }; // Class_Member
 
 
@@ -848,7 +992,7 @@ public:
 
     // Return the type of this field.
     Java_Type get_java_type() {
-        return (Java_Type)(get_descriptor()->bytes[0]); 
+        return (Java_Type)(get_descriptor()->bytes[0]);
     };
 
     Const_Java_Value get_const_value() { return const_value; };
@@ -861,6 +1005,8 @@ public:
         _field_type_desc = 0;
         _offset_computed = 0;
         _is_injected = 0;
+        track_access = 0;
+        track_modification = 0;
     }
 
     void Reset() { }
@@ -877,13 +1023,18 @@ public:
         _descriptor = fd._descriptor;
         _deprecated = fd._deprecated;
         _synthetic = fd._synthetic;
-                
+        _annotations = fd._annotations;
+        _signature = fd._signature;
+
         // copy Field fields
         _const_value_index = fd._const_value_index;
         _field_type_desc = fd._field_type_desc;
         _is_injected = fd._is_injected;
         _offset_computed = fd._offset_computed;
         const_value = fd.const_value;
+        track_access = fd.track_access;
+        track_modification = fd.track_modification;
+
         return *this;
     }
     //
@@ -891,7 +1042,8 @@ public:
     //
     unsigned is_volatile()  {return (_access_flags&ACC_VOLATILE);} 
     unsigned is_transient() {return (_access_flags&ACC_TRANSIENT);} 
- 
+    bool is_enum()          {return (_access_flags&ACC_ENUM)?true:false;} 
+
     bool parse(Class* clss, Const_Pool* cp, unsigned cp_size, ByteReader& cfs);
 
     unsigned calculate_size() {
@@ -906,10 +1058,28 @@ public:
     Boolean is_injected() {return _is_injected;}
     void set_injected() { _is_injected = 1; }
 
+    void set_track_access(bool value) {
+        track_access = value ? 1 : 0 ;
+    }
+
+    void set_track_modification(bool value) {
+        track_modification = value ? 1 : 0 ;
+    }
+
+    void get_track_access_flag(char** address, char* mask) {
+        *address = &track_access;
+        *mask = TRACK_ACCESS_MASK;
+    }
+
+    void get_track_modification_flag(char** address, char* mask) {
+        *address = &track_modification;
+        *mask = TRACK_MODIFICATION_MASK;
+    }
+
 private:
     //
-    // The initial values of static fields.  This is defined by the 
-    // ConstantValue attribute in the class file.  
+    // The initial values of static fields.  This is defined by the
+    // ConstantValue attribute in the class file.
     //
     // If there was not ConstantValue attribute for that field then _const_value_index==0
     //
@@ -918,6 +1088,28 @@ private:
     TypeDesc* _field_type_desc;
     unsigned _is_injected : 1;
     unsigned _offset_computed : 1;
+
+    /** Turns on sending FieldAccess events on access to this field */
+    char track_access;
+    const static char TRACK_ACCESS_MASK = 1;
+
+    /** Turns on sending FieldModification events on modification of this field */
+    char track_modification;
+    const static char TRACK_MODIFICATION_MASK = 1;
+
+    //union {
+    //    char bit_flags;
+    //    struct {
+
+    //        /** Turns on sending FieldAccess events on access to this field */
+    //        char track_access : 1;
+    //        const static char TRACK_ACCESS_MASK = 4;
+
+    //        /** Turns on sending FieldModification events on modification of this field */
+    //        char track_modification : 1;
+    //        const static char TRACK_MODIFICATION_MASK = 8;
+    //    };
+    //};
 }; // Field
 
 
@@ -1063,11 +1255,11 @@ public:
     // The section id of the main code chunk for a method. Using an enum avoids a VC++ bug on Windows.
     enum {main_code_chunk_id = 0};
 
-    // A predicate that returns true iff this is the main code chunk for a method: i.e, it 1) contains the method's entry point, 
+    // A predicate that returns true iff this is the main code chunk for a method: i.e, it 1) contains the method's entry point,
     // and 2) contains the various flavors of JIT data for that method.
     static bool is_main_code_chunk(CodeChunkInfo *chunk)  { assert(chunk);  return (chunk->get_id() == main_code_chunk_id); }
 
-    // A predicate that returns true iff "id" is the section id of the main code chunk for a method. 
+    // A predicate that returns true iff "id" is the section id of the main code chunk for a method.
     static bool is_main_code_chunk_id(int id)             { return (id == main_code_chunk_id); }
 
 private:
@@ -1083,7 +1275,7 @@ private:
 
     bool            _has_been_loaded_for_vtune;
 
-    // 20040224 This records information about the methods (actually, CodeChunkInfo's) called by this CodeChunkInfo. 
+    // 20040224 This records information about the methods (actually, CodeChunkInfo's) called by this CodeChunkInfo.
     // 20040405 This now records for each callee, the number of times it was called by each call IP in the caller.
     // That is, this is a list of Callee_Info structures, each giving a call IP
     Callee_Info    *_callee_info;       // points to an array of max_callees Callee_Info entries for this code chunk
@@ -1116,7 +1308,7 @@ public:
 
 
 
-// Used to notify interested JITs whenever a method is changed: overwritten, recompiled, 
+// Used to notify interested JITs whenever a method is changed: overwritten, recompiled,
 // or initially compiled.
 struct Method_Change_Notification_Record {
     Method *method_of_interest;
@@ -1221,7 +1413,7 @@ public:
     // bytecodes are not available (presumably they have been garbage collected by VM).
     const Byte  *get_byte_code_addr()   {return _byte_codes;}
     size_t       get_byte_code_size()   {return _byte_code_length;}
- 
+
     // From the class file (Sec. 4.7.4)
     unsigned get_max_stack()                       { return _max_stack; }
     unsigned get_max_locals()                      { return _max_locals; }
@@ -1317,7 +1509,7 @@ public:
 private:
     State _state;
     void *_code;
-    VTable_Patches *_vtable_patch; 
+    VTable_Patches *_vtable_patch;
 
     NativeCodePtr _counting_stub;
 
@@ -1330,7 +1522,7 @@ public:
     Method();
     // destructor should be instead of this function, but it's not allowed to use it because copy for Method class is
     // done with memcpy, and old value is destroyed with delete operator.
-    void MethodClearInternals(); 
+    void MethodClearInternals();
 
     //
     // access modifiers
@@ -1338,6 +1530,8 @@ public:
     bool is_synchronized()  {return (_access_flags&ACC_SYNCHRONIZED)?true:false;} 
     bool is_native()        {return (_access_flags&ACC_NATIVE)?true:false;} 
     bool is_abstract()      {return (_access_flags&ACC_ABSTRACT)?true:false;} 
+    bool is_varargs()       {return (_access_flags&ACC_VARARGS)?true:false;} 
+    bool is_bridge()        {return (_access_flags&ACC_BRIDGE)?true:false;} 
 
     // method flags
     bool is_init()          {return _flags.is_init?true:false;}
@@ -1351,7 +1545,7 @@ public:
 
     unsigned get_index()    {return _index;}
 
-    // Fake methods are interface methods inherited by an abstract class that are not (directly or indirectly) 
+    // Fake methods are interface methods inherited by an abstract class that are not (directly or indirectly)
     // implemented by that class. They are added to the class to ensure they have thecorrect vtable offset.
     // These fake methods point to the "real" interface method for which they are surrogates; this information
     // is used by reflection methods.
@@ -1377,7 +1571,17 @@ public:
     friend void add_new_fake_method(Class* clss, Class* example, unsigned* next);
     friend void add_any_fake_methods(Class* clss);
 
+    unsigned get_num_param_annotations() {return _num_param_annotations;}
+    AnnotationTable * get_param_annotations(unsigned index) {
+        return index < _num_param_annotations ? _param_annotations[index] : NULL;
+    }
+    AnnotationValue * get_default_value() {return _default_value; }
+
 private:
+    uint8 _num_param_annotations;
+    AnnotationTable ** _param_annotations;
+    AnnotationValue * _default_value;
+
     unsigned _index;                // index in method table
     uint16 _max_stack;
     uint16 _max_locals;
@@ -1404,7 +1608,7 @@ private:
 
     bool _parse_line_numbers(unsigned attr_len, ByteReader &cfs);
 
-    bool _parse_local_vars(Const_Pool *cp, unsigned cp_size, 
+    bool _parse_local_vars(Const_Pool *cp, unsigned cp_size,
         unsigned attr_len, ByteReader &cfs);
 
     bool _parse_exceptions(Const_Pool *cp, unsigned cp_size, unsigned attr_len,
@@ -1415,46 +1619,41 @@ private:
     //
     // debugging info
     //
-    struct Line_Number_Entry {
-        uint16 start_pc;
-        uint16 line_number;
-    };
-
-    struct Line_Number_Table {
-        uint16 length;
-        Line_Number_Entry table[1];
-    };
-
-    struct Local_Var_Entry {
-        uint16 start_pc;
-        uint16 length;
-        uint16 index;
-        String* name;
-        String* type;
-    };
-
-    struct Local_Var_Table {
-        uint16 length;
-        Local_Var_Entry table[1];
-    };
-
     Line_Number_Table *_line_number_table;
     Local_Var_Table *_local_vars_table;
+
+    Local_Var_Table * _parse_local_vars(Const_Pool *cp, unsigned cp_size, 
+        unsigned attr_len, ByteReader &cfs, const char* attr_name);
+
+    // This is the number of breakpoints which should be set in the
+    // method when it is compiled. This number does not reflect
+    // multiple breakpoints that are set in the same location by
+    // different environments, it counts only unique locations
+    uint32 pending_breakpoints;
 public:
 
     unsigned get_line_number_table_size() {
         return (_line_number_table) ? _line_number_table->length : 0;
     }
+
     bool get_line_number_entry(unsigned index, jlong* pc, jint* line);
+
     unsigned get_local_var_table_size() {
         return (_local_vars_table) ? _local_vars_table->length : 0;
     }
+
     bool get_local_var_entry(unsigned index, jlong* pc, 
-        jint* length, jint* slot, String** name, String** type);
+        jint* length, jint* slot, String** name, String** type, 
+        String** generic_type);
+
+    // XXX
+    //bool get_local_var_entry(unsigned index, jlong* pc,
+    //    jint* length, jint* slot, String** name, String** type);
+
 
     // Returns number of line in the source file, to which the given bytecode offset
     // corresponds, or -1 if it is unknown.
-    int get_line_number(uint16 bc_offset);   
+    int get_line_number(uint16 bc_offset);
 
     Inline_Record *inline_records;
     void set_inline_assumption(JIT *jit, Method *caller);
@@ -1467,42 +1666,22 @@ public:
 
     void lock();
     void unlock();
+
+    uint32 get_pending_breakpoints()
+    {
+        return pending_breakpoints;
+    }
+
+    void insert_pending_breakpoint()
+    {
+        pending_breakpoints++;
+    }
+
+    void remove_pending_breakpoint()
+    {
+        pending_breakpoints--;
+    }
 }; // Method
-
-
-
-///////////////////////////////////////////////////////////////////////////////
-// class file attributes
-///////////////////////////////////////////////////////////////////////////////
-enum Attributes {
-    ATTR_SourceFile,            // Class (no more than 1 in each class file)
-    ATTR_InnerClasses,          // inner class
-    ATTR_ConstantValue,         // Field (no more than 1 for each field)
-    ATTR_Code,                  // Method
-    ATTR_Exceptions,            // Method
-    ATTR_LineNumberTable,       // Code
-    ATTR_LocalVariableTable,    // Code
-    ATTR_Synthetic,             // Field/Method
-    ATTR_Deprecated,            // Field/Method
-    ATTR_SourceDebugExtension,  // Class (no more than 1 in each class file)
-    N_ATTR,
-    ATTR_UNDEF,
-    ATTR_ERROR
-};
-
-#define N_FIELD_ATTR    3
-#define N_METHOD_ATTR   4
-#define N_CODE_ATTR     2
-#define N_CLASS_ATTR    3
-
-//
-// magic number, and major/minor version numbers of class file
-//
-#define CLASSFILE_MAGIC 0xCAFEBABE
-#define CLASSFILE_MAJOR 45
-// Supported class files up to this version
-#define CLASSFILE_MAJOR_MAX 49
-#define CLASSFILE_MINOR 3
 
 
 VMEXPORT Class* load_class(Global_Env *env, const String *classname);
@@ -1510,7 +1689,7 @@ Class* find_loaded_class(Global_Env *env, const String *classname);
 
 #define BITS_PER_BYTE 8
 // We want to use signed arithmetic when we do allocation pointer/limit compares.
-// In order to do this all sizes must be positive so when we want to overflow instead of 
+// In order to do this all sizes must be positive so when we want to overflow instead of
 // setting the high bit we set the next to high bit. If we set the high bit and the allocation buffer
 // is at the top of memory we might not detect an overflow the unsigned overflow would produce
 // a small positive number that is smaller then the limit.
@@ -1518,7 +1697,7 @@ Class* find_loaded_class(Global_Env *env, const String *classname);
 #define NEXT_TO_HIGH_BIT_SET_MASK (1<<((sizeof(unsigned) * BITS_PER_BYTE)-2))
 #define NEXT_TO_HIGH_BIT_CLEAR_MASK ~NEXT_TO_HIGH_BIT_SET_MASK
 
-inline unsigned int get_instance_data_size (Class *c) 
+inline unsigned int get_instance_data_size (Class *c)
 {
     return (c->instance_data_size & NEXT_TO_HIGH_BIT_CLEAR_MASK);
 }

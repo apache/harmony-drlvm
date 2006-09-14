@@ -41,90 +41,48 @@ extern "C" {
 /* Native methods */
 
 /*
- * Method: java.lang.reflect.VMReflection.getDeclaringClass(Ljava/lang/Object;)Ljava/lang/Class;
+ * Method: java.lang.reflect.VMReflection.getExceptionTypes(J)[Ljava/lang/Class;
  */
-JNIEXPORT jclass JNICALL
-Java_java_lang_reflect_VMReflection_getDeclaringClass(JNIEnv *, jclass, 
-    jobject);
+JNIEXPORT jobjectArray JNICALL Java_java_lang_reflect_VMReflection_getExceptionTypes
+    (JNIEnv *, jclass, jlong);
 
 /*
- * Method: java.lang.reflect.VMReflection.getExceptionTypes(Ljava/lang/Object;)[Ljava/lang/Class;
+ * Method: java.lang.reflect.VMReflection.getParameterTypes(J)[Ljava/lang/Class;
  */
-JNIEXPORT jobjectArray JNICALL
-Java_java_lang_reflect_VMReflection_getExceptionTypes(JNIEnv *, jclass, 
-    jobject);
+JNIEXPORT jobjectArray JNICALL Java_java_lang_reflect_VMReflection_getParameterTypes
+    (JNIEnv *, jclass, jlong);
 
 /*
- * Method: java.lang.reflect.VMReflection.getFieldType(Ljava/lang/Object;)Ljava/lang/Class;
+ * Method: java.lang.reflect.VMReflection.getMethodReturnType(J)Ljava/lang/Class;
  */
-JNIEXPORT jclass JNICALL
-Java_java_lang_reflect_VMReflection_getFieldType(JNIEnv *, jclass, 
-    jobject);
+JNIEXPORT jclass JNICALL Java_java_lang_reflect_VMReflection_getMethodReturnType
+    (JNIEnv *, jclass, jlong);
 
 /*
- * Method: java.lang.reflect.VMReflection.getFieldValue(Ljava/lang/Object;Ljava/lang/Object;)Ljava/lang/Object;
+ * Method: java.lang.reflect.VMReflection.getFieldType(J)Ljava/lang/Class;
  */
-JNIEXPORT jobject JNICALL
-Java_java_lang_reflect_VMReflection_getFieldValue(JNIEnv *, jclass, 
-    jobject, jobject);
+JNIEXPORT jclass JNICALL Java_java_lang_reflect_VMReflection_getFieldType
+    (JNIEnv *, jclass, jlong);
 
 /*
- * Method: java.lang.reflect.VMReflection.getMethodReturnType(Ljava/lang/Object;)Ljava/lang/Class;
- */
-JNIEXPORT jclass JNICALL
-Java_java_lang_reflect_VMReflection_getMethodReturnType(JNIEnv *, jclass, 
-    jobject);
-
-/*
- * Method: java.lang.reflect.VMReflection.getModifiers(Ljava/lang/Object;)I
- */
-JNIEXPORT jint JNICALL
-Java_java_lang_reflect_VMReflection_getModifiers(JNIEnv *, jclass, 
-    jobject);
-
-/*
- * Method: java.lang.reflect.VMReflection.getName(Ljava/lang/Object;)Ljava/lang/String;
- */
-JNIEXPORT jstring JNICALL
-Java_java_lang_reflect_VMReflection_getName(JNIEnv *, jclass, 
-    jobject);
-
-/*
- * Method: java.lang.reflect.VMReflection.getParameterTypes(Ljava/lang/Object;)[Ljava/lang/Class;
- */
-JNIEXPORT jobjectArray JNICALL
-Java_java_lang_reflect_VMReflection_getParameterTypes(JNIEnv *, jclass, 
-    jobject);
-
-/*
- * Method: java.lang.reflect.VMReflection.invokeMethod(Ljava/lang/Object;Ljava/lang/Object;[Ljava/lang/Object;)Ljava/lang/Object;
+ * Method: java.lang.reflect.VMReflection.invokeMethod(JLjava/lang/Object;[Ljava/lang/Object;)Ljava/lang/Object;
  * Throws: java.lang.reflect.InvocationTargetException
  */
-JNIEXPORT jobject JNICALL
-Java_java_lang_reflect_VMReflection_invokeMethod(JNIEnv *, jclass, 
-    jobject, jobject, jobjectArray);
+JNIEXPORT jobject JNICALL Java_java_lang_reflect_VMReflection_invokeMethod
+    (JNIEnv *, jclass, jlong, jobject, jobjectArray);
 
 /*
  * Method: java.lang.reflect.VMReflection.newArrayInstance(Ljava/lang/Class;[I)Ljava/lang/Object;
  */
-JNIEXPORT jobject JNICALL
-Java_java_lang_reflect_VMReflection_newArrayInstance(JNIEnv *, jclass, 
-    jclass, jintArray);
+JNIEXPORT jobject JNICALL Java_java_lang_reflect_VMReflection_newArrayInstance
+    (JNIEnv *, jclass, jclass, jintArray);
 
 /*
- * Method: java.lang.reflect.VMReflection.newClassInstance(Ljava/lang/Object;[Ljava/lang/Object;)Ljava/lang/Object;
+ * Method: java.lang.reflect.VMReflection.newClassInstance(J[Ljava/lang/Object;)Ljava/lang/Object;
  * Throws: java.lang.reflect.InvocationTargetException
  */
-JNIEXPORT jobject JNICALL
-Java_java_lang_reflect_VMReflection_newClassInstance(JNIEnv *, jclass, 
-    jobject, jobjectArray);
-
-/*
- * Method: java.lang.reflect.VMReflection.setFieldValue(Ljava/lang/Object;Ljava/lang/Object;Ljava/lang/Object;)V
- */
-JNIEXPORT void JNICALL
-Java_java_lang_reflect_VMReflection_setFieldValue(JNIEnv *, jclass, 
-    jobject, jobject, jobject);
+JNIEXPORT jobject JNICALL Java_java_lang_reflect_VMReflection_newClassInstance
+    (JNIEnv *, jclass, jlong, jobjectArray);
 
 
 #ifdef __cplusplus

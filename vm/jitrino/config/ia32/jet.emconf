@@ -1,0 +1,9 @@
+# EM configuration file for JET-only mode of Jitrino
+
+chains=chain1
+chain1.jits=JET
+JET.file=jitrino
+
+# Options to be passed to JIT
+
+-Djit.JET.path=

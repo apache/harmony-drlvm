@@ -1,3 +1,4 @@
+
 /*
  *  Copyright 2005-2006 The Apache Software Foundation or its licensors, as applicable.
  *
@@ -14,16 +15,13 @@
  *  limitations under the License.
  */
 /**
- * @author Alexander V. Astapchuk
- * @version $Revision: 1.7.12.4.4.5 $
+ * @author Alexander Astapchuk
+ * @version $Revision$
  */
- 
-/**
- * @file
- * @brief Platform independent part of Compiler methods, mostly related to 
- *        basic blocks processing.
- */
-
+ /**
+  * @file
+  * @brief Compiler class' main methods implementation.
+  */
 #include <assert.h>
 #include <algorithm>
 #include <malloc.h>
@@ -35,15 +33,21 @@
 
 #include "../shared/mkernel.h"
 
+#include "jet.h"
+
 #include "compiler.h"
 #include "trace.h"
 #include "stats.h"
 
+#include <stack>
+using std::stack;
 
 #if !defined(PROJECT_JET)
     #include "Jitrino.h"
     #include "VMInterface.h"
     #include "DrlVMInterface.h"
+    #include "EMInterface.h"
+    #include "JITInstanceContext.h"
 #else
     /**
      * See DrlVMInterface.h/g_compileLock and 
@@ -52,74 +56,226 @@
     static Jitrino::Mutex g_compileLock;
 #endif
 
-namespace Jitrino {
+#include "../main/Log.h"
+using Jitrino::Log;
+using Jitrino::LogStream;
+
+#ifndef PLATFORM_POSIX
+    #define snprintf _snprintf
+#endif
+
+namespace Jitrino { 
 namespace Jet {
 
-#if defined(JET_PROTO)
 
-// Only used for compilation's stress testing/performance tuning
-static JIT_Handle shared_jit_handle = 0;
+unsigned Compiler::defaultFlags = JMF_BBPOLLING;
+unsigned Compiler::g_acceptStartID = NOTHING;
+unsigned Compiler::g_acceptEndID = NOTHING;
+unsigned Compiler::g_rejectStartID = NOTHING;
+unsigned Compiler::g_rejectEndID = NOTHING;
 
-// Only used for compilation's stress testing/performance tuning
-extern "C" __declspec(dllexport) void * get_jet_jit(void) {
-    return shared_jit_handle;
-}
+/**
+ * Simple counter of how much times the Compiler::compile() was called.
+ */
+static unsigned methodsSeen = 0;
 
-#endif
-
-const int       Compiler::g_iconst_m1 = -1;
-const int       Compiler::g_iconst_0 = 0;
-const int       Compiler::g_iconst_1 = 1;
-
-const float     Compiler::g_fconst_0 = 0.;
-const float     Compiler::g_fconst_1 = 1.;
-const float     Compiler::g_fconst_2 = 2.;
-const double    Compiler::g_dconst_0 = 0.;
-const double    Compiler::g_dconst_1 = 1.;
-
-#if defined(JIT_STATS) || defined(JIT_LOGS) || \
-    defined(JET_PROTO) || defined(_DEBUG)
-unsigned Compiler::g_methodsSeen = 0;
-#else
-const char Compiler::m_fname[1] = {0};
-#endif
-
-unsigned Compiler::defaultFlags = JMF_BBPOOLING;
-
-JIT_Result Compiler::compile(Compile_Handle ch, Method_Handle method)
+JIT_Result Compiler::compile(Compile_Handle ch, Method_Handle method,
+                             const OpenMethodExecutionParams& params)
 {
+    compilation_params = params;
     m_compileHandle = ch;
-    m_method = method;
-    m_klass = method_get_class(method);
+    MethInfo::init(method);
 
-#if defined(_DEBUG) || defined(JIT_STATS) || defined(JIT_LOGS)
-    m_fname[0] = 0;
-    const char * mname = method_get_name(method);
-    const char * msig = method_get_descriptor(method); msig = msig;
-    const char * kname = class_get_name(m_klass);
-    snprintf(m_fname, sizeof(m_fname)-1, "%s::%s", kname, mname);
-    ++g_methodsSeen;
-#else
-    const char * msig = ""; msig = msig;
-#endif
+    // Currently use bp-based frame
+    m_base = bp;
+    // Will be used later, with sp-based frame
+    m_depth = 0;
 
+    //
+    // Check contract with VM
+    //
+    assert(!method_is_abstract(method) && 
+           "VM must not try to compile abstract method!");
+    assert(!method_is_native(method) && 
+           "VM must not try to compile native method!");
+    
     STATS_SET_NAME_FILER(NULL);
-
-    unsigned compile_flags = defaultFlags; //JMF_LAZY_RESOLUTION;
-
+    m_methID = ++methodsSeen;
+    
+    unsigned compile_flags = defaultFlags;
     initProfilingData(&compile_flags);
+    //
+    // the latest PMF machinery seems working without much overhead,
+    // let's try to have tracing functionality on by default
+    //
+#if 1 //def JET_PROTO 
 
-#if defined(_DEBUG) || defined(JET_PROTO)
+    // Ensure no memory problems exist on entrance
+    if (get_bool_arg("checkmem", false)) {
+        dbg_check_mem();
+    }
+
+    const char * lp;
+    //
+    // Process args, update flags if necessary
+    //
+    if (!get_bool_arg("bbp", true)) {
+        compile_flags &= JMF_BBPOLLING;
+    }
+    //
+    // Debugging support
+    //
+    lp = get_arg("log", NULL);
+    if (lp != NULL) {
+        if (NULL != strstr(lp, "ct")) {
+            bool ct = false;
+            if (NULL != strstr(lp, "sum")) {
+                compile_flags |= DBG_TRACE_SUMM;
+                ct = true;
+            }
+            static const unsigned TRACE_CG = 
+                        DBG_DUMP_BBS | DBG_TRACE_CG | 
+                        DBG_TRACE_SUMM | DBG_DUMP_CODE;
+            if (NULL != strstr(lp, "cg")) {
+                compile_flags |= TRACE_CG;
+                ct = true;
+            }
+            if (NULL != strstr(lp, "layout")) {
+                compile_flags |= DBG_TRACE_LAYOUT;
+                ct = true;
+            }
+            if (NULL != strstr(lp, "code")) {
+                compile_flags |= DBG_DUMP_CODE;
+                ct = true;
+            }
+            if (!ct) {
+                // No category means 'code+sum'
+                compile_flags |= DBG_DUMP_CODE|DBG_TRACE_SUMM;
+            }
+        }
+        
+        if (Log::log_rt().isEnabled()) {
+            if (NULL != strstr(lp, "rtsupp")) {
+                compile_flags |= DBG_TRACE_RT;
+            }
+            if (NULL != strstr(lp, "ee")) {
+                compile_flags |= DBG_TRACE_EE;
+            }
+            if (NULL != strstr(lp, "bc")) {
+                compile_flags |= DBG_TRACE_BC;
+            }
+        }
+    } // ~compLS.isEnabled()
+    
+    //
+    // Accept or reject the method ?
+    // 
+    bool accept = true;
+    if (g_acceptStartID != NOTHING && m_methID < g_acceptStartID) {
+        accept = false;
+    }
+    if (g_acceptEndID != NOTHING && m_methID > g_acceptEndID) {
+        accept = false;
+    }
+    if (g_rejectStartID != NOTHING && m_methID >= g_rejectStartID) {
+        accept = false;
+    }
+    if (g_rejectEndID != NOTHING && m_methID <= g_rejectEndID) {
+        accept = false;
+    }
+    lp = get_arg("reject", NULL);
+    if (lp != NULL && isalpha(lp[0])) {
+        accept = !to_bool(lp);
+    }
+    
+    if (!accept) {
+        if (compile_flags & DBG_TRACE_SUMM) {
+            //dbg_trace_comp_start();
+            //dbg_trace_comp_end(false, "Due to accept or reject argument.");
+        }
+        return JIT_FAILURE;
+    }
+    //
+    // A special way to accept/reject method - list of method in file.
+    // May be useful to find problematic method in multi threaded 
+    // compilation env when id-s get changed much.
+    //    
+    static bool loadList = true;
+    static vector<string> data;
+    if (loadList) {
+        lp = get_arg("list", NULL);
+        if (lp != NULL) {
+            FILE * f = fopen(lp, "r");
+            if (f != NULL) {
+                char buf[1024*4];
+                while(NULL != fgets(buf, sizeof(buf)-1, f)) {
+                    // Skip comments
+                    if (buf[0] == '#') continue;
+                    int len = strlen(buf);
+                    // Trim CRLF
+                    if (len>=1 && buf[len-1]<=' ') { buf[len-1] = 0; }
+                    if (len>=2 && buf[len-2]<=' ') { buf[len-2] = 0; }
+                    data.push_back(buf);
+                }
+                fclose(f);
+            } // if f != NULL
+            else {
+                dbg("WARN: list option - can not open '%s'.\b", lp);
+            }
+        }
+        loadList = false;
+    }
+    bool found = data.size() == 0;
+    for (unsigned i=0; i<data.size(); i++) {
+        const string& s = data[i];
+        if (!strcmp(meth_fname(), s.c_str())) {
+            found = true;
+            break;
+        }
+    }
+    if (!found) {
+        if (compile_flags & DBG_TRACE_SUMM) {
+            //dbg_trace_comp_start();
+            //dbg_trace_comp_end(false, "Not in file list.");
+        }
+        return JIT_FAILURE;
+    }
+    
+    //
+    // Only emulate compilation, without registering code in the VM ?
+    //
+    m_bEmulation = get_bool_arg("emulate", false);
+    
+    //
+    // Check stack integrity ?
+    //
+    if (get_bool_arg("checkstack", false)) {
+        compile_flags |= DBG_CHECK_STACK;
+    }
+    
+    //
+    // Insert software breakpoint at specified place of method ?
+    //
     dbg_break_pc = NOTHING;
-#endif
-
-#if defined(_DEBUG) && defined(JET_PROTO)
-    compile_flags |= DBG_TRACE_SUMM; 
-#endif
+    lp = get_arg("brk", NULL);
+    if (lp == NULL) { lp = get_arg("break", NULL); };
+    if (lp != NULL) {
+        // PC specified where to insert breakpoint into ...
+        if (isdigit(lp[0])) {
+            dbg_break_pc = atoi(lp);
+        }
+        else {
+            // no PC specified - break at entrance.
+            compile_flags |= DBG_BRK;
+        }
+    }
+#endif  // ~JET_PROTO
 
     if (compile_flags & DBG_TRACE_SUMM) {
         dbg_trace_comp_start();
     }
+    
+    Encoder::m_trace = (compile_flags & DBG_TRACE_CG);
 
     if (NULL == rt_helper_throw) {
         // The very first call of ::compile(), initialize
@@ -127,31 +283,23 @@ JIT_Result Compiler::compile(Compile_Handle ch, Method_Handle method)
         initStatics();
     }
 
-    Timers::compTotal.start();
-    Timers::compInit.start();
-    
+    m_max_native_stack_depth = 0;
     m_bc = (unsigned char*)method_get_byte_code_addr(m_method);
     unsigned bc_size = method_get_byte_code_size(m_method);
     unsigned num_locals = method_vars_get_number(m_method);
     unsigned max_stack = method_get_max_stack(m_method);
-
-    get_args_info(m_method, m_args, &m_retType);
-    unsigned num_input_slots = count_slots(m_args);
-
-    m_java_meth_flags = method_get_flags(m_method);
-
-    m_patchID = -1;
-    if (compile_flags & JMF_LAZY_RESOLUTION) {
-        m_codeStream.init((size_t)(bc_size*
-                                       NATIVE_CODE_SIZE_2_BC_SIZE_RATIO_LAZY));
-        m_patchItems.reserve((size_t)(bc_size*
-                                            PATCH_COUNT_2_BC_SIZE_RATIO_LAZY));
-    }
-    else {
-        m_codeStream.init((size_t)(bc_size*NATIVE_CODE_SIZE_2_BC_SIZE_RATIO));
-        m_patchItems.reserve((size_t)(bc_size*PATCH_COUNT_2_BC_SIZE_RATIO));
-    }
-
+    
+    // Input arguments
+    ::std::vector<jtype> inargs;
+    get_args_info(m_method, inargs, &m_retType);
+    m_ci.init(CCONV_MANAGED, inargs);
+    unsigned num_input_slots = count_slots(inargs);
+    m_argSlots = num_input_slots;
+    m_argids.resize(num_input_slots); //[in_slots];
+    m_ra.resize(num_locals, ar_x);
+    //
+    
+    m_codeStream.init((size_t)(bc_size*NATIVE_CODE_SIZE_2_BC_SIZE_RATIO));
     m_stack.init(num_locals, max_stack, num_input_slots);
     // We need to report 'this' additionally for the following cases:
     // - non-static sync methods - to allow VM to call monitor_exit() for
@@ -161,100 +309,135 @@ JIT_Result Compiler::compile(Compile_Handle ch, Method_Handle method)
     //      stack_trace.cpp + com_openintel_drl_vm_VMStack.cpp:
     //      Java_com_openintel_drl_vm_VMStack_getStackState.
     //
-    if (!method_is_static(m_method)) {
-        if (method_is_synchronized(m_method) ||
-            (class_hint_is_exceptiontype(m_klass) &&
-            !strcmp(method_get_name(m_method), "<init>"))) {
-            compile_flags |= JMF_REPORT_THIS;
-        }
+    if (!meth_is_static() && (meth_is_sync() || meth_is_exc_ctor())) {
+        compile_flags |= JMF_REPORT_THIS;
     }
+
     m_infoBlock.init(bc_size, max_stack, num_locals, num_input_slots, 
                      compile_flags);
 
-    bool eh_ok = bbs_ehandlers_resolve();    
-    Timers::compInit.stop();
+    bool eh_ok = comp_resolve_ehandlers();    
     
     if (!eh_ok) {
         // At least on of the exception handlers classes was not resolved:
-        // unable to resolve class of Exception => will be unable to 
-		// register exception handlers => can't generate code at
-		// all => stop here
-        // Might need/want to [re]consider: seems good for eager 
-		// resolution. Might want to generate LinkageError and throw it at
-		// runtime for lazy resolution.
-        if (m_infoBlock.get_flags() & DBG_TRACE_SUMM) {
+        // unable to resolve class of Exception => will be unable to register
+        // exception handlers => can't generate code et all => stop here
+        // TODO - might want to [re]consider and may generate LinkageError 
+        // and throw it at runtime.
+        if (is_set(DBG_TRACE_SUMM)) {
             dbg_trace_comp_end(false, "ehandler.resolve");
         }
-    	m_infoBlock.release();
+        m_infoBlock.release();
         return JIT_FAILURE;
     }
     
     //
     // Initialization done, collect statistics
+    //
     STATS_INC(Stats::methodsCompiled, 1);
-    if (m_handlers.size() == 0) {
-        STATS_INC(Stats::methodsWOCatchHandlers, 1);
-    }
-    
+    STATS_INC(Stats::methodsWOCatchHandlers, m_handlers.size() ? 0 : 1);
     //
-    STATS_MEASURE_MIN_MAX_VALUE(bc_size, m_infoBlock.get_bc_size(), m_fname);
-    STATS_MEASURE_MIN_MAX_VALUE(jstack, max_stack, m_fname);
-    STATS_MEASURE_MIN_MAX_VALUE(locals, num_locals, m_fname);
+    STATS_MEASURE_MIN_MAX_VALUE(bc_size, m_infoBlock.get_bc_size(), meth_fname());
+    STATS_MEASURE_MIN_MAX_VALUE(jstack, max_stack, meth_fname());
+    STATS_MEASURE_MIN_MAX_VALUE(locals, num_locals, meth_fname());
     //
-    // ~end of Stats
+    // ~Stats
     //
-
-    m_insts.alloc(bc_size);
-    
-    Timers::compMarkBBs.start();
-        bbs_mark_all();
-    Timers::compMarkBBs.stop();
-
+    m_insts.alloc(bc_size, true);
+    //
+    // Initialization ends, 
+    // Phase 1 - decoding instructions, finding basic blocks.
+    //
+    comp_parse_bytecode();
+    comp_alloc_regs();
     // Statistics:: number of basic blocks
-    STATS_MEASURE_MIN_MAX_VALUE(bbs, m_bbs.size(), m_fname);
+    STATS_MEASURE_MIN_MAX_VALUE(bbs, m_bbs.size(), meth_fname());
 
-    if (m_infoBlock.get_flags() & DBG_DUMP_BBS) {
+    if (is_set(DBG_DUMP_BBS)) {
         dbg_dump_bbs();
     }
+    //
+    // Phase 2 - code generation.
+    //
+    SmartPtr<BBState> allStates;
+    allStates.alloc(m_bbs.size());
+    unsigned c = 0;
+    for (BBMAP::iterator i=m_bbs.begin(); i != m_bbs.end(); i++, c++) {
+        m_bbStates[i->first] = &allStates[c];
+    }
+    m_bbStates[0]->jframe.init(m_infoBlock.get_stack_max(),
+                                m_infoBlock.get_num_locals());
     
-    Timers::compCodeGen.start();
-        // generate code - will recursively generate all the reachable 
-        // code, except the exception handlers
-        bbs_gen_code(0, NULL, NOTHING);
-        // generate exception handlers
-        for (unsigned i=0; i<m_handlers.size(); i++) {
-            bbs_gen_code(m_handlers[i].handler, NULL, NOTHING);
-        }
-    Timers::compCodeGen.stop();
+    // Generate the whole code - will recursively generate all the 
+    // reachable code, except the exception handlers ...
+    comp_gen_code_bb(0);
+    
+    // ... now, generate exception handlers ...
+    for (unsigned i=0; i<m_handlers.size(); i++) {
+        comp_gen_code_bb(m_handlers[i].handler);
+    }
+    
+    // ... and finally, generate prolog.
+    // Fake BB data - it's used in gen_prolog()
+    BBInfo bbinfo;
+    unsigned prolog_ipoff = bbinfo.ipoff = ipoff();
+    BBState bbstate;
+    bbstate.jframe.init(m_infoBlock.get_stack_max(),
+                        m_infoBlock.get_num_locals());
+    m_bbstate = &bbstate;
+    m_bbinfo = &bbinfo;
+    m_jframe = &bbstate.jframe;
+    rclear();
+    gen_prolog();
+    unsigned prolog_size = ipoff() - prolog_ipoff;
+    if (is_set(DBG_TRACE_CG)) {
+        dbg_dump_code(m_codeStream.data() + prolog_ipoff,
+                      prolog_size, "prolog");
+    }
+    //
+    // phase 2 end.
+    // Register code and related info in the VM
+    //
     
     // *************
     // * LOCK HERE *
     // *************
     g_compileLock.lock();
 
-    if (method_get_code_block_size_jit(m_method, jit_handle) != 0) {
+    if (method_get_code_block_size_jit(m_method, m_hjit) != 0) {
         // the code generated already
-        Stats::methodsCompiledSeveralTimes++;
-        g_compileLock.unlock();
-    	m_infoBlock.release();
+        STATS_INC(Stats::methodsCompiledSeveralTimes, 1);
+        g_compileLock.unlock(); /* Unlock here */
+        m_infoBlock.release();
+        if (get_bool_arg("checkmem", false)) {
+            dbg_check_mem();
+        }
         return JIT_SUCCESS;
     }
 
-    Timers::compCodeLayout.start();
-        const unsigned total_code_size = m_codeStream.size();
-        m_vmCode = (char*)method_allocate_code_block(m_method, jit_handle,
+    const unsigned total_code_size = m_codeStream.size();
+        
+    if (m_bEmulation) {
+        m_vmCode = (char*)malloc(total_code_size);
+    }
+    else {
+        m_vmCode = (char*)method_allocate_code_block(m_method, m_hjit,
                                                      total_code_size, 
                                                      16/*fixme aligment*/, 
                                                      CODE_BLOCK_HEAT_DEFAULT,
                                                      0, CAA_Allocate);
-        bbs_layout_code();
-    Timers::compCodeLayout.stop();
+        m_infoBlock.set_code_start(m_vmCode);
+    }
+    //
+    // Copy and reposition code from m_codeStream into the allocated buf.
+    //
+    comp_layout_code(prolog_ipoff, prolog_size);
     
-    STATS_MEASURE_MIN_MAX_VALUE(code_size, total_code_size, m_fname);
+    STATS_MEASURE_MIN_MAX_VALUE(code_size, total_code_size, meth_fname());
     STATS_MEASURE_MIN_MAX_VALUE(native_per_bc_ratio, 
                                 m_infoBlock.get_bc_size() == 0 ? 
                                 0 : total_code_size/m_infoBlock.get_bc_size(),
-                                m_fname);
+                                meth_fname());
 
 #ifdef _DEBUG
     // At this point, the codeStream content is completely copied into the
@@ -265,256 +448,462 @@ JIT_Result Compiler::compile(Compile_Handle ch, Method_Handle method)
     //
     // runtime data. must be initialized before code patching
     //
-    m_infoBlock.set_num_refs(m_lazyRefs.size());
     unsigned data_size = m_infoBlock.get_total_size();
-    char * pdata = (char*)method_allocate_info_block(m_method, jit_handle, 
-                                                     data_size);
+    char * pdata;
+    if (m_bEmulation) {
+        pdata = (char*)malloc(data_size);
+    }
+    else {
+        pdata = (char*)method_allocate_info_block(m_method, m_hjit, 
+                                                  data_size);
+    }    
     m_infoBlock.save(pdata);
     //
     // Finalize addresses
     //
-    Timers::compCodePatch.start();
-        cg_patch_code();
-    Timers::compCodePatch.stop();
+    comp_patch_code();
     
     //
     // register exception handlers
     //
-    Timers::compEhandlers.start();
-        bbs_ehandlers_set();
-    Timers::compEhandlers.stop();
+    if (m_bEmulation) {
+        // no op
+    }
+    else {
+        comp_set_ehandlers();
+    }
     
-    // ****************
-    // * UN LOCK HERE *
-    // ****************
+    // ***************
+    // * UNLOCK HERE *
+    // ***************
     g_compileLock.unlock();
     
+    STATS_MEASURE_MIN_MAX_VALUE(patchItemsToBcSizeRatioX1000, 
+                                patch_count()*1000/bc_size, meth_fname());
+    
+    if (is_set(DBG_DUMP_CODE)) {
+        dbg_dump_code_bc(m_vmCode, total_code_size);
+    }
+    
+    if (is_set(DBG_TRACE_SUMM)) {
+        dbg_trace_comp_end(true, "ok");
+    }
     m_infoBlock.release();
     
-    Timers::compTotal.stop();
-    
-    STATS_MEASURE_MIN_MAX_VALUE(patchItemsToBcSizeRatioX1000, 
-                                m_patchItems.size()*1000/bc_size, m_fname);
-    
-    
-    if (m_infoBlock.get_flags() & DBG_DUMP_CODE) {
-        dbg_dump_code();
+    // Ensure no memory problems appeared during compilation
+    if (get_bool_arg("checkmem", false)) {
+        dbg_check_mem();
     }
-    if (m_infoBlock.get_flags() & DBG_TRACE_SUMM) {
-        dbg_trace_comp_end(true, "ok");
+    
+    if (m_bEmulation) {
+        free(m_vmCode);
+        free(pdata);
+        return JIT_FAILURE;
     }
     return JIT_SUCCESS;
 }
 
-
-void Compiler::bbs_mark_all(void)
+BBInfo& Compiler::comp_create_bb(unsigned pc)
 {
-    unsigned pc = 0;
-    // the very first instruction always start a new BB - a prolog
-    bbs_mark_one(0, false, true, false, false);
-    const unsigned bc_size = m_infoBlock.get_bc_size();
-    do{
-        JInst& jinst = m_insts[pc];
-        pc = fetch(pc, jinst);
-        // 'pc' points to the instructions next to jinst ...
-        if (jinst.flags & OPF_ENDS_BB) {
-            // ... and is just considered as BB leader
-            const bool is_dead_end = jinst.flags&OPF_DEAD_END;
-            bbs_mark_one(pc, false, !is_dead_end, false, false);
-            bool is_jsr = jinst.opcode == OPCODE_JSR;
-            for (unsigned i=0, n = jinst.get_num_targets(); i<n; i++) {
-                // mark jmp target(s)
-                bbs_mark_one(jinst.get_target(i), true, true, false, is_jsr);
-            }
-            if (jinst.is_switch()) {
-                bbs_mark_one(jinst.get_def_target(), true, true, false, false);
-            }
-        }
-        
-    } while(pc<bc_size);
-
-    //
-    // mark exception handlers as leads of basic blocks
-    //
-    for (unsigned i=0; i<m_handlers.size(); i++) {
-        const HandlerInfo& hi = m_handlers[i];
-        bbs_mark_one(hi.handler, false, true, true, false);
-    }
-
-    //
-    // make list of heads and sort it.
-    //
-    // TODO: may eliminate vector here, and use simple scan over byte code
-    // Another variant is: 
-    // currently, 2 passes over the bytecode performed. Might want to replace
-    // it with a single DFS pass, and also may eliminate BBInfo structure.
-    
-    const unsigned num_bbs = m_bbs.size();
-    ::std::vector<unsigned> bb_heads;
-    bb_heads.reserve(num_bbs);
-    for (BBMAP::iterator i=m_bbs.begin(); i != m_bbs.end(); i++) {
-        bb_heads.push_back(i->second.start);
-    };
-    ::std::sort(bb_heads.begin(), bb_heads.end());
-
-    // initialize with ATHROW to avoid ref_count increment for pc=0
-    JavaByteCodes prev = OPCODE_ATHROW; 
-    // for each basic block, find it's last instruction
-    for (unsigned idx = 0; idx != num_bbs; idx++) {
-        unsigned pc = bb_heads[idx];
-        BBInfo& bb = m_bbs[pc];
-        unsigned next_bb_start = idx == num_bbs-1 ? 
-                                                bc_size : bb_heads[idx + 1];
-        while (next_bb_start != m_insts[pc].next) {
-            pc = m_insts[pc].next;
-        }
-        bb.last_pc = m_insts[pc].pc;
-        bb.next_bb = next_bb_start;
-        unsigned prev_flags = instrs[prev].flags;
-        if (!(prev_flags & OPF_ENDS_BB)) {
-            // here we have an instruction (jinst.opcode) which
-            // follows an instruction which normally does not
-            // end a basic block. This normally means, that the
-            // current instruction is a branch target, and thus become
-            // a BB leader. As the previous opcode does not end basic
-            // block, then this means that there is a control flow path
-            // which leads from the previous instruction to the current one:
-            //
-            //      GOTO n      ; somewhere in the bytecode
-            //      ...
-            //      ALOAD_0     ; sample prev instruction
-            //  n:  ASTORE_1    ; sample current instruction. ref_ocunt found
-            //                  is '1' because of GOTO
-            //
-            // Thus incrementing ref_count and this assertion
-            //assert(bb.jmp_target || bb.jsr_target || 
-            //       bb.start == 0 || bb.ehandler);
-            bb.ref_count++;
-        }
-        prev = m_insts[pc].opcode;
-        
-        // Statistics:: size of the basic blocks, in bytes
-        if (bb.ref_count) {
-            STATS_MEASURE_MIN_MAX_VALUE( bb_size, bb.next_bb - bb.start, m_fname );
-        }
-    }
-}
-
-void Compiler::bbs_mark_one(unsigned pc, bool jmp_target, bool add_ref,
-                            bool ehandler, bool jsr_target)
-{
-    assert(pc < USHRT_MAX);
-    if (pc >= m_infoBlock.get_bc_size()) {
-        return;
-    }
-
-    BBMAP::iterator i = m_bbs.find(pc);
-    if (i != m_bbs.end()) {
-        i->second.jmp_target = i->second.jmp_target || jmp_target;
-        i->second.ehandler = i->second.ehandler || ehandler;
-        i->second.jsr_target = i->second.jsr_target || jsr_target;
-        if (add_ref )   ++i->second.ref_count;
-    }
-    else {
+    if (m_bbs.find(pc) == m_bbs.end()) {
         BBInfo bbinfo;
-        bbinfo.start = pc;
-        bbinfo.last_pc = 0;
-        bbinfo.next_bb = 0;
-        bbinfo.ipoff = 0;
-
-        //      bbinfo.next_bb = NOTHING;
-        //      bbinfo.code_start = NULL;
-        //      bbinfo.code_size = NOTHING;
-        bbinfo.code_size = 0;
-        bbinfo.jmp_target = jmp_target;
-        bbinfo.ehandler = ehandler;
-        bbinfo.ref_count = add_ref ? 1 : 0;
-        bbinfo.jsr_target = jsr_target;
-        bbinfo.processed = false;
+        bbinfo.start = bbinfo.last_pc = bbinfo.next_bb = pc;
         m_bbs[pc] = bbinfo;
     }
+    return m_bbs[pc];
 }
 
-void Compiler::bbs_gen_code(unsigned pc, BBState * prev, unsigned jsr_lead)
+
+void Compiler::comp_parse_bytecode(void)
+{
+    const unsigned vars = m_infoBlock.get_num_locals();
+    m_defs.resize(vars, 0);
+    m_uses.resize(vars, 0);
+    // jretAddr here is used as 'not initialized yet' value
+    m_staticTypes.resize(vars, jretAddr);
+    for (unsigned i=0, var=0; i<m_ci.count(); i++, var++) {
+        jtype jt = m_ci.jt(i);
+        if (jt < i32) { jt = i32; }
+        bool big = is_big(jt);
+        m_staticTypes[var] = jt;
+        m_argids[var] = m_ci.reg(i) == ar_x && !big? i : NOTHING;
+        if (is_wide(jt)) {
+            ++var;
+            m_argids[var] = m_ci.reg(i) == ar_x && !big ? i : NOTHING;
+            m_staticTypes[var] = jt;
+        }
+    }
+    
+    // PC=0 always starts new basic block
+    comp_create_bb(0);
+    JInst& start = m_insts[0];
+    start.ref_count = 1;
+    start.flags |= OPF_STARTS_BB;
+    
+    unsigned id = 1;
+    const unsigned bc_size = m_infoBlock.get_bc_size();
+    for (unsigned pc=0; pc<bc_size; ) {
+        JInst& jinst = m_insts[pc];
+        pc = fetch(pc, jinst);
+        if (jinst.id != 0) {
+            continue;
+        }
+        jinst.id = id++;
+        if (jinst.flags & OPF_VAR_DU_MASK) {
+            // extract variable index
+            unsigned idx = 
+                (jinst.flags&OPF_VAR_IDX_MASK) == OPF_VAR_OP0 ? 
+                                jinst.op0 : jinst.flags&OPF_VAR_IDX_MASK;
+            assert(idx<vars);
+            // extract variable type
+            jtype jt = 
+                (jtype)((jinst.flags&OPF_VAR_TYPE_MASK)>>OPF_VAR_TYPE_SHIFT);
+                
+            // update def-use info
+            if (jinst.flags & OPF_VAR_DEF) {
+                ++m_defs[idx];
+                if (is_big(jt)) {
+                    ++m_defs[idx+1];
+                }
+            }
+            if (jinst.flags & OPF_VAR_USE) {
+                ++m_uses[idx];
+                if (is_big(jt)) {
+                    ++m_uses[idx+1];
+                }
+            }
+                
+            // Store a slot's 'static' type - if a slot is used only as 
+            // one type (say, only i32). If the slot is used to keep various 
+            // types (i.e. we have both ASTORE_1 and DSTORE_1 - then store 
+            // 'jvoid' as 'static' type.
+            if (m_staticTypes[idx] == jretAddr || m_staticTypes[idx] == jt) {
+                m_staticTypes[idx] = jt;
+                if (is_wide(jt)) {
+                    jtype jt_hi = m_staticTypes[idx+1];
+                    if (jt_hi == jretAddr || jt_hi == jt) {
+                        m_staticTypes[idx+1] = jt;
+                    }
+                    else {
+                        m_staticTypes[idx+1] = jvoid;
+                        m_staticTypes[idx] = jvoid;
+                    }
+                }
+            }
+            else {
+                m_staticTypes[idx] = jvoid;
+                if (is_wide(jt)) {
+                    m_staticTypes[idx+1] = jvoid;
+                }
+            }
+        }
+        if (jinst.flags & OPF_STARTS_BB) {
+            comp_create_bb(jinst.pc);
+        }
+        //JInst& next = m_insts[pc];
+        if (!(jinst.flags&OPF_DEAD_END)) {
+            if (pc<bc_size) { ++m_insts[pc].ref_count; }
+        }
+        if (!(jinst.flags & OPF_ENDS_BB)) {
+            continue;
+        }
+        if (pc<bc_size) {
+            m_insts[pc].flags |= OPF_STARTS_BB;
+            comp_create_bb(pc);
+        }
+        for (unsigned i=0, n = jinst.get_num_targets(); i<n; i++) {
+            // mark jmp target(s)
+            JInst& ji = m_insts[jinst.get_target(i)];
+            ji.flags |= OPF_STARTS_BB;
+            ++ji.ref_count;
+            BBInfo& nbb = comp_create_bb(jinst.get_target(i));
+            nbb.jsr_target = nbb.jsr_target || jinst.is_jsr();
+        }
+        if (jinst.is_switch()) {
+            JInst& ji = m_insts[jinst.get_def_target()];
+            ji.flags |= OPF_STARTS_BB;
+            ++ji.ref_count;
+            comp_create_bb(jinst.get_def_target());
+        }
+    }
+    //
+    // mark exception handlers as leads of basic blocks 
+    for (unsigned i=0; i<m_handlers.size(); i++) {
+        const HandlerInfo& hi = m_handlers[i];
+        JInst& ji = m_insts[hi.handler];
+        ji.flags |= OPF_STARTS_BB;
+        comp_create_bb(hi.handler).ehandler = true;
+        ++ji.ref_count;
+        if (ji.id == 0) {
+            ji.id = id++;
+        }
+    }
+
+}
+
+void Compiler::comp_alloc_regs(void)
+{
+    if (g_jvmtiMode) {
+        // Do not allocate regs. Only ensure the m_base will be saved.
+        m_global_rusage.set(ar_idx(m_base));
+        // Make sure all method args get reloaded into local vars
+        for (unsigned i=0; i<m_argids.size(); i++) {
+            m_argids[i] = -1;
+        }
+        return;
+    }
+    const unsigned vars = m_infoBlock.get_num_locals();
+    // 1. allocate GP registers
+    for (unsigned i=0; i<g_global_grs.size(); i++) {
+        AR ar = g_global_grs[i];
+        assert(is_callee_save(ar));
+        unsigned max_dus = 0;
+        unsigned idx = NOTHING;
+        for (unsigned j=0; j<vars; j++) {
+            jtype jt = m_staticTypes[j];
+            bool accept = jt==i32 || (jt==i64 && !is_big(i64)) || jt==jobj;
+            if (!accept) continue;
+            if (m_ra[j] != ar_x) continue;
+            if (m_defs[j]+m_uses[j]>max_dus) {
+                max_dus = m_defs[j]+m_uses[j];
+                idx = j;
+            }
+        }
+        if (idx == NOTHING) {
+            // no more vars remain
+            break;
+        }
+        m_ra[idx] = ar;
+    }
+    
+    // 2. allocate FP registers
+    for (unsigned i=0; i<g_global_frs.size(); i++) {
+        AR ar = g_global_frs[i];
+        unsigned max_dus = 0;
+        unsigned idx = NOTHING;
+        for (unsigned j=0; j<vars; j++) {
+            jtype jt = m_staticTypes[j];
+            if (!is_f(jt)) continue;
+            if (m_ra[j] != ar_x) continue;
+            if (m_defs[j]+m_uses[j]>max_dus) {
+                max_dus = m_defs[j]+m_uses[j];
+                idx = j;
+            }
+        }
+        if (idx == NOTHING) {
+            // no more vars remain
+            break;
+        }
+        m_ra[idx] = ar;
+    }
+    // Set a bitset of globally used registers
+    // m_base is always used.
+    m_global_rusage.set(ar_idx(m_base));
+    for (unsigned i=0; i<m_ra.size(); i++) {
+        AR ar = m_ra[i];
+        if (ar == ar_x) { continue; }
+        m_global_rusage.set(ar_idx(ar));
+    }
+    
+    // Print out 
+    if (is_set(DBG_TRACE_CG)) {
+        for (unsigned i=0; i<vars; i++) {
+            jtype jt = m_staticTypes[i];
+            // common info on var - type (if any), uses, defs ...
+            dbg("local#%d (%s): d=%u, u=%u", 
+                    i, jt < jvoid ? jtypes[jt].name : "",  
+                    m_defs[i], m_uses[i]);
+            // ... which input arg it came from ...
+            if (i<m_argSlots && m_argids[i] != -1) {
+                dbg(" <= arg#%d", m_argids[i]);
+            }
+            // ... which register it's assigned on ...
+            if (m_ra[i] != ar_x) {
+                dbg(" => %s", to_str(m_ra[i]).c_str());
+            }
+            dbg("\n");
+        }
+    }
+}
+
+
+/**
+ * A helper structure to organize recursive compilation.
+ */
+struct GenItem {
+    /**
+     * No op.
+     */
+    GenItem() {}
+    /**
+     * @param _pc - start of basic block to generate
+     * @param _parent - start of predecessor block (to inherit BBState 
+     *        from) or equal to _pc if no predecessor
+     * @param _jsr - PC of start of JSR subroutine the \c _pc block belongs
+     *        to, or #NOTHING if the block lies outside of JSR subroutines.
+     */
+    GenItem(unsigned _pc, unsigned _parent, unsigned _jsr)
+    {
+        pc = _pc; parentPC = _parent; jsr_lead = _jsr;
+    }
+    /** start of basic block to generate */
+    unsigned pc;
+    /** start of predecessor block */
+    unsigned parentPC;
+    /** start of JSR subroutine the block belongs to*/
+    unsigned jsr_lead;
+};
+
+
+void Compiler::comp_gen_code_bb(unsigned pc)
+{
+///////////////////////////////////////////////////////////////////////////
+    /*
+    Ok, here is a bit sophisticated code, but the idea is simple: we
+    emulate recursion, without doing real recursive calls of method.
+    
+    We generate code in depth-first search order. Banal recursion is the 
+    most natural, simple and clear way to do so:
+        //    
+        generate_all_insts_in_bb(head);
+        foreach target in targets_of_last_instrution {
+            generate_all_insts_in_bb(target)
+        }
+        if (last_inst_has_fall_through) {
+            generate_all_insts_in_bb(last_inst.next)
+        }
+        //
+    Now, let's count. The max bytecode size is 65535, including RETURN at
+    the end. GOTO instruction takes 3 bytes, so the hypothetical max number 
+    of basic blocks is (65'535-1(return))/3 = 21'844 which is also maximum
+    recursion depth for simplest implementation. The default maximum size 
+    of thread's stack is 1 MB (at least on Win32). Having all of this in 
+    mind: 1024*1024/21'844 = 48 bytes we can only spend in comp_gen_code()
+    for local variables, spilled regs, passed args, etc. In addition, in 
+    real life there are many calls before comp_gen_code() and comp_gen_code() 
+    also do some calls - they all require stack space - and we're in 
+    trouble with the direct approach as we may easily exhaust stack on 
+    a legal and valid bytecode.
+    
+    So, here is what we do to avoid this: we emulate recursion, using 
+    heap-based stack structure.
+    */
+    
+    stack<GenItem> stk;
+    stk.push(GenItem(pc, pc, NOTHING));
+    
+    while (true) {
+        if (stk.empty()) {
+            break;
+        }
+        GenItem gi = stk.top(); stk.pop();
+        unsigned head = gi.pc;
+        //
+        if (!comp_gen_insts(gi.pc, gi.parentPC, gi.jsr_lead)) {
+            // Basic block was already seen, nothing to do.
+            continue;
+        }
+        const BBInfo& bbi = m_bbs[head];
+        const JInst& lastInst = m_insts[bbi.last_pc];
+        // Push fall-through block first, so it's processed at the very end
+        if (!lastInst.is_set(OPF_DEAD_END)) {
+            unsigned next = lastInst.next;
+            // If last inst was JSR, then when generating fall through,
+            // specify the JSR leader as 'parent PC', so the BBState 
+            // to inherit will be taken the JSR's one.
+            unsigned h = lastInst.is_jsr() ? lastInst.get_target(0): head;
+            if (lastInst.single_suc() && !m_bbs[next].processed) {
+                // If instruction has only one successor, so its BBState 
+                // will be used once for inheritance. May eliminate 
+                // copying and in operate directly on this BBState when 
+                // generating next block.
+                m_bbStates[next] = m_bbStates[head];
+            }
+            stk.push(GenItem(next, h, gi.jsr_lead));
+        }
+        // Then, process target blocks - this is match with how code gen 
+        // for branches works - it expects to visit branch target first, 
+        // and then fall through
+        //         
+        for (unsigned i=0; !lastInst.is_jsr() && 
+                           i<lastInst.get_num_targets(); i++) {
+            unsigned next = lastInst.get_target(i);
+            if (lastInst.single_suc() && !m_bbs[next].processed) {
+                m_bbStates[next] = m_bbStates[head];
+            }
+            stk.push(GenItem(next, head, gi.jsr_lead));
+        }
+        if (lastInst.is_switch()) {
+            unsigned next = lastInst.get_def_target();
+            stk.push(GenItem(next, head, gi.jsr_lead));
+        }
+        // at the very end push JSR target, so JSR subroutine get processed
+        // first
+        if (lastInst.is_jsr()) {
+            unsigned jsr_lead = lastInst.get_target(0);
+            stk.push(GenItem(jsr_lead, head, jsr_lead));
+        }
+        
+    }
+}
+
+bool Compiler::comp_gen_insts(unsigned pc, unsigned parentPC, 
+                              unsigned jsr_lead)
 {
     assert(m_bbs.find(pc) != m_bbs.end());
     BBInfo& bbinfo = m_bbs[pc];
     if (bbinfo.processed) {
         if (bbinfo.jsr_target) {
-            // we're processing JSR subroutine as result of JSR call || we 
-            // are processing JSR subroutine as result of fall-through pass
-            assert(jsr_lead == pc || jsr_lead==NOTHING);
-            // JSR block was processed already - there must be a stack state
-            assert(m_stack_states.find(pc) != m_stack_states.end());
+            // we're processing JSR subroutine
+            assert(jsr_lead == pc);
             // Simply load the state back to the parent's
-            const JFrame& stackState = m_stack_states[ pc ];
-            // make sure we'll not lost anything
-            assert(prev->jframe.need_update() == 0);
-            prev->jframe.init(&stackState);
+            BBState* prevState = m_bbStates[parentPC];
+            assert(m_jsrStates.find(jsr_lead) != m_jsrStates.end());
+            const BBState* jsrState = m_jsrStates[jsr_lead];
+            //prevState.jframe.init(&jsrState.jframe);
+            *prevState = *jsrState;
         }
-        return;
+        return false;
     }
+    BBState* pState = m_bbStates[pc];
+    BBState * parentState = m_bbStates[parentPC];
 
-    bbinfo.processed = true;
-    BBState bbstate;
-    
-    if (prev == NULL) {
-        bbstate.jframe.init(m_infoBlock.get_stack_max(),
-                              m_infoBlock.get_num_locals(), 
-                              I_STACK_REGS, I_LOCAL_REGS,
-                              F_STACK_REGS, F_LOCAL_REGS);
+    JInst& bbhead = m_insts[pc];
+    if (pc != parentPC) {
+        if (pState != parentState) {
+            if (bbhead.ref_count > 1) {
+                pState->jframe = parentState->jframe;
+            }
+            else {
+                *pState = *parentState;
+            }
+        }
     }
     else {
-        bbstate.jframe.init(&prev->jframe);
+        pState->jframe.init(m_infoBlock.get_stack_max(),
+                            m_infoBlock.get_num_locals());
     }
-
+    
+    BBState& bbstate = *pState;
+    bbinfo.processed = true;
     m_jframe = &bbstate.jframe;
-    m_curr_bb_state = &bbstate;
-    m_curr_bb = &bbinfo;
+    m_bbstate = &bbstate;
+    m_bbinfo = &bbinfo;
+    m_pc = pc;
 
     unsigned bb_ip_start = bbinfo.ipoff = m_codeStream.ipoff();
-    
-    if (pc == 0) {
-        assert(!bbinfo.ehandler); // cant be at pc=0
-        m_pc = 0;
-        if (!(m_java_meth_flags & ACC_STATIC)) {
-            // for instance methods, their local_0 is 'this' at entrance,
-            // so we can say it's not null for sure.
-            bbstate.jframe.var_def(jobj, 0, SA_NZ);
-        }
-        gen_prolog(m_args);
-    }
-
-    // If there are several execution paths merged on this basic block, then 
-    // we can not predict many things, including, but not limited to type of
-    // of local variables, state of stack items, what stack depth was saved 
-    // last, etc. So, clearing this out.
-    // The current convention is that before the execution goes to such 
-    // 'multiref' basic block, then all local vars are in the memory and 
-    // all appropriate stack items are on their registers
     //
-    // The same applies to exception handlers.
-    if (bbinfo.ehandler || bbinfo.ref_count > 1 || prev==NULL) {
-        m_jframe->clear_vars();
-        m_jframe->clear_attrs();
-    //todo: might be useful to extract this several assignments into, say,
-    // operator=(BBState*) - ?
-        bbstate.seen_gcpt = false;
-        bbstate.stack_depth = NOTHING;
-        bbstate.stack_mask = 0;
-        bbstate.stack_mask_valid = false;
-    }
-    else {
-        bbstate.seen_gcpt = prev->seen_gcpt;
-        bbstate.stack_depth = prev->stack_depth;
-        bbstate.stack_mask = prev->stack_mask;
-        bbstate.stack_mask_valid = prev->stack_mask_valid;
-        bbstate.resState = prev->resState;
+    // If there are several execution paths merged on this basic block, 
+    // then we can not predict many things, including, but not limited to 
+    // type of of local variables, state of stack items, what stack depth 
+    // was saved last, etc. So, clearing all this stuff out.
+    //
+    
+    if (bbinfo.ehandler || bbhead.ref_count > 1) {
+        bbstate.clear();
     }
 
-    if (m_infoBlock.get_flags() & DBG_CHECK_STACK && (jsr_lead==NOTHING)){
-        // do not check stack for JSR subroutines (at least for IA32/EM64T)
-        // More comments in cg_ia32.cpp::gen_dbg_check_bb_stack
+    if (is_set(DBG_CHECK_STACK)){
         gen_dbg_check_bb_stack();
     }
 
@@ -522,158 +911,131 @@ void Compiler::bbs_gen_code(unsigned pc, BBState * prev, unsigned jsr_lead)
         //
         // Here, we invoke gen_save_ret() because this is how the idea of
         // exception handlers works in DRL VM: 
-        // Loosely speaking, calling something like 'throw_<whatever>' is 
-        // like a regular function call. The only difference is that the 
-        // return point is at another address, not at the next instruction - 
-        // we're 'returning' to the proper exception handler.
+        // Loosely speaking, calling 'throw_<whatever>' is like a regular 
+        // function call. The only difference is that the return point is 
+        // at another address, not at the next instruction - we're 
+        // 'returning' to the proper exception handler.
         //
         // That's why the exception object acts like a return value - for 
         // example on IA32 it's in EAX.
         //
-        
-        // a stack get empty on entrance into exception handler ...
-        m_jframe->clear_stack();
-        
-        // ... with an reference to Exception object on the top of it
         gen_save_ret(jobj);
-        
-        // We're entering exception handler - the exception object 
-        // on the stack is guaranteed to be non-null, marking it as such
-        m_jframe->stack_attrs(0, SA_NZ);
     }
-
-    if (m_infoBlock.get_flags() & DBG_TRACE_CG) {
-        dbg(";; ========================================================\n");
-        dbg(";; bb.ref.count=%d%s%s savedStackDepth=%d stackMask=0x%X %s\n",
-            bbinfo.ref_count, bbinfo.ehandler ? " ehandler " : "",
+    
+    if (is_set(DBG_TRACE_CG)) {
+        dbg("\n");
+        dbg(";; ======================================================\n");
+        dbg(";; bb.ref.count=%d%s%s savedStackDepth=%d stackMask=0x%X %s"
+            " jsr_lead=%d\n",
+            bbhead.ref_count, bbinfo.ehandler ? " ehandler " : "",
             bbinfo.jsr_target ? " #JSR# " : "",
             bbstate.stack_depth, bbstate.stack_mask,
-            bbstate.stack_mask_valid ? "" : "*mask.invalid*");
+            bbstate.stack_mask_valid ? "" : "*mask.invalid*", jsr_lead);
         if (bb_ip_start != m_codeStream.ipoff()) {
             dbg_dump_code(m_codeStream.data() + bb_ip_start,
                           m_codeStream.ipoff()-bb_ip_start, "bb.head");
         }
+        dbg(";; ======================================================\n");
     }
+    gen_bb_enter();
+#ifdef _DEBUG
+        vcheck();
+#endif
+    
+    const unsigned bc_size = m_infoBlock.get_bc_size();
     
     unsigned next_pc = bbinfo.start;
-    
+    bool last = false;
     do {
         // read out instruction to process
-        const JInst& jinst = m_insts[next_pc];
         m_pc = next_pc;
-        m_curr_inst = &jinst;
-        next_pc = jinst.next;
+        m_curr_inst = &m_insts[m_pc];
+        next_pc = m_insts[m_pc].next;
+        last = next_pc>=bc_size || (m_insts[next_pc].is_set(OPF_STARTS_BB));
+        if (last) {
+            bbinfo.last_pc = m_pc;
+            bbinfo.next_bb = next_pc;
+        }
         unsigned inst_code_start = m_codeStream.ipoff();
+        unsigned inst_code_dump_start = inst_code_start;
         
-        if (m_infoBlock.get_flags() & DBG_TRACE_CG) {
-            dbg_dump_jframe("before", &bbstate.jframe);
+        if (is_set(DBG_TRACE_CG)) {
+            dbg_dump_state("before", &bbstate);
             // print an opcode
-            dbg(";; %-30s\n", toStr(jinst, true).c_str());
+            dbg(";; %-30s\n", toStr(m_insts[m_pc], true).c_str());
+        }
+
+        if (is_set(DBG_TRACE_BC)) {
+            gen_dbg_rt(true, "//%s@%u", meth_fname(), m_pc);
+            inst_code_dump_start = m_codeStream.ipoff();
         }
         
-#if defined(_DEBUG) && defined(JET_PROTO)
-        if (dbg_break_pc == jinst.pc) {
-            gen_dbg_brk();
+#ifdef JET_PROTO
+        if (dbg_break_pc == m_pc) {
+            gen_brk();
         }
 #endif
-        if (m_infoBlock.get_flags() & DBG_TRACE_BC) {
-            gen_dbg_rt_out("//%s @ PC = %u", m_fname, m_pc);
-        }
-
-        STATS_INC(Stats::opcodesSeen[jinst.opcode], 1);
-
-        handle_inst(jinst);
-        
+        STATS_INC(Stats::opcodesSeen[m_insts[m_pc].opcode], 1);
+        handle_inst();
+#ifdef _DEBUG
+        vcheck();
+#endif
         unsigned inst_code_end = m_codeStream.ipoff();
-        unsigned inst_code_size = inst_code_end-inst_code_start;
+        unsigned inst_code_dump_size = inst_code_end - inst_code_dump_start;
 
         unsigned bb_off = inst_code_start - bb_ip_start;
         // store a native offset inside the basic block for now,
-        // this will be adjusted in bbs_layout_code(), by adding the BB's
+        // this will be adjusted in comp_layout_code(), by adding the BB's
         // start address
-        for (unsigned i=jinst.pc; i<next_pc; i++) {
-            m_infoBlock.set_code_info(i, (const char *)bb_off);
+        for (unsigned i=m_pc; i<next_pc; i++) {
+            m_infoBlock.set_code_info(i, (const char *)(int_ptr)bb_off);
         }
-
         if (m_infoBlock.get_flags() & DBG_TRACE_CG) {
             // disassemble the code
-            dbg_dump_code(m_codeStream.data() + inst_code_start, 
-                          inst_code_size, NULL);
+            dbg_dump_code(m_codeStream.data() + inst_code_dump_start, 
+                          inst_code_dump_size, NULL);
         }
         // no one should change m_pc, it's used right after the loop to get
         // the same JInst back again
-        assert(jinst.pc == m_pc);
-    } while(next_pc != bbinfo.next_bb);
+        //assert(jinst.pc == m_pc);
+    } while(!last);
+
+    bbinfo.last_pc = m_pc;
+    bbinfo.next_bb = next_pc;
     
     const JInst& jinst = m_insts[m_pc];
 
     unsigned bb_code_end = m_codeStream.ipoff();
     bbinfo.code_size = bb_code_end - bb_ip_start;
     
-    // process JSR target first, so it will update the state of jframe
-    bool is_jsr = jinst.opcode == OPCODE_JSR || jinst.opcode == OPCODE_JSR_W;
-    if (is_jsr) {
-        unsigned targetBB = jinst.get_target(0);
-        bbs_gen_code(targetBB, &bbstate, targetBB);
-        //
-        // bbs_gen_code() invalidated m_* fields, so below only use
-        // local variables, not the instance ones !
-        //
-        
-        // We just executed/generated the JSR subroutine. 
-        // We must have a state for it:
-        assert(m_stack_states.find(targetBB) != m_stack_states.end());
-        // Reload the stack state into the current one
-        bbstate.jframe.init(&m_stack_states[targetBB]);
-    }
-    else if (jinst.opcode == OPCODE_RET) {
+    // 
+    // We just finished JSR subroutine - store its state for further use
+    // 
+    if (jinst.opcode == OPCODE_RET) {
         assert(jsr_lead != NOTHING);
-        m_stack_states[jsr_lead] = bbstate.jframe;
+        assert(m_insts[jsr_lead].ref_count>0);
+        assert(m_bbs[jsr_lead].processed);
+        m_jsrStates[jsr_lead] = pState;
     }
-    else {
-        // process jmp target blocks
-        for (unsigned i=0, n=jinst.get_num_targets(); i<n; i++) {
-            bbs_gen_code(jinst.get_target(i), &bbstate, jsr_lead);
-        }
-        if (jinst.is_switch()) {
-            bbs_gen_code(jinst.get_def_target(), &bbstate, jsr_lead);
-        }
+    else if (jsr_lead != NOTHING && 
+             (jinst.opcode == OPCODE_ATHROW || jinst.is_set(OPF_RETURN))) {
+        assert(m_insts[jsr_lead].ref_count>0);
+        assert(m_bbs[jsr_lead].processed);
+        m_jsrStates[jsr_lead] = pState;
     }
-    if (!(jinst.flags & OPF_DEAD_END)) {
-        // process fall through block
-        assert(next_pc != NOTHING);
-        bbs_gen_code(next_pc, &bbstate, jsr_lead);
-    }
-    else if ((jinst.flags & OPF_EXIT) && jsr_lead != NOTHING) {
-        // A special case - when a JSR subroutine ends the method 
-        // (xRETURN, ATHROW) save an empty state, but if there are 
-        // several paths in the subroutine and at least one of them does 
-        // not end the method, then keep that state:
-        // JSR _jsr
-        // ...
-        // _jsr: ASTORE_0
-        //       IF_xCMPx _ret
-        //       xRETURN        // <= here, save an empty state
-        // _ret: ... RET 0      // <= here, save the stack state
-        //
-        // So, only save the empty state if there is no state exists
-        // otherwise left it as is, this is either a state saved by 
-        // RET or an empty state saved by another xRETURN. 
-        // There is no such check in RET processing, so if we have both
-        // xRETURN and RET then RET's state always overwrites xRETURN's.
-        if (m_stack_states.find(jsr_lead) == m_stack_states.end()) {
-            bbstate.jframe.clear_stack();
-            bbstate.jframe.clear_vars();
-            m_stack_states[jsr_lead] = bbstate.jframe;
-        }
-    }
+    return true;
 }
 
-void Compiler::bbs_layout_code(void)
+
+void Compiler::comp_layout_code(unsigned prolog_ipoff, unsigned prolog_size)
 {
     char * p = m_vmCode;
+    // Copy prolog
+    memcpy(p, m_codeStream.data() + prolog_ipoff, prolog_size);
+    p += prolog_size;
     // copy all BBs
-    for (unsigned pc = 0; pc<m_infoBlock.get_bc_size(); ) {
+    unsigned bc_size = m_infoBlock.get_bc_size();
+    for (unsigned pc = 0; pc<bc_size; ) {
         // it's basic block lead.
         assert(m_bbs.find(pc) != m_bbs.end());
         BBInfo& bbinfo = m_bbs[pc];
@@ -681,7 +1043,7 @@ void Compiler::bbs_layout_code(void)
         if (bbinfo.processed) {
             // copy the code. 
             memcpy(p, m_codeStream.data()+bbinfo.ipoff, bbinfo.code_size);
-            bbinfo.ipoff = p - m_vmCode;
+            bbinfo.addr = p;
             if (m_infoBlock.get_flags() & DBG_TRACE_LAYOUT) {
                 dbg("code.range: [%u - %u] => [%p - %p)\n", 
                     bbinfo.start, bbinfo.last_pc, 
@@ -693,10 +1055,18 @@ void Compiler::bbs_layout_code(void)
                 dbg("warning - dead code @ %d\n", pc);
             }
             assert(bbinfo.code_size == 0);
+            unsigned j=pc+1;
+            for (; j<bc_size; j++) {
+                if (m_insts[j].flags & OPF_STARTS_BB) {
+                    break;
+                }
+            }
+            bbinfo.next_bb = j;
         }        
         // update runtime info with the mapping pc/ip data
         for (unsigned j=pc; j<bbinfo.next_bb; j++) {
-            const char * inst_ip = pBBStart + (int)m_infoBlock.get_code_info(j);
+            const char * inst_ip = pBBStart + 
+                                (int)(int_ptr)m_infoBlock.get_code_info(j);
             m_infoBlock.set_code_info(j, inst_ip);
         }
         p = (char*)(pBBStart+bbinfo.code_size);
@@ -704,7 +1074,7 @@ void Compiler::bbs_layout_code(void)
     }
 }
 
-bool Compiler::bbs_ehandlers_resolve(void)
+bool Compiler::comp_resolve_ehandlers(void)
 {
     unsigned num_handlers = method_get_num_handlers(m_method);
     m_handlers.resize(num_handlers);
@@ -721,9 +1091,7 @@ bool Compiler::bbs_ehandlers_resolve(void)
         hi.handler = handlerStart;
         hi.type = klassType;
         if (hi.type != 0) {
-            Timers::vmResolve.start();
-                hi.klass = resolve_class(m_compileHandle, m_klass, hi.type);
-            Timers::vmResolve.stop();
+            hi.klass = resolve_class(m_compileHandle, m_klass, hi.type);
             eh_ok = eh_ok && (hi.klass != NULL);
         }
         if (m_infoBlock.get_flags() & DBG_DUMP_BBS) {
@@ -734,12 +1102,12 @@ bool Compiler::bbs_ehandlers_resolve(void)
     return eh_ok;
 }
 
-void Compiler::bbs_ehandlers_set(void)
+void Compiler::comp_set_ehandlers(void)
 {
     unsigned real_num_handlers = 0;
     for (unsigned i=0, n=m_handlers.size(); i<n; i++) {
         HandlerInfo& hi = m_handlers[i];
-        if (bbs_hi_to_native(m_vmCode, hi)) {
+        if (comp_hi_to_native(hi)) {
             ++real_num_handlers;
         }
         else {
@@ -750,7 +1118,7 @@ void Compiler::bbs_ehandlers_set(void)
         }
     }
 
-    method_set_num_target_handlers(m_method, jit_handle, real_num_handlers);
+    method_set_num_target_handlers(m_method, m_hjit, real_num_handlers);
     
     for (unsigned i=0, handlerID=0, n=m_handlers.size(); i<n; i++) {
         const HandlerInfo& hi = m_handlers[i];
@@ -758,14 +1126,14 @@ void Compiler::bbs_ehandlers_set(void)
             continue;
         }
         // The last param is 'is_exception_object_dead'
-        // In many cases, when an exception handler does not use an exception
-        // object, the fist bytecode instruction is 'pop' to throw the 
-        // exception object away. Thus, this can used as a quick, cheap but 
-        // good check whether the 'exception_object_is_dead'. 
-        method_set_target_handler_info(m_method, jit_handle, handlerID,
+        // In many cases, when an exception handler does not use an 
+        // exception object, the fist bytecode instruction is 'pop' to 
+        // throw the exception object away. Thus, this can used as a quick,
+        // cheap but good check whether the 'exception_object_is_dead'. 
+        method_set_target_handler_info(m_method, m_hjit, handlerID,
                                        hi.start_ip, hi.end_ip, hi.handler_ip, 
                                        hi.klass, 
-                                       m_bc[hi.handler] == OPCODE_POP );
+                                       m_bc[hi.handler] == OPCODE_POP);
         
         ++handlerID;
         
@@ -844,20 +1212,20 @@ void Compiler::get_args_info(Method_Handle meth, ::std::vector<jtype>& args,
 
 jtype Compiler::to_jtype(Type_Info_Handle th)
 {
-    if (type_info_is_unboxed(th)) {
+    if (type_info_is_void(th)) {
+        return jvoid;
+    }
+    if (type_info_is_primitive(th)) {
         Class_Handle ch = type_info_get_class(th);
         assert(class_is_primitive(ch));
         VM_Data_Type vmdt = class_get_primitive_type_of_class(ch);
         return to_jtype(vmdt);
     }
-    if (type_info_is_void(th)) {
-        return jvoid;
-    }
     assert(type_info_is_reference(th) || type_info_is_vector(th));
     return jobj;
 }
 
-bool Compiler::bbs_hi_to_native(char * codeBlock, HandlerInfo& hi)
+bool Compiler::comp_hi_to_native(HandlerInfo& hi)
 {
     // Find beginning of the area protected by the handler, 
     // lookup for the first reachable instruction
@@ -867,10 +1235,7 @@ bool Compiler::bbs_hi_to_native(char * codeBlock, HandlerInfo& hi)
     }
 
     hi.end_ip = (char*)m_infoBlock.get_ip(hi.end);
-    if (hi.end_ip == NULL) {
-        assert(false);
-    }
-
+    
     // either both are NULLs, or both are not NULLs
     assert(!((hi.start_ip == NULL) ^ (hi.end_ip == NULL)));
 
@@ -882,7 +1247,7 @@ bool Compiler::bbs_hi_to_native(char * codeBlock, HandlerInfo& hi)
 
         const BBInfo& handlerBB = m_bbs[hi.handler];
         assert(handlerBB.ehandler);
-        hi.handler_ip = codeBlock + handlerBB.ipoff;
+        hi.handler_ip = handlerBB.addr;
     }
     else {
         hi.handler_ip = NULL;
@@ -890,26 +1255,98 @@ bool Compiler::bbs_hi_to_native(char * codeBlock, HandlerInfo& hi)
     return hi.start_ip != NULL;
 }
 
+
+void Compiler::comp_patch_code(void)
+{
+    for (void * h=enum_start(); !enum_is_end(h); enum_next(h)) {
+        unsigned udata, bb, pid;
+        bool done;
+        enum_patch_data(&pid, &udata, &bb, &done);
+        if (done) {
+            continue;
+        }
+        unsigned inst_ipoff = pid;
+        const BBInfo& bbinfo = m_bbs[bb];
+        assert(bbinfo.processed);
+        void * target;
+        if (udata & DATA_SWITCH_TABLE) {
+            assert(DATA_SWITCH_TABLE==(udata&0xFFFF0000));
+            unsigned pc = udata&0xFFFF;
+            assert(bbinfo.start<=pc && pc<=bbinfo.last_pc);
+            const JInst& jinst = m_insts[pc];
+            assert(jinst.opcode == OPCODE_TABLESWITCH);
+            unsigned targets = jinst.get_num_targets();
+            char * theTable;
+            if (m_bEmulation) {
+                theTable = (char*)malloc(targets * sizeof(void*));
+            }
+            else {
+                theTable = (char*)method_allocate_data_block(
+                                m_method, m_hjit, 
+                                targets * sizeof(void*), 16);
+            }
+            char ** ptargets = (char**)theTable;
+            // Fill out the table with targets
+            for (unsigned j=0; j<targets; j++, ptargets++) {
+                unsigned pc = jinst.get_target(j);
+                *ptargets = (char*)m_infoBlock.get_ip(pc);
+            }
+            target = theTable;
+            if (m_bEmulation) {
+                free(theTable);
+            }
+        }
+        else {
+            target = (void*)m_infoBlock.get_ip(udata);
+        }
+        assert(target != NULL);
+        inst_ipoff -= bbinfo.ipoff;
+        void * inst_addr = bbinfo.addr + inst_ipoff;
+        assert(m_infoBlock.get_pc((char*)inst_addr) < m_infoBlock.get_bc_size());
+        patch(pid, inst_addr, target);
+    }
+}
+
 void Compiler::initStatics(void)
 {
-
     // must only be called once
     assert(NULL == rt_helper_throw);
+
+    Encoder::init();
+    // Fill out lists of registers for global allocation
+    // ... for GP registers, always using callee-save
+    for (unsigned i=0; i<gr_num; i++) {
+        AR gr = _gr(i);
+        if (!is_callee_save(gr)) { continue; };
+        // Do not add bp 
+        // TODO: need to synchronize somehow with JFM_SP_FRAME
+        if (gr == bp) continue;
+        g_global_grs.push_back(gr);
+    }
+    // ... for fr registers, leave 3 registers available for scratch
+    for (unsigned i=3; i<fr_num; i++) {
+        AR fr = _fr(i);
+        g_global_frs.push_back(fr);
+    }
     
     //
     // Collect addresses of runtime helpers
     //
-    rt_helper_throw = 
-                (char*)vm_get_rt_support_addr(VM_RT_THROW);
-    rt_helper_throw_out_of_bounds = 
-                (char*)vm_get_rt_support_addr(VM_RT_IDX_OUT_OF_BOUNDS);
-    rt_helper_throw_npe = 
-                (char*)vm_get_rt_support_addr(VM_RT_NULL_PTR_EXCEPTION);
-    rt_helper_throw_linking_exc = 
-                (char*)vm_get_rt_support_addr(VM_RT_THROW_LINKING_EXCEPTION);
-    rt_helper_throw_div_by_zero_exc = 
-                (char*)vm_get_rt_support_addr(VM_RT_DIVIDE_BY_ZERO_EXCEPTION);
+    rt_helper_init_class = 
+                (char*)vm_get_rt_support_addr(VM_RT_INITIALIZE_CLASS);
+    rt_helper_ldc_string =
+                (char*)vm_get_rt_support_addr(VM_RT_LDC_STRING);
+    rt_helper_new = 
+     (char*)vm_get_rt_support_addr(VM_RT_NEW_RESOLVED_USING_VTABLE_AND_SIZE);
 
+    g_refs_squeeze = vm_references_are_compressed();
+    g_vtbl_squeeze = vm_vtable_pointers_are_compressed();
+    OBJ_BASE  = (const char*)vm_heap_base_address();
+    VTBL_BASE = (const char*)vm_get_vtable_base();
+    NULL_REF  = g_refs_squeeze ? OBJ_BASE : NULL;
+
+    g_jvmtiMode =  vm_get_property_value_boolean("vm.jvmti.enabled", false);
+    
     rt_helper_monitor_enter = 
                 (char*)vm_get_rt_support_addr(VM_RT_MONITOR_ENTER);
     rt_helper_monitor_exit  = 
@@ -918,24 +1355,34 @@ void Compiler::initStatics(void)
                 (char*)vm_get_rt_support_addr(VM_RT_MONITOR_ENTER_STATIC);
     rt_helper_monitor_exit_static = 
                 (char*)vm_get_rt_support_addr(VM_RT_MONITOR_EXIT_STATIC);
-
-    rt_helper_ldc_string =
-                (char*)vm_get_rt_support_addr(VM_RT_LDC_STRING);
-    rt_helper_new = 
-     (char*)vm_get_rt_support_addr(VM_RT_NEW_RESOLVED_USING_VTABLE_AND_SIZE);
+    
     rt_helper_new_array = 
                 (char*)vm_get_rt_support_addr(VM_RT_NEW_VECTOR_USING_VTABLE);
-    rt_helper_init_class = 
-                (char*)vm_get_rt_support_addr(VM_RT_INITIALIZE_CLASS);
     rt_helper_aastore = (char*)vm_get_rt_support_addr(VM_RT_AASTORE);
-    rt_helper_multinewarray = 
-                (char*)vm_get_rt_support_addr(VM_RT_MULTIANEWARRAY_RESOLVED);
+    
     rt_helper_get_vtable = 
               (char*)vm_get_rt_support_addr(VM_RT_GET_INTERFACE_VTABLE_VER0);
+
+    rt_helper_throw_npe = 
+                (char*)vm_get_rt_support_addr(VM_RT_NULL_PTR_EXCEPTION);
+
+    rt_helper_throw = 
+                (char*)vm_get_rt_support_addr(VM_RT_THROW);
+    rt_helper_throw_out_of_bounds = 
+                (char*)vm_get_rt_support_addr(VM_RT_IDX_OUT_OF_BOUNDS);
+    rt_helper_throw_linking_exc = 
+                (char*)vm_get_rt_support_addr(VM_RT_THROW_LINKING_EXCEPTION);
+    rt_helper_throw_div_by_zero_exc = 
+                (char*)vm_get_rt_support_addr(VM_RT_DIVIDE_BY_ZERO_EXCEPTION);
+
     rt_helper_checkcast = 
                 (char*)vm_get_rt_support_addr(VM_RT_CHECKCAST);
     rt_helper_instanceof = 
                 (char*)vm_get_rt_support_addr(VM_RT_INSTANCEOF);
+
+    rt_helper_multinewarray = 
+                (char*)vm_get_rt_support_addr(VM_RT_MULTIANEWARRAY_RESOLVED);
+
     rt_helper_gc_safepoint = 
                 (char*)vm_get_rt_support_addr(VM_RT_GC_SAFE_POINT);
     rt_helper_get_thread_suspend_ptr = 
@@ -945,11 +1392,19 @@ void Compiler::initStatics(void)
             (char*)vm_get_rt_support_addr(VM_RT_JVMTI_METHOD_ENTER_CALLBACK);
     rt_helper_ti_method_exit = 
             (char*)vm_get_rt_support_addr(VM_RT_JVMTI_METHOD_EXIT_CALLBACK);
+
+    rt_helper_ti_field_access =
+            (char*)vm_get_rt_support_addr(VM_RT_JVMTI_FIELD_ACCESS_CALLBACK);
+    rt_helper_ti_field_modification =
+            (char*)vm_get_rt_support_addr(VM_RT_JVMTI_FIELD_MODIFICATION_CALLBACK);;
+
+
     //
     // Collect runtime constants
     //
     rt_array_length_offset = vector_length_offset();
     rt_suspend_req_flag_offset = thread_get_suspend_request_offset();
+    rt_vtable_offset = object_get_vtable_offset();
     
     Class_Handle clss;
     clss = class_get_class_of_primitive_type(VM_DATA_TYPE_INT8);
@@ -978,16 +1433,16 @@ void Compiler::initStatics(void)
     jtypes[jvoid].rt_offset = 0xFFFFFFFF;
 }
 
-void Compiler::initProfilingData(unsigned * pflags) {
+void Compiler::initProfilingData(unsigned * pflags)
+{
     m_p_methentry_counter = NULL;
     m_p_backedge_counter = NULL;
 #if !defined(PROJECT_JET)
-    JITModeData* modeData = Jitrino::getJITModeData(jit_handle);
-    ProfilingInterface* pi = modeData->getProfilingInterface();
-    if (pi->isProfilingEnabled(ProfileType_EntryBackedge,
-                               JITProfilingRole_GEN)) {
+    JITInstanceContext* jitContext = JITInstanceContext::getContextForJIT(m_hjit);
+    ProfilingInterface* pi = jitContext->getProfilingInterface();
+    if (pi->isProfilingEnabled(ProfileType_EntryBackedge, JITProfilingRole_GEN)) {
         MemoryManager mm(128, "jet_profiling_mm");
-        DrlVMMethodDesc md(m_method, jit_handle);
+        DrlVMMethodDesc md(m_method, m_hjit);
 
         g_compileLock.lock();
 
@@ -1002,16 +1457,17 @@ void Compiler::initProfilingData(unsigned * pflags) {
         m_p_backedge_counter = mp->getBackedgeCounter();
         if (pi->isEBProfilerInSyncMode()) {
             *pflags |= JMF_PROF_SYNC_CHECK;
-            m_methentry_threshold = pi->getEBProfilerMethodEntryThreshold();
-            m_backedge_threshold = pi->getEBProfilerBackedgeThreshold();
+            m_methentry_threshold = pi->getMethodEntryThreshold();
+            m_backedge_threshold = pi->getBackedgeThreshold();
             m_profile_handle = mp->getHandle();
             m_recomp_handler_ptr = (void*)pi->getEBProfilerSyncModeCallback();
         }
-
         g_compileLock.unlock();
     }
 #endif
 }
+
+
 
 }}; // ~namespace Jitrino::Jet
 

@@ -34,32 +34,29 @@ static void
 vm_enumerate_interned_strings()
 {
     TRACE2("enumeration", "vm_enumerate_interned_strings()");
-    unsigned cookie = 0;
-    VM_Global_State::loader_env->string_pool.lock_pool();
-    String *ps = VM_Global_State::loader_env->string_pool.get_first_string_intern(&cookie);
+    // string enumeration should be done in stop_the_world phase.
+    // see String_Pool for more information
+    String *ps = VM_Global_State::loader_env->string_pool.get_first_string_intern();
     // 20030405 Don't enumerate references that are *unmanaged null* (i.e. zero/NULL)
     // since vm_enumerate_root_reference() expects to be called with slots containing managed refs.
     if (VM_Global_State::loader_env->compress_references) {
         while (ps != NULL) {
             COMPRESSED_REFERENCE compressed_ref = ps->intern.compressed_ref;
             assert(is_compressed_reference(compressed_ref));
-            if (compressed_ref != 0) {
-                vm_enumerate_compressed_root_reference((COMPRESSED_REFERENCE *)&ps->intern.compressed_ref, 
-                        VM_Global_State::loader_env->pin_interned_strings);
-            }
-            ps = VM_Global_State::loader_env->string_pool.get_next_string_intern(ps, &cookie);
+            assert(compressed_ref != 0);
+            vm_enumerate_compressed_root_reference((COMPRESSED_REFERENCE *)&ps->intern.compressed_ref, 
+                VM_Global_State::loader_env->pin_interned_strings);
+            ps = VM_Global_State::loader_env->string_pool.get_next_string_intern();
         }
     } else {
         while (ps != NULL) {
             ManagedObject* s = ps->intern.raw_ref;
-            if (s != NULL) {
-                vm_enumerate_root_reference((void **)&(ps->intern.raw_ref), 
-                        VM_Global_State::loader_env->pin_interned_strings);
-            }
-            ps = VM_Global_State::loader_env->string_pool.get_next_string_intern(ps, &cookie);
+            assert(s != NULL);
+            vm_enumerate_root_reference((void **)&(ps->intern.raw_ref), 
+                VM_Global_State::loader_env->pin_interned_strings);
+            ps = VM_Global_State::loader_env->string_pool.get_next_string_intern();
         }
     }
-    VM_Global_State::loader_env->string_pool.unlock_pool();
 } //vm_enumerate_interned_strings
 
 
@@ -227,8 +224,14 @@ VMEXPORT // temporary solution for interpreter unplug
 void vm_enumerate_root_set_single_thread_not_on_stack(VM_thread *thread)
 {
     assert(thread);
-    if (thread->p_exception_object != NULL) {
-        vm_enumerate_root_reference((void **)&(thread->p_exception_object), FALSE);
+    if (thread->thread_exception.exc_object != NULL) {
+        vm_enumerate_root_reference((void **)&(thread->thread_exception.exc_object), FALSE);
+    }
+    if (thread->thread_exception.exc_cause != NULL) {
+        vm_enumerate_root_reference((void **)&(thread->thread_exception.exc_cause), FALSE);
+    }
+    if (thread->p_exception_object_ti != NULL) {
+        vm_enumerate_root_reference((void **)&(thread->p_exception_object_ti), FALSE);
     }
 
     if (thread->native_handles)
@@ -249,7 +252,7 @@ void vm_enumerate_root_set_single_thread_on_stack(StackIterator* si)
         CodeChunkInfo* cci = si_get_code_chunk_info(si);
         if (cci) {
 #ifdef VM_STATS
-            vm_stats_inc(vm_stats_total.num_unwind_java_frames_gc);
+            vm_stats_inc(VM_Statistics::get_vm_stats().num_unwind_java_frames_gc);
             vm_stats_inc(cci->num_unwind_java_frames_gc);
 #endif
             TRACE2("enumeration", "enumerating eip=" << (void *) si_get_ip(si)
@@ -265,7 +268,7 @@ void vm_enumerate_root_set_single_thread_on_stack(StackIterator* si)
                 << method_get_descriptor(cci->get_method()));
         } else {
 #ifdef VM_STATS
-            vm_stats_inc(vm_stats_total.num_unwind_native_frames_gc);
+            vm_stats_inc(VM_Statistics::get_vm_stats().num_unwind_native_frames_gc);
 #endif
             TRACE2("enumeration", "enumeration local handles " 
                 << (m2n_get_method(si_get_m2n(si)) ? method_get_name(m2n_get_method(si_get_m2n(si))) : "")

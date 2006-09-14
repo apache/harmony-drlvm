@@ -36,15 +36,11 @@ class IRManager;
 class InstFactory;
 class Reassociate;
 
-DEFINE_OPTPASS(SimplificationPass)
-
-DEFINE_OPTPASS(LateSimplificationPass)
-
 
 class Simplifier : public InstOptimizer {
 public:
     Simplifier(IRManager& irm, bool latepass=false,
-	       Reassociate *reassociate=0);
+           Reassociate *reassociate=0);
     //
     // returns an Opnd if the add can be simplified
     // null if the operation cannot be simplified
@@ -110,16 +106,16 @@ public:
                                          Opnd** args,
                                          InlineInfoBuilder* inlineBuilder);
     // loads
-    Opnd* simplifyLdString(Modifier mod, Type *dstType, 
-                           uint32 token,
-                           MethodDesc* enclosingMethod);
+    Opnd* simplifyLdRef(Modifier mod, Type *dstType, 
+                        uint32 token,
+                        MethodDesc* enclosingMethod);
     Opnd* simplifyTauLdInd(Modifier mod, Type *dstType, 
                            Type::Tag type,
                            Opnd* ptr,
                            Opnd* tauBaseNonNull,
                            Opnd* tauAddressInRange);
     Opnd* simplifyTauLdVTableAddr(Opnd* base, Opnd *tauBaseNonNull);
-    Opnd* simplifyTauLdIntfcVTableAddr(Opnd* base, Opnd *tauBaseHasInterface, Type* vtableType);
+    Opnd* simplifyTauLdIntfcVTableAddr(Opnd* base, Type* vtableType);
     Opnd* simplifyTauLdVirtFunAddr(Opnd* vtable, Opnd *tauVtableHasDesc, MethodDesc*);
     Opnd* simplifyTauLdVirtFunAddrSlot(Opnd* vtable, Opnd *tauVtableHasDesc, MethodDesc*);
 
@@ -186,7 +182,7 @@ public:
     static bool isExactType(Opnd*);
 protected:
     IRManager& irManager;
-    FlowGraph& flowGraph;
+    ControlFlowGraph& flowGraph;
 
     // genOp routines create an instruction, may never return NULL
     // but may simplify it to some other instruction
@@ -240,8 +236,8 @@ protected:
     virtual Inst* genLdConstant(Type *type, ConstInst::ConstValue val) = 0;
     virtual Inst* genTauLdInd(Modifier mod, Type *dstType, Type::Tag type, Opnd *ptr, 
                               Opnd *tauNonNullBase, Opnd *tauAddressInRange) = 0;
-    virtual Inst* genLdString(Modifier mod, Type *dstType,
-                              uint32 token, MethodDesc *enclosingMethod) = 0;
+    virtual Inst* genLdRef(Modifier mod, Type *dstType,
+                           uint32 token, MethodDesc *enclosingMethod) = 0;
     virtual Inst* genLdFunAddrSlot(MethodDesc*) = 0;
     virtual Inst* genGetVTableAddr(ObjectType* type) = 0;
     // compressed references
@@ -495,9 +491,7 @@ public:
 
     Inst* caseCatch(Inst* inst) {return caseDefault(inst);}
 
-	Inst* caseThrow(Inst* inst) {return caseDefault(inst);}
-
-	Inst* caseThrowLazy(Inst* inst) {return caseDefault(inst);}
+    Inst* caseThrow(Inst* inst) {return caseDefault(inst);}
 
     Inst* caseThrowSystemException(Inst* inst) {return caseDefault(inst);}
 
@@ -528,11 +522,11 @@ public:
     Inst* caseLdNull(ConstInst* inst) {return caseDefault(inst);}
 
     Inst*
-    caseLdString(TokenInst* inst) {
-	Opnd* opnd = simplifyLdString(inst->getModifier(),
-                                      inst->getDst()->getType(),
-                                      inst->getToken(),
-                                      inst->getEnclosingMethod());
+    caseLdRef(TokenInst* inst) {
+    Opnd* opnd = simplifyLdRef(inst->getModifier(),
+                               inst->getDst()->getType(),
+                               inst->getToken(),
+                               inst->getEnclosingMethod());
 	if (opnd != NULL)
 	    return opnd->getInst();
 	return inst;
@@ -544,15 +538,15 @@ public:
 
     Inst*
     caseTauLdInd(Inst* inst)          {
-	Opnd* opnd = simplifyTauLdInd(inst->getModifier(),
+    Opnd* opnd = simplifyTauLdInd(inst->getModifier(),
                                    inst->getDst()->getType(),
                                    inst->getType(),
                                    inst->getSrc(0),
                                    inst->getSrc(1),
                                    inst->getSrc(2));
-	if (opnd != NULL)
-	    return opnd->getInst();
-	return inst;
+    if (opnd != NULL)
+        return opnd->getInst();
+    return inst;
     }
 
     Inst* caseTauLdField(FieldAccessInst* inst) {return caseDefault(inst);}
@@ -577,7 +571,6 @@ public:
     }
     Inst* caseTauLdIntfcVTableAddr(TypeInst* inst) {
         Opnd* opnd = simplifyTauLdIntfcVTableAddr(inst->getSrc(0),
-                                                  inst->getSrc(1),
                                                   inst->getTypeInfo());
         if (opnd != NULL)
             return opnd->getInst();
@@ -1078,26 +1071,19 @@ protected:
 
     // re-association machinery
     friend class Reassociate;
-    Opnd*
-    simplifyAddViaReassociation2(Type* type, Opnd* src1, Opnd* src2);
-    Opnd*
-    simplifyNegViaReassociation2(Type* type, Opnd* src1);
-    Opnd*
-    simplifySubViaReassociation2(Type* type, Opnd* src1, Opnd *src2);
-    Opnd*
-    simplifyMulViaReassociation2(Type* type, Opnd* src1, Opnd* src2);
-    Opnd*
-    simplifyAddOffsetViaReassociation(Opnd* uncompBase, Opnd *offset);
-    Opnd*
-    simplifyAddOffsetPlusHeapbaseViaReassociation(Opnd *compBase,
-                                                              Opnd *offsetPlusHeapbase);
+    Opnd* simplifyAddViaReassociation2(Type* type, Opnd* src1, Opnd* src2);
+    Opnd* simplifyNegViaReassociation2(Type* type, Opnd* src1);
+    Opnd* simplifySubViaReassociation2(Type* type, Opnd* src1, Opnd *src2);
+    Opnd* simplifyMulViaReassociation2(Type* type, Opnd* src1, Opnd* src2);
+    Opnd* simplifyAddOffsetViaReassociation(Opnd* uncompBase, Opnd *offset);
+    Opnd* simplifyAddOffsetPlusHeapbaseViaReassociation(Opnd *compBase, Opnd *offsetPlusHeapbase);
     Reassociate *theReassociate;
 };
 
 class SimplifierWithInstFactory : public Simplifier {
 public:
     SimplifierWithInstFactory(IRManager&,bool latePass=false,
-			      Reassociate *reassociate0=0);
+                  Reassociate *reassociate0=0);
     virtual Inst* optimizeInst(Inst* inst);
     uint32 simplifyControlFlowGraph();
 protected:
@@ -1152,8 +1138,8 @@ protected:
 
     virtual Inst* genTauLdInd(Modifier mod, Type *dstType, Type::Tag type, Opnd *ptr,
                               Opnd *tauNonNullBase, Opnd *tauAddressInRange);
-    virtual Inst* genLdString(Modifier mod, Type *dstType,
-                              uint32 token, MethodDesc *enclosingMethod);
+    virtual Inst* genLdRef(Modifier mod, Type *dstType,
+                           uint32 token, MethodDesc *enclosingMethod);
 
     virtual Inst* genLdFunAddrSlot(MethodDesc*);
     virtual Inst* genGetVTableAddr(ObjectType* type);
@@ -1184,7 +1170,7 @@ protected:
     virtual void  eliminateCheck(Inst* checkInst, bool alwaysThrows);
 private:
     Inst*           nextInst;
-    CFGNode*        currentCfgNode;
+    Node*        currentCfgNode;
     InstFactory&    instFactory;
     OpndManager&    opndManager;
     TypeManager&    typeManager;

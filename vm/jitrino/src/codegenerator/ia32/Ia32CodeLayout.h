@@ -21,30 +21,30 @@
 #ifndef _IA32_CODE_LAYOUT
 #define _IA32_CODE_LAYOUT
 
-#include "Ia32CFG.h"
+
 #include "Ia32IRManager.h"
+
 namespace Jitrino
 {
 namespace Ia32 {
 
+class BasicBlock;
 
-    BEGIN_DECLARE_IRTRANSFORMER(Layouter, "layout", "Code layout")
-        Layouter(IRManager& irm, const char * params=0): IRTransformer(irm, params){} 
-        void runImpl();
-        uint32 getSideEffects() const {return 0;}
-        uint32 getNeedInfo()const{ return 0;}
-    END_DECLARE_IRTRANSFORMER(Layouter) 
+class Layouter : public SessionAction {
+    void runImpl();
+    uint32 getSideEffects() const {return 0;}
+    uint32 getNeedInfo()const{ return 0;}
+};
 
 /**
  *  Base class for code layout 
  */
 class Linearizer {
 public:
-    virtual ~Linearizer() {}
     enum LinearizerType { TOPOLOGICAL, TOPDOWN, BOTTOM_UP};
+    virtual ~Linearizer() {}
     static void doLayout(LinearizerType t, IRManager* irManager);
-    static bool hasValidLayout(IRManager* irm);
-    static bool hasValidFallthroughEdges(IRManager* irm);
+    static void checkLayout(IRManager* irm);
 
 protected:
     Linearizer(IRManager* irMgr);
@@ -52,8 +52,7 @@ protected:
     virtual void linearizeCfgImpl() = 0;
     /** Fix branches to work with the code layout */
     void fixBranches();
-    void fixBranches(BasicBlock* block);
-
+    
     
     /** Returns true if edge can be converted to a fall-through edge (i.e. an edge
      * not requiring a branch) assuming the edge's head block is laid out after the tail block. 
@@ -63,8 +62,6 @@ protected:
     /** checks if CFG has no BB nodes without layout successors*/
     bool isBlockLayoutDone();
 
-    void ensureProfileIsValid() const;
-
     //  Fields
     IRManager* irManager;
 
@@ -72,12 +69,12 @@ private:
    /**  Add block containing jump instruction to the fallthrough successor
     *  after this block
     */
-    BasicBlock * addJumpBlock(Edge * fallEdge);
+    BasicBlock* addJumpBlock(Edge * jumpEdge);
 
     /**  Reverse branch predicate. We assume that branch is the last instruction
     *  in the node.
     */
-    bool reverseBranchIfPossible(BasicBlock * bb);
+    bool reverseBranchIfPossible(Node * bb);
 
 };
 
