@@ -1205,6 +1205,7 @@ void ClassLoader::FieldClearInternals(Class* clss)
     }
 }
 
+
 void ClassLoader::LoadNativeLibrary( const char *name )
 {
     // Translate library path to full canonical path to ensure that
@@ -1216,12 +1217,12 @@ void ClassLoader::LoadNativeLibrary( const char *name )
    //
    // $$$ GMJ - we don't want it to be where we're running from, but
    //    where everything else came from.  For now, let it be
-   //    so that apr_dso_load() will do the right thing, but we need
-   //    to prefix with vm_get_property_value("org.apache.harmony.vm.vmdir");
-   //    and I'm too lazy to grok how/why I need apr pools for strcat().
+   //    so that apr_dso_load() will do the right thing.  This is
+   //    going to be weird, because we have native code in both
+   //    / as well as /default...  FIXME
    //
    // const char* canoname = port_filepath_canonical(name, tmp_pool); 
-    
+
     const char *canoname = name;
     
     // get library name from string pool
