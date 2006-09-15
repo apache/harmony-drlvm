@@ -678,6 +678,8 @@ void CodeGen::gen_call_vm_restore(bool exc, const CallSig& cs,
     call_va(is_set(DBG_CHECK_STACK), gr, target, cs, idx, valist);
     runlock(cs);
     // 4.
+    // Restore BBState first, so ref_counts for registers become valid
+    *m_bbstate = saveBB;
     // restore the registers state
     for (unsigned i=0; saveScratch && i<ar_num; i++) {
         AR ar = _ar(i);
@@ -696,7 +698,6 @@ void CodeGen::gen_call_vm_restore(bool exc, const CallSig& cs,
     // then the memory was not corrupted.
     // So, just nothing to do with callee-save regs
     //
-    *m_bbstate = saveBB;
 }
 
 }};             // ~namespace Jitrino::Jet
