@@ -185,7 +185,7 @@ public class ThreadGroup implements Thread.UncaughtExceptionHandler{
 		}
         if (!nonsecureDestroy()) {
             throw new IllegalThreadStateException("The thread group " + name + 
-                    " contains non-empty subgroups");
+                    " is not empty");
         } else {
             if (parent != null) {
                 parent.remove(this);

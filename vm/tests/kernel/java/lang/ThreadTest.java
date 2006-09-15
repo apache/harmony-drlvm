@@ -519,16 +519,18 @@ public class ThreadTest extends TestCase {
             fail("unexpected: thread has not started");
         }
         StackTraceElement ste[] = t.getStackTrace();
-        assertTrue("stack dump of thread t1 is empty", ste.length > 0);
+        while (ste.length == 0 && !(expired = doSleep(10))) {
+            ste = t.getStackTrace();
+        }
         s.stop = true;
+        if (expired) {
+            fail("stack dump of thread t1 is empty");
+        }
     }
 
     /**
      * Thread(ThreadGroup, Runnable, String, long)
      */
-/*
-    // fails on some platforms due to the known issue:
-    // OutOfMemoryError when running a thread created with too high stack size
     public void testThreadThreadGroupRunnableStringlong_Long_MAX_VALUE() {
         ThreadGroup tg = new ThreadGroup("newGroup");
         String name = "t1";
@@ -544,13 +546,18 @@ public class ThreadTest extends TestCase {
                 fail("unexpected: thread has not started");
             }
             ste = t.getStackTrace();
+            while (ste.length == 0 && !(expired = doSleep(10))) {
+                ste = t.getStackTrace();
+            }
+            s.stop = true;
+            if (expired) {
+                fail("stack dump of thread t1 is empty");
+            }
         } catch (OutOfMemoryError er) {
             fail("OutOfMemoryError when stack size is Long.MAX_VALUE");
         }
-        assertTrue("stack dump of thread t1 is empty", ste.length > 0);
-        s.stop = true;
     }
-*/
+
     /**
      * Thread(ThreadGroup, String)
      */
@@ -913,7 +920,13 @@ public class ThreadTest extends TestCase {
         StackTraceElement ste[] = tR.getStackTrace();
         assertEquals("stack dump of a new thread is not empty", ste.length, 0);
         tR.start();
-        
+        waitTime = waitDuration;
+        while (!tR.isAlive() && !(expired = doSleep(10))) {
+        }
+        if (expired) {
+            fail("unexpected: thread has not started");
+        }        
+
         // get stack trace of a running thread
         waitTime = waitDuration;
         do {
@@ -923,11 +936,14 @@ public class ThreadTest extends TestCase {
             fail("stack dump of a running thread is empty");
         } else {
             assertTrue("incorrect length", ste.length >= 1);
-            assertEquals("incorrect class name", 
+/*
+             // commented: sometimes it returns Thread.runImpl 
+             assertEquals("incorrect class name", 
                          "java.lang.ThreadTest$ThreadRunning", 
                          ste[0].getClassName());
             assertEquals("incorrect method name", 
                          "run", ste[0].getMethodName());
+*/
         }
         
         // get stack trace of a terminated thread
@@ -1008,8 +1024,6 @@ public class ThreadTest extends TestCase {
     /**
      * Get the state of a blocked thread.
      */
-/*    
-     // fails due to the known issue: getState() does not return correct values
      public void testGetStateBlocked() {
         Team team = new Team();
         RunProject pr1 = new RunProject(team);
@@ -1026,7 +1040,7 @@ public class ThreadTest extends TestCase {
             fail("BLOCKED state has not been set");
         }
     }
-*/    
+    
     /**
      * Get the state of a new thread.
      */
@@ -1083,8 +1097,6 @@ public class ThreadTest extends TestCase {
     /**
      * Get the state of a terminated thread.
      */
-/*    
-     // fails due to the known issue: getState() does not return correct values
      public void testGetStateTerminated() {
         ThreadRunning tR = new ThreadRunning();
         tR.start();
@@ -1103,12 +1115,10 @@ public class ThreadTest extends TestCase {
             fail("TERMINATED state has not been set");
         }
     }
-*/
+
     /**
      * Get the state of a terminated thread.
      */
-/*    
-     // fails due to the known issue: getState() does not return correct values
      public void testGetStateTerminated1() {
         Square s = new Square(15);
         Thread tR = new Thread(s);
@@ -1128,12 +1138,10 @@ public class ThreadTest extends TestCase {
             fail("TERMINATED state has not been set");
         }
     }
-*/
+
     /**
      * Get the state of a timed waiting thread.
      */
-/*    
-     // fails due to the known issue: getState() does not return correct values
      public void testGetStateTimedWaiting() {
         ThreadWaiting tW = new ThreadWaiting(Action.WAIT, 6000, 0);
         tW.start();
@@ -1149,12 +1157,10 @@ public class ThreadTest extends TestCase {
             fail("TIMED_WAITING state has not been set");
         }
     }
-*/
+
     /**
      * Get the state of a waiting thread.
      */
-/*    
-     // fails due to the known issue: getState() does not return correct values
      public void testGetStateWaiting() {
         ThreadWaiting tW = new ThreadWaiting(Action.WAIT, 0, 0);
         tW.start();
@@ -1170,7 +1176,7 @@ public class ThreadTest extends TestCase {
             fail("WAITING state has not been set");
         }
     }
-*/
+
     class ExceptionHandler implements Thread.UncaughtExceptionHandler {
 
         public boolean wasCalled = false;
@@ -1194,8 +1200,6 @@ public class ThreadTest extends TestCase {
     /**
      * Test getUncaughtExceptionHandler() for a terminated thread
      */
-/*    
-     // fails due to the known issue: getState() does not return correct values
      public void testGetUncaughtExceptionHandler_Null() {
         ThreadGroup tg = new ThreadGroup("test thread group");
         Thread t = new Thread(tg, "test thread");
@@ -1216,7 +1220,7 @@ public class ThreadTest extends TestCase {
         assertNull("handler should be null for a terminated thread",
                    t.getUncaughtExceptionHandler());
     }
-*/   
+
     /**
      * Test for setUncaughtExceptionHandler()
      */
@@ -1298,9 +1302,6 @@ public class ThreadTest extends TestCase {
     /**
      * Interrupt the current thread
      */
-/*    
-    // fails due to the known issue: interrupt() does not set 
-    // the current thread's interrupted status 
     public void testInterrupt_CurrentThread() {
         Thread t = new Thread() {
             public void run() {
@@ -1321,7 +1322,7 @@ public class ThreadTest extends TestCase {
             fail("interrupt status has not changed to true");
         }
     }
-*/
+
     /**
      * Interrupt a terminated thread
      */
@@ -1348,7 +1349,6 @@ public class ThreadTest extends TestCase {
     /**
      * Interrupt a joining thread
      */
-
     public void testInterrupt_Joining() {
         ThreadWaiting t = new ThreadWaiting(Action.JOIN, 10000, 0);
         t.start();
@@ -1530,13 +1530,14 @@ public class ThreadTest extends TestCase {
         long millis = 2000;
         ThreadRunning t = new ThreadRunning();
         t.start();
+        long joinStartTime = System.currentTimeMillis();
         try {
             t.join(millis);
         } catch (InterruptedException e) {
             fail(INTERRUPTED_MESSAGE);
         }
         long curTime = System.currentTimeMillis();
-        long duration = curTime - t.getStartTime();
+        long duration = curTime - joinStartTime;
         t.stopWork = true;
         assertTrue("join(" + millis + ") has waited for " + duration,
                    duration >= millis);
@@ -1550,13 +1551,14 @@ public class ThreadTest extends TestCase {
         int nanos = 999999;
         ThreadRunning t = new ThreadRunning();
         t.start();
+        long joinStartTime = System.currentTimeMillis();
         try {
             t.join(millis, nanos);
         } catch (InterruptedException e) {
             fail(INTERRUPTED_MESSAGE);
         }
         long curTime = System.currentTimeMillis();
-        long duration = 1000000 * (curTime - t.getStartTime());
+        long duration = 1000000 * (curTime - joinStartTime);
         long joinTime = 1000000 * millis + nanos;
         t.stopWork = true;
         assertTrue("join should wait for at least " + joinTime + 

@@ -38,7 +38,7 @@
         <exclude name="java/lang/RuntimeAdditionalTest42.java" />
 
 	<!-- This test fails -->
-	<exclude name="java/lang/ThreadTest.java" />
+	<!--exclude name="java/lang/ThreadTest.java" /-->
     </patternset>
 
     <property name="vm.use_verifier" value="1" />

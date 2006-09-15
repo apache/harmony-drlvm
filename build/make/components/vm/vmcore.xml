@@ -298,17 +298,5 @@ Version: $Revision: 1.5.2.3 $
                 <linkerarg value="-lstdc++" /-->
             </select>
         </linker>
-
-        <path id="unit.test.c.include">
-            <pathelement location="${build.VM.home}/tests/unit/thread/utils" />
-            <pathelement location="${build.semi.dir}/extra/apr/include" />
-            <pathelement location="${build.semi.dir}/extra/apr/include/apr-1" />
-            <pathelement location="${build.VM.home}/vmcore/include" />
-        </path>
-
-        <fileset id="unit.test.c.src" dir="${build.VM.home}/tests/unit/thread">
-            <include name="*.c" />
-            <exclude name="*performance*"/>
-        </fileset>
     </target>
 </project>

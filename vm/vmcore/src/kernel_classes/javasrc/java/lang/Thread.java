@@ -214,7 +214,6 @@ public class Thread implements Runnable {
                 threadGroup = currentThread.group;
             }
             this.group = threadGroup;
-            threadGroup.add(this);
             // throws NullPointerException if the given name is null
             this.name = (name != THREAD) ? this.name = name.toString() : THREAD
                     + threadCounter++;
@@ -222,7 +221,7 @@ public class Thread implements Runnable {
             this.contextClassLoader = currentThread.contextClassLoader;
             this.target = target;
             this.stackSize = stackSize;
-        this.priority = currentThread.priority;
+            this.priority = currentThread.priority;
             initializeInheritableLocalValues(currentThread);
     
         checkGCWatermark();
@@ -240,7 +239,8 @@ public class Thread implements Runnable {
         this.threadId = getNextThreadId();
         SecurityUtils.putContext(this, AccessController.getContext());
         checkAccess(); 
-        }
+        threadGroup.add(this);
+    }
 
     /**
      * @com.intel.drl.spec_ref

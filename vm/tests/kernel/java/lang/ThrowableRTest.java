@@ -38,8 +38,8 @@ public class ThrowableRTest extends TestCase {
         }
     }
 
-    /*
-	 * Test the Throwable(Throwable) constructor when the initCause() method
+    /**
+	 * Tests the Throwable(Throwable) constructor when the initCause() method
      * is overloaded
 	 */
 	public void testThrowableThrowableInitCause() {
@@ -49,5 +49,43 @@ public class ThrowableRTest extends TestCase {
                    iC.getCause() != null); 
         assertTrue("Assert 1: The invalid cause has been set", 
                    iC.getCause() == nPE);        
+    }
+
+    /**
+     * A regression test for HARMONY-1431 I-3 issue.
+     * Tests that getStackTrace() contains info about sources
+     * and does not contain empty parentheses
+     */
+    public void testStackTraceFileName() {
+        try {
+            Class<?> a = Class.forName("SomeClass");
+            fail("ClassNotFoundException should be thrown");
+        } catch (ClassNotFoundException e) {
+            StackTraceElement ste[] = e.getStackTrace();
+            for (int i = 0; i < ste.length; i++) {
+                String element = ste[i].toString();
+                if (element.indexOf("()") != -1) {
+                    fail("Empty parentheses are published in stack trace: " + element);
+                    break;
+                }
+            }
+        }
+    }
+
+    /**
+     * A regression test for HARMONY-1431 I-3 issue.
+     * Tests that getStackTrace() contains info about the "main" method
+     */
+    public void testStackTraceMathodMain() {
+        try {
+            Class<?> a = Class.forName("SomeClass");
+            fail("ClassNotFoundException should be thrown");
+        } catch (ClassNotFoundException e) {
+            StackTraceElement ste[] = e.getStackTrace();
+            String mainFrame = ste[ste.length - 1].toString();
+            if (mainFrame.indexOf("TestRunner.main") == -1) {
+                fail("Method \"main\" is not published in stack trace");
+            }
+        }
     }
 }

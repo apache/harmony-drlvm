@@ -61,18 +61,5 @@ Version: $Revision: 1.4.2.4 $
                                                   vm.kernel_classes"  />
         </select>
 
-        <property name="smoke.test.depends" value="" />
-
-        <property name="smoke.test.javasrc" location="${build.VM.home}/tests/smoke" />
-        
-        <patternset id="smoke.test.java.pattern">
-            <include name="**/*.java"/>
-            <exclude name="**/Logger.java"/>
-        </patternset>        
-        <patternset id="smoke.test.pattern">
-            <include name="**/*.class"/>
-            <exclude name="**/*$*.class"/>
-        </patternset>        
-
     </target>
 </project>

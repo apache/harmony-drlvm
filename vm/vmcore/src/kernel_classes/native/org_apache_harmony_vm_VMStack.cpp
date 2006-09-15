@@ -284,19 +284,24 @@ JNIEXPORT jobjectArray JNICALL Java_org_apache_harmony_vm_VMStack_getStackTrace
             }
         }
     }
-    // skip Thread.runImpl()
-    size--;
 
-    // skip the VMStart$MainThread if one exits from the bottom of the stack
-    // along with 2 reflection frames used to invoke method main
+
+    // skip the VMStart$MainThread.runImpl() if it exists from the bottom
+    // of the stack along with 2 reflection frames used to invoke method main
     static String* starter_String = genv->string_pool.lookup("java/lang/VMStart$MainThread");
-    Method_Handle method = frames[size].method;
+    Method_Handle method = frames[size - 1].method;
     assert(method);
-    // skip only for main application thread
+
     if (!strcmp(method_get_name(method), "runImpl")
-        && method->get_class()->name == starter_String) {
-        int rem = size - skip-1;
-        size -= rem < 2 ? rem : 2;
+          && method->get_class()->name == starter_String) {
+        for (; --size;) {
+            method = frames[size - 1].method;
+            assert(method);
+            if ((strstr(method->get_class()->name->bytes, "java/lang/reflect"))
+                == NULL) {
+                break;
+            }
+        }
     }
 
     ASSERT(size >= skip, "Trying to skip " << skip 
@@ -329,13 +334,17 @@ JNIEXPORT jobjectArray JNICALL Java_org_apache_harmony_vm_VMStack_getStackTrace
         const char* fileName;
 
         get_file_and_line(method, ip, &fileName, &lineNumber);
-        if (fileName == NULL) fileName = "";
-
-        jstring strFileName = jenv->NewStringUTF(fileName);
-        if (!strFileName) {
-            assert(exn_raised());
-            return NULL;
+        jstring strFileName;
+        if (fileName != NULL) {
+            strFileName = jenv->NewStringUTF(fileName);
+            if (!strFileName) {
+                assert(exn_raised());
+                return NULL;
+            }
+        } else {
+            strFileName = NULL;
         }
+
      
         tmn_suspend_disable();
         // class name
