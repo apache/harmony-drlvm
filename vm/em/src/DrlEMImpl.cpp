@@ -201,7 +201,7 @@ static bool endsWith(const std::string& str, const std::string& suffix) {
     }
     return std::equal(suffix.rbegin(), suffix.rend(), str.rbegin());
 }
-
+    
 std::string prepareLibPath(const std::string& origPath) {
 #ifdef PLATFORM_NT
     std::string separator("\\"), libPrefix(""), libSuffix(".dll");
@@ -224,8 +224,6 @@ std::string prepareLibPath(const std::string& origPath) {
     if (!endsWith(path, libSuffix)) {
         path+=libSuffix;
     }
-    
-    TRACE2("init",  path.c_str()); 
     return path;
   }
 
