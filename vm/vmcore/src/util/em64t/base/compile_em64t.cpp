@@ -29,6 +29,8 @@
 #include "nogc.h"
 #include "m2n.h"
 #include "../m2n_em64t_internal.h"
+#include "exceptions.h"
+#include "exceptions_jit.h"
 
 #define LOG_DOMAIN "vm.helpers"
 #include "cxxlog.h"
@@ -146,7 +148,7 @@ static NativeCodePtr compile_get_compile_me_generic() {
         return addr;
     }
 
-    const int STUB_SIZE = 350;
+    const int STUB_SIZE = 357;
     char * stub = (char *) malloc_fixed_code_for_jit(STUB_SIZE,
         DEFAULT_CODE_ALIGNMENT, CODE_BLOCK_HEAT_DEFAULT, CAA_Allocate);
     addr = stub;
@@ -183,6 +185,12 @@ static NativeCodePtr compile_get_compile_me_generic() {
     stub = mov(stub, rdi_opnd, M_Base_Opnd(rsp_reg, 0));
     // compile the method
     stub = call(stub, (char *)&compile_jit_a_method);
+
+    // rethrow exception if it panding
+    stub = push(stub, rax_opnd);
+    stub = call(stub, (char *)&exn_rethrow_if_pending);
+    stub = pop(stub, rax_opnd);
+
     // restore gp inputs from the stack
     // NOTE: m2n_gen_pop_m2n must not destroy inputs
     stub = pop(stub, rdi_opnd);

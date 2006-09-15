@@ -1016,6 +1016,8 @@ jint JNICALL MonitorEnter(JNIEnv * UNREF env, jobject obj)
 
 jint JNICALL MonitorExit(JNIEnv * UNREF env, jobject obj)
 {
+    ASSERT_RAISE_AREA;
+
     TRACE2("jni", "MonitorExit called");
     assert(hythread_is_suspend_enabled());
     jthread_monitor_exit(obj);

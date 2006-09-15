@@ -86,6 +86,8 @@ static void vm_monitor_enter_default(ManagedObject *p_obj)
 
 static void vm_monitor_exit_default(ManagedObject *p_obj)
 {
+    ASSERT_RAISE_AREA;
+
     assert(managed_object_is_valid(p_obj));
     //
     assert(!hythread_is_suspend_enabled());

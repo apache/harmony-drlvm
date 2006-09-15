@@ -174,14 +174,16 @@ static NativeCodePtr compile_get_compile_me_generic() {
     stub = push(stub, ecx_opnd);
     // compile the method
     stub = call(stub, (char *)&compile_jit_a_method);
+
+    // rethrow exception if it panding
+    stub = push(stub, eax_opnd);
+    stub = call(stub, (char *)&exn_rethrow_if_pending);
+    stub = pop(stub, eax_opnd);
+
     // remove ecx from the stack
     stub = pop(stub, ecx_opnd);
     // pop m2n from the stack
     stub = m2n_gen_pop_m2n(stub, false, 0, 0, 1);
-    stub = push(stub, eax_opnd);
-    // rethrow exception if
-    stub = call(stub, (char *)&exn_rethrow_if_pending);
-    stub = pop(stub, eax_opnd);
     // transfer control to the compiled code
     stub = jump(stub, eax_opnd);
     
