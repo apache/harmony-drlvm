@@ -168,6 +168,30 @@ static inline bool is_name_lowercase(const char* name)
     return true;
 }
 
+/**
+ *  Creates a copy of the argument with all characters
+ *  lowercase
+ * 
+ *  returns a new copy of the string with all chars lowercase
+ */
+static inline char *convert_to_lowercase(const char* name)
+{
+    if (name == NULL) {
+        return NULL;
+    }
+
+    char *newCopy = strdup(name);
+    char *temp = newCopy;
+    
+    for(; *temp; temp++)
+    {
+        if (isalpha(*temp) && !islower(*temp)) {
+            *temp = tolower(*temp);
+        }
+    }
+
+    return newCopy;
+}
 
 // Function loads native library with a given name.
 NativeLibraryHandle
@@ -176,13 +200,28 @@ natives_load_library(const char* library_name, bool* just_loaded,
 {
     assert(NULL != library_name);
     assert(NULL != pstatus);
+    
+    char *localLibName = (char *) library_name;
+    NativeLibraryHandle returnCode = NULL;
+    
 #ifdef PLATFORM_NT
-    assert(is_name_lowercase(library_name));
+    TRACE2("init", "### lib name = " << library_name);
+
+    /*
+     *  always convert on NT (and any other non-case-sensitive
+     *  platform - it's as fast as checking to see if 
+     *  lowercase, and keeps the free() logic simpler
+     */
+    localLibName = convert_to_lowercase(localLibName);
+    
+    TRACE2("init", "### lib name = " << localLibName);
+        
+    assert(is_name_lowercase(localLibName));   
 #endif
 
     jni_libs.lock._lock();
 
-    NativeLibInfo* pfound = search_library_list(library_name);
+    NativeLibInfo* pfound = search_library_list(localLibName);
 
     if (pfound)
     {
@@ -190,26 +229,30 @@ natives_load_library(const char* library_name, bool* just_loaded,
 
         *just_loaded = false;
         *pstatus = APR_SUCCESS;
-
-        return pfound->handle;
+        returnCode = pfound->handle;
+        
+        goto NATIVES_LOAD_LIBRARY_EXIT;
     }
 
     *just_loaded = true;
 
     // library was not loaded previously, try to load it
     NativeLibraryHandle handle;
-    apr_status_t apr_status = port_dso_load_ex(&handle, library_name,
+    apr_status_t apr_status = port_dso_load_ex(&handle, localLibName,
                                                PORT_DSO_BIND_DEFER, jni_libs.ppool);
     if (APR_SUCCESS != apr_status)
     {
         char buf[1024];
         apr_dso_error( handle, buf, 1024 );
-        TRACE( "Natives: could not load library " << library_name << "; " << buf );
+        TRACE( "Natives: could not load library " << localLibName << "; " << buf );
 
         jni_libs.lock._unlock();
 
         *pstatus = apr_status;
-        return NULL;
+        
+        returnCode = NULL;
+        
+        goto NATIVES_LOAD_LIBRARY_EXIT;
     }
 
     NativeLibInfo* pinfo = (NativeLibInfo*)apr_palloc(jni_libs.ppool, sizeof(NativeLibInfo));
@@ -219,13 +262,16 @@ natives_load_library(const char* library_name, bool* just_loaded,
         jni_libs.lock._unlock();
 
         DIE("natives_load_library: apr_palloc failed");
-        return NULL;
+
+        returnCode = NULL;
+
+        goto NATIVES_LOAD_LIBRARY_EXIT;
     }
 
     pinfo->handle = handle;
 
     Global_Env *ge = VM_Global_State::loader_env;
-    pinfo->name = ge->string_pool.lookup(library_name);
+    pinfo->name = ge->string_pool.lookup(localLibName);
 
     pinfo->next = jni_libs.lib_info_list;
     jni_libs.lib_info_list = pinfo;
@@ -236,7 +282,16 @@ natives_load_library(const char* library_name, bool* just_loaded,
 
     *pstatus = APR_SUCCESS;
 
-    return pinfo->handle;
+    returnCode = pinfo->handle;
+    
+NATIVES_LOAD_LIBRARY_EXIT :
+
+#ifdef PLATFORM_NT
+    free(localLibName);
+#endif
+
+    return returnCode;
+    
 } // natives_load_library
 
 
