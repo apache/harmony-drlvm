@@ -579,6 +579,7 @@ jvalue new_field_value(Field *field, StackFrame& frame) {
         case VM_DATA_TYPE_INT16: val.s = (int16) frame.stack.pick().i; break;
         case VM_DATA_TYPE_INT32: val.i = frame.stack.pick().i; break;
         case VM_DATA_TYPE_INT64: val.j = frame.stack.getLong(0).i64; break;
+        case VM_DATA_TYPE_F4: val.f = frame.stack.pick().f; break;
         case VM_DATA_TYPE_F8: val.d = frame.stack.getLong(0).d; break;
         case VM_DATA_TYPE_ARRAY:
         case VM_DATA_TYPE_CLASS:

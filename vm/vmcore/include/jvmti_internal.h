@@ -471,6 +471,11 @@ class DebugUtilsTI {
         unsigned global_capabilities;
 }; /* end of class DebugUtilsTI */
 
+struct jvmti_StepLocation {
+    struct Method* method;
+    unsigned location;
+};
+
 jvmtiError add_event_to_thread(jvmtiEnv *env, jvmtiEvent event_type, jthread event_thread);
 void remove_event_from_thread(jvmtiEnv *env, jvmtiEvent event_type, jthread event_thread);
 void add_event_to_global(jvmtiEnv *env, jvmtiEvent event_type);
@@ -487,5 +492,9 @@ Boolean is_valid_class_object(jclass klass);
 
 // JIT support
 jvmtiError jvmti_translate_jit_error(OpenExeJpdaError error);
+
+// Single step support
+void jvmti_SingleStepLocation( VM_thread* thread, struct Method *method, unsigned location, 
+                               jvmti_StepLocation **next_step, unsigned *count);
 
 #endif /* _JVMTI_INTERNAL_H_ */
