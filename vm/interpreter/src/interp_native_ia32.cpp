@@ -234,12 +234,10 @@ interpreter_execute_native_method(
 
     if (interpreter_ti_notification_mode
             & INTERPRETER_TI_METHOD_EXIT_EVENT) {
-        hythread_suspend_enable();
         jvalue val;
         method_exit_callback(method,
                 exn_raised(),
                 resultPtr != 0 ? *resultPtr : (val.j = 0, val));
-        hythread_suspend_disable();
     }
 
     DEBUG_TRACE("interpreter_invoke_native >>>\n");
@@ -339,9 +337,7 @@ interpreterInvokeStaticNative(StackFrame& prevFrame, StackFrame& frame, Method *
 
     if (interpreter_ti_notification_mode
             & INTERPRETER_TI_METHOD_ENTRY_EVENT) {
-        hythread_suspend_enable();
         method_entry_callback(method);
-        hythread_suspend_disable();
     }
 
     if (method->is_synchronized()) {
@@ -578,9 +574,7 @@ interpreterInvokeVirtualNative(StackFrame& prevFrame, StackFrame& frame, Method 
 
     if (interpreter_ti_notification_mode
             & INTERPRETER_TI_METHOD_ENTRY_EVENT) {
-        hythread_suspend_enable();
         method_entry_callback(method);
-        hythread_suspend_disable();
     }
 
     if (method->is_synchronized()) {

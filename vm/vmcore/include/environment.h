@@ -136,7 +136,10 @@ struct Global_Env {
     Class* java_lang_ClassCastException_Class;
     Class* java_lang_OutOfMemoryError_Class;
     ObjectHandle java_lang_OutOfMemoryError;
-    
+
+    // object of java.lang.Error class used for JVMTI JIT PopFrame support
+    ObjectHandle popFrameException;
+
     Class* java_io_Serializable_Class;
     Class* java_lang_Cloneable_Class;
     Class* java_lang_Thread_Class;

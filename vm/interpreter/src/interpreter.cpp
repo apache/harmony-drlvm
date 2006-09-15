@@ -2496,9 +2496,7 @@ method_exit_callback_with_frame(Method *method, StackFrame& frame) {
             ABORT("Unexpected java type");
     }
 
-    hythread_suspend_enable();
     method_exit_callback(method, false, val);
-    hythread_suspend_disable();
 }
 
 void

@@ -45,7 +45,7 @@ void jvmti_method_exit_callback(Method_Handle method, jvalue* return_value);
 /**
  * Field access callback which is called from JITted code compiled with <field access> flag whenever
  * access of field which has <field access mask> set occures.
- * Garbage collector must be enabled.
+ * Garbage collector must be disabled.
  * @param field - handle of the field under access
  * @param method - handle of the method, which accesses field
  * @param location - location of code which accesses field
@@ -60,7 +60,7 @@ void jvmti_field_access_callback(Field_Handle field,
 /**
  * Field modification callback which is called from JITted code compiled with <field modification> flag whenever
  * modification of field which has <field modification mask> set occures.
- * Garbage collector must be enabled.
+ * Garbage collector must be disabled.
  * @param field - handle of the field under modification
  * @param method - handle of the method, which modifies field
  * @param location - location of code which modifies field
@@ -74,6 +74,11 @@ void jvmti_field_modification_callback(Field_Handle field,
                                        jobject* object,
                                        jvalue* new_value);
 
+/**
+ * Callback which is called frim JITted code. Serves as a wrapper for 
+ * hythread_safe_point().
+ */
+void jvmti_safe_point();
 
 #ifdef __cplusplus
 }

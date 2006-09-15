@@ -314,6 +314,14 @@ void exn_raise_by_name(const char* exc_name, const char* exc_message,
     exn_raise_by_name_internal(exc_name, exc_message, exc_cause);
 }
 
+static void check_pop_frame(ManagedObject *exn) {
+    if (exn == VM_Global_State::loader_env->popFrameException->object) {
+        frame_type type = m2n_get_frame_type(m2n_get_last_frame());
+
+        if (FRAME_POP_NOW == (FRAME_POP_NOW & type))
+            jvmti_jit_do_pop_frame();
+    }
+}
 
 void exn_rethrow()
 {
@@ -321,11 +329,17 @@ void exn_rethrow()
     ManagedObject *exn = get_exception_object_internal();
     assert(exn);
     clear_exception_internal();
+
+    check_pop_frame(exn);
+
     exn_throw_for_JIT(exn, NULL, NULL, NULL, NULL);
 #else
     if (NULL != p_TLS_vmthread->thread_exception.exc_object) {
         ManagedObject* exn_mng_object = p_TLS_vmthread->thread_exception.exc_object;
         clear_exception_internal();
+
+        check_pop_frame(exn_mng_object);
+
         exn_throw_for_JIT(exn_mng_object, NULL, NULL, NULL, NULL);
     } else if (NULL != p_TLS_vmthread->thread_exception.exc_class) {
         Class * exc_class = p_TLS_vmthread->thread_exception.exc_class;

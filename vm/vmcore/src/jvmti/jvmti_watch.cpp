@@ -311,8 +311,12 @@ void jvmti_field_access_callback(Field_Handle field,
                                        jlocation location,
                                        jobject* object)
 {
+    tmn_suspend_enable();
+
     jvmti_process_field_access_event(field, (jmethodID) method, location,
              object);
+
+    tmn_suspend_disable();
 }
 
 void jvmti_field_modification_callback(Field_Handle field,
@@ -321,6 +325,10 @@ void jvmti_field_modification_callback(Field_Handle field,
                                        jobject* object,
                                        jvalue* new_value)
 {
+    tmn_suspend_enable();
+
     jvmti_process_field_modification_event(field, (jmethodID) method, location,
             object, *new_value);
+
+    tmn_suspend_disable();
 }

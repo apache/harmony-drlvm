@@ -283,13 +283,17 @@ bool vm_init(Global_Env *env)
         preload_class(env, "java/lang/ClassCastException");
     env->java_lang_OutOfMemoryError_Class = 
         preload_class(env, "java/lang/OutOfMemoryError");
+
     env->java_lang_OutOfMemoryError = oh_allocate_global_handle();
+    env->popFrameException = oh_allocate_global_handle();
 
     tmn_suspend_disable();
     // precompile StackOverflowError
     class_alloc_new_object_and_run_default_constructor(env->java_lang_StackOverflowError_Class);
     env->java_lang_OutOfMemoryError->object = 
         class_alloc_new_object(env->java_lang_OutOfMemoryError_Class);
+    env->popFrameException->object =
+        class_alloc_new_object(env->java_lang_Error_Class);
     tmn_suspend_enable();
 
     env->java_lang_Cloneable_Class =

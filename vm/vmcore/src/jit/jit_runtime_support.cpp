@@ -1606,7 +1606,7 @@ static NativeCodePtr rth_get_lil_gc_safe_point(int * dyn_count) {
     if (addr) {
         return addr;
     }
-    void (*hythread_safe_point_ptr)() = hythread_safe_point;
+    void (*hythread_safe_point_ptr)() = jvmti_safe_point;
     LilCodeStub* cs = lil_parse_code_stub("entry 0:managed::void;");
     assert(cs);
     if (dyn_count) {
@@ -1614,11 +1614,12 @@ static NativeCodePtr rth_get_lil_gc_safe_point(int * dyn_count) {
         assert(cs);
     }
     cs = lil_parse_onto_end(cs,
-        "push_m2n 0, 0;"
+        "push_m2n 0, %0i;"
         "out platform::void;"
-        "call %0i;"
+        "call %1i;"
         "pop_m2n;"
         "ret;",
+        (FRAME_POPABLE | FRAME_SAFE_POINT),
         hythread_safe_point_ptr);
     assert(cs && lil_is_valid(cs));
     addr = LilCodeGenerator::get_platform()->compile(cs);

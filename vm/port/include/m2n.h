@@ -44,7 +44,11 @@ enum frame_type {
     FRAME_UNKNOWN = 0x0,
     FRAME_NON_UNWINDABLE = 0x1000,
     FRAME_JNI = 0x1 | FRAME_NON_UNWINDABLE,
-    FRAME_COMPILATION = 0x2 | FRAME_NON_UNWINDABLE
+    FRAME_COMPILATION = 0x2 | FRAME_NON_UNWINDABLE,
+    FRAME_UNPOPABLE = 0x0000,
+    FRAME_POPABLE = 0x0100,
+    FRAME_POP_NOW = 0x0200,
+    FRAME_SAFE_POINT = 0x0400
 };
 
 // The pushing and popping of native frames is done only by stubs that

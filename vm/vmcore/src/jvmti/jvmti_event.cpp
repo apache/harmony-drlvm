@@ -764,7 +764,7 @@ jvmti_process_single_step_event(jmethodID method, jlocation location) {
 }
 
 VMEXPORT void jvmti_process_field_access_event(Field_Handle field,
-    jmethodID method, jlocation location, jobject* object)
+    jmethodID method, jlocation location, jobject* p_object)
 {
     DebugUtilsTI *ti = VM_Global_State::loader_env->TI;
     if (!ti->isEnabled() )
@@ -775,6 +775,9 @@ VMEXPORT void jvmti_process_field_access_event(Field_Handle field,
 
     if (!ti->get_global_capability(DebugUtilsTI::TI_GC_ENABLE_FIELD_ACCESS_EVENT))
         return;
+
+    // unreference pointer to object handle
+    jobject object = (p_object) ? *p_object : NULL ;
 
     // get field class
     //Type_Info_Handle field_type = field_get_type_info_of_field_value(field);
@@ -816,13 +819,13 @@ VMEXPORT void jvmti_process_field_access_event(Field_Handle field,
 
         if (NULL != ti_env->event_table.FieldAccess)
             ti_env->event_table.FieldAccess(jvmti_env, jni_env, thread,
-                    method, location, field_klass, *object, (jfieldID) field);
+                    method, location, field_klass, object, (jfieldID) field);
         ti_env = next_env;
     }
 } // jvmti_process_field_access_event
 
 VMEXPORT void jvmti_process_field_modification_event(Field_Handle field,
-    jmethodID method, jlocation location, jobject* object, jvalue new_value)
+    jmethodID method, jlocation location, jobject* p_object, jvalue new_value)
 {
     DebugUtilsTI *ti = VM_Global_State::loader_env->TI;
     if (!ti->isEnabled() )
@@ -833,6 +836,9 @@ VMEXPORT void jvmti_process_field_modification_event(Field_Handle field,
 
     if (!ti->get_global_capability(DebugUtilsTI::TI_GC_ENABLE_FIELD_MODIFICATION_EVENT))
         return;
+
+    // unreference pointer to object handle
+    jobject object = (p_object) ? *p_object : NULL ;
 
     // get field class
     //Type_Info_Handle field_type = field_get_type_info_of_field_value(field);
@@ -877,7 +883,7 @@ VMEXPORT void jvmti_process_field_modification_event(Field_Handle field,
 
         if (NULL != ti_env->event_table.FieldModification)
             ti_env->event_table.FieldModification(jvmti_env, jni_env, thread,
-                    method, location, field_klass, *object, (jfieldID) field,
+                    method, location, field_klass, object, (jfieldID) field,
                     signature_type, new_value);
         ti_env = next_env;
     }
