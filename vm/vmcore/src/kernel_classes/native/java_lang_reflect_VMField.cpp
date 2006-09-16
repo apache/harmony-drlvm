@@ -87,7 +87,7 @@ static jvalue read_primitive(JNIEnv* jenv, jfieldID field_id, jobject obj, char 
         GetBooleanField(jenv, obj, field_id);
         break;
     default:
-        ASSERT(0, "Unexpected type descriptor");
+        ASSERT(0, "Unexpected type descriptor: " << field_sig);
     }
 
     return primitive_value;
@@ -99,9 +99,15 @@ static jvalue get_primitive_field(JNIEnv *jenv, jobject obj, jlong jmember, char
 
     TRACE("read field value : " << field);
 
-    char field_sig = field->get_descriptor()->bytes[0];
-    jvalue result = read_primitive(jenv, (jfieldID)field, obj, field_sig);
-    if (!widen_primitive_jvalue(&result, field_sig, to_type) && !exn_raised()) {
+    jvalue result;
+    if (field->get_field_type_desc()->is_primitive()) {
+        char field_sig = field->get_descriptor()->bytes[0];
+        result = read_primitive(jenv, (jfieldID)field, obj, field_sig);
+        if (widen_primitive_jvalue(&result, field_sig, to_type)) {
+            return result;
+        }
+    }
+    if (!exn_raised()) {
         ThrowNew_Quick(jenv, "java/lang/IllegalArgumentException", field->get_descriptor()->bytes);
     }
     return result;
