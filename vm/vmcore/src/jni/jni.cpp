@@ -613,10 +613,10 @@ void JNICALL ExceptionDescribe(JNIEnv * UNREF env)
     TRACE2("jni", "ExceptionDescribe called");
     assert(hythread_is_suspend_enabled());
     if (exn_raised()) {
-        tmn_suspend_disable();       //---------------------------------v
+//        tmn_suspend_disable();       //---------------------------------v
         fprintf(stderr, "JNI.ExceptionDescribe: %s:\n", exn_get_name());
         exn_print_stack_trace(stderr, exn_get());
-        tmn_suspend_enable();        //---------------------------------^
+//        tmn_suspend_enable();        //---------------------------------^
     }
 } //ExceptionDescribe
 
