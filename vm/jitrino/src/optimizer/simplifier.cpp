@@ -946,8 +946,8 @@ Simplifier::simplifyAnd(Type* theType, Opnd* src1, Opnd* src2) {
     } else if (ConstantFolder::isConstant(src2->getInst(), val64) &&
            (inst1->getOpcode() == Op_Conv) &&
            (((typeTag1 == Type::Int8) && (((uint64)val64) <= 0xff)) ||
-            ((typeTag2 == Type::Int16) && (((uint64)val64) <= 0xffff)) ||
-            ((typeTag2 == Type::Int32) && (((uint64)val64) <= 0xffffffff)))) {
+            ((typeTag1 == Type::Int16) && (((uint64)val64) <= 0xffff)) ||
+            ((typeTag1 == Type::Int32) && (((uint64)val64) <= 0xffffffff)))) {
         Opnd *src1opnd = inst1->getSrc(0);
         if (src1opnd->getType() == src1->getType()) {
         return genAnd(theType, src1opnd, src2)->getDst();
@@ -964,8 +964,8 @@ Simplifier::simplifyAnd(Type* theType, Opnd* src1, Opnd* src2) {
     } else if (ConstantFolder::isConstant(src2->getInst(), val32) &&
            (inst1->getOpcode() == Op_Conv) &&
            (((typeTag1 == Type::Int8) && (((uint32)val32) <= 0xff)) ||
-            ((typeTag2 == Type::Int16) && (((uint32)val32) <= 0xffff)) ||
-            ((typeTag2 == Type::Int32) && (((uint32)val32) <= 0xffffffff)))) {
+            ((typeTag1 == Type::Int16) && (((uint32)val32) <= 0xffff)) ||
+            ((typeTag1 == Type::Int32) && (((uint32)val32) <= 0xffffffff)))) {
         Opnd *src1opnd = inst1->getSrc(0);
         if (src1opnd->getType() == src1->getType()) {
         return genAnd(theType, src1opnd, src2)->getDst();
@@ -984,8 +984,8 @@ Simplifier::simplifyAnd(Type* theType, Opnd* src1, Opnd* src2) {
     } else if (ConstantFolder::isConstant(src2->getInst(), val64) &&
            (inst1->getOpcode() == Op_TauLdInd) &&
            (((typeTag1 == Type::UInt8) && (((uint64)val64) == 0xff)) ||
-            ((typeTag2 == Type::UInt16) && (((uint64)val64) == 0xffff)) ||
-            ((typeTag2 == Type::UInt32) && (((uint64)val64) == 0xffffffff)))) {
+            ((typeTag1 == Type::UInt16) && (((uint64)val64) == 0xffff)) ||
+            ((typeTag1 == Type::UInt32) && (((uint64)val64) == 0xffffffff)))) {
         if (theType == src1->getType()) {
         return src1;
         }
@@ -1000,8 +1000,8 @@ Simplifier::simplifyAnd(Type* theType, Opnd* src1, Opnd* src2) {
     } else if (ConstantFolder::isConstant(src2->getInst(), val32) &&
            (inst1->getOpcode() == Op_TauLdInd) &&
            (((typeTag1 == Type::UInt8) && (((uint32)val32) == 0xff)) ||
-            ((typeTag2 == Type::UInt16) && (((uint32)val32) == 0xffff)) ||
-            ((typeTag2 == Type::UInt32) && (((uint32)val32) == 0xffffffff)))) {
+            ((typeTag1 == Type::UInt16) && (((uint32)val32) == 0xffff)) ||
+            ((typeTag1 == Type::UInt32) && (((uint32)val32) == 0xffffffff)))) {
         if (theType == src1->getType()) {
         return src1;
         }

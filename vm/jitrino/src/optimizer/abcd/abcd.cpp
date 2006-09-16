@@ -65,7 +65,7 @@ Abcd::readFlags(Action* argSource, AbcdFlags* flags ) {
     flags->dryRun = argSource->getBoolArg(p, "abcd.dry_run", false);
     flags->useAliases = argSource->getBoolArg(p, "abcd.use_aliases", true);
     flags->useConv = argSource->getBoolArg(p, "abcd.use_conv", true);
-    flags->remConv = argSource->getBoolArg(p, "abcd.rem_conv", true);
+    flags->remConv = argSource->getBoolArg(p, "abcd.rem_conv", false);
     flags->useShr = argSource->getBoolArg(p, "abcd.use_shr", true);
     flags->unmaskShifts = argSource->getBoolArg(p, "abcd.unmask_shifts", true);
     flags->remBr = argSource->getBoolArg(p, "abcd.rem_br", true);

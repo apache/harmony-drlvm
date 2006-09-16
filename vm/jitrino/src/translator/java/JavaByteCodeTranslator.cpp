@@ -885,8 +885,17 @@ JavaByteCodeTranslator::ldc(uint32 constPoolIndex) {
     Type* constantType = 
         compilationInterface.getConstantType(&methodToCompile,constPoolIndex);
     Opnd* opnd = NULL;
-    if (constantType->isSystemString() || constantType->isSystemClass()) {
+    if (constantType->isSystemString()) {
         opnd = irBuilder.genLdRef(&methodToCompile,constPoolIndex,constantType);
+    } else if (constantType->isSystemClass()) {
+        NamedType *literalType = resolveType(constPoolIndex);
+        if (!literalType) {
+            linkingException(constPoolIndex, OPCODE_LDC);
+            pushOpnd(irBuilder.genLdNull());
+            return;
+        } else {
+            opnd = irBuilder.genLdRef(&methodToCompile,constPoolIndex,constantType);
+        }
     } else {
         const void* constantAddress =
            compilationInterface.getConstantValue(&methodToCompile,constPoolIndex);
