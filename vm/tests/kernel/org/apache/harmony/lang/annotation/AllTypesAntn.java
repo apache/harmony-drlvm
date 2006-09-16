@@ -40,7 +40,7 @@ import java.lang.annotation.RetentionPolicy;
     double doubleValue() default 7E-34;
     boolean booleanValue() default true;
     Class classValue() default AllTypesAntn.class;
-    //TheEnum enumValue() default TheEnum.A; //FIXME enum de/serialization fails
+    TheEnum enumValue() default TheEnum.A;
     TheAntn antnValue() default @TheAntn;
     
     int[] intArrayValue() default 345;
@@ -52,7 +52,7 @@ import java.lang.annotation.RetentionPolicy;
     double[] doubleArrayValue() default 7E-34;
     boolean[] booleanArrayValue() default true;
     Class[] classArrayValue() default AllTypesAntn.class;
-    //TheEnum[] enumArrayValue() default TheEnum.A; //FIXME enum de/serialization fails
+    TheEnum[] enumArrayValue() default TheEnum.A;
     TheAntn[] antnArrayValue() default @TheAntn;
     
     /**
@@ -74,7 +74,7 @@ import java.lang.annotation.RetentionPolicy;
         public double doubleValue() {return 7E-34;}
         public boolean booleanValue() {return true;}
         public Class classValue() {return AllTypesAntn.class;}
-        //public TheEnum enumValue() {return TheEnum.A; } //FIXME enum de/serialization fails
+        public TheEnum enumValue() {return TheEnum.A; }
         public TheAntn antnValue() {return new TheAntnImpl();}
         
         public int[] intArrayValue() {return new int[]{345};}
@@ -86,7 +86,7 @@ import java.lang.annotation.RetentionPolicy;
         public double[] doubleArrayValue() {return new double[] {7E-34};}
         public boolean[] booleanArrayValue() {return new boolean[]{true};}
         public Class[] classArrayValue() {return new Class[] {AllTypesAntn.class};}
-        //public TheEnum[] enumArrayValue() {return new TheEnum[] {TheEnum.A}; } //FIXME enum de/serialization fails
+        public TheEnum[] enumArrayValue() {return new TheEnum[] {TheEnum.A}; }
         public TheAntn[] antnArrayValue() {return new TheAntn[] {new TheAntnImpl()};}
     }
 }

@@ -34,7 +34,7 @@ import java.lang.annotation.RetentionPolicy;
         doubleArrayValue=34, doubleValue=345,
         booleanArrayValue=true, booleanValue=false,
         classArrayValue=AllTypesAntn2.class, classValue=AllTypesAntn2.class,
-        //enumArrayValue=AllTypesAntn2.TheEnum.B, enumValue=AllTypesAntn2.TheEnum.C, //FIXME enum de/serialization fails
+        enumArrayValue=AllTypesAntn2.TheEnum.B, enumValue=AllTypesAntn2.TheEnum.C,
         antnArrayValue=@AllTypesAntn2.TheAntn, antnValue=@AllTypesAntn2.TheAntn)
 public @interface AllTypesAntn2 {
     public enum TheEnum {A, B, C, }
@@ -49,7 +49,7 @@ public @interface AllTypesAntn2 {
     double doubleValue() ;
     boolean booleanValue();
     Class classValue() ;
-    //TheEnum enumValue(); //FIXME enum de/serialization fails
+    TheEnum enumValue();
     TheAntn antnValue();
     
     int[] intArrayValue() ;
@@ -61,6 +61,6 @@ public @interface AllTypesAntn2 {
     double[] doubleArrayValue();
     boolean[] booleanArrayValue() ;
     Class[] classArrayValue() ;
-    // TheEnum[] enumArrayValue(); //FIXME enum de/serialization fails
+    TheEnum[] enumArrayValue();
     TheAntn[] antnArrayValue();
 }

@@ -367,7 +367,7 @@ public class Thread implements Runnable {
      * @com.intel.drl.spec_ref
      */
     public int countStackFrames() {
-        return VMThreadManager.countStackFrames(this);
+        return 0; //deprecated
     }
 
     /**

@@ -46,7 +46,10 @@ public final class Compiler {
      * @api2vm
      */
     public static Object command(Object obj) {
-        throw new UnsupportedOperationException("Not implemented");
+       if (obj == null) {
+           throw new NullPointerException();
+       }
+       return null;
     }
 
     /**
@@ -57,7 +60,10 @@ public final class Compiler {
      * @api2vm
      */
     public static boolean compileClass(Class<?> clazz) {
-        throw new UnsupportedOperationException("Not implemented");
+       if (clazz == null) {
+           throw new NullPointerException();
+       }
+       return false;
     }
 
     /**
@@ -68,7 +74,10 @@ public final class Compiler {
      * @api2vm
      */
     public static boolean compileClasses(String name){
-        throw new UnsupportedOperationException("Not implemented");
+       if (name == null) {
+           throw new NullPointerException();
+       }
+       return false;
     }
 
     /**
@@ -78,7 +87,6 @@ public final class Compiler {
      * @api2vm
      */
     public static void disable() {
-        throw new UnsupportedOperationException("Not implemented");
     }
 
     /**
@@ -88,6 +96,5 @@ public final class Compiler {
      * @api2vm
      */
     public static void enable() {
-       throw new UnsupportedOperationException("Not implemented");
     }
 }

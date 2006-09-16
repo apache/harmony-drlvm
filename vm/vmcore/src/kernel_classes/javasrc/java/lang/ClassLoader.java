@@ -643,7 +643,7 @@ public abstract class ClassLoader {
             try {
                 final Class<?> userClassLoader = systemClassLoader
                     .loadClass(className);
-                if (ClassLoader.class.isAssignableFrom(userClassLoader)) {
+                if (!ClassLoader.class.isAssignableFrom(userClassLoader)) {
                     throw new Error(userClassLoader.toString()
                         + " must inherit java.lang.ClassLoader");
                 }

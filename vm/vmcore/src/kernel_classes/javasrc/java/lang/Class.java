@@ -971,7 +971,9 @@ public final class Class<T> implements Serializable, AnnotatedElement, GenericDe
      * 
      **/
     public boolean isEnum() {
-        return (getModifiers() & ACC_ENUM) != 0;
+        // check for superclass is needed for compatibility
+        // otherwise there are false positives on anonymous element classes
+        return ((getModifiers() & ACC_ENUM) != 0 && getSuperclass() == Enum.class);
     }
 
     /**

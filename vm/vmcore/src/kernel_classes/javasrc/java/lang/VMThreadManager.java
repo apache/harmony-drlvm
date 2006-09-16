@@ -73,13 +73,6 @@ final class VMThreadManager {
 
     /**
      * This method satisfies the requirements of the specification for the
-     * {@link Thread#countStackFrames() Thread.countStackFrames()} method.
-     * @api2vm
-     */
-    static native int countStackFrames(Thread thread);
-
-    /**
-     * This method satisfies the requirements of the specification for the
      * {@link Thread#currentThread() Thread.currentThread()} method.
      * <p> 
      * But there is one special case. When this method is called while
