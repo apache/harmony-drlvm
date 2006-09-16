@@ -272,8 +272,65 @@ public:
      */
     bool    survive_calls(void) const { return m_surviveCalls; };
     /**
-     * Converts Val into memory reference.
-     */
+    * Converts Val into operand.
+    */
+    void    to_opnd(Opnd& op) {
+
+            m_kind = op.kind();
+            if (op.is_mem()) {
+                m_base = op.base();
+                m_disp = op.disp();
+                m_index = op.index();
+                m_scale = op.scale();
+            } else if (op.is_reg()){
+                m_reg = op.reg();
+            } else if (op.jt() <= i32) {
+                m_lval = op.ival();
+                m_surviveCalls = true;
+            } else if (op.jt() == jobj) {
+                m_pval = (const void*)op.lval();
+            } else if (op.jt() == flt32) {
+                m_fval = (float)op.ival();
+            } else if (op.jt() == dbl64) {
+                m_dval = (double)op.lval();
+            }  else {
+                assert(op.jt() == i64);
+                m_lval = op.lval();
+            }
+        }
+    /**
+    * Converts Val into operand.
+    */
+    void    to_val(Val& value) {
+            m_jt = value.jt();
+            m_kind = value.kind();
+            m_surviveCalls = value.get_survive_calls();
+            m_caddr = value.caddr();
+            m_attrs = value.attrs();
+
+            if (value.is_mem()) {
+                m_base = value.base();
+                m_disp = value.disp();
+                m_index = value.index();
+                m_scale = value.scale();
+            } else if (value.is_reg()){
+                m_reg = value.reg();
+            } else if (value.jt() <= i32) {
+                m_lval = value.ival();
+            } else if (value.jt() == jobj) {
+                m_pval = value.pval();
+            } else if (value.jt() == flt32) {
+                m_fval = value.fval();
+            } else if (value.jt() == dbl64) {
+                m_dval = value.dval();
+            }  else {
+                assert(value.jt() == i64);
+                m_lval = value.lval();
+            }
+        }
+    /**
+    * Converts Val into memory reference.
+    */
     void    to_mem(AR base, int disp, AR index = ar_x, unsigned scale=0)
     {
         m_kind = opnd_mem;

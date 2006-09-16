@@ -485,8 +485,8 @@ OpenMethodExecutionParams get_exe_capabilities()
         true,  // exe_notify_method_entry
         true,  // exe_notify_method_exit
         
-        false, // exe_notify_field_access
-        false, // exe_notify_field_modification 
+        true, // exe_notify_field_access
+        true, // exe_notify_field_modification 
         false, // exe_notify_exception_throw
         false, // exe_notify_exception_catch
         false, // exe_notify_monitor_enter

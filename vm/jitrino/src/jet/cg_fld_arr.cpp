@@ -232,6 +232,10 @@ void CodeGen::do_field_op(JavaByteCodes opcode, jtype jt, Field_Handle fld)
         gen_call_throw(ci_helper_linkerr, rt_helper_throw_linking_exc, 0,
                        m_klass, jinst.op0, jinst.opcode);
     }
+
+    if (!get && compilation_params.exe_notify_field_modification)  {
+        gen_modification_watchpoint(opcode, jt, fld);
+    }
     
     Opnd where;
     if (field_op) {
@@ -253,47 +257,12 @@ void CodeGen::do_field_op(JavaByteCodes opcode, jtype jt, Field_Handle fld)
     // compilation, without access to g_refs_squeeze in runtime.
     assert(is_ia32() || g_refs_squeeze);
     
+
+    if (get && compilation_params.exe_notify_field_access) {
+        gen_access_watchpoint(opcode, jt, fld);
+    }
+    
     if (get) {
-        if (compilation_params.exe_notify_field_access) {
-            // Check whether VM need access notifications
-
-            char* fld_tr_add;
-            char fld_tr_mask;
-            field_get_track_access_flag(fld, &fld_tr_add, &fld_tr_mask);
-
-            Val fld_track_mask((int)fld_tr_mask);
-
-            AR ar = valloc(jobj);
-            movp(ar, (void*)fld_tr_add);
-            Opnd fld_track_opnd(i32, ar, 0);
-            rlock(fld_track_opnd);
-
-            alu(alu_test, fld_track_opnd, fld_track_mask.as_opnd());
-            runlock(fld_track_opnd);
-
-            unsigned br_off = br(z, 0, 0, taken);
-
-             //JVMTI helper takes field handle, method handle, byte code location, pointer
-             //to reference for fields or NULL for statics
-
-            const CallSig cs_ti_faccess(CCONV_HELPERS, jobj, jobj, i64, jobj);
-            rlock(cs_ti_faccess);
-            Val vlocation((jlong)m_pc);
-
-            Val vfield(jobj, fld);
-            Val vmeth(jobj, m_method);
-            Val vobject =  Val(jobj, NULL);
-
-            if (field_op) {
-                vobject = vstack(0);
-            }
-            
-            gen_args(cs_ti_faccess, 0, &vfield, &vmeth, &vlocation, &vobject);
-            gen_call_vm(cs_ti_faccess, rt_helper_ti_field_access, cs_ti_faccess.count());
-            runlock(cs_ti_faccess);
-
-            patch(br_off, ip());
-        }// end if (compilation_params.exe_notify_field_access) 
 
         if (field_op) {
             // pop out ref
@@ -342,69 +311,6 @@ void CodeGen::do_field_op(JavaByteCodes opcode, jtype jt, Field_Handle fld)
     } // if (get)
     
     vunref(jt);
-
-    if (compilation_params.exe_notify_field_modification)  {
-        // Check whether VM need access notifications
-
-        char* fld_tr_add;
-        char fld_tr_mask;
-        field_get_track_modification_flag(fld, &fld_tr_add, &fld_tr_mask);
-
-        Val fld_track_mask((int)fld_tr_mask);
-
-        AR ar = valloc(jobj);
-        movp(ar, (void*)fld_tr_add);
-        Opnd fld_track_opnd(i32, ar, 0);
-        rlock(fld_track_opnd);
-
-        alu(alu_test, fld_track_opnd, fld_track_mask.as_opnd());
-        runlock(fld_track_opnd);
-
-        unsigned br_off = br(z, 0, 0, taken);
-
-        //JVMTI helper takes field handle, method handle, byte code location, pointer
-        //to reference for fields or NULL for statics, pointer to field value
-
-        Val fieldVal;
-        Val fieldValPtr = Val(jobj, valloc(jobj));
-        rlock(fieldValPtr);
-        int st_depth = field_op ? 0 :-1;
-
-        if (jt != jvoid) {
-            // Make sure the top item is on the memory
-            vswap(st_depth + 1);
-            if (is_big(jt)) {
-                vswap(st_depth + 2);
-            }
-            const Val& s = vstack(st_depth + 1);
-            assert(s.is_mem());
-            lea(fieldValPtr.as_opnd(), s.as_opnd());
-        }
-        else {
-            Opnd stackTop(jobj, m_base, voff(m_stack.unused()));
-            lea(fieldValPtr.as_opnd(), stackTop);
-        }
-        runlock(fieldValPtr);
-
-        const CallSig cs_ti_fmodif(CCONV_HELPERS, jobj, jobj, i64, jobj, jobj);
-        rlock(cs_ti_fmodif);
-        Val vlocation((jlong)m_pc);
-
-        Val vfield(jobj, fld);
-        Val vmeth(jobj, m_method);
-        Val vobject =  Val(jobj, NULL);
-
-        if (field_op) {
-            vobject = vstack(st_depth);
-        }
-        
-        gen_args(cs_ti_fmodif, 0, &vfield, &vmeth, &vlocation, &vobject, &fieldValPtr);
-        gen_call_vm(cs_ti_fmodif, rt_helper_ti_field_modification, cs_ti_fmodif.count());
-        runlock(cs_ti_fmodif);
-
-        patch(br_off, ip());
-    }// end if (compilation_params.exe_notify_field_modification) 
-
 
     if (!is_ia32() && g_refs_squeeze && jt == jobj && vis_imm(0)) {
         const Val& s = m_jframe->dip(0);

@@ -181,6 +181,35 @@ public:
     void do_field_op(JavaByteCodes op, jtype jt, Field_Handle fld);
 
     /**
+    * @brief Generates modification watchpoints if VM need it.
+    *
+    * @param jt - field type.
+    * @param fld - field handle.
+    */
+    void gen_modification_watchpoint(JavaByteCodes opcode, jtype jt, Field_Handle fld);
+
+    /**
+    * @brief Generates access watchpoints if VM need it.
+    *
+    * @param jt - field type.
+    * @param fld - field handle.
+    */
+    void CodeGen::gen_access_watchpoint(JavaByteCodes opcode, jtype jt, Field_Handle fld);
+
+    /**
+    * @brief Restore all scratch registers and operand stack state
+    *
+    * @param saveBB - pointer to operand stack state.
+    */
+    void pop_all_state(BBState* saveBB);
+    /**
+    * @brief Save all scratch registers and operand stack state
+    *
+    * @param saveBB - pointer to operand stack state.
+    */
+    void push_all_state(BBState* saveBB);
+
+    /**
      * @brief Generates code for INVOKE instructions.
      */
     void gen_invoke(JavaByteCodes opcod, Method_Handle meth, 

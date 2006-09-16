@@ -670,6 +670,7 @@ void CodeGen::gen_call_vm_restore(bool exc, const CallSig& cs,
     }
     // 2. 
     vpark();
+    gen_gc_stack(-1, true);
     // 3.
     va_list valist;
     va_start(valist, idx);

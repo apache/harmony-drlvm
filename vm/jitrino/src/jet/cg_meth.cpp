@@ -46,8 +46,8 @@ namespace Jet {
 static CallSig cs_mon(CCONV_HELPERS, jobj);
 
 
-void Compiler::gen_prolog(void){
-    if (is_set(DBG_TRACE_CG)) {    
+void Compiler::gen_prolog(void) {
+    if (is_set(DBG_TRACE_CG)) {
         dbg(";; ========================================================\n");
         dbg(";; Prolog: max_stack=%d, num_locals=%d, in_slots=%d\n", 
                 m_stack.get_max_stack(), 
