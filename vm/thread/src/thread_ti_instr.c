@@ -492,8 +492,8 @@ IDATA VMCALL jthread_get_owned_monitors(jthread java_thread,
 
         hythread_t tm_native_thread;
         jvmti_thread_t tm_java_thread;
-    apr_pool_t* pool;
-        apr_status_t apr_status;
+    // apr_pool_t* pool;
+    // apr_status_t apr_status;
     jobject* monitors;
         int i;
         IDATA status;
@@ -504,12 +504,13 @@ IDATA VMCALL jthread_get_owned_monitors(jthread java_thread,
         tm_native_thread = vm_jthread_get_tm_data(java_thread);
     tm_java_thread = hythread_get_private_data(tm_native_thread);
         assert(tm_java_thread);
-    apr_status = apr_pool_create(&pool, 0);
+    /* apr_status = apr_pool_create(&pool, 0);
     if (apr_status != APR_SUCCESS) {
         hythread_global_unlock();
         return TM_ERROR_INTERNAL;
     }
-    monitors = apr_palloc(pool, sizeof(jobject*) * tm_java_thread->owned_monitors_nmb);
+    monitors = apr_palloc(pool, sizeof(jobject*) * tm_java_thread->owned_monitors_nmb); */
+    monitors = (jobject *)malloc(sizeof(jobject*) * tm_java_thread->owned_monitors_nmb);
     if (!monitors) {
         hythread_global_unlock();
         return TM_ERROR_OUT_OF_MEMORY;
