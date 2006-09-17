@@ -116,7 +116,7 @@ static transfer_control_stub_type gen_transfer_control_stub()
         return addr;
     }
 
-    const int stub_size = 88;
+    const int stub_size = 64;
     char *stub = (char *)malloc_fixed_code_for_jit(stub_size, DEFAULT_CODE_ALIGNMENT, CODE_BLOCK_HEAT_COLD, CAA_Allocate);
 #ifdef _DEBUG
     memset(stub, 0xcc /*int 3*/, stub_size);
@@ -129,30 +129,62 @@ static transfer_control_stub_type gen_transfer_control_stub()
     // changing the esp at the very end of the sequence.
     //
 
-    // ecx will hold the final esp value
-    // edx will hold the pointer to the stack iterator
-
     M_Base_Opnd m1(esp_reg, 4);
     ss = mov(ss,  edx_opnd,  m1);
 
-    // Put esp inot ecx, and restore eax (return value)
-    ss = get_reg(ss, &eax_opnd, eax_reg, edx_reg, (unsigned)&((StackIterator*)0)->c.p_eax);
+    ss = get_reg(ss, &ebx_opnd, ebx_reg, edx_reg, (unsigned)&((StackIterator*)0)->c.p_eip);
+
     M_Base_Opnd m2(edx_reg, (int)&((StackIterator*)0)->c.esp);
     ss = mov(ss,  ecx_opnd,  m2);
 
-    // Restore callee saves registers
+    M_Base_Opnd m3(ecx_reg, -4);
+    ss = mov(ss,  m3,  ebx_opnd);
+
+    ss = alu(ss, sub_opc, ecx_opnd, Imm_Opnd(4));
+    ss = mov(ss,  m1,  ecx_opnd);
+
     ss = get_reg(ss, &esi_opnd, esi_reg, edx_reg, (unsigned)&((StackIterator*)0)->c.p_esi);
     ss = get_reg(ss, &edi_opnd, edi_reg, edx_reg, (unsigned)&((StackIterator*)0)->c.p_edi);
-    ss = get_reg(ss, &ebx_opnd, ebx_reg, edx_reg, (unsigned)&((StackIterator*)0)->c.p_ebx);
     ss = get_reg(ss, &ebp_opnd, ebp_reg, edx_reg, (unsigned)&((StackIterator*)0)->c.p_ebp);
 
-    // Now we are ready, grab the new IP, cut the stack, and jump
-    ss = get_reg(ss, &edx_opnd, edx_reg, edx_reg, (unsigned)&((StackIterator*)0)->c.p_eip);
-    ss = mov(ss,  esp_opnd,  ecx_opnd);
-    ss = jump(ss,  edx_opnd);
+    ss = get_reg(ss, &eax_opnd, eax_reg, edx_reg, (unsigned)&((StackIterator*)0)->c.p_eax);
+    ss = get_reg(ss, &ebx_opnd, ebx_reg, edx_reg, (unsigned)&((StackIterator*)0)->c.p_ebx);
+    ss = get_reg(ss, &ecx_opnd, ecx_reg, edx_reg, (unsigned)&((StackIterator*)0)->c.p_ecx);
+    ss = get_reg(ss, &edx_opnd, edx_reg, edx_reg, (unsigned)&((StackIterator*)0)->c.p_edx);
+
+    ss = mov(ss,  esp_opnd,  m1);
+    ss = ret(ss);
 
     addr = (transfer_control_stub_type)stub;
     assert(ss-stub <= stub_size);
+
+    /*
+       The following code will be generated:
+
+        mov         edx,dword ptr [esp+4]
+        mov         ebx,dword ptr [edx+0Ch]
+        mov         ebx,dword ptr [ebx]
+        mov         ecx,dword ptr [edx+4]
+        mov         dword ptr [ecx-4],ebx
+        sub         ecx,4
+        mov         dword ptr [esp+4],ecx
+        mov         esi,dword ptr [edx+14h]
+        mov         esi,dword ptr [esi]
+        mov         edi,dword ptr [edx+10h]
+        mov         edi,dword ptr [edi]
+        mov         ebp,dword ptr [edx+8]
+        mov         ebp,dword ptr [ebp]
+        mov         eax,dword ptr [edx+1Ch]
+        mov         eax,dword ptr [eax]
+        mov         ebx,dword ptr [edx+18h]
+        mov         ebx,dword ptr [ebx]
+        mov         ecx,dword ptr [edx+20h]
+        mov         ecx,dword ptr [ecx]
+        mov         edx,dword ptr [edx+24h]
+        mov         edx,dword ptr [edx]
+        mov         esp,dword ptr [esp+4]
+        ret
+    */
 
     DUMP_STUB(stub, "getaddress__transfer_control", ss - stub);
 
@@ -419,8 +451,19 @@ void si_transfer_control(StackIterator* si)
 /* !!!! NO CXX LOGGER IS ALLOWED IN THIS FUNCTION !!!
  * !!!! RELEASE BUILD WILL BE BROKEN          !!!*/
     // 1. Copy si to stack
+    void* null_pointer = NULL;
     StackIterator local_si;
     memcpy(&local_si, si, sizeof(StackIterator));
+
+    if (NULL == si->c.p_eax)
+        local_si.c.p_eax = (uint32*)&null_pointer;
+    if (NULL == si->c.p_ebx)
+        local_si.c.p_ebx = (uint32*)&null_pointer;
+    if (NULL == si->c.p_ecx)
+        local_si.c.p_ecx = (uint32*)&null_pointer;
+    if (NULL == si->c.p_edx)
+        local_si.c.p_edx = (uint32*)&null_pointer;
+
     if (si->c.p_eip == &si->ip)
         local_si.c.p_eip = &local_si.ip;
     si_free(si);
