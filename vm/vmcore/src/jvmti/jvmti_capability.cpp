@@ -116,7 +116,7 @@ static const jvmtiCapabilities jvmti_enable_on_live_flags =
     1, // can_get_monitor_info
     0, // can_pop_frame
     0, // can_redefine_classes
-    0, // can_signal_thread
+    1, // can_signal_thread
     1, // can_get_source_file_name
     1, // can_get_line_numbers
     1, // can_get_source_debug_extension

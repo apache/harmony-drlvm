@@ -2567,8 +2567,8 @@ restart:
                     & INTERPRETER_TI_SINGLE_STEP_EVENT) {
                 single_step_callback(frame);
             }
-            assert(!exn_raised());
-            if (get_thread_ptr()->p_exception_object_ti) {
+            //assert(!exn_raised());
+            if (get_thread_ptr()->p_exception_object_ti || exn_raised()) {
                 frame.exc = get_current_thread_exception();
                 goto got_exception;
             }
