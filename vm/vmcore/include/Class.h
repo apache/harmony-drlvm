@@ -1608,9 +1608,6 @@ private:
 
     bool _parse_line_numbers(unsigned attr_len, ByteReader &cfs);
 
-    bool _parse_local_vars(Const_Pool *cp, unsigned cp_size,
-        unsigned attr_len, ByteReader &cfs);
-
     bool _parse_exceptions(Const_Pool *cp, unsigned cp_size, unsigned attr_len,
         ByteReader &cfs);
 
@@ -1622,8 +1619,8 @@ private:
     Line_Number_Table *_line_number_table;
     Local_Var_Table *_local_vars_table;
 
-    Local_Var_Table * _parse_local_vars(Const_Pool *cp, unsigned cp_size, 
-        unsigned attr_len, ByteReader &cfs, const char* attr_name);
+    bool _parse_local_vars(const char* attr_name, Local_Var_Table** lvt_address,
+        Const_Pool *cp, unsigned cp_size, unsigned attr_len, ByteReader &cfs);
 
     // This is the number of breakpoints which should be set in the
     // method when it is compiled. This number does not reflect

@@ -1126,27 +1126,29 @@ bool Method::_parse_line_numbers(unsigned attr_len, ByteReader &cfs) {
     return true;
 } //Method::_parse_line_numbers
 
-Local_Var_Table * Method::_parse_local_vars(Const_Pool *cp, unsigned cp_size, 
-                               unsigned attr_len, ByteReader &cfs, const char* attr_name) {
 
+bool Method::_parse_local_vars(const char* attr_name, Local_Var_Table** lvt_address,
+        Const_Pool *cp, unsigned cp_size, unsigned attr_len, ByteReader &cfs)
+{
     uint16 n_local_vars;
     if(!cfs.parse_u2_be(&n_local_vars)) {
         REPORT_FAILED_METHOD("could not parse local variables number "
             "of " << attr_name << " attribute");
-        return NULL;
+        return false;
     }
+
     unsigned real_lnt_attr_len = 2 + n_local_vars * 10; 
     if(real_lnt_attr_len != attr_len) {
         REPORT_FAILED_METHOD("real " << attr_name << " length differ "
             "from declared length ("
             << attr_len << " vs. " << real_lnt_attr_len << ")" );
-        return NULL;
+        return false;
     }
     if (!n_local_vars) {
-        return NULL;
+        return true;
     }
 
-    Local_Var_Table * table = (Local_Var_Table *)_class->class_loader->Alloc(
+    Local_Var_Table* table = (Local_Var_Table *)_class->class_loader->Alloc(
         sizeof(Local_Var_Table) +
         sizeof(Local_Var_Entry) * (n_local_vars - 1));
     // ppervov: FIXME: should throw OOME
@@ -1157,62 +1159,62 @@ Local_Var_Table * Method::_parse_local_vars(Const_Pool *cp, unsigned cp_size,
         if(!cfs.parse_u2_be(&start_pc)) {
             REPORT_FAILED_METHOD("could not parse start_pc "
                 "in " << attr_name << " attribute");
-            return NULL;
+            return false;
         }
         uint16 length;      
         if(!cfs.parse_u2_be(&length)) {
             REPORT_FAILED_METHOD("could not parse length entry "
                 "in " << attr_name << " attribute");
-            return NULL;
+            return false;
         }
 
         if( (start_pc >= _byte_code_length)
             || (start_pc + (unsigned)length) > _byte_code_length ) {
             REPORT_FAILED_METHOD(attr_name << " entry "
                 "[start_pc, start_pc + length) points outside bytecode range");
-            return NULL;
+            return false;
         }
 
         uint16 name_index;
         if(!cfs.parse_u2_be(&name_index)) {
             REPORT_FAILED_METHOD("could not parse name index "
                 "in " << attr_name << " attribute");
-            return NULL;
+            return false;
         }
 
         uint16 descriptor_index;
         if(!cfs.parse_u2_be(&descriptor_index)) {
             REPORT_FAILED_METHOD("could not parse descriptor index "
                 "in " << attr_name << " attribute");
-            return NULL;
+            return false;
         }
 
         String* name = cp_check_utf8(cp,cp_size,name_index);
         if(name == NULL) {
             REPORT_FAILED_METHOD("name index is not valid CONSTANT_Utf8 entry "
                 "in " << attr_name << " attribute");
-            return NULL;
+            return false;
         }
 
         String* descriptor = cp_check_utf8(cp,cp_size,descriptor_index);
         if(descriptor == NULL) {
             REPORT_FAILED_METHOD("descriptor index is not valid CONSTANT_Utf8 entry "
                 "in " << attr_name << " attribute");
-            return NULL;
+            return false;
         }
 
         uint16 index;
         if(!cfs.parse_u2_be(&index)) {
             REPORT_FAILED_METHOD("could not parse index "
                 "in " << attr_name << " attribute");
-            return NULL;
+            return false;
         }
 
         // FIXME Don't work with long and double
         if (index >= _max_locals) {
             REPORT_FAILED_METHOD("invalid local index "
                 "in " << attr_name << " attribute");
-            return NULL;
+            return false;
         }
 
         table->table[j].start_pc = start_pc;
@@ -1223,8 +1225,12 @@ Local_Var_Table * Method::_parse_local_vars(Const_Pool *cp, unsigned cp_size,
         table->table[j].generic_type = NULL;
     }
 
-    return table;
+    assert(lvt_address);
+    *lvt_address = table;
+
+    return true;
 } //Method::_parse_local_vars
+
 
 bool Method::_parse_code( Const_Pool *cp, unsigned cp_size, unsigned code_attr_len, ByteReader &cfs)
 {
@@ -1344,8 +1350,7 @@ bool Method::_parse_code( Const_Pool *cp, unsigned cp_size, unsigned code_attr_l
             {
                 if (TI_enabled)
                 {
-                    if (!(_local_vars_table = 
-                        _parse_local_vars(cp, cp_size, attr_len, cfs, "LocalVariableTable")))
+                    if (!_parse_local_vars("LocalVariableTable", &_local_vars_table, cp, cp_size, attr_len, cfs))
                     {
                         return false;
                     }
@@ -1360,8 +1365,7 @@ bool Method::_parse_code( Const_Pool *cp, unsigned cp_size, unsigned code_attr_l
             {
                 if (TI_enabled)
                 {
-                    if (!(generic_vars = 
-                        _parse_local_vars(cp, cp_size, attr_len, cfs, "LocalVariableTypeTable")))
+                    if (!_parse_local_vars("LocalVariableTypeTable", &generic_vars, cp, cp_size, attr_len, cfs))
                     {
                         return false;
                     }
