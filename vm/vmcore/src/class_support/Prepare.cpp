@@ -858,9 +858,25 @@ void assign_offsets_to_class_methods(Class *clss)
                 for (j = 0;  j < n_super_virtual_method_entries;  j++) {
                     Method *m = super_vtable_descriptors[j];
                     if (name == m->get_name() && desc == m->get_descriptor()) {
-                        if( m->is_final() && !m->is_private() ) {
-                            clss->state = ST_Error;
-                            return;
+                        if(m->is_final()) {
+                            if(m->is_private()
+                                || (m->is_package_private() 
+                                    && m->get_class()->package != method.get_class()->package))
+                            {
+                                // We allow to override private final and
+                                // default (package private) final methods
+                                // from superclasses since they are not accessible
+                                // from descendants.
+                                // Note: for package private methods this statement
+                                // is true only for classes from different packages
+                            } else {
+                                REPORT_FAILED_CLASS_CLASS(clss->class_loader, clss,
+                                    "java/lang/VerifyError",
+                                    "An attempt is made to override final method "
+                                    << m->get_class()->name->bytes << "."
+                                    << m->get_name()->bytes << m->get_descriptor()->bytes);
+                                return;
+                            }
                         }
                         // method doesn't override m if method has package access
                         // and is in a different runtime package than m.
@@ -1373,8 +1389,6 @@ bool class_prepare(Global_Env* env, Class *clss)
     //
     assign_offsets_to_class_methods(clss);
     if(clss->state == ST_Error) {
-        REPORT_FAILED_CLASS_CLASS(clss->class_loader, clss,
-            "java/lang/IncompatibleClassChangeError", clss->name->bytes);
         return false;
     }
     //

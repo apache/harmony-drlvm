@@ -894,6 +894,7 @@ public:
     bool is_public()            {return (_access_flags&ACC_PUBLIC)?true:false;}
     bool is_private()           {return (_access_flags&ACC_PRIVATE)?true:false;}
     bool is_protected()         {return (_access_flags&ACC_PROTECTED)?true:false;}
+    bool is_package_private()   {return !(is_public()||is_protected()||is_public())?true:false;}
     bool is_static()            {return (_access_flags&ACC_STATIC)?true:false;}
     bool is_final()             {return (_access_flags&ACC_FINAL)?true:false;}
     bool is_strict()            {return (_access_flags&ACC_STRICT)?true:false;}
