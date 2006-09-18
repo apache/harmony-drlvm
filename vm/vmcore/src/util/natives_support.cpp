@@ -203,7 +203,12 @@ natives_load_library(const char* library_name, bool* just_loaded,
     
     char *localLibName = (char *) library_name;
     NativeLibraryHandle returnCode = NULL;
-    
+    NativeLibInfo* pfound;
+    NativeLibInfo* pinfo;
+    NativeLibraryHandle handle;
+    apr_status_t apr_status; 
+    Global_Env *ge;
+    jint UNREF res;
 #ifdef PLATFORM_NT
     TRACE2("init", "### lib name = " << library_name);
 
@@ -221,7 +226,7 @@ natives_load_library(const char* library_name, bool* just_loaded,
 
     jni_libs.lock._lock();
 
-    NativeLibInfo* pfound = search_library_list(localLibName);
+    pfound = search_library_list(localLibName);
 
     if (pfound)
     {
@@ -237,8 +242,7 @@ natives_load_library(const char* library_name, bool* just_loaded,
     *just_loaded = true;
 
     // library was not loaded previously, try to load it
-    NativeLibraryHandle handle;
-    apr_status_t apr_status = port_dso_load_ex(&handle, localLibName,
+    apr_status = port_dso_load_ex(&handle, localLibName,
                                                PORT_DSO_BIND_DEFER, jni_libs.ppool);
     if (APR_SUCCESS != apr_status)
     {
@@ -255,7 +259,7 @@ natives_load_library(const char* library_name, bool* just_loaded,
         goto NATIVES_LOAD_LIBRARY_EXIT;
     }
 
-    NativeLibInfo* pinfo = (NativeLibInfo*)apr_palloc(jni_libs.ppool, sizeof(NativeLibInfo));
+    pinfo = (NativeLibInfo*)apr_palloc(jni_libs.ppool, sizeof(NativeLibInfo));
     if (NULL == pinfo)
     {
         apr_dso_unload(handle);
@@ -270,7 +274,7 @@ natives_load_library(const char* library_name, bool* just_loaded,
 
     pinfo->handle = handle;
 
-    Global_Env *ge = VM_Global_State::loader_env;
+    ge = VM_Global_State::loader_env;
     pinfo->name = ge->string_pool.lookup(localLibName);
 
     pinfo->next = jni_libs.lib_info_list;
@@ -278,7 +282,7 @@ natives_load_library(const char* library_name, bool* just_loaded,
 
     jni_libs.lock._unlock();
 
-    jint UNREF res = find_call_JNI_OnLoad(pinfo->handle); // What to do with result???
+    res = find_call_JNI_OnLoad(pinfo->handle); // What to do with result???
 
     *pstatus = APR_SUCCESS;
 
