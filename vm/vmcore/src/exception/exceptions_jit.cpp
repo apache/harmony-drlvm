@@ -213,6 +213,19 @@ static void exn_propagate_exception(
         interrupted_method_jit = interrupted_cci->get_jit();
     }
 
+    // Remove single step breakpoints which could have been set on the
+    // exception bytecode
+    DebugUtilsTI *ti = VM_Global_State::loader_env->TI;
+    if (ti->isEnabled() && ti->is_single_step_enabled())
+    {
+        VM_thread *vm_thread = p_TLS_vmthread;
+        if (vm_thread->ss_state->enabled)
+        {
+            LMAutoUnlock lock(&ti->brkpntlst_lock);
+            jvmti_remove_single_step_breakpoints(ti, vm_thread);
+        }
+    }
+
     bool same_frame = true;
     while (!si_is_past_end(si) && !si_is_native(si)) {
         CodeChunkInfo *cci = si_get_code_chunk_info(si);
@@ -247,6 +260,29 @@ static void exn_propagate_exception(
                 // Setup handler context
                 jit->fix_handler_context(method, si_get_jit_context(si));
                 si_set_ip(si, handler->get_handler_ip(), false);
+
+                // Start single step in exception handler
+                if (ti->isEnabled() && ti->is_single_step_enabled())
+                {
+                    VM_thread *vm_thread = p_TLS_vmthread;
+                    if (vm_thread->ss_state->enabled)
+                    {
+                        LMAutoUnlock lock(&ti->brkpntlst_lock);
+
+                        uint16 bc;
+                        OpenExeJpdaError UNREF result =
+                            jit->get_bc_location_for_native(
+                                method, handler->get_handler_ip(), &bc);
+                        assert(EXE_ERROR_NONE == result);
+
+                        jvmti_StepLocation method_start = {(Method *)method, bc};
+
+                        jvmtiError UNREF errorCode =
+                            jvmti_set_single_step_breakpoints(ti, vm_thread,
+                                &method_start, 1);
+                        assert(JVMTI_ERROR_NONE == errorCode);
+                    }
+                }
 
                 // Create exception if necessary
                 if (!*exn_obj) {

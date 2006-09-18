@@ -166,7 +166,77 @@ bool jvmti_send_jit_breakpoint_event(Registers *regs)
     // Copy disassembler instance in case a breakpoint is deleted
     // inside of callbacks
     InstructionDisassembler idisasm(*bp->disasm);
+    JNIEnv *jni_env = (JNIEnv *)jni_native_intf;
 
+    BreakPoint *ss_breakpoint = NULL;
+    // Check if there are Single Step type breakpoints in TLS
+    if (ti->is_single_step_enabled())
+    {
+        VM_thread *vm_thread = p_TLS_vmthread;
+        if (vm_thread->ss_state->enabled)
+        {
+            JVMTISingleStepState *ss_state = vm_thread->ss_state;
+            for(unsigned iii = 0; iii < ss_state->predicted_bp_count; iii++)
+            {
+                if (ss_state->predicted_breakpoints[iii]->native_location ==
+                    native_location)
+                {
+                    ss_breakpoint = ss_state->predicted_breakpoints[iii];
+
+                    TIEnv *ti_env = ti->getEnvironments();
+                    TIEnv *next_env;
+                    jlocation location = ss_breakpoint->location;
+                    jmethodID method = ss_breakpoint->method;
+
+                    while (NULL != ti_env)
+                    {
+                        next_env = ti_env->next;
+                        jvmtiEventSingleStep func =
+                            (jvmtiEventSingleStep)ti_env->get_event_callback(JVMTI_EVENT_SINGLE_STEP);
+                        if (NULL != func)
+                        {
+                            if (ti_env->global_events[JVMTI_EVENT_SINGLE_STEP - JVMTI_MIN_EVENT_TYPE_VAL])
+                            {
+                                TRACE2("jvmti.break.ss",
+                                    "Calling JIT global SingleStep breakpoint callback method = " <<
+                                    ((Method*)method)->get_name() << " location = " << location);
+                                // fire global event
+                                ti->brkpntlst_lock._unlock();
+                                func((jvmtiEnv*)ti_env, jni_env, (jthread)hThread, method, location);
+                                ti->brkpntlst_lock._lock();
+                                TRACE2("jvmti.break.ss",
+                                    "Finished JIT global SingleStep breakpoint callback method = " <<
+                                    ((Method*)method)->get_name() << " location = " << location);
+                                ti_env = next_env;
+                                continue;
+                            }
+
+                            // fire local events
+                            for(TIEventThread* ti_et = ti_env->event_threads[JVMTI_EVENT_SINGLE_STEP - JVMTI_MIN_EVENT_TYPE_VAL];
+                                ti_et != NULL; ti_et = ti_et->next)
+                                if (ti_et->thread == hythread_self())
+                                {
+                                    TRACE2("jvmti.break.ss",
+                                        "Calling JIT local SingleStep breakpoint callback method = " <<
+                                    ((Method*)method)->get_name() << " location = " << location);
+                                    ti->brkpntlst_lock._unlock();
+                                    func((jvmtiEnv*)ti_env, jni_env,
+                                        (jthread)hThread, method, location);
+                                    ti->brkpntlst_lock._lock();
+                                    TRACE2("jvmti.break.ss",
+                                        "Finished JIT local SingleStep breakpoint callback method = " <<
+                                    ((Method*)method)->get_name() << " location = " << location);
+                                }
+                        }
+                        ti_env = next_env;
+                    }
+                }
+            }
+        }
+    }
+
+    // Send events for all normally set breakpoints for this location
+    // if there are any
     do
     {
         TIEnv *env = bp->env;
@@ -174,12 +244,16 @@ bool jvmti_send_jit_breakpoint_event(Registers *regs)
         jmethodID method = bp->method;
         BreakPoint *next_bp = ti->find_next_bpt(bp, native_location);
 
+        if (bp == ss_breakpoint)
+            // Don't send breakpoint event for breakpoint which was
+            // actually SingleStep breakpoint
+            continue;
+
         if (env->global_events[JVMTI_EVENT_BREAKPOINT - JVMTI_MIN_EVENT_TYPE_VAL])
         {
             jvmtiEventBreakpoint func = (jvmtiEventBreakpoint)env->get_event_callback(JVMTI_EVENT_BREAKPOINT);
             if (NULL != func)
             {
-                JNIEnv *jni_env = (JNIEnv *)jni_native_intf;
                 TRACE2("jvmti.break", "Calling JIT global breakpoint callback method = " <<
                     ((Method*)method)->get_name() << " location = " << location);
 
@@ -308,6 +382,26 @@ bool jvmti_send_jit_breakpoint_event(Registers *regs)
     regs->rip = (POINTER_SIZE_INT)instruction_buffer;
 #endif
 
+    // Set breakpoints on bytecodes after the current one
+    if (ti->is_single_step_enabled())
+    {
+        VM_thread *vm_thread = p_TLS_vmthread;
+        if (vm_thread->ss_state->enabled)
+        {
+            jvmti_remove_single_step_breakpoints(ti, vm_thread);
+
+            jvmti_StepLocation *locations;
+            unsigned locations_count;
+
+            jvmti_SingleStepLocation(vm_thread, (Method *)ss_breakpoint->method,
+                (unsigned)ss_breakpoint->location, &locations, &locations_count);
+
+            jvmtiError UNREF errorCode = jvmti_set_single_step_breakpoints(
+                ti, vm_thread, locations, locations_count);
+            assert(JVMTI_ERROR_NONE == errorCode);
+        }
+    }
+
     ti->brkpntlst_lock._unlock();
 
     tmn_suspend_disable();
@@ -318,6 +412,8 @@ bool jvmti_send_jit_breakpoint_event(Registers *regs)
 
 jvmtiError jvmti_set_jit_mode_breakpoint(BreakPoint *bp)
 {
+    // Function is always executed under global TI breakpoints lock
+
     // Find native location in the method code
     NativeCodePtr np = NULL;
     Method *m = (Method *)bp->method;
@@ -383,6 +479,44 @@ void jvmti_set_pending_breakpoints(Method *method)
 
     assert(method->get_pending_breakpoints() == 0);
     STD_FREE(locations);
+}
+
+jvmtiError jvmti_set_breakpoint_for_jit(DebugUtilsTI *ti, BreakPoint *bp)
+{
+    // Function is always executed under global TI breakpoints lock
+
+    BreakPoint *other_bp = ti->get_other_breakpoint_same_location(bp->method,
+        bp->location);
+
+    if (NULL == other_bp) // No other breakpoints were set in this place
+    {
+        Method *m = (Method *)bp->method;
+
+        if (m->get_state() == Method::ST_Compiled)
+        {
+            jvmtiError errorCode = jvmti_set_jit_mode_breakpoint(bp);
+
+            if (JVMTI_ERROR_NONE != errorCode)
+                return JVMTI_ERROR_INTERNAL;
+        }
+        else
+        {
+            TRACE2("jvmti.break", "Skipping setting breakpoing in method " <<
+                m->get_class()->name->bytes << "." <<
+                m->get_name()->bytes << " " << m->get_descriptor()->bytes <<
+                " because it is not compiled yet");
+            m->insert_pending_breakpoint();
+        }
+    }
+    else
+    {
+        bp->id = other_bp->id;
+        if (NULL != bp->disasm)
+            bp->disasm = new InstructionDisassembler(*bp->disasm);
+    }
+
+    ti->add_breakpoint(bp);
+    return JVMTI_ERROR_NONE;
 }
 
 /*
@@ -457,42 +591,45 @@ jvmtiSetBreakpoint(jvmtiEnv* env,
     bp->env = p_env;
     bp->disasm = NULL;
 
-    BreakPoint *other_bp = ti->get_other_breakpoint_same_location(method, location, p_env);
-
-    if (NULL == other_bp) // No more environments set breakpoints here
+    if (interpreter_enabled())
     {
-        if (interpreter_enabled())
+        BreakPoint *other_bp = ti->get_other_breakpoint_same_location(method, location);
+
+        if (NULL == other_bp) // No other breakpoints were set in this place
             bp->id = interpreter.interpreter_ti_set_breakpoint(method, location);
-        else
-        {
-            Method *m = (Method *)method;
 
-            if (m->get_state() == Method::ST_Compiled)
-                errorCode = jvmti_set_jit_mode_breakpoint(bp);
-            else
-            {
-                TRACE2("jvmti.break", "Skipping setting breakpoing in method " <<
-                    m->get_class()->name->bytes << "." <<
-                    m->get_name()->bytes << " " << m->get_descriptor()->bytes <<
-                    " because it is not compiled yet");
-                m->insert_pending_breakpoint();
-            }
-
-            if (errorCode != JVMTI_ERROR_NONE)
-                return JVMTI_ERROR_INTERNAL;
-        }
+        ti->add_breakpoint(bp);
     }
     else
     {
-        bp->id = other_bp->id;
-        if (NULL != bp->disasm)
-            bp->disasm = new InstructionDisassembler(*bp->disasm);
-    }
+        errorCode = jvmti_set_breakpoint_for_jit(ti, bp);
 
-    ti->add_breakpoint(bp);
+        if (JVMTI_ERROR_NONE != errorCode)
+            return JVMTI_ERROR_INTERNAL;
+    }
 
     TRACE2("jvmti.break", "SetBreakpoint successfull");
     return JVMTI_ERROR_NONE;
+}
+
+void jvmti_remove_breakpoint_for_jit(DebugUtilsTI *ti, BreakPoint *bp)
+{
+    // Function is always executed under global TI breakpoints lock
+
+    if (NULL == ti->get_other_breakpoint_same_location(bp->method, bp->location))
+    {
+        Method *m = (Method *)bp->method;
+
+        if (m->get_state() == Method::ST_Compiled)
+        {
+            jbyte *target_instruction = (jbyte *)bp->native_location;
+            *target_instruction = (POINTER_SIZE_INT)bp->id;
+        }
+        else
+            m->remove_pending_breakpoint();
+    }
+
+    ti->remove_breakpoint(bp);
 }
 
 /*
@@ -558,26 +695,16 @@ jvmtiClearBreakpoint(jvmtiEnv* env,
     if (NULL == bp)
         return JVMTI_ERROR_NOT_FOUND;
 
-    if (NULL == ti->get_other_breakpoint_same_location(method, location, p_env))
+    if (interpreter_enabled())
     {
-        // No more environments set breakpoints here
-        if (interpreter_enabled())
+        if (NULL == ti->get_other_breakpoint_same_location(method, location))
+            // No other breakpoints were set in this place
             interpreter.interpreter_ti_clear_breakpoint(method, location, bp->id);
-        else
-        {
-            Method *m = (Method *)method;
 
-            if (m->get_state() == Method::ST_Compiled)
-            {
-                jbyte *target_instruction = (jbyte *)bp->native_location;
-                *target_instruction = (POINTER_SIZE_INT)bp->id;
-            }
-            else
-                m->remove_pending_breakpoint();
-        }
+        ti->remove_breakpoint(bp);
     }
-
-    ti->remove_breakpoint(bp);
+    else
+        jvmti_remove_breakpoint_for_jit(ti, bp);
 
     TRACE2("jvmti.break", "ClearBreakpoint successfull");
     return JVMTI_ERROR_NONE;

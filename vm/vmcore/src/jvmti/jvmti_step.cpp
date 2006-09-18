@@ -28,6 +28,8 @@
 #include "interpreter.h"
 #include "open/bytecodes.h"
 
+static JNIEnv * jvmti_test_jenv = jni_native_intf;
+
 static inline short
 jvmti_GetHalfWordValue( const unsigned char *bytecode,
                         unsigned location)
@@ -326,7 +328,7 @@ jvmti_SingleStepLocation( VM_thread* thread,
             assert( !is_wide );
             {
                 // create stack iterator, current stack frame should be native
-                StackIterator *si = si_create_from_native();
+                StackIterator *si = si_create_from_native(thread);
                 assert(si_is_native(si));
                 // get previous stack frame, it should be java frame
                 si_goto_previous(si);
@@ -351,7 +353,11 @@ jvmti_SingleStepLocation( VM_thread* thread,
                     error = _allocate( sizeof(jvmti_StepLocation), (unsigned char**)next_step );
                     assert( error == JVMTI_ERROR_NONE );
                     (*next_step)->method = func;
-                    (*next_step)->location = jvmti_GetNextBytecodeAfterInvoke( func, bc );
+                    // gregory - IP in stack iterator points to a
+                    // bytecode next after the one which caused call
+                    // of the method. So next location is the BC which
+                    // IP points to.
+                    (*next_step)->location = bc;
                 }
             }
             break;
@@ -454,3 +460,197 @@ jvmti_SingleStepLocation( VM_thread* thread,
 
     return;
 } // jvmti_SingleStepLocation
+
+jvmtiError jvmti_set_single_step_breakpoints(DebugUtilsTI *ti, VM_thread *vm_thread,
+    jvmti_StepLocation *locations, unsigned locations_number)
+{
+    // Function is always executed under global TI breakpoints lock
+    BreakPoint **thread_breakpoints;
+    jvmtiError errorCode = _allocate(sizeof(BreakPoint),
+        (unsigned char **)&thread_breakpoints);
+    if (JVMTI_ERROR_NONE != errorCode)
+        return errorCode;
+
+    for (unsigned iii = 0; iii < locations_number; iii++)
+    {
+        BreakPoint *bp;
+        errorCode = _allocate(sizeof(BreakPoint), (unsigned char **)&bp);
+        if (JVMTI_ERROR_NONE != errorCode)
+            return errorCode;
+
+        bp->method = (jmethodID)locations[iii].method;
+        bp->location = locations[iii].location;
+        bp->env = NULL;
+        bp->disasm = NULL;
+
+        errorCode = jvmti_set_breakpoint_for_jit(ti, bp);
+        if (JVMTI_ERROR_NONE != errorCode)
+            return errorCode;
+
+        thread_breakpoints[iii] = bp;
+    }
+
+    JVMTISingleStepState *ss_state = vm_thread->ss_state;
+    ss_state->predicted_breakpoints = thread_breakpoints;
+    ss_state->predicted_bp_count = locations_number;
+
+    return JVMTI_ERROR_NONE;
+}
+
+void jvmti_remove_single_step_breakpoints(DebugUtilsTI *ti, VM_thread *vm_thread)
+{
+    // Function is always executed under global TI breakpoints lock
+    JVMTISingleStepState *ss_state = vm_thread->ss_state;
+
+    for (unsigned iii = 0; iii < ss_state->predicted_bp_count; iii++)
+    {
+        BreakPoint *bp = ss_state->predicted_breakpoints[iii];
+        jvmti_remove_breakpoint_for_jit(ti, bp);
+    }
+
+    _deallocate((unsigned char *)ss_state->predicted_breakpoints);
+    ss_state->predicted_bp_count = 0;
+}
+
+jvmtiError jvmti_get_next_bytecodes_up_stack_from_native(VM_thread *thread,
+    jvmti_StepLocation **next_step,
+    unsigned *count)
+{
+    StackIterator *si = si_create_from_native(thread);
+
+    // Find first Java frame in the thread stack
+    while (!si_is_past_end(si))
+        if (!si_is_native(si))
+            break;
+
+    *count = 0;
+
+    if (!si_is_past_end(si))
+    {
+        Method *m = si_get_method(si);
+        assert(m);
+
+        CodeChunkInfo *cci = si_get_code_chunk_info(si);
+        JIT *jit = cci->get_jit();
+        // IP address in stack iterator points to the next bytecode after
+        // call
+        NativeCodePtr ip = si_get_ip(si);
+        uint16 bc;
+
+        OpenExeJpdaError UNREF result =
+            jit->get_bc_location_for_native(m, ip, &bc);
+        assert(result == EXE_ERROR_NONE);
+
+        jvmtiError errorCode = _allocate(sizeof(jvmti_StepLocation),
+            (unsigned char **)next_step);
+
+        if (JVMTI_ERROR_NONE != errorCode)
+        {
+            si_free(si);
+            return errorCode;
+        }
+        (*next_step)->method = (Method *)m;
+        (*next_step)->location = bc;
+    }
+
+    si_free(si);
+    return JVMTI_ERROR_NONE;
+}
+
+jvmtiError DebugUtilsTI::jvmti_single_step_start(void)
+{
+    assert(hythread_is_suspend_enabled());
+    LMAutoUnlock lock(&brkpntlst_lock);
+
+    hythread_iterator_t threads_iterator;
+
+    // Suspend all threads except current
+    IDATA tm_ret = hythread_suspend_all(&threads_iterator, NULL);
+    if (TM_ERROR_NONE != tm_ret)
+        return JVMTI_ERROR_INTERNAL;
+
+    hythread_t ht;
+
+    // Set single step in all threads
+    while ((ht = hythread_iterator_next(&threads_iterator)) != NULL)
+    {
+        VM_thread *vm_thread = get_vm_thread(ht);
+
+        // Init single step state for the thread
+        jvmtiError errorCode = _allocate(sizeof(JVMTISingleStepState),
+            (unsigned char **)&vm_thread->ss_state);
+
+        if (JVMTI_ERROR_NONE != errorCode)
+        {
+            hythread_resume_all(NULL);
+            return errorCode;
+        }
+
+        vm_thread->ss_state->predicted_breakpoints = NULL;
+        vm_thread->ss_state->predicted_bp_count = 0;
+        vm_thread->ss_state->enabled = true;
+
+        vm_thread->ss_state->enabled = true;
+
+        jvmti_StepLocation *locations;
+        unsigned locations_number;
+
+        errorCode = jvmti_get_next_bytecodes_up_stack_from_native(
+            vm_thread, &locations, &locations_number);
+
+        if (JVMTI_ERROR_NONE != errorCode)
+        {
+            hythread_resume_all(NULL);
+            return errorCode;
+        }
+
+        errorCode = jvmti_set_single_step_breakpoints(this, vm_thread, locations,
+                locations_number);
+
+        if (JVMTI_ERROR_NONE != errorCode)
+        {
+            hythread_resume_all(NULL);
+            return errorCode;
+        }
+    }
+    
+    single_step_enabled = true;
+
+    tm_ret = hythread_resume_all(NULL);
+    if (TM_ERROR_NONE != tm_ret)
+        return JVMTI_ERROR_INTERNAL;
+
+    return JVMTI_ERROR_NONE;
+}
+
+jvmtiError DebugUtilsTI::jvmti_single_step_stop(void)
+{
+    assert(hythread_is_suspend_enabled());
+    LMAutoUnlock lock(&brkpntlst_lock);
+
+    hythread_iterator_t threads_iterator;
+
+    // Suspend all threads except current
+    IDATA tm_ret = hythread_suspend_all(&threads_iterator, NULL);
+    if (TM_ERROR_NONE != tm_ret)
+        return JVMTI_ERROR_INTERNAL;
+
+    hythread_t ht;
+
+    // Clear single step in all threads
+    while ((ht = hythread_iterator_next(&threads_iterator)) != NULL)
+    {
+        VM_thread *vm_thread = get_vm_thread(ht);
+        jvmti_remove_single_step_breakpoints(this, vm_thread);
+        vm_thread->ss_state->enabled = false;
+        _deallocate((unsigned char *)vm_thread->ss_state);
+    }
+
+    single_step_enabled = false;
+
+    tm_ret = hythread_resume_all(NULL);
+    if (TM_ERROR_NONE != tm_ret)
+        return JVMTI_ERROR_INTERNAL;
+
+    return JVMTI_ERROR_NONE;
+}

@@ -307,6 +307,48 @@ jvmtiSetEventNotificationMode(jvmtiEnv* env,
     if (event_enabled(event_type) != (jboolean)old_state) {
         if (interpreter_enabled())
             interpreter.interpreter_ti_set_notification_mode(event_type, !old_state);
+        else
+        {
+            if (JVMTI_EVENT_SINGLE_STEP == event_type)
+            {
+                DebugUtilsTI *ti = ((TIEnv *)env)->vm->vm_env->TI;
+
+                if (JVMTI_ENABLE == mode && !ti->is_single_step_enabled())
+                {
+                    jvmtiError errorCode = ti->jvmti_single_step_start();
+
+                    if (JVMTI_ERROR_NONE != errorCode)
+                        return errorCode;
+                }
+                else if (JVMTI_DISABLE == mode && ti->is_single_step_enabled())
+                {
+                    // Check that no environment has SingleStep enabled
+                    LMAutoUnlock lock(&ti->TIenvs_lock);
+                    bool disable = true;
+
+                    for (TIEnv *ti_env = ti->getEnvironments(); ti_env;
+                         ti_env = ti_env->next)
+                    {
+                        if (ti_env->global_events[JVMTI_EVENT_SINGLE_STEP -
+                                JVMTI_MIN_EVENT_TYPE_VAL] ||
+                            NULL != ti_env->event_threads[JVMTI_EVENT_SINGLE_STEP -
+                                JVMTI_MIN_EVENT_TYPE_VAL])
+                        {
+                            disable = false;
+                            break;
+                        }
+                    }
+
+                    if (disable)
+                    {
+                        jvmtiError errorCode = ti->jvmti_single_step_stop();
+
+                        if (JVMTI_ERROR_NONE != errorCode)
+                            return errorCode;
+                    }
+                }
+            }
+        }
     }
 
     return JVMTI_ERROR_NONE;
@@ -1501,10 +1543,44 @@ static void process_jvmti_event(jvmtiEvent event_type, int per_thread, ...) {
         
         }
 
-void jvmti_send_thread_start_end_event(int is_start) {
-    is_start ? process_jvmti_event(JVMTI_EVENT_THREAD_START, 0, 0)
-        :process_jvmti_event(JVMTI_EVENT_THREAD_END, 1, 0);
-            }
+void jvmti_send_thread_start_end_event(int is_start)
+{
+    DebugUtilsTI *ti = VM_Global_State::loader_env->TI;
+
+    if (is_start)
+    {
+        process_jvmti_event(JVMTI_EVENT_THREAD_START, 0, 0);
+
+        if (ti->is_single_step_enabled())
+        {
+            // Init single step state for the thread
+            VM_thread *vm_thread = p_TLS_vmthread;
+
+            jvmtiError UNREF errorCode = _allocate(sizeof(JVMTISingleStepState),
+                (unsigned char **)&vm_thread->ss_state);
+            assert(JVMTI_ERROR_NONE == errorCode);
+
+            vm_thread->ss_state->predicted_breakpoints = NULL;
+            vm_thread->ss_state->predicted_bp_count = 0;
+            vm_thread->ss_state->enabled = true;
+        }
+    }
+    else
+    {
+        process_jvmti_event(JVMTI_EVENT_THREAD_END, 1, 0);
+
+        if (ti->is_single_step_enabled())
+        {
+            // Shut down single step state for the thread
+            VM_thread *vm_thread = p_TLS_vmthread;
+            LMAutoUnlock lock(&ti->brkpntlst_lock);
+            jvmti_remove_single_step_breakpoints(ti, vm_thread);
+
+            vm_thread->ss_state->enabled = false;
+            _deallocate((unsigned char *)vm_thread->ss_state);
+        }
+    }
+}
 
 void jvmti_send_wait_monitor_event(jobject monitor, jlong timeout) {
     TRACE2("jvmti.monitor.wait", "Monitor wait event, monitor = " << monitor);

@@ -83,7 +83,7 @@ static const jvmtiCapabilities jvmti_supported_jit_capabilities =
     1, // can_get_source_debug_extension
     1, // can_access_local_variables
     0, // can_maintain_original_method_order
-    0, // can_generate_single_step_events
+    1, // can_generate_single_step_events
     1, // can_generate_exception_events
     1, // can_generate_frame_pop_events
     1, // can_generate_breakpoint_events
@@ -122,7 +122,7 @@ static const jvmtiCapabilities jvmti_enable_on_live_flags =
     1, // can_get_source_debug_extension
     0, // can_access_local_variables
     0, // can_maintain_original_method_order
-    0, // can_generate_single_step_events
+    1, // can_generate_single_step_events
     0, // can_generate_exception_events
     0, // can_generate_frame_pop_events
     0, // can_generate_breakpoint_events

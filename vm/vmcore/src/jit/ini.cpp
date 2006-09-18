@@ -36,8 +36,32 @@ vm_execute_java_method_array(jmethodID method, jvalue *result, jvalue *args) {
     assert(NULL != VM_Global_State::loader_env);
     assert(NULL != VM_Global_State::loader_env->em_interface);
     assert(NULL != VM_Global_State::loader_env->em_interface->ExecuteMethod);
+
+    DebugUtilsTI *ti = VM_Global_State::loader_env->TI;
+    if (ti->isEnabled() && ti->is_single_step_enabled())
+    {
+        VM_thread *vm_thread = p_TLS_vmthread;
+        if (vm_thread->ss_state->enabled)
+        {
+            // Start single stepping a new Java method
+            LMAutoUnlock lock(&ti->brkpntlst_lock);
+            jvmti_remove_single_step_breakpoints(ti, vm_thread);
+
+            jvmti_StepLocation method_start = {(Method *)method, 0};
+            jvmtiError UNREF errorCode = jvmti_set_single_step_breakpoints(
+                ti, vm_thread, &method_start, 1);
+            assert(JVMTI_ERROR_NONE == errorCode);
+        }
+    }
+
     VM_Global_State::loader_env->em_interface->ExecuteMethod(method, result, args);
     //DEBUG_POP_LOCK(JAVA_CODE_PSEUDO_LOCK);
- 
+
+    // gregory - When method executes *return bytecode in Java it will
+    // set a breakpoint on the bytecode after invoke* or another
+    // bytecode which caused managed to VM transition. This is a
+    // general case of *return handling. So it seems here we don't
+    // have to do anything, *return handling will set a breakpoint up
+    // the stack in java automatically.
 }
 

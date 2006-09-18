@@ -89,6 +89,19 @@ struct BreakPoint {
     BreakPoint(TIEnv *_env) : method(NULL), location(0), next(NULL), env(_env) {}
 };
 
+struct jvmti_StepLocation
+{
+    struct Method* method;
+    unsigned location;
+};
+
+struct JVMTISingleStepState
+{
+    bool enabled;
+    BreakPoint **predicted_breakpoints;
+    unsigned predicted_bp_count;
+};
+
 /*
  * Type which will describe one watched field
  */
@@ -304,12 +317,12 @@ class DebugUtilsTI {
             return NULL;
         }
 
-        BreakPoint *get_other_breakpoint_same_location(jmethodID m, jlocation l, TIEnv *env)
+        BreakPoint *get_other_breakpoint_same_location(jmethodID m, jlocation l)
         {
             // assert(brkpntlst_lock._lock_or_null());
 
             for (BreakPoint *bp = brkpntlst; NULL != bp; bp = bp->next)
-                if (bp->method == m && bp->location == l && bp->env != env)
+                if (bp->method == m && bp->location == l)
                     return bp;
 
             return NULL;
@@ -452,6 +465,15 @@ class DebugUtilsTI {
             return global_capabilities & ti_gc;
         }
 
+        bool is_single_step_enabled(void)
+        {
+            return single_step_enabled;
+        }
+
+        // Single step functions
+        jvmtiError jvmti_single_step_start(void);
+        jvmtiError jvmti_single_step_stop(void);
+
     private:
 
     protected:
@@ -469,12 +491,8 @@ class DebugUtilsTI {
         Class **notifyPrepareList;
         unsigned prepareListNumber;
         unsigned global_capabilities;
+        bool single_step_enabled;
 }; /* end of class DebugUtilsTI */
-
-struct jvmti_StepLocation {
-    struct Method* method;
-    unsigned location;
-};
 
 jvmtiError add_event_to_thread(jvmtiEnv *env, jvmtiEvent event_type, jthread event_thread);
 void remove_event_from_thread(jvmtiEnv *env, jvmtiEvent event_type, jthread event_thread);
@@ -485,6 +503,16 @@ jthread getCurrentThread();
 jint load_agentlib(Agent *agent, const char *str, JavaVM_Internal *vm);
 jint load_agentpath(Agent *agent, const char *str, JavaVM_Internal *vm);
 
+// Breakpoints internal functions
+jvmtiError jvmti_get_next_bytecodes_up_stack_from_native(VM_thread *thread,
+    jvmti_StepLocation **next_step, unsigned *count);
+jvmtiError jvmti_set_breakpoint_for_jit(DebugUtilsTI *ti, BreakPoint *bp);
+void jvmti_remove_breakpoint_for_jit(DebugUtilsTI *ti, BreakPoint *bp);
+jvmtiError jvmti_set_single_step_breakpoints(DebugUtilsTI *ti,
+    VM_thread *vm_thread, jvmti_StepLocation *locations,
+    unsigned locations_number);
+void jvmti_remove_single_step_breakpoints(DebugUtilsTI *ti, VM_thread *vm_thread);
+
 // Object check functions
 Boolean is_valid_thread_object(jthread thread);
 Boolean is_valid_thread_group_object(jthreadGroup group);
@@ -494,7 +522,7 @@ Boolean is_valid_class_object(jclass klass);
 jvmtiError jvmti_translate_jit_error(OpenExeJpdaError error);
 
 // Single step support
-void jvmti_SingleStepLocation( VM_thread* thread, struct Method *method, unsigned location, 
-                               jvmti_StepLocation **next_step, unsigned *count);
+void jvmti_SingleStepLocation(VM_thread* thread, Method *method,
+    unsigned location, jvmti_StepLocation **next_step, unsigned *count);
 
 #endif /* _JVMTI_INTERNAL_H_ */
