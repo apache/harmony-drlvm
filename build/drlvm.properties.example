@@ -1,4 +1,6 @@
-#default drlvm.properties to point to the local working_classlib
+# example drlvm.properties to point to the local working_classlib
+#
+#  to use, rename to "drlvm.properties"
 
 external.dep.CLASSLIB.loc=../../../working_classlib
 
