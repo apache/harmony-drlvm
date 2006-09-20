@@ -697,6 +697,16 @@ hythread_t VMCALL hythread_thin_monitor_get_owner(hythread_thin_monitor_t *lockw
         fat_monitor = locktable_get_fat_monitor(FAT_LOCK_ID(lockword)); //  find fat_monitor in lock table
         return fat_monitor->owner;
     }
+
+    if (THREAD_ID(lockword)== 0) {
+         return NULL;
+    }
+
+#ifdef LOCK_RESERVATION
+    if (RECURSION(lockword)==0 && IS_RESERVED(lockword)) {
+         return NULL;
+    }
+#endif
     return hythread_get_thread(THREAD_ID(lockword));
 }
 

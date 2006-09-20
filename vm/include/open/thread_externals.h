@@ -78,12 +78,20 @@ VMEXPORT int vm_attach();
   */
 VMEXPORT int vm_detach();
 
-/* throw exception
+/**
+ * creates exception object using given class name and message and throws it
+ * using jthread_throw_exception method;
  * @param[in] name char* -name
  * @param[in] message char* -message
  * @return int.
  */
 VMEXPORT int jthread_throw_exception(char* name, char* message);
+
+/**
+ * Throws given exception object; Desides whether current thread is unwindable
+ * and throws it, raises exception otherwise;
+ */
+VMEXPORT int jthread_throw_exception_object(jobject object);
 
 // TI support interface
 VMEXPORT void jvmti_send_thread_start_end_event(int);

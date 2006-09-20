@@ -702,15 +702,21 @@ static void* APR_THREAD_FUNC thread_start_proc(apr_thread_t* thd, void *p_args) 
 
     // Do actual call of the thread body supplied by the user
     thread->start_proc(thread->start_proc_args);
-    
-    thread->state = TM_THREAD_STATE_TERMINATED;
+
+    // shutdown sequence
+    status = hythread_global_lock(NULL);
+    assert (status == TM_ERROR_NONE);
+    assert(hythread_is_suspend_enabled()); 
+    thread->state = TM_THREAD_STATE_TERMINATED | (TM_THREAD_STATE_INTERRUPTED  & thread->state);
     // Send join event to those threads who called join on this thread
     hylatch_count_down(thread->join_event);
     status = thread_destroy(thread);       // Remove thread from the list of thread 
     assert (status == TM_ERROR_NONE);
-    
     // Cleanup TLS after thread completes
-    thread_set_self(NULL); 
+    thread_set_self(NULL);
+    status = hythread_global_unlock(NULL);
+    assert (status == TM_ERROR_NONE);
+ 
     return (void *)(IDATA)apr_thread_exit(thd, APR_SUCCESS);
 }
 

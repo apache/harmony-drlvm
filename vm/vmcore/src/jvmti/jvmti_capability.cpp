@@ -40,7 +40,7 @@ static const jvmtiCapabilities jvmti_supported_interpreter_capabilities =
     1, // can_get_monitor_info
     1, // can_pop_frame
     0, // can_redefine_classes
-    0, // can_signal_thread
+    1, // can_signal_thread
     1, // can_get_source_file_name
     1, // can_get_line_numbers
     1, // can_get_source_debug_extension
@@ -58,7 +58,7 @@ static const jvmtiCapabilities jvmti_supported_interpreter_capabilities =
     1, // can_generate_method_exit_events
     1, // can_generate_all_class_hook_events
     1, // can_generate_compiled_method_load_events
-    0, // can_generate_monitor_events
+    1, // can_generate_monitor_events
     0, // can_generate_vm_object_alloc_events
     0, // can_generate_native_method_bind_events
     0, // can_generate_garbage_collection_events
@@ -77,7 +77,7 @@ static const jvmtiCapabilities jvmti_supported_jit_capabilities =
     1, // can_get_monitor_info
     1, // can_pop_frame
     0, // can_redefine_classes
-    0, // can_signal_thread
+    1, // can_signal_thread
     1, // can_get_source_file_name
     1, // can_get_line_numbers
     1, // can_get_source_debug_extension
@@ -95,7 +95,7 @@ static const jvmtiCapabilities jvmti_supported_jit_capabilities =
     1, // can_generate_method_exit_events
     1, // can_generate_all_class_hook_events
     1, // can_generate_compiled_method_load_events
-    0, // can_generate_monitor_events
+    1, // can_generate_monitor_events
     0, // can_generate_vm_object_alloc_events
     0, // can_generate_native_method_bind_events
     0, // can_generate_garbage_collection_events

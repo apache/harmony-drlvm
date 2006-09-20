@@ -80,6 +80,8 @@ jmethodID JNICALL GetMethodID(JNIEnv *env, jclass clazz,
         return setDaemonID;
     } else if (! strcmp(name, "runImpl")){
         return runID;
+    } else if (! strcmp(name, "<init>")){
+        return runID;
     }
     log_info("GetMethodID emulator: UNKNOWN METHOD");
     assert(0);

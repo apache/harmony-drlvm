@@ -396,9 +396,7 @@ jvmtiStopThread(jvmtiEnv* env,
         return JVMTI_ERROR_INVALID_THREAD;
     }
 
-    jthread_exception_stop(thread, exception);
-
-    return JVMTI_NYI;
+    return (jvmtiError)jthread_exception_stop(thread, exception);
 }
 
 /*

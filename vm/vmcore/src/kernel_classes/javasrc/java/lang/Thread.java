@@ -686,7 +686,7 @@ public class Thread implements Runnable {
             this.isAlive = true;
             
             if (VMThreadManager.start(this, stackSize, daemon, priority) != 0) {
-                throw new OutOfMemoryError("Failed to create new thread");
+                throw new OutOfMemoryError("Failed to start new thread");
             } 
             
             started = true;

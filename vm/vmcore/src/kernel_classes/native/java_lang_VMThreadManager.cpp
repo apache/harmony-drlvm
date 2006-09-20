@@ -160,8 +160,8 @@ JNIEXPORT jint JNICALL Java_java_lang_VMThreadManager_start
     jthread_threadattr_t attrs;
     
     attrs.daemon = daemon;
-    attrs.priority = priority; 
-    attrs.stacksize = (jint)stackSize;
+    attrs.priority = priority;
+    attrs.stacksize = stackSize > 40000000? 0:(jint)stackSize;
     return (jint)jthread_create(jenv, thread, &attrs);
 }
 

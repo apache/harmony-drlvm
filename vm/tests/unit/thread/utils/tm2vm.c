@@ -60,6 +60,9 @@ void vm_jthread_set_tm_data(jthread jt, void* nt) {
 IDATA jthread_throw_exception(char* name, char* message) {
     return 0;
 }
+VMEXPORT int jthread_throw_exception_object(jobject object) {
+    return 0;
+}
 
 int vm_objects_are_equal(jobject obj1, jobject obj2){
     //ObjectHandle h1 = (ObjectHandle)obj1;

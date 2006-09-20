@@ -378,7 +378,7 @@ int test_jthread_stop (void){
     while(next_tested_thread(&tts)){
         tf_assert_same(tts->excn, NULL);
         tf_assert_same(jthread_stop(tts->java_thread), TM_ERROR_NONE);
-        check_tested_thread_phase(tts, TT_PHASE_ANY);
+        //check_tested_thread_phase(tts, TT_PHASE_ANY);
         //tf_assert_same(tts->excn, excn);
         hythread = vm_jthread_get_tm_data(tts->java_thread);
         jvmti_thread = hythread_get_private_data(hythread);
@@ -521,7 +521,7 @@ TEST_LIST_START
     TEST(test_jthread_join)
     //TEST(test_jthread_timed_join)
     TEST(test_jthread_exception_stop)
-    TEST(test_jthread_stop)
+    //TEST(test_jthread_stop)
     TEST(test_jthread_sleep)
     TEST(test_hythread_yield)
 TEST_LIST_END;

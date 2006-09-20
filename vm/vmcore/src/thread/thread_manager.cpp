@@ -70,6 +70,9 @@ using namespace std;
 #include "java_lang_thread_ia32.h"
 #endif
 
+#include "interpreter.h"
+#include "exceptions_int.h"
+
 static StaticInitializer thread_runtime_initializer;
 
 static tl::MemoryPool thr_pool;
@@ -166,9 +169,22 @@ void set_TLS_data(VM_thread *thread) {
 }
 
 IDATA jthread_throw_exception(char* name, char* message) {
-    ASSERT_RAISE_AREA;
     jobject jthe = exn_create(name);
-    exn_raise_object(jthe);
+    return jthread_throw_exception_object(jthe);
+}
+
+IDATA jthread_throw_exception_object(jobject object) {
+    if (interpreter_enabled()) {
+        set_current_thread_exception(object->object);
+    } else {
+        if (is_unwindable()) {
+            exn_throw_object(object);
+        } else {
+            ASSERT_RAISE_AREA;
+            exn_raise_object(object);
+        }
+    }
+
     return 0;
 }
 

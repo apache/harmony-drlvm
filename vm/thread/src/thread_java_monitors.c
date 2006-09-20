@@ -75,27 +75,16 @@ IDATA VMCALL jthread_monitor_enter(jobject monitor) {
       apr_time_t enter_begin;
     jvmti_thread_t tm_java_thread;
     hythread_t tm_native_thread;
-    ////////
+    int disable_count;
 
     assert(monitor);
     hythread_suspend_disable();
     lockword = vm_object_get_lockword_addr(monitor);
     status = hythread_thin_monitor_try_enter(lockword);
     if(status != TM_ERROR_EBUSY) {
-        hythread_suspend_enable();
-        if (ti_is_enabled()){
-            add_owned_monitor(monitor);
-        }
-        return status;
+        goto entered;
     }
 
-    // should be moved to event handler
-    if (ti_is_enabled()){
-         enter_begin = apr_time_now();
-		 tm_native_thread = hythread_self();
-         tm_native_thread->state &= ~TM_THREAD_STATE_RUNNABLE;
-         tm_native_thread->state |= TM_THREAD_STATE_BLOCKED_ON_MONITOR_ENTER;
-    }
     /////////
 #ifdef LOCK_RESERVATION
 // busy unreserve lock before blocking and inflating
@@ -109,18 +98,23 @@ IDATA VMCALL jthread_monitor_enter(jobject monitor) {
         goto entered;
     }
 #endif //LOCK_RESERVATION
+    tm_native_thread = hythread_self();
+    tm_native_thread->state &= ~TM_THREAD_STATE_RUNNABLE;
+    tm_native_thread->state |= TM_THREAD_STATE_BLOCKED_ON_MONITOR_ENTER;
+
+    // should be moved to event handler
+    if (ti_is_enabled()){
+        enter_begin = apr_time_now();
+        disable_count =  reset_suspend_disable();
+        set_contended_monitor(monitor);
+        jvmti_send_contended_enter_or_entered_monitor_event(monitor, 1);
+        set_suspend_disable(disable_count);
+
+    }
     
     // busy wait and inflate
     // reload poiter after safepoints
     
-    if (ti_is_enabled()){
-        hythread_suspend_enable();
-        set_contended_monitor(monitor);
-        jvmti_send_contended_enter_or_entered_monitor_event(monitor, 1);
-        hythread_suspend_disable();
-
-    }
-
     lockword = vm_object_get_lockword_addr(monitor);
     while ((status = hythread_thin_monitor_try_enter(lockword)) == TM_ERROR_EBUSY) {
         hythread_safe_point();
@@ -133,7 +127,7 @@ IDATA VMCALL jthread_monitor_enter(jobject monitor) {
                  assert(0);
                  return status;
              }
-             goto entered; 
+             goto contended_entered; 
         }
         hythread_yield();
     }
@@ -142,18 +136,24 @@ IDATA VMCALL jthread_monitor_enter(jobject monitor) {
         inflate_lock(lockword);
     }
 // do all ti staff here
-entered:
-    hythread_suspend_enable();
-    jvmti_send_contended_enter_or_entered_monitor_event(monitor, 0);
+contended_entered:
     if (ti_is_enabled()){
-        add_owned_monitor(monitor);
+        disable_count =  reset_suspend_disable();
+        jvmti_send_contended_enter_or_entered_monitor_event(monitor, 0);
+        set_suspend_disable(disable_count);
         // should be moved to event handler
         tm_java_thread = hythread_get_private_data(hythread_self());
         tm_java_thread->blocked_time += apr_time_now()- enter_begin;
-        tm_native_thread->state &= ~TM_THREAD_STATE_BLOCKED_ON_MONITOR_ENTER;
-        tm_native_thread->state |= TM_THREAD_STATE_RUNNABLE;
         /////////
     }
+    tm_native_thread->state &= ~TM_THREAD_STATE_BLOCKED_ON_MONITOR_ENTER;
+    tm_native_thread->state |= TM_THREAD_STATE_RUNNABLE;
+
+entered:
+   if (ti_is_enabled()) { 
+      add_owned_monitor(monitor);
+   }
+    hythread_suspend_enable();
     return TM_ERROR_NONE;
 }
 
@@ -265,47 +265,7 @@ IDATA VMCALL jthread_monitor_notify_all(jobject monitor) {
  * @return 
  */
 IDATA VMCALL jthread_monitor_wait(jobject monitor) {
-    hythread_thin_monitor_t *lockword;
-    IDATA status;
-    // should be moved to event handler
-    apr_time_t wait_begin;
-    jvmti_thread_t tm_java_thread;
-    ///////
-
-    assert(monitor);
-
-    if (ti_is_enabled()) {
-        set_wait_monitor(monitor);
-        jvmti_send_wait_monitor_event(monitor, (jlong)0);
-        // should be moved to event handler
-        wait_begin = apr_time_now();
-        ////////
-    }
-
-    hythread_suspend_disable();
-    lockword = vm_object_get_lockword_addr(monitor);
-    if (!is_fat_lock(*lockword)) {
-                if (!owns_thin_lock(hythread_self(), *lockword)) {
-            TRACE(("ILLEGAL_STATE wait %x\n", lockword));
-                        hythread_suspend_enable();
-            return TM_ERROR_ILLEGAL_STATE;  
-        }    
-        inflate_lock(lockword);
-    }
-     if (ti_is_enabled()){
-        remove_owned_monitor(monitor);
-    }
-    status = hythread_thin_monitor_wait_interruptable(lockword, 0, 0); 
-    hythread_suspend_enable();
-     if (ti_is_enabled()){
-        add_owned_monitor(monitor);
-        jvmti_send_waited_monitor_event(monitor, (jboolean)0);
-        // should be moved to event handler
-        tm_java_thread = hythread_get_private_data(hythread_self());
-        tm_java_thread->waited_time += apr_time_now()- wait_begin;
-        /////////
-    }
-    return status;
+    return jthread_monitor_timed_wait(monitor, 0, 0);
 }
 
 /**
@@ -330,10 +290,13 @@ IDATA VMCALL jthread_monitor_wait(jobject monitor) {
 IDATA VMCALL jthread_monitor_timed_wait(jobject monitor, jlong millis, jint nanos) {
     hythread_thin_monitor_t *lockword;
     IDATA status;
-	hythread_t tm_native_thread;
+    hythread_t tm_native_thread;
+    apr_time_t wait_begin;
+    jvmti_thread_t tm_java_thread;
+    int disable_count;
+    ///////
 
     assert(monitor);
-    jvmti_send_wait_monitor_event(monitor, millis);
 
     hythread_suspend_disable();
     lockword = vm_object_get_lockword_addr(monitor);
@@ -345,35 +308,51 @@ IDATA VMCALL jthread_monitor_timed_wait(jobject monitor, jlong millis, jint nano
         }    
         inflate_lock(lockword);
     }
-      if (ti_is_enabled()){
+
+    if (ti_is_enabled()) {
+        disable_count =  reset_suspend_disable();
+        set_wait_monitor(monitor);
+        jvmti_send_wait_monitor_event(monitor, (jlong)millis);
+        set_suspend_disable(disable_count);
+
+        // should be moved to event handler
+        wait_begin = apr_time_now();
+        ////////
         remove_owned_monitor(monitor);
- 		tm_native_thread = hythread_self();
-        tm_native_thread->state &= ~TM_THREAD_STATE_RUNNABLE;
-        tm_native_thread->state |= TM_THREAD_STATE_WAITING |
-			                       TM_THREAD_STATE_IN_MONITOR_WAIT;
-		if((millis > 0) || (nanos > 0)) { 
-            tm_native_thread->state |= TM_THREAD_STATE_WAITING_WITH_TIMEOUT;
-		} else {
-            tm_native_thread->state |= TM_THREAD_STATE_WAITING_INDEFINITELY;
-		}
     }
+
+    tm_native_thread = hythread_self();
+    tm_native_thread->state &= ~TM_THREAD_STATE_RUNNABLE;
+    tm_native_thread->state |= TM_THREAD_STATE_WAITING |
+            TM_THREAD_STATE_IN_MONITOR_WAIT;
+    if((millis > 0) || (nanos > 0)) { 
+       tm_native_thread->state |= TM_THREAD_STATE_WAITING_WITH_TIMEOUT;
+    } else {
+       tm_native_thread->state |= TM_THREAD_STATE_WAITING_INDEFINITELY;
+    }
+
     status = hythread_thin_monitor_wait_interruptable(lockword, millis, nanos);
 
-     if (ti_is_enabled()){
-        add_owned_monitor(monitor);
-        tm_native_thread->state &= ~(TM_THREAD_STATE_WAITING | 
+    tm_native_thread->state &= ~(TM_THREAD_STATE_WAITING | 
 			                         TM_THREAD_STATE_IN_MONITOR_WAIT);
-		if((millis > 0) || (nanos > 0)) { 
-            tm_native_thread->state &= ~TM_THREAD_STATE_WAITING_WITH_TIMEOUT;
-		} else {
-            tm_native_thread->state &= ~TM_THREAD_STATE_WAITING_INDEFINITELY;
+    if((millis > 0) || (nanos > 0)) { 
+       tm_native_thread->state &= ~TM_THREAD_STATE_WAITING_WITH_TIMEOUT;
+    } else {
+       tm_native_thread->state &= ~TM_THREAD_STATE_WAITING_INDEFINITELY;
     }
-        tm_native_thread->state |= TM_THREAD_STATE_RUNNABLE;
-	}
+    tm_native_thread->state |= TM_THREAD_STATE_RUNNABLE;
+
     hythread_suspend_enable();
-
-    jvmti_send_waited_monitor_event(monitor, (status == APR_TIMEUP)?(jboolean)1:(jboolean)0);
-
+    if (ti_is_enabled()){
+        add_owned_monitor(monitor);
+        disable_count =  reset_suspend_disable();
+        jvmti_send_waited_monitor_event(monitor, (status == APR_TIMEUP)?(jboolean)1:(jboolean)0);
+        // should be moved to event handler
+        set_suspend_disable(disable_count);
+        tm_java_thread = hythread_get_private_data(hythread_self());
+        tm_java_thread->waited_time += apr_time_now()- wait_begin;
+        /////////
+    }
     return status;
 }
 

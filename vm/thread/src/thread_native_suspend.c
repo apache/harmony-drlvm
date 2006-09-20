@@ -147,32 +147,41 @@ void VMCALL hythread_safe_point() {
 }
 
 static void thread_safe_point_impl(hythread_t thread) { 
+    hythread_event_callback_proc callback_func;
     if(thread->suspend_request >0) {   
         
-                int old_status = thread->suspend_disable_count;
-                do {
+        int old_status = thread->suspend_disable_count;
+        do {
             TRACE(("TM: safe point enter: thread: %p count: %d dis count: %d", 
-                        thread, thread->suspend_request, thread->suspend_disable_count));
+                thread, thread->suspend_request, thread->suspend_disable_count));
             
-                        thread->suspend_disable_count = 0;
-
             if (thread->safepoint_callback) {
-                thread->safepoint_callback();
+                thread->suspend_disable_count = 1;
+                // Clear callback (this is one-time event)
+                callback_func = thread->safepoint_callback;
+                thread->safepoint_callback = NULL;
+                
+                // since set callback suspended the thread
+                // resore its original state
+                hythread_resume(tm_self_tls);
+                callback_func();
             }
             
-                        apr_memory_rw_barrier();
-                        // code for Ipf that support StackIterator and immmediate suspend
-                        // notify suspender
-                  //  hylatch_count_down(thread->safe_region_event);
+            thread->suspend_disable_count = 0;
+            
+            apr_memory_rw_barrier();
+            // code for Ipf that support StackIterator and immmediate suspend
+            // notify suspender
+            //  hylatch_count_down(thread->safe_region_event);
 
-                // wait for resume event
+            // wait for resume event
             hysem_wait(thread->resume_event);
             TRACE(("TM: safe point resume: thread: %p count: %d", thread, thread->suspend_request));
 
             thread->suspend_disable_count = old_status;
             apr_memory_rw_barrier();
-                } while (thread->suspend_request >0);
-     }
+        } while (thread->suspend_request >0);
+    }
 } // thread_safe_point_impl
 
 
@@ -211,11 +220,10 @@ static IDATA wait_safe_region_event(hythread_t thread) {
                 // we need to wait for notification only in case the thread is in the unsafe/disable region
     while (thread->suspend_disable_count) {
         // HIT cyclic suspend
-        /*if(tm_self_tls->suspend_request > 1) {
+        if(tm_self_tls->suspend_request > 0) {
              return TM_ERROR_EBUSY; 
-        }*/
-        // wait for the notification
-        return TM_ERROR_EBUSY;//hythread_yield();
+        }
+        hythread_yield();
     }
     TRACE(("TM: suspend wait exit safe region thread: %p request count: %d",thread , thread->suspend_request));
     thread->state |= TM_THREAD_STATE_SUSPENDED;
@@ -269,7 +277,7 @@ void VMCALL hythread_suspend() {
 IDATA VMCALL hythread_suspend_other(hythread_t thread) {
     hythread_t self;
     self = tm_self_tls;
-    TRACE(("TM: suspend one enter thread: %p request count: %d",thread , thread->suspend_request));
+    TRACE(("TM: suspend one enter thread: %p self: %p request count: %d",thread , tm_self_tls, thread->suspend_request));
     if(self == thread) {
         hythread_suspend();
         return TM_ERROR_NONE; 
@@ -304,7 +312,7 @@ void VMCALL hythread_resume(hythread_t thread) {
     // If there was request for suspension, decrease the request counter
  //       printf("resume other now lock %d  %d  %d  %d\n",tm_self_tls->thread_id,tm_self_tls->suspend_disable_count,thread->thread_id,thread->suspend_disable_count);
     if(thread->suspend_request > 0) {
-
+        if (thread->safepoint_callback && thread->suspend_request < 2) return;
         atomic16_dec((int16 *)&(thread->suspend_request));
         if(thread->suspend_request == 0) {  
             // Notify the thread that it may wake up now
@@ -325,8 +333,22 @@ void VMCALL hythread_resume(hythread_t thread) {
  * @param[in] callback callback function
  */
 IDATA set_safepoint_callback(hythread_t thread, tm_thread_event_callback_proc callback) {
-    // not implemented
-    thread->safepoint_callback = callback;      
+    while (apr_atomic_casptr((volatile void **)&thread->safepoint_callback, (void *)callback, (void *)NULL) != NULL);
+    if(tm_self_tls == thread) {
+        int old_status = thread->suspend_disable_count;
+        thread->suspend_disable_count = 1;
+        hythread_suspend();
+        thread->suspend_disable_count = old_status;
+    } else {
+        //we will not have notification from the
+        //target thread if safe_point call back will not exit
+        ////
+        send_suspend_request(thread);
+        //let the thread execute safe point in the case it's already suspended
+        ////
+        hysem_post(thread->resume_event);
+    }
+
     return TM_ERROR_NONE;
 }
 

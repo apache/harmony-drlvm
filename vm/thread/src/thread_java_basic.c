@@ -412,26 +412,12 @@ IDATA jthread_yield(){
 void stop_callback() {  
     hythread_t tm_native_thread;
     jvmti_thread_t tm_java_thread;
-    JNIEnv *env;
-        jobject excn;
-        IDATA status;
+    jobject excn;
     
     tm_native_thread = hythread_self();
-    hythread_global_lock();
-        if (tm_native_thread->suspend_request > 0){
-        tm_native_thread->suspend_request = 1;
-        hythread_resume(tm_native_thread);
-        }
-    hythread_global_unlock();
-    hythread_resume(tm_native_thread);
-        // Clear callback (this is one-time event)
-    status=set_safepoint_callback(tm_native_thread, NULL);
-    assert (status == TM_ERROR_NONE);
-
-        tm_java_thread = hythread_get_private_data(tm_native_thread);
+    tm_java_thread = hythread_get_private_data(tm_native_thread);
     excn = tm_java_thread->stop_exception;
-        env = tm_java_thread->jenv;
-        (*env) -> Throw(env, excn);
+    jthread_throw_exception_object(excn);
 }
 
 /**
@@ -443,15 +429,20 @@ void stop_callback() {
  */
 IDATA jthread_stop(jthread java_thread) {
     jclass clazz;
-        JNIEnv *env;
+    jmethodID excn_constr;
+    jobject excen_obj;
+    JNIEnv *env;
     jvmti_thread_t tm_java_thread; 
     hythread_t tm_native_thread;
 
     tm_native_thread = vm_jthread_get_tm_data(java_thread);
     tm_java_thread = hythread_get_private_data(tm_native_thread);
-        env = tm_java_thread->jenv;
+    env = tm_java_thread->jenv;
     clazz = (*env)->FindClass(env, "java/lang/ThreadDeath");
-        return jthread_exception_stop(java_thread, clazz);
+    excn_constr = (*env)->GetMethodID(env, clazz, "<init>", "()V");
+    excen_obj = (*env)->NewObject(env, clazz, excn_constr);
+    
+    return jthread_exception_stop(java_thread, excen_obj);
 }
 
 /**
@@ -466,26 +457,16 @@ IDATA jthread_exception_stop(jthread java_thread, jobject excn) {
 
     jvmti_thread_t tm_java_thread;
     hythread_t tm_native_thread;
-    IDATA status;
-        JNIEnv* env;
+    JNIEnv* env;
 
     tm_native_thread = jthread_get_native_thread(java_thread);
-    status=hythread_suspend_other(tm_native_thread);
-    if (status != TM_ERROR_NONE) return status;
-        tm_java_thread = hythread_get_private_data(tm_native_thread);
+    tm_java_thread = hythread_get_private_data(tm_native_thread);
         
     // Install safepoint callback that would throw exception
-        env = tm_java_thread->jenv;
+    env = tm_java_thread->jenv;
     tm_java_thread->stop_exception = (*env)->NewGlobalRef(env,excn);
-    status=set_safepoint_callback(tm_native_thread, stop_callback);
-    if (status != TM_ERROR_NONE) return status;
-    // Let thread do callback inside safe point loop
-    status=hysem_post(tm_native_thread->resume_event);
-    // resume will be called by stop_callback
-    // hythread_resume(tm_native_thread);
-    ////        
-
-        return status;
+    
+    return set_safepoint_callback(tm_native_thread, stop_callback);
 }
 
 /**

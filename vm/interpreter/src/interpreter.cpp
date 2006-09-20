@@ -882,7 +882,6 @@ Opcode_LREM(StackFrame& frame) {
 #define DEF_OPCODE_CMP(CMP,check)                   \
 static inline void                                  \
 Opcode_##CMP(StackFrame& frame) {                   \
-    hythread_safe_point();                                \
     int32 val = frame.stack.pick().i;               \
     frame.stack.ref() = FLAG_NONE; /* for OPCODE_IFNULL */ \
     DEBUG_BYTECODE("val = " << (int)val);                    \
@@ -894,6 +893,7 @@ Opcode_##CMP(StackFrame& frame) {                   \
     frame.ip += 3;                                  \
     }                                               \
     frame.stack.pop();                              \
+    hythread_safe_point();                                \
 }
 
 DEF_OPCODE_CMP(IFEQ,==0) // Opcode_IFEQ
@@ -906,7 +906,6 @@ DEF_OPCODE_CMP(IFLT,<0)  // Opcode_IFLT
 #define DEF_OPCODE_IF_ICMPXX(NAME,cmp)                          \
 static inline void                                              \
 Opcode_IF_ICMP ## NAME(StackFrame& frame) {                     \
-    hythread_safe_point();                                           \
     int32 val0 = frame.stack.pick(1).i;                         \
     int32 val1 = frame.stack.pick(0).i;                         \
     frame.stack.ref(1) = FLAG_NONE;                             \
@@ -919,6 +918,7 @@ Opcode_IF_ICMP ## NAME(StackFrame& frame) {                     \
         DEBUG_BYTECODE(val1 << " " << val0 << " branch not taken");\
     }                                                           \
     frame.stack.pop(2);                                         \
+    hythread_safe_point();                                           \
 }
 
 DEF_OPCODE_IF_ICMPXX(EQ,==) // Opcode_IF_ICMPEQ OPCODE_IF_ACMPEQ
@@ -2864,22 +2864,22 @@ restart:
             case OPCODE_IFEQ: Opcode_IFEQ(frame); break;
 
             case OPCODE_IFNONNULL:
-            case OPCODE_IFNE: Opcode_IFNE(frame); break;
-            case OPCODE_IFGE: Opcode_IFGE(frame); break;
-            case OPCODE_IFGT: Opcode_IFGT(frame); break;
-            case OPCODE_IFLE: Opcode_IFLE(frame); break;
-            case OPCODE_IFLT: Opcode_IFLT(frame); break;
+            case OPCODE_IFNE: Opcode_IFNE(frame); goto check_exception;
+            case OPCODE_IFGE: Opcode_IFGE(frame); goto check_exception;
+            case OPCODE_IFGT: Opcode_IFGT(frame); goto check_exception;
+            case OPCODE_IFLE: Opcode_IFLE(frame); goto check_exception;
+            case OPCODE_IFLT: Opcode_IFLT(frame); goto check_exception;
 
             case OPCODE_IF_ACMPEQ:
-            case OPCODE_IF_ICMPEQ: Opcode_IF_ICMPEQ(frame); break;
+            case OPCODE_IF_ICMPEQ: Opcode_IF_ICMPEQ(frame); goto check_exception;
 
             case OPCODE_IF_ACMPNE:
-            case OPCODE_IF_ICMPNE: Opcode_IF_ICMPNE(frame); break;
+            case OPCODE_IF_ICMPNE: Opcode_IF_ICMPNE(frame); goto check_exception;
 
-            case OPCODE_IF_ICMPGE: Opcode_IF_ICMPGE(frame); break;
-            case OPCODE_IF_ICMPGT: Opcode_IF_ICMPGT(frame); break;
-            case OPCODE_IF_ICMPLE: Opcode_IF_ICMPLE(frame); break;
-            case OPCODE_IF_ICMPLT: Opcode_IF_ICMPLT(frame); break;
+            case OPCODE_IF_ICMPGE: Opcode_IF_ICMPGE(frame); goto check_exception;
+            case OPCODE_IF_ICMPGT: Opcode_IF_ICMPGT(frame); goto check_exception;
+            case OPCODE_IF_ICMPLE: Opcode_IF_ICMPLE(frame); goto check_exception;
+            case OPCODE_IF_ICMPLT: Opcode_IF_ICMPLT(frame); goto check_exception;
 
             case OPCODE_FCMPL: Opcode_FCMPL(frame); break;
             case OPCODE_FCMPG: Opcode_FCMPG(frame); break;

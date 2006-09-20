@@ -78,7 +78,7 @@ int test_hythread_iterator(void) {
     while(hythread_iterator_has_next(iterator)) {
         i++;
         thread = hythread_iterator_next(&iterator);
-        hythread_join(thread);
+        tf_assert(hythread_is_alive(thread));
     }
 
     tf_assert(i == 100);
