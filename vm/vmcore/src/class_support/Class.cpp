@@ -178,6 +178,15 @@ Method *class_lookup_method(Class *clss,
     return class_lookup_method(clss, method_name, method_descr);
 } //class_lookup_method
 
+Method *class_get_method_from_vt_offset(VTable *vt,
+                                        unsigned offset)
+{
+    assert(vt);
+    unsigned index = (offset - VTABLE_OVERHEAD 
+        - vt->clss->n_virtual_method_entries * sizeof(void*))
+        / sizeof(void*);
+    return &(vt->clss->methods[index]);
+} // class_get_method_from_vt_offset
 
 void* Field::get_address()
 {

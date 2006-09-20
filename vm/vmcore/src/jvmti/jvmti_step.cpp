@@ -26,6 +26,7 @@
 #include "jit_intf_cpp.h"
 #include "stack_iterator.h"
 #include "interpreter.h"
+#include "method_lookup.h"
 #include "open/bytecodes.h"
 
 static JNIEnv * jvmti_test_jenv = jni_native_intf;
@@ -47,134 +48,54 @@ jvmti_GetWordValue( const unsigned char *bytecode,
     return result;
 } // jvmti_GetWordValue
 
-static unsigned
-jvmti_GetNextBytecodeLocation( Method *method,
-                               unsigned location)
+static Method *
+jvmti_get_invoked_virtual_method( VM_thread* thread )
 {
-    assert( location < method->get_byte_code_size() );
-    const unsigned char *bytecode = method->get_byte_code_addr();
-    bool is_wide = false;
-    do {
-        switch( bytecode[location] )
-        {
-        case OPCODE_WIDE:           /* 0xc4 */
-            assert( !is_wide );
-            location++;
-            is_wide = true;
-            continue;
+    ASSERT_NO_INTERPRETER;
 
-        case OPCODE_TABLESWITCH:    /* 0xaa + pad + s4 * (3 + N) */
-            assert( !is_wide );
-            location = (location + 4)&(~0x3U);
-            {
-                int low = jvmti_GetWordValue( bytecode, location + 4 );
-                int high = jvmti_GetWordValue( bytecode, location + 8 );
-                return location + 4 * (high - low + 4);
-            }
-
-        case OPCODE_LOOKUPSWITCH:   /* 0xab + pad + s4 * 2 * (N + 1) */
-            assert( !is_wide );
-            location = (location + 4)&(~0x3U);
-            {
-                int number = jvmti_GetWordValue( bytecode, location + 4 ) + 1;
-                return location + 8 * number;
-            }
-
-        case OPCODE_IINC:           /* 0x84 + u1|u2 + s1|s2 */
-            if( is_wide ) {
-                return location + 5;
-            } else {
-                return location + 3;
-            }
-
-        case OPCODE_GOTO_W:         /* 0xc8 + s4 */
-        case OPCODE_JSR_W:          /* 0xc9 + s4 */
-        case OPCODE_INVOKEINTERFACE:/* 0xb9 + u2 + u1 + u1 */
-            assert( !is_wide );
-            return location + 5;
-
-        case OPCODE_MULTIANEWARRAY: /* 0xc5 + u2 + u1 */
-            assert( !is_wide );
-            return location + 4;
-
-        case OPCODE_ILOAD:          /* 0x15 + u1|u2 */
-        case OPCODE_LLOAD:          /* 0x16 + u1|u2 */
-        case OPCODE_FLOAD:          /* 0x17 + u1|u2 */
-        case OPCODE_DLOAD:          /* 0x18 + u1|u2 */
-        case OPCODE_ALOAD:          /* 0x19 + u1|u2 */
-        case OPCODE_ISTORE:         /* 0x36 + u1|u2 */
-        case OPCODE_LSTORE:         /* 0x37 + u1|u2 */
-        case OPCODE_FSTORE:         /* 0x38 + u1|u2 */
-        case OPCODE_DSTORE:         /* 0x39 + u1|u2 */
-        case OPCODE_ASTORE:         /* 0x3a + u1|u2 */
-        case OPCODE_RET:            /* 0xa9 + u1|u2  */
-            if( is_wide ) {
-                return location + 3;
-            } else {
-                return location + 2;
-            }
-
-        case OPCODE_SIPUSH:         /* 0x11 + s2 */
-        case OPCODE_LDC_W:          /* 0x13 + u2 */
-        case OPCODE_LDC2_W:         /* 0x14 + u2 */
-        case OPCODE_IFEQ:           /* 0x99 + s2 */
-        case OPCODE_IFNE:           /* 0x9a + s2 */
-        case OPCODE_IFLT:           /* 0x9b + s2 */
-        case OPCODE_IFGE:           /* 0x9c + s2 */
-        case OPCODE_IFGT:           /* 0x9d + s2 */
-        case OPCODE_IFLE:           /* 0x9e + s2 */
-        case OPCODE_IF_ICMPEQ:      /* 0x9f + s2 */
-        case OPCODE_IF_ICMPNE:      /* 0xa0 + s2 */
-        case OPCODE_IF_ICMPLT:      /* 0xa1 + s2 */
-        case OPCODE_IF_ICMPGE:      /* 0xa2 + s2 */
-        case OPCODE_IF_ICMPGT:      /* 0xa3 + s2 */
-        case OPCODE_IF_ICMPLE:      /* 0xa4 + s2 */
-        case OPCODE_IF_ACMPEQ:      /* 0xa5 + s2 */
-        case OPCODE_IF_ACMPNE:      /* 0xa6 + s2 */
-        case OPCODE_GOTO:           /* 0xa7 + s2 */
-        case OPCODE_GETSTATIC:      /* 0xb2 + u2 */
-        case OPCODE_PUTSTATIC:      /* 0xb3 + u2 */
-        case OPCODE_GETFIELD:       /* 0xb4 + u2 */
-        case OPCODE_PUTFIELD:       /* 0xb5 + u2 */
-        case OPCODE_INVOKEVIRTUAL:  /* 0xb6 + u2 */
-        case OPCODE_INVOKESPECIAL:  /* 0xb7 + u2 */
-        case OPCODE_JSR:            /* 0xa8 + s2 */
-        case OPCODE_INVOKESTATIC:   /* 0xb8 + u2 */
-        case OPCODE_NEW:            /* 0xbb + u2 */
-        case OPCODE_ANEWARRAY:      /* 0xbd + u2 */
-        case OPCODE_CHECKCAST:      /* 0xc0 + u2 */
-        case OPCODE_INSTANCEOF:     /* 0xc1 + u2 */
-        case OPCODE_IFNULL:         /* 0xc6 + s2 */
-        case OPCODE_IFNONNULL:      /* 0xc7 + s2 */
-            assert( !is_wide );
-            return location + 3;
-
-        case OPCODE_BIPUSH:         /* 0x10 + s1 */
-        case OPCODE_LDC:            /* 0x12 + u1 */
-        case OPCODE_NEWARRAY:       /* 0xbc + u1 */
-            assert( !is_wide );
-            return location + 2;
-
-        default:
-            assert( !is_wide );
-            assert( bytecode[location] < OPCODE_COUNT );
-            assert( bytecode[location] != _OPCODE_UNDEFINED );
-            return location + 1;
-        }
+#if PLATFORM_NT
+    // create stack iterator from native
+    StackIterator* si = si_create_from_native( thread );
+    si_transfer_all_preserved_registers(si);
+    assert(si_is_native(si));
+    // get java frame
+    si_goto_previous(si);
+    assert(!si_is_native(si));
+    // find correct ip in java frame
+    NativeCodePtr ip = si_get_ip(si);
+    // get virtual table
+    VTable* vtable;
+    JitFrameContext* jitContext = si_get_jit_context(si);
+    unsigned short code = (*((unsigned short*)((char*)ip)));
+    switch( code )
+    {
+    case 0x50ff:
+        vtable = (VTable*)*(jitContext->p_eax);
         break;
-    } while( true );
-    return 0;
-} // jvmti_GetNextBytecodeLocation
+    case 0x51ff:
+        vtable = (VTable*)*(jitContext->p_ecx);
+        break;
+    case 0x52ff:
+        vtable = (VTable*)*(jitContext->p_edx);
+        break;
+    case 0x53ff:
+        vtable = (VTable*)*(jitContext->p_ebx);
+        break;
+    default:
+        vtable = NULL;
+    }
+    assert(vtable);
+    si_free(si);
 
-static unsigned
-jvmti_GetNextBytecodeAfterInvoke( Method *method,
-                                  unsigned location)
-{
-    const unsigned char UNREF *bytecode = method->get_byte_code_addr();
-    assert( bytecode[location] >= OPCODE_INVOKEVIRTUAL
-           && bytecode[location] <= OPCODE_INVOKEINTERFACE );
-    return jvmti_GetNextBytecodeLocation(method, location);
-} // jvmti_GetNextBytecodeAfterInvoke
+    // get method from virtual table
+    Method *method = class_get_method_from_vt_offset( vtable, *((char*)ip + 2) );
+    return method;
+
+#else // for PLATFORM_POSIX
+
+    return NULL;
+#endif // PLATFORM_NT
+} // jvmti_get_invoked_virtual_method
 
 void
 jvmti_SingleStepLocation( VM_thread* thread,
@@ -311,11 +232,11 @@ jvmti_SingleStepLocation( VM_thread* thread,
             }
             break;
 
-        // athrow instruction
+        // athrow and invokeinterface instruction
         case OPCODE_ATHROW:         /* 0xbf */
+        case OPCODE_INVOKEINTERFACE:/* 0xb9 + u2 + u1 + u1 */
             assert( !is_wide );
-            *count = 0;
-            *next_step = NULL;
+            // instructions are processed in helpers
             break;
 
         // return instructions
@@ -327,42 +248,14 @@ jvmti_SingleStepLocation( VM_thread* thread,
         case OPCODE_RETURN:         /* 0xb1 */
             assert( !is_wide );
             {
-                // create stack iterator, current stack frame should be native
-                StackIterator *si = si_create_from_native(thread);
-                assert(si_is_native(si));
-                // get previous stack frame, it should be java frame
-                si_goto_previous(si);
-                assert(!si_is_native(si));
-                // get previous stack frame
-                si_goto_previous(si);
-                if (!si_is_native(si)) {
-                    // stack frame is java frame, get frame method and location
-                    uint16 bc = 0;
-                    CodeChunkInfo *cci = si_get_code_chunk_info(si);
-                    Method *func = cci->get_method();
-                    NativeCodePtr ip = si_get_ip(si);
-                    JIT *jit = cci->get_jit();
-                    OpenExeJpdaError UNREF result =
-                                jit->get_bc_location_for_native(
-                                    func, ip, &bc);
-                    assert(result == EXE_ERROR_NONE);
-                    si_free(si);
-
-                    // set step location structure
-                    *count = 1;
-                    error = _allocate( sizeof(jvmti_StepLocation), (unsigned char**)next_step );
-                    assert( error == JVMTI_ERROR_NONE );
-                    (*next_step)->method = func;
-                    // gregory - IP in stack iterator points to a
-                    // bytecode next after the one which caused call
-                    // of the method. So next location is the BC which
-                    // IP points to.
-                    (*next_step)->location = bc;
-                }
+                error = jvmti_get_next_bytecodes_up_stack_from_native( 
+                    thread, next_step, count );
+                assert( error == JVMTI_ERROR_NONE );
             }
             break;
 
-        // invokestatic instruction
+        // invokes instruction
+        case OPCODE_INVOKESPECIAL:  /* 0xb7 + u2 */
         case OPCODE_INVOKESTATIC:   /* 0xb8 + u2 */
             assert( !is_wide );
             {
@@ -370,15 +263,26 @@ jvmti_SingleStepLocation( VM_thread* thread,
                 Class *klass = method_get_class( method );
                 assert( cp_is_resolved(klass->const_pool, index) );
 
-                *count = 1;
-                error = _allocate( sizeof(jvmti_StepLocation), (unsigned char**)next_step );
-                assert( error == JVMTI_ERROR_NONE );
-                if( method_is_native( klass->const_pool[index].CONSTANT_ref.method ) ) {
-                    (*next_step)->method = method;
-                    (*next_step)->location = 
-                        jvmti_GetNextBytecodeAfterInvoke( method, bytecode_index );
-                } else {
+                if( !method_is_native( klass->const_pool[index].CONSTANT_ref.method ) ) {
+                    *count = 1;
+                    error = _allocate( sizeof(jvmti_StepLocation), (unsigned char**)next_step );
+                    assert( error == JVMTI_ERROR_NONE );
                     (*next_step)->method = klass->const_pool[index].CONSTANT_ref.method;
+                    (*next_step)->location = 0;
+                }
+            }
+            break;
+
+        // invokevirtual instruction
+        case OPCODE_INVOKEVIRTUAL:  /* 0xb6 + u2 */
+            assert( !is_wide );
+            {
+                Method *func = jvmti_get_invoked_virtual_method( thread );
+                if( !method_is_native(func) ) {
+                    *count = 1;
+                    error = _allocate( sizeof(jvmti_StepLocation), (unsigned char**)next_step );
+                    assert( error == JVMTI_ERROR_NONE );
+                    (*next_step)->method = func;
                     (*next_step)->location = 0;
                 }
             }
@@ -446,14 +350,6 @@ jvmti_SingleStepLocation( VM_thread* thread,
         case OPCODE_RET:            /* 0xa9 + u1|u2  */
             // FIXME - need to obtain return address from stack.
             break;
-
-        // invokes instruction with reference in stack 
-        case OPCODE_INVOKEVIRTUAL:  /* 0xb6 + u2 */
-        case OPCODE_INVOKESPECIAL:  /* 0xb7 + u2 */
-        case OPCODE_INVOKEINTERFACE:/* 0xb9 + u2 + u1 + u1 */
-            assert( !is_wide );
-            // FIXME - need to get reference from stack to determine next method
-            break;
         }
         break;
     } while( true );
@@ -516,46 +412,45 @@ jvmtiError jvmti_get_next_bytecodes_up_stack_from_native(VM_thread *thread,
     jvmti_StepLocation **next_step,
     unsigned *count)
 {
+    ASSERT_NO_INTERPRETER;
+
+    // create stack iterator, current stack frame should be native
     StackIterator *si = si_create_from_native(thread);
-
-    // Find first Java frame in the thread stack
-    while (!si_is_past_end(si))
-        if (!si_is_native(si))
-            break;
-
+    si_transfer_all_preserved_registers(si);
+    assert(si_is_native(si));
+    // get previous stack frame, it should be java frame
+    si_goto_previous(si);
+    assert(!si_is_native(si));
+    // get previous stack frame
+    si_goto_previous(si);
     *count = 0;
-
-    if (!si_is_past_end(si))
-    {
-        Method *m = si_get_method(si);
-        assert(m);
-
+    if (!si_is_native(si)) {
+        // stack frame is java frame, get frame method and location
+        uint16 bc = 0;
         CodeChunkInfo *cci = si_get_code_chunk_info(si);
-        JIT *jit = cci->get_jit();
-        // IP address in stack iterator points to the next bytecode after
-        // call
+        Method *func = cci->get_method();
         NativeCodePtr ip = si_get_ip(si);
-        uint16 bc;
-
+        JIT *jit = cci->get_jit();
         OpenExeJpdaError UNREF result =
-            jit->get_bc_location_for_native(m, ip, &bc);
+                    jit->get_bc_location_for_native(func, ip, &bc);
         assert(result == EXE_ERROR_NONE);
 
-        jvmtiError errorCode = _allocate(sizeof(jvmti_StepLocation),
-            (unsigned char **)next_step);
-
-        if (JVMTI_ERROR_NONE != errorCode)
-        {
+        // set step location structure
+        *count = 1;
+        jvmtiError error = _allocate( sizeof(jvmti_StepLocation), (unsigned char**)next_step );
+        if( error == JVMTI_ERROR_NONE ) {
             si_free(si);
-            return errorCode;
+            return error;
         }
-        (*next_step)->method = (Method *)m;
+        (*next_step)->method = func;
+        // IP in stack iterator points to a bytecode next after the one
+        // which caused call of the method. So next location is the 'bc' which
+        // IP points to.
         (*next_step)->location = bc;
     }
-
     si_free(si);
     return JVMTI_ERROR_NONE;
-}
+} // jvmti_get_next_bytecodes_up_stack_from_native
 
 jvmtiError DebugUtilsTI::jvmti_single_step_start(void)
 {

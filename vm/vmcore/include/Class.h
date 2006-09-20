@@ -805,6 +805,7 @@ VMEXPORT Method *class_lookup_method_recursive(Class *clss, const char *name, co
 Method *class_lookup_method_init(Class*, const char*);
 Method *class_lookup_method_clinit(Class*);
 VMEXPORT Method *class_lookup_method(Class *clss, const char *name, const char *descr);
+Method *class_get_method_from_vt_offset(VTable *vt, unsigned offset);
 
 VMEXPORT Java_Type class_get_cp_const_type(Class *clss, unsigned cp_index);
 VMEXPORT const void *class_get_addr_of_constant(Class *clss, unsigned cp_index);
