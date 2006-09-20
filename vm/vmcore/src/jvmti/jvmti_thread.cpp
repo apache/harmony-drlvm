@@ -382,6 +382,8 @@ jvmtiStopThread(jvmtiEnv* env,
 
     CHECK_EVERYTHING();
 
+    jint state;
+    
     jvmtiCapabilities capa;
 
     jvmtiError err = env -> GetCapabilities(&capa);
@@ -395,6 +397,30 @@ jvmtiStopThread(jvmtiEnv* env,
     if (!is_valid_thread_object(thread)){
         return JVMTI_ERROR_INVALID_THREAD;
     }
+
+    err = jvmtiGetThreadState(env, thread, &state);
+
+    if (err != JVMTI_ERROR_NONE){
+        return err;
+    }
+    if ((state & JVMTI_THREAD_STATE_ALIVE) == 0){
+        return JVMTI_ERROR_THREAD_NOT_ALIVE;
+    }
+
+    if (exception == NULL) return JVMTI_ERROR_INVALID_OBJECT;
+    tmn_suspend_disable();       //---------------------------------v
+    ObjectHandle h = (ObjectHandle)exception;
+    ManagedObject *mo = h->object;
+
+    // Check that reference pointer points to the heap
+    if (mo < (ManagedObject *)Class::heap_base ||
+        mo > (ManagedObject *)Class::heap_end)
+    {
+        tmn_suspend_enable();
+        return JVMTI_ERROR_INVALID_OBJECT;
+    }
+
+    tmn_suspend_enable();       //---------------------------------^
 
     return (jvmtiError)jthread_exception_stop(thread, exception);
 }
