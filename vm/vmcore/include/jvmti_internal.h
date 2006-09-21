@@ -316,12 +316,33 @@ class DebugUtilsTI {
             return NULL;
         }
 
-        BreakPoint *get_other_breakpoint_same_location(jmethodID m, jlocation l)
+        BreakPoint *get_other_breakpoint_same_location(BreakPoint *this_bp)
         {
             // assert(brkpntlst_lock._lock_or_null());
 
             for (BreakPoint *bp = brkpntlst; NULL != bp; bp = bp->next)
-                if (bp->method == m && bp->location == l)
+                if (bp != this_bp &&
+                    bp->method == this_bp->method && bp->location == this_bp->location)
+                    return bp;
+
+            return NULL;
+        }
+
+        BreakPoint *get_other_breakpoint_same_native_location(BreakPoint *this_bp)
+        {
+            // assert(brkpntlst_lock._lock_or_null());
+
+            for (BreakPoint *bp = brkpntlst; NULL != bp; bp = bp->next)
+                if (bp != this_bp && bp->native_location == this_bp->native_location)
+                    return bp;
+
+            return NULL;
+        }
+
+        BreakPoint *get_breakpoint_from_location(jmethodID method, jlocation location)
+        {
+            for (BreakPoint *bp = brkpntlst; NULL != bp; bp = bp->next)
+                if (bp->method == method && bp->location == location)
                     return bp;
 
             return NULL;
@@ -503,8 +524,8 @@ jint load_agentlib(Agent *agent, const char *str, JavaVM_Internal *vm);
 jint load_agentpath(Agent *agent, const char *str, JavaVM_Internal *vm);
 
 // Breakpoints internal functions
-jvmtiError jvmti_get_next_bytecodes_up_stack_from_native(VM_thread *thread,
-    jvmti_StepLocation **next_step, unsigned *count);
+jvmtiError jvmti_get_next_bytecodes_stack_from_native(VM_thread *thread,
+    jvmti_StepLocation **next_step, unsigned *count, bool step_up);
 jvmtiError jvmti_set_breakpoint_for_jit(DebugUtilsTI *ti, BreakPoint *bp);
 void jvmti_remove_breakpoint_for_jit(DebugUtilsTI *ti, BreakPoint *bp);
 jvmtiError jvmti_set_single_step_breakpoints(DebugUtilsTI *ti,

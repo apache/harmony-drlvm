@@ -299,12 +299,14 @@ static void exn_propagate_exception(
                     }
                 }
 
+                BEGIN_RAISE_AREA;
                 // Reload exception object pointer because it could have
                 // moved while calling JVMTI callback
                 *exn_obj = jvmti_jit_exception_event_callback_call(*exn_obj,
                     interrupted_method_jit, interrupted_method,
                     interrupted_method_location,
                     jit, method, handler->get_handler_ip());
+                END_RAISE_AREA;
 
                 TRACE2("exn", ("setting return pointer to %d", exn_obj));
 

@@ -27,6 +27,7 @@
 void InstructionDisassembler::disasm(const NativeCodePtr addr, 
                                      InstructionDisassembler * pidi)
 {
+    assert(addr);
     assert(pidi != NULL);
     Inst inst;
     pidi->len = DecoderBase::decode(addr, &inst);
