@@ -195,8 +195,8 @@ jvmtiGetThreadGroupChildren(jvmtiEnv* env,
 
     jclass cll = struct_Class_to_java_lang_Class_Handle(VM_Global_State::loader_env->java_lang_Thread_Class);
     jobjectArray jt = jvmti_test_jenv -> NewObjectArray(10, cll, 0);
-    id = jvmti_test_jenv -> GetMethodID(cl, "enumerate","([Ljava/lang/Thread;)I");
-    cc = jvmti_test_jenv -> CallIntMethod (group, id, jt);
+    id = jvmti_test_jenv -> GetMethodID(cl, "enumerate","([Ljava/lang/Thread;Z)I");
+    cc = jvmti_test_jenv -> CallIntMethod (group, id, jt, JNI_FALSE);
     jthread * threads = NULL;
     jvmti_error = _allocate(sizeof(jthread) * cc, (unsigned char **)&threads);
 

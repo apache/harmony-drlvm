@@ -62,18 +62,21 @@ IDATA VMCALL jthread_iterator_reset(jthread_iterator_t *it) {
  * @param[in] it iterator
  */
 jthread VMCALL jthread_iterator_next(jthread_iterator_t *it) {
-        hythread_t tm_native_thread;
-        jvmti_thread_t tm_java_thread;
-        tm_native_thread = hythread_iterator_next((hythread_iterator_t *)it);
-        while(tm_native_thread!=NULL)
-        {
+    hythread_t tm_native_thread;
+    jvmti_thread_t tm_java_thread;
+    tm_native_thread = hythread_iterator_next((hythread_iterator_t *)it);
+    while(tm_native_thread!=NULL)
+    {
+        if (hythread_is_alive(tm_native_thread)) {
             tm_java_thread = hythread_get_private_data(tm_native_thread);
-                if (tm_java_thread){
-                        return (jthread)tm_java_thread->thread_object;
-                }
-                tm_native_thread = hythread_iterator_next((hythread_iterator_t *)it);
+            if (tm_java_thread){
+                return (jthread)tm_java_thread->thread_object;
+            }
         }
-        return NULL;
+        tm_native_thread = hythread_iterator_next((hythread_iterator_t *)it);
+    }
+
+    return NULL;
 } 
 
 /**
@@ -89,8 +92,8 @@ IDATA VMCALL jthread_iterator_size(jthread_iterator_t iterator) {
         assert (status == TM_ERROR_NONE);
         res = jthread_iterator_next(&iterator);
         while(res!=NULL){
-                count++;        
-                res = jthread_iterator_next(&iterator);
+            count++;        
+            res = jthread_iterator_next(&iterator);
         }
         status=jthread_iterator_reset(&iterator);
         assert (status == TM_ERROR_NONE);

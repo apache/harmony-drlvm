@@ -67,10 +67,11 @@ jvmtiGetThreadState(jvmtiEnv* env,
 
     if (NULL != thread)
     {
-        if (!is_valid_thread_object(thread))
+        if (!is_valid_thread_object(thread)) {
             return JVMTI_ERROR_INVALID_THREAD;
+        }
     }
-    else
+    else 
         thread = jthread_self();
 
     if (thread_state_ptr == NULL){
@@ -123,7 +124,8 @@ jvmtiGetAllThreads(jvmtiEnv* env,
     //allocate memory
     err=jvmtiAllocate(env,java_thread_count*sizeof(jthread),(unsigned char**)&java_threads);
     if (err != JVMTI_ERROR_NONE){
-          return err; 
+        jthread_iterator_release(&iterator);
+        return err; 
     } 
     for (i=0;i<java_thread_count;i++)    {
         java_threads[i]=jthread_iterator_next(&iterator);

@@ -187,7 +187,7 @@ IDATA VMCALL hythread_attach_to_group(hythread_t *handle, hythread_group_t group
     thread->os_handle = os_handle;
     thread_set_self(thread);
     
-    thread->state = TM_THREAD_STATE_ALIVE;
+    thread->state = TM_THREAD_STATE_ALIVE | TM_THREAD_STATE_RUNNABLE;
     assert(thread == tm_self_tls);
     TRACE(("TM: native attached: native: %p ",  tm_self_tls));
 
@@ -716,7 +716,6 @@ static void* APR_THREAD_FUNC thread_start_proc(apr_thread_t* thd, void *p_args) 
     thread_set_self(NULL);
     status = hythread_global_unlock(NULL);
     assert (status == TM_ERROR_NONE);
- 
     return (void *)(IDATA)apr_thread_exit(thd, APR_SUCCESS);
 }
 
