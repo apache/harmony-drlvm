@@ -497,9 +497,12 @@ void jvmti_jit_breakpoint_handler(int signum, siginfo_t* UNREF info, void* conte
 
     bool handled = jvmti_send_jit_breakpoint_event(&regs);
     if (handled)
+    {
         linux_regs_to_ucontext(uc, &regs);
+        return;
+    }
 
-    fprintf(stderr, "SIGINT in VM code.\n");
+    fprintf(stderr, "SIGTRAP in VM code.\n");
     linux_ucontext_to_regs(&regs, uc);
     st_print_stack(&regs);
     signal(signum, 0);

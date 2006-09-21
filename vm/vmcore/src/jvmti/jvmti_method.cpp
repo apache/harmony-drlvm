@@ -34,6 +34,8 @@
 #include "suspend_checker.h"
 #include "jvmti_internal.h"
 #include "environment.h"
+#include "exceptions.h"
+#include "interpreter_exports.h"
 
 /*
  * Get Method Name (and Signature)
@@ -524,19 +526,22 @@ jvmtiGetBytecodes(jvmtiEnv* env,
     if( err != JVMTI_ERROR_NONE ) return err;
     memcpy( *bytecodes_ptr, mtd->get_byte_code_addr(), *bytecode_count_ptr );
 
-    TIEnv *p_env = (TIEnv *)env;
-    DebugUtilsTI *ti = p_env->vm->vm_env->TI;
-
-    LMAutoUnlock lock(&ti->brkpntlst_lock);
-
-    if (!ti->have_breakpoint(method))
-        return JVMTI_ERROR_NONE;
-
-    for (BreakPoint* bpt = ti->find_first_bpt(method); bpt;
-         bpt = ti->find_next_bpt(bpt, method))
+    if (interpreter_enabled())
     {
-        (*bytecodes_ptr)[bpt->location] =
-            (unsigned char)(POINTER_SIZE_INT) bpt->id;
+        TIEnv *p_env = (TIEnv *)env;
+        DebugUtilsTI *ti = p_env->vm->vm_env->TI;
+
+        LMAutoUnlock lock(&ti->brkpntlst_lock);
+
+        if (!ti->have_breakpoint(method))
+            return JVMTI_ERROR_NONE;
+
+        for (BreakPoint* bpt = ti->find_first_bpt(method); bpt;
+             bpt = ti->find_next_bpt(bpt, method))
+        {
+            (*bytecodes_ptr)[bpt->location] =
+                (unsigned char)(POINTER_SIZE_INT) bpt->id;
+        }
     }
 
     return JVMTI_ERROR_NONE;
@@ -672,11 +677,17 @@ jvmtiIsMethodObsolete(jvmtiEnv* env,
 
 void jvmti_method_enter_callback(Method_Handle method)
 {
+    BEGIN_RAISE_AREA;
+
     jvmti_process_method_entry_event(reinterpret_cast<jmethodID>(method));
+
+    END_RAISE_AREA;
 }
 
 void jvmti_method_exit_callback(Method_Handle method, jvalue* return_value)
 {
+    BEGIN_RAISE_AREA;
+
     Method *m = reinterpret_cast<Method *>(method);
     jmethodID mid = reinterpret_cast<jmethodID>(method);
 
@@ -687,4 +698,6 @@ void jvmti_method_exit_callback(Method_Handle method, jvalue* return_value)
         jvalue jv = { 0 };
         jvmti_process_method_exit_event(mid, JNI_FALSE, jv);
     }
+
+    END_RAISE_AREA;
 }

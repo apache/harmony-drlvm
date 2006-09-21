@@ -489,7 +489,6 @@ interpreter_ti_notify_frame_pop(jvmtiEnv* env,
 
 void single_step_callback(StackFrame &frame) {
     uint8 ip0 = *frame.ip;
-    if (ip0 == OPCODE_BREAKPOINT) return;
     hythread_suspend_enable();
     Method *method = frame.method;
     

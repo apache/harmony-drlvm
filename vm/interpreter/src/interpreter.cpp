@@ -2547,6 +2547,8 @@ interpreter(StackFrame &frame) {
         vm_monitor_enter_wrapper(ml->monitor);
     }
 
+    bool breakpoint_processed = false;
+
     while (true) {
         uint8 ip0 = *frame.ip;
 
@@ -2563,8 +2565,10 @@ restart:
                 }
                 return;
             }
-            if (interpreter_ti_notification_mode
+            if (!breakpoint_processed &&
+                    interpreter_ti_notification_mode
                     & INTERPRETER_TI_SINGLE_STEP_EVENT) {
+                breakpoint_processed = false;
                 single_step_callback(frame);
             }
             //assert(!exn_raised());
@@ -2905,6 +2909,7 @@ restart:
             case OPCODE_D2L: Opcode_D2L(frame); break;
             case OPCODE_BREAKPOINT:
                              ip0 = Opcode_BREAKPOINT(frame);
+                             breakpoint_processed = true;
                              goto restart;
 
             case OPCODE_WIDE:
@@ -3234,7 +3239,7 @@ interpreterInvokeStatic(StackFrame& prevFrame, Method *method) {
     if (frame.jvmti_pop_frame == POP_FRAME_NOW) {
         setLastStackFrame(frame.prev);
         clear_current_thread_exception();
-        frame.ip -= 3;
+        frame.prev->ip -= 3;
         DEBUG_TRACE("<POP_FRAME> invoke_static }}}\n");
         return;
     }
@@ -3520,7 +3525,7 @@ interpreterInvokeSpecial(StackFrame& prevFrame, Method *method) {
     if (frame.jvmti_pop_frame == POP_FRAME_NOW) {
         setLastStackFrame(frame.prev);
         clear_current_thread_exception();
-        frame.ip -= 3;
+        frame.prev->ip -= 3;
         DEBUG_TRACE("<POP_FRAME> invoke_special }}}\n");
         return;
     }

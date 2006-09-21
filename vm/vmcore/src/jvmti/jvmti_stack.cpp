@@ -52,28 +52,27 @@ jint get_thread_stack_depth(VM_thread *thread, jint* pskip)
     jint depth = 0;
     Method_Handle method = NULL;
 
+    jint skip = 0;
+
     while (!si_is_past_end(si))
     {
         method = si_get_method(si);
 
         if (method)
+        {
             depth += 1 + si_get_inline_depth(si);
 
-        si_goto_previous(si);
-    }
+            Class *clss = method_get_class(method);
+            assert(clss);
 
-    jint skip = 0;
-
-    if (method)
-    {
-        Class *clss = method_get_class(method);
-        assert(clss);
-
-        if (strcmp(method_get_name(method), "run") == 0 &&
-            strcmp(class_get_name(clss), "java/lang/VMStart$MainThread") == 0)
-        {
-            skip = 3;
+            if (strcmp(method_get_name(method), "runImpl") == 0 &&
+                strcmp(class_get_name(clss), "java/lang/VMStart$MainThread") == 0)
+            {
+                skip = 3;
+            }
         }
+
+        si_goto_previous(si);
     }
 
     depth -= skip;

@@ -43,6 +43,7 @@
 #include "suspend_checker.h"
 #include "jvmti_internal.h"
 #include "environment.h"
+#include "exceptions.h"
 
 
 enum Watch_Type
@@ -311,12 +312,14 @@ void jvmti_field_access_callback(Field_Handle field,
                                        jlocation location,
                                        jobject* object)
 {
+    BEGIN_RAISE_AREA;
     tmn_suspend_enable();
 
     jvmti_process_field_access_event(field, (jmethodID) method, location,
              object);
 
     tmn_suspend_disable();
+    END_RAISE_AREA;
 }
 
 void jvmti_field_modification_callback(Field_Handle field,
@@ -325,10 +328,12 @@ void jvmti_field_modification_callback(Field_Handle field,
                                        jobject* object,
                                        jvalue* new_value)
 {
+    BEGIN_RAISE_AREA;
     tmn_suspend_enable();
 
     jvmti_process_field_modification_event(field, (jmethodID) method, location,
             object, *new_value);
 
     tmn_suspend_disable();
+    END_RAISE_AREA;
 }
