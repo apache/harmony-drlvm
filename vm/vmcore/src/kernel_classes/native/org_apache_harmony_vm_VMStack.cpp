@@ -66,52 +66,36 @@ JNIEXPORT jclass JNICALL Java_org_apache_harmony_vm_VMStack_getCallerClass
     return struct_Class_to_jclass((Class*)method_get_class(frame.method));
 }
 
-inline static bool isReflectionFrame(Method_Handle method) {
-    const char *method_name = method_get_name(method);
-    const char *class_name = class_get_name(method_get_class(method));
-    static Method *invoke = 0;
-    static Method *invokeMethod = 0;
-
-    // if java.lang.reflect.Method.invoke()
-    if (invoke) {
-        if (method == invoke) return true;
-    } else if (0 == strcmp(method_name, "invoke") &&
-            0 == strcmp(class_name, "java/lang/reflect/Method") ) {
-        invoke = method;
-        return true;
-    }
-
-    // if java.lang.reflect.VMReflection.invokeMethod()
-    if (invokeMethod) {
-        if (method == invokeMethod) return true;
-    } else if (0 == strcmp(method_name, "invokeMethod") &&
-            0 == strcmp(class_name, "java/lang/reflect/VMReflection") ) {
-        invokeMethod = method;
-        return true;
-    }
-
-    // non reflection frame
-    return false;
+inline static bool isReflectionFrame(Method* method, Global_Env* genv) {
+    // for simplicity, any method of 
+    // java/lang/reflect/VMReflection or java/lang/reflect/Method 
+    static Class *VMReflection = genv->LoadCoreClass("java/lang/reflect/VMReflection");
+    
+    Class* mc = method->get_class();
+    return (mc == VMReflection || mc == genv->java_lang_reflect_Method_Class);
 }
 
-inline static bool isPrivilegedFrame(Method_Handle method) {
-    static Method *doPrivileged = 0;
+inline static bool isPrivilegedFrame(Method_Handle method, Global_Env* genv) {
+    static Method_Handle doPrivileged[4];
 
-    if (doPrivileged) {
-        return method == doPrivileged;
+    if (!doPrivileged[0]) {
+        Class* ac = genv->LoadCoreClass("java/security/AccessController");
+        doPrivileged[3] = (Method_Handle)class_lookup_method(ac, "doPrivileged", 
+            "(Ljava/security/PrivilegedAction;)Ljava/lang/Object;");
+        doPrivileged[2] = (Method_Handle)class_lookup_method(ac, "doPrivileged", 
+            "(Ljava/security/PrivilegedExceptionAction;)Ljava/lang/Object;");
+        doPrivileged[1] = (Method_Handle)class_lookup_method(ac, "doPrivileged", 
+            "(Ljava/security/PrivilegedAction;Ljava/security/AccessControlContext;)Ljava/lang/Object;");
+        doPrivileged[0] = (Method_Handle)class_lookup_method(ac, "doPrivileged", 
+            "(Ljava/security/PrivilegedExceptionAction;Ljava/security/AccessControlContext;)Ljava/lang/Object;");
+        unsigned i = 0;
+        for (; i < 4; i++) assert(doPrivileged[i]);
     }
 
-    const char *method_name = method_get_name(method);
-    const char *class_name = class_get_name(method_get_class(method));
-
-    // if java.security.AccessController.doPrivileged()
-    if (0 == strcmp(method_name, "doPrivileged") &&
-            0 == strcmp(class_name, "java/security/AccessController") ) {
-        doPrivileged = method;
-        return true;
+    unsigned i = 0;
+    for (; i < 4; i++) {
+        if (method == doPrivileged[i]) return true;
     }
-
-    // non privileged frame
     return false;
 }
 
@@ -138,15 +122,17 @@ JNIEXPORT jobjectArray JNICALL Java_org_apache_harmony_vm_VMStack_getClasses
     // For details look at the org/apache/harmony/vm/VMStack.java file. Thus skipping 2 frames.
     unsigned skip = 2;
 
+    Global_Env* genv = ((JNIEnv_Internal*)jenv)->vm->vm_env;
+
     // count target array length ignoring reflection frames
     unsigned length = 0, s;
     for (s = skip; s < size && length < maxSize; s++) {
         Method_Handle method = frames[s].method;
 
-        if (isReflectionFrame(method))
+        if (isReflectionFrame(method, genv))
             continue;
 
-        if (considerPrivileged && isPrivilegedFrame(method) 
+        if (considerPrivileged && isPrivilegedFrame(method, genv) 
                 && maxSize > length + 2)
             maxSize = length + 2;
 
@@ -155,7 +141,7 @@ JNIEXPORT jobjectArray JNICALL Java_org_apache_harmony_vm_VMStack_getClasses
 
     assert(hythread_is_suspend_enabled());
 
-    jclass ste = struct_Class_to_java_lang_Class_Handle(VM_Global_State::loader_env->JavaLangClass_Class);
+    jclass ste = struct_Class_to_java_lang_Class_Handle(genv->JavaLangClass_Class);
     assert(ste);
 
     // creating java array
@@ -172,7 +158,7 @@ JNIEXPORT jobjectArray JNICALL Java_org_apache_harmony_vm_VMStack_getClasses
     for (s = skip; s < size && i < length; s++) {
         Method_Handle method = frames[s].method;
 
-        if (isReflectionFrame(method))
+        if (isReflectionFrame(method, genv))
             continue;
 
         // obtain frame class
