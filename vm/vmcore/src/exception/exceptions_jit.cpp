@@ -219,7 +219,7 @@ static void exn_propagate_exception(
     if (ti->isEnabled() && ti->is_single_step_enabled())
     {
         VM_thread *vm_thread = p_TLS_vmthread;
-        if (vm_thread->ss_state->enabled)
+        if (NULL != vm_thread->ss_state)
         {
             LMAutoUnlock lock(&ti->brkpntlst_lock);
             jvmti_remove_single_step_breakpoints(ti, vm_thread);
@@ -262,10 +262,11 @@ static void exn_propagate_exception(
                 si_set_ip(si, handler->get_handler_ip(), false);
 
                 // Start single step in exception handler
-                if (ti->isEnabled() && ti->is_single_step_enabled())
+                if (ti->isEnabled() && ti->is_single_step_enabled() &&
+                    ti->getPhase() == JVMTI_PHASE_LIVE)
                 {
                     VM_thread *vm_thread = p_TLS_vmthread;
-                    if (vm_thread->ss_state->enabled)
+                    if (NULL != vm_thread->ss_state)
                     {
                         LMAutoUnlock lock(&ti->brkpntlst_lock);
 

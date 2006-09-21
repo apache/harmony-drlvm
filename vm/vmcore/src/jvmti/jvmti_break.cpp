@@ -33,6 +33,8 @@
 #include "suspend_checker.h"
 #include "jit_intf_cpp.h"
 #include "encoder.h"
+#include "m2n.h"
+
 
 #define INSTRUMENTATION_BYTE_HLT 0xf4 // HLT instruction
 #define INSTRUMENTATION_BYTE_CLI 0xfa // CLI instruction
@@ -143,7 +145,7 @@ bool jvmti_send_jit_breakpoint_event(Registers *regs)
     TRACE2("jvmti.break", "BREAKPOINT occured, location = " << native_location);
 
     DebugUtilsTI *ti = VM_Global_State::loader_env->TI;
-    if (!ti->isEnabled())
+    if (!ti->isEnabled() || ti->getPhase() != JVMTI_PHASE_LIVE)
         return false;
 
     ti->brkpntlst_lock._lock();
@@ -157,8 +159,12 @@ bool jvmti_send_jit_breakpoint_event(Registers *regs)
     assert(ti->isEnabled());
     assert(!interpreter_enabled());
 
+    M2nFrame *m2nf = m2n_push_suspended_frame(regs);
+
+    hythread_t h_thread = hythread_self();
+    jthread j_thread = jthread_get_java_thread(h_thread);
     ObjectHandle hThread = oh_allocate_local_handle();
-    hThread->object = (Java_java_lang_Thread *)jthread_get_java_thread(hythread_self())->object;
+    hThread->object = (Java_java_lang_Thread *)j_thread->object;
     tmn_suspend_enable();
 
     void *id = bp->id;
@@ -173,15 +179,16 @@ bool jvmti_send_jit_breakpoint_event(Registers *regs)
     if (ti->is_single_step_enabled())
     {
         VM_thread *vm_thread = p_TLS_vmthread;
-        if (vm_thread->ss_state->enabled)
+        if (NULL != vm_thread->ss_state)
         {
-            JVMTISingleStepState *ss_state = vm_thread->ss_state;
-            for(unsigned iii = 0; iii < ss_state->predicted_bp_count; iii++)
+            for(unsigned iii = 0; NULL != vm_thread->ss_state &&
+                    iii < vm_thread->ss_state->predicted_bp_count; iii++)
             {
-                if (ss_state->predicted_breakpoints[iii]->native_location ==
+                if (vm_thread->ss_state->predicted_breakpoints[iii]->native_location ==
                     native_location)
                 {
-                    ss_breakpoint = ss_state->predicted_breakpoints[iii];
+                    ss_breakpoint =
+                        vm_thread->ss_state->predicted_breakpoints[iii];
 
                     TIEnv *ti_env = ti->getEnvironments();
                     TIEnv *next_env;
@@ -232,12 +239,17 @@ bool jvmti_send_jit_breakpoint_event(Registers *regs)
                     }
                 }
             }
+            // Reinitialize breakpoint after SingleStep because this
+            // breakpoint could have been deleted inside of callback
+            // if agent terminated single step
+            bp = ti->find_first_bpt(native_location);
         }
     }
 
+
     // Send events for all normally set breakpoints for this location
     // if there are any
-    do
+    while (bp)
     {
         TIEnv *env = bp->env;
         jlocation location = bp->location;
@@ -245,9 +257,12 @@ bool jvmti_send_jit_breakpoint_event(Registers *regs)
         BreakPoint *next_bp = ti->find_next_bpt(bp, native_location);
 
         if (bp == ss_breakpoint)
+        {
             // Don't send breakpoint event for breakpoint which was
             // actually SingleStep breakpoint
+            bp = next_bp;
             continue;
+        }
 
         if (env->global_events[JVMTI_EVENT_BREAKPOINT - JVMTI_MIN_EVENT_TYPE_VAL])
         {
@@ -295,7 +310,7 @@ bool jvmti_send_jit_breakpoint_event(Registers *regs)
         }
 
         bp = next_bp;
-    } while(bp);
+    }
 
     // Now we need to return back to normal code execution, it is
     // necessary to execute the original instruction The idea is to
@@ -386,15 +401,15 @@ bool jvmti_send_jit_breakpoint_event(Registers *regs)
     if (ti->is_single_step_enabled())
     {
         VM_thread *vm_thread = p_TLS_vmthread;
-        if (vm_thread->ss_state->enabled)
+        if (NULL != vm_thread->ss_state)
         {
-            jvmti_remove_single_step_breakpoints(ti, vm_thread);
-
             jvmti_StepLocation *locations;
             unsigned locations_count;
 
             jvmti_SingleStepLocation(vm_thread, (Method *)ss_breakpoint->method,
                 (unsigned)ss_breakpoint->location, &locations, &locations_count);
+
+            jvmti_remove_single_step_breakpoints(ti, vm_thread);
 
             jvmtiError UNREF errorCode = jvmti_set_single_step_breakpoints(
                 ti, vm_thread, locations, locations_count);
@@ -406,6 +421,9 @@ bool jvmti_send_jit_breakpoint_event(Registers *regs)
 
     tmn_suspend_disable();
     oh_discard_local_handle(hThread);
+
+    m2n_set_last_frame(m2n_get_previous_frame(m2nf));
+    STD_FREE(m2nf);
 
     return true;
 }

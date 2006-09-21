@@ -38,10 +38,11 @@ vm_execute_java_method_array(jmethodID method, jvalue *result, jvalue *args) {
     assert(NULL != VM_Global_State::loader_env->em_interface->ExecuteMethod);
 
     DebugUtilsTI *ti = VM_Global_State::loader_env->TI;
-    if (ti->isEnabled() && ti->is_single_step_enabled())
+    if (ti->isEnabled() && ti->is_single_step_enabled() &&
+        ti->getPhase() == JVMTI_PHASE_LIVE)
     {
         VM_thread *vm_thread = p_TLS_vmthread;
-        if (vm_thread->ss_state->enabled)
+        if (NULL != vm_thread->ss_state)
         {
             // Start single stepping a new Java method
             LMAutoUnlock lock(&ti->brkpntlst_lock);

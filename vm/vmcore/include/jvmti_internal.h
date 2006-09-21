@@ -97,7 +97,6 @@ struct jvmti_StepLocation
 
 struct JVMTISingleStepState
 {
-    bool enabled;
     BreakPoint **predicted_breakpoints;
     unsigned predicted_bp_count;
 };

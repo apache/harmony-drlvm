@@ -414,16 +414,23 @@ jvmtiError jvmti_get_next_bytecodes_up_stack_from_native(VM_thread *thread,
 {
     ASSERT_NO_INTERPRETER;
 
+    *count = 0;
     // create stack iterator, current stack frame should be native
     StackIterator *si = si_create_from_native(thread);
     si_transfer_all_preserved_registers(si);
     assert(si_is_native(si));
     // get previous stack frame, it should be java frame
     si_goto_previous(si);
+
+    if (si_is_past_end(si))
+    {
+        si_free(si);
+        return JVMTI_ERROR_NONE;
+    }
+
     assert(!si_is_native(si));
     // get previous stack frame
     si_goto_previous(si);
-    *count = 0;
     if (!si_is_native(si)) {
         // stack frame is java frame, get frame method and location
         uint16 bc = 0;
@@ -483,9 +490,6 @@ jvmtiError DebugUtilsTI::jvmti_single_step_start(void)
 
         vm_thread->ss_state->predicted_breakpoints = NULL;
         vm_thread->ss_state->predicted_bp_count = 0;
-        vm_thread->ss_state->enabled = true;
-
-        vm_thread->ss_state->enabled = true;
 
         jvmti_StepLocation *locations;
         unsigned locations_number;
@@ -537,8 +541,8 @@ jvmtiError DebugUtilsTI::jvmti_single_step_stop(void)
     {
         VM_thread *vm_thread = get_vm_thread(ht);
         jvmti_remove_single_step_breakpoints(this, vm_thread);
-        vm_thread->ss_state->enabled = false;
         _deallocate((unsigned char *)vm_thread->ss_state);
+        vm_thread->ss_state = NULL;
     }
 
     single_step_enabled = false;

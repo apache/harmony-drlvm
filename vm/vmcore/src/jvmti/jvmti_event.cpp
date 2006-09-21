@@ -1551,7 +1551,7 @@ void jvmti_send_thread_start_end_event(int is_start)
     {
         process_jvmti_event(JVMTI_EVENT_THREAD_START, 0, 0);
 
-        if (ti->is_single_step_enabled())
+        if (ti->is_single_step_enabled() && ti->getPhase() == JVMTI_PHASE_LIVE)
         {
             // Init single step state for the thread
             VM_thread *vm_thread = p_TLS_vmthread;
@@ -1562,7 +1562,6 @@ void jvmti_send_thread_start_end_event(int is_start)
 
             vm_thread->ss_state->predicted_breakpoints = NULL;
             vm_thread->ss_state->predicted_bp_count = 0;
-            vm_thread->ss_state->enabled = true;
         }
     }
     else
@@ -1576,8 +1575,8 @@ void jvmti_send_thread_start_end_event(int is_start)
             LMAutoUnlock lock(&ti->brkpntlst_lock);
             jvmti_remove_single_step_breakpoints(ti, vm_thread);
 
-            vm_thread->ss_state->enabled = false;
             _deallocate((unsigned char *)vm_thread->ss_state);
+            vm_thread->ss_state = NULL;
         }
     }
 }
