@@ -466,7 +466,7 @@ IDATA jthread_exception_stop(jthread java_thread, jobject excn) {
     env = tm_java_thread->jenv;
     tm_java_thread->stop_exception = (*env)->NewGlobalRef(env,excn);
     
-    return set_safepoint_callback(tm_native_thread, stop_callback);
+    return hythread_set_safepoint_callback(tm_native_thread, stop_callback);
 }
 
 /**

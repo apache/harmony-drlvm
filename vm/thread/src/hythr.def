@@ -58,6 +58,7 @@ hythread_suspend_enable
 hythread_suspend_disable
 hythread_safe_point
 hythread_suspend_other
+hythread_set_safepoint_callback
 hythread_get_safepoint_callback
 hythread_suspend_all
 hythread_resume_all
@@ -115,7 +116,6 @@ hythread_is_terminated
 hythread_init
 countdown_nondaemon_threads
 increase_nondaemon_threads_count
-set_safepoint_callback
 
 release_start_lock
 acquire_start_lock

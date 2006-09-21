@@ -58,6 +58,7 @@ hythread_suspend_disable;
 hythread_safe_point;
 hythread_suspend_other;
 hythread_get_safepoint_callback;
+hythread_set_safepoint_callback;
 hythread_suspend_all;
 hythread_resume_all;
 hythread_iterator_create;

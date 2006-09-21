@@ -249,7 +249,7 @@ static void *getaddress__vm_initialize_class_naked()
              out platform::void; \
              call.noret %5i;",
              (void *)is_class_initialized,
-             FRAME_JNI,
+             (FRAME_JNI | FRAME_POPABLE),
              (void *)class_initialize,
              APR_OFFSETOF(VM_thread, thread_exception.exc_object),
              APR_OFFSETOF(VM_thread, thread_exception.exc_class),

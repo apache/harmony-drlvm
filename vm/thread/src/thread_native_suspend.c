@@ -332,7 +332,7 @@ void VMCALL hythread_resume(hythread_t thread) {
  * @param[in] thread thread where callback needs to be executed
  * @param[in] callback callback function
  */
-IDATA set_safepoint_callback(hythread_t thread, tm_thread_event_callback_proc callback) {
+IDATA hythread_set_safepoint_callback(hythread_t thread, tm_thread_event_callback_proc callback) {
     while (apr_atomic_casptr((volatile void **)&thread->safepoint_callback, (void *)callback, (void *)NULL) != NULL);
     if(tm_self_tls == thread) {
         int old_status = thread->suspend_disable_count;

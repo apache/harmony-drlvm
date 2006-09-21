@@ -874,13 +874,13 @@ NativeCodePtr compile_do_instrumentation(CodeChunkInfo *callee,
     assert(callee_addr);
     LilCodeStub *cs = lil_parse_code_stub(
         "entry 0:managed:arbitrary;"
-        "push_m2n 0, 0;"
+        "push_m2n 0, %0I;"
         "out platform:pint:void;"
-        "o0=%0i;"
-        "call %1i;"       // call instrumentation procedure
+        "o0=%1i;"
+        "call %2i;"       // call instrumentation procedure
         "pop_m2n;"
-        "tailcall %2i;",  // call original entry point
-        callee, instr_proc, lil_npc_to_fp(callee_addr));
+        "tailcall %3i;",  // call original entry point
+        FRAME_POPABLE, callee, instr_proc, lil_npc_to_fp(callee_addr));
     assert(cs && lil_is_valid(cs));
     // TODO: 2 & 3 parameters should be removed from the method signature
     // since it makes sense for debugging only

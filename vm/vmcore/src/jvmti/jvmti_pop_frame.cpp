@@ -24,25 +24,53 @@
 #include "jvmti_interface.h"
 #include "exceptions.h"
 #include "environment.h"
+#include "open/jthread.h"
 #include "vm_threads.h"
 #include "jit_intf_cpp.h"
 #include "m2n.h"
 #include "mon_enter_exit.h"
 #include "stack_iterator.h"
-//#include "cxxlog.h"
 #include "clog.h"
 
-jvmtiError jvmti_jit_pop_frame(VM_thread *thread)
+static void jvmti_pop_frame_callback()
+{
+    TRACE(("--->>>  JVMTI pop frame callback..."));
+    frame_type type = m2n_get_frame_type(p_TLS_vmthread->last_m2n_frame);
+
+    // frame wasn't requested to be popped
+    if (FRAME_POP_NOW != (FRAME_POP_NOW & type))
+        return;
+
+    // if we are in hythread_safe_point() or frame is unwindable
+    if (FRAME_SAFE_POINT == (FRAME_SAFE_POINT & type) || is_unwindable()) {
+        // wait for resume
+        TRACE(("entering safe_point"));
+        hythread_safe_point();
+        TRACE(("left safe_point"));
+
+        // switch execution to the previous frame
+        jvmti_jit_do_pop_frame();
+        assert(0 /* mustn't get here */);
+    } else {
+        // raise special exception object
+        exn_raise_object(VM_Global_State::loader_env->popFrameException);
+    }
+} //jvmti_pop_frame_callback
+
+jvmtiError jvmti_jit_pop_frame(jthread java_thread)
 {
     assert(hythread_is_suspend_enabled());
 
-    M2nFrame* top_frame = thread->last_m2n_frame;
+    hythread_t hy_thread = jthread_get_native_thread(java_thread);
+    VM_thread* vm_thread = get_vm_thread(hy_thread);
+
+    M2nFrame* top_frame = m2n_get_last_frame(vm_thread);
     frame_type type = m2n_get_frame_type(top_frame);
 
     if (FRAME_POPABLE != (FRAME_POPABLE & type))
         return JVMTI_ERROR_OPAQUE_FRAME;
 
-    StackIterator *si = si_create_from_native(thread);
+    StackIterator *si = si_create_from_native(vm_thread);
 
     // check that topmost frame is M2n
     assert(si_is_native(si));
@@ -55,19 +83,20 @@ jvmtiError jvmti_jit_pop_frame(VM_thread *thread)
     si_goto_previous(si);
 
     if (si_is_native(si)) {
-        M2nFrame* third_frame = m2n_get_previous_frame(top_frame);
-        
-        if (FRAME_POPABLE != (FRAME_POPABLE & m2n_get_frame_type(top_frame)))
-            return JVMTI_ERROR_OPAQUE_FRAME;
+        si_free(si);
+        return JVMTI_ERROR_OPAQUE_FRAME;
     }
+
+    si_free(si);
 
     type = (frame_type) (type | FRAME_POP_NOW);
     m2n_set_frame_type(top_frame, type);
 
-    si_free(si);
+    // Install safepoint callback that would perform popping job
+    hythread_set_safepoint_callback(hy_thread, &jvmti_pop_frame_callback);
 
     return JVMTI_ERROR_NONE;
-}
+} //jvmti_jit_pop_frame
 
 void jvmti_jit_do_pop_frame()
 {
@@ -166,32 +195,16 @@ void jvmti_jit_do_pop_frame()
 
     // transfer cdontrol
     si_transfer_control(si);
-}
+} // jvmti_jit_do_pop_frame
 
 void jvmti_safe_point()
 {
-//    __asm int 3;
-    TRACE(("entering safe_point"));
+//    TRACE(("entering safe_point"));
     hythread_safe_point();
 
-    TRACE(("left safe_point"));
-    frame_type type = m2n_get_frame_type(m2n_get_last_frame());
+    //TRACE(("left safe_point"));
+    //frame_type type = m2n_get_frame_type(m2n_get_last_frame());
 
-    if (FRAME_POP_NOW == (FRAME_POP_NOW & type))
-        jvmti_jit_do_pop_frame();
-}
-
-void jvmti_pop_frame_callback()
-{
-    TRACE(("suspend_disable post callback..."));
-    frame_type type = m2n_get_frame_type(p_TLS_vmthread->last_m2n_frame);
-
-    if (FRAME_POP_NOW != (FRAME_POP_NOW & type))
-        return;
-
-    if (is_unwindable()) {
-        jvmti_jit_do_pop_frame();
-    } else {
-        exn_raise_object(VM_Global_State::loader_env->popFrameException);
-    }
+    //if (FRAME_POP_NOW == (FRAME_POP_NOW & type))
+    //    jvmti_jit_do_pop_frame();
 }

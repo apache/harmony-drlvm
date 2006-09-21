@@ -598,8 +598,7 @@ jvmtiPopFrame(jvmtiEnv* env,
         return interpreter.interpreter_ti_pop_frame(env,
             get_vm_thread_ptr_safe(jvmti_test_jenv, thread));
     } else {
-        return jvmti_jit_pop_frame(
-            get_vm_thread_ptr_safe(jvmti_test_jenv, thread));
+        return jvmti_jit_pop_frame(thread);
     }
 }
 

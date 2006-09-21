@@ -204,6 +204,11 @@ bool jvmti_send_jit_breakpoint_event(Registers *regs)
     M2nFrame *m2nf = m2n_push_suspended_frame(regs);
     BEGIN_RAISE_AREA;
 
+    // need to be able to pop the frame
+    frame_type m2nf_type = m2n_get_frame_type(m2nf);
+    m2nf_type = (frame_type) (m2nf_type | FRAME_POPABLE);
+    m2n_set_frame_type(m2nf, m2nf_type);
+
     hythread_t h_thread = hythread_self();
     jthread j_thread = jthread_get_java_thread(h_thread);
     ObjectHandle hThread = oh_allocate_local_handle();

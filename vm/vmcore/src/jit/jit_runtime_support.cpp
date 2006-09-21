@@ -131,11 +131,12 @@ static NativeCodePtr rth_get_lil_multianewarray(int* dyn_count)
             assert(cs);
         }
         cs = lil_parse_onto_end(cs,
-            "push_m2n 0, 0;"
+            "push_m2n 0, %0i;"
             "out platform::ref;"
-            "call %0i;"
+            "call %1i;"
             "pop_m2n;"
             "ret;",
+            FRAME_POPABLE,
             rth_multianewarrayhelper);
         assert(cs && lil_is_valid(cs));
         
@@ -199,13 +200,14 @@ static NativeCodePtr rth_get_lil_ldc_ref(int* dyn_count)
             assert(cs);
         }
         cs = lil_parse_onto_end(cs,
-            "push_m2n 0, 0;"
+            "push_m2n 0, %0i;"
             "out platform:pint,g4:ref;"
             "o0=i1;"
             "o1=i0;"
-            "call %0i;"
+            "call %1i;"
             "pop_m2n;"
             "ret;",
+            FRAME_POPABLE,
             p_instantiate_ref);
         assert(cs && lil_is_valid(cs));
         addr = LilCodeGenerator::get_platform()->compile(cs);
@@ -778,7 +780,7 @@ static NativeCodePtr rth_get_lil_initialize_class(int* dyn_count)
             ":_exn_raised;"
             "out platform::void;"
             "call.noret %5i;",
-            p_is_inited, FRAME_JNI, p_init,
+            p_is_inited, (FRAME_JNI | FRAME_POPABLE), p_init,
             OFFSET(VM_thread, thread_exception.exc_object),
             OFFSET(VM_thread, thread_exception.exc_class),
             p_rethrow);
@@ -1749,11 +1751,12 @@ static NativeCodePtr rth_get_lil_resolve(int * dyn_count)
     }
     
     cs = lil_parse_onto_end(cs,
-        "push_m2n 0, 0;"
+        "push_m2n 0, %0i;"
         "in2out platform:pint;"
-        "call %0i;"
+        "call %1i;"
         "pop_m2n;"
         "ret;",
+        FRAME_POPABLE,
         (void*)&rth_resolve);
     assert(cs && lil_is_valid(cs));
     addr = LilCodeGenerator::get_platform()->compile(cs);
@@ -1777,11 +1780,12 @@ static NativeCodePtr rth_get_lil_jvmti_method_enter_callback(int * dyn_count) {
             assert(cs);
         }
     cs = lil_parse_onto_end(cs,
-        "push_m2n 0, 0;"
+        "push_m2n 0, %0i;"
         "in2out platform:void;"
-        "call %0i;"
+        "call %1i;"
         "pop_m2n;"
         "ret;",
+        FRAME_POPABLE,
         jvmti_method_enter_callback_ptr);
     assert(cs && lil_is_valid(cs));
     addr = LilCodeGenerator::get_platform()->compile(cs);
@@ -1805,13 +1809,14 @@ static NativeCodePtr rth_get_lil_jvmti_method_exit_callback(int * dyn_count) {
         assert(cs);
     }
     cs = lil_parse_onto_end(cs,
-        "push_m2n 0, 0;"
+        "push_m2n 0, %0i;"
         "out platform:pint,pint:void;"
         "o0=i1;"
         "o1=i0;"
-        "call %0i;"
+        "call %1i;"
         "pop_m2n;"
         "ret;",
+        FRAME_POPABLE,
         jvmti_method_exit_callback_ptr);
     assert(cs && lil_is_valid(cs));
     addr = LilCodeGenerator::get_platform()->compile(cs);
@@ -1837,12 +1842,13 @@ static NativeCodePtr rth_get_lil_jvmti_field_access_callback(int * dyn_count) {
         assert(cs);
     }
     cs = lil_parse_onto_end(cs,
-            "push_m2n 0, 0;"
+            "push_m2n 0, %0i;"
             "in2out platform:void;"
-            "call %0i;"
+            "call %1i;"
             "pop_m2n;"
             "ret;",
-             jvmti_field_access_callback_ptr);
+            FRAME_POPABLE,
+            jvmti_field_access_callback_ptr);
     assert(cs && lil_is_valid(cs));
     addr = LilCodeGenerator::get_platform()->compile(cs);
 
@@ -1883,11 +1889,12 @@ void (*jvmti_field_modification_callback_ptr)(Field_Handle, Method_Handle,
         assert(cs);
         }
     cs = lil_parse_onto_end(cs,
-            "push_m2n 0, 0;"
+            "push_m2n 0, %0i;"
             "in2out platform:void;"
-            "call %0i;"
+            "call %1i;"
             "pop_m2n;"
             "ret;",
+            FRAME_POPABLE,
             jvmti_field_modification_callback_ptr);
     assert(cs && lil_is_valid(cs));
     addr = LilCodeGenerator::get_platform()->compile(cs);
@@ -2911,7 +2918,7 @@ VMEXPORT void * vm_create_helper_for_function(void* (*fptr)(void*))
     void * fptr_suspend_disable = (void*)&hythread_suspend_disable;
 
     LilCodeStub* cs = lil_parse_code_stub(
-        lil_stub, FRAME_COMPILATION,
+        lil_stub, (FRAME_COMPILATION | FRAME_POPABLE),
         fptr_suspend_enable, (void*)fptr, fptr_suspend_disable,
         OFFSET(VM_thread, thread_exception.exc_object),
         OFFSET(VM_thread, thread_exception.exc_class),
