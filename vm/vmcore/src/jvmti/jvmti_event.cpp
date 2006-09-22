@@ -717,23 +717,24 @@ jvmti_process_method_exit_event(jmethodID method, jboolean was_popped_by_excepti
 
     VM_thread *curr_thread = p_TLS_vmthread;
     jvmti_frame_pop_listener *fpl = curr_thread->frame_pop_listener;
-    jvmti_frame_pop_listener **prev_fpl = &curr_thread->frame_pop_listener;
     jint skip = 0;
     jint depth = get_thread_stack_depth(curr_thread, &skip);
 
     while (fpl)
     {
+        jvmti_frame_pop_listener *next_fpl = fpl->next;
         if (fpl->depth == depth + skip)
         {
             jvmti_process_frame_pop_event(
                 reinterpret_cast<jvmtiEnv *>(fpl->env),
                 method,
                 was_popped_by_exception);
-            *prev_fpl = fpl->next;
+            if( fpl == curr_thread->frame_pop_listener ) {
+                curr_thread->frame_pop_listener = fpl->next;
+            }
             STD_FREE(fpl);
         }
-        prev_fpl = &fpl->next;
-        fpl = fpl->next;
+        fpl = next_fpl;
     }
 
     tmn_suspend_disable();
