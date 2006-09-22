@@ -312,6 +312,7 @@ IDATA VMCALL jthread_monitor_timed_wait(jobject monitor, jlong millis, jint nano
     if (ti_is_enabled()) {
         disable_count =  reset_suspend_disable();
         set_wait_monitor(monitor);
+        set_contended_monitor(monitor);
         jvmti_send_wait_monitor_event(monitor, (jlong)millis);
         set_suspend_disable(disable_count);
 
@@ -422,6 +423,7 @@ void set_contended_monitor(jobject monitor){
     
     suspend_status = reset_suspend_disable();
     tm_java_thread->contended_monitor = (*(tm_java_thread->jenv))->NewGlobalRef(tm_java_thread->jenv, monitor);
+
     set_suspend_disable(suspend_status);
 }
 

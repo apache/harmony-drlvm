@@ -96,6 +96,9 @@ static char * gen_restore_monitor_enter(char *ss, char *patch_addr_null_arg)
     ss = branch8(ss, Condition_Z,  Imm_Opnd(size_8, 0));
     char *backpatch_address__null_pointer = ((char *)ss) - 1;
 
+// skip fast path if ti is enabled
+// so all TI events will be generated
+if(!VM_Global_State::loader_env->TI->isEnabled()) {
     ss = alu(ss, add_opc, ecx_opnd, Imm_Opnd(header_offset)); // pop parameters
     ss = gen_monitorenter_fast_path_helper(ss, ecx_opnd);
     ss = test(ss,  eax_opnd,   eax_opnd);
@@ -106,7 +109,7 @@ static char * gen_restore_monitor_enter(char *ss, char *patch_addr_null_arg)
     // Slow path: happens when the monitor is busy (contention case)
     offset = (signed)ss - (signed)backpatch_address__fast_monitor_failed - 1;
     *backpatch_address__fast_monitor_failed = (char)offset;
-
+}
     ss = gen_setup_j2n_frame(ss);
     ss = push(ss,  M_Base_Opnd(esp_reg, m2n_sizeof_m2n_frame));
  
@@ -186,9 +189,20 @@ static char * gen_restore_monitor_exit(char *ss, char *patch_addr_null_arg)
     ss = test(ss,  ecx_opnd,   ecx_opnd);
     ss = branch8(ss, Condition_Z,  Imm_Opnd(size_8, 0));
     char *backpatch_address__null_pointer = ((char *)ss) - 1;
-
+// skip fast path if ti is enabled
+// so all TI events will be generated
+if(!VM_Global_State::loader_env->TI->isEnabled()) {
     ss = alu(ss, add_opc, ecx_opnd, Imm_Opnd(header_offset));
     ss = gen_monitor_exit_helper(ss, ecx_opnd);
+} else {
+    ss = gen_setup_j2n_frame(ss);
+    ss = push(ss,  M_Base_Opnd(esp_reg, m2n_sizeof_m2n_frame));
+
+    ss = call(ss, (char *)oh_convert_to_local_handle);
+    ss = alu(ss, add_opc, esp_opnd, Imm_Opnd(4)); // pop parameters
+    ss = gen_monitorexit_slow_path_helper(ss, eax_opnd);
+    ss = gen_pop_j2n_frame(ss);
+}
     ss = test(ss,  eax_opnd,   eax_opnd);
     ss = branch8(ss, Condition_NZ,  Imm_Opnd(size_8, 0));
     char *backpatch_address__fast_monitor_failed = ((char *)ss) - 1;

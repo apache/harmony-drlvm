@@ -723,9 +723,17 @@ IDATA VMCALL hythread_thin_monitor_get_recursion(hythread_thin_monitor_t *lockwo
     lockword = *lockword_ptr;       
     if(IS_FAT_LOCK(lockword)) {
         fat_monitor = locktable_get_fat_monitor(FAT_LOCK_ID(lockword)); //  find fat_monitor in lock table
-        return fat_monitor->recursion_count;
+        return fat_monitor->recursion_count+1;
     }
-    return RECURSION(lockword);
+    if(THREAD_ID(lockword) == 0) {
+        return 0;
+    }
+#ifdef LOCK_RESERVATION
+    if (IS_RESERVED(lockword)) {
+         return RECURSION(lockword);
+    }
+#endif
+    return RECURSION(lockword)+1;
 }
 
 //@}

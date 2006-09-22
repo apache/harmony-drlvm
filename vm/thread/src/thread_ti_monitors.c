@@ -114,11 +114,14 @@ IDATA VMCALL jthread_raw_monitor_destroy(jrawMonitorID mon_ptr) {
  * @param[in] mon_ptr monitor
  */
 IDATA VMCALL jthread_raw_monitor_enter(jrawMonitorID mon_ptr) {
-        hythread_monitor_t monitor;
+    hythread_monitor_t monitor;
+    IDATA stat;
     if (!(monitor = (hythread_monitor_t)array_get(jvmti_monitor_table, (UDATA)mon_ptr))) {
         return TM_ERROR_INVALID_MONITOR;
     }
-    return hythread_monitor_enter(monitor);
+    stat = hythread_monitor_enter(monitor);
+    hythread_safe_point();
+    return stat;
 }
 
 /**
@@ -142,10 +145,13 @@ IDATA VMCALL jthread_raw_monitor_try_enter(jrawMonitorID mon_ptr) {
  */
 IDATA VMCALL jthread_raw_monitor_exit(jrawMonitorID mon_ptr) {
     hythread_monitor_t monitor;
+    IDATA stat;
     if (!(monitor = (hythread_monitor_t)array_get(jvmti_monitor_table, (UDATA)mon_ptr))) {
         return TM_ERROR_INVALID_MONITOR;
     }
-        return hythread_monitor_exit(monitor);
+    stat = hythread_monitor_exit(monitor);
+    hythread_safe_point();
+    return stat;
 }
 
 /**
@@ -171,10 +177,13 @@ IDATA VMCALL jthread_raw_monitor_exit(jrawMonitorID mon_ptr) {
  */
 IDATA VMCALL jthread_raw_monitor_wait(jrawMonitorID mon_ptr, I_64 millis) {
     hythread_monitor_t monitor;
+    IDATA stat;
     if (!(monitor = (hythread_monitor_t)array_get(jvmti_monitor_table, (UDATA)mon_ptr))) {
         return TM_ERROR_INVALID_MONITOR;
     }
-        return hythread_monitor_wait_interruptable(monitor, millis, 0);
+    stat = hythread_monitor_wait_interruptable(monitor, millis, 0);
+    hythread_safe_point();
+    return stat;
 }
 
 /**

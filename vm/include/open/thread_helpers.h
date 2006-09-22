@@ -44,6 +44,7 @@ char* gen_hythread_self_helper(char *ss);
 char* gen_monitorenter_fast_path_helper(char *ss, const R_Opnd & input_param1);
 char* gen_monitorenter_slow_path_helper(char *ss, const R_Opnd & input_param1);
 char* gen_monitor_exit_helper(char *ss, const R_Opnd & input_param1);
+char* gen_monitorexit_slow_path_helper(char *ss, const R_Opnd & input_param1);
 
 #ifdef __cplusplus
 }

@@ -225,6 +225,27 @@ char* gen_monitor_exit_helper(char *ss, const R_Opnd & input_param1) {
     return ss;
 }
 
+/** 
+  *  Generates slow path of monitor exit.
+  *  This code could block on monitor and contains safepoint.
+  *  The appropriate m2n frame should be generated and
+  *  
+  *  @param[in] ss buffer to put the assembly code to
+  *  @param[in] input_param1 register should point to the jobject(handle)
+  *  If input_param1 == eax it reduces one register mov.
+  *  the code use and do not restore ecx, edx, eax registers
+  *  @return 0 if success in eax register
+  */
+char* gen_monitorexit_slow_path_helper(char *ss, const R_Opnd & input_param1) {
+    if (&input_param1 != &eax_opnd) { 
+        ss = mov(ss, eax_opnd,  input_param1);
+    }
+    
+    ss = push(ss, eax_opnd); // push the address of the handle
+    ss = call(ss, (char *)jthread_monitor_exit);
+    ss = alu(ss, add_opc, esp_opnd, Imm_Opnd(4)); // pop parameters
+    return ss;
+}   
 
 /**
   * Generates fast accessor to the TLS for the given key.<br>
