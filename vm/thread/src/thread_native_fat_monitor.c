@@ -207,6 +207,12 @@ IDATA monitor_wait_impl(hythread_monitor_t mon_ptr, I_64 ms, IDATA nano, IDATA i
         status =  condvar_wait_impl(mon_ptr->condition, mon_ptr->mutex, ms, nano, interruptable);
     //printf("finishing wait: %x, %x \n", mon_ptr->condition, hythread_self());
 #endif
+        if(self->suspend_request) {
+            hymutex_unlock(mon_ptr->mutex);
+            hythread_safe_point();
+            hymutex_lock(mon_ptr->mutex);
+        }
+
         mon_ptr->recursion_count = saved_recursion;
         mon_ptr->owner = self;
         assert(mon_ptr->owner);

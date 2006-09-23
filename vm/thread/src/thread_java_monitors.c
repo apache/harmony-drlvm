@@ -314,6 +314,7 @@ IDATA VMCALL jthread_monitor_timed_wait(jobject monitor, jlong millis, jint nano
         set_wait_monitor(monitor);
         set_contended_monitor(monitor);
         jvmti_send_wait_monitor_event(monitor, (jlong)millis);
+        jvmti_send_contended_enter_or_entered_monitor_event(monitor, 1);
         set_suspend_disable(disable_count);
 
         // should be moved to event handler
@@ -347,6 +348,7 @@ IDATA VMCALL jthread_monitor_timed_wait(jobject monitor, jlong millis, jint nano
     if (ti_is_enabled()){
         add_owned_monitor(monitor);
         disable_count =  reset_suspend_disable();
+        jvmti_send_contended_enter_or_entered_monitor_event(monitor, 0);
         jvmti_send_waited_monitor_event(monitor, (status == APR_TIMEUP)?(jboolean)1:(jboolean)0);
         // should be moved to event handler
         set_suspend_disable(disable_count);

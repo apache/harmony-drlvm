@@ -177,13 +177,12 @@ IDATA VMCALL jthread_raw_monitor_exit(jrawMonitorID mon_ptr) {
  */
 IDATA VMCALL jthread_raw_monitor_wait(jrawMonitorID mon_ptr, I_64 millis) {
     hythread_monitor_t monitor;
-    IDATA stat;
+
     if (!(monitor = (hythread_monitor_t)array_get(jvmti_monitor_table, (UDATA)mon_ptr))) {
         return TM_ERROR_INVALID_MONITOR;
     }
-    stat = hythread_monitor_wait_interruptable(monitor, millis, 0);
-    hythread_safe_point();
-    return stat;
+
+    return hythread_monitor_wait_interruptable(monitor, millis, 0);
 }
 
 /**

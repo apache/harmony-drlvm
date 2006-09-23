@@ -1498,8 +1498,8 @@ static void call_callback(jvmtiEvent event_type, JNIEnv *jni_env, TIEnv *ti_env,
 
         case JVMTI_EVENT_MONITOR_WAITED: {
             jobject monitor = va_arg(args, jobject);
-            jboolean is_timed_out   = va_arg(args, jint); //jboolean);
-            ((jvmtiEventMonitorWait)callback_func)((jvmtiEnv*)ti_env, jni_env, 
+            jboolean is_timed_out   = va_arg(args, jint);
+            ((jvmtiEventMonitorWaited)callback_func)((jvmtiEnv*)ti_env, jni_env, 
                     jthread_get_java_thread(hythread_self()), monitor, is_timed_out);
             break;
         }
@@ -1524,8 +1524,18 @@ static void process_jvmti_event(jvmtiEvent event_type, int per_thread, ...) {
     TIEnv *ti_env, *next_env;
     DebugUtilsTI *ti = VM_Global_State::loader_env->TI;
     void *callback_func;
-    
+    bool unwindable;
+    jthrowable excn = NULL;
+
     if (! ti->isEnabled()) return;
+    unwindable = set_unwindable(false);
+    
+    if (!unwindable) {
+        if (excn = exn_get()) {
+            exn_clear();
+        }
+    }
+
     ti_env = ti->getEnvironments();
     va_start(args, per_thread);
     while(ti_env) {
@@ -1534,15 +1544,20 @@ static void process_jvmti_event(jvmtiEvent event_type, int per_thread, ...) {
                 && (!per_thread || !is_interested_thread(ti_env, event_type))) {
            ti_env = ti_env->next;
            continue;   
-            }
+        }
         
         callback_func = ti_env->get_event_callback(event_type);
         if (callback_func) call_callback(event_type, jni_env, ti_env, callback_func, args);
         ti_env = next_env;
-            }
+    }
+    
+    assert(!exn_get());
+    
+    if (excn) exn_raise_object(excn);
+
+    set_unwindable(unwindable);
     va_end(args);
-        
-        }
+}
 
 void jvmti_send_thread_start_end_event(int is_start)
 {

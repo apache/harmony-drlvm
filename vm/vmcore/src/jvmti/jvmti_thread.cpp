@@ -128,7 +128,7 @@ jvmtiGetAllThreads(jvmtiEnv* env,
         return err; 
     } 
     for (i=0;i<java_thread_count;i++)    {
-        java_threads[i]=jthread_iterator_next(&iterator);
+        java_threads[i]=jni_native_intf->NewLocalRef(jthread_iterator_next(&iterator));
     }
     *threads_count_ptr = java_thread_count;
     *threads_ptr = java_threads;

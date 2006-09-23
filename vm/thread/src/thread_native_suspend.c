@@ -333,6 +333,7 @@ void VMCALL hythread_resume(hythread_t thread) {
  * @param[in] callback callback function
  */
 IDATA hythread_set_safepoint_callback(hythread_t thread, tm_thread_event_callback_proc callback) {
+    IDATA status;
     while (apr_atomic_casptr((volatile void **)&thread->safepoint_callback, (void *)callback, (void *)NULL) != NULL);
     if(tm_self_tls == thread) {
         int old_status = thread->suspend_disable_count;
@@ -346,7 +347,13 @@ IDATA hythread_set_safepoint_callback(hythread_t thread, tm_thread_event_callbac
         send_suspend_request(thread);
         //let the thread execute safe point in the case it's already suspended
         ////
-        hysem_post(thread->resume_event);
+        status = hysem_post(thread->resume_event);
+        assert (status == TM_ERROR_NONE);
+    }
+    
+    if (thread->current_condition) {
+        status=hycond_notify(thread->current_condition);   
+        assert (status == TM_ERROR_NONE);
     }
 
     return TM_ERROR_NONE;

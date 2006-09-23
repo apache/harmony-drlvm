@@ -62,7 +62,8 @@ IDATA VMCALL jthread_get_thread_cpu_time(jthread java_thread, jlong *nanos_ptr) 
     assert(java_thread);
     assert(nanos_ptr);
     tm_native_thread = vm_jthread_get_tm_data(java_thread);
-    return CONVERT_ERROR(apr_get_thread_time(tm_native_thread->os_handle,nanos_ptr));
+    return CONVERT_ERROR(apr_get_thread_time(tm_native_thread->os_handle,
+        (apr_int64_t*) nanos_ptr));
 }
 
 /**

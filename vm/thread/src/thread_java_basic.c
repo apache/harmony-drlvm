@@ -417,6 +417,7 @@ void stop_callback() {
     tm_native_thread = hythread_self();
     tm_java_thread = hythread_get_private_data(tm_native_thread);
     excn = tm_java_thread->stop_exception;
+    tm_native_thread->suspend_request = 0;
     jthread_throw_exception_object(excn);
 }
 
