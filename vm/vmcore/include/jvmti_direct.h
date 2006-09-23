@@ -32,6 +32,7 @@ struct TIEventThread
 
 struct Agent;
 extern Agent *current_loading_agent;
+class VmBrkptIntf;
 
 /*
  * Type that describes TI environment created by GetEnv function
@@ -45,6 +46,7 @@ struct TIEnv
     jvmtiEventCallbacks event_table;
     jvmtiExtensionEvent *extension_event_table;
     jvmtiCapabilities posessed_capabilities;
+    VmBrkptIntf *brpt_intf;
     TIEnv* next;
 
     bool global_events[JVMTI_MAX_EVENT_TYPE_VAL - JVMTI_MIN_EVENT_TYPE_VAL];
@@ -75,7 +77,6 @@ struct TIEnv
 
 jint JNICALL create_jvmti_environment(JavaVM *vm, void **env, jint version);
 jint get_thread_stack_depth(VM_thread *thread, jint* pskip = NULL);
-void jvmti_set_pending_breakpoints(Method *method);
 void jvmti_get_compilation_flags(OpenMethodExecutionParams *flags);
 
 // Marks topmost frame of the specified thead to be popped

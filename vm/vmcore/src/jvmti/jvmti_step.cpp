@@ -28,6 +28,8 @@
 #include "interpreter.h"
 #include "method_lookup.h"
 #include "open/bytecodes.h"
+#include "open/jthread.h"
+#include "jvmti_break_intf.h"
 
 static JNIEnv * jvmti_test_jenv = jni_native_intf;
 
@@ -379,46 +381,167 @@ jvmti_SingleStepLocation( VM_thread* thread,
     return;
 } // jvmti_SingleStepLocation
 
-jvmtiError jvmti_set_single_step_breakpoints(DebugUtilsTI *ti, VM_thread *vm_thread,
+static void
+jvmti_setup_jit_single_step(DebugUtilsTI *ti, VmBrkptIntf* intf,
+                            Method* m, jlocation location)
+{
+    VM_thread* vm_thread = p_TLS_vmthread;
+    jvmti_StepLocation *locations;
+    unsigned locations_count;
+
+    jvmti_SingleStepLocation(vm_thread, m, (unsigned)location,
+                            &locations, &locations_count);
+
+    jvmti_remove_single_step_breakpoints(ti, vm_thread);
+
+    jvmti_set_single_step_breakpoints(ti, vm_thread, locations, locations_count);
+}
+
+// Callback function for JVMTI single step processing
+static bool jvmti_process_jit_single_step_event(VmBrkptIntf* intf, VmBrkptRef* bp_ref)
+{
+    VmBrkpt* bp = bp_ref->brpt;
+    assert(bp);
+
+    TRACE2("jvmti.break.ss", "Single Step occured: location=" << bp->location);
+
+    DebugUtilsTI *ti = VM_Global_State::loader_env->TI;
+    if (!ti->isEnabled() || ti->getPhase() != JVMTI_PHASE_LIVE)
+        return false;
+
+    JVMTISingleStepState* sss = p_TLS_vmthread->ss_state;
+
+    if (!sss || !ti->is_single_step_enabled())
+        return false;
+
+    jlocation location = bp->location;
+    jmethodID method = bp->method;
+    Method* m = (Method*)method;
+    NativeCodePtr addr = bp->addr;
+    assert(addr);
+    assert(bp_ref->data == NULL);
+    
+    hythread_t h_thread = hythread_self();
+    jthread j_thread = jthread_get_java_thread(h_thread);
+    ObjectHandle hThread = oh_allocate_local_handle();
+    hThread->object = (Java_java_lang_Thread *)j_thread->object;
+    tmn_suspend_enable();
+
+    JNIEnv *jni_env = (JNIEnv *)jni_native_intf;
+    TIEnv *env = ti->getEnvironments();
+    TIEnv *next_env;
+
+    while (NULL != env)
+    {
+        next_env = env->next;
+
+        jvmtiEventSingleStep func =
+            (jvmtiEventSingleStep)env->get_event_callback(JVMTI_EVENT_SINGLE_STEP);
+
+        if (NULL != func)
+        {
+            if (env->global_events[JVMTI_EVENT_SINGLE_STEP - JVMTI_MIN_EVENT_TYPE_VAL])
+            {
+                TRACE2("jvmti.break.ss",
+                    "Calling JIT global SingleStep breakpoint callback: "
+                    << class_get_name(method_get_class((Method*)method)) << "."
+                    << method_get_name((Method*)method)
+                    << method_get_descriptor((Method*)method)
+                    << " :" << location << " :" << addr);
+                // fire global event
+                intf->unlock();
+                func((jvmtiEnv*)env, jni_env, (jthread)hThread, method, location);
+                intf->lock();
+                TRACE2("jvmti.break.ss",
+                    "Finished JIT global SingleStep breakpoint callback: "
+                    << class_get_name(method_get_class((Method*)method)) << "."
+                    << method_get_name((Method*)method)
+                    << method_get_descriptor((Method*)method)
+                    << " :" << location << " :" << addr);
+
+                env = next_env;
+                continue;
+            }
+
+            TIEventThread* next_et;
+            bool found = false;
+            // fire local events
+            for (TIEventThread* et = env->event_threads[JVMTI_EVENT_SINGLE_STEP - JVMTI_MIN_EVENT_TYPE_VAL];
+                 et != NULL; et = next_et)
+            {
+                next_et = et->next;
+
+                if (et->thread == hythread_self())
+                {
+                    TRACE2("jvmti.break.ss",
+                        "Calling JIT local SingleStep breakpoint callback: "
+                        << class_get_name(method_get_class((Method*)method)) << "."
+                        << method_get_name((Method*)method)
+                        << method_get_descriptor((Method*)method)
+                        << " :" << location << " :" << addr);
+                    found = true;
+                    intf->unlock();
+                    func((jvmtiEnv*)env, jni_env,
+                        (jthread)hThread, method, location);
+                    intf->lock();
+                    TRACE2("jvmti.break.ss",
+                        "Finished JIT local SingleStep breakpoint callback: "
+                        << class_get_name(method_get_class((Method*)method)) << "."
+                        << method_get_name((Method*)method)
+                        << method_get_descriptor((Method*)method)
+                        << " :" << location << " :" << addr);
+                }
+            }
+
+            env = next_env;
+        }
+    }
+
+    // Set breakpoints on bytecodes after the current one
+    if (ti->is_single_step_enabled())
+        jvmti_setup_jit_single_step(ti, intf, m, location);
+
+    tmn_suspend_disable();
+    oh_discard_local_handle(hThread);
+
+    return true;
+}
+
+void jvmti_set_single_step_breakpoints(DebugUtilsTI *ti, VM_thread *vm_thread,
     jvmti_StepLocation *locations, unsigned locations_number)
 {
     // Function is always executed under global TI breakpoints lock
-    BreakPoint **thread_breakpoints;
-    jvmtiError errorCode = _allocate(sizeof(BreakPoint*) * locations_number,
-        (unsigned char **)&thread_breakpoints);
-    if (JVMTI_ERROR_NONE != errorCode)
-        return errorCode;
+    ASSERT_NO_INTERPRETER;
+
+    JVMTISingleStepState *ss_state = vm_thread->ss_state;
+
+    if (NULL == ss_state->predicted_breakpoints)
+    { // Create SS breakpoints list
+        ss_state->predicted_breakpoints =
+            ti->vm_brpt->query_intf(jvmti_process_jit_single_step_event, false);
+        assert(ss_state->predicted_breakpoints);
+        // Single Step must be processed earlier then Breakpoints
+        assert(BREAK_MIN_PRIORITY > BREAK_MAX_PRIORITY);
+        ss_state->predicted_breakpoints->set_priority(BREAK_MIN_PRIORITY - 1);
+    }
 
     for (unsigned iii = 0; iii < locations_number; iii++)
     {
-        BreakPoint *bp;
-        errorCode = _allocate(sizeof(BreakPoint), (unsigned char **)&bp);
-        if (JVMTI_ERROR_NONE != errorCode)
-            return errorCode;
-
-        memset( bp, 0, sizeof(BreakPoint));
-        bp->method = (jmethodID)locations[iii].method;
-        bp->location = locations[iii].location;
-        bp->native_location = locations[iii].native_location;
+        VmBrkptRef* ref =
+            ss_state->predicted_breakpoints->add((jmethodID)locations[iii].method,
+                                                  locations[iii].location,
+                                                  locations[iii].native_location,
+                                                  NULL);
 
         TRACE2("jvmti.break.ss", "Set single step breakpoint: "
-            << class_get_name(method_get_class((Method *)bp->method)) << "."
-            << method_get_name((Method *)bp->method)
-            << method_get_descriptor((Method *)bp->method)
-            << " :" << bp->location << " :" << bp->native_location);
+            << class_get_name(method_get_class(locations[iii].method)) << "."
+            << method_get_name(locations[iii].method)
+            << method_get_descriptor(locations[iii].method)
+            << " :" << locations[iii].location
+            << " :" << locations[iii].native_location);
 
-        errorCode = jvmti_set_breakpoint_for_jit(ti, bp);
-        if (JVMTI_ERROR_NONE != errorCode)
-            return errorCode;
-
-        thread_breakpoints[iii] = bp;
+        assert(ref);
     }
-
-    JVMTISingleStepState *ss_state = vm_thread->ss_state;
-    ss_state->predicted_breakpoints = thread_breakpoints;
-    ss_state->predicted_bp_count = locations_number;
-
-    return JVMTI_ERROR_NONE;
 }
 
 void jvmti_remove_single_step_breakpoints(DebugUtilsTI *ti, VM_thread *vm_thread)
@@ -426,18 +549,8 @@ void jvmti_remove_single_step_breakpoints(DebugUtilsTI *ti, VM_thread *vm_thread
     // Function is always executed under global TI breakpoints lock
     JVMTISingleStepState *ss_state = vm_thread->ss_state;
 
-    if(!ss_state->predicted_bp_count) {
-        // nothing to do
-        return;
-    }
-    for (unsigned iii = 0; iii < ss_state->predicted_bp_count; iii++)
-    {
-        BreakPoint *bp = ss_state->predicted_breakpoints[iii];
-        jvmti_remove_breakpoint_for_jit(ti, bp);
-    }
-
-    _deallocate((unsigned char *)ss_state->predicted_breakpoints);
-    ss_state->predicted_bp_count = 0;
+    if (ss_state && ss_state->predicted_breakpoints)
+        ss_state->predicted_breakpoints->remove_all();
 }
 
 jvmtiError jvmti_get_next_bytecodes_stack_from_native(VM_thread *thread,
@@ -499,7 +612,9 @@ jvmtiError jvmti_get_next_bytecodes_stack_from_native(VM_thread *thread,
 jvmtiError DebugUtilsTI::jvmti_single_step_start(void)
 {
     assert(hythread_is_suspend_enabled());
-    LMAutoUnlock lock(&brkpntlst_lock);
+
+    VmBreakpoints* vm_brpt = VM_Global_State::loader_env->TI->vm_brpt;
+    LMAutoUnlock lock(vm_brpt->get_lock());
 
     hythread_iterator_t threads_iterator;
 
@@ -532,7 +647,6 @@ jvmtiError DebugUtilsTI::jvmti_single_step_start(void)
         }
 
         vm_thread->ss_state->predicted_breakpoints = NULL;
-        vm_thread->ss_state->predicted_bp_count = 0;
 
         jvmti_StepLocation *locations;
         unsigned locations_number;
@@ -546,14 +660,7 @@ jvmtiError DebugUtilsTI::jvmti_single_step_start(void)
             return errorCode;
         }
 
-        errorCode = jvmti_set_single_step_breakpoints(this, vm_thread, locations,
-                locations_number);
-
-        if (JVMTI_ERROR_NONE != errorCode)
-        {
-            hythread_resume_all(NULL);
-            return errorCode;
-        }
+        jvmti_set_single_step_breakpoints(this, vm_thread, locations, locations_number);
     }
     
     single_step_enabled = true;
@@ -568,7 +675,9 @@ jvmtiError DebugUtilsTI::jvmti_single_step_start(void)
 jvmtiError DebugUtilsTI::jvmti_single_step_stop(void)
 {
     assert(hythread_is_suspend_enabled());
-    LMAutoUnlock lock(&brkpntlst_lock);
+
+    VmBreakpoints* vm_brpt = VM_Global_State::loader_env->TI->vm_brpt;
+    LMAutoUnlock lock(vm_brpt->get_lock());
 
     hythread_iterator_t threads_iterator;
 
@@ -588,7 +697,9 @@ jvmtiError DebugUtilsTI::jvmti_single_step_stop(void)
             // SingleStep state for it
             continue;
         }
+
         jvmti_remove_single_step_breakpoints(this, vm_thread);
+        vm_brpt->release_intf(vm_thread->ss_state->predicted_breakpoints);
         _deallocate((unsigned char *)vm_thread->ss_state);
         vm_thread->ss_state = NULL;
     }

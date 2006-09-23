@@ -27,6 +27,7 @@
 #include "environment.h"
 #include "cxxlog.h"
 #include "suspend_checker.h"
+#include "jvmti_break_intf.h"
 
 /*
  * Get Phase
@@ -106,10 +107,8 @@ jvmtiDisposeEnvironment(jvmtiEnv* env)
         _deallocate((unsigned char *)threads);
     }
 
-    // Remove all breakpoints set by this environment
-    ti->brkpntlst_lock._lock();
-    ti->remove_all_breakpoints_env(p_env);
-    ti->brkpntlst_lock._unlock();
+    // Remove all breakpoints set by this environment and release interface
+    ti->vm_brpt->release_intf(p_env->brpt_intf);
 
     // Remove all capabilities for this environment
     jvmtiRelinquishCapabilities(env, &p_env->posessed_capabilities);

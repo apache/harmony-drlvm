@@ -84,8 +84,8 @@ uint64* interpreter_get_stacked_register_address(uint64* bsp, unsigned reg);
 extern void interpreter_execute_method(Method *method, jvalue *return_value, jvalue *args);
 
 extern void interpreter_ti_set_notification_mode(jvmtiEvent event_type, bool enable);
-extern void* interpreter_ti_set_breakpoint(jmethodID method, jlocation location);
-extern void interpreter_ti_clear_breakpoint(jmethodID method, jlocation location, void *id);
+extern jbyte interpreter_ti_set_breakpoint(jmethodID method, jlocation location);
+extern void interpreter_ti_clear_breakpoint(jmethodID method, jlocation location, jbyte saved);
 extern jvmtiError interpreter_ti_pop_frame(jvmtiEnv*, VM_thread *thread);
 extern void stack_dump(VM_thread *thread);
 

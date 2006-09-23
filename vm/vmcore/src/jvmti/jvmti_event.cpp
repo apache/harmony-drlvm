@@ -36,6 +36,7 @@
 #include "jit_intf_cpp.h"
 #include "vm_log.h"
 #include "compile.h"
+#include "jvmti_break_intf.h"
 
 /*
  * Set Event Callbacks
@@ -1601,7 +1602,6 @@ void jvmti_send_thread_start_end_event(int is_start)
             assert(JVMTI_ERROR_NONE == errorCode);
 
             vm_thread->ss_state->predicted_breakpoints = NULL;
-            vm_thread->ss_state->predicted_bp_count = 0;
         }
     }
     else
@@ -1612,9 +1612,10 @@ void jvmti_send_thread_start_end_event(int is_start)
         {
             // Shut down single step state for the thread
             VM_thread *vm_thread = p_TLS_vmthread;
-            LMAutoUnlock lock(&ti->brkpntlst_lock);
-            jvmti_remove_single_step_breakpoints(ti, vm_thread);
+            LMAutoUnlock lock(ti->vm_brpt->get_lock());
 
+            jvmti_remove_single_step_breakpoints(ti, vm_thread);
+            ti->vm_brpt->release_intf(vm_thread->ss_state->predicted_breakpoints);
             _deallocate((unsigned char *)vm_thread->ss_state);
             vm_thread->ss_state = NULL;
         }

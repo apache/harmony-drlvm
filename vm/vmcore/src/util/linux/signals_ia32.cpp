@@ -71,6 +71,7 @@
 #include "interpreter.h"
 #include "crash_handler.h"
 #include "stack_dump.h"
+#include "jvmti_break_intf.h"
 
 // Variables used to locate the context from the signal handler
 static int sc_nest = -1;

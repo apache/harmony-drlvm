@@ -33,6 +33,8 @@
 #include "environment.h"
 #include <string.h>
 #include "properties.h"
+#include "jvmti_break_intf.h"
+#include "interpreter_exports.h"
 
 #include "port_filepath.h"
 #include "port_dso.h"
@@ -262,6 +264,11 @@ jint JNICALL create_jvmti_environment(JavaVM *vm_ext, void **env, jint version)
     memset(&newenv->global_events, 0, sizeof(newenv->global_events));
     memset(&newenv->event_threads, 0, sizeof(newenv->event_threads));
 
+    // Acquire interface for breakpoint handling
+    newenv->brpt_intf =
+        vm->vm_env->TI->vm_brpt->query_intf(jvmti_process_breakpoint_event,
+                                                    interpreter_enabled());
+
     LMAutoUnlock lock(&vm->vm_env->TI->TIenvs_lock);
     vm->vm_env->TI->addEnvironment(newenv);
     *env = newenv;
@@ -288,7 +295,6 @@ void DebugUtilsTI::setExecutionMode(Global_Env *p_env)
 
 DebugUtilsTI::DebugUtilsTI() :
     agent_counter(1),
-    brkpntlst(NULL),
     access_watch_list(NULL),
     modification_watch_list(NULL),
     status(false),
@@ -306,12 +312,15 @@ DebugUtilsTI::DebugUtilsTI() :
     res = _allocate( MAX_NOTIFY_LIST * sizeof(Class**),
         (unsigned char**)&notifyPrepareList );
     assert(res == JVMTI_ERROR_NONE);
+    vm_brpt = new VmBreakpoints();
+    assert(vm_brpt);
     return;
 }
 
 DebugUtilsTI::~DebugUtilsTI()
 {
     ReleaseNotifyLists();
+    delete vm_brpt;
     return;
 }
 

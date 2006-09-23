@@ -75,18 +75,11 @@ struct jvmti_frame_pop_listener
 };
 
 /*
- * Type which will describe one breakpoint
+ * Type which will be attached to each JVMTI breakpoint
  */
-struct BreakPoint {
-    jmethodID method;
-    jlocation location;
-    NativeCodePtr native_location;
-    InstructionDisassembler *disasm;
-    void *id;
-    BreakPoint *next;
+struct TIBrptData
+{
     TIEnv *env;
-
-    BreakPoint(TIEnv *_env) : method(NULL), location(0), next(NULL), env(_env) {}
 };
 
 struct jvmti_StepLocation
@@ -98,8 +91,7 @@ struct jvmti_StepLocation
 
 struct JVMTISingleStepState
 {
-    BreakPoint **predicted_breakpoints;
-    unsigned predicted_bp_count;
+    VmBrkptIntf* predicted_breakpoints;
 };
 
 /*
@@ -153,6 +145,8 @@ public:
 };
 
 typedef struct Class Class;
+class VmBreakpoints;
+struct VmBrkptRef;
 
 /*
  * JVMTI state of the VM
@@ -160,9 +154,9 @@ typedef struct Class Class;
 class DebugUtilsTI {
     public:
         jint agent_counter;
-        Lock_Manager brkpntlst_lock;
         Lock_Manager TIenvs_lock;
         Lock_Manager dcList_lock;
+        VmBreakpoints* vm_brpt;
 
         DebugUtilsTI();
 
@@ -227,179 +221,6 @@ class DebugUtilsTI {
             // assert(TIenvs_lock._lock_or_null());
 
             return p_TIenvs;
-        }
-
-        BreakPoint *find_breakpoint(jmethodID m, jlocation l, TIEnv *env)
-        {
-            // assert(brkpntlst_lock._lock_or_null());
-
-            for (BreakPoint *bp = brkpntlst; NULL != bp; bp = bp->next)
-                if (bp->method == m && bp->location == l && bp->env == env)
-                    return bp;
-
-            return NULL;
-        }
-
-        bool have_breakpoint(jmethodID m)
-        {
-            // assert(brkpntlst_lock._lock_or_null());
-
-            for (BreakPoint *bp = brkpntlst; NULL != bp; bp = bp->next)
-                if (bp->method == m)
-                    return true;
-
-            return false;
-        }
-
-        BreakPoint* find_first_bpt(jmethodID m)
-        {
-            // assert(brkpntlst_lock._lock_or_null());
-
-            for (BreakPoint *bp = brkpntlst; NULL != bp; bp = bp->next)
-                if (bp->method == m)
-                    return bp;
-
-            return NULL;
-        }
-
-        BreakPoint* find_next_bpt(BreakPoint* bpt, jmethodID m)
-        {
-            // assert(brkpntlst_lock._lock_or_null());
-
-            for (BreakPoint *bp = bpt->next; NULL != bp; bp = bp->next)
-                if (bp->method == m)
-                    return bp;
-
-            return NULL;
-        }
-
-        BreakPoint* find_first_bpt(jmethodID m, jlocation l)
-        {
-            // assert(brkpntlst_lock._lock_or_null());
-
-            for (BreakPoint *bp = brkpntlst; NULL != bp; bp = bp->next)
-                if (bp->method == m && bp->location == l)
-                    return bp;
-
-            return NULL;
-        }
-
-        BreakPoint* find_next_bpt(BreakPoint* bpt, jmethodID m, jlocation l)
-        {
-            // assert(brkpntlst_lock._lock_or_null());
-
-            for (BreakPoint *bp = bpt->next; NULL != bp; bp = bp->next)
-                if (bp->method == m && bp->location == l)
-                    return bp;
-
-            return NULL;
-        }
-
-        BreakPoint* find_first_bpt(NativeCodePtr np)
-        {
-            // assert(brkpntlst_lock._lock_or_null());
-
-            for (BreakPoint *bp = brkpntlst; NULL != bp; bp = bp->next)
-                if (bp->native_location == np)
-                    return bp;
-
-            return NULL;
-        }
-
-        BreakPoint* find_next_bpt(BreakPoint* bpt, NativeCodePtr np)
-        {
-            // assert(brkpntlst_lock._lock_or_null());
-
-            for (BreakPoint *bp = bpt->next; NULL != bp; bp = bp->next)
-                if (bp->native_location == np)
-                    return bp;
-
-            return NULL;
-        }
-
-        BreakPoint *get_other_breakpoint_same_location(BreakPoint *this_bp)
-        {
-            // assert(brkpntlst_lock._lock_or_null());
-
-            for (BreakPoint *bp = brkpntlst; NULL != bp; bp = bp->next)
-                if (bp != this_bp &&
-                    bp->method == this_bp->method && bp->location == this_bp->location)
-                    return bp;
-
-            return NULL;
-        }
-
-        BreakPoint *get_other_breakpoint_same_native_location(BreakPoint *this_bp)
-        {
-            // assert(brkpntlst_lock._lock_or_null());
-
-            for (BreakPoint *bp = brkpntlst; NULL != bp; bp = bp->next)
-                if (bp != this_bp && bp->native_location == this_bp->native_location)
-                    return bp;
-
-            return NULL;
-        }
-
-        BreakPoint *get_breakpoint_from_location(jmethodID method, jlocation location)
-        {
-            for (BreakPoint *bp = brkpntlst; NULL != bp; bp = bp->next)
-                if (bp->method == method && bp->location == location)
-                    return bp;
-
-            return NULL;
-        }
-
-        void add_breakpoint(BreakPoint *bp)
-        {
-            // assert(brkpntlst_lock._lock_or_null());
-
-            bp->next = brkpntlst;
-            brkpntlst = bp;
-        }
-
-        void remove_breakpoint(BreakPoint *bp)
-        {
-            // assert(brkpntlst_lock._lock_or_null());
-            assert(brkpntlst);
-
-            if (bp == brkpntlst)
-            {
-                brkpntlst = bp->next;
-                if (NULL != bp->disasm)
-                    delete bp->disasm;
-                _deallocate((unsigned char *)bp);
-                return;
-            }
-
-            for (BreakPoint *p_bp = brkpntlst; NULL != p_bp->next; p_bp = p_bp->next)
-                if (p_bp->next == bp)
-                {
-                    p_bp->next = bp->next;
-                    _deallocate((unsigned char *)bp);
-                    return;
-                }
-
-            ABORT("Can't find the breakpoint");
-        }
-
-        void remove_all_breakpoints_env(TIEnv *env)
-        {
-            // assert(brkpntlst_lock._lock_or_null());
-
-            for (BreakPoint **pp_bp = &brkpntlst; NULL != *pp_bp; )
-            {
-                BreakPoint *p_bp = *pp_bp;
-
-                if (p_bp->env == env)
-                {
-                    *pp_bp = p_bp->next;
-                    _deallocate((unsigned char *)p_bp);
-                }
-                else
-                {
-                    pp_bp = &(p_bp->next);
-                }
-            }
         }
 
         // Watched fields' support
@@ -500,7 +321,6 @@ class DebugUtilsTI {
 
     protected:
         friend jint JNICALL create_jvmti_environment(JavaVM *vm, void **env, jint version);
-        BreakPoint *brkpntlst;
         Watch *access_watch_list;
         Watch *modification_watch_list;
         bool status;
@@ -528,9 +348,7 @@ jint load_agentpath(Agent *agent, const char *str, JavaVM_Internal *vm);
 // Breakpoints internal functions
 jvmtiError jvmti_get_next_bytecodes_stack_from_native(VM_thread *thread,
     jvmti_StepLocation **next_step, unsigned *count, bool step_up);
-jvmtiError jvmti_set_breakpoint_for_jit(DebugUtilsTI *ti, BreakPoint *bp);
-void jvmti_remove_breakpoint_for_jit(DebugUtilsTI *ti, BreakPoint *bp);
-jvmtiError jvmti_set_single_step_breakpoints(DebugUtilsTI *ti,
+void jvmti_set_single_step_breakpoints(DebugUtilsTI *ti,
     VM_thread *vm_thread, jvmti_StepLocation *locations,
     unsigned locations_number);
 void jvmti_remove_single_step_breakpoints(DebugUtilsTI *ti, VM_thread *vm_thread);
@@ -546,5 +364,8 @@ jvmtiError jvmti_translate_jit_error(OpenExeJpdaError error);
 // Single step support
 void jvmti_SingleStepLocation(VM_thread* thread, Method *method,
     unsigned location, jvmti_StepLocation **next_step, unsigned *count);
+
+// Callback function for JVMTI breakpoint processing
+bool jvmti_process_breakpoint_event(VmBrkptIntf* intf, VmBrkptRef* bp_ref);
 
 #endif /* _JVMTI_INTERNAL_H_ */

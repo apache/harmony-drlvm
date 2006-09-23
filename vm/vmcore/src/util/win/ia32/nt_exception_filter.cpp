@@ -25,6 +25,7 @@
 #include "exceptions_jit.h"
 #include "interpreter_exports.h"
 #include "stack_dump.h"
+#include "jvmti_break_intf.h"
 
 // Windows specific
 #include <string>

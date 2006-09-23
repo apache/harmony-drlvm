@@ -25,6 +25,7 @@
 #include "ini.h"
 #include "environment.h"
 #include "open/em_vm.h"
+#include "jvmti_break_intf.h"
 
 
 void
@@ -45,13 +46,11 @@ vm_execute_java_method_array(jmethodID method, jvalue *result, jvalue *args) {
         if (NULL != vm_thread->ss_state)
         {
             // Start single stepping a new Java method
-            LMAutoUnlock lock(&ti->brkpntlst_lock);
+            LMAutoUnlock lock(ti->vm_brpt->get_lock());
             jvmti_remove_single_step_breakpoints(ti, vm_thread);
 
             jvmti_StepLocation method_start = {(Method *)method, 0};
-            jvmtiError UNREF errorCode = jvmti_set_single_step_breakpoints(
-                ti, vm_thread, &method_start, 1);
-            assert(JVMTI_ERROR_NONE == errorCode);
+            jvmti_set_single_step_breakpoints(ti, vm_thread, &method_start, 1);
         }
     }
 

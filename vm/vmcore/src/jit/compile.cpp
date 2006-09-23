@@ -36,6 +36,7 @@
 #include "lil_code_generator.h"
 #include "stack_iterator.h"
 #include "interpreter.h"
+#include "jvmti_break_intf.h"
 
 #include "vm_stats.h"
 #include "dump.h"

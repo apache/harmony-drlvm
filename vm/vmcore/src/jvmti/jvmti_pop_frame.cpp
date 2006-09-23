@@ -30,6 +30,7 @@
 #include "m2n.h"
 #include "mon_enter_exit.h"
 #include "stack_iterator.h"
+#include "jvmti_break_intf.h"
 #include "clog.h"
 
 static void jvmti_pop_frame_callback()
@@ -328,7 +329,7 @@ jvmti_relocate_single_step_breakpoints( StackIterator *si)
         VM_thread *vm_thread = p_TLS_vmthread;
         if (NULL != vm_thread->ss_state) {
             // remove old single step breakpoints
-            LMAutoUnlock lock(&ti->brkpntlst_lock);
+            LMAutoUnlock lock(ti->vm_brpt->get_lock());
             jvmti_remove_single_step_breakpoints(ti, vm_thread);
 
             // set new single step breakpoints
@@ -342,9 +343,7 @@ jvmti_relocate_single_step_breakpoints( StackIterator *si)
             assert(EXE_ERROR_NONE == result);
 
             jvmti_StepLocation locations = {method, bc, ip};
-            jvmtiError UNREF error = jvmti_set_single_step_breakpoints(ti, vm_thread,
-                &locations, 1);
-            assert( error == JVMTI_ERROR_NONE);
+            jvmti_set_single_step_breakpoints(ti, vm_thread, &locations, 1);
         }
     }
     return;

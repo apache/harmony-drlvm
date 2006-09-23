@@ -67,17 +67,16 @@ typedef struct {
      * Set breakpoint in place identified by method and location.
      * No more then one breakpoint will be set at any specific place. Handling
      * for multiple jvmti environments is done by jvmti framework.
-     * @return ID, a black box pointer. The pointer will be returned by jvmti as
-     * a result of breakpoint event callback: jvmti_process_breakpoint_event(...).
+     * @return bytecode has been replaced by instrumentation
      */
-    void* (*interpreter_ti_set_breakpoint)(jmethodID method, jlocation location);
+    jbyte (*interpreter_ti_set_breakpoint)(jmethodID method, jlocation location);
 
     /**
      * Clear breakpoint in place identified by method and location.
-     * Breakpoint ID (returned by interpreter_ti_set_breakpoint(..) also passed
-     * as a parameter.
+     * Replaced bytecode (returned by interpreter_ti_set_breakpoint(..)
+     * is also passed as a parameter.
      */
-    void (*interpreter_ti_clear_breakpoint)(jmethodID method, jlocation location, void *id);
+    void (*interpreter_ti_clear_breakpoint)(jmethodID method, jlocation location, jbyte saved);
 
     /**
      * Set callback to notify JVMTI about frame pop event.

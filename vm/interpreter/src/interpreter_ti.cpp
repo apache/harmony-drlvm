@@ -357,18 +357,18 @@ Opcode_BREAKPOINT(StackFrame& frame) {
     return (uint8) (POINTER_SIZE_INT) jvmti_process_interpreter_breakpoint_event((jmethodID)m, l);
 }
 
-void* interpreter_ti_set_breakpoint(jmethodID method, jlocation location) {
+jbyte interpreter_ti_set_breakpoint(jmethodID method, jlocation location) {
     Method *m = (Method*) method;
     uint8 *bytecodes = (uint8*) m->get_byte_code_addr();
     uint8 b = bytecodes[location];
     bytecodes[location] = OPCODE_BREAKPOINT;
-    return (void*) (POINTER_SIZE_INT) b;
+    return b;
 }
 
-void interpreter_ti_clear_breakpoint(jmethodID method, jlocation location, void* id) {
+void interpreter_ti_clear_breakpoint(jmethodID method, jlocation location, jbyte saved) {
     Method *m = (Method*) method;
     uint8 *bytecodes = (uint8*) m->get_byte_code_addr();
-    bytecodes[location] = (uint8) (POINTER_SIZE_INT) id;
+    bytecodes[location] = saved;
 }
 
 int interpreter_ti_notification_mode = 0;

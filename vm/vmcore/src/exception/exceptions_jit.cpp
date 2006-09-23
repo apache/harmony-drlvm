@@ -40,6 +40,7 @@
 #include "mon_enter_exit.h"
 #include "stack_iterator.h"
 #include "vm_stats.h"
+#include "jvmti_break_intf.h"
 
 #ifdef _IPF_
 #elif defined _EM64T_
@@ -222,7 +223,7 @@ static void exn_propagate_exception(
         VM_thread *vm_thread = p_TLS_vmthread;
         if (NULL != vm_thread->ss_state)
         {
-            LMAutoUnlock lock(&ti->brkpntlst_lock);
+            LMAutoUnlock lock(ti->vm_brpt->get_lock());
             jvmti_remove_single_step_breakpoints(ti, vm_thread);
         }
     }
@@ -269,7 +270,7 @@ static void exn_propagate_exception(
                     VM_thread *vm_thread = p_TLS_vmthread;
                     if (NULL != vm_thread->ss_state)
                     {
-                        LMAutoUnlock lock(&ti->brkpntlst_lock);
+                        LMAutoUnlock lock(ti->vm_brpt->get_lock());
 
                         uint16 bc;
                         NativeCodePtr ip = handler->get_handler_ip();
@@ -279,10 +280,8 @@ static void exn_propagate_exception(
 
                         jvmti_StepLocation method_start = {(Method *)method, bc, ip};
 
-                        jvmtiError UNREF errorCode =
-                            jvmti_set_single_step_breakpoints(ti, vm_thread,
+                        jvmti_set_single_step_breakpoints(ti, vm_thread,
                                 &method_start, 1);
-                        assert(JVMTI_ERROR_NONE == errorCode);
                     }
                 }
 

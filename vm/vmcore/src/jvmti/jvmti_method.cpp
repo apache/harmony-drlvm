@@ -36,6 +36,7 @@
 #include "environment.h"
 #include "exceptions.h"
 #include "interpreter_exports.h"
+#include "jvmti_break_intf.h"
 
 /*
  * Get Method Name (and Signature)
@@ -529,18 +530,18 @@ jvmtiGetBytecodes(jvmtiEnv* env,
     if (interpreter_enabled())
     {
         TIEnv *p_env = (TIEnv *)env;
-        DebugUtilsTI *ti = p_env->vm->vm_env->TI;
+        VmBreakpoints* vm_brpt = p_env->vm->vm_env->TI->vm_brpt;
 
-        LMAutoUnlock lock(&ti->brkpntlst_lock);
+        LMAutoUnlock lock(vm_brpt->get_lock());
 
-        if (!ti->have_breakpoint(method))
+        if (!vm_brpt->has_breakpoint(method))
             return JVMTI_ERROR_NONE;
 
-        for (BreakPoint* bpt = ti->find_first_bpt(method); bpt;
-             bpt = ti->find_next_bpt(bpt, method))
+        for (VmBrkpt* bpt = vm_brpt->find_first(method); bpt;
+             bpt = vm_brpt->find_next(bpt, method))
         {
             (*bytecodes_ptr)[bpt->location] =
-                (unsigned char)(POINTER_SIZE_INT) bpt->id;
+                (unsigned char)bpt->saved_byte;
         }
     }
 
