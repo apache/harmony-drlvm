@@ -37,12 +37,16 @@
 
 
 // Callback function for JVMTI breakpoint processing
-bool jvmti_process_breakpoint_event(VmBrkptIntf* intf, VmBrkptRef* bp_ref)
+bool jvmti_process_breakpoint_event(VMBreakInterface* intf, VMBreakPointRef* bp_ref)
 {
-    VmBrkpt* bp = bp_ref->brpt;
+    VMBreakPoint* bp = bp_ref->brpt;
     assert(bp);
 
-    TRACE2("jvmti.break", "BREAKPOINT occured: location=" << bp->location);
+    TRACE2("jvmti.break", "Process breakpoint: "
+            << class_get_name(method_get_class((Method*)bp->method)) << "."
+            << method_get_name((Method*)bp->method)
+            << method_get_descriptor((Method*)bp->method)
+            << " :" << bp->location << " :" << bp->addr);
 
     DebugUtilsTI *ti = VM_Global_State::loader_env->TI;
     if (!ti->isEnabled() || ti->getPhase() != JVMTI_PHASE_LIVE)
@@ -135,7 +139,11 @@ jvmtiSetBreakpoint(jvmtiEnv* env,
                    jmethodID method,
                    jlocation location)
 {
-    TRACE2("jvmti.break", "SetBreakpoint called, method = " << method << " , location = " << location);
+    TRACE2("jvmti.break", "SetBreakpoint is called for method: "
+        << class_get_name(method_get_class((Method*)method)) << "."
+        << method_get_name((Method*)method)
+        << method_get_descriptor((Method*)method)
+        << " :" << location);
     SuspendEnabledChecker sec;
 
     jvmtiError errorCode;
@@ -181,10 +189,10 @@ jvmtiSetBreakpoint(jvmtiEnv* env,
         return JVMTI_ERROR_MUST_POSSESS_CAPABILITY;
 
     TIEnv *p_env = (TIEnv *)env;
-    VmBrkptIntf* brpt_intf = p_env->brpt_intf;
+    VMBreakInterface* brpt_intf = p_env->brpt_intf;
     LMAutoUnlock lock(brpt_intf->get_lock());
 
-    VmBrkptRef* bp = brpt_intf->find(method, location);
+    VMBreakPointRef* bp = brpt_intf->find(method, location);
 
     if (NULL != bp)
         return JVMTI_ERROR_DUPLICATE;
@@ -202,7 +210,7 @@ jvmtiSetBreakpoint(jvmtiEnv* env,
         return JVMTI_ERROR_INTERNAL;
     }
 
-    TRACE2("jvmti.break", "SetBreakpoint successfull");
+    TRACE2("jvmti.break", "SetBreakpoint is successfull");
     return JVMTI_ERROR_NONE;
 }
 
@@ -219,7 +227,11 @@ jvmtiClearBreakpoint(jvmtiEnv* env,
                      jmethodID method,
                      jlocation location)
 {
-    TRACE2("jvmti.break", "ClearBreakpoint called, method = " << method << " , location = " << location);
+    TRACE2("jvmti.break", "ClearBreakpoint is called for method: "
+        << class_get_name(method_get_class((Method*)method)) << "."
+        << method_get_name((Method*)method)
+        << method_get_descriptor((Method*)method)
+        << " :" << location);
     SuspendEnabledChecker sec;
     jvmtiError errorCode;
 
@@ -265,10 +277,10 @@ jvmtiClearBreakpoint(jvmtiEnv* env,
         return JVMTI_ERROR_MUST_POSSESS_CAPABILITY;
 
     TIEnv *p_env = (TIEnv *)env;
-    VmBrkptIntf* brpt_intf = p_env->brpt_intf;
+    VMBreakInterface* brpt_intf = p_env->brpt_intf;
     LMAutoUnlock lock(brpt_intf->get_lock());
 
-    VmBrkptRef* bp = brpt_intf->find(method, location);
+    VMBreakPointRef* bp = brpt_intf->find(method, location);
 
     if (NULL == bp)
         return JVMTI_ERROR_NOT_FOUND;
@@ -276,6 +288,6 @@ jvmtiClearBreakpoint(jvmtiEnv* env,
     if (!brpt_intf->remove(bp))
         return JVMTI_ERROR_INTERNAL;
 
-    TRACE2("jvmti.break", "ClearBreakpoint successfull");
+    TRACE2("jvmti.break", "ClearBreakpoint is successfull");
     return JVMTI_ERROR_NONE;
 }

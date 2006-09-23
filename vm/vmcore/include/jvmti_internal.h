@@ -91,7 +91,7 @@ struct jvmti_StepLocation
 
 struct JVMTISingleStepState
 {
-    VmBrkptIntf* predicted_breakpoints;
+    VMBreakInterface* predicted_breakpoints;
 };
 
 /*
@@ -145,8 +145,8 @@ public:
 };
 
 typedef struct Class Class;
-class VmBreakpoints;
-struct VmBrkptRef;
+class VMBreakPoints;
+struct VMBreakPointRef;
 
 /*
  * JVMTI state of the VM
@@ -156,7 +156,7 @@ class DebugUtilsTI {
         jint agent_counter;
         Lock_Manager TIenvs_lock;
         Lock_Manager dcList_lock;
-        VmBreakpoints* vm_brpt;
+        VMBreakPoints* vm_brpt;
 
         DebugUtilsTI();
 
@@ -346,8 +346,8 @@ jint load_agentlib(Agent *agent, const char *str, JavaVM_Internal *vm);
 jint load_agentpath(Agent *agent, const char *str, JavaVM_Internal *vm);
 
 // Breakpoints internal functions
-jvmtiError jvmti_get_next_bytecodes_stack_from_native(VM_thread *thread,
-    jvmti_StepLocation **next_step, unsigned *count, bool step_up);
+jvmtiError jvmti_get_next_bytecodes_from_native(VM_thread *thread,
+    jvmti_StepLocation **next_step, unsigned *count, bool stack_step_up);
 void jvmti_set_single_step_breakpoints(DebugUtilsTI *ti,
     VM_thread *vm_thread, jvmti_StepLocation *locations,
     unsigned locations_number);
@@ -366,6 +366,6 @@ void jvmti_SingleStepLocation(VM_thread* thread, Method *method,
     unsigned location, jvmti_StepLocation **next_step, unsigned *count);
 
 // Callback function for JVMTI breakpoint processing
-bool jvmti_process_breakpoint_event(VmBrkptIntf* intf, VmBrkptRef* bp_ref);
+bool jvmti_process_breakpoint_event(VMBreakInterface* intf, VMBreakPointRef* bp_ref);
 
 #endif /* _JVMTI_INTERNAL_H_ */

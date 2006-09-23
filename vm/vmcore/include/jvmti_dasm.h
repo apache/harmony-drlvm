@@ -32,7 +32,7 @@ class InstructionDisassembler {
 public:
 
     enum Type {
-        OPCODEERROR,
+        OPCODEERROR = 0,
         UNKNOWN,
         OTHER=UNKNOWN,
         RELATIVE_JUMP,
@@ -72,7 +72,8 @@ public:
     };
 
     
-    InstructionDisassembler(NativeCodePtr address)
+    InstructionDisassembler(NativeCodePtr address) :
+        type(OPCODEERROR), target(0), len(0), cond_jump_type(JUMP_OVERFLOW)
     {
         disasm(address, this);
     }

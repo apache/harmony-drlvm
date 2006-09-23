@@ -530,14 +530,14 @@ jvmtiGetBytecodes(jvmtiEnv* env,
     if (interpreter_enabled())
     {
         TIEnv *p_env = (TIEnv *)env;
-        VmBreakpoints* vm_brpt = p_env->vm->vm_env->TI->vm_brpt;
+        VMBreakPoints* vm_brpt = p_env->vm->vm_env->TI->vm_brpt;
 
         LMAutoUnlock lock(vm_brpt->get_lock());
 
         if (!vm_brpt->has_breakpoint(method))
             return JVMTI_ERROR_NONE;
 
-        for (VmBrkpt* bpt = vm_brpt->find_first(method); bpt;
+        for (VMBreakPoint* bpt = vm_brpt->find_first(method); bpt;
              bpt = vm_brpt->find_next(bpt, method))
         {
             (*bytecodes_ptr)[bpt->location] =

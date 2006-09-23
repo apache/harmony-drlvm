@@ -32,7 +32,7 @@ struct TIEventThread
 
 struct Agent;
 extern Agent *current_loading_agent;
-class VmBrkptIntf;
+class VMBreakInterface;
 
 /*
  * Type that describes TI environment created by GetEnv function
@@ -46,7 +46,7 @@ struct TIEnv
     jvmtiEventCallbacks event_table;
     jvmtiExtensionEvent *extension_event_table;
     jvmtiCapabilities posessed_capabilities;
-    VmBrkptIntf *brpt_intf;
+    VMBreakInterface *brpt_intf;
     TIEnv* next;
 
     bool global_events[JVMTI_MAX_EVENT_TYPE_VAL - JVMTI_MIN_EVENT_TYPE_VAL];

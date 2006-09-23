@@ -266,8 +266,9 @@ jint JNICALL create_jvmti_environment(JavaVM *vm_ext, void **env, jint version)
 
     // Acquire interface for breakpoint handling
     newenv->brpt_intf =
-        vm->vm_env->TI->vm_brpt->query_intf(jvmti_process_breakpoint_event,
-                                                    interpreter_enabled());
+        vm->vm_env->TI->vm_brpt->new_intf(jvmti_process_breakpoint_event,
+                                          PRIORITY_SIMPLE_BREAKPOINT,
+                                          interpreter_enabled());
 
     LMAutoUnlock lock(&vm->vm_env->TI->TIenvs_lock);
     vm->vm_env->TI->addEnvironment(newenv);
@@ -312,7 +313,7 @@ DebugUtilsTI::DebugUtilsTI() :
     res = _allocate( MAX_NOTIFY_LIST * sizeof(Class**),
         (unsigned char**)&notifyPrepareList );
     assert(res == JVMTI_ERROR_NONE);
-    vm_brpt = new VmBreakpoints();
+    vm_brpt = new VMBreakPoints();
     assert(vm_brpt);
     return;
 }
