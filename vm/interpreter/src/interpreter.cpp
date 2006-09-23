@@ -2563,6 +2563,7 @@ restart:
                     vm_monitor_exit_wrapper(ml->monitor);
                     ml = ml->next;
                 }
+                M2N_FREE_MACRO;
                 return;
             }
             if (!breakpoint_processed &&
@@ -2570,6 +2571,15 @@ restart:
                     & INTERPRETER_TI_SINGLE_STEP_EVENT) {
                 breakpoint_processed = false;
                 single_step_callback(frame);
+            }
+            if (frame.jvmti_pop_frame == POP_FRAME_NOW) {
+                MonitorList *ml = frame.locked_monitors;
+                while(ml) {
+                    vm_monitor_exit_wrapper(ml->monitor);
+                    ml = ml->next;
+                }
+                M2N_FREE_MACRO;
+                return;
             }
             //assert(!exn_raised());
             if (get_thread_ptr()->p_exception_object_ti || exn_raised()) {
