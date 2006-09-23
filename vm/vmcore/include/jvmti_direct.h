@@ -110,7 +110,7 @@ void jvmti_send_class_file_load_hook_event(const Global_Env* env,
 void jvmti_send_class_prepare_event(Class* clss);
 VMEXPORT void jvmti_send_thread_start_end_event(int is_start);
 void jvmti_send_vm_death_event();
-bool jvmti_send_jit_breakpoint_event(Registers *regs);
+bool jvmti_jit_breakpoint_handler(Registers *regs);
 
 #ifdef __cplusplus
 }

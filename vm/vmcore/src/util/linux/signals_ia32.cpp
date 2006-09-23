@@ -494,7 +494,7 @@ void jvmti_jit_breakpoint_handler(int signum, siginfo_t* UNREF info, void* conte
         (void *)regs.eip);
     assert(!interpreter_enabled());
 
-    bool handled = jvmti_send_jit_breakpoint_event(&regs);
+    bool handled = jvmti_jit_breakpoint_handler(&regs);
     if (handled)
     {
         linux_regs_to_ucontext(uc, &regs);

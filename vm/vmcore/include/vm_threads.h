@@ -103,6 +103,7 @@ public:
     jbyte                             jvmti_jit_breakpoints_handling_buffer[50];
     jvmti_frame_pop_listener          *frame_pop_listener;
     JVMTISingleStepState              *ss_state;
+    Registers                         jvmti_saved_exception_registers;
 
     // CPU registers.
     Registers                         regs;

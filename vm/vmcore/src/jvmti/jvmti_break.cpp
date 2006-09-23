@@ -35,6 +35,7 @@
 #include "encoder.h"
 #include "m2n.h"
 #include "exceptions.h"
+#include "stack_iterator.h"
 
 
 #define INSTRUMENTATION_BYTE_HLT 0xf4 // HLT instruction
@@ -175,35 +176,29 @@ jvmti_check_and_get_single_step_breakpoint( DebugUtilsTI *ti,
     return ss_breakpoint;
 } // jvmti_check_and_get_single_step_breakpoint
 
-bool jvmti_send_jit_breakpoint_event(Registers *regs)
+static void jvmti_send_jit_breakpoint_event(void)
 {
+    // When we get here we know already that breakpoint occurred in JITted code,
+    // JVMTI handles it, and registers context is saved for us in TLS
+    VM_thread *vm_thread = p_TLS_vmthread;
+    Registers regs = vm_thread->jvmti_saved_exception_registers;
+
 #if PLATFORM_POSIX && INSTRUMENTATION_BYTE == INSTRUMENTATION_BYTE_INT3
     // Int3 exception address points to the instruction after it
-    NativeCodePtr native_location = (NativeCodePtr)(((POINTER_SIZE_INT)regs->get_ip()) - 1);
+    NativeCodePtr native_location = (NativeCodePtr)(((POINTER_SIZE_INT)regs.get_ip()) - 1);
 #else
-    NativeCodePtr native_location = (NativeCodePtr)regs->get_ip();
+    NativeCodePtr native_location = (NativeCodePtr)regs.get_ip();
 #endif
 
-    TRACE2("jvmti.break", "BREAKPOINT occured: " << native_location);
-
     DebugUtilsTI *ti = VM_Global_State::loader_env->TI;
-    if (!ti->isEnabled() || ti->getPhase() != JVMTI_PHASE_LIVE)
-        return false;
-
-    ti->brkpntlst_lock._lock();
     BreakPoint *bp = ti->find_first_bpt(native_location);
-    if (NULL == bp)
-    {
-        ti->brkpntlst_lock._unlock();
-        return false;
-    }
-
+    assert(bp);
     assert(ti->isEnabled());
     assert(!interpreter_enabled());
+    assert(ti->getPhase() == JVMTI_PHASE_LIVE);
 
-    Registers orig_regs = *regs;
-
-    M2nFrame *m2nf = m2n_push_suspended_frame(&orig_regs);
+    M2nFrame *m2nf = m2n_push_suspended_frame(&regs);
+    jbyte *instruction_buffer;
     BEGIN_RAISE_AREA;
 
     // need to be able to pop the frame
@@ -224,7 +219,6 @@ bool jvmti_send_jit_breakpoint_event(Registers *regs)
     InstructionDisassembler idisasm(*bp->disasm);
     JNIEnv *jni_env = (JNIEnv *)jni_native_intf;
 
-    VM_thread *vm_thread = p_TLS_vmthread;
     BreakPoint *ss_breakpoint = jvmti_check_and_get_single_step_breakpoint( ti,
         vm_thread, native_location );
     // Check if there are Single Step type breakpoints in TLS
@@ -387,7 +381,7 @@ bool jvmti_send_jit_breakpoint_event(Registers *regs)
     // special handling.
     InstructionDisassembler::Type type = idisasm.get_type();
 
-    jbyte *instruction_buffer = vm_thread->jvmti_jit_breakpoints_handling_buffer;
+    instruction_buffer = vm_thread->jvmti_jit_breakpoints_handling_buffer;
     jbyte *interrupted_instruction = (jbyte *)native_location;
     jint instruction_length = idisasm.get_length_with_prefix();
 
@@ -456,13 +450,6 @@ bool jvmti_send_jit_breakpoint_event(Registers *regs)
     }
     }
 
-    // Set exception or signal return address to the instruction buffer
-#ifndef _EM64T_
-    regs->eip = (POINTER_SIZE_INT)instruction_buffer;
-#else
-    regs->rip = (POINTER_SIZE_INT)instruction_buffer;
-#endif
-
     // Set breakpoints on bytecodes after the current one
     ss_breakpoint = jvmti_check_and_get_single_step_breakpoint( ti,
         vm_thread, native_location );
@@ -487,9 +474,60 @@ bool jvmti_send_jit_breakpoint_event(Registers *regs)
     oh_discard_local_handle(hThread);
 
     END_RAISE_AREA;
+
+    // This function does not return. It restores register context and
+    // transfers execution control to the instruction buffer to
+    // execute the original instruction with the registers which it
+    // had before breakpoint happened
+    StackIterator *si = si_create_from_registers(&regs, false, m2n_get_previous_frame(m2nf));
+
     m2n_set_last_frame(m2n_get_previous_frame(m2nf));
     STD_FREE(m2nf);
 
+    si_set_ip(si, instruction_buffer, false);
+    si_transfer_control(si);
+}
+
+bool jvmti_jit_breakpoint_handler(Registers *regs)
+{
+#if PLATFORM_POSIX && INSTRUMENTATION_BYTE == INSTRUMENTATION_BYTE_INT3
+    // Int3 exception address points to the instruction after it
+    NativeCodePtr native_location = (NativeCodePtr)(((POINTER_SIZE_INT)regs->get_ip()) - 1);
+#else
+    NativeCodePtr native_location = (NativeCodePtr)regs->get_ip();
+#endif
+
+    TRACE2("jvmti.break", "BREAKPOINT occured: " << native_location);
+
+    DebugUtilsTI *ti = VM_Global_State::loader_env->TI;
+    if (!ti->isEnabled() || ti->getPhase() != JVMTI_PHASE_LIVE)
+        return false;
+
+    ti->brkpntlst_lock._lock();
+    BreakPoint *bp = ti->find_first_bpt(native_location);
+    if (NULL == bp)
+    {
+        ti->brkpntlst_lock._unlock();
+        return false;
+    }
+
+    assert(ti->isEnabled());
+    assert(!interpreter_enabled());
+
+    // Now it is necessary to set up a transition to
+    // jvmti_send_jit_breakpoint_event from the exception/signal
+    // handler
+    VM_thread *vm_thread = p_TLS_vmthread;
+    // Copy original registers to TLS
+    vm_thread->jvmti_saved_exception_registers = *regs;
+#ifndef _EM64T_
+    regs->eip = (POINTER_SIZE_INT)jvmti_send_jit_breakpoint_event;
+#else
+    regs->rip = (POINTER_SIZE_INT)jvmti_send_jit_breakpoint_event;
+#endif
+
+    // Breakpoints list lock is not released until it is unlocked
+    // inside of jvmti_send_jit_breakpoint_event
     return true;
 }
 

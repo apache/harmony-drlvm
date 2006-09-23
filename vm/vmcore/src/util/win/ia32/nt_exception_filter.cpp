@@ -418,7 +418,7 @@ LONG NTAPI vectored_exception_handler(LPEXCEPTION_POINTERS nt_exception)
             nt_to_vm_context(context, &regs);
             TRACE2("signals", "JVMTI breakpoint detected at " <<
                 (void *)regs.eip);
-            bool handled = jvmti_send_jit_breakpoint_event(&regs);
+            bool handled = jvmti_jit_breakpoint_handler(&regs);
             if (handled)
             {
                 vm_to_nt_context(&regs, context);
