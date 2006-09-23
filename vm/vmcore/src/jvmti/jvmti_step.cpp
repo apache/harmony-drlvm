@@ -53,7 +53,7 @@ jvmti_get_invoked_virtual_method( VM_thread* thread )
 {
     ASSERT_NO_INTERPRETER;
 
-#if PLATFORM_NT
+#if _IA32_
     // create stack iterator from native
     StackIterator* si = si_create_from_native( thread );
     si_transfer_all_preserved_registers(si);
@@ -91,10 +91,10 @@ jvmti_get_invoked_virtual_method( VM_thread* thread )
     Method *method = class_get_method_from_vt_offset( vtable, *((char*)ip + 2) );
     return method;
 
-#else // for PLATFORM_POSIX
+#else // for !_IA32_
 
     return NULL;
-#endif // PLATFORM_NT
+#endif // _IA32_
 } // jvmti_get_invoked_virtual_method
 
 void
@@ -160,8 +160,10 @@ jvmti_SingleStepLocation( VM_thread* thread,
             assert( error == JVMTI_ERROR_NONE );
             (*next_step)[0].method = method;
             (*next_step)[0].location = location;
+            (*next_step)[0].native_location = NULL;
             (*next_step)[1].method = method;
             (*next_step)[1].location = offset;
+            (*next_step)[1].native_location = NULL;
             break;
 
         // goto instructions
@@ -174,6 +176,7 @@ jvmti_SingleStepLocation( VM_thread* thread,
             assert( error == JVMTI_ERROR_NONE );
             (*next_step)->method = method;
             (*next_step)->location = offset;
+            (*next_step)->native_location = NULL;
             break;
         case OPCODE_GOTO_W:         /* 0xc8 + s4 */
         case OPCODE_JSR_W:          /* 0xc9 + s4 */
@@ -184,6 +187,7 @@ jvmti_SingleStepLocation( VM_thread* thread,
             assert( error == JVMTI_ERROR_NONE );
             (*next_step)->method = method;
             (*next_step)->location = offset;
+            (*next_step)->native_location = NULL;
             break;
 
         // tableswitch instruction
@@ -201,11 +205,13 @@ jvmti_SingleStepLocation( VM_thread* thread,
                 (*next_step)[0].method = method;
                 (*next_step)[0].location = (int)bytecode_index
                     + jvmti_GetWordValue( bytecode, location );
+                (*next_step)[0].native_location = NULL;
                 location += 12;
                 for( int index = 1; index < number; index++, location += 4 ) {
                     (*next_step)[index].method = method;
                     (*next_step)[index].location = (int)bytecode_index
                         + jvmti_GetWordValue( bytecode, location );
+                    (*next_step)[index].native_location = NULL;
                 }
             }
             break;
@@ -223,11 +229,13 @@ jvmti_SingleStepLocation( VM_thread* thread,
                 (*next_step)[0].method = method;
                 (*next_step)[0].location = (int)bytecode_index
                     + jvmti_GetWordValue( bytecode, location );
+                (*next_step)[0].native_location = NULL;
                 location += 12;
                 for( int index = 1; index < number; index++, location += 8 ) {
                     (*next_step)[index].method = method;
                     (*next_step)[index].location = (int)
                         + jvmti_GetWordValue( bytecode, location );
+                    (*next_step)[index].native_location = NULL;
                 }
             }
             break;
@@ -269,6 +277,7 @@ jvmti_SingleStepLocation( VM_thread* thread,
                     assert( error == JVMTI_ERROR_NONE );
                     (*next_step)->method = klass->const_pool[index].CONSTANT_ref.method;
                     (*next_step)->location = 0;
+                    (*next_step)->native_location = NULL;
                 }
             }
             break;
@@ -284,6 +293,7 @@ jvmti_SingleStepLocation( VM_thread* thread,
                     assert( error == JVMTI_ERROR_NONE );
                     (*next_step)->method = func;
                     (*next_step)->location = 0;
+                    (*next_step)->native_location = NULL;
                 }
             }
             break;
@@ -344,18 +354,20 @@ jvmti_SingleStepLocation( VM_thread* thread,
             assert( error == JVMTI_ERROR_NONE );
             (*next_step)->method = method;
             (*next_step)->location = location;
+            (*next_step)->native_location = NULL;
             break;
 
         // ret instruction
         case OPCODE_RET:            /* 0xa9 + u1|u2  */
             // FIXME - need to obtain return address from stack.
+            DIE2("jvmti", "SingleStepLocation: not implemented ret instruction");
             break;
         }
         break;
     } while( true );
 
     for( unsigned index = 0; index < *count; index++ ) {
-        TRACE2( "jvmti.step", "Step: " << class_get_name(method_get_class(method))
+        TRACE2( "jvmti.break.ss", "Step: " << class_get_name(method_get_class(method))
             << "." << method_get_name(method) << method_get_descriptor(method)
             << " :" << bytecode_index << "\n      -> "
             << class_get_name(method_get_class((*next_step)[index].method))
@@ -387,12 +399,13 @@ jvmtiError jvmti_set_single_step_breakpoints(DebugUtilsTI *ti, VM_thread *vm_thr
         memset( bp, 0, sizeof(BreakPoint));
         bp->method = (jmethodID)locations[iii].method;
         bp->location = locations[iii].location;
+        bp->native_location = locations[iii].native_location;
 
         TRACE2("jvmti.break.ss", "Set single step breakpoint: "
             << class_get_name(method_get_class((Method *)bp->method)) << "."
             << method_get_name((Method *)bp->method)
             << method_get_descriptor((Method *)bp->method)
-            << " :" << bp->location);
+            << " :" << bp->location << " :" << bp->native_location);
 
         errorCode = jvmti_set_breakpoint_for_jit(ti, bp);
         if (JVMTI_ERROR_NONE != errorCode)
@@ -413,6 +426,10 @@ void jvmti_remove_single_step_breakpoints(DebugUtilsTI *ti, VM_thread *vm_thread
     // Function is always executed under global TI breakpoints lock
     JVMTISingleStepState *ss_state = vm_thread->ss_state;
 
+    if(!ss_state->predicted_bp_count) {
+        // nothing to do
+        return;
+    }
     for (unsigned iii = 0; iii < ss_state->predicted_bp_count; iii++)
     {
         BreakPoint *bp = ss_state->predicted_breakpoints[iii];
@@ -473,6 +490,7 @@ jvmtiError jvmti_get_next_bytecodes_stack_from_native(VM_thread *thread,
         // which caused call of the method. So next location is the 'bc' which
         // IP points to.
         (*next_step)->location = bc;
+        (*next_step)->native_location = ip;
     }
     si_free(si);
     return JVMTI_ERROR_NONE;

@@ -272,12 +272,12 @@ static void exn_propagate_exception(
                         LMAutoUnlock lock(&ti->brkpntlst_lock);
 
                         uint16 bc;
+                        NativeCodePtr ip = handler->get_handler_ip();
                         OpenExeJpdaError UNREF result =
-                            jit->get_bc_location_for_native(
-                                method, handler->get_handler_ip(), &bc);
+                            jit->get_bc_location_for_native(method, ip, &bc);
                         assert(EXE_ERROR_NONE == result);
 
-                        jvmti_StepLocation method_start = {(Method *)method, bc};
+                        jvmti_StepLocation method_start = {(Method *)method, bc, ip};
 
                         jvmtiError UNREF errorCode =
                             jvmti_set_single_step_breakpoints(ti, vm_thread,

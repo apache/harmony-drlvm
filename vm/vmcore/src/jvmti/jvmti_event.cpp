@@ -315,6 +315,7 @@ jvmtiSetEventNotificationMode(jvmtiEnv* env,
 
                 if (JVMTI_ENABLE == mode && !ti->is_single_step_enabled())
                 {
+                    TRACE2("jvmti.break.ss", "SingleStep event is enabled");
                     jvmtiError errorCode = ti->jvmti_single_step_start();
 
                     if (JVMTI_ERROR_NONE != errorCode)
@@ -323,6 +324,7 @@ jvmtiSetEventNotificationMode(jvmtiEnv* env,
                 else if (JVMTI_DISABLE == mode && ti->is_single_step_enabled())
                 {
                     // Check that no environment has SingleStep enabled
+                    TRACE2("jvmti.break.ss", "SingleStep event is disabled");
                     LMAutoUnlock lock(&ti->TIenvs_lock);
                     bool disable = true;
 

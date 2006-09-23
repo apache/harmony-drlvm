@@ -34,31 +34,33 @@
 
 static void jvmti_pop_frame_callback()
 {
-    TRACE(("--->>>  JVMTI pop frame callback..."));
+    TRACE(("JVMTI PopFrame callback is called"));
     frame_type type = m2n_get_frame_type(p_TLS_vmthread->last_m2n_frame);
 
     // frame wasn't requested to be popped
-    if (FRAME_POP_NOW != (FRAME_POP_NOW & type))
+    if (FRAME_POP_NOW != (FRAME_POP_NOW & type)) {
+        TRACE(("PopFrame callback is not FRAME_POP_NOW"));
         return;
+    }
 
     // if we are in hythread_safe_point() frame is unwindable
     if (FRAME_SAFE_POINT == (FRAME_SAFE_POINT & type)) {
+        TRACE(("PopFrame callback is FRAME_SAFE_POINT"));
         jvmti_jit_prepare_pop_frame();
 
-    // if we in unwindable frame
     } else if (is_unwindable()) {
-        // wait for resume
-        TRACE(("entering safe_point"));
+        // unwindable frame, wait for resume
+        TRACE(("PopFrame callback is entering safe_point"));
         hythread_safe_point();
-        TRACE(("left safe_point"));
+        TRACE(("PopFrame callback is FRAME_SAFE_POINT"));
 
         // switch execution to the previous frame
         jvmti_jit_do_pop_frame();
         assert(0 /* mustn't get here */);
 
-    // if we in nonunwindable frame
     } else {
-        // raise special exception object
+        // nonunwindable frame, raise special exception object
+        TRACE(("PopFrame callback is raising exception"));
         exn_raise_object(VM_Global_State::loader_env->popFrameException);
     }
 } //jvmti_pop_frame_callback
@@ -66,6 +68,7 @@ static void jvmti_pop_frame_callback()
 jvmtiError jvmti_jit_pop_frame(jthread java_thread)
 {
     assert(hythread_is_suspend_enabled());
+    TRACE(("Called PopFrame for JIT"));
 
     DebugUtilsTI *ti = VM_Global_State::loader_env->TI;
 
@@ -90,6 +93,11 @@ jvmtiError jvmti_jit_pop_frame(jthread java_thread)
     // go to 2-d frame & check it's managed
     si_goto_previous(si);
     assert(! si_is_native(si));
+    TRACE(("PopFrame is called for method %s.%s%s :%p",
+        class_get_name(method_get_class(si_get_code_chunk_info(si)->get_method())),
+        method_get_name(si_get_code_chunk_info(si)->get_method()),
+        method_get_descriptor(si_get_code_chunk_info(si)->get_method()),
+        si_get_ip(si) ));
 
     // go to 3-d frame & check its type
     si_goto_previous(si);
@@ -146,6 +154,7 @@ void jvmti_jit_do_pop_frame(){
 
 // requires stack iterator and buffer to save intermediate information
 static void jvmti_jit_prepare_pop_frame(StackIterator* si, uint32* buf) {
+    TRACE(("Prepare PopFrame for JIT"));
     // pop native frame
     assert(si_is_native(si));
     si_goto_previous(si);
@@ -160,6 +169,10 @@ static void jvmti_jit_prepare_pop_frame(StackIterator* si, uint32* buf) {
     Method *method = cci->get_method();
     Class* method_class = method->get_class();
     bool is_method_static = method->is_static();
+    TRACE(("PopFrame method %s.%s%s, stop IP: %p",
+        class_get_name(method_get_class(cci->get_method())),
+        method_get_name(cci->get_method()),
+        method_get_descriptor(cci->get_method()), si_get_ip(si) ));
 
     // free lock of synchronized method
     /*
@@ -192,6 +205,10 @@ static void jvmti_jit_prepare_pop_frame(StackIterator* si, uint32* buf) {
     // find correct ip and restore required regiksters context
     NativeCodePtr current_method_addr = NULL;
     NativeCodePtr ip = si_get_ip(si);
+    TRACE(("PopFrame method %s.%s%s, set IP begin: %p",
+        class_get_name(method_get_class(si_get_code_chunk_info(si)->get_method())),
+        method_get_name(si_get_code_chunk_info(si)->get_method()),
+        method_get_descriptor(si_get_code_chunk_info(si)->get_method()), ip ));
     size_t ip_reduce;
 
     // invoke static
@@ -233,6 +250,10 @@ static void jvmti_jit_prepare_pop_frame(StackIterator* si, uint32* buf) {
 
     // set corrrrect ip
     ip = (NativeCodePtr)(((char*)ip) - ip_reduce);
+    TRACE(("PopFrame method %s.%s%s, set IP end: %p",
+        class_get_name(method_get_class(si_get_code_chunk_info(si)->get_method())),
+        method_get_name(si_get_code_chunk_info(si)->get_method()),
+        method_get_descriptor(si_get_code_chunk_info(si)->get_method()), ip ));
     si_set_ip(si, ip, false);
 }
 
@@ -248,6 +269,11 @@ void jvmti_jit_prepare_pop_frame() {
     // create stack iterator from native
     StackIterator* si = si_create_from_native();
     si_transfer_all_preserved_registers(si);
+    TRACE(("PopFrame prepare for method %s.%s%s, IP: %p",
+        class_get_name(method_get_class(si_get_code_chunk_info(si)->get_method())),
+        method_get_name(si_get_code_chunk_info(si)->get_method()),
+        method_get_descriptor(si_get_code_chunk_info(si)->get_method()),
+        si_get_ip(si) ));
 
     // preare pop frame - find regs values
     uint32 buf = 0;
@@ -289,10 +315,44 @@ void jvmti_jit_prepare_pop_frame() {
 
     // set pop done frame state
     m2n_set_frame_type(top_frame, FRAME_POP_DONE);
+    return;
 }
+
+static void
+jvmti_relocate_single_step_breakpoints( StackIterator *si)
+{
+    // relocate single step
+    DebugUtilsTI *ti = VM_Global_State::loader_env->TI;
+    if (ti->isEnabled() && ti->is_single_step_enabled())
+    {
+        VM_thread *vm_thread = p_TLS_vmthread;
+        if (NULL != vm_thread->ss_state) {
+            // remove old single step breakpoints
+            LMAutoUnlock lock(&ti->brkpntlst_lock);
+            jvmti_remove_single_step_breakpoints(ti, vm_thread);
+
+            // set new single step breakpoints
+            CodeChunkInfo *cci = si_get_code_chunk_info(si);
+            Method *method = cci->get_method();
+            NativeCodePtr ip = si_get_ip(si);
+            uint16 bc;
+            JIT *jit = cci->get_jit();
+            OpenExeJpdaError UNREF result =
+                jit->get_bc_location_for_native(method, ip, &bc);
+            assert(EXE_ERROR_NONE == result);
+
+            jvmti_StepLocation locations = {method, bc, ip};
+            jvmtiError UNREF error = jvmti_set_single_step_breakpoints(ti, vm_thread,
+                &locations, 1);
+            assert( error == JVMTI_ERROR_NONE);
+        }
+    }
+    return;
+} // jvmti_relocate_single_step_breakpoints
 
 void jvmti_jit_complete_pop_frame() {
     // Destructive Unwinding!!! NO CXX Logging put here.
+    TRACE(("Complite PopFrame for JIT"));
 
     // Find top m2n frame
     M2nFrame* top_frame = m2n_get_last_frame();
@@ -309,12 +369,17 @@ void jvmti_jit_complete_pop_frame() {
     assert(si_is_native(si));
     si_goto_previous(si);
 
+    // relocate single step breakpoints
+    jvmti_relocate_single_step_breakpoints(si);
+
     // transfer cdontrol
+    TRACE(("PopFrame transfer control to: %p",  (void*)si_get_ip(si) ));
     si_transfer_control(si);
 }
 
 void jvmti_jit_do_pop_frame() {
     // Destructive Unwinding!!! NO CXX Logging put here.
+    TRACE(("Do PopFrame for JIT"));
 
     // Find top m2n frame
     M2nFrame* top_frame = m2n_get_last_frame();
@@ -331,7 +396,11 @@ void jvmti_jit_do_pop_frame() {
     uint32 buf = 0;
     jvmti_jit_prepare_pop_frame(si, &buf);
 
+    // relocate single step breakpoints
+    jvmti_relocate_single_step_breakpoints(si);
+
     // transfer cdontrol
+    TRACE(("PopFrame transfer control to: %p",  (void*)si_get_ip(si) ));
     si_transfer_control(si);
 }
 #endif // _IA32_

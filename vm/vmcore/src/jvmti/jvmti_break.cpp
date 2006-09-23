@@ -497,19 +497,21 @@ jvmtiError jvmti_set_jit_mode_breakpoint(DebugUtilsTI *ti, BreakPoint *bp)
 {
     // Function is always executed under global TI breakpoints lock
     // Find native location in the method code
-    NativeCodePtr np = NULL;
     Method *m = (Method *)bp->method;
     assert( m->get_state() == Method::ST_Compiled );
 
-    OpenExeJpdaError res = EXE_ERROR_NONE;
-    for (CodeChunkInfo* cci = m->get_first_JIT_specific_info(); cci; cci = cci->_next)
-    {
-        JIT *jit = cci->get_jit();
-        res = jit->get_native_location_for_bc(m, (uint16)bp->location, &np);
-        if (res == EXE_ERROR_NONE)
-            break;
+    NativeCodePtr np = bp->native_location;
+    if( !np ) {
+        OpenExeJpdaError res = EXE_ERROR_NONE;
+        for (CodeChunkInfo* cci = m->get_first_JIT_specific_info(); cci; cci = cci->_next)
+        {
+            JIT *jit = cci->get_jit();
+            res = jit->get_native_location_for_bc(m, (uint16)bp->location, &np);
+            if (res == EXE_ERROR_NONE)
+                break;
+        }
+        assert(res == EXE_ERROR_NONE);
     }
-    assert(res == EXE_ERROR_NONE);
 
     if (NULL == np)
         return JVMTI_ERROR_INTERNAL;

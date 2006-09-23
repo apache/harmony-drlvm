@@ -93,6 +93,7 @@ struct jvmti_StepLocation
 {
     struct Method* method;
     unsigned location;
+    NativeCodePtr native_location;
 };
 
 struct JVMTISingleStepState
