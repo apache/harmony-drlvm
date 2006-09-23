@@ -275,7 +275,7 @@ void vm_enumerate_root_set_single_thread_on_stack(StackIterator* si)
                 << (m2n_get_method(si_get_m2n(si)) ? method_get_descriptor(m2n_get_method(si_get_m2n(si))) : ""));
             oh_enumerate_handles(m2n_get_local_handles(si_get_m2n(si)));
         }
-        si_goto_previous(si);
+        si_goto_previous(si, false);
     }
     si_free(si);
 }

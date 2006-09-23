@@ -201,7 +201,9 @@ bool jvmti_send_jit_breakpoint_event(Registers *regs)
     assert(ti->isEnabled());
     assert(!interpreter_enabled());
 
-    M2nFrame *m2nf = m2n_push_suspended_frame(regs);
+    Registers orig_regs = *regs;
+
+    M2nFrame *m2nf = m2n_push_suspended_frame(&orig_regs);
     BEGIN_RAISE_AREA;
 
     // need to be able to pop the frame

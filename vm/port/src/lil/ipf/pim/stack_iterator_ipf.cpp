@@ -501,7 +501,7 @@ bool si_is_past_end(StackIterator* si)
     return si->cci==NULL && si->m2nfl==NULL;
 }
 
-void si_goto_previous(StackIterator* si)
+void si_goto_previous(StackIterator* si, bool over_popped)
 {
     if (si->cci) {
         assert(si->cci->get_jit() && si->cci->get_method());

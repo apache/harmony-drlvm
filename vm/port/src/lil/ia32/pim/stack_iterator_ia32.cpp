@@ -59,7 +59,7 @@ struct StackIterator {
 // Utilities
 
 // Goto the managed frame immediately prior to m2nfl
-static void si_unwind_from_m2n(StackIterator* si)
+static void si_unwind_from_m2n(StackIterator* si, bool over_popped = true)
 {
 #ifdef VM_STATS
     VM_Statistics::get_vm_stats().num_unwind_native_frames_all++;
@@ -87,6 +87,18 @@ static void si_unwind_from_m2n(StackIterator* si)
         si->c.p_esi = &m2nfl->regs->esi;
         si->c.p_edi = &m2nfl->regs->edi;
         si->c.p_ebp = &m2nfl->regs->ebp;
+    } else if (over_popped &&
+            (FRAME_POP_DONE == (FRAME_POP_MASK & m2n_get_frame_type(m2nfl)))) {
+        si->c.esp = m2nfl->pop_regs->esp;
+        si->c.p_eip = &(m2nfl->pop_regs->eip);
+        si->c.is_ip_past = FALSE;
+        si->c.p_eax = &m2nfl->pop_regs->eax;
+        si->c.p_ebx = &m2nfl->pop_regs->ebx;
+        si->c.p_ecx = &m2nfl->pop_regs->ecx;
+        si->c.p_edx = &m2nfl->pop_regs->edx;
+        si->c.p_esi = &m2nfl->pop_regs->esi;
+        si->c.p_edi = &m2nfl->pop_regs->edi;
+        si->c.p_ebp = &m2nfl->pop_regs->ebp;
     } else {
         // Normal M2nFrame, eip is past instruction, esp is implicitly address just beyond the frame, callee saves registers in M2nFrame
         si->c.esp   = (uint32)m2nfl + m2n_sizeof_m2n_frame;
@@ -137,15 +149,15 @@ static transfer_control_stub_type gen_transfer_control_stub()
     M_Base_Opnd m2(edx_reg, (int)&((StackIterator*)0)->c.esp);
     ss = mov(ss,  ecx_opnd,  m2);
 
-    M_Base_Opnd m3(ecx_reg, -4);
-    ss = mov(ss,  m3,  ebx_opnd);
-
     ss = alu(ss, sub_opc, ecx_opnd, Imm_Opnd(4));
     ss = mov(ss,  m1,  ecx_opnd);
 
     ss = get_reg(ss, &esi_opnd, esi_reg, edx_reg, (unsigned)&((StackIterator*)0)->c.p_esi);
     ss = get_reg(ss, &edi_opnd, edi_reg, edx_reg, (unsigned)&((StackIterator*)0)->c.p_edi);
     ss = get_reg(ss, &ebp_opnd, ebp_reg, edx_reg, (unsigned)&((StackIterator*)0)->c.p_ebp);
+
+    M_Base_Opnd m3(ecx_reg, 0);
+    ss = mov(ss,  m3,  ebx_opnd);
 
     ss = get_reg(ss, &eax_opnd, eax_reg, edx_reg, (unsigned)&((StackIterator*)0)->c.p_eax);
     ss = get_reg(ss, &ebx_opnd, ebx_reg, edx_reg, (unsigned)&((StackIterator*)0)->c.p_ebx);
@@ -165,7 +177,6 @@ static transfer_control_stub_type gen_transfer_control_stub()
         mov         ebx,dword ptr [edx+0Ch]
         mov         ebx,dword ptr [ebx]
         mov         ecx,dword ptr [edx+4]
-        mov         dword ptr [ecx-4],ebx
         sub         ecx,4
         mov         dword ptr [esp+4],ecx
         mov         esi,dword ptr [edx+14h]
@@ -174,6 +185,7 @@ static transfer_control_stub_type gen_transfer_control_stub()
         mov         edi,dword ptr [edi]
         mov         ebp,dword ptr [edx+8]
         mov         ebp,dword ptr [ebp]
+        mov         dword ptr [ecx],ebx
         mov         eax,dword ptr [edx+1Ch]
         mov         eax,dword ptr [eax]
         mov         ebx,dword ptr [edx+18h]
@@ -265,7 +277,7 @@ bool si_is_past_end(StackIterator* si)
     return si->cci==NULL && si->m2nfl==NULL;
 }
 
-void si_goto_previous(StackIterator* si)
+void si_goto_previous(StackIterator* si, bool over_popped)
 {
     ASSERT_NO_INTERPRETER
     if (si->cci) {
@@ -280,7 +292,7 @@ void si_goto_previous(StackIterator* si)
         TRACE2("si", ("si_goto_previous from ip = %p (M2N)",
             (void*)si_get_ip(si)));
         if (!si->m2nfl) return;
-        si_unwind_from_m2n(si);
+        si_unwind_from_m2n(si, over_popped);
     }
     si->cci = vm_methods->find(si_get_ip(si), true);
     if (si->cci) {
@@ -493,6 +505,12 @@ void si_copy_to_registers(StackIterator* si, Registers* regs)
     regs->esi = *si->c.p_esi;
     regs->ebx = *si->c.p_ebx;
     regs->eax = *si->c.p_eax;
+}
+
+void si_set_callbak(StackIterator* si, NativeCodePtr* callback) {
+    si->c.esp = si->c.esp - 4;
+    *((uint32*) si->c.esp) = *(si->c.p_eip);
+    si->c.p_eip = ((uint32*)callback);
 }
 
 void si_reload_registers()

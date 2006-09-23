@@ -240,7 +240,7 @@ bool si_is_past_end(StackIterator * si) {
     return si->cci == NULL && si->m2n_frame == NULL;
 }
 
-void si_goto_previous(StackIterator * si) {
+void si_goto_previous(StackIterator * si, bool over_popped) {
     ASSERT_NO_INTERPRETER
     if (si_is_native(si)) {
         TRACE2("si", "si_goto_previous from ip = " 

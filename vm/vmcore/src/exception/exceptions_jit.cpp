@@ -28,6 +28,7 @@
 #include "classloader.h"
 #include "exceptions.h"
 #include "exceptions_impl.h"
+#include "exceptions_jit.h"
 #include "environment.h"
 #include "dump.h"
 #include "heap.h"
@@ -424,8 +425,18 @@ void exn_throw_for_JIT(ManagedObject* exn_obj, Class_Handle exn_class,
     }
 
     si_transfer_all_preserved_registers(si);
+
+    DebugUtilsTI* ti = VM_Global_State::loader_env->TI;
+
     exn_propagate_exception(si, &local_exn_obj, exn_class, exn_constr,
         jit_exn_constr_args, vm_exn_constr_args);
+
+    if (ti->get_global_capability(DebugUtilsTI::TI_GC_ENABLE_EXCEPTION_EVENT)) {
+        NativeCodePtr callback = (NativeCodePtr)
+                asm_jvmti_exception_catch_callback;
+        si_set_callbak(si, &callback);
+    }
+
     si_transfer_control(si);
 }   //exn_throw_for_JIT
 
@@ -482,9 +493,6 @@ void jvmti_exception_catch_callback(Registers* regs) {
     }
 
     M2nFrame *m2nf = m2n_push_suspended_frame(regs);
-
-    printf("jvmti_exception_catch_callback\n");
-    st_print();
 
     StackIterator *si = si_create_from_native();
 

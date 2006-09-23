@@ -272,6 +272,9 @@ jvmtiAddCapabilities(jvmtiEnv* env,
     if (capabilities_ptr->can_generate_field_modification_events)
         ti->set_global_capability(DebugUtilsTI::TI_GC_ENABLE_FIELD_MODIFICATION_EVENT);
 
+    if (capabilities_ptr->can_pop_frame)
+        ti->set_global_capability(DebugUtilsTI::TI_GC_ENABLE_POP_FRAME);
+
     return JVMTI_ERROR_NONE;
 }
 
@@ -356,6 +359,9 @@ jvmtiRelinquishCapabilities(jvmtiEnv* env,
 
     if (removed_caps.can_generate_field_modification_events)
         ti->reset_global_capability(DebugUtilsTI::TI_GC_ENABLE_FIELD_MODIFICATION_EVENT);
+
+    if (capabilities_ptr->can_pop_frame)
+        ti->reset_global_capability(DebugUtilsTI::TI_GC_ENABLE_POP_FRAME);
 
     return JVMTI_ERROR_NONE;
 }

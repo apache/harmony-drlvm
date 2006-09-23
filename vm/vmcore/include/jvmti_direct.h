@@ -81,6 +81,8 @@ void jvmti_get_compilation_flags(OpenMethodExecutionParams *flags);
 // Marks topmost frame of the specified thead to be popped
 jvmtiError jvmti_jit_pop_frame(jthread thread);
 // On current thread perform popping of topmost frame
+void jvmti_jit_prepare_pop_frame();
+void jvmti_jit_complete_pop_frame();
 void jvmti_jit_do_pop_frame();
 
 /* Events functions */

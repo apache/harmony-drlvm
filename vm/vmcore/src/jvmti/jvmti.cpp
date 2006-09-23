@@ -744,5 +744,14 @@ void jvmti_get_compilation_flags(OpenMethodExecutionParams *flags)
         ti->get_global_capability(DebugUtilsTI::TI_GC_ENABLE_FRAME_POP_NOTIFICATION))
         flags->exe_notify_method_exit = 1;
 
+    if (ti->get_global_capability(DebugUtilsTI::TI_GC_ENABLE_FIELD_ACCESS_EVENT))
+        flags->exe_notify_field_access = true;
+    if (ti->get_global_capability(DebugUtilsTI::TI_GC_ENABLE_FIELD_MODIFICATION_EVENT))
+        flags->exe_notify_field_modification = true;
+
+    if (ti->get_global_capability(DebugUtilsTI::TI_GC_ENABLE_POP_FRAME)) {
+        flags->exe_restore_context_after_unwind = true;
+        flags->exe_provide_access_to_this = true;
+    }
 }
 

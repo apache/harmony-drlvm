@@ -40,7 +40,7 @@ uint32* m2n_get_args(M2nFrame*);
 // It takes up space below and including the return address to the managed code, and thus is immediately below the arguments.
 
 // This is the size of the structure that goes on the stack.
-const unsigned m2n_sizeof_m2n_frame = 40;
+const unsigned m2n_sizeof_m2n_frame = 44;
 
 // Generate code to put the thread local storage pointer into a given register
 unsigned m2n_ts_to_register_size();
@@ -95,12 +95,13 @@ struct M2nFrame {
     ObjectHandles*       local_object_handles;
     Method_Handle        method;
     frame_type           current_frame_type; // type of the current frame also shows is the frame unwindable
+    Registers*           pop_regs; // This is only for M2nFrames for suspended managed code (as against ones that call stubs and prepare jvmtiPopFrame)
     uint32               edi;
     uint32               esi;
     uint32               ebx;
     uint32               ebp;
     uint32               eip;
-    Registers*           regs; // This is only for M2nFrames for suspended managed code (as against ones that call stubs)
+    Registers*           regs; // This is only for M2nFrames for suspended managed code (as against ones that call stubs and prepare jvmtiPopFrame)
 };
 
 #endif //!_M2N_IA32_INTERNAL_H_

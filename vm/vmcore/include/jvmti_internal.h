@@ -461,13 +461,14 @@ class DebugUtilsTI {
         void ReleaseNotifyLists();
 
         enum GlobalCapabilities {
-            TI_GC_ENABLE_METHOD_ENTRY           = 0x01,
-            TI_GC_ENABLE_METHOD_EXIT            = 0x02,
-            TI_GC_ENABLE_FRAME_POP_NOTIFICATION = 0x04,
-            TI_GC_ENABLE_SINGLE_STEP            = 0x08,
+            TI_GC_ENABLE_METHOD_ENTRY             = 0x01,
+            TI_GC_ENABLE_METHOD_EXIT              = 0x02,
+            TI_GC_ENABLE_FRAME_POP_NOTIFICATION   = 0x04,
+            TI_GC_ENABLE_SINGLE_STEP              = 0x08,
             TI_GC_ENABLE_EXCEPTION_EVENT          = 0x10,
             TI_GC_ENABLE_FIELD_ACCESS_EVENT       = 0x20,
-            TI_GC_ENABLE_FIELD_MODIFICATION_EVENT = 0x40
+            TI_GC_ENABLE_FIELD_MODIFICATION_EVENT = 0x40,
+            TI_GC_ENABLE_POP_FRAME                = 0x80
         };
 
         void set_global_capability(GlobalCapabilities ti_gc)

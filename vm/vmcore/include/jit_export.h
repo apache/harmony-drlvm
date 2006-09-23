@@ -162,6 +162,19 @@ typedef struct OpenMethodExecutionParams {
     /** call corresponding VM helper upon setting a value of any field of reference type */
     Boolean  exe_insert_write_barriers : 1;
 
+   /**
+    * Provide possibility to obtain reference to the current 'this' object by
+    * means of get_address_of_this method. Used for JVMTI debug support.
+    */
+    Boolean  exe_provide_access_to_this : 1;
+
+   /**
+    * Provide restoring of arguments in the stack after the call
+    * of the unwind_frame method so that method could be called again
+    * with the same arguments. Used for JVMTI debug support.
+    */
+    Boolean  exe_restore_context_after_unwind : 1;
+
 } OpenMethodExecutionParams;
 
 

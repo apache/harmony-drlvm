@@ -109,7 +109,7 @@ extern "C" {
     }
 }
 
-static void __attribute__ ((cdecl)) asm_jvmti_exception_catch_callback() {
+void __attribute__ ((cdecl)) asm_jvmti_exception_catch_callback() {
     //naked_jvmti_exception_catch_callback:
     asm (
         "addl $-36, %%esp;\n"
@@ -154,7 +154,6 @@ static void throw_from_sigcontext(ucontext_t *uc, Class* exc_clss)
         regs.esp = regs.esp - 4;
         *((uint32*) regs.esp) = regs.eip;
         regs.eip = ((uint32)asm_jvmti_exception_catch_callback);
-        //regs.eip = ((uint32)naked_jvmti_exception_catch_callback);
     }
 
     linux_regs_to_ucontext(uc, &regs);

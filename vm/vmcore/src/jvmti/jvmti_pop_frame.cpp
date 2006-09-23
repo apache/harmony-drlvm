@@ -41,8 +41,12 @@ static void jvmti_pop_frame_callback()
     if (FRAME_POP_NOW != (FRAME_POP_NOW & type))
         return;
 
-    // if we are in hythread_safe_point() or frame is unwindable
-    if (FRAME_SAFE_POINT == (FRAME_SAFE_POINT & type) || is_unwindable()) {
+    // if we are in hythread_safe_point() frame is unwindable
+    if (FRAME_SAFE_POINT == (FRAME_SAFE_POINT & type)) {
+        jvmti_jit_prepare_pop_frame();
+
+    // if we in unwindable frame
+    } else if (is_unwindable()) {
         // wait for resume
         TRACE(("entering safe_point"));
         hythread_safe_point();
@@ -51,6 +55,8 @@ static void jvmti_pop_frame_callback()
         // switch execution to the previous frame
         jvmti_jit_do_pop_frame();
         assert(0 /* mustn't get here */);
+
+    // if we in nonunwindable frame
     } else {
         // raise special exception object
         exn_raise_object(VM_Global_State::loader_env->popFrameException);
@@ -60,6 +66,12 @@ static void jvmti_pop_frame_callback()
 jvmtiError jvmti_jit_pop_frame(jthread java_thread)
 {
     assert(hythread_is_suspend_enabled());
+
+    DebugUtilsTI *ti = VM_Global_State::loader_env->TI;
+
+    if (!ti->get_global_capability(DebugUtilsTI::TI_GC_ENABLE_POP_FRAME)) {
+        return JVMTI_ERROR_MUST_POSSESS_CAPABILITY;
+    }
 
     hythread_t hy_thread = jthread_get_native_thread(java_thread);
     VM_thread* vm_thread = get_vm_thread(hy_thread);
@@ -89,7 +101,10 @@ jvmtiError jvmti_jit_pop_frame(jthread java_thread)
 
     si_free(si);
 
-    type = (frame_type) (type | FRAME_POP_NOW);
+    // change type from popable to pop_now, pop_done should'n be changed
+    if (FRAME_POPABLE == (type & FRAME_POP_MASK)) {
+        type = (frame_type)((type & ~FRAME_POP_MASK) | FRAME_POP_NOW);
+    }
     m2n_set_frame_type(top_frame, type);
 
     // Install safepoint callback that would perform popping job
@@ -98,14 +113,39 @@ jvmtiError jvmti_jit_pop_frame(jthread java_thread)
     return JVMTI_ERROR_NONE;
 } //jvmti_jit_pop_frame
 
-void jvmti_jit_do_pop_frame()
-{
-    // Destructive Unwinding!!! NO CXZ Logging put here.
 
-    // create stack iterator from native
-    StackIterator* si = si_create_from_native();
-    si_transfer_all_preserved_registers(si);
+#ifdef _IPF_
 
+void jvmti_jit_prepare_pop_frame(){
+    assert(0);
+}
+
+void jvmti_jit_complete_pop_frame(){
+    assert(0);
+}
+
+void jvmti_jit_do_pop_frame(){
+    assert(0);
+}
+
+#elif defined _EM64T_
+
+void jvmti_jit_prepare_pop_frame(){
+    assert(0);
+}
+
+void jvmti_jit_complete_pop_frame(){
+    assert(0);
+}
+
+void jvmti_jit_do_pop_frame(){
+    assert(0);
+}
+
+#else // _IA32_
+
+// requires stack iterator and buffer to save intermediate information
+static void jvmti_jit_prepare_pop_frame(StackIterator* si, uint32* buf) {
     // pop native frame
     assert(si_is_native(si));
     si_goto_previous(si);
@@ -162,25 +202,27 @@ void jvmti_jit_do_pop_frame()
     } else if (0xd0ff == (*((unsigned short*)(((char*)ip)-2)))) {
         ip_reduce = 2;
         current_method_addr = cci->get_code_block_addr();
-        jitContext->p_eax = (uint32*)&current_method_addr;
+        *buf = (uint32)current_method_addr;
+        jitContext->p_eax = buf;
 
     // invoke virtual and special
     } else {
         VTable_Handle vtable = class_get_vtable( method_class);
+        *buf = (uint32) vtable;
         unsigned short code = (*((unsigned short*)(((char*)ip)-3)));
 
         // invoke virtual
         if (0x50ff == code) {
-            jitContext->p_eax = (uint32*) &vtable;
+            jitContext->p_eax = buf;
             ip_reduce = 3;
         } else if (0x51ff == code) {
-            jitContext->p_ecx = (uint32*) &vtable;
+            jitContext->p_ecx = buf;
             ip_reduce = 3;
         } else if (0x52ff == code) {
-            jitContext->p_edx = (uint32*) &vtable;
+            jitContext->p_edx = buf;
             ip_reduce = 3;
         } else if (0x53ff == code) {
-            jitContext->p_ebx = (uint32*) &vtable;
+            jitContext->p_ebx = buf;
             ip_reduce = 3;
 
         // invoke special
@@ -192,19 +234,123 @@ void jvmti_jit_do_pop_frame()
     // set corrrrect ip
     ip = (NativeCodePtr)(((char*)ip) - ip_reduce);
     si_set_ip(si, ip, false);
+}
+
+void jvmti_jit_prepare_pop_frame() {
+    // Find top m2n frame
+    M2nFrame* top_frame = m2n_get_last_frame();
+    frame_type type = m2n_get_frame_type(top_frame);
+
+    // Check that frame has correct type
+    assert((FRAME_POP_NOW == (FRAME_POP_MASK & type))
+            ||(FRAME_POP_DONE == (FRAME_POP_MASK & type)));
+
+    // create stack iterator from native
+    StackIterator* si = si_create_from_native();
+    si_transfer_all_preserved_registers(si);
+
+    // preare pop frame - find regs values
+    uint32 buf = 0;
+    jvmti_jit_prepare_pop_frame(si, &buf);
+
+    // save regs value from jit context to m2n
+    JitFrameContext* jitContext = si_get_jit_context(si);
+    Registers* regs = get_pop_frame_registers(top_frame);
+
+    regs->esp = jitContext->esp;
+    regs->eip = *(jitContext->p_eip);
+    regs->esi = *(jitContext->p_esi);
+    regs->edi = *(jitContext->p_edi);
+    regs->ebp = *(jitContext->p_ebp);
+
+    if (0 == jitContext->p_eax) {
+        regs->eax = 0;
+    } else {
+        regs->eax = *(jitContext->p_eax);
+    }
+
+    if (0 == jitContext->p_ebx) {
+        regs->ebx = 0;
+    } else {
+        regs->ebx = *(jitContext->p_ebx);
+    }
+
+    if (0 == jitContext->p_ecx) {
+        regs->ecx = 0;
+    } else {
+        regs->ecx = *(jitContext->p_ecx);
+    }
+
+    if (0 == jitContext->p_edx) {
+        regs->edx = 0;
+    } else {
+        regs->edx = *(jitContext->p_edx);
+    }
+
+    // set pop done frame state
+    m2n_set_frame_type(top_frame, FRAME_POP_DONE);
+}
+
+void jvmti_jit_complete_pop_frame() {
+    // Destructive Unwinding!!! NO CXX Logging put here.
+
+    // Find top m2n frame
+    M2nFrame* top_frame = m2n_get_last_frame();
+    frame_type type = m2n_get_frame_type(top_frame);
+
+    // Check that frame has correct type
+    assert(FRAME_POP_DONE == (FRAME_POP_MASK & type));
+
+    // create stack iterator from native
+    StackIterator* si = si_create_from_native();
+    si_transfer_all_preserved_registers(si);
+
+    // pop native frame
+    assert(si_is_native(si));
+    si_goto_previous(si);
 
     // transfer cdontrol
     si_transfer_control(si);
-} // jvmti_jit_do_pop_frame
+}
+
+void jvmti_jit_do_pop_frame() {
+    // Destructive Unwinding!!! NO CXX Logging put here.
+
+    // Find top m2n frame
+    M2nFrame* top_frame = m2n_get_last_frame();
+    frame_type type = m2n_get_frame_type(top_frame);
+
+    // Check that frame has correct type
+    assert(FRAME_POP_NOW == (FRAME_POP_MASK & type));
+
+    // create stack iterator from native
+    StackIterator* si = si_create_from_native();
+    si_transfer_all_preserved_registers(si);
+
+    // preare pop frame - find regs values
+    uint32 buf = 0;
+    jvmti_jit_prepare_pop_frame(si, &buf);
+
+    // transfer cdontrol
+    si_transfer_control(si);
+}
+#endif // _IA32_
 
 void jvmti_safe_point()
 {
-//    TRACE(("entering safe_point"));
+    Registers regs;
+    M2nFrame* top_frame = m2n_get_last_frame();
+    set_pop_frame_registers(top_frame, &regs);
+
+    TRACE(("entering safe_point"));
     hythread_safe_point();
+    TRACE(("left safe_point"));
 
-    //TRACE(("left safe_point"));
-    //frame_type type = m2n_get_frame_type(m2n_get_last_frame());
+    // find frame type
+    frame_type type = m2n_get_frame_type(top_frame);
 
-    //if (FRAME_POP_NOW == (FRAME_POP_NOW & type))
-    //    jvmti_jit_do_pop_frame();
+    // complete pop frame if frame has correct type
+    if (FRAME_POP_DONE == (FRAME_POP_MASK & type)){
+        jvmti_jit_complete_pop_frame();
+    }
 }

@@ -316,10 +316,12 @@ void exn_raise_by_name(const char* exc_name, const char* exc_message,
 
 static void check_pop_frame(ManagedObject *exn) {
     if (exn == VM_Global_State::loader_env->popFrameException->object) {
+        exn_clear();
         frame_type type = m2n_get_frame_type(m2n_get_last_frame());
 
-        if (FRAME_POP_NOW == (FRAME_POP_NOW & type))
+        if (FRAME_POP_NOW == (FRAME_POP_MASK & type)) {
             jvmti_jit_do_pop_frame();
+        }
     }
 }
 

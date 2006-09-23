@@ -691,14 +691,6 @@ JIT_Result compile_do_compilation_jit(Method* method, JIT* jit)
     jvmti_get_compilation_flags(&flags);
     flags.exe_insert_write_barriers = gc_requires_barriers();
 
-    DebugUtilsTI *ti = VM_Global_State::loader_env->TI;
-    if ( ti->isEnabled() ) {
-        if (ti->get_global_capability(DebugUtilsTI::TI_GC_ENABLE_FIELD_ACCESS_EVENT))
-            flags.exe_notify_field_access = true;
-        if (ti->get_global_capability(DebugUtilsTI::TI_GC_ENABLE_FIELD_MODIFICATION_EVENT))
-            flags.exe_notify_field_modification = true;
-    }
-
     Compilation_Handle ch;
     ch.env = VM_Global_State::loader_env;
     ch.jit = jit;
@@ -731,6 +723,9 @@ JIT_Result compile_do_compilation_jit(Method* method, JIT* jit)
     if (!parallel_jit) {
         p_jit_a_method_lock->_unlock();
     }
+
+    // Find TI environment
+    DebugUtilsTI *ti = VM_Global_State::loader_env->TI;
 
     // Call TI callbacks
     if (ti->isEnabled() && ti->getPhase() == JVMTI_PHASE_LIVE) {

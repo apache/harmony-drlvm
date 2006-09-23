@@ -41,14 +41,19 @@
 struct M2nFrame;
 
 enum frame_type {
-    FRAME_UNKNOWN = 0x0,
-    FRAME_NON_UNWINDABLE = 0x1000,
-    FRAME_JNI = 0x1 | FRAME_NON_UNWINDABLE,
-    FRAME_COMPILATION = 0x2 | FRAME_NON_UNWINDABLE,
+    FRAME_UNKNOWN = 0x00,
+    FRAME_NON_UNWINDABLE = 0x80,
+    FRAME_JNI = 0x01 | FRAME_NON_UNWINDABLE,
+    FRAME_COMPILATION = 0x02 | FRAME_NON_UNWINDABLE,
+
     FRAME_UNPOPABLE = 0x0000,
     FRAME_POPABLE = 0x0100,
     FRAME_POP_NOW = 0x0200,
-    FRAME_SAFE_POINT = 0x0400
+    FRAME_POP_DONE = FRAME_POPABLE | FRAME_POP_NOW,
+
+    FRAME_POP_MASK = 0x0700,
+
+    FRAME_SAFE_POINT = 0x0800
 };
 
 // The pushing and popping of native frames is done only by stubs that
@@ -135,5 +140,11 @@ M2nFrame* m2n_push_suspended_frame(VM_thread *, Registers *);
 
 // answers true if passed in m2n frame represents suspended frame
 bool m2n_is_suspended_frame(M2nFrame *);
+
+// returns pointer to the registers used for jvmti PopFrame
+Registers* get_pop_frame_registers(M2nFrame* );
+
+// sets pointer to the registers used for jvmti PopFrame
+void set_pop_frame_registers(M2nFrame* , Registers*);
 
 #endif //!_M2N_H_

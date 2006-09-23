@@ -227,7 +227,7 @@ static void __cdecl jvmti_exception_catch_callback_wrapper(Registers regs){
     jvmti_exception_catch_callback(&regs);
 }
 
-static void __declspec(naked) __stdcall naked_exception_catch_callback() {
+static void __declspec(naked) asm_exception_catch_callback() {
     __asm {
         push ebp
         mov ebp, esp
@@ -245,7 +245,7 @@ static void __declspec(naked) __stdcall naked_exception_catch_callback() {
     }
 }
 
-static void __declspec(naked) __stdcall naked_jvmti_exception_catch_callback() {
+void __declspec(naked) asm_jvmti_exception_catch_callback() {
     __asm {
         push ebp
         mov ebp, esp
@@ -443,11 +443,11 @@ LONG NTAPI vectored_exception_handler(LPEXCEPTION_POINTERS nt_exception)
     if (ti->get_global_capability(DebugUtilsTI::TI_GC_ENABLE_EXCEPTION_EVENT)) {
         regs.esp = regs.esp - 4;
         *((uint32*) regs.esp) = regs.eip;
-        regs.eip = ((uint32)naked_jvmti_exception_catch_callback);
+        regs.eip = ((uint32)asm_jvmti_exception_catch_callback);
     } else if (p_TLS_vmthread->restore_guard_page) {
         regs.esp = regs.esp - 4;
         *((uint32*) regs.esp) = regs.eip;
-        regs.eip = ((uint32)naked_exception_catch_callback);
+        regs.eip = ((uint32)asm_exception_catch_callback);
     }
 
     vm_to_nt_context(&regs, context);

@@ -138,8 +138,9 @@ bool si_is_past_end(StackIterator* si );
  *
  * @param[in] si -  the pointer to the stack iterator that will be iterated to the previous
  *                  frame
+ * @param[in] over_popped - take into account the intermediate result of pop frame operation.
  */
-void si_goto_previous(StackIterator* si);
+void si_goto_previous(StackIterator* si, bool over_popped = true);
 
 /**
  * Gets the instruction pointer for the current frame.
@@ -285,5 +286,15 @@ Method_Handle si_get_method(StackIterator* si);
  * @return The number of inlined methods.
  */
 uint32 si_get_inline_depth(StackIterator* si);
+
+/**
+ * Gets the method handle for the frame iterated by the stack iterator.
+ *
+ * @param[in] si - the pointer to the stack iterator indicating the frame,
+ *                 from which control will be transfered
+ * @param[in] callback - pointer to the native cose adress which should be
+ *                       called, after transfer control
+ */
+void si_set_callbak(StackIterator* si, NativeCodePtr* callback);
 
 #endif //!_STACK_ITERATOR_H_

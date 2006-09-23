@@ -28,6 +28,7 @@
 #include "encoder.h"
 #include "interpreter.h" // for asserts only
 
+
 //////////////////////////////////////////////////////////////////////////
 // M2nFrame Interface
 
@@ -184,7 +185,7 @@ char* m2n_gen_ts_to_register(char* buf, R_Opnd* reg)
 
 unsigned m2n_push_m2n_size(bool UNREF handles, unsigned num_callee_saves)
 {
-    return 20+(4-num_callee_saves)+m2n_ts_to_register_size()+11;
+    return 20+(4-num_callee_saves)+m2n_ts_to_register_size()+11+8;
 }
 
 char* m2n_gen_push_m2n(char* buf, Method_Handle method, frame_type current_frame_type, bool UNREF handles, unsigned num_callee_saves)
@@ -199,6 +200,7 @@ char* m2n_gen_push_m2n(char* buf, Method_Handle method, frame_type current_frame
     
     buf = m2n_gen_ts_to_register(buf, &eax_opnd);
     
+    buf = push(buf, Imm_Opnd(size_32, 0));
     //MVM APN 20050513 work with frame_type set up current_frame_type to NULL
     //int frame_type_offset = (int)&((VM_thread*)0)->current_frame_type;
     buf = push(buf, Imm_Opnd(current_frame_type));
@@ -239,7 +241,7 @@ unsigned m2n_pop_m2n_size(bool handles, unsigned num_callee_saves, unsigned extr
     if (handles) size += (extra_on_stack+8<128 ? 12 : 15)+preserve_ret*2;
     else size += 11;
     if (extra_on_stack) size += (extra_on_stack<128 ? 3 : 6);
-    return size;
+    return size + 128;
 }
 
 void m2n_pop_local_handles() {
@@ -288,8 +290,8 @@ char* m2n_gen_pop_m2n(char* buf, bool handles, unsigned num_callee_saves, unsign
     buf = pop(buf,  esi_opnd);
     buf = pop(buf,  ebx_opnd);
     buf = mov(buf,  M_Base_Opnd(ebx_reg, +0),  esi_opnd);
-    buf = alu(buf, add_opc,  esp_opnd,  Imm_Opnd(+12));
-    
+    buf = alu(buf, add_opc,  esp_opnd,  Imm_Opnd(+16));
+
     if (num_callee_saves<4) buf = pop(buf,  edi_opnd);
     if (num_callee_saves<3) buf = pop(buf,  esi_opnd);
     if (num_callee_saves<2) buf = pop(buf,  ebx_opnd);
@@ -297,3 +299,14 @@ char* m2n_gen_pop_m2n(char* buf, bool handles, unsigned num_callee_saves, unsign
 
     return buf;
 }
+
+// returns pointer to the registers used for jvmti PopFrame
+Registers* get_pop_frame_registers(M2nFrame* m2nf) {
+    return m2nf->pop_regs;
+}
+
+// sets pointer to the registers used for jvmti PopFrame
+void set_pop_frame_registers(M2nFrame* m2nf, Registers* regs) {
+    m2nf->pop_regs = regs;
+}
+
