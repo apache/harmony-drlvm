@@ -103,6 +103,9 @@ void linux_regs_to_ucontext(ucontext_t *uc, Registers* regs)
     uc->uc_mcontext.gregs[REG_RSP] = regs->rsp;
 }
 
+void asm_jvmti_exception_catch_callback() {
+    assert(0);
+}
 static void throw_from_sigcontext(ucontext_t *uc, Class* exc_clss)
 {
     Registers regs;

@@ -363,3 +363,15 @@ char * m2n_gen_pop_m2n(char * buf, bool handles, unsigned num_callee_saves,
     }
     return buf;
 }
+
+// returns pointer to the registers used for jvmti PopFrame
+Registers* get_pop_frame_registers(M2nFrame* m2nf) {
+    // Empty implementation
+    return NULL;
+}
+
+// sets pointer to the registers used for jvmti PopFrame
+void set_pop_frame_registers(M2nFrame* m2nf, Registers* regs) {
+    // Empty implementation
+}
+

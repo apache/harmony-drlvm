@@ -22,6 +22,8 @@
 
 #include <assert.h>
 
+#include "environment.h"
+
 #include "open/hythread_ext.h"
 #include "lil.h"
 #include "lil_code_generator.h"

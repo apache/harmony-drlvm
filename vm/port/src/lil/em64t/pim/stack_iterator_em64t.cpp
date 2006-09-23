@@ -367,6 +367,12 @@ void si_copy_to_registers(StackIterator * si, Registers * regs) {
     regs->r11 = *si->jit_frame_context.p_r11;
 }
 
+void si_set_callbak(StackIterator* si, NativeCodePtr* callback) {
+    si->jit_frame_context.rsp = si->jit_frame_context.rsp - 4;
+    *((uint64*) si->jit_frame_context.rsp) = *(si->jit_frame_context.p_rip);
+    si->jit_frame_context.p_rip = ((uint64*)callback);
+}
+
 void si_reload_registers() {
     // Nothing to do
 }

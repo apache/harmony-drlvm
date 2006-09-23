@@ -66,6 +66,27 @@ static void convertOperand2Opnd(
     }
 }
 
+#ifdef _IPF_
+static const char* get_reg_value(
+    InstructionDisassembler::Register reg,
+    const Registers* pcontext)
+{
+    assert(0);
+    return NULL;
+}
+
+#elif defined _EM64T_
+
+static const char* get_reg_value(
+    InstructionDisassembler::Register reg,
+    const Registers* pcontext)
+{
+    assert(0);
+    return NULL;
+}
+
+#else // _IA32_
+
 static const char* get_reg_value(
     InstructionDisassembler::Register reg,
     const Registers* pcontext)
@@ -85,6 +106,7 @@ static const char* get_reg_value(
     return NULL;
 }
 
+#endif // _IA32_
 
 void InstructionDisassembler::disasm(const NativeCodePtr addr, 
                                      InstructionDisassembler * pidi)
