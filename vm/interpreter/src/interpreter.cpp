@@ -1603,7 +1603,9 @@ Opcode_PUTSTATIC(StackFrame& frame) {
     if (interpreter_ti_notification_mode
             & INTERPRETER_TI_FIELD_MODIFICATION) {
         Method *method = frame.method;
+        M2N_ALLOC_MACRO;
         putstatic_callback(field, frame);
+        M2N_FREE_MACRO;
     }
 
 
@@ -1698,7 +1700,9 @@ Opcode_GETSTATIC(StackFrame& frame) {
     if (interpreter_ti_notification_mode
             & INTERPRETER_TI_FIELD_ACCESS) {
         Method *method = frame.method;
+        M2N_ALLOC_MACRO;
         getstatic_callback(field, frame);
+        M2N_FREE_MACRO;
     }
 
     void *addr = field->get_address();
@@ -1770,7 +1774,9 @@ Opcode_PUTFIELD(StackFrame& frame) {
     if (interpreter_ti_notification_mode
             & INTERPRETER_TI_FIELD_MODIFICATION) {
         Method *method = frame.method;
+        M2N_ALLOC_MACRO;
         putfield_callback(field, frame);
+        M2N_FREE_MACRO;
     }
 
     if (field->is_final()) {
@@ -1939,7 +1945,9 @@ Opcode_GETFIELD(StackFrame& frame) {
     if (interpreter_ti_notification_mode
             & INTERPRETER_TI_FIELD_ACCESS) {
         Method *method = frame.method;
+        M2N_ALLOC_MACRO;
         getfield_callback(field, frame);
+        M2N_FREE_MACRO;
     }
 
     CREF cref = frame.stack.pick(0).cr;
@@ -2560,7 +2568,9 @@ restart:
             if (frame.jvmti_pop_frame == POP_FRAME_NOW) {
                 MonitorList *ml = frame.locked_monitors;
                 while(ml) {
+                    M2N_ALLOC_MACRO;
                     vm_monitor_exit_wrapper(ml->monitor);
+                    M2N_FREE_MACRO;
                     ml = ml->next;
                 }
                 M2N_FREE_MACRO;
@@ -2569,8 +2579,9 @@ restart:
             if (!breakpoint_processed &&
                     interpreter_ti_notification_mode
                     & INTERPRETER_TI_SINGLE_STEP_EVENT) {
-                breakpoint_processed = false;
+                M2N_ALLOC_MACRO;
                 single_step_callback(frame);
+                M2N_FREE_MACRO;
             }
             if (frame.jvmti_pop_frame == POP_FRAME_NOW) {
                 MonitorList *ml = frame.locked_monitors;
@@ -2581,6 +2592,8 @@ restart:
                 M2N_FREE_MACRO;
                 return;
             }
+            breakpoint_processed = false;
+
             //assert(!exn_raised());
             if (get_thread_ptr()->p_exception_object_ti || exn_raised()) {
                 frame.exc = get_current_thread_exception();
@@ -2989,7 +3002,9 @@ got_exception:
                 Method *catch_method;
                 jlocation catch_location;
                 findCatchMethod(&frame.exc, &catch_method, &catch_location);
+                M2N_ALLOC_MACRO;
                 jvmti_interpreter_exception_event_callback_call(frame.exc, method, loc, catch_method, catch_location);
+                M2N_FREE_MACRO;
                 assert(!exn_raised());
                 p_TLS_vmthread->p_exception_object_ti = (volatile ManagedObject*) frame.exc;
             }
@@ -3007,7 +3022,9 @@ got_exception:
         set_current_thread_exception(frame.exc);
         
         if (frame.locked_monitors) {
+            M2N_ALLOC_MACRO;
             vm_monitor_exit_wrapper(frame.locked_monitors->monitor);
+            M2N_FREE_MACRO;
             assert(!frame.locked_monitors->next);
         }
 

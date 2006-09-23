@@ -31,6 +31,14 @@
 #include <string>
 #include <excpt.h>
 
+#if INSTRUMENTATION_BYTE == INSTRUMENTATION_BYTE_INT3
+#define JVMTI_EXCEPTION_STATUS STATUS_BREAKPOINT
+#elif INSTRUMENTATION_BYTE == INSTRUMENTATION_BYTE_HLT || INSTRUMENTATION_BYTE == INSTRUMENTATION_BYTE_CLI
+#define JVMTI_EXCEPTION_STATUS STATUS_PRIVILEGED_INSTRUCTION
+#else
+#error Unknown value of INSTRUMENTATION_BYTE
+#endif
+
 void nt_to_vm_context(PCONTEXT context, Registers* regs)
 {
     regs->eax = context->Eax;
@@ -297,7 +305,7 @@ LONG NTAPI vectored_exception_handler(LPEXCEPTION_POINTERS nt_exception)
                 code == STATUS_INTEGER_DIVIDE_BY_ZERO ||
                 code == STATUS_STACK_OVERFLOW) &&
                 vm_identify_eip((void *)context->Eip) == VM_TYPE_JAVA) ||
-            code == STATUS_BREAKPOINT)
+            code == JVMTI_EXCEPTION_STATUS)
         {
             run_default_handler = false;
         } else if (code == STATUS_STACK_OVERFLOW) {
@@ -375,7 +383,7 @@ LONG NTAPI vectored_exception_handler(LPEXCEPTION_POINTERS nt_exception)
     // assertions for breakpoints which it has set in Java inside of
     // breakpoint handling function. Otherwise this assert should not
     // fail in case _CrtDbgBreak() was added somewhere in VM.
-    assert(!hythread_is_suspend_enabled() || code == STATUS_BREAKPOINT);
+    assert(!hythread_is_suspend_enabled() || code == JVMTI_EXCEPTION_STATUS);
     
     Global_Env *env = VM_Global_State::loader_env;
     Class *exc_clss = 0;
@@ -412,7 +420,7 @@ LONG NTAPI vectored_exception_handler(LPEXCEPTION_POINTERS nt_exception)
             exc_clss = env->java_lang_ArithmeticException_Class;
         }
         break;
-    case STATUS_BREAKPOINT:
+    case JVMTI_EXCEPTION_STATUS:
         // JVMTI breakpoint in JITted code
         {
             Registers regs;

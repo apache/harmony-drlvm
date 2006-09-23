@@ -803,8 +803,18 @@ jvmti_process_single_step_event(jmethodID method, jlocation location) {
         JNIEnv *jni_env = (JNIEnv *)jni_native_intf;
         jvmtiEnv *jvmti_env = (jvmtiEnv*) ti_env;
 
+        TRACE2("jvmti.break.ss", "Calling SingleStep callback for env " << jvmti_env << ": " <<
+            class_get_name(method_get_class((Method*)method)) << "." <<
+            method_get_name((Method*)method) <<
+            method_get_descriptor((Method*)method) << " :" << location);
+
         if (NULL != ti_env->event_table.SingleStep)
             ti_env->event_table.SingleStep(jvmti_env, jni_env, thread, method, location);
+
+        TRACE2("jvmti.break.ss", "Finished SingleStep callback for env " << jvmti_env << ": " <<
+            class_get_name(method_get_class((Method*)method)) << "." <<
+            method_get_name((Method*)method) <<
+            method_get_descriptor((Method*)method) << " :" << location);
         ti_env = next_env;
     }
 }
@@ -1664,6 +1674,14 @@ void jvmti_send_vm_death_event()
 
         ti_env = next_env;
     }
+    
+    if (ti->is_single_step_enabled())
+    {
+        // Stop single step and remove all breakpoints if there were some
+        jvmtiError errorCode = ti->jvmti_single_step_stop();
+        assert(JVMTI_ERROR_NONE == errorCode);
+    }
+    
     ti->nextPhase(JVMTI_PHASE_DEAD);
 }
 

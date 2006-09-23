@@ -354,7 +354,10 @@ uint8
 Opcode_BREAKPOINT(StackFrame& frame) {
     Method *m = frame.method;
     jlocation l = frame.ip - (uint8*)m->get_byte_code_addr();
-    return (uint8) (POINTER_SIZE_INT) jvmti_process_interpreter_breakpoint_event((jmethodID)m, l);
+    M2N_ALLOC_MACRO;
+    uint8 b = (uint8) (POINTER_SIZE_INT) jvmti_process_interpreter_breakpoint_event((jmethodID)m, l);
+    M2N_FREE_MACRO;
+    return b;
 }
 
 jbyte interpreter_ti_set_breakpoint(jmethodID method, jlocation location) {

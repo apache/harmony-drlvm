@@ -87,6 +87,7 @@ struct jvmti_StepLocation
     struct Method* method;
     unsigned location;
     NativeCodePtr native_location;
+    bool no_event;
 };
 
 struct JVMTISingleStepState
@@ -347,7 +348,7 @@ jint load_agentpath(Agent *agent, const char *str, JavaVM_Internal *vm);
 
 // Breakpoints internal functions
 jvmtiError jvmti_get_next_bytecodes_from_native(VM_thread *thread,
-    jvmti_StepLocation **next_step, unsigned *count, bool stack_step_up);
+    jvmti_StepLocation **next_step, unsigned *count, bool invoked_frame);
 void jvmti_set_single_step_breakpoints(DebugUtilsTI *ti,
     VM_thread *vm_thread, jvmti_StepLocation *locations,
     unsigned locations_number);

@@ -336,9 +336,11 @@ static void exn_propagate_exception(
             set_unwindable(unwindable);
         }
 
+        BEGIN_RAISE_AREA;
         jvalue ret_val = {(jlong)0};
         jvmti_process_method_exit_event(reinterpret_cast<jmethodID>(method),
             JNI_TRUE, ret_val);
+        END_RAISE_AREA;
 
         // Goto previous frame
         si_goto_previous(si);

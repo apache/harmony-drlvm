@@ -48,12 +48,11 @@ jvmti_GetWordValue( const unsigned char *bytecode,
     return result;
 } // jvmti_GetWordValue
 
-static Method *
-jvmti_get_invoked_virtual_method( VM_thread* thread )
+NativeCodePtr static get_ip_for_invoke_call_ip(VM_thread* thread,
+    unsigned location, unsigned next_location)
 {
     ASSERT_NO_INTERPRETER;
 
-#if _IA32_
     // create stack iterator from native
     StackIterator* si = si_create_from_native( thread );
     si_transfer_all_preserved_registers(si);
@@ -63,38 +62,64 @@ jvmti_get_invoked_virtual_method( VM_thread* thread )
     assert(!si_is_native(si));
     // find correct ip in java frame
     NativeCodePtr ip = si_get_ip(si);
-    // get virtual table
-    VTable* vtable;
-    JitFrameContext* jitContext = si_get_jit_context(si);
-    unsigned short code = (*((unsigned short*)((char*)ip)));
-    switch( code )
+
+    Method *method = si_get_method(si);
+    assert(method);
+
+    CodeChunkInfo *cci = si_get_code_chunk_info(si);
+    JIT *jit = cci->get_jit();
+
+    NativeCodePtr next_ip;
+    OpenExeJpdaError UNREF result = jit->get_native_location_for_bc(method,
+        (uint16)next_location, &next_ip);
+    assert(result == EXE_ERROR_NONE);
+    assert(ip < next_ip);
+
+    VMBreakPoints *vm_brpt = VM_Global_State::loader_env->TI->vm_brpt;
+    VMBreakPoint *bp = vm_brpt->find_breakpoint(ip);
+
+    InstructionDisassembler disasm;
+    if (bp)
+        disasm = *bp->disasm;
+    else
+        disasm = ip;
+
+    // Iterate over this bytecode instructions untill we reach an
+    // indirect call in this bytecode which should be the
+    // invikevirtual or invokeinterface call
+    NativeCodePtr call_ip = NULL;
+    do
     {
-    case 0x50ff:
-        vtable = (VTable*)*(jitContext->p_eax);
-        break;
-    case 0x51ff:
-        vtable = (VTable*)*(jitContext->p_ecx);
-        break;
-    case 0x52ff:
-        vtable = (VTable*)*(jitContext->p_edx);
-        break;
-    case 0x53ff:
-        vtable = (VTable*)*(jitContext->p_ebx);
-        break;
-    default:
-        vtable = NULL;
+        ip = (NativeCodePtr)((POINTER_SIZE_INT)ip + disasm.get_length_with_prefix());
+
+        // Another thread could have instrumented this location for
+        // prediction of invokevirtual or invokeinterface, so it is
+        // necessary to check that location may be instrumented
+        uint8 b = *((uint8 *)ip);
+        if (b == INSTRUMENTATION_BYTE)
+        {
+            bp = vm_brpt->find_breakpoint(ip);
+            assert(bp);
+            disasm = *bp->disasm;
+        }
+        else
+            disasm = ip;
+
+        if (disasm.get_type() == InstructionDisassembler::INDIRECT_CALL)
+            call_ip = ip;
     }
-    assert(vtable);
-    si_free(si);
+    while (ip < next_ip);
 
-    // get method from virtual table
-    Method *method = class_get_method_from_vt_offset( vtable, *((char*)ip + 2) );
-    return method;
+    assert(call_ip);
 
-#else // for !_IA32_
+    TRACE2("jvmti.break.ss", "Predicting VIRTUAL type breakpoint on address: " << call_ip);
 
-    return NULL;
-#endif // _IA32_
+    // ip now points to the call instruction which actually invokes a
+    // virtual method. We're going to set a sythetic breakpoint there
+    // and allow execution up until that point to get the virtual
+    // table address and offset inside of it to determine exactly
+    // which method is going to invoked in runtime.
+    return call_ip;
 } // jvmti_get_invoked_virtual_method
 
 void
@@ -161,9 +186,11 @@ jvmti_SingleStepLocation( VM_thread* thread,
             (*next_step)[0].method = method;
             (*next_step)[0].location = location;
             (*next_step)[0].native_location = NULL;
+            (*next_step)[0].no_event = false;
             (*next_step)[1].method = method;
             (*next_step)[1].location = offset;
             (*next_step)[1].native_location = NULL;
+            (*next_step)[1].no_event = false;
             break;
 
         // goto instructions
@@ -177,6 +204,7 @@ jvmti_SingleStepLocation( VM_thread* thread,
             (*next_step)->method = method;
             (*next_step)->location = offset;
             (*next_step)->native_location = NULL;
+            (*next_step)->no_event = false;
             break;
         case OPCODE_GOTO_W:         /* 0xc8 + s4 */
         case OPCODE_JSR_W:          /* 0xc9 + s4 */
@@ -188,6 +216,7 @@ jvmti_SingleStepLocation( VM_thread* thread,
             (*next_step)->method = method;
             (*next_step)->location = offset;
             (*next_step)->native_location = NULL;
+            (*next_step)->no_event = false;
             break;
 
         // tableswitch instruction
@@ -206,12 +235,14 @@ jvmti_SingleStepLocation( VM_thread* thread,
                 (*next_step)[0].location = (int)bytecode_index
                     + jvmti_GetWordValue( bytecode, location );
                 (*next_step)[0].native_location = NULL;
+                (*next_step)[0].no_event = false;
                 location += 12;
                 for( int index = 1; index < number; index++, location += 4 ) {
                     (*next_step)[index].method = method;
                     (*next_step)[index].location = (int)bytecode_index
                         + jvmti_GetWordValue( bytecode, location );
                     (*next_step)[index].native_location = NULL;
+                    (*next_step)[index].no_event = false;
                 }
             }
             break;
@@ -230,21 +261,36 @@ jvmti_SingleStepLocation( VM_thread* thread,
                 (*next_step)[0].location = (int)bytecode_index
                     + jvmti_GetWordValue( bytecode, location );
                 (*next_step)[0].native_location = NULL;
+                (*next_step)[0].no_event = false;
                 location += 12;
                 for( int index = 1; index < number; index++, location += 8 ) {
                     (*next_step)[index].method = method;
                     (*next_step)[index].location = (int)
                         + jvmti_GetWordValue( bytecode, location );
                     (*next_step)[index].native_location = NULL;
+                    (*next_step)[index].no_event = false;
                 }
             }
             break;
 
         // athrow and invokeinterface instruction
         case OPCODE_ATHROW:         /* 0xbf */
+            assert( !is_wide );
+            break;
         case OPCODE_INVOKEINTERFACE:/* 0xb9 + u2 + u1 + u1 */
             assert( !is_wide );
-            // instructions are processed in helpers
+            {
+                NativeCodePtr ip = get_ip_for_invoke_call_ip(thread, location,
+                    location + 5);
+                error = _allocate(sizeof(jvmti_StepLocation),
+                    (unsigned char**)next_step );
+                assert(error == JVMTI_ERROR_NONE);
+                *count = 1;
+                (*next_step)->method = method;
+                (*next_step)->location = location;
+                (*next_step)->native_location = ip;
+                (*next_step)->no_event = true;
+            }
             break;
 
         // return instructions
@@ -278,6 +324,7 @@ jvmti_SingleStepLocation( VM_thread* thread,
                     (*next_step)->method = klass->const_pool[index].CONSTANT_ref.method;
                     (*next_step)->location = 0;
                     (*next_step)->native_location = NULL;
+                    (*next_step)->no_event = false;
                 }
             }
             break;
@@ -286,15 +333,16 @@ jvmti_SingleStepLocation( VM_thread* thread,
         case OPCODE_INVOKEVIRTUAL:  /* 0xb6 + u2 */
             assert( !is_wide );
             {
-                Method *func = jvmti_get_invoked_virtual_method( thread );
-                if( !method_is_native(func) ) {
-                    *count = 1;
-                    error = _allocate( sizeof(jvmti_StepLocation), (unsigned char**)next_step );
-                    assert( error == JVMTI_ERROR_NONE );
-                    (*next_step)->method = func;
-                    (*next_step)->location = 0;
-                    (*next_step)->native_location = NULL;
-                }
+                NativeCodePtr ip = get_ip_for_invoke_call_ip(thread, location,
+                    location + 3);
+                error = _allocate(sizeof(jvmti_StepLocation),
+                    (unsigned char**)next_step );
+                assert(error == JVMTI_ERROR_NONE);
+                *count = 1;
+                (*next_step)->method = method;
+                (*next_step)->location = location;
+                (*next_step)->native_location = ip;
+                (*next_step)->no_event = true;
             }
             break;
 
@@ -355,6 +403,7 @@ jvmti_SingleStepLocation( VM_thread* thread,
             (*next_step)->method = method;
             (*next_step)->location = location;
             (*next_step)->native_location = NULL;
+            (*next_step)->no_event = false;
             break;
 
         // ret instruction
@@ -395,6 +444,76 @@ jvmti_setup_jit_single_step(DebugUtilsTI *ti, VMBreakInterface* intf,
     jvmti_set_single_step_breakpoints(ti, vm_thread, locations, locations_count);
 }
 
+static void jvmti_start_single_step_in_virtual_method(DebugUtilsTI *ti, VMBreakInterface* intf,
+    VMBreakPointRef* bp_ref)
+{
+    VM_thread *vm_thread = p_TLS_vmthread;
+    Registers *regs = &vm_thread->jvmti_saved_exception_registers;
+    // This is a virtual breakpoint set exactly on the call
+    // instruction for the virtual method. In this place it is
+    // possible to determine the target method in runtime
+    bool *virtual_flag = (bool *)bp_ref->data;
+    assert(*virtual_flag == true);
+
+    InstructionDisassembler *disasm = bp_ref->brpt->disasm;
+    const InstructionDisassembler::Opnd& op = disasm->get_opnd(0);
+    Method *method;
+    if (op.kind == InstructionDisassembler::Kind_Mem)
+    {
+        // Invokevirtual uses indirect call from VTable. The base
+        // address is in the register, offset is in displacement *
+        // scale. This method is much faster than 
+        VTable* vtable = (VTable*)disasm->get_reg_value(op.base, regs);
+        assert(vtable);
+        // For x86 based architectures offset cannot be longer than 32
+        // bits, so unsigned is ok here
+        unsigned offset = (unsigned)((POINTER_SIZE_INT)disasm->get_reg_value(op.index, regs) *
+            op.scale + op.disp);
+        method = class_get_method_from_vt_offset(vtable, offset);
+    }
+    else if (op.kind == InstructionDisassembler::Kind_Reg)
+    {
+        // This is invokeinterface bytecode which uses register
+        // call so we need to search through all methods for this
+        // one to find it, no way to get vtable and offset in it
+        NativeCodePtr ip = disasm->get_target_address_from_context(regs);
+        CodeChunkInfo *cci = vm_methods->find(ip);
+        if (cci)
+            method = cci->get_method();
+        else
+        {
+            // This is an uncompiled interface method. We don't
+            // know its address and don't know its handle. To get
+            // the handle we need to parse LIL stub generated in
+            // compile_gen_compile_me.
+            InstructionDisassembler stub_disasm(ip);
+#ifdef VM_STATS
+            // In case of VM_STATS first instuction should be
+            // skipped because it is a stats increment
+            ip = (NativeCodePtr)((POINTER_SIZE_INT)ip + stub_disasm.get_length_with_prefix());
+            stub_disasm = ip;
+#endif
+            // Now IP points on mov(stub, ecx_opnd, Imm_Opnd((int32)method));
+            // where method is the method handle. Need to get its
+            // address from instruction, it is an immd operand in mov
+            assert(stub_disasm.get_operands_count() == 1);
+
+            const InstructionDisassembler::Opnd& stub_op = stub_disasm.get_opnd(0);
+            assert(stub_op.kind == InstructionDisassembler::Kind_Imm);
+            method = (Method *)stub_op.imm;
+        }
+    }
+
+    TRACE2("jvmti.break.ss", "Removing VIRTUAL single step breakpoint: " << bp_ref->brpt->addr);
+    // The determined method is the one which is called by
+    // invokevirtual or invokeinterface bytecodes. It should be
+    // started to be single stepped from the beginning
+    intf->remove_all();
+
+    jvmti_StepLocation method_start = {(Method *)method, 0};
+    jvmti_set_single_step_breakpoints(ti, vm_thread, &method_start, 1);
+}
+
 // Callback function for JVMTI single step processing
 static bool jvmti_process_jit_single_step_event(VMBreakInterface* intf, VMBreakPointRef* bp_ref)
 {
@@ -421,8 +540,13 @@ static bool jvmti_process_jit_single_step_event(VMBreakInterface* intf, VMBreakP
     Method* m = (Method*)method;
     NativeCodePtr addr = bp->addr;
     assert(addr);
-    assert(bp_ref->data == NULL);
-    
+
+    if (NULL != bp_ref->data)
+    {
+        jvmti_start_single_step_in_virtual_method(ti, intf, bp_ref);
+        return true;
+    }
+
     hythread_t h_thread = hythread_self();
     jthread j_thread = jthread_get_java_thread(h_thread);
     ObjectHandle hThread = oh_allocate_local_handle();
@@ -536,11 +660,23 @@ void jvmti_set_single_step_breakpoints(DebugUtilsTI *ti, VM_thread *vm_thread,
             << " :" << locations[iii].location
             << " :" << locations[iii].native_location);
 
+        void *data = NULL;
+        if (locations[iii].no_event)
+        {
+            bool *virtual_flag;
+            jvmtiError error = _allocate(sizeof(bool),
+                (unsigned char**)&virtual_flag);
+
+            assert(error == JVMTI_ERROR_NONE);
+            *virtual_flag = true;
+            data = virtual_flag;
+        }
+
         VMBreakPointRef* ref =
             ss_state->predicted_breakpoints->add((jmethodID)locations[iii].method,
                                                   locations[iii].location,
                                                   locations[iii].native_location,
-                                                  NULL);
+                                                  data);
         assert(ref);
     }
 }
@@ -559,9 +695,10 @@ void jvmti_remove_single_step_breakpoints(DebugUtilsTI *ti, VM_thread *vm_thread
 jvmtiError jvmti_get_next_bytecodes_from_native(VM_thread *thread,
     jvmti_StepLocation **next_step,
     unsigned *count,
-    bool stack_step_up)
+    bool invoked_frame)
 {
     ASSERT_NO_INTERPRETER;
+    VMBreakPoints *vm_brpt = VM_Global_State::loader_env->TI->vm_brpt;
 
     *count = 0;
     // create stack iterator, current stack frame should be native
@@ -578,7 +715,7 @@ jvmtiError jvmti_get_next_bytecodes_from_native(VM_thread *thread,
     }
 
     assert(!si_is_native(si));
-    if( stack_step_up ) {
+    if( invoked_frame ) {
         // get previous stack frame
         si_goto_previous(si);
     }
@@ -594,19 +731,111 @@ jvmtiError jvmti_get_next_bytecodes_from_native(VM_thread *thread,
         assert(result == EXE_ERROR_NONE);
         TRACE2( "jvmti.break.ss", "SingleStep method IP: " << ip );
 
-        // set step location structure
-        *count = 1;
-        jvmtiError error = _allocate( sizeof(jvmti_StepLocation), (unsigned char**)next_step );
-        if( error != JVMTI_ERROR_NONE ) {
-            si_free(si);
-            return error;
+        // In case stack iterator points to invoke (in invoked_frame)
+        // case the IP may point to an instruction after a call, but
+        // still on the invoke* bytecode. It can be found out by
+        // iterating through instructions inside of the same
+        // bytecode. If we find a call in it, then we're on a correct
+        // bytecode, if not, we're on a tail of an invoke*
+        // instruction. It is necessary to move one bytecode ahead in
+        // this case.
+        if (invoked_frame)
+        {
+            // Determine if the found bytecode if of an invoke type
+            const unsigned char *bytecode = func->get_byte_code_addr();
+            uint16 next_location = 0;
+
+            switch (bytecode[bc])
+            {
+            case OPCODE_INVOKEINTERFACE: /* 0xb9 + u2 + u1 + u1 */
+                next_location = bc + 5;
+                break;
+            case OPCODE_INVOKESPECIAL:   /* 0xb7 + u2 */
+            case OPCODE_INVOKESTATIC:    /* 0xb8 + u2 */
+            case OPCODE_INVOKEVIRTUAL:   /* 0xb6 + u2 */
+                next_location = bc + 3;
+                break;
+            }
+
+            // Yes this is an invoke type bytecode
+            if (next_location)
+            {
+                NativeCodePtr next_ip;
+                OpenExeJpdaError UNREF result = jit->get_native_location_for_bc(func,
+                    next_location, &next_ip);
+                assert(result == EXE_ERROR_NONE);
+                assert(ip < next_ip);
+
+                VMBreakPoint *bp = vm_brpt->find_breakpoint(ip);
+
+                InstructionDisassembler disasm;
+                if (bp)
+                    disasm = *bp->disasm;
+                else
+                    disasm = ip;
+
+                NativeCodePtr call_ip = NULL;
+                do
+                {
+                    ip = (NativeCodePtr)((POINTER_SIZE_INT)ip + disasm.get_length_with_prefix());
+
+                    // Another thread could have instrumented this location for
+                    // prediction of invokevirtual or invokeinterface, so it is
+                    // necessary to check that location may be instrumented
+                    uint8 b = *((uint8 *)ip);
+                    if (b == INSTRUMENTATION_BYTE)
+                    {
+                        bp = vm_brpt->find_breakpoint(ip);
+                        assert(bp);
+                        disasm = *bp->disasm;
+                    }
+                    else
+                        disasm = ip;
+
+                    // Bytecode may be either invokevirtual or
+                    // invokeinterface which generate indirect calls or
+                    // invokestatic or invokespecial which generate
+                    // relative calls
+                    if (disasm.get_type() == InstructionDisassembler::INDIRECT_CALL ||
+                        disasm.get_type() == InstructionDisassembler::RELATIVE_CALL)
+                        call_ip = ip;
+                }
+                while (ip < next_ip);
+
+                // We've found no call instruction in this
+                // bytecode. This means we're standing on the tail of
+                // invoke. Need to shift to the next bytecode
+                if (NULL == call_ip)
+                {
+                    TRACE2("jvmti.break.ss", "SingleStep IP shifted in prediction to: " << call_ip);
+                    bc = next_location;
+                }
+            }
+            // No this is not an invoke type bytecode, so the IP
+            // points to a normal bytecode after invoke. No need to
+            // shift to the next one.
+
+            // set step location structure
+            *count = 1;
+            jvmtiError error = _allocate( sizeof(jvmti_StepLocation), (unsigned char**)next_step );
+            if( error != JVMTI_ERROR_NONE ) {
+                si_free(si);
+                return error;
+            }
+            (*next_step)->method = func;
+            // IP in stack iterator points to a bytecode next after the one
+            // which caused call of the method. So next location is the 'bc' which
+            // IP points to.
+            (*next_step)->location = bc;
+            (*next_step)->native_location = ip;
+            (*next_step)->no_event = false;
         }
-        (*next_step)->method = func;
-        // IP in stack iterator points to a bytecode next after the one
-        // which caused call of the method. So next location is the 'bc' which
-        // IP points to.
-        (*next_step)->location = bc;
-        (*next_step)->native_location = ip;
+        else
+        {
+            // Find next bytecode after the one we're currently
+            // standing on
+            jvmti_SingleStepLocation(thread, func, bc, next_step, count);
+        }
     }
     si_free(si);
     return JVMTI_ERROR_NONE;

@@ -37,11 +37,11 @@ static InstructionDisassembler::Register convertRegName2Register(RegName reg)
     case RegName_EBP:   return InstructionDisassembler::IA32_REG_EBP;
     case RegName_ESP:   return InstructionDisassembler::IA32_REG_ESP;
     default:
-        // currently not supported and unexpected
-        assert(false);
         break;
     }
-    return (InstructionDisassembler::Register)-1;
+    // Some other registers (e.g. AL or XMM or whatever) - not
+    // supported currently
+    return InstructionDisassembler::IA32_REG_NONE;
 }
 
 static void convertOperand2Opnd(
@@ -87,20 +87,20 @@ static const char* get_reg_value(
 
 #else // _IA32_
 
-static const char* get_reg_value(
-    InstructionDisassembler::Register reg,
-    const Registers* pcontext)
+const char* InstructionDisassembler::get_reg_value(
+    Register reg,
+    const Registers* pcontext) const
 {
     switch(reg) {
-    case InstructionDisassembler::IA32_REG_NONE: return NULL;
-    case InstructionDisassembler::IA32_REG_EAX:  return (const char*)pcontext->eax;
-    case InstructionDisassembler::IA32_REG_EBX:  return (const char*)pcontext->ebx;
-    case InstructionDisassembler::IA32_REG_ECX:  return (const char*)pcontext->ecx;
-    case InstructionDisassembler::IA32_REG_EDX:  return (const char*)pcontext->edx;
-    case InstructionDisassembler::IA32_REG_ESI:  return (const char*)pcontext->esi;
-    case InstructionDisassembler::IA32_REG_EDI:  return (const char*)pcontext->edi;
-    case InstructionDisassembler::IA32_REG_EBP:  return (const char*)pcontext->ebp;
-    case InstructionDisassembler::IA32_REG_ESP:  return (const char*)pcontext->esp;
+    case IA32_REG_NONE: return NULL;
+    case IA32_REG_EAX:  return (const char*)pcontext->eax;
+    case IA32_REG_EBX:  return (const char*)pcontext->ebx;
+    case IA32_REG_ECX:  return (const char*)pcontext->ecx;
+    case IA32_REG_EDX:  return (const char*)pcontext->edx;
+    case IA32_REG_ESI:  return (const char*)pcontext->esi;
+    case IA32_REG_EDI:  return (const char*)pcontext->edi;
+    case IA32_REG_EBP:  return (const char*)pcontext->ebp;
+    case IA32_REG_ESP:  return (const char*)pcontext->esp;
     default: assert(false);
     }
     return NULL;

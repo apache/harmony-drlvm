@@ -115,9 +115,15 @@ public:
         CondJumpType_Count = 16
     };
 
+    InstructionDisassembler(void) :
+        m_type(OPCODEERROR), m_target(0), m_len(0),
+        m_cond_jump_type(JUMP_OVERFLOW), m_argc(0)
+    {
+    }
     
     InstructionDisassembler(NativeCodePtr address) :
-        m_type(OPCODEERROR), m_target(0), m_len(0), m_cond_jump_type(JUMP_OVERFLOW)
+        m_type(OPCODEERROR), m_target(0), m_len(0),
+        m_cond_jump_type(JUMP_OVERFLOW), m_argc(0)
     {
         disasm(address, this);
     }
@@ -128,6 +134,10 @@ public:
         m_target = d.m_target;
         m_len = d.m_len;
         m_cond_jump_type = d.m_cond_jump_type;
+        m_argc = d.m_argc;
+        m_opnds[0] = d.m_opnds[0];
+        m_opnds[1] = d.m_opnds[1];
+        m_opnds[2] = d.m_opnds[2];
     }
 
     /**
@@ -197,6 +207,11 @@ public:
      * @note Only valid for branch instructions like JMPs, CALLs, etc.
      */
     NativeCodePtr get_target_address_from_context(const Registers* pregs) const;
+
+    /**
+     * Returns the appropriate register value for the register operand reg
+     */
+    const char* get_reg_value(Register reg, const Registers* pcontext) const;
 private:
     /**
      * @brief Performs disassembling, fills out InstructionDisassembler's 
