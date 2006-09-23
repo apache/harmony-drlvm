@@ -70,7 +70,7 @@ GCExport void gc_heap_slot_write_ref (Managed_Object_Handle p_base_of_object_wit
 Boolean gc_supports_frontier_allocation(unsigned *offset_of_current, unsigned *offset_of_limit) {
     // Need additional support for object offset in native stubs.
     *offset_of_current = field_offset(GC_Thread_Info, tls_current_free);
-    *offset_of_limit = field_offset(GC_Thread_Info, tls_current_ceiling);
+    *offset_of_limit = field_offset(GC_Thread_Info, tls_current_cleaned);
     return true;
 }
 
@@ -155,19 +155,42 @@ Managed_Object_Handle gc_alloc_fast(unsigned in_size,
     //TRACE2("gc.alloc", "gc_alloc_fast");
     assert((in_size % GC_OBJECT_ALIGNMENT) == 0);
     assert (ah);
-    unsigned char *res;
+    unsigned char *next;
 
     GC_Thread_Info *info = (GC_Thread_Info *) thread_pointer;
     Partial_Reveal_VTable *vtable = (Partial_Reveal_VTable*) ah;
     GC_VTable_Info *gcvt = vtable->get_gcvt();
+    unsigned char *cleaned = info->tls_current_cleaned;
+    unsigned char *res = info->tls_current_free;
 
-    // TODO: finalizible objects can be added atomicly and can be handled here
-    if (info->tls_current_free + in_size <= info->tls_current_ceiling && !gcvt->is_finalizible()) {
-        res = (unsigned char*) info->tls_current_free;
-        info->tls_current_free += in_size;
+    if (res + in_size <= cleaned) {
+        if (gcvt->is_finalizible()) return 0;
+
+        info->tls_current_free =  res + in_size;
         *(int*)res = ah;
-        return (Managed_Object_Handle)res;
+
+        return res;
     }
+
+    if (gcvt->is_finalizible()) return 0;
+
+    unsigned char *ceiling = info->tls_current_ceiling;
+
+
+    if (res + in_size <= ceiling) {
+
+        info->tls_current_free = next = info->tls_current_free + in_size;
+
+        // cleaning required
+        unsigned char *cleaned_new = next + THREAD_LOCAL_CLEANED_AREA_SIZE;
+        if (cleaned_new > ceiling) cleaned_new = ceiling;
+        info->tls_current_cleaned = cleaned_new;
+        memset(cleaned, 0, cleaned_new - cleaned);
+        *(int*)res = ah;
+
+        return res;
+    }
+
     return 0;
 }
 
@@ -177,17 +200,38 @@ Managed_Object_Handle gc_alloc(unsigned in_size,
     TRACE2("gc.alloc", "gc_alloc: " << in_size);
     assert((in_size % GC_OBJECT_ALIGNMENT) == 0);
     assert (ah);
-    unsigned char *res;
 
     GC_Thread_Info *info = (GC_Thread_Info *) thread_pointer;
     Partial_Reveal_VTable *vtable = (Partial_Reveal_VTable*) ah;
     GC_VTable_Info *gcvt = vtable->get_gcvt();
+    unsigned char *res = info->tls_current_free;
+    unsigned char *cleaned = info->tls_current_cleaned;
 
-    if (!gcvt->is_finalizible() && info->tls_current_free + in_size <= info->tls_current_ceiling) {
-        res = (unsigned char*) info->tls_current_free;
-        info->tls_current_free += in_size;
-        *(int*)res = ah;
-        return (Managed_Object_Handle)res;
+    if (!gcvt->is_finalizible()) {
+
+        if (res + in_size <= cleaned) {
+            info->tls_current_free =  res + in_size;
+            *(int*)res = ah;
+
+            return res;
+        }
+
+        unsigned char *ceiling = info->tls_current_ceiling;
+
+        if (res + in_size <= ceiling) {
+            unsigned char *next;
+
+            info->tls_current_free = next = info->tls_current_free + in_size;
+
+            // cleaning required
+            unsigned char *cleaned_new = next + THREAD_LOCAL_CLEANED_AREA_SIZE;
+            if (cleaned_new > ceiling) cleaned_new = ceiling;
+            info->tls_current_cleaned = cleaned_new;
+            memset(cleaned, 0, cleaned_new - cleaned);
+
+            *(int*)res = ah;
+            return (Managed_Object_Handle)res;
+        }
     }
 
     // TODO: can reproduce problems of synchronization of finalizer threads
@@ -275,9 +319,12 @@ Managed_Object_Handle gc_alloc(unsigned in_size,
     if (info->tls_current_ceiling > heap.pos_limit)
         info->tls_current_ceiling = heap.pos_limit;
     heap.pos = info->tls_current_ceiling;
+    if (cleaning_needed) info->tls_current_cleaned = info->tls_current_free;
+    else info->tls_current_cleaned = info->tls_current_ceiling;
 
     vm_gc_unlock_enum();
-    if (cleaning_needed) memset(res, 0, info->tls_current_ceiling - info->tls_current_free + size);
+    if (cleaning_needed) memset(res, 0, size);
+
     *(int*)res = ah;
     return (Managed_Object_Handle)res;
 }
@@ -305,6 +352,7 @@ void gc_thread_init(void *gc_information) {
     GC_Thread_Info *info = (GC_Thread_Info *) gc_information;
     info->tls_current_free = 0;
     info->tls_current_ceiling = 0;
+    info->tls_current_cleaned = 0;
     //info->saved_object = 0;
     spin_lock(&thread_list_lock);
     info->next = thread_list;

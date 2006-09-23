@@ -113,6 +113,7 @@ void clear_thread_local_buffers() {
     while(info) {
         info->tls_current_free = 0;
         info->tls_current_ceiling = 0;
+        info->tls_current_cleaned = 0;
         info = info->next;
     }
 }
@@ -159,7 +160,6 @@ void process_finalizable_objects() {
             // not marked
             TRACE2("gc.debug", "0x" << obj << " referenced from finalizible objects (unmarked)");
             to_finalize.push_back(obj);
-            gc_add_root_set_entry((Managed_Object_Handle*)&to_finalize.back(), false);
 
             // removing this object from vector, replacing it with last one.
             *i = finalizible_objects.pop_back();
@@ -167,7 +167,13 @@ void process_finalizable_objects() {
         }
         ++i;
     }
+
     if (!to_finalize.empty()) {
+        for(reference_vector::iterator i = to_finalize.begin();
+                i != to_finalize.end(); ++i) {
+            gc_add_root_set_entry((Managed_Object_Handle*)&*i, false);
+        }
+
         pending_finalizers = true;
         TRACE2("gc.finalize", to_finalize.count() << " objects to be finalized");
     }

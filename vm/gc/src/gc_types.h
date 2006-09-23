@@ -67,8 +67,11 @@ enum GC_TYPE {
 extern GC_TYPE gc_type;
 class Partial_Reveal_Object;
 
+#define THREAD_LOCAL_CLEANED_AREA_SIZE 2048
+
 typedef struct GC_Thread_Info {
     unsigned char *tls_current_free;
+    unsigned char *tls_current_cleaned;
     unsigned char *tls_current_ceiling;
 
     GC_Thread_Info *next;

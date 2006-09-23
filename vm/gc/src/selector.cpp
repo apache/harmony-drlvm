@@ -292,6 +292,11 @@ void select_force_gc() {
         full_gc(0);
         vm_gc_unlock_enum();
         vm_hint_finalize();
+    } else if ((gc_algorithm / 10) == 3) {
+        vm_gc_lock_enum();
+        copy_gc(0);
+        vm_gc_unlock_enum();
+        vm_hint_finalize();
     }
 }
 
