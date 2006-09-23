@@ -807,8 +807,20 @@ jvmti_process_single_step_event(jmethodID method, jlocation location) {
 }
 
 VMEXPORT void jvmti_process_field_access_event(Field_Handle field,
-    jmethodID method, jlocation location, jobject* p_object)
+    jmethodID method, jlocation location, ManagedObject* managed_object)
 {
+    SuspendDisabledChecker sdc;
+
+    // create handle for object
+    jobject object = NULL;
+
+    if (NULL != managed_object) {
+        object = oh_allocate_local_handle();
+        object->object = managed_object;
+    }
+
+    tmn_suspend_enable();
+
     DebugUtilsTI *ti = VM_Global_State::loader_env->TI;
     if (!ti->isEnabled() )
         return;
@@ -818,9 +830,6 @@ VMEXPORT void jvmti_process_field_access_event(Field_Handle field,
 
     if (!ti->get_global_capability(DebugUtilsTI::TI_GC_ENABLE_FIELD_ACCESS_EVENT))
         return;
-
-    // unreference pointer to object handle
-    jobject object = (p_object) ? *p_object : NULL ;
 
     // get field class
     //Type_Info_Handle field_type = field_get_type_info_of_field_value(field);
@@ -865,11 +874,25 @@ VMEXPORT void jvmti_process_field_access_event(Field_Handle field,
                     method, location, field_klass, object, (jfieldID) field);
         ti_env = next_env;
     }
+
+    tmn_suspend_disable();
 } // jvmti_process_field_access_event
 
 VMEXPORT void jvmti_process_field_modification_event(Field_Handle field,
-    jmethodID method, jlocation location, jobject* p_object, jvalue new_value)
+    jmethodID method, jlocation location, ManagedObject* managed_object, jvalue new_value)
 {
+    SuspendDisabledChecker sdc;
+
+    // create handle for object
+    jobject object = NULL;
+
+    if (NULL != managed_object) {
+        object = oh_allocate_local_handle();
+        object->object = managed_object;
+    }
+
+    tmn_suspend_enable();
+
     DebugUtilsTI *ti = VM_Global_State::loader_env->TI;
     if (!ti->isEnabled() )
         return;
@@ -879,9 +902,6 @@ VMEXPORT void jvmti_process_field_modification_event(Field_Handle field,
 
     if (!ti->get_global_capability(DebugUtilsTI::TI_GC_ENABLE_FIELD_MODIFICATION_EVENT))
         return;
-
-    // unreference pointer to object handle
-    jobject object = (p_object) ? *p_object : NULL ;
 
     // get field class
     //Type_Info_Handle field_type = field_get_type_info_of_field_value(field);
@@ -930,6 +950,8 @@ VMEXPORT void jvmti_process_field_modification_event(Field_Handle field,
                     signature_type, new_value);
         ti_env = next_env;
     }
+
+    tmn_suspend_disable();
 } // jvmti_process_field_modification_event
 
 /*

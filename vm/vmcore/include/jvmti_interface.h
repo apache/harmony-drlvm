@@ -49,13 +49,13 @@ void jvmti_method_exit_callback(Method_Handle method, jvalue* return_value);
  * @param field - handle of the field under access
  * @param method - handle of the method, which accesses field
  * @param location - location of code which accesses field
- * @param object - pointer to the reference of the object, which field is beeng
- *      accessed or NULL for static field
+ * @param object - non GC-safe pointer to the object, which field is beeng 
+ *     accessed or NULL for static field
  */
 void jvmti_field_access_callback(Field_Handle field,
                                        Method_Handle method,
                                        jlocation location,
-                                       jobject* object);
+                                       ManagedObject* object);
 
 /**
  * Field modification callback which is called from JITted code compiled with <field modification> flag whenever
@@ -64,14 +64,14 @@ void jvmti_field_access_callback(Field_Handle field,
  * @param field - handle of the field under modification
  * @param method - handle of the method, which modifies field
  * @param location - location of code which modifies field
- * @param object - pointer to the reference of the object, which field is beeng
- *      modified or NULL for static field
+ * @param object - non GC-safe pointer to the object, which field is beeng 
+ *     accessed or NULL for static field
  * @param new_value - pointer to the new value for the field
  */
 void jvmti_field_modification_callback(Field_Handle field,
                                        Method_Handle method,
                                        jlocation location,
-                                       jobject* object,
+                                       ManagedObject* object,
                                        jvalue* new_value);
 
 /**

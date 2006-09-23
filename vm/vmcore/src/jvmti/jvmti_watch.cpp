@@ -310,30 +310,38 @@ jvmtiClearFieldModificationWatch(jvmtiEnv* env,
 void jvmti_field_access_callback(Field_Handle field,
                                        Method_Handle method,
                                        jlocation location,
-                                       jobject* object)
+                                       ManagedObject* object)
 {
     BEGIN_RAISE_AREA;
-    tmn_suspend_enable();
 
     jvmti_process_field_access_event(field, (jmethodID) method, location,
              object);
 
-    tmn_suspend_disable();
     END_RAISE_AREA;
 }
 
 void jvmti_field_modification_callback(Field_Handle field,
                                        Method_Handle method,
                                        jlocation location,
-                                       jobject* object,
-                                       jvalue* new_value)
+                                       ManagedObject* object,
+                                       jvalue* p_new_value)
 {
     BEGIN_RAISE_AREA;
-    tmn_suspend_enable();
+
+    jvalue new_value = *p_new_value;
+
+    if (! field->get_field_type_desc()->is_primitive() && NULL != new_value.l) {
+        // if new_value.l is not a handle but a direct pointer to java heap
+        if ((ManagedObject*)new_value.l >= (ManagedObject*)Class::heap_base &&
+            (ManagedObject*)new_value.l <= (ManagedObject*)Class::heap_end)
+        {
+            new_value.l = oh_allocate_local_handle();
+            new_value.l->object = (ManagedObject*)p_new_value->l;
+        }
+    }
 
     jvmti_process_field_modification_event(field, (jmethodID) method, location,
-            object, *new_value);
+            object, new_value);
 
-    tmn_suspend_disable();
     END_RAISE_AREA;
 }

@@ -537,21 +537,16 @@ static inline void field_access_callback(Field *field, StackFrame& frame, Manage
     jlocation pc = frame.ip - (uint8*)method->get_code_addr();
 
     M2N_ALLOC_MACRO;
-    ObjectHandle handle = oh_allocate_local_handle();
-    handle->object = obj;
 
-    tmn_suspend_enable();
-    jvmti_process_field_access_event(field, (jmethodID) method, pc, &handle);
-    tmn_suspend_disable();
+    jvmti_process_field_access_event(field, (jmethodID) method, pc, obj);
+
     M2N_FREE_MACRO;
 }
 
-static inline void field_modification_callback(Field *field, StackFrame& frame, jobject obj, jvalue val) {
+static inline void field_modification_callback(Field *field, StackFrame& frame, ManagedObject * obj, jvalue val) {
     Method *method = frame.method;
     jlocation pc = frame.ip - (uint8*)method->get_code_addr();
-    tmn_suspend_enable();
-    jvmti_process_field_modification_event(field, (jmethodID) method, pc, &obj, val);
-    tmn_suspend_disable();
+    jvmti_process_field_modification_event(field, (jmethodID) method, pc, obj, val);
 }
 
 void getfield_callback(Field *field, StackFrame& frame) {
@@ -616,10 +611,8 @@ void putfield_callback(Field *field, StackFrame& frame) {
     }
 
     M2N_ALLOC_MACRO;
-    ObjectHandle handle = oh_allocate_local_handle();
-    handle->object = UNCOMPRESS_REF(cref);
     jvalue val = new_field_value(field, frame);
-    field_modification_callback(field, frame, handle, val);
+    field_modification_callback(field, frame, UNCOMPRESS_REF(cref), val);
     M2N_FREE_MACRO;
 }
 

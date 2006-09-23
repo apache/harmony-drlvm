@@ -129,9 +129,9 @@ ManagedObject *jvmti_jit_exception_catch_event_callback_call(ManagedObject
 VMEXPORT void jvmti_process_method_entry_event(jmethodID method);
 VMEXPORT void jvmti_process_method_exit_event(jmethodID method, jboolean exn_flag, jvalue ret_val);
 VMEXPORT void jvmti_process_field_access_event(Field_Handle field,
-    jmethodID method, jlocation location, jobject* object);
+    jmethodID method, jlocation location, ManagedObject* object);
 VMEXPORT void jvmti_process_field_modification_event(Field_Handle field,
-    jmethodID method, jlocation location, jobject* object, jvalue new_value);
+    jmethodID method, jlocation location, ManagedObject* object, jvalue new_value);
 
 #ifdef __cplusplus
 extern "C" {

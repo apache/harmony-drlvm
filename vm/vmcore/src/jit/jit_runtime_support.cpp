@@ -1833,7 +1833,7 @@ static NativeCodePtr rth_get_lil_jvmti_field_access_callback(int * dyn_count) {
         return addr;
         }
     void (*jvmti_field_access_callback_ptr)(Field_Handle, Method_Handle,
-            jlocation, jobject*) = jvmti_field_access_callback;
+            jlocation, ManagedObject*) = jvmti_field_access_callback;
 
     LilCodeStub* cs = lil_parse_code_stub("entry 0:managed:pint,pint,g8,pint:void;");
     assert(cs);
@@ -1880,8 +1880,8 @@ static NativeCodePtr rth_get_lil_jvmti_field_modification_callback(int * dyn_cou
     if (addr) {
         return addr;
         }
-void (*jvmti_field_modification_callback_ptr)(Field_Handle, Method_Handle,
-                                              jlocation, jobject*, jvalue*) = jvmti_field_modification_callback;
+    void (*jvmti_field_modification_callback_ptr)(Field_Handle, Method_Handle,
+            jlocation, ManagedObject*, jvalue*) = jvmti_field_modification_callback;
     LilCodeStub* cs = lil_parse_code_stub("entry 0:managed:pint,pint,g8,pint,pint:void;");
     assert(cs);
     if (dyn_count) {
