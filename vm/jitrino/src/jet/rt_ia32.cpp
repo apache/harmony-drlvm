@@ -72,7 +72,8 @@ void *** devirt(AR gr, const JitFrameContext * jfc)
     if (gr == ecx)    return (void***)&jfc->p_ecx;
     if (gr == edx)    return (void***)&jfc->p_edx;
 #endif
-    assert(false);
+    // May happen when XMM regs requested on IA-32/Intel64 - JitFrameContext
+    // currently does not have such fields
     return NULL;
 }
 

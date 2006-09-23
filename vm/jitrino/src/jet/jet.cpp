@@ -481,25 +481,13 @@ void cmd_line_arg(JIT_Handle jit, const char* name, const char* arg)
 
 OpenMethodExecutionParams get_exe_capabilities()
 {
-    static const OpenMethodExecutionParams supported = {
-        true,  // exe_notify_method_entry
-        true,  // exe_notify_method_exit
-        
-        true, // exe_notify_field_access
-        true, // exe_notify_field_modification 
-        false, // exe_notify_exception_throw
-        false, // exe_notify_exception_catch
-        false, // exe_notify_monitor_enter
-        false, // exe_notify_monitor_exit
-        false, // exe_notify_contended_monitor_enter
-        false, // exe_notify_contended_monitor_exit
-        false, // exe_do_method_inlining
-        
-        true,  // exe_do_code_mapping
-        true,  // exe_do_local_var_mapping
-        
-        false, // exe_insert_write_barriers
-    };
+    OpenMethodExecutionParams supported = {0};
+    supported.exe_notify_method_entry = true;
+    supported.exe_notify_method_exit = true;
+    supported.exe_do_code_mapping = true;
+    supported.exe_do_local_var_mapping = true;
+    supported.exe_restore_context_after_unwind = true;
+    supported.exe_provide_access_to_this = true;
     return supported;
 }
 
@@ -543,11 +531,182 @@ JIT_Result compile_with_params(JIT_Handle jit_handle, Compile_Handle ch,
 using std::map;
 #include "../main/Log.h"
 #include "../main/LogStream.h"
+#include "../main/PMF.h"
+
 //
 // PMF and JitInstanceContext things uses various stuff from Jitrino::.
 // Define it here to allow standalone .jet build.
 // 
+
+
 namespace Jitrino {
+typedef map<JIT_Handle, JITInstanceContext*> JITCTXLIST;
+static JITCTXLIST jitContextList;
+static MemoryManager g_mm(4026, "global MM");
+
+//
+// CompilationContext stub
+//
+static TlsStack<CompilationContext> ccTls;
+
+CompilationContext* CompilationContext::getCurrentContext() {
+    CompilationContext* currentCC = ccTls.get();
+    return currentCC;
+}
+
+CompilationContext::CompilationContext(MemoryManager& _mm,
+                                       CompilationInterface * ci,
+                                       JITInstanceContext * jtx) : mm(_mm)
+{
+    compilationInterface = ci;
+    compilationFailed = false;
+    compilationFinished = false;
+
+    jitContext = jtx;
+    hirm = NULL;
+    lirm = NULL;
+    currentSessionAction = NULL;
+    currentSessionNum = 0;
+    currentLogStreams = NULL;
+    pipeline = NULL;
+    //
+    //
+    ccTls.push((CompilationContext*)this);
+}
+
+CompilationContext::~CompilationContext()
+{
+    assert(this == ccTls.get());
+    ccTls.pop();
+}
+
+static int thread_nb = 0;
+
+struct TlsLogStreams {
+
+    int threadnb;
+    MemoryManager mm;
+
+    typedef std::pair<JITInstanceContext*, LogStreams*> Jit2Log;
+
+    typedef StlVector<Jit2Log> Jit2Logs;
+    Jit2Logs jit2logs;
+
+    TlsLogStreams ()
+        :threadnb(thread_nb), mm(0, "TlsLogStreams"), jit2logs(mm) {}
+
+    ~TlsLogStreams ();
+};
+
+
+TlsLogStreams::~TlsLogStreams ()
+{
+    Jit2Logs::iterator ptr = jit2logs.begin(),
+                       end = jit2logs.end();
+    for (; ptr != end; ++ptr)
+        ptr->second->~LogStreams();
+}
+
+
+static TlsStore<TlsLogStreams> tlslogstreams;
+
+
+/*
+    Because CompilationContext is a transient object (it created on start of compilation
+    and destroyed on end of compilation for every method), LogStreams table cannot reside
+    in it. Thread-local storage (TLS) is used to keep LogStreams.
+    On the other hand, different Jits can run on the same thread, so several LogStreams
+    have to be keept for single thread.
+    To optimize access, pointer to LogStreams is cached in CompilationContext.
+
+ */
+LogStreams& LogStreams::current(JITInstanceContext* jitContext) {
+
+    CompilationContext* ccp = CompilationContext::getCurrentContext();
+    LogStreams* cls = ccp->getCurrentLogs();
+    if (cls != 0)
+        return *cls;
+
+//  No cached pointer is available for this CompilationContext.
+//  Find TLS for this thread.
+
+    TlsLogStreams* sp = tlslogstreams.get();
+    if (sp == 0)
+    {   // new thread
+        ++thread_nb;
+        sp = new TlsLogStreams();
+        tlslogstreams.put(sp);
+    }
+
+//  Find which Jit is running now.
+
+    if (jitContext == 0)
+        jitContext = ccp->getCurrentJITContext();
+
+//  Was LogStreams created for this Jit already?
+
+    TlsLogStreams::Jit2Logs::iterator ptr = sp->jit2logs.begin(),
+                                      end = sp->jit2logs.end();
+    for (; ptr != end; ++ptr)
+        if (ptr->first == jitContext) {
+        //  yes, it was - store pointer in the CompilationContext
+            ccp->setCurrentLogs(cls = ptr->second);
+            return *cls;
+        }
+
+//  This is the first logger usage by the running Jit in the current thread.
+//  Create LogStreams now.
+
+    cls = new (sp->mm) LogStreams(sp->mm, jitContext->getPMF(), sp->threadnb);
+    sp->jit2logs.push_back(TlsLogStreams::Jit2Log(jitContext, cls));
+    ccp->setCurrentLogs(cls);
+
+    return *cls;
+}
+
+
+LogStream& LogStream::log (SID sid, HPipeline* hp)
+{
+    if (hp == 0)
+        hp = CompilationContext::getCurrentContext()->getPipeline();
+    Str name = ((PMF::Pipeline*)hp)->name;
+    return LogStream::log(sid, name.ptr, name.count);
+}
+
+//
+// JITInstanceContex stub
+//
+JITInstanceContext::JITInstanceContext(MemoryManager& _mm,
+                                       JIT_Handle _jitHandle,
+                                       const char* _jitName) : mm(_mm)
+{
+    jitHandle = _jitHandle;
+    jitName = _jitName;
+    pmf = new (mm) PMF(mm, *this);
+    profInterface = NULL;
+    useJet = true;
+}
+
+
+JITInstanceContext* JITInstanceContext::getContextForJIT(JIT_Handle jitHandle)
+{
+    assert(jitContextList.find(jitHandle) != jitContextList.end());
+    return jitContextList[jitHandle];
+}
+
+JITInstanceContext* Jitrino::getJITInstanceContext(JIT_Handle jitHandle)
+{
+    return JITInstanceContext::getContextForJIT(jitHandle);
+}
+
+
+//
+// Fake XTimer stuff
+double XTimer::getSeconds(void)const { return 0.0; }
+void SummTimes::add(char const *,double) {}
+
+//
+// Crash handler
 void crash(const char* fmt, ...)
 {
     va_list valist;
@@ -555,109 +714,21 @@ void crash(const char* fmt, ...)
     vprintf(fmt, valist);
     exit(0);
 }
-//
-// JITInstanceContex stub
-//
-typedef map<JIT_Handle, JITInstanceContext*> JITCTXLIST;
-static JITCTXLIST jitContextList;
-
-JITInstanceContext* Jitrino::getJITInstanceContext(JIT_Handle jitHandle)
-{
-    assert(jitContextList.find(jitHandle) != jitContextList.end());
-    return jitContextList[jitHandle];
-}
-
-//
-// CompilationContext stub
-//
-
-class CompilationContext {
-public:
-    CompilationContext(JIT_Handle jitHandle, Method_Handle meth);
-    ~CompilationContext();
-    static CompilationContext* getCurrentContext(void);
-    JITInstanceContext* getCurrentJITContext(void)
-    {
-        return jitContext;
-    } 
-    //
-    JITInstanceContext*     jitContext;
-};
-
-static TlsStack<CompilationContext> ccTls;
-static MemoryManager g_mm(4026, "global MM");
-
-CompilationContext* CompilationContext::getCurrentContext() {
-    CompilationContext* currentCC = ccTls.get();
-    return currentCC;
-}
-
-CompilationContext::CompilationContext(JIT_Handle jitHandle, 
-                                       Method_Handle meth)
-{
-    jitContext = Jitrino::getJITInstanceContext(jitHandle);
-    ccTls.push(this);
-    Class_Handle klass = method_get_class(meth);
-    const char* kname = class_get_name(klass);
-    const char* mname = method_get_name(meth);
-    const char* msig = method_get_descriptor(meth);
-    LogStreams::current(jitContext).beginMethod(kname, mname, msig);
-}
-
-CompilationContext::~CompilationContext()
-{
-    LogStreams::current(jitContext).endMethod();
-#ifdef _DEBUG
-    CompilationContext* last = ccTls.pop();
-    assert(this == last);
-#else 
-    ccTls.pop();
-#endif
-}
-
-//
-// LogStream::current()
-//
-
-static size_t threadnb = 0;
-
-struct TlsLogStreams {
-    MemoryManager mm;
-    LogStreams logstreams;
-    TlsLogStreams (PMF& pmf)   
-        :mm(0, "TlsLogStreams"), logstreams(mm, pmf, ++threadnb) {}
-    ~TlsLogStreams () 
-        {}
-};
-
-static TlsStore<TlsLogStreams> tlslogstreams;
-
-LogStreams& LogStreams::current(JITInstanceContext* jitContext) {
-    TlsLogStreams* sp = tlslogstreams.get();
-    if (sp == NULL)
-    {   // new thread
-        if (jitContext == NULL) {
-            jitContext = 
-            CompilationContext::getCurrentContext()->getCurrentJITContext(); 
-        }
-        sp = new TlsLogStreams(jitContext->getPMF());
-        tlslogstreams.put(sp);
-    }
-    return sp->logstreams;
-}
-
-//
-// Fake XTimer
-void XTimer::initialize(bool) {}
-double XTimer::getSeconds(void)const { return 0.0; }
-
 
 }; // ~namespace Jitrino
 
+//
+// Symbols from local 'Jitrino::'
 using Jitrino::JITInstanceContext;
 using Jitrino::MemoryManager;
 using Jitrino::jitContextList;
 using Jitrino::g_mm;
+//
+//
+using Jitrino::CompilationContext;
+using Jitrino::PMF;
+using Jitrino::HPipeline;
+using Jitrino::LogStreams;
 
 /**
  * @see setup
@@ -667,7 +738,7 @@ void JIT_init(JIT_Handle jit, const char* name)
 {
     JITInstanceContext* jic = 
                 new(g_mm) JITInstanceContext(g_mm, jit, name);
-    assert(Jitrino::jitContextList.find(jit) == Jitrino::jitContextList.end());
+    assert(jitContextList.find(jit) == jitContextList.end());
     jitContextList[jit] = jic;
     jic->getPMF().init();
     Jitrino::Jet::setup(jit, name);
@@ -698,8 +769,10 @@ JIT_Result JIT_compile_method(JIT_Handle jit, Compile_Handle ch,
                               Method_Handle method,
                               JIT_Flags flags)
 {
-    Jitrino::CompilationContext ctx(jit, method);
-    return Jitrino::Jet::compile(jit, ch, method, flags);
+    //Jitrino::CompilationContext ctx(jit, method);
+    //return Jitrino::Jet::compile(jit, ch, method, flags);
+    assert(false); // Obsolete
+    return JIT_FAILURE;
 }
 
 extern "C" JITEXPORT 
@@ -708,8 +781,30 @@ JIT_Result JIT_compile_method_with_params(JIT_Handle jit,
                                           Method_Handle method, 
                                           OpenMethodExecutionParams params)
 {
-    Jitrino::CompilationContext ctx(jit, method);
-    return Jitrino::Jet::compile_with_params(jit, ch, method, params);
+    //Jitrino::CompilationContext ctx(jit, method);
+    MemoryManager memManager(1024, "JIT_compile_method.memManager");
+    JITInstanceContext* jitContext = Jitrino::Jitrino::getJITInstanceContext(jit);
+    assert(jitContext!= NULL);
+    //DrlVMCompilationInterface
+    //        compilationInterface(ch, method, jit, memManager, params, NULL);
+    Jitrino::CompilationInterface* pci = NULL;
+    CompilationContext cs(memManager, pci/*&compilationInterface*/, jitContext);
+    //compilationInterface.setCompilationContext(&cs);
+
+    static int method_seqnb = 0;
+    int current_nb = method_seqnb++;
+
+    Class_Handle klass = method_get_class(method);
+    const char* methodTypeName = class_get_name(klass);
+    const char* methodName = method_get_name(method);
+    const char* methodSig = method_get_descriptor(method);
+    PMF::Pipeline* pipep =
+        jitContext->getPMF().selectPipeline(methodTypeName, methodName, methodSig);
+    cs.setPipeline((HPipeline*)pipep);
+    LogStreams::current(jitContext).beginMethod(methodTypeName, methodName, methodSig, current_nb);
+    JIT_Result result = Jitrino::Jet::compile_with_params(jit, ch, method, params);
+    LogStreams::current(jitContext).endMethod();
+    return result;
 }
 
 /**

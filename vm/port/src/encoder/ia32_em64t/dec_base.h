@@ -32,16 +32,53 @@
 #include "enc_base.h"
 #include "enc_prvt.h"
 
+#ifdef ENCODER_ISOLATE
+using namespace enc_ia32;
+#endif
+
 #define IF_CONDITIONAL  (0x00000000)
 #define IF_SYMMETRIC    (0x00000000)
 #define IF_BRANCH       (0x00000000)
 
 struct Inst {
+    Inst() {
+        mn = Mnemonic_Null;
+        size = 0;
+        flags = 0;
+        //offset = 0;
+        //direct_addr = NULL;
+        argc = 0;
+    }
+    /**
+     * Mnemonic of the instruction.s
+     */
     Mnemonic mn;
-    unsigned flags;
+    /**
+     * Size, in bytes, of the instruction.
+     */
     unsigned size;
-    int      offset;
-    void *   direct_addr;
+    /**
+     * Flags of the instruction.
+     * @see MF_
+     */
+    unsigned flags;
+    /**
+     * An offset of target address, in case of 'CALL offset', 
+     * 'JMP/Jcc offset'.
+     */
+    //int      offset;
+    /**
+     * Direct address of the target (on Intel64/IA-32 is 'instruction IP' + 
+     * 'instruction length' + offset).
+     */
+    //void *   direct_addr;
+    /**
+     * Number of arguments of the instruction.
+     */
+    unsigned argc;
+    //
+    EncoderBase::Operand operands[3];
+    //
     const EncoderBase::OpcodeDesc * odesc;
 };
 

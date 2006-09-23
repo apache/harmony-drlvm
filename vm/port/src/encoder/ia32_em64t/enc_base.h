@@ -298,6 +298,10 @@ public:
     class Operand {
     public:
         /**
+         * @brief Initializes the instance with empty size and kind.
+         */
+        Operand() : m_kind(OpndKind_Null), m_size(OpndSize_Null), m_need_rex(false) {}
+        /**
          * @brief Creates register operand from given RegName.
          */
         Operand(RegName reg) : m_kind(getRegKind(reg)), 
@@ -482,10 +486,6 @@ public:
             }
 #endif
         }
-        /**
-         * @brief Initializes the instance with empty size and kind.
-         */
-        Operand() : m_kind(OpndKind_Null), m_size(OpndSize_Null), m_need_rex(false) {}
         // general info
         OpndKind    m_kind;
         OpndSize    m_size;

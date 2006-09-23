@@ -69,7 +69,7 @@ static const RegName reg_map[] = {
 RegName devirt(AR ar, jtype jt)
 {
     RegName reg = RegName_Null;
-    if (ar != gr_x && ar!=ar_total) {
+    if (ar != gr_x) { // && ar!=ar_total) {
         //return RegName_Null;
         assert(COUNTOF(reg_map) == gr_total);
         unsigned idx = type_idx(ar);

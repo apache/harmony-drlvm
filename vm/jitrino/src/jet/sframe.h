@@ -289,11 +289,30 @@ public:
     {
         return scratch() - STACK_SLOT_SIZE;
     }
+    //
+    // Static area for JVMTI needs
+    //
 
+    // An area to preserve all the registers for JVMTI's PopFrame
+    int jvmti_regs_spill_area(void) const
+    {
+        return dbg_scratch() - Encoder::get_all_regs_size();
+    }
+    int jvmti_register_spill_offset(AR ar) const
+    {
+        if (is_gr(ar)) {
+            return jvmti_regs_spill_area() + STACK_SLOT_SIZE*gr_idx(ar);
+        }
+        assert(is_fr(ar));
+        return jvmti_regs_spill_area() + STACK_SLOT_SIZE*gr_num + 8*fr_idx(ar);
+    }
+    // ~Static JVMTI
+    //
     int info_gc_regs(void) const
     {
         assert(words(gen_num_calle_save()) == 1);
-        return dbg_scratch() - sizeof(unsigned);
+        //return dbg_scratch() - sizeof(unsigned);
+        return jvmti_regs_spill_area();
     }
     
     /**

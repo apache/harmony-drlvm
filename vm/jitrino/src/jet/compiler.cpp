@@ -32,6 +32,8 @@
 #include "jit_intf.h"
 
 #include "../shared/mkernel.h"
+//FIXME: needed for NOPs fix only, to be removed
+#include "enc_ia32.h"
 
 #include "jet.h"
 
@@ -83,6 +85,14 @@ JIT_Result Compiler::compile(Compile_Handle ch, Method_Handle method,
                              const OpenMethodExecutionParams& params)
 {
     compilation_params = params;
+
+    /*
+    compilation_params.exe_restore_context_after_unwind = true;
+    compilation_params.exe_provide_access_to_this = true;
+    //vm_properties_set_value("vm.jvmti.enabled", "true");
+    g_jvmtiMode = true;
+    */
+
     m_compileHandle = ch;
     MethInfo::init(method);
 
@@ -313,11 +323,16 @@ JIT_Result Compiler::compile(Compile_Handle ch, Method_Handle method,
         compile_flags |= JMF_REPORT_THIS;
     }
 
+    // Always report 'this' if we're asked about this explicitly
+    if (compilation_params.exe_provide_access_to_this && !meth_is_static()) {
+        compile_flags |= JMF_REPORT_THIS;
+    }
+
     m_infoBlock.init(bc_size, max_stack, num_locals, num_input_slots, 
                      compile_flags);
-
+    m_infoBlock.set_compile_params(compilation_params);
     bool eh_ok = comp_resolve_ehandlers();    
-    
+
     if (!eh_ok) {
         // At least on of the exception handlers classes was not resolved:
         // unable to resolve class of Exception => will be unable to register
@@ -638,7 +653,6 @@ void Compiler::comp_parse_bytecode(void)
             ji.id = id++;
         }
     }
-
 }
 
 void Compiler::comp_alloc_regs(void)
@@ -981,6 +995,14 @@ bool Compiler::comp_gen_insts(unsigned pc, unsigned parentPC,
         vcheck();
 #endif
         unsigned inst_code_end = m_codeStream.ipoff();
+        if (g_jvmtiMode && (inst_code_end == inst_code_dump_start)) {
+            // XXX, FIXME: quick fix for JVMTI testing:
+            // if bytecode did not produce any native code, then add a fake
+            // NOP, so every BC instruction has its own separate native 
+            // address
+            ip(EncoderBase::nops(ip(), 1));
+            inst_code_end = m_codeStream.ipoff();
+        }
         unsigned inst_code_dump_size = inst_code_end - inst_code_dump_start;
 
         unsigned bb_off = inst_code_start - bb_ip_start;
@@ -1345,7 +1367,7 @@ void Compiler::initStatics(void)
     VTBL_BASE = (const char*)vm_get_vtable_base();
     NULL_REF  = g_refs_squeeze ? OBJ_BASE : NULL;
 
-    g_jvmtiMode =  vm_get_property_value_boolean("vm.jvmti.enabled", false);
+    g_jvmtiMode = vm_get_property_value_boolean("vm.jvmti.enabled", false);
     
     rt_helper_monitor_enter = 
                 (char*)vm_get_rt_support_addr(VM_RT_MONITOR_ENTER);

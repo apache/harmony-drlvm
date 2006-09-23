@@ -309,8 +309,6 @@ enum AR {
     fr8, fr9, fr10, fr11, fr12, fr13, fr14, fr15, 
 #endif
     //
-    ar_num, ar_total = ar_num,
-    //
     // Specials
     //
 #ifdef _EM64T_
@@ -323,15 +321,16 @@ enum AR {
     //
     //
 #ifdef _EM64T_
-    gr_num=15,      // not including sp
-    gr_total = 16,  // including sp
+    gr_num=15,      /// not including sp
+    gr_total = 16,  /// including sp
     fr_num=16,
 #else
-    gr_num=7,       // not including sp
-    gr_total = 8,   // including sp
+    gr_num=7,       /// not including sp
+    gr_total = 8,   /// including sp
     fr_num=8,
 #endif
     fr_total=fr_num,
+    ar_total = fr_total + gr_total, ar_num = ar_total,
 };
 
 /**

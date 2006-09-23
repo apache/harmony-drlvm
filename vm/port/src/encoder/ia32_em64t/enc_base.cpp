@@ -23,8 +23,6 @@
 #include "enc_prvt.h"
 #include <stdio.h>
 
-ENCODER_NAMESPACE_START
-
 //#define JET_PROTO
 
 #ifdef JET_PROTO
@@ -32,6 +30,7 @@ ENCODER_NAMESPACE_START
 #include "jvmti_dasm.h"
 #endif
 
+ENCODER_NAMESPACE_START
 
 /**
  * @file
@@ -283,6 +282,10 @@ char * EncoderBase::encode(char * stream, Mnemonic mn, const Operands& opnds)
     }
 #endif
 
+#ifdef JET_PROTO
+    char* saveStream = stream;
+#endif
+
     const OpcodeDesc * odesc = lookup(mn, opnds);
 #if !defined(_EM64T_)
     bool copy_opcode = true;
@@ -358,16 +361,71 @@ char * EncoderBase::encode(char * stream, Mnemonic mn, const Operands& opnds)
     //saveStream 
     Inst inst;
     unsigned len = DecoderBase::decode(saveStream, &inst);
-    if(inst.mn != mn) {
-	__asm { int 3 };
+    assert(inst.mn == mn);
+    assert(len == (unsigned)(stream-saveStream));
+    if (mn == Mnemonic_CALL || mn == Mnemonic_JMP || 
+        (Mnemonic_JO<=mn && mn<=Mnemonic_JG)) {
+        assert(inst.argc == opnds.count());
+        
+        InstructionDisassembler idi(saveStream, (unsigned char)0xCC);
+        
+        for (unsigned i=0; i<inst.argc; i++) {
+            const EncoderBase::Operand& original = opnds[i];
+            const EncoderBase::Operand& decoded = inst.operands[i];
+            assert(original.kind() == decoded.kind());
+            assert(original.size() == decoded.size());
+            if (original.is_imm()) {
+                assert(original.imm() == decoded.imm());
+                assert(idi.get_opnd(0).kind == Kind_Imm);
+                if (mn == Mnemonic_CALL) {
+                    assert(idi.get_type() == InstructionDisassembler::RELATIVE_CALL);
+                }
+                else if (mn == Mnemonic_JMP) {
+                    assert(idi.get_type() == InstructionDisassembler::RELATIVE_JUMP);
+                }
+                else {
+                    assert(idi.get_type() == InstructionDisassembler::RELATIVE_COND_JUMP);
+                }
+            }
+            else if (original.is_mem()) {
+                assert(original.base() == decoded.base());
+                assert(original.index() == decoded.index());
+                assert(original.scale() == decoded.scale());
+                assert(original.disp() == decoded.disp());
+                assert(idi.get_opnd(0).kind == Kind_Mem);
+                if (mn == Mnemonic_CALL) {
+                    assert(idi.get_type() == InstructionDisassembler::INDIRECT_CALL);
+                }
+                else if (mn == Mnemonic_JMP) {
+                    assert(idi.get_type() == InstructionDisassembler::INDIRECT_JUMP);
+                }
+                else {
+                    assert(false);
+                }
+            }
+            else {
+                assert(original.is_reg());
+                assert(original.reg() == decoded.reg());
+                assert(idi.get_opnd(0).kind == Kind_Reg);
+                if (mn == Mnemonic_CALL) {
+                    assert(idi.get_type() == InstructionDisassembler::INDIRECT_CALL);
+                }
+                else if (mn == Mnemonic_JMP) {
+                    assert(idi.get_type() == InstructionDisassembler::INDIRECT_JUMP);
+                }
+                else {
+                    assert(false);
+                }
+            }
+        }
+        
+        Inst inst2;
+        len = DecoderBase::decode(saveStream, &inst2);
     }
-    if (len != (unsigned)(stream-saveStream)) {
-	__asm { int 3 };
-    }
-    InstructionDisassembler idi(saveStream, (unsigned char)0xCC);
-    if(idi.get_length_with_prefix() != (int)len) {
-	__asm { int 3 };
-    }
+    
+ //   if(idi.get_length_with_prefix() != (int)len) {
+	//__asm { int 3 };
+ //   }
 #endif
     
     return stream;

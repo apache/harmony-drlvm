@@ -27,6 +27,7 @@
 #define __MIB_H_INCLUDED__
 
 #include "enc.h"
+#include "jit_export.h"
 
 namespace Jitrino {
 namespace Jet {
@@ -269,6 +270,16 @@ public:
     {
         return rt_header->code_start;
     }
+
+    void set_compile_params(const OpenMethodExecutionParams& compileParams)
+    {
+        rt_header->compileParams = compileParams;
+    }
+
+    OpenMethodExecutionParams get_compile_params(void) const
+    {
+        return rt_header->compileParams;
+    }
     
     /**
      * @brief Copies MethodInfoBlock's data into a buffer.
@@ -470,7 +481,7 @@ private:
          *        in method's prolog (and thus need to be restored during
          *        unwinding).
          */
-        unsigned    saved_regs[words(ar_total)];
+        unsigned    saved_regs[words(ar_total+1)];
         /**
          * @brief Length of 'warm up code sequence'.
          *
@@ -486,6 +497,8 @@ private:
          * Beyond this point, a regular unwinding procedure is performed.
          */
         unsigned    warmup_len;
+
+        OpenMethodExecutionParams compileParams;
     };
     /**
      * @brief Pointer to a temporary buffer. The buffer is allocated in 

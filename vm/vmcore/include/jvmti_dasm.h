@@ -25,20 +25,64 @@
 #define __JVMTI_DASM_H_INCLUDED__
 
 #include "open/types.h"
+#include "vm_core_types.h"
 #include "jni_types.h"
 #include <assert.h>
 
 class InstructionDisassembler {
 public:
-
+    /**
+     * Type of instruction.
+     */
     enum Type {
         OPCODEERROR = 0,
         UNKNOWN,
         OTHER=UNKNOWN,
         RELATIVE_JUMP,
         RELATIVE_COND_JUMP,
-        ABSOLUTE_CALL,
-        RELATIVE_CALL
+        RELATIVE_CALL,
+        INDIRECT_JUMP,
+        INDIRECT_CALL
+    };
+    /**
+     * IA-32 general-purpose registers set.
+     */
+    enum Register {
+        IA32_REG_NONE, IA32_REG_EAX, IA32_REG_EBX, IA32_REG_ECX,
+        IA32_REG_EDX, IA32_REG_ESI, IA32_REG_EDI, IA32_REG_EBP, IA32_REG_ESP
+    };
+    /**
+     * Kind of operand 
+     * @see Opnd
+     */
+    enum Kind {
+        /// Operand represents a constant
+        Kind_Imm,
+        /// Operand is memory reference
+        Kind_Mem,
+        /// Operand is register
+        Kind_Reg
+    };
+    /**
+     * Describes an argument of instruction.
+     */
+    struct Opnd {
+        Opnd()
+            {
+                kind = Kind_Imm;
+                base = index = reg = IA32_REG_NONE;
+                scale = 0;
+                disp = 0;
+            }
+        Kind kind;
+        Register    base;
+        Register    index;
+        unsigned    scale;
+        union {
+            int         disp;
+            Register    reg;
+            int         imm;
+        };
     };
     /**
      * @brief Enum of possible condtions for conditional jump-s.
@@ -73,17 +117,17 @@ public:
 
     
     InstructionDisassembler(NativeCodePtr address) :
-        type(OPCODEERROR), target(0), len(0), cond_jump_type(JUMP_OVERFLOW)
+        m_type(OPCODEERROR), m_target(0), m_len(0), m_cond_jump_type(JUMP_OVERFLOW)
     {
         disasm(address, this);
     }
 
     InstructionDisassembler(InstructionDisassembler &d)
     {
-        type = d.type;
-        target = d.target;
-        len = d.len;
-        cond_jump_type = d.cond_jump_type;
+        m_type = d.m_type;
+        m_target = d.m_target;
+        m_len = d.m_len;
+        m_cond_jump_type = d.m_cond_jump_type;
     }
 
     /**
@@ -91,7 +135,7 @@ public:
      */
     Type get_type(void) const
     {
-        return type;
+        return m_type;
     }
     /**
      * @brief Returns length (in bytes) of underlying instruction.
@@ -100,8 +144,8 @@ public:
      */
     jint get_length_with_prefix(void) const
     {
-        assert(type != OPCODEERROR);
-        return len;
+        assert(get_type() != OPCODEERROR);
+        return m_len;
     }
     /**
      * @brief Returns absolute address of target, if applicable.
@@ -111,9 +155,10 @@ public:
      */
     NativeCodePtr get_jump_target_address(void) const
     {
-        assert(type == RELATIVE_JUMP || type == RELATIVE_COND_JUMP ||
-            type == ABSOLUTE_CALL || type == RELATIVE_CALL);
-        return target;
+        assert(get_type() == RELATIVE_JUMP || 
+               get_type() == RELATIVE_COND_JUMP ||
+               get_type() == RELATIVE_CALL);
+        return m_target;
     }
     /**
      * @brief Returns type of conditional jump.
@@ -123,10 +168,35 @@ public:
      */
     CondJumpType get_cond_jump_type(void) const
     {
-        assert(type == RELATIVE_COND_JUMP);
-        return cond_jump_type;
+        assert(get_type() == RELATIVE_COND_JUMP);
+        return m_cond_jump_type;
     }
-
+    
+    /**
+     * Returns number of operands of the instruction.
+     */
+    unsigned get_operands_count(void) const
+    {
+        return m_argc;
+    }
+    
+    /**
+     * Returns \c i-th operand.
+     */
+    const Opnd& get_opnd(unsigned i) const
+    {
+        assert(i<get_operands_count());
+        return m_opnds[i];
+    }
+    /**
+     * Calculates and returns address of target basing on the decoded 
+     * arguments and provided register context.
+     * 
+     * Works for both indirect and direct branches.
+     *
+     * @note Only valid for branch instructions like JMPs, CALLs, etc.
+     */
+    NativeCodePtr get_target_address_from_context(const Registers* pregs) const;
 private:
     /**
      * @brief Performs disassembling, fills out InstructionDisassembler's 
@@ -140,19 +210,27 @@ private:
     /**
      * @brief Type of instruction.
      */
-    Type    type;
+    Type    m_type;
     /**
      * @brief Absolute address of target, if applicable.
      */
-    NativeCodePtr   target;
+    NativeCodePtr   m_target;
     /**
      * @brief Length of the instruction, in bytes.
      */
-    unsigned len;
+    unsigned    m_len;
     /**
      * @brief Type of conditional jump.
      */
-    CondJumpType cond_jump_type;
+    CondJumpType m_cond_jump_type;
+    /**
+     * @brief Number of arguments of the instruction.
+     */
+    unsigned    m_argc;
+    /**
+     * @brief Arguments of the instruction.
+     */
+    Opnd        m_opnds[3];
 };
 
 

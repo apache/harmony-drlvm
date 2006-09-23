@@ -484,9 +484,9 @@ void Compiler::dbg_trace_comp_end(bool success, const char * reason)
     if (success) {
         unsigned size = method_get_code_block_size_jit(m_method, m_hjit);
         void * start = size ? method_get_code_block_addr_jit(m_method, m_hjit) : NULL;
-        
-        dbg("code.start=%p | code.end=%p | code.size=%d", 
-             start, (char*)start + size, size);    
+
+        dbg("code.begin=%p | code.end=%p | code.size=%d",
+             start, (char*)start + size, size);
     }
     else {
         dbg("[REJECTED:%s]", reason);

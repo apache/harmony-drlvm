@@ -68,8 +68,9 @@ void Compiler::gen_prolog(void) {
     //
     // Debugging things
     //
-    
-    // Ensure stack is aligned properly
+
+    // Ensure stack is aligned properly - for _ALIGN16 only here.
+    // _ALIGN_HALF16 is handled below.
     if (is_set(DBG_CHECK_STACK) && (m_ci.cc() & CCONV_STACK_ALIGN16)){
         alu(alu_test, sp, 0xF);
         unsigned br_off = br(eq, 0, 0);
@@ -132,6 +133,15 @@ void Compiler::gen_prolog(void) {
         AR ar = valloc(i32);
         ld4(ar, sp, frameSize-i*PAGE_SIZE);
     }
+    // When requested, store the whole context (==including scratch registers)
+    // - normally for JVMTI PopFrame support.
+    // Scratch registers get stored separately from the callee-save:
+    // The callee-save registers are stored into spill area, but we can't
+    // save scratch regs there - this area is already used to temporary
+    // save scratch regs during method calls, etc (see gen_vm_call_restore).
+    // Thus, we dedicate a separate place.
+    const bool storeWholeContext =
+        m_infoBlock.get_compile_params().exe_restore_context_after_unwind;
 #ifdef _DEBUG
     // Fill the whole stack frame with a special value
     // -1 to avoid erasing retAddr
@@ -142,6 +152,14 @@ void Compiler::gen_prolog(void) {
     AR ridx = valloc(i32);
     runlock(ar);
     Opnd idx(i32, ridx);
+    //
+    // When filling up the frame, the regs context is destroyed - preserve
+    // it.
+    if (storeWholeContext) {
+        push(fill);
+        push(idx);
+    }
+    //
     mov(fill, 0xDEADBEEF);
     mov(idx, num_words);
     unsigned _loop = ipoff();
@@ -149,7 +167,12 @@ void Compiler::gen_prolog(void) {
     alu(alu_sub, idx, 1);
     unsigned br_off = br(nz, 0, 0);
     patch(br_off, ip(_loop));
-#endif    
+    if (storeWholeContext) {
+        pop(idx);
+        pop(fill);
+    }
+#endif
+
     // save callee-save registers. If frame size is less than 1 page, 
     // the page was not touched yet, and the SOE may happen here
     for (unsigned i=0; i<ar_num; i++) {
@@ -165,6 +188,25 @@ void Compiler::gen_prolog(void) {
         m_infoBlock.saved(ar);
     }
     
+    if (storeWholeContext) {
+        // For JVMTI's PopFrame we store all scratch registers to a special
+        // place.
+        if (is_set(DBG_TRACE_CG)) { dbg(";;>jvmti.save.all.regs\n"); }
+        for (unsigned i=0; i<ar_num; i++) {
+            AR ar = _ar(i);
+            if (is_callee_save(ar) || ar==sp) {
+                continue;
+            }
+            // use maximum possible size to store the register
+            jtype jt = is_f(ar) ? dbl64 : jobj;
+            // Here, always use sp-based addressing - bp frame is not ready
+            // yet.
+            st(jt, ar, sp, frameSize+m_stack.jvmti_register_spill_offset(ar));
+        }
+        if (is_set(DBG_TRACE_CG)) { dbg(";;>~jvmti.save.all.regs\n"); }
+    }
+
+
     // ok, if we pass to this point at runtime, then we have enough stack
     // and we stored all needed registers, so in case of unwind_stack() 
     // we'll simply restore registers from the stack.
@@ -213,6 +255,7 @@ void Compiler::gen_prolog(void) {
             ++local;
         }
     }
+
     // Now, process input args: 
     //  - set GC maps for objects came as input args, 
     //  - move input args into the slots in the local stack frame (for some
@@ -230,13 +273,26 @@ void Compiler::gen_prolog(void) {
                 // .. callee-saved GP regs or ..
                 regs_map |= 1<<ar_idx(m_ra[local]);
             }
-            else if (vis_arg(local)) {
-                // .. local vars that are kept on the input slots  or ..
-                assert(m_ci.reg(i) == ar_x);
+            else if (vis_arg(local) || storeWholeContext) {
+                // .. local vars that are kept on the input slots or
+                // when we need to keep input args valid during enumeration
+                // (for example for JVMTI PopFrame needs) ...
+                assert(m_ci.reg(i) == ar_x || storeWholeContext);
                 assert(0 == m_ci.off(i)%STACK_SLOT_SIZE);
                 int inVal = m_ci.off(i)/STACK_SLOT_SIZE;
-                args_map[word_no(inVal)] = 
+                // TODO: With storeWholeContext it only works with
+                // stack-based parameters. On Intel64 with register-based
+                // calling convention, need to track the registers that are
+                // spilled separately from spill area (see above how the
+                // storeWholeContext is processed).
+                args_map[word_no(inVal)] =
                             args_map[word_no(inVal)] | (1 <<bit_no(inVal));
+                if (storeWholeContext) {
+                    // .. a 'regular' GC map for locals - must report
+                    // together with input args in case of storeWholeContext
+                    locals_map[word_no(local)] =
+                                locals_map[word_no(local)] | (1 <<bit_no(local));
+                }
             }
             else {
                 // .. a 'regular' GC map for locals.
@@ -247,8 +303,8 @@ void Compiler::gen_prolog(void) {
         jtype jtm = jtmov(jt);
         // as_type() => Convert narrow types (<i32) to i32.
         Opnd arg = m_ci.get(i, sp_offset).as_type(jt);
-        
-        // If we need to store 'this' for special reporting (ie. 
+
+        // If we need to store 'this' for special reporting (i.e.
         // monitor_exit or for stack trace) - store it.
         if (i==0 && is_set(JMF_REPORT_THIS)) {
             if (is_set(DBG_TRACE_CG)) {dbg(";;>copy thiz\n");}

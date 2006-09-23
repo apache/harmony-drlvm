@@ -224,10 +224,34 @@ void rt_unwind(JIT_Handle jit, Method_Handle method,
         context->p_edi = (unsigned*)(sp_val + spill_off);
     }
 #endif
+    // When needed, restore the whole context including scratch registers
+    // (normally, under JVMTI for PopFrame functionality)
+    if (infoBlock.get_compile_params().exe_restore_context_after_unwind) {
+        for (unsigned i=0; i<ar_num; i++) {
+            AR ar = _ar(i);
+            if (is_callee_save(ar) || ar==sp) {
+                continue;
+            }
+            void *** preg = devirt(ar, context);
+            //FIXME: JVMTI-popframe // assert(preg && *preg);
+            // ^^ temporarily disabling the assert, will need to uncomment
+            // when VM also supports all the registers to restore
+            // Currently, XMM regs are not restored as there are no proper
+            // fields in JitFrameContext
+            if (preg && *preg) {
+                *preg = (void**)(sp_val+sframe.jvmti_register_spill_offset(ar));
+                if (infoBlock.get_flags() & DBG_TRACE_RT) {
+                    dbg_rt("\trt.JVMTI.unwind.%s.%s: [%p]=%p\n",
+                        Encoder::to_str(ar, false).c_str(),
+                        Encoder::to_str(ar, true).c_str(), *preg, **preg);
+                }
+            } // ~if (*preg)
+        }
+    }
 
     sp_val += STACK_SLOT_SIZE; // pop out retIP
     *psp = sp_val;
-    
+
     if (infoBlock.get_flags() & DBG_TRACE_RT) {
         void *** pip = devirt(gr_x, context);
         rt_trace("rt.unwind", method, infoBlock, &saveContextForLogs);

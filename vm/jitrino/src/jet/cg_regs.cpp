@@ -35,6 +35,7 @@ AR CodeGen::valloc(jtype jt)
 {
     unsigned start = is_f(jt) ? ar_idx(fr0) : ar_idx(gr0);
     unsigned count = is_f(jt) ? fr_num : gr_num;
+    unsigned highest_index = start+count-1;
     //
     // We are going to allocate a temporary register - we do several tries 
     // to reach the following goals:
@@ -44,7 +45,7 @@ AR CodeGen::valloc(jtype jt)
     // Try to find the first SCRATCH (non callee-save) register
     
     AR last_used = rlast(jt);
-    for (unsigned i=ar_idx(last_used)+1; i<start+count; i++) {
+    for (unsigned i=ar_idx(last_used)+1; i<highest_index; i++) {
         AR ar = _ar(i);
         if (is_callee_save(ar) || ar == sp || ar == m_base) continue;
         if (rrefs(ar) == 0 && rlocks(ar) == 0 && !m_global_rusage.test(i)) {
@@ -54,7 +55,7 @@ AR CodeGen::valloc(jtype jt)
         }
     }
     // No free scratch registers above the 'last used'. Try any scratch reg.
-    for (unsigned i=start; i<start+count; i++) {
+    for (unsigned i=start; i<highest_index; i++) {
         AR ar = _ar(i);
         if (is_callee_save(ar) || ar == sp || ar == m_base) continue;
         if (rrefs(ar) == 0 && rlocks(ar) == 0 && !m_global_rusage.test(i)) {
@@ -69,7 +70,7 @@ AR CodeGen::valloc(jtype jt)
     //
     // not now. currently, only scratch regs are used as temporaries,
     // and callee-save are used as global regs. may revisit it.
-    for (unsigned i=start; i<start+count; i++) {
+    for (unsigned i=start; i<highest_index; i++) {
         AR ar = _ar(i);
         if (ar == sp || ar == m_base) continue;
         if (m_bbstate->regs[i].refs == 0 && m_bbstate->regs[i].locks==0 && 
@@ -87,7 +88,7 @@ AR CodeGen::valloc(jtype jt)
     // try to locate first non locked scratch register with min number of 
     // refs
     unsigned min_ref = NOTHING, min_idx = NOTHING;
-    for (unsigned i=start; i<start+count; i++) {
+    for (unsigned i=start; i<highest_index; i++) {
         AR ar = _ar(i);
         if (is_callee_save(ar) || ar == sp || ar == m_base) continue;
         if (min_ref > rrefs(ar) && rlocks(ar)==0 && !m_global_rusage.test(i)) {
@@ -118,7 +119,7 @@ AR CodeGen::valloc(jtype jt)
     start = !is_f(jt) ? ar_idx(fr0) : ar_idx(gr0);
     count = !is_f(jt) ? fr_num : gr_num;
     AR otherKind = ar_x;
-    for (unsigned i=start; i<start+count; i++) {
+    for (unsigned i=start; i<highest_index; i++) {
         AR ar = _ar(i);
         if (is_callee_save(ar) || ar == sp || ar == m_base) continue;
         if (m_bbstate->regs[i].refs == 0 && !m_bbstate->regs[i].locked) {
@@ -512,6 +513,12 @@ void CodeGen::vpop2(Val* pop_lo, Val* pop_hi)
 
 bool CodeGen::vis_arg(unsigned local_idx) const
 {
+    // Under JVMTI - never use input args as locals. Doing this keeps us
+    // away from problems with rt_{get|set}_local_var which does not handle
+    // input args.
+    if (g_jvmtiMode) {
+        return false;
+    }
     if (local_idx >= m_argSlots)return false;
     int argid = m_argids[local_idx];
     if(argid == -1)             return false;
