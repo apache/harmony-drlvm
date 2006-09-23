@@ -272,28 +272,18 @@ jint JNICALL create_jvmti_environment(JavaVM *vm_ext, void **env, jint version)
 
 void DebugUtilsTI::setExecutionMode(Global_Env *p_env)
 {
-    const char *interp_property =
-        properties_get_string_property((PropertiesHandle)&p_env->properties, "vm.use_interpreter");
+    for (int i = 0; i < p_env->vm_arguments.nOptions; i++) {
+        char *option = p_env->vm_arguments.options[i].optionString;
 
-    if (NULL != interp_property)
-    {
-        TRACE2("jvmti", "Interpreter property is already set on command line to value " <<
-            interp_property);
-    }
-    else
-        for (int i = 0; i < p_env->vm_arguments.nOptions; i++) {
-            char *option = p_env->vm_arguments.options[i].optionString;
-
-            if (!strncmp(option, "-agentlib:", 10) ||
-                !strncmp(option, "-agentpath:", 11) ||
-                !strncmp(option, "-Xrun", 5))
-            {
-                TRACE2("jvmti", "Enabling EM JVMTI mode");
-                // add_pair_to_properties(p_env->properties, "vm.use_interpreter", "true");
-                add_pair_to_properties(p_env->properties, "vm.jvmti.enabled", "true");
-                break;
-            }
+        if (!strncmp(option, "-agentlib:", 10) ||
+            !strncmp(option, "-agentpath:", 11) ||
+            !strncmp(option, "-Xrun", 5))
+        {
+            TRACE2("jvmti", "Enabling EM JVMTI mode");
+            add_pair_to_properties(p_env->properties, "vm.jvmti.enabled", "true");
+            break;
         }
+    }
 }
 
 DebugUtilsTI::DebugUtilsTI() :

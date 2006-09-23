@@ -497,7 +497,9 @@ jvmtiError DebugUtilsTI::jvmti_single_step_start(void)
     {
         VM_thread *vm_thread = get_vm_thread(ht);
         if( !vm_thread ) {
-            assert(!hythread_is_alive(ht));
+            // Skip thread that isn't started yet. SingleStep state
+            // will be enabled for it in
+            // jvmti_send_thread_start_end_event
             continue;
         }
 
@@ -564,7 +566,8 @@ jvmtiError DebugUtilsTI::jvmti_single_step_stop(void)
     {
         VM_thread *vm_thread = get_vm_thread(ht);
         if( !vm_thread ) {
-            assert(!hythread_is_alive(ht));
+            // Skip thread that isn't started yet. No need to disable
+            // SingleStep state for it
             continue;
         }
         jvmti_remove_single_step_breakpoints(this, vm_thread);
