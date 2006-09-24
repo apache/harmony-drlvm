@@ -35,7 +35,7 @@ APR_DECLARE(apr_status_t) apr_thread_set_priority(apr_thread_t *thread,
         return status;
     }
     
-    if (SetThreadPriority(os_thread, (int)convert_priority(priority))) {
+    if (SetThreadPriority(*os_thread, (int)convert_priority(priority))) {
         return APR_SUCCESS;
     } else {
         return apr_get_os_error();
@@ -59,12 +59,12 @@ APR_DECLARE(apr_status_t) apr_thread_yield_other(apr_thread_t* thread) {
 //        printf ("detached thread\n");
               return status;
         }
-       //printf("suspending %d\n", os_thread);
-    if(-1!=SuspendThread(os_thread)) {
-         ResumeThread(os_thread);
- //      printf("resuming %d\n", os_thread);
+       //printf("suspending %d\n", *os_thread);
+    if(-1!=SuspendThread(*os_thread)) {
+         ResumeThread(*os_thread);
+ //      printf("resuming %d\n", *os_thread);
         } else {
-  //            printf("fail to suspend %d\n", os_thread);
+  //            printf("fail to suspend %d\n", *os_thread);
         }
   return APR_SUCCESS; 
 }
@@ -91,7 +91,7 @@ APR_DECLARE(apr_status_t) apr_thread_times(apr_thread_t *thread,
     }
                     
     res = GetThreadTimes(
-        hThread,
+        *hThread,
         &creationTime,
         &exitTime,
         &kernelTime,
@@ -131,7 +131,7 @@ APR_DECLARE(apr_status_t) apr_get_thread_time(apr_thread_t *thread, apr_int64_t*
     if (status = apr_os_thread_get(&((apr_os_thread_t *)os_thread), thread)!=APR_SUCCESS) {
         return status;
     }
-    GetThreadTimes(os_thread, &creation_time, 
+    GetThreadTimes(*os_thread, &creation_time, 
         &exit_time, &kernel_time, 
         &user_time);
 
@@ -147,7 +147,7 @@ APR_DECLARE(apr_status_t) apr_thread_cancel(apr_thread_t *thread) {
         return status;
     }
     
-    if (TerminateThread(os_thread, 0)) {
+    if (TerminateThread(*os_thread, 0)) {
         return APR_SUCCESS;
     } else {
         return apr_get_os_error();
