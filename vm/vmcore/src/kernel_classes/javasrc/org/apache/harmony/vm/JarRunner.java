@@ -21,9 +21,6 @@ import java.util.jar.Attributes;
 
 import java.lang.reflect.Method;
 
-import java.net.URLClassLoader;
-import java.net.URL;
-
 /**
  *  Small class to launch jars.  Used by VM for the 
  *   "java -jar foo.jar" use case.
@@ -64,19 +61,13 @@ public class JarRunner {
         }
         
         /*
-         *  now suck the jar in via a classloader, and try to invoke main
-         *  on the mainclass
+         *  load class, copy the args (skipping the first that is the jarname)
+         *  and try to invoke main on the mainclass
          */
         
-        URL[] loaderArgs = {  new URL("jar:file:"+jarName + "!/") };
-
-        MyLoader urlLoader = new MyLoader(loaderArgs);
-        Class mainClass = urlLoader.findClass(className);        
+        Class mainClass = Thread.currentThread().getContextClassLoader().loadClass(className);               
         Method mainMethod = mainClass.getMethod("main", args.getClass());
-        
-        /*
-         *  copy the args, skipping the first which is the jarname
-         */
+
         String newArgs[] = new String[args.length - 1];
         
         for (int i=1; i < args.length; i++) {
@@ -84,16 +75,5 @@ public class JarRunner {
         }
             
         mainMethod.invoke(null, (java.lang.Object) newArgs);
-    }
-    
-    static class MyLoader extends URLClassLoader { 
-        
-        MyLoader(URL[] urls) {
-            super(urls);
-        }
-        
-        public Class findClass(String name) throws ClassNotFoundException { 
-            return super.findClass(name);
-        }
     }
 }
