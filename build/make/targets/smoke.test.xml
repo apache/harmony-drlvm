@@ -123,6 +123,7 @@ Version: $Revision: 1.4.2.11 $
                                     <jvmarg value="${int.or.jit.arg}" />
                                     <jvmarg value="-classpath" />
                                     <jvmarg value="${build.dir}/_smoke.tests/classes" />
+                                    <env key="JAVA_HOME" value="${build.deploy.dir}" />
                                     <env key="LD_LIBRARY_PATH" value="${build.deploy.dir}/bin:${env.LD_LIBRARY_PATH}" />
                                 </java>
                             </then>
@@ -131,6 +132,7 @@ Version: $Revision: 1.4.2.11 $
                                     <jvmarg value="-Dvm.assert_dialog=0" />
                                     <jvmarg value="-classpath" />
                                     <jvmarg value="${build.dir}/_smoke.tests/classes" />
+                                    <env key="JAVA_HOME" value="${build.deploy.dir}" />
                                     <env key="LD_LIBRARY_PATH" value="${build.deploy.dir}/bin:${env.LD_LIBRARY_PATH}" />
                                 </java>
                             </else>

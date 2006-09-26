@@ -164,6 +164,7 @@ Version: $Revision$
                               executable="${unit.test.c.workdir}/_bin/${filename}${extention}"
                               resultproperty="resultproperty"
                               outputproperty="outputproperty">
+                    <env key="JAVA_HOME" value="${build.deploy.dir}" />
                     <select os="lnx">
                         <env key="LD_LIBRARY_PATH" path="${unit.test.c.workdir}/_bin" />
                     </select>

@@ -147,6 +147,9 @@
             haltonfailure="no" failureproperty="batch.failed"
             filtertrace="no" printsummary="on"
             jvm="${build.deploy.dir}/bin/java">
+
+            <env key="JAVA_HOME" value="${build.deploy.dir}"/>
+
             <jvmarg value="-Dtest.resource.path=${test.resource.path}"/>
             <jvmarg value="-Dvm.assert_dialog=0" />
             <jvmarg value="-Xbootclasspath/a:${junit.jar}${path.separator}${test.class.path}" />
@@ -190,6 +193,9 @@
                 <junit fork="yes" failureproperty="@{test}.failed"
                     timeout="${kernel.test.timeout}" newenvironment="yes" filtertrace="no"
                     jvm="${build.deploy.dir}/bin/java">
+
+                    <env key="JAVA_HOME" value="${build.deploy.dir}"/>
+
                     <!--env key="LD_LIBRARY_PATH" value="${build.deploy.dir}/bin:${env.LD_LIBRARY_PATH}" /-->
                     <env key="SYSTEMDRIVE" value="${env.SystemDrive}" />
                     <env key="HOME" value="${env.HOME}" />
@@ -220,6 +226,10 @@
                         <junit fork="yes" failureproperty="@{test}.ref.failed" 
                             timeout="${kernel.test.timeout}" 
                             newenvironment="yes" filtertrace="no">
+
+
+                            <env key="JAVA_HOME" value="${build.deploy.dir}"/>
+
                             <!--env key="LD_LIBRARY_PATH" value="${build.deploy.dir}/bin:${env.LD_LIBRARY_PATH}" /-->
                             <env key="SYSTEMDRIVE" value="${env.SystemDrive}" />
                             <env key="HOME" value="${env.HOME}" />
