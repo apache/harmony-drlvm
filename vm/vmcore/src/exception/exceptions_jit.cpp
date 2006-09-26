@@ -278,7 +278,7 @@ static void exn_propagate_exception(
                             jit->get_bc_location_for_native(method, ip, &bc);
                         assert(EXE_ERROR_NONE == result);
 
-                        jvmti_StepLocation method_start = {(Method *)method, bc, ip};
+                        jvmti_StepLocation method_start = {(Method *)method, ip, bc, false};
 
                         jvmti_set_single_step_breakpoints(ti, vm_thread,
                                 &method_start, 1);

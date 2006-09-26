@@ -534,11 +534,8 @@ jvmtiGetBytecodes(jvmtiEnv* env,
 
         LMAutoUnlock lock(vm_brpt->get_lock());
 
-        if (!vm_brpt->has_breakpoint(method))
-            return JVMTI_ERROR_NONE;
-
-        for (VMBreakPoint* bpt = vm_brpt->find_first(method); bpt;
-             bpt = vm_brpt->find_next(bpt, method))
+        for (VMBreakPoint* bpt = vm_brpt->find_method_breakpoint(method); bpt;
+             bpt = vm_brpt->find_next_method_breakpoint(bpt, method))
         {
             (*bytecodes_ptr)[bpt->location] =
                 (unsigned char)bpt->saved_byte;

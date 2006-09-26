@@ -266,7 +266,8 @@ jint JNICALL create_jvmti_environment(JavaVM *vm_ext, void **env, jint version)
 
     // Acquire interface for breakpoint handling
     newenv->brpt_intf =
-        vm->vm_env->TI->vm_brpt->new_intf(jvmti_process_breakpoint_event,
+        vm->vm_env->TI->vm_brpt->new_intf(newenv,
+                                          jvmti_process_breakpoint_event,
                                           PRIORITY_SIMPLE_BREAKPOINT,
                                           interpreter_enabled());
 

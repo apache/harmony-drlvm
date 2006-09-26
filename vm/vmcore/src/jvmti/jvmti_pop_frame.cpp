@@ -342,7 +342,7 @@ jvmti_relocate_single_step_breakpoints( StackIterator *si)
                 jit->get_bc_location_for_native(method, ip, &bc);
             assert(EXE_ERROR_NONE == result);
 
-            jvmti_StepLocation locations = {method, bc, ip};
+            jvmti_StepLocation locations = {method, ip, bc, false};
             jvmti_set_single_step_breakpoints(ti, vm_thread, &locations, 1);
         }
     }

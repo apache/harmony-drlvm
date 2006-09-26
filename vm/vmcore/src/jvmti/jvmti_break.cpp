@@ -37,16 +37,17 @@
 
 
 // Callback function for JVMTI breakpoint processing
-bool jvmti_process_breakpoint_event(VMBreakInterface* intf, VMBreakPointRef* bp_ref)
+bool jvmti_process_breakpoint_event(TIEnv *env, VMBreakPoint* bp, void* UNREF data)
 {
-    VMBreakPoint* bp = bp_ref->brpt;
     assert(bp);
 
     TRACE2("jvmti.break", "Process breakpoint: "
-            << class_get_name(method_get_class((Method*)bp->method)) << "."
-            << method_get_name((Method*)bp->method)
-            << method_get_descriptor((Method*)bp->method)
-            << " :" << bp->location << " :" << bp->addr);
+            << (bp->method
+                ? class_get_name(method_get_class((Method*)bp->method)) : "(nil)")
+            << "."
+            << (bp->method ? method_get_name((Method*)bp->method) : "(nil)")
+            << (bp->method ? method_get_descriptor((Method*)bp->method) : "")
+            << " :" << bp->location << " :" << bp->addr );
 
     DebugUtilsTI *ti = VM_Global_State::loader_env->TI;
     if (!ti->isEnabled() || ti->getPhase() != JVMTI_PHASE_LIVE)
@@ -54,8 +55,7 @@ bool jvmti_process_breakpoint_event(VMBreakInterface* intf, VMBreakPointRef* bp_
 
     jlocation location = bp->location;
     jmethodID method = bp->method;
-    TIBrptData* data = (TIBrptData*)bp_ref->data;
-    TIEnv *env = data->env;
+    NativeCodePtr addr = bp->addr;
     
     hythread_t h_thread = hythread_self();
     jthread j_thread = jthread_get_java_thread(h_thread);
@@ -76,17 +76,15 @@ bool jvmti_process_breakpoint_event(VMBreakInterface* intf, VMBreakPointRef* bp_
                 << class_get_name(method_get_class((Method*)method)) << "."
                 << method_get_name((Method*)method)
                 << method_get_descriptor((Method*)method)
-                << " :" << location);
+                << " :" << location << " :" << addr);
 
-            intf->unlock();
             func((jvmtiEnv*)env, jni_env, (jthread)hThread, method, location);
-            intf->lock();
 
             TRACE2("jvmti.break", "Finished global breakpoint callback: "
                 << class_get_name(method_get_class((Method*)method)) << "."
                 << method_get_name((Method*)method)
                 << method_get_descriptor((Method*)method)
-                << " :" << location);
+                << " :" << location << " :" << addr);
         }
         else
         {
@@ -104,17 +102,15 @@ bool jvmti_process_breakpoint_event(VMBreakInterface* intf, VMBreakPointRef* bp_
                         << class_get_name(method_get_class((Method*)method)) << "."
                         << method_get_name((Method*)method)
                         << method_get_descriptor((Method*)method)
-                        << " :" << location);
+                        << " :" << location << " :" << addr);
 
-                    intf->unlock();
                     func((jvmtiEnv*)env, jni_env, (jthread)hThread, method, location);
-                    intf->lock();
 
                     TRACE2("jvmti.break", "Finished local breakpoint callback: "
                         << class_get_name(method_get_class((Method*)method)) << "."
                         << method_get_name((Method*)method)
                         << method_get_descriptor((Method*)method)
-                        << " :" << location);
+                        << " :" << location << " :" << addr);
                 }
             }
         }
@@ -190,25 +186,16 @@ jvmtiSetBreakpoint(jvmtiEnv* env,
 
     TIEnv *p_env = (TIEnv *)env;
     VMBreakInterface* brpt_intf = p_env->brpt_intf;
-    LMAutoUnlock lock(brpt_intf->get_lock());
+    VMBreakPoints *vm_breaks = VM_Global_State::loader_env->TI->vm_brpt;
+    LMAutoUnlock lock(vm_breaks->get_lock());
 
-    VMBreakPointRef* bp = brpt_intf->find(method, location);
+    VMBreakPointRef* bp = brpt_intf->find_reference(method, location);
 
     if (NULL != bp)
         return JVMTI_ERROR_DUPLICATE;
 
-    TIBrptData* data;
-    errorCode = _allocate(sizeof(TIBrptData), (unsigned char**)&data);
-    if (JVMTI_ERROR_NONE != errorCode)
-        return errorCode;
-
-    data->env = p_env;
-
-    if (!brpt_intf->add(method, location, data))
-    {
-        _deallocate((unsigned char*)data);
+    if (!brpt_intf->add_reference(method, location, NULL))
         return JVMTI_ERROR_INTERNAL;
-    }
 
     TRACE2("jvmti.break", "SetBreakpoint is successfull");
     return JVMTI_ERROR_NONE;
@@ -278,14 +265,15 @@ jvmtiClearBreakpoint(jvmtiEnv* env,
 
     TIEnv *p_env = (TIEnv *)env;
     VMBreakInterface* brpt_intf = p_env->brpt_intf;
-    LMAutoUnlock lock(brpt_intf->get_lock());
+    VMBreakPoints *vm_breaks = VM_Global_State::loader_env->TI->vm_brpt;
+    LMAutoUnlock lock(vm_breaks->get_lock());
 
-    VMBreakPointRef* bp = brpt_intf->find(method, location);
+    VMBreakPointRef* bp_ref = brpt_intf->find_reference(method, location);
 
-    if (NULL == bp)
+    if (NULL == bp_ref)
         return JVMTI_ERROR_NOT_FOUND;
 
-    if (!brpt_intf->remove(bp))
+    if (!brpt_intf->remove_reference(bp_ref))
         return JVMTI_ERROR_INTERNAL;
 
     TRACE2("jvmti.break", "ClearBreakpoint is successfull");

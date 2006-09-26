@@ -356,6 +356,10 @@ Opcode_BREAKPOINT(StackFrame& frame) {
     jlocation l = frame.ip - (uint8*)m->get_byte_code_addr();
     M2N_ALLOC_MACRO;
     uint8 b = (uint8) (POINTER_SIZE_INT) jvmti_process_interpreter_breakpoint_event((jmethodID)m, l);
+    if(b == OPCODE_COUNT) {
+        // breakpoint was remove by another thread, get original opcode
+        b = *(frame.ip);
+    }
     M2N_FREE_MACRO;
     return b;
 }

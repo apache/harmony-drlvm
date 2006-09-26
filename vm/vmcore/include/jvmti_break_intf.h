@@ -54,28 +54,36 @@ struct VMBreakPoint
     InstructionDisassembler* disasm;
     VMBreakPoint*            next;
     NativeCodePtr            addr;
-    jlocation                location;
     jmethodID                method;
+    jlocation                location;
     jbyte                    saved_byte;
-    bool                     is_interp;
-    bool                     is_processed;
 };
 
 // Breakpoint reference
 struct VMBreakPointRef
 {
-    VMBreakPoint*    brpt;
+    VMBreakPoint*    bp;
     void*            data;
     VMBreakPointRef* next;
 };
 
+struct VMLocalBreak
+{
+    VMBreakPoint *bp;
+    VMBreakPoint *bp_next;
+    VMBreakInterface *intf;
+    VMLocalBreak* next;
+    unsigned priority;
+};
+
 // Pointer to interface callback function
-typedef bool (*BPInterfaceCallBack)(VMBreakInterface* intf, VMBreakPointRef* bp_ref);
+typedef bool (*BPInterfaceCallBack)(TIEnv *env, VMBreakPoint* bp, void *data);
+typedef bool (*BPInterfaceProcedure) (VMBreakPoint *bp);
 
 class VMBreakPoints
 {
 public:
-    VMBreakPoints() : m_break(NULL)
+    VMBreakPoints() : m_break(NULL), m_last(NULL), m_local(NULL)
     {
         for(unsigned index = 0; index < PRIORITY_NUMBER; index++ ) {
             m_intf[index] = NULL;
@@ -84,34 +92,36 @@ public:
 
     ~VMBreakPoints();
 
+    // Class lock interface
     void lock() {m_lock._lock();}
     void unlock() {m_lock._unlock();}
     // Is used for LMAutoUnlock
     Lock_Manager* get_lock() {return &m_lock;}
 
     // Returns interface for breakpoint handling
-    VMBreakInterface* new_intf(BPInterfaceCallBack callback,
+    VMBreakInterface* new_intf(TIEnv *env, BPInterfaceCallBack callback,
         unsigned priority, bool is_interp);
     // Destroys interface and deletes all its breakpoints
     void release_intf(VMBreakInterface* intf);
 
-    // Checks breakpoint before inserting
-    bool check_insert_breakpoint(VMBreakPoint* bp);
     // Inserts breakpoint into global list and performs instrumentation
-    bool insert_breakpoint(VMBreakPoint* brpt);
+    bool insert_native_breakpoint(VMBreakPoint* bp);
+    bool insert_interpreter_breakpoint(VMBreakPoint* bp);
     // Removes breakpoint from global list and restores instrumented area
-    bool remove_breakpoint(VMBreakPoint* brpt);
+    bool remove_native_breakpoint(VMBreakPoint* bp);
+    bool remove_interpreter_breakpoint(VMBreakPoint* bp);
 
-    // Search operations
+    // Search breakpoints operations
     VMBreakPoint* find_breakpoint(jmethodID method, jlocation location);
     VMBreakPoint* find_breakpoint(NativeCodePtr addr);
     VMBreakPoint* find_other_breakpoint_with_same_addr(VMBreakPoint* bp);
     VMBreakPoint* find_next_breakpoint(VMBreakPoint* prev, NativeCodePtr addr);
+    VMBreakPoint* find_next_breakpoint(VMBreakPoint* prev, jmethodID method,
+        jlocation location);
 
     // Search breakpoints for given method
-    bool has_breakpoint(jmethodID method);
-    VMBreakPoint* find_first(jmethodID method);
-    VMBreakPoint* find_next(VMBreakPoint* prev, jmethodID method);
+    VMBreakPoint* find_method_breakpoint(jmethodID method);
+    VMBreakPoint* find_next_method_breakpoint(VMBreakPoint* prev, jmethodID method);
 
     // Checks if given breakpoint is set by other interfaces
     VMBreakPointRef* find_other_reference(VMBreakInterface* intf,
@@ -119,31 +129,32 @@ public:
     VMBreakPointRef* find_other_reference(VMBreakInterface* intf,
         NativeCodePtr addr);
     VMBreakPointRef* find_other_reference(VMBreakInterface* intf,
-        VMBreakPoint* brpt);
+        VMBreakPoint* bp);
+
+    // Interfaces iterator
+    VMBreakInterface* get_first_intf(unsigned priority) { return m_intf[priority]; }
+    VMBreakInterface* get_next_intf(VMBreakInterface *intf);
 
     // General callback functions
     void  process_native_breakpoint();
     jbyte process_interpreter_breakpoint(jmethodID method, jlocation location);
 
-protected:
-    void clear_breakpoints_processed_flags();
-    VMBreakPoint* get_none_processed_breakpoint(NativeCodePtr addr);
-    void set_breakpoint_processed( VMBreakPoint *bp, bool flag )
-    {
-        bp->is_processed = flag;
-    }
-    bool breakpoint_is_processed( VMBreakPoint *bp )
-    {
-        return bp->is_processed == true;
-    }
+private:
+    // Checks breakpoint before inserting
+    inline bool check_insert_breakpoint(VMBreakPoint* bp);
+    void insert_breakpoint(VMBreakPoint* bp);
+    void remove_breakpoint(VMBreakPoint* bp);
 
-    void clear_intfs_processed_flags();
-    VMBreakInterface* get_none_processed_intf(unsigned priority);
+    // Set/remove thread processing breakpoints interfaces
+    void set_thread_local_break(VMLocalBreak *local);
+    void remove_thread_local_break(VMLocalBreak *local);
 
 private:
     VMBreakInterface* m_intf[PRIORITY_NUMBER];
     VMBreakPoint*     m_break;
-    Lock_Manager m_lock;
+    VMBreakPoint*     m_last;
+    VMLocalBreak*     m_local;
+    Lock_Manager      m_lock;
 };
 
 class VMBreakInterface
@@ -151,54 +162,60 @@ class VMBreakInterface
     friend class VMBreakPoints;
 
 public:
-    void lock()     {VM_Global_State::loader_env->TI->vm_brpt->lock();}
-    void unlock()   {VM_Global_State::loader_env->TI->vm_brpt->unlock();}
-    Lock_Manager* get_lock()
-                    {return VM_Global_State::loader_env->TI->vm_brpt->get_lock();}
-
     int get_priority() const { return m_priority; }
 
     // Iteration
-    VMBreakPointRef* get_first() { return m_list; }
-    VMBreakPointRef* get_next(VMBreakPointRef* prev)
+    VMBreakPointRef* get_reference() { return m_list; }
+    VMBreakPointRef* get_next_reference(VMBreakPointRef* ref)
     {
-        assert(prev);
-        return prev->next;
+        assert(ref);
+        return ref->next;
     }
 
     // Basic operations
 
     // 'data' must be allocated with JVMTI Allocate (or internal _allocate)
     // Users must not deallocate 'data', it will be deallocated by 'remove'
-    VMBreakPointRef* add(jmethodID method, jlocation location, void* data);
+    VMBreakPointRef* add_reference(jmethodID method, jlocation location, void* data);
     // To specify address explicitly
-    VMBreakPointRef* add(jmethodID method, jlocation location,
+    VMBreakPointRef* add_reference(jmethodID method, jlocation location,
                     NativeCodePtr addr, void* data);
-    VMBreakPointRef* add(NativeCodePtr addr, void* data);
+    VMBreakPointRef* add_reference(NativeCodePtr addr, void* data);
 
-    void remove_all();
-    bool remove(VMBreakPointRef* ref);
+    bool remove_reference(VMBreakPointRef* ref);
+    void remove_all_reference()
+    {
+        while (m_list) {
+            remove_reference(m_list);
+        }
+    }
 
-    VMBreakPointRef* find(jmethodID method, jlocation location);
-    VMBreakPointRef* find(NativeCodePtr addr);
-    VMBreakPointRef* find(VMBreakPoint* brpt);
+    VMBreakPointRef* find_reference(jmethodID method, jlocation location);
+    VMBreakPointRef* find_reference(NativeCodePtr addr);
+    VMBreakPointRef* find_reference(VMBreakPoint* bp);
 
 protected:
-    VMBreakInterface(BPInterfaceCallBack callback, unsigned priority, bool is_interp)
-        : m_list(NULL), m_callback(callback), m_priority(priority),
-          m_next(NULL), m_processed(false), m_is_interp(is_interp) {}
-    ~VMBreakInterface() { remove_all(); }
+    VMBreakInterface(TIEnv *env,
+                     BPInterfaceCallBack callback,
+                     unsigned priority,
+                     bool is_interp);
+    ~VMBreakInterface() { remove_all_reference(); }
+    TIEnv* get_env() { return m_env; }
 
-    void set_processed(bool processed) { m_processed = processed; }
-    bool is_processed() const { return (m_processed == true); }
+private:
+    inline VMBreakPointRef* add_reference_internal(VMBreakPoint *bp, void *data);
+
+protected:
     VMBreakInterface*   m_next;
 
 private:
-    VMBreakPointRef*    m_list;
-    BPInterfaceCallBack m_callback;
-    bool                m_is_interp;
-    unsigned            m_priority;
-    bool                m_processed;
+    BPInterfaceCallBack  breakpoint_event_callback;
+    BPInterfaceProcedure breakpoint_insert;
+    BPInterfaceProcedure breakpoint_remove;
+    VMBreakPointRef*     m_list;
+    TIEnv               *m_env;
+    unsigned             m_priority;
+    Lock_Manager         m_lock;
 };
 
 // Callback function for native breakpoint processing

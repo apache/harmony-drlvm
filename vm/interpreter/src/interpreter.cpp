@@ -1781,8 +1781,18 @@ Opcode_PUTFIELD(StackFrame& frame) {
 
     if (field->is_final()) {
         if (!frame.method->is_init()) {
-            throwIAE(field_get_name(field));
-            return;
+
+            // searching for the constructor for this class in stack.
+            for (StackFrame *f = frame.prev; true; f = f->prev) {
+                if (f == NULL) {
+                    throwIAE(field_get_name(field));
+                    return;
+                }
+
+                if (f->This == frame.This && f->method->is_init()) {
+                    break;
+                }
+            }
         }
     }
 
@@ -2513,6 +2523,8 @@ interpreter(StackFrame &frame) {
             << frame.method->get_class()->name->bytes
             << " " << frame.method->get_name()->bytes
             << frame.method->get_descriptor()->bytes << endl);
+
+    assert(frame.method->is_static() || frame.This);
 
     M2N_ALLOC_MACRO;
     assert(!check_current_thread_exception());

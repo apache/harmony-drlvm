@@ -74,19 +74,11 @@ struct jvmti_frame_pop_listener
     jvmti_frame_pop_listener *next;
 };
 
-/*
- * Type which will be attached to each JVMTI breakpoint
- */
-struct TIBrptData
-{
-    TIEnv *env;
-};
-
 struct jvmti_StepLocation
 {
     struct Method* method;
-    unsigned location;
     NativeCodePtr native_location;
+    unsigned location;
     bool no_event;
 };
 
@@ -147,7 +139,7 @@ public:
 
 typedef struct Class Class;
 class VMBreakPoints;
-struct VMBreakPointRef;
+struct VMBreakPoint;
 
 /*
  * JVMTI state of the VM
@@ -367,6 +359,6 @@ void jvmti_SingleStepLocation(VM_thread* thread, Method *method,
     unsigned location, jvmti_StepLocation **next_step, unsigned *count);
 
 // Callback function for JVMTI breakpoint processing
-bool jvmti_process_breakpoint_event(VMBreakInterface* intf, VMBreakPointRef* bp_ref);
+bool jvmti_process_breakpoint_event(TIEnv *env, VMBreakPoint* bp, void* data);
 
 #endif /* _JVMTI_INTERNAL_H_ */
