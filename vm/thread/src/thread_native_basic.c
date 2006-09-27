@@ -719,6 +719,18 @@ static void* APR_THREAD_FUNC thread_start_proc(apr_thread_t* thd, void *p_args) 
     return (void *)(IDATA)apr_thread_exit(thd, APR_SUCCESS);
 }
 
+extern HY_CFUNC void VMCALL 
+    hythread_exit (hythread_monitor_t monitor) {
+   
+    if (monitor !=NULL && monitor->owner == hythread_self()) {
+        monitor->recursion_count = 0;
+        hythread_monitor_exit(monitor);
+    }
+    apr_thread_exit(hythread_self()->os_handle, APR_SUCCESS);     
+    // unreachable statement
+    abort();
+}
+
 apr_pool_t* get_local_pool() {
   hythread_t self = tm_self_tls;
   if(self == NULL) {

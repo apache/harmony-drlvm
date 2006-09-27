@@ -119,7 +119,7 @@ hymutex_lock;
 hymutex_trylock;
 hymutex_unlock;
 hymutex_destroy;
-
+hythread_exit;
 
 hythread_wait_for_all_nondaemon_threads;
 hythread_is_alive;

@@ -136,6 +136,7 @@ hythread_is_waiting_with_timeout
 hythread_is_waiting_indefinitely
 hythread_is_runnable
 hythread_thin_monitor_get_recursion
+hythread_exit
 array_add
 array_create
 array_delete
