@@ -714,7 +714,14 @@ jvmtiError jvmti_get_next_bytecodes_from_native(VM_thread *thread,
         return JVMTI_ERROR_NONE;
     }
 
-    assert(!si_is_native(si));
+    if (si_is_native(si))
+    {
+        // We are called from native code, nothing to be done
+        // here. The bytecode which called us will be instrumented
+        // when we return back to java in vm_execute_java_method_array
+        return JVMTI_ERROR_NONE;
+    }
+
     if( invoked_frame ) {
         // get previous stack frame
         si_goto_previous(si);
