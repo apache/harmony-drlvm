@@ -393,7 +393,7 @@ Version: $Revision: 1.16.2.20 $
     </target>
 
     <!-- Main target to run kernel tests -->
-    <target name="kernel.test" depends="init" >
+    <target name="kernel.test" depends="extern_dep,init" >
         <ant antfile="targets/kernel.test.xml" target="kernel.test"/>
     </target>
 
