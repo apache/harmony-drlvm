@@ -27,7 +27,7 @@
 
 #include "method_lookup.h"
 
-void get_file_and_line(Method_Handle mh, void *ip, const char **file, int *line) {
+void get_file_and_line(Method_Handle mh, void *ip, bool is_ip_past, const char **file, int *line) {
     Method *method = (Method*)mh;
     *file = class_get_source_file_name(method_get_class(method));
 
@@ -61,6 +61,10 @@ void get_file_and_line(Method_Handle mh, void *ip, const char **file, int *line)
         &bcOffset) != EXE_ERROR_NONE) {
         //
         return;
+    }
+
+    if (is_ip_past) {
+        bcOffset--;
     }
     *line = method->get_line_number(bcOffset);
 #endif        
@@ -188,7 +192,7 @@ void st_print_frame(ExpandableMemBlock* buf, StackTraceFrame* stf)
     buf->AppendFormatBlock("\tat %s.%s%s", cname, mname, dname);
     const char *file;
     int line;
-    get_file_and_line(stf->method, stf->ip, &file, &line);
+    get_file_and_line(stf->method, stf->ip, false, &file, &line);
 
     if (line==-2)
         // Native method

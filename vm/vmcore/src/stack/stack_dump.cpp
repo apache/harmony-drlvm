@@ -164,7 +164,7 @@ static void st_get_c_method_info(MethodInfo* info, void* ip) {
 #endif
 }
 
-static void st_get_java_method_info(MethodInfo* info, Method* m, void* ip) {
+static void st_get_java_method_info(MethodInfo* info, Method* m, void* ip, bool is_ip_past) {
     info->file_name = NULL;
     info->line = -1;
     info->method_name = NULL;
@@ -191,7 +191,7 @@ static void st_get_java_method_info(MethodInfo* info, Method* m, void* ip) {
     info->method_name[clen + mlen + dlen + 1] = '\0';
 
     const char* f;
-    get_file_and_line(m, ip, &f, &info->line);
+    get_file_and_line(m, ip, is_ip_past, &f, &info->line);
 }
 
 static void st_print_line(int count, MethodInfo* m) {
@@ -234,10 +234,10 @@ void st_print_stack(Registers* regs) {
                 uint32 offset = (POINTER_SIZE_INT)si_get_ip(si) - (POINTER_SIZE_INT)cci->get_code_block_addr();
                 for (uint32 j = 0; j < inlined_depth; j++) {
                     Method *real_method = cci->get_jit()->get_inlined_method(cci->get_inline_info(), offset, j);
-                    st_get_java_method_info(&m, real_method, frames[i].ip);
+                    st_get_java_method_info(&m, real_method, frames[i].ip, 0 == i);
                     st_print_line(++count, &m);
                 }
-                st_get_java_method_info(&m, cci->get_method(), frames[i].ip);
+                st_get_java_method_info(&m, cci->get_method(), frames[i].ip, 0 == i);
           }
           si_goto_previous(si);
       }

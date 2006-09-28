@@ -136,7 +136,7 @@ VMEXPORT void st_get_trace(VM_thread *p_vmthread, unsigned* depth,
  * @param[out] file   - the pointer to the file reference to be filled by this function
  * @param[out] line   - the pointer to the line number to be filled by this function
  */
-VMEXPORT void get_file_and_line(Method_Handle method, void *ip, const char **file, int *line);
+VMEXPORT void get_file_and_line(Method_Handle method, void *ip, bool is_ip_past, const char **file, int *line);
 
 #ifdef __cplusplus
 }

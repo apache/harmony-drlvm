@@ -319,7 +319,7 @@ JNIEXPORT jobjectArray JNICALL Java_org_apache_harmony_vm_VMStack_getStackTrace
         int lineNumber;
         const char* fileName;
 
-        get_file_and_line(method, ip, &fileName, &lineNumber);
+        get_file_and_line(method, ip, true, &fileName, &lineNumber);
         jstring strFileName;
         if (fileName != NULL) {
             strFileName = jenv->NewStringUTF(fileName);
@@ -441,7 +441,7 @@ JNIEXPORT jobjectArray JNICALL Java_org_apache_harmony_vm_VMStack_getThreadStack
             int lineNumber;
             const char* fileName;
 
-            get_file_and_line(method, ip, &fileName, &lineNumber);
+            get_file_and_line(method, ip, true, &fileName, &lineNumber);
             if (fileName == NULL) fileName = "";
 
             jstring strFileName = jenv->NewStringUTF(fileName);

@@ -217,6 +217,10 @@ jvmtiGetStackTrace(jvmtiEnv* env,
                                     jit->get_bc_location_for_native(
                                         inlined_method, ip, &bc);
                                 assert(result == EXE_ERROR_NONE);
+
+                                if (0 < stack_depth - iii) {
+                                    bc--;
+                                }
                                 frame_buffer[count].location = bc;
                                 frame_buffer[count].method =
                                     reinterpret_cast<jmethodID>(method);
@@ -232,6 +236,10 @@ jvmtiGetStackTrace(jvmtiEnv* env,
                                 jit->get_bc_location_for_native(
                                     method, ip, &bc);
                             assert(result == EXE_ERROR_NONE);
+
+                            if (0 < stack_depth - inlined_depth) {
+                                bc--;
+                            }
                             frame_buffer[count].location = bc;
                         }
                     }
