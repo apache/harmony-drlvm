@@ -21,25 +21,24 @@
 #include "collect.h"
 #include <math.h>
 
-void reserve_old_object_space(int size) {
-    size &= ~3;
+void reserve_old_object_space(POINTER_SIZE_SINT size) {
+    size &= ~(GC_OBJECT_ALIGNMENT - 1);
 
-    int free = heap.old_objects.end - heap.old_objects.pos;
     if (size < 0) {
         TRACE2("gc.select", "Reserve old object space: can't shrink old object space");
         return;
     }
 
     assert(heap.old_objects.end == heap.pos);
-    if (heap.old_objects.end + size > heap.ceiling) {
-        size = heap.ceiling - heap.old_objects.end;
+    if (heap.old_objects.end + size > heap.allocation_region_end()) {
+        size = heap.allocation_region_end() - heap.old_objects.end;
     }
 
     heap.old_objects.end += size;
     TRACE2("gc.select", "Reserved space = " << mb(heap.old_objects.end - heap.old_objects.pos));
 
     // balancing free areas.
-    pinned_areas.push_back(heap.ceiling);
+    pinned_areas.push_back(heap.allocation_region_end());
 
     // update heap.old_objects.pos_limit
     if (heap.old_objects.pos_limit == heap.pos) {
@@ -73,7 +72,7 @@ void reserve_old_object_space(int size) {
     heap.old_objects.end = heap.pos;
 
     // restore pinned areas.
-    pinned_areas.pop_back();
+    pinned_areas.pop_back(); // heap.allocation_region_end()
 }
 
 unsigned char *select_gc(int size) {
@@ -119,7 +118,7 @@ unsigned char *select_gc(int size) {
     TRACE2("gc.mem", "select_gc2 = " << res);
 
     if (res == 0 && heap.size != heap.max_size) {
-        assert(heap.pos_limit == heap.ceiling);
+        assert(heap.pos_limit == heap.allocation_region_end());
         heap_extend(round_up(heap.size + size, 65536));
         if (heap.pos + size <= heap.pos_limit) {
             res = heap.pos;
@@ -166,20 +165,25 @@ float Smin(float Smax, float Tslow, float Tfast, float dS) {
 bool need_compaction_next_gc() {
     if (heap.working_set_size == 0 || !gc_adaptive) {
         TRACE2("gc.adaptive", "static Smin analisis");
-        return heap.ceiling - heap.pos < heap.size * 0.7f;
+        return heap.allocation_region_end() - heap.pos < heap.size * 0.7f;
     } else {
-        float smin = Smin(heap.size - heap.working_set_size,
+        float smin = Smin(heap.roots_start - heap.base - RESERVED_FOR_HEAP_NULL - heap.working_set_size,
                 heap.Tcompact, heap.Tcopy, heap.dS_copy);
-        float free = (float) (heap.ceiling - heap.pos);
+        float free = (float) (heap.allocation_region_end() - heap.old_objects.pos);
+        INFO2("gc.smin", "smin = " << mb((size_t)smin)
+                << " (working set " << mb((size_t)heap.working_set_size)
+                << " Tfast " << (int)(heap.Tcopy / 1000.)
+                << " Tslow " << (int)(heap.Tcompact / 1000.)
+                << " dS " << mb((size_t)heap.dS_copy)
+                << "), free = " << mb((int)free));
         //INFO2("gc.logic", "Smin = " << (int) mb((int)smin) << "mb, free = " << mb((int)free) << " mb");
         return free < smin;
-            
     }
 }
 
 static void check_heap_extend() {
-    int free_space = heap.allocation_region_end() - heap.allocation_region_start();
-    int used_space = heap.size - free_space;
+    size_t free_space = heap.allocation_region_end() - heap.allocation_region_start();
+    size_t used_space = heap.size - free_space;
 
     if (free_space < used_space) {
         size_t new_heap_size = used_space * 8;
@@ -197,6 +201,7 @@ static void check_heap_extend() {
 }
 
 size_t correction;
+Ptr prev_alloc_start;
 
 static void update_evacuation_area() {
     POINTER_SIZE_SINT free = heap.allocation_region_end() - heap.allocation_region_start();
@@ -209,10 +214,16 @@ static void update_evacuation_area() {
         return;
     }
 
+    POINTER_SIZE_SINT dS = heap.old_objects.pos - prev_alloc_start;
+    if (prev_alloc_start != 0) {
+        heap.dS_copy = (float)dS;
+    }
+    prev_alloc_start = heap.old_objects.pos;
+
     if (need_compaction_next_gc()) {
         //INFO2("gc.logic", "compaction triggered by Smin");
         heap.next_gc = GC_FULL;
-        heap.dS_copy = 0;
+        prev_alloc_start = 0;
         return;
     }
 
@@ -231,7 +242,6 @@ static void update_evacuation_area() {
         return;
     }
     assert(incr > 0);
-    heap.dS_copy = (float)incr;
 
     /*INFO2("gc.logic", 
             "mb overflow = " << overflow / 1024 / 1024
@@ -282,29 +292,25 @@ void after_slide_gc() {
 }
 
 void select_force_gc() {
+    vm_gc_lock_enum();
     if (gc_algorithm < 10) {
-        vm_gc_lock_enum();
         force_gc();
-        vm_gc_unlock_enum();
-        vm_hint_finalize();
     } else if ((gc_algorithm / 10) == 2) {
-        vm_gc_lock_enum();
         full_gc(0);
-        vm_gc_unlock_enum();
-        vm_hint_finalize();
     } else if ((gc_algorithm / 10) == 3) {
-        vm_gc_lock_enum();
+        heap.old_objects.prev_pos = heap.old_objects.pos;
         copy_gc(0);
-        vm_gc_unlock_enum();
-        vm_hint_finalize();
     }
+    vm_gc_unlock_enum();
+    vm_hint_finalize();
 }
 
 void init_select_gc() {
-    heap.old_objects.end = heap.old_objects.pos = heap.old_objects.pos_limit = heap.base;
+    heap.old_objects.end = heap.old_objects.pos = heap.old_objects.pos_limit
+        = heap.base + RESERVED_FOR_HEAP_NULL;
 
-    heap.pos = heap.base;
-    heap.pos_limit = heap.ceiling;
+    heap.pos = heap.base + RESERVED_FOR_HEAP_NULL;
+    heap.pos_limit = heap.allocation_region_end();
 
     heap.incr_abs = 0;
     heap.incr_rel = 0.2f;
@@ -314,15 +320,14 @@ void init_select_gc() {
     pinned_areas_pos = 1;
 
     if (gc_algorithm % 10 == 0) {
-        int reserve = heap.size / 5;
+        size_t reserve = heap.size / 5;
         reserve_old_object_space(reserve);
-        heap.predicted_pos = heap.base + reserve;
+        heap.predicted_pos = heap.base + reserve + RESERVED_FOR_HEAP_NULL;
     }
     if (gc_algorithm % 10 == 3) {
-        int reserve = heap.size / 3;
+        size_t reserve = heap.size / 3;
         reserve_old_object_space(reserve);
-        heap.predicted_pos = heap.base + reserve;
+        heap.predicted_pos = heap.base + reserve + RESERVED_FOR_HEAP_NULL;
     }
     heap.next_gc = GC_COPY;
-
 }

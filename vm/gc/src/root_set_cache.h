@@ -17,5 +17,5 @@
  * @author Ivan Volosyuk
  */
 
-typedef fast_list<Partial_Reveal_Object**,65536> roots_vector;
+typedef fast_list<Slot,65536> roots_vector;
 extern roots_vector root_set;
