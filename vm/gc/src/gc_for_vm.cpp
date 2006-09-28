@@ -250,27 +250,33 @@ Managed_Object_Handle gc_alloc(unsigned in_size,
     if (gcvt->is_finalizible()) {
         unsigned char *obj;
         unsigned char *endpos;
-        bool res = place_into_old_objects(obj, endpos, size);
-        if (res) {
+        bool allocated = place_into_old_objects(obj, endpos, size);
+        if (allocated) {
             memset(obj, 0, size);
             finalizible_objects.push_back((Partial_Reveal_Object*) obj);
             vm_gc_unlock_enum();
             *(int*)obj = ah;
             return (Managed_Object_Handle)obj;
         }
-    }
 
-    if (info->tls_current_free + size <= info->tls_current_ceiling) {
-        res = (unsigned char*) info->tls_current_free;
-        info->tls_current_free += size;
-        assert(!((POINTER_SIZE_INT)res & 3));
+        // reload cached values after possible GC
+        res = info->tls_current_free;
+        cleaned = info->tls_current_cleaned;
 
-        if (gcvt->is_finalizible()) {
+        if (res + size <= info->tls_current_ceiling) {
+            unsigned char *next;
+            info->tls_current_free = next = info->tls_current_free + in_size;
+            assert(!((POINTER_SIZE_INT)res & 3));
             finalizible_objects.push_back((Partial_Reveal_Object*) res);
+
+            if (cleaned < next) {
+                memset(cleaned, 0, next - cleaned);
+                info->tls_current_cleaned = next;
+            }
+            vm_gc_unlock_enum();
+            *(int*)res = ah;
+            return (Managed_Object_Handle)res;
         }
-        vm_gc_unlock_enum();
-        *(int*)res = ah;
-        return (Managed_Object_Handle)res;
     }
 
     res = heap.pos;
