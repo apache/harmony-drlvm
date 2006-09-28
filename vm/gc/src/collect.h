@@ -23,9 +23,8 @@
 #include <assert.h>
 #include <open/gc.h>
 #include <open/types.h>
-#include "slot.h"
 
-extern fast_list<Slot,65536> slots;
+extern fast_list<Partial_Reveal_Object**,65536> slots;
 typedef fast_list<Partial_Reveal_Object*,1024> reference_vector;
 extern reference_vector finalizible_objects;
 extern reference_vector soft_references;
@@ -65,24 +64,27 @@ inline void assert_vt(Partial_Reveal_Object *obj) {
     assert(!(obj->vt() & (FORWARDING_BIT|RESCAN_BIT)));
 }
 
-void roots_clear();
-void roots_update();
-
-void gc_copy_add_root_set_entry(Slot slot);
+void gc_copy_add_root_set_entry(Managed_Object_Handle *ref, Boolean is_pinned);
+void gc_copy_add_root_set_entry_interior_pointer (void **slot, int offset, Boolean is_pinned);
 void gc_copy_update_regions();
 
-void gc_forced_add_root_set_entry(Slot slot);
+void gc_forced_add_root_set_entry(Managed_Object_Handle *ref, Boolean is_pinned);
+void gc_forced_add_root_set_entry_interior_pointer (void **slot, int offset, Boolean is_pinned);
 
-void gc_slide_add_root_set_entry(Slot slot);
+void gc_reset_interior_pointers();
+void gc_process_interior_pointers();
+void gc_slide_add_root_set_entry(Managed_Object_Handle *ref, Boolean is_pinned);
+void gc_slide_add_root_set_entry_interior_pointer (void **slot, int offset, Boolean is_pinned);
 void gc_slide_move_all();
 void gc_slide_process_special_references(reference_vector& array);
 void gc_slide_postprocess_special_references(reference_vector& array);
 
-void transition_copy_to_sliding_compaction(fast_list<Slot,65536>& slots);
-void gc_slide_process_transitional_slots(fast_list<Slot,65536>& slots);
-void gc_slide_process_transitional_slots(Reference *refs, int pos, int length);
+void transition_copy_to_sliding_compaction(fast_list<Partial_Reveal_Object**,65536>& slots);
+void gc_slide_process_transitional_slots(fast_list<Partial_Reveal_Object**,65536>& slots);
+void gc_slide_process_transitional_slots(Partial_Reveal_Object **refs, int pos, int length);
 
-void gc_cache_add_root_set_entry(Slot slot);
+void gc_cache_add_root_set_entry(Managed_Object_Handle *ref, Boolean is_pinned);
+void gc_cache_add_root_set_entry_interior_pointer (void **slot, int offset, Boolean is_pinned);
 void gc_cache_retrieve_root_set();
 void gc_cache_emit_root_set();
 

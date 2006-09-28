@@ -25,8 +25,6 @@
 #include <jni_types.h>
 #include "gc_types.h"
 #include "collect.h"
-#include "slot.h"
-
 
 void gc_copy_update_regions() {
     int n = 0;
@@ -54,7 +52,7 @@ void gc_copy_update_regions() {
     cleaning_needed = true;
 }
 
-static bool gc_copy_process_reference(Slot slot, int phase);
+static bool gc_copy_process_reference(Partial_Reveal_Object **ref, Boolean is_pinned, int phase);
 
 static inline bool 
 gc_copy_scan_array_object(Partial_Reveal_Object *array, int vector_length, int phase)
@@ -63,13 +61,13 @@ gc_copy_scan_array_object(Partial_Reveal_Object *array, int vector_length, int p
 
     int32 array_length = vector_length; //vector_get_length((Vector_Handle) array);
 
-    Reference *refs = (Reference*)
+    Partial_Reveal_Object **refs = (Partial_Reveal_Object**)
         vector_get_element_address_ref ((Vector_Handle) array, 0);
 
     for(int i = 0; i < array_length; i++) {
-        Slot slot(refs + i);
+        Partial_Reveal_Object **ref = &refs[i];
 
-        bool success = gc_copy_process_reference(slot, phase);
+        bool success = gc_copy_process_reference(ref, false, phase);
 
         if (!success) {
             // overflow in old objects
@@ -92,7 +90,6 @@ bool place_into_old_objects(unsigned char *&newpos,
     if (endpos <= heap.old_objects.pos_limit) {
         heap.old_objects.pos = endpos;
         assert(endpos <= heap.old_objects.end);
-        assert(((POINTER_SIZE_INT) endpos & (GC_OBJECT_ALIGNMENT - 1)) == 0);
         return true;
     }
     TRACE2("gc.pin.gc", "old area: reached heap.old_objects.pos_limit =" << heap.old_objects.pos_limit);
@@ -130,54 +127,53 @@ bool place_into_old_objects(unsigned char *&newpos,
         endpos = newpos + size;
         if (endpos <= heap.old_objects.pos_limit) {
             heap.old_objects.pos = endpos;
-            assert(((POINTER_SIZE_INT) endpos & (GC_OBJECT_ALIGNMENT - 1)) == 0);
             return true;
         }
     }
     return false;
 }
 
-static bool gc_copy_process_reference(Slot slot, int phase) {
-    Partial_Reveal_Object* obj = slot.read();
+static bool gc_copy_process_reference(Partial_Reveal_Object **ref, Boolean is_pinned, int phase) {
+    assert(ref);
+ 
+    Partial_Reveal_Object* obj = *ref;
 
-    if (obj == heap_null) return true;
-    assert(obj);
+    if (!obj) return true;
     assert(obj->vt() & ~(FORWARDING_BIT|RESCAN_BIT));
     TRACE2("gc.debug", "0x" << obj << " info = " << obj->obj_info());
 
-    unsigned info = obj->obj_info();
-    unsigned vt = obj->vt();
+    int info = obj->obj_info();
+    int vt = obj->vt();
 
     if (info & phase) {
         // object already marked, need to check if it is forwared still
         
         if (vt & FORWARDING_BIT) {
-            Partial_Reveal_Object *newpos = fw_to_pointer(vt & ~FORWARDING_BIT);
+            Partial_Reveal_Object *newpos = (Partial_Reveal_Object*) (vt & ~FORWARDING_BIT);
             assert_vt(newpos);
-            slot.write(newpos);
-        } else obj->valid();
+            *ref = newpos;
+        }
         return true;
     }
-    obj->valid();
 
     VMEXPORT Class_Handle vtable_get_class(VTable_Handle vh);
-    assert(class_get_vtable(vtable_get_class((VTable_Handle)obj->vtable())) == (VTable_Handle)obj->vtable());
-    TRACE2("gc.debug", "0x" << obj << " is " << class_get_name(vtable_get_class((VTable_Handle)obj->vtable())));
+    assert(class_get_vtable(vtable_get_class((VTable_Handle)obj->vt())) == (VTable_Handle)obj->vt());
+    TRACE2("gc.debug", "0x" << obj << " is " << class_get_name(vtable_get_class((VTable_Handle)obj->vt())));
 
     obj->obj_info() = (info & ~MARK_BITS) | phase;
 
     // move the object?
 #define pos ((unsigned char*) obj)
-    Partial_Reveal_VTable *vtable = ah_to_vtable(vt);
+    Partial_Reveal_VTable *vtable = (Partial_Reveal_VTable*) vt;
     GC_VTable_Info *gcvt = vtable->get_gcvt();
 
     if (pos >= heap.compaction_region_start() && pos < heap.compaction_region_end()) {
         int size = get_object_size(obj, gcvt);
 
         // is it not pinned?
-        if (size < 5000 && ((info & OBJECT_IS_PINNED_BITS) == 0)) {
+        if (size < 5000 &&  (!is_pinned) && ((info & OBJECT_IS_PINNED_BITS) == 0)) {
             if (info & HASHCODE_IS_SET_BIT) {
-                size += GC_OBJECT_ALIGNMENT;
+                size += 4;
             }
 
             // move the object
@@ -188,8 +184,8 @@ static bool gc_copy_process_reference(Slot slot, int phase) {
 
                 Partial_Reveal_Object *newobj = (Partial_Reveal_Object*) newpos;
                 if ((info & HASHCODE_IS_SET_BIT) && !(info & HASHCODE_IS_ALLOCATED_BIT)) {
-                    memcpy(newobj, obj, size-GC_OBJECT_ALIGNMENT);
-                    *(int*)(newpos + size-GC_OBJECT_ALIGNMENT) = gen_hashcode(obj);
+                    memcpy(newobj, obj, size-4);
+                    *(int*)(newpos + size-4) = gen_hashcode(obj);
                     newobj->obj_info() |= HASHCODE_IS_ALLOCATED_BIT;
                 } else {
                     memcpy(newobj, obj, size);
@@ -197,21 +193,21 @@ static bool gc_copy_process_reference(Slot slot, int phase) {
                 //TRACE2("gc.copy", "obj " << obj << " -> " << newobj << " + " << size);
                 assert(newobj->vt() == obj->vt());
                 assert(newobj->obj_info() & phase);
-                obj->vt() = pointer_to_fw(newobj);
+                obj->vt() = (POINTER_SIZE_INT)newobj | FORWARDING_BIT;
                 assert_vt(newobj);
-                slot.write(newobj);
+                *ref = newobj;
                 obj = newobj;
             } else {
                 // overflow! no more space in old objects area
                 // pinning the overflow object
                 pinned_areas_unsorted.push_back(pos);
                 pinned_areas_unsorted.push_back(pos + size
-                        + ((obj->obj_info() & HASHCODE_IS_ALLOCATED_BIT) ? GC_OBJECT_ALIGNMENT : 0));
+                        + ((obj->obj_info() & HASHCODE_IS_ALLOCATED_BIT) ? 4 : 0));
                 TRACE2("gc.pin", "add failed pinned area = " << pos << " " << pinned_areas_unsorted.back());
                 TRACE2("gc.pin", "failed object = " << pos);
                 // arange transition to slide compaction
                 obj->obj_info() &= ~MARK_BITS;
-                slots.push_back(slot);
+                slots.push_back(ref);
                 transition_copy_to_sliding_compaction(slots);
                 return false;
             }
@@ -220,9 +216,9 @@ static bool gc_copy_process_reference(Slot slot, int phase) {
             assert(gc_num != 1 || !(obj->obj_info() & HASHCODE_IS_ALLOCATED_BIT));
             pinned_areas_unsorted.push_back(pos);
             pinned_areas_unsorted.push_back(pos + size
-                    + ((obj->obj_info() & HASHCODE_IS_ALLOCATED_BIT) ? GC_OBJECT_ALIGNMENT : 0));
+                    + ((obj->obj_info() & HASHCODE_IS_ALLOCATED_BIT) ? 4 : 0));
             TRACE2("gc.pin", "add pinned area = " << pos << " " << pinned_areas_unsorted.back() << " hash = " 
-                    << ((obj->obj_info() & HASHCODE_IS_ALLOCATED_BIT) ? GC_OBJECT_ALIGNMENT : 0));
+                    << ((obj->obj_info() & HASHCODE_IS_ALLOCATED_BIT) ? 4 : 0));
         }
     }
 
@@ -240,12 +236,15 @@ static bool gc_copy_process_reference(Slot slot, int phase) {
     if (type != NOT_REFERENCE) {
         switch (type) {
             case SOFT_REFERENCE:
+                TRACE2("gc.debug", "soft reference 0x" << obj);
                 add_soft_reference(obj);
                 break;
             case WEAK_REFERENCE:
+                TRACE2("gc.debug", "weak reference 0x" << obj);
                 add_weak_reference(obj);
                 break;
             case PHANTOM_REFERENCE:
+                TRACE2("gc.debug", "phantom reference 0x" << obj);
                 add_phantom_reference(obj);
                 break;
             default:
@@ -256,10 +255,10 @@ static bool gc_copy_process_reference(Slot slot, int phase) {
 
     int offset;
     while ((offset = *offset_list) != 0) {
-        Slot inner_slot((Reference*)(pos + offset));
+        Partial_Reveal_Object **slot = (Partial_Reveal_Object**)(pos + offset);
         //if (*slot) { looks like without check is better
-            TRACE2("gc.debug", "0x" << inner_slot.read() << " referenced from object = 0x" << obj);
-            slots.push_back(inner_slot);
+            TRACE2("gc.debug", "0x" << *slot << " referenced from object = 0x" << obj);
+            slots.push_back(slot);
         //}
 
         offset_list++;
@@ -269,19 +268,44 @@ static bool gc_copy_process_reference(Slot slot, int phase) {
 #undef pos
 }
 
-void gc_copy_add_root_set_entry(Slot root) {
+static void gc_copy_add_root_set_entry_internal(Partial_Reveal_Object **ref, Boolean is_pinned) {
     // FIXME: check for zero here, how it reflect perfomance, should be better!
     // and possibly remove check in gc_copy_process_reference
     // while added check in array handling
 
+#ifdef _DEBUG
+    if (*ref) {
+        TRACE2("gc.debug", "0x" << *ref << " referenced from root = 0x" << ref << " info = " << (*ref)->obj_info());
+    }
+#endif
+
     int phase = heap_mark_phase;
-    gc_copy_process_reference(root, phase);
+    gc_copy_process_reference(ref, is_pinned, phase);
 
     while (true) {
         if (slots.empty()) break;
-        Slot slot = slots.pop_back();
-        slot.read();
-        gc_copy_process_reference(slot, phase);
+        Partial_Reveal_Object **ref = slots.pop_back();
+        *ref;
+        gc_copy_process_reference(ref, false, phase);
+    }
+}
+
+void gc_copy_add_root_set_entry(Managed_Object_Handle *ref, Boolean is_pinned) {
+    assert(!is_pinned);
+    //TRACE2("gc.enum", "gc_add_root_set_entry");
+    gc_copy_add_root_set_entry_internal((Partial_Reveal_Object**)ref, is_pinned);
+}
+
+void gc_copy_add_root_set_entry_interior_pointer (void **slot, int offset, Boolean is_pinned)
+{
+    assert(!is_pinned);
+    int *ref = (int*)slot;
+    int oldobj = *ref - offset;
+    int newobj = oldobj;
+
+    gc_copy_add_root_set_entry_internal((Partial_Reveal_Object**)&newobj, is_pinned);
+    if (newobj != oldobj) {
+        *ref = newobj + offset;
     }
 }
 

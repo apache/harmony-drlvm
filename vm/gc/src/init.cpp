@@ -31,7 +31,6 @@
 #include "gc_types.h"
 #include "cxxlog.h"
 #include "timer.h"
-#include "apr_time.h"
 #ifndef _WIN32
 #include <sys/mman.h>
 #endif
@@ -41,14 +40,14 @@
 unsigned int heap_mark_phase;
 
 HeapSegment heap;
-uint32 chunk_size;
+int chunk_size;
 
 int pending_finalizers = false;
 
 #define RESERVED_FOR_LAST_HASH 4
 
 #define MB * (1024 * 1024)
-size_t HEAP_SIZE_DEFAULT = 256 MB;
+int HEAP_SIZE_DEFAULT = 256 MB;
 
 unsigned int prev_mark_phase;
 bool cleaning_needed = false;
@@ -57,15 +56,16 @@ int gc_adaptive = true;
 int64 timer_start;
 int64 timer_dt;
 Ptr heap_base;
+Ptr heap_ceiling;
 size_t max_heap_size;
 size_t min_heap_size;
 bool ignore_finalizers = false;
 bool remember_root_set = false;
 const char *lp_hint = NULL;
 
-static size_t parse_size_string(const char* size_string) {
+static long parse_size_string(const char* size_string) {
     size_t len = strlen(size_string);
-    size_t unit = 1;
+    int unit = 1;
     if (tolower(size_string[len - 1]) == 'k') {
         unit = 1024;
     } else if (tolower(size_string[len - 1]) == 'm') {
@@ -73,8 +73,8 @@ static size_t parse_size_string(const char* size_string) {
     } else if (tolower(size_string[len - 1]) == 'g') {
         unit = 1024 * 1024 * 1024;
     }
-    size_t size = atol(size_string);
-    size_t res = size * unit;
+    long size = atol(size_string);
+    long res = size * unit;
     if (res / unit != size) {
         // overflow happened
         return 0;
@@ -104,13 +104,13 @@ static bool is_property_set(char* name) {
 
 static void parse_configuration_properties() {
     max_heap_size = HEAP_SIZE_DEFAULT;
-    min_heap_size = 16 MB;
+    min_heap_size = 8 MB;
     if (is_property_set("gc.mx")) {
         max_heap_size = parse_size_string(vm_get_property_value("gc.mx"));
 
-        if (max_heap_size < 16 MB) {
+        if (max_heap_size < 8 MB) {
             INFO("max heap size is too small: " << max_heap_size);
-            max_heap_size = 16 MB;
+            max_heap_size = 8 MB;
         }
         if (0 == max_heap_size) {
             INFO("wrong max heap size");
@@ -118,15 +118,15 @@ static void parse_configuration_properties() {
         }
 
         min_heap_size = max_heap_size / 10;
-        if (min_heap_size < 16 MB) min_heap_size = 16 MB;
+        if (min_heap_size < 8 MB) min_heap_size = 8 MB;
     }
 
     if (is_property_set("gc.ms")) {
         min_heap_size = parse_size_string(vm_get_property_value("gc.ms"));
 
-        if (min_heap_size < 16 MB) {
+        if (min_heap_size < 1 MB) {
             INFO("min heap size is too small: " << min_heap_size);
-            min_heap_size = 16 MB;
+            min_heap_size = 1 MB;
         }
 
         if (0 == min_heap_size)
@@ -138,17 +138,6 @@ static void parse_configuration_properties() {
         max_heap_size = min_heap_size;
     }
 
-#ifdef POINTER64
-        size_t max_compressed = (4096 * (size_t) 1024 * 1024);
-        if (max_heap_size > max_compressed) {
-            INFO("maximum heap size is limited"
-                    " to 4 Gb due to pointer compression");
-            max_heap_size = max_compressed;
-            if (min_heap_size > max_heap_size)
-                min_heap_size = max_heap_size;
-        }
-#endif
-
 
     if (is_property_set("gc.lp")) {
         lp_hint = vm_get_property_value("gc.lp");
@@ -157,8 +146,12 @@ static void parse_configuration_properties() {
     if (is_property_set("gc.type"))
         gc_algorithm = get_property_value_int("gc.type");
 
-    // version
-    INFO(gc_version_string());
+#if (defined _DEBUG) || ! (defined NDEBUG)
+    char *build_mode = " (debug)";
+#else
+    char *build_mode = " (release)";
+#endif
+    INFO("gc 4.1" << build_mode);
     INFO("GC type = " << gc_algorithm);
 
     if (get_property_value_boolean("gc.ignore_finalizers", false)) {
@@ -180,29 +173,13 @@ static void parse_configuration_properties() {
 }
 
 #ifdef _WIN32
-static inline void *reserve_mem(size_t size) {
+static inline void *reserve_mem(long size) {
     return VirtualAlloc(NULL, size, MEM_RESERVE, PAGE_READWRITE);
 }
 static const void* RESERVE_FAILURE = 0;
 #else
-static inline void *reserve_mem(size_t size) {
-#ifdef POINTER64
-    /* We have planty of address space, let's protect unaccessible part of heap
-     * to find some of bad pointers. */
-    size_t four_gig = 4 * 1024 * (size_t) 1024 * 1024;
-    size_t padding = 4 * 1024 * (size_t) 1024 * 1024;
-    void *addr = mmap(0, padding + four_gig, PROT_READ | PROT_WRITE,
-            MAP_NORESERVE | MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
-    assert(addr != MAP_FAILED);
-    UNUSED int err = mprotect((Ptr)addr, padding, PROT_NONE);
-    assert(!err);
-    err = mprotect((Ptr)addr + padding + max_heap_size,
-                    four_gig - max_heap_size, PROT_NONE);
-    assert(!err);
-    return (Ptr)addr + padding;
-#else
+static inline void *reserve_mem(long size) {
     return mmap(0, max_heap_size, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
-#endif
 }
 static const void* RESERVE_FAILURE = MAP_FAILED;
 #endif
@@ -235,7 +212,7 @@ void init_mem() {
     if (heap_base == NULL) {
         heap_base = (unsigned char*) reserve_mem(max_heap_size);
         if (heap_base == RESERVE_FAILURE) {
-            size_t dec = 100 * 1024 * 1024;
+            long dec = 100 * 1024 * 1024;
             max_heap_size = max_heap_size / dec * dec;
 
             while(true) {
@@ -253,13 +230,12 @@ void init_mem() {
         ECHO("WARNING: min heap size reduced to " << mb(min_heap_size) << " Mb");
     }
 
-    heap.ceiling = heap_base + min_heap_size - RESERVED_FOR_LAST_HASH;
+    heap_ceiling = heap_base + max_heap_size;
 
     heap.base = heap_base;
     heap.size = min_heap_size;
+    heap.ceiling = heap.base + heap.size - RESERVED_FOR_LAST_HASH;
     heap.max_size = max_heap_size;
-    heap.roots_start = heap.roots_pos = heap.roots_end =
-        heap.base + heap.max_size - RESERVED_FOR_LAST_HASH;
 
 #ifdef _WIN32
     void *res;
@@ -276,7 +252,6 @@ void init_mem() {
 void gc_init() {
     INFO2("gc.init", "GC init called\n");
     init_mem();
-    init_slots();
     init_select_gc();
     gc_end = apr_time_now();
     timer_init();
@@ -335,8 +310,8 @@ void gc_allocate_mark_bits() {
     unsigned char *start = mark_bits + (heap.compaction_region_start() - heap_base) / sizeof(void*) / 8;
     unsigned char *end = mark_bits + (heap.compaction_region_end() - heap_base + sizeof(void*) * 8 - 1) / sizeof(void*) / 8;
     int page = 4096; // FIXME
-    mark_bits_allocated_start = (unsigned char*)((POINTER_SIZE_INT)start & ~(page - 1));
-    mark_bits_allocated_end = (unsigned char*)(((POINTER_SIZE_INT)end + page - 1) & ~(page - 1));
+    mark_bits_allocated_start = (unsigned char*)((int)start & ~(page - 1));
+    mark_bits_allocated_end = (unsigned char*)(((int)end + page - 1) & ~(page - 1));
 #ifdef _WIN32
     unsigned char *res = (unsigned char*) VirtualAlloc(mark_bits_allocated_start,
             mark_bits_allocated_end - mark_bits_allocated_start, MEM_COMMIT, PAGE_READWRITE);
@@ -358,8 +333,7 @@ void gc_deallocate_mark_bits() {
 
 void heap_extend(size_t size) {
     size = (size + 65535) & ~65535;
-    size_t max_size = heap.max_size - (heap.roots_end - heap.roots_start);
-    if (size > max_size) size = max_size;
+    if (size > max_heap_size) size = max_heap_size;
     if (size <= heap.size) return;
 
 #ifdef _WIN32
@@ -370,7 +344,7 @@ void heap_extend(size_t size) {
     unsigned char *old_ceiling = heap.ceiling;
     heap.ceiling = heap.base + heap.size - RESERVED_FOR_LAST_HASH;
 
-    if (heap.pos_limit == old_ceiling) {
+    if (old_ceiling == heap.pos_limit) {
         heap.pos_limit = heap.ceiling;
     }
     chunk_size = round_down(heap.size / (10 * num_threads),128);

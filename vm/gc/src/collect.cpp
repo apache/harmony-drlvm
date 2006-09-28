@@ -25,7 +25,7 @@
 #include "timer.h"
 #include <stdio.h>
 
-fast_list<Slot,65536> slots;
+fast_list<Partial_Reveal_Object**,65536> slots;
 reference_vector soft_references;
 reference_vector weak_references;
 reference_vector phantom_references;
@@ -149,7 +149,7 @@ void process_finalizable_objects() {
             i != finalizible_objects.end();) {
 
         Partial_Reveal_Object *obj = *i;
-        assert (obj);
+        if (!obj) { ++i; continue; }
 
         int info = obj->obj_info();
         if (info & heap_mark_phase) {
@@ -192,28 +192,28 @@ void process_special_references(reference_vector& array) {
             i != array.end(); ++i) {
         Partial_Reveal_Object *ref = *i;
 
-        Slot referent( (Reference*) ((Ptr)ref + global_referent_offset) );
-        Partial_Reveal_Object* obj = referent.read();
+        Partial_Reveal_Object **referent = (Partial_Reveal_Object**) ((Ptr)ref + global_referent_offset);
+        Partial_Reveal_Object* obj = *referent;
 
-        if (obj == heap_null) {
+        if (obj == 0) {
             // reference already cleared
             continue;
         }
 
-        unsigned info = obj->obj_info();
+        int info = obj->obj_info();
         if (info & heap_mark_phase) {
             // object marked, is it moved?
-            unsigned vt = obj->vt();
+            int vt = obj->vt();
             if (!(vt & FORWARDING_BIT)) continue;
             // moved, updating referent field
-            referent.write( fw_to_pointer(vt & ~FORWARDING_BIT) );
+            *referent = (Partial_Reveal_Object*)(vt & ~FORWARDING_BIT);
             continue;
         }
 
         // object not marked
-        referent.write(heap_null);
+        *referent = 0;
         TRACE2("gc.ref", "process_special_references: reference enquequed");
-        vm_enqueue_reference((Managed_Object_Handle)ref);
+        vm_enqueue_reference((Managed_Object_Handle*)ref);
     }
 }
 
@@ -260,11 +260,11 @@ try_alloc(int size) {
 
 unsigned char *full_gc(int size) {
     Timer gc_time("FULL_GC", "gc.time.total");
-    heap.old_objects.end = heap.old_objects.pos = heap.old_objects.pos_limit = heap.base + RESERVED_FOR_HEAP_NULL;
+    heap.old_objects.end = heap.old_objects.pos = heap.old_objects.pos_limit = heap.base;
     unsigned char *res = slide_gc(size);
 
     heap.Tcompact = (float) gc_time.dt();
-    heap.working_set_size = (float) (heap.old_objects.pos - heap.base);
+    heap.working_set_size = (float) (heap.old_objects.end - heap.base);
     return res;
 }
 
@@ -278,12 +278,12 @@ finish_slide_gc(int size, int stage) {
     gc_slide_process_special_references(phantom_references);
 
     TIME(gc_slide_move_all,());
-    roots_update();
     gc_slide_postprocess_special_references(soft_references);
     gc_slide_postprocess_special_references(weak_references);
-    gc_slide_postprocess_special_references(phantom_references);
-    gc_deallocate_mark_bits();
     finalize_objects();
+    gc_slide_postprocess_special_references(phantom_references);
+    gc_process_interior_pointers();
+    gc_deallocate_mark_bits();
 
     heap_mark_phase ^= 3;
     // reset thread-local allocation areas
@@ -304,18 +304,19 @@ unsigned char *slide_gc(int size) {
 
     pinned_areas.clear();
     pinned_areas_unsorted.clear();
-    roots_clear();
     gc_type = GC_SLIDE_COMPACT;
     gc_allocate_mark_bits();
+    gc_reset_interior_pointers();
 
     TIME(enumerate_universe,());
     return finish_slide_gc(size, 0);
 }
 
-void transition_copy_to_sliding_compaction(fast_list<Slot,65536>& slots) {
+void transition_copy_to_sliding_compaction(fast_list<Partial_Reveal_Object**,65536>& slots) {
     INFO2("gc.verbose", "COPY -> COMP on go transition");
     gc_type = GC_SLIDE_COMPACT;
     gc_allocate_mark_bits();
+    gc_reset_interior_pointers();
     gc_slide_process_transitional_slots(slots);
 }
 
@@ -326,7 +327,6 @@ unsigned char *copy_gc(int size) {
 
     pinned_areas.clear();
     pinned_areas_unsorted.clear();
-    roots_clear();
 
     gc_type = GC_COPY;
     TIME(enumerate_universe,());
@@ -344,13 +344,11 @@ unsigned char *copy_gc(int size) {
         heap.Tcopy = (float) gc_time.dt();
         return res;
     }
-    process_special_references(phantom_references);
-    roots_update();
     finalize_objects();
+    process_special_references(phantom_references);
 
     heap_mark_phase ^= 3;
     gc_copy_update_regions();
-    heap.Tcopy = (float) gc_time.dt();
     after_copy_gc();
     // reset thread-local allocation areas
     clear_thread_local_buffers();
@@ -359,6 +357,7 @@ unsigned char *copy_gc(int size) {
     vm_resume_threads_after();
     notify_gc_end();
     TRACE2("gc.mem", "copy_gc = " << res);
+    heap.Tcopy = (float) gc_time.dt();
     return res;
 }
 
@@ -366,15 +365,12 @@ void force_gc() {
     Timer gc_time("FORCE_GC", "gc.time.total");
     prepare_gc();
 
-    roots_clear();
-
     gc_type = GC_FORCED;
     TIME(enumerate_universe,());
     TIME(process_special_references,(soft_references));
     TIME(process_special_references,(weak_references));
     TIME(process_finalizable_objects,());
     TIME(process_special_references,(phantom_references));
-    roots_update();
     TIME(finalize_objects,());
 
     heap_mark_phase ^= 3;
@@ -385,3 +381,28 @@ void force_gc() {
     notify_gc_end();
 }
 
+void gc_add_root_set_entry(Managed_Object_Handle *ref, Boolean is_pinned) {
+    //Partial_Reveal_Object **ref1 = (Partial_Reveal_Object**)ref;
+    switch(gc_type) {
+        case GC_COPY: gc_copy_add_root_set_entry(ref, is_pinned); break;
+        case GC_FORCED: gc_forced_add_root_set_entry(ref, is_pinned); break;
+        case GC_SLIDE_COMPACT: gc_slide_add_root_set_entry(ref, is_pinned); break;
+        case GC_CACHE: gc_cache_add_root_set_entry(ref, is_pinned); break;
+                      
+        case GC_FULL:
+        default: abort();
+    }
+}
+
+void gc_add_root_set_entry_interior_pointer (void **slot, int offset, Boolean is_pinned)
+{
+    switch (gc_type) {
+        case GC_COPY: gc_copy_add_root_set_entry_interior_pointer(slot, offset, is_pinned); break;
+        case GC_FORCED: gc_forced_add_root_set_entry_interior_pointer(slot, offset, is_pinned); break;
+        case GC_SLIDE_COMPACT: gc_slide_add_root_set_entry_interior_pointer(slot, offset, is_pinned); break;
+        case GC_CACHE: gc_cache_add_root_set_entry_interior_pointer(slot, offset, is_pinned); break;
+
+        case GC_FULL:
+        default: abort();
+    }
+}

@@ -27,25 +27,10 @@
 #include <list>
 #include <open/vm.h>
 #include <open/vm_gc.h>
-#include <open/gc.h>
 #include <port_vmem.h>
 #include <apr_time.h>
 #include <apr_atomic.h>
 #include <cxxlog.h>
-#include "slot.h"
-
-static char* gc_version_string() {
-#if (defined _DEBUG) || ! (defined NDEBUG)
-#define BUILD_MODE "debug"
-#else
-#define BUILD_MODE "release"
-#endif
-#ifndef __TIMESTAMP__
-#define __TIMESTAMP__
-#endif /* TIMESTAMP */
-//    return "GC v4.1 " __TIMESTAMP__ " (" BUILD_MODE ")";
-    return "GC v4.1 " __TIMESTAMP__ " (" BUILD_MODE ")";
-}
 
 /// obtains a spinlock.
 inline void spin_lock(volatile int* lock) {
@@ -93,8 +78,15 @@ typedef struct GC_Thread_Info {
     GC_Thread_Info **prev;
 } GC_Thread_Info;
 
-// Heap layout
-#define RESERVED_FOR_HEAP_NULL (4 * 32)
+#define FORWARDING_BIT 1
+#define RESCAN_BIT 2
+#define GC_OBJECT_MARK_BIT_MASK 0x00000080
+#define MARK_BITS 3
+
+#define HASHCODE_IS_ALLOCATED_BIT 4
+#define HASHCODE_IS_SET_BIT 8
+#define OBJECT_IS_PINNED_BITS (7 << 4)
+#define OBJECT_IS_PINNED_INCR (1 << 4)
 
 // FLAGS
 extern const char *lp_hint; // Use large pages
@@ -118,7 +110,7 @@ struct GC_VTable_Info {
     unsigned size_and_ref_type;
 
     // Methods
-    POINTER_SIZE_INT flags() { return (POINTER_SIZE_INT)this; }
+    unsigned flags() { return (int)this; }
     GC_VTable_Info *ptr() {
         assert(!is_array());
         return (GC_VTable_Info*) ((POINTER_SIZE_INT)this & ~GC_VT_FLAGS);
@@ -136,7 +128,6 @@ struct GC_VTable_Info {
 };
 
 typedef POINTER_SIZE_INT GC_VT;
-typedef uint32 VT32;
 
 typedef struct Partial_Reveal_VTable {
 private:
@@ -148,27 +139,21 @@ public:
 
 } Partial_Reveal_VTable;
 
-
 class Partial_Reveal_Object {
     private:
     Partial_Reveal_Object();
-    VT32 vt_raw;
-    unsigned info;
+    int vt_raw;
+    int info;
     int array_len;
 
     public:
-    VT32 &vt() { assert(/* alignment check */ !((POINTER_SIZE_INT)this & (GC_OBJECT_ALIGNMENT - 1))); return vt_raw; }
-    unsigned &obj_info() { assert(/* alignment check */ !((POINTER_SIZE_INT)this & (GC_OBJECT_ALIGNMENT - 1))); return info; }
+    int &vt() { assert(/* alignment check */ !((int)this & 3)); return vt_raw; }
+    int &obj_info() { assert(/* alignment check */ !((int)this & 3)); return info; }
     unsigned char &obj_info_byte() { return *(unsigned char*)&obj_info(); }
 
     Partial_Reveal_VTable *vtable() {
-#ifdef POINTER64
-        assert(!(vt() & FORWARDING_BIT));
-        return ah_to_vtable(vt());
-#else
         assert(!(vt() & FORWARDING_BIT));
         return (Partial_Reveal_VTable*) vt();
-#endif
     }
 
     int array_length() { return array_len; }
@@ -179,16 +164,6 @@ class Partial_Reveal_Object {
         return (Partial_Reveal_Object**)
             ((unsigned char*) this + (gcvt->flags() >> GC_VT_ARRAY_FIRST_SHIFT));
     }
-
-#if _DEBUG
-    void valid() {
-        assert((vt() & FORWARDING_BIT) == 0);
-        Class_Handle c = allocation_handle_get_class(vt());
-        assert(class_get_allocation_handle(c) == vt());
-    }
-#else
-    void valid() {}
-#endif
 };
 
 
@@ -198,7 +173,7 @@ GC_VTable_Info::array_size(int length) {
     unsigned f = flags();
     unsigned element_shift = f >> GC_VT_ARRAY_ELEMENT_SHIFT;
     unsigned first_element = element_shift >> (GC_VT_ARRAY_FIRST_SHIFT - GC_VT_ARRAY_ELEMENT_SHIFT);
-    return (first_element + (length << (element_shift & GC_VT_ARRAY_ELEMENT_MASK)) + (GC_OBJECT_ALIGNMENT - 1)) & ~(GC_OBJECT_ALIGNMENT - 1);
+    return (first_element + (length << (element_shift & GC_VT_ARRAY_ELEMENT_MASK)) + 3) & ~3;
 }
 
 static inline int get_object_size(Partial_Reveal_Object *obj, GC_VTable_Info *gcvt) {
@@ -233,6 +208,8 @@ inline POINTER_SIZE_INT mb(POINTER_SIZE_INT size) {
     return (size + m/2-1)/m;
 }
 
+typedef unsigned char* Ptr;
+
 struct OldObjects {
     Ptr end;
     Ptr pos;
@@ -249,10 +226,6 @@ struct HeapSegment {
     size_t max_size;
     Ptr pos; // current allocation position
     Ptr pos_limit; // end of continuous allocation region
-
-    Ptr roots_start;
-    Ptr roots_pos;
-    Ptr roots_end;
 
     Ptr compaction_region_start() { return old_objects.end; }  // compaction region
     Ptr compaction_region_end() { return ceiling; }
@@ -280,9 +253,10 @@ extern HeapSegment heap;
 
 // GLOBALS
 extern Ptr heap_base;
+extern Ptr heap_ceiling;
 
 extern int pending_finalizers;
-extern uint32 chunk_size;
+extern int chunk_size;
 extern bool cleaning_needed;
 extern std::vector<unsigned char*> pinned_areas;
 extern unsigned pinned_areas_pos;
@@ -349,7 +323,7 @@ inline void check_hashcode(int hash) {
     assert((hash & ~0x7e) == 0x3a00);
 }
 #else /* DEBUG_HASHCODE */
-inline int gen_hashcode(void *addr) { return (int)(POINTER_SIZE_INT)addr; }
+inline int gen_hashcode(void *addr) { return (int)addr; }
 inline void check_hashcode(int hash) {}
 #endif /* DEBUG_HASHCODE */
 

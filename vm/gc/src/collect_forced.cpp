@@ -28,7 +28,7 @@
 extern fast_list<Partial_Reveal_Object*, 65536> objects; // FIXME: duplication of memory slots and objects
                                                   // FIXME: move to header file
 
-static void forced_process_reference(Partial_Reveal_Object *obj);
+static void forced_process_reference(Partial_Reveal_Object *obj, Boolean is_pinned);
 
 static inline void 
 forced_scan_array_object(Partial_Reveal_Object *array, int vector_length)
@@ -38,27 +38,27 @@ forced_scan_array_object(Partial_Reveal_Object *array, int vector_length)
 
     int32 array_length = vector_length; //vector_get_length((Vector_Handle) array);
 
-    Reference *refs = (Reference*)
+    Partial_Reveal_Object **refs = (Partial_Reveal_Object**)
         vector_get_element_address_ref ((Vector_Handle) array, 0);
 
     for(int i = 0; i < array_length; i++) {
-        Slot slot(refs + i);
-        Partial_Reveal_Object *obj = slot.read();
-        if (obj != heap_null) {
-            forced_process_reference(obj);
+        Partial_Reveal_Object **ref = &refs[i];
+        Partial_Reveal_Object *obj = *ref;
+        if (obj != 0) {
+            forced_process_reference(obj, false);
         }
     }
 }
 
-static void forced_process_reference(Partial_Reveal_Object *obj) {
+static void forced_process_reference(Partial_Reveal_Object *obj, Boolean is_pinned) {
+    assert(!is_pinned);
 
     assert(obj->vt() & ~FORWARDING_BIT);
 
-    unsigned info = obj->obj_info();
+    int info = obj->obj_info();
     if (info & heap_mark_phase) {
         return;
     }
-    obj->valid();
 
     obj->obj_info() = (info & ~MARK_BITS) | heap_mark_phase;
 
@@ -99,23 +99,35 @@ static void forced_process_reference(Partial_Reveal_Object *obj) {
 
     int offset;
     while ((offset = *offset_list) != 0) {
-        Slot slot( (Reference*)(((char*)obj) + offset) );
+        Partial_Reveal_Object **slot = (Partial_Reveal_Object**)(((char*)obj) + offset);
         offset_list++;
-        Partial_Reveal_Object *object = slot.read();
-        if (object != heap_null) {
+        Partial_Reveal_Object *object = *slot;
+        if (object != 0) {
             objects.push_back(object);
         }
     }
 }
 
-void gc_forced_add_root_set_entry(Slot slot) {
-    Partial_Reveal_Object *obj = slot.read();
-    if (obj == heap_null) return;
-    forced_process_reference(obj);
+static void gc_forced_add_root_set_entry_internal(Partial_Reveal_Object *obj, Boolean is_pinned) {
+    forced_process_reference(obj, is_pinned);
 
     while (!objects.empty()) {
         Partial_Reveal_Object *obj = objects.pop_back();
-        forced_process_reference(obj);
+        forced_process_reference(obj, false);
     }
 }
 
+void gc_forced_add_root_set_entry(Managed_Object_Handle *ref, Boolean is_pinned) {
+    Partial_Reveal_Object *obj = *(Partial_Reveal_Object**)ref;
+    if (obj == 0) return;
+    gc_forced_add_root_set_entry_internal(obj, is_pinned);
+}
+
+void gc_forced_add_root_set_entry_interior_pointer (void **slot, int offset, Boolean is_pinned)
+{
+    int *ref = (int*)slot;
+    int obj = *ref - offset;
+    if (obj == 0) return;
+
+    gc_forced_add_root_set_entry_internal((Partial_Reveal_Object*)obj, is_pinned);
+}

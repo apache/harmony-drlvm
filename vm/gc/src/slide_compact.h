@@ -17,10 +17,17 @@
  * @author Ivan Volosyuk
  */
 
+struct InteriorPointer {
+    Partial_Reveal_Object *obj;
+    int offset;
+    Partial_Reveal_Object **interior_ref;
+};
+
 extern fast_list<Partial_Reveal_Object*, 65536> objects;
+extern fast_list<InteriorPointer,256> interior_pointers;
 
 
-inline bool is_left_object(Partial_Reveal_Object *refobj, Slot slot) {
-    return (void*)refobj <= slot.ptr();
+inline bool is_left_object(Partial_Reveal_Object *refobj, Partial_Reveal_Object **ref) {
+    return (void*)refobj <= (void*) ref;
 }
 
