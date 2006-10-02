@@ -60,6 +60,8 @@ public class JarRunner {
         if (className == null || className.length() == 0) {
             throw new Exception ("Empty/Null Main-class specified in " + jarName);
         }
+
+        className = className.replace('/', '.');
         
         /*
          *  load class, copy the args (skipping the first that is the jarname)
