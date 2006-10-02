@@ -46,7 +46,7 @@ static jint skip_old_frames(VM_thread *thread)
         }
     }
 
-    return 1;
+    return 0;
 }
 
 jvmtiError
