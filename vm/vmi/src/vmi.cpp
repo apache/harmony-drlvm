@@ -49,51 +49,6 @@ VMI_GetVMIFromJavaVM(JavaVM *vm)
     return &vmi;
 }
 
-/*
- * FIXME: support for previous drop from partner - to be removed.
- */
-char* VMI_bootstrapClassPath(JNIEnv *env)
-{
-    assert(/* vmi.dll: VMI_bootstrapClassPath unimplemented. */0);
-    return NULL;
-}
-
-/*
- * FIXME: support for previous drop from partner - to be removed.
- */
-void VMI_fullVersionString(JNIEnv *env, char *fullversion, int size)
-{
-    assert(/* vmi.dll: VMI_fullVersionString unimplemented. */0);
-    return;
-}
-
-/*
- * FIXME: support for previous drop from partner - to be removed.
- */
-char* VMI_VMVersion(JNIEnv *env)
-{
-    assert(/* vmi.dll: VMI_VMVersion unimplemented. */0);
-    return NULL;
-}
-
-/*
- * FIXME: support for previous drop from partner - to be removed.
- */
-JavaVMInitArgs* VMI_initArgsFromEnv(JNIEnv *env)
-{
-    assert(/* vmi.dll: VMI_initArgsFromEnv unimplemented. */0);
-    return NULL;
-}
-
-/*
- * FIXME: support for previous drop from partner - to be removed.
- */
-HyZipCachePool* VMI_zipCachePool(JNIEnv *env)
-{
-
-    assert(/* vmi.dll:  unimplemented. */0);
-    return NULL;
-}
 
 //////////////////////////////////////
 //  VMI structure member functions  //
@@ -110,14 +65,6 @@ JavaVM *JNICALL GetJavaVM(VMInterface *vmi)
     assert(/* vmi.dll:  unimplemented. */0);
     return NULL;
 }
-
-//#ifdef __cplusplus
-//extern "C" {
-//#endif
-//JNIEXPORT int j9port_allocate_library(void *version, J9PortLibrary **portLibrary);
-//#ifdef __cplusplus
-//}
-//#endif
  
 HyPortLibrary *JNICALL GetPortLibrary(VMInterface *vmi)
 {
