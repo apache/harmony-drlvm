@@ -373,6 +373,8 @@ void ConstInst::handlePrintEscape(::std::ostream& os, char code) const {
         os << (unsigned long)value.i8;
         break;
     case Type::IntPtr:
+    case Type::UIntPtr:
+    case Type::UnmanagedPtr:
         os << value.i;
         break;
     case Type::Single:
@@ -458,6 +460,8 @@ void JitHelperCallInst::handlePrintEscape(::std::ostream& os, char code) const {
         os << "SaveThisState"; break;
     case ReadThisState:
         os << "ReadThisState"; break;
+    case LockedCompareAndExchange:
+        os << "LockedCmpExchange"; break;
     default:
         assert(0); break;
         }

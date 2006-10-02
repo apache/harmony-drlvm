@@ -898,7 +898,6 @@ void IRDotPrinter::printHeader(uint32 indent)
         << "nodesep=\".20\";" << ::std::endl
         << "page=\"200,260\";" << ::std::endl
         << "ratio=auto;" << ::std::endl
-        << "fontpath=\"c:\\winnt\\fonts\";" << ::std::endl
         << "node [shape=record,fontname=\"Courier\",fontsize=9];" << ::std::endl
         << "edge [minlen=2];" << ::std::endl
         << "label=\""

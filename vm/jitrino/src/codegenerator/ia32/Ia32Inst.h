@@ -185,6 +185,7 @@ public:
 
     /** Returns the type of the operand */
     Type * getType()const{ return type; }
+    void setType(Type* newType) {type = newType; }
 
     /** Returns the constraint of the specified kind sk */
     Constraint getConstraint(ConstraintKind ck) const
@@ -435,6 +436,7 @@ public:
         Properties_MemoryOpndConditional=0x8,
     };
 
+    
     /** 
      * Enum OpndRole defines the role of an operand in an instruction.
      * The structure of the enumeration is filter-like allowing to combine its values with '|'.
@@ -442,7 +444,7 @@ public:
      * It is important to notice that the role mask consists of two parts
      * covered by OpndRole_FromEncoder and OpndRole_ForIterator.
      * When used as filter values from each part are virtually combined by "and"
-     * meanding that an operand must satisfy filters from both parts.
+     * meaning that an operand must satisfy filters from both parts.
      * 
      * For example OpndRole_Use|OpndRole_Def|OpndRole_Explicit
      * will filter explicit operand which are both uses and defs while 
@@ -543,6 +545,12 @@ public:
 
     /** Returns the mnemonic of the instruction. */
     Mnemonic    getMnemonic()const{ return mnemonic; }
+
+    /** Returns the prefix of the instruction. */
+    InstPrefix getPrefix()const{ return prefix; }
+
+    /** Sets the prefix of the instruction. */
+    void setPrefix(InstPrefix newPrefix){prefix = newPrefix;}
 
     /** Returns opcode group description associated with this instruction. */
     const Encoder::OpcodeGroup* getOpcodeGroup()const
@@ -760,7 +768,7 @@ protected:
     static inline void operator delete(void * p) {}
 
     Inst(Mnemonic m, uint32 _id, Form f)
-        :kind(Kind_Inst), id(_id), mnemonic(m), 
+        :kind(Kind_Inst), id(_id), mnemonic(m), prefix(InstPrefix_Null),
         form(f), reservedFlags(0), 
         opcodeGroup(0), index(0), defOpndCount(0), opndCount(0)
     {}
@@ -795,6 +803,7 @@ protected:
     Kind                                        kind;
     uint32                                      id;
     Mnemonic                                    mnemonic;
+    InstPrefix                                  prefix;
 
     uint32                                      form:1;
     uint32                                      reservedFlags:7;

@@ -271,7 +271,8 @@ enum JitHelperCallId {
     InitializeArray,
     PseudoCanThrow,
     SaveThisState,
-    ReadThisState
+    ReadThisState,
+    LockedCompareAndExchange
 };
 
 enum VMHelperCallId {

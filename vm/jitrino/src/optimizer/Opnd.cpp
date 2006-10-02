@@ -140,7 +140,8 @@ OpndManager::getOpndTypeFromLdType(Type* ldType) {
         return typeManager.getInt32Type();
 
     case Type::IntPtr:   case Type::UIntPtr:
-        return typeManager.getIntPtrType();
+        return ldType;
+        //return typeManager.getIntPtrType();
 
     case Type::Int64:    case Type::UInt64:
         return typeManager.getInt64Type();
@@ -171,7 +172,7 @@ OpndManager::getOpndTypeFromLdType(Type* ldType) {
         }
         return ldType;
     case Type::UnmanagedPtr:
-        return typeManager.getIntPtrType();
+        //return typeManager.getIntPtrType();
     case Type::ManagedPtr:        // Managed ptr is valid only for ldvar or ldarg
     case Type::TypedReference:    // TypedReference is valid only for ldvar or ldarg
         return ldType;

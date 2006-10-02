@@ -38,6 +38,54 @@
 
 namespace Jitrino {
 
+    
+static bool isMagicClass(Type* type) {
+#ifdef _EM64T_
+    return false;//magics are not supported on EM64T today.
+#endif
+    static const char unboxedName[] = "org/vmmagic/unboxed/";
+    static const unsigned nameLen = sizeof(unboxedName)-1;
+    const char* name = type->getName();
+    return !strncmp(name, unboxedName, nameLen);
+}
+
+static bool isMagicMethod(MethodDesc* md) {
+    return isMagicClass(md->getParentType());
+}
+
+Type* convertMagicType2HIR(TypeManager& tm, Type* type) {
+    if (!type->isObject() || !type->isNamedType()) {
+        return type;
+    }
+    assert(isMagicClass(type));
+    const char* name = type->getName();    
+    if (!strcmp(name, "org/vmmagic/unboxed/Address") 
+        || !strcmp(name, "org/vmmagic/unboxed/ObjectReference")) 
+    {
+        return tm.getUnmanagedPtrType(tm.getInt8Type());
+    } else if (!strcmp(name, "org/vmmagic/unboxed/Word") 
+        || !strcmp(name, "org/vmmagic/unboxed/Offset")
+        || !strcmp(name, "org/vmmagic/unboxed/Extent")) 
+    {
+            return tm.getUIntPtrType();
+    } else if (!strcmp(name, "org/vmmagic/unboxed/WordArray")
+        || !strcmp(name, "org/vmmagic/unboxed/OffsetArray")
+        || !strcmp(name, "org/vmmagic/unboxed/ExtentArray") 
+        || !strcmp(name, "org/vmmagic/unboxed/AddressArray") 
+        || !strcmp(name, "org/vmmagic/unboxed/ObjectReferenceArray")) 
+    {
+#ifdef _EM64T_
+        return tm.getArrayType(tm.getInt64Type(), false);
+#else 
+        return tm.getArrayType(tm.getInt32Type(), false);
+#endif
+    }
+    assert(0);
+    return NULL;
+}
+
+
+
 //-----------------------------------------------------------------------------
 // inlining policy management
 //-----------------------------------------------------------------------------
@@ -1000,6 +1048,9 @@ JavaByteCodeTranslator::getstatic(uint32 constPoolIndex) {
     if (field && field->isStatic()) {
         Type* fieldType = getFieldType(field,constPoolIndex);
         assert(fieldType);
+        if (isMagicClass(fieldType)) {
+            fieldType = convertMagicType2HIR(typeManager, fieldType);
+        }
         pushOpnd(irBuilder.genLdStatic(fieldType,field));
         return;
     }
@@ -1028,6 +1079,9 @@ JavaByteCodeTranslator::getfield(uint32 constPoolIndex) {
     if (field && !field->isStatic()) {
         Type* fieldType = getFieldType(field,constPoolIndex);
         assert(fieldType);
+        if (isMagicClass(fieldType)) {
+            fieldType = convertMagicType2HIR(typeManager, fieldType);
+        }
         pushOpnd(irBuilder.genLdField(fieldType,popOpnd(),field));
         return;
     }
@@ -1724,6 +1778,10 @@ JavaByteCodeTranslator::invokevirtual(uint32 constPoolIndex) {
     uint32 numArgs = methodSig->getNumParams();
     Type* returnType = methodSig->getReturnType();
 
+    if (isMagicClass(methodDesc->getParentType())) {
+        genMagic(methodDesc, numArgs, srcOpnds, returnType);
+        return;
+    }
     // callvirt can throw a null pointer exception
     Opnd *tauNullChecked = irBuilder.genTauCheckNull(srcOpnds[0]);
     Opnd* thisOpnd = srcOpnds[0];
@@ -2577,42 +2635,9 @@ JavaByteCodeTranslator::genInvokeStatic(MethodDesc * methodDesc,
                                         Type *       returnType) {
     Opnd *dst;
 
-        if ( (translationFlags.magicClass != NULL) &&
-             strcmp(methodDesc->getParentType()->getName(),translationFlags.magicClass)==0) {
-
-        const char *methodName = methodDesc->getName();
-        if (strcmp(methodName,"add")==0) {
-            pushOpnd(irBuilder.genAdd(returnType,Modifier(Overflow_None)|Modifier(Exception_Never)|Modifier(Strict_No),
-                        srcOpnds[0],srcOpnds[1]));
-            return;
-        }
-        if (strncmp(methodName,"prefetch",8)==0) {
-            assert(numArgs == 3);
-            assert(returnType->isVoid());
-            irBuilder.genPrefetch(srcOpnds[0],srcOpnds[1],srcOpnds[2]);
-            return;
-        } 
-        if (strncmp(methodName,"loadField",9)==0) {
-            NamedType *fieldType = (NamedType *)returnType;
-            int  index = ((ConstInst*)srcOpnds[1]->getInst())->getValue().i4;
-            FieldDesc *fd = compilationInterface.resolveFieldByIndex(
-                         (NamedType*)srcOpnds[0]->getType(),index,&fieldType);
-            pushOpnd (irBuilder.genLdField(returnType,srcOpnds[0],fd));
-            return;
-        }
-        if (strncmp(methodName,"loadElement",11)==0) {
-            Type *type = srcOpnds[0]->getType();
-            assert(type->isArrayType());
-            pushOpnd(irBuilder.genLdElem(
-               ((ArrayType*)type)->getElementType(),srcOpnds[0],srcOpnds[1]));
-            return;
-        }
-        if (strncmp(methodName,"distance",8)==0) {
-            pushOpnd(irBuilder.genSub(returnType,Modifier(Overflow_None)|Modifier(Exception_Never)|Modifier(Strict_No),
-                                      srcOpnds[0],srcOpnds[1]));
-            return;
-        }
-        ::std::cerr << "Unknown Magic " << methodName << ::std::endl;
+    if (isMagicMethod(methodDesc)) {
+        genMagic(methodDesc, numArgs, srcOpnds, returnType);    
+        return;
     }
     if (inlineMethod(methodDesc)) {
         if(Log::isEnabled()) {
@@ -3430,6 +3455,216 @@ uint32 JavaByteCodeTranslator::getNumericValue(const uint8* byteCodes, uint32 of
             return 0;
     }
     return off - offset;
+}
+
+void JavaByteCodeTranslator::genMagic(MethodDesc *md, uint32 numArgs, Opnd **srcOpnds, Type *magicRetType) {
+    const char* mname = md->getName();
+    Type* resType = convertMagicType2HIR(typeManager, magicRetType);
+    Opnd* tauSafe = irBuilder.genTauSafe();
+    Opnd* arg0 = numArgs > 0 ? srcOpnds[0]: NULL;
+    Opnd* arg1 = numArgs > 1 ? srcOpnds[1]: NULL;
+    Modifier mod = Modifier(Overflow_None)|Modifier(Exception_Never)|Modifier(Strict_No);
+
+    
+    // max, one, zero
+    int theConst = 0;
+    bool loadConst = false;
+    if (!strcmp(mname, "max"))          { loadConst = true; theConst = -1;}
+    else if (!strcmp(mname, "one"))     { loadConst = true; theConst =  1;}
+    else if (!strcmp(mname, "zero"))    { loadConst = true; theConst =  0;}
+    else if (!strcmp(mname, "nullReference")) { loadConst = true; theConst =  0;}
+    if (loadConst) {
+        //todo: recheck and fix the type of the const:
+        ConstInst::ConstValue v; v.i4 = theConst;
+        Opnd* res = irBuilder.genLdConstant(typeManager.getUIntPtrType(), v);//todo:clean typing
+        if (resType->isPtr()) {
+            res = irBuilder.genConv(resType, resType->tag, mod, res);
+        }
+        pushOpnd(res);
+        return;
+    }
+
+    //
+    // fromXXX, toXXX - static creation from something
+    //
+    if (!strcmp(mname, "fromInt") 
+        || !strcmp(mname, "fromIntSignExtend") 
+        || !strcmp(mname, "fromIntZeroExtend")
+        || !strcmp(mname, "fromObject")  
+        || !strcmp(mname, "toAddress") 
+        || !strcmp(mname, "toObjectReference")
+        || !strcmp(mname, "toInt")
+        || !strcmp(mname, "toLong")
+        || !strcmp(mname, "toObjectRef")
+        || !strcmp(mname, "toWord")
+        || !strcmp(mname, "toAddress")
+        || !strcmp(mname, "toObject")
+        || !strcmp(mname, "toExtent")
+        || !strcmp(mname, "toOffset"))
+    {
+        assert(numArgs == 1);
+        if (resType == arg0->getType()) {
+            pushOpnd(irBuilder.genCopy(arg0));
+            return;
+        } 
+        Opnd* res = irBuilder.genConv(resType, resType->tag, mod, arg0);
+        pushOpnd(res);
+        return;
+    }
+
+    //
+    // is<Smth> one arg testing
+    //
+    bool isOp = false;
+    if (!strcmp(mname, "isZero")) { isOp = true; theConst = 0; }
+    else if (!strcmp(mname, "isMax")) { isOp = true; theConst = ~0; }
+    else if (!strcmp(mname, "isNull")) { isOp = true; theConst = 0; }
+    if (isOp) {
+        assert(numArgs == 1);
+        Opnd* res = irBuilder.genCmp(typeManager.getInt32Type(), Type::Int32, Cmp_EQ, arg0, irBuilder.genLdConstant(theConst));
+        pushOpnd(res);
+        return;
+    }
+
+
+    //
+    // EQ, GE, GT, LE, LT, sXX - 2 args compare
+    //
+    ComparisonModifier cm = Cmp_Mask;
+    bool commuteOpnds=false;
+    if (!strcmp(mname, "EQ"))          { cm = Cmp_EQ; }
+    else if (!strcmp(mname, "equals")) { cm = Cmp_EQ; }
+    else if (!strcmp(mname, "NE"))     { cm = Cmp_NE_Un; }
+    else if (!strcmp(mname, "GE"))     { cm = Cmp_GTE;}
+    else if (!strcmp(mname, "GT"))     { cm = Cmp_GT; }
+    else if (!strcmp(mname, "LE"))     { cm = Cmp_GTE;  commuteOpnds = true;}
+    else if (!strcmp(mname, "LT"))     { cm = Cmp_GT;  commuteOpnds = true;}
+    if (cm!=Cmp_Mask) {
+        assert(numArgs == 2);
+        assert(arg0->getType() == arg1->getType());
+        Opnd* op0 = commuteOpnds ? arg1 : arg0;
+        Opnd* op1 = commuteOpnds ? arg0 : arg1;
+        Opnd* res = irBuilder.genCmp(typeManager.getInt32Type(), Type::Int32, cm, op0, op1);
+        pushOpnd(res);
+        return;
+    }
+
+   
+    //
+    // plus, minus, xor, or, and ... etc - 1,2 args arithmetics
+    //
+    if (!strcmp(mname, "plus")) { 
+        assert(numArgs==2); 
+        if (resType->isPtr()) {
+            pushOpnd(irBuilder.genAddScaledIndex(arg0, arg1)); 
+        } else {
+            pushOpnd(irBuilder.genAdd(resType, mod, arg0, arg1)); 
+        }
+        return;
+    }
+    if (!strcmp(mname, "minus")){ 
+        assert(numArgs==2); 
+        if (resType->isPtr()) {
+            Opnd* negArg1 = irBuilder.genNeg(typeManager.getInt32Type(), arg1);
+            pushOpnd(irBuilder.genAddScaledIndex(arg0, negArg1)); 
+        } else {
+            pushOpnd(irBuilder.genSub(resType, mod, arg0, arg1)); 
+        }
+        return;
+    }
+    if (!strcmp(mname, "or"))   { assert(numArgs==2); pushOpnd(irBuilder.genOr (resType, arg0, arg1)); return;}
+    if (!strcmp(mname, "xor"))  { assert(numArgs==2); pushOpnd(irBuilder.genXor(resType, arg0, arg1)); return;}
+    if (!strcmp(mname, "and"))  { assert(numArgs==2); pushOpnd(irBuilder.genAnd(resType, arg0, arg1)); return;}
+    if (!strcmp(mname, "not"))  { assert(numArgs==1); pushOpnd(irBuilder.genNot(resType, arg0)); return;}
+    if (!strcmp(mname, "diff")) { assert(numArgs==2); pushOpnd(irBuilder.genSub(resType, mod, arg0, arg1)); return;}
+
+    
+    //
+    // shifts
+    //
+    Modifier shMod(ShiftMask_Masked);
+    if (!strcmp(mname, "lsh"))      {assert(numArgs==2); pushOpnd(irBuilder.genShl(resType, shMod|SignedOp, arg0, arg1));  return;}
+    else if (!strcmp(mname, "rsha")){assert(numArgs==2); pushOpnd(irBuilder.genShr(resType, shMod|SignedOp, arg0, arg1)); return;}
+    else if (!strcmp(mname, "rshl")){assert(numArgs==2); pushOpnd(irBuilder.genShr(resType, shMod |UnsignedOp, arg0, arg1)); return;}
+
+    
+    //
+    // loadXYZ.. prepareXYZ..
+    //
+    if (!strcmp(mname, "loadObjectReference")
+        || !strcmp(mname, "loadAddress")
+        || !strcmp(mname, "loadWord")
+        || !strcmp(mname, "loadByte")
+        || !strcmp(mname, "loadChar")
+        || !strcmp(mname, "loadDouble")
+        || !strcmp(mname, "loadFloat")
+        || !strcmp(mname, "loadInt")
+        || !strcmp(mname, "loadLong")
+        || !strcmp(mname, "loadShort")
+        || !strcmp(mname, "prepareWord")
+        || !strcmp(mname, "prepareObjectReference")
+        || !strcmp(mname, "prepareAddress")
+        || !strcmp(mname, "prepareInt"))
+    {
+        assert(numArgs == 1 || numArgs == 2);
+        Opnd* effectiveAddress = arg0;
+        if (numArgs == 2) {//load by offset
+            effectiveAddress = irBuilder.genAddScaledIndex(arg0, arg1);
+        }
+        Opnd* res = irBuilder.genTauLdInd(AutoCompress_No, resType, resType->tag, effectiveAddress, tauSafe, tauSafe);
+        pushOpnd(res);
+        return;
+    }
+
+    //
+    // store(XYZ)
+    //
+    if (!strcmp(mname, "store")) {
+        assert(numArgs==2 || numArgs == 3);
+        Opnd* effectiveAddress = arg0;
+        if (numArgs == 3) { // store by offset
+            effectiveAddress = irBuilder.genAddScaledIndex(arg0, srcOpnds[2]);
+        }
+        irBuilder.genTauStInd(arg1->getType(), effectiveAddress, arg1, tauSafe, tauSafe, tauSafe);
+        return;
+    }
+
+    if (!strcmp(mname, "attempt")) {
+        assert(numArgs == 3 || numArgs == 4);
+        Opnd* effectiveAddress = arg0;
+        if (numArgs == 4) { // offset opnd
+            effectiveAddress = irBuilder.genAddScaledIndex(arg0, srcOpnds[3]);
+        }
+        Opnd* opnds[3] = {effectiveAddress, arg1, srcOpnds[2]};
+        Opnd* res = irBuilder.genJitHelperCall(LockedCompareAndExchange, resType, 3, opnds);
+        pushOpnd(res);
+        return;
+    }
+
+    //
+    //Arrays
+    //
+    if (!strcmp(mname, "create")) { assert(numArgs==1); pushOpnd(irBuilder.genNewArray(resType->asNamedType(),arg0)); return;} 
+    if (!strcmp(mname, "set")) {
+        assert(numArgs == 3);
+        Opnd* arg2 = srcOpnds[2];
+        Type* opType = convertMagicType2HIR(typeManager, arg2->getType());
+        irBuilder.genStElem(opType, arg0, arg1, arg2, tauSafe, tauSafe, tauSafe); 
+        return;
+    }
+    if (!strcmp(mname, "get")) {
+        assert(numArgs == 2);
+        Opnd* res = irBuilder.genLdElem(resType, arg0, arg1, tauSafe, tauSafe);
+        pushOpnd(res);
+        return;
+    }
+    if (!strcmp(mname, "length")) {    
+        pushOpnd(irBuilder.genArrayLen(typeManager.getInt32Type(), Type::Int32, arg0));
+        return;
+    }
+
+    assert(0);
+    return;
 }
 
 } //namespace Jitrino 

@@ -669,6 +669,7 @@ MemoryOptInitWalker::applyToInst(Inst *i)
             case PseudoCanThrow:
             case SaveThisState:
             case ReadThisState:
+            case LockedCompareAndExchange:
                 break;
             default:
                 assert(0);
@@ -1274,7 +1275,7 @@ AliasRep AliasManager::getReference(Opnd *addr)
             Type *eltType = NULL;
             Opnd *thePtr = addri->getSrc(0);
             Type *theType = thePtr->getType();
-            if (theType->isManagedPtr()) {
+            if (theType->isManagedPtr() || theType->isUnmanagedPtr()) {
                 PtrType *thePtrType = (PtrType *) theType;
                 eltType = thePtrType->getPointedToType();
             } else {
@@ -1387,6 +1388,12 @@ AliasRep AliasManager::getReference(Opnd *addr)
     case Op_LdVarAddr:
     case Op_Phi:
         break;
+    case Op_Conv: //the result of a conversion
+    case Op_TauLdInd: // the result of static field load
+        {
+            assert(addr->getType()->isUnmanagedPtr());
+            break;
+        }
     default:
         assert(0);
         break;

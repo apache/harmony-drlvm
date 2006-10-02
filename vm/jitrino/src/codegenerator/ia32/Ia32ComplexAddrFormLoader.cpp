@@ -108,7 +108,12 @@ ComplexAddrFormLoader::findAddressComputation(Opnd * memOp) {
         }
     } else {
         if (table.baseOp) {
-            memOp->setMemOpndSubOpnd(MemOpndSubOpndKind_Base, table.baseOp);
+            Opnd* origOp = memOp->getMemOpndSubOpnd(MemOpndSubOpndKind_Base);
+            Opnd* replacementOp = table.baseOp;
+            if (origOp->getType()->isUnmanagedPtr() && replacementOp->getType()->isInteger()) {
+                replacementOp->setType(origOp->getType());
+            }
+            memOp->setMemOpndSubOpnd(MemOpndSubOpndKind_Base, replacementOp);
         } 
         if (table.indexOp) {
             memOp->setMemOpndSubOpnd(MemOpndSubOpndKind_Index, table.indexOp);
@@ -163,6 +168,11 @@ ComplexAddrFormLoader::walkThroughOpnds(SubOpndsTable& table) {
                 table.baseCand1 = NULL;
                 walkThroughOpnds(table);
             }
+        } else if (table.baseOp) {
+            table.baseOp = table.suspOp;
+            table.baseCand1 = NULL;
+            table.baseCand2 = NULL;
+            table.dispOp = NULL;
         }
         return;
     } 

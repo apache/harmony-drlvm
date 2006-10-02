@@ -411,12 +411,12 @@ BEGIN_OPCODES()
 END_OPCODES()
 END_MNEMONIC()
 
-BEGIN_MNEMONIC(CMPXCHG, MF_NONE, DU_DU )
+BEGIN_MNEMONIC(CMPXCHG, MF_AFFECTS_FLAGS, N)
 BEGIN_OPCODES()
-    {OpcodeInfo::all, {0x0F, 0xB0, _r},         {r_m8, r8},     DU_DU },
-    {OpcodeInfo::all, {Size16, 0x0F, 0xB1, _r}, {r_m16, r16},   DU_DU },
-    {OpcodeInfo::all, {0x0F, 0xB1, _r},         {r_m32, r32},   DU_DU },
-    {OpcodeInfo::em64t, {REX_W, 0x0F, 0xB1, _r},{r_m64, r64},   DU_DU },
+    {OpcodeInfo::all, {0x0F, 0xB0, _r},         {r_m8, r8, AL},     DU_DU_DU },
+    {OpcodeInfo::all, {Size16, 0x0F, 0xB1, _r}, {r_m16, r16, AX},   DU_DU_DU },
+    {OpcodeInfo::all, {0x0F, 0xB1, _r},         {r_m32, r32, EAX},   DU_DU_DU},
+    {OpcodeInfo::em64t, {REX_W, 0x0F, 0xB1, _r},{r_m64, r64, RAX},   DU_DU_DU },
 END_OPCODES()
 END_MNEMONIC()
 

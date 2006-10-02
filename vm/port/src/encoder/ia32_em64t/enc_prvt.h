@@ -98,6 +98,7 @@ enum OpcodeByteKind {
 #define DU_U        {2, 1, 2, ((OpndRole_Def|OpndRole_Use)<<2 | OpndRole_Use) }
 #define DU_DU       {2, 2, 2, ((OpndRole_Def|OpndRole_Use)<<2 | (OpndRole_Def|OpndRole_Use)) }
 
+#define DU_DU_DU    {3, 3, 3, ((OpndRole_Def|OpndRole_Use)<<4) | ((OpndRole_Def|OpndRole_Use)<<2) | (OpndRole_Def|OpndRole_Use) }
 #define DU_DU_U     {3, 2, 3, (((OpndRole_Def|OpndRole_Use)<<4) | ((OpndRole_Def|OpndRole_Use)<<2) | OpndRole_Use) }
 #define D_DU_U      {3, 2, 2, (((OpndRole_Def)<<4) | ((OpndRole_Def|OpndRole_Use)<<2) | OpndRole_Use) }
 #define D_U_U       {3, 1, 2, (((OpndRole_Def)<<4) | ((OpndRole_Use)<<2) | OpndRole_Use) }

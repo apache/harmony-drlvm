@@ -58,12 +58,10 @@ struct TranslatorFlags {
     bool ignoreSync       : 1;    // do not generate monitor enter/exit instructions
     bool syncAsEnterFence : 1;    // implement monitor enter as enter fence and
     bool newCatchHandling : 1;    // use fix for catch handler ordering problem
-    bool magicMinMaxAbs   : 1;    // recognize, e.g., java/lang/Math.min/max/abs
     bool genMinMaxAbs     : 1;    // gen min/max/abs opcodes instead of using select
     bool genFMinMaxAbs    : 1;    // gen min/max/abs opcodes for floats
     bool optArrayInit     : 1;    // skip array initializers from optimizations
     Method_Table* inlineSkipTable; // do not inline these methods
-    char *magicClass;             //  Name of the MagicClass. NULL if no class specified.
 };
 
 class IRBuilderAction;

@@ -117,6 +117,10 @@ public:
                               ConvertToIntOp::OverflowMod,Type* dstType, CG_OpndHandle* src);
     CG_OpndHandle* convToFp(ConvertToFpOp::Types, Type* dstType, CG_OpndHandle* src);
 
+    /// convert unmanaged pointer to object. Boxing
+    CG_OpndHandle*  convUPtrToObject(ObjectType * dstType, CG_OpndHandle* val);
+    /// convert object or integer to unmanaged pointer.
+    CG_OpndHandle*  convToUPtr(PtrType * dstType, CG_OpndHandle* src);
 
 
     CG_OpndHandle* ldc_i4(uint32 val);
@@ -310,7 +314,9 @@ private:
     Opnd *  convertIntToFp(Opnd * srcOpnd, Type * dstType, Opnd * dstOpnd=NULL);
     Opnd *  convertFpToInt(Opnd * srcOpnd, Type * dstType, Opnd * dstOpnd=NULL);
     Opnd *  convertFpToFp(Opnd * srcOpnd, Type * dstType, Opnd * dstOpnd=NULL);
-
+    Opnd*   convertUnmanagedPtr(Opnd * srcOpnd, Type * dstType, Opnd * dstOpnd=NULL);
+    Opnd*   convertToUnmanagedPtr(Opnd * srcOpnd, Type * dstType, Opnd * dstOpnd=NULL);
+    
     bool    isIntegerType(Type * type)
     { return type->isInteger()||type->isBoolean()||type->isChar(); }
     void    copyOpnd(Opnd *dst, Opnd *src);

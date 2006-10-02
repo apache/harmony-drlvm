@@ -315,7 +315,8 @@ private:
     bool    guardedInlineMethod(MethodDesc* methodDesc);
     bool    needsReturnLabel(uint32 off);
     void    genInvokeStatic(MethodDesc * methodDesc,uint32 numArgs,Opnd ** srcOpnds,Type * returnType);
-
+    void    genMagic(MethodDesc * methodDesc,uint32 numArgs,Opnd ** srcOpnds,Type * returnType);
+    
     bool    genCharArrayCopy(MethodDesc * methodDesc,uint32 numArgs,Opnd ** srcOpnds, Type * returnType);
     bool    genArrayCopy(MethodDesc * methodDesc,uint32 numArgs,Opnd ** srcOpnds, Type * returnType);
     bool    genMinMax(MethodDesc * methodDesc,uint32 numArgs,Opnd ** srcOpnds, Type * returnType);

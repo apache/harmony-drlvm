@@ -121,7 +121,6 @@ void PrintDotFile::printDotFile(MethodDesc& mh, ::std::ostream& fos) {
 
 void PrintDotFile::printDotHeader(MethodDesc& mh) {
     *os << "digraph dotgraph {" << ::std::endl
-        << "fontpath=\"c:\\winnt\\fonts\";" << ::std::endl
         << "node [shape=record,fontname=\"Courier\",fontsize=9];" << ::std::endl
         << "label=\""
         << mh.getParentType()->getName()

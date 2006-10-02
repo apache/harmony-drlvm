@@ -88,11 +88,9 @@ static const char* help = \
     "  guardedInlining[={on|OFF}]  - do guarded inlining during translation\n"\
     "  genCharArrayCopy[={on|off}] - generate intrinsic calls to char array copy\n"\
     "  genArrayCopy[={ON|off}] - inline java/lang/System::arraycopy call\n"\
-    "  useMagicMethods[={MagicClass name}] - use magic methods with magic class named MagicClass\n"\
     "  balancedSync[={on|OFF}] - treat all synchronization as balanced\n"\
     "  ignoreSync[={on|OFF}]   - do not generate synchronization\n"\
     "  syncAsEnterFence[={on|OFF}] - implement synchronization as monitor enter fence\n"\
-    "  magicMinMaxAbs[={on|OFF}] - treat java/lang/Math::min and max as magic\n"\
     "  genMinMaxAbs[={on|OFF}]   - use special opcodes for Min/Max/Abs\n"\
     "  genFMinMaxAbs[={on|OFF}]  - also use opcodes for float Min/Max/Abs\n";
 
@@ -127,7 +125,6 @@ void TranslatorAction::readFlags() {
     flags.inlineMethods  = getBoolArg("inlineMethods", false);
     flags.guardedInlining = getBoolArg("guardedInlining", false);
 
-    flags.magicMinMaxAbs = getBoolArg("magicMinMaxAbs", false);
     flags.genMinMaxAbs = getBoolArg("genMinMaxAbs", false);
     flags.genFMinMaxAbs = getBoolArg("genFMinMaxAbs", false);
  
@@ -138,7 +135,6 @@ void TranslatorAction::readFlags() {
         flags.inlineSkipTable = new Method_Table(strdup(skipMethods), "SKIP_METHODS", true);
     }
 
-    flags.magicClass=(char *)getStringArg("useMagicMethods", NULL);
 }
 
 

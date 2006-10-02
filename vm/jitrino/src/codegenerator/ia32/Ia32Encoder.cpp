@@ -187,6 +187,12 @@ uint8* Encoder::emit(uint8* stream, const Inst * inst)
 
     Opnd * const * opnds = inst->getOpnds();
     const uint32 * roles = inst->getOpndRoles();
+
+    //emit inst prefix
+    if (inst->getPrefix()!=InstPrefix_Null) {
+        stream = (uint8*)EncoderBase::prefix((char*)stream, inst->getPrefix());
+    }
+
     for( int idx=0, n=inst->getOpndCount(); idx<n; idx++ ) { 
         if (!(roles[idx] & Inst::OpndRole_Explicit)) continue;
         const Opnd * p = opnds[idx];

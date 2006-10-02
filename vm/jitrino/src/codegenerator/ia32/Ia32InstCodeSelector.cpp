@@ -294,11 +294,15 @@ Opnd * InstCodeSelector::convertIntToInt(Opnd * srcOpnd, Type * dstType, Opnd * 
     OpndSize srcSize=irManager.getTypeSize(srcType);
     OpndSize dstSize=irManager.getTypeSize(dstType);
     
-    if (dstSize==srcSize){ // trivial conversion without changing type
-        if (dstOpnd==NULL)
+    if (dstSize==srcSize){ // trivial conversion
+        if (dstOpnd==NULL && dstType == srcType) {
             dstOpnd=srcOpnd;
-        else
+        } else {
+            if (dstOpnd == NULL) {
+                dstOpnd = irManager.newOpnd(dstType);
+            }
             copyOpndTrivialOrTruncatingConversion(dstOpnd, srcOpnd);
+        }
     }else if (dstSize<=srcSize){ // truncating conversion 
         if (dstOpnd==NULL)
             dstOpnd=irManager.newOpnd(dstType);
@@ -387,6 +391,52 @@ Opnd * InstCodeSelector::convertFpToFp(Opnd * srcOpnd, Type * dstType, Opnd * ds
 }
 
 //_______________________________________________________________________________________________________________
+Opnd * InstCodeSelector::convertToUnmanagedPtr(Opnd * srcOpnd, Type * dstType, Opnd * dstOpnd) {
+    assert(dstType->isUnmanagedPtr());
+    Type* srcType = srcOpnd->getType();
+    if (dstOpnd == NULL) {
+        dstOpnd = irManager.newOpnd(dstType);
+    }
+
+    if (srcType->isObject() || srcType->isInteger()) {
+        appendInsts(irManager.newCopyPseudoInst(Mnemonic_MOV, dstOpnd, srcOpnd));
+    } else {
+        assert(0);
+    }
+    return dstOpnd;
+}
+
+
+//_______________________________________________________________________________________________________________
+Opnd * InstCodeSelector::convertUnmanagedPtr(Opnd * srcOpnd, Type * dstType, Opnd * dstOpnd) {
+    Type * srcType=srcOpnd->getType();
+    assert(srcType->isUnmanagedPtr());
+
+    if (dstOpnd == NULL) {
+        dstOpnd = irManager.newOpnd(dstType);
+    }
+
+    if (dstType->isObject()) {
+        appendInsts(irManager.newCopyPseudoInst(Mnemonic_MOV, dstOpnd, srcOpnd));
+    } else {
+        assert(dstType->isInteger());
+        OpndSize srcSize=irManager.getTypeSize(srcType);
+        OpndSize dstSize=irManager.getTypeSize(dstType);
+        if (dstSize<=srcSize) {
+            copyOpndTrivialOrTruncatingConversion(dstOpnd, srcOpnd);
+        } else {
+            assert(dstSize==OpndSize_64);
+#ifdef _EM64T_
+            appendInsts(irManager.newInstEx(srcType->isSignedInteger()?Mnemonic_MOVSX:Mnemonic_MOVZX, 1, dstOpnd, srcOpnd));
+#else
+            appendInsts(irManager.newI8PseudoInst(srcType->isSignedInteger()?Mnemonic_MOVSX:Mnemonic_MOVZX, 1, dstOpnd, srcOpnd));
+#endif
+        }
+    }
+    return dstOpnd;
+}
+
+//_______________________________________________________________________________________________________________
 Opnd * InstCodeSelector::convert(CG_OpndHandle * oph, Type * dstType, Opnd * dstOpnd)
 {
     if (!oph)
@@ -399,10 +449,13 @@ Opnd * InstCodeSelector::convert(CG_OpndHandle * oph, Type * dstType, Opnd * dst
         if (isIntegerType(dstType)){
             dstOpnd=convertIntToInt(srcOpnd, dstType, dstOpnd);
             converted=true;
-        }else if (dstType->isFP()){
+        } else if (dstType->isFP()){
             dstOpnd=convertIntToFp(srcOpnd, dstType, dstOpnd);
             converted=true;
-        }   
+        } else if (dstType->isUnmanagedPtr()) {
+            dstOpnd = convertToUnmanagedPtr(srcOpnd, dstType, dstOpnd);
+            converted = true;
+        }
     }else if (srcType->isFP()){
         if (dstType->isInteger()){
             dstOpnd=convertFpToInt(srcOpnd, dstType, dstOpnd);
@@ -411,6 +464,9 @@ Opnd * InstCodeSelector::convert(CG_OpndHandle * oph, Type * dstType, Opnd * dst
             dstOpnd=convertFpToFp(srcOpnd, dstType, dstOpnd);
             converted=true;
         }   
+    } else if (srcType->isUnmanagedPtr() && !dstType->isUnmanagedPtr()) {
+        dstOpnd = convertUnmanagedPtr(srcOpnd, dstType, dstOpnd);
+        converted = true;
     }
 
     if (!converted){
@@ -465,6 +521,18 @@ CG_OpndHandle*  InstCodeSelector::convToFp(ConvertToFpOp::Types opType,
     return convert(src, dstType);
 }
 
+//_______________________________________________________________________________________________________________
+//  Convert to objects to unmanaged pointers and via versa
+
+/// convert unmanaged pointer to object. Boxing
+CG_OpndHandle*  InstCodeSelector::convUPtrToObject(ObjectType * dstType, CG_OpndHandle* val) {
+    return convert(val, dstType);
+}
+
+/// convert object or integer to unmanaged pointer.
+CG_OpndHandle*  InstCodeSelector::convToUPtr(PtrType * dstType, CG_OpndHandle* src) {
+    return  convert(src, dstType);
+}
 
 //_______________________________________________________________________________________________________________
 Opnd * InstCodeSelector::createResultOpnd(Type * dstType)
@@ -1789,9 +1857,11 @@ CG_OpndHandle*  InstCodeSelector::addElemIndex(Type          * eType,
     indexOpnd=convert(indexOpnd, indexType);
     
     Opnd * scaledIndexOpnd=NULL;
-    if (indexOpnd->isPlacedIn(OpndKind_Imm)){
-        scaledIndexOpnd=irManager.newImmOpnd(indexType, indexOpnd->getImmValue()*elemSize);
-    }else{
+    if (indexOpnd->isPlacedIn(OpndKind_Imm)) {
+        scaledIndexOpnd=irManager.newImmOpnd(indexType, indexOpnd->getImmValue() * elemSize);
+    //} else if (elemSize == 1 && ptrType->isUnmanagedPtr()) {
+    //    scaledIndexOpnd = indexOpnd;
+    } else {
         scaledIndexOpnd=irManager.newOpnd(indexType);
         appendInsts(irManager.newInstEx(Mnemonic_IMUL, 1, scaledIndexOpnd, indexOpnd, irManager.newImmOpnd(indexType, elemSize)));
     }
@@ -2529,8 +2599,6 @@ CG_OpndHandle* InstCodeSelector::callhelper(uint32              numArgs,
 #ifdef PLATFORM_POSIX
         // Not supported
         assert(0);
-        // Not supported
-        assert(0);
 #else // PLATFORM_POSIX
         // TLS base can be obtained from [fs:0x14]
         Opnd * tlsBaseReg = irManager.newOpnd(typeManager.getUnmanagedPtrType(typeManager.getInt32Type()));
@@ -2552,6 +2620,28 @@ CG_OpndHandle* InstCodeSelector::callhelper(uint32              numArgs,
                                                 irManager.newImmOpnd(typeManager.getInt32Type(),1)));
 #endif
 
+        break;
+    }
+    case LockedCompareAndExchange:
+    {
+        assert(numArgs == 3);
+        Opnd** opnds = (Opnd**)args;
+
+        //deal with constraints       
+        Opnd* eaxOpnd = irManager.getRegOpnd(RegName_EAX);
+        Opnd* ecxOpnd = irManager.getRegOpnd(RegName_ECX);
+        Opnd* memOpnd = irManager.newMemOpnd(opnds[0]->getType(), opnds[0]);
+        
+        appendInsts(irManager.newInst(Mnemonic_MOV, eaxOpnd, opnds[1]));
+        appendInsts(irManager.newInst(Mnemonic_MOV, ecxOpnd, opnds[2]));
+        
+        Inst*  inst = irManager.newInst(Mnemonic_CMPXCHG, memOpnd, ecxOpnd, eaxOpnd);
+        inst->setPrefix(InstPrefix_LOCK);
+        appendInsts(inst);
+
+        //save the result
+        appendInsts(irManager.newInst(Mnemonic_MOV, dstOpnd, irManager.newImmOpnd(typeManager.getInt32Type(), 0)));
+        appendInsts(irManager.newInst(Mnemonic_SETZ, dstOpnd));
         break;
     }
     default:

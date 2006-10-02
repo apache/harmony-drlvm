@@ -215,6 +215,10 @@ void I8Lowerer::processOpnds(Inst * inst, StlMap<Opnd *,Opnd **>& pairs)
                 if (mn==Mnemonic_MOVSX){
                     irManager->newInstEx(Mnemonic_CDQ, 1, dst_2, dst_1)->insertBefore(inst);
                     inst->unlink();
+                } else {
+                    Opnd* zero = irManager->newImmOpnd(irManager->getTypeManager().getInt32Type(), 0);
+                    irManager->newInstEx(Mnemonic_MOV, 1, dst_2, zero)->insertBefore(inst);
+                    inst->unlink();
                 }
                 break;
             case Mnemonic_PUSH  :

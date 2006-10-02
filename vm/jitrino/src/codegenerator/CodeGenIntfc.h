@@ -166,7 +166,8 @@ public:
         InitializeArray,
         PseudoCanThrow,
         SaveThisState,
-        ReadThisState
+        ReadThisState,
+        LockedCompareAndExchange
     };
 };
 
@@ -243,6 +244,11 @@ public:
     virtual void            throwException(CG_OpndHandle* exceptionObj, bool createStackTrace) = 0;
     virtual void            throwSystemException(CompilationInterface::SystemExceptionId) = 0;
     virtual void            throwLinkingException(Class_Handle encClass, uint32 cp_ndx, uint32 opcode) = 0;
+
+    /// convert unmanaged pointer to object. Boxing
+    virtual CG_OpndHandle*  convUPtrToObject(ObjectType * dstType, CG_OpndHandle* val) = 0;
+    /// convert object or integer to unmanaged pointer. Unboxing
+    virtual CG_OpndHandle*  convToUPtr(PtrType * dstType, CG_OpndHandle* op) = 0;
 
     virtual CG_OpndHandle*  convToInt(ConvertToIntOp::Types, bool isSigned, 
                                       ConvertToIntOp::OverflowMod,

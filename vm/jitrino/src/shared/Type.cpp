@@ -134,6 +134,7 @@ Type* TypeManager::toInternalType(Type* t)
     case Type::NullObject:
     case Type::Array:
     case Type::Object:
+    case Type::UnmanagedPtr:
     case Type::ManagedPtr:
     case Type::CompressedSystemObject:
     case Type::CompressedSystemClass:

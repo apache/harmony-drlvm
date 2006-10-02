@@ -163,7 +163,13 @@ void EarlyPropagation::runImpl()
                         inst->unlink();
                     }
                     if (opndInfos[i].sourceOpndId != i){
-                        replacements[i] = irManager->getOpnd(opndInfos[i].sourceOpndId);
+                        Opnd* origOpnd= irManager->getOpnd(i);
+                        Opnd* replacementOpnd = irManager->getOpnd(opndInfos[i].sourceOpndId);
+                        //TODO: extends possible convertions.
+                        if (origOpnd->getType()->isUnmanagedPtr() && replacementOpnd->getType()->isInteger()) {
+                            replacementOpnd->setType(origOpnd->getType());
+                        }
+                        replacements[i] = replacementOpnd;
                         hasReplacements = true;
                     }
                 }

@@ -139,6 +139,7 @@ public:
                 return ArithmeticOp::I8_Ovf;
             return ArithmeticOp::U8_Ovf;
         case Type::IntPtr:
+        case Type::UIntPtr:
             if ((modifier == Overflow_None) || (excModifier == Exception_Never))
                 return ArithmeticOp::I;
             if (modifier == Overflow_Signed)
@@ -296,6 +297,7 @@ public:
         case Type::Int64:
             return IntegerOp::I8;
         case Type::IntPtr:
+        case Type::UIntPtr:
             return IntegerOp::I;
         default: assert(0);
         }
@@ -313,6 +315,7 @@ public:
         case Type::Int64:
             return CompareOp::I8;
         case Type::IntPtr:
+        case Type::UIntPtr:
             return CompareOp::I;
         case Type::Float:
             return CompareOp::F;
@@ -436,6 +439,7 @@ public:
         case PseudoCanThrow: return JitHelperCallOp::PseudoCanThrow;
         case SaveThisState: return JitHelperCallOp::SaveThisState;
         case ReadThisState: return JitHelperCallOp::ReadThisState;
+        case LockedCompareAndExchange: return JitHelperCallOp::LockedCompareAndExchange;
         }
         assert(0);
         return JitHelperCallOp::InitializeArray; // to keep compiler quiet
@@ -646,8 +650,11 @@ public:
                     cgInst = instructionCallback.convToFp(mapToFpConvertOpType(inst),
                                                           dstType,
                                                           getCGInst(inst->getSrc(0)));
-                }
-                else {
+                } else if (dstType->isObject()){
+                    cgInst = instructionCallback.convUPtrToObject((ObjectType*)dstType, getCGInst(inst->getSrc(0)));
+                } else if (dstType->isUnmanagedPtr()) {
+                    cgInst = instructionCallback.convToUPtr((PtrType*)dstType, getCGInst(inst->getSrc(0)));
+                } else {
                     bool isSigned = Type::isSignedInteger(inst->getType());
                     cgInst = instructionCallback.convToInt(mapToIntConvertOpType(inst),
                                                            isSigned, 
@@ -991,6 +998,9 @@ public:
                 if (!genConsts) break;
                 ConstInst* constInst = (ConstInst*)inst;
                 switch (inst->getType()) {
+                case Type::UIntPtr://mfursov todo!
+                case Type::IntPtr://mfursov todo!
+                case Type::UnmanagedPtr://mfursov todo!
                 case Type::Int32:
                     cgInst = instructionCallback.ldc_i4(constInst->getValue().i4);
                     break;
