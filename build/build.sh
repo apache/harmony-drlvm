@@ -68,8 +68,6 @@ export ANT_HOME=`(cd $ANT_HOME;pwd)`
 export CXX
 export BUILD_CFG
 CLASSPATH=`pwd`/make/tmp/cpptasks.jar
-CLASSPATH=$CLASSPATH:`pwd`/make/tmp/org.eclipse.jdt.core_3.1.1.jar;
-CLASSPATH=$CLASSPATH:`pwd`/make/tmp/jdtCompilerAdapter.jar
 CLASSPATH=$CLASSPATH:`pwd`/make/tmp/junit.jar
 CLASSPATH=$CLASSPATH:`pwd`/make/tmp/xalan.jar
 CLASSPATH=`pwd`/make/tmp/cpptasks/patched.classes:$CLASSPATH

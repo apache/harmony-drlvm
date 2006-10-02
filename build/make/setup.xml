@@ -102,9 +102,7 @@ Version: $Revision: 1.5.2.33 $
         <property name="APRICONV.check.file" value="lib/api_version.c" />
         <property name="LOG4CXX.check.file" value="configure.in" />
         <property name="ZLIB.check.file" value="zlib1.dll" />
-        <property name="HYPLUGIN.check.file" value="src/org/apache/harmony/eclipse/jdt/launching/HyLaunchingPlugin.java" />
         <property name="CLASSLIB.check.file" value="native-src/README.txt" />
-        <property name="ECLIPSE.check.file" value="plugins/org.eclipse.jdt.core_3.1.1.jar" />
         <property name="XALAN.check.file" value="xalan.jar" />
         <property name="VM.check.file" value="vmcore/src/init/vm_main.cpp" />
 		<property name="ANTLR.check.file" value="antlr-2.7.5.jar" />
@@ -149,22 +147,6 @@ Version: $Revision: 1.5.2.33 $
     </target>
 
     <target name="copy.nessessary.jars">
-        <propertyregex property="build.ECLIPSE.path" input="${if.ECLIPSE.exist}" regexp="(.*)/${ECLIPSE.check.file}" select="\1" />
-        <unzip dest="tmp">
-            <fileset dir="${build.ECLIPSE.path}" includes="plugins/org.eclipse.jdt.core_3.1.1.jar" />
-            <patternset>
-                <include name="jdtCompilerAdapter.jar" />
-            </patternset>
-        </unzip>
-        <copy tofile="tmp/org.eclipse.jdt.core_3.1.1.jar">
-            <fileset dir="${build.ECLIPSE.path}" includes="plugins/org.eclipse.jdt.core_3.1.1.jar" />
-        </copy>
-        <copy tofile="tmp/junit.jar">
-            <fileset dir="${build.ECLIPSE.path}">
-                <include name="plugins/org.junit_3.8.1/junit.jar" />
-            </fileset>
-        </copy>
-
 
         <propertyregex property="build.XALAN.path" input="${if.XALAN.exist}" regexp="(.*)/${XALAN.check.file}" select="\1" />
         <copy file="${build.XALAN.path}/xalan.jar" todir="tmp" />
@@ -194,17 +176,17 @@ Version: $Revision: 1.5.2.33 $
 
 
     <target name="setup.resources" depends="plugin.antcontrib">
-        <property name="common.resources" value="LOG4CXX,HYPLUGIN,CPPTASKS,XALAN,VM,ANTLR,PATCHES" />
-        <property name="build.resources" value="CPPTASKS,ECLIPSE" />
+        <property name="common.resources" value="LOG4CXX,CPPTASKS,XALAN,VM,ANTLR,PATCHES" />
+        <property name="build.resources" value="CPPTASKS" />
         <if>
             <isset property="if.lnx" />
             <then>
                 <property name="build.os.short" value="lnx" />
-                <property name="os.resources" value="APR,APRUTIL,APRICONV,ECLIPSE" />
+                <property name="os.resources" value="APR,APRUTIL,APRICONV" />
             </then>
             <else>
                 <property name="build.os.short" value="win" />
-                <property name="os.resources" value="APR,APRUTIL,APRICONV,ECLIPSE,ZLIB" />
+                <property name="os.resources" value="APR,APRUTIL,APRICONV,ZLIB" />
             </else>
         </if>
     </target>
@@ -318,13 +300,8 @@ Version: $Revision: 1.5.2.33 $
             <condition>
                 <not>
                     <and>
-                        <available file="tmp/jdtCompilerAdapter.jar" />
-                        <available file="tmp/org.eclipse.jdt.core_3.1.1.jar" />
                         <available file="tmp/junit.jar" />
                         <available file="tmp/xalan.jar" />
-			<!-- Removed cpptasks patching
-                        <available file="tmp/cpptasks/cpptasks.jar" />
- 			-->
                     </and>
                 </not>
             </condition>Error:

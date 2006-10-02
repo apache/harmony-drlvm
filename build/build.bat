@@ -122,8 +122,6 @@ REM Executing Ant build
 REM ===================
 
 SET CLASSPATH=%CD%\make\tmp\cpptasks.jar
-SET CLASSPATH=%CLASSPATH%;.\make\tmp\org.eclipse.jdt.core_3.1.1.jar
-SET CLASSPATH=%CLASSPATH%;.\make\tmp\jdtCompilerAdapter.jar
 SET CLASSPATH=%CLASSPATH%;.\make\tmp\junit.jar
 SET CLASSPATH=%CLASSPATH%;.\make\tmp\xalan.jar
 

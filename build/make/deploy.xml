@@ -80,10 +80,5 @@ Description of the product deploy folder.
             </zlib>
         </select>
 
-<!--        <hyplugin>
-            <jar>lib:*</jar>
-        </hyplugin>
--->
-
     </extra>
 </deploy>
