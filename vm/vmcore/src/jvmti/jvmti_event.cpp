@@ -721,13 +721,13 @@ jvmti_process_method_exit_event(jmethodID method, jboolean was_popped_by_excepti
 
     VM_thread *curr_thread = p_TLS_vmthread;
     jvmti_frame_pop_listener *fpl = curr_thread->frame_pop_listener;
-    jint skip = 0;
+    jint UNREF skip;
     jint depth = get_thread_stack_depth(curr_thread, &skip);
 
     while (fpl)
     {
         jvmti_frame_pop_listener *next_fpl = fpl->next;
-        if (fpl->depth == depth + skip)
+        if (fpl->depth == depth)
         {
             jvmti_process_frame_pop_event(
                 reinterpret_cast<jvmtiEnv *>(fpl->env),
@@ -756,6 +756,12 @@ jvmti_process_frame_pop_event(jvmtiEnv *jvmti_env, jmethodID method, jboolean wa
     TIEnv *ti_env = (TIEnv*) jvmti_env;
     jthread thread = getCurrentThread();
     JNIEnv *jni_env = (JNIEnv *)jni_native_intf;
+
+    assert(method);
+    TRACE2("jvmti.event.popframe", "PopFrame event is called for method:"
+        << class_get_name(method_get_class((Method*)method)) << "."
+        << method_get_name((Method*)method)
+        << method_get_descriptor((Method*)method) );
 
     if (NULL != ti_env->event_table.FramePop)
         ti_env->event_table.FramePop(jvmti_env, jni_env, thread, method,

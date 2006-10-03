@@ -423,7 +423,9 @@ jvmti_SingleStepLocation( VM_thread* thread,
             << class_get_name(method_get_class((*next_step)[index].method))
             << "." << method_get_name((*next_step)[index].method)
             << method_get_descriptor((*next_step)[index].method)
-            << " :" << (*next_step)[index].location )
+            << " :" << (*next_step)[index].location << " :"
+            << (*next_step)[index].native_location << ", event: "
+            << (*next_step)[index].no_event );
     }
 
     return;
@@ -765,6 +767,7 @@ jvmtiError jvmti_get_next_bytecodes_from_native(VM_thread *thread,
                 break;
             }
 
+            NativeCodePtr ip2 = ip;
             // Yes this is an invoke type bytecode
             if (next_location)
             {
@@ -772,33 +775,33 @@ jvmtiError jvmti_get_next_bytecodes_from_native(VM_thread *thread,
                 OpenExeJpdaError UNREF result = jit->get_native_location_for_bc(func,
                     next_location, &next_ip);
                 assert(result == EXE_ERROR_NONE);
-                assert(ip < next_ip);
+                assert(ip2 < next_ip);
 
-                VMBreakPoint *bp = vm_brpt->find_breakpoint(ip);
+                VMBreakPoint *bp = vm_brpt->find_breakpoint(ip2);
 
                 InstructionDisassembler disasm;
                 if (bp)
                     disasm = *bp->disasm;
                 else
-                    disasm = ip;
+                    disasm = ip2;
 
                 NativeCodePtr call_ip = NULL;
                 do
                 {
-                    ip = (NativeCodePtr)((POINTER_SIZE_INT)ip + disasm.get_length_with_prefix());
+                    ip2 = (NativeCodePtr)((POINTER_SIZE_INT)ip2 + disasm.get_length_with_prefix());
 
                     // Another thread could have instrumented this location for
                     // prediction of invokevirtual or invokeinterface, so it is
                     // necessary to check that location may be instrumented
-                    uint8 b = *((uint8 *)ip);
+                    uint8 b = *((uint8 *)ip2);
                     if (b == INSTRUMENTATION_BYTE)
                     {
-                        bp = vm_brpt->find_breakpoint(ip);
+                        bp = vm_brpt->find_breakpoint(ip2);
                         assert(bp);
                         disasm = *bp->disasm;
                     }
                     else
-                        disasm = ip;
+                        disasm = ip2;
 
                     // Bytecode may be either invokevirtual or
                     // invokeinterface which generate indirect calls or
@@ -806,9 +809,9 @@ jvmtiError jvmti_get_next_bytecodes_from_native(VM_thread *thread,
                     // relative calls
                     if (disasm.get_type() == InstructionDisassembler::INDIRECT_CALL ||
                         disasm.get_type() == InstructionDisassembler::RELATIVE_CALL)
-                        call_ip = ip;
+                        call_ip = ip2;
                 }
-                while (ip < next_ip);
+                while (ip2 < next_ip);
 
                 // We've found no call instruction in this
                 // bytecode. This means we're standing on the tail of
@@ -817,6 +820,7 @@ jvmtiError jvmti_get_next_bytecodes_from_native(VM_thread *thread,
                 {
                     TRACE2("jvmti.break.ss", "SingleStep IP shifted in prediction to: " << call_ip);
                     bc = next_location;
+                    ip = ip2;
                 }
             }
             // No this is not an invoke type bytecode, so the IP
@@ -951,4 +955,152 @@ jvmtiError DebugUtilsTI::jvmti_single_step_stop(void)
         return JVMTI_ERROR_INTERNAL;
 
     return JVMTI_ERROR_NONE;
+}
+
+static unsigned
+jvmti_GetNextBytecodeLocation( Method *method,
+                               unsigned location)
+{
+    assert( location < method->get_byte_code_size() );
+    const unsigned char *bytecode = method->get_byte_code_addr();
+    bool is_wide = false;
+    do {
+        switch( bytecode[location] )
+        {
+        case OPCODE_WIDE:           /* 0xc4 */
+            assert( !is_wide );
+            location++;
+            is_wide = true;
+            continue;
+
+        case OPCODE_TABLESWITCH:    /* 0xaa + pad + s4 * (3 + N) */
+            assert( !is_wide );
+            location = (location + 4)&(~0x3U);
+            {
+                int low = jvmti_GetWordValue( bytecode, location + 4 );
+                int high = jvmti_GetWordValue( bytecode, location + 8 );
+                return location + 4 * (high - low + 4);
+            }
+
+        case OPCODE_LOOKUPSWITCH:   /* 0xab + pad + s4 * 2 * (N + 1) */
+            assert( !is_wide );
+            location = (location + 4)&(~0x3U);
+            {
+                int number = jvmti_GetWordValue( bytecode, location + 4 ) + 1;
+                return location + 8 * number;
+            }
+
+        case OPCODE_IINC:           /* 0x84 + u1|u2 + s1|s2 */
+            if( is_wide ) {
+                return location + 5;
+            } else {
+                return location + 3;
+            }
+
+        case OPCODE_GOTO_W:         /* 0xc8 + s4 */
+        case OPCODE_JSR_W:          /* 0xc9 + s4 */
+        case OPCODE_INVOKEINTERFACE:/* 0xb9 + u2 + u1 + u1 */
+            assert( !is_wide );
+            return location + 5;
+
+        case OPCODE_MULTIANEWARRAY: /* 0xc5 + u2 + u1 */
+            assert( !is_wide );
+            return location + 4;
+
+        case OPCODE_ILOAD:          /* 0x15 + u1|u2 */
+        case OPCODE_LLOAD:          /* 0x16 + u1|u2 */
+        case OPCODE_FLOAD:          /* 0x17 + u1|u2 */
+        case OPCODE_DLOAD:          /* 0x18 + u1|u2 */
+        case OPCODE_ALOAD:          /* 0x19 + u1|u2 */
+        case OPCODE_ISTORE:         /* 0x36 + u1|u2 */
+        case OPCODE_LSTORE:         /* 0x37 + u1|u2 */
+        case OPCODE_FSTORE:         /* 0x38 + u1|u2 */
+        case OPCODE_DSTORE:         /* 0x39 + u1|u2 */
+        case OPCODE_ASTORE:         /* 0x3a + u1|u2 */
+        case OPCODE_RET:            /* 0xa9 + u1|u2  */
+            if( is_wide ) {
+                return location + 3;
+            } else {
+                return location + 2;
+            }
+
+        case OPCODE_SIPUSH:         /* 0x11 + s2 */
+        case OPCODE_LDC_W:          /* 0x13 + u2 */
+        case OPCODE_LDC2_W:         /* 0x14 + u2 */
+        case OPCODE_IFEQ:           /* 0x99 + s2 */
+        case OPCODE_IFNE:           /* 0x9a + s2 */
+        case OPCODE_IFLT:           /* 0x9b + s2 */
+        case OPCODE_IFGE:           /* 0x9c + s2 */
+        case OPCODE_IFGT:           /* 0x9d + s2 */
+        case OPCODE_IFLE:           /* 0x9e + s2 */
+        case OPCODE_IF_ICMPEQ:      /* 0x9f + s2 */
+        case OPCODE_IF_ICMPNE:      /* 0xa0 + s2 */
+        case OPCODE_IF_ICMPLT:      /* 0xa1 + s2 */
+        case OPCODE_IF_ICMPGE:      /* 0xa2 + s2 */
+        case OPCODE_IF_ICMPGT:      /* 0xa3 + s2 */
+        case OPCODE_IF_ICMPLE:      /* 0xa4 + s2 */
+        case OPCODE_IF_ACMPEQ:      /* 0xa5 + s2 */
+        case OPCODE_IF_ACMPNE:      /* 0xa6 + s2 */
+        case OPCODE_GOTO:           /* 0xa7 + s2 */
+        case OPCODE_GETSTATIC:      /* 0xb2 + u2 */
+        case OPCODE_PUTSTATIC:      /* 0xb3 + u2 */
+        case OPCODE_GETFIELD:       /* 0xb4 + u2 */
+        case OPCODE_PUTFIELD:       /* 0xb5 + u2 */
+        case OPCODE_INVOKEVIRTUAL:  /* 0xb6 + u2 */
+        case OPCODE_INVOKESPECIAL:  /* 0xb7 + u2 */
+        case OPCODE_JSR:            /* 0xa8 + s2 */
+        case OPCODE_INVOKESTATIC:   /* 0xb8 + u2 */
+        case OPCODE_NEW:            /* 0xbb + u2 */
+        case OPCODE_ANEWARRAY:      /* 0xbd + u2 */
+        case OPCODE_CHECKCAST:      /* 0xc0 + u2 */
+        case OPCODE_INSTANCEOF:     /* 0xc1 + u2 */
+        case OPCODE_IFNULL:         /* 0xc6 + s2 */
+        case OPCODE_IFNONNULL:      /* 0xc7 + s2 */
+            assert( !is_wide );
+            return location + 3;
+
+        case OPCODE_BIPUSH:         /* 0x10 + s1 */
+        case OPCODE_LDC:            /* 0x12 + u1 */
+        case OPCODE_NEWARRAY:       /* 0xbc + u1 */
+            assert( !is_wide );
+            return location + 2;
+
+        default:
+            assert( !is_wide );
+            assert( bytecode[location] < OPCODE_COUNT );
+            assert( bytecode[location] != _OPCODE_UNDEFINED );
+            return location + 1;
+        }
+        break;
+    } while( true );
+    return 0;
+} // jvmti_GetNextBytecodeLocation
+
+void
+jvmti_dump_compiled_method(Method *method)
+{
+    unsigned location = 0;
+    unsigned bc_number = 0;
+
+    do
+    {
+        OpenExeJpdaError res = EXE_ERROR_UNSUPPORTED;
+        NativeCodePtr native_location = NULL;
+        for (CodeChunkInfo* cci = method->get_first_JIT_specific_info(); cci; cci = cci->_next)
+        {
+            JIT *jit = cci->get_jit();
+            res = jit->get_native_location_for_bc(method,
+                location, &native_location);
+            if (res == EXE_ERROR_NONE)
+                break;
+        }
+        assert(res == EXE_ERROR_NONE);
+
+        TRACE2("jvmti.break.ss", "bytecode " << bc_number << ": "
+            << location << " = " << native_location);
+
+        location = jvmti_GetNextBytecodeLocation(method, location);
+        bc_number++;
+    }
+    while(location < method->get_byte_code_size());
 }

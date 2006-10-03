@@ -229,4 +229,8 @@ jvmti_process_interpreter_breakpoint_event(jmethodID method, jlocation location)
 // Callback for JIT method compile
 void jvmti_set_pending_breakpoints(Method *method);
 
+// debug function dump compiled method
+void jvmti_dump_compiled_method(Method *method);
+
+
 #endif  // __JVMTI_BREAK_INTF_H__

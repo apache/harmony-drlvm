@@ -841,8 +841,11 @@ jvmtiNotifyFramePop(jvmtiEnv* env,
             vm_thread, depth);
     else
     {
-
         StackIterator* si = si_create_from_native(vm_thread);
+        if (!si_get_method(si)) {
+            // skip VM native
+            si_goto_previous(si);
+        }
         jint current_depth = 0;
         while (!si_is_past_end(si) && current_depth < depth)
         {
@@ -857,17 +860,13 @@ jvmtiNotifyFramePop(jvmtiEnv* env,
             si_free(si);
             return JVMTI_ERROR_OPAQUE_FRAME;
         }
+        Method* UNREF method = si_get_method(si);
+        si_free(si);
 
+        jint UNREF skip;
+        current_depth = get_thread_stack_depth(vm_thread, &skip);
         if (current_depth < depth)
             return JVMTI_ERROR_NO_MORE_FRAMES;
-
-        while (!si_is_past_end(si))
-        {
-            if (si_get_method(si))
-                current_depth += 1 + si_get_inline_depth(si);
-
-            si_goto_previous(si);
-        }
 
         jvmti_frame_pop_listener *new_listener =
             (jvmti_frame_pop_listener *)STD_MALLOC(
@@ -878,6 +877,11 @@ jvmtiNotifyFramePop(jvmtiEnv* env,
         new_listener->env = reinterpret_cast<TIEnv *>(env);
         new_listener->next = vm_thread->frame_pop_listener;
         vm_thread->frame_pop_listener = new_listener;
+        TRACE2("jvmti.stack", "Pop listener is created: thread: "
+            << vm_thread << ", listener: " << new_listener
+            << ", env: " << new_listener->env << ", depth: " << new_listener->depth
+            << " -> " << class_get_name(method_get_class(method)) << "."
+            << method_get_name(method) << method_get_descriptor(method));
 
         return JVMTI_ERROR_NONE;
     }
