@@ -30,11 +30,17 @@
 GC_Thread_Info *thread_list;
 volatile int thread_list_lock;
 int num_threads = 0;
+Ptr vtable_base;
 
 fast_list<Partial_Reveal_Object*, 1024> finalizible_objects;
 
+#ifdef POINTER64
+GCExport Boolean gc_supports_compressed_references() {
+    vtable_base = (Ptr) vm_get_vtable_base();
+    return true;
+}
+#endif
 
-// GCExport Boolean gc_supports_compressed_references(); optional
 GCExport void gc_write_barrier(Managed_Object_Handle p_base_of_obj_with_slot) {
     TRACE2("gc.wb", "gc_write_barrier");
 }
@@ -79,8 +85,6 @@ void gc_vm_initialized() {
     static int UNUSED count = 0;
     TRACE2("gc.init2", "gc_vm_initialized called (" << count++ << ")");
 }
-
-//GCExport void gc_add_compressed_root_set_entry(uint32 *ref, Boolean is_pinned); optional
 
 void gc_add_weak_root_set_entry(Managed_Object_Handle *slot, 
     Boolean is_pinned, Boolean is_short_weak) {
@@ -159,7 +163,7 @@ Managed_Object_Handle gc_alloc_fast(unsigned in_size,
     unsigned char *next;
 
     GC_Thread_Info *info = (GC_Thread_Info *) thread_pointer;
-    Partial_Reveal_VTable *vtable = (Partial_Reveal_VTable*) ah;
+    Partial_Reveal_VTable *vtable = ah_to_vtable(ah);
     GC_VTable_Info *gcvt = vtable->get_gcvt();
     unsigned char *cleaned = info->tls_current_cleaned;
     unsigned char *res = info->tls_current_free;
@@ -168,8 +172,9 @@ Managed_Object_Handle gc_alloc_fast(unsigned in_size,
         if (gcvt->is_finalizible()) return 0;
 
         info->tls_current_free =  res + in_size;
-        *(int*)res = ah;
+        *(VT32*)res = ah;
 
+        assert(((POINTER_SIZE_INT)res & (GC_OBJECT_ALIGNMENT - 1)) == 0);
         return res;
     }
 
@@ -187,8 +192,9 @@ Managed_Object_Handle gc_alloc_fast(unsigned in_size,
         if (cleaned_new > ceiling) cleaned_new = ceiling;
         info->tls_current_cleaned = cleaned_new;
         memset(cleaned, 0, cleaned_new - cleaned);
-        *(int*)res = ah;
+        *(VT32*)res = ah;
 
+        assert(((POINTER_SIZE_INT)res & (GC_OBJECT_ALIGNMENT - 1)) == 0);
         return res;
     }
 
@@ -203,7 +209,7 @@ Managed_Object_Handle gc_alloc(unsigned in_size,
     assert (ah);
 
     GC_Thread_Info *info = (GC_Thread_Info *) thread_pointer;
-    Partial_Reveal_VTable *vtable = (Partial_Reveal_VTable*) ah;
+    Partial_Reveal_VTable *vtable = ah_to_vtable(ah);
     GC_VTable_Info *gcvt = vtable->get_gcvt();
     unsigned char *res = info->tls_current_free;
     unsigned char *cleaned = info->tls_current_cleaned;
@@ -212,8 +218,9 @@ Managed_Object_Handle gc_alloc(unsigned in_size,
 
         if (res + in_size <= cleaned) {
             info->tls_current_free =  res + in_size;
-            *(int*)res = ah;
+            *(VT32*)res = ah;
 
+            assert(((POINTER_SIZE_INT)res & (GC_OBJECT_ALIGNMENT - 1)) == 0);
             return res;
         }
 
@@ -230,7 +237,8 @@ Managed_Object_Handle gc_alloc(unsigned in_size,
             info->tls_current_cleaned = cleaned_new;
             memset(cleaned, 0, cleaned_new - cleaned);
 
-            *(int*)res = ah;
+            *(VT32*)res = ah;
+            assert(((POINTER_SIZE_INT)res & (GC_OBJECT_ALIGNMENT - 1)) == 0);
             return (Managed_Object_Handle)res;
         }
     }
@@ -256,7 +264,8 @@ Managed_Object_Handle gc_alloc(unsigned in_size,
             memset(obj, 0, size);
             finalizible_objects.push_back((Partial_Reveal_Object*) obj);
             vm_gc_unlock_enum();
-            *(int*)obj = ah;
+            *(VT32*)obj = ah;
+            assert(((POINTER_SIZE_INT)obj & (GC_OBJECT_ALIGNMENT - 1)) == 0);
             return (Managed_Object_Handle)obj;
         }
 
@@ -266,8 +275,7 @@ Managed_Object_Handle gc_alloc(unsigned in_size,
 
         if (res + size <= info->tls_current_ceiling) {
             unsigned char *next;
-            info->tls_current_free = next = info->tls_current_free + in_size;
-            assert(!((POINTER_SIZE_INT)res & 3));
+            info->tls_current_free = next = info->tls_current_free + size;
             finalizible_objects.push_back((Partial_Reveal_Object*) res);
 
             if (cleaned < next) {
@@ -275,7 +283,8 @@ Managed_Object_Handle gc_alloc(unsigned in_size,
                 info->tls_current_cleaned = next;
             }
             vm_gc_unlock_enum();
-            *(int*)res = ah;
+            *(VT32*)res = ah;
+            assert(((POINTER_SIZE_INT)res & (GC_OBJECT_ALIGNMENT - 1)) == 0);
             return (Managed_Object_Handle)res;
         }
     }
@@ -301,9 +310,10 @@ Managed_Object_Handle gc_alloc(unsigned in_size,
         }
         vm_gc_unlock_enum();
         if (cleaning_needed) memset(res, 0, size);
-        *(int*)res = ah; // NOTE: object partially initialized, should not be moved!!
+        *(VT32*)res = ah; // NOTE: object partially initialized, should not be moved!!
                          //       problems with arrays
                          //       no way to call vm_hint_finalize() here
+        assert(((POINTER_SIZE_INT)res & (GC_OBJECT_ALIGNMENT - 1)) == 0);
         return res;
     }
 
@@ -317,7 +327,8 @@ Managed_Object_Handle gc_alloc(unsigned in_size,
         // chunk is not expired yet, reuse it
         vm_gc_unlock_enum();
         if (cleaning_needed) memset(res, 0, size);
-        *(int*)res = ah;
+        *(VT32*)res = ah;
+        assert(((POINTER_SIZE_INT)res & (GC_OBJECT_ALIGNMENT - 1)) == 0);
         return (Managed_Object_Handle)res;
     }
 
@@ -332,7 +343,8 @@ Managed_Object_Handle gc_alloc(unsigned in_size,
     vm_gc_unlock_enum();
     if (cleaning_needed) memset(res, 0, size);
 
-    *(int*)res = ah;
+    *(VT32*)res = ah;
+    assert(((POINTER_SIZE_INT)res & (GC_OBJECT_ALIGNMENT - 1)) == 0);
     return (Managed_Object_Handle)res;
 }
 
@@ -407,6 +419,7 @@ int64 gc_free_memory()
 }
 
 void gc_pin_object (Managed_Object_Handle* p_object) {
+#if 0
     // FIXME: overflow check and handling
     Partial_Reveal_Object *obj = *(Partial_Reveal_Object**) p_object;
 
@@ -421,9 +434,11 @@ void gc_pin_object (Managed_Object_Handle* p_object) {
         if (old_value == value) return;
         value = old_value;
     }
+#endif
 }
 
 void gc_unpin_object (Managed_Object_Handle* p_object) {
+#if 0
     Partial_Reveal_Object *obj = *(Partial_Reveal_Object**) p_object;
     assert((obj->obj_info_byte() & OBJECT_IS_PINNED_BITS) != 0);
 
@@ -434,17 +449,23 @@ void gc_unpin_object (Managed_Object_Handle* p_object) {
         if (old_value == value) return;
         value = old_value;
     }
+#endif
 }
 
 Boolean gc_is_object_pinned (Managed_Object_Handle p_object) {
     Partial_Reveal_Object *obj = (Partial_Reveal_Object*) p_object;
+    assert ((obj->obj_info_byte() & OBJECT_IS_PINNED_INCR) == 0);
+    return false;
+#if 0
+    Partial_Reveal_Object *obj = (Partial_Reveal_Object*) p_object;
     return (obj->obj_info_byte() & OBJECT_IS_PINNED_INCR) != 0;
+#endif
 }
 
 int32 gc_get_hashcode(Managed_Object_Handle p_object) {
     Partial_Reveal_Object *obj = (Partial_Reveal_Object*) p_object;
     if (!obj) return 0;
-    assert((unsigned char*)obj >= heap_base && (unsigned char*)obj < heap_ceiling);
+    assert((unsigned char*)obj >= heap.base && (unsigned char*)obj < heap.ceiling);
     assert(obj->vtable());
     unsigned char info = obj->obj_info_byte();
     // FIXME: atomic ops need to keep pinning work?
@@ -465,7 +486,6 @@ int32 gc_get_hashcode(Managed_Object_Handle p_object) {
     return hash;
 }
 
-
 Managed_Object_Handle gc_get_next_live_object(void *iterator) {
     TRACE2("gc.iter", "gc_get_next_live_object - NOT IMPLEMENTED");
     abort();
@@ -477,10 +497,10 @@ unsigned int gc_time_since_last_gc() {
 }
 
 void *gc_heap_base_address() {
-    return (void*) heap_base;
+    return (void*) heap.base;
 }
 void *gc_heap_ceiling_address() {
-    return (void*) heap_ceiling;
+    return (void*) (heap.base + heap.max_size);
 }
 
 void gc_finalize_on_exit() {

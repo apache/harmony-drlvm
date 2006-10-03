@@ -24,26 +24,6 @@
                                            action_name action_params;               \
                                            timer_##action_name.finish(); }
 
-#ifdef _WIN32
-static __declspec(naked) __int64
-ticks(void) {
-    __asm       {
-        rdtsc
-        ret
-    }
-}
-#else
-static int64
-ticks(void) {
-    int64 val;
-    __asm__ __volatile__ ("rdtsc" : "=A" (val));
-    return val;
-}
-#endif
-
-extern int64 timer_start;
-extern int64 timer_dt;
-
 class Timer {
     const char *action;
     const char *category;
@@ -55,39 +35,31 @@ class Timer {
         action = str;
         finished = false;
         category = "gc.time";
-        start = ticks();
+        start = apr_time_now();
     }
 
     Timer(const char *str, const char *_category) {
         action = str;
         category = _category;
         finished = false;
-        start = ticks();
+        start = apr_time_now();
     }
 
     void finish() {
         finished = true;
-        apr_time_t end = ticks();
-        INFO2(category, action << " " << (end - start) / timer_dt / 1000 << " ms");
+        apr_time_t end = apr_time_now();
+        INFO2(category, action << " " << (end - start + 500) / 1000 << " ms");
     }
 
     ~Timer() {
         if (!finished) finish();
     }
 
-    apr_time_t dt() { return ticks() - start; }
+    apr_time_t dt() { return apr_time_now() - start; }
 };
 
-inline void timer_init() {
-    timer_start = ticks();
-}
-
-inline void timer_calibrate(apr_time_t time_from_start) {
-    int64 ticks_from_start = ticks() - timer_start;
-    int64 dt = ticks_from_start / time_from_start;
-    timer_dt = dt;
-    
-}
+inline void timer_init() {}
+inline void timer_calibrate(apr_time_t time_from_start) {}
 
 #else
 #  define TIME(action_name, action_params) action_name action_params

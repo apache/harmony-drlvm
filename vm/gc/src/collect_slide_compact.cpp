@@ -32,7 +32,6 @@
 unsigned char *mark_bits;
 int mark_bits_size;
 fast_list<Partial_Reveal_Object*, 65536> objects;
-static fast_list<InteriorPointer,256> comp_interior_pointers;
 
 static inline bool
 is_compaction_object(Partial_Reveal_Object *refobj) {
@@ -47,29 +46,37 @@ is_forwarded_object(Partial_Reveal_Object *obj) {
 }
 
 static inline void
-update_forwarded_reference(Partial_Reveal_Object *obj, Partial_Reveal_Object **ref) {
+update_forwarded_reference(Partial_Reveal_Object *obj, Slot slot) {
     assert(!(obj->vt() & RESCAN_BIT));
     assert(obj->vt() & FORWARDING_BIT);
-    *(int*)ref = obj->vt() & ~FORWARDING_BIT;
+    slot.write(fw_to_pointer(obj->vt() & ~FORWARDING_BIT));
 }
 
+#if GC_OBJECT_ALIGNMENT == 8
+#define GC_OBJECT_ALIGNMENT_SHIFT 3
+#elif GC_OBJECT_ALIGNMENT == 4
+#define GC_OBJECT_ALIGNMENT_SHIFT 2
+#else
+#error not detected GC_OBJECT_ALIGNMENT
+#endif
+
 static inline bool mark_bit_is_set(Partial_Reveal_Object *obj) {
-    int addr = (POINTER_SIZE_INT)obj - (POINTER_SIZE_INT) heap_base;
-    addr >>= 2;
-    int bit = addr & 7; // FIXME: use defines
-    int byte = addr >> 3;
+    size_t addr = (POINTER_SIZE_INT)obj - (POINTER_SIZE_INT) heap_base;
+    addr >>= GC_OBJECT_ALIGNMENT_SHIFT;
+    size_t bit = addr & 7; // FIXME: use defines
+    size_t byte = addr >> 3;
     return mark_bits[byte] & ((unsigned char)1 << bit);
 }
 
-static inline void enqueue_reference(Partial_Reveal_Object *refobj, Partial_Reveal_Object **ref) {
+static inline void enqueue_reference(Partial_Reveal_Object *refobj, Slot slot) {
     assert(is_compaction_object(refobj));
     assert(!is_forwarded_object(refobj));
     //assert(*ref == refobj);
     assert(refobj->obj_info());
 
-    int &info = refobj->obj_info();
-    *(int*)ref = info;
-    info = (int)ref | heap_mark_phase;
+    unsigned &info = refobj->obj_info();
+    slot.write_raw(info);
+    info = slot.addr() | heap_mark_phase; //(int)ref
 }
 
 static inline bool is_object_marked(Partial_Reveal_Object *obj) {
@@ -77,17 +84,17 @@ static inline bool is_object_marked(Partial_Reveal_Object *obj) {
 }
 
 static inline void set_mark_bit(Partial_Reveal_Object *obj) {
-    int addr = (POINTER_SIZE_INT)obj - (POINTER_SIZE_INT) heap_base;
-    addr >>= 2;
-    int bit = addr & 7; // FIXME: use defines
-    int byte = addr >> 3;
+    size_t addr = (POINTER_SIZE_INT)obj - (POINTER_SIZE_INT) heap_base;
+    addr >>= GC_OBJECT_ALIGNMENT_SHIFT;
+    size_t bit = addr & 7; // FIXME: use defines
+    size_t byte = addr >> 3;
     mark_bits[byte] |=  ((unsigned char) 1 << bit);
 }
 
 static inline bool mark_object(Partial_Reveal_Object *obj) {
     int phase = heap_mark_phase;
 
-    assert((unsigned char*) obj >= heap_base && (unsigned char*) obj < heap_ceiling);
+    assert((unsigned char*) obj >= heap.base && (unsigned char*) obj < heap.ceiling);
     assert(obj->vt() != 0);
 
     // is object already marked
@@ -95,9 +102,10 @@ static inline bool mark_object(Partial_Reveal_Object *obj) {
         return false;
     }
 
+    obj->valid();
     assert(!is_forwarded_object(obj));
 
-    int info = obj->obj_info();
+    unsigned info = obj->obj_info();
 
     if (is_compaction_object(obj)) {
         set_mark_bit(obj);
@@ -106,7 +114,7 @@ static inline bool mark_object(Partial_Reveal_Object *obj) {
             pinned_areas_unsorted.push_back((unsigned char*)obj);
             int size = get_object_size(obj, obj->vtable()->get_gcvt());
             pinned_areas_unsorted.push_back((unsigned char*)obj + size
-                    + ((info & HASHCODE_IS_ALLOCATED_BIT) ? 4 : 0));
+                    + ((info & HASHCODE_IS_ALLOCATED_BIT) ? GC_OBJECT_ALIGNMENT : 0));
             TRACE2("gc.pin", "add pinned area = " << (unsigned char*)obj << " " << pinned_areas_unsorted.back());
         }
 
@@ -125,22 +133,18 @@ static inline void set_rescan_bit(Partial_Reveal_Object *obj) {
 }
 
 static inline void process_reference_queue(Partial_Reveal_Object *newobj, Partial_Reveal_Object *obj) {
-    int info = obj->obj_info();
+    unsigned info = obj->obj_info();
     assert(info);
     assert(info & heap_mark_phase); assert(is_compaction_object(obj));
 
     while (!(info & prev_mark_phase)) {
         assert(info);
         assert(info & heap_mark_phase);
-        Partial_Reveal_Object **ref = (Partial_Reveal_Object**) (info & ~MARK_BITS);
-        info = (int)*ref;
-        *ref = newobj;
+        Slot slot((Reference*) fw_to_pointer(info & ~MARK_BITS));
+        info = slot.read_raw(); //(int)*ref;
+        slot.write(newobj);
     }
     obj->obj_info() = info & ~MARK_BITS;
-}
-
-void gc_reset_interior_pointers() { // FIXME: rename
-    comp_interior_pointers.clear();
 }
 
 static void postprocess_array(Partial_Reveal_Object *array, int vector_length, Partial_Reveal_Object *oldobj) {
@@ -149,17 +153,17 @@ static void postprocess_array(Partial_Reveal_Object *array, int vector_length, P
     assert(is_compaction_object(array));
     assert(!is_forwarded_object(array));
 
-    int32 array_length = vector_length; //vector_get_length((Vector_Handle) array);
+    int array_length = vector_length; //vector_get_length((Vector_Handle) array);
 
-    Partial_Reveal_Object **refs = (Partial_Reveal_Object**) vector_get_element_address_ref ((Vector_Handle) array, 0);
+    Reference *refs = (Reference*) vector_get_element_address_ref ((Vector_Handle) array, 0);
 
     for(int i = 0; i < array_length; i++) {
-        Partial_Reveal_Object **ref = &refs[i];
-        POINTER_SIZE_INT refobj_int = (POINTER_SIZE_INT)*ref;
+        Slot slot(refs + i);
+        POINTER_SIZE_INT refobj_int = (POINTER_SIZE_INT)slot.read();
         POINTER_SIZE_INT refobj_unmarked = refobj_int & ~1;
         if (refobj_int == refobj_unmarked) continue; // not specially marked reference
         Partial_Reveal_Object *refobj = (Partial_Reveal_Object*) refobj_unmarked;
-        enqueue_reference(refobj, ref);
+        enqueue_reference(refobj, slot);
     }
 }
 
@@ -174,10 +178,12 @@ static void postprocess_object(Partial_Reveal_Object *obj, Partial_Reveal_Object
     assert(is_compaction_object(obj));
     assert(!is_forwarded_object(obj));
  
-    assert((unsigned char*) obj >= heap_base && (unsigned char*) obj < heap_ceiling);
+    assert((unsigned char*) obj >= heap.base && (unsigned char*) obj < heap.ceiling);
     assert(obj->vt() & RESCAN_BIT);
-    Partial_Reveal_VTable *vtable = (Partial_Reveal_VTable*) (obj->vt() & ~RESCAN_BIT);
-    obj->vt() = (int) vtable;
+
+    VT32 vt = obj->vt() & ~RESCAN_BIT;
+    obj->vt() = vt;
+    Partial_Reveal_VTable *vtable = ah_to_vtable(vt);
     GC_VTable_Info *gcvt = vtable->get_gcvt();
 
     // process slots
@@ -190,34 +196,34 @@ static void postprocess_object(Partial_Reveal_Object *obj, Partial_Reveal_Object
     }
 
     if (gcvt->reference_type() != NOT_REFERENCE) {
-        Partial_Reveal_Object **ref = (Partial_Reveal_Object**)((char*)obj + global_referent_offset);
+        Slot slot((Reference*)((char*)obj + global_referent_offset));
 
-        POINTER_SIZE_INT refobj_int = (POINTER_SIZE_INT)*ref;
+        POINTER_SIZE_INT refobj_int = (POINTER_SIZE_INT)slot.read();
         POINTER_SIZE_INT refobj_unmarked = refobj_int & ~1;
         if (refobj_int != refobj_unmarked) {
             Partial_Reveal_Object *refobj = (Partial_Reveal_Object*) refobj_unmarked;
-            enqueue_reference(refobj, ref);
+            enqueue_reference(refobj, slot);
         }
     }
 
     int *offset_list = gcvt->offset_array();
     int offset;
     while ((offset = *offset_list) != 0) {
-        Partial_Reveal_Object **ref = (Partial_Reveal_Object**)((char*)obj + offset);
+        Slot slot( (Reference*)((char*)obj + offset));
         offset_list++;
 
-        POINTER_SIZE_INT refobj_int = (POINTER_SIZE_INT)*ref;
+        POINTER_SIZE_INT refobj_int = (POINTER_SIZE_INT)slot.read();
         POINTER_SIZE_INT refobj_unmarked = refobj_int & ~1;
         if (refobj_int == refobj_unmarked) continue; // not specially marked reference
         Partial_Reveal_Object *refobj = (Partial_Reveal_Object*) refobj_unmarked;
-        enqueue_reference(refobj, ref);
+        enqueue_reference(refobj, slot);
     }
 }
 
 void gc_slide_move_all() {
     unsigned char *compact_pos = heap.compaction_region_start();
     unsigned char *compact_pos_limit = heap.compaction_region_end();
-    unsigned char *next_pinned_object = heap.ceiling;
+    unsigned char *next_pinned_object = heap.compaction_region_end();
     unsigned next_pinned_object_pos = 0;
 
     prev_mark_phase = heap_mark_phase ^ 3;
@@ -261,14 +267,14 @@ void gc_slide_move_all() {
         break;
     }
 
-    pinned_areas.push_back(heap.ceiling);
+    pinned_areas.push_back(heap.compaction_region_end());
 
     int *mark_words = (int*) mark_bits;
     // Searching marked bits
-    int start = (heap.compaction_region_start() - heap_base) / sizeof(void*) / sizeof(int) / 8;
-    int end = (heap.compaction_region_end() - heap_base + sizeof(void*) + sizeof(int) * 8 - 1) / sizeof(void*) / sizeof(int) / 8;
-    if (end > mark_bits_size/4) end = mark_bits_size/4;
-    for(int i = start; i < end; i++) {
+    unsigned start = (unsigned)(heap.compaction_region_start() - heap_base) / GC_OBJECT_ALIGNMENT / sizeof(int) / 8;
+    unsigned end = (unsigned)(heap.compaction_region_end() - heap_base + GC_OBJECT_ALIGNMENT * sizeof(int) * 8 - 1) / GC_OBJECT_ALIGNMENT / sizeof(int) / 8;
+    if (end > mark_bits_size/sizeof(int)) end = mark_bits_size/sizeof(int);
+    for(unsigned i = start; i < end; i++) {
         // no marked bits in word - skip
 
         int word = mark_words[i];
@@ -276,12 +282,12 @@ void gc_slide_move_all() {
 
         for(int bit = 0; bit < 32; bit++) {
             if (word & 1) {
-                unsigned char *pos = heap_base + i * 32 * 4 + bit * 4;
+                unsigned char *pos = heap_base + i * 8 * GC_OBJECT_ALIGNMENT * sizeof(int) + bit * GC_OBJECT_ALIGNMENT;
                 Partial_Reveal_Object *obj = (Partial_Reveal_Object*) pos;
 
-                int vt = obj->vt();
+                VT32 vt = obj->vt();
                 bool post_processing = vt & RESCAN_BIT;
-                Partial_Reveal_VTable *vtable = (Partial_Reveal_VTable*)(vt & ~RESCAN_BIT);
+                Partial_Reveal_VTable *vtable = ah_to_vtable(vt & ~RESCAN_BIT);
                 int size = get_object_size(obj, vtable->get_gcvt());
 
                 assert(is_object_marked(obj));
@@ -289,7 +295,7 @@ void gc_slide_move_all() {
 
                 if ((unsigned char*)obj != next_pinned_object) {
 
-                    // 4 bytes reserved for hash
+                    // 4/8 bytes reserved for hash
                     while (compact_pos + size > compact_pos_limit) {
                         assert(pinned_areas_pos < pinned_areas.size());
                         compact_pos = pinned_areas[pinned_areas_pos];
@@ -302,10 +308,10 @@ void gc_slide_move_all() {
                     if (compact_pos >= pos) {
                         newobj = obj;
                         process_reference_queue(obj, obj);
-                        int info = obj->obj_info();
+                        unsigned info = obj->obj_info();
                         if (compact_pos == pos) {
-                            assert(HASHCODE_IS_ALLOCATED_BIT == 4);
-                            compact_pos += size + (info & HASHCODE_IS_ALLOCATED_BIT);
+                            compact_pos += size +
+                                (((info & HASHCODE_IS_ALLOCATED_BIT) != 0) ? GC_OBJECT_ALIGNMENT : 0);
                         } else {
                             assert(compact_pos >= pos + size);
                         }
@@ -315,11 +321,11 @@ void gc_slide_move_all() {
 
                         newobj = (Partial_Reveal_Object*) newpos;
                         process_reference_queue(newobj, obj);
-                        int info = obj->obj_info();
+                        unsigned info = obj->obj_info();
 
                         if (info & HASHCODE_IS_SET_BIT) {
-                            size += 4;
-                            compact_pos += 4;
+                            size += GC_OBJECT_ALIGNMENT;
+                            compact_pos += GC_OBJECT_ALIGNMENT;
                         }
 
                         if (newpos + size <= pos) {
@@ -328,7 +334,7 @@ void gc_slide_move_all() {
                             memmove(newpos, pos, size);
                         }
                         if (info & HASHCODE_IS_SET_BIT && !(info & HASHCODE_IS_ALLOCATED_BIT)) {
-                            *(int*)(newpos + size - 4) = gen_hashcode(pos);
+                            *(int*)(newpos + size - GC_OBJECT_ALIGNMENT) = gen_hashcode(pos);
                             newobj->obj_info() |= HASHCODE_IS_ALLOCATED_BIT;
                         }
                     }
@@ -352,12 +358,12 @@ void gc_slide_move_all() {
         }
     }
     assert(next_pinned_object >= heap.compaction_region_end());
-    pinned_areas.pop_back(); //heap.ceiling
+    pinned_areas.pop_back(); //heap.compaction_region_end()
 
     TRACE2("gc.mem", "compaction: region size = "
             << (heap.compaction_region_end() - heap.compaction_region_start()) / 1024 / 1024 << " mb");
     TRACE2("gc.mem", "compaction: free_space = "
-            << (heap.ceiling - compact_pos) / 1024 / 1024 << " mb");
+            << (heap.compaction_region_end() - compact_pos) / 1024 / 1024 << " mb");
 
     cleaning_needed = true;
     heap.pos = compact_pos;
@@ -371,7 +377,7 @@ void gc_slide_move_all() {
     old_pinned_areas_pos = 1;
 }
 
-static void slide_process_object(Partial_Reveal_Object *obj, Boolean is_pinned);
+static void slide_process_object(Partial_Reveal_Object *obj);
 
 static inline void 
 slide_scan_array_object(Partial_Reveal_Object *array, Partial_Reveal_VTable *vtable, int vector_length)
@@ -382,28 +388,28 @@ slide_scan_array_object(Partial_Reveal_Object *array, Partial_Reveal_VTable *vta
 
     int32 array_length = vector_length; //vector_get_length((Vector_Handle) array);
 
-    Partial_Reveal_Object **refs = (Partial_Reveal_Object**) vector_get_element_address_ref ((Vector_Handle) array, 0);
+    Reference *refs = (Reference*) vector_get_element_address_ref ((Vector_Handle) array, 0);
 
     if (is_compaction_object(array)) {
         bool rescan = false;
         for(int i = 0; i < array_length; i++) {
-            Partial_Reveal_Object **ref = &refs[i];
-            Partial_Reveal_Object *refobj = *ref;
-            if (!refobj) continue;
+            Slot slot(refs + i);
+            Partial_Reveal_Object *refobj = slot.read();
+            if (refobj == heap_null) continue;
 
             if (mark_object(refobj)) {
-                slide_process_object(refobj, false);
+                slide_process_object(refobj);
             } else if (is_forwarded_object(refobj)) {
-                update_forwarded_reference(refobj, ref);
+                update_forwarded_reference(refobj, slot);
                 continue;
             }
 
             if (is_compaction_object(refobj)) {
-                if (is_left_object(refobj, ref)) {
-                    enqueue_reference(refobj, ref);
+                if (is_left_object(refobj, slot)) {
+                    enqueue_reference(refobj, slot);
                 } else {
                     // mark_rescan_reference
-                    *ref = (Partial_Reveal_Object*) ((size_t)refobj | 1);
+                    slot.write( (Partial_Reveal_Object*) ((size_t)refobj | 1) );
                     rescan = true;
                 }
             }
@@ -411,36 +417,35 @@ slide_scan_array_object(Partial_Reveal_Object *array, Partial_Reveal_VTable *vta
         if (rescan) set_rescan_bit(array);
     } else {
         for(int i = 0; i < array_length; i++) {
-            Partial_Reveal_Object **ref = &refs[i];
-            Partial_Reveal_Object *refobj = *ref;
-            if (!refobj) continue;
+            Slot slot(refs + i);
+            Partial_Reveal_Object *refobj = slot.read();
+            if (refobj == heap_null) continue;
 
             if (mark_object(refobj)) {
-                slide_process_object(refobj, false);
+                slide_process_object(refobj);
             } else if (is_forwarded_object(refobj)) {
-                update_forwarded_reference(refobj, ref);
+                update_forwarded_reference(refobj, slot);
                 continue;
             }
 
             if (is_compaction_object(refobj)) {
-                enqueue_reference(refobj, ref);
+                enqueue_reference(refobj, slot);
             }
         }
     }
 }
 
-static void slide_process_object(Partial_Reveal_Object *obj, Boolean is_pinned) {
+static void slide_process_object(Partial_Reveal_Object *obj) {
 
-    assert(!is_pinned);
     assert(obj);
-    assert((unsigned char*) obj >= heap_base && (unsigned char*) obj < heap_ceiling);
+    assert((unsigned char*) obj >= heap.base && (unsigned char*) obj < heap.ceiling);
     assert(is_object_marked(obj));
     //assert(mark_bit_is_set(obj) || !is_compaction_object(obj));
 
-    int vt = obj->vt();
+    unsigned vt = obj->vt();
     assert(obj->vt() & ~RESCAN_BIT); // has vt
 
-    Partial_Reveal_VTable *vtable = (Partial_Reveal_VTable*) (vt & ~RESCAN_BIT);
+    Partial_Reveal_VTable *vtable = ah_to_vtable(vt & ~RESCAN_BIT);
     GC_VTable_Info *gcvt = vtable->get_gcvt();
 
     // process slots
@@ -481,25 +486,25 @@ static void slide_process_object(Partial_Reveal_Object *obj, Boolean is_pinned) 
         bool rescan = false;
         int offset;
         while ((offset = *offset_list) != 0) {
-            Partial_Reveal_Object **ref = (Partial_Reveal_Object**)((char*)obj + offset);
-            Partial_Reveal_Object *refobj = *ref;
+            Slot slot((Reference*)((char*)obj + offset));
+            Partial_Reveal_Object *refobj = slot.read();
             offset_list++;
 
-            if (!refobj) continue;
+            if (refobj == heap_null) continue;
 
             if (mark_object(refobj)) {
                 objects.push_back(refobj);
             } else if (is_forwarded_object(refobj)) {
-                update_forwarded_reference(refobj, ref);
+                update_forwarded_reference(refobj, slot);
                 continue;
             }
 
             if (is_compaction_object(refobj)) {
-                if (is_left_object(refobj, ref)) {
-                    enqueue_reference(refobj, ref);
+                if (is_left_object(refobj, slot)) {
+                    enqueue_reference(refobj, slot);
                 } else {
                     // mark_rescan_reference
-                    *ref = (Partial_Reveal_Object*) ((size_t)refobj | 1);
+                    slot.write( (Partial_Reveal_Object*) ((size_t)refobj | 1) );
                     rescan = true;
                 }
             }
@@ -508,79 +513,54 @@ static void slide_process_object(Partial_Reveal_Object *obj, Boolean is_pinned) 
     } else {
         int offset;
         while ((offset = *offset_list) != 0) {
-            Partial_Reveal_Object **ref = (Partial_Reveal_Object**)((char*)obj + offset);
-            Partial_Reveal_Object *refobj = *ref;
+            Slot slot((Reference*)((char*)obj + offset));
+            Partial_Reveal_Object *refobj = slot.read();
             offset_list++;
 
-            if (!refobj) continue;
+            if (refobj == heap_null) continue;
 
             if (mark_object(refobj)) {
                 objects.push_back(refobj);
             } else if (is_forwarded_object(refobj)) {
-                update_forwarded_reference(refobj, ref);
+                update_forwarded_reference(refobj, slot);
                 continue;
             }
 
             if (is_compaction_object(refobj)) {
-                enqueue_reference(refobj, ref);
+                enqueue_reference(refobj, slot);
             }
         }
     }
 
 }
 
-static void gc_slide_add_root_set_entry_internal(Partial_Reveal_Object **ref, Boolean is_pinned) {
+void gc_slide_add_root_set_entry(Slot slot) {
     // get object
-    Partial_Reveal_Object *refobj = *ref;
+    Partial_Reveal_Object *refobj = slot.read();
 
     // check no garbage
-    assert(((int)refobj & 3) == 0);
+    assert(((POINTER_SIZE_INT)refobj & 3) == 0);
 
     // empty references is not interesting
-    if (!refobj) return;
-    assert(!is_pinned); // no pinning allowed for now
+    if (refobj == heap_null) return;
 
     if (mark_object(refobj)) {
         // object wasn't marked yet
-        slide_process_object(refobj, is_pinned);
+        slide_process_object(refobj);
     } else if (is_forwarded_object(refobj)) {
-        update_forwarded_reference(refobj, ref);
+        update_forwarded_reference(refobj, slot);
         goto skip;
     }
 
     if (is_compaction_object(refobj)) {
-        enqueue_reference(refobj, ref);
+        enqueue_reference(refobj, slot);
     }
 skip:
 
     while (true) {
         if (objects.empty()) break;
         Partial_Reveal_Object *obj = objects.pop_back();
-        slide_process_object(obj, false);
-    }
-}
-
-void gc_slide_add_root_set_entry(Managed_Object_Handle *ref, Boolean is_pinned) {
-    //TRACE2("gc.enum", "gc_add_root_set_entry");
-    gc_slide_add_root_set_entry_internal((Partial_Reveal_Object**)ref, is_pinned);
-}
-
-void gc_slide_add_root_set_entry_interior_pointer (void **slot, int offset, Boolean is_pinned)
-{
-    InteriorPointer ip;
-    ip.obj = (Partial_Reveal_Object*) (*(unsigned char**)slot - offset);
-    ip.interior_ref = (Partial_Reveal_Object**)slot;
-    ip.offset = offset;
-    InteriorPointer& ips = comp_interior_pointers.push_back(ip);
-    gc_slide_add_root_set_entry_internal((Partial_Reveal_Object**)&ips.obj, is_pinned);
-}
-
-void gc_process_interior_pointers() {
-    fast_list<InteriorPointer,256>::iterator begin = comp_interior_pointers.begin();
-    fast_list<InteriorPointer,256>::iterator end = comp_interior_pointers.end();
-
-    for(fast_list<InteriorPointer,256>::iterator i = begin; i != end; ++i) {
-        *(*i).interior_ref = (Partial_Reveal_Object*)((unsigned char*)(*i).obj + (*i).offset);
+        slide_process_object(obj);
     }
 }
 
@@ -589,13 +569,13 @@ void gc_slide_process_special_references(reference_vector& array) {
             i != array.end(); ++i) {
         Partial_Reveal_Object *obj = *i;
 
-        Partial_Reveal_Object **ref = 
-            (Partial_Reveal_Object**) ((unsigned char *)obj + global_referent_offset);
-        Partial_Reveal_Object* refobj = *ref;
+        Slot slot(
+            (Reference*) ((unsigned char *)obj + global_referent_offset));
+        Partial_Reveal_Object* refobj = slot.read();
 
         if (refobj == 0) {
             // reference already cleared, no post processing needed
-            *i = 0;
+            *i = heap_null;
             continue;
         }
 
@@ -603,31 +583,32 @@ void gc_slide_process_special_references(reference_vector& array) {
             //assert(mark_bit_is_set(refobj) || !is_compaction_object(refobj) || is_forwarded_object(refobj));
 
             if (is_forwarded_object(refobj)) {
-                update_forwarded_reference(refobj, ref);
+                update_forwarded_reference(refobj, slot);
             } else if (is_compaction_object(refobj)) {
-                if (is_left_object(refobj, ref) || !is_compaction_object(obj)) {
-                    enqueue_reference(refobj, ref);
+                if (is_left_object(refobj, slot) || !is_compaction_object(obj)) {
+                    enqueue_reference(refobj, slot);
                 } else {
                     // mark_rescan_reference
-                    *ref = (Partial_Reveal_Object*) ((size_t)refobj | 1);
+                    slot.write( (Partial_Reveal_Object*) ((size_t)refobj | 1) );
                     set_rescan_bit(obj);
                 }
             }
 
             // no post processing needed
-            *i = 0;
+            *i = heap_null;
             continue;
         } else {
             //assert(!mark_bit_is_set(refobj));
         }
 
         // object not marked, clear reference
-        *ref = (Partial_Reveal_Object*)0;
+        slot.write((Partial_Reveal_Object*) heap_null);
+        Slot root = make_direct_root(&*i);
 
         if (is_forwarded_object(obj)) {
-            update_forwarded_reference(obj, &*i);
+            update_forwarded_reference(obj, root);
         } else if (is_compaction_object(obj)) {
-            enqueue_reference(obj, &*i);
+            enqueue_reference(obj, root);
         }
     }
 }
@@ -637,8 +618,8 @@ void gc_slide_postprocess_special_references(reference_vector& array) {
             i != array.end(); ++i) {
         Partial_Reveal_Object *obj = *i;
 
-        if (!obj) continue;
-        vm_enqueue_reference((Managed_Object_Handle*)obj);
+        if (obj == heap_null) continue;
+        vm_enqueue_reference((Managed_Object_Handle)obj);
     }
 }
 
@@ -646,7 +627,7 @@ void gc_slide_postprocess_special_references(reference_vector& array) {
 // all previous references are processed in copying collector
 // so will not move, they can be considered as root references here
 
-void gc_slide_process_transitional_slots(fast_list<Partial_Reveal_Object**,65536>& slots) {
+void gc_slide_process_transitional_slots(fast_list<Slot,65536>& slots) {
     // also process pinned objects all but last
     pinned_areas_unsorted_t::iterator end = --(--pinned_areas_unsorted.end());
     for(pinned_areas_unsorted_t::iterator i = pinned_areas_unsorted.begin();
@@ -660,13 +641,14 @@ void gc_slide_process_transitional_slots(fast_list<Partial_Reveal_Object**,65536
 
     while (true) {
         if (slots.empty()) break;
-        Partial_Reveal_Object **ref = slots.pop_back();
-        gc_slide_add_root_set_entry_internal(ref, false);
+        Slot slot = slots.pop_back();
+        gc_slide_add_root_set_entry(slot);
     }
 }
-void gc_slide_process_transitional_slots(Partial_Reveal_Object **refs, int pos, int length) {
+
+void gc_slide_process_transitional_slots(Reference *refs, int pos, int length) {
     for(int i = pos; i < length; i++) {
-        Partial_Reveal_Object **ref = &refs[i];
-        gc_slide_add_root_set_entry_internal(ref, false);
+        Slot slot(refs + i);
+        gc_slide_add_root_set_entry(slot);
     }
 }

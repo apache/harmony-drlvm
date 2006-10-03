@@ -124,9 +124,14 @@ void gc_class_prepared(Class_Handle ch, VTable_Handle vth) {
         int el_offset;
         for(el_offset = -1; el_size; el_size >>= 1, el_offset++);
 
+        // FIXME: use data from VM
+#ifdef _EM64T_
+        int first_element = 16;
+#else
         int first_element = (el_offset == 3) ? 16 : 12;
+#endif
 
-        int flags = GC_VT_ARRAY
+        POINTER_SIZE_INT flags = GC_VT_ARRAY
             | (el_offset << GC_VT_ARRAY_ELEMENT_SHIFT)
             | (first_element << GC_VT_ARRAY_FIRST_SHIFT);
 
@@ -143,7 +148,7 @@ void gc_class_prepared(Class_Handle ch, VTable_Handle vth) {
     GC_VTable_Info *info = build_slot_offset_array(ch, vt, type);
     info->size_and_ref_type = class_get_boxed_data_size(ch) | (int)type;
 
-    int flags = 0;
+    POINTER_SIZE_INT flags = 0;
     if (!ignore_finalizers && class_is_finalizable(ch)) {
         flags |= GC_VT_FINALIZIBLE;
     }
@@ -153,7 +158,7 @@ void gc_class_prepared(Class_Handle ch, VTable_Handle vth) {
         flags |= GC_VT_HAS_SLOTS;
     }
 
-    int addr = (int) info;
+    POINTER_SIZE_INT addr = (POINTER_SIZE_INT) info;
     assert((addr & 7) == 0); // required alignment
 
     flags |= addr;
