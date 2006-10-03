@@ -88,6 +88,7 @@ static void si_unwind_from_m2n(StackIterator* si, bool over_popped = true)
         si->c.p_esi = &m2nfl->regs->esi;
         si->c.p_edi = &m2nfl->regs->edi;
         si->c.p_ebp = &m2nfl->regs->ebp;
+        si->c.eflags = m2nfl->regs->eflags;
     } else if (over_popped &&
             (FRAME_MODIFIED_STACK == (FRAME_MODIFIED_STACK & m2n_get_frame_type(m2nfl)))) {
         si->c.esp = m2nfl->pop_regs->esp;
@@ -100,6 +101,7 @@ static void si_unwind_from_m2n(StackIterator* si, bool over_popped = true)
         si->c.p_esi = &m2nfl->pop_regs->esi;
         si->c.p_edi = &m2nfl->pop_regs->edi;
         si->c.p_ebp = &m2nfl->pop_regs->ebp;
+        si->c.eflags = m2nfl->pop_regs->eflags;
     } else {
         // Normal M2nFrame, eip is past instruction, esp is implicitly address just beyond the frame, callee saves registers in M2nFrame
         si->c.esp   = (uint32)m2nfl + m2n_sizeof_m2n_frame;
@@ -129,7 +131,7 @@ static transfer_control_stub_type gen_transfer_control_stub()
         return addr;
     }
 
-    const int stub_size = 64;
+    const int stub_size = 0x47;
     char *stub = (char *)malloc_fixed_code_for_jit(stub_size, DEFAULT_CODE_ALIGNMENT, CODE_BLOCK_HEAT_COLD, CAA_Allocate);
 #ifdef _DEBUG
     memset(stub, 0xcc /*int 3*/, stub_size);
@@ -162,6 +164,17 @@ static transfer_control_stub_type gen_transfer_control_stub()
 
     ss = get_reg(ss, &eax_opnd, eax_reg, edx_reg, (unsigned)&((StackIterator*)0)->c.p_eax);
     ss = get_reg(ss, &ebx_opnd, ebx_reg, edx_reg, (unsigned)&((StackIterator*)0)->c.p_ebx);
+
+    ss = mov(ss, ecx_opnd,  M_Base_Opnd(edx_reg, (unsigned)&((StackIterator*)0)->c.eflags));
+    ss = test(ss, ecx_opnd, ecx_opnd);
+    ss = branch8(ss, Condition_Z,  Imm_Opnd(size_8, 0));
+    char* patch_offset = ((char *)ss) - 1; // Store location for jump patch
+    ss = push(ss,  ecx_opnd);
+    *ss++ = (char)0x9D; // POPFD
+    // Patch conditional jump
+    signed offset = (signed)ss - (signed)patch_offset - 1;
+    *patch_offset = (char)offset;
+
     ss = get_reg(ss, &ecx_opnd, ecx_reg, edx_reg, (unsigned)&((StackIterator*)0)->c.p_ecx);
     ss = get_reg(ss, &edx_opnd, edx_reg, edx_reg, (unsigned)&((StackIterator*)0)->c.p_edx);
 
@@ -191,6 +204,12 @@ static transfer_control_stub_type gen_transfer_control_stub()
         mov         eax,dword ptr [eax]
         mov         ebx,dword ptr [edx+18h]
         mov         ebx,dword ptr [ebx]
+        mov         ecx,dword ptr [edx+28h]
+        test        ecx,ecx
+        je          _label_
+        push        ecx
+        popfd
+_label_:
         mov         ecx,dword ptr [edx+20h]
         mov         ecx,dword ptr [ecx]
         mov         edx,dword ptr [edx+24h]
@@ -249,8 +268,9 @@ StackIterator* si_create_from_registers(Registers* regs, bool is_ip_past, M2nFra
     memset(res, 0, sizeof(StackIterator));
 
     // Setup current frame
+    // It's possible that registers represent native code and res->cci==NULL
     res->cci = vm_methods->find((NativeCodePtr)regs->eip, is_ip_past);
-    assert(res->cci);
+
     res->c.esp = regs->esp;
     res->c.p_eip = &regs->eip;
     res->c.p_ebp = &regs->ebp;
@@ -261,6 +281,7 @@ StackIterator* si_create_from_registers(Registers* regs, bool is_ip_past, M2nFra
     res->c.p_ecx = &regs->ecx;
     res->c.p_edx = &regs->edx;
     res->c.is_ip_past = is_ip_past;
+    res->c.eflags = regs->eflags;
     res->m2nfl = lm2nf;
 
     return res;
@@ -504,6 +525,7 @@ void si_copy_to_registers(StackIterator* si, Registers* regs)
     ASSERT_NO_INTERPRETER
 
     regs->esp = si->c.esp;
+    regs->eflags = si->c.eflags;
     regs->eip = unref_reg(si->c.p_eip);
     regs->ebp = unref_reg(si->c.p_ebp);
     regs->edi = unref_reg(si->c.p_edi);

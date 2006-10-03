@@ -51,6 +51,7 @@ void nt_to_vm_context(PCONTEXT context, Registers* regs)
     regs->ebp = context->Ebp;
     regs->eip = context->Eip;
     regs->esp = context->Esp;
+    regs->eflags = context->EFlags;
 }
 
 void vm_to_nt_context(Registers* regs, PCONTEXT context)
@@ -64,6 +65,7 @@ void vm_to_nt_context(Registers* regs, PCONTEXT context)
     context->Eax = regs->eax;
     context->Ecx = regs->ecx;
     context->Edx = regs->edx;
+    context->EFlags = regs->eflags;
 }
 
 static void print_state(LPEXCEPTION_POINTERS nt_exception, const char *msg)

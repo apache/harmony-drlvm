@@ -89,6 +89,7 @@ void linux_ucontext_to_regs(Registers* regs, ucontext_t *uc)
     regs->ebp = uc->uc_mcontext.gregs[REG_EBP];
     regs->eip = uc->uc_mcontext.gregs[REG_EIP];
     regs->esp = uc->uc_mcontext.gregs[REG_ESP];
+    regs->eflags = uc->uc_mcontext.gregs[REG_EFL];
 }
 
 void linux_regs_to_ucontext(ucontext_t *uc, Registers* regs)
@@ -102,6 +103,7 @@ void linux_regs_to_ucontext(ucontext_t *uc, Registers* regs)
     uc->uc_mcontext.gregs[REG_EBP] = regs->ebp;
     uc->uc_mcontext.gregs[REG_EIP] = regs->eip;
     uc->uc_mcontext.gregs[REG_ESP] = regs->esp;
+    uc->uc_mcontext.gregs[REG_EFL] = regs->eflags;
 }
 
 // exception catch support for JVMTI

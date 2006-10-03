@@ -610,14 +610,7 @@ VMBreakPoints::process_native_breakpoint()
         << (bp->method ? method_get_descriptor((Method*)bp->method) : "")
         << " :" << bp->location << " :" << bp->addr);
 
-    bool push_frame = (vm_identify_eip(addr) == VM_TYPE_JAVA);
-    M2nFrame* m2nf;
-
-    if (push_frame) {
-        m2nf = m2n_push_suspended_frame(&regs);
-    } else {
-        m2nf = m2n_get_last_frame();
-    }
+    M2nFrame* m2nf = m2n_push_suspended_frame(&regs);
 
     jbyte *instruction_buffer;
     BEGIN_RAISE_AREA;
@@ -811,12 +804,6 @@ VMBreakPoints::process_native_breakpoint()
     // had before breakpoint happened
     StackIterator *si =
         si_create_from_registers(&regs, false, m2n_get_previous_frame(m2nf));
-
-    if (push_frame)
-    {
-        m2n_set_last_frame(m2n_get_previous_frame(m2nf));
-        STD_FREE(m2nf);
-    }
 
     si_set_ip(si, instruction_buffer, false);
     si_transfer_control(si);

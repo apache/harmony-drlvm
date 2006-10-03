@@ -114,6 +114,7 @@ struct Registers {
     uint32 ebp;
     uint32 esp;
     uint32 eip;
+    uint32 eflags;
 
     void reset_ip() { eip = 0; }
     void* get_ip() { return (void*)eip; }
