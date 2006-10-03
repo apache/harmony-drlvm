@@ -89,7 +89,7 @@ static void si_unwind_from_m2n(StackIterator* si, bool over_popped = true)
         si->c.p_edi = &m2nfl->regs->edi;
         si->c.p_ebp = &m2nfl->regs->ebp;
     } else if (over_popped &&
-            (FRAME_POP_DONE == (FRAME_POP_MASK & m2n_get_frame_type(m2nfl)))) {
+            (FRAME_MODIFIED_STACK == (FRAME_MODIFIED_STACK & m2n_get_frame_type(m2nfl)))) {
         si->c.esp = m2nfl->pop_regs->esp;
         si->c.p_eip = &(m2nfl->pop_regs->eip);
         si->c.is_ip_past = FALSE;
@@ -495,17 +495,23 @@ void si_transfer_control(StackIterator* si)
     tcs(&local_si);
 }
 
+inline static uint32 unref_reg(uint32* p_reg) {
+    return p_reg ? *p_reg : 0;
+}
+
 void si_copy_to_registers(StackIterator* si, Registers* regs)
 {
     ASSERT_NO_INTERPRETER
-    m2n_set_last_frame(si->m2nfl);
+
     regs->esp = si->c.esp;
-    regs->eip = *si->c.p_eip;
-    regs->ebp = *si->c.p_ebp;
-    regs->edi = *si->c.p_edi;
-    regs->esi = *si->c.p_esi;
-    regs->ebx = *si->c.p_ebx;
-    regs->eax = *si->c.p_eax;
+    regs->eip = unref_reg(si->c.p_eip);
+    regs->ebp = unref_reg(si->c.p_ebp);
+    regs->edi = unref_reg(si->c.p_edi);
+    regs->esi = unref_reg(si->c.p_esi);
+    regs->edx = unref_reg(si->c.p_edx);
+    regs->ecx = unref_reg(si->c.p_ecx);
+    regs->ebx = unref_reg(si->c.p_ebx);
+    regs->eax = unref_reg(si->c.p_eax);
 }
 
 void si_set_callbak(StackIterator* si, NativeCodePtr* callback) {

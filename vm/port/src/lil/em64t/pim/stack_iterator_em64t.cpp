@@ -345,7 +345,6 @@ void si_transfer_control(StackIterator * si) {
 
 void si_copy_to_registers(StackIterator * si, Registers * regs) {
     ASSERT_NO_INTERPRETER    
-    m2n_set_last_frame(si->m2n_frame);
 
     regs->rsp = si->jit_frame_context.rsp;
     regs->rbp = *si->jit_frame_context.p_rbp;

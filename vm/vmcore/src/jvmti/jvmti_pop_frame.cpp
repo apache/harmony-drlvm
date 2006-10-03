@@ -316,7 +316,7 @@ void jvmti_jit_prepare_pop_frame() {
     }
 
     // set pop done frame state
-    m2n_set_frame_type(top_frame, FRAME_POP_DONE);
+    m2n_set_frame_type(top_frame, frame_type(FRAME_POP_DONE | FRAME_MODIFIED_STACK));
     return;
 }
 

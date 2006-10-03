@@ -339,8 +339,8 @@ static void exn_propagate_exception(
 
         BEGIN_RAISE_AREA;
         jvalue ret_val = {(jlong)0};
-        jvmti_process_method_exit_event(reinterpret_cast<jmethodID>(method),
-            JNI_TRUE, ret_val);
+        jvmti_process_method_exception_exit_event(
+            reinterpret_cast<jmethodID>(method), JNI_TRUE, ret_val, si);
         END_RAISE_AREA;
 
         // Goto previous frame
@@ -469,6 +469,7 @@ void exn_athrow_regs(Registers * regs, Class_Handle exn_class)
     ManagedObject *local_exn_obj = NULL;
     exn_propagate_exception(si, &local_exn_obj, exn_class, NULL, NULL, NULL);
     si_copy_to_registers(si, regs);
+    m2n_set_last_frame(si_get_m2n(si));
     si_free(si);
     STD_FREE(m2nf);
 #endif

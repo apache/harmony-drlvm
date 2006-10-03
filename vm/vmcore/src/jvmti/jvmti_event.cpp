@@ -38,6 +38,8 @@
 #include "vm_log.h"
 #include "compile.h"
 #include "jvmti_break_intf.h"
+#include "stack_iterator.h"
+#include "m2n.h"
 
 /*
  * Set Event Callbacks
@@ -658,20 +660,12 @@ jvmti_process_method_entry_event(jmethodID method) {
     tmn_suspend_disable();
 }
 
-VMEXPORT void
-jvmti_process_method_exit_event(jmethodID method, jboolean was_popped_by_exception, jvalue ret_val) {
-    SuspendDisabledChecker sdc;
-
+static void
+jvmti_process_method_exit_event_internal(jmethodID method,
+                                         jboolean was_popped_by_exception,
+                                         jvalue ret_val)
+{
     DebugUtilsTI *ti = VM_Global_State::loader_env->TI;
-    if (!ti->isEnabled() )
-        return;
-
-    if (JVMTI_PHASE_LIVE != ti->getPhase())
-        return;
-
-    if (!ti->get_global_capability(DebugUtilsTI::TI_GC_ENABLE_METHOD_EXIT))
-        return;
-
     tmn_suspend_enable();
     jvmtiEvent event_type = JVMTI_EVENT_METHOD_EXIT;
     hythread_t curr_native_thread = hythread_self();
@@ -700,7 +694,6 @@ jvmti_process_method_exit_event(jmethodID method, jboolean was_popped_by_excepti
         jthread thread = getCurrentThread();
         JNIEnv *jni_env = (JNIEnv *)jni_native_intf;
         jvmtiEnv *jvmti_env = (jvmtiEnv*) ti_env;
-
         if (NULL != ti_env->event_table.MethodExit)
             ti_env->event_table.MethodExit(jvmti_env, jni_env, thread, method, was_popped_by_exception, ret_val);
         ti_env = next_env;
@@ -720,28 +713,99 @@ jvmti_process_method_exit_event(jmethodID method, jboolean was_popped_by_excepti
     }
 
     VM_thread *curr_thread = p_TLS_vmthread;
-    jvmti_frame_pop_listener *fpl = curr_thread->frame_pop_listener;
     jint UNREF skip;
     jint depth = get_thread_stack_depth(curr_thread, &skip);
 
-    while (fpl)
+    jvmti_frame_pop_listener *last = NULL;
+    for( jvmti_frame_pop_listener *fpl = curr_thread->frame_pop_listener;
+         fpl;
+         last = fpl, (fpl = fpl ? fpl->next : curr_thread->frame_pop_listener) )
     {
-        jvmti_frame_pop_listener *next_fpl = fpl->next;
         if (fpl->depth == depth)
         {
-            jvmti_process_frame_pop_event(
-                reinterpret_cast<jvmtiEnv *>(fpl->env),
-                method,
-                was_popped_by_exception);
-            if( fpl == curr_thread->frame_pop_listener ) {
+            jvmti_frame_pop_listener *report = fpl;
+            if(last) {
+                last->next = fpl->next;
+            } else {
                 curr_thread->frame_pop_listener = fpl->next;
             }
-            STD_FREE(fpl);
+            fpl = last;
+
+            TRACE2("jvmti.stack", "Calling PopFrame callback for thread: "
+                << curr_thread << ", listener: " << report
+                << ", env: " << report->env << ", depth: " << report->depth
+                << " -> " << class_get_name(method_get_class((Method*)method))
+                << "." << method_get_name((Method*)method)
+                << method_get_descriptor((Method*)method));
+
+            jvmti_process_frame_pop_event(
+                reinterpret_cast<jvmtiEnv *>(report->env),
+                method,
+                was_popped_by_exception);
+            STD_FREE(report);
         }
-        fpl = next_fpl;
     }
 
     tmn_suspend_disable();
+}
+
+VMEXPORT void
+jvmti_process_method_exit_event(jmethodID method,
+                                jboolean was_popped_by_exception,
+                                jvalue ret_val)
+{
+    SuspendDisabledChecker sdc;
+
+    DebugUtilsTI *ti = VM_Global_State::loader_env->TI;
+    if (!ti->isEnabled() )
+        return;
+
+    if (JVMTI_PHASE_LIVE != ti->getPhase())
+        return;
+
+    if (!ti->get_global_capability(DebugUtilsTI::TI_GC_ENABLE_METHOD_EXIT))
+        return;
+
+    // process method exit event
+    jvmti_process_method_exit_event_internal(method, was_popped_by_exception, ret_val);
+}
+
+VMEXPORT void
+jvmti_process_method_exception_exit_event(jmethodID method,
+                                          jboolean was_popped_by_exception,
+                                          jvalue ret_val,
+                                          StackIterator* si)
+{
+    SuspendDisabledChecker sdc;
+
+    DebugUtilsTI *ti = VM_Global_State::loader_env->TI;
+    if (!ti->isEnabled() )
+        return;
+
+    if (JVMTI_PHASE_LIVE != ti->getPhase())
+        return;
+
+    if (!ti->get_global_capability(DebugUtilsTI::TI_GC_ENABLE_METHOD_EXIT))
+        return;
+
+    // save context from stack interation to m2n frame
+    Registers regs;
+    si_copy_to_registers(si, &regs);
+    M2nFrame* m2nf = m2n_get_last_frame();
+    set_pop_frame_registers(m2nf, &regs);
+    
+    // save old type of m2n frame
+    frame_type old_type = m2n_get_frame_type(m2nf);
+    
+    // enable modified stack context in m2n frame 
+    m2n_set_frame_type(m2nf, frame_type(FRAME_MODIFIED_STACK | old_type));
+
+    // process method exit event
+    jvmti_process_method_exit_event_internal(method, was_popped_by_exception, ret_val);
+
+    // restore old frame type and switch off context modification
+    m2n_set_frame_type(m2nf, old_type);
+    set_pop_frame_registers(m2nf, NULL);
 }
 
 VMEXPORT void

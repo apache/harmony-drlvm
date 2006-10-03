@@ -618,7 +618,6 @@ void si_transfer_control(StackIterator* si)
 void si_copy_to_registers(StackIterator* si, Registers*)
 {
     ABORT("Not implemented");
-    m2n_set_last_frame(si->m2nfl);
 }
 
 extern "C" void do_loadrs_asm(int loadrs);

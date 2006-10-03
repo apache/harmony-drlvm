@@ -54,7 +54,9 @@ enum frame_type {
 
     FRAME_POP_MASK = 0x0700,
 
-    FRAME_SAFE_POINT = 0x0800
+    FRAME_SAFE_POINT = 0x0800,
+
+    FRAME_MODIFIED_STACK = 0x1000
 };
 
 // The pushing and popping of native frames is done only by stubs that
