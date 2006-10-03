@@ -34,6 +34,7 @@ public:
     Dlink() {
         _next = _prev = this;
     }
+    virtual ~Dlink() {}
     //
     // routines for manipulating double linked list
     //

@@ -195,7 +195,7 @@ public:
     * @param jt - field type.
     * @param fld - field handle.
     */
-    void CodeGen::gen_access_watchpoint(JavaByteCodes opcode, jtype jt, Field_Handle fld);
+    void gen_access_watchpoint(JavaByteCodes opcode, jtype jt, Field_Handle fld);
 
     /**
     * @brief Restore all scratch registers and operand stack state

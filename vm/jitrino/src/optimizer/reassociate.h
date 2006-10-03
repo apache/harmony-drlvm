@@ -45,6 +45,7 @@ class Opnd;
 class CSEHashTable;
 class Type;
 class LoopTree;
+class Simplifier;
 
 struct OpndWithPriority {
     OpndWithPriority(Opnd *op, uint32 priority0,

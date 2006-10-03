@@ -69,9 +69,9 @@ protected:
     void registerDirectCall(Inst * inst);
     void registerInlineInfoOffsets( void );
 
-    void CodeEmitter::orderNodesAndMarkInlinees(StlList<MethodMarkerPseudoInst*>& container, 
+    void orderNodesAndMarkInlinees(StlList<MethodMarkerPseudoInst*>& container, 
         Node * node, bool isForward);
-    void CodeEmitter::reportCompiledInlinees();
+    void reportCompiledInlinees();
 
     //------------------------------------------------------------------------------------
     class ConstantAreaLayout

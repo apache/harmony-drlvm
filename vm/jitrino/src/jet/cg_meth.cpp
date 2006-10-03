@@ -443,7 +443,7 @@ void Compiler::gen_prolog(void) {
                     Opnd scratch(jt, m_base, voff(m_stack.scratch()));
                     mov(scratch, Opnd(jt, ar));
                     
-                    jt = jt = flt32 ? i32 : i64;
+                    jt = jt == flt32 ? i32 : i64;
                     var = scratch.as_type(jt);
                 }
                 else {

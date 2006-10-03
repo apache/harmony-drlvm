@@ -71,7 +71,7 @@ public:
     static bool matches(Constraint co, Constraint ci, uint32 opndRoles, bool allowAliases);
     static const OpcodeGroup* findOpcodeGroup(const FindInfo& fi);
     static bool matches(const OpcodeGroup* og, const FindInfo& fi, bool any);
-    static bool Encoder::isOpndAllowed(const Encoder::OpcodeGroup * og, uint32 i, Constraint co, bool isExtended, bool any);
+    static bool isOpndAllowed(const Encoder::OpcodeGroup * og, uint32 i, Constraint co, bool isExtended, bool any);
 
     /**
      * Retunrs an empty opcode group.

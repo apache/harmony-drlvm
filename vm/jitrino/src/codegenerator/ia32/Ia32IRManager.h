@@ -243,7 +243,7 @@ public:
 
     /** Creates an EmptyPseudoInst instruction to fill BB, which shoud not be cosidered as an empty one.
     */
-    Inst* IRManager::newEmptyPseudoInst();
+    Inst* newEmptyPseudoInst();
 
     /** Creates an MethodEntryPseudoInst pseudo instruction representing the inlined method entry/end markers.
     */

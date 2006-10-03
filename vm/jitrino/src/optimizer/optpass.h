@@ -95,8 +95,8 @@ private:
 class classname : public OptPass { \
 protected: \
            void _run(IRManager& irm); \
-           const char* classname::getName() { return fullname; } \
-           const char* classname::getTagName() { return #tagname; } \
+           const char* getName() { return fullname; } \
+           const char* getTagName() { return #tagname; } \
 }; \
 ActionFactory<classname> tagname##_(#tagname);
 

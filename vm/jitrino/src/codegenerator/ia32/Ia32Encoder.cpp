@@ -55,7 +55,7 @@ bool is_ptr_type(const Type* typ) {
 const Encoder::OpcodeGroup Encoder::dummyOpcodeGroup;
 
 const Encoder::MemOpndConstraints Encoder::memOpndConstraints[16]= {
-    {
+    {{
 #ifdef _EM64T_
     Constraint(OpndKind_GPReg, OpndSize_64), 
     Constraint(OpndKind_GPReg, OpndSize_64),
@@ -64,7 +64,7 @@ const Encoder::MemOpndConstraints Encoder::memOpndConstraints[16]= {
     Constraint(OpndKind_GPReg, OpndSize_32),
 #endif
     Constraint(OpndKind_Imm, OpndSize_32),
-    Constraint(OpndKind_Imm, OpndSize_32) }, 
+    Constraint(OpndKind_Imm, OpndSize_32) }}, 
     // others contain null constraints, to be fixed later
 };
 

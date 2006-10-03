@@ -537,11 +537,13 @@ public:
 class MethodCodeSelector {
 public:
     MethodCodeSelector() {}
+    virtual ~MethodCodeSelector() {}
     class Callback {
     public:
         virtual void    genVars(uint32 numLocals,VarCodeSelector&) = 0;
         virtual void    setMethodDesc(MethodDesc * desc) = 0;
         virtual void    genCFG(uint32 numNodes,CFGCodeSelector&,bool useProfile) = 0;
+        virtual ~Callback() {}
     };
     virtual void selectCode(Callback&) = 0;
 };

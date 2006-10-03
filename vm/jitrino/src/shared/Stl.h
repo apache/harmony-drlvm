@@ -365,7 +365,7 @@ public:
 /**
  * A MemoryManager-based STL map container.
  **/
-template<class KeyT, class ValueT, class Traits = ::std::less<KeyT>, class Allocator = StlMMAllocator<ValueT> >
+template<class KeyT, class ValueT, class Traits = ::std::less<KeyT>, class Allocator = StlMMAllocator<std::pair<const KeyT, ValueT> > >
 class StlMap : public ::std::map<KeyT, ValueT, Traits, Allocator>
 {
   typedef ::std::map<KeyT, ValueT, Traits, Allocator> Map;
@@ -379,7 +379,7 @@ public:
 /**
  * A MemoryManager-based STL multimap container.
  **/
-template<class KeyT, class ValueT, class Traits = ::std::less<KeyT>, class Allocator = StlMMAllocator<ValueT> >
+template<class KeyT, class ValueT, class Traits = ::std::less<KeyT>, class Allocator = StlMMAllocator<std::pair<const KeyT, ValueT> > >
 class StlMultiMap : public ::std::multimap<KeyT, ValueT, Traits, Allocator>
 {
   typedef ::std::multimap<KeyT, ValueT, Traits, Allocator> MultiMap;
@@ -483,7 +483,7 @@ public:
  * A MemoryManager-based STL hash_map container.
  **/
 #if !defined (__SGI_STL_PORT)
-template<class KeyT, class ValueT, class HashCompareFun = ::std::less<KeyT>, class Allocator = StlMMAllocator<ValueT> >
+template<class KeyT, class ValueT, class HashCompareFun = ::std::less<KeyT>, class Allocator = StlMMAllocator<std::pair<const KeyT, ValueT> > >
 class StlHashMap : public ::std::map<KeyT, ValueT, HashCompareFun, Allocator>
 {
   typedef ::std::map<KeyT, ValueT, HashCompareFun, Allocator> HashMap;
@@ -496,7 +496,7 @@ public:
 };
 
 #else
-template<class KeyT, class ValueT, class HashFun = StlSimpleHash, class CompareFun = ::std::equal_to<KeyT>, class Allocator = StlMMAllocator<ValueT> >
+template<class KeyT, class ValueT, class HashFun = StlSimpleHash, class CompareFun = ::std::equal_to<KeyT>, class Allocator = StlMMAllocator<std::pair<const KeyT, ValueT> > >
 class StlHashMap : public ::std::hash_map<KeyT, ValueT, HashFun, CompareFun, Allocator>
 {
   typedef ::std::hash_map<KeyT, ValueT, HashFun, CompareFun, Allocator> HashMap;
@@ -515,7 +515,7 @@ public:
  * A MemoryManager-based STL hash_map container.
  **/
 #if !defined (__SGI_STL_PORT)
-template<class KeyT, class ValueT, class HashCompareFun = ::std::less<KeyT>, class Allocator = StlMMAllocator<ValueT> >
+template<class KeyT, class ValueT, class HashCompareFun = ::std::less<KeyT>, class Allocator = StlMMAllocator<std::pair<const KeyT, ValueT> > >
 class StlHashMultiMap : public ::std::multimap<KeyT, ValueT, HashCompareFun, Allocator>
 {
   typedef ::std::multimap<KeyT, ValueT, HashCompareFun, Allocator> HashMultiMap;
@@ -527,7 +527,7 @@ public:
   bool has(const KeyT& k) const { return (find(k) != StlHashMultiMap<KeyT,ValueT,HashCompareFun,Allocator>::end()); };
 };
 #else
-template<class KeyT, class ValueT, class HashFun = StlSimpleHash, class CompareFun = ::std::equal_to<KeyT>, class Allocator = StlMMAllocator<ValueT> >
+template<class KeyT, class ValueT, class HashFun = StlSimpleHash, class CompareFun = ::std::equal_to<KeyT>, class Allocator = StlMMAllocator<std::pair<const KeyT, ValueT> > >
 class StlHashMultiMap : public ::std::hash_multimap<KeyT, ValueT, HashFun, CompareFun, Allocator>
 {
   typedef ::std::hash_multimap<KeyT, ValueT, HashFun, CompareFun, Allocator> HashMultiMap;
