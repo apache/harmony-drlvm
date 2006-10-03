@@ -1667,9 +1667,14 @@ protected:
         if (isForward) {
             lastOrderingTraversalNumber = ++traversalNumber;
             postOrderCache.clear();
+            if (entryNode==NULL) {
+                return;
+            }
             startNode = entryNode;
         } else {
-            assert(exitNode!=NULL);
+            if (exitNode==NULL) {
+                return;
+            }
             startNode = exitNode;
         }
         currentPreNumber = currentPostNumber = 0;
