@@ -41,12 +41,13 @@ namespace Jitrino {
     
 static bool isMagicClass(Type* type) {
 #ifdef _EM64T_
-    return false;//magics are not supported on EM64T today.
-#endif
+    return false;//magics are not tested on EM64T.
+#else
     static const char unboxedName[] = "org/vmmagic/unboxed/";
     static const unsigned nameLen = sizeof(unboxedName)-1;
     const char* name = type->getName();
     return !strncmp(name, unboxedName, nameLen);
+#endif    
 }
 
 static bool isMagicMethod(MethodDesc* md) {
