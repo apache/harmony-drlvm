@@ -148,6 +148,8 @@ Version: $Revision: 1.5.2.33 $
 
     <target name="copy.nessessary.jars">
 
+        <copy file="${external.dep.CLASSLIB}/depends/jars/junit_3.8.2/junit.jar" todir="tmp" />
+
         <propertyregex property="build.XALAN.path" input="${if.XALAN.exist}" regexp="(.*)/${XALAN.check.file}" select="\1" />
         <copy file="${build.XALAN.path}/xalan.jar" todir="tmp" />
 
