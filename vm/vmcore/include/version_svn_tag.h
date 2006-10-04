@@ -18,6 +18,6 @@
 #ifndef _VERSION_SVN_TAG_
 #define _VERSION_SVN_TAG_
 
-#define VERSION_SVN_TAG  "452436"
+#define VERSION_SVN_TAG  "452887"
 
 #endif // _VERSION_SVN_TAG_

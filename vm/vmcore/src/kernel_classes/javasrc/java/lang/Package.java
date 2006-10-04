@@ -258,15 +258,31 @@ public class Package implements AnnotatedElement {
      */
     public boolean isCompatibleWith(String desiredVersion)
             throws NumberFormatException {
+
         if (jar != null) {
             init();
         }
 
+        /*
+         *  yes, it's not as performant as catching an NPE down below when
+         *  something blows up, but it's very clear to those that read this.
+         *  Spec says that an NFE is thrown if the current or desired version
+         *  is not of the correct dotted form.  Lack of a version is such...
+         */
+        if (specVersion == null) { 
+            throw new NumberFormatException("No version defined for implementation");
+        }
+        
         StringTokenizer specVersionTokens = new StringTokenizer(specVersion,
                 ".");
+        
         StringTokenizer desiredVersionTokens = new StringTokenizer(
                 desiredVersion, ".");
+
         try {
+            if (!specVersionTokens.hasMoreElements() || !desiredVersionTokens.hasMoreElements()) {
+                throw new NumberFormatException("Empty version string");
+            }
             while (specVersionTokens.hasMoreElements()) {
                 int desiredVer = Integer.parseInt(desiredVersionTokens
                         .nextToken());
@@ -294,7 +310,6 @@ public class Package implements AnnotatedElement {
         		return false;
         	}
     	}
-
         
         return true;
     }
@@ -316,7 +331,7 @@ public class Package implements AnnotatedElement {
         if (jar != null) {
             init();
         }
-        return sealBase != null && sealBase.equals(url);
+        return url.equals(sealBase);
     }
 
     /**
@@ -342,8 +357,10 @@ public class Package implements AnnotatedElement {
             if (jarCache != null && (map = jarCache.get()) != null) {
                 manifest = map.get(jar); 
             }
+            
             if (manifest == null) {
                 final URL url = sealURL = new URL(jar);
+                            
                 manifest = AccessController.doPrivileged(
                     new PrivilegedAction<Manifest>() {
                         public Manifest run()
@@ -366,33 +383,34 @@ public class Package implements AnnotatedElement {
             }
 
             Attributes mainAttrs = manifest.getMainAttributes();
-            Attributes pkgAttrs = manifest.getAttributes(name);
-            specTitle = (specTitle = pkgAttrs
+            Attributes pkgAttrs = manifest.getAttributes(name.replace('.','/')+"/");
+            
+            specTitle = pkgAttrs == null || (specTitle = pkgAttrs
                     .getValue(Attributes.Name.SPECIFICATION_TITLE)) == null
                     ? mainAttrs.getValue(Attributes.Name.SPECIFICATION_TITLE)
                     : specTitle;
-            specVersion = (specVersion = pkgAttrs
+            specVersion = pkgAttrs == null || (specVersion = pkgAttrs
                     .getValue(Attributes.Name.SPECIFICATION_VERSION)) == null
                     ? mainAttrs.getValue(Attributes.Name.SPECIFICATION_VERSION)
                     : specVersion;
-            specVendor = (specVendor = pkgAttrs
+            specVendor = pkgAttrs == null || (specVendor = pkgAttrs
                     .getValue(Attributes.Name.SPECIFICATION_VENDOR)) == null
                     ? mainAttrs.getValue(Attributes.Name.SPECIFICATION_VENDOR)
                     : specVendor;
-            implTitle = (implTitle = pkgAttrs
+            implTitle = pkgAttrs == null || (implTitle = pkgAttrs
                     .getValue(Attributes.Name.IMPLEMENTATION_TITLE)) == null
                     ? mainAttrs.getValue(Attributes.Name.IMPLEMENTATION_TITLE)
                     : implTitle;
-            implVersion = (implVersion = pkgAttrs
+            implVersion = pkgAttrs == null || (implVersion = pkgAttrs
                     .getValue(Attributes.Name.IMPLEMENTATION_VERSION)) == null
                     ? mainAttrs
                         .getValue(Attributes.Name.IMPLEMENTATION_VERSION)
                     : implVersion;
-            implVendor = (implVendor = pkgAttrs
+            implVendor = pkgAttrs == null || (implVendor = pkgAttrs
                     .getValue(Attributes.Name.IMPLEMENTATION_VENDOR)) == null
                     ? mainAttrs.getValue(Attributes.Name.IMPLEMENTATION_VENDOR)
                     : implVendor;
-            String sealed = (sealed = pkgAttrs
+            String sealed = pkgAttrs == null || (sealed = pkgAttrs
                     .getValue(Attributes.Name.SEALED)) == null ? mainAttrs
                     .getValue(Attributes.Name.SEALED) : sealed;
             if (Boolean.valueOf(sealed).booleanValue()) {
