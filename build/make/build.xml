@@ -54,11 +54,13 @@ Version: $Revision: 1.16.2.20 $
 
 <project name="build" default="build">
 
-    <property name="canonical.deploy.dir" location="../deploy" />
-
     <property file="../drlvm.properties"/>
     <property file="${user.home}/drlvm.properties"/>
 
+    <!-- flag and location for final 'copy to build/deploy directory' step -->
+    <!-- <property name="deploy.canonical.flag" value="false"/> -->
+    <property name="canonical.deploy.dir" location="../deploy" />
+    
     <!-- ===============================================================
         Define locations of external dependencies
       ================================================================== -->
@@ -487,12 +489,13 @@ Version: $Revision: 1.16.2.20 $
 -->
     </target>
 
-    <!-- place things into canonical 'deploy' directory
-    so irrespective of the platform, compiler or release/debug
-    there's a predicable place to find the output -->
-
-    <target name="deploy.canonical">
-        <delete dir="${canonical.deploy.dir}" />
+    <!-- ==================================================================
+      place things into canonical 'deploy' directory
+      so irrespective of the platform, compiler or release/debug
+      there's a predicable place to find the output 
+      ================================================================== -->
+    <target name="deploy.canonical" if="deploy.canonical.flag">
+        <delete dir="${canonical.deploy.dir}" failonerror="false" />
 
         <mkdir dir="${canonical.deploy.dir}" />
 
