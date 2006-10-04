@@ -45,5 +45,9 @@ Version: $Revision: 1.4.2.5 $
         </path>
 
         <property name="jarname" value="kernel.jar"/>
+        
+        <property name="manifest.file" 
+	        location="${build.vm.home}/vmcore/src/kernel_classes/resource/MANIFEST.MF" />	
+        
     </target>
 </project>
