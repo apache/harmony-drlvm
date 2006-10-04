@@ -19,14 +19,23 @@
 
 #include "apr_thread_cond.h"
 
+
+struct waiting_node {
+   // notification event
+   HANDLE event;
+   // double-linked queue
+   struct waiting_node *prev;
+   struct waiting_node *next;
+};
+
+// queue based condition implementation
 struct apr_thread_cond_t {
     apr_pool_t *pool;
-    HANDLE event;
-    int signal_all;
-    int num_waiting;
-    int signalled;
-    unsigned wait_level;
-    unsigned notify_level;
+    // the signal, could be called without mutex
+    // so we use internal one to guard the waiting queue
+    apr_thread_mutex_t *queue_mutex;
+    // head-tail marker node
+    struct waiting_node dummy_node;
 };
 
 #endif  /* THREAD_COND_H */
