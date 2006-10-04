@@ -220,22 +220,24 @@ void print_native_stack (unsigned *rbp) {
 inline void* find_stack_addr() {
     int err;
     void* stack_addr;
+    size_t stack_size;
     pthread_attr_t pthread_attr;
 
     pthread_t thread = pthread_self();
     err = pthread_getattr_np(thread, &pthread_attr);
-    err = pthread_attr_getstackaddr(&pthread_attr, &stack_addr);
+    err = pthread_attr_getstack(&pthread_attr, &stack_addr, &stack_size);
     pthread_attr_destroy(&pthread_attr);
     return stack_addr;
 }
 
 inline size_t find_stack_size() {
     int err;
+    void *stack_addr;
     size_t stack_size;
     pthread_attr_t pthread_attr;
 
     pthread_attr_init(&pthread_attr);
-    err = pthread_attr_getstacksize(&pthread_attr, &stack_size);
+    err = pthread_attr_getstack(&pthread_attr, &stack_addr, &stack_size);
     pthread_attr_destroy(&pthread_attr);
     return stack_size;
 }
