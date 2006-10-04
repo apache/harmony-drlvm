@@ -1,0 +1,37 @@
+Microsoft Visual Studio Solution File, Format Version 8.00
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "jitrino", "jitrino\jitrino.vcproj", "{AB5F3BB7-F05F-4600-8169-5B86158D3463}"
+	ProjectSection(ProjectDependencies) = postProject
+	EndProjectSection
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "em", "em\em.vcproj", "{6581FED0-5E16-479A-873B-26C072AF7679}"
+	ProjectSection(ProjectDependencies) = postProject
+	EndProjectSection
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "port_encoder", "port_encoder\port_encoder.vcproj", "{B89AC381-5594-4B8B-B6D8-FC6AD020F612}"
+	ProjectSection(ProjectDependencies) = postProject
+	EndProjectSection
+EndProject
+Global
+	GlobalSection(SolutionConfiguration) = preSolution
+		Debug = Debug
+		Release = Release
+	EndGlobalSection
+	GlobalSection(ProjectConfiguration) = postSolution
+		{AB5F3BB7-F05F-4600-8169-5B86158D3463}.Debug.ActiveCfg = Debug|Win32
+		{AB5F3BB7-F05F-4600-8169-5B86158D3463}.Debug.Build.0 = Debug|Win32
+		{AB5F3BB7-F05F-4600-8169-5B86158D3463}.Release.ActiveCfg = Release|Win32
+		{AB5F3BB7-F05F-4600-8169-5B86158D3463}.Release.Build.0 = Release|Win32
+		{6581FED0-5E16-479A-873B-26C072AF7679}.Debug.ActiveCfg = Debug|Win32
+		{6581FED0-5E16-479A-873B-26C072AF7679}.Debug.Build.0 = Debug|Win32
+		{6581FED0-5E16-479A-873B-26C072AF7679}.Release.ActiveCfg = Release|Win32
+		{6581FED0-5E16-479A-873B-26C072AF7679}.Release.Build.0 = Release|Win32
+		{B89AC381-5594-4B8B-B6D8-FC6AD020F612}.Debug.ActiveCfg = Debug|Win32
+		{B89AC381-5594-4B8B-B6D8-FC6AD020F612}.Debug.Build.0 = Debug|Win32
+		{B89AC381-5594-4B8B-B6D8-FC6AD020F612}.Release.ActiveCfg = Release|Win32
+		{B89AC381-5594-4B8B-B6D8-FC6AD020F612}.Release.Build.0 = Release|Win32
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+	EndGlobalSection
+	GlobalSection(ExtensibilityAddIns) = postSolution
+	EndGlobalSection
+EndGlobal
