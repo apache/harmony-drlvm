@@ -502,7 +502,7 @@ static void jvmti_start_single_step_in_virtual_method(DebugUtilsTI *ti, VMBreakP
 
             const InstructionDisassembler::Opnd& stub_op = stub_disasm.get_opnd(0);
             assert(stub_op.kind == InstructionDisassembler::Kind_Imm);
-            method = (Method *)stub_op.imm;
+            method = (Method *)((POINTER_SIZE_INT)stub_op.imm);
         }
     }
 
