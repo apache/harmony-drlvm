@@ -9,7 +9,7 @@ CS_OPT.file=jitrino
 
 -Djit.CS_OPT.path=opt_init,translator,optimizer,hir2lir,codegen
 
--Djit.CS_OPT.path.optimizer=ssa,devirt,inline,purge,simplify,uce,dce,lazyexc,memopt,simplify,uce,dce,lower,dessa,statprof,markglobals
+-Djit.CS_OPT.path.optimizer=ssa,devirt,inline,purge,simplify,dce,uce,lazyexc,memopt,simplify,dce,uce,lower,dessa,statprof,markglobals
 -Djit.CS_OPT.path.codegen=lock_method,bbp,gcpoints,cafl,dce1,i8l,early_prop,itrace-,native,constraints,dce2,regalloc,spillgen,layout,copy,rce+,stack,break-,iprof-,emitter!,si_insts,gcmap,info,unlock_method
 -Djit.CS_OPT.path.dce1=cg_dce
 -Djit.CS_OPT.path.dce2=cg_dce
