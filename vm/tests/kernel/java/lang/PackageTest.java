@@ -53,7 +53,7 @@ public class PackageTest extends TestCase {
         } else if (vendor.equals("BEA Systems, Inc.")) {
             assertEquals("Error2: unexpected title:", "...", s);
         } else if (vendor.equals("Intel DRL")) {
-            assertEquals("Error3: unexpected title:", "...", s);
+            assertEquals("Error3: unexpected title:", "Apache Harmony", s);
         }
     }
 
@@ -74,7 +74,7 @@ public class PackageTest extends TestCase {
         } else if (vendor.equals("BEA Systems, Inc.")) {
             assertEquals("Error2: unexpected vendor:", "...", s);
         } else if (vendor.equals("Intel DRL")) {
-            assertEquals("Error3: unexpected vendor:", "...", s);
+            assertEquals("Error3: unexpected vendor:", "The Apache Software Foundation", s);
         }
     }
 
