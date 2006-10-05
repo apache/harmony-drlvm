@@ -445,8 +445,16 @@ LazyExceptionOpt::fixOptCandidates(BitSet* bs) {
                 Log::out() << std::endl;
             }
 #endif
+            if ((*it)->initInst == NULL) {
+#ifdef _DEBUG
+                if (Log::isEnabled()) {
+                    Log::out() << "  init inst is null ";
+                    Log::out() << std::endl;
+                }
+#endif
+                continue;
+            }
             iinst = (*it)->initInst->asMethodCallInst(); 
-            assert(iinst != NULL);
             // inline info from constructor should be propogated to lazy
             // exception if any
             InlineInfo* constrInlineInfo = iinst->getInlineInfoPtr();
@@ -512,7 +520,6 @@ LazyExceptionOpt::fixOptCandidates(BitSet* bs) {
                     }
                 }
             }
-            irManager.getFlowGraph().purgeEmptyNodes();
         }
     }
 }
@@ -789,8 +796,9 @@ LazyExceptionOpt::checkArg(Node* nodeS) {
 
 #ifdef _DEBUG
         if (Log::isEnabled()) {
-            Log::out() << "    checkArg: first node " << node->getId()
-            << "  inEdges " << node->getInDegree() << "  " << std::endl;
+            Log::out() << "    checkArg: first node " << node->getId() << " ";
+            FlowGraph::printLabel(Log::out(),node);
+            Log::out() << "  inEdges " << node->getInDegree() << "  " << std::endl;
         }
 #endif 
  
@@ -799,24 +807,27 @@ LazyExceptionOpt::checkArg(Node* nodeS) {
             if (nodeSet->call_inst->getNode() == node) {
 #ifdef _DEBUG
                 if (Log::isEnabled()) {
-                    Log::out() << "        node " << node->getId()
-                    << " again in call_inst node " << std::endl; 
+                    Log::out() << "        node " << node->getId() << " ";
+                    FlowGraph::printLabel(Log::out(),node);
+                    Log::out() << " again in call_inst node " << std::endl; 
                 }
 #endif 
                 doneOK = false;
             }
 #ifdef _DEBUG
             if (Log::isEnabled()) {
-                Log::out() << "        node " << node->getId()
-                << "  inEdges " << node->getInDegree() << " was scanned " << std::endl; 
+                Log::out() << "        node " << node->getId() << " ";
+                FlowGraph::printLabel(Log::out(),node);
+                Log::out() << "  inEdges " << node->getInDegree() << " was scanned " << std::endl; 
             }
 #endif 
             break;
         }
 #ifdef _DEBUG
         if (Log::isEnabled()) {
-            Log::out() << "        node " << node->getId()
-            << "  inEdges " << node->getInDegree() << std::endl; 
+            Log::out() << "        node " << node->getId() << " ";
+            FlowGraph::printLabel(Log::out(),node);
+            Log::out() << "  inEdges " << node->getInDegree() << std::endl; 
         }
 #endif 
         for (inst = instlast; inst!=instfirst; inst=inst->getPrevInst()) {
@@ -832,14 +843,18 @@ LazyExceptionOpt::checkArg(Node* nodeS) {
             }
             if (inst->getOpcode()==Op_TauCheckNull && inst->getSrc(0)==arg_opnd) {
                 if (nodeSet->check_inst != NULL) {
-                    dofind = false; 
-                    doneOK = false; 
 #ifdef _DEBUG
                     if (Log::isEnabled()) {
                         Log::out() << "  check_inst is not NULL" << std::endl; 
                     }
 #endif
+                    break;
                 }
+#ifdef _DEBUG
+                if (Log::isEnabled()) {
+                    Log::out() << "  check_inst is FOUND" << std::endl; 
+                }
+#endif			    		
                 nodeSet->check_inst = inst;
                 break;
             }
@@ -1007,7 +1022,7 @@ LazyExceptionOpt::instSideEffect(Inst* inst) {
         case Op_ScaledDiffRef:
             return true;
         case Op_StVar:
-            return true;
+            return false;
         case Op_TauStInd:
             {
                 Inst* inst_src1 = inst->getSrc(1)->getInst();
