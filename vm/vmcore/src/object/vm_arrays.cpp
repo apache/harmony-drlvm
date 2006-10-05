@@ -374,7 +374,7 @@ vm_multianewarray_recursive(Class    *c,
             element = subarray;
             d--;
 
-            if (d == 0) return array;
+            if (d == 0) return obj[0]->object;
         }
     }
 } //vm_multianewarray_recursive
