@@ -147,15 +147,16 @@ public class Runtime {
          */
 
         static void addShutdownHook(Thread hook) throws IllegalStateException, IllegalArgumentException {
+            if (hook.getState() != Thread.State.NEW) {
+                throw new IllegalArgumentException();
+            }
             synchronized (hooksList) {
                 if (hooksList.contains((Object) hook)) {
                     throw new IllegalArgumentException();
                 }
             }
-            synchronized (Synchro.class) {
-                if (VMState > 0) {
-                    throw new IllegalStateException();
-                }
+            if (VMState > 0) {
+                throw new IllegalStateException();
             }
             synchronized (hooksList) {
                 hooksList.addElement((Object) hook);
@@ -169,10 +170,8 @@ public class Runtime {
          */
 
         static boolean removeShutdownHook(Thread hook) throws IllegalStateException {
-            synchronized (Synchro.class) {
-                if (VMState > 0) {
-                    throw new IllegalStateException();
-                }
+            if (VMState > 0) {
+                throw new IllegalStateException();
             }
             synchronized (hooksList) {
                 return hooksList == null ? false : hooksList.removeElement((Object) hook);
@@ -296,16 +295,11 @@ public class Runtime {
             private final native void close0(long handle) throws IOException;
 
             public final synchronized void close() throws IOException {
-                if (streamHandle == -1) return;
-
-                long handle = streamHandle;
-                streamHandle = -1;
-                close0(handle);
+                close0(streamHandle);
             }
 
             protected void finalize() throws Throwable {
-                if (streamHandle != -1)
-                    close0(this.streamHandle);
+                close0(streamHandle);
             }
         }
 
@@ -412,15 +406,11 @@ public class Runtime {
             private final native void close0(long handle);
 
             public final synchronized void close() throws IOException {
-                if (streamHandle == -1) return;
-                long handle = streamHandle;
-                streamHandle = -1;
-                close0(handle);
+                close0(streamHandle);
             }
 
             protected void finalize() throws Throwable {
-                if (streamHandle != -1)
-                    close0(this.streamHandle);
+                close0(streamHandle);
             }
         }
 

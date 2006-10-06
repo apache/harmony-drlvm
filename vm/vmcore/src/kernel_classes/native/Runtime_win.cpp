@@ -37,9 +37,6 @@ static void Error (LPTSTR lpszMess, JNIEnv *env, jlongArray la)
 { 
    jlong *lp = (jlong*)env->GetLongArrayElements(la, 0);
    lp[0] = 0;
-   lp[1] = 0;
-   lp[2] = 0;
-   lp[3] = 0;
    env->ReleaseLongArrayElements(la, lp, 0);
 
    INFO(lpszMess);
@@ -94,8 +91,8 @@ void JNICALL Java_java_lang_Runtime_00024SubProcess_createProcess0 (
 {
     TRACE("Creating child process ...");
 
-    HANDLE hChildStdinRd, hChildStdinWr, hChildStdoutRd, hChildStdoutWr,
-           hChildStderrorRd, hChildStderrorWr;     
+    HANDLE hChildStdinRd, hChildStdinWr, hChildStdinWrDup, hChildStdoutRd, hChildStdoutWr, hChildStdoutRdDup, 
+           hChildStderrorRd, hChildStderrorWr, hChildStderrorRdDup; 
     PROCESS_INFORMATION piProcInfo; 
     STARTUPINFO siStartInfo;    
     SECURITY_ATTRIBUTES saAttr; 
@@ -107,8 +104,9 @@ void JNICALL Java_java_lang_Runtime_00024SubProcess_createProcess0 (
     }
 
     // Get the the command to call and its arguments:
-    int l = 1024;
-    char *strCmnd = (char*)malloc(1024);
+    int btl = 1024;
+    int l = btl;
+    char *strCmnd = (char*)malloc(btl);
     *strCmnd = '\0';
     jsize len = env->GetArrayLength(cmdarray);
     int cur_pos = 0;
@@ -117,15 +115,14 @@ void JNICALL Java_java_lang_Runtime_00024SubProcess_createProcess0 (
         jstring jo = (jstring)env->GetObjectArrayElement(cmdarray, (jsize) i);
         const char *strChain = env->GetStringUTFChars(jo, 0);
         bool need_esc = (*strChain != '\"' && strchr(strChain, ' ') != NULL);
-        cur_pos += strlen(strChain) + 1 + (need_esc ? 0 : 2);
+        cur_pos += strlen(strChain) + (i == 0 ? 0 : 1) + (need_esc ? 0 : 2);
         while (l <= cur_pos) {
-            char *strtmp = (char*)malloc(l + 1024);
+            char *strtmp = (char*)malloc(l + btl);
             memcpy(strtmp, strCmnd, l);
-            l += 1024;
+            l += btl;
             free((void *)strCmnd);
             strCmnd = strtmp;
         }
-
         if ( i != 0 ) {
             strcat(strCmnd, " ");
         }
@@ -141,8 +138,8 @@ void JNICALL Java_java_lang_Runtime_00024SubProcess_createProcess0 (
     char *strEnvp = NULL;
     // Get the array, each element of which has environment variable settings:
     if (envp != NULL) {
-        int l = 1024;
-        strEnvp = (char*)malloc(1024);
+        int l = btl;
+        strEnvp = (char*)malloc(btl);
         *strEnvp = '\0';
         len = env->GetArrayLength(envp);
         cur_pos = 0;
@@ -151,9 +148,9 @@ void JNICALL Java_java_lang_Runtime_00024SubProcess_createProcess0 (
             const char* strChain = env->GetStringUTFChars(jo, 0);
             size_t tmp = strlen(strChain) + 1;
             while ((unsigned)l <= (cur_pos + tmp)) {
-                char *strtmp = (char*)malloc(l + 1024);
+                char *strtmp = (char*)malloc(l + btl);
                 memcpy(strtmp, strEnvp, l);
-                l += 1024;
+                l += btl;
                 free(strEnvp);
                 strEnvp = strtmp;
             }
@@ -168,32 +165,71 @@ void JNICALL Java_java_lang_Runtime_00024SubProcess_createProcess0 (
     saAttr.nLength = sizeof(SECURITY_ATTRIBUTES); 
     saAttr.bInheritHandle = TRUE; 
     saAttr.lpSecurityDescriptor = NULL; 
-    
-    // Create a pipe for the child process's STDOUT. 
-    if (! CreatePipe(&hChildStdoutRd, &hChildStdoutWr, &saAttr, 0)) {
-        Error("Stdout pipe creation failed\n", env, la); 
-        return; 
-    }
-    
-    // Create anonymous pipe to be STDERROR for child process. 
-    if (! CreatePipe(&hChildStderrorRd, &hChildStderrorWr, &saAttr, 0)) {
-        CloseHandle(hChildStdoutRd);
-        CloseHandle(hChildStdoutWr);
-        Error("Stderror pipe creation failed\n", env, la); 
-        return; 
-    }
-    
-    // Create anonymous pipe to be STDIN for child process. 
-    if (! CreatePipe(&hChildStdinRd, &hChildStdinWr, &saAttr, 0)) {
-        CloseHandle(hChildStdoutRd);
-        CloseHandle(hChildStdoutWr);
-        CloseHandle(hChildStderrorRd);
-        CloseHandle(hChildStderrorWr);
-        Error("Stdin pipe creation failed\n", env, la); 
-        return; 
-    }
-        
-    // Now create the child process:    
+
+       // Preparation of the child process's STDOUT: 
+
+       // 1. Create a pipe for the child process's STDOUT. 
+       if (! CreatePipe(&hChildStdoutRd, &hChildStdoutWr, &saAttr, 0)) {
+               Error("Stdout pipe creation failed\n", env, la); 
+               return; 
+       }
+
+       // 2. Create noninheritable read handle and close the inheritable read handle. 
+       if( !DuplicateHandle(GetCurrentProcess(), hChildStdoutRd, GetCurrentProcess(), &hChildStdoutRdDup, 0, FALSE, DUPLICATE_SAME_ACCESS) ) {
+               CloseHandle(hChildStdoutRd);
+               CloseHandle(hChildStdoutWr);
+               Error("DuplicateHandle failed", env, la);
+               return; 
+       }
+       CloseHandle(hChildStdoutRd);
+
+       // Preparation of the child process's STDERROR: 
+
+       // 1. Create anonymous pipe to be STDERROR for child process. 
+       if (! CreatePipe(&hChildStderrorRd, &hChildStderrorWr, &saAttr, 0)) {
+               CloseHandle(hChildStdoutRdDup);
+               CloseHandle(hChildStdoutWr);
+               Error("Stderror pipe creation failed\n", env, la); 
+               return; 
+       }
+
+       // 2. Create a noninheritable duplicate of the read handle, and close the inheritable read handle. 
+       if( !DuplicateHandle(GetCurrentProcess(), hChildStderrorRd, GetCurrentProcess(), &hChildStderrorRdDup, 0, FALSE, DUPLICATE_SAME_ACCESS) ) {
+               CloseHandle(hChildStdoutRdDup);
+               CloseHandle(hChildStdoutWr);
+               CloseHandle(hChildStderrorRd);
+               CloseHandle(hChildStderrorWr);
+               Error("DuplicateHandle failed", env, la);
+               return; 
+       }
+       CloseHandle(hChildStderrorRd);
+
+       // Preparation of the child process's STDIN: 
+
+       // 1. Create anonymous pipe to be STDIN for child process. 
+       if (! CreatePipe(&hChildStdinRd, &hChildStdinWr, &saAttr, 0)) {
+               CloseHandle(hChildStdoutRdDup);
+               CloseHandle(hChildStdoutWr);
+               CloseHandle(hChildStderrorRdDup);
+               CloseHandle(hChildStderrorWr);
+               Error("Stdin pipe creation failed\n", env, la); 
+               return; 
+       }
+
+       // 2. Create a noninheritable duplicate of the write handle, and close the inheritable write handle. 
+       if ( !DuplicateHandle(GetCurrentProcess(), hChildStdinWr, GetCurrentProcess(), &hChildStdinWrDup, 0, FALSE, DUPLICATE_SAME_ACCESS)) {
+               CloseHandle(hChildStdoutRdDup);
+               CloseHandle(hChildStdoutWr);
+               CloseHandle(hChildStderrorRdDup);
+               CloseHandle(hChildStderrorWr);
+               CloseHandle(hChildStdinRd);
+               CloseHandle(hChildStdinWr);
+               Error("DuplicateHandle failed", env, la); 
+               return; 
+       }
+       CloseHandle(hChildStdinWr); 
+
+       // Now create the child process:    
     
     ZeroMemory(&siStartInfo, sizeof(STARTUPINFO));
     siStartInfo.cb = sizeof(STARTUPINFO); 
@@ -234,15 +270,15 @@ void JNICALL Java_java_lang_Runtime_00024SubProcess_createProcess0 (
     if (created) {
         CloseHandle(piProcInfo.hThread); 
         jlong *lp = (jlong*)env->GetLongArrayElements(la, 0);
-        lp[0] = (jlong) piProcInfo.hProcess; 
-        lp[1] = (jlong) hChildStdinWr; 
-        lp[2] = (jlong) hChildStdoutRd; 
-        lp[3] = (jlong) hChildStderrorRd;
+        lp[0] = (jlong) piProcInfo.hProcess;
+        lp[1] = (jlong) hChildStdinWrDup; 
+        lp[2] = (jlong) hChildStdoutRdDup; 
+        lp[3] = (jlong) hChildStderrorRdDup;
         env->ReleaseLongArrayElements(la, lp, 0);
     } else {
-        CloseHandle(hChildStdoutRd);
-        CloseHandle(hChildStderrorRd);
-        CloseHandle(hChildStdinWr);
+        CloseHandle(hChildStdoutRdDup);
+        CloseHandle(hChildStderrorRdDup);
+        CloseHandle(hChildStdinWrDup);
     }
 }
 
@@ -283,7 +319,7 @@ void JNICALL Java_java_lang_Runtime_00024SubProcess_destroy0 (JNIEnv *env, jobje
 
     TerminateProcess(
             (HANDLE) handle /* handle to the process */,
-            0 /* exit code for the process */ );
+            ERROR_PROCESS_ABORTED /* exit code for the process */ );
 }
 
 void JNICALL Java_java_lang_Runtime_00024SubProcess_close0 (JNIEnv *env, jobject obj, jint handle) {
@@ -366,7 +402,7 @@ void JNICALL Java_java_lang_Runtime_00024SubProcess_00024SubInputStream_close0 (
     JNIEnv *env, jobject obj, jlong inputHandle) 
 {
     DWORD res = CloseHandle((HANDLE)(POINTER_SIZE_INT)inputHandle);
-    if (res == 0) {
+    if (res == 0 && GetLastError() != ERROR_INVALID_HANDLE) {
         ThrowError(env);
     }
 }
@@ -424,5 +460,5 @@ void JNICALL Java_java_lang_Runtime_00024SubProcess_00024SubOutputStream_flush0 
 
 void JNICALL Java_java_lang_Runtime_00024SubProcess_00024SubOutputStream_close0 (JNIEnv *env, jobject obj, jlong outputHandle) {   
     DWORD res = CloseHandle((HANDLE)(POINTER_SIZE_INT)outputHandle /* handle to pipe */ );
-    if (res == 0) ThrowError(env);
+    if (res == 0 && GetLastError() != ERROR_INVALID_HANDLE) ThrowError(env);
 }

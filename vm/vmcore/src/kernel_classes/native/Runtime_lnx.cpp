@@ -44,6 +44,7 @@
 #include <sys/stat.h>
 #include <fcntl.h>
 #include <sys/wait.h>
+#include <sys/ioctl.h>
 #include <sys/poll.h>
 
 #include <errno.h>
@@ -55,9 +56,6 @@ static void Error (char *lpszMess, JNIEnv *env, jlongArray la)
    jboolean jb = true;
    jlong *lp = (jlong*)env->GetLongArrayElements(la, &jb);
    lp[0] = 0;
-   lp[1] = -1ll;
-   lp[2] = -1ll;
-   lp[3] = -1ll;
    env->ReleaseLongArrayElements(la, lp, 0);
    if (lpszMess != NULL) {
         INFO(lpszMess); 
@@ -300,36 +298,53 @@ jint JNICALL Java_java_lang_Runtime_00024SubProcess_00024SubInputStream_readInpu
 }
 
 jint JNICALL Java_java_lang_Runtime_00024SubProcess_00024SubInputStream_available0 (JNIEnv *env, jobject obj, jlong inputHandle) {
-    struct pollfd r[1];
     int res;
+    if (ioctl((int) inputHandle, FIONREAD, &res) == -1) {
+        if (errno == EINVAL) {
+            struct pollfd r[1];
 
-    r[0].fd = (int) inputHandle;
-    r[0].events = POLLRDNORM;
-    r[0].revents = 0;
+            r[0].fd = (int) inputHandle;
+            r[0].events = POLLRDNORM;
+            r[0].revents = 0;
 
-    do {
-        res = poll(r, 1, 0);
-    } while (res == -1 && errno == EINTR);
+            do {
+                res = poll(r, 1, 0);
+            } while (res == -1 && errno == EINTR);
 
-    if (res == 1) {
-        if(r[0].revents & r[0].events) {
-            return 1; // Can we define the number certainly? Idea: can buffer be attached to pipe for preliminary reading or else one?
+            if (res == 1) {
+                if(r[0].revents & r[0].events) {
+                    return 1; // So, in that case we can define one byte is available at least
+                } else if(r[0].revents & (POLLERR | POLLNVAL)) {
+                    char mess[100];
+                    mess[0] = '\0';
+                    sprintf(mess, "%s", (r[0].revents & POLLERR ? "Some error condition has raised." : "Invalid request: handle closed."));
+                    jclass jc = env->FindClass((const char *)"java/io/IOException");
+                    env->ThrowNew(jc, (const char *) mess);
+                }
+                return 0;
+            } else if (res < 0) {
+                char mess[100];
+                mess[0] = '\0';
+                sprintf(mess, "It's impossible to identify if there are available bytes in the input stream! ERRNO=%d. %s", errno, strerror(errno));
+                jclass jc = env->FindClass((const char *)"java/io/IOException");
+                env->ThrowNew(jc, (const char *) mess);
+            }
+            return 0;
+        } else {
+            char mess[100];
+            mess[0] = '\0';
+            sprintf(mess, "%s", "Some error condition has raised.");
+            jclass jc = env->FindClass((const char *)"java/io/IOException");
+            env->ThrowNew(jc, (const char *) mess);
         }
-        return 0;
-    } else if (res < 0) {
-        char mess[100];
-        mess[0] = '\0';
-        sprintf(mess, "It's impossible to identify if there are available bytes in the input stream! ERRNO=%d. %s", errno, strerror(errno));
-        jclass jc = env->FindClass((const char *)"java/io/IOException");
-        env->ThrowNew(jc, (const char *) mess);
     }
-    return 0;
+    return res;
 }
 
 void JNICALL Java_java_lang_Runtime_00024SubProcess_00024SubInputStream_close0 (JNIEnv *env, jobject obj, jlong inputHandle) {
     int res = close((int) inputHandle);
 
-    if (res == -1) {
+    if (res == -1 && errno != EBADF) {
         ThrowError(env);
     }
 }
@@ -383,7 +398,7 @@ void JNICALL Java_java_lang_Runtime_00024SubProcess_00024SubOutputStream_flush0 
 void JNICALL Java_java_lang_Runtime_00024SubProcess_00024SubOutputStream_close0 (JNIEnv *env, jobject obj, jlong outputHandle) {
     int res = close((int) outputHandle);
 
-    if (res == -1) {
+    if (res == -1 && errno != EBADF) {
         ThrowError(env);
     }
 }
