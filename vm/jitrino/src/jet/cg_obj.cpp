@@ -39,8 +39,9 @@ namespace Jet {
 void CodeGen::gen_new_array(Allocation_Handle ah)
 {
     const JInst& jinst = *m_curr_inst;
-    assert(jinst.opcode == OPCODE_NEWARRAY || 
-           jinst.opcode == OPCODE_ANEWARRAY);
+    assert(jinst.opcode == OPCODE_NEWARRAY 
+        ||  jinst.opcode == OPCODE_ANEWARRAY 
+        || jinst.opcode == OPCODE_INVOKESTATIC); //OPCODE_INVOKESTATIC is used to generate magic
 
     if (ah == 0) {
         // it's unexpected that that something failed for a primitive type

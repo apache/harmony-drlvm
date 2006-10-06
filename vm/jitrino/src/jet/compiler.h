@@ -350,6 +350,12 @@ private:
      */
     void gen_ret(unsigned idx);
     
+    /**
+     * @brief Checks current inst and generates magic if needed
+     * @return  - true if current inst is magic call, false otherwise.
+     */
+    bool gen_magic(void);
+    
     //
     // Method being compiled info
     //

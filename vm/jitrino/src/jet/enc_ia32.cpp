@@ -247,13 +247,22 @@ AR virt(RegName reg)
 
 ConditionMnemonic devirt(COND cond)
 {
-    if (cond==ge) return ConditionMnemonic_GE;
-    if (cond==le) return ConditionMnemonic_LE;
-    if (cond==gt) return ConditionMnemonic_G;
-    if (cond==lt) return ConditionMnemonic_L;
-    if (cond==eq) return ConditionMnemonic_Z;
-    if (cond==ne) return ConditionMnemonic_NZ;
-    if (cond==above) return ConditionMnemonic_A;
+    switch (cond) {
+        case ge: return ConditionMnemonic_GE;
+        case le: return ConditionMnemonic_LE;
+        case gt: return ConditionMnemonic_G;
+        case lt: return ConditionMnemonic_L;
+
+        case eq: return ConditionMnemonic_Z;
+        case ne: return ConditionMnemonic_NZ;
+
+        case be   : return ConditionMnemonic_BE;
+        case ae   : return ConditionMnemonic_AE;
+        case above: return ConditionMnemonic_A;
+        case below: return ConditionMnemonic_B;
+
+        default: break;
+    }
     assert(false);
     return ConditionMnemonic_Count;
 }
@@ -631,6 +640,14 @@ void Encoder::mov_impl(const Opnd& _op0, const Opnd& _op1)
     emu_unfix_opnds(this, op0, op1, _op0, _op1);
 }
 
+void Encoder::not_impl(const Opnd& op0)
+{
+    Mnemonic mn = Mnemonic_NOT;
+    EncoderBase::Operands args;
+    add_arg(args, op0, false);
+    ip(EncoderBase::encode(ip(), mn, args));
+}
+
 void Encoder::alu_impl(ALU alu, const Opnd& op0, const Opnd& op1)
 {
     Mnemonic mn = to_mn(op0.jt(), alu);
@@ -639,6 +656,54 @@ void Encoder::alu_impl(ALU alu, const Opnd& op0, const Opnd& op1)
     // For alu_test can not shrink imm32 to imm8.
     add_arg(args, Opnd(op1), alu != alu_test);
     ip(EncoderBase::encode(ip(), mn, args));
+}
+
+void Encoder::cmovcc_impl(COND c, const Opnd& op0, const Opnd& op1) 
+{
+    ConditionMnemonic cm = devirt(c);
+    Mnemonic mn = (Mnemonic)(Mnemonic_CMOVcc + cm);
+    EncoderBase::Operands args;
+    add_args(args, op0);
+    add_args(args, op1);
+    ip(EncoderBase::encode(ip(), mn, args));
+}
+
+//TODO: reuse the same func for all XCHG ops in this file
+static void xchg_regs(Encoder * enc, RegName reg1, RegName reg2) {
+    EncoderBase::Operands xargs;
+    xargs.add(reg1);
+    xargs.add(reg2);
+    enc->ip(EncoderBase::encode(enc->ip(), Mnemonic_XCHG, xargs));
+}
+
+void Encoder::cmpxchg_impl(bool lockPrefix, AR addrReg, AR newReg, AR oldReg) {
+    RegName dNewReg = devirt(newReg);
+    RegName dOldReg = devirt(oldReg);
+    RegName dAddrReg = devirt(addrReg);
+    bool eaxFix = dOldReg != RegName_EAX;
+    if (eaxFix) {
+        if (dAddrReg == RegName_EAX) {
+            dAddrReg = dOldReg;
+        } else if (dNewReg == RegName_EAX) {
+            dNewReg = dOldReg;
+        }
+        xchg_regs(this, dOldReg, RegName_EAX);
+    }
+
+    if (lockPrefix) {
+        ip(EncoderBase::prefix(ip(), InstPrefix_LOCK));
+    }
+
+    EncoderBase::Operands args;
+    args.add(EncoderBase::Operand(OpndSize_32, dAddrReg, 0)); //TODO: EM64t fix!
+    args.add(dNewReg);
+    args.add(RegName_EAX);
+    ip(EncoderBase::encode(ip(), Mnemonic_CMPXCHG, args));
+
+    if (eaxFix) {
+        xchg_regs(this, RegName_EAX, devirt(oldReg));
+    }
+
 }
 
 void Encoder::lea_impl(const Opnd& reg, const Opnd& mem)

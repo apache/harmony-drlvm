@@ -124,11 +124,11 @@ void CodeGen::gen_arr_load(jtype jt)
     }
 }
 
-void CodeGen::gen_arr_store(jtype jt)
+void CodeGen::gen_arr_store(jtype jt, bool helperOk)
 {
     vunref(jt);
     // stack: [.., aref, idx, val]
-    if (jt == jobj) {
+    if (jt == jobj && helperOk) {
         static const CallSig cs_aastore(CCONV_HELPERS, jobj, i32, jobj);
         unsigned stackFix = gen_stack_to_args(true, cs_aastore, 0);
 #ifdef _EM64T_

@@ -375,7 +375,7 @@ public:
      *
      * Also invokes gen_check_bounds() and gen_check_null().
      */
-    void gen_arr_store(jtype jt);
+    void gen_arr_store(jtype jt, bool helperOk = true);
     /**
      * @brief Generates code to check bounds for array access.
      * @param aref_depth - depth (in the operand stack) of the array's object

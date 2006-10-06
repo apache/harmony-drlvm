@@ -314,7 +314,10 @@ string Encoder::to_str(COND cond)
     if (cond==lt) return ":lt";
     if (cond==eq) return ":eq";
     if (cond==ne) return ":ne";
+    if (cond==ae) return ":ae";
+    if (cond==be) return ":be";
     if (cond==above) return ":above";
+    if (cond==below) return ":below";
     assert(false);
     return "???";
 }

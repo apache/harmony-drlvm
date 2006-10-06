@@ -455,7 +455,7 @@ enum COND {
     // signed
     ge, le, gt, lt, eq, z=eq, ne, nz=ne, 
     /// unsigned
-    above,
+    ae, be, above, below,
     // 
     cond_none
 };
@@ -476,7 +476,7 @@ enum HINT {
  */
 unsigned gen_num_calle_save(void);
 /**
- * @brief Returns i-th float-point register for regiter-based calling 
+ * @brief Returns i-th float-point register for register-based calling 
  *        conventions.
  *
  * The presumption used: the set of registers is constant across a platform
@@ -487,7 +487,7 @@ unsigned gen_num_calle_save(void);
  */
 AR get_cconv_fr(unsigned i);
 /**
- * @brief Returns i-th general-purpose register for regiter-based calling 
+ * @brief Returns i-th general-purpose register for register-based calling 
  *        conventions.
  * @see get_cconv_fr
  */
@@ -502,7 +502,7 @@ enum OpndKind { opnd_imm, opnd_mem, opnd_reg };
  * @brief Represents an operand the Encoder works with.
  *
  * The Opnd can represent either immediate integer constant, or a register
- * operand, or a memory operand with compex address form [base+index*scale+
+ * operand, or a memory operand with complex address form [base+index*scale+
  * displacement].
  * 
  * Once created, instances of Opnd class are immutable. E.g. to change the 
@@ -531,7 +531,7 @@ public:
      * @brief Constructs immediate operand of the given type and 
      *        initializes immediate field with the given value.
      * 
-     * The width of any_val is wide enough to fit any neccessary value - 
+     * The width of any_val is wide enough to fit any necessary value - 
      * a pointer, #dbl64 or #i64.
      */
     Opnd(jtype jt, jlong any_val)
@@ -998,6 +998,38 @@ public:
     }
     
     /**
+    * Performs bitwise NOT operation.
+    */
+    void bitwise_not(const Opnd& op0) {
+        if (is_trace_on()) {
+            trace(string("not"), to_str(op0), to_str(""));
+        }
+        not_impl(op0);
+    }
+
+    /**
+    * Generates CMOVxx operation.
+    */
+    void cmovcc(COND cond, const Opnd& op0, const Opnd& op1)
+    {
+        if (is_trace_on()) {
+            trace(string("cmov:")+ to_str(cond), to_str(op0), to_str(op1));
+        }
+        cmovcc_impl(cond, op0, op1);
+    }
+
+    /**
+    * Generates CMPXCHG operation.
+    */
+    void cmpxchg(bool lockPrefix, AR addrBaseReg, AR newReg, AR oldReg)
+    {
+        if (is_trace_on()) {
+            trace(string("cmpxchg:")+ (lockPrefix ? "(locked) ":"") + to_str(addrBaseReg), to_str(newReg), to_str(oldReg));
+        }
+        cmpxchg_impl(lockPrefix, addrBaseReg, newReg, oldReg);
+    }
+
+    /**
      * Generates ALU operation between two registers.
      *
      * The registers are used as \c jt type.
@@ -1418,8 +1450,14 @@ private:
     
     /// Implementation of mov().
     void mov_impl(const Opnd& op0, const Opnd& op1);
+    /// Implementation of not().
+    void not_impl(const Opnd& op0);
     /// Implementation of alu().
     void alu_impl(ALU op, const Opnd& op0, const Opnd& op1);
+    /// Implementation of cmovcc().
+    void cmovcc_impl(COND c, const Opnd& op0, const Opnd& op1);
+    /// Implementation of cmpxchg().
+    void cmpxchg_impl(bool lockPrefix, AR addrReg, AR newReg, AR oldReg);
     /// Implementation of lea().
     void lea_impl(const Opnd& reg, const Opnd& mem);
     /// Implementation of movp().

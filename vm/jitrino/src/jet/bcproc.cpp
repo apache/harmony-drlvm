@@ -46,37 +46,43 @@ void Compiler::handle_inst(void)
         gen_dbg_check_stack(true);
     }
 
-    const InstrDesc& idesc = instrs[jinst.opcode];
-    switch (idesc.ik) {
-    case ik_a:
-        handle_ik_a(jinst);
-        break;
-    case ik_cf:
-        handle_ik_cf(jinst);
-        break;
-    case ik_cnv:
-        handle_ik_cnv(jinst);
-        break;
-    case ik_ls:
-        handle_ik_ls(jinst);
-        break;
-    case ik_meth:
-        handle_ik_meth(jinst);
-        break;
-    case ik_obj:
-        handle_ik_obj(jinst);
-        break;
-    case ik_stack:
-        handle_ik_stack(jinst);
-        break;
-    case ik_throw:
-        gen_athrow();
-        break;
-    default:
-        assert(jinst.opcode == OPCODE_NOP);
-        break;
-    };
-    
+    // First test if this is a magic. If not, then proceed with regular
+    // code gen.
+    if (!gen_magic()) {
+        const InstrDesc& idesc = instrs[jinst.opcode];
+        switch (idesc.ik) {
+            case ik_a:
+                handle_ik_a(jinst);
+                break;
+            case ik_cf:
+                handle_ik_cf(jinst);
+                break;
+            case ik_cnv:
+                handle_ik_cnv(jinst);
+                break;
+            case ik_ls:
+                handle_ik_ls(jinst);
+                break;
+            case ik_meth:
+                handle_ik_meth(jinst);
+                break;
+            case ik_obj:
+                handle_ik_obj(jinst);
+                break;
+            case ik_stack:
+                handle_ik_stack(jinst);
+                break;
+            case ik_throw:
+                gen_athrow();
+                break;
+            default:
+                assert(jinst.opcode == OPCODE_NOP);
+                break;
+        } // ~switch(opcodegroup)
+    } else {  // if (!gen_magic()) {
+        // no op. Just check stack (if applicable) and do mem manipulations
+    }
+
     if (is_set(DBG_CHECK_STACK)) {
         gen_dbg_check_stack(false);
     }
