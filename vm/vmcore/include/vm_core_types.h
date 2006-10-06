@@ -71,6 +71,7 @@ struct Registers {
 
     void reset_ip() { ip = 0; }
     void* get_ip() { return (void*)ip; }
+    void set_ip(void* src_ip) { ip = (uint64)src_ip; }
 }; //Registers
 
 #else  // !_IPF_
@@ -100,6 +101,7 @@ struct Registers {
 
     void reset_ip() { rip = 0; }
     void* get_ip() { return (void*)rip; }
+    void set_ip(void* src_ip) { rip = (uint64)src_ip; }
 }; //Registers
 
 #else // ! _EM64T_
@@ -118,6 +120,7 @@ struct Registers {
 
     void reset_ip() { eip = 0; }
     void* get_ip() { return (void*)eip; }
+    void set_ip(void* src_ip) { eip = (uint32)src_ip; }
 }; //Registers
 
 #endif // _EM64T_

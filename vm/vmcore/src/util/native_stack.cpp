@@ -26,6 +26,8 @@
 #include "interpreter.h"
 #include "interpreter_exports.h"
 #include "compile.h"
+#include "jvmti_break_intf.h"
+#include "environment.h"
 #include "native_modules.h"
 #include "native_stack.h"
 
@@ -88,6 +90,12 @@ bool native_is_ip_stub(void* ip)
 
     return false;
 }
+
+static bool native_is_ip_in_breakpoint_handler(void* ip)
+{
+    return (ip >= &process_native_breakpoint_event &&
+            ip < &jvmti_jit_breakpoint_handler);
+}
 /// Helper functions
 //////////////////////////////////////////////////////////////////////////////
 
@@ -143,14 +151,19 @@ static int walk_native_stack_jit(Registers* pregs, VM_thread* pthread,
 
     si = si_create_from_native(pthread);
 
-    if (is_java)
+    if (is_java ||
+        // Frame was pushed already by breakpoint handler
+        (si_is_native(si) && si_get_m2n(si) && m2n_is_suspended_frame(si_get_m2n(si))))
+    {
         si_goto_previous(si);
+    }
 
     jint inline_index = -1;
     jint inline_count;
     CodeChunkInfo* cci = NULL;
     bool is_stub = false;
     int special_count = 0;
+    bool flag_breakpoint = false;
 
     while (1)
     {
@@ -197,7 +210,7 @@ static int walk_native_stack_jit(Registers* pregs, VM_thread* pthread,
             else
             {
                 inline_index = -1;
-                // Ge to previous stack frame from StackIterator
+                // Go to previous stack frame from StackIterator
                 si_goto_previous(si);
                 native_get_ip_bp_from_si_jit_context(si, &ip, &bp);//???
                 native_get_sp_from_si_jit_context(si, &sp);
@@ -238,7 +251,25 @@ static int walk_native_stack_jit(Registers* pregs, VM_thread* pthread,
 
             if (native_is_frame_valid(modules, bp, sp))
             { // Simply bp-based frame, let's unwind it
-                native_unwind_bp_based_frame(bp, &ip, &bp, &sp);
+                void *tmp_ip, *tmp_bp, *tmp_sp;
+                native_unwind_bp_based_frame(bp, &tmp_ip, &tmp_bp, &tmp_sp);
+
+                VMBreakPoints* vm_breaks = VM_Global_State::loader_env->TI->vm_brpt;
+                vm_breaks->lock();
+
+                if (native_is_ip_in_breakpoint_handler(tmp_ip))
+                {
+                    native_unwind_interrupted_frame(pthread, &ip, &bp, &sp);
+                    flag_breakpoint = true;
+                }
+                else
+                {
+                    ip = tmp_ip;
+                    bp = tmp_bp;
+                    sp = tmp_sp;
+                }
+
+                vm_breaks->unlock();
             }
             else
             { // Is not bp-based frame
@@ -266,9 +297,10 @@ static int walk_native_stack_jit(Registers* pregs, VM_thread* pthread,
         code_type = vm_identify_eip(ip);
         is_java = (code_type == VM_TYPE_JAVA);
 
-        // If we've reached Java without native stub
-        if (is_java && !is_stub)
+        // If we've reached Java without native stub (or breakpoint handler frame)
+        if (is_java && !is_stub && !flag_breakpoint)
             break; // then stop processing
+        flag_breakpoint = false;
 // ^^ Native ^^
 /////////////////////////
     }
@@ -279,6 +311,8 @@ static int walk_native_stack_jit(Registers* pregs, VM_thread* pthread,
         m2n_set_last_frame(pthread, m2n_get_previous_frame(plm2n));
         STD_FREE(plm2n);
     }
+
+    si_free(si);
 
     return frame_count;
 }

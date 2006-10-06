@@ -56,7 +56,7 @@ void native_get_sp_from_si_jit_context(StackIterator* si, void** sp)
 bool native_is_out_of_stack(void* value)
 {
     // FIXME: Invalid criterion
-    return (value < (void*)0x10000) || (value > (void*)0x80000000);
+    return (value < (void*)0x10000) || (value > (void*)0xC0000000);
 }
 
 bool native_is_frame_valid(native_module_t* modules, void* bp, void* sp)
@@ -181,4 +181,12 @@ bool native_unwind_special(native_module_t* modules,
         *bp = *sp;
 
     return true;
+}
+
+void native_unwind_interrupted_frame(VM_thread* pthread, void** p_ip, void** p_bp, void** p_sp)
+{
+    Registers* pregs = &pthread->jvmti_saved_exception_registers;
+    *p_ip = (void*)pregs->eip;
+    *p_bp = (void*)pregs->ebp;
+    *p_sp = (void*)pregs->esp;
 }

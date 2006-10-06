@@ -584,17 +584,12 @@ VMBreakPoints::process_native_breakpoint()
     // When we get here we know already that breakpoint occurred in JITted code,
     // JVMTI handles it, and registers context is saved for us in TLS
     VM_thread *vm_thread = p_TLS_vmthread;
+    lock();
     Registers regs = vm_thread->jvmti_saved_exception_registers;
-
-#if _IA32_ && PLATFORM_POSIX && INSTRUMENTATION_BYTE == INSTRUMENTATION_BYTE_INT3
-    // Int3 exception address points to the instruction after it
-    regs.eip -= 1;
-#endif //_IA32_ && PLATFORM_POSIX && INSTRUMENTATION_BYTE == INSTRUMENTATION_BYTE_INT3
     NativeCodePtr addr = (NativeCodePtr)regs.get_ip();
 
     TRACE2("jvmti.break", "Native breakpoint occured: " << addr);
 
-    lock();
     VMBreakPoint* bp = find_breakpoint(addr);
     if (NULL == bp) {
         // breakpoint could be deleted by another thread
@@ -1302,7 +1297,7 @@ static bool clear_native_breakpoint(VMBreakPoint* bp)
 // Native breakpoints
 //////////////////////////////////////////////////////////////////////////////
 
-static void process_native_breakpoint_event()
+void process_native_breakpoint_event()
 {
     DebugUtilsTI *ti = VM_Global_State::loader_env->TI;
     ti->vm_brpt->process_native_breakpoint();
@@ -1327,13 +1322,12 @@ bool jvmti_jit_breakpoint_handler(Registers *regs)
     // Now it is necessary to set up a transition to
     // process_native_breakpoint_event from the exception/signal handler
     VM_thread *vm_thread = p_TLS_vmthread;
+    // Store possibly corrected location
+    regs->set_ip((void*)native_location);
     // Copy original registers to TLS
     vm_thread->jvmti_saved_exception_registers = *regs;
-#ifndef _EM64T_
-    regs->eip = (POINTER_SIZE_INT)process_native_breakpoint_event;
-#else
-    regs->rip = (POINTER_SIZE_INT)process_native_breakpoint_event;
-#endif
+    // Set return address for exception handler
+    regs->set_ip((void*)process_native_breakpoint_event);
     return true;
 }
 

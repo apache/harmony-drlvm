@@ -25,6 +25,7 @@
 #include "jni.h"
 #include "stack_iterator.h"
 #include "native_modules.h"
+#include "vm_threads.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -53,6 +54,7 @@ bool native_is_frame_valid(native_module_t* modules, void* bp, void* sp);
 int native_test_unwind_special(native_module_t* modules, void* sp);
 bool native_unwind_special(native_module_t* modules,
                 void* stack, void** ip, void** sp, void** bp, bool is_last);
+void native_unwind_interrupted_frame(VM_thread* pthread, void** p_ip, void** p_bp, void** p_sp);
 bool native_is_ip_in_modules(native_module_t* modules, void* ip);
 bool native_is_ip_stub(void* ip);
 

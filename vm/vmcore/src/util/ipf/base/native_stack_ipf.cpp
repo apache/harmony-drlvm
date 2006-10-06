@@ -59,3 +59,10 @@ bool native_unwind_special(native_module_t* modules,
 {
     return false; // Not implemented
 }
+
+void native_unwind_interrupted_frame(VM_thread* pthread, void** p_ip, void** p_bp, void** p_sp)
+{ // Not implemented yet
+    *p_ip = NULL;
+    *p_bp = NULL;
+    *p_sp = NULL;
+}
