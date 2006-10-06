@@ -151,7 +151,7 @@ int test_hythread_thin_monitor_enter_contended(void){
     hythread_suspend_enable();
     hythread_join(thread);
     
-    tf_assert_same((int)args[1], 1);
+    tf_assert_same((IDATA)args[1], 1);
     hythread_suspend_disable();
     status = hythread_thin_monitor_enter(&lockword_ptr);
     tf_assert_same(status, TM_ERROR_NONE);
@@ -177,7 +177,7 @@ int test_hythread_thin_monitor_enter_contended(void){
 
 int start_proc(void *args) {
     hythread_thin_monitor_t *lockword_ptr = (hythread_thin_monitor_t*)((void**)args)[0];
-    int *ret =  (int*)args+1;
+    IDATA *ret =  (IDATA*)args+1;
     IDATA status;
     hythread_suspend_disable();    
     status = hythread_thin_monitor_enter(lockword_ptr);

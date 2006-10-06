@@ -48,7 +48,7 @@ EXE_EXTENSION_CHAR: the executable has a delimiter that we want to stop at as pa
 #define HY_PLATFORM_DOUBLE_ORDER
 #if defined(LINUX)
 /* NOTE: Linux supports different processors -- do not assume 386 */
-#if defined(LINUXPPC64)
+#if defined(LINUXPPC64) || defined(POINTER64)
 #define DATA_TYPES_DEFINED
 typedef unsigned long int UDATA;        /* 64bits */
 typedef unsigned long int U_64;
@@ -61,7 +61,7 @@ typedef signed int I_32;
 typedef signed short I_16;
 typedef signed char I_8;
 //typedef U_32 BOOLEAN;
-#if defined(LINUXPPC64)
+#if defined(LINUXPPC64) || defined(POINTER64)
 #define TOC_UNWRAP_ADDRESS(wrappedPointer) ((void *) (wrappedPointer)[0])
 #define TOC_STORE_TOC(dest,wrappedPointer) (dest = ((UDATA*)wrappedPointer)[1])
 #endif

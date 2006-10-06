@@ -61,7 +61,7 @@ void vm_jthread_set_tm_data(jthread jt, void* nt) {
 IDATA jthread_throw_exception(char* name, char* message) {
     return 0;
 }
-VMEXPORT int jthread_throw_exception_object(jobject object) {
+VMEXPORT IDATA jthread_throw_exception_object(jobject object) {
     return 0;
 }
 
@@ -90,10 +90,10 @@ int ti_is_enabled(){
 }
 //--------------------------------------------------------------------------------
 
-int vm_attach() {
+IDATA vm_attach() {
     return 0;
 }
-int vm_detach() {
+IDATA vm_detach() {
     return 0;
 }
 void jvmti_send_thread_start_end_event(int is_start) {

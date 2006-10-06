@@ -111,14 +111,14 @@ int test_hythread_thread_suspend_all(void){
     
     hythread_join(thread);
     
-    tf_assert_same((int)args[1], 1);
+    tf_assert_same((IDATA)args[1], 1);
 
     return 0;
 }
 
 int start_proc(void *args) {
     hythread_thin_monitor_t *lockword_ptr = (hythread_thin_monitor_t*)((void**)args)[0];
-    int *ret =  (int*)args+1;
+    IDATA *ret =  (IDATA*)args+1;
     IDATA status;
         
     //wait to start

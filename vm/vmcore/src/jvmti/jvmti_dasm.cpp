@@ -68,9 +68,9 @@ static void convertOperand2Opnd(
 }
 
 #ifdef _IPF_
-static const char* get_reg_value(
+const char* InstructionDisassembler::get_reg_value(
     InstructionDisassembler::Register reg,
-    const Registers* pcontext)
+    const Registers* pcontext) const
 {
     assert(0);
     return NULL;
@@ -78,9 +78,9 @@ static const char* get_reg_value(
 
 #elif defined _EM64T_
 
-static const char* get_reg_value(
+const char* InstructionDisassembler::get_reg_value(
     InstructionDisassembler::Register reg,
-    const Registers* pcontext)
+    const Registers* pcontext) const
 {
     assert(0);
     return NULL;

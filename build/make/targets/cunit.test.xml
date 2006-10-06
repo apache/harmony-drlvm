@@ -49,6 +49,11 @@ Version: $Revision$
                 <compilerarg value="-g" />
                 <compilerarg value="-O0" />
             </select>
+	    <select arch="em64t">
+		<defineset define="_EM64T_" />
+		<defineset define="POINTER64" />
+		<defineset define="LAZY_LOCK" />
+	    </select>
         </compiler>
         <!-- Compiling framework -->
         <echo message="## Compiling framework..." />

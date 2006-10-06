@@ -23,6 +23,7 @@
 #define OPEN_THREAD_EXTERNALS_H
 
 #include "open/types.h"
+#include "open/hycomp.h"
 #include <jni.h>
 #include "jvmti_types.h"
 #ifdef __cplusplus
@@ -73,11 +74,11 @@ VMEXPORT void *vm_jthread_get_tm_data(jthread thread);
 /** 
   * registtrate thread in VM, so it could execute Java
   */
-VMEXPORT int vm_attach();
+VMEXPORT IDATA vm_attach();
 /**
   * free java related resources before thread exit
   */
-VMEXPORT int vm_detach();
+VMEXPORT IDATA vm_detach();
 
 /**
  * creates exception object using given class name and message and throws it
@@ -86,13 +87,13 @@ VMEXPORT int vm_detach();
  * @param[in] message char* -message
  * @return int.
  */
-VMEXPORT int jthread_throw_exception(char* name, char* message);
+VMEXPORT IDATA jthread_throw_exception(char* name, char* message);
 
 /**
  * Throws given exception object; Desides whether current thread is unwindable
  * and throws it, raises exception otherwise;
  */
-VMEXPORT int jthread_throw_exception_object(jobject object);
+VMEXPORT IDATA jthread_throw_exception_object(jobject object);
 
 // TI support interface
 VMEXPORT void jvmti_send_thread_start_end_event(int);
