@@ -91,6 +91,9 @@ NativeCodePtr static get_ip_for_invoke_call_ip(VM_thread* thread,
     NativeCodePtr call_ip = NULL;
     do
     {
+        if (disasm.get_type() == InstructionDisassembler::INDIRECT_CALL)
+            call_ip = ip;
+
         ip = (NativeCodePtr)((POINTER_SIZE_INT)ip + disasm.get_length_with_prefix());
 
         // Another thread could have instrumented this location for
@@ -105,9 +108,6 @@ NativeCodePtr static get_ip_for_invoke_call_ip(VM_thread* thread,
         }
         else
             disasm = ip;
-
-        if (disasm.get_type() == InstructionDisassembler::INDIRECT_CALL)
-            call_ip = ip;
     }
     while (ip < next_ip);
 

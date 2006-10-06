@@ -184,22 +184,7 @@ static void jvmti_jit_prepare_pop_frame(StackIterator* si, uint32* buf) {
     unlocked by VM, so JIT has to store information about these monitors
     somewhere.
     */
-    if (method->is_synchronized()) {
-        if (is_method_static) {
-            assert(!hythread_is_suspend_enabled());
-            TRACE2("tm.locks", ("unlock staic sync methods... "));
-            vm_monitor_exit(struct_Class_to_java_lang_Class(method->
-                    get_class()));
-            exn_clear();
-        } else {
-            JIT *jit = cci->get_jit();
-            void **p_this =
-                (void **) jit->get_address_of_this(method, jitContext);
-            TRACE2("tm.locks", ("unlock sync methods...%x" , *p_this));
-            vm_monitor_exit((ManagedObject *) * p_this);
-            exn_clear();
-        }
-    }
+    vm_monitor_exit_synchronized_method(si);
 
     // pop java frame
     si_goto_previous(si);

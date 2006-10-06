@@ -37,6 +37,9 @@ using namespace std;
 #include "vm_threads.h"
 #include "jit_runtime_support.h"
 #include "exceptions.h"
+#include "stack_iterator.h"
+#include "Class.h"
+#include "jit_intf_cpp.h"
 
 #include "mon_enter_exit.h"
 #include "thread_generic.h"
@@ -72,6 +75,35 @@ void vm_monitor_init()
     vm_monitor_try_enter = vm_monitor_try_enter_default;
     vm_monitor_exit = vm_monitor_exit_default;
     vm_monitor_try_exit = vm_monitor_try_exit_default;
+}
+
+void vm_monitor_exit_synchronized_method(StackIterator *si)
+{
+    assert(!si_is_native(si));
+    CodeChunkInfo *cci = si_get_code_chunk_info(si);
+    assert(cci);
+    Method *method = cci->get_method();
+
+    if (method->is_synchronized()) {
+        bool unwindable = set_unwindable(false);
+        if (method->is_static()) {
+            assert(!hythread_is_suspend_enabled());
+            TRACE2("tm.locks", ("unlock static sync methods...%x",
+                struct_Class_to_java_lang_Class(method->get_class())));
+            vm_monitor_exit(struct_Class_to_java_lang_Class(method->
+                    get_class()));
+        }
+        else {
+            JIT *jit = cci->get_jit();
+            void **p_this =
+                (void **) jit->get_address_of_this(method,
+                si_get_jit_context(si));
+            TRACE2("tm.locks", ("unlock sync methods...%x" , *p_this));
+            vm_monitor_exit((ManagedObject *) * p_this);
+        }
+        exn_clear();
+        set_unwindable(unwindable);
+    }
 }
 
 static void vm_monitor_enter_default(ManagedObject *p_obj)

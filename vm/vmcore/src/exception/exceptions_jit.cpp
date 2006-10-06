@@ -317,24 +317,7 @@ static void exn_propagate_exception(
         }
 
         // No appropriate handler found, undo synchronization
-        if (method->is_synchronized()) {
-            bool unwindable = set_unwindable(false);
-            if (method->is_static()) {
-                assert(!hythread_is_suspend_enabled());
-                TRACE2("tm.locks", ("unlock staic sync methods... %x",  exn_obj));
-                vm_monitor_exit(struct_Class_to_java_lang_Class(method->
-                        get_class()));
-            }
-            else {
-                void **p_this =
-                    (void **) jit->get_address_of_this(method,
-                    si_get_jit_context(si));
-                TRACE2("tm.locks", ("unlock sync methods...%x" , *p_this));
-                vm_monitor_exit((ManagedObject *) * p_this);
-            }
-            exn_clear();
-            set_unwindable(unwindable);
-        }
+        vm_monitor_exit_synchronized_method(si);
 
         BEGIN_RAISE_AREA;
         jvalue ret_val = {(jlong)0};

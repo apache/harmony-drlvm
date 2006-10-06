@@ -39,6 +39,11 @@ extern "C" {
 // and after arguments are parsed.  It should set function pointers
 // to the appropriate values.
 void vm_monitor_init();
+
+// monitor exit from synchronized method
+struct StackIterator;
+void vm_monitor_exit_synchronized_method(StackIterator *si);
+
 // Does a monitorexit operation.
 extern void (*vm_monitor_exit)(ManagedObject *p_obj);
 extern void (*vm_monitor_enter)(ManagedObject *p_obj);
