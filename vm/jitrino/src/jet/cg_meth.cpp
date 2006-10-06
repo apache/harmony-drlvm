@@ -84,7 +84,7 @@ void Compiler::gen_prolog(void) {
         gen_brk();
     }
 
-    if (m_infoBlock.get_bc_size() == 1 && m_bc[0] == OPCODE_RETURN) {
+    if (m_infoBlock.get_bc_size() == 1 && m_bc[0] == OPCODE_RETURN && !g_jvmtiMode) {
         // empty method, nothing to do; the same is in gen_return();
         return;
     }
@@ -540,7 +540,7 @@ void Compiler::gen_return(jtype retType)
         gen_dbg_rt(true, "exiting : %s", meth_fname());
     }
  
-    if (m_infoBlock.get_bc_size() == 1 && m_bc[0] == OPCODE_RETURN) {
+    if (m_infoBlock.get_bc_size() == 1 && m_bc[0] == OPCODE_RETURN && !g_jvmtiMode) {
         // empty method, nothing to do; the same is in gen_prolog();
         // TODO: need to check and make sure whether it's absolutely legal
         // to bypass monitors on such an empty method
