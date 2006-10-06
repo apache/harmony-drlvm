@@ -328,9 +328,9 @@ jvmti_relocate_single_step_breakpoints( StackIterator *si)
     if (ti->isEnabled() && ti->is_single_step_enabled())
     {
         VM_thread *vm_thread = p_TLS_vmthread;
+        LMAutoUnlock lock(ti->vm_brpt->get_lock());
         if (NULL != vm_thread->ss_state) {
             // remove old single step breakpoints
-            LMAutoUnlock lock(ti->vm_brpt->get_lock());
             jvmti_remove_single_step_breakpoints(ti, vm_thread);
 
             // set new single step breakpoints

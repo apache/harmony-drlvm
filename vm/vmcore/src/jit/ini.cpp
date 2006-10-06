@@ -44,10 +44,10 @@ vm_execute_java_method_array(jmethodID method, jvalue *result, jvalue *args) {
         ti->getPhase() == JVMTI_PHASE_LIVE)
     {
         VM_thread *vm_thread = p_TLS_vmthread;
+        LMAutoUnlock lock(ti->vm_brpt->get_lock());
         if (NULL != vm_thread->ss_state)
         {
             // Start single stepping a new Java method
-            LMAutoUnlock lock(ti->vm_brpt->get_lock());
             jvmti_remove_single_step_breakpoints(ti, vm_thread);
 
             jvmti_StepLocation method_start = {(Method *)method, 0};
@@ -64,10 +64,9 @@ vm_execute_java_method_array(jmethodID method, jvalue *result, jvalue *args) {
         ti->getPhase() == JVMTI_PHASE_LIVE)
     {
         VM_thread *vm_thread = p_TLS_vmthread;
+        LMAutoUnlock lock(ti->vm_brpt->get_lock());
         if (NULL != vm_thread->ss_state)
         {
-            LMAutoUnlock lock(ti->vm_brpt->get_lock());
-
             jvmti_StepLocation *method_return;
             unsigned locations_number;
 

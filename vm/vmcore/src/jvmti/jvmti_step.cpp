@@ -441,6 +441,10 @@ jvmti_setup_jit_single_step(DebugUtilsTI *ti, Method* m, jlocation location)
     jvmti_SingleStepLocation(vm_thread, m, (unsigned)location,
                             &locations, &locations_count);
 
+    // lock breakpoints
+    VMBreakPoints* vm_brpt = VM_Global_State::loader_env->TI->vm_brpt;
+    LMAutoUnlock lock(vm_brpt->get_lock());
+
     jvmti_remove_single_step_breakpoints(ti, vm_thread);
 
     jvmti_set_single_step_breakpoints(ti, vm_thread, locations, locations_count);
@@ -507,6 +511,11 @@ static void jvmti_start_single_step_in_virtual_method(DebugUtilsTI *ti, VMBreakP
     }
 
     TRACE2("jvmti.break.ss", "Removing VIRTUAL single step breakpoint: " << bp->addr);
+
+    // lock breakpoints
+    VMBreakPoints* vm_brpt = VM_Global_State::loader_env->TI->vm_brpt;
+    LMAutoUnlock lock(vm_brpt->get_lock());
+
     // The determined method is the one which is called by
     // invokevirtual or invokeinterface bytecodes. It should be
     // started to be single stepped from the beginning
@@ -532,10 +541,14 @@ static bool jvmti_process_jit_single_step_event(TIEnv* UNREF unused_env,
     if (!ti->isEnabled() || ti->getPhase() != JVMTI_PHASE_LIVE)
         return false;
 
+    ti->vm_brpt->lock();
     JVMTISingleStepState* sss = p_TLS_vmthread->ss_state;
 
-    if (!sss || !ti->is_single_step_enabled())
+    if (!sss || !ti->is_single_step_enabled()) {
+        ti->vm_brpt->unlock();
         return false;
+    }
+    ti->vm_brpt->unlock();
 
     jlocation location = bp->location;
     jmethodID method = bp->method;
@@ -629,8 +642,8 @@ static bool jvmti_process_jit_single_step_event(TIEnv* UNREF unused_env,
     if (ti->is_single_step_enabled())
         jvmti_setup_jit_single_step(ti, m, location);
 
-    tmn_suspend_disable();
     oh_discard_local_handle(hThread);
+    tmn_suspend_disable();
 
     return true;
 }
@@ -642,6 +655,10 @@ void jvmti_set_single_step_breakpoints(DebugUtilsTI *ti, VM_thread *vm_thread,
     ASSERT_NO_INTERPRETER;
 
     JVMTISingleStepState *ss_state = vm_thread->ss_state;
+    if( NULL == ss_state ) {
+        // no need predict next step due to single step is off
+        return;
+    }
 
     if (NULL == ss_state->predicted_breakpoints)
     {
@@ -691,8 +708,11 @@ void jvmti_remove_single_step_breakpoints(DebugUtilsTI *ti, VM_thread *vm_thread
 
     TRACE2("jvmti.break.ss", "Remove single step breakpoints");
 
-    if (ss_state && ss_state->predicted_breakpoints)
+    if (ss_state && ss_state->predicted_breakpoints) {
+        TRACE2("jvmti.break.ss", "Remove single step, intf: "
+            << ss_state->predicted_breakpoints);
         ss_state->predicted_breakpoints->remove_all_reference();
+    }
 }
 
 jvmtiError jvmti_get_next_bytecodes_from_native(VM_thread *thread,
@@ -857,15 +877,26 @@ jvmtiError DebugUtilsTI::jvmti_single_step_start(void)
 {
     assert(hythread_is_suspend_enabled());
 
-    VMBreakPoints* vm_brpt = VM_Global_State::loader_env->TI->vm_brpt;
-    LMAutoUnlock lock(vm_brpt->get_lock());
-
     hythread_iterator_t threads_iterator;
+
+    if( single_step_enabled ) {
+        // single step is already enabled
+        return JVMTI_ERROR_NONE;
+    }
 
     // Suspend all threads except current
     IDATA tm_ret = hythread_suspend_all(&threads_iterator, NULL);
     if (TM_ERROR_NONE != tm_ret)
         return JVMTI_ERROR_INTERNAL;
+
+    // get this lock for insurance - all threads are suspended
+    VMBreakPoints* vm_brpt = VM_Global_State::loader_env->TI->vm_brpt;
+    LMAutoUnlock lock(vm_brpt->get_lock());
+
+    if( single_step_enabled ) {
+        // single step is already enabled
+        return JVMTI_ERROR_NONE;
+    }
 
     hythread_t ht;
 
@@ -920,15 +951,25 @@ jvmtiError DebugUtilsTI::jvmti_single_step_stop(void)
 {
     assert(hythread_is_suspend_enabled());
 
-    VMBreakPoints* vm_brpt = VM_Global_State::loader_env->TI->vm_brpt;
-    LMAutoUnlock lock(vm_brpt->get_lock());
-
     hythread_iterator_t threads_iterator;
 
+    if( !single_step_enabled ) {
+        // single step is already disabled
+        return JVMTI_ERROR_NONE;
+    }
     // Suspend all threads except current
     IDATA tm_ret = hythread_suspend_all(&threads_iterator, NULL);
     if (TM_ERROR_NONE != tm_ret)
         return JVMTI_ERROR_INTERNAL;
+
+    // get this lock for insurance - all threads are suspended
+    VMBreakPoints* vm_brpt = VM_Global_State::loader_env->TI->vm_brpt;
+    LMAutoUnlock lock(vm_brpt->get_lock());
+
+    if( !single_step_enabled ) {
+        // single step is already disabled
+        return JVMTI_ERROR_NONE;
+    }
 
     hythread_t ht;
 
@@ -942,10 +983,12 @@ jvmtiError DebugUtilsTI::jvmti_single_step_stop(void)
             continue;
         }
 
-        jvmti_remove_single_step_breakpoints(this, vm_thread);
-        vm_brpt->release_intf(vm_thread->ss_state->predicted_breakpoints);
-        _deallocate((unsigned char *)vm_thread->ss_state);
-        vm_thread->ss_state = NULL;
+        if( vm_thread->ss_state ) {
+            jvmti_remove_single_step_breakpoints(this, vm_thread);
+            vm_brpt->release_intf(vm_thread->ss_state->predicted_breakpoints);
+            _deallocate((unsigned char *)vm_thread->ss_state);
+            vm_thread->ss_state = NULL;
+        }
     }
 
     single_step_enabled = false;

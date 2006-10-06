@@ -1677,6 +1677,7 @@ void jvmti_send_thread_start_end_event(int is_start)
         {
             // Init single step state for the thread
             VM_thread *vm_thread = p_TLS_vmthread;
+            LMAutoUnlock lock(ti->vm_brpt->get_lock());
 
             jvmtiError UNREF errorCode = _allocate(sizeof(JVMTISingleStepState),
                 (unsigned char **)&vm_thread->ss_state);

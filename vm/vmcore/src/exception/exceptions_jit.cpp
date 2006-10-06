@@ -222,9 +222,9 @@ static void exn_propagate_exception(
     if (ti->isEnabled() && ti->is_single_step_enabled())
     {
         VM_thread *vm_thread = p_TLS_vmthread;
+        LMAutoUnlock lock(ti->vm_brpt->get_lock());
         if (NULL != vm_thread->ss_state)
         {
-            LMAutoUnlock lock(ti->vm_brpt->get_lock());
             jvmti_remove_single_step_breakpoints(ti, vm_thread);
         }
     }
@@ -269,10 +269,9 @@ static void exn_propagate_exception(
                     ti->getPhase() == JVMTI_PHASE_LIVE)
                 {
                     VM_thread *vm_thread = p_TLS_vmthread;
+                    LMAutoUnlock lock(ti->vm_brpt->get_lock());
                     if (NULL != vm_thread->ss_state)
                     {
-                        LMAutoUnlock lock(ti->vm_brpt->get_lock());
-
                         uint16 bc;
                         NativeCodePtr ip = handler->get_handler_ip();
                         OpenExeJpdaError UNREF result =
