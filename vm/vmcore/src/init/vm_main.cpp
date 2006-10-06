@@ -63,6 +63,11 @@ union Scalar_Arg {
 #endif
 
 static StaticInitializer vm_initializer;
+
+/*
+ * The VM's global environment.  Extern declared in init.h
+ * @TODO - make this per-VM
+ */
 tl::MemoryPool m;
 Properties properties;
 Global_Env env(m, properties);
