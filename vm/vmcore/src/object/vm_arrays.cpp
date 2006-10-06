@@ -339,7 +339,6 @@ vm_multianewarray_recursive(Class    *c,
         assert(exn_raised());
         return 0;
     }
-    set_vector_length(array, dims_array[0]);
     if (max_depth == 0) return array;
 
     d = 1;
@@ -351,8 +350,6 @@ vm_multianewarray_recursive(Class    *c,
             // OutOfMemoryError occured
             return 0;
         }
-
-        set_vector_length(element, dims_array[d]);
 
         if (d != max_depth) {
             obj[d]->object = element;
