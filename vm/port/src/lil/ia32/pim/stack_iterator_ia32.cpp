@@ -316,7 +316,7 @@ void si_goto_previous(StackIterator* si, bool over_popped)
         if (!si->m2nfl) return;
         si_unwind_from_m2n(si, over_popped);
     }
-    si->cci = vm_methods->find(si_get_ip(si), true);
+    si->cci = vm_methods->find(si_get_ip(si), si_get_jit_context(si)->is_ip_past);
     if (si->cci) {
         TRACE2("si", ("si_goto_previous to ip = %p (%s%s)",
             (void*)si_get_ip(si),

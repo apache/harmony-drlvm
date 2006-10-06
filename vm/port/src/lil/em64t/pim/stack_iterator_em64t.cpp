@@ -257,7 +257,7 @@ void si_goto_previous(StackIterator * si, bool over_popped) {
         si->cci->get_jit()->unwind_stack_frame(si->cci->get_method(), si_get_jit_context(si));
         si->jit_frame_context.is_ip_past = TRUE;
     }
-    si->cci = vm_methods->find(si_get_ip(si), true);
+    si->cci = vm_methods->find(si_get_ip(si), si_get_jit_context(si)->is_ip_past);
 #ifndef NDEBUG
     if (si_is_native(si)) {
         TRACE2("si", "si_goto_previous to ip = " << (void*)si_get_ip(si)
