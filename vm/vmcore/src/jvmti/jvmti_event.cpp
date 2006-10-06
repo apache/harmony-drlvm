@@ -330,6 +330,9 @@ jvmtiSetEventNotificationMode(jvmtiEnv* env,
                     // Check that no environment has SingleStep enabled
                     LMAutoUnlock lock(&ti->TIenvs_lock);
                     bool disable = true;
+                    TRACE2("jvmti.break.ss",
+                        "SingleStep event is disabled locally for env: "
+                        << env);
 
                     for (TIEnv *ti_env = ti->getEnvironments(); ti_env;
                          ti_env = ti_env->next)
@@ -665,6 +668,7 @@ jvmti_process_method_exit_event_internal(jmethodID method,
                                          jboolean was_popped_by_exception,
                                          jvalue ret_val)
 {
+    // processing MethodExit event
     DebugUtilsTI *ti = VM_Global_State::loader_env->TI;
     tmn_suspend_enable();
     jvmtiEvent event_type = JVMTI_EVENT_METHOD_EXIT;
@@ -694,8 +698,13 @@ jvmti_process_method_exit_event_internal(jmethodID method,
         jthread thread = getCurrentThread();
         JNIEnv *jni_env = (JNIEnv *)jni_native_intf;
         jvmtiEnv *jvmti_env = (jvmtiEnv*) ti_env;
-        if (NULL != ti_env->event_table.MethodExit)
+        if (NULL != ti_env->event_table.MethodExit) {
+            TRACE2("jvmti.stack", "Calling MethodExit callback for method: "
+                << class_get_name(method_get_class((Method*)method))
+                << "." << method_get_name((Method*)method)
+                << method_get_descriptor((Method*)method));
             ti_env->event_table.MethodExit(jvmti_env, jni_env, thread, method, was_popped_by_exception, ret_val);
+        }
         ti_env = next_env;
     }
 
@@ -712,15 +721,30 @@ jvmti_process_method_exit_event_internal(jmethodID method,
         return;
     }
 
+    // processing PopFrame event
     VM_thread *curr_thread = p_TLS_vmthread;
     jint UNREF skip;
     jint depth = get_thread_stack_depth(curr_thread, &skip);
+
+#ifndef NDEBUG
+    if( curr_thread->frame_pop_listener ) {
+        TRACE2("jvmti.stack", "Prepare to PopFrame callback for thread: "
+            << curr_thread << ", method: " << class_get_name(method_get_class((Method*)method))
+            << "." << method_get_name((Method*)method)
+            << method_get_descriptor((Method*)method)
+            << ", depth: " << depth
+            << (was_popped_by_exception == JNI_TRUE ? " by exception" : ""));
+    }
+#endif // NDEBUG
 
     jvmti_frame_pop_listener *last = NULL;
     for( jvmti_frame_pop_listener *fpl = curr_thread->frame_pop_listener;
          fpl;
          last = fpl, (fpl = fpl ? fpl->next : curr_thread->frame_pop_listener) )
     {
+        TRACE2("jvmti.stack", "-> Look through listener: "
+            << fpl << ", env: " << fpl->env << ", depth: " << fpl->depth);
+
         if (fpl->depth == depth)
         {
             jvmti_frame_pop_listener *report = fpl;

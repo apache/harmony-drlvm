@@ -790,7 +790,8 @@ jvmtiNotifyFramePop(jvmtiEnv* env,
                     jthread thread,
                     jint depth)
 {
-    TRACE2("jvmti.stack", "NotifyFramePop called");
+    TRACE2("jvmti.stack", "NotifyFramePop called: thread: "
+        << thread << ", depth: " << depth);
     SuspendEnabledChecker sec;
     jint state;
     jthread curr_thread = getCurrentThread();

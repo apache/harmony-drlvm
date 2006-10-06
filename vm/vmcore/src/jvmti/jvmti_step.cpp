@@ -706,13 +706,11 @@ void jvmti_remove_single_step_breakpoints(DebugUtilsTI *ti, VM_thread *vm_thread
     // Function is always executed under global TI breakpoints lock
     JVMTISingleStepState *ss_state = vm_thread->ss_state;
 
-    TRACE2("jvmti.break.ss", "Remove single step breakpoints");
+    TRACE2("jvmti.break.ss", "Remove single step breakpoints, intf: "
+        << (ss_state ? ss_state->predicted_breakpoints : NULL) );
 
-    if (ss_state && ss_state->predicted_breakpoints) {
-        TRACE2("jvmti.break.ss", "Remove single step, intf: "
-            << ss_state->predicted_breakpoints);
+    if (ss_state && ss_state->predicted_breakpoints)
         ss_state->predicted_breakpoints->remove_all_reference();
-    }
 }
 
 jvmtiError jvmti_get_next_bytecodes_from_native(VM_thread *thread,
@@ -838,7 +836,11 @@ jvmtiError jvmti_get_next_bytecodes_from_native(VM_thread *thread,
                 // invoke. Need to shift to the next bytecode
                 if (NULL == call_ip)
                 {
-                    TRACE2("jvmti.break.ss", "SingleStep IP shifted in prediction to: " << call_ip);
+                    TRACE2("jvmti.break.ss", "SingleStep IP shifted in prediction to: "
+                        << class_get_name(method_get_class(func)) << "."
+                        << method_get_name(func)
+                        << method_get_descriptor(func)
+                        << " :" << next_location << " :" << ip2);
                     bc = next_location;
                     ip = ip2;
                 }
