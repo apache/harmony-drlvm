@@ -38,7 +38,11 @@ void parse_jit_arguments(JavaVMInitArgs* vm_arguments);
 void print_generic_help();
 
 void create_vm(Global_Env *p_env, JavaVMInitArgs* vm_arguments);
-void destroy_vm(Global_Env *p_env);  
+void destroy_vm(Global_Env *p_env);
+
+/*
+ *  declared in vm_main.cpp
+ */  
 extern Global_Env env;
 
 #endif //_INIT_H
