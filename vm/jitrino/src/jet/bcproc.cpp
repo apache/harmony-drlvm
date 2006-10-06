@@ -81,6 +81,12 @@ void Compiler::handle_inst(void)
         gen_dbg_check_stack(false);
     }
 
+    if (g_jvmtiMode) {
+        // Do not allow values to cross instruction boundaries
+        // on a temporary registers
+        vpark();
+    }
+
     const bool has_fall_through = !(jinst.flags & OPF_DEAD_END);
     if (last && has_fall_through && jinst.get_num_targets() == 0) {
         gen_bb_leave(jinst.next);

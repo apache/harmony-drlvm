@@ -582,10 +582,12 @@ void Compiler::gen_bb_leave(unsigned to)
     if (is_set(DBG_TRACE_CG)) { dbg(";;>bb_leave to %d\n", to); }
     unsigned ref_count;
     bool to_eh;
-    if (to == NOTHING || m_pc == 0) {
+    if (to == NOTHING || m_pc == 0 || g_jvmtiMode) {
         // leaving JSR block - act as if were leaving to multiref block
         // Also, special processing for 0th BB - see also gen_bb_enter() 
         // and gen_prolog().
+        // The same for JVMTI mode - do not allow a thing to be transferred
+        // on a temporary register between basic blocks
         ref_count = 2;
         to_eh = false;
     }
