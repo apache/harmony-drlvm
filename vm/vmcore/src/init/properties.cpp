@@ -37,7 +37,6 @@
 #define PROP_FILE_NAME "vm.properties"
 #define BOOT_PROPS_FILE_NAME "bootclasspath.properties"
 #define BOOTCLASSPATH_PROP_NAME "bootclasspath"
-#define BOOTCLASSPATH_KERNEL_JAR "kernel.jar"
 
 #define MAX_PROP_LINE 5120
 
@@ -130,8 +129,8 @@ char *predefined_propeties[] =
     "java.specification.vendor=Sun Microsystems Inc.",
     "java.specification.name=Java Platform API Specification",
     "java.version=11.2.0",
-    "java.vendor=Intel DRL",
-    "java.vm.vendor=Intel DRL",
+    "java.vendor=Apache Software Foundation",
+    "java.vm.vendor=Apache Software Foundation",
     "java.vm.version=11.2.0",
     "java.vm.name=DRLVM",
     "java.vm.info=no info",
@@ -187,84 +186,6 @@ static char *compose_full_files_path_names_list(const char *path,
     }
 
     return full_name;
-}
-
-int str_compare(const void *arg1, const void *arg2) {
-    char *string1 = *(char**)arg1;
-    char *string2 = *(char**)arg2;
-    if (strlen(string1) < strlen(string2))
-        return -1;
-    if (strlen(string2) < strlen(string1))
-        return 1;
-    return strcmp(string1, string2);
-}
-
-static char *load_full_api_files_path_names_list(const char *path)
-{
-    char *full_name = "";
-    int array_size = 30;
-    char **props = (char**)STD_MALLOC(array_size*sizeof(char*));
-    char *jre_file_path = apr_pstrcat(prop_pool, path, PORT_FILE_SEPARATOR_STR BOOT_PROPS_FILE_NAME, NULL);
-    apr_file_t *f_jre;
-    if (APR_SUCCESS == apr_file_open(&f_jre, jre_file_path, APR_FOPEN_READ, 0, prop_pool))
-    {
-        char jre_file_name[MAX_PROP_LINE];
-        int props_count = 0;
-        while (!apr_file_eof(f_jre) && !apr_file_gets(jre_file_name, MAX_PROP_LINE, f_jre)) {
-	        if ((jre_file_name[0] != 0x0D || jre_file_name[0] != 0x0A)
-				&& !strncmp(jre_file_name ,BOOTCLASSPATH_PROP_NAME, strlen(BOOTCLASSPATH_PROP_NAME))) {
-                char *char_pos = jre_file_name + strlen(BOOTCLASSPATH_PROP_NAME);
-                // Check that there are digits after dots so only bootclasspath
-                // elements appear in the property
-                if (char_pos[0] != '.' || char_pos[1] < '0' || char_pos[1] > '9')
-                    continue;
-                
-                if(props_count == array_size) {
-                    array_size *= 2;
-                    props = (char**)STD_REALLOC(props, array_size*sizeof(char*));
-                }
-                unsigned length;
-                char_pos = strchr(jre_file_name, 0x0D);
-                if (!char_pos) {
-                    char_pos = strchr(jre_file_name, 0x0A);
-                }
-                if (char_pos) {
-                    *char_pos = '\0';
-                    length = char_pos - jre_file_name + 1;
-                } else {
-                    length = strlen(jre_file_name) + 1;
-                }
-                char_pos = strchr(jre_file_name, '=');
-                if (!char_pos) {
-                    DIE("Malformed bootclasspath entry: " << jre_file_name);
-                }
-                *char_pos = '\0';
-                props[props_count] = (char*)STD_MALLOC(length * sizeof(char));
-                memcpy(props[props_count], jre_file_name, length);
-                props_count++;
-            }
-	    }
-    
-		qsort(props, props_count, sizeof(char*), str_compare);
-        
-        full_name = apr_pstrcat(prop_pool, path, PORT_FILE_SEPARATOR_STR,
-            BOOTCLASSPATH_KERNEL_JAR, NULL);
-            
-        TRACE2("init", "kernel jar path : " << full_name);
-        
-        for(int i = 0; i < props_count; i++){
-            full_name = apr_pstrcat(prop_pool, full_name, PORT_PATH_SEPARATOR_STR,
-                path, PORT_FILE_SEPARATOR_STR, props[i] + strlen(props[i]) + 1, NULL);
-            STD_FREE(props[i]);
-        }
-        STD_FREE(props);
-        apr_file_close(f_jre);
-    }
-    else
-    {
-        DIE("Can't find file : " << jre_file_path);
-    }
-	return full_name;
 }
 
 
@@ -409,19 +330,6 @@ static void define_undefined_predefined_properties(Properties & properties)
     add_pair_to_properties(properties, "java.ext.dirs", ext_path);
     TRACE( "java.ext.dirs = " << ext_path);
 
-    // vm.boot.class.path initialization. Value is
-    // java.home PATH_SEPARATOR lib PATH_SEPARATOR API_CLASSES_ARCHIVE
-    // where API_CLASSES_ARCHIVE is defined in this file
-    char *boot_path = port_filepath_merge(base_path_buf, "lib" PORT_FILE_SEPARATOR_STR "boot", prop_pool);
-	
-    path_buf = load_full_api_files_path_names_list(boot_path);
-    add_pair_to_properties(properties, "vm.boot.class.path", path_buf);
-    TRACE( "vm.boot.class.path = " << path_buf);
-
-    // Added for compatibility with a reference JDWP agent
-    add_pair_to_properties(properties, "sun.boot.class.path", path_buf);
-    TRACE( "sun.boot.class.path = " << path_buf);
-
     // user.name initialization, try to get the name from the system
     char *user_buf;
     apr_status_t status = port_user_name(&user_buf, prop_pool);
@@ -480,6 +388,8 @@ initialize_properties(Global_Env * p_env, Properties & prop)
  * gregory -
  * 0. Add predefined properties from property table
  */
+     
+
     define_undefined_predefined_properties(p_env->properties);
 
     char **pp = predefined_propeties;

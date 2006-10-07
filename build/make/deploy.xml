@@ -55,7 +55,7 @@ Description of the product deploy folder.
         </vmi>
 
         <kernel_classes>
-            <jar>lib/boot:kernel</jar>
+            <jar>bin/default:kernel</jar>
         </kernel_classes>
 
         <hythr>

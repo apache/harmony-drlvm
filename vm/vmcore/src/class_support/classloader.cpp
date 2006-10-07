@@ -43,6 +43,7 @@
 #include "open/vm_util.h"
 #include "suspend_checker.h"
 #include "verifier.h"
+#include "classpath_const.h"
 
 #include "port_filepath.h"
 #include <apr_file_io.h>
@@ -1542,6 +1543,7 @@ bool BootstrapClassLoader::Initialize(ManagedObject* UNREF loader)
     // separate natives libraries
     const char separator[2] = {PORT_PATH_SEPARATOR, 0};
     char *lib_name = strtok( libraries, separator );
+
     while( lib_name != NULL )
     {
         // load native library
@@ -1551,13 +1553,102 @@ bool BootstrapClassLoader::Initialize(ManagedObject* UNREF loader)
         lib_name = strtok( NULL, separator );
     }
 
+    /*
+     *  at this point, LUNI is loaded, so we can use the boot classpath
+     *  generated there to set vm.boot.class.path since we didn't do
+     *  it before.  We need  to add on the kernel.jar
+     *  note that parse_arguments.cpp defers any override, postpend or 
+     *  preprend here, storing everything as properties.
+     */
+     
+    /*
+     * start with the boot classpath. If overridden, just use that as the basis
+     * and otherwise, contstruct from o.a.h.b.c.p + o.a.h.vm.vmdir to add 
+     * the kernel
+     */
+     
+    PropertiesHandle hProps = reinterpret_cast<PropertiesHandle>(&m_env->properties);
+     
+    /* strdup so that it's freeable w/o extra logic */
+
+    const char *temp = properties_get_string_property(hProps, XBOOTCLASSPATH);    
+    char *bcp_value = (temp ? strdup(temp) : NULL);
+    
+    if (bcp_value == NULL) { 
+        
+        /* not overridden, so lets build, adding the kernel to what luni made for us */
+        
+        const char *kernel_dir_path = properties_get_string_property(hProps, O_A_H_VM_VMDIR);
+    
+        char *kernel_path = (char *) malloc(strlen(kernel_dir_path) 
+                                        + strlen(PORT_FILE_SEPARATOR_STR) 
+                                        + strlen(KERNEL_JAR) + 1);
+    
+        strcpy(kernel_path, kernel_dir_path);
+        strcat(kernel_path, PORT_FILE_SEPARATOR_STR);
+        strcat(kernel_path, KERNEL_JAR);
+        
+        const char *luni_path = properties_get_string_property(hProps,O_A_H_BOOT_CLASS_PATH);
+        
+        char *vmboot = (char *) malloc(strlen(luni_path) + strlen(kernel_path) + strlen(PORT_PATH_SEPARATOR_STR) + 1);
+        
+        strcpy(vmboot, kernel_path);
+        strcat(vmboot, PORT_PATH_SEPARATOR_STR);
+        strcat(vmboot, luni_path);
+
+        free(kernel_path);
+        bcp_value = vmboot;
+    }
+    
+    /*
+     *  now if there a pre or post bootclasspath, add those
+     */
+     
+    const char *prepend = properties_get_string_property(hProps, XBOOTCLASSPATH_P);
+    const char *append = properties_get_string_property(hProps, XBOOTCLASSPATH_A);
+    
+    if (prepend || append) {
+        
+        char *temp = (char *) malloc(strlen(bcp_value) 
+                                    + (prepend ? strlen(prepend) + strlen(PORT_PATH_SEPARATOR_STR) : 0 )
+                                    + (append  ? strlen(append) + strlen(PORT_PATH_SEPARATOR_STR) : 0 ) + 1);
+       
+       if (prepend) { 
+            strcpy(temp, prepend);
+            strcat(temp, PORT_PATH_SEPARATOR_STR);
+            strcat(temp, bcp_value);
+       }
+       else {
+            strcpy(temp, bcp_value);
+       }
+       
+       if (append) {
+            strcat(temp, PORT_PATH_SEPARATOR_STR);
+            strcat(temp, append);
+       }
+       
+       free(bcp_value);
+       bcp_value = temp;
+    }
+    
+    /*
+     *  set VM_BOOT_CLASS_PATH and SUN_BOOT_CLASS_PATH for any code 
+     *  that needs it
+     */
+     
+    add_pair_to_properties(m_env->properties, VM_BOOT_CLASS_PATH, bcp_value);
+    add_pair_to_properties(m_env->properties, SUN_BOOT_CLASS_PATH, bcp_value);
+    
+    free(bcp_value);
+    
     // create temp pool for apr functions
     apr_pool_t *tmp_pool;
     apr_pool_create(&tmp_pool, NULL);
 
     // create a bootclasspath collection
-    SetClasspathFromProperty("vm.boot.class.path", tmp_pool);
 
+    SetClasspathFromProperty(VM_BOOT_CLASS_PATH, tmp_pool);
+        
     // check if vm.bootclasspath.appendclasspath property is set to true
     Boolean is_enabled =
         vm_get_boolean_property_value_with_default("vm.bootclasspath.appendclasspath");

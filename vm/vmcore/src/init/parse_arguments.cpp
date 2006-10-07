@@ -45,6 +45,8 @@
 #include "nogc.h"
 #include "version.h"
 
+#include "classpath_const.h"
+
 // Multiple-JIT support.
 #include "jit_intf.h"
 #include "dll_jit_intf.h"
@@ -169,24 +171,83 @@ void parse_vm_arguments(Global_Env *p_env)
     for (int i = 0; i < p_env->vm_arguments.nOptions; i++) {
         const char* option = p_env->vm_arguments.options[i].optionString;
 
-        if (begins_with(option, "-Xbootclasspath:")) {
-            // replace boot class path by argument
-            add_pair_to_properties(p_env->properties, "vm.boot.class.path", option + 16); 
-            add_pair_to_properties(p_env->properties, "sun.boot.class.path", option + 16); 
-        } else if (begins_with(option, "-Xbootclasspath/a:")) {
-            // append argument to boot class path 
-            char *bcp_old = (char *)properties_get_string_property((PropertiesHandle)&p_env->properties, "vm.boot.class.path");
-            assert(bcp_old);
-            char *bcp_new = apr_pstrcat(pool, bcp_old, PORT_PATH_SEPARATOR_STR, option + 18, NULL);
-            add_pair_to_properties(p_env->properties, "vm.boot.class.path", bcp_new);
-            add_pair_to_properties(p_env->properties, "sun.boot.class.path", bcp_new);
-        } else if (begins_with(option, "-Xbootclasspath/p:")) {
-            // prepend argument to boot class path
-            char *bcp_old = (char*)properties_get_string_property((PropertiesHandle)&p_env->properties, "vm.boot.class.path");
-            assert(bcp_old);
-            char *bcp_new = apr_pstrcat(pool, option + 18, PORT_PATH_SEPARATOR_STR, bcp_old, NULL);
-            add_pair_to_properties(p_env->properties, "vm.boot.class.path", bcp_new);
-            add_pair_to_properties(p_env->properties, "sun.boot.class.path", bcp_new);
+        if (begins_with(option,"-Dorg.apache.harmony.vm.vmdir=")) {
+            
+            /*
+             *  This is the directory where the virtual machine artifacts are located
+             *  (vm.dll, etc) including the kernel.jar  GEIR
+             */
+            add_pair_to_properties(p_env->properties, "org.apache.harmony.vm.vmdir", 
+                        option + strlen("-Dorg.apache.harmony.vm.vmdir="));
+        }
+        else if (begins_with(option, XBOOTCLASSPATH)) {
+            /*
+             *  Override for bootclasspath - 
+             *  set in the environment- the boot classloader will be responsible for 
+             *  processing and setting up "vm.boot.class.path" and "sun.boot.class.path"
+             *  Note that in the case of multiple arguments, the last one will be used
+             */
+            add_pair_to_properties(p_env->properties, XBOOTCLASSPATH, option + strlen(XBOOTCLASSPATH));
+        }
+        else if (begins_with(option, XBOOTCLASSPATH_A)) {
+            /*
+             *  addition to append to boot classpath
+             *  set in environment - responsibility of boot classloader to process
+             *  Note that we accumulate if multiple, appending each time
+             */
+
+            const char *bcp_old = properties_get_string_property((PropertiesHandle)&p_env->properties, 
+                                XBOOTCLASSPATH_A);
+            const char *value = option + strlen(XBOOTCLASSPATH_A);
+            
+            char *bcp_new = NULL;
+            
+            if (bcp_old) { 
+                 char *tmp = (char *) malloc(strlen(bcp_old) + strlen(PORT_PATH_SEPARATOR_STR)
+                                                        + strlen(value) + 1);
+            
+                 strcpy(tmp, bcp_old);
+                 strcat(tmp, PORT_PATH_SEPARATOR_STR);
+                 strcat(tmp, value);
+                 
+                 bcp_new = tmp;
+            }
+            
+            add_pair_to_properties(p_env->properties, XBOOTCLASSPATH_A, bcp_old ? bcp_new : value); 
+                        
+            if (bcp_new) {
+                free(bcp_new);
+            }                       
+        }
+        else if (begins_with(option, XBOOTCLASSPATH_P)) {
+            /*
+             *  addition to prepend to boot classpath
+             *  set in environment - responsibility of boot classloader to process
+             *  Note that we accumulate if multiple, prepending each time
+             */
+             
+            const char *bcp_old = properties_get_string_property((PropertiesHandle)&p_env->properties, 
+                                XBOOTCLASSPATH_P);
+            const char *value = option + strlen(XBOOTCLASSPATH_P);
+            
+            char *bcp_new = NULL;
+            
+            if (bcp_old) { 
+                 char *tmp = (char *) malloc(strlen(bcp_old) + strlen(PORT_PATH_SEPARATOR_STR)
+                                                        + strlen(value) + 1);
+            
+                 strcpy(tmp, value);
+                 strcat(tmp, PORT_PATH_SEPARATOR_STR);
+                 strcat(tmp, bcp_old);
+                 
+                 bcp_new = tmp;
+            }
+            
+            add_pair_to_properties(p_env->properties, XBOOTCLASSPATH_P, bcp_old ? bcp_new : value); 
+            
+            if (bcp_new) {
+                free(bcp_new);
+            }                       
         } else if (begins_with(option, "-Xhelp:")) {
             const char* arg = option + strlen("-Xhelp:");
 
