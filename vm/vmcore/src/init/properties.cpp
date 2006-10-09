@@ -150,7 +150,7 @@ char *predefined_propeties[] =
 #define API_DLLA "hyluni"
 #define API_DLLB "hyarchive"
 
-#define GC_DLL "gc"
+#define GC_DLL "gc_cc"
 #define EM_DLL "em"
 
 /**

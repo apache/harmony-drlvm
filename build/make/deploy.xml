@@ -46,9 +46,13 @@ Description of the product deploy folder.
             <other>bin/default:*</other>
         </jitrino>
 
-        <gc>
-            <shared>bin/default:gc</shared>
-        </gc>
+        <gc_gen>
+            <shared>bin/default:gc_gen</shared>
+        </gc_gen>
+
+        <gc_cc>
+            <shared>bin/default:gc_cc</shared>
+        </gc_cc>
 
         <vmi>
             <shared>bin/default:vmi</shared>
