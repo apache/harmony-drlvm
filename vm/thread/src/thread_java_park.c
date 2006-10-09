@@ -25,6 +25,7 @@
  * @brief Java thread park/unpark functions
  */
 
+#include <apr_time.h>
 #include <open/jthread.h>
 #include <open/hythread_ext.h>
 #include "thread_private.h"
@@ -79,4 +80,20 @@ IDATA VMCALL jthread_unpark(jthread java_thread) {
     hythread_unpark(tm_native_thread);
     
     return TM_ERROR_NONE;
+}
+
+/**
+ * Parks the current thread until the specified deadline
+ *
+ * Stops the current thread from executing until it is unparked, interrupted,
+ * or until the specified dealine.
+ * Unlike wait or sleep, the interrupted flag is NOT cleared by this API.
+ *
+ * @param[in] millis absolute time in milliseconds to wait until
+ * @sa java.util.concurrent.locks.LockSupport.parkUntil() 
+ */
+IDATA VMCALL jthread_park_until(jlong millis) {
+    jlong delta = millis - apr_time_now()/1000;
+    if (delta <= 0) return TM_ERROR_NONE;
+    return hythread_park((I_64)delta, 0);
 }

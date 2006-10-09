@@ -59,8 +59,6 @@ IDATA condvar_wait_impl(hycond_t cond, hymutex_t mutex, I_64 ms, IDATA nano, IDA
 
         // check interrupted flag
     if (interruptable && (this_thread->state & TM_THREAD_STATE_INTERRUPTED)) {
-        // clean interrupted flag
-        this_thread->state &= (~TM_THREAD_STATE_INTERRUPTED);
                 return TM_ERROR_INTERRUPT;
     }
 
@@ -76,8 +74,6 @@ IDATA condvar_wait_impl(hycond_t cond, hymutex_t mutex, I_64 ms, IDATA nano, IDA
    
     // check interrupted flag
     if (interruptable &&  (this_thread->state & TM_THREAD_STATE_INTERRUPTED)) {
-        // clean interrupted flag
-        this_thread->state &= (~TM_THREAD_STATE_INTERRUPTED);
                 return TM_ERROR_INTERRUPT;
     }
 

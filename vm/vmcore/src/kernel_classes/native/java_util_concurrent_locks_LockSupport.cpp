@@ -29,6 +29,7 @@
  * Method: java.util.concurrent.locks.LockSupport.unpark(Ljava/lang/Thread;)V
  */
 JNIEXPORT void JNICALL Java_java_util_concurrent_locks_LockSupport_unpark (JNIEnv *jenv, jclass, jobject thread) {
+    if (!thread) return;
     jthread_unpark(thread);
 }
 
@@ -59,8 +60,7 @@ JNIEXPORT void JNICALL Java_java_util_concurrent_locks_LockSupport_parkNanos(JNI
 /*
  * Method: java.util.concurrent.locks.LockSupport.parkUntil(J)V
  */
-JNIEXPORT void JNICALL Java_java_util_concurrent_locks_LockSupport_parkUntil(JNIEnv * UNREF jenv, jclass UNREF thread, jlong milis) {
-    //FIXME integration should be parkUntil
-    jthread_timed_park((jlong)milis, 0);
+JNIEXPORT void JNICALL Java_java_util_concurrent_locks_LockSupport_parkUntil(JNIEnv * UNREF jenv, jclass UNREF thread, jlong millis) {
+    jthread_park_until((jlong)millis);
 }
 

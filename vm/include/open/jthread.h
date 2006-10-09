@@ -177,6 +177,7 @@ VMEXPORT IDATA jthread_monitor_exit(jobject mon);
  IDATA jthread_park();
  IDATA jthread_timed_park(jlong millis, jint nanos);
  IDATA jthread_unpark(jthread thread);
+ IDATA jthread_park_until(jlong milis);
 
 //@}
 /** @name Suspension
