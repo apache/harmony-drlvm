@@ -42,6 +42,18 @@ extern "C" {
 /* Native methods */
 
 /*
+ * Method: org.apache.harmony.util.concurrent.Atomics.arrayBaseOffset(Ljava/lang/Class;)I
+ */
+JNIEXPORT jint JNICALL Java_org_apache_harmony_util_concurrent_Atomics_arrayBaseOffset
+  (JNIEnv *, jclass, jclass);
+
+/*
+ * Method: org.apache.harmony.util.concurrent.Atomics.arrayIndexScale(Ljava/lang/Class;)I
+ */
+JNIEXPORT jint JNICALL Java_org_apache_harmony_util_concurrent_Atomics_arrayIndexScale
+  (JNIEnv *, jclass, jclass);
+
+/*
  * Method: org.apache.harmony.util.concurrent.Atomics.setIntVolatile(Ljava/lang/Object;JI)V
  */
 JNIEXPORT void JNICALL 

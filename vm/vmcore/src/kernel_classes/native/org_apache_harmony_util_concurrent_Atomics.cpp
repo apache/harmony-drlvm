@@ -24,6 +24,23 @@
 #include "atomics.h"
 #include "org_apache_harmony_util_concurrent_Atomics.h"
 
+JNIEXPORT jint JNICALL Java_org_apache_harmony_util_concurrent_Atomics_arrayBaseOffset
+  (JNIEnv * env, jclass self, jclass array)
+{
+    jlong array_element_size = Java_org_apache_harmony_util_concurrent_Atomics_arrayIndexScale(env, self, array);
+    if(array_element_size < 8) {
+        return VM_VECTOR_FIRST_ELEM_OFFSET_1_2_4;
+    } else {
+        return VM_VECTOR_FIRST_ELEM_OFFSET_8;
+    }
+}
+
+JNIEXPORT jint JNICALL Java_org_apache_harmony_util_concurrent_Atomics_arrayIndexScale
+  (JNIEnv * env, jclass self, jclass array)
+{
+    Class * clz = jclass_to_struct_Class(array);
+    return clz->array_element_size;
+}
 
 JNIEXPORT void JNICALL 
 Java_org_apache_harmony_util_concurrent_Atomics_setIntVolatile__Ljava_lang_Object_2JI(JNIEnv * env, jclass self, 

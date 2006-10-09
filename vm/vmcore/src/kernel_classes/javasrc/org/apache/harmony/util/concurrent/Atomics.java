@@ -33,6 +33,22 @@ public final class Atomics {
 
     private Atomics() {};
 
+     /**
+      * Returns offset of the first array's element 
+      * @param arrayClass class of the array
+      *
+      * @return offset of the array's first element
+      */
+    public static native int arrayBaseOffset(Class arrayClass);
+
+     /**
+      * Returns size of the array's element
+      * @param arrayClass class of the array
+      *
+      * @return size of the array's element
+      */
+    public static native int arrayIndexScale(Class arrayClass);
+
      /*
       * Writes new value to the object's field (by given offset) in volatile manner
       * @param obj object which field needs to be set

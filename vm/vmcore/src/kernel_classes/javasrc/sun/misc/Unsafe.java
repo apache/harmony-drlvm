@@ -117,7 +117,7 @@ public class Unsafe {
      * @return The base offset value.
      */
     public int arrayBaseOffset(Class<?> clazz) {
-        throw new UnsupportedOperationException("Not Yet Implemented");
+        return Atomics.arrayBaseOffset(clazz);
     }
 
     /**
@@ -150,7 +150,7 @@ public class Unsafe {
      * @return The index scale value.
      */
     public int arrayIndexScale(Class<?> clazz) {
-        throw new UnsupportedOperationException("Not Yet Implemented");
+        return Atomics.arrayIndexScale(clazz);
     }
 
     /**
@@ -272,6 +272,7 @@ public class Unsafe {
      */
     public void unpark(Thread thread) {
         throw new UnsupportedOperationException("Not Yet Implemented");
+        //LockSupport.unpark(thread);
     }
 
     /**
@@ -293,5 +294,10 @@ public class Unsafe {
      */
     public void park(boolean timestamp, long nanosOrTimestamp) {
         throw new UnsupportedOperationException("Not Yet Implemented");
+        /*if (timestamp) {
+            LockSupport.parkUntil(nanosOrTimestamp);
+        } else {
+            LockSupport.parkNanos(nanosOrTimestamp);
+        }*/
     }
 }
