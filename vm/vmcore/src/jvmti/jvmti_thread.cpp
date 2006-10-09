@@ -26,6 +26,7 @@
 #include "cxxlog.h"
 
 #include "jvmti_utils.h"
+#include "jni_utils.h"
 #include "vm_threads.h"
 #include "thread_generic.h"
 
@@ -648,6 +649,8 @@ jvmtiRunAgentThread(jvmtiEnv* env,
                     const void* arg,
                     jint priority)
 {
+    JNIEnv * jni_env;
+
     TRACE2("jvmti.thread", "RunAgentThread called");
     SuspendEnabledChecker sec;
     /*
@@ -673,6 +676,8 @@ jvmtiRunAgentThread(jvmtiEnv* env,
     jmethodID set_daemon = GetMethodID(jvmti_test_jenv, thread_class, "setDaemon", "(Z)V");
     assert(set_daemon);
     CallVoidMethod(jvmti_test_jenv, thread, set_daemon, JNI_TRUE);
+
+    jni_env = jthread_get_JNI_env(jthread_self());
     // Run new thread
     // FIXME TM integration, pass arguments correctly
     //Java_java_lang_Thread_start_generic(jvmti_test_jenv, thread, env, proc, arg, priority);
@@ -681,7 +686,7 @@ jvmtiRunAgentThread(jvmtiEnv* env,
     attrs.stacksize = 0;
     attrs.daemon = JNI_TRUE;
     attrs.jvmti_env = env;
-    jthread_create_with_function(jvmti_test_jenv, thread, &attrs, proc, arg);
+    jthread_create_with_function(jni_env, thread, &attrs, proc, arg);
 
     return JVMTI_ERROR_NONE;
 }

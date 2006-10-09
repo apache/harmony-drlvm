@@ -80,6 +80,7 @@ String_Pool::String_Pool() {
 
     index_interned = (Interned_Strings_Index *)memory_pool.alloc(sizeof(Interned_Strings_Index));
 
+    string_pool_lock = 0;
 #ifdef VM_STATS
     string_stat = apr_hash_make(VM_Statistics::get_vm_stats().vm_stats_pool);
     num_ambiguity = 0;

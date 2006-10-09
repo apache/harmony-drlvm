@@ -354,7 +354,8 @@ void *Method::allocate_code_block_mt(size_t size, size_t alignment, JIT *jit, un
     jit_info->_code_block_alignment = alignment;
     unlock();
 
-    vm_methods->add(jit_info); // Method table is thread safe
+    Global_Env *env = VM_Global_State::loader_env;
+    env->vm_methods->add(jit_info); // Method table is thread safe
     return addr;
 } // Method::allocate_code_block
 

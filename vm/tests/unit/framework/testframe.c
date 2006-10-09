@@ -71,7 +71,7 @@ void log_debug(char *fmt, ...) {
     fflush(NULL);
 }
 
-int execute(char *name, int (*f)(void)) {
+int execute(int argc, char *argv[], char *name, int (*f)(void)) {
     int status; 
     if (f==NULL) {
         log_error("no test function to execute");       
@@ -79,7 +79,7 @@ int execute(char *name, int (*f)(void)) {
     }
     log_info("TEST %s start", name);
     error_flag = 0;
-    setup();
+    setup(argc, argv);
     status = f();
     if (status || error_flag){
         log_info("TEST %s: FAILED", name);
@@ -102,26 +102,15 @@ int default_main(int argc, char *argv[]){
 
     log_set_level(LOG_LEVEL_INFO);
 
-    if (argc>=2) {
-        /* execute given test only */
-        for (p=testDescriptor; (p->name!=NULL) && (strncmp(argv[1], p->name, strlen(p->name))!=0); p++) {}
-                                
-        if ((p->name!=NULL) && (p->func!=NULL)) {
-            return (execute(p->name, p->func));
+    /* execute all tests */
+    result = 0;
+    for (p=testDescriptor; (p->name!=NULL); p++) {
+        //log_debug("executing test %s", p->name);
+        if (p->func!=NULL) { 
+            result = execute(argc, argv, p->name, p->func) || result;
             fflush(NULL);
         }
-    } else {
-        /* execute all tests */
-        result = 0;
-        for (p=testDescriptor; (p->name!=NULL); p++) {
-            //log_debug("executing test %s", p->name);
-            if (p->func!=NULL) { 
-                result = execute(p->name, p->func) || result;
-                fflush(NULL);
-            }
-        }
-        return result;
     }
-    return (0);
+    return result;
 }
 

@@ -51,3 +51,15 @@ IDATA VMCALL jthread_set_priority(jthread java_thread, int priority){
     hythread_t tm_native_thread = jthread_get_native_thread(java_thread);
     return hythread_set_priority(tm_native_thread, priority);
 }
+
+/**
+ * Returns daemon status for the specified thread.
+ *
+ * @param[in] java_thread thread those attribute is read
+ */
+jboolean jthread_is_daemon(jthread thread) {
+    jvmti_thread_t jvmti_thread;
+    
+    jvmti_thread = hythread_get_private_data(hythread_self());
+    return jvmti_thread->daemon;
+}

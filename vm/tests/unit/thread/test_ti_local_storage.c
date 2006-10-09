@@ -56,6 +56,6 @@ int test_jthread_get_local_storage(void) {
 }
 
 TEST_LIST_START
-    TEST(test_jthread_set_local_storage)
-    TEST(test_jthread_get_local_storage)
+    //TEST(test_jthread_set_local_storage)
+    //TEST(test_jthread_get_local_storage)
 TEST_LIST_END;

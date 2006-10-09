@@ -511,8 +511,9 @@ void si_goto_previous(StackIterator* si, bool over_popped)
         if (!si->m2nfl) return;
         si_unwind_from_m2n(si);
     }
+    Global_Env *env = VM_Global_State::loader_env;
     si->c.is_ip_past = TRUE;
-    si->cci = vm_methods->find(si_get_ip(si));
+    si->cci = env->vm_methods->find(si_get_ip(si));
     si_unwind_bsp(si);
     si_setup_stacked_registers(si);
 }

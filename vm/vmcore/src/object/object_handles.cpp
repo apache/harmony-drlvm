@@ -206,7 +206,7 @@ ObjectHandle oh_allocate_global_handle()
     h->handle.object = NULL;
     h->allocated_on_the_stack = false;
     
-    tmn_suspend_disable(); // ----------------vvv
+    hythread_suspend_disable(); // ----------------vvv
     p_handle_lock->_lock(); 
     // Insert at beginning of globals list
     h->prev = NULL;
@@ -215,7 +215,7 @@ ObjectHandle oh_allocate_global_handle()
     if(h->next)
         h->next->prev = h;
     p_handle_lock->_unlock();
-    tmn_suspend_enable(); //--------------------------------------------^^^
+    hythread_suspend_enable(); //--------------------------------------------^^^
     return &h->handle;
 } //vm_create_global_object_handle
 

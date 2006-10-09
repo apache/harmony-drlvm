@@ -20,44 +20,34 @@
  */  
 
 
-
-
-
 #ifndef _JNI_DIRECT_H_
 #define _JNI_DIRECT_H_
 
-#include "jni.h"
+#include <apr_ring.h>
+#include <apr_pools.h>
+
 #include "open/types.h"
+
+#include "jni.h"
 #include "Class.h"
 
-struct _jfieldID : public Field {
-};
-
-VMEXPORT jint JNICALL GetVersion(JNIEnv *env);
+typedef struct JavaVM_Internal JavaVM_Internal;
+typedef struct JNIEnv_Internal JNIEnv_Internal;
 
 struct JavaVM_Internal : public JavaVM_External {
-    JavaVM_Internal(const JNIInvokeInterface_ *_functions,
-        Global_Env *_vm_env,
-        void *_reserved) : vm_env(_vm_env), reserved(_reserved)
-    {
-        functions = _functions;
-    }
-    Global_Env* vm_env;
+    apr_pool_t * pool;
+    Global_Env * vm_env;   
+    APR_RING_ENTRY(JavaVM_Internal) link;
     void* reserved;
 };
 
 struct JNIEnv_Internal : public JNIEnv_External {
-    JNIEnv_Internal(const JNINativeInterface_ *_functions,
-        JavaVM_Internal *_vm,
-        void *_reserved0) : vm(_vm), reserved0(_reserved0)
-    {
-        functions = _functions;
-    }
     JavaVM_Internal* vm;
     void *reserved0;
 };
 
-void jni_init();
+struct _jfieldID : public Field {
+};
 
 jmethodID reflection_unreflect_method(JNIEnv *jenv, jobject ref_method);
 jmethodID reflection_unreflect_constructor(JNIEnv *jenv, jobject ref_constructor);
@@ -606,7 +596,7 @@ VMEXPORT void* JNICALL GetDirectBufferAddress(JNIEnv* env, jobject buf);
 VMEXPORT jlong JNICALL GetDirectBufferCapacity(JNIEnv* env, jobject buf);
 
 
-VMEXPORT jint JNICALL DestroyVM(JavaVM*);
+VMEXPORT jint JNICALL DestroyJavaVM(JavaVM*);
 
 VMEXPORT jint JNICALL AttachCurrentThread(JavaVM*, void** penv, void* args);
 VMEXPORT jint JNICALL DetachCurrentThread(JavaVM*);

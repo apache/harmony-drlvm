@@ -60,9 +60,9 @@ typedef NativeLibInfo* NativeLibraryList;
 /**
  * Initializes natives_support module. Caller must provide thread safety.
  *
- * @return Returns true if initialized successfully.
+ * @return Returns JNI_OK if initialized successfully.
  */
-bool
+jint
 natives_init();
 
 /**

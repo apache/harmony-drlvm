@@ -28,15 +28,8 @@
 extern "C" {
 #endif
 
- 
-void vm_thread_shutdown();
-void vm_thread_init(Global_Env *p_env);
-
-void vm_thread_attach();
-void vm_thread_detach();
-
 void free_this_thread_block(VM_thread *);
-VM_thread * get_a_thread_block();
+VM_thread * get_a_thread_block(JavaVM_Internal * java_vm);
 
 
 extern volatile VM_thread *p_the_safepoint_control_thread;  // only set when a gc is happening

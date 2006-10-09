@@ -20,7 +20,7 @@
  * @version $Revision$
  */  
 
-
+#include "environment.h"
 #include "jit_intf_cpp.h"
 #include "m2n.h"
 #include "m2n_ia32_internal.h"
@@ -268,9 +268,9 @@ StackIterator* si_create_from_registers(Registers* regs, bool is_ip_past, M2nFra
     memset(res, 0, sizeof(StackIterator));
 
     // Setup current frame
+    Global_Env *env = VM_Global_State::loader_env;
     // It's possible that registers represent native code and res->cci==NULL
-    res->cci = vm_methods->find((NativeCodePtr)regs->eip, is_ip_past);
-
+    res->cci = env->vm_methods->find((NativeCodePtr)regs->eip, is_ip_past);
     res->c.esp = regs->esp;
     res->c.p_eip = &regs->eip;
     res->c.p_ebp = &regs->ebp;
@@ -316,7 +316,8 @@ void si_goto_previous(StackIterator* si, bool over_popped)
         if (!si->m2nfl) return;
         si_unwind_from_m2n(si, over_popped);
     }
-    si->cci = vm_methods->find(si_get_ip(si), si_get_jit_context(si)->is_ip_past);
+    Global_Env *vm_env = VM_Global_State::loader_env;
+    si->cci = vm_env->vm_methods->find(si_get_ip(si), si_get_jit_context(si)->is_ip_past);
     if (si->cci) {
         TRACE2("si", ("si_goto_previous to ip = %p (%s%s)",
             (void*)si_get_ip(si),
@@ -519,7 +520,6 @@ void si_transfer_control(StackIterator* si)
 inline static uint32 unref_reg(uint32* p_reg) {
     return p_reg ? *p_reg : 0;
 }
-
 void si_copy_to_registers(StackIterator* si, Registers* regs)
 {
     ASSERT_NO_INTERPRETER

@@ -2089,7 +2089,7 @@ public:
 
 
 // initialization of static members
-static StaticInitializer lil_initializer;
+// TODO: we have to get rid of memory pool in static area due to initialization problems
 static tl::MemoryPool loc_mem;
 const LcgIpfLoc* LcgIpfCodeGen::gp = new(loc_mem) LcgIpfLoc(LLK_Gr, 1);
 const LcgIpfLoc* LcgIpfCodeGen::sp = new(loc_mem) LcgIpfLoc(LLK_Gr, 12);

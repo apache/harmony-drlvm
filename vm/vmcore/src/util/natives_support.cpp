@@ -36,6 +36,7 @@
 #include "open/vm_util.h"
 
 #include "jni_types.h"
+#include "jni_utils.h"
 
 #define LOG_DOMAIN "natives"
 #include "cxxlog.h"
@@ -57,17 +58,17 @@ static JNILibInfo jni_libs;
 
 
 // Initializes natives_support module. Caller must provide thread safety.
-bool natives_init()
+jint natives_init()
 {
     apr_status_t apr_status = apr_pool_create(&jni_libs.ppool, NULL);
 
     if (APR_SUCCESS != apr_status)
     {
         assert(jni_libs.ppool == NULL);
-        return false;
+        return JNI_ENOMEM;
     }
 
-    return true;
+    return JNI_OK;
 }
 
 // Searches for given name trough the list of loaded libraries
@@ -112,7 +113,7 @@ static char* name_list[] =
 
         assert(onload_func);
 
-        JavaVM* vm = jni_native_intf->vm; // FIXME ???? Can we use it here ????
+        JavaVM* vm = jni_get_java_vm(jni_native_intf); // FIXME ???? Can we use it here ????
 
         assert(hythread_is_suspend_enabled());
         jint res = onload_func(vm, NULL);
@@ -149,7 +150,7 @@ static char* name_list[] =
 
         assert(onunload_func);
 
-        JavaVM* vm = jni_native_intf->vm; // FIXME ???? Can we use it here ????
+        JavaVM* vm = jni_get_java_vm(jni_native_intf); // FIXME ???? Can we use it here ????
 
         assert(hythread_is_suspend_enabled());
         onunload_func(vm, NULL);

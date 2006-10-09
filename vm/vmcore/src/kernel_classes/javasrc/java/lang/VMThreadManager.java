@@ -234,18 +234,12 @@ final class VMThreadManager {
      */
     static native int yield();
 
-     /**
-      * This method initialize native thread structure as well as inter dependencies
-      * between java thread and native thread.
-      * @api2vm
-      */
-     static native long init(Thread thread, ThreadWeakRef ref, long oldAddr);
-
-     /**
-      * This method attches current thread to vm. Required for main thread construction.
-      * @api2vm
-      */
-     static native int attach(java.lang.Thread thread);
+    /**
+     * This method initialize native thread structure as well as inter dependencies
+     * between java thread and native thread.
+     * @api2vm
+     */
+    static native long init(Thread thread, ThreadWeakRef ref, long oldAddr);
 
     /**
      * Returns the state of the given thread as described by JVMTI spec

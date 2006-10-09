@@ -28,6 +28,7 @@
 #include "open/jthread.h"
 #include "open/ti_thread.h"
 #include "open/thread_externals.h"
+#include "jni_utils.h"
 
 /*
  * Class:     java_lang_VMThreadManager
@@ -159,7 +160,7 @@ JNIEXPORT jint JNICALL Java_java_lang_VMThreadManager_start
   (JNIEnv *jenv, jclass clazz, jobject thread, jlong stackSize, jboolean daemon, jint priority)
 {
     jthread_threadattr_t attrs;
-    
+
     attrs.daemon = daemon;
     attrs.priority = priority;
     attrs.stacksize = stackSize > 40000000? 0:(jint)stackSize;
@@ -197,6 +198,7 @@ JNIEXPORT jint JNICALL Java_java_lang_VMThreadManager_suspend
 JNIEXPORT jint JNICALL Java_java_lang_VMThreadManager_wait
   (JNIEnv *env, jclass clazz, jobject monitor, jlong millis, jint UNREF nanos)
 {
+    // TODO: need to evaluate return code properly
     return jthread_monitor_timed_wait(monitor, millis, nanos);
 }
 
@@ -209,17 +211,6 @@ JNIEXPORT jint JNICALL Java_java_lang_VMThreadManager_yield
   (JNIEnv * UNREF jenv, jclass clazz)
 {
     return jthread_yield();
-}
-
-/*
- * Class:     java_lang_VMThreadManager
- * Method:    attach
- * Signature: ()V
- */
-JNIEXPORT void JNICALL Java_java_lang_VMThreadManager_attach
-  (JNIEnv * UNREF jenv, jclass clazz, jobject java_thread)
-{
-    jthread_attach(jenv, java_thread);
 }
 
 /*

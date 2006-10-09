@@ -597,14 +597,14 @@ ENCODER_DECLARE_EXPORT char * jump(char * stream, const RM_Opnd & rm, Opnd_Size 
 ENCODER_DECLARE_EXPORT char * jump(char * stream, char * target) {
 #ifdef _EM64T_
     int64 offset = target - stream;
+    // sub 2 bytes for the short version
+    offset -= 2;
     if (fit8(offset)) {
-        // sub 2 bytes for the short version
-        offset -= 2;
         // use 8-bit signed relative form
         return jump8(stream, Imm_Opnd(size_8, offset));
     } else if (fit32(offset)) {
-        // sub 5 bytes for the long version
-        offset -= 5;
+        // sub 5 (3 + 2)bytes for the long version
+        offset -= 3;
         // use 32-bit signed relative form
         return jump32(stream, Imm_Opnd(size_32, offset));
     }
@@ -613,14 +613,14 @@ ENCODER_DECLARE_EXPORT char * jump(char * stream, char * target) {
     return jump(stream, rax_opnd, size_64);
 #else
     int32 offset = target - stream;
+    // sub 2 bytes for the short version
+    offset -= 2;
     if (fit8(offset)) {
-        // sub 2 bytes for the short version
-        offset -= 2;
         // use 8-bit signed relative form
         return jump8(stream, Imm_Opnd(size_8, offset));
     }
-    // sub 5 bytes for the long version    
-    offset -= 5;
+    // sub 5 (3 + 2) bytes for the long version    
+    offset -= 3;
     // use 32-bit signed relative form
     return jump32(stream, Imm_Opnd(size_32, offset));
 #endif

@@ -40,7 +40,7 @@ jobjectArray get_annotations(JNIEnv* jenv, AnnotationTable* table, Class* clss)
     unsigned num = table ? table->length : 0;
     TRACE("annotations table size = " << num);
 
-    static Class* antn_class = ((JNIEnv_Internal*)jenv)->vm->vm_env->LoadCoreClass(
+    static Class* antn_class = jni_get_vm_env(jenv)->LoadCoreClass(
         "java/lang/annotation/Annotation");
 
     jobjectArray array = NewObjectArray(jenv, num, 
@@ -122,7 +122,7 @@ jobject resolve_annotation(JNIEnv* jenv, Annotation* antn, Class* clss, jthrowab
     }
     TRACE("Annotation type " << antn_type);
 
-    static Global_Env* genv = ((JNIEnv_Internal*)jenv)->vm->vm_env;
+    static Global_Env* genv = jni_get_vm_env(jenv);
     static Class* factory_class = genv->LoadCoreClass(
         "org/apache/harmony/lang/annotation/AnnotationFactory");
     static jmethodID factory_method = (jmethodID)class_lookup_method(factory_class, "createAnnotation", 
@@ -184,7 +184,7 @@ static jobject process_enum_value(JNIEnv* jenv, AnnotationValue& value, Class* c
             if (enum_value) {
                 return enum_value;
             } else {
-                static Global_Env* genv = ((JNIEnv_Internal*)jenv)->vm->vm_env;
+                static Global_Env* genv = jni_get_vm_env(jenv);
                 static Class* ECNPE_class = genv->LoadCoreClass(
                     "java/lang/EnumConstantNotPresentException");
                 static jmethodID ECNPE_ctor = (jmethodID)class_lookup_method(ECNPE_class, "<init>", 
@@ -210,7 +210,7 @@ static bool process_array_element(JNIEnv* jenv, AnnotationValue& value, Class* a
                                   String* name, jthrowable* cause, 
                                   jarray array, unsigned idx, Class* type) 
 {
-    Global_Env* genv = ((JNIEnv_Internal*)jenv)->vm->vm_env;
+    Global_Env* genv = jni_get_vm_env(jenv);
     switch (value.tag) {
     case AVT_INT:
         {

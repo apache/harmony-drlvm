@@ -80,7 +80,6 @@ jvmtiSetEventCallbacks(jvmtiEnv* env,
 jvmtiError add_event_to_thread(jvmtiEnv *env, jvmtiEvent event_type, jthread event_thread)
 {
     TIEnv *p_env = (TIEnv *)env;
-    //JNIEnv *jni_env = jni_native_intf;
     hythread_t p_thread = jthread_get_native_thread(event_thread);
     TIEventThread *et = p_env->event_threads[event_type - JVMTI_MIN_EVENT_TYPE_VAL];
 
@@ -107,7 +106,6 @@ jvmtiError add_event_to_thread(jvmtiEnv *env, jvmtiEvent event_type, jthread eve
 void remove_event_from_thread(jvmtiEnv *env, jvmtiEvent event_type, jthread event_thread)
 {
     TIEnv *p_env = (TIEnv *)env;
-   // JNIEnv *jni_env = jni_native_intf;
     hythread_t p_thread = jthread_get_native_thread(event_thread);
     TIEventThread *et = p_env->event_threads[event_type - JVMTI_MIN_EVENT_TYPE_VAL];
 
@@ -419,7 +417,7 @@ void jvmti_send_vm_init_event(Global_Env *env)
     tmn_suspend_enable();
     // Send VM_INIT TI events
     TIEnv *ti_env = ti->getEnvironments();
-    JNIEnv *jni_env = (JNIEnv *)jni_native_intf;
+    JNIEnv *jni_env = jni_native_intf;
     TIEnv *next_env;
     while (NULL != ti_env)
     {
@@ -652,7 +650,7 @@ jvmti_process_method_entry_event(jmethodID method) {
 
         // event is enabled in this environment
         jthread thread = getCurrentThread();
-        JNIEnv *jni_env = (JNIEnv *)jni_native_intf;
+        JNIEnv *jni_env = jni_native_intf;
         jvmtiEnv *jvmti_env = (jvmtiEnv*) ti_env;
 
         if (NULL != ti_env->event_table.MethodEntry)
@@ -696,7 +694,7 @@ jvmti_process_method_exit_event_internal(jmethodID method,
 
         // event is enabled in this environment
         jthread thread = getCurrentThread();
-        JNIEnv *jni_env = (JNIEnv *)jni_native_intf;
+        JNIEnv *jni_env = jni_native_intf;
         jvmtiEnv *jvmti_env = (jvmtiEnv*) ti_env;
         if (NULL != ti_env->event_table.MethodExit) {
             TRACE2("jvmti.stack", "Calling MethodExit callback for method: "
@@ -843,7 +841,7 @@ jvmti_process_frame_pop_event(jvmtiEnv *jvmti_env, jmethodID method, jboolean wa
 
     TIEnv *ti_env = (TIEnv*) jvmti_env;
     jthread thread = getCurrentThread();
-    JNIEnv *jni_env = (JNIEnv *)jni_native_intf;
+    JNIEnv *jni_env = jni_native_intf;
 
     assert(method);
     TRACE2("jvmti.event.popframe", "PopFrame event is called for method:"
@@ -895,7 +893,7 @@ jvmti_process_single_step_event(jmethodID method, jlocation location) {
 
         // event is enabled in this environment
         jthread thread = getCurrentThread();
-        JNIEnv *jni_env = (JNIEnv *)jni_native_intf;
+        JNIEnv *jni_env = jni_native_intf;
         jvmtiEnv *jvmti_env = (jvmtiEnv*) ti_env;
 
         TRACE2("jvmti.break.ss", "Calling SingleStep callback for env " << jvmti_env << ": " <<
@@ -974,7 +972,7 @@ VMEXPORT void jvmti_process_field_access_event(Field_Handle field,
 
         // event is enabled in this environment
         jthread thread = getCurrentThread();
-        JNIEnv *jni_env = (JNIEnv *)jni_native_intf;
+        JNIEnv *jni_env = jni_native_intf;
         jvmtiEnv *jvmti_env = (jvmtiEnv*) ti_env;
 
         if (NULL != ti_env->event_table.FieldAccess)
@@ -1049,7 +1047,7 @@ VMEXPORT void jvmti_process_field_modification_event(Field_Handle field,
 
         // event is enabled in this environment
         jthread thread = getCurrentThread();
-        JNIEnv *jni_env = (JNIEnv *)jni_native_intf;
+        JNIEnv *jni_env = jni_native_intf;
         jvmtiEnv *jvmti_env = (jvmtiEnv*) ti_env;
 
         if (NULL != ti_env->event_table.FieldModification)
@@ -1080,7 +1078,7 @@ void jvmti_send_exception_event(jthrowable exn_object,
     assert(ti->isEnabled());
 
     // Create local handles frame
-    JNIEnv *jni_env = (JNIEnv *)jni_native_intf;
+    JNIEnv *jni_env = jni_native_intf;
 
     ObjectHandle hThread = oh_allocate_local_handle();
     hThread->object = (Java_java_lang_Thread *)jthread_get_java_thread(curr_native_thread)->object;
@@ -1234,7 +1232,7 @@ ManagedObject *jvmti_exception_catch_event_callback_call(ManagedObject *exn,
     hythread_t curr_thread = hythread_self();
 
     // Create local handles frame
-    JNIEnv *jni_env = (JNIEnv *)jni_native_intf;
+    JNIEnv *jni_env = jni_native_intf;
 
     ObjectHandle exn_object = oh_allocate_local_handle();
     exn_object->object = exn;
@@ -1351,7 +1349,7 @@ void jvmti_send_contended_enter_or_entered_monitor_event(jobject obj,
         return;
     }
 
-    JNIEnv *jni_env = (JNIEnv *)jni_native_intf;
+    JNIEnv *jni_env = jni_native_intf;
 
     tmn_suspend_disable();
     // Create local handles frame
@@ -1408,7 +1406,7 @@ void jvmti_send_class_load_event(const Global_Env* env, Class* clss)
         return;
     }
 
-    JNIEnv *jni_env = (JNIEnv *)jni_native_intf;
+    JNIEnv *jni_env = jni_native_intf;
     tmn_suspend_disable();
     ObjectHandle hThread = oh_allocate_local_handle();
     ObjectHandle hClass = oh_allocate_local_handle();
@@ -1467,7 +1465,7 @@ void jvmti_send_class_file_load_hook_event(const Global_Env* env,
     if (!ti->isEnabled())
         return;
 
-    JNIEnv *jni_env = (JNIEnv *)jni_native_intf;
+    JNIEnv *jni_env = jni_native_intf;
     tmn_suspend_disable();
     ObjectHandle hLoader = oh_convert_to_local_handle((ManagedObject*)loader->GetLoader());
     if( !(hLoader->object) ) hLoader = NULL;
@@ -1552,7 +1550,7 @@ void jvmti_send_class_prepare_event(Class* clss)
         return;
     }
 
-    JNIEnv *jni_env = (JNIEnv *)jni_native_intf;
+    JNIEnv *jni_env = jni_native_intf;
     tmn_suspend_disable(); // -----------vv
     ObjectHandle hThread = oh_allocate_local_handle();
     ObjectHandle hClass = oh_allocate_local_handle();
@@ -1650,7 +1648,7 @@ static int is_interested_thread(TIEnv *ti_env, jvmtiEvent event_type) {
 
 static void process_jvmti_event(jvmtiEvent event_type, int per_thread, ...) {
     va_list args;
-    JNIEnv *jni_env = (JNIEnv *)jni_native_intf;
+    JNIEnv *jni_env = jni_native_intf;
     TIEnv *ti_env, *next_env;
     DebugUtilsTI *ti = VM_Global_State::loader_env->TI;
     void *callback_func;
@@ -1759,7 +1757,7 @@ void jvmti_send_vm_death_event()
         if (ti_env->global_events[JVMTI_EVENT_VM_DEATH - JVMTI_MIN_EVENT_TYPE_VAL])
         {
             jvmtiEventVMDeath func = (jvmtiEventVMDeath)ti_env->get_event_callback(JVMTI_EVENT_VM_DEATH);
-            JNIEnv *jni_env = (JNIEnv *)jni_native_intf;
+            JNIEnv *jni_env = jni_native_intf;
             if (NULL != func)
             {
                 TRACE2("jvmti.event.vd", "Callback JVMTI_PHASE_DEATH called");

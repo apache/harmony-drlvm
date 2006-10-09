@@ -46,7 +46,7 @@
  */
 IDATA VMCALL hythread_set_priority(hythread_t thread, UDATA priority){
     apr_status_t apr_status = apr_thread_set_priority(thread->os_handle, priority); 
-        if (apr_status != APR_SUCCESS) return CONVERT_ERROR(apr_status);
+    if (apr_status != APR_SUCCESS) return CONVERT_ERROR(apr_status);
     thread->priority = priority;
     return TM_ERROR_NONE;
 }

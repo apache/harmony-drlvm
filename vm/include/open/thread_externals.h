@@ -1,9 +1,9 @@
- /* Licensed to the Apache Software Foundation (ASF) under one or more
- /* contributor license agreements.  See the NOTICE file distributed with
- /* this work for additional information regarding copyright ownership.
- /* The ASF licenses this file to You under the Apache License, Version 2.0
- /* (the "License"); you may not use this file except in compliance with
- /* the License.  You may obtain a copy of the License at
+/* Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
  *
  *     http://www.apache.org/licenses/LICENSE-2.0
  *
@@ -72,13 +72,17 @@ VMEXPORT void vm_jthread_set_tm_data(jthread thread, void *data_ptr);
 VMEXPORT void *vm_jthread_get_tm_data(jthread thread);
 
 /** 
-  * registtrate thread in VM, so it could execute Java
-  */
-VMEXPORT IDATA vm_attach();
+ * Registrates current thread in VM, so it could execute Java
+ *
+ * @param[in] java_vm current thread will be attached to the specified VM
+ * @param[out] p_jni_env will point to JNI environment assocciated with the thread
+ */
+VMEXPORT jint vm_attach(JavaVM * java_vm, JNIEnv ** p_jni_env);
+
 /**
-  * free java related resources before thread exit
-  */
-VMEXPORT IDATA vm_detach();
+ * Frees java related resources before thread exit.
+ */
+VMEXPORT jint vm_detach(jthread java_thread);
 
 /**
  * creates exception object using given class name and message and throws it
@@ -115,19 +119,12 @@ VMEXPORT int vm_objects_are_equal(jobject obj1, jobject obj2);
  */
 VMEXPORT int ti_is_enabled();
 
-/**
- * get JNIEnv *
- * @return JNIEnv *
- */
-VMEXPORT JNIEnv * get_jnienv(void);
-
-
 #ifdef __cplusplus
 }
 
 /**
-  * all folowing entries is requiried for VM helpers only 
-  */
+ * all folowing entries is requiried for VM helpers only 
+ */
 
 #include "encoder.h"
 

@@ -22,11 +22,13 @@
 #define LOG_DOMAIN "vm.core"
 #include "cxxlog.h"
 
+#include <apr_pools.h>
+
 #include "assertion_registry.h"
 
 void Assertion_Registry::add_class(const Global_Env* genv, const char* name, unsigned len, bool value) {
-    Assertion_Record* rec = (Assertion_Record*)genv->mem_pool.alloc(
-        sizeof(Assertion_Record) + len * sizeof(char));
+    Assertion_Record* rec = (Assertion_Record*)
+        apr_palloc(genv->mem_pool, sizeof(Assertion_Record) + len * sizeof(char));
     rec->status = value;
     rec->len = len;
     strncpy(rec->name, name, len);
@@ -36,8 +38,8 @@ void Assertion_Registry::add_class(const Global_Env* genv, const char* name, uns
 }
 
 void Assertion_Registry::add_package(const Global_Env* genv, const char* name, unsigned len, bool value) {
-    Assertion_Record* rec = (Assertion_Record*)genv->mem_pool.alloc(
-        sizeof(Assertion_Record) + len * sizeof(char));
+    Assertion_Record* rec = (Assertion_Record*)
+        apr_palloc(genv->mem_pool, sizeof(Assertion_Record) + len * sizeof(char));
     rec->status = value;
     rec->len = len;
     strncpy(rec->name, name, len);

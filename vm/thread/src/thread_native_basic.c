@@ -31,10 +31,19 @@
 #include <open/hythread_ext.h>
 #include "thread_private.h"
 
+typedef struct {
+    hythread_t thread;
+    hythread_group_t group;
+    hythread_entrypoint_t start_proc;
+    void * start_proc_args;
+} thread_start_proc_data;
+
 extern hythread_group_t TM_DEFAULT_GROUP;
+extern hythread_library_t TM_LIBRARY;
 static void* APR_THREAD_FUNC thread_start_proc(apr_thread_t* thd, void *p_args);
-static hythread_t init_thread(hythread_group_t group);
+static hythread_t allocate_thread();
 static void reset_thread(hythread_t thread);
+static IDATA register_to_group(hythread_t thread, hythread_group_t group);
 //#define APR_TLS_USE 1
 
 #define NAKED __declspec( naked )
@@ -51,6 +60,7 @@ __declspec(thread) hythread_t tm_self_tls = NULL;
 #define MAX_ID 1000000
 hythread_t fast_thread_array[MAX_ID];
 int next_id = 1;
+
 /*
 IDATA add_to_fast_thread_array(hythread_t thread,int id)
 {
@@ -87,18 +97,21 @@ static void thread_set_self(hythread_t thread);
 IDATA VMCALL hythread_create_with_group(hythread_t *ret_thread, hythread_group_t group, UDATA stacksize, UDATA priority, UDATA suspend, hythread_entrypoint_t func, void *data) {
     apr_threadattr_t *apr_attrs;
     hythread_t  new_thread;
+    thread_start_proc_data * start_proc_data;
     apr_status_t apr_status;
    
-    if (!ret_thread || !(*ret_thread)) {
-        // Allocate & init thread structure
-        new_thread = init_thread(group); 
-		if(new_thread==NULL){
-			return TM_ERROR_OUT_OF_MEMORY;
-		}
+    if (ret_thread) {
+        hythread_struct_init(ret_thread);
+        new_thread = *ret_thread;
     } else {
-        new_thread = (*ret_thread);
+        new_thread = allocate_thread();
+    }
+    
+    if (new_thread == NULL) {
+        return TM_ERROR_OUT_OF_MEMORY;
     }
 
+    new_thread->library = hythread_self()->library;
     if (stacksize) {
         apr_threadattr_create(&apr_attrs, new_thread->pool);
         apr_threadattr_stacksize_set(apr_attrs, stacksize);
@@ -108,23 +121,27 @@ IDATA VMCALL hythread_create_with_group(hythread_t *ret_thread, hythread_group_t
     }
 
     new_thread->priority = priority ? priority : HYTHREAD_PRIORITY_NORMAL;
+    new_thread->state = TM_THREAD_STATE_ALIVE;
     //new_thread->suspend_request = suspend ? 1 : 0;
     
+    start_proc_data = (thread_start_proc_data *) apr_palloc(new_thread->pool, sizeof(thread_start_proc_data));
+    if (start_proc_data == NULL) {
+        return TM_ERROR_OUT_OF_MEMORY;
+    }
+
     // Set up thread body procedure 
-    new_thread->start_proc = func;
-    new_thread->start_proc_args = data;
-    new_thread->state = TM_THREAD_STATE_ALIVE; 
+    start_proc_data->thread = new_thread;
+    start_proc_data->group = group == NULL ? TM_DEFAULT_GROUP : group;
+    start_proc_data->start_proc = func;
+    start_proc_data->start_proc_args = data;
+
     // Create APR thread using the given attributes;
-    apr_status = apr_thread_create(&(new_thread->os_handle),    // new thread OS handle 
-            new_thread->apr_attrs,                          // thread attr created here
-            thread_start_proc,                              //
-            (void *)new_thread,                             //thread_proc attrs 
+    apr_status = apr_thread_create(&(new_thread->os_handle), // new thread OS handle 
+            new_thread->apr_attrs,                           // thread attr created here
+            thread_start_proc,                               //
+            (void *)start_proc_data,                         //thread_proc attrs 
             new_thread->pool); 
    
-    // Store the pointer to the resulting thread 
-    if(ret_thread) {
-        *ret_thread = new_thread;
-    }
     return CONVERT_ERROR(apr_status);
 }
 
@@ -157,13 +174,18 @@ IDATA VMCALL hythread_create(hythread_t *ret_thread, UDATA stacksize, UDATA prio
  * Registers the current OS thread with the threading subsystem.
  *
  * @param[in] handle thread to register
+ * @param[in] lib thread library to attach to
  * @param[in] group thread group, or NULL; in case of NULL this thread will go to the default group
  */
-IDATA VMCALL hythread_attach_to_group(hythread_t *handle, hythread_group_t group) {
+IDATA hythread_attach_to_group(hythread_t * handle, hythread_library_t lib, hythread_group_t group) {
     hythread_t thread;
     apr_thread_t *os_handle = NULL; 
     apr_os_thread_t *os_thread;
-    apr_status_t apr_status; 
+    apr_status_t apr_status;
+
+    if (lib == NULL) {
+        lib = TM_LIBRARY;
+    }
 
     // Do nothing and return if the thread is already attached
     thread = tm_self_tls;
@@ -173,30 +195,29 @@ IDATA VMCALL hythread_attach_to_group(hythread_t *handle, hythread_group_t group
         }
         return TM_ERROR_NONE;
     }
-    thread = init_thread(group); // allocate & init thread structure
-	if (thread==NULL){
-		return TM_ERROR_OUT_OF_MEMORY;
-	}
-    os_thread = apr_palloc(thread->pool, sizeof(apr_os_thread_t));
-	if(os_thread == NULL) {
+    if (handle) {
+        hythread_struct_init(handle);
+        thread = *handle;
+    } else {
+        thread = allocate_thread();
+    }
+    if (thread == NULL) {
         return TM_ERROR_OUT_OF_MEMORY;
-	} 
+    }
+    thread->library = lib;
+    os_thread = apr_palloc(thread->pool, sizeof(apr_os_thread_t));
+    if (os_thread == NULL) {
+        return TM_ERROR_OUT_OF_MEMORY;
+    } 
     *os_thread = apr_os_thread_current();
     apr_status = apr_os_thread_put(&os_handle, os_thread, thread->pool);
-        if (apr_status != APR_SUCCESS) return CONVERT_ERROR(apr_status);
+    if (apr_status != APR_SUCCESS) return CONVERT_ERROR(apr_status);
     
     thread->os_handle = os_handle;
-    thread_set_self(thread);
-    
-    thread->state = TM_THREAD_STATE_ALIVE | TM_THREAD_STATE_RUNNABLE;
-    assert(thread == tm_self_tls);
-    TRACE(("TM: native attached: native: %p ",  tm_self_tls));
 
-    if (handle) {
-        *handle = thread;
-    }
+    TRACE(("TM: native attached: native: %p ",  tm_self_tls));
     
-    return TM_ERROR_NONE;
+    return register_to_group(thread, group == NULL ? TM_DEFAULT_GROUP : group);
 }
 
 /**
@@ -213,10 +234,25 @@ IDATA VMCALL hythread_attach_to_group(hythread_t *handle, hythread_group_t group
  * @param[out] handle pointer to a hythread_t to be set (will be ignored if null)
  * @return  0 on success or negative value on failure
  *
+ * @note (*handle) should be NULL or point to hythread_t structure  
  * @see hythread_detach
  */
 IDATA VMCALL hythread_attach(hythread_t *handle) {
-    return hythread_attach_to_group(handle, NULL);
+    return hythread_attach_to_group(handle, TM_LIBRARY, NULL);
+}
+
+/**
+ * Attach an OS thread to the threading library.
+ *
+ * @param[out] handle pointer to a hythread_t to be set (will be ignored if null)
+ * @param[in] lib thread library to attach thread to
+ * @return  0 on success or negative value on failure
+ *
+ * @note (*handle) should be NULL or point to hythread_t structure  
+ * @see hythread_detach
+ */
+IDATA VMCALL hythread_attach_ex(hythread_t *handle, hythread_library_t lib) {
+    return hythread_attach_to_group(handle, lib, NULL);
 }
 
 /**
@@ -237,22 +273,23 @@ IDATA VMCALL hythread_attach(hythread_t *handle) {
  */
 void VMCALL hythread_detach(hythread_t thread) {
     // Acquire global TM lock to prevent concurrent acccess to thread list
-        IDATA status;
+    IDATA status;
+    
+    assert(thread == tm_self_tls);
     status = hythread_global_lock(NULL);
-        assert (status == TM_ERROR_NONE);
-    
-    if (!(thread = tm_self_tls)) {
-        status = hythread_global_unlock(NULL);
-                assert (status == TM_ERROR_NONE);
-        return;
-    }
-    
-        status = thread_destroy(thread);       // Remove thread from the list of thread 
     assert (status == TM_ERROR_NONE);
-        thread_set_self(NULL); 
-    status = hythread_global_unlock(NULL); 
-        assert (status == TM_ERROR_NONE);
+
+    thread_set_self(NULL);
+    fast_thread_array[thread->thread_id] = NULL;
+
+    thread->prev->next = thread->next;
+    thread->next->prev = thread->prev;
+    thread->group->threads_count--;
+
+    hythread_global_unlock(NULL);
+    assert(status == TM_ERROR_NONE);
 }
+
 /**
  * Waits until the selected thread finishes execution.
  *
@@ -481,66 +518,6 @@ IDATA VMCALL hythread_get_group(hythread_group_t *group, hythread_t thread) {
     return TM_ERROR_NONE;
 }
 
-//==============================================================================
-// Private functions
-/*
- */
-IDATA thread_destroy(hythread_t thread) {
-    
-    // Acquire global TM lock to prevent concurrent acccess to thread list    
-    IDATA status;
-    status =hythread_global_lock(NULL);
-    if (status != TM_ERROR_NONE) return status;
-    thread->prev->next = thread->next;
-    thread->next->prev = thread->prev;
-    thread->group->threads_count--;
-
-    //fast_thread_array[thread->thread_id] = NULL;
-
-    status =hythread_global_unlock(NULL);
-    if (status != TM_ERROR_NONE) return status;
-    return TM_ERROR_NONE;
-}
-/*
- */
-IDATA allocate_thread(hythread_t thread, hythread_group_t group) {
-    int id = 0;
-    hythread_t cur, prev;
-        IDATA status;
-    //thread_list points to the dummy thread, which is not actual thread, just 
-    //a auxiliary thread structure to maintain the thread list
-    /////
-    
-    // Acquire global TM lock to prevent concurrent acccess to thread list
-    status =hythread_global_lock(NULL); 
-        if (status != TM_ERROR_NONE) return status;
-    
-    // Append the thread to the list of threads
-    cur  = group->thread_list->next;
-    if (thread->thread_id) {
-        id   = thread->thread_id;
-    } else {
-        id   = ++next_id;
-    }
-	if (id>=MAX_ID){
-		hythread_global_unlock(NULL);
-		return TM_ERROR_OUT_OF_MEMORY;
-    }
-    prev = cur->prev;
-    
-    thread->next = cur;
-    thread->prev = prev;
-    prev->next = cur->prev = thread;
-    thread->thread_id = id;
-    fast_thread_array[id] = thread;
-    /*status=add_to_fast_thread_array(thread,id);
-    if (status != TM_ERROR_NONE) return status;*/
-    status=hythread_global_unlock(NULL);
-    if (status != TM_ERROR_NONE) return status;
-    return TM_ERROR_NONE;
-    
-}
-
 /** 
  * Terminates a running thread.
  * 
@@ -570,14 +547,14 @@ IDATA VMCALL hythread_cancel_all(hythread_group_t group) {
         group = TM_DEFAULT_GROUP;
     }
     
-    iter = hythread_iterator_create (group);
+    iter = hythread_iterator_create(group);
     while((next = hythread_iterator_next (&iter)) != NULL) {
-                if(next != self) {
-                        hythread_cancel(next);
+        if(next != self) {
+            hythread_cancel(next);
             //since this method being used at shutdown it does not
             //males any sence to exit on error, but continue terminating threads
-                }       
-        }
+        }       
+    }
 
     return TM_ERROR_NONE;
 }
@@ -586,17 +563,54 @@ IDATA VMCALL hythread_cancel_all(hythread_group_t group) {
  * Allocates and initializes a new thread_t structure.
  *
  */
-IDATA VMCALL hythread_struct_init(hythread_t *ret_thread, hythread_group_t group) {
+IDATA VMCALL hythread_struct_init(hythread_t *ret_thread) {
     if (*ret_thread) {
         reset_thread(*ret_thread);
-    } else {
-        (*ret_thread) = init_thread(group);
+        return TM_ERROR_NONE;
     }
-    if ((*ret_thread)==NULL)
-	{
-		return TM_ERROR_OUT_OF_MEMORY;
-	}
-    return TM_ERROR_NONE;
+    (*ret_thread) = allocate_thread();
+    return (*ret_thread) == NULL ? TM_ERROR_OUT_OF_MEMORY : TM_ERROR_NONE;
+}
+//==============================================================================
+// Private functions
+
+/*
+ */
+static IDATA register_to_group(hythread_t thread, hythread_group_t group) {
+    IDATA status;
+    hythread_t cur, prev;
+
+    assert(thread);
+    assert(group);
+    
+    // Acquire global TM lock to prevent concurrent acccess to thread list
+    status = hythread_global_lock(NULL);
+    if (status != TM_ERROR_NONE) return status;
+
+    thread_set_self(thread);
+    assert(thread == tm_self_tls);
+
+    thread->state = TM_THREAD_STATE_ALIVE | TM_THREAD_STATE_RUNNABLE;
+    
+    if (!thread->thread_id) {
+        ++next_id;
+        thread->thread_id = next_id;
+        if (next_id >= MAX_ID) {
+            hythread_global_unlock(NULL);
+            return TM_ERROR_OUT_OF_MEMORY;
+        }
+    }
+    
+    fast_thread_array[thread->thread_id] = thread;
+
+    thread->group = group;
+    group->threads_count++;
+    cur  = group->thread_list->next;
+    prev = cur->prev;
+    thread->next = cur;
+    thread->prev = prev;
+    prev->next = cur->prev = thread;
+    return hythread_global_unlock(NULL);    
 }
 
 /*
@@ -604,26 +618,20 @@ IDATA VMCALL hythread_struct_init(hythread_t *ret_thread, hythread_group_t group
  *
  * @return created and initialized thread_t structure
  */
-static hythread_t init_thread(hythread_group_t group) {
+static hythread_t allocate_thread() {
     apr_pool_t *pool;
-        apr_status_t apr_status;
+    apr_status_t apr_status;
     hythread_t ptr;
-        IDATA status;
+    IDATA status;
 
-    if (!group) {
-        group = TM_DEFAULT_GROUP;
-    }
+    apr_status = apr_pool_create(&pool, TM_POOL);
+    if((apr_status != APR_SUCCESS) || (pool == NULL)) return NULL;
 
-    apr_status = apr_pool_create(&pool, group->pool);
-    if((apr_status!=APR_SUCCESS)||(pool==NULL))
-	    return NULL;
     ptr = (hythread_t )apr_pcalloc(pool, sizeof(HyThread));
-	if (ptr==NULL)
-		return NULL;
+    if (ptr == NULL) return NULL;
+
     ptr->pool       = pool;
-    ptr->group      = group;
     ptr->os_handle  = NULL;
-    ptr->next       = ptr->prev = ptr;
     ptr->priority   = HYTHREAD_PRIORITY_NORMAL;
     // not implemented
     //ptr->big_thread_local_storage = (void **)apr_pcalloc(pool, sizeof(void*)*tm_tls_capacity);
@@ -632,91 +640,94 @@ static hythread_t init_thread(hythread_group_t group) {
     ptr->suspend_request = 0;
     ptr->suspend_disable_count = 0;
     status = hylatch_create(&ptr->join_event, 1);
-        assert (status == TM_ERROR_NONE);
-    status = hylatch_create(&ptr->safe_region_event, 1);        
-        assert (status == TM_ERROR_NONE);
+    assert (status == TM_ERROR_NONE);
+    status = hylatch_create(&ptr->safe_region_event, 1);
+    assert (status == TM_ERROR_NONE);
     status = hysem_create(&ptr->resume_event, 0, 1);
-        assert (status == TM_ERROR_NONE);
+    assert (status == TM_ERROR_NONE);
     status = hysem_create(&ptr->park_event, 0, 1);
-        assert (status == TM_ERROR_NONE);
+    assert (status == TM_ERROR_NONE);
     status = hysem_create(&ptr->sleep_event, 0, 1);
-        assert (status == TM_ERROR_NONE);
+    assert (status == TM_ERROR_NONE);
     
     ptr->state = TM_THREAD_STATE_ALLOCATED;
-    status = allocate_thread(ptr, group);
-	if (status !=TM_ERROR_NONE)
-	{
-		return NULL;
-	}
-    group->threads_count++;
-
     return ptr;
 }
 
 static void reset_thread(hythread_t thread) {
     apr_status_t apr_status;
-        IDATA status;
-    apr_thread_join(&apr_status, thread->os_handle);
+    IDATA status;
+    if (thread->os_handle) {
+        apr_thread_join(&apr_status, thread->os_handle);
         assert(!apr_status);
+    }
+
     thread->os_handle  = NULL;
     thread->priority   = HYTHREAD_PRIORITY_NORMAL;
     // not implemented
     //ptr->big_thread_local_storage = (void **)apr_pcalloc(pool, sizeof(void*)*tm_tls_capacity);
-    thread->next       = thread->prev = thread;
+
     // Suspension
     thread->suspend_request = 0;
     thread->suspend_disable_count = 0;
     status = hylatch_set(thread->join_event, 1);
-        assert (status == TM_ERROR_NONE);
-    status = hylatch_set(thread->safe_region_event, 1); 
-        assert (status == TM_ERROR_NONE);
+    assert (status == TM_ERROR_NONE);
+    status = hylatch_set(thread->safe_region_event, 1);
+    assert (status == TM_ERROR_NONE);
     status = hysem_set(thread->resume_event, 0);
-        assert (status == TM_ERROR_NONE);
+    assert (status == TM_ERROR_NONE);
     status = hysem_set(thread->park_event, 0);
-        assert (status == TM_ERROR_NONE);
+    assert (status == TM_ERROR_NONE);
     status = hysem_set(thread->sleep_event, 0);
-        assert (status == TM_ERROR_NONE);
+    assert (status == TM_ERROR_NONE);
     
     thread->state = TM_THREAD_STATE_ALLOCATED;
-    status =allocate_thread(thread, thread->group);
-	if (status!=TM_ERROR_NONE)
-	{
-		thread=NULL;
-	}
-    thread->group->threads_count++;
 }
 
 // Wrapper around user thread start proc. Used to perform some duty jobs 
 // right after thread is started.
 //////
 static void* APR_THREAD_FUNC thread_start_proc(apr_thread_t* thd, void *p_args) {
-        IDATA status;
-    hythread_t thread = (hythread_t )p_args;
+    IDATA status;
+    hythread_t thread;
+    thread_start_proc_data * start_proc_data;
+    
+    start_proc_data = (thread_start_proc_data *) p_args;
+    thread = start_proc_data->thread;
 
     TRACE(("TM: native thread started: native: %p tm: %p", apr_os_thread_current(), thread));
+
+    status = register_to_group(thread, start_proc_data->group);
+    if (status != TM_ERROR_NONE) {
+        thread->exit_value = status;
+        return &thread->exit_value;
+    }
+
     // Also, should it be executed under TM global lock?
     thread->os_handle = thd; // DELETE?
-    thread_set_self(thread);
     status = hythread_set_priority(thread, thread->priority);
-        //assert (status == TM_ERROR_NONE);//now we down - fixme
+    //assert (status == TM_ERROR_NONE);//now we down - fixme
     thread->state |= TM_THREAD_STATE_RUNNABLE;
 
-    // Do actual call of the thread body supplied by the user
-    thread->start_proc(thread->start_proc_args);
+    // Do actual call of the thread body supplied by the user.
+    start_proc_data->start_proc(start_proc_data->start_proc_args);
 
-    // shutdown sequence
+    // Shutdown sequence.
     status = hythread_global_lock(NULL);
     assert (status == TM_ERROR_NONE);
     assert(hythread_is_suspend_enabled()); 
     thread->state = TM_THREAD_STATE_TERMINATED | (TM_THREAD_STATE_INTERRUPTED  & thread->state);
-    // Send join event to those threads who called join on this thread
+    thread->exit_value = 0;
+
+    hythread_detach(thread);
+    // Send join event to those threads who called join on this thread.
     hylatch_count_down(thread->join_event);
-    status = thread_destroy(thread);       // Remove thread from the list of thread 
-    assert (status == TM_ERROR_NONE);
-    // Cleanup TLS after thread completes
-    thread_set_self(NULL);
+
     status = hythread_global_unlock(NULL);
-    assert (status == TM_ERROR_NONE);
+    assert (status == TM_ERROR_NONE);    
+    
+    // TODO: It seems it is there is no need to call apr_thread_exit.
+    // Current thread should automatically exit upon returning from this function.
     return (void *)(IDATA)apr_thread_exit(thd, APR_SUCCESS);
 }
 
@@ -733,12 +744,8 @@ extern HY_CFUNC void VMCALL
 }
 
 apr_pool_t* get_local_pool() {
-  hythread_t self = tm_self_tls;
-  if(self == NULL) {
-      return TM_POOL;
-  } else {
-      return self->pool;
-  }
+    hythread_t self = tm_self_tls;
+    return self == NULL ? TM_POOL : self->pool;
 }
  
 /**

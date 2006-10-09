@@ -64,7 +64,7 @@ bool jvmti_process_breakpoint_event(TIEnv *env, VMBreakPoint* bp, void* UNREF da
     hThread->object = (Java_java_lang_Thread *)j_thread->object;
     tmn_suspend_enable();
 
-    JNIEnv *jni_env = (JNIEnv *)jni_native_intf;
+    JNIEnv *jni_env = jni_native_intf;
 
     jvmtiEventBreakpoint func =
         (jvmtiEventBreakpoint)env->get_event_callback(JVMTI_EVENT_BREAKPOINT);

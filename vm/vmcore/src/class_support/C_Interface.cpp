@@ -313,7 +313,8 @@ method_allocate_code_block(Method_Handle m,
 
 void method_set_relocatable(Method_Handle m, JIT_Handle j, NativeCodePtr code_address, Boolean is_relocatable)
 {
-    CodeChunkInfo *cci = vm_methods->find(code_address);
+    Global_Env *env = VM_Global_State::loader_env;
+    CodeChunkInfo *cci = env->vm_methods->find(code_address);
     assert(cci);
     assert(cci->get_jit() == j);
     assert(cci->get_method() == m);
@@ -499,14 +500,16 @@ void method_set_inline_assumption(Compile_Handle h,
 
 Method_Iterator method_get_first_method_jit(JIT_Handle j)
 {
-    return vm_methods->get_first_method_jit((JIT *)j);
+    Global_Env *env = VM_Global_State::loader_env;
+    return env->vm_methods->get_first_method_jit((JIT *)j);
 } //method_get_first_method_jit
 
 
 
 Method_Iterator method_get_next_method_jit(Method_Iterator i)
 {
-    return vm_methods->get_next_method_jit((CodeChunkInfo *)i);
+    Global_Env *env = VM_Global_State::loader_env;
+    return env->vm_methods->get_next_method_jit((CodeChunkInfo *)i);
 } //method_get_next_method_jit
 
 
@@ -2421,7 +2424,7 @@ unsigned vm_get_runtime_type_handle_width()
 const char *vm_get_property_value(const char *property_name)
 {
     assert(property_name);
-    PropertiesHandle props = (PropertiesHandle)&VM_Global_State::loader_env->properties;
+    PropertiesHandle props = (PropertiesHandle)VM_Global_State::loader_env->properties;
     const char *result = properties_get_string_property(props, property_name);
     if (result == NULL)
         result = "";
@@ -2431,7 +2434,7 @@ const char *vm_get_property_value(const char *property_name)
 Boolean vm_get_property_value_boolean(const char *property_name, Boolean default_value)
 {
     assert(property_name);
-    PropertiesHandle props = (PropertiesHandle)&VM_Global_State::loader_env->properties;
+    PropertiesHandle props = (PropertiesHandle)VM_Global_State::loader_env->properties;
     const char *value = properties_get_string_property(props, property_name);
 
     // fall back to provided default if the property is not set
@@ -2510,10 +2513,10 @@ void vm_patch_code_block(Byte *code_block, Byte *new_code, size_t size)
     // a branch long. Note that this function does not synchronize the I- or D-caches.
 
     // Run through list of active threads and suspend the other ones.
-     hythread_suspend_all(NULL, NULL);
+    hythread_suspend_all(NULL, NULL);
     patch_code_with_threads_suspended(code_block, new_code, size);
 
-     hythread_resume_all(NULL);
+    hythread_resume_all(NULL);
 
 } //vm_patch_code_block
 
@@ -2678,7 +2681,7 @@ unsigned thread_get_thread_state_flag_offset() {
 
 void vm_properties_set_value(const char* name, const char* value) 
 {
-    PropertiesHandle ph = (PropertiesHandle)&VM_Global_State::loader_env->properties;
+    PropertiesHandle ph = (PropertiesHandle)VM_Global_State::loader_env->properties;
     properties_set_string_property(ph, name, value);
 }
 
@@ -2686,13 +2689,13 @@ void vm_properties_set_value(const char* name, const char* value)
 // All iterators created with this method call 
 // must be destroyed with vm_properties_iterator_destroy 
 PropertiesIteratorHandle vm_properties_iterator_create() {
-    PropertiesHandle ph = (PropertiesHandle)&VM_Global_State::loader_env->properties;
+    PropertiesHandle ph = (PropertiesHandle)VM_Global_State::loader_env->properties;
     return properties_iterator_create(ph);
 }
 
 // Destroy iterator created by vm_properties_iterator_create
 void vm_properties_iterator_destroy(PropertiesIteratorHandle props_iter) {
-    PropertiesHandle ph = (PropertiesHandle)&VM_Global_State::loader_env->properties;
+    PropertiesHandle ph = (PropertiesHandle)VM_Global_State::loader_env->properties;
     properties_iterator_destroy(ph, props_iter);
 }
 

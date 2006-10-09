@@ -163,7 +163,7 @@ public abstract class ClassLoader {
             // current thread isn't allowed to set systemClassLoader as a
             // context class loader. Actually, it is abnormal situation if
             // thread can not change his own context class loader.
-            Thread.currentThread().setContextClassLoader(systemClassLoader);
+            // Thread.currentThread().setContextClassLoader(systemClassLoader);
         }
         //assert initialized;
         SecurityManager sc = System.getSecurityManager();

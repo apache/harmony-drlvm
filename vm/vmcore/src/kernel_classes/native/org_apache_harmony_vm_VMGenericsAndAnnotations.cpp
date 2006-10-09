@@ -76,7 +76,7 @@ JNIEXPORT jobjectArray JNICALL Java_org_apache_harmony_vm_VMGenericsAndAnnotatio
 JNIEXPORT jobjectArray JNICALL Java_org_apache_harmony_vm_VMGenericsAndAnnotations_getParameterAnnotations
 (JNIEnv *jenv, jclass, jlong jmethod) 
 {
-    static Global_Env* genv = ((JNIEnv_Internal*)jenv)->vm->vm_env;
+    static Global_Env* genv = jni_get_vm_env(jenv);
     Method* method = (Method*) ((POINTER_SIZE_INT) jmethod);
     Class* declaring_class = method->get_class();
 
@@ -91,7 +91,7 @@ JNIEXPORT jobjectArray JNICALL Java_org_apache_harmony_vm_VMGenericsAndAnnotatio
     if (num == 0) {
         unsigned nparams = (method->get_num_args() - (method->is_static() ? 0 : 1));
         if (nparams > 0) {
-            static Class* antn_class = ((JNIEnv_Internal*)jenv)->vm->vm_env->LoadCoreClass(
+            static Class* antn_class = jni_get_vm_env(jenv)->LoadCoreClass(
                 "java/lang/annotation/Annotation");
             array = NewObjectArray(jenv, nparams, 
                 struct_Class_to_java_lang_Class_Handle(array_class), NewObjectArray(jenv, 0, 

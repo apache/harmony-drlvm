@@ -33,14 +33,27 @@
 #include "native_overrides.h"
 #include "compile.h"
 
-Global_Env::Global_Env(tl::MemoryPool & mp, Properties & prop):
-mem_pool(mp),
+
+Global_Env::Global_Env(apr_pool_t * pool):
+mem_pool(pool),
 bootstrap_class_loader(NULL),
 system_class_loader(NULL),
-properties(prop),
+properties(NULL),
+TI(NULL),
+nsoTable(NULL),
+portLib(NULL),
+dcList(NULL),
+assert_reg(NULL),
+vm_methods(NULL),
 bootstrapping(false),
 ready_for_exceptions(false)
 {
+    // TODO: Use proper MM.
+    properties = new Properties();
+    bootstrap_class_loader = new BootstrapClassLoader(this); 
+    
+    hythread_lib_create(&hythread_lib);
+
     JavaLangString_String = string_pool.lookup("java/lang/String");
     JavaLangStringBuffer_String = string_pool.lookup("java/lang/StringBuffer");
     JavaLangObject_String = string_pool.lookup("java/lang/Object");
@@ -117,6 +130,7 @@ ready_for_exceptions(false)
     JavaLangClass_Class = NULL;
     java_lang_Throwable_Class = NULL;
     java_lang_Error_Class = NULL;
+    java_lang_ThreadDeathError_Class = NULL;
     java_lang_ExceptionInInitializerError_Class = NULL;
     java_lang_NullPointerException_Class = NULL;
     java_lang_StackOverflowError_Class = NULL;
@@ -141,22 +155,20 @@ ready_for_exceptions(false)
     JavaLangString_VTable = NULL;
     JavaLangString_allocation_handle = 0;
 
+    uncaught_exception = NULL;
+
     vm_class_offset = 0;
     shutting_down = 0;
 
-    TI = NULL;
-    portLib = NULL;
+    TI = new DebugUtilsTI; 
+    vm_methods = new Method_Lookup_Table;
 
+    nsoTable = nso_init_lookup_table(&string_pool);
 
-    nsoTable = nso_init_lookup_table(&this->string_pool);
+} //Global_Env::Global_Env
 
-    dcList = NULL;
-}       //Global_Env::Global_Env
-
-void Global_Env::EnvClearInternals()
+Global_Env::~Global_Env()
 {
-    // No GC should work during iteration
-    tmn_suspend_disable();
     GlobalClassLoaderIterator ClIterator;
     ClassLoader *cl = ClIterator.first();
     
@@ -166,17 +178,27 @@ void Global_Env::EnvClearInternals()
         delete cltmp;
     }
     ClassLoader::DeleteClassLoaderTable();
-    tmn_suspend_enable();
 
-    if (TI)
-        delete TI;
+    delete TI;
+    TI = NULL;
+
+    delete vm_methods;
+    vm_methods = NULL;
+
+    delete properties;
+    properties = NULL;
+
+    delete bootstrap_class_loader;
+    bootstrap_class_loader = NULL;
 
     nso_clear_lookup_table(nsoTable);
     nsoTable = NULL;
 
     compile_clear_dynamic_code_list(dcList);
     dcList = NULL;
-}
+
+    hythread_lib_destroy(hythread_lib);
+ }
 
 Class* Global_Env::LoadCoreClass(const String* s)
 {

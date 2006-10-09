@@ -25,7 +25,7 @@
 #include "stack_trace.h"
 #include "interpreter.h"
 #include "jit_intf_cpp.h"
-
+#include "environment.h"
 #include "method_lookup.h"
 
 void get_file_and_line(Method_Handle mh, void *ip, bool is_ip_past, const char **file, int *line) {
@@ -55,7 +55,8 @@ void get_file_and_line(Method_Handle mh, void *ip, bool is_ip_past, const char *
     uint16 bcOffset;
     POINTER_SIZE_INT callLength = 5;
 
-    CodeChunkInfo* jit_info = vm_methods->find((unsigned char*)ip - callLength);
+    Global_Env * vm_env = VM_Global_State::loader_env;
+    CodeChunkInfo* jit_info = vm_env->vm_methods->find((unsigned char*)ip - callLength);
     if (jit_info->get_jit()->get_bc_location_for_native(
         method,
         (NativeCodePtr) ((POINTER_SIZE_INT) ip - callLength),

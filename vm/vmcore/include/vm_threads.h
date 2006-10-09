@@ -31,14 +31,18 @@
 #include "vm_process.h"
 #endif
 
+#include <apr_pools.h>
+
 #include "open/types.h"
 #include "open/hythread.h"
 #include "open/ti_thread.h"
+
 #include "vm_core_types.h"
 #include "object_layout.h"
 #include "open/vm_gc.h"
 #include "exceptions_type.h"
 #include "jvmti.h"
+#include "jni_direct.h"
 
 
 // 
@@ -66,9 +70,16 @@ class VmRegisterContext;
 class VM_thread {
 
 public:
-    // FIXME: workaround for strange bug. If this line is removed Visual Stidio
-    // has corrupted list of modules and no debug info at all.
-    void* system_private_data;
+    /**
+     * Memory pool where this structure is allocated.
+     * This pool should be used by current thread for memory allocations.
+     */
+    apr_pool_t * pool;
+
+    /**
+     * JNI environment associated with this thread.
+     */
+    JNIEnv_Internal * jni_env;
 
     // In case exception is thrown, Exception object is put here
     // TODO: Needs to be replaced with jobject!

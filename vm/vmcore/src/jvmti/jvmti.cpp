@@ -290,7 +290,7 @@ void DebugUtilsTI::setExecutionMode(Global_Env *p_env)
             !strncmp(option, "-Xrun", 5))
         {
             TRACE2("jvmti", "Enabling EM JVMTI mode");
-            add_pair_to_properties(p_env->properties, "vm.jvmti.enabled", "true");
+            add_pair_to_properties(*p_env->properties, "vm.jvmti.enabled", "true");
             break;
         }
     }
@@ -472,7 +472,7 @@ static void generate_platform_lib_name(apr_pool_t* pool, JavaVM_Internal *vm,
                                        const char *lib_name,
                                        char **p_path1, char **p_path2)
 {
-    const char *vm_libs = vm->vm_env->properties.get("vm.boot.library.path")->as_string();
+    const char *vm_libs = vm->vm_env->properties->get("vm.boot.library.path")->as_string();
     assert(vm_libs);
     char *path1 = apr_pstrdup(pool, vm_libs);
     char *path2 = port_dso_name_decorate(lib_name, pool);

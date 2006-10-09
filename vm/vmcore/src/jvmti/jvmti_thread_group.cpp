@@ -30,7 +30,7 @@
 #include "suspend_checker.h"
 #include "environment.h"
 
-static JNIEnv_Internal * jvmti_test_jenv = jni_native_intf;
+static JNIEnv * jvmti_test_jenv = jni_native_intf;
 
 /*
  * Get Top Thread Groups

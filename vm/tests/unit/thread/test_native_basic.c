@@ -59,30 +59,41 @@ int test_hythread_create(void){
     return 0;
 }
 
+hylatch_t start;
+hylatch_t end;
+
 int test_hythread_iterator(void) {
     hythread_group_t group = NULL;
     hythread_t thread = NULL;
     hythread_iterator_t iterator;
-    int i = 100;
+    const int n = 100;
+    int i;
 
     hythread_group_create(&group);
+    hylatch_create(&start, n);
+    hylatch_create(&end, 1);
 
-    while(i--) {
+    for (i = 0; i < n; i++) {
         thread = NULL;
         hythread_create_with_group(&thread, group, 0, 0, 0, start_proc_empty, NULL);
     }
 
+    // Wait util all thread has started.
+    hylatch_wait(start);
     iterator = hythread_iterator_create(group);
-    i++;
+    // Notify all threads
+    hylatch_count_down(end);
+
     printf ("iterator size: %d\n", hythread_iterator_size(iterator));
-    tf_assert(hythread_iterator_size(iterator) == 100);
+    tf_assert(hythread_iterator_size(iterator) == n);
+    i = 0;
     while(hythread_iterator_has_next(iterator)) {
         i++;
         thread = hythread_iterator_next(&iterator);
         tf_assert(hythread_is_alive(thread));
     }
 
-    tf_assert(i == 100);
+    tf_assert(i == n);
     
     hythread_iterator_release(&iterator);
     
@@ -92,24 +103,32 @@ int test_hythread_iterator(void) {
 int test_hythread_iterator_default(void) {
     hythread_t thread = NULL;
     hythread_iterator_t iterator;
-    int i = 100;
+    const int n = 100;
+    int i;
 
-    while(i--) {
+    hylatch_create(&start, n);
+    hylatch_create(&end, 1);
+
+    for (i = 0; i < n; i++) {
         thread = NULL;
         hythread_create(&thread, 0, 0, 0, start_proc_empty, NULL);
     }
 
+    // Wait util all thread has started.
+    hylatch_wait(start);
     iterator = hythread_iterator_create(NULL);
-    i++;
+    // Notify all threads
+    hylatch_count_down(end);
+
     printf("default group iterator: %d\n", hythread_iterator_size(iterator));
-    tf_assert(hythread_iterator_size(iterator) == (100 + 1/*current thread*/));
-    
+    tf_assert(hythread_iterator_size(iterator) >= n);
+    i = 0;
     while(hythread_iterator_has_next(iterator)) {
         i++;
         thread = hythread_iterator_next(&iterator);
     }
 
-    tf_assert(i == 101);
+    tf_assert(i >= n);
     
     hythread_iterator_release(&iterator);
     
@@ -153,7 +172,7 @@ int test_hythread_create_many(void){
           sprintf(buf, "Thread %d\0", i);
           hythread_set_name(thread, buf);
         */
-        //hythread_join(thread);
+        hythread_join(thread);
     }
 
     //check thread structures:
@@ -165,16 +184,7 @@ int test_hythread_create_many(void){
     //1.group
     ////
     tf_assert(group);
-    tf_assert(group->threads_count == 10);
-    thread = group->thread_list->next;
-    
-    i=10;
-    while(thread != group->thread_list && i>0) {
-        i--;
-        thread = thread->next;
-    } 
-    
-    tf_assert(!i);
+    tf_assert(group->threads_count == 0);
 
     return 0;
 }
@@ -189,7 +199,8 @@ int start_proc(void *args) {
 }
 
 int start_proc_empty(void *args) {
-    hythread_sleep(1000);
+    hylatch_count_down(start);
+    hylatch_wait(end);
     return 0;
 }
 

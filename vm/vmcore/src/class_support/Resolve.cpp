@@ -1059,7 +1059,7 @@ static bool resolve_const_pool_item(Global_Env *env, Class *clss, unsigned cp_in
 /**
  * Resolve whole constant pool
  */
-unsigned resolve_const_pool(Global_Env& env, Class *clss) {
+int resolve_const_pool(Global_Env& env, Class *clss) {
     Const_Pool *cp = clss->const_pool;
 
     // It's possible that cp is null when defining class on the fly
@@ -1071,5 +1071,5 @@ unsigned resolve_const_pool(Global_Env& env, Class *clss) {
             return i;
         }
     }
-    return 0xFFFFFFFF;
+    return 0;
 } //resolve_const_pool

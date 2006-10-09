@@ -49,14 +49,11 @@
 #define MAX_OWNED_MONITORS_NMB 2
 #define SLEEP_MSEC 10
 
-typedef void (*run_method_t)(void);
-
 typedef struct _jjobject{
     void *data;
     jboolean daemon;
     char *name;
     int lockword;
-    run_method_t run_method;
 }_jjobject;
 
 typedef struct _jobject{
@@ -68,7 +65,6 @@ typedef struct {
     jthread java_thread;
     jobject monitor;
     jrawMonitorID raw_monitor;
-    JNIEnv *jni_env;
     void * jvmti_start_proc_arg;
     int clicks;
     int phase;
@@ -81,14 +77,13 @@ typedef struct {
 extern tested_thread_sturct_t *current_thread_tts;
 extern tested_thread_sturct_t *dummy_tts;
 void jni_init();
-VMEXPORT void *vm_jthread_get_tm_data(jthread thread);
 void sleep_a_click(void);
-void test_java_thread_setup(void);
+void test_java_thread_setup(int argc, char *argv[]);
 void test_java_thread_teardown(void);
 void tested_threads_init(int mode);
-void tested_threads_run(run_method_t run_method_param);
-void tested_threads_run_common(run_method_t run_method_param);
-void tested_threads_run_with_different_monitors(run_method_t run_method_param);
+void tested_threads_run(jvmtiStartFunction run_method_param);
+void tested_threads_run_common(jvmtiStartFunction run_method_param);
+void tested_threads_run_with_different_monitors(jvmtiStartFunction run_method_param);
 void tested_threads_run_with_jvmti_start_proc(jvmtiStartFunction jvmti_start_proc);
 void tested_os_threads_run(apr_thread_start_t run_method_param);
 int tested_threads_destroy();
@@ -106,5 +101,4 @@ int check_exception(jobject excn);
 jobject new_jobject();
 void delete_jobject(jobject obj);
 void set_phase(tested_thread_sturct_t *tts, int phase);
-void default_run_for_test(void);
-JNIEnv * new_JNIEnv();
+void JNICALL default_run_for_test(jvmtiEnv * jvmti_env, JNIEnv * jni_env, void *arg);

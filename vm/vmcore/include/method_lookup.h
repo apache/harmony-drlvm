@@ -86,7 +86,4 @@ private:
 }; //class Method_Lookup_Table
 
 
-VMEXPORT extern Method_Lookup_Table *vm_methods;
-
-
 #endif //_METHOD_LOOKUP_H_

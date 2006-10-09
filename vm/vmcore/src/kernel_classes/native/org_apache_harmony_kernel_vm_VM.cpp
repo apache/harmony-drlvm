@@ -39,7 +39,7 @@ JNIEXPORT jobject JNICALL Java_org_apache_harmony_kernel_vm_VM_getClassLoader
 (JNIEnv *jenv, jclass, jclass clazz)
 {
     // reuse similar method in VMClassRegistry
-    return Java_java_lang_VMClassRegistry_getClassLoader(jenv, NULL, clazz);
+    return Java_java_lang_VMClassRegistry_getClassLoader0(jenv, NULL, clazz);
 }
 
 /**

@@ -106,9 +106,8 @@ inline static bool isPrivilegedFrame(Method_Handle method, Global_Env* genv) {
  * Signature: (IZ)[Ljava/lang/Class;
  */
 JNIEXPORT jobjectArray JNICALL Java_org_apache_harmony_vm_VMStack_getClasses
-  (JNIEnv *jenv_ext, jclass, jint signedMaxSize, jboolean considerPrivileged)
+  (JNIEnv *jenv, jclass, jint signedMaxSize, jboolean considerPrivileged)
 {
-    JNIEnv_Internal *jenv = (JNIEnv_Internal *)jenv_ext;
     
     // if signedMaxSize is negative, maxSize will be > MAX_INT_VALUE
     unsigned maxSize = signedMaxSize;
@@ -123,7 +122,7 @@ JNIEXPORT jobjectArray JNICALL Java_org_apache_harmony_vm_VMStack_getClasses
     // For details look at the org/apache/harmony/vm/VMStack.java file. Thus skipping 2 frames.
     unsigned skip = 2;
 
-    Global_Env* genv = ((JNIEnv_Internal*)jenv)->vm->vm_env;
+    Global_Env* genv = jni_get_vm_env(jenv);
 
     // count target array length ignoring reflection frames
     unsigned length = 0, s;
@@ -214,15 +213,14 @@ JNIEXPORT jobject JNICALL Java_org_apache_harmony_vm_VMStack_getStackState
  * Signature: (Ljava/lang/Object;)[Ljava/lang/StackTraceElement;
  */
 JNIEXPORT jobjectArray JNICALL Java_org_apache_harmony_vm_VMStack_getStackTrace
-  (JNIEnv * jenv_ext, jclass, jobject state)
+  (JNIEnv * jenv, jclass, jobject state)
 {
     ASSERT_RAISE_AREA;
     if (NULL == state)
         return NULL;
 
-    Global_Env* genv = VM_Global_State::loader_env;
+    Global_Env* genv = jni_get_vm_env(jenv);
 
-    JNIEnv_Internal *jenv = (JNIEnv_Internal *)jenv_ext;
      // state object contains raw data as long array
     jlongArray array = (jlongArray)state;
     assert(array);
@@ -255,7 +253,7 @@ JNIEXPORT jobjectArray JNICALL Java_org_apache_harmony_vm_VMStack_getStackTrace
         Method *method = frames[skip].method;
         // skip Throwable constructor
         if (method->is_init() && method->get_class() ==
-                VM_Global_State::loader_env->java_lang_Throwable_Class) {
+                genv->java_lang_Throwable_Class) {
             void *old_this = frames[skip].outdated_this;
             skip++;
 
@@ -268,25 +266,6 @@ JNIEXPORT jobjectArray JNICALL Java_org_apache_harmony_vm_VMStack_getStackTrace
                         || old_this != frames[skip].outdated_this) {
                     break;
                 }
-            }
-        }
-    }
-
-
-    // skip the VMStart$MainThread.runImpl() if it exists from the bottom
-    // of the stack along with 2 reflection frames used to invoke method main
-    static String* starter_String = genv->string_pool.lookup("java/lang/VMStart$MainThread");
-    Method_Handle method = frames[size - 1].method;
-    assert(method);
-
-    if (!strcmp(method_get_name(method), "runImpl")
-          && method->get_class()->name == starter_String) {
-        for (; --size;) {
-            method = frames[size - 1].method;
-            assert(method);
-            if ((strstr(method->get_class()->name->bytes, "java/lang/reflect"))
-                == NULL) {
-                break;
             }
         }
     }
@@ -335,8 +314,7 @@ JNIEXPORT jobjectArray JNICALL Java_org_apache_harmony_vm_VMStack_getStackTrace
      
         tmn_suspend_disable();
         // class name
-        String* className = class_get_java_name(method->get_class(), 
-            VM_Global_State::loader_env);
+        String* className = class_get_java_name(method->get_class(), genv);
         strClassName->object = vm_instantiate_cp_string_resolved(className);
         if (!strClassName->object) {
             tmn_suspend_enable();
@@ -376,7 +354,7 @@ JNIEXPORT jobject JNICALL Java_org_apache_harmony_vm_VMStack_getClassLoader
   (JNIEnv *jenv, jclass, jclass clazz)
 {
     // reuse similar method in VMClassRegistry
-    return Java_java_lang_VMClassRegistry_getClassLoader(jenv, NULL, clazz);
+    return Java_java_lang_VMClassRegistry_getClassLoader0(jenv, NULL, clazz);
 }
 
 /*

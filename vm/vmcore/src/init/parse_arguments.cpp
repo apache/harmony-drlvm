@@ -19,27 +19,20 @@
  * @version $Revision: 1.1.2.4.4.7 $
  */  
 
-
-#define LOG_DOMAIN "vm.core"
-#include "cxxlog.h"
-
-#include <apr_strings.h>
-#include <apr_env.h>
-#include "port_filepath.h"
-
 #include <string.h>
 #include <assert.h>
 #include <ctype.h>
+#include <apr_strings.h>
+#include <apr_env.h>
 
+#include "open/gc.h" 
+#include "open/vm_util.h"
 
 #include "Class.h"
 #include "properties.h"
 #include "environment.h"
 #include "assertion_registry.h"
-
-#include "open/gc.h"
- 
-#include "open/vm_util.h"
+#include "port_filepath.h"
 #include "compile.h"
 #include "vm_stats.h"
 #include "nogc.h"
@@ -51,6 +44,9 @@
 #include "jit_intf.h"
 #include "dll_jit_intf.h"
 #include "dll_gc.h"
+
+#define LOG_DOMAIN "vm.core"
+#include "cxxlog.h"
 
 //------ Begin DYNOPT support --------------------------------------
 //
@@ -134,7 +130,7 @@ void print_generic_help()
 
 static inline Assertion_Registry* get_assert_reg(Global_Env *p_env) {
     if (!p_env->assert_reg) {
-        void * mem = p_env->mem_pool.alloc(sizeof(Assertion_Registry));
+        void * mem = apr_palloc(p_env->mem_pool, sizeof(Assertion_Registry));
         p_env->assert_reg = new (mem) Assertion_Registry(); 
     }
     return p_env->assert_reg;
@@ -177,7 +173,7 @@ void parse_vm_arguments(Global_Env *p_env)
              *  This is the directory where the virtual machine artifacts are located
              *  (vm.dll, etc) including the kernel.jar  GEIR
              */
-            add_pair_to_properties(p_env->properties, "org.apache.harmony.vm.vmdir", 
+            add_pair_to_properties(*p_env->properties, "org.apache.harmony.vm.vmdir", 
                         option + strlen("-Dorg.apache.harmony.vm.vmdir="));
         }
         else if (begins_with(option, XBOOTCLASSPATH)) {
@@ -187,7 +183,7 @@ void parse_vm_arguments(Global_Env *p_env)
              *  processing and setting up "vm.boot.class.path" and "sun.boot.class.path"
              *  Note that in the case of multiple arguments, the last one will be used
              */
-            add_pair_to_properties(p_env->properties, XBOOTCLASSPATH, option + strlen(XBOOTCLASSPATH));
+            add_pair_to_properties(*p_env->properties, XBOOTCLASSPATH, option + strlen(XBOOTCLASSPATH));
         }
         else if (begins_with(option, XBOOTCLASSPATH_A)) {
             /*
@@ -196,7 +192,7 @@ void parse_vm_arguments(Global_Env *p_env)
              *  Note that we accumulate if multiple, appending each time
              */
 
-            const char *bcp_old = properties_get_string_property((PropertiesHandle)&p_env->properties, 
+            const char *bcp_old = properties_get_string_property((PropertiesHandle)p_env->properties, 
                                 XBOOTCLASSPATH_A);
             const char *value = option + strlen(XBOOTCLASSPATH_A);
             
@@ -213,7 +209,7 @@ void parse_vm_arguments(Global_Env *p_env)
                  bcp_new = tmp;
             }
             
-            add_pair_to_properties(p_env->properties, XBOOTCLASSPATH_A, bcp_old ? bcp_new : value); 
+            add_pair_to_properties(*p_env->properties, XBOOTCLASSPATH_A, bcp_old ? bcp_new : value); 
                         
             if (bcp_new) {
                 free(bcp_new);
@@ -226,7 +222,7 @@ void parse_vm_arguments(Global_Env *p_env)
              *  Note that we accumulate if multiple, prepending each time
              */
              
-            const char *bcp_old = properties_get_string_property((PropertiesHandle)&p_env->properties, 
+            const char *bcp_old = properties_get_string_property((PropertiesHandle)p_env->properties, 
                                 XBOOTCLASSPATH_P);
             const char *value = option + strlen(XBOOTCLASSPATH_P);
             
@@ -243,7 +239,7 @@ void parse_vm_arguments(Global_Env *p_env)
                  bcp_new = tmp;
             }
             
-            add_pair_to_properties(p_env->properties, XBOOTCLASSPATH_P, bcp_old ? bcp_new : value); 
+            add_pair_to_properties(*p_env->properties, XBOOTCLASSPATH_P, bcp_old ? bcp_new : value); 
             
             if (bcp_new) {
                 free(bcp_new);
@@ -262,7 +258,7 @@ void parse_vm_arguments(Global_Env *p_env)
         } else if (begins_with(option, "-Xjit:")) {
             // Do nothing here, just skip this option for later parsing
         } else if (strcmp(option, "-Xint") == 0) {
-            add_pair_to_properties(p_env->properties, "vm.use_interpreter", "true");
+            add_pair_to_properties(*p_env->properties, "vm.use_interpreter", "true");
 #ifdef VM_STATS
         } else if (begins_with(option, "-Xstats:")) {
             vm_print_total_stats = true;
@@ -286,12 +282,12 @@ void parse_vm_arguments(Global_Env *p_env)
             char* prop_key = strdup(option + strlen("-X"));
             prop_key[2] = '.';
             TRACE2("init", prop_key << " = 1");
-            add_pair_to_properties(p_env->properties, prop_key, "1");
+            add_pair_to_properties(*p_env->properties, prop_key, "1");
             free(prop_key);
 
         } else if (begins_with(option, "-Xem:")) {
             const char* arg = option + strlen("-Xem:");
-            add_pair_to_properties(p_env->properties, "em.properties", arg);
+            add_pair_to_properties(*p_env->properties, "em.properties", arg);
 
         } else if (begins_with(option, "-Xms")) {
             // cut -Xms
@@ -300,7 +296,7 @@ void parse_vm_arguments(Global_Env *p_env)
             if (atoi(arg) == 0) {
                 ECHO("Negative or invalid heap size. Default value will be used!");
             }
-            add_pair_to_properties(p_env->properties, "gc.ms", arg);
+            add_pair_to_properties(*p_env->properties, "gc.ms", arg);
 
         } else if (begins_with(option, "-Xmx")) {
             // cut -Xmx
@@ -309,7 +305,7 @@ void parse_vm_arguments(Global_Env *p_env)
             if (atoi(arg) == 0) {
                 ECHO("Negative or invalid heap size. Default value will be used!");
             }
-            add_pair_to_properties(p_env->properties, "gc.mx", arg);
+            add_pair_to_properties(*p_env->properties, "gc.mx", arg);
         }
         else if (begins_with(option, "-agentlib:")) {
             p_env->TI->addAgent(option);
@@ -372,7 +368,7 @@ void parse_vm_arguments(Global_Env *p_env)
             dump_file_name = arg;
         }
         else if (strcmp(option, "-XcleanupOnExit") == 0) {
-            add_pair_to_properties(p_env->properties, "vm.cleanupOnExit", "true");       
+            add_pair_to_properties(*p_env->properties, "vm.cleanupOnExit", "true");       
         }
         else if (strcmp(option, "_org.apache.harmony.vmi.portlib") == 0) {
             // Store a pointer to the portlib
@@ -554,73 +550,6 @@ void set_log_levels_from_cmd(JavaVMInitArgs* vm_arguments)
     } // for (arg_num)
 } //set_log_levels_from_cmd
 
-struct cmd_arg
-{
-    bool substring;
-    char *param;
-    int length;
-    int args;
-};
-
-static const cmd_arg supported_parameters[] =
-{
-    {false, "-classpath",                    strlen("-classpath"),                    1},
-    {false, "-cp",                           strlen("-cp"),                           1},
-    {true,  "-Xbootclasspath:",              strlen("-Xbootclasspath:"),              0},
-    {true,  "-Xbootclasspath/a:",            strlen("-Xbootclasspath/a:"),            0},
-    {true,  "-Xbootclasspath/p:",            strlen("-Xbootclasspath/p:"),            0},
-    {false, "-?",                            strlen("-?"),                            0},
-    {false, "-help",                         strlen("-help"),                         1},
-    {true,  "-Xjit",                         strlen("-Xjit"),                         1},
-    {false, "-Xint",                         strlen("-Xint"),                         0},
-#ifdef VM_STATS
-    {false, "-Xstats",                       strlen("-Xstats"),                       1},
-#endif
-    {false, "-version",                      strlen("-version"),                      0},
-    {false, "-showversion",                  strlen("-showversion"),                  0},
-    {false, "-fullversion",                  strlen("-fullversion"),                  0},
-    {true,  "-ea",                           strlen("-ea"),                           0},
-    {true,  "-enableassertions",             strlen("-enableassertions"),             0},
-    {true,  "-da",                           strlen("-da"),                           0},
-    {true,  "-disableassertions",            strlen("-disableassertions"),            0},
-    {false, "-dsa",                          strlen("-esa"),                          0},
-    {false, "-esa",                          strlen("-dsa"),                          0},
-    {false, "-enablesystemassertions",       strlen("-enablesystemassertions"),       0},
-    {false, "-disablesystemassertions",      strlen("-disablesystemassertions"),      0},
-    {false, "-Xgc",                          strlen("-Xgc"),                          1},
-    {true,  "-Xem",                          strlen("-Xem"),                          1},
-    {true,  "-Xms",                          strlen("-Xms"),                          0},
-    {true,  "-Xmx",                          strlen("-Xmx"),                          0},
-    {true,  "-agentlib:",                    strlen("-agentlib:"),                    0},
-    {true,  "-agentpath:",                   strlen("-agentpath:"),                   0},
-    {false, "-Xdebug",                       strlen("-Xdebug"),                       0},
-    {false, "-Xverify",                      strlen("-Xverify"),                      0},
-    {false, "-verify",                       strlen("-verify"),                       0},
-    {false, "-Xnoagent",                     strlen("-Xnoagent"),                     0},
-    {true,  "-Xrun",                         strlen("-Xrun"),                         0},
-    {true,  "-verbose",                      strlen("-verbose"),                      0},
-    {true,  "-Xverbose",                     strlen("-Xverbose"),                     0},
-    {true,  "-Xverboseconf:",                strlen("-Xverboseconf:"),                0},
-    {true,  "-Xverboselog:",                 strlen("-Xverboselog:"),                 0},
-    {true,  "-Xfileline",                    strlen("-Xfileline"),                    0},
-    {true,  "-Xthread",                      strlen("-Xthread"),                      0},
-    {true,  "-Xcategory",                    strlen("-Xcategory"),                    0},
-    {true,  "-Xtimestamp",                   strlen("-Xtimestamp"),                   0},
-    {true,  "-Xwarn",                        strlen("-Xwarn"),                        0},
-    {true,  "-Xfunction",                    strlen("-Xfunction"),                    0},
-#ifdef _DEBUG
-    {true,  "-Xtrace",                       strlen("-Xtrace"),                       0},
-    {true,  "-Xlog",                         strlen("-Xlog"),                         0},
-#endif //_DEBUG
-    {true,  "-D",                            strlen("-D"),                            0},
-    {false, "-Xdumpstubs",                   strlen("-Xdumpstubs"),                   0},
-    {false, "-Xparallel_jit",                strlen("-Xparallel_jit"),                0},
-    {false, "-Xno_parallel_jit",             strlen("-Xno_parallel_jit"),             0},
-    {false, "-Xdumpfile",                    strlen("-Xdumpfile"),                    1},
-    {false, "-XcleanupOnExit",               strlen("-XcleanupOnExit"),               0},
-    {false, "-jar",                          strlen("-jar"),                          0}
-}; //supported_parameters
-
 static void print_help_on_nonstandard_options()
 {
 #ifdef _DEBUG
@@ -701,217 +630,6 @@ static void print_help_on_nonstandard_options()
          "    -XcleanupOnExit\n"
          "              Excplicitly free VM resources before exit\n");
 } //print_help_on_nonstandard_options
-
-static JavaVMInitArgs* create_vm_arguments(int options_capacity)
-{
-    JavaVMInitArgs* vm_arguments = (JavaVMInitArgs*) STD_MALLOC(sizeof(JavaVMInitArgs));
-    assert(vm_arguments);
-    vm_arguments->version = JNI_VERSION_1_4;
-    vm_arguments->nOptions = 0;
-    vm_arguments->ignoreUnrecognized = JNI_FALSE;
-    vm_arguments->options =
-        (JavaVMOption*)STD_MALLOC(sizeof(JavaVMOption) * (options_capacity));
-    assert(vm_arguments->options);
-
-    return vm_arguments;
-} //create_vm_arguments
-
-void clear_vm_arguments(JavaVMInitArgs* vm_args)
-{
-    STD_FREE(vm_args->options);
-    STD_FREE(vm_args);
-} 
-
-static void vm_arguments_append_classpath(JavaVMInitArgs* vm_arguments, const char* jar_file)
-{
-    static const char prefix[] = "-Djava.class.path=";
-
-    // search for the last java.class.path property declaration
-    for (int i = vm_arguments->nOptions - 1; i >= 0 ; i--)
-    {
-        const char* option = vm_arguments->options[i].optionString;
-        if (strncmp(option, prefix, strlen(prefix)) == 0)
-        {
-            // if found, append jar file name
-            char* new_option = (char*) STD_MALLOC(strlen(option) + 
-                    strlen(PORT_PATH_SEPARATOR_STR) + strlen(jar_file) + 1);
-            assert(new_option);
-
-            strcpy(new_option, option);
-            strcat(new_option, PORT_PATH_SEPARATOR_STR);
-            strcat(new_option, jar_file);
-
-            vm_arguments->options[i].optionString = new_option;
-            return;
-        }
-    }
-
-    // if not found, define java.class.path with jar file name
-    char* option = (char*) STD_MALLOC(strlen(prefix) + strlen(jar_file) + 1);
-    assert(option);
-
-    strcpy(option, prefix);
-    strcat(option, jar_file);
-
-    vm_arguments->options[vm_arguments->nOptions].optionString = option;
-    vm_arguments->nOptions ++;
-    return;
-} //vm_arguments_append_classpath
-
-static int parse_vm_option(JavaVMInitArgs* vm_arguments, int argc, char *argv[], int i)
-{
-    // return 0, if arguments are over
-    if (i >= argc)
-        return 0;
-
-    // if '-jar' met, thean vm options are over
-    if (strcmp(argv[i], "-jar") == 0)
-        return 0;
-
-    const cmd_arg* supported_parameter;
-    bool found = false;
-    for (unsigned j = 0; j < sizeof(supported_parameters) / sizeof(cmd_arg); j++)
-    {
-        supported_parameter = &(supported_parameters[j]);
-        if ((supported_parameters[j].substring &&
-            strncmp(argv[i], supported_parameters[j].param,
-            supported_parameters[j].length) == 0) ||
-            (!supported_parameters[j].substring &&
-            strcmp(argv[i], supported_parameters[j].param) == 0))
-        {
-            found = true;
-            break;
-        }
-    }
-
-    if (found) 
-    {
-        char* option;
-
-        if (strcmp(argv[i], "-classpath") == 0 || strcmp(argv[i], "-cp") == 0) 
-        {
-            if (i + 1 >= argc) {
-                ECHO("Classpath option "
-                    << argv[i]
-                    << " should be followed by classpath value"
-                    USE_JAVA_HELP);
-                LOGGER_EXIT(1);
-            }
-
-            char* class_path = argv[i + 1];
-            static const char prefix[] = "-Djava.class.path=";
-
-            option = (char*) STD_MALLOC(strlen(prefix) + strlen(class_path) + 1);
-            assert(option);
-
-            strcpy(option, prefix);
-            strcat(option, class_path);
-        } 
-        else if (strcmp(argv[i], "-help") == 0 || strcmp(argv[i], "-?") == 0) 
-        {
-            if (i + 1 >= argc) 
-            {
-                // out a generic help message
-                print_generic_help();
-                LOGGER_EXIT(0);
-            }
-
-            const char* arg = argv[i + 1];
-            if (strcmp(arg, "jit") != 0 && !begins_with(arg, "prop")) 
-            {
-                // out a generic help message
-                print_generic_help();
-                LOGGER_EXIT(0);
-            }
-
-            static const char prefix[] = "-Xhelp:";
-
-            option = (char*) STD_MALLOC(strlen(prefix) + strlen(arg) + 1);
-            assert(option);
-
-            strcpy(option, prefix);
-            strcat(option, arg);
-
-        } 
-        else if (supported_parameter->args == 1)
-        {
-            if (i + 1 >= argc) 
-            {
-                ECHO("Option " << argv[i] << " should be followed by a additional parameter");
-                LOGGER_EXIT(1);
-            }
-
-            option = (char*) STD_MALLOC(strlen(argv[i]) + 1 + strlen(argv[i + 1]) + 1);
-            assert(option);
-
-            strcpy(option, argv[i]);
-            strcat(option, ":");
-            strcat(option, argv[i + 1]);
-        }
-        else
-        {
-            option = argv[i];
-        }
-
-        vm_arguments->options[vm_arguments->nOptions].optionString = option;
-        vm_arguments->nOptions ++;
-
-        return  1 + supported_parameter->args;
-    }
-
-    if (argv[i][0] != '-')
-        return 0;
-
-    if (strcmp(argv[i], "-X") == 0) 
-    {
-        print_help_on_nonstandard_options();
-        LOGGER_EXIT(0);
-    } else {
-        ECHO("Unknown option " << argv[i] << USE_JAVA_HELP);
-        LOGGER_EXIT(1);
-    }
-
-} //parse_vm_option
-
-JavaVMInitArgs* parse_cmd_arguments(int argc, char *argv[], 
-        char **p_class_name, char **p_jar_file, int *p_java_arg_num)
-{
-    *p_class_name = NULL;
-    *p_jar_file = NULL;
-
-    JavaVMInitArgs* vm_arguments = create_vm_arguments(argc);
-
-    int i = 1; // skip argv[0], since it is a program name
-    int inc = 0;
-    do
-    {
-        inc = parse_vm_option(vm_arguments, argc, argv, i);
-        i += inc;
-    } while (inc > 0);
-
-    if (i < argc)
-    {
-        if (strcmp(argv[i], "-jar") == 0)
-        {
-            i++;
-            if (i >= argc) {
-                ECHO("Option -jar must be followed by a jar file name");
-                LOGGER_EXIT(1);
-            }
-
-            *p_jar_file = argv[i];
-            vm_arguments_append_classpath(vm_arguments, *p_jar_file);
-        }
-        else
-        {
-            *p_class_name = argv[i];
-        }
-    }
-
-    *p_java_arg_num = argc - i - 1;
-
-    return vm_arguments;
-} //parse_cmd_arguments
 
 void initialize_vm_cmd_state(Global_Env *p_env, JavaVMInitArgs* arguments)
 {

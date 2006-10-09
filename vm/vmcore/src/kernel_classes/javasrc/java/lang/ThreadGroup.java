@@ -363,7 +363,7 @@ public class ThreadGroup implements Thread.UncaughtExceptionHandler{
         if(throwable instanceof ThreadDeath){
             return;
         }
-        System.err.println("Uncaught exception in "+thread.getName()+":");
+        System.err.println("Uncaught exception in " + thread.getName() + ":");
         throwable.printStackTrace();
     }
 

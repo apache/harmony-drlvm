@@ -64,7 +64,7 @@ int test_jthread_get_thread_cpu_timer_info(void) {
     return helper_hythread_cpu_timing();
 }
 
-void run_for_helper_hythread_cpu_timing(void){
+void JNICALL run_for_helper_hythread_cpu_timing(jvmtiEnv * jvmti_env, JNIEnv * jni_env, void *arg){
 
     tested_thread_sturct_t * tts = current_thread_tts;
     int i;

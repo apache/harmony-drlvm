@@ -480,7 +480,7 @@ void
 DrlVMCompilationInterface::hardAssert(const char *message, int line, const char *file)
 {
     ::std::cerr << message << " at line " << line << " of file " << file << ::std::endl;
-    vm_exit(1);
+    exit(1);
 }
 
 Type*

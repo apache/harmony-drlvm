@@ -67,7 +67,7 @@ Java_java_lang_VMClassRegistry_getClass(JNIEnv *, jclass,
  * Method: java.lang.VMClassRegistry.getClassLoader(Ljava/lang/Class;)Ljava/lang/ClassLoader;
  */
 JNIEXPORT jobject JNICALL
-Java_java_lang_VMClassRegistry_getClassLoader(JNIEnv *, jclass, 
+Java_java_lang_VMClassRegistry_getClassLoader0(JNIEnv *, jclass, 
     jclass);
 
 /*

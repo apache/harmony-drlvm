@@ -111,10 +111,7 @@ class FinalizerThread extends Thread {
     /*
      * Staic private part
      */
-    
-    // Finalizer Threads Group
-    private static final ThreadGroup threadGroup = new ThreadGroup("Finalizer Threads Group");
-    
+        
     // Maximum quantity of finalizers threads
     private static final int MAX_THREADS = 256;
 
@@ -313,7 +310,7 @@ class FinalizerThread extends Thread {
     private FinalizerStartLock startLock = new FinalizerStartLock();
 
     protected FinalizerThread (boolean permanent) {
-        super(threadGroup, "FinalizerThread");
+        super(Thread.systemThreadGroup, "FinalizerThread");
         this.permanent = permanent;
         this.setDaemon(true);
     }

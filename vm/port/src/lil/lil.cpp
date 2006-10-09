@@ -1309,7 +1309,7 @@ static void lil_next_context(LilInstructionContext* c, LilCodeStub* cs, LilInstr
         break;
     case LIT_StdPlaces:
         c->num_std_places = i->u.std_places;
-        for(j=0; j<c->num_locals; j++) c->std_place_types[j] = LT_Void;
+        for(j=0; j<c->num_std_places; j++) c->std_place_types[j] = LT_Void;
         break;
     case LIT_Alloc:
         c->amt_alloced += i->u.alloc.num_bytes;

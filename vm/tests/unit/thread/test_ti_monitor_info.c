@@ -23,10 +23,16 @@
 #include <open/hythread_ext.h>
 #include <open/ti_thread.h>
 
+hylatch_t mon_enter;
+
+int ti_is_enabled() {
+    return 1;
+}
+
 /*
  * Test jthread_get_contended_monitor(...)
  */
-void run_for_test_jthread_get_contended_monitor(void){
+void JNICALL run_for_test_jthread_get_contended_monitor(jvmtiEnv * jvmti_env, JNIEnv * jni_env, void *arg){
 
     tested_thread_sturct_t * tts = current_thread_tts;
     jobject monitor = tts->monitor;
@@ -36,6 +42,7 @@ void run_for_test_jthread_get_contended_monitor(void){
     status = jthread_monitor_enter(monitor);
     // Begin critical section
     tts->phase = (status == TM_ERROR_NONE ? TT_PHASE_IN_CRITICAL_SECTON : TT_PHASE_ERROR);
+    hylatch_count_down(mon_enter);
     while(1){
         tts->clicks++;
         sleep_a_click();
@@ -43,6 +50,7 @@ void run_for_test_jthread_get_contended_monitor(void){
             break;
         }
     }
+    hylatch_set(mon_enter, 1);
     // End critical section
     status = jthread_monitor_exit(monitor);
     tts->phase = (status == TM_ERROR_NONE ? TT_PHASE_DEAD : TT_PHASE_ERROR);
@@ -55,6 +63,8 @@ int test_jthread_get_contended_monitor(void) {
     jobject contended_monitor;
     int i;
 
+    hylatch_create(&mon_enter, 1);
+
     // Initialize tts structures and run all tested threads
     tested_threads_run(run_for_test_jthread_get_contended_monitor);
     
@@ -64,6 +74,7 @@ int test_jthread_get_contended_monitor(void) {
         reset_tested_thread_iterator(&tts);
         while(next_tested_thread(&tts)){
             check_tested_thread_phase(tts, TT_PHASE_ANY); // to make thread running
+            hylatch_wait(mon_enter);
             tf_assert_same(jthread_get_contended_monitor(tts->java_thread, &contended_monitor), TM_ERROR_NONE);
             if (tts->phase == TT_PHASE_IN_CRITICAL_SECTON){
                 tf_assert_null(contended_monitor);
@@ -71,7 +82,8 @@ int test_jthread_get_contended_monitor(void) {
                 critical_tts = tts;
             } else if (tts->phase != TT_PHASE_DEAD){
                 check_tested_thread_phase(tts, TT_PHASE_WAITING_ON_MONITOR);
-                tf_assert(vm_objects_are_equal(contended_monitor, tts->monitor));
+                // This can't be guaranteed
+                //tf_assert(vm_objects_are_equal(contended_monitor, tts->monitor));
             }
         }
         critical_tts->stop = 1;
@@ -86,7 +98,7 @@ int test_jthread_get_contended_monitor(void) {
 /*
  * Test jthread_holds_lock(...)
  */
-void run_for_test_jthread_holds_lock(void){
+void JNICALL run_for_test_jthread_holds_lock(jvmtiEnv * jvmti_env, JNIEnv * jni_env, void *arg){
 
     tested_thread_sturct_t * tts = current_thread_tts;
     jobject monitor = tts->monitor;
@@ -152,7 +164,7 @@ int test_jthread_holds_lock(void) {
 /*
  * Test jthread_get_lock_owner(...)
  */
-void run_for_test_jthread_get_lock_owner(void){
+void JNICALL run_for_test_jthread_get_lock_owner(jvmtiEnv * jvmti_env, JNIEnv * jni_env, void *arg){
 
     tested_thread_sturct_t * tts = current_thread_tts;
     jobject monitor = tts->monitor;
@@ -213,7 +225,7 @@ int test_jthread_get_lock_owner(void) {
 /*
  * Test jthread_get_owned_monitors(...)
  */
-void run_for_test_jthread_get_owned_monitors(void){
+void JNICALL run_for_test_jthread_get_owned_monitors(jvmtiEnv * jvmti_env, JNIEnv * jni_env, void *arg){
 
     tested_thread_sturct_t * tts = current_thread_tts;
     jobject monitor = tts->monitor;
@@ -224,6 +236,7 @@ void run_for_test_jthread_get_owned_monitors(void){
 
     // Begin critical section
     tts->phase = (status == TM_ERROR_NONE ? TT_PHASE_IN_CRITICAL_SECTON : TT_PHASE_ERROR);
+    hylatch_count_down(mon_enter);
     while(1){
         tts->clicks++;
         sleep_a_click();
@@ -231,6 +244,7 @@ void run_for_test_jthread_get_owned_monitors(void){
             break;
         }
     }
+    hylatch_set(mon_enter, 1);
     status = jthread_monitor_exit(monitor);
     // End critical section
     tts->phase = (status == TM_ERROR_NONE ? TT_PHASE_DEAD : TT_PHASE_ERROR);
@@ -244,6 +258,8 @@ int test_jthread_get_owned_monitors(void) {
     jint owned_monitors_count;
     jobject *owned_monitors = NULL;
 
+    hylatch_create(&mon_enter, 1);
+
     // Initialize tts structures and run all tested threads
     tested_threads_run(run_for_test_jthread_get_owned_monitors);
     
@@ -253,6 +269,7 @@ int test_jthread_get_owned_monitors(void) {
         reset_tested_thread_iterator(&tts);
         while(next_tested_thread(&tts)){
             check_tested_thread_phase(tts, TT_PHASE_ANY); // to make thread running
+            hylatch_wait(mon_enter);
             tf_assert_same(jthread_get_owned_monitors (tts->java_thread, 
                                                        &owned_monitors_count, &owned_monitors), TM_ERROR_NONE);
             if (tts->phase == TT_PHASE_IN_CRITICAL_SECTON){

@@ -19,9 +19,17 @@
  * @version $Revision: 1.1.2.2.4.5 $
  */  
 
-
 #define LOG_DOMAIN "jni"
 #include "cxxlog.h"
+
+#include <apr_atomic.h>
+#include <apr_pools.h>
+#include <apr_thread_mutex.h>
+
+#include "open/types.h"
+#include "open/hythread.h"
+#include "open/jthread.h"
+#include "open/vm_util.h"
 
 #include "platform.h"
 #include "lock_manager.h"
@@ -29,11 +37,7 @@
 #include "classloader.h"
 #include "environment.h"
 #include "object_handles.h"
-#include "open/types.h"
-#include "open/vm_util.h"
 #include "vm_threads.h"
-#include "open/jthread.h"
-
 #include "vm_synch.h"
 #include "exceptions.h"
 #include "reflection.h"
@@ -44,13 +48,9 @@
 #include "m2n.h"
 #include "nogc.h"
 #include "init.h"
-
 #include "Verifier_stub.h"
-
 #include "jni_utils.h"
-
 #include "jit_runtime_support.h"
-
 #include "jvmti_direct.h"
 
 #ifdef _IPF_
@@ -58,6 +58,7 @@
 #endif // _IPF_
 
 static void JNICALL UnimpStub(JNIEnv*);
+jint JNICALL GetVersion(JNIEnv *);
 
 struct JNINativeInterface_ jni_vtable = {
             
@@ -65,6 +66,7 @@ struct JNINativeInterface_ jni_vtable = {
     (void*)UnimpStub,
     (void*)UnimpStub,
     (void*)UnimpStub,
+    
     GetVersion,
             
     DefineClass,
@@ -333,28 +335,207 @@ const struct JNIInvokeInterface_ java_vm_vtable = {
     (void*)UnimpStub,
     (void*)UnimpStub,
 
-    DestroyVM,
+    DestroyJavaVM,
 
     AttachCurrentThread,
     DetachCurrentThread,
 
     GetEnv,
 
-    AttachCurrentThreadAsDaemon,
-
+    AttachCurrentThreadAsDaemon
 };
 
-static JavaVM_Internal java_vm = JavaVM_Internal(&java_vm_vtable, NULL, (void *)0x1234abcd);
+/**
+ * List of all running in the current process.
+ */ 
+APR_RING_HEAD(JavaVM_Internal_T, JavaVM_Internal) GLOBAL_VMS;
 
-static JNIEnv_Internal jni_env = JNIEnv_Internal(&jni_vtable, &java_vm, (void *)0x1234abcd);
+/**
+ * Memory pool to keep global data.
+ */
+apr_pool_t * GLOBAL_POOL = NULL;
 
-struct JNIEnv_Internal *jni_native_intf = &jni_env;
+/**
+ * Used to synchronize VM creation and destruction.
+ */
+apr_thread_mutex_t * GLOBAL_LOCK = NULL;
 
-void jni_init()
+static jboolean & get_init_status() {
+    static jboolean init_status = JNI_FALSE;
+    return init_status;
+}
+/**
+ * Initializes JNI module.
+ * Should  be called before creating first VM.
+ */
+static jint jni_init()
 {
-    java_vm.vm_env = VM_Global_State::loader_env;
-} //jni_init
+    jint status;
 
+    if (get_init_status() == JNI_FALSE) {
+         status = apr_initialize();
+        if (status != APR_SUCCESS) return JNI_ERR;
+
+        if (apr_atomic_cas32((volatile apr_uint32_t *)&get_init_status(), JNI_TRUE, JNI_FALSE) == JNI_FALSE) {
+            APR_RING_INIT(&GLOBAL_VMS, JavaVM_Internal, link);
+            status = apr_pool_create(&GLOBAL_POOL, 0);
+            if (status != APR_SUCCESS) return JNI_ERR;
+
+            status = apr_thread_mutex_create(&GLOBAL_LOCK, APR_THREAD_MUTEX_DEFAULT, GLOBAL_POOL);
+            if (status != APR_SUCCESS) {
+                apr_pool_destroy(GLOBAL_POOL);
+                return JNI_ERR;
+            }
+        }
+    }
+    return JNI_OK;
+}
+
+/*    BEGIN: List of directly exported functions.    */
+
+JNIEXPORT jint JNICALL JNI_GetDefaultJavaVMInitArgs(void * args)
+{
+    // TODO: current implementation doesn't support JDK1_1InitArgs.
+    if (((JavaVMInitArgs *)args)->version == JNI_VERSION_1_1) {
+        return JNI_EVERSION;
+    }
+    ((JavaVMInitArgs *)args)->version = JNI_VERSION_1_4;
+    return JNI_OK;
+}
+
+JNIEXPORT jint JNICALL JNI_GetCreatedJavaVMs(JavaVM ** vmBuf,
+                                               jsize bufLen,
+                                               jsize * nVMs)
+{
+
+    jint status = jni_init();
+    if (status != JNI_OK) {
+        return status;
+    }
+
+    apr_thread_mutex_lock(GLOBAL_LOCK);
+
+    *nVMs = 0;
+    if (!APR_RING_EMPTY(&GLOBAL_VMS, JavaVM_Internal, link)) {
+            JavaVM_Internal * current_vm = APR_RING_FIRST(&GLOBAL_VMS);
+            while (current_vm) {
+                if (*nVMs < bufLen) {
+                    vmBuf[*nVMs] = (JavaVM *)current_vm;
+                }
+                ++(*nVMs);
+                current_vm = APR_RING_NEXT(current_vm, link);
+            }
+
+    }
+    apr_thread_mutex_unlock(GLOBAL_LOCK);
+    return JNI_OK;
+}
+
+JNIEXPORT jint JNICALL JNI_CreateJavaVM(JavaVM ** p_vm, JNIEnv ** p_jni_env,
+                                          void * args) {
+    jboolean daemon = JNI_FALSE;
+    char * name = "main";
+    JNIEnv * jni_env;
+    JavaVMInitArgs * vm_args;
+    JavaVM_Internal * java_vm;
+    Global_Env * vm_env;
+    apr_pool_t * vm_global_pool;
+    jthread java_thread;
+    jint status;
+
+
+    status = jni_init();
+    if (status != JNI_OK) return status;
+
+    apr_thread_mutex_lock(GLOBAL_LOCK);
+
+    // TODO: only one VM instance can be created in the process address space.
+    if (!APR_RING_EMPTY(&GLOBAL_VMS, JavaVM_Internal, link)) {
+        status = JNI_ERR;
+        goto done;
+    }
+
+    // Create global memory pool.
+    status = apr_pool_create(&vm_global_pool, NULL);
+    if (status != APR_SUCCESS) {
+        TRACE2("jni", "Unable to create memory pool for VM");
+        status = JNI_ENOMEM;
+        goto done;
+    }
+
+    // TODO: current implementation doesn't support JDK1_1InitArgs.
+    if (((JavaVMInitArgs *)args)->version == JNI_VERSION_1_1) {
+        status = JNI_EVERSION;
+        goto done;
+    }
+
+    vm_args = (JavaVMInitArgs *)args;
+    // Create JavaVM_Internal.
+    java_vm = (JavaVM_Internal *) apr_palloc(vm_global_pool, sizeof(JavaVM_Internal));
+    if (java_vm == NULL) {
+        status = JNI_ENOMEM;
+        goto done;
+    }
+
+    // Create Global_Env.
+    vm_env = new(vm_global_pool) Global_Env(vm_global_pool);
+    if (vm_env == NULL) {
+        status = JNI_ENOMEM;
+        goto done;
+    }
+
+    java_vm->functions = &java_vm_vtable;
+    java_vm->pool = vm_global_pool;
+    java_vm->vm_env = vm_env;
+    java_vm->reserved = (void *)0x1234abcd;
+    *p_vm = java_vm;
+    
+    status = vm_init1(java_vm, vm_args);
+    if (status != JNI_OK) {
+        goto done;
+    }
+
+    // Attaches main thread to VM.
+    status = vm_attach_internal(&jni_env, &java_thread, java_vm, NULL, name, daemon);
+    if (status != JNI_OK) goto done;
+
+    // Attaches main thread to TM.
+    status = jthread_attach(jni_env, java_thread, daemon);
+    if (status != TM_ERROR_NONE) {
+        status = JNI_ERR;
+        goto done;
+    }
+    assert(jthread_self() != NULL);
+    *p_jni_env = jni_env;
+
+    // Now JVMTIThread keeps global reference. Discared temporary global reference.
+   jni_env->DeleteGlobalRef(java_thread);
+
+    // Send VM start event. JNI services are available now.
+    // JVMTI services permited in the start phase are available as well.
+    jvmti_send_vm_start_event(vm_env, jni_env);
+
+    status = vm_init2(jni_env);
+    if (status != JNI_OK) {
+        goto done;
+    }
+
+    // Send VM init event.
+    jvmti_send_vm_init_event(vm_env);
+
+    // Thread start event for the main thread should be sent after VMInit callback has finished.
+    jvmti_send_thread_start_end_event(1);
+
+    // Register created VM.
+    APR_RING_INSERT_TAIL(&GLOBAL_VMS, java_vm, JavaVM_Internal, link);
+
+    status  = JNI_OK;
+done:
+    apr_thread_mutex_unlock(GLOBAL_LOCK);
+    return status;
+}
+
+/*    END: List of directly exported functions.    */
 
 static void JNICALL UnimpStub(JNIEnv* UNREF env)
 {
@@ -614,10 +795,7 @@ void JNICALL ExceptionDescribe(JNIEnv * UNREF env)
     TRACE2("jni", "ExceptionDescribe called");
     assert(hythread_is_suspend_enabled());
     if (exn_raised()) {
-//        tmn_suspend_disable();       //---------------------------------v
-        fprintf(stderr, "JNI.ExceptionDescribe: %s:\n", exn_get_name());
         exn_print_stack_trace(stderr, exn_get());
-//        tmn_suspend_enable();        //---------------------------------^
     }
 } //ExceptionDescribe
 
@@ -644,8 +822,7 @@ void JNICALL FatalError(JNIEnv * UNREF env, const char *msg)
 {
     TRACE2("jni", "FatalError called");
     assert(hythread_is_suspend_enabled());
-    fprintf(stderr, "\nFATAL error occurred in a JNI native method:\n\t%s\n", msg);
-    vm_exit(109);
+    DIE("\nFATAL error occurred in a JNI native method:\n\t" << msg);
 } //FatalError
 
 jobject JNICALL NewGlobalRef(JNIEnv * UNREF env, jobject obj)
@@ -1256,77 +1433,156 @@ VMEXPORT jlong JNICALL GetDirectBufferCapacity(JNIEnv* env, jobject buf)
     return (jlong)CallStaticIntMethod(env, bbcl, id, buf);
 }
 
+/*    BEGIN: Invocation API functions.    */
 
-VMEXPORT jint JNICALL JNI_CreateJavaVM(JavaVM **p_vm, JNIEnv **p_env, void *vm_args) {
-    static int called = 0; // this function can only be called once for now;
+VMEXPORT jint JNICALL DestroyJavaVM(JavaVM * vm)
+{
+    char * name = "destroy";
+    jboolean daemon = JNI_FALSE;
+    jthread java_thread;
+    JavaVM_Internal * java_vm;
+    JNIEnv * jni_env;
+    jint status;
 
-    init_log_system();
-    TRACE2("jni", "CreateJavaVM called");
-    if (called) {
-        WARN("Java Invoke :: multiple VM instances are not implemented");
-        ASSERT(0, "Not implemented");
-        return JNI_ERR;
-    } else {
-        create_vm(&env, (JavaVMInitArgs *)vm_args);
-        *p_env = &jni_env;
-        *p_vm = jni_env.vm;
+    TRACE2("jni", "DestroyJavaVM  called");
+
+    java_vm = (JavaVM_Internal *) vm;
+
+    java_thread = jthread_self();
+    if (java_thread == NULL) {
+        // Attaches main thread to VM.
+        status = vm_attach_internal(&jni_env, &java_thread, java_vm, NULL, name, daemon);
+        if (status != JNI_OK) return status;
+
+        status = jthread_attach(jni_env, java_thread, daemon);
+        if (status != TM_ERROR_NONE) return JNI_ERR;
+        // Now JVMTIThread keeps global reference. Discared temporary global reference.
+        jni_env->DeleteGlobalRef(java_thread);
+
+        java_thread = jthread_self();        
+    }    
+    assert(java_thread != NULL);
+
+    apr_thread_mutex_lock(GLOBAL_LOCK);
+    
+    status = vm_destroy(java_vm, java_thread);
+    if (status != JNI_OK) return status;
+
+    APR_RING_REMOVE(java_vm, link);
+    
+    // Destroy VM environment.
+    delete java_vm->vm_env;
+    
+    // Destroy VM pool.
+    apr_pool_destroy(java_vm->pool);
+    
+    // TODO: Destroy globals if it is last VM.
+
+    apr_thread_mutex_unlock(GLOBAL_LOCK);
+    
+    // TODO: error code should be returned until
+    // VM cleanups its internals properly.
+    return JNI_ERR;
+}
+
+static jint attach_current_thread(JavaVM * java_vm, void ** p_jni_env, void * args, jboolean daemon)
+{
+    char * name;
+    jobject group;
+    JNIEnv * jni_env;
+    JavaVMAttachArgs * jni_1_2_args;
+    jthread java_thread;
+    IDATA status; 
+
+    TRACE2("jni", "AttachCurrentThread called");
+    
+    if (jthread_self()) {
+        *p_jni_env = jthread_get_JNI_env(jthread_self());
         return JNI_OK;
     }
+
+    name = NULL;
+    group = NULL;
+
+    if (args != NULL) {
+        jni_1_2_args = (JavaVMAttachArgs *) args;
+        if (jni_1_2_args->version != JNI_VERSION_1_2) {
+            return JNI_EVERSION;
+        }
+        name = jni_1_2_args->name;
+        group = jni_1_2_args->group;
+    }
+
+    // Attaches current thread to VM.
+    status = vm_attach_internal(&jni_env, &java_thread, java_vm, group, name, daemon);
+    if (status != JNI_OK) return status;
+
+    *p_jni_env = jni_env;
+
+    // Attaches current thread to TM.
+    status = jthread_attach(jni_env, java_thread, daemon);
+    assert(jthread_self() != NULL);
+
+    // Now JVMTIThread keeps global reference. Discared temporary global reference.
+   jni_env->DeleteGlobalRef(java_thread);
+
+    // Send thread start event.
+    // TODO: Thread start event should be sent before its initial method executes.
+    jvmti_send_thread_start_end_event(1);
+
+    return status == TM_ERROR_NONE ? JNI_OK : JNI_ERR;
 }
 
-
-VMEXPORT jint JNICALL DestroyVM(JavaVM*)
+VMEXPORT jint JNICALL AttachCurrentThread(JavaVM * vm, void ** p_jni_env, void * args)
 {
-    TRACE2("jni", "DestroyVM  called");
-    destroy_vm(&env);
-    return JNI_OK;
+    return attach_current_thread(vm, p_jni_env, args, JNI_FALSE);
 }
 
-VMEXPORT jint JNICALL AttachCurrentThread(JavaVM* vm, void** penv, void* UNREF args)
+VMEXPORT jint JNICALL AttachCurrentThreadAsDaemon(JavaVM * vm, void ** p_jni_env, void * args)
 {
-    TRACE2("jni", "AttachCurrentThread called");
-    if (NULL == p_TLS_vmthread)
-        WARN("WARNING!! Attaching deattached thread is not implemented!!\n");
-    GetEnv(vm, penv, JNI_VERSION_1_4);
-    return JNI_ERR;
+    return attach_current_thread(vm, p_jni_env, args, JNI_TRUE);
 }
 
-VMEXPORT jint JNICALL DetachCurrentThread(JavaVM*)
+VMEXPORT jint JNICALL DetachCurrentThread(JavaVM * vm)
 {
-    WARN("Java Invoke :: DetachCurrentThread not implemented");
-    ASSERT(0, "Not implemented");
-    return JNI_ERR;
+    jthread java_thread;
+    IDATA status;
+    
+    java_thread = jthread_self();
+    if (java_thread == NULL) return JNI_EDETACHED;
+
+    status = jthread_detach(java_thread);
+    
+    // Send thread end event.
+    jvmti_send_thread_start_end_event(0);
+    return status == TM_ERROR_NONE ? JNI_OK : JNI_ERR;
 }
 
-VMEXPORT jint JNICALL GetEnv(JavaVM* vm, void** penv, jint ver)
+VMEXPORT jint JNICALL GetEnv(JavaVM * vm, void ** penv, jint ver)
 {
+    VM_thread * vm_thread;
+
     TRACE2("jni", "GetEnv called, ver = " << ver);
     assert(hythread_is_suspend_enabled());
 
-    if (p_TLS_vmthread == NULL)
-        return JNI_EDETACHED;
+    vm_thread = p_TLS_vmthread;
+    if (vm_thread == NULL) return JNI_EDETACHED;
 
-    if ((ver & JVMTI_VERSION_MASK_INTERFACE_TYPE) == JVMTI_VERSION_INTERFACE_JNI)
-        switch (ver)
-        {
+    if ((ver & JVMTI_VERSION_MASK_INTERFACE_TYPE) == JVMTI_VERSION_INTERFACE_JNI) {
+        switch (ver) {
             case JNI_VERSION_1_1:
             case JNI_VERSION_1_2:
             case JNI_VERSION_1_4:
-                *penv = (void*)jni_native_intf;
+                *penv = (void*)vm_thread->jni_env;
                 return JNI_OK;
         }
-    else if((ver & JVMTI_VERSION_MASK_INTERFACE_TYPE) == JVMTI_VERSION_INTERFACE_JVMTI)
+    } else if((ver & JVMTI_VERSION_MASK_INTERFACE_TYPE) == JVMTI_VERSION_INTERFACE_JVMTI) {
         return create_jvmti_environment(vm, penv, ver);
-    else if((ver & JVMTI_VERSION_MASK_INTERFACE_TYPE) == 0x10000000)
-    {
+    } else if((ver & JVMTI_VERSION_MASK_INTERFACE_TYPE) == 0x10000000) {
         WARN("GetEnv requested unsupported JVMPI environment!! Only JVMTI is supported by VM.");
-    }
-    else if((ver & JVMTI_VERSION_MASK_INTERFACE_TYPE) == 0x20000000)
-    {
+    } else if((ver & JVMTI_VERSION_MASK_INTERFACE_TYPE) == 0x20000000) {
         WARN("GetEnv requested unsupported JVMDI environment!! Only JVMTI is supported by VM.");
-    }
-    else
-    {
+    } else {
         WARN("GetEnv called with unsupported interface version 0x" << ((void *)((POINTER_SIZE_INT)ver)));
     }
 
@@ -1334,12 +1590,7 @@ VMEXPORT jint JNICALL GetEnv(JavaVM* vm, void** penv, jint ver)
     return JNI_EVERSION;
 }
 
-VMEXPORT jint JNICALL AttachCurrentThreadAsDaemon(JavaVM*, void** UNREF penv, void* UNREF args)
-{
-    WARN("Java Invoke :: AttachCurrentThreadAsDaemon not implemented");
-    ASSERT(0, "Not implemented");
-    return JNI_ERR;
-}
+/*    END: Invocation API functions.    */
 
 /* Global Handles: see jni_utils.h for more information about them */
 ObjectHandle gh_jlc;
@@ -1384,20 +1635,18 @@ jmethodID gid_doubleisNaN = 0;
 jdouble gc_double_POSITIVE_INFINITY = 0;
 jdouble gc_double_NEGATIVE_INFINITY = 0;
 
-
+// TODO: should return error code instead of exiting.
 static void check_for_unexpected_exception(){
     assert(hythread_is_suspend_enabled());
     if (exn_raised()) {
-        fprintf(stderr, "Error initializing java machine\n");
-        fprintf(stderr, "Uncaught and unexpected exception\n");
         print_uncaught_exception_message(stderr, "static initializing", exn_get());
-        vm_exit(1);
+        DIE("Error initializing java machine\n");
     }
 }
 
-void global_object_handles_init(){
-    Global_Env *env = VM_Global_State::loader_env;
-    JNIEnv_Internal *jenv = jni_native_intf;
+void global_object_handles_init(JNIEnv * jni_env) {
+
+    Global_Env * vm_env = jni_get_vm_env(jni_env);
 
     gh_jlc = oh_allocate_global_handle();
     gh_jls = oh_allocate_global_handle();
@@ -1422,27 +1671,27 @@ void global_object_handles_init(){
     ObjectHandle h_jlt = oh_allocate_global_handle();
     tmn_suspend_disable();
 
-    gh_jlc->object = struct_Class_to_java_lang_Class(env->JavaLangClass_Class);
-    gh_jls->object = struct_Class_to_java_lang_Class(env->JavaLangString_Class);
-    gh_jlcloneable->object = struct_Class_to_java_lang_Class(env->java_lang_Cloneable_Class);
-    gh_aoboolean->object = struct_Class_to_java_lang_Class(env->ArrayOfBoolean_Class);
-    gh_aobyte->object = struct_Class_to_java_lang_Class(env->ArrayOfByte_Class);
-    gh_aochar->object = struct_Class_to_java_lang_Class(env->ArrayOfChar_Class);
-    gh_aoshort->object = struct_Class_to_java_lang_Class(env->ArrayOfShort_Class);
-    gh_aoint->object = struct_Class_to_java_lang_Class(env->ArrayOfInt_Class);
-    gh_aolong->object = struct_Class_to_java_lang_Class(env->ArrayOfLong_Class);
-    gh_aofloat->object = struct_Class_to_java_lang_Class(env->ArrayOfFloat_Class);
-    gh_aodouble->object = struct_Class_to_java_lang_Class(env->ArrayOfDouble_Class);
+    gh_jlc->object = struct_Class_to_java_lang_Class(vm_env->JavaLangClass_Class);
+    gh_jls->object = struct_Class_to_java_lang_Class(vm_env->JavaLangString_Class);
+    gh_jlcloneable->object = struct_Class_to_java_lang_Class(vm_env->java_lang_Cloneable_Class);
+    gh_aoboolean->object = struct_Class_to_java_lang_Class(vm_env->ArrayOfBoolean_Class);
+    gh_aobyte->object = struct_Class_to_java_lang_Class(vm_env->ArrayOfByte_Class);
+    gh_aochar->object = struct_Class_to_java_lang_Class(vm_env->ArrayOfChar_Class);
+    gh_aoshort->object = struct_Class_to_java_lang_Class(vm_env->ArrayOfShort_Class);
+    gh_aoint->object = struct_Class_to_java_lang_Class(vm_env->ArrayOfInt_Class);
+    gh_aolong->object = struct_Class_to_java_lang_Class(vm_env->ArrayOfLong_Class);
+    gh_aofloat->object = struct_Class_to_java_lang_Class(vm_env->ArrayOfFloat_Class);
+    gh_aodouble->object = struct_Class_to_java_lang_Class(vm_env->ArrayOfDouble_Class);
     tmn_suspend_enable(); //-------------------------------------------------------^
-    Class *preload_class(Global_Env* env, const char *classname);
-    Class* jlboolean = preload_class(env, "java/lang/Boolean");
-    Class* jlbyte = preload_class(env, "java/lang/Byte");
-    Class* jlchar = preload_class(env, "java/lang/Character");
-    Class* jlshort = preload_class(env, "java/lang/Short");
-    Class* jlint = preload_class(env, "java/lang/Integer");
-    Class* jllong = preload_class(env, "java/lang/Long");
-    Class* jlfloat = preload_class(env, "java/lang/Float");
-    Class* jldouble = preload_class(env, "java/lang/Double");
+    Class *preload_class(Global_Env* vm_env, const char *classname);
+    Class* jlboolean = preload_class(vm_env, "java/lang/Boolean");
+    Class* jlbyte = preload_class(vm_env, "java/lang/Byte");
+    Class* jlchar = preload_class(vm_env, "java/lang/Character");
+    Class* jlshort = preload_class(vm_env, "java/lang/Short");
+    Class* jlint = preload_class(vm_env, "java/lang/Integer");
+    Class* jllong = preload_class(vm_env, "java/lang/Long");
+    Class* jlfloat = preload_class(vm_env, "java/lang/Float");
+    Class* jldouble = preload_class(vm_env, "java/lang/Double");
 
     tmn_suspend_disable();
     gh_jlboolean->object = struct_Class_to_java_lang_Class(jlboolean);
@@ -1453,33 +1702,34 @@ void global_object_handles_init(){
     gh_jllong->object = struct_Class_to_java_lang_Class(jllong);
     gh_jlfloat->object = struct_Class_to_java_lang_Class(jlfloat);
     gh_jldouble->object = struct_Class_to_java_lang_Class(jldouble);
-    h_jlt->object= struct_Class_to_java_lang_Class(env->java_lang_Throwable_Class);
+    h_jlt->object= struct_Class_to_java_lang_Class(vm_env->java_lang_Throwable_Class);
     tmn_suspend_enable(); //-------------------------------------------------------^
     assert(hythread_is_suspend_enabled());
 
-    gid_throwable_traceinfo = jenv->GetFieldID((jclass)h_jlt, "vm_stacktrace", "[J");
+    gid_throwable_traceinfo = jni_env->GetFieldID((jclass)h_jlt, "vm_stacktrace", "[J");
     assert(hythread_is_suspend_enabled());
 
-    gid_boolean_value = jenv->GetFieldID((jclass)gh_jlboolean, "value", "Z");   
-    gid_byte_value = jenv->GetFieldID((jclass)gh_jlbyte, "value", "B");        
-    gid_char_value = jenv->GetFieldID((jclass)gh_jlchar, "value", "C");       
-    gid_short_value = jenv->GetFieldID((jclass)gh_jlshort, "value", "S");      
-    gid_int_value = jenv->GetFieldID((jclass)gh_jlint, "value", "I");        
-    gid_long_value = jenv->GetFieldID((jclass)gh_jllong, "value", "J");       
-    gid_float_value = jenv->GetFieldID((jclass)gh_jlfloat, "value", "F");     
-    gid_double_value = jenv->GetFieldID((jclass)gh_jldouble, "value", "D");   
+    gid_boolean_value = jni_env->GetFieldID((jclass)gh_jlboolean, "value", "Z");   
+    gid_byte_value = jni_env->GetFieldID((jclass)gh_jlbyte, "value", "B");        
+    gid_char_value = jni_env->GetFieldID((jclass)gh_jlchar, "value", "C");       
+    gid_short_value = jni_env->GetFieldID((jclass)gh_jlshort, "value", "S");      
+    gid_int_value = jni_env->GetFieldID((jclass)gh_jlint, "value", "I");        
+    gid_long_value = jni_env->GetFieldID((jclass)gh_jllong, "value", "J");       
+    gid_float_value = jni_env->GetFieldID((jclass)gh_jlfloat, "value", "F");     
+    gid_double_value = jni_env->GetFieldID((jclass)gh_jldouble, "value", "D");   
     assert(hythread_is_suspend_enabled());
 
-    gid_doubleisNaN = jenv->GetStaticMethodID((jclass)gh_jldouble, "isNaN", "(D)Z");
+    gid_doubleisNaN = jni_env->GetStaticMethodID((jclass)gh_jldouble, "isNaN", "(D)Z");
 
-    gid_stringinit = jenv->GetMethodID((jclass)gh_jls, "<init>", "([C)V");
-    gid_string_field_value = jenv->GetFieldID((jclass)gh_jls, "value", "[C");
-    if(env->strings_are_compressed)
-        gid_string_field_bvalue = jenv->GetFieldID((jclass)gh_jls, "bvalue", "[B");
-    assert(hythread_is_suspend_enabled());
+    gid_stringinit = jni_env->GetMethodID((jclass)gh_jls, "<init>", "([C)V");
+    gid_string_field_value = jni_env->GetFieldID((jclass)gh_jls, "value", "[C");
+    
+    if (vm_env->strings_are_compressed) {
+        gid_string_field_bvalue = jni_env->GetFieldID((jclass)gh_jls, "bvalue", "[B");
+    }
 
-    gid_string_field_offset = jenv->GetFieldID((jclass)gh_jls, "offset", "I");
-    gid_string_field_count = jenv->GetFieldID((jclass)gh_jls, "count", "I");
+    gid_string_field_offset = jni_env->GetFieldID((jclass)gh_jls, "offset", "I");
+    gid_string_field_count = jni_env->GetFieldID((jclass)gh_jls, "count", "I");    
     assert(hythread_is_suspend_enabled());
 
     oh_deallocate_global_handle(h_jlt);
@@ -1493,18 +1743,17 @@ void global_object_handles_init(){
     assert(hythread_is_suspend_enabled());
 }
 
-void unsafe_global_object_handles_init(){
+void unsafe_global_object_handles_init(JNIEnv * jni_env) {
     assert(!hythread_is_suspend_enabled());
     tmn_suspend_enable();
-    JNIEnv_Internal *jenv = jni_native_intf;
    
-    jfieldID POSITIVE_INFINITY_id = jenv->GetStaticFieldID((jclass)gh_jldouble, "POSITIVE_INFINITY", "D");
-    gc_double_POSITIVE_INFINITY = jenv->GetStaticDoubleField((jclass)gh_jldouble, POSITIVE_INFINITY_id);
+    jfieldID POSITIVE_INFINITY_id = jni_env->GetStaticFieldID((jclass)gh_jldouble, "POSITIVE_INFINITY", "D");
+    gc_double_POSITIVE_INFINITY = jni_env->GetStaticDoubleField((jclass)gh_jldouble, POSITIVE_INFINITY_id);
     check_for_unexpected_exception();
     assert(hythread_is_suspend_enabled());
     
-    jfieldID NEGATIVE_INFINITY_id = jenv->GetStaticFieldID((jclass)gh_jldouble, "NEGATIVE_INFINITY", "D");      
-    gc_double_NEGATIVE_INFINITY = jenv->GetStaticDoubleField((jclass)gh_jldouble, NEGATIVE_INFINITY_id);
+    jfieldID NEGATIVE_INFINITY_id = jni_env->GetStaticFieldID((jclass)gh_jldouble, "NEGATIVE_INFINITY", "D");      
+    gc_double_NEGATIVE_INFINITY = jni_env->GetStaticDoubleField((jclass)gh_jldouble, NEGATIVE_INFINITY_id);    
     assert(hythread_is_suspend_enabled());
      check_for_unexpected_exception();
      assert(hythread_is_suspend_enabled());

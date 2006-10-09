@@ -45,6 +45,7 @@
 #include "exceptions.h"
 #include "java_lang_VMExecutionEngine.h"
 #include "assertion_registry.h"
+#include "init.h"
 
 /*
  * Class:     java_lang_VMExecutionEngine
@@ -84,7 +85,7 @@ JNIEXPORT jint JNICALL Java_java_lang_VMExecutionEngine_getAssertionStatus
   (JNIEnv * jenv, jclass, jclass jclss, jboolean recursive, jint defaultStatus)
 {
     Assertion_Status status = ASRT_UNSPECIFIED;
-    Global_Env* genv = ((JNIEnv_Internal*)jenv)->vm->vm_env;
+    Global_Env* genv = jni_get_vm_env(jenv);
     Assertion_Registry* reg = genv->assert_reg;
     if (!reg) {
         return status;
@@ -173,7 +174,7 @@ static void insertSystemProperties(JNIEnv *jenv, jobject pProperties, apr_pool_t
     PropPut(jenv, pProperties, "java.tmpdir", tmp);
     PropPut(jenv, pProperties, "java.class.path",
         properties_get_string_property( 
-            reinterpret_cast<PropertiesHandle>(&((JNIEnv_Internal*)jenv)->vm->vm_env->properties),
+            reinterpret_cast<PropertiesHandle>(jni_get_vm_env(jenv)->properties),
             "java.class.path") );
 
     // TODO : fix this - it should come from Class.h
@@ -199,7 +200,7 @@ static void insertSystemProperties(JNIEnv *jenv, jobject pProperties, apr_pool_t
     }
 
     // Next, add runtime specified properties.
-    Properties::Iterator *iterator = VM_Global_State::loader_env->properties.getIterator();
+    Properties::Iterator *iterator = VM_Global_State::loader_env->properties->getIterator();
     const Prop_entry *next = NULL;
     while((next = iterator->next())){
         if (!PropPut(jenv, pProperties, next->key, ((Prop_String*)next->value)->value)){

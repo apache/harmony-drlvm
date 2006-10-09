@@ -148,15 +148,19 @@ typedef void (*hythread_event_callback_proc)(void);
 
 IDATA VMCALL hythread_global_lock();
 IDATA VMCALL hythread_global_unlock();
-void VMCALL hythread_init (hythread_library_t lib);
+void VMCALL hythread_init(hythread_library_t lib);
+void VMCALL hythread_shutdown();
+IDATA VMCALL hythread_lib_create(hythread_library_t * lib);
+void VMCALL hythread_lib_destroy(hythread_library_t lib);
 
 //@}
 /** @name  Basic manipulation 
  */
 //@{
 
-IDATA VMCALL hythread_attach_to_group(hythread_t *handle, hythread_group_t group);
- IDATA hythread_create_with_group(hythread_t *ret_thread, hythread_group_t group, UDATA stacksize, UDATA priority, UDATA suspend, hythread_entrypoint_t func, void *data);
+IDATA VMCALL hythread_attach_ex(hythread_t *handle, hythread_library_t lib);
+IDATA VMCALL hythread_attach_to_group(hythread_t *handle, hythread_library_t lib, hythread_group_t group);
+IDATA hythread_create_with_group(hythread_t *ret_thread, hythread_group_t group, UDATA stacksize, UDATA priority, UDATA suspend, hythread_entrypoint_t func, void *data);
 UDATA VMCALL hythread_clear_interrupted_other(hythread_t thread);
 IDATA VMCALL hythread_join(hythread_t t);
 IDATA VMCALL hythread_join_timed(hythread_t t, I_64 millis, IDATA nanos);
@@ -164,9 +168,8 @@ IDATA VMCALL hythread_join_interruptable(hythread_t t, I_64 millis, IDATA nanos)
 IDATA VMCALL hythread_get_self_id();
 IDATA VMCALL hythread_get_id(hythread_t t);
 hythread_t VMCALL hythread_get_thread(IDATA id);
-IDATA VMCALL hythread_struct_init(hythread_t *ret_thread, hythread_group_t group);
+IDATA VMCALL hythread_struct_init(hythread_t *ret_thread);
 IDATA VMCALL hythread_cancel_all(hythread_group_t group);
-IDATA VMCALL hythread_wait_for_all_nondaemon_threads();
  IDATA hythread_group_create(hythread_group_t *group);
 IDATA VMCALL hythread_group_release(hythread_group_t group);
 IDATA VMCALL hythread_group_get_list(hythread_group_t **list, int* size);
@@ -191,11 +194,11 @@ IDATA VMCALL hycond_destroy (hycond_t cond);
  */
 //@{
 
- IDATA hythread_is_suspend_enabled();
- void hythread_suspend_enable();
- void hythread_suspend_disable();
- void hythread_safe_point();
- IDATA VMCALL hythread_suspend_other(hythread_t thread);
+IDATA hythread_is_suspend_enabled();
+void hythread_suspend_enable();
+void hythread_suspend_disable();
+void hythread_safe_point();
+IDATA VMCALL hythread_suspend_other(hythread_t thread);
 
 IDATA VMCALL hythread_set_safepoint_callback(hythread_t thread, hythread_event_callback_proc callback);
 hythread_event_callback_proc VMCALL hythread_get_safepoint_callback(hythread_t t);
@@ -233,22 +236,22 @@ IDATA VMCALL hythread_iterator_size(hythread_iterator_t iterator);
  */
 //@{
 
- IDATA hysem_create(hysem_t *sem, UDATA initial_count, UDATA max_count);
+IDATA hysem_create(hysem_t *sem, UDATA initial_count, UDATA max_count);
 IDATA VMCALL hysem_wait_timed(hysem_t sem, I_64 ms, IDATA nano);
 IDATA VMCALL hysem_wait_interruptable(hysem_t sem, I_64 ms, IDATA nano);
 IDATA VMCALL hysem_getvalue(IDATA *count, hysem_t sem);
- IDATA hysem_set(hysem_t sem, IDATA count);
+IDATA hysem_set(hysem_t sem, IDATA count);
 
 //@}
 /** @name Mutex
  */
 //@{
 
- IDATA hymutex_create (hymutex_t *mutex, UDATA flags);
- IDATA hymutex_lock(hymutex_t mutex);
- IDATA hymutex_trylock (hymutex_t mutex);
- IDATA hymutex_unlock (hymutex_t mutex);
- IDATA hymutex_destroy (hymutex_t mutex);
+IDATA hymutex_create (hymutex_t *mutex, UDATA flags);
+IDATA hymutex_lock(hymutex_t mutex);
+IDATA hymutex_trylock (hymutex_t mutex);
+IDATA hymutex_unlock (hymutex_t mutex);
+IDATA hymutex_destroy (hymutex_t mutex);
 
 //@}
 /** @name Thin monitors support
@@ -284,14 +287,9 @@ int VMCALL hythread_is_sleeping(hythread_t thread) ;
 int VMCALL hythread_is_in_monitor_wait(hythread_t thread) ;
 int VMCALL hythread_is_parked(hythread_t thread) ;
 int VMCALL hythread_is_suspended(hythread_t thread) ;
-
-/**
- * Returns non-zero if thread is interrupted.
- *
- * @param[in] thread those attribute is read
- */
 int VMCALL hythread_is_interrupted(hythread_t thread) ;
 int VMCALL hythread_is_in_native(hythread_t thread) ;
+int VMCALL hythread_is_daemon(hythread_t thread) ;
 
 
 /**
@@ -316,7 +314,6 @@ int VMCALL hythread_is_in_native(hythread_t thread) ;
 #define TM_THREAD_STATE_ALLOCATED JVMTI_THREAD_STATE_VENDOR_1 // 0x10000000 Thread just has been allocated.
 #define TM_THREAD_STATE_RESERVED1 JVMTI_THREAD_STATE_VENDOR_2 // 0x20000000 Defined by VM vendor.  
 #define TM_THREAD_STATE_RESERVED2 JVMTI_THREAD_STATE_VENDOR_3 // 0x40000000 Defined by VM vendor 
-
 
 #define TM_MUTEX_DEFAULT  0   
 #define TM_MUTEX_NESTED   1  

@@ -20,6 +20,7 @@
  */  
 #include <assert.h>
 
+
 #include "platform_lowlevel.h"
 #include "vm_trace.h"
 
@@ -147,7 +148,7 @@ GetSystemProperty(VMInterface *vmi, char *key, char **valuePtr)
 {
     *valuePtr = const_cast<char *>(
         properties_get_string_property(
-            (PropertiesHandle)&VM_Global_State::loader_env->properties, key));
+            (PropertiesHandle)VM_Global_State::loader_env->properties, key));
     return VMI_ERROR_NONE;
 }
 
@@ -158,14 +159,14 @@ SetSystemProperty(VMInterface *vmi, char *key, char *value)
     /*
      * The possible implemenation might be:
      */
-    add_pair_to_properties(VM_Global_State::loader_env->properties, key, value);
+    add_pair_to_properties(*VM_Global_State::loader_env->properties, key, value);
     return VMI_ERROR_NONE;
 }
 
 vmiError JNICALL CountSystemProperties(VMInterface *vmi, int *countPtr)
 {
-    Properties &p = VM_Global_State::loader_env->properties;
-    Properties::Iterator *iter = p.getIterator();
+    Properties *p = VM_Global_State::loader_env->properties;
+    Properties::Iterator *iter = p->getIterator();
     int count = 0;
     const Prop_entry *next = NULL;
 
@@ -179,8 +180,8 @@ vmiError JNICALL CountSystemProperties(VMInterface *vmi, int *countPtr)
 vmiError JNICALL IterateSystemProperties(VMInterface *vmi,
         vmiSystemPropertyIterator iterator, void *userData)
 {
-    Properties &p = VM_Global_State::loader_env->properties;
-    Properties::Iterator *iter = p.getIterator();
+    Properties *p = VM_Global_State::loader_env->properties;
+    Properties::Iterator *iter = p->getIterator();
     const Prop_entry *next = NULL;
 
     while((next = iter->next()))

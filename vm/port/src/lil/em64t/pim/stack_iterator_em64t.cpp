@@ -216,8 +216,9 @@ StackIterator * si_create_from_registers(Registers * regs, bool is_ip_past,
     StackIterator * si = (StackIterator *)STD_MALLOC(sizeof(StackIterator));
     memset(si, 0, sizeof(StackIterator));
 
+    Global_Env *env = VM_Global_State::loader_env;
     // Setup current frame
-    si->cci = vm_methods->find((NativeCodePtr)regs->rip, is_ip_past);
+    si->cci = env->vm_methods->find((NativeCodePtr)regs->rip, is_ip_past);
     assert(si->cci);
 
     init_context_from_registers(si->jit_frame_context, *regs, is_ip_past);
@@ -257,7 +258,9 @@ void si_goto_previous(StackIterator * si, bool over_popped) {
         si->cci->get_jit()->unwind_stack_frame(si->cci->get_method(), si_get_jit_context(si));
         si->jit_frame_context.is_ip_past = TRUE;
     }
-    si->cci = vm_methods->find(si_get_ip(si), si_get_jit_context(si)->is_ip_past);
+
+    Global_Env *vm_env = VM_Global_State::loader_env;
+    si->cci = vm_env->vm_methods->find(si_get_ip(si), si_get_jit_context(si)->is_ip_past);
 #ifndef NDEBUG
     if (si_is_native(si)) {
         TRACE2("si", "si_goto_previous to ip = " << (void*)si_get_ip(si)

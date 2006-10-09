@@ -107,7 +107,7 @@ __forceinline hythread_t tmn_self_macro() {
 #endif
 
 /**
-  * get_local_pool() function return apr pool asociated with the current thread.
+  * get_local_pool() function return apr pool associated with the current thread.
   * the memory could be allocated without lock using this pool
   * dealocation should be done in the same thread, otherwise 
   * local_pool_cleanup_register() should be called
@@ -153,6 +153,9 @@ extern int16 tm_tls_size;
 
 typedef struct HyThreadLibrary {
     IDATA a;
+    hymutex_t TM_LOCK;
+    IDATA     nondaemon_thread_count;
+    hycond_t  nondaemon_thread_cond;
 } HyThreadLibrary;
 
 
@@ -161,6 +164,12 @@ typedef struct HyThreadLibrary {
  * Native thread control structure.
  */
 typedef struct HyThread {
+
+    /**
+     * Each thread keeps a pointer to the libary it belongs to.
+     */
+    HyThreadLibrary * library;
+
 // Suspension 
     
     /**
@@ -279,13 +288,7 @@ typedef struct HyThread {
    /**
     * Hint for scheduler about thread priority
     */
-    IDATA priority;
-
-    /**
-     * Is this thread daemon?
-     */
-    IDATA daemon;
-    
+    IDATA priority;    
 
 // Monitors
     
@@ -305,17 +308,6 @@ typedef struct HyThread {
      * APR thread attributes
      */
     apr_threadattr_t *apr_attrs;
-
-    
-    /**
-     * Procedure that describes thread body to be executed.
-     */
-    hythread_entrypoint_t start_proc;
-
-    /**
-     * Arguments to be passed to the thread body.
-     */
-    void *start_proc_args;
 
     /**
      * Array representing thread local storage
@@ -399,6 +391,11 @@ typedef struct JVMTIThread {
       * weak reference to corresponding java.lang.Thread instace
       */
      jobject thread_ref;
+
+     /**
+      * Is this thread daemon?
+      */
+     IDATA daemon;
 
 } JVMTIThread;
 
@@ -603,18 +600,11 @@ hythread_group_t  get_java_thread_group(void);
  * threads at shutdown.
  */
 
-IDATA countdown_nondaemon_threads();
-IDATA increase_nondaemon_threads_count();
-
-IDATA VMCALL hythread_create_with_group(hythread_t *ret_thread, hythread_group_t group, UDATA stacksize, UDATA priority, UDATA suspend, hythread_entrypoint_t func, void *data);
-
 typedef void (*tm_thread_event_callback_proc)(void);
 IDATA VMCALL set_safepoint_callback(hythread_t thread, tm_thread_event_callback_proc callback);
 
 IDATA acquire_start_lock(void);
 IDATA release_start_lock(void);
-
-IDATA thread_destroy(hythread_t thread);
 
 IDATA thread_sleep_impl(I_64 millis, IDATA nanos, IDATA interruptable);
 IDATA condvar_wait_impl(hycond_t cond, hymutex_t mutex, I_64 ms, IDATA nano, IDATA interruptable);

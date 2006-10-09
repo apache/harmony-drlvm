@@ -44,7 +44,7 @@ class EMThreadSupport {
 				EMThreadSupport.run();			
 			}
 		};
-		profilerThread = new Thread(emWorker, "profiler thread");
+		profilerThread = new Thread(Thread.systemThreadGroup, emWorker, "profiler thread");
 		profilerThread.setDaemon(true);
 		profilerThread.start();
 	}

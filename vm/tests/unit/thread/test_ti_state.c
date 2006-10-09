@@ -34,7 +34,7 @@
  *  jthread_clear_interrupted()  ALIVE | RUNNABLE
  *                           DEAD
  */
-void run_for_test_jthread_get_state_1(void){
+void JNICALL run_for_test_jthread_get_state_1(jvmtiEnv * jvmti_env, JNIEnv * jni_env, void *arg){
 
     tested_thread_sturct_t * tts = current_thread_tts;
 
@@ -116,7 +116,7 @@ int test_jthread_get_state_1(void) {
 /*
  * Test jthread_get_state(...)
  */
-void run_for_test_jthread_get_state_2(void){
+void JNICALL run_for_test_jthread_get_state_2(jvmtiEnv * jvmti_env, JNIEnv * jni_env, void *arg){
 
     tested_thread_sturct_t * tts = current_thread_tts;
     jobject monitor = tts->monitor;
@@ -231,7 +231,7 @@ int test_jthread_get_state_2(void) {
 /*
  * Test jthread_get_state(...)
  */
-void run_for_test_jthread_get_state_3(void){
+void JNICALL run_for_test_jthread_get_state_3(jvmtiEnv * jvmti_env, JNIEnv * jni_env, void *arg){
 
     tested_thread_sturct_t * tts = current_thread_tts;
     jobject monitor = tts->monitor;
@@ -288,7 +288,7 @@ int test_jthread_get_state_3(void) {
 /*
  * Test jthread_get_state(...)
  */
-void run_for_test_jthread_get_state_4(void){
+void JNICALL run_for_test_jthread_get_state_4(jvmtiEnv * jvmti_env, JNIEnv * jni_env, void *arg){
 
     tested_thread_sturct_t * tts = current_thread_tts;
     jobject monitor = tts->monitor;
@@ -342,7 +342,7 @@ int test_jthread_get_state_4(void) {
 /*
  * Test jthread_get_state(...)
  */
-void run_for_test_jthread_get_state_5(void){
+void JNICALL run_for_test_jthread_get_state_5(jvmtiEnv * jvmti_env, JNIEnv * jni_env, void *arg){
 
     tested_thread_sturct_t * tts = current_thread_tts;
     IDATA status;
@@ -385,7 +385,7 @@ int test_jthread_get_state_5(void) {
 /*
  * Test jthread_get_state(...)
  */
-void run_for_test_jthread_get_state_6(void){
+void JNICALL run_for_test_jthread_get_state_6(jvmtiEnv * jvmti_env, JNIEnv * jni_env, void *arg){
 
     tested_thread_sturct_t * tts = current_thread_tts;
     IDATA status;

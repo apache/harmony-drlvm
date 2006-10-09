@@ -37,7 +37,7 @@ int test_jthread_monitor_enter (void){
 /*
  * Test jthread_monitor_try_enter()
  */
-void run_for_test_jthread_monitor_try_enter(void){
+void JNICALL run_for_test_jthread_monitor_try_enter(jvmtiEnv * jvmti_env, JNIEnv * jni_env, void *arg){
 
     tested_thread_sturct_t * tts = current_thread_tts;
     jobject monitor = tts->monitor;
@@ -114,7 +114,7 @@ int test_jthread_monitor_notify (void){
 /*
  * Test jthread_monitor_notify_all(...)
  */
-void run_for_test_jthread_monitor_notify_all(void){
+void JNICALL run_for_test_jthread_monitor_notify_all(jvmtiEnv * jvmti_env, JNIEnv * jni_env, void *arg){
 
     tested_thread_sturct_t * tts = current_thread_tts;
     jobject monitor = tts->monitor;
@@ -193,7 +193,7 @@ int test_jthread_monitor_notify_all(void) {
 /*
  * Test jthread_monitor_wait()
  */
-void run_for_test_jthread_monitor_wait(void){
+void JNICALL run_for_test_jthread_monitor_wait(jvmtiEnv * jvmti_env, JNIEnv * jni_env, void *arg){
 
     tested_thread_sturct_t * tts = current_thread_tts;
     jobject monitor = tts->monitor;
@@ -246,7 +246,7 @@ int test_jthread_monitor_wait (void){
 /*
  * Test jthread_monitor_wait_interrupt()
  */
-void run_for_test_jthread_monitor_wait_interrupt(void){
+void JNICALL run_for_test_jthread_monitor_wait_interrupt(jvmtiEnv * jvmti_env, JNIEnv * jni_env, void *arg){
 
     tested_thread_sturct_t * tts = current_thread_tts;
     jobject monitor = tts->monitor;
@@ -313,7 +313,7 @@ int test_jthread_monitor_wait_interrupt(void){
 /*
  * Test jthread_monitor_timed_wait()
  */
-void run_for_test_jthread_monitor_timed_wait(void){
+void JNICALL run_for_test_jthread_monitor_timed_wait(jvmtiEnv * jvmti_env, JNIEnv * jni_env, void *arg){
 
     tested_thread_sturct_t * tts = current_thread_tts;
     jobject monitor = tts->monitor;
@@ -366,7 +366,7 @@ int test_jthread_monitor_timed_wait(void) {
 /*
  * Test jthread_monitor_timed_wait()
  */
-void run_for_test_jthread_monitor_timed_wait_timeout(void){
+void JNICALL run_for_test_jthread_monitor_timed_wait_timeout(jvmtiEnv * jvmti_env, JNIEnv * jni_env, void *arg){
 
 
     tested_thread_sturct_t * tts = current_thread_tts;
@@ -420,7 +420,7 @@ int test_jthread_monitor_timed_wait_timeout(void) {
 /*
  * Test jthread_monitor_timed_wait()
  */
-void run_for_test_jthread_monitor_timed_wait_interrupt(void){
+void JNICALL run_for_test_jthread_monitor_timed_wait_interrupt(jvmtiEnv * jvmti_env, JNIEnv * jni_env, void *arg){
 
     tested_thread_sturct_t * tts = current_thread_tts;
     jobject monitor = tts->monitor;
@@ -497,7 +497,7 @@ int test_jthread_monitor_timed_wait_interrupt(void) {
 //?????????????????????????????? jthread_monitor_init and not init
 //?????????????????????????????? jthread_monitor_exit without enter
 
-void run_for_helper_jthread_monitor_enter_exit(void){
+void JNICALL run_for_helper_jthread_monitor_enter_exit(jvmtiEnv * jvmti_env, JNIEnv * jni_env, void *arg){
 
     tested_thread_sturct_t * tts = current_thread_tts;
     jobject monitor = tts->monitor;
@@ -561,7 +561,7 @@ int helper_jthread_monitor_enter_exit(void) {
  * Test jthread_monitor_wait(...)
  * Test jthread_monitor_notify(...)
  */
-void run_for_helper_jthread_monitor_wait_notify(void){
+void JNICALL run_for_helper_jthread_monitor_wait_notify(jvmtiEnv * jvmti_env, JNIEnv * jni_env, void *arg){
 
     tested_thread_sturct_t * tts = current_thread_tts;
     jobject monitor = tts->monitor;

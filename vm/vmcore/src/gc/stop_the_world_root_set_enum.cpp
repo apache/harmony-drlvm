@@ -53,12 +53,13 @@ vm_time_end_hook(apr_time_t *start_time, apr_time_t *end_time)
 
 
 static void 
-vm_enumerate_the_current_thread()
+vm_enumerate_the_current_thread(VM_thread * vm_thread)
 {
+    assert(p_TLS_vmthread == vm_thread);
     // Process roots for the current thread
     //assert(p_TLS_vmthread->gc_status == zero);
     //p_TLS_vmthread->gc_status = gc_at_safepoint;
-    vm_enumerate_thread(p_TLS_vmthread);
+    vm_enumerate_thread(vm_thread);
 
     // Enumeration for this thread is complete.
     //p_TLS_vmthread->gc_status = gc_enumeration_done;
@@ -79,14 +80,16 @@ vm_enumerate_the_current_thread()
 static void
 stop_the_world_root_set_enumeration()
 {
+    VM_thread * current_vm_thread;
+
     TRACE2("vm.gc", "stop_the_world_root_set_enumeration()");
 
     // Run through list of active threads and suspend each one of them.
 
     INFO2("threads","Start thread suspension ");
     vm_time_start_hook(&_start_time);   //thread suspension time measurement        
-
-      hythread_iterator_t  iterator;
+    
+    hythread_iterator_t  iterator;
     hythread_suspend_all(&iterator, NULL);
 
     thread_suspend_time = vm_time_end_hook(&_start_time, &_end_time);
@@ -94,13 +97,13 @@ stop_the_world_root_set_enumeration()
 
     class_unloading_clear_mark_bits();
 
+    current_vm_thread = p_TLS_vmthread;
     // Run through list of active threads and enumerate each one of them.
-    hythread_t tm_thread = hythread_iterator_next(&iterator);
-    
-    //VM_thread *thread = get_vm_thread (hythread_iterator_next(&iterator));
-    while(tm_thread) {
+    hythread_t tm_thread = hythread_iterator_next(&iterator);    
+    while (tm_thread) {
         VM_thread *thread = get_vm_thread(tm_thread);
-        if (thread && thread != p_TLS_vmthread) {
+        //assert(thread);
+        if (thread && thread != current_vm_thread) {
             vm_enumerate_thread(thread);
             // Enumeration for this thread is complete.
             //thread->gc_status = gc_enumeration_done;
@@ -110,7 +113,7 @@ stop_the_world_root_set_enumeration()
         tm_thread = hythread_iterator_next(&iterator);
     }
 
-    vm_enumerate_the_current_thread();
+    vm_enumerate_the_current_thread(current_vm_thread);
 
     // finally, process all the global refs
     vm_enumerate_root_set_global_refs();

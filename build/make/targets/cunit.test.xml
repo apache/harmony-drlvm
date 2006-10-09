@@ -103,10 +103,7 @@ Version: $Revision$
             <includepath refid="unit.test.c.include" />
         </cc>
         <mkdir dir="${unit.test.c.workdir}/_bin" />
-        <!-- copy zlib library; it's necessary for test execution -->
-        <copy todir="${unit.test.c.workdir}/_bin">
-            <fileset dir="${external.dep.CLASSLIB}/deploy/jdk/jre/bin" includes="*hyzlib*" />
-        </copy>
+
         <mkdir dir="${unit.test.c.workdir}/report" />
         <!-- set of properties which will be needed for test execution -->
         <property name="filename" value="--" />
@@ -129,22 +126,18 @@ Version: $Revision$
                             <include name="${filename}.o*" />
                             <include name="thread_unit_test_main.o*" />
                             <include name="thread_unit_test_utils.o*" />
-                            <include name="thread_unit_test_vm_emulator.o*" />
                             <include name="testframe.o*" />
-                            <include name="tm2vm.o*" />
                         </fileset>
-                        <fileset dir="${build.semi.dir}/vm/jthread/_obj">
-                            <include name="*.o*" />
-                        </fileset>
-                        <fileset dir="${build.semi.dir}/vm/hythr/_obj">
-                            <include name="*.o*" />
-                        </fileset>
+
+                        <libset libs="hythr" dir="${build.semi.dir}/vm/hythr/_bin" />
                         <libset libs="encoder" dir="${build.semi.dir}/vm/encoder/_bin" />
                         <libset libs="apr-1" dir="${build.semi.dir}/extra/apr/_bin" />
                         <libset libs="aprutil-1" dir="${build.semi.dir}/extra/aprutil/_bin" />
                         <libset libs="port" dir="${build.semi.dir}/vm/port/_bin" />
                         <libset libs="log4cxx" dir="${build.semi.dir}/extra/log4cxx/_bin" />
                         <libset libs="hyzlib" dir="${external.dep.CLASSLIB}/deploy/jdk/jre/bin" />
+                        <libset libs="jthread" dir="${build.semi.dir}/vm/jthread/_bin" />
+                        <libset libs="harmonyvm" dir="${build.semi.dir}/vm/vmcore/_bin" />
                         <select os="win">
                             <syslibset libs="advapi32, ws2_32, mswsock, user32, userenv, odbc32" />
                             <linkerarg value="/NODEFAULTLIB:libcmt.lib" />
@@ -169,9 +162,14 @@ Version: $Revision$
                               executable="${unit.test.c.workdir}/_bin/${filename}${extention}"
                               resultproperty="resultproperty"
                               outputproperty="outputproperty">
+                    <arg value="-Dorg.apache.harmony.vm.vmdir=${build.deploy.dir}/bin/default"/>
+                    <arg value="-Djava.home=${build.deploy.dir}"/>
                     <env key="JAVA_HOME" value="${build.deploy.dir}" />
+                    <select os="win">
+                        <env key="Path" path="${build.deploy.dir}/bin/:${build.deploy.dir}/bin/default:${env.Path}" />
+                    </select>
                     <select os="lnx">
-                        <env key="LD_LIBRARY_PATH" path="${unit.test.c.workdir}/_bin" />
+                        <env key="LD_LIBRARY_PATH" path="${build.deploy.dir}/bin/:${build.deploy.dir}/bin/default" />
                     </select>
                 </exec>
                 <echo file="${unit.test.c.workdir}/report/${filename}.out"

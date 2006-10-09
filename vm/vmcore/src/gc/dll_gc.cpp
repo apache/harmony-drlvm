@@ -397,8 +397,7 @@ static void default_gc_heap_wrote_object(Managed_Object_Handle UNREF p_base_of_o
 
 static void default_gc_add_compressed_root_set_entry(uint32 * UNREF ref)
 {
-    printf("Fatal GC error: compressed references are not supported\n");
-    vm_exit(1);
+    DIE("Fatal GC error: compressed references are not supported\n");
 } //default_gc_add_compressed_root_set_entry
 
 
@@ -406,8 +405,7 @@ static void default_gc_add_compressed_root_set_entry(uint32 * UNREF ref)
 static void default_gc_add_root_set_entry_managed_pointer(void ** UNREF slot,
                                                           Boolean UNREF is_pinned)
 {
-    printf("Fatal GC error: managed pointers are not supported\n");
-    vm_exit(1);
+    DIE("Fatal GC error: managed pointers are not supported\n");
 } //default_gc_add_root_set_entry_managed_pointer
 
 

@@ -93,7 +93,7 @@ int test_jthread_raw_wait(void) {
  */
 //?????????????????????????????? jthread_raw_monitor_init and not init
 //?????????????????????????????? jthread_raw_monitor_exit without enter
-void run_for_helper_jthread_raw_monitor_enter_exit(void){
+void JNICALL run_for_helper_jthread_raw_monitor_enter_exit(jvmtiEnv * jvmti_env, JNIEnv * jni_env, void *arg){
 
     tested_thread_sturct_t * tts = current_thread_tts;
     jrawMonitorID monitor = tts->raw_monitor;
@@ -158,7 +158,7 @@ int helper_jthread_raw_monitor_enter_exit(void) {
  * Test jthread_raw_wait(...)
  * Test jthread_raw_notify(...)
  */
-void run_for_helper_jthread_raw_wait_notify(void){
+void JNICALL run_for_helper_jthread_raw_wait_notify(jvmtiEnv * jvmti_env, JNIEnv * jni_env, void *arg){
 
     tested_thread_sturct_t * tts = current_thread_tts;
     jrawMonitorID monitor = tts->raw_monitor;
@@ -241,7 +241,7 @@ int helper_jthread_raw_wait_notify(void) {
  * Test jthread_raw_wait(...)
  * Test jthread_raw_notify_all(...)
  */
-void run_for_helper_jthread_raw_wait_notify_all(void){
+void JNICALL run_for_helper_jthread_raw_wait_notify_all(jvmtiEnv * jvmti_env, JNIEnv * jni_env, void *arg){
 
     tested_thread_sturct_t * tts = current_thread_tts;
     jrawMonitorID monitor = tts->raw_monitor;
@@ -318,7 +318,7 @@ int helper_jthread_raw_wait_notify_all(void) {
     return TEST_PASSED;
 }
 
-void run_for_helper_jthread_raw_monitor_try_enter(void){
+void JNICALL run_for_helper_jthread_raw_monitor_try_enter(jvmtiEnv * jvmti_env, JNIEnv * jni_env, void *arg){
 
     tested_thread_sturct_t * tts = current_thread_tts;
     jrawMonitorID monitor = tts->raw_monitor;

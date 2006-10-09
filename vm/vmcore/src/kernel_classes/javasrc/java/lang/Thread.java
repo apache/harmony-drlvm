@@ -56,11 +56,6 @@ public class Thread implements Runnable {
     private static final String STACK_TRACE_INDENT = "    ";
 
     /**
-     * Counter used to generate default thread names
-     */
-    private static int threadCounter = 0;
-
-    /**
      * This thread's thread group
      */
     ThreadGroup group;
@@ -140,17 +135,31 @@ public class Thread implements Runnable {
     Object lock = new Object();
 
     /**
-     * generates a unique thread ID
-     */
-    private static synchronized long getNextThreadId() {
-            return ++threadOrdinalNum;
-    }
-
-    /*
      * used to generate a default thread name
      */
     private static final String THREAD = "Thread-";
 
+    /**
+     * System thread group for keeping helper threads.
+     */
+    static ThreadGroup systemThreadGroup = null;
+    
+    /**
+     * Main thread group.
+     */
+    static ThreadGroup mainThreadGroup = null;
+
+    /*
+     * Number of threads that was created w/o garbage collection.
+     */ 
+    private static int currentGCWatermarkCount = 0;
+
+    /*
+     * Max number of threads to be created w/o GC, required collect dead Thread 
+     * references.
+     */
+    private static final int GC_WATERMARK_MAX_COUNT = 700;
+    
     /**
      * @com.intel.drl.spec_ref
      */
@@ -194,6 +203,58 @@ public class Thread implements Runnable {
     }
 
     /**
+     * Creates a new thread object for the thread attached to VM.     
+     * The first attached thread is the main thread.
+     *
+     * @param group determines the thread group to place the thread in
+     * @param name thread's name
+     * @param nativeAddr address of the attached native thread
+     * @param stackeSize size of the thread's stack
+     * @param priority thread's priority
+     * @param daemon true if the thread is daemon, false otherwise
+     */
+    Thread(ThreadGroup group, String name, long nativeAddr,
+        long stackSize, int priority, boolean daemon) {
+
+        ClassLoader contextLoader = null;
+        
+        if (group == null) {
+            if (systemThreadGroup == null) {
+                // This is main thread.
+                systemThreadGroup = new ThreadGroup();
+                mainThreadGroup = new ThreadGroup(systemThreadGroup, "main");
+                group = mainThreadGroup;
+                // Initialize system class loader.
+                contextLoader = ClassLoader.getSystemClassLoader();
+            } else {
+                group = mainThreadGroup;
+            }
+        }
+
+        this.group = group;
+        this.stackSize = stackSize;
+        this.priority = priority;
+        this.daemon = daemon;
+        this.threadId = getNextThreadId();
+        this.name = (name != null) ? name : THREAD + threadId; 
+        // Each thread created from JNI has bootstrap class loader as
+        // its context class loader. The only exception is the main thread
+        // which has system class loader as its context class loader.
+        this.contextClassLoader = contextLoader;
+        this.target = null;
+        // The thread is actually running.
+        this.isAlive = true;
+        this.started = true;
+
+        ThreadWeakRef newRef = new ThreadWeakRef(this);
+        newRef.setNativeAddr(nativeAddr);
+
+        SecurityUtils.putContext(this, AccessController.getContext());
+        // adding the thread to the thread group should be the last action
+        group.add(this);
+    }
+
+    /**
      * @com.intel.drl.spec_ref
      */
     public Thread(ThreadGroup group, Runnable target, String name,
@@ -201,65 +262,48 @@ public class Thread implements Runnable {
 
         Thread currentThread = VMThreadManager.currentThread();
         SecurityManager securityManager = System.getSecurityManager();
+        
+        ThreadGroup threadGroup = null;
+        if (group != null) {
+            if (securityManager != null) {
+                securityManager.checkAccess(group);
+            }
+            threadGroup = group;
+        } else if (securityManager != null) {
+            threadGroup = securityManager.getThreadGroup();
+        }
+        if (threadGroup == null) {
+            threadGroup = currentThread.group;
+        }
+        this.group = threadGroup;
+        this.daemon = currentThread.daemon;
+        this.contextClassLoader = currentThread.contextClassLoader;
+        this.target = target;
+        this.stackSize = stackSize;
+        this.priority = currentThread.priority;
+        this.threadId = getNextThreadId();
+        // throws NullPointerException if the given name is null
+        this.name = (name != THREAD) ? this.name = name.toString() :
+            THREAD + threadId;
 
-            ThreadGroup threadGroup = null;
-            if (group != null) {
-                if (securityManager != null) {
-                    securityManager.checkAccess(group);
-                }
-                threadGroup = group;
-            } else if (securityManager != null) {
-                threadGroup = securityManager.getThreadGroup();
-            }
-            if (threadGroup == null) {
-                threadGroup = currentThread.group;
-            }
-            this.group = threadGroup;
-            // throws NullPointerException if the given name is null
-            this.name = (name != THREAD) ? this.name = name.toString() : THREAD
-                    + threadCounter++;
-            this.daemon = currentThread.daemon;
-            this.contextClassLoader = currentThread.contextClassLoader;
-            this.target = target;
-            this.stackSize = stackSize;
-            this.priority = currentThread.priority;
-            initializeInheritableLocalValues(currentThread);
+        initializeInheritableLocalValues(currentThread);
     
         checkGCWatermark();
         
         ThreadWeakRef oldRef = ThreadWeakRef.poll();
         ThreadWeakRef newRef = new ThreadWeakRef(this);
         
-        long oldPointer = (oldRef == null)? 0 : oldRef.getNativeAddr();
+        long oldPointer = (oldRef == null) ? 0 : oldRef.getNativeAddr();
         long newPointer = VMThreadManager.init(this, newRef, oldPointer);
         if (newPointer == 0) {
-           throw new OutOfMemoryError("Failed to create new thread");   
+            throw new OutOfMemoryError("Failed to create new thread");
         }
         newRef.setNativeAddr(newPointer);
-        
-        this.threadId = getNextThreadId();
-        SecurityUtils.putContext(this, AccessController.getContext());
-        checkAccess(); 
-        threadGroup.add(this);
-    }
 
-    /**
-     * @com.intel.drl.spec_ref
-     */
-    Thread(boolean nativeThread) {
-        VMThreadManager.attach(this);
-        this.name = "System thread";
-        this.group = new ThreadGroup();
-        this.group.add(this);
-        this.daemon = false;
-        this.started = true;
-        this.priority = NORM_PRIORITY;
-        // initialize the system class loader and set it as context
-        // classloader
-        ClassLoader.getSystemClassLoader();
-        
-        this.threadId = getNextThreadId();
         SecurityUtils.putContext(this, AccessController.getContext());
+        checkAccess();
+        // adding the thread to the thread group should be the last action
+        threadGroup.add(this);
     }
 
     /**
@@ -482,11 +526,7 @@ public class Thread implements Runnable {
             }
         }
         StackTraceElement ste[] = VMStack.getThreadStackTrace(this);
-        if (ste != null) {
-            return ste;
-        } else {
-            return  new StackTraceElement[0];
-        }
+        return ste != null ? ste : new StackTraceElement[0];
     }
     
     /**
@@ -668,8 +708,7 @@ public class Thread implements Runnable {
             ? threadGroup.maxPriority : priority;
         int status = VMThreadManager.setPriority(this, this.priority);
         if (status != VMThreadManager.TM_ERROR_NONE) {
-        //    throw new InternalError(
-        //        "Thread Manager internal error " + status);
+            //throw new InternalError("Thread Manager internal error " + status);
         }
     }
 
@@ -687,22 +726,25 @@ public class Thread implements Runnable {
             this.isAlive = true;
             
             if (VMThreadManager.start(this, stackSize, daemon, priority) != 0) {
-                throw new OutOfMemoryError("Failed to start new thread");
+                throw new OutOfMemoryError("Failed to create new thread");
             } 
             
             started = true;
         }
     }
 
-    /*
-     * This method serves as a wrapper around Thread.run() method to meet 
-     * specification requirements in regard to ucaught exception catching.
+    /**
+     * Performs premortal actions. First it processes uncaught exception if any.
+     * Second removes current thread from its thread group.
+     * VM calls this method when current thread is detaching from VM.
+     * 
+     * @param uncaughtException uncaught exception or null
      */
-    void runImpl() {
+    void detach(Throwable uncaughtException) {
         try {
-            run();
-        } catch (Throwable e) {
-           getUncaughtExceptionHandler().uncaughtException(this, e);
+            if (uncaughtException != null) {
+                getUncaughtExceptionHandler().uncaughtException(this, uncaughtException);
+            }
         } finally {
             group.remove(this);
             synchronized(lock) {
@@ -711,8 +753,6 @@ public class Thread implements Runnable {
             }
         }
     }
-
-    
 
     public enum State {
         NEW,
@@ -810,12 +850,10 @@ public class Thread implements Runnable {
     /**
      * @com.intel.drl.spec_ref
      */
-    public static void setDefaultUncaughtExceptionHandler(
-                                                          UncaughtExceptionHandler eh) {
+    public static void setDefaultUncaughtExceptionHandler(UncaughtExceptionHandler eh) {
         SecurityManager sm = System.getSecurityManager();
         if (sm != null) {
-            sm
-                .checkPermission(RuntimePermissionCollection.SET_DEFAULT_UNCAUGHT_EXCEPTION_HANDLER_PERMISSION);
+            sm.checkPermission(RuntimePermissionCollection.SET_DEFAULT_UNCAUGHT_EXCEPTION_HANDLER_PERMISSION);
         }
         defaultExceptionHandler = eh;
     }
@@ -836,8 +874,7 @@ public class Thread implements Runnable {
     public void setUncaughtExceptionHandler(UncaughtExceptionHandler eh) {
         SecurityManager sm = System.getSecurityManager();
         if (sm != null) {
-            sm
-                .checkPermission(RuntimePermissionCollection.MODIFY_THREAD_PERMISSION);
+            sm.checkPermission(RuntimePermissionCollection.MODIFY_THREAD_PERMISSION);
         }
         exceptionHandler = eh;
     }
@@ -890,6 +927,14 @@ public class Thread implements Runnable {
             localValues.remove(local);
         }
     }
+
+    /**
+     * Associate current thread object with native thread structure.
+     */
+    private void initNativeThread() {
+        
+    }
+
     
     /**
      * Initializes local values represented by
@@ -899,7 +944,8 @@ public class Thread implements Runnable {
      * <code>InheritableThreadLocal</code> class <br>
      * This method should be called from <code>Thread</code>'s constructor.
      */
-    private void initializeInheritableLocalValues(Thread parent) {
+    private void initializeInheritableLocalValues(Thread parent) 
+    {
         Map<ThreadLocal<Object>, Object> parentLocalValues = parent.localValues;
         if (parentLocalValues == null) {
            return;
@@ -916,34 +962,34 @@ public class Thread implements Runnable {
     }
 
     /**
+     * generates a unique thread ID
+     */
+    private static synchronized long getNextThreadId() 
+    {
+        return ++threadOrdinalNum;
+    }
+
+    /*
+     * Checks if more then GC_WATERMARK_MAX_COUNT threads was created and calls
+     * System.gc() to ensure that dead thread references was collected.
+     */
+    private void checkGCWatermark() 
+    {
+        if (++currentGCWatermarkCount % GC_WATERMARK_MAX_COUNT == 0) 
+        {
+            System.gc();
+        }
+    }
+
+    /**
      * @com.intel.drl.spec_ref
      */
-    public static interface UncaughtExceptionHandler {
+    public static interface UncaughtExceptionHandler 
+    {
 
         /**
          * @com.intel.drl.spec_ref
          */
         void uncaughtException(Thread t, Throwable e);
-    }
-
-    /*
-     * Number of threads that was created w/o garbage collection.
-     */ 
-    private static int       currentGCWatermarkCount = 0;
-
-    /*
-     * Max number of threads to be created w/o GC, required collect dead Thread 
-     * references.
-     */
-    private static final int GC_WATERMARK_MAX_COUNT     = 700;
-    
-    /*
-     * Checks if more then GC_WATERMARK_MAX_COUNT threads was created and calls
-     * System.gc() to ensure that dead thread references was callected.
-     */
-    private void             checkGCWatermark() {
-        if (++currentGCWatermarkCount % GC_WATERMARK_MAX_COUNT == 0) {
-            System.gc();
-        }
     }
 }

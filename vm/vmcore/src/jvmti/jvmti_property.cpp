@@ -75,7 +75,7 @@ jvmtiAddToBootstrapClassLoaderSearch(jvmtiEnv* env,
 
     // get bootclasspath property
     Global_Env *g_env = ((TIEnv*)env)->vm->vm_env;
-    Properties *properties = &g_env->properties;
+    Properties *properties = g_env->properties;
     const char *bcp_prop = properties_get_string_property(
         reinterpret_cast<PropertiesHandle>(properties),
         "vm.boot.class.path");
@@ -131,7 +131,7 @@ jvmtiGetSystemProperties(jvmtiEnv* env,
 
     jint properties_count = 0;
 
-    Properties::Iterator *iterator = ((TIEnv*)env)->vm->vm_env->properties.getIterator();
+    Properties::Iterator *iterator = ((TIEnv*)env)->vm->vm_env->properties->getIterator();
     const Prop_entry *next = NULL;
     while((next = iterator->next()))
         properties_count++;
@@ -142,7 +142,7 @@ jvmtiGetSystemProperties(jvmtiEnv* env,
         return errorCode;
 
     // Copy properties defined in properties list
-    iterator = ((TIEnv*)env)->vm->vm_env->properties.getIterator();
+    iterator = ((TIEnv*)env)->vm->vm_env->properties->getIterator();
     for (int iii = 0; iii < properties_count; iii++)
     {
         next = iterator->next();
@@ -188,7 +188,7 @@ jvmtiGetSystemProperty(jvmtiEnv* env,
     if (NULL == property || NULL == value_ptr)
         return JVMTI_ERROR_NULL_POINTER;
 
-    Prop_Value *prop_value = ((TIEnv*)env)->vm->vm_env->properties.get(property);
+    Prop_Value *prop_value = ((TIEnv*)env)->vm->vm_env->properties->get(property);
     if (NULL == prop_value)
         return JVMTI_ERROR_NOT_AVAILABLE;
 
@@ -240,9 +240,9 @@ jvmtiSetSystemProperty(jvmtiEnv* env,
     e->key = strdup(property);
     e->value = ps;
 
-    Prop_entry *pe = vm_env->properties.get_entry(property);
+    Prop_entry *pe = vm_env->properties->get_entry(property);
     if (NULL == pe)
-        vm_env->properties.add(e);
+        vm_env->properties->add(e);
     else
         pe->replace(e);
 

@@ -20,12 +20,12 @@
 #include "testframe.h"
 #include "thread_unit_test_utils.h"
 
-void setup() {
+void setup(int argc, char *argv[]) {
 
     //log_set_level(2);
     log_debug("setup");
 
-    test_java_thread_setup();
+    test_java_thread_setup(argc, argv);
 }
 
 void teardown(void) {

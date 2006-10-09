@@ -23,6 +23,7 @@
 #ifndef _JNI_UTILS_H_
 #define _JNI_UTILS_H_
 
+#include "environment.h"
 #include "object_handles.h"
 #include "platform.h"
 #include "jni_direct.h"
@@ -39,7 +40,6 @@ VMEXPORT jobject jni_class_loader_from_handle(JNIEnv*, ClassLoaderHandle);
 VMEXPORT ClassLoaderHandle class_loader_lookup(jobject loader);
 VMEXPORT void class_loader_load_native_lib(const char* lib, ClassLoaderHandle loader);
 VMEXPORT ClassLoaderHandle class_loader_find_if_exists(jobject loader);
-VMEXPORT void class_loader_set_system_class_loader(ClassLoaderHandle);
 
 VMEXPORT jvalue *get_jvalue_arg_array(Method *method, va_list args);
 
@@ -94,6 +94,9 @@ Method* LookupDeclaredMethod (Class *clss, const char *mname, const char *msig);
 // internal VM function that provide Class searching functionality using 
 // String* parameter (instead of const char* in JNI FindClass)
 jclass FindClass(JNIEnv* env_ext, String* name);
+
+JavaVM * jni_get_java_vm(JNIEnv * jni_env);
+Global_Env * jni_get_vm_env(JNIEnv * jni_env);
 
 /* global handles */
 extern ObjectHandle gh_jlc;         //java.lang.Class

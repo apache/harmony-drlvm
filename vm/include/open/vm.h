@@ -716,9 +716,6 @@ VMEXPORT Boolean vm_get_property_value_boolean(const char* property, Boolean def
 
 VMEXPORT Boolean vm_get_boolean_property_value_with_default(const char *property_name);
 
-// Exit and perform the necessary cleanup.
-VMEXPORT void vm_exit(int exit_code);
-
 // end miscellaneous functions.
 /////////////////////////////////////////////////////////////////
 

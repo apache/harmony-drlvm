@@ -114,8 +114,7 @@ int NT_exception_filter(LPEXCEPTION_POINTERS p_NT_exception)
 
     case STATUS_PRIVILEGED_INSTRUCTION:
         {
-            ABORT("Unexpected exception code");
-            vm_exit(99553);
+            DIE("Unexpected exception code");
         }
         break;
 

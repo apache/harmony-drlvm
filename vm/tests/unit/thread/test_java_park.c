@@ -24,7 +24,7 @@
  * Test jthread_park(...)
  * Test jthread_unpark(...)
  */
-void run_for_test_jthread_park_unpark(void){
+void JNICALL run_for_test_jthread_park_unpark(jvmtiEnv * jvmti_env, JNIEnv * jni_env, void *arg){
 
     tested_thread_sturct_t * tts = current_thread_tts;
     IDATA status;
@@ -88,7 +88,7 @@ int test_jthread_park_unpark(void) {
 /*
  * Test jthread_park(...)
  */
-void run_for_test_jthread_park_interrupt(void){
+void JNICALL run_for_test_jthread_park_interrupt(jvmtiEnv * jvmti_env, JNIEnv * jni_env, void *arg){
 
     tested_thread_sturct_t * tts = current_thread_tts;
     IDATA status;
@@ -151,7 +151,7 @@ int test_jthread_park_interrupt(void) {
 /*
  * Test jthread_timed_park(...)
  */
-void run_for_test_jthread_timed_park(void){
+void JNICALL run_for_test_jthread_timed_park(jvmtiEnv * jvmti_env, JNIEnv * jni_env, void *arg){
 
     tested_thread_sturct_t * tts = current_thread_tts;
     IDATA status;

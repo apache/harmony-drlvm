@@ -81,9 +81,9 @@ typedef struct {
 } jthread_threadattr_t;
 
 jlong jthread_thread_init(jvmti_thread_t *ret_thread, JNIEnv* env, jthread java_thread, jobject weak_ref, jlong old_thread);
- IDATA jthread_create(JNIEnv *env, jthread thread, jthread_threadattr_t *attrs);
- IDATA jthread_create_with_function(JNIEnv *env, jthread thread, jthread_threadattr_t *attrs, jvmtiStartFunction proc, const void* arg);
- IDATA jthread_attach(JNIEnv* env, jthread thread);
+IDATA jthread_create(JNIEnv * jni_env, jthread thread, jthread_threadattr_t *attrs);
+IDATA jthread_create_with_function(JNIEnv * jni_env, jthread thread, jthread_threadattr_t *attrs, jvmtiStartFunction proc, const void* arg);
+IDATA jthread_attach(JNIEnv * jni_env, jthread thread, jboolean daemon);
  IDATA jthread_detach(jthread thread);
 IDATA jthread_join(jthread thread);
 IDATA jthread_timed_join(jthread thread, jlong millis, jint nanos);
@@ -92,6 +92,7 @@ IDATA jthread_stop(jthread thread);
 IDATA jthread_exception_stop(jthread thread, jobject throwable);
 IDATA jthread_sleep(jlong millis, jint nanos);
 JNIEnv *jthread_get_JNI_env(jthread thread);
+IDATA jthread_wait_for_all_nondaemon_threads();
 
 
 
@@ -122,27 +123,9 @@ jthread jthread_get_java_thread(hythread_t thread);
 //@{
 
 
-/**
- * Sets the daemon attribute for the <code>thread</code>.
- *
- * JVM exits when the only threads running are all daemon threads.
- *
- * @param[in] thread those attribute is set
- * @param[in] on daemon off or on
- * @sa java.lang.Thread.setDaemon()
- */
-IDATA jthread_set_daemon(jthread thread, jboolean on);
-
-/**
- * Returns true if the <code>thread</code>is daemon.
- *
- * @param[in] thread those attribute is read
- * @sa java.lang.Thread.isDaemon()
- */
-jboolean jthread_is_daemon(jthread thread);
-
 IDATA jthread_set_priority(jthread thread, int priority);
 int jthread_get_priority(jthread thread);
+jboolean jthread_is_daemon(jthread thread);
 
 /**
  * Sets the name for the <code>thread</code>.

@@ -31,6 +31,7 @@
 #include "open/bytecodes.h"
 #include "open/jthread.h"
 #include "jvmti_break_intf.h"
+#include "jni_utils.h"
 
 static inline short
 jvmti_GetHalfWordValue( const unsigned char *bytecode,
@@ -483,7 +484,8 @@ static void jvmti_start_single_step_in_virtual_method(DebugUtilsTI *ti, VMBreakP
         // call so we need to search through all methods for this
         // one to find it, no way to get vtable and offset in it
         NativeCodePtr ip = disasm->get_target_address_from_context(regs);
-        CodeChunkInfo *cci = vm_methods->find(ip);
+        Global_Env * vm_env = jni_get_vm_env(vm_thread->jni_env);
+        CodeChunkInfo *cci = vm_env->vm_methods->find(ip);
         if (cci)
             method = cci->get_method();
         else

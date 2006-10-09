@@ -91,18 +91,17 @@ JNIEXPORT jclass JNICALL Java_java_lang_VMClassRegistry_defineClass
  * Signature: (Ljava/lang/String;Ljava/lang/ClassLoader;)Ljava/lang/Class;
  */
 JNIEXPORT jclass JNICALL Java_java_lang_VMClassRegistry_findLoadedClass
-    (JNIEnv *jenv_ext, jclass, jstring name, jobject cl)
+    (JNIEnv *jenv, jclass, jstring name, jobject cl)
 {
     ASSERT_RAISE_AREA;
 
     // check the name is provided
     if (name == NULL) {
-        ThrowNew_Quick(jenv_ext, "java/lang/NullPointerException", "null class name value.");
+        ThrowNew_Quick(jenv, "java/lang/NullPointerException", "null class name value.");
         return NULL;
     }
 
     // obtain char* for the name
-    JNIEnv_Internal *jenv = (JNIEnv_Internal *)jenv_ext;
     unsigned length = GetStringUTFLength(jenv, name);
     char* buf = (char*)STD_MALLOC(length+1);
     assert(buf);
@@ -116,7 +115,7 @@ JNIEXPORT jclass JNICALL Java_java_lang_VMClassRegistry_findLoadedClass
 
     // filter out primitive types
 
-    Global_Env *ge = jenv->vm->vm_env;
+    Global_Env *ge = jni_get_vm_env(jenv);
     Class* primitives[] = {
         ge->Boolean_Class,
         ge->Char_Class,
@@ -185,7 +184,7 @@ JNIEXPORT jclass JNICALL Java_java_lang_VMClassRegistry_getClass
  * Method:    getClassLoader
  * Signature: (Ljava/lang/Class;)Ljava/lang/ClassLoader;
  */
-JNIEXPORT jobject JNICALL Java_java_lang_VMClassRegistry_getClassLoader
+JNIEXPORT jobject JNICALL Java_java_lang_VMClassRegistry_getClassLoader0
   (JNIEnv *jenv, jclass, jclass clazz)
 {
     Class_Handle clss = jni_get_class_handle(jenv, clazz);
@@ -556,13 +555,13 @@ JNIEXPORT void JNICALL Java_java_lang_VMClassRegistry_loadLibrary
     // load native library
     ClassLoaderHandle loader;
     if( classLoader ) {
-        loader = class_loader_lookup( classLoader );
+        loader = class_loader_lookup(classLoader);
     } else {
         // bootstrap class loader
         loader = (ClassLoaderHandle)
-            ((JNIEnv_Internal*)jenv)->vm->vm_env->bootstrap_class_loader;
+            jni_get_vm_env(jenv)->bootstrap_class_loader;
     }
-    class_loader_load_native_lib( str_filename, loader );
+    class_loader_load_native_lib(str_filename, loader);
 
     // release char string
     ReleaseStringUTFChars(jenv, filename, str_filename);

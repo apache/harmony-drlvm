@@ -46,8 +46,6 @@ typedef struct String String;
 // #include "object_layout.h"
 #include "vm_threads.h"
 
-VMEXPORT void vm_exit(int exit_code);
-
 unsigned sizeof_java_lang_class();
 
 
@@ -59,7 +57,7 @@ public:
 }; //VM_Global_State
 
 
-extern struct JNIEnv_Internal *jni_native_intf;
+extern JNIEnv * jni_native_intf;
 extern VTable *cached_object_array_vtable_ptr;
 
 
@@ -161,17 +159,6 @@ protected:
     long m_nCurPos;
     long m_nInc;
 };
-
-class StaticInitializer {
-public:
-    StaticInitializer() {
-        apr_initialize();
-    }
-    ~StaticInitializer() {
-        apr_terminate2();
-    }
-};
-
 
 /**
  * @brief Generates an VM's helper to invoke the provided function.

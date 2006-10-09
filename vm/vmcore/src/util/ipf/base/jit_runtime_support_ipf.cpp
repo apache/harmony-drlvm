@@ -126,8 +126,7 @@ jlong get_current_time(); // This is for system_currenttimemillis override
 
 static void unimplemented_rt_support_func1(int f, const char *name)
 {
-    printf("This runtime support function is not implemented: f=%d, '%s'\n", f, name);
-    vm_exit(1);
+    DIE("This runtime support function is not implemented: f=" << f << ", " << name);
 } //unimplemented_rt_support_func1
 
 

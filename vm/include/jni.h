@@ -1,4 +1,4 @@
-/*
+/* 
  *  Licensed to the Apache Software Foundation (ASF) under one or more
  *  contributor license agreements.  See the NOTICE file distributed with
  *  this work for additional information regarding copyright ownership.
@@ -37,7 +37,6 @@
 #define JNI_VERSION_1_1 0x00010001
 #define JNI_VERSION_1_2 0x00010002
 #define JNI_VERSION_1_4 0x00010004
-
 
 /*
  * JNI Native Method Interface - C
@@ -1688,12 +1687,18 @@ typedef struct JavaVMInitArgs {
     jboolean ignoreUnrecognized;
 } JavaVMInitArgs;
 
+typedef struct JavaVMAttachArgs {
+    jint version;  
+    char *name;
+    jobject group;
+} JavaVMAttachArgs;
+
 struct JNIInvokeInterface_ {
     void* reserved0;
     void* reserved1;
     void* reserved2;
 
-    jint (JNICALL *DestroyVM)(JavaVM*);
+    jint (JNICALL *DestroyJavaVM)(JavaVM*);
 
     jint (JNICALL *AttachCurrentThread)(JavaVM*, void** penv, void* args);
     jint (JNICALL *DetachCurrentThread)(JavaVM*);
@@ -1707,13 +1712,14 @@ struct JavaVM_External {
     const struct JNIInvokeInterface_* functions;
 
 #ifdef __cplusplus
-    jint DestroyVM() {
-        return functions->DestroyVM(this);
+    jint DestroyJavaVM() {
+        return functions->DestroyJavaVM(this);
     }
 
     jint AttachCurrentThread(void** penv, void* args) {
         return functions->AttachCurrentThread(this, penv, args);
     }
+
     jint DetachCurrentThread() {
         return functions->DetachCurrentThread(this);
     }
@@ -1725,20 +1731,32 @@ struct JavaVM_External {
     jint AttachCurrentThreadAsDaemon(void** penv, void* args) {
         return functions->AttachCurrentThreadAsDaemon(this, penv, args);
     }
+
 #endif
 };
-
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-JNIEXPORT jint JNICALL JNI_CreateJavaVM(JavaVM **p_vm, JNIEnv **p_env, void *vm_args);
+#ifdef BUILDING_VM
+#define _JNI_EXPORT_ JNIEXPORT
+#else
+#define _JNI_EXPORT_ JNIIMPORT
+#endif
+
+_JNI_EXPORT_ jint JNICALL JNI_GetDefaultJavaVMInitArgs(void * vm_args);
+
+_JNI_EXPORT_ jint JNICALL JNI_GetCreatedJavaVMs(JavaVM ** vmBuf,
+                                                jsize bufLen,
+                                                jsize * nVMs);
+
+_JNI_EXPORT_ jint JNICALL JNI_CreateJavaVM(JavaVM ** p_vm, JNIEnv ** p_env,
+                                           void * vm_args);
 
 #ifdef __cplusplus
 }
 #endif
-
 
 
 #endif /* _JNI_H_ */

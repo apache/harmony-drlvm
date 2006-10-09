@@ -23,7 +23,7 @@
 /*
  * Test jthread_interrupt(...)
  */
-void run_for_test_jthread_interrupt(void){
+void JNICALL run_for_test_jthread_interrupt(jvmtiEnv * jvmti_env, JNIEnv * jni_env, void *arg){
 
     tested_thread_sturct_t * tts = current_thread_tts;
     
@@ -76,7 +76,7 @@ int test_jthread_interrupt(void){
 /*
  * Test jthread_is_interrupted(...)
  */
-void run_for_test_jthread_is_interrupted(void){
+void JNICALL run_for_test_jthread_is_interrupted(jvmtiEnv * jvmti_env, JNIEnv * jni_env, void *arg){
 
     tested_thread_sturct_t * tts = current_thread_tts;
     
@@ -129,7 +129,7 @@ int test_jthread_is_interrupted(void){
 /*
  * Test jthread_clear_interrupted(...)
  */
-void run_for_test_jthread_clear_interrupted(void){
+void JNICALL run_for_test_jthread_clear_interrupted(jvmtiEnv * jvmti_env, JNIEnv * jni_env, void *arg){
 
     tested_thread_sturct_t * tts = current_thread_tts;
     

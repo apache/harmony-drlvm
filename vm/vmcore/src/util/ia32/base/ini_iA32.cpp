@@ -240,6 +240,7 @@ JIT_execute_method_default(JIT_Handle jit, jmethodID methodID, jvalue *return_va
     }
 
     if (exn_raised()) {
+        TRACE("Exception occured: " << exn_get_name());
         if ((resultPtr != NULL) && (ret_type != JAVA_TYPE_VOID)) {   
             resultPtr->l = 0; //clear result
         }

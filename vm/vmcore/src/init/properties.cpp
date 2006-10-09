@@ -390,12 +390,12 @@ initialize_properties(Global_Env * p_env, Properties & prop)
  */
      
 
-    define_undefined_predefined_properties(p_env->properties);
+    define_undefined_predefined_properties(*p_env->properties);
 
     char **pp = predefined_propeties;
     while (NULL != *pp)
     {
-        p_env->properties.add(*pp);
+        p_env->properties->add(*pp);
         pp++;
     }
 
@@ -443,7 +443,7 @@ initialize_properties(Global_Env * p_env, Properties & prop)
         if (strncmp(option, "-D", 2) == 0)
         {
             TRACE("setting property " << option + 2);
-            add_to_properties(p_env->properties, option + 2);
+            add_to_properties(*p_env->properties, option + 2);
         }
     }
     apr_pool_clear(prop_pool);

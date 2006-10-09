@@ -22,31 +22,40 @@
 #ifndef _ENVIRONMENT_H
 #define _ENVIRONMENT_H
 
-#include "tl/memory_pool.h"
+#include <apr_pools.h>
+#include <apr_thread_mutex.h>
+
+#include "open/hythread.h"
+#include "open/compmgr.h"
+#include "open/em_vm.h"
+
 #include "String_Pool.h"
 #include "vm_core_types.h"
 #include "object_handles.h"
 #include "jvmti_internal.h"
-#include "open/compmgr.h"
-#include "open/em_vm.h"
+#include "method_lookup.h"
 
 typedef struct NSOTableItem NSOTableItem;
 typedef struct DynamicCode DynamicCode;
 typedef struct Assertion_Registry Assertion_Registry;
 
 struct Global_Env {
- public:
-    tl::MemoryPool&           mem_pool; // memory pool
-    String_Pool               string_pool;  // string table
+  public:
+    apr_pool_t*               mem_pool; // memory pool
     BootstrapClassLoader*     bootstrap_class_loader;
-    JavaVMInitArgs            vm_arguments;
     UserDefinedClassLoader*   system_class_loader;
-    Properties&               properties;
+    Properties*               properties;
     DebugUtilsTI*             TI;
     NSOTableItem*             nsoTable;
     void*                     portLib;  // Classlib's port library
     DynamicCode*              dcList;
     Assertion_Registry*       assert_reg;
+    Method_Lookup_Table*      vm_methods;
+    hythread_library_t        hythread_lib;
+    String_Pool               string_pool;  // string table
+    JavaVMInitArgs            vm_arguments;
+
+
     //
     // globals
     //
@@ -127,6 +136,7 @@ struct Global_Env {
     Class* java_lang_ExceptionInInitializerError_Class;
     Class* java_lang_NullPointerException_Class;
     Class* java_lang_StackOverflowError_Class;
+    Class* java_lang_ThreadDeathError_Class;
 
     Class* java_lang_ClassNotFoundException_Class;
     Class* java_lang_NoClassDefFoundError_Class;
@@ -137,7 +147,7 @@ struct Global_Env {
     Class* java_lang_ClassCastException_Class;
     Class* java_lang_OutOfMemoryError_Class;
     ObjectHandle java_lang_OutOfMemoryError;
-
+    ObjectHandle java_lang_ThreadDeathError;
     // object of java.lang.Error class used for JVMTI JIT PopFrame support
     ObjectHandle popFrameException;
 
@@ -163,8 +173,12 @@ struct Global_Env {
     VTable* JavaLangString_VTable;
     Allocation_Handle JavaLangString_allocation_handle;
 
+    // Keeps uncaught exception for the thread which is destroying VM.
+    jthrowable uncaught_exception;
+
     // Offset to the vm_class field in java.lang.Class;
     unsigned vm_class_offset;
+
     /**
      * Shutting down state.
      * 0 - working
@@ -172,7 +186,7 @@ struct Global_Env {
      * 2 - deadly errors in shutdown
      */
     int shutting_down;
-    
+        
     // FIXME
     // The whole environemt will be refactored to VM instance
     // The following contains a cached copy of EM interface table
@@ -180,12 +194,16 @@ struct Global_Env {
     OpenInstanceHandle em_instance;
     OpenEmVmHandle em_interface;
 
-    //
-    // constructor
-    //
-    Global_Env(tl::MemoryPool& mm, Properties& prop);
-    // function is used instead of destructor to uninitialize manually
-    void EnvClearInternals();
+    Global_Env(apr_pool_t * pool);
+    ~Global_Env();
+
+    void * operator new(size_t size, apr_pool_t * pool) {
+        return apr_palloc(pool, sizeof(Global_Env));
+    }
+
+    void operator delete(void *) {}
+
+    void operator delete(void * mem, apr_pool_t * pool) {};
 
     //
     // determine bootstrapping of root classes

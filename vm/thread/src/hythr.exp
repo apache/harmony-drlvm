@@ -8,6 +8,7 @@ hythread_cancel;
 hythread_monitor_enter;
 hythread_monitor_notify_all;
 hythread_attach;
+hythread_attach_ex;
 hythread_monitor_destroy;
 hythread_monitor_num_waiting;
 hythread_interrupted;
@@ -121,11 +122,13 @@ hymutex_unlock;
 hymutex_destroy;
 hythread_exit;
 
-hythread_wait_for_all_nondaemon_threads;
 hythread_is_alive;
 hythread_init;
-countdown_nondaemon_threads;
-increase_nondaemon_threads_count;
+hythread_shutdown;
+hythread_lib_create;
+hythread_lib_destroy;
+hythread_lib_lock;
+hythread_lib_unlock;
 set_safepoint_callback;
 
 release_start_lock;

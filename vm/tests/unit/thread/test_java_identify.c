@@ -26,7 +26,7 @@
 /*
  * Test jthread_self(...)
  */
-void run_for_test_jthread_self(void){
+void JNICALL run_for_test_jthread_self(jvmtiEnv * jvmti_env, JNIEnv * jni_env, void *arg){
 
     tested_thread_sturct_t * tts = current_thread_tts;
     

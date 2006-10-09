@@ -104,6 +104,11 @@ suspended:
 void VMCALL hythread_suspend_disable()
 {   
     register hythread_t thread;
+#ifndef NDEBUG
+    // Check that current thread is in default thread group.
+    // Justification: GC suspends and enumerates threads from default group only.
+    assert(tm_self_tls->group == TM_DEFAULT_GROUP);
+#endif
 
 #ifdef FS14_TLS_USE
     __asm { 

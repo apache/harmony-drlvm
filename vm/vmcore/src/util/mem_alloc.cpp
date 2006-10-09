@@ -51,7 +51,7 @@ static apr_thread_mutex_t* vtable_mutex;
 static apr_thread_mutex_t* jit_code_mutex;
 
 
-// this vector is used to store ptrs of allocated memory to free it in vm_exit
+// this vector is used to store ptrs of allocated memory to free it on exit
 static std::vector<port_vmem_t *> m_allocated_memory_ptrs;
 
 

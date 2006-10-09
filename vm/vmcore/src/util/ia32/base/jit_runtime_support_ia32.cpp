@@ -1261,60 +1261,6 @@ void *vm_get_rt_support_addr(VM_RT_SUPPORT f)
  */
 
 
-// a structure used in memoizing already created stubs
-struct TypecheckStubMemoizer {
-    Class *clss;  // the class for which this stub is for
-    void *fast_checkcast_stub, *fast_instanceof_stub;
-    TypecheckStubMemoizer *next;
-
-    static TypecheckStubMemoizer* head;  // head of the list
-    static  tl::MemoryPool mem;  // we'll alocate structures from here
-
-    static void* find_stub(Class *c, bool is_checkcast) {
-        // search for an existing struct for this class
-        for (TypecheckStubMemoizer *t = head;  t != NULL;  t = t->next) {
-            if (t->clss == c) {
-                return (is_checkcast) ?
-                    t->fast_checkcast_stub : t->fast_instanceof_stub;
-            }
-        }
-
-        return NULL;
-    }
-
-    static void add_stub(Class *c, void *stub, bool is_checkcast) {
-        // search for an existing struct for this class
-      
-      TypecheckStubMemoizer *t;
-      for (t = head;  t != NULL;  t = t->next) {
-            if (t->clss == c)
-                break;
-        }
-
-        if (t == NULL) {
-            // create new structure
-            t = (TypecheckStubMemoizer*) mem.alloc(sizeof(TypecheckStubMemoizer));
-            t->clss = c;
-            t->fast_checkcast_stub = NULL;
-            t->fast_instanceof_stub = NULL;
-            t->next = head;
-            head = t;
-        }
-
-        if (is_checkcast) {
-            assert(t->fast_checkcast_stub == NULL);
-            t->fast_checkcast_stub = stub;
-        }
-        else {
-            assert(t->fast_instanceof_stub == NULL);
-            t->fast_instanceof_stub = stub;
-        }
-    }
-};
-
-static StaticInitializer jit_runtime_initializer;
-TypecheckStubMemoizer* TypecheckStubMemoizer::head = NULL;
-tl::MemoryPool TypecheckStubMemoizer::mem;  // we'll alocate structures from here
 
 /* ? 03/07/30: temporary interface change!!! */
 void *vm_get_rt_support_addr_optimized(VM_RT_SUPPORT f, Class_Handle c) {

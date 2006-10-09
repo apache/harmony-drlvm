@@ -25,11 +25,9 @@
  * Test jthread_suspend(...)
  * Test jthread_resume(...)
   */
-void run_for_test_jthread_suspend_resume(void){
+void JNICALL run_for_test_jthread_suspend_resume(jvmtiEnv * jvmti_env, JNIEnv * jni_env, void *arg){
 
     tested_thread_sturct_t * tts = current_thread_tts;
-    jobject mon = tts->monitor;
-    IDATA status;
     
     tts->phase = TT_PHASE_RUNNING;
     while(1){

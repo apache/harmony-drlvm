@@ -27,6 +27,7 @@
 
 #include <open/jthread.h>
 #include <open/hythread_ext.h>
+#include "open/thread_externals.h"
 #include "thread_private.h"
 #include "jni.h"
 
@@ -35,18 +36,19 @@
 
 void stop_callback(void);
 jmethodID getRunMethod(JNIEnv *env);
+IDATA increase_nondaemon_threads_count(hythread_t self);
+IDATA countdown_nondaemon_threads(hythread_t self);
 
 typedef struct  {
-    JNIEnv *jenv;
-    jthread thread;
+    JavaVM * java_vm;
     jboolean daemon;
-        jvmtiEnv *tiEnv;
-        jvmtiStartFunction tiProc;
-        void *tiProcArgs;
+    jvmtiEnv *tiEnv;
+    jvmtiStartFunction tiProc;
+    void *tiProcArgs;
 } wrapper_proc_data;
 
 
-IDATA associate_native_and_java_thread(JNIEnv* env, jthread java_thread, hythread_t  tm_native_thread, jobject thread_ref);
+IDATA associate_native_and_java_thread(JNIEnv* env, jthread java_thread, hythread_t tm_native_thread, jobject thread_ref);
 
 /**
  * Creates new Java thread.
@@ -54,70 +56,60 @@ IDATA associate_native_and_java_thread(JNIEnv* env, jthread java_thread, hythrea
  * The newly created thread will immediately start to execute the <code>run()</code>
  * method of the appropriate <code>thread</code> object.
  *
- * @param[in] env JNI environment that will be associated with the created Java thread
+ * @param[in] jni_env jni environment for the current thread.
  * @param[in] java_thread Java thread object with which new thread must be associated.
  * @param[in] attrs thread attributes.
  * @sa java.lang.Thread.run()
  */
-IDATA jthread_create(JNIEnv* env, jthread java_thread, jthread_threadattr_t *attrs) {
+IDATA jthread_create(JNIEnv * jni_env, jthread java_thread, jthread_threadattr_t *attrs) {
 
-        IDATA status;
-        status = jthread_create_with_function(env,java_thread,attrs,NULL,NULL);
-        return status;
+    return jthread_create_with_function(jni_env, java_thread, attrs, NULL, NULL);
 }
 
 int wrapper_proc(void *arg) {
-
-    IDATA status,status1;
+    IDATA status;
+    JNIEnv * jni_env;
+    hythread_t native_thread;
+    jvmti_thread_t jvmti_thread;
+    jthread java_thread;
     wrapper_proc_data *data = (wrapper_proc_data *)arg;
-    JNIEnv *env = data->jenv;
-    jvmtiEnv *tiEnv = data->tiEnv;
-    jvmtiStartFunction tiProc  = data->tiProc;
-    void *tiProcArgs =  data->tiProcArgs;
+    
+    // Assocciation should be already done.
+    native_thread = hythread_self();
+    jvmti_thread = hythread_get_private_data(native_thread);
+    assert(jvmti_thread);
+    java_thread = jvmti_thread->thread_object;
 
-    TRACE(("TM: Java thread started: id=%d OS_handle=%p", hythread_self()->thread_id, apr_os_thread_current()));
-    //status = hythread_global_lock();
-    //assert (status == TM_ERROR_NONE);
-    status=vm_attach();
-    if(status!=TM_ERROR_NONE)
-    {
-        if (!data->daemon){
-            status1 = countdown_nondaemon_threads();
-            assert (status1 == TM_ERROR_NONE);
-        }
-        return status;
+    status = vm_attach(data->java_vm, &jni_env);
+    if (status != JNI_OK) return TM_ERROR_INTERNAL;
+
+    jvmti_thread->jenv = jni_env;
+    jvmti_thread->daemon = data->daemon;
+
+    if (!jvmti_thread->daemon) {
+        increase_nondaemon_threads_count(native_thread);
     }
+
+    TRACE(("TM: Java thread started: id=%d OS_handle=%p", native_thread->thread_id, apr_os_thread_current()));
+
+    // Send Thread Start event.
     jvmti_send_thread_start_end_event(1);
-    //status = hythread_global_unlock();
-    //  assert (status == TM_ERROR_NONE);
-        if(tiProc!=NULL)
-        {
-                tiProc(tiEnv, env, tiProcArgs);
-        }
-        else
-        {
-                (*env) -> CallVoidMethodA(env, data->thread, getRunMethod(env), NULL);//for jthread_create();
-        }
 
-        jvmti_send_thread_start_end_event(0);
-    (*env) -> DeleteGlobalRef(env, data->thread);
-    TRACE(("TM: Java thread finished: id=%d OS_handle=%p", hythread_self()->thread_id, apr_os_thread_current()));
-        assert(hythread_is_suspend_enabled());
-    status=vm_detach();
-    if(status!=TM_ERROR_NONE)
+    if(data->tiProc != NULL)
     {
-        if (!data->daemon){
-            status1 = countdown_nondaemon_threads();
-            assert (status1 == TM_ERROR_NONE);
-        }
-        return status;
+        data->tiProc(data->tiEnv, jni_env, data->tiProcArgs);
     }
-    assert(hythread_is_suspend_enabled());
-        if (!data->daemon){
-                status = countdown_nondaemon_threads();
-                assert (status == TM_ERROR_NONE);
-        }
-    return TM_ERROR_NONE;
+    else
+    {
+        // for jthread_create();
+        (*jni_env) -> CallVoidMethodA(jni_env, java_thread, getRunMethod(jni_env), NULL);
+    }
+    
+    status = jthread_detach(java_thread);
+
+    TRACE(("TM: Java thread finished: id=%d OS_handle=%p", native_thread->thread_id, apr_os_thread_current()));
+
+    return status;
 }
 
 /**
@@ -129,72 +121,57 @@ int wrapper_proc(void *arg) {
  * This method of thread creation would be useful for creating TI agent threads (i.e. Java threads
  * which always execute only native code).
  *
- * @param[in] env JNI environment that will be associated with the created Java thread
+ * @param[in] jni_env jni environment for the current thread.
  * @param[in] java_thread Java thread object with which new thread must be associated.
  * @param[in] attrs thread attributes.
  * @param[in] proc the start function to be executed in this thread.
  * @param[in] arg The argument to the start function. Is passed as an array.
  * @sa JVMTI::RunAgentThread()
  */
-IDATA jthread_create_with_function(JNIEnv *env, jthread java_thread, jthread_threadattr_t *attrs,jvmtiStartFunction proc, const void* arg)
+IDATA jthread_create_with_function(JNIEnv * jni_env, jthread java_thread, jthread_threadattr_t *attrs, jvmtiStartFunction proc, const void* arg)
 {
-        hythread_t tm_native_thread = NULL;
-    jvmti_thread_t tm_java_thread = NULL;
-    wrapper_proc_data *data;
-        IDATA status;
-        apr_status_t apr_status;
-        apr_pool_t * pool;
-
-        if (env == NULL || java_thread == NULL || attrs == NULL){
-            return TM_ERROR_NULL_POINTER;
-        }
+    hythread_t tm_native_thread = NULL;
+    jvmti_thread_t tm_java_thread;
+    wrapper_proc_data * data;
+    IDATA status;
+    
+    if (jni_env == NULL || java_thread == NULL || attrs == NULL) {
+        return TM_ERROR_NULL_POINTER;
+    }
     tm_native_thread = vm_jthread_get_tm_data(java_thread);
-        
-    //This is for irregular use. In ordinary live valid jthread instance
-    //contains weak reference associated with it and native thread to reuse 
-    //if any
-    ////
-
-    if (tm_native_thread==NULL)
-        {
-       if(!jthread_thread_init(NULL,env,java_thread, NULL, 0))
-		 {
-			 return TM_ERROR_OUT_OF_MEMORY;
-		 }
-                tm_native_thread = vm_jthread_get_tm_data(java_thread);
+    
+    // This is for irregular use. In ordinary live valid jthread instance
+    // contains weak reference associated with it and native thread to reuse. 
+    if (tm_native_thread == NULL) {
+        if( !jthread_thread_init(NULL, jni_env, java_thread, NULL, 0)) {
+            return TM_ERROR_OUT_OF_MEMORY;
         }
+        tm_native_thread = vm_jthread_get_tm_data(java_thread);
+    }
+
     tm_java_thread = hythread_get_private_data(tm_native_thread);
-    assert(tm_java_thread);    
-    apr_status = apr_pool_create(&pool, 0);
-	if (apr_status != APR_SUCCESS) {
-		return CONVERT_ERROR(apr_status);
-	}
-    data = apr_palloc(pool, sizeof(wrapper_proc_data));
-        if(data == NULL) {
-                return TM_ERROR_OUT_OF_MEMORY;
-        }
+    assert(tm_java_thread);
 
+    data = apr_palloc(tm_java_thread->pool, sizeof(wrapper_proc_data));
+    if (data == NULL) {
+        return TM_ERROR_OUT_OF_MEMORY;
+    }
+    
     // Prepare argumets for wrapper proc
-    data->jenv = env;
-    data->thread = tm_java_thread->thread_object; 
+    status = (*jni_env) -> GetJavaVM(jni_env, &data->java_vm);
+    if (status != JNI_OK) return TM_ERROR_INTERNAL;
+
     data->daemon = attrs->daemon;
-        data->tiEnv  = attrs->jvmti_env;
+    data->tiEnv  = attrs->jvmti_env;
     data->tiProc = proc;
     data->tiProcArgs = (void *)arg;
     
-    // create native thread with wrapper_proc
-        if (!attrs->daemon){
-         status = increase_nondaemon_threads_count();
-                 if (status != TM_ERROR_NONE) return status;
-        }
-        status = hythread_create(&tm_native_thread, (attrs->stacksize)?attrs->stacksize:1024000,
-                              attrs->priority, 0, wrapper_proc, data);
-    if ((!attrs->daemon)&&(status != TM_ERROR_NONE)){
-        countdown_nondaemon_threads();
-    }
+    status = hythread_create(&tm_native_thread, (attrs->stacksize)?attrs->stacksize:1024000,
+                               attrs->priority, 0, wrapper_proc, data);
+
     TRACE(("TM: Created thread: id=%d", tm_native_thread->thread_id));
 
-        return status;
+    return status;
 }
 
 /**
@@ -204,30 +181,39 @@ IDATA jthread_create_with_function(JNIEnv *env, jthread java_thread, jthread_thr
  * and associate it with the current native thread. Nothing happens
  * if this thread is already attached.
  *
- * @param[in] env JNI environment that will be associated with the attached Java thread
- * @param[in] java_thread Java thread object with which the current native thread must be associated.
+ * @param[in] jni_env JNI environment for cuurent thread
+ * @param[in] java_thread j.l.Thread instance to associate with current thread
+ * @param[in] daemon JNI_TRUE if attaching thread is a daemon thread, JNI_FALSE overwise
  * @sa JNI::AttachCurrentThread ()
  */
-IDATA jthread_attach(JNIEnv* env, jthread java_thread) {        
-
+IDATA jthread_attach(JNIEnv * jni_env, jthread java_thread, jboolean daemon) {
     hythread_t tm_native_thread;
+    jvmti_thread_t jvmti_thread;
     IDATA status;
-        status = hythread_attach(NULL);
-    if (status != TM_ERROR_NONE){
-        return status;
+
+    // Do nothing if thread already attached.
+    if (jthread_self() != NULL) return TM_ERROR_NONE;
+
+    tm_native_thread = hythread_self();
+    assert(tm_native_thread);    
+
+    status = associate_native_and_java_thread(jni_env, java_thread, tm_native_thread, NULL);
+    if (status != TM_ERROR_NONE) return status;
+
+    jvmti_thread = hythread_get_private_data(tm_native_thread);
+    assert(jvmti_thread);
+    jvmti_thread->jenv = jni_env;
+    jvmti_thread->daemon = daemon;
+
+    if (!jvmti_thread->daemon) {
+        increase_nondaemon_threads_count(tm_native_thread);
     }
-        tm_native_thread = hythread_self();
-        //I wonder if we need it.
-    //since jthread already created, thus association is already done,
-    //see jthread_init
-    //VVVVVVVVVVVVVVVVVVVVVV
-    status=associate_native_and_java_thread(env, java_thread, tm_native_thread, NULL);
-    if (status != TM_ERROR_NONE){
-        return status;
-    }
+
+    // Send Thread Start event.
+    jvmti_send_thread_start_end_event(1);
+
     TRACE(("TM: Current thread attached to jthread=%p", java_thread));
-    status=vm_attach();
-        return status;
+    return TM_ERROR_NONE;
 }
 
 /**
@@ -243,25 +229,24 @@ IDATA jthread_attach(JNIEnv* env, jthread java_thread) {
 jlong jthread_thread_init(jvmti_thread_t *ret_thread, JNIEnv* env, jthread java_thread, jobject weak_ref, jlong old_thread) {
     hythread_t     tm_native_thread = NULL;
     jvmti_thread_t tmj_thread;
-        IDATA status;
+    IDATA status;
 
     if (old_thread) {
         tm_native_thread = (hythread_t)((IDATA)old_thread);
         tmj_thread = (jvmti_thread_t)hythread_get_private_data(tm_native_thread);
         //delete used weak reference
-        if (tmj_thread->thread_ref) (*env)->DeleteGlobalRef(env, tmj_thread->thread_ref);
-        
+        if (tmj_thread->thread_ref) (*env)->DeleteGlobalRef(env, tmj_thread->thread_ref);       
     }
-        status = hythread_struct_init(&tm_native_thread, NULL);
-        if(status != TM_ERROR_NONE)
-		{
-			return 0;
-		}
-        status=associate_native_and_java_thread(env, java_thread, tm_native_thread, weak_ref);
-        if(status != TM_ERROR_NONE)
-		{
-			return 0;
-		}
+    
+    status = hythread_struct_init(&tm_native_thread);
+    if (status != TM_ERROR_NONE) {
+        return 0;
+    }
+    
+    status = associate_native_and_java_thread(env, java_thread, tm_native_thread, weak_ref);
+    if (status != TM_ERROR_NONE) {
+        return 0;
+    }
     return (jlong)((IDATA)tm_native_thread);
 }
 
@@ -273,66 +258,73 @@ jlong jthread_thread_init(jvmti_thread_t *ret_thread, JNIEnv* env, jthread java_
  * @param[in] java_thread Java thread to be detached
  */
 IDATA jthread_detach(jthread java_thread) {
-    jvmti_thread_t tm_java_thread;
+    IDATA status;
     hythread_t tm_native_thread;
+    jvmti_thread_t tm_jvmti_thread;
+    JNIEnv * jni_env;
+
+    assert(hythread_is_suspend_enabled());
      
-        // Check input arg
+    // Check input arg
     assert(java_thread);
-        TRACE(("TM: jthread_detach %x", hythread_self()));
+    TRACE(("TM: jthread_detach %x", hythread_self()));
 
-        tm_native_thread = vm_jthread_get_tm_data(java_thread);
-        tm_java_thread = hythread_get_private_data(tm_native_thread);
+    tm_native_thread = jthread_get_native_thread(java_thread);
+    tm_jvmti_thread = hythread_get_private_data(tm_native_thread);
+    jni_env = tm_jvmti_thread->jenv;
 
-        // Remove tm_thread_t pointer from java.lang.Thread object
-    vm_jthread_set_tm_data(java_thread, NULL);
- 
-        vm_detach();     
+    if (!tm_jvmti_thread->daemon){
+        countdown_nondaemon_threads(tm_native_thread);
+    }
 
-    // Deallocate tm_java_thread 
-    apr_pool_destroy(tm_java_thread->pool);
+    // Send Thread End event
+    jvmti_send_thread_start_end_event(0);
 
-    // Remove tm_jthread_t pointer from *tm_native_thread      
-    /*
-    status = hythread_set_private_data(tm_native_thread, NULL);
-    if (status != TM_ERROR_NONE){
-        return status;
-    }*/
-        assert(hythread_is_suspend_enabled());
+    // Detach from VM.
+    status = vm_detach(java_thread);
+    if (status != JNI_OK) return TM_ERROR_INTERNAL;
+
+    // Delete global reference to current thread object.
+    (*jni_env)->DeleteGlobalRef(jni_env, tm_jvmti_thread->thread_object);
+    // jthread_self() will return NULL now.
+    tm_jvmti_thread->thread_object = NULL;
+
+
+    // Deallocate tm_jvmti_thread 
+    //apr_pool_destroy(tm_jvmti_thread->pool);
+
+    assert(hythread_is_suspend_enabled());
     return TM_ERROR_NONE;    
 }
 
-IDATA associate_native_and_java_thread(JNIEnv* env, jthread java_thread, hythread_t tm_native_thread, jobject thread_ref)
+IDATA associate_native_and_java_thread(JNIEnv * jni_env, jthread java_thread, hythread_t tm_native_thread, jobject thread_ref)
 {
-        IDATA status;
+    IDATA status;
     apr_status_t apr_status;
     apr_pool_t *pool;
-        jvmti_thread_t tm_java_thread;
-        if ((env == NULL) || (java_thread == NULL)||(tm_native_thread==NULL)){
+    jvmti_thread_t tm_java_thread;
+    
+    if ((jni_env == NULL) || (java_thread == NULL) || (tm_native_thread == NULL)) {
         return TM_ERROR_NULL_POINTER;
     }
     
-
     tm_java_thread = hythread_get_private_data(tm_native_thread);
     if (!tm_java_thread) {
         apr_status = apr_pool_create(&pool, 0);
-            if (apr_status != APR_SUCCESS) return CONVERT_ERROR(apr_status);
-        if (pool==NULL) return TM_ERROR_OUT_OF_MEMORY;
+        if (apr_status != APR_SUCCESS) return CONVERT_ERROR(apr_status);
+        if (pool == NULL) return TM_ERROR_OUT_OF_MEMORY;
         tm_java_thread = apr_palloc(pool, sizeof(JVMTIThread));
-            if(tm_java_thread == NULL) {
-                    return TM_ERROR_OUT_OF_MEMORY;
-            }
+        if (tm_java_thread == NULL) return TM_ERROR_OUT_OF_MEMORY;
     
         tm_java_thread->pool = pool;
 
         status = hythread_set_private_data(tm_native_thread, tm_java_thread);
-        if (status != TM_ERROR_NONE){
-            return status;
-        }
+        if (status != TM_ERROR_NONE) return status;
     }
-    
-    tm_java_thread->jenv = env;
-    tm_java_thread->thread_object = (*env)->NewGlobalRef(env,java_thread);
-    tm_java_thread->thread_ref    = (thread_ref)?(*env)->NewGlobalRef(env, thread_ref):NULL; 
+    // JNI environment is created when this thread attaches to VM.
+    tm_java_thread->jenv = NULL;
+    tm_java_thread->thread_object = (*jni_env)->NewGlobalRef(jni_env, java_thread);
+    tm_java_thread->thread_ref    = (thread_ref) ? (*jni_env)->NewGlobalRef(jni_env, thread_ref) : NULL; 
     tm_java_thread->contended_monitor = 0;
     tm_java_thread->wait_monitor = 0;
     tm_java_thread->owned_monitors = 0;
@@ -343,7 +335,7 @@ IDATA associate_native_and_java_thread(JNIEnv* env, jthread java_thread, hythrea
     // Associate java_thread with tm_thread      
     vm_jthread_set_tm_data(java_thread, tm_native_thread);
     
-        return TM_ERROR_NONE;
+    return TM_ERROR_NONE;
 }
 
 /**
@@ -355,18 +347,17 @@ IDATA associate_native_and_java_thread(JNIEnv* env, jthread java_thread, hythrea
  * @sa java.lang.Thread.join()
  */
 IDATA jthread_join(jthread java_thread) {
-
+    IDATA status;
     hythread_t  tm_native_thread;
-        IDATA status;
-
-        if (java_thread == NULL){
-            return TM_ERROR_NULL_POINTER;
-        }
+    
+    if (java_thread == NULL) {
+        return TM_ERROR_NULL_POINTER;
+    }
     tm_native_thread = jthread_get_native_thread(java_thread); 
     status = hythread_join_interruptable(tm_native_thread, 0, 0);
     TRACE(("TM: jthread %d joined %d", hythread_self()->thread_id, tm_native_thread->thread_id));
-
-        return status;
+    
+    return status;
 }
 
 /**
@@ -488,17 +479,20 @@ IDATA jthread_sleep(jlong millis, jint nanos) {
         IDATA status;
 
     tm_native_thread->state &= ~TM_THREAD_STATE_RUNNABLE;
-        tm_native_thread->state |= TM_THREAD_STATE_WAITING | TM_THREAD_STATE_SLEEPING |
-                                   TM_THREAD_STATE_WAITING_WITH_TIMEOUT;
+    tm_native_thread->state |= TM_THREAD_STATE_WAITING | TM_THREAD_STATE_SLEEPING |
+        TM_THREAD_STATE_WAITING_WITH_TIMEOUT;
 
     status = hythread_sleep_interruptable(millis, nanos); 
-
-        tm_native_thread->state &= ~(TM_THREAD_STATE_WAITING | TM_THREAD_STATE_SLEEPING |
-                                     TM_THREAD_STATE_WAITING_WITH_TIMEOUT);
-    tm_native_thread->state |= TM_THREAD_STATE_RUNNABLE;
-        if (status == TM_ERROR_INTERRUPT) {
+#ifndef NDEBUG
+    if (status == TM_ERROR_INTERRUPT) {
         TRACE(("TM: sleep interrupted status received, thread: %p", hythread_self()));
-    }    
+    }
+#endif
+    
+    tm_native_thread->state &= ~(TM_THREAD_STATE_WAITING | TM_THREAD_STATE_SLEEPING |
+        TM_THREAD_STATE_WAITING_WITH_TIMEOUT);
+
+    tm_native_thread->state |= TM_THREAD_STATE_RUNNABLE;
     return status;
 }
 
@@ -511,21 +505,20 @@ IDATA jthread_sleep(jlong millis, jint nanos) {
  * @param[in] java_thread java.lang.Thread object
  */
 JNIEnv *jthread_get_JNI_env(jthread java_thread) {
+    hythread_t tm_native_thread;
+    jvmti_thread_t tm_java_thread;
 
-        hythread_t tm_native_thread;
-        jvmti_thread_t tm_java_thread;
-
-    if (java_thread == NULL){
+    if (java_thread == NULL) {
         return NULL;
-        }
-        tm_native_thread = jthread_get_native_thread(java_thread);
-    if (tm_native_thread == NULL){
+    }
+    tm_native_thread = jthread_get_native_thread(java_thread);
+    if (tm_native_thread == NULL) {
         return NULL;
-        }
-        tm_java_thread = hythread_get_private_data(tm_native_thread);
-    if (tm_java_thread == NULL){
+    }
+    tm_java_thread = hythread_get_private_data(tm_native_thread);
+    if (tm_java_thread == NULL) {
         return NULL;
-        }
+    }
     return tm_java_thread->jenv;
 }
 /**
@@ -540,11 +533,11 @@ JNIEnv *jthread_get_JNI_env(jthread java_thread) {
 jlong jthread_get_id(jthread java_thread) {
 
     hythread_t tm_native_thread;
-
-        tm_native_thread = jthread_get_native_thread(java_thread);
+    
+    tm_native_thread = jthread_get_native_thread(java_thread);
     assert(tm_native_thread);
-
-        return hythread_get_id(tm_native_thread);
+    
+    return hythread_get_id(tm_native_thread);
 }
 
 /**
@@ -554,19 +547,19 @@ jlong jthread_get_id(jthread java_thread) {
  * @return jthread for the given ID, or NULL if there are no such.
  */
 jthread jthread_get_thread(jlong thread_id) {
-
-        hythread_t tm_native_thread;
-        jvmti_thread_t tm_java_thread;
-        jthread java_thread;
+    
+    hythread_t tm_native_thread;
+    jvmti_thread_t tm_java_thread;
+    jthread java_thread;
     
     tm_native_thread = hythread_get_thread((jint)thread_id);
-    if (tm_native_thread == NULL){
+    if (tm_native_thread == NULL) {
         return NULL;
-        }
-        tm_java_thread = hythread_get_private_data(tm_native_thread);
-        java_thread = tm_java_thread->thread_object;
+    }
+    tm_java_thread = hythread_get_private_data(tm_native_thread);
+    java_thread = tm_java_thread->thread_object;
     assert(java_thread);
-        return java_thread;
+    return java_thread;
 }
 
 /**
@@ -575,9 +568,8 @@ jthread jthread_get_thread(jlong thread_id) {
  * @return native thread
  */
 hythread_t  jthread_get_native_thread(jthread thread) {
-
-        assert(thread);
-
+    
+    assert(thread);
     return vm_jthread_get_tm_data(thread);        
 }
 
@@ -587,19 +579,19 @@ hythread_t  jthread_get_native_thread(jthread thread) {
  * @return Java thread
  */
 jthread jthread_get_java_thread(hythread_t tm_native_thread) {
+    
+    jvmti_thread_t tm_java_thread;
 
-        jvmti_thread_t tm_java_thread;
-
-    if (tm_native_thread == NULL){
+    if (tm_native_thread == NULL) {
         TRACE(("TM: native thread is NULL"));
         return NULL;
-        }
-        tm_java_thread = hythread_get_private_data(tm_native_thread);
+    }
+    tm_java_thread = hythread_get_private_data(tm_native_thread);
 
-    if (tm_java_thread == NULL){
+    if (tm_java_thread == NULL) {
         TRACE(("TM: tmj thread is NULL"));
         return NULL;
-        }
+    }
 
     return tm_java_thread->thread_object;
 }
@@ -610,7 +602,6 @@ jthread jthread_get_java_thread(hythread_t tm_native_thread) {
  * or NULL if the current native thread is not attached to JVM.
  */
 jthread jthread_self(void) {
-
     return jthread_get_java_thread(hythread_self());
 }
 
@@ -622,6 +613,42 @@ IDATA jthread_cancel_all() {
     return hythread_cancel_all(NULL);
 }
 
+/**
+ * waiting all nondaemon thread's
+ * 
+ */
+IDATA VMCALL jthread_wait_for_all_nondaemon_threads() {
+    hythread_t native_thread;
+    jvmti_thread_t jvmti_thread;
+    hythread_library_t lib;
+    IDATA status;
+    
+    native_thread = hythread_self();
+    jvmti_thread = hythread_get_private_data(native_thread);
+    lib = native_thread->library;
+
+    status = hymutex_lock(lib->TM_LOCK);
+    if (status != TM_ERROR_NONE) return status;    
+
+    if (lib->nondaemon_thread_count == 1 && !jvmti_thread->daemon) {
+        status = hymutex_unlock(lib->TM_LOCK);
+        return status;
+    }
+
+    while (lib->nondaemon_thread_count) {
+        status = hycond_wait(lib->nondaemon_thread_cond, lib->TM_LOCK);
+        //check interruption and other problems
+        TRACE(("TM wait for nondaemons notified, count: %d", nondaemon_thread_count));
+        if(status != TM_ERROR_NONE) {
+            hymutex_unlock(lib->TM_LOCK);
+            return status;
+        }
+    }
+    
+    status = hymutex_unlock(lib->TM_LOCK);
+    return status;
+}
+
 /*
  *  Auxiliary function to throw java.lang.InterruptedException
  */
@@ -631,29 +658,74 @@ void throw_interrupted_exception(void){
     jvmti_thread_t tm_java_thread;
     hythread_t tm_native_thread;
     jclass clazz;
-        JNIEnv *env;
-        TRACE(("interrupted_exception thrown"));
+    JNIEnv *env;
+    
+    TRACE(("interrupted_exception thrown"));
     tm_native_thread = hythread_self();
     tm_java_thread = hythread_get_private_data(tm_native_thread);
-        env = tm_java_thread->jenv;
-        clazz = (*env) -> FindClass(env, "java/lang/InterruptedException");
-        (*env) -> ThrowNew(env, clazz, "Park() is interrupted");
+    env = tm_java_thread->jenv;
+    clazz = (*env) -> FindClass(env, "java/lang/InterruptedException");
+    (*env) -> ThrowNew(env, clazz, "Park() is interrupted");
 }
 
 jmethodID getRunMethod(JNIEnv *env) {
     jclass clazz;
     static jmethodID run_method = NULL;
-        IDATA status;
+    IDATA status;
     
     status=acquire_start_lock();
-        assert (status == TM_ERROR_NONE);
+    assert (status == TM_ERROR_NONE);
     //printf("run method find enter\n");
     if (!run_method) {
         clazz = (*env) -> FindClass(env, "java/lang/Thread");
-        run_method = (*env) -> GetMethodID(env, clazz, "runImpl", "()V");
+        run_method = (*env) -> GetMethodID(env, clazz, "run", "()V");
     }
     status=release_start_lock();
     //printf("run method find exit\n");
     assert (status == TM_ERROR_NONE);
     return run_method;
+}
+
+IDATA increase_nondaemon_threads_count(hythread_t self) {
+    hythread_library_t lib;
+    IDATA status;
+    
+    lib = self->library;
+
+    status = hymutex_lock(lib->TM_LOCK);
+    if (status != TM_ERROR_NONE) return status;
+    
+    lib->nondaemon_thread_count++;
+    status = hymutex_unlock(lib->TM_LOCK);
+    return status;
+}
+
+IDATA countdown_nondaemon_threads(hythread_t self) {
+    hythread_library_t lib;
+    IDATA status;
+
+    lib = self->library;
+    
+    status = hymutex_lock(lib->TM_LOCK);
+    if (status != TM_ERROR_NONE) return status;
+    
+    if(lib->nondaemon_thread_count <= 0) {
+        status = hymutex_unlock(lib->TM_LOCK);
+        if (status != TM_ERROR_NONE) return status;
+        return TM_ERROR_ILLEGAL_STATE;
+    }
+    
+    TRACE(("TM: nondaemons decreased, thread: %p count: %d", self, lib->nondaemon_thread_count));
+    lib->nondaemon_thread_count--;
+    if(lib->nondaemon_thread_count == 0) {
+        status = hycond_notify_all(lib->nondaemon_thread_cond); 
+        TRACE(("TM: nondaemons all dead, thread: %p count: %d", self, lib->nondaemon_thread_count));
+        if (status != TM_ERROR_NONE){
+            hymutex_unlock(lib->TM_LOCK);
+            return status;
+        }
+    }
+    
+    status = hymutex_unlock(lib->TM_LOCK);
+    return status;
 }

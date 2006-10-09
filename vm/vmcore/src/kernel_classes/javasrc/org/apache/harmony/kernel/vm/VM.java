@@ -70,7 +70,7 @@ public final class VM {
      * @deprecated
      */
     public static ClassLoader callerClassLoader() {
-        return getClassLoader(VMStack.getCallerClass(1));
+        return getStackClassLoader(2);
     }
 
     private static native ClassLoader getClassLoader(Class clazz);

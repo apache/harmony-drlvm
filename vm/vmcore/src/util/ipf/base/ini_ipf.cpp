@@ -306,12 +306,11 @@ JIT_execute_method_default(JIT_Handle jh,
         break;
     default:
 #ifdef _DEBUG
-        printf("Return type %c is not implemented\n", ret_type);
         printf("Returned to C from %s.%s%s\n",
                meth->get_class()->name->bytes, meth->get_name()->bytes,
                meth->get_descriptor()->bytes);
 #endif
-        vm_exit(1);
+        DIE("Return type " << ret_type << " is not implemented\n");
     }
 
 } //vm_execute_java_method_array

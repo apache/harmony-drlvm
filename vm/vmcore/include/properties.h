@@ -279,21 +279,6 @@ private:
         bucket = (Prop_entry**)STD_CALLOC(sizeof(Prop_entry*), size_);
         iterator = new Iterator(this);
     }
-#ifdef USE_MEM_MANAGER_FOR_ALLOCATION 
-public:
-    void *operator new(size_t sz, tl::MemoryPool& m) {
-        return m.alloc(sz);
-    }
-    void operator delete(void *obj, tl::MemoryPool& m){
-        //do nothing
-    };
-    void *operator new(size_t sz) {
-        return m_malloc(sz);
-    }
-    void operator delete(void *obj){
-        m_free(obj);
-    };
-#endif
 };
 
 typedef struct _properties* PropertiesHandle;

@@ -46,8 +46,7 @@ VMEXPORT void jit_unlock() {
 }
 
 Lock_Manager::Lock_Manager()
-{   // init thread menager if needed
-    hythread_init(hythread_lib);
+{
     UNREF IDATA stat = hymutex_create (&lock, TM_MUTEX_NESTED);
     assert(stat==TM_ERROR_NONE);
 }

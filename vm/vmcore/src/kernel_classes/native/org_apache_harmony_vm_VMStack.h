@@ -72,7 +72,7 @@ Java_org_apache_harmony_vm_VMStack_getStackTrace(JNIEnv *, jclass,
  * Method: org.apache.harmony.vm.VMStack.getClassLoader(Ljava/lang/Class;)Ljava/lang/ClassLoader;
  */
 JNIEXPORT jobject JNICALL
-Java_org_apache_harmony_vm_VMStack_getClassLoader(JNIEnv *, jclass, 
+Java_org_apache_harmony_vm_VMStack_getClassLoader0(JNIEnv *, jclass, 
     jclass);
 
 /*

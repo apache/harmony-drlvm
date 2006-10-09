@@ -32,13 +32,12 @@ int timed_join_wait_time;
  * Test jthread_attach()
  */
 void * APR_THREAD_FUNC run_for_test_jthread_attach(apr_thread_t *thread, void *args){
-
     tested_thread_sturct_t * tts = current_thread_tts;
-    //JNIEnv * new_env = new_JNIEnv();
+    JNIEnv * jni_env = NULL;
     IDATA status;
     
-    tts->jni_env = new_JNIEnv();
-    status = jthread_attach(tts->jni_env, tts->java_thread);
+    //tts->jni_env = tts_jni_env;
+    status = jthread_attach(jni_env, tts->java_thread, JNI_FALSE);
     tts->phase = (status == TM_ERROR_NONE ? TT_PHASE_ATTACHED : TT_PHASE_ERROR);
     while(1){
         tts->clicks++;
@@ -53,7 +52,6 @@ void * APR_THREAD_FUNC run_for_test_jthread_attach(apr_thread_t *thread, void *a
 }
 
 int test_jthread_attach(void) {
-
     tested_thread_sturct_t * tts;
 
     // Initialize tts structures and run all tested threads
@@ -74,7 +72,6 @@ int test_jthread_attach(void) {
  * Test jthread_detach()
  */
 int test_jthread_detach (void){
-
     tested_thread_sturct_t * tts;
     jthread *thread;
     hythread_t hythread;
@@ -128,10 +125,6 @@ void JNICALL jvmti_start_proc(jvmtiEnv *jvmti_env, JNIEnv *jni_env, void *arg){
 
     tested_thread_sturct_t * tts = current_thread_tts;
     
-    if (tts->jni_env != jni_env){
-        tts->phase = TT_PHASE_ERROR;
-        return;
-    }
     if (tts->jvmti_start_proc_arg != arg){
         tts->phase = TT_PHASE_ERROR;
         return;
@@ -171,7 +164,7 @@ int test_hythread_create_with_function(void) {
 /*
  * Test jthread_join()
  */
-void run_for_test_jthread_join(void){
+void JNICALL run_for_test_jthread_join(jvmtiEnv * jvmti_env, JNIEnv * jni_env, void *arg){
 
     tested_thread_sturct_t * tts = current_thread_tts;
     tested_thread_sturct_t * prev_tts = tts; 
@@ -233,7 +226,7 @@ int test_jthread_join(void) {
 /*
  * Test jthread_timed_join()
  */
-void run_for_test_jthread_timed_join(void){
+void JNICALL run_for_test_jthread_timed_join(jvmtiEnv * jvmti_env, JNIEnv * jni_env, void *arg){
 
     tested_thread_sturct_t * tts = current_thread_tts;
     tested_thread_sturct_t * prev_tts = tts;
@@ -316,7 +309,7 @@ int test_jthread_timed_join(void) {
 /*
  * Test jthread_exception_stop()
  */
-void run_for_test_jthread_exception_stop(void){
+void JNICALL run_for_test_jthread_exception_stop(jvmtiEnv * jvmti_env, JNIEnv * jni_env, void *arg){
 
     tested_thread_sturct_t * tts = current_thread_tts;
     
@@ -369,7 +362,7 @@ int test_jthread_stop (void){
     hythread_t hythread;
     jvmti_thread_t jvmti_thread;
 
-    env = new_JNIEnv();
+    env = jthread_get_JNI_env(jthread_self());
     excn = (*env) -> FindClass(env, "java/lang/ThreadDeath");
 
     // Initialize tts structures and run all tested threads
@@ -398,7 +391,7 @@ int test_jthread_stop (void){
 /*
  * Test jthread_sleep(...)
  */
-void run_for_test_jthread_sleep(void){
+void JNICALL run_for_test_jthread_sleep(jvmtiEnv * jvmti_env, JNIEnv * jni_env, void *arg){
 
     tested_thread_sturct_t * tts = current_thread_tts;
     IDATA status;
@@ -457,15 +450,7 @@ int test_jthread_get_JNI_env(void) {
 
     tested_thread_sturct_t *tts;
 
-    // Initialize tts structures and run all tested threads
-    tested_threads_run(default_run_for_test);
-
-    reset_tested_thread_iterator(&tts);
-    while(next_tested_thread(&tts)){
-        tf_assert_same(jthread_get_JNI_env(tts->java_thread), tts->jni_env);
-    }
-    // Terminate all threads and clear tts structures
-    tested_threads_destroy();
+    tf_assert(jthread_get_JNI_env(jthread_self()) != 0);
 
     return TEST_PASSED;
 }
@@ -473,7 +458,7 @@ int test_jthread_get_JNI_env(void) {
 /*
  * Test hythread_yield()
  */
-void run_for_test_hythread_yield(void){
+void JNICALL run_for_test_hythread_yield(jvmtiEnv * jvmti_env, JNIEnv * jni_env, void *arg){
 
     tested_thread_sturct_t * tts = current_thread_tts;
 
@@ -514,14 +499,14 @@ int test_hythread_yield (void){
 } 
 
 TEST_LIST_START
-    TEST(test_jthread_attach)
-    TEST(test_jthread_detach)
+    //TEST(test_jthread_attach)
+    //TEST(test_jthread_detach)
     TEST(test_hythread_create)
     TEST(test_hythread_create_with_function)
     TEST(test_jthread_get_JNI_env)
     TEST(test_jthread_join)
     //TEST(test_jthread_timed_join)
-    TEST(test_jthread_exception_stop)
+    //TEST(test_jthread_exception_stop)
     //TEST(test_jthread_stop)
     TEST(test_jthread_sleep)
     TEST(test_hythread_yield)

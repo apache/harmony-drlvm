@@ -24,6 +24,7 @@
 #define LOG_DOMAIN "vm.methods"
 #include "cxxlog.h"
 
+#include "environment.h"
 #include "platform.h"
 #include <assert.h>
 #include "lock_manager.h"
@@ -35,10 +36,6 @@
 
 #define EIP_CACHE_SIZE 1024
 #define EIP_ALIGNMENT     4
-
-
-Method_Lookup_Table *vm_methods = NULL;
-
 
 Method_Lookup_Table::Method_Lookup_Table()
 {
@@ -402,7 +399,8 @@ CodeChunkInfo *Method_Lookup_Table::get(unsigned i) {
 
 VM_Code_Type vm_identify_eip(void *addr)
 {
-    CodeChunkInfo *m = vm_methods->find(addr);
+    Global_Env *env = VM_Global_State::loader_env;
+    CodeChunkInfo *m = env->vm_methods->find(addr);
     if (m == NULL) {
         return VM_TYPE_UNKNOWN;
     }
@@ -418,7 +416,8 @@ VM_Code_Type vm_identify_eip(void *addr)
 
 VM_Code_Type vm_identify_eip_deadlock_free(void *addr)
 {
-    CodeChunkInfo *m = vm_methods->find_deadlock_free(addr);
+    Global_Env *env = VM_Global_State::loader_env;
+    CodeChunkInfo *m = env->vm_methods->find_deadlock_free(addr);
     if (m == NULL) {
         return VM_TYPE_UNKNOWN;
     }

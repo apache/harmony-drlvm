@@ -41,7 +41,8 @@ import java.lang.reflect.Member;
  * 
  * @api2vm
  */
-final class VMClassRegistry {
+final class VMClassRegistry 
+{
     /**
      * This method satisfies the requirements of the specification for the
      * {@link Class#getSimpleName() Class.getSimpleName()}
@@ -86,7 +87,8 @@ final class VMClassRegistry {
     /**
      * This class is not supposed to be instantiated.
      */
-    private VMClassRegistry() {
+    private VMClassRegistry() 
+    {
     }
 
     /**
@@ -108,7 +110,7 @@ final class VMClassRegistry {
      * @api2vm
      */
     static native Class<?> defineClass(String name, ClassLoader classLoader,
-        byte[] data, int off, int len) throws ClassFormatError;
+    byte[] data, int off, int len) throws ClassFormatError;
 
     /**
      * This method satisfies the requirements of the specification for the
@@ -138,10 +140,24 @@ final class VMClassRegistry {
 
     /**
      * This method satisfies the requirements of the specification for the
-     * {@link Class#getClassLoader() Class.getClassLoader()} method.
+     * {@link Class#getClassLoader() Class.getClassLoader()} method except
+     * the clazz parameter may be null. In this case context class loader
+     * of the current thread is returned.
+     * 
      * @api2vm
      */
-    static native ClassLoader getClassLoader(Class<?> clazz);
+    static ClassLoader getClassLoader(Class<?> clazz) {
+        return clazz != null ? getClassLoader0(clazz)
+            : Thread.currentThread().getContextClassLoader();
+    }
+
+    /**
+     * This method satisfies the requirements of the specification for the
+     * {@link Class#getClassLoader() Class.getClassLoader()} method.
+     * 
+     * @api2vm
+     */
+    static native ClassLoader getClassLoader0(Class<?> clazz);
 
     /**
      * This method satisfies the requirements of the specification for the

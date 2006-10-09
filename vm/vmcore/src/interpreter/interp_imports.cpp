@@ -37,9 +37,9 @@ VMEXPORT void class_throw_linking_error_for_interpreter(Class_Handle ch,
     class_throw_linking_error(ch, index, opcode);
 }
 
-extern struct JNIEnv_Internal *jni_native_intf;
+extern JNIEnv *jni_native_intf;
 
-VMEXPORT struct JNIEnv_Internal* get_jni_native_intf() {
+VMEXPORT JNIEnv * get_jni_native_intf() {
     return jni_native_intf;
 }
 

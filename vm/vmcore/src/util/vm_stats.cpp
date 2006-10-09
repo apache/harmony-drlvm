@@ -320,7 +320,6 @@ VM_Statistics::~VM_Statistics() {
 }
 
 VM_Statistics & VM_Statistics::get_vm_stats() {
-    static StaticInitializer initializer = StaticInitializer();
     static VM_Statistics vm_stats = VM_Statistics();
     return vm_stats;
 }
@@ -657,6 +656,7 @@ void VM_Statistics::print_string_pool_stats() {
 
 void VM_Statistics::print()
 {
+    Global_Env *env = VM_Global_State::loader_env;
     if(!vm_print_total_stats)
         return;
 
@@ -668,9 +668,7 @@ void VM_Statistics::print()
         print_methods();
     }
 
-    if (vm_methods != NULL) {
-        vm_methods->print_stats();
-    }
+    env->vm_methods->print_stats();
 
     printf("%11" FMT64 "u ::::Number of native methods\n", num_native_methods);
     printf("%11" FMT64 "u ::::Number of Java methods\n",   num_java_methods);

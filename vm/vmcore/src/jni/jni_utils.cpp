@@ -84,10 +84,10 @@ ClassLoaderHandle class_loader_lookup(jobject loader)
     return cl;
 } //class_loader_lookup
 
-void class_loader_load_native_lib( const char* lib,
+void class_loader_load_native_lib(const char* lib,
                                    ClassLoaderHandle cl)
 {
-    cl->LoadNativeLibrary( lib );
+    cl->LoadNativeLibrary(lib);
 }
 
 
@@ -101,12 +101,6 @@ ClassLoaderHandle class_loader_find_if_exists(jobject loader)
 
     return cl;
 } //class_loader_find_if_exists
-
-
-void class_loader_set_system_class_loader(ClassLoaderHandle cl)
-{
-    VM_Global_State::loader_env->system_class_loader = (UserDefinedClassLoader*) cl;
-}
 
 VMEXPORT
 jvalue *get_jvalue_arg_array(Method *method, va_list args)
@@ -453,7 +447,6 @@ jclass SignatureToClass (JNIEnv* env, const char* sig)
 jclass SignatureToClass (JNIEnv* env_ext, const char* sig, ClassLoader *class_loader)
 {
     assert(hythread_is_suspend_enabled());
-    JNIEnv_Internal *env = (JNIEnv_Internal *)env_ext;
     assert (sig);
 
     if (sig[0] == 'L' || sig[0] == '[') {
@@ -463,7 +456,7 @@ jclass SignatureToClass (JNIEnv* env_ext, const char* sig, ClassLoader *class_lo
         return clazz;
     }
 
-    Global_Env *ge = env->vm->vm_env;
+    Global_Env *ge = jni_get_vm_env(env_ext);
     Class* clss = NULL;
 
     switch (sig[0]) {
@@ -499,7 +492,7 @@ jclass SignatureToClass (JNIEnv* env_ext, const char* sig, ClassLoader *class_lo
             break;
     }
 
-    return jni_class_from_handle(env, clss);
+    return jni_class_from_handle(env_ext, clss);
 } // SignatureToClass
 
 
@@ -722,8 +715,7 @@ jclass FindClass(JNIEnv* env_ext, String* name)
         jthrowable exn = class_get_error(loader, name->bytes);
         assert(exn);
         exn_clear();
-        jint UNUSED ok = Throw(env, exn);
-        assert(ok == 0);
+        Throw(env, exn);
         return 0;
     }
 }
@@ -816,4 +808,12 @@ bool ensure_initialised(JNIEnv* env, Class* clss)
         }
     }
     return true;
+}
+
+JavaVM * jni_get_java_vm(JNIEnv * jni_env) {
+    return ((JNIEnv_Internal *)jni_env)->vm;
+}
+
+Global_Env * jni_get_vm_env(JNIEnv * jni_env) {
+    return ((JNIEnv_Internal *)jni_env)->vm->vm_env;
 }

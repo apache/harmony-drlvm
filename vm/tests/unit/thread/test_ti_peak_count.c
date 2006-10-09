@@ -44,7 +44,7 @@ int test_jthread_get_peak_thread_count(void) {
     return helper_get_reset_peak_count();
 }
 
-void run_for_helper_get_reset_peak_count(void){
+void JNICALL run_for_helper_get_reset_peak_count(jvmtiEnv * jvmti_env, JNIEnv * jni_env, void *arg){
 
     tested_thread_sturct_t * tts = current_thread_tts;
     IDATA status;

@@ -33,9 +33,7 @@
  *
  * @param[in] thread those attribute is read
  */
-int VMCALL hythread_is_alive(hythread_t thread) { 
-        return thread->state & TM_THREAD_STATE_ALIVE;  
-};
+int VMCALL hythread_is_alive(hythread_t thread) { return thread->state & TM_THREAD_STATE_ALIVE ;  };
 
 /**
  * Returns non-zero if thread is blocked on monitor enter.

@@ -15,6 +15,8 @@
  *  limitations under the License.
  */
 
+#include <assert.h>
+#include "jni.h"
 #include "testframe.h"
 #include "thread_unit_test_utils.h"
 #include <open/jthread.h>
@@ -33,16 +35,66 @@ tested_thread_sturct_t dummy_tts_struct;
 tested_thread_sturct_t * dummy_tts = &dummy_tts_struct;
 tested_thread_sturct_t tested_threads[MAX_TESTED_THREAD_NUMBER];
 
+apr_pool_t *pool = NULL;
+
 void sleep_a_click(void){
     apr_sleep(CLICK_TIME_MSEC * 1000);
 }
 
-void test_java_thread_setup(void) {
+jthread new_jthread_jobject(JNIEnv * jni_env) {
+    const char * name = "<init>";
+    const char * sig = "()V";
+    jmethodID constructor = NULL;
+    jclass thread_class;
+    
+    thread_class = (*jni_env)->FindClass(jni_env, "java/lang/Thread");
+    constructor = (*jni_env)->GetMethodID(jni_env, thread_class, name, sig);
+    return (*jni_env)->NewObject(jni_env, thread_class, constructor);
+}
+
+jthread new_jobject(){
+
+    apr_status_t status;
+    _jobject *obj;
+    _jjobject *object;
+
+    if (!pool){
+        status = apr_pool_create(&pool, NULL);
+        if (status) return NULL; 
+    }
+
+    obj = apr_palloc(pool, sizeof(_jobject));
+    object = apr_palloc(pool, sizeof(_jjobject));
+    assert(obj);
+    obj->object = object;
+    obj->object->data = NULL;
+    obj->object->daemon = 0;
+    obj->object->name = NULL;
+    return obj;
+}
+
+void delete_jobject(jobject obj){
+}
+
+void test_java_thread_setup(int argc, char *argv[]) {
+    JavaVMInitArgs args;
+    JavaVM * java_vm;
+    JNIEnv * jni_env;
+    int i;
+
+    args.version = JNI_VERSION_1_2;
+    args.nOptions = argc;
+    args.options = (JavaVMOption *) malloc(args.nOptions * sizeof(JavaVMOption));
+    args.options[0].optionString = "-Djava.class.path=.";
+    for (i = 1; i < argc; i++) {
+        args.options[i].optionString = argv[i];
+        args.options[i].extraInfo = NULL;
+    }
 
     log_debug("test_java_thread_init()");
-    jni_init();
-    hythread_init(NULL);
-    hythread_attach(NULL);
+
+    apr_initialize();
+    JNI_CreateJavaVM(&java_vm, &jni_env, &args);
 }
 
 void test_java_thread_teardown(void) {
@@ -50,7 +102,7 @@ void test_java_thread_teardown(void) {
     IDATA status;
 
     log_debug("test_java_thread_shutdown()");
-    hythread_detach(NULL);
+    //hythread_detach(NULL);
 
     // status = tm_shutdown(); ??????????????? fix me: 
     // second testcase don't work after tm_shutdown() call
@@ -70,8 +122,11 @@ void tested_threads_init(int mode){
     tested_thread_sturct_t *tts;
     jobject monitor;
     jrawMonitorID raw_monitor;
+    JNIEnv * jni_env;
     IDATA status; 
     int i;
+    
+    jni_env = jthread_get_JNI_env(jthread_self());
         
     if (mode != TTS_INIT_DIFFERENT_MONITORS){
         monitor = new_jobject();
@@ -86,10 +141,9 @@ void tested_threads_init(int mode){
         tts = &tested_threads[i];
         tts->my_index = i;
         //tf_assert_null(tts->java_thread);
-        tts->java_thread = new_jobject();
+        tts->java_thread = new_jthread_jobject(jni_env);
         //tf_assert_null(tts->jni_env);
-        tts->jni_env = new_JNIEnv();
-//        tts->attrs.priority = 5;
+        //tts->attrs.priority = 5;
         tts->jvmti_start_proc_arg = &tts->jvmti_start_proc_arg;
         tts->clicks = 0;
         tts->phase = TT_PHASE_NONE;
@@ -168,41 +222,44 @@ void reset_tested_thread_iterator(tested_thread_sturct_t **tts){
     *tts = (void *)NULL;
 }
 
-void tested_threads_run_common(run_method_t run_method_param){
-
+void tested_threads_run_common(jvmtiStartFunction run_method_param){
     tested_thread_sturct_t *tts;
+    JNIEnv * jni_env;
+
+    jni_env = jthread_get_JNI_env(jthread_self());
 
     reset_tested_thread_iterator(&tts);
     while(next_tested_thread(&tts)){
         current_thread_tts = tts;
-        tts->java_thread->object->run_method = run_method_param;
-        tf_assert_same_v(jthread_create(tts->jni_env, tts->java_thread, &tts->attrs), TM_ERROR_NONE);
+        tf_assert_same_v(jthread_create_with_function(jni_env, tts->java_thread, &tts->attrs, run_method_param, NULL), TM_ERROR_NONE);
         check_tested_thread_phase(tts, TT_PHASE_ANY);
         check_tested_thread_structures(tts);
     }
 }
 
-void tested_threads_run(run_method_t run_method_param){
+void tested_threads_run(jvmtiStartFunction run_method_param){
 
     tested_threads_init(TTS_INIT_COMMON_MONITOR);
     tested_threads_run_common(run_method_param);
 }
 
-void tested_threads_run_with_different_monitors(run_method_t run_method_param){
+void tested_threads_run_with_different_monitors(jvmtiStartFunction run_method_param){
 
     tested_threads_init(TTS_INIT_DIFFERENT_MONITORS);
     tested_threads_run_common(run_method_param);
 }
 
 void tested_threads_run_with_jvmti_start_proc(jvmtiStartFunction jvmti_start_proc){
-
     tested_thread_sturct_t *tts;
+    JNIEnv * jni_env;
+
+    jni_env = jthread_get_JNI_env(jthread_self());
     
     tested_threads_init(TTS_INIT_COMMON_MONITOR);
     reset_tested_thread_iterator(&tts);
     while(next_tested_thread(&tts)){
         current_thread_tts = tts;
-        tf_assert_same_v(jthread_create_with_function(tts->jni_env, tts->java_thread, &tts->attrs,
+        tf_assert_same_v(jthread_create_with_function(jni_env, tts->java_thread, &tts->attrs,
                                                       jvmti_start_proc, tts->jvmti_start_proc_arg), TM_ERROR_NONE);
         check_tested_thread_phase(tts, TT_PHASE_ANY);
     }
@@ -374,7 +431,7 @@ int check_exception(jobject excn){
     //return TM_ERROR_NONE;
 }
 
-void default_run_for_test(void){
+void JNICALL default_run_for_test(jvmtiEnv * jvmti_env, JNIEnv * jni_env, void *arg) {
 
     tested_thread_sturct_t * tts = current_thread_tts;
     

@@ -439,7 +439,7 @@ void gc_init()
     p_global_gc->gc_v4_init();
 
     // create a nursery for the main thread
-    gc_thread_init(vm_get_gc_thread_local());
+    // gc_thread_init(vm_get_gc_thread_local());
     
     assert (sizeof(block_info) <= 4096); 
     // If we hit this we should take a close look at our defines. While it is possible

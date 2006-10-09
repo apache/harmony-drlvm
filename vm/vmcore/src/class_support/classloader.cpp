@@ -1354,7 +1354,7 @@ BootstrapClassLoader::SetClasspathFromProperty(const char* prop_string,
 {
     // get property value
     const char *bcp_value = properties_get_string_property(
-        reinterpret_cast<PropertiesHandle>(&m_env->properties), prop_string);
+        reinterpret_cast<PropertiesHandle>(m_env->properties), prop_string);
     assert(bcp_value);
 
     size_t len = strlen(bcp_value) + 1;
@@ -1534,7 +1534,7 @@ bool BootstrapClassLoader::Initialize(ManagedObject* UNREF loader)
     // get list of natives libraries
     const char *lib_list = 
         properties_get_string_property(
-            reinterpret_cast<PropertiesHandle>(&m_env->properties),
+            reinterpret_cast<PropertiesHandle>(m_env->properties),
             "vm.other_natives_dlls" );
     size_t len = strlen( lib_list ) + 1;
     char *libraries = (char*)STD_ALLOCA( len );
@@ -1567,7 +1567,7 @@ bool BootstrapClassLoader::Initialize(ManagedObject* UNREF loader)
      * the kernel
      */
      
-    PropertiesHandle hProps = reinterpret_cast<PropertiesHandle>(&m_env->properties);
+    PropertiesHandle hProps = reinterpret_cast<PropertiesHandle>(m_env->properties);
      
     /* strdup so that it's freeable w/o extra logic */
 
@@ -1636,8 +1636,8 @@ bool BootstrapClassLoader::Initialize(ManagedObject* UNREF loader)
      *  that needs it
      */
      
-    add_pair_to_properties(m_env->properties, VM_BOOT_CLASS_PATH, bcp_value);
-    add_pair_to_properties(m_env->properties, SUN_BOOT_CLASS_PATH, bcp_value);
+    add_pair_to_properties(*m_env->properties, VM_BOOT_CLASS_PATH, bcp_value);
+    add_pair_to_properties(*m_env->properties, SUN_BOOT_CLASS_PATH, bcp_value);
     
     free(bcp_value);
     

@@ -33,10 +33,9 @@
 
 
 //global constants:
-//library instance
 
-hythread_library_t hythread_lib;
-
+// Global pointer to the threading library
+hythread_library_t TM_LIBRARY = NULL;
 
 //Thread manager memory pool
 apr_pool_t     *TM_POOL = NULL;
@@ -45,7 +44,6 @@ apr_pool_t     *TM_POOL = NULL;
 apr_threadkey_t *TM_THREAD_KEY;
 
 //Thread manager global lock
-hymutex_t TM_LOCK = NULL;
 hymutex_t TM_START_LOCK = NULL;
 hymutex_t FAT_MONITOR_TABLE_LOCK = NULL;
 #define GLOBAL_MONITOR_NAME "global_monitor"
@@ -60,9 +58,6 @@ int table_size = 8024;
 
 IDATA       groups_count;
 
-IDATA       nondaemon_thread_count;
-hycond_t    nondaemon_thread_cond;
-
 static IDATA init_group_list();
 static IDATA destroy_group_list();
 
@@ -70,16 +65,58 @@ static IDATA destroy_group_list();
 #include <windows.h>
 BOOL WINAPI DllMain(HINSTANCE hInstance, DWORD dwReason, LPVOID lpres) {
   if (dwReason == DLL_PROCESS_ATTACH) {
-     hythread_init (NULL);
+     hythread_lib_create(&TM_LIBRARY);
    }
    return TRUE;
 }
 #else
 void hythread_library_init(void) {
-    hythread_init(NULL);
-
+    hythread_lib_create(&TM_LIBRARY);
 }
 #endif
+
+/**
+ * Creates and initializes a threading library.
+ *
+ * @param[out] lib pointer to the created thread library
+ * @return The thead library's initStatus will be set to 0 on success or 
+ * a negative value on failure.
+ * 
+ * @see hythread_attach, hythread_shutdown
+ */
+IDATA VMCALL hythread_lib_create(hythread_library_t * lib) {
+    apr_status_t apr_status;
+
+    // Current implementation doesn't support more than one library instance.
+    if (TM_LIBRARY) {
+        *lib = TM_LIBRARY;
+        return TM_ERROR_NONE;
+    }
+    
+    apr_status = apr_initialize();
+    assert(apr_status == APR_SUCCESS);
+
+    apr_status = apr_pool_create(&TM_POOL, NULL);
+    if (apr_status != APR_SUCCESS) return CONVERT_ERROR(apr_status);
+
+    *lib = (hythread_library_t) apr_palloc(TM_POOL, sizeof(HyThreadLibrary));
+    if (*lib == NULL) return TM_ERROR_OUT_OF_MEMORY;
+
+    hythread_init(*lib);
+    return TM_ERROR_NONE;
+}
+
+/**
+ * Shut down the threading library.
+ * 
+ * @param lib the library
+ * @return none
+ * 
+ * @see hythread_lib_create
+ */
+void VMCALL hythread_lib_destroy(hythread_library_t lib) {
+    apr_pool_destroy(TM_POOL);
+}
 
 /**
  * Initialize a threading library.
@@ -96,23 +133,33 @@ void hythread_library_init(void) {
  * @see hythread_attach, hythread_shutdown
  */
 void VMCALL hythread_init(hythread_library_t lib){
-        apr_status_t apr_status;
+    apr_status_t apr_status;
     IDATA status;
     hythread_monitor_t *mon;
-    // check the someone already init the library
-        if(TM_LOCK) {
-                return;
-        }
+
+    // Current implementation doesn't support more than one library instance.
+    if (TM_LIBRARY == NULL) {
+        TM_LIBRARY = lib;
+    }
+    assert(TM_LIBRARY == lib);
+
+    // Check if someone already initialized the library.
+    if (TM_START_LOCK != NULL) {
+        return;
+    }
      
     apr_status = apr_initialize();
     assert(apr_status == APR_SUCCESS);
-    apr_status = apr_pool_create(&TM_POOL, NULL);
-    assert(apr_status == APR_SUCCESS);
+    // TM_POOL will be NULL if hythread_lib_create was not used to create the library
+    if (TM_POOL == NULL) {
+        apr_status = apr_pool_create(&TM_POOL, NULL);
+        assert(apr_status == APR_SUCCESS);
+    }
 
     apr_status = apr_threadkey_private_create(&TM_THREAD_KEY, NULL, TM_POOL);
     assert(apr_status == APR_SUCCESS);
     
-    status = hymutex_create(&TM_LOCK, TM_MUTEX_NESTED);
+    status = hymutex_create(&lib->TM_LOCK, TM_MUTEX_NESTED);
     assert (status == TM_ERROR_NONE);
     status = hymutex_create(&TM_START_LOCK, TM_MUTEX_NESTED);
     assert (status == TM_ERROR_NONE);
@@ -128,8 +175,8 @@ void VMCALL hythread_init(hythread_library_t lib){
 
     //nondaemon thread barrier
     ////
-    nondaemon_thread_count = 0;
-    status = hycond_create(&nondaemon_thread_cond);
+    lib->nondaemon_thread_count = 0;
+    status = hycond_create(&lib->nondaemon_thread_cond);
     assert (status == TM_ERROR_NONE);
     
     lock_table = (hythread_monitor_t *)malloc(sizeof(hythread_monitor_t)*table_size);
@@ -152,28 +199,43 @@ void VMCALL hythread_init(hythread_library_t lib){
  * 
  * @see hythread_init
  */
-IDATA VMCALL hythread_shutdown(){
-        IDATA status;
-    apr_status_t apr_status;
-    if (destroy_group_list() == TM_ERROR_NONE) {
-            status=hymutex_destroy(TM_LOCK);
-                if (status != TM_ERROR_NONE) return status;
-            status=hymutex_destroy(TM_START_LOCK);
-                if (status != TM_ERROR_NONE) return status;
-            apr_status=apr_threadkey_private_delete(TM_THREAD_KEY);
-                if (apr_status != APR_SUCCESS) return CONVERT_ERROR(apr_status);
-            apr_pool_destroy(TM_POOL);
-        return TM_ERROR_NONE;
-    }
-    return TM_ERROR_RUNNING_THREADS;
+void VMCALL hythread_shutdown() {
+    hythread_lib_destroy(hythread_self()->library);
 }
+
+/**
+ * Acquires global lock of the library assocciated with the current thread.
+ *
+ * @param[in] self current thread
+ */
+void VMCALL hythread_lib_lock(hythread_t self) {
+    IDATA status;
+    
+    assert(self == hythread_self());
+    status = hymutex_lock(self->library->TM_LOCK);
+    assert(status == TM_ERROR_NONE);
+}
+
+/**
+ * Releases global lock of the library assocciated with the current thread.
+ *
+ * @param[in] self current thread
+ */
+void VMCALL hythread_lib_unlock(hythread_t self) {
+    IDATA status;
+
+    assert(self == hythread_self());
+    status = hymutex_unlock(self->library->TM_LOCK);
+    assert(status == TM_ERROR_NONE);
+}
+
 /**
  * Acquires the lock over threading subsystem.
  * 
  * The lock blocks new thread creation and thread exit operations. 
  */
 IDATA VMCALL hythread_global_lock() {
-    return hymutex_lock(TM_LOCK);
+    return hymutex_lock(TM_LIBRARY->TM_LOCK);
 }
 
 /**
@@ -181,67 +243,7 @@ IDATA VMCALL hythread_global_lock() {
  * 
  */
 IDATA VMCALL hythread_global_unlock() {
-    return hymutex_unlock(TM_LOCK);
-}
-
-
-IDATA increase_nondaemon_threads_count() {
-    IDATA status;
-        
-        status = hymutex_lock(TM_LOCK);
-        if (status != TM_ERROR_NONE) return status;
-
-        nondaemon_thread_count++;
-        status = hymutex_unlock(TM_LOCK);
-        return status;
-}
-
-IDATA countdown_nondaemon_threads() {
-    IDATA status;
-        
-        status = hymutex_lock(TM_LOCK);
-        if (status != TM_ERROR_NONE) return status;
-    
-        if(nondaemon_thread_count <= 0) {
-                status = hymutex_unlock(TM_LOCK);
-            if (status != TM_ERROR_NONE) return status;
-                return TM_ERROR_ILLEGAL_STATE;
-        }
-        TRACE(("TM: nondaemons decreased, thread: %p count: %d", tm_self_tls, nondaemon_thread_count));
-        nondaemon_thread_count--;
-        if(nondaemon_thread_count == 0) {
-                status = hycond_notify_all(nondaemon_thread_cond); 
-                TRACE(("TM: nondaemons all dead, thread: %p count: %d", tm_self_tls, nondaemon_thread_count));
-                if (status != TM_ERROR_NONE){
-                        hymutex_unlock(TM_LOCK);
-                        return status;
-                }
-        }
-                
-        status = hymutex_unlock(TM_LOCK);
-    return status;
-}
-/**
- * waiting all nondaemon thread's
- * 
- */
-IDATA VMCALL hythread_wait_for_all_nondaemon_threads() {
-    IDATA status;
-        
-        status = hymutex_lock(TM_LOCK);
-        if (status != TM_ERROR_NONE) return status;
-
-        while (nondaemon_thread_count) {
-                status = hycond_wait(nondaemon_thread_cond, TM_LOCK);
-                //check interruption and other problems
-                TRACE(("TM wait for nondaemons notified, count: %d", nondaemon_thread_count));
-        if(status != TM_ERROR_NONE) {
-                        hymutex_unlock(TM_LOCK);
-                        return status;
-                }
-        }
-        status = hymutex_unlock(TM_LOCK);
-    return status;
+    return hymutex_unlock(TM_LIBRARY->TM_LOCK);;
 }
 
 hythread_group_t  get_java_thread_group(void){
@@ -297,7 +299,6 @@ IDATA release_start_lock() {
     return hymutex_unlock(TM_START_LOCK);
 }
 
-
 /*
 // very simple Map implementation
 // current scenario use only one global so it works well
@@ -350,8 +351,7 @@ int add_entry(char* name) {
  * 0 on failure.
  * 
  */
-UDATA*
-VMCALL hythread_global (char* name) {
+UDATA* VMCALL hythread_global (char* name) {
     //hythread_monitor_enter(*p_global_monitor);
     int index = find_entry(name);
     if(index == -1) {

@@ -166,8 +166,7 @@ bool
 get_num_consecutive_similar_bits(uint8 *p_byte_start, unsigned int bit_index_to_search_from, unsigned int *num_consec_bits, uint8 *p_ceil)
 {
     if (p_ceil <= p_byte_start) {
-        ASSERT(0, "Unexpected values of input prameters");
-        vm_exit(-7520);
+        DIE("Unexpected values of input prameters");
     }
 
     bool is_zero_str = ((*p_byte_start) & (1 << bit_index_to_search_from)) ? false : true;

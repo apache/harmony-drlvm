@@ -104,7 +104,7 @@ Version: $Revision: 1.5.2.33 $
         <property name="ZLIB.check.file" value="zlib1.dll" />
         <property name="CLASSLIB.check.file" value="native-src/README.txt" />
         <property name="XALAN.check.file" value="xalan.jar" />
-        <property name="VM.check.file" value="vmcore/src/init/vm_main.cpp" />
+        <property name="VM.check.file" value="vmcore/src/init/vm_init.cpp" />
 		<property name="ANTLR.check.file" value="antlr-2.7.5.jar" />
         <property name="PATCHES.check.file" value="README.txt" />
     </target>

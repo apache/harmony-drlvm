@@ -903,7 +903,8 @@ void count_method_calls(CodeChunkInfo *callee)
     assert(ret_ip);
 
     // Record call from caller to the callee.
-    CodeChunkInfo *caller = vm_methods->find(ret_ip);
+    Global_Env *env = VM_Global_State::loader_env;
+    CodeChunkInfo *caller = env->vm_methods->find(ret_ip);
     if (caller != NULL) {
         caller->record_call_to_callee(callee, ret_ip);
     }

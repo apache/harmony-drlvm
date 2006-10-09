@@ -54,11 +54,14 @@ using namespace std;
 #include "open/jthread.h"
 
 #include "vm_threads.h"
-#define LOG_DOMAIN "thread"
-#include "cxxlog.h"
 #include "tl/memory_pool.h"
 #include "open/vm_util.h"
 #include "suspend_checker.h"
+#include "jni_utils.h"
+#include "heap.h"
+#include "vm_strings.h"
+#include "interpreter.h"
+#include "exceptions_int.h"
 
 #ifdef PLATFORM_NT
 // wjw -- following lines needs to be generic for all OSs
@@ -71,12 +74,8 @@ using namespace std;
 #include "java_lang_thread_ia32.h"
 #endif
 
-#include "interpreter.h"
-#include "exceptions_int.h"
-
-static StaticInitializer thread_runtime_initializer;
-
-static tl::MemoryPool thr_pool;
+#define LOG_DOMAIN "vmcore.thread"
+#include "cxxlog.h"
 
 hythread_tls_key_t TLS_key_pvmthread;
 
@@ -91,52 +90,33 @@ volatile safepoint_state global_safepoint_status = nill;
 }
 #endif
 
+
 void init_TLS_data();
 
-void vm_thread_init(Global_Env * UNREF p_env___not_used)
-{
-   init_TLS_data();
-}
+VM_thread * get_a_thread_block(JavaVM_Internal * java_vm) {
+    VM_thread * p_vmthread;
+    apr_pool_t * thread_pool;
 
-
-void vm_thread_shutdown()
-{
-} //vm_thread_shutdown
-
-
-
-VM_thread * get_a_thread_block()
-{
-    VM_thread *p_vmthread;
-
-    p_vmthread = p_TLS_vmthread;   
+    p_vmthread = p_TLS_vmthread;
     if (!p_vmthread) {
-        p_vmthread = (VM_thread *)thr_pool.alloc(sizeof(VM_thread));
-        memset(p_vmthread, 0, sizeof(VM_thread) );
+        if (apr_pool_create(&thread_pool, java_vm->vm_env->mem_pool) != APR_SUCCESS) {
+            return NULL;
+        }
+        p_vmthread = (VM_thread *) apr_pcalloc(thread_pool, sizeof(VM_thread));
+        if (!p_vmthread) return NULL;
+
+        p_vmthread->pool = thread_pool;
+        set_TLS_data(p_vmthread);
+    } else {
+        memset(p_vmthread, 0, sizeof(VM_thread));
     }
     return p_vmthread;
-    } 
-    
-void free_this_thread_block(VM_thread *p_vmthread)
-{
-     }
-        
-void vm_thread_attach()
-{
-    VM_thread *p_vmthread;
-   
-    p_vmthread = p_TLS_vmthread;   
-    if (!p_vmthread) {
-        p_vmthread = (VM_thread *)thr_pool.alloc(sizeof(VM_thread));
-        memset(p_vmthread, 0, sizeof(VM_thread) );
-        set_TLS_data(p_vmthread);
-    }
-} //init_thread_block
-
+} 
+            
 VM_thread *get_vm_thread(hythread_t thr) {
     if (thr == NULL) {
         return NULL;
-}
+    }
     return (VM_thread *)hythread_tls_get(thr, TLS_key_pvmthread);
 }
 
@@ -166,7 +146,7 @@ void init_TLS_data() {
   
 void set_TLS_data(VM_thread *thread) {
     hythread_tls_set(hythread_self(), TLS_key_pvmthread, thread);
-        //printf ("sett ls call %p %p\n", get_thread_ptr(), get_vm_thread(hythread_self()));
+    //printf ("sett ls call %p %p\n", get_thread_ptr(), get_vm_thread(hythread_self()));
 }
 
 IDATA jthread_throw_exception(char* name, char* message) {
@@ -204,7 +184,7 @@ extern "C" char *vm_get_object_class_name(void* ptr) {
 
 void* vm_jthread_get_tm_data(jthread thread)
 {
-    JNIEnv *jenv = (JNIEnv*)jni_native_intf;    
+    JNIEnv *jenv = jni_native_intf;    
     jclass jThreadClass = jenv->GetObjectClass(thread);
     jfieldID field_id = jenv->GetFieldID(jThreadClass, "vm_thread", "J");
     POINTER_SIZE_INT data = (POINTER_SIZE_INT)jenv->GetLongField(thread, field_id);
@@ -213,15 +193,10 @@ void* vm_jthread_get_tm_data(jthread thread)
 }
 
 void vm_jthread_set_tm_data(jthread jt, void* nt) {
-    JNIEnv *jenv = (JNIEnv*)jni_native_intf;    
+    JNIEnv *jenv = jni_native_intf;    
     jclass jthreadclass = jenv->GetObjectClass(jt);
     jfieldID field_id = jenv->GetFieldID(jthreadclass, "vm_thread", "J");
     jenv->SetLongField(jt, field_id, (jlong)(POINTER_SIZE_INT)nt);
-}
-
-JNIEnv * get_jnienv(void)
-{
-    return (JNIEnv*)jni_native_intf;
 }
 
 int vm_objects_are_equal(jobject obj1, jobject obj2){
@@ -239,4 +214,3 @@ int vm_objects_are_equal(jobject obj1, jobject obj2){
 int ti_is_enabled(){
     return VM_Global_State::loader_env->TI->isEnabled();
 }
-
