@@ -580,7 +580,7 @@ void CodeGen::vswap(unsigned depth)
 void Compiler::gen_bb_leave(unsigned to)
 {
     if (is_set(DBG_TRACE_CG)) { dbg(";;>bb_leave to %d\n", to); }
-    unsigned ref_count;
+    bool targetIsMultiRef = false;
     bool to_eh;
     if (to == NOTHING || m_pc == 0 || g_jvmtiMode) {
         // leaving JSR block - act as if were leaving to multiref block
@@ -588,19 +588,32 @@ void Compiler::gen_bb_leave(unsigned to)
         // and gen_prolog().
         // The same for JVMTI mode - do not allow a thing to be transferred
         // on a temporary register between basic blocks
-        ref_count = 2;
+        targetIsMultiRef = true;
         to_eh = false;
     }
     else {
-        ref_count = m_insts[to].ref_count;
         const BBInfo& bbto = m_bbs[to];
         // Must be BB
         assert(m_bbs.find(to) != m_bbs.end());
         // Jumps to ehandler ?
         to_eh = bbto.ehandler;
+         // Now, check where the control flow may be transferred from the 
+         // current instruction. If *any* of the targets is multi-ref, then
+         // perform a full sync.
+         const JInst& jinst = *m_curr_inst;
+         for (unsigned i=0; i<jinst.get_num_targets(); i++) {
+             unsigned targetPC = jinst.get_target(i);
+             targetIsMultiRef = targetIsMultiRef || (m_insts[targetPC].ref_count > 1);
+         }
+         if (jinst.is_switch()) {
+             unsigned targetPC = jinst.get_def_target();
+             targetIsMultiRef = targetIsMultiRef || (m_insts[targetPC].ref_count > 1);
+         }
+         if (!jinst.is_set(OPF_DEAD_END)) {
+             unsigned targetPC  = jinst.next;
+             targetIsMultiRef = targetIsMultiRef || (m_insts[targetPC].ref_count > 1);
+         }
     }
-    // Must be reachable
-    assert(ref_count != 0);
     
     if (to_eh) {
         // we're generating a 'goto/fall through/if_' to a basic block
@@ -614,7 +627,7 @@ void Compiler::gen_bb_leave(unsigned to)
         assert(m_jframe->dip(0).is_reg() && m_jframe->dip(0).reg() == gr_ret);
     }
     
-    if (ref_count == 1 && !to_eh) {
+    if (!targetIsMultiRef && !to_eh) {
         // nothing to do anymore
         if (is_set(DBG_TRACE_CG)) { dbg(";;>~bb_leave\n"); }
         return;
