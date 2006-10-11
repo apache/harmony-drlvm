@@ -323,7 +323,11 @@ Version: $Revision: 1.16.2.20 $
         <ant antfile="setup.xml" target="setup" inheritall="true" />
     </target>
 
-    <target name="svn-prop">
+    <target name="svn-detect">
+      <available file=".svn" type="dir" property="svn.available"/>
+    </target>
+
+    <target name="svn-prop" depends="svn-detect" if="svn.available">
         <exec executable="svn">
             <arg value="info" />
             <redirector outputproperty="svn.revision">

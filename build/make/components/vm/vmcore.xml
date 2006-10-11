@@ -26,7 +26,17 @@ Version: $Revision: 1.5.2.3 $
   -->
 
 <project name="vm.vmcore">
-    <target name="init" depends="common_vm">
+
+    <target name="stamp_version" depends="common_vm" if="svn.revision">
+        <copy file="${build.vm.home}/vmcore/include/version_svn_tag_orig.h"
+              tofile="${build.vm.home}/vmcore/include/version_svn_tag.h" overwrite="true">
+            <filterset>
+                <filter token="svn.revision" value="${svn.revision}"/>
+            </filterset>
+        </copy>
+    </target>
+
+    <target name="init" depends="common_vm, stamp_version">
         <property name="build.depends" value="extra.apr,
                                               extra.aprutil,
                                               extra.log4cxx,
@@ -37,13 +47,6 @@ Version: $Revision: 1.5.2.3 $
         <property name="libname" value="harmonyvm" />
         <property name="outtype" value="shared" />
         <property name="src" location="${build.vm.home}" />
-
-        <copy file="${build.vm.home}/vmcore/include/version_svn_tag_orig.h"
-              tofile="${build.vm.home}/vmcore/include/version_svn_tag.h" overwrite="true">
-            <filterset>
-                <filter token="svn.revision" value="${svn.revision}"/>
-            </filterset>
-        </copy>
 
         <compiler id="c.compiler" extends="common.c.compiler">
             <includepath>
