@@ -86,10 +86,6 @@ int wrapper_proc(void *arg) {
     jvmti_thread->jenv = jni_env;
     jvmti_thread->daemon = data->daemon;
 
-    if (!jvmti_thread->daemon) {
-        increase_nondaemon_threads_count(native_thread);
-    }
-
     TRACE(("TM: Java thread started: id=%d OS_handle=%p", native_thread->thread_id, apr_os_thread_current()));
 
     // Send Thread Start event.
@@ -165,6 +161,10 @@ IDATA jthread_create_with_function(JNIEnv * jni_env, jthread java_thread, jthrea
     data->tiEnv  = attrs->jvmti_env;
     data->tiProc = proc;
     data->tiProcArgs = (void *)arg;
+
+    if (!data->daemon) {
+        increase_nondaemon_threads_count(hythread_self());
+    }
     
     status = hythread_create(&tm_native_thread, (attrs->stacksize)?attrs->stacksize:1024000,
                                attrs->priority, 0, wrapper_proc, data);
@@ -635,10 +635,11 @@ IDATA VMCALL jthread_wait_for_all_nondaemon_threads() {
         return status;
     }
 
-    while (lib->nondaemon_thread_count) {
+    while ((!jvmti_thread->daemon && lib->nondaemon_thread_count > 1)
+            || (jvmti_thread->daemon && lib->nondaemon_thread_count > 0)) {
         status = hycond_wait(lib->nondaemon_thread_cond, lib->TM_LOCK);
         //check interruption and other problems
-        TRACE(("TM wait for nondaemons notified, count: %d", nondaemon_thread_count));
+        TRACE(("TM wait for nondaemons notified, count: %d", lib->nondaemon_thread_count));
         if(status != TM_ERROR_NONE) {
             hymutex_unlock(lib->TM_LOCK);
             return status;
@@ -715,11 +716,11 @@ IDATA countdown_nondaemon_threads(hythread_t self) {
         return TM_ERROR_ILLEGAL_STATE;
     }
     
-    TRACE(("TM: nondaemons decreased, thread: %p count: %d", self, lib->nondaemon_thread_count));
+    TRACE(("TM: nondaemons decreased, thread: %p count: %d\n", self, lib->nondaemon_thread_count));
     lib->nondaemon_thread_count--;
-    if(lib->nondaemon_thread_count == 0) {
+    if(lib->nondaemon_thread_count <= 1) {
         status = hycond_notify_all(lib->nondaemon_thread_cond); 
-        TRACE(("TM: nondaemons all dead, thread: %p count: %d", self, lib->nondaemon_thread_count));
+        TRACE(("TM: nondaemons all dead, thread: %p count: %d\n", self, lib->nondaemon_thread_count));
         if (status != TM_ERROR_NONE){
             hymutex_unlock(lib->TM_LOCK);
             return status;
