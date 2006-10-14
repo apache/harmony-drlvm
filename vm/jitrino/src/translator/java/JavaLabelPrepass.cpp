@@ -295,13 +295,7 @@ public:
     void addHandlerForCatchBlock(CatchBlock* block, 
                                       uint32 handlerOffset,
                                       uint32 handlerLength,
-                                      uint32 exceptionTypeToken) {
-        Type* exceptionType = NULL;
-        if (exceptionTypeToken != 0) {
-            exceptionType = compilationInterface.resolveNamedType(enclosingMethod,exceptionTypeToken);
-        } else {
-            exceptionType = prepass.typeManager.getSystemObjectType();
-        }
+                                      Type*  exceptionType) {
         jitrino_assert(compilationInterface, exceptionType);
         Log::out() << "Catch Exception Type = " << exceptionType->getName() << ::std::endl;
 
@@ -348,7 +342,7 @@ public:
         return newBlock;
     }
 
-    virtual void catchBlock(uint32 tryOffset,
+    virtual bool catchBlock(uint32 tryOffset,
                             uint32 tryLength,
                             uint32 handlerOffset,
                             uint32 handlerLength,
@@ -367,9 +361,20 @@ public:
   
         bool unnested_try_regions_found = false;
         CatchBlock* catchBlock;
+
+        Type* exceptionType = NULL;
+        if (exceptionTypeToken != 0) {
+            exceptionType = compilationInterface.resolveNamedType(enclosingMethod,exceptionTypeToken);
+            if(!exceptionType) { // the type can not be resolved. LinkingException must be thrown
+                return 0;
+            }
+        } else {
+            exceptionType = prepass.typeManager.getSystemObjectType();
+        }
+
         if (prevCatch != NULL && prevCatch->equals(tryOffset, endOffset) == true) {
             catchBlock = prevCatch;
-            addHandlerForCatchBlock(catchBlock, handlerOffset, handlerLength, exceptionTypeToken);
+            addHandlerForCatchBlock(catchBlock, handlerOffset, handlerLength, exceptionType);
         } else {
             prepass.stateTable->createStateInfo(tryOffset);
             // 
@@ -410,8 +415,9 @@ public:
                 new (memManager) CatchBlock(nextRegionId++, tryOffset, endOffset, numCatch++);
             prepass.stateTable->getStateInfo(tryOffset)->addExceptionInfo(catchBlock);
             prepass.exceptionTable.push_back(catchBlock);
-            addHandlerForCatchBlock(catchBlock, handlerOffset, handlerLength, exceptionTypeToken);
+            addHandlerForCatchBlock(catchBlock, handlerOffset, handlerLength, exceptionType);
         }
+        return 1; // all exceptionTypes are OK
     }
     virtual void finallyBlock(uint32 tryOffset,
                             uint32 tryLength,
@@ -451,7 +457,8 @@ JavaLabelPrepass::JavaLabelPrepass(MemoryManager& mm,
    localVars(mm),
    jsrEntriesMap(mm),
    retToSubEntryMap(mm),
-   exceptionTable(mm)
+   exceptionTable(mm),
+   problemTypeToken(MAX_UINT32)
 {
     uint32 numByteCodes = methodDesc.getByteCodeSize();
     //nextIsLabel = false;
@@ -483,8 +490,15 @@ JavaLabelPrepass::JavaLabelPrepass(MemoryManager& mm,
     // parse and create exception info
     JavaExceptionParser exceptionTypes(irManager,*this,compilationInterface,&methodDesc);
     // fix exception handlers
-    methodDesc.parseJavaHandlers(exceptionTypes);
-    numCatchHandlers = exceptionTypes.numCatch;
+    unsigned problemToken = methodDesc.parseJavaHandlers(exceptionTypes);
+    if(problemToken != MAX_UINT32)
+    {
+        problemTypeToken = problemToken;
+        noNeedToParse = true;
+        numCatchHandlers = 0;
+    } else {
+        numCatchHandlers = exceptionTypes.numCatch;
+    }
 
     hasJsrLabels = false;
     isFallThruLabel = true;
@@ -511,7 +525,12 @@ JavaLabelPrepass::JavaLabelPrepass(MemoryManager& mm,
             if (Simplifier::isExactType(actual))       StateInfo::setExactType(slot);
         } else {
             type = methodSig->getParamType(i);
-            slot->type = typeManager.toInternalType(methodSig->getParamType(i));
+            if (!type) {
+                // linkage error will happen at the usage point of this parameter
+                // here we just keep it as NullObj
+                type = typeManager.getNullObjectType();
+            }
+            slot->type = typeManager.toInternalType(type);
         }
         slot->vars  = new (memManager) SlotVar(getOrCreateVarInc(0, j, slot->type, NULL));
         JavaVarType javaType = getJavaType(type);

@@ -61,7 +61,7 @@ class ExceptionCallback {
 public:
     virtual ~ExceptionCallback() {}
 
-    virtual void catchBlock(uint32 tryOffset,
+    virtual bool catchBlock(uint32 tryOffset,
                             uint32 tryLength,
                             uint32 handlerOffset,
                             uint32 handlerLength,
@@ -160,7 +160,7 @@ public:
     virtual uint32      getNumHandlers()    = 0;
     
     // Exception handler and signature parsing API
-    virtual void        parseJavaHandlers(ExceptionCallback&) = 0;
+    virtual unsigned    parseJavaHandlers(ExceptionCallback&) = 0;
     virtual void        parseCliHandlers(ExceptionCallback&) = 0;
     virtual bool        isVarPinned(uint32 varIndex) = 0;
     virtual Type*       getVarType(uint32 varType) = 0;

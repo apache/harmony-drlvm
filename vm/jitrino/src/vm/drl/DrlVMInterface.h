@@ -293,8 +293,8 @@ public:
     //
     // Signature and handler parsing
     //
-    void parseJavaHandlers(ExceptionCallback&);
-    void parseCliHandlers(ExceptionCallback&);
+    unsigned parseJavaHandlers(ExceptionCallback&);
+    void     parseCliHandlers(ExceptionCallback&);
     
     uint32    getNumVars()            {return method_vars_get_number(drlMethod);}
     bool      isVarPinned(uint32 varIndex);

@@ -347,16 +347,22 @@ DrlVMMethodDesc::getParentType()    {
     return typeManager.getObjectType(parentClassHandle);
 }
 
-void 
+unsigned 
 DrlVMMethodDesc::parseJavaHandlers(ExceptionCallback& callback) {
     uint32 numHandlers = getNumHandlers();
     for (uint32 i=0; i<numHandlers; i++) {
         unsigned beginOffset,endOffset,handlerOffset,handlerClassIndex;
         method_get_handler_info(drlMethod,i,&beginOffset,&endOffset,
                              &handlerOffset,&handlerClassIndex);
-        callback.catchBlock(beginOffset,endOffset-beginOffset,
-                            handlerOffset,0,handlerClassIndex);
+        if (!callback.catchBlock(beginOffset,endOffset-beginOffset,
+                                 handlerOffset,0,handlerClassIndex))
+        {
+            // handlerClass failed to be resolved. LinkingException throwing helper
+            // will be generated instead of method's body
+            return handlerClassIndex;
+        }
     }
+    return MAX_UINT32; // all catchBlocks were processed successfully
 }
 
 void 

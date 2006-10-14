@@ -56,6 +56,7 @@ public:
         bytecodevisited = NULL;
         prepassVisited = NULL;
         labelStack = NULL;
+        noNeedToParse = false;
     }
     JavaByteCodeParserCallback(MemoryManager& memManager,uint32 byteCodeLength) {
         currentOffset = 0;
@@ -66,6 +67,7 @@ public:
         bytecodevisited = new (memManager) BitSet(memManager,byteCodeLength);
         prepassVisited = NULL;
         labelStack = new (memManager) Queue<uint8>(memManager);
+        noNeedToParse = false;
     }
     bool parseByteCode(const uint8* byteCodes,uint32 byteCodeOffset);
     BitSet* getVisited()  { return visited; }
@@ -78,6 +80,10 @@ protected:
     BitSet*          bytecodevisited;
     BitSet*          prepassVisited;
     Queue<uint8>*    labelStack;
+
+    // for example when some exception type can not be resolved
+    bool noNeedToParse;
+
     // called before each byte code to indicate the next byte code's offset
     virtual void offset(uint32 offset) = 0;
     virtual void offset_done(uint32 offset) = 0;
@@ -228,6 +234,9 @@ protected:
     virtual void multianewarray(uint32 constPoolIndex,uint8 dimensions) = 0;
     virtual void ifnull(uint32 targetOffset,uint32 nextOffset) = 0;
     virtual void ifnonnull(uint32 targetOffset,uint32 nextOffset) = 0;
+
+    virtual bool skipParsing() {return noNeedToParse;}
+
 };
 
 

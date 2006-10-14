@@ -41,6 +41,9 @@ public:
     virtual void parseInit() = 0;
     // called after the parsing ends, but not if an error occurs
     virtual void parseDone() = 0;
+    // if a callback during its construction determines some error
+    // the parsing can be ommitted with help of this:
+    virtual bool skipParsing() {return false;};
     // called when an error occurs during the byte code parsing
     virtual void parseError() = 0;
     uint32       getNextOffset() {return nextOffset;}
@@ -61,12 +64,14 @@ public:
     //
     void parse(ByteCodeParserCallback* cb) {
         cb->parseInit();
-        byteCodeOffset = 0;
-        while (byteCodeOffset < byteCodeLength) {
-            if (cb->parseByteCode(byteCodes,byteCodeOffset) != true) {
-                return;
+        if (!cb->skipParsing()) {
+            byteCodeOffset = 0;
+            while (byteCodeOffset < byteCodeLength) {
+                if (cb->parseByteCode(byteCodes,byteCodeOffset) != true) {
+                    return;
+                }
+                byteCodeOffset = cb->getNextOffset();
             }
-            byteCodeOffset = cb->getNextOffset();
         }
         cb->parseDone();
     }

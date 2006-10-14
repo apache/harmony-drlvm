@@ -259,6 +259,10 @@ public:
     void                    pushType(Type *type);
     bool isCategory2(struct StateInfo::SlotInfo slot) { return slot.type == int64Type || slot.type == doubleType; }
 
+    //
+    bool        allExceptionTypesResolved() {return problemTypeToken == MAX_UINT32;}
+    unsigned    getProblemTypeToken() {return problemTypeToken;}
+
     // cut and paste from Java_Translator.cpp
     // field, method, and type resolution
     //
@@ -527,6 +531,9 @@ private:
     // helpers
     Type           *int32Type, *int64Type, *singleType, *doubleType;
     ExceptionTable exceptionTable;
+
+    // if an exception type can not be resolved, its token is being kept here
+    unsigned       problemTypeToken;
 
     // private helper methods
     void setLabel(uint32 offset);

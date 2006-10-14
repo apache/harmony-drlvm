@@ -250,6 +250,13 @@ JavaByteCodeTranslator::JavaByteCodeTranslator(CompilationInterface& ci,
             genMethodMonitorEnter();
         }
     }
+
+    if(!prepass.allExceptionTypesResolved()) {
+        unsigned problemToken = prepass.getProblemTypeToken();
+        assert(problemToken != MAX_UINT32);
+        linkingException(problemToken,OPCODE_CHECKCAST); // CHECKCAST is suitable here
+        noNeedToParse = true;
+    }
 }
 
 
@@ -314,6 +321,15 @@ JavaByteCodeTranslator::JavaByteCodeTranslator(CompilationInterface& ci,
     }
     // create a prolog instruction
     irBuilder.genMethodEntryMarker(&methodDesc);
+
+    if(!prepass.allExceptionTypesResolved()) {
+        unsigned problemToken = prepass.getProblemTypeToken();
+        assert(problemToken != MAX_UINT32);
+        linkingException(problemToken,OPCODE_CHECKCAST); // CHECKCAST is suitable here
+        noNeedToParse = true;
+        return;
+    }
+
     initLocalVars();
     initArgs();
     assert(numActualArgs == numArgs);
@@ -402,7 +418,10 @@ JavaByteCodeTranslator::initArgs() {
     argTypes = new (memManager) Type*[numArgs];
     args = new (memManager) Opnd*[numArgs];
     for (uint16 i=0; i<numArgs; i++) {
-        argTypes[i] = methodSignatureDesc->getParamType(i);
+        Type* argType = methodSignatureDesc->getParamType(i);
+        // argType == NULL if it fails to be resolved. Respective exception
+        // will be thrown at the point of usage
+        argTypes[i] = argType != NULL ? argType : typeManager.getNullObjectType();
     }
 }
 
