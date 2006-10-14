@@ -605,7 +605,7 @@ Simplifier::simplifySubViaReassociation(Type* type, Opnd* src1, Opnd* src2) {
                 Opnd* constSrc = fold(Op_Add, type, constInst1, constInst2, true);
                 // (C1+C2)-s
                 return genSub(type, Modifier(Overflow_None)|Modifier(Exception_Never)|Modifier(Strict_No),
-                    nonConstSrc, constSrc)->getDst();
+                    constSrc, nonConstSrc)->getDst();
             }
         }
         if (isAddWithConstant(nonConstInst)) {
