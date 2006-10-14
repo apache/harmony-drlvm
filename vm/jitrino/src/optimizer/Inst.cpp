@@ -2552,7 +2552,7 @@ Inst* InstFactory::makeTauInstanceOf(Opnd* dst, Opnd* src, Opnd* tauNullChecked,
 }
 
 Inst* InstFactory::makeInitType(Type* type) {
-    return makeTypeInst(Op_InitType, Modifier(), 
+    return makeTypeInst(Op_InitType, Modifier(Exception_Sometimes), 
                         Type::Void, OpndManager::getNullOpnd(), type);
 }
 

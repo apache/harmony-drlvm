@@ -52,7 +52,11 @@ MemoryValueNumberingPass::_run(IRManager& irm) {
     computeDominators(irm);
     DominatorTree* dominatorTree = irm.getDominatorTree();
     assert(dominatorTree && dominatorTree->isValid());
+
+    computeLoops(irm);
     LoopTree* loopTree = irm.getLoopTree();
+    assert(loopTree && loopTree->isValid());
+
     ControlFlowGraph& flowGraph = irm.getFlowGraph();
     MemoryManager& memoryManager = irm.getNestedMemoryManager();
 

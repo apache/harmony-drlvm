@@ -131,9 +131,9 @@ public:
         // then hash
         return dispatch(inst);
     }
-    Inst* caseAdd(Inst* inst)               { return hashIfNoOverflow(inst); }
-    Inst* caseSub(Inst* inst)               { return hashIfNoOverflow(inst); }  
-    Inst* caseMul(Inst* inst)               { return hashIfNoOverflow(inst); }
+    Inst* caseAdd(Inst* inst)               { return hashIfNoException(inst); }
+    Inst* caseSub(Inst* inst)               { return hashIfNoException(inst); }  
+    Inst* caseMul(Inst* inst)               { return hashIfNoException(inst); }
     Inst* caseTauDiv(Inst* inst)            { return hashInst(inst, getKey(inst->getOperation(),
                                                                            inst->getSrc(0)->getId(),
                                                                            inst->getSrc(1)->getId())); }
@@ -156,7 +156,7 @@ public:
     Inst* caseSelect(Inst* inst)            { return hashInst(inst); }
     
     // conversion
-    Inst* caseConv(Inst* inst)              { return hashIfNoOverflow(inst); }
+    Inst* caseConv(Inst* inst)              { return hashIfNoException(inst); }
     
     // shifts
     Inst* caseShladd(Inst* inst)            { return hashInst(inst); }
@@ -792,7 +792,7 @@ public:
         }
         return inst;
     }
-    Inst* caseInitType(TypeInst* inst) { return hashInst(inst); }
+    Inst* caseInitType(TypeInst* inst) { return hashIfNoException(inst); }
 
     // labels
 
@@ -1189,13 +1189,66 @@ private:
             return 0;
     }
 
-    // arithmetic operations should only be added if no exception can occur
-    Inst* hashIfNoOverflow(Inst* inst) {
-        if ((inst->getOverflowModifier() == Overflow_None) ||
-            (inst->getExceptionModifier() == Exception_Never))
+    bool thereIsAPath(Node* start, Node* finish, Node* commonAncestor)
+    {
+        assert(domTree.dominates(commonAncestor,start));
+        assert(domTree.dominates(commonAncestor,finish));
+
+        const Edges &outedges = start->getOutEdges();
+        typedef Edges::const_iterator EdgeIter;
+        EdgeIter eLast = outedges.end();
+        for (EdgeIter eIter = outedges.begin(); eIter != eLast; eIter++) {
+            Edge* outEdge = *eIter;
+            Node* succBlock = outEdge->getTargetNode();
+
+            if( domTree.dominates(succBlock,start) )
+                continue; // outEdge is a backedge. Skip it.
+
+            if (finish == succBlock) {
+                return true;
+            } else if ( domTree.dominates(commonAncestor,succBlock) &&
+                        thereIsAPath(succBlock,finish,commonAncestor) )
+            {
+                return true;
+            }
+        }        
+        return false;
+    }
+
+    Inst* hashIfNoException(Inst* inst) {
+        Modifier mod = inst->getModifier();
+        if ((mod.hasOverflowModifier() && mod.getOverflowModifier() != Overflow_None)   ||
+            (mod.hasExceptionModifier() && mod.getExceptionModifier() != Exception_Never))
+        {
+            Inst* optInst = lookupInst(inst);
+            if (!optInst) {
+                setHashToInst(inst, getKey(inst));
+                return inst;
+            } else {
+                Node* block = inst->getNode();
+                Node* optBlock = optInst->getNode();
+                // we must ensure that optInst was successfully executed
+                // if there is a way [block]->[dispatch]->...->[optBlock]
+                // we should not consider optInst as successfully executed
+                // so inst can not be eliminated, but it should be added
+                // into hash table instead of optInst
+                Node* dispatch = optBlock->getEdgeTarget(Edge::Kind_Dispatch);
+                if ( dispatch && domTree.dominates(optBlock,dispatch) &&
+                     thereIsAPath(dispatch,block,optBlock))
+                {
+                    // do not optimize, just add to hash.
+                    setHashToInst(inst, getKey(inst));
+                    return inst;
+                } else {
+                    // everything is OK. Can optimize.
+                    return optInst;
+                }
+            }
+
+        } else {
+            // process inst as usual
             return hashInst(inst);
-        else 
-            return lookupInst(inst);
+        }
     }
 
     Inst* lookupInst(Inst* inst) {
@@ -1264,7 +1317,7 @@ protected:
     IRManager&          irManager;
     Inst*               tauUnsafe;
     Opnd*               tauPoint;
-    DominatorTree      &domTree;
+    DominatorTree       &domTree;
     MemoryOpt           *memOpt;
     bool                cse_final;
     ControlFlowGraph    &fg;

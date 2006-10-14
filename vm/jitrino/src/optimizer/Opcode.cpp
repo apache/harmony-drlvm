@@ -176,9 +176,9 @@ static OpcodeInfo opcodeTable[] = {
     { Op_MonitorExitFence,      true,  MB::StoreOrSync,   MK::None,                                  "monexitfence",  "monexitfence  %0",             }, // (opnd must be non-null)
     { Op_TauStaticCast,         false, MB::Movable,       MK::None,                                  "staticcast",    "staticcast %0,%d ((%1)) -) %l",       }, // Compile-time assertion.  Asserts that cast is legal.
     { Op_TauCast,               false, MB::Check,         MK::Exception,                             "cast  ",        "cast      %0,%d ((%1)) -) %l",        }, // CastException (suceeds if argument is null, returns casted object)
-    { Op_TauAsType,                false, MB::Movable,       MK::None,                                  "astype",        "astype    %0,%d -) %l",        }, // returns casted object if argument is an instance of, null otherwise
+    { Op_TauAsType,             false, MB::Movable,       MK::None,                                  "astype",        "astype    %0,%d -) %l",        }, // returns casted object if argument is an instance of, null otherwise
     { Op_TauInstanceOf,         false, MB::Movable,       MK::None,                                  "instanceof",    "instanceof %0,%d ((%1)) -) %l",       }, // returns true if argument is an instance of type T, tau opnd isNonNull
-    { Op_InitType,              true,  MB::CSEable,       MK::None,                                  "inittype",      "inittype  %d",                 }, // REVIEW: can this throw an exception?
+    { Op_InitType,              true,  MB::CSEable,       MK::Exception,                             "inittype",      "inittype  %d",                 }, // can throw a linking exception during class initialization
     { Op_Label,                 true,  MB::None,          MK::None,                                  "label ",        "%l:",                          }, // special label instructions for branch labels, finally, catch
     { Op_MethodEntry,           true,  MB::None,          MK::None,                                  "methodentry",   "--- MethodEntry(%d): (%s)",                 }, // method entry label
     { Op_MethodEnd,             true,  MB::None,          MK::None,                                  "methodend",     "+++ MethodEnd(%d) (%s)",       }, // end of a method

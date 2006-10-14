@@ -181,8 +181,8 @@ Node * JavaFlowGraphBuilder::edgesForBlock(Node* block) {
     //
     // add an edge to handler entry node
     //
-    if (lastExceptionalInstSeen != NULL &&  !block->findTargetEdge(dispatch))
-        fg->addEdge(block,dispatch);
+    if (lastExceptionalInstSeen != NULL)
+        addEdge(block,dispatch);
     return block;
 }
 
