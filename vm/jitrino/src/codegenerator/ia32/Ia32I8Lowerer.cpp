@@ -378,14 +378,16 @@ void I8Lowerer::buildJumpSubGraph(Inst * inst, Opnd * src1_1,Opnd * src1_2,Opnd 
     
     ControlFlowGraph* subCFG = irManager->createSubCFG(true, false);
     Node* bbHMain = subCFG->getEntryNode();
+    Node* bbHCmp = subCFG->createBlockNode();
     Node* bbLMain = subCFG->createBlockNode();
     Node* sinkNode =  subCFG->getReturnNode();
     
     bbHMain->appendInst(irManager->newInst(Mnemonic_CMP, src1_2, src2_2));
-    bbHMain->appendInst(irManager->newBranchInst(Mnemonic_JNZ, sinkNode, bbLMain));
+    bbHMain->appendInst(irManager->newBranchInst(Mnemonic_JNZ, bbHCmp, bbLMain));
     
     bbLMain->appendInst(irManager->newInst(Mnemonic_CMP, src1_1, src2_1));
     
+    bbHCmp->appendInst(irManager->newInst(Mnemonic_CMP, src1_2, src2_2));
     
     Node* bbFT = bb->getFalseEdgeTarget();
     Node* bbDB = bb->getTrueEdgeTarget();
@@ -400,7 +402,8 @@ void I8Lowerer::buildJumpSubGraph(Inst * inst, Opnd * src1_1,Opnd * src1_2,Opnd 
     }
     bbLMain->appendInst(irManager->newBranchInst(mnem, bbDB, bbFT));
     
-    subCFG->addEdge(bbHMain, sinkNode, 0.1);
+    subCFG->addEdge(bbHMain, bbHCmp, 0.1);
+    subCFG->addEdge(bbHCmp, sinkNode, 1);
     subCFG->addEdge(bbHMain, bbLMain, 0.9);
     subCFG->addEdge(bbLMain, bbFT, 0.1);
     subCFG->addEdge(bbLMain, bbDB, 0.9);

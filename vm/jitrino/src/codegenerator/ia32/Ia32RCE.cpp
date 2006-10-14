@@ -93,21 +93,21 @@ RCE::runImpl()
     Inst * inst, * cmpInst, *condInst;
     Opnd * cmpOp = NULL; 
     cmpInst = condInst = NULL;
-    const Nodes& nodes = irManager->getFlowGraph()->getNodes();
+    const Nodes& nodes = irManager->getFlowGraph()->getNodesPostOrder();
     for (Nodes::const_iterator it = nodes.begin(), end = nodes.end(); it!=end; ++it) {
         Node* node = *it;
         if (node->isBlockNode()) {
             if(node->isEmpty()) {
                 continue;
             }
-            cmpInst = condInst = NULL;
+            cmpInst = NULL;
             Inst* prevInst = NULL;
             for(inst = (Inst*)node->getLastInst(); inst != NULL; inst = prevInst) {
             prevInst = inst->getPrevInst();
                 //find conditional instruction
                 Mnemonic baseMnem = getBaseConditionMnemonic(inst->getMnemonic());
                 if (baseMnem != Mnemonic_NULL) {
-                    condInst = inst;
+                    condInst = condInst ? NULL : inst;
                     cmpInst = NULL;
                 } else if (condInst) {
                     //find CMP instruction corresponds to conditional instruction
@@ -153,7 +153,7 @@ RCE::runImpl()
                     //find flags affected instruction precedes cmpInst
                     } else if (isUsingFlagsAffected(inst, condInst)) {
                         if (cmpInst) {
-                            if (isSuitableToRemove(inst, condInst, cmpInst, cmpOp))                         
+                            if (isSuitableToRemove(inst, condInst, cmpInst, cmpOp))
                             {
                                 cmpInst->unlink();//replace cmp
                             } 
