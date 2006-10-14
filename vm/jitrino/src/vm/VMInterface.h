@@ -591,8 +591,6 @@ public:
     virtual void enumerateRootReference(void** reference) = 0;
     virtual void enumerateCompressedRootReference(uint32* reference) = 0;
     virtual void enumerateRootManagedReference(void** slotReference, int slotOffset) = 0;
-    virtual void enumerateRootManagedReferenceWithBase(void** slotReference, void** baseReference) = 0;
-    virtual void enumerateRootManagedReferenceWithUnknownOffset(void** slotReference) = 0;
 };
 
 

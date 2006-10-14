@@ -652,14 +652,6 @@ public:
         vm_enumerate_root_interior_pointer(slotReference, slotOffset, FALSE);
     }
 
-    virtual void enumerateRootManagedReferenceWithBase(void** slotReference, void** baseReference) {
-        vm_enumerate_root_interior_pointer_with_base(slotReference, baseReference, FALSE);
-    }
-
-    virtual void enumerateRootManagedReferenceWithUnknownOffset(void** slotReference) {
-        assert(0);
-    }
-
 private:
     GC_Enumeration_Handle gcHandle;
 };
@@ -679,14 +671,6 @@ public:
 
     virtual void enumerateRootManagedReference(void** slotReference, int slotOffset) {
         vm_check_if_monitor(slotReference, 0, 0, slotOffset, FALSE, 3);
-    }
-
-    virtual void enumerateRootManagedReferenceWithBase(void** slotReference, void** baseReference) {
-        vm_check_if_monitor(slotReference, baseReference, 0, 0, FALSE, 4);
-    }
-
-    virtual void enumerateRootManagedReferenceWithUnknownOffset(void** slotReference) {
-        assert(0);
     }
 };
 

@@ -341,6 +341,48 @@ void GCSafePoint::enumerate(GCInterface* gcInterface, const JitFrameContext* con
     MemoryManager mm(256, "tmp");
     DrlVMTypeManager tm(mm);
 #endif
+    //The algorithm of enumeration is
+    //1. Derive all offsets for MPTRs with offsets unknown during compile time.
+    //2. Report to VM
+    //We need this 2 steps behavior because some GCs move objects during enumeration.
+    //In this case it's impossible to derive valid base for mptr with unknown offset.
+
+    //1. Derive all offsets. Use GCSafePointOpnd.mptrOffset to store the result.
+    for (uint32 i=0, n = gcOpnds.size(); i<n; i++) {
+        GCSafePointOpnd* gcOpnd = gcOpnds[i];
+        POINTER_SIZE_INT valPtrAddr = getOpndSaveAddr(context, stackInfo, gcOpnd);
+        if (gcOpnd->isObject() || gcOpnd->getMPtrOffset()!=MPTR_OFFSET_UNKNOWN) {
+            continue;
+        }
+
+        POINTER_SIZE_INT mptrAddr = *((POINTER_SIZE_INT*)valPtrAddr); 
+        //we looking for a base that  a) located before mptr in memory b) nearest to mptr
+        GCSafePointOpnd* baseOpnd = NULL;
+        POINTER_SIZE_INT basePtrAddr = 0, baseAddr = 0;
+        for (uint32 j=0; j<n; j++) {
+            GCSafePointOpnd* tmpOpnd = gcOpnds[j];   
+            if (tmpOpnd->isObject()) {
+                POINTER_SIZE_INT tmpPtrAddr = getOpndSaveAddr(context, stackInfo, tmpOpnd);
+                POINTER_SIZE_INT tmpBaseAddr = *((POINTER_SIZE_INT*)tmpPtrAddr);
+                if (tmpBaseAddr <= mptrAddr) {
+                    if (baseOpnd == NULL || tmpBaseAddr > baseAddr) {
+                        baseOpnd = tmpOpnd;
+                        basePtrAddr = tmpPtrAddr;
+                        baseAddr = tmpBaseAddr;
+                    } 
+                }
+            }
+        }
+        assert(baseOpnd!=NULL);
+#ifdef ENABLE_GC_RT_CHECKS
+        GCMap::checkObject(tm,  *(void**)basePtrAddr);
+#endif 
+        int offset = (int)(mptrAddr-baseAddr);
+        assert(offset>=0);
+        gcOpnd->getMPtrOffset(offset);
+    }
+
+    //2. Report the results
     for (uint32 i=0, n = gcOpnds.size(); i<n; i++) {
         GCSafePointOpnd* gcOpnd = gcOpnds[i];
         POINTER_SIZE_INT valPtrAddr = getOpndSaveAddr(context, stackInfo, gcOpnd);
@@ -354,42 +396,15 @@ void GCSafePoint::enumerate(GCInterface* gcInterface, const JitFrameContext* con
             else
 #endif
                 gcInterface->enumerateRootReference((void**)valPtrAddr);
-        } else {
+        } else { //mptr with offset
             assert(gcOpnd->isMPtr());
-            POINTER_SIZE_INT mptrAddr = *((POINTER_SIZE_INT*)valPtrAddr); //
-            //find base, calculate offset and report to GC
-            if (gcOpnd->getMPtrOffset() == MPTR_OFFSET_UNKNOWN) {
-                //we looking for a base that  a) located before mptr in memory b) nearest to mptr
-                GCSafePointOpnd* baseOpnd = NULL;
-                POINTER_SIZE_INT basePtrAddr = 0, baseAddr = 0;
-                for (uint32 j =0; j<n; j++) {
-                    GCSafePointOpnd* tmpOpnd = gcOpnds[j];   
-                    if (tmpOpnd->isObject()) {
-                        POINTER_SIZE_INT tmpPtrAddr = getOpndSaveAddr(context, stackInfo, tmpOpnd);
-                        POINTER_SIZE_INT tmpBaseAddr = *((POINTER_SIZE_INT*)tmpPtrAddr);
-                        if (tmpBaseAddr <= mptrAddr) {
-                            if (baseOpnd == NULL || tmpBaseAddr > baseAddr) {
-                                baseOpnd = tmpOpnd;
-                                basePtrAddr = tmpPtrAddr;
-                                baseAddr = tmpBaseAddr;
-                            } 
-                        }
-                    }
-                }
-                assert(baseOpnd!=NULL);
+            int offset = gcOpnd->getMPtrOffset();
+            assert(offset>=0);
 #ifdef ENABLE_GC_RT_CHECKS
-                GCMap::checkObject(tm,  *(void**)basePtrAddr);
-#endif 
-                gcInterface->enumerateRootManagedReferenceWithBase((void**)valPtrAddr, (void**)basePtrAddr);
-            } else { // mptr - base == static_offset
-                POINTER_SIZE_INT offset = gcOpnd->getMPtrOffset();
-                //assert(offset>=0);
-#ifdef ENABLE_GC_RT_CHECKS
-                char* mptrAddr = *(char**)valPtrAddr;
-                GCMap::checkObject(tm, mptrAddr - offset);
+            char* mptrAddr = *(char**)valPtrAddr;
+            GCMap::checkObject(tm, mptrAddr - offset);
 #endif
-                gcInterface->enumerateRootManagedReference((void**)valPtrAddr, offset);
-            }
+            gcInterface->enumerateRootManagedReference((void**)valPtrAddr, offset);
         }
     }
 }

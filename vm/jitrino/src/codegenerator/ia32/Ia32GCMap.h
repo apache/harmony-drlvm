@@ -145,6 +145,7 @@ namespace Ia32 {
         int32 getDistFromInstESP() const { assert(isOnStack()); return val;}
 
         int32 getMPtrOffset() const {return mptrOffset;}
+        void getMPtrOffset(int newOffset) {mptrOffset = newOffset;}
 
 #ifdef _DEBUG
         uint32 firstId;

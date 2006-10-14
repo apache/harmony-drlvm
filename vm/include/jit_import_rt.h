@@ -54,10 +54,6 @@ VMEXPORT void vm_enumerate_compressed_root_reference(uint32 *ref, Boolean is_pin
 // to a location that contains a pointer to an inside of an object.
 VMEXPORT void vm_enumerate_root_interior_pointer(void **slot, int offset, Boolean is_pinned);
 
-// The first argument is an interior pointer root, second argument is a pointer to the reference to the object
-// the first argument is in.  The function enumerates the interior pointer, but not the base.
-VMEXPORT void vm_enumerate_root_interior_pointer_with_base(void **slot_root, void **slot_base, Boolean is_pinned);
-
 // The JIT enumerates a managed pointer.  The pointer can be declared as
 // pinned.  The pointer can point to the managed heap or any other area
 // where data can be stored: stack or static fields.  It is the responsibility
