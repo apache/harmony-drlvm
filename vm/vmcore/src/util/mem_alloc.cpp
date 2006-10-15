@@ -309,5 +309,5 @@ POINTER_SIZE_INT vm_get_vtable_base()
     assert (base);
     // Subtract a small number (like 1) from the real base so that
     // no valid vtable offsets will ever be 0.
-    return (POINTER_SIZE_INT) (base - 1);
+    return (POINTER_SIZE_INT) (base - 8);
 } //vm_get_vtable_base
