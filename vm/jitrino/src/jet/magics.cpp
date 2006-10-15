@@ -41,12 +41,15 @@ bool is_magic(Class_Handle k)
 {
     static const char unboxedName[] = "org/vmmagic/unboxed/";
     static const unsigned nameLen = sizeof(unboxedName)-1;
+
+    assert(k!=NULL);
     const char * kname = class_get_name(k);
     return !strncmp(kname, unboxedName, nameLen);
 }
 
 bool is_magic(Method_Handle m)
 {
+    assert(m != NULL);
     Class_Handle klass = method_get_class(m);
     return is_magic(klass);
 }
@@ -57,8 +60,8 @@ static size_t sizeof_jt(jtype jt) {
         1, //i8,
         2, //i16, 
         2, //u16,
-        4, //i32,
         8, //i64,
+        4, //i32,
         4, //flt32,
         8, //dbl64,
         4, //jobj,
@@ -98,7 +101,7 @@ bool Compiler::gen_magic(void)
         // trying to create a magic instance ?
         Class_Handle klass = NULL;
         klass = vm_resolve_class_new(m_compileHandle, m_klass, jinst.op0);
-        if (!is_magic(klass)) {
+        if (klass == NULL || !is_magic(klass)) {
             // not a magic - proceed as usual
             return false;
         }
