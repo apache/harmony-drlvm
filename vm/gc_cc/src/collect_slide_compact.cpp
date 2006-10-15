@@ -32,6 +32,7 @@
 unsigned char *mark_bits;
 int mark_bits_size;
 fast_list<Partial_Reveal_Object*, 65536> objects;
+reference_vector references_to_enqueue;
 
 static inline bool
 is_compaction_object(Partial_Reveal_Object *refobj) {
@@ -603,7 +604,8 @@ void gc_slide_process_special_references(reference_vector& array) {
 
         // object not marked, clear reference
         slot.write((Partial_Reveal_Object*) heap_null);
-        Slot root = make_direct_root(&*i);
+        references_to_enqueue.push_back(obj);
+        Slot root = make_direct_root(&references_to_enqueue.back());
 
         if (is_forwarded_object(obj)) {
             update_forwarded_reference(obj, root);
@@ -611,16 +613,18 @@ void gc_slide_process_special_references(reference_vector& array) {
             enqueue_reference(obj, root);
         }
     }
+    array.clear();
 }
 
-void gc_slide_postprocess_special_references(reference_vector& array) {
-    for(reference_vector::iterator i = array.begin();
-            i != array.end(); ++i) {
+void gc_slide_postprocess_special_references() {
+    for(reference_vector::iterator i = references_to_enqueue.begin();
+            i != references_to_enqueue.end(); ++i) {
         Partial_Reveal_Object *obj = *i;
 
-        if (obj == heap_null) continue;
+        assert (obj != heap_null);
         vm_enqueue_reference((Managed_Object_Handle)obj);
     }
+    references_to_enqueue.clear();
 }
 
 // transition from coping collector code

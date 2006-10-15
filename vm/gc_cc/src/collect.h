@@ -77,7 +77,7 @@ void gc_forced_add_root_set_entry(Slot slot);
 void gc_slide_add_root_set_entry(Slot slot);
 void gc_slide_move_all();
 void gc_slide_process_special_references(reference_vector& array);
-void gc_slide_postprocess_special_references(reference_vector& array);
+void gc_slide_postprocess_special_references();
 
 void transition_copy_to_sliding_compaction(fast_list<Slot,65536>& slots);
 void gc_slide_process_transitional_slots(fast_list<Slot,65536>& slots);

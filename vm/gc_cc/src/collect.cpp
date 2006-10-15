@@ -216,6 +216,7 @@ void process_special_references(reference_vector& array) {
         TRACE2("gc.ref", "process_special_references: reference enquequed");
         vm_enqueue_reference((Managed_Object_Handle)ref);
     }
+    array.clear();
 }
 
 // scan only finalizible object, without enqueue
@@ -230,9 +231,9 @@ static void prepare_gc() {
     notify_gc_start(); 
 
     object_count = 0;
-    soft_references.clear();
-    weak_references.clear();
-    phantom_references.clear();
+    assert (soft_references.empty());
+    assert (weak_references.empty());
+    assert (phantom_references.empty());
     soft_refs = weak_refs = phantom_refs = 0;
 }
 
@@ -276,13 +277,13 @@ finish_slide_gc(int size, int stage) {
         gc_slide_process_special_references(weak_references);
         process_finalizable_objects();
     }
+    gc_slide_process_special_references(soft_references);
+    gc_slide_process_special_references(weak_references);
     gc_slide_process_special_references(phantom_references);
 
     TIME(gc_slide_move_all,());
     roots_update();
-    gc_slide_postprocess_special_references(soft_references);
-    gc_slide_postprocess_special_references(weak_references);
-    gc_slide_postprocess_special_references(phantom_references);
+    gc_slide_postprocess_special_references();
     gc_deallocate_mark_bits();
     finalize_objects();
 
@@ -345,6 +346,8 @@ unsigned char *copy_gc(int size) {
         heap.Tcopy = (float) gc_time.dt();
         return res;
     }
+    process_special_references(soft_references);
+    process_special_references(weak_references);
     process_special_references(phantom_references);
     roots_update();
     finalize_objects();
@@ -374,6 +377,8 @@ void force_gc() {
     TIME(process_special_references,(soft_references));
     TIME(process_special_references,(weak_references));
     TIME(process_finalizable_objects,());
+    TIME(process_special_references,(soft_references));
+    TIME(process_special_references,(weak_references));
     TIME(process_special_references,(phantom_references));
     roots_update();
     TIME(finalize_objects,());
