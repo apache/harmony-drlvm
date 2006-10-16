@@ -35,6 +35,11 @@
 #include "thread_manager.h"
 #include <sstream>
 
+#ifndef PLATFORM_POSIX
+#include <float.h>
+#define isnan _isnan
+#endif
+
 // ppervov: HACK: allows using STL modifiers (dec/hex) and special constants (endl)
 using namespace std;
 
@@ -722,7 +727,9 @@ Opcode_D2I(StackFrame& frame) {
     if (exponent < max_exp) {
         res.i = (int) arg.d;
     } else {
-        if (arg.d > 0) {
+        if (isnan(arg.d)) {
+            res.i = 0;
+        } else if (arg.d > 0) {
             res.i = (int32)2147483647;
         } else {
             res.i = (int32)2147483648u;
@@ -745,7 +752,9 @@ Opcode_F2I(StackFrame& frame) {
     if (exponent < max_exp) {
         arg.i = (int32) arg.f;
     } else {
-        if (arg.f > 0) {
+        if (isnan(arg.f)) {
+            arg.i = 0;
+        } else if (arg.f > 0) {
             arg.i = (int32)2147483647;
         } else {
             arg.i = (int32)2147483648u;
@@ -767,7 +776,9 @@ Opcode_D2L(StackFrame& frame) {
     if (exponent < max_exp) {
         res.i64 = (int64) arg.d;
     } else {
-        if (arg.d > 0) {
+        if (isnan(arg.d)) {
+            res.i64 = (int64) 0;
+        } else if (arg.d > 0) {
             res.i64 = (int64)(((uint64)(int64)-1) >> 1); // 7FFFF......
         } else {
             res.i64 = ((int64)-1) << 63; // 80000......
@@ -791,7 +802,9 @@ Opcode_F2L(StackFrame& frame) {
     if (exponent < max_exp) {
         res.i64 = (int64) arg.f;
     } else {
-        if (arg.f > 0) {
+        if (isnan(arg.f)) {
+            res.i64 = (int64) 0;
+        } else if (arg.f > 0) {
             res.i64 = (int64)(((uint64)(int64)-1) >> 1); // 7FFFF......
         } else {
             res.i64 = ((int64)-1) << 63; // 80000......
