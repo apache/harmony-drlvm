@@ -635,17 +635,18 @@ public class Thread implements Runnable {
     }
 
     /**
+     *  Note that this is unsnchronized - the assumption is that
+     *  hythread does the synchronization for us
+     *  
      * @com.intel.drl.spec_ref
      */
     public final void resume() {
-        synchronized (lock) {
             checkAccess();
             int status = VMThreadManager.resume(this);
             if (status != VMThreadManager.TM_ERROR_NONE) {
                 throw new InternalError(
                     "Thread Manager internal error " + status);
             }
-        }
     }
 
     /**
@@ -818,17 +819,18 @@ public class Thread implements Runnable {
     }
 
     /**
+     *  Note that this is unsnchronized - the assumption is that
+     *  hythread does the synchronization for us
+     *  
      * @com.intel.drl.spec_ref
      */
     public final void suspend() {
-        synchronized (lock) {
             checkAccess();
             int status = VMThreadManager.suspend(this);
             if (status != VMThreadManager.TM_ERROR_NONE) {
                 throw new InternalError(
                     "Thread Manager internal error " + status);
             }
-        }
     }
 
     /**
