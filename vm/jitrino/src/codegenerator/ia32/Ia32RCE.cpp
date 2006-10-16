@@ -187,6 +187,8 @@ RCE::isUsingFlagsAffected(Inst * inst, Inst * condInst)
             return true; 
         case Mnemonic_IDIV:
         case Mnemonic_CALL:
+        case Mnemonic_IMUL:
+        case Mnemonic_MUL:
             //instruction changes flags in the way doesn't correspond CMP
             return false;
         default:

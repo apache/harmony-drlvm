@@ -21,7 +21,7 @@
 package gc;
 
 /**
- * @keyword gc
+ * @keyword  XXX
  */
 public class Finalizer {
 

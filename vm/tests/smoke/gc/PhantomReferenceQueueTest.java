@@ -26,7 +26,7 @@ import java.lang.ref.Reference;
 import java.lang.ref.ReferenceQueue;
 
 /**
- * @keyword ref X_ipf_bug_6361
+ * @keyword XXX ref X_ipf_bug_6361
  */
 public class PhantomReferenceQueueTest {
 
