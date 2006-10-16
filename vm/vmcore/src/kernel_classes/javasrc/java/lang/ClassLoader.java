@@ -240,19 +240,20 @@ public abstract class ClassLoader {
      * @com.intel.drl.spec_ref 
      */
     public URL getResource(String name) {
+        String nm = name.toString();
         checkInitialized();
         URL foundResource = (parentClassLoader == null)
-            ? BootstrapLoader.findResource(name)
-            : parentClassLoader.getResource(name);
-        return foundResource == null ? findResource(name) : foundResource;
+            ? BootstrapLoader.findResource(nm)
+            : parentClassLoader.getResource(nm);
+        return foundResource == null ? findResource(nm) : foundResource;
     }
 
     /**
      * @com.intel.drl.spec_ref 
      */
     public InputStream getResourceAsStream(String name) {
+        URL foundResource = getResource(name);
         try {
-            URL foundResource = getResource(name);
             return foundResource.openStream();
         } catch (IOException e) {
         } catch (NullPointerException e) {
@@ -871,7 +872,38 @@ public abstract class ClassLoader {
         }
     }
 
-    private static final class SystemClassLoader {
+    private static final class SystemClassLoader extends URLClassLoader {
+
+        private boolean checkingPackageAccess = false;
+
+        private SystemClassLoader(URL[] urls, ClassLoader parent) {
+            super(urls, parent);
+        }
+        
+        @Override
+        protected java.security.PermissionCollection getPermissions(CodeSource codesource) {
+            java.security.PermissionCollection pc = super.getPermissions(codesource);
+            pc.add(org.apache.harmony.lang.RuntimePermissionCollection.EXIT_VM_PERMISSION); 
+            return pc;
+        }
+        
+        @Override
+        protected synchronized Class<?> loadClass(String className,
+                boolean resolveClass) throws ClassNotFoundException {
+            SecurityManager sm = System.getSecurityManager();
+            if (sm != null && !checkingPackageAccess) {
+                int index = className.lastIndexOf('.');
+                if (index > 0) { // skip if class is from a default package
+                    try {
+                        checkingPackageAccess = true;
+                        sm.checkPackageAccess(className.substring(0, index));
+                    } finally {
+                        checkingPackageAccess = false;
+                    }
+                }
+            }
+            return super.loadClass(className, resolveClass);
+        }
 
         private static URLClassLoader instance;
 
@@ -909,15 +941,8 @@ public abstract class ClassLoader {
                     assert false: e.toString();
                 }
             }
-            instance = URLClassLoader.newInstance((URL[])urlList
+            instance = new SystemClassLoader((URL[])urlList
                 .toArray(new URL[urlList.size()]), null);
-        }
-
-        /**
-         * This class contains static methods only. So it should not be
-         * instantiated.
-         */
-        private SystemClassLoader() {
         }
 
         public static ClassLoader getInstance() {

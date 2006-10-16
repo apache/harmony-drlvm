@@ -601,9 +601,6 @@ public final class Class<T> implements Serializable, AnnotatedElement, GenericDe
      * @com.intel.drl.spec_ref
      */
     public URL getResource(String resource) {
-        if (resource == null) {
-            return null;
-        }
         resource = getAbsoluteResource(resource);
         ClassLoader classLoader = VMClassRegistry.getClassLoader(this);
         return classLoader == null
@@ -615,9 +612,6 @@ public final class Class<T> implements Serializable, AnnotatedElement, GenericDe
      * @com.intel.drl.spec_ref
      */
     public InputStream getResourceAsStream(String resource) {
-        if (resource == null) {
-            return null;
-        }
         resource = getAbsoluteResource(resource);
         ClassLoader classLoader = VMClassRegistry.getClassLoader(this);
         return classLoader == null
