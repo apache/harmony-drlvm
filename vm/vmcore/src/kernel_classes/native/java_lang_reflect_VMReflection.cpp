@@ -190,7 +190,7 @@ static jobject invoke_primitive_method(JNIEnv* jenv, jobject obj, jclass declari
         ABORT("Unexpected java type");
     }
 
-    return wrap_primitive(jenv, result, (char)return_type);
+    return exn_raised() ? NULL : wrap_primitive(jenv, result, (char)return_type);
 }
 
 JNIEXPORT jobject JNICALL Java_java_lang_reflect_VMReflection_invokeMethod

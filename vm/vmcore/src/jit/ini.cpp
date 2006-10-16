@@ -25,6 +25,7 @@
 #include <assert.h>
 #include "ini.h"
 #include "environment.h"
+#include "exceptions.h"
 #include "open/em_vm.h"
 #include "jvmti_break_intf.h"
 
@@ -33,6 +34,7 @@ void
 vm_execute_java_method_array(jmethodID method, jvalue *result, jvalue *args) {
     // TODO: select jit which compiled the method
     assert(!hythread_is_suspend_enabled());
+    assert(!exn_raised());
     //FIXME integration
     //DEBUG_PUSH_LOCK(JAVA_CODE_PSEUDO_LOCK);
     assert(NULL != VM_Global_State::loader_env);
