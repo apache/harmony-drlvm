@@ -20,6 +20,7 @@
 
 #include "fspace.h"
 #include "../thread/collector.h"
+#include "../common/interior_pointer.h"
 
 static Boolean fspace_object_to_be_forwarded(Partial_Reveal_Object *p_obj, Fspace *fspace)
 {
@@ -221,6 +222,11 @@ static void collector_scan_remsets(Collector* collector)
   return;
 }
 
+static void update_relocated_refs(Collector* collector)
+{
+	update_rootset_interior_pointer();
+}
+
 static void trace_forward_fspace(Collector* collector) 
 {  
   GC* gc = collector->gc;
@@ -230,7 +236,7 @@ static void trace_forward_fspace(Collector* collector)
 
   space->remslot_sets->push_back(gc->root_set);
   collector_scan_remsets(collector);
-    
+  update_relocated_refs(collector);  
   reset_fspace_for_allocation(space);  
 
   return;

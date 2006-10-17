@@ -21,6 +21,7 @@
 #include "mspace_collect.h"
 #include "../thread/collector.h"
 #include "../trace_forward/fspace.h"
+#include "../common/interior_pointer.h"
 struct GC_Gen;
 Space* gc_get_nos(GC_Gen* gc);
 Space* gc_get_mos(GC_Gen* gc);
@@ -211,6 +212,7 @@ static void update_relocated_refs(Collector* collector)
   space_update_remsets((Fspace*)gc_get_nos(gc));
   
   /* FIXME:: interior table */
+  update_rootset_interior_pointer();
   return;
 }
 

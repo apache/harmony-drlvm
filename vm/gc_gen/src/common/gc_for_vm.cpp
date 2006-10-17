@@ -22,6 +22,8 @@
 
 #include "../gen/gen.h"
 
+#include "../common/interior_pointer.h"
+
 static GC* p_global_gc = NULL;
 
 void gc_init() 
@@ -108,4 +110,4 @@ unsigned int gc_time_since_last_gc()
 {  assert(0); return 0; }
 
 void gc_add_root_set_entry_interior_pointer (void **slot, int offset, Boolean is_pinned) 
-{  assert(0); }
+{	add_root_set_entry_interior_pointer(slot, offset, is_pinned); }
