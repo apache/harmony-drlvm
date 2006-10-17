@@ -84,7 +84,7 @@
 				AdditionalDependencies="harmonyvm.lib hythr.lib"
 				OutputFile="$(OutDir)/em.dll"
 				LinkIncremental="1"
-				AdditionalLibraryDirectories="&quot;$(ProjectDir)\..\..\..\win_ia32_msvc_debug\deploy\jre\bin\default&quot;;&quot;$(ProjectDir)\..\..\..\win_ia32_msvc_debug\semis\vm\hythr\_bin&quot;"
+				AdditionalLibraryDirectories="&quot;$(ProjectDir)\..\..\..\win_ia32_msvc_release\deploy\jre\bin\default&quot;;&quot;$(ProjectDir)\..\..\..\win_ia32_msvc_release\semis\vm\hythr\_bin&quot;"
 				GenerateDebugInformation="TRUE"
 				SubSystem="2"
 				OptimizeReferences="2"

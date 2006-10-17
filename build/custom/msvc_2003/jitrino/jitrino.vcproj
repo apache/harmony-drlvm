@@ -460,6 +460,9 @@
 				RelativePath="..\..\..\..\vm\jitrino\src\jet\jframe.h">
 			</File>
 			<File
+				RelativePath="..\..\..\..\vm\jitrino\src\jet\magics.cpp">
+			</File>
+			<File
 				RelativePath="..\..\..\..\vm\jitrino\src\jet\mib.cpp">
 			</File>
 			<File

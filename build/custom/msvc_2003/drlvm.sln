@@ -11,6 +11,10 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "port_encoder", "port_encode
 	ProjectSection(ProjectDependencies) = postProject
 	EndProjectSection
 EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "interpreter", "interpreter\interpreter.vcproj", "{C9FC1C2B-6440-4460-8889-48353D136D31}"
+	ProjectSection(ProjectDependencies) = postProject
+	EndProjectSection
+EndProject
 Global
 	GlobalSection(SolutionConfiguration) = preSolution
 		Debug = Debug
@@ -29,6 +33,10 @@ Global
 		{B89AC381-5594-4B8B-B6D8-FC6AD020F612}.Debug.Build.0 = Debug|Win32
 		{B89AC381-5594-4B8B-B6D8-FC6AD020F612}.Release.ActiveCfg = Release|Win32
 		{B89AC381-5594-4B8B-B6D8-FC6AD020F612}.Release.Build.0 = Release|Win32
+		{C9FC1C2B-6440-4460-8889-48353D136D31}.Debug.ActiveCfg = Debug|Win32
+		{C9FC1C2B-6440-4460-8889-48353D136D31}.Debug.Build.0 = Debug|Win32
+		{C9FC1C2B-6440-4460-8889-48353D136D31}.Release.ActiveCfg = Release|Win32
+		{C9FC1C2B-6440-4460-8889-48353D136D31}.Release.Build.0 = Release|Win32
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 	EndGlobalSection
