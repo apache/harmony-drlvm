@@ -286,6 +286,22 @@ const char *args[][2] =
  "Note: you may need to pass -XcleanupOnExit to VM to view the stats.   \n"
 },
 #endif  // ~JIT_STATS
+
+{"wb4c", 
+ "type: bool; default: off; scope: method                               \n"
+ "Generates code with write barriers (C-based GC).                      \n"
+
+},
+{"wb4c.skip_statics", 
+"type: bool; default: TRUE; scope: method                               \n"
+"If true (default) then do NOT report PUTSTATIC into write barrier.     \n"
+},
+
+{"wb4j", 
+"type: bool; default: off; scope: method                                \n"
+"Generates code with write barriers (Java-based GC).                    \n"
+},
+
 //-------------------------------------------------------------------------
 // "                                                                      \n"
 // "                                                                      \n"

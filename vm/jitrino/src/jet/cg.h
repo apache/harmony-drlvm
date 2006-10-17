@@ -457,6 +457,16 @@ public:
      * For debugging only.
      */
     void gen_dbg_rt(bool save_regs, const char * fmt, ...);
+
+    
+    /**
+     * The opcode may be one of AASTORE, PUTFIELD or PUTSTATIC.
+     *
+     * For AASTORE \c fieldHandle must be \b NULL.
+     */
+    void gen_write_barrier(JavaByteCodes opcode, Field_Handle fieldHandle);
+
+
     /**
      * @brief Prints out an argument's (or return value's) type and value.
      *

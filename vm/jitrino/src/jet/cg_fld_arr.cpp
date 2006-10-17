@@ -129,6 +129,7 @@ void CodeGen::gen_arr_store(jtype jt, bool helperOk)
     vunref(jt);
     // stack: [.., aref, idx, val]
     if (jt == jobj && helperOk) {
+        gen_write_barrier(m_curr_inst->opcode, NULL);
         static const CallSig cs_aastore(CCONV_HELPERS, jobj, i32, jobj);
         unsigned stackFix = gen_stack_to_args(true, cs_aastore, 0);
 #ifdef _EM64T_
@@ -237,6 +238,11 @@ void CodeGen::do_field_op(JavaByteCodes opcode, jtype jt, Field_Handle fld)
     if (!get && compilation_params.exe_notify_field_modification)  {
         gen_modification_watchpoint(opcode, jt, fld);
     }
+
+    if (!get) {
+        gen_write_barrier(opcode, fld);
+    }
+
     
     Opnd where;
     if (field_op) {

@@ -25,6 +25,7 @@
  
 #include "cg.h"
 #include "trace.h"
+#include "jit_runtime_support.h"
 
 namespace Jitrino {
 namespace Jet {
@@ -297,4 +298,141 @@ void CodeGen::pop_all_state(BBState* saveBB) {
 //
 }
 
+void CodeGen::gen_write_barrier(JavaByteCodes opcode, Field_Handle fieldHandle)
+{
+    //
+    // TODO: the WB implementation is expected to perform the write
+    // so, we can skip the code e.g. AASTORE after the succesfull
+    // write barrier.
+    //
+    const bool doGenWB4J = get_bool_arg("wb4j", false);
+    const bool doGenWB4C = get_bool_arg("wb4c", false);
+
+    bool doWB = compilation_params.exe_insert_write_barriers;
+    doWB = doWB || doGenWB4J || doGenWB4C;
+    
+    // No request to generate WBs - nothing to do
+    if (!doWB) {
+        return;
+    }
+
+    if (doGenWB4J && doGenWB4C) {
+        // Can't have both 
+        assert(false);
+        return;
+    }
+
+    if (doGenWB4J) {
+        assert(false && "Sorry, not implemented yet.");
+        return;
+    }
+    
+    if (m_jframe->top() != jobj) {
+        // Item on top is not Object - GC does not care, nothing to do.
+        return;
+    }
+
+    if ((opcode == OPCODE_PUTFIELD || opcode == OPCODE_PUTSTATIC) && 
+         fieldHandle == NULL) {
+        // Resolution error ? - nothing to report
+        return;
+    }
+    const bool wb4c_skip_statics = get_bool_arg("wb4c.skip_statics", true);
+    if (doGenWB4C && (opcode == OPCODE_PUTSTATIC) && wb4c_skip_statics) {
+        // Currently, in DRLVM, statics are allocated outside of GC heap, 
+        // no need to report them
+        return;        
+    }
+
+    // WB4C has the following signature:
+    //(object written to, slot written to, value written to slot)
+    static const CallSig wb4c_sig(CCONV_CDECL, jobj, jobj, jobj);
+    //static char* wb4c_helper = xxx_gc_heap_slot_write_ref
+    static char* wb4c_helper = (char*)vm_get_rt_support_addr(VM_RT_GC_HEAP_WRITE_REF);
+
+    if (doGenWB4C && (NULL == wb4c_helper)) {
+        // WB4C requested, but VM knows nothing about such helper
+        assert(false);
+        return;
+    }
+    // WB4J has the following signature:
+    //(object written to, slot written to, value written to slot, metaA, metaB, mode)
+    static const CallSig wb4j_sig(CCONV_CDECL, jobj, jobj, jobj, i32, i32, i32);
+    static char* wb4j_helper = NULL;
+    
+    const CallSig& csig = doGenWB4C ? wb4c_sig : wb4j_sig;
+    void* wb_helper = doGenWB4C ? wb4c_helper : wb4j_helper;
+    
+    Val baseObject, slotAddress, value;
+    // operand stack for ASTORE:    arr, idx, ref
+    // operand stack for PUTFIELD:  base, ref
+    // operand stack for PUTSTATIC: ref
+    rlock(csig);
+    if (is_set(DBG_TRACE_CG)) { dbg(";;> write.barrier\n"); }
+    
+    int mode = -1;
+    
+    if (opcode == OPCODE_PUTFIELD) {
+        //
+        mode = 0;
+        //
+        unsigned f_offset = field_get_offset(fieldHandle);
+        baseObject = vstack(1, true);
+        rlock(baseObject);
+        slotAddress = Val(jobj, valloc(jobj));
+        Opnd address(jobj, baseObject.reg(), f_offset);
+        lea(slotAddress.as_opnd(), address);
+        rlock(slotAddress);
+    }
+    else if (opcode == OPCODE_PUTSTATIC) {
+        //
+        mode = 1;
+        //
+        baseObject = Val(jobj, NULL_REF);
+        rlock(baseObject);
+        void* fieldAddress = field_get_addr(fieldHandle);
+        slotAddress = Opnd(jobj, (jlong)(int_ptr)fieldAddress);
+        rlock(slotAddress);
+    }
+    else if (opcode == OPCODE_AASTORE) {
+        //
+        mode = 2;
+        //
+        baseObject = vstack(2, true);
+        rlock(baseObject);
+        
+        const Val& idx = vstack(1, vis_mem(1));
+        
+        AR base = baseObject.reg();
+        jtype jt = jobj;
+        int disp = jtypes[jt].rt_offset + (idx.is_imm() ? jtypes[jt].size*idx.ival() : 0);
+        AR index = idx.is_imm() ? ar_x : idx.reg();
+        unsigned scale = idx.is_imm() ? 0 : jtypes[jt].size;
+        slotAddress = Val(jobj, valloc(jobj));
+        Opnd address(jobj, base, disp, index, scale);
+        lea(slotAddress.as_opnd(), address);
+        rlock(slotAddress);
+    }
+    else {
+        // must not happen
+        assert(false);
+        return;
+    }
+
+    value = vstack(0);
+    runlock(slotAddress);
+    runlock(baseObject);
+    
+    Val modeArg((int)mode);
+    Val metaAArg((int)0);
+    Val metaBArg((int)0);
+    
+    gen_args(csig, 0, &baseObject, &slotAddress, &value,  &metaAArg, &metaBArg, &modeArg);
+    // according to contract with CG guys, the WB code neither 
+    // throws an exception nor may lead to GC - may use gen_call_novm.
+    runlock(csig);
+//gen_brk();
+    gen_call_novm(csig, wb_helper, csig.count());
+    if (is_set(DBG_TRACE_CG)) { dbg(";;> ~write.barrier\n"); }
+}
 }}; // ~namespace Jitrino::Jet

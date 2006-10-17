@@ -432,7 +432,7 @@ JIT_Result Compiler::compile(Compile_Handle ch, Method_Handle method,
     }
 
     const unsigned total_code_size = m_codeStream.size();
-        
+
     if (m_bEmulation) {
         m_vmCode = (char*)malloc(total_code_size);
     }

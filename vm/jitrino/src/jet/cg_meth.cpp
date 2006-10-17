@@ -845,6 +845,14 @@ void CodeGen::gen_args(const CallSig& cs, unsigned idx, const Val * parg0,
     
     const Val* args[] = {parg0, parg1, parg2, parg3, parg4, parg5, parg6};
     unsigned steps = min((int)COUNTOF(args), (int)cs.count()-(int)idx);
+    // 1st, lock'em all
+    for (unsigned i=0; i<steps; i++) {
+        if (args[i] == 0) {
+            break;
+        }
+        rlock(*args[0]);
+    }
+    // 2nd, generate moves
     for (unsigned i=0; i<steps; i++) {
         if (args[i] == 0) {
             break;
@@ -852,6 +860,8 @@ void CodeGen::gen_args(const CallSig& cs, unsigned idx, const Val * parg0,
         unsigned id = idx + i;
         Opnd arg = cs.get(id);
         do_mov(arg, *args[i]);
+        // 3d, unlock when not needed anymore
+        runlock(*args[0]);
     }
 }
 

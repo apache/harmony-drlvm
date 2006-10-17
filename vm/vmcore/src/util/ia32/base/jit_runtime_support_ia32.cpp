@@ -1246,7 +1246,8 @@ void *vm_get_rt_support_addr(VM_RT_SUPPORT f)
     case VM_RT_IREM:
     case VM_RT_CHAR_ARRAYCOPY_NO_EXC:
         return get_generic_rt_support_addr_ia32(f);
-
+    case VM_RT_GC_HEAP_WRITE_REF:
+        return (void*)gc_heap_slot_write_ref;
     default:
         ABORT("Unexpected helper id");
         return 0;
