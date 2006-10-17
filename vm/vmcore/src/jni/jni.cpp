@@ -1081,6 +1081,26 @@ jboolean JNICALL IsInstanceOf(JNIEnv *env,
     }
 } //IsInstanceOf
 
+static bool
+check_is_jstring_class(jstring string)
+{
+#ifndef NDEBUG
+    ObjectHandle h = (ObjectHandle)string;
+
+    tmn_suspend_disable();       //---------------------------------v
+
+    ObjectHandle new_handle = oh_allocate_local_handle();
+    ManagedObject *jlo = h->object;
+    assert(jlo);
+    assert(jlo->vt());
+    Class *clss = jlo->vt()->clss;
+    tmn_suspend_enable();        //---------------------------------^
+    return clss == VM_Global_State::loader_env->JavaLangString_Class;
+#else
+    return true;
+#endif // !NDEBUG
+}
+
 jstring JNICALL NewString(JNIEnv * UNREF env,
                           const jchar *unicodeChars,
                           jsize length)
@@ -1095,7 +1115,9 @@ jsize JNICALL GetStringLength(JNIEnv * UNREF env,
 {
     TRACE2("jni", "GetStringLength called");
     assert(hythread_is_suspend_enabled());
-    if(!string) return 0;
+    if(!string)
+        return 0;
+    assert(check_is_jstring_class(string));
     return string_get_length_h((ObjectHandle)string);
 } //GetStringLength
 
@@ -1105,7 +1127,9 @@ const jchar *JNICALL GetStringChars(JNIEnv * UNREF env,
 {
     TRACE2("jni", "GetStringChars called");
     assert(hythread_is_suspend_enabled());
-    assert(string);
+    if(!string)
+        return 0;
+    assert(check_is_jstring_class(string));
 
     tmn_suspend_disable();
     ManagedObject* str = ((ObjectHandle)string)->object;
@@ -1116,10 +1140,13 @@ const jchar *JNICALL GetStringChars(JNIEnv * UNREF env,
 } //GetStringChars
 
 void JNICALL ReleaseStringChars(JNIEnv * UNREF env,
-                                jstring UNREF string,
+                                jstring string,
                                 const jchar *chars)
 {
     TRACE2("jni", "ReleaseStringChars called");
+    if(!string)
+        return;
+    assert(check_is_jstring_class(string));
     assert(hythread_is_suspend_enabled());
     STD_FREE((void*)chars);
 } //ReleaseStringChars
@@ -1136,6 +1163,9 @@ jsize JNICALL GetStringUTFLength(JNIEnv * UNREF env,
                                  jstring string)
 {
     TRACE2("jni", "GetStringUTFLength called");
+    if(!string)
+        return 0;
+    assert(check_is_jstring_class(string));
     assert(hythread_is_suspend_enabled());
     return string_get_utf8_length_h((ObjectHandle)string);
 } //GetStringUTFLength
@@ -1145,19 +1175,23 @@ const char *JNICALL GetStringUTFChars(JNIEnv * UNREF env,
                                       jboolean *isCopy)
 {
     TRACE2("jni", "GetStringUTFChars called");
-    assert(hythread_is_suspend_enabled());
     if(!string)
         return 0;
+    assert(check_is_jstring_class(string));
+    assert(hythread_is_suspend_enabled());
     const char* res = string_get_utf8_chars_h((ObjectHandle)string);
     if (isCopy) *isCopy = JNI_TRUE;
     return res;
 } //GetStringUTFChars
 
 void JNICALL ReleaseStringUTFChars(JNIEnv * UNREF env,
-                                   jstring UNREF string,
+                                   jstring string,
                                    const char *utf)
 {
     TRACE2("jni", "ReleaseStringUTFChars called");
+    if(!string)
+        return;
+    assert(check_is_jstring_class(string));
     assert(hythread_is_suspend_enabled());
     STD_FREE((void*)utf);
 } //ReleaseStringUTFChars
