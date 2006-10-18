@@ -26,6 +26,7 @@
 #include "cg.h"
 #include "trace.h"
 #include "jit_runtime_support.h"
+#include "jit_intf.h"
 
 namespace Jitrino {
 namespace Jet {
@@ -305,38 +306,34 @@ void CodeGen::gen_write_barrier(JavaByteCodes opcode, Field_Handle fieldHandle)
     // so, we can skip the code e.g. AASTORE after the succesfull
     // write barrier.
     //
-    const bool doGenWB4J = get_bool_arg("wb4j", false);
-    const bool doGenWB4C = get_bool_arg("wb4c", false);
-
-    bool doWB = compilation_params.exe_insert_write_barriers;
-    doWB = doWB || doGenWB4J || doGenWB4C;
-    
-    // No request to generate WBs - nothing to do
-    if (!doWB) {
-        return;
-    }
-
-    if (doGenWB4J && doGenWB4C) {
-        // Can't have both 
-        assert(false);
-        return;
-    }
-
-    if (doGenWB4J) {
-        assert(false && "Sorry, not implemented yet.");
-        return;
-    }
-    
     if (m_jframe->top() != jobj) {
         // Item on top is not Object - GC does not care, nothing to do.
         return;
     }
 
+    const bool doGenWB4J = get_bool_arg("wb4j", false);
+    const bool doGenWB4C = 
+        (get_bool_arg("wb4c", false) || 
+        // .exe_insert_write_barriers presumed to be WB4C
+        compilation_params.exe_insert_write_barriers) &&
+        !doGenWB4J;
+    //  ^^^^^
+    // When GC requires WBs, then VM always sets .exe_insert_write_barriers
+    // May have conflict here - both doGenWB4J and doGenWB4C set. To avoid
+    // such conflict, here's the rule: 
+    // explicitly requested wb4j has a higher priority 
+    //
+    
+    // No request to generate WBs - nothing to do
+    if (!doGenWB4J && !doGenWB4C) {
+        return;
+    }
     if ((opcode == OPCODE_PUTFIELD || opcode == OPCODE_PUTSTATIC) && 
          fieldHandle == NULL) {
         // Resolution error ? - nothing to report
         return;
     }
+
     const bool wb4c_skip_statics = get_bool_arg("wb4c.skip_statics", true);
     if (doGenWB4C && (opcode == OPCODE_PUTSTATIC) && wb4c_skip_statics) {
         // Currently, in DRLVM, statics are allocated outside of GC heap, 
@@ -357,9 +354,64 @@ void CodeGen::gen_write_barrier(JavaByteCodes opcode, Field_Handle fieldHandle)
     }
     // WB4J has the following signature:
     //(object written to, slot written to, value written to slot, metaA, metaB, mode)
-    static const CallSig wb4j_sig(CCONV_CDECL, jobj, jobj, jobj, i32, i32, i32);
+    static const CallSig wb4j_sig(CCONV_MANAGED, jobj, jobj, jobj, i32, i32, i32);
     static char* wb4j_helper = NULL;
     
+
+    static const char wbKlassName[] = "org/mmtk/vm/Barriers";
+    static const char wbMethName[] = "performWriteInBarrier";
+    static const char wbMethSig[] = "("
+        "Lorg/vmmagic/unboxed/ObjectReference;"
+        "Lorg/vmmagic/unboxed/Address;"
+        "Lorg/vmmagic/unboxed/ObjectReference;"
+        "Lorg/vmmagic/unboxed/Offset;"
+        "II"
+        ")V";
+    static Class_Handle wbKlass = NULL;
+    static Method_Handle wbMeth = NULL;
+    static char* wbMethAddr = NULL;
+
+    if (doGenWB4J && NULL == wbMethAddr) {
+        wbKlass = class_load_class_by_name(wbKlassName, m_klass);
+            //class_find_class_from_loader(NULL, wbKlassName, true);
+        if (wbKlass != NULL) {
+            wbMeth = class_lookup_method_recursively(wbKlass, wbMethName, wbMethSig);
+        }
+        if (wbMeth != NULL) {
+            if (wbMeth != NULL) {
+                // Must pre-compile the method before a first usage.
+                // Otherwise, if the first usage is WB for PUTSTATIC, then
+                // address of the static field goes as 'slot' argument.
+                // When VM tries to compile the method, then it tries to 
+                // GC-protect args of the method, including this 'slot'.
+                // Statics lies outside of the GC heap, so we'll get an 
+                // assert that the reference is invalid.
+                vm_compile_method(m_hjit, wbMeth);
+                wbMethAddr = *(char**)method_get_indirect_address(wbMeth);
+            }
+        }
+        if (NULL == wbMethAddr) {
+            // Something terrible happened
+#ifdef _DEBUG
+            static bool printWarning = true;
+            if (printWarning) {
+                printWarning = false;
+                fprintf(stderr, 
+                    "*** WARNING: ***\n"
+                    "WB4J requested, but unable to find\n"
+                    "\t%s::%s(%s).\n"
+                    "(No WB code is generated at all)\n"
+                    "Did you put %s into *bootclasspath*?\n\n",
+                    wbKlassName, wbMethName, wbMethSig, wbKlassName);
+            }
+#endif
+            return;
+        }
+        //FIXME: This stores address statically - will not work in case of 
+        // writeBarrier method get recompiled!
+        wb4j_helper = wbMethAddr;
+    }
+
     const CallSig& csig = doGenWB4C ? wb4c_sig : wb4j_sig;
     void* wb_helper = doGenWB4C ? wb4c_helper : wb4j_helper;
     
