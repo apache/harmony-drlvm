@@ -13,15 +13,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# EM configuration file for JET-only mode of Jitrino
+# EM configuration file for Interpreter-only mode of VM
 
 chains=chain1
-chain1.jits=JET
-JET.file=jitrino
+chain1.jits=int
 
-#JIT options
--Djit.JET.path=
+int.file=interpreter
 
 
 #system properties
--Djava.compiler=jet
+-Djava.compiler=interpreter
+-Dvm.use_interpreter=true

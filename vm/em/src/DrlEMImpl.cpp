@@ -36,7 +36,6 @@
 #include <fstream>
 
 
-#define DEFAULT_INTERPRETER_DLL "interpreter"
 #define LOG_DOMAIN "em"
 
 #define EDGE_PROFILER_STR  "EDGE_PROFILER"
@@ -95,14 +94,15 @@ get_method_profile(EM_Handle _this, PC_Handle pch, Method_Handle mh) {
 
 
 
-RStep::RStep(JIT_Handle _jit, const std::string& _jitName, RChain* _chain)
-: jit(_jit), jitName(_jitName), catName(std::string(LOG_DOMAIN)+"."+_jitName), chain(_chain), loggingEnabled(false), enable_profiling(NULL) 
+RStep::RStep(JIT_Handle _jit, const std::string& _jitName, RChain* _chain, apr_dso_handle_t* _libHandle)
+: jit(_jit), jitName(_jitName), catName(std::string(LOG_DOMAIN)+"."+_jitName), 
+chain(_chain), loggingEnabled(false), enable_profiling(NULL),
+libHandle(_libHandle)
 {}
 
 
 //todo!! replace inlined strings with defines!!
-DrlEMImpl::DrlEMImpl() : jh(NULL), _execute_method(NULL), 
-        interpreterMode(false), jitTiMode(false) {
+DrlEMImpl::DrlEMImpl() : jh(NULL), _execute_method(NULL) {
     nMethodsCompiled=0;
     nMethodsRecompiled=0;
     tick=0;
@@ -316,17 +316,18 @@ static std::string readFile(const std::string& fileName) {
 std::string DrlEMImpl::readConfiguration() {
     std::string  configFileName = vm_get_property_value("em.properties");
     if (configFileName.empty()) {
-        configFileName = jitTiMode ? "ti" : "client";
+        bool jitTiMode = vm_get_property_value_boolean("vm.jvmti.enabled", false);
+        bool interpreterMode = vm_get_boolean_property_value_with_default("vm.use_interpreter");
+        configFileName = interpreterMode ? "interpreter" : (jitTiMode ? "ti" : "client");
     } 
-        if (!endsWith(configFileName, EM_CONFIG_EXT)) {
-            configFileName = configFileName+EM_CONFIG_EXT;
-        }
+    if (!endsWith(configFileName, EM_CONFIG_EXT)) {
+        configFileName = configFileName+EM_CONFIG_EXT;
+    }
 
-        if (configFileName.find('/') == configFileName.npos && configFileName.find('\\') == configFileName.npos ) {
-//  $$$ GMJ          std::string defaultConfigDir = vm_get_property_value("vm.boot.library.path");
-            std::string defaultConfigDir = vm_get_property_value("org.apache.harmony.vm.vmdir");
-            configFileName = defaultConfigDir + "/" + configFileName;
-        }
+    if (configFileName.find('/') == configFileName.npos && configFileName.find('\\') == configFileName.npos ) {
+        std::string defaultConfigDir = vm_get_property_value("org.apache.harmony.vm.vmdir");
+        configFileName = defaultConfigDir + "/" + configFileName;
+    }
     std::string config = readFile(configFileName);
     return config;
 }
@@ -335,28 +336,6 @@ std::string DrlEMImpl::readConfiguration() {
 // EM initialization methods
 
 bool DrlEMImpl::init() {
-    interpreterMode = vm_get_boolean_property_value_with_default("vm.use_interpreter");
-    jitTiMode = vm_get_property_value_boolean("vm.jvmti.enabled", false);
-    if (interpreterMode) {
-        apr_dso_handle_t* libHandle;
-        std::string interpreterLib = prepareLibPath(DEFAULT_INTERPRETER_DLL); 
-        jh = vm_load_jit(interpreterLib.c_str(), &libHandle);
-
-        if (jh == NULL) {
-            ECHO(("EM: Can't load EE library:" + interpreterLib).c_str());
-            return false;
-        }
-        apr_dso_handle_sym_t fn = NULL;
-        apr_dso_sym(&fn, libHandle, "JIT_execute_method");
-        _execute_method = (void(*)(JIT_Handle,jmethodID, jvalue*, jvalue*)) fn;
-        if (_execute_method==NULL) {
-            ECHO(("EM: Not a EE shared library: '" + std::string(interpreterLib) + "'").c_str());
-            return false;
-        }
-        RStep step(jh, "interpreter", NULL);
-        return initJIT(interpreterLib, libHandle, step);
-    }
-    //normal mode with recompilation chains..
     _execute_method = JIT_execute_method_default;
     std::string config = readConfiguration();
     if (!config.empty()) {
@@ -440,7 +419,7 @@ void DrlEMImpl::buildChains(std::string& config) {
                 failed = true;
                 break;
             }
-            RStep* step = new RStep(jh, jitName, chain);
+            RStep* step = new RStep(jh, jitName, chain, libHandle);
             step->loggingEnabled = loggingEnabled || is_info_enabled(step->catName.c_str());
             chain->steps.push_back(step);
 
@@ -474,6 +453,24 @@ void DrlEMImpl::buildChains(std::string& config) {
             }
         }
     }
+
+    //The next lines do the following:
+    //If we have only 1 execution engine in CFG - check if it have JIT_execute_method
+    //This way interpreter mode is supported today.
+    //This code must be refactored when mixed (JIT/interpreter) mode is implemented
+    if (!failed && chains.size()==1) {
+        RChain* chain = *chains.begin();
+        assert(chain->steps.size() > 0);
+        RStep* step = *chain->steps.begin();
+        
+        apr_dso_handle_sym_t fn = NULL;
+        apr_dso_sym(&fn, step->libHandle, "JIT_execute_method");
+        if (fn!=NULL) {
+            _execute_method = (void(*)(JIT_Handle,jmethodID, jvalue*, jvalue*)) fn;    
+        }
+    }
+
+
     if (failed) {
         deallocateResources();
     }
@@ -767,5 +764,6 @@ void DrlEMImpl::tbsTimeout() {
 int DrlEMImpl::getTbsTimeout() const {
     return 100;
 }   
+
 
 

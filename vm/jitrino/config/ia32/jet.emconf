@@ -22,3 +22,6 @@ JET.file=jitrino
 # Options to be passed to JIT
 
 -Djit.JET.path=
+
+#system properties
+-Djava.compiler=jet

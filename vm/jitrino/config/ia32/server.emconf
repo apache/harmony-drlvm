@@ -74,3 +74,7 @@ SD2_OPT.useProfile=EDGE_PROF
 -Djit.SD2_OPT.arg.codegen.dce1.early=yes
 -Djit.SD2_OPT.arg.codegen.regalloc.bp_regalloc1.regs=ALL_GP
 -Djit.SD2_OPT.arg.codegen.regalloc.bp_regalloc2.regs=ALL_XMM
+
+
+#system properties
+-Djava.compiler=server

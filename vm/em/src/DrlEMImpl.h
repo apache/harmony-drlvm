@@ -45,13 +45,14 @@ typedef std::vector<RStep*> RSteps;
 /** Recompilation step. One recompilation chain can have 1 or more recompilation steps */
 class RStep {
 public:
-    RStep(JIT_Handle _jit, const std::string& _jitName, RChain* _chain);
+    RStep(JIT_Handle _jit, const std::string& _jitName, RChain* _chain, apr_dso_handle_t* _libHandle);
     virtual ~RStep(){}
    
     JIT_Handle jit;
     std::string jitName, catName;
     RChain* chain;
     bool loggingEnabled;
+    apr_dso_handle_t* libHandle;
 
     bool (*enable_profiling)(JIT_Handle, PC_Handle, EM_JIT_PC_Role);
 };
@@ -117,8 +118,6 @@ private:
     
     JIT_Handle jh;
     void (*_execute_method) (JIT_Handle jit, jmethodID method, jvalue *return_value, jvalue *args);
-    bool interpreterMode;
-    bool jitTiMode;
     RChains chains;
     size_t nMethodsCompiled, nMethodsRecompiled;
     

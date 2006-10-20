@@ -44,3 +44,7 @@ CS_OPT.file=jitrino
 
 #-Djit.CS_OPT.arg.log.irdump.file=log/%jit%/%log%/%seqnb%_%class%.%method%.log
 #-Djit.CS_OPT.arg.log=ct,ir,irdump,all
+
+
+#system properties
+-Djava.compiler=client static

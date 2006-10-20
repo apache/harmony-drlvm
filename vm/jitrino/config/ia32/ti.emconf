@@ -21,3 +21,7 @@ JET_TI.file=jitrino
 
 #JIT options
 -Djit.JET_TI.path=
+
+
+#system properties
+-Djava.compiler=jet ti

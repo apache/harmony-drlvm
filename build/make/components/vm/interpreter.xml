@@ -162,5 +162,17 @@ Version: $Revision: 1.3.2.3 $
             <libset libs="${vm.vmcore.lib}" dir="${vm.vmcore.libdir}" />
            <libset libs="${vm.hythr.lib}" dir="${vm.hythr.libdir}" />
         </linker>
+
+        <echo message="Copying the configuration interpreter files..."/>
+
+        <mkdir dir="${build.semi.dir}/vm/interpreter/_other"/> 
+        <copy todir="${build.semi.dir}/vm/interpreter/_other" 
+              flatten="true" 
+              includeEmptyDirs="false">
+              <fileset dir="${build.VM.home}/interpreter">
+                   <include name="interpreter.emconf" />
+              </fileset>
+        </copy>
+
     </target>
 </project>

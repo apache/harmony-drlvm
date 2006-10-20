@@ -39,6 +39,7 @@ Description of the product deploy folder.
 
         <interpreter>
             <shared>bin/default:interpreter</shared>
+            <other>bin/default:*</other>
         </interpreter>
 
         <jitrino>
