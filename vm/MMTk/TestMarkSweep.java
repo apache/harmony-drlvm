@@ -21,7 +21,7 @@ import org.mmtk.vm.*;
 import org.mmtk.plan.nogc.*;
 import org.mmtk.plan.Plan;
 import org.mmtk.plan.CollectorContext;
-import org.mmtk.utility.heap.LazyMmapper;
+// toss import org.mmtk.utility.heap.Mmapper;
 import org.mmtk.plan.MutatorContext;
 import org.mmtk.plan.marksweep.MS;
 import org.mmtk.utility.options.*;
@@ -42,7 +42,7 @@ public class TestMarkSweep
         pl2.boot();
         pl.fullyBooted();
         org.apache.HarmonyDRLVM.mm.mmtk.SynchronizedCounter.boot();
-        LazyMmapper.boot(Address.zero(), 0 );
+        // toss Mmapper.boot(Address.zero(), 0 );
         HeapGrowthManager.boot(Extent.fromInt(1024*1024*1), Extent.fromInt(1024*1024*1) ); //set the java heap very small to force collections
 
         TestMarkSweep.mc = SelectedPlan.ap.mutator();
@@ -169,7 +169,7 @@ public class TestMarkSweep
 
             Object obj2 = or2.toObject();
 
-            //System.out.println(obj2 + " " + obj2.hashCode() );
+            if ( (kk % 200000) == 0) System.out.println("TestMarkSweep.singleRootTest(), obj2 = " + obj2 + " " + obj2.hashCode() );
         }
         addrElementZero = addr.plus(12);
         addrElementZero.store(addr);  // stuff the _address_ of the array into an element to test enumeration

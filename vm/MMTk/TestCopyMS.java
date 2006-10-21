@@ -20,7 +20,7 @@ import org.apache.HarmonyDRLVM.mm.mmtk.*;
 import org.mmtk.vm.*;
 import org.mmtk.plan.Plan;
 import org.mmtk.plan.CollectorContext;
-import org.mmtk.utility.heap.LazyMmapper;
+// toss import org.mmtk.utility.heap.LazyMmapper;
 import org.mmtk.plan.MutatorContext;
 ////////////import org.mmtk.plan.marksweep.MS;
 //////////import org.mmtk.plan.nogc.*;
@@ -46,7 +46,7 @@ public class TestCopyMS
         pl2.boot();
         pl.fullyBooted();
         org.apache.HarmonyDRLVM.mm.mmtk.SynchronizedCounter.boot();
-        LazyMmapper.boot(Address.zero(), 0 );
+        // toss LazyMmapper.boot(Address.zero(), 0 );
         HeapGrowthManager.boot(Extent.fromInt(1024*1024*1), Extent.fromInt(1024*1024*1) ); //set the java heap very small to force collections
 
         TestCopyMS.mc = SelectedPlan.ap.mutator();
