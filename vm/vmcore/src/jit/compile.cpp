@@ -427,8 +427,10 @@ NativeCodePtr compile_create_lil_jni_stub(Method_Handle method, void* func, Nati
     // Setup outputs, set JNIEnv, set class/this handle
     cs = lil_parse_onto_end(cs,
                             "out jni:%0j;"
-                            "o0=%1i; o1=l0+%2i;",
-                            method, jni_native_intf, oh_get_handle_offset(0));
+                            "l1=ts;"
+                            "ld o0,[l1 + %1i:pint];"
+                            "o1=l0+%2i;",
+                            method, APR_OFFSETOF(VM_thread, jni_env), oh_get_handle_offset(0));
     assert(cs);
 
     // Loop over arguments proper, setting rest of outputs

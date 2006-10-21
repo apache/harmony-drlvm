@@ -373,7 +373,7 @@ void exn_rethrow_if_pending()
 inline void exn_java_print_stack_trace(FILE * UNREF f, jthrowable exc)
 {
     // finds java environment
-    JNIEnv *jenv = jni_native_intf;
+    JNIEnv *jenv = p_TLS_vmthread->jni_env;
 
     // finds class of Throwable
     jclass throwableClazz = FindClass(jenv, VM_Global_State::loader_env->JavaLangThrowable_String);
@@ -389,7 +389,7 @@ inline void exn_jni_print_stack_trace(FILE * f, jthrowable exc)
 {
     assert(hythread_is_suspend_enabled());
     // finds java environment
-    JNIEnv *jenv = jni_native_intf;
+    JNIEnv *jenv = p_TLS_vmthread->jni_env;
 
     // finds class of Throwable
     jclass throwableClazz = FindClass(jenv, VM_Global_State::loader_env->JavaLangThrowable_String);

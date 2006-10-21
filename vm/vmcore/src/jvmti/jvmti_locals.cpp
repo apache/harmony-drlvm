@@ -37,6 +37,8 @@
 #include "stack_trace.h"
 #include "jit_intf_cpp.h"
 
+#define jvmti_test_jenv (p_TLS_vmthread->jni_env)
+
 /*
  * Local Variable functions:
  *
@@ -59,8 +61,6 @@
  *
  * OPTIONAL Functionality
  */
-
-static JNIEnv * jvmti_test_jenv = jni_native_intf;
 
 static jvmtiError
 GetLocal_checkArgs(jvmtiEnv* env,

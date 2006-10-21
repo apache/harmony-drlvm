@@ -200,7 +200,7 @@ void gen_native_readinternal(Emitter_Handle h, Method *m)
     char * UNUSED stub = s;
 
     s = alu(s, sub_opc,  esp_opnd,  Imm_Opnd(24));
-    s = mov(s,  M_Base_Opnd(esp_reg, 0),  Imm_Opnd((int)jni_native_intf)) ; // o0=jni_native_intf
+    s = mov(s,  M_Base_Opnd(esp_reg, 0),  Imm_Opnd((int)p_TLS_vmthread->jni_env)) ; // o0=jni_native_intf
     s = mov(s,  eax_opnd,  M_Base_Opnd(esp_reg, 44)) ; // o1=i0
     s = mov(s,  M_Base_Opnd(esp_reg, 4),  eax_opnd) ;
     s = mov(s,  eax_opnd,  M_Base_Opnd(esp_reg, 40)) ; // o2=i1

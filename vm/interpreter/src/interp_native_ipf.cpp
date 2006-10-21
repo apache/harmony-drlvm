@@ -97,7 +97,7 @@ interpreter_execute_native_method(
 
     int argId = 0;
     int pos = 0;
-    arg_words[argId++] = (uword) jni_native_intf;
+    arg_words[argId++] = (uword) get_jni_native_intf();
 
     jobject _this;
     if (method->is_static()) {
@@ -288,7 +288,7 @@ interpreterInvokeStaticNative(StackFrame& prevFrame, StackFrame& frame, Method *
     char *fptypes = (char*)&fpargs[6];
     int nfpargs = 0;
 
-    args[0] = (uword) jni_native_intf;
+    args[0] = (uword) get_jni_native_intf();
     args[1] = (uword) &frame.This; 
     int argId = 2;
     int pos = sz - 1;
@@ -555,7 +555,7 @@ interpreterInvokeVirtualNative(StackFrame& prevFrame, StackFrame& frame, Method 
     char *fptypes = (char*)&fpargs[6];
     int nfpargs = 0;
 
-    args[0] = (uword) jni_native_intf;
+    args[0] = (uword) get_jni_native_intf();
     args[1] = (uword) &frame.This;
     int argId = 2;
     int pos = sz - 2;

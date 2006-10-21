@@ -97,7 +97,8 @@ int readinternal_override_lil(JNIEnv *jenv,
 
 LilCodeStub* nso_readinternal(LilCodeStub* cs, Method_Handle)
 {
-    cs = lil_parse_onto_end(cs, "out platform:pint,ref,g4,ref,g4,g4:g4; o0=%0i;", jni_native_intf);
+    cs = lil_parse_onto_end(cs, "out platform:pint,ref,g4,ref,g4,g4:g4; o0=%0i;",
+        p_TLS_vmthread->jni_env);
     cs = lil_parse_onto_end(cs, "o1=i0; o2=i1; o3=i2; o4=i3; o5=i4;");
     cs = lil_parse_onto_end(cs, "call %0i; ret;", readinternal_override_lil);
     assert(cs);

@@ -590,7 +590,7 @@ jint load_xrun(Agent *agent, const char *str, JavaVM_Internal *vm)
     return result;
 }
 
-jint DebugUtilsTI::Init()
+jint DebugUtilsTI::Init(JavaVM *vm)
 {
     phase = JVMTI_PHASE_ONLOAD;
     Agent* agent = this->getAgents();
@@ -614,8 +614,6 @@ jint DebugUtilsTI::Init()
     else
     {
         status = true;
-        JavaVM_Internal *vm;
-        jni_native_intf->GetJavaVM((JavaVM**)&vm);
         // FIXME: workaround to let get_vm_thread_ptr_safe function and other JNI code
         // to work in OnLoad phase
         NativeObjectHandles noh;
@@ -631,11 +629,11 @@ jint DebugUtilsTI::Init()
 
             current_loading_agent = agent;
             if (strncmp(str, "-agentpath:",  11) == 0)
-                result = load_agentpath(agent, str, vm);
+                result = load_agentpath(agent, str, (JavaVM_Internal*)vm);
             else if (strncmp(str, "-agentlib:", 10) == 0)
-                result = load_agentlib(agent, str, vm);
+                result = load_agentlib(agent, str, (JavaVM_Internal*)vm);
             else if (strncmp(str, "-Xrun:", 5) == 0)
-                result = load_xrun(agent, str, vm);
+                result = load_xrun(agent, str, (JavaVM_Internal*)vm);
             else
                 DIE("Unknown agent loading option " << str);
             current_loading_agent = NULL;
@@ -654,11 +652,8 @@ jint DebugUtilsTI::Init()
 
 /* Calls Agent_OnUnlod() for agents where it was found, then unloads agents.
 */
-void DebugUtilsTI::Shutdown()
+void DebugUtilsTI::Shutdown(JavaVM *vm)
 {
-    JavaVM *vm;
-    jni_native_intf->GetJavaVM(&vm);
-
     Agent* agent = this->getAgents();
 
     while (agent != NULL)

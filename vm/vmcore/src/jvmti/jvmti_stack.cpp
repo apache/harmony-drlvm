@@ -37,7 +37,7 @@
 #include "jit_intf_cpp.h"
 #include "thread_manager.h"
 
-static JNIEnv * jvmti_test_jenv = jni_native_intf;
+#define jvmti_test_jenv (p_TLS_vmthread->jni_env)
 
 jthread getCurrentThread() {
     tmn_suspend_disable();
@@ -595,7 +595,7 @@ jvmtiPopFrame(jvmtiEnv* env,
     }
 
     // check error condition: JVMTI_ERROR_THREAD_NOT_SUSPENDED
-    JNIEnv *jni_env = (JNIEnv *)jni_native_intf;
+    JNIEnv *jni_env = p_TLS_vmthread->jni_env;
     jthread curr_thread = getCurrentThread();
     if (jni_env->IsSameObject(thread,curr_thread)
             || ((state & JVMTI_THREAD_STATE_SUSPENDED) == 0)) {
@@ -818,7 +818,7 @@ jvmtiNotifyFramePop(jvmtiEnv* env,
     }
 
     // check error condition: JVMTI_ERROR_THREAD_NOT_SUSPENDED
-    JNIEnv *jni_env = (JNIEnv *)jni_native_intf;
+    JNIEnv *jni_env = p_TLS_vmthread->jni_env;
     if (!jni_env->IsSameObject(thread,curr_thread)
             && ((state & JVMTI_THREAD_STATE_SUSPENDED) == 0)) {
         return JVMTI_ERROR_THREAD_NOT_SUSPENDED;

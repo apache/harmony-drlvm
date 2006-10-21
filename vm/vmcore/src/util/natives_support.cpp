@@ -113,7 +113,7 @@ static char* name_list[] =
 
         assert(onload_func);
 
-        JavaVM* vm = jni_get_java_vm(jni_native_intf); // FIXME ???? Can we use it here ????
+        JavaVM* vm = jni_get_java_vm(p_TLS_vmthread->jni_env); // FIXME ???? Can we use it here ????
 
         assert(hythread_is_suspend_enabled());
         jint res = onload_func(vm, NULL);
@@ -150,7 +150,7 @@ static char* name_list[] =
 
         assert(onunload_func);
 
-        JavaVM* vm = jni_get_java_vm(jni_native_intf); // FIXME ???? Can we use it here ????
+        JavaVM* vm = jni_get_java_vm(p_TLS_vmthread->jni_env); // FIXME ???? Can we use it here ????
 
         assert(hythread_is_suspend_enabled());
         onunload_func(vm, NULL);

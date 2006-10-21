@@ -267,11 +267,6 @@ interpreter_ti_setObject(
     return JVMTI_ERROR_NONE;
 }
 
-/*
- *  Looks like no way to get JNIEnv from jvmtiEnv, strange.
- */
-static JNIEnv * UNUSED jvmti_test_jenv = get_jni_native_intf();
-
 jvmtiError
 interpreter_ti_getStackTrace(
         jvmtiEnv * UNREF env,

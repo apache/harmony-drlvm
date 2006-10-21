@@ -1812,7 +1812,7 @@ Class* UserDefinedClassLoader::LoadClass(Global_Env* env, const String* classNam
                      "NoClassDefFoundError for " << className->bytes);
                 exn_clear();
                 jthrowable new_exn = CreateNewThrowable(
-                    (JNIEnv*)jni_native_intf,
+                    p_TLS_vmthread->jni_env,
                     env->java_lang_NoClassDefFoundError_Class, 
                     className->bytes, exn);
                 if (new_exn) {

@@ -132,7 +132,7 @@ jvmtiGetFieldDeclaringClass(jvmtiEnv* env,
     Class* cls = reinterpret_cast<Field*>(field)->get_class();
 
     ObjectHandle hclss = struct_Class_to_java_lang_Class_Handle(cls);
-    ObjectHandle newH = NewLocalRef(jni_native_intf, hclss);
+    ObjectHandle newH = NewLocalRef(p_TLS_vmthread->jni_env, hclss);
 
     *declaring_class_ptr = (jclass)newH;
 

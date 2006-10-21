@@ -94,7 +94,9 @@ void vm_exit(int exit_code)
      * problems are fixed                                                                  *
      * FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME */
     // call Agent_OnUnload() for agents and unload agents
-    vm_env->TI->Shutdown();
+    JavaVM *java_vm;
+    jni_env->GetJavaVM(&java_vm);
+    vm_env->TI->Shutdown(java_vm);
 
     // Raise uncaught exception to current thread.
     // It will be properly processed in jthread_detach().

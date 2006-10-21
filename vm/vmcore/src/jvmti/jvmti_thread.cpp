@@ -44,7 +44,7 @@
 
 
 #define MAX_JVMTI_ENV_NUMBER 10
-static JNIEnv * jvmti_test_jenv = jni_native_intf;
+#define jvmti_test_jenv (p_TLS_vmthread->jni_env)
 
 /*
  * Get Thread State
@@ -130,7 +130,7 @@ jvmtiGetAllThreads(jvmtiEnv* env,
         return err; 
     } 
     for (i=0;i<java_thread_count;i++)    {
-        java_threads[i]=jni_native_intf->NewLocalRef(jthread_iterator_next(&iterator));
+        java_threads[i]=p_TLS_vmthread->jni_env->NewLocalRef(jthread_iterator_next(&iterator));
     }
     *threads_count_ptr = java_thread_count;
     *threads_ptr = java_threads;

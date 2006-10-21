@@ -184,7 +184,7 @@ extern "C" char *vm_get_object_class_name(void* ptr) {
 
 void* vm_jthread_get_tm_data(jthread thread)
 {
-    JNIEnv *jenv = jni_native_intf;    
+    JNIEnv *jenv = p_TLS_vmthread->jni_env;
     jclass jThreadClass = jenv->GetObjectClass(thread);
     jfieldID field_id = jenv->GetFieldID(jThreadClass, "vm_thread", "J");
     POINTER_SIZE_INT data = (POINTER_SIZE_INT)jenv->GetLongField(thread, field_id);
@@ -193,7 +193,7 @@ void* vm_jthread_get_tm_data(jthread thread)
 }
 
 void vm_jthread_set_tm_data(jthread jt, void* nt) {
-    JNIEnv *jenv = jni_native_intf;    
+    JNIEnv *jenv = p_TLS_vmthread->jni_env;
     jclass jthreadclass = jenv->GetObjectClass(jt);
     jfieldID field_id = jenv->GetFieldID(jthreadclass, "vm_thread", "J");
     jenv->SetLongField(jt, field_id, (jlong)(POINTER_SIZE_INT)nt);

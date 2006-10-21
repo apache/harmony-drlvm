@@ -54,7 +54,6 @@
 VTable * cached_object_array_vtable_ptr;
 bool parallel_jit = true;
 VMEXPORT bool dump_stubs = false;
-JNIEnv * jni_native_intf;
 
 void vm_initialize_critical_sections() {
     p_jit_a_method_lock = new Lock_Manager();
@@ -618,6 +617,9 @@ int vm_init1(JavaVM_Internal * java_vm, JavaVMInitArgs * vm_arguments) {
 
     parse_vm_arguments(vm_env);
 
+    // "Tool Interface" enabling.
+    vm_env->TI->setExecutionMode(vm_env);
+
     status = process_properties_dlls(vm_env);
     if (status != JNI_OK) return status;
  
@@ -654,24 +656,18 @@ int vm_init1(JavaVM_Internal * java_vm, JavaVMInitArgs * vm_arguments) {
     status = natives_init();
     if (status != JNI_OK) return status;
 
-    // "Tool Interface" initialization
-    status = vm_env->TI->Init();
-    if (status != JNI_OK) {
-        WARN("Failed to initialize JVMTI.");
-        return status;
-    }
-
-    // Enable interpreter by default if TI should be enabled.
-    vm_env->TI->setExecutionMode(vm_env);
-
     extern void initialize_signals();
     initialize_signals(); 
 
     status = vm_attach(java_vm, &jni_env);
     if (status != JNI_OK) return status;
     
-    // TODO: jni_native_intf should be removed from global namespace
-    jni_native_intf = jni_env;
+    // "Tool Interface" initialization
+    status = vm_env->TI->Init(java_vm);
+    if (status != JNI_OK) {
+        WARN("Failed to initialize JVMTI.");
+        return status;
+    }
 
     status = preload_classes(vm_env);
     if (status != JNI_OK) return status;

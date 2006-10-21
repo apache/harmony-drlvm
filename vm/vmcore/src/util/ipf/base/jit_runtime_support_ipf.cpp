@@ -1617,7 +1617,7 @@ void emit_readinternal_override(Emitter_Handle eh, Method *method)
     emitter.ipf_mfbr(save_b0, BRANCH_RETURN_LINK_REG);
     emitter.ipf_mov(save_gp, GP_REG);
     
-    emit_movl_compactor(emitter, out0+0, (uint64)jni_native_intf);
+    emit_movl_compactor(emitter, out0+0, (uint64)p_TLS_vmthread->jni_env);
     emitter.ipf_mov(out0+1, IN_REG0);
     emitter.ipf_mov(out0+2, IN_REG1);
     emitter.ipf_mov(out0+3, IN_REG2);

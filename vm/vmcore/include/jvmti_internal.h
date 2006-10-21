@@ -155,8 +155,8 @@ class DebugUtilsTI {
         DebugUtilsTI();
 
         ~DebugUtilsTI();
-        jint Init();
-        void Shutdown();
+        jint Init(JavaVM *vm);
+        void Shutdown(JavaVM *vm);
         void setExecutionMode(Global_Env *p_env);
         int getVersion(char* version);
         void addAgent(const char*); // add agent name (string)

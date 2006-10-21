@@ -23,6 +23,7 @@
 #include "interpreter.h"
 #include "interpreter_imports.h"
 #include "jit_intf.h"
+#include "vm_threads.h"
 
 VMEXPORT void vm_monitor_enter_wrapper(ManagedObject *obj) {
     vm_monitor_enter(obj);
@@ -37,10 +38,8 @@ VMEXPORT void class_throw_linking_error_for_interpreter(Class_Handle ch,
     class_throw_linking_error(ch, index, opcode);
 }
 
-extern JNIEnv *jni_native_intf;
-
 VMEXPORT JNIEnv * get_jni_native_intf() {
-    return jni_native_intf;
+    return p_TLS_vmthread->jni_env;
 }
 
 

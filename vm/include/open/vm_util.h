@@ -57,7 +57,6 @@ public:
 }; //VM_Global_State
 
 
-extern JNIEnv * jni_native_intf;
 extern VTable *cached_object_array_vtable_ptr;
 
 

@@ -570,7 +570,7 @@ static bool jvmti_process_jit_single_step_event(TIEnv* UNREF unused_env,
     hThread->object = (Java_java_lang_Thread *)j_thread->object;
     tmn_suspend_enable();
 
-    JNIEnv *jni_env = (JNIEnv *)jni_native_intf;
+    JNIEnv *jni_env = p_TLS_vmthread->jni_env;
     TIEnv *env = ti->getEnvironments();
     TIEnv *next_env;
 
@@ -989,7 +989,9 @@ jvmtiError DebugUtilsTI::jvmti_single_step_stop(void)
 
         if( vm_thread->ss_state ) {
             jvmti_remove_single_step_breakpoints(this, vm_thread);
-            vm_brpt->release_intf(vm_thread->ss_state->predicted_breakpoints);
+            if( vm_thread->ss_state->predicted_breakpoints ) {
+                vm_brpt->release_intf(vm_thread->ss_state->predicted_breakpoints);
+            }
             _deallocate((unsigned char *)vm_thread->ss_state);
             vm_thread->ss_state = NULL;
         }
