@@ -147,4 +147,8 @@ public class Scanning extends org.mmtk.vm.Scanning implements Constants, Uninter
       //TODO: somehow put a barrier at the end of this method so that all java threads must have enumerated before proceeding
 
   }
+	public void computeBootImageRoots(TraceLocal trace)
+	{
+		// FIXME:  do nothing for DLRVM --- I think VM.assertions._assert(false);
+	}
 }

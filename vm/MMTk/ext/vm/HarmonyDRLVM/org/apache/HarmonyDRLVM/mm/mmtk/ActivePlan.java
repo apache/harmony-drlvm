@@ -21,7 +21,7 @@ import org.mmtk.plan.Plan;
 import org.mmtk.plan.CollectorContext;
 import org.mmtk.plan.MutatorContext;
 import org.mmtk.plan.PlanConstraints;
-
+import org.mmtk.vm.*;
 import org.vmmagic.pragma.*;
 
 /**
@@ -58,7 +58,16 @@ public final class ActivePlan extends org.mmtk.vm.ActivePlan implements Uninterr
   public final MutatorContext mutator() throws InlinePragma {
     return SelectedMutatorContext.get();
   }
+  /** @return The active MutatorContext instance. */
+	///MERGEWJW
+  public final CollectorContext collector(int id) throws InlinePragma
+  {
+	  VM.assertions._assert(false);
+	  ///////return SelectedCollectorContext.get();
+	  return null;
+  }
   
+
   /**
    * Return the MutatorContext instance given its unique identifier.
    * 

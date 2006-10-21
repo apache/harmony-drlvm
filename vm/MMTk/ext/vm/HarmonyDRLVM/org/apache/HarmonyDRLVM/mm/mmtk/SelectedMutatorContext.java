@@ -25,14 +25,16 @@ import org.mmtk.plan.MutatorContext;
 import org.mmtk.plan.copyms.CopyMSMutator;
 import org.mmtk.plan.generational.marksweep.GenMSMutator;
 
-public final class SelectedMutatorContext 
-  implements Uninterruptible {
+//public static final MutatorContext singleton = new NoGCMutator();
+//public static final MutatorContext singleton = new MSMutator();
+//public static final MutatorContext singleton = new CopyMSMutator();
+//public static final MutatorContext singleton = new GenMSMutator();
 
-  //public static final MutatorContext singleton = new NoGCMutator();
-  //public static final MutatorContext singleton = new MSMutator();
-  //public static final MutatorContext singleton = new SSMutator();
-  //public static final MutatorContext singleton = new CopyMSMutator();
-  public static final MutatorContext singleton = new GenMSMutator();
+//public final class SelectedMutatorContext extends SSMutator implements 
+public final class SelectedMutatorContext extends MSMutator implements 
+	Uninterruptible {
+
+	public static final MutatorContext singleton = new SelectedMutatorContext();
 
   /**
    * Return the instance of the SelectedPlan

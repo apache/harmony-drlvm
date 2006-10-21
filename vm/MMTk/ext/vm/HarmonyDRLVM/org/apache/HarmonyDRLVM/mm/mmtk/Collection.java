@@ -137,8 +137,8 @@ public class Collection extends org.mmtk.vm.Collection implements Constants, Uni
           System.out.println("org.apache.HarmonyDRLVM.mm.mmtk.Collection.rendezvous() has been called -7-"); 
           rendFlag = true;
       }
-      ////////////////VM.assertions._assert(false);
-    return 1;
+      //VM.assertions._assert(false);
+    return 1;    ///wjw fixme
   }
 
   /***********************************************************************

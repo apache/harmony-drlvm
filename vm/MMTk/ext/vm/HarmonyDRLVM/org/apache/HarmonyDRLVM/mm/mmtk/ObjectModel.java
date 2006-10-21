@@ -220,8 +220,9 @@ public final class ObjectModel extends org.mmtk.vm.ObjectModel implements Consta
    */
   public ObjectReference getObjectFromStartAddress(Address start) {
     //System.out.println("wjw org.apache.HarmonyDRLVM.mm.mmtk.ObjectModel.getObjectFromStartAddress() was called");
-    VM.assertions._assert(false);
-    return ObjectReference.fromObject(null);
+	  ObjectReference or = start.toObjectReference();
+	  Object obj = or.toObject();
+	  return or;
   }
   
   /**
@@ -529,5 +530,17 @@ public final class ObjectModel extends org.mmtk.vm.ObjectModel implements Consta
       getObjectTypeCacheInsert(clsObj, mmt);
       return mmt;
   }
+
+	public Offset getArrayBaseOffset()
+	{
+		//// toss VM.assertions._assert(false);
+		Offset ofs = Offset.fromInt(12);
+		return ofs;
+	}
+
+	static Offset arrayBaseOffsetTrapdoor(ObjectModel o)
+	{
+		return o.getArrayBaseOffset();
+	}
 }
 

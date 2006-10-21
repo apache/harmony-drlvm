@@ -119,7 +119,9 @@ public class Memory extends org.mmtk.vm.Memory
    * @param size the size, in bytes, of the area to be mapped
    * @return 0 if successful, otherwise the system errno
    */
-  public final int mmap(Address start, int size) {
+	
+  public final int dzmmap(Address start, int size) {
+  //MERGEWJW  public final int mmap(Address start, int size) {
       //System.out.println("org.apache.HarmonyDRLVM.mm.mmtk.Memory.mmap() needs fixing");
   
     return 0;

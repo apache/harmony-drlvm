@@ -32,10 +32,10 @@ import org.mmtk.plan.generational.marksweep.GenMSConstraints;
 public final class SelectedPlanConstraints implements Uninterruptible 
 {
     //public static final PlanConstraints singleton = new NoGCConstraints();
-    //public static final PlanConstraints singleton = new MSConstraints();
+    public static final PlanConstraints singleton = new MSConstraints();
     //public static final PlanConstraints singleton = new SSConstraints();
     //public static final PlanConstraints singleton = new CopyMSConstraints();
-    public static final PlanConstraints singleton = new GenMSConstraints();
+    //public static final PlanConstraints singleton = new GenMSConstraints();
 
     public static final PlanConstraints get() throws InlinePragma 
     {
