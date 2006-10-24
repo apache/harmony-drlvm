@@ -110,6 +110,8 @@ bool ClassLoader::Initialize( ManagedObject* loader )
     }
     m_loadedClasses = new ClassTable();
     if(!m_loadedClasses) return false;
+    m_initiatedClasses = new ClassTable();
+    if(!m_initiatedClasses) return false;
     m_loadingClasses = new LoadingClasses();
     if(!m_loadingClasses) return false;
     m_reportedClasses = new ReportedClasses();
@@ -762,6 +764,11 @@ Class* ClassLoader::StartLoadingClass(Global_Env* UNREF env, const String* class
         LMAutoUnlock aulock(&m_lock);
         FailedClass* failed = m_failedClasses->Lookup(className);
         if(failed) return NULL;
+
+        // check if the class has been already recorded as initiated by this loader
+        pklass = m_initiatedClasses->Lookup(className);
+        if (pklass) return *pklass;
+
         pklass = m_loadedClasses->Lookup(className);
         if(pklass)
         {
@@ -1674,7 +1681,27 @@ bool BootstrapClassLoader::Initialize(ManagedObject* UNREF loader)
     return true;
 } // BootstrapClassLoader::Initialize
 
-Class* BootstrapClassLoader::LoadClass(Global_Env* UNREF env,
+Class* ClassLoader::LoadClass(Global_Env* env, const String* className)
+{
+    Class* klass = DoLoadClass(env, className);
+
+    // record class as initiated
+    if (klass) {
+        LMAutoUnlock aulock(&m_lock);
+
+        // check if class has been alredy recorded as initiated by DefineClass()
+        Class** pklass = m_initiatedClasses->Lookup(className);
+        if (NULL == pklass) {
+            m_initiatedClasses->Insert(className, klass);
+        } else {
+            assert(klass == *pklass);
+        }
+    }
+
+    return klass;
+} // ClassLoader::LoadClass
+
+Class* BootstrapClassLoader::DoLoadClass(Global_Env* UNREF env,
                                        const String* className)
 {
     assert(env == m_env);
@@ -1702,10 +1729,9 @@ Class* BootstrapClassLoader::LoadClass(Global_Env* UNREF env,
         klass = LoadFromFile(className);
     }
     return klass;
-} // BootstrapClassLoader::LoadClass
+} // BootstrapClassLoader::DoLoadClass
 
-
-Class* UserDefinedClassLoader::LoadClass(Global_Env* env, const String* className)
+Class* UserDefinedClassLoader::DoLoadClass(Global_Env* env, const String* className)
 {
     ASSERT_RAISE_AREA;
     assert(m_loader != NULL);
@@ -1851,7 +1877,7 @@ Class* UserDefinedClassLoader::LoadClass(Global_Env* env, const String* classNam
         SuccessLoadingClass(className);
     }
     return clss;
-} // UserDefinedClassLoader::LoadClass
+} // UserDefinedClassLoader::DoLoadClass
 
 void BootstrapClassLoader::ReportAndExit(const char* exnclass, std::stringstream& exnmsg) 
 {

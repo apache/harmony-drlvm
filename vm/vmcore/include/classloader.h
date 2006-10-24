@@ -188,14 +188,14 @@ public:
     void InsertClass(Class* clss) {
         LMAutoUnlock aulock(&m_lock);
         m_loadedClasses->Insert(clss->name, clss);
+        m_initiatedClasses->Insert(clss->name, clss);
     }
     Class* AllocateAndReportInstance(const Global_Env* env, Class* klass);
     Class* NewClass(const Global_Env* env, const String* name);
     ManagedObject** RegisterClassInstance(const String* className, ManagedObject* instance);
     Class* DefineClass(Global_Env* env, const char* class_name,
         uint8* bytecode, unsigned offset, unsigned length, const String** res_name = NULL);
-    virtual Class* LoadClass( Global_Env* UNREF env, const String* UNREF name)
-        { return NULL; }
+    Class* LoadClass( Global_Env* UNREF env, const String* UNREF name);
     Class* LoadVerifyAndPrepareClass( Global_Env* env, const String* name);
     virtual void ReportException(const char* exn_name, std::stringstream& message_stream);
     virtual void ReportFailedClass(Class* klass, const char* exnclass, std::stringstream& exnmsg);
@@ -219,6 +219,7 @@ public:
     static void LockLoadersTable() { m_tableLock._lock(); }
     static void UnlockLoadersTable() { m_tableLock._unlock(); }
 protected:
+    virtual Class* DoLoadClass( Global_Env* UNREF env, const String* UNREF name) = 0;
     Class* StartLoadingClass(Global_Env* env, const String* className);
     bool FinishLoadingClass(Global_Env *env, Class* clss,
         unsigned int* super_class_cp_index);
@@ -236,6 +237,7 @@ public:
     ClassLoader* GetParent() { return m_parent; }
     Package_Table* getPackageTable() { return m_package_table; }
     ClassTable* GetLoadedClasses() { return m_loadedClasses; }
+    ClassTable* GetInitiatedClasses() { return m_initiatedClasses; }
     FailedClasses* GetFailedClasses() { return m_failedClasses; }
     LoadingClasses* GetLoadingClasses() { return m_loadingClasses; }
     ReportedClasses* GetReportedClasses() { return m_reportedClasses; }
@@ -279,6 +281,7 @@ protected:
     ClassLoader* m_parent;
     Package_Table* m_package_table;
     ClassTable* m_loadedClasses;
+    ClassTable* m_initiatedClasses;
     FailedClasses* m_failedClasses;
     LoadingClasses* m_loadingClasses;
     ReportedClasses* m_reportedClasses;
@@ -355,7 +358,6 @@ public:
 
     BootstrapClassLoader(Global_Env* env);
     virtual ~BootstrapClassLoader();
-    virtual Class* LoadClass(Global_Env* env, const String* name);
     virtual bool Initialize( ManagedObject* loader = NULL );
     // reloading error reporting in bootstrap class loader
     virtual void ReportException(const char* exn_name, std::stringstream& message_stream);
@@ -378,6 +380,9 @@ public:
         return primitive_types[k];
     }
 
+protected:
+    virtual Class* DoLoadClass(Global_Env* env, const String* name);
+
 private:
     void ReportAndExit(const char* exnclass, std::stringstream& exnmsg);
     Class* LoadFromFile(const String* className);
@@ -399,7 +404,8 @@ class UserDefinedClassLoader : public ClassLoader
 {
 public:
     UserDefinedClassLoader() {}
-    virtual Class* LoadClass(Global_Env* env, const String* name);
+protected:
+    virtual Class* DoLoadClass(Global_Env* env, const String* name);
 }; // class UserDefinedClassLoader
 
 /**

@@ -252,7 +252,7 @@ jvmtiGetClassLoaderClasses(jvmtiEnv* env,
     /**
      * Get the number of loaded classes
      */
-    tbl = classloader->GetLoadedClasses();
+    tbl = classloader->GetInitiatedClasses();
     if( !(count = tbl->GetItemCount()) ) {
         // no loaded classes
         *classes_ptr = NULL;
