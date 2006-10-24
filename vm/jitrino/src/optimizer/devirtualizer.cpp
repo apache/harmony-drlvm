@@ -25,6 +25,7 @@
 #include "Log.h"
 #include "Dominator.h"
 #include "inliner.h"
+#include "EMInterface.h"
 
 namespace Jitrino {
 
@@ -52,17 +53,22 @@ Devirtualizer::Devirtualizer(IRManager& irm)
   _instFactory(irm.getInstFactory()), _opndManager (irm.getOpndManager()) {
     
     const OptimizerFlags& optFlags = irm.getOptimizerFlags();
-    _skipColdTargets = optFlags.devirt_skip_cold_targets;
     _doAggressiveGuardedDevirtualization = !_hasProfileInfo || optFlags.devirt_do_aggressive_guarded_devirtualization;
-    _devirtUseCHA = optFlags.devirt_devirt_use_cha;
-    _devirtSkipExceptionPath = optFlags.devirt_devirt_skip_exception_path;
+    _devirtUseCHAWithProfile = optFlags.devirt_use_cha_with_profile;
+    _devirtUseCHAWithProfileThreshold = optFlags.devirt_use_cha_with_profile_threshold;
+    _devirtSkipExceptionPath = optFlags.devirt_skip_exception_path;
+    _devirtBlockHotnessMultiplier = optFlags.devirt_block_hotness_multiplier;
+    _devirtSkipJLObjectMethods = optFlags.devirt_skip_object_methods;
+
+    _directCallPercent = optFlags.unguard_dcall_percent;
+    _directCallPercientOfEntry = optFlags.unguard_dcall_percent_of_entry;
 }
 
 bool
 Devirtualizer::isGuardableVirtualCall(Inst* inst, MethodInst*& methodInst, Opnd*& base, Opnd*& tauNullChecked, Opnd *&tauTypesChecked, uint32 &argOffset)
 {
     //
-    // Returns true if this call site may be considered for guarded de-virtualization
+    // Returns true if this call site may be considered for guarded devirtualization
     //
     Opcode opcode = inst->getOpcode();
     if(opcode == Op_TauVirtualCall) { 
@@ -325,14 +331,16 @@ Devirtualizer::genGuardedDirectCall(IRManager &regionIRM, Node* node, Inst* call
 
 bool
 Devirtualizer::doGuard(IRManager& irm, Node* node, MethodDesc& methodDesc) {
-    
-
-    if(_skipColdTargets && _hasProfileInfo && irm.getFlowGraph().getEntryNode()->getExecCount() == 0)
-        return false;
-
     //
     // Determine if a call site should be guarded
     //
+
+    if (_devirtSkipJLObjectMethods) {
+        const char* className = methodDesc.getParentType()->getName();
+        if (!strcmp(className, "java/lang/Object")) {
+            return false;
+        }
+    }
 
     if (_doAggressiveGuardedDevirtualization) {
         // 
@@ -342,15 +350,16 @@ Devirtualizer::doGuard(IRManager& irm, Node* node, MethodDesc& methodDesc) {
     }
 
     //
-    // Only de-virtualize if there's profile information for this
+    // Only devirtualize if there's profile information for this
     // node and the apparent target.
     //
-    if(!_hasProfileInfo)
+    if(!_hasProfileInfo) {
         return false;
+    }
 
     double methodCount = irm.getFlowGraph().getEntryNode()->getExecCount();
     double blockCount = node->getExecCount();
-    return (blockCount >= methodCount / 10.0);
+    return (blockCount >= methodCount / _devirtBlockHotnessMultiplier);
 }
 
 void
@@ -370,86 +379,54 @@ Devirtualizer::guardCallsInBlock(IRManager& regionIRM, Node* node) {
                                   argOffset)) {
             assert(methodInst && base && tauNullChecked && tauTypesChecked && argOffset);
 
-            bool done = false;
             assert(base->getType()->isObject());
             ObjectType* baseType = (ObjectType*) base->getType();
-            MethodDesc* methodDesc = methodInst->getMethodDesc();
-            // Class hierarchy analysis -- can we de-virtualize without a guard?
-            if(_devirtUseCHA && isPreexisting(base)) {
-                ClassHierarchyMethodIterator* iterator = regionIRM.getCompilationInterface().getClassHierarchyMethodIterator(baseType, methodDesc);
-                if(iterator) {
-                    if(!baseType->isNullObject() && (!baseType->isAbstract() || baseType->isArray()) && !baseType->isInterface()) {
-                        methodDesc = regionIRM.getCompilationInterface().getOverriddenMethod(baseType, methodDesc);
-                        jitrino_assert(regionIRM.getCompilationInterface(),methodDesc);
-                    }
-
-                    if(!iterator->hasNext()) {
-                        // No candidate
-                        Log::out() << "CHA no candidate " << baseType->getName() << "::" << methodDesc->getName() << methodDesc->getSignatureString() << ::std::endl;
-                        jitrino_assert(regionIRM.getCompilationInterface(),0);
-                    }
-                
-                    MethodDesc* newMethodDesc = iterator->getNext();
-                    if(!iterator->hasNext()) {
-                        // Only one candidate
-                        Log::out() << "CHA devirtualize " << baseType->getName() << "::" << methodDesc->getName() << methodDesc->getSignatureString() << ::std::endl;
-                        if(!baseType->isNullObject() && (!baseType->isAbstract() || baseType->isArray()) && !baseType->isInterface()) {
-                            assert(newMethodDesc == methodDesc);
-                        }
-
-                        Opnd* dst = last->getDst(); 
-                        uint32 numArgs = last->getNumSrcOperands()-argOffset;
-                        uint32 i = 0;
-                        uint32 j = argOffset;
-                        Opnd** args = new (regionIRM.getMemoryManager()) Opnd*[numArgs];
-                        for(; i < numArgs; ++i, ++j)
-                            args[i] = last->getSrc(j-argOffset);
-                        Inst* directCall = 
-                            _instFactory.makeDirectCall(dst, 
-                                                        tauNullChecked,
-                                                        tauTypesChecked,
-                                                        numArgs, args, 
-                                                        newMethodDesc);
-                        //
-                        // copy InlineInfo
-                        //
-                        InlineInfo* call_ii = last->getCallInstInlineInfoPtr();
-                        InlineInfo* new_ii = directCall->getCallInstInlineInfoPtr();
-                        assert(call_ii && new_ii);
-                        new_ii->getInlineChainFrom(*call_ii);
-
-                        last->unlink();
-                        node->appendInst(directCall);
-                        done = true;
-                    }
-                }
-            }
+            MethodDesc* origMethodDesc = methodInst->getMethodDesc();
             
             // If base type is concrete, consider an explicit guarded test against it
-            if(!done && !baseType->isNullObject() && (!baseType->isAbstract() || baseType->isArray()) && !baseType->isInterface()) {
-
-                NamedType* methodType = methodDesc->getParentType();
-                if (_typeManager.isSubClassOf(baseType, methodType)) {
-                    // only bother if the baseType has the given method
-                    // for an interface call, this may not be the case
-                       
-                    methodDesc =
-                        regionIRM.getCompilationInterface().getOverriddenMethod(baseType, methodDesc);
-                    if (methodDesc) {
-                        jitrino_assert(regionIRM.getCompilationInterface(), methodDesc->getParentType()->isClass());
-                        methodInst->setMethodDesc(methodDesc);
-                        
-                        //
-                        // Try to guard this call
-                        //
-                        if(doGuard(regionIRM, node, *methodDesc)) {
-                            Log::out() << "Guard call to " << baseType->getName() << "::" << methodDesc->getName() << ::std::endl;
-                            genGuardedDirectCall(regionIRM, node, last, methodDesc, tauNullChecked,
-                                                 tauTypesChecked, argOffset);
-                            Log::out() << "Done guarding call to " << baseType->getName() << "::" << methodDesc->getName() << ::std::endl;
-                        } else {
-                            Log::out() << "Don't guard call to " << baseType->getName() << "::" << methodDesc->getName() << ::std::endl;
+            if(!baseType->isNullObject() && (!baseType->isAbstract() || baseType->isArray()) && !baseType->isInterface()) {
+                MethodDesc* candidateMeth = NULL;
+                int candidateExecCount = 0;
+                CompilationContext* cc = regionIRM.getCompilationContext();
+                bool profileSelection = _devirtUseCHAWithProfile && cc->hasDynamicProfileToUse();
+                if (profileSelection) {
+                    ClassHierarchyMethodIterator* iterator = regionIRM.getCompilationInterface().getClassHierarchyMethodIterator(baseType, origMethodDesc);
+                    if(iterator) {
+                        if (profileSelection) {
+                            ProfilingInterface* pi = cc->getProfilingInterface();
+                            while (iterator->hasNext()) {
+                                MethodDesc* tmpMeth = iterator->getNext();
+                                int tmpCount = pi->getProfileMethodCount(*tmpMeth);
+                                Log::out() << "CHA devirt profile-selection" << baseType->getName() << "::" << tmpMeth->getName() << tmpMeth->getSignatureString() 
+                                    << " exec_count=" << tmpCount << std::endl;
+                                if (candidateExecCount < tmpCount) {
+                                    candidateExecCount = tmpCount;
+                                    candidateMeth = tmpMeth;
+                                }
+                            }
                         }
+                    }
+                } else {
+                    NamedType* methodType = origMethodDesc->getParentType();
+                    if (_typeManager.isSubClassOf(baseType, methodType)) {
+                        // only bother if the baseType has the given method
+                        // for an interface call, this may not be the case
+                        candidateMeth = regionIRM.getCompilationInterface().getOverriddenMethod(baseType, origMethodDesc);
+                    }
+                }
+                if (candidateMeth) {
+                    jitrino_assert(regionIRM.getCompilationInterface(), origMethodDesc->getParentType()->isClass());
+                    methodInst->setMethodDesc(candidateMeth);
+                    //
+                    // Try to guard this call
+                    //
+                    if(doGuard(regionIRM, node, *candidateMeth )) {
+                        Log::out() << "Guard call to " << baseType->getName() << "::" << candidateMeth->getName() 
+                            <<" CHAWithProfile="<<(profileSelection ? "true":"false")<<" execCnt="<<candidateExecCount<< std::endl;
+                        genGuardedDirectCall(regionIRM, node, last, candidateMeth, tauNullChecked, tauTypesChecked, argOffset);
+                        Log::out() << "Done guarding call to " << baseType->getName() << "::" << candidateMeth->getName() << std::endl;
+                    } else {
+                        Log::out() << "Don't guard call to " << baseType->getName() << "::" << origMethodDesc->getName() << std::endl;
                     }
                 }
             }
@@ -457,33 +434,15 @@ Devirtualizer::guardCallsInBlock(IRManager& regionIRM, Node* node) {
     }
 }
 
-bool
-Devirtualizer::isPreexisting(Opnd* obj) {
-    assert(obj->getType()->isObject());
-
-    SsaOpnd* ssa = obj->asSsaOpnd();
-    if(ssa == NULL)
-        return false;
-
-    Inst* inst = ssa->getInst();
-    switch(inst->getOpcode()) {
-    case Op_DefArg:
-        return true;
-    case Op_Copy:
-    case Op_TauAsType:
-    case Op_TauCast:
-    case Op_TauStaticCast:
-        return isPreexisting(inst->getSrc(0));
-    default:
-        return false;
-    }
-}
-
 void
-Devirtualizer::unguardCallsInRegion(IRManager& regionIRM, uint32 safetyLevel) {
+Devirtualizer::unguardCallsInRegion(IRManager& regionIRM) {
     ControlFlowGraph &regionFG = regionIRM.getFlowGraph();
-    if(!regionFG.hasEdgeProfile())
+    if(!regionFG.hasEdgeProfile()) {
+        if (Log::isEnabled()) {
+            Log::out()<<"No edge profile, skipping unguard pass"<<std::endl;
+        }
         return;
+    }
 
     //
     // Search for previously guarded virtual calls
@@ -523,34 +482,23 @@ Devirtualizer::unguardCallsInRegion(IRManager& regionIRM, uint32 safetyLevel) {
             //
             // A guard - fold based on profile results.
             //
-            bool fold = false;
-            bool foldDirect = false;
-            if(node->getExecCount() == 0) {
-                fold = true;
-                foldDirect = false;
-            } else if(vCallNode->getExecCount() == 0) {
-                if(safetyLevel == 0) {
-                    fold = false;
-                } else if(safetyLevel == 1) {
-                    Inst* inst0 = src0->getInst();
-                    fold = (inst0->getOpcode() == Op_TauLdVTableAddr && isPreexisting(inst0->getSrc(0)));
-                } else {
-                    assert(safetyLevel == 2);
-                    fold = true;
-                }
-                foldDirect = true;
-            } else if(dCallNode->getExecCount() == 0) {
-                fold = true;
-                foldDirect = false;
-            }
+            
+            bool fold = dCallNode->getExecCount() < (node->getExecCount() * _directCallPercent / 100);
+            fold = fold || (dCallNode->getExecCount()  < (regionFG.getEntryNode()->getExecCount() * _directCallPercientOfEntry / 100));
             
             if(fold) {
                 //
                 // A compile time is compared.  Later simplification will fold branch appropriately.
                 //
+                if (Log::isEnabled()) {
+                    Log::out()<<"Unguarding: instId="<<last->getId()<<std::endl;
+                }
+               
                 branch->setSrc(1, src0);
-                if(!foldDirect)
-                    branch->setComparisonModifier(Cmp_NE_Un);
+                branch->setComparisonModifier(Cmp_NE_Un);
+
+                //regionFG.removeEdge(node->getTrueEdge());
+               // branch->unlink();
             }
         }
     }

@@ -35,7 +35,7 @@ public:
 
     void guardCallsInRegion(IRManager& irm, DominatorTree* tree);
 
-    void unguardCallsInRegion(IRManager& irm, uint32 safetyLevel=0);
+    void unguardCallsInRegion(IRManager& irm);
 
 private:
     void guardCallsInBlock(IRManager& irm, Node* node);
@@ -44,14 +44,20 @@ private:
                                 Opnd* & tauNullChecked, Opnd*&tauTypesChecked,
                                 uint32 &argOffset);
     bool doGuard(IRManager& irm, Node* node, MethodDesc& methodDesc);
-    bool isPreexisting(Opnd* obj);
-
+    
     bool _hasProfileInfo;
     bool _doProfileOnlyGuardedDevirtualization;
     bool _doAggressiveGuardedDevirtualization;
-    bool _skipColdTargets;
-    bool _devirtUseCHA;
+    bool _devirtUseCHAWithProfile;
+    bool _devirtUseCHAWithProfileThreshold;
     bool _devirtSkipExceptionPath;
+    float _devirtBlockHotnessMultiplier;
+    bool _devirtSkipJLObjectMethods;
+
+
+    //unguard pass params
+    int _directCallPercent;
+    int _directCallPercientOfEntry;
 
     TypeManager& _typeManager;
     InstFactory& _instFactory;

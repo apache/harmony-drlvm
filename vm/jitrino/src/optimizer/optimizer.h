@@ -91,10 +91,17 @@ struct OptimizerFlags {
     bool gc_build_var_map;
 
     //devirt
-    bool devirt_skip_cold_targets;
     bool devirt_do_aggressive_guarded_devirtualization;
-    bool devirt_devirt_use_cha;
-    bool devirt_devirt_skip_exception_path;
+    bool devirt_use_cha_with_profile;
+    int devirt_use_cha_with_profile_threshold;
+    bool devirt_skip_exception_path;
+    float devirt_block_hotness_multiplier;
+    bool devirt_skip_object_methods;
+
+    //unguard
+    int unguard_dcall_percent;
+    int unguard_dcall_percent_of_entry;
+
 
     AbcdFlags*              abcdFlags;
     GcmFlags*               gcmFlags;
