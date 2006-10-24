@@ -683,6 +683,17 @@ public class Runtime {
         if (command.length() == 0) {
             throw new IllegalArgumentException();
         }
+        if (envp != null) {
+            if (envp.length != 0) {
+                for (int i = 0; i < envp.length; i++) {
+                    if (envp[i] == null) {
+                        throw new NullPointerException("An element of envp shouldn't be empty.");
+                    }
+                }
+            } else {
+                envp = null;
+            }
+        }
 
         StringTokenizer st = new StringTokenizer(command);
         String[] cmdarray = new String[st.countTokens()];
@@ -738,10 +749,22 @@ public class Runtime {
         if (cmdarray.length == 0) {
             throw new IndexOutOfBoundsException();
         }
-        //XXX:
-        //#IN004# Should we check cmdarray's direction values: cmdarray[i] != null ?
-        //#IN004# Should we check: envp != null ?
-        //#IN004# Should we check envp's direction values: envp[i] != null ?
+        for (int i = 0; i < cmdarray.length; i++) {
+            if (cmdarray[i] == null) {
+                throw new NullPointerException("An element of cmdarray shouldn't be empty.");
+            }
+        }
+        if (envp != null) {
+            if (envp.length != 0) {
+                for (int i = 0; i < envp.length; i++) {
+                    if (envp[i] == null) {
+                        throw new NullPointerException("An element of envp shouldn't be empty.");
+                    }
+                }
+            } else {
+                envp = null;
+            }
+        }
 
         String dirPathName = (dir != null ? dir.getPath() : null);
 
