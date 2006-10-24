@@ -1029,8 +1029,20 @@ public class ThreadTest extends TestCase {
         Team team = new Team();
         RunProject pr1 = new RunProject(team);
         pr1.start();
+        waitTime = waitDuration;
+        while (!pr1.isAlive() && !(expired = doSleep(10))) {
+        }
+        if (expired) {
+            fail("pr1 has not been started");
+        }
         RunProject pr2 = new RunProject(team);
         pr2.start();
+        waitTime = waitDuration;
+        while (!pr2.isAlive() && !(expired = doSleep(10))) {
+        }
+        if (expired) {
+            fail("pr2 has not been started");
+        }
         Thread.State state;
         waitTime = waitDuration;
         do {
