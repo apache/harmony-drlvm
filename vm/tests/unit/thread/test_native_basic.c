@@ -44,19 +44,19 @@ int test_hythread_create(void){
     
     apr_pool_create(&pool, NULL);
 
-    args = (void**) apr_palloc(pool, sizeof(void *) *3); 
+    args = (void**) apr_palloc(pool, sizeof(void *) *2); 
     
     hythread_group_create((hythread_group_t *)&args[0]); 
     
     args[1] = apr_palloc(pool, sizeof(jthread_threadattr_t));
     ((jthread_threadattr_t *)args[1])->stacksize = 1024;
     ((jthread_threadattr_t *)args[1])->priority  = 1;
-    args[2] = pool;
     
     hythread_create_with_group(&thread, args[0], 1024, 1, 0, start_proc, args);
 
-    //hythread_join(thread);
-    return 0;
+    hythread_join(thread);
+    // TODO: should check that created thread finished without errors.
+    return TEST_PASSED;
 }
 
 hylatch_t start;
@@ -78,7 +78,7 @@ int test_hythread_iterator(void) {
         hythread_create_with_group(&thread, group, 0, 0, 0, start_proc_empty, NULL);
     }
 
-    // Wait util all thread has started.
+    // Wait util all threads have started.
     hylatch_wait(start);
     iterator = hythread_iterator_create(group);
     // Notify all threads
@@ -114,7 +114,7 @@ int test_hythread_iterator_default(void) {
         hythread_create(&thread, 0, 0, 0, start_proc_empty, NULL);
     }
 
-    // Wait util all thread has started.
+    // Wait util all threads have started.
     hylatch_wait(start);
     iterator = hythread_iterator_create(NULL);
     // Notify all threads
@@ -153,15 +153,13 @@ int test_hythread_create_many(void){
     while(i--) {
         apr_pool_create(&pool, NULL);
 
-        args = (void**) apr_palloc(pool, sizeof(void *) *3); 
+        args = (void**) apr_palloc(pool, sizeof(void *) *2); 
     
         args[0] = group; 
         
         args[1] = apr_palloc(pool, sizeof(jthread_threadattr_t));
         ((jthread_threadattr_t *)args[1])->stacksize = 1024;
         ((jthread_threadattr_t *)args[1])->priority  = 1;
-        
-        args[2] = pool;
         
         thread = NULL;
 
@@ -193,8 +191,6 @@ int start_proc(void *args) {
     void** attrs = (void **)args; 
     tf_assert_same(hythread_self()->priority, ((jthread_threadattr_t *)attrs[1])->priority);
     tf_assert_same(hythread_self()->group, attrs[0]);
-    hythread_sleep(1000);
-    apr_pool_destroy((apr_pool_t *)attrs[2]); 
     return 0;
 }
 

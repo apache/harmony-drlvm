@@ -121,7 +121,6 @@ int start_proc(void *args);
 int test_hythread_thin_monitor_enter_contended(void){
     apr_pool_t *pool;
     void **args; 
-    jthread_threadattr_t *attr;
     hythread_t thread = NULL;
     hythread_thin_monitor_t lockword_ptr;
     IDATA status;

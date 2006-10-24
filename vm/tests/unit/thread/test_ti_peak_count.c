@@ -44,27 +44,22 @@ int test_jthread_get_peak_thread_count(void) {
     return helper_get_reset_peak_count();
 }
 
-void JNICALL run_for_helper_get_reset_peak_count(jvmtiEnv * jvmti_env, JNIEnv * jni_env, void *arg){
+void JNICALL run_for_helper_get_reset_peak_count(jvmtiEnv * jvmti_env, JNIEnv * jni_env, void *args){
 
-    tested_thread_sturct_t * tts = current_thread_tts;
+    tested_thread_sturct_t * tts = (tested_thread_sturct_t *) args;
     IDATA status;
-    int i;
     int num = 0;
     
     status = jthread_reset_peak_thread_count();
     tts->peak_count = 0;
     tts->phase = (status == TM_ERROR_NONE ? TT_PHASE_RUNNING : TT_PHASE_ERROR);
-    while(1){
-        for (i = 0; i < 1000; i++){
-            num = num + 1;
-        }
-        if (tts->stop) {
-            break;
-        }
-        sleep_a_click();
+    tested_thread_started(tts);
+    while(tested_thread_wait_for_stop_request_timed(tts, SLEEP_TIME) == TM_ERROR_TIMEOUT) {
+        ++num;
     }
     status = jthread_get_peak_thread_count(&tts->peak_count);
     tts->phase = (status == TM_ERROR_NONE ? TT_PHASE_DEAD : TT_PHASE_ERROR);
+    tested_thread_ended(tts);
 }
 
 int helper_get_reset_peak_count(void) {
@@ -76,7 +71,8 @@ int helper_get_reset_peak_count(void) {
     
     reset_tested_thread_iterator(&tts);
     while(next_tested_thread(&tts)){
-        tts->stop = 1;
+        tested_thread_send_stop_request(tts);
+        tested_thread_wait_ended(tts);
         check_tested_thread_phase(tts, TT_PHASE_DEAD);
         printf("peak_count = %i \n", tts->peak_count);
         tf_assert(tts->peak_count > 0);

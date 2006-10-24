@@ -23,6 +23,7 @@
 #include <open/hythread.h>
 #include <open/hythread_ext.h>
 #include <open/ti_thread.h>
+#include <open/thread_externals.h>
 #include "apr_time.h"
 
 
@@ -30,10 +31,10 @@
  * Utilities for thread manager unit tests 
  */
 
-tested_thread_sturct_t * current_thread_tts;
 tested_thread_sturct_t dummy_tts_struct;
 tested_thread_sturct_t * dummy_tts = &dummy_tts_struct;
 tested_thread_sturct_t tested_threads[MAX_TESTED_THREAD_NUMBER];
+JavaVM * GLOBAL_VM = NULL;
 
 apr_pool_t *pool = NULL;
 
@@ -41,7 +42,7 @@ void sleep_a_click(void){
     apr_sleep(CLICK_TIME_MSEC * 1000);
 }
 
-jthread new_jthread_jobject(JNIEnv * jni_env) {
+jthread new_jobject_thread(JNIEnv * jni_env) {
     const char * name = "<init>";
     const char * sig = "()V";
     jmethodID constructor = NULL;
@@ -50,6 +51,17 @@ jthread new_jthread_jobject(JNIEnv * jni_env) {
     thread_class = (*jni_env)->FindClass(jni_env, "java/lang/Thread");
     constructor = (*jni_env)->GetMethodID(jni_env, thread_class, name, sig);
     return (*jni_env)->NewObject(jni_env, thread_class, constructor);
+}
+
+jobject new_jobject_thread_death(JNIEnv * jni_env) {
+    const char * name = "<init>";
+    const char * sig = "()V";
+    jmethodID constructor = NULL;
+    jclass thread_death_class;
+    
+    thread_death_class = (*jni_env)->FindClass(jni_env, "java/lang/ThreadDeath");
+    constructor = (*jni_env)->GetMethodID(jni_env, thread_death_class, name, sig);
+    return (*jni_env)->NewObject(jni_env, thread_death_class, constructor);
 }
 
 jthread new_jobject(){
@@ -78,7 +90,6 @@ void delete_jobject(jobject obj){
 
 void test_java_thread_setup(int argc, char *argv[]) {
     JavaVMInitArgs args;
-    JavaVM * java_vm;
     JNIEnv * jni_env;
     int i;
 
@@ -93,8 +104,9 @@ void test_java_thread_setup(int argc, char *argv[]) {
 
     log_debug("test_java_thread_init()");
 
+    hythread_sleep(1000);
     apr_initialize();
-    JNI_CreateJavaVM(&java_vm, &jni_env, &args);
+    JNI_CreateJavaVM(&GLOBAL_VM, &jni_env, &args);
 }
 
 void test_java_thread_teardown(void) {
@@ -140,14 +152,15 @@ void tested_threads_init(int mode){
     for (i = 0; i < MAX_TESTED_THREAD_NUMBER; i++){
         tts = &tested_threads[i];
         tts->my_index = i;
-        //tf_assert_null(tts->java_thread);
-        tts->java_thread = new_jthread_jobject(jni_env);
-        //tf_assert_null(tts->jni_env);
+        tts->java_thread = new_jobject_thread(jni_env);
+        tts->native_thread = NULL;
         //tts->attrs.priority = 5;
         tts->jvmti_start_proc_arg = &tts->jvmti_start_proc_arg;
-        tts->clicks = 0;
+        hysem_create(&tts->started, 0, 1);
+        hysem_create(&tts->running, 0, 1);
+        hysem_create(&tts->stop_request, 0, 1);
+        hysem_create(&tts->ended, 0, 1);
         tts->phase = TT_PHASE_NONE;
-        tts->stop = 0;
         if (mode == TTS_INIT_DIFFERENT_MONITORS){
             monitor = new_jobject();
             status = jthread_monitor_init(monitor);
@@ -230,10 +243,9 @@ void tested_threads_run_common(jvmtiStartFunction run_method_param){
 
     reset_tested_thread_iterator(&tts);
     while(next_tested_thread(&tts)){
-        current_thread_tts = tts;
-        tf_assert_same_v(jthread_create_with_function(jni_env, tts->java_thread, &tts->attrs, run_method_param, NULL), TM_ERROR_NONE);
-        check_tested_thread_phase(tts, TT_PHASE_ANY);
-        check_tested_thread_structures(tts);
+        tf_assert_same_v(jthread_create_with_function(jni_env, tts->java_thread, &tts->attrs, run_method_param, tts), TM_ERROR_NONE);
+        tested_thread_wait_started(tts);
+        tts->native_thread = (hythread_t) vm_jthread_get_tm_data(tts->java_thread);
     }
 }
 
@@ -249,85 +261,88 @@ void tested_threads_run_with_different_monitors(jvmtiStartFunction run_method_pa
     tested_threads_run_common(run_method_param);
 }
 
-void tested_threads_run_with_jvmti_start_proc(jvmtiStartFunction jvmti_start_proc){
-    tested_thread_sturct_t *tts;
-    JNIEnv * jni_env;
+void tested_os_threads_run(hythread_entrypoint_t run_method_param){
 
-    jni_env = jthread_get_JNI_env(jthread_self());
-    
+    tested_thread_sturct_t *tts;
+    IDATA status;
+
     tested_threads_init(TTS_INIT_COMMON_MONITOR);
     reset_tested_thread_iterator(&tts);
     while(next_tested_thread(&tts)){
-        current_thread_tts = tts;
-        tf_assert_same_v(jthread_create_with_function(jni_env, tts->java_thread, &tts->attrs,
-                                                      jvmti_start_proc, tts->jvmti_start_proc_arg), TM_ERROR_NONE);
-        check_tested_thread_phase(tts, TT_PHASE_ANY);
+        // Create thread
+        status = hythread_create(&tts->native_thread,  // new thread OS handle 
+                                 0, 5, 0,
+                                 run_method_param, // start proc
+                                 tts); 
+        tf_assert_v(status == TM_ERROR_NONE);
+        tested_thread_wait_started(tts);
     }
 }
 
-void tested_os_threads_run(apr_thread_start_t run_method_param){
-
-    tested_thread_sturct_t *tts;
-    apr_thread_t *apr_thread;
-    apr_threadattr_t *apr_attrs = NULL;
-    apr_status_t status;
-    apr_pool_t *pool;
-
-    status = apr_pool_create(&pool, NULL);
-    tf_assert_v(status == APR_SUCCESS);
-    tested_threads_init(TTS_INIT_COMMON_MONITOR);
-    reset_tested_thread_iterator(&tts);
-    while(next_tested_thread(&tts)){
-        current_thread_tts = tts;
-        apr_thread = NULL;
-        // Create APR thread
-        status = apr_thread_create(
-                                   &apr_thread,      // new thread OS handle 
-                                   apr_attrs,
-                                   run_method_param, // start proc
-                                   NULL,             // start proc arg 
-                                   pool
-                                   ); 
-        tf_assert_v(status == APR_SUCCESS);
-        check_tested_thread_phase(tts, TT_PHASE_ANY);
-    }
+void tested_thread_started(tested_thread_sturct_t * tts) {
+    hysem_set(tts->started, 1);
 }
 
-int tested_threads_stop(){
+void tested_thread_ended(tested_thread_sturct_t * tts) {
+    hysem_set(tts->ended, 1);
+}
+
+void tested_thread_send_stop_request(tested_thread_sturct_t * tts) {
+    hysem_set(tts->stop_request, 1);    
+}
+
+void tested_thread_wait_for_stop_request(tested_thread_sturct_t * tts) {
+    IDATA status;
+    do {
+        hysem_set(tts->running, 1);
+        status = hysem_wait_timed(tts->stop_request, SLEEP_TIME, 0);
+    } while (status == TM_ERROR_TIMEOUT);
+}
+
+IDATA tested_thread_wait_for_stop_request_timed(tested_thread_sturct_t * tts, I_64 sleep_time) {
+    hysem_set(tts->running, 1);
+    return hysem_wait_timed(tts->stop_request, sleep_time, 0);
+}
+
+int tested_threads_stop() {
 
     tested_thread_sturct_t *tts;
     
     reset_tested_thread_iterator(&tts);
-    while(next_tested_thread(&tts)){
-        if (check_tested_thread_phase(tts, TT_PHASE_DEAD) != TEST_PASSED){
-            tts->stop = 1;
-            check_tested_thread_phase(tts, TT_PHASE_DEAD);
-            //Sleep(1000);
-        }
+    while (next_tested_thread(&tts)) {
+        tested_thread_send_stop_request(tts);
+    }
+    while (next_tested_thread(&tts)) {
+        tested_thread_wait_ended(tts);
     }
     return TEST_PASSED;
 }
 
-int tested_threads_destroy(){
+int tested_threads_destroy() {
 
     tested_thread_sturct_t *tts;
     
     reset_tested_thread_iterator(&tts);
-    while(next_tested_thread(&tts)){
-        tts->stop = 1;
-        check_tested_thread_phase(tts, TT_PHASE_DEAD);
+    while (next_tested_thread(&tts)) {
+        tested_thread_send_stop_request(tts);
     }
+    reset_tested_thread_iterator(&tts);
+    while (next_tested_thread(&tts)) {
+        tested_thread_wait_dead(tts);
+    }
+
     return TEST_PASSED;
 }
 
-int check_tested_thread_structures(tested_thread_sturct_t *tts){
+
+int check_structure(tested_thread_sturct_t *tts){
 
     jthread java_thread = tts->java_thread;
     jvmti_thread_t jvmti_thread;
     hythread_t hythread;
 
-    hythread = vm_jthread_get_tm_data(java_thread);
-    tf_assert(hythread);
+    hythread = (hythread_t) vm_jthread_get_tm_data(java_thread);
+    tf_assert_same(hythread, tts->native_thread);
     jvmti_thread = hythread_get_private_data(hythread);
     tf_assert(jvmti_thread);
     /*
@@ -339,41 +354,65 @@ int check_tested_thread_structures(tested_thread_sturct_t *tts){
     //if(jvmti_thread->stop_exception != stop_exception){
     //      return TEST_FAILED; ????????????????????????????????????????????
     //}
-
     return TEST_PASSED;
 }
 
-int check_tested_thread_phase(tested_thread_sturct_t *tts, int phase){
-
-    int i;
-    for (i = 0; i < MAX_CLICKS_TO_WAIT; i++){
-        sleep_a_click(); // must be here to give tested thread to change phase
-
-        tf_assert(tts->phase != TT_PHASE_ERROR);
-        if (phase == tts->phase){
-            return 0;
-        } 
-        if (phase == TT_PHASE_ANY && tts->phase != TT_PHASE_NONE){
-            return 0;
-        }
+int check_phase(tested_thread_sturct_t *tts, int phase) {
+    
+    tf_assert(tts->phase != TT_PHASE_ERROR);
+    if (phase == TT_PHASE_ANY) {
+        tf_assert(tts->phase != TT_PHASE_NONE);
+    } else {
+        tf_assert_same(tts->phase, phase);
     }
-
-    //    tf_assert_same(phase, tts->phase);
-    return 0;
+    return TEST_PASSED;
 }
 
-int tested_thread_is_running(tested_thread_sturct_t *tts){
-
-    int clicks = tts->clicks;
+void tested_thread_wait_started(tested_thread_sturct_t *tts) {
     int i;
-
-    for (i = 0; i < MAX_CLICKS_TO_WAIT; i++){
-        sleep_a_click();
-        if (clicks != tts->clicks){
-            return 1;
-        }
+     
+    i = 0;
+    while (hysem_wait_timed(tts->started, MAX_TIME_TO_WAIT, 0) == TM_ERROR_TIMEOUT) {
+        i++;
+        printf("Thread %i hasn't started for %i milliseconds", 
+            tts->my_index, (i * MAX_TIME_TO_WAIT));
     }
-    return 0;
+
+    hysem_post(tts->started);
+}
+
+void tested_thread_wait_running(tested_thread_sturct_t *tts) {
+    int i;
+     
+    i = 0;
+    while (hysem_wait_timed(tts->running, MAX_TIME_TO_WAIT, 0) == TM_ERROR_TIMEOUT) {
+        i++;
+        printf("Thread %i isn't running after %i milliseconds", 
+            tts->my_index, (i * MAX_TIME_TO_WAIT));
+    }    
+}
+
+void tested_thread_wait_ended(tested_thread_sturct_t *tts) {
+    int i;
+     
+    i = 0;
+    while (hysem_wait_timed(tts->ended, MAX_TIME_TO_WAIT, 0) == TM_ERROR_TIMEOUT) {
+        i++;
+        printf("Thread %i hasn't ended for %i milliseconds", 
+            tts->my_index, (i * MAX_TIME_TO_WAIT));
+    }
+    hysem_post(tts->ended);
+}
+
+void tested_thread_wait_dead(tested_thread_sturct_t *tts) {
+    int i;
+     
+    i = 0;
+    while (hythread_join_timed(tts->native_thread, MAX_TIME_TO_WAIT, 0) == TM_ERROR_TIMEOUT) {
+        i++;
+        printf("Thread %i isn't dead after %i milliseconds", 
+            tts->my_index, (i * MAX_TIME_TO_WAIT));
+    }
 }
 
 int compare_threads(jthread *threads, int thread_nmb, int compare_from_end) {
@@ -433,16 +472,12 @@ int check_exception(jobject excn){
 
 void JNICALL default_run_for_test(jvmtiEnv * jvmti_env, JNIEnv * jni_env, void *arg) {
 
-    tested_thread_sturct_t * tts = current_thread_tts;
+    tested_thread_sturct_t * tts = (tested_thread_sturct_t *)arg;
     
     tts->phase = TT_PHASE_RUNNING;
-    while(1){
-        tts->clicks++;
-        sleep_a_click();
-        if (tts->stop) {
-            break;
-        }
-    }
+    tested_thread_started(tts);
+    tested_thread_wait_for_stop_request(tts);
     tts->phase = TT_PHASE_DEAD;
+    tested_thread_ended(tts);
 }
 

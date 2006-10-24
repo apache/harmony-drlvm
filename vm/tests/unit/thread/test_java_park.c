@@ -24,22 +24,18 @@
  * Test jthread_park(...)
  * Test jthread_unpark(...)
  */
-void JNICALL run_for_test_jthread_park_unpark(jvmtiEnv * jvmti_env, JNIEnv * jni_env, void *arg){
+void JNICALL run_for_test_jthread_park_unpark(jvmtiEnv * jvmti_env, JNIEnv * jni_env, void *args){
 
-    tested_thread_sturct_t * tts = current_thread_tts;
+    tested_thread_sturct_t * tts = (tested_thread_sturct_t *) args;
     IDATA status;
     
     tts->phase = TT_PHASE_PARKED;
+    tested_thread_started(tts);
     status = jthread_park();
     tts->phase = (status == TM_ERROR_NONE ? TT_PHASE_RUNNING : TT_PHASE_ERROR);
-    while(1){
-        tts->clicks++;
-        sleep_a_click();
-        if (tts->stop) {
-            break;
-        }
-    }
+    tested_thread_wait_for_stop_request(tts);
     tts->phase = TT_PHASE_DEAD;
+    tested_thread_ended(tts);
 }
 
 int test_jthread_park_unpark(void) {
@@ -76,6 +72,7 @@ int test_jthread_park_unpark(void) {
         }
         if (parked_nmb > 0){
             tf_assert_same(jthread_unpark(parked_tts->java_thread), TM_ERROR_NONE);
+            tested_thread_wait_running(parked_tts);
             check_tested_thread_phase(parked_tts, TT_PHASE_RUNNING);
         }
     }
@@ -88,22 +85,18 @@ int test_jthread_park_unpark(void) {
 /*
  * Test jthread_park(...)
  */
-void JNICALL run_for_test_jthread_park_interrupt(jvmtiEnv * jvmti_env, JNIEnv * jni_env, void *arg){
+void JNICALL run_for_test_jthread_park_interrupt(jvmtiEnv * jvmti_env, JNIEnv * jni_env, void *args){
 
-    tested_thread_sturct_t * tts = current_thread_tts;
+    tested_thread_sturct_t * tts = (tested_thread_sturct_t *) args;
     IDATA status;
     
     tts->phase = TT_PHASE_PARKED;
+    tested_thread_started(tts);
     status = jthread_park();
     tts->phase = (status == TM_ERROR_INTERRUPT ? TT_PHASE_RUNNING : TT_PHASE_ERROR);
-    while(1){
-        tts->clicks++;
-        sleep_a_click();
-        if (tts->stop) {
-            break;
-        }
-    }
+    tested_thread_wait_for_stop_request(tts);
     tts->phase = TT_PHASE_DEAD;
+    tested_thread_ended(tts);
 }
 
 int test_jthread_park_interrupt(void) {
@@ -139,6 +132,7 @@ int test_jthread_park_interrupt(void) {
         }
         if (parked_nmb > 0){
             tf_assert_same(jthread_interrupt(parked_tts->java_thread), TM_ERROR_NONE);
+            tested_thread_wait_running(parked_tts);
             check_tested_thread_phase(parked_tts, TT_PHASE_RUNNING);
         }
     }
@@ -151,22 +145,18 @@ int test_jthread_park_interrupt(void) {
 /*
  * Test jthread_timed_park(...)
  */
-void JNICALL run_for_test_jthread_timed_park(jvmtiEnv * jvmti_env, JNIEnv * jni_env, void *arg){
+void JNICALL run_for_test_jthread_timed_park(jvmtiEnv * jvmti_env, JNIEnv * jni_env, void *args){
 
-    tested_thread_sturct_t * tts = current_thread_tts;
+    tested_thread_sturct_t * tts = (tested_thread_sturct_t *) args;
     IDATA status;
     
     tts->phase = TT_PHASE_PARKED;
+    tested_thread_started(tts);
     status = jthread_timed_park(50, 0);
     tts->phase = (status == TM_ERROR_TIMEOUT ? TT_PHASE_RUNNING : TT_PHASE_ERROR);
-    while(1){
-        tts->clicks++;
-        sleep_a_click();
-        if (tts->stop) {
-            break;
-        }
-    }
+    tested_thread_wait_for_stop_request(tts);
     tts->phase = TT_PHASE_DEAD;
+    tested_thread_ended(tts);
 }
 
 int test_jthread_timed_park(void) {
@@ -178,6 +168,7 @@ int test_jthread_timed_park(void) {
 
     reset_tested_thread_iterator(&tts);
     while(next_tested_thread(&tts)){
+        tested_thread_wait_running(tts);
         check_tested_thread_phase(tts, TT_PHASE_RUNNING);       
     }
 

@@ -87,33 +87,31 @@ int test_jthread_raw_wait(void) {
  * ------------------------ HELPERS -----------------------
  */
 
+hysem_t mon_enter;
 /*
  * Test jthread_raw_monitor_enter(...)
  * Test jthread_raw_monitor_exit(...)
  */
 //?????????????????????????????? jthread_raw_monitor_init and not init
 //?????????????????????????????? jthread_raw_monitor_exit without enter
-void JNICALL run_for_helper_jthread_raw_monitor_enter_exit(jvmtiEnv * jvmti_env, JNIEnv * jni_env, void *arg){
+void JNICALL run_for_helper_jthread_raw_monitor_enter_exit(jvmtiEnv * jvmti_env, JNIEnv * jni_env, void *args){
 
-    tested_thread_sturct_t * tts = current_thread_tts;
+    tested_thread_sturct_t * tts = (tested_thread_sturct_t *) args;
     jrawMonitorID monitor = tts->raw_monitor;
     IDATA status;
     
     tts->phase = TT_PHASE_WAITING_ON_MONITOR;
+    tested_thread_started(tts);
     status = jthread_raw_monitor_enter(monitor);
 
     // Begin critical section
     tts->phase = (status == TM_ERROR_NONE ? TT_PHASE_IN_CRITICAL_SECTON : TT_PHASE_ERROR);
-    while(1){
-        tts->clicks++;
-        sleep_a_click();
-        if (tts->stop) {
-            break;
-        }
-    }
+    hysem_set(mon_enter, 1);
+    tested_thread_wait_for_stop_request(tts);
     status = jthread_raw_monitor_exit(monitor);
     // End critical section
     tts->phase = (status == TM_ERROR_NONE ? TT_PHASE_DEAD : TT_PHASE_ERROR);
+    tested_thread_ended(tts);
 }
 
 int helper_jthread_raw_monitor_enter_exit(void) {
@@ -123,6 +121,8 @@ int helper_jthread_raw_monitor_enter_exit(void) {
     int i;
     int waiting_on_monitor_nmb;
 
+    hysem_create(&mon_enter, 0, 1);
+
     // Initialize tts structures and run all tested threads
     tested_threads_run(run_for_helper_jthread_raw_monitor_enter_exit);
 
@@ -131,9 +131,10 @@ int helper_jthread_raw_monitor_enter_exit(void) {
         waiting_on_monitor_nmb = 0;
         critical_tts = NULL;
 
+        hysem_wait(mon_enter);
+
         reset_tested_thread_iterator(&tts);
         while(next_tested_thread(&tts)){
-            check_tested_thread_phase(tts, TT_PHASE_ANY); // to make thread running
             if (tts->phase == TT_PHASE_IN_CRITICAL_SECTON){
                 tf_assert(critical_tts == NULL); // error if two threads in critical section
                 critical_tts = tts;
@@ -145,7 +146,8 @@ int helper_jthread_raw_monitor_enter_exit(void) {
         if (MAX_TESTED_THREAD_NUMBER - waiting_on_monitor_nmb - i != 1){
             tf_fail("Wrong number waiting on monitor threads");
         }
-        critical_tts->stop = 1;
+        tested_thread_send_stop_request(critical_tts);
+        tested_thread_wait_ended(critical_tts);
         check_tested_thread_phase(critical_tts, TT_PHASE_DEAD);
     }
     // Terminate all threads and clear tts structures
@@ -158,9 +160,9 @@ int helper_jthread_raw_monitor_enter_exit(void) {
  * Test jthread_raw_wait(...)
  * Test jthread_raw_notify(...)
  */
-void JNICALL run_for_helper_jthread_raw_wait_notify(jvmtiEnv * jvmti_env, JNIEnv * jni_env, void *arg){
+void JNICALL run_for_helper_jthread_raw_wait_notify(jvmtiEnv * jvmti_env, JNIEnv * jni_env, void *args){
 
-    tested_thread_sturct_t * tts = current_thread_tts;
+    tested_thread_sturct_t * tts = (tested_thread_sturct_t *) args;
     jrawMonitorID monitor = tts->raw_monitor;
     IDATA status;
     int64 msec = 1000000;
@@ -168,22 +170,20 @@ void JNICALL run_for_helper_jthread_raw_wait_notify(jvmtiEnv * jvmti_env, JNIEnv
     status = jthread_raw_monitor_enter(monitor);
     if (status != TM_ERROR_NONE){
         tts->phase = TT_PHASE_ERROR;
+        tested_thread_ended(tts);
         return;
     }
     // Begin critical section
     tts->phase = TT_PHASE_WAITING_ON_WAIT;
+    tested_thread_started(tts);
     status = jthread_raw_monitor_wait(monitor, msec);
     tts->phase = (status == TM_ERROR_NONE ? TT_PHASE_IN_CRITICAL_SECTON : TT_PHASE_ERROR);
-    while(1){
-        tts->clicks++;
-        sleep_a_click();
-        if (tts->stop) {
-            break;
-        }
-    }
+    hysem_set(mon_enter, 1);
+    tested_thread_wait_for_stop_request(tts);
     status = jthread_raw_monitor_exit(monitor);
     // End critical section
     tts->phase = (status == TM_ERROR_NONE ? TT_PHASE_DEAD : TT_PHASE_ERROR);
+    tested_thread_ended(tts);
 }
 
 int helper_jthread_raw_wait_notify(void) {
@@ -191,9 +191,10 @@ int helper_jthread_raw_wait_notify(void) {
     tested_thread_sturct_t *tts;
     tested_thread_sturct_t *critical_tts;
     jrawMonitorID monitor;
-    int64 msec = 1000000;
     int i;
     int waiting_on_wait_nmb;
+
+    hysem_create(&mon_enter, 0, 1);
 
     // Initialize tts structures and run all tested threads
     tested_threads_run(run_for_helper_jthread_raw_wait_notify);
@@ -210,13 +211,12 @@ int helper_jthread_raw_wait_notify(void) {
 
         reset_tested_thread_iterator(&tts);
         while(next_tested_thread(&tts)){
-            check_tested_thread_phase(tts, TT_PHASE_ANY); // to make thread running
             tf_assert(tts->phase != TT_PHASE_IN_CRITICAL_SECTON);
         }
         tf_assert_same(jthread_raw_monitor_notify(monitor), TM_ERROR_NONE);
+        hysem_wait(mon_enter);
         reset_tested_thread_iterator(&tts);
         while(next_tested_thread(&tts)){
-            check_tested_thread_phase(tts, TT_PHASE_ANY); // to make thread running
             if (tts->phase == TT_PHASE_IN_CRITICAL_SECTON){
                 tf_assert(critical_tts == NULL); // error if two threads in critical section
                 critical_tts = tts;
@@ -228,7 +228,8 @@ int helper_jthread_raw_wait_notify(void) {
         if (MAX_TESTED_THREAD_NUMBER - waiting_on_wait_nmb - i != 1){
             tf_fail("Wrong number waiting on monitor threads");
         }
-        critical_tts->stop = 1;
+        tested_thread_send_stop_request(critical_tts);
+        tested_thread_wait_ended(critical_tts);
         check_tested_thread_phase(critical_tts, TT_PHASE_DEAD);
     }
     // Terminate all threads and clear tts structures
@@ -241,34 +242,6 @@ int helper_jthread_raw_wait_notify(void) {
  * Test jthread_raw_wait(...)
  * Test jthread_raw_notify_all(...)
  */
-void JNICALL run_for_helper_jthread_raw_wait_notify_all(jvmtiEnv * jvmti_env, JNIEnv * jni_env, void *arg){
-
-    tested_thread_sturct_t * tts = current_thread_tts;
-    jrawMonitorID monitor = tts->raw_monitor;
-    int64 msec = 1000000;
-    IDATA status;
-
-    tts->phase = TT_PHASE_WAITING_ON_MONITOR;
-    status = jthread_raw_monitor_enter(monitor);
-    if (status != TM_ERROR_NONE){
-        tts->phase = TT_PHASE_ERROR;
-        return;
-    }
-    // Begin critical section
-    tts->phase = TT_PHASE_WAITING_ON_WAIT;
-    status = jthread_raw_monitor_wait(monitor, msec);
-    tts->phase = (status == TM_ERROR_NONE ? TT_PHASE_IN_CRITICAL_SECTON : TT_PHASE_ERROR);
-    while(1){
-        tts->clicks++;
-        sleep_a_click();
-        if (tts->stop) {
-            break;
-        }
-    }
-    status = jthread_raw_monitor_exit(monitor);
-    // Exit critical section
-    tts->phase = (status == TM_ERROR_NONE ? TT_PHASE_DEAD : TT_PHASE_ERROR);
-}
 
 int helper_jthread_raw_wait_notify_all(void) {
 
@@ -278,8 +251,10 @@ int helper_jthread_raw_wait_notify_all(void) {
     int i;
     int waiting_on_wait_nmb;
 
+    hysem_create(&mon_enter, 0, 1);
+
     // Initialize tts structures and run all tested threads
-    tested_threads_run(run_for_helper_jthread_raw_wait_notify_all);
+    tested_threads_run(run_for_helper_jthread_raw_wait_notify);
 
     reset_tested_thread_iterator(&tts);
     while(next_tested_thread(&tts)){
@@ -295,9 +270,10 @@ int helper_jthread_raw_wait_notify_all(void) {
         waiting_on_wait_nmb = 0;
         critical_tts = NULL;
 
+        hysem_wait(mon_enter);
+
         reset_tested_thread_iterator(&tts);
         while(next_tested_thread(&tts)){
-            check_tested_thread_phase(tts, TT_PHASE_ANY); // to make thread running
             if (tts->phase == TT_PHASE_IN_CRITICAL_SECTON){
                 tf_assert(critical_tts == NULL); // error if two threads in critical section
                 critical_tts = tts;
@@ -309,7 +285,8 @@ int helper_jthread_raw_wait_notify_all(void) {
         if (MAX_TESTED_THREAD_NUMBER - waiting_on_wait_nmb - i != 1){
             tf_fail("Wrong number waiting on monitor threads");
         }
-        critical_tts->stop = 1;
+        tested_thread_send_stop_request(critical_tts);
+        tested_thread_wait_ended(critical_tts);
         check_tested_thread_phase(critical_tts, TT_PHASE_DEAD);
     }
     // Terminate all threads and clear tts structures
@@ -318,13 +295,14 @@ int helper_jthread_raw_wait_notify_all(void) {
     return TEST_PASSED;
 }
 
-void JNICALL run_for_helper_jthread_raw_monitor_try_enter(jvmtiEnv * jvmti_env, JNIEnv * jni_env, void *arg){
+void JNICALL run_for_helper_jthread_raw_monitor_try_enter(jvmtiEnv * jvmti_env, JNIEnv * jni_env, void *args){
 
-    tested_thread_sturct_t * tts = current_thread_tts;
+    tested_thread_sturct_t * tts = (tested_thread_sturct_t *) args;
     jrawMonitorID monitor = tts->raw_monitor;
     IDATA status;
     
     tts->phase = TT_PHASE_WAITING_ON_MONITOR;
+    tested_thread_started(tts);
     status = jthread_raw_monitor_try_enter(monitor);
     while (status == TM_ERROR_EBUSY){
         status = jthread_raw_monitor_try_enter(monitor);
@@ -332,16 +310,12 @@ void JNICALL run_for_helper_jthread_raw_monitor_try_enter(jvmtiEnv * jvmti_env, 
     }
     // Begin critical section
     tts->phase = (status == TM_ERROR_NONE ? TT_PHASE_IN_CRITICAL_SECTON : TT_PHASE_ERROR);
-    while(1){
-        tts->clicks++;
-        sleep_a_click();
-        if (tts->stop) {
-            break;
-        }
-    }
+    hysem_set(mon_enter, 1);
+    tested_thread_wait_for_stop_request(tts);
     status = jthread_raw_monitor_exit(monitor);
     // End critical section
     tts->phase = (status == TM_ERROR_NONE ? TT_PHASE_DEAD : TT_PHASE_ERROR);
+    tested_thread_ended(tts);
 }
 
 int helper_jthread_raw_monitor_try_enter(void) {
@@ -351,6 +325,8 @@ int helper_jthread_raw_monitor_try_enter(void) {
     int i;
     int waiting_on_monitor_nmb;
 
+    hysem_create(&mon_enter, 0, 1);
+
     // Initialize tts structures and run all tested threads
     tested_threads_run(run_for_helper_jthread_raw_monitor_try_enter);
 
@@ -359,9 +335,10 @@ int helper_jthread_raw_monitor_try_enter(void) {
         waiting_on_monitor_nmb = 0;
         critical_tts = NULL;
 
+        hysem_wait(mon_enter);
+
         reset_tested_thread_iterator(&tts);
         while(next_tested_thread(&tts)){
-            check_tested_thread_phase(tts, TT_PHASE_ANY); // to make thread running
             if (tts->phase == TT_PHASE_IN_CRITICAL_SECTON){
                 tf_assert(critical_tts == NULL); // error if two threads in critical section
                 critical_tts = tts;
@@ -373,7 +350,8 @@ int helper_jthread_raw_monitor_try_enter(void) {
         if (MAX_TESTED_THREAD_NUMBER - waiting_on_monitor_nmb - i != 1){
             tf_fail("Wrong number waiting on monitor threads");
         }
-        critical_tts->stop = 1;
+        tested_thread_send_stop_request(critical_tts);
+        tested_thread_wait_ended(critical_tts);
         check_tested_thread_phase(critical_tts, TT_PHASE_DEAD);
     }
     // Terminate all threads and clear tts structures

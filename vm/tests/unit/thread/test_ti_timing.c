@@ -64,23 +64,18 @@ int test_jthread_get_thread_cpu_timer_info(void) {
     return helper_hythread_cpu_timing();
 }
 
-void JNICALL run_for_helper_hythread_cpu_timing(jvmtiEnv * jvmti_env, JNIEnv * jni_env, void *arg){
+void JNICALL run_for_helper_hythread_cpu_timing(jvmtiEnv * jvmti_env, JNIEnv * jni_env, void *args){
 
-    tested_thread_sturct_t * tts = current_thread_tts;
-    int i;
+    tested_thread_sturct_t * tts = (tested_thread_sturct_t *) args;
     int num = 0;
     
     tts->phase = TT_PHASE_RUNNING;
-    while(1){
-        for (i = 0; i < 1000; i++){
-            num = num + 1;
-        }
-        if (tts->stop) {
-            break;
-        }
-        sleep_a_click();
+    tested_thread_started(tts);
+    while(tested_thread_wait_for_stop_request_timed(tts, SLEEP_TIME) == TM_ERROR_TIMEOUT) {
+        ++num;
     }
     tts->phase = TT_PHASE_DEAD;
+    tested_thread_ended(tts);
 }
 
 int helper_hythread_cpu_timing(void) {
@@ -100,7 +95,8 @@ int helper_hythread_cpu_timing(void) {
     
     reset_tested_thread_iterator(&tts);
     while(next_tested_thread(&tts)){
-        tts->stop = 1;
+        tested_thread_send_stop_request(tts);
+        tested_thread_wait_ended(tts);
         check_tested_thread_phase(tts, TT_PHASE_DEAD);
 
         tf_assert_same(jthread_get_thread_cpu_time(tts->java_thread, &cpu_time), TM_ERROR_NONE);
@@ -110,6 +106,7 @@ int helper_hythread_cpu_timing(void) {
         tf_assert_same(jthread_get_thread_cpu_timer_info(&timer_info), TM_ERROR_NONE);
         
         tf_assert(user_cpu_time > 0);
+        /*
         printf("=================================================== %08x\n", cpu_time);
         printf("cpu_time = %i \n", cpu_time);
         printf("user_cpu_time = %i \n", user_cpu_time);
@@ -122,6 +119,7 @@ int helper_hythread_cpu_timing(void) {
         printf("may_skip_forward = %i \n", timer_info.may_skip_forward);
         printf("may_skip_backward = %i \n", timer_info.may_skip_backward);
         printf("kind = %i \n", timer_info.kind);
+        */
     }
 
     // Terminate all threads and clear tts structures

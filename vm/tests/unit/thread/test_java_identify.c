@@ -26,23 +26,15 @@
 /*
  * Test jthread_self(...)
  */
-void JNICALL run_for_test_jthread_self(jvmtiEnv * jvmti_env, JNIEnv * jni_env, void *arg){
+void JNICALL run_for_test_jthread_self(jvmtiEnv * jvmti_env, JNIEnv * jni_env, void *args){
 
-    tested_thread_sturct_t * tts = current_thread_tts;
+    tested_thread_sturct_t * tts = (tested_thread_sturct_t *) args;
     
     tts->phase = TT_PHASE_RUNNING;
-    while(1){
-        if (jthread_self()->object != tts->java_thread->object){
-            tts->phase = TT_PHASE_ERROR;
-            return;
-        }
-        tts->clicks++;
-        sleep_a_click();
-        if (tts->stop) {
-            break;
-        }
-    }
-    tts->phase = TT_PHASE_DEAD;
+    tested_thread_started(tts);
+    tested_thread_wait_for_stop_request(tts);
+    tts->phase = jthread_self()->object == tts->java_thread->object ? TT_PHASE_DEAD : TT_PHASE_ERROR;
+    tested_thread_ended(tts);
 }
 
 int test_jthread_self(void) {
@@ -54,7 +46,8 @@ int test_jthread_self(void) {
 
     reset_tested_thread_iterator(&tts);
     while(next_tested_thread(&tts)){
-        tts->stop = 1;
+        tested_thread_send_stop_request(tts);
+        tested_thread_wait_ended(tts);
         check_tested_thread_phase(tts, TT_PHASE_DEAD);
     }
     // Terminate all threads (not needed here) and clear tts structures

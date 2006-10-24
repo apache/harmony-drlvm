@@ -44,10 +44,12 @@
 #define TTS_INIT_DIFFERENT_MONITORS 1
 
 #define MAX_TESTED_THREAD_NUMBER 5
-#define MAX_CLICKS_TO_WAIT 30
-#define CLICK_TIME_MSEC 10
+#define MAX_TIME_TO_WAIT 1000
 #define MAX_OWNED_MONITORS_NMB 2
-#define SLEEP_MSEC 10
+#define SLEEP_TIME 100
+#define CLICK_TIME_MSEC 10
+
+extern JavaVM * GLOBAL_VM;
 
 typedef struct _jjobject{
     void *data;
@@ -63,20 +65,20 @@ typedef struct _jobject{
 typedef struct {
     int my_index;
     jthread java_thread;
+    hythread_t native_thread;
     jobject monitor;
     jrawMonitorID raw_monitor;
     void * jvmti_start_proc_arg;
-    int clicks;
+    hysem_t started;
+    hysem_t running;
+    hysem_t stop_request;
+    hysem_t ended;
     int phase;
-    int stop;
     jint peak_count;
     jthread_threadattr_t attrs;
     jclass excn;
-}tested_thread_sturct_t;
+} tested_thread_sturct_t;
 
-extern tested_thread_sturct_t *current_thread_tts;
-extern tested_thread_sturct_t *dummy_tts;
-void jni_init();
 void sleep_a_click(void);
 void test_java_thread_setup(int argc, char *argv[]);
 void test_java_thread_teardown(void);
@@ -85,20 +87,38 @@ void tested_threads_run(jvmtiStartFunction run_method_param);
 void tested_threads_run_common(jvmtiStartFunction run_method_param);
 void tested_threads_run_with_different_monitors(jvmtiStartFunction run_method_param);
 void tested_threads_run_with_jvmti_start_proc(jvmtiStartFunction jvmti_start_proc);
-void tested_os_threads_run(apr_thread_start_t run_method_param);
+void tested_os_threads_run(hythread_entrypoint_t run_method_param);
+
 int tested_threads_destroy();
 int tested_threads_stop();
+
 tested_thread_sturct_t *get_tts(int tts_index);
 int next_tested_thread(tested_thread_sturct_t **tts);
 int prev_tested_thread(tested_thread_sturct_t **tts);
 void reset_tested_thread_iterator(tested_thread_sturct_t ** tts);
-int check_tested_thread_structures(tested_thread_sturct_t *tts);
-int check_tested_thread_phase(tested_thread_sturct_t *tts, int phase);
-int tested_thread_is_running(tested_thread_sturct_t *tts);
+
+#define check_tested_thread_phase(tts, phase) if (check_phase(tts, phase) != TEST_PASSED) return TEST_FAILED;
+#define check_tested_thread_structures(tts) if (check_structure(tts) != TEST_PASSED) return TEST_FAILED;
+int check_structure(tested_thread_sturct_t *tts);
+int check_phase(tested_thread_sturct_t *tts, int phase);
+
+void tested_thread_started(tested_thread_sturct_t * tts);
+void tested_thread_ended(tested_thread_sturct_t * tts);
+void tested_thread_send_stop_request(tested_thread_sturct_t * tts);
+void tested_thread_wait_for_stop_request(tested_thread_sturct_t * tts);
+IDATA tested_thread_wait_for_stop_request_timed(tested_thread_sturct_t * tts, I_64 sleep_time);
+
+void tested_thread_wait_started(tested_thread_sturct_t *tts);
+void tested_thread_wait_running(tested_thread_sturct_t *tts);
+void tested_thread_wait_ended(tested_thread_sturct_t *tts);
+void tested_thread_wait_dead(tested_thread_sturct_t *tts);
+
 int compare_threads(jthread *threads, int thread_nmb, int compare_from_end);
 int compare_pointer_sets(void ** set_a, void ** set_b, int nmb);
 int check_exception(jobject excn);
-jobject new_jobject();
-void delete_jobject(jobject obj);
 void set_phase(tested_thread_sturct_t *tts, int phase);
 void JNICALL default_run_for_test(jvmtiEnv * jvmti_env, JNIEnv * jni_env, void *arg);
+jthread new_jobject_thread(JNIEnv * jni_env);
+jobject new_jobject_thread_death(JNIEnv * jni_env);
+jthread new_jobject();
+void delete_jobject(jobject obj);

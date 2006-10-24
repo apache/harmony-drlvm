@@ -34,20 +34,18 @@
  *  jthread_clear_interrupted()  ALIVE | RUNNABLE
  *                           DEAD
  */
-void JNICALL run_for_test_jthread_get_state_1(jvmtiEnv * jvmti_env, JNIEnv * jni_env, void *arg){
+void JNICALL run_for_test_jthread_get_state_1(jvmtiEnv * jvmti_env, JNIEnv * jni_env, void *args){
 
-    tested_thread_sturct_t * tts = current_thread_tts;
+    tested_thread_sturct_t * tts = (tested_thread_sturct_t *) args;
 
     tts->phase = TT_PHASE_RUNNING;
-    while(1){
+    tested_thread_started(tts);
+    while(tested_thread_wait_for_stop_request_timed(tts, SLEEP_TIME) == TM_ERROR_TIMEOUT){
         hythread_safe_point();
-        tts->clicks++;
         hythread_yield();
-        if (tts->stop) {
-            break;
-        }
     }
     tts->phase = TT_PHASE_DEAD;
+    tested_thread_ended(tts);
 }
 
 int test_jthread_get_state_1(void) {
@@ -74,7 +72,7 @@ int test_jthread_get_state_1(void) {
 
     reset_tested_thread_iterator(&tts);
     while(next_tested_thread(&tts)){
-        check_tested_thread_phase(tts, TT_PHASE_RUNNING);
+        tested_thread_wait_running(tts);
         tf_assert_same(jthread_get_state(tts->java_thread, &state), TM_ERROR_NONE);
         ref_state = 0x5;
         if(tts->my_index == 0){
@@ -98,7 +96,8 @@ int test_jthread_get_state_1(void) {
         }
         //tf_assert_same(state, ref_state);
 
-        tts->stop = 1;
+        tested_thread_send_stop_request(tts);
+        tested_thread_wait_ended(tts);
         check_tested_thread_phase(tts, TT_PHASE_DEAD);
         tf_assert_same(jthread_get_state(tts->java_thread, &state), TM_ERROR_NONE);
         ref_state = 0x2;
@@ -116,16 +115,18 @@ int test_jthread_get_state_1(void) {
 /*
  * Test jthread_get_state(...)
  */
-void JNICALL run_for_test_jthread_get_state_2(jvmtiEnv * jvmti_env, JNIEnv * jni_env, void *arg){
+void JNICALL run_for_test_jthread_get_state_2(jvmtiEnv * jvmti_env, JNIEnv * jni_env, void *args){
 
-    tested_thread_sturct_t * tts = current_thread_tts;
+    tested_thread_sturct_t * tts = (tested_thread_sturct_t *) args;
     jobject monitor = tts->monitor;
     IDATA status;
 
     tts->phase = TT_PHASE_WAITING_ON_MONITOR;
+    tested_thread_started(tts);
     status = jthread_monitor_enter(monitor);
     if (status != TM_ERROR_NONE){
         tts->phase = TT_PHASE_ERROR;
+        tested_thread_ended(tts);
         return;
     }
     // Begin critical section
@@ -138,15 +139,12 @@ void JNICALL run_for_test_jthread_get_state_2(jvmtiEnv * jvmti_env, JNIEnv * jni
     status = jthread_monitor_exit(monitor);
     // Exit critical section
     tts->phase = (status == TM_ERROR_NONE ? TT_PHASE_RUNNING : TT_PHASE_ERROR);
-    while(1){
+    while(tested_thread_wait_for_stop_request_timed(tts, SLEEP_TIME) == TM_ERROR_TIMEOUT){
         hythread_safe_point();
-        tts->clicks++;
         hythread_yield();
-        if (tts->stop) {
-            break;
-        }
     }
     tts->phase = TT_PHASE_DEAD;
+    tested_thread_ended(tts);
 }
 
 int test_jthread_get_state_2(void) {
@@ -231,16 +229,18 @@ int test_jthread_get_state_2(void) {
 /*
  * Test jthread_get_state(...)
  */
-void JNICALL run_for_test_jthread_get_state_3(jvmtiEnv * jvmti_env, JNIEnv * jni_env, void *arg){
+void JNICALL run_for_test_jthread_get_state_3(jvmtiEnv * jvmti_env, JNIEnv * jni_env, void *args){
 
-    tested_thread_sturct_t * tts = current_thread_tts;
+    tested_thread_sturct_t * tts = (tested_thread_sturct_t *) args;
     jobject monitor = tts->monitor;
     IDATA status;
 
     tts->phase = TT_PHASE_WAITING_ON_MONITOR;
+    tested_thread_started(tts);
     status = jthread_monitor_enter(monitor);
     if (status != TM_ERROR_NONE){
         tts->phase = TT_PHASE_ERROR;
+        tested_thread_ended(tts);
         return;
     }
     // Begin critical section
@@ -248,11 +248,13 @@ void JNICALL run_for_test_jthread_get_state_3(jvmtiEnv * jvmti_env, JNIEnv * jni
     status = jthread_monitor_timed_wait(monitor, 1000000, 100);
     if (status != TM_ERROR_INTERRUPT){
         tts->phase = TT_PHASE_ERROR;
+        tested_thread_ended(tts);
         return;
     }
     status = jthread_monitor_exit(monitor);
     // Exit critical section
     tts->phase = (status == TM_ERROR_NONE ? TT_PHASE_DEAD : TT_PHASE_ERROR);
+    tested_thread_ended(tts);
 }
 
 int test_jthread_get_state_3(void) {
@@ -288,16 +290,18 @@ int test_jthread_get_state_3(void) {
 /*
  * Test jthread_get_state(...)
  */
-void JNICALL run_for_test_jthread_get_state_4(jvmtiEnv * jvmti_env, JNIEnv * jni_env, void *arg){
+void JNICALL run_for_test_jthread_get_state_4(jvmtiEnv * jvmti_env, JNIEnv * jni_env, void *args){
 
-    tested_thread_sturct_t * tts = current_thread_tts;
+    tested_thread_sturct_t * tts = (tested_thread_sturct_t *) args;
     jobject monitor = tts->monitor;
     IDATA status;
 
     tts->phase = TT_PHASE_WAITING_ON_MONITOR;
+    tested_thread_started(tts);
     status = jthread_monitor_enter(monitor);
     if (status != TM_ERROR_NONE){
         tts->phase = TT_PHASE_ERROR;
+        tested_thread_ended(tts);
         return;
     }
     // Begin critical section
@@ -305,11 +309,13 @@ void JNICALL run_for_test_jthread_get_state_4(jvmtiEnv * jvmti_env, JNIEnv * jni
     status = jthread_monitor_timed_wait(monitor, CLICK_TIME_MSEC, 0);
     if (status != TM_ERROR_TIMEOUT){
         tts->phase = TT_PHASE_ERROR;
+        tested_thread_ended(tts);
         return;
     }
     status = jthread_monitor_exit(monitor);
     // Exit critical section
     tts->phase = (status == TM_ERROR_NONE ? TT_PHASE_DEAD : TT_PHASE_ERROR);
+    tested_thread_ended(tts);
 }
 
 int test_jthread_get_state_4(void) {
@@ -342,14 +348,16 @@ int test_jthread_get_state_4(void) {
 /*
  * Test jthread_get_state(...)
  */
-void JNICALL run_for_test_jthread_get_state_5(jvmtiEnv * jvmti_env, JNIEnv * jni_env, void *arg){
+void JNICALL run_for_test_jthread_get_state_5(jvmtiEnv * jvmti_env, JNIEnv * jni_env, void *args){
 
-    tested_thread_sturct_t * tts = current_thread_tts;
+    tested_thread_sturct_t * tts = (tested_thread_sturct_t *) args;
     IDATA status;
 
     tts->phase = TT_PHASE_SLEEPING;
+    tested_thread_started(tts);
     status = hythread_sleep(1000000);
     tts->phase = (status == TM_ERROR_INTERRUPT ? TT_PHASE_DEAD : TT_PHASE_ERROR);
+    tested_thread_ended(tts);
 }
 
 int test_jthread_get_state_5(void) {
@@ -385,14 +393,16 @@ int test_jthread_get_state_5(void) {
 /*
  * Test jthread_get_state(...)
  */
-void JNICALL run_for_test_jthread_get_state_6(jvmtiEnv * jvmti_env, JNIEnv * jni_env, void *arg){
+void JNICALL run_for_test_jthread_get_state_6(jvmtiEnv * jvmti_env, JNIEnv * jni_env, void *args){
 
-    tested_thread_sturct_t * tts = current_thread_tts;
+    tested_thread_sturct_t * tts = (tested_thread_sturct_t *) args;
     IDATA status;
 
     tts->phase = TT_PHASE_SLEEPING;
+    tested_thread_started(tts);
     status = hythread_sleep(CLICK_TIME_MSEC);
     tts->phase = (status == TM_ERROR_NONE ? TT_PHASE_DEAD : TT_PHASE_ERROR);
+    tested_thread_ended(tts);
 }
 
 int test_jthread_get_state_6(void) {

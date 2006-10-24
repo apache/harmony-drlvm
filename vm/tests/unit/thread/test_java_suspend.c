@@ -25,73 +25,59 @@
  * Test jthread_suspend(...)
  * Test jthread_resume(...)
   */
-void JNICALL run_for_test_jthread_suspend_resume(jvmtiEnv * jvmti_env, JNIEnv * jni_env, void *arg){
+void JNICALL run_for_test_jthread_suspend_resume(jvmtiEnv * jvmti_env, JNIEnv * jni_env, void *args){
 
-    tested_thread_sturct_t * tts = current_thread_tts;
+    tested_thread_sturct_t * tts = (tested_thread_sturct_t *) args;
+    IDATA status;
     
     tts->phase = TT_PHASE_RUNNING;
-    while(1){
+    tested_thread_started(tts);    
+    do {
         hythread_safe_point();
-        tts->clicks++;
-        sleep_a_click();
-        if (tts->stop) {
-            break;
-        }
-    }
-    tts->phase = TT_PHASE_DEAD;
+        status = tested_thread_wait_for_stop_request_timed(tts, SLEEP_TIME);
+        hythread_suspend_disable();
+        hythread_suspend_enable();
+    } while (status == TM_ERROR_TIMEOUT);
+    tts->phase = status == TM_ERROR_NONE ? TT_PHASE_DEAD : TT_PHASE_ERROR;
+    tested_thread_ended(tts);
 }
 
 int test_jthread_suspend_resume(void) {
 
     tested_thread_sturct_t *tts;
     tested_thread_sturct_t *switch_tts;
-    int i;
-    int suspended_nmb;
 
     // Initialize tts structures and run all tested threads
     tested_threads_run(run_for_test_jthread_suspend_resume);
 
-    for (i = 0; i <= MAX_TESTED_THREAD_NUMBER; i++){
+    switch_tts = get_tts(0);
 
-        suspended_nmb = 0;
-        switch_tts = NULL;
+    reset_tested_thread_iterator(&tts);
+    while(next_tested_thread(&tts)){
+        tested_thread_wait_running(tts);
+    }
 
-        reset_tested_thread_iterator(&tts);
-        while(next_tested_thread(&tts)){
+    tf_assert_same((jthread_suspend(switch_tts->java_thread)), TM_ERROR_NONE);
+    
+    reset_tested_thread_iterator(&tts);
+    while(next_tested_thread(&tts)){
+        tested_thread_send_stop_request(tts);
+    }
+ 
+    reset_tested_thread_iterator(&tts);
+    while(next_tested_thread(&tts)){
+        if (tts != switch_tts) {
+            tested_thread_wait_ended(tts);
+            check_tested_thread_phase(tts, TT_PHASE_DEAD);
+        } else {
             check_tested_thread_phase(tts, TT_PHASE_RUNNING);
-            if (tested_thread_is_running(tts)){
-                switch_tts = tts;
-            } else {
-                suspended_nmb++;
-            }
-        }
-        if (suspended_nmb != i){
-            tf_fail("Wrong number of suspended threads");
-        }
-        if (switch_tts != NULL){
-            tf_assert_same(jthread_suspend(switch_tts->java_thread), TM_ERROR_NONE);
         }
     }
-    for (i = 0; i <= MAX_TESTED_THREAD_NUMBER; i++){
 
-        suspended_nmb = 0;
-        switch_tts = NULL;
+    tf_assert_same(jthread_resume(switch_tts->java_thread), TM_ERROR_NONE);
+    tested_thread_wait_ended(switch_tts);
+    check_tested_thread_phase(switch_tts, TT_PHASE_DEAD);
 
-        reset_tested_thread_iterator(&tts);
-        while(next_tested_thread(&tts)){
-            check_tested_thread_phase(tts, TT_PHASE_RUNNING);
-            if (!tested_thread_is_running(tts)){
-                suspended_nmb++;
-                switch_tts = tts;
-            }
-        }
-        if (suspended_nmb != MAX_TESTED_THREAD_NUMBER - i){
-            tf_fail("Wrong number of suspended threads");
-        }
-        if (switch_tts != NULL){
-            tf_assert_same(jthread_resume(switch_tts->java_thread), TM_ERROR_NONE);
-        }
-    }
     // Terminate all threads and clear tts structures
     tested_threads_destroy();
 
@@ -101,7 +87,6 @@ int test_jthread_suspend_resume(void) {
  * Test jthread_suspend_all(...)
  * Test jthread_resume_all(...)
  */
-
 int test_jthread_suspend_all_resume_all(void) {
 
     tested_thread_sturct_t * tts;
@@ -115,29 +100,31 @@ int test_jthread_suspend_all_resume_all(void) {
     // Test that all threads are running
     reset_tested_thread_iterator(&tts);
     while(next_tested_thread(&tts)){
+        tested_thread_wait_running(tts);
         all_threads[i] = tts->java_thread;
         results[i] = (jvmtiError)(TM_ERROR_NONE + 1);
         i++;
-        tf_assert(tested_thread_is_running(tts));
     }
     tf_assert_same(jthread_suspend_all(results, MAX_TESTED_THREAD_NUMBER, all_threads), TM_ERROR_NONE);
     // Test that all threads are suspended
+    reset_tested_thread_iterator(&tts);
+    while(next_tested_thread(&tts)){
+        tested_thread_send_stop_request(tts);
+    }
     i = 0;
     reset_tested_thread_iterator(&tts);
     while(next_tested_thread(&tts)){
-        tf_assert(!tested_thread_is_running(tts));
+        check_tested_thread_phase(tts, TT_PHASE_RUNNING);
         tf_assert_same(results[i], TM_ERROR_NONE);
         results[i] = (jvmtiError)(TM_ERROR_NONE + 1);
         i++;
     }
     tf_assert_same(jthread_resume_all(results, MAX_TESTED_THREAD_NUMBER, all_threads), TM_ERROR_NONE);
     // Test that all threads are running
-    i = 0;
     reset_tested_thread_iterator(&tts);
     while(next_tested_thread(&tts)){
-        tf_assert(tested_thread_is_running(tts));
-        tf_assert_same(results[i], TM_ERROR_NONE);
-        i++;
+        tested_thread_wait_ended(tts);
+        check_tested_thread_phase(tts, TT_PHASE_DEAD);        
     }
     // Terminate all threads and clear tts structures
     tested_threads_destroy();
