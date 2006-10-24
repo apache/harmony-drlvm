@@ -47,9 +47,17 @@
  * @see hythread_unpark
  */
 IDATA VMCALL hythread_park(I_64 millis, IDATA nanos) {
+     IDATA status;
      hythread_t t = tm_self_tls;     
      assert(t);
-     return hysem_wait_interruptable(t->park_event, millis, nanos);
+     status = hysem_wait_interruptable(t->park_event, millis, nanos);
+     //the status should be restored for j.u.c.LockSupport
+     ////
+     if (status == TM_ERROR_INTERRUPT) {
+         t->state |= TM_THREAD_STATE_INTERRUPTED;
+     }
+
+     return status;
 }
 
 /**

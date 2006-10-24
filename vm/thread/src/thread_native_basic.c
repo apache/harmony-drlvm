@@ -121,7 +121,6 @@ IDATA VMCALL hythread_create_with_group(hythread_t *ret_thread, hythread_group_t
     }
 
     new_thread->priority = priority ? priority : HYTHREAD_PRIORITY_NORMAL;
-    new_thread->state = TM_THREAD_STATE_ALIVE;
     //new_thread->suspend_request = suspend ? 1 : 0;
     
     start_proc_data = (thread_start_proc_data *) apr_palloc(new_thread->pool, sizeof(thread_start_proc_data));
@@ -590,7 +589,7 @@ static IDATA register_to_group(hythread_t thread, hythread_group_t group) {
     thread_set_self(thread);
     assert(thread == tm_self_tls);
 
-    thread->state = TM_THREAD_STATE_ALIVE | TM_THREAD_STATE_RUNNABLE;
+    thread->state |= TM_THREAD_STATE_ALIVE | TM_THREAD_STATE_RUNNABLE;
     
     if (!thread->thread_id) {
         ++next_id;
