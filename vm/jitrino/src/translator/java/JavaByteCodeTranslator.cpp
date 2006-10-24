@@ -3552,13 +3552,18 @@ void JavaByteCodeTranslator::genMagic(MethodDesc *md, uint32 numArgs, Opnd **src
     //
     ComparisonModifier cm = Cmp_Mask;
     bool commuteOpnds=false;
-    if (!strcmp(mname, "EQ"))          { cm = Cmp_EQ; }
-    else if (!strcmp(mname, "equals")) { cm = Cmp_EQ; }
-    else if (!strcmp(mname, "NE"))     { cm = Cmp_NE_Un; }
-    else if (!strcmp(mname, "GE"))     { cm = Cmp_GTE;}
-    else if (!strcmp(mname, "GT"))     { cm = Cmp_GT; }
-    else if (!strcmp(mname, "LE"))     { cm = Cmp_GTE;  commuteOpnds = true;}
-    else if (!strcmp(mname, "LT"))     { cm = Cmp_GT;  commuteOpnds = true;}
+    if (!strcmp(mname, "EQ"))         { cm = Cmp_EQ; }
+    else if (!strcmp(mname, "equals")){ cm = Cmp_EQ; }
+    else if (!strcmp(mname, "NE"))    { cm = Cmp_NE_Un; }
+    else if (!strcmp(mname, "GE"))    { cm = Cmp_GTE_Un;}
+    else if (!strcmp(mname, "GT"))    { cm = Cmp_GT_Un; }
+    else if (!strcmp(mname, "LE"))    { cm = Cmp_GTE_Un; commuteOpnds = true;}
+    else if (!strcmp(mname, "LT"))    { cm = Cmp_GT_Un;  commuteOpnds = true;}
+    else if (!strcmp(mname, "sGE"))   { cm = Cmp_GTE;}
+    else if (!strcmp(mname, "sGT"))   { cm = Cmp_GT; }
+    else if (!strcmp(mname, "sLE"))   { cm = Cmp_GTE; commuteOpnds = true;}
+    else if (!strcmp(mname, "sLT"))   { cm = Cmp_GT;  commuteOpnds = true;}
+
     if (cm!=Cmp_Mask) {
         assert(numArgs == 2);
         assert(arg0->getType() == arg1->getType());
