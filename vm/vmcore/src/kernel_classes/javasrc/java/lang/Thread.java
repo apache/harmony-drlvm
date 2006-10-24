@@ -791,25 +791,29 @@ public class Thread implements Runnable {
      * @com.intel.drl.spec_ref
      */
     public final void stop() {
-        stop(new ThreadDeath());
+        synchronized (lock) {
+        	if (isAlive()) {
+                stop(new ThreadDeath());
+        	}
+        }
     }
 
     /**
      * @com.intel.drl.spec_ref
      */
     public final void stop(Throwable throwable) {
+        SecurityManager securityManager = System.getSecurityManager();
+        if (securityManager != null) {
+            securityManager.checkAccess(this);
+            if (currentThread() != this || !(throwable instanceof ThreadDeath)) {
+                securityManager.checkPermission(
+                    RuntimePermissionCollection.STOP_THREAD_PERMISSION);
+            }
+        }
+        if (throwable == null) {
+            throw new NullPointerException("The argument is null!");
+        }
         synchronized (lock) {
-            if (throwable == null) {
-                throw new NullPointerException("The argument is null!");
-            }
-            SecurityManager securityManager = System.getSecurityManager();
-            if (securityManager != null) {
-                securityManager.checkAccess(this);
-                if (currentThread() != this) {
-                    securityManager
-                        .checkPermission(RuntimePermissionCollection.STOP_THREAD_PERMISSION);
-                }
-            }
             int status = VMThreadManager.stop(this, throwable);
             if (status != VMThreadManager.TM_ERROR_NONE) {
                 throw new InternalError(
@@ -982,7 +986,7 @@ public class Thread implements Runnable {
             System.gc();
         }
     }
-
+    
     /**
      * @com.intel.drl.spec_ref
      */
