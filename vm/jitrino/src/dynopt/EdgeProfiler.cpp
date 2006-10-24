@@ -40,7 +40,7 @@ namespace Jitrino {
 
 static bool isMethodTrivial( ControlFlowGraph& cfg );
 static uint32 computeCheckSum( MemoryManager& mm, ControlFlowGraph& cfg,  const StlSet<Node*>& nodesToIgnore);
-static void calculateProbsFromProfile(MemoryManager& mm, ControlFlowGraph& fg, const Edges& edges, DominatorTree* dt, LoopTree* lt, EdgeMethodProfile* profile, bool bcLevelProfiling, const StlSet<Node*>& nodesToIgnore);
+static bool calculateProbsFromProfile(MemoryManager& mm, ControlFlowGraph& fg, const Edges& edges, DominatorTree* dt, LoopTree* lt, EdgeMethodProfile* profile, bool bcLevelProfiling, const StlSet<Node*>& nodesToIgnore);
 static Node* selectNodeToInstrument(IRManager& irm, Edge* edge);
 static void selectEdgesToInstrument(MemoryManager& mm, IRManager& irm, Edges& result, const StlSet<Node*>& nodesToIgnore);
 static uint32 genKey( uint32 n, Edge* edge, bool bcLevel, bool debug);
@@ -60,8 +60,6 @@ void EdgeProfilerInstrumentationPass::_run(IRManager& irm)
     bool debug = Log::isEnabled();
     LoopTree* lt = irm.getLoopTree();    
 
-    //printDotFile(irm, true, "inside");
-    //printHIR(irm, true, "inside");
 
     //set of nodes with out-edges are not taken into account during instrumentation
     //and checksum calculation
@@ -138,7 +136,7 @@ void EdgeProfilerAnnotationPass::_run(IRManager& irm) {
     if (isMethodTrivial(flowGraph) || !edgeProfilerMode || entryCount == 0) { 
         // Annotate the CFG using static profiler heuristics.
         if (debug) {
-            Log::out()<<"Using static profiler to estimate graph"<<std::endl;
+            Log::out()<<"Using static profiler to estimate trivial graph"<<std::endl;
         }
         StaticProfiler::estimateGraph(irm, entryCount);
         return;
@@ -146,8 +144,6 @@ void EdgeProfilerAnnotationPass::_run(IRManager& irm) {
         
     OptPass::computeDominatorsAndLoops(irm);
     DominatorTree* dt = irm.getDominatorTree();
-
-//    printDotFile(irm, true, "inside");
 
     LoopTree* lt = irm.getLoopTree();
 
@@ -159,22 +155,24 @@ void EdgeProfilerAnnotationPass::_run(IRManager& irm) {
 
     EdgeMethodProfile* edgeProfile = pi->getEdgeMethodProfile(mm, md);
     uint32 profileCheckSum = edgeProfile->getCheckSum();
-    assert(profileCheckSum == cfgCheckSum);
-    if (cfgCheckSum != profileCheckSum) {
-        if (Log::isEnabled()) {
-            Log::out() << "ERROR: invalid CFG checksum!";
+    //assert(profileCheckSum == cfgCheckSum);
+    if (cfgCheckSum == profileCheckSum) {
+        // Start propagating the CFG from instrumented edges.
+        Edges edges(mm);
+        selectEdgesToInstrument(mm, irm, edges, nodesToIgnore);
+        assert(edges.size() == edgeProfile->getNumCounters());
+        bool bcLevelProfiling = false; //TODO:
+        bool res = calculateProbsFromProfile(mm, flowGraph, edges, dt, lt, edgeProfile, bcLevelProfiling, nodesToIgnore);
+        if (res) {
+            flowGraph.setEdgeProfile(true);
         }
-        return;
     }
-    
-    // Start propagating the CFG from instrumented edges.
-    Edges edges(mm);
-    selectEdgesToInstrument(mm, irm, edges, nodesToIgnore);
-    assert(edges.size() == edgeProfile->getNumCounters());
-    bool bcLevelProfiling = false; //TODO:
-    calculateProbsFromProfile(mm, flowGraph, edges, dt, lt, edgeProfile, bcLevelProfiling, nodesToIgnore);
-    flowGraph.setEdgeProfile(true);
-    
+    if (!flowGraph.hasEdgeProfile()) {
+        if (debug) {
+            Log::out()<<"DynProf failed: using static profiler to estimate graph!"<<std::endl;
+        }
+        StaticProfiler::estimateGraph(irm, 10000, true);
+    }
     if (irm.getParent() == NULL) {
         // fix profile: estimate cold paths that was never executed and recalculate frequencies
         StaticProfiler::fixEdgeProbs(irm); 
@@ -205,7 +203,7 @@ static void updateDispatchPathsToCatch(Node* node, StlVector<double>& edgeFreqs,
     }
 }
 
-static void calculateProbsFromProfile(MemoryManager& mm, ControlFlowGraph& fg, const Edges& pEdges, 
+static bool calculateProbsFromProfile(MemoryManager& mm, ControlFlowGraph& fg, const Edges& pEdges, 
                                       DominatorTree* dt, LoopTree* lt, EdgeMethodProfile* profile, 
                                       bool bcLevelProfiling, const StlSet<Node*>& nodesToIgnore) 
 {
@@ -238,7 +236,12 @@ static void calculateProbsFromProfile(MemoryManager& mm, ControlFlowGraph& fg, c
     for (Edges::const_iterator it = pEdges.begin(), end = pEdges.end(); it!=end; ++it, ++n) {
         Edge* edge = *it;
         uint32 key = genKey(n, edge, bcLevelProfiling, debug);
-        uint32 freq = *profile->getCounter(key);
+        uint32* counterAddr = profile->getCounter(key);
+        assert(counterAddr!=NULL);
+        if (counterAddr == NULL) {
+            return false;
+        }
+        uint32 freq = *counterAddr;
         setEdgeFreq(edgeFreqs, edge, freq, debug);
     }
 
@@ -388,7 +391,7 @@ static void calculateProbsFromProfile(MemoryManager& mm, ControlFlowGraph& fg, c
         } 
     }
     
-#ifdef _DEBUG
+#if 0
     //2.99 debug check : check that every child node in dom-tree that is in the same loop as parent
     //has nodeFreq <= parent freq
     if (debug) {
@@ -425,14 +428,14 @@ static void calculateProbsFromProfile(MemoryManager& mm, ControlFlowGraph& fg, c
             double edgeFreq =edgeFreqs[edge->getId()];
             assert(edgeFreq!=-1);
             double edgeProb = nodeFreq == 0 ? 0 : edgeFreq / nodeFreq ;
-            assert(edgeProb >= 0 && edgeProb <= 1);
+//            assert(edgeProb >= 0 && edgeProb <= 1);
             edge->setEdgeProb(edgeProb);
         }
     }
     if (debug) {
         Log::out()<<"Finished probs calculation";
     }
-
+    return true;
 }
 
 //
@@ -687,30 +690,19 @@ static uint32 genKey( uint32 pos, Edge* edge, bool bcLevel, bool debug)  {
     uint32 key = 0;
     if (bcLevel) {
         assert(0); //TODO:
-        /*Node* node = edge->getSourceNode();
-        Inst* lastInst = node->getLastInst();
-
-        if( lastInst->getOpcode() == Op_Branch || lastInst->getOpcode() == Op_Jump ){
-                BranchInst* br = (BranchInst*)lastInst;
-                const uint32 bcAddr = getBcAddr(br);
-                Node* targetNode = edge->getTargetNode();
-
-                // Only instrument valid taken branches.
-                if( ( bcAddr != 0 ) && ( br->getTargetLabel() == targetNode->getFirstInst() ) ){
-                    assert( (bcAddr & 0xffff0000) != 0 );
-                    return (uint32)bcAddr;
-                }
-            }
-            return 0;
-        }*/
     } else {
+        //TODO: this algorithm is not 100% effective: we can't rely on edges order in CFG
         uint32 edgePos = 0;
         const Edges& edges = edge->getSourceNode()->getOutEdges();
-        for (Edges::const_iterator it = edges.begin(), end = edges.end(); it!=end; ++it, edgePos++) {
+        for (Edges::const_iterator it = edges.begin(), end = edges.end(); it!=end; ++it) {
             Edge* outEdge = *it;
             if (outEdge == edge) {
                 break;
             }
+            if (outEdge->isDispatchEdge()) { //dispatch edge order is the reason of the most of the edge ordering errors 
+                continue;
+            }
+            edgePos++;
         }
 
         key = pos + (edgePos << 16);

@@ -204,7 +204,6 @@ uint32* DrlEdgeMethodProfile::getEntryCounter() const {
 
 uint32* DrlEdgeMethodProfile::getCounter(uint32 key) const  {
     uint32* counter = (uint32*)profileAccessInterface->edge_profiler_get_counter_addr(getHandle(), key);
-    assert(counter!=NULL);
     return counter;
 }
 
