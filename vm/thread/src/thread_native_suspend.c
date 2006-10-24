@@ -358,7 +358,7 @@ IDATA hythread_set_safepoint_callback(hythread_t thread, tm_thread_event_callbac
     }
     
     if (thread->current_condition) {
-        status=hycond_notify(thread->current_condition);   
+        status=hycond_notify_all(thread->current_condition);   
         assert (status == TM_ERROR_NONE);
     }
 
