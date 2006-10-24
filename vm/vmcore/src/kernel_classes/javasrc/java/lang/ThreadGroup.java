@@ -314,7 +314,17 @@ public class ThreadGroup implements Thread.UncaughtExceptionHandler{
      */
     public synchronized final void setMaxPriority(int priority) {
         checkAccess();
-        if (priority > Thread.MAX_PRIORITY || priority < Thread.MIN_PRIORITY) {
+        
+        /*
+         *  GMJ : note that this is to match a known bug in the RI
+         *  http://bugs.sun.com/bugdatabase/view_bug.do?bug_id=4708197
+         *  We agreed to follow bug for now to prevent breaking apps
+         */
+        if (priority > Thread.MAX_PRIORITY) {
+            return;
+        }
+        if (priority < Thread.MIN_PRIORITY) {
+            this.maxPriority = Thread.MIN_PRIORITY;
             return;
         }
         this.maxPriority = (parent != null && parent.maxPriority < priority)

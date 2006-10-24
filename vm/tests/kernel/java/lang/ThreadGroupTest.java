@@ -971,8 +971,8 @@ public class ThreadGroupTest extends TestCase {
                      curPriority, tg.getMaxPriority());
         newPriority = Thread.MIN_PRIORITY - 1;
         tg.setMaxPriority(newPriority);
-        assertEquals("Assert2: group priority should not change",
-                     curPriority, tg.getMaxPriority());
+        assertEquals("Assert2: group priority should be set to Thread.MIN_PRIORITY",
+        		Thread.MIN_PRIORITY, tg.getMaxPriority());
     }
 
     /**
