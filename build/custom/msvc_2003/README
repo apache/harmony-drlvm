@@ -9,8 +9,3 @@ drlvm/trunk/build/win_ia32_msvc_debug folder (apr.h ...).
 So you have to build DRLVM using standard way (build update/build), before you can use MSVC build today.
 
 
-
-
-INSTALL
-
-Put 'custom' folder from this archive into drlvm/trunk/build folder

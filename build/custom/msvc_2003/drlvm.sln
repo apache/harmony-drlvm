@@ -15,6 +15,22 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "interpreter", "interpreter\
 	ProjectSection(ProjectDependencies) = postProject
 	EndProjectSection
 EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "gc_cc", "gc_cc\gc_cc.vcproj", "{3B33CE22-1196-4B02-A486-E8AED9DDA548}"
+	ProjectSection(ProjectDependencies) = postProject
+	EndProjectSection
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "vmcore", "vmcore\vmcore.vcproj", "{65E079BA-B8F1-4057-9307-B80A5B9EC379}"
+	ProjectSection(ProjectDependencies) = postProject
+	EndProjectSection
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "hythr", "hythr\hythr.vcproj", "{0FDD6505-BDF8-4574-95FF-7BC800C0EF18}"
+	ProjectSection(ProjectDependencies) = postProject
+	EndProjectSection
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "jthread", "jthread\jthread.vcproj", "{2D8F4662-5052-497B-8DB7-0452CDDB7AF8}"
+	ProjectSection(ProjectDependencies) = postProject
+	EndProjectSection
+EndProject
 Global
 	GlobalSection(SolutionConfiguration) = preSolution
 		Debug = Debug
@@ -37,6 +53,22 @@ Global
 		{C9FC1C2B-6440-4460-8889-48353D136D31}.Debug.Build.0 = Debug|Win32
 		{C9FC1C2B-6440-4460-8889-48353D136D31}.Release.ActiveCfg = Release|Win32
 		{C9FC1C2B-6440-4460-8889-48353D136D31}.Release.Build.0 = Release|Win32
+		{3B33CE22-1196-4B02-A486-E8AED9DDA548}.Debug.ActiveCfg = Debug|Win32
+		{3B33CE22-1196-4B02-A486-E8AED9DDA548}.Debug.Build.0 = Debug|Win32
+		{3B33CE22-1196-4B02-A486-E8AED9DDA548}.Release.ActiveCfg = Release|Win32
+		{3B33CE22-1196-4B02-A486-E8AED9DDA548}.Release.Build.0 = Release|Win32
+		{65E079BA-B8F1-4057-9307-B80A5B9EC379}.Debug.ActiveCfg = Debug|Win32
+		{65E079BA-B8F1-4057-9307-B80A5B9EC379}.Debug.Build.0 = Debug|Win32
+		{65E079BA-B8F1-4057-9307-B80A5B9EC379}.Release.ActiveCfg = Release|Win32
+		{65E079BA-B8F1-4057-9307-B80A5B9EC379}.Release.Build.0 = Release|Win32
+		{0FDD6505-BDF8-4574-95FF-7BC800C0EF18}.Debug.ActiveCfg = Debug|Win32
+		{0FDD6505-BDF8-4574-95FF-7BC800C0EF18}.Debug.Build.0 = Debug|Win32
+		{0FDD6505-BDF8-4574-95FF-7BC800C0EF18}.Release.ActiveCfg = Release|Win32
+		{0FDD6505-BDF8-4574-95FF-7BC800C0EF18}.Release.Build.0 = Release|Win32
+		{2D8F4662-5052-497B-8DB7-0452CDDB7AF8}.Debug.ActiveCfg = Debug|Win32
+		{2D8F4662-5052-497B-8DB7-0452CDDB7AF8}.Debug.Build.0 = Debug|Win32
+		{2D8F4662-5052-497B-8DB7-0452CDDB7AF8}.Release.ActiveCfg = Release|Win32
+		{2D8F4662-5052-497B-8DB7-0452CDDB7AF8}.Release.Build.0 = Release|Win32
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 	EndGlobalSection

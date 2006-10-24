@@ -1,9 +1,9 @@
-<?xml version="1.0" encoding="Windows-1252"?>
+<?xml version="1.0" encoding="windows-1251"?>
 <VisualStudioProject
 	ProjectType="Visual C++"
 	Version="7.10"
-	Name="port_encoder"
-	ProjectGUID="{B89AC381-5594-4B8B-B6D8-FC6AD020F612}"
+	Name="gc_cc"
+	ProjectGUID="{3B33CE22-1196-4B02-A486-E8AED9DDA548}"
 	Keyword="Win32Proj">
 	<Platforms>
 		<Platform
@@ -19,8 +19,8 @@
 			<Tool
 				Name="VCCLCompilerTool"
 				Optimization="0"
-				AdditionalIncludeDirectories="$(ProjectDir)\..\..\..\..\vm\include"
-				PreprocessorDefinitions="WIN32;_DEBUG;_WINDOWS;_USRDLL;PORT_ENCODER_EXPORTS"
+				AdditionalIncludeDirectories="&quot;$(ProjectDir)\..\..\..\..\vm\vmcore\include&quot;;&quot;$(ProjectDir)\..\..\..\..\vm\include&quot;;&quot;$(ProjectDir)\..\..\..\..\vm\vmcore\src\util\win\include&quot;;&quot;$(ProjectDir)\..\..\..\..\vm\port\include&quot;;&quot;$(ProjectDir)\..\..\..\win_ia32_msvc_debug\semis\extra\apr\include\apr-1&quot;"
+				PreprocessorDefinitions="BUILDING_GC;WIN32;_DEBUG;_WINDOWS;_USRDLL"
 				MinimalRebuild="TRUE"
 				BasicRuntimeChecks="3"
 				RuntimeLibrary="1"
@@ -32,12 +32,14 @@
 				Name="VCCustomBuildTool"/>
 			<Tool
 				Name="VCLinkerTool"
-				OutputFile="$(OutDir)/port_encoder.dll"
+				AdditionalDependencies="harmonyvm.lib"
+				OutputFile="$(OutDir)/gc_cc.dll"
 				LinkIncremental="2"
+				AdditionalLibraryDirectories="$(ProjectDir)\..\..\..\win_ia32_msvc_debug\deploy\jre\bin\default"
 				GenerateDebugInformation="TRUE"
-				ProgramDatabaseFile="$(OutDir)/port_encoder.pdb"
+				ProgramDatabaseFile="$(OutDir)/gc_cc.pdb"
 				SubSystem="2"
-				ImportLibrary="$(OutDir)/port_encoder.lib"
+				ImportLibrary="$(OutDir)/gc_cc.lib"
 				TargetMachine="1"/>
 			<Tool
 				Name="VCMIDLTool"/>
@@ -68,8 +70,8 @@
 			CharacterSet="2">
 			<Tool
 				Name="VCCLCompilerTool"
-				AdditionalIncludeDirectories="$(ProjectDir)\..\..\..\..\vm\include"
-				PreprocessorDefinitions="WIN32;NDEBUG;_WINDOWS;_USRDLL"
+				AdditionalIncludeDirectories="&quot;$(ProjectDir)\..\..\..\..\vm\vmcore\include&quot;;&quot;$(ProjectDir)\..\..\..\..\vm\include&quot;;&quot;$(ProjectDir)\..\..\..\..\vm\vmcore\src\util\win\include&quot;;&quot;$(ProjectDir)\..\..\..\..\vm\port\include&quot;;&quot;$(ProjectDir)\..\..\..\win_ia32_msvc_release\semis\extra\apr\include\apr-1&quot;"
+				PreprocessorDefinitions="BUILDING_GC;WIN32;NDEBUG;_WINDOWS;_USRDLL"
 				RuntimeLibrary="0"
 				UsePrecompiledHeader="0"
 				WarningLevel="3"
@@ -79,13 +81,15 @@
 				Name="VCCustomBuildTool"/>
 			<Tool
 				Name="VCLinkerTool"
-				OutputFile="$(OutDir)/port_encoder.dll"
+				AdditionalDependencies="harmonyvm.lib"
+				OutputFile="$(OutDir)/gc_cc.dll"
 				LinkIncremental="1"
+				AdditionalLibraryDirectories="&quot;$(ProjectDir)\..\..\..\win_ia32_msvc_release\deploy\jre\bin\default&quot;"
 				GenerateDebugInformation="TRUE"
 				SubSystem="2"
 				OptimizeReferences="2"
 				EnableCOMDATFolding="2"
-				ImportLibrary="$(OutDir)/port_encoder.lib"
+				ImportLibrary="$(OutDir)/gc_cc.lib"
 				TargetMachine="1"/>
 			<Tool
 				Name="VCMIDLTool"/>
@@ -113,34 +117,58 @@
 	</References>
 	<Files>
 		<File
-			RelativePath="..\..\..\..\vm\port\src\encoder\ia32_em64t\dec_base.cpp">
+			RelativePath="..\..\..\..\vm\gc_cc\src\collect.cpp">
 		</File>
 		<File
-			RelativePath="..\..\..\..\vm\port\src\encoder\ia32_em64t\dec_base.h">
+			RelativePath="..\..\..\..\vm\gc_cc\src\collect.h">
 		</File>
 		<File
-			RelativePath="..\..\..\..\vm\port\src\encoder\ia32_em64t\enc_base.cpp">
+			RelativePath="..\..\..\..\vm\gc_cc\src\collect_cache.cpp">
 		</File>
 		<File
-			RelativePath="..\..\..\..\vm\port\src\encoder\ia32_em64t\enc_base.h">
+			RelativePath="..\..\..\..\vm\gc_cc\src\collect_copy.cpp">
 		</File>
 		<File
-			RelativePath="..\..\..\..\vm\port\src\encoder\ia32_em64t\enc_defs.h">
+			RelativePath="..\..\..\..\vm\gc_cc\src\collect_forced.cpp">
 		</File>
 		<File
-			RelativePath="..\..\..\..\vm\port\src\encoder\ia32_em64t\enc_prvt.h">
+			RelativePath="..\..\..\..\vm\gc_cc\src\collect_slide_compact.cpp">
 		</File>
 		<File
-			RelativePath="..\..\..\..\vm\port\src\encoder\ia32_em64t\enc_tabl.cpp">
+			RelativePath="..\..\..\..\vm\gc_cc\src\fast_list.h">
 		</File>
 		<File
-			RelativePath="..\..\..\..\vm\port\src\encoder\ia32_em64t\encoder.cpp">
+			RelativePath="..\..\..\..\vm\gc_cc\src\gc_for_vm.cpp">
 		</File>
 		<File
-			RelativePath="..\..\..\..\vm\port\src\encoder\ia32_em64t\encoder.h">
+			RelativePath="..\..\..\..\vm\gc_cc\src\gc_types.h">
 		</File>
 		<File
-			RelativePath="..\..\..\..\vm\port\src\encoder\ia32_em64t\encoder.inl">
+			RelativePath="..\..\..\..\vm\gc_cc\src\init.cpp">
+		</File>
+		<File
+			RelativePath="..\..\..\..\vm\gc_cc\src\large_pages_win32.cpp">
+		</File>
+		<File
+			RelativePath="..\..\..\..\vm\gc_cc\src\prepare.cpp">
+		</File>
+		<File
+			RelativePath="..\..\..\..\vm\gc_cc\src\root_set_cache.h">
+		</File>
+		<File
+			RelativePath="..\..\..\..\vm\gc_cc\src\selector.cpp">
+		</File>
+		<File
+			RelativePath="..\..\..\..\vm\gc_cc\src\slide_compact.h">
+		</File>
+		<File
+			RelativePath="..\..\..\..\vm\gc_cc\src\slot.cpp">
+		</File>
+		<File
+			RelativePath="..\..\..\..\vm\gc_cc\src\slot.h">
+		</File>
+		<File
+			RelativePath="..\..\..\..\vm\gc_cc\src\timer.h">
 		</File>
 	</Files>
 	<Globals>

@@ -1,9 +1,9 @@
-<?xml version="1.0" encoding="Windows-1252"?>
+<?xml version="1.0" encoding="windows-1251"?>
 <VisualStudioProject
 	ProjectType="Visual C++"
 	Version="7.10"
-	Name="port_encoder"
-	ProjectGUID="{B89AC381-5594-4B8B-B6D8-FC6AD020F612}"
+	Name="jthread"
+	ProjectGUID="{2D8F4662-5052-497B-8DB7-0452CDDB7AF8}"
 	Keyword="Win32Proj">
 	<Platforms>
 		<Platform
@@ -14,13 +14,13 @@
 			Name="Debug|Win32"
 			OutputDirectory="bin/$(ConfigurationName)"
 			IntermediateDirectory="tmp/$(ConfigurationName)"
-			ConfigurationType="2"
+			ConfigurationType="4"
 			CharacterSet="2">
 			<Tool
 				Name="VCCLCompilerTool"
 				Optimization="0"
-				AdditionalIncludeDirectories="$(ProjectDir)\..\..\..\..\vm\include"
-				PreprocessorDefinitions="WIN32;_DEBUG;_WINDOWS;_USRDLL;PORT_ENCODER_EXPORTS"
+				AdditionalIncludeDirectories="&quot;$(ProjectDir)\..\..\..\..\vm\include&quot;;&quot;$(ProjectDir)\..\..\..\..\vm\port\include&quot;;&quot;$(ProjectDir)\..\..\..\win_ia32_msvc_debug\semis\extra\apr\include\apr-1&quot;;&quot;$(ProjectDir)\..\..\..\..\vm\port\encoder\ia32_em64t&quot;"
+				PreprocessorDefinitions="WIN32;_DEBUG;_WINDOWS;_USRDLL"
 				MinimalRebuild="TRUE"
 				BasicRuntimeChecks="3"
 				RuntimeLibrary="1"
@@ -31,14 +31,7 @@
 			<Tool
 				Name="VCCustomBuildTool"/>
 			<Tool
-				Name="VCLinkerTool"
-				OutputFile="$(OutDir)/port_encoder.dll"
-				LinkIncremental="2"
-				GenerateDebugInformation="TRUE"
-				ProgramDatabaseFile="$(OutDir)/port_encoder.pdb"
-				SubSystem="2"
-				ImportLibrary="$(OutDir)/port_encoder.lib"
-				TargetMachine="1"/>
+				Name="VCLibrarianTool"/>
 			<Tool
 				Name="VCMIDLTool"/>
 			<Tool
@@ -53,8 +46,6 @@
 				Name="VCWebServiceProxyGeneratorTool"/>
 			<Tool
 				Name="VCXMLDataGeneratorTool"/>
-			<Tool
-				Name="VCWebDeploymentTool"/>
 			<Tool
 				Name="VCManagedWrapperGeneratorTool"/>
 			<Tool
@@ -64,11 +55,11 @@
 			Name="Release|Win32"
 			OutputDirectory="bin/$(ConfigurationName)"
 			IntermediateDirectory="tmp/$(ConfigurationName)"
-			ConfigurationType="2"
+			ConfigurationType="4"
 			CharacterSet="2">
 			<Tool
 				Name="VCCLCompilerTool"
-				AdditionalIncludeDirectories="$(ProjectDir)\..\..\..\..\vm\include"
+				AdditionalIncludeDirectories="&quot;$(ProjectDir)\..\..\..\..\vm\include&quot;;&quot;$(ProjectDir)\..\..\..\..\vm\port\include&quot;;&quot;$(ProjectDir)\..\..\..\win_ia32_msvc_release\semis\extra\apr\include\apr-1&quot;;&quot;$(ProjectDir)\..\..\..\..\vm\port\encoder\ia32_em64t&quot;"
 				PreprocessorDefinitions="WIN32;NDEBUG;_WINDOWS;_USRDLL"
 				RuntimeLibrary="0"
 				UsePrecompiledHeader="0"
@@ -78,15 +69,7 @@
 			<Tool
 				Name="VCCustomBuildTool"/>
 			<Tool
-				Name="VCLinkerTool"
-				OutputFile="$(OutDir)/port_encoder.dll"
-				LinkIncremental="1"
-				GenerateDebugInformation="TRUE"
-				SubSystem="2"
-				OptimizeReferences="2"
-				EnableCOMDATFolding="2"
-				ImportLibrary="$(OutDir)/port_encoder.lib"
-				TargetMachine="1"/>
+				Name="VCLibrarianTool"/>
 			<Tool
 				Name="VCMIDLTool"/>
 			<Tool
@@ -101,8 +84,6 @@
 				Name="VCWebServiceProxyGeneratorTool"/>
 			<Tool
 				Name="VCXMLDataGeneratorTool"/>
-			<Tool
-				Name="VCWebDeploymentTool"/>
 			<Tool
 				Name="VCManagedWrapperGeneratorTool"/>
 			<Tool
@@ -113,34 +94,37 @@
 	</References>
 	<Files>
 		<File
-			RelativePath="..\..\..\..\vm\port\src\encoder\ia32_em64t\dec_base.cpp">
+			RelativePath="..\..\..\..\vm\thread\src\thread_java_attrs.c">
 		</File>
 		<File
-			RelativePath="..\..\..\..\vm\port\src\encoder\ia32_em64t\dec_base.h">
+			RelativePath="..\..\..\..\vm\thread\src\thread_java_basic.c">
 		</File>
 		<File
-			RelativePath="..\..\..\..\vm\port\src\encoder\ia32_em64t\enc_base.cpp">
+			RelativePath="..\..\..\..\vm\thread\src\thread_java_interrupt.c">
 		</File>
 		<File
-			RelativePath="..\..\..\..\vm\port\src\encoder\ia32_em64t\enc_base.h">
+			RelativePath="..\..\..\..\vm\thread\src\thread_java_iterator.c">
 		</File>
 		<File
-			RelativePath="..\..\..\..\vm\port\src\encoder\ia32_em64t\enc_defs.h">
+			RelativePath="..\..\..\..\vm\thread\src\thread_java_monitors.c">
 		</File>
 		<File
-			RelativePath="..\..\..\..\vm\port\src\encoder\ia32_em64t\enc_prvt.h">
+			RelativePath="..\..\..\..\vm\thread\src\thread_java_park.c">
 		</File>
 		<File
-			RelativePath="..\..\..\..\vm\port\src\encoder\ia32_em64t\enc_tabl.cpp">
+			RelativePath="..\..\..\..\vm\thread\src\thread_java_suspend.c">
 		</File>
 		<File
-			RelativePath="..\..\..\..\vm\port\src\encoder\ia32_em64t\encoder.cpp">
+			RelativePath="..\..\..\..\vm\thread\src\thread_ti_instr.c">
 		</File>
 		<File
-			RelativePath="..\..\..\..\vm\port\src\encoder\ia32_em64t\encoder.h">
+			RelativePath="..\..\..\..\vm\thread\src\thread_ti_monitors.c">
 		</File>
 		<File
-			RelativePath="..\..\..\..\vm\port\src\encoder\ia32_em64t\encoder.inl">
+			RelativePath="..\..\..\..\vm\thread\src\thread_ti_others.c">
+		</File>
+		<File
+			RelativePath="..\..\..\..\vm\thread\src\thread_ti_timing.c">
 		</File>
 	</Files>
 	<Globals>
