@@ -15,10 +15,6 @@
  *  limitations under the License.
  */
 
-/*
- *  $$$ GMJ
- *  @keyword XXX_StackOverflowBroken
- */
 public class StackTest {
 
     static int depth = 0;

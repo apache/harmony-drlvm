@@ -1,4 +1,4 @@
-/*
+/* 
  *  Licensed to the Apache Software Foundation (ASF) under one or more
  *  contributor license agreements.  See the NOTICE file distributed with
  *  this work for additional information regarding copyright ownership.
@@ -88,6 +88,9 @@ void compile_protect_arguments(Method_Handle method, GcFrame* gc) {
     unsigned cur_word = 0;
     for(unsigned i=0; i<num_args; i++) {
         Type_Info_Handle tih = method_args_get_type_info(msh, i);
+        bool is_magic = false;  //wjw, MMTk support
+        const String *str = tih->get_type_name();
+
         switch (type_info_get_type(tih)) {
         case VM_DATA_TYPE_INT64:
         case VM_DATA_TYPE_UINT64:
@@ -110,6 +113,19 @@ void compile_protect_arguments(Method_Handle method, GcFrame* gc) {
             break;
         case VM_DATA_TYPE_CLASS:
         case VM_DATA_TYPE_ARRAY:
+            if (str) {   //wjw MMTk support
+                if (strncmp(str->bytes, "org/vmmagic/unboxed/Address", str->len) == 0 ) 
+                     is_magic = true;
+                if (strncmp(str->bytes, "org/vmmagic/unboxed/Extent",  str->len) == 0 ) 
+                     is_magic = true;
+                if (strncmp(str->bytes, "org/vmmagic/unboxed/Offset",  str->len) == 0 ) 
+                     is_magic = true;
+                if (strncmp(str->bytes, "org/vmmagic/unboxed/Word",    str->len) == 0 ) 
+                     is_magic = true;
+                if (strncmp(str->bytes, "org/vmmagic/unboxed/ObjectReference",    str->len) == 0 ) 
+                     is_magic = true;
+            }
+            if (is_magic == false)
             gc->add_object((ManagedObject**)get_arg_word(num_arg_words, cur_word));
             cur_word++;
             break;

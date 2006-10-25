@@ -78,6 +78,8 @@
 static int sc_nest = -1;
 static uint32 exam_point;
 
+
+
 void linux_ucontext_to_regs(Registers* regs, ucontext_t *uc)
 {
     regs->eax = uc->uc_mcontext.gregs[REG_EAX];
@@ -150,16 +152,13 @@ static void throw_from_sigcontext(ucontext_t *uc, Class* exc_clss)
 
     uint32 exception_esp = regs.esp;
     DebugUtilsTI* ti = VM_Global_State::loader_env->TI;
-
     exn_athrow_regs(&regs, exc_clss);
-
     assert(exception_esp <= regs.esp);
     if (ti->get_global_capability(DebugUtilsTI::TI_GC_ENABLE_EXCEPTION_EVENT)) {
         regs.esp = regs.esp - 4;
         *((uint32*) regs.esp) = regs.eip;
         regs.eip = ((uint32)asm_jvmti_exception_catch_callback);
     }
-
     linux_regs_to_ucontext(uc, &regs);
 }
 
@@ -272,6 +271,7 @@ inline size_t find_stack_size() {
 
 inline size_t find_guard_stack_size() {
     return 64*1024;
+    
 }
 
 inline size_t find_guard_page_size() {
@@ -318,34 +318,39 @@ void init_stack_info() {
 void set_guard_stack() {
     int err;
     
-    /*
-     * have the stack parameters been initialized?
-     * 
-     * TODO - fix this - this probably should be elsewhere
-     */
-
-    if(!p_TLS_vmthread->stack_addr) {
-        init_stack_info();
-    }
-    
     char* stack_addr = (char*) get_stack_addr();
     size_t stack_size = get_stack_size();
     size_t guard_stack_size = get_guard_stack_size();
     size_t guard_page_size = get_guard_page_size();
 
-    err = mprotect(stack_addr - stack_size + guard_page_size + guard_stack_size,
-        guard_page_size, PROT_NONE);
+    // map the guard page and protect it
+    void UNUSED *res = mmap(stack_addr - stack_size + guard_page_size +
+    guard_stack_size, guard_page_size,  PROT_READ | PROT_WRITE,
+    MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
 
-/* $$$ GMJ    assert(!err);  */
-    
+    assert(res!=MAP_FAILED);
+
+    err = mprotect(stack_addr - stack_size  + guard_page_size +  
+    guard_stack_size, guard_page_size, PROT_NONE );
+   
+    assert(!err);
+
+    //map the alternate stack on which we want to handle the signal
+    void UNUSED *res2 = mmap(stack_addr - stack_size + guard_page_size,
+    guard_stack_size,  PROT_READ | PROT_WRITE,
+    MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+
+    assert(res2!=MAP_FAILED);
+
+
     stack_t sigalt;
     sigalt.ss_sp = stack_addr - stack_size + guard_page_size;
     sigalt.ss_flags = SS_ONSTACK;
     sigalt.ss_size = guard_stack_size;
 
     err = sigaltstack (&sigalt, NULL);
-    
     assert(!err);
+
 }
 
 size_t get_available_stack_size() {
@@ -376,8 +381,10 @@ void remove_guard_stack() {
     size_t guard_stack_size = get_guard_stack_size();
     size_t guard_page_size = get_guard_page_size();
 
-    err = mprotect(stack_addr - stack_size + guard_page_size + guard_stack_size,
-        guard_page_size, PROT_READ | PROT_WRITE);
+
+    err = mprotect(stack_addr - stack_size + guard_page_size +
+    guard_stack_size, guard_page_size, PROT_READ | PROT_WRITE);
+
 
     stack_t sigalt;
     sigalt.ss_sp = stack_addr - stack_size + guard_page_size;
@@ -385,6 +392,7 @@ void remove_guard_stack() {
     sigalt.ss_size = guard_stack_size;
 
     err = sigaltstack (&sigalt, NULL);
+
 }
 
 bool check_stack_overflow(siginfo_t *info, ucontext_t *uc) {
@@ -395,6 +403,7 @@ bool check_stack_overflow(siginfo_t *info, ucontext_t *uc) {
 
     char* guard_page_begin = stack_addr - stack_size + guard_page_size + guard_stack_size;
     char* guard_page_end = guard_page_begin + guard_page_size;
+
     char* fault_addr = (char*)(info->si_addr);
     //char* esp_value = (char*)(uc->uc_mcontext.gregs[REG_ESP]);
 
@@ -432,7 +441,7 @@ void stack_overflow_handler(int signum, siginfo_t* UNREF info, void* context)
 }
 
 void null_java_reference_handler(int signum, siginfo_t* UNREF info, void* context)
-{
+{ 
     ucontext_t *uc = (ucontext_t *)context;
     Global_Env *env = VM_Global_State::loader_env;
 
@@ -443,7 +452,7 @@ void null_java_reference_handler(int signum, siginfo_t* UNREF info, void* contex
         stack_overflow_handler(signum, info, context);
         return;
     }
-
+     
     if (env->shutting_down != 0) {
         fprintf(stderr, "null_java_reference_handler(): called in shutdown stage\n");
     } else if (!interpreter_enabled()) {
@@ -452,7 +461,6 @@ void null_java_reference_handler(int signum, siginfo_t* UNREF info, void* contex
             return;
         }
     }
-
     fprintf(stderr, "SIGSEGV in VM code.\n");
     Registers regs;
     linux_ucontext_to_regs(&regs, uc);
