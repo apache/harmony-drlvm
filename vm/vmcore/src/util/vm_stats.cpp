@@ -78,7 +78,7 @@ static JIT_RT_Function_Entry _jit_rt_function_entries_base[] = {
 
     {VM_RT_GC_HEAP_WRITE_REF,                  "VM_RT_GC_HEAP_WRITE_REF",                  3},
     {VM_RT_GC_SAFE_POINT,                      "VM_RT_GC_SAFE_POINT",                      0},
-    {VM_RT_GC_GET_THREAD_SUSPEND_FLAG_PTR,     "VM_RT_GC_GET_THREAD_SUSPEND_FLAG_PTR",     0},
+    {VM_RT_GC_GET_TLS_BASE,                    "VM_RT_GET_TLS_BASE",                       0},
 
     {VM_RT_JVMTI_METHOD_ENTER_CALLBACK,        "VM_RT_JVMTI_METHOD_ENTER_CALLBACK",        1},
     {VM_RT_JVMTI_METHOD_EXIT_CALLBACK,         "VM_RT_JVMTI_METHOD_EXIT_CALLBACK",         2},

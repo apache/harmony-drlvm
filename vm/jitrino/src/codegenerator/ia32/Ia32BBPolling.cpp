@@ -272,19 +272,21 @@ BBPolling::getOrCreateTLSBaseReg(Edge* e)
          // TLS base can be obtained by calling get_thread_ptr()  (from vm_threads.h)
          Opnd * target=irManager.newImmOpnd( irManager.getTypeManager().getUnmanagedPtrType(irManager.getTypeManager().getIntPtrType()),
                                              Opnd::RuntimeInfo::Kind_HelperAddress,
-                                            (void*)CompilationInterface::Helper_GetSuspReqFlag
+                                            (void*)CompilationInterface::Helper_GetTLSBase
                                            );
-         bbpFlagAddrBlock->appendInst(irManager.newCallInst(target, &CallingConvention_STDCALL, 0, NULL, tlsBaseReg));
+         Opnd* tlsBase  = irManager.newOpnd(typeInt32);
+         bbpFlagAddrBlock->appendInst(irManager.newCallInst(target, &CallingConvention_STDCALL, 0, NULL, tlsBase));
 #else // PLATFORM_POSIX
         // TLS base can be obtained from [fs:0x14]
         Opnd* tlsBase = irManager.newMemOpnd(typeInt32, MemOpndKind_Any, NULL, 0x14, RegName_FS);
+#endif // PLATFORM_POSIX
+
         if (version == 4 || version == 6) {
             Opnd * offset = irManager.newImmOpnd(typeInt32, gcFlagOffsetOffset);
             bbpFlagAddrBlock->appendInst(irManager.newInstEx(Mnemonic_ADD, 1, tlsBaseReg, tlsBase, offset));
         } else {
             bbpFlagAddrBlock->appendInst(irManager.newInst(Mnemonic_MOV, tlsBaseReg, tlsBase));
         }
-#endif // PLATFORM_POSIX
 
         // inserting bbpFlagAddrBlock before the given loopHeader
         uint32 startIndex = otherStartNdx[id];
@@ -362,16 +364,13 @@ BBPolling::createBBPSubCFG(IRManager& irManager, Opnd* tlsBaseReg)
     bbpBBController->appendInsts(dbgCall);
 #endif
 
-#ifdef PLATFORM_POSIX
-    Opnd* gcFlag = irManager.newMemOpnd(typeInt32, MemOpndKind_Any, tlsBaseReg, 0);
-#else
     Opnd* gcFlag = NULL;
     if (version == 4 || version == 6) {
         gcFlag = irManager.newMemOpnd(typeInt32, MemOpndKind_Any, tlsBaseReg, 0);
     } else {
         gcFlag = irManager.newMemOpnd(typeInt32, MemOpndKind_Any, tlsBaseReg, gcFlagOffsetOffset);
     }
-#endif
+
     Opnd* zero = irManager.newImmOpnd(typeInt32, 0);
     bbpBBController->appendInst(irManager.newInst(Mnemonic_CMP, gcFlag, zero));
     bbpBBController->appendInst(irManager.newBranchInst(Mnemonic_JNZ, bbpBBHelpCaller, bbpReturn));

@@ -305,11 +305,6 @@ VMEXPORT const char  *const_pool_get_interface_method_class_name(Class_Handle cl
                                                                   unsigned index);
 VMEXPORT const char  *const_pool_get_interface_method_descriptor(Class_Handle cl,
                                                                   unsigned index);
-
-VMEXPORT unsigned thread_get_suspend_request_offset();
-
-VMEXPORT unsigned thread_get_thread_state_flag_offset(); //temporary: for EscapeAnalysis prototype
-
 VMEXPORT Compile_Handle jit_get_comp_handle(JIT_Handle j);
 
 // Needed for DLL problems

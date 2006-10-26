@@ -176,6 +176,10 @@ IDATA VMCALL hythread_group_get_list(hythread_group_t **list, int* size);
 void* VMCALL hythread_get_private_data(hythread_t  t);
 IDATA VMCALL hythread_set_private_data(hythread_t  t, void* data);
 
+UDATA VMCALL hythread_tls_get_offset(hythread_tls_key_t key);
+UDATA VMCALL hythread_tls_get_suspend_request_offset();
+
+
 //@}
 /** @name Conditional variable
  */

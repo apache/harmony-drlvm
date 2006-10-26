@@ -176,11 +176,7 @@ typedef struct HyThread {
      * Number of suspend requests made for this thread.
      */
     int32 suspend_request;
-    /**
-     * Field reserved for JIT proprietary needs.
-     */
-    int32 jit_private_data; 
-
+    
     /**
      * Flag indicating that thread can safely be suspended.
      */

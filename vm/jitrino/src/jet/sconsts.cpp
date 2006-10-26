@@ -60,7 +60,7 @@ char *  StaticConsts::rt_helper_ti_field_modification= NULL;
 
 
 char *  StaticConsts::rt_helper_gc_safepoint = NULL;
-char *  StaticConsts::rt_helper_get_thread_suspend_ptr = NULL;
+char *  StaticConsts::rt_helper_get_tls_base_ptr= NULL;
 
 unsigned StaticConsts::rt_array_length_offset = NOTHING;
 unsigned StaticConsts::rt_suspend_req_flag_offset = NOTHING;

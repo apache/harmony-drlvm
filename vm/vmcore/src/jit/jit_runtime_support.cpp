@@ -1633,32 +1633,7 @@ static NativeCodePtr rth_get_lil_gc_safe_point(int * dyn_count) {
     return addr;
 }
 
-static NativeCodePtr rth_get_lil_gc_thread_suspend_flag_ptr(int * dyn_count) {
-    /*static NativeCodePtr addr = NULL;
-    if (addr) {
-        return addr;
-    }
-
-    LilCodeStub* cs = lil_parse_code_stub("entry 0:managed::pint;");
-    assert(cs);
-    if (dyn_count) {
-        cs = lil_parse_onto_end(cs, "inc [%0i:pint];", dyn_count);
-        assert(cs);
-    }
-
-    cs = lil_parse_onto_end(cs,
-        "r=ts;"
-        "r=r+%0i:pint;"
-        "ret;",
-        thread_get_suspend_request_offset());
-    assert(cs && lil_is_valid(cs));
-    addr = LilCodeGenerator::get_platform()->compile(cs);
-
-    DUMP_STUB(addr, "rth_get_lil_gc_thread_suspend_flag_ptr", lil_cs_get_code_size(cs));
-
-    lil_free_code_stub(cs);
-    */
-    //assert(0);
+static NativeCodePtr rth_get_lil_tls_base(int * dyn_count) {
     return (NativeCodePtr)hythread_self;
 }
 
@@ -1967,8 +1942,8 @@ NativeCodePtr rth_get_lil_helper(VM_RT_SUPPORT f)
         return rth_get_lil_initialize_class(dyn_count);
     case VM_RT_GC_SAFE_POINT:
         return rth_get_lil_gc_safe_point(dyn_count);
-    case VM_RT_GC_GET_THREAD_SUSPEND_FLAG_PTR:
-        return rth_get_lil_gc_thread_suspend_flag_ptr(dyn_count);
+    case VM_RT_GC_GET_TLS_BASE:
+        return rth_get_lil_tls_base(dyn_count);
     // JVMTI
     case VM_RT_JVMTI_METHOD_ENTER_CALLBACK:
         return rth_get_lil_jvmti_method_enter_callback(dyn_count);

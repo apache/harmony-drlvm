@@ -30,6 +30,7 @@
 #include "Log.h"
 #include "JITInstanceContext.h"
 #include "jit_intf.h"
+#include "open/hythread_ext.h"
 
 
 namespace Jitrino {
@@ -76,14 +77,22 @@ methodGetStacknGCInfoBlockSize(Method_Handle method, JIT_Handle jit)
     return (size - sizeof(void *));     // skip the header
 }
 
+// TODO: move both methods below to the base VMInterface level
+// TODO: free TLS key on JIT deinitilization
 uint32
 flagTLSSuspendRequestOffset(){
-        return thread_get_suspend_request_offset();
+    return hythread_tls_get_suspend_request_offset();
 }
 
 uint32
 flagTLSThreadStateOffset() {
-    return thread_get_thread_state_flag_offset();
+    static hythread_tls_key_t key = 0;
+    static size_t offset = 0;
+    if (key == 0) {
+        hythread_tls_alloc(&key);
+        offset = hythread_tls_get_offset(key);
+    }
+    return offset;
 }
 
 //////////////////////////////////////////////////////////////////////////////
@@ -559,7 +568,7 @@ VM_RT_SUPPORT DrlVMCompilationInterface::translateHelperId(RuntimeHelperId runti
     case Helper_DivideByZeroException: vmHelperId = VM_RT_DIVIDE_BY_ZERO_EXCEPTION; break;
     case Helper_Throw_LinkingException: vmHelperId = VM_RT_THROW_LINKING_EXCEPTION; break;
     case Helper_EnableThreadSuspension: vmHelperId = VM_RT_GC_SAFE_POINT; break;
-    case Helper_GetSuspReqFlag:        vmHelperId = VM_RT_GC_GET_THREAD_SUSPEND_FLAG_PTR; break;
+    case Helper_GetTLSBase:            vmHelperId = VM_RT_GC_GET_TLS_BASE; break;
     case Helper_CharArrayCopy:         vmHelperId = VM_RT_CHAR_ARRAYCOPY_NO_EXC; break;
     case Helper_DivI32:                vmHelperId = VM_RT_IDIV; break;
     case Helper_DivU32:                assert(0); break;

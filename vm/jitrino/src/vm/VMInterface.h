@@ -371,7 +371,7 @@ public:
         Helper_ConvDtoI32,    // int32  x        = f(double x) 
         Helper_ConvDtoI64,    // int64  x        = f(double x) 
         Helper_EnableThreadSuspension,//           f()
-        Helper_GetSuspReqFlag,// int *           = f()
+        Helper_GetTLSBase,    // int *           = f()
         Helper_MethodEntry, // f(MethodHandle)
         Helper_MethodExit,   // f(MethodHandle, void* ret_value)
         Num_Helpers

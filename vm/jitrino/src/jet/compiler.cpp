@@ -28,9 +28,11 @@
 #include <malloc.h>
 
 #include "open/vm.h"
+#include "open/hythread_ext.h"
 #include "jit_import.h"
 #include "jit_runtime_support.h"
 #include "jit_intf.h"
+
 
 #include "../shared/mkernel.h"
 //FIXME: needed for NOPs fix only, to be removed
@@ -1408,8 +1410,8 @@ void Compiler::initStatics(void)
 
     rt_helper_gc_safepoint = 
                 (char*)vm_get_rt_support_addr(VM_RT_GC_SAFE_POINT);
-    rt_helper_get_thread_suspend_ptr = 
-                (char*)vm_get_rt_support_addr(VM_RT_GC_GET_THREAD_SUSPEND_FLAG_PTR);
+    rt_helper_get_tls_base_ptr= 
+                (char*)vm_get_rt_support_addr(VM_RT_GC_GET_TLS_BASE);
     //
     rt_helper_ti_method_enter = 
             (char*)vm_get_rt_support_addr(VM_RT_JVMTI_METHOD_ENTER_CALLBACK);
@@ -1426,7 +1428,7 @@ void Compiler::initStatics(void)
     // Collect runtime constants
     //
     rt_array_length_offset = vector_length_offset();
-    rt_suspend_req_flag_offset = thread_get_suspend_request_offset();
+    rt_suspend_req_flag_offset = hythread_tls_get_suspend_request_offset();
     rt_vtable_offset = object_get_vtable_offset();
     
     Class_Handle clss;

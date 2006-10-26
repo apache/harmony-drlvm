@@ -2665,18 +2665,6 @@ CallingConvention vm_managed_calling_convention()
     return CC_Vm;
 } //vm_managed_calling_convention
 
-unsigned thread_get_suspend_request_offset() {
-    //FIXME: 
-    //return APR_OFFSETOF(VM_thread, suspend_request);
-    return 0;
-}
-
-
-    //temporary: for EscapeAnalysis prototype
-unsigned thread_get_thread_state_flag_offset() { 
-    return 0;//APR_OFFSETOF(hythread_t, state);
-}
-
 
 
 void vm_properties_set_value(const char* name, const char* value) 

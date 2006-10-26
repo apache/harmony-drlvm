@@ -78,19 +78,19 @@ public:
     static char*        rt_helper_gc_safepoint;
     /**
      * @brief An offset of 'thread suspend requiest' flag in TIB.
-     * @see rt_helper_get_thread_suspend_ptr
+     * @see rt_helper_get_tls_base_ptr
      * @see rt_helper_gc_safepoint
      * @todo seems unused after the recent ThreadManager changes.
      */
     static unsigned     rt_suspend_req_flag_offset;
     
     /**
-     * @brief Address of helper that returns a pointer to the thread 
-     *        suspension request flag.
+     * @brief Address of helper that returns a pointer to 
+        thread local struct.
      * @param none
      * @return read-only pointer to an int32 flag.
      */
-    static char*        rt_helper_get_thread_suspend_ptr;
+    static char*        rt_helper_get_tls_base_ptr;
 
     /**
      * @brief An offset of vtable in the object's header.

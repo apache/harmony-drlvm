@@ -330,7 +330,7 @@ enum VM_RT_SUPPORT {
     // Return value: none.
     // Use this helper to notify GC about safe point in managed code
 
-    VM_RT_GC_GET_THREAD_SUSPEND_FLAG_PTR=602,
+    VM_RT_GC_GET_TLS_BASE=602,
     // Arguments: none
     // Return value: pointer to int-sized suspension request flag
     //

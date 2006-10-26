@@ -35,6 +35,8 @@ hythread_resume;
 hythread_monitor_notify;
 hythread_get_priority;
 hythread_tls_get;
+hythread_tls_get_suspend_request_offset;
+hythread_tls_get_offset;
 hythread_global_lock;
 hythread_global_unlock;
 hythread_attach_to_group;

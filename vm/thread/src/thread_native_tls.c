@@ -118,4 +118,20 @@ IDATA VMCALL hythread_tls_free(hythread_tls_key_t key) {
     return TM_ERROR_NONE;
 }
 
+/**
+ * Returns 'suspend_request' field offset in HyThread struct
+ */
+UDATA VMCALL hythread_tls_get_suspend_request_offset() {
+    return (UDATA)&((hythread_t)0)->suspend_request;
+}
+
+/**
+ * Return value's offset for the given key from the HyThread struct start.
+ */
+UDATA VMCALL hythread_tls_get_offset(hythread_tls_key_t key) {
+    assert(key < (UDATA)tm_tls_capacity);
+    return ((UDATA)&((hythread_t)0)->thread_local_storage) + (key * sizeof(void*));
+}
+
+
 //@}

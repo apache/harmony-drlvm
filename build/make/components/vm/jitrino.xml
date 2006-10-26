@@ -26,7 +26,7 @@ Version: $Revision: 1.6.2.8 $
 
 <project name="vm.jitrino">
     <target name="init">
-        <property name="build.depends" value="extra.apr,vm.vmcore,vm.encoder" />
+        <property name="build.depends" value="extra.apr,vm.vmcore,vm.encoder,vm.hythr" />
         <property name="outtype" value="shared" />
         <property name="libname" value="jitrino" />
 
@@ -134,7 +134,7 @@ Version: $Revision: 1.6.2.8 $
             <select os="win">
                 <compilerarg value="/Fo${build.semi.dir}/vm/jitrino/_obj/" />
 
-                <defineset define="PLATFORM_NT,_WINDLL,_MBCS,_REENTRANT,__SMP__" />
+                <defineset define="PLATFORM_NT,_WINDLL,_MBCS,_REENTRANT,__SMP__,WIN32,_WIN32" />
 
                 <compilerarg value="/nologo" />
                 <compilerarg value="/EHsc" />
@@ -221,15 +221,11 @@ Version: $Revision: 1.6.2.8 $
                       # thus causes problems during parralel build.
                     -->
                 </select>
-
-                <select arch="ia32">
-                    <defineset define="_WIN32_" />
-                </select>
             </select>
 
             <!-- linux specific -->
             <select os="lnx">
-                <defineset define="PLATFORM_POSIX" />
+                <defineset define="PLATFORM_POSIX,LINUX" />
 
                 <select cxx="gcc" arch="ia32,em64t">
                     <compilerarg value="-msse2" />
@@ -326,6 +322,8 @@ Version: $Revision: 1.6.2.8 $
 
                 <libset libs="${vm.vmcore.lib}" dir="${vm.vmcore.libdir}" />
                 <libset libs="${vm.encoder.lib}" dir="${vm.encoder.libdir}" />
+                <libset libs="${vm.hythr.lib}" dir="${vm.hythr.libdir}" />
+
             </select>
 
             <select os="lnx">
