@@ -405,6 +405,11 @@ public:
                                        CG_OpndHandle* tauBaseNonNull,
                                        CG_OpndHandle* tauAddressInRange,
                                        CG_OpndHandle* tauElemTypeChecked) = 0;
+    virtual void            tau_stRef(CG_OpndHandle* src, CG_OpndHandle* ptr, CG_OpndHandle* base, Type::Tag memType,
+                                       bool autoCompressRef, 
+                                       CG_OpndHandle* tauBaseNonNull,
+                                       CG_OpndHandle* tauAddressInRange, 
+                                       CG_OpndHandle* tauElemTypeChecked) = 0;
     // COMPRESSED_PTR note: var is already uncompressed, so compression doesn't affect it
     virtual void            stVar(CG_OpndHandle* src, uint32 varId) = 0;
 

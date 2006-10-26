@@ -103,6 +103,7 @@ runtime_helpers_names[] = {
     DECL_HELPER_ITEM(GetSuspReqFlag),
     DECL_HELPER_ITEM(MethodEntry),
     DECL_HELPER_ITEM(MethodExit),
+    DECL_HELPER_ITEM(WriteBarrier),
 #undef DECL_HELPER_ITEM
 };
 static const unsigned runtime_helpers_names_count = sizeof(runtime_helpers_names)/sizeof(runtime_helpers_names[0]);

@@ -2498,17 +2498,16 @@ IRBuilder::genTauStRef(Type* type, Opnd *objectbase, Opnd* ptr, Opnd* src,
                      !type->isCompressedReference());
     Modifier compressMod = Modifier(compress ? AutoCompress_Yes
                                     : AutoCompress_No);
-
     if (irBuilderFlags.insertWriteBarriers) {
         appendInst(instFactory->makeTauStRef((Modifier(Store_WriteBarrier)|
                                              compressMod),
-                                            type->tag, src, objectbase, ptr,
+                                            type->tag, src, ptr, objectbase,
                                             tauBaseNonNull, tauAddressInRange, 
                                             tauElemTypeChecked));
     } else {
         appendInst(instFactory->makeTauStRef((Modifier(Store_NoWriteBarrier)|
                                              compressMod),
-                                            type->tag, src, objectbase, ptr,
+                                            type->tag, src, ptr, objectbase,
                                             tauBaseNonNull, tauAddressInRange, 
                                             tauElemTypeChecked));
     }
@@ -2534,7 +2533,7 @@ IRBuilder::genStField(Type* type,
                                : genTauSafe()); // safe, not an object
     if (irBuilderFlags.expandMemAddrs) { // do not expand ldField of stack values
         Opnd *ptr = genLdFieldAddr(type, base, fieldDesc);
-        if (irBuilderFlags.insertWriteBarriers) {
+        if (irBuilderFlags.insertWriteBarriers && src->getType()->isObject()) {
             genTauStRef(type, base, ptr, src, 
                         tauBaseNonNull, 
                         tauBaseTypeIsOk,
@@ -2625,7 +2624,7 @@ IRBuilder::genStElem(Type* elemType,
         } else {
             ptr = genLdElemAddr(elemType, array, index);
         }
-        if (irBuilderFlags.insertWriteBarriers) {
+        if (irBuilderFlags.insertWriteBarriers && elemType->isObject()) {
             genTauStRef(elemType, array, ptr, src, tauNullChecked, tauAddressInRange,
                         tauElemTypeChecked);
         } else {

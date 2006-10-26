@@ -374,6 +374,7 @@ public:
         Helper_GetTLSBase,    // int *           = f()
         Helper_MethodEntry, // f(MethodHandle)
         Helper_MethodExit,   // f(MethodHandle, void* ret_value)
+        Helper_WriteBarrier,
         Num_Helpers
     };
     //

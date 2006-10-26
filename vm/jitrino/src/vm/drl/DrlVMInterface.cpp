@@ -592,6 +592,8 @@ VM_RT_SUPPORT DrlVMCompilationInterface::translateHelperId(RuntimeHelperId runti
     case Helper_ConvDtoI64:            vmHelperId = VM_RT_D2L; break;
     case Helper_MethodEntry:           vmHelperId = VM_RT_JVMTI_METHOD_ENTER_CALLBACK; break;
     case Helper_MethodExit:             vmHelperId = VM_RT_JVMTI_METHOD_EXIT_CALLBACK; break;
+    case Helper_WriteBarrier:          vmHelperId = VM_RT_GC_HEAP_WRITE_REF; break;
+
     default:
         assert(0);
     }
@@ -655,7 +657,8 @@ DrlVMCompilationInterface::setMethodHasSideEffect(MethodDesc *m, MethodSideEffec
 CompilationInterface::VmCallingConvention 
 DrlVMCompilationInterface::getRuntimeHelperCallingConvention(RuntimeHelperId id) {
     switch(id) {
-    case Helper_NewMultiArray:         
+    case Helper_NewMultiArray:
+    case Helper_WriteBarrier:
         return CallingConvention_Cdecl;
     case Helper_ShlI64:                
     case Helper_ShrI64:                

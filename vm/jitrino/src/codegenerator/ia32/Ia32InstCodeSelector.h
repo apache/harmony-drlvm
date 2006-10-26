@@ -186,6 +186,10 @@ public:
     void           tau_stElem(CG_OpndHandle* src,CG_OpndHandle* array, CG_OpndHandle* index,
                           bool autoCompressRef, CG_OpndHandle* tauBaseNonNull,
                           CG_OpndHandle* tauAddressInRange, CG_OpndHandle* tauElemTypeChecked);
+    void           tau_stRef(CG_OpndHandle* src, CG_OpndHandle* ptr, CG_OpndHandle* base, Type::Tag memType, 
+                             bool autoCompressRef, CG_OpndHandle* tauBaseNonNull,
+                             CG_OpndHandle* tauAddressInRange, CG_OpndHandle* tauElemTypeChecked);
+
     void           stVar(CG_OpndHandle* src, uint32 varId);
     CG_OpndHandle* newObj(ObjectType* objType);     
     CG_OpndHandle* newArray(ArrayType* arrayType, CG_OpndHandle* numElems);

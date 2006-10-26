@@ -2102,6 +2102,22 @@ void InstCodeSelector::tau_stInd(CG_OpndHandle* src,
     return simpleStInd((Opnd*)ptr, (Opnd*)src, memType, autoCompressRef, (Opnd*)tauBaseNonNull, (Opnd*)tauElemTypeChecked);
 }
 
+void InstCodeSelector::tau_stRef(CG_OpndHandle* src,
+                                    CG_OpndHandle* ptr, 
+                                    CG_OpndHandle* base,
+                                    Type::Tag      memType, 
+                                    bool           autoCompressRef,
+                                    CG_OpndHandle* tauBaseNonNull,
+                                    CG_OpndHandle* tauAddressInRange, 
+                                    CG_OpndHandle* tauElemTypeChecked)
+{
+    Opnd* helperOpnds[] = {(Opnd*)base,(Opnd*)ptr,(Opnd*)src};
+    CallInst * callInst = irManager.newRuntimeHelperCallInst(
+                                        CompilationInterface::Helper_WriteBarrier,
+                                        3,helperOpnds,NULL);
+    appendInsts(callInst);
+}
+
 //_______________________________________________________________________________________________________________
 //  Load variable address
 

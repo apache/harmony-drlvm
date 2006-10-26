@@ -300,7 +300,7 @@ public:
                         if (memOpt) memOpt->remMemInst(inst);
                         return res;
                     }
-                } else if (res->getOpcode() == Op_TauStInd) {
+                } else if (res->getOpcode() == Op_TauStInd ||res->getOpcode() == Op_TauStRef) {
                     if ((!memOpt) || memOpt->hasDefReachesUse(res, inst)) {
                         if (memOpt) memOpt->remMemInst(inst);
                         return res->getSrc(0)->getInst();
@@ -349,7 +349,7 @@ public:
                                 if (memOpt) memOpt->remMemInst(inst);
                                 dataOpnd = res->getDst();
                             }
-                        } else if (res->getOpcode() == Op_TauStInd) {
+                        } else if (res->getOpcode() == Op_TauStInd ||res->getOpcode() == Op_TauStRef) {
                             if ((!memOpt) || memOpt->hasDefReachesUse(res, inst)) {
                                 if (memOpt) memOpt->remMemInst(inst);
                                 dataOpnd = res->getSrc(0);
@@ -641,12 +641,48 @@ public:
         }
     }
     Inst* caseTauStRef(Inst* inst) {
-        if (memOpt) {
-            assert(0); // dunno what to do here.
+        bool is_final = false;
+        bool is_volatile = false;
+        {
+            Inst *ptrInst = inst->getSrc(1)->getInst();
+            if ((ptrInst->getOpcode() == Op_LdFieldAddr) ) {
+                FieldAccessInst *faInst = ptrInst->asFieldAccessInst();
+                FieldDesc *fd = faInst->getFieldDesc();
+                is_volatile = fd->isVolatile();
+                if (fd->isInitOnly()) {
+                    is_final = true;
+                    // first check for System stream final fields which vary
+                    NamedType *td = fd->getParentType();
+                    if (strncmp(td->getName(),"java/lang/System",20)==0) {
+                        const char *fdname = fd->getName();
+                        if ((strncmp(fdname,"in",5)==0) ||
+                            (strncmp(fdname,"out",5)==0) ||
+                            (strncmp(fdname,"err",5)==0)) {
+                            is_final = false;
+                        }
+                    }
+                }
+            }
+        }
+        if ((cse_final && is_final) || (memOpt && !is_volatile)) {
+            Opnd *addrOp = inst->getSrc(1);
+            Type::Tag typetag = inst->getType();
+            Operation op(Op_TauLdInd, typetag);
+            if (Log::isEnabled()) {
+                Log::out() << "StRef hashing Ldind : "
+                           << (int) op.encodeForHashing()
+                           << ", "
+                           << (int) addrOp->getId()
+                           << ::std::endl;
+            }
+            Modifier m(Modifier(inst->getAutoCompressModifier()) | Modifier(Speculative_No));
+            setHashToInst(inst, getKey(Operation(Op_TauLdInd, inst->getType(), m),
+                                       addrOp->getId()));
             return inst;
         } else {
             return caseDefault(inst);
         }
+
     }
 
     // checks 

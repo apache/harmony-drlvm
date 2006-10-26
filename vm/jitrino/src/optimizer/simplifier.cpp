@@ -3428,7 +3428,7 @@ Simplifier::simplifyTauStRef(Inst *inst)
     Modifier mod = inst->getModifier();
     assert(inst->getNumSrcOperands() == 6);
     Opnd *src = inst->getSrc(0);
-    Opnd *pointer = inst->getSrc(2);
+    Opnd *pointer = inst->getSrc(1);
 
     Type *ptrType = pointer->getType();
     assert(ptrType->isPtr());

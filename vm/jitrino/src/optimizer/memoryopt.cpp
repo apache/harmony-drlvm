@@ -747,6 +747,12 @@ MemoryOptInitWalker::applyToInst(Inst *i)
         }
         break;
 
+    case Op_TauStRef:
+        {
+            thePass->effectWrite(n, i, i->getSrc(1));
+        }
+        break;
+
     case Op_TauCheckElemType:
         {
             thePass->effectReadVtable(n, i, i->getSrc(0)); // array
@@ -971,8 +977,8 @@ MemoryOptInitWalker::applyToInst(Inst *i)
     case Op_PredBranch:
         break;
 
-    case Op_TauStRef:
-        assert(0); 
+    //case Op_TauStRef:
+    //    assert(0); 
 
     case Op_TauLdField:
     case Op_LdStatic:
@@ -2404,6 +2410,7 @@ MemoryRedStoreWalker::applyToInst(Inst *inst)
     case Op_TauStField:
     case Op_TauStStatic:
     case Op_TauStElem:
+    case Op_TauStRef:
         // maybe eliminate inst;
         break;
     default:
@@ -2433,6 +2440,21 @@ MemoryRedStoreWalker::applyToInst(Inst *inst)
                     }
                 }
                 break;
+
+            case Op_TauStRef:
+                {
+                    Opnd *usingAddr = usingInst->getSrc(1);
+                    Opnd *thisAddr = inst->getSrc(1);
+                    if ((usingAddr == thisAddr) &&
+                        (getBitWidth(usingInst->getType()) >=
+                         getBitWidth(inst->getType()))) {
+                         // eliminate inst;
+                        thePass->remMemInst(inst);
+                        inst->unlink();
+                    }
+                }
+                break;
+
             case Op_TauStField:
                 {
                     Opnd *usingBase = usingInst->getSrc(1);

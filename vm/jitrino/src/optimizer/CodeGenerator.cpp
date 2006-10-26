@@ -1520,6 +1520,42 @@ public:
                                                getCGInst(tauElemTypeChecked));
             }
             break;
+        case Op_TauStRef:
+            {
+                assert(inst->getNumSrcOperands() == 6);
+
+                Opnd *src = inst->getSrc(0);
+                Opnd *ptr = inst->getSrc(1);
+                Opnd *base = inst->getSrc(2);
+
+                Opnd *tauNonNullBase = inst->getSrc(3);
+                Opnd *tauTypeHasField = inst->getSrc(4);
+                Opnd *tauFieldTypeChecked = inst->getSrc(5);
+
+                assert(tauNonNullBase->getType()->tag == Type::Tau);
+                assert(tauTypeHasField->getType()->tag == Type::Tau);
+                assert(tauFieldTypeChecked->getType()->tag == Type::Tau);
+
+                AutoCompressModifier acmod = inst->getAutoCompressModifier();
+                StoreModifier UNUSED stmod = inst->getStoreModifier();
+
+                bool autocompress = (acmod == AutoCompress_Yes);
+                Type::Tag type = inst->getType();
+                if (acmod == AutoCompress_Yes) {
+                    assert(Type::isReference(type));
+                    assert(!Type::isCompressedReference(type));
+                }
+                assert(stmod == Store_WriteBarrier);
+                instructionCallback.tau_stRef(getCGInst(src),
+                                        getCGInst(ptr),
+                                        getCGInst(base),
+                                        type,
+                                        autocompress,
+                                        getCGInst(tauNonNullBase),
+                                        getCGInst(tauTypeHasField),
+                                        getCGInst(tauFieldTypeChecked));
+            }
+            break;
         case Op_TauCheckBounds:
             {
                 assert(inst->getNumSrcOperands() == 2);

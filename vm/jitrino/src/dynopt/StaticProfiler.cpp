@@ -555,8 +555,8 @@ static double opcodeHeuristic(const StaticProfilerContext* c) {
 static double storeHeuristic(const StaticProfilerContext* c) {
     Node* node1 = c->edge1->getTargetNode();
     Node* node2 = c->edge2->getTargetNode();
-    bool node1Accepted = findInst(node1, Op_TauStInd)!=NULL;
-    bool node2Accepted = findInst(node2, Op_TauStInd)!=NULL;
+    bool node1Accepted = (findInst(node1, Op_TauStInd)!=NULL||findInst(node1, Op_TauStRef)!=NULL);
+    bool node2Accepted = (findInst(node2, Op_TauStInd)!=NULL||findInst(node2, Op_TauStRef)!=NULL);
     if (!node1Accepted && !node2Accepted) {
         return PROB_HEURISTIC_FAIL;
     }

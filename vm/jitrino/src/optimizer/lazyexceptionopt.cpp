@@ -1037,12 +1037,26 @@ LazyExceptionOpt::instSideEffect(Inst* inst) {
                 if (inst_src1->getOpcode()==Op_LdFieldAddr ) 
                     return checkField(inst_src1);
             }
-            return true; 
+            return true;
+        case Op_TauStRef:
+            {
+                Inst* inst_src1 = inst->getSrc(1)->getInst();
+#ifdef _DEBUG
+                if (Log::isEnabled()) {
+                    Log::out() << "    stref: "; 
+                    inst->print(Log::out()); Log::out()  << std::endl;
+                    Log::out() << "           "; 
+                    inst_src1->print(Log::out()); Log::out()  << std::endl;
+                }
+#endif
+                if (inst_src1->getOpcode()==Op_LdFieldAddr ) 
+                    return checkField(inst_src1);
+            }
+            return true;
         case Op_TauStField:
             return true; // 
         case Op_TauStElem:
         case Op_TauStStatic:
-        case Op_TauStRef:
         case Op_TauCheckBounds:
         case Op_TauCheckLowerBound:
         case Op_TauCheckUpperBound:

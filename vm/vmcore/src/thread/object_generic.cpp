@@ -151,6 +151,9 @@ jobject object_clone(JNIEnv *jenv, jobject jobj)
         exn_raise_object(VM_Global_State::loader_env->java_lang_OutOfMemoryError);
         return NULL;
     }
+    if(gc_requires_barriers())
+        gc_heap_wrote_object(result);
+
     memcpy(result, h->object, size);
     result->set_obj_info(0);
     ObjectHandle new_handle = oh_allocate_local_handle();
