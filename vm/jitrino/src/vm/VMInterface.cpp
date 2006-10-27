@@ -100,7 +100,7 @@ runtime_helpers_names[] = {
     DECL_HELPER_ITEM(ConvDtoI32),
     DECL_HELPER_ITEM(ConvDtoI64),
     DECL_HELPER_ITEM(EnableThreadSuspension),
-    DECL_HELPER_ITEM(GetSuspReqFlag),
+    DECL_HELPER_ITEM(GetTLSBase),
     DECL_HELPER_ITEM(MethodEntry),
     DECL_HELPER_ITEM(MethodExit),
     DECL_HELPER_ITEM(WriteBarrier),
