@@ -24,14 +24,14 @@
 #include "../common/gc_common.h"
 
 typedef struct Collector{
-  /* <-- first couple of fields are overloaded as Alloc_Context */
+  /* <-- first couple of fields are overloaded as Allocator */
   void *free;
   void *ceiling;
-  void *curr_alloc_block;
+  void *alloc_block;
   Space* alloc_space;
   GC* gc;
   VmThreadHandle thread_handle;   /* This thread; */
-  /* End of Alloc_Context --> */
+  /* End of Allocator --> */
 
   Space* collect_space;
   /* collector has remsets to remember those stored during copying */  

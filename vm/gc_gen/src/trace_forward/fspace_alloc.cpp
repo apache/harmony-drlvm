@@ -20,66 +20,71 @@
 
 #include "fspace.h"
 
-static Boolean fspace_alloc_block(Fspace* fspace, Alloc_Context *alloc_ctx)
+static Boolean fspace_alloc_block(Fspace* fspace, Allocator* allocator)
 {
-         
-  void* old_free_pos = (void*)fspace->alloc_free;
-  void* new_free_pos = (void*)((POINTER_SIZE_INT)old_free_pos + fspace->block_size_bytes);
-  while ( fspace_has_free_block(fspace) ){
-    /* There are enough space to hold a TLB in fspace, try to get it */
-    POINTER_SIZE_INT temp = atomic_cas32((volatile uint32 *)&fspace->alloc_free, \
-                            (POINTER_SIZE_INT)new_free_pos, (POINTER_SIZE_INT)old_free_pos);
-      
-    if(temp != (POINTER_SIZE_INT)old_free_pos){
-      old_free_pos = (void*)fspace->alloc_free;
-      new_free_pos = (void*)((POINTER_SIZE_INT)old_free_pos + fspace->block_size_bytes);
+  Block_Header* alloc_block = (Block_Header* )allocator->alloc_block;
+  /* put back the used block */
+  if(alloc_block != NULL){ /* it is NULL at first time */
+    assert(alloc_block->status == BLOCK_IN_USE);
+    alloc_block->status = BLOCK_USED;
+    alloc_block->free = allocator->free;
+  }
+
+  /* now try to get a new block */
+  unsigned int old_free_idx = fspace->free_block_idx;
+  unsigned int new_free_idx = old_free_idx+1;
+  while(old_free_idx <= fspace->ceiling_block_idx){   
+    unsigned int allocated_idx = atomic_cas32(&fspace->free_block_idx, new_free_idx, old_free_idx);
+    if(allocated_idx != old_free_idx){     /* if failed */  
+      old_free_idx = fspace->free_block_idx;
+      new_free_idx = old_free_idx+1;
       continue;
     }
+    /* ok, got one */
+    alloc_block = (Block_Header*)&(fspace->blocks[allocated_idx - fspace->first_block_idx]);
+    assert(alloc_block->status == BLOCK_FREE);
+    alloc_block->status = BLOCK_IN_USE;
+    fspace->num_used_blocks++;
+    memset(alloc_block->free, 0, GC_BLOCK_BODY_SIZE_BYTES);
     
-    alloc_ctx->free = (char*)old_free_pos;
-    alloc_ctx->ceiling = (char*)old_free_pos + fspace->block_size_bytes;
-    memset(old_free_pos, 0, fspace->block_size_bytes);
+    /* set allocation context */
+    allocator->free = alloc_block->free;
+    allocator->ceiling = alloc_block->ceiling;
+    allocator->alloc_block = (Block*)alloc_block; 
     
     return TRUE;
   }
+
+  return FALSE;
   
-  return FALSE;      
 }
+
 /* FIXME:: the collection should be seperated from the alloation */
 struct GC_Gen;
-Space* gc_get_nos(GC_Gen* gc);
 void gc_gen_reclaim_heap(GC_Gen* gc, unsigned int cause);
 
-void* fspace_alloc(unsigned size, Alloc_Context *alloc_ctx) 
+void* fspace_alloc(unsigned size, Allocator *allocator) 
 {
   void*  p_return = NULL;
 
   /* First, try to allocate object from TLB (thread local block) */
-  p_return = thread_local_alloc(size, alloc_ctx);
+  p_return = thread_local_alloc(size, allocator);
   if (p_return)  return p_return;
-  
-  /* grab another TLB */
-  Fspace* fspace = (Fspace*)alloc_ctx->alloc_space;
 
-retry_grab_block:
-  if ( !fspace_has_free_block(fspace)) {    /* can not get a new TLB, activate GC */ 
+  /* ran out local block, grab a new one*/  
+  Fspace* fspace = (Fspace*)allocator->alloc_space;
+  while( !fspace_alloc_block(fspace, allocator)){
     vm_gc_lock_enum();
     /* after holding lock, try if other thread collected already */
     if ( !fspace_has_free_block(fspace) ) {  
-      gc_gen_reclaim_heap((GC_Gen*)alloc_ctx->gc, GC_CAUSE_NOS_IS_FULL); 
+      gc_gen_reclaim_heap((GC_Gen*)allocator->gc, GC_CAUSE_NOS_IS_FULL); 
     }    
     vm_gc_unlock_enum();  
   }
-
-  Boolean ok = fspace_alloc_block(fspace, alloc_ctx);
-  if(ok){
-    p_return = thread_local_alloc(size, alloc_ctx);
-    assert(p_return);              
-    return p_return;
-  }
-
-  /* failed to get a TLB atomically */
-  goto retry_grab_block;
+  
+  p_return = thread_local_alloc(size, allocator);
+  
+  return p_return;
   
 }
 

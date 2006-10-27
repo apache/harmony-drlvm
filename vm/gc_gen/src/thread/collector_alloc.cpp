@@ -20,7 +20,7 @@
 
 #include "thread_alloc.h"
 
-void* mos_alloc(unsigned size, Alloc_Context *alloc_ctx);
+void* mos_alloc(unsigned size, Allocator *allocator);
 
 /* NOS forward obj to MOS in MINOR_COLLECTION */
 Partial_Reveal_Object* collector_forward_object(Collector* collector, Partial_Reveal_Object* p_obj)
@@ -43,7 +43,7 @@ Partial_Reveal_Object* collector_forward_object(Collector* collector, Partial_Re
 
   /* we hold the object, now forward it */
   unsigned int size = vm_object_size(p_obj);
-  Partial_Reveal_Object* p_targ_obj = (Partial_Reveal_Object*)mos_alloc(size, (Alloc_Context*)collector);  
+  Partial_Reveal_Object* p_targ_obj = (Partial_Reveal_Object*)mos_alloc(size, (Allocator*)collector);  
   /* mos should always has enough space to hold nos during collection */
   assert(p_targ_obj); 
   memcpy(p_targ_obj, p_obj, size);

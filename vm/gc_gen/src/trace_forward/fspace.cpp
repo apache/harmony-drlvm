@@ -30,13 +30,107 @@ void* nos_boundary = null; /* this is only for speeding up write barrier */
 Boolean forward_first_half;;
 void* object_forwarding_boundary=NULL;
 
-
-void fspace_destruct(Fspace *fspace) 
+void fspace_save_reloc(Fspace* fspace, Partial_Reveal_Object** p_ref)
 {
-  port_vmem_decommit(fspace->heap_start, fspace->committed_heap_size, fspace->gc->allocated_memory);
-  STD_FREE(fspace->mark_table);
-  STD_FREE(fspace);  
- 
+  Block_Header* block = GC_BLOCK_HEADER(p_ref);
+  block->reloc_table->push_back(p_ref);
+  return;
+}
+
+void  fspace_update_reloc(Fspace* fspace)
+{
+  SlotVector* reloc_table;
+  /* update refs in fspace */
+  Block* blocks = fspace->blocks;
+  for(unsigned int i=0; i < fspace->num_managed_blocks; i++){
+    Block_Header* block = (Block_Header*)&(blocks[i]);
+    reloc_table = block->reloc_table;
+    for(unsigned int j=0; j < reloc_table->size(); j++){
+      Partial_Reveal_Object** p_ref = (*reloc_table)[j];
+      Partial_Reveal_Object* p_target_obj = get_forwarding_pointer_in_obj_info(*p_ref);
+      *p_ref = p_target_obj;
+    }
+    reloc_table->clear();
+  }
+  
+  return;  
+}  
+
+Boolean fspace_mark_object(Fspace* fspace, Partial_Reveal_Object *p_obj)
+{  
+  obj_mark_in_vt(p_obj);
+
+  unsigned int obj_word_index = OBJECT_WORD_INDEX_TO_MARKBIT_TABLE(p_obj);
+  unsigned int obj_offset_in_word = OBJECT_WORD_OFFSET_IN_MARKBIT_TABLE(p_obj); 	
+	
+  unsigned int *p_word = &(GC_BLOCK_HEADER(p_obj)->mark_table[obj_word_index]);
+  unsigned int word_mask = (1<<obj_offset_in_word);
+	
+  unsigned int result = (*p_word)|word_mask;
+	
+  if( result==(*p_word) ) return FALSE;
+  
+  *p_word = result; 
+  
+   return TRUE;
+}
+
+Boolean fspace_object_is_marked(Partial_Reveal_Object *p_obj, Fspace* fspace)
+{
+  assert(p_obj);
+  
+#ifdef _DEBUG //TODO:: Cleanup
+  unsigned int obj_word_index = OBJECT_WORD_INDEX_TO_MARKBIT_TABLE(p_obj);
+  unsigned int obj_offset_in_word = OBJECT_WORD_OFFSET_IN_MARKBIT_TABLE(p_obj); 	
+	
+  unsigned int *p_word = &(GC_BLOCK_HEADER(p_obj)->mark_table[obj_word_index]);
+  unsigned int word_mask = (1<<obj_offset_in_word);
+	
+  unsigned int result = (*p_word)|word_mask;
+	
+  if( result==(*p_word) )
+    assert( obj_is_marked_in_vt(p_obj));
+  else 
+    assert(!obj_is_marked_in_vt(p_obj));
+    
+#endif
+
+  return (obj_is_marked_in_vt(p_obj));
+    
+}
+
+static void fspace_destruct_blocks(Fspace* fspace)
+{ 
+  Block* blocks = (Block*)fspace->blocks; 
+  for(unsigned int i=0; i < fspace->num_managed_blocks; i++){
+    Block_Header* block = (Block_Header*)&(blocks[i]);
+    delete block->reloc_table;
+    block->reloc_table = NULL;
+  }
+  
+  return;
+}
+
+static void fspace_init_blocks(Fspace* fspace)
+{ 
+  Block* blocks = (Block*)fspace->heap_start; 
+  Block_Header* last_block = (Block_Header*)blocks;
+  unsigned int start_idx = fspace->first_block_idx;
+  for(unsigned int i=0; i < fspace->num_managed_blocks; i++){
+    Block_Header* block = (Block_Header*)&(blocks[i]);
+    block->free = (void*)((unsigned int)block + GC_BLOCK_HEADER_SIZE_BYTES);
+    block->ceiling = (void*)((unsigned int)block + GC_BLOCK_SIZE_BYTES); 
+    block->base = block->free;
+    block->block_idx = i + start_idx;
+    block->status = BLOCK_FREE;  
+    block->reloc_table = new SlotVector();
+    last_block->next = block;
+    last_block = block;
+  }
+  last_block->next = NULL;
+  fspace->blocks = blocks;
+   
+  return;
 }
 
 struct GC_Gen;
@@ -47,133 +141,109 @@ void fspace_initialize(GC* gc, void* start, unsigned int fspace_size)
   Fspace* fspace = (Fspace *)STD_MALLOC(sizeof(Fspace));
   assert(fspace);
   memset(fspace, 0, sizeof(Fspace));
+    
+  fspace->reserved_heap_size = fspace_size;
+  fspace->num_total_blocks = fspace_size >> GC_BLOCK_SHIFT_COUNT;
 
   void* reserved_base = start;
   int status = port_vmem_commit(&reserved_base, fspace_size, gc->allocated_memory); 
   assert(status == APR_SUCCESS && reserved_base == start);
-  
-  memset(reserved_base, 0, fspace_size);
-
-  fspace->block_size_bytes = GC_BLOCK_SIZE_BYTES;
-  fspace->committed_heap_size = fspace->reserved_heap_size = fspace_size;
-  
-  fspace->heap_start = (void *)start;
-  fspace->heap_end = (void *)((POINTER_SIZE_INT) start + fspace_size);
-
-  fspace->num_collections = 0;
     
-  fspace->alloc_free = fspace->heap_start;
-  fspace->alloc_ceiling = fspace->heap_end;
-  forward_first_half = TRUE;
-  object_forwarding_boundary = (void *)((((POINTER_SIZE_INT)start + (unsigned int)(fspace_size*NURSERY_OBJECT_FORWARDING_RATIO))>>7)<<7);
-
-  /* mark_table: 1. MAJOR_COLLECTION mark and copy nursery, 2. MINOR_COLLECTION mark non-forwarded part */
-  fspace->mark_table_size = fspace_size>>5;
-  fspace->mark_table = (unsigned int*)STD_MALLOC(fspace->mark_table_size); 
-  fspace->mark_table_half_boundary = fspace->mark_table + (((unsigned int)(fspace_size*NURSERY_OBJECT_FORWARDING_RATIO))>>7);
-  memset(fspace->mark_table, 0, fspace->mark_table_size);
-
+  memset(reserved_base, 0, fspace_size);
+  fspace->committed_heap_size = fspace_size;
+  fspace->heap_start = reserved_base;
+  fspace->heap_end = (void *)((unsigned int)reserved_base + fspace->reserved_heap_size);
+  fspace->num_managed_blocks = fspace_size >> GC_BLOCK_SHIFT_COUNT;
+  
+  fspace->first_block_idx = GC_BLOCK_INDEX_FROM(gc->heap_start, reserved_base);
+  fspace->ceiling_block_idx = fspace->first_block_idx + fspace->num_managed_blocks - 1;
+  
+  fspace->num_used_blocks = 0;
+  fspace->free_block_idx = fspace->first_block_idx;
+  
+  fspace_init_blocks(fspace);
+  
+  fspace->obj_info_map = new ObjectMap();
   fspace->mark_object_func = fspace_mark_object;
   fspace->save_reloc_func = fspace_save_reloc;
   fspace->update_reloc_func = fspace_update_reloc;
 
-  fspace->remslot_sets = new std::vector<RemslotSet *>();
-  fspace->remobj_sets = new std::vector<RemobjSet *>();
-  fspace->rem_sets_lock = FREE_LOCK;
-
-  fspace->reloc_table = new SlotVector();
-  fspace->obj_info_map = new ObjectMap();
-
   fspace->move_object = TRUE;
+  fspace->num_collections = 0;
   fspace->gc = gc;
   gc_set_nos((GC_Gen*)gc, (Space*)fspace);
+  /* above is same as Mspace init --> */
+  
+  fspace->remslot_sets = new std::vector<RemslotSet *>();
+  fspace->rem_sets_lock = FREE_LOCK;
 
   nos_boundary = fspace->heap_end;
+
+  forward_first_half = TRUE;
+  object_forwarding_boundary = (void*)&fspace->blocks[fspace->first_block_idx + (unsigned int)(fspace->num_managed_blocks * NURSERY_OBJECT_FORWARDING_RATIO)];
 
   return;
 }
 
-Boolean fspace_mark_object(Fspace* fspace, Partial_Reveal_Object *p_obj)
+void fspace_destruct(Fspace *fspace) 
 {
-  assert(obj_belongs_to_space(p_obj, (Space*)fspace));
-  
-  //offset in byte
-  unsigned int offset = (POINTER_SIZE_INT)p_obj - (POINTER_SIZE_INT)fspace->heap_start; 
-  assert( ((offset>>2)<<2)==offset);
-  
-  offset >>= 2; //offset in word
-  unsigned int bit_off_in_word = offset - ((offset>>5)<<5);
-  unsigned int* pos = fspace->mark_table + (offset>>5);
-
-  if( NURSERY_OBJECT_FORWARDING_RATIO != FORWARD_ALL && fspace->gc->collect_kind != MAJOR_COLLECTION )
-    assert(forward_first_half?(pos >= fspace->mark_table_half_boundary):(pos<fspace->mark_table_half_boundary));
-  
-  unsigned int word = *pos;
-  unsigned int result = word | (1<<bit_off_in_word);
-  if(word == result) return FALSE;
-
-  *pos = result;
-  obj_mark_in_vt(p_obj);
-  
-  return TRUE;
-}
-
-void fspace_clear_mark_bits(Fspace* fspace)
-{
-  unsigned int* mark_table = fspace->mark_table;
-  unsigned int* fspace_marked_half = (unsigned int*)fspace->heap_start;
-  unsigned int* table_end = fspace->mark_table_half_boundary;
-  Partial_Reveal_Object* p_obj = NULL;
-  
-  if( forward_first_half ){
-    //forward frist half, so the second half is marked
-    table_end = (unsigned int*)((POINTER_SIZE_INT)mark_table + fspace->mark_table_size);
-    mark_table = fspace->mark_table_half_boundary; 
-    fspace_marked_half = (unsigned int*)object_forwarding_boundary;
-  }
-  
-  unsigned j=0;
-  while( (mark_table + j) < table_end){
-    unsigned int markbits = *(mark_table+j);
-    if(!markbits){ j++; continue; }
-    unsigned int k=0;
-    while(k<32){
-      if( !(markbits& (1<<k)) ){ k++; continue;}
-      p_obj = (Partial_Reveal_Object*)(fspace_marked_half + (j<<5) + k);
-      
-      Partial_Reveal_VTable* vt = obj_get_vtraw(p_obj);
-      Allocation_Handle ah = (Allocation_Handle)vt;
-      assert(!(ah & FORWARDING_BIT_MASK));
-      assert(ah & MARK_BIT_MASK);
-      
-      obj_unmark_in_vt(p_obj);
-      //*(mark_table+j) &= ~(1<<k); //we do it in chunck
-      
-      k++;
-    }   
-    j++;;
-  }
-
-  memset(mark_table, 0, (POINTER_SIZE_INT)table_end-(POINTER_SIZE_INT)mark_table);
+  fspace_destruct_blocks(fspace);
+  port_vmem_decommit(fspace->heap_start, fspace->committed_heap_size, fspace->gc->allocated_memory);
+  STD_FREE(fspace);  
+ 
 }
  
 void reset_fspace_for_allocation(Fspace* fspace)
 { 
   if( NURSERY_OBJECT_FORWARDING_RATIO == FORWARD_ALL ||
-            fspace->gc->collect_kind == MAJOR_COLLECTION ){
-    fspace->alloc_free = fspace->heap_start;
-    fspace->alloc_ceiling = fspace->heap_end;    
+            fspace->gc->collect_kind == MAJOR_COLLECTION )
+  {
+    fspace->free_block_idx = fspace->first_block_idx;
+    fspace->ceiling_block_idx = fspace->first_block_idx + fspace->num_managed_blocks - 1;  
     forward_first_half = TRUE; /* only useful for not-FORWARD_ALL*/
   }else{    
     if(forward_first_half){
-      fspace->alloc_free = fspace->heap_start;
-      fspace->alloc_ceiling = object_forwarding_boundary;
+      fspace->free_block_idx = fspace->first_block_idx;
+      fspace->ceiling_block_idx = ((Block_Header*)object_forwarding_boundary)->block_idx - 1;
     }else{
-      fspace->alloc_free = object_forwarding_boundary;
-      fspace->alloc_ceiling = fspace->heap_end;
+      fspace->free_block_idx = ((Block_Header*)object_forwarding_boundary)->block_idx;
+      fspace->ceiling_block_idx = fspace->first_block_idx + fspace->num_managed_blocks - 1;
     }
     forward_first_half = ~forward_first_half;
-    /* clear all the marking bits of the remaining objects in fspace */
-    fspace_clear_mark_bits(fspace); 
   }
+
+  unsigned int first_idx = fspace->free_block_idx;
+  unsigned int last_idx = fspace->ceiling_block_idx;
+  Block* blocks = fspace->blocks;
+  unsigned int num_freed = 0;
+  for(unsigned int i = first_idx; i <= last_idx; i++){
+    Block_Header* block = (Block_Header*)&(blocks[i]);
+    if(block->status == BLOCK_FREE) continue;
+    block_clear_mark_table(block); 
+    block->status = BLOCK_FREE; 
+    block->free = GC_BLOCK_BODY(block);
+    num_freed ++;
+  }
+  fspace->num_used_blocks = fspace->num_used_blocks - num_freed;
+
+}
+
+void collector_execute_task(GC* gc, TaskType task_func, Space* space);
+
+/* world is stopped when starting fspace_collection */      
+void fspace_collection(Fspace *fspace)
+{
+  fspace->num_collections++;  
+  
+  GC* gc = fspace->gc;
+
+  if(gc_requires_barriers()){ 
+    /* generational GC. Only trace (mark) nos */
+    collector_execute_task(gc, (TaskType)trace_forward_fspace, (Space*)fspace);
+  }else{
+    /* non-generational GC. Mark the whole heap (nos, mos, and los) */
+    collector_execute_task(gc, (TaskType)mark_copy_fspace, (Space*)fspace);
+  }
+  
+  return; 
 }

@@ -21,8 +21,7 @@
 #include "vm_threads.h"
 
 #include "../gen/gen.h"
-
-#include "../common/interior_pointer.h"
+#include "interior_pointer.h"
 
 static GC* p_global_gc = NULL;
 
@@ -50,6 +49,11 @@ void gc_add_root_set_entry(Managed_Object_Handle *ref, Boolean is_pinned)
 	assert( obj_is_in_gc_heap(*p_ref));
 	p_global_gc->root_set->push_back(p_ref);
 } 
+
+void gc_add_root_set_entry_interior_pointer (void **slot, int offset, Boolean is_pinned) 
+{  
+  add_root_set_entry_interior_pointer(slot, offset, is_pinned); 
+}
 
 /* VM to force GC */
 void gc_force_gc() 
@@ -109,5 +113,3 @@ Managed_Object_Handle gc_get_next_live_object(void *iterator)
 unsigned int gc_time_since_last_gc()
 {  assert(0); return 0; }
 
-void gc_add_root_set_entry_interior_pointer (void **slot, int offset, Boolean is_pinned) 
-{	add_root_set_entry_interior_pointer(slot, offset, is_pinned); }

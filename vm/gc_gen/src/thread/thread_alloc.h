@@ -21,35 +21,35 @@
 #ifndef _THREAD_ALLOC_H_
 #define _THREAD_ALLOC_H_
 
-#include "../common/gc_common.h"
+#include "../common/gc_block.h"
 
-typedef struct Alloc_Context{
+typedef struct Allocator{
   void *free;
   void *ceiling;
-  void *curr_alloc_block;
+  Block *alloc_block;
   Space* alloc_space;
   GC   *gc;
   VmThreadHandle thread_handle;   /* This thread; */
-}Alloc_Context;
+}Allocator;
 
-inline Partial_Reveal_Object* thread_local_alloc(unsigned int size, Alloc_Context* alloc_ctx)
+inline Partial_Reveal_Object* thread_local_alloc(unsigned int size, Allocator* allocator)
 {
-    Partial_Reveal_Object* p_return_obj=(Partial_Reveal_Object*)alloc_ctx->free;
+    Partial_Reveal_Object* p_return_obj=(Partial_Reveal_Object*)allocator->free;
     unsigned int new_free = size+(unsigned int)p_return_obj;
 		    
-    if (new_free <= (unsigned int)alloc_ctx->ceiling){
-    	alloc_ctx->free=(void*)new_free;
+    if (new_free <= (unsigned int)allocator->ceiling){
+    	allocator->free=(void*)new_free;
     	return p_return_obj;
     }
 
     return NULL;
 }
 
-inline void alloc_context_reset(Alloc_Context* alloc_ctx)
+inline void alloc_context_reset(Allocator* allocator)
 {
-  alloc_ctx->free = NULL;
-  alloc_ctx->ceiling = NULL;
-  alloc_ctx->curr_alloc_block = NULL;
+  allocator->free = NULL;
+  allocator->ceiling = NULL;
+  allocator->alloc_block = NULL;
   
   return;
 }

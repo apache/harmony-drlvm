@@ -25,17 +25,16 @@
 
 /* Mutator thread local information for GC */
 typedef struct Mutator {
-  /* <-- first couple of fields are overloaded as Alloc_Context */
+  /* <-- first couple of fields are overloaded as Allocator */
 	void*	free;
 	void*	ceiling;
-  void* curr_alloc_block;
+  void* alloc_block;
   Space* alloc_space;
   GC* gc;
   VmThreadHandle thread_handle;   /* This thread; */
-  /* END of Alloc_Context --> */
+  /* END of Allocator --> */
   
   RemslotSet *remslot;
-  RemobjSet *remobj;
   Mutator *next;  /* The gc info area associated with the next active thread. */
 } Mutator;
 

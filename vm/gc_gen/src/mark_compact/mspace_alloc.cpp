@@ -18,46 +18,49 @@
  * @author Xiao-Feng Li, 2006/10/05
  */
 
-#include "mspace_collect.h"
+#include "mspace.h"
 
-static Boolean mspace_alloc_block(Mspace* mspace, Alloc_Context* alloc_ctx)
+static Boolean mspace_alloc_block(Mspace* mspace, Allocator* allocator)
 {
-  int old_free_idx = mspace->free_block_idx;
-  int new_free_idx = old_free_idx+1;
-
-  Block_Info* curr_alloc_block = (Block_Info* )alloc_ctx->curr_alloc_block;
-  if(curr_alloc_block != NULL){ /* it is NULL at first time */
-    assert(curr_alloc_block->status == BLOCK_IN_USE);
-    curr_alloc_block->status = BLOCK_USED;
-    curr_alloc_block->block->free = alloc_ctx->free;
+  Block_Header* alloc_block = (Block_Header* )allocator->alloc_block;
+  /* put back the used block */
+  if(alloc_block != NULL){ /* it is NULL at first time */
+    assert(alloc_block->status == BLOCK_IN_USE);
+    alloc_block->status = BLOCK_USED;
+    alloc_block->free = allocator->free;
   }
 
-  while( mspace_has_free_block(mspace)){
-    
+  /* now try to get a new block */
+  unsigned int old_free_idx = mspace->free_block_idx;
+  unsigned int new_free_idx = old_free_idx+1;
+  while( old_free_idx <= mspace->ceiling_block_idx ){   
     unsigned int allocated_idx = atomic_cas32(&mspace->free_block_idx, new_free_idx, old_free_idx);
-      
-    if(allocated_idx != (POINTER_SIZE_INT)old_free_idx){
+    if(allocated_idx != old_free_idx){
       old_free_idx = mspace->free_block_idx;
       new_free_idx = old_free_idx+1;
       continue;
     }
-  
-    Block_Info* curr_alloc_block = &(mspace->block_info[allocated_idx]);
-
-    assert(curr_alloc_block->status == BLOCK_FREE);
-    curr_alloc_block->status = BLOCK_IN_USE;
+    /* ok, got one */
+    alloc_block = (Block_Header*)&(mspace->blocks[allocated_idx - mspace->first_block_idx]);
+    assert(alloc_block->status == BLOCK_FREE);
+    alloc_block->status = BLOCK_IN_USE;
     mspace->num_used_blocks++;
-
-    alloc_ctx->curr_alloc_block = curr_alloc_block; 
-    Block_Header* block = curr_alloc_block->block;
-    memset(block->free, 0, (unsigned int)block->ceiling - (unsigned int)block->free);
-    alloc_ctx->free = block->free;
-    alloc_ctx->ceiling = block->ceiling;
+    memset(alloc_block->free, 0, GC_BLOCK_BODY_SIZE_BYTES);
+    
+    /* set allocation context */
+    allocator->free = alloc_block->free;
+    allocator->ceiling = alloc_block->ceiling;
+    allocator->alloc_block = (Block*)alloc_block; 
     
     return TRUE;
   }
-  
-  /* FIXME:: collect Mspace if for mutator, else assert(0) */
+
+  /* if Mspace is used for mutator allocation, here a collection should be triggered. 
+     else if this is only for collector allocation, when code goes here, it means 
+     Mspace is not enough to hold Nursery live objects, so the invoker of this routine 
+     should throw out-of-memory exception.
+     But because in our design, we don't do any Mspace allocation during collection, this
+     path should never be reached. That's why we assert(0) here. */  
   assert(0);
   return FALSE;
   
@@ -65,25 +68,25 @@ static Boolean mspace_alloc_block(Mspace* mspace, Alloc_Context* alloc_ctx)
 
 struct GC_Gen;
 Space* gc_get_mos(GC_Gen* gc);
-void* mspace_alloc(unsigned int size, Alloc_Context* alloc_ctx)
+void* mspace_alloc(unsigned int size, Allocator* allocator)
 {
   void *p_return = NULL;
  
-  Mspace* mspace = (Mspace*)gc_get_mos((GC_Gen*)alloc_ctx->gc);
+  Mspace* mspace = (Mspace*)gc_get_mos((GC_Gen*)allocator->gc);
   
   /* All chunks of data requested need to be multiples of GC_OBJECT_ALIGNMENT */
   assert((size % GC_OBJECT_ALIGNMENT) == 0);
   assert( size <= GC_OBJ_SIZE_THRESHOLD );
 
   /* check if collector local alloc block is ok. If not, grab a new block */
-  p_return = thread_local_alloc(size, alloc_ctx);
+  p_return = thread_local_alloc(size, allocator);
   if(p_return) return p_return;
   
   /* grab a new block */
-  Boolean ok = mspace_alloc_block(mspace, alloc_ctx);
+  Boolean ok = mspace_alloc_block(mspace, allocator);
   assert(ok);
   
-  p_return = thread_local_alloc(size, alloc_ctx);
+  p_return = thread_local_alloc(size, allocator);
   assert(p_return);
     
   return p_return;

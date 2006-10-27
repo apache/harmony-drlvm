@@ -24,55 +24,80 @@
 
 /* All the write barrier interfaces need cleanup */
 
+static Boolean NEED_BARRIER = TRUE;
+
 Boolean gc_requires_barriers() 
-{   return 1; }
+{   return NEED_BARRIER; }
 
 /* The implementations are only temporary */
-static void gc_write_barrier_generic(Managed_Object_Handle p_obj_holding_ref, Managed_Object_Handle *p_slot, 
-                      Managed_Object_Handle p_target, unsigned int kind) 
+static void gc_slot_write_barrier(Managed_Object_Handle *p_slot, 
+                      Managed_Object_Handle p_target) 
 {
   Mutator *mutator = (Mutator *)vm_get_gc_thread_local();
   GC_Gen* gc = (GC_Gen*)mutator->gc;
-  if(kind == WRITE_BARRIER_SLOT ){
-    if( address_belongs_to_nursery((void *)p_target, gc) && 
-         !address_belongs_to_nursery((void *)p_slot, gc)) 
-    {
-      mutator->remslot->push_back((Partial_Reveal_Object **)p_slot);
-    }
-  }else if( kind == WRITE_BARRIER_OBJECT ){
-    if( !address_belongs_to_nursery((void *)p_obj_holding_ref, gc) ) {
-      mutator->remobj->push_back((Partial_Reveal_Object *)p_obj_holding_ref);
-    }    
-  }else{  
-    assert(kind == WRITE_BARRIER_UPDATE ); 
-    *p_slot = p_target;
-    if( address_belongs_to_nursery((void *)p_target, gc) && 
-         !address_belongs_to_nursery((void *)p_slot, gc)) 
-    {
-      mutator->remslot->push_back((Partial_Reveal_Object **)p_slot);
-    }      
+  if( address_belongs_to_nursery((void *)p_target, gc) && 
+       !address_belongs_to_nursery((void *)p_slot, gc)) 
+  {
+    mutator->remslot->push_back((Partial_Reveal_Object **)p_slot);
   }
 }
 
-/* temporary write barriers, need reconsidering */
-void gc_write_barrier(Managed_Object_Handle p_obj_holding_ref)
+static void gc_object_write_barrier(Managed_Object_Handle p_object) 
 {
-  gc_write_barrier_generic(p_obj_holding_ref, NULL, NULL, WRITE_BARRIER_OBJECT); 
+  Mutator *mutator = (Mutator *)vm_get_gc_thread_local();
+  GC_Gen* gc = (GC_Gen*)mutator->gc;
+  if( !address_belongs_to_nursery((void *)p_object, gc)) return;
+  
+  Partial_Reveal_Object **p_slot; 
+  /* scan array object */
+  if (object_is_array((Partial_Reveal_Object*)p_object)) {
+    Partial_Reveal_Object* array = (Partial_Reveal_Object*)p_object;
+    assert(!obj_is_primitive_array(array));
+    
+    int32 array_length = vector_get_length((Vector_Handle) array);
+    for (int i = 0; i < array_length; i++) {
+      p_slot = (Partial_Reveal_Object **)vector_get_element_address_ref((Vector_Handle) array, i);
+      if( *p_slot != NULL && address_belongs_to_nursery((void *)*p_slot, gc)){
+        mutator->remslot->push_back(p_slot);
+      }
+    }   
+    return;
+  }
+
+  /* scan non-array object */
+  Partial_Reveal_Object* p_obj =  (Partial_Reveal_Object*)p_object;   
+  int *offset_scanner = init_object_scanner(p_obj);
+  while (true) {
+    p_slot = (Partial_Reveal_Object**)offset_get_ref(offset_scanner, p_obj);
+    if (p_slot == NULL) break;  
+    if( address_belongs_to_nursery((void *)*p_slot, gc)){
+      mutator->remslot->push_back(p_slot);
+    }
+    offset_scanner = offset_next_ref(offset_scanner);
+  }
+
+  return;
 }
 
-/* for array copy and object clone */
-void gc_heap_wrote_object (Managed_Object_Handle p_obj_holding_ref)
+void gc_heap_wrote_object (Managed_Object_Handle p_obj_written)
 {
-  gc_write_barrier_generic(p_obj_holding_ref, NULL, NULL, WRITE_BARRIER_OBJECT); 
+  if( !NEED_BARRIER ) return;
+  if( object_has_slots((Partial_Reveal_Object*)p_obj_written)){
+    /* for array copy and object clone */
+    gc_object_write_barrier(p_obj_written); 
+  }
 }
 
 /* The following routines were supposed to be the only way to alter any value in gc heap. */
 void gc_heap_write_ref (Managed_Object_Handle p_obj_holding_ref, unsigned offset, Managed_Object_Handle p_target) 
 {  assert(0); }
 
+/* FIXME:: this is not the right interface for write barrier */
 void gc_heap_slot_write_ref (Managed_Object_Handle p_obj_holding_ref,Managed_Object_Handle *p_slot, Managed_Object_Handle p_target)
 {  
-  gc_write_barrier_generic(NULL, p_slot, p_target, WRITE_BARRIER_UPDATE); 
+  *p_slot = p_target;
+  if( !NEED_BARRIER ) return;
+  gc_slot_write_barrier(p_slot, p_target); 
 }
 
 /* this is used for global object update, e.g., strings. Since globals are roots, no barrier here */

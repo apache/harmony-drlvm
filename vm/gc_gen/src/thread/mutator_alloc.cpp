@@ -32,9 +32,9 @@ Managed_Object_Handle gc_alloc(unsigned size, Allocation_Handle ah, void *gc_tls
   assert(ah);
 
   if ( size > GC_OBJ_SIZE_THRESHOLD )
-    p_obj = (Managed_Object_Handle)los_alloc(size, (Alloc_Context*)gc_tls);
+    p_obj = (Managed_Object_Handle)los_alloc(size, (Allocator*)gc_tls);
   else
-    p_obj = (Managed_Object_Handle)nos_alloc(size, (Alloc_Context*)gc_tls);
+    p_obj = (Managed_Object_Handle)nos_alloc(size, (Allocator*)gc_tls);
   
   assert(p_obj);
   obj_set_vt((Partial_Reveal_Object*)p_obj, ah);
@@ -55,7 +55,7 @@ Managed_Object_Handle gc_alloc_fast (unsigned size, Allocation_Handle ah, void *
   
   /* Try to allocate an object from the current Thread Local Block */
   Managed_Object_Handle p_obj = NULL;
-  p_obj = (Managed_Object_Handle)thread_local_alloc(size, (Alloc_Context*)gc_tls);
+  p_obj = (Managed_Object_Handle)thread_local_alloc(size, (Allocator*)gc_tls);
   if(p_obj == NULL) return NULL;
    
   obj_set_vt((Partial_Reveal_Object*)p_obj, ah);

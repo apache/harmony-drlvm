@@ -88,6 +88,7 @@ static void scan_root(Collector* collector, Partial_Reveal_Object *p_obj)
   return;
 }
 
+/* NOTE:: Only marking in object header is idempotent */
 void mark_scan_heap(Collector* collector)
 {
   GC* gc = collector->gc;
@@ -99,26 +100,6 @@ void mark_scan_heap(Collector* collector)
 	  assert(*p_ref); /* root ref should never by NULL */
 	  scan_root(collector, *p_ref);	
   }	
-  
-  return;
-}
-
-void gc_update_rootset(GC* gc)
-{
-  RootSet* root_set = gc->root_set;
-  /* update refs in root set after moving collection */
-  for(unsigned int i=0; i < root_set->size(); i++){
-      Partial_Reveal_Object** p_ref = (*root_set)[i];
-      Partial_Reveal_Object* p_obj = *p_ref;
-      assert(p_obj); /* root ref should never by NULL*/
-      /* FIXME:: this should be reconsidered: forwarded in vt or obj_info */
-      if(!obj_is_forwarded_in_obj_info(p_obj)){
-         assert(obj_belongs_to_space(p_obj, gc_get_los((GC_Gen*)gc)));
-         continue;
-      }
-      Partial_Reveal_Object* p_target_obj = get_forwarding_pointer_in_obj_info(p_obj);
-      *p_ref = p_target_obj; 
-  }
   
   return;
 }

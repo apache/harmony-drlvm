@@ -24,9 +24,9 @@ void* los_boundary = NULL;
 struct GC_Gen;
 Space* gc_get_los(GC_Gen* gc);
 void gc_set_los(GC_Gen* gc, Space* lspace);
-void* lspace_alloc(unsigned int size, Alloc_Context *alloc_ctx)
+void* lspace_alloc(unsigned int size, Allocator *allocator)
 {  
-  Lspace* lspace = (Lspace*)gc_get_los((GC_Gen*)alloc_ctx->gc);
+  Lspace* lspace = (Lspace*)gc_get_los((GC_Gen*)allocator->gc);
   
   unsigned int old_free = (unsigned int)lspace->alloc_free;
   unsigned int new_free = old_free + size;
@@ -108,6 +108,14 @@ void lspace_collection(Lspace* lspace)
   
   return;
 }
+
+void reset_lspace_after_copy_nursery(Lspace* lspace)
+{
+  unsigned int used_size = (unsigned int)lspace->alloc_free - (unsigned int)lspace->heap_start;
+  memset(lspace->mark_table, 0, (used_size>>BIT_SHIFT_TO_KILO)>>BIT_SHIFT_TO_BITS_PER_BYTE );
+  return;  
+}
+
 
 Boolean lspace_mark_object(Lspace* lspace, Partial_Reveal_Object* p_obj)
 {

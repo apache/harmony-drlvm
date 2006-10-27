@@ -47,60 +47,57 @@ typedef struct Fspace {
   void (*save_reloc_func)(Fspace* space, Partial_Reveal_Object** p_ref);
   void (*update_reloc_func)(Fspace* space);
   /* END of Space --> */
-    
-  /* places to start and stop alloc */
-  volatile void* alloc_free;
-  void* alloc_ceiling;
-    
-  unsigned int block_size_bytes;
+
+  Block* blocks; /* short-cut for mpsace blockheader access, not mandatory */
   
-  unsigned int* mark_table; //table to keep mark_bits of fspace
-  unsigned int mark_table_size;
-  unsigned int* mark_table_half_boundary;
+  /* FIXME:: the block indices should be replaced with block header addresses */
+  unsigned int first_block_idx;
+  unsigned int ceiling_block_idx;
+  volatile unsigned int free_block_idx;
   
+  unsigned int num_used_blocks;
+  unsigned int num_managed_blocks;
+  unsigned int num_total_blocks;
+
+  /* during compaction, save non-zero obj_info who's overwritten by forwarding pointer */
+  ObjectMap*  obj_info_map; 
+  /* END of Blocked_Space --> */
+    
   /* saved remsets of collectors */
   /* saved remsets of exited mutators */
   std::vector<RemslotSet *> *remslot_sets;
-  std::vector<RemobjSet *> *remobj_sets;
   SpinLock rem_sets_lock;
-
-  /* support other space moving collection */
-  SlotVector* reloc_table;
-  ObjectMap*  obj_info_map; 
   
 } Fspace;
 
 void fspace_initialize(GC* gc, void* start, unsigned int fspace_size);
 void fspace_destruct(Fspace *fspace);
 
-inline unsigned int fspace_free_memory_size(Fspace* fspace)
-{ return (unsigned int)fspace->alloc_ceiling - (unsigned int)fspace->alloc_free; }
+inline Boolean fspace_has_free_block(Fspace* fspace){ return fspace->free_block_idx <= fspace->ceiling_block_idx; }
+inline unsigned int fspace_free_memory_size(Fspace* fspace){ return GC_BLOCK_SIZE_BYTES * (fspace->ceiling_block_idx - fspace->free_block_idx + 1);  }
+inline Boolean fspace_used_memory_size(Fspace* fspace){ return GC_BLOCK_SIZE_BYTES * fspace->num_used_blocks; }
 
-inline unsigned int fspace_used_memory_size(Fspace* fspace)
-{ return (unsigned int)fspace->alloc_free - (unsigned int)fspace->heap_start; }
 
-void* fspace_alloc(unsigned size, Alloc_Context *alloc_ctx);
+void* fspace_alloc(unsigned size, Allocator *allocator);
 
 Boolean fspace_mark_object(Fspace* fspace, Partial_Reveal_Object *p_obj);
-void fspace_clear_mark_bits(Fspace* fspace);
-
 void fspace_save_reloc(Fspace* fspace, Partial_Reveal_Object** p_ref);
 void fspace_update_reloc(Fspace* fspace);
-void fspace_restore_obj_info(Fspace* fspace);
-void fspace_copy_collect(Collector* collector, Fspace* fspace); 
-void space_copy_remset_slots(Fspace* space, RootSet* copy_rootset);
-void space_update_remsets(Fspace* space);
-
-void fspace_collection(Fspace* fspace);
 void reset_fspace_for_allocation(Fspace* fspace);
 
-inline unsigned int fspace_allocated_size(Fspace* fspace)
-{ 
-  return (unsigned int)fspace->alloc_ceiling - (unsigned int)fspace->alloc_free;
-}
+inline Block_Header* fspace_get_first_copy_block(Fspace* fspace)
+{  return (Block_Header*)fspace->blocks; }
+
+inline Block_Header* fspace_get_next_copy_block(Fspace* fspace, Block_Header* block)
+{  return block->next; }
+
+
+Boolean fspace_compute_object_target(Collector* collector, Fspace* fspace);
+void fspace_copy_collect(Collector* collector, Fspace* fspace); 
+
+void trace_forward_fspace(Collector* collector); 
+void mark_copy_fspace(Collector* collector); 
+
+void fspace_collection(Fspace* fspace);
   
-inline Boolean fspace_has_free_block(Fspace* fspace)
-{
-  return ((POINTER_SIZE_INT)fspace->alloc_free + fspace->block_size_bytes) <= (POINTER_SIZE_INT)fspace->alloc_ceiling;  
-}
 #endif // _FROM_SPACE_H_

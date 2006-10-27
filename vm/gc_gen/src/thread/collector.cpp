@@ -30,7 +30,7 @@ static void collector_reset_thread(Collector *collector)
 	vm_reset_event(collector->task_assigned_event);
 	vm_reset_event(collector->task_finished_event);
 	
-	alloc_context_reset((Alloc_Context*)collector);
+	alloc_context_reset((Allocator*)collector);
 	
 	return;
 }

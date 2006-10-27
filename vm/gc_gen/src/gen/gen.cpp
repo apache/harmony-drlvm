@@ -27,7 +27,7 @@
 
 /* heap size limit is not interesting. only for manual tuning purpose */
 unsigned int min_heap_size_bytes = 32 * MB;
-unsigned int max_heap_size_bytes = 64 * MB;
+unsigned int max_heap_size_bytes = 128 * MB;
 
 /* fspace size limit is not interesting. only for manual tuning purpose */
 unsigned int min_nos_size_bytes = 2 * MB;
@@ -76,17 +76,18 @@ void gc_gen_initialize(GC_Gen *gc_gen, unsigned int min_heap_size, unsigned int 
   gc_gen->reserved_heap_size = max_heap_size;
   gc_gen->heap_start = reserved_base;
   gc_gen->heap_end = (void*)((unsigned int)reserved_base + max_heap_size);
+  gc_gen->blocks = (Block*)reserved_base;
   gc_gen->num_collections = 0;
 
   /* heuristic nos + mos + LOS */
-  unsigned int nos_size =  max_heap_size >> 4; 
+  unsigned int nos_size =  max_heap_size >> 2; 
   assert(nos_size > min_nos_size_bytes);
 	gc_nos_initialize(gc_gen, reserved_base, nos_size);	
 
 	unsigned int mos_size = max_heap_size >> 1;
 	reserved_base = (void*)((unsigned int)reserved_base + nos_size);
 	gc_mos_initialize(gc_gen, reserved_base, mos_size);
-  
+    
 	unsigned int los_size = max_heap_size >> 2;
 	reserved_base = (void*)((unsigned int)gc_gen->heap_end - los_size);
 	gc_los_initialize(gc_gen, reserved_base, los_size);
@@ -137,9 +138,9 @@ Boolean major_collection_needed(GC_Gen* gc)
   return mspace_free_memory_size(gc->mos) < fspace_used_memory_size(gc->nos);  
 }
 
-void* mos_alloc(unsigned size, Alloc_Context *alloc_ctx){return mspace_alloc(size, alloc_ctx);}
-void* nos_alloc(unsigned size, Alloc_Context *alloc_ctx){return fspace_alloc(size, alloc_ctx);}
-void* los_alloc(unsigned size, Alloc_Context *alloc_ctx){return lspace_alloc(size, alloc_ctx);}
+void* mos_alloc(unsigned size, Allocator *allocator){return mspace_alloc(size, allocator);}
+void* nos_alloc(unsigned size, Allocator *allocator){return fspace_alloc(size, allocator);}
+void* los_alloc(unsigned size, Allocator *allocator){return lspace_alloc(size, allocator);}
 Space* gc_get_nos(GC_Gen* gc){ return (Space*)gc->nos;}
 Space* gc_get_mos(GC_Gen* gc){ return (Space*)gc->mos;}
 Space* gc_get_los(GC_Gen* gc){ return (Space*)gc->los;}
@@ -148,10 +149,60 @@ void gc_set_mos(GC_Gen* gc, Space* mos){ gc->mos = (Mspace*)mos;}
 void gc_set_los(GC_Gen* gc, Space* los){ gc->los = (Lspace*)los;}
 unsigned int gc_get_processor_num(GC_Gen* gc){ return gc->_num_processors;}
 
-void gc_preprocess_collector(Collector *collector)
+static void gc_gen_update_rootset(GC* gc)
+{
+  RootSet* root_set = gc->root_set;
+  /* update refs in root set after moving collection */
+  for(unsigned int i=0; i < root_set->size(); i++){
+      Partial_Reveal_Object** p_ref = (*root_set)[i];
+      Partial_Reveal_Object* p_obj = *p_ref;
+      assert(p_obj); /* root ref should never by NULL*/
+      /* FIXME:: this should be reconsidered: forwarded in vt or obj_info */
+      if(!obj_is_forwarded_in_obj_info(p_obj)){
+        /* if an obj is not moved, it must be in LOS or otherwise in MOS for MINOR_COLLECTION */
+#ifdef _DEBUG
+        if( gc->collect_kind == MINOR_COLLECTION )
+          assert( !obj_belongs_to_space(p_obj, gc_get_nos((GC_Gen*)gc)) );
+        else
+          assert( obj_belongs_to_space(p_obj, gc_get_los((GC_Gen*)gc)) ); 
+#endif
+        continue;
+      }
+      Partial_Reveal_Object* p_target_obj = get_forwarding_pointer_in_obj_info(p_obj);
+      *p_ref = p_target_obj; 
+  }
+  
+  return;
+}
+
+void update_rootset_interior_pointer();
+
+void gc_gen_update_repointed_refs(Collector* collector)
 {
   GC_Gen* gc = (GC_Gen*)collector->gc;
+  Space* space;
+  space = gc_get_nos(gc);  space->update_reloc_func(space);
+  space = gc_get_mos(gc);  space->update_reloc_func(space);
+  space = gc_get_los(gc);  space->update_reloc_func(space);
+
+  gc_gen_update_rootset((GC*)gc);   
+  update_rootset_interior_pointer();
   
+  return;
+}
+
+void gc_preprocess_collector(Collector *collector)
+{
+  /* for MAJOR_COLLECTION, all the remsets are useless */
+  GC_Gen* gc = (GC_Gen*)collector->gc;
+  if( gc->collect_kind == MAJOR_COLLECTION ){
+    collector->last_cycle_remset->clear();
+    return;
+  }
+
+  Fspace* fspace = (Fspace*)gc_get_nos(gc);
+  fspace->remslot_sets->push_back(collector->last_cycle_remset);
+    
   /* this_cycle_remset is ready to be used */
   assert(collector->this_cycle_remset->empty());
 
@@ -160,11 +211,12 @@ void gc_preprocess_collector(Collector *collector)
 
 void gc_postprocess_collector(Collector *collector)
 { 
+  /* for MAJOR_COLLECTION we do nothing */
   GC_Gen* gc = (GC_Gen*)collector->gc;
+  if( gc->collect_kind == MAJOR_COLLECTION )
+    return;
       
   /* for MINOR_COLLECTION */
-  Fspace* fspace = (Fspace*)gc_get_nos(gc);
-  
   /* switch its remsets, this_cycle_remset data kept in space->remslot_sets */
   /* last_cycle_remset was in space->remslot_sets and cleared during collection */
   assert(collector->last_cycle_remset->empty());
@@ -173,32 +225,32 @@ void gc_postprocess_collector(Collector *collector)
   collector->this_cycle_remset = collector->last_cycle_remset;
   collector->last_cycle_remset = temp_set;
   
-  fspace->remslot_sets->push_back(collector->last_cycle_remset);
-  
   return;
 }
 
 void gc_preprocess_mutator(GC_Gen* gc)
-{
+{       
   Mutator *mutator = gc->mutator_list;
   Fspace* fspace = (Fspace*)mutator->alloc_space;
-  
+  /* for MAJOR_COLLECTION, all the remsets are useless */
   while (mutator) {
-    fspace->remslot_sets->push_back(mutator->remslot);
-    fspace->remobj_sets->push_back(mutator->remobj);  
+    if(gc->collect_kind == MAJOR_COLLECTION){
+      mutator->remslot->clear();
+    }else{        
+      fspace->remslot_sets->push_back(mutator->remslot);
+    }
     mutator = mutator->next;
   }
  
   return;
-}
+} /////////FIXME::: need clear space remsets
 
 void gc_postprocess_mutator(GC_Gen* gc)
 {
   Mutator *mutator = gc->mutator_list;
   while (mutator) {
-    assert(mutator->remobj->empty());
     assert(mutator->remslot->empty());
-    alloc_context_reset((Alloc_Context*)mutator);    
+    alloc_context_reset((Allocator*)mutator);    
     mutator = mutator->next;
   }
   
@@ -209,7 +261,7 @@ static unsigned int gc_decide_collection_kind(GC_Gen* gc, unsigned int cause)
 {
   if(major_collection_needed(gc) || cause== GC_CAUSE_LOS_IS_FULL)
     return  MAJOR_COLLECTION;
-
+    
   return MINOR_COLLECTION;     
 }
 
@@ -227,9 +279,27 @@ void gc_gen_reclaim_heap(GC_Gen* gc, unsigned int cause)
   
   if(verify_live_heap) gc_verify_heap((GC*)gc, TRUE);
 
-  if(gc->collect_kind == MINOR_COLLECTION)
-    fspace_collection(gc->nos);
-  else{
+  if(gc->collect_kind == MINOR_COLLECTION){
+    if( gc_requires_barriers()) /* normal gen gc nos collection */
+      fspace_collection(gc->nos);
+    else{ /* copy nos to mos for non-gen gc */
+      /* we don't move mos objects in MINOR_COLLECTION. This is true for both 
+        gen or non-gen collections, but only meaningful for non-gen GC, because
+        non-gen GC need mark the heap in order to find the refs from mos/los to nos.
+        This can save lots of reloc table space for slots having ref pointing to mos.
+        For gen GC, MINOR_COLLECTION doesn't really mark the heap. It has remsets that
+        have all the refs from mos/los to nos, which are actually the same thing as reloc table */
+      gc->mos->move_object = FALSE;
+      fspace_collection(gc->nos);
+      gc->mos->move_object = TRUE;
+      
+      /* these are only needed for non-gen MINOR_COLLECTION, because 
+        both mos and los will be collected (and reset) in MAJOR_COLLECTION */
+      reset_mspace_after_copy_nursery(gc->mos);
+      reset_lspace_after_copy_nursery(gc->los);
+    }
+  }else{
+    /* process mos and nos together in one compaction */
     mspace_collection(gc->mos); /* fspace collection is included */
     lspace_collection(gc->los);
   }

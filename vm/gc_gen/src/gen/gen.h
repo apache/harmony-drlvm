@@ -44,8 +44,6 @@ extern unsigned int max_heap_size_bytes;
 extern unsigned int min_nos_size_bytes;
 extern unsigned int max_nos_size_bytes;
 
-extern unsigned int block_size_bytes;
-
 typedef struct GC_Gen {
   /* <-- First couple of fields overloadded as GC */
   void* heap_start;
@@ -73,6 +71,7 @@ typedef struct GC_Gen {
   port_vmem_t *allocated_memory;
   /* END of GC --> */
   
+  Block* blocks;
   Fspace *nos;
   Mspace *mos;
   Lspace *los;
@@ -94,6 +93,7 @@ inline unsigned int gc_gen_free_memory_size(GC_Gen* gc)
          lspace_free_memory_size(gc->los);  }
                         
 void gc_gen_reclaim_heap(GC_Gen* gc, unsigned int cause);
+void gc_gen_update_repointed_refs(Collector* collector);
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
@@ -128,9 +128,9 @@ inline Space* space_of_addr(GC* gc, void* addr)
   return (Space*)((GC_Gen*)gc)->los;
 }
 
-void* mos_alloc(unsigned size, Alloc_Context *alloc_ctx);
-void* nos_alloc(unsigned size, Alloc_Context *alloc_ctx);
-void* los_alloc(unsigned size, Alloc_Context *alloc_ctx);
+void* mos_alloc(unsigned size, Allocator *allocator);
+void* nos_alloc(unsigned size, Allocator *allocator);
+void* los_alloc(unsigned size, Allocator *allocator);
 Space* gc_get_nos(GC_Gen* gc);
 Space* gc_get_mos(GC_Gen* gc);
 Space* gc_get_los(GC_Gen* gc);

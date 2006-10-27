@@ -60,10 +60,7 @@
 
 #define BIT_MASK_TO_BITS_PER_WORD ((1<<BIT_SHIFT_TO_BITS_PER_WORD)-1)
 
-#define GC_BLOCK_SHIFT_COUNT 15
-#define GC_BLOCK_SIZE_BYTES (1 << GC_BLOCK_SHIFT_COUNT)
-
-#define GC_OBJ_SIZE_THRESHOLD (GC_BLOCK_SIZE_BYTES >> 1)
+#define GC_OBJ_SIZE_THRESHOLD (4*KB)
 
 typedef void (*TaskType)(void*);
 
@@ -253,7 +250,7 @@ inline void gc_reset_rootset(GC* gc)
 {
 	gc->root_set->clear();
 }
-void gc_update_rootset(GC* gc);
+
 void mark_scan_heap(Collector* collector);
 
 inline void* gc_heap_base(GC* gc){ return gc->heap_start; }

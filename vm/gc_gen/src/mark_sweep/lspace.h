@@ -49,7 +49,7 @@ typedef struct Lspace{
 
 void lspace_initialize(GC* gc, void* reserved_base, unsigned int lspace_size);
 void lspace_destruct(Lspace* lspace);
-Managed_Object_Handle lspace_alloc(unsigned int size, Alloc_Context* alloc_ctx);
+Managed_Object_Handle lspace_alloc(unsigned int size, Allocator* allocator);
 void lspace_collection(Lspace* lspace);
 
 inline unsigned int lspace_free_memory_size(Lspace* lspace){ /* FIXME:: */ return 0; }
@@ -73,5 +73,7 @@ inline Boolean lspace_object_is_marked(Lspace* lspace, Partial_Reveal_Object* p_
 Boolean lspace_mark_object(Lspace* lspace, Partial_Reveal_Object* p_obj);
 void lspace_save_reloc(Lspace* space, Partial_Reveal_Object** p_ref);
 void lspace_update_reloc(Lspace* lspace);
+
+void reset_lspace_after_copy_nursery(Lspace* lspace);
 
 #endif /*_LSPACE_H_ */

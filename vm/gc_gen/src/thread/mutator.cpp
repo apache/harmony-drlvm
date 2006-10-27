@@ -29,7 +29,7 @@ void mutator_initialize(GC* gc, void *gc_information)
   Mutator *mutator = (Mutator *) gc_information;
   mutator->free = NULL;
   mutator->ceiling = NULL;
-  mutator->curr_alloc_block = NULL;
+  mutator->alloc_block = NULL;
   mutator->alloc_space = gc_get_nos((GC_Gen*)gc);
   mutator->gc = gc;
   
@@ -37,10 +37,6 @@ void mutator_initialize(GC* gc, void *gc_information)
   mutator->remslot = new RemslotSet();
   mutator->remslot->clear();
     
-  assert(mutator->remobj == NULL);
-  mutator->remobj = new RemobjSet();
-  mutator->remobj->clear();
-
   lock(gc->mutator_list_lock);     // vvvvvvvvvvvvvvvvvvvvvvvvvvvvvv
 
   mutator->next = (Mutator *)gc->mutator_list;
@@ -62,8 +58,6 @@ void mutator_destruct(GC* gc, void *gc_information)
   Fspace* fspace = (Fspace*)mutator->alloc_space;
   fspace->remslot_sets->push_back(mutator->remslot);
   mutator->remslot = NULL;
-  fspace->remobj_sets->push_back(mutator->remobj);
-  mutator->remobj = NULL;
 
   volatile Mutator *temp = gc->mutator_list;
   if (temp == mutator) {  /* it is at the head of the list */
