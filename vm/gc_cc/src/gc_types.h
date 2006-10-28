@@ -85,14 +85,21 @@ class Partial_Reveal_Object;
 
 #define THREAD_LOCAL_CLEANED_AREA_SIZE 2048
 
-typedef struct GC_Thread_Info {
-    unsigned char *tls_current_free;
-    unsigned char *tls_current_cleaned;
-    unsigned char *tls_current_ceiling;
+extern size_t tls_offset_current, tls_offset_clean, tls_offset_ceiling;
 
-    GC_Thread_Info *next;
-    GC_Thread_Info **prev;
-} GC_Thread_Info;
+struct GC_Thread_Info {
+    unsigned char* tls_base;
+    GC_Thread_Info(unsigned char* _tls_base) : tls_base(_tls_base){}
+
+    void set_tls_current_free(unsigned char* v) {*(unsigned char**)(tls_base + tls_offset_current) = v;}
+    void set_tls_current_cleaned(unsigned char* v) {*(unsigned char**)(tls_base + tls_offset_clean) = v;}
+    void set_tls_current_ceiling(unsigned char* v) {*(unsigned char**)(tls_base + tls_offset_ceiling) = v;}
+
+    unsigned char* get_tls_current_free() const  {return *(unsigned char**)(tls_base + tls_offset_current);}
+    unsigned char* get_tls_current_cleaned() const {return *(unsigned char**)(tls_base + tls_offset_clean);}
+    unsigned char* get_tls_current_ceiling() const {return *(unsigned char**)(tls_base + tls_offset_ceiling);}
+};
+
 
 // Heap layout
 #define RESERVED_FOR_HEAP_NULL (4 * 32)
@@ -289,10 +296,8 @@ extern std::vector<unsigned char*> pinned_areas;
 extern unsigned pinned_areas_pos;
 extern std::vector<unsigned char*> old_pinned_areas;
 extern unsigned old_pinned_areas_pos;
-
 extern unsigned int heap_mark_phase;
 extern unsigned int prev_mark_phase;
-extern GC_Thread_Info *thread_list;
 extern int num_threads;
 extern int global_referent_offset;
 extern apr_time_t gc_start, gc_end;

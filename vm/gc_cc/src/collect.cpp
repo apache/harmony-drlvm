@@ -25,6 +25,7 @@
 #include "collect.h"
 #include "timer.h"
 #include <stdio.h>
+#include "open/hythread_ext.h"
 
 fast_list<Slot,65536> slots;
 reference_vector soft_references;
@@ -110,13 +111,16 @@ void notify_gc_end() {
 }
 
 void clear_thread_local_buffers() {
-    GC_Thread_Info *info = thread_list;
-    while(info) {
-        info->tls_current_free = 0;
-        info->tls_current_ceiling = 0;
-        info->tls_current_cleaned = 0;
-        info = info->next;
+    hythread_iterator_t it = hythread_iterator_create(0);
+    int count = (int)hythread_iterator_size (it);
+    for (int i = 0; i < count; i++){
+        unsigned char* tls_base = (unsigned char*)hythread_iterator_next(&it);
+        GC_Thread_Info  info(tls_base);
+        info.set_tls_current_free(0);
+        info.set_tls_current_cleaned(0);
+        info.set_tls_current_ceiling(0);
     }
+    hythread_iterator_release(&it);
 }
 
 static void enumerate_universe() {

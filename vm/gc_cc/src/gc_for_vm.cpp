@@ -26,11 +26,14 @@
 #include "gc_types.h"
 #include "fast_list.h"
 #include "port_atomic.h"
+#include "open/hythread_ext.h"
 
-GC_Thread_Info *thread_list;
 volatile int thread_list_lock;
 int num_threads = 0;
 Ptr vtable_base;
+
+size_t tls_offset_current=MAX_UINT32, tls_offset_clean=MAX_UINT32, tls_offset_ceiling=MAX_UINT32;
+static hythread_tls_key_t tls_key_current=MAX_UINT32, tls_key_clean=MAX_UINT32, tls_key_ceiling=MAX_UINT32;
 
 fast_list<Partial_Reveal_Object*, 1024> finalizible_objects;
 
@@ -75,10 +78,7 @@ GCExport void gc_heap_slot_write_ref (Managed_Object_Handle p_base_of_object_wit
 
 // GCExport void gc_test_safepoint(); optional
 Boolean gc_supports_frontier_allocation(unsigned *offset_of_current, unsigned *offset_of_limit) {
-    // Need additional support for object offset in native stubs.
-    *offset_of_current = field_offset(GC_Thread_Info, tls_current_free);
-    *offset_of_limit = field_offset(GC_Thread_Info, tls_current_cleaned);
-    return true;
+    return false;
 }
 
 void gc_vm_initialized() {
@@ -139,20 +139,6 @@ unsigned char* allocate_from_chunk(int size) {
     return 0;
 }
 
-static bool UNUSED thread_is_thread_list(GC_Thread_Info *thread) {
-    spin_lock(&thread_list_lock);
-    GC_Thread_Info *t = thread_list;
-    while(t) {
-        if (t == thread) {
-            spin_unlock(&thread_list_lock);
-            return true;
-        }
-        t = t->next;
-    }
-    spin_unlock(&thread_list_lock);
-    return false;
-}
-
 Managed_Object_Handle gc_alloc_fast(unsigned in_size, 
                                              Allocation_Handle ah,
                                              void *thread_pointer) {
@@ -162,16 +148,17 @@ Managed_Object_Handle gc_alloc_fast(unsigned in_size,
     assert (ah);
     unsigned char *next;
 
-    GC_Thread_Info *info = (GC_Thread_Info *) thread_pointer;
+    unsigned char* tls_base = (unsigned char*)hythread_self();
+    GC_Thread_Info  info(tls_base);
     Partial_Reveal_VTable *vtable = ah_to_vtable(ah);
     GC_VTable_Info *gcvt = vtable->get_gcvt();
-    unsigned char *cleaned = info->tls_current_cleaned;
-    unsigned char *res = info->tls_current_free;
+    unsigned char *cleaned = info.get_tls_current_cleaned();
+    unsigned char *res = info.get_tls_current_free();
 
     if (res + in_size <= cleaned) {
         if (gcvt->is_finalizible()) return 0;
 
-        info->tls_current_free =  res + in_size;
+        info.set_tls_current_free(res + in_size);
         *(VT32*)res = ah;
 
         assert(((POINTER_SIZE_INT)res & (GC_OBJECT_ALIGNMENT - 1)) == 0);
@@ -180,17 +167,17 @@ Managed_Object_Handle gc_alloc_fast(unsigned in_size,
 
     if (gcvt->is_finalizible()) return 0;
 
-    unsigned char *ceiling = info->tls_current_ceiling;
+    unsigned char *ceiling = info.get_tls_current_ceiling();
 
 
     if (res + in_size <= ceiling) {
-
-        info->tls_current_free = next = info->tls_current_free + in_size;
+        next = info.get_tls_current_free() + in_size;
+        info.set_tls_current_free(next);
 
         // cleaning required
         unsigned char *cleaned_new = next + THREAD_LOCAL_CLEANED_AREA_SIZE;
         if (cleaned_new > ceiling) cleaned_new = ceiling;
-        info->tls_current_cleaned = cleaned_new;
+        info.set_tls_current_cleaned(cleaned_new);
         memset(cleaned, 0, cleaned_new - cleaned);
         *(VT32*)res = ah;
 
@@ -208,33 +195,34 @@ Managed_Object_Handle gc_alloc(unsigned in_size,
     assert((in_size % GC_OBJECT_ALIGNMENT) == 0);
     assert (ah);
 
-    GC_Thread_Info *info = (GC_Thread_Info *) thread_pointer;
+    unsigned char* tls_base = (unsigned char*)hythread_self();
+    GC_Thread_Info  info(tls_base);
     Partial_Reveal_VTable *vtable = ah_to_vtable(ah);
     GC_VTable_Info *gcvt = vtable->get_gcvt();
-    unsigned char *res = info->tls_current_free;
-    unsigned char *cleaned = info->tls_current_cleaned;
+    unsigned char *res = info.get_tls_current_free();
+    unsigned char *cleaned = info.get_tls_current_cleaned();
 
     if (!gcvt->is_finalizible()) {
 
         if (res + in_size <= cleaned) {
-            info->tls_current_free =  res + in_size;
+            info.set_tls_current_free(res + in_size);
             *(VT32*)res = ah;
 
             assert(((POINTER_SIZE_INT)res & (GC_OBJECT_ALIGNMENT - 1)) == 0);
             return res;
         }
 
-        unsigned char *ceiling = info->tls_current_ceiling;
+        unsigned char *ceiling = info.get_tls_current_ceiling();
 
         if (res + in_size <= ceiling) {
             unsigned char *next;
-
-            info->tls_current_free = next = info->tls_current_free + in_size;
+            next = info.get_tls_current_free() + in_size;
+            info.set_tls_current_free(next);
 
             // cleaning required
             unsigned char *cleaned_new = next + THREAD_LOCAL_CLEANED_AREA_SIZE;
             if (cleaned_new > ceiling) cleaned_new = ceiling;
-            info->tls_current_cleaned = cleaned_new;
+            info.set_tls_current_cleaned(cleaned_new);
             memset(cleaned, 0, cleaned_new - cleaned);
 
             *(VT32*)res = ah;
@@ -270,17 +258,17 @@ Managed_Object_Handle gc_alloc(unsigned in_size,
         }
 
         // reload cached values after possible GC
-        res = info->tls_current_free;
-        cleaned = info->tls_current_cleaned;
+        res = info.get_tls_current_free();
+        cleaned = info.get_tls_current_cleaned();
 
-        if (res + size <= info->tls_current_ceiling) {
-            unsigned char *next;
-            info->tls_current_free = next = info->tls_current_free + size;
+        if (res + size <= info.get_tls_current_ceiling()) {
+            unsigned char *next = info.get_tls_current_free() + size;
+            info.set_tls_current_free(next); 
             finalizible_objects.push_back((Partial_Reveal_Object*) res);
 
             if (cleaned < next) {
                 memset(cleaned, 0, next - cleaned);
-                info->tls_current_cleaned = next;
+                info.set_tls_current_cleaned(next);
             }
             vm_gc_unlock_enum();
             *(VT32*)res = ah;
@@ -323,7 +311,7 @@ Managed_Object_Handle gc_alloc(unsigned in_size,
         finalizible_objects.push_back((Partial_Reveal_Object*) res);
     }
 
-    if (info->tls_current_free + chunk_size / 8 < info->tls_current_ceiling) {
+    if (info.get_tls_current_free() + chunk_size / 8 < info.get_tls_current_ceiling()) {
         // chunk is not expired yet, reuse it
         vm_gc_unlock_enum();
         if (cleaning_needed) memset(res, 0, size);
@@ -332,13 +320,13 @@ Managed_Object_Handle gc_alloc(unsigned in_size,
         return (Managed_Object_Handle)res;
     }
 
-    info->tls_current_free = heap.pos;
-    info->tls_current_ceiling = heap.pos + chunk_size;
-    if (info->tls_current_ceiling > heap.pos_limit)
-        info->tls_current_ceiling = heap.pos_limit;
-    heap.pos = info->tls_current_ceiling;
-    if (cleaning_needed) info->tls_current_cleaned = info->tls_current_free;
-    else info->tls_current_cleaned = info->tls_current_ceiling;
+    info.set_tls_current_free(heap.pos);
+    info.set_tls_current_ceiling(heap.pos + chunk_size);
+    if (info.get_tls_current_ceiling() > heap.pos_limit)
+        info.set_tls_current_ceiling(heap.pos_limit);
+    heap.pos = info.get_tls_current_ceiling();
+    if (cleaning_needed) info.set_tls_current_cleaned(info.get_tls_current_free());
+    else info.set_tls_current_cleaned(info.get_tls_current_ceiling());
 
     vm_gc_unlock_enum();
     if (cleaning_needed) memset(res, 0, size);
@@ -368,16 +356,24 @@ Boolean gc_requires_barriers() {
 void gc_thread_init(void *gc_information) {
     TRACE2("gc.thread", "gc_thread_init " << gc_information);
 
-    GC_Thread_Info *info = (GC_Thread_Info *) gc_information;
-    info->tls_current_free = 0;
-    info->tls_current_ceiling = 0;
-    info->tls_current_cleaned = 0;
-    //info->saved_object = 0;
     spin_lock(&thread_list_lock);
-    info->next = thread_list;
-    if (info->next) info->next->prev = &info->next;
-    thread_list = info;
-    info->prev = &thread_list;
+    if (tls_key_current == MAX_UINT32) {
+        //allocate TLS data
+        hythread_tls_alloc(&tls_key_current);
+        hythread_tls_alloc(&tls_key_clean);
+        hythread_tls_alloc(&tls_key_ceiling);
+
+        //cache TLS offsets
+        tls_offset_current = hythread_tls_get_offset(tls_key_current);
+        tls_offset_clean = hythread_tls_get_offset(tls_key_clean);
+        tls_offset_ceiling = hythread_tls_get_offset(tls_key_ceiling);
+    }
+    unsigned char* tls_base = (unsigned char*)hythread_self();
+    GC_Thread_Info  info(tls_base);
+    info.set_tls_current_free(0);
+    info.set_tls_current_ceiling(0);
+    info.set_tls_current_cleaned(0);
+
     int n = ++num_threads;
     chunk_size = round_down(heap.size / (10 * n),128);
     spin_unlock(&thread_list_lock);
@@ -386,12 +382,8 @@ void gc_thread_init(void *gc_information) {
 
 void gc_thread_kill(void *gc_information) {
     TRACE2("gc.thread", "gc_thread_kill " << gc_information);
-    GC_Thread_Info *info = (GC_Thread_Info *) gc_information;
-
-    //assert(info->saved_object == 0);
+    
     spin_lock(&thread_list_lock);
-    *info->prev = info->next;
-    if (info->next) info->next->prev = info->prev;
     int n = --num_threads;
     if (n != 0)
         chunk_size = round_down(heap.size / (10 * n),128);
