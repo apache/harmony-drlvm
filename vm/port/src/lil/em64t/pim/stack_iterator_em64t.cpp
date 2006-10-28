@@ -21,6 +21,7 @@
 
 #include <string.h>
 
+#include "environment.h"
 #include "stack_iterator.h"
 #include "vm_threads.h"
 #include "method_lookup.h"

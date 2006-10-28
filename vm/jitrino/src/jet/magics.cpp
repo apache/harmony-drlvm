@@ -54,7 +54,9 @@ bool is_magic(Method_Handle m)
     return is_magic(klass);
 }
 
-
+#ifdef _EM64T_ 
+// sizeof_jt & vstack_replace_top_opnd aren't used on EM64T
+#else
 static size_t sizeof_jt(jtype jt) {
     static size_t sizes[] =  { 
         1, //i8,
@@ -83,6 +85,7 @@ static void vstack_replace_top_opnd(Compiler* c, jtype jt) {
     c->vpop(); 
     c->vpush(after);
 }
+#endif //not em64t
 
 bool Compiler::gen_magic(void)
 {
