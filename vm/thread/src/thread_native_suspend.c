@@ -32,11 +32,8 @@
 #include <open/thread_externals.h>
 #include "thread_private.h"
 #include <apr_atomic.h>
-#include <port_atomic.h>
-static void thread_safe_point_impl(hythread_t thread);
 
-int16 atomic16_inc(int16 *value);
-int16 atomic16_dec(int16 *value);
+static void thread_safe_point_impl(hythread_t thread);
 
 /** @name Safe suspension support
  */
@@ -199,15 +196,15 @@ static void send_suspend_request(hythread_t thread) {
     assert(thread->suspend_request >=0);
     // already suspended?
     if(thread->suspend_request > 0) {
-        atomic16_inc((int16 *)&(thread->suspend_request));
-         return;
+        apr_atomic_inc32((apr_uint32_t *)&(thread->suspend_request));
+        return;
     }               
                 
      //we realy need to suspend thread.
 
      hysem_set(thread->resume_event, 0);
                 
-     atomic16_inc((int16 *)&(thread->suspend_request));
+     apr_atomic_inc32((apr_uint32_t *)&(thread->suspend_request));
 
      apr_thread_yield_other(thread->os_handle);
 
@@ -248,7 +245,7 @@ static IDATA wait_safe_region_event(hythread_t thread) {
 void VMCALL hythread_suspend() {
     hythread_t thread = tm_self_tls;
 
-    atomic16_inc((int16 *)&(thread->suspend_request));
+    apr_atomic_inc32((apr_uint32_t *)&(thread->suspend_request));
 
     hythread_safe_point();
 }
@@ -319,7 +316,7 @@ void VMCALL hythread_resume(hythread_t thread) {
  //       printf("resume other now lock %d  %d  %d  %d\n",tm_self_tls->thread_id,tm_self_tls->suspend_disable_count,thread->thread_id,thread->suspend_disable_count);
     if(thread->suspend_request > 0) {
         if (thread->safepoint_callback && thread->suspend_request < 2) return;
-        atomic16_dec((int16 *)&(thread->suspend_request));
+        apr_atomic_dec32((apr_uint32_t *)&(thread->suspend_request));
         if(thread->suspend_request == 0) {  
             // Notify the thread that it may wake up now
             hysem_post(thread->resume_event);            
@@ -475,25 +472,5 @@ void set_suspend_disable(int count) {
            thread_safe_point_impl(self);
     }
 }
-int16 atomic16_inc(int16 *value)
-{
-    int16 old_value=*value;
-    while(port_atomic_cas16((volatile apr_uint16_t*)value,(apr_uint16_t)(old_value+1),(apr_uint16_t)old_value)!=old_value)
-    {
-        old_value=*value;
-    }
-
-    return old_value+1;
-}
-int16 atomic16_dec(int16 *value)
-{
-    int16 old_value=*value;
-    while(port_atomic_cas16((volatile apr_uint16_t*)value,(apr_uint16_t)(old_value-1),(apr_uint16_t)old_value)!=old_value)
-    {
-        old_value=*value;
-    }
-    return old_value-1;
-}
-
 
 //@}
