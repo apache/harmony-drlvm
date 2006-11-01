@@ -14,7 +14,7 @@
  *  See the License for the specific language governing permissions and
  *  limitations under the License.
  */
-
+                                                                                                            
 /**
  * @author Intel, Konstantin M. Anisimov, Igor V. Chebykin
  * @version $Revision$
@@ -620,7 +620,7 @@ void VertexBB::setDef() {
 
 //---------------------------------------------------------------------------//
 void IpfCfgVerifier::setDefs() {
-    OpndVector&  args = cfg.getArgs();
+    OpndVector args; // = cfg.getArgs();
     BitSet* enterIn=getVertex(cfg.getEnterNode())->in;
     for (uint k=0; k<args.size(); k++) {
         enterIn->setBit(args[k]->getId());

@@ -14,7 +14,7 @@
  *  See the License for the specific language governing permissions and
  *  limitations under the License.
  */
-
+                                                                                                            
 /**
  * @author Intel, Konstantin M. Anisimov, Igor V. Chebykin
  * @version $Revision$
@@ -69,26 +69,6 @@ void __stdcall sighandler(int sn, siginfo_t *si, void *_sc) {
 
 namespace Jitrino {
 namespace IPF {
-
-vector<char *> ipfCompileMethodList;
-vector<char *> ipfNotCompileMethodList;
-vector<char *> ipfBreakMethodList;
-vector<int>    ipfBreakBbList;
-vector<char *> ipfLogoutMethodList;
-bool           ipfEnableSigillBreakActionHandler = false;
-bool           ipfEnableAutoSigillBreak = false;
-bool           ipfSigillBreakAllBB = false;
-bool           ipfNotifyWhenMethodIsRecompiled = true;
-bool           ipfCompileAllMethods = true;
-int            ipfSigillBreakCount = 0;
-bool           ipfLogoutAllMethods = false;
-bool           __IPF_ONLY__ = false;
-
-bool isIpfCompiled(MethodDesc* method) { return false; }
-bool isIpfMethod(MethodDesc* method) { return false; }
-bool isIpfBreakBb(unsigned int nodeid) { return false; }
-bool isIpfBreakMethod(MethodDesc* method, bool recompile) { return false; }
-bool isIpfLogoutMethod(MethodDesc* method) { return false; }
 
 //============================================================================//
 
@@ -256,7 +236,7 @@ const BundleDescription Emitter::BundleDesc[TEMPLATES_COUNT] = {
 
 //============================================================================//
 EmitterBb::EmitterBb(Cfg & cfg, CompilationInterface & compilationinterface
-        , BbNode  * node_, bool _setbreak) : 
+        , BbNode  * node_, bool _break4cafe, bool _nop4cafe) : 
     node(node_), 
     insts(node->getInsts())
 {
@@ -272,13 +252,13 @@ EmitterBb::EmitterBb(Cfg & cfg, CompilationInterface & compilationinterface
     consts=new(mm) vectorconst;
     bsize=0;
 
-//    if (__IPF_ONLY__) return; TODO
-    if (!_setbreak) {
-        bundles->addBundle(0x01
-            , new(mm) Inst(INST_NOP, p0, IMM(INST_BREAKPOINT_IMM_VALUE))
-            , new(mm) Inst(INST_NOP, p0, IMM(INST_BREAKPOINT_IMM_VALUE))
-            , new(mm) Inst(INST_NOP, p0, IMM(INST_BREAKPOINT_IMM_VALUE)));
-        return;
+    if (!_break4cafe) {
+        if (_nop4cafe) {
+            bundles->addBundle(0x01
+                , new(mm) Inst(INST_NOP, p0, IMM(INST_BREAKPOINT_IMM_VALUE))
+                , new(mm) Inst(INST_NOP, p0, IMM(INST_BREAKPOINT_IMM_VALUE))
+                , new(mm) Inst(INST_NOP, p0, IMM(INST_BREAKPOINT_IMM_VALUE)));
+        }
     } else {
 #ifdef SIGILL_BREAK_ACTION_HANDLER
         if (ipfEnableSigillBreakActionHandler) {
@@ -295,19 +275,58 @@ EmitterBb::EmitterBb(Cfg & cfg, CompilationInterface & compilationinterface
                 , new(mm) Inst(INST_BREAK, p0, IMM(INST_BREAKPOINT_IMM_VALUE))
                 , new(mm) Inst(INST_NOP, p0, IMM(INST_BREAKPOINT_IMM_VALUE)));
         } else {
+            if (_nop4cafe) {
+                bundles->addBundle(0x01
+                    , new(mm) Inst(INST_NOP, p0, IMM(INST_BREAKPOINT_IMM_VALUE))
+                    , new(mm) Inst(INST_NOP, p0, IMM(INST_BREAKPOINT_IMM_VALUE))
+                    , new(mm) Inst(INST_NOP, p0, IMM(INST_BREAKPOINT_IMM_VALUE)));
+            }
+        }
+#else
+        if (_nop4cafe) {
             bundles->addBundle(0x01
                 , new(mm) Inst(INST_NOP, p0, IMM(INST_BREAKPOINT_IMM_VALUE))
                 , new(mm) Inst(INST_NOP, p0, IMM(INST_BREAKPOINT_IMM_VALUE))
                 , new(mm) Inst(INST_NOP, p0, IMM(INST_BREAKPOINT_IMM_VALUE)));
         }
-#else
-        bundles->addBundle(0x01
-            , new(mm) Inst(INST_NOP, p0, IMM(INST_BREAKPOINT_IMM_VALUE))
-            , new(mm) Inst(INST_NOP, p0, IMM(INST_BREAKPOINT_IMM_VALUE))
-            , new(mm) Inst(INST_NOP, p0, IMM(INST_BREAKPOINT_IMM_VALUE)));
 #endif
     }
 
+};
+
+//============================================================================//
+Emitter::Emitter(Cfg & cfg_, CompilationInterface & compilationinterface_) : 
+        mm(cfg_.getMM()),
+        cfg(cfg_),
+        compilationinterface(compilationinterface_)
+    {
+
+    removeUselessInst(cfg, compilationinterface);
+    
+    (new(mm) IpfVerifier(cfg, compilationinterface))->verifyMethod();
+
+    bbs = new(mm) vectorbb;
+    BbNode  * node = (BbNode *)cfg.getEnterNode();
+    EmitterBb * bbdesc;
+    bool break4cafe = ipfEnableSigillBreakActionHandler 
+                && (ipfEnableAutoSigillBreak
+                    || isIpfBreakMethod(compilationinterface.getMethodToCompile()));
+    bool nop4cafe = true;
+
+    do {
+        // for debugging
+        // tricking(node->getInsts(), mm, cfg);
+        
+        if (isIpfBreakBb(node->getId())) {
+            bbdesc = new(mm) EmitterBb(cfg, compilationinterface, node, true, nop4cafe);
+        } else {
+            bbdesc = new(mm) EmitterBb(cfg, compilationinterface, node, break4cafe, nop4cafe);
+        }
+        bbs->push_back(bbdesc);
+        if (!ipfSigillBreakAllBB) break4cafe = false;
+        nop4cafe = false;
+    } while( (node = node->getLayoutSucc()) != NULL );
+    
 };
 
 //============================================================================//
@@ -329,7 +348,7 @@ int  Emitter::removeUselessInst(Cfg & cfg, CompilationInterface & compilationint
                     OpndVector &opnds = inst->getOpnds();
                     if (opnds[1]->isReg() && opnds[2]->isReg() 
                             && opnds[1]->getValue()==opnds[2]->getValue()) {
-                        LOG_OUT << "USELESS: " << IrPrinter::toString(inst) << "\n";
+                        IPF_LOG << "USELESS: " << IrPrinter::toString(inst) << "\n";
                         insts.erase(insts.begin() + i);
                         methoduseless++;
                         continue;
@@ -342,7 +361,7 @@ int  Emitter::removeUselessInst(Cfg & cfg, CompilationInterface & compilationint
                     OpndVector &opnds = inst->getOpnds();
                     if (opnds[2]->getValue()==0
                             && opnds[1]->getValue()==opnds[3]->getValue()) {
-                        LOG_OUT << "USELESS: " << IrPrinter::toString(inst) << "\n";
+                        IPF_LOG << "USELESS: " << IrPrinter::toString(inst) << "\n";
                         insts.erase(insts.begin() + i);
                         methoduseless++;
                         continue;
@@ -358,53 +377,18 @@ int  Emitter::removeUselessInst(Cfg & cfg, CompilationInterface & compilationint
         static int alluseless = 0;
         static int allafter = 0;
         alluseless += methoduseless;
-        clog << "USELESS: method: " << methoduseless 
+        IPF_LOG << "USELESS: method: " << methoduseless 
             << "(" << (((float)methoduseless)/(methoduseless + methodafter)) << "%) instructions\n";
-        clog << "USELESS: all: " << alluseless 
+        IPF_LOG << "USELESS: all: " << alluseless 
             << "(" << (((float)alluseless)/(alluseless + allafter)) << "%) instructions\n";
     }
 
     if (methoduseless > 0) {
-        LOG_OUT << "USELESS: removed " << methoduseless 
+        IPF_LOG << "USELESS: removed " << methoduseless 
             << "(" << (((float)methoduseless)/(methoduseless + methodafter)) << "%) instructions\n";
     }
     return methoduseless;
 }
-
-//============================================================================//
-Emitter::Emitter(Cfg & cfg_, CompilationInterface & compilationinterface_
-        , bool break4cafe_) : 
-    mm(cfg_.getMM()),
-    cfg(cfg_),
-    compilationinterface(compilationinterface_),
-    break4cafe(break4cafe_) {
-
-    removeUselessInst(cfg, compilationinterface);
-    
-    (new(mm) IpfVerifier(cfg, compilationinterface))->verifyMethod();
-
-    bbs = new(mm) vectorbb;
-    BbNode  * node = (BbNode *)cfg.getEnterNode();
-    EmitterBb * bbdesc;
-    bool setbreak = ipfEnableAutoSigillBreak
-                    || isIpfBreakMethod(compilationinterface.getMethodToCompile());
-
-    if (break4cafe_) setbreak = true;
-    
-    do {
-        // for debugging
-        // tricking(node->getInsts(), mm, cfg);
-        
-        if (isIpfBreakBb(node->getId())) {
-            bbdesc = new(mm) EmitterBb(cfg, compilationinterface, node, true);
-        } else {
-            bbdesc = new(mm) EmitterBb(cfg, compilationinterface, node, setbreak);
-        }
-        bbs->push_back(bbdesc);
-        if (!ipfSigillBreakAllBB) setbreak = false;
-    } while( (node = node->getLayoutSucc()) != NULL );
-    
-};
 
 //============================================================================//
 InstructionType Emitter::getExecUnitType(int templateindex, int slotindex) {
@@ -1167,8 +1151,6 @@ void Emitter::printCodeBlock(char * cap) {
 
 void Emitter::registerDirectCall(Inst * inst, uint64 data)
 {
-    if (!ipfNotifyWhenMethodIsRecompiled) return;
-    
     InstCode     icode  = inst->getInstCode();
     unsigned int is13 = (icode==INST_BRL13 ? 1 : 0);  // must be 1 or 0
     

@@ -14,7 +14,7 @@
  *  See the License for the specific language governing permissions and
  *  limitations under the License.
  */
-
+                                                                                                            
 /**
  * @author Intel, Konstantin M. Anisimov, Igor V. Chebykin
  * @version $Revision$
@@ -389,6 +389,19 @@ string IrPrinter::toString(InstList &instList) {
     return oss.str();
 }
 
+//----------------------------------------------------------------------------------------//
+
+string IrPrinter::toString(Chain &chain) {
+
+    ostringstream oss;
+    for(ChainIterator i=chain.begin(); i!=chain.end();) {
+        oss << "node" << (*i)->getId();
+        i++;
+        if (i!=chain.end()) oss << "->";
+    }
+    return oss.str();
+}
+    
 //----------------------------------------------------------------------------------------//
 
 string IrPrinter::toString(NodeKind nodeKind) {

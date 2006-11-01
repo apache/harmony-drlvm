@@ -14,7 +14,7 @@
  *  See the License for the specific language governing permissions and
  *  limitations under the License.
  */
-
+                                                                                                            
 /**
  * @author Intel, Konstantin M. Anisimov, Igor V. Chebykin
  * @version $Revision$
@@ -42,22 +42,6 @@ using namespace std;
 
 namespace Jitrino {
 namespace IPF {
-
-// TODO
-#define IpfCOUT std::cerr
-extern bool isIpfCompiled(MethodDesc* method);
-extern bool isIpfMethod(MethodDesc* method);
-extern bool isIpfBreakBb(unsigned int nodeid);
-extern bool isIpfBreakMethod(MethodDesc* method, bool recompile=false);
-extern bool isIpfLogoutMethod(MethodDesc* method);
-extern bool ipfEnableSigillBreakActionHandler;
-extern bool ipfEnableAutoSigillBreak;
-extern bool ipfSigillBreakAllBB;
-extern bool ipfNotifyWhenMethodIsRecompiled;
-extern bool ipfCompileAllMethods;
-extern int  ipfSigillBreakCount;
-extern bool ipfLogoutAllMethods;
-extern bool __IPF_ONLY__;
 
 //========================================================================================//
 // Forward declaration
@@ -120,10 +104,8 @@ class Cfg;
 #define ROOT_SET_HEADER_SIZE    4   // header size in root set info block
 #define SAFE_POINT_HEADER_SIZE 12   // header size in safe points info block
 
-//#define LOG_ON                ipfLogIsOn      // Log for Code Generator is on
-//#define VERIFY_ON             ipfVerifyIsOn   // verification for Code Generator is on
-#define LOG_ON                1      // Log for Code Generator is on
-#define VERIFY_ON             1     // verification for Code Generator is on
+#define LOG_ON                ipfLogIsOn      // Log for Code Generator is on
+#define VERIFY_ON             ipfVerifyIsOn   // verification for Code Generator is on
 #define LOG_OUT               Log::out()
 #define STAT_ON               0               // Log for statistic
 
@@ -219,6 +201,8 @@ typedef vector< Node* >                 NodeVector;
 typedef vector< Edge* >                 EdgeVector;
 typedef vector< uint32 >                Uint32Vector;
 typedef list< Inst* >                   InstList;
+typedef list< Node* >                   NodeList;
+typedef list< Edge* >                   EdgeList;
 typedef set< Opnd* >                    OpndSet;
 typedef set< RegOpnd* >                 RegOpndSet;
 typedef set< Node* >                    NodeSet;
@@ -229,11 +213,21 @@ typedef bitset< NUM_G_REG >             RegBitSet;
 typedef NodeVector::iterator            NodeIterator;
 typedef InstVector::iterator            InstIterator;
 typedef OpndVector::iterator            OpndIterator;
+typedef EdgeVector::iterator            EdgeIterator;
 typedef OpndSet::iterator               OpndSetIterator;
 typedef RegOpndSet::iterator            RegOpndSetIterator;
 typedef InstList::iterator              InstListIterator;
+typedef NodeList::iterator              NodeListIterator;
+typedef EdgeList::iterator              EdgeListIterator;
 typedef Inst2RegOpndSetMap::iterator    Inst2RegOpndSetMapIterator;
 typedef Uint642RegOpndSetMap::iterator  Uint642RegOpndSetMapIterator;
+
+typedef NodeList                        Chain;
+typedef list< Chain* >                  ChainList;
+typedef multimap< uint32, Chain*, greater < uint32 > > ChainMap;
+typedef Chain::iterator                 ChainIterator;
+typedef ChainList::iterator             ChainListIterator;
+typedef ChainMap::iterator              ChainMapIterator;
 
 //========================================================================================//
 // IpfType

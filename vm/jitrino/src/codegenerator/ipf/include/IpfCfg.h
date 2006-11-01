@@ -14,7 +14,7 @@
  *  See the License for the specific language governing permissions and
  *  limitations under the License.
  */
-
+                                                                                                            
 /**
  * @author Intel, Konstantin M. Anisimov, Igor V. Chebykin
  * @version $Revision$
@@ -271,23 +271,26 @@ public:
     CompVector  &getComps()                          { return compList; }
     Completer   getComp(uint16 num)                  { return compList[num]; }
     void        addComp(Completer comp_)             { compList.push_back(comp_); }
-    void        removeLastComp()                     { compList.pop_back(); }
     void        setComp(uint32 num, Completer comp_) { compList[num] = comp_; }
 
     void        addOpnd(Opnd *opnd_)                 { opndList.push_back(opnd_); }
     void        removeLastOpnd()                     { opndList.pop_back(); }
-    OpndVector &getOpnds()                           { return opndList; }
+    OpndVector  &getOpnds()                          { return opndList; }
     void        setOpnd(uint32 num, Opnd *opnd_)     { opndList[num] = opnd_; }
     Opnd        *getOpnd(uint32 num)                 { return opndList[num]; }
-    char        *getInstMnemonic()                   { return Encoder::getMnemonic(instCode); }
-
-    char        *getCompMnemonic(Completer comp)     { return Encoder::getMnemonic(comp); }
     uint16      getNumDst()                          { return Encoder::getNumDst(instCode); }
     uint16      getNumOpnd()                         { return Encoder::getNumOpnd(instCode); }
-    Inst&       set_qp(Opnd *p1)                     { setOpnd(0, p1); return *this; }
+
+    char        *getInstMnemonic()                   { return Encoder::getMnemonic(instCode); }
+    char        *getCompMnemonic(Completer comp)     { return Encoder::getMnemonic(comp); }
 
     uint32      getAddr()                            { return addr; }
     void        setAddr(uint32 addr_)                { addr = addr_; }
+    
+    bool        isBr();
+    bool        isCall();
+    bool        isRet();
+    bool        isConditionalBranch();
     
 protected:
     InstCode    instCode;
@@ -302,16 +305,17 @@ protected:
 
 class Edge {
 public:
-                Edge(Node *source_, Node *target_, double prob_);
                 Edge(Node *source_, Node *target_, double prob_, EdgeKind kind_);
-    void        setSource(Node *source_)    { source = source_; }
     Node        *getSource()                { return source; }
-    void        setTarget(Node *target_)    { target = target_; }
     Node        *getTarget()                { return target; }
     double      getProb()                   { return prob; }
     void        setProb(double prob_)       { prob = prob_; }
     EdgeKind    getEdgeKind()               { return edgeKind; }
     void        setEdgeKind(EdgeKind kind_) { edgeKind = kind_; }
+    void        remove();
+    void        insert();
+    void        changeSource(Node *source_);
+    void        changeTarget(Node *target_);
     bool        isBackEdge();
     void        connect(Node *target);
     void        disconnect();
@@ -346,6 +350,7 @@ class Node {
 public:
                 Node(uint32 id_, NodeKind kind_ = NODE_INVALID);
 
+    void        remove();
     void        addEdge(Edge *edge);
     void        removeEdge(Edge *edge);
     Edge        *getOutEdge(EdgeKind edgeKind);
@@ -355,14 +360,14 @@ public:
     Node        *getDispatchNode();
     void        mergeOutLiveSets(RegOpndSet &resultSet);
 
-    EdgeVector &getInEdges()                     { return inEdges; }
-    EdgeVector &getOutEdges()                    { return outEdges; }
+    EdgeVector  &getInEdges()                    { return inEdges; }
+    EdgeVector  &getOutEdges()                   { return outEdges; }
     void        setNodeKind(NodeKind kind_)      { nodeKind = kind_; }
     NodeKind    getNodeKind()                    { return nodeKind; }
     void        setId(uint32 id_)                { id = id_; }
     uint32      getId()                          { return id; }
     void        setLiveSet(RegOpndSet& liveSet_) { liveSet = liveSet_; }
-    RegOpndSet &getLiveSet()                     { return liveSet; }
+    RegOpndSet  &getLiveSet()                    { return liveSet; }
     void        clearLiveSet()                   { liveSet.clear(); }
     void        setLoopHeader(Node *loopHeader_) { loopHeader = loopHeader_; }
     Node        *getLoopHeader()                 { return loopHeader; }
@@ -387,8 +392,7 @@ protected:
 
 class BbNode : public Node {
 public:
-                BbNode(uint32 execCounter_);
-                BbNode(uint32 execCounter_, uint32 id_);
+                BbNode(uint32 id_, uint32 execCounter_);
     void        addInst(Inst *inst); 
     void        removeInst(Inst *inst)              { insts.erase(find(insts.begin(),insts.end(),inst)); } 
     InstVector  &getInsts()                         { return insts; }
@@ -413,38 +417,34 @@ protected:
 
 class Cfg {
 public:
-                   Cfg(MemoryManager &mm, CompilationInterface &compilationInterface);
-    void           addEdge(Edge *edge);
-    void           removeEdge(Edge *edge);
-    void           removeNode(Node *node);
-    NodeVector     &search(SearchKind searchKind);
+                         Cfg(MemoryManager &mm, CompilationInterface &compilationInterface);
+    NodeVector           &search(SearchKind searchKind);
     
-    MemoryManager  &getMM()                       { return mm; }
-    void           setEnterNode(Node *enterNode_) { enterNode = enterNode_; }
-    Node           *getEnterNode()                { return enterNode; }
-    void           setExitNode(Node *exitNode_)   { exitNode = exitNode_; }
-    Node           *getExitNode()                 { return exitNode; }
-    OpndManager    *getOpndManager()              { return opndManager; }
-    uint16         getNextNodeId()                { return maxNodeId++; }
-    uint16         getMaxNodeId()                 { return maxNodeId; }
-    MethodDesc     *getMethodDesc()               { return compilationInterface.getMethodToCompile(); }
-    void           addArg(Opnd *opnd_)            { argList.push_back(opnd_); }
-    OpndVector     &getArgs()                     { return argList; }    
+    MemoryManager        &getMM()                       { return mm; }
+    CompilationInterface &getCompilationInterface()     { return compilationInterface; }
+    uint16               getNextNodeId()                { return maxNodeId++; }
+    uint16               getMaxNodeId()                 { return maxNodeId; }
+    void                 setEnterNode(Node *enterNode_) { enterNode = enterNode_; }
+    void                 setExitNode(Node *exitNode_)   { exitNode = exitNode_; }
+    Node                 *getEnterNode()                { return enterNode; }
+    Node                 *getExitNode()                 { return exitNode; }
+    OpndManager          *getOpndManager()              { return opndManager; }
+    MethodDesc           *getMethodDesc()               { return compilationInterface.getMethodToCompile(); }
+
 protected:
-    void           makePostOrdered(Node *node, NodeSet &visitedNodes);
-    void           makeDirectOrdered(Node *node, NodeSet &visitedNodesd);
-    void           makeLayoutOrdered();
+    void                 makePostOrdered(Node *node, NodeSet &visitedNodes);
+    void                 makeDirectOrdered(Node *node, NodeSet &visitedNodesd);
+    void                 makeLayoutOrdered();
 
     MemoryManager        &mm;
     CompilationInterface &compilationInterface;
 
-    Node           *enterNode;
-    Node           *exitNode;
-    NodeVector     searchResult;
-    SearchKind     lastSearchKind;
-    OpndManager    *opndManager;
-    uint16         maxNodeId;
-    OpndVector     argList;
+    uint16               maxNodeId;
+    OpndManager          *opndManager;
+    Node                 *enterNode;
+    Node                 *exitNode;
+    NodeVector           searchResult;
+    SearchKind           lastSearchKind;
 };
 
 } // IPF

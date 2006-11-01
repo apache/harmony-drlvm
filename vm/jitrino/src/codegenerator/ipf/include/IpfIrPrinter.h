@@ -14,7 +14,7 @@
  *  See the License for the specific language governing permissions and
  *  limitations under the License.
  */
-
+                                                                                                            
 /**
  * @author Intel, Konstantin M. Anisimov, Igor V. Chebykin
  * @version $Revision$
@@ -50,6 +50,7 @@ public:
     static string  toString(OpndVector&);
     static string  toString(InstVector&);
     static string  toString(InstList&);
+    static string  toString(Chain&);
     static string  toString(NodeKind);
     static string  toString(EdgeKind);
     static string  toString(OpndKind);

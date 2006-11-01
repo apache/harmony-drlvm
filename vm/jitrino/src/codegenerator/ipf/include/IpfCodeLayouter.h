@@ -14,7 +14,7 @@
  *  See the License for the specific language governing permissions and
  *  limitations under the License.
  */
-
+                                                                                                            
 /**
  * @author Intel, Konstantin M. Anisimov, Igor V. Chebykin
  * @version $Revision$
@@ -30,12 +30,6 @@ namespace Jitrino {
 namespace IPF {
 
 //========================================================================================//
-// Typedefs
-//========================================================================================//
-
-typedef vector< NodeVector* > ChainVector;
-
-//========================================================================================//
 // CodeLayouter
 //========================================================================================//
 
@@ -45,17 +39,31 @@ public:
     void          layout();
 
 protected:
+    // merge sequential nodes
     void          mergeNodes();
-    bool          mergeNode(BbNode *pred, Edge *pred2succ);
+    BbNode*       getSucc(BbNode*);
+    bool          checkSucc(BbNode*);
+    void          merge(BbNode*, BbNode*);
+    void          checkUnwind();
+
+    // layout nodes
     void          makeChains();
-    void          fixBranches();
-    void          fixConditionalBranch(BbNode *node);
-    void          fixSwitch(BbNode *node);
-    void          fixUnconditionalBranch(BbNode *node);
+    void          inChainList(Edge*);
+    void          pushBack(Chain*, Node*);
+    void          pushFront(Chain*, Node*);
+    void          layoutNodes();
+    uint32        calculateChainWeight(Chain*);
+
+    // set branch targets
+    void          setBranchTargets();
+    void          fixConditionalBranch(BbNode*);
+    void          fixSwitch(BbNode*);
+    void          fixUnconditionalBranch(BbNode*);
     
     MemoryManager &mm;
     Cfg           &cfg;
-    ChainVector   chains;
+    ChainList     chains;
+    NodeSet       visitedNodes;
 };
 
 } // IPF

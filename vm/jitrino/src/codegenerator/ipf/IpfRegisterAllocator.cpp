@@ -14,7 +14,7 @@
  *  See the License for the specific language governing permissions and
  *  limitations under the License.
  */
-
+                                                                                                            
 /**
  * @author Intel, Konstantin M. Anisimov, Igor V. Chebykin
  * @version $Revision$
@@ -171,7 +171,8 @@ void RegisterAllocator::assignLocations() {
         RegOpnd *opnd = opndVector[i];
         IPF_LOG << "      " << left << setw(5) << IrPrinter::toString(opnd); 
         opndManager->assignLocation(opnd);  // assign location for current opnd
-        IPF_LOG << " after assignment " << IrPrinter::toString(opnd) << endl; 
+        IPF_LOG << " after assignment " << left << setw(5) << IrPrinter::toString(opnd);
+        IPF_LOG << " spill cost: " << opnd->getSpillCost() << endl; 
         
         if (opnd->isMem()) continue;        // if opnd assigned on stack - nothing more to do 
         

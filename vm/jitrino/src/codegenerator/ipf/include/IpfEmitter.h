@@ -14,7 +14,7 @@
  *  See the License for the specific language governing permissions and
  *  limitations under the License.
  */
-
+                                                                                                            
 /**
  * @author Intel, Konstantin M. Anisimov, Igor V. Chebykin
  * @version $Revision$
@@ -165,9 +165,9 @@ class BundleVector : public vector<Bundle*> {
 class EmitterBb {
   public:
     EmitterBb(Cfg & cfg_, CompilationInterface & compilationinterface_
-            , BbNode  * node_, bool _setbreak=false);
+            , BbNode  * node_, bool _break4cafe=false, bool _nop4cafe=false);
     
-    BbNode    * node;
+    BbNode       * node;
     InstVector   & insts;
     long           isize;
     vectorbool   * stops;
@@ -189,8 +189,7 @@ typedef vector<EmitterBb *> vectorbb;
 
 class Emitter {
   public:
-    Emitter(Cfg & cfg_, CompilationInterface & compilationinterface_
-        , bool break4cafe_=false);
+    Emitter(Cfg & cfg_, CompilationInterface & compilationinterface_);
 
     bool emit();
     void printInsts(char *);
@@ -228,7 +227,6 @@ class Emitter {
     MemoryManager& mm;
     Cfg      & cfg;
     CompilationInterface & compilationinterface;
-    bool       break4cafe;
     vectorbb * bbs;
     char *     dataoff;
     long       datasize;  // full size of data block
