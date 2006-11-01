@@ -12,9 +12,9 @@
 	<Configurations>
 		<Configuration
 			Name="Debug|Win32"
-			OutputDirectory="bin/$(ConfigurationName)"
-			IntermediateDirectory="tmp/$(ConfigurationName)"
-			ConfigurationType="2"
+			OutputDirectory="bin\$(ConfigurationName)"
+			IntermediateDirectory="tmp\$(ConfigurationName)"
+			ConfigurationType="4"
 			CharacterSet="2">
 			<Tool
 				Name="VCCLCompilerTool"
@@ -31,18 +31,14 @@
 			<Tool
 				Name="VCCustomBuildTool"/>
 			<Tool
-				Name="VCLinkerTool"
-				OutputFile="$(OutDir)/port_encoder.dll"
-				LinkIncremental="2"
-				GenerateDebugInformation="TRUE"
-				ProgramDatabaseFile="$(OutDir)/port_encoder.pdb"
-				SubSystem="2"
-				ImportLibrary="$(OutDir)/port_encoder.lib"
-				TargetMachine="1"/>
+				Name="VCLibrarianTool"
+				OutputFile="$(OutDir)/encoder.lib"/>
 			<Tool
 				Name="VCMIDLTool"/>
 			<Tool
-				Name="VCPostBuildEventTool"/>
+				Name="VCPostBuildEventTool"
+				Description="       ... Copying files to bin/default folder ...."
+				CommandLine="copy $(OutDir)\encoder.lib $(ProjectDir)\..\..\..\win_ia32_msvc_$(ConfigurationName)\deploy\jre\bin\default"/>
 			<Tool
 				Name="VCPreBuildEventTool"/>
 			<Tool
@@ -54,17 +50,15 @@
 			<Tool
 				Name="VCXMLDataGeneratorTool"/>
 			<Tool
-				Name="VCWebDeploymentTool"/>
-			<Tool
 				Name="VCManagedWrapperGeneratorTool"/>
 			<Tool
 				Name="VCAuxiliaryManagedWrapperGeneratorTool"/>
 		</Configuration>
 		<Configuration
 			Name="Release|Win32"
-			OutputDirectory="bin/$(ConfigurationName)"
-			IntermediateDirectory="tmp/$(ConfigurationName)"
-			ConfigurationType="2"
+			OutputDirectory="bin\$(ConfigurationName)"
+			IntermediateDirectory="tmp\$(ConfigurationName)"
+			ConfigurationType="4"
 			CharacterSet="2">
 			<Tool
 				Name="VCCLCompilerTool"
@@ -78,19 +72,14 @@
 			<Tool
 				Name="VCCustomBuildTool"/>
 			<Tool
-				Name="VCLinkerTool"
-				OutputFile="$(OutDir)/port_encoder.dll"
-				LinkIncremental="1"
-				GenerateDebugInformation="TRUE"
-				SubSystem="2"
-				OptimizeReferences="2"
-				EnableCOMDATFolding="2"
-				ImportLibrary="$(OutDir)/port_encoder.lib"
-				TargetMachine="1"/>
+				Name="VCLibrarianTool"
+				OutputFile="$(OutDir)/encoder.lib"/>
 			<Tool
 				Name="VCMIDLTool"/>
 			<Tool
-				Name="VCPostBuildEventTool"/>
+				Name="VCPostBuildEventTool"
+				Description="       ... Copying files to bin/default folder ...."
+				CommandLine="copy $(OutDir)\encoder.lib $(ProjectDir)\..\..\..\win_ia32_msvc_$(ConfigurationName)\deploy\jre\bin\default"/>
 			<Tool
 				Name="VCPreBuildEventTool"/>
 			<Tool
@@ -101,8 +90,6 @@
 				Name="VCWebServiceProxyGeneratorTool"/>
 			<Tool
 				Name="VCXMLDataGeneratorTool"/>
-			<Tool
-				Name="VCWebDeploymentTool"/>
 			<Tool
 				Name="VCManagedWrapperGeneratorTool"/>
 			<Tool
