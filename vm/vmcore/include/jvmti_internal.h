@@ -151,6 +151,7 @@ class DebugUtilsTI {
         Lock_Manager TIenvs_lock;
         Lock_Manager dcList_lock;
         VMBreakPoints* vm_brpt;
+        hythread_tls_key_t TL_ti_enabled; //thread local TI flag
 
         DebugUtilsTI();
 
@@ -165,6 +166,10 @@ class DebugUtilsTI {
         bool isEnabled();
         void setEnabled();
         void setDisabled();
+
+        bool isLocallyEnabled();
+        void setLocallyEnabled();
+        void setLocallyDisabled();
 
         jvmtiPhase getPhase()
         {

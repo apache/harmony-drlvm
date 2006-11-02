@@ -46,6 +46,7 @@ jvmtiGetTopThreadGroups(jvmtiEnv* env,
 {
     TRACE2("jvmti.thread.group", "GetTopThreadGroups called");
     SuspendEnabledChecker sec;
+    DebugUtilsTI *ti = VM_Global_State::loader_env->TI;
     /*
      * Check given env & current phase.
      */
@@ -57,6 +58,8 @@ jvmtiGetTopThreadGroups(jvmtiEnv* env,
     {
         return JVMTI_ERROR_NULL_POINTER;
     }
+
+    ti->setLocallyDisabled();//-----------------------------------V
 
     jclass cl = struct_Class_to_java_lang_Class_Handle(VM_Global_State::loader_env->java_lang_Thread_Class);
     jmethodID id = jvmti_test_jenv -> GetMethodID(cl,
@@ -74,6 +77,8 @@ jvmtiGetTopThreadGroups(jvmtiEnv* env,
         group = parent;
         parent = jvmti_test_jenv -> CallObjectMethod (group, id);
     }
+
+    ti->setLocallyEnabled();//-----------------------------------^
 
     jvmtiError jvmti_error = _allocate(sizeof(jthreadGroup*),
             (unsigned char **)groups_ptr);
@@ -104,6 +109,7 @@ jvmtiGetThreadGroupInfo(jvmtiEnv* env,
 {
     TRACE2("jvmti.thread.group", "GetThreadGroupInfo called");
     SuspendEnabledChecker sec;
+    DebugUtilsTI *ti = VM_Global_State::loader_env->TI;
     /*
      * Check given env & current phase.
      */
@@ -120,6 +126,8 @@ jvmtiGetThreadGroupInfo(jvmtiEnv* env,
         return JVMTI_ERROR_NULL_POINTER;
     }
 
+    ti->setLocallyDisabled();//-----------------------------------V
+
     jclass cl = GetObjectClass(jvmti_test_jenv, group);
     jmethodID id = jvmti_test_jenv -> GetMethodID(cl, "getParent","()Ljava/lang/ThreadGroup;");
     info_ptr -> parent = jvmti_test_jenv -> CallObjectMethod (group, id);
@@ -133,6 +141,8 @@ jvmtiGetThreadGroupInfo(jvmtiEnv* env,
 
     id = jvmti_test_jenv -> GetMethodID(cl, "isDaemon","()Z");
     info_ptr -> is_daemon = jvmti_test_jenv -> CallBooleanMethod (group, id);
+
+    ti->setLocallyEnabled();//-----------------------------------^
 
     return JVMTI_ERROR_NONE;
 }
@@ -154,6 +164,7 @@ jvmtiGetThreadGroupChildren(jvmtiEnv* env,
 {
     TRACE2("jvmti.thread.group", "GetThreadGroupChildren called");
     SuspendEnabledChecker sec;
+    DebugUtilsTI *ti = VM_Global_State::loader_env->TI;
     /*
      * Check given env & current phase.
      */
@@ -171,6 +182,8 @@ jvmtiGetThreadGroupChildren(jvmtiEnv* env,
         return JVMTI_ERROR_NULL_POINTER;
     }
 
+    ti->setLocallyDisabled();//-----------------------------------V
+
     jclass cl = GetObjectClass(jvmti_test_jenv, group);
     jobjectArray jg = jvmti_test_jenv -> NewObjectArray(10, cl, 0);
     jmethodID id = jvmti_test_jenv -> GetMethodID(cl, "enumerate","([Ljava/lang/ThreadGroup;)I");
@@ -181,6 +194,8 @@ jvmtiGetThreadGroupChildren(jvmtiEnv* env,
 
     if (JVMTI_ERROR_NONE != jvmti_error)
     {
+        
+        ti->setLocallyEnabled();//-----------------------------------^
         return jvmti_error;
     }
 
@@ -198,6 +213,9 @@ jvmtiGetThreadGroupChildren(jvmtiEnv* env,
     jobjectArray jt = jvmti_test_jenv -> NewObjectArray(10, cll, 0);
     id = jvmti_test_jenv -> GetMethodID(cl, "enumerate","([Ljava/lang/Thread;Z)I");
     cc = jvmti_test_jenv -> CallIntMethod (group, id, jt, JNI_FALSE);
+
+    ti->setLocallyEnabled();//-----------------------------------^
+
     jthread * threads = NULL;
     jvmti_error = _allocate(sizeof(jthread) * cc, (unsigned char **)&threads);
 

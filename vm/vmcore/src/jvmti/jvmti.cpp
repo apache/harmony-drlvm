@@ -317,12 +317,16 @@ DebugUtilsTI::DebugUtilsTI() :
     assert(res == JVMTI_ERROR_NONE);
     vm_brpt = new VMBreakPoints();
     assert(vm_brpt);
+    IDATA status = hythread_tls_alloc(&TL_ti_enabled);
+    assert(status == TM_ERROR_NONE);
+
     return;
 }
 
 DebugUtilsTI::~DebugUtilsTI()
 {
     ReleaseNotifyLists();
+    hythread_tls_free(TL_ti_enabled);
     delete vm_brpt;
     return;
 }
@@ -690,8 +694,22 @@ void DebugUtilsTI::setAgents(Agent *agents) {
     this->agents = agents;
 }
 
+bool DebugUtilsTI::isLocallyEnabled() {
+    //default value is that ti enabled on thread level
+    return hythread_tls_get(hythread_self(), this->TL_ti_enabled) == NULL;
+}
+
+void DebugUtilsTI::setLocallyEnabled() {
+    //default value is that ti enabled on thread level
+    hythread_tls_set(hythread_self(), this->TL_ti_enabled, NULL);
+}
+
+void DebugUtilsTI::setLocallyDisabled() {
+    hythread_tls_set(hythread_self(), this->TL_ti_enabled, this);
+}
+
 bool DebugUtilsTI::isEnabled() {
-    return status;
+    return status && isLocallyEnabled();
 }
 
 void DebugUtilsTI::setEnabled() {

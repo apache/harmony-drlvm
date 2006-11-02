@@ -481,6 +481,7 @@ jvmtiGetThreadInfo(jvmtiEnv* env,
                    jvmtiThreadInfo* info_ptr)
 {
     TRACE2("jvmti.thread", "GetThreadInfo called");
+    DebugUtilsTI *ti = VM_Global_State::loader_env->TI;
     SuspendEnabledChecker sec;
     /*
      * Check given env & current phase.
@@ -500,6 +501,8 @@ jvmtiGetThreadInfo(jvmtiEnv* env,
     else
         thread = jthread_self();
 
+    ti->setLocallyDisabled();//-----------------------------------V
+
     jclass cl = GetObjectClass(jvmti_test_jenv, thread);
     jmethodID id = jvmti_test_jenv -> GetMethodID(cl, "getName","()Ljava/lang/String;");
     jstring  name = jvmti_test_jenv -> CallObjectMethod (thread, id);
@@ -516,6 +519,8 @@ jvmtiGetThreadInfo(jvmtiEnv* env,
 
     id = jvmti_test_jenv -> GetMethodID(cl, "getContextClassLoader","()Ljava/lang/ClassLoader;");
     info_ptr -> context_class_loader = jvmti_test_jenv -> CallObjectMethod (thread, id);
+
+    ti->setLocallyEnabled();//------------------------------------^
 
     return JVMTI_ERROR_NONE;
 }
@@ -652,6 +657,7 @@ jvmtiRunAgentThread(jvmtiEnv* env,
     JNIEnv * jni_env;
 
     TRACE2("jvmti.thread", "RunAgentThread called");
+    DebugUtilsTI *ti = VM_Global_State::loader_env->TI;
     SuspendEnabledChecker sec;
     /*
      * Check given env & current phase.
@@ -670,6 +676,8 @@ jvmtiRunAgentThread(jvmtiEnv* env,
         return JVMTI_ERROR_NULL_POINTER;
     }
 
+    ti->setLocallyDisabled();//-----------------------------------V
+
     // Set daemon flag for the thread
     jclass thread_class = GetObjectClass(jvmti_test_jenv, thread);
     assert(thread_class);
@@ -687,6 +695,8 @@ jvmtiRunAgentThread(jvmtiEnv* env,
     attrs.daemon = JNI_TRUE;
     attrs.jvmti_env = env;
     jthread_create_with_function(jni_env, thread, &attrs, proc, arg);
+
+    ti->setLocallyEnabled();//-----------------------------------^
 
     return JVMTI_ERROR_NONE;
 }
