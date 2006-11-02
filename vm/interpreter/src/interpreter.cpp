@@ -3624,13 +3624,17 @@ interpreterGetNativeMethodAddr(Method* method) {
         return (GenericFunctionPointer) method->get_code_addr();
     }
 
-    GenericFunctionPointer f = interp_find_native(method);
+    NativeCodePtr f = (NativeCodePtr)interp_find_native(method);
+
+    hythread_suspend_enable();
+    jvmti_process_native_method_bind_event( (jmethodID) method, f, &f);
+    hythread_suspend_disable();
 
     // TODO: check if we need synchronization here
     if( f ) {
-        method->set_code_addr((NativeCodePtr) f);
+        method->set_code_addr(f);
         method->set_state( Method::ST_Linked );
     }
 
-    return f;
+    return (GenericFunctionPointer)f;
 }

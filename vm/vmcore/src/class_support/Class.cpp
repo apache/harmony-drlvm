@@ -690,9 +690,13 @@ class_register_methods(Class_Handle klass,
                 // found method
                 not_found = false;
 
+                // Calling callback for NativeMethodBind event
+                NativeCodePtr native_addr = methods[index].fnPtr;
+                jvmti_process_native_method_bind_event( (jmethodID) class_method, native_addr, &native_addr);
+
                 // lock class
                 klass->m_lock->_lock();
-                class_method->set_code_addr( methods[index].fnPtr );
+                class_method->set_code_addr( native_addr );
                 class_method->set_registered( true );
                 klass->m_lock->_unlock();
                 break;

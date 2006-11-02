@@ -113,6 +113,8 @@ void jvmti_send_class_prepare_event(Class* clss);
 VMEXPORT void jvmti_send_thread_start_end_event(int is_start);
 void jvmti_send_vm_death_event();
 bool jvmti_jit_breakpoint_handler(Registers *regs);
+VMEXPORT void jvmti_process_native_method_bind_event(jmethodID method, 
+    NativeCodePtr address, NativeCodePtr* new_address_ptr);
 
 #ifdef __cplusplus
 }

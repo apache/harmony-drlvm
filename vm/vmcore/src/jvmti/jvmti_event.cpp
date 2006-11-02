@@ -40,7 +40,6 @@
 #include "jvmti_break_intf.h"
 #include "stack_iterator.h"
 #include "m2n.h"
-#include "suspend_checker.h"
 
 /*
  * Set Event Callbacks
@@ -834,6 +833,8 @@ jvmti_process_method_exception_exit_event(jmethodID method,
 VMEXPORT void
 jvmti_process_frame_pop_event(jvmtiEnv *jvmti_env, jmethodID method, jboolean was_popped_by_exception)
 {
+    assert(hythread_is_suspend_enabled());
+
     DebugUtilsTI *ti = VM_Global_State::loader_env->TI;
     if (!ti->isEnabled() ) return;
 
@@ -854,6 +855,40 @@ jvmti_process_frame_pop_event(jvmtiEnv *jvmti_env, jmethodID method, jboolean wa
         ti_env->event_table.FramePop(jvmti_env, jni_env, thread, method,
             was_popped_by_exception);
 
+}
+
+VMEXPORT void
+jvmti_process_native_method_bind_event(jmethodID method, NativeCodePtr address, NativeCodePtr* new_address_ptr)
+{
+    SuspendEnabledChecker sec;
+
+    DebugUtilsTI *ti = VM_Global_State::loader_env->TI;
+    if( !ti->isEnabled() )
+        return;
+
+    //Checking current phase
+    jvmtiPhase phase = ti->getPhase();
+    if( phase != JVMTI_PHASE_START && phase != JVMTI_PHASE_LIVE && phase != JVMTI_PHASE_PRIMORDIAL)
+        return;
+
+    TRACE2("jvmti.event.bind", "Native method bind event is called for method:"
+        << (method ? class_get_name(method_get_class((Method*)method)) : "(nil)") << "." 
+        << (method ? method_get_name((Method*)method) : "(nil)") 
+        << (method ? method_get_descriptor((Method*)method) : "" ) );
+
+    jthread thread = getCurrentThread();
+    JNIEnv *jni_env = p_TLS_vmthread->jni_env;
+
+    for( TIEnv *ti_env = ti->getEnvironments(); ti_env; ti_env = ti_env->next ) {
+        //Must possess capability
+        jvmtiCapabilities capa;
+        if( JVMTI_ERROR_NONE != ((jvmtiEnv *)ti_env)->GetCapabilities(&capa) )
+            return;
+        if( !capa.can_generate_native_method_bind_events )
+            return;
+        if (NULL != ti_env->event_table.NativeMethodBind)
+            ti_env->event_table.NativeMethodBind((jvmtiEnv *)ti_env, jni_env, thread, method, address, new_address_ptr);
+    }
 }
 
 VMEXPORT void

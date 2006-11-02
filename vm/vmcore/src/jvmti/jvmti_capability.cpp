@@ -61,7 +61,7 @@ static const jvmtiCapabilities jvmti_supported_interpreter_capabilities =
     1, // can_generate_compiled_method_load_events
     1, // can_generate_monitor_events
     1, // can_generate_vm_object_alloc_events
-    0, // can_generate_native_method_bind_events
+    1, // can_generate_native_method_bind_events
     0, // can_generate_garbage_collection_events
     0  // can_generate_object_free_events
 };
@@ -98,7 +98,7 @@ static const jvmtiCapabilities jvmti_supported_jit_capabilities =
     1, // can_generate_compiled_method_load_events
     1, // can_generate_monitor_events
     1, // can_generate_vm_object_alloc_events
-    0, // can_generate_native_method_bind_events
+    1, // can_generate_native_method_bind_events
     0, // can_generate_garbage_collection_events
     0  // can_generate_object_free_events
 };
@@ -137,7 +137,7 @@ static const jvmtiCapabilities jvmti_enable_on_live_flags =
     1, // can_generate_compiled_method_load_events
     0, // can_generate_monitor_events
     1, // can_generate_vm_object_alloc_events
-    0, // can_generate_native_method_bind_events
+    1, // can_generate_native_method_bind_events
     0, // can_generate_garbage_collection_events
     0  // can_generate_object_free_events
 };

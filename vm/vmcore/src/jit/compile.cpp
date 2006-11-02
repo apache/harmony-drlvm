@@ -653,8 +653,10 @@ static JIT_Result compile_prepare_native_method(Method* method, JIT_Flags flags)
     if (!func)
         return JIT_FAILURE;
 
-    Class* cl = method->get_class();
+    // Calling callback for NativeMethodBind event
+    jvmti_process_native_method_bind_event( (jmethodID) method, (NativeCodePtr)func, (NativeCodePtr*)&func);
 
+    Class* cl = method->get_class();
     NativeStubOverride nso = nso_find_method_override(VM_Global_State::loader_env,
                                                     cl->name, method->get_name(),
                                                     method->get_descriptor());
@@ -663,7 +665,6 @@ static JIT_Result compile_prepare_native_method(Method* method, JIT_Flags flags)
 
     if (!stub)
         return JIT_FAILURE;
-
     cl->m_lock->_lock();
     method->set_code_addr(stub);
     cl->m_lock->_unlock();
