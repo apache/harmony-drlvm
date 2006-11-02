@@ -2077,9 +2077,9 @@ ManagedObject *class_alloc_new_object_using_vtable(VTable *vtable)
     vtable->clss->num_bytes_allocated += vtable->allocated_size;
 #endif //VM_STATS
     // From vm_types.h: this is the same as instance_data_size with the constraint bit cleared.
-    ManagedObject* o = (ManagedObject *)
-        gc_alloc(vtable->allocated_size, 
-            vtable->clss->allocation_handle, vm_get_gc_thread_local());
+    ManagedObject* o = (ManagedObject *) vm_alloc_and_report_ti(
+            vtable->allocated_size, vtable->clss->allocation_handle, 
+            vm_get_gc_thread_local(), vtable->clss);
     if (!o) {
         exn_raise_object(
             VM_Global_State::loader_env->java_lang_OutOfMemoryError);

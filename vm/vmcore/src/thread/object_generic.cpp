@@ -144,7 +144,8 @@ jobject object_clone(JNIEnv *jenv, jobject jobj)
             return NULL;
         }
         size = vt->allocated_size;
-        result = (ManagedObject *) gc_alloc(size, vt->clss->allocation_handle, vm_get_gc_thread_local());
+        result = (ManagedObject *) vm_alloc_and_report_ti(size, 
+            vt->clss->allocation_handle, vm_get_gc_thread_local(), vt->clss);
     }
     if (result == NULL) {
         tmn_suspend_enable(); 

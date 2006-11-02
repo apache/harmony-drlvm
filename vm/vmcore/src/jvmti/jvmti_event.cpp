@@ -40,6 +40,7 @@
 #include "jvmti_break_intf.h"
 #include "stack_iterator.h"
 #include "m2n.h"
+#include "suspend_checker.h"
 
 /*
  * Set Event Callbacks
@@ -925,8 +926,6 @@ VMEXPORT void jvmti_process_field_access_event(Field_Handle field,
         object->object = managed_object;
     }
 
-    tmn_suspend_enable();
-
     DebugUtilsTI *ti = VM_Global_State::loader_env->TI;
     if (!ti->isEnabled() )
         return;
@@ -936,6 +935,8 @@ VMEXPORT void jvmti_process_field_access_event(Field_Handle field,
 
     if (!ti->get_global_capability(DebugUtilsTI::TI_GC_ENABLE_FIELD_ACCESS_EVENT))
         return;
+
+    tmn_suspend_enable();
 
     // get field class
     //Type_Info_Handle field_type = field_get_type_info_of_field_value(field);
@@ -997,8 +998,6 @@ VMEXPORT void jvmti_process_field_modification_event(Field_Handle field,
         object->object = managed_object;
     }
 
-    tmn_suspend_enable();
-
     DebugUtilsTI *ti = VM_Global_State::loader_env->TI;
     if (!ti->isEnabled() )
         return;
@@ -1010,6 +1009,8 @@ VMEXPORT void jvmti_process_field_modification_event(Field_Handle field,
         return;
 
     // get field class
+    tmn_suspend_enable();
+
     //Type_Info_Handle field_type = field_get_type_info_of_field_value(field);
     //Class_Handle clss = type_info_get_class(field_type);
     //ASSERT(clss, "Can't get class handle for field type.");
@@ -1059,6 +1060,90 @@ VMEXPORT void jvmti_process_field_modification_event(Field_Handle field,
 
     tmn_suspend_disable();
 } // jvmti_process_field_modification_event
+
+static void jvmti_process_vm_object_alloc_event(ManagedObject** p_managed_object,
+    Class* object_clss, unsigned size)
+{
+    SuspendDisabledChecker sdc;
+
+    DebugUtilsTI *ti = VM_Global_State::loader_env->TI;
+    if (!ti->isEnabled() )
+        return;
+
+    if (JVMTI_PHASE_LIVE != ti->getPhase())
+        return;
+
+    // check the j.l.Thread is already initialized
+    hythread_t curr_thread = hythread_self();
+    jthread thread = jthread_get_java_thread(curr_thread);
+    if (NULL == thread)
+        return;
+
+    ManagedObject* managed_object = *p_managed_object;
+    // create handle for object
+    jobject object = NULL;
+
+    if (NULL != managed_object) {
+        object = oh_allocate_local_handle();
+        object->object = managed_object;
+    }
+
+    tmn_suspend_enable();
+
+    // get class
+    jclass klass = struct_Class_to_java_lang_Class_Handle(object_clss);
+
+    jvmtiEvent event_type = JVMTI_EVENT_VM_OBJECT_ALLOC;
+    TIEnv *ti_env = ti->getEnvironments();
+    TIEnv *next_env;
+    while (NULL != ti_env)
+    {
+        next_env = ti_env->next;
+        // check that event is enabled in this environment.
+        if (!ti_env->global_events[event_type - JVMTI_MIN_EVENT_TYPE_VAL]) {
+            TIEventThread *thr = ti_env->event_threads[event_type - JVMTI_MIN_EVENT_TYPE_VAL];
+            while (thr)
+            {
+                if (thr->thread == curr_thread)
+                    break;
+                thr = thr->next;
+            }
+
+            if (!thr)
+            {
+                ti_env = next_env;
+                continue;
+            }
+        }
+
+        // event is enabled in this environment
+        JNIEnv *jni_env = p_TLS_vmthread->jni_env;
+        jvmtiEnv *jvmti_env = (jvmtiEnv*) ti_env;
+
+        if (NULL != ti_env->event_table.VMObjectAlloc)
+            ti_env->event_table.VMObjectAlloc(jvmti_env, jni_env, thread,
+                    object, klass, (jlong)size);
+
+        ti_env = next_env;
+    }
+
+    tmn_suspend_disable();
+
+    // restore object pointer. As et could be relocated by GC.
+    *p_managed_object = object->object;
+} // jvmti_process_vm_object_alloc_event
+
+VMEXPORT Managed_Object_Handle vm_alloc_and_report_ti(unsigned size, 
+    Allocation_Handle p_vtable, void *thread_pointer, Class* object_class)
+{
+    SuspendDisabledChecker sdc;
+    Managed_Object_Handle handle = gc_alloc(size, p_vtable, thread_pointer);
+
+    if (handle) 
+        jvmti_process_vm_object_alloc_event((ManagedObject**) &handle, object_class, size);
+
+    return handle;
+} // vm_alloc_and_report_ti
 
 /*
  * Send Exception event

@@ -283,6 +283,8 @@ extern "C"
         JVMTI_MAX_EVENT_TYPE_VAL = 84
     } jvmtiEvent;
 
+#define TOTAL_EVENT_TYPE_NUM (JVMTI_MAX_EVENT_TYPE_VAL - JVMTI_MIN_EVENT_TYPE_VAL + 1)
+
     /**
      * Root types.
      */

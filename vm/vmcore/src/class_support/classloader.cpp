@@ -1114,8 +1114,8 @@ Class* ClassLoader::AllocateAndReportInstance(const Global_Env* env, Class* clss
 
         tmn_suspend_disable(); // -----------------vvv
         ManagedObject* new_java_lang_Class =
-            (ManagedObject*)gc_alloc(root_class->instance_data_size,
-                root_class->allocation_handle, vm_get_gc_thread_local());
+            (ManagedObject*) vm_alloc_and_report_ti(root_class->instance_data_size,
+                root_class->allocation_handle, vm_get_gc_thread_local(), root_class);
         if(new_java_lang_Class == NULL)
         {
             tmn_suspend_enable();

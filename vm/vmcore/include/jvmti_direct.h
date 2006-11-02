@@ -50,8 +50,8 @@ struct TIEnv
     VMBreakInterface *brpt_intf;
     TIEnv* next;
 
-    bool global_events[JVMTI_MAX_EVENT_TYPE_VAL - JVMTI_MIN_EVENT_TYPE_VAL];
-    TIEventThread *event_threads[JVMTI_MAX_EVENT_TYPE_VAL - JVMTI_MIN_EVENT_TYPE_VAL];
+    bool global_events[TOTAL_EVENT_TYPE_NUM];
+    TIEventThread *event_threads[TOTAL_EVENT_TYPE_NUM];
 
     /**
      * Returns pointer to a callback function that was set by SetEventCallbacks
@@ -137,6 +137,8 @@ VMEXPORT void jvmti_process_field_access_event(Field_Handle field,
     jmethodID method, jlocation location, ManagedObject* object);
 VMEXPORT void jvmti_process_field_modification_event(Field_Handle field,
     jmethodID method, jlocation location, ManagedObject* object, jvalue new_value);
+VMEXPORT Managed_Object_Handle vm_alloc_and_report_ti(unsigned size, 
+    Allocation_Handle p_vtable, void *thread_pointer, Class* object_class);
 
 #ifdef __cplusplus
 extern "C" {

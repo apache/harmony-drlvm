@@ -88,7 +88,7 @@ jvmtiDisposeEnvironment(jvmtiEnv* env)
 
     // Disable all global events for this environment
     int iii;
-    for (iii = JVMTI_MIN_EVENT_TYPE_VAL; iii < JVMTI_MAX_EVENT_TYPE_VAL; iii++)
+    for (iii = JVMTI_MIN_EVENT_TYPE_VAL; iii <= JVMTI_MAX_EVENT_TYPE_VAL; iii++)
         remove_event_from_global(env, (jvmtiEvent)iii);
 
     // Disable all thread local events for this environment, do it only in live phase
@@ -103,7 +103,7 @@ jvmtiDisposeEnvironment(jvmtiEnv* env)
         jthread *threads;
         jvmtiGetAllThreads(env, &threads_number, &threads);
         for (int jjj = 0; jjj < threads_number; jjj++)
-            for (iii = JVMTI_MIN_EVENT_TYPE_VAL; iii < JVMTI_MAX_EVENT_TYPE_VAL; iii++)
+            for (iii = JVMTI_MIN_EVENT_TYPE_VAL; iii <= JVMTI_MAX_EVENT_TYPE_VAL; iii++)
                 remove_event_from_thread(env, (jvmtiEvent)iii, threads[jjj]);
         _deallocate((unsigned char *)threads);
     }

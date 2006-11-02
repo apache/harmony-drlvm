@@ -244,7 +244,8 @@ static void string_create(unsigned unicode_length, bool eight_bit, ManagedObject
     assert(clss);
 
     unsigned sz = vm_array_size(clss->vtable, unicode_length);
-    Vector_Handle array = gc_alloc(sz, clss->allocation_handle, vm_get_gc_thread_local());
+    Vector_Handle array = vm_alloc_and_report_ti(sz, clss->allocation_handle, 
+            vm_get_gc_thread_local(), clss);
     if (!array) { // OutOfMemory should be thrown
         *str = NULL;
         exn_raise_object(VM_Global_State::loader_env->java_lang_OutOfMemoryError);
