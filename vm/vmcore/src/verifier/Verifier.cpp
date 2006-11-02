@@ -5124,20 +5124,6 @@ vf_parse_bytecode( vf_Context_t *ctex )     // verifier context
         }
     }
 
-    // set constraints for class exceptions a method can throw
-    count = method_get_number_exc_method_can_throw( ctex->m_method );
-    for( index = 0; index < count; index++ ) {
-        // create valid type for exception class
-        const char* name = method_get_exc_method_can_throw( ctex->m_method, index );
-        vf_ValidType_t *type = vf_create_class_valid_type( name, ctex );
-
-        // set restriction for handler class
-        if( ctex->m_vtype.m_throwable->string[0] != type->string[0] ) {
-            ctex->m_type->SetRestriction( ctex->m_vtype.m_throwable->string[0],
-                type->string[0], 0, VF_CHECK_SUPER );
-        }
-    }
-
     /** 
      * Initialize basic block count
      * Include start-entry basic block, handler basic blocks, 
