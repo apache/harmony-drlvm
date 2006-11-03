@@ -128,12 +128,13 @@ char *predefined_propeties[] =
     "java.specification.version=1.5",
     "java.specification.vendor=Sun Microsystems Inc.",
     "java.specification.name=Java Platform API Specification",
-    "java.version=11.2.0",
+    "java.version=1.5.0",
     "java.vendor=Apache Software Foundation",
     "java.vm.vendor=Apache Software Foundation",
     "java.vm.version=11.2.0",
     "java.vm.name=DRLVM",
     "java.vm.info=no info",
+    "java.class.version=49.0",
     NULL
 };
 
