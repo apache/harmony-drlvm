@@ -215,6 +215,7 @@ JNIEXPORT jobject JNICALL Java_org_apache_harmony_vm_VMStack_getStackState
 JNIEXPORT jobjectArray JNICALL Java_org_apache_harmony_vm_VMStack_getStackTrace
   (JNIEnv * jenv, jclass, jobject state)
 {
+
     ASSERT_RAISE_AREA;
     if (NULL == state)
         return NULL;
@@ -235,6 +236,10 @@ JNIEXPORT jobjectArray JNICALL Java_org_apache_harmony_vm_VMStack_getStackTrace
         genv->java_lang_Throwable_Class,
             "fillInStackTrace", "()Ljava/lang/Throwable;");
 
+    static Method_Handle threadRunImpl = class_lookup_method(
+        genv->java_lang_Thread_Class,
+            "runImpl", "()V");
+
     unsigned skip;
 
     // skip frames up to one with fillInStackTrace method and remember this
@@ -248,6 +253,8 @@ JNIEXPORT jobjectArray JNICALL Java_org_apache_harmony_vm_VMStack_getStackTrace
             break;
         }
     }
+
+    if (frames[size -1].method == threadRunImpl) size--;
 
     if (skip < size) {
         Method *method = frames[skip].method;
@@ -386,13 +393,14 @@ JNIEXPORT jobjectArray JNICALL Java_org_apache_harmony_vm_VMStack_getThreadStack
 
     // skip the VMStart$MainThread if one exits from the bottom of the stack
     // along with 2 reflection frames used to invoke method main
-    static String* starter_String = genv->string_pool.lookup("java/lang/VMStart$MainThread");
+    static String* starter_String = genv->string_pool.lookup("java/lang/Thread");
     Method_Handle method = frames[size-1].method;
     assert(method);
     // skip only for main application thread
-    if (!strcmp(method_get_name(method), "run")
+    if (!strcmp(method_get_name(method), "runImpl")
         && method->get_class()->name == starter_String) {
-            size -= size < 3 ? size : 3;
+
+            size --;
         }
 
         assert(hythread_is_suspend_enabled());

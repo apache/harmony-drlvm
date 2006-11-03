@@ -351,7 +351,7 @@ IDATA hythread_set_safepoint_callback(hythread_t thread, tm_thread_event_callbac
         //let the thread execute safe point in the case it's already suspended
         ////
         status = hysem_post(thread->resume_event);
-        assert (status == TM_ERROR_NONE);
+        
     }
     
     if (thread->current_condition) {

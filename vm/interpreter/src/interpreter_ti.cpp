@@ -40,9 +40,9 @@ static jint skip_old_frames(VM_thread *thread)
         assert(clss);
 
         if (strcmp(method_get_name(first_frame->method), "runImpl") == 0 &&
-            strcmp(class_get_name(clss), "java/lang/VMStart$MainThread") == 0)
+            strcmp(class_get_name(clss), "java/lang/Thread") == 0)
         {
-            return 3;
+            return 1;
         }
     }
 

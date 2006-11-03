@@ -658,6 +658,16 @@ public class Thread implements Runnable {
         }
     }
 
+    void runImpl() {
+        synchronized (lock) {
+            this.isAlive = true;
+            this.started = true;
+            lock.notifyAll();
+        }
+
+        run();
+    }
+
     /**
      * @com.intel.drl.spec_ref
      */
@@ -716,7 +726,7 @@ public class Thread implements Runnable {
     /**
      * @com.intel.drl.spec_ref
      */
-    public void start() {
+    public synchronized void start() {
         synchronized (lock) {
             if (started) {
                 //this thread was started
@@ -724,13 +734,16 @@ public class Thread implements Runnable {
                         "This thread was already started!");
             }
 
-            this.isAlive = true;
             
             if (VMThreadManager.start(this, stackSize, daemon, priority) != 0) {
                 throw new OutOfMemoryError("Failed to create new thread");
             } 
             
-            started = true;
+            while(!this.started) {
+                try {
+                    lock.wait();
+                } catch (InterruptedException e) {/* continue waiting*/}
+            }
         }
     }
 

@@ -409,7 +409,10 @@ void stop_callback() {
     tm_native_thread = hythread_self();
     tm_java_thread = hythread_get_private_data(tm_native_thread);
     excn = tm_java_thread->stop_exception;
+    
     tm_native_thread->suspend_request = 0;
+    hysem_post(tm_native_thread->resume_event);
+    
     jthread_throw_exception_object(excn);
 }
 
@@ -456,7 +459,7 @@ IDATA jthread_exception_stop(jthread java_thread, jobject excn) {
     tm_java_thread = hythread_get_private_data(tm_native_thread);
         
     // Install safepoint callback that would throw exception
-    env = tm_java_thread->jenv;
+    env = jthread_get_JNI_env(jthread_self());
     tm_java_thread->stop_exception = (*env)->NewGlobalRef(env,excn);
     
     return hythread_set_safepoint_callback(tm_native_thread, stop_callback);
@@ -679,7 +682,7 @@ jmethodID getRunMethod(JNIEnv *env) {
     //printf("run method find enter\n");
     if (!run_method) {
         clazz = (*env) -> FindClass(env, "java/lang/Thread");
-        run_method = (*env) -> GetMethodID(env, clazz, "run", "()V");
+        run_method = (*env) -> GetMethodID(env, clazz, "runImpl", "()V");
     }
     status=release_start_lock();
     //printf("run method find exit\n");

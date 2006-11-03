@@ -2521,6 +2521,11 @@ method_exit_callback_with_frame(Method *method, StackFrame& frame) {
 
 void
 interpreter(StackFrame &frame) {
+    uint8 *first = NULL;
+    uint8 ip0 = 0;
+    bool breakpoint_processed = false;
+    int stackLength = 0;
+    
     DEBUG_TRACE_PLAIN("interpreter: "
             << frame.method->get_class()->name->bytes
             << " " << frame.method->get_name()->bytes
@@ -2529,11 +2534,14 @@ interpreter(StackFrame &frame) {
     assert(frame.method->is_static() || frame.This);
     
     M2N_ALLOC_MACRO;
-    assert(!check_current_thread_exception());
+    if (get_thread_ptr()->p_exception_object_ti || exn_raised()) {
+         frame.exc = get_current_thread_exception();
+         goto got_exception;
+    }
     assert(!hythread_is_suspend_enabled());
     
-    uint8 *first = (uint8*) get_thread_ptr()->firstFrame;
-    int stackLength = ((uint8*)first) - ((uint8*)&frame);
+    first = (uint8*) get_thread_ptr()->firstFrame;
+    stackLength = ((uint8*)first) - ((uint8*)&frame);
     if (stackLength > 500000) { // FIXME: hardcoded stack limit
         if (!(get_thread_ptr()->interpreter_state & INTERP_STATE_STACK_OVERFLOW)) {
             get_thread_ptr()->interpreter_state |= INTERP_STATE_STACK_OVERFLOW;
@@ -2569,10 +2577,10 @@ interpreter(StackFrame &frame) {
         vm_monitor_enter_wrapper(ml->monitor);
     }
 
-    bool breakpoint_processed = false;
+    breakpoint_processed = false;
 
     while (true) {
-        uint8 ip0 = *frame.ip;
+        ip0 = *frame.ip;
 
         DEBUG_BYTECODE(endl << "(" << frame.stack.getIndex()
                    << ") " << opcodeNames[ip0] << ": ");
@@ -2608,11 +2616,6 @@ restart:
             }
             breakpoint_processed = false;
 
-            //assert(!exn_raised());
-            if (get_thread_ptr()->p_exception_object_ti || exn_raised()) {
-                frame.exc = get_current_thread_exception();
-                goto got_exception;
-            }
         }
 
 #ifdef INTERPRETER_DEEP_DEBUG
@@ -2621,7 +2624,12 @@ restart:
 
         assert(!hythread_is_suspend_enabled());
         assert(&frame == getLastStackFrame());
-        assert(!exn_raised());
+        
+        if (get_thread_ptr()->p_exception_object_ti || exn_raised()) {
+             frame.exc = get_current_thread_exception();
+             goto got_exception;
+        }
+
         switch(ip0) {
             case OPCODE_NOP:
                 Opcode_NOP(frame); break;
