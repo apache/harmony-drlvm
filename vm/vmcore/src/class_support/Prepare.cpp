@@ -39,6 +39,7 @@
 #include "interpreter.h"
 #include "lil.h"
 #include "lil_code_generator.h"
+#include "vm_log.h"
 
 #ifdef _DEBUG
 #include "jni.h"
@@ -1516,6 +1517,8 @@ bool class_prepare(Global_Env* env, Class *clss)
     // Move the size to the vtable.
     clss->vtable->allocated_size = clss->allocated_size;
     clss->instance_data_size = clss->allocated_size;
+    TRACE2("class.size", "class " << clss << " allocated size "
+            << clss->allocated_size);
 
     //
     //

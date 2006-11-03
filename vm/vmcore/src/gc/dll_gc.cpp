@@ -41,6 +41,7 @@ static void default_gc_pin_object(Managed_Object_Handle*);
 static void default_gc_unpin_object(Managed_Object_Handle*);
 static int32 default_gc_get_hashcode(Managed_Object_Handle);
 static Managed_Object_Handle default_gc_get_next_live_object(void*);
+static void default_gc_iterate_heap();
 static void default_gc_finalize_on_exit();
 static int64 default_gc_max_memory();
 static void default_gc_wrapup();
@@ -66,6 +67,8 @@ static void default_gc_test_safepoint();
 /* $$$ GMJ static int32 default_gc_get_hashcode(Managed_Object_Handle); */
 
 static Boolean default_gc_supports_frontier_allocation(unsigned *offset_of_current, unsigned *offset_of_limit);
+static void default_gc_add_weak_root_set_entry(
+        Managed_Object_Handle*, Boolean, Boolean);
 
 
 
@@ -122,6 +125,7 @@ void (*gc_unpin_object)(Managed_Object_Handle* p_object) = 0;
 int32 (*gc_get_hashcode)(Managed_Object_Handle obj) = 0;
 Managed_Object_Handle (*gc_get_next_live_object)(void *iterator) = 0;
 int32 (*gc_get_hashcode0) (Managed_Object_Handle p_object) = 0;
+void (*gc_iterate_heap)() = 0;
 
 void (*gc_finalize_on_exit)() = 0;
 
@@ -172,7 +176,13 @@ void vm_add_gc(const char *dllName)
                             dllName,
                             (apr_dso_handle_sym_t)default_gc_supports_compressed_references); 
     
-    gc_add_root_set_entry = (void (*)(Managed_Object_Handle *ref, Boolean is_pinned)) getFunction(handle, "gc_add_root_set_entry", dllName); 
+    gc_add_root_set_entry = (void (*)(Managed_Object_Handle *ref, Boolean is_pinned)) 
+        getFunction(handle, "gc_add_root_set_entry", dllName); 
+
+    gc_add_weak_root_set_entry = (void (*)(Managed_Object_Handle *, Boolean, Boolean)) 
+        getFunctionOptional(handle, "gc_add_weak_root_set_entry", dllName,
+                (apr_dso_handle_sym_t) default_gc_add_weak_root_set_entry); 
+
     gc_add_compressed_root_set_entry = (void (*)(uint32 *ref, Boolean is_pinned)) 
         getFunctionOptional(handle, 
                             "gc_add_compressed_root_set_entry", 
@@ -247,6 +257,10 @@ void vm_add_gc(const char *dllName)
     gc_get_next_live_object = (Managed_Object_Handle (*)(void*))
         getFunctionOptional(handle, "gc_get_next_live_object", dllName,
             (apr_dso_handle_sym_t)default_gc_get_next_live_object);
+
+    gc_iterate_heap = (void (*)())
+        getFunctionOptional(handle, "gc_iterate_heap", dllName,
+            (apr_dso_handle_sym_t)default_gc_iterate_heap);
     
     gc_finalize_on_exit = (void (*)())
         getFunctionOptional(handle, "gc_finalize_on_exit", dllName,
@@ -473,6 +487,11 @@ static Managed_Object_Handle default_gc_get_next_live_object(void*)
     return NULL;
 }
 
+static void default_gc_iterate_heap()
+{
+    WARN_ONCE("The GC did not provide heap iteration");
+}
+
 static void default_gc_finalize_on_exit()
 {
     WARN_ONCE("The GC did not provide finalization on exit");
@@ -486,5 +505,13 @@ static int64 default_gc_max_memory()
 
 static void default_gc_write_barrier(Managed_Object_Handle)
 {
+}
+
+static void default_gc_add_weak_root_set_entry(
+        Managed_Object_Handle* root, Boolean pinned, Boolean is_short)
+{
+    WARN_ONCE("The GC did not provide gc_add_weak_root_set_entry()");
+    // default to strong reference semantics
+    gc_add_root_set_entry(root, pinned);
 }
 #endif // !USE_GC_STATIC

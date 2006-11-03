@@ -28,6 +28,7 @@
 #include "thread_manager.h"
 #include "interpreter.h"
 #include "finalize.h"
+#include "jvmti_direct.h"
 
 
 ////////// M E A S U R E M E N T of thread suspension time///////////
@@ -95,6 +96,8 @@ stop_the_world_root_set_enumeration()
     thread_suspend_time = vm_time_end_hook(&_start_time, &_end_time);
     INFO2("tm.suspend","Thread suspension time: "<< thread_suspend_time <<" mksec");
 
+    jvmti_send_gc_start_event();
+
     class_unloading_clear_mark_bits();
 
     current_vm_thread = p_TLS_vmthread;
@@ -161,6 +164,9 @@ void vm_resume_threads_after()
     p_the_safepoint_control_thread = 0;
 
     class_unloading_start();
+
+    jvmti_send_gc_finish_event();
+    jvmti_clean_reclaimed_object_tags();
 
     // Run through list of active threads and resume each one of them.
     hythread_resume_all( NULL);

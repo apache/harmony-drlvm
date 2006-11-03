@@ -1905,3 +1905,66 @@ void jvmti_send_vm_death_event()
     ti->nextPhase(JVMTI_PHASE_DEAD);
 }
 
+void jvmti_send_gc_start_event()
+{
+    Global_Env *env = VM_Global_State::loader_env;
+    // this event is sent from stop-the-world setting
+    assert(!hythread_is_suspend_enabled());
+
+    DebugUtilsTI *ti = env->TI;
+    if (!ti->isEnabled())
+        return;
+
+    TIEnv *ti_env = ti->getEnvironments();
+    TIEnv *next_env;
+    while (NULL != ti_env)
+    {
+        next_env = ti_env->next;
+        if (ti_env->global_events[JVMTI_EVENT_GARBAGE_COLLECTION_START - JVMTI_MIN_EVENT_TYPE_VAL])
+        {
+            jvmtiEventGarbageCollectionStart func = 
+                (jvmtiEventGarbageCollectionStart)
+                ti_env->get_event_callback(JVMTI_EVENT_GARBAGE_COLLECTION_START);
+
+            if (NULL != func)
+            {
+                TRACE2("jvmti.event.gc", "Callback JVMTI_EVENT_GARBAGE_COLLECTION_START called");
+                func((jvmtiEnv*)ti_env);
+                TRACE2("jvmti.event.gc", "Callback JVMTI_EVENT_GARBAGE_COLLECTION_START finished");
+            }
+        }
+        ti_env = next_env;
+    }
+}
+
+void jvmti_send_gc_finish_event()
+{
+    Global_Env *env = VM_Global_State::loader_env;
+    // this event is sent from stop-the-world setting
+    assert(!hythread_is_suspend_enabled());
+
+    DebugUtilsTI *ti = env->TI;
+    if (!ti->isEnabled())
+        return;
+
+    TIEnv *ti_env = ti->getEnvironments();
+    TIEnv *next_env;
+    while (NULL != ti_env)
+    {
+        next_env = ti_env->next;
+        if (ti_env->global_events[JVMTI_EVENT_GARBAGE_COLLECTION_FINISH - JVMTI_MIN_EVENT_TYPE_VAL])
+        {
+            jvmtiEventGarbageCollectionFinish func = 
+                (jvmtiEventGarbageCollectionFinish)
+                ti_env->get_event_callback(JVMTI_EVENT_GARBAGE_COLLECTION_FINISH);
+
+            if (NULL != func)
+            {
+                TRACE2("jvmti.event.gc", "Callback JVMTI_EVENT_GARBAGE_COLLECTION_FINISH called");
+                func((jvmtiEnv*)ti_env);
+                TRACE2("jvmti.event.gc", "Callback JVMTI_EVENT_GARBAGE_COLLECTION_FINISH finished");
+            }
+        }
+        ti_env = next_env;
+    }
+}

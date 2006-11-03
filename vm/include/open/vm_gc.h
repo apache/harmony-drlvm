@@ -97,6 +97,16 @@ VMEXPORT void vm_resume_threads_after();
 VMEXPORT void vm_classloader_iterate_objects(void *iterator);
 
 /**
+ * GC calls this function during heap iteration to iterate
+ * one object. The GC aborts heap iteration if this function
+ * returns false.
+ *
+ * @return true to continue heap iteration, false to abort
+ * @see gc.h#gc_iterate_heap()
+ */
+VMEXPORT bool vm_iterate_object(Managed_Object_Handle object);
+
+/**
  * GC calls this function to hint VM that finalizers may need to be run
  * and references enqueued. This method is guaranteed not to hold global
  * GC lock. 

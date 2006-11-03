@@ -42,6 +42,7 @@
 #include "verify_stack_enumeration.h"
 #include "nogc.h"
 #include "vm_strings.h"
+#include "slot.h"
 
 #ifdef PLATFORM_NT
 // 20040427 Used to turn on heap checking on every allocation
@@ -54,6 +55,9 @@
 VTable * cached_object_array_vtable_ptr;
 bool parallel_jit = true;
 VMEXPORT bool dump_stubs = false;
+
+void* Slot::heap_base = NULL;
+void* Slot::heap_ceiling = NULL;
 
 void vm_initialize_critical_sections() {
     p_jit_a_method_lock = new Lock_Manager();
@@ -640,6 +644,9 @@ int vm_init1(JavaVM_Internal * java_vm, JavaVMInitArgs * vm_arguments) {
     // Initialize memory allocation.
     vm_init_mem_alloc();
     gc_init();
+
+    // TODO: change all uses of Class::heap_base to Slot::heap_base
+    Slot::init(gc_heap_base_address(), gc_heap_ceiling_address());
 
     // TODO: find another way to initialize the following.
     Class::heap_base = (Byte *)gc_heap_base_address();

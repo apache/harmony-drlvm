@@ -24,6 +24,7 @@
 
 #include "jni_direct.h"
 #include "jvmti.h"
+#include "open/hythread_ext.h"
 
 struct TIEventThread
 {
@@ -35,12 +36,22 @@ struct Agent;
 extern Agent *current_loading_agent;
 class VMBreakInterface;
 
+// declared privately in jvmti_tags.h
+struct TITags;
+
+// declared privately in jvmti_heap.h
+struct TIIterationState;
+
 /*
  * Type that describes TI environment created by GetEnv function
  */
 struct TIEnv
 {
     const ti_interface *functions;
+
+    /// Lock used to protect TIEnv instance
+    hymutex_t lock;
+
     JavaVM_Internal *vm;
     Agent *agent;
     void *user_storage;
@@ -48,6 +59,8 @@ struct TIEnv
     jvmtiExtensionEvent *extension_event_table;
     jvmtiCapabilities posessed_capabilities;
     VMBreakInterface *brpt_intf;
+    TITags* tags;
+    TIIterationState* iteration_state;
     TIEnv* next;
 
     bool global_events[TOTAL_EVENT_TYPE_NUM];
@@ -112,9 +125,12 @@ void jvmti_send_class_file_load_hook_event(const Global_Env* env,
 void jvmti_send_class_prepare_event(Class* clss);
 VMEXPORT void jvmti_send_thread_start_end_event(int is_start);
 void jvmti_send_vm_death_event();
+void jvmti_send_gc_finish_event();
+void jvmti_send_gc_start_event();
 bool jvmti_jit_breakpoint_handler(Registers *regs);
 VMEXPORT void jvmti_process_native_method_bind_event(jmethodID method, 
     NativeCodePtr address, NativeCodePtr* new_address_ptr);
+void jvmti_clean_reclaimed_object_tags();
 
 #ifdef __cplusplus
 }

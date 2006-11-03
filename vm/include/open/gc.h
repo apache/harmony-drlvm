@@ -587,7 +587,7 @@ extern void (*gc_unpin_object)(Managed_Object_Handle* p_object);
 extern int32 (*gc_get_hashcode)(Managed_Object_Handle);
 extern int32 (*gc_get_hashcode0) (Managed_Object_Handle p_object);
 extern Managed_Object_Handle (*gc_get_next_live_object)(void *iterator);
-
+extern void (*gc_iterate_heap)();
 extern void (*gc_finalize_on_exit)();
 
 
@@ -756,6 +756,17 @@ GCExport int32 gc_get_hashcode (Managed_Object_Handle p_object);
  * Should be use only in classloader for class unloading purposes.
  */
 GCExport Managed_Object_Handle gc_get_next_live_object(void *iterator);
+
+/**
+ * Iterates all objects in the heap.
+ * This function calls vm_iterate_object() for each
+ * iterated object.
+ * Used for JVMTI Heap Iteration.
+ * Should be called only in stop-the-world setting
+ *
+ * @see vm_gc.h#vm_iterate_object()
+ */
+GCExport void gc_iterate_heap();
 
 /**
  * Moves all finalizable objects to vm finalization queue

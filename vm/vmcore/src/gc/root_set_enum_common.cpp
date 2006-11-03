@@ -31,8 +31,7 @@
 #include "open/vm_util.h"
 #include "finalize.h"
 
-static void 
-vm_enumerate_interned_strings()
+void vm_enumerate_interned_strings()
 {
     TRACE2("enumeration", "vm_enumerate_interned_strings()");
     // string enumeration should be done in stop_the_world phase.
@@ -65,8 +64,7 @@ vm_enumerate_interned_strings()
 
 // Enumerate all globally visible classes and their static fields.
 
-static void 
-vm_enumerate_static_fields()
+void vm_enumerate_static_fields()
 {
     TRACE2("enumeration", "vm_enumerate_static_fields()");
     Global_Env *global_env = VM_Global_State::loader_env;
@@ -128,8 +126,8 @@ vm_enumerate_static_fields()
 void 
 vm_enumerate_root_reference(void **ref, Boolean is_pinned)
 {
-    if (get_global_safepoint_status() == enumerate_the_universe) {
-
+    TRACE2("vm.enum", "vm_enumerate_root_reference(" 
+            << ref << " -> " << *ref << ")");
 #if _DEBUG
         if (VM_Global_State::loader_env->compress_references) {
             // 20030324 DEBUG: verify the slot whose reference is being passed.
@@ -143,8 +141,7 @@ vm_enumerate_root_reference(void **ref, Boolean is_pinned)
         }
 #endif // _DEBUG
 
-        gc_add_root_set_entry((Managed_Object_Handle *)ref, is_pinned);
-    }
+    gc_add_root_set_entry((Managed_Object_Handle *)ref, is_pinned);
 } //vm_enumerate_root_reference
 
 
@@ -153,8 +150,6 @@ vm_enumerate_root_reference(void **ref, Boolean is_pinned)
 VMEXPORT void vm_enumerate_compressed_root_reference(uint32 *ref, Boolean is_pinned)
 {
     assert(VM_Global_State::loader_env->compress_references);
-
-    if (get_global_safepoint_status() == enumerate_the_universe) {
 
 #if _DEBUG
         // 20030324 Temporary: verify the slot whose reference is being passed.
@@ -172,8 +167,7 @@ VMEXPORT void vm_enumerate_compressed_root_reference(uint32 *ref, Boolean is_pin
         }
 #endif // _DEBUG
 
-        gc_add_compressed_root_set_entry(ref, is_pinned);
-    }
+    gc_add_compressed_root_set_entry(ref, is_pinned);
 } //vm_enumerate_compressed_root_reference
 
 
@@ -195,6 +189,10 @@ void vm_enumerate_root_interior_pointer_with_base(void **slot_root, void **slot_
 void 
 vm_enumerate_root_set_global_refs()
 {
+    // ! The enumeration code is duplicated in !
+    // ! ti_enumerate_globals(), plase apply   !
+    // ! all changes there too.                !
+
     ////////////////////////////////////////
     ///// First enumerate strong pointers
 
@@ -212,6 +210,12 @@ vm_enumerate_root_set_global_refs()
     vm_enumerate_root_set_mon_arrays();
 
     ClassLoader::gc_enumerate();
+
+    // this enumeration part is needed only for real garbage collection,
+    // and not needed for JVMTI IterateOverReachableObjects
+    if (VM_Global_State::loader_env->TI->isEnabled()) {
+        VM_Global_State::loader_env->TI->enumerate();
+    }
 
 } //vm_enumerate_root_set_global_refs
 

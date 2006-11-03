@@ -28,6 +28,7 @@
 #include "open/bytecodes.h"
 #include "open/vm_util.h"
 #include "ini.h"
+#include "jvmti_types.h"
 
 //#define INTERPRETER_DEEP_DEBUG
 #define DEBUG_PRINT(a) TRACE2("interpreter", a)
@@ -181,6 +182,7 @@ class Stack {
     static inline int getStorageSize(int size);
     inline int getIndex() { return index + 1; }
     friend void interp_enumerate_root_set_single_thread_on_stack(VM_thread*);
+    friend void interp_ti_enumerate_root_set_single_thread_on_stack(jvmtiEnv* ti_env, VM_thread *thread);
 };
 
 class Locals {
@@ -203,6 +205,7 @@ class Locals {
     inline uint32 getLocalsNumber() { return varNum; }
 
     friend void interp_enumerate_root_set_single_thread_on_stack(VM_thread*);
+    friend void interp_ti_enumerate_root_set_single_thread_on_stack(jvmtiEnv* ti_env, VM_thread *thread);
 };
 
 struct FramePopListener {

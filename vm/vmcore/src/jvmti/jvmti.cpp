@@ -248,9 +248,20 @@ jint JNICALL create_jvmti_environment(JavaVM *vm_ext, void **env, jint version)
         return error_code;
     }
 
+    memset(newenv, 0, sizeof(TIEnv));
+
+    IDATA error_code1 = hymutex_create(&newenv->lock, 0/*HYTHREAD_MUTEX_DEFAULT*/);
+    if (error_code1 != APR_SUCCESS)
+    {
+        _deallocate((unsigned char *)newenv);
+        *env = NULL;
+        return JVMTI_ERROR_OUT_OF_MEMORY;
+    }
+
     error_code = newenv->allocate_extension_event_callbacks_table();
     if (error_code != JVMTI_ERROR_NONE)
     {
+        hymutex_destroy(newenv->lock);
         _deallocate((unsigned char *)newenv);
         *env = NULL;
         return error_code;

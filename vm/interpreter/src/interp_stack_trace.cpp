@@ -24,6 +24,7 @@
 #include "interp_defs.h"
 #include "stack_trace.h"
 #include "exceptions.h"
+#include "jvmti_support.h"
 
 // ppervov: HACK: allows using STL modifiers (dec/hex) and special constants (endl)
 using namespace std;
@@ -249,3 +250,110 @@ interpreter_enumerate_thread(VM_thread *thread)
     // Enumerate references associated with a thread that are not stored on the thread's stack.
     vm_enumerate_root_set_single_thread_not_on_stack(thread);
 } //vm_enumerate_thread
+
+void
+interp_ti_enumerate_root_set_single_thread_on_stack(jvmtiEnv* ti_env, VM_thread *thread) {
+    TRACE2("enumeration", "interp_enumerate_root_set_single_thread_on_stack()");
+    StackIterator_interp* si;
+    si = interp_si_create_from_native(thread);
+    
+    int i;
+    int depth;
+    DEBUG_GC("\n\nGC enumeration in interpreter stack:\n");
+    for (depth = 0; !interp_si_is_past_end(si); depth++) {
+        Method* method = (Method*)interp_si_get_method(si);
+        jmethodID method_id = (jmethodID)method;
+        int slot = 0;
+
+        if (si->This) {
+            vm_ti_enumerate_stack_root(ti_env,
+                    (void**)&si->This, si->This,
+                    JVMTI_HEAP_ROOT_STACK_LOCAL,
+                    depth, method_id, slot++);
+            DEBUG_GC("  [THIS]: " << si->This->vt()->clss->name->bytes << endl);
+        }
+
+        if (si->exc) {
+            vm_ti_enumerate_stack_root(ti_env,
+                (void**)&si->exc, si->exc,
+                JVMTI_HEAP_ROOT_STACK_LOCAL,
+                depth, method_id, slot++);
+            DEBUG_GC("  [EXCEPTION]: " << si->exc->vt()->clss->name->bytes << endl);
+        }
+
+        if (method->is_native()) {
+            DEBUG_GC("[METHOD <native>]: "
+                    << method->get_class()->name->bytes << "."
+                    << method->get_name()->bytes
+                    << method->get_descriptor()->bytes << endl);
+            interp_si_goto_previous(si);
+            continue;
+        }
+
+        DEBUG_GC("[METHOD "<< si->stack.size << " " << (int)si->locals.varNum << "]: "
+                << method->get_class()->name->bytes << "."
+                << method->get_name()->bytes
+                << method->get_descriptor()->bytes << endl);
+
+        if (si->stack.size)
+            for(i = 0; i <= si->stack.index; i++) {
+                if (si->stack.refs[i] == FLAG_OBJECT) {
+                    DEBUG_GC("  Stack[" << i << "] ");
+                    CREF* cref = &si->stack.data[i].cr;
+                    ManagedObject *obj = UNCOMPRESS_REF(*cref);
+                    if (obj == 0) {
+                        DEBUG_GC("NULL");
+                    } else {
+                        DEBUG_GC(obj->vt()->clss->name->bytes << endl);
+                        vm_ti_enumerate_stack_root(ti_env,
+                            cref, (Managed_Object_Handle)obj, 
+                            JVMTI_HEAP_ROOT_STACK_LOCAL,
+                            depth, method_id, slot++);
+                    }
+                }
+            }
+
+                unsigned j;
+        if (si->locals.varNum)
+            for(j = 0; j < si->locals.varNum; j++) {
+                if (si->locals.refs[j] == FLAG_OBJECT) {
+                    DEBUG_GC("  Locals[" << j << "] ");
+                    CREF* cref = &si->locals.var[j].cr;
+                    ManagedObject *obj = UNCOMPRESS_REF(*cref);
+                    if (obj == 0) {
+                        DEBUG_GC("NULL\n");
+                    } else {
+                        DEBUG_GC(obj->vt()->clss->name->bytes << endl);
+                        vm_ti_enumerate_stack_root(ti_env,
+                            cref, (Managed_Object_Handle)obj, 
+                            JVMTI_HEAP_ROOT_STACK_LOCAL,
+                            depth, method_id, slot++);
+                    }
+                }
+            }
+        MonitorList *ml = si->locked_monitors;
+        while(ml) {
+            vm_ti_enumerate_stack_root(ti_env,
+                    &ml->monitor, ml->monitor,
+                    JVMTI_HEAP_ROOT_MONITOR,
+                    depth, method_id, slot++);
+            ml = ml->next;
+        }
+        interp_si_goto_previous(si);
+    }
+
+    // enumerate m2n frames
+    M2nFrame *m2n = m2n_get_last_frame(thread);
+    while(m2n) {
+        oh_enumerate_handles(m2n_get_local_handles(m2n));
+        m2n = m2n_get_previous_frame(m2n);
+    }
+}
+
+void interpreter_ti_enumerate_thread(jvmtiEnv *ti_env, VM_thread *thread)
+{
+    interp_ti_enumerate_root_set_single_thread_on_stack(ti_env, thread);
+
+    // Enumerate references associated with a thread that are not stored on the thread's stack.
+    vm_enumerate_root_set_single_thread_not_on_stack(thread);
+}

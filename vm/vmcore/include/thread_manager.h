@@ -23,6 +23,9 @@
 #ifndef THREAD_MANAGER_HEADER
 #define THREAD_MANAGER_HEADER
 
+#include "platform.h"
+#include "vm_threads.h"
+
 
 #ifdef __cplusplus
 extern "C" {

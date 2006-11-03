@@ -113,7 +113,7 @@ static GC_VTable_Info* build_slot_offset_array(Class_Handle ch, Partial_Reveal_V
 
 
 void gc_class_prepared(Class_Handle ch, VTable_Handle vth) {
-    TRACE2("gc.init", "gc_class_prepared");
+    TRACE2("gc.init", "gc_class_prepared " << class_get_name(ch));
     assert(ch);
     assert(vth);
     Partial_Reveal_VTable *vt = (Partial_Reveal_VTable *)vth;
@@ -124,12 +124,10 @@ void gc_class_prepared(Class_Handle ch, VTable_Handle vth) {
         int el_offset;
         for(el_offset = -1; el_size; el_size >>= 1, el_offset++);
 
-        // FIXME: use data from VM
-#ifdef _EM64T_
-        int first_element = 16;
-#else
-        int first_element = (el_offset == 3) ? 16 : 12;
-#endif
+        int first_element = vector_first_element_offset_unboxed(
+                class_get_array_element_class(ch));
+
+        TRACE2("gc.init.size", "first array element offset " << first_element);
 
         POINTER_SIZE_INT flags = GC_VT_ARRAY
             | (el_offset << GC_VT_ARRAY_ELEMENT_SHIFT)

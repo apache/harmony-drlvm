@@ -36,6 +36,8 @@ typedef struct {
 	// 'end' is not inclusive
     bool (*is_frame_in_native_frame) (struct FrameHandle* frame, void* begin, void* end);
 
+    void (*interpreter_ti_enumerate_thread) (jvmtiEnv*, class VM_thread *thread);
+
 #ifdef _IPF_
     uint64* (*interpreter_get_stacked_register_address) (uint64* bsp, unsigned reg);
 #endif

@@ -61,12 +61,8 @@
 Global_Env *VM_Global_State::loader_env = 0;
 
 
-// Set the default for compressed vtable pointers depending on the architecture.
-#ifdef _IPF_
-bool ManagedObject::_compressed = true;
-#else // !_IPF_
-bool ManagedObject::_compressed = false;
-#endif // !_IPF_
+// tag pointer is not allocated by default, enabled by TI
+bool ManagedObject::_tag_pointer = false;
 
 
 

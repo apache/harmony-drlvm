@@ -31,7 +31,7 @@
 
 static const jvmtiCapabilities jvmti_supported_interpreter_capabilities =
 {
-    0, // can_tag_objects
+    1, // can_tag_objects
     1, // can_generate_field_modification_events
     1, // can_generate_field_access_events
     1, // can_get_bytecodes
@@ -62,13 +62,13 @@ static const jvmtiCapabilities jvmti_supported_interpreter_capabilities =
     1, // can_generate_monitor_events
     1, // can_generate_vm_object_alloc_events
     1, // can_generate_native_method_bind_events
-    0, // can_generate_garbage_collection_events
-    0  // can_generate_object_free_events
+    1, // can_generate_garbage_collection_events
+    1  // can_generate_object_free_events
 };
 
 static const jvmtiCapabilities jvmti_supported_jit_capabilities =
 {
-    0, // can_tag_objects
+    1, // can_tag_objects
     1, // can_generate_field_modification_events
     1, // can_generate_field_access_events
     1, // can_get_bytecodes
@@ -99,8 +99,8 @@ static const jvmtiCapabilities jvmti_supported_jit_capabilities =
     1, // can_generate_monitor_events
     1, // can_generate_vm_object_alloc_events
     1, // can_generate_native_method_bind_events
-    0, // can_generate_garbage_collection_events
-    0  // can_generate_object_free_events
+    1, // can_generate_garbage_collection_events
+    1  // can_generate_object_free_events
 };
 
 // 1 means that corresponding capability can be enabled
@@ -138,8 +138,8 @@ static const jvmtiCapabilities jvmti_enable_on_live_flags =
     0, // can_generate_monitor_events
     1, // can_generate_vm_object_alloc_events
     1, // can_generate_native_method_bind_events
-    0, // can_generate_garbage_collection_events
-    0  // can_generate_object_free_events
+    1, // can_generate_garbage_collection_events
+    1  // can_generate_object_free_events
 };
 
 /*
@@ -275,6 +275,11 @@ jvmtiAddCapabilities(jvmtiEnv* env,
 
     if (capabilities_ptr->can_pop_frame)
         ti->set_global_capability(DebugUtilsTI::TI_GC_ENABLE_POP_FRAME);
+
+    if (capabilities_ptr->can_tag_objects) {
+        ti->set_global_capability(DebugUtilsTI::TI_GC_ENABLE_TAG_OBJECTS);
+        ManagedObject::_tag_pointer = true;
+    }
 
     return JVMTI_ERROR_NONE;
 }

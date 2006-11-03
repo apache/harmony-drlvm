@@ -80,6 +80,9 @@ extern jvmtiError interpreter_ti_setObject( struct jvmtiEnv_struct *,class VM_th
 
 extern unsigned int interpreter_st_get_interrupted_method_native_bit(class VM_thread *);
 extern void interpreter_enumerate_thread(class VM_thread *);
+extern void interpreter_ti_enumerate_thread(jvmtiEnv*, class VM_thread*);
+extern void interpreter_st_get_interrupted_method(struct Method * *,int64 *);
+extern void interpreter_st_get_catch_method(struct Method * *,int64 *,struct _jobject *);
 extern void interpreter_st_get_trace(VM_thread *thread, unsigned int *,struct StackTraceFrame * *);
 uint64* interpreter_get_stacked_register_address(uint64* bsp, unsigned reg);
 extern void interpreter_execute_method(Method *method, jvalue *return_value, jvalue *args);
@@ -104,6 +107,7 @@ void EXPORT JIT_init(JIT_Handle UNREF h, const char* UNREF name) {
     interpreter->interpreter_get_last_frame = &interpreter_get_last_frame;
     interpreter->interpreter_get_prev_frame = &interpreter_get_prev_frame;
     interpreter->is_frame_in_native_frame = &is_frame_in_native_frame;
+    interpreter->interpreter_ti_enumerate_thread = &interpreter_ti_enumerate_thread;
 #ifdef _IPF_
     interpreter->interpreter_get_stacked_register_address = &interpreter_get_stacked_register_address;
 #endif

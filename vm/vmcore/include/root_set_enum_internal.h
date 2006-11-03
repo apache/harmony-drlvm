@@ -35,4 +35,11 @@ void vm_enumerate_root_set_single_thread_on_stack(StackIterator* si);
 void vm_enumerate_root_set_global_refs();
 void vm_enumerate_thread(VM_thread *thread);
 
+void vm_enumerate_static_fields();
+void vm_enumerate_references_to_enqueue();
+void oh_enumerate_global_handles();
+void vm_enumerate_interned_strings();
+void vm_enumerate_root_set_mon_arrays();
+
+
 #endif // _ROOT_SET_ENUM_INTERNAL_H_

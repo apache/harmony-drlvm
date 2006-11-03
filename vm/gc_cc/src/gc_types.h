@@ -34,6 +34,7 @@
 #include <apr_atomic.h>
 #include <cxxlog.h>
 #include "slot.h"
+#include "object_layout.h"
 
 static char* gc_version_string() {
 #if (defined _DEBUG) || ! (defined NDEBUG)
@@ -179,7 +180,7 @@ class Partial_Reveal_Object {
 #endif
     }
 
-    int array_length() { return array_len; }
+    int array_length() { return ((VM_Vector*)this)->get_length(); }
 
     Partial_Reveal_Object **get_array_elements(GC_VTable_Info *gcvt) {
         assert(gcvt->is_array());

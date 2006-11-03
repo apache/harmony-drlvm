@@ -15,20 +15,38 @@
  *  limitations under the License.
  */
 /** 
- * @author Gregory Shimansky
+ * @author Salikh Zakirov
  * @version $Revision: 1.1.2.1.4.4 $
  */  
 /*
  * JVMTI heap API
  */
 
-#include "jvmti_direct.h"
-#include "jvmti_utils.h"
 #include "cxxlog.h"
 
-#include "open/gc.h"
+#include "jvmti_direct.h"
+#include "jvmti_utils.h"
 
+#include "open/gc.h"
+#include "open/vm_gc.h"
+#include "open/thread.h"
+#include "open/hythread_ext.h"
+
+#include "object_layout.h"
+#include "thread_manager.h"
 #include "suspend_checker.h"
+#include "vm_arrays.h"
+#include "object_handles.h"
+#include "vm_log.h"
+
+// private module headers
+#include "jvmti_heap.h"
+#include "jvmti_roots.h"
+#include "jvmti_tags.h"
+#include "jvmti_trace.h"
+
+// FIXME: use TLS to store ti_env
+TIEnv* ti_env;
 
 /*
  * Get Tag
@@ -42,8 +60,8 @@
  */
 jvmtiError JNICALL
 jvmtiGetTag(jvmtiEnv* env,
-            jobject UNREF object,
-            jlong* UNREF tag_ptr)
+            jobject object,
+            jlong* tag_ptr)
 {
     TRACE2("jvmti.heap", "GetTag called");
     SuspendEnabledChecker sec;
@@ -54,9 +72,26 @@ jvmtiGetTag(jvmtiEnv* env,
 
     CHECK_EVERYTHING();
 
-    //TBD
+    if (NULL == tag_ptr || !is_jobject_valid(object)) 
+        return JVMTI_ERROR_ILLEGAL_ARGUMENT;
 
-    return JVMTI_NYI;
+    TIEnv* ti_env = reinterpret_cast<TIEnv *>(env);
+
+    if (!ti_env->posessed_capabilities.can_tag_objects) {
+        return JVMTI_ERROR_MUST_POSSESS_CAPABILITY;
+    }
+
+    if (ti_env->tags == NULL) {
+        *tag_ptr = 0;
+        return JVMTI_ERROR_NONE;
+    }
+
+    tmn_suspend_disable();  // ----vv
+    Managed_Object_Handle obj = object->object;
+    *tag_ptr = ti_env->tags->get(obj);
+    tmn_suspend_enable();   // ----^^
+
+    return JVMTI_ERROR_NONE;
 }
 
 /*
@@ -70,8 +105,8 @@ jvmtiGetTag(jvmtiEnv* env,
  */
 jvmtiError JNICALL
 jvmtiSetTag(jvmtiEnv* env,
-            jobject UNREF object,
-            jlong UNREF tag)
+            jobject object,
+            jlong tag)
 {
     TRACE2("jvmti.heap", "SetTag called");
     SuspendEnabledChecker sec;
@@ -81,10 +116,34 @@ jvmtiSetTag(jvmtiEnv* env,
     jvmtiPhase phases[] = {JVMTI_PHASE_START, JVMTI_PHASE_LIVE};
 
     CHECK_EVERYTHING();
+    if (!is_jobject_valid(object)) 
+        return JVMTI_ERROR_ILLEGAL_ARGUMENT;
 
-    //TBD
+    TIEnv* ti_env = reinterpret_cast<TIEnv *>(env);
 
-    return JVMTI_NYI;
+    if (!ti_env->posessed_capabilities.can_tag_objects) {
+        return JVMTI_ERROR_MUST_POSSESS_CAPABILITY;
+    }
+
+    if (ti_env->tags == NULL) {
+        assert(ti_env->lock);
+        hymutex_lock(ti_env->lock);
+        if (ti_env->tags == NULL) {
+            ti_env->tags = new TITags;
+        }
+        hymutex_unlock(ti_env->lock);
+    }
+
+    if (ti_env->tags == NULL) {
+        return JVMTI_ERROR_OUT_OF_MEMORY;
+    }
+
+    tmn_suspend_disable();  // ----vv
+    Managed_Object_Handle obj = object->object;
+    ti_env->tags->set(obj, tag);
+    tmn_suspend_enable();   // ----^^
+
+    return JVMTI_ERROR_NONE;
 }
 
 /*
@@ -109,18 +168,65 @@ jvmtiForceGarbageCollection(jvmtiEnv* env)
 
     CHECK_EVERYTHING();
 
-    assert(hythread_is_suspend_enabled());
     // no matter how counter-intuitive,
-    // gc_force_gc() expects gc_enabled_status == disabled,
+    // gc_force_gc() expects suspend_enabled_status == disabled,
     // but, obviously, at a GC safepoint.
-    // See gc-safety (aka suspend-safety) rules explained elsewhere
-    // -salikh 2005-05-12
-    tmn_suspend_disable();
+    // for more details, see
+    // * "SAFE SUSPENSION" section of Developers' Guide
+    // * "THREAD SUSPENSION" section of Thread Manager documentation
+    hythread_suspend_disable();
     gc_force_gc();
-    tmn_suspend_enable();
+    hythread_suspend_enable();
 
-    return JVMTI_NYI;
+    return JVMTI_ERROR_NONE;
 }
+
+static jvmtiError allocate_iteration_state(TIEnv* ti_env)
+{
+    assert(NULL == ti_env->iteration_state);
+    ti_env->iteration_state = new TIIterationState;
+    TIIterationState* state = ti_env->iteration_state;
+    if (NULL == state) {
+        return JVMTI_ERROR_OUT_OF_MEMORY;
+    }
+
+    memset(state, 0, sizeof(TIIterationState));
+
+    // we trust in correct values of global values
+    // Class::heap_base and Class::heap_ceiling
+    assert((UDATA)Class::heap_base == (UDATA)gc_heap_base_address());
+    assert((UDATA)Class::heap_end == (UDATA)gc_heap_ceiling_address());
+
+    state->markbits_size = ((UDATA)Class::heap_end - (UDATA)Class::heap_base) 
+        / GC_OBJECT_ALIGNMENT / 8;
+    state->markbits = new unsigned char[state->markbits_size];
+    if (state->markbits == NULL) {
+        delete state;
+        ti_env->iteration_state = NULL;
+        return JVMTI_ERROR_OUT_OF_MEMORY;
+    }
+    state->markstack = new std::stack<ManagedObject*>;
+    if (state->markstack == NULL) {
+        delete[] state->markbits;
+        delete state;
+        ti_env->iteration_state = NULL;
+        return JVMTI_ERROR_OUT_OF_MEMORY;
+    }
+    memset(state->markbits, 0, state->markbits_size);
+    return JVMTI_ERROR_NONE;
+}
+
+static void free_iteration_state(TIEnv* ti_env)
+{
+    assert(ti_env->iteration_state);
+    assert(ti_env->iteration_state->markstack);
+    assert(ti_env->iteration_state->markbits);
+    delete ti_env->iteration_state->markstack;
+    delete[] ti_env->iteration_state->markbits;
+    delete ti_env->iteration_state;
+    ti_env->iteration_state = NULL;
+}
+
 
 /*
  * Iterate Over Objects Reachable From Object
@@ -132,9 +238,9 @@ jvmtiForceGarbageCollection(jvmtiEnv* env)
  */
 jvmtiError JNICALL
 jvmtiIterateOverObjectsReachableFromObject(jvmtiEnv* env,
-                                           jobject UNREF object,
-                                           jvmtiObjectReferenceCallback UNREF object_reference_callback,
-                                           void* UNREF user_data)
+                                           jobject object,
+                                           jvmtiObjectReferenceCallback object_ref_callback,
+                                           void* user_data)
 {
     TRACE2("jvmti.heap", "IterateOverObjectsReachableFromObject called");
     SuspendEnabledChecker sec;
@@ -145,9 +251,52 @@ jvmtiIterateOverObjectsReachableFromObject(jvmtiEnv* env,
 
     CHECK_EVERYTHING();
 
-    //TBD
+    if (!is_jobject_valid(object)) {
+        return JVMTI_ERROR_ILLEGAL_ARGUMENT;
+    }
 
-    return JVMTI_NYI;
+    TIEnv* ti_env = reinterpret_cast<TIEnv *>(env);
+    hythread_global_lock();
+
+    jvmtiError r;
+    r = allocate_iteration_state(ti_env);
+    if (r != JVMTI_ERROR_NONE) {
+        hythread_global_unlock();
+        return r;
+    }
+
+    hythread_suspend_disable(); // to keep assertions happy
+    hythread_iterator_t iterator;
+    hythread_suspend_all(&iterator, NULL);
+
+    ::ti_env = ti_env; // FIXME: use TLS to store TIEnv pointer
+
+    ti_env->iteration_state->user_data = user_data;
+    ti_env->iteration_state->object_ref_callback = object_ref_callback;
+
+    ti_env->iteration_state->markstack->push((ManagedObject*)object->object);
+    ti_trace_heap(ti_env);
+
+    free_iteration_state(ti_env);
+
+    TRACE2("ti.iterate", "iteration complete");
+    hythread_resume_all(NULL);
+    hythread_suspend_enable();
+    hythread_global_unlock();
+
+    return JVMTI_ERROR_NONE;
+}
+
+static void ti_iterate_reachable(TIEnv* ti_env, 
+        hythread_iterator_t iterator)
+{
+    // enumerate roots and the trace the heap
+    ti_enumerate_roots(ti_env, iterator);
+
+    // check if we don't need to trace heap
+    if (ti_env->iteration_state->abort) return;
+
+    ti_trace_heap(ti_env);
 }
 
 /*
@@ -163,10 +312,10 @@ jvmtiIterateOverObjectsReachableFromObject(jvmtiEnv* env,
  */
 jvmtiError JNICALL
 jvmtiIterateOverReachableObjects(jvmtiEnv* env,
-                                 jvmtiHeapRootCallback UNREF heap_root_callback,
-                                 jvmtiStackReferenceCallback UNREF stack_ref_callback,
-                                 jvmtiObjectReferenceCallback UNREF object_ref_callback,
-                                 void* UNREF user_data)
+                                 jvmtiHeapRootCallback heap_root_callback,
+                                 jvmtiStackReferenceCallback stack_ref_callback,
+                                 jvmtiObjectReferenceCallback object_ref_callback,
+                                 void* user_data)
 {
     TRACE2("jvmti.heap", "IterateOverReachableObjects called");
     SuspendEnabledChecker sec;
@@ -177,9 +326,81 @@ jvmtiIterateOverReachableObjects(jvmtiEnv* env,
 
     CHECK_EVERYTHING();
 
-    //TBD
+    TIEnv* ti_env = reinterpret_cast<TIEnv *>(env);
+    hythread_global_lock();
 
-    return JVMTI_NYI;
+    jvmtiError r;
+    r = allocate_iteration_state(ti_env);
+    if (r != JVMTI_ERROR_NONE) {
+        hythread_global_unlock();
+        return r;
+    }
+
+    hythread_suspend_disable(); // to keep assertions happy
+    hythread_iterator_t iterator;
+    hythread_suspend_all(&iterator, NULL);
+
+    ::ti_env = ti_env; // FIXME: use TLS to store TIEnv pointer
+
+    ti_env->iteration_state->user_data = user_data;
+    ti_env->iteration_state->heap_root_callback = heap_root_callback;
+    ti_env->iteration_state->stack_ref_callback = stack_ref_callback;
+    ti_env->iteration_state->object_ref_callback = object_ref_callback;
+
+    ti_iterate_reachable(ti_env, iterator);
+
+    free_iteration_state(ti_env);
+
+    TRACE2("ti.iterate", "iteration complete");
+    hythread_resume_all(NULL);
+    hythread_suspend_enable();
+    hythread_global_unlock();
+
+    return JVMTI_ERROR_NONE;
+}
+
+bool vm_iterate_object(Managed_Object_Handle obj)
+{
+    TIEnv* ti_env = ::ti_env;  // FIXME: use TLS to store ti_env
+
+    TRACE2("vm.iterate", "vm_iterate_object " << (ManagedObject*)obj);
+    assert(ti_env->tags);
+
+    jlong class_tag = ti_get_object_class_tag(ti_env, obj);
+    tag_pair** tp = ti_get_object_tptr(obj);
+    jlong tag = (*tp != NULL ? (*tp)->tag : 0);
+    jlong size = ti_get_object_size(ti_env, obj);
+
+    TIIterationState *state = ti_env->iteration_state;
+    assert(state);
+    void* user_data = state->user_data;
+    jvmtiHeapObjectCallback heap_object_callback
+        = state->heap_object_callback;
+
+    if (state->class_filter != NULL &&
+            ((ManagedObject*)obj)->vt()->clss != state->class_filter) {
+        // do not run user callback if we were
+        // asked to iterate instances of specified class
+        return true;
+    }
+
+    if (state->object_filter == JVMTI_HEAP_OBJECT_UNTAGGED && tag != 0) {
+        // do not run user callback for tagged objects
+        // if we were asked for untagged objects only
+        return true;
+    }
+
+    // in JVMTI_HEAP_OBJECT_TAGGED case, we should only get tagged objects
+    assert(!(state->object_filter == JVMTI_HEAP_OBJECT_TAGGED && tag == 0));
+
+    jvmtiIterationControl r =
+        heap_object_callback(class_tag, size, &tag, user_data);
+
+    // update tag value or remove tag
+    ti_env->tags->update(obj, tag, tp);
+
+    // return true to continue iteration, false to terminate it
+    return (JVMTI_ITERATION_CONTINUE == r);
 }
 
 /*
@@ -192,9 +413,9 @@ jvmtiIterateOverReachableObjects(jvmtiEnv* env,
  */
 jvmtiError JNICALL
 jvmtiIterateOverHeap(jvmtiEnv* env,
-                     jvmtiHeapObjectFilter UNREF object_filter,
-                     jvmtiHeapObjectCallback UNREF heap_object_callback,
-                     void* UNREF user_data)
+                     jvmtiHeapObjectFilter object_filter,
+                     jvmtiHeapObjectCallback heap_object_callback,
+                     void* user_data)
 {
     TRACE2("jvmti.heap", "IterateOverHeap called");
     SuspendEnabledChecker sec;
@@ -205,9 +426,50 @@ jvmtiIterateOverHeap(jvmtiEnv* env,
 
     CHECK_EVERYTHING();
 
-    //TBD
+    TIEnv* ti_env = reinterpret_cast<TIEnv *>(env);
 
-    return JVMTI_NYI;
+
+    // heap iteration requires stop-the-world
+    hythread_global_lock();
+
+    assert(NULL == ti_env->iteration_state);
+    ti_env->iteration_state = new TIIterationState;
+    TIIterationState* state = ti_env->iteration_state;
+    if (NULL == state) {
+        hythread_global_unlock();
+        return JVMTI_ERROR_OUT_OF_MEMORY;
+    }
+
+    memset(state, 0, sizeof(TIIterationState));
+
+    hythread_suspend_disable(); // to keep assertions happy
+    hythread_iterator_t  iterator;
+    hythread_suspend_all(&iterator, NULL);
+    TRACE2("ti.iterate", "suspended all threads");
+    
+    ::ti_env = ti_env; // FIXME: use TLS to store TIEnv pointer
+    state->user_data = user_data;
+    state->heap_object_callback = heap_object_callback;
+    state->object_filter = object_filter;
+
+    if (JVMTI_HEAP_OBJECT_TAGGED == object_filter) {
+        // we iterate tagged objects directly from tags structure
+        if (ti_env->tags)
+            ti_env->tags->iterate();
+    } else {
+        // iterating untagged objects requires full heap iteration
+        gc_iterate_heap();
+    }
+
+    delete ti_env->iteration_state;
+    ti_env->iteration_state = NULL;
+
+    TRACE2("ti.iterate", "iteration complete");
+    hythread_resume_all(NULL);
+    hythread_suspend_enable();
+    hythread_global_unlock();
+
+    return JVMTI_ERROR_NONE;
 }
 
 /*
@@ -221,10 +483,10 @@ jvmtiIterateOverHeap(jvmtiEnv* env,
  */
 jvmtiError JNICALL
 jvmtiIterateOverInstancesOfClass(jvmtiEnv* env,
-                                 jclass UNREF klass,
-                                 jvmtiHeapObjectFilter UNREF object_filter,
-                                 jvmtiHeapObjectCallback UNREF heap_object_callback,
-                                 void* UNREF user_data)
+                                 jclass klass,
+                                 jvmtiHeapObjectFilter object_filter,
+                                 jvmtiHeapObjectCallback heap_object_callback,
+                                 void* user_data)
 {
     TRACE2("jvmti.heap", "IterateOverInstancesOfClass called");
     SuspendEnabledChecker sec;
@@ -235,9 +497,52 @@ jvmtiIterateOverInstancesOfClass(jvmtiEnv* env,
 
     CHECK_EVERYTHING();
 
-    //TBD
+    TIEnv* ti_env = reinterpret_cast<TIEnv *>(env);
 
-    return JVMTI_NYI;
+
+    // heap iteration requires stop-the-world
+    TRACE2("ti.iterate", "acquire tm lock");
+    hythread_global_lock();
+    TRACE2("ti.iterate", "got tm lock");
+
+    assert(NULL == ti_env->iteration_state);
+    ti_env->iteration_state = new TIIterationState;
+    TIIterationState* state = ti_env->iteration_state;
+    if (NULL == state) {
+        hythread_global_unlock();
+        return JVMTI_ERROR_OUT_OF_MEMORY;
+    }
+
+    memset(state, 0, sizeof(TIIterationState));
+
+    hythread_suspend_disable(); // to keep assertions happy
+    hythread_iterator_t  iterator;
+    hythread_suspend_all(&iterator, NULL);
+    TRACE2("ti.iterate", "suspended all threads");
+    
+    ::ti_env = ti_env; // FIXME: use TLS to store TIEnv pointer
+    state->user_data = user_data;
+    state->heap_object_callback = heap_object_callback;
+    state->object_filter = object_filter;
+    state->class_filter = jclass_to_struct_Class(klass);
+
+    if (JVMTI_HEAP_OBJECT_TAGGED == object_filter) {
+        // we iterate tagged objects directly from tags structure
+        ti_env->tags->iterate();
+    } else {
+        // iterating untagged objects requires full heap iteration
+        gc_iterate_heap();
+    }
+
+    delete ti_env->iteration_state;
+    ti_env->iteration_state = NULL;
+
+    TRACE2("ti.iterate", "iteration complete");
+    hythread_resume_all(NULL);
+    hythread_suspend_enable();
+    hythread_global_unlock();
+
+    return JVMTI_ERROR_NONE;
 }
 
 /*
@@ -250,11 +555,11 @@ jvmtiIterateOverInstancesOfClass(jvmtiEnv* env,
  */
 jvmtiError JNICALL
 jvmtiGetObjectsWithTags(jvmtiEnv* env,
-                        jint UNREF tag_count,
-                        const jlong* UNREF tags,
-                        jint* UNREF count_ptr,
-                        jobject** UNREF object_result_ptr,
-                        jlong** UNREF tag_result_ptr)
+                        jint tag_count,
+                        const jlong* tags,
+                        jint* count_ptr,
+                        jobject** object_result_ptr,
+                        jlong** tag_result_ptr)
 {
     TRACE2("jvmti.heap", "GetObjectsWithTags called");
     SuspendEnabledChecker sec;
@@ -264,8 +569,63 @@ jvmtiGetObjectsWithTags(jvmtiEnv* env,
     jvmtiPhase phases[] = {JVMTI_PHASE_LIVE};
 
     CHECK_EVERYTHING();
+    if (count_ptr == NULL || tags == NULL || tag_count <= 0 ||
+            (object_result_ptr == NULL && tag_result_ptr == NULL)) {
+        return JVMTI_ERROR_ILLEGAL_ARGUMENT;
+    }
 
-    //TBD
+    hythread_suspend_disable(); // ---------------vv
 
-    return JVMTI_NYI;
+    std::set<jlong> tag_set;
+    std::list<tag_pair> objects;
+    jvmtiError error = JVMTI_ERROR_NONE;
+
+    int i;
+    for (i = 0; i < tag_count; i++) {
+        tag_set.insert(tags[i]);
+    }
+
+    ti_env->tags->get_objects_with_tags(tag_set, objects);
+    int count = objects.size();
+    *count_ptr = count;
+    if (count > 0) {
+        if (object_result_ptr != NULL) {
+            jvmtiError r = _allocate(count * sizeof(jobject),
+                    (unsigned char **)object_result_ptr);
+            if (r == JVMTI_ERROR_NONE) {
+                memset(*object_result_ptr, 0, count * sizeof(jobject));
+                std::list<tag_pair>::iterator o;
+                for (i = 0, o = objects.begin(); o != objects.end(); o++, i++) {
+                    jobject jobj = oh_allocate_local_handle();
+                    if (jobj) jobj->object = (ManagedObject*)o->obj;
+                    else error = JVMTI_ERROR_OUT_OF_MEMORY;
+                    (*object_result_ptr)[i] = jobj;
+                }
+            } else {
+                error = r;
+            }
+            if (r != JVMTI_ERROR_NONE && (*object_result_ptr)) {
+                _deallocate((unsigned char *)*object_result_ptr);
+                *object_result_ptr = NULL;
+            }
+        }
+
+        if (tag_result_ptr != NULL && error == JVMTI_ERROR_NONE) {
+            jvmtiError r = _allocate(count * sizeof(jlong),
+                    (unsigned char **)tag_result_ptr);
+            if (JVMTI_ERROR_NONE == r) {
+                memset(*tag_result_ptr, 0, count * sizeof(jlong));
+                std::list<tag_pair>::iterator o;
+                for (i = 0, o = objects.begin(); o != objects.end(); o++, i++) {
+                    (*tag_result_ptr)[i] = o->tag;
+                }
+            } else {
+                error = r;
+            }
+        }
+    }
+    
+    hythread_suspend_enable();  // ---------------^^
+    
+    return error;
 }
