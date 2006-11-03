@@ -1813,48 +1813,49 @@ void jvmti_send_thread_start_end_event(int is_start)
     if (!ti->isEnabled())
         return;
 
+    if (JVMTI_PHASE_LIVE == ti->getPhase() ||
+        JVMTI_PHASE_START == ti->getPhase())
+    {
+        process_jvmti_event(
+            (is_start ? JVMTI_EVENT_THREAD_START : JVMTI_EVENT_THREAD_END),
+            (is_start ? 0 : 1), 0);
+    }
+
+    if (!ti->is_single_step_enabled())
+        return;
+
     if (is_start)
     {
-        process_jvmti_event(JVMTI_EVENT_THREAD_START, 0, 0);
+        // Init single step state for the thread
+        VM_thread *vm_thread = p_TLS_vmthread;
+        LMAutoUnlock lock(ti->vm_brpt->get_lock());
 
-        if (ti->is_single_step_enabled())
-        {
-            // Init single step state for the thread
-            VM_thread *vm_thread = p_TLS_vmthread;
-            LMAutoUnlock lock(ti->vm_brpt->get_lock());
+        jvmtiError UNREF errorCode = _allocate(sizeof(JVMTISingleStepState),
+            (unsigned char **)&vm_thread->ss_state);
+        assert(JVMTI_ERROR_NONE == errorCode);
 
-            jvmtiError UNREF errorCode = _allocate(sizeof(JVMTISingleStepState),
-                (unsigned char **)&vm_thread->ss_state);
-            assert(JVMTI_ERROR_NONE == errorCode);
+        vm_thread->ss_state->predicted_breakpoints = NULL;
 
-            vm_thread->ss_state->predicted_breakpoints = NULL;
-
-            // There is no need to set a breakpoint in a thread which
-            // is started inside of jvmti_send_thread_start_end_event() function.
-            // This function is called when no java code in the new thread is
-            // executed yet, so this function just sets single step state for this
-            // thread. When this thread will be ran, calling the first java method
-            // will set a breakpoint on the first bytecode if this mehod.
-        }
+        // There is no need to set a breakpoint in a thread which
+        // is started inside of jvmti_send_thread_start_end_event() function.
+        // This function is called when no java code in the new thread is
+        // executed yet, so this function just sets single step state for this
+        // thread. When this thread will be ran, calling the first java method
+        // will set a breakpoint on the first bytecode if this mehod.
     }
     else
     {
-        process_jvmti_event(JVMTI_EVENT_THREAD_END, 1, 0);
+        // Shut down single step state for the thread
+        VM_thread *vm_thread = p_TLS_vmthread;
+        LMAutoUnlock lock(ti->vm_brpt->get_lock());
 
-        if (ti->is_single_step_enabled())
-        {
-            // Shut down single step state for the thread
-            VM_thread *vm_thread = p_TLS_vmthread;
-            LMAutoUnlock lock(ti->vm_brpt->get_lock());
-
-            jvmti_remove_single_step_breakpoints(ti, vm_thread);
-            if( vm_thread->ss_state ) {
-                if( vm_thread->ss_state->predicted_breakpoints ) {
-                    ti->vm_brpt->release_intf(vm_thread->ss_state->predicted_breakpoints);
-                }
-                _deallocate((unsigned char *)vm_thread->ss_state);
-                vm_thread->ss_state = NULL;
+        jvmti_remove_single_step_breakpoints(ti, vm_thread);
+        if( vm_thread->ss_state ) {
+            if( vm_thread->ss_state->predicted_breakpoints ) {
+                ti->vm_brpt->release_intf(vm_thread->ss_state->predicted_breakpoints);
             }
+            _deallocate((unsigned char *)vm_thread->ss_state);
+            vm_thread->ss_state = NULL;
         }
     }
 }
