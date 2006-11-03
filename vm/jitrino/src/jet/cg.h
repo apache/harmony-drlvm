@@ -719,6 +719,19 @@ public:
      */
     bool    vis_stack(const Val& s) const;
     /**
+     * @brief Tests whether the operand stack at the given \c depth 
+     * is memory <b>and is located in the operand stack area in the stack 
+     * frame</b>.
+     * In other words, it's memory and represents neither a local variable, 
+     * nor a field, nor any other value stored in memory, but exactly
+     * the operand stack element.
+     */
+    bool    vis_stack(unsigned depth) const
+    {
+        return vis_stack(m_jframe->dip(depth));
+    }
+
+    /**
      * @brief Returns \b true if the local variable is not stored in the 
      * method's stack frame, but rather a stack slot of input argument is 
      * reused.
