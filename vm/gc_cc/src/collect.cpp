@@ -33,6 +33,9 @@ reference_vector weak_references;
 reference_vector phantom_references;
 reference_vector to_finalize;
 
+slots_vector weak_roots;
+slots_vector phantom_roots;
+
 std::vector<unsigned char*> pinned_areas;
 fast_list<unsigned char*, 1024> pinned_areas_unsorted;
 unsigned pinned_areas_pos = 0;
@@ -192,6 +195,35 @@ void finalize_objects() {
     to_finalize.clear();
 }
 
+void process_special_roots(slots_vector& array) {
+    for(slots_vector::iterator i = array.begin();
+            i != array.end(); ++i) {
+        Partial_Reveal_Object **ref = *i;
+
+        Partial_Reveal_Object* obj = *ref;
+
+        if (obj == 0) {
+            // reference already cleared
+            continue;
+        }
+
+        int info = obj->obj_info();
+        if (info & heap_mark_phase) {
+            // object marked, is it moved?
+            int vt = obj->vt();
+            if (!(vt & FORWARDING_BIT)) continue;
+            // moved, updating referent field
+            *ref = fw_to_pointer(vt & ~FORWARDING_BIT);
+            assert((((POINTER_SIZE_INT)*ref) & 3) == 0);
+            continue;
+        }
+
+        // object not marked, clear ref
+        *ref = 0;
+    }
+    array.clear();
+}
+
 void process_special_references(reference_vector& array) {
     for(reference_vector::iterator i = array.begin();
             i != array.end(); ++i) {
@@ -279,11 +311,13 @@ finish_slide_gc(int size, int stage) {
     if (stage == 0) {
         gc_slide_process_special_references(soft_references);
         gc_slide_process_special_references(weak_references);
+        gc_slide_process_special_roots(weak_roots);
         process_finalizable_objects();
     }
     gc_slide_process_special_references(soft_references);
     gc_slide_process_special_references(weak_references);
     gc_slide_process_special_references(phantom_references);
+    gc_slide_process_special_roots(phantom_roots);
 
     TIME(gc_slide_move_all,());
     roots_update();
@@ -344,6 +378,7 @@ unsigned char *copy_gc(int size) {
     }
     process_special_references(soft_references);
     process_special_references(weak_references);
+    process_special_roots(weak_roots);
     process_finalizable_objects();
     if (gc_type == GC_SLIDE_COMPACT) {
         unsigned char *res = finish_slide_gc(size, 1);
@@ -353,6 +388,7 @@ unsigned char *copy_gc(int size) {
     process_special_references(soft_references);
     process_special_references(weak_references);
     process_special_references(phantom_references);
+    process_special_roots(phantom_roots);
     roots_update();
     finalize_objects();
 
@@ -380,14 +416,16 @@ void force_gc() {
     TIME(enumerate_universe,());
     TIME(process_special_references,(soft_references));
     TIME(process_special_references,(weak_references));
+    TIME(process_special_roots,(weak_roots));
     TIME(process_finalizable_objects,());
     TIME(process_special_references,(soft_references));
     TIME(process_special_references,(weak_references));
     TIME(process_special_references,(phantom_references));
+    TIME(process_special_roots,(phantom_roots));
     roots_update();
     TIME(finalize_objects,());
 
-    heap_mark_phase ^= 3;
+    heap_mark_phase ^= MARK_BITS; // toggle mark bits
     // reset thread-local allocation areas
     //clear_thread_local_buffers();
 
@@ -395,3 +433,14 @@ void force_gc() {
     notify_gc_end();
 }
 
+void gc_add_weak_root_set_entry(Managed_Object_Handle *_slot, 
+    Boolean is_pinned, Boolean is_short_weak) {
+    Partial_Reveal_Object **slot = (Partial_Reveal_Object**) _slot;
+    (*slot)->vt();
+    assert(!is_pinned);
+    if (is_short_weak) {
+        weak_roots.push_back(slot);
+    } else {
+        phantom_roots.push_back(slot);
+    }
+}

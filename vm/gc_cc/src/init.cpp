@@ -63,6 +63,7 @@ size_t min_heap_size;
 bool ignore_finalizers = false;
 bool remember_root_set = false;
 const char *lp_hint = NULL;
+bool jvmti_heap_iteration = false;
 
 static size_t parse_size_string(const char* size_string) {
     size_t len = strlen(size_string);
@@ -177,6 +178,20 @@ static void parse_configuration_properties() {
     if (get_property_value_boolean("gc.remember_root_set", false)) {
         remember_root_set = true;
         INFO("GC will retrieve root set before any modification in heap");
+    }
+
+    if (get_property_value_boolean("gc.heap_iteration", false)) {
+        jvmti_heap_iteration = true;
+        INFO("GC jvmti heap iteration enabled");
+    }
+}
+
+void gc_vm_initialized() {
+    TRACE2("gc.init", "gc_vm_initialized");
+
+    if (get_property_value_boolean("gc.heap_iteration", false)) {
+        jvmti_heap_iteration = true;
+        INFO("GC jvmti heap iteration enabled");
     }
 }
 

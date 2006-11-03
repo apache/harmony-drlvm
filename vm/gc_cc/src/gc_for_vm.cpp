@@ -81,16 +81,6 @@ Boolean gc_supports_frontier_allocation(unsigned *offset_of_current, unsigned *o
     return false;
 }
 
-void gc_vm_initialized() {
-    static int UNUSED count = 0;
-    TRACE2("gc.init2", "gc_vm_initialized called (" << count++ << ")");
-}
-
-void gc_add_weak_root_set_entry(Managed_Object_Handle *slot, 
-    Boolean is_pinned, Boolean is_short_weak) {
-    TRACE2("gc.enum", "gc_add_weak_root_set_entry - EMPTY");
-    abort();
-}
 //GCExport void gc_add_root_set_entry_managed_pointer(void **slot,
 //                                                    Boolean is_pinned); //  optional
 
@@ -498,4 +488,68 @@ void *gc_heap_ceiling_address() {
 void gc_finalize_on_exit() {
     process_finalizible_objects_on_exit();
 }
+
+/**
+ * Iterates all objects in the heap.
+ * This function calls vm_iterate_object() for each
+ * iterated object.
+ * Used for JVMTI Heap Iteration.
+ * Should be called only in stop-the-world setting
+ *
+ * @see vm_gc.h#vm_iterate_object()
+ */
+
+#ifdef GC_YUK_JVMTI_HEAP_ITERATION
+
+static bool gc_iterate_region(Ptr pos, Ptr limit) {
+    while (pos < limit) {
+        int32 vt = *(int32*)pos;
+        if (vt == 0) {
+            pos += sizeof(int32);
+            continue;
+        }
+        Partial_Reveal_Object *obj = (Partial_Reveal_Object*) pos;
+        obj->valid();
+        bool cont = vm_iterate_object((Managed_Object_Handle) obj);
+        if (!cont) return false;
+
+        pos += get_object_size(obj, obj->vtable()->get_gcvt());
+
+        if (obj->obj_info() & HASHCODE_IS_ALLOCATED_BIT) {
+            pos += sizeof(int32);
+        }
+    }
+    return true;
+}
+
+void gc_iterate_heap() {
+    // data structures in not consistent for heap iteration
+    if (!jvmti_heap_iteration) return;
+    bool cont;
+
+    // iterate over old objects
+    cont = gc_iterate_region(heap.base, heap.old_objects.pos);
+    if (!cont) return;
+
+    // iterate over new objects
+    cont = gc_iterate_region(heap.old_objects.end, heap.pos);
+    if (!cont) return;
+
+    // iterate over pinned objects in evacuation area
+    for(unsigned opos = old_pinned_areas_pos; opos < old_pinned_areas.size(); opos += 2) {
+        Partial_Reveal_Object *obj = (Partial_Reveal_Object*) old_pinned_areas[opos];
+        obj->valid();
+        cont = vm_iterate_object((Managed_Object_Handle) obj);
+        if (!cont) return;
+    }
+
+    // iterate over pinned objects in new objects area
+    for (unsigned pos = pinned_areas_pos; pos < pinned_areas.size(); pos += 2) {
+        Partial_Reveal_Object *obj = (Partial_Reveal_Object*) pinned_areas[pos];
+        obj->valid();
+        cont = vm_iterate_object((Managed_Object_Handle) obj);
+        if (!cont) return;
+    }
+}
+#endif
 

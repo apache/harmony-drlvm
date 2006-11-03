@@ -109,6 +109,7 @@ struct GC_Thread_Info {
 extern const char *lp_hint; // Use large pages
 extern bool ignore_finalizers;
 extern bool remember_root_set;
+extern bool jvmti_heap_iteration;
 
 #define field_offset(type,field) ((POINTER_SIZE_INT)&((type*)0)->field)
 
@@ -359,6 +360,16 @@ inline void check_hashcode(int hash) {
 inline int gen_hashcode(void *addr) { return (int)(POINTER_SIZE_INT)addr; }
 inline void check_hashcode(int hash) {}
 #endif /* DEBUG_HASHCODE */
+
+#define GC_YUK_JVMTI_HEAP_ITERATION
+#ifdef GC_YUK_JVMTI_HEAP_ITERATION
+static inline void clear_mem_for_heap_iteration(void *pos, size_t size) {
+    if (!jvmti_heap_iteration) return;
+    memset(pos, 0, size);
+}
+#else
+static inline void clear_mem_for_heap_iteration(void *pos, size_t size) {}
+#endif
 
 #endif /* __GC_TYPES_H__ */
 

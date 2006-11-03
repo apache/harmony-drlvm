@@ -99,6 +99,7 @@ bool place_into_old_objects(unsigned char *&newpos,
     TRACE2("gc.pin.gc", "old area: reached heap.old_objects.pos_limit =" << heap.old_objects.pos_limit);
 
 
+    clear_mem_for_heap_iteration(newpos, heap.old_objects.pos_limit - newpos);
 
     // object doesn't feet in old objects region, skip possibly
     // pinned objects in old objects region
@@ -134,6 +135,7 @@ bool place_into_old_objects(unsigned char *&newpos,
             assert(((POINTER_SIZE_INT) endpos & (GC_OBJECT_ALIGNMENT - 1)) == 0);
             return true;
         }
+        clear_mem_for_heap_iteration(newpos, heap.old_objects.pos_limit - newpos);
     }
     return false;
 }
@@ -160,10 +162,6 @@ static bool gc_copy_process_reference(Slot slot, int phase) {
         return true;
     }
     obj->valid();
-
-    VMEXPORT Class_Handle vtable_get_class(VTable_Handle vh);
-    assert(class_get_vtable(vtable_get_class((VTable_Handle)obj->vtable())) == (VTable_Handle)obj->vtable());
-    TRACE2("gc.debug", "0x" << obj << " is " << class_get_name(vtable_get_class((VTable_Handle)obj->vtable())));
 
     obj->obj_info() = (info & ~MARK_BITS) | phase;
 

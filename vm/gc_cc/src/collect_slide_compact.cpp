@@ -298,6 +298,14 @@ void gc_slide_move_all() {
 
                     // 4/8 bytes reserved for hash
                     while (compact_pos + size > compact_pos_limit) {
+
+                        if (compact_pos == pos) {
+                            break;
+                        }
+
+                        assert(compact_pos_limit <= pos);
+                        clear_mem_for_heap_iteration(compact_pos, compact_pos_limit - compact_pos);
+
                         assert(pinned_areas_pos < pinned_areas.size());
                         compact_pos = pinned_areas[pinned_areas_pos];
                         compact_pos_limit = pinned_areas[pinned_areas_pos+1];
@@ -306,16 +314,15 @@ void gc_slide_move_all() {
                     
                     Partial_Reveal_Object *newobj;
 
-                    if (compact_pos >= pos) {
+                    assert(compact_pos <= pos);
+
+                    if (compact_pos == pos) {
                         newobj = obj;
                         process_reference_queue(obj, obj);
+
                         unsigned info = obj->obj_info();
-                        if (compact_pos == pos) {
-                            compact_pos += size +
-                                (((info & HASHCODE_IS_ALLOCATED_BIT) != 0) ? GC_OBJECT_ALIGNMENT : 0);
-                        } else {
-                            assert(compact_pos >= pos + size);
-                        }
+                        compact_pos += size +
+                            (((info & HASHCODE_IS_ALLOCATED_BIT) != 0) ? GC_OBJECT_ALIGNMENT : 0);
                     } else {
                         unsigned char *newpos = compact_pos;
                         compact_pos += size;
@@ -611,6 +618,34 @@ void gc_slide_process_special_references(reference_vector& array) {
             update_forwarded_reference(obj, root);
         } else if (is_compaction_object(obj)) {
             enqueue_reference(obj, root);
+        }
+    }
+    array.clear();
+}
+
+void gc_slide_process_special_roots(slots_vector& array) {
+    for(slots_vector::iterator i = array.begin();
+            i != array.end(); ++i) {
+        Partial_Reveal_Object **ref = *i;
+        Partial_Reveal_Object* refobj = *ref;
+
+        if (refobj == 0) {
+            // reference already cleared, no post processing needed
+            continue;
+        }
+
+        if (is_object_marked(refobj)) {
+            //assert(mark_bit_is_set(refobj) || !is_compaction_object(refobj) || is_forwarded_object(refobj));
+
+            Slot root = make_direct_root(ref);
+
+            if (is_forwarded_object(refobj)) {
+                update_forwarded_reference(refobj, root);
+            } else if (is_compaction_object(refobj)) {
+                enqueue_reference(refobj, root);
+            }
+        } else {
+            *ref = NULL;
         }
     }
     array.clear();
