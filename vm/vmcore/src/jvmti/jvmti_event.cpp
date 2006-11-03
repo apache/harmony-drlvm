@@ -1828,6 +1828,13 @@ void jvmti_send_thread_start_end_event(int is_start)
             assert(JVMTI_ERROR_NONE == errorCode);
 
             vm_thread->ss_state->predicted_breakpoints = NULL;
+
+            // There is no need to set a breakpoint in a thread which
+            // is started inside of jvmti_send_thread_start_end_event() function.
+            // This function is called when no java code in the new thread is
+            // executed yet, so this function just sets single step state for this
+            // thread. When this thread will be ran, calling the first java method
+            // will set a breakpoint on the first bytecode if this mehod.
         }
     }
     else

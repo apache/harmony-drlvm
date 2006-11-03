@@ -906,6 +906,9 @@ jvmtiError DebugUtilsTI::jvmti_single_step_start(void)
 
     if( single_step_enabled ) {
         // single step is already enabled
+        tm_ret = hythread_resume_all(NULL);
+        if (TM_ERROR_NONE != tm_ret)
+            return JVMTI_ERROR_INTERNAL;
         return JVMTI_ERROR_NONE;
     }
 
@@ -968,6 +971,7 @@ jvmtiError DebugUtilsTI::jvmti_single_step_stop(void)
         // single step is already disabled
         return JVMTI_ERROR_NONE;
     }
+
     // Suspend all threads except current
     IDATA tm_ret = hythread_suspend_all(&threads_iterator, NULL);
     if (TM_ERROR_NONE != tm_ret)
@@ -979,6 +983,9 @@ jvmtiError DebugUtilsTI::jvmti_single_step_stop(void)
 
     if( !single_step_enabled ) {
         // single step is already disabled
+        tm_ret = hythread_resume_all(NULL);
+        if (TM_ERROR_NONE != tm_ret)
+            return JVMTI_ERROR_INTERNAL;
         return JVMTI_ERROR_NONE;
     }
 
