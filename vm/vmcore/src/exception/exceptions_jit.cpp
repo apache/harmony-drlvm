@@ -288,7 +288,8 @@ static void exn_propagate_exception(
 
                 // Create exception if necessary
                 if (!*exn_obj) {
-                    if (handler->is_exc_obj_dead()) {
+                    if (handler->is_exc_obj_dead()
+                            && !VM_Global_State::loader_env->TI->isEnabled()) {
 #ifdef VM_STATS
                         VM_Statistics::get_vm_stats().num_exceptions_object_not_created++;
 #endif // VM_STATS
