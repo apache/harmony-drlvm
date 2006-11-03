@@ -60,7 +60,21 @@ jvmtiGetFieldName(jvmtiEnv* env,
     if (! is_valid_class_object(klass))
         return JVMTI_ERROR_INVALID_CLASS;
 
+    Class *cl = jclass_to_struct_Class(klass);
+    if( cl == NULL ) return JVMTI_ERROR_NULL_POINTER;
+
     if( !field ) return JVMTI_ERROR_INVALID_FIELDID; // (25)
+
+    bool present = false;
+    for( unsigned i = 0; i < cl->n_fields; i++ ) {
+        if( (jfieldID)&(cl->fields[i]) == field ) {
+            present = true;
+            break;
+        }
+    }
+
+    if( !present )
+        return JVMTI_ERROR_INVALID_FIELDID;
 
     char* fld_name;
     char* fld_sig;
@@ -125,8 +139,23 @@ jvmtiGetFieldDeclaringClass(jvmtiEnv* env,
 
     if (! is_valid_class_object(klass))
         return JVMTI_ERROR_INVALID_CLASS;
+    
+    Class *cl = jclass_to_struct_Class(klass);
+    if( cl == NULL ) return JVMTI_ERROR_NULL_POINTER;
 
     if( !field ) return JVMTI_ERROR_INVALID_FIELDID;
+
+    bool present = false;
+    for( unsigned i = 0; i < cl->n_fields; i++ ) {
+        if( (jfieldID)&(cl->fields[i]) == field ) {
+            present = true;
+            break;
+        }
+    }
+
+    if( !present )
+        return JVMTI_ERROR_INVALID_FIELDID;
+
     if( !declaring_class_ptr ) return JVMTI_ERROR_NULL_POINTER;
 
     Class* cls = reinterpret_cast<Field*>(field)->get_class();
@@ -164,8 +193,23 @@ jvmtiGetFieldModifiers(jvmtiEnv* env,
 
     if (! is_valid_class_object(klass))
         return JVMTI_ERROR_INVALID_CLASS;
+    
+    Class *cl = jclass_to_struct_Class(klass);
+    if( cl == NULL ) return JVMTI_ERROR_NULL_POINTER;
 
     if( !field ) return JVMTI_ERROR_INVALID_FIELDID;
+
+    bool present = false;
+    for( unsigned i = 0; i < cl->n_fields; i++ ) {
+        if( (jfieldID)&(cl->fields[i]) == field ) {
+            present = true;
+            break;
+        }
+    }
+
+    if( !present )
+        return JVMTI_ERROR_INVALID_FIELDID;
+
     if( !modifiers_ptr ) return JVMTI_ERROR_NULL_POINTER;
 
     *modifiers_ptr = 0;
