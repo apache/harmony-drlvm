@@ -254,11 +254,13 @@ BBPolling::getOrCreateTLSBaseReg(Edge* e)
         return tlsBaseReg;
     } else {
 
+        Type* tlsBaseType;
 #ifdef _EM64T_              
-        tlsBaseReg = irManager.newOpnd(irManager.getTypeManager().getUnmanagedPtrType(irManager.getTypeManager().getIntPtrType()), Constraint(OpndKind_GPReg));
+        tlsBaseType = irManager.getTypeManager().getUnmanagedPtrType(irManager.getTypeManager().getIntPtrType());
+        tlsBaseReg = irManager.newOpnd(tlsBaseType, Constraint(OpndKind_GPReg));
 #else
-        Type* typeInt32 = irManager.getTypeManager().getPrimitiveType(Type::Int32);
-        tlsBaseReg = irManager.newOpnd(typeInt32, Constraint(RegName_EAX)|
+        tlsBaseType = irManager.getTypeManager().getPrimitiveType(Type::Int32);
+        tlsBaseReg = irManager.newOpnd(tlsBaseType, Constraint(RegName_EAX)|
                                                              RegName_EBX |
                                                              RegName_ECX |
                                                              RegName_EDX |
@@ -274,15 +276,18 @@ BBPolling::getOrCreateTLSBaseReg(Edge* e)
                                              Opnd::RuntimeInfo::Kind_HelperAddress,
                                             (void*)CompilationInterface::Helper_GetTLSBase
                                            );
-         Opnd* tlsBase  = irManager.newOpnd(typeInt32);
+         Opnd* tlsBase  = irManager.newOpnd(tlsBaseType);
          bbpFlagAddrBlock->appendInst(irManager.newCallInst(target, &CallingConvention_STDCALL, 0, NULL, tlsBase));
 #else // PLATFORM_POSIX
+#ifdef _EM64T_
+#error "BBP not implemented on windows/em64t"
+#endif
         // TLS base can be obtained from [fs:0x14]
-        Opnd* tlsBase = irManager.newMemOpnd(typeInt32, MemOpndKind_Any, NULL, 0x14, RegName_FS);
+        Opnd* tlsBase = irManager.newMemOpnd(tlsBaseType, MemOpndKind_Any, NULL, 0x14, RegName_FS);
 #endif // PLATFORM_POSIX
 
         if (version == 4 || version == 6) {
-            Opnd * offset = irManager.newImmOpnd(typeInt32, gcFlagOffsetOffset);
+            Opnd * offset = irManager.newImmOpnd(tlsBaseType, gcFlagOffsetOffset);
             bbpFlagAddrBlock->appendInst(irManager.newInstEx(Mnemonic_ADD, 1, tlsBaseReg, tlsBase, offset));
         } else {
             bbpFlagAddrBlock->appendInst(irManager.newInst(Mnemonic_MOV, tlsBaseReg, tlsBase));
