@@ -41,9 +41,19 @@ vm_execute_java_method_array(jmethodID method, jvalue *result, jvalue *args) {
     assert(NULL != VM_Global_State::loader_env->em_interface);
     assert(NULL != VM_Global_State::loader_env->em_interface->ExecuteMethod);
 
+    // Start single stepping a new Java method
     DebugUtilsTI *ti = VM_Global_State::loader_env->TI;
-    if (ti->isEnabled() && ti->is_single_step_enabled() &&
-        ti->getPhase() == JVMTI_PHASE_LIVE)
+    if(ti->isEnabled() && ti->is_single_step_enabled()) {
+        // Start single stepping a new Java method
+        jvmti_set_single_step_breakpoints_for_method(ti, p_TLS_vmthread, (Method*)method);
+    }
+
+    VM_Global_State::loader_env->em_interface->ExecuteMethod(method, result, args);
+    //DEBUG_POP_LOCK(JAVA_CODE_PSEUDO_LOCK);
+
+    // Return from native code. It is necessary to set up a breakpoint
+    // in the method which called us
+    if (ti->isEnabled() && ti->is_single_step_enabled())
     {
         VM_thread *vm_thread = p_TLS_vmthread;
         LMAutoUnlock lock(ti->vm_brpt->get_lock());
@@ -52,26 +62,8 @@ vm_execute_java_method_array(jmethodID method, jvalue *result, jvalue *args) {
             // Start single stepping a new Java method
             jvmti_remove_single_step_breakpoints(ti, vm_thread);
 
-            jvmti_StepLocation method_start = {(Method *)method, 0};
-            jvmti_set_single_step_breakpoints(ti, vm_thread, &method_start, 1);
-        }
-    }
-
-    VM_Global_State::loader_env->em_interface->ExecuteMethod(method, result, args);
-    //DEBUG_POP_LOCK(JAVA_CODE_PSEUDO_LOCK);
-
-    // Return from native code. It is necessary to set up a breakpoint
-    // in the method which called us
-    if (ti->isEnabled() && ti->is_single_step_enabled() &&
-        ti->getPhase() == JVMTI_PHASE_LIVE)
-    {
-        VM_thread *vm_thread = p_TLS_vmthread;
-        LMAutoUnlock lock(ti->vm_brpt->get_lock());
-        if (NULL != vm_thread->ss_state)
-        {
             jvmti_StepLocation *method_return;
             unsigned locations_number;
-
             jvmtiError errorCode = jvmti_get_next_bytecodes_from_native(
                 vm_thread, &method_return, &locations_number, false);
             assert (JVMTI_ERROR_NONE == errorCode);

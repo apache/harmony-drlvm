@@ -451,6 +451,24 @@ jvmti_setup_jit_single_step(DebugUtilsTI *ti, Method* m, jlocation location)
     jvmti_set_single_step_breakpoints(ti, vm_thread, locations, locations_count);
 }
 
+void
+jvmti_set_single_step_breakpoints_for_method(DebugUtilsTI *ti,
+                                             VM_thread *vm_thread,
+                                             Method *method)
+{
+    if (ti->isEnabled() && ti->is_single_step_enabled())
+    {
+        LMAutoUnlock lock(ti->vm_brpt->get_lock());
+        if (NULL != vm_thread->ss_state)
+        {
+            jvmti_remove_single_step_breakpoints(ti, vm_thread);
+
+            jvmti_StepLocation method_start = {method, NULL, 0, false};
+            jvmti_set_single_step_breakpoints(ti, vm_thread, &method_start, 1);
+        }
+    }
+}
+
 static void jvmti_start_single_step_in_virtual_method(DebugUtilsTI *ti, VMBreakPoint* bp,
                                                       void *data)
 {
@@ -514,17 +532,10 @@ static void jvmti_start_single_step_in_virtual_method(DebugUtilsTI *ti, VMBreakP
 
     TRACE2("jvmti.break.ss", "Removing VIRTUAL single step breakpoint: " << bp->addr);
 
-    // lock breakpoints
-    VMBreakPoints* vm_brpt = VM_Global_State::loader_env->TI->vm_brpt;
-    LMAutoUnlock lock(vm_brpt->get_lock());
-
     // The determined method is the one which is called by
     // invokevirtual or invokeinterface bytecodes. It should be
     // started to be single stepped from the beginning
-    jvmti_remove_single_step_breakpoints(ti, vm_thread);
-
-    jvmti_StepLocation method_start = {(Method *)method, 0};
-    jvmti_set_single_step_breakpoints(ti, vm_thread, &method_start, 1);
+    jvmti_set_single_step_breakpoints_for_method(ti, vm_thread, method);
 }
 
 // Callback function for JVMTI single step processing
@@ -808,21 +819,6 @@ jvmtiError jvmti_get_next_bytecodes_from_native(VM_thread *thread,
                 NativeCodePtr call_ip = NULL;
                 do
                 {
-                    ip2 = (NativeCodePtr)((POINTER_SIZE_INT)ip2 + disasm.get_length_with_prefix());
-
-                    // Another thread could have instrumented this location for
-                    // prediction of invokevirtual or invokeinterface, so it is
-                    // necessary to check that location may be instrumented
-                    uint8 b = *((uint8 *)ip2);
-                    if (b == INSTRUMENTATION_BYTE)
-                    {
-                        bp = vm_brpt->find_breakpoint(ip2);
-                        assert(bp);
-                        disasm = *bp->disasm;
-                    }
-                    else
-                        disasm = ip2;
-
                     // Bytecode may be either invokevirtual or
                     // invokeinterface which generate indirect calls or
                     // invokestatic or invokespecial which generate
@@ -830,6 +826,17 @@ jvmtiError jvmti_get_next_bytecodes_from_native(VM_thread *thread,
                     if (disasm.get_type() == InstructionDisassembler::INDIRECT_CALL ||
                         disasm.get_type() == InstructionDisassembler::RELATIVE_CALL)
                         call_ip = ip2;
+
+                    ip2 = (NativeCodePtr)((POINTER_SIZE_INT)ip2 + disasm.get_length_with_prefix());
+
+                    // Another thread could have instrumented this location for
+                    // prediction of invokevirtual or invokeinterface, so it is
+                    // necessary to check that location may be instrumented
+                    bp = vm_brpt->find_breakpoint(ip2);
+                    if (bp)
+                        disasm = *bp->disasm;
+                    else
+                        disasm = ip2;
                 }
                 while (ip2 < next_ip);
 

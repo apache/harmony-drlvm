@@ -1817,7 +1817,7 @@ void jvmti_send_thread_start_end_event(int is_start)
     {
         process_jvmti_event(JVMTI_EVENT_THREAD_START, 0, 0);
 
-        if (ti->is_single_step_enabled() && ti->getPhase() == JVMTI_PHASE_LIVE)
+        if (ti->is_single_step_enabled())
         {
             // Init single step state for the thread
             VM_thread *vm_thread = p_TLS_vmthread;

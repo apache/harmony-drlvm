@@ -312,7 +312,7 @@ class DebugUtilsTI {
 
         bool is_single_step_enabled(void)
         {
-            return single_step_enabled;
+            return single_step_enabled && (phase == JVMTI_PHASE_LIVE);
         }
 
         // Single step functions
@@ -353,6 +353,8 @@ jvmtiError jvmti_get_next_bytecodes_from_native(VM_thread *thread,
 void jvmti_set_single_step_breakpoints(DebugUtilsTI *ti,
     VM_thread *vm_thread, jvmti_StepLocation *locations,
     unsigned locations_number);
+void jvmti_set_single_step_breakpoints_for_method(DebugUtilsTI *ti,
+    VM_thread *vm_thread, Method* method);
 void jvmti_remove_single_step_breakpoints(DebugUtilsTI *ti, VM_thread *vm_thread);
 
 // Object check functions

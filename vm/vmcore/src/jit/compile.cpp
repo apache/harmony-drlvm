@@ -37,6 +37,7 @@
 #include "lil_code_generator.h"
 #include "stack_iterator.h"
 #include "interpreter.h"
+#include "jvmti_internal.h"
 #include "jvmti_break_intf.h"
 
 #include "vm_stats.h"
@@ -839,6 +840,13 @@ NativeCodePtr compile_jit_a_method(Method* method)
 
         if (method->get_pending_breakpoints() != 0)
             jvmti_set_pending_breakpoints(method);
+        DebugUtilsTI *ti = VM_Global_State::loader_env->TI;
+        if(ti->isEnabled() && ti->is_single_step_enabled()
+            && !method->is_native())
+        {
+            jvmti_set_single_step_breakpoints_for_method(ti, p_TLS_vmthread, method);
+        }
+
         return entry_point;
     }
 
