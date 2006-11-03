@@ -821,7 +821,11 @@ jint vm_init2(JNIEnv * jni_env) {
 JIT_Handle vm_load_jit(const char* file_name, apr_dso_handle_t** handle) {
     //if (vm_is_a_jit_dll(file_name)) {
         Dll_JIT* jit = new Dll_JIT(file_name);
-        handle[0]=jit->get_lib_handle();
+        *handle = jit->get_lib_handle();
+        if(!*handle) {
+            delete jit;
+            return NULL;
+        }
         vm_add_jit(jit);
         return (JIT_Handle)jit;
         

@@ -53,12 +53,15 @@ _execute_method(NULL),
 _get_bc_location_for_native(NULL),
 _get_native_location_for_bc(NULL),
 _get_local_var(NULL),
-_set_local_var(NULL)
+_set_local_var(NULL),
+jit_dll_filename(NULL),
+lib_handle(NULL)
 {
     apr_status_t stat;
     char buf[1024];
     memset((void *) &jit_flags, 0, sizeof(JIT_Flags));
     apr_pool_create(&pool, 0);
+    assert(pool);
     apr_dso_handle_t *handle;
     if ((stat = apr_dso_load(&handle, dll_filename, pool)) != APR_SUCCESS)
     {
