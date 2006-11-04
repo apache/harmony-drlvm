@@ -370,10 +370,27 @@ JNIEXPORT jobjectArray JNICALL Java_java_lang_VMClassRegistry_getSystemPackages
     ClassLoader* cl = static_cast<ClassLoader*>
         (genv->bootstrap_class_loader);
     Package_Table* ptab = cl->getPackageTable();
-    if (ptab->size() == (unsigned)len) 
+    cl->Lock();
+    unsigned p_num = ptab->size();
+    if (p_num == (unsigned)len) 
     {
+        cl->Unlock();
         return NULL;
     }
+    const char ** pkgs = (const char **)STD_MALLOC(p_num * 2 * sizeof(char*));
+    size_t buf_len = 0;
+    unsigned index = 0;
+    for (Package_Table::const_iterator it = ptab->begin(), end = ptab->end(); 
+        it != end; ++it)
+    {
+        const char* name = pkgs[index++] = (*it).first->bytes;
+        pkgs[index++] = (*it).second->get_jar();
+        size_t name_len = (*it).first->len;
+        if (name_len > buf_len) {
+            buf_len = name_len;
+        }
+    }
+    cl->Unlock();
 
     jclass string_class = struct_Class_to_java_lang_Class_Handle(genv->JavaLangString_Class);
     static Class* aos = genv->LoadCoreClass(genv->string_pool.lookup("[Ljava/lang/String;"));
@@ -381,38 +398,44 @@ JNIEXPORT jobjectArray JNICALL Java_java_lang_VMClassRegistry_getSystemPackages
     assert(string_class);
     assert(string_array_class);
         
-    apr_pool_t* pool;
-    apr_pool_create(&pool, NULL);
-    unsigned index = 0;
-
-    cl->Lock();
-    jobjectArray result = NewObjectArray(jenv, ptab->size(), string_array_class, NULL);
-    assert(result);
-
-    for (Package_Table::const_iterator it = ptab->begin(), end = ptab->end(); 
-        it != end; ++it, ++index)
+    jobjectArray result = NewObjectArray(jenv, p_num, string_array_class, NULL);
+    if (result) 
     {
-        jobjectArray pair = NewObjectArray(jenv, 2, string_class, NULL);
-        assert(pair);
-        
-        char* name = apr_pstrdup(pool, (*it).first->bytes);
-        for (char* c = name; *c != '\0'; ++c) {
-            if (*c == '/') {
-                *c = '.';
+        char* buf = (char*)STD_MALLOC(buf_len + 1);
+        p_num *= 2;
+        for (index = 0; index < p_num; )
+        {
+            jobjectArray pair = NewObjectArray(jenv, 2, string_class, NULL);
+            if (!pair) {
+                break;
+            }
+            SetObjectArrayElement(jenv, result, index/2, pair);
+
+            char* name = strcpy(buf, pkgs[index++]);
+            for (char* c = name; *c != '\0'; ++c) {
+                if (*c == '/') {
+                    *c = '.';
+                }
+            }
+            jstring jname = NewStringUTF(jenv, name);
+            if (!jname) {
+                break;
+            }
+            SetObjectArrayElement(jenv, pair, 0, jname);
+
+            const char * jar = pkgs[index++];
+            if (jar) {
+                jstring js = NewStringUTF(jenv, jar);
+                if (!js) break;
+                SetObjectArrayElement(jenv, pair, 1, js);
             }
         }
-        SetObjectArrayElement(jenv, pair, 0, NewStringUTF(jenv, name));
-
-        const char * jar = (*it).second->get_jar();
-        if (jar) {
-            SetObjectArrayElement(jenv, pair, 1, NewStringUTF(jenv, jar));
-        }
-        
-        SetObjectArrayElement(jenv, result, index, pair);
+        STD_FREE(buf);
     }
-    cl->Unlock();
-    apr_pool_destroy(pool);
 
+    STD_FREE(pkgs);
+    
+    assert(result || exn_raised());
     return result;
 }
 
