@@ -160,8 +160,8 @@ static OpcodeInfo opcodeTable[] = {
     { Op_TauCheckElemType,      false, MB::Check,         MK::Exception,                             "chkelemtype",   "chkelemtype %0,%1 ((%2,%3)) -) %l",            }, // Array element type check for aastore
     { Op_TauCheckFinite,        false, MB::Check,         MK::Exception,                             "ckfinite",      "ckfinite  %s -) %l",           }, // throws ArithmeticException if value is NaN or +- inifinity
     { Op_NewObj,                false, MB::Exception,     MK::None,                                  "newobj",        "newobj    %d -) %l",           }, // OutOfMemoryException
-    { Op_NewArray,              false, MB::Exception,     MK::None,                                  "newarray",      "newarray  %d[%0] -) %l",       }, // OutOfMemoryException, NegativeArraySizeException
-    { Op_NewMultiArray,         false, MB::Exception,     MK::None,                                  "newmultiarray", "newmultiarray %d[%s] -) %l",   }, // OutOfMemoryException, NegativeArraySizeException
+    { Op_NewArray,              false, MB::Exception,     MK::Exception,                             "newarray",      "newarray  %d[%0] -) %l",       }, // OutOfMemoryException, NegativeArraySizeException
+    { Op_NewMultiArray,         false, MB::Exception,     MK::Exception,                             "newmultiarray", "newmultiarray %d[%s] -) %l",   }, // OutOfMemoryException, NegativeArraySizeException
     { Op_TauMonitorEnter,       true,  MB::StoreOrSync,   MK::None,                                  "monenter",      "monenter  %0 ((%1))",                 }, // (opnd must be non-null)
     { Op_TauMonitorExit,        true,  MB::StoreOrSync,   MK::Exception,                             "monexit",       "monexit   %0 ((%1))",                 }, // (opnd must be non-null), IllegalMonitorStateException
     { Op_TypeMonitorEnter,      true,  MB::StoreOrSync,   MK::None,                                  "tmonenter",     "monenter  %d",                 },
