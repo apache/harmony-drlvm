@@ -1076,7 +1076,9 @@ JavaByteCodeTranslator::getstatic(uint32 constPoolIndex) {
     }
     // generate helper call for throwing respective exception
     linkingException(constPoolIndex, OPCODE_GETSTATIC);
-    pushOpnd(irBuilder.genLdNull());
+    Type* type = compilationInterface.getFieldType(&methodToCompile, constPoolIndex);
+    ConstInst::ConstValue nullValue;
+    pushOpnd(irBuilder.genLdConstant(type,nullValue));
 }
 
 void 
