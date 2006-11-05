@@ -473,8 +473,16 @@ bool ClassLoader::FinishLoadingClass(Global_Env* env, Class* clss, unsigned* sup
             }
             return false;
         }
-        if(class_is_interface(superClass) || class_is_final(superClass)) {
-            REPORT_FAILED_CLASS_CLASS(this, clss, "java/lang/IncompatibleClassChangeError", clss->name->bytes);
+        if(class_is_interface(superClass)) {
+            REPORT_FAILED_CLASS_CLASS(this, clss, "java/lang/IncompatibleClassChangeError",
+                "class " << clss->name->bytes << " has interface "
+                << superClass->name->bytes << " as super class");
+            return false;
+        }
+        if(class_is_final(superClass)) {
+            REPORT_FAILED_CLASS_CLASS(this, clss, "java/lang/VerifyError",
+                clss->name->bytes << " : try to inherit final class "
+                << superClass->name->bytes);
             return false;
         }
         if(!class_verify(env, superClass)) return false;
