@@ -3429,14 +3429,14 @@ uint32 JavaByteCodeTranslator::getNumericValue(const uint8* byteCodes, uint32 of
                 uint32 constPoolIndex = su8(byteCodes + (off++));
                 // load 32-bit quantity from constant pool
                 Type* constantType = compilationInterface.getConstantType(&methodToCompile,constPoolIndex);
+                if ( !(constantType->isInt4() || constantType->isSingle()) ) {
+                    // only integer and floating-point types 
+                    //     are implemented for streamed array loads
+                    return 0;
+                }
                 const void* constantAddress =
                     compilationInterface.getConstantValue(&methodToCompile,constPoolIndex);
-                if (constantType->isInt4() || constantType->isSingle()) {
-                    value = *(uint32*)constantAddress;
-                } else {
-                    // Invalid type!
-                    assert(0);
-                }
+                value = *(uint32*)constantAddress;
             }
             break;
         case 0x13:        // ldc_w
@@ -3445,14 +3445,14 @@ uint32 JavaByteCodeTranslator::getNumericValue(const uint8* byteCodes, uint32 of
                 uint32 constPoolIndex = su16(byteCodes + off);
                 // load 32-bit quantity from constant pool
                 Type* constantType = compilationInterface.getConstantType(&methodToCompile,constPoolIndex);
+                if ( !(constantType->isInt4() || constantType->isSingle()) ) {
+                    // only integer and floating-point types 
+                    //     are implemented for streamed array loads
+                    return 0;
+                }
                 const void* constantAddress =
                     compilationInterface.getConstantValue(&methodToCompile,constPoolIndex);
-                if (constantType->isInt4() || constantType->isSingle()) {
-                    value = *(uint32*)constantAddress;
-                } else {
-                    // Invalid type!
-                    assert(0);
-                }
+                value = *(uint32*)constantAddress;
             }
             off += 2;
             break;
@@ -3460,16 +3460,16 @@ uint32 JavaByteCodeTranslator::getNumericValue(const uint8* byteCodes, uint32 of
             {
                 if ((off + 1) >= byteCodeLength) return 0;
                 uint32 constPoolIndex = su16(byteCodes + off);
-                // load 32-bit quantity from constant pool
+                // load 64-bit quantity from constant pool
                 Type* constantType = compilationInterface.getConstantType(&methodToCompile,constPoolIndex);
+                if ( !(constantType->isInt8() || constantType->isDouble()) ) {
+                    // only integer and floating-point types 
+                    //     are implemented for streamed array loads
+                    return 0;
+                }
                 const void* constantAddress =
                     compilationInterface.getConstantValue(&methodToCompile,constPoolIndex);
-                if (constantType->isInt8() || constantType->isDouble()) {
-                    value = *(uint64*)constantAddress;
-                } else {
-                    // Invalid type!
-                    assert(0);
-                }
+                value = *(uint64*)constantAddress;
             }
             off += 2;
             break;

@@ -388,7 +388,7 @@ private:
     // If they are then substitute array initializers with jit helper array copy instruction.
     // Returns the length of bytecodes converted by this routine.
     uint32 checkForArrayInitializer(Opnd* arrayOpnd, const uint8* byteCodes, uint32 offset, const uint32 byteCodeLength);
-    // Obtain the next numeric value from the bytecode.
+    // Obtain the next numeric value from the bytecode in array initialization sequence
     // Returns number of bytes read from the byteCodes array.
     uint32 getNumericValue(const uint8* byteCodes, uint32 offset, const uint32 byteCodeLength, uint64& value);
 
