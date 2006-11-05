@@ -332,7 +332,7 @@ uint32 parse_annotation(Annotation** value, ByteReader& cfs, Class* clss)
             return 0;
         }
 
-        uint16 size = parse_annotation_value(antn->elements[j].value, cfs, clss);
+        uint32 size = parse_annotation_value(antn->elements[j].value, cfs, clss);
         if (size == 0) {
             return 0;
         }
@@ -526,7 +526,7 @@ uint32 parse_annotation_table(AnnotationTable ** table, ByteReader& cfs, Class* 
 
         for (unsigned i = 0; i < num_annotations; i++)
         {
-            uint16 size = parse_annotation((*table)->table + i, cfs, clss);
+            uint32 size = parse_annotation((*table)->table + i, cfs, clss);
             if (size == 0) {
                 return 0;
             }
@@ -1637,7 +1637,7 @@ bool Method::parse(Global_Env& env, Class *clss, Const_Pool *cp, unsigned cp_siz
                 _default_value = (AnnotationValue *)_class->class_loader->Alloc(
                     sizeof(AnnotationValue));
 
-                uint16 read_len = parse_annotation_value(*_default_value, cfs, clss);
+                uint32 read_len = parse_annotation_value(*_default_value, cfs, clss);
                 if (read_len == 0) {
                     return false;
                 } else if (read_len != attr_len) {
