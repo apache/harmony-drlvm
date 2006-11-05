@@ -481,7 +481,7 @@ bool ClassLoader::FinishLoadingClass(Global_Env* env, Class* clss, unsigned* sup
         }
         if(class_is_final(superClass)) {
             REPORT_FAILED_CLASS_CLASS(this, clss, "java/lang/VerifyError",
-                clss->name->bytes << " : try to inherit final class "
+                clss->name->bytes << " cannot inherit from final class "
                 << superClass->name->bytes);
             return false;
         }
