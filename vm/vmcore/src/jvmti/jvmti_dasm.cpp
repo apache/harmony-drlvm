@@ -153,6 +153,7 @@ void InstructionDisassembler::disasm(const NativeCodePtr addr,
         assert(inst.odesc->opnds[0].kind == OpndKind_Imm);
         pidi->m_cond_jump_type = (CondJumpType)(inst.mn-Mnemonic_Jcc);
         assert(pidi->m_cond_jump_type < CondJumpType_Count);
+        pidi->m_target = (NativeCodePtr)((char*)addr + pidi->m_len + inst.operands[0].imm());
         pidi->m_type = RELATIVE_COND_JUMP;
     }
 }
