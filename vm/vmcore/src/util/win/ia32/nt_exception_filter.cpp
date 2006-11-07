@@ -275,7 +275,25 @@ void __declspec(naked) asm_jvmti_exception_catch_callback() {
     }
 }
 
-LONG NTAPI vectored_exception_handler(LPEXCEPTION_POINTERS nt_exception)
+static LONG NTAPI vectored_exception_handler_internal(LPEXCEPTION_POINTERS nt_exception);
+
+LONG __declspec(naked) NTAPI vectored_exception_handler(LPEXCEPTION_POINTERS nt_exception)
+{
+    __asm {
+    push    ebp
+    mov     ebp,esp
+    pushfd
+    cld
+    mov     eax, [ebp + 8]
+    push    eax
+    call    vectored_exception_handler_internal
+    popfd
+    pop     ebp
+    ret     4    
+    }
+}
+
+static LONG NTAPI vectored_exception_handler_internal(LPEXCEPTION_POINTERS nt_exception)
 {
     DWORD code = nt_exception->ExceptionRecord->ExceptionCode;
     
