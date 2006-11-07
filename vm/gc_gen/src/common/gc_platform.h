@@ -29,7 +29,7 @@
 
 #define USEC_PER_SEC INT64_C(1000000)
 
-#define VmThreadHandle (void*)
+#define VmThreadHandle void*
 #define VmEventHandle   hysem_t
 #define THREAD_OK       TM_ERROR_NONE
 
