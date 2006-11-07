@@ -45,7 +45,7 @@ struct edge_comparator {
     bool operator() (const Edge* e1, const Edge* e2) const { //true -> e1 is first
         double v1 = getEdgeExecCount(e1);
         double v2 = getEdgeExecCount(e2);
-        return   v1 > v2 ? true : (v1 < v2 ? false: e1 < e2);
+        return   v1 > v2;
     }
     static double getEdgeExecCount(const Edge* e) { 
         return e->getSourceNode()->getExecCount() * e->getEdgeProb();
