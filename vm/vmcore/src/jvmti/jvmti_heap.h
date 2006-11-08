@@ -78,7 +78,7 @@ struct TIIterationState {
     int bytes;
 };
 
-extern TIEnv* ti_env; // FIXME: store it in TLS
+extern TIEnv* global_ti_env; // FIXME: store it in TLS
 
 /**
  * returns object tag.

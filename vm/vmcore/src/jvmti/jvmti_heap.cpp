@@ -46,7 +46,7 @@
 #include "jvmti_trace.h"
 
 // FIXME: use TLS to store ti_env
-TIEnv* ti_env;
+TIEnv* global_ti_env;
 
 /*
  * Get Tag
@@ -72,14 +72,14 @@ jvmtiGetTag(jvmtiEnv* env,
 
     CHECK_EVERYTHING();
 
-    if (NULL == tag_ptr || !is_jobject_valid(object)) 
-        return JVMTI_ERROR_ILLEGAL_ARGUMENT;
-
     TIEnv* ti_env = reinterpret_cast<TIEnv *>(env);
 
-    if (!ti_env->posessed_capabilities.can_tag_objects) {
+    if (!ti_env->posessed_capabilities.can_tag_objects)
         return JVMTI_ERROR_MUST_POSSESS_CAPABILITY;
-    }
+    if (NULL == tag_ptr)
+        return JVMTI_ERROR_NULL_POINTER;
+    if (!is_jobject_valid(object))
+        return JVMTI_ERROR_INVALID_OBJECT;
 
     if (ti_env->tags == NULL) {
         *tag_ptr = 0;
@@ -116,14 +116,13 @@ jvmtiSetTag(jvmtiEnv* env,
     jvmtiPhase phases[] = {JVMTI_PHASE_START, JVMTI_PHASE_LIVE};
 
     CHECK_EVERYTHING();
-    if (!is_jobject_valid(object)) 
-        return JVMTI_ERROR_ILLEGAL_ARGUMENT;
 
     TIEnv* ti_env = reinterpret_cast<TIEnv *>(env);
 
-    if (!ti_env->posessed_capabilities.can_tag_objects) {
+    if (!ti_env->posessed_capabilities.can_tag_objects)
         return JVMTI_ERROR_MUST_POSSESS_CAPABILITY;
-    }
+    if (!is_jobject_valid(object))
+        return JVMTI_ERROR_INVALID_OBJECT;
 
     if (ti_env->tags == NULL) {
         assert(ti_env->lock);
@@ -251,11 +250,13 @@ jvmtiIterateOverObjectsReachableFromObject(jvmtiEnv* env,
 
     CHECK_EVERYTHING();
 
-    if (!is_jobject_valid(object)) {
-        return JVMTI_ERROR_ILLEGAL_ARGUMENT;
-    }
-
     TIEnv* ti_env = reinterpret_cast<TIEnv *>(env);
+
+    if (!ti_env->posessed_capabilities.can_tag_objects)
+        return JVMTI_ERROR_MUST_POSSESS_CAPABILITY;
+    if (!is_jobject_valid(object))
+        return JVMTI_ERROR_INVALID_OBJECT;
+
     hythread_global_lock();
 
     jvmtiError r;
@@ -269,7 +270,7 @@ jvmtiIterateOverObjectsReachableFromObject(jvmtiEnv* env,
     hythread_iterator_t iterator;
     hythread_suspend_all(&iterator, NULL);
 
-    ::ti_env = ti_env; // FIXME: use TLS to store TIEnv pointer
+    global_ti_env = ti_env; // FIXME: use TLS to store TIEnv pointer
 
     ti_env->iteration_state->user_data = user_data;
     ti_env->iteration_state->object_ref_callback = object_ref_callback;
@@ -327,6 +328,10 @@ jvmtiIterateOverReachableObjects(jvmtiEnv* env,
     CHECK_EVERYTHING();
 
     TIEnv* ti_env = reinterpret_cast<TIEnv *>(env);
+
+    if (!ti_env->posessed_capabilities.can_tag_objects)
+        return JVMTI_ERROR_MUST_POSSESS_CAPABILITY;
+
     hythread_global_lock();
 
     jvmtiError r;
@@ -340,7 +345,7 @@ jvmtiIterateOverReachableObjects(jvmtiEnv* env,
     hythread_iterator_t iterator;
     hythread_suspend_all(&iterator, NULL);
 
-    ::ti_env = ti_env; // FIXME: use TLS to store TIEnv pointer
+    global_ti_env = ti_env; // FIXME: use TLS to store TIEnv pointer
 
     ti_env->iteration_state->user_data = user_data;
     ti_env->iteration_state->heap_root_callback = heap_root_callback;
@@ -361,7 +366,7 @@ jvmtiIterateOverReachableObjects(jvmtiEnv* env,
 
 bool vm_iterate_object(Managed_Object_Handle obj)
 {
-    TIEnv* ti_env = ::ti_env;  // FIXME: use TLS to store ti_env
+    TIEnv* ti_env = global_ti_env;  // FIXME: use TLS to store ti_env
 
     TRACE2("vm.iterate", "vm_iterate_object " << (ManagedObject*)obj);
     assert(ti_env->tags);
@@ -428,6 +433,12 @@ jvmtiIterateOverHeap(jvmtiEnv* env,
 
     TIEnv* ti_env = reinterpret_cast<TIEnv *>(env);
 
+    if (!ti_env->posessed_capabilities.can_tag_objects)
+        return JVMTI_ERROR_MUST_POSSESS_CAPABILITY;
+    if (object_filter != JVMTI_HEAP_OBJECT_TAGGED
+            && object_filter != JVMTI_HEAP_OBJECT_UNTAGGED
+            && object_filter != JVMTI_HEAP_OBJECT_EITHER)
+        return JVMTI_ERROR_ILLEGAL_ARGUMENT;
 
     // heap iteration requires stop-the-world
     hythread_global_lock();
@@ -447,7 +458,7 @@ jvmtiIterateOverHeap(jvmtiEnv* env,
     hythread_suspend_all(&iterator, NULL);
     TRACE2("ti.iterate", "suspended all threads");
     
-    ::ti_env = ti_env; // FIXME: use TLS to store TIEnv pointer
+    global_ti_env = ti_env; // FIXME: use TLS to store TIEnv pointer
     state->user_data = user_data;
     state->heap_object_callback = heap_object_callback;
     state->object_filter = object_filter;
@@ -499,6 +510,12 @@ jvmtiIterateOverInstancesOfClass(jvmtiEnv* env,
 
     TIEnv* ti_env = reinterpret_cast<TIEnv *>(env);
 
+    if (!ti_env->posessed_capabilities.can_tag_objects)
+        return JVMTI_ERROR_MUST_POSSESS_CAPABILITY;
+    if (object_filter != JVMTI_HEAP_OBJECT_TAGGED
+            && object_filter != JVMTI_HEAP_OBJECT_UNTAGGED
+            && object_filter != JVMTI_HEAP_OBJECT_EITHER)
+        return JVMTI_ERROR_ILLEGAL_ARGUMENT;
 
     // heap iteration requires stop-the-world
     TRACE2("ti.iterate", "acquire tm lock");
@@ -520,7 +537,7 @@ jvmtiIterateOverInstancesOfClass(jvmtiEnv* env,
     hythread_suspend_all(&iterator, NULL);
     TRACE2("ti.iterate", "suspended all threads");
     
-    ::ti_env = ti_env; // FIXME: use TLS to store TIEnv pointer
+    global_ti_env = ti_env; // FIXME: use TLS to store TIEnv pointer
     state->user_data = user_data;
     state->heap_object_callback = heap_object_callback;
     state->object_filter = object_filter;
@@ -569,12 +586,16 @@ jvmtiGetObjectsWithTags(jvmtiEnv* env,
     jvmtiPhase phases[] = {JVMTI_PHASE_LIVE};
 
     CHECK_EVERYTHING();
-    if (count_ptr == NULL || tags == NULL || tag_count <= 0 ||
-            (object_result_ptr == NULL && tag_result_ptr == NULL)) {
-        return JVMTI_ERROR_ILLEGAL_ARGUMENT;
-    }
 
-    hythread_suspend_disable(); // ---------------vv
+    TIEnv* ti_env = reinterpret_cast<TIEnv *>(env);
+
+    if (!ti_env->posessed_capabilities.can_tag_objects)
+        return JVMTI_ERROR_MUST_POSSESS_CAPABILITY;
+    if (count_ptr == NULL || tags == NULL ||
+            (object_result_ptr == NULL && tag_result_ptr == NULL))
+        return JVMTI_ERROR_NULL_POINTER;
+    if (tag_count <= 0)
+        return JVMTI_ERROR_ILLEGAL_ARGUMENT;
 
     std::set<jlong> tag_set;
     std::list<tag_pair> objects;
@@ -582,13 +603,25 @@ jvmtiGetObjectsWithTags(jvmtiEnv* env,
 
     int i;
     for (i = 0; i < tag_count; i++) {
+        if (tags[i] == 0)
+            return JVMTI_ERROR_ILLEGAL_ARGUMENT;
         tag_set.insert(tags[i]);
     }
+
+    hythread_suspend_disable(); // ---------------vv
 
     ti_env->tags->get_objects_with_tags(tag_set, objects);
     int count = objects.size();
     *count_ptr = count;
-    if (count > 0) {
+    if (count == 0) {
+        // set output args to NULL
+        // for compatibility
+        if (object_result_ptr)
+            *object_result_ptr = NULL;
+        if (tag_result_ptr)
+            *tag_result_ptr = NULL;
+    } else {
+        assert(count > 0);
         if (object_result_ptr != NULL) {
             jvmtiError r = _allocate(count * sizeof(jobject),
                     (unsigned char **)object_result_ptr);

@@ -164,7 +164,7 @@ void vm_ti_enumerate_heap_root(
  */
 static void ti_enumerate_root(void* root, Managed_Object_Handle obj)
 {
-    TIEnv* ti_env = ::ti_env; // FIXME: load ti_env from TLS
+    TIEnv* ti_env = global_ti_env; // FIXME: load ti_env from TLS
     TIIterationState *state = ti_env->iteration_state;
     assert(state);
     if (JVMTI_HEAP_ROOT_STACK_LOCAL == state->root_kind
@@ -312,10 +312,10 @@ void jitted_ti_enumerate_thread(jvmtiEnv *env, VM_thread *thread)
 {
     StackIterator* si;
     si = si_create_from_native(thread);
-    ti_enumerate_thread_stack(ti_env, si);    
+    ti_enumerate_thread_stack((TIEnv*)env, si);    
 
     // Enumerate references associated with a thread that are not stored on the thread's stack.
-    ti_enumerate_thread_not_on_stack(ti_env, thread);
+    ti_enumerate_thread_not_on_stack((TIEnv*)env, thread);
 }
 
 static void ti_enumerate_thread(TIEnv *ti_env, VM_thread* thread)

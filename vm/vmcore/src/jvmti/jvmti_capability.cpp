@@ -233,6 +233,15 @@ jvmtiAddCapabilities(jvmtiEnv* env,
     unsigned char* available = (unsigned char*)available_caps;
     unsigned char* p_posessed = (unsigned char*)&posessed;
 
+    DebugUtilsTI *ti = ti_env->vm->vm_env->TI;
+
+    // if the global capability can_tag_objects has already been enabled,
+    // requested by this environment, but not yet posessed by this environment,
+    // reject the request
+    if (ti->get_global_capability(DebugUtilsTI::TI_GC_ENABLE_TAG_OBJECTS)
+            && !posessed.can_tag_objects && capabilities_ptr->can_tag_objects)
+        return JVMTI_ERROR_NOT_AVAILABLE;
+
     // Allow to turn on any capabilities that are listed in potential capabilities
     for (int i = 0; i < int(sizeof(jvmtiCapabilities)); i++)
     {
@@ -248,7 +257,6 @@ jvmtiAddCapabilities(jvmtiEnv* env,
     ti_env->posessed_capabilities = posessed;
 
     // Update global capabilities
-    DebugUtilsTI *ti = ti_env->vm->vm_env->TI;
     if (capabilities_ptr->can_generate_method_entry_events)
         ti->set_global_capability(DebugUtilsTI::TI_GC_ENABLE_METHOD_ENTRY);
 
@@ -278,6 +286,7 @@ jvmtiAddCapabilities(jvmtiEnv* env,
 
     if (capabilities_ptr->can_tag_objects) {
         ti->set_global_capability(DebugUtilsTI::TI_GC_ENABLE_TAG_OBJECTS);
+        assert(ManagedObject::_tag_pointer == false);
         ManagedObject::_tag_pointer = true;
     }
 
