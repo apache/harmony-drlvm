@@ -292,13 +292,6 @@ Version: $Revision: 1.5.2.3 $
 
             <select os="lnx">
                 <syslibset type="shared" libs="m,dl,stdc++,z,xml2,pthread,gcc_s,rt" /> 
-                <linkerarg value="--export-dynamic" />
-                <!--linkerarg value="-lz" />
-                <linkerarg value="-lxml2" />
-                <linkerarg value="-lm" />
-                <linkerarg value="-ldl" />
-                <linkerarg value="-lpthread" />
-                <linkerarg value="-lstdc++" /-->
             </select>
         </linker>
     </target>
