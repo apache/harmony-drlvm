@@ -217,6 +217,16 @@
                     <isset property="@{test}.failed" />
                 </condition>
                 
+                <!--
+                Gregory
+                It appears that some kernel unit tests for drlvm classes are
+                implementation specific and may fail on RI. So it makes no
+                sense to check tests on RI. Also running test on RI
+                right after it failed on drlvm creates wrong test run report.
+
+                I am commenting this block for now in case someone wants it
+                back, possibly under some condition. My POV is that this
+                block should be removed eventually.
                 <if>
                     <or>
                         <isset property="@{test}.failed" />
@@ -230,7 +240,7 @@
 
                             <env key="JAVA_HOME" value="${build.deploy.dir}"/>
 
-                            <!--env key="LD_LIBRARY_PATH" value="${build.deploy.dir}/bin:${env.LD_LIBRARY_PATH}" /-->
+                            <!- -env key="LD_LIBRARY_PATH" value="${build.deploy.dir}/bin:${env.LD_LIBRARY_PATH}" /- ->
                             <env key="SYSTEMDRIVE" value="${env.SystemDrive}" />
                             <env key="HOME" value="${env.HOME}" />
                             <env key="PATH" value="${env.PATH}" />
@@ -249,6 +259,7 @@
                         </if>
                     </then>
                 </if>
+                /-->
             </sequential>
         </for>
 
