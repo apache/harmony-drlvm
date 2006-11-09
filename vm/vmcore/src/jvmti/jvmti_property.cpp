@@ -80,17 +80,27 @@ jvmtiAddToBootstrapClassLoaderSearch(jvmtiEnv* env,
         reinterpret_cast<PropertiesHandle>(properties),
         "vm.boot.class.path");
 
-    // create new bootclasspath
-    size_t len_bcp = strlen(bcp_prop);
-    size_t len_seg = strlen(segment);
-    char *new_bcp = (char *)STD_ALLOCA( len_bcp + len_seg + 2);
-    memcpy(new_bcp, bcp_prop, len_bcp);
-    char *end = new_bcp + len_bcp;
-    *end = PORT_PATH_SEPARATOR;
-    memcpy(end + 1, segment, len_seg + 1);
+    size_t len_bcp = 0;
 
-    // update bootclasspath property
-    add_pair_to_properties(*properties, "vm.boot.class.path", new_bcp);
+    if (bcp_prop != NULL) {
+        len_bcp = strlen(bcp_prop);
+    }
+
+    if (len_bcp != 0) {
+        // create new bootclasspath
+        char* new_bcp = (char*) STD_ALLOCA(len_bcp + 1 + strlen(segment) + 1);
+        strcpy(new_bcp, bcp_prop);
+        new_bcp[len_bcp] = PORT_PATH_SEPARATOR;
+        strcpy(new_bcp + len_bcp + 1, segment);
+
+        // update bootclasspath property
+        add_pair_to_properties(*properties, "vm.boot.class.path", new_bcp);
+
+        STD_FREE(new_bcp);
+    } else {
+        // update bootclasspath property
+        add_pair_to_properties(*properties, "vm.boot.class.path", segment);
+    }
 
     return JVMTI_ERROR_NONE;
 }
