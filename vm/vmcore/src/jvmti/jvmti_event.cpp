@@ -1527,9 +1527,10 @@ void jvmti_send_class_load_event(const Global_Env* env, Class* clss)
     }
 
     JNIEnv *jni_env = p_TLS_vmthread->jni_env;
-    ObjectHandle hThread = oh_allocate_local_handle();
     ObjectHandle hClass = struct_Class_to_jclass(clss);
+
     tmn_suspend_disable();
+    ObjectHandle hThread = oh_allocate_local_handle();
     hThread->object = (Java_java_lang_Thread *)jthread_get_java_thread(hythread_self())->object;
     tmn_suspend_enable();
 
