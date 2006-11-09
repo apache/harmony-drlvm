@@ -14,10 +14,9 @@
  *  See the License for the specific language governing permissions and
  *  limitations under the License.
  */
-
+                                                                                                            
 /**
  * @author Intel, Konstantin M. Anisimov, Igor V. Chebykin
- * @version $Revision$
  *
  */
 
@@ -26,7 +25,6 @@
 
 #include "CodeGenIntfc.h"
 #include "VMInterface.h"
-//#include "Profiler.h"
 #include "IpfCfg.h"
 #include "IpfOpndManager.h"
 
@@ -48,7 +46,7 @@ public:
     void                 genVars(uint32, VarCodeSelector&);
     void                 setMethodDesc(MethodDesc*);
     void                 genCFG(uint32, CFGCodeSelector&, bool);
-//    void                 setProfileInfo(CodeProfiler*);
+    void                 setProfileInfo(CodeProfiler*) {}
     virtual              ~IpfMethodCodeSelector() {}
 
 protected:
@@ -56,7 +54,6 @@ protected:
     Cfg                  &cfg;
     CompilationInterface &compilationInterface;
     MethodDesc           *methodDesc;
-//    CodeProfiler         *codeProfiler;
     OpndVector           opnds;
     NodeVector           nodes;
 };
@@ -111,9 +108,6 @@ protected:
 //========================================================================================//
 // IpfInstCodeSelector
 //========================================================================================//
-//Jitrino::CG_OpndHandle* Jitrino::InstructionCallback::scaledDiffRef(Jitrino::CG_OpndHandle*, Jitrino::CG_OpndHandle*)
-//virtual Jitrino::CG_OpndHandle* Jitrino::InstructionCallback::tau_ldIntfTableAddr(Jitrino::Type*, Jitrino::CG_OpndHandle*, Jitrino::NamedType*)
-//virtual Jitrino::CG_OpndHandle* Jitrino::InstructionCallback::callvmhelper(unsigned int, Jitrino::CG_OpndHandle**, Jitrino::Type*, Jitrino::VMHelperCallOp::Id, Jitrino::InlineInfo*)
 
 class IpfInstCodeSelector : public InstructionCallback {
 
@@ -213,7 +207,7 @@ public:
     CG_OpndHandle *tau_ldVirtFunAddr(Type*, CG_OpndHandle*, MethodDesc*, CG_OpndHandle*);
     CG_OpndHandle *tau_ldVTableAddr(Type*, CG_OpndHandle*, CG_OpndHandle*);
     CG_OpndHandle *getVTableAddr(Type*, ObjectType*);
-    CG_OpndHandle *tau_ldIntfTableAddr(Type*, CG_OpndHandle*, NamedType*);
+    CG_OpndHandle *tau_ldIntfTableAddr(Type*, CG_OpndHandle*, NamedType*, CG_OpndHandle*);
     CG_OpndHandle *ldFieldAddr(Type*, CG_OpndHandle*, FieldDesc*);
     CG_OpndHandle *ldStaticAddr(Type*, FieldDesc*);
 
@@ -223,7 +217,7 @@ public:
     CG_OpndHandle *newArray(ArrayType*, CG_OpndHandle*);
     CG_OpndHandle *newMultiArray(ArrayType*, uint32, CG_OpndHandle**);
     CG_OpndHandle *ldElemBaseAddr(CG_OpndHandle*);
-    CG_OpndHandle *addElemIndex(Type*, CG_OpndHandle*, CG_OpndHandle*);
+    CG_OpndHandle *addElemIndex(Type *, CG_OpndHandle *, CG_OpndHandle *);
     CG_OpndHandle *tau_arrayLen(Type*, ArrayType*, Type*, CG_OpndHandle*, CG_OpndHandle*, CG_OpndHandle*);
 
     //---------------------------------------------------------------------------//
@@ -304,7 +298,7 @@ public:
     void          tau_stField(CG_OpndHandle*, CG_OpndHandle*, Type::Tag, FieldDesc*, bool, CG_OpndHandle*, CG_OpndHandle*, CG_OpndHandle*) { NOT_IMPLEMENTED_V("tau_stField") }
     void          tau_stElem(CG_OpndHandle*, CG_OpndHandle*, CG_OpndHandle*, bool, CG_OpndHandle*, CG_OpndHandle*, CG_OpndHandle*) { NOT_IMPLEMENTED_V("tau_stElem") }
     void          optimisticBalancedMonitorExit(CG_OpndHandle*, CG_OpndHandle*, CG_OpndHandle*) { NOT_IMPLEMENTED_V("optimisticBalancedMonitorExit") }
-    CG_OpndHandle *callvmhelper(uint32, CG_OpndHandle**, Type*, VMHelperCallOp::Id, InlineInfo* = NULL) { NOT_IMPLEMENTED_C("callvmhelper") }
+    CG_OpndHandle *callvmhelper(uint32, CG_OpndHandle**, Type *, VMHelperCallOp::Id) { NOT_IMPLEMENTED_C("callvmhelper") }
 
     //---------------------------------------------------------------------------//
     // convertors from HLO to IPF::CG types
@@ -329,6 +323,7 @@ public:
 protected:
 
     // Create new inst and add it in current node
+    void      addInst(Inst* inst);
     Inst&     addNewInst(InstCode instCode_, 
                   CG_OpndHandle *op1=NULL, CG_OpndHandle *op2=NULL, CG_OpndHandle *op3=NULL, 
                   CG_OpndHandle *op4=NULL, CG_OpndHandle *op5=NULL, CG_OpndHandle *op6=NULL);
@@ -338,10 +333,13 @@ protected:
     Inst&     addNewInst(InstCode instCode_, Completer comp1, Completer comp2,
                   CG_OpndHandle *op1=NULL, CG_OpndHandle *op2=NULL, CG_OpndHandle *op3=NULL, 
                   CG_OpndHandle *op4=NULL, CG_OpndHandle *op5=NULL, CG_OpndHandle *op6=NULL);
+    Inst&     addNewInst(InstCode instCode_, Completer comp1, Completer comp2, Completer comp3,
+                  CG_OpndHandle *op1=NULL, CG_OpndHandle *op2=NULL, CG_OpndHandle *op3=NULL, 
+                  CG_OpndHandle *op4=NULL, CG_OpndHandle *op5=NULL, CG_OpndHandle *op6=NULL);
         
     // CG helper methods
-    void      directCall(uint32, Opnd**, RegOpnd*, Opnd*, RegOpnd*);
-    void      indirectCall(uint32, Opnd**, RegOpnd*, RegOpnd*, RegOpnd*);
+    void      directCall(uint32, Opnd**, RegOpnd*, Opnd*, RegOpnd*, Completer=CMPLT_WH_SPTK);
+    void      indirectCall(uint32, Opnd**, RegOpnd*, RegOpnd*, RegOpnd*, Completer=CMPLT_WH_SPTK);
     void      makeCallArgs(uint32, Opnd**, Inst*, RegOpnd*);
     RegOpnd   *makeConvOpnd(RegOpnd*);
     void      makeRetVal(RegOpnd*, RegOpnd*, RegOpnd*);

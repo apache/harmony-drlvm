@@ -14,10 +14,9 @@
  *  See the License for the specific language governing permissions and
  *  limitations under the License.
  */
-
+                                                                                                            
 /**
  * @author Intel, Konstantin M. Anisimov, Igor V. Chebykin
- * @version $Revision$
  *
  */
 
@@ -34,6 +33,7 @@
 #include "IpfPrologEpilogGenerator.h"
 #include "IpfRuntimeSupport.h"
 #include "IpfCfgVerifier.h"
+#include "IpfInstrumentator.h"
 
 namespace Jitrino {
 namespace IPF {
@@ -56,14 +56,13 @@ bool CodeGenerator::genCode(MethodCodeSelector &methodCodeSelector) {
 
     MemoryManager  mm(0x1000, "IpfCodeGenerator");
     cfg = new(mm) Cfg(mm, compilationInterface);
-    char logDirName[] = "tmp_dir_name";
-    IrPrinter irPrinter(*cfg, logDirName);
+    IrPrinter irPrinter(*cfg, (char *)Log::getLogDirName());
     methodDesc = compilationInterface.getMethodToCompile();
 
-//    bool ipfLogIsOnSaved = ipfLogIsOn;
-//    if (isIpfLogoutMethod(methodDesc)) {
-//        ipfLogIsOn = true;
-//    }
+    bool ipfLogIsOnSaved = ipfLogIsOn;
+    if (isIpfLogoutMethod(methodDesc)) {
+        ipfLogIsOn = true;
+    }
     if(LOG_ON) {
         const char *methodName     = methodDesc->getName();
         const char *methodTypeName = (methodDesc->getParentType()!=NULL
@@ -81,15 +80,17 @@ bool CodeGenerator::genCode(MethodCodeSelector &methodCodeSelector) {
     methodDesc = ipfMethodCodeSelector.getMethodDesc();
     cfg->getOpndManager()->initCompBases((BbNode *)cfg->getEnterNode());
     cfg->getOpndManager()->saveThisArg();
-    if(LOG_ON) irPrinter.printCfgDot("/cfg_cs.dot");
+    if(LOG_ON) irPrinter.printCfgDot("/cs.dot");
+
+    IPF_LOG << endl << "=========== Stage: Code Instrumentation ======================" << endl;
+//    Instrumentator instrumentator(*cfg);
+//    instrumentator.instrument();
 
     IPF_LOG << endl << "=========== Stage: Code Layouter =============================" << endl;
     CodeLayouter codeLayouter(*cfg);
     codeLayouter.layout();
-    if(LOG_ON) {
-        irPrinter.printCfgDot("/cfg_cl.dot");
-        irPrinter.printLayoutDot("/lot.dot");
-    }
+    if(LOG_ON) irPrinter.printCfgDot("/cl.dot");
+    if(LOG_ON) irPrinter.printAsm(LOG_OUT);
 
     IPF_LOG << endl << "=========== Stage: Liveness analyzis =========================" << endl;
     LiveAnalyzer liveAnalyzer(*cfg);
@@ -98,8 +99,8 @@ bool CodeGenerator::genCode(MethodCodeSelector &methodCodeSelector) {
     IPF_LOG << endl << "=========== Stage: Dead Code Eliminator ======================" << endl;
     Dce dce(*cfg);
     dce.eliminate();
-
     liveAnalyzer.makeLiveSets(false);
+
     IPF_LOG << endl << "=========== Stage: Build GC Root Set =========================" << endl;
     RuntimeSupport runtimeSupport(*cfg, compilationInterface);
     runtimeSupport.buildRootSet();
@@ -128,7 +129,7 @@ bool CodeGenerator::genCode(MethodCodeSelector &methodCodeSelector) {
     if(ret) IPF_LOG << endl << "=========== Compilation Successful ===========================" << endl;
     else    IPF_LOG << endl << "=========== Compilation Failed ===============================" << endl;
 
-//    ipfLogIsOn = ipfLogIsOnSaved;
+    ipfLogIsOn = ipfLogIsOnSaved;
     return ret;
 }
 

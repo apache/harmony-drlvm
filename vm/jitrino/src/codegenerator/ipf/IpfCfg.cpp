@@ -17,7 +17,6 @@
                                                                                                             
 /**
  * @author Intel, Konstantin M. Anisimov, Igor V. Chebykin
- * @version $Revision$
  *
  */
 
@@ -32,11 +31,11 @@ namespace IPF {
 // Edge
 //========================================================================================//
 
-Edge::Edge(Node *source_, Node *target_, double prob_, EdgeKind edgeKind_) : 
-    edgeKind(edgeKind_),
-    source(source_), 
-    target(target_), 
-    prob(prob_) {
+Edge::Edge(Node *source, Node *target, double prob, EdgeKind edgeKind) : 
+    edgeKind(edgeKind),
+    source(source), 
+    target(target), 
+    prob(prob) {
 }
 
 //----------------------------------------------------------------------------------------//
@@ -81,48 +80,32 @@ bool Edge::isBackEdge() {
     return false;
 }
 
-//---------------------------------------------------------------------------//
-void    Edge::connect(Node *target_) {
-    if (target!=NULL) {
-//        target->removeEdge(this);
-        target->removeInEdge(this);
-    }
-    target=target_;
-//    target_->addEdge(this);
-    target_->addInEdge(this);
-}
-    
-//----------------------------------------------------------------------------//
-void    Edge::disconnect() {
-    if (target!=NULL) {
-//        target->removeEdge(this);
-        target->removeInEdge(this);
-        target=NULL;
-    }
-}
-
 //========================================================================================//
 // ExceptionEdge
 //========================================================================================//
 
-ExceptionEdge::ExceptionEdge(Node   *source_, 
-                             Node   *target_, 
-                             double  prob_, 
-                             Type   *exceptionType_, 
-                             uint32  priority_) :
-    Edge(source_, target_, prob_, EDGE_EXCEPTION), 
-    exceptionType(exceptionType_),
-    priority(priority_) {
+ExceptionEdge::ExceptionEdge(Node   *source, 
+                             Node   *target, 
+                             double  prob, 
+                             Type   *exceptionType, 
+                             uint32  priority) :
+    Edge(source, target, prob, EDGE_EXCEPTION), 
+    exceptionType(exceptionType),
+    priority(priority) {
 }
 
 //========================================================================================//
 // Node
 //========================================================================================//
 
-Node::Node(uint32 id_, NodeKind kind_)  {
-    id         = id_;
-    nodeKind   = kind_;
-    loopHeader = NULL;
+Node::Node(MemoryManager &mm, uint32 id, uint32 execCounter, NodeKind kind) : 
+    id(id), 
+    execCounter(execCounter),
+    nodeKind(kind),  
+    inEdges(mm),
+    outEdges(mm),
+    loopHeader(NULL),
+    liveSet(mm) {
 }
 
 //----------------------------------------------------------------------------------------//
@@ -211,71 +194,19 @@ void Node::mergeOutLiveSets(RegOpndSet &resultSet) {
 
 void Node::remove() {
     
-    EdgeVector edges;
-    
-    // remove out edges
-    edges = outEdges;                          
-    for (uint16 i=0; i<edges.size(); i++) edges[i]->remove();                    
-    
-    // remove in edges
-    edges = inEdges;
-    for (uint16 i=0; i<edges.size(); i++) edges[i]->remove();                    
-}
-
-//----------------------------------------------------------------------------------------//
-
-void Node::removeInEdge(Edge *edge) {
-//    remove(inEdges.begin(), inEdges.end(), edge);
-    EdgeVector::iterator last=inEdges.end();
-    EdgeVector::iterator pos=find(inEdges.begin(), last, edge);
-    if (pos==last) return; // not found
-    inEdges.erase(pos);
-}
-
-void Node::addInEdge(Edge *edge) {
-    inEdges.push_back(edge);
-}
-
-void Node::printEdges(ostream& out, EdgeVector& edges, bool head) {
-    for (uint i=0; i<edges.size(); i++) {
-        Edge *edge=edges[i];
-        if (edge==NULL) {
-            out << " <edge[" << i << "]=null>";
-            continue;
-        }
-        Node *sibling=head? edge->getTarget(): edge->getSource();
-        if (sibling==NULL) {
-            out << " null";
-            continue;
-        }
-          out << " " << sibling->getId();
-    }
-}
-
-void Node::printEdges(ostream& out) {
-    out << " ins:";
-    printEdges(out, getInEdges(), false);
-    out << " outs:";
-    printEdges(out, getOutEdges(), true);
+    for (int16 i=outEdges.size()-1; i>=0; i--) outEdges[i]->remove(); // remove out edges
+    for (int16 i=inEdges.size()-1;  i>=0; i--) inEdges[i]->remove();  // remove in edges
 }
 
 //========================================================================================//
 // BbNode
 //========================================================================================//
 
-BbNode::BbNode(uint32 id_, uint32 execCounter_) : 
-    Node(id_, NODE_BB),
+BbNode::BbNode(MemoryManager &mm, uint32 id, uint32 execCounter) : 
+    Node(mm, id, execCounter, NODE_BB),
+    insts(mm),
     layoutSucc(NULL),
-    address(0),
-    execCounter(execCounter_) {
-}
-
-//----------------------------------------------------------------------------------------//
-
-void BbNode::addInst(Inst *inst) { 
-
-    IPF_LOG << "        " << IrPrinter::toString(inst) << endl;
-    insts.push_back(inst); 
+    address(0) {
 }
 
 //========================================================================================//
@@ -284,13 +215,14 @@ void BbNode::addInst(Inst *inst) {
 
 Cfg::Cfg(MemoryManager &mm, CompilationInterface &compilationInterface):
     mm(mm),
-    compilationInterface(compilationInterface) {
+    compilationInterface(compilationInterface),
+    maxNodeId(0),
+    enterNode(NULL),
+    exitNode(NULL),
+    searchResult(mm),
+    lastSearchKind(SEARCH_UNDEF_ORDER) {
 
-    maxNodeId      = 0;
-    opndManager    = new(mm) OpndManager(mm, compilationInterface);
-    enterNode      = NULL;
-    exitNode       = NULL;
-    lastSearchKind = SEARCH_UNDEF_ORDER;
+    opndManager = new(mm) OpndManager(mm, compilationInterface);
 }
 
 //----------------------------------------------------------------------------------------//
@@ -300,7 +232,7 @@ NodeVector& Cfg::search(SearchKind searchKind) {
     if(lastSearchKind == searchKind) return searchResult;
     lastSearchKind = searchKind;
 
-    NodeSet visitedNodes;
+    NodeSet visitedNodes(mm);
     searchResult.clear();
 
     switch(searchKind) {

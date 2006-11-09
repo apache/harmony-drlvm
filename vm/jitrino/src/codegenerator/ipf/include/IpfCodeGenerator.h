@@ -14,10 +14,9 @@
  *  See the License for the specific language governing permissions and
  *  limitations under the License.
  */
-
+                                                                                                            
 /**
  * @author Intel, Konstantin M. Anisimov, Igor V. Chebykin
- * @version $Revision$
  *
  */
 
@@ -38,7 +37,7 @@ class CodeGenerator : public ::Jitrino::CodeGenerator {
 public:
                          CodeGenerator(MemoryManager&, CompilationInterface&);
     bool                 genCode(MethodCodeSelector&);
-    void                 genCode(SessionAction* s, MethodCodeSelector& m) {} // TODO
+//    void                 genCode(SessionAction* s, MethodCodeSelector& m) {} // TODO
     virtual              ~CodeGenerator() {}
 
 protected:

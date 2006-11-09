@@ -17,7 +17,6 @@
                                                                                                             
 /**
  * @author Intel, Konstantin M. Anisimov, Igor V. Chebykin
- * @version $Revision$
  *
  */
 
@@ -32,20 +31,30 @@ namespace IPF {
 // Compare two edges by prob value
 //========================================================================================//
 
-bool greaterEdge(Edge *e1, Edge *e2) { return e1->getProb() > e2->getProb(); }
+bool greaterEdge(Edge *e1, Edge *e2) { 
+
+    double c1 = e1->getProb() * e1->getSource()->getExecCounter();
+    double c2 = e2->getProb() * e2->getSource()->getExecCounter();
+    return c1 > c2; 
+}
  
 //========================================================================================//
 // CodeLayouter
 //========================================================================================//
 
-CodeLayouter::CodeLayouter(Cfg &cfg_) : 
-    mm(cfg_.getMM()),
-    cfg(cfg_) {
+CodeLayouter::CodeLayouter(Cfg &cfg) : 
+    mm(cfg.getMM()),
+    cfg(cfg),
+    chains(mm),
+    visitedNodes(mm) {
 }
 
 //----------------------------------------------------------------------------------------//
 
 void CodeLayouter::layout() {
+
+    IPF_LOG << endl << "  Outline predicated direct calls " << endl;
+    transformPredicatedCalls();
 
     IPF_LOG << endl << "  Merge Nodes" << endl;
     mergeNodes();
@@ -63,10 +72,90 @@ void CodeLayouter::layout() {
 
 //----------------------------------------------------------------------------------------//
 
+void CodeLayouter::transformPredicatedCalls() {
+
+    Long2Node addr2node(mm);
+    NodeVector &nodes = cfg.search(SEARCH_POST_ORDER);
+    for(uint16 i=0; i<nodes.size(); i++) {            // iterate through CFG nodes
+        if(nodes[i]->isBb() == false) continue;       // ignore non BB nodes
+
+        BbNode *node  = (BbNode *)nodes[i];
+        if (node->getInsts().size() == 0) continue;
+        transformPredicatedCall(node, addr2node);
+    }
+    cfg.search(SEARCH_UNDEF_ORDER);
+}
+    
+//----------------------------------------------------------------------------------------//
+
+void CodeLayouter::transformPredicatedCall(BbNode *branchNode, Long2Node &addr2node) {
+
+    Inst *branchInst = branchNode->getInsts().back();    // inst to be branch
+    Edge *unwindEdge = getUnwindEdge(branchNode);        // get edge to unwind node
+    
+    if (branchInst->getOpnd(0)->getValue() == 0) return; // if not predicated - ignore
+    if (branchInst->isCall() == false)           return; // if not call - ignore
+    if (unwindEdge == NULL)                      return; // if there is no unwind edge - ignore
+
+    uint64     addr   = branchInst->getOpnd(3)->getValue();
+    OpndVector &opnds = branchInst->getOpnds();
+    
+    BbNode *callNode = NULL;
+    Inst   *callInst = NULL;
+    Edge   *callEdge = NULL;
+    
+    IPF_LOG << "    branch inst is " << IrPrinter::toString(branchInst);
+    
+    if (addr2node.find(addr) == addr2node.end()) {              // this call has not been moved in outstanding node
+        callNode = new(mm) BbNode(mm, cfg.getNextNodeId(), 0);  // create new node
+        callInst = new(mm) Inst(mm, INST_BRL13, CMPLT_BTYPE_CALL, cfg.getOpndManager()->getP0());
+        for (uint16 i=1; i<opnds.size(); i++) callInst->addOpnd(opnds[i]);
+        callNode->addInst(callInst);                            // create and add call instruction 
+        addr2node[addr] = callNode;                             // the addr is processed, next time we will use this node
+        unwindEdge->changeSource(callNode);                     // change unwind edge source
+        
+        IPF_LOG << "  created new node" << callNode->getId();
+        IPF_LOG << " call inst is " << IrPrinter::toString(callInst) << endl;
+    } else {                                                    // call on this addr has been already moved in outstanding node
+        callNode = addr2node[addr];                             // get the node
+        unwindEdge->remove();                                   // the node has already had edge on unwind node
+        IPF_LOG << "  use node" << callNode->getId() << endl;
+    }
+
+    // replace call with branch
+    for (uint16 i=opnds.size()-1; i>0; i--) opnds.pop_back();
+    NodeRef *branchTarget = cfg.getOpndManager()->newNodeRef(); 
+    branchInst->addOpnd(branchTarget);
+    branchInst->setInstCode(INST_BR);
+    branchInst->getComps().clear();
+    branchInst->addComp(CMPLT_BTYPE_COND);
+    branchInst->addComp(CMPLT_WH_SPNT);
+
+    // create branch edge
+    callEdge = new(mm) Edge(branchNode, callNode, 0.001, EDGE_BRANCH);
+    callEdge->insert();
+}
+
+//----------------------------------------------------------------------------------------//
+
+Edge* CodeLayouter::getUnwindEdge(Node *node) {
+
+    Edge       *unwindEdge = NULL;
+    EdgeVector &outEdges   = node->getOutEdges();
+    for (uint16 i=0; i<outEdges.size(); i++) {
+        Node *target = outEdges[i]->getTarget();
+        if (target->getNodeKind() == NODE_UNWIND) unwindEdge = outEdges[i];
+    }
+    return unwindEdge;
+}
+
+//----------------------------------------------------------------------------------------//
+
 void CodeLayouter::mergeNodes() {
     
     NodeVector& nodeVector = cfg.search(SEARCH_POST_ORDER);
-    NodeList    nodes(nodeVector.begin(), nodeVector.end());
+    NodeList    nodes(mm); 
+    nodes.insert(nodes.begin(), nodeVector.begin(), nodeVector.end());
 
     // try to merge current node with its successor
     for (NodeListIterator it=nodes.begin(); it!=nodes.end(); it++) {
@@ -76,13 +165,22 @@ void CodeLayouter::mergeNodes() {
         if (node == cfg.getEnterNode())     continue; // do not merge enter node
         
         BbNode *pred = (BbNode *)node;                // let's name current node "pred"
-        BbNode *succ = getSucc(pred);                 // check if it has mergable successor
-        if (succ == NULL)              continue;      // current node does not have mergable successor
+        BbNode *succ = getCandidate(pred);            // check if it has mergable successor
+        if (succ == NULL) {
+            IPF_LOG << "    node" << left << setw(3) << node->getId() << " does not have mergable successor" << endl;
+            continue;      // current node does not have mergable successor
+        }
+
         if (succ == cfg.getExitNode()) continue;      // do not merge exit node
-        if (checkSucc(succ) == false)  continue;      // succ can not be merged with pred
+
+        if (isMergable(pred, succ) == false) {
+            IPF_LOG << "    node" << left << setw(3) << node->getId() << " succ can not be merged with pred" << endl;
+            continue;      // succ can not be merged with pred
+        }
         
         merge(pred, succ);                            // merge pred and succ nodes
-        nodes.remove(succ);                           // remove succ node from current nodes list
+        nodes.remove(pred);                           // remove pred node from current nodes list
+        IPF_LOG << " node" << pred->getId() << " removed" << endl;
     }
     cfg.search(SEARCH_UNDEF_ORDER);                   // we could remove some nodes - old search is broken
 }
@@ -90,7 +188,7 @@ void CodeLayouter::mergeNodes() {
 //----------------------------------------------------------------------------------------//
 // if node has only one succ (not taking in account unwind) - return the succ
 
-BbNode* CodeLayouter::getSucc(BbNode *node) {
+BbNode* CodeLayouter::getCandidate(BbNode *node) {
     
     Node       *succ     = NULL;
     EdgeVector &outEdges = node->getOutEdges();
@@ -110,11 +208,17 @@ BbNode* CodeLayouter::getSucc(BbNode *node) {
 //----------------------------------------------------------------------------------------//
 // check if succ can be merged with pred (has only one pred)
 
-bool CodeLayouter::checkSucc(BbNode *node) {
+bool CodeLayouter::isMergable(BbNode *pred, BbNode *succ) {
 
-    EdgeVector &inEdges = node->getInEdges();   // get succ in edges
-    if (inEdges.size() > 1) return false;       // succ has more than one pred - it can not be merged
-    return true;
+    EdgeVector &outEdges = succ->getOutEdges();                   // get out edges of succ
+    for (uint16 i=0; i<outEdges.size(); i++) {                    // iterate them
+        Node *target = outEdges[i]->getTarget();                  // get successor of current succ :)
+        if (target->getNodeKind() == NODE_DISPATCH) return false; // if it is dispatch node - do not merge
+    }
+
+    if (pred->getInsts().size() == 0)   return true; // empty pred can be merged with any succ
+    if (succ->getInEdges().size() == 1) return true; // succ has one pred - it can be merged
+    return false;
 }
     
 //----------------------------------------------------------------------------------------//
@@ -125,26 +229,21 @@ void CodeLayouter::merge(BbNode *pred, BbNode *succ) {
     // copy succ's insts in pred node
     InstVector &predInsts = pred->getInsts();
     InstVector &succInsts = succ->getInsts();
-    predInsts.insert(predInsts.end(), succInsts.begin(), succInsts.end());
+    succInsts.insert(succInsts.begin(), predInsts.begin(), predInsts.end());
     
     // remove pred out edges
-    EdgeVector predOutEdges = pred->getOutEdges();    // make copy of pred out edges vector
-    for (uint16 i=0; i<predOutEdges.size(); i++) {    // iterate edges
-        predOutEdges[i]->remove();                    // remove edge
+    EdgeVector &predOutEdges = pred->getOutEdges();
+    for (int16 i=predOutEdges.size()-1; i>=0; i--) {   // iterate edges
+        predOutEdges[i]->remove();                     // remove edge
     }
     
-    // redirect succ's out edges on pred
-    EdgeVector succOutEdges = succ->getOutEdges();    // make copy of succ out edges vector
-    for (uint16 i=0; i<succOutEdges.size(); i++) {    // iterate edges
-        succOutEdges[i]->changeSource(pred);          // redirect edge
+    // redirect pred in edges on succ
+    EdgeVector &predInEdges = pred->getInEdges(); 
+    for (int16 i=predInEdges.size()-1; i>=0; i--) {    // iterate edges
+        predInEdges[i]->changeTarget(succ);            // redirect edge
     }
     
-    IPF_LOG << "    node" << left << setw(3) << pred->getId() << " merged with node" << succ->getId() << endl;
-
-    if (LOG_ON) {
-        if (succ->getInEdges().size()  != 0) IPF_ERR << " size " << succ->getInEdges().size() << endl;
-        if (succ->getOutEdges().size() != 0) IPF_ERR << " size " << succ->getOutEdges().size() << endl;
-    }
+    IPF_LOG << "    node" << left << setw(3) << pred->getId() << " merged with node" << succ->getId();
 }
         
 //----------------------------------------------------------------------------------------//
@@ -168,6 +267,7 @@ void CodeLayouter::checkUnwind() {
     
     // remove useless unwind
     unwind->remove();
+    cfg.search(SEARCH_UNDEF_ORDER);
     IPF_LOG << endl << "    unwind node removed" << endl;
 }
 
@@ -176,7 +276,7 @@ void CodeLayouter::checkUnwind() {
 void CodeLayouter::makeChains() {
 
     // make edge list
-    EdgeVector edges;
+    EdgeVector edges(mm);
     NodeVector &nodes = cfg.search(SEARCH_POST_ORDER);               // get nodes vector
     for (uint16 i=0; i<nodes.size(); i++) {                          // iterate throgh it
         EdgeVector &outEdges = nodes[i]->getOutEdges();              // get out edges of current node
@@ -224,7 +324,7 @@ void CodeLayouter::inChainList(Edge *edge) {
     }
 
     // there is no chain that can be merged with the edge 
-    Chain *newChain = new Chain();                              // create new chain
+    Chain *newChain = new(mm) Chain(mm);                        // create new chain
     pushBack(newChain, sourceNode);                             // push source back in new chain
     pushBack(newChain, targetNode);                             // push target back in new chain
     if (newChain->size() > 0) chains.push_back(newChain);       // insert new chain in chain list
@@ -261,7 +361,7 @@ void CodeLayouter::layoutNodes() {
     }
 
     // set layout successors for BbNodes
-    BbNode *pred = new(mm) BbNode(0, 0);            // current pred node (init with fake node)
+    BbNode *pred = new(mm) BbNode(mm, 0, 0);            // current pred node (init with fake node)
     BbNode *succ = NULL;                            // currend succ node
     for (ChainMapIterator it1=order.begin(); it1!=order.end(); it1++) {
         Chain *chain = it1->second;                 // current chain
@@ -370,13 +470,14 @@ void CodeLayouter::fixConditionalBranch(BbNode *node) {
     NodeRef *targetOpnd = (NodeRef *)branchInst->getOpnd(POS_BR_TARGET);
     targetOpnd->setNode(branchTargetNode);
 
-    IPF_LOG << " branch target is node" << branchTargetNode->getId() << endl;
+    IPF_LOG << " branch target is node" << branchTargetNode->getId();
     
     // if fall through node coinsides with layout successor - noting more to do
-    if (fallThroughNode == layoutSuccNode) return;
+    if (fallThroughNode == layoutSuccNode) { IPF_LOG << endl; return; }
     
-    // create new node for unconditional branch on through edge target node
-    BbNode *branchNode = new(mm) BbNode(cfg.getNextNodeId(), fallThroughNode->getExecCounter());
+    // create new node for unconditional branch on through edge target node 
+    // branch instruction will be inserted in fixUnconditionalBranch method
+    BbNode *branchNode = new(mm) BbNode(mm, cfg.getNextNodeId(), fallThroughNode->getExecCounter());
     branchNode->setLayoutSucc(layoutSuccNode); // layout successor of current node becomes layoute successor of new node
     node->setLayoutSucc(branchNode);           // the new node becomes layout successor of current node
 
@@ -436,7 +537,7 @@ void CodeLayouter::fixUnconditionalBranch(BbNode *node) {
     // Add branch to through edge target
     Opnd    *p0         = cfg.getOpndManager()->getP0();
     NodeRef *targetNode = cfg.getOpndManager()->newNodeRef(target);
-    node->addInst(new(mm) Inst(INST_BR, CMPLT_BTYPE_COND, p0, targetNode));
+    node->addInst(new(mm) Inst(mm, INST_BR, CMPLT_WH_SPTK, CMPLT_PH_FEW, p0, targetNode));
     
     throughEdge->setEdgeKind(EDGE_BRANCH);
     IPF_LOG << " branch on node" << target->getId() << " added" << endl;

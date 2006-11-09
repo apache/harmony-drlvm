@@ -17,7 +17,6 @@
                                                                                                             
 /**
  * @author Intel, Konstantin M. Anisimov, Igor V. Chebykin
- * @version $Revision$
  *
  */
 
@@ -29,20 +28,26 @@
 namespace Jitrino {
 namespace IPF {
 
+typedef StlMap <uint64, BbNode*> Long2Node;
+
 //========================================================================================//
 // CodeLayouter
 //========================================================================================//
 
 class CodeLayouter {
 public:
-                  CodeLayouter(Cfg &cfg_);
+                  CodeLayouter(Cfg&);
     void          layout();
 
 protected:
+    void          transformPredicatedCalls();
+    void          transformPredicatedCall(BbNode*, Long2Node&);
+    Edge*         getUnwindEdge(Node*);
+
     // merge sequential nodes
     void          mergeNodes();
-    BbNode*       getSucc(BbNode*);
-    bool          checkSucc(BbNode*);
+    BbNode*       getCandidate(BbNode*);
+    bool          isMergable(BbNode*, BbNode*);
     void          merge(BbNode*, BbNode*);
     void          checkUnwind();
 

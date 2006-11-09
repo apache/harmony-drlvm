@@ -14,10 +14,9 @@
  *  See the License for the specific language governing permissions and
  *  limitations under the License.
  */
-
+                                                                                                            
 /**
  * @author Intel, Konstantin M. Anisimov, Igor V. Chebykin
- * @version $Revision$
  *
  */
 
@@ -32,18 +31,18 @@ namespace IPF {
 // Constant
 //============================================================================//
 
-Constant::Constant(DataKind dataKind_) {
-    offset   = LOCATION_INVALID;
-    size     = 0;
-    dataKind = dataKind_;
+Constant::Constant(DataKind dataKind) :
+    address(NULL),
+    offset(LOCATION_INVALID),
+    size(0),
+    dataKind(dataKind) {
 }
 
 //============================================================================//
 // SwitchConstant
 //============================================================================//
 
-SwitchConstant::SwitchConstant() : Constant(DATA_U64) { 
-}
+SwitchConstant::SwitchConstant(MemoryManager &mm) : Constant(DATA_U64), edgeList(mm) {}
 
 //----------------------------------------------------------------------------//
 
@@ -77,44 +76,14 @@ uint16 SwitchConstant::getChoice(Edge *edge) {
 }
 
 //============================================================================//
-// Float Constants
-//============================================================================//
-
-FloatConstant::FloatConstant(float value_) : Constant(DATA_S) { 
-    value = value_; 
-    setSize(sizeof(float)); 
-}
-
-//----------------------------------------------------------------------------//
-
-void *FloatConstant::getData() {
-    return NULL;
-}
-
-//============================================================================//
-// Double Constants
-//============================================================================//
-
-DoubleConstant::DoubleConstant(double value_) : Constant(DATA_D) { 
-    value = value_; 
-    setSize(sizeof(double)); 
-}
-
-//----------------------------------------------------------------------------//
-
-void *DoubleConstant::getData() {
-    return NULL;
-}
-
-//============================================================================//
 // Opnd
 //============================================================================//
 
-Opnd::Opnd(uint32 id_, OpndKind opndKind_, DataKind dataKind_, int64 value_) :
-    id(id_), 
-    opndKind(opndKind_), 
-    dataKind(dataKind_), 
-    value(value_) { 
+Opnd::Opnd(uint32 id, OpndKind opndKind, DataKind dataKind, int64 value) :
+    id(id), 
+    opndKind(opndKind), 
+    dataKind(dataKind), 
+    value(value) { 
 }
 
 //----------------------------------------------------------------------------//
@@ -173,11 +142,12 @@ bool Opnd::isFoldableImm(int64 imm, int16 size) {
 // RegOpnd
 //============================================================================//
 
-RegOpnd::RegOpnd(uint32 id_, OpndKind opndKind_, DataKind dataKind_, int32 value_) : 
-    Opnd(id_, opndKind_, dataKind_, value_) { 
-    
-    spillCost     = 0;
-    crossCallSite = false;
+RegOpnd::RegOpnd(MemoryManager &mm, uint32 id, OpndKind opndKind, DataKind dataKind, int32 value) : 
+    Opnd(id, opndKind, dataKind, value),
+    spillCost(0),
+    depOpnds(mm),
+    crossCallSite(false),
+    coalesceCands(mm) { 
 }
 
 //----------------------------------------------------------------------------//

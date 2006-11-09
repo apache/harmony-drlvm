@@ -17,7 +17,6 @@
                                                                                                             
 /**
  * @author Intel, Konstantin M. Anisimov, Igor V. Chebykin
- * @version $Revision$
  *
  */
 
@@ -52,7 +51,7 @@ class OpndManager;
 
 class Constant {
 public:
-                 Constant(DataKind dataKind_);
+                 Constant(DataKind);
     void         setOffset(int32 offset_)    { offset = offset_; }
     int32        getOffset()                 { return offset; }
     void         setAddress(void *address_)  { address = address_; }
@@ -75,7 +74,7 @@ protected:
 
 class SwitchConstant : public Constant {
 public:
-               SwitchConstant();
+               SwitchConstant(MemoryManager&);
     void       addEdge(Edge*);
     Edge       *getEdge(int16 choice) { return edgeList[choice]; };
     uint16     getChoice(Edge*);
@@ -94,7 +93,7 @@ protected:
 
 class Int64Constant : public Constant {
 public:
-           Int64Constant(int64 value_) : Constant(DATA_I64) { value = value_; setSize(sizeof(int64)); };
+           Int64Constant(int64 value) : Constant(DATA_I64), value(value) { setSize(sizeof(int64)); }
     void   *getData() { return NULL; };
     int64  getValue() { return value; };
 
@@ -108,8 +107,8 @@ protected:
 
 class FloatConstant : public Constant {
 public:
-           FloatConstant(float value_);
-    void   *getData();
+           FloatConstant(float value) : Constant(DATA_S), value(value) { setSize(sizeof(float)); }
+    void   *getData() { return NULL; }
     double getValue() { return value; };
 
 protected:
@@ -122,8 +121,8 @@ protected:
 
 class DoubleConstant : public Constant {
 public:
-           DoubleConstant(double value_);
-    void   *getData();
+           DoubleConstant(double value) : Constant(DATA_D), value(value) { setSize(sizeof(double)); }
+    void   *getData() { return NULL; }
     double getValue() { return value; };
 
 protected:
@@ -152,9 +151,9 @@ public:
     bool            isWritable();
     bool            isConstant();
     bool            isMem();
-
-    bool            isFoldableImm(int16 size) { return isFoldableImm(value, size); }
     bool            isImm(int);
+
+    bool            isFoldableImm(int16 size)       { return isFoldableImm(value, size); }
     static bool     isFoldableImm(int64 value, int16 size);
     
 protected:
@@ -170,7 +169,7 @@ protected:
 
 class RegOpnd : public Opnd {
 public:
-                RegOpnd(uint32, OpndKind, DataKind, int32=LOCATION_INVALID);
+                RegOpnd(MemoryManager&, uint32, OpndKind, DataKind, int32=LOCATION_INVALID);
     int64       getValue();
     void        setLocation(int32 value_)             { value = value_; }
     int32       getLocation()                         { return value; }
@@ -178,11 +177,13 @@ public:
     void        incSpillCost(uint32 spillCost_)       { spillCost += spillCost_; }
     uint32      getSpillCost()                        { return spillCost; }
     RegOpndSet  &getDepOpnds()                        { return depOpnds; }
-    void        markRegBusy(uint16 regNum)            { busyRegMask[regNum] = true; }
-    RegBitSet   &getBusyRegMask()                     { return busyRegMask; }
+    void        insertDepOpnds(RegOpndSet &opnds)     { depOpnds.insert(opnds.begin(), opnds.end()); }
+    void        insertDepOpnd(RegOpnd*);
     void        setCrossCallSite(bool crossCallSite_) { crossCallSite = crossCallSite_; }
     bool        getCrossCallSite()                    { return crossCallSite; }
-    void        insertDepOpnd(RegOpnd *depOpnd);
+
+    Int2OpndMap &getCoalesceCands()                   { return coalesceCands; }
+    void        addCoalesceCand(uint32 execCnt, RegOpnd *opnd) { coalesceCands.insert(make_pair(execCnt, opnd)); }
 
     virtual     ~RegOpnd() {}
 
@@ -190,8 +191,8 @@ protected:
     // These fields are for register allocation algorithm
     uint32      spillCost;          // number of opnd uses
     RegOpndSet  depOpnds;           // opnds which can not be placed in the same reg with the opnd
-    RegBitSet   busyRegMask;        // registers that can not be used for allocation of this opnd
     bool        crossCallSite;      // opnd live range crosses call site
+    Int2OpndMap coalesceCands;      // 
 };
 
 //========================================================================================//
@@ -200,10 +201,8 @@ protected:
 
 class ConstantRef : public Opnd {
 public:
-    ConstantRef::ConstantRef(uint32 id_, Constant *constant_, DataKind dataKind_ = DATA_CONST_REF)
-    : Opnd(id_, OPND_IMM, dataKind_, LOCATION_INVALID) { 
-        constant = constant_; 
-    }
+    ConstantRef::ConstantRef(uint32 id, Constant *constant, DataKind dataKind = DATA_CONST_REF) :
+        Opnd(id, OPND_IMM, dataKind, LOCATION_INVALID), constant(constant) {}
 
     int64     getValue()     { return (int64)constant->getAddress(); }
     Constant  *getConstant() { return constant; }
@@ -218,8 +217,8 @@ protected:
 
 class NodeRef : public Opnd {
 public:
-    NodeRef(uint32 id_, BbNode *node_ = NULL) 
-    : Opnd(id_, OPND_IMM, DATA_NODE_REF, LOCATION_INVALID), node(node_) {}
+    NodeRef(uint32 id, BbNode *node = NULL) 
+    : Opnd(id, OPND_IMM, DATA_NODE_REF, LOCATION_INVALID), node(node) {}
     
     int64    getValue();
     void     setNode(BbNode *node_)  { node = node_; }
@@ -229,15 +228,14 @@ protected:
     BbNode   *node;
 };
 
-
 //========================================================================================//
 // MethodRef
 //========================================================================================//
 
 class MethodRef : public Opnd {
 public:
-    MethodRef(uint32 id_, MethodDesc *method_ = NULL) 
-    : Opnd(id_, OPND_IMM, DATA_METHOD_REF, LOCATION_INVALID), method(method_) {}
+    MethodRef(uint32 id, MethodDesc *method = NULL) 
+    : Opnd(id, OPND_IMM, DATA_METHOD_REF, LOCATION_INVALID), method(method) {}
     
     int64       getValue();
     void        setMethod(MethodDesc *method_) { method = method_; }
@@ -253,17 +251,17 @@ protected:
 
 class Inst {
 public:
-    Inst(InstCode instCode_, 
-         Opnd *op1=NULL, Opnd *op2=NULL, Opnd *op3=NULL, Opnd *op4=NULL, Opnd *op5=NULL, Opnd *op6=NULL);
+    Inst(MemoryManager&, InstCode, 
+         Opnd* =NULL, Opnd* =NULL, Opnd* =NULL, Opnd* =NULL, Opnd* =NULL, Opnd* =NULL);
 
-    Inst(InstCode instCode_, Completer comp1, 
-         Opnd *op1=NULL, Opnd *op2=NULL, Opnd *op3=NULL, Opnd *op4=NULL, Opnd *op5=NULL, Opnd *op6=NULL);
+    Inst(MemoryManager&, InstCode, Completer, 
+         Opnd* =NULL, Opnd* =NULL, Opnd* =NULL, Opnd* =NULL, Opnd* =NULL, Opnd* =NULL);
 
-    Inst(InstCode instCode_, Completer comp1, Completer comp2, 
-         Opnd *op1=NULL, Opnd *op2=NULL, Opnd *op3=NULL, Opnd *op4=NULL, Opnd *op5=NULL, Opnd *op6=NULL);
+    Inst(MemoryManager&, InstCode, Completer, Completer, 
+         Opnd* =NULL, Opnd* =NULL, Opnd* =NULL, Opnd* =NULL, Opnd* =NULL, Opnd* =NULL);
 
-    Inst(InstCode instCode_, Completer comp1, Completer comp2, Completer comp3,
-         Opnd *op1=NULL, Opnd *op2=NULL, Opnd *op3=NULL, Opnd *op4=NULL, Opnd *op5=NULL, Opnd *op6=NULL);
+    Inst(MemoryManager&, InstCode, Completer, Completer, Completer,
+         Opnd* =NULL, Opnd* =NULL, Opnd* =NULL, Opnd* =NULL, Opnd* =NULL, Opnd* =NULL);
 
     InstCode    getInstCode()                        { return instCode; }
     void        setInstCode(InstCode instCode_)      { instCode = instCode_; }
@@ -305,7 +303,7 @@ protected:
 
 class Edge {
 public:
-                Edge(Node *source_, Node *target_, double prob_, EdgeKind kind_);
+                Edge(Node*, Node*, double, EdgeKind);
     Node        *getSource()                { return source; }
     Node        *getTarget()                { return target; }
     double      getProb()                   { return prob; }
@@ -317,8 +315,6 @@ public:
     void        changeSource(Node *source_);
     void        changeTarget(Node *target_);
     bool        isBackEdge();
-    void        connect(Node *target);
-    void        disconnect();
 
 protected:
     EdgeKind    edgeKind;
@@ -348,7 +344,7 @@ protected:
 
 class Node {
 public:
-                Node(uint32 id_, NodeKind kind_ = NODE_INVALID);
+                Node(MemoryManager&, uint32, uint32, NodeKind = NODE_INVALID);
 
     void        remove();
     void        addEdge(Edge *edge);
@@ -360,30 +356,29 @@ public:
     Node        *getDispatchNode();
     void        mergeOutLiveSets(RegOpndSet &resultSet);
 
-    EdgeVector  &getInEdges()                    { return inEdges; }
-    EdgeVector  &getOutEdges()                   { return outEdges; }
-    void        setNodeKind(NodeKind kind_)      { nodeKind = kind_; }
-    NodeKind    getNodeKind()                    { return nodeKind; }
-    void        setId(uint32 id_)                { id = id_; }
-    uint32      getId()                          { return id; }
-    void        setLiveSet(RegOpndSet& liveSet_) { liveSet = liveSet_; }
-    RegOpndSet  &getLiveSet()                    { return liveSet; }
-    void        clearLiveSet()                   { liveSet.clear(); }
-    void        setLoopHeader(Node *loopHeader_) { loopHeader = loopHeader_; }
-    Node        *getLoopHeader()                 { return loopHeader; }
-    bool        isBb()                           { return nodeKind == NODE_BB; }
-    void        addInEdge(Edge *edge);
-    void        removeInEdge(Edge *edge);
-    void        printEdges(ostream& out);
+    void        setExecCounter(uint32 execCounter_) { execCounter = execCounter_; }
+    uint32      getExecCounter()                    { return execCounter; }
+    EdgeVector  &getInEdges()                       { return inEdges; }
+    EdgeVector  &getOutEdges()                      { return outEdges; }
+    void        setNodeKind(NodeKind kind_)         { nodeKind = kind_; }
+    NodeKind    getNodeKind()                       { return nodeKind; }
+    void        setId(uint32 id_)                   { id = id_; }
+    uint32      getId()                             { return id; }
+    void        setLiveSet(RegOpndSet& liveSet_)    { liveSet = liveSet_; }
+    RegOpndSet  &getLiveSet()                       { return liveSet; }
+    void        clearLiveSet()                      { liveSet.clear(); }
+    void        setLoopHeader(Node *loopHeader_)    { loopHeader = loopHeader_; }
+    Node        *getLoopHeader()                    { return loopHeader; }
+    bool        isBb()                              { return nodeKind == NODE_BB; }
     
 protected:
     uint32      id;               // node unique Id
+    uint32      execCounter;      // profile info (how many times the node executes)
     NodeKind    nodeKind;         // 
     EdgeVector  inEdges;          // in edges list
     EdgeVector  outEdges;         // out edges list
     Node        *loopHeader;      // header of loop containing this node, if NULL - node is not in loop
     RegOpndSet  liveSet;          // set of opnds alive on node enter
-    void        printEdges(ostream& out, EdgeVector& edges, bool head);
 };
 
 //========================================================================================//
@@ -392,23 +387,20 @@ protected:
 
 class BbNode : public Node {
 public:
-                BbNode(uint32 id_, uint32 execCounter_);
-    void        addInst(Inst *inst); 
+                BbNode(MemoryManager&, uint32, uint32);
+    void        addInst(Inst *inst)                 { insts.push_back(inst); }
     void        removeInst(Inst *inst)              { insts.erase(find(insts.begin(),insts.end(),inst)); } 
     InstVector  &getInsts()                         { return insts; }
     void        setAddress(uint64 address_)         { address = address_; }
     uint64      getAddress()                        { return address; }
     void        setLayoutSucc(BbNode *layoutSucc_)  { layoutSucc = layoutSucc_; }
     BbNode      *getLayoutSucc()                    { return layoutSucc; }
-    void        setExecCounter(uint32 execCounter_) { execCounter = execCounter_; }
-    uint32      getExecCounter()                    { return execCounter; }
     uint64      getInstAddr(Inst *inst)             { return ((uint64)address + inst->getAddr()); }
 
 protected:
     InstVector  insts;
     BbNode      *layoutSucc;
     uint64      address;
-    uint32      execCounter;
 };
 
 //========================================================================================//
