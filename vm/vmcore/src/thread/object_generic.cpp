@@ -84,8 +84,8 @@ jint default_hashcode(Managed_Object_Handle obj) {
     set_hash_bits(p_obj);
 
     if ( *P_HASH_CONTENTION_BYTE(p_obj) & HASH_MASK)
-        return *P_HASH_CONTENTION_BYTE(p_obj) & HASH_MASK;    
-    
+        return *P_HASH_CONTENTION_BYTE(p_obj) & HASH_MASK;
+
     ASSERT(0, "All the possible cases are supposed to be covered before");
     return 0xff;
 }
@@ -124,14 +124,14 @@ jobject object_clone(JNIEnv *jenv, jobject jobj)
     ObjectHandle h = (ObjectHandle) jobj;
     VTable *vt = h->object->vt();
     unsigned size;
-    if (get_prop_array(vt->class_properties))
+    if((vt->class_properties & CL_PROP_ARRAY_MASK) != 0)
     {
         // clone an array
         int32 length = get_vector_length((Vector_Handle) h->object);
-        size = vm_array_size(vt, length);
-        result = (ManagedObject *) 
-            vm_new_vector_using_vtable_and_thread_pointer(
-                length, vt->clss->allocation_handle, vm_get_gc_thread_local());
+        size = vt->clss->calculate_array_size(length);
+        result = (ManagedObject*)
+            vm_new_vector_using_vtable_and_thread_pointer(length,
+                vt->clss->get_allocation_handle(), vm_get_gc_thread_local());
     }
     else
     {
@@ -144,8 +144,7 @@ jobject object_clone(JNIEnv *jenv, jobject jobj)
             return NULL;
         }
         size = vt->allocated_size;
-        result = (ManagedObject *) vm_alloc_and_report_ti(size, 
-            vt->clss->allocation_handle, vm_get_gc_thread_local(), vt->clss);
+        result = vt->clss->allocate_instance();
     }
     if (result == NULL) {
         tmn_suspend_enable(); 

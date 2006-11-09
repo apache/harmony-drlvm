@@ -82,7 +82,7 @@ scan_array_object(Partial_Reveal_Object *array, GC_Mark_Activity *gc_thread)
     assert (type_info_is_reference(tih) || type_info_is_vector(tih) || type_info_is_general_array(tih));
 
     int32 array_length = vector_get_length((Vector_Handle) array);
-    for (jint i = 0; i < array_length; i++) {
+    for (int i = 0; i < array_length; i++) {
         Slot p_element(vector_get_element_address_ref
                 ((Vector_Handle) array, i));
 

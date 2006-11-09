@@ -33,11 +33,11 @@
 class Lock_Manager {
 
 public:
-    VMEXPORT Lock_Manager();
-    VMEXPORT ~Lock_Manager();
+    Lock_Manager();
+    ~Lock_Manager();
 
-    VMEXPORT void _lock();
-    VMEXPORT void _unlock();
+    void _lock();
+    void _unlock();
     bool _tryLock();
 
     void _lock_enum();

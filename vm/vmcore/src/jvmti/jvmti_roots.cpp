@@ -31,6 +31,7 @@
 
 // VM headers
 #include "Class.h"
+#include "cci.h"
 #include "classloader.h"
 #include "finalize.h"
 #include "interpreter.h"

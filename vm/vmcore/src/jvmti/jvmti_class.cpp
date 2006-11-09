@@ -133,7 +133,7 @@ jvmtiGetLoadedClasses(jvmtiEnv* env,
         for(it = tbl->begin(); it != tbl->end(); it++)
         {
             klass = &it->second;
-            if ((*klass)->class_loader != classloader)
+            if ((*klass)->get_class_loader() != classloader)
                 continue;
             count++;
         }
@@ -176,15 +176,12 @@ jvmtiGetLoadedClasses(jvmtiEnv* env,
         for(it = tbl->begin(); it != tbl->end(); it++)
         {
             klass = &it->second;
-            if((*klass)->is_primitive)
+            if((*klass)->is_primitive())
                 continue;
-            if ((*klass)->class_loader != classloader)
+            if ((*klass)->get_class_loader() != classloader)
                 continue;
             // create a new jclass handle for Class
-            tmn_suspend_disable();
-            ObjectHandle new_handle = oh_allocate_local_handle();
-            new_handle->object = struct_Class_to_java_lang_Class( *klass );
-            tmn_suspend_enable();
+            ObjectHandle new_handle = struct_Class_to_jclass(*klass);
 
             // set created handle into jclass handle table
             (*classes)[number++] = (jclass)new_handle;
@@ -277,10 +274,7 @@ jvmtiGetClassLoaderClasses(jvmtiEnv* env,
     {
         klass = &it->second;
         // create a new jclass handle for Class
-        tmn_suspend_disable();
-        ObjectHandle new_handle = oh_allocate_local_handle();
-        new_handle->object = struct_Class_to_java_lang_Class( *klass );
-        tmn_suspend_enable();
+        ObjectHandle new_handle = struct_Class_to_jclass(*klass);
 
         // set created handle into jclass handle table
         (*classes_ptr)[index++] = (jclass)new_handle;
@@ -398,18 +392,18 @@ jvmtiGetClassStatus(jvmtiEnv* env, jclass handle, jint* status_ptr)
     } else if( class_is_array( cl ) ) {
         *status_ptr = JVMTI_CLASS_STATUS_ARRAY;
     } else {
-        switch( cl->state )
+        switch(cl->get_state())
         {
         case ST_Start:
         case ST_LoadingAncestors:
-            break;
         case ST_Loaded:
+        case ST_BytecodesVerified:
         case ST_InstanceSizeComputed:
-            if( cl->is_verified ) {
-                *status_ptr |= JVMTI_CLASS_STATUS_VERIFIED;
-            }
             break;
         case ST_Prepared:
+            *status_ptr |= JVMTI_CLASS_STATUS_PREPARED;
+            break;
+        case ST_ConstraintsVerified:
         case ST_Initializing:
             *status_ptr |= JVMTI_CLASS_STATUS_PREPARED
                 | JVMTI_CLASS_STATUS_VERIFIED;
@@ -459,20 +453,21 @@ jvmtiGetSourceFileName(jvmtiEnv* env, jclass handle, char** res)
             &errorCode);
     if( cl == NULL ) return errorCode;
 
-    if( cl->is_primitive || cl->is_array )
+    if(cl->is_primitive() || cl->is_array())
     {
-        TRACE2("jvmti.class", "GetSourceFileName called, name = " << cl->name->bytes <<
-            " file name is absent");
+        TRACE2("jvmti.class", "GetSourceFileName called, name = "
+            << cl->get_name()->bytes << " file name is absent");
         return JVMTI_ERROR_ABSENT_INFORMATION;
     }
-    if(!cl->src_file_name) return JVMTI_ERROR_ABSENT_INFORMATION;
+    if(!cl->has_source_information()) return JVMTI_ERROR_ABSENT_INFORMATION;
 
-    TRACE2("jvmti.class", "GetSourceFileName called, name = " << cl->name->bytes <<
-        " file name = " << cl->src_file_name->bytes);
-    errorCode = _allocate( cl->src_file_name->len + 1, (unsigned char**)res );
+    TRACE2("jvmti.class", "GetSourceFileName called, name = "
+        << cl->get_name()->bytes << " file name = "
+        << cl->get_source_file_name());
+    errorCode = _allocate(cl->get_source_file_name_length() + 1, (unsigned char**)res);
     if( errorCode != JVMTI_ERROR_NONE ) return errorCode;
 
-    strcpy( *res, cl->src_file_name->bytes );
+    memcpy(*res, cl->get_source_file_name(), cl->get_source_file_name_length() + 1);
 
     return JVMTI_ERROR_NONE;
 }
@@ -503,11 +498,11 @@ jvmtiGetClassModifiers(jvmtiEnv* env, jclass handle, jint* modifiers_ptr)
     if( cl == NULL ) return errorCode;
 
     *modifiers_ptr = 0;
-    if( class_is_public( cl ) ) *modifiers_ptr |= ACC_PUBLIC;
-    if( class_is_final( cl ) ) *modifiers_ptr |= ACC_FINAL;
-    if( class_is_super( cl ) ) *modifiers_ptr |= ACC_SUPER;
-    if( class_is_interface( cl ) ) *modifiers_ptr |= ACC_INTERFACE;
-    if( class_is_abstract( cl ) ) *modifiers_ptr |= ACC_ABSTRACT;
+    if(cl->is_public()) *modifiers_ptr |= ACC_PUBLIC;
+    if(cl->is_final()) *modifiers_ptr |= ACC_FINAL;
+    if(cl->is_super()) *modifiers_ptr |= ACC_SUPER;
+    if(cl->is_interface()) *modifiers_ptr |= ACC_INTERFACE;
+    if(cl->is_abstract()) *modifiers_ptr |= ACC_ABSTRACT;
 
     return JVMTI_ERROR_NONE;
 }
@@ -542,16 +537,14 @@ jvmtiGetClassMethods(jvmtiEnv* env, jclass handle, jint* method_count_ptr,
      * Check class status. If class is not on PREPARED status, GetClassMethods(...)
      * function returns JVMTI_ERROR_CLASS_NOT_PREPARED
      */
-    if ((cl->state == ST_Start) ||
-            (cl->state == ST_LoadingAncestors) ||
-            (cl->state == ST_Loaded) ||
-            (cl->state == ST_InstanceSizeComputed))
+    if(!cl->is_at_least_prepared())
         return JVMTI_ERROR_CLASS_NOT_PREPARED;
 
-    errorCode = _allocate( cl->n_methods*sizeof(jmethodID), (unsigned char**)methods_ptr );
+    errorCode = _allocate(cl->get_number_of_methods()*sizeof(jmethodID), (unsigned char**)methods_ptr );
     if( errorCode != JVMTI_ERROR_NONE ) return errorCode;
-    *method_count_ptr = cl->n_methods;
-    for( short i = 0; i < cl->n_methods; i++ ) (*methods_ptr)[i] = (jmethodID)&(cl->methods[i]);
+    *method_count_ptr = cl->get_number_of_methods();
+    for(short i = 0; i < cl->get_number_of_methods(); i++ )
+        (*methods_ptr)[i] = (jmethodID)cl->get_method(i);
 
     return JVMTI_ERROR_NONE;
 }
@@ -586,16 +579,15 @@ jvmtiGetClassFields(jvmtiEnv* env, jclass handle, jint* field_count_ptr,
      * Check class status. If class is not on PREPARED status, GetClassMethods(...)
      * function returns JVMTI_ERROR_CLASS_NOT_PREPARED
      */
-    if ((cl->state == ST_Start) ||
-            (cl->state == ST_LoadingAncestors) ||
-            (cl->state == ST_Loaded) ||
-            (cl->state == ST_InstanceSizeComputed))
+    if(!cl->is_at_least_prepared())
         return JVMTI_ERROR_CLASS_NOT_PREPARED;
 
-    errorCode = _allocate( cl->n_fields*sizeof(jfieldID), (unsigned char**)fields_ptr );
+    errorCode = _allocate(cl->get_number_of_fields()*sizeof(jfieldID),
+        (unsigned char**)fields_ptr);
     if( errorCode != JVMTI_ERROR_NONE ) return errorCode;
-    *field_count_ptr = cl->n_fields;
-    for( short i = 0; i < cl->n_fields; i++ ) (*fields_ptr)[i] = (jfieldID)&(cl->fields[i]);
+    *field_count_ptr = cl->get_number_of_fields();
+    for(short i = 0; i < cl->get_number_of_fields(); i++ )
+        (*fields_ptr)[i] = (jfieldID)cl->get_field(i);
 
     return JVMTI_ERROR_NONE;
 }
@@ -630,25 +622,19 @@ jvmtiGetImplementedInterfaces(jvmtiEnv* env, jclass klass, jint* interface_count
      * Check class status. If class is not on PREPARED status, GetClassMethods(...)
      * function returns JVMTI_ERROR_CLASS_NOT_PREPARED
      */
-    if ((cl->state == ST_Start) ||
-            (cl->state == ST_LoadingAncestors) ||
-            (cl->state == ST_Loaded) ||
-            (cl->state == ST_InstanceSizeComputed))
+    if(!cl->is_at_least_prepared())
         return JVMTI_ERROR_CLASS_NOT_PREPARED;
 
-    errorCode = _allocate( cl->n_superinterfaces*sizeof(jclass),
+    errorCode = _allocate( cl->get_number_of_superinterfaces()*sizeof(jclass),
         reinterpret_cast<unsigned char**>(interfaces_ptr) );
     if( errorCode != JVMTI_ERROR_NONE ) return errorCode;
     ObjectHandle jclss;
-    for( int i = 0; i < cl->n_superinterfaces; i++ )
+    for( int i = 0; i < cl->get_number_of_superinterfaces(); i++ )
     {
-        tmn_suspend_disable();
-        jclss = oh_allocate_local_handle();
-        jclss->object = struct_Class_to_java_lang_Class( cl->superinterfaces[i].clss );
-        tmn_suspend_enable();
+        jclss = struct_Class_to_jclass(cl->get_superinterface(i));
         (*interfaces_ptr)[i] = (jclass)jclss;
     }
-    *interface_count_ptr = cl->n_superinterfaces;
+    *interface_count_ptr = cl->get_number_of_superinterfaces();
 
     return JVMTI_ERROR_NONE;
 }
@@ -680,8 +666,8 @@ jvmtiIsInterface(jvmtiEnv* env, jclass handle, jboolean* is_interface_ptr)
     if (cl == NULL)
         return errorCode;
 
-    TRACE2("jvmti.class", "IsInterface: class = " << cl->name->bytes);
-    *is_interface_ptr = (jboolean)(class_is_interface(cl) ? JNI_TRUE : JNI_FALSE);
+    TRACE2("jvmti.class", "IsInterface: class = " << cl->get_name()->bytes);
+    *is_interface_ptr = (jboolean)(cl->is_interface() ? JNI_TRUE : JNI_FALSE);
     return JVMTI_ERROR_NONE;
 }
 
@@ -712,8 +698,8 @@ jvmtiIsArrayClass(jvmtiEnv* env, jclass handle, jboolean* is_array_class_ptr)
     if (cl == NULL)
         return errorCode;
 
-    TRACE2("jvmti.class", "IsArrayClass: class = " << cl->name->bytes);
-    *is_array_class_ptr = (jboolean)(cl->is_array ? JNI_TRUE : JNI_FALSE);
+    TRACE2("jvmti.class", "IsArrayClass: class = " << cl->get_name()->bytes);
+    *is_array_class_ptr = (jboolean)(cl->is_array() ? JNI_TRUE : JNI_FALSE);
     return JVMTI_ERROR_NONE;
 }
 
@@ -743,7 +729,7 @@ jvmtiError JNICALL jvmtiGetClassLoader(jvmtiEnv* env, jclass handle, jobject* cl
         return errorCode;
 
     tmn_suspend_disable();
-    ManagedObject* cl = clss->class_loader->GetLoader();
+    ManagedObject* cl = clss->get_class_loader()->GetLoader();
     if( !cl ) {
         *classloader_ptr = NULL;
     } else {
@@ -782,14 +768,15 @@ jvmtiGetSourceDebugExtension(jvmtiEnv* env, jclass handle, char** source_debug_e
     if (clss == NULL)
         return errorCode;
 
-    if( !clss->sourceDebugExtension ) return JVMTI_ERROR_ABSENT_INFORMATION;
+    if(!clss->has_source_debug_extension()) return JVMTI_ERROR_ABSENT_INFORMATION;
 
-    errorCode = _allocate( clss->sourceDebugExtension->len + 1,
-        reinterpret_cast<unsigned char**>(source_debug_extension_ptr) );
+    errorCode = _allocate(clss->get_source_debug_extension_length() + 1,
+        reinterpret_cast<unsigned char**>(source_debug_extension_ptr));
     if( errorCode != JVMTI_ERROR_NONE )
         return errorCode;
 
-    strcpy( *source_debug_extension_ptr, clss->sourceDebugExtension->bytes );
+    memcpy(*source_debug_extension_ptr, clss->get_source_debug_extension(),
+        clss->get_source_debug_extension_length() + 1);
 
     return JVMTI_ERROR_NONE;
 }

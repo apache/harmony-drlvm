@@ -305,7 +305,7 @@ VMEXPORT Boolean field_is_unmanaged_static(Field_Handle fh);
 VMEXPORT unsigned field_get_offset(Field_Handle fh);
 
 // Returns an address of a static field.
-VMEXPORT void *field_get_addr(Field_Handle fh);
+VMEXPORT void *field_get_address(Field_Handle fh);
 
 // Returns a name of the field.
 VMEXPORT const char *field_get_name(Field_Handle fh);

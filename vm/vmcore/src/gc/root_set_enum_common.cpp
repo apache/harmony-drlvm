@@ -29,7 +29,9 @@
 #include "vm_stats.h"
 #include "m2n.h"
 #include "open/vm_util.h"
+#include "open/gc.h"
 #include "finalize.h"
+#include "cci.h"
 
 void vm_enumerate_interned_strings()
 {
@@ -80,24 +82,22 @@ void vm_enumerate_static_fields()
             assert(*ppc);
             Class* c = jclass_to_struct_Class((jclass)ppc);
 
-            if (c->p_error) {
+            if(c->in_error()) {
                 vm_enumerate_root_reference(
-                        (void**)&c->p_error ,FALSE);
+                        (void**)c->get_error_cause() ,FALSE);
             }
             vm_enumerate_root_reference((void**)ppc, FALSE);
-            Const_Pool* cp = c->m_failedResolution;
+            ConstPoolEntry* cp = c->get_constant_pool().get_error_chain();
             while(cp) {
                 vm_enumerate_root_reference((void**)(&(cp->error.cause)), FALSE);
                 cp = cp->error.next;
             }
             // Finally enumerate the static fields of the class
-            unsigned n_fields = c->n_fields;
-            if((c->state == ST_Prepared)
-                || (c->state == ST_Initializing)
-                || (c->state == ST_Initialized)) {
+            unsigned n_fields = c->get_number_of_fields();
+            if(c->is_at_least_prepared()) {
                 // Class has been prepared, so we can iterate over all its fields.
                 for(unsigned i = 0; i < n_fields; i++) {
-                    Field *f = &c->fields[i];
+                    Field* f = c->get_field(i);
                     if(f->is_static()) {
                         char desc0 = f->get_descriptor()->bytes[0];
                         if(desc0 == 'L' || desc0 == '[') {
@@ -134,9 +134,10 @@ vm_enumerate_root_reference(void **ref, Boolean is_pinned)
             ManagedObject **p_obj = (ManagedObject **)ref;  
             ManagedObject* obj = *p_obj;
             assert(obj != NULL);    // See the comment at the top of the procedure.
-            if ((void *)obj != Class::heap_base) {
-                assert(((POINTER_SIZE_INT)Class::heap_base <= (POINTER_SIZE_INT)obj) && ((POINTER_SIZE_INT)obj <= (POINTER_SIZE_INT)Class::heap_end));
-                (obj->vt())->clss->name->bytes;
+            if ((void *)obj != VM_Global_State::loader_env->heap_base) {
+                assert(((POINTER_SIZE_INT)VM_Global_State::loader_env->heap_base <= (POINTER_SIZE_INT)obj)
+                    && ((POINTER_SIZE_INT)obj <= (POINTER_SIZE_INT)VM_Global_State::loader_env->heap_end));
+                (obj->vt())->clss->get_name()->bytes;
             } 
         }
 #endif // _DEBUG
@@ -156,11 +157,12 @@ VMEXPORT void vm_enumerate_compressed_root_reference(uint32 *ref, Boolean is_pin
         COMPRESSED_REFERENCE compressed_ref = *ref;
         ManagedObject* obj = (ManagedObject *)uncompress_compressed_reference(compressed_ref);
         bool is_null    = (compressed_ref == 0);
-        bool is_in_heap = (((POINTER_SIZE_INT)Class::heap_base <= (POINTER_SIZE_INT)obj) && ((POINTER_SIZE_INT)obj <= (POINTER_SIZE_INT)Class::heap_end));
+        bool is_in_heap = (((POINTER_SIZE_INT)VM_Global_State::loader_env->heap_base <= (POINTER_SIZE_INT)obj)
+            && ((POINTER_SIZE_INT)obj <= (POINTER_SIZE_INT)VM_Global_State::loader_env->heap_end));
         if (is_null || is_in_heap) {
             // Make sure the reference is valid.
             if (!is_null) {
-                (obj->vt())->clss->name->bytes;
+                (obj->vt())->clss->get_name()->bytes;
             }                                                               
         } else {
             ASSERT(0, "Bad slot pointer");

@@ -25,6 +25,7 @@
 #define LOG_DOMAIN "jvmti"
 #include "cxxlog.h"
 
+#include "open/gc.h"
 #include "jvmti_direct.h"
 #include "jvmti_internal.h"
 #include "jvmti_utils.h"
@@ -36,6 +37,7 @@
 #include "suspend_checker.h"
 #include "jit_intf_cpp.h"
 #include "vm_log.h"
+#include "cci.h"
 #include "compile.h"
 #include "jvmti_break_intf.h"
 #include "stack_iterator.h"
@@ -455,7 +457,7 @@ void jvmti_send_compiled_method_load_event(Method *method)
             {
                 TRACE2("jvmti.event.cml",
                     "Callback JVMTI_EVENT_COMPILED_METHOD_LOAD called, method = " <<
-                    method->get_class()->name->bytes << "." << method->get_name()->bytes <<
+                    method->get_class()->get_name()->bytes << "." << method->get_name()->bytes <<
                     method->get_descriptor()->bytes);
 
                 for (CodeChunkInfo* cci = method->get_first_JIT_specific_info();  cci;  cci = cci->_next)
@@ -466,7 +468,7 @@ void jvmti_send_compiled_method_load_event(Method *method)
 
                 TRACE2("jvmti.event.cml",
                     "Callback JVMTI_EVENT_COMPILED_METHOD_LOAD finished, method = " <<
-                    method->get_class()->name->bytes << "." << method->get_name()->bytes <<
+                    method->get_class()->get_name()->bytes << "." << method->get_name()->bytes <<
                     method->get_descriptor()->bytes);
             }
         }
@@ -557,25 +559,23 @@ jvmtiGenerateEvents(jvmtiEnv* env,
             /**
              * Create jclass handle for classes and set in jclass table
              */
-          classloader->Lock();
-          ClassTable* tbl;
-          Class **klass;
-          ClassTable::iterator it;
-          tbl = classloader->GetLoadedClasses();
-          for(it = tbl->begin(); it != tbl->end(); it++)
-          {
+            classloader->Lock();
+            ClassTable* tbl;
+            Class **klass;
+            ClassTable::iterator it;
+            tbl = classloader->GetLoadedClasses();
+            for(it = tbl->begin(); it != tbl->end(); it++)
+            {
                 klass = &it->second;
-                TRACE2("jvmti.event", "Class = " << (*klass)->name->bytes);
-                if((*klass)->is_primitive)
+                TRACE2("jvmti.event", "Class = " << (*klass)->get_name()->bytes);
+                if((*klass)->is_primitive())
                     continue;
-                if((*klass)->class_loader != classloader)
+                if((*klass)->get_class_loader() != classloader)
                     continue;
-                if((*klass)->state == ST_Prepared ||
-                    (*klass)->state == ST_Initializing ||
-                    (*klass)->state == ST_Initialized)
-                    for (int jjj = 0; jjj < (*klass)->n_methods; jjj++)
+                if((*klass)->is_at_least_prepared())
+                    for (int jjj = 0; jjj < (*klass)->get_number_of_methods(); jjj++)
                     {
-                        Method *method = &(*klass)->methods[jjj];
+                        Method* method = (*klass)->get_method(jjj);
                         TRACE2("jvmti.event", "    Method = " << method->get_name()->bytes <<
                             method->get_descriptor()->bytes <<
                             (method->get_state() == Method::ST_Compiled ? " compiled" : " not compiled"));
@@ -593,7 +593,7 @@ jvmtiGenerateEvents(jvmtiEnv* env,
             } else {
                 break;
             }
-        } while( true );
+        } while(true);
 
         ClassLoader::UnlockLoadersTable();
     }
@@ -1510,7 +1510,7 @@ void jvmti_send_contended_enter_or_entered_monitor_event(jobject obj,
 void jvmti_send_class_load_event(const Global_Env* env, Class* clss)
 {
     assert(hythread_is_suspend_enabled());
-    if( clss->is_array || clss->is_primitive ) {
+    if(clss->is_array() || clss->is_primitive()) {
         // array class creation and creation of a primitive class
         // do not generate a class load event.
         return;
@@ -1527,11 +1527,10 @@ void jvmti_send_class_load_event(const Global_Env* env, Class* clss)
     }
 
     JNIEnv *jni_env = p_TLS_vmthread->jni_env;
-    tmn_suspend_disable();
     ObjectHandle hThread = oh_allocate_local_handle();
-    ObjectHandle hClass = oh_allocate_local_handle();
+    ObjectHandle hClass = struct_Class_to_jclass(clss);
+    tmn_suspend_disable();
     hThread->object = (Java_java_lang_Thread *)jthread_get_java_thread(hythread_self())->object;
-    hClass->object = struct_Class_to_java_lang_Class(clss);
     tmn_suspend_enable();
 
     TIEnv *ti_env = ti->getEnvironments();
@@ -1545,7 +1544,7 @@ void jvmti_send_class_load_event(const Global_Env* env, Class* clss)
         {
             if (ti_env->global_events[JVMTI_EVENT_CLASS_LOAD - JVMTI_MIN_EVENT_TYPE_VAL])
             {
-                TRACE2("jvmti.class.cl", "Class load event, class name = " << clss->name->bytes);
+                TRACE2("jvmti.class.cl", "Class load event, class name = " << clss->get_name()->bytes);
                 // fire global event
                 func((jvmtiEnv *)ti_env, jni_env, (jthread)hThread, (jclass)hClass);
                 ti_env = next_env;
@@ -1557,7 +1556,7 @@ void jvmti_send_class_load_event(const Global_Env* env, Class* clss)
                  ti_et != NULL; ti_et = ti_et->next )
                 if (ti_et->thread == hythread_self())
                 {
-                    TRACE2("jvmti.class.cl", "Class load event, class name = " << clss->name->bytes);
+                    TRACE2("jvmti.class.cl", "Class load event, class name = " << clss->get_name()->bytes);
                     tmn_suspend_disable();
                     ObjectHandle hThreadLocal = oh_allocate_local_handle();
                     hThreadLocal->object = (Java_java_lang_Thread *)jthread_get_java_thread(ti_et->thread)->object;
@@ -1654,7 +1653,7 @@ void jvmti_send_class_file_load_hook_event(const Global_Env* env,
 void jvmti_send_class_prepare_event(Class* clss)
 {
     assert(hythread_is_suspend_enabled());
-    if( clss->is_array || clss->is_primitive ) {
+    if(clss->is_array() || clss->is_primitive()) {
         // class prepare events are not generated for primitive classes
         // and arrays
         return;
@@ -1671,12 +1670,11 @@ void jvmti_send_class_prepare_event(Class* clss)
     }
 
     JNIEnv *jni_env = p_TLS_vmthread->jni_env;
+    ObjectHandle hClass = struct_Class_to_jclass(clss);
     tmn_suspend_disable(); // -----------vv
     ObjectHandle hThread = oh_allocate_local_handle();
-    ObjectHandle hClass = oh_allocate_local_handle();
     hThread->object = (Java_java_lang_Thread *)jthread_get_java_thread(hythread_self())->object;
-    hClass->object = struct_Class_to_java_lang_Class(clss);
-    tmn_suspend_enable(); // ------------^^
+    tmn_suspend_enable();   // -----------^^
 
     TIEnv *ti_env = ti->getEnvironments();
     TIEnv *next_env;
@@ -1689,10 +1687,10 @@ void jvmti_send_class_prepare_event(Class* clss)
         {
             if (ti_env->global_events[JVMTI_EVENT_CLASS_PREPARE - JVMTI_MIN_EVENT_TYPE_VAL])
             {
-                TRACE2("jvmti.class.cp", "Class prepare event, class name = " << clss->name->bytes);
+                TRACE2("jvmti.class.cp", "Class prepare event, class name = " << clss->get_name()->bytes);
                 // fire global event
                 func((jvmtiEnv *)ti_env, jni_env, (jthread)hThread, (jclass)hClass);
-                TRACE2("jvmti.class.cp", "Class prepare event exited, class name = " << clss->name->bytes);
+                TRACE2("jvmti.class.cp", "Class prepare event exited, class name = " << clss->get_name()->bytes);
                 ti_env = next_env;
                 continue;
             }
@@ -1701,7 +1699,7 @@ void jvmti_send_class_prepare_event(Class* clss)
                 ti_et != NULL; ti_et = ti_et->next )
                 if (ti_et->thread == hythread_self())
                 {
-                    TRACE2("jvmti.class.cp", "Class prepare event, class name = " << clss->name->bytes);
+                    TRACE2("jvmti.class.cp", "Class prepare event, class name = " << clss->get_name()->bytes);
                     tmn_suspend_disable(); // -------------------------------vv
                     ObjectHandle hThreadLocal = oh_allocate_local_handle();
                     hThreadLocal->object = (Java_java_lang_Thread *)jthread_get_java_thread(hythread_self())->object;

@@ -34,8 +34,10 @@
 #include "m2n.h"
 #include "stack_iterator.h"
 #include "open/bytecodes.h"
-#include "jvmti_break_intf.h"
+#include "cci.h"
 
+#include "jvmti_break_intf.h"
+#include "cci.h"
 
 // Forvard declarations
 static ConditionCode

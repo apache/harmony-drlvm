@@ -36,6 +36,7 @@
 #include "stack_iterator.h"
 #include "jit_intf_cpp.h"
 #include "thread_manager.h"
+#include "cci.h"
 
 #define jvmti_test_jenv (p_TLS_vmthread->jni_env)
 

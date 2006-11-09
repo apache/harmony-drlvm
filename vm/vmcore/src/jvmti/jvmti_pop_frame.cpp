@@ -32,6 +32,7 @@
 #include "mon_enter_exit.h"
 #include "stack_iterator.h"
 #include "jvmti_break_intf.h"
+#include "cci.h"
 #include "clog.h"
 
 static void jvmti_pop_frame_callback()

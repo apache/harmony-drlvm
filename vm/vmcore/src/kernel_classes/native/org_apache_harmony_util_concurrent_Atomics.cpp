@@ -39,7 +39,7 @@ JNIEXPORT jint JNICALL Java_org_apache_harmony_util_concurrent_Atomics_arrayInde
   (JNIEnv * env, jclass self, jclass array)
 {
     Class * clz = jclass_to_struct_Class(array);
-    return clz->array_element_size;
+    return clz->get_array_element_size();
 }
 
 JNIEXPORT void JNICALL 

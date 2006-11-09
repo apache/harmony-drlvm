@@ -38,8 +38,8 @@ static Boolean is_valid_instance(jobject obj, Class* clss)
     ManagedObject *mo = h->object;
 
     // Check that reference pointer points to the heap
-    if (mo < (ManagedObject *)Class::heap_base ||
-        mo > (ManagedObject *)Class::heap_end)
+    if (mo < (ManagedObject *)VM_Global_State::loader_env->heap_base ||
+        mo > (ManagedObject *)VM_Global_State::loader_env->heap_end)
     {
         tmn_suspend_enable();
         return false;
@@ -52,8 +52,8 @@ static Boolean is_valid_instance(jobject obj, Class* clss)
         return false;
     }
 
-    Class *object_clss = mo->vt()->clss;
-    Boolean result = class_is_subtype_fast(object_clss->vtable, clss);
+    Class* object_clss = mo->vt()->clss;
+    Boolean result = object_clss->is_instanceof(clss);
     tmn_suspend_enable();        //---------------------------------^
 
     return result;

@@ -51,8 +51,17 @@ ready_for_exceptions(false)
     // TODO: Use proper MM.
     properties = new Properties();
     bootstrap_class_loader = new BootstrapClassLoader(this); 
-    
+
     hythread_lib_create(&hythread_lib);
+
+#if defined _IPF_ || defined _EM64T_
+    compact_fields = true;
+    sort_fields = true;
+#else // !_IPF_
+    compact_fields = false;
+    sort_fields = false;
+#endif // !IPF_
+    heap_base = heap_end = managed_null = NULL;
 
     JavaLangString_String = string_pool.lookup("java/lang/String");
     JavaLangStringBuffer_String = string_pool.lookup("java/lang/StringBuffer");

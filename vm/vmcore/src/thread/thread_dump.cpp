@@ -30,9 +30,13 @@
 #include "dll_jit_intf.h"
 
 #include "object_generic.h"
+#include "Class.h"
+#include "vtable.h"
+#include "environment.h"
 #include "root_set_enum_internal.h"
 #include "lock_manager.h"
 #include "open/gc.h"
+#include "cci.h"
 
 #define LOG_DOMAIN "thread_dump"
 #include "cxxlog.h"

@@ -31,101 +31,106 @@
 #include "lock_manager.h"
 
 bool
-class_verify(const Global_Env* env, Class *clss)
+Class::verify(const Global_Env* env)
 {
     // fast path
-    if(clss->is_verified)
+    if(is_at_least_prepared() || in_error())
         return true;
 
-    LMAutoUnlock aulock(clss->m_lock);
-    if(clss->is_verified)
+    LMAutoUnlock aulock(m_lock);
+    if(is_at_least_prepared() || m_state == ST_Error)
         return true;
 
     /**
      * Get verifier enable status
      */
     Boolean is_forced = env->verify_all;
-    Boolean is_bootstrap = clss->class_loader->IsBootstrap();
+    Boolean is_bootstrap = m_class_loader->IsBootstrap();
     Boolean is_enabled = vm_get_boolean_property_value_with_default("vm.use_verifier");
 
     /**
      * Verify class
      */
     if(is_enabled == TRUE
-        && !class_is_interface(clss)
-       && (is_bootstrap == FALSE || is_forced == TRUE))
+        && !is_interface()
+        && (is_bootstrap == FALSE || is_forced == TRUE))
     {
         char *error;
-        Verifier_Result result = vf_verify_class((class_handler)clss, is_forced, &error );
+        Verifier_Result result = vf_verify_class((class_handler)this, is_forced, &error);
         if( result != VER_OK ) {
             aulock.ForceUnlock();
-            REPORT_FAILED_CLASS_CLASS(clss->class_loader, clss,
+            REPORT_FAILED_CLASS_CLASS(m_class_loader, this,
                 "java/lang/VerifyError", error);
             return false;
         }
-        clss->is_verified = 1;
-    } else {
-        clss->is_verified = 2;
     }
+    m_state = ST_BytecodesVerified;
 
     return true;
-} // class_verify
+} // Class::verify
 
 
 bool
-class_verify_constraints(const Global_Env* env, Class* clss)
+Class::verify_constraints(const Global_Env* env)
 {
-    if(clss->state == ST_Error)
-        return true;
-
-    assert(clss->is_verified >= 1);
-
     // fast path
-    if(clss->is_verified == 2)
-        return true;
-
-    // lock class
-    clss->m_lock->_lock();
-
-    // check verification stage
-    if(clss->is_verified == 2) {
-        clss->m_lock->_unlock();
+    switch(m_state)
+    {
+    case ST_ConstraintsVerified:
+    case ST_Initializing:
+    case ST_Initialized:
+    case ST_Error:
         return true;
     }
+
+    // lock class
+    lock();
+
+    // check verification stage again
+    switch(m_state)
+    {
+    case ST_ConstraintsVerified:
+    case ST_Initializing:
+    case ST_Initialized:
+    case ST_Error:
+        unlock();
+        return true;
+    }
+    assert(m_state == ST_Prepared);
 
     // get verifier enable status
     Boolean verify_all = env->verify_all;
 
-    // unlock a class before calling of verifier
-    clss->m_lock->_unlock();
+    // unlock a class before calling to verifier
+    unlock();
 
     // check method constraints
     char *error;
     Verifier_Result result =
-        vf_verify_class_constraints( (class_handler)clss, verify_all, &error );
+        vf_verify_class_constraints((class_handler)this, verify_all, &error);
 
     // lock class and check result
-    clss->m_lock->_lock();
-    if( clss->state == ST_Error ) {
-        clss->m_lock->_unlock();
+    lock();
+    if(in_error()) {
+        unlock();
         return false;
     }
     if( result != VER_OK ) {
-        clss->m_lock->_unlock();
+        unlock();
         if( result == VER_ErrorLoadClass ) {
-            REPORT_FAILED_CLASS_CLASS(clss->class_loader, clss,
+            REPORT_FAILED_CLASS_CLASS(m_class_loader, this,
             VM_Global_State::loader_env->JavaLangNoClassDefFoundError_String->bytes,
             error);
         } else {
-            REPORT_FAILED_CLASS_CLASS(clss->class_loader, clss,
+            REPORT_FAILED_CLASS_CLASS(m_class_loader, this,
                 "java/lang/VerifyError", error);
         }
         return false;
     }
-    clss->is_verified = 2;
+    m_state = ST_ConstraintsVerified;
 
     // unlock class
-    clss->m_lock->_unlock();
+    unlock();
 
     return true;
 } // class_verify_method_constraints

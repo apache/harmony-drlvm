@@ -36,6 +36,7 @@
 #include "exceptions.h"
 #include "primitives_support.h"
 #include "jni_utils.h"
+#include "type.h"
 
 #include "java_lang_reflect_VMField.h"
 
@@ -175,7 +176,7 @@ JNIEXPORT jobject JNICALL Java_java_lang_reflect_VMField_getObject
 
     jobject retobj = NULL;
 
-    if (field->get_field_type_desc()->is_primitive()) 
+    if (field->get_field_type_desc()->is_primitive())
     {
         char field_sig = field->get_descriptor()->bytes[0];
         jvalue primitive_value = read_primitive(jenv, (jfieldID)field, obj, field_sig);
@@ -286,7 +287,7 @@ JNIEXPORT void JNICALL Java_java_lang_reflect_VMField_setObject
 
     if (field->get_field_type_desc()->is_primitive()) 
     {
-        char value_sig = value ? is_wrapper_class(jobject_to_struct_Class(value)->name->bytes) : 0;
+        char value_sig = value ? is_wrapper_class(jobject_to_struct_Class(value)->get_name()->bytes) : 0;
         if (!value_sig) {
             // the value is not primitive
             ThrowNew_Quick(jenv, "java/lang/IllegalArgumentException",
@@ -302,7 +303,7 @@ JNIEXPORT void JNICALL Java_java_lang_reflect_VMField_setObject
         Class* value_clss = jobject_to_struct_Class(value);
         Class* clss = field->get_field_type_desc()->load_type_desc();
         assert(clss);
-        if (!class_is_subtype_fast(value_clss->vtable, clss)) {
+        if (!value_clss->is_instanceof(clss)) {
             ThrowNew_Quick(jenv, "java/lang/IllegalArgumentException",
                 "The specified value cannot be converted to the field's type type by an identity or widening conversions");
             return;

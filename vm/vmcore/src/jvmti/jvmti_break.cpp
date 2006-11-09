@@ -28,6 +28,7 @@
 #include "environment.h"
 #include "Class.h"
 #include "cxxlog.h"
+#include "cci.h"
 
 #include "suspend_checker.h"
 #include "interpreter_exports.h"

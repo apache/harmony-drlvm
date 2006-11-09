@@ -19,8 +19,6 @@
  * @version $Revision: 1.1.2.6.4.5 $
  */  
 
-
-
 //
 // exceptions that can be thrown during class resolution:
 //
@@ -107,12 +105,26 @@
 #include "open/vm_util.h"
 
 
-#define CLASS_REPORT_FAILURE(target, cp_index, exnclass, exnmsg)    \
-{                                                               \
-    std::stringstream ss;                                       \
-    ss << exnmsg;                                               \
-    class_report_failure(target, cp_index, exnclass, ss);       \
+static void class_report_failure(Class* target, uint16 cp_index, jthrowable exn)
+{
+    ConstantPool& cp = target->get_constant_pool();
+    assert(cp.is_valid_index(cp_index));
+    assert(hythread_is_suspend_enabled());
+    if (exn_raised()) {
+        TRACE2("classloader.error", "runtime exception in classloading");
+        return;
+    }
+    assert(exn);
+
+    tmn_suspend_disable();
+    target->lock();
+    // vvv - This should be atomic change
+    cp.resolve_as_error(cp_index, exn);
+    // ^^^
+    target->unlock();
+    tmn_suspend_enable();
 }
+
 
 static void class_report_failure(Class* target, uint16 cp_index, 
                                  const char* exnname, std::stringstream& exnmsg)
@@ -123,43 +135,43 @@ static void class_report_failure(Class* target, uint16 cp_index,
     class_report_failure(target, cp_index, exn);
 }
 
-// check is class "first" in the same runtime package with class "second"
-static bool is_class_in_same_runtime_package( Class *first, Class *second)
-{
-    return first->package == second->package;
+
+#define CLASS_REPORT_FAILURE(target, cp_index, exnclass, exnmsg)    \
+{                                                                   \
+    std::stringstream ss;                                           \
+    ss << exnmsg;                                                   \
+    class_report_failure(target, cp_index, exnclass, ss);           \
 }
 
-static Class* _resolve_class(Global_Env *env,
-                             Class *clss,
+
+Class* Class::_resolve_class(Global_Env* env,
                              unsigned cp_index)
 {
     assert(hythread_is_suspend_enabled());
-    Const_Pool *cp = clss->const_pool;
+    ConstantPool& cp = m_const_pool;
 
-    clss->m_lock->_lock();
-    if(cp_in_error(cp, cp_index)) {
-        TRACE2("resolve:testing", "Constant pool entry " << cp_index << " already contains error.");
-        clss->m_lock->_unlock();
+    lock();
+    if(cp.is_entry_in_error(cp_index)) {
+        TRACE2("resolve.testing", "Constant pool entry " << cp_index << " already contains error.");
+        unlock();
         return NULL;
     }
 
-    if(cp_is_resolved(cp, cp_index)) {
-        clss->m_lock->_unlock();
-        return cp[cp_index].CONSTANT_Class.klass;
+    if(cp.is_entry_resolved(cp_index)) {
+        unlock();
+        return cp.get_class_class(cp_index);
     }
 
-    String *classname = cp[cp[cp_index].CONSTANT_Class.name_index].CONSTANT_Utf8.string;
-    clss->m_lock->_unlock();
+    const String* classname = cp.get_utf8_string(cp.get_class_name_index(cp_index));
+    unlock();
 
     // load the class in
-    Class *other_clss;
-
-    other_clss = clss->class_loader->LoadVerifyAndPrepareClass(env, classname);
+    Class* other_clss = m_class_loader->LoadVerifyAndPrepareClass(env, classname);
     if(other_clss == NULL)
     {
-        jthrowable exn = class_get_error(clss->class_loader, classname->bytes);
+        jthrowable exn = class_get_error(m_class_loader, classname->bytes);
         if (exn) {
-            class_report_failure(clss, cp_index, exn);
+            class_report_failure(this, cp_index, exn);
         } else {
             assert(exn_raised());
         }
@@ -170,116 +182,117 @@ static Class* _resolve_class(Global_Env *env,
     //   referenced class should be public,
     //   or referenced class & declaring class are the same,
     //   or referenced class & declaring class are in the same runtime package,
-    //   or declaring class not verified
+    //   or declaring class not checked
     //   (the last case is needed for certain magic classes,
     //   eg, reflection implementation)
-    if(class_is_public(other_clss)
-        || other_clss == clss
-        || is_class_in_same_runtime_package( clss, other_clss )
-        || clss->is_not_verified) 
+    if(m_can_access_all
+        || other_clss->is_public()
+        || other_clss == this
+        || m_package == other_clss->m_package)
     {
-        clss->m_lock->_lock();
-        cp_resolve_to_class(cp, cp_index, other_clss);
-        clss->m_lock->_unlock();
+        lock();
+        cp.resolve_entry(cp_index, other_clss);
+        unlock();
         return other_clss;
     }
 
     // Check access control for inner classes:
     //   access control checks is the same as for members
-    if(strrchr((char*)other_clss->name->bytes, '$') != NULL
-        && check_inner_class_access(env, other_clss, clss))
+    if(strrchr(other_clss->get_name()->bytes, '$') != NULL
+        && can_access_inner_class(env, other_clss))
     {
-        clss->m_lock->_lock();
-        cp_resolve_to_class(cp, cp_index, other_clss);
-        clss->m_lock->_unlock();
+        lock();
+        cp.resolve_entry(cp_index, other_clss);
+        unlock();
         return other_clss;
     }
 
-    CLASS_REPORT_FAILURE(clss, cp_index, "java/lang/IllegalAccessError",
-        "from " << clss->name->bytes << " to " << other_clss->name->bytes);
+    CLASS_REPORT_FAILURE(this, cp_index, "java/lang/IllegalAccessError",
+        "from " << get_name()->bytes << " to " << other_clss->get_name()->bytes);
     // IllegalAccessError
     return NULL;
-} //_resolve_class
+} // Class::_resolve_class
 
 
 static bool class_can_instantiate(Class* clss, bool _throw)
 {
     ASSERT_RAISE_AREA;
-    bool fail = class_is_abstract(clss);
+    bool fail = clss->is_abstract();
     if(fail && _throw) {
-        exn_raise_by_name("java/lang/InstantiationError", clss->name->bytes);
+        exn_raise_by_name("java/lang/InstantiationError", clss->get_name()->bytes);
     }
     return !fail;
 }
 
 
-Class* _resolve_class_new(Global_Env *env, Class *clss,
+Class* _resolve_class_new(Global_Env* env, Class* clss,
                           unsigned cp_index)
 {
     ASSERT_RAISE_AREA;
 
-    Class *new_clss = _resolve_class(env,clss,cp_index);
+    Class* new_clss = clss->_resolve_class(env, cp_index);
     if (!new_clss) return NULL;
     bool can_instantiate = class_can_instantiate(new_clss, false);
 
-    if (new_clss && !can_instantiate) {
+    if(new_clss && !can_instantiate) {
         return NULL;
     }
     return new_clss;
-} //_resolve_class_new
+} // _resolve_class_new
 
 // Can "other_clss" access the field or method "member"?
-Boolean check_member_access(Class_Member *member, Class *other_clss)
+bool Class::can_access_member(Class_Member *member)
 {
-    Class *member_clss = member->get_class();
-    const char *reflect = "java/lang/reflect/";
-
-    // check if reflection class it has full access to all fields
-    if( !strncmp( other_clss->name->bytes, reflect, strlen(reflect) ) ) {
-        return 1;
-    }
+    Class* member_clss = member->get_class();
     // check access permissions
-    if (member->is_public() || (other_clss == member_clss)) {
+    if(member->is_public() || (this == member_clss)) {
         // no problemo
-        return 1;
-    } else if (member->is_private()) {
+        return true;
+    } else if(member->is_private()) {
         // IllegalAccessError
-        return 0;
-    } else if (member->is_protected()) {
-        // When a member is protected, it can be accessed by classes 
-        // in the same runtime package. 
-        if( is_class_in_same_runtime_package( other_clss, member_clss ) )
-            return 1;
-        // Otherwise, when other_clss is not in the same package, 
+        return false;
+    } else if(member->is_protected()) {
+        // When a member is protected, it can be accessed by classes
+        // in the same runtime package
+        if(m_package == member_clss->m_package)
+            return true;
+        // Otherwise, when this class is not in the same package,
         // the class containing the member (member_clss) must be
-        // a superclass of other_clss.
-        Class *c;
-        for (c = other_clss->super_class; c != NULL; c = c->super_class) {
-            if (c == member_clss)
+        // a superclass of this class
+        // ppervov: FIXME: this can be made a method of struct Class
+        // smth. like:
+        //if(!is_extending_class(member_clss)) {
+        //    // IllegalAccessError
+        //    return false;
+        //}
+        //return true;
+        Class* c;
+        for(c = get_super_class(); c != NULL; c = c->get_super_class()) {
+            if(c == member_clss)
                 break;
         }
-        if (c == NULL) {
+        if(c == NULL) {
             // IllegalAccessError
-            return 0;
+            return false;
         }
-        return 1;
+        return true;
     } else {
-        // When a member has default (or package private) access, it can only be accessed 
-        // by classes in the same package.
-        if( is_class_in_same_runtime_package( other_clss, member_clss ) )
-            return 1;
-        return 0;
+        // When a member has default (or package private) access,
+        // it can only be accessed by classes in the same package
+        if(m_package == member_clss->m_package)
+            return true;
+        return false;
     }
-} //check_member_access
+} // Class::can_access_member
 
 inline static bool
 is_class_extended_class( Class *super_clss, 
                          Class *check_clss)
 {
-    for(; super_clss != NULL; super_clss = super_clss->super_class)
+    for(; super_clss != NULL; super_clss = super_clss->get_super_class())
     {
-        if( super_clss->class_loader == check_clss->class_loader
-            && super_clss->name == check_clss->name )
+        if( super_clss->get_class_loader() == check_clss->get_class_loader()
+            && super_clss->get_name() == check_clss->get_name() )
         {
             return true;
         }
@@ -293,14 +306,14 @@ get_enclosing_class( Global_Env *env,
 {
     Class *encl_clss = NULL;
 
-    if( strrchr( (char*)klass->name->bytes, '$') != NULL ) 
+    if( strrchr( klass->get_name()->bytes, '$') != NULL )
     {   // it is anonymous class
         // search "this$..." in fields and look for enclosing class
         unsigned index;
         Field *field;
-        for( index = 0, field = &klass->fields[index];
-             index < klass->n_fields;
-             index++, field = &klass->fields[index] )
+        for( index = 0, field = klass->get_field(index);
+             index < klass->get_number_of_fields();
+             index++, field = klass->get_field(index) )
         {
             if( strncmp( field->get_name()->bytes, "this$", 5 ) 
                 || !(field->get_access_flags() & ACC_FINAL)
@@ -313,54 +326,49 @@ get_enclosing_class( Global_Env *env,
             // get name of enclosing class
             String* name = env->string_pool.lookup(&desc->bytes[1], desc->len - 2);
             // loading enclosing class
-            encl_clss = klass->class_loader->LoadVerifyAndPrepareClass(env, name);
+            encl_clss = klass->get_class_loader()->LoadVerifyAndPrepareClass(env, name);
             break;
         }
     }
     return encl_clss;
 } // get_enclosing_class
 
-// Can "other_clss" access the "inner_clss"
-Boolean
-check_inner_class_access(Global_Env *env,
-                         Class *inner_clss,
-                         Class *other_clss)
+bool Class::can_access_inner_class(Global_Env* env, Class* inner_clss)
 {
     // check access permissions
-    if ((inner_clss->access_flags & ACC_PUBLIC) || (other_clss == inner_clss)) {
+    if (inner_clss->is_public() || (this == inner_clss)) {
         // no problemo
-        return 1;
-    } else if (inner_clss->access_flags & ACC_PRIVATE) {
+        return true;
+    } else if (inner_clss->is_private()) {
         // IllegalAccessError
-        return 0;
-    } else if (inner_clss->access_flags & ACC_PROTECTED) {
+        return false;
+    } else if (inner_clss->is_protected()) {
         // When inner class is protected, it can be accessed by classes 
         // in the same runtime package. 
-        if( is_class_in_same_runtime_package( other_clss, inner_clss ) )
-            return 1;
+        if(m_package == inner_clss->m_package)
+            return true;
         // Otherwise, when other_clss is not in the same package, 
         // inner_clss must be a superclass of other_clss.
-        for( Class *decl_other_clss = other_clss; decl_other_clss != NULL; )
+        for(Class *decl_other_clss = this; decl_other_clss != NULL;)
         {
-            for( Class *decl_inner_clss = inner_clss; decl_inner_clss != NULL; )
+            for(Class *decl_inner_clss = inner_clss; decl_inner_clss != NULL;)
             {
                 if(is_class_extended_class( decl_other_clss, decl_inner_clss ) ) {
-                    return 1;
+                    return true;
                 }
-                if( !decl_inner_clss->declaringclass_index ) {
+                if( !decl_inner_clss->is_inner_class() ) {
                     // class "decl_inner_clss" isn't inner class
                     break;
                 } else {
                     // loading declaring class
-                    if(Class* decl_inner_clss_res = _resolve_class(env, decl_inner_clss,
-                            decl_inner_clss->declaringclass_index)) {
+                    if(Class* decl_inner_clss_res = decl_inner_clss->resolve_declaring_class(env)) {
                         decl_inner_clss = decl_inner_clss_res;
                     } else {
                         break;
                     }
                 }
             }
-            if( !decl_other_clss->declaringclass_index )
+            if( !decl_other_clss->is_inner_class() )
             {
                 // class "decl_other_clss" isn't inner class
                 decl_other_clss = get_enclosing_class(env, decl_other_clss);
@@ -368,103 +376,98 @@ check_inner_class_access(Global_Env *env,
             } else {
                 // loading declaring class
                 if(Class* decl_other_clss_res =
-                    _resolve_class(env, decl_other_clss, decl_other_clss->declaringclass_index))
+                    decl_other_clss->resolve_declaring_class(env))
                 {
-                    decl_other_clss = decl_other_clss_res ;
+                    decl_other_clss = decl_other_clss_res;
                     continue;
                 }
             }
             break;
         }
         // IllegalAccessError
-        return 0;
+        return false;
     } else {
         // When a member has default (or package private) access,
         // it can only be accessed by classes in the same runtime package.
-        if(is_class_in_same_runtime_package(other_clss, inner_clss))
-            return 1;
-        return 0;
+        if(m_package == inner_clss->m_package)
+            return true;
+        return false;
     }
-} // check_inner_class_access
+} // Class::can_access_inner_class
 
-/**
- *
- */
-static Field* _resolve_field(Global_Env *env, Class *clss, unsigned cp_index)
+
+Field* Class::_resolve_field(Global_Env *env, unsigned cp_index)
 {
-    Const_Pool *cp = clss->const_pool;
-    clss->m_lock->_lock();
-    if(cp_in_error(cp, cp_index)) {
+    lock();
+    if(m_const_pool.is_entry_in_error(cp_index)) {
         TRACE2("resolve.testing", "Constant pool entry " << cp_index << " already contains error.");
-        clss->m_lock->_unlock();
+        unlock();
         return NULL;
     }
 
-    if (cp_is_resolved(cp, cp_index)) {
-        clss->m_lock->_unlock();
-        return cp[cp_index].CONSTANT_ref.field;
+    if(m_const_pool.is_entry_resolved(cp_index)) {
+        unlock();
+        return m_const_pool.get_ref_field(cp_index);
     }
 
     //
     // constant pool entry hasn't been resolved yet
     //
-    unsigned other_index = cp[cp_index].CONSTANT_ref.class_index;
-    clss->m_lock->_unlock();
+    unsigned other_index = m_const_pool.get_ref_class_index(cp_index);
+    unlock();
 
     //
     // check error condition from resolve class
     //
-    Class *other_clss = _resolve_class(env, clss, other_index);
+    Class* other_clss = _resolve_class(env, other_index);
     if(!other_clss) {
-        if(cp_in_error(clss->const_pool, other_index)) {
-            class_report_failure(clss, cp_index, 
-                (jthrowable)(&(clss->const_pool[other_index].error.cause)));
+        if(m_const_pool.is_entry_in_error(other_index)) {
+            class_report_failure(this, cp_index,
+                m_const_pool.get_error_cause(other_index));
         } else {
             assert(exn_raised());
         }
         return NULL;
     }
 
-    String* name = cp[cp[cp_index].CONSTANT_ref.name_and_type_index]
-            .CONSTANT_NameAndType.name;
-    String* desc = cp[cp[cp_index].CONSTANT_ref.name_and_type_index]
-            .CONSTANT_NameAndType.descriptor;
-
-    Field* field = class_lookup_field_recursive(other_clss, name, desc);
-    if (field == NULL)
+    uint16 name_and_type_index = m_const_pool.get_ref_name_and_type_index(cp_index);
+    String* name = m_const_pool.get_name_and_type_name(name_and_type_index);
+    String* desc = m_const_pool.get_name_and_type_descriptor(name_and_type_index);
+    Field* field = other_clss->lookup_field_recursive(name, desc);
+    if(field == NULL)
     {
         //
         // NoSuchFieldError
         //
-        CLASS_REPORT_FAILURE(clss, cp_index, "java/lang/NoSuchFieldError",
-            other_clss->name->bytes << "." << name->bytes
+        CLASS_REPORT_FAILURE(this, cp_index, "java/lang/NoSuchFieldError",
+            other_clss->get_name()->bytes << "." << name->bytes
             << " of type " << desc->bytes
             << " while resolving constant pool entry at index "
-            << cp_index << " in class " << clss->name->bytes);
+            << cp_index << " in class " << get_name()->bytes);
         return NULL;
     }
 
     //
     // check access permissions
     //
-    if (check_member_access(field, clss) == 0)
+    if(!can_access_member(field))
     {
         //
         // IllegalAccessError
         //
-        CLASS_REPORT_FAILURE(clss, cp_index, "java/lang/IllegalAccessError",
-            other_clss->name->bytes << "." << name->bytes
+        CLASS_REPORT_FAILURE(this, cp_index, "java/lang/IllegalAccessError",
+            other_clss->get_name()->bytes << "." << name->bytes
             << " of type " << desc->bytes
             << " while resolving constant pool entry at index "
-            << cp_index << " in class " << clss->name->bytes);
+            << cp_index << " in class " << get_name()->bytes);
         return NULL;
     }
-    clss->m_lock->_lock();
-    cp_resolve_to_field(cp, cp_index, field);
-    clss->m_lock->_unlock();
+    lock();
+    m_const_pool.resolve_entry(cp_index, field);
+    unlock();
 
     return field;
-} //_resolve_field
+} // Class::_resolve_field
 
 
 bool field_can_link(Class* clss, Field* field, bool _static, bool putfield, bool _throw)
@@ -473,21 +476,25 @@ bool field_can_link(Class* clss, Field* field, bool _static, bool putfield, bool
     if(_static?(!field->is_static()):(field->is_static())) {
         if(_throw) {
             exn_raise_by_name("java/lang/IncompatibleClassChangeError",
-                field->get_class()->name->bytes);
+                field->get_class()->get_name()->bytes);
         }
         return false;
     }
     if(putfield && field->is_final()) {
-        for(int fn = 0; fn < clss->n_fields; fn++) {
-            if(&(clss->fields[fn]) == field) {
+        for(int fn = 0; fn < clss->get_number_of_fields(); fn++) {
+            if(clss->get_field(fn) == field) {
                 return true;
             }
         }
         if(_throw) {
-            unsigned buf_size = clss->name->len + field->get_class()->name->len + field->get_name()->len + 15;
+            unsigned buf_size = clss->get_name()->len +
+                field->get_class()->get_name()->len +
+                field->get_name()->len + 15;
             char* buf = (char*)STD_ALLOCA(buf_size);
             memset(buf, 0, buf_size);
-            sprintf(buf, " from %s to %s.%s", clss->name->bytes, field->get_class()->name->bytes, field->get_name()->bytes);
+            sprintf(buf, " from %s to %s.%s", clss->get_name()->bytes,
+                field->get_class()->get_name()->bytes,
+                field->get_name()->bytes);
             jthrowable exc_object = exn_create("java/lang/IllegalAccessError", buf);
             exn_raise_object(exc_object);
         }
@@ -510,126 +517,120 @@ static Field* _resolve_static_field(Global_Env *env,
 {
     ASSERT_RAISE_AREA;
 
-    Field *field = _resolve_field(env,clss,cp_index);
+    Field *field = clss->_resolve_field(env, cp_index);
     if(field && !field_can_link(clss, field, CAN_LINK_FROM_STATIC, putfield, LINK_NO_THROW)) {
         return NULL;
     }
     return field;
-} //_resolve_static_field
+} // _resolve_static_field
 
 
-
-static Field* _resolve_nonstatic_field(Global_Env *env,
-                                       Class *clss,
+static Field* _resolve_nonstatic_field(Global_Env* env,
+                                       Class* clss,
                                        unsigned cp_index,
                                        unsigned putfield)
 {
     ASSERT_RAISE_AREA;
 
-    Field *field = _resolve_field(env, clss, cp_index);
+    Field *field = clss->_resolve_field(env, cp_index);
     if(field && !field_can_link(clss, field, CAN_LINK_FROM_FIELD, putfield, LINK_NO_THROW)) {
         return NULL;
     }
     return field;
-} //_resolve_nonstatic_field
+} // _resolve_nonstatic_field
 
-/**
- *
- */ 
-static Method* _resolve_method(Global_Env *env, Class *clss, unsigned cp_index)
+
+Method* Class::_resolve_method(Global_Env* env, unsigned cp_index)
 {
-    Const_Pool *cp = clss->const_pool;
-    clss->m_lock->_lock();
-    if(cp_in_error(cp, cp_index)) {
-        TRACE2("resolve:testing", "Constant pool entry " << cp_index << " already contains error.");
-        clss->m_lock->_unlock();
+    lock();
+    if(m_const_pool.is_entry_in_error(cp_index)) {
+        TRACE2("resolve.testing", "Constant pool entry " << cp_index << " already contains error.");
+        unlock();
         return NULL;
     }
 
-    if (cp_is_resolved(cp,cp_index)) {
-        clss->m_lock->_unlock();
-        return cp[cp_index].CONSTANT_ref.method;
+    if(m_const_pool.is_entry_resolved(cp_index)) {
+        unlock();
+        return m_const_pool.get_ref_method(cp_index);
     }
 
     //
     // constant pool entry hasn't been resolved yet
     //
     unsigned other_index;
-    other_index = cp[cp_index].CONSTANT_ref.class_index;
-    clss->m_lock->_unlock();
+    other_index = m_const_pool.get_ref_class_index(cp_index);
+    unlock();
 
     //
     // check error condition from resolve class
     //
-    Class *other_clss = _resolve_class(env, clss, other_index);
+    Class* other_clss = _resolve_class(env, other_index);
     if(!other_clss) {
-        if(cp_in_error(clss->const_pool, other_index)) {
-            class_report_failure(clss, cp_index, 
-                (jthrowable)(&(clss->const_pool[other_index].error.cause)));
+        if(m_const_pool.is_entry_in_error(other_index)) {
+            class_report_failure(this, cp_index, 
+                m_const_pool.get_error_cause(other_index));
         } else {
             assert(exn_raised());
         }
         return NULL;
     }
 
-    String* name = cp[cp[cp_index].CONSTANT_ref.name_and_type_index].
-        CONSTANT_NameAndType.name;
-
-    String* desc = cp[cp[cp_index].CONSTANT_ref.name_and_type_index].
-        CONSTANT_NameAndType.descriptor;
+    uint16 name_and_type_index = m_const_pool.get_ref_name_and_type_index(cp_index);
+    String* name = m_const_pool.get_name_and_type_name(name_and_type_index);
+    String* desc = m_const_pool.get_name_and_type_descriptor(name_and_type_index);
 
     // CONSTANT_Methodref must refer to a class, not an interface, and
     // CONSTANT_InterfaceMethodref must refer to an interface (vm spec 4.4.2)
-    if (cp_is_methodref(cp, cp_index) && class_is_interface(other_clss)) {
-        CLASS_REPORT_FAILURE(clss, cp_index, "java/lang/IncompatibleClassChangeError",
-            other_clss->name->bytes
+    if(m_const_pool.is_methodref(cp_index) && other_clss->is_interface()) {
+        CLASS_REPORT_FAILURE(this, cp_index, "java/lang/IncompatibleClassChangeError",
+            other_clss->get_name()->bytes
             << " while resolving constant pool entry " << cp_index
-            << " in class " << clss->name->bytes);
+            << " in class " << m_name->bytes);
         return NULL;
     }
 
-    if(cp_is_interfacemethodref(cp, cp_index) && !class_is_interface(other_clss)) {
-        CLASS_REPORT_FAILURE(clss, cp_index, "java/lang/IncompatibleClassChangeError",
-            other_clss->name->bytes
+    if(m_const_pool.is_interfacemethodref(cp_index) && !other_clss->is_interface()) {
+        CLASS_REPORT_FAILURE(this, cp_index, "java/lang/IncompatibleClassChangeError",
+            other_clss->get_name()->bytes
             << " while resolving constant pool entry " << cp_index
-            << " in class " << clss->name->bytes);
+            << " in class " << m_name->bytes);
         return NULL;
     }
 
     Method* method = class_lookup_method_recursive(other_clss, name, desc);
-    if (method == NULL) {
+    if(method == NULL) {
         // NoSuchMethodError
-        CLASS_REPORT_FAILURE(clss, cp_index, "java/lang/NoSuchMethodError",
-            other_clss->name->bytes << "." << name->bytes << desc->bytes
+        CLASS_REPORT_FAILURE(this, cp_index, "java/lang/NoSuchMethodError",
+            other_clss->get_name()->bytes << "." << name->bytes << desc->bytes
             << " while resolving constant pool entry at index " << cp_index
-            << " in class " << clss->name->bytes);
+            << " in class " << m_name->bytes);
         return NULL;
     }
 
-    if(method_is_abstract(method) && !class_is_abstract(other_clss)) {
+    if(method->is_abstract() && !other_clss->is_abstract()) {
         // AbstractMethodError
-        CLASS_REPORT_FAILURE(clss, cp_index, "java/lang/AbstractMethodError",
-            other_clss->name->bytes << "." << name->bytes << desc->bytes
+        CLASS_REPORT_FAILURE(this, cp_index, "java/lang/AbstractMethodError",
+            other_clss->get_name()->bytes << "." << name->bytes << desc->bytes
             << " while resolving constant pool entry at index " << cp_index
-            << " in class " << clss->name->bytes);
+            << " in class " << m_name->bytes);
         return NULL;
     }
 
     //
     // check access permissions
     //
-    if (check_member_access(method,clss) == 0) {
+    if(!can_access_member(method)) {
         // IllegalAccessError
-        CLASS_REPORT_FAILURE(clss, cp_index, "java/lang/IllegalAccessError",
-            other_clss->name->bytes << "." << name->bytes << desc->bytes
+        CLASS_REPORT_FAILURE(this, cp_index, "java/lang/IllegalAccessError",
+            other_clss->get_name()->bytes << "." << name->bytes << desc->bytes
             << " while resolving constant pool entry at index " << cp_index
-            << " in class " << clss->name->bytes);
+            << " in class " << m_name->bytes);
         return NULL; 
     }
 
-    clss->m_lock->_lock();
-    cp_resolve_to_method(cp,cp_index,method);
-    clss->m_lock->_unlock();
+    lock();
+    m_const_pool.resolve_entry(cp_index, method);
+    unlock();
 
     return method;
 } //_resolve_method
@@ -641,7 +642,7 @@ static bool method_can_link_static(Class* clss, unsigned index, Method* method, 
     if (!method->is_static()) {
         if(_throw) {
             exn_raise_by_name("java/lang/IncompatibleClassChangeError",
-                method->get_class()->name->bytes);
+                method->get_class()->get_name()->bytes);
         }
         return false;
     }
@@ -654,7 +655,7 @@ static Method* _resolve_static_method(Global_Env *env,
 {
     ASSERT_RAISE_AREA;
 
-    Method* method = _resolve_method(env, clss, cp_index);
+    Method* method = clss->_resolve_method(env, cp_index);
     if(method && !method_can_link_static(clss, cp_index, method, LINK_NO_THROW))
         return NULL;
     return method;
@@ -668,15 +669,15 @@ static bool method_can_link_virtual(Class* clss, unsigned cp_index, Method* meth
     if(method->is_static()) {
         if(_throw) {
             exn_raise_by_name("java/lang/IncompatibleClassChangeError",
-                method->get_class()->name->bytes);
+                method->get_class()->get_name()->bytes);
         }
         return false;
     }
-    if(class_is_interface(method->get_class())) {
+    if(method->get_class()->is_interface()) {
         if(_throw) {
-            char* buf = (char*)STD_ALLOCA(clss->name->len
+            char* buf = (char*)STD_ALLOCA(clss->get_name()->len
                 + method->get_name()->len + method->get_descriptor()->len + 2);
-            sprintf(buf, "%s.%s%s", clss->name->bytes,
+            sprintf(buf, "%s.%s%s", clss->get_name()->bytes,
                 method->get_name()->bytes, method->get_descriptor()->bytes);
             jthrowable exc_object = exn_create("java/lang/AbstractMethodError", buf);
             exn_raise_object(exc_object);
@@ -691,7 +692,7 @@ static Method* _resolve_virtual_method(Global_Env *env,
                                        Class *clss,
                                        unsigned cp_index)
 {
-    Method* method = _resolve_method(env, clss, cp_index);
+    Method* method = clss->_resolve_method(env, cp_index);
     if(method && !method_can_link_virtual(clss, cp_index, method, LINK_NO_THROW))
         return NULL;
     return method;
@@ -707,7 +708,7 @@ static Method* _resolve_interface_method(Global_Env *env,
                                          Class *clss,
                                          unsigned cp_index)
 {
-    Method* method = _resolve_method(env, clss, cp_index);
+    Method* method = clss->_resolve_method(env, cp_index);
     if(method && !method_can_link_interface(clss, cp_index, method, LINK_NO_THROW)) {
         return NULL;
     }
@@ -719,7 +720,7 @@ Field_Handle resolve_field(Compile_Handle h,
                            Class_Handle c,
                            unsigned index)
 {
-    return _resolve_field(compile_handle_to_environment(h), c, index);
+    return c->_resolve_field(compile_handle_to_environment(h), index);
 } // resolve_field
 
 
@@ -751,7 +752,7 @@ Field_Handle resolve_static_field(Compile_Handle h,
 
 Method_Handle resolve_method(Compile_Handle h, Class_Handle ch, unsigned idx)
 {
-    return _resolve_method(compile_handle_to_environment(h), ch, idx);
+    return ch->_resolve_method(compile_handle_to_environment(h), idx);
 }
 
 
@@ -771,12 +772,13 @@ static bool method_can_link_special(Class* clss, unsigned index, Method* method,
 {
     ASSERT_RAISE_AREA;
 
-    unsigned class_idx = clss->const_pool[index].CONSTANT_ref.class_index;
-    unsigned class_name_idx = clss->const_pool[class_idx].CONSTANT_Class.name_index;
-    String* ref_class_name = clss->const_pool[class_name_idx].CONSTANT_String.string;
+    ConstantPool& cp = clss->get_constant_pool();
+    unsigned class_idx = cp.get_ref_class_index(index);
+    unsigned class_name_idx = cp.get_class_name_index(class_idx);
+    String* ref_class_name = cp.get_utf8_string(class_name_idx);
 
     if(method->get_name() == VM_Global_State::loader_env->Init_String
-        && method->get_class()->name != ref_class_name)
+        && method->get_class()->get_name() != ref_class_name)
     {
         if(_throw) {
             exn_raise_by_name("java/lang/NoSuchMethodError",
@@ -788,7 +790,7 @@ static bool method_can_link_special(Class* clss, unsigned index, Method* method,
     {
         if(_throw) {
             exn_raise_by_name("java/lang/IncompatibleClassChangeError",
-                method->get_class()->name->bytes);
+                method->get_class()->get_name()->bytes);
         }
         return false;
     }
@@ -796,10 +798,12 @@ static bool method_can_link_special(Class* clss, unsigned index, Method* method,
     {
         if(_throw) {
             tmn_suspend_enable();
-            unsigned buf_size = clss->name->len + method->get_name()->len + method->get_descriptor()->len + 5;
+            unsigned buf_size = clss->get_name()->len +
+                method->get_name()->len + method->get_descriptor()->len + 5;
             char* buf = (char*)STD_ALLOCA(buf_size);
             memset(buf, 0, buf_size);
-            sprintf(buf, "%s.%s%s", clss->name->bytes, method->get_name()->bytes, method->get_descriptor()->bytes);
+            sprintf(buf, "%s.%s%s", clss->get_name()->bytes,
+                method->get_name()->bytes, method->get_descriptor()->bytes);
             jthrowable exc_object = exn_create("java/lang/AbstractMethodError", buf);
             exn_raise_object(exc_object);
             tmn_suspend_disable();
@@ -819,18 +823,18 @@ Method_Handle resolve_special_method_env(Global_Env *env,
 {
     ASSERT_RAISE_AREA;
 
-    Method* method = _resolve_method(env, curr_clss, index);
+    Method* method = curr_clss->_resolve_method(env, index);
     if(!method) {
         return NULL;
     }
-    if(class_is_super(curr_clss)
-        && is_class_extended_class(curr_clss->super_class, method->get_class())
+    if(curr_clss->is_super()
+        && is_class_extended_class(curr_clss->get_super_class(), method->get_class())
         && method->get_name() != env->Init_String)
     {
         Method* result_meth;
-        for(Class* clss = curr_clss->super_class; clss; clss = clss->super_class)
+        for(Class* clss = curr_clss->get_super_class(); clss; clss = clss->get_super_class())
         {
-            result_meth = class_lookup_method(clss, method->get_name(), method->get_descriptor());
+            result_meth = clss->lookup_method(method->get_name(), method->get_descriptor());
             if(result_meth) {
                 method = result_meth;
                 break;
@@ -910,7 +914,7 @@ Class_Handle resolve_class(Compile_Handle h,
                            Class_Handle c,
                            unsigned index) 
 {
-    return _resolve_class(compile_handle_to_environment(h), c, index);
+    return c->_resolve_class(compile_handle_to_environment(h), index);
 } //resolve_class
 
 
@@ -918,46 +922,46 @@ void class_throw_linking_error(Class_Handle ch, unsigned index, unsigned opcode)
 {
     ASSERT_RAISE_AREA;
 
-    Const_Pool* cp = ch->const_pool;
-    if(cp_in_error(cp, index)) {
-        exn_raise_object((jthrowable)(&(cp[index].error.cause)));
+    ConstantPool& cp = ch->get_constant_pool();
+    if(cp.is_entry_in_error(index)) {
+        exn_raise_object(cp.get_error_cause(index));
         return; // will return in interpreter mode
     }
 
     switch(opcode) {
         case OPCODE_NEW:
-            class_can_instantiate(cp[index].CONSTANT_Class.klass, LINK_THROW_ERRORS);
+            class_can_instantiate(cp.get_class_class(index), LINK_THROW_ERRORS);
             break;
         case OPCODE_PUTFIELD:
-            field_can_link(ch, cp[index].CONSTANT_ref.field,
+            field_can_link(ch, cp.get_ref_field(index),
                 CAN_LINK_FROM_FIELD, LINK_WRITE_ACCESS, LINK_THROW_ERRORS);
             break;
         case OPCODE_GETFIELD:
-            field_can_link(ch, cp[index].CONSTANT_ref.field,
+            field_can_link(ch, cp.get_ref_field(index),
                 CAN_LINK_FROM_FIELD, LINK_READ_ACCESS, LINK_THROW_ERRORS);
             break;
         case OPCODE_PUTSTATIC:
-            field_can_link(ch, cp[index].CONSTANT_ref.field,
+            field_can_link(ch, cp.get_ref_field(index),
                 CAN_LINK_FROM_STATIC, LINK_WRITE_ACCESS, LINK_THROW_ERRORS);
             break;
         case OPCODE_GETSTATIC:
-            field_can_link(ch, cp[index].CONSTANT_ref.field,
+            field_can_link(ch, cp.get_ref_field(index),
                 CAN_LINK_FROM_STATIC, LINK_READ_ACCESS, LINK_THROW_ERRORS);
             break;
         case OPCODE_INVOKEINTERFACE:
-            method_can_link_interface(ch, index, cp[index].CONSTANT_ref.method,
+            method_can_link_interface(ch, index, cp.get_ref_method(index),
                 LINK_THROW_ERRORS);
             break;
         case OPCODE_INVOKESPECIAL:
-            method_can_link_special(ch, index, cp[index].CONSTANT_ref.method,
+            method_can_link_special(ch, index, cp.get_ref_method(index),
                 LINK_THROW_ERRORS);
             break;
         case OPCODE_INVOKESTATIC:
-            method_can_link_static(ch, index, cp[index].CONSTANT_ref.method,
+            method_can_link_static(ch, index, cp.get_ref_method(index),
                 LINK_THROW_ERRORS);
             break;
         case OPCODE_INVOKEVIRTUAL:
-            method_can_link_virtual(ch, index, cp[index].CONSTANT_ref.method,
+            method_can_link_virtual(ch, index, cp.get_ref_method(index),
                 LINK_THROW_ERRORS);
             break;
         default:
@@ -975,7 +979,7 @@ Class *resolve_class_array_of_class1(Global_Env *env,
 {
     // If the element type is primitive, return one of the preloaded
     // classes of arrays of primitive types.
-    if (cc->is_primitive) {
+    if (cc->is_primitive()) {
         if (cc == env->Boolean_Class) {
             return env->ArrayOfBoolean_Class;
         } else if (cc == env->Byte_Class) {
@@ -995,16 +999,16 @@ Class *resolve_class_array_of_class1(Global_Env *env,
         }
     }
 
-    char *array_name = (char *)STD_MALLOC(cc->name->len + 5);
-    if(cc->name->bytes[0] == '[') {
-        sprintf(array_name, "[%s", cc->name->bytes);
+    char *array_name = (char *)STD_MALLOC(cc->get_name()->len + 5);
+    if(cc->get_name()->bytes[0] == '[') {
+        sprintf(array_name, "[%s", cc->get_name()->bytes);
     } else {
-        sprintf(array_name, "[L%s;", cc->name->bytes);
+        sprintf(array_name, "[L%s;", cc->get_name()->bytes);
     }
     String *arr_str = env->string_pool.lookup(array_name);
     STD_FREE(array_name);
 
-    Class* arr_clss = cc->class_loader->LoadVerifyAndPrepareClass(env, arr_str);
+    Class* arr_clss = cc->get_class_loader()->LoadVerifyAndPrepareClass(env, arr_str);
 
     return arr_clss;
 } //resolve_class_array_of_class1
@@ -1023,24 +1027,22 @@ Class_Handle class_get_array_of_class(Class_Handle cl)
 } //class_get_array_of_class
 
 
-static bool resolve_const_pool_item(Global_Env *env, Class *clss, unsigned cp_index)
+static bool resolve_const_pool_item(Global_Env* env, Class* clss, unsigned cp_index)
 {
-    Const_Pool *cp = clss->const_pool;
-    unsigned char *cp_tags = cp[0].tags;
+    ConstantPool& cp = clss->get_constant_pool();
 
-    if (cp_is_resolved(cp, cp_index)) {
+    if(cp.is_entry_resolved(cp_index))
         return true;
-    }
 
-    switch (cp_tags[cp_index]) {
+    switch(cp.get_tag(cp_index)) {
         case CONSTANT_Class:
-            return _resolve_class(env, clss, cp_index);
+            return clss->_resolve_class(env, cp_index);
         case CONSTANT_Fieldref:
-            return _resolve_field(env, clss, cp_index);
+            return clss->_resolve_field(env, cp_index);
         case CONSTANT_Methodref:
-            return _resolve_method(env, clss, cp_index);
+            return clss->_resolve_method(env, cp_index);
         case CONSTANT_InterfaceMethodref:
-            return _resolve_method(env, clss, cp_index);
+            return clss->_resolve_method(env, cp_index);
         case CONSTANT_NameAndType: // fall through
         case CONSTANT_Utf8:
             return true;
@@ -1060,12 +1062,12 @@ static bool resolve_const_pool_item(Global_Env *env, Class *clss, unsigned cp_in
  * Resolve whole constant pool
  */
 int resolve_const_pool(Global_Env& env, Class *clss) {
-    Const_Pool *cp = clss->const_pool;
+    ConstantPool& cp = clss->get_constant_pool();
 
     // It's possible that cp is null when defining class on the fly
-    if (!cp) return true;
-    unsigned cp_size = clss->cp_size;
+    if(!cp.available()) return 0;
 
+    unsigned cp_size = cp.get_size();
     for (unsigned i = 1; i < cp_size; i++) {
         if(!resolve_const_pool_item(&env, clss, i)) {
             return i;

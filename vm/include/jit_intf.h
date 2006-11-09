@@ -55,35 +55,7 @@ enum Method_Side_Effects {
 } Method_Side_Effects; //Method_Side_Effects
 
 
-///////////////////////////////////////////////////////////////////////////////
-// Access flags for Class, Class_Member, Field and Method.
-///////////////////////////////////////////////////////////////////////////////
-                                    //      used by
-                                    //
-#define ACC_PUBLIC          0x0001  // Class    Field   Method
-#define ACC_PRIVATE         0x0002  //          Field   Method
-#define ACC_PROTECTED       0x0004  //          Field   Method
-#define ACC_STATIC          0x0008  //          Field   Method
-#define ACC_FINAL           0x0010  // Class    Field   Method
-#define ACC_SUPER           0x0020  // Class
-#define ACC_SYNCHRONIZED    0x0020  //                  Method
-#define ACC_BRIDGE          0x0040  //                  Method (this is Java 1.5 flag)
-#define ACC_VOLATILE        0x0040  //          Field
-#define ACC_VARARGS         0x0080  //                  Method (this is Java 1.5 flag)
-#define ACC_TRANSIENT       0x0080  //          Field
-#define ACC_NATIVE          0x0100  //                  Method
-#define ACC_INTERFACE       0x0200  // Class
-#define ACC_ABSTRACT        0x0400  // Class            Method
-#define ACC_STRICT          0x0800  //                  Method
-// The following are Java 1.5 flags
-#define ACC_SYNTHETIC       0x1000  // Class    Field   Method
-#define ACC_ANNOTATION      0x2000  // Class
-#define ACC_ENUM            0x4000  // Class    Field
-
-
 //////////////// begin C interface
-
-
 //
 // calls from Compiler to VM
 //
@@ -228,7 +200,6 @@ VMEXPORT void method_set_inline_assumption(Compile_Handle h,
 //
 // Class
 //        
-VMEXPORT char*        class_get_java_name(Class_Handle ch);
 VMEXPORT unsigned     class_get_flags(Class_Handle cl);
 //VMEXPORT ClassLoaderHandle class_get_classloader(Class_Handle ch);
 VMEXPORT unsigned     class_number_fields(Class_Handle ch);

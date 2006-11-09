@@ -104,17 +104,6 @@ void gc_register_finalizer(Managed_Object_Handle obj);
 // probable need to be looked at also.
 //*****************************************************
 
-#define BITS_PER_BYTE 8
-
-// We want to use signed arithmetic when we do allocation pointer/limit compares.
-// In order to do this all sizes must be positive so when we want to overflow instead of 
-// setting the high bit we set the next to high bit. If we set the high bit and the allocation buffer
-// is at the top of memory we might not detect an overflow the unsigned overflow would produce
-// a small positive number that is smaller then the limit.
-
-#define NEXT_TO_HIGH_BIT_SET_MASK (1<<((sizeof(unsigned) * BITS_PER_BYTE)-2))
-#define NEXT_TO_HIGH_BIT_CLEAR_MASK ~NEXT_TO_HIGH_BIT_SET_MASK
-
 inline unsigned int get_instance_data_size (unsigned int encoded_size) 
 {
     return (encoded_size & NEXT_TO_HIGH_BIT_CLEAR_MASK);

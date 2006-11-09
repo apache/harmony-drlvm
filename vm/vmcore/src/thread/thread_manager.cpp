@@ -179,7 +179,7 @@ void *vm_object_get_lockword_addr(jobject monitor){
 }
 
 extern "C" char *vm_get_object_class_name(void* ptr) {
-        return (char*) (((ManagedObject*)ptr)->vt()->clss->name->bytes);
+        return (char*)(((ManagedObject*)ptr)->vt()->clss->get_name()->bytes);
 }
 
 void* vm_jthread_get_tm_data(jthread thread)

@@ -278,34 +278,34 @@ char* ParameterTypesToMethodSignature (JNIEnv* env, jobjectArray parameterTypes,
  * GetClassSignatureLength() + 1 bytes.
  */
 //should we care about buffer overflow and return len?
-size_t GetClassSignatureLength (Class* cl)
+size_t GetClassSignatureLength(Class* cl)
 {
-    assert (cl);
+    assert(cl);
 
-    const char* name = cl->name->bytes;
+    const String* name = cl->get_name();
 
-    if (name[0] == '[') {
-        return strlen(name);
+    if (name->bytes[0] == '[') {
+        return name->len;
     }
-    else if (cl->is_primitive) {
+    else if (cl->is_primitive()) {
         return 1;
     }
     else {
-        return 2 + strlen(name);
+        return 2 + name->len; // 2 bytes are for L and ;
     }
 } // GetClassSignatureLength
 
 //should we care about buffer overflow and return len?
-void GetClassSignature (Class* cl, char *sig)
+void GetClassSignature(Class* cl, char* sig)
 {
     assert (cl);
 
-    const char* name = cl->name->bytes;
+    const char* name = cl->get_name()->bytes;
 
     if (name[0] == '[') {
         sprintf (sig, "%s",name);
     }
-    else if (cl->is_primitive) {
+    else if (cl->is_primitive()) {
         sig[0] = PrimitiveNameToSignature (name);
         sig[1] = '\0';
     }
@@ -374,7 +374,7 @@ void PrimitiveSignatureToName (const char sig, char *classname)
 Field* LookupField (Class *clss, const char *name)
 {
     Field *f = 0;
-    for(; clss && !f; clss = clss->super_class) {
+    for(; clss && !f; clss = clss->get_super_class()) {
         if((f = LookupDeclaredField(clss, name)))
             return f;
     }
@@ -382,21 +382,20 @@ Field* LookupField (Class *clss, const char *name)
     return NULL;
 } // LookupField
 
-Method* LookupMethod (Class *clss, const char *mname, const char *mdesc)
+Method* LookupMethod(Class* clss, const char* mname, const char* mdesc)
 {
     Method* m = 0;
-    Class *oclss = clss;
-    for (; clss; clss = clss->super_class) {        // for each superclass
+    Class* oclss = clss;
+    for (; clss; clss = clss->get_super_class()) {      // for each superclass
         if((m = LookupDeclaredMethod(clss, mname, mdesc)))
             return m;
     }
 
-    Class_Superinterface *intfs = oclss->superinterfaces;
-    for(int i = 0; i < oclss->n_superinterfaces; i++)
-        if((m = LookupMethod(intfs[i].clss, mname, mdesc)))
+    for(int i = 0; i < oclss->get_number_of_superinterfaces(); i++)
+        if((m = LookupMethod(oclss->get_superinterface(i), mname, mdesc)))
             return m;
 
-    return (Method*)0;                                // method not found
+    return NULL;                                        // method not found
 } // LookupMethod
 
 char PrimitiveNameToSignature (const char* name)
@@ -523,9 +522,9 @@ Field* LookupDeclaredField (Class *clss, const char *name)
 
     assert (clss);
 
-    for (unsigned i =0; i < clss->n_fields; i++) {
-        if (clss->fields[i].get_name() == field_name) {
-            return &clss->fields[i];
+    for (unsigned i =0; i < clss->get_number_of_fields(); i++) {
+        if (clss->get_field(i)->get_name() == field_name) {
+            return clss->get_field(i);
         }
     }
 
@@ -545,7 +544,7 @@ void VerifyArray (JNIEnv* env, jarray array)
     // Acquire handle to internal class handle (Class):
     Class* clss = jclass_to_struct_Class(aclazz);
 
-    if (!clss->is_array) {
+    if (!clss->is_array()) {
         ThrowNew_Quick (env, "java/lang/IllegalArgumentException", 0);
         return;
     }
@@ -558,7 +557,7 @@ char GetComponentSignature (JNIEnv *env, jarray array)
 
     // Acquire handle to internal class handle (Class):
     Class* clss = jclass_to_struct_Class(aclazz);
-    return clss->name->bytes[1]; // return component first character
+    return clss->get_name()->bytes[1]; // return component first character
 }
 
 
@@ -568,19 +567,20 @@ Method* LookupDeclaredMethod(Class *clss, const char *mname, const char *mdesc)
    
     size_t len = strlen (mdesc);
     Method *m = 0;
-    for (unsigned i =0; i < clss->n_methods; i++) {   // for each method
-        m = &clss->methods[i];
+    for (unsigned i =0; i < clss->get_number_of_methods(); i++) {   // for each method
+        m = clss->get_method(i);
         if (m->is_fake_method()) {
             continue;   // ignore fake methods
         }
         const char* desc = m->get_descriptor()->bytes;
-        if ((m->get_name() == method_name) &&        // if names and signatures
-            (strncmp (mdesc, desc, len) == 0)) {     //   (excluding return types) match,   
-            return m;                                //     return method
+        if ((m->get_name() == method_name)          // if names and signatures
+            && (strncmp (mdesc, desc, len) == 0))   // (excluding return types) match
+        {
+            return m;                               // return method
         }
     }
 
-    return (Method*)0;                                   // method not found
+    return NULL;                                    // method not found
 } // LookupDeclaredMethod
 
 //Checks if the object is null.
@@ -669,10 +669,6 @@ void array_copy_jni(JNIEnv* jenv, jobject src, jint src_off, jobject dst, jint d
     jenv->ThrowNew(tclass, "bad arrayCopy");
 }
 
-Boolean class_is_subclass(Class_Handle subclss, Class_Handle superclss)
-{
-    return class_is_subtype_fast(((Class*)subclss)->vtable, (Class*)superclss);
-}
 
 jclass FindClass(JNIEnv* env_ext, String* name)
 {
@@ -744,9 +740,9 @@ jobject CreateNewThrowable(JNIEnv* jenv, Class* clazz,
 
     Method* ctor;
     if (message)
-        ctor = class_lookup_method(clazz, genv->Init_String, genv->FromStringConstructorDescriptor_String);
+        ctor = clazz->lookup_method(genv->Init_String, genv->FromStringConstructorDescriptor_String);
     else
-        ctor = class_lookup_method(clazz, genv->Init_String, genv->VoidVoidDescriptor_String);
+        ctor = clazz->lookup_method(genv->Init_String, genv->VoidVoidDescriptor_String);
     assert(ctor);
     jclass jclazz = struct_Class_to_jclass(clazz);
     assert(jclazz);
@@ -795,14 +791,14 @@ bool ensure_initialised(JNIEnv* env, Class* clss)
     ASSERT_RAISE_AREA;
     assert(hythread_is_suspend_enabled());
 
-    if(clss->state != ST_Initialized) {
+    if(!clss->is_initialized()) {
         class_initialize_from_jni(clss);
-        if(clss->state == ST_Error) {
+        if(clss->in_error()) {
             // If exception is already raised, no need to
             // throw new one, just return instead
-            if (!exn_raised()) 
+            if(!exn_raised()) 
             {
-                env->Throw(class_get_error_cause(clss));
+                env->Throw(clss->get_error_cause());
             }
             return false;
         }

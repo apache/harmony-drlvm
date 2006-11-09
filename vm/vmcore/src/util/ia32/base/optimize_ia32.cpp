@@ -66,7 +66,7 @@ static bool enable_fast_char_arraycopy()
 static ManagedObject *
 get_class_ptr(ManagedObject *obj)
 {
-    return *(obj->vt()->clss->class_handle);
+    return *(obj->vt()->clss->get_class_handle());
 }
 
 // ****** Begin overrides
@@ -124,16 +124,15 @@ void gen_native_newinstance(Emitter_Handle h, Method *m)
         s = mov(s,  ebp_opnd,  M_Base_Opnd(eax_reg, (int)env->vm_class_offset)) ; // ld l0,i0+offset (add offset, ld val)
         
         // Determine if this class supports fast allocation
-        size_t offset_is_fast_allocation_possible = (Byte *)&(env->Void_Class->is_fast_allocation_possible) - (Byte *)(env->Void_Class);
-        assert(sizeof(env->Void_Class->is_fast_allocation_possible) == 1);   // else one byte ld below will fail
+        size_t offset_is_fast_allocation_possible = env->Void_Class->get_offset_of_fast_allocation_flag();
         s = movzx(s,  ebx_opnd,  M_Base_Opnd(ebp_reg, offset_is_fast_allocation_possible), size_8);
         s = test(s,  ebx_opnd,  ebx_opnd); // jc l1=0,fallback
         s = branch8(s, Condition_Z,  Imm_Opnd(size_8, 50));
 
         // Class supports fast allocation, now use frontier allocation technique
         size_t offset_gc_local           = (Byte *)&(p_TLS_vmthread->_gc_private_information) - (Byte *)p_TLS_vmthread;
-        size_t offset_allocation_handle  = (Byte *)&(env->Void_Class->allocation_handle)       - (Byte *)(env->Void_Class);
-        size_t offset_instance_data_size = (Byte *)&(env->Void_Class->instance_data_size)      - (Byte *)(env->Void_Class);
+        size_t offset_allocation_handle  = env->Void_Class->get_offset_of_allocation_handle();
+        size_t offset_instance_data_size = env->Void_Class->get_offset_of_instance_data_size();
         current_offset += (unsigned) offset_gc_local;
         limit_offset += (unsigned) offset_gc_local;
 

@@ -337,6 +337,7 @@ public final class Class<T> implements Serializable, AnnotatedElement, GenericDe
      * @com.intel.drl.spec_ref
      */
     public Class<?> getComponentType() {
+		if(!isArray()) return null;
         return VMClassRegistry.getComponentType(this);
     }
 
@@ -646,7 +647,10 @@ public final class Class<T> implements Serializable, AnnotatedElement, GenericDe
      * @com.intel.drl.spec_ref
      */
     public boolean isArray() {
-        return VMClassRegistry.isArray(this);
+        if (reflectionData == null) {
+            initReflectionData();
+        }
+        return reflectionData.isArray;
     }
 
     /**
@@ -1169,6 +1173,8 @@ public final class Class<T> implements Serializable, AnnotatedElement, GenericDe
         String name;
         
         int modifiers = -1;
+        
+        boolean isArray;
 
         Constructor<T>[] declaredConstructors;
 
@@ -1188,6 +1194,7 @@ public final class Class<T> implements Serializable, AnnotatedElement, GenericDe
         
         public ReflectionData() {
             name = VMClassRegistry.getName(Class.this);
+            isArray = VMClassRegistry.isArray(Class.this);
             packageName = Class.getParentName(name);
         }
         

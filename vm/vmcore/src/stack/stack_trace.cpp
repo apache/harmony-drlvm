@@ -27,6 +27,8 @@
 #include "jit_intf_cpp.h"
 #include "environment.h"
 #include "method_lookup.h"
+#include "cci.h"
+#include "class_member.h"
 
 void get_file_and_line(Method_Handle mh, void *ip, bool is_ip_past, const char **file, int *line) {
     Method *method = (Method*)mh;

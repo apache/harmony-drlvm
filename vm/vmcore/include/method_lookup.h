@@ -33,8 +33,8 @@ enum VM_Code_Type {
 };
 
 
-VMEXPORT VM_Code_Type vm_identify_eip(void *addr);
-VM_Code_Type           vm_identify_eip_deadlock_free(void *addr);
+VM_Code_Type vm_identify_eip(void *addr);
+VM_Code_Type vm_identify_eip_deadlock_free(void *addr);
 
 
 

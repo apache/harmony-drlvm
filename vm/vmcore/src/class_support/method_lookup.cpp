@@ -30,6 +30,8 @@
 #include "lock_manager.h"
 #include "nogc.h"
 #include "vm_stats.h"
+#include "cci.h"
+#include "class_member.h"
 
 #include "method_lookup.h"
 
@@ -268,7 +270,7 @@ void Method_Lookup_Table::print_stats()
                 num++;
                 printf("%8" FMT64 "u :::: %s.%s%s\n",
                        m->num_throws,
-                       m->get_method()->get_class()->name->bytes,
+                       m->get_method()->get_class()->get_name()->bytes,
                        m->get_method()->get_name()->bytes,
                        m->get_method()->get_descriptor()->bytes);
             }
@@ -285,7 +287,7 @@ void Method_Lookup_Table::print_stats()
                 num++;
                 printf("%8" FMT64 "u :::: %s.%s%s\n",
                        m->num_catches,
-                       m->get_method()->get_class()->name->bytes,
+                       m->get_method()->get_class()->get_name()->bytes,
                        m->get_method()->get_name()->bytes,
                        m->get_method()->get_descriptor()->bytes);
             }
@@ -302,7 +304,7 @@ void Method_Lookup_Table::print_stats()
                 num++;
                 printf("%8" FMT64 "u :::: %s.%s%s\n",
                        m->num_unwind_java_frames_gc,
-                       m->get_method()->get_class()->name->bytes,
+                       m->get_method()->get_class()->get_name()->bytes,
                        m->get_method()->get_name()->bytes,
                        m->get_method()->get_descriptor()->bytes);
             }
@@ -317,7 +319,7 @@ void Method_Lookup_Table::print_stats()
                 num++;
                 printf("%8" FMT64 "u :::: %s.%s%s\n",
                        m->num_unwind_java_frames_non_gc,
-                       m->get_method()->get_class()->name->bytes,
+                       m->get_method()->get_class()->get_name()->bytes,
                        m->get_method()->get_name()->bytes,
                        m->get_method()->get_descriptor()->bytes);
             }

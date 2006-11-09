@@ -174,17 +174,17 @@ interp_enumerate_root_set_single_thread_on_stack(VM_thread *thread) {
 
         if (si->This) {
             vm_enumerate_root_reference((void**)&si->This, FALSE);
-            DEBUG_GC("  [THIS]: " << si->This->vt()->clss->name->bytes << endl);
+            DEBUG_GC("  [THIS]: " << si->This->vt()->clss->get_name()->bytes << endl);
         }
 
         if (si->exc) {
             vm_enumerate_root_reference((void**)&si->exc, FALSE);
-            DEBUG_GC("  [EXCEPTION]: " << si->exc->vt()->clss->name->bytes << endl);
+            DEBUG_GC("  [EXCEPTION]: " << si->exc->vt()->clss->get_name()->bytes << endl);
         }
 
         if (method->is_native()) {
             DEBUG_GC("[METHOD <native>]: "
-                    << method->get_class()->name->bytes << "."
+                    << method->get_class()->get_name()->bytes << "."
                     << method->get_name()->bytes
                     << method->get_descriptor()->bytes << endl);
             interp_si_goto_previous(si);
@@ -192,7 +192,7 @@ interp_enumerate_root_set_single_thread_on_stack(VM_thread *thread) {
         }
 
         DEBUG_GC("[METHOD "<< si->stack.size << " " << (int)si->locals.varNum << "]: "
-                << method->get_class()->name->bytes << "."
+                << class_get_name(method_get_class(method)) << "."
                 << method->get_name()->bytes
                 << method->get_descriptor()->bytes << endl);
 
@@ -205,7 +205,7 @@ interp_enumerate_root_set_single_thread_on_stack(VM_thread *thread) {
                     if (obj == 0) {
                         DEBUG_GC("NULL");
                     } else {
-                        DEBUG_GC(obj->vt()->clss->name->bytes << endl);
+                        DEBUG_GC(obj->vt()->clss->get_name()->bytes << endl);
                         vm_enumerate(cref, FALSE);
                     }
                 }
@@ -221,7 +221,7 @@ interp_enumerate_root_set_single_thread_on_stack(VM_thread *thread) {
                     if (obj == 0) {
                         DEBUG_GC("NULL\n");
                     } else {
-                        DEBUG_GC(obj->vt()->clss->name->bytes << endl);
+                        DEBUG_GC(obj->vt()->clss->get_name()->bytes << endl);
                         vm_enumerate(cref, FALSE);
                     }
                 }
@@ -270,7 +270,7 @@ interp_ti_enumerate_root_set_single_thread_on_stack(jvmtiEnv* ti_env, VM_thread 
                     (void**)&si->This, si->This,
                     JVMTI_HEAP_ROOT_STACK_LOCAL,
                     depth, method_id, slot++);
-            DEBUG_GC("  [THIS]: " << si->This->vt()->clss->name->bytes << endl);
+            DEBUG_GC("  [THIS]: " << si->This->vt()->clss->get_name()->bytes << endl);
         }
 
         if (si->exc) {
@@ -278,12 +278,12 @@ interp_ti_enumerate_root_set_single_thread_on_stack(jvmtiEnv* ti_env, VM_thread 
                 (void**)&si->exc, si->exc,
                 JVMTI_HEAP_ROOT_STACK_LOCAL,
                 depth, method_id, slot++);
-            DEBUG_GC("  [EXCEPTION]: " << si->exc->vt()->clss->name->bytes << endl);
+            DEBUG_GC("  [EXCEPTION]: " << si->exc->vt()->clss->get_name()->bytes << endl);
         }
 
         if (method->is_native()) {
             DEBUG_GC("[METHOD <native>]: "
-                    << method->get_class()->name->bytes << "."
+                    << method->get_class()->get_name()->bytes << "."
                     << method->get_name()->bytes
                     << method->get_descriptor()->bytes << endl);
             interp_si_goto_previous(si);
@@ -291,7 +291,7 @@ interp_ti_enumerate_root_set_single_thread_on_stack(jvmtiEnv* ti_env, VM_thread 
         }
 
         DEBUG_GC("[METHOD "<< si->stack.size << " " << (int)si->locals.varNum << "]: "
-                << method->get_class()->name->bytes << "."
+                << method->get_class()->get_name()->bytes << "."
                 << method->get_name()->bytes
                 << method->get_descriptor()->bytes << endl);
 
@@ -304,7 +304,7 @@ interp_ti_enumerate_root_set_single_thread_on_stack(jvmtiEnv* ti_env, VM_thread 
                     if (obj == 0) {
                         DEBUG_GC("NULL");
                     } else {
-                        DEBUG_GC(obj->vt()->clss->name->bytes << endl);
+                        DEBUG_GC(obj->vt()->clss->get_name()->bytes << endl);
                         vm_ti_enumerate_stack_root(ti_env,
                             cref, (Managed_Object_Handle)obj, 
                             JVMTI_HEAP_ROOT_STACK_LOCAL,
@@ -323,7 +323,7 @@ interp_ti_enumerate_root_set_single_thread_on_stack(jvmtiEnv* ti_env, VM_thread 
                     if (obj == 0) {
                         DEBUG_GC("NULL\n");
                     } else {
-                        DEBUG_GC(obj->vt()->clss->name->bytes << endl);
+                        DEBUG_GC(obj->vt()->clss->get_name()->bytes << endl);
                         vm_ti_enumerate_stack_root(ti_env,
                             cref, (Managed_Object_Handle)obj, 
                             JVMTI_HEAP_ROOT_STACK_LOCAL,

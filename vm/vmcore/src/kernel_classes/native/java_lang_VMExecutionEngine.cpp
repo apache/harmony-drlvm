@@ -93,11 +93,11 @@ JNIEXPORT jint JNICALL Java_java_lang_VMExecutionEngine_getAssertionStatus
 
     if(jclss) {
         Class* clss = jclass_to_struct_Class(jclss);
-        while (clss->declaringclass_index) {
+        while (clss->get_declaring_class_index()) {
             clss = class_get_declaring_class((Class_Handle)clss);
         }
-        const char* name = class_get_java_name(clss, genv)->bytes;
-        bool system = (((void*)clss->class_loader) == ((void*)genv->bootstrap_class_loader));
+        const char* name = clss->get_java_name()->bytes;
+        bool system = (((void*)clss->get_class_loader()) == ((void*)genv->bootstrap_class_loader));
         TRACE("check assert status for " << name << " system=" << system);
         if (system || !recursive) {
             status = reg->get_class_status(name);

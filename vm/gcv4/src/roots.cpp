@@ -29,7 +29,6 @@
 #include "port_atomic.h"
 #include "open/vm_gc.h"
 #include "open/gc.h"
-#include "method_lookup.h"
 
 // GC header files
 #include "gc_cout.h"

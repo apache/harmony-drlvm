@@ -66,8 +66,8 @@ jvmtiGetFieldName(jvmtiEnv* env,
     if( !field ) return JVMTI_ERROR_INVALID_FIELDID; // (25)
 
     bool present = false;
-    for( unsigned i = 0; i < cl->n_fields; i++ ) {
-        if( (jfieldID)&(cl->fields[i]) == field ) {
+    for( unsigned i = 0; i < cl->get_number_of_fields(); i++ ) {
+        if( (jfieldID)cl->get_field(i) == field ) {
             present = true;
             break;
         }
@@ -146,8 +146,8 @@ jvmtiGetFieldDeclaringClass(jvmtiEnv* env,
     if( !field ) return JVMTI_ERROR_INVALID_FIELDID;
 
     bool present = false;
-    for( unsigned i = 0; i < cl->n_fields; i++ ) {
-        if( (jfieldID)&(cl->fields[i]) == field ) {
+    for( unsigned i = 0; i < cl->get_number_of_fields(); i++ ) {
+        if( (jfieldID)cl->get_field(i) == field ) {
             present = true;
             break;
         }
@@ -200,8 +200,8 @@ jvmtiGetFieldModifiers(jvmtiEnv* env,
     if( !field ) return JVMTI_ERROR_INVALID_FIELDID;
 
     bool present = false;
-    for( unsigned i = 0; i < cl->n_fields; i++ ) {
-        if( (jfieldID)&(cl->fields[i]) == field ) {
+    for( unsigned i = 0; i < cl->get_number_of_fields(); i++ ) {
+        if( (jfieldID)cl->get_field(i) == field ) {
             present = true;
             break;
         }

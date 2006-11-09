@@ -1,4 +1,4 @@
-/*
+/**
  *  Licensed to the Apache Software Foundation (ASF) under one or more
  *  contributor license agreements.  See the NOTICE file distributed with
  *  this work for additional information regarding copyright ownership.
@@ -14,6 +14,7 @@
  *  See the License for the specific language governing permissions and
  *  limitations under the License.
  */
+
 /**
  * @author Pavel Pervov
  * @version $Revision: 1.1.2.7.2.1.2.5 $
@@ -22,289 +23,148 @@
 #define _CLASS_H_
 /**
  * @file
- * interfaces to class functionality.
+ * Interfaces to class functionality.
  */
 
-#include "jit_intf.h"
-// The following is included for CL_PROP_* defines.
-// Should they be moved somewhere and made constants?
-#include "open/vm_gc.h"
+#include <assert.h>
 #include "open/gc.h"
+#include "port_malloc.h"
 #include "String_Pool.h"
-#include "type.h"
+#include "vtable.h"
 
-//
+
 // forward declarations
-//
+struct Class;
+
+// external declarations
 class Class_Member;
 struct Field;
 struct Method;
-struct Method_Signature;
-class Package;
-typedef struct Class Class;
-class JIT;
-struct ClassLoader;
-class ByteReader;
 struct Class_Extended_Notification_Record;
-class DynoptInfo;
+class CodeChunkInfo;
 class Lock_Manager;
+class ByteReader;
+struct ClassLoader;
+class JIT;
+struct Global_Env;
+class Package;
+class VM_thread;
+struct AnnotationTable;
 
-//
-// external declarations
-//
-struct Global_Env;  // defined in Environment.h
 
-
-
-
-///////////////////////////////////////////////////////////////////////////////
-// Constant Java values
-///////////////////////////////////////////////////////////////////////////////
-union Const_Java_Value {
-    uint32 i;
-    int64 j;
+/** The constant pool entry descriptor.
+* For each constant pool entry, the descriptor content varies depending
+* on the constant pool tag that corresponds to this constant pool entry.
+* Content of each entry is described in
+* <a href="http://java.sun.com/docs/books/vmspec/2nd-edition/ClassFileFormat-Java5.pdf">
+* The Java Virtual Machine Specification, Chapter 4</a>, <i>The Constant
+* Pool</i> section, with the following exceptions:<ol>
+* <li>A zero entry of the constant pool contains an array of tags
+*  corresponding to entries in the constant pool entries array.</li>
+* <li>As required by
+* <a href=http://java.sun.com/docs/books/vmspec/2nd-edition/ConstantPool.pdf>
+* The Java Virtual Machine Specification, Chapter 5</a>
+* <i>Linking/Resolution</i> section, errors are cached for entries that have
+* not been resolved earlier for some reason.</li></ol>
+*/
+union ConstPoolEntry {
+    /** Zero entry of constant pool only: array of tags for constant pool.*/
+    unsigned char* tags;
+    /** CONSTANT_Class.*/
     struct {
-        uint32 lo_bytes;
-        uint32 hi_bytes;
-    } l;
-    float f;
-    double d;
-    String *string;
-    void *object;
-    //Const_Java_Value() {l.lo_bytes=l.hi_bytes=0;}
-};
-
-
-
-///////////////////////////////////////////////////////////////////////////////
-// Raw and compressed reference pointers
-///////////////////////////////////////////////////////////////////////////////
-#define RAW_REFERENCE         ManagedObject *
-#define COMPRESSED_REFERENCE  uint32
-
-VMEXPORT bool is_compressed_reference(COMPRESSED_REFERENCE value);
-VMEXPORT bool is_null_compressed_reference(COMPRESSED_REFERENCE value);
-
-VMEXPORT COMPRESSED_REFERENCE  compress_reference(ManagedObject *obj);
-VMEXPORT ManagedObject        *uncompress_compressed_reference(COMPRESSED_REFERENCE compressed_ref);
-VMEXPORT ManagedObject        *get_raw_reference_pointer(ManagedObject **slot_addr);
-
-// Store the reference "VALUE" in the slot at address "SLOT_ADDR" in the object "CONTAINING_OBJECT".
-// Signature: void store_reference(ManagedObject *CONTAINING_OBJECT, ManagedObject **SLOT_ADDR, ManagedObject *VALUE);
-#define STORE_REFERENCE(CONTAINING_OBJECT, SLOT_ADDR, VALUE)                                  \
-    {                                                                                         \
-        if (VM_Global_State::loader_env->compress_references) {                              \
-            gc_heap_slot_write_ref_compressed((Managed_Object_Handle)(CONTAINING_OBJECT),     \
-                                              (uint32 *)(SLOT_ADDR),                          \
-                                              (Managed_Object_Handle)(VALUE));                \
-        } else {                                                                              \
-            gc_heap_slot_write_ref((Managed_Object_Handle)(CONTAINING_OBJECT),                \
-                                   (Managed_Object_Handle *)(SLOT_ADDR),                      \
-                                   (Managed_Object_Handle)(VALUE));                           \
-        }                                                                                     \
-    }
-
-
-// Store the reference "VALUE" in the static field or other global slot at address "SLOT_ADDR".
-// Signature: void store_global_reference(COMPRESSED_REFERENCE *SLOT_ADDR, ManagedObject *VALUE);
-#define STORE_GLOBAL_REFERENCE(SLOT_ADDR, VALUE)                                              \
-    {                                                                                         \
-        if (VM_Global_State::loader_env->compress_references) {                              \
-            gc_heap_write_global_slot_compressed((uint32 *)(SLOT_ADDR),                       \
-                                                 (Managed_Object_Handle)(VALUE));             \
-        } else {                                                                              \
-            gc_heap_write_global_slot((Managed_Object_Handle *)(SLOT_ADDR),                   \
-                                      (Managed_Object_Handle)(VALUE));                        \
-        }                                                                                     \
-    }
-
-
-
-///////////////////////////////////////////////////////////////////////////////
-// class file attributes
-///////////////////////////////////////////////////////////////////////////////
-enum Attributes {
-    ATTR_SourceFile,            // Class (no more than 1 in each class file)
-    ATTR_InnerClasses,          // Class
-    ATTR_ConstantValue,         // Field (no more than 1 for each field)
-    ATTR_Code,                  // Method
-    ATTR_Exceptions,            // Method
-    ATTR_LineNumberTable,       // Code
-    ATTR_LocalVariableTable,    // Code
-    ATTR_Synthetic,             // Class/Field/Method
-    ATTR_Deprecated,            // Class/Field/Method
-    ATTR_SourceDebugExtension,  // Class (no more than 1 in each class file)
-    ATTR_Signature,             // Class/Field/Method (spec does not limit number???)
-    ATTR_EnclosingMethod,       // Class (1 at most)
-    ATTR_LocalVariableTypeTable,    // Code
-    ATTR_RuntimeVisibleAnnotations,             // Class/Field/Method (at most 1 per entity)
-    ATTR_RuntimeInvisibleAnnotations,           // Class/Field/Method
-    ATTR_RuntimeVisibleParameterAnnotations,    // Method
-    ATTR_RuntimeInvisibleParameterAnnotations,  // Method
-    ATTR_AnnotationDefault,     // Method (spec does not limit number???)
-    N_ATTR,
-    ATTR_UNDEF,
-    ATTR_ERROR
-};
-
-#define N_COMMON_ATTR    5
-#define N_FIELD_ATTR    1
-#define N_METHOD_ATTR   5
-#define N_CODE_ATTR     3
-#define N_CLASS_ATTR    4
-
-//
-// magic number, and major/minor version numbers of class file
-//
-#define CLASSFILE_MAGIC 0xCAFEBABE
-#define CLASSFILE_MAJOR 45
-// Supported class files up to this version
-#define CLASSFILE_MAJOR_MAX 49
-#define CLASSFILE_MINOR 3
-
-
-///////////////////////////////////////////////////////////////////////////////
-// Constant pool entries.
-///////////////////////////////////////////////////////////////////////////////
-
-union Const_Pool {
-    unsigned char  *tags;           // entry 0 of const pool only
-    struct {                        // CONSTANT_Class
         union {
-            Class* klass;       // resolved class
-            struct {            // resolution error
-                Const_Pool* next;       // next resolution error in this constant pool
+            /** Resolved class*/
+            Class* klass;
+            /** Resolution error, if any.*/
+            struct {
+                /** Next resolution error in this constant pool.*/
+                ConstPoolEntry* next;
+                /** Exception object describing an error.*/
                 ManagedObject* cause;
             } error;
         };
+        /** Index to class name in this constant pool.*/
         uint16 name_index;
     } CONSTANT_Class;
-    struct {                        // CONSTANT_String
-        String *string;     // resolved entry
+    /** CONSTANT_String.*/
+    struct {
+        /** Resolved class.*/
+        String* string;
+        /** Index of CONSTANT_Utf8 for this string.*/
         uint16 string_index;
     }  CONSTANT_String;
-    struct {                        // CONSTANT_{Field,Method,InterfaceMethod}ref
+    /** CONSTANT_{Field|Method|InterfaceMethod}ref.*/
+    struct {
         union {
-            Field*  field;  // resolved entry for CONSTANT_Fieldref
-            Method* method; // resolved entry for CONSTANT_{Interface}Methodref
-            struct {        // resolution error
-                Const_Pool* next;       // next resolution error in this constant pool
+            /** Generic class member for CONSTANT_*ref.
+            * Only valid for resolved refs.*/
+            Class_Member* member;
+            /** Resolved entry for CONSTANT_Fieldref.*/
+            Field*  field;
+            /** resolved entry for CONSTANT_[Interface]Methodref.*/
+            Method* method;
+            /** Resolution error, if any.*/
+            struct {
+                /** Next resolution error in this constant pool.*/
+                ConstPoolEntry* next;
+                /** Exception object describing error.*/
                 ManagedObject* cause;
             } error;
         };
+        /** Index of CONSTANT_Class for this CONSTANT_*ref.*/
         uint16 class_index;
+        /** Index of CONSTANT_NameAndType for CONSTANT_*ref.*/
         uint16 name_and_type_index;
     } CONSTANT_ref;
 
-    struct {    // shortcut to resolution error in CONSTANT_Class and CONSTANT_ref
-        Const_Pool* next;       // next resolution error in this constant pool
+    /** Shortcut to resolution error in CONSTANT_Class and CONSTANT_ref.*/
+    struct {
+        /** Next resolution error in this constant pool.*/
+        ConstPoolEntry* next;
+        /** Exception object describing error.*/
         ManagedObject* cause;
     } error;
 
-    uint32      int_value;          // CONSTANT_Integer
-    float       float_value;        // CONSTANT_Float
+    /** CONSTANT_Integer.*/
+    uint32 int_value;
+    /** CONSTANT_Float.*/
+    float float_value;
+    /** CONSTANT_Long and CONSTANT_Double.
+    * @note In this case we pack all 8 bytes of long/double in one
+    * ConstPoolEntry and leave the second ConstPoolEntry of the long/double
+    * unused.*/
     struct {
-        uint32 low_bytes;   // each Const_Pool element is 64bit in this case
-        uint32 high_bytes;  // we pack all 8 bytes of long/double in one
-                            // Const_Pool element (and leave the second
-                            // Const_Pool element of the long/double unused)
+        uint32 low_bytes;
+        uint32 high_bytes;
     } CONSTANT_8byte;
-    struct {                        // CONSTANT_NameAndType
-        String *name;        // resolved entry
-        String *descriptor;  // resolved entry
+    /** CONSTANT_NameAndType.*/
+    struct {
+        /** Resolved name.*/
+        String* name;
+        /** Resolved descriptor.*/
+        String* descriptor;
+        /** Name index in this constant pool.*/
         uint16 name_index;
+        /** Descriptor index in this constant pool.*/
         uint16 descriptor_index;
     } CONSTANT_NameAndType;
+    /** CONSTANT_Utf8.*/
     struct {
-        String *string;             // CONSTANT_Utf8
-        uint16 dummy;
+        /** Content of CONSTANT_Utf8 entry.*/
+        String* string;
     } CONSTANT_Utf8;
 };
 
-enum AnnotationValueType {
-  //  'B', 'C', 'D', 'F', 'I', 'J', 'S', and 'Z' 's' 'e' 'c' '@' '['
-    AVT_BYTE    = 'B',
-    AVT_CHAR    = 'C',
-    AVT_DOUBLE  = 'D',
-    AVT_FLOAT   = 'F',
-    AVT_INT     = 'I',
-    AVT_LONG    = 'J',
-    AVT_SHORT   = 'S',
-    AVT_BOOLEAN = 'Z',
-    AVT_STRING  = 's',
-    AVT_ENUM    = 'e',
-    AVT_CLASS   = 'c',
-    AVT_ANNOTN  = '@',
-    AVT_ARRAY   = '['
-};
 
-struct Annotation; // forward declaration
-
-// element-value pair of an annotation
-struct AnnotationValue {
-    union {
-        Const_Java_Value const_value;
-        String* class_name;
-        Annotation * nested;
-        struct {
-            String* type;
-            String* name;
-        } enum_const;
-        struct {
-            AnnotationValue* items;
-            uint16 length;
-        } array;
-    };
-    AnnotationValueType tag;
-};
-
-struct AnnotationElement {
-    String* name;
-    AnnotationValue value;
-};
-
-struct Annotation {
-    String* type;
-    AnnotationElement* elements;
-    uint16 num_elements;
-};
-
-struct AnnotationTable {
-    uint16 length;
-    Annotation * table[1];
-};
-
-struct Line_Number_Entry {
-    uint16 start_pc;
-    uint16 line_number;
-};
-
-struct Line_Number_Table {
-    uint16 length;
-    Line_Number_Entry table[1];
-};
-
-struct Local_Var_Entry {
-    uint16 start_pc;
-    uint16 length;
-    uint16 index;
-    String* name;
-    String* type;
-    String* generic_type;
-};
-
-struct Local_Var_Table {
-    uint16 length;
-    Local_Var_Entry table[1];
-};
-
-
-///////////////////////////////////////////////////////////////////////////////
-// Types of constant pool entries.  These are defined by a seperate byte array
-// pointed to by the first constant pool entry.
-///////////////////////////////////////////////////////////////////////////////
-enum Const_Pool_Tags {
-    CONSTANT_Tags               = 0,    // pointer to tags array
+/** Types of constant pool entries. These entry types are defined by a seperate
+* byte array that the first constant pool entry points at.*/
+enum ConstPoolTags {
+    /** pointer to the tags array.*/
+    CONSTANT_Tags               = 0,
+    /** The rest of tag values are taken from
+     * <a href="http://java.sun.com/docs/books/vmspec/2nd-edition/ClassFileFormat-Java5.pdf">
+     * The Java Virtual Machine Specification, Chapter 4</a>, <i>The Constant
+     * Pool</i> section.*/
     CONSTANT_Utf8               = 1,
     CONSTANT_Integer            = 3,
     CONSTANT_Float              = 4,
@@ -318,138 +178,608 @@ enum Const_Pool_Tags {
     CONSTANT_NameAndType        = 12,
 };
 
-#define TAG_MASK        0x0F    // 4 bits is sufficient for tag
-#define RESOLVED_MASK   0x80    // msb is resolved flag
-#define ERROR_MASK      0x40    // this entry contains resolution error information
 
-#define cp_tag(cp,i)            (cp[0].tags[i] & TAG_MASK)
-#define cp_is_resolved(cp,i)    (cp[0].tags[i] & RESOLVED_MASK)
-#define cp_set_resolved(cp,i)   (cp[0].tags[i] |= RESOLVED_MASK)
+/** The constant pool of a class and related operations.
+ * The structure covers all operations that may be required to run
+ * on the constant pool, such as parsing and processing queries.*/
 
-#define cp_in_error(cp, i)      (cp[0].tags[i] & ERROR_MASK)
-#define cp_set_error(cp, i)     (cp[0].tags[i] |= ERROR_MASK)
+struct ConstantPool {
+private:
+    // tag mask; 4 bits are sufficient for tag
+    static const unsigned char TAG_MASK = 0x0F;
+    // this entry contains resolution error information
+    static const unsigned char ERROR_MASK = 0x40;
+    // "entry is resolved" flag; msb
+    static const unsigned char RESOLVED_MASK = 0x80;
 
-#define cp_is_utf8(cp,i)        (cp_tag(cp,i) == CONSTANT_Utf8)
-#define cp_is_class(cp,i)       (cp_tag(cp,i) == CONSTANT_Class)
-#define cp_is_constant(cp,i)    ((cp_tag(cp,i) >= CONSTANT_Integer      \
-                                    && cp_tag(cp,i) <= CONSTANT_Double) \
-                                    || cp_tag(cp,i) == CONSTANT_String)
+    // constant pool size
+    uint16 m_size;
+    // constant pool entries; 0-th entry contains array of constant pool tags
+    // for all entries
+    ConstPoolEntry* m_entries;
+    // List of constant pool entries, which resolution had failed
+    // Required for fast enumeration of error objects
+    ConstPoolEntry* m_failedResolution;
 
-#define cp_is_string(cp,i)              (cp_tag(cp,i) == CONSTANT_String)
-#define cp_is_fieldref(cp,i)            (cp_tag(cp,i) == CONSTANT_Fieldref)
-#define cp_is_methodref(cp,i)           (cp_tag(cp,i) == CONSTANT_Methodref)
-#define cp_is_interfacemethodref(cp,i)  (cp_tag(cp,i) == CONSTANT_InterfaceMethodref)
+public:
+    /** Initializes the constant pool to its initial values.*/
+    ConstantPool() {
+        init();
+    }
+    /** Clears constant pool content (if there are any).*/
+    ~ConstantPool() {
+        clear();
+    }
 
-#define cp_resolve_to_class(cp,i,c) cp_set_resolved(cp,i); cp[i].CONSTANT_Class.klass=c;
+    /** Checks whether the constant pool is not empty.
+     * @return <code>true</code> if the constant pool contains
+     *         certain entries; otherwise <code>false</code>.*/
+    bool available() const { return m_size != 0; }
 
-#define cp_resolve_to_field(cp,i,f) cp_set_resolved(cp,i); cp[i].CONSTANT_ref.field=f;
+    /** Gets the size of the given constant pool.
+     * @return The number of entries in the constant pool.*/
+    uint16 get_size() const { return m_size; }
 
-#define cp_resolve_to_method(cp,i,m) cp_set_resolved(cp,i); cp[i].CONSTANT_ref.method=m;
+    /** Checks whether the index is a valid one in the constant pool.
+     * @param[in] index - an index in the constant pool
+     * @return <code>true</code> if the index is a valid one in the constant
+     *         pool; otherwise <code>false</code>.*/
+    bool is_valid_index(uint16 index) const {
+        return /*index > 0 && */index < m_size;
+    }
 
-#define MAX_FAST_INSTOF_DEPTH 5
+    /** Checks whether the constant-pool entry is resolved.
+     * @param[in] index - an index in the constant pool
+     * @return <code>true</code> if the entry is resolved;
+     *         otherwise <code>false</code>.*/
+    bool is_entry_resolved(uint16 index) const {
+        assert(is_valid_index(index));
+        return (m_entries[0].tags[index] & RESOLVED_MASK) != 0;
+    }
 
-///////////////////////////////////////////////////////////////////////////////
-// virtual method table of a class
-///////////////////////////////////////////////////////////////////////////////
-extern "C" {
+    /** Checks whether the resolution of the constant-pool entry has failed.
+     * @param[in] index - an index in the constant pool
+     * @return <code>true</code> if the resolution error is recorded
+     *         for the entry.*/
+    bool is_entry_in_error(uint16 index) const {
+        assert(is_valid_index(index));
+        return (m_entries[0].tags[index] & ERROR_MASK) != 0;
+    }
 
-typedef struct {
-    unsigned char   **table;// pointer into methods array of VTable below
-    unsigned intfc_id;      // id of interface
-} Intfc_Table_Entry;
+    /** Checks whether the constant-pool entry represents the string of
+     * the #CONSTANT_Utf8 type.
+     * @param[in] index - an index in the constant pool
+     * @return <code>true</code> if the given entry is the <code>utf8</code> 
+     *         string; otherwise <code>false</code>.*/
+    bool is_utf8(uint16 index) const {
+        return get_tag(index) == CONSTANT_Utf8;
+    }
 
-typedef struct Intfc_Table  {
-#ifdef POINTER64
-    // see INTFC_TABLE_OVERHEAD
-    uint32 dummy;   // padding
-#endif
-    uint32 n_entries;
-    Intfc_Table_Entry entry[1];
-} Intfc_Table;
+    /** Checks whether the constant-pool entry refers to a #CONSTANT_Class.
+     * @param[in] index - an index in the constant pool
+     * @return <code>true</code> if the given entry is a class;
+     *         otherwise <code>false</code>.*/
+    bool is_class(uint16 index) const {
+        return get_tag(index) == CONSTANT_Class;
+    }
 
+    /** Checks whether the constant-pool entry contains a constant.
+     * @param[in] index - an index in the constant pool
+     * @return <code>true</code> if the given entry contains a constant; 
+     *         otherwise <code>false</code>.*/
+    bool is_constant(uint16 index) const {
+        return get_tag(index) == CONSTANT_Integer
+            || get_tag(index) == CONSTANT_Float
+            || get_tag(index) == CONSTANT_Long
+            || get_tag(index) == CONSTANT_Double
+            || get_tag(index) == CONSTANT_String
+            || get_tag(index) == CONSTANT_Class;
+    }
 
-#define INTFC_TABLE_OVERHEAD    (sizeof(void *))
+    /** Checks whether the constant-pool entry is a literal constant.
+     * @param[in] index - an index in the constant pool
+     * @return <code>true</code> if the given entry contains a string; 
+     *         otherwise <code>false</code>.*/
+    bool is_string(uint16 index) const {
+        return get_tag(index) == CONSTANT_String;
+    }
 
+    /** Checks whether the constant-pool entry is #CONSTANT_NameAndType.
+     * @param[in] index - an index in the constant pool
+     * @return <code>true</code> if the given entry contains name-and-type;
+     *         otherwise <code>false</code>.*/
+    bool is_name_and_type(uint16 index) const {
+        return get_tag(index) == CONSTANT_NameAndType;
+    }
 
-#ifdef POINTER64
-#define OBJECT_HEADER_SIZE 0
-// The size of an object reference. Used by arrays of object to determine
-// the size of an element.
-#define OBJECT_REF_SIZE 8
-#else // POINTER64
-#define OBJECT_HEADER_SIZE 0
-#define OBJECT_REF_SIZE 4
-#endif // POINTER64
+    /** Checks whether the constant-pool entry contains a field reference,
+     * #CONSTANT_Fieldref.
+     * @param[in] index - an index in the constant pool
+     * @return <code>true</code> if the given entry contains a field reference;
+     *         otherwise <code>false</code>.*/
+    bool is_fieldref(uint16 index) const {
+        return get_tag(index) == CONSTANT_Fieldref;
+    }
 
+    /** Checks whether the constant-pool entry contains a method reference,
+     * #CONSTANT_Methodref.
+     * @param[in] index - an index in the constant pool
+     * @return <code>true</code> if the given entry contains a method reference;
+     *         otherwise <code>false</code>.*/
+    bool is_methodref(uint16 index) const {
+        return get_tag(index) == CONSTANT_Methodref;
+    }
 
-#define GC_BYTES_IN_VTABLE (sizeof(void *))
+    /** Checks whether the constant-pool entry constains an interface-method
+     * reference, #CONSTANT_InterfaceMethodref.
+     * @param[in] index - an index in the constant pool
+     * @return <code>true</code> if the given entry contains an interface-method
+     *         reference; otherwise <code>false</code>.*/
+    bool is_interfacemethodref(uint16 index) const {
+        return get_tag(index) == CONSTANT_InterfaceMethodref;
+    }
 
-typedef struct VTable {
+    /** Gets a tag of the referenced constant-pool entry.
+     * @param[in] index - an index in the constant pool
+     * @return A constant-pool entry tag for a given index.*/
+    unsigned char get_tag(uint16 index) const {
+        assert(is_valid_index(index));
+        return m_entries[0].tags[index] & TAG_MASK;
+    }
 
-    Byte _gc_private_information[GC_BYTES_IN_VTABLE];
+    /** Gets characters from the <code>utf8</code> string stored in the
+     * constant pool.
+     * @param[in] index - an index in the constant pool
+     * @return Characters from the <code>utf8</code> string stored in
+     *         the constant pool.*/
+    const char* get_utf8_chars(uint16 index) const {
+        return get_utf8_string(index)->bytes;
+    }
 
-    Class           *clss;          // the class - see above before change
-    //
-    // See the masks in vm_for_gc.h.
-    //
-    uint32 class_properties;
+    /** Gets the <code>utf8</code> string stored in the constant pool.
+     * @param[in] index - an index in the constant pool
+     * @return The <code>utf8</code> string.*/
+    String* get_utf8_string(uint16 index) const {
+        assert(is_utf8(index));
+        return m_entries[index].CONSTANT_Utf8.string;
+    }
 
+    /** Gets characters stored in the <code>utf8</code> string for
+     * the #CONSTANT_String entry.
+     * @param[in] index - an index in the constant pool
+     * @return The <code>utf8</code> string characters for the given
+     *         constant-pool entry.*/
+    const char* get_string_chars(uint16 index) const {
+        return get_string(index)->bytes;
+    }
 
-    // Offset from the top by CLASS_ALLOCATED_SIZE_OFFSET
-    // The number of bytes allocated for this object. It is the same as
-    // instance_data_size with the constraint bit cleared. This includes
-    // the OBJECT_HEADER_SIZE as well as the OBJECT_VTABLE_POINTER_SIZE
-    unsigned int allocated_size;
+    /** Gets the <code>utf8</code> string stored for the #CONSTANT_String
+     * entry.
+     * @param[in] index - an index in the constant pool
+     * @return The <code>utf8</code> string stored in the constant-pool entry.*/
+    String* get_string(uint16 index) const {
+        assert(is_string(index));
+        return m_entries[index].CONSTANT_String.string;
+    }
 
-    unsigned short array_element_size;
-    unsigned short array_element_shift;
-    Intfc_Table     *intfc_table;   // interface table; NULL if no intfc table
-//#ifdef FAST_INSTOF
-    Class *superclasses[MAX_FAST_INSTOF_DEPTH]; //::
-//#endif
-    unsigned char   *methods[1];    // code for method
-} VTable;
+    /** Gets the <code>utf8</code> string representing the name part of the
+     * name-and-type constant-pool entry.
+     * @param[in] index - an index in the constant pool
+     * @return The <code>utf8</code> string with the name part.*/
+    String* get_name_and_type_name(uint16 index) const {
+        assert(is_name_and_type(index));
+        assert(is_entry_resolved(index));
+        return m_entries[index].CONSTANT_NameAndType.name;
+    }
 
+    /** Gets the <code>utf8</code> string representing the descriptor part of
+     * the name-and-type constant-pool entry.
+     * @param[in] index - an index in the constant pool
+     * @return The <code>utf8</code> string with the descriptor part.*/
+    String* get_name_and_type_descriptor(uint16 index) const {
+        assert(is_name_and_type(index));
+        assert(is_entry_resolved(index));
+        return m_entries[index].CONSTANT_NameAndType.descriptor;
+    }
 
-#define VTABLE_OVERHEAD (sizeof(VTable) - sizeof(void *))
-// The "- sizeof(void *)" part subtracts out the "unsigned char *methods[1]" contribution.
+    /** Gets the generic class member for the <code>CONSTANT_*ref</code>
+     * constant-pool entry.
+     * @param[in] index - an index in the constant pool
+     * @return The generic-class member for the given constant-pool entry.*/
+    Class_Member* get_ref_class_member(uint16 index) const {
+        assert(is_fieldref(index)
+            || is_methodref(index)
+            || is_interfacemethodref(index));
+        return m_entries[index].CONSTANT_ref.member;
+    }
 
-VTable *create_vtable(Class *p_class, unsigned n_vtable_entries);
+    /** Gets the method from the #CONSTANT_Methodref or
+     * the #CONSTANT_InterfaceMethodref constant-pool entry
+     * @param[in] index - an index in the constant pool
+     * @return The method from the given constant-pool entry.*/
+    Method* get_ref_method(uint16 index) const {
+        assert(is_methodref(index)
+            || is_interfacemethodref(index));
+        assert(is_entry_resolved(index));
+        return m_entries[index].CONSTANT_ref.method;
+    }
 
-} // extern "C"
+    /** Gets the field from the #CONSTANT_Fieldref
+     * constant-pool entry.
+     * @param[in] index - an index in the constant pool
+     * @return The field from the given constant-pool entry.*/
+    Field* get_ref_field(uint16 index) const {
+        assert(is_fieldref(index));
+        assert(is_entry_resolved(index));
+        return m_entries[index].CONSTANT_ref.field;
+    }
 
+    /** Gets the class for the #CONSTANT_Class
+     * constant-pool entry.
+     * @param[in] index - an index in the constant pool
+     * @return The class for the given constant-pool entry.*/
+    Class* get_class_class(uint16 index) const {
+        assert(is_class(index));
+        assert(is_entry_resolved(index));
+        return m_entries[index].CONSTANT_Class.klass;
+    }
 
-///////////////////////////////////////////////////////////////////////////////
-// A Java class
-///////////////////////////////////////////////////////////////////////////////
-extern "C" {
+    /** Gets a 32-bit value (either interger or float) for a constant stored
+     * in the constant pool.
+     * @param[in] index - an index in the constant pool
+     * @return The value of a 32-bit constant stored in the constant pool.*/
+    uint32 get_4byte(uint16 index) const {
+        assert(get_tag(index) == CONSTANT_Integer
+            || get_tag(index) == CONSTANT_Float);
+        return m_entries[index].int_value;
+    }
 
-//
-// state of this class
-//
-enum Class_State {
-    ST_Start,                   // initial state
-    ST_LoadingAncestors,        // loading super class and super interfaces
-    ST_Loaded,                  // successfully loaded
-    ST_InstanceSizeComputed,    // still preparing the class but size of
-                                // its instances is known
-    ST_Prepared,                // successfully prepared
-    ST_Initializing,            // initializing the class
-    ST_Initialized,             // class initialized
-    ST_Error                    // bad class or the initializer failed
+    /** Gets an integer value for a constant stored in the constant pool.
+     * @param[in] index - an index in the constant pool
+     * @return The value of integer constant stored in the constant pool.*/
+    uint32 get_int(uint16 index) const {
+        assert(get_tag(index) == CONSTANT_Integer);
+        return m_entries[index].int_value;
+    }
+
+    /** Gets a float value for a constant stored in the constant pool.
+     * @param[in] index - an index in the constant pool
+     * @return A value of a float constant stored in the constant pool.*/
+    float get_float(uint16 index) const {
+        assert(get_tag(index) == CONSTANT_Float);
+        return m_entries[index].float_value;
+    }
+
+    /** Gets a low word of the 64-bit constant (either long or double)
+     * stored in the constant pool.
+     * @param[in] index - an index in the constant pool
+     * @return A value of low 32-bits of 64-bit constant.*/
+    uint32 get_8byte_low_word(uint16 index) const {
+        assert(get_tag(index) == CONSTANT_Long
+            || get_tag(index) == CONSTANT_Double);
+        return m_entries[index].CONSTANT_8byte.low_bytes;
+    }
+
+    /** Gets a high word of the 64-bit constant (either long or double)
+     * stored in the constant pool.
+     * @param[in] index - an index in the constant pool
+     * @return A value of high 32-bits of 64-bit constant.*/
+    uint32 get_8byte_high_word(uint16 index) const {
+        assert(get_tag(index) == CONSTANT_Long
+            || get_tag(index) == CONSTANT_Double);
+        return m_entries[index].CONSTANT_8byte.high_bytes;
+    }
+
+    /** Gets an address of a constant stored in the constant pool.
+     * @param[in] index - an index in the constant pool
+     * @return An address of a constant.*/
+    void* get_address_of_constant(uint16 index) const {
+        assert(is_constant(index));
+        assert(!is_string(index));
+        return (void*)(m_entries + index);
+    }
+
+    /** Gets an exception, which has caused failure of the referred 
+     * constant-pool entry.
+     * @param[in] index - an index in the constant pool
+     * @return An exception object, which is the cause of the
+     *         resolution failure.*/
+    jthrowable get_error_cause(uint16 index) const {
+        assert(is_entry_in_error(index));
+        return (jthrowable)(&(m_entries[index].error.cause));
+    }
+
+    /** Gets a head of a single-linked list containing resolution errors
+     * in the given constant pool.
+     * @return A head of a signle-linked list of constant-pool entries,
+     *         which resolution had failed.*/
+    ConstPoolEntry* get_error_chain() const {
+        return m_failedResolution;
+    }
+
+    /** Gets an an index in the constant pool where the <code>utf8</code>
+     * representation for #CONSTANT_String is stored.
+     * @param[in] index - an index in the constant pool for the 
+     *                    #CONSTANT_String entry
+     * @return An an index in the constant pool with the <code>utf8</code>
+     *         representation of the given string.*/
+    uint16 get_string_index(uint16 index) const {
+        assert(is_string(index));
+        return m_entries[index].CONSTANT_String.string_index;
+    }
+
+    /** Gets an index of the constant-pool entry containing the
+     * <code>utf8</code> string with the name part.
+     * @param[in] index - an index in the constant pool
+     * @return An an index in the constant pool with the <code>utf8</code>
+     *         name string.*/
+    uint16 get_name_and_type_name_index(uint16 index) const {
+        assert(is_name_and_type(index));
+        return m_entries[index].CONSTANT_NameAndType.name_index;
+    }
+
+    /** Gets an index of the constant-pool entry containing the 
+     * <code>utf8</code> string with the descriptor part.
+     * @param[in] index - an index in the constant pool
+     * @return An an index in the constant pool with the <code>utf8</code>
+     *         string for the descriptor.*/
+    uint16 get_name_and_type_descriptor_index(uint16 index) const {
+        assert(is_name_and_type(index));
+        return m_entries[index].CONSTANT_NameAndType.descriptor_index;
+    }
+
+    /** Gets an index of the constant-pool entry containing a class for
+     * the given <code>CONSTANT_*ref</code> entry.
+     * @param[in] index - an index in the constant pool
+     * @return An index of a class entry for the given constant-pool entry.*/
+    uint16 get_ref_class_index(uint16 index) const {
+        assert(is_fieldref(index)
+            || is_methodref(index)
+            || is_interfacemethodref(index));
+        return m_entries[index].CONSTANT_ref.class_index;
+    }
+
+    /** Gets an index of <code>CONSTANT_NameAndType</code> for the given
+     * constant-pool entry.
+     * @param[in] index - an index in the constant pool
+     * @return An index of #CONSTANT_NameAndType for the given
+     *         constant-pool entry.*/
+    uint16 get_ref_name_and_type_index(uint16 index) const {
+        assert(is_fieldref(index)
+            || is_methodref(index)
+            || is_interfacemethodref(index));
+        return m_entries[index].CONSTANT_ref.name_and_type_index;
+    }
+
+    /** Gets a class-name an index in the constant pool for the
+     * #CONSTANT_Class entry.
+     * @param[in] index - an index in the constant pool
+     * @return An index of the <code>utf8</code> name of the given class.*/
+    uint16 get_class_name_index(uint16 index) const {
+        assert(is_class(index));
+        return m_entries[index].CONSTANT_Class.name_index;
+    }
+
+    /** Resolves an entry to the class.
+     * @param[in] index - an index in the constant pool
+     * @param[in] clss  - a class to resolve the given entry to*/
+    void resolve_entry(uint16 index, Class* clss) {
+        // we do not want to resolve entry of a different type
+        assert(is_class(index));
+        set_entry_resolved(index);
+        m_entries[index].CONSTANT_Class.klass = clss;
+    }
+
+    /** Resolves an entry to the field.
+     * @param[in] index - an index in the constant pool
+     * @param[in] field - a field to resolve the given entry to*/
+    void resolve_entry(uint16 index, Field* field) {
+        // we do not want to resolve entry of different type
+        assert(is_fieldref(index));
+        set_entry_resolved(index);
+        m_entries[index].CONSTANT_ref.field = field;
+    }
+
+    /** Resolves an entry to the method.
+     * @param[in] index  - an index in the constant pool
+     * @param[in] method - a method to resolve the given entry to*/
+    void resolve_entry(uint16 index, Method* method) {
+        // we do not want to resolve entry of a different type
+        assert(is_methodref(index) || is_interfacemethodref(index));
+        set_entry_resolved(index);
+        m_entries[index].CONSTANT_ref.method = method;
+    }
+
+    /** Records a resolution error into a constant-pool entry.
+     * @param[in] index - an index in the constant pool
+     * @param[in] exn   - a cause of resolution failure
+     * @note Disable suspension during this operation.*/
+    void resolve_as_error(uint16 index, jthrowable exn) {
+        assert(is_class(index)
+            || is_fieldref(index)
+            || is_methodref(index)
+            || is_interfacemethodref(index));
+        // ppervov: 'if' clause is changed to 'assert' expression as this
+        // should never happen, i.e. class resolution should never try
+        // to resolve failed entry twice
+        // ppervov: if(!cp.is_entry_in_error(cp_index)) {
+        assert(!is_entry_in_error(index));
+        set_entry_error_state(index);
+        m_entries[index].error.cause = *((ManagedObject**)exn);
+        m_entries[index].error.next = m_failedResolution;
+        assert(&(m_entries[index]) != m_failedResolution);
+        m_failedResolution = &(m_entries[index]);
+        // ppervov: }
+    }
+
+    /** Parses in a constant pool for a class.
+     * @param[in] clss        - a class containing the given constant pool
+     * @param[in] string_pool - a reference to the string pool to intern strings in
+     * @param[in] cfs         - a byte stream to parse the constant pool from
+     * @return <code>true</code> if the constant pool was parsed successfully;
+     *         <code>false</code> if some error was discovered during the parsing.*/
+    bool parse(Class* clss, String_Pool& string_pool, ByteReader& cfs);
+
+    /** Checks constant pool consistency. <ul>
+     * <li>Makes sure that all indices to other constant pool entries are in range
+     * and that contents of the entries are of the right type.
+     * <li>Sets #CONSTANT_Class entries to point directly
+     * to <code>String</code> representing the internal form of a fully qualified
+     * form of a fully qualified name of <code>%Class</code>.
+     * <li>Sets #CONSTANT_String entries to point directly to the
+     * <code>String</code> representation. 
+     * <li>Preresolves #CONSTANT_NameAndType entries to signatures. </ul>
+     * @param[in] clss - the class that the given constant pool belongs to
+     * @return <code>true</code> if the constant pool of clss is valid;
+     *         otherwise <code>false</code>.*/
+    bool check(Class* clss);
+
+    /** Clears the constant-pool content: tags and entries arrays.*/
+    void clear() {
+        if(m_size != 0) {
+            delete[] m_entries[0].tags;
+            delete[] m_entries;
+        }
+        init();
+    }
+
+    /** Initializes the constant pool to initial values.*/
+    void init() {
+        m_size = 0;
+        m_entries = NULL;
+        m_failedResolution = NULL;
+    }
+private:
+    /** Sets a resolved flag in the constant-pool entry.
+     * @param[in] index - an index in the constant pool*/
+    void set_entry_resolved(uint16 index) {
+        assert(is_valid_index(index));
+        //// we do not want to resolve one entry twice
+        // ppervov: FIXME: there is possible positive/negative race condition
+        // in class resolution
+        //assert(!is_entry_resolved(index));
+        // we should not resolve failed entries
+        assert(!is_entry_in_error(index));
+        m_entries[0].tags[index] |= RESOLVED_MASK;
+    }
+
+    /** Sets an error flag in the constant-pool entry to mark it as failed.
+     * @param[in] index - an index in the constant pool*/
+    void set_entry_error_state(uint16 index) {
+        assert(is_valid_index(index));
+        //// we do not want to reset the resolved error
+        // ppervov: FIXME: there is possible positive/negative race condition
+        // in class resolution
+        //assert(!is_entry_resolved(index));
+        // we do not want to reset the reason of the failure
+        assert(!is_entry_in_error(index));
+        m_entries[0].tags[index] |= ERROR_MASK;
+    }
+
+    /** Resolves the #CONSTANT_NameAndType constant-pool entry 
+     * to actual string values.
+     * @param[in] index      - an index in the constant pool
+     * @param[in] name       - name-and-type name
+     * @param[in] descriptor - name-and-type type (descriptor)*/
+    void resolve_entry(uint16 index, String* name, String* descriptor) {
+        // we do not want to resolve entry of different type
+        assert(is_name_and_type(index));
+        set_entry_resolved(index);
+        m_entries[index].CONSTANT_NameAndType.name = name;
+        m_entries[index].CONSTANT_NameAndType.descriptor = descriptor;
+    }
+
+    /** Resolves the <code>CONSTANT_String</code> constant-pool entry to
+     * actual string values.
+     * @param[in] index - an index in the constant pool
+     * @param[in] str   - an actual string*/
+    void resolve_entry(uint16 index, String* str) {
+        assert(is_string(index));
+        set_entry_resolved(index);
+        m_entries[index].CONSTANT_String.string = str;
+    }
 };
 
-typedef union {
-        String *name;
-        Class  *clss;
-} Class_Superinterface;
 
-typedef struct Class {
+/** Converts a class name from an internal (VM) form to the Java form.
+ * @param[in] class_name - the class name in an internal form
+ * @return The class name in the Java form.*/
+String* class_name_get_java_name(const String* class_name);
 
-/////////////////////////////////////////////////////////////////////
-//////// The first few fields can not be changed without reflecting
-//////// the changes in the type Partial_Class in vm_for_gc.h
-////////////////////////////////////////////////////////////////////
+// A Java class
+extern "C" {
+
+/** The state of the Java class*/
+
+enum Class_State {
+    ST_Start,                   /// the initial state
+    ST_LoadingAncestors,        /// the loading super class and super interfaces
+    ST_Loaded,                  /// successfully loaded
+    ST_BytecodesVerified,       /// bytecodes for methods verified for the class
+    ST_InstanceSizeComputed,    /// preparing the class; instance size known
+    ST_Prepared,                /// successfully prepared
+    ST_ConstraintsVerified,     /// constraints verified for the class
+    ST_Initializing,            /// initializing the class
+    ST_Initialized,             /// the class initialized
+    ST_Error                    /// bad class or the class initializer failed
+};
+
+
+/** Access and properties flags for Class, Field and Method.*/
+enum AccessAndPropertiesFlags {
+    /** Public access modifier. Valid for Class, Field, Method. */
+    ACC_PUBLIC       = 0x0001,
+    /** Private access modifier. Valid for Field, Method.*/
+    ACC_PRIVATE      = 0x0002,
+    /** Protected access modifier. Valid for Field, Method.*/
+    ACC_PROTECTED    = 0x0004,
+    /** Static modifier. Valid for Field, Method.*/
+    ACC_STATIC       = 0x0008,
+    /** Final modifier. Valid for Class, Field, Method.*/
+    ACC_FINAL        = 0x0010,
+    /** Super modifier. Valid for Class.*/
+    ACC_SUPER        = 0x0020,
+    /** Synchronized modifier. Valid for Method.*/
+    ACC_SYNCHRONIZED = 0x0020,
+    /** Bridge modifier. Valid for Method (since J2SE 5.0).*/
+    ACC_BRIDGE       = 0x0040,
+    /** Volatile modifier. Valid for Field.*/
+    ACC_VOLATILE     = 0x0040,
+    /** Varargs modifier. Valid for Method (since J2SE 5.0).*/
+    ACC_VARARGS      = 0x0080,
+    /** Transient modifier. Valid for Field.*/
+    ACC_TRANSIENT    = 0x0080,
+    /** Native modifier. Valid for Method.*/
+    ACC_NATIVE       = 0x0100,
+    /** Interface modifier. Valid for Class.*/
+    ACC_INTERFACE    = 0x0200,
+    /** Abstract modifier. Valid for Class, Method.*/
+    ACC_ABSTRACT     = 0x0400,
+    /** Strict modifier. Valid for Method.*/
+    ACC_STRICT       = 0x0800,
+    /** Synthetic modifier. Valid for Class, Field, Method (since J2SE 5.0).*/
+    ACC_SYNTHETIC    = 0x1000,
+    /** Annotation modifier. Valid for Class (since J2SE 5.0).*/
+    ACC_ANNOTATION   = 0x2000,
+    /** Enum modifier. Valid for Class, Field (since J2SE 5.0).*/
+    ACC_ENUM         = 0x4000
+};
+
+
+/** VM representation of Java class.
+ * This class contains methods for parsing classes, querying class properties,
+ * setting external properties of a class (source file name, class file name),
+ * calling the verifier, preparing, resolving and initializing the class.*/
+
+struct Class {
+private:
+    typedef struct {
+        union {
+            const String* name;
+            Class* clss;
+        };
+        unsigned cp_index;
+    } Class_Super;
 
     //
     // super class of this class; initially, it is the string name of super
@@ -459,1332 +789,1221 @@ typedef struct Class {
     // The offset of this field is returned by class_get_super_offset.
     // Make sure to update this function if the field is moved around.
     //
-    union {
-        String  *super_name;
-        Class   *super_class;
-    };
+    Class_Super m_super_class;
 
-    const String * name;   // class name in internal (VM, class-file) format
-    //String * java_name;    // class canonical (Java) name
-    String * Signature;    // generic type information (since 1.5)
+    // class name in internal (VM, class-file) format
+    const String* m_name;
+    // class canonical (Java) name
+    String* m_java_name;
+    // generic type information (since Java 1.5.0)
+    String* m_signature;
+    // simple name of the class as given in the source code; empty string if anonymous
+    String* m_simple_name;
+    // package to which this class belongs
+    Package* m_package;
 
-    //
-    // See the masks in vm_for_gc.h.
-    //
+    // Distance in the hierarchy from java/lang/Object
+    int m_depth;
 
-    uint32 class_properties;
+    // The field m_is_suitable_for_fast_instanceof should be 0
+    // if depth==0 or depth>=vm_max_fast_instanceof_depth()
+    // or is_array or access_flags&ACC_INTERFACE
+    // It should be 1 otherwise
+    int m_is_suitable_for_fast_instanceof;
+
+    // string name of file from which this class has been loaded
+    const String* m_class_file_name;
+    // string name of source java file from which this class has been compiled
+    const String* m_src_file_name;
+
+    // unique class id
+    // FIXME: current implementation of id is not thread safe
+    // so, class id may not be unique
+    unsigned m_id;
+
+    // The class loader used to load this class.
+    ClassLoader* m_class_loader;
+
+    // This points to the location where java.lang.Class associated
+    // with the current class resides. Similarly, java.lang.Class has a field
+    // that points to the corresponding Class data structure.
+    ManagedObject** m_class_handle;
+
+    // Access and properties flags of a class
+    uint16 m_access_flags;
+
+    // state of this class
+    Class_State m_state;
+
+    // Is this class marked as deprecated
+    bool m_deprecated;
+
+    // Does this class represent a primitive type?
+    unsigned m_is_primitive : 1;
+
+    // Does this class represent an array?
+    unsigned m_is_array : 1;
+
+    // Does base class of this array is primitive
+    unsigned m_is_array_of_primitives : 1;
+
+    // Does the class have a finalizer that is not inherited from
+    // java.lang.Object?
+    unsigned m_has_finalizer : 1;
+
+    // Should access from this class be checked
+    // (needed for certain special classes)
+    unsigned m_can_access_all : 1;
+
+    // Can instances of this class be allocated using a fast inline sequence
+    // containing no calls to other routines
+    unsigned char m_is_fast_allocation_possible;
 
     // Offset from the top by CLASS_ALLOCATED_SIZE_OFFSET
     // The number of bytes allocated for this object. It is the same as
     // instance_data_size with the constraint bit cleared. This includes
     // the OBJECT_HEADER_SIZE as well as the OBJECT_VTABLE_POINTER_SIZE
-    unsigned int allocated_size;
-
-    unsigned int array_element_size;
-
-
-/////////////////////////////////////////////////////////////////////
-//////// Fields above this point can not be moved without redefining
-//////// the data structure Partial_Class in vm_for_gc.h
-/////////////////////////////////////////////////////////////////////
-
-    //
-    // How should objects of this class be aligned by GC.
-    //
-    int alignment;
-
-
-    //
-    // unique class id
-    //
-    unsigned id;
-
-
-    //
-    // The class loader used to load this class.
-    //
-    ClassLoader* class_loader;
-
-
-    //
-    // Does it represent a primitive type?
-    //
-    unsigned is_primitive : 1;
-
-    //
-    // array information
-    //
-    unsigned is_array : 1;
-
-    //
-    // This is even TRUE for multidimensional arrays as long
-    // as the type of the last dimension is primitve.
-    //
-    unsigned is_array_of_primitives : 1;
-
-
-    //
-    // Does the class have a finalizer that is not inherited from
-    // java.lang.Object?
-    //
-    unsigned has_finalizer : 1;
-
-    // Should this class not be verified (needed for certain special classes)
-    unsigned is_not_verified : 1;
-
-    //
-    // Is this class verified by verifier
-    // ??? FIXME - have to be in Class_State
-    unsigned is_verified : 2;
-
-    //
-    // Can instances of this class be allocated using a fast inline sequence containing
-    // no calls to other routines.
-    //
-    unsigned char is_fast_allocation_possible;
-
-    //
-    // number of dimensions in array; current VM limitation is 255
-    //
-    // Note, that you can derive the base component type of the array
-    // by looking at name->bytes[n_dimensions].
-    //
-    unsigned char n_dimensions;
-
-    //
-    // for non-primitive arrays only, array_base_class is the base class
-    // of an array
-    //
-    Class *array_base_class;
-
-
-    Class *array_element_class;
-    TypeDesc* array_element_type_desc;
-
-    uint16 access_flags;
-    uint16 cp_size;
-    uint16 n_superinterfaces;
-    uint16 n_fields;
-    uint16 n_static_fields;
-    uint16 n_methods;
-
-    // for inner class support
-    uint16 declaringclass_index;
-    uint16 enclosing_class_index;
-    uint16 enclosing_method_index;
-    uint16 n_innerclasses;
-    uint16 *innerclass_indexes;
-
-    // simple name of the class as given in the source code
-    // empty string if anonymous
-    String * simple_name; 
-
-    Const_Pool *const_pool; // constant pool array; size is cp_size
-    Field   *fields;            // array of fields; size is n_fields
-    Method  *methods;           // array of methods; size is n_methods
-    //
-    // array of interfaces this class implements; size is n_superinterfaces
-    // initially, it is an array of string names of interfaces and then
-    // after superinterfaces are loaded, this becomes an array pointers
-    // to superinterface class structures.
-    //
-    Class_Superinterface *superinterfaces;
-
-    const String    *class_file_name;   // string name of file from which
-                                        // this class has been loaded
-    const String    *src_file_name;     // string name of file from which
-                                        // this class has been compiled
-    Class_State   state;                // state of this class
-
-    Package *package;           // package to which this class belongs
-
-    bool deprecated;
-    //
-    // the following sizes are all in bytes
-    //
-
-    unsigned n_instance_refs;  // number of instance variables that are references
-
-    unsigned n_virtual_method_entries;  // number virtual methods in vtable
-    unsigned n_intfc_method_entries;    // number interface methods in vtable
-    unsigned n_intfc_table_entries;     // number intfc tables in _intfc_table
-                                        // same as _vtable->_intfc_table->n_entries
-
-    Method  *finalize_method;           // NULL if none exists
-
-    Method  *static_initializer;        // if it exists, NULL otherwise
-
-    Method  *default_constructor;       // for performance
-
-    unsigned static_data_size;      // size of this class' static data block
-    void *static_data_block;    // block containing array of static data fields
-
-    unsigned static_method_size;    // size in bytes of this class' static method block
-    unsigned char **static_method_block;    // array of pointers to code of
-                                            // static methods
+    unsigned int m_allocated_size;
 
     // This is the size of an instance without any alignment padding.
     // It can be used while calculating the field offsets of subclasses.
     // It does not include the OBJECT_HEADER_SIZE but does include the
     // OBJECT_VTABLE_POINTER_SIZE.
-    // The allocated_size field will be this field properly aligned.
-    unsigned unpadded_instance_data_size;
+    // The m_allocated_size field will be this field properly aligned.
+    unsigned m_unpadded_instance_data_size;
 
-    // Size of java/lang/Class instances in bytes. This variable is used during bootstrapping to allocate
-    // the three classes (i.e. Class instances) loaded before java.lang.Class: java.lang.Object,
-    // java.io.Serializable and java.lang.Class.
-    //static unsigned sizeof_class_class;
+    // How should objects of this class be aligned by GC.
+    int m_alignment;
 
     // Try to keep instance_data_size near vtable since they are used at the same time
     // by the allocation routines and sharing a cache line seem to help.
-    //
+
     // The next to high bit is set if allocation needs to consider class_properties.
     // (mumble->instance_data_size & NEXT_TO_HIGH_BIT_CLEAR_MASK) will always return the
     // actual size of and instance of class mumble.
     // Use get_instance_data_size() to get the actual size of an instance.
     // Use set_instance_data_size_constraint_bit() to set this bit.
 
-    unsigned instance_data_size;    // For most classes the size of a class instance's
-                                    // data block. This is what is passed to the GC.
-                                    // See above for details.
-    // ppervov: FIXME: the next two should be joined into a union
-    VTable  *vtable;            // virtual method table; NULL for interfaces
-    Allocation_Handle allocation_handle;
+    // For most classes the size of a class instance's data block.
+    // This is what is passed to the GC. See above for details.
+    unsigned m_instance_data_size;
 
-    //
-    // _vtable_descriptor is an array of pointers to Method descriptors, one
-    // descriptor for each corresponding entry in _vtable.methods[].
-    //
-    Method  **vtable_descriptors;
-    //
-    // _intfc_table_descriptor is an array of pointers to Class descriptors,
-    // one descriptor for each corresponding entry in intf_table.entry[];
-    //
-    Class   **intfc_table_descriptors;      // Class struture of interface
-    // ppervov: FIXME: to remove
-    void *class_object;
+    // ppervov: FIXME: the next two can be joined into a union;
+    // vtable compression should be dropped in that case
 
-    bool printed_in_dump_jit;
+    // virtual method table; <code>NULL</code> for interfaces
+    VTable* m_vtable;
 
-    void *p_initializing_thread;            // this really points to VM thread data struct
-    ManagedObject *p_error;          // enumeratable as static field
+    // "Compressed VTable" - offset from the base of VTable allocation area
+    Allocation_Handle m_allocation_handle;
 
-#ifdef VM_STATS
-    uint64 num_class_init_checks;
+    // number of virtual methods in vtable
+    unsigned m_num_virtual_method_entries;
 
-    // For subclasses of java.lang.Throwable only.
-    uint64 num_throws;
+    // number of interface methods in vtable
+    unsigned m_num_intfc_method_entries;
 
-    // Number of instanceof/checkcast calls both from the user code
-    // and the VM that were not subsumed by the fast version of instanceof.
-    uint64 num_instanceof_slow;
+    // number intfc tables in intfc_table
+    // same as vtable->intfc_table->n_entries
+    unsigned m_num_intfc_table_entries;
 
-    // Number of times an instance of the class has been created using new, newarray, etc.
-    uint64 num_allocations;
+    // An array of pointers to Method descriptors, one descriptor
+    // for each corresponding entry in m_vtable.methods[].
+    Method** m_vtable_descriptors;
 
-    // Number of times an instance of the class has been created using new, newarray, etc.
-    uint64 num_allocations_from_newInstance;
+    // An array of pointers to Class descriptors, one descriptor
+    // for each corresponding entry in m_intf_table.entry[].
+    Class** m_intfc_table_descriptors;
 
-    // Number of bytes allocated for instances of the class.
-    uint64 num_bytes_allocated;
-#endif
+    // number of dimensions in array; current VM limitation is 255
+    // Note, that you can derive the base component type of the array
+    // by looking at m_name->bytes[m_num_dimensions].
+    unsigned char m_num_dimensions;
 
-    // Number of "padding" bytes curently added per class instance to its fields to
-    // make each field at least 32 bits.
-    uint32 num_field_padding_bytes;
+    // for non-primitive arrays only, array_base_class is the base class
+    // of an array
+    Class* m_array_base_class;
 
-    // If set true by the "-compact_fields" command line option, the VM will not pad out fields of
-    // less than 32 bits to four bytes. However, fields will still be aligned to a natural boundary,
-    // and the num_field_padding_bytes field will reflect those alignment padding bytes.
-    static bool compact_fields;
+    // class of the element of an array
+    Class* m_array_element_class;
 
-    // If set true by the "-sort_fields" command line option, the VM will sort fields by size before
-    // assigning their offset during class preparation.
-    static bool sort_fields;
+    // size of element of array; equals zero, if this class is not an array
+    unsigned int m_array_element_size;
 
-    // Notify JITs whenever this class is extended by calling their JIT_extended_class_callback callback function,
-    Class_Extended_Notification_Record *notify_extended_records;
+    // type descriptor for array element class
+    TypeDesc* m_array_element_type_desc;
 
-    int depth;
-    // The field is_suitable_for_fast_instanceof should be 0 if depth==0 or depth>=vm_max_fast_instanceof_depth()
-    // or is_array or access_flags&ACC_INTERFACE.  It should be 1 otherwise.
-    int is_suitable_for_fast_instanceof;
+    // Number of superinterfaces
+    uint16 m_num_superinterfaces;
 
-    // This points to the location where java.lang.Class associated with the current class resides.
-    // Similarly, java.lang.Class has a field that points to the corresponding struct Class data structure.
-    ManagedObject** class_handle;
+    // array of interfaces this class implements; size is m_num_superinterfaces
+    // initially, it is an array of string names of interfaces and then,
+    // after superinterfaces are loaded, this becomes an array pointers
+    // to superinterface class structures
+    Class_Super* m_superinterfaces;
 
-    // 20030318 Gotten from the GC after gc_init() is called.
-    static Byte *heap_base;
-    static Byte *heap_end;
+    // constant pool of class
+    ConstantPool m_const_pool;
 
-    // 2003-05-13.  This will be set to either NULL or heap_base depending
-    // on whether compressed references are used.
-    static Byte *managed_null;
+    // number of fields in this class
+    uint16 m_num_fields;
+    // number of static fields in this class
+    uint16 m_num_static_fields;
+    // number of instance fields that are references
+    unsigned m_num_instance_refs;
 
-//#ifdef VM_STATS
-    // 20020923 Total number of allocations and total number of bytes for class-related data structures.
-    // This includes any rounding added to make each item aligned (current alignment is to the next 16 byte boundary).
-    // Might need to make these uint64 for some data structures.
-    static unsigned num_statics_allocations;
-    static unsigned num_nonempty_statics_allocations;
-    static unsigned num_vtable_allocations;
-    static unsigned num_hot_statics_allocations;
-    static unsigned num_hot_vtable_allocations;
+    // array of fields; size is m_num_fields
+    Field* m_fields;
 
-    static unsigned total_statics_bytes;
-    static unsigned total_vtable_bytes;
-    static unsigned total_hot_statics_bytes;
-    static unsigned total_hot_vtable_bytes;
-//#endif //VM_STATS
+    // size of this class' static data block
+    unsigned m_static_data_size;
 
-    Class *cha_first_child;
-    Class *cha_next_sibling;
+    // block containing array of static data fields
+    void* m_static_data_block;
 
-    // New field definitions start here
+    // number of methods in this class
+    uint16 m_num_methods;
 
-    // SourceDebugExtension support
-    String* sourceDebugExtension;
+    // array of methods; size is m_num_methods
+    Method* m_methods;
+
+    // pointer to finalize method, NULL if none exists
+    Method* m_finalize_method;
+
+    // pointer to <clinit> method, NULL if none exists
+    Method* m_static_initializer;
+
+    // pointer to init()V method, cached for performance
+    Method* m_default_constructor;
+
+    // index of declaring class in constant pool of this class
+    uint16 m_declaring_class_index;
+
+    // index of CONSTANT_Class of outer class
+    uint16 m_enclosing_class_index;
+
+    // index of CONSTANT_MethodRef of outer method
+    uint16 m_enclosing_method_index;
+
+    // number of inner classes
+    uint16 m_num_innerclasses;
+
+    struct InnerClass {
+        uint16 index;
+        uint16 access_flags;
+    };
+    // indexes of inner classes descriptors in constant pool
+    InnerClass* m_innerclasses;
+
+    // annotations for this class
+    AnnotationTable* m_annotations;
+
+    // thread, which currently executes <clinit>
+    VM_thread* m_initializing_thread;
+
+    // error, which is the cause of changing class state to ST_Error
+    // enumeratable as static field
+    ManagedObject* m_error;
+
+    // Notify JITs whenever tis class is extended by calling their
+    // JIT_extended_class_callback callback function,
+    Class_Extended_Notification_Record* m_notify_extended_records;
+
+    // These fields store information for
+    // Class Hierarchy Analysis JIT optimizations
+    // first class extending this class
+    Class* m_cha_first_child;
+    // next class which extends the same superclass
+    Class* m_cha_next_sibling;
+
+    // SourceDebugExtension class attribute support
+    String* m_sourceDebugExtension;
+
+    // struct Class accessibility for unloading
+    unsigned m_markBit:1;
+
+    // verifier private data pointer
+    void* m_verify_data;
 
     // class operations lock
     Lock_Manager* m_lock;
 
-    // List of constant pool entries, which resolution had failed
-    // Required for fast enumeration of error objects
-    Const_Pool* m_failedResolution;
+    // Per-class statistics
+    // Number of times an instance of the class has been created
+    // using new, newarray, etc
+    uint64 m_num_allocations;
 
-    // struct Class accessibility
-    unsigned m_markBit:1;
+    // Number of bytes allocated for instances of the class
+    uint64 m_num_bytes_allocated;
 
-    // verify data
-    void *verify_data;
+    // Number of instanceof/checkcast calls both from the user code
+    // and the VM that were not subsumed by the fast version of instanceof
+    uint64 m_num_instanceof_slow;
 
-    AnnotationTable * annotations;
-} Class; // typedef struct Class
+    // For subclasses of java.lang.Throwable only
+    uint64 m_num_throws;
 
+    // Number of times class is checked for initialization
+    uint64 m_num_class_init_checks;
 
+    // Number of "padding" bytes added per class instance to its fields to
+    // make each field at least 32 bits
+    uint32 m_num_field_padding_bytes;
+public:
+
+    /** Initializes class-member variables to their initial values.
+     * @param[in] env  - VM environment
+     * @param[in] name - a class name to assign to the given class
+     * @param[in] cl   - a class loader for the given class*/
+    void init_internals(const Global_Env* env, const String* name, ClassLoader* cl);
+
+    /** Clears member variables within a class.*/
+    void clear_internals();
+
+    /** Determines whether the given class has a super class.
+     * @return <code>true</code> if the current class has a super class;
+     *         otherwise <code>false</code>.*/
+    bool has_super_class() const {
+        return m_super_class.clss != NULL;
+    }
+
+    /** Gets the name of the super class.
+     *
+     * @return The super class name or <code>NULL</code>, if the given class 
+     *         is <code>java/lang/Object</code>.
+     * @note It is valid until the super class is loaded; after that, use
+     *       <code>get_super_class()->get_name()</code> to retrieve the 
+     *       super class name.*/
+    const String* get_super_class_name() const {
+        return m_super_class.name;
+    }
+
+    /** Gets the super class of the given class.
+     * @return The super class of the given class or <code>NULL</code>,
+     *         if the given class is <code>java/lang/Object</code>.*/
+    Class* get_super_class() const {
+        return m_super_class.clss;
+    }
+
+    /** Gets the class loader of the given class.
+     * @return the class loader of the given class.*/
+    ClassLoader* get_class_loader() const {
+        return m_class_loader;
+    }
+    /** Gets the class handle of <code>java.lang.Class</code> for the given class.
+     * @return The <code>java.lang.Class</code> handle for the given class.*/
+
+    ManagedObject** get_class_handle() const { return m_class_handle; }
+
+    /** Gets the natively interned class name for the given class.
+     * @return The class name in the VM format.*/
+
+    const String* get_name() const { return m_name; }
+
+    /** Gets a natively interned class name for the given class.
+     * @return A class name in the Java format.*/
+    String* get_java_name() {
+        if(!m_java_name) {
+            m_java_name = class_name_get_java_name(m_name);
+        }
+        return m_java_name;
+    }
+
+    /** Gets a class signature.
+     * @return A class signature.*/
+    String* get_signature() const { return m_signature; }
+
+    /** Gets a simple name of the class.
+     * @return A simple name of the class.*/
+    String* get_simple_name();
+
+    /** Gets a package containing the given class.
+     * @return A package to which the given class belongs.*/
+    Package* get_package() const { return m_package; }
+    
+    /** Gets depth in the hierarchy of the given class.
+     * @return A number of classes in the super-class hierarchy.*/
+    int get_depth() const { return m_depth; }
+    bool get_fast_instanceof_flag() const { return m_is_suitable_for_fast_instanceof; }
+
+    /** Gets the vtable for the given class.
+     * @return The vtable for the given class or <code>NULL</code>, if the given
+     *         class is an interface.*/
+    VTable* get_vtable() const { return m_vtable; }
+
+    /** Gets an allocation handle for the given class.*/
+    Allocation_Handle get_allocation_handle() const { return m_allocation_handle; }
+
+    /** Gets the length of the source-file name.
+     * @return The length in bytes of the source-file name.*/
+    size_t get_source_file_name_length() {
+        assert(has_source_information());
+        return m_src_file_name->len;
+    }
+
+    /** Gets a source-file name.
+     * @return A source-file name for the given class.*/
+    const char* get_source_file_name() {
+        assert(has_source_information());
+        return m_src_file_name->bytes;
+    }
+
+    /** Gets a method localed at <code>method_idx</code> in 
+     * the <code>m_vtable_descriptors</code> table.
+     * @param method_idx - index of method in vtable descriptors table
+     * @return A method from the vtable descriptors table.*/
+    Method* get_method_from_vtable(unsigned method_idx) const {
+        return m_vtable_descriptors[method_idx];
+    }
+
+    /** Gets the first subclass for Class Hierarchy Analysis.
+     * @return The first subclass.*/
+    Class* get_first_child() const { return m_cha_first_child; }
+
+    /** Return the next sibling for Class Hierarchy Analysis.
+     * @return The next sibling.*/
+    Class* get_next_sibling() const { return m_cha_next_sibling; }
+
+    /** Gets offset of m_depth field in struct Class.
+     * @param dummy - dummy variable used to calculate field offset
+     * @note Instanceof helpers use returned offset.*/
+    static size_t get_offset_of_depth(Class* dummy) {
+        return (size_t)((char*)(&dummy->m_depth) - (char*)dummy);
+    }
+
+    /** Gets offset of m_is_suitable_for_fast_instanceof field in struct Class.
+     * @param dummy - dummy variable used to calculate field offset
+     * @note Instanceof helper uses returned offset.*/
+    static size_t get_offset_of_fast_instanceof_flag(Class* dummy) {
+        return (size_t)((char*)(&dummy->m_is_suitable_for_fast_instanceof) - (char*)dummy);
+    }
+
+    /** Gets an offset of <code>m_is_fast_allocation_possible</code> in
+     * the class.
+     * @note Allocation helpers use returned offset.*/
+    size_t get_offset_of_fast_allocation_flag() {
+        // else one byte ld in helpers will fail
+        assert(sizeof(m_is_fast_allocation_possible) == 1);
+        return (size_t)((char*)(&m_is_fast_allocation_possible) - (char*)this);
+    }
+
+    /** Gets an offset of <code>m_allocation_handle</code> in the class.
+     * @note Allocation helpers use returned offset.*/
+    size_t get_offset_of_allocation_handle() {
+        return (size_t)((char*)(&m_num_class_init_checks) - (char*)this);
+    }
+
+    /** Gets an offset of <code>m_instance_data_size</code> in the class.
+     * @note Allocation helpers use returned offset.*/
+    size_t get_offset_of_instance_data_size() {
+        return (size_t)((char*)(&m_instance_data_size) - (char*)this);
+    }
+
+    /** Gets an offset of <code>m_num_class_init_checks</code> in the class.
+     * @param dummy - dummy variable used to calculate field offset
+     * @note Class initialization helper on IPF uses returned offset.*/
+    static size_t get_offset_of_class_init_checks(Class* dummy) {
+        return (size_t)((char*)(&dummy->m_num_class_init_checks) - (char*)dummy);
+    }
+
+    /** Gets the number of array dimensions.
+     * @return Number of dimentions in an array represented by this class.*/
+    unsigned char get_number_of_dimensions() const {
+        assert(is_array());
+        return m_num_dimensions;
+    }
+
+    /** Gets the class of the array element.
+     * @return Class describing the element of an array
+     * represented by this class.*/
+    Class* get_array_element_class() const {
+        assert(is_array());
+        return m_array_element_class;
+    }
+
+    /** Gets the array-element type descriptor.
+     * @return Type descriptor for the element of an array
+     * represented by this class.*/
+    TypeDesc* get_array_element_type_desc() const {
+        assert(is_array());
+        return m_array_element_type_desc;
+    }
+
+    /** Gets the class state.
+     * @return The class state.*/
+    Class_State get_state() const { return m_state; }
+
+    /** Gets a number of superinterfaces.
+     * @return A number of superinterfaces of the given class.*/
+    uint16 get_number_of_superinterfaces() const { return m_num_superinterfaces; }
+
+    /** Gets a super-interface name from the array of super-interfaces that
+     * the given class implements.
+     * @param[in] index - an index of super-interface to return the name for
+     * @return The requested super-interface name.*/
+    const String* get_superinterface_name(uint16 index) const {
+        assert(index < m_num_superinterfaces);
+        return m_superinterfaces[index].name;
+    }
+
+    /** Gets a superinterface from the array of superinterfaces the given class 
+     * implements.
+     * @param[in] index - an index of a superinterface to return
+     * @return A requested superinterface.*/
+    Class* get_superinterface(uint16 index) const {
+        assert(index < m_num_superinterfaces);
+        return m_superinterfaces[index].clss;
+    }
+
+    /** Gets a constant pool of the given class.
+     * @return A constant pool of the given class.*/
+    ConstantPool& get_constant_pool() { return m_const_pool; }
+
+    /** Gets a number of fields in the given class.
+     * @return A number of fields in the given class.*/
+    uint16 get_number_of_fields() const { return m_num_fields; }
+
+    /** Gets a number of static fields in the given class.
+     * @return A number of static fields in the given class.*/
+    uint16 get_number_of_static_fields() const { return m_num_static_fields; }
+
+    /** Gets a field from the given class by its position in the class-fields
+     * array.
+     * @param[in] index - an index in the class-fields array of a field to
+     *                    retrieve
+     * @return The requested field.*/
+    Field* get_field(uint16 index) const;
+
+    /** Gets an address of the memory block containing static data of
+     * the given class.
+     * @return An address of a static data block.*/
+    void* get_static_data_address() const { return m_static_data_block; }
+
+    /** Gets a number of methods in the given class.
+     * @return A number of methods in the given class.*/
+    uint16 get_number_of_methods() const { return m_num_methods; }
+
+    /** Gets a method from the given class by its position in the
+     * class-method array.
+     * @param[in] index - an index in the class-method array of a
+     *                    method to retrieve
+     * @return A requested method.*/
+    Method* get_method(uint16 index) const;
+
+    /** Gets a constant-pool index of the declaring class.
+     * @return An index in the constant pool describing the requested
+     *         declaring class.*/
+    uint16 get_declaring_class_index() const { return m_declaring_class_index; }
+
+    /** Gets a constant-pool index of the enclosing class.
+     * @return An index in the constant pool describing the requested 
+     *         enclosing class.*/
+    uint16 get_enclosing_class_index() const { return m_enclosing_class_index; }
+
+    /** Gets a constant-pool index of the enclosing method.
+     * @return An index in the constant pool describing the requested enclosing
+     *         method.*/
+    uint16 get_enclosing_method_index() const { return m_enclosing_method_index; }
+
+    /** Gets a number of inner classes.
+     * @return A number of inner classes.*/
+    uint16 get_number_of_inner_classes() const { return m_num_innerclasses; }
+
+    /** Gets an index in the constant pool of the given class, which
+     * describes the inner class.
+     * @param[in] index - an index of the inner class in the array of
+     *                    inner classes in the given class
+     * @return An index in the constant pool describing the requested inner
+     *         class.*/
+    uint16 get_inner_class_index(uint16 index) const {
+        assert(index < m_num_innerclasses);
+        return m_innerclasses[index].index;
+    }
+
+    /** Gets access flags for the inner class.
+     * @param[in] index - an index of the inner class in the array of inner
+     *                    classes in the given class
+     * @return Access flags of the requested inner class.*/
+    uint16 get_inner_class_access_flags(uint16 index) const {
+        assert(index < m_num_innerclasses);
+        return m_innerclasses[index].access_flags;
+    }
+    /** Gets a collection of annotations.
+     * @return A collection of annotations.*/
+    AnnotationTable* get_annotations() const { return m_annotations; }
+
+    /** Gets a handle of exception making the class change its state
+     * to <code>ST_Error</code>.
+     * @return A handle of exception.*/
+    jthrowable get_error_cause() const {
+        assert(in_error());
+        return (jthrowable)(&m_error);
+    }
+
+    /** Gets a class instance size.
+     * @return A size of the allocated instance in bytes.*/
+    unsigned int get_allocated_size() const { return m_allocated_size; }
+    unsigned int get_instance_data_size() const {
+        return m_instance_data_size & NEXT_TO_HIGH_BIT_CLEAR_MASK;
+    }
+
+    /** Gets the array-alement size.
+     * @return A size of the array element.
+     * @note The given function assumes that the class is an array class.*/
+    unsigned int get_array_element_size() const {
+        assert(m_is_array == 1);
+        return m_array_element_size;
+    }
+
+    /** Gets the class ID.*/
+    unsigned get_id() const { return m_id; }
+
+    /** Gets access and properties flags of the given class.
+     * @return The 16-bit integer representing access and properties flags
+     *         the given class.*/
+    uint16 get_access_flags() const { return m_access_flags; }
+
+   /** Checks whether the given class represents the primitive type.
+    * @return <code>true</code> if the class is primitive; otherwise 
+    *         <code>false</code>.*/
+    bool is_primitive() const { return m_is_primitive == 1; }
+
+   /** Checks whether the given class represents an array.
+    * @return <code>true</code> if the given class is an array, otherwise 
+    *         <code>false</code>.*/
+    bool is_array() const { return m_is_array == 1; }
+
+   /** Checks whether the base class of the given array is primitive.
+    * @return <code>true</code> if the base class is primitive, otherwise
+    *         <code>false</code>.*/
+    bool is_array_of_primitives() const { return m_is_array_of_primitives == 1; }
+
+    /** Checks whether the class has the <code>ACC_PUBLIC</code> flag set.
+     * @return <code>true</code> if the class has the <code>ACC_PUBLIC</code> 
+     *         access flag set.*/
+    bool is_public() const { return (m_access_flags & ACC_PUBLIC) != 0; }
+
+    /** Checks whether the class has the <code>ACC_PUBLIC</code> flag set.
+     * @return <code>true</code> if the class has the <code>ACC_PUBLIC</code> 
+     *         access flag set.*/
+    bool is_private() const { return (m_access_flags & ACC_PRIVATE) != 0; }
+
+    /** Checks whether the class has the <code>ACC_PUBLIC</code> flag set.
+     * @return <code>true</code> if the class has the <code>ACC_PUBLIC</code> 
+     *         access flag set.*/
+    bool is_protected() const { return (m_access_flags & ACC_PROTECTED) != 0; }
+
+   /** Checks whether the class has the <code>ACC_FINAL</code> flag set.
+    * @return <code>true</code> if the class has the <code>ACC_FINAL</code> 
+    *         access flag set.*/
+    bool is_final() const { return (m_access_flags & ACC_FINAL) != 0; }
+
+   /** Checks whether the class has the <code>ACC_SUPER</code> flag set.
+    * @return <code>true</code> if the class has the <code>ACC_SUPER</code> 
+    *         access flag set.*/
+ 
+    bool is_super() const { return (m_access_flags & ACC_SUPER) != 0; }
+
+    /** Checks whether the class has the <code>ACC_INTERFACE</code> flag set.
+     * @return <code>true</code> if the class has the <code>ACC_INTERFACE</code> 
+     *         access flag set.*/
+
+    bool is_interface() const { return (m_access_flags & ACC_INTERFACE) != 0; }
+    
+    /** Checks whether the class has the <code>ACC_ABSTRACT</code> flag set.
+     * @return <code>true</code> if the class has the <code>ACC_ABSTRACT</code> 
+     *         access flag set.*/
+    bool is_abstract() const { return (m_access_flags & ACC_ABSTRACT) != 0; }
+
+    /** Checks whether the class is enum, that is the <code>ACC_ENUM</code> 
+     * flag is set.
+     * @return <code>true</code> if the class is enum.*/
+    bool is_enum() const { return (m_access_flags & ACC_ENUM) != 0; }
+    
+    /** Checks whether the class is an annotation.
+     * @return <code>true</code> if the class is an annotation.*/
+    bool is_annotation() const { return (m_access_flags & ACC_ANNOTATION) != 0; }
+
+    /** Checks whether the given class has a finalizer.
+     * @return <code>true</code> if the given class (or its super class) has
+     *         a finalize method; otherwise <code>false</code>.*/
+    bool has_finalizer() const { return m_has_finalizer == 1; }
+
+    /** Checks whether the given class is an inner class of some other class.
+     * @return <code>true</code> if the given class is an inner class of some 
+     *         other class, otherwise <code>false</code>.*/
+    bool is_inner_class() const { return m_declaring_class_index != 0; }
+
+    /** Checks whether the given class can access <code>inner_class</code>.
+     * @param[in] env         - VM environment
+     * @param[in] inner_class - an inner class to check access to
+     * @return <code>true</code> if the given class has access to the inner 
+     *         class; otherwise <code>false</code>.*/
+    bool can_access_inner_class(Global_Env* env, Class* inner_class);
+
+    /** Checks whether the given class can access a member class.
+     * @param[in] member - a class member to check access to
+     * @return <code>true</code> if the given class can access a member class;
+     *         otherwise <code>false</code>.*/
+    bool can_access_member(Class_Member* member);
+
+    /** Checks whether the given class has a source-file name available.
+     * @return <code>true</code> if source file name is available for the given class;
+     *         otherwise <code>false</code>.*/
+    bool has_source_information() const { return m_src_file_name != NULL; }
+
+    /** Checks whether the given class is in the process of initialization.
+     * @return <code>true</code> if the class initialization method is executed;
+     *         otherwise <code>false</code>.*/
+
+    bool is_initializing() const { return m_state == ST_Initializing; }
+
+    /** Checks whether the class is initialized.
+     * @return <code>true</code> if the class is initialized;
+     *         otherwise <code>false</code>.*/
+
+    bool is_initialized() const { return m_state == ST_Initialized; }
+
+    /** Checks whether the class is in the error state.
+     * @return <code>true</code> if the class is in the error state;
+     *         otherwise <code>false</code>.*/
+    bool in_error() const { return m_state == ST_Error; }
+
+    /** Checks whether the given class has a passed preparation stage.
+     * @return <code>true</code> if the class has a passed preparation stage;
+     *         otherwise <code>false</code>.*/
+    bool is_at_least_prepared() const {
+        return m_state == ST_Prepared
+            || m_state == ST_ConstraintsVerified
+            || m_state == ST_Initializing
+            || m_state == ST_Initialized;
+    }
+
+   /** Checks whether the given class represents a class that is a subtype of 
+    * <code>clss</code>, according to the Java instance of rules.
+    * @param[in] clss - a class to check for being super relative
+    * @return <code>true</code> if the given class represents a class that is
+    *         a subtype of <code>clss</code>, otherwise <code>false</code>.*/
+    bool is_instanceof(Class* clss);
+
+    /** FIXME: all setter functions must be rethought to become private
+     * or to be removed altogether, if possible.
+     * Sets the name of a file from which the given class has been loaded.
+     * @param[in] cf_name - a class-file name*/
+    void set_class_file_name(const String* cf_name) {
+        assert(cf_name);
+        m_class_file_name = cf_name;
+    }
+
+    /** Sets instance data size constraint bit to let the allocation know
+     * there are constraints on the way instance should be allocated.
+     * @note Constaints are recorded in the <code>class_properties</code> 
+     *       field of the class <code>VTable</code>.*/
+    void set_instance_data_size_constraint_bit() {
+        m_instance_data_size |= NEXT_TO_HIGH_BIT_SET_MASK;
+    }
+
+    /** Sets a class handle of <code>java.lang.Class</code> for the given class.
+     * @param[in] oh - a class handle of <code>java.lang.Class</code>*/
+    void set_class_handle(ManagedObject** oh) { m_class_handle = oh; }
+
+    /** Records a cause of changing state to <code>ST_Error</code> for the given
+     * class.
+     * @param[in] exn - an exception object with error*/
+    void set_error_cause(jthrowable exn);
+
+    /** Constructs internal representation of a class from the byte array
+     * (defines class).
+     * @param[in] env - VM environment
+     * @param[in] cfs - a class-file stream; byte array contaning class data*/
+    bool parse(Global_Env* env, ByteReader& cfs);
+
+   /** Loads a super class and super interfaces of the given class.
+    * The given class's class loader is used for it.
+    * @param[in] env - VM environment*/
+    bool load_ancestors(Global_Env* env);
+
+    /** Verifies bytecodes of the class.
+     * @param[in] env - VM environment
+     * @return <code>true</code> if bytecodes of a class were successfully verified;
+     *         otherwise <code>false</code>.*/
+    bool verify(const Global_Env* env);
+
+    /** Verifies constraints for the given class collected during the bytecodes
+     * verification.
+     * @param[in] env - VM environment
+     * @return <code>true</code> if constraints successfully pass verification;
+     *         otherwise <code>false</code>.*/
+    bool verify_constraints(const Global_Env* env);
+
+    /** Setups the given class as representing a primitive type.
+     * @param[in] cl - a class loader the given class belongs to
+     * @note FIXME: <code>cl</code> is always a bootstrap class loader 
+     *       for primitive types. Retrieve the bootstrap class loader 
+     *       from VM environment here, not one level up the calling stack.*/
+    void setup_as_primitive(ClassLoader* cl) {
+        m_is_primitive = 1;
+        m_class_loader = cl;
+        m_access_flags = ACC_ABSTRACT | ACC_FINAL | ACC_PUBLIC;
+        m_state = ST_Initialized;
+    }
+
+    /** Sets up the given class as representing an array.
+     * @param[in] env                  - VM environment
+     * @param[in] num_dimentions       - a number of dimentions this array has
+     * @param[in] isArrayOfPrimitives  - does this array is an array of primitives
+     * @param[in] baseClass            - base class of this array; for example,
+     *                                   for <code>[[[Ljava/lang/String;</code> 
+     *                                   base class is <code>java/lang/String</code>
+     * @param[in] elementClass         - class representing element of this array;
+     *                                   for example, for <code>[[I</code>, element 
+     *                                   the class is <code>[I</code>
+     * @note For single-dimentional arrays <code>baseClass<code> and 
+     *       <code>elementClass</code> are the same.*/
+    void setup_as_array(Global_Env* env, unsigned char num_dimensions,
+        bool isArrayOfPrimitives, Class* baseClass, Class* elementClass);
+
+   /** Prepares a class: <ol>
+    * <li> assigns offsets:
+    *      - the offset of instance data fields
+    *      - virtual methods in a vtable
+    *      - static data fields in a static data block</li>
+    * <li> creates a class vtable</li>
+    * <li> creates a static field block</li>
+    * <li> creates a static method block </ol>
+    * @param[in] env - vm environment
+    * @return <code>true</code> if the class was successfully prepared; 
+    *         otherwise <code>false</code>.*/
+    bool prepare(Global_Env* env);
+
+    /** Resolves a constant-pool entry to a class. Loads a class if neccessary.
+     * @param[in] env      - VM environment
+     * @param[in] cp_index - a constant-pool index of <code>CONSTANT_Class</code> 
+     *                       to resolve
+     * @return A resolved class, if a resolution attempt succeeds; 
+     *         otherwise <code>NULL</code>.
+     * @note Should become private as soon as wrappers become members of the 
+     * struct #Class.*/
+    Class* _resolve_class(Global_Env* env, unsigned cp_index);
+    
+    /** Resolves a declaring class.
+     * @return A declaring class, if the given class is inner class of some
+     *         other class and if the resolution was successful;
+     *         otherwise <code>NULL</code>.*/
+    Class* resolve_declaring_class(Global_Env* env);
+
+    /** Resolves a field in the constant pool of the given class.
+     * @param[in] env      - VM environment
+     * @param[in] cp_index - an index of an entry in the constant pool,
+     *                       which describes field to be resolved
+     * @return A resolved field, if a resolution attempt succeeds; 
+     *         otherwise <code>NULL</code>.
+     * @note Should become private as soon as wrappers
+     *       become members of the struct #Class.*/
+    Field* _resolve_field(Global_Env* env, unsigned cp_index);
+
+    /** Resolves a method in the constant pool of the given class.
+     * @param[in] env      - VM environment
+     * @param[in] cp_index - an index of an entry in the constant pool,
+     *                       which describes method to be resolved
+     * @return A resolved method, if a resolution attempt succeeds;
+     *         otherwise <code>NULL</code>.
+     * @note Should become private as soon as wrappers become members of
+     *       the struct #Class.*/
+    Method* _resolve_method(Global_Env* env, unsigned cp_index);
+
+   /** Initializes the class.
+    * @param[in] throw_exception - defines whether the exception should
+    *                              be thrown or raised
+    * @note The given method may raise exception, if an error occurs during
+    *       the initialization of the class.*/
+    void initialize();
+
+    /** Looks up the field with specified name and descriptor in the given class only.
+     * @param[in] name - the field name to look up for
+     * @param[in] desc - the field descriptor to look up for
+     * @return The looked up field if found in the given class, 
+     *         otherwise <code>NULL</code>.*/
+    Field* lookup_field(const String* name, const String* descriptor);
+
+   /** Looks up the field with specified name and descriptor in the given class
+     * and also in the super class and super-interfaces recursively.
+    * @param[in] name - field name to look up for
+    * @param[in] desc - field descriptor to look up for
+    * @return The looked up field if found, <code>NULL</code> otherwise*/
+    Field* lookup_field_recursive(const String* name, const String* descriptor);
+
+    /** Looks up a method with a specified name and descriptor in the given
+     * class only.
+     * @param[in] name - a method name to look up for
+     * @param[in] desc - a method descriptor to look up for
+     * @return The looked-up method, if found in the given class;
+     *         otherwise <code>NULL</code>.*/
+    Method* lookup_method(const String* name, const String* desc);
+
+    /** Allocates an instance of the given class and returns a pointer to it.
+     * @return A managed pointer to the allocated class instance;
+     *         <code>NULL</code>, if no memory is available and
+     *         <code>OutOfMemoryError</code> exception is raised on a
+     *         caller thread.*/
+    ManagedObject* allocate_instance();
+
+    /** Calculates a size of the block allocated for the array, which is represented by 
+     * the given class.
+     * @param[in] length - the length of the array
+     * @return The size of the array of specified length in bytes.*/
+    unsigned calculate_array_size(int length) const {
+        assert(length >= 0);
+        assert(is_array());
+        assert(m_array_element_size);
+        unsigned first_elem_offset;
+        if(m_array_element_size < 8) {
+            first_elem_offset = VM_VECTOR_FIRST_ELEM_OFFSET_1_2_4;
+        } else {
+            first_elem_offset = VM_VECTOR_FIRST_ELEM_OFFSET_8;
+        }
+        unsigned size = first_elem_offset + length*m_array_element_size;
+        size = (((size + (GC_OBJECT_ALIGNMENT - 1)) & (~(GC_OBJECT_ALIGNMENT - 1))));
+        assert((size % GC_OBJECT_ALIGNMENT) == 0);
+        return size;
+    }
+
+    /** Estimates the amount of memory allocated for C++ part of the given class.
+     * @return The size of memory allocated for the given class.*/
+    unsigned calculate_size();
+
+    /** Gets the interface vtable for interface <code>iid</code> within 
+     * object <code>obj</code>.
+     * @param[in] obj - an object to retrieve an interface table entry from
+     * @param[in] iid - an interface class to retrieve vtable for
+     * @return An interface vtable from object; <code>NULL</code>, if no 
+     *         such interface exists for the object.*/
+    void* helper_get_interface_vtable(ManagedObject* obj, Class* iid);
+
+    /** Registers a callback that is called to notify the given JIT
+     * whenever the given class is extended. The <code>callback_data</code> 
+     * pointer will be passed back to the JIT during the callback. The JIT's callback
+     * function is <code>JIT_extended_class_callback</code>.
+     * @param[in] jit_to_be_notified - JIT to notify on extending the class
+     * @param[in] callback_data      - data to be passed back to JIT, when the callback
+     *                                 is called*/
+    void register_jit_extended_class_callback(JIT* jit_to_be_notified, void* callback_data);
+
+    /** Calls registered JITs callbacks to notify that the given class was 
+     * extended by <code>new_class</code>.
+     * @param[in] new_subclass - a subclass extending the given class*/
+    void do_jit_extended_class_callbacks(Class* new_subclass);
+
+    // SourceDebugExtension class attribute support
+
+    /** Checks whether the given class has the 
+     * <code>SourceDebugExtension</code> attribute.
+     * @return <code>true</code> if the <code>SourceDebugExtension</code> 
+     *         attribute is available for the given class;
+     *         otherwise <code>false</code>.*/
+    bool has_source_debug_extension() const {
+        return m_sourceDebugExtension != NULL;
+    }
+
+    /** Gets length of the <code>SourceDebugExtension</code> attribute.
+     * @return The <code>SourceDebugExtension</code> attribute length.*/
+    unsigned get_source_debug_extension_length() const {
+        return m_sourceDebugExtension->len;
+    }
+
+    /** Gets data from the <code>SourceDebugExtension</code> attribute.
+     * @return <code>SourceDebugExtension</code> attribute bytes.*/
+    const char* get_source_debug_extension() const {
+        return m_sourceDebugExtension->bytes;
+    }
+
+    // Class unloading support
+
+   /** Checks whether the given class is reachable through its loader
+    * or any live object.
+    * @return <code>true</code> if the given class is reachable, 
+    *         otherwise <code>false</code>.*/
+    bool is_reachable() { return m_markBit == 1; }
+
+    /** Clears a reachability mark.*/
+    void reset_reachable() { m_markBit = 0; }
+
+    /** Marks the given class as reachable.*/
+    void mark_reachable() { m_markBit = 1; }
+
+    /** Stores a verifier specific pointer into the given class.
+     * @param[in] data - a verifier specific data pointer*/
+    void set_verification_data(void* data) {
+        assert(m_verify_data == NULL);
+        m_verify_data = data;
+    }
+
+    /** Gets a pointer to verifier specific data, previously stored with
+     * the call to <code>set_verification_data</code>.
+     * @return A pointer to verifier specific data or <code>NULL</code>, if 
+     *         none was set.*/
+    void* get_verification_data() {
+        return m_verify_data;
+    }
+
+    /** Locks access to the given class.*/
+    void lock();
+
+    /** Unlocks access to the given class.*/
+    void unlock();
+
+    // Statistics update
+
+    /** Updates allocation statistics.
+    * @param[in] size - a size of an allocated instance*/
+    void instance_allocated(unsigned size) {
+        m_num_allocations++;
+        m_num_bytes_allocated += size;
+    }
+
+    /** Updates an instance of slow path statistics.*/
+    void instanceof_slow_path_taken() { m_num_instanceof_slow++; }
+
+    /** Updates throwing statistics for <code>java/lang/Throwable</code> decendants.*/
+    void class_thrown() { m_num_throws++; }
+
+    /** Updates initialization check statistics.*/
+    void initialization_checked() { m_num_class_init_checks++; }
+
+    /** Gets the number of times instance of the given class was allocated.
+     * @return The number of allocations of the given class.*/
+    uint64 get_times_allocated() const { return m_num_allocations; }
+
+    /** Gets the total number of bytes allocated for instances of the given class.
+     * @return The number of bytes allocated for all instances of the given class.*/
+    uint64 get_total_bytes_allocated() const { return m_num_bytes_allocated; }
+
+    /** Gets the number of times the slow path of the check instance was taken.
+     * @return The number of times the slow path was taken.*/
+    uint64 get_times_instanceof_slow_path_taken() const { return m_num_instanceof_slow; }
+
+    /** Gets the number of times the given class was thrown.
+     * @return The number of times the given class was thrown.*/
+    uint64 get_times_thrown() const { return m_num_throws; }
+
+    /** Gets the number of times the initialization of the given class
+     * was checked by run-time helpers.
+     * @return The number of times initialization of the given class was checked.*/
+    uint64 get_times_init_checked() const { return m_num_class_init_checks; }
+    
+    /** Gets the number of excessive bytes used for aligning class fields.
+     * @return A number of excessive bytes used for aligning class fields.*/
+    uint64 get_total_padding_bytes() const { return m_num_field_padding_bytes; }
+private:
+    
+    /** Parses super-interfaces information from a class-file stream.
+     * @param[in] cfs - a class-file stream to parse superinterfaces information from
+     * @return <code>true</code> if information was succesfully parsed;
+     *         otherwise <code>false</code>.*/
+    bool parse_interfaces(ByteReader &cfs);
+
+    /** Parses class fields from a class-file stream.
+     * @param[in] env - VM enviroment
+     * @param[in] cfs - a class-file stream
+     * @return <code>true</code> if successfully parses fields; <code>false</code> 
+     *         if any parse error occurs.*/
+    bool parse_fields(Global_Env* env, ByteReader &cfs);
+
+    /** Parses class methods from a class-file stream.
+     * @param[in] env - VM enviroment
+     * @param[in] cfs - a class file stream
+     * @return <code>true</code> if successfully parses methods; <code>false</code> 
+     *         if any parse error occurs.*/
+    bool parse_methods(Global_Env* env, ByteReader &cfs);
+
+    /** Calculates and assigns offsets to class fields during preparation.*/
+    void assign_offsets_to_fields();
+
+    /** Assign offsets to class-instance fields.
+     * @param[in] field_ptrs          - an array of class fields to assign 
+     *                                  offsets to
+     * @param[in] do_field_compaction - defines whether the class fields should 
+     *                                  be compacted*/
+    void assign_offsets_to_instance_fields(Field** field_ptrs, bool do_field_compaction);
+
+    /** Assigns an offset to an instance field.
+     * @param[in] field               - a field to calculate offset for
+     * @param[in] do_field_compaction - defines whether the class fields should 
+     *                                  be compacted*/
+    void assign_offset_to_instance_field(Field* field, bool do_field_compaction);
+
+    /** Assigns offsets to static fields of a class.
+     * @param[in] field_ptrs          - an array of fields
+     * @param[in] do_field_compaction - defines whether the class fields should 
+     *                                  be compacted*/
+    void assign_offsets_to_static_fields(Field** field_ptrs, bool do_field_compaction);
+
+    /** Initializes an interface class.
+     * @return <code>true</code> if  the interface was successfully initialized; 
+     *         otherwise <code>false</code>.*/
+    bool initialize_static_fields_for_interface();
+
+    /** Assigns offsets (from the base of the vtable) and the <code>VTable</code> index to
+     * class methods.
+     * @param[in] env - VM environment*/
+    void assign_offsets_to_methods(Global_Env* env);
+
+    /** Creates the vtable for the given class.
+     * @param[in] n_vtable_entries - a number of entries for the vtable*/
+    void create_vtable(unsigned n_vtable_entries);
+
+    /** Populates the vtable descriptors table with methods overriding as neccessary.*/
+    void populate_vtable_descriptors_table_and_override_methods();
+
+    /** Creates and populates an interface table for a class.
+     * @return The created interface table.*/
+    Intfc_Table* create_and_populate_interface_table();
+
+    /** Constructs an interface table descriptors table.*/
+    void build_interface_table_descriptors();
+
+    /** Sets vtable entries to methods addresses.*/
+    void point_vtable_entries_to_stubs();
+
+    /** Adds any required "fake" methods to a class. These are interface methods
+     * inherited by an abstract class that are not implemented by that class
+     * or any superclass. Such methods will never be called, but they are added
+     * so they have the correct offset in the virtual method part of the vtable
+     * (that is the offset of the "real" method in the vtable for a concrete class).*/
+    void add_any_fake_methods();
+}; // struct Class
 } // extern "C"
 
 
-ManagedObject *struct_Class_to_java_lang_Class(Class *clss);
-jclass struct_Class_to_jclass(Class *clss);
-Class *jclass_to_struct_Class(jclass jc);
-Class *jobject_to_struct_Class(jobject jobj);
+/** Gets instance of java/lang/Class associated with this class.
+ * @param[in] clss - class to retrieve java/lang/Class instance for.
+ * @return Instance of java/lang/Class associated with class.*/
+ManagedObject* struct_Class_to_java_lang_Class(Class* clss);
+/** Gets handle of java/lang/Class instance associated with this class.
+ * @param[in] clss - class to retrieve handle with java/lang/Class instance for.
+ * @return Handle with instance of java/lang/Class associated with class.
+ * @note This function allocates local handle and stores reference to
+ * java/lang/Class into it.*/
+jclass struct_Class_to_jclass(Class* clss);
+/** Gets native class from the java/lang/Class handle.
+ * @param[in] jc - handle to retrieve struct Class from.
+ * @return Class for the given handle.*/
+Class* jclass_to_struct_Class(jclass jc);
+/** Gets native class for any given object handle.
+ * @param[in] jobj - object to retrieve class for.
+ * @return Class for the given object handle.*/
+Class* jobject_to_struct_Class(jobject jobj);
+/** Gets pointer to instance of java/lang/Class associated with the class.
+ * @param[in] clss - class to retrieve pointer to instance of java/lang/Class for.
+ * @return Pointer to instance of java/lang/Class associated with the class.
+ * @note This is NOT real handle, so, when using this function, make sure the
+ * returned value will never be passed to ANY user code including JVMTI
+ * agent callbacks.*/
 jobject struct_Class_to_java_lang_Class_Handle(Class* clss);
-Class *java_lang_Class_to_struct_Class(ManagedObject *jlc);
-void set_struct_Class_field_in_java_lang_Class(const Global_Env* env,
-    ManagedObject** jlc, Class* clss);
-void class_report_failure(Class* target, uint16 cp_index, jthrowable exn);
-jthrowable class_get_linking_error(Class_Handle ch, unsigned index);
+/** Gets native class from instance of java/lang/Class.
+ * @param[in] jlc - instance of java/lang/Class to retrieve class from.
+ * @return Native class from instance of java/lang/Class.*/
+Class* java_lang_Class_to_struct_Class(ManagedObject* jlc);
+/** Gets loading error for a class with the given name.
+ * @param[in] cl - class loader which attempted to load the class.
+ * @param[in] name - name of a class which loading had failed.
+ * @return Exception describing class loading failure.*/
 jthrowable class_get_error(ClassLoaderHandle cl, const char* name);
 
-void class_set_error_cause(Class *c, jthrowable exn);
-jthrowable class_get_error_cause(Class *c);
-
-String* class_get_java_name(Class* clss, Global_Env* env);
-String* class_get_simple_name(Class* clss, Global_Env* env);
-//
-// access modifiers
-//
-#define class_is_public(clss)       ((clss)->access_flags & ACC_PUBLIC)
-#define class_is_final(clss)        ((clss)->access_flags & ACC_FINAL)
-#define class_is_super(clss)        ((clss)->access_flags & ACC_SUPER)
-#define class_is_interface(clss)    ((clss)->access_flags & ACC_INTERFACE)
-#define class_is_abstract(clss)     ((clss)->access_flags & ACC_ABSTRACT)
-#define class_is_annotation(clss)     ((clss)->access_flags & ACC_ANNOTATION)
-
-//
-// Look up of methods and fields in class.
-// Functions with the "_recursive" suffix also check superclasses.
-//
-VMEXPORT Field *class_lookup_field(Class *clss, const String* name, const String* desc);
-VMEXPORT Field *class_lookup_field_recursive(Class *clss, const char *name, const char *descr);
-Field *class_lookup_field_recursive(Class *clss, const String* name, const String* desc);
-VMEXPORT Method *class_lookup_method(Class *clss, const String* name, const String* desc);
-VMEXPORT Method *class_lookup_method_recursive(Class *clss, const String* name, const String* desc);
-VMEXPORT Method *class_lookup_method_recursive(Class *clss, const char *name, const char *descr);
-Method *class_lookup_method_init(Class*, const char*);
-Method *class_lookup_method_clinit(Class*);
-VMEXPORT Method *class_lookup_method(Class *clss, const char *name, const char *descr);
-Method *class_get_method_from_vt_offset(VTable *vt, unsigned offset);
-
-VMEXPORT Java_Type class_get_cp_const_type(Class *clss, unsigned cp_index);
-VMEXPORT const void *class_get_addr_of_constant(Class *clss, unsigned cp_index);
-VMEXPORT Field *class_resolve_field(Class *clss, unsigned cp_index);
-//VMEXPORT Field *class_resolve_static_field(Class *clss, unsigned cp_index);
-VMEXPORT Field *class_resolve_nonstatic_field(Class *clss, unsigned cp_index);
-//VMEXPORT Method *class_resolve_static_method(Class *clss, unsigned cp_index);
-//VMEXPORT Method *class_resolve_nonstatic_method(Class *clss, unsigned cp_index);
-VMEXPORT Method *class_resolve_method(Class *clss, unsigned cp_index);
-VMEXPORT Class *class_resolve_class(Class *clss, unsigned cp_index);
-
-// Can "other_clss" access the field or method "member"
-Boolean check_member_access(Class_Member *member, Class *other_clss);
-// Can "other_clss" access the "inner_clss"
-Boolean check_inner_class_access(Global_Env *env, Class *inner_clss, Class *other_clss);
-// get class name from constant pool
-extern String *cp_check_class(Const_Pool *cp, unsigned cp_size, unsigned class_index);
-
-//
-// parses in class description from a class file format
-//
-bool class_parse(Global_Env* env,
-                 Class* clss,
-                 unsigned* super_class_cp_index,
-                 ByteReader& cfs);
-
-const String* class_extract_name(Global_Env* env,
-                                 uint8* buffer, unsigned offset, unsigned length);
-
-
-//
-// preparation phase of class loading
-//
-bool class_prepare(Global_Env* env, Class *clss);
-
-
-
-//
-// Load a class and perform the first two parts of the link process: verify
-// and prepare.  The last stage of linking, resolution, is done at JIT-time.
-// See the JVM spec 2.16.3.
-//
-
-VMEXPORT Class *class_load_verify_prepare_by_loader_jni(Global_Env* env,
-                                                     const String* classname,
-                                                     ClassLoader* cl);
-
-VMEXPORT Class *class_load_verify_prepare_from_jni(Global_Env* env,
-                                                   const String* classname);
-
-unsigned class_calculate_size(const Class*);
-void mark_classloader(ClassLoader*);
-VMEXPORT void vm_notify_live_object_class(Class_Handle);
-
-//
-// execute static initializer of class
-//
-
-// Alexei
-// migrating to C interfaces
-#if (defined __cplusplus) && (defined PLATFORM_POSIX)
-extern "C" {
-#endif
-VMEXPORT void class_initialize_from_jni(Class *clss);
-#if (defined __cplusplus) && (defined PLATFORM_POSIX)
-}
-#endif
-VMEXPORT void class_initialize_ex(Class *clss);
-VMEXPORT void class_initialize(Class *clss);
-
-
-// Notify JITs whenever this class is extended by calling their JIT_extended_class_callback callback function,
-void class_register_jit_extended_class_callback(Class *clss, JIT *jit_to_be_notified, void *callback_data);
-void do_jit_extended_class_callbacks(Class *clss, Class *new_subclass);
-
-///////////////////////////////////////////////////////////////////////////////
-// A class' members are its fields and methods.  Class_Member is the base
-// class for Field and Method, and factors out the commonalities in these
-// two classes.
-///////////////////////////////////////////////////////////////////////////////
-// VMEXPORT // temporary solution for interpreter unplug
-class VMEXPORT Class_Member {
-public:
-    //
-    // access modifiers
-    //
-    bool is_public()            {return (_access_flags&ACC_PUBLIC)?true:false;}
-    bool is_private()           {return (_access_flags&ACC_PRIVATE)?true:false;}
-    bool is_protected()         {return (_access_flags&ACC_PROTECTED)?true:false;}
-    bool is_package_private()   {return !(is_public()||is_protected()||is_public())?true:false;}
-    bool is_static()            {return (_access_flags&ACC_STATIC)?true:false;}
-    bool is_final()             {return (_access_flags&ACC_FINAL)?true:false;}
-    bool is_strict()            {return (_access_flags&ACC_STRICT)?true:false;}
-    bool is_synthetic()         {return (_access_flags&ACC_SYNTHETIC)?true:_synthetic;}
-    bool is_deprecated()        {return _deprecated;}
-    unsigned get_access_flags() {return _access_flags;}
-
-    //
-    // field get/set methods
-    //
-    unsigned get_offset() const {return _offset;}
-    Class *get_class() const    {return _class;}
-    String *get_name() const    {return _name;}
-
-    // Get the type descriptor (Sec. 4.3.2)
-    String *get_descriptor() const {return _descriptor;}
-    String *get_signature() const {return _signature;}
-
-    AnnotationTable* get_declared_annotations() const {return _annotations;}
-
-    friend void assign_instance_field_offset(Class *clss, Field *field, bool do_field_compaction);
-    friend void assign_offsets_to_static_fields(Class *clss, Field **field_ptrs, bool do_field_compaction);
-    friend void assign_offsets_to_class_fields(Class *);
-    friend void add_new_fake_method(Class *clss, Class *example, unsigned *next);
-    friend void add_any_fake_methods(Class *);
-
-    /**
-     * Allocate a memory from a class loader pool using the class
-     * loader lock.
-     */
-    void* Alloc(size_t size);
-
-protected:
-    Class_Member()
-    {
-        _access_flags = 0;
-        _class = NULL;
-        _offset = 0;
-#ifdef VM_STATS
-        num_accesses = 0;
-        num_slow_accesses = 0;
-#endif
-        _synthetic = _deprecated = false;
-        _annotations = NULL;
-        _signature = NULL;
-    }
-
-    // offset of class member; 
-    //   for virtual  methods, the method's offset within the vtable
-    //   for static   methods, the method's offset within the class' static method table
-    //   for instance data,    offset within the instance's data block
-    //   for static   data,    offset within the class' static data block
-    unsigned _offset;
-
-    bool _synthetic;
-    bool _deprecated;
-    AnnotationTable * _annotations;
-
-    uint16 _access_flags;
-    String * _name;
-    String * _descriptor;
-    String * _signature;
-    Class  * _class;
-
-    bool parse(Class* clss, Const_Pool* cp, unsigned cp_size, ByteReader& cfs);
-
-   /* 
-    * returns ATTR_ERROR if attribute was recognized but parsing failed;
-    * returns ATTR_UNDEF if attribute was not recognized 
-    * otherwise returns passed attr value
-    */
-    Attributes process_common_attribute(Attributes attr, uint32 attr_len, ByteReader& cfs);
-
-public:
-#ifdef VM_STATS
-    uint64 num_accesses;
-    uint64 num_slow_accesses;
-#endif
-}; // Class_Member
-
-
-
-///////////////////////////////////////////////////////////////////////////////
-// Fields within Class structures.
-///////////////////////////////////////////////////////////////////////////////
-struct Field : public Class_Member{
-public:
-    //-----------------------
-
-    // For all fields
-    bool is_offset_computed() { return (_offset_computed != 0); }
-    void set_offset_computed(bool is_computed) { _offset_computed = is_computed? 1 : 0; }
-
-    // For static fields
-    VMEXPORT void* get_address();
-
-    // Return the type of this field.
-    Java_Type get_java_type() {
-        return (Java_Type)(get_descriptor()->bytes[0]);
-    };
-
-    Const_Java_Value get_const_value() { return const_value; };
-    uint16 get_const_value_index() { return _const_value_index; };
-
-    //-----------------------
-
-    Field() {
-        _const_value_index = 0;
-        _field_type_desc = 0;
-        _offset_computed = 0;
-        _is_injected = 0;
-        track_access = 0;
-        track_modification = 0;
-    }
-
-    void Reset() { }
-
-    void set(Class *cl, String* name, String* desc, unsigned short af) {
-        _class = cl; _access_flags = af; _name = name; _descriptor = desc;
-    }
-    Field& operator = (const Field& fd) {
-        // copy Class_Member fields
-        _access_flags = fd._access_flags;
-        _class = fd._class;
-        _offset = fd._offset;
-        _name = fd._name;
-        _descriptor = fd._descriptor;
-        _deprecated = fd._deprecated;
-        _synthetic = fd._synthetic;
-        _annotations = fd._annotations;
-        _signature = fd._signature;
-
-        // copy Field fields
-        _const_value_index = fd._const_value_index;
-        _field_type_desc = fd._field_type_desc;
-        _is_injected = fd._is_injected;
-        _offset_computed = fd._offset_computed;
-        const_value = fd.const_value;
-        track_access = fd.track_access;
-        track_modification = fd.track_modification;
-
-        return *this;
-    }
-    //
-    // access modifiers
-    //
-    unsigned is_volatile()  {return (_access_flags&ACC_VOLATILE);} 
-    unsigned is_transient() {return (_access_flags&ACC_TRANSIENT);} 
-    bool is_enum()          {return (_access_flags&ACC_ENUM)?true:false;} 
-
-    bool parse(Class* clss, Const_Pool* cp, unsigned cp_size, ByteReader& cfs);
-
-    unsigned calculate_size() {
-        unsigned size = sizeof(Class_Member) + sizeof(Field);
-        size += sizeof(TypeDesc);
-        return size;
-    }
-
-    TypeDesc* get_field_type_desc() { return _field_type_desc; }
-    void set_field_type_desc(TypeDesc* td) { _field_type_desc = td; }
-
-    Boolean is_injected() {return _is_injected;}
-    void set_injected() { _is_injected = 1; }
-
-    void set_track_access(bool value) {
-        track_access = value ? 1 : 0 ;
-    }
-
-    void set_track_modification(bool value) {
-        track_modification = value ? 1 : 0 ;
-    }
-
-    void get_track_access_flag(char** address, char* mask) {
-        *address = &track_access;
-        *mask = TRACK_ACCESS_MASK;
-    }
-
-    void get_track_modification_flag(char** address, char* mask) {
-        *address = &track_modification;
-        *mask = TRACK_MODIFICATION_MASK;
-    }
-
-private:
-    //
-    // The initial values of static fields.  This is defined by the
-    // ConstantValue attribute in the class file.
-    //
-    // If there was not ConstantValue attribute for that field then _const_value_index==0
-    //
-    uint16 _const_value_index;
-    Const_Java_Value const_value;
-    TypeDesc* _field_type_desc;
-    unsigned _is_injected : 1;
-    unsigned _offset_computed : 1;
-
-    /** Turns on sending FieldAccess events on access to this field */
-    char track_access;
-    const static char TRACK_ACCESS_MASK = 1;
-
-    /** Turns on sending FieldModification events on modification of this field */
-    char track_modification;
-    const static char TRACK_MODIFICATION_MASK = 1;
-
-    //union {
-    //    char bit_flags;
-    //    struct {
-
-    //        /** Turns on sending FieldAccess events on access to this field */
-    //        char track_access : 1;
-    //        const static char TRACK_ACCESS_MASK = 4;
-
-    //        /** Turns on sending FieldModification events on modification of this field */
-    //        char track_modification : 1;
-    //        const static char TRACK_MODIFICATION_MASK = 8;
-    //    };
-    //};
-}; // Field
-
-
-
-///////////////////////////////////////////////////////////////////////////////
-// Handler represents a catch block in a method's code array
-///////////////////////////////////////////////////////////////////////////////
-class Handler {
-public:
-    Handler();
-    bool parse(Const_Pool *cp, unsigned cp_size,
-        unsigned code_length, ByteReader &cfs);
-    uint32 get_start_pc() {return _start_pc;}
-    uint32 get_end_pc() {return _end_pc;}
-    uint32 get_handler_pc() {return _handler_pc;}
-    uint32 get_catch_type_index() {return _catch_type_index;}
-
-
-private:
-    uint32 _start_pc;
-    uint32 _end_pc;
-    uint32 _handler_pc;
-    uint32 _catch_type_index;  // CP idx
-    String *_catch_type;
-
-}; //Handler
-
-
-
-// Representation of target handlers in the generated code.
-class Target_Exception_Handler {
-public:
-    Target_Exception_Handler(NativeCodePtr start_ip, NativeCodePtr end_ip, NativeCodePtr handler_ip, Class_Handle exn_class, bool exn_is_dead);
-
-    NativeCodePtr get_start_ip();
-    NativeCodePtr get_end_ip();
-    NativeCodePtr get_handler_ip();
-    Class_Handle  get_exc();
-    bool          is_exc_obj_dead();
-
-    bool is_in_range(NativeCodePtr eip, bool is_ip_past);
-    bool is_assignable(Class_Handle exn_class);
-
-    void update_catch_range(NativeCodePtr new_start_ip, NativeCodePtr new_end_ip);
-    void update_handler_address(NativeCodePtr new_handler_ip);
-
-private:
-    NativeCodePtr _start_ip;
-    NativeCodePtr _end_ip;
-    NativeCodePtr _handler_ip;
-    Class_Handle _exc;
-    bool _exc_obj_is_dead;
-}; //Target_Exception_Handler
-
-typedef Target_Exception_Handler *Target_Exception_Handler_Ptr;
-
-
-#define MAX_VTABLE_PATCH_ENTRIES 10
-
-class VTable_Patches {
-public:
-    void *patch_table[MAX_VTABLE_PATCH_ENTRIES];
-    VTable_Patches *next;
-};
-
-
-
-/////////////////////////////////////////////////////////////////
-// begin multiple-JIT support
-
-int get_index_of_jit(JIT *jit);
-
-
-struct JIT_Data_Block {
-    JIT_Data_Block *next;
-    char bytes[1];
-};
-
-
-// Each callee for a given code chunk can have multiple Callee_Info structures, one for each call site in the caller.
-typedef struct Callee_Info {
-    void          *caller_ip;   // the IP in the caller where the call was made
-    CodeChunkInfo *callee;      // which code chunk was called
-    uint64         num_calls;
-} Callee_Info;
-
-
-#define NUM_STATIC_CALLEE_ENTRIES 8
-
-
-class CodeChunkInfo {
-    friend struct Method;
-public:
-    CodeChunkInfo();
-
-    void     set_jit(JIT *jit)               { _jit = jit; }
-    JIT     *get_jit()                       { return _jit; }
-
-    void     set_method(Method *m)           { _method = m; }
-    Method  *get_method()                    { return _method; }
-
-    void     set_id(int id)                  { _id = id; }
-    int      get_id()                        { return _id; }
-
-    void     set_relocatable(Boolean r)      { _relocatable = r; }
-    Boolean  get_relocatable()               { return _relocatable; }
-
-    void     set_heat(unsigned heat)         { _heat = heat; }
-    unsigned get_heat()                      { return _heat; }
-
-    void    *get_code_block_addr()           { return _code_block; }
-    void     set_code_block_addr(void *addr) { _code_block = addr; }
-
-    size_t   get_code_block_size()           { return _code_block_size; }
-    size_t   get_code_block_alignment()      { return _code_block_alignment; }
-
-    void     set_loaded_for_vtune(bool v)    { _has_been_loaded_for_vtune = v; }
-    bool     get_loaded_for_vtune()          { return _has_been_loaded_for_vtune; }
-
-    unsigned get_num_callees()               { return _num_callees; }
-    Callee_Info *get_callees()               { return _callee_info; }
-
-    int      get_jit_index()                 { return get_index_of_jit(_jit); }
-
-    // Note: _data_blocks can only be used for inline info for now
-    Boolean  has_inline_info()               { return _data_blocks != NULL; }
-    void    *get_inline_info()               { return &_data_blocks->bytes[0]; }
-
-    unsigned get_num_target_exception_handlers();
-    Target_Exception_Handler_Ptr get_target_exception_handler_info(unsigned eh_num);
-
-    void     record_call_to_callee(CodeChunkInfo *callee, void *caller_return_ip);
-    uint64   num_calls_to(CodeChunkInfo *other_chunk);
-
-    void     print_name();
-    void     print_name(FILE *file);
-    void     print_info(bool print_ellipses=false);   // does not print callee information; see below
-    void     print_callee_info();                     // prints the callee information; usually called after print_info()
-
-    static void initialize_code_chunk(CodeChunkInfo *chunk);
-
-public:
-    // The section id of the main code chunk for a method. Using an enum avoids a VC++ bug on Windows.
-    enum {main_code_chunk_id = 0};
-
-    // A predicate that returns true iff this is the main code chunk for a method: i.e, it 1) contains the method's entry point,
-    // and 2) contains the various flavors of JIT data for that method.
-    static bool is_main_code_chunk(CodeChunkInfo *chunk)  { assert(chunk);  return (chunk->get_id() == main_code_chunk_id); }
-
-    // A predicate that returns true iff "id" is the section id of the main code chunk for a method.
-    static bool is_main_code_chunk_id(int id)             { return (id == main_code_chunk_id); }
-
-private:
-    // The triple (_jit, _method, _id) uniquely identifies a CodeChunkInfo.
-    JIT            *_jit;
-    Method         *_method;
-    int             _id;
-    bool            _relocatable;
-
-    // "Target" handlers.
-    unsigned        _num_target_exception_handlers;
-    Target_Exception_Handler_Ptr *_target_exception_handlers;
-
-    bool            _has_been_loaded_for_vtune;
-
-    // 20040224 This records information about the methods (actually, CodeChunkInfo's) called by this CodeChunkInfo.
-    // 20040405 This now records for each callee, the number of times it was called by each call IP in the caller.
-    // That is, this is a list of Callee_Info structures, each giving a call IP
-    Callee_Info    *_callee_info;       // points to an array of max_callees Callee_Info entries for this code chunk
-    unsigned        _num_callees;
-    unsigned        _max_callees;
-    Callee_Info     _static_callee_info[NUM_STATIC_CALLEE_ENTRIES]; // Array used if a small number of callers to avoid mallocs & frees
-
-public:
-    unsigned        _heat;
-    void           *_code_block;
-    void           *_jit_info_block;
-    size_t          _code_block_size;
-    size_t          _jit_info_block_size;
-    size_t          _code_block_alignment;
-    JIT_Data_Block *_data_blocks;
-    DynoptInfo     *_dynopt_info;
-    CodeChunkInfo  *_next;
-
-#ifdef VM_STATS
-    uint64          num_throws;
-    uint64          num_catches;
-    uint64          num_unwind_java_frames_gc;
-    uint64          num_unwind_java_frames_non_gc;
-#endif
-}; //CodeChunkInfo
-
-
-// end multiple-JIT support
-/////////////////////////////////////////////////////////////////
-
-
-
-// Used to notify interested JITs whenever a method is changed: overwritten, recompiled,
-// or initially compiled.
-struct Method_Change_Notification_Record {
-    Method *method_of_interest;
-    JIT    *jit;
-    void   *callback_data;
-    Method_Change_Notification_Record *next;
-
-    bool equals(Method *method_of_interest_, JIT *jit_, void *callback_data_) {
-        if ((method_of_interest == method_of_interest_) &&
-            (jit == jit_) &&
-            (callback_data == callback_data_)) {
-            return true;
-        }
-        return false;
-    }
-    // Optimized equals method. Most callbacks know method of interest, so we could skip one check.
-    inline bool equals(JIT *jit_, void *callback_data_) {
-        if ((callback_data == callback_data_) &&
-            (jit == jit_)) {
-            return true;
-        }
-        return false;
-    }
-};
-
-
-struct Inline_Record;
-
-
-// 20020222 This is only temporary to support the new JIT interface.
-// We will reimplement the signature support.
-struct Method_Signature {
-public:
-    TypeDesc* return_type_desc;
-    unsigned num_args;
-    TypeDesc** arg_type_descs;
-    Method *method;
-    String *sig;
-
-
-    void initialize_from_method(Method *method);
-    void reset();
-
-private:
-    void initialize_from_java_method(Method *method);
-};
-
-
-
-///////////////////////////////////////////////////////////////////////////////
-// Methods defined in a class.
-///////////////////////////////////////////////////////////////////////////////
-
-// VMEXPORT // temporary solution for interpreter unplug
-struct VMEXPORT Method : public Class_Member {
-    //-----------------------
-public:
-    //
-    // state of this method
-    //
-    enum State {
-        ST_NotCompiled,                 // initial state
-        ST_NotLinked = ST_NotCompiled,  // native not linked to implementation
-        ST_Compiled,                    // compiled by JIT
-        ST_Linked = ST_Compiled         // native linked to implementation
-    };
-    State get_state()                   {return _state;}
-    void set_state(State st)            {_state=st;}
-
-    // "Bytecode" exception handlers, i.e., those from the class file
-    unsigned num_bc_exception_handlers();
-    Handler *get_bc_exception_handler_info(unsigned eh_number);
-
-    // "Target" exception handlers, i.e., those in the code generated by the JIT.
-    void set_num_target_exception_handlers(JIT *jit, unsigned n);
-    unsigned get_num_target_exception_handlers(JIT *jit);
-
-    // Arguments:
-    //  ...
-    //  catch_clss  -- class of the exception or null (for "catch-all")
-    //  ...
-    void set_target_exception_handler_info(JIT *jit,
-                                           unsigned eh_number,
-                                           void *start_ip,
-                                           void *end_ip,
-                                           void *handler_ip,
-                                           Class *catch_clss,
-                                           bool exc_obj_is_dead = false);
-
-    Target_Exception_Handler_Ptr get_target_exception_handler_info(JIT *jit, unsigned eh_num);
-
-    unsigned num_exceptions_method_can_throw();
-    String *get_exception_name (int n);
-
-    // Address of the memory block containing bytecodes.  For best performance
-    // the bytecodes should not be destroyed even after the method has been
-    // jitted to allow re-compilation.  However the interface allows for such
-    // deallocation.  The effect would be that re-optimizing JITs would not
-    // show their full potential, but that may be acceptable for low-end systems
-    // where memory is at a premium.
-    // The value returned by getByteCodeAddr may be NULL in which case the
-    // bytecodes are not available (presumably they have been garbage collected by VM).
-    const Byte  *get_byte_code_addr()   {return _byte_codes;}
-    size_t       get_byte_code_size()   {return _byte_code_length;}
-
-    // From the class file (Sec. 4.7.4)
-    unsigned get_max_stack()                       { return _max_stack; }
-    unsigned get_max_locals()                      { return _max_locals; }
-
-    // Returns an iterator for the argument list.
-    Arg_List_Iterator get_argument_list();
-
-    // Returns number of bytes of arguments pushed on the stack.
-    // This value depends on the descriptor and the calling convention.
-    unsigned get_num_arg_bytes();
-
-    // Returns number of arguments.  For non-static methods, the this pointer
-    // is included in this number
-    unsigned get_num_args();
-
-    // Number of arguments which are references.
-    unsigned get_num_ref_args();
-
-
-    // Return the return type of this method.
-    Java_Type get_return_java_type();
-
-    // For non-primitive types (i.e., classes) get the class type information.
-    Class *get_return_class_type();
-
-    // Address of the memory location containing the address of the code.
-    // Used for static and special methods which have been resolved but not jitted.
-    // The call would be:
-    //      call dword ptr [addr]
-    void *get_indirect_address()                   { return &_code; }
-
-    // Entry address of the method.  Points to an appropriate stub or directly
-    // to the code if no stub is necessary.
-    void *get_code_addr()                          { return _code; }
-    void set_code_addr(void *code_addr)            { _code = code_addr; }
-
-    void add_vtable_patch(void *);
-    void apply_vtable_patches();
-
-    /**
-     * This returns a block for jitted code. It is not used for native methods.
-     * It is safe to call this function from multiple threads.
-     */
-    void *allocate_code_block_mt(size_t size, size_t alignment, JIT *jit, unsigned heat,
-        int id, Code_Allocation_Action action);
-
-    void *allocate_rw_data_block(size_t size, size_t alignment, JIT *jit);
-
-    // The JIT can store some information in a JavaMethod object.
-    void *allocate_jit_info_block(size_t size, JIT *jit);
-
-    // JIT-specific data blocks.
-    // Access should be protected with _lock.
-    // FIXME
-    // Think about moving lock aquisition inside public methods.
-    void *allocate_JIT_data_block(size_t size, JIT *jit, size_t alignment);
-    CodeChunkInfo *get_first_JIT_specific_info()   { return _jits; };
-    CodeChunkInfo *get_JIT_specific_info_no_create(JIT *jit);
-    /**
-     * Find a chunk info for specific JIT. If no chunk exist for this JIT,
-     * create and return one. This method is safe to call
-     * from multiple threads.
-     */
-    CodeChunkInfo *get_chunk_info_mt(JIT *jit, int id);
-
-    /**
-     * Find a chunk info for specific JIT, or <code>NULL</code> if
-     * no chunk info is created for this JIT. This method is safe to call
-     * from multiple threads.
-     */
-    CodeChunkInfo *get_chunk_info_no_create_mt(JIT *jit, int id);
-
-    /**
-     * Allocate a new chunk info. This method is safe to call
-     * from multiple threads.
-     */
-    CodeChunkInfo *create_code_chunk_info_mt();
-
-    // Notify JITs whenever this method is overridden by a newly loaded class.
-    void register_jit_overridden_method_callback(JIT *jit_to_be_notified, void *callback_data);
-    void do_jit_overridden_method_callbacks(Method *overriding_method);
-
-    // Notify JITs whenever this method is recompiled or initially compiled.
-    void register_jit_recompiled_method_callback(JIT *jit_to_be_notified, void *callback_data);
-    void do_jit_recompiled_method_callbacks();
-
-    Method_Side_Effects get_side_effects()         { return _side_effects; };
-    void set_side_effects(Method_Side_Effects mse) { _side_effects = mse; };
-
-    Method_Signature *get_method_sig()             { return _method_sig; };
-    void set_method_sig(Method_Signature *msig)    { _method_sig = msig; };
-
-private:
-    State _state;
-    void *_code;
-    VTable_Patches *_vtable_patch;
-
-    NativeCodePtr _counting_stub;
-
-    CodeChunkInfo *_jits;
-
-    Method_Side_Effects _side_effects;
-    Method_Signature *_method_sig;
-
-public:
-    Method();
-    // destructor should be instead of this function, but it's not allowed to use it because copy for Method class is
-    // done with memcpy, and old value is destroyed with delete operator.
-    void MethodClearInternals();
-
-    //
-    // access modifiers
-    //
-    bool is_synchronized()  {return (_access_flags&ACC_SYNCHRONIZED)?true:false;} 
-    bool is_native()        {return (_access_flags&ACC_NATIVE)?true:false;} 
-    bool is_abstract()      {return (_access_flags&ACC_ABSTRACT)?true:false;} 
-    bool is_varargs()       {return (_access_flags&ACC_VARARGS)?true:false;} 
-    bool is_bridge()        {return (_access_flags&ACC_BRIDGE)?true:false;} 
-
-    // method flags
-    bool is_init()          {return _flags.is_init?true:false;}
-    bool is_clinit()        {return _flags.is_clinit?true:false;}
-    bool is_finalize()      {return _flags.is_finalize?true:false;}
-    bool is_overridden()    {return _flags.is_overridden?true:false;}
-    bool is_registered()    {return _flags.is_registered?true:false;}
-    Boolean  is_nop()       {return _flags.is_nop;}
-
-    void set_registered( bool flag ) { _flags.is_registered = flag; }
-
-    unsigned get_index()    {return _index;}
-
-    // Fake methods are interface methods inherited by an abstract class that are not (directly or indirectly)
-    // implemented by that class. They are added to the class to ensure they have thecorrect vtable offset.
-    // These fake methods point to the "real" interface method for which they are surrogates; this information
-    // is used by reflection methods.
-    bool is_fake_method()           {return (_intf_method_for_fake_method != NULL);}
-    Method *get_real_intf_method()  {return _intf_method_for_fake_method;}
-
-    bool parse(Global_Env& env, Class* clss,
-        Const_Pool* cp, unsigned cp_size, ByteReader& cfs);
-
-    unsigned calculate_size() {
-        unsigned size = sizeof(Class_Member) + sizeof(Method);
-        if(_local_vars_table)
-            size += sizeof(uint16) + _local_vars_table->length*sizeof(Local_Var_Entry);
-        if(_line_number_table)
-            size += sizeof(uint16) + _line_number_table->length*sizeof(Line_Number_Entry);
-        size += _n_exceptions*sizeof(String*);
-        size += _n_handlers*sizeof(Handler);
-        size += _byte_code_length;
-        return size;
-    }
-
-    friend void assign_offsets_to_class_methods(Class* clss);
-    friend void add_new_fake_method(Class* clss, Class* example, unsigned* next);
-    friend void add_any_fake_methods(Class* clss);
-
-    unsigned get_num_param_annotations() {return _num_param_annotations;}
-    AnnotationTable * get_param_annotations(unsigned index) {
-        return index < _num_param_annotations ? _param_annotations[index] : NULL;
-    }
-    AnnotationValue * get_default_value() {return _default_value; }
-
-private:
-    uint8 _num_param_annotations;
-    AnnotationTable ** _param_annotations;
-    AnnotationValue * _default_value;
-
-    unsigned _index;                // index in method table
-    uint16 _max_stack;
-    uint16 _max_locals;
-    uint16 _n_exceptions;           // num exceptions method can throw
-    uint16 _n_handlers;             // num exception handlers in byte codes
-    String  **_exceptions;          // array of exceptions method can throw
-    uint32 _byte_code_length;       // num bytes of byte code
-    Byte    *_byte_codes;           // method's byte codes
-    Handler *_handlers;             // array of exception handlers in code
-    Method *_intf_method_for_fake_method;
-    struct {
-        unsigned is_init        : 1;
-        unsigned is_clinit      : 1;
-        unsigned is_finalize    : 1;    // is finalize() method
-        unsigned is_overridden  : 1;    // has this virtual method been overridden by a loaded subclass?
-        unsigned is_nop         : 1;
-        unsigned is_registered  : 1;    // the method is registred native method
-    } _flags;
-
-    //
-    // private methods for parsing methods
-    //
-    bool _parse_code(Const_Pool *cp, unsigned cp_size, unsigned code_attr_len, ByteReader &cfs);
-
-    bool _parse_line_numbers(unsigned attr_len, ByteReader &cfs);
-
-    bool _parse_exceptions(Const_Pool *cp, unsigned cp_size, unsigned attr_len,
-        ByteReader &cfs);
-
-    void _set_nop();
-
-    //
-    // debugging info
-    //
-    Line_Number_Table *_line_number_table;
-    Local_Var_Table *_local_vars_table;
-
-    bool _parse_local_vars(const char* attr_name, Local_Var_Table** lvt_address,
-        Const_Pool *cp, unsigned cp_size, unsigned attr_len, ByteReader &cfs);
-
-    // This is the number of breakpoints which should be set in the
-    // method when it is compiled. This number does not reflect
-    // multiple breakpoints that are set in the same location by
-    // different environments, it counts only unique locations
-    uint32 pending_breakpoints;
-public:
-
-    unsigned get_line_number_table_size() {
-        return (_line_number_table) ? _line_number_table->length : 0;
-    }
-
-    bool get_line_number_entry(unsigned index, jlong* pc, jint* line);
-
-    unsigned get_local_var_table_size() {
-        return (_local_vars_table) ? _local_vars_table->length : 0;
-    }
-
-    bool get_local_var_entry(unsigned index, jlong* pc, 
-        jint* length, jint* slot, String** name, String** type, 
-        String** generic_type);
-
-    // XXX
-    //bool get_local_var_entry(unsigned index, jlong* pc,
-    //    jint* length, jint* slot, String** name, String** type);
-
-
-    // Returns number of line in the source file, to which the given bytecode offset
-    // corresponds, or -1 if it is unknown.
-    int get_line_number(uint16 bc_offset);
-
-    Inline_Record *inline_records;
-    void set_inline_assumption(JIT *jit, Method *caller);
-    void method_was_overridden();
-
-    Method_Change_Notification_Record *_notify_override_records;
-
-    // Records JITs to be notified when a method is recompiled or initially compiled.
-    Method_Change_Notification_Record *_notify_recompiled_records;
-
-    void lock();
-    void unlock();
-
-    uint32 get_pending_breakpoints()
-    {
-        return pending_breakpoints;
-    }
-
-    void insert_pending_breakpoint()
-    {
-        pending_breakpoints++;
-    }
-
-    void remove_pending_breakpoint()
-    {
-        pending_breakpoints--;
-    }
-}; // Method
-
-
-VMEXPORT Class* load_class(Global_Env *env, const String *classname);
-Class* find_loaded_class(Global_Env *env, const String *classname);
-
-#define BITS_PER_BYTE 8
-// We want to use signed arithmetic when we do allocation pointer/limit compares.
-// In order to do this all sizes must be positive so when we want to overflow instead of
-// setting the high bit we set the next to high bit. If we set the high bit and the allocation buffer
-// is at the top of memory we might not detect an overflow the unsigned overflow would produce
-// a small positive number that is smaller then the limit.
-
-#define NEXT_TO_HIGH_BIT_SET_MASK (1<<((sizeof(unsigned) * BITS_PER_BYTE)-2))
-#define NEXT_TO_HIGH_BIT_CLEAR_MASK ~NEXT_TO_HIGH_BIT_SET_MASK
-
-inline unsigned int get_instance_data_size (Class *c)
-{
-    return (c->instance_data_size & NEXT_TO_HIGH_BIT_CLEAR_MASK);
-}
-
-inline void set_instance_data_size_constraint_bit (Class *c)
-{
-    c->instance_data_size = (c->instance_data_size | NEXT_TO_HIGH_BIT_SET_MASK);
-}
-
-// Setter functions for the class property field.
-inline void set_prop_alignment_mask (Class *c, unsigned int the_mask)
-{
-    c->class_properties = (c->class_properties | the_mask);
-    c->vtable->class_properties = c->class_properties;
-    set_instance_data_size_constraint_bit (c);
-}
-inline void set_prop_non_ref_array (Class *c)
-{
-    c->class_properties = (c->class_properties | CL_PROP_NON_REF_ARRAY_MASK);
-    c->vtable->class_properties = c->class_properties;
-}
-inline void set_prop_array (Class *c)
-{
-    c->class_properties = (c->class_properties | CL_PROP_ARRAY_MASK);
-    c->vtable->class_properties = c->class_properties;
-}
-inline void set_prop_pinned (Class *c)
-{
-    c->class_properties = (c->class_properties | CL_PROP_PINNED_MASK);
-    c->vtable->class_properties = c->class_properties;
-    set_instance_data_size_constraint_bit (c);
-}
-inline void set_prop_finalizable (Class *c)
-{
-    c->class_properties = (c->class_properties | CL_PROP_FINALIZABLE_MASK);
-    c->vtable->class_properties = c->class_properties;
-    set_instance_data_size_constraint_bit (c);
-}
-
-// get functions for the class property field.
-inline unsigned int get_prop_alignment (unsigned int class_properties)
-{
-    return (unsigned int)(class_properties & CL_PROP_ALIGNMENT_MASK);
-}
-inline unsigned int get_prop_non_ref_array (unsigned int class_properties)
-{
-    return (class_properties & CL_PROP_NON_REF_ARRAY_MASK);
-}
-inline unsigned int get_prop_array (unsigned int class_properties)
-{
-    return (class_properties & CL_PROP_ARRAY_MASK);
-}
-inline unsigned int get_prop_pinned (unsigned int class_properties)
-{
-    return (class_properties & CL_PROP_PINNED_MASK);
-}
-inline unsigned int get_prop_finalizable (unsigned int class_properties)
-{
-    return (class_properties & CL_PROP_FINALIZABLE_MASK);
-}
-
-VMEXPORT Class_Handle vtable_get_class(VTable_Handle vh);
-
-/**
- * Function registers a number of native methods to a given class.
- *
- * @param klass       - specified class
- * @param methods     - array of methods
- * @param num_methods - number of methods
- *
- * @return <code>FALSE</code> if methods resistration is successful,
- *         otherwise - <code>TRUE</code>.
- *
- * @note Function raises <code>NoSuchMethodError</code> with method name in exception message
- *       if one of the methods in JNINativeMethod* array is not present in a specified class.
- */
+/** Looks up field in class and its superclasses.
+ * @param[in] clss - class to lookup field in.
+ * @param[in] name - name of the field.
+ * @param[in] desc - descriptor of the field.
+ * @return Requested field, if the field exists, <code>NULL</code> otherwise.*/
+Field* class_lookup_field_recursive(Class* clss, const char* name, const char* desc);
+/** Looks up method in class and its superclasses.
+ * @param[in] clss - class to lookup method in.
+ * @param[in] name - name of the method as VM String.
+ * @param[in] desc - descriptor of the method as VM String.
+ * @return Requested method, if the method exists,
+ *         <code>NULL</code> otherwise.
+ * @note VMEXPORT specifier is solely for interpreter.*/
+VMEXPORT
+Method* class_lookup_method_recursive(Class* clss, const String* name, const String* desc);
+/** Looks up method in class and its superclasses.
+ * @param[in] clss - class to lookup method in.
+ * @param[in] name - name of the method.
+ * @param[in] desc - descriptor of the method.
+ * @return Requested method, if the method exists,
+ *         <code>NULL</code> otherwise.*/
+Method* class_lookup_method_recursive(Class* clss, const char* name, const char* desc);
+/** Looks up method in the given class only.
+ * @param[in] clss - class to lookup method in.
+ * @param[in] name - name of the method.
+ * @param[in] desc - descriptor of the method.
+ * @return Requested method, if the method exists,
+ *         <code>NULL</code> otherwise.*/
+Method* class_lookup_method(Class* clss, const char* name, const char* desc);
+/** Gets method given its offset in the vtable.
+ * @param[in] vt - vtable containing method.
+ * @param[in] offset - offset of the method in the vtable.
+ * @return Method at the specified offset.*/
+Method* class_get_method_from_vt_offset(VTable* vt, unsigned offset);
+/** Resolves non-static field at the specified index in
+ * the constant pool of the class.
+ * @param[in] clss - class to resolve field in.
+ * @param[in] cp_index - index in the constant pool of the class.
+ * @return Resolved field, if resolution succeeded,
+ * <code>NULL</code> otherwise.*/
+Field* class_resolve_nonstatic_field(Class* clss, unsigned cp_index);
+
+
+/** Loads a class and performs the first two parts of the link process:
+ * verify and prepare.
+ * @param[in] env - VM environment.
+ * @param[in] classname - name of a class to load.
+ * @param[in] cl - class loader to load class with.
+ * @return Loaded class, if loading and linking succeeded,
+ *         <code>NULL</code> otherwise.*/
+Class* class_load_verify_prepare_by_loader_jni(Global_Env* env,
+                                               const String* classname,
+                                               ClassLoader* cl);
+
+/** Loads a class with bootstrap class loader and performs the first two parts
+ * of the link process: verify and prepare.
+ * @param[in] env - VM environment.
+ * @param[in] classname - name of a class to load.
+ * @param[in] cl - class loader to load class with.
+ * @return Loaded class, if loading and linking succeeded,
+ *         <code>NULL</code> otherwise.
+ * @note The class is loaded .*/
+Class* class_load_verify_prepare_from_jni(Global_Env* env,
+                                          const String* classname);
+
+/** Executes static initializer of class.
+ * @param[in] clss - class to initialize.*/
+void class_initialize_from_jni(Class *clss);
+/** Executes static initializer of class.
+ * @param[in] clss - class to initialize.*/
+void class_initialize_ex(Class *clss);
+/** Executes static initializer of class.
+ * @param[in] clss - class to initialize.
+ * @note VMEXPORT specifier is solely for interpreter.*/
+VMEXPORT
+void class_initialize(Class *clss);
+
+
+/** Registers a number of native methods to a given class.
+ * @param[in] klass       - a specified class
+ * @param[in] methods     - an array of methods
+ * @param[in] num_methods - a number of methods
+ * @return <code>false</code>, if methods resistration is successful;
+ *         otherwise <code>true</code>.
+ * @note Function raises <code>NoSuchMethodError</code> with the method name in 
+ *       exception message, if one of the methods in the <code>JNINativeMethod*</code> 
+ *       array is not present in a specified class.*/
 bool
 class_register_methods(Class_Handle klass, const JNINativeMethod* methods, int num_methods);
 
-/**
- * Function unregisters a native methods of a given class.
- *
- * @param klass       - specified class
- *
- * @return <code>FALSE</code> if methods unresistration is successful,
- *         otherwise - <code>TRUE</code>.
- */
+/** Unregisters a native methods off a given class.
+ * @param[in] klass       - specified class
+ * @return <code>false</code>, if methods unresistration is successful;
+ *         otherwise <code>true</code>.*/
 bool
 class_unregister_methods(Class_Handle klass);
 

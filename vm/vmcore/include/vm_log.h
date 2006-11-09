@@ -22,8 +22,12 @@
 #define _VM_LOG_H_
 
 #include "loggerstring.h"
-#include "Class.h"
+#include "object_layout.h"
 #include "object_handles.h"
+#include "vtable.h"
+#include "String_Pool.h"
+#include "class_member.h"
+#include "Class.h"
 
 /**
  * @file
@@ -47,7 +51,7 @@ inline LoggerString& operator<<(LoggerString& log, const String* str) {
  */
 inline LoggerString& operator<<(LoggerString& log, const Class* clss) {
     if (clss) {
-        log << clss->name; 
+        log << clss->get_name(); 
     } else {
         log << "<null class>";
     }

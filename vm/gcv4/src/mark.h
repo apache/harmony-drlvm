@@ -34,7 +34,7 @@
 #include "characterize_heap.h"
 
 // for vtable_get_class
-#include "Class.h"
+#include "open/vm_gc.h"
 
 // returns address correcsponding bit index in specified block
 inline void*

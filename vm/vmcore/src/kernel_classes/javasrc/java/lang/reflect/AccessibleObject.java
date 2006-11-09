@@ -172,14 +172,14 @@ public class AccessibleObject implements AnnotatedElement {
      * @throws NullPointerException if any of the arguments is null 
      */
     void appendArrayType(StringBuilder sb, Class<?> obj) {
-        Class simplified = obj.getComponentType();
-        if (simplified == null) {
+        if (!obj.isArray()) {
             sb.append(obj.getName());
             return;
         }
         int dimensions = 1;
+        Class simplified = obj.getComponentType();
         obj = simplified;
-        while ((simplified = obj.getComponentType()) != null) {
+        while (simplified.isArray()) {
             obj = simplified;
             dimensions++;
         }

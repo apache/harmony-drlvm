@@ -51,7 +51,8 @@ jfieldID JNICALL GetFieldID(JNIEnv *env,
         ThrowNew_Quick(env, "java/lang/NoSuchFieldError", name);
         return 0;
     }
-    TRACE2("jni", "GetFieldID " << clss->name->bytes << "." << name << " " << sig << " = " << (jfieldID)field);
+    TRACE2("jni", "GetFieldID " << clss->get_name()->bytes
+        << "." << name << " " << sig << " = " << (jfieldID)field);
 
     assert(!field->is_static());
     return (jfieldID)field;
@@ -92,7 +93,8 @@ jfieldID JNICALL GetStaticFieldID(JNIEnv *env,
         ThrowNew_Quick(env, "java/lang/NoSuchFieldError", name);
         return 0;
     }
-    TRACE2("jni", "GetStaticFieldID " << clss->name->bytes << "." << name << " " << sig << " = " << (jfieldID)field);
+    TRACE2("jni", "GetStaticFieldID " << clss->get_name()->bytes
+        << "." << name << " " << sig << " = " << (jfieldID)field);
 
     assert(field->is_static());
     return (jfieldID)field;
@@ -471,7 +473,7 @@ void JNICALL SetByteFieldOffset(JNIEnv * UNREF env, jobject obj, jint offset, jb
     tmn_suspend_disable();       //---------------------------------v
 
     Byte *java_ref = (Byte *)h->object;
-    if (Class::compact_fields)
+    if(VM_Global_State::loader_env->compact_fields)
         *(jbyte *)(java_ref + offset) = value;
     else
         *(jint *)(java_ref + offset) = value;
@@ -534,7 +536,7 @@ void JNICALL SetShortFieldOffset(JNIEnv * UNREF env, jobject obj, jint offset, j
     tmn_suspend_disable();       //---------------------------------v
 
     Byte *java_ref = (Byte *)h->object;
-    if (Class::compact_fields)
+    if (VM_Global_State::loader_env->compact_fields)
         *(jshort *)(java_ref + offset) = value;
     else
         *(jint *)(java_ref + offset) = value;
@@ -898,7 +900,7 @@ void JNICALL SetStaticByteField(JNIEnv *env,
     assert(f->is_static());
     jbyte *field_addr = (jbyte *)f->get_address();
     jint *field_addr_int = (jint *)f->get_address();
-    if (Class::compact_fields)
+    if (VM_Global_State::loader_env->compact_fields)
         *field_addr = value;
     else
         *field_addr_int = value;
@@ -934,7 +936,7 @@ void JNICALL SetStaticShortField(JNIEnv *env,
     assert(f->is_static());
     jshort *field_addr = (jshort *)f->get_address();
     jint *field_addr_int = (jint *)f->get_address();
-    if (Class::compact_fields)
+    if (VM_Global_State::loader_env->compact_fields)
         *field_addr = value;
     else
         *field_addr_int = value;

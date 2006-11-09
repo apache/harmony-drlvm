@@ -18,9 +18,9 @@
  * @author Ivan Volosyuk
  * @version $Revision: 1.2.12.2.4.3 $
  */  
+
+#include "vm_core_types.h"
 #include "Class.h"
-
-
 
 /**
  * Set thread-local exception with name 'exc'.

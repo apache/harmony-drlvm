@@ -30,30 +30,29 @@
 
 #define STRING_PADDING 4
 
-extern "C" {
-    typedef struct String {
+struct String
+{
 #ifdef _DEBUG
-        unsigned id; // id for debugging
+    unsigned id; // id for debugging
 #endif
-        // 20030507 Ref to the interned string used by java.lang.String.intern().
-        // It is compressed when compressing refs.
-        union {
-            // raw reference to interned string if not compressing references
-            ManagedObject   * raw_ref;
-            // equivalent compressed reference.
-            uint32          compressed_ref;
-        } intern;
-        unsigned len;
-        char bytes[STRING_PADDING];
-    } String;
-}
+    // 20030507 Ref to the interned string used by java.lang.String.intern().
+    // It is compressed when compressing refs.
+    union {
+        // raw reference to interned string if not compressing references
+        ManagedObject   * raw_ref;
+        // equivalent compressed reference.
+        uint32          compressed_ref;
+    } intern;
+    unsigned len;
+    char bytes[STRING_PADDING];
+};
 
 class String_Pool {
 public:
     String_Pool();
 
     // lookup string in string table & insert if not found
-    VMEXPORT String * lookup(const char *str);
+    String * lookup(const char *str);
     String * lookup(const char *str, unsigned len);
 
     // Iterators for GC

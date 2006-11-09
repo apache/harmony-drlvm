@@ -31,6 +31,7 @@
 #include "open/types.h"
 #include "encoder.h"
 #include "interpreter.h"
+#include "cci.h"
 
 #include "clog.h"
 

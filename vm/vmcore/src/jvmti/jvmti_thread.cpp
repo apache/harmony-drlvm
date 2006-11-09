@@ -43,6 +43,8 @@
 #include "stack_iterator.h"
 
 
+#include "Class.h" // FIXME: this is for Class::heap_base and Class::heap_end
+
 #define MAX_JVMTI_ENV_NUMBER 10
 #define jvmti_test_jenv (p_TLS_vmthread->jni_env)
 
@@ -417,8 +419,8 @@ jvmtiStopThread(jvmtiEnv* env,
     ManagedObject *mo = h->object;
 
     // Check that reference pointer points to the heap
-    if (mo < (ManagedObject *)Class::heap_base ||
-        mo > (ManagedObject *)Class::heap_end)
+    if (mo < (ManagedObject*)VM_Global_State::loader_env->heap_base ||
+        mo > (ManagedObject*)VM_Global_State::loader_env->heap_end)
     {
         tmn_suspend_enable();
         return JVMTI_ERROR_INVALID_OBJECT;

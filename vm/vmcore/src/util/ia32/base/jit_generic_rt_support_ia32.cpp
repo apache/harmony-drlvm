@@ -1010,11 +1010,11 @@ static int get_log2(int value)
 } //get_log2
 #endif
 
-static void vm_rt_char_arraycopy_no_exc(ManagedObject *src,
-                                         int32 srcOffset,
-                                         ManagedObject *dst,
-                                         int32 dstOffset,
-                                         int32 length)
+static void vm_rt_char_arraycopy_no_exc(ManagedObject* src,
+                                        int32 srcOffset,
+                                        ManagedObject* dst,
+                                        int32 dstOffset,
+                                        int32 length)
 {
     // 20030303 Use a C loop to (hopefully) speed up short array copies.
 
@@ -1025,10 +1025,10 @@ static void vm_rt_char_arraycopy_no_exc(ManagedObject *src,
     assert(src_class);
     Class * UNUSED dst_class = dst->vt()->clss;
     assert(dst_class);
-    assert((src_class->is_array) && (dst_class->is_array));
-    assert((src_class->is_array_of_primitives) && (dst_class->is_array_of_primitives));
-    assert(strcmp(src_class->name->bytes, "[C") == 0);
-    assert(strcmp(dst_class->name->bytes, "[C") == 0);
+    assert(src_class->is_array() && (dst_class->is_array()));
+    assert(src_class->is_array_of_primitives() && dst_class->is_array_of_primitives());
+    assert(strcmp(src_class->get_name()->bytes, "[C") == 0);
+    assert(strcmp(dst_class->get_name()->bytes, "[C") == 0);
     // Check the offsets
     assert(srcOffset >= 0);
     assert(dstOffset >= 0);

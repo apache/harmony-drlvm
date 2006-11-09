@@ -88,22 +88,23 @@ TypeDesc* type_desc_create_from_java_descriptor(const char* d, ClassLoader* load
 
 TypeDesc* type_desc_create_from_java_class(Class* c)
 {
-    if(c->is_array)
-        return type_desc_create_from_java_descriptor(c->name->bytes, c->class_loader);
-    assert(!c->is_primitive);
+    const String* cname = c->get_name();
+    if(c->is_array())
+        return type_desc_create_from_java_descriptor(cname->bytes, c->get_class_loader());
+    assert(!c->is_primitive());
     
-    c->class_loader->LockTypesCache();
-    TypeDesc** tdres = c->class_loader->GetJavaTypes()->Lookup(c->name);
+    c->get_class_loader()->LockTypesCache();
+    TypeDesc** tdres = c->get_class_loader()->GetJavaTypes()->Lookup(cname);
     if (tdres)
     {
         assert (*tdres);
-        c->class_loader->UnlockTypesCache();
+        c->get_class_loader()->UnlockTypesCache();
         return *tdres;
     }
-    TypeDesc* td = new TypeDesc(K_Object, NULL, NULL, c->name, c->class_loader, NULL);
+    TypeDesc* td = new TypeDesc(K_Object, NULL, NULL, cname, c->get_class_loader(), NULL);
     assert(td);
-    c->class_loader->GetJavaTypes()->Insert(c->name, td);
-    c->class_loader->UnlockTypesCache();
+    c->get_class_loader()->GetJavaTypes()->Insert(cname, td);
+    c->get_class_loader()->UnlockTypesCache();
     return td;
 }
 

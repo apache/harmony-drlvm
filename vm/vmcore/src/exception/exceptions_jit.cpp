@@ -42,6 +42,7 @@
 #include "stack_iterator.h"
 #include "vm_stats.h"
 #include "jvmti_break_intf.h"
+#include "cci.h"
 
 #ifdef _IPF_
 #elif defined _EM64T_
@@ -193,7 +194,7 @@ static void exn_propagate_exception(
         exn_class = (*exn_obj)->vt()->clss;
 
 #ifdef VM_STATS
-    ((Class *) exn_class)->num_throws++;
+    exn_class->class_thrown();
     VM_Statistics::get_vm_stats().num_exceptions++;
 #endif // VM_STATS
 
@@ -529,7 +530,8 @@ NativeCodePtr exn_get_rth_throw()
     if (VM_Global_State::loader_env->compress_references)
         cs = lil_parse_onto_end(cs,
             "jc i0=%0i:ref,%n;"
-            "o0=i0;" "j %o;" ":%g;" "o0=0:ref;" ":%g;", Class::heap_base);
+            "o0=i0;" "j %o;" ":%g;" "o0=0:ref;" ":%g;",
+            VM_Global_State::loader_env->heap_base);
     else
         cs = lil_parse_onto_end(cs, "o0=i0;");
     assert(cs);

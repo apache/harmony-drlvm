@@ -251,9 +251,8 @@ VM_Statistics::VM_Statistics()
     num_monitor_exit_decr_rec_count         = 0;
     num_monitor_exit_very_slow_path         = 0;
 
-    num_monitor_enters_with_zero_headers    = 0;  
+    num_monitor_enters_with_zero_headers    = 0;
     num_monitor_enters_with_nonzero_headers = 0;
-
 
     num_monitor_enter_wait           = 0;
     num_sleep_monitor_enter          = 0;
@@ -301,6 +300,17 @@ VM_Statistics::VM_Statistics()
     num_compileme_generated = 0;
     num_compileme_used = 0;
 
+    num_statics_allocations = 0;
+    num_nonempty_statics_allocations = 0;
+    num_vtable_allocations = 0;
+    num_hot_statics_allocations = 0;
+    num_hot_vtable_allocations = 0;
+
+    total_statics_bytes = 0;
+    total_vtable_bytes = 0;
+    total_hot_statics_bytes = 0;
+    total_hot_vtable_bytes = 0;
+
     // Enter the JIT RT support functions into a <function number> -> <function name, argument number> map.
     for (int i = 0;  i < sizeof_jit_rt_function_entries;  i++) {
         char *fn_name;
@@ -340,12 +350,12 @@ static void print_classes()
     for (it = ct->begin(); it != ct->end(); it++)
     {
         Class *c = it->second;
-        if(c->num_throws) {
+        if(c->get_times_thrown()) {
             if(first_time) {
                 first_time = false;
                 printf("\nFollowing exceptions were thrown:\n");
             }
-            printf("%11" FMT64 "u :::: %s\n", c->num_throws, c->name->bytes);
+            printf("%11" FMT64 "u :::: %s\n", c->get_times_thrown(), c->get_name()->bytes);
         }
     }
     if(!first_time) {
@@ -356,12 +366,12 @@ static void print_classes()
     for (it = ct->begin(); it != ct->end(); it++)
     {
         Class *c = it->second;
-        if(c->num_class_init_checks) {
+        if(c->get_times_init_checked() != 0) {
             if(first_time) {
                 first_time = false;
                 printf("Following classes were checked for init state:\n");
             }
-            printf("%11" FMT64 "u :::: %s\n", c->num_class_init_checks, c->name->bytes);
+            printf("%11" FMT64 "u :::: %s\n", c->get_times_init_checked(), c->get_name()->bytes);
         }
     }
     if(!first_time) {
@@ -372,13 +382,14 @@ static void print_classes()
     for (it = ct->begin(); it != ct->end(); it++)
     {
         Class *c = it->second;
-        if(c->num_instanceof_slow) {
+        if(c->get_times_instanceof_slow_path_taken() != 0) {
             if(first_time) {
                 first_time = false;
                 printf("Following classes were used in the instanceof test:\n");
             }
             printf("%11" FMT64 "u :::: %-50s : [intf=%d, depth=%2d]\n",
-                c->num_instanceof_slow, c->name->bytes, (class_is_interface(c) ? 1 : 0), c->depth);
+                c->get_times_instanceof_slow_path_taken(), c->get_name()->bytes,
+                (c->is_interface() ? 1 : 0), c->get_depth());
         }
     }
     if(!first_time) {
@@ -389,18 +400,18 @@ static void print_classes()
     for (it = ct->begin(); it != ct->end(); it++)
     {
         Class *c = it->second;
-        total_bytes_allocated += c->num_bytes_allocated;
+        total_bytes_allocated += c->get_total_bytes_allocated();
     }
     first_time = true;
     for (it = ct->begin(); it != ct->end(); it++)
     {
         Class *c = it->second;
-        if(c->num_allocations) {
+        if(c->get_times_allocated() != 0) {
             if(first_time) {
                 first_time = false;
                 printf("Number of instances [and # from Class.newInstance],\nand total allocated bytes for the following classes:\n");
             }
-            uint64 nb = c->num_bytes_allocated;
+            uint64 nb = c->get_total_bytes_allocated();
 
 #if defined (__INTEL_COMPILER) 
 #pragma warning( push )
@@ -413,21 +424,24 @@ static void print_classes()
 #endif
             if (false && nb > 1000000) {
                 uint64 nk = (nb/1024);
-                if (c->is_array) {
-                    printf(" %60s  %10" FMT64 "u [%10" FMT64 "u]        = %10" FMT64 "uK %3u%%\n",
-                        c->name->bytes, c->num_allocations, c->num_allocations_from_newInstance, nk, percent);
+                if (c->is_array()) {
+                    printf(" %60s  %10" FMT64 "u        = %10" FMT64 "uK %3u%%\n",
+                        c->get_name()->bytes, c->get_times_allocated(),
+                        nk, percent);
                 } else {
-                    printf(" %60s  %10" FMT64 "u [%10" FMT64 "u] * %4u = %10" FMT64 "uK %3u%%\n",
-                        c->name->bytes, c->num_allocations, c->num_allocations_from_newInstance, get_instance_data_size(c), nk, percent);
+                    printf(" %60s  %10" FMT64 "u * %4u = %10" FMT64 "uK %3u%%\n",
+                        c->get_name()->bytes, c->get_times_allocated(),
+                        c->get_instance_data_size(), nk, percent);
                 }
             } else {
-                if (c->is_array) {
-                    printf("%10" FMT64 "u : %10" FMT64 "u :          : %10" FMT64 "u :%-60s:%2u%%\n",
-                        c->num_allocations, c->num_allocations_from_newInstance, nb, c->name->bytes, percent);
+                if (c->is_array()) {
+                    printf("%10" FMT64 "u :           : %10" FMT64 "u :%-60s:%2u%%\n",
+                        c->get_times_allocated(),
+                        nb, c->get_name()->bytes, percent);
                 } else {
-                    printf("%10" FMT64 "u : %10" FMT64 "u : * %4u = : %10" FMT64 "u :%-60s:%2u%%\n",
-                        c->num_allocations, c->num_allocations_from_newInstance,
-                        get_instance_data_size(c), nb, c->name->bytes, percent);
+                    printf("%10" FMT64 "u * %4u = : %10" FMT64 "u :%-60s:%2u%%\n",
+                        c->get_times_allocated(),
+                        c->get_instance_data_size(), nb, c->get_name()->bytes, percent);
                 }
             }
         }
@@ -449,28 +463,29 @@ static void print_classes()
     {
         Class *c = it->second;
         // Only print out those classes with padding bytes that also have instances allocated.
-        if((c->num_field_padding_bytes) && (c->num_allocations)) {
+        if((c->get_total_padding_bytes() != 0) && (c->get_times_allocated() != 0)) {
             if(first_time) {
                 first_time = false;
-                if (Class::compact_fields) {
+                if (VM_Global_State::loader_env->compact_fields) {
                     printf("Field alignment bytes and total allocated alignment bytes for the following classes:\n");
                 } else {
                     printf("Field padding and alignment bytes and the total such bytes for the following classes:\n");
                 }
             }
-            if (c->is_array) {
-                printf("%11u :::: %s\n", (unsigned)c->num_field_padding_bytes, c->name->bytes);
+            if (c->is_array()) {
+                printf("%11u :::: %s\n", (unsigned)c->get_total_padding_bytes(), c->get_name()->bytes);
             } else {
-                uint64 bytes_allocated = (c->num_allocations * (uint64)(c->num_field_padding_bytes));
+                uint64 bytes_allocated = c->get_times_allocated()*(uint64)c->get_total_padding_bytes();
                 total_pad_bytes_allocated += bytes_allocated;
-                printf("%11u : %11" FMT64 "u ::: %s\n", c->num_field_padding_bytes, bytes_allocated, c->name->bytes);
+                printf("%11u : %11" FMT64 "u ::: %s\n", c->get_total_padding_bytes(),
+                    bytes_allocated, c->get_name()->bytes);
             }
         }
     }
     if(!first_time) {
         printf(":              ----------\n");
         printf(":         %15" FMT64 "u\n", total_pad_bytes_allocated);
-       printf("\n");
+        printf("\n");
     }
 } //print_classes
 
@@ -487,22 +502,19 @@ static void print_methods()
         for (it = ct->begin(); it != ct->end(); it++)
         {
             Class *c = it->second;
-            int n_methods = c->n_methods;
+            int n_methods = c->get_number_of_methods();
             for(int i = 0; i < n_methods; i++) {
-                Method *m = &(c->methods[i]);
+                Method* m = c->get_method(i);
                 if (m->is_fake_method()) {
                     continue;   // ignore fake methods
                 }
                 if(m->num_accesses) {
-                    const char *cname = c->name->bytes;
-                    const char *mname = m->get_name()->bytes;
-                    const char *descr = m->get_descriptor()->bytes;
                     printf("%11" FMT64 "u : %11" FMT64 "u ::: %s.%s%s\n",
                         m->num_accesses,
                         m->num_slow_accesses,
-                        cname,
-                        mname,
-                        descr);
+                        c->get_name()->bytes,
+                        m->get_name()->bytes,
+                        m->get_descriptor()->bytes);
                 }
             }
         }
@@ -839,18 +851,19 @@ void VM_Statistics::print()
     printf("%11" FMT64 "u ::::Number of Java yield sleeps\n", num_sleep_java_thread_yield);
     printf("%11" FMT64 "u ::::Number of wait for object\n", num_wait_WaitForSingleObject);
     printf("%11" FMT64 "u ::::Number of hashcode sleeps\n", num_sleep_hashcode);
-    printf("%11" FMT64 "u ::::Number of mon owner sleeps\n", num_sleep_monitor_ownership);    
+    printf("%11" FMT64 "u ::::Number of mon owner sleeps\n", num_sleep_monitor_ownership);
 
-    // 20020923 Print total number of allocations and total number of bytes for class-related data structures. 
+    // Print total number of allocations and total number of bytes
+    // for class-related data structures.
     printf("\nAllocations of storage for statics:\n");
-    printf("%11d ::::number allocated\n", Class::num_statics_allocations);
-    printf("%11d ::::number nonempty allocated\n", Class::num_nonempty_statics_allocations);
-    printf("%11d ::::bytes allocated\n", Class::total_statics_bytes);
+    printf("%11d ::::number allocated\n", num_statics_allocations);
+    printf("%11d ::::number nonempty allocated\n", num_nonempty_statics_allocations);
+    printf("%11d ::::bytes allocated\n", total_statics_bytes);
     fflush(stdout);
-    
+
     printf("\nAllocations of storage for vtables:\n");
-    printf("%11d ::::number allocated\n", Class::num_vtable_allocations);
-    printf("%11d ::::bytes allocated\n", Class::total_vtable_bytes);   
+    printf("%11d ::::number allocated\n", num_vtable_allocations);
+    printf("%11d ::::bytes allocated\n", total_vtable_bytes);
 
     printf("\n");
     printf("%11" FMT64 "u ::::# times free_local_handle_2 was called\n", num_free_local_called);

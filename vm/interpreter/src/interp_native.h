@@ -18,6 +18,8 @@
  * @author Ivan Volosyuk
  * @version $Revision: 1.8.4.2.4.3 $
  */
+#include "vm_core_types.h"
+
 #ifdef _IPF_
 #include "../m2n_ipf_internal.h"
 #elif defined _EM64T_

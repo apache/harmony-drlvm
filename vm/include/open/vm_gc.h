@@ -107,6 +107,13 @@ VMEXPORT void vm_classloader_iterate_objects(void *iterator);
 VMEXPORT bool vm_iterate_object(Managed_Object_Handle object);
 
 /**
+ * GC calls this function for each live object it finds in heap.
+ * This is used for finding unreferenced class loaders for class
+ * unloading.
+ */
+VMEXPORT void vm_notify_live_object_class(Class_Handle);
+
+/**
  * GC calls this function to hint VM that finalizers may need to be run
  * and references enqueued. This method is guaranteed not to hold global
  * GC lock. 
@@ -194,6 +201,19 @@ enum WeakReferenceType {
  * value of WeakReferenceType.
  */
 VMEXPORT WeakReferenceType class_is_reference(Class_Handle clss);
+
+/*
+ * Returns handle of a class for a specified vtable
+ * @param vh - handle of vtable to retrieve class for
+ * @return class handle for a specified vtable
+ */
+VMEXPORT Class_Handle vtable_get_class(VTable_Handle vh);
+
+/**
+ * Notifies VM that live object of this class was found in the heap
+ * @param clss - class of live object in Java heap
+ **/
+VMEXPORT void vm_notify_live_object_class(Class_Handle clss);
 
 /**
  * Returns the offset of the referent field 

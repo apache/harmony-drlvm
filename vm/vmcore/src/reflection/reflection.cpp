@@ -83,7 +83,7 @@ static jobject reflect_member(JNIEnv *jenv, Class_Member* member, Class* type)
     static Global_Env* genv = VM_Global_State::loader_env;
     static String* desc = genv->string_pool.lookup(
         "(JLjava/lang/Class;Ljava/lang/String;Ljava/lang/String;I)V");
-    Method* member_constr = class_lookup_method(type, genv->Init_String, desc);
+    Method* member_constr = type->lookup_method(genv->Init_String, desc);
 
     jstring jname = String_to_interned_jstring(member->get_name());
     if (jname == NULL) {
@@ -308,11 +308,11 @@ bool jobjectarray_to_jvaluearray(JNIEnv *jenv, jvalue **output, Method *method, 
         {
             ASSERT(arg, "Cannot unwrap NULL");
             Class* arg_clss = jobject_to_struct_Class(arg);
-            char arg_sig = is_wrapper_class(arg_clss->name->bytes);
+            char arg_sig = is_wrapper_class(arg_clss->get_name()->bytes);
             char param_sig = (char)type;
 
             ASSERT(arg_sig, "Reflection arguments mismatch: expected " 
-                << param_sig << " but was " << arg_clss->name->bytes);
+                << param_sig << " but was " << arg_clss->get_name()->bytes);
             
             array[arg_number] = unwrap_primitive(jenv, arg, arg_sig);
 
@@ -332,14 +332,14 @@ bool jobjectarray_to_jvaluearray(JNIEnv *jenv, jvalue **output, Method *method, 
 jobject reflection_get_enum_value(JNIEnv *jenv, Class* enum_type, String* name) 
 {
     ASSERT(class_is_enum(enum_type), "Requested Class is not ENUM: " 
-        << enum_type->name->bytes);
+        << enum_type->get_name()->bytes);
 
-    for (unsigned i=0; i<enum_type->n_fields; i++) {
-        if (enum_type->fields[i].get_name() == name) {
+    for (unsigned i=0; i<enum_type->get_number_of_fields(); i++) {
+        if (enum_type->get_field(i)->get_name() == name) {
 #ifndef NDEBUG
-            ASSERT(enum_type->fields[i].is_enum(), "Requested field is not ENUM: " << name->bytes);
-            const String* type = enum_type->name;
-            const String* desc = enum_type->fields[i].get_descriptor();
+            ASSERT(enum_type->get_field(i)->is_enum(), "Requested field is not ENUM: " << name->bytes);
+            const String* type = enum_type->get_name();
+            const String* desc = enum_type->get_field(i)->get_descriptor();
             if (desc->len != (type->len + 2)
                 || desc->bytes[0] != 'L' 
                 || strncmp(desc->bytes + 1, type->bytes, type->len)
@@ -348,7 +348,7 @@ jobject reflection_get_enum_value(JNIEnv *jenv, Class* enum_type, String* name)
                 DIE("Invalid enum field descriptor: " << desc->bytes);
             }
 #endif
-            return GetStaticObjectField(jenv, 0, (jfieldID)(enum_type->fields + i));
+            return GetStaticObjectField(jenv, 0, (jfieldID)(enum_type->get_field(i)));
         }
     }
     //public EnumConstantNotPresentException(Class<? extends Enum> enumType,String constantName)

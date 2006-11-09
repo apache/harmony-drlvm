@@ -205,7 +205,7 @@ public:
     bool          isUnmanagedStatic();
     Type*         getFieldType();
     uint32        getOffset();
-    void*         getAddress()     {return field_get_addr(drlField);}
+    void*         getAddress()     {return field_get_address(drlField);}
 
     // the following method to be used only by the DrlVM implementation
     Field_Handle  getFieldHandle()  {return drlField; }

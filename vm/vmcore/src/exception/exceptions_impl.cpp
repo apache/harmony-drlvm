@@ -55,7 +55,7 @@ Method* lookup_exc_constructor(Class * exc_class, const char *signature)
     // Get the method for the constructor
     String *init_name = env->Init_String;
     String *init_descr = env->string_pool.lookup(signature);
-    Method *exc_init = class_lookup_method(exc_class, init_name, init_descr);
+    Method *exc_init = exc_class->lookup_method(init_name, init_descr);
     return exc_init;
 }
 

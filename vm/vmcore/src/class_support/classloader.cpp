@@ -32,7 +32,6 @@
 #include "exceptions.h"
 #include "properties.h"
 #include "vm_strings.h"
-#include "Verifier_stub.h"
 #include "nogc.h"
 #include "bytereader.h"
 #include "Package.h"
@@ -52,53 +51,22 @@
 #include "jarfile_util.h"
 #include "jni_utils.h"
 
-//
-// private static variable containing the id of the next class
-// access to this needs to be thread safe; also, this will have to 
-// change if we want to reuse class ids
-//
-// an id of 0 is reserved to mean null; therefore, ids start from 1
-//
-// ppervov: FIXME: usage of this variable is not currently thread safe
-unsigned class_next_id = 1;
-
 unsigned ClassLoader::m_capacity = 0;
 unsigned ClassLoader::m_unloadedBytes = 0;
 unsigned ClassLoader::m_nextEntry = 0;
 ClassLoader** ClassLoader::m_table = NULL;
 Lock_Manager ClassLoader::m_tableLock;
 
-void mark_classloader(ClassLoader* cl)
-{
-    if(cl->GetLoader() && cl->NotMarked()) {
-        TRACE2("classloader.unloading.markloader", "  Marking loader "
-            << cl << " (" << (void*)cl->GetLoader() << " : "
-            << ((VTable*)(*(unsigned**)(cl->GetLoader())))->clss->name->bytes << ")");
-        cl->Mark();
-    }
-}
-
+// external declaration; definition is in Class_File_Loader.cpp
+const String* class_extract_name(Global_Env* env,
+                                 uint8* buffer,
+                                 unsigned offset, unsigned length);
 
 /*VMEXPORT*/ jthrowable class_get_error(ClassLoaderHandle clh, const char* name)
 {
     assert(clh);
     assert(name);
     return clh->GetClassError(name);
-}
-
-
-void class_set_error_cause(Class *clss, jthrowable exn) {
-    tmn_suspend_disable();
-    clss->m_lock->_lock();
-    clss->state = ST_Error;
-    clss->p_error = exn->object;
-    clss->m_lock->_unlock();
-    tmn_suspend_enable();
-}
-
-jthrowable class_get_error_cause(Class *clss) {
-    assert(clss->p_error);
-    return (jthrowable) &clss->p_error;
 }
 
 
@@ -230,11 +198,16 @@ Class* ClassLoader::NewClass(const Global_Env* env, const String* name)
         assert(env->JavaLangClass_Class == NULL);
     }
 
-    clss = (Class *) Alloc(sizeof(Class));
+    clss = (Class*)Alloc(sizeof(Class));
     // ppervov: FIXME: should check that class is successfully allocated
     assert(clss);
 
-    return InitClassFields(env, clss, name);
+    clss->init_internals(env, name, this);
+
+    if(clss->get_name())
+        clss = AllocateAndReportInstance(env, clss);
+
+    return clss;
 }
 
 ManagedObject** ClassLoader::RegisterClassInstance(const String* className, ManagedObject* instance) 
@@ -294,18 +267,16 @@ Class* ClassLoader::DefineClass(Global_Env* env, const char* class_name,
         FailedLoadingClass(className);
         return NULL;
     }
-    
+
     /*
      *  Create a Class File Stream object
      */
     ByteReader cfs(bytecode, offset, length);
-    unsigned super_class_cp_index;
-    assert(clss->state == ST_Start);
-    
+
     /* 
      * now parse and verify the class data
      */
-    if(!class_parse(env, clss, &super_class_cp_index, cfs)) {
+    if(!clss->parse(env, cfs)) {
         if (NULL != redef_buf)
             _deallocate(redef_buf);
         FailedLoadingClass(className);
@@ -329,22 +300,14 @@ Class* ClassLoader::DefineClass(Global_Env* env, const char* class_name,
     }
     // XXX
 
-    //clss->class_loader = this;
-    if(!FinishLoadingClass(env, clss, &super_class_cp_index)) {
+    if(!clss->load_ancestors(env)) {
         FailedLoadingClass(className);
         return NULL;
     }
 
-    clss->package = ProvidePackage(env, className, NULL);
-
     InsertClass(clss);
     SuccessLoadingClass(className);
 
-    //bool doNotNotifyBaseClasses = // false if class is either j/l/Object, j/io/Serializable, or j/l/Class
-    //    (clss->name != env->JavaLangObject_String)
-    //    && (env->java_io_Serializable_Class != NULL && clss->name != env->java_io_Serializable_Class->name)
-    //    && (clss->name != env->JavaLangClass_String);
-    //if( this != env->bootstrap_class_loader || doNotNotifyBaseClasses )
     if(this != env->bootstrap_class_loader || !env->InBootstrap())
     {
         jvmti_send_class_load_event(env, clss);
@@ -353,32 +316,34 @@ Class* ClassLoader::DefineClass(Global_Env* env, const char* class_name,
     return clss;
 }
 
- Package* ClassLoader::ProvidePackage(Global_Env* env, const String *class_name, 
-                                     const char *jar) {
-     const char* clss = class_name->bytes;
-     const char* sep = strrchr(clss, '/');
-     const String* package_name;
-     if (!sep) {
-         // this must be the default package...
-         package_name = env->string_pool.lookup("");
-     } else {
-         package_name = env->string_pool.lookup(clss, 
+
+Package* ClassLoader::ProvidePackage(Global_Env* env, const String* class_name,
+                                     const char* jar)
+{
+    const char* clss = class_name->bytes;
+    const char* sep = strrchr(clss, '/');
+    const String* package_name;
+    if (!sep) {
+        // this must be the default package...
+        package_name = env->string_pool.lookup("");
+    } else {
+        package_name = env->string_pool.lookup(clss,
             static_cast<unsigned>(sep - clss));
-     }
-     Lock();
-     Package *package = m_package_table->lookup(package_name);
-     if (package == NULL) {
-         // create a new package
-         void* p = apr_palloc(pool, sizeof(Package));
-         const char* jar_url = jar ? 
-             apr_pstrcat(pool, "jar:file:", jar, "!/", NULL) : NULL;
-         package = new (p) Package(package_name, jar_url);
-         m_package_table->Insert(package);
-     }
-     Unlock();
- 
-     return package;
- }
+    }
+    Lock();
+    Package *package = m_package_table->lookup(package_name);
+    if (package == NULL) {
+        // create a new package
+        void* p = apr_palloc(pool, sizeof(Package));
+        const char* jar_url = jar ?
+            apr_pstrcat(pool, "jar:file:", jar, "!/", NULL) : NULL;
+        package = new (p) Package(package_name, jar_url);
+        m_package_table->Insert(package);
+    }
+    Unlock();
+
+    return package;
+}
 
 Class* ClassLoader::LoadVerifyAndPrepareClass(Global_Env* env, const String* name)
 {
@@ -386,14 +351,8 @@ Class* ClassLoader::LoadVerifyAndPrepareClass(Global_Env* env, const String* nam
 
     Class* clss = LoadClass(env, name);
     if(!clss) return NULL;
-
-    if(!class_verify(env, clss)) {
-        return NULL;
-    }
-
-    if(!class_prepare(env, clss)) {
-        return NULL;
-    }
+    if(!clss->verify(env)) return NULL;
+    if(!clss->prepare(env)) return NULL;
 
     return clss;
 }
@@ -419,8 +378,8 @@ void ClassLoader::ReportFailedClass(Class* klass, const jthrowable exn)
         assert(exn_raised());
         return; // OOME
     }
-    AddFailedClass(klass->name, exn);
-    class_set_error_cause(klass, exn);
+    AddFailedClass(klass->get_name(), exn);
+    klass->set_error_cause(exn);
 }
 
 void ClassLoader::ReportFailedClass(Class* klass, const char* exnclass, std::stringstream& exnmsg)
@@ -428,8 +387,8 @@ void ClassLoader::ReportFailedClass(Class* klass, const char* exnclass, std::str
     jthrowable exn = exn_create(exnclass, exnmsg.str().c_str());
 
     // ppervov: FIXME: should throw OOME
-    AddFailedClass(klass->name, exn);
-    class_set_error_cause(klass, exn);
+    AddFailedClass(klass->get_name(), exn);
+    klass->set_error_cause(exn);
 }
 
 
@@ -443,105 +402,6 @@ void ClassLoader::ReportFailedClass(const char* klass, const char* exnclass, std
     AddFailedClass(klassName, exn);
 }
 
-bool ClassLoader::FinishLoadingClass(Global_Env* env, Class* clss, unsigned* super_class_cp_index)
-{
-    clss->state = ST_LoadingAncestors;
-
-    String* superName = clss->super_name;
-
-    if( superName == NULL ) {
-        if(env->InBootstrap() || clss->name != env->JavaLangClass_String) {
-            // This class better be java.lang.Object
-            if( clss->name != env->JavaLangObject_String ) {
-                // ClassFormatError
-                std::stringstream ss;
-                ss << clss->name->bytes << ": class does not have superclass but the class is not java.lang.Object";
-                REPORT_FAILED_CLASS_CLASS(this, clss, "java/lang/ClassFormatError", ss.str().c_str());
-                return false;
-            }
-        }
-    } else {
-        // Load super class
-        Class* superClass;
-        clss->super_class = NULL;
-        superClass = LoadClass(env, superName);
-
-        if(superClass == NULL) {
-            if(!GetClassError(clss->name->bytes)) {
-                // Don't report failed classes more than one time
-                REPORT_FAILED_CLASS_CLASS_EXN(this, clss, GetClassError(superName->bytes));
-            }
-            return false;
-        }
-        if(class_is_interface(superClass)) {
-            REPORT_FAILED_CLASS_CLASS(this, clss, "java/lang/IncompatibleClassChangeError",
-                "class " << clss->name->bytes << " has interface "
-                << superClass->name->bytes << " as super class");
-            return false;
-        }
-        if(class_is_final(superClass)) {
-            REPORT_FAILED_CLASS_CLASS(this, clss, "java/lang/VerifyError",
-                clss->name->bytes << " cannot inherit from final class "
-                << superClass->name->bytes);
-            return false;
-        }
-        if(!class_verify(env, superClass)) return false;
-        if(!class_prepare(env, superClass)) return false;
-
-        // super class was successfully loaded
-        clss->super_class = superClass;
-        if( super_class_cp_index && *super_class_cp_index ) {
-            cp_resolve_to_class( clss->const_pool, *super_class_cp_index, superClass );
-        }
-
-        // if it's an interface, its superclass must be java/lang/Object
-        if(class_is_interface(clss)) {
-            if((env->JavaLangObject_Class != NULL) && (superClass != env->JavaLangObject_Class)) {
-                std::stringstream ss;
-                ss << clss->name->bytes << ": interface superclass is not java.lang.Object";
-                REPORT_FAILED_CLASS_CLASS(this, clss, "java/lang/ClassFormatError", ss.str().c_str());
-                return false;
-            }
-        }
-
-        // 2003-06-18. Update the cha_first_child and cha_next_sibling fields.
-        clss->cha_first_child = NULL;
-        if (clss->super_class != NULL)
-        {
-            clss->cha_next_sibling = clss->super_class->cha_first_child;
-            clss->super_class->cha_first_child = clss;
-        }
-        // Notify interested JITs that the superclass has been extended.
-        do_jit_extended_class_callbacks( superClass, /*new_subclass*/ clss );
-    }
-
-    //
-    // load in super interfaces
-    //
-    for( unsigned i = 0; i < clss->n_superinterfaces; i++ ) {
-        String *intfc_name = clss->superinterfaces[i].name;
-        Class* intfc = LoadVerifyAndPrepareClass(env, intfc_name);
-        if( intfc == NULL ) {
-            if(!GetClassError(clss->name->bytes)) {
-                REPORT_FAILED_CLASS_CLASS_EXN(this, clss, GetClassError(intfc_name->bytes));
-            }
-            return false;
-        }
-        if(!class_is_interface(intfc)) {
-            REPORT_FAILED_CLASS_CLASS(this, clss, "java/lang/IncompatibleClassChangeError",
-                clss->name->bytes << ": " << intfc->name->bytes << " is not an interface");
-            return false;
-        }
-
-        // superinterface was successfully loaded
-        clss->superinterfaces[i].clss = intfc;
-    }
-    // class, superclass, and superinterfaces successfully loaded
-
-    clss->state = ST_Loaded;
-
-    return true;
-}
 
 void ClassLoader::RemoveLoadingClass(const String* className, LoadingClass* loading) 
 {
@@ -641,19 +501,19 @@ void ClassLoader::ClearMarkBits()
         if(m_table[i]->m_unloading) {
             TRACE2("classloader.unloading.debug", "  Skipping \"unloaded\" classloader "
                 << m_table[i] << " (" << m_table[i]->m_loader << " : "
-                << ((VTable*)(*(unsigned**)(m_table[i]->m_loader)))->clss->name->bytes << ")");
+                << ((VTable*)(*(unsigned**)(m_table[i]->m_loader)))->clss->get_name()->bytes << ")");
             continue;
         }
         TRACE2("classloader.unloading.debug", "  Clearing mark bits in classloader "
             << m_table[i] << " (" << m_table[i]->m_loader << " : "
-            << ((VTable*)(*(unsigned**)(m_table[i]->m_loader)))->clss->name->bytes << ") and its classes");
+            << ((VTable*)(*(unsigned**)(m_table[i]->m_loader)))->clss->get_name()->bytes << ") and its classes");
         // clear mark bits in loader and classes
         m_table[i]->m_markBit = 0;
         for(cti = m_table[i]->m_loadedClasses->begin();
             cti != m_table[i]->m_loadedClasses->end(); cti++)
         {
-            if(cti->second->class_loader == m_table[i]) {
-                cti->second->m_markBit = 0;
+            if(cti->second->get_class_loader() == m_table[i]) {
+                cti->second->reset_reachable();
              }
          }
      }
@@ -672,16 +532,16 @@ void ClassLoader::StartUnloading()
         if(m_table[i]->m_unloading) {
             TRACE2("classloader.unloading.debug", "  Skipping \"unloaded\" classloader "
                 << m_table[i] << " (" << m_table[i]->m_loader << " : "
-                << ((VTable*)(*(unsigned**)(m_table[i]->m_loader)))->clss->name->bytes << ")");
+                << ((VTable*)(*(unsigned**)(m_table[i]->m_loader)))->clss->get_name()->bytes << ")");
             continue;
         }
         TRACE2("classloader.unloading.debug", "  Scanning loader "
             << m_table[i] << " (" << m_table[i]->m_loader << " : "
-            << ((VTable*)(*(unsigned**)(m_table[i]->m_loader)))->clss->name->bytes << ")");
+            << ((VTable*)(*(unsigned**)(m_table[i]->m_loader)))->clss->get_name()->bytes << ")");
         if(!m_table[i]->m_markBit) {
             TRACE2("classloader.unloading.stats", "  (!) Ready to unload classloader "
                 << m_table[i] << " (" << m_table[i]->m_loader << " : "
-                << ((VTable*)(*(unsigned**)(m_table[i]->m_loader)))->clss->name->bytes << ")");
+                << ((VTable*)(*(unsigned**)(m_table[i]->m_loader)))->clss->get_name()->bytes << ")");
             TRACE2("classloader.unloading.stats", "  (!) This will free "
                 << m_table[i]->GetFullSize() << " bytes in C heap");
             m_table[i]->m_unloading = true;
@@ -701,7 +561,7 @@ void ClassLoader::PrintUnloadingStats()
         if(m_table[i]->m_unloading) {
             TRACE2("classloader.unloading.stats", "  Class loader "
                 << m_table[i] << " (" << m_table[i]->m_loader << " : "
-                << ((VTable*)(*(unsigned**)(m_table[i]->m_loader)))->clss->name->bytes
+                << ((VTable*)(*(unsigned**)(m_table[i]->m_loader)))->clss->get_name()->bytes
                 << ") contains " << m_table[i]->GetFullSize() << " bytes in C heap");
         }
     }
@@ -733,7 +593,7 @@ ClassLoader* ClassLoader::AddClassLoader( ManagedObject* loader )
     ClassLoader* cl = new UserDefinedClassLoader();
     TRACE2("classloader.unloading.add", "Adding class loader "
         << cl << " (" << loader << " : "
-        << ((VTable*)(*(unsigned**)(loader)))->clss->name->bytes << ")");
+        << ((VTable*)(*(unsigned**)(loader)))->clss->get_name()->bytes << ")");
     cl->Initialize( loader );
     if( m_capacity <= m_nextEntry )
         ReallocateTable( m_capacity?(2*m_capacity):32 );
@@ -782,10 +642,10 @@ Class* ClassLoader::StartLoadingClass(Global_Env* UNREF env, const String* class
         {
             klass = *pklass;
             // class has already been loaded
-            if(klass->state == ST_LoadingAncestors) {
+            if(klass->get_state() == ST_LoadingAncestors) {
                 // there is a circularity in the class hierarchy
                 aulock.ForceUnlock();
-                REPORT_FAILED_CLASS_CLASS(this, klass, "java/lang/ClassCircularityError", klass->name->bytes);
+                REPORT_FAILED_CLASS_CLASS(this, klass, "java/lang/ClassCircularityError", klass->get_name()->bytes);
                 return NULL;
             }
             return klass;
@@ -860,8 +720,8 @@ unsigned ClassLoader::GetFullSize() {
     for(cti = m_loadedClasses->begin();
         cti != m_loadedClasses->end(); cti++)
     {
-        if(cti->second->class_loader == this) {
-            m_fullSize += class_calculate_size(cti->second);
+        if(cti->second->get_class_loader() == this) {
+            m_fullSize += cti->second->calculate_size();
         }
     }
     return m_fullSize;
@@ -925,7 +785,7 @@ Class* ClassLoader::WaitDefinition(Global_Env* env, const String* className)
             // We only have to report current error condition and do not need
             // to record error state in the class...
             std::stringstream ss;
-            ss << "class " << clss->name->bytes << " is defined second time";
+            ss << "class " << clss->get_name()->bytes << " is defined second time";
             jthrowable exn = exn_create("java/lang/LinkageError", ss.str().c_str());
             exn_raise_object(exn);
             return NULL;
@@ -1011,7 +871,7 @@ Class* ClassLoader::SetupAsArray(Global_Env* env, const String* classNameString)
             className);
         return NULL;
     }
-    ClassLoader* baseLoader = baseClass->class_loader;
+    ClassLoader* baseLoader = baseClass->get_class_loader();
     Class* elementClass = baseClass;
     if(n_dimensions > 1) {
         elementClass = baseLoader->LoadVerifyAndPrepareClass(env, env->string_pool.lookup(&className[1]));
@@ -1053,49 +913,11 @@ Class* ClassLoader::SetupAsArray(Global_Env* env, const String* classNameString)
         }
 
         // setup array-related fields
-        klass->is_array = 1;
-        klass->n_dimensions = (unsigned char)n_dimensions;
-        if(n_dimensions == 1) {
-            klass->is_array_of_primitives = isArrayOfPrimitives;
-        } else {
-            klass->is_array_of_primitives = false;
-        }
-        klass->array_element_class = elementClass;
-        klass->array_base_class = baseClass;
-        klass->is_verified = 2;
-
-        assert(elementClass);
-        klass->array_element_type_desc = type_desc_create_from_class(elementClass);
-
-        // insert Java field, required by spec - 'length'
-        klass->n_fields = 1;
-        klass->fields = new Field[1];
-        klass->fields[0].set(klass, env->Length_String,
-            env->string_pool.lookup("I"), ACC_PUBLIC|ACC_FINAL);
-        klass->fields[0].set_field_type_desc(
-            type_desc_create_from_java_descriptor("I", NULL));
-        klass->fields[0].set_injected();
-
-        klass->super_name = env->JavaLangObject_String;
-
-        // set array access flags the same as its base class
-        klass->access_flags = (ACC_FINAL | ACC_ABSTRACT);
-        if(isArrayOfPrimitives) {
-            klass->access_flags |= ACC_PUBLIC;
-        } else {
-            klass->access_flags = (uint16)(klass->access_flags | (baseClass->access_flags
-                & (ACC_PUBLIC | ACC_PRIVATE | ACC_PROTECTED) ));
-        }
-        klass->package = elementClass->package;
-
-        // array classes implement two interfaces: Cloneable and Serializable
-        klass->superinterfaces = (Class_Superinterface*) Alloc(2 * sizeof(Class_Superinterface));
-        klass->superinterfaces[0].name = env->Clonable_String;
-        klass->superinterfaces[1].name = env->Serializable_String;
-        klass->n_superinterfaces = 2;
+        klass->setup_as_array(env, n_dimensions, isArrayOfPrimitives,
+            baseClass, elementClass);
     }
 
-    if(!FinishLoadingClass(env, klass, NULL)) {
+    if(!klass->load_ancestors(env)) {
         FailedLoadingClass(classNameString);
         return NULL;
     }
@@ -1106,24 +928,39 @@ Class* ClassLoader::SetupAsArray(Global_Env* env, const String* classNameString)
     return klass;
 } // ClassLoader::SetupAsArray
 
+
+static void set_struct_Class_field_in_java_lang_Class(const Global_Env* env, ManagedObject** jlc, Class *clss)
+{
+    assert(managed_object_is_java_lang_class(*jlc));
+    assert(env->vm_class_offset != 0);
+
+    Class** vm_class_ptr = (Class **)(((Byte *)(*jlc)) + env->vm_class_offset);
+    *vm_class_ptr = clss;
+} // set_struct_Class_field_in_java_lang_Class
+
+
 /** Adds Class* pointer to m_reportedClasses HashTable. 
-*   clss->name must not be NULL.
+*   clss->m_name must not be NULL.
 */
 Class* ClassLoader::AllocateAndReportInstance(const Global_Env* env, Class* clss)
 {
-    const String* name = clss->name;
+    const String* name = clss->get_name();
     assert(name);
 
     if (env->InBootstrap()) {
-        clss->class_handle = NULL;
+        // Make sure we are bootstrapping initial VM classes
+        assert((name == env->JavaLangObject_String)
+             || (strcmp(name->bytes, "java/io/Serializable") == 0)
+             || (name == env->JavaLangClass_String)
+             || (strcmp(name->bytes, "java/lang/reflect/AnnotatedElement") == 0)
+             || (strcmp(name->bytes, "java/lang/reflect/GenericDeclaration") == 0)
+             || (strcmp(name->bytes, "java/lang/reflect/Type") == 0));
     } else {
         Class* root_class = env->JavaLangClass_Class;
         assert(root_class != NULL);
 
         tmn_suspend_disable(); // -----------------vvv
-        ManagedObject* new_java_lang_Class =
-            (ManagedObject*) vm_alloc_and_report_ti(root_class->instance_data_size,
-                root_class->allocation_handle, vm_get_gc_thread_local(), root_class);
+        ManagedObject* new_java_lang_Class = root_class->allocate_instance();
         if(new_java_lang_Class == NULL)
         {
             tmn_suspend_enable();
@@ -1135,91 +972,24 @@ Class* ClassLoader::AllocateAndReportInstance(const Global_Env* env, Class* clss
         }
         // add newly created java_lang_Class to reportable collection
         LMAutoUnlock aulock(&m_lock);
-        clss->class_handle = m_reportedClasses->Insert(name, new_java_lang_Class);
+        clss->set_class_handle(m_reportedClasses->Insert(name, new_java_lang_Class));
         aulock.ForceUnlock();
         TRACE("NewClass inserting class \"" << name->bytes
             << "\" with key " << name << " and object " << new_java_lang_Class);
-        assert(new_java_lang_Class == *(clss->class_handle));
-#ifdef VM_STATS
-        root_class->num_allocations++;
-        root_class->num_bytes_allocated += root_class->instance_data_size;
-#endif //VM_STATS
+        assert(new_java_lang_Class == *(clss->get_class_handle()));
 
         assert(env->vm_class_offset);
-        set_struct_Class_field_in_java_lang_Class(env, clss->class_handle, clss);
+        set_struct_Class_field_in_java_lang_Class(env, clss->get_class_handle(), clss);
         tmn_suspend_enable(); // -----------------^^^
     }
 
     return clss;
 }
 
-Class* ClassLoader::InitClassFields(const Global_Env* env, Class* clss, const String* name)
-{
-    memset(clss, 0, sizeof(Class));
-
-#ifdef POINTER64
-    clss->alignment = ((GC_OBJECT_ALIGNMENT<8)?8:GC_OBJECT_ALIGNMENT);;
-#else
-    clss->alignment = GC_OBJECT_ALIGNMENT;
-#endif
- 
-    clss->id = class_next_id++;
-    clss->name = name;
-    clss->class_loader = this;
-    clss->state = ST_Start;
-
-    clss->m_lock = new Lock_Manager();
-
-    // Special case: ClassLoader.defineClass() call with null classname value.
-    // Calling AddToReported() only if real class name is already known.
-    if (clss->name != NULL)
-        clss = AllocateAndReportInstance(env, clss);
-
-    return clss;
-}
 
 void ClassLoader::ClassClearInternals(Class* clss)
 {
-    FieldClearInternals(clss);
-
-    if (clss->methods != NULL)
-    {
-        for (int i = 0; i < clss->n_methods; i++){
-            clss->methods[i].MethodClearInternals();
-        }
-        delete []clss->methods;
-        clss->methods = NULL;
-    }
-    if (clss->const_pool != NULL)
-    {
-        if (clss->const_pool[0].tags)
-            delete []clss->const_pool[0].tags;
-        delete []clss->const_pool;
-        clss->const_pool = NULL;
-    }
-    if (clss->vtable_descriptors)
-        delete []clss->vtable_descriptors;
-    
-    if (clss->static_method_block)
-        delete []clss->static_method_block;
-
-    if (clss->m_lock)
-        delete clss->m_lock;
-
-    if (clss->array_element_type_desc)
-    {
-        delete clss->array_element_type_desc;
-        clss->array_element_type_desc = NULL;
-    }
-}
-
-void ClassLoader::FieldClearInternals(Class* clss)
-{
-    if (clss->fields != NULL)
-    {
-        delete []clss->fields;   
-        clss->fields = NULL;
-    }
+    clss->clear_internals();
 }
 
 
@@ -1312,7 +1082,7 @@ GenericFunctionPointer ClassLoader::LookupNative(Method* method)
     Class* klass = method->get_class();
 
     // get class name, method name and method descriptor
-    const String* class_name = klass->name;
+    const String* class_name = klass->get_name();
     const String* method_name = method->get_name();
     const String* method_desc = method->get_descriptor();
 
@@ -1835,10 +1605,10 @@ Class* UserDefinedClassLoader::DoLoadClass(Global_Env* env, const String* classN
             Class *exn_class = jobject_to_struct_Class(exn);
 
             INFO("Loading of " << className->bytes << " class failed due to "
-                << exn_class->name->bytes);
+                << exn_class->get_name()->bytes);
 
             while(exn_class && exn_class != NotFoundExn_class) {
-                exn_class = exn_class->super_class;
+                exn_class = exn_class->get_super_class();
             }
 
             if (exn_class == NotFoundExn_class) {
@@ -1878,8 +1648,8 @@ Class* UserDefinedClassLoader::DoLoadClass(Global_Env* env, const String* classN
     Class* clss = java_lang_Class_to_struct_Class(oh->object);
     tmn_suspend_enable();
 
-    assert(clss->class_loader != NULL);
-    if(clss->class_loader != this) {
+    assert(clss->get_class_loader() != NULL);
+    if(clss->get_class_loader() != this) {
         // if loading of this class was delegated to some other CL
         //      signal successful loading for our CL
         SuccessLoadingClass(className);
@@ -2006,7 +1776,7 @@ Class* BootstrapClassLoader::LoadFromClassFile(const String* dir_name,
     // define class
     Class* clss = DefineClass(m_env, class_name->bytes, buf, 0, buf_len); 
     if(clss) {
-        clss->class_file_name = m_env->string_pool.lookup(full_name);
+        clss->set_class_file_name(m_env->string_pool.lookup(full_name));
     }
     apr_pool_destroy(local_pool);
 
@@ -2035,14 +1805,14 @@ Class* BootstrapClassLoader::LoadFromJarFile( JarFile* jar_file,
         return NULL;
     }
 
-    // set class into package collection
+    // create package information with jar source
     ProvidePackage(m_env, class_name, jar_file->GetName());
 
     // define class
     Class *clss = DefineClass(m_env, class_name->bytes, buffer, 0, size, NULL);
     if(clss) {
         // set class file name
-        clss->class_file_name = m_env->string_pool.lookup(jar_file->GetName());
+        clss->set_class_file_name(m_env->string_pool.lookup(jar_file->GetName()));
     }
 
     return clss;

@@ -35,6 +35,7 @@ using namespace std;
 #include "environment.h"
 #include "open/hythread.h"
 #include "open/vm_util.h"
+#include "open/gc.h"
 #include "atomics.h"
 #include "vm_strings.h"
 #include "vm_stats.h"
@@ -290,7 +291,9 @@ ManagedObject * String_Pool::intern(String * str) {
     // Atomically update the string structure since some other thread might be trying to make the same update.
     // The GC won't be able to enumerate here since GC is disabled, so there are no race conditions with GC.
     if (VM_Global_State::loader_env->compress_references) {
-        COMPRESSED_REFERENCE compressed_lang_string = (COMPRESSED_REFERENCE)((POINTER_SIZE_INT)lang_string - (POINTER_SIZE_INT)Class::heap_base);
+        COMPRESSED_REFERENCE compressed_lang_string =
+            (COMPRESSED_REFERENCE)((POINTER_SIZE_INT)lang_string
+            - (POINTER_SIZE_INT)VM_Global_State::loader_env->heap_base);
         assert(is_compressed_reference(compressed_lang_string));     
         assert(sizeof(LONG) == sizeof(uint32));
         uint32 result = apr_atomic_cas32(

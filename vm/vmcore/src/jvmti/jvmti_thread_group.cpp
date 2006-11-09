@@ -29,6 +29,7 @@
 #include "cxxlog.h"
 #include "suspend_checker.h"
 #include "environment.h"
+#include "Class.h"
 
 #define jvmti_test_jenv (p_TLS_vmthread->jni_env)
 

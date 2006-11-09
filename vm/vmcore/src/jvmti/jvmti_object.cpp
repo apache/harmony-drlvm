@@ -67,16 +67,16 @@ jvmtiGetObjectSize(jvmtiEnv* env,
     ManagedObject *mo = h->object;
 
     // Check that reference pointer points to the heap
-    if (mo < (ManagedObject *)Class::heap_base ||
-        mo > (ManagedObject *)Class::heap_end)
+    if (mo < (ManagedObject *)VM_Global_State::loader_env->heap_base ||
+        mo > (ManagedObject *)VM_Global_State::loader_env->heap_end)
     {
         tmn_suspend_enable();
         return JVMTI_ERROR_INVALID_OBJECT;
     }
 
     Class *object_clss = mo->vt()->clss;
-    if (class_is_array(object_clss))
-        *size_ptr = vm_vector_size(object_clss, get_vector_length((Vector_Handle)mo));
+    if(object_clss->is_array())
+        *size_ptr = object_clss->calculate_array_size(get_vector_length((Vector_Handle)mo));
     else
         *size_ptr = class_get_boxed_data_size(object_clss);
 
@@ -119,7 +119,7 @@ jvmtiGetObjectHashCode(jvmtiEnv* env,
         p_obj = NULL;
     *hash_code_ptr = generic_hashcode(p_obj);
     TRACE2("jvmti-object", "Object " <<
-        ((NULL == p_obj) ? "is null" : p_obj->vt()->clss->name->bytes) <<
+        ((NULL == p_obj) ? "is null" : p_obj->vt()->clss->get_name()->bytes) <<
         " hash code = " << *hash_code_ptr);
     tmn_suspend_enable();
 

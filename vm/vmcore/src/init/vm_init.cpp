@@ -75,7 +75,7 @@ void vm_uninitialize_critical_sections() {
     delete p_method_call_lock;
 }
 
-Class * preload_class(Global_Env * vm_env, const char * classname) {
+Class* preload_class(Global_Env * vm_env, const char * classname) {
     String * s = vm_env->string_pool.lookup(classname);
     return vm_env->LoadCoreClass(s);
 }
@@ -88,13 +88,10 @@ static Class * preload_primitive_class(Global_Env * vm_env, const char * classna
     String * s = vm_env->string_pool.lookup(classname);
     ClassLoader * cl = vm_env->bootstrap_class_loader;
     Class *clss = cl->NewClass(vm_env, s);
-    clss->is_primitive = 1;
-    clss->class_loader = cl;
-    clss->access_flags = ACC_ABSTRACT | ACC_FINAL | ACC_PUBLIC;
-    clss->is_verified = 2;
+    clss->setup_as_primitive(cl);
     cl->InsertClass(clss);
 
-    class_prepare(vm_env, clss);
+    clss->prepare(vm_env);
     return clss;
 }
 
@@ -123,8 +120,8 @@ static jint lib_dependent_opts() {
 // and set its "vm_class" field to point back to that structure.
 void create_instance_for_class(Global_Env * vm_env, Class *clss) 
 {
-    clss->class_loader->AllocateAndReportInstance(vm_env, clss);
-}
+    clss->get_class_loader()->AllocateAndReportInstance(vm_env, clss);
+} //create_instance_for_class
 
 /**
  * Loads DLLs.
@@ -276,6 +273,9 @@ static void bootstrap_initial_java_classes(Global_Env * vm_env)
     vm_env->StartVMBootstrap();
     vm_env->JavaLangObject_Class       = preload_class(vm_env, vm_env->JavaLangObject_String);
     vm_env->java_io_Serializable_Class = preload_class(vm_env, vm_env->Serializable_String);
+    Class* AnnotatedElement_Class      = preload_class(vm_env, "java/lang/reflect/AnnotatedElement");
+    Class* GenericDeclaration_Class    = preload_class(vm_env, "java/lang/reflect/GenericDeclaration");
+    Class* Type_Class                  = preload_class(vm_env, "java/lang/reflect/Type");
     vm_env->JavaLangClass_Class        = preload_class(vm_env, vm_env->JavaLangClass_String);
     vm_env->FinishVMBootstrap();
 
@@ -293,15 +293,10 @@ static void bootstrap_initial_java_classes(Global_Env * vm_env)
         }
         jvmti_send_class_load_event(vm_env, booted);
         jvmti_send_class_prepare_event(booted);
-    }    
+    }
 
-#ifdef VM_STATS
-      // Account for the classes loaded before vm_env->JavaLangObject_Class is set.
-    vm_env->JavaLangObject_Class->num_allocations += num;
-    vm_env->JavaLangObject_Class->num_bytes_allocated += (num * vm_env->JavaLangClass_Class->instance_data_size);
-#endif //VM_STATS
     TRACE("bootstrapping initial java classes complete");
-}
+} // bootstrap_initial_java_classes
 
 /**
  * Loads hot classes.
@@ -331,24 +326,12 @@ static jint preload_classes(Global_Env * vm_env) {
     vm_env->ArrayOfFloat_Class     = preload_class(vm_env, "[F");
     vm_env->ArrayOfDouble_Class    = preload_class(vm_env, "[D");
 
-#ifndef POINTER64
-    // In IA32, Arrays of Doubles need to be eight byte aligned to improve 
-    // performance. In IPF all objects (arrays, class data structures, heap objects)
-    // get aligned on eight byte boundaries. So, this special code is not needed.
-    vm_env->ArrayOfDouble_Class->alignment = ((GC_OBJECT_ALIGNMENT < 8) ? 8: GC_OBJECT_ALIGNMENT);
-    // The alignment is either 4 or it is a multiple of 8. Things like 12 aren't allowed.
-    assert ((GC_OBJECT_ALIGNMENT == 4) || ((GC_OBJECT_ALIGNMENT % 8) == 0)); 
-    // align doubles on 8, clear alignment field and put in 8.
-    set_prop_alignment_mask(vm_env->ArrayOfDouble_Class, 8);
-    // Set high bit in size so that gc knows there are constraints
-#endif
-
     TRACE2("init", "preloading string class");
     vm_env->JavaLangString_Class = preload_class(vm_env, vm_env->JavaLangString_String);
     vm_env->strings_are_compressed =
         (class_lookup_field_recursive(vm_env->JavaLangString_Class, "bvalue", "[B") != NULL);
-    vm_env->JavaLangString_VTable = vm_env->JavaLangString_Class->vtable;
-    vm_env->JavaLangString_allocation_handle = vm_env->JavaLangString_Class->allocation_handle;
+    vm_env->JavaLangString_VTable = vm_env->JavaLangString_Class->get_vtable();
+    vm_env->JavaLangString_allocation_handle = vm_env->JavaLangString_Class->get_allocation_handle();
 
     TRACE2("init", "preloading exceptions");
     vm_env->java_lang_Throwable_Class =
@@ -488,7 +471,7 @@ static jint vm_create_jthread(jthread * thread_object, JNIEnv * jni_env, jobject
     assert(!hythread_is_suspend_enabled());
 
     vm_env = jni_get_vm_env(jni_env);
-    
+
     thread_class = vm_env->java_lang_Thread_Class;
     class_initialize(thread_class);
     if (exn_raised()) return TM_ERROR_INTERNAL;
@@ -504,7 +487,8 @@ static jint vm_create_jthread(jthread * thread_object, JNIEnv * jni_env, jobject
 
     if (constructor == NULL) {
         // Initialize created thread object.
-        constructor = class_lookup_method_init(thread_class, descriptor);
+        constructor = thread_class->lookup_method(vm_env->Init_String,
+            vm_env->string_pool.lookup(descriptor));
         if (constructor == NULL) {
             TRACE("Failed to find thread's constructor " << descriptor << " , exception = " << exn_get());
             return JNI_ERR;
@@ -649,9 +633,9 @@ int vm_init1(JavaVM_Internal * java_vm, JavaVMInitArgs * vm_arguments) {
     Slot::init(gc_heap_base_address(), gc_heap_ceiling_address());
 
     // TODO: find another way to initialize the following.
-    Class::heap_base = (Byte *)gc_heap_base_address();
-    Class::heap_end  = (Byte *)gc_heap_ceiling_address();
-    Class::managed_null = (vm_references_are_compressed() ? Class::heap_base : NULL);
+    vm_env->heap_base = (Byte *)gc_heap_base_address();
+    vm_env->heap_end  = (Byte *)gc_heap_ceiling_address();
+    vm_env->managed_null = (vm_references_are_compressed() ? vm_env->heap_base : NULL);
 
     // 20030404 This handshaking protocol isn't quite correct. It doesn't
     // work at the moment because JIT has not yet been modified to support
@@ -692,7 +676,6 @@ int vm_init1(JavaVM_Internal * java_vm, JavaVMInitArgs * vm_arguments) {
     vm_env->popFrameException->object =
         class_alloc_new_object(vm_env->java_lang_Error_Class);
 
-
     // Precompile StackOverflowError.
     class_alloc_new_object_and_run_default_constructor(vm_env->java_lang_StackOverflowError_Class);
     // Precompile ThreadDeathError.
@@ -701,13 +684,13 @@ int vm_init1(JavaVM_Internal * java_vm, JavaVMInitArgs * vm_arguments) {
     hythread_suspend_enable();
 
     // Mark j.l.Throwable() constructor as a side effects free.
-    Method * m = class_lookup_method(vm_env->java_lang_Throwable_Class,
+    Method * m = vm_env->java_lang_Throwable_Class->lookup_method(
         vm_env->Init_String, vm_env->VoidVoidDescriptor_String);
     assert(m);
     m->set_side_effects(MSE_False);
 
     // Mark j.l.Throwable(j.l.String) constructor as a side effects free.
-    m = class_lookup_method(vm_env->java_lang_Throwable_Class,
+    m = vm_env->java_lang_Throwable_Class->lookup_method(
         vm_env->Init_String, vm_env->FromStringConstructorDescriptor_String);
     assert(m);
     m->set_side_effects(MSE_False);
@@ -716,7 +699,7 @@ int vm_init1(JavaVM_Internal * java_vm, JavaVMInitArgs * vm_arguments) {
     global_object_handles_init(jni_env);
 
     Class * aoObjectArray = preload_class(vm_env, "[Ljava/lang/Object;");
-    cached_object_array_vtable_ptr = aoObjectArray->vtable;
+    cached_object_array_vtable_ptr = aoObjectArray->get_vtable();
 
     // the following is required for creating exceptions
     preload_class(vm_env, "[Ljava/lang/VMClassRegistry;");

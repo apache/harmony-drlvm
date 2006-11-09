@@ -84,10 +84,6 @@ Boolean gc_supports_frontier_allocation(unsigned *offset_of_current, unsigned *o
 //GCExport void gc_add_root_set_entry_managed_pointer(void **slot,
 //                                                    Boolean is_pinned); //  optional
 
-#define BITS_PER_BYTE 8
-#define NEXT_TO_HIGH_BIT_SET_MASK (1<<((sizeof(unsigned) * BITS_PER_BYTE)-2))
-#define NEXT_TO_HIGH_BIT_CLEAR_MASK ~NEXT_TO_HIGH_BIT_SET_MASK
-
 // classloader sometimes sets the bit for finalizible objects (?)
 inline unsigned int get_instance_data_size (unsigned int encoded_size) 
 {

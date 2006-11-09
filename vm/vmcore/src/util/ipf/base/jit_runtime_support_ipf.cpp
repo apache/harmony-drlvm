@@ -157,8 +157,7 @@ extern "C" ManagedObject *vm_rt_new_resolved(Class *c)
     assert(strcmp(c->name->bytes, "java/lang/Class")); 
 #ifdef VM_STATS
     VM_Statistics::get_vm_stats().num_class_alloc_new_object++;
-    c->num_allocations++;
-    c->num_bytes_allocated += get_instance_data_size(c);
+    c->instance_allocated(c->get_instance_data_size());
 #endif //VM_STATS
     return (ManagedObject *)vm_malloc_with_thread_pointer(c->instance_data_size, c->allocation_handle, vm_get_gc_thread_local());
 } //vm_rt_new_resolved
@@ -285,8 +284,7 @@ static void update_allocation_stats(int64 size,
 #ifdef VM_STATS
     VTable *vt = ManagedObject::allocation_handle_to_vtable(ah);
     Class *c = vt->clss;
-    c->num_allocations++;
-    c->num_bytes_allocated += get_instance_data_size(c);
+    c->instance_allocated(get_instance_data_size(c));
 #endif
 }
 
@@ -651,9 +649,9 @@ static void emit_fast_type_check_without_vm_stats(Merced_Code_Emitter& emitter,
                                                    int sub_object, int super_class, int pred,
                                                    bool is_instanceof, int call_label)
 {
-    // sc1 = &super_class->is_suitable_for_fast_instanceof
+    // sc1 = super_class->get_offset_of_fast_instanceof_flag()
     // sc3 = [sub_object]
-    // sc6 = &super_class->depth
+    // sc6 = super_class->get_offset_of_depth()
     // sc4 = offset(superclasses) - 8
 
     // sc2 = [sc1]
@@ -691,19 +689,16 @@ static void emit_fast_type_check_without_vm_stats(Merced_Code_Emitter& emitter,
     const unsigned sc9 = SCRATCH_GENERAL_REG9;
 
     Class *dummy_class = NULL;
-    const int offset_is_suitable = (int) ((Byte*)&dummy_class->is_suitable_for_fast_instanceof - (Byte*)dummy_class);
-    assert(sizeof(dummy_class->is_suitable_for_fast_instanceof) == 4);
-
-    const int offset_depth = (int) ((Byte*)&dummy_class->depth - (Byte*)dummy_class);
-    assert(sizeof(dummy_class->depth) == 4);
+    const int offset_is_suitable = (int)Class::get_offset_of_fast_instanceof_flag(dummy_class);
+    const int offset_depth = (int)Class::get_offset_of_depth(dummy_class);
 
     VTable *dummy_vtable = NULL;
     const int offset_superclasses = (int) ((Byte*)&dummy_vtable->superclasses[-1] - (Byte*)dummy_vtable);
     const int offset_clss = (int) ((Byte*)&dummy_vtable->clss - (Byte*)dummy_vtable);
 
-    // sc1 = &super_class->is_suitable_for_fast_instanceof
+    // sc1 = super_class->get_offset_of_fast_instanceof_flag()
     // sc3 = [sub_object]
-    // sc6 = &super_class->depth
+    // sc6 = super_class->get_offset_of_depth()
     // sc4 = offset(superclasses) - 8
     emitter.ipf_adds(sc1, offset_is_suitable, super_class);
     if (vm_vtable_pointers_are_compressed())
@@ -1092,7 +1087,7 @@ static void *get_vm_rt_initialize_class_compactor()
     // reg1 = [reg0]
     // reg1 = reg1 + 1
     // [reg0] = reg1
-    emitter.ipf_adds(SCRATCH_GENERAL_REG, (int)((Byte*)&dummy->num_class_init_checks-(Byte*)dummy), IN_REG0);
+    emitter.ipf_adds(SCRATCH_GENERAL_REG, (int)Class::get_offset_of_class_init_checks(dummy), IN_REG0);
     emitter.ipf_ld(int_mem_size_8, mem_ld_none, mem_none, SCRATCH_GENERAL_REG2, SCRATCH_GENERAL_REG);
     emitter.ipf_adds(SCRATCH_GENERAL_REG2, 1, SCRATCH_GENERAL_REG2);
     emitter.ipf_st(int_mem_size_8, mem_st_none, mem_none, SCRATCH_GENERAL_REG, SCRATCH_GENERAL_REG2);
@@ -1132,7 +1127,7 @@ static void *get_vm_rt_initialize_class_compactor()
 // 20030502 This JIT support routine expects to be called directly from managed code. 
 static void *vm_rt_get_interface_vtable(ManagedObject *object, Class *clss)
 {
-    assert(object != (ManagedObject *)Class::managed_null);
+    assert(object != (ManagedObject *)VM_Global_State::loader_env->managed_null);
     void *vt = vm_get_interface_vtable(object, clss);
     return vt;
 } //vm_rt_get_interface_vtable

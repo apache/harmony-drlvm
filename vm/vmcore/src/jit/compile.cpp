@@ -39,6 +39,8 @@
 #include "interpreter.h"
 #include "jvmti_internal.h"
 #include "jvmti_break_intf.h"
+#include "cci.h"
+#include "open/gc.h"
 
 #include "vm_stats.h"
 #include "dump.h"
@@ -53,11 +55,23 @@ Global_Env* compile_handle_to_environment(Compile_Handle h)
 }
 
 
+int get_index_of_jit(JIT *jit)
+{
+    int idx;
+    JIT **j;
+    for (j = jit_compilers, idx = 0;  *j;  j++, idx++) {
+        if (*j == jit) {
+            return idx;
+        }
+    }
+    return -999;
+} //get_index_of_jit
+
 ////////////////////////////////////////////////////////////////////////
 // begin Forward declarations
 
 // A MethodInstrumentationProc that records calls in a call graph weighted by the call counts between methods.
-void count_method_calls(CodeChunkInfo *callee);
+void count_method_calls(CodeChunkInfo* callee);
 
 // end Forward declarations
 ////////////////////////////////////////////////////////////////////////
@@ -76,7 +90,6 @@ CodeChunkInfo::CodeChunkInfo()
     _relocatable = TRUE;
     _num_target_exception_handlers = 0;
     _target_exception_handlers     = NULL;
-    _has_been_loaded_for_vtune     = false;
     _callee_info = _static_callee_info;
     _max_callees = NUM_STATIC_CALLEE_ENTRIES;
     _num_callees = 0;
@@ -87,7 +100,6 @@ CodeChunkInfo::CodeChunkInfo()
     _jit_info_block_size  = 0;
     _code_block_alignment = 0;
     _data_blocks = NULL;
-    _dynopt_info = NULL;
     _next        = NULL;
 #ifdef VM_STATS
     num_throws  = 0;
@@ -97,35 +109,37 @@ CodeChunkInfo::CodeChunkInfo()
 #endif
 } //CodeChunkInfo::CodeChunkInfo
 
-
-void CodeChunkInfo::initialize_code_chunk(CodeChunkInfo *chunk)
+int CodeChunkInfo::get_jit_index() const
 {
-    memset(chunk, 0, sizeof(CodeChunkInfo));
-    chunk->_callee_info = chunk->_static_callee_info;
-    chunk->_max_callees = NUM_STATIC_CALLEE_ENTRIES;
-    chunk->_relocatable = TRUE;
-} //CodeChunkInfo::initialize_code_chunk
+    return get_index_of_jit(_jit);
+}
 
-
-
-unsigned CodeChunkInfo::get_num_target_exception_handlers()
+unsigned CodeChunkInfo::get_num_target_exception_handlers() const
 {
     if (_id==0) {
         return _num_target_exception_handlers;
     } else {
         return _method->get_num_target_exception_handlers(_jit);
     }
-} //get_num_target_exception_handlers
+}
 
-
-Target_Exception_Handler_Ptr CodeChunkInfo::get_target_exception_handler_info(unsigned eh_num)
+Target_Exception_Handler_Ptr CodeChunkInfo::get_target_exception_handler_info(unsigned eh_num) const
 {
     if (_id==0) {
         return _target_exception_handlers[eh_num];
     } else {
         return _method->get_target_exception_handler_info(_jit, eh_num);
     }
-} //get_target_exception_handler_info
+}
+
+
+//void CodeChunkInfo::initialize_code_chunk(CodeChunkInfo *chunk)
+//{
+//    memset(chunk, 0, sizeof(CodeChunkInfo));
+//    chunk->_callee_info = chunk->_static_callee_info;
+//    chunk->_max_callees = NUM_STATIC_CALLEE_ENTRIES;
+//    chunk->_relocatable = TRUE;
+//} //CodeChunkInfo::initialize_code_chunk
 
 
 // 20040224 Support for recording which methods (actually, CodeChunkInfo's) call which other methods.
@@ -180,10 +194,10 @@ void CodeChunkInfo::record_call_to_callee(CodeChunkInfo *callee, void *caller_ip
 } //CodeChunkInfo::record_call_to_callee
 
 
-uint64 CodeChunkInfo::num_calls_to(CodeChunkInfo *other_chunk)
+uint64 CodeChunkInfo::num_calls_to(CodeChunkInfo *other_chunk) const
 {
     assert(other_chunk);
-    for (unsigned i = 0;  i < _num_callees;  i++) { 
+    for (unsigned i = 0;  i < _num_callees;  i++) {
         Callee_Info *info = &(_callee_info[i]);
         CodeChunkInfo *callee = info->callee;
         assert(callee);
@@ -196,7 +210,7 @@ uint64 CodeChunkInfo::num_calls_to(CodeChunkInfo *other_chunk)
 } //CodeChunkInfo::num_calls_to
 
 
-void CodeChunkInfo::print_name()
+void CodeChunkInfo::print_name() const
 {
     Method *meth = get_method();
     assert(meth);
@@ -207,7 +221,7 @@ void CodeChunkInfo::print_name()
 } //CodeChunkInfo::print_name
 
 
-void CodeChunkInfo::print_name(FILE *file)
+void CodeChunkInfo::print_name(FILE *file) const
 {
     Method *meth = get_method();
     assert(meth);
@@ -218,7 +232,7 @@ void CodeChunkInfo::print_name(FILE *file)
 } //CodeChunkInfo::print_name
 
 
-void CodeChunkInfo::print_info(bool print_ellipses)
+void CodeChunkInfo::print_info(bool print_ellipses) const
 {
     size_t code_size = get_code_block_size();
     print_name();
@@ -226,12 +240,12 @@ void CodeChunkInfo::print_info(bool print_ellipses)
 } //CodeChunkInfo::print_info
 
 
-void CodeChunkInfo::print_callee_info()
+void CodeChunkInfo::print_callee_info() const
 {
-    for (unsigned i = 0;  i < _num_callees;  i++) { 
+    for (unsigned i = 0;  i < _num_callees;  i++) {
         Callee_Info *info = &(_callee_info[i]);
-        // Don't print the "back edges" (e.g., b calls a whenever a calls b) added to make the graph symmetric 
-        if (info->caller_ip != NULL) { 
+        // Don't print the "back edges" (e.g., b calls a whenever a calls b) added to make the graph symmetric
+        if (info->caller_ip != NULL) {
             CodeChunkInfo *callee = info->callee;
             assert(callee);
             unsigned call_offset = (unsigned)((char *)info->caller_ip - (char *)_code_block);
@@ -239,10 +253,9 @@ void CodeChunkInfo::print_callee_info()
             printf("%10" FMT64 "u calls at %u to ", info->num_calls, call_offset);
             callee->print_name();
             printf("\n");
-        } 
+        }
     }
 } //CodeChunkInfo::print_callee_info
-
 
 // end CodeChunkInfo
 ////////////////////////////////////////////////////////////////////////
@@ -291,19 +304,6 @@ void vm_initialize_all_jits()
         (*jit)->jit_flags.insert_write_barriers = (gc_requires_barriers());
     }
 } //vm_initialize_all_jits
-
-
-int get_index_of_jit(JIT *jit)
-{
-    int idx;
-    JIT **j;
-    for (j = jit_compilers, idx = 0;  *j;  j++, idx++) {
-        if (*j == jit) {
-            return idx;
-        }
-    }
-    return -999;
-} //get_index_of_jit
 
 
 // end JIT management
@@ -371,10 +371,10 @@ NativeCodePtr compile_create_lil_jni_stub(Method_Handle method, void* func, Nati
     //***** Part 2: Initialise object handles
 
     if (is_static) {
-        void *jlc = &((Class*)clss)->class_handle;
+        void *jlc = clss->get_class_handle();
         cs = lil_parse_onto_end(cs,
-                                "ld l1,[%0i:pint];"
-                                "ld l1,[l1+0:ref];",
+                                //"ld l1,[%0i:pint];"
+                                "ld l1,[%0i:ref];",
                                 jlc);
         assert(cs);
         cs = oh_gen_init_handle(cs, "l0", 0, "l1", false);
@@ -448,7 +448,7 @@ NativeCodePtr compile_create_lil_jni_stub(Method_Handle method, void* func, Nati
                                         ":%g;"
                                         "o%4i=0;"
                                         ":%g;",
-                                        i, Class::managed_null,
+                                        i, VM_Global_State::loader_env->managed_null,
                                         arg_base+i, handle_offset, arg_base+i);
             } else {
                 cs = lil_parse_onto_end(cs,
@@ -536,7 +536,7 @@ NativeCodePtr compile_create_lil_jni_stub(Method_Handle method, void* func, Nati
                                     "jc l1!=0,done_translating_ret;"
                                     "l1=%0i:ref;"
                                     ":done_translating_ret;",
-                                    Class::managed_null);
+                                    VM_Global_State::loader_env->managed_null);
         }
         assert(cs);
     }
@@ -597,15 +597,16 @@ NativeCodePtr compile_create_lil_jni_stub(Method_Handle method, void* func, Nati
 // begin Support for stub override code sequences 
 
 
-static int get_override_index(Method *method)
+static int get_override_index(Method* method)
 {
-    const char *clss_name = &(method->get_class()->name->bytes[0]);
-    const char *meth_name = method->get_name()->bytes;
-    const char *meth_desc = method->get_descriptor()->bytes;
+    const char* clss_name = method->get_class()->get_name()->bytes;
+    const char* meth_name = method->get_name()->bytes;
+    const char* meth_desc = method->get_descriptor()->bytes;
     for (int i = 0;  i < sizeof_stub_override_entries;  i++) {
-        if ((strcmp(clss_name, stub_override_entries[i].class_name)  == 0) &&
-            (strcmp(meth_name, stub_override_entries[i].method_name) == 0) &&
-            (strcmp(meth_desc, stub_override_entries[i].descriptor)  == 0)) {
+        if ((strcmp(clss_name, stub_override_entries[i].class_name) == 0)
+            && (strcmp(meth_name, stub_override_entries[i].method_name) == 0)
+            && (strcmp(meth_desc, stub_override_entries[i].descriptor) == 0))
+        {
             return i;
         }
     }
@@ -659,19 +660,19 @@ static JIT_Result compile_prepare_native_method(Method* method, JIT_Flags flags)
 
     Class* cl = method->get_class();
     NativeStubOverride nso = nso_find_method_override(VM_Global_State::loader_env,
-                                                    cl->name, method->get_name(),
+                                                    cl->get_name(), method->get_name(),
                                                     method->get_descriptor());
 
     NativeCodePtr stub = compile_create_jni_stub(method, func, nso);
-
     if (!stub)
         return JIT_FAILURE;
-    cl->m_lock->_lock();
+
+    method->lock();
     method->set_code_addr(stub);
-    cl->m_lock->_unlock();
+    method->unlock();
 
     return JIT_SUCCESS;
-} //compile_prepare_native_method
+} // compile_prepare_native_method
 
 
 JIT_Result compile_do_compilation_jit(Method* method, JIT* jit)
@@ -797,10 +798,13 @@ static jthrowable compile_make_exception(const char* name, Method* method)
     jthrowable old_exc = exn_get();
     exn_clear();
 
-    const char* c = method->get_class()->name->bytes;
+    const char* c = method->get_class()->get_name()->bytes;
     const char* m = method->get_name()->bytes;
     const char* d = method->get_descriptor()->bytes;
-    size_t sz = 25+strlen(c)+strlen(m)+strlen(d);
+    size_t sz = 25 +
+        method->get_class()->get_name()->len +
+        method->get_name()->len +
+        method->get_descriptor()->len;
     char* msg_raw = (char*)STD_MALLOC(sz);
     assert(msg_raw);
     sprintf(msg_raw, "Error compiling method %s.%s%s", c, m, d);

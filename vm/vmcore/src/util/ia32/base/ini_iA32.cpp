@@ -119,7 +119,7 @@ JIT_execute_method_default(JIT_Handle jit, jmethodID methodID, jvalue *return_va
 
     Method *method = (Method*) methodID;
     TRACE("enter method "
-            << method->get_class()->name->bytes << " "
+            << method->get_class()->get_name()->bytes << " "
             << method->get_name()->bytes << " "
             << method->get_descriptor()->bytes);
     int sz = method->get_num_arg_bytes() >> 2;
@@ -247,7 +247,7 @@ JIT_execute_method_default(JIT_Handle jit, jmethodID methodID, jvalue *return_va
     }
  
     TRACE("exit method "
-            << method->get_class()->name->bytes << " "
+            << method->get_class()->get_name()->bytes << " "
             << method->get_name()->bytes << " "
             << method->get_descriptor()->bytes);
 

@@ -52,7 +52,7 @@ JNIEXPORT jstring JNICALL Java_org_apache_harmony_vm_VMGenericsAndAnnotations_ge
 (JNIEnv *jenv, jclass, jclass jclazz) 
 {
     Class* clazz = jclass_to_struct_Class(jclazz);
-    String* sig = clazz->Signature;
+    String* sig = clazz->get_signature();
     TRACE("Signature of " << clazz << " : " << sig);
     return sig ? NewStringUTF(jenv, sig->bytes) : NULL;
 }
@@ -70,7 +70,7 @@ JNIEXPORT jobjectArray JNICALL Java_org_apache_harmony_vm_VMGenericsAndAnnotatio
 {
     Class* clazz = jclass_to_struct_Class(jclazz);
     TRACE("Requested annotations for class " << clazz);
-    return get_annotations(jenv, clazz->annotations, clazz);
+    return get_annotations(jenv, clazz->get_annotations(), clazz);
 }
 
 JNIEXPORT jobjectArray JNICALL Java_org_apache_harmony_vm_VMGenericsAndAnnotations_getParameterAnnotations
@@ -81,7 +81,7 @@ JNIEXPORT jobjectArray JNICALL Java_org_apache_harmony_vm_VMGenericsAndAnnotatio
     Class* declaring_class = method->get_class();
 
     static Class* array_class = genv->LoadCoreClass(
-        genv->string_pool.lookup("[Ljava/lang/annotation/Annotation;"));
+        "[Ljava/lang/annotation/Annotation;");
 
     unsigned num = method->get_num_param_annotations();
     TRACE("Requested parameters annotations for method " << method

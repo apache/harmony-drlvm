@@ -35,9 +35,9 @@
 #include "Class.h"
 #include "vm_strings.h"
 #include "jvmti_direct.h"
-#include "Class.h"
 #include "object_handles.h"
 #include "jvmti_utils.h"
+#include "type.h"
 #include "cxxlog.h"
 
 #include "jvmti_interface.h"
@@ -333,8 +333,8 @@ void jvmti_field_modification_callback(Field_Handle field,
 
     if (! field->get_field_type_desc()->is_primitive() && NULL != new_value.l) {
         // if new_value.l is not a handle but a direct pointer to java heap
-        if ((ManagedObject*)new_value.l >= (ManagedObject*)Class::heap_base &&
-            (ManagedObject*)new_value.l <= (ManagedObject*)Class::heap_end)
+        if ((ManagedObject*)new_value.l >= (ManagedObject*)VM_Global_State::loader_env->heap_base
+            && (ManagedObject*)new_value.l <= (ManagedObject*)VM_Global_State::loader_env->heap_end)
         {
             new_value.l = oh_allocate_local_handle();
             new_value.l->object = (ManagedObject*)p_new_value->l;

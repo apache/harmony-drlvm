@@ -29,6 +29,7 @@
 #include "annotations.h"
 #include "jni.h"
 #include "jni_utils.h"
+#include "type.h"
 #include "environment.h"
 #include "reflection.h"
 #include "exceptions.h"
@@ -69,7 +70,7 @@ static Class* field_descriptor_to_type(JNIEnv* jenv, String* desc, Class* clss,
                                        jthrowable* cause = NULL)
 {
     Type_Info_Handle tih = (Type_Info_Handle)
-        type_desc_create_from_java_descriptor(desc->bytes, clss->class_loader);
+        type_desc_create_from_java_descriptor(desc->bytes, clss->get_class_loader());
     if (tih) {
         Class* type = type_info_get_class(tih);
         if (type) {
@@ -114,7 +115,7 @@ jobject resolve_annotation(JNIEnv* jenv, Annotation* antn, Class* clss, jthrowab
     if (!antn_type) {
         return NULL;
     }
-    if (!class_is_annotation(antn_type)) {
+    if (!antn_type->is_annotation()) {
         std::stringstream ss;
         ss << "Non-annotation type : " << antn->type->bytes;
         ThrowNew_Quick(jenv, "java/lang/annotation/AnnotationFormatError", ss.str().c_str());
@@ -198,7 +199,7 @@ static jobject process_enum_value(JNIEnv* jenv, AnnotationValue& value, Class* c
             }
         } else {
             std::stringstream ss;
-            ss << "Invalid enum type " << enum_type->name->bytes
+            ss << "Invalid enum type " << enum_type->get_name()->bytes
                 << " specified for value of element \'" << name->bytes << "\'";
             ThrowNew_Quick(jenv, "java/lang/annotation/AnnotationFormatError", ss.str().c_str());
         }
@@ -279,7 +280,7 @@ static bool process_array_element(JNIEnv* jenv, AnnotationValue& value, Class* a
             // primitive value type does not match array type
             std::stringstream ss;
             ss << "Encountered value tag \'" << (char)value.tag 
-                << "\' does not match array type " << type->name->bytes << "[]";
+                << "\' does not match array type " << type->get_name()->bytes << "[]";
 
             *cause = CreateNewThrowable(jenv, genv->java_lang_ArrayStoreException_Class, 
                 ss.str().c_str(), NULL);
@@ -350,8 +351,8 @@ jobject resolve_annotation_value(JNIEnv* jenv, AnnotationValue& value, Class* an
             // of the element-defining method.
             Class* arr_type = NULL;
             unsigned i;
-            for (i = 0; i < antn_type->n_methods; i++) {
-                Method* m = antn_type->methods + i;
+            for (i = 0; i < antn_type->get_number_of_methods(); i++) {
+                Method* m = antn_type->get_method(i);
                 if (m->get_name() == name && m->get_num_args() == 1) 
                 {
                     Type_Info_Handle tih = method_ret_type_get_type_info(
@@ -366,13 +367,13 @@ jobject resolve_annotation_value(JNIEnv* jenv, AnnotationValue& value, Class* an
                     break;
                 }
             }
-            if (!arr_type || arr_type->n_dimensions != 1) {
+            if (!arr_type || arr_type->get_number_of_dimensions() != 1) {
                 std::stringstream ss;
                 ss << "Invalid array value for element \'" << name->bytes << "\'";
                 ThrowNew_Quick(jenv, "java/lang/annotation/AnnotationFormatError", ss.str().c_str());
                 return NULL;
             }
-            arr_type = arr_type->array_element_class;
+            arr_type = arr_type->get_array_element_class();
 
             jclass jarr_type = struct_Class_to_java_lang_Class_Handle(arr_type);
             jarray array = NewObjectArray(jenv, (jsize)value.array.length, jarr_type, NULL);

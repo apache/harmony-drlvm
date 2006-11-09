@@ -28,6 +28,7 @@
 #include "stack_iterator.h"
 #include "interpreter.h"
 #include "method_lookup.h"
+#include "cci.h"
 #include "open/bytecodes.h"
 #include "open/jthread.h"
 #include "jvmti_break_intf.h"
@@ -317,13 +318,13 @@ jvmti_SingleStepLocation( VM_thread* thread,
             {
                 unsigned short index = jvmti_GetHalfWordValue( bytecode, location + 1 );
                 Class *klass = method_get_class( method );
-                assert( cp_is_resolved(klass->const_pool, index) );
+                assert(klass->get_constant_pool().is_entry_resolved(index));
 
-                if( !method_is_native( klass->const_pool[index].CONSTANT_ref.method ) ) {
+                if(!method_is_native(klass->get_constant_pool().get_ref_method(index))) {
                     *count = 1;
                     error = _allocate( sizeof(jvmti_StepLocation), (unsigned char**)next_step );
                     assert( error == JVMTI_ERROR_NONE );
-                    (*next_step)->method = klass->const_pool[index].CONSTANT_ref.method;
+                    (*next_step)->method = klass->get_constant_pool().get_ref_method(index);
                     (*next_step)->location = 0;
                     (*next_step)->native_location = NULL;
                     (*next_step)->no_event = false;

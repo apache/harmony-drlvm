@@ -38,9 +38,8 @@
  * A function creates handles for the references and passes the handles rather than the references.
  */
 
-
-#include "object_layout.h"
 #include "vm_core_types.h"
+#include "object_layout.h"
 #include "jni.h"
 
 /**

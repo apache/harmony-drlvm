@@ -129,9 +129,9 @@ void ti_trace_heap(TIEnv* ti_env)
 
 bool ti_mark_object(Managed_Object_Handle obj, TIIterationState *state)
 {
-    assert((UDATA)obj < (UDATA)Class::heap_end);
-    assert((UDATA)obj >= (UDATA)Class::heap_base);
-    unsigned offset = (UDATA)obj - (UDATA)Class::heap_base;
+    assert((UDATA)obj < (UDATA)VM_Global_State::loader_env->heap_end);
+    assert((UDATA)obj >= (UDATA)VM_Global_State::loader_env->heap_base);
+    unsigned offset = (UDATA)obj - (UDATA)VM_Global_State::loader_env->heap_base;
     unsigned bitnum = offset / GC_OBJECT_ALIGNMENT;
     unsigned index = bitnum / 8;
     unsigned mask = 1 << (bitnum % 8);

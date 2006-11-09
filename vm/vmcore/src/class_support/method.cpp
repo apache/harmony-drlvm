@@ -31,6 +31,7 @@
 #include "open/vm_util.h"
 #include "jit_intf_cpp.h"
 #include "atomics.h"
+#include "cci.h"
 
 #ifdef _IPF_
 #include "vm_ipf.h"
@@ -77,7 +78,7 @@ Class_Handle get_curr_arg_class(Arg_List_Iterator it,
         n = env->string_pool.lookup(name, len);
     }
     Class* clss = ((Method *)m)->get_class();
-    Class* c = clss->class_loader->LoadClass(env, n);
+    Class* c = clss->get_class_loader()->LoadClass(env, n);
     return c;
 } //get_curr_arg_class
 
@@ -104,19 +105,6 @@ Arg_List_Iterator advance_arg_iterator(Arg_List_Iterator it)
     return iter;
 } //advance_arg_iterator
 
-
-// Return the return type of this method.
-VMEXPORT // temporary solution for interpreter unplug
-Java_Type Method::get_return_java_type()
-{
-    const char *descr = get_descriptor()->bytes;
-    while(*descr != ')')
-        descr++;
-    return (Java_Type)*(descr + 1);
-} //Method::get_return_java_type
-
-
-
 Class_Handle method_get_return_type_class(Method_Handle m)
 {
     assert(hythread_is_suspend_enabled());
@@ -138,7 +126,7 @@ Class_Handle method_get_return_type_class(Method_Handle m)
     }
 
     Class *clss = method->get_class();
-    Class *c = clss->class_loader->LoadVerifyAndPrepareClass(env, n);
+    Class *c = clss->get_class_loader()->LoadVerifyAndPrepareClass(env, n);
     return c;
 } //method_get_return_type_class
 
@@ -162,24 +150,6 @@ Handler::Handler()
     _handler_pc  = 0;
     _catch_type  = NULL;
 } //Handler::Handler
-
-
-VMEXPORT // temporary solution for interpreter unplug
-unsigned Method::num_bc_exception_handlers()
-{
-    return _n_handlers;
-} //Method::num_bc_exception_handlers
-
-
-
-VMEXPORT // temporary solution for interpreter unplug
-Handler *
-Method::get_bc_exception_handler_info(unsigned eh_number)
-{
-    assert(eh_number < _n_handlers);
-    return _handlers + eh_number;
-} //Method::get_bc_exception_handler_info
-
 
 
 void Method::set_num_target_exception_handlers(JIT *jit, unsigned n)
@@ -231,20 +201,11 @@ Method::get_target_exception_handler_info(JIT *jit, unsigned eh_num)
 } //Method::get_target_exception_handler_info
 
 
-
-VMEXPORT // temporary solution for interpreter unplug
-Arg_List_Iterator Method::get_argument_list()
+void Method::calculate_arguments_size()
 {
-    return initialize_arg_list_iterator(get_descriptor()->bytes);
-} //Method::get_argument_list
-
-
-VMEXPORT // temporary solution for interpreter unplug
-unsigned Method::get_num_arg_bytes()
-{
-    // Use this old scheme until we can use the new JIT interface's methods to inspect the types of
-    // each method argument. This requires that these methods support Java, and that
-    // they work during VM's bootstrapping.
+    // Use this old scheme until we can use the new JIT interface's methods
+    // to inspect the types of each method argument. This requires that these
+    // methods support Java, and that they work during VM's bootstrapping.
     unsigned nb = 0;
     if (!is_static()) {
         nb = 4;
@@ -263,8 +224,8 @@ unsigned Method::get_num_arg_bytes()
         }
         iter = advance_arg_iterator(iter);
     }
-    return nb;
-} //Method::get_num_arg_bytes
+    _arguments_size = nb;
+} // Method::get_num_arg_bytes
 
 
 
@@ -780,7 +741,7 @@ void Method::_set_nop()
     Byte *bc = _byte_codes;
     Nop_Stack_State stack_state = NS_StackEmpty;
     if(verbose) {
-        printf("=========== nop[%d]: %s.%s%s\n", len, get_class()->name->bytes, get_name()->bytes, get_descriptor()->bytes);
+        printf("=========== nop[%d]: %s.%s%s\n", len, get_class()->get_name()->bytes, get_name()->bytes, get_descriptor()->bytes);
     }
     for (unsigned idx = 0; idx < len; idx++) {
         Byte b = bc[idx];
@@ -789,7 +750,7 @@ void Method::_set_nop()
         }
         if(b == 0xb1) {   // return
             if(verbose) {
-                printf("+++++++ nop: %s.%s%s\n", get_class()->name->bytes, get_name()->bytes, get_descriptor()->bytes);
+                printf("+++++++ nop: %s.%s%s\n", get_class()->get_name()->bytes, get_name()->bytes, get_descriptor()->bytes);
             }
             _flags.is_nop = TRUE;
             return;
@@ -830,7 +791,7 @@ void Method::_set_nop()
                         return;
                     }
                     if(verbose) {
-                        printf("invokespecial: %s.%s%s\n", callee->get_class()->name->bytes, callee->get_name()->bytes, callee->get_descriptor()->bytes);
+                        printf("invokespecial: %s.%s%s\n", callee->get_class()->get_name()->bytes, callee->get_name()->bytes, callee->get_descriptor()->bytes);
                     }
                     if(!callee->is_nop()) {
                         return;
@@ -840,7 +801,7 @@ void Method::_set_nop()
                         return;
                     }
                     if(verbose) {
-                        printf("invokespecial nop: %s.%s%s\n", callee->get_class()->name->bytes, callee->get_name()->bytes, callee->get_descriptor()->bytes);
+                        printf("invokespecial nop: %s.%s%s\n", callee->get_class()->get_name()->bytes, callee->get_name()->bytes, callee->get_descriptor()->bytes);
                     }
                 }
                 stack_state = NS_StackEmpty;

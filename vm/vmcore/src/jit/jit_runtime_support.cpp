@@ -71,6 +71,9 @@ using namespace std;
 #define OFFSET(Struct, Field) \
     ((POINTER_SIZE_SINT) (&(((Struct *) NULL)->Field) - NULL))
 
+#define OFFSET_INST(inst_ptr, Field) \
+    ((POINTER_SIZE_SINT) ((char*)(&inst_ptr->Field) - (char*)inst_ptr))
+
 // macro that gets the size of a field within a struct or class
 #define SIZE(Struct, Field) \
     (sizeof(((Struct *) NULL)->Field))
@@ -157,19 +160,19 @@ static NativeCodePtr rth_get_lil_multianewarray(int* dyn_count)
 static ManagedObject * rth_ldc_ref_helper(Class *c, unsigned cp_index) 
     {
     ASSERT_THROW_AREA;
-    Const_Pool *cp = c->const_pool;
-    if (cp_is_string(cp, cp_index)) 
+    ConstantPool& cp = c->get_constant_pool();
+    if(cp.is_string(cp_index))
     {
         return vm_instantiate_cp_string_slow(c, cp_index);
     } 
-    else if (cp_is_class(cp, cp_index)) 
+    else if (cp.is_class(cp_index))
     {
         assert(!hythread_is_suspend_enabled());
         hythread_suspend_enable();
 
         Class *objClass = NULL;
         BEGIN_RAISE_AREA;
-        objClass = class_resolve_class(c, cp_index);
+        objClass = c->_resolve_class(VM_Global_State::loader_env, cp_index);
         END_RAISE_AREA;
 
         hythread_suspend_disable();
@@ -253,22 +256,25 @@ static LilCodeStub* rth_gen_lil_type_test(LilCodeStub* cs, RthTypeTestNull null,
     // Null check
     if (null!=RTTN_NoNullCheck) {
         if (null==RTTN_NullMember) {
-            cs = lil_parse_onto_end(cs, "jc i0!=%0i:ref,null_check_faild;", Class::managed_null);
+            cs = lil_parse_onto_end(cs, "jc i0!=%0i:ref,null_check_faild;",
+                VM_Global_State::loader_env->managed_null);
             cs = lil_parse_onto_end(cs, (res==RTTR_ReturnOutcome ? "r=1:g4; ret;" : "r=i0; ret;"));
             cs = lil_parse_onto_end(cs, ":null_check_faild;");
         } else {
-            cs = lil_parse_onto_end(cs, "jc i0=%0i:ref,failed;", Class::managed_null);
+            cs = lil_parse_onto_end(cs, "jc i0=%0i:ref,failed;",
+                VM_Global_State::loader_env->managed_null);
         }
         assert(cs);
     }
 
     // Fast sequence
-    const POINTER_SIZE_INT is_fast_off = (POINTER_SIZE_INT)&((Class*)NULL)->is_suitable_for_fast_instanceof;
-    const POINTER_SIZE_INT depth_off = (POINTER_SIZE_INT)&((Class*)NULL)->depth;
+    Class* dummy = NULL;
+    const size_t is_fast_off = Class::get_offset_of_fast_instanceof_flag(dummy);
+    const size_t depth_off = Class::get_offset_of_depth(dummy);
     const POINTER_SIZE_INT supertable_off = (POINTER_SIZE_INT)&((VTable*)NULL)->superclasses;
     bool do_slow = true;
     if (type) {
-        if (type->is_suitable_for_fast_instanceof) {
+        if(type->get_fast_instanceof_flag()) {
             cs = lil_parse_onto_end(cs,
                 vm_vtable_pointers_are_compressed() ? "ld l0,[i0+%0i:g4],zx;" : "ld l0,[i0+%0i:pint];",
                 vtable_off);            
@@ -276,7 +282,7 @@ static LilCodeStub* rth_gen_lil_type_test(LilCodeStub* cs, RthTypeTestNull null,
             cs = lil_parse_onto_end(cs,
                 "ld l0,[l0+%1i:pint];"
                 "jc l0!=%2i,failed;",
-                vtable_add+supertable_off+sizeof(Class*)*(type->depth-1), type);
+                vtable_add+supertable_off+sizeof(Class*)*(type->get_depth()-1), type);
             do_slow = false;
             assert(cs);
         }
@@ -304,7 +310,7 @@ static LilCodeStub* rth_gen_lil_type_test(LilCodeStub* cs, RthTypeTestNull null,
 
     //*** Slow sequence
     const POINTER_SIZE_INT clss_off = (POINTER_SIZE_INT)&((VTable*)NULL)->clss;
-    Boolean (*p_subclass)(Class_Handle, Class_Handle) = class_is_subclass;
+    Boolean (*p_subclass)(Class_Handle, Class_Handle) = class_is_subtype;
     if (do_slow) {
         cs = lil_parse_onto_end(cs,
             ":slowpath;"
@@ -348,13 +354,13 @@ static void rth_type_test_update_stats(VTable* sub, Class* super)
     VM_Statistics::get_vm_stats().num_type_checks ++;
     if (sub->clss == super)
         VM_Statistics::get_vm_stats().num_type_checks_equal_type ++;
-    if (super->is_suitable_for_fast_instanceof)
+    if (super->get_fast_instanceof_flag())
         VM_Statistics::get_vm_stats().num_type_checks_fast_decision ++;
-    else if (super->is_array)
+    else if (super->is_array())
         VM_Statistics::get_vm_stats().num_type_checks_super_is_array ++;
-    else if (class_is_interface(super))
+    else if (super->is_interface())
         VM_Statistics::get_vm_stats().num_type_checks_super_is_interface ++;
-    else if (super->depth >= vm_max_fast_instanceof_depth())
+    else if (super->get_depth() >= vm_max_fast_instanceof_depth())
         VM_Statistics::get_vm_stats().num_type_checks_super_is_too_deep ++;
 }
 
@@ -362,12 +368,12 @@ static void rth_type_test_update_stats(VTable* sub, Class* super)
 static void rth_update_checkcast_stats(ManagedObject* o, Class* super)
 {
     VM_Statistics::get_vm_stats().num_checkcast ++;
-    if (o == (ManagedObject*)Class::managed_null) {
+    if (o == (ManagedObject*)VM_Global_State::loader_env->managed_null) {
         VM_Statistics::get_vm_stats().num_checkcast_null++;
     } else {
         if (o->vt()->clss == super)
             VM_Statistics::get_vm_stats().num_checkcast_equal_type ++;
-        if (super->is_suitable_for_fast_instanceof)
+        if (super->get_fast_instanceof_flag())
             VM_Statistics::get_vm_stats().num_checkcast_fast_decision ++;
         rth_type_test_update_stats(o->vt(), super);
     }
@@ -377,13 +383,13 @@ static void rth_update_checkcast_stats(ManagedObject* o, Class* super)
 static void rth_update_instanceof_stats(ManagedObject* o, Class* super)
 {
     VM_Statistics::get_vm_stats().num_instanceof++;
-    super->num_instanceof_slow++;
-    if (o == (ManagedObject*)Class::managed_null) {
+    super->instanceof_slow_path_taken();
+    if (o == (ManagedObject*)VM_Global_State::loader_env->managed_null) {
         VM_Statistics::get_vm_stats().num_instanceof_null++;
     } else {
         if (o->vt()->clss == super)
             VM_Statistics::get_vm_stats().num_instanceof_equal_type ++;
-        if (super->is_suitable_for_fast_instanceof)
+        if (super->get_fast_instanceof_flag())
             VM_Statistics::get_vm_stats().num_instanceof_fast_decision ++;
         rth_type_test_update_stats(o->vt(), super);
     }
@@ -400,7 +406,9 @@ static NativeCodePtr rth_get_lil_checkcast(int* dyn_count)
 
 #ifdef VM_STATS
         if (dyn_count) {
-            cs = lil_parse_onto_end(cs, "inc [%0i:pint]; in2out platform:void; call %1i;", dyn_count, rth_update_checkcast_stats);
+            cs = lil_parse_onto_end(cs,
+                "inc [%0i:pint]; in2out platform:void; call %1i;",
+                dyn_count, rth_update_checkcast_stats);
             assert(cs);
         }
 #endif
@@ -453,7 +461,7 @@ static Class* rth_aastore(ManagedObject* elem, int idx, Vector_Handle array)
 #endif // VM_STATS
 
     Global_Env *env = VM_Global_State::loader_env;
-    ManagedObject* null_ref = (ManagedObject*)Class::managed_null;
+    ManagedObject* null_ref = (ManagedObject*)VM_Global_State::loader_env->managed_null;
     if (array == null_ref) {
         return env->java_lang_NullPointerException_Class;
     } else if (((uint32)idx) >= (uint32)get_vector_length(array)) {
@@ -462,17 +470,17 @@ static Class* rth_aastore(ManagedObject* elem, int idx, Vector_Handle array)
         assert(get_vector_vtable(array));
         Class* array_class = get_vector_vtable(array)->clss;
         assert(array_class);
-        assert(array_class->is_array);
+        assert(array_class->is_array());
 #ifdef VM_STATS
         VTable* vt = get_vector_vtable(array);
         if (vt == cached_object_array_vtable_ptr)
             VM_Statistics::get_vm_stats().num_aastore_test_object_array++;
-        if (elem->vt()->clss == array_class->array_element_class)
+        if (elem->vt()->clss == array_class->get_array_element_class())
             VM_Statistics::get_vm_stats().num_aastore_equal_type ++;
-        if (array_class->array_element_class->is_suitable_for_fast_instanceof)
+        if (array_class->get_array_element_class()->get_fast_instanceof_flag())
             VM_Statistics::get_vm_stats().num_aastore_fast_decision ++;
 #endif // VM_STATS
-        if (class_is_subtype_fast(elem->vt(), array_class->array_element_class)) {
+        if (class_is_subtype_fast(elem->vt(), array_class->get_array_element_class())) {
             STORE_REFERENCE((ManagedObject*)array, get_vector_element_address_ref(array, idx), (ManagedObject*)elem);
         } else {
             return env->java_lang_ArrayStoreException_Class;
@@ -535,7 +543,7 @@ static bool rth_aastore_test(ManagedObject* elem, Vector_Handle array)
     VM_Statistics::get_vm_stats().num_aastore_test++;
 #endif // VM_STATS
 
-    ManagedObject* null_ref = (ManagedObject*)Class::managed_null;
+    ManagedObject* null_ref = (ManagedObject*)VM_Global_State::loader_env->managed_null;
     if (array == null_ref) {
         return false;
     }
@@ -556,15 +564,15 @@ static bool rth_aastore_test(ManagedObject* elem, Vector_Handle array)
 
     Class* array_class = vt->clss;
     assert(array_class);
-    assert(array_class->is_array);
+    assert(array_class->is_array());
 
 #ifdef VM_STATS
-    if (elem->vt()->clss == array_class->array_element_class)
+    if (elem->vt()->clss == array_class->get_array_element_class())
         VM_Statistics::get_vm_stats().num_aastore_test_equal_type ++;
-    if (array_class->array_element_class->is_suitable_for_fast_instanceof)
+    if (array_class->get_array_element_class()->get_fast_instanceof_flag())
         VM_Statistics::get_vm_stats().num_aastore_test_fast_decision ++;
 #endif // VM_STATS
-    return (class_is_subtype_fast(elem->vt(), array_class->array_element_class) ? true : false);
+    return (class_is_subtype_fast(elem->vt(), array_class->get_array_element_class()) ? true : false);
 } //rth_aastore_test
 
 static NativeCodePtr rth_get_lil_aastore_test(int * dyn_count)
@@ -641,37 +649,8 @@ static NativeCodePtr rth_get_lil_throw_linking_exception(int* dyn_count)
 // Or NULL if no such interface exists for obj
 static void* rth_get_interface_vtable(ManagedObject* obj, Class* iid)
 {
-    assert(obj && obj->vt());
-    Class* clss = obj->vt()->clss;
-    assert(clss);
-    unsigned num_intfc = clss->n_intfc_table_entries;
-#ifdef VM_STATS
-    VM_Statistics::get_vm_stats().num_invokeinterface_calls++;
-    switch(num_intfc) {
-    case 1:  VM_Statistics::get_vm_stats().num_invokeinterface_calls_size_1++;    break;
-    case 2:  VM_Statistics::get_vm_stats().num_invokeinterface_calls_size_2++;    break;
-    default: VM_Statistics::get_vm_stats().num_invokeinterface_calls_size_many++; break;
-    }
-    if(num_intfc > VM_Statistics::get_vm_stats().invokeinterface_calls_size_max)
-        VM_Statistics::get_vm_stats().invokeinterface_calls_size_max = num_intfc;
-#endif
-    for(unsigned i = 0; i < num_intfc; i++) {
-        Class* intfc = clss->intfc_table_descriptors[i];
-        if(intfc == iid) {
-#ifdef VM_STATS
-            switch(i) {
-            case 0:  VM_Statistics::get_vm_stats().num_invokeinterface_calls_searched_1++;    break;
-            case 1:  VM_Statistics::get_vm_stats().num_invokeinterface_calls_searched_2++;    break;
-            default: VM_Statistics::get_vm_stats().num_invokeinterface_calls_searched_many++; break;
-            }
-            if(i > VM_Statistics::get_vm_stats().invokeinterface_calls_searched_max)
-                VM_Statistics::get_vm_stats().invokeinterface_calls_searched_max = i;
-#endif
-            unsigned char **table = clss->vtable->intfc_table->entry[i].table;
-            return (void *)table;
-        }
-    }
-    return NULL;
+    assert(obj && obj->vt() && obj->vt()->clss);
+    return obj->vt()->clss->helper_get_interface_vtable(obj, iid);
 }
 
 // Get interface vtable helper
@@ -698,7 +677,8 @@ static NativeCodePtr rth_get_lil_get_interface_vtable(int* dyn_count)
             ":null;"
             "r=0;"
             "ret;",
-            Class::managed_null, p_get_ivtable, lil_npc_to_fp(exn_get_rth_throw_incompatible_class_change_exception()));
+            VM_Global_State::loader_env->managed_null, p_get_ivtable,
+            lil_npc_to_fp(exn_get_rth_throw_incompatible_class_change_exception()));
         assert(cs && lil_is_valid(cs));
         addr = LilCodeGenerator::get_platform()->compile(cs);
 
@@ -718,10 +698,10 @@ static POINTER_SIZE_INT is_class_initialized(Class *clss)
 {
 #ifdef VM_STATS
     VM_Statistics::get_vm_stats().num_is_class_initialized++;
-    clss->num_class_init_checks++;
+    clss->initialization_checked();
 #endif // VM_STATS
     assert(!hythread_is_suspend_enabled());
-    return clss->state == ST_Initialized;
+    return clss->is_initialized();
 } //is_class_initialized
 
 void vm_rt_class_initialize(Class *clss)
@@ -2042,44 +2022,34 @@ ManagedObject* vm_rt_class_alloc_new_object(Class *c)
 }
 
 
-ManagedObject *class_alloc_new_object(Class *c)
+ManagedObject* class_alloc_new_object(Class* c)
 {
     ASSERT_RAISE_AREA;
     assert(!hythread_is_suspend_enabled());
-    //hythread_suspend_disable();
-    assert(strcmp(c->name->bytes, "java/lang/Class")); 
-#ifdef VM_STATS
-    VM_Statistics::get_vm_stats().num_class_alloc_new_object++;
-    c->num_allocations++;
-    c->num_bytes_allocated += get_instance_data_size(c);
-#endif //VM_STATS
-    ManagedObject* o = (ManagedObject *)
-        gc_alloc(c->instance_data_size, 
-            c->allocation_handle, vm_get_gc_thread_local());
-    if (!o) {
+    assert(strcmp(c->get_name()->bytes, "java/lang/Class")); 
+
+    ManagedObject* obj = c->allocate_instance();
+    if(!obj) {
         exn_raise_object(
             VM_Global_State::loader_env->java_lang_OutOfMemoryError);
-        //hythread_suspend_enable();
-        return 0; // whether this return is reached or not is solved via is_unwindable state
+        return NULL; // whether this return is reached or not is solved via is_unwindable state
     }
-     //hythread_suspend_enable();
-     return o;
-} //class_alloc_new_object
+     return obj;
+} // class_alloc_new_object
 
 ManagedObject *class_alloc_new_object_using_vtable(VTable *vtable)
 {
     ASSERT_RAISE_AREA;
     assert(!hythread_is_suspend_enabled());
-    assert(strcmp(vtable->clss->name->bytes, "java/lang/Class")); 
+    assert(strcmp(vtable->clss->get_name()->bytes, "java/lang/Class")); 
 #ifdef VM_STATS
     VM_Statistics::get_vm_stats().num_class_alloc_new_object++;
-    vtable->clss->num_allocations++;
-    vtable->clss->num_bytes_allocated += vtable->allocated_size;
+    vtable->clss->instance_allocated(vtable->allocated_size);
 #endif //VM_STATS
     // From vm_types.h: this is the same as instance_data_size with the constraint bit cleared.
-    ManagedObject* o = (ManagedObject *) vm_alloc_and_report_ti(
-            vtable->allocated_size, vtable->clss->allocation_handle, 
-            vm_get_gc_thread_local(), vtable->clss);
+    ManagedObject* o = (ManagedObject*) vm_alloc_and_report_ti(
+        vtable->allocated_size, vtable->clss->get_allocation_handle(),
+        vm_get_gc_thread_local(), vtable->clss);
     if (!o) {
         exn_raise_object(
             VM_Global_State::loader_env->java_lang_OutOfMemoryError);
@@ -2088,48 +2058,42 @@ ManagedObject *class_alloc_new_object_using_vtable(VTable *vtable)
     return o;
 } //class_alloc_new_object_using_vtable
 
-ManagedObject *class_alloc_new_object_and_run_default_constructor(Class *clss)
+ManagedObject* class_alloc_new_object_and_run_default_constructor(Class* clss)
 {
     return class_alloc_new_object_and_run_constructor(clss, 0, 0);
-} //class_alloc_new_object_and_run_default_constructor
+} // class_alloc_new_object_and_run_default_constructor
 
-ManagedObject *
-class_alloc_new_object_and_run_constructor(Class *clss,
-                                           Method *constructor,
-                                           uint8 *constructor_args)
+ManagedObject*
+class_alloc_new_object_and_run_constructor(Class* clss,
+                                           Method* constructor,
+                                           uint8* constructor_args)
 {
     ASSERT_RAISE_AREA;
     assert(!hythread_is_suspend_enabled());
-    assert(strcmp(clss->name->bytes, "java/lang/Class"));
- 
+    assert(strcmp(clss->get_name()->bytes, "java/lang/Class"));
+
     ObjectHandle obj = oh_allocate_local_handle();
-    obj->object = (ManagedObject*)
-        gc_alloc(clss->instance_data_size, clss->allocation_handle, vm_get_gc_thread_local());
-    if (!obj->object) {
+    obj->object = clss->allocate_instance();
+    if(!obj->object) {
         exn_raise_object(
             VM_Global_State::loader_env->java_lang_OutOfMemoryError);
-        return 0; // should never be reached
+        return NULL;
     }
-#ifdef VM_STATS
-    clss->num_allocations++;
-    clss->num_bytes_allocated += get_instance_data_size(clss);
-#endif //VM_STATS
 
     if(!constructor) {
         // Get the default constructor
-        Global_Env *env = VM_Global_State::loader_env;
-        constructor = class_lookup_method(clss, env->Init_String, env->VoidVoidDescriptor_String);
+        Global_Env* env = VM_Global_State::loader_env;
+        constructor = clss->lookup_method(env->Init_String, env->VoidVoidDescriptor_String);
         assert(constructor);
     }
 
-
     // Every argument is at least 4 bytes long
     int num_args_estimate = constructor->get_num_arg_bytes() / 4;
-    jvalue *args = (jvalue*)STD_MALLOC(num_args_estimate * sizeof(jvalue));
-    args[0].l = (jobject) obj;
+    jvalue* args = (jvalue*)STD_MALLOC(num_args_estimate * sizeof(jvalue));
+    args[0].l = (jobject)obj;
 
     int arg_num = 1;
-    uint8 *argp = constructor_args;
+    uint8* argp = constructor_args;
     Arg_List_Iterator iter = constructor->get_argument_list();
     Java_Type typ;
     while((typ = curr_arg(iter)) != JAVA_TYPE_END) {
@@ -2185,7 +2149,7 @@ class_alloc_new_object_and_run_constructor(Class *clss,
     }
     assert(!hythread_is_suspend_enabled());
     vm_execute_java_method_array((jmethodID) constructor, 0, args);
-    
+
     if (exn_raised()) {
         DIE("class constructor has thrown an exception");
     }
@@ -2208,17 +2172,17 @@ class_alloc_new_object_and_run_constructor(Class *clss,
 static void update_general_type_checking_stats(VTable *sub, Class *super)
 {
 #ifdef VM_STATS
-    VM_Statistics::get_vm_stats().num_type_checks ++;
+    VM_Statistics::get_vm_stats().num_type_checks++;
     if (sub->clss == super)
-        VM_Statistics::get_vm_stats().num_type_checks_equal_type ++;
-    if (super->is_suitable_for_fast_instanceof)
-        VM_Statistics::get_vm_stats().num_type_checks_fast_decision ++;
-    else if (super->is_array)
-        VM_Statistics::get_vm_stats().num_type_checks_super_is_array ++;
-    else if (class_is_interface(super))
-        VM_Statistics::get_vm_stats().num_type_checks_super_is_interface ++;
-    else if (super->depth >= vm_max_fast_instanceof_depth())
-        VM_Statistics::get_vm_stats().num_type_checks_super_is_too_deep ++;
+        VM_Statistics::get_vm_stats().num_type_checks_equal_type++;
+    if (super->get_fast_instanceof_flag())
+        VM_Statistics::get_vm_stats().num_type_checks_fast_decision++;
+    else if (super->is_array())
+        VM_Statistics::get_vm_stats().num_type_checks_super_is_array++;
+    else if (super->is_interface())
+        VM_Statistics::get_vm_stats().num_type_checks_super_is_interface++;
+    else if (super->get_depth() >= vm_max_fast_instanceof_depth())
+        VM_Statistics::get_vm_stats().num_type_checks_super_is_too_deep++;
 #endif // VM_STATS
 }
 
@@ -2226,14 +2190,14 @@ void vm_instanceof_update_stats(ManagedObject *obj, Class *super)
 {
 #ifdef VM_STATS
     VM_Statistics::get_vm_stats().num_instanceof++;
-    super->num_instanceof_slow++;
-    if (obj == (ManagedObject *)Class::managed_null)
+    super->instanceof_slow_path_taken();
+    if (obj == (ManagedObject*)VM_Global_State::loader_env->managed_null)
         VM_Statistics::get_vm_stats().num_instanceof_null++;
     else
     {
         if (obj->vt()->clss == super)
             VM_Statistics::get_vm_stats().num_instanceof_equal_type ++;
-        if (super->is_suitable_for_fast_instanceof)
+        if (super->get_fast_instanceof_flag())
             VM_Statistics::get_vm_stats().num_instanceof_fast_decision ++;
         update_general_type_checking_stats(obj->vt(), super);
     }
@@ -2244,13 +2208,13 @@ void vm_checkcast_update_stats(ManagedObject *obj, Class *super)
 {
 #ifdef VM_STATS
     VM_Statistics::get_vm_stats().num_checkcast ++;
-    if (obj == (ManagedObject *)Class::managed_null)
+    if (obj == (ManagedObject*)VM_Global_State::loader_env->managed_null)
         VM_Statistics::get_vm_stats().num_checkcast_null++;
     else
     {
         if (obj->vt()->clss == super)
             VM_Statistics::get_vm_stats().num_checkcast_equal_type ++;
-        if (super->is_suitable_for_fast_instanceof)
+        if (super->get_fast_instanceof_flag())
             VM_Statistics::get_vm_stats().num_checkcast_fast_decision ++;
         update_general_type_checking_stats(obj->vt(), super);
     }
@@ -2385,12 +2349,13 @@ static LilCodeStub* gen_lil_typecheck_fastpath(LilCodeStub *cs,
             object_get_vtable_offset());
     }
 
+    Class* dummy = NULL;
     cs2 = lil_parse_onto_end
         (cs2,
          "ld l1, [i1 + %0i: g4],zx;"
          "ld l2, [l0 + %1i*l1 + %2i: pint];"
          "jc i1 != l2, failed;",
-         OFFSET(Class, depth),
+         Class::get_offset_of_depth(dummy),
          sizeof(Class*),
          OFFSET(VTable, superclasses) - sizeof(Class*) + (vm_vtable_pointers_are_compressed() ? vm_get_vtable_base() : 0)
          );
@@ -2430,12 +2395,8 @@ static LilCodeStub* gen_lil_typecheck_fastpath(LilCodeStub *cs,
 
 // creates a LIL code stub for checkcast or instanceof
 // can be used by both IA32 and IPF code
-LilCodeStub *gen_lil_typecheck_stub(bool is_checkcast) {
-
-    // assert that some sizes are what we expect them to be
-    assert(SIZE(Class, is_suitable_for_fast_instanceof) == 4);
-    assert(SIZE(Class, depth) == 4);
-
+LilCodeStub *gen_lil_typecheck_stub(bool is_checkcast)
+{
     LilCodeStub* cs = NULL;
 
     // check if object address is NULL
@@ -2446,7 +2407,7 @@ LilCodeStub *gen_lil_typecheck_stub(bool is_checkcast) {
          "jc i0!=%0i:ref,nonnull;"
          "r=i0;"  // return obj if obj==NULL
          "ret;",
-         Class::managed_null);
+         VM_Global_State::loader_env->managed_null);
     }
     else {
         // args: ManagedObject *obj, Class *super; returns a boolean
@@ -2455,9 +2416,10 @@ LilCodeStub *gen_lil_typecheck_stub(bool is_checkcast) {
          "jc i0!=%0i:ref,nonnull;"
          "r=0:g4;"  // return FALSE if obj==NULL
          "ret;",
-         Class::managed_null);
+         VM_Global_State::loader_env->managed_null);
     }
 
+    Class* dummy = NULL;
     // check whether the fast or the slow path is appropriate
     cs = lil_parse_onto_end
         (cs,
@@ -2466,7 +2428,7 @@ LilCodeStub *gen_lil_typecheck_stub(bool is_checkcast) {
          // check if super->is_suitable_for_fast_instanceof
          "ld l0, [i1 + %0i: g4];"
          "jc l0!=0:g4, fast;",
-         OFFSET(Class, is_suitable_for_fast_instanceof));
+         Class::get_offset_of_fast_instanceof_flag(dummy));
 
     // append the slow path right here
     cs = gen_lil_typecheck_slowpath(cs, is_checkcast);
@@ -2506,7 +2468,7 @@ LilCodeStub *gen_lil_typecheck_stub_specialized(bool is_checkcast,
          "jc i0!=%0i,nonnull;"
          "r=i0;"  // return obj if obj==NULL
          "ret;",
-         Class::managed_null);
+         VM_Global_State::loader_env->managed_null);
     }
     else {
         // args: ManagedObject *obj, Class *super; returns a boolean
@@ -2515,7 +2477,7 @@ LilCodeStub *gen_lil_typecheck_stub_specialized(bool is_checkcast,
          "jc i0!=%0i,nonnull;"
          "r=0:g4;"  // return FALSE if obj==NULL
          "ret;",
-         Class::managed_null);
+         VM_Global_State::loader_env->managed_null);
     }
 
     /* fast case; check whether
@@ -2550,7 +2512,7 @@ LilCodeStub *gen_lil_typecheck_stub_specialized(bool is_checkcast,
          "ld l1, [l0 + %0i: ref];"
          "jc l1 != %1i, failed;",
          OFFSET(VTable, superclasses) + (vm_vtable_pointers_are_compressed() ? vm_get_vtable_base() : 0)
-         + sizeof(Class*) * (superclass->depth-1),
+         + sizeof(Class*)*(superclass->get_depth()-1),
          (POINTER_SIZE_INT) superclass);
 
     if (is_checkcast) {
@@ -2595,7 +2557,7 @@ void vm_aastore_test_update_stats(ManagedObject *elem, Vector_Handle array)
 {
 #ifdef VM_STATS
     VM_Statistics::get_vm_stats().num_aastore_test++;
-    if (elem == (ManagedObject *)Class::managed_null)
+    if(elem == (ManagedObject*)VM_Global_State::loader_env->managed_null)
     {
         VM_Statistics::get_vm_stats().num_aastore_test_null ++;
         return;
@@ -2607,43 +2569,24 @@ void vm_aastore_test_update_stats(ManagedObject *elem, Vector_Handle array)
         return;
     }
     Class *array_class = vt->clss;
-    if (elem->vt()->clss == array_class->array_element_class)
+    if (elem->vt()->clss == array_class->get_array_element_class())
         VM_Statistics::get_vm_stats().num_aastore_test_equal_type ++;
-    if (array_class->array_element_class->is_suitable_for_fast_instanceof)
+    if (array_class->get_array_element_class()->get_fast_instanceof_flag())
         VM_Statistics::get_vm_stats().num_aastore_test_fast_decision ++;
-    update_general_type_checking_stats(elem->vt(), array_class->array_element_class);
+    update_general_type_checking_stats(elem->vt(), array_class->get_array_element_class());
 #endif
 }
-
-
-// Returns TRUE if "sub" represents a class that is a subtype of "super",
-// according to the Java instanceof rules.
-// "sub" must correspond to a non-interface type, since interfaces
-// currently have a null vtable.
-// 
-// No VM_STATS calculations are done here.  Call class_is_subtype_fast
-// if stats are needed.
- static Boolean class_is_subtype_fast_no_stats(VTable *sub, Class *super)
-{
-    assert(sub != NULL); // Might happen if vtable of an interface class is accidentally taken.
-    if (super->is_suitable_for_fast_instanceof)
-    {
-        return sub->superclasses[super->depth-1] == super ? TRUE : FALSE;
-    }
-    return class_is_subtype(sub->clss, super);
-} // class_is_subtype_fast_no_stats
-
 
 
 Boolean class_is_subtype_fast(VTable *sub, Class *super)
 {
     update_general_type_checking_stats(sub, super);
-    return class_is_subtype_fast_no_stats(sub, super);
+    return sub->clss->is_instanceof(super);
 } // class_is_subtype_fast
 
 
 Boolean vm_instanceof_class(Class *s, Class *t) {
-    return class_is_subtype(s, t);
+    return s->is_instanceof(t);
 }
 
 
@@ -2662,8 +2605,7 @@ Boolean class_is_subtype(Class *s, Class *t)
     Class *object_class = env->JavaLangObject_Class;
     assert(object_class != NULL);
 
-    if(s->is_array) {
-        assert(*s->name->bytes == '[');
+    if(s->is_array()) {
         if (t == object_class) {
             return TRUE;
         }
@@ -2673,26 +2615,25 @@ Boolean class_is_subtype(Class *s, Class *t)
         if(t == env->java_lang_Cloneable_Class) {
             return TRUE;
         }
-        if(!t->is_array) {
+        if(!t->is_array()) {
             return FALSE;
         }
 
-        return class_is_subtype(s->array_element_class, t->array_element_class);
+        return class_is_subtype(s->get_array_element_class(), t->get_array_element_class());
     } else {
-        assert(s->name->bytes[0] != '[');
-        if(!class_is_interface(t)) {
-            for(Class *c = s; c; c = c->super_class) {
+        if(!t->is_interface()) {
+            for(Class *c = s; c; c = c->get_super_class()) {
                 if(c == t){
                     return TRUE;
                 }
             }
         } else {
-            for(Class *c = s; c; c = c->super_class) {
-                unsigned n_intf = c->n_superinterfaces;
+            for(Class *c = s; c; c = c->get_super_class()) {
+                unsigned n_intf = c->get_number_of_superinterfaces();
                 for(unsigned i = 0; i < n_intf; i++) {
-                    Class *intf = c->superinterfaces[i].clss;
+                    Class* intf = c->get_superinterface(i);
                     assert(intf);
-                    assert(class_is_interface(intf));
+                    assert(intf->is_interface());
                     if(class_is_subtype(intf, t)) {
                         return TRUE;
                     }
@@ -2714,10 +2655,10 @@ int __stdcall vm_instanceof(ManagedObject *obj, Class *c)
 
 #ifdef VM_STATS
     VM_Statistics::get_vm_stats().num_instanceof++;
-    c->num_instanceof_slow++;
+    c->instanceof_slow_path_taken();
 #endif
 
-    ManagedObject *null_ref = (ManagedObject *)Class::managed_null;
+    ManagedObject *null_ref = (ManagedObject *)VM_Global_State::loader_env->managed_null;
     if (obj == null_ref) {
 #ifdef VM_STATS
         VM_Statistics::get_vm_stats().num_instanceof_null++;
@@ -2728,7 +2669,7 @@ int __stdcall vm_instanceof(ManagedObject *obj, Class *c)
 #ifdef VM_STATS
     if (obj->vt()->clss == c)
         VM_Statistics::get_vm_stats().num_instanceof_equal_type ++;
-    if (c->is_suitable_for_fast_instanceof)
+    if (c->get_fast_instanceof_flag())
         VM_Statistics::get_vm_stats().num_instanceof_fast_decision ++;
 #endif // VM_STATS
     return class_is_subtype_fast(obj->vt(), c);
@@ -2753,7 +2694,7 @@ vm_aastore_test(ManagedObject *elem,
     VM_Statistics::get_vm_stats().num_aastore_test++;
 #endif // VM_STATS
 
-    ManagedObject *null_ref = (ManagedObject *)Class::managed_null;
+    ManagedObject *null_ref = (ManagedObject *)VM_Global_State::loader_env->managed_null;
     if (array == null_ref) {
         return 0;
     }
@@ -2774,15 +2715,15 @@ vm_aastore_test(ManagedObject *elem,
 
     Class *array_class = vt->clss;
     assert(array_class);
-    assert(array_class->is_array);
+    assert(array_class->is_array());
 
 #ifdef VM_STATS
-    if (elem->vt()->clss == array_class->array_element_class)
+    if (elem->vt()->clss == array_class->get_array_element_class())
         VM_Statistics::get_vm_stats().num_aastore_test_equal_type ++;
-    if (array_class->array_element_class->is_suitable_for_fast_instanceof)
+    if (array_class->get_array_element_class()->get_fast_instanceof_flag())
         VM_Statistics::get_vm_stats().num_aastore_test_fast_decision ++;
 #endif // VM_STATS
-    return class_is_subtype_fast(elem->vt(), array_class->array_element_class);
+    return class_is_subtype_fast(elem->vt(), array_class->get_array_element_class());
 } //vm_aastore_test
 
 
@@ -2796,7 +2737,7 @@ vm_rt_aastore(ManagedObject *elem, int idx, Vector_Handle array)
 #endif // VM_STATS
 
     Global_Env *env = VM_Global_State::loader_env;
-    ManagedObject *null_ref = (ManagedObject *)Class::managed_null;
+    ManagedObject *null_ref = (ManagedObject *)VM_Global_State::loader_env->managed_null;
     if (array == null_ref) {
         return env->java_lang_NullPointerException_Class;
     } else if (((uint32)idx) >= (uint32)get_vector_length(array)) {
@@ -2804,15 +2745,15 @@ vm_rt_aastore(ManagedObject *elem, int idx, Vector_Handle array)
     } else if (elem != null_ref) {
         Class *array_class = get_vector_vtable(array)->clss;
         assert(array_class);
-        assert(array_class->is_array);
+        assert(array_class->is_array());
 #ifdef VM_STATS
         // XXX - Should update VM_Statistics::get_vm_stats().num_aastore_object_array
-        if (elem->vt()->clss == array_class->array_element_class)
+        if (elem->vt()->clss == array_class->get_array_element_class())
             VM_Statistics::get_vm_stats().num_aastore_equal_type ++;
-        if (array_class->array_element_class->is_suitable_for_fast_instanceof)
+        if (array_class->get_array_element_class()->get_fast_instanceof_flag())
             VM_Statistics::get_vm_stats().num_aastore_fast_decision ++;
 #endif // VM_STATS
-        if (class_is_subtype_fast(elem->vt(), array_class->array_element_class)) {
+        if (class_is_subtype_fast(elem->vt(), array_class->get_array_element_class())) {
             STORE_REFERENCE((ManagedObject *)array, get_vector_element_address_ref(array, idx), (ManagedObject *)elem);
         } else {
             return env->java_lang_ArrayStoreException_Class;

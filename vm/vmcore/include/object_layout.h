@@ -39,6 +39,51 @@ typedef struct VTable VTable;
 extern "C" {
 #endif
 
+/// Raw and compressed reference pointers
+
+typedef ManagedObject*  RAW_REFERENCE;
+typedef uint32          COMPRESSED_REFERENCE;
+
+VMEXPORT bool is_compressed_reference(COMPRESSED_REFERENCE value);
+VMEXPORT bool is_null_compressed_reference(COMPRESSED_REFERENCE value);
+
+VMEXPORT COMPRESSED_REFERENCE compress_reference(ManagedObject *obj);
+VMEXPORT ManagedObject* uncompress_compressed_reference(COMPRESSED_REFERENCE compressed_ref);
+VMEXPORT ManagedObject* get_raw_reference_pointer(ManagedObject **slot_addr);
+
+// Store the reference "VALUE" in the slot at address "SLOT_ADDR"
+// in the object "CONTAINING_OBJECT".
+// Signature: void store_reference(ManagedObject* CONTAINING_OBJECT,
+//                                 ManagedObject** SLOT_ADDR,
+//                                 ManagedObject* VALUE);
+#define STORE_REFERENCE(CONTAINING_OBJECT, SLOT_ADDR, VALUE)                                  \
+    {                                                                                         \
+        if (VM_Global_State::loader_env->compress_references) {                               \
+            gc_heap_slot_write_ref_compressed((Managed_Object_Handle)(CONTAINING_OBJECT),     \
+                                              (uint32*)(SLOT_ADDR),                           \
+                                              (Managed_Object_Handle)(VALUE));                \
+        } else {                                                                              \
+            gc_heap_slot_write_ref((Managed_Object_Handle)(CONTAINING_OBJECT),                \
+                                   (Managed_Object_Handle*)(SLOT_ADDR),                      \
+                                   (Managed_Object_Handle)(VALUE));                           \
+        }                                                                                     \
+    }
+
+// Store the reference "VALUE" in the static field or
+// other global slot at address "SLOT_ADDR".
+// Signature: void store_global_reference(COMPRESSED_REFERENCE* SLOT_ADDR,
+//                                        ManagedObject* VALUE);
+#define STORE_GLOBAL_REFERENCE(SLOT_ADDR, VALUE)                              \
+    {                                                                         \
+        if (VM_Global_State::loader_env->compress_references) {               \
+            gc_heap_write_global_slot_compressed((uint32*)(SLOT_ADDR),        \
+                (Managed_Object_Handle)(VALUE));                              \
+        } else {                                                              \
+            gc_heap_write_global_slot((Managed_Object_Handle*)(SLOT_ADDR),    \
+                                      (Managed_Object_Handle)(VALUE));        \
+        }                                                                     \
+    }
+
 
 // The object layout is currently as follows
 //

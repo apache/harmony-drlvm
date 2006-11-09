@@ -130,9 +130,9 @@ JNIEXPORT jclass JNICALL Java_java_lang_VMClassRegistry_findLoadedClass
     int primitives_len = sizeof(primitives) / sizeof(Class*);
 
     for (int i = 0; i < primitives_len; i++) {
-        if (primitives[i] && primitives[i]->name) {
-            char *pname = (char*)primitives[i]->name->bytes;
-            if (0 == strcmp(buf, pname)) { 
+        if (primitives[i] && primitives[i]->get_name()) {
+            char *pname = (char*)primitives[i]->get_name()->bytes;
+            if (0 == strcmp(buf, pname)) {
                 STD_FREE(buf);
                 return NULL;
             }
@@ -201,7 +201,7 @@ JNIEXPORT jclass JNICALL Java_java_lang_VMClassRegistry_getComponentType
   (JNIEnv *jenv, jclass, jclass clazz)
 {
     Class_Handle ch = jni_get_class_handle(jenv, clazz);
-    Class *pCompClass = ((Class*)ch)->array_element_class;
+    Class* pCompClass = ch->get_array_element_class();
     return jni_class_from_handle(jenv, pCompClass);
 }
 
@@ -323,7 +323,7 @@ JNIEXPORT jint JNICALL Java_java_lang_VMClassRegistry_getModifiers
   (JNIEnv *jenv, jclass, jclass clazz)
 {
     Class_Handle clss = jni_get_class_handle(jenv, clazz);
-    return class_get_flags(clss) & (~ACC_SUPER);
+    return clss->get_access_flags() & (~ACC_SUPER);
 }
 
 /*
@@ -336,7 +336,7 @@ JNIEXPORT jstring JNICALL Java_java_lang_VMClassRegistry_getName
 {
     ASSERT_RAISE_AREA;
     Class* clss = jclass_to_struct_Class(clazz);
-    String* str = class_get_java_name(clss, VM_Global_State::loader_env);
+    String* str = clss->get_java_name();
     return String_to_interned_jstring(str);
 }
 
@@ -350,12 +350,12 @@ JNIEXPORT jclass JNICALL Java_java_lang_VMClassRegistry_getSuperclass
 {
     Class *clss = jni_get_class_handle(jenv, clazz);
 
-    if (class_is_interface (clss) || clss->is_primitive || !clss->super_class) {
+    if (clss->is_interface() || clss->is_primitive() || !clss->has_super_class()) {
         // Interfaces and primitive classes have no superclasses.
         return (jclass)0;
     }
 
-    return jni_class_from_handle(jenv, clss->super_class);
+    return jni_class_from_handle(jenv, clss->get_super_class());
 }
 
 /*
@@ -393,7 +393,7 @@ JNIEXPORT jobjectArray JNICALL Java_java_lang_VMClassRegistry_getSystemPackages
     cl->Unlock();
 
     jclass string_class = struct_Class_to_java_lang_Class_Handle(genv->JavaLangString_Class);
-    static Class* aos = genv->LoadCoreClass(genv->string_pool.lookup("[Ljava/lang/String;"));
+    static Class* aos = genv->LoadCoreClass("[Ljava/lang/String;");
     jclass string_array_class = struct_Class_to_java_lang_Class_Handle(aos);
     assert(string_class);
     assert(string_array_class);
@@ -600,17 +600,17 @@ JNIEXPORT jclass JNICALL Java_java_lang_VMClassRegistry_getEnclosingClass
 {
     assert(jclazz);
     Class* clazz = jclass_to_struct_Class(jclazz);
-    unsigned idx = clazz->enclosing_class_index;
+    unsigned idx = clazz->get_enclosing_class_index();
     if (!idx) {
-        idx = clazz->declaringclass_index;
+        idx = clazz->get_declaring_class_index();
     }
     if (idx) {
-        Class* outer_clss = class_resolve_class(clazz, idx);
+        Class* outer_clss = clazz->_resolve_class(VM_Global_State::loader_env, idx);
         if (outer_clss) {
-            return struct_Class_to_java_lang_Class_Handle(outer_clss);
+            return struct_Class_to_jclass(outer_clss);
         }
         if (!exn_raised()) {
-            exn_raise_object(class_get_linking_error(clazz, idx));
+            exn_raise_object(clazz->get_constant_pool().get_error_cause(idx));
         }
     } 
     return NULL;
@@ -626,20 +626,20 @@ JNIEXPORT jobject JNICALL Java_java_lang_VMClassRegistry_getEnclosingMember
 {
     assert(jclazz);
     Class* clazz = jclass_to_struct_Class(jclazz);
-    unsigned m_idx = clazz->enclosing_method_index;
-    if (m_idx) {
-        unsigned c_idx = clazz->enclosing_class_index;
+    unsigned method_idx = clazz->get_enclosing_method_index();
+    if (method_idx) {
+        unsigned c_idx = clazz->get_enclosing_class_index();
         ASSERT(c_idx, "No class for enclosing method");
-        Class* outer_clss = class_resolve_class(clazz, c_idx);
+        Class* outer_clss = clazz->_resolve_class(VM_Global_State::loader_env, c_idx);
         if (outer_clss) 
         {
-            String* name = clazz->const_pool[m_idx].CONSTANT_NameAndType.name;
-            String* desc = clazz->const_pool[m_idx].CONSTANT_NameAndType.descriptor;
+            String* name = clazz->get_constant_pool().get_name_and_type_name(method_idx);
+            String* desc = clazz->get_constant_pool().get_name_and_type_descriptor(method_idx);
 
-            TRACE("Looking for enclosing method: class="<<outer_clss->name->bytes 
+            TRACE("Looking for enclosing method: class="<<outer_clss->get_name()->bytes 
                 <<"; name="<<name->bytes<<"; desc="<<desc->bytes);
 
-            Method* enclosing = class_lookup_method(outer_clss, name, desc);
+            Method* enclosing = outer_clss->lookup_method(name, desc);
             if (enclosing) 
             {
                 if (enclosing->is_init()) 
@@ -656,7 +656,7 @@ JNIEXPORT jobject JNICALL Java_java_lang_VMClassRegistry_getEnclosingMember
                     "Invalid enclosing method declared");
             }
         } else if (!exn_raised()) {
-            exn_raise_object(class_get_linking_error(clazz, c_idx));
+            exn_raise_object(clazz->get_constant_pool().get_error_cause(c_idx));
         }
     } 
     return NULL;
@@ -673,6 +673,6 @@ JNIEXPORT jstring JNICALL Java_java_lang_VMClassRegistry_getSimpleName
     ASSERT_RAISE_AREA;
     assert(jclazz);
     Class* clazz = jclass_to_struct_Class(jclazz);
-    String* str = class_get_simple_name(clazz, VM_Global_State::loader_env);
+    String* str = clazz->get_simple_name();
     return str ? String_to_interned_jstring(str) : NULL;
 }

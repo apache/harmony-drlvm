@@ -253,7 +253,7 @@ void CodeGen::do_field_op(JavaByteCodes opcode, jtype jt, Field_Handle fld)
     }
     else {
         // static s
-        char * fld_addr = fld ? (char*)field_get_addr(fld) : NULL;
+        char * fld_addr = fld ? (char*)field_get_address(fld) : NULL;
         where = vaddr(jt, fld_addr);
     }
     rlock(where);

@@ -50,7 +50,7 @@ extern bool interpreter_enable_debug;
 
 #define ASSERT_TAGS(a)
 
-#define ASSERT_OBJECT(a) assert((a == 0) || ((*((a)->vt()->clss->class_handle))->vt()->clss == VM_Global_State::loader_env->JavaLangClass_Class))
+#define ASSERT_OBJECT(a) assert((a == 0) || ((*((a)->vt()->clss->get_class_handle()))->vt()->clss == VM_Global_State::loader_env->JavaLangClass_Class))
 
 #ifndef INTERPRETER_USE_MALLOC_ALLOCATION
 #define ALLOC_FRAME(sz) alloca(sz)

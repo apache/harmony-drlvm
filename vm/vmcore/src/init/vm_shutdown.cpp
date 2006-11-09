@@ -23,6 +23,7 @@
 
 #include "open/hythread.h"
 #include "open/jthread.h"
+#include "open/gc.h"
 
 #include "jni.h"
 #include "jni_direct.h"

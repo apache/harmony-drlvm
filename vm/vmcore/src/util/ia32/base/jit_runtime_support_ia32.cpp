@@ -91,7 +91,7 @@ static void update_checkcast_stats(ManagedObject *obj, Class *c)
         VM_Statistics::get_vm_stats().num_checkcast_null ++;
     if (obj != NULL && obj->vt()->clss == c)
         VM_Statistics::get_vm_stats().num_checkcast_equal_type ++;
-    if (obj != NULL && c->is_suitable_for_fast_instanceof)
+    if (obj != NULL && c->get_fast_instanceof_flag())
         VM_Statistics::get_vm_stats().num_checkcast_fast_decision ++;
 } //update_checkcast_stats
 #endif
@@ -130,7 +130,7 @@ static void *getaddress__vm_checkcast_naked()
 
     ss = mov(ss,  eax_opnd,  M_Base_Opnd(esp_reg, +4) );
     if (VM_Global_State::loader_env->compress_references) {
-        ss = alu(ss, cmp_opc,  eax_opnd,  Imm_Opnd((unsigned)Class::heap_base)); //is eax == NULL?
+        ss = alu(ss, cmp_opc,  eax_opnd,  Imm_Opnd((unsigned)VM_Global_State::loader_env->heap_base)); //is eax == NULL?
         ss = branch8(ss, Condition_NZ,  Imm_Opnd(size_8, 0));
     } else {
         ss = test(ss,  eax_opnd,  eax_opnd);
@@ -212,10 +212,10 @@ static Boolean is_class_initialized(Class *clss)
 {
 #ifdef VM_STATS
     VM_Statistics::get_vm_stats().num_is_class_initialized++;
-    clss->num_class_init_checks++;
+    clss->initialization_checked();
 #endif // VM_STATS
     assert(!hythread_is_suspend_enabled());
-    return clss->state == ST_Initialized;
+    return clss->is_initialized();
 } //is_class_initialized
 
 
@@ -505,10 +505,10 @@ aastore_ia32(volatile ManagedObject *elem,
 {
     if (VM_Global_State::loader_env->compress_references) {
         // 20030321 Convert a null reference from a managed (heap_base) to an unmanaged null (NULL/0).
-        if (elem == (volatile ManagedObject *)Class::heap_base) {
+        if (elem == (volatile ManagedObject *)VM_Global_State::loader_env->heap_base) {
             elem = NULL;
         }
-        if (array == (ManagedObject *)Class::heap_base) {
+        if (array == (ManagedObject *)VM_Global_State::loader_env->heap_base) {
             array = NULL;
         }
     }
@@ -529,13 +529,14 @@ aastore_ia32(volatile ManagedObject *elem,
 #ifdef VM_STATS
             if (vt == cached_object_array_vtable_ptr)
                 VM_Statistics::get_vm_stats().num_aastore_object_array ++;
-            if (vt->clss->array_element_class->vtable == ((ManagedObject *)elem)->vt())
+            if (vt->clss->get_array_element_class()->get_vtable() == ((ManagedObject *)elem)->vt())
                 VM_Statistics::get_vm_stats().num_aastore_equal_type ++;
-            if (vt->clss->array_element_class->is_suitable_for_fast_instanceof)
+            if (vt->clss->get_array_element_class()->get_fast_instanceof_flag())
                 VM_Statistics::get_vm_stats().num_aastore_fast_decision ++;
 #endif // VM_STATS
-            if(vt == cached_object_array_vtable_ptr ||
-                class_is_subtype_fast(((ManagedObject *)elem)->vt(), vt->clss->array_element_class)) {
+            if(vt == cached_object_array_vtable_ptr
+                || class_is_subtype_fast(((ManagedObject *)elem)->vt(), vt->clss->get_array_element_class()))
+            {
                 STORE_REFERENCE((ManagedObject *)array, get_vector_element_address_ref(array, idx), (ManagedObject *)elem);
                 return 0;           
             }
@@ -1007,7 +1008,7 @@ void * getaddress__gc_write_barrier_fastcall()
 
     if (VM_Global_State::loader_env->compress_references) {
         // 20030321 Convert a null reference in %ecx from a managed (heap_base) to an unmanaged null (0/NULL). 
-        ss = test(ss,  ecx_opnd,  Imm_Opnd((unsigned)Class::heap_base));
+        ss = test(ss,  ecx_opnd,  Imm_Opnd((unsigned)VM_Global_State::loader_env->heap_base));
         ss = branch8(ss, Condition_NE,  Imm_Opnd(size_8, 0));  // branch around mov 0
         char *backpatch_address__not_managed_null = ((char *)ss) - 1;
         ss = mov(ss,  ecx_opnd,  Imm_Opnd(0));
@@ -1300,14 +1301,14 @@ VMEXPORT LilCodeStub *vm_get_rt_support_stub(VM_RT_SUPPORT f, Class_Handle c) {
     switch (f) {
     case VM_RT_CHECKCAST:
     {
-        if (!clss->is_suitable_for_fast_instanceof)
+        if (!clss->get_fast_instanceof_flag())
             return NULL;
 
         return gen_lil_typecheck_stub_specialized(true, true, clss);
     }
     case VM_RT_INSTANCEOF:
     {
-        if (!clss->is_suitable_for_fast_instanceof)
+        if (!clss->get_fast_instanceof_flag())
             return NULL;
 
         return gen_lil_typecheck_stub_specialized(false, true, clss);

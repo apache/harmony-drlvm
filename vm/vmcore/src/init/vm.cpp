@@ -70,27 +70,8 @@ bool ManagedObject::_tag_pointer = false;
 // begin Class
 /////////////////////////////////////////////////////////////////
 
-Field* class_resolve_field(Class* clss, unsigned cp_index)
-{
-    Compilation_Handle ch;
-    ch.env = VM_Global_State::loader_env;
-    ch.jit = NULL;
-    Field_Handle fh = resolve_field(&ch, (Class_Handle)clss, cp_index);
-    return (Field *)fh;
-}
 
-
-Method *class_resolve_method(Class *clss, unsigned cp_index)
-{
-    Compilation_Handle ch;
-    ch.env = VM_Global_State::loader_env;
-    ch.jit = NULL;
-    Method_Handle fh = resolve_method(&ch, (Class_Handle)clss, cp_index);
-    return (Method *)fh;
-} //class_resolve_static_field
-
-
-Field *class_resolve_nonstatic_field(Class *clss, unsigned cp_index)
+Field* class_resolve_nonstatic_field(Class* clss, unsigned cp_index)
 {
     Compilation_Handle ch;
     ch.env = VM_Global_State::loader_env;
@@ -99,55 +80,8 @@ Field *class_resolve_nonstatic_field(Class *clss, unsigned cp_index)
     if(!fh || field_is_static(fh))
         return NULL;
     return fh;
-} //class_resolve_static_field
+} // class_resolve_nonstatic_field
 
-
-Class *class_resolve_class(Class *clss, unsigned cp_index)
-{
-    Compilation_Handle ch;
-    ch.env = VM_Global_State::loader_env;
-    ch.jit = NULL;
-    return resolve_class(&ch, clss, cp_index);
-} //class_resolve_class
-
-
-
-
-// A run-time error occurs if called for an index which does not represent
-// a constant of type Class, String, Integer, Float, Long or Double.
-Java_Type class_get_cp_const_type(Class *clss, unsigned cp_index)
-{
-    Const_Pool *cp = clss->const_pool;
-    switch(cp_tag(cp, cp_index)) {
-    case CONSTANT_String:
-        return JAVA_TYPE_STRING;
-    case CONSTANT_Integer:
-        return JAVA_TYPE_INT;
-    case CONSTANT_Float:
-        return JAVA_TYPE_FLOAT;
-    case CONSTANT_Long:
-        return JAVA_TYPE_LONG;
-    case CONSTANT_Double:
-        return JAVA_TYPE_DOUBLE;
-    case CONSTANT_Class:
-        return JAVA_TYPE_CLASS;
-    default:
-        DIE("non-constant type is requested from constant pool : " << cp_tag(cp, cp_index));
-    }
-    return JAVA_TYPE_INVALID;
-} //class_get_cp_const_type
-
-
-
-// Returns an address of an int, float, etc.
-// For a string it returns a pointer to the utf8 representation of the string.
-const void *class_get_addr_of_constant(Class *clss, unsigned cp_index)
-{
-    Const_Pool *cp = clss->const_pool;
-    assert(cp_tag(cp, cp_index) != CONSTANT_String);
-
-    return (void *)(cp + cp_index);
-} //class_get_addr_of_constant
 
 /////////////////////////////////////////////////////////////////
 // end Class

@@ -960,42 +960,42 @@ Opcode_LCMP(StackFrame& frame) {
 
 static bool
 ldc(StackFrame& frame, uint32 index) {
-    Class *clazz = frame.method->get_class();
-    Const_Pool *cp = clazz->const_pool;
+    Class* clazz = frame.method->get_class();
+    ConstantPool& cp = clazz->get_constant_pool();
 
 #ifndef NDEBUG
-    switch(cp_tag(cp, index)) {
+    switch(cp.get_tag(index)) {
         case CONSTANT_String:
-            DEBUG_BYTECODE("#" << dec << (int)index << " String: \"" << cp[index].CONSTANT_String.string->bytes << "\"");
+            DEBUG_BYTECODE("#" << dec << (int)index << " String: \"" << cp.get_string_chars(index) << "\"");
             break;
         case CONSTANT_Integer:
-            DEBUG_BYTECODE("#" << dec << (int)index << " Integer: " << (int)cp[index].int_value);
+            DEBUG_BYTECODE("#" << dec << (int)index << " Integer: " << (int)cp.get_int(index));
             break;
         case CONSTANT_Float:
-            DEBUG_BYTECODE("#" << dec << (int)index << " Float: " << cp[index].float_value);
+            DEBUG_BYTECODE("#" << dec << (int)index << " Float: " << cp.get_float(index));
             break;
         case CONSTANT_Class:
             DEBUG_BYTECODE("#" << dec << (int)index << " Class: \"" << const_pool_get_class_name(clazz, index) << "\"");
             break;
         default:
-            DEBUG_BYTECODE("#" << dec << (int)index << " Unknown type = " << cp_tag(cp, index));
-            DIE("ldc instruction: unexpected type (" << cp_tag(cp, index) 
+            DEBUG_BYTECODE("#" << dec << (int)index << " Unknown type = " << cp.get_tag(index));
+            DIE("ldc instruction: unexpected type (" << cp.get_tag(index)
                 << ") of constant pool entry [" << index << "]");
             break;
     }
 #endif
 
     frame.stack.push();
-    if (cp_is_string(cp, index)) {
-        // FIXME: is string reference is packed??
+    if(cp.is_string(index)) {
+        // FIXME: is string reference packed??
         // possibly not
-        String* str = (String*) cp[index].CONSTANT_String.string;
+        String* str = cp.get_string(index);
         // FIXME: only compressed references
         frame.stack.pick().cr = COMPRESS_REF(vm_instantiate_cp_string_resolved(str));
         frame.stack.ref() = FLAG_OBJECT;
         return !check_current_thread_exception();
     } 
-    else if (cp_is_class(cp, index)) 
+    else if (cp.is_class(index))
     {
         Class *other_class = interp_resolve_class(clazz, index);
         if (!other_class) {
@@ -1003,13 +1003,13 @@ ldc(StackFrame& frame, uint32 index) {
         }
         assert(!hythread_is_suspend_enabled());
         
-        frame.stack.pick().cr = COMPRESS_REF(*(other_class->class_handle));
+        frame.stack.pick().cr = COMPRESS_REF(*(other_class->get_class_handle()));
         frame.stack.ref() = FLAG_OBJECT;
         
         return !exn_raised();
     }
     
-    frame.stack.pick().u = cp[index].int_value;
+    frame.stack.pick().u = cp.get_4byte(index);
     return true;
 }
 
@@ -1033,10 +1033,11 @@ Opcode_LDC2_W(StackFrame& frame) {
     uint32 index = read_uint16(frame.ip + 1);
 
     Class *clazz = frame.method->get_class();
-    Const_Pool *cp = clazz->const_pool;
+    ConstantPool& cp = clazz->get_constant_pool();
     frame.stack.push(2);
     Value2 val;
-    val.u64 = ((uint64)cp[index].CONSTANT_8byte.high_bytes << 32) | cp[index].CONSTANT_8byte.low_bytes;
+    val.u64 = ((uint64)cp.get_8byte_high_word(index) << 32)
+        | cp.get_8byte_low_word(index);
     frame.stack.setLong(0, val);
     DEBUG_BYTECODE("#" << dec << (int)index << " (val = " << hex << val.d << ")");
     frame.ip += 3;
@@ -1161,8 +1162,7 @@ allocDimensions(StackFrame& frame, Class *arrayClass, int depth) {
     Class *c = clss[0] = arrayClass;
 
     for(d = 1; d < depth; d++) {
-        c = c->array_element_class;
-
+        c = c->get_array_element_class();
         clss[d] = c;
     }
 
@@ -1221,7 +1221,7 @@ Opcode_MULTIANEWARRAY(StackFrame& frame) {
     Class *arrayClass = interp_resolve_class(clazz, classId);
     if (!arrayClass) return; // exception
 
-    DEBUG_BYTECODE(arrayClass->name->bytes << " " << depth);
+    DEBUG_BYTECODE(class_get_name(arrayClass) << " " << depth);
 
     bool success = allocDimensions(frame, arrayClass, depth);
     if (!success) {
@@ -1241,7 +1241,7 @@ Opcode_NEW(StackFrame& frame) {
     Class *objClass = interp_resolve_class_new(clazz, classId);
     if (!objClass) return; // exception
 
-    DEBUG_BYTECODE("cless = " << objClass->name->bytes);
+    DEBUG_BYTECODE("cless = " << class_get_name(objClass));
 
     class_initialize(objClass);
 
@@ -1516,8 +1516,8 @@ Opcode_AASTORE(StackFrame& frame) {
     // TODO: check ArrayStoreException
     ManagedObject *arrayObj = (ManagedObject*) array;
     Class *arrayClass = arrayObj->vt()->clss;
-    Class *elementClass = arrayClass->array_element_class;
-    ManagedObject *obj = UNCOMPRESS_REF(frame.stack.pick().cr);
+    Class *elementClass = arrayClass->get_array_element_class();
+    ManagedObject* obj = UNCOMPRESS_REF(frame.stack.pick().cr);
     if (!(obj == 0 || vm_instanceof(obj, elementClass))) {
         interp_throw_exception("java/lang/ArrayStoreException");
         return;
@@ -1624,19 +1624,18 @@ Opcode_PUTSTATIC(StackFrame& frame) {
 
 
     if (field->is_final()) {
-        if (frame.method->get_class()->state != ST_Initializing) {
+        if(!frame.method->get_class()->is_initializing()) {
             throwIAE(field_get_name(field));
             return;
         }
     }
 
-    void *addr = field->get_address();
+    void* addr = field_get_address(field);
 
     DEBUG_BYTECODE(field->get_name()->bytes << " " << field->get_descriptor()->bytes
             << " (val = " << hex << (int)frame.stack.pick().i << ")");
 
     switch (field->get_java_type()) {
-
 #ifdef COMPACT_FIELDS // use compact fields on ipf
         case VM_DATA_TYPE_BOOLEAN:
         case VM_DATA_TYPE_INT8:
@@ -1719,7 +1718,7 @@ Opcode_GETSTATIC(StackFrame& frame) {
         M2N_FREE_MACRO;
     }
 
-    void *addr = field->get_address();
+    void *addr = field_get_address(field);
     frame.stack.push();
 
     switch (field->get_java_type()) {
@@ -2047,7 +2046,7 @@ Opcode_INVOKEVIRTUAL(StackFrame& frame) {
     Method *method = interp_resolve_virtual_method(clazz, methodId);
     if (!method) return; // exception
 
-    DEBUG_BYTECODE(method->get_class()->name->bytes << "."
+    DEBUG_BYTECODE(class_get_name(method_get_class(method)) << "."
             << method->get_name()->bytes << "/"
             << method->get_descriptor()->bytes<< endl);
 
@@ -2063,7 +2062,7 @@ Opcode_INVOKEINTERFACE(StackFrame& frame) {
     Method *method = interp_resolve_interface_method(clazz, methodId);
     if (!method) return; // exception
     
-    DEBUG_BYTECODE(method->get_class()->name->bytes << "."
+    DEBUG_BYTECODE(class_get_name(method_get_class(method)) << "."
             << method->get_name()->bytes << "/"
             << method->get_descriptor()->bytes << endl);
 
@@ -2079,7 +2078,7 @@ Opcode_INVOKESTATIC(StackFrame& frame) {
     Method *method = interp_resolve_static_method(clazz, methodId);
     if (!method) return; // exception
 
-    DEBUG_BYTECODE(method->get_class()->name->bytes << "."
+    DEBUG_BYTECODE(class_get_name(method_get_class(method)) << "."
             << method->get_name()->bytes << "/"
             << method->get_descriptor()->bytes << endl);
 
@@ -2102,7 +2101,7 @@ Opcode_INVOKESPECIAL(StackFrame& frame) {
     Method *method = interp_resolve_special_method(clazz, methodId);
     if (!method) return; // exception
     
-    DEBUG_BYTECODE(method->get_class()->name->bytes << "."
+    DEBUG_BYTECODE(class_get_name(method_get_class(method)) << "."
             << method->get_name()->bytes << "/"
              << method->get_descriptor()->bytes << endl);
 
@@ -2210,7 +2209,7 @@ Opcode_CHECKCAST(StackFrame& frame) {
     Class *objClass = interp_resolve_class(clazz, classId);
     if (!objClass) return; // exception
     
-    DEBUG_BYTECODE("class = " << objClass->name->bytes);
+    DEBUG_BYTECODE("class = " << class_get_name(objClass));
 
     ManagedObject *obj = UNCOMPRESS_REF(frame.stack.pick().cr);
 
@@ -2228,7 +2227,7 @@ Opcode_INSTANCEOF(StackFrame& frame) {
     Class *objClass = interp_resolve_class(clazz, classId);
     if (!objClass) return; // exception
     
-    DEBUG_BYTECODE("class = " << objClass->name->bytes);
+    DEBUG_BYTECODE("class = " << class_get_name(objClass));
 
     ManagedObject *obj = UNCOMPRESS_REF(frame.stack.pick().cr);
 
@@ -2303,7 +2302,7 @@ Opcode_ATHROW(StackFrame& frame) {
         interp_throw_exception("java/lang/VerifyError");
         return;
     }
-    DEBUG_BYTECODE(" " << obj->vt()->clss->name->bytes << endl);
+    DEBUG_BYTECODE(" " << obj->vt()->clss->get_name()->bytes << endl);
     assert(!hythread_is_suspend_enabled());
     set_current_thread_exception(obj);
 }
@@ -2316,8 +2315,7 @@ findExceptionHandler(StackFrame& frame, ManagedObject **exception, Handler **hh)
     Method *m = frame.method;
     DEBUG_BYTECODE("Searching for exception handler:");
     DEBUG_BYTECODE("   In "
-            << m->get_class()->name->bytes
-            << "/"
+            << class_get_name(method_get_class(m)) << "/"
             << m->get_name()->bytes
             << m->get_descriptor()->bytes << endl);
 
@@ -2363,7 +2361,7 @@ processExceptionHandler(StackFrame& frame, ManagedObject **exception) {
     Method *m = frame.method;
     Handler *h;
     if (findExceptionHandler(frame, exception, &h)){
-        DEBUG_BYTECODE("Exception caught: " << (*exception)->vt()->clss->name->bytes << endl);
+        DEBUG_BYTECODE("Exception caught: " << (*exception)->vt()->clss->get_name()->bytes << endl);
         DEBUG_BYTECODE("Found handler!\n");
         frame.ip = (uint8*)m->get_byte_code_addr() + h->get_handler_pc();
         return true;
@@ -2432,11 +2430,11 @@ stackDump(StackFrame& frame) {
                         (f->n_last_bytecode-8)&7]]);
 #else
     const char *filename = class_get_source_file_name(c);
-        ECHO(c->name->bytes << "."
-                << m->get_name()->bytes
-                << m->get_descriptor()->bytes << " ("
-                << (filename != NULL ? filename : "NULL") << ":"
-                << line << ")");
+    ECHO(class_get_name(c) << "."
+        << m->get_name()->bytes
+        << m->get_descriptor()->bytes << " ("
+        << (filename != NULL ? filename : "NULL") << ":"
+        << line << ")");
 #endif
         f = f->prev;
     }
@@ -2527,7 +2525,7 @@ interpreter(StackFrame &frame) {
     int stackLength = 0;
     
     DEBUG_TRACE_PLAIN("interpreter: "
-            << frame.method->get_class()->name->bytes
+            << class_get_name(method_get_class(frame.method))
             << " " << frame.method->get_name()->bytes
             << frame.method->get_descriptor()->bytes << endl);
 
@@ -2570,7 +2568,7 @@ interpreter(StackFrame &frame) {
         ml->next = 0;
 
         if (frame.method->is_static()) {
-            ml->monitor = *(frame.method->get_class()->class_handle);
+            ml->monitor = *(frame.method->get_class()->get_class_handle());
         } else {
             ml->monitor = UNCOMPRESS_REF(frame.locals(0).cr);
         }
@@ -3093,10 +3091,10 @@ interpreter_execute_method(
     }
 
     DEBUG_TRACE("\n{{{ interpreter_invoke: "
-           << method->get_class()->name->bytes << " "
+           << class_get_name(method_get_class(method)) << " "
            << method->get_name()->bytes
            << method->get_descriptor()->bytes << endl);
-    
+
     DEBUG("\tmax stack = " << method->get_max_stack() << endl);
     DEBUG("\tmax locals = " << method->get_max_locals() << endl);
 
@@ -3263,10 +3261,9 @@ interpreterInvokeStatic(StackFrame& prevFrame, Method *method) {
     }
 
     DEBUG_TRACE("\n{{{ invoke_static     : "
-           << method->get_class()->name->bytes << " "
+           << class_get_name(method_get_class(method)) << " "
            << method->get_name()->bytes
            << method->get_descriptor()->bytes << endl);
-
 
     DEBUG("\tmax stack = " << method->get_max_stack() << endl);
     DEBUG("\tmax locals = " << method->get_max_locals() << endl);
@@ -3440,7 +3437,7 @@ interpreterInvokeVirtual(StackFrame& prevFrame, Method *method) {
     ASSERT_OBJECT(obj);
 
     Class *objClass = obj->vt()->clss;
-    method = objClass->vtable_descriptors[method->get_index()];
+    method = objClass->get_method_from_vtable(method->get_index());
 
     if (method->is_abstract()) {
         ostringstream str;
@@ -3451,7 +3448,7 @@ interpreterInvokeVirtual(StackFrame& prevFrame, Method *method) {
     }
 
     DEBUG_TRACE("\n{{{ invoke_virtual    : "
-           << method->get_class()->name->bytes << " "
+           << class_get_name(method_get_class(method)) << " "
            << method->get_name()->bytes
            << method->get_descriptor()->bytes << endl);
 
@@ -3475,7 +3472,7 @@ interpreterInvokeInterface(StackFrame& prevFrame, Method *method) {
 
     if (!vm_instanceof(obj, method->get_class())) {
         interp_throw_exception("java/lang/IncompatibleClassChangeError",
-            method->get_class()->name->bytes);
+            class_get_name(method_get_class(method)));
         return;
     }
 
@@ -3506,7 +3503,7 @@ interpreterInvokeInterface(StackFrame& prevFrame, Method *method) {
     }
 
     DEBUG_TRACE("\n{{{ invoke_interface  : "
-           << method->get_class()->name->bytes << " "
+           << class_get_name(method_get_class(method)) << " "
            << method->get_name()->bytes
            << method->get_descriptor()->bytes << endl);
 
@@ -3552,7 +3549,7 @@ interpreterInvokeSpecial(StackFrame& prevFrame, Method *method) {
     }
 
     DEBUG_TRACE("\n{{{ invoke_special    : "
-           << method->get_class()->name->bytes << " "
+           << class_get_name(method_get_class(method)) << " "
            << method->get_name()->bytes
            << method->get_descriptor()->bytes << endl);
 

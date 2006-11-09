@@ -36,6 +36,8 @@
 #include "stack_iterator.h"
 #include "stack_trace.h"
 #include "jit_intf_cpp.h"
+#include "cci.h"
+#include "Class.h"
 
 #define jvmti_test_jenv (p_TLS_vmthread->jni_env)
 
@@ -409,8 +411,8 @@ jvmtiSetLocalObject(jvmtiEnv* env,
         tmn_suspend_disable();
         ManagedObject *obj = handle->object;
 
-        if (obj < (ManagedObject *)Class::heap_base ||
-            obj > (ManagedObject *)Class::heap_end)
+        if (obj < (ManagedObject *)VM_Global_State::loader_env->heap_base ||
+            obj > (ManagedObject *)VM_Global_State::loader_env->heap_end)
         {
             tmn_suspend_enable();
             return JVMTI_ERROR_INVALID_OBJECT;
@@ -418,6 +420,9 @@ jvmtiSetLocalObject(jvmtiEnv* env,
 
         Class *clss = obj->vt()->clss;
         ManagedObject *clsObj = struct_Class_to_java_lang_Class(clss);
+        // ppervov: FIXME: there is an assertion in the above function which
+        // is exactly the same as in the following if. So, this code will only
+        // work in release and just assert in debug.
         if (clsObj->vt()->clss != VM_Global_State::loader_env->JavaLangClass_Class) {
             tmn_suspend_enable();
             return JVMTI_ERROR_INVALID_OBJECT;

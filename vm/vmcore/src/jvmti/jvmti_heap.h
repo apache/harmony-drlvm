@@ -94,7 +94,7 @@ inline jlong ti_get_object_tag(TIEnv *ti_env, Managed_Object_Handle obj)
 inline jlong ti_get_object_class_tag(TIEnv *ti_env, Managed_Object_Handle obj)
 {
     Class* clss = ((ManagedObject*)obj)->vt()->clss;
-    return ti_env->tags->get(*clss->class_handle);
+    return ti_env->tags->get(*(clss->get_class_handle()));
 }
 
 /**
@@ -115,8 +115,8 @@ inline jint ti_get_object_size(TIEnv *ti_env, Managed_Object_Handle obj)
  */
 inline bool is_object_valid(Managed_Object_Handle obj)
 {
-    return ((obj != NULL) && (obj > Class::heap_base)
-            && (obj < Class::heap_end));
+    return ((obj != NULL) && (obj > VM_Global_State::loader_env->heap_base)
+            && (obj < VM_Global_State::loader_env->heap_end));
 }
 
 /**

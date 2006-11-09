@@ -68,6 +68,27 @@ struct Global_Env {
     bool verify_all;                // psrebriy 20050815 Verify all classes including loaded by bootstrap class loader
     bool pin_interned_strings;      // if true, interned strings are never moved
 
+    // If set to true by the "-compact_fields" command line option,
+    // the VM will not pad out fields of less than 32 bits to four bytes.
+    // However, fields will still be aligned to a natural boundary,
+    // and the num_field_padding_bytes field will reflect those alignment padding bytes.
+    bool compact_fields;
+
+    // If set to true by the "-sort_fields" command line option,
+    // the VM will sort fields by size before assigning their offset during
+    // class preparation.
+    bool sort_fields;
+
+    // Base address of Java heap
+    Byte* heap_base;
+    // Ceiling of Java heap.
+    // NOTE: we assume Java heap uses one continuous memory block.
+    Byte* heap_end;
+
+    // This will be set to either NULL or heap_base depending
+    // on whether compressed references are used.
+    Byte* managed_null;
+
     //
     // preloaded strings
     //

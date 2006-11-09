@@ -29,11 +29,11 @@
 #include "environment.h"
 #include "classloader.h"
 #include "Class.h"
+#include "class_member.h"
 #include "vm_strings.h"
 #include "open/vm_util.h"
 #include "bytereader.h"
 #include "compile.h"
-#include "jit_intf_cpp.h"
 #include "interpreter_exports.h"
 #include "jarfile_util.h"
 
@@ -61,40 +61,43 @@
 #define REPORT_FAILED_CLASS_FORMAT(klass, msg)   \
     {                                                               \
     std::stringstream ss;                                       \
-    ss << klass->name->bytes << " : " << msg;                                               \
-    klass->class_loader->ReportFailedClass(klass, "java/lang/ClassFormatError", ss);              \
+    ss << klass->get_name()->bytes << " : " << msg;                                               \
+    klass->get_class_loader()->ReportFailedClass(klass, "java/lang/ClassFormatError", ss);              \
     }
 
 #define valid_cpi(clss, idx, type) \
-    (idx < clss->cp_size && cp_tag(clss->const_pool, idx) == type)
+    (clss->get_constant_pool().is_valid_index(idx) \
+    && clss->get_constant_pool().get_tag(idx) == type)
 
 
 
-String *cp_check_utf8(Const_Pool *cp,
-                     unsigned cp_size,
-                     unsigned utf8_index)
+static String* cp_check_utf8(ConstantPool& cp, unsigned utf8_index)
 {
-    if(utf8_index >= cp_size || !cp_is_utf8(cp, utf8_index)) {
+    if(!cp.is_valid_index(utf8_index) || !cp.is_utf8(utf8_index)) {
         return NULL;
     }
-    return cp[utf8_index].CONSTANT_Utf8.string;
-} //cp_check_utf8
+    return cp.get_utf8_string(utf8_index);
+} // cp_check_utf8
 
 
 
-String *cp_check_class(Const_Pool *cp,
-                      unsigned cp_size,
-                      unsigned class_index)
+static String* cp_check_class(ConstantPool& cp, unsigned class_index)
 {
-    if (class_index >= cp_size || !cp_is_class(cp,class_index)) {
+    if(!cp.is_valid_index(class_index) || !cp.is_class(class_index)) {
 #ifdef _DEBUG
         WARN("cp_check_class: illegal const pool class index" << class_index);
 #endif
         return NULL;
     }    
-    return cp[cp[class_index].CONSTANT_Class.name_index].CONSTANT_Utf8.string;
+    return cp.get_utf8_string(cp.get_class_name_index(class_index));
 } //cp_check_class
 
+
+#define N_COMMON_ATTR   5
+#define N_FIELD_ATTR    1
+#define N_METHOD_ATTR   5
+#define N_CODE_ATTR     3
+#define N_CLASS_ATTR    4
 
 static String *common_attr_strings[N_COMMON_ATTR+1];
 static Attributes common_attrs[N_COMMON_ATTR];
@@ -216,7 +219,7 @@ String* parse_signature_attr(ByteReader &cfs,
             "cannot parse Signature index");
         return NULL;
     }
-    String* sig = cp_check_utf8(clss->const_pool, clss->cp_size, idx);
+    String* sig = cp_check_utf8(clss->get_constant_pool(), idx);
     if(!sig) {
         REPORT_FAILED_CLASS_FORMAT(clss, "invalid Signature index : " << idx);
     }
@@ -225,8 +228,7 @@ String* parse_signature_attr(ByteReader &cfs,
 
 
 Attributes parse_attribute(ByteReader &cfs,
-                           Const_Pool *cp,
-                           unsigned cp_size,
+                           ConstantPool& cp,
                            String *attr_strings[],
                            Attributes attrs[],
                            uint32 *attr_len, 
@@ -243,7 +245,7 @@ Attributes parse_attribute(ByteReader &cfs,
     if (!result)
         return ATTR_ERROR;
 
-    String *attr_name = cp_check_utf8(cp,cp_size,attr_name_index);
+    String* attr_name = cp_check_utf8(cp, attr_name_index);
     if (attr_name == NULL) {
 #ifdef _DEBUG
         WARN("parse_attribute: illegal const pool attr_name_index");
@@ -294,7 +296,7 @@ uint32 parse_annotation(Annotation** value, ByteReader& cfs, Class* clss)
             "cannot parse type index of annotation");
         return 0;
     }
-    String* type = cp_check_utf8(clss->const_pool, clss->cp_size, type_idx);
+    String* type = cp_check_utf8(clss->get_constant_pool(), type_idx);
     if (type == NULL) {
         REPORT_FAILED_CLASS_FORMAT(clss, 
             "invalid type index of annotation : " << type_idx);
@@ -308,7 +310,7 @@ uint32 parse_annotation(Annotation** value, ByteReader& cfs, Class* clss)
         return 0;
     }
     
-    Annotation* antn = (Annotation*) clss->class_loader->Alloc(
+    Annotation* antn = (Annotation*) clss->get_class_loader()->Alloc(
         sizeof(Annotation) + num_elements * sizeof(AnnotationElement));
     antn->type = type;
     antn->num_elements = num_elements;
@@ -325,7 +327,7 @@ uint32 parse_annotation(Annotation** value, ByteReader& cfs, Class* clss)
                 "cannot parse element_name_index of annotation element");
             return 0;
         }
-        antn->elements[j].name = cp_check_utf8(clss->const_pool, clss->cp_size, name_idx);
+        antn->elements[j].name = cp_check_utf8(clss->get_constant_pool(), name_idx);
         if (antn->elements[j].name == NULL) {
             REPORT_FAILED_CLASS_FORMAT(clss, 
                 "invalid element_name_index of annotation : " << name_idx);
@@ -354,8 +356,8 @@ uint32 parse_annotation_value(AnnotationValue& value, ByteReader& cfs, Class* cl
     value.tag = (AnnotationValueType)tag;
     uint32 read_len = 1;
 
-    Const_Pool *cp = clss->const_pool;
-    unsigned cp_size = clss->cp_size;
+    ConstantPool& cp = clss->get_constant_pool();
+    unsigned cp_size = cp.get_size();
 
     char ctag = (char)tag;
     switch(ctag) {
@@ -382,29 +384,29 @@ uint32 parse_annotation_value(AnnotationValue& value, ByteReader& cfs, Class* cl
             case AVT_CHAR:
             case AVT_INT: 
                 if (valid_cpi(clss, const_idx, CONSTANT_Integer)) {
-                    value.const_value.i = cp[const_idx].int_value;
+                    value.const_value.i = cp.get_int(const_idx);
                     break;
                 }
             case AVT_FLOAT: 
                 if (valid_cpi(clss, const_idx, CONSTANT_Float)) {
-                    value.const_value.f = cp[const_idx].float_value;
+                    value.const_value.f = cp.get_float(const_idx);
                     break;
                 }
             case AVT_LONG: 
                 if (valid_cpi(clss, const_idx, CONSTANT_Long)) {
-                    value.const_value.l.lo_bytes = cp[const_idx].CONSTANT_8byte.low_bytes;
-                    value.const_value.l.hi_bytes = cp[const_idx].CONSTANT_8byte.high_bytes;
+                    value.const_value.l.lo_bytes = cp.get_8byte_low_word(const_idx);
+                    value.const_value.l.hi_bytes = cp.get_8byte_high_word(const_idx);
                     break;
                 }
             case AVT_DOUBLE: 
                 if (valid_cpi(clss, const_idx, CONSTANT_Double)) {
-                    value.const_value.l.lo_bytes = cp[const_idx].CONSTANT_8byte.low_bytes;
-                    value.const_value.l.hi_bytes = cp[const_idx].CONSTANT_8byte.high_bytes;
+                    value.const_value.l.lo_bytes = cp.get_8byte_low_word(const_idx);
+                    value.const_value.l.hi_bytes = cp.get_8byte_high_word(const_idx);
                     break;
                 }
             case AVT_STRING: 
                 if (valid_cpi(clss, const_idx, CONSTANT_Utf8)) {
-                    value.const_value.string = cp[const_idx].CONSTANT_Utf8.string;
+                    value.const_value.string = cp.get_utf8_string(const_idx);
                     break;
                 }
             default:
@@ -425,7 +427,7 @@ uint32 parse_annotation_value(AnnotationValue& value, ByteReader& cfs, Class* cl
                     "cannot parse class_info_index of annotation value");
                 return 0;
             }
-            value.class_name = cp_check_utf8(cp, cp_size, class_idx);
+            value.class_name = cp_check_utf8(cp, class_idx);
             if (value.class_name == NULL) {
                 REPORT_FAILED_CLASS_FORMAT(clss, 
                     "invalid class_info_index of annotation value: " << class_idx);
@@ -443,7 +445,7 @@ uint32 parse_annotation_value(AnnotationValue& value, ByteReader& cfs, Class* cl
                     "cannot parse type_name_index of annotation enum value");
                 return 0;
             }
-            value.enum_const.type = cp_check_utf8(cp, cp_size, type_idx);
+            value.enum_const.type = cp_check_utf8(cp, type_idx);
             if (value.enum_const.type == NULL) {
                 REPORT_FAILED_CLASS_FORMAT(clss, 
                     "invalid type_name_index of annotation enum value: " << type_idx);
@@ -455,7 +457,7 @@ uint32 parse_annotation_value(AnnotationValue& value, ByteReader& cfs, Class* cl
                     "cannot parse const_name_index of annotation enum value");
                 return 0;
             }
-            value.enum_const.name = cp_check_utf8(cp, cp_size, name_idx);
+            value.enum_const.name = cp_check_utf8(cp, name_idx);
             if (value.enum_const.name == NULL) {
                 REPORT_FAILED_CLASS_FORMAT(clss, 
                     "invalid const_name_index of annotation enum value: " << name_idx);
@@ -486,7 +488,7 @@ uint32 parse_annotation_value(AnnotationValue& value, ByteReader& cfs, Class* cl
             read_len += 2;
             value.array.length = num;
             if (num) {
-                value.array.items = (AnnotationValue*) clss->class_loader->Alloc(
+                value.array.items = (AnnotationValue*) clss->get_class_loader()->Alloc(
                     num * sizeof(AnnotationValue));
                 for (int i = 0; i < num; i++) {
                     uint32 size = parse_annotation_value(value.array.items[i], cfs, clss);
@@ -520,7 +522,7 @@ uint32 parse_annotation_table(AnnotationTable ** table, ByteReader& cfs, Class* 
     uint32 read_len = 2;
 
     if (num_annotations) {
-        *table = (AnnotationTable*) clss->class_loader->Alloc(
+        *table = (AnnotationTable*) clss->get_class_loader()->Alloc(
             sizeof (AnnotationTable) + (num_annotations - 1)*sizeof(Annotation*));
         (*table)->length = num_annotations;
 
@@ -605,13 +607,13 @@ Attributes Class_Member::process_common_attribute(Attributes attr, uint32 attr_l
 }
 
 void* Class_Member::Alloc(size_t size) {
-    ClassLoader* cl = get_class()->class_loader;
+    ClassLoader* cl = get_class()->get_class_loader();
     assert(cl);
     return cl->Alloc(size);
 }
 
 
-bool Class_Member::parse(Class *clss, Const_Pool *cp, unsigned cp_size, ByteReader &cfs)
+bool Class_Member::parse(Class* clss, ByteReader &cfs)
 {
     if (!cfs.parse_u2_be(&_access_flags)) {
         REPORT_FAILED_CLASS_FORMAT(clss, "cannot parse member access flags");
@@ -631,12 +633,13 @@ bool Class_Member::parse(Class *clss, Const_Pool *cp, unsigned cp_size, ByteRead
         return false;
     }
 
+    ConstantPool& cp = clss->get_constant_pool();
     //
     // look up the name_index and descriptor_index 
     // utf8 string const pool entries
     //
-    String *name = cp_check_utf8(cp,cp_size,name_index);
-    String *descriptor = cp_check_utf8(cp,cp_size,descriptor_index);
+    String* name = cp_check_utf8(cp, name_index);
+    String* descriptor = cp_check_utf8(cp, descriptor_index);
     if (name == NULL || descriptor == NULL) {
         REPORT_FAILED_CLASS_FORMAT(clss, 
             "some of member name or descriptor indexes is not CONSTANT_Utf8 entry : " 
@@ -740,9 +743,9 @@ check_field_descriptor( const char *descriptor,
     // DIE( "unreachable code!" ); // exclude remark #111: statement is unreachable
 }
 
-bool Field::parse(Class *clss, Const_Pool *cp, unsigned cp_size, ByteReader &cfs)
+bool Field::parse(Class *clss, ByteReader &cfs)
 {
-    if(!Class_Member::parse(clss, cp, cp_size, cfs))
+    if(!Class_Member::parse(clss, cfs))
         return false;
 
     if(!check_field_name(_name)) {
@@ -751,13 +754,13 @@ bool Field::parse(Class *clss, Const_Pool *cp, unsigned cp_size, ByteReader &cfs
     }
 
     // check field descriptor
-    const char *next;
+    const char* next;
     if(!check_field_descriptor(_descriptor->bytes, &next, false) || *next != '\0') {
         REPORT_FAILED_CLASS_FORMAT(clss, "illegal field descriptor : " << _descriptor->bytes);
         return false;
     }
     // check interface fields access flags
-    if( class_is_interface(clss) ) {
+    if( clss->is_interface() ) {
         if(!(is_public() && is_static() && is_final())){
             REPORT_FAILED_CLASS_FORMAT(clss, "interface field " << get_name()->bytes
                 << " does not have one of ACC_PUBLIC, ACC_STATIC, or ACC_FINAL access flags set");
@@ -765,7 +768,7 @@ bool Field::parse(Class *clss, Const_Pool *cp, unsigned cp_size, ByteReader &cfs
         }
         if(_access_flags & ~(ACC_FINAL | ACC_PUBLIC | ACC_STATIC | ACC_SYNTHETIC)){
             REPORT_FAILED_CLASS_FORMAT(clss, "interface field " << get_name()->bytes
-                << " has illegal access flags set : " << _access_flags); //FIXME to hex format
+                << " has illegal access flags set : " << _access_flags); //FIXME to literal form
             return false;
         }
     } else if((is_public() && is_protected() 
@@ -773,14 +776,14 @@ bool Field::parse(Class *clss, Const_Pool *cp, unsigned cp_size, ByteReader &cfs
         || is_public() && is_private())
         || (is_final() && is_volatile())) {
         REPORT_FAILED_CLASS_FORMAT(clss, " field " << get_name()->bytes 
-            << " has invalid combination of access flags : " << _access_flags); //FIXME to hex format
+            << " has invalid combination of access flags : " << _access_flags); //FIXME to literal form
         return false;
     }
 
     uint16 attr_count;
     if(!cfs.parse_u2_be(&attr_count)) {
-        REPORT_FAILED_CLASS_CLASS(clss->class_loader, clss, "java/lang/ClassFormatError",
-            clss->name->bytes << ": could not parse attribute count for field " << get_name());
+        REPORT_FAILED_CLASS_CLASS(clss->get_class_loader(), clss, "java/lang/ClassFormatError",
+            clss->get_name()->bytes << ": could not parse attribute count for field " << get_name());
         return false;
     }
 
@@ -790,9 +793,11 @@ bool Field::parse(Class *clss, Const_Pool *cp, unsigned cp_size, ByteReader &cfs
 
     uint32 attr_len = 0;
 
+    ConstantPool& cp = clss->get_constant_pool();
+
     for (unsigned j=0; j<attr_count; j++) 
     {
-        Attributes cur_attr = parse_attribute(cfs, cp, cp_size, field_attr_strings, field_attrs, &attr_len);
+        Attributes cur_attr = parse_attribute(cfs, cp, field_attr_strings, field_attrs, &attr_len);
         switch (cur_attr) {
         case ATTR_ConstantValue:
         {    // constant value attribute
@@ -801,71 +806,71 @@ bool Field::parse(Class *clss, Const_Pool *cp, unsigned cp_size, ByteReader &cfs
 
             // a field can have at most 1 ConstantValue attribute
             if (++n_constval_attr > 1) {
-                REPORT_FAILED_CLASS_CLASS(clss->class_loader, clss, "java/lang/ClassFormatError",
-                    clss->name->bytes << ": field " << get_name() << " has more then one ConstantValue attribute");
+                REPORT_FAILED_CLASS_CLASS(clss->get_class_loader(), clss, "java/lang/ClassFormatError",
+                    clss->get_name()->bytes << ": field " << get_name() << " has more then one ConstantValue attribute");
                 return false;
             }
             // attribute length must be two (vm spec reference 4.7.3)
             if (attr_len != 2) {
-                REPORT_FAILED_CLASS_CLASS(clss->class_loader, clss, "java/lang/ClassFormatError",
-                    clss->name->bytes << ": ConstantValue attribute has invalid length for field " << get_name());
+                REPORT_FAILED_CLASS_CLASS(clss->get_class_loader(), clss, "java/lang/ClassFormatError",
+                    clss->get_name()->bytes << ": ConstantValue attribute has invalid length for field " << get_name());
                 return false;
             }
 
             if(!cfs.parse_u2_be(&_const_value_index)) {
-                REPORT_FAILED_CLASS_CLASS(clss->class_loader, clss, "java/lang/ClassFormatError",
-                    clss->name->bytes << ": could not parse ConstantValue index for field " << get_name());
+                REPORT_FAILED_CLASS_CLASS(clss->get_class_loader(), clss,
+                    "java/lang/ClassFormatError",
+                    clss->get_name()->bytes << ": could not parse "
+                    << "ConstantValue index for field " << get_name());
                 return false;
             }
 
-            if(_const_value_index == 0 || _const_value_index >= cp_size) {
-                REPORT_FAILED_CLASS_CLASS(clss->class_loader, clss, "java/lang/ClassFormatError",
-                    clss->name->bytes << ": invalid ConstantValue index for field " << get_name());
+            if(_const_value_index == 0 || _const_value_index >= cp.get_size()) {
+                REPORT_FAILED_CLASS_CLASS(clss->get_class_loader(), clss, "java/lang/ClassFormatError",
+                    clss->get_name()->bytes << ": invalid ConstantValue index for field " << get_name());
                 return false;
             }
-            // type of constant must match field's type
-            Const_Pool_Tags tag = (Const_Pool_Tags)cp_tag(cp, _const_value_index);
 
             Java_Type java_type = get_java_type();
 
-            switch(tag) {
+            switch(cp.get_tag(_const_value_index)) {
             case CONSTANT_Long:
                 {
                     if (java_type != JAVA_TYPE_LONG) {
-                        REPORT_FAILED_CLASS_CLASS(clss->class_loader, clss, "java/lang/ClassFormatError",
-                            clss->name->bytes
+                        REPORT_FAILED_CLASS_CLASS(clss->get_class_loader(), clss, "java/lang/ClassFormatError",
+                            clss->get_name()->bytes
                             << ": data type CONSTANT_Long of ConstantValue does not correspond to the type of field "
                             << get_name());
                         return false;
                     }
-                const_value.l.lo_bytes = cp[_const_value_index].CONSTANT_8byte.low_bytes;
-                const_value.l.hi_bytes = cp[_const_value_index].CONSTANT_8byte.high_bytes;
-                break;
+                    const_value.l.lo_bytes = cp.get_8byte_low_word(_const_value_index);
+                    const_value.l.hi_bytes = cp.get_8byte_high_word(_const_value_index);
+                    break;
                 }
             case CONSTANT_Float:
                 {
                     if (java_type != JAVA_TYPE_FLOAT) {
-                        REPORT_FAILED_CLASS_CLASS(clss->class_loader, clss, "java/lang/ClassFormatError",
-                            clss->name->bytes
+                        REPORT_FAILED_CLASS_CLASS(clss->get_class_loader(), clss, "java/lang/ClassFormatError",
+                            clss->get_name()->bytes
                             << ": data type CONSTANT_Float of ConstantValue does not correspond to the type of field "
                             << get_name());
                         return false;
                     }
-                const_value.f = cp[_const_value_index].float_value;
-                break;
+                    const_value.f = cp.get_float(_const_value_index);
+                    break;
                 }
             case CONSTANT_Double:
                 {
                     if (java_type != JAVA_TYPE_DOUBLE) {
-                        REPORT_FAILED_CLASS_CLASS(clss->class_loader, clss, "java/lang/ClassFormatError",
-                            clss->name->bytes
+                        REPORT_FAILED_CLASS_CLASS(clss->get_class_loader(), clss, "java/lang/ClassFormatError",
+                            clss->get_name()->bytes
                             << ": data type CONSTANT_Double of ConstantValue does not correspond to the type of field "
                             << get_name());
                         return false;
                     }
-                const_value.l.lo_bytes = cp[_const_value_index].CONSTANT_8byte.low_bytes;
-                const_value.l.hi_bytes = cp[_const_value_index].CONSTANT_8byte.high_bytes;
-                break;
+                    const_value.l.lo_bytes = cp.get_8byte_low_word(_const_value_index);
+                    const_value.l.hi_bytes = cp.get_8byte_high_word(_const_value_index);
+                    break;
                 }
             case CONSTANT_Integer:
                 {
@@ -875,32 +880,36 @@ bool Field::parse(Class *clss, Const_Pool *cp, unsigned cp_size, ByteReader &cfs
                        java_type == JAVA_TYPE_BYTE        ||
                         java_type == JAVA_TYPE_CHAR) )
                     {
-                        REPORT_FAILED_CLASS_CLASS(clss->class_loader, clss, "java/lang/ClassFormatError",
-                            clss->name->bytes
+                        REPORT_FAILED_CLASS_CLASS(clss->get_class_loader(), clss, "java/lang/ClassFormatError",
+                            clss->get_name()->bytes
                             << ": data type CONSTANT_Integer of ConstantValue does not correspond to the type of field "
                             << get_name());
                         return false;
                     }
-                const_value.i = cp[_const_value_index].int_value;
-                break;
+                    const_value.i = cp.get_int(_const_value_index);
+                    break;
                 }
             case CONSTANT_String:
                 {
                     if (java_type != JAVA_TYPE_CLASS) {
-                        REPORT_FAILED_CLASS_CLASS(clss->class_loader, clss, "java/lang/ClassFormatError",
-                            clss->name->bytes
-                            << ": data type CONSTANT_String of ConstantValue does not correspond to the type of field "
-                            << get_name());
+                        REPORT_FAILED_CLASS_CLASS(clss->get_class_loader(), clss,
+                            "java/lang/ClassFormatError",
+                            clss->get_name()->bytes
+                            << ": data type " << "CONSTANT_String of "
+                            << "ConstantValue does not correspond "
+                            << "to the type of field " << get_name());
                         return false;
                     }
-                const_value.string = cp[_const_value_index].CONSTANT_String.string;
-                break;
+                    const_value.string = cp.get_string(_const_value_index);
+                    break;
                 }
             default:
                 {
-                    REPORT_FAILED_CLASS_CLASS(clss->class_loader, clss, "java/lang/ClassFormatError",
-                        clss->name->bytes
-                        << ": invalid data type tag of ConstantValue for field " << get_name());
+                    REPORT_FAILED_CLASS_CLASS(clss->get_class_loader(), clss,
+                        "java/lang/ClassFormatError",
+                        clss->get_name()->bytes
+                        << ": invalid data type tag of ConstantValue "
+                        << "for field " << get_name());
                     return false;
                 }
             }
@@ -917,21 +926,21 @@ bool Field::parse(Class *clss, Const_Pool *cp, unsigned cp_size, ByteReader &cfs
                 return false;
             case ATTR_UNDEF:
                 // unprocessed
-                REPORT_FAILED_CLASS_CLASS(clss->class_loader, clss, "java/lang/InternalError",
-                    clss->name->bytes
+                REPORT_FAILED_CLASS_CLASS(clss->get_class_loader(), clss, "java/lang/InternalError",
+                    clss->get_name()->bytes
                     << ": error parsing attributes for field "
-                    << get_name() 
+                    << get_name()->bytes
                     << "; unprocessed attribute " << cur_attr);
                 return false;
             } // switch
         } // switch
     } // for
 
-    TypeDesc* td = type_desc_create_from_java_descriptor(get_descriptor()->bytes, clss->class_loader);
+    TypeDesc* td = type_desc_create_from_java_descriptor(get_descriptor()->bytes, clss->get_class_loader());
     if( td == NULL ) {
         // ppervov: the fact we don't have td indicates we could not allocate one
         //std::stringstream ss;
-        //ss << clss->name->bytes << ": could not create type descriptor for field " << get_name();
+        //ss << clss->get_name()->bytes << ": could not create type descriptor for field " << get_name();
         //jthrowable exn = exn_create("java/lang/OutOfMemoryError", ss.str().c_str());
         exn_raise_object(VM_Global_State::loader_env->java_lang_OutOfMemoryError);
         return false;
@@ -942,8 +951,8 @@ bool Field::parse(Class *clss, Const_Pool *cp, unsigned cp_size, ByteReader &cfs
 } //Field::parse
 
 
-bool Handler::parse(Const_Pool* cp, unsigned cp_size, unsigned code_length,
-                    ByteReader &cfs)
+bool Handler::parse(ConstantPool& cp, unsigned code_length,
+                    ByteReader& cfs)
 {
     uint16 start = 0;
     if(!cfs.parse_u2_be(&start))
@@ -982,28 +991,13 @@ bool Handler::parse(Const_Pool* cp, unsigned cp_size, unsigned code_length,
     if (catch_index == 0) {
         _catch_type = NULL;
     } else {
-        _catch_type = cp_check_class(cp,cp_size,catch_index);
+        _catch_type = cp_check_class(cp, catch_index);
         if (_catch_type == NULL)
             return false;
     }
     return true;
 } //Handler::parse
 
-int Method::get_line_number(uint16 bc) {
-    int line = -1;
-    if (_line_number_table) {
-        uint16 prev = 0;
-        for (int i = _line_number_table->length - 1; i >= 0; --i){
-            uint16 start = _line_number_table->table[i].start_pc;
-            if (bc >= start && start >= prev) {
-                prev = start;
-                line = _line_number_table->table[i].line_number;
-            }
-        }
-    }
-
-    return line;
-}
 
 bool Method::get_line_number_entry(unsigned index, jlong* pc, jint* line) {
     if (_line_number_table && index < _line_number_table->length) {
@@ -1032,18 +1026,18 @@ bool Method::get_local_var_entry(unsigned index, jlong* pc,
     }
 }
 
-#define REPORT_FAILED_METHOD(msg) REPORT_FAILED_CLASS_CLASS(_class->class_loader, \
+#define REPORT_FAILED_METHOD(msg) REPORT_FAILED_CLASS_CLASS(_class->get_class_loader(), \
     _class, "java/lang/ClassFormatError", \
-    _class->name->bytes << " : " << msg << " for method "\
+    _class->get_name()->bytes << " : " << msg << " for method "\
     << _name->bytes << _descriptor->bytes);
 
 
-bool Method::_parse_exceptions(Const_Pool *cp, unsigned cp_size, unsigned attr_len,
-                               ByteReader &cfs)
+bool Method::_parse_exceptions(ConstantPool& cp, unsigned attr_len,
+                               ByteReader& cfs)
 {
     if(!cfs.parse_u2_be(&_n_exceptions)) {
-        REPORT_FAILED_CLASS_CLASS(_class->class_loader, _class, "java/lang/ClassFormatError",
-            _class->name->bytes << ": could not parse number of exceptions for method "
+        REPORT_FAILED_CLASS_CLASS(_class->get_class_loader(), _class, "java/lang/ClassFormatError",
+            _class->get_name()->bytes << ": could not parse number of exceptions for method "
             << _name->bytes << _descriptor->bytes);
         return false;
     }
@@ -1052,17 +1046,17 @@ bool Method::_parse_exceptions(Const_Pool *cp, unsigned cp_size, unsigned attr_l
     for (unsigned i=0; i<_n_exceptions; i++) {
         uint16 index;
         if(!cfs.parse_u2_be(&index)) {
-            REPORT_FAILED_CLASS_CLASS(_class->class_loader, _class, "java/lang/ClassFormatError",
-                _class->name->bytes << ": could not parse exception class index "
+            REPORT_FAILED_CLASS_CLASS(_class->get_class_loader(), _class, "java/lang/ClassFormatError",
+                _class->get_name()->bytes << ": could not parse exception class index "
                 << "while parsing excpetions for method "
                 << _name->bytes << _descriptor->bytes);
             return false;
         }
 
-        _exceptions[i] = cp_check_class(cp,cp_size,index);
+        _exceptions[i] = cp_check_class(cp, index);
         if (_exceptions[i] == NULL) {
-            REPORT_FAILED_CLASS_CLASS(_class->class_loader, _class, "java/lang/ClassFormatError",
-                _class->name->bytes << ": exception class index "
+            REPORT_FAILED_CLASS_CLASS(_class->get_class_loader(), _class, "java/lang/ClassFormatError",
+                _class->get_name()->bytes << ": exception class index "
                 << index << "is not a valid CONSTANT_class entry "
                 << "while parsing excpetions for method "
                 << _name->bytes << _descriptor->bytes);
@@ -1070,8 +1064,8 @@ bool Method::_parse_exceptions(Const_Pool *cp, unsigned cp_size, unsigned attr_l
         }
     }
     if (attr_len != _n_exceptions * sizeof(uint16) + sizeof(_n_exceptions) ) {
-        REPORT_FAILED_CLASS_CLASS(_class->class_loader, _class, "java/lang/ClassFormatError",
-            _class->name->bytes << ": invalid Exceptions attribute length "
+        REPORT_FAILED_CLASS_CLASS(_class->get_class_loader(), _class, "java/lang/ClassFormatError",
+            _class->get_name()->bytes << ": invalid Exceptions attribute length "
             << "while parsing excpetions for method "
             << _name->bytes << _descriptor->bytes);
         return false;
@@ -1129,7 +1123,7 @@ bool Method::_parse_line_numbers(unsigned attr_len, ByteReader &cfs) {
 
 
 bool Method::_parse_local_vars(const char* attr_name, Local_Var_Table** lvt_address,
-        Const_Pool *cp, unsigned cp_size, unsigned attr_len, ByteReader &cfs)
+        ConstantPool& cp, unsigned attr_len, ByteReader &cfs)
 {
     uint16 n_local_vars;
     if(!cfs.parse_u2_be(&n_local_vars)) {
@@ -1149,7 +1143,7 @@ bool Method::_parse_local_vars(const char* attr_name, Local_Var_Table** lvt_addr
         return true;
     }
 
-    Local_Var_Table* table = (Local_Var_Table *)_class->class_loader->Alloc(
+    Local_Var_Table* table = (Local_Var_Table *)_class->get_class_loader()->Alloc(
         sizeof(Local_Var_Table) +
         sizeof(Local_Var_Entry) * (n_local_vars - 1));
     // ppervov: FIXME: should throw OOME
@@ -1190,14 +1184,14 @@ bool Method::_parse_local_vars(const char* attr_name, Local_Var_Table** lvt_addr
             return false;
         }
 
-        String* name = cp_check_utf8(cp,cp_size,name_index);
+        String* name = cp_check_utf8(cp, name_index);
         if(name == NULL) {
             REPORT_FAILED_METHOD("name index is not valid CONSTANT_Utf8 entry "
                 "in " << attr_name << " attribute");
             return false;
         }
 
-        String* descriptor = cp_check_utf8(cp,cp_size,descriptor_index);
+        String* descriptor = cp_check_utf8(cp, descriptor_index);
         if(descriptor == NULL) {
             REPORT_FAILED_METHOD("descriptor index is not valid CONSTANT_Utf8 entry "
                 "in " << attr_name << " attribute");
@@ -1233,36 +1227,37 @@ bool Method::_parse_local_vars(const char* attr_name, Local_Var_Table** lvt_addr
 } //Method::_parse_local_vars
 
 
-bool Method::_parse_code( Const_Pool *cp, unsigned cp_size, unsigned code_attr_len, ByteReader &cfs)
+bool Method::_parse_code(ConstantPool& cp, unsigned code_attr_len,
+                         ByteReader& cfs)
 {
     unsigned real_code_attr_len = 0;
     if(!cfs.parse_u2_be(&_max_stack)) {
-        REPORT_FAILED_CLASS_CLASS(_class->class_loader, _class, "java/lang/ClassFormatError",
-            _class->name->bytes << ": could not parse max_stack "
+        REPORT_FAILED_CLASS_CLASS(_class->get_class_loader(), _class, "java/lang/ClassFormatError",
+            _class->get_name()->bytes << ": could not parse max_stack "
             << "while parsing Code attribute for method "
             << _name->bytes << _descriptor->bytes);
         return false;
     }
 
     if(!cfs.parse_u2_be(&_max_locals)) {
-        REPORT_FAILED_CLASS_CLASS(_class->class_loader, _class, "java/lang/ClassFormatError",
-            _class->name->bytes << ": could not parse max_locals "
+        REPORT_FAILED_CLASS_CLASS(_class->get_class_loader(), _class, "java/lang/ClassFormatError",
+            _class->get_name()->bytes << ": could not parse max_locals "
             << "while parsing Code attribute for method "
             << _name->bytes << _descriptor->bytes);
         return false;
     }
 
-    if(_max_locals < (get_num_arg_bytes() / 4) ) {
-        REPORT_FAILED_CLASS_CLASS(_class->class_loader, _class, "java/lang/ClassFormatError",
-            _class->name->bytes << ": wrong max_locals count "
+    if(_max_locals < _arguments_size/4) {
+        REPORT_FAILED_CLASS_CLASS(_class->get_class_loader(), _class, "java/lang/ClassFormatError",
+            _class->get_name()->bytes << ": wrong max_locals count "
             << "while parsing Code attribute for method "
             << _name->bytes << _descriptor->bytes);
         return false;
     }
 
     if(!cfs.parse_u4_be(& _byte_code_length)) {
-        REPORT_FAILED_CLASS_CLASS(_class->class_loader, _class, "java/lang/ClassFormatError",
-            _class->name->bytes << ": could not parse bytecode length "
+        REPORT_FAILED_CLASS_CLASS(_class->get_class_loader(), _class, "java/lang/ClassFormatError",
+            _class->get_name()->bytes << ": could not parse bytecode length "
             << "while parsing Code attribute for method "
             << _name->bytes << _descriptor->bytes);
         return false;
@@ -1272,8 +1267,8 @@ bool Method::_parse_code( Const_Pool *cp, unsigned cp_size, unsigned code_attr_l
     if(_byte_code_length == 0
         || (_byte_code_length >= (1<<16) && !is_native() && !is_abstract()))
     {
-        REPORT_FAILED_CLASS_CLASS(_class->class_loader, _class, "java/lang/ClassFormatError",
-            _class->name->bytes << ": bytecode length for method "
+        REPORT_FAILED_CLASS_CLASS(_class->get_class_loader(), _class, "java/lang/ClassFormatError",
+            _class->get_name()->bytes << ": bytecode length for method "
             << _name->bytes << _descriptor->bytes
             << " has zero length");
         return false;
@@ -1289,8 +1284,8 @@ bool Method::_parse_code( Const_Pool *cp, unsigned cp_size, unsigned code_attr_l
     unsigned i;
     for (i=0; i<_byte_code_length; i++) {
         if(!cfs.parse_u1((uint8 *)&_byte_codes[i])) {
-            REPORT_FAILED_CLASS_CLASS(_class->class_loader, _class, "java/lang/ClassFormatError",
-                _class->name->bytes << ": could not parse bytecode for method "
+            REPORT_FAILED_CLASS_CLASS(_class->get_class_loader(), _class, "java/lang/ClassFormatError",
+                _class->get_name()->bytes << ": could not parse bytecode for method "
                 << _name->bytes << _descriptor->bytes);
             return false;
         }
@@ -1298,8 +1293,8 @@ bool Method::_parse_code( Const_Pool *cp, unsigned cp_size, unsigned code_attr_l
     real_code_attr_len += _byte_code_length;
 
     if(!cfs.parse_u2_be(&_n_handlers)) {
-            REPORT_FAILED_CLASS_CLASS(_class->class_loader, _class, "java/lang/ClassFormatError",
-                _class->name->bytes << ": could not parse number of exception handlers for method "
+            REPORT_FAILED_CLASS_CLASS(_class->get_class_loader(), _class, "java/lang/ClassFormatError",
+                _class->get_name()->bytes << ": could not parse number of exception handlers for method "
                 << _name->bytes << _descriptor->bytes);
         return false;
     }
@@ -1312,9 +1307,9 @@ bool Method::_parse_code( Const_Pool *cp, unsigned cp_size, unsigned code_attr_l
     // ppervov: FIXME: should throw OOME
 
     for (i=0; i<_n_handlers; i++) {
-        if(!_handlers[i].parse(cp, cp_size, _byte_code_length, cfs)) {
-            REPORT_FAILED_CLASS_CLASS(_class->class_loader, _class, "java/lang/ClassFormatError",
-                _class->name->bytes << ": could not parse exceptions for method "
+        if(!_handlers[i].parse(cp, _byte_code_length, cfs)) {
+            REPORT_FAILED_CLASS_CLASS(_class->get_class_loader(), _class, "java/lang/ClassFormatError",
+                _class->get_name()->bytes << ": could not parse exceptions for method "
                 << _name->bytes << _descriptor->bytes);
             return false;
         }
@@ -1326,8 +1321,8 @@ bool Method::_parse_code( Const_Pool *cp, unsigned cp_size, unsigned code_attr_l
     //
     uint16 n_attrs;
     if(!cfs.parse_u2_be(&n_attrs)) {
-        REPORT_FAILED_CLASS_CLASS(_class->class_loader, _class, "java/lang/ClassFormatError",
-            _class->name->bytes << ": could not parse number of attributes for method "
+        REPORT_FAILED_CLASS_CLASS(_class->get_class_loader(), _class, "java/lang/ClassFormatError",
+            _class->get_name()->bytes << ": could not parse number of attributes for method "
             << _name->bytes << _descriptor->bytes);
         return false;
     }
@@ -1338,7 +1333,7 @@ bool Method::_parse_code( Const_Pool *cp, unsigned cp_size, unsigned code_attr_l
 
     uint32 attr_len = 0;
     for (i=0; i<n_attrs; i++) {
-        Attributes cur_attr = parse_attribute(cfs, cp, cp_size, code_attr_strings, code_attrs, &attr_len, false);
+        Attributes cur_attr = parse_attribute(cfs, cp, code_attr_strings, code_attrs, &attr_len, false);
         switch(cur_attr) {
         case ATTR_LineNumberTable:
             {
@@ -1351,7 +1346,7 @@ bool Method::_parse_code( Const_Pool *cp, unsigned cp_size, unsigned code_attr_l
             {
                 if (TI_enabled)
                 {
-                    if (!_parse_local_vars("LocalVariableTable", &_local_vars_table, cp, cp_size, attr_len, cfs))
+                    if (!_parse_local_vars("LocalVariableTable", &_local_vars_table, cp, attr_len, cfs))
                     {
                         return false;
                     }
@@ -1366,7 +1361,7 @@ bool Method::_parse_code( Const_Pool *cp, unsigned cp_size, unsigned code_attr_l
             {
                 if (TI_enabled)
                 {
-                    if (!_parse_local_vars("LocalVariableTypeTable", &generic_vars, cp, cp_size, attr_len, cfs))
+                    if (!_parse_local_vars("LocalVariableTypeTable", &generic_vars, cp, attr_len, cfs))
                     {
                         return false;
                     }
@@ -1383,8 +1378,8 @@ bool Method::_parse_code( Const_Pool *cp, unsigned cp_size, unsigned code_attr_l
             break;
         default:
             // error occured
-            REPORT_FAILED_CLASS_CLASS(_class->class_loader, _class, "java/lang/InternalError",
-                _class->name->bytes << ": unknown error occured "
+            REPORT_FAILED_CLASS_CLASS(_class->get_class_loader(), _class, "java/lang/InternalError",
+                _class->get_name()->bytes << ": unknown error occured "
                 "while parsing attributes for code of method "
                 << _name->bytes << _descriptor->bytes
                 << "; unprocessed attribute " << cur_attr);
@@ -1394,8 +1389,8 @@ bool Method::_parse_code( Const_Pool *cp, unsigned cp_size, unsigned code_attr_l
     } // for
 
     if(code_attr_len != real_code_attr_len) {
-        REPORT_FAILED_CLASS_CLASS(_class->class_loader, _class, "java/lang/ClassFormatError",
-            _class->name->bytes << ": Code attribute length does not match real length "
+        REPORT_FAILED_CLASS_CLASS(_class->get_class_loader(), _class, "java/lang/ClassFormatError",
+            _class->get_name()->bytes << ": Code attribute length does not match real length "
             "in class file (" << code_attr_len << " vs. " << real_code_attr_len
             << ") while parsing attributes for code of method "
             << _name->bytes << _descriptor->bytes);
@@ -1442,10 +1437,10 @@ check_method_descriptor( const char *descriptor )
 }
 
 
-bool Method::parse(Global_Env& env, Class *clss, Const_Pool *cp, unsigned cp_size,
+bool Method::parse(Global_Env& env, Class* clss,
                    ByteReader &cfs)
 {
-    if (!Class_Member::parse(clss, cp, cp_size, cfs))
+    if(!Class_Member::parse(clss, cfs))
         return false;
 
     if(!check_method_name(_name, env)) {
@@ -1455,29 +1450,26 @@ bool Method::parse(Global_Env& env, Class *clss, Const_Pool *cp, unsigned cp_siz
 
     // check method descriptor
     if(!check_method_descriptor(_descriptor->bytes)) {
-        REPORT_FAILED_CLASS_CLASS(_class->class_loader, _class, "java/lang/ClassFormatError",
-            _class->name->bytes << ": invalid descriptor "
+        REPORT_FAILED_CLASS_CLASS(_class->get_class_loader(), _class, "java/lang/ClassFormatError",
+            _class->get_name()->bytes << ": invalid descriptor "
             "while parsing method "
             << _name->bytes << _descriptor->bytes);
         return false;
     }
+    calculate_arguments_size();
 
     uint16 attr_count;
     if (!cfs.parse_u2_be(&attr_count)) {
-        REPORT_FAILED_CLASS_CLASS(_class->class_loader, _class, "java/lang/ClassFormatError",
-            _class->name->bytes << ": could not parse attributes count for method "
+        REPORT_FAILED_CLASS_CLASS(_class->get_class_loader(), _class, "java/lang/ClassFormatError",
+            _class->get_name()->bytes << ": could not parse attributes count for method "
             << _name->bytes << _descriptor->bytes);
         return false;
     }
     _intf_method_for_fake_method = NULL;
-    //
+
     // set the has_finalizer, is_clinit and is_init flags
-    //
     if (_name == env.FinalizeName_String && _descriptor == env.VoidVoidDescriptor_String) {
         _flags.is_finalize = 1;
-        if(clss->name != env.JavaLangObject_String) {
-            clss->has_finalizer = 1;
-        }
     }
     else if (_name == env.Init_String)
         _flags.is_init = 1;
@@ -1489,8 +1481,8 @@ bool Method::parse(Global_Env& env, Class *clss, Const_Pool *cp, unsigned cp_siz
         if(is_private() && is_protected() || is_private() && is_public() || is_protected() && is_public())
         {
             bool bout = false;
-            REPORT_FAILED_CLASS_CLASS(_class->class_loader, _class, "java/lang/ClassFormatError",
-                _class->name->bytes << ": invalid combination of access flags ("
+            REPORT_FAILED_CLASS_CLASS(_class->get_class_loader(), _class, "java/lang/ClassFormatError",
+                _class->get_name()->bytes << ": invalid combination of access flags ("
                 << ((bout = is_public())?"ACC_PUBLIC":"")
                 << (bout?"|":"")
                 << ((bout |= is_protected())?"ACC_PROTECTED":"")
@@ -1504,8 +1496,8 @@ bool Method::parse(Global_Env& env, Class *clss, Const_Pool *cp, unsigned cp_siz
         && (is_final() || is_native() || is_private() || is_static() || is_strict() || is_synchronized()))
         {
             bool bout = false;
-            REPORT_FAILED_CLASS_CLASS(_class->class_loader, _class, "java/lang/ClassFormatError",
-                _class->name->bytes << ": invalid combination of access flags (ACC_ABSTRACT|"
+            REPORT_FAILED_CLASS_CLASS(_class->get_class_loader(), _class, "java/lang/ClassFormatError",
+                _class->get_name()->bytes << ": invalid combination of access flags (ACC_ABSTRACT|"
                 << ((bout = is_final())?"ACC_FINAL":"")
                 << (bout?"|":"")
                 << ((bout |= is_native())?"ACC_NATIVE":"")
@@ -1521,28 +1513,28 @@ bool Method::parse(Global_Env& env, Class *clss, Const_Pool *cp, unsigned cp_siz
                 << _name->bytes << _descriptor->bytes);
             return false;
         }
-        if(class_is_interface(_class) && !(is_abstract() && is_public())) {
-            REPORT_FAILED_CLASS_CLASS(_class->class_loader, _class, "java/lang/ClassFormatError",
-                _class->name->bytes << "." << _name->bytes << _descriptor->bytes
+        if(_class->is_interface() && !(is_abstract() && is_public())) {
+            REPORT_FAILED_CLASS_CLASS(_class->get_class_loader(), _class, "java/lang/ClassFormatError",
+                _class->get_name()->bytes << "." << _name->bytes << _descriptor->bytes
                 << ": interface method cannot have access flags other then "
                 "ACC_ABSTRACT and ACC_PUBLIC set"
                 );
             return false;
         }
-        if(class_is_interface(_class) &&
+        if(_class->is_interface() &&
             (is_private() || is_protected() || is_static() || is_final()
             || is_synchronized() || is_native() || is_strict()))
         {
-            REPORT_FAILED_CLASS_CLASS(_class->class_loader, _class, "java/lang/ClassFormatError",
-                _class->name->bytes << "." << _name->bytes << _descriptor->bytes
+            REPORT_FAILED_CLASS_CLASS(_class->get_class_loader(), _class, "java/lang/ClassFormatError",
+                _class->get_name()->bytes << "." << _name->bytes << _descriptor->bytes
                 << ": interface method cannot have access flags other then "
                 "ACC_ABSTRACT and ACC_PUBLIC set");
             return false;
         }
     }    
     if(is_init() && (is_static() || is_final() || is_synchronized() || is_native() || is_abstract() || is_bridge())) {
-        REPORT_FAILED_CLASS_CLASS(_class->class_loader, _class, "java/lang/ClassFormatError",
-            _class->name->bytes << "." << _name->bytes << _descriptor->bytes
+        REPORT_FAILED_CLASS_CLASS(_class->get_class_loader(), _class, "java/lang/ClassFormatError",
+            _class->get_name()->bytes << "." << _name->bytes << _descriptor->bytes
             << ": constructor cannot have access flags other then "
             "ACC_STRICT and one of ACC_PUBLIC, ACC_PRIVATE, or ACC_PROTECTED set");
         return false;
@@ -1564,22 +1556,23 @@ bool Method::parse(Global_Env& env, Class *clss, Const_Pool *cp, unsigned cp_siz
     unsigned n_code_attr = 0;
     unsigned n_exceptions_attr = 0;
     uint32 attr_len = 0;
+    ConstantPool& cp = clss->get_constant_pool();
 
     for (unsigned j=0; j<attr_count; j++) {
         //
         // only code and exception attributes are defined for Method
         //
-        Attributes cur_attr = parse_attribute(cfs, cp, cp_size, method_attr_strings, method_attrs, &attr_len);
+        Attributes cur_attr = parse_attribute(cfs, cp, method_attr_strings, method_attrs, &attr_len);
         switch(cur_attr) {
         case ATTR_Code:
             n_code_attr++;
-            if(!_parse_code(cp, cp_size, attr_len, cfs))
+            if(!_parse_code(cp, attr_len, cfs))
                 return false;
             break;
 
         case ATTR_Exceptions:
             n_exceptions_attr++;
-            if(!_parse_exceptions(cp, cp_size, attr_len, cfs))
+            if(!_parse_exceptions(cp, attr_len, cfs))
                 return false;
             break;
 
@@ -1606,7 +1599,7 @@ bool Method::parse(Global_Env& env, Class *clss, Const_Pool *cp, unsigned cp_siz
                 }
                 uint32 read_len = 1;
                 if (_num_param_annotations) {
-                    _param_annotations = (AnnotationTable**)_class->class_loader->Alloc(
+                    _param_annotations = (AnnotationTable**)_class->get_class_loader()->Alloc(
                         _num_param_annotations * sizeof (AnnotationTable*));
 
                     for (unsigned i = 0; i < _num_param_annotations; i++)
@@ -1634,7 +1627,7 @@ bool Method::parse(Global_Env& env, Class *clss, Const_Pool *cp, unsigned cp_siz
                     REPORT_FAILED_METHOD("more than one AnnotationDefault attribute");
                     return false;
                 }
-                _default_value = (AnnotationValue *)_class->class_loader->Alloc(
+                _default_value = (AnnotationValue *)_class->get_class_loader()->Alloc(
                     sizeof(AnnotationValue));
 
                 uint32 read_len = parse_annotation_value(*_default_value, cfs, clss);
@@ -1661,8 +1654,8 @@ bool Method::parse(Global_Env& env, Class *clss, Const_Pool *cp, unsigned cp_siz
                 return false;
             case ATTR_UNDEF:
                 // unprocessed
-                REPORT_FAILED_CLASS_CLASS(clss->class_loader, clss, "java/lang/InternalError",
-                    clss->name->bytes
+                REPORT_FAILED_CLASS_CLASS(clss->get_class_loader(), clss, "java/lang/InternalError",
+                    clss->get_name()->bytes
                     << " : error parsing attributes for method "
                     << _name->bytes << _descriptor->bytes
                     << "; unprocessed attribute " << cur_attr);
@@ -1676,29 +1669,29 @@ bool Method::parse(Global_Env& env, Class *clss, Const_Pool *cp, unsigned cp_siz
     // attribute per method
     //
     if (n_code_attr > 1) {
-        REPORT_FAILED_CLASS_CLASS(_class->class_loader, _class, "java/lang/ClassFormatError",
-            _class->name->bytes << ": there is more than one Code attribute for method "
+        REPORT_FAILED_CLASS_CLASS(_class->get_class_loader(), _class, "java/lang/ClassFormatError",
+            _class->get_name()->bytes << ": there is more than one Code attribute for method "
             << _name->bytes << _descriptor->bytes);
         return false;
     }
     if(n_exceptions_attr > 1) {
-        REPORT_FAILED_CLASS_CLASS(_class->class_loader, _class, "java/lang/ClassFormatError",
-            _class->name->bytes << ": there is more than one Exceptions attribute for method "
+        REPORT_FAILED_CLASS_CLASS(_class->get_class_loader(), _class, "java/lang/ClassFormatError",
+            _class->get_name()->bytes << ": there is more than one Exceptions attribute for method "
             << _name->bytes << _descriptor->bytes);
         return false;
     }
 
     if((is_abstract() || is_native()) && n_code_attr > 0) {
-        REPORT_FAILED_CLASS_CLASS(_class->class_loader, _class, "java/lang/ClassFormatError",
-            _class->name->bytes << "." << _name->bytes << _descriptor->bytes
+        REPORT_FAILED_CLASS_CLASS(_class->get_class_loader(), _class, "java/lang/ClassFormatError",
+            _class->get_name()->bytes << "." << _name->bytes << _descriptor->bytes
             << ": " << (is_abstract()?"abstract":(is_native()?"native":""))
             << " method should not have Code attribute present");
         return false;
     }
 
     if(!(is_abstract() || is_native()) && n_code_attr == 0) {
-        REPORT_FAILED_CLASS_CLASS(_class->class_loader, _class, "java/lang/ClassFormatError",
-            _class->name->bytes << "." << _name->bytes << _descriptor->bytes
+        REPORT_FAILED_CLASS_CLASS(_class->get_class_loader(), _class, "java/lang/ClassFormatError",
+            _class->get_name()->bytes << "." << _name->bytes << _descriptor->bytes
             << ": Java method should have Code attribute present");
         return false;
     }
@@ -1707,17 +1700,11 @@ bool Method::parse(Global_Env& env, Class *clss, Const_Pool *cp, unsigned cp_siz
 } //Method::parse
 
 
-
-
-
-
-static bool class_parse_fields(Global_Env* env,
-                               Class *clss,
-                               ByteReader &cfs)
+bool Class::parse_fields(Global_Env* env, ByteReader& cfs)
 {
     // Those fields are added by the loader even though they are nor defined
     // in their corresponding class files.
-    static     struct VMExtraFieldDescription {
+    static struct VMExtraFieldDescription {
         const String* classname;
         String* fieldname;
         String* descriptor;
@@ -1733,53 +1720,53 @@ static bool class_parse_fields(Global_Env* env,
                 env->string_pool.lookup("vm_class"),
                 env->string_pool.lookup("J"), ACC_PRIVATE},
     };
-    if(!cfs.parse_u2_be(&clss->n_fields)) {
-        REPORT_FAILED_CLASS_CLASS(clss->class_loader, clss, "java/lang/ClassFormatError",
-            clss->name->bytes << ": could not parse number of fields");
+    if(!cfs.parse_u2_be(&m_num_fields)) {
+        REPORT_FAILED_CLASS_CLASS(m_class_loader, this, "java/lang/ClassFormatError",
+            get_name()->bytes << ": could not parse number of fields");
         return false;
     }
 
-    int num_fields_in_class_file = clss->n_fields;
+    int num_fields_in_class_file = m_num_fields;
     int i;
     for(i = 0; i < int(sizeof(vm_extra_fields)/sizeof(VMExtraFieldDescription)); i++) {
-        if(clss->name == vm_extra_fields[i].classname) {
-            clss->n_fields++;
+        if(get_name() == vm_extra_fields[i].classname) {
+            m_num_fields++;
         }
     }
 
-    clss->fields = new Field[clss->n_fields];
+    m_fields = new Field[m_num_fields];
     // ppervov: FIXME: should throw OOME
 
-    clss->n_static_fields = 0;
+    m_num_static_fields = 0;
     unsigned short last_nonstatic_field = (unsigned short)num_fields_in_class_file;
-    for (i=0; i < num_fields_in_class_file; i++) {
+    for(i=0; i < num_fields_in_class_file; i++) {
         Field fd;
-        if(!fd.parse(clss, clss->const_pool, clss->cp_size, cfs))
+        if(!fd.parse(this, cfs))
             return false;
         if(fd.is_static()) {
-            clss->fields[clss->n_static_fields] = fd;
-            clss->n_static_fields++;
+            m_fields[m_num_static_fields] = fd;
+            m_num_static_fields++;
         } else {
             last_nonstatic_field--;
-            clss->fields[last_nonstatic_field] = fd;
+            m_fields[last_nonstatic_field] = fd;
         }
     }
-    assert(last_nonstatic_field == clss->n_static_fields);
+    assert(last_nonstatic_field == m_num_static_fields);
 
     for(i = 0; i < int(sizeof(vm_extra_fields)/sizeof(VMExtraFieldDescription)); i++) {
-        if(clss->name == vm_extra_fields[i].classname) {
-            Field* f = clss->fields+num_fields_in_class_file;
-            f->set(clss, vm_extra_fields[i].fieldname,
+        if(get_name() == vm_extra_fields[i].classname) {
+            Field& f = m_fields[num_fields_in_class_file];
+            f.set(this, vm_extra_fields[i].fieldname,
                 vm_extra_fields[i].descriptor, vm_extra_fields[i].accessflags);
-            f->set_injected();
+            f.set_injected();
             TypeDesc* td = type_desc_create_from_java_descriptor(
-                vm_extra_fields[i].descriptor->bytes, clss->class_loader);
+                vm_extra_fields[i].descriptor->bytes, m_class_loader);
             if( td == NULL ) {
                 // error occured
                 // ppervov: FIXME: should throw OOME
                 return false;
             }
-            f->set_field_type_desc(td);
+            f.set_field_type_desc(td);
             num_fields_in_class_file++;
         }
     }
@@ -1790,43 +1777,44 @@ static bool class_parse_fields(Global_Env* env,
 
 long _total_method_bytes = 0;
 
-static bool class_parse_methods(Class *clss,
-                                         ByteReader &cfs,
-                                         Global_Env* env)
+bool Class::parse_methods(Global_Env* env, ByteReader &cfs)
 {
-    if(!cfs.parse_u2_be(&clss->n_methods)) {
-        REPORT_FAILED_CLASS_CLASS(clss->class_loader, clss, "java/lang/ClassFormatError",
-            clss->name->bytes << ": could not parse number of methods");
+    if(!cfs.parse_u2_be(&m_num_methods)) {
+        REPORT_FAILED_CLASS_CLASS(m_class_loader, this, "java/lang/ClassFormatError",
+            get_name()->bytes << ": could not parse number of methods");
         return false;
     }
 
-    clss->methods = new Method[clss->n_methods];
+    m_methods = new Method[m_num_methods];
 
-    _total_method_bytes += sizeof(Method)*clss->n_methods;
-    for (unsigned i=0;  i < clss->n_methods;  i++) {
-        if (!clss->methods[i].parse(*env, clss, clss->const_pool, clss->cp_size, cfs))
+    _total_method_bytes += sizeof(Method)*m_num_methods;
+    for(unsigned i = 0;  i < m_num_methods; i++) {
+        if(!m_methods[i].parse(*env, this, cfs)) {
             return false;
-        Method *m = &clss->methods[i];
+        }
 
+        Method* m = &m_methods[i];
         if(m->is_clinit()) {
             // There can be at most one clinit per class.
-            if(clss->static_initializer) {
-                REPORT_FAILED_CLASS_CLASS(clss->class_loader, clss, "java/lang/ClassFormatError",
-                    clss->name->bytes << ": there is more than one class initialization method");
+            if(m_static_initializer) {
+                REPORT_FAILED_CLASS_CLASS(m_class_loader, this, "java/lang/ClassFormatError",
+                    get_name()->bytes << ": there is more than one class initialization method");
                 return false;
             }
-            clss->static_initializer = &(clss->methods[i]);
+            m_static_initializer = &(m_methods[i]);
         }
         // to cache the default constructor 
-        if (m->get_name() == VM_Global_State::loader_env->Init_String && m->get_descriptor() == VM_Global_State::loader_env->VoidVoidDescriptor_String) {
-            clss->default_constructor = &(clss->methods[i]);
-        }        
+        if (m->get_name() == VM_Global_State::loader_env->Init_String
+            && m->get_descriptor() == VM_Global_State::loader_env->VoidVoidDescriptor_String)
+        {
+            m_default_constructor = &m_methods[i];
+        }
     }
     return true; // success
 } //class_parse_methods
 
 
-static String* const_pool_parse_utf8data(String_Pool& string_pool, ByteReader& cfs,
+static String* class_file_parse_utf8data(String_Pool& string_pool, ByteReader& cfs,
                                          uint16 len)
 {
     // buffer ends before len
@@ -1847,51 +1835,51 @@ static String* const_pool_parse_utf8data(String_Pool& string_pool, ByteReader& c
 }
 
 
-static String* const_pool_parse_utf8(String_Pool& string_pool,
+static String* class_file_parse_utf8(String_Pool& string_pool,
                                      ByteReader& cfs)
 {
     uint16 len;
     if(!cfs.parse_u2_be(&len))
         return false;
 
-    return const_pool_parse_utf8data(string_pool, cfs, len);
+    return class_file_parse_utf8data(string_pool, cfs, len);
 }
 
 
-static bool class_parse_const_pool(Class *clss,
-                                   String_Pool& string_pool,
-                                   ByteReader &cfs)
+bool ConstantPool::parse(Class* clss,
+                         String_Pool& string_pool,
+                         ByteReader& cfs)
 {
-    if(!cfs.parse_u2_be(&clss->cp_size)) {
-        REPORT_FAILED_CLASS_CLASS(clss->class_loader, clss, "java/lang/ClassFormatError",
-            clss->name->bytes << ": could not parse constant pool size");
+    if(!cfs.parse_u2_be(&m_size)) {
+        REPORT_FAILED_CLASS_CLASS(clss->get_class_loader(), clss, "java/lang/ClassFormatError",
+            clss->get_name()->bytes << ": could not parse constant pool size");
         return false;
     }
 
-    unsigned char *cp_tags = new unsigned char[clss->cp_size];
+    unsigned char* cp_tags = new unsigned char[m_size];
     // ppervov: FIXME: should throw OOME
-    clss->const_pool = new Const_Pool[clss->cp_size];
+    m_entries = new ConstPoolEntry[m_size];
     // ppervov: FIXME: should throw OOME
 
     //
     // 0'th constant pool entry is a pointer to the tags array
     //
-    clss->const_pool[0].tags = cp_tags;
+    m_entries[0].tags = cp_tags;
     cp_tags[0] = CONSTANT_Tags;
-    for (unsigned i=1; i<clss->cp_size; i++) {
+    for(unsigned i = 1; i < m_size; i++) {
         // parse tag into tag array
         uint8 tag;
         if(!cfs.parse_u1(&tag)) {
-            REPORT_FAILED_CLASS_CLASS(clss->class_loader, clss, "java/lang/ClassFormatError",
-                clss->name->bytes << ": could not parse constant pool tag for index " << i);
+            REPORT_FAILED_CLASS_CLASS(clss->get_class_loader(), clss, "java/lang/ClassFormatError",
+                clss->get_name()->bytes << ": could not parse constant pool tag for index " << i);
             return false;
         }
 
-        switch (cp_tags[i] = tag) {
+        switch(cp_tags[i] = tag) {
             case CONSTANT_Class:
-                if(!cfs.parse_u2_be(&clss->const_pool[i].CONSTANT_Class.name_index)) {
-                    REPORT_FAILED_CLASS_CLASS(clss->class_loader, clss, "java/lang/ClassFormatError",
-                        clss->name->bytes << ": could not parse name index "
+                if(!cfs.parse_u2_be(&m_entries[i].CONSTANT_Class.name_index)) {
+                    REPORT_FAILED_CLASS_CLASS(clss->get_class_loader(), clss, "java/lang/ClassFormatError",
+                        clss->get_name()->bytes << ": could not parse name index "
                         "for CONSTANT_Class entry");
                     return false;
                 }
@@ -1900,31 +1888,31 @@ static bool class_parse_const_pool(Class *clss,
             case CONSTANT_Methodref:
             case CONSTANT_Fieldref:
             case CONSTANT_InterfaceMethodref:
-                if(!cfs.parse_u2_be(&clss->const_pool[i].CONSTANT_ref.class_index)) {
-                    REPORT_FAILED_CLASS_CLASS(clss->class_loader, clss, "java/lang/ClassFormatError",
-                        clss->name->bytes << ": could not parse class index for CONSTANT_*ref entry");
+                if(!cfs.parse_u2_be(&m_entries[i].CONSTANT_ref.class_index)) {
+                    REPORT_FAILED_CLASS_CLASS(clss->get_class_loader(), clss, "java/lang/ClassFormatError",
+                        clss->get_name()->bytes << ": could not parse class index for CONSTANT_*ref entry");
                     return false;
                 }
-                if(!cfs.parse_u2_be(&clss->const_pool[i].CONSTANT_ref.name_and_type_index)) {
-                    REPORT_FAILED_CLASS_CLASS(clss->class_loader, clss, "java/lang/ClassFormatError",
-                        clss->name->bytes << ": could not parse name-and-type index for CONSTANT_*ref entry");
+                if(!cfs.parse_u2_be(&m_entries[i].CONSTANT_ref.name_and_type_index)) {
+                    REPORT_FAILED_CLASS_CLASS(clss->get_class_loader(), clss, "java/lang/ClassFormatError",
+                        clss->get_name()->bytes << ": could not parse name-and-type index for CONSTANT_*ref entry");
                     return false;
                 }
                 break;
 
             case CONSTANT_String:
-                if(!cfs.parse_u2_be(&clss->const_pool[i].CONSTANT_String.string_index)) {
-                    REPORT_FAILED_CLASS_CLASS(clss->class_loader, clss, "java/lang/ClassFormatError",
-                        clss->name->bytes << ": could not parse string index for CONSTANT_String entry");
+                if(!cfs.parse_u2_be(&m_entries[i].CONSTANT_String.string_index)) {
+                    REPORT_FAILED_CLASS_CLASS(clss->get_class_loader(), clss, "java/lang/ClassFormatError",
+                        clss->get_name()->bytes << ": could not parse string index for CONSTANT_String entry");
                     return false;
                 }
                 break;
 
             case CONSTANT_Float:
             case CONSTANT_Integer:
-                if(!cfs.parse_u4_be(&clss->const_pool[i].int_value)) {
-                    REPORT_FAILED_CLASS_CLASS(clss->class_loader, clss, "java/lang/ClassFormatError",
-                        clss->name->bytes << ": could not parse value for "
+                if(!cfs.parse_u4_be(&m_entries[i].int_value)) {
+                    REPORT_FAILED_CLASS_CLASS(clss->get_class_loader(), clss, "java/lang/ClassFormatError",
+                        clss->get_name()->bytes << ": could not parse value for "
                         << (tag==CONSTANT_Integer?"CONSTANT_Integer":"CONSTANT_Float") << " entry");
                     return false;
                 }
@@ -1934,15 +1922,15 @@ static bool class_parse_const_pool(Class *clss,
             case CONSTANT_Long:
                 // longs and doubles take up two entries
                 // on both IA32 & IPF, first constant pool element is used, second element - unused
-                if(!cfs.parse_u4_be(&clss->const_pool[i].CONSTANT_8byte.high_bytes)) {
-                    REPORT_FAILED_CLASS_CLASS(clss->class_loader, clss, "java/lang/ClassFormatError",
-                        clss->name->bytes << ": could not parse high four bytes for "
+                if(!cfs.parse_u4_be(&m_entries[i].CONSTANT_8byte.high_bytes)) {
+                    REPORT_FAILED_CLASS_CLASS(clss->get_class_loader(), clss, "java/lang/ClassFormatError",
+                        clss->get_name()->bytes << ": could not parse high four bytes for "
                         << (tag==CONSTANT_Long?"CONSTANT_Integer":"CONSTANT_Float") << " entry");
                     return false;
                 }
-                if(!cfs.parse_u4_be(&clss->const_pool[i].CONSTANT_8byte.low_bytes)) {
-                    REPORT_FAILED_CLASS_CLASS(clss->class_loader, clss, "java/lang/ClassFormatError",
-                        clss->name->bytes << ": could not parse low four bytes for "
+                if(!cfs.parse_u4_be(&m_entries[i].CONSTANT_8byte.low_bytes)) {
+                    REPORT_FAILED_CLASS_CLASS(clss->get_class_loader(), clss, "java/lang/ClassFormatError",
+                        clss->get_name()->bytes << ": could not parse low four bytes for "
                         << (tag==CONSTANT_Long?"CONSTANT_Long":"CONSTANT_Double") << " entry");
                     return false;
                 }
@@ -1952,15 +1940,15 @@ static bool class_parse_const_pool(Class *clss,
                 break;
 
             case CONSTANT_NameAndType:
-                if(!cfs.parse_u2_be(&clss->const_pool[i].CONSTANT_NameAndType.name_index)) {
-                    REPORT_FAILED_CLASS_CLASS(clss->class_loader, clss, "java/lang/ClassFormatError",
-                        clss->name->bytes << ": could not parse name index "
+                if(!cfs.parse_u2_be(&m_entries[i].CONSTANT_NameAndType.name_index)) {
+                    REPORT_FAILED_CLASS_CLASS(clss->get_class_loader(), clss, "java/lang/ClassFormatError",
+                        clss->get_name()->bytes << ": could not parse name index "
                         "for CONSTANT_NameAndType entry");
                     return false;
                 }
-                if(!cfs.parse_u2_be(&clss->const_pool[i].CONSTANT_NameAndType.descriptor_index)) {
-                    REPORT_FAILED_CLASS_CLASS(clss->class_loader, clss, "java/lang/ClassFormatError",
-                        clss->name->bytes << ": could not parse descriptor index "
+                if(!cfs.parse_u2_be(&m_entries[i].CONSTANT_NameAndType.descriptor_index)) {
+                    REPORT_FAILED_CLASS_CLASS(clss->get_class_loader(), clss, "java/lang/ClassFormatError",
+                        clss->get_name()->bytes << ": could not parse descriptor index "
                         "for CONSTANT_NameAndType entry");
                     return false;
                 }
@@ -1969,55 +1957,37 @@ static bool class_parse_const_pool(Class *clss,
             case CONSTANT_Utf8:
                 {
                     // parse and insert string into string table
-                    String* str = const_pool_parse_utf8(string_pool, cfs);
+                    String* str = class_file_parse_utf8(string_pool, cfs);
                     if(!str) {
-                        REPORT_FAILED_CLASS_CLASS(clss->class_loader, clss, "java/lang/ClassFormatError",
-                            clss->name->bytes << ": could not parse CONTANT_Utf8 entry");
+                        REPORT_FAILED_CLASS_CLASS(clss->get_class_loader(), clss, "java/lang/ClassFormatError",
+                            clss->get_name()->bytes << ": could not parse CONTANT_Utf8 entry");
                         return false;
                     }
-                    clss->const_pool[i].CONSTANT_Utf8.string = str;
+                    m_entries[i].CONSTANT_Utf8.string = str;
                 }
                 break;
             default:
-                REPORT_FAILED_CLASS_CLASS(clss->class_loader, clss, "java/lang/ClassFormatError",
-                    clss->name->bytes << ": unknown constant pool tag " << cp_tags[i]);
+                REPORT_FAILED_CLASS_CLASS(clss->get_class_loader(), clss, "java/lang/ClassFormatError",
+                    clss->get_name()->bytes << ": unknown constant pool tag " << cp_tags[i]);
                 return false;
         }
     }
     return true;
-} //class_parse_const_pool
+} // ConstantPool::parse
 
 
-//
-// check consistency of constant pool
-//
-// make sure all indices to other constant pool entries are in range
-// make sure contents of constant pool entries are of the right type
-//
-// Set CONSTANT_Class entries to point directly to String representing
-// internal form of fully qualified name of Class.
-//
-// Set CONSTANT_String entries to point directly to String representation
-// of String.
-//
-// Peresolve CONSTANT_NameAndType entries to signature
-//
-static bool check_const_pool(Class* clss,
-                             Const_Pool *cp,
-                                unsigned cp_size)
+bool ConstantPool::check(Class* clss)
 {
-    unsigned char *cp_tags = cp[0].tags;
-    for (unsigned i=1; i<cp_size; i++) {
-        switch (cp_tags[i]) 
+    for(unsigned i = 1; i < m_size; i++) {
+        switch(get_tag(i))
         {
         case CONSTANT_Class:
         {
-            unsigned name_index = cp[i].CONSTANT_Class.name_index;
-            if (name_index >= cp_size ||
-                cp_tag(cp,name_index) != CONSTANT_Utf8) {
+            unsigned name_index = get_class_name_index(i);
+            if (!is_valid_index(name_index) || !is_utf8(name_index)) {
                 // illegal name index
-                REPORT_FAILED_CLASS_CLASS(clss->class_loader, clss, "java/lang/ClassFormatError",
-                    clss->name->bytes << ": wrong name index for CONSTANT_Class entry");
+                REPORT_FAILED_CLASS_CLASS(clss->get_class_loader(), clss, "java/lang/ClassFormatError",
+                    clss->get_name()->bytes << ": wrong name index for CONSTANT_Class entry");
                 return false;
             }
             break;
@@ -2026,34 +1996,31 @@ static bool check_const_pool(Class* clss,
         case CONSTANT_Fieldref:
         case CONSTANT_InterfaceMethodref:
         {
-            unsigned class_index = cp[i].CONSTANT_ref.class_index;
-            unsigned name_type_index = cp[i].CONSTANT_ref.name_and_type_index;
-            if (class_index >= cp_size ||
-                cp_tag(cp,class_index) != CONSTANT_Class) {
-                REPORT_FAILED_CLASS_CLASS(clss->class_loader, clss, "java/lang/ClassFormatError",
-                    clss->name->bytes << ": wrong class index for CONSTANT_*ref entry");
+            unsigned class_index = get_ref_class_index(i);
+            unsigned name_type_index = get_ref_name_and_type_index(i);
+            if (!is_valid_index(class_index) || !is_class(class_index)) {
+                REPORT_FAILED_CLASS_CLASS(clss->get_class_loader(), clss, "java/lang/ClassFormatError",
+                    clss->get_name()->bytes << ": wrong class index for CONSTANT_*ref entry");
                 return false;
             }
-            if (name_type_index >= cp_size ||
-                cp_tag(cp,name_type_index) != CONSTANT_NameAndType) {
-                REPORT_FAILED_CLASS_CLASS(clss->class_loader, clss, "java/lang/ClassFormatError",
-                    clss->name->bytes << ": wrong name-and-type index for CONSTANT_*ref entry");
+            if (!is_valid_index(name_type_index) || !is_name_and_type(name_type_index)) {
+                REPORT_FAILED_CLASS_CLASS(clss->get_class_loader(), clss, "java/lang/ClassFormatError",
+                    clss->get_name()->bytes << ": wrong name-and-type index for CONSTANT_*ref entry");
                 return false;
             }
             break;
         }
         case CONSTANT_String:
         {
-            unsigned string_index = cp[i].CONSTANT_String.string_index;
-            if (string_index >= cp_size ||
-                cp_tag(cp,string_index) != CONSTANT_Utf8) {
+            unsigned string_index = get_string_index(i);
+            if (!is_valid_index(string_index) || !is_utf8(string_index)) {
                 // illegal string index
-                REPORT_FAILED_CLASS_CLASS(clss->class_loader, clss, "java/lang/ClassFormatError",
-                    clss->name->bytes << ": wrong string index for CONSTANT_String entry");
+                REPORT_FAILED_CLASS_CLASS(clss->get_class_loader(), clss, "java/lang/ClassFormatError",
+                    clss->get_name()->bytes << ": wrong string index for CONSTANT_String entry");
                 return false;
             }
             // set entry to the actual string
-            cp[i].CONSTANT_String.string = cp[string_index].CONSTANT_Utf8.string;
+            resolve_entry(i, get_utf8_string(string_index));
             break;
         }
         case CONSTANT_Integer:
@@ -2064,74 +2031,80 @@ static bool check_const_pool(Class* clss,
             break;
         case CONSTANT_NameAndType:
         {
-            unsigned name_index = cp[i].CONSTANT_NameAndType.name_index;
-            unsigned descriptor_index = cp[i].CONSTANT_NameAndType.descriptor_index;
-            if (name_index >= cp_size ||
-                cp_tag(cp,name_index) != CONSTANT_Utf8) {
-                REPORT_FAILED_CLASS_CLASS(clss->class_loader, clss, "java/lang/ClassFormatError",
-                    clss->name->bytes << ": wrong name index for CONSTANT_NameAndType entry");
+            unsigned name_index = get_name_and_type_name_index(i);
+            unsigned descriptor_index = get_name_and_type_descriptor_index(i);
+            if(!is_valid_index(name_index) || !is_utf8(name_index)) {
+                REPORT_FAILED_CLASS_CLASS(clss->get_class_loader(), clss, "java/lang/ClassFormatError",
+                    clss->get_name()->bytes << ": wrong name index for CONSTANT_NameAndType entry");
                 return false;
             }
-            if (descriptor_index >= cp_size ||
-                cp_tag(cp,descriptor_index) != CONSTANT_Utf8) {
-                REPORT_FAILED_CLASS_CLASS(clss->class_loader, clss, "java/lang/ClassFormatError",
-                    clss->name->bytes << ": wrong descriptor index for CONSTANT_NameAndType entry");
+            if (!is_valid_index(descriptor_index) || !is_utf8(descriptor_index)) {
+                REPORT_FAILED_CLASS_CLASS(clss->get_class_loader(), clss, "java/lang/ClassFormatError",
+                    clss->get_name()->bytes << ": wrong descriptor index for CONSTANT_NameAndType entry");
                 return false;
             }
-            cp[i].CONSTANT_NameAndType.name = cp[name_index].CONSTANT_Utf8.string;
-            cp[i].CONSTANT_NameAndType.descriptor = cp[descriptor_index].CONSTANT_Utf8.string;
-            cp_set_resolved(cp,i);
+            resolve_entry(i, get_utf8_string(name_index), get_utf8_string(descriptor_index));
             break;
         }
         case CONSTANT_Utf8:
             // nothing to do here
             break;
         default:
-            REPORT_FAILED_CLASS_CLASS(clss->class_loader, clss, "java/lang/ClassFormatError",
-                clss->name->bytes << ": wrong constant pool tag");
+            REPORT_FAILED_CLASS_CLASS(clss->get_class_loader(), clss, "java/lang/ClassFormatError",
+                clss->get_name()->bytes << ": wrong constant pool tag " << get_tag(i));
             return false;
         }
     }
     return true;
-} //check_const_pool
+} // ConstantPool::check
 
 
-static bool class_parse_interfaces(Class *clss, ByteReader &cfs)
+bool Class::parse_interfaces(ByteReader &cfs)
 {
-    if(!cfs.parse_u2_be(&clss->n_superinterfaces)) {
-        REPORT_FAILED_CLASS_CLASS(clss->class_loader, clss, "java/lang/ClassFormatError",
-            clss->name->bytes << ": could not parse number of superinterfaces");
+    if(!cfs.parse_u2_be(&m_num_superinterfaces)) {
+        REPORT_FAILED_CLASS_CLASS(m_class_loader, this, "java/lang/ClassFormatError",
+            get_name()->bytes << ": could not parse number of superinterfaces");
         return false;
     }
 
-    clss->superinterfaces = (Class_Superinterface *) clss->class_loader->
-        Alloc(sizeof(Class_Superinterface)*clss->n_superinterfaces);
+    m_superinterfaces = (Class_Super*)m_class_loader->
+        Alloc(sizeof(Class_Super)*m_num_superinterfaces);
     // ppervov: FIXME: should throw OOME
-    for (unsigned i=0; i<clss->n_superinterfaces; i++) {
+    for (unsigned i=0; i<m_num_superinterfaces; i++) {
         uint16 interface_index;
         if(!cfs.parse_u2_be(&interface_index)) {
-            REPORT_FAILED_CLASS_CLASS(clss->class_loader, clss, "java/lang/ClassFormatError",
-                clss->name->bytes << ": could not parse superinterface index");
+            REPORT_FAILED_CLASS_CLASS(m_class_loader, this, "java/lang/ClassFormatError",
+                get_name()->bytes << ": could not parse superinterface index");
             return false;
         }
         //
         // verify that entry in constant pool is of type CONSTANT_Class
         //
-        clss->superinterfaces[i].name = cp_check_class(clss->const_pool,clss->cp_size,interface_index);
-        if (clss->superinterfaces[i].name == NULL) {
-            REPORT_FAILED_CLASS_CLASS(clss->class_loader, clss, "java/lang/ClassFormatError",
-                clss->name->bytes << ": constant pool index " << i << " is not CONSTANT_Class entry"
+        m_superinterfaces[i].name = cp_check_class(m_const_pool, interface_index);
+        if(m_superinterfaces[i].name == NULL) {
+            REPORT_FAILED_CLASS_CLASS(m_class_loader, this, "java/lang/ClassFormatError",
+                get_name()->bytes << ": constant pool index "
+                << i << " is not CONSTANT_Class entry"
                 " while parsing superinterfaces");
             return false;
         }
+        m_superinterfaces[i].cp_index = interface_index;
     }
     return true;
-} //class_parse_interfaces
+} // Class::parse_interfaces
 
 
+//
+// magic number, and major/minor version numbers of class file
+//
+#define CLASSFILE_MAGIC 0xCAFEBABE
+#define CLASSFILE_MAJOR 45
+// Supported class files up to this version
+#define CLASSFILE_MAJOR_MAX 49
+#define CLASSFILE_MINOR 3
 
 /*
- *  Parses and verifies the classfile.  Format is (from JVM spec) :
+ *  Parses and verifies the classfile. Format is (from JVM spec):
  * 
  *    ClassFile {
  *      u4 magic;
@@ -2152,24 +2125,22 @@ static bool class_parse_interfaces(Class *clss, ByteReader &cfs)
  *      attribute_info attributes[attributes_count];
  *   }
  */
-bool class_parse(Global_Env* env,
-                 Class* clss,
-                 unsigned* super_class_cp_index,
-                 ByteReader& cfs)
+bool Class::parse(Global_Env* env,
+                  ByteReader& cfs)
 {
     /*
      *  get and check magic number (Oxcafebabe)
      */
     uint32 magic;
     if (!cfs.parse_u4_be(&magic)) {
-        REPORT_FAILED_CLASS_CLASS(clss->class_loader, clss, "java/lang/ClassFormatError",
-            clss->name->bytes << ".class is not a valid Java class file");
+        REPORT_FAILED_CLASS_CLASS(m_class_loader, this, "java/lang/ClassFormatError",
+            "class is not a valid Java class file");
         return false;
     }
 
     if (magic != CLASSFILE_MAGIC) {
-        REPORT_FAILED_CLASS_CLASS(clss->class_loader, clss, "java/lang/ClassFormatError",
-            clss->name->bytes << ": invalid magic");
+        REPORT_FAILED_CLASS_CLASS(m_class_loader, this, "java/lang/ClassFormatError",
+            "invalid magic");
         return false;
     }
 
@@ -2179,51 +2150,50 @@ bool class_parse(Global_Env* env,
      */
     uint16 minor_version;
     if (!cfs.parse_u2_be(&minor_version)) {
-        REPORT_FAILED_CLASS_CLASS(clss->class_loader, clss, "java/lang/ClassFormatError",
-            clss->name->bytes << ": could not parse minor version");
+        REPORT_FAILED_CLASS_CLASS(m_class_loader, this, "java/lang/ClassFormatError",
+            "could not parse minor version");
         return false;
     }
 
     uint16 major_version;
     if (!cfs.parse_u2_be(&major_version)) {
-        REPORT_FAILED_CLASS_CLASS(clss->class_loader, clss, "java/lang/ClassFormatError",
-            clss->name->bytes << ": could not parse major version");
+        REPORT_FAILED_CLASS_CLASS(m_class_loader, this, "java/lang/ClassFormatError",
+            "could not parse major version");
         return false;
     }
 
     if (!(major_version >= CLASSFILE_MAJOR
         && major_version <= CLASSFILE_MAJOR_MAX))
     {
-        REPORT_FAILED_CLASS_CLASS(clss->class_loader, clss, "java/lang/UnsupportedClassVersionError",
-            clss->name->bytes << " has version number " << major_version);
+        REPORT_FAILED_CLASS_CLASS(m_class_loader, this, "java/lang/UnsupportedClassVersionError",
+            "class has version number " << major_version);
         return false;
     }
 
     /*
      *  allocate and parse constant pool
      */
-    if (!class_parse_const_pool(clss, env->string_pool, cfs)) {
+    if(!m_const_pool.parse(this, env->string_pool, cfs))
         return false;
-    }
 
     /*
      * check and preprocess the constant pool
      */
-    if (!check_const_pool(clss, clss->const_pool, clss->cp_size))
+    if(!m_const_pool.check(this))
         return false;
 
-    if(!cfs.parse_u2_be(&clss->access_flags)) {
-        REPORT_FAILED_CLASS_CLASS(clss->class_loader, clss, "java/lang/ClassFormatError",
-            clss->name->bytes << ": could not parse access flags");
+    if(!cfs.parse_u2_be(&m_access_flags)) {
+        REPORT_FAILED_CLASS_CLASS(m_class_loader, this, "java/lang/ClassFormatError",
+            m_name->bytes << ": could not parse access flags");
         return false;
     }
 
-    if (class_is_interface(clss)) {
-        // NOTE: Fix for the bug that an interface should have
+    if(is_interface()) {
+        // NOTE: Fix for the statement that an interface should have
         // abstract flag set.
         // spec/harness/BenchmarkDone has interface flag, but it does not 
         // have abstract flag.
-        clss->access_flags |= ACC_ABSTRACT;
+        m_access_flags |= ACC_ABSTRACT;
     }
 
     /*
@@ -2231,15 +2201,15 @@ bool class_parse(Global_Env* env,
      */
     uint16 this_class;
     if (!cfs.parse_u2_be(&this_class)) {
-        REPORT_FAILED_CLASS_CLASS(clss->class_loader, clss, "java/lang/ClassFormatError",
-            clss->name->bytes << ": could not parse this class index");
+        REPORT_FAILED_CLASS_CLASS(m_class_loader, this, "java/lang/ClassFormatError",
+            m_name->bytes << ": could not parse this class index");
         return false;
     }
 
-    String *name = cp_check_class(clss->const_pool, clss->cp_size, this_class);
-    if (name == NULL) {
-        REPORT_FAILED_CLASS_CLASS(clss->class_loader, clss, "java/lang/ClassFormatError",
-            clss->name->bytes << ": this_class constant pool entry "
+    String * class_name = cp_check_class(m_const_pool, this_class);
+    if (class_name == NULL) {
+        REPORT_FAILED_CLASS_CLASS(m_class_loader, this, "java/lang/ClassFormatError",
+            m_name->bytes << ": this_class constant pool entry "
             << this_class << " is an illegal CONSTANT_Class entry");
         return false;
     }
@@ -2248,50 +2218,49 @@ bool class_parse(Global_Env* env,
      * When defineClass from byte stream, there are cases that clss->name is null,
      * so we should add a check here
      */
-    if (clss->name && name != clss->name) { 
-        REPORT_FAILED_CLASS_CLASS(clss->class_loader, clss,
+    if(m_name != NULL && class_name != m_name) { 
+        REPORT_FAILED_CLASS_CLASS(m_class_loader, this,
             VM_Global_State::loader_env->JavaLangNoClassDefFoundError_String->bytes,
-            clss->name->bytes << ": class name in class data does not match class name passed");
+            m_name->bytes << ": class name in class data does not match class name passed");
         return false;
     }
 
-    if (!clss->name) {
-        clss->name = name;
+    if(m_name == NULL) {
+        m_name = class_name;
     }
 
     /*
      *  Mark the current class as resolved.
      */
-    cp_resolve_to_class(clss->const_pool, this_class, clss);
+    m_const_pool.resolve_entry(this_class, this);
 
     /*
      * parse the super class name
      */
     uint16 super_class;
     if (!cfs.parse_u2_be(&super_class)) {
-        REPORT_FAILED_CLASS_CLASS(clss->class_loader, clss, "java/lang/ClassFormatError",
-            clss->name->bytes << ": could not parse super class index");
+        REPORT_FAILED_CLASS_CLASS(m_class_loader, this, "java/lang/ClassFormatError",
+            m_name->bytes << ": could not parse super class index");
         return false;
     }
 
-    *super_class_cp_index = super_class;
-
+    m_super_class.cp_index = super_class;
     if (super_class == 0) {
         //
         // this class must represent java.lang.Object
         //
-        if(clss->name != env->JavaLangObject_String) {
-            REPORT_FAILED_CLASS_CLASS(clss->class_loader, clss, "java/lang/ClassFormatError",
-                clss->name->bytes << ": class does not contain super class "
+        if(m_name != env->JavaLangObject_String) {
+            REPORT_FAILED_CLASS_CLASS(m_class_loader, this, "java/lang/ClassFormatError",
+                m_name->bytes << ": class does not contain super class "
                 << "but is not java.lang.Object class");
             return false;
         }
-        clss->super_name = NULL;
+        m_super_class.name = NULL;
     } else {
-        clss->super_name = cp_check_class(clss->const_pool, clss->cp_size, super_class);
-        if (clss->super_name == NULL) {
-            REPORT_FAILED_CLASS_CLASS(clss->class_loader, clss, "java/lang/ClassFormatError",
-                clss->name->bytes << ": super_class constant pool entry "
+        m_super_class.name = cp_check_class(m_const_pool, super_class);
+        if (m_super_class.name == NULL) {
+            REPORT_FAILED_CLASS_CLASS(m_class_loader, this, "java/lang/ClassFormatError",
+                m_name->bytes << ": super_class constant pool entry "
                 << super_class << " is an illegal CONSTANT_Class entry");
             return false;
         }
@@ -2300,20 +2269,19 @@ bool class_parse(Global_Env* env,
     /*
      * allocate and parse class' interfaces
      */
-    if (!class_parse_interfaces(clss, cfs))
+    if(!parse_interfaces(cfs))
         return false;
 
     /* 
      *  allocate and parse class' fields
      */
-    if (!class_parse_fields(env, clss, cfs))
+    if(!parse_fields(env, cfs))
         return false;
-
 
     /* 
      *  allocate and parse class' methods
      */
-    if (!class_parse_methods(clss, cfs, env))
+    if(!parse_methods(env, cfs))
         return false;
 
     /*
@@ -2321,8 +2289,8 @@ bool class_parse(Global_Env* env,
      */
     uint16 n_attrs;
     if (!cfs.parse_u2_be(&n_attrs)) {
-        REPORT_FAILED_CLASS_CLASS(clss->class_loader, clss, "java/lang/ClassFormatError",
-            clss->name->bytes << ": could not parse number of attributes");
+        REPORT_FAILED_CLASS_CLASS(m_class_loader, this, "java/lang/ClassFormatError",
+            m_name->bytes << ": could not parse number of attributes");
         return false;
     }
 
@@ -2332,21 +2300,21 @@ bool class_parse(Global_Env* env,
     uint32 attr_len = 0;
 
     for (unsigned i=0; i<n_attrs; i++) {
-        Attributes cur_attr = parse_attribute(cfs, clss->const_pool, clss->cp_size, class_attr_strings, class_attrs, &attr_len);
+        Attributes cur_attr = parse_attribute(cfs, m_const_pool, class_attr_strings, class_attrs, &attr_len);
         switch(cur_attr){
         case ATTR_SourceFile:
         {
             // a class file can have at most one source file attribute
             if (++n_source_file_attr > 1) {
-                REPORT_FAILED_CLASS_CLASS(clss->class_loader, clss, "java/lang/ClassFormatError",
-                    clss->name->bytes << ": there is more than one SourceFile attribute");
+                REPORT_FAILED_CLASS_CLASS(m_class_loader, this, "java/lang/ClassFormatError",
+                    m_name->bytes << ": there is more than one SourceFile attribute");
                 return false;
             }
 
             // attribute length must be two (vm spec 4.7.2)
             if (attr_len != 2) {
-                REPORT_FAILED_CLASS_CLASS(clss->class_loader, clss, "java/lang/ClassFormatError",
-                    clss->name->bytes << ": SourceFile attribute has incorrect length ("
+                REPORT_FAILED_CLASS_CLASS(m_class_loader, this, "java/lang/ClassFormatError",
+                    m_name->bytes << ": SourceFile attribute has incorrect length ("
                     << attr_len << " bytes, should be 2 bytes)");
                 return false;
             }
@@ -2354,16 +2322,16 @@ bool class_parse(Global_Env* env,
             // constant value attribute
             uint16 filename_index;
             if(!cfs.parse_u2_be(&filename_index)) {
-                REPORT_FAILED_CLASS_CLASS(clss->class_loader, clss, "java/lang/ClassFormatError",
-                    clss->name->bytes << ": could not parse filename index"
+                REPORT_FAILED_CLASS_CLASS(m_class_loader, this, "java/lang/ClassFormatError",
+                    m_name->bytes << ": could not parse filename index"
                     << " while parsing SourceFile attribute");
                 return false;
             }
 
-            clss->src_file_name = cp_check_utf8(clss->const_pool,clss->cp_size,filename_index);
-            if (clss->src_file_name == NULL) {
-                REPORT_FAILED_CLASS_CLASS(clss->class_loader, clss, "java/lang/ClassFormatError",
-                    clss->name->bytes << ": filename index points to incorrect constant pool entry"
+            m_src_file_name = cp_check_utf8(m_const_pool, filename_index);
+            if(m_src_file_name == NULL) {
+                REPORT_FAILED_CLASS_CLASS(m_class_loader, this, "java/lang/ClassFormatError",
+                    m_name->bytes << ": filename index points to incorrect constant pool entry"
                     << " while parsing SourceFile attribute");
                 return false;
             }
@@ -2372,115 +2340,115 @@ bool class_parse(Global_Env* env,
 
         case ATTR_InnerClasses:
         {
-            if (clss->declaringclass_index || clss->innerclass_indexes) {
-                REPORT_FAILED_CLASS_FORMAT(clss, "more than one InnerClasses attribute");
+            if (m_declaring_class_index || m_innerclasses) {
+                REPORT_FAILED_CLASS_FORMAT(this, "more than one InnerClasses attribute");
             }
             bool isinner = false;
             // found_myself == 2: myself is not inner class or has passed myself when iterating inner class attribute arrays
             // found_myself == 1: myself is inner class, current index of inner class attribute arrays is just myself
             // found_myself == 0: myself is inner class, hasn't met myself in inner class attribute arrays
             int found_myself = 2;
-            if(strchr(clss->name->bytes, '$')){
+            if(strchr(m_name->bytes, '$')){
                 isinner = true;
                 found_myself = 0;
             }
             //Only handle inner class
             uint16 num_of_classes;
             if(!cfs.parse_u2_be(&num_of_classes)) {
-                REPORT_FAILED_CLASS_CLASS(clss->class_loader, clss, "java/lang/ClassFormatError",
-                    clss->name->bytes << ": could not parse number of classes"
+                REPORT_FAILED_CLASS_CLASS(m_class_loader, this, "java/lang/ClassFormatError",
+                    m_name->bytes << ": could not parse number of classes"
                     << " while parsing InnerClasses attribute");
                 return false;
             }
 
             if(isinner)
-                clss->n_innerclasses = (uint16)(num_of_classes - 1); //exclude itself
+                m_num_innerclasses = (uint16)(num_of_classes - 1); //exclude itself
             else
-                clss->n_innerclasses = num_of_classes;
+                m_num_innerclasses = num_of_classes;
             if(num_of_classes)
-                clss->innerclass_indexes = (uint16*) clss->class_loader->
-                    Alloc(2*sizeof(uint16)*clss->n_innerclasses);
+                m_innerclasses = (InnerClass*) m_class_loader->
+                    Alloc(2*sizeof(InnerClass)*m_num_innerclasses);
                 // ppervov: FIXME: should throw OOME
             int index = 0;
             for(int i = 0; i < num_of_classes; i++){
                 uint16 inner_clss_info_idx;
                 if(!cfs.parse_u2_be(&inner_clss_info_idx)) {
-                    REPORT_FAILED_CLASS_CLASS(clss->class_loader, clss, "java/lang/ClassFormatError",
-                        clss->name->bytes << ": could not parse inner class info index"
+                    REPORT_FAILED_CLASS_CLASS(m_class_loader, this, "java/lang/ClassFormatError",
+                        m_name->bytes << ": could not parse inner class info index"
                         << " while parsing InnerClasses attribute");
                     return false;
                 }
                 if(inner_clss_info_idx
-                   && cp_tag(clss->const_pool,inner_clss_info_idx) != CONSTANT_Class)
+                    && !valid_cpi(this, inner_clss_info_idx, CONSTANT_Class))
                 {
-                    REPORT_FAILED_CLASS_CLASS(clss->class_loader, clss, "java/lang/ClassFormatError",
-                        clss->name->bytes << ": inner class info index points to incorrect constant pool entry"
+                    REPORT_FAILED_CLASS_CLASS(m_class_loader, this, "java/lang/ClassFormatError",
+                        m_name->bytes << ": inner class info index points to incorrect constant pool entry"
                         << " while parsing InnerClasses attribute");
                     return false;
                 }
 
                 if(!found_myself){
-                    String *clssname = cp_check_class(clss->const_pool, clss->cp_size, inner_clss_info_idx);
+                    String* clssname = cp_check_class(m_const_pool, inner_clss_info_idx);
                     // Only handle this class
-                    if(clss->name == clssname)
+                    if(m_name == clssname)
                         found_myself = 1;
                 }
                 if(found_myself != 1)
-                    clss->innerclass_indexes[index++] = inner_clss_info_idx;
+                    m_innerclasses[index].index = inner_clss_info_idx;
 
                 uint16 outer_clss_info_idx;
                 if(!cfs.parse_u2_be(&outer_clss_info_idx)) {
-                    REPORT_FAILED_CLASS_CLASS(clss->class_loader, clss, "java/lang/ClassFormatError",
-                        clss->name->bytes << ": could not parse outer class info index"
+                    REPORT_FAILED_CLASS_CLASS(m_class_loader, this, "java/lang/ClassFormatError",
+                        m_name->bytes << ": could not parse outer class info index"
                         << " while parsing InnerClasses attribute");
                     return false;
                 }
                 if(outer_clss_info_idx
-                    && cp_tag(clss->const_pool,outer_clss_info_idx) != CONSTANT_Class)
+                    && !valid_cpi(this, outer_clss_info_idx, CONSTANT_Class))
                 {
-                    REPORT_FAILED_CLASS_CLASS(clss->class_loader, clss, "java/lang/ClassFormatError",
-                        clss->name->bytes << ": outer class info index points to incorrect constant pool entry"
-                        << " while parsing InnerClasses attribute");
+                    REPORT_FAILED_CLASS_CLASS(m_class_loader, this, "java/lang/ClassFormatError",
+                        m_name->bytes << ": outer class info index points to incorrect constant pool entry"
+                        << outer_clss_info_idx << " while parsing InnerClasses attribute");
                     return false;
                 }
                 if(found_myself == 1 && outer_clss_info_idx){
-                    clss->declaringclass_index = outer_clss_info_idx;
+                    m_declaring_class_index = outer_clss_info_idx;
                 }
 
                 uint16 inner_name_idx;
                 if(!cfs.parse_u2_be(&inner_name_idx)) {
-                    REPORT_FAILED_CLASS_CLASS(clss->class_loader, clss, "java/lang/ClassFormatError",
-                        clss->name->bytes << ": could not parse inner name index"
+                    REPORT_FAILED_CLASS_CLASS(m_class_loader, this, "java/lang/ClassFormatError",
+                        m_name->bytes << ": could not parse inner name index"
                         << " while parsing InnerClasses attribute");
                     return false;
                 }
-                if(inner_name_idx && !valid_cpi(clss, inner_name_idx, CONSTANT_Utf8))
+                if(inner_name_idx && !valid_cpi(this, inner_name_idx, CONSTANT_Utf8))
                 {
-                    REPORT_FAILED_CLASS_FORMAT(clss,
+                    REPORT_FAILED_CLASS_FORMAT(this,
                         "inner name index points to incorrect constant pool entry");
                     return false;
                 }
-                if(found_myself == 1 /*&& outer_clss_info_idx*/){
+                if(found_myself == 1){
                     if (inner_name_idx) {
-                        clss->simple_name = clss->const_pool[inner_name_idx].CONSTANT_Utf8.string;
+                        m_simple_name = m_const_pool.get_utf8_string(inner_name_idx);
                     } else {
                         //anonymous class
-                        clss->simple_name = env->string_pool.lookup("");
+                        m_simple_name = env->string_pool.lookup("");
                     }
                 }
 
                 uint16 inner_clss_access_flag;
                 if(!cfs.parse_u2_be(&inner_clss_access_flag)) {
-                    REPORT_FAILED_CLASS_CLASS(clss->class_loader, clss, "java/lang/ClassFormatError",
-                        clss->name->bytes << ": could not parse inner class access flags"
+                    REPORT_FAILED_CLASS_CLASS(m_class_loader, this, "java/lang/ClassFormatError",
+                        m_name->bytes << ": could not parse inner class access flags"
                         << " while parsing InnerClasses attribute");
                     return false;
                 }
                 if(found_myself == 1) {
                     found_myself = 2;
-                    clss->access_flags = inner_clss_access_flag;
+                    m_access_flags = inner_clss_access_flag;
                 } else
-                    clss->innerclass_indexes[index++] = inner_clss_access_flag;
+                    m_innerclasses[index++].access_flags = inner_clss_access_flag;
             } // for num_of_classes
         }break; //case ATTR_InnerClasses
 
@@ -2489,17 +2457,17 @@ bool class_parse(Global_Env* env,
                 // attribute length is already recorded in attr_len
                 // now reading debug extension information
                 if( ++numSourceDebugExtensions > 1 ) {
-                    REPORT_FAILED_CLASS_CLASS(clss->class_loader, clss, "java/lang/ClassFormatError",
-                        clss->name->bytes << ": there is more than one SourceDebugExtension attribute");
+                    REPORT_FAILED_CLASS_CLASS(m_class_loader, this, "java/lang/ClassFormatError",
+                        m_name->bytes << ": there is more than one SourceDebugExtension attribute");
                     return false;
                 }
 
                 // cfs is at debug_extension[] which is:
                 //      The debug_extension array holds a string, which must be in UTF-8 format.
                 //      There is no terminating zero byte.
-                clss->sourceDebugExtension = const_pool_parse_utf8data(env->string_pool, cfs, attr_len);
-                if (!clss->sourceDebugExtension) {
-                    REPORT_FAILED_CLASS_FORMAT(clss, "invalid SourceDebugExtension attribute");
+                m_sourceDebugExtension = class_file_parse_utf8data(env->string_pool, cfs, attr_len);
+                if(!m_sourceDebugExtension) {
+                    REPORT_FAILED_CLASS_FORMAT(this, "invalid SourceDebugExtension attribute");
                     return false;
                 }
             }
@@ -2508,74 +2476,74 @@ bool class_parse(Global_Env* env,
         case ATTR_EnclosingMethod:
             {
                 if ( ++numEnclosingMethods > 1 ) {
-                    REPORT_FAILED_CLASS_FORMAT(clss,"more than one EnclosingMethod attribute");
+                    REPORT_FAILED_CLASS_FORMAT(this, "more than one EnclosingMethod attribute");
                     return false;
                 }
                 if (attr_len != 4) {
-                    REPORT_FAILED_CLASS_FORMAT(clss,
+                    REPORT_FAILED_CLASS_FORMAT(this,
                         "unexpected length of EnclosingMethod attribute: " << attr_len);
                     return false;
                 }
                 uint16 class_idx;
                 if(!cfs.parse_u2_be(&class_idx)) {
-                    REPORT_FAILED_CLASS_FORMAT(clss, 
+                    REPORT_FAILED_CLASS_FORMAT(this, 
                         "could not parse class index of EnclosingMethod attribute");
                     return false;
                 }
-                if(!valid_cpi(clss, class_idx, CONSTANT_Class))
+                if(!valid_cpi(this, class_idx, CONSTANT_Class))
                 {
-                    REPORT_FAILED_CLASS_FORMAT(clss, 
+                    REPORT_FAILED_CLASS_FORMAT(this, 
                         "incorrect class index of EnclosingMethod attribute");
                     return false;
                 }
-                clss->enclosing_class_index = class_idx;
+                m_enclosing_class_index = class_idx;
 
                 uint16 method_idx;
                 if(!cfs.parse_u2_be(&method_idx)) {
-                    REPORT_FAILED_CLASS_FORMAT(clss, 
+                    REPORT_FAILED_CLASS_FORMAT(this, 
                         "could not parse method index of EnclosingMethod attribute");
                     return false;
                 }
-                if(method_idx && !valid_cpi(clss, method_idx, CONSTANT_NameAndType))
+                if(method_idx && !valid_cpi(this, method_idx, CONSTANT_NameAndType))
                 {
-                    REPORT_FAILED_CLASS_FORMAT(clss, 
+                    REPORT_FAILED_CLASS_FORMAT(this, 
                         "incorrect method index of EnclosingMethod attribute");
                     return false;
                 }
-                clss->enclosing_method_index = method_idx;
+                m_enclosing_method_index = method_idx;
             }
             break;
 
         case ATTR_Synthetic:
             {
                 if(attr_len != 0) {
-                    REPORT_FAILED_CLASS_FORMAT(clss,
+                    REPORT_FAILED_CLASS_FORMAT(this,
                         "attribute Synthetic has non-zero length");
                     return false;
                 }
-                clss->access_flags |= ACC_SYNTHETIC;
+                m_access_flags |= ACC_SYNTHETIC;
             }
             break;
 
         case ATTR_Deprecated:
             {
                 if(attr_len != 0) {
-                    REPORT_FAILED_CLASS_FORMAT(clss,
+                    REPORT_FAILED_CLASS_FORMAT(this,
                         "attribute Deprecated has non-zero length");
                     return false;
                 }
-                clss->deprecated = true;
+                m_deprecated = true;
             }
             break;
 
         case ATTR_Signature:
             {
-                if(clss->Signature) {
-                    REPORT_FAILED_CLASS_FORMAT(clss,
+                if(m_signature != NULL) {
+                    REPORT_FAILED_CLASS_FORMAT(this,
                         "more than one Signature attribute for the class");
                     return false;
                 }
-                if (!(clss->Signature = parse_signature_attr(cfs, attr_len, clss))) {
+                if (!(m_signature = parse_signature_attr(cfs, attr_len, this))) {
                     return false;
                 }
             }
@@ -2583,9 +2551,9 @@ bool class_parse(Global_Env* env,
 
         case ATTR_RuntimeVisibleAnnotations:
             {
-                uint32 read_len = parse_annotation_table(&(clss->annotations), cfs, clss);
+                uint32 read_len = parse_annotation_table(&m_annotations, cfs, this);
                 if (attr_len != read_len) {
-                    REPORT_FAILED_CLASS_FORMAT(clss, 
+                    REPORT_FAILED_CLASS_FORMAT(this, 
                         "error parsing Annotations attribute"
                         << "; declared length " << attr_len
                         << " does not match actual " << read_len);
@@ -2597,7 +2565,7 @@ bool class_parse(Global_Env* env,
         case ATTR_RuntimeInvisibleAnnotations:
             {
                 if(!cfs.skip(attr_len)) {
-                    REPORT_FAILED_CLASS_FORMAT(clss,
+                    REPORT_FAILED_CLASS_FORMAT(this,
                         "failed to skip RuntimeInvisibleAnnotations attribute");
                     return false;
                 }
@@ -2609,8 +2577,8 @@ bool class_parse(Global_Env* env,
             break;
         default:
             // error occured
-            REPORT_FAILED_CLASS_CLASS(clss->class_loader, clss, "java/lang/InternalError",
-                clss->name->bytes << ": unknown error occured"
+            REPORT_FAILED_CLASS_CLASS(m_class_loader, this, "java/lang/InternalError",
+                m_name->bytes << ": unknown error occured"
                 " while parsing attributes for class"  
                 << "; unprocessed attribute " << cur_attr);
             return false;
@@ -2618,27 +2586,26 @@ bool class_parse(Global_Env* env,
     } // for
 
     if (cfs.have(1)) {
-        REPORT_FAILED_CLASS_FORMAT(clss, "Extra bytes at the end of class file");
+        REPORT_FAILED_CLASS_FORMAT(this, "Extra bytes at the end of class file");
         return false;
     }
 
-    if (clss->enclosing_class_index && !clss->simple_name) {
+    if (m_enclosing_class_index && m_simple_name == NULL) {
         WARN("Attention: EnclosingMethod attribute does not imply "
-            "InnerClasses presence for class " << clss->name->bytes);
+            "InnerClasses presence for class " << m_name->bytes);
     }
-
 
     /*
      *   can't be both final and interface, or both final and abstract
      */
-    if (class_is_final(clss) && class_is_interface(clss))
+    if(is_final() && is_interface())
     {
-        REPORT_FAILED_CLASS_FORMAT(clss, "interface cannot be final");
+        REPORT_FAILED_CLASS_FORMAT(this, "interface cannot be final");
         return false;
     }
     
-    if (class_is_final(clss) && class_is_abstract(clss)) {
-        REPORT_FAILED_CLASS_FORMAT(clss, "abstract class cannot be final");
+    if(is_final() && is_abstract()) {
+        REPORT_FAILED_CLASS_FORMAT(this, "abstract class cannot be final");
         return false;
     }
 
@@ -2649,14 +2616,14 @@ bool class_parse(Global_Env* env,
     //    return false;
     //}
 
-    if(class_is_annotation(clss) && !class_is_interface(clss))
+    if(is_annotation() && !is_interface())
     {
-        REPORT_FAILED_CLASS_FORMAT(clss, "annotation type must be interface");
+        REPORT_FAILED_CLASS_FORMAT(this, "annotation type must be interface");
         return false;
     }
 
     return true;
-} //class_parse
+} // Class::parse
 
 
 static bool const_pool_find_entry(ByteReader& cp, uint16 cp_count, uint16 index)
@@ -2811,7 +2778,7 @@ const String* class_extract_name(Global_Env* env,
     if(!cfs.parse_u1(&tag) && tag != CONSTANT_Utf8)
         return NULL;
     // parse class name
-    const String* class_name = const_pool_parse_utf8(env->string_pool, cfs);
+    const String* class_name = class_file_parse_utf8(env->string_pool, cfs);
     return class_name;
 }
 
@@ -2832,102 +2799,4 @@ Class *class_load_verify_prepare_from_jni(Global_Env *env, const String *classna
     assert(hythread_is_suspend_enabled());
     Class *clss = env->bootstrap_class_loader->LoadVerifyAndPrepareClass(env, classname);
     return clss;
-}
-
-
-////////////////////////////////////////////////////////////////////
-// begin support for JIT notification when classes are extended
-
-struct Class_Extended_Notification_Record {
-    Class *class_of_interest;
-    JIT   *jit;
-    void  *callback_data;
-    Class_Extended_Notification_Record *next;
-
-    bool equals(Class *class_of_interest_, JIT *jit_, void *callback_data_) {
-        if ((class_of_interest == class_of_interest_) &&
-            (jit == jit_) &&
-            (callback_data == callback_data_)) {
-            return true;
-        }
-        return false;
-    }
-};
-
-
-// Notify the given JIT whenever the class "clss" is extended.
-// The callback_data pointer will be passed back to the JIT during the callback.  
-// The JIT's callback function is JIT_extended_class_callback.
-void class_register_jit_extended_class_callback(Class *clss, JIT *jit_to_be_notified, void *callback_data)
-{
-    // Don't insert the same entry repeatedly on the notify_extended_records list.
-    Class_Extended_Notification_Record *nr = clss->notify_extended_records;
-    while (nr != NULL) {
-        if (nr->equals(clss, jit_to_be_notified, callback_data)) {
-            return;
-        }
-        nr = nr->next;
-    }
-
-    // Insert a new notification record.
-    Class_Extended_Notification_Record *new_nr = 
-        (Class_Extended_Notification_Record *)STD_MALLOC(sizeof(Method_Change_Notification_Record));
-    new_nr->class_of_interest  = clss;
-    new_nr->jit                = jit_to_be_notified;
-    new_nr->callback_data      = callback_data;
-    new_nr->next               = clss->notify_extended_records;
-    clss->notify_extended_records = new_nr;
-} //class_register_jit_extended_class_callback
-
-
-void do_jit_extended_class_callbacks(Class *clss, Class *new_subclass)
-{
-    Class_Extended_Notification_Record *nr;
-    for (nr = clss->notify_extended_records;  nr != NULL;  nr = nr->next) {
-        JIT *jit_to_be_notified = nr->jit;
-        Boolean code_was_modified = 
-            jit_to_be_notified->extended_class_callback(/*extended_class*/ clss,
-                                                        /*new_class*/ new_subclass,
-                                                        nr->callback_data);
-        if (code_was_modified) {
-#ifdef _IPF_
-            // 20030128 I don't think we have to do a flush_hw_cache() here since that should 
-            // be done by the recompiled_method callbacks.
-            sync_i_cache();            
-            do_mf();
-#endif //_IPF_
-        }
-    }
-} //do_jit_extended_class_callbacks
-
-// end support for JIT notification when classes are extended
-////////////////////////////////////////////////////////////////////
-
-
-unsigned class_calculate_size(const Class* klass)
-{
-    unsigned size = 0;
-    size += sizeof(Class);
-    size += klass->n_innerclasses*sizeof(uint16);
-    size += klass->cp_size*sizeof(Const_Pool);
-    for(unsigned i = 0; i < klass->n_fields; i++) {
-        size += klass->fields[i].calculate_size();
-    }
-    for(unsigned i = 0; i < klass->n_methods; i++) {
-        size += klass->methods[i].calculate_size();
-    }
-    size += klass->n_superinterfaces*sizeof(Class_Superinterface);
-    size += klass->static_data_size;
-    size += klass->static_method_size;
-    if(!class_is_interface(klass))
-        size += sizeof(VTable);
-    size += klass->n_intfc_table_entries*sizeof(Class*);
-    for(Class_Extended_Notification_Record* mcnr = klass->notify_extended_records;
-        mcnr != NULL; mcnr = mcnr->next)
-    {
-        size += sizeof(Class_Extended_Notification_Record);
-    }
-    size += sizeof(Lock_Manager);
-
-    return size;
 }

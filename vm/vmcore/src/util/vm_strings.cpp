@@ -243,17 +243,16 @@ static void string_create(unsigned unicode_length, bool eight_bit, ManagedObject
         clss = global_env->ArrayOfByte_Class;
     assert(clss);
 
-    unsigned sz = vm_array_size(clss->vtable, unicode_length);
-    Vector_Handle array = vm_alloc_and_report_ti(sz, clss->allocation_handle, 
-            vm_get_gc_thread_local(), clss);
-    if (!array) { // OutOfMemory should be thrown
+    unsigned sz = clss->calculate_array_size(unicode_length);
+    Vector_Handle array = vm_alloc_and_report_ti(sz, clss->get_allocation_handle(),
+        vm_get_gc_thread_local(), clss);
+    if(!array) { // OutOfMemory should be thrown
         *str = NULL;
         exn_raise_object(VM_Global_State::loader_env->java_lang_OutOfMemoryError);
         return;
     }
 #ifdef VM_STATS
-    clss->num_allocations++;
-    clss->num_bytes_allocated += sz;
+    clss->instance_allocated(sz);
 #endif //VM_STATS
     set_vector_length(array, unicode_length);
 
@@ -590,20 +589,17 @@ jstring String_to_interned_jstring(String* str)
 }
 
 
-Java_java_lang_String *
-vm_instantiate_cp_string_slow(Class *c, unsigned cp_index)
+Java_java_lang_String*
+vm_instantiate_cp_string_slow(Class* c, unsigned cp_index)
 {
     ASSERT_THROW_AREA;
 #ifdef VM_STATS
     VM_Statistics::get_vm_stats().num_instantiate_cp_string_slow++;
 #endif
 
-    Java_java_lang_String *result;
-    assert(cp_index < c->cp_size);
-    Const_Pool *cp = c->const_pool;
-
-    String *str = cp[cp_index].CONSTANT_String.string;
-    assert(cp_is_constant(cp, cp_index));
+    Java_java_lang_String* result;
+    ConstantPool& cp = c->get_constant_pool();
+    String* str = cp.get_string(cp_index);
 
     BEGIN_RAISE_AREA;
     result = vm_instantiate_cp_string_resolved(str);

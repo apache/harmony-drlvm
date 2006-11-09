@@ -48,7 +48,6 @@
 #include "m2n.h"
 #include "nogc.h"
 #include "init.h"
-#include "Verifier_stub.h"
 #include "jni_utils.h"
 #include "jit_runtime_support.h"
 #include "jvmti_direct.h"
@@ -632,7 +631,7 @@ jclass JNICALL DefineClass(JNIEnv *jenv,
 
     bool ld_result;
     if(clss != NULL)
-        ld_result = class_verify(env, clss) && class_prepare(env, clss);
+        ld_result = clss->verify(env) && clss->prepare(env);
 
     if(clss && ld_result)
     {
@@ -680,10 +679,10 @@ jclass JNICALL GetSuperclass(JNIEnv * UNREF env, jclass clazz)
     assert(hythread_is_suspend_enabled());
     Class* clss = jclass_to_struct_Class(clazz);
     if(clss) {
-        if(class_is_interface(clss)) {
+        if(clss->is_interface()) {
             return 0;
         } else {
-            Class *super_class = clss->super_class;
+            Class* super_class = clss->get_super_class();
             if(super_class) {
                 assert(hythread_is_suspend_enabled());
                 return struct_Class_to_jclass(super_class);
@@ -922,8 +921,8 @@ jboolean JNICALL IsSameObject(JNIEnv * UNREF env,
 
     ManagedObject *java_ref1 = h1->object;
     ManagedObject *java_ref2 = h2->object;
-    TRACE2("jni-same", "IsSameObject: Obj1 = " << java_ref1->vt()->clss->name->bytes <<
-        " Obj2 = " << java_ref2->vt()->clss->name->bytes <<
+    TRACE2("jni-same", "IsSameObject: Obj1 = " << java_ref1->vt()->clss->get_name()->bytes <<
+        " Obj2 = " << java_ref2->vt()->clss->get_name()->bytes <<
         " objects are " << ((java_ref1 == java_ref2) ? "same" : "different"));
     jboolean result = (jboolean)((java_ref1 == java_ref2) ? JNI_TRUE : JNI_FALSE);
 
@@ -965,9 +964,9 @@ jobject JNICALL AllocObject(JNIEnv *env,
     assert(clazz);
     Class* clss = jclass_to_struct_Class(clazz);
 
-    if(class_is_interface(clss) || class_is_abstract(clss)) {
+    if(clss->is_interface() || clss->is_abstract()) {
         // Can't instantiate interfaces and abtract classes.
-        ThrowNew_Quick(env, "java/lang/InstantiationException", clss->name->bytes);
+        ThrowNew_Quick(env, "java/lang/InstantiationException", clss->get_name()->bytes);
         return 0;
     }
 
@@ -1050,7 +1049,7 @@ jclass JNICALL GetObjectClass(JNIEnv * UNREF env,
     assert(jlo);
     assert(jlo->vt());
     Class *clss = jlo->vt()->clss;
-    TRACE2("jni", "GetObjectClass: class = " << clss->name->bytes);
+    TRACE2("jni", "GetObjectClass: class = " << clss->get_name()->bytes);
     new_handle->object= struct_Class_to_java_lang_Class(clss);
     tmn_suspend_enable();        //---------------------------------^
 
@@ -1072,7 +1071,7 @@ jboolean JNICALL IsInstanceOf(JNIEnv *env,
     Class* clss = jclass_to_struct_Class(clazz);
     Class* obj_clss = jclass_to_struct_Class(obj_class);
 
-    Boolean isInstance = class_is_subtype_fast(obj_clss->vtable, clss);
+    Boolean isInstance = obj_clss->is_instanceof(clss);
 
     if(isInstance) {
         return JNI_TRUE;
@@ -1271,11 +1270,11 @@ VMEXPORT void* JNICALL GetPrimitiveArrayCritical(JNIEnv* jenv, jarray array, jbo
     tmn_suspend_disable();
     Class* array_clss = ((ObjectHandle)array)->object->vt()->clss;
     tmn_suspend_enable();
-    assert(array_clss->name->bytes[0]=='[');
+    assert(array_clss->get_name()->bytes[0]=='[');
 
     TRACE2("jni.pin", "pinning array " << array->object);
     gc_pin_object((Managed_Object_Handle*)array);
-    switch (array_clss->name->bytes[1]) {
+    switch (array_clss->get_name()->bytes[1]) {
     case 'B':  return GetByteArrayElements(jenv, array, isCopy);
     case 'C':  return GetCharArrayElements(jenv, array, isCopy);
     case 'D':  return GetDoubleArrayElements(jenv, array, isCopy);
@@ -1295,8 +1294,8 @@ VMEXPORT void JNICALL ReleasePrimitiveArrayCritical(JNIEnv* jenv, jarray array, 
     tmn_suspend_disable();
     Class* array_clss = ((ObjectHandle)array)->object->vt()->clss;
     tmn_suspend_enable();
-    assert(array_clss->name->bytes[0]=='[');
-    switch (array_clss->name->bytes[1]) {
+    assert(array_clss->get_name()->bytes[0]=='[');
+    switch (array_clss->get_name()->bytes[1]) {
     case 'B':  ReleaseByteArrayElements(jenv, array, (jbyte*)carray, mode); break;
     case 'C':  ReleaseCharArrayElements(jenv, array, (jchar*)carray, mode); break;
     case 'D':  ReleaseDoubleArrayElements(jenv, array, (jdouble*)carray, mode); break;
@@ -1679,9 +1678,9 @@ static void check_for_unexpected_exception(){
     }
 }
 
-void global_object_handles_init(JNIEnv * jni_env) {
-
-    Global_Env * vm_env = jni_get_vm_env(jni_env);
+void global_object_handles_init(JNIEnv* jni_env)
+{
+    Global_Env* vm_env = jni_get_vm_env(jni_env);
 
     gh_jlc = oh_allocate_global_handle();
     gh_jls = oh_allocate_global_handle();
@@ -1704,8 +1703,8 @@ void global_object_handles_init(JNIEnv * jni_env) {
     gh_jlfloat = oh_allocate_global_handle();
     gh_jldouble = oh_allocate_global_handle();
     ObjectHandle h_jlt = oh_allocate_global_handle();
-    tmn_suspend_disable();
 
+    tmn_suspend_disable();  // --------------vvv
     gh_jlc->object = struct_Class_to_java_lang_Class(vm_env->JavaLangClass_Class);
     gh_jls->object = struct_Class_to_java_lang_Class(vm_env->JavaLangString_Class);
     gh_jlcloneable->object = struct_Class_to_java_lang_Class(vm_env->java_lang_Cloneable_Class);
@@ -1717,16 +1716,16 @@ void global_object_handles_init(JNIEnv * jni_env) {
     gh_aolong->object = struct_Class_to_java_lang_Class(vm_env->ArrayOfLong_Class);
     gh_aofloat->object = struct_Class_to_java_lang_Class(vm_env->ArrayOfFloat_Class);
     gh_aodouble->object = struct_Class_to_java_lang_Class(vm_env->ArrayOfDouble_Class);
-    tmn_suspend_enable(); //-------------------------------------------------------^
-    Class *preload_class(Global_Env* vm_env, const char *classname);
-    Class* jlboolean = preload_class(vm_env, "java/lang/Boolean");
-    Class* jlbyte = preload_class(vm_env, "java/lang/Byte");
-    Class* jlchar = preload_class(vm_env, "java/lang/Character");
-    Class* jlshort = preload_class(vm_env, "java/lang/Short");
-    Class* jlint = preload_class(vm_env, "java/lang/Integer");
-    Class* jllong = preload_class(vm_env, "java/lang/Long");
-    Class* jlfloat = preload_class(vm_env, "java/lang/Float");
-    Class* jldouble = preload_class(vm_env, "java/lang/Double");
+    tmn_suspend_enable();    // -------------^^^
+
+    Class* jlboolean = vm_env->LoadCoreClass("java/lang/Boolean");
+    Class* jlbyte = vm_env->LoadCoreClass("java/lang/Byte");
+    Class* jlchar = vm_env->LoadCoreClass("java/lang/Character");
+    Class* jlshort = vm_env->LoadCoreClass("java/lang/Short");
+    Class* jlint = vm_env->LoadCoreClass("java/lang/Integer");
+    Class* jllong = vm_env->LoadCoreClass("java/lang/Long");
+    Class* jlfloat = vm_env->LoadCoreClass("java/lang/Float");
+    Class* jldouble = vm_env->LoadCoreClass("java/lang/Double");
 
     tmn_suspend_disable();
     gh_jlboolean->object = struct_Class_to_java_lang_Class(jlboolean);
@@ -1739,6 +1738,7 @@ void global_object_handles_init(JNIEnv * jni_env) {
     gh_jldouble->object = struct_Class_to_java_lang_Class(jldouble);
     h_jlt->object= struct_Class_to_java_lang_Class(vm_env->java_lang_Throwable_Class);
     tmn_suspend_enable(); //-------------------------------------------------------^
+
     assert(hythread_is_suspend_enabled());
 
     gid_throwable_traceinfo = jni_env->GetFieldID((jclass)h_jlt, "vm_stacktrace", "[J");
@@ -1758,7 +1758,7 @@ void global_object_handles_init(JNIEnv * jni_env) {
 
     gid_stringinit = jni_env->GetMethodID((jclass)gh_jls, "<init>", "([C)V");
     gid_string_field_value = jni_env->GetFieldID((jclass)gh_jls, "value", "[C");
-    
+
     if (vm_env->strings_are_compressed) {
         gid_string_field_bvalue = jni_env->GetFieldID((jclass)gh_jls, "bvalue", "[B");
     }
@@ -1777,6 +1777,7 @@ void global_object_handles_init(JNIEnv * jni_env) {
 #endif //#ifndef USE_NATIVE_ISARRAY
     assert(hythread_is_suspend_enabled());
 }
+
 
 void unsafe_global_object_handles_init(JNIEnv * jni_env) {
     assert(!hythread_is_suspend_enabled());

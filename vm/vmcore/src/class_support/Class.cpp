@@ -24,51 +24,406 @@
 
 #include <cctype>
 
+#include <sstream>
+
 #include "Class.h"
+#include "classloader.h"
 #include "environment.h"
 #include "lock_manager.h"
 #include "exceptions.h"
 #include "compile.h"
 #include "open/gc.h"
 #include "nogc.h"
+#include "vm_stats.h"
+#include "jit_intf_cpp.h"
+#include "type.h"
 
-// 20020923 Total number of allocations and total number of bytes for class-related data structures. 
-// This includes any rounding added to make each item aligned (current alignment is to the next 16 byte boundary).
-unsigned Class::num_nonempty_statics_allocations = 0;
-unsigned Class::num_statics_allocations          = 0;
-unsigned Class::num_vtable_allocations           = 0;
-unsigned Class::num_hot_statics_allocations      = 0;
-unsigned Class::num_hot_vtable_allocations       = 0;
+//
+// private static variable containing the id of the next class
+// access to this needs to be thread safe; also, this will have to
+// change if we want to reuse class ids
+//
+// an id of 0 is reserved to mean null; therefore, ids start from 1
+//
+// ppervov: FIXME: usage of this variable is not currently thread safe
+unsigned class_next_id = 1;
 
-unsigned Class::total_statics_bytes              = 0;
-unsigned Class::total_vtable_bytes               = 0;
-unsigned Class::total_hot_statics_bytes          = 0;
-unsigned Class::total_hot_vtable_bytes           = 0;
+void Class::init_internals(const Global_Env* env, const String* name, ClassLoader* cl)
+{
+    memset(this, 0, sizeof(Class));
+
+    m_super_class.name = NULL;
+    m_name = name;
+    m_simple_name = m_java_name = m_signature = NULL;
+
+    m_allocated_size = 0;
+    m_array_element_size = 0;
+
+#ifdef POINTER64
+    m_alignment = ((GC_OBJECT_ALIGNMENT<8)?8:GC_OBJECT_ALIGNMENT);;
+#else
+    m_alignment = GC_OBJECT_ALIGNMENT;
+#endif
+
+    m_id = class_next_id++;
+    m_class_loader = cl;
+    m_class_handle = NULL;
+    m_is_primitive = 0;
+    m_is_array = 0;
+    m_is_array_of_primitives = 0;
+    m_has_finalizer = 0;
+    m_can_access_all = 0;
+    m_is_fast_allocation_possible = 0;
+
+    m_num_dimensions = 0;
+    m_array_base_class = m_array_element_class = NULL;
+    m_array_element_type_desc = NULL;
+
+    m_access_flags = 0;
+    m_num_superinterfaces = 0;
+    m_num_fields = m_num_static_fields = m_num_methods = 0;
+
+    m_declaring_class_index = 0;
+    m_enclosing_class_index = 0;
+    m_enclosing_method_index = 0;
+    m_num_innerclasses = 0;
+    m_innerclasses = NULL;
+
+    m_fields = NULL;
+    m_methods = NULL;
+
+    m_superinterfaces = NULL;
+
+    m_const_pool.init();
+
+    m_class_file_name = m_src_file_name = NULL;
+
+    m_state = ST_Start;
+
+    m_package = NULL;
+
+    m_num_instance_refs = 0;
+
+    m_num_virtual_method_entries = m_num_intfc_method_entries =
+        m_num_intfc_table_entries = 0;
+
+    m_finalize_method = m_static_initializer = m_default_constructor = NULL;
+
+    m_static_data_size = 0;
+    m_static_data_block = NULL;
+
+    m_unpadded_instance_data_size = m_instance_data_size = 0;
+    m_vtable = NULL;
+    m_allocation_handle = 0;
+
+    m_vtable_descriptors = NULL;
+    m_intfc_table_descriptors = NULL;
+
+    m_initializing_thread = NULL;
+    m_error = NULL;
+
+    m_num_class_init_checks = m_num_throws = m_num_instanceof_slow
+        = m_num_allocations = m_num_bytes_allocated = 0;
+
+    m_num_field_padding_bytes = 0;
+
+    m_notify_extended_records = 0;
+
+    m_depth = 0;
+    m_is_suitable_for_fast_instanceof = 0;
+
+    m_cha_first_child = m_cha_next_sibling = NULL;
+
+    m_sourceDebugExtension = NULL;
+    m_lock = new Lock_Manager();
+    m_markBit = 0;
+    m_verify_data = 0;
+}
 
 
-// 2003-01-10: This is a temporary hack to make field compaction the default on IPF
-// while not destabilizing JIT work on IA32.  Ultimately both fields should be
-// true by default on all platforms.
-#if defined _IPF_ || defined _EM64T_
-bool Class::compact_fields = true;
-bool Class::sort_fields    = true;
-#else // !_IPF_
-bool Class::compact_fields = false;
-bool Class::sort_fields    = false;
-#endif // !IPF_
+void Class::clear_internals() {
+    if(m_fields != NULL)
+    {
+        delete[] m_fields;
+        m_fields = NULL;
+    }
+    if(m_methods != NULL) {
+        for (int i = 0; i < m_num_methods; i++){
+            m_methods[i].MethodClearInternals();
+        }
+        delete[] m_methods;
+        m_methods = NULL;
+    }
+    m_const_pool.clear();
+    if(m_vtable_descriptors)
+        delete[] m_vtable_descriptors;
+
+    if(m_lock)
+        delete m_lock;
+
+    if(m_array_element_type_desc)
+    {
+        delete m_array_element_type_desc;
+        m_array_element_type_desc = NULL;
+    }
+}
+
+
+Field* Class::get_field(uint16 index) const
+{
+    assert(index < m_num_fields);
+    return &(m_fields[index]);
+}
+
+
+Method* Class::get_method(uint16 index) const
+{
+    assert(index < m_num_methods);
+    return &m_methods[index];
+}
+
+
+bool Class::is_instanceof(Class* clss)
+{
+    assert(!is_interface());
+
+#ifdef VM_STATS
+    VM_Statistics::get_vm_stats().num_type_checks++;
+    if(this == clss)
+        VM_Statistics::get_vm_stats().num_type_checks_equal_type++;
+    if(clss->m_is_suitable_for_fast_instanceof)
+        VM_Statistics::get_vm_stats().num_type_checks_fast_decision++;
+    else if(clss->is_array())
+        VM_Statistics::get_vm_stats().num_type_checks_super_is_array++;
+    else if(clss->is_interface())
+        VM_Statistics::get_vm_stats().num_type_checks_super_is_interface ++;
+    else if(clss->m_depth >= vm_max_fast_instanceof_depth())
+        VM_Statistics::get_vm_stats().num_type_checks_super_is_too_deep++;
+#endif // VM_STATS
+
+    if(this == clss) return true;
+
+    Global_Env* env = VM_Global_State::loader_env;
+
+    if(is_array()) {
+        Class* object_class = env->JavaLangObject_Class;
+        assert(object_class != NULL);
+        if(clss == object_class) return true;
+        if(clss == env->java_io_Serializable_Class) return true;
+        if(clss == env->java_lang_Cloneable_Class) return true;
+        if(!clss->is_array()) return false;
+
+        return class_is_subtype(get_array_element_class(), clss->get_array_element_class());
+    } else {
+        if(clss->m_is_suitable_for_fast_instanceof)
+        {
+            return m_vtable->superclasses[clss->m_depth - 1] == clss;
+        }
+
+        if(!clss->is_interface()) {
+            for(Class *c = this; c; c = c->get_super_class()) {
+                if(c == clss) return true;
+            }
+        } else {
+            for(Class *c = this; c; c = c->get_super_class()) {
+                unsigned n_intf = c->get_number_of_superinterfaces();
+                for(unsigned i = 0; i < n_intf; i++) {
+                    Class* intf = c->get_superinterface(i);
+                    assert(intf);
+                    assert(intf->is_interface());
+                    if(class_is_subtype(intf, clss)) return true;
+                }
+            }
+        }
+    }
+
+    return false;
+}
+
+
+bool Class::load_ancestors(Global_Env* env)
+{
+    m_state = ST_LoadingAncestors;
+
+    const String* superName = get_super_class_name();
+
+    if(superName == NULL) {
+        if(env->InBootstrap() || get_name() != env->JavaLangClass_String) {
+            // This class better be java.lang.Object
+            if(get_name() != env->JavaLangObject_String) {
+                // ClassFormatError
+                std::stringstream ss;
+                ss << get_name()->bytes
+                    << ": class does not have superclass "
+                    << "but the class is not java.lang.Object";
+                REPORT_FAILED_CLASS_CLASS(m_class_loader, this,
+                    "java/lang/ClassFormatError", ss.str().c_str());
+                return false;
+            }
+        }
+    } else {
+        // Load super class
+        Class* superClass;
+        m_super_class.name = NULL;
+        superClass = m_class_loader->LoadVerifyAndPrepareClass(env, superName);
+        if(superClass == NULL) {
+            if(!m_class_loader->GetClassError(get_name()->bytes)) {
+                // Don't report failed classes more than one time
+                REPORT_FAILED_CLASS_CLASS_EXN(m_class_loader, this,
+                    m_class_loader->GetClassError(superName->bytes));
+            }
+            return false;
+        }
+
+        if(superClass->is_interface()) {
+            REPORT_FAILED_CLASS_CLASS(m_class_loader, this,
+                "java/lang/IncompatibleClassChangeError",
+                "class " << m_name->bytes << " has interface "
+                << superClass->get_name()->bytes << " as super class");
+            return false;
+        }
+        if(superClass->is_final()) {
+            REPORT_FAILED_CLASS_CLASS(m_class_loader, this,
+                "java/lang/VerifyError",
+                m_name->bytes << " cannot inherit from final class "
+                << superClass->get_name()->bytes);
+            return false;
+        }
+
+        // super class was successfully loaded
+        m_super_class.clss = superClass;
+        if(m_super_class.cp_index) {
+            m_const_pool.resolve_entry(m_super_class.cp_index, superClass);
+        }
+
+        // if it's an interface, its superclass must be java/lang/Object
+        if(is_interface()) {
+            if((env->JavaLangObject_Class != NULL) && (superClass != env->JavaLangObject_Class)) {
+                std::stringstream ss;
+                ss << get_name()->bytes << ": interface superclass is not java.lang.Object";
+                REPORT_FAILED_CLASS_CLASS(m_class_loader, this,
+                    "java/lang/ClassFormatError", ss.str().c_str());
+                return false;
+            }
+        }
+
+        // Update the cha_first_child and cha_next_sibling fields.
+        m_cha_first_child = NULL;
+        if(has_super_class())
+        {
+            m_cha_next_sibling = get_super_class()->m_cha_first_child;
+            get_super_class()->m_cha_first_child = this;
+        }
+        // Notify interested JITs that the superclass has been extended.
+        superClass->do_jit_extended_class_callbacks(this);
+    }
+
+    //
+    // load in super interfaces
+    //
+    for(unsigned i = 0; i < m_num_superinterfaces; i++ ) {
+        const String* intfc_name = m_superinterfaces[i].name;
+        Class* intfc = m_class_loader->LoadVerifyAndPrepareClass(env, intfc_name);
+        if(intfc == NULL) {
+            if(!m_class_loader->GetClassError(get_name()->bytes)) {
+                REPORT_FAILED_CLASS_CLASS_EXN(m_class_loader, this,
+                    m_class_loader->GetClassError(intfc_name->bytes));
+            }
+            return false;
+        }
+        if(!intfc->is_interface()) {
+            REPORT_FAILED_CLASS_CLASS(m_class_loader, this,
+                "java/lang/IncompatibleClassChangeError",
+                get_name()->bytes << ": " << intfc->get_name()->bytes
+                << " is not an interface");
+            return false;
+        }
+
+        // superinterface was successfully loaded
+        m_superinterfaces[i].clss = intfc;
+        if(m_superinterfaces[i].cp_index != 0) {
+            // there are no constant pool entries for array classes
+            m_const_pool.resolve_entry(m_superinterfaces[i].cp_index, intfc);
+        }
+    }
+    // class, superclass, and superinterfaces successfully loaded
+
+    m_state = ST_Loaded;
+    if(!is_array())
+        m_package = m_class_loader->ProvidePackage(env, m_name, NULL);
+
+    return true;
+}
+
+
+Class* Class::resolve_declaring_class(Global_Env* env)
+{
+    if(m_declaring_class_index == 0) return NULL;
+    return _resolve_class(env, m_declaring_class_index);
+}
+
+
+void Class::setup_as_array(Global_Env* env, unsigned char num_dimensions,
+    bool isArrayOfPrimitives, Class* baseClass, Class* elementClass)
+{
+    m_is_array = 1;
+    m_num_dimensions = (unsigned char)num_dimensions;
+    if(m_num_dimensions == 1) {
+        m_is_array_of_primitives = isArrayOfPrimitives;
+    } else {
+        m_is_array_of_primitives = false;
+    }
+    m_array_element_class = elementClass;
+    m_array_base_class = baseClass;
+    m_state = ST_Initialized;
+
+    assert(elementClass);
+    m_array_element_type_desc = type_desc_create_from_class(elementClass);
+
+    // insert Java field, required by spec - 'length I'
+    m_num_fields = 1;
+    m_fields = new Field[1];
+    m_fields[0].set(this, env->Length_String,
+        env->string_pool.lookup("I"), ACC_PUBLIC|ACC_FINAL);
+    m_fields[0].set_field_type_desc(
+        type_desc_create_from_java_descriptor("I", NULL));
+    m_fields[0].set_injected();
+
+    m_super_class.name = env->JavaLangObject_String;
+    m_super_class.cp_index = 0;
+
+    m_access_flags = (ACC_FINAL | ACC_ABSTRACT);
+    if(isArrayOfPrimitives) {
+        m_access_flags |= ACC_PUBLIC;
+    } else {
+        // set array access flags the same as in its base class
+        m_access_flags = (uint16)(m_access_flags
+            | (baseClass->get_access_flags()
+            & (ACC_PUBLIC | ACC_PRIVATE | ACC_PROTECTED)));
+    }
+    m_package = elementClass->m_package;
+
+    // array classes implement two interfaces: Cloneable and Serializable
+    m_superinterfaces = (Class_Super*) STD_MALLOC(2 * sizeof(Class_Super));
+    m_superinterfaces[0].name = env->Clonable_String;
+    m_superinterfaces[0].cp_index = 0;
+    m_superinterfaces[1].name = env->Serializable_String;
+    m_superinterfaces[1].cp_index = 0;
+    m_num_superinterfaces = 2;
+}
 
 
 //
 // This function doesn't check for fields inherited from superclasses.
 //
-Field *class_lookup_field(Class *clss, const String* name, const String* desc)
+Field* Class::lookup_field(const String* name, const String* desc)
 {
-    for (unsigned i=0; i<clss->n_fields; i++) {
-        if (clss->fields[i].get_name() == name && clss->fields[i].get_descriptor() == desc)
-            return &clss->fields[i];
+    for(uint16 i = 0; i < m_num_fields; i++) {
+        if(m_fields[i].get_name() == name && m_fields[i].get_descriptor() == desc)
+            return &m_fields[i];
     }
     return NULL;
-} //class_lookup_field
+} // Class::lookup_field
 
 
 Field* class_lookup_field_recursive(Class* clss,
@@ -80,59 +435,119 @@ Field* class_lookup_field_recursive(Class* clss,
     String *field_descr =
         VM_Global_State::loader_env->string_pool.lookup(descr);
 
-    return class_lookup_field_recursive(clss, field_name, field_descr);
+    return clss->lookup_field_recursive(field_name, field_descr);
 }
 
 
-Field* class_lookup_field_recursive(Class *clss,
-                                        const String* name, const String* desc)
+Field* Class::lookup_field_recursive(const String* name, const String* desc)
 {
     // Step 1: lookup in self
-    Field* field = class_lookup_field(clss, name, desc);
+    Field* field = lookup_field(name, desc);
     if(field) return field;
 
     // Step 2: lookup in direct superinterfaces recursively
-    for (int in = 0; in < clss->n_superinterfaces && !field; in++) {
-        field = class_lookup_field_recursive(clss->superinterfaces[in].clss, name, desc);
+    for(uint16 in = 0; in < m_num_superinterfaces; in++) {
+        field = get_superinterface(in)->lookup_field_recursive(name, desc);
         if(field) return field;
     }
 
     // Step 3: lookup in super classes recursively
-    if(clss->super_class) {
-        field = class_lookup_field_recursive(clss->super_class, name, desc);
+    if(has_super_class()) {
+        field = get_super_class()->lookup_field_recursive(name, desc);
     }
 
     return field;
-} //class_lookup_field_recursive
+} // Class::lookup_field_recursive
 
 
-
-Method *class_lookup_method(Class *clss, const String* name, const String* desc)
+Method* Class::lookup_method(const String* name, const String* desc)
 {
-    for (unsigned i=0; i<clss->n_methods; i++) {
-        if (clss->methods[i].get_name() == name && clss->methods[i].get_descriptor() == desc)
-            return &clss->methods[i];
+    for(unsigned i = 0; i < m_num_methods; i++) {
+        if(m_methods[i].get_name() == name && m_methods[i].get_descriptor() == desc)
+            return &m_methods[i];
     }
     return NULL;
-} //class_lookup_method
+} // Class::lookup_method
 
 
+ManagedObject* Class::allocate_instance()
+{
+    assert(!hythread_is_suspend_enabled());
+    ManagedObject* new_instance =
+        (ManagedObject*)vm_alloc_and_report_ti(m_instance_data_size,
+            m_allocation_handle, vm_get_gc_thread_local(), this);
+    if(new_instance == NULL)
+    {
+        return NULL;
+    }
 
-Method *class_lookup_method_recursive(Class *clss, const String* name, const String* desc)
+#ifdef VM_STATS
+    VM_Statistics::get_vm_stats().num_class_alloc_new_object++;
+    instance_allocated(m_instance_data_size);
+#endif //VM_STATS
+
+    return new_instance;
+}
+
+
+void* Class::helper_get_interface_vtable(ManagedObject* obj, Class* iid)
+{
+    unsigned num_intfc = m_num_intfc_table_entries;
+#ifdef VM_STATS
+    VM_Statistics::get_vm_stats().num_invokeinterface_calls++;
+    switch(num_intfc) {
+    case 1:  VM_Statistics::get_vm_stats().num_invokeinterface_calls_size_1++;    break;
+    case 2:  VM_Statistics::get_vm_stats().num_invokeinterface_calls_size_2++;    break;
+    default: VM_Statistics::get_vm_stats().num_invokeinterface_calls_size_many++; break;
+    }
+    if(num_intfc > VM_Statistics::get_vm_stats().invokeinterface_calls_size_max)
+        VM_Statistics::get_vm_stats().invokeinterface_calls_size_max = num_intfc;
+#endif
+    for(unsigned i = 0; i < num_intfc; i++) {
+        Class* intfc = m_intfc_table_descriptors[i];
+        if(intfc == iid) {
+#ifdef VM_STATS
+            switch(i) {
+            case 0:  VM_Statistics::get_vm_stats().num_invokeinterface_calls_searched_1++;    break;
+            case 1:  VM_Statistics::get_vm_stats().num_invokeinterface_calls_searched_2++;    break;
+            default: VM_Statistics::get_vm_stats().num_invokeinterface_calls_searched_many++; break;
+            }
+            if(i > VM_Statistics::get_vm_stats().invokeinterface_calls_searched_max)
+                VM_Statistics::get_vm_stats().invokeinterface_calls_searched_max = i;
+#endif
+            unsigned char** table = m_vtable->intfc_table->entry[i].table;
+            return (void*)table;
+        }
+    }
+    return NULL;
+}
+
+
+void Class::set_error_cause(jthrowable exn)
+{
+    tmn_suspend_disable();
+    lock();
+    m_state = ST_Error;
+    m_error = exn->object;
+    unlock();
+    tmn_suspend_enable();
+}
+
+
+Method* class_lookup_method_recursive(Class *clss, const String* name, const String* desc)
 {
     assert(clss);
     Method *m = 0;
     Class *oclss = clss;
-    for(; clss && !m; clss = clss->super_class) {
-        m = class_lookup_method(clss, name, desc);
+    for(; clss && !m; clss = clss->get_super_class()) {
+        m = clss->lookup_method(name, desc);
     }
     if(m)return m;
 
     //if not found, search in interfaces, that means
     // clss itself is also interface
-    Class_Superinterface *intfs = oclss->superinterfaces;
-    for(int i = 0; i < oclss->n_superinterfaces; i++)
-        if((m = class_lookup_method_recursive(intfs[i].clss, name, desc)))
+    for(int i = 0; i < oclss->get_number_of_superinterfaces(); i++)
+        if((m = class_lookup_method_recursive(oclss->get_superinterface(i), name, desc)))
             return m;
     return NULL;
 } //class_lookup_method_recursive
@@ -152,47 +567,40 @@ Method *class_lookup_method_recursive(Class *clss,
 } //class_lookup_method_recursive
 
 
-Method *class_lookup_method_init(Class *clss,
-                            const char *descr)
+Method* class_lookup_method(Class* clss,
+                            const char* name,
+                            const char* descr)
 {
-    String *method_name = VM_Global_State::loader_env->Init_String;
-    String *method_descr =
-        VM_Global_State::loader_env->string_pool.lookup(descr);
-
-    return class_lookup_method(clss, method_name, method_descr);
-} //class_lookup_method_init
-
-Method *class_lookup_method_clinit(Class *clss)
-{
-    return class_lookup_method(clss, VM_Global_State::loader_env->Clinit_String, VM_Global_State::loader_env->VoidVoidDescriptor_String);
-} //class_lookup_method_clinit
-
-Method *class_lookup_method(Class *clss,
-                            const char *name,
-                            const char *descr)
-{
-    String *method_name =
+    String* method_name =
         VM_Global_State::loader_env->string_pool.lookup(name);
-    String *method_descr =
+    String* method_descr =
         VM_Global_State::loader_env->string_pool.lookup(descr);
 
-    return class_lookup_method(clss, method_name, method_descr);
-} //class_lookup_method
+    return clss->lookup_method(method_name, method_descr);
+} // class_lookup_method
 
-Method *class_get_method_from_vt_offset(VTable *vt,
+Method* class_get_method_from_vt_offset(VTable* vt,
                                         unsigned offset)
 {
     assert(vt);
     unsigned index = (offset - VTABLE_OVERHEAD) / sizeof(void*);
-    return vt->clss->vtable_descriptors[index];
+    return vt->clss->get_method_from_vtable(index);
 } // class_get_method_from_vt_offset
 
 void* Field::get_address()
 {
     assert(is_static());
     assert(is_offset_computed());
-    return (char *)(get_class()->static_data_block) + get_offset();
+    return (char*)(get_class()->get_static_data_address()) + get_offset();
 } // Field::get_address
+
+
+unsigned Field::calculate_size() {
+    static unsigned size = sizeof(Field) + sizeof(TypeDesc);
+    return size;
+}
+
+
 
 
 Method::Method()
@@ -296,12 +704,12 @@ void Method::MethodClearInternals()
 
 void Method::lock()
 {
-    _class->m_lock->_lock();
+    _class->lock();
 }
 
 void Method::unlock()
 {
-    _class->m_lock->_unlock();
+    _class->unlock();
 }
 
 
@@ -334,7 +742,7 @@ ManagedObject *struct_Class_to_java_lang_Class(Class *clss)
 //sundr    printf("struct to class %s, %p, %p\n", clss->name->bytes, clss, clss->super_class);
     assert(!hythread_is_suspend_enabled());
     assert(clss);
-    ManagedObject** hjlc = clss->class_handle;
+    ManagedObject** hjlc = clss->get_class_handle();
     assert(hjlc);
     ManagedObject* jlc  = *hjlc;
     assert(jlc != NULL);
@@ -356,9 +764,9 @@ jobject struct_Class_to_java_lang_Class_Handle(Class *clss) {
     tmn_suspend_disable_recursive();
   #endif
     assert(clss);
-    assert(clss->class_handle);
-    assert(*(clss->class_handle));
-    ManagedObject* UNUSED jlc = *(clss->class_handle);
+    assert(clss->get_class_handle());
+    ManagedObject* UNUSED jlc = *(clss->get_class_handle());
+    assert(jlc);
     assert(jlc->vt());
     //assert(jlc->vt()->clss == VM_Global_State::loader_env->JavaLangClass_Class);
   #ifndef NDEBUG
@@ -377,7 +785,7 @@ jobject struct_Class_to_java_lang_Class_Handle(Class *clss) {
     //
     // ppervov 2005-04-18
     // redone struct Class to contain class handle instead of raw ManagedObject*
-    return (jclass)(clss->class_handle);
+    return (jclass)(clss->get_class_handle());
 }
 
 /* The following two utility functions to ease
@@ -386,10 +794,10 @@ jobject struct_Class_to_java_lang_Class_Handle(Class *clss) {
 jclass struct_Class_to_jclass(Class *c)
 {
     assert(hythread_is_suspend_enabled());
-    tmn_suspend_disable(); // ------------------------vvv
+    tmn_suspend_disable();  // ----------vvv
     ObjectHandle h = oh_allocate_local_handle();
     h->object = struct_Class_to_java_lang_Class(c);
-    tmn_suspend_enable(); // -------------------------^^^
+    tmn_suspend_enable();   // ----------^^^
     return (jclass)h;
 }
 
@@ -427,94 +835,39 @@ Class *java_lang_Class_to_struct_Class(ManagedObject *jlc)
 
     Class* clss = *vm_class_ptr;
     assert(clss != NULL);
-    assert(clss->class_handle);
-    assert(*(clss->class_handle) == jlc);
+    assert(clss->get_class_handle());
+    assert(*(clss->get_class_handle()) == jlc);
     assert(clss != (Class*) jlc);           // else the two structures still overlap!
     return clss;
 } //java_lang_Class_to_struct_Class
 
 
-
-void set_struct_Class_field_in_java_lang_Class(const Global_Env* env, ManagedObject** jlc, Class *clss)
+String* Class::get_simple_name()
 {
-    assert(managed_object_is_java_lang_class(*jlc));
-    assert(env->vm_class_offset != 0);
-
-    Class** vm_class_ptr = (Class **)(((Byte *)(*jlc)) + env->vm_class_offset);
-    *vm_class_ptr = clss;
-} //set_struct_Class_field_in_java_lang_Class
-
-
-void class_report_failure(Class* target, uint16 cp_index, jthrowable exn)
-{
-    assert(cp_index > 0 && cp_index < target->cp_size);
-    assert(hythread_is_suspend_enabled());
-    if (exn_raised()) {
-        TRACE2("classloader.error", "runtime exception in classloading");
-        return;
-    }
-    assert(exn);
-
-    tmn_suspend_disable();
-    target->m_lock->_lock();
-    // vvv - This should be atomic change
-    if (!cp_in_error(target->const_pool, cp_index)) {
-        cp_set_error(target->const_pool, cp_index);
-        target->const_pool[cp_index].error.cause = ((ObjectHandle)exn)->object;
-        target->const_pool[cp_index].error.next = target->m_failedResolution;
-        assert(&(target->const_pool[cp_index]) != target->m_failedResolution);
-        target->m_failedResolution = &(target->const_pool[cp_index]);
-    }
-    // ^^^
-    target->m_lock->_unlock();
-    tmn_suspend_enable();
-}
-
-
-jthrowable class_get_linking_error(Class* clss, unsigned index)
-{
-    assert(cp_in_error(clss->const_pool, index));
-    return (jthrowable)(&(clss->const_pool[index].error.cause));
-}
-
-String* class_get_java_name(Class* clss, Global_Env* env) 
-{
-    unsigned len = clss->name->len + 1;
-    char * name = (char*) STD_ALLOCA(len);
-    char * tmp_name = name;
-    memcpy(name, clss->name->bytes, len);
-    while (tmp_name = strchr(tmp_name, '/')) {
-        *tmp_name = '.';
-        ++tmp_name;
-    }
-    return VM_Global_State::loader_env->string_pool.lookup(name);
-}
-
-String* class_get_simple_name(Class* clss, Global_Env* env)
-{
-    if (!clss->simple_name) 
+    Global_Env* env = VM_Global_State::loader_env;
+    if(m_simple_name == NULL) 
     {
-        if (clss->is_array) 
+        if (is_array()) 
         {
-            String* simple_base_name = class_get_simple_name(clss->array_base_class, env);
+            String* simple_base_name = m_array_base_class->get_simple_name();
             unsigned len = simple_base_name->len;
-            unsigned dims = clss->n_dimensions;
+            unsigned dims = m_num_dimensions;
             char * buf = (char*)STD_ALLOCA(dims * 2 + len);
             strcpy(buf, simple_base_name->bytes);
             while (dims-- > 0) {
                 buf[len++] = '[';
                 buf[len++] = ']';
             }
-            clss->simple_name = env->string_pool.lookup(buf, len);
+            m_simple_name = env->string_pool.lookup(buf, len);
         } 
         else 
         {
-            const char* fn = clss->name->bytes;
+            const char* fn = m_name->bytes;
             const char* start;
-            if (clss->enclosing_class_index) 
+            if(m_enclosing_class_index) 
             {
-                const char* enclosing_name = const_pool_get_class_name(clss, 
-                    clss->enclosing_class_index);
+                const char* enclosing_name =
+                    const_pool_get_class_name(this, m_enclosing_class_index);
                 start = fn + strlen(enclosing_name);
                 while (*start == '$' || isdigit(*start)) start++;
             } 
@@ -523,21 +876,45 @@ String* class_get_simple_name(Class* clss, Global_Env* env)
                 start = strrchr(fn, '/');
             }
 
-            if (start) {
-                clss->simple_name = env->string_pool.lookup(start + 1);
+            if(start) {
+                m_simple_name = env->string_pool.lookup(start + 1);
             } else {
-                clss->simple_name = const_cast<String*> (clss->name);
+                m_simple_name = const_cast<String*>(m_name);
             }
         }
     }
-    return clss->simple_name;
+    return m_simple_name;
 }
+
+
+String* class_name_get_java_name(const String* class_name) {
+    unsigned len = class_name->len + 1;
+    char* name = (char*)STD_ALLOCA(len);
+    memcpy(name, class_name->bytes, len);
+    for(char *p = name; *p; ++p) {
+        if (*p=='/') *p='.';
+    }
+    String* str = VM_Global_State::loader_env->string_pool.lookup(name);
+    return str;
+}
+
+
+static void mark_classloader(ClassLoader* cl)
+{
+    if(cl->GetLoader() && cl->NotMarked()) {
+        TRACE2("classloader.unloading.markloader", "  Marking loader "
+            << cl << " (" << (void*)cl->GetLoader() << " : "
+            << cl->GetLoader()->vt()->clss->get_name()->bytes << ")");
+        cl->Mark();
+    }
+}
+
 
 void vm_notify_live_object_class(Class_Handle clss)
 {
-    if(!clss->m_markBit) {
-        clss->m_markBit = 1;
-        mark_classloader(clss->class_loader);
+    if(!clss->is_reachable()) {
+        clss->mark_reachable();
+        mark_classloader(clss->get_class_loader());
     }
 }
 
@@ -550,15 +927,11 @@ void vm_notify_live_object_class(Class_Handle clss)
 ////////////////////////////////////////////////////////////////////
 // begin Support for compressed and raw reference pointers
 
-Byte *Class::heap_base = (Byte *)NULL;
-Byte *Class::heap_end  = (Byte *)NULL;
-Byte *Class::managed_null = (Byte *)NULL;
-
-
 bool is_compressed_reference(COMPRESSED_REFERENCE compressed_ref) 
 {
     // A compressed reference is an offset into the heap.
-    uint64 heap_max_size = (Class::heap_end - Class::heap_base);
+    uint64 heap_max_size = (VM_Global_State::loader_env->heap_end
+        - VM_Global_State::loader_env->heap_base);
     return ((uint64) compressed_ref) < heap_max_size;
 } // is_compressed_reference
 
@@ -578,7 +951,8 @@ COMPRESSED_REFERENCE compress_reference(ManagedObject *obj) {
      if(obj == NULL)
          compressed_ref = 0;
      else
-         compressed_ref = (COMPRESSED_REFERENCE)((POINTER_SIZE_INT)obj - (POINTER_SIZE_INT)Class::heap_base);
+         compressed_ref = (COMPRESSED_REFERENCE)((POINTER_SIZE_INT)obj
+            - (POINTER_SIZE_INT)VM_Global_State::loader_env->heap_base);
     assert(is_compressed_reference(compressed_ref));
     return compressed_ref;
 } //compress_reference
@@ -591,7 +965,7 @@ ManagedObject *uncompress_compressed_reference(COMPRESSED_REFERENCE compressed_r
     if (compressed_ref == 0) {
         return NULL;
     } else {
-        return (ManagedObject *)(Class::heap_base + compressed_ref);
+        return (ManagedObject *)(VM_Global_State::loader_env->heap_base + compressed_ref);
     }
 } //uncompress_compressed_reference
 
@@ -606,7 +980,7 @@ ManagedObject *get_raw_reference_pointer(ManagedObject **slot_addr)
         COMPRESSED_REFERENCE offset = *((COMPRESSED_REFERENCE *)slot_addr);
         assert(is_compressed_reference(offset));
         if (offset != 0) {
-            obj = (ManagedObject *)(Class::heap_base + offset);
+            obj = (ManagedObject *)(VM_Global_State::loader_env->heap_base + offset);
         }
     } else {
         obj = *slot_addr;
@@ -617,50 +991,6 @@ ManagedObject *get_raw_reference_pointer(ManagedObject **slot_addr)
 
 // end Support for compressed and raw reference pointers
 ////////////////////////////////////////////////////////////////////
-
-
-
-
-VTable *create_vtable(Class *p_class, unsigned n_vtable_entries)
-{
-    unsigned vtable_size = VTABLE_OVERHEAD + n_vtable_entries * sizeof(void *);
-
-    // Always allocate vtable data from vtable_data_pool
-    void *p_gc_hdr = allocate_vtable_data_from_pool(vtable_size);
-
-#ifdef VM_STATS
-        // For allocation statistics, include any rounding added to make each item aligned (current alignment is to the next 16 byte boundary).
-        unsigned num_bytes = (vtable_size + 15) & ~15;
-        // 20020923 Total number of allocations and total number of bytes for class-related data structures.
-        Class::num_vtable_allocations++;
-        Class::total_vtable_bytes += num_bytes;
-#endif
-    assert(p_gc_hdr);
-    memset(p_gc_hdr, 0, vtable_size);
-
-    VTable *vtable = (VTable *)p_gc_hdr;
-
-    if(p_class && p_class->super_class) {
-        p_class->depth = p_class->super_class->depth + 1;
-        memcpy(&vtable->superclasses,
-               &p_class->super_class->vtable->superclasses,
-               sizeof(vtable->superclasses));
-        for(int i = 0; i < vm_max_fast_instanceof_depth(); i++) {
-            if(vtable->superclasses[i] == NULL) {
-                vtable->superclasses[i] = p_class;
-                break;
-            }
-        }
-    }
-    if (p_class->depth > 0 &&
-        p_class->depth < vm_max_fast_instanceof_depth() &&
-        !p_class->is_array &&
-        !class_is_interface(p_class))
-    {
-        p_class->is_suitable_for_fast_instanceof = 1;
-    }
-    return vtable;
-} //create_vtable
 
 // Function registers a number of native methods to a given class.
 bool
@@ -677,15 +1007,16 @@ class_register_methods(Class_Handle klass,
 
         // find method from class
         bool not_found = true;
-        for( int count = 0; count < klass->n_methods; count++ ) {
-            Method *class_method = &klass->methods[count];
+        for(int count = 0; count < klass->get_number_of_methods(); count++ ) {
+            Method *class_method = klass->get_method(count);
             const String *method_name = class_method->get_name();
             const String *method_desc = class_method->get_descriptor();
             if( method_name == name && method_desc == desc )
             {
                 // trace
                 TRACE2("class.native", "Register native method: "
-                    << klass->name->bytes << "." << name->bytes << desc->bytes);
+                    << klass->get_name()->bytes
+                    << "." << name->bytes << desc->bytes);
 
                 // found method
                 not_found = false;
@@ -695,21 +1026,21 @@ class_register_methods(Class_Handle klass,
                 jvmti_process_native_method_bind_event( (jmethodID) class_method, native_addr, &native_addr);
 
                 // lock class
-                klass->m_lock->_lock();
+                klass->lock();
                 class_method->set_code_addr( native_addr );
                 class_method->set_registered( true );
-                klass->m_lock->_unlock();
+                klass->unlock();
                 break;
             }
         }
         if( not_found ) {
             // create error string "<class_name>.<method_name><method_descriptor>
-            int clen = strlen(klass->name->bytes);
-            int mlen = strlen(name->bytes);
-            int dlen = strlen(desc->bytes);
+            int clen = klass->get_name()->len;
+            int mlen = name->len;
+            int dlen = desc->len;
             int len = clen + 1 + mlen + dlen;
             char *error = (char*)STD_ALLOCA(len + 1);
-            memcpy(error, klass->name->bytes, clen);
+            memcpy(error, klass->get_name()->bytes, clen);
             error[clen] = '.';
             memcpy(error + clen + 1, name->bytes, mlen);
             memcpy(error + clen + 1 + mlen, desc->bytes, dlen);
@@ -717,7 +1048,7 @@ class_register_methods(Class_Handle klass,
 
             // trace
             TRACE2("class.native", "Native could not be registered: "
-                << klass->name->bytes << "." << name->bytes << desc->bytes);
+                << klass->get_name()->bytes << "." << name->bytes << desc->bytes);
 
             // raise an exception
             jthrowable exc_object = exn_create("java/lang/NoSuchMethodError", error);
@@ -728,25 +1059,126 @@ class_register_methods(Class_Handle klass,
     return false;
 } // class_register_methods
 
-// Function unregisters a native methods of a given class.
+// Function unregisters registered native methods of a given class.
 bool
 class_unregister_methods(Class_Handle klass)
 {
     // lock class
-    klass->m_lock->_lock();
-    for( int count = 0; count < klass->n_methods; count++ ) {
-        Method *method = &klass->methods[count];
+    klass->lock();
+    for(int count = 0; count < klass->get_number_of_methods(); count++ ) {
+        Method* method = klass->get_method(count);
         if( method->is_registered() ) {
             // trace
             TRACE2("class.native", "Unregister native method: "
-                << klass->name << "." << method->get_name()->bytes 
+                << klass->get_name() << "." << method->get_name()->bytes
                 << method->get_descriptor()->bytes);
 
             // reset registered flag
-            method->set_registered( false );
+            method->set_registered(false);
         }
     }
     // unlock class
-    klass->m_lock->_unlock();
+    klass->unlock();
     return false;
 } // class_unregister_methods
+
+
+////////////////////////////////////////////////////////////////////
+// begin support for JIT notification when classes are extended
+
+struct Class_Extended_Notification_Record {
+    Class *class_of_interest;
+    JIT   *jit;
+    void  *callback_data;
+    Class_Extended_Notification_Record *next;
+
+    bool equals(Class *class_of_interest_, JIT *jit_, void *callback_data_) {
+        if ((class_of_interest == class_of_interest_) &&
+            (jit == jit_) &&
+            (callback_data == callback_data_)) {
+            return true;
+        }
+        return false;
+    }
+};
+
+
+void Class::register_jit_extended_class_callback(JIT* jit_to_be_notified, void* callback_data)
+{
+    // Don't insert the same entry repeatedly on the notify_extended_records list.
+    Class_Extended_Notification_Record* nr = m_notify_extended_records;
+    while(nr != NULL) {
+        if(nr->equals(this, jit_to_be_notified, callback_data)) {
+            return;
+        }
+        nr = nr->next;
+    }
+
+    // Insert a new notification record.
+    Class_Extended_Notification_Record* new_nr =
+        (Class_Extended_Notification_Record*)STD_MALLOC(sizeof(Class_Extended_Notification_Record));
+    new_nr->class_of_interest = this;
+    new_nr->jit = jit_to_be_notified;
+    new_nr->callback_data = callback_data;
+    new_nr->next = m_notify_extended_records;
+    m_notify_extended_records = new_nr;
+} // Class::register_jit_extended_class_callback
+
+
+void Class::do_jit_extended_class_callbacks(Class* new_subclass)
+{
+    Class_Extended_Notification_Record* nr;
+    for(nr = m_notify_extended_records;  nr != NULL;  nr = nr->next) {
+        JIT* jit_to_be_notified = nr->jit;
+        Boolean code_was_modified =
+            jit_to_be_notified->extended_class_callback(this,
+                new_subclass, nr->callback_data);
+        if(code_was_modified) {
+#ifdef _IPF_
+            sync_i_cache();
+            do_mf();
+#endif // _IPF_
+        }
+    }
+} // Class::do_jit_extended_class_callbacks
+
+
+void Class::lock()
+{
+    m_lock->_lock();
+}
+
+
+void Class::unlock()
+{
+    m_lock->_unlock();
+}
+
+
+unsigned Class::calculate_size()
+{
+    unsigned size = 0;
+    size += sizeof(Class);
+    size += m_num_innerclasses*sizeof(InnerClass);
+    size += sizeof(ConstantPool)
+        + m_const_pool.get_size()*sizeof(ConstPoolEntry);
+    for(unsigned i = 0; i < m_num_fields; i++) {
+        size += m_fields[i].calculate_size();
+    }
+    for(unsigned i = 0; i < m_num_methods; i++) {
+        size += m_methods[i].calculate_size();
+    }
+    size += m_num_superinterfaces*sizeof(Class_Super);
+    size += m_static_data_size;
+    if(!is_interface())
+        size += sizeof(VTable);
+    size += m_num_intfc_table_entries*sizeof(Class*);
+    for(Class_Extended_Notification_Record* mcnr = m_notify_extended_records;
+        mcnr != NULL; mcnr = mcnr->next)
+    {
+        size += sizeof(Class_Extended_Notification_Record);
+    }
+    size += sizeof(Lock_Manager);
+
+    return size;
+}

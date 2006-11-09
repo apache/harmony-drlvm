@@ -30,21 +30,10 @@
 #include "open/vm_util.h"
 #include "heap.h"
 
-inline unsigned vm_array_size(VTable *vector_vtable, int length)
-{
-    unsigned array_element_size = vector_vtable->array_element_size;
-    assert(array_element_size);
-    unsigned first_elem_offset;
-    if(array_element_size < 8) {
-        first_elem_offset = VM_VECTOR_FIRST_ELEM_OFFSET_1_2_4;
-    } else {
-        first_elem_offset = VM_VECTOR_FIRST_ELEM_OFFSET_8;
-    }
-    unsigned size = first_elem_offset + length * array_element_size;
-    size = ( ((size + (GC_OBJECT_ALIGNMENT - 1)) & (~(GC_OBJECT_ALIGNMENT - 1))) );
-    assert((size % GC_OBJECT_ALIGNMENT) == 0);
-    return size;
-} //vm_array_size
+
+#define HIGH_BIT_SET_MASK (1<<((sizeof(unsigned) * BITS_PER_BYTE)-1))
+#define HIGH_BIT_CLEAR_MASK (~HIGH_BIT_SET_MASK)
+#define TWO_HIGHEST_BITS_SET_MASK (HIGH_BIT_SET_MASK|NEXT_TO_HIGH_BIT_SET_MASK)
 
 
 inline VTable *get_vector_vtable(Vector_Handle vector)

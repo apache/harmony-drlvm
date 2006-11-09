@@ -24,6 +24,7 @@
 #include "jit_intf_cpp.h"
 #include "m2n.h"
 #include "stack_iterator.h"
+#include "cci.h"
 
 Method_Handle si_get_method(StackIterator* si)
 {

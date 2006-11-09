@@ -163,12 +163,12 @@ TypeDesc* type_desc_create_from_class(Class* c)
         default:
             ABORT("Unexpected data type");
         }
-        td = new TypeDesc(k, NULL, NULL, NULL, c->class_loader, c);
+        td = new TypeDesc(k, NULL, NULL, NULL, c->get_class_loader(), c);
     } else if (class_is_array(c)) {
-        td = new TypeDesc(K_Vector, NULL, NULL, NULL, c->class_loader, c);
+        td = new TypeDesc(K_Vector, NULL, NULL, NULL, c->get_class_loader(), c);
     } else {
         Kind k = K_Object;
-        td = new TypeDesc(k, NULL, NULL, NULL, c->class_loader, c);
+        td = new TypeDesc(k, NULL, NULL, NULL, c->get_class_loader(), c);
     }
     assert(td);
     return td;

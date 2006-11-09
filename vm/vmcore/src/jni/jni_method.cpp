@@ -40,6 +40,23 @@
 #include "nogc.h"
 
 
+static Method* lookup_method_init(Class* clss, const char* descr)
+{
+    String* method_name = VM_Global_State::loader_env->Init_String;
+    String* method_descr =
+        VM_Global_State::loader_env->string_pool.lookup(descr);
+
+    return clss->lookup_method(method_name, method_descr);
+} // lookup_method_init
+
+
+static Method* lookup_method_clinit(Class* clss)
+{
+    return clss->lookup_method(VM_Global_State::loader_env->Clinit_String,
+        VM_Global_State::loader_env->VoidVoidDescriptor_String);
+} // lookup_method_clinit
+
+
 jmethodID JNICALL GetMethodID(JNIEnv *env,
                               jclass clazz,
                               const char *name,
@@ -53,7 +70,7 @@ jmethodID JNICALL GetMethodID(JNIEnv *env,
     Method *method;
     if ('<' == *name) {
         if (!strcmp(name + 1, "init>")) {
-            method = class_lookup_method_init(clss, descr);
+            method = lookup_method_init(clss, descr);
         } else {
             ThrowNew_Quick(env, "java/lang/NoSuchMethodError", name);
             return NULL;
@@ -66,7 +83,8 @@ jmethodID JNICALL GetMethodID(JNIEnv *env,
         ThrowNew_Quick(env, "java/lang/NoSuchMethodError", name);
         return NULL;
     }
-    TRACE2("jni", "GetMethodID " << clss->name->bytes << "." << name << " " << descr << " = " << (jmethodID)method);
+    TRACE2("jni", "GetMethodID " << clss->get_name()->bytes
+        << "." << name << " " << descr << " = " << (jmethodID)method);
 
     return (jmethodID)method;
 } //GetMethodID
@@ -85,7 +103,7 @@ jmethodID JNICALL GetStaticMethodID(JNIEnv *env,
     Method *method;
     if ('<' == *name) {
         if (!strcmp(name + 1, "clinit>") && !strcmp(descr, "()V")) {
-            method = class_lookup_method_clinit(clss);
+            method = lookup_method_clinit(clss);
         } else {
             ThrowNew_Quick(env, "java/lang/NoSuchMethodError", name);
             return NULL;
@@ -98,7 +116,8 @@ jmethodID JNICALL GetStaticMethodID(JNIEnv *env,
         ThrowNew_Quick(env, "java/lang/NoSuchMethodError", name);
         return NULL;
     }
-    TRACE2("jni", "GetStaticMethodID " << clss->name->bytes << "." << name << " " << descr << " = " << (jmethodID)method);
+    TRACE2("jni", "GetStaticMethodID " << clss->get_name()->bytes
+        << "." << name << " " << descr << " = " << (jmethodID)method);
 
     return (jmethodID)method;
 } //GetStaticMethodID
@@ -339,8 +358,6 @@ jbyte JNICALL CallByteMethodA(JNIEnv *env,
     call_method_no_ref_result(env, obj, methodID, args, &result, FALSE);
     return result.b;
 } //CallByteMethodA
-
-
 
 
 jchar JNICALL CallCharMethod(JNIEnv *env, jobject obj, jmethodID methodID, ...)

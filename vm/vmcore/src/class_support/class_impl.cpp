@@ -35,7 +35,7 @@ class_get_name( class_handler klass )
 {
     assert( klass );
     Class *clss = (Class*)klass;
-    return clss->name->bytes;
+    return clss->get_name()->bytes;
 } // class_get_name_bytes
 
 /** 
@@ -46,7 +46,7 @@ class_get_class_loader( class_handler klass )
 {
     assert( klass );
     Class *clss = (Class*)klass;
-    return (classloader_handler)clss->class_loader;
+    return (classloader_handler)clss->get_class_loader();
 } // class_get_classloader
 
 /** 
@@ -57,7 +57,7 @@ class_get_super_class( class_handler klass )
 {
     assert( klass );
     Class *clss = (Class*)klass;
-    return (class_handler)clss->super_class;
+    return (class_handler)clss->get_super_class();
 } // class_get_super_class
 
 /** 
@@ -75,13 +75,13 @@ class_is_same_class( class_handler klass1, class_handler klass2 )
  * Function checks if classes have the same package.
  */
 unsigned
-class_is_same_package( class_handler klass1, class_handler klass2 )
+class_is_same_package(class_handler klass1, class_handler klass2)
 {
     assert( klass1 );
     assert( klass2 );
-    Class *clss1 = (Class*)klass1;
-    Class *clss2 = (Class*)klass2;
-    return (clss1->package == clss2->package) ? 1 : 0;
+    Class* clss1 = (Class*)klass1;
+    Class* clss2 = (Class*)klass2;
+    return (clss1->get_package() == clss2->get_package()) ? 1 : 0;
 } // class_is_same_package
 
 /**
@@ -93,7 +93,7 @@ class_is_interface_( class_handler klass )
 {
     assert( klass );
     Class *clss = (Class*)klass;
-    return class_is_interface( clss ) ? 1 : 0;
+    return clss->is_interface() ? 1 : 0;
 } // class_is_interface_
 
 /**
@@ -104,7 +104,7 @@ class_is_array( class_handler klass )
 {
     assert( klass );
     Class *clss = (Class*)klass;
-    return clss->is_array;
+    return clss->is_array();
 } // class_is_array
 
 /**
@@ -116,18 +116,18 @@ class_is_final_( class_handler klass )
 {
     assert( klass );
     Class *clss = (Class*)klass;
-    return class_is_final( clss ) ? 1 : 0;
+    return clss->is_final() ? 1 : 0;
 } // class_is_final_
 
 /**
  * Function receives number of super interfaces of class.
  */
 unsigned short
-class_get_superinterface_number( class_handler klass )
+class_get_superinterface_number(class_handler klass)
 {
     assert( klass );
     Class *clss = (Class*)klass;
-    return clss->n_superinterfaces;
+    return clss->get_number_of_superinterfaces();
 } // class_get_superinterface_number
 
 /**
@@ -138,8 +138,8 @@ class_get_superinterface( class_handler klass, unsigned short index )
 {
     assert( klass );
     Class *clss = (Class*)klass;
-    assert( index < clss->n_superinterfaces );
-    return (class_handler)clss->superinterfaces[index].clss;
+    assert(index < clss->get_number_of_superinterfaces());
+    return (class_handler)clss->get_superinterface(index);
 } // class_get_superinterface
 
 /**
@@ -153,8 +153,8 @@ class_get_array_element_class( class_handler klass )
 {
     assert( klass );
     Class *clss = (Class*)klass;
-    assert( clss->is_array );
-    return (class_handler)clss->array_element_class;
+    assert(clss->is_array());
+    return (class_handler)clss->get_array_element_class();
 } // class_get_array_element_class
 
 /**
@@ -165,8 +165,8 @@ class_is_extending_class( class_handler klass, char *super_name )
 {
     assert( klass );
     assert( super_name );
-    for( Class *clss = (Class*)klass; clss; clss = clss->super_class ) {
-        if( !strcmp( clss->name->bytes, super_name ) ) {
+    for( Class *clss = (Class*)klass; clss; clss = clss->get_super_class() ) {
+        if( !strcmp( clss->get_name()->bytes, super_name ) ) {
             // found class with given name
             return 1;
         }
@@ -182,7 +182,7 @@ class_get_method_number( class_handler klass )
 {
     assert( klass );
     Class *clss = (Class*)klass;
-    return clss->n_methods;
+    return clss->get_number_of_methods();
 } // class_get_method_number
 
 /** 
@@ -193,8 +193,7 @@ class_get_method( class_handler klass, unsigned short index )
 {
     assert( klass );
     Class *clss = (Class*)klass;
-    assert( index < clss->n_methods );
-    return (method_handler)&clss->methods[index];
+    return (method_handler)clss->get_method(index);
 } // class_get_method
 
 /** 
@@ -203,9 +202,9 @@ class_get_method( class_handler klass, unsigned short index )
 unsigned short
 class_get_cp_size( class_handler klass )
 {
-    assert( klass );
-    Class *clss = (Class*)klass;
-    return clss->cp_size;
+    assert(klass);
+    Class* clss = (Class*)klass;
+    return clss->get_constant_pool().get_size();
 } // class_get_cp_size
 
 /** 
@@ -215,9 +214,8 @@ unsigned char
 class_get_cp_tag( class_handler klass, unsigned short index )
 {
     assert( klass );
-    Class *clss = (Class*)klass;
-    assert( index < clss->cp_size );
-    return (unsigned char)cp_tag( clss->const_pool, index );
+    Class* clss = (Class*)klass;
+    return clss->get_constant_pool().get_tag(index);
 } // class_get_cp_tag
 
 /** 
@@ -227,10 +225,8 @@ unsigned short
 class_get_cp_class_name_index( class_handler klass, unsigned short index )
 {
     assert( klass );
-    Class *clss = (Class*)klass;
-    assert( index < clss->cp_size );
-    assert( cp_is_class( clss->const_pool, index ) );
-    return clss->const_pool[index].CONSTANT_Class.name_index;
+    Class* clss = (Class*)klass;
+    return clss->get_constant_pool().get_class_name_index(index);
 } // class_get_cp_class_name_index
 
 /** 
@@ -241,11 +237,7 @@ class_get_cp_ref_class_index( class_handler klass, unsigned short index )
 {
     assert( klass );
     Class *clss = (Class*)klass;
-    assert( index < clss->cp_size );
-    assert( cp_is_fieldref( clss->const_pool, index ) 
-        || cp_is_methodref( clss->const_pool, index )
-        || cp_is_interfacemethodref( clss->const_pool, index ) );
-    return clss->const_pool[index].CONSTANT_ref.class_index;
+    return clss->get_constant_pool().get_ref_class_index(index);
 } // class_get_cp_ref_class_index
 
 /** 
@@ -256,24 +248,18 @@ class_get_cp_ref_name_and_type_index( class_handler klass, unsigned short index 
 {
     assert( klass );
     Class *clss = (Class*)klass;
-    assert( index < clss->cp_size );
-    assert( cp_is_fieldref( clss->const_pool, index ) 
-        || cp_is_methodref( clss->const_pool, index )
-        || cp_is_interfacemethodref( clss->const_pool, index ) );
-    return clss->const_pool[index].CONSTANT_ref.name_and_type_index;
+    return clss->get_constant_pool().get_ref_name_and_type_index(index);
 } // class_get_cp_ref_name_and_type_index
 
 /** 
  * Function returns string entry index in constant pool.
  */
 unsigned short
-class_get_cp_string_index( class_handler klass, unsigned short index )
+class_get_cp_string_index(class_handler klass, unsigned short index)
 {
-    assert( klass );
-    Class *clss = (Class*)klass;
-    assert( index < clss->cp_size );
-    assert( cp_is_string( clss->const_pool, index ) );
-    return clss->const_pool[index].CONSTANT_String.string_index;
+    assert(klass);
+    Class* clss = (Class*)klass;
+    return clss->get_constant_pool().get_string_index(index);
 } // class_get_cp_string_index
 
 /** 
@@ -283,10 +269,8 @@ unsigned short
 class_get_cp_name_index( class_handler klass, unsigned short index )
 {
     assert( klass );
-    Class *clss = (Class*)klass;
-    assert( index < clss->cp_size );
-    assert( cp_tag( clss->const_pool, index ) == CONSTANT_NameAndType );
-    return clss->const_pool[index].CONSTANT_NameAndType.name_index;
+    Class* clss = (Class*)klass;
+    return clss->get_constant_pool().get_name_and_type_name_index(index);
 } // class_get_cp_name_index
 
 /** 
@@ -296,46 +280,39 @@ unsigned short
 class_get_cp_descriptor_index( class_handler klass, unsigned short index )
 {
     assert( klass );
-    Class *clss = (Class*)klass;
-    assert( index < clss->cp_size );
-    assert( cp_tag( clss->const_pool, index ) == CONSTANT_NameAndType );
-    return clss->const_pool[index].CONSTANT_NameAndType.descriptor_index;
+    Class* clss = (Class*)klass;
+    return clss->get_constant_pool().get_name_and_type_descriptor_index(index);
 } // class_get_cp_descriptor_index
 
 /** 
  * Function returns bytes for UTF8 constant pool entry.
  */
-const char *
+const char*
 class_get_cp_utf8_bytes( class_handler klass, unsigned short index )
 {
     assert( klass );
-    Class *clss = (Class*)klass;
-    assert( index < clss->cp_size );
-    assert( cp_tag( clss->const_pool, index ) == CONSTANT_Utf8 );
-    return clss->const_pool[index].CONSTANT_Utf8.string->bytes;
+    Class* clss = (Class*)klass;
+    return clss->get_constant_pool().get_utf8_chars(index);
 } // class_get_cp_utf8_bytes
 
 /**
  * Function sets verify data to a given class.
  */
-void
-class_set_verify_data_ptr( class_handler klass, void *data )
+void class_set_verify_data_ptr(class_handler klass, void* data)
 {
-    assert( klass );
-    Class *clss = (Class*)klass;
-    clss->verify_data = data;
-    return;
+    assert(klass);
+    Class* clss = (Class*)klass;
+    clss->set_verification_data(data);
 } // class_set_verify_data_ptr
 
 /**
  * Function returns verify data for a given class.
  */
-void *
-class_get_verify_data_ptr( class_handler klass )
+void* class_get_verify_data_ptr(class_handler klass)
 {
-    assert( klass );
-    Class *clss = (Class*)klass;
-    return clss->verify_data;
+    assert(klass);
+    Class* clss = (Class*)klass;
+    return clss->get_verification_data();
 } // class_get_verify_data_ptr
 
 /**
@@ -344,10 +321,10 @@ class_get_verify_data_ptr( class_handler klass )
 method_handler
 class_resolve_method( class_handler klass, unsigned short index )
 {
-    assert( klass );
-    assert( index );
-    Class *clss = (Class*)klass;
-    Method *method = class_resolve_method( clss, index );
+    assert(klass);
+    assert(index);
+    Class* clss = (Class*)klass;
+    Method* method = clss->_resolve_method(VM_Global_State::loader_env, index);
     return (method_handler)method;
 } // class_resolve_method
 

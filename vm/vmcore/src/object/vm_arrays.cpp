@@ -38,17 +38,6 @@
 #include "vm_stats.h"
 
 
-#define BITS_PER_BYTE 8
-#define HIGH_BIT_SET_MASK (1<<((sizeof(unsigned) * BITS_PER_BYTE)-1))
-#define HIGH_BIT_CLEAR_MASK (~HIGH_BIT_SET_MASK)
-#ifndef NEXT_TO_HIGH_BIT_SET_MASK
-#define NEXT_TO_HIGH_BIT_SET_MASK (1<<((sizeof(unsigned) * BITS_PER_BYTE)-2))
-#define NEXT_TO_HIGH_BIT_CLEAR_MASK (~NEXT_TO_HIGH_BIT_SET_MASK)
-#endif /* #ifndef NEXT_TO_HIGH_BIT_SET_MAS */
-#define TWO_HIGHEST_BITS_SET_MASK (HIGH_BIT_SET_MASK|NEXT_TO_HIGH_BIT_SET_MASK)
-
-
-
 /////////////////////////////////////////////////////////////
 // begin vector access functions
 //
@@ -81,7 +70,7 @@ static Vector_Handle vm_anewarray_resolved_array_type(Class *arr_clss, int lengt
 #endif
     ASSERT_RAISE_AREA;
     assert(!hythread_is_suspend_enabled());
-    assert(!arr_clss->is_array_of_primitives);
+    assert(!arr_clss->is_array_of_primitives());
 
     if (length < 0) {
         tmn_suspend_enable();
@@ -90,7 +79,7 @@ static Vector_Handle vm_anewarray_resolved_array_type(Class *arr_clss, int lengt
         return NULL;
     }
 
-    unsigned sz = vm_array_size(arr_clss->vtable, length);
+    unsigned sz = arr_clss->calculate_array_size(length);
 
     if ((length & TWO_HIGHEST_BITS_SET_MASK) || (sz & TWO_HIGHEST_BITS_SET_MASK)) {
         // VM does not support arrays of length >= MAXINT>>2
@@ -102,10 +91,10 @@ static Vector_Handle vm_anewarray_resolved_array_type(Class *arr_clss, int lengt
         return NULL;
     }
 
-    Vector_Handle object_array = (Vector_Handle )gc_alloc(sz, arr_clss->allocation_handle, vm_get_gc_thread_local());
+    Vector_Handle object_array = (Vector_Handle )gc_alloc(sz,
+        arr_clss->get_allocation_handle(), vm_get_gc_thread_local());
 #ifdef VM_STATS
-    arr_clss->num_allocations++;    
-    arr_clss->num_bytes_allocated += sz;
+    arr_clss->instance_allocated(sz);
 #endif //VM_STATS
 
     if (NULL == object_array) {
@@ -115,7 +104,7 @@ static Vector_Handle vm_anewarray_resolved_array_type(Class *arr_clss, int lengt
     }
 
     set_vector_length(object_array, length);
-    assert(get_vector_vtable(object_array) == arr_clss->vtable);
+    assert(get_vector_vtable(object_array) == arr_clss->get_vtable());
     return object_array;
 } //vm_anewarray_resolved_array_type
 
@@ -145,14 +134,12 @@ Vector_Handle vm_new_vector_primitive(Class *vector_class, int length) {
         tmn_suspend_disable();
         return NULL;
     }
-    assert(vector_class->is_array_of_primitives);
-    assert(vector_class->vtable);
-    unsigned sz = vm_array_size(vector_class->vtable, length);
+    assert(vector_class->is_array_of_primitives());
+    unsigned sz = vector_class->calculate_array_size(length);
     Vector_Handle vector = (Vector_Handle)gc_alloc(sz, 
-        vector_class->allocation_handle, vm_get_gc_thread_local());
+        vector_class->get_allocation_handle(), vm_get_gc_thread_local());
 #ifdef VM_STATS
-    vector_class->num_allocations++;
-    vector_class->num_bytes_allocated += sz;
+    vector_class->instance_allocated(sz);
 #endif //VM_STATS
 
     if (NULL == vector) {
@@ -162,7 +149,7 @@ Vector_Handle vm_new_vector_primitive(Class *vector_class, int length) {
     }
 
     set_vector_length(vector, length);
-    assert(get_vector_vtable(vector) == vector_class->vtable);
+    assert(get_vector_vtable(vector) == vector_class->get_vtable());
     return vector;
 }
 
@@ -172,7 +159,7 @@ Vector_Handle vm_new_vector(Class *vector_class, int length)
     ASSERT_RAISE_AREA;
     Vector_Handle returned_vector;
 
-    if(vector_class->is_array_of_primitives) {
+    if(vector_class->is_array_of_primitives()) {
         returned_vector = vm_new_vector_primitive(vector_class,length);
     } else {
         returned_vector = vm_anewarray_resolved_array_type(vector_class, length);
@@ -197,10 +184,9 @@ void vm_new_vector_update_stats(int length, Allocation_Handle vector_handle, voi
 #ifdef VM_STATS
     if (0 != (length&TWO_HIGHEST_BITS_SET_MASK)) return;
     VTable *vector_vtable = ManagedObject::allocation_handle_to_vtable(vector_handle);
-    unsigned sz = vm_array_size(vector_vtable, (unsigned)length);
-    vector_vtable->clss->num_allocations++;
-    vector_vtable->clss->num_bytes_allocated += sz;
-    if (!get_prop_non_ref_array(vector_vtable->class_properties))
+    unsigned sz = vector_vtable->clss->calculate_array_size(length);
+    vector_vtable->clss->instance_allocated(sz);
+    if((vector_vtable->class_properties & CL_PROP_NON_REF_ARRAY_MASK) == 0)
     {
         VM_Statistics::get_vm_stats().num_anewarray++;
     }
@@ -225,10 +211,9 @@ Vector_Handle vm_new_vector_using_vtable_and_thread_pointer(int length, Allocati
     }
 
     VTable *vector_vtable = ManagedObject::allocation_handle_to_vtable(vector_handle);
-    unsigned sz = vm_array_size(vector_vtable, length);
+    unsigned sz = vector_vtable->clss->calculate_array_size(length);
 #ifdef VM_STATSxxx // Functionality moved into vm_new_vector_update_stats().
-    vector_vtable->clss->num_allocations++;
-    vector_vtable->clss->num_bytes_allocated += sz;
+    vector_vtable->clss->instance_allocated(sz);
 #endif //VM_STATS
     assert( ! hythread_is_suspend_enabled());
     Vector_Handle vector = (Vector_Handle)gc_alloc(sz, vector_handle, tp);
@@ -256,21 +241,13 @@ Vector_Handle vm_new_vector_or_null_using_vtable_and_thread_pointer(int length, 
     }
 
     VTable *vector_vtable = ManagedObject::allocation_handle_to_vtable(vector_handle);
-    unsigned sz = vm_array_size(vector_vtable, length);
+    unsigned sz = vector_vtable->clss->calculate_array_size(length);
     Vector_Handle vector = (Vector_Handle)gc_alloc_fast(sz, vector_handle, tp);
     if (vector == NULL)
     {
         return NULL;
     }
-#ifdef VM_STATSxxx // Functionality moved into vm_new_vector_update_stats().
-    vector_vtable->clss->num_allocations++;
-    vector_vtable->clss->num_bytes_allocated += sz;
-    if (!get_prop_non_ref_array(vector_vtable->class_properties))
-    {
-        VM_Statistics::get_vm_stats().num_anewarray++;
-    }
-#endif //VM_STATS
-    
+
     set_vector_length(vector, length);
     assert(get_vector_vtable(vector) == vector_vtable);
     return vector;
@@ -323,13 +300,13 @@ vm_multianewarray_recursive(Class    *c,
 
     // init Class* array
     clss[0] = c;
-    assert(c->name->bytes[0] == '[');
-    assert(c->name->len > 1);
+    assert(c->get_name()->bytes[0] == '[');
+    assert(c->get_name()->len > 1);
 
     for(d = 1; d < dims; d++) {
-        c = c->array_element_class;
-        assert(c->name->bytes[0] == '[');
-        assert(c->name->len > 1);
+        c = c->get_array_element_class();
+        assert(c->get_name()->bytes[0] == '[');
+        assert(c->get_name()->len > 1);
         clss[d] = c;
     }
 
@@ -445,8 +422,8 @@ static void increment_array_copy_counter(uint64 &counter)
 
 ArrayCopyResult array_copy(ManagedObject *src, int32 srcOffset, ManagedObject *dst, int32 dstOffset, int32 length)
 {
-    if (src == ((ManagedObject *)Class::managed_null) ||
-        dst == ((ManagedObject *)Class::managed_null)) {
+    if (src == ((ManagedObject *)VM_Global_State::loader_env->managed_null) ||
+        dst == ((ManagedObject *)VM_Global_State::loader_env->managed_null)) {
         return ACR_NullPointer;
     }
 
@@ -455,12 +432,12 @@ ArrayCopyResult array_copy(ManagedObject *src, int32 srcOffset, ManagedObject *d
     Class *dst_class = dst->vt()->clss;
     assert(dst_class);
 
-    if (!(src_class->is_array && dst_class->is_array)) return ACR_TypeMismatch;
-    assert(src_class->name->bytes[0] == '[');
-    assert(dst_class->name->bytes[0] == '[');
+    if (!(src_class->is_array() && dst_class->is_array())) return ACR_TypeMismatch;
+    assert(src_class->get_name()->bytes[0] == '[');
+    assert(dst_class->get_name()->bytes[0] == '[');
 
-    if (src_class->name != dst_class->name
-        && (src_class->is_array_of_primitives || dst_class->is_array_of_primitives)) {
+    if (src_class->get_name() != dst_class->get_name()
+        && (src_class->is_array_of_primitives() || dst_class->is_array_of_primitives())) {
         return ACR_TypeMismatch;
     }
 
@@ -476,7 +453,7 @@ ArrayCopyResult array_copy(ManagedObject *src, int32 srcOffset, ManagedObject *d
     if((srcOffset + length) > src_length || (dstOffset + length) > dst_length)
        return ACR_BadIndices;
 
-    char src_elem_type = src_class->name->bytes[1];
+    char src_elem_type = src_class->get_name()->bytes[1];
 
     switch(src_elem_type) {
     case 'C': 
@@ -591,7 +568,7 @@ ArrayCopyResult array_copy(ManagedObject *src, int32 srcOffset, ManagedObject *d
 #ifdef VM_STATS
                 increment_array_copy_counter(VM_Statistics::get_vm_stats().num_arraycopy_object_different_type);
 #endif // VM_STATS
-                Class *dst_elem_clss = dst_class->array_element_class;
+                Class* dst_elem_clss = dst_class->get_array_element_class();
                 assert(dst_elem_clss);
                 
                 if (VM_Global_State::loader_env->compress_references) {
@@ -604,8 +581,8 @@ ArrayCopyResult array_copy(ManagedObject *src, int32 srcOffset, ManagedObject *d
                             ManagedObject *src_elem = (ManagedObject *)uncompress_compressed_reference(src_elem_offset);
                             Class *src_elem_clss = src_elem->vt()->clss;
                             if (src_elem_clss == dst_elem_clss) {
-                            } else if (!class_is_subtype_fast(src_elem_clss->vtable, dst_elem_clss)) {
-                                // note: VM_STATS values are updated when class_is_subtype_fast() is called.
+                            } else if (!src_elem_clss->is_instanceof(dst_elem_clss)) {
+                                // note: VM_STATS values are updated when Class::is_instanceof() is called.
                                 // Since we only flag the base do it before we throw exception
                                 gc_heap_wrote_object(dst);
                                 return ACR_TypeMismatch;
@@ -621,7 +598,7 @@ ArrayCopyResult array_copy(ManagedObject *src, int32 srcOffset, ManagedObject *d
                         if (src_body[count] != NULL) {
                             Class *src_elem_clss = src_body[count]->vt()->clss;
                             if (src_elem_clss == dst_elem_clss) {
-                            } else if (!class_is_subtype_fast(src_elem_clss->vtable, dst_elem_clss)) {
+                            } else if (!src_elem_clss->is_instanceof(dst_elem_clss)) {
                                 // note: VM_STATS values are updated when class_is_subtype_fast() is called.
                                 // Since we only flag the base do it before we throw exception
                                 gc_heap_wrote_object(dst);

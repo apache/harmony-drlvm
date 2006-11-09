@@ -37,6 +37,13 @@
 #include "thread_manager.h"
 #include "open/types.h"
 #include "open/vm_util.h"
+#include "vtable.h"
+
+#ifndef NDEBUG
+// this is for managed object sanity checks
+// (used in monitor enter/exit functions)
+#include "Class.h"
+#endif
 
 static ObjectHandlesOld* oh_allocate_object_handle();
 
@@ -173,8 +180,8 @@ object_is_java_lang_class(ObjectHandle oh) {
 static bool
 managed_object_object_is_valid_unsafe(ManagedObject* p_obj) {
     Class* clss = p_obj->vt()->clss;
-    assert(clss->vtable->clss == clss);
-    return managed_object_is_java_lang_class_unsafe(*clss->class_handle);
+    assert(clss->get_vtable()->clss == clss);
+    return managed_object_is_java_lang_class_unsafe(*(clss->get_class_handle()));
 }
 
 bool
@@ -352,18 +359,19 @@ VMEXPORT // temporary solution for interpreter unplug
 ObjectHandle oh_allocate_local_handle()
 {
     assert(!hythread_is_suspend_enabled());
-    // FIXME: it looks like this should be uncoment or suspend_disable added 
-       //assert(!hythread_is_suspend_enabled());
-       
-       
-    // ? 20021202 There are really 3 cases to check: 
-    //   1) JNI transition: both LJF and LJF->local_object_handles are non-NULL. Any local handles will be cleaned up on return.
-    //   2) RNI/stub transition: LJF is non-NULL but LJF->local_object_handles is NULL. Although an LJF frame was pushed, 
-    //      local handles will NOT be cleaned up, so to avoid a storage leak we use the same code as case 3) below.
-    //   3) LJF is NULL. Native code uses Native_Local_Object_Handles, whose destructor cleans up any local handles.
 
-    // As of 2005-03-05, RNI is not used at all, and we need local handles,
-    // so 2) is handled by creating new local handles. 
+    // There are really 3 cases to check:
+    //   1) JNI transition: both LJF and LJF->local_object_handles are
+    //      non-NULL. Any local handles will be cleaned up on return.
+    //   2) RNI/stub transition: LJF is non-NULL but LJF->local_object_handles
+    //      is NULL. Although an LJF frame was pushed, local handles will NOT
+    //      be cleaned up, so to avoid a storage leak we use the same code as
+    //      case (3) below.
+    //   3) LJF is NULL. Native code uses Native_Local_Object_Handles, whose
+    //      destructor cleans up any local handles.
+
+    // RNI is not used at all, and we need local handles, so (2) is handled by
+    // creating new local handles.
     // XXX: need to check against leaks. -salikh
 
     M2nFrame* lm2nf = m2n_get_last_frame();
@@ -526,7 +534,8 @@ LilCodeStub* oh_gen_init_handle(LilCodeStub* cs, char* base_var, unsigned handle
     if (null_check && VM_Global_State::loader_env->compress_references) {
         sprintf(buf,
                 "jc %s=%p:ref,%%n; st [%s+%d:ref],%s; j %%o; :%%g; st [%s+%d:ref],0; :%%g;",
-                val, Class::heap_base, base_var, offset, val, base_var, offset);
+                val, VM_Global_State::loader_env->heap_base, base_var, offset,
+                val, base_var, offset);
     } else {
         sprintf(buf, "st [%s+%d:ref],%s;", base_var, offset, val);
     }

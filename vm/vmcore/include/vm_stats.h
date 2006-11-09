@@ -14,10 +14,10 @@
  *  See the License for the specific language governing permissions and
  *  limitations under the License.
  */
-/** 
+/**
  * @author Intel, Alexei Fedotov
  * @version $Revision: 1.1.2.1.4.3 $
- */  
+ */
 
 #ifndef _VM_STATS_H_
 #define _VM_STATS_H_
@@ -223,9 +223,23 @@ public:
     uint64 codemgr_total_code_allocated;
     uint64 codemgr_total_data_pool_size;
     uint64 codemgr_total_data_allocated;
-    
+
     uint64 num_compileme_generated;
     uint64 num_compileme_used;
+
+    // Total number of allocations and total number of bytes for class-related
+    // data structures. This includes any rounding added to make each item
+    // aligned (current alignment is to the next 16 byte boundary).
+    uint64 num_statics_allocations;
+    uint64 num_nonempty_statics_allocations;
+    uint64 num_vtable_allocations;
+    uint64 num_hot_statics_allocations;
+    uint64 num_hot_vtable_allocations;
+
+    uint64 total_statics_bytes;
+    uint64 total_vtable_bytes;
+    uint64 total_hot_statics_bytes;
+    uint64 total_hot_vtable_bytes;
 
     SimpleHashtable rt_function_map;
     SimpleHashtable rt_function_requests;

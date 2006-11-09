@@ -127,15 +127,14 @@ LilCodeStub* nso_newinstance(LilCodeStub* cs, Method_Handle)
         cs = lil_parse_onto_end(cs, "ld l0,[i0+%0i:pint];", (int)env->vm_class_offset);
         
         // Determine if this class supports fast allocation
-        size_t offset_is_fast_allocation_possible = (Byte *)&(env->Void_Class->is_fast_allocation_possible) - (Byte *)(env->Void_Class);
-        assert(sizeof(env->Void_Class->is_fast_allocation_possible) == 1);   // else one byte ld below will fail
+        size_t offset_is_fast_allocation_possible = env->Void_Class->get_offset_of_fast_allocation_flag();
         cs = lil_parse_onto_end(cs, "ld l1,[l0+%0i:g1];", (int)offset_is_fast_allocation_possible);
         cs = lil_parse_onto_end(cs, "jc l1=0,fallback;");
 
         // Class supports fast allocation, now use frontier allocation technique
         size_t offset_gc_local           = (Byte *)&(p_TLS_vmthread->_gc_private_information) - (Byte *)p_TLS_vmthread;
-        size_t offset_allocation_handle  = (Byte *)&(env->Void_Class->allocation_handle)       - (Byte *)(env->Void_Class);
-        size_t offset_instance_data_size = (Byte *)&(env->Void_Class->instance_data_size)      - (Byte *)(env->Void_Class);
+        size_t offset_allocation_handle  = env->Void_Class->get_offset_of_allocation_handle();
+        size_t offset_instance_data_size = env->Void_Class->get_offset_of_instance_data_size();
         current_offset += (unsigned) offset_gc_local;
         limit_offset += (unsigned) offset_gc_local;
 
@@ -166,7 +165,7 @@ LilCodeStub* nso_newinstance(LilCodeStub* cs, Method_Handle)
 
 static ManagedObject* get_class_ptr(ManagedObject* obj)
 {
-    return *(obj->vt()->clss->class_handle);
+    return *(obj->vt()->clss->get_class_handle());
 }
 
 LilCodeStub* nso_get_class(LilCodeStub* cs, Method_Handle)
@@ -336,7 +335,9 @@ LilCodeStub* nso_char_array_copy(LilCodeStub* cs, Method_Handle)
         "ld l0,[i2+%6i:pint];"
         "l1 = l1+i4;"
         "jc l0:g4<l1,slowpath;",                   // dst offset + length <= dst length
-        Class::managed_null, Class::managed_null, object_get_vtable_offset(), class_get_vtable(env->ArrayOfChar_Class), 
+        VM_Global_State::loader_env->managed_null,
+        VM_Global_State::loader_env->managed_null,
+        object_get_vtable_offset(), class_get_vtable(env->ArrayOfChar_Class),
         object_get_vtable_offset(), length_offset, length_offset);
     assert(cs);
 

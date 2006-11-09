@@ -36,6 +36,7 @@
 #include "vm_strings.h"
 #include "primitives_support.h"
 #include "jni_utils.h"
+#include "Class.h"
 
 #include "java_lang_VMClassRegistry.h"
 #include "java_lang_reflect_VMReflection.h"
@@ -112,7 +113,7 @@ static bool rethrow_invocation_exception(JNIEnv* jenv)
     jthrowable exn = exn_get(); 
     //FIXME need better handling for lazy exceptions
     if (!exn) {
-    	WARN("ATTENTION! Could not get cause exception from lazy machinery");
+        WARN("ATTENTION! Could not get cause exception from lazy machinery");
     }
     exn_clear();
     //static Class* ITE_class = genv->LoadCoreClass(
@@ -199,7 +200,7 @@ JNIEXPORT jobject JNICALL Java_java_lang_reflect_VMReflection_invokeMethod
     Class* type = VM_Global_State::loader_env->java_lang_reflect_Method_Class;
     Method_Handle method = (Method_Handle) ((POINTER_SIZE_INT) member);
 
-    TRACE("invoke : " << method->get_class()->name->bytes << "."  << method->get_name()->bytes << "()");
+    TRACE("invoke : " << method->get_class()->get_name()->bytes << "."  << method->get_name()->bytes << "()");
 
     unsigned num_args = method->get_num_args();
     jvalue *jvalue_args = (jvalue *)STD_ALLOCA(num_args * sizeof(jvalue));
@@ -302,7 +303,7 @@ JNIEXPORT jobject JNICALL Java_java_lang_reflect_VMReflection_newClassInstance
 {
     Method_Handle method = (Method_Handle) ((POINTER_SIZE_INT) member);
 
-    TRACE("new class instance : " << method->get_class()->name->bytes);
+    TRACE("new class instance : " << method->get_class()->get_name()->bytes);
 
     unsigned num_args = method->get_num_args();
     jvalue *jvalue_args = (jvalue *)STD_ALLOCA(num_args * sizeof(jvalue));

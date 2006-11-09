@@ -192,12 +192,12 @@ static jvmtiError allocate_iteration_state(TIEnv* ti_env)
     memset(state, 0, sizeof(TIIterationState));
 
     // we trust in correct values of global values
-    // Class::heap_base and Class::heap_ceiling
-    assert((UDATA)Class::heap_base == (UDATA)gc_heap_base_address());
-    assert((UDATA)Class::heap_end == (UDATA)gc_heap_ceiling_address());
+    // Global_Env::heap_base and Global_Env::heap_end
+    assert((UDATA)ti_env->vm->vm_env->heap_base == (UDATA)gc_heap_base_address());
+    assert((UDATA)ti_env->vm->vm_env->heap_end == (UDATA)gc_heap_ceiling_address());
 
-    state->markbits_size = ((UDATA)Class::heap_end - (UDATA)Class::heap_base) 
-        / GC_OBJECT_ALIGNMENT / 8;
+    state->markbits_size = ((UDATA)ti_env->vm->vm_env->heap_end
+        - (UDATA)ti_env->vm->vm_env->heap_base) / GC_OBJECT_ALIGNMENT / 8;
     state->markbits = new unsigned char[state->markbits_size];
     if (state->markbits == NULL) {
         delete state;

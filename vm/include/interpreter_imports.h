@@ -22,6 +22,7 @@
 #define _INTERPRETER_IMPORTS_H_
 
 #include "open/types.h"
+#include "vm_core_types.h"
 #include "jvmti.h"
 
 struct ManagedObject;

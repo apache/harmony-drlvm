@@ -53,13 +53,6 @@ jsize JNICALL GetArrayLength(JNIEnv * UNREF env,
 } //GetArrayLength
 
 
-#define BITS_PER_BYTE 8
-#define HIGH_BIT_SET_MASK (1<<((sizeof(unsigned) * BITS_PER_BYTE)-1))
-#ifndef NEXT_TO_HIGH_BIT_SET_MASK
-#define NEXT_TO_HIGH_BIT_SET_MASK (1<<((sizeof(unsigned) * BITS_PER_BYTE)-2))
-#endif /* #ifndef NEXT_TO_HIGH_BIT_SET_MAS */
-#define TWO_HIGHEST_BITS_SET_MASK (HIGH_BIT_SET_MASK|NEXT_TO_HIGH_BIT_SET_MASK)
-
 jarray JNICALL NewObjectArray(JNIEnv * UNREF env,
                               jsize length,
                               jclass elementClass,
@@ -203,8 +196,8 @@ void JNICALL SetObjectArrayElement(JNIEnv *env,
         DeleteLocalRef(env, array_jclass);
         DeleteLocalRef(env, actual_element_jclass);
 
-        if (!class_is_subtype_fast(actual_element_class->vtable, array_class->array_element_class)) {
-            ThrowNew_Quick(env, "java/lang/ArrayStoreException", actual_element_class->name->bytes);
+        if (!actual_element_class->is_instanceof(array_class->get_array_element_class())) {
+            ThrowNew_Quick(env, "java/lang/ArrayStoreException", actual_element_class->get_name()->bytes);
             return;
         }
     }
@@ -240,11 +233,12 @@ jbooleanArray JNICALL NewBooleanArray(JNIEnv * UNREF env, jsize length)
     assert(hythread_is_suspend_enabled());
     Class *clss = VM_Global_State::loader_env->ArrayOfBoolean_Class;
     
-    unsigned sz = vm_array_size(clss->vtable, length);
+    unsigned sz = clss->calculate_array_size(length);
     tmn_suspend_disable();       //---------------------------------v
     ObjectHandle h = oh_allocate_local_handle();
-    Vector_Handle array = gc_alloc(sz, clss->allocation_handle, vm_get_gc_thread_local());
-    if (NULL == array)
+    Vector_Handle array = gc_alloc(sz, clss->get_allocation_handle(),
+        vm_get_gc_thread_local());
+    if(NULL == array)
     {
         tmn_suspend_enable();
         return NULL;
@@ -253,8 +247,7 @@ jbooleanArray JNICALL NewBooleanArray(JNIEnv * UNREF env, jsize length)
     set_vector_length(array, length);
 
 #ifdef VM_STATS
-    clss->num_allocations++;
-    clss->num_bytes_allocated += sz;
+    clss->instance_allocated(sz);
 #endif //VM_STATS
 
     h->object = (ManagedObject *)array;
@@ -273,10 +266,11 @@ jbyteArray JNICALL NewByteArray(JNIEnv * UNREF env, jsize length)
     Class *clss = VM_Global_State::loader_env->ArrayOfByte_Class;
     assert(clss);
  
-    unsigned sz = vm_array_size(clss->vtable, length);
+    unsigned sz = clss->calculate_array_size(length);
     tmn_suspend_disable();       //---------------------------------v
     ObjectHandle h = oh_allocate_local_handle();
-    Vector_Handle array = gc_alloc(sz, clss->allocation_handle, vm_get_gc_thread_local());
+    Vector_Handle array = gc_alloc(sz, clss->get_allocation_handle(),
+        vm_get_gc_thread_local());
     if (NULL == array)
     {
         tmn_suspend_enable();
@@ -286,8 +280,7 @@ jbyteArray JNICALL NewByteArray(JNIEnv * UNREF env, jsize length)
     set_vector_length(array, length);
 
 #ifdef VM_STATS
-    clss->num_allocations++;
-    clss->num_bytes_allocated += sz;
+    clss->instance_allocated(sz);
 #endif //VM_STATS
 
     h->object = (ManagedObject *)array;
@@ -305,11 +298,12 @@ jcharArray JNICALL NewCharArray(JNIEnv * UNREF env, jsize length)
     assert(hythread_is_suspend_enabled());
     Class *clss = VM_Global_State::loader_env->ArrayOfChar_Class;
  
-    unsigned sz = vm_array_size(clss->vtable, length);
+    unsigned sz = clss->calculate_array_size(length);
     tmn_suspend_disable();       //---------------------------------v
     ObjectHandle h = oh_allocate_local_handle();
-    Vector_Handle array = gc_alloc(sz, clss->allocation_handle, vm_get_gc_thread_local());
-    if (NULL == array)
+    Vector_Handle array = gc_alloc(sz, clss->get_allocation_handle(),
+        vm_get_gc_thread_local());
+    if(NULL == array)
     {
         tmn_suspend_enable();
         return NULL;
@@ -318,8 +312,7 @@ jcharArray JNICALL NewCharArray(JNIEnv * UNREF env, jsize length)
     set_vector_length(array, length);
 
 #ifdef VM_STATS
-    clss->num_allocations++;
-    clss->num_bytes_allocated += sz;
+    clss->instance_allocated(sz);
 #endif //VM_STATS
 
     h->object = (ManagedObject *)array;
@@ -337,11 +330,12 @@ jshortArray JNICALL NewShortArray(JNIEnv * UNREF env, jsize length)
     assert(hythread_is_suspend_enabled());
     Class *clss = VM_Global_State::loader_env->ArrayOfShort_Class;
  
-    unsigned sz = vm_array_size(clss->vtable, length);
+    unsigned sz = clss->calculate_array_size(length);
     tmn_suspend_disable();       //---------------------------------v
     ObjectHandle h = oh_allocate_local_handle();
 
-    Vector_Handle array = gc_alloc(sz, clss->allocation_handle, vm_get_gc_thread_local());
+    Vector_Handle array = gc_alloc(sz, clss->get_allocation_handle(),
+        vm_get_gc_thread_local());
     if (NULL == array)
     {
         tmn_suspend_enable();
@@ -351,8 +345,7 @@ jshortArray JNICALL NewShortArray(JNIEnv * UNREF env, jsize length)
     set_vector_length(array, length);
 
 #ifdef VM_STATS
-    clss->num_allocations++;
-    clss->num_bytes_allocated += sz;
+    clss->instance_allocated(sz);
 #endif //VM_STATS
 
     h->object = (ManagedObject *)array;
@@ -369,10 +362,11 @@ jintArray JNICALL NewIntArray(JNIEnv * UNREF env, jsize length)
     TRACE2("jni", "NewIntArray called");
     assert(hythread_is_suspend_enabled());
     Class *clss = VM_Global_State::loader_env->ArrayOfInt_Class;
-    unsigned sz = vm_array_size(clss->vtable, length);
+    unsigned sz = clss->calculate_array_size(length);
     tmn_suspend_disable();       //---------------------------------v
     ObjectHandle h = oh_allocate_local_handle();
-    Vector_Handle array = gc_alloc(sz, clss->allocation_handle, vm_get_gc_thread_local());
+    Vector_Handle array = gc_alloc(sz, clss->get_allocation_handle(),
+        vm_get_gc_thread_local());
     if (NULL == array)
     {
         tmn_suspend_enable();
@@ -382,8 +376,7 @@ jintArray JNICALL NewIntArray(JNIEnv * UNREF env, jsize length)
     set_vector_length(array, length);
 
 #ifdef VM_STATS
-    clss->num_allocations++;
-    clss->num_bytes_allocated += sz;
+    clss->instance_allocated(sz);
 #endif //VM_STATS
 
     h->object = (ManagedObject *)array;
@@ -400,10 +393,11 @@ jlongArray JNICALL NewLongArray(JNIEnv * UNREF env, jsize length)
     TRACE2("jni", "NewLongArray called");
     assert(hythread_is_suspend_enabled());
     Class *clss = VM_Global_State::loader_env->ArrayOfLong_Class;
-    unsigned sz = vm_array_size(clss->vtable, length);
+    unsigned sz = clss->calculate_array_size(length);
     tmn_suspend_disable();       //---------------------------------v
     ObjectHandle h = oh_allocate_local_handle();
-    Vector_Handle array = gc_alloc(sz, clss->allocation_handle, vm_get_gc_thread_local());
+    Vector_Handle array = gc_alloc(sz, clss->get_allocation_handle(),
+        vm_get_gc_thread_local());
     if (NULL == array)
     {
         tmn_suspend_enable();
@@ -413,8 +407,7 @@ jlongArray JNICALL NewLongArray(JNIEnv * UNREF env, jsize length)
     set_vector_length(array, length);
 
 #ifdef VM_STATS
-    clss->num_allocations++;
-    clss->num_bytes_allocated += sz;
+    clss->instance_allocated(sz);
 #endif //VM_STATS
 
     h->object = (ManagedObject *)array;
@@ -431,10 +424,11 @@ jfloatArray JNICALL NewFloatArray(JNIEnv * UNREF env, jsize length)
     TRACE2("jni", "NewFloatArray called");
     assert(hythread_is_suspend_enabled());
     Class *clss = VM_Global_State::loader_env->ArrayOfFloat_Class;
-    unsigned sz = vm_array_size(clss->vtable, length);
+    unsigned sz = clss->calculate_array_size(length);
     tmn_suspend_disable();       //---------------------------------v
     ObjectHandle h = oh_allocate_local_handle();
-    Vector_Handle array = gc_alloc(sz, clss->allocation_handle, vm_get_gc_thread_local());
+    Vector_Handle array = gc_alloc(sz, clss->get_allocation_handle(),
+        vm_get_gc_thread_local());
     if (NULL == array)
     {
         tmn_suspend_enable();
@@ -444,8 +438,7 @@ jfloatArray JNICALL NewFloatArray(JNIEnv * UNREF env, jsize length)
     set_vector_length(array, length);
 
 #ifdef VM_STATS
-    clss->num_allocations++;
-    clss->num_bytes_allocated += sz;
+    clss->instance_allocated(sz);
 #endif //VM_STATS
 
     h->object = (ManagedObject *)array;
@@ -462,10 +455,11 @@ jdoubleArray JNICALL NewDoubleArray(JNIEnv * UNREF env, jsize length)
     TRACE2("jni", "NewDoubleArray called");
     assert(hythread_is_suspend_enabled());
     Class *clss = VM_Global_State::loader_env->ArrayOfDouble_Class;
-    unsigned sz = vm_array_size(clss->vtable, length);
+    unsigned sz = clss->calculate_array_size(length);
     tmn_suspend_disable();       //---------------------------------v
     ObjectHandle h = oh_allocate_local_handle();
-    Vector_Handle array = gc_alloc(sz, clss->allocation_handle, vm_get_gc_thread_local());
+    Vector_Handle array = gc_alloc(sz, clss->get_allocation_handle(),
+        vm_get_gc_thread_local());
     if (NULL == array)
     {
         tmn_suspend_enable();
@@ -475,8 +469,7 @@ jdoubleArray JNICALL NewDoubleArray(JNIEnv * UNREF env, jsize length)
     set_vector_length(array, length);
 
 #ifdef VM_STATS
-    clss->num_allocations++;
-    clss->num_bytes_allocated += sz;
+    clss->instance_allocated(sz);
 #endif //VM_STATS
 
     h->object = (ManagedObject *)array;

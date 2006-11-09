@@ -285,8 +285,8 @@ JNIEXPORT jobjectArray JNICALL Java_org_apache_harmony_vm_VMStack_getStackTrace
     jclass ste = struct_Class_to_java_lang_Class_Handle(genv->java_lang_StackTraceElement_Class);
     assert(ste);
 
-    static jmethodID init = (jmethodID) class_lookup_method(
-        genv->java_lang_StackTraceElement_Class, genv->Init_String, 
+    static jmethodID init = (jmethodID) genv->java_lang_StackTraceElement_Class->lookup_method(
+        genv->Init_String,
         genv->string_pool.lookup("(Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;I)V"));
    
     jarray arr = jenv->NewObjectArray(size - skip, ste, NULL);
@@ -321,7 +321,7 @@ JNIEXPORT jobjectArray JNICALL Java_org_apache_harmony_vm_VMStack_getStackTrace
      
         tmn_suspend_disable();
         // class name
-        String* className = class_get_java_name(method->get_class(), genv);
+        String* className = method->get_class()->get_java_name();
         strClassName->object = vm_instantiate_cp_string_resolved(className);
         if (!strClassName->object) {
             tmn_suspend_enable();
@@ -398,74 +398,73 @@ JNIEXPORT jobjectArray JNICALL Java_org_apache_harmony_vm_VMStack_getThreadStack
     assert(method);
     // skip only for main application thread
     if (!strcmp(method_get_name(method), "runImpl")
-        && method->get_class()->name == starter_String) {
+        && method->get_class()->get_name() == starter_String) {
 
-            size --;
-        }
+        size --;
+    }
 
-        assert(hythread_is_suspend_enabled());
-        jclass ste = struct_Class_to_java_lang_Class_Handle(genv->java_lang_StackTraceElement_Class);
-        assert(ste);
+    assert(hythread_is_suspend_enabled());
+    jclass ste = struct_Class_to_java_lang_Class_Handle(genv->java_lang_StackTraceElement_Class);
+    assert(ste);
 
-        static jmethodID init = (jmethodID) class_lookup_method(
-            genv->java_lang_StackTraceElement_Class, genv->Init_String, 
-            genv->string_pool.lookup("(Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;I)V"));
+    static jmethodID init = (jmethodID) genv->java_lang_StackTraceElement_Class->lookup_method(
+        genv->Init_String,
+        genv->string_pool.lookup("(Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;I)V"));
 
-        jarray arr = jenv->NewObjectArray(size, ste, NULL);
-        if (!arr) {
+    jarray arr = jenv->NewObjectArray(size, ste, NULL);
+    if (!arr) {
+        assert(exn_raised());
+        return NULL;
+    }
+
+    tmn_suspend_disable();
+    ObjectHandle strMethodName = oh_allocate_local_handle();
+    ObjectHandle strClassName = oh_allocate_local_handle();
+    tmn_suspend_enable();
+
+    for(unsigned i = 0; i < size; i++) {
+        Method_Handle method = frames[i].method;
+        NativeCodePtr ip = frames[i].ip;
+        int lineNumber;
+        const char* fileName;
+
+        get_file_and_line(method, ip, true, &fileName, &lineNumber);
+        if (fileName == NULL) fileName = "";
+
+        jstring strFileName = jenv->NewStringUTF(fileName);
+        if (!strFileName) {
             assert(exn_raised());
             return NULL;
         }
 
         tmn_suspend_disable();
-        ObjectHandle strMethodName = oh_allocate_local_handle();
-        ObjectHandle strClassName = oh_allocate_local_handle();
+        // class name
+        String* className = method->get_class()->get_java_name();
+        strClassName->object = vm_instantiate_cp_string_resolved(className);
+        if (!strClassName->object) {
+            tmn_suspend_enable();
+            assert(exn_raised());
+            return NULL;
+        }
+        // method name
+        strMethodName->object = vm_instantiate_cp_string_resolved(method->get_name());
+        if (!strMethodName->object) {
+            tmn_suspend_enable();
+            assert(exn_raised());
+            return NULL;
+        }
         tmn_suspend_enable();
 
-        for(unsigned i = 0; i < size; i++) {
-            Method_Handle method = frames[i].method;
-            NativeCodePtr ip = frames[i].ip;
-            int lineNumber;
-            const char* fileName;
-
-            get_file_and_line(method, ip, true, &fileName, &lineNumber);
-            if (fileName == NULL) fileName = "";
-
-            jstring strFileName = jenv->NewStringUTF(fileName);
-            if (!strFileName) {
-                assert(exn_raised());
-                return NULL;
-            }
-
-            tmn_suspend_disable();
-            // class name
-            String* className = class_get_java_name(method->get_class(), 
-                VM_Global_State::loader_env);
-            strClassName->object = vm_instantiate_cp_string_resolved(className);
-            if (!strClassName->object) {
-                tmn_suspend_enable();
-                assert(exn_raised());
-                return NULL;
-            }
-            // method name
-            strMethodName->object = vm_instantiate_cp_string_resolved(method->get_name());
-            if (!strMethodName->object) {
-                tmn_suspend_enable();
-                assert(exn_raised());
-                return NULL;
-            }
-            tmn_suspend_enable();
-
-            // creating StackTraceElement object
-            jobject obj = jenv->NewObject(ste, init, strClassName, strMethodName, 
-                strFileName, lineNumber);
-            if (!obj) {
-                assert(exn_raised());
-                return NULL;
-            }
-
-            jenv->SetObjectArrayElement(arr, i, obj);
+        // creating StackTraceElement object
+        jobject obj = jenv->NewObject(ste, init, strClassName, strMethodName, 
+            strFileName, lineNumber);
+        if (!obj) {
+            assert(exn_raised());
+            return NULL;
         }
-        core_free(frames);
-        return arr;
+
+        jenv->SetObjectArrayElement(arr, i, obj);
+    }
+    core_free(frames);
+    return arr;
 }

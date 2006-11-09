@@ -40,6 +40,7 @@ using namespace std;
 #include "stack_iterator.h"
 #include "Class.h"
 #include "jit_intf_cpp.h"
+#include "cci.h"
 
 #include "mon_enter_exit.h"
 #include "thread_generic.h"

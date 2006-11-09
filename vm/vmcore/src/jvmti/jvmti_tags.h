@@ -26,6 +26,7 @@
 
 #include "jvmti_types.h"
 #include "open/types.h"
+#include "vtable.h"
 
 #include "ulist.h"
 

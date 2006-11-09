@@ -37,6 +37,7 @@ using namespace std;
 #include "open/types.h"
 
 #include "Class.h"
+#include "type.h"
 #include "environment.h"
 #include "method_lookup.h"
 #include "stack_iterator.h"
@@ -47,6 +48,7 @@ using namespace std;
 #include "jit_intf.h"
 #include "jit_intf_cpp.h"
 #include "jit_runtime_support.h"
+#include "type.h"
 
 #include "encoder.h"
 
@@ -59,6 +61,7 @@ using namespace std;
 #include "vm_synch.h"
 #include "vm_threads.h"
 #include "ini.h"
+#include "type.h"
 
 #include "compile.h"
 #include "lil.h"
@@ -156,7 +159,7 @@ char * gen_convert_managed_to_unmanaged_null_ia32(char * ss,
                                                   unsigned stack_pointer_offset) {
     if (VM_Global_State::loader_env->compress_references) {
         ss = mov(ss,  eax_opnd,  M_Base_Opnd(esp_reg, stack_pointer_offset));
-        ss = alu(ss, cmp_opc,  eax_opnd,  Imm_Opnd((int32)Class::heap_base) );
+        ss = alu(ss, cmp_opc,  eax_opnd,  Imm_Opnd((int32)VM_Global_State::loader_env->heap_base) );
         ss = branch8(ss, Condition_NE,  Imm_Opnd(size_8, 0));  // not null, branch around the mov 0
         char *backpatch_address__not_managed_null = ((char *)ss) - 1;
         ss = mov(ss,  M_Base_Opnd(esp_reg, stack_pointer_offset),  Imm_Opnd(0));

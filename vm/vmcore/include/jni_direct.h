@@ -29,7 +29,8 @@
 #include "open/types.h"
 
 #include "jni.h"
-#include "Class.h"
+#include "open/types.h"
+#include "class_member.h"
 
 typedef struct JavaVM_Internal JavaVM_Internal;
 typedef struct JNIEnv_Internal JNIEnv_Internal;

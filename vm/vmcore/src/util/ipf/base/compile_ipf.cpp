@@ -118,7 +118,7 @@ void gen_convert_unmanaged_to_managed_null_ipf(Emitter_Handle emitter, unsigned 
         increment_stats_counter(*mce, &VM_Statistics::get_vm_stats().num_convert_null_u2m);
 #endif
         mce->ipf_cmp(icmp_eq, cmp_none, SCRATCH_PRED_REG, SCRATCH_PRED_REG2, reg, 0);
-        emit_mov_imm_compactor(*mce, reg, (uint64)Class::heap_base, SCRATCH_PRED_REG);
+        emit_mov_imm_compactor(*mce, reg, (uint64)VM_Global_State::loader_env->heap_base, SCRATCH_PRED_REG);
     } 
 } //gen_convert_unmanaged_to_managed_null_ipf
 
@@ -146,17 +146,16 @@ static void emit_newinstance_override(Emitter_Handle eh, Method *method) {
         emitter.ipf_ld(int_mem_size_8, mem_ld_none, mem_none, SCRATCH_GENERAL_REG7, SCRATCH_GENERAL_REG);
 
         // Check that the argument class is instantiatable. Note: we use Void_Class here but any class will do.
-        // g1 = g7 + offset_is_fast_allocation_possible  // address of (clss->is_fast_allocation_possible)
-        // g2 = [g1]                                     // clss->is_fast_allocation_possible
-        // p1 = (g2 != 0)                                // p1 = is clss->is_fast_allocation_possible?
-        size_t offset_is_fast_allocation_possible = (Byte *)&(env->Void_Class->is_fast_allocation_possible) - (Byte *)(env->Void_Class);
-        assert(sizeof(env->Void_Class->is_fast_allocation_possible) == 1);   // else one byte ld below will fail
+        // g1 = g7 + offset_is_fast_allocation_possible  // address of (clss->m_is_fast_allocation_possible)
+        // g2 = [g1]                                     // clss->m_is_fast_allocation_possible
+        // p1 = (g2 != 0)                                // p1 = is clss->m_is_fast_allocation_possible?
+        size_t offset_is_fast_allocation_possible = env->Void_Class->get_offset_of_fast_allocation_flag();
 
         emitter.ipf_adds(SCRATCH_GENERAL_REG, (int)offset_is_fast_allocation_possible, SCRATCH_GENERAL_REG7);
         emitter.ipf_ld(int_mem_size_1, mem_ld_none, mem_none, SCRATCH_GENERAL_REG2, SCRATCH_GENERAL_REG);
         emitter.ipf_cmp(icmp_ne, cmp_none, SCRATCH_PRED_REG, SCRATCH_PRED_REG2, 0, SCRATCH_GENERAL_REG2);
 
-        // The following instructions are executed only if p1 (i.e., if clss->is_fast_allocation_possible).
+        // The following instructions are executed only if p1 (i.e., if clss->m_is_fast_allocation_possible).
         // This is a significantly modified version of the inline code in get_vm_rt_new_with_thread_pointer_compactor().
         // Do the fast path without creating a frame. This sequence uses predicated instructions rather than branching,
         // although I wonder if it has become too long for this to be effective.

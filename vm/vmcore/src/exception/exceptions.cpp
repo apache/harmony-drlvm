@@ -34,6 +34,7 @@
 #include "object_handles.h"
 #include "vm_arrays.h"
 #include "vm_strings.h"
+#include "cci.h"
 
 
 bool exn_raised()
@@ -406,7 +407,7 @@ inline void exn_jni_print_stack_trace(FILE * f, jthrowable exc)
         return;
 
     tmn_suspend_disable();
-    const char *exceptionNameChars = exc->object->vt()->clss->name->bytes;
+    const char* exceptionNameChars = exc->object->vt()->clss->get_name()->bytes;
     tmn_suspend_enable();
     const char *messageChars = GetStringUTFChars(jenv, message, false);
     fprintf(f, "\n%s : %s\n", exceptionNameChars, messageChars);
@@ -625,7 +626,7 @@ void print_uncaught_exception_message(FILE * f, char *context_message,
 
     tmn_suspend_disable();
     fprintf(f, "** During %s uncaught exception: %s\n", context_message,
-        exc->object->vt()->clss->name->bytes);
+        exc->object->vt()->clss->get_name()->bytes);
     tmn_suspend_enable();
 
     exn_print_stack_trace(f, exc);

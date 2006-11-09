@@ -165,7 +165,7 @@ JIT_execute_method_default(JIT_Handle jh,
             // 20030318 We are in unmanaged code where null is represented by 0/NULL. Convert a null reference
             // to the representation of null in managed code (heap_base).
             if (i64 == 0) {
-                i64 = (uint64)Class::heap_base;
+                i64 = (uint64)VM_Global_State::loader_env->heap_base;
             }
         }
         arg_words[num_arg_words++] = i64;
@@ -188,7 +188,7 @@ JIT_execute_method_default(JIT_Handle jh,
                 // 20030318 We are in unmanaged code where null is represented by 0/NULL. Convert a null reference
                 // to the representation of null in managed code (heap_base).
                 if (i64 == 0) {
-                    i64 = (uint64)Class::heap_base;
+                    i64 = (uint64)VM_Global_State::loader_env->heap_base;
                 }
             }
             arg_words[num_arg_words++] = i64;
@@ -196,7 +196,7 @@ JIT_execute_method_default(JIT_Handle jh,
 #ifdef _DEBUG
             {
                 if (! VM_Global_State::loader_env->compress_references ||
-                    i64 != (uint64)Class::heap_base) {
+                    i64 != (uint64)VM_Global_State::loader_env->heap_base) {
                     ManagedObject *object = (ManagedObject *)i64;
                     if(object) {
                         Class *clss = object->vt()->clss;
@@ -269,7 +269,7 @@ JIT_execute_method_default(JIT_Handle jh,
             if (VM_Global_State::loader_env->compress_references) {
                 // 20030318 Convert a null reference in managed code (represented by heap_base)
                 // to the representation of null in unmanaged code (0 or NULL).
-                if ((uint64)int_result == (uint64)Class::heap_base) {
+                if ((uint64)int_result == (uint64)VM_Global_State::loader_env->heap_base) {
                     int_result = 0;
                 } 
             }

@@ -36,6 +36,7 @@
 #include "hashtable.h"
 #include "loggerstring.h"
 #include "jarfile_support.h"
+#include "type.h"
 
 class ClassTable : public MapEx<const String*, Class* > {};
 
@@ -187,12 +188,13 @@ public:
     }
     void InsertClass(Class* clss) {
         LMAutoUnlock aulock(&m_lock);
-        m_loadedClasses->Insert(clss->name, clss);
-        m_initiatedClasses->Insert(clss->name, clss);
+        m_loadedClasses->Insert(clss->get_name(), clss);
+        m_initiatedClasses->Insert(clss->get_name(), clss);
     }
     Class* AllocateAndReportInstance(const Global_Env* env, Class* klass);
     Class* NewClass(const Global_Env* env, const String* name);
     ManagedObject** RegisterClassInstance(const String* className, ManagedObject* instance);
+    Package* ProvidePackage(Global_Env* env, const String *class_name, const char *jar);
     Class* DefineClass(Global_Env* env, const char* class_name,
         uint8* bytecode, unsigned offset, unsigned length, const String** res_name = NULL);
     Class* LoadClass( Global_Env* UNREF env, const String* UNREF name);
@@ -221,8 +223,6 @@ public:
 protected:
     virtual Class* DoLoadClass( Global_Env* UNREF env, const String* UNREF name) = 0;
     Class* StartLoadingClass(Global_Env* env, const String* className);
-    bool FinishLoadingClass(Global_Env *env, Class* clss,
-        unsigned int* super_class_cp_index);
     void RemoveLoadingClass(const String* className, LoadingClass* loading);
     void SuccessLoadingClass(const String* className);
     void AddFailedClass(const String* className, const jthrowable exn);
@@ -298,10 +298,8 @@ protected:
     // methods
     Class* WaitDefinition(Global_Env* env, const String* className);
     Class* SetupAsArray(Global_Env* env, const String* klass);
-    Package* ProvidePackage(Global_Env* env, const String *class_name, const char *jar);
 
 private:
-    Class* InitClassFields(const Global_Env* env, Class* clss, const String* name);
     void FieldClearInternals(Class*); // clean Field internals in Class
 }; // class ClassLoader
 

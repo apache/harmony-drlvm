@@ -23,9 +23,7 @@
 #ifndef _JNI_UTILS_H_
 #define _JNI_UTILS_H_
 
-#include "environment.h"
 #include "object_handles.h"
-#include "platform.h"
 #include "jni_direct.h"
 #include "ini.h"
 #include "String_Pool.h"
@@ -53,8 +51,6 @@ VMEXPORT Method* LookupMethod (Class*, const char*, const char*);
 VMEXPORT char* ParameterTypesToMethodSignature (JNIEnv*, jobjectArray, const char *name);
 VMEXPORT char PrimitiveNameToSignature (const char*);
 
-VMEXPORT Boolean class_is_subclass(Class_Handle subclss, Class_Handle superclss);
-
 #ifdef __cplusplus
 }
 #endif
@@ -81,9 +77,6 @@ void PrimitiveSignatureToName (const char sig, char *classname);
 
 const char* SignatureToName (const char* sig);
 void SignatureToName (const char* sig, char *name);
-
-jclass struct_Class_to_jclass(Class *c);
-Class *jclass_to_struct_Class(jclass jc);
 
 jclass FindClassWithClassLoader(JNIEnv* env_ext, const char *name, ClassLoader *loader);
 jclass FindClassWithClassLoader(JNIEnv* env_ext, String*name, ClassLoader *loader);

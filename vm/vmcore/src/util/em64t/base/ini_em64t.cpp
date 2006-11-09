@@ -211,7 +211,7 @@ void JIT_execute_method_default(JIT_Handle jh, jmethodID methodID,
         assert(VM_Global_State::loader_env->compress_references);
         // convert from native to managed NULL
         gr_args[gr_nargs++] = handle->object != NULL
-            ? (uint64) handle->object : (uint64) Class::managed_null;
+            ? (uint64) handle->object : (uint64) VM_Global_State::loader_env->managed_null;
     }
 
     Java_Type type;

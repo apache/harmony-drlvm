@@ -25,7 +25,9 @@
 #include "port_malloc.h"
 #include "jit_intf_cpp.h"
 #include "Class.h"
+#include "class_member.h"
 #include "stack_trace.h"
+#include "cci.h"
 
 #ifdef PLATFORM_NT
 
@@ -170,19 +172,19 @@ static void st_get_java_method_info(MethodInfo* info, Method* m, void* ip, bool 
     info->line = -1;
     info->method_name = NULL;
     assert(m);
-    if (m->get_class()->src_file_name && m->get_class()->src_file_name->bytes) {
-        const char* fname = m->get_class()->src_file_name->bytes;
-        size_t flen = strlen(fname);
+    if (m->get_class()->has_source_information() && m->get_class()->get_source_file_name()) {
+        const char* fname = m->get_class()->get_source_file_name();
+        size_t flen = m->get_class()->get_source_file_name_length();
         info->file_name = (char*) STD_MALLOC(flen + 1);
         strcpy(info->file_name, fname);
     }
 
     const char* mname = m->get_name()->bytes;
-    size_t mlen = strlen(mname);
-    const char* cname = m->get_class()->name->bytes;
-    size_t clen = strlen(cname);
+    size_t mlen = m->get_name()->len;
+    const char* cname = m->get_class()->get_name()->bytes;
+    size_t clen = m->get_class()->get_name()->len;
     const char* descr = m->get_descriptor()->bytes;
-    size_t dlen = strlen(descr);
+    size_t dlen = m->get_descriptor()->len;
     
     info->method_name = (char*) STD_MALLOC(mlen + clen + dlen + 2);
     memcpy(info->method_name, cname, clen);
