@@ -95,11 +95,11 @@ vm.port,extra.log4cxx, extra.aprutil" />
             </select>
 
             <select os="lnx">
-                <syslibset libs="pthread,rt" />
+                <syslibset libs="rt" />
                 <linkerarg value="-Wl,-init" />
                 <linkerarg value="-Wl,hythread_library_init" />
                 <linkerarg value="-Wl,--version-script,${src}/thread/src/hythr.exp" />
-           </select>
+            </select>
 
             <select os="win">
                 <syslibset libs="advapi32,ws2_32" />

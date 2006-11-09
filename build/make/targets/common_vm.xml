@@ -207,8 +207,8 @@ Version: $Revision: 1.6.2.6 $
                 <syslibset libs="advapi32,odbc32,userenv,ws2_32,mswsock" />
             </select>
             <select os="lnx" arch="ia32">
-                <syslibset type="static" libs="z,xml2" />
-                <syslibset type="shared" libs="m,dl,stdc++,rt,pthread" />
+                <syslibset type="static" libs="z,pthread,xml2" />
+                <syslibset type="shared" libs="m,dl,stdc++,rt" />
             </select>
             <select os="lnx" cxx="gcc" arch="ia32">
                 <linkerarg value="-lgcc_s" />
