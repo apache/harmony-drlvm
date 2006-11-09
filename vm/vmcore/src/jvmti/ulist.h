@@ -58,9 +58,14 @@ public:
             index++;
             assert(index >= 0);
             if ((size_t)index >= current->used) {
-                current = current->next;
                 index = 0;
+                do {
+                    current = current->next;
+                    // skip emptied chunk during iteration,
+                    // as they have no elements to iterate
+                } while (current && current->used == 0);
             }
+            assert(0 <= index); assert(current == NULL || ((size_t)index < current->used));
             return *this;
         }
 
@@ -71,6 +76,7 @@ public:
         }
 
         T & operator*() {
+            assert(0 <= index); assert((size_t)index < current->used);
             return current->chunk[index];
         }
 
@@ -152,8 +158,10 @@ public:
     }
 
     void erase(iterator i) {
-        assert(0 <= i.index && (size_t)i.index < i.current->used);
-        i.current->used--;
+        assert(0 <= i.index); assert((size_t)i.index < i.current->used);
+        i.current->used--; assert(i.current->used >= 0);
+
+        // compact array if the erased element was not the last
         if ((size_t)i.index < i.current->used) {
             i.current->chunk[i.index] = i.current->chunk[i.current->used];
             // moving element notification
@@ -177,7 +185,13 @@ public:
 
     // iteration is not compatible with adding elements !!!
     iterator begin() {
-        return iterator(this, 0);
+        ulist<T> *current = this;
+        while (current && current->used == 0) {
+            current = current->next;
+            // skip empty chunk during iteration,
+            // as they have no elements to iterate
+        }
+        return iterator(current, 0);
     }
 
     iterator end() {
@@ -261,6 +275,53 @@ TEST(erase) {
         c++;
     }
     assert(c == N/2);
+}
+
+TEST(erase_random) {
+    ulist<int> list(3);
+    int N = 77;
+    int j;
+    for (j = 0; j < N; j++) {
+        list.push_back(j);
+    }
+    ulist<int>::iterator i;
+    int removed = 0;
+    for (i = list.begin(), j = 0; i != list.end(); i++, j++) {
+        if (j % 3 == 0) {
+            list.erase(i--);
+            removed++;
+        }
+    }
+    assert(j == N);
+    N -= removed;
+    removed = 0;
+    for (i = list.begin(), j = 0; i != list.end(); i++, j++) {
+        if (j % 3 == 0) {
+            list.erase(i--);
+            removed++;
+        }
+    }
+    assert(j == N);
+    N -= removed;
+    removed = 0;
+    for (i = list.begin(), j = 0; i != list.end(); i++, j++) {
+        if (j < N/3 || j > N-N/3) {
+            list.erase(i--);
+            removed++;
+        }
+    }
+    assert(j == N);
+    N -= removed;
+    removed = 0;
+    for (i = list.begin(), j = 0; i != list.end(); i++, j++) {
+        list.erase(i--);
+        removed++;
+    }
+    assert(j == N);
+    assert(removed == N);
+    for (i = list.begin(); i != list.end(); i++) {
+        assert(!"should not have any elements");
+    }
 }
 
 TEST(erase_all) {
@@ -348,6 +409,25 @@ TEST(find) {
 
     delete[] elements;
     elements = NULL;
+}
+
+TEST(iterate_empty) {
+    ulist<int> list(10);
+    assert(!(list.begin() != list.end()));
+}
+
+TEST(iterate_emptied) {
+    ulist<int> list(10);
+    int N = 33;
+    int j;
+    for (j = 0; j < N; j++) {
+        list.push_back(j);
+    }
+    ulist<int>::iterator i;
+    for (i = list.begin(); i != list.end(); i++) {
+        list.erase(i--);
+    }
+    assert(!(list.begin() != list.end()));
 }
 
 #endif // UNIT_TEST
