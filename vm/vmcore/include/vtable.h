@@ -1,0 +1,81 @@
+/*
+ *  Copyright 2006 The Apache Software Foundation or its licensors, as applicable.
+ *
+ *  Licensed under the Apache License, Version 2.0 (the "License");
+ *  you may not use this file except in compliance with the License.
+ *  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ *  Unless required by applicable law or agreed to in writing, software
+ *  distributed under the License is distributed on an "AS IS" BASIS,
+ *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ *  See the License for the specific language governing permissions and
+ *  limitations under the License.
+ */
+#ifndef __VTABLE_H__
+#define __VTABLE_H__
+
+/**
+ * @file
+ * virtual method table of a class
+ */
+extern "C" {
+
+typedef struct {
+    unsigned char** table;  // pointer into methods array of Intfc_Table below
+    unsigned intfc_id;      // id of interface
+} Intfc_Table_Entry;
+
+typedef struct Intfc_Table {
+#ifdef POINTER64
+    // see INTFC_TABLE_OVERHEAD
+    uint32 dummy;   // padding
+#endif
+    uint32 n_entries;
+    Intfc_Table_Entry entry[1];
+} Intfc_Table;
+
+#define INTFC_TABLE_OVERHEAD    (sizeof(void*))
+
+#ifdef POINTER64
+#define OBJECT_HEADER_SIZE 0
+// The size of an object reference. Used by arrays of object to determine
+// the size of an element.
+#define OBJECT_REF_SIZE 8
+#else // POINTER64
+#define OBJECT_HEADER_SIZE 0
+#define OBJECT_REF_SIZE 4
+#endif // POINTER64
+
+#define GC_BYTES_IN_VTABLE (sizeof(void*))
+#define MAX_FAST_INSTOF_DEPTH 5
+
+typedef struct VTable {
+    Byte _gc_private_information[GC_BYTES_IN_VTABLE];
+    Class* clss;
+
+    // See the masks in vm_for_gc.h.
+    uint32 class_properties;
+
+    // Offset from the top by CLASS_ALLOCATED_SIZE_OFFSET
+    // The number of bytes allocated for this object. It is the same as
+    // instance_data_size with the constraint bit cleared. This includes
+    // the OBJECT_HEADER_SIZE as well as the OBJECT_VTABLE_POINTER_SIZE
+    unsigned int allocated_size;
+
+    unsigned short array_element_size;
+    unsigned short array_element_shift;
+    Intfc_Table* intfc_table;   // interface table; NULL if no intfc table
+    Class *superclasses[MAX_FAST_INSTOF_DEPTH];
+    unsigned char* methods[1];  // code for methods
+} VTable;
+#define VTABLE_OVERHEAD (sizeof(VTable) - sizeof(void *))
+// The "- sizeof(void *)" part subtracts out the "unsigned char *methods[1]" contribution.
+
+VTable *create_vtable(Class *p_class, unsigned n_vtable_entries);
+
+} // extern "C"
+
+
+#endif
