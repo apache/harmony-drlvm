@@ -732,7 +732,6 @@ Class* ClassLoader::WaitDefinition(Global_Env* env, const String* className)
 {
     VM_thread* cur_thread = get_thread_ptr();
     LoadingClass* loading;
-    Class** pclss;
     Class* clss = NULL;
     m_lock._lock();
     do
@@ -741,12 +740,8 @@ Class* ClassLoader::WaitDefinition(Global_Env* env, const String* className)
             m_lock._unlock();
             return NULL;
         }
-        if((pclss = m_loadedClasses->Lookup(className)) != NULL) {
-            m_lock._unlock();
-            return *pclss;
-        }
         loading = m_loadingClasses->Lookup(className);
-        if(loading) {
+        if(loading && m_loadedClasses->Lookup(className) == NULL) {
             TRACE2("classloader.collisions", this << " " << cur_thread << " DC " << className->bytes);
             if(!loading->HasDefiner()) {
                 break;
