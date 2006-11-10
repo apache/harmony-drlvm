@@ -158,21 +158,25 @@ class ReflectExporter implements ReflectAccessor {
             return true;
         }
         int modifiers = callee.getModifiers();
-        if (Modifier.isPrivate(modifiers)) {
+	    Class calleeDeclaringClass = callee.getDeclaringClass();
+	    if (calleeDeclaringClass == null) {
+	        // the callee is either a top level class or a local class
+            if (Modifier.isPublic(modifiers) || hasSamePackage(callee, caller)) {
+	            return true;
+	        }
+	        // other top level classes and local classes 
             return false;
-        }
-        if (Modifier.isPublic(modifiers) || hasSamePackage(callee, caller)) {
-            return allowClassAccess(callee.getDeclaringClass(), caller);
-        }
-        return false;
+	    }
+	    // here callee is a member class
+   	    return allowAccess(caller, calleeDeclaringClass, calleeDeclaringClass, modifiers);
     }
 
     private boolean hasSameTopLevelClass(Class<?> class1, Class<?> class2) {
         Class topClass;
-        while ( (topClass = class1.getDeclaringClass()) != null) {
+        while ( (topClass = class1.getEnclosingClass()) != null) {
             class1 = topClass;
         }
-        while ( (topClass = class2.getDeclaringClass()) != null) {
+        while ( (topClass = class2.getEnclosingClass()) != null) {
             class2 = topClass;
         }
         return class1 == class2;
