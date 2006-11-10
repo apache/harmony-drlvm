@@ -36,16 +36,16 @@ namespace Jitrino {
 DEFINE_SESSION_ACTION(LazyExceptionOptPass, lazyexc, "Lazy Exception Throwing Optimization")
 
 void LazyExceptionOptPass::_run(IRManager& irm) {
-    LazyExceptionOpt le(irm, irm.getMemoryManager());
+    LazyExceptionOpt le(irm);
     le.doLazyExceptionOpt();
 }
 
 int LazyExceptionOpt::level=0;
 
-LazyExceptionOpt::LazyExceptionOpt(IRManager &ir_manager, MemoryManager& mem_manager) :
-    irManager(ir_manager), memManager(mem_manager), 
+LazyExceptionOpt::LazyExceptionOpt(IRManager &ir_manager) :
+    irManager(ir_manager), 
     leMemManager(1024,"LazyExceptionOpt::doLazyExceptionOpt"),
-    compInterface(ir_manager.getCompilationInterface()),nodeSet(NULL)
+    compInterface(ir_manager.getCompilationInterface())
 {
     if (compInterface.isBCMapInfoRequired()) {
         isBCmapRequired = true;
@@ -57,6 +57,9 @@ LazyExceptionOpt::LazyExceptionOpt(IRManager &ir_manager, MemoryManager& mem_man
     }
 }
 
+/**
+ * Executes lazy exception optimization pass.
+ */
 void 
 LazyExceptionOpt::doLazyExceptionOpt() {
     MethodDesc &md = irManager.getMethodDesc();
@@ -120,7 +123,7 @@ LazyExceptionOpt::doLazyExceptionOpt() {
             if (inst->getOpcode()==Op_Throw) {
                 if (inst->getSrc(0)->getInst()->getOpcode()==Op_NewObj) {
                     excOpnds.setBit(opndId=inst->getSrc(0)->getId(),true);
-                    if (addOptCandidates(opndId,inst))
+                    if (!addOptCandidates(opndId,inst))
                         excOpnds.setBit(opndId,false); // different exc. edges
 #ifdef _DEBUG
                     if (excOpnds.getBit(opndId)==1) {
@@ -134,9 +137,9 @@ LazyExceptionOpt::doLazyExceptionOpt() {
 #endif
                 }
             }
-            if (m_sideEff==0)
-                if (instSideEffect(inst)) {
-                    m_sideEff=compInterface.MSE_YES;
+            if (m_sideEff==CompilationInterface::MSE_UNKNOWN)
+                if (instHasSideEffect(inst)) {
+                    m_sideEff=CompilationInterface::MSE_YES;
 #ifdef _DEBUG
                     if (Log::isEnabled()) {
                         Log::out() << "~~~~~~inst sideEff "; 
@@ -176,7 +179,7 @@ LazyExceptionOpt::doLazyExceptionOpt() {
                     MethodDesc* md = inst->asMethodInst()->getMethodDesc();
                     if (md->isInstanceInitializer() &&
                         md->getParentType()->isLikelyExceptionType()) {
-                        if (addOptCandidates(opndId,inst)) {
+                        if (!addOptCandidates(opndId,inst)) {
                             excOpnds.setBit(opndId,false);
 #ifdef _DEBUG
                             if (Log::isEnabled()) {
@@ -228,11 +231,13 @@ level--;
 #endif
 };
 
-/*
-*  Returns:
-*      true, if throw cannot be optimized
-*      false, otherwise
-*/
+/**
+ * Adds information to optCandidates list for specified exception object.
+ * @param id - an exception object operand Id
+ * @param inst - call, or throw instructions operating with this exception object
+ * @return <code>true</code> if an information is added; 
+ *         <code>false<code> if an exception object cannot be optimized.
+ */
 bool 
 LazyExceptionOpt::addOptCandidates(uint32 id, Inst* inst) {
     OptCandidate* oc = NULL;
@@ -261,7 +266,7 @@ LazyExceptionOpt::addOptCandidates(uint32 id, Inst* inst) {
                 Log::out() << "    isFinalizable: "
                  << hasFinalize << std::endl;
 #endif
-                return true;
+                return false;
             }
         }
         oc = new (leMemManager) OptCandidate;
@@ -273,12 +278,12 @@ LazyExceptionOpt::addOptCandidates(uint32 id, Inst* inst) {
         oc->throwInsts = thrinst;
         optCandidates->push_back(oc);
         if (!isEqualExceptionNodes(oc->objInst,inst)) {
-            return true;
+            return false;
         }
     } else {
         if (inst->getOpcode()==Op_Throw) {
             oc->throwInsts->push_back(inst);
-            return false;
+            return true;
         } else {
             assert(inst->getOpcode()==Op_DirectCall);
             assert(oc->initInst==NULL);
@@ -289,7 +294,7 @@ LazyExceptionOpt::addOptCandidates(uint32 id, Inst* inst) {
                 inst->print(Log::out()); Log::out()  << std::endl;
             }
 #endif
-            uint32 nii_id=inst->getId()+1;
+            uint32 nii_id=((Inst*)(inst->getNode()->getUnconditionalEdgeTarget()->getFirstInst()))->getId();
             ThrowInsts::iterator it1;
             for (it1 = oc->throwInsts->begin(); it1 !=oc->throwInsts->end(); it1++) {
                 if ((*it1)->getId() != nii_id) {
@@ -300,17 +305,24 @@ LazyExceptionOpt::addOptCandidates(uint32 id, Inst* inst) {
                     }
 #endif
                     if (checkInSideEff((*it1),inst))
-                        return true;
+                        return false;
                 }
             }
-            if (checkMethodCall(inst)) {
-                return true;
+            if (methodCallHasSideEffect(inst)) {
+                return false;
             }
         }
     }
-    return false;
+    return true;
 };
 
+/**
+ * Checks if there is a side effect between throw_inst and init_inst instructions.
+ * @param throw_inst - the exception object throw instruction
+ * @param init_inst - the exception object constructor call instruction
+ * @return <code>true</code> if there is side effect;
+ *         <code>false<code> if there is no side effect.
+ */
 bool 
 LazyExceptionOpt::checkInSideEff(Inst* throw_inst, Inst* init_inst) {
     Node* node = throw_inst->getNode();
@@ -339,7 +351,7 @@ LazyExceptionOpt::checkInSideEff(Inst* throw_inst, Inst* init_inst) {
                 break;
             }
             if (!inSE) {
-                if (instSideEffect(inst)) {
+                if (instHasSideEffect(inst)) {
                     inSE=true;
 #ifdef _DEBUG
                     if (Log::isEnabled()) {
@@ -361,6 +373,14 @@ LazyExceptionOpt::checkInSideEff(Inst* throw_inst, Inst* init_inst) {
     return inSE;
 }
 
+/**
+ * Checks that exception edges are equal for newobj instruction node and
+ * throw instruction node.
+ * @param oi - newobj instruction
+ * @param ti - throw instruction
+ * @return <code>true</code> if exception edges are equal;
+ *         <code>false<code> otherwise.
+ */
 bool
 LazyExceptionOpt::isEqualExceptionNodes(Inst* oi, Inst* ti) {
     Edge* oedge = oi->getNode()->getExceptionEdge();
@@ -378,6 +398,10 @@ LazyExceptionOpt::isEqualExceptionNodes(Inst* oi, Inst* ti) {
     return true;
 }
 
+/**
+ * Prints information about optimization candidates.
+ * @param os - output stream
+ */
 void 
 LazyExceptionOpt::printOptCandidates(::std::ostream& os) {
     OptCandidates::iterator it;
@@ -421,6 +445,11 @@ LazyExceptionOpt::printOptCandidates(::std::ostream& os) {
     os << "end~~" << std::endl;
 }
 
+/**
+ * Checks that exception edges are equal for newobj instruction node and
+ * throw instruction node.
+ * @param bs - bit set of operands that may be optimized
+ */
 void 
 LazyExceptionOpt::fixOptCandidates(BitSet* bs) {
     OptCandidates::iterator it;
@@ -524,6 +553,13 @@ LazyExceptionOpt::fixOptCandidates(BitSet* bs) {
     }
 }
 
+/**
+ * Removes specified instructions if they have the same exception node.
+ * @param oinst - exception creating instruction
+ * @param iinst - constructor call instruction
+ * @return <code>true</code> if instruction were removed;
+ *         <code>false<code> otherwise.
+ */
 bool
 LazyExceptionOpt::removeInsts(Inst* oinst,Inst* iinst) {
     ControlFlowGraph& fg = irManager.getFlowGraph();
@@ -558,6 +594,10 @@ LazyExceptionOpt::removeInsts(Inst* oinst,Inst* iinst) {
     return true;
 }
 
+/**
+ * Removes node from compiled method flow graph.
+ * @param node - removed node
+ */
 void 
 LazyExceptionOpt::removeNode(Node* node) {
     const Edges &out_edges = node->getOutEdges();
@@ -583,8 +623,14 @@ LazyExceptionOpt::printInst1(::std::ostream& os, Inst* inst, std::string txt) {
 
 }
 
+/**
+ * Checks a callee method side effect.
+ * @param inst - method call instruction
+ * @return <code>true</code> if method has side effect;
+ *         <code>false<code> if method has no side effect.
+ */
 bool 
-LazyExceptionOpt::checkMethodCall(Inst* inst) {
+LazyExceptionOpt::methodCallHasSideEffect(Inst* inst) {
     uint32 opcode = inst->getOpcode();
     MethodDesc* cmd;
     CompilationInterface::MethodSideEffect mse;
@@ -672,247 +718,124 @@ LazyExceptionOpt::checkMethodCall(Inst* inst) {
 #endif
         return true;  // cannot compile <init> before <clinit> (to fix vm)
     }
-    if (compInterface.compileMethod(cmd)) {
-        mse = compInterface.getMethodHasSideEffect(cmd);
+
+    if (mse==CompilationInterface::MSE_UNKNOWN) {  // try to compile method
+        if (!compInterface.compileMethod(cmd)) {
 #ifdef _DEBUG
-        if (Log::isEnabled()) {
-            Log::out() << "    checkMC: method was compiled, sideEff " 
-                << mse << std::endl;
-        }
+            if (Log::isEnabled()) {
+                Log::out() << "    checkMC: method was not compiled " << std::endl;
+            }
 #endif
-        if (mse==CompilationInterface::MSE_YES)
             return true;
-        else {
-            if (mse==CompilationInterface::MSE_NULL_PARAM) {
-                uint32 nsrc=inst->getNumSrcOperands();
-                Inst* src_inst;
-                bool mayBeNull;
-                if (nsrc>3) {
+        } else {
+             mse = compInterface.getMethodHasSideEffect(cmd);
 #ifdef _DEBUG
-                    if (Log::isEnabled()) {
-                        Log::out() << "    checkMC: exc.init "; 
-                        inst->print(Log::out()); Log::out() << std::endl;
-                    }
+            if (Log::isEnabled()) {
+                Log::out() << "    checkMC: method was compiled, sideEff " 
+                    << mse << std::endl;
+            }
 #endif
-                    mayBeNull=false;
-                    for (uint32 i=3; i<nsrc; i++) {
-                        if (inst->getSrc(i)->getType()->isReference()) {
-                            src_inst=inst->getSrc(i)->getInst();
-                            if (mayBeNullArg(inst,src_inst))
-                                mayBeNull=true;
-                         }
-                    }
-                    if (!mayBeNull)
-                        return false;
+            if (mse==CompilationInterface::MSE_YES)
+                return true;
+            if (mse==CompilationInterface::MSE_NO) {
+                return false;
+            }
+       }
+    }
+
+    if (mse==CompilationInterface::MSE_NULL_PARAM) {
+        uint32 nsrc=inst->getNumSrcOperands();
+        bool mayBeNull;
+        if (nsrc>3) {
 #ifdef _DEBUG
-                    for (uint32 i=0; i<nsrc; i++) {
-                        if (Log::isEnabled()) {
-                            Log::out() << "        "<<i<<" isRef: "<<
-                            inst->getSrc(i)->getType()->isReference()<<" "; 
-                            inst->getSrc(i)->getInst()->print(Log::out()); 
-                            Log::out() << std::endl;
-                        }
-                    }
+            if (Log::isEnabled()) {
+                Log::out() << "    checkMC: exc.init "; 
+                inst->print(Log::out()); Log::out() << std::endl;
+            }
 #endif
-                    return true;
-                } 
-#ifdef _DEBUG
-                else {
-                    if (Log::isEnabled()) {
-                        Log::out() << " ?????? MSE_NULL_PARAM & nsrc "<<
-                        nsrc << std::endl;
-                    }
+            mayBeNull=false;
+            for (uint32 i=3; i<nsrc; i++) {
+                if (inst->getSrc(i)->getType()->isReference()) {
+                    if (mayBeNullArg(inst,i))
+                        mayBeNull=true;
                 }
-#endif
             }
-            return false;
-        }
-    } else {
+            if (!mayBeNull)
+                return false;
 #ifdef _DEBUG
-        if (Log::isEnabled()) {
-            Log::out() << "    checkMC: method was not compiled " << std::endl;
-        }
+            for (uint32 i=0; i<nsrc; i++) {
+                if (Log::isEnabled()) {
+                    Log::out() << "        "<<i<<" isRef: "<<
+                    inst->getSrc(i)->getType()->isReference()<<" "; 
+                    inst->getSrc(i)->getInst()->print(Log::out()); 
+                    Log::out() << std::endl;
+                }
+            }
 #endif
-        return true;
-    }
-}
-
-bool 
-LazyExceptionOpt::mayBeNullArg(Inst* call_inst, Inst* src_inst) {
-    uint32 mnid = irManager.getFlowGraph().getMaxNodeId();
-    Node* node = call_inst->getNode();
-    bool done = true;
-
-    if (nodeSet == NULL) {
-        nodeSet = new (leMemManager) NodeSet;
-        nodeSet->nodes=new (leMemManager) BitSet(leMemManager,mnid);
-    } else {
-        nodeSet->nodes->clear();
-    }
-    nodeSet->arg_src_inst = src_inst;
-    nodeSet->call_inst = call_inst;
-    nodeSet->check_inst = NULL;
-    nodeSet->reset_inst = NULL;
-
-    done = checkArg(node);
+            return true;
+        } 
 #ifdef _DEBUG
-    if (Log::isEnabled()) {
-        Log::out() << "        mb0 done " << done << " nodes: " << std::endl; 
-        for(uint32 i = 0; i < mnid; i++) {
-            if (nodeSet->nodes->getBit(i)) {
-                Log::out() << " " << i;
+        else {
+            if (Log::isEnabled()) {
+                Log::out() << " ?????? MSE_NULL_PARAM & nsrc "<<
+                nsrc << std::endl;
             }
         }
-        Log::out() << std::endl; 
-        Log::out() << "   arg   node: " << nodeSet->arg_src_inst->getNode()->getId() << std::endl; 
-        Log::out() << "   call  node: " << nodeSet->call_inst->getNode()->getId() << std::endl; 
-        if (nodeSet->check_inst)
-        Log::out() << "   check node: " << nodeSet->check_inst->getNode()->getId() << std::endl; 
-        if (nodeSet->reset_inst)
-        Log::out() << "   reset node: " << nodeSet->reset_inst->getNode()->getId() << std::endl; 
+#endif
     }
-#endif 
-    if (!done)
-        return true;
-    if (nodeSet->reset_inst)
-        return true;
-    if (nodeSet->check_inst==NULL && src_inst->getOpcode()==Op_Catch)
-        return false;
-    if (nodeSet->check_inst!=NULL && (nodeSet->check_inst->getNode()->getId() == 
-            nodeSet->arg_src_inst->getNode()->getId()))
-        return false;
     return true;
 }
 
+/**
+ * Checks if a callee method agrument may be null.
+ * @param call_inst - method call instruction
+ * @param arg_n - callee method argument number
+ * @return <code>true</code> if a callee method argument may be null
+ *         <code>false<code> if a callee method argument is not null
+ */
 bool 
-LazyExceptionOpt::checkArg(Node* nodeS) {
-    Node* node = nodeS;
-    Inst* instfirst = (Inst*)node->getFirstInst();
-    Inst* instlast = (Inst*)node->getLastInst();
-    Inst* inst;
-    Opnd* arg_opnd = nodeSet->arg_src_inst->getDst();
-    bool doneOK = true;
-    bool dofind = true;
+LazyExceptionOpt::mayBeNullArg(Inst* call_inst, uint32 arg_n) {
+    Opnd* arg_opnd = call_inst->getSrc(arg_n);
+    Inst* inst=arg_opnd->getInst();
 
-#ifdef _DEBUG
-        if (Log::isEnabled()) {
-            Log::out() << "    checkArg: first node " << node->getId() << " ";
-            FlowGraph::printLabel(Log::out(),node);
-            Log::out() << "  inEdges " << node->getInDegree() << "  " << std::endl;
-        }
-#endif 
- 
-    while (dofind && node!=NULL) {
-        if ( nodeSet->nodes->getBit(node->getId()) ) {
-            if (nodeSet->call_inst->getNode() == node) {
-#ifdef _DEBUG
-                if (Log::isEnabled()) {
-                    Log::out() << "        node " << node->getId() << " ";
-                    FlowGraph::printLabel(Log::out(),node);
-                    Log::out() << " again in call_inst node " << std::endl; 
-                }
-#endif 
-                doneOK = false;
-            }
+    while ((inst=inst->getNextInst())!=NULL) {
+        if (inst->getOpcode()==Op_TauCheckNull && inst->getSrc(0)==arg_opnd) {
 #ifdef _DEBUG
             if (Log::isEnabled()) {
-                Log::out() << "        node " << node->getId() << " ";
-                FlowGraph::printLabel(Log::out(),node);
-                Log::out() << "  inEdges " << node->getInDegree() << " was scanned " << std::endl; 
-            }
-#endif 
-            break;
-        }
-#ifdef _DEBUG
-        if (Log::isEnabled()) {
-            Log::out() << "        node " << node->getId() << " ";
-            FlowGraph::printLabel(Log::out(),node);
-            Log::out() << "  inEdges " << node->getInDegree() << std::endl; 
-        }
-#endif 
-        for (inst = instlast; inst!=instfirst; inst=inst->getPrevInst()) {
-#ifdef _DEBUG
-            if (Log::isEnabled()) {
-                Log::out() << "          "; 
+                Log::out() << "   check node: " << inst->getNode()->getId() << " ";
                 inst->print(Log::out()); Log::out() << std::endl; 
             }
-#endif
-            if (inst==nodeSet->arg_src_inst) {
-                dofind=false;
-                break;
-            }
-            if (inst->getOpcode()==Op_TauCheckNull && inst->getSrc(0)==arg_opnd) {
-                if (nodeSet->check_inst != NULL) {
-#ifdef _DEBUG
-                    if (Log::isEnabled()) {
-                        Log::out() << "  check_inst is not NULL" << std::endl; 
-                    }
-#endif
-                    break;
-                }
-#ifdef _DEBUG
-                if (Log::isEnabled()) {
-                    Log::out() << "  check_inst is FOUND" << std::endl; 
-                }
-#endif			    		
-                nodeSet->check_inst = inst;
-                break;
-            }
-            if (inst->getDst()==arg_opnd) {
-#ifdef _DEBUG
-                if (nodeSet->reset_inst != NULL) {
-                    if (Log::isEnabled()) {
-                        Log::out() << "  reset_inst is not NULL" << std::endl; 
-                    }
-                }
-#endif
-                nodeSet->reset_inst=inst;
-                dofind = false; 
-                doneOK = false; 
-            }
-        }
-        if (nodeSet->nodes->getBit(node->getId()) == 0) {
-            nodeSet->nodes->setBit(node->getId(),true); 
-        } 
-        if (dofind) {
-            if (node->getInDegree()==0) {
-                dofind = false;
-                break;
-            }
-            if (node->getInDegree()==1) {
-                node = node->getInEdges().front()->getSourceNode();
-                instfirst = (Inst*)node->getFirstInst();
-                instlast = (Inst*)node->getLastInst();
-            } else {
-                const Edges &in_edges = node->getInEdges();
-                Edges::const_iterator eit;
-                for (eit = in_edges.begin(); eit != in_edges.end(); ++eit) {
-                     if ( !(checkArg((*eit)->getSourceNode())) ) {
-                         doneOK = false;
-                         break;
-                     }
-                }
-                dofind = false;
-            }
+#endif 
+            return false; // may not be null
         }
     }
-//    if (nodeSet->reset_inst != NULL)
-//        return false;
-    return doneOK;
+#ifdef _DEBUG
+    if (Log::isEnabled()) {
+        Log::out() << "   chknull wasn,t found in node: "
+            << arg_opnd->getInst()->getId()<< std::endl; 
+    }
+#endif 
+    return true;  // may be null
 }
 
+/**
+ * Checks if Op_TauStInd (stind) instruction has a side effect.
+ * @param inst - checked instruction
+ * @return <code>true</code> if an instruction has side effect;
+ *         <code>false<code> if an instruction has no side effect.
+ */
 bool
-LazyExceptionOpt::checkField(Inst* inst) {
+LazyExceptionOpt::fieldUsageHasSideEffect(Inst* inst) {
     Opnd* insOp = inst->getSrc(0);
     Inst* instDef = insOp->getInst();
     if (instDef->getOpcode() == Op_DefArg) {
 #ifdef _DEBUG
         if (Log::isEnabled()) {
-            Log::out() << "    checkField: "; 
+            Log::out() << "    fieldUsageHasSideEffect: "; 
             inst->print(Log::out()); Log::out()  << std::endl;
-            Log::out() << "    checkField: "; 
+            Log::out() << "    fieldUsageHasSideEffect: "; 
             instDef->print(Log::out()); Log::out()  << std::endl;
-            Log::out() << "    checkField: "; 
+            Log::out() << "    fieldUsageHasSideEffect: "; 
             Log::out() << (int)(instDef->getDefArgModifier()) << " " <<
             (instDef->getDefArgModifier()==DefArgNoModifier) << " " <<
             (instDef->getDefArgModifier()==NonNullThisArg) << " " <<
@@ -923,11 +846,16 @@ LazyExceptionOpt::checkField(Inst* inst) {
             return false;
     }
     return true;
-   
 }
 
+/**
+ * Checks if there is a side effect between throw_inst and init_inst instructions.
+ * @param inst - checked instruction
+ * @return <code>true</code> if an instruction has side effect;
+ *         <code>false<code> if an instruction has no side effect.
+ */
 bool 
-LazyExceptionOpt::instSideEffect(Inst* inst) {
+LazyExceptionOpt::instHasSideEffect(Inst* inst) {
     switch (inst->getOpcode()) {
         case Op_Add:
         case Op_Mul:
@@ -962,11 +890,11 @@ LazyExceptionOpt::instSideEffect(Inst* inst) {
         case Op_IndirectMemoryCall:
 #ifdef _DEBUG
             if (Log::isEnabled()) {
-                Log::out() << "    instSideEffect: call checkMC "; 
+                Log::out() << "    instHasSideEffect: call checkMC "; 
                 inst->print(Log::out()); Log::out()  << std::endl;
             }
 #endif
-            return checkMethodCall(inst);  
+            return methodCallHasSideEffect(inst);  
         case Op_IntrinsicCall:
         case Op_JitHelperCall:
         case Op_VMHelperCall:
@@ -1035,7 +963,7 @@ LazyExceptionOpt::instSideEffect(Inst* inst) {
                 }
 #endif
                 if (inst_src1->getOpcode()==Op_LdFieldAddr ) 
-                    return checkField(inst_src1);
+                    return fieldUsageHasSideEffect(inst_src1);
             }
             return true;
         case Op_TauStRef:
@@ -1050,7 +978,7 @@ LazyExceptionOpt::instSideEffect(Inst* inst) {
                 }
 #endif
                 if (inst_src1->getOpcode()==Op_LdFieldAddr ) 
-                    return checkField(inst_src1);
+                    return fieldUsageHasSideEffect(inst_src1);
             }
             return true;
         case Op_TauStField:
@@ -1066,7 +994,7 @@ LazyExceptionOpt::instSideEffect(Inst* inst) {
                 Inst* inst_src = inst->getSrc(0)->getInst();
 #ifdef _DEBUG
                 if (Log::isEnabled()) {
-                    Log::out() << "    checknull: "; 
+                    Log::out() << "    chknull: "; 
                     inst->print(Log::out()); Log::out()  << std::endl;
                     Log::out() << "               "; 
                     inst_src->print(Log::out()); Log::out()  << std::endl;
