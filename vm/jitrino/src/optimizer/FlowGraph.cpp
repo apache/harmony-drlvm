@@ -477,12 +477,21 @@ static bool inlineJSR(IRManager* irManager, Node *block, DefUseBuilder& defUses,
     Node* entryJSR  = jsrInst->getTargetLabel()->getNode();
     Inst *saveReturn = findSaveRet(entryJSR);
     assert(saveReturn);
-    // 'stvar' should follow 'saveret' (feature of current IRBuilder)
+    //
+    // if JSR 'returns' via at least one RET
+    // then
+    //     'stvar' follows 'saveret' and stores return info into the local var
+    //     retVar (the stored operand) is non-NULL
+    // else
+    //     no 'stvar' can follow 'saveret' (because it is unused)
+    //     retVar is NULL
     Inst *stVar = saveReturn->getNextInst();
-    // If retVar is NULL, JSR never returns. 
     Opnd *retVar = NULL;
-    if(stVar->isStVar() && (stVar->getSrc(0) == saveReturn->getDst()))
+    if ( stVar && 
+         stVar->isStVar() && 
+         (stVar->getSrc(0) == saveReturn->getDst()) ) {
         retVar = stVar->getDst();
+    }
 
     //
     // Find return node for this invocation.
