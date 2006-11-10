@@ -96,8 +96,14 @@ inline tag_pair** ti_get_object_tptr(Managed_Object_Handle obj)
 // update tag pointer in objects when the tag pair has been moved
 // ("magically" called by ulist<tag_pair>::erase())
 inline void element_moved(tag_pair* from, tag_pair* to) {
-    tag_pair** tptr = ti_get_object_tptr(from->obj);
-    *tptr = to;
+    assert(from->obj == to->obj);
+    assert(from->tag == to->tag);
+    // if object was already reclaimed and weak root reset,
+    // the object->tag_pair pointer does not need to be updated
+    if (from->obj != NULL) {
+        tag_pair** tptr = ti_get_object_tptr(from->obj);
+        *tptr = to;
+    }
 }
 
 
