@@ -868,26 +868,59 @@ jvmti_process_native_method_bind_event(jmethodID method, NativeCodePtr address, 
 
     //Checking current phase
     jvmtiPhase phase = ti->getPhase();
-    if( phase != JVMTI_PHASE_START && phase != JVMTI_PHASE_LIVE && phase != JVMTI_PHASE_PRIMORDIAL)
+    if( phase != JVMTI_PHASE_START && phase != JVMTI_PHASE_LIVE &&
+        phase != JVMTI_PHASE_PRIMORDIAL)
         return;
 
-    TRACE2("jvmti.event.bind", "Native method bind event is called for method:"
-        << (method ? class_get_name(method_get_class((Method*)method)) : "(nil)") << "." 
-        << (method ? method_get_name((Method*)method) : "(nil)") 
-        << (method ? method_get_descriptor((Method*)method) : "" ) );
-
-    jthread thread = getCurrentThread();
+    hythread_t thread = hythread_self();
+    jthread j_thread = jthread_get_java_thread(thread);
     JNIEnv *jni_env = p_TLS_vmthread->jni_env;
 
-    for( TIEnv *ti_env = ti->getEnvironments(); ti_env; ti_env = ti_env->next ) {
-        //Must possess capability
-        jvmtiCapabilities capa;
-        if( JVMTI_ERROR_NONE != ((jvmtiEnv *)ti_env)->GetCapabilities(&capa) )
-            return;
-        if( !capa.can_generate_native_method_bind_events )
-            return;
-        if (NULL != ti_env->event_table.NativeMethodBind)
-            ti_env->event_table.NativeMethodBind((jvmtiEnv *)ti_env, jni_env, thread, method, address, new_address_ptr);
+    TIEnv* next_env;
+    for (TIEnv* env = ti->getEnvironments(); env; env = next_env)
+    {
+        next_env = env->next;
+
+        jvmtiEventNativeMethodBind callback =
+            env->event_table.NativeMethodBind;
+
+        if (NULL == callback)
+            continue;
+
+        if (env->global_events[JVMTI_EVENT_NATIVE_METHOD_BIND - JVMTI_MIN_EVENT_TYPE_VAL])
+        {
+            TRACE2("jvmti.event.bind", "Calling global NativeMethodBind event for method:"
+                << (method ? class_get_name(method_get_class((Method*)method)) : "(nil)") << "." 
+                << (method ? method_get_name((Method*)method) : "(nil)") 
+                << (method ? method_get_descriptor((Method*)method) : "" ) );
+
+
+            callback((jvmtiEnv*)env, jni_env,
+                j_thread, method, address, new_address_ptr);
+
+            continue;
+        }
+
+        TIEventThread *next_et;
+        TIEventThread *first_et =
+            env->event_threads[JVMTI_EVENT_NATIVE_METHOD_BIND - JVMTI_MIN_EVENT_TYPE_VAL];
+
+        for (TIEventThread *et = first_et; NULL != et; et = next_et)
+        {
+            next_et = et->next;
+
+            if (et->thread == thread)
+            {
+                TRACE2("jvmti.event.bind", "Calling local NativeMethodBind event for method:"
+                    << (method ? class_get_name(method_get_class((Method*)method)) : "(nil)") << "." 
+                    << (method ? method_get_name((Method*)method) : "(nil)") 
+                    << (method ? method_get_descriptor((Method*)method) : "" ) );
+
+
+                callback((jvmtiEnv *)env, jni_env,
+                    j_thread, method, address, new_address_ptr);
+            }
+        }
     }
 }
 
