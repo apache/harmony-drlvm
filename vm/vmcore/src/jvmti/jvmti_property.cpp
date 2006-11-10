@@ -31,6 +31,7 @@
 #include "cxxlog.h"
 #include "port_filepath.h"
 #include "suspend_checker.h"
+#include "classpath_const.h"
 
 /*
  * Add To Bootstrap Class Loader Search
@@ -73,12 +74,15 @@ jvmtiAddToBootstrapClassLoaderSearch(jvmtiEnv* env,
     // destroy temp pool
     apr_pool_destroy(tmp_pool);
 
+    // we'll append segment to -Xbootclasspath/a:
+    const char* bcp_property = XBOOTCLASSPATH_A;
+
     // get bootclasspath property
     Global_Env *g_env = ((TIEnv*)env)->vm->vm_env;
     Properties *properties = g_env->properties;
     const char *bcp_prop = properties_get_string_property(
         reinterpret_cast<PropertiesHandle>(properties),
-        "vm.boot.class.path");
+        bcp_property);
 
     size_t len_bcp = 0;
 
@@ -94,12 +98,12 @@ jvmtiAddToBootstrapClassLoaderSearch(jvmtiEnv* env,
         strcpy(new_bcp + len_bcp + 1, segment);
 
         // update bootclasspath property
-        add_pair_to_properties(*properties, "vm.boot.class.path", new_bcp);
+        add_pair_to_properties(*properties, bcp_property, new_bcp);
 
         STD_FREE(new_bcp);
     } else {
         // update bootclasspath property
-        add_pair_to_properties(*properties, "vm.boot.class.path", segment);
+        add_pair_to_properties(*properties, bcp_property, segment);
     }
 
     return JVMTI_ERROR_NONE;
