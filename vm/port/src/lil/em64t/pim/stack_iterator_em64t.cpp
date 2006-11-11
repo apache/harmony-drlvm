@@ -31,6 +31,7 @@
 #include "m2n_em64t_internal.h"
 #include "nogc.h"
 #include "interpreter.h" // for ASSERT_NO_INTERPRETER
+#include "cci.h"
 
 #include "dump.h"
 #include "vm_stats.h"

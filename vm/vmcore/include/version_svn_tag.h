@@ -18,6 +18,6 @@
 #ifndef _VERSION_SVN_TAG_
 #define _VERSION_SVN_TAG_
 
-#define VERSION_SVN_TAG  "473506"
+#define VERSION_SVN_TAG  "svn: This client is too old to work with working copy '.'; please get a newer Subversion client"
 
 #endif // _VERSION_SVN_TAG_

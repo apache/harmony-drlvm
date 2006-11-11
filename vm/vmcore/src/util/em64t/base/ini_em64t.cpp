@@ -199,7 +199,7 @@ void JIT_execute_method_default(JIT_Handle jh, jmethodID methodID,
     int64 arg_num = 0;
 
     TRACE2("invoke", "enter method "
-        << method->get_class()->name->bytes << " "
+        << method->get_class()->get_name()->bytes << " "
         << method->get_name()->bytes << " "
         << method->get_descriptor());
 
@@ -226,7 +226,7 @@ void JIT_execute_method_default(JIT_Handle jh, jmethodID methodID,
             // only compressed references are supported yet
             assert(VM_Global_State::loader_env->compress_references);
             // convert from native to managed NULL
-            ref = ref ? ref : (uint64) Class::managed_null;
+            ref = ref ? ref : (uint64) VM_Global_State::loader_env->managed_null;
             if (gr_nargs < MAX_GR) {
                 gr_args[gr_nargs++] = ref;
             } else {
@@ -323,7 +323,7 @@ void JIT_execute_method_default(JIT_Handle jh, jmethodID methodID,
         // only compressed references are supported yet
         assert(VM_Global_State::loader_env->compress_references);
         // convert from managed to native NULL
-        ref = ref != (uint64) Class::managed_null ? ref : (uint64) NULL;
+        ref = ref != (uint64) VM_Global_State::loader_env->managed_null ? ref : (uint64) NULL;
         if (ref) {
             handle = oh_allocate_local_handle();
             handle->object = (ManagedObject*) ref;
@@ -357,7 +357,7 @@ void JIT_execute_method_default(JIT_Handle jh, jmethodID methodID,
     STD_FREE(stack_args);
 
     TRACE2("invoke", "exit method "
-        << method->get_class()->name->bytes << " "
+        << method->get_class()->get_name()->bytes << " "
         << method->get_name()->bytes << " "
         << method->get_descriptor());
 }

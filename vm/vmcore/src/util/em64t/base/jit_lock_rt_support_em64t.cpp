@@ -124,7 +124,7 @@ NativeCodePtr rth_get_lil_monitor_enter() {
         "jc i0 = %0i:ref, throw_null_pointer;"
         "locals 1;"
         "l0 = i0;",
-        (ManagedObject *) Class::managed_null
+        (ManagedObject *) VM_Global_State::loader_env->managed_null
     );
     assert(cs);
     
@@ -262,7 +262,7 @@ NativeCodePtr rth_get_lil_monitor_exit() {
     cs = lil_parse_onto_end(cs,
         "jc i0 = %0i:ref, throw_null_pointer;"
         "in2out platform:g4;",
-        (ManagedObject *) Class::managed_null
+        (ManagedObject *) VM_Global_State::loader_env->managed_null
     );
 
     assert(cs);
