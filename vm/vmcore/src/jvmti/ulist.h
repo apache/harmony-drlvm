@@ -159,7 +159,7 @@ public:
 
     void erase(iterator i) {
         assert(0 <= i.index); assert((size_t)i.index < i.current->used);
-        i.current->used--; assert(i.current->used >= 0);
+        i.current->used--;
 
         // compact array if the erased element was not the last
         if ((size_t)i.index < i.current->used) {
