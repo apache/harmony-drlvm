@@ -286,7 +286,6 @@ jvmtiAddCapabilities(jvmtiEnv* env,
 
     if (capabilities_ptr->can_tag_objects) {
         ti->set_global_capability(DebugUtilsTI::TI_GC_ENABLE_TAG_OBJECTS);
-        assert(ManagedObject::_tag_pointer == false);
         ManagedObject::_tag_pointer = true;
     }
 
