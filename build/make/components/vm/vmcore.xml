@@ -36,7 +36,13 @@ Version: $Revision: 1.5.2.3 $
         </copy>
     </target>
 
-    <target name="init" depends="common_vm, stamp_version">
+    <target name="copy_version" depends="common_vm" unless="svn.revision">
+        <copy file="${build.vm.home}/vmcore/include/version_svn_tag_orig.h"
+              tofile="${build.vm.home}/vmcore/include/version_svn_tag.h" overwrite="false">
+        </copy>
+    </target>
+
+    <target name="init" depends="common_vm, stamp_version, copy_version">
         <property name="build.depends" value="extra.apr,
                                               extra.aprutil,
                                               extra.log4cxx,
