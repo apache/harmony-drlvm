@@ -33,6 +33,8 @@
 #include "port_filepath.h"
 #include "port_sysinfo.h"
 
+#include "vm_properties.h"
+
 #define PROP_ENV_NAME  "VM_PROPERTIES"
 #define PROP_FILE_NAME "vm.properties"
 #define BOOT_PROPS_FILE_NAME "bootclasspath.properties"
@@ -252,12 +254,29 @@ static void define_undefined_predefined_properties(Properties & properties)
      *  launched in a mariad of ways, so just set to empty string.
      */
     add_pair_to_properties(properties, "vm.boot.library.path", "");
-    TRACE( "vm.boot.library.path = " << base_path_buf);
+    TRACE( "vm.boot.library.path = ");
     
     // Added for compatibility with the external java JDWP agent
     add_pair_to_properties(properties, "sun.boot.library.path", base_path_buf);
     TRACE( "sun.boot.library.path = " << base_path_buf);
 
+    /*
+     *  it's possible someone forgot to set this property - set to default of .
+     */
+    if (properties_get_string_property(reinterpret_cast<PropertiesHandle>(&properties), O_A_H_VM_VMDIR) == NULL) {
+        TRACE2("init", "o.a.h.vm.vmdir not set - setting predefined value of as '.'");
+        add_pair_to_properties(properties, O_A_H_VM_VMDIR, ".");
+    }
+    
+    /*
+     *  also, do the same for java.class.path
+     */
+     
+    if (properties_get_string_property(reinterpret_cast<PropertiesHandle>(&properties), "java.class.path") == NULL) {
+        TRACE2("init", "java.class.path not set - setting predefined value of '.'");
+        add_pair_to_properties(properties, "java.class.path", ".");
+    }
+    
     // vm.dlls initialization, the value is location of VM executable +
     // GC_DLL and on IPF JIT_DLL
     // FIXME, add JIT_DLL on other architectures when we have JIT in a dll on ia32

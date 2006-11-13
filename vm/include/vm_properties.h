@@ -14,20 +14,17 @@
  *  See the License for the specific language governing permissions and
  *  limitations under the License.
  */
-#ifndef CLASSPATH_CONST_H_
-#define CLASSPATH_CONST_H_
-
-#include "vm_properties.h"
+#ifndef VM_PROPERTIES_H_
+#define VM_PROPERTIES_H_
 
 /**
- *   Constants used for classpath definition and manipulation
+ *   Constants used for VM properties
  */
 
-#define XBOOTCLASSPATH         "-Xbootclasspath:"
-#define XBOOTCLASSPATH_A       "-Xbootclasspath/a:"
-#define XBOOTCLASSPATH_P       "-Xbootclasspath/p:"
+#define O_A_H_BOOT_CLASS_PATH  "org.apache.harmony.boot.class.path"
+#define O_A_H_VM_VMDIR         "org.apache.harmony.vm.vmdir"
 
-#define KERNEL_JAR             "kernel.jar"
+#define VM_BOOT_CLASS_PATH     "vm.boot.class.path"
+#define SUN_BOOT_CLASS_PATH    "sun.boot.class.path"
 
-#endif /*CLASSPATH_CONST_H_*/
-
+#endif /*VM_PROPERTIES_H_*/

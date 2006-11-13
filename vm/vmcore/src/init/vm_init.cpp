@@ -318,12 +318,14 @@ static void bootstrap_initial_java_classes(Global_Env * vm_env)
     Class* GenericDeclaration_Class    = preload_class(vm_env, "java/lang/reflect/GenericDeclaration");
     Class* Type_Class                  = preload_class(vm_env, "java/lang/reflect/Type");
     vm_env->JavaLangClass_Class        = preload_class(vm_env, vm_env->JavaLangClass_String);
+
     vm_env->FinishVMBootstrap();
 
     // Now create the java_lang_Class instance.
     create_instance_for_class(vm_env, vm_env->JavaLangClass_Class);
 
     ClassTable* table = vm_env->bootstrap_class_loader->GetLoadedClasses();
+    
     unsigned num = 0;
     for (ClassTable::const_iterator it = table->begin(), end = table->end(); 
         it != end; ++it, ++num)

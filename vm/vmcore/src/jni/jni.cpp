@@ -446,8 +446,8 @@ JNIEXPORT jint JNICALL JNI_CreateJavaVM(JavaVM ** p_vm, JNIEnv ** p_jni_env,
     jthread java_thread;
     jint status;
 
-
-    status = jni_init();
+    status = jni_init();        
+    
     if (status != JNI_OK) return status;
 
     apr_thread_mutex_lock(GLOBAL_LOCK);
@@ -492,7 +492,7 @@ JNIEXPORT jint JNICALL JNI_CreateJavaVM(JavaVM ** p_vm, JNIEnv ** p_jni_env,
     java_vm->vm_env = vm_env;
     java_vm->reserved = (void *)0x1234abcd;
     *p_vm = java_vm;
-    
+        
     status = vm_init1(java_vm, vm_args);
     if (status != JNI_OK) {
         goto done;

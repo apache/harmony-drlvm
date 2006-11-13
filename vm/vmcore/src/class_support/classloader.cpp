@@ -1316,7 +1316,9 @@ bool BootstrapClassLoader::Initialize(ManagedObject* UNREF loader)
         properties_get_string_property(
             reinterpret_cast<PropertiesHandle>(m_env->properties),
             "vm.other_natives_dlls" );
+             
     size_t len = strlen( lib_list ) + 1;
+
     char *libraries = (char*)STD_ALLOCA( len );
     memcpy( libraries, lib_list, len );
 
@@ -1359,8 +1361,8 @@ bool BootstrapClassLoader::Initialize(ManagedObject* UNREF loader)
         /* not overridden, so lets build, adding the kernel to what luni made for us */
         
         const char *kernel_dir_path = properties_get_string_property(hProps, O_A_H_VM_VMDIR);
-    
-        char *kernel_path = (char *) malloc(strlen(kernel_dir_path) 
+
+        char *kernel_path = (char *) malloc(strlen(kernel_dir_path == NULL ? "" : kernel_dir_path) 
                                         + strlen(PORT_FILE_SEPARATOR_STR) 
                                         + strlen(KERNEL_JAR) + 1);
     
@@ -1370,7 +1372,8 @@ bool BootstrapClassLoader::Initialize(ManagedObject* UNREF loader)
         
         const char *luni_path = properties_get_string_property(hProps,O_A_H_BOOT_CLASS_PATH);
         
-        char *vmboot = (char *) malloc(strlen(luni_path) + strlen(kernel_path) + strlen(PORT_PATH_SEPARATOR_STR) + 1);
+        char *vmboot = (char *) malloc(strlen(luni_path == NULL ? "" : luni_path) 
+                                + strlen(kernel_path) + strlen(PORT_PATH_SEPARATOR_STR) + 1);
         
         strcpy(vmboot, kernel_path);
         strcat(vmboot, PORT_PATH_SEPARATOR_STR);

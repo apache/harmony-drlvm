@@ -30,6 +30,8 @@
 #include "ini.h"
 #include "cxxlog.h"
 
+#include "vm_properties.h"
+
 #include <assert.h>
 #include <algorithm>
 #include <sstream>
@@ -325,7 +327,8 @@ std::string DrlEMImpl::readConfiguration() {
     }
 
     if (configFileName.find('/') == configFileName.npos && configFileName.find('\\') == configFileName.npos ) {
-        std::string defaultConfigDir = vm_get_property_value("org.apache.harmony.vm.vmdir");
+        std::string defaultConfigDir = vm_get_property_value(O_A_H_VM_VMDIR);
+        
         configFileName = defaultConfigDir + "/" + configFileName;
     }
     std::string config = readFile(configFileName);
