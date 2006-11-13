@@ -402,7 +402,6 @@ void JavaFlowGraphBuilder::build() {
     resolveWhileTrue();
 
     eliminateUnnestedLoopsOnDispatch();
-
 }
 
 
@@ -418,11 +417,7 @@ void JavaFlowGraphBuilder::build() {
 //      D  -- dispatch node
 //      C  -- catch node
 //
-//   when found, give a warning (to be resolved later)
-//
-//   ------------------------------------------------------------------------
-//
-//   look for edge pattern like this:
+//   and this:
 //
 //      S  ME
 //      ME D
@@ -468,11 +463,6 @@ void JavaFlowGraphBuilder::eliminateUnnestedLoopsOnDispatch()
                 if ( !catch_node->isCatchBlock() ) {
                     continue;
                 }
-                // TODO: Let catch edges contain only one instruction.
-                //       In that case assertions will become meaningful.
-                //assert(catch_node->hasOnlyOneSuccEdge());
-                //assert(catch_node->hasOnlyOnePredEdge());
-
                 Node* catch_target = (*(catch_node->getOutEdges().begin()))->getTargetNode();
                 if ( catch_target->getInDegree() <= 1 ) {
                     continue;
@@ -480,6 +470,10 @@ void JavaFlowGraphBuilder::eliminateUnnestedLoopsOnDispatch()
                 bool found_monitorexit = false;
                 bool dispatch_is_after_target = false;
                 bool monitorexit_after_catch_target = false;
+                bool monitorexit_after_catch = false;
+                // number of edges leading 
+                //   from within the searched loop to the current dispatch
+                uint32 eins_from_loop = 0;
                 const Edges& in_edges = dispatch->getInEdges();
                 for (Edges::const_iterator in_iter = in_edges.begin();
                      in_iter != in_edges.end();
@@ -487,32 +481,50 @@ void JavaFlowGraphBuilder::eliminateUnnestedLoopsOnDispatch()
                     Node* pre_dispatch = (*in_iter)->getSourceNode();
                     if ( pre_dispatch == catch_target ) {
                         dispatch_is_after_target = true;
+                        eins_from_loop++;
                     }
                     if ( lastInstIsMonitorExit(pre_dispatch) ) {
                         found_monitorexit = true;
-                        if ( pre_dispatch->getInDegree() == 1 &&
-                             (*pre_dispatch->getInEdges().begin())->getSourceNode() == catch_target ) {
-                            monitorexit_after_catch_target = true;
+                        const Edges& in_monexit_edges = pre_dispatch->getInEdges();
+                        Edges::const_iterator in_monexit_it = in_monexit_edges.begin();
+                        Edges::const_iterator in_monexit_end = in_monexit_edges.end();
+                        for (; in_monexit_it != in_monexit_end; in_monexit_it++) {
+                            Node* mon_pred = (*in_monexit_it)->getSourceNode();
+                            if ( mon_pred == catch_target ) {
+                               monitorexit_after_catch_target = true;
+                               eins_from_loop++;
+                               assert(((Inst*)catch_target->getLastInst())->getOpcode() == Op_TauCheckNull);
+                            }
+                            if ( mon_pred == catch_node ) {
+                               monitorexit_after_catch = true;
+                            }
                         }
                     }
                 }
 
-                if ( dispatch_is_after_target && 
-                     found_monitorexit &&
-                     monitorexit_after_catch_target ) {
-                    if ( dispatch->getInDegree() == 2 ) {
-                        //
-                        // simple monitorexit code pattern, no goto into loop here
-                        //
-                        continue;
-                    }else if ( dispatch->getInDegree() > 2 ) {
-                        // goto into loop found
-                        matched_dispatches.push_back(dispatch);
-                        if ( Log::isEnabled() ) {
-                            Log::out() << "goto into loop found, fixing..." << std::endl;
-                        }
-                        break;
+                if ( Log::isEnabled() ) {
+                    Log::out() << "eliminateUnnestedLoopsOnDispatch()" << std::endl;
+                    Log::out() << "    monitorexit_after_catch_target=" 
+                               << monitorexit_after_catch_target << std::endl;
+                    Log::out() << "    dispatch_is_after_target=" 
+                               << dispatch_is_after_target << std::endl;
+                    Log::out() << "    monitorexit_after_catch=" 
+                               << monitorexit_after_catch << std::endl;
+                }
+
+                if ( dispatch->getInDegree() <= eins_from_loop ) {
+                    // no second entrance into the loop
+                    continue;
+                }
+                if ( found_monitorexit &&
+                     ((monitorexit_after_catch_target && dispatch_is_after_target) ||
+                       monitorexit_after_catch)) {
+
+                    matched_dispatches.push_back(dispatch);
+                    if ( Log::isEnabled() ) {
+                        Log::out() << "goto into loop found, fixing..." << std::endl;
                     }
+                    break;
                 }
                 if ( !found_goto_into_loop_warning ) {
                     if ( Log::isEnabled() ) {
@@ -544,8 +556,11 @@ void JavaFlowGraphBuilder::eliminateUnnestedLoopsOnDispatch()
                if ( !dispatch_target->isCatchBlock() ) {
                    fg->addEdge(dup_dispatch, dispatch_target);
                }else{
-                   CatchLabelInst* catch_label = (CatchLabelInst*)dispatch_target->getFirstInst();
-                   Node* dup_catch = createBlockNodeOrdered(instFactory->makeCatchLabel(catch_label->getOrder(), catch_label->getExceptionType()));
+                   CatchLabelInst* catch_label = 
+                       (CatchLabelInst*)dispatch_target->getFirstInst();
+                   assert(dispatch_target->getInstCount() == 0);
+                   Node* dup_catch = createBlockNodeOrdered(
+                           instFactory->makeCatchLabel( catch_label->getOrder(), catch_label->getExceptionType()));
                    fg->addEdge(dup_dispatch, dup_catch);
                    assert(dispatch_target->getOutDegree() == 1);
                    fg->addEdge(dup_catch, (*dispatch_target->getOutEdges().begin())->getTargetNode());
