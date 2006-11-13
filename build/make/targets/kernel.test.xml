@@ -42,7 +42,7 @@
     </patternset>
 
     <property name="vm.use_verifier" value="1" />
-    <property name="kernel.test.timeout" value="180000" />
+    <property name="kernel.test.timeout" value="360000" />
     
     <target name="kernel.test" depends="-pre-kernel-test">
         <property name="test.mode" value="jet+opt+int" />

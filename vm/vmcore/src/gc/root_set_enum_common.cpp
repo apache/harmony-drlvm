@@ -137,7 +137,6 @@ vm_enumerate_root_reference(void **ref, Boolean is_pinned)
             if ((void *)obj != VM_Global_State::loader_env->heap_base) {
                 assert(((POINTER_SIZE_INT)VM_Global_State::loader_env->heap_base <= (POINTER_SIZE_INT)obj)
                     && ((POINTER_SIZE_INT)obj <= (POINTER_SIZE_INT)VM_Global_State::loader_env->heap_end));
-                (obj->vt())->clss->get_name()->bytes;
             } 
         }
 #endif // _DEBUG
@@ -159,14 +158,7 @@ VMEXPORT void vm_enumerate_compressed_root_reference(uint32 *ref, Boolean is_pin
         bool is_null    = (compressed_ref == 0);
         bool is_in_heap = (((POINTER_SIZE_INT)VM_Global_State::loader_env->heap_base <= (POINTER_SIZE_INT)obj)
             && ((POINTER_SIZE_INT)obj <= (POINTER_SIZE_INT)VM_Global_State::loader_env->heap_end));
-        if (is_null || is_in_heap) {
-            // Make sure the reference is valid.
-            if (!is_null) {
-                (obj->vt())->clss->get_name()->bytes;
-            }                                                               
-        } else {
-            ASSERT(0, "Bad slot pointer");
-        }
+        assert (is_null || is_in_heap);
 #endif // _DEBUG
 
     gc_add_compressed_root_set_entry(ref, is_pinned);
