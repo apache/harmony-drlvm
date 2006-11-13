@@ -131,4 +131,21 @@ inline bool is_jobject_valid(jobject jobj)
     return r;
 }
 
+/**
+ * returns true if the jclass looks like a valid java.lang.Class instance.
+ */
+inline bool is_jclass_valid(jclass jobj)
+{
+    if (jobj == NULL) return false;
+    hythread_suspend_disable();
+    bool r = false;
+    if (is_object_valid(jobj->object)) {
+        Class* cls = ((ManagedObject*)jobj->object)->vt()->clss;
+        r = class_is_instanceof(cls,
+            VM_Global_State::loader_env->JavaLangClass_Class);
+    }
+    hythread_suspend_enable();
+    return r;
+}
+
 #endif // _JVMTI_HEAP_H_

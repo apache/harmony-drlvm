@@ -54,8 +54,8 @@ static void ti_trace_reference(TIEnv *ti_env,
 
     void *user_data = state->user_data;
 
-    jvmtiIterationControl r;
-    r = state->object_ref_callback(reference_kind,
+    assert(state->object_ref_callback);
+    jvmtiIterationControl r = state->object_ref_callback(reference_kind,
             class_tag, size, &tag, referrer_tag,
             referrer_index, user_data);
 

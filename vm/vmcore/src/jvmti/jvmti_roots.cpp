@@ -81,21 +81,20 @@ void vm_ti_enumerate_stack_root(
         return;
     }
 
-    tag_pair **tp = ti_get_object_tptr(obj);
-    jlong tag = (*tp != NULL ? (*tp)->tag : 0);
-    jlong class_tag = ti_get_object_class_tag(ti_env, obj);
-    jlong size = ti_get_object_size(ti_env, obj);
+    jvmtiIterationControl r = JVMTI_ITERATION_CONTINUE;
+    if (state->stack_ref_callback) {
+        tag_pair **tp = ti_get_object_tptr(obj);
+        jlong tag = (*tp != NULL ? (*tp)->tag : 0);
+        jlong class_tag = ti_get_object_class_tag(ti_env, obj);
+        jlong size = ti_get_object_size(ti_env, obj);
 
-    void* user_data = state->user_data;
+        void* user_data = state->user_data;
+        jlong thread_tag = state->thread_tag;
 
-    jvmtiIterationControl r;
-
-    jlong thread_tag = state->thread_tag;
-
-    r = state->stack_ref_callback(root_kind, class_tag, size, &tag,
-            thread_tag, depth, method, slot, user_data);
-
-    ti_env->tags->update(obj, tag, tp);
+        r = state->stack_ref_callback(root_kind, class_tag, size, &tag,
+                thread_tag, depth, method, slot, user_data);
+        ti_env->tags->update(obj, tag, tp);
+    }
 
     if (JVMTI_ITERATION_ABORT == r) {
         state->abort = true;
@@ -131,19 +130,18 @@ void vm_ti_enumerate_heap_root(
         return;
     }
 
-    tag_pair** tp = ti_get_object_tptr(obj);
-    jlong tag = ((*tp) != NULL ? (*tp)->tag : 0);
+    jvmtiIterationControl r = JVMTI_ITERATION_CONTINUE;
+    if (state->heap_root_callback) {
+        tag_pair** tp = ti_get_object_tptr(obj);
+        jlong tag = ((*tp) != NULL ? (*tp)->tag : 0);
+        jlong class_tag = ti_get_object_class_tag(ti_env, obj);
+        jlong size = ti_get_object_size(ti_env, obj);
 
-    jlong class_tag = ti_get_object_class_tag(ti_env, obj);
-    jlong size = ti_get_object_size(ti_env, obj);
+        void* user_data = state->user_data;
 
-    void* user_data = state->user_data;
-
-    jvmtiIterationControl r;
-
-    r = state->heap_root_callback(root_kind, class_tag, size, &tag, user_data);
-
-    ti_env->tags->update(obj, tag, tp);
+        r = state->heap_root_callback(root_kind, class_tag, size, &tag, user_data);
+        ti_env->tags->update(obj, tag, tp);
+    }
 
     if (JVMTI_ITERATION_ABORT == r) {
         state->abort = true;

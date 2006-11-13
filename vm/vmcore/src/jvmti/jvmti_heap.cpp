@@ -76,7 +76,7 @@ jvmtiGetTag(jvmtiEnv* env,
 
     if (!ti_env->posessed_capabilities.can_tag_objects)
         return JVMTI_ERROR_MUST_POSSESS_CAPABILITY;
-    if (NULL == tag_ptr)
+    if (!tag_ptr)
         return JVMTI_ERROR_NULL_POINTER;
     if (!is_jobject_valid(object))
         return JVMTI_ERROR_INVALID_OBJECT;
@@ -254,6 +254,8 @@ jvmtiIterateOverObjectsReachableFromObject(jvmtiEnv* env,
 
     if (!ti_env->posessed_capabilities.can_tag_objects)
         return JVMTI_ERROR_MUST_POSSESS_CAPABILITY;
+    if (!object_ref_callback)
+        return JVMTI_ERROR_NULL_POINTER;
     if (!is_jobject_valid(object))
         return JVMTI_ERROR_INVALID_OBJECT;
 
@@ -291,11 +293,12 @@ jvmtiIterateOverObjectsReachableFromObject(jvmtiEnv* env,
 static void ti_iterate_reachable(TIEnv* ti_env, 
         hythread_iterator_t iterator)
 {
-    // enumerate roots and the trace the heap
+    // enumerate roots
     ti_enumerate_roots(ti_env, iterator);
 
     // check if we don't need to trace heap
-    if (ti_env->iteration_state->abort) return;
+    if (ti_env->iteration_state->abort
+            || ti_env->iteration_state->object_ref_callback == NULL) return;
 
     ti_trace_heap(ti_env);
 }
@@ -440,6 +443,13 @@ jvmtiIterateOverHeap(jvmtiEnv* env,
             && object_filter != JVMTI_HEAP_OBJECT_EITHER)
         return JVMTI_ERROR_ILLEGAL_ARGUMENT;
 
+    // According to JVMTI specification, if callback is NULL,
+    // we must not process untagged objects.
+    // Since the iteration is visible to user only through callback,
+    // doing nothing will satisfy specification.
+    if (!heap_object_callback)
+        return JVMTI_ERROR_NONE;
+
     // heap iteration requires stop-the-world
     hythread_global_lock();
 
@@ -512,10 +522,19 @@ jvmtiIterateOverInstancesOfClass(jvmtiEnv* env,
 
     if (!ti_env->posessed_capabilities.can_tag_objects)
         return JVMTI_ERROR_MUST_POSSESS_CAPABILITY;
+    if (!is_jclass_valid(klass))
+        return JVMTI_ERROR_INVALID_CLASS;
     if (object_filter != JVMTI_HEAP_OBJECT_TAGGED
             && object_filter != JVMTI_HEAP_OBJECT_UNTAGGED
             && object_filter != JVMTI_HEAP_OBJECT_EITHER)
         return JVMTI_ERROR_ILLEGAL_ARGUMENT;
+
+    // According to JVMTI specification, if callback is NULL,
+    // we must not process untagged objects.
+    // Since the iteration is visible to user only through callback,
+    // doing nothing will satisfy specification.
+    if (!heap_object_callback)
+        return JVMTI_ERROR_NONE;
 
     // heap iteration requires stop-the-world
     TRACE2("ti.iterate", "acquire tm lock");
