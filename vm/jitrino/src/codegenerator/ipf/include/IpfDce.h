@@ -14,10 +14,9 @@
  *  See the License for the specific language governing permissions and
  *  limitations under the License.
  */
-
+                                                                                                            
 /**
  * @author Intel, Konstantin M. Anisimov, Igor V. Chebykin
- * @version $Revision$
  *
  */
 
@@ -37,12 +36,11 @@ namespace IPF {
 
 class Dce {
 public:
-               Dce(Cfg &cfg_) : cfg(cfg_) {}
+               Dce(Cfg &cfg) : cfg(cfg), currLiveSet(cfg.getMM()) {}
     void       eliminate();
 
 protected:
     bool       isInstDead(Inst*);
-    void       removeInst(InstVector&, InstIterator);
 
     Cfg        &cfg;
     RegOpndSet currLiveSet;

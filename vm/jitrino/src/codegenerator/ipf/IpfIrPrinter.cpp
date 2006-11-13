@@ -17,7 +17,6 @@
                                                                                                             
 /**
  * @author Intel, Konstantin M. Anisimov, Igor V. Chebykin
- * @version $Revision$
  *
  */
 
@@ -51,7 +50,7 @@ void IrPrinter::printLayoutDot(char *logFileName) {
     logName.append(logFileName);
     ofs = new(mm) ofstream(logName.c_str());
     
-    BbNode *node    = (BbNode *)cfg.getEnterNode();
+    BbNode *node = (BbNode *)cfg.getEnterNode();
     BbNode *succ = node->getLayoutSucc();
     
     printHead();
@@ -170,7 +169,6 @@ void IrPrinter::printHead() {
     *ofs << "  fontpath=\"c:\\winnt\\fonts\";" << ::std::endl;
     *ofs << "  node [shape=record,fontname=\"Courier\",fontsize=9];" << ::std::endl;
     *ofs << "  edge [fontname=\"Courier\",fontsize=9];" << ::std::endl;
-
 }
 
 //----------------------------------------------------------------------------------------//
@@ -336,7 +334,9 @@ string IrPrinter::toString(Opnd *opnd) {
 string IrPrinter::toString(OpndSet &opndSet) {
     
     ostringstream oss;
-    OpndVector opndVector(opndSet.begin(), opndSet.end());
+    MemoryManager mml(1024, "");
+    OpndVector opndVector(mml);
+    opndVector.insert(opndVector.begin(), opndSet.begin(), opndSet.end());
     sort(opndVector.begin(), opndVector.end(), ptr_fun(greaterOpnd));
     
     return toString(opndVector);
@@ -347,7 +347,9 @@ string IrPrinter::toString(OpndSet &opndSet) {
 string IrPrinter::toString(RegOpndSet &opndSet) {
     
     ostringstream oss;
-    OpndVector opndVector(opndSet.begin(), opndSet.end());
+    MemoryManager mml(1024, "");
+    OpndVector opndVector(mml);
+    opndVector.insert(opndVector.begin(), opndSet.begin(), opndSet.end());
     sort(opndVector.begin(), opndVector.end(), ptr_fun(greaterOpnd));
     
     return toString(opndVector);

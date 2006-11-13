@@ -17,18 +17,13 @@
                                                                                                             
 /**
  * @author Intel, Konstantin M. Anisimov, Igor V. Chebykin
- * @version $Revision$
  *
  */
 
 #ifndef IPFTYPE_H_
 #define IPFTYPE_H_
 
-#include <set>
-#include <map>
-#include <list>
 #include <bitset>
-#include <vector>
 #include <string>
 #include <sstream>
 #include <algorithm>
@@ -36,6 +31,7 @@
 #include <iomanip>
 #include "Type.h"
 #include "Log.h"
+#include "Stl.h"
 #include "VMInterface.h"
 
 using namespace std;
@@ -194,21 +190,23 @@ enum SearchKind {
 // Typedefs
 //========================================================================================//
 
-typedef vector< Opnd* >                 OpndVector;
-typedef vector< RegOpnd* >              RegOpndVector;
-typedef vector< Inst* >                 InstVector;
-typedef vector< Node* >                 NodeVector;
-typedef vector< Edge* >                 EdgeVector;
-typedef vector< uint32 >                Uint32Vector;
-typedef list< Inst* >                   InstList;
-typedef list< Node* >                   NodeList;
-typedef list< Edge* >                   EdgeList;
-typedef set< Opnd* >                    OpndSet;
-typedef set< RegOpnd* >                 RegOpndSet;
-typedef set< Node* >                    NodeSet;
-typedef map< Inst*, RegOpndSet >        Inst2RegOpndSetMap;
-typedef map< uint64, RegOpndSet >       Uint642RegOpndSetMap;
-typedef bitset< NUM_G_REG >             RegBitSet;
+typedef StlVector< Opnd* >           OpndVector;
+typedef StlVector< RegOpnd* >        RegOpndVector;
+typedef StlVector< Inst* >           InstVector;
+typedef StlVector< Node* >           NodeVector;
+typedef StlVector< Edge* >           EdgeVector;
+typedef StlVector< uint32 >          Uint32Vector;
+typedef StlList< Inst* >             InstList;
+typedef StlList< Node* >             NodeList;
+typedef StlList< Edge* >             EdgeList;
+typedef StlSet< Opnd* >              OpndSet;
+typedef StlSet< RegOpnd* >           RegOpndSet;
+typedef StlSet< Node* >              NodeSet;
+typedef StlMap< RegOpnd*, RegOpnd* > RegOpnd2RegOpndMap;
+typedef StlMap< Inst*, RegOpndSet >  Inst2RegOpndSetMap;
+typedef StlMap< uint64, RegOpndSet > Uint642RegOpndSetMap;
+typedef bitset< NUM_G_REG >          RegBitSet;
+typedef StlMultiMap <uint32, RegOpnd*, greater <uint32> > Int2OpndMap;
 
 typedef NodeVector::iterator            NodeIterator;
 typedef InstVector::iterator            InstIterator;
@@ -219,12 +217,13 @@ typedef RegOpndSet::iterator            RegOpndSetIterator;
 typedef InstList::iterator              InstListIterator;
 typedef NodeList::iterator              NodeListIterator;
 typedef EdgeList::iterator              EdgeListIterator;
+typedef RegOpnd2RegOpndMap::iterator    RegOpnd2RegOpndMapIterator;
 typedef Inst2RegOpndSetMap::iterator    Inst2RegOpndSetMapIterator;
 typedef Uint642RegOpndSetMap::iterator  Uint642RegOpndSetMapIterator;
 
 typedef NodeList                        Chain;
-typedef list< Chain* >                  ChainList;
-typedef multimap< uint32, Chain*, greater < uint32 > > ChainMap;
+typedef StlList< Chain* >                  ChainList;
+typedef StlMultiMap< uint32, Chain*, greater < uint32 > > ChainMap;
 typedef Chain::iterator                 ChainIterator;
 typedef ChainList::iterator             ChainListIterator;
 typedef ChainMap::iterator              ChainMapIterator;

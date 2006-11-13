@@ -14,10 +14,9 @@
  *  See the License for the specific language governing permissions and
  *  limitations under the License.
  */
-
+                                                                                                            
 /**
  * @author Intel, Konstantin M. Anisimov, Igor V. Chebykin
- * @version $Revision$
  *
  */
 
@@ -38,7 +37,7 @@ LiveAnalyzer::LiveAnalyzer(Cfg &cfg_) : cfg(cfg_) { }
 
 void LiveAnalyzer::makeLiveSets(bool verify_) {
     
-    IPF_LOG << endl;
+//    IPF_LOG << endl;
     verify = verify_;
     NodeVector &nodes = cfg.search(SEARCH_POST_ORDER);   // get postordered node list
 
@@ -64,25 +63,25 @@ void LiveAnalyzer::makeLiveSets(bool verify_) {
 bool LiveAnalyzer::analyzeNode(Node *node) {
 
     // build live set for node
-    RegOpndSet currLiveSet;
+    RegOpndSet currLiveSet(cfg.getMM());
     RegOpndSet &oldLiveSet = node->getLiveSet();
     node->mergeOutLiveSets(currLiveSet);          // put in the live set merged live sets of successors
 
-    if (LOG_ON) {
-        IPF_LOG << "    node" << node->getId() << " successors:";
-        EdgeVector &edges = node->getOutEdges();
-        for (uint16 i=0; i<edges.size(); i++) {
-            Node *succ       = edges[i]->getTarget();
-            Node *loopHeader = succ->getLoopHeader();
-            IPF_LOG << " " << succ->getId();
-            if (loopHeader != NULL) IPF_LOG << "(" << loopHeader->getId() << ")";
-        }
-        IPF_LOG << " exit live set: " << IrPrinter::toString(currLiveSet) << endl;
-    }
+//    if (LOG_ON) {
+//        IPF_LOG << "    node" << node->getId() << " successors:";
+//        EdgeVector &edges = node->getOutEdges();
+//        for (uint16 i=0; i<edges.size(); i++) {
+//            Node *succ       = edges[i]->getTarget();
+//            Node *loopHeader = succ->getLoopHeader();
+//            IPF_LOG << " " << succ->getId();
+//            if (loopHeader != NULL) IPF_LOG << "(" << loopHeader->getId() << ")";
+//        }
+//        IPF_LOG << " exit live set: " << IrPrinter::toString(currLiveSet) << endl;
+//    }
 
     // If node is not BB - currLiveSet is not going to change 
     if(node->getNodeKind() != NODE_BB) {
-        IPF_LOG << "      node is not BB - live set is not changed" << endl;
+//        IPF_LOG << "      node is not BB - live set is not changed" << endl;
         if (oldLiveSet == currLiveSet) return true;     // if live set has not changed - nothing to do
 
         node->setLiveSet(currLiveSet);            // Set currLiveSet for the current node
@@ -94,11 +93,7 @@ bool LiveAnalyzer::analyzeNode(Node *node) {
     InstIterator firstInst = insts.begin()-1;
     
     for(; currInst>firstInst; currInst--) {
-
         updateLiveSet(currLiveSet, *currInst);
-
-        IPF_LOG << "      " << left << setw(46) << IrPrinter::toString(*currInst); 
-        IPF_LOG << " live set : " << IrPrinter::toString(currLiveSet) << endl; 
     }
     
     if (oldLiveSet == currLiveSet) return true;     // if live set has not changed - nothing to do

@@ -14,10 +14,9 @@
  *  See the License for the specific language governing permissions and
  *  limitations under the License.
  */
-
+                                                                                                            
 /**
  * @author Intel, Konstantin M. Anisimov, Igor V. Chebykin
- * @version $Revision$
  *
  */
 
@@ -43,9 +42,9 @@ struct SafePoint;
 // Typedefs
 //========================================================================================//
 
-typedef vector < TryRegion* >     RegionVector;
-typedef vector < SafePoint >      SafePointVector;
-typedef map < RegOpnd*, MptrDef > MptrDefMap;
+typedef StlVector < TryRegion* >     RegionVector;
+typedef StlVector < SafePoint >      SafePointVector;
+typedef StlMap < RegOpnd*, MptrDef > MptrDefMap;
 
 typedef MptrDefMap::iterator      MptrDefMapIterator; 
 
@@ -83,8 +82,8 @@ public:
 
 class SafePoint {
 public:
-    SafePoint() { node=NULL; inst=NULL; }
-    SafePoint(BbNode *node, Inst *inst) : node(node), inst(inst) {}
+    SafePoint(MemoryManager &mm) : node(NULL), inst(NULL), alivePtrs(mm) {}
+    SafePoint(MemoryManager &mm, BbNode *node, Inst *inst) : node(node), inst(inst), alivePtrs(mm) {}
     
     BbNode        *node;
     Inst          *inst;

@@ -14,10 +14,9 @@
  *  See the License for the specific language governing permissions and
  *  limitations under the License.
  */
-
+                                                                                                            
 /**
  * @author Intel, Konstantin M. Anisimov, Igor V. Chebykin
- * @version $Revision$
  *
  */
 
@@ -37,14 +36,10 @@ void Dce::eliminate() {
     
     IPF_LOG << endl;
     NodeVector &nodes = cfg.search(SEARCH_POST_ORDER);        // get postordered node list
-
     for(uint16 i=0; i<nodes.size(); i++) {                    // iterate through nodes postorder
 
         currLiveSet.clear();                                  // clear live set
         nodes[i]->mergeOutLiveSets(currLiveSet);              // put in the live set merged live sets of successors
-    
-        IPF_LOG << "    node" << nodes[i]->getId() << endl;
-//        IPF_LOG << " exit live set: " << IrPrinter::toString(currLiveSet) << endl;
     
         if(nodes[i]->getNodeKind() != NODE_BB) continue;      // node does not contain insts - ignore
     
@@ -56,15 +51,13 @@ void Dce::eliminate() {
     
             if (isInstDead(*currInst)) {
                 InstIterator inst = currInst--;
-                removeInst(insts, inst);
+                IPF_LOG << "    node" << nodes[i]->getId();
+                IPF_LOG << " dead code - " << IrPrinter::toString(*inst) << endl;
+                insts.erase(inst);                       // remove instruction
                 continue;
             }
             
             LiveAnalyzer::updateLiveSet(currLiveSet, *currInst);
-    
-//            IPF_LOG << "    " << left << setw(46) << IrPrinter::toString(*currInst) << endl; 
-//            IPF_LOG << " live set : " << IrPrinter::toString(currLiveSet) << endl; 
-            
             currInst--;
         }
     }
@@ -91,15 +84,6 @@ bool Dce::isInstDead(Inst *inst) {
     }
 
     return true;
-}
-
-//----------------------------------------------------------------------------------------//
-// Remove instruction from inst vector
-
-void Dce::removeInst(InstVector &insts, InstIterator inst) {
-    
-    IPF_LOG << "      dead code - " << IrPrinter::toString(*inst) << endl;
-    insts.erase(inst);                       // remove instruction
 }
 
 } // IPF

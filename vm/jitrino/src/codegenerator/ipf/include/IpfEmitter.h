@@ -17,7 +17,6 @@
                                                                                                             
 /**
  * @author Intel, Konstantin M. Anisimov, Igor V. Chebykin
- * @version $Revision$
  *
  */
 

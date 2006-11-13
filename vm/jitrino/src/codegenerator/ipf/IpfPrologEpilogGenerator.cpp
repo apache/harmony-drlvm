@@ -14,10 +14,9 @@
  *  See the License for the specific language governing permissions and
  *  limitations under the License.
  */
-
+                                                                                                            
 /**
  * @author Intel, Konstantin M. Anisimov, Igor V. Chebykin
- * @version $Revision$
  *
  */
 
@@ -31,9 +30,30 @@ namespace IPF {
 // PrologEpilogGenerator
 //========================================================================================//
 
-PrologEpilogGenerator::PrologEpilogGenerator(Cfg &cfg_) :
-    mm(cfg_.getMM()),
-    cfg(cfg_) {
+PrologEpilogGenerator::PrologEpilogGenerator(Cfg &cfg) :
+    mm(cfg.getMM()),
+    cfg(cfg), 
+    outRegArgs(mm),
+    prologInsts(mm),
+    epilogInsts(mm),
+    allocInsts(mm),
+    saveSpInsts(mm),
+    savePfsInsts(mm),
+    saveUnatInsts(mm),
+    saveGrsInsts(mm),
+    saveFrsInsts(mm),
+    saveBrsInsts(mm),
+    savePrsInsts(mm),
+    saveRpInsts(mm),
+    restRpInsts(mm),
+    restPrsInsts(mm),
+    restBrsInsts(mm),
+    restFrsInsts(mm),
+    restGrsInsts(mm),
+    restUnatInsts(mm),
+    restPfsInsts(mm),
+    restSpInsts(mm),
+    epilogNodes(mm) {
     
     opndManager = cfg.getOpndManager();
     p0          = opndManager->getP0();
@@ -54,10 +74,9 @@ PrologEpilogGenerator::PrologEpilogGenerator(Cfg &cfg_) :
 
 void PrologEpilogGenerator::genPrologEpilog() {
     
-    IPF_LOG << endl << "  Build Data Sets" << endl;
     buildSets();
 
-    IPF_LOG << "  Generate Code" << endl;
+    IPF_LOG << endl << "  Generate Code" << endl;
     genCode();
 
     IPF_LOG << "  Reassign OutRegArgs" << endl;
@@ -77,14 +96,15 @@ void PrologEpilogGenerator::buildSets() {
     for(uint16 i=0; i<nodes.size(); i++) {                      // iterate through CFG nodes
 
         if(nodes[i]->getNodeKind() != NODE_BB) continue;        // ignore non BB node
+        
         InstVector &insts = ((BbNode *)nodes[i])->getInsts();   // get insts
+        if(insts.size() == 0) continue;                         // if there are no insts in node - ignore
+
 
         // check if node is epilog and insert it in epilogNodes list
-        if(insts.size() > 0) {                                  // if there are insts in node
-            CompVector &comps = insts.back()->getComps();       // get last one completers
-            if(comps.size()>0 && comps[0]==CMPLT_BTYPE_RET) {   // if the inst is br.ret - node is epilog
-                epilogNodes.push_back(nodes[i]);                // put it in epilogNodes list
-            }
+        CompVector &comps = insts.back()->getComps();           // get last inst completers
+        if(comps.size()>0 && comps[0]==CMPLT_BTYPE_RET) {       // if the inst is br.ret - node is epilog
+            epilogNodes.push_back(nodes[i]);                    // put it in epilogNodes list
         }
 
         // build mask of used registers and vector of outArgs 
@@ -96,7 +116,7 @@ void PrologEpilogGenerator::buildSets() {
 
                 setRegUsage(opnd, true);                        // mark reg as used
                 if (opndManager->isOutReg(opnd)) {              // if opnd is out arg
-                    outRegArgs.push_back(opnd);                 // place it in ouRegArgs vector
+                    outRegArgs.insert(opnd);                    // place it in ouRegArgs vector
                 }
             }
         }
@@ -112,17 +132,18 @@ void PrologEpilogGenerator::reassignOutRegArgs() {
     // First out arg will have this location 
     int32 outArgBase = G_INARG_BASE + opndManager->getLocRegSize();
     
-    for(uint16 i=0; i<outRegArgs.size(); i++) {                      // iterate through out args list
-        setRegUsage(outRegArgs[i], false);                           // mark old reg as free
+    for(RegOpndSetIterator it=outRegArgs.begin(); it!=outRegArgs.end(); it++) {  
+        setRegUsage(*it, false);                                     // mark old reg as free
     }
 
-    for(uint16 i=0; i<outRegArgs.size(); i++) {                      // iterate through out args list
+    for(RegOpndSetIterator it=outRegArgs.begin(); it!=outRegArgs.end(); it++) {  
 
-        IPF_LOG << "      " << IrPrinter::toString(outRegArgs[i]) << " reassigned on ";
-        int32 outArgNum = G_OUTARG_BASE - outRegArgs[i]->getValue(); // calculate real out arg number
-        outRegArgs[i]->setLocation(outArgBase + outArgNum);          // calculate and assign new location
-        setRegUsage(outRegArgs[i], true);                            // mark new reg as used
-        IPF_LOG << IrPrinter::toString(outRegArgs[i]) << endl;
+        RegOpnd *arg = *it;
+        IPF_LOG << "      " << IrPrinter::toString(arg) << " reassigned on ";
+        int32 outArgNum = G_OUTARG_BASE - arg->getValue();           // calculate real out arg number
+        arg->setLocation(outArgBase + outArgNum);                    // calculate and assign new location
+        setRegUsage(arg, true);                                      // mark new reg as used
+        IPF_LOG << IrPrinter::toString(arg) << endl;  
     }
 }
 
@@ -191,8 +212,7 @@ void PrologEpilogGenerator::genCode() {
     epilogInsts.splice(epilogInsts.end(), restSpInsts);
 
     // Print Prolog and Epilog insts
-    IPF_LOG << endl;
-    IPF_LOG << "    Prolog:" << endl << IrPrinter::toString(prologInsts) << endl;
+    IPF_LOG << "    Prolog:" << endl << IrPrinter::toString(prologInsts);
     IPF_LOG << "    Epilog:" << endl << IrPrinter::toString(epilogInsts) << endl;
 
     // Insert prolog instructions in begining of enter node
@@ -223,16 +243,16 @@ void PrologEpilogGenerator::saveRestoreRp() {
         Opnd  *offset   = opndManager->newImm(rpBak->getValue());
         Opnd  *scratch  = opndManager->newRegOpnd(OPND_G_REG, DATA_B, SPILL_REG2);
 
-        saveRpInsts.push_back(new(mm) Inst(INST_MOV, p0, scratch, b0));
-        saveRpInsts.push_back(new(mm) Inst(INST_ADDS, p0, stackAddr, offset, sp));
-        saveRpInsts.push_back(new(mm) Inst(INST_ST, CMPLT_SZ_8, p0, stackAddr, scratch));
+        saveRpInsts.push_back(new(mm) Inst(mm, INST_MOV, p0, scratch, b0));
+        saveRpInsts.push_back(new(mm) Inst(mm, INST_ADDS, p0, stackAddr, offset, sp));
+        saveRpInsts.push_back(new(mm) Inst(mm, INST_ST, CMPLT_SZ_8, p0, stackAddr, scratch));
     
-        restRpInsts.push_back(new(mm) Inst(INST_ADDS, p0, stackAddr, offset, sp));
-        restRpInsts.push_back(new(mm) Inst(INST_LD, CMPLT_SZ_8, p0, scratch, stackAddr));
-        restRpInsts.push_back(new(mm) Inst(INST_MOV, p0, b0, scratch));
+        restRpInsts.push_back(new(mm) Inst(mm, INST_ADDS, p0, stackAddr, offset, sp));
+        restRpInsts.push_back(new(mm) Inst(mm, INST_LD, CMPLT_SZ_8, p0, scratch, stackAddr));
+        restRpInsts.push_back(new(mm) Inst(mm, INST_MOV, p0, b0, scratch));
     } else {
-        saveRpInsts.push_back(new(mm) Inst(INST_MOV, p0, rpBak, b0));
-        restRpInsts.push_back(new(mm) Inst(INST_MOV, p0, b0, rpBak));
+        saveRpInsts.push_back(new(mm) Inst(mm, INST_MOV, p0, rpBak, b0));
+        restRpInsts.push_back(new(mm) Inst(mm, INST_MOV, p0, b0, rpBak));
     }
 }
 
@@ -251,16 +271,16 @@ void PrologEpilogGenerator::saveRestorePr() {
         Opnd  *offset   = opndManager->newImm(prBak->getValue());
         Opnd  *scratch  = opndManager->newRegOpnd(OPND_G_REG, DATA_B, SPILL_REG2);
 
-        savePrsInsts.push_back(new(mm) Inst(INST_MOV, p0, scratch, p0));
-        savePrsInsts.push_back(new(mm) Inst(INST_ADDS, p0, stackAddr, offset, sp));
-        savePrsInsts.push_back(new(mm) Inst(INST_ST, CMPLT_SZ_8, p0, stackAddr, scratch));
+        savePrsInsts.push_back(new(mm) Inst(mm, INST_MOV, p0, scratch, p0));
+        savePrsInsts.push_back(new(mm) Inst(mm, INST_ADDS, p0, stackAddr, offset, sp));
+        savePrsInsts.push_back(new(mm) Inst(mm, INST_ST, CMPLT_SZ_8, p0, stackAddr, scratch));
     
-        restPrsInsts.push_back(new(mm) Inst(INST_ADDS, p0, stackAddr, offset, sp));
-        restPrsInsts.push_back(new(mm) Inst(INST_LD, CMPLT_SZ_8, p0, scratch, stackAddr));
-        restPrsInsts.push_back(new(mm) Inst(INST_MOV, p0, p0, scratch));
+        restPrsInsts.push_back(new(mm) Inst(mm, INST_ADDS, p0, stackAddr, offset, sp));
+        restPrsInsts.push_back(new(mm) Inst(mm, INST_LD, CMPLT_SZ_8, p0, scratch, stackAddr));
+        restPrsInsts.push_back(new(mm) Inst(mm, INST_MOV, p0, p0, scratch));
     } else {
-        savePrsInsts.push_back(new(mm) Inst(INST_MOV, p0, prBak, p0));
-        restPrsInsts.push_back(new(mm) Inst(INST_MOV, p0, p0, prBak));
+        savePrsInsts.push_back(new(mm) Inst(mm, INST_MOV, p0, prBak, p0));
+        restPrsInsts.push_back(new(mm) Inst(mm, INST_MOV, p0, p0, prBak));
     }
 }
 
@@ -282,7 +302,7 @@ void PrologEpilogGenerator::genAlloc() {
     Opnd *oSize     = opndManager->newImm(outRegSize);         // number of output gr
     Opnd *rSize     = opndManager->newImm(0);                  // number of rotate gr
 
-    allocInsts.push_back(new(mm) Inst(INST_ALLOC, p0, pfsBak, iSize, lSize, oSize, rSize));
+    allocInsts.push_back(new(mm) Inst(mm, INST_ALLOC, p0, pfsBak, iSize, lSize, oSize, rSize));
 }
 
 //----------------------------------------------------------------------------------------//
@@ -305,16 +325,16 @@ Opnd* PrologEpilogGenerator::saveRestorePfs() {
         Opnd  *offset  = opndManager->newImm(pfsBak->getValue());
         Opnd  *scratch = opndManager->newRegOpnd(OPND_G_REG, DATA_B, SPILL_REG2);
 
-        savePfsInsts.push_back(new(mm) Inst(INST_ADDS, p0, stackAddr, offset, sp));
-        savePfsInsts.push_back(new(mm) Inst(INST_ST, CMPLT_SZ_8, p0, stackAddr, scratch));
+        savePfsInsts.push_back(new(mm) Inst(mm, INST_ADDS, p0, stackAddr, offset, sp));
+        savePfsInsts.push_back(new(mm) Inst(mm, INST_ST, CMPLT_SZ_8, p0, stackAddr, scratch));
     
-        restPfsInsts.push_back(new(mm) Inst(INST_ADDS, p0, stackAddr, offset, sp));
-        restPfsInsts.push_back(new(mm) Inst(INST_LD, CMPLT_SZ_8, p0, scratch, stackAddr));
-        restPfsInsts.push_back(new(mm) Inst(INST_MOV_I, p0, pfs, scratch));
+        restPfsInsts.push_back(new(mm) Inst(mm, INST_ADDS, p0, stackAddr, offset, sp));
+        restPfsInsts.push_back(new(mm) Inst(mm, INST_LD, CMPLT_SZ_8, p0, scratch, stackAddr));
+        restPfsInsts.push_back(new(mm) Inst(mm, INST_MOV_I, p0, pfs, scratch));
         
         return scratch;
     } else {
-        restPfsInsts.push_back(new(mm) Inst(INST_MOV_I, p0, pfs, pfsBak));
+        restPfsInsts.push_back(new(mm) Inst(mm, INST_MOV_I, p0, pfs, pfsBak));
         return pfsBak;
     }
 }
@@ -335,13 +355,13 @@ void PrologEpilogGenerator::saveRestoreUnat() {
 
     opndManager->unatBak = storage->getLocation();
 
-    saveUnatInsts.push_back(new(mm) Inst(INST_MOV_M, p0, scratch, unat));
-    saveUnatInsts.push_back(new(mm) Inst(INST_ADDS, p0, stackAddr, offset, sp));
-    saveUnatInsts.push_back(new(mm) Inst(INST_ST, CMPLT_SZ_8, p0, stackAddr, scratch));
+    saveUnatInsts.push_back(new(mm) Inst(mm, INST_MOV_M, p0, scratch, unat));
+    saveUnatInsts.push_back(new(mm) Inst(mm, INST_ADDS, p0, stackAddr, offset, sp));
+    saveUnatInsts.push_back(new(mm) Inst(mm, INST_ST, CMPLT_SZ_8, p0, stackAddr, scratch));
 
-    restUnatInsts.push_back(new(mm) Inst(INST_ADDS, p0, stackAddr, offset, sp));
-    restUnatInsts.push_back(new(mm) Inst(INST_LD, CMPLT_SZ_8, p0, scratch, stackAddr));
-    restUnatInsts.push_back(new(mm) Inst(INST_MOV_M, p0, unat, scratch));
+    restUnatInsts.push_back(new(mm) Inst(mm, INST_ADDS, p0, stackAddr, offset, sp));
+    restUnatInsts.push_back(new(mm) Inst(mm, INST_LD, CMPLT_SZ_8, p0, scratch, stackAddr));
+    restUnatInsts.push_back(new(mm) Inst(mm, INST_MOV_M, p0, unat, scratch));
 }
 
 //----------------------------------------------------------------------------------------//
@@ -366,10 +386,10 @@ void PrologEpilogGenerator::saveRestorePreservedGr() {
         Opnd *offset  = opndManager->newImm(storage->getValue());
         Opnd *preserv = opndManager->newRegOpnd(OPND_G_REG, DATA_U64, i);
 
-        saveGrsInsts.push_back(new(mm) Inst(INST_ADDS, p0, stackAddr, offset, sp));
-        saveGrsInsts.push_back(new(mm) Inst(INST_ST8_SPILL, p0, stackAddr, preserv));
-        restGrsInsts.push_back(new(mm) Inst(INST_ADDS, p0, stackAddr, offset, sp));
-        restGrsInsts.push_back(new(mm) Inst(INST_LD8_FILL, p0, preserv, stackAddr));
+        saveGrsInsts.push_back(new(mm) Inst(mm, INST_ADDS, p0, stackAddr, offset, sp));
+        saveGrsInsts.push_back(new(mm) Inst(mm, INST_ST8_SPILL, p0, stackAddr, preserv));
+        restGrsInsts.push_back(new(mm) Inst(mm, INST_ADDS, p0, stackAddr, offset, sp));
+        restGrsInsts.push_back(new(mm) Inst(mm, INST_LD8_FILL, p0, preserv, stackAddr));
 
         IPF_LOG << " " << IrPrinter::toString(preserv);
     }
@@ -395,10 +415,10 @@ void PrologEpilogGenerator::saveRestorePreservedFr() {
         Opnd *offset  = opndManager->newImm(storage->getValue());
         Opnd *preserv = opndManager->newRegOpnd(OPND_F_REG, DATA_F, i);
         
-        saveFrsInsts.push_back(new(mm) Inst(INST_ADDS, p0, stackAddr, offset, sp));
-        saveFrsInsts.push_back(new(mm) Inst(INST_STF_SPILL, p0, stackAddr, preserv));
-        restFrsInsts.push_back(new(mm) Inst(INST_ADDS, p0, stackAddr, offset, sp));
-        restFrsInsts.push_back(new(mm) Inst(INST_LDF_FILL, p0, preserv, stackAddr));
+        saveFrsInsts.push_back(new(mm) Inst(mm, INST_ADDS, p0, stackAddr, offset, sp));
+        saveFrsInsts.push_back(new(mm) Inst(mm, INST_STF_SPILL, p0, stackAddr, preserv));
+        restFrsInsts.push_back(new(mm) Inst(mm, INST_ADDS, p0, stackAddr, offset, sp));
+        restFrsInsts.push_back(new(mm) Inst(mm, INST_LDF_FILL, p0, preserv, stackAddr));
 
         IPF_LOG << " " << IrPrinter::toString(preserv);
     }
@@ -423,13 +443,13 @@ void PrologEpilogGenerator::saveRestorePreservedBr() {
         Opnd *scratch  = opndManager->newRegOpnd(OPND_G_REG, DATA_B, SPILL_REG2);
         Opnd *preserv  = opndManager->newRegOpnd(OPND_B_REG, DATA_B, i);
         
-        saveBrsInsts.push_back(new(mm) Inst(INST_MOV, p0, scratch, preserv));
-        saveBrsInsts.push_back(new(mm) Inst(INST_ADDS, p0, stackAddr, offset, sp));
-        saveBrsInsts.push_back(new(mm) Inst(INST_ST, CMPLT_SZ_8, p0, stackAddr, scratch));
+        saveBrsInsts.push_back(new(mm) Inst(mm, INST_MOV, p0, scratch, preserv));
+        saveBrsInsts.push_back(new(mm) Inst(mm, INST_ADDS, p0, stackAddr, offset, sp));
+        saveBrsInsts.push_back(new(mm) Inst(mm, INST_ST, CMPLT_SZ_8, p0, stackAddr, scratch));
 
-        restBrsInsts.push_back(new(mm) Inst(INST_ADDS, p0, stackAddr, offset, sp));
-        restBrsInsts.push_back(new(mm) Inst(INST_LD, CMPLT_SZ_8, p0, scratch, stackAddr));
-        restBrsInsts.push_back(new(mm) Inst(INST_MOV, p0, preserv, scratch));
+        restBrsInsts.push_back(new(mm) Inst(mm, INST_ADDS, p0, stackAddr, offset, sp));
+        restBrsInsts.push_back(new(mm) Inst(mm, INST_LD, CMPLT_SZ_8, p0, scratch, stackAddr));
+        restBrsInsts.push_back(new(mm) Inst(mm, INST_MOV, p0, preserv, scratch));
         IPF_LOG << " " << IrPrinter::toString(preserv);
     }
     IPF_LOG << endl;
@@ -447,8 +467,8 @@ void PrologEpilogGenerator::saveRestoreSp() {
     
     Opnd *memStackSizeOpndNeg = opndManager->newImm(-memStackSize);
     Opnd *memStackSizeOpndPos = opndManager->newImm(memStackSize);
-    saveSpInsts.push_back(new(mm) Inst(INST_ADDS, p0, sp, memStackSizeOpndNeg, sp));
-    restSpInsts.push_back(new(mm) Inst(INST_ADDS, p0, sp, memStackSizeOpndPos, sp));
+    saveSpInsts.push_back(new(mm) Inst(mm, INST_ADDS, p0, sp, memStackSizeOpndNeg, sp));
+    restSpInsts.push_back(new(mm) Inst(mm, INST_ADDS, p0, sp, memStackSizeOpndPos, sp));
 }
     
 //----------------------------------------------------------------------------------------//

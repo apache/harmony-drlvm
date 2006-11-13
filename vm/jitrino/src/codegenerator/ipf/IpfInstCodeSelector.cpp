@@ -14,10 +14,9 @@
  *  See the License for the specific language governing permissions and
  *  limitations under the License.
  */
-
+                                                                                                            
 /**
  * @author Intel, Konstantin M. Anisimov, Igor V. Chebykin
- * @version $Revision$
  *
  */
 
@@ -676,7 +675,7 @@ CG_OpndHandle *IpfInstCodeSelector::defArg(uint32 inArgPosition, Type *type) {
     RegOpnd *arg = opndManager->newRegOpnd(opndKind, dataKind, location);
     IPF_LOG << "      defArg " << IrPrinter::toString(arg) << " " << type->getName() << endl;
 
-//    addNewInst(INST_DEF, p0, arg);                      // artificial def for in arg opnd
+//    addNewInst(INST_DEF, p0, arg);                        // artificial def for in arg opnd
     if (isFp) {
         RegOpnd *newarg = opndManager->newRegOpnd(opndKind, dataKind);
         addNewInst(INST_MOV, p0, newarg, arg);            // if fp arg crosses call site
@@ -810,7 +809,7 @@ void IpfInstCodeSelector::branch(CompareOp::Operators cmpOp,
     NodeRef   *target    = opndManager->newNodeRef();
 
     cmp(instCode, crel, truePred, p0, src1, src2);
-    addNewInst(INST_BR, CMPLT_BTYPE_COND, truePred, target);
+    addNewInst(INST_BR, CMPLT_BTYPE_COND, CMPLT_WH_DPNT, CMPLT_PH_FEW, truePred, target);
 }
 
 //----------------------------------------------------------------------------//
@@ -834,7 +833,7 @@ void IpfInstCodeSelector::bzero(CompareZeroOp::Types opType,
     }
 
     cmp(instCode, CMPLT_CMP_CREL_EQ, truePred, p0, src, zero);
-    addNewInst(INST_BR, CMPLT_BTYPE_COND, truePred, target);
+    addNewInst(INST_BR, CMPLT_BTYPE_COND, CMPLT_WH_DPNT, CMPLT_PH_FEW, truePred, target);
 }
 
 //----------------------------------------------------------------------------//
@@ -858,7 +857,7 @@ void IpfInstCodeSelector::bnzero(CompareZeroOp::Types opType,
     } 
 
     cmp(instCode, CMPLT_CMP_CREL_NE, truePred, p0, src, zero);
-    addNewInst(INST_BR, CMPLT_BTYPE_COND, truePred, target);
+    addNewInst(INST_BR, CMPLT_BTYPE_COND, CMPLT_WH_DPNT, CMPLT_PH_FEW, truePred, target);
 }
 
 //----------------------------------------------------------------------------//
@@ -882,7 +881,7 @@ void IpfInstCodeSelector::tableSwitch(CG_OpndHandle *src, uint32 nTargets) {
 
     IPF_LOG << "      tableSwitch" << endl;
 
-    Constant *switchTable = new(mm) SwitchConstant();
+    Constant *switchTable = new(mm) SwitchConstant(mm);
 
     Opnd *r0                  = opndManager->getR0();
     Opnd *p6                  = opndManager->newRegOpnd(OPND_P_REG, DATA_P);   // default target is taken
@@ -911,10 +910,10 @@ void IpfInstCodeSelector::tableSwitch(CG_OpndHandle *src, uint32 nTargets) {
     // compare with default
     addNewInst(INST_CMP4, CMPLT_CMP_CREL_GT, CMPLT_CMP_CTYPE_UNC, p0, p6, p7, tgt, maxTgt);
 
-    Inst *tmpinst = new(mm) Inst(INST_CMP4, CMPLT_CMP_CREL_LT, CMPLT_CMP_CTYPE_OR_ANDCM, p7, p6, p7, tgt, r0);
+    Inst *tmpinst = new(mm) Inst(mm, INST_CMP4, CMPLT_CMP_CREL_LT, CMPLT_CMP_CTYPE_OR_ANDCM, p7, p6, p7, tgt, r0);
     tmpinst->addOpnd(p6);
     tmpinst->addOpnd(p7);
-    node.addInst(tmpinst);
+    addInst(tmpinst);
 
     addNewInst(INST_MOV, p6, tgt, defTgt);
     // compare if through target
@@ -1150,7 +1149,7 @@ CG_OpndHandle *IpfInstCodeSelector::tau_checkNull(CG_OpndHandle *base, bool chec
     CompilationInterface::RuntimeHelperId hId = CompilationInterface::Helper_NullPtrException;
     uint64  address        = (uint64) compilationInterface.getRuntimeHelperAddress(hId);
     Opnd    *helperAddress = opndManager->newImm(address);
-    directCall(0, NULL, NULL, helperAddress, truePred);
+    directCall(0, NULL, NULL, helperAddress, truePred, CMPLT_WH_SPNT);
 
     return opndManager->getTau();    // return fake value (we do not use tau)
 }
@@ -1171,7 +1170,7 @@ CG_OpndHandle *IpfInstCodeSelector::tau_checkBounds(CG_OpndHandle *arrayLen,
     CompilationInterface::RuntimeHelperId hId = CompilationInterface::Helper_ArrayBoundsException;
     uint64  address        = (uint64) compilationInterface.getRuntimeHelperAddress(hId);
     Opnd    *helperAddress = opndManager->newImm(address);
-    directCall(0, NULL, NULL, helperAddress, truePred);
+    directCall(0, NULL, NULL, helperAddress, truePred, CMPLT_WH_SPNT);
 
     return opndManager->getTau();    // return fake value (we do not use tau);
 }
@@ -1192,7 +1191,7 @@ CG_OpndHandle *IpfInstCodeSelector::tau_checkLowerBound(CG_OpndHandle *a,
     CompilationInterface::RuntimeHelperId hId = CompilationInterface::Helper_ArrayBoundsException;
     uint64  address        = (uint64) compilationInterface.getRuntimeHelperAddress(hId);
     Opnd    *helperAddress = opndManager->newImm(address);
-    directCall(0, NULL, NULL, helperAddress, truePred);
+    directCall(0, NULL, NULL, helperAddress, truePred, CMPLT_WH_SPNT);
 
     return opndManager->getTau();    // return fake value (we do not use tau);
 }
@@ -1213,7 +1212,7 @@ CG_OpndHandle *IpfInstCodeSelector::tau_checkUpperBound(CG_OpndHandle *a,
     CompilationInterface::RuntimeHelperId hId = CompilationInterface::Helper_ArrayBoundsException;
     uint64  address        = (uint64) compilationInterface.getRuntimeHelperAddress(hId);
     Opnd    *helperAddress = opndManager->newImm(address);
-    directCall(0, NULL, NULL, helperAddress, truePred);
+    directCall(0, NULL, NULL, helperAddress, truePred, CMPLT_WH_SPNT);
 
     return opndManager->getTau();    // return fake value (we do not use tau);
 }
@@ -1253,7 +1252,7 @@ CG_OpndHandle *IpfInstCodeSelector::tau_checkElemType(CG_OpndHandle *array,
     hId     = CompilationInterface::Helper_ElemTypeException;
     address = (uint64) compilationInterface.getRuntimeHelperAddress(hId);
     Opnd    *helperAddress2 = opndManager->newImm(address);
-    directCall(0, NULL, NULL, helperAddress2, truePred);
+    directCall(0, NULL, NULL, helperAddress2, truePred, CMPLT_WH_SPNT);
     
     return opndManager->getTau();    // return fake value (we do not use tau);
 }
@@ -1275,7 +1274,7 @@ CG_OpndHandle *IpfInstCodeSelector::tau_checkZero(CG_OpndHandle *src_) {
     CompilationInterface::RuntimeHelperId hId = CompilationInterface::Helper_DivideByZeroException;
     uint64  address        = (uint64) compilationInterface.getRuntimeHelperAddress(hId);
     Opnd    *helperAddress = opndManager->newImm(address);
-    directCall(0, NULL, NULL, helperAddress, truePred);
+    directCall(0, NULL, NULL, helperAddress, truePred, CMPLT_WH_SPNT);
 
     return opndManager->getTau();    // return fake value (we do not use tau)
 }
@@ -1471,24 +1470,24 @@ CG_OpndHandle *IpfInstCodeSelector::tau_ldVTableAddr(Type          *dstType,
 CG_OpndHandle *IpfInstCodeSelector::getVTableAddr(Type       *dstType, 
                                                   ObjectType *base) {
 
-    IPF_LOG << "      getVTableAddr; dstType==" << Type::tag2str(dstType->tag) << endl;
-
     uint64 value = (uint64) base->getVTable();
-    
     if (dstType->tag==Type::VTablePtr && opndManager->areVtablePtrsCompressed()) {
         value += (uint64) compilationInterface.getVTableBase();
     }
     
     Opnd *addr = opndManager->newImm(value);
+    IPF_LOG << "      getVTableAddr" << endl << "        addr " << IrPrinter::toString(addr) << endl;
+
     return addr;
 }
 
 //----------------------------------------------------------------------------//
 // Load interface table address
 
-CG_OpndHandle *IpfInstCodeSelector::tau_ldIntfTableAddr(Type           *dstType, 
-                                                         CG_OpndHandle *base, 
-                                                         NamedType     *vtableType) {
+CG_OpndHandle *IpfInstCodeSelector::tau_ldIntfTableAddr(Type          *dstType, 
+                                                        CG_OpndHandle *base, 
+                                                        NamedType     *vtableType,
+                                                        CG_OpndHandle *) {
 
     IPF_LOG << "      tau_ldIntfTableAddr; dstType==" << Type::tag2str(dstType->tag)  
         << "; vtableType=" << Type::tag2str(vtableType->tag) << endl;
@@ -1813,44 +1812,46 @@ void IpfInstCodeSelector::balancedMonitorExit(CG_OpndHandle *obj,
 //----------------------------------------------------------------------------//
 // Create direct call to the method 
 
-void IpfInstCodeSelector::directCall(uint32  numArgs, 
-                                     Opnd    **args, 
-                                     RegOpnd *retOpnd,
-                                     Opnd    *methodAddress,
-                                     RegOpnd *pred) {
+void IpfInstCodeSelector::directCall(uint32    numArgs, 
+                                     Opnd      **args, 
+                                     RegOpnd   *retOpnd,
+                                     Opnd      *methodAddress,
+                                     RegOpnd   *pred,
+                                     Completer whetherHint) {
 
     RegOpnd *b0       = opndManager->getB0();
     RegOpnd *convOpnd = makeConvOpnd(retOpnd);
-    Inst    *callInst = new(mm) Inst(INST_BRL13, CMPLT_BTYPE_CALL, CMPLT_WH_SPTK, CMPLT_PH_MANY
+    Inst    *callInst = new(mm) Inst(mm, INST_BRL13, CMPLT_BTYPE_CALL, whetherHint, CMPLT_PH_MANY
         , pred, convOpnd, b0, methodAddress);
     
     opndManager->setContainCall(true);           // set flag OpndManager::containCall
     makeCallArgs(numArgs, args, callInst, pred); // add instructions moving args in appropriate locations
 
-    node.addInst(callInst);                      // add "call" inst 
+    addInst(callInst);                           // add "call" inst 
     makeRetVal(retOpnd, convOpnd, pred);         // add instruction moving ret value from r8/f8
 }
 
 //----------------------------------------------------------------------------//
 // Create indirect call to the method 
 
-void IpfInstCodeSelector::indirectCall(uint32  numArgs, 
-                                       Opnd    **args, 
-                                       RegOpnd *retOpnd,
-                                       RegOpnd *methodPtr,
-                                       RegOpnd *pred) {
+void IpfInstCodeSelector::indirectCall(uint32    numArgs, 
+                                       Opnd      **args, 
+                                       RegOpnd   *retOpnd,
+                                       RegOpnd   *methodPtr,
+                                       RegOpnd   *pred,
+                                       Completer whetherHint) {
 
     RegOpnd *b0        = opndManager->getB0();
     RegOpnd *convOpnd  = makeConvOpnd(retOpnd);
     RegOpnd *callTgt   = opndManager->newRegOpnd(OPND_B_REG, DATA_U64);
-    Inst    *ldAddress = new(mm) Inst(INST_MOV, pred, callTgt, methodPtr);
-    Inst    *callInst  = new(mm) Inst(INST_BR13, CMPLT_BTYPE_CALL, pred, convOpnd, b0, callTgt);
+    Inst    *ldAddress = new(mm) Inst(mm, INST_MOV, pred, callTgt, methodPtr);
+    Inst    *callInst  = new(mm) Inst(mm, INST_BR13, CMPLT_BTYPE_CALL, CMPLT_WH_SPTK, CMPLT_PH_MANY, pred, convOpnd, b0, callTgt);
 
     opndManager->setContainCall(true);           // set flag OpndManager::containCall (method contains call)
     makeCallArgs(numArgs, args, callInst, pred); // add instructions moving args in appropriate locations
 
-    node.addInst(ldAddress);                     // add inst loading method address 
-    node.addInst(callInst);                      // add "call" inst 
+    addInst(ldAddress);                          // add inst loading method address 
+    addInst(callInst);                           // add "call" inst 
     makeRetVal(retOpnd, convOpnd, pred);         // add instruction moving ret value from r8/f8
 }
 
@@ -1899,14 +1900,8 @@ RegOpnd *IpfInstCodeSelector::makeConvOpnd(RegOpnd *retOpnd) {
 
     if(retOpnd == NULL) return opndManager->getR0(); // method has return type "void"
 
-    OpndKind opndKind = retOpnd->getOpndKind();
-    DataKind dataKind = retOpnd->getDataKind();
-    int32    location = LOCATION_INVALID;
-
-    if (retOpnd->isFloating()) location = RET_F_REG;
-    else                       location = RET_G_REG;
-     
-    return opndManager->newRegOpnd(opndKind, dataKind, location);
+    if (retOpnd->isFloating()) return opndManager->getF8();
+    else                       return opndManager->getR8();
 }
 
 //----------------------------------------------------------------------------//
@@ -2604,6 +2599,14 @@ void IpfInstCodeSelector::divFloat(RegOpnd *dst, CG_OpndHandle *src1, CG_OpndHan
 // create new inst and add it in current node
 //----------------------------------------------------------------------------//
 
+void IpfInstCodeSelector::addInst(Inst *inst) { 
+
+    IPF_LOG << "        " << IrPrinter::toString(inst) << endl;
+    node.addInst(inst);
+}
+
+//----------------------------------------------------------------------------//
+
 Inst& IpfInstCodeSelector::addNewInst(InstCode      instCode, 
                                       CG_OpndHandle *op1, 
                                       CG_OpndHandle *op2, 
@@ -2612,9 +2615,9 @@ Inst& IpfInstCodeSelector::addNewInst(InstCode      instCode,
                                       CG_OpndHandle *op5, 
                                       CG_OpndHandle *op6) {
 
-    Inst* inst = new(mm) Inst(instCode, (Opnd *)op1, (Opnd *)op2, (Opnd *)op3, 
+    Inst* inst = new(mm) Inst(mm, instCode, (Opnd *)op1, (Opnd *)op2, (Opnd *)op3, 
                                         (Opnd *)op4, (Opnd *)op5, (Opnd *)op6);
-    node.addInst(inst);
+    addInst(inst);
     return *inst;
 }
 
@@ -2629,9 +2632,9 @@ Inst& IpfInstCodeSelector::addNewInst(InstCode      instCode,
                                       CG_OpndHandle *op5, 
                                       CG_OpndHandle *op6) {
 
-    Inst* inst = new(mm) Inst(instCode, comp1, (Opnd *)op1, (Opnd *)op2, (Opnd *)op3, 
+    Inst* inst = new(mm) Inst(mm, instCode, comp1, (Opnd *)op1, (Opnd *)op2, (Opnd *)op3, 
                                                (Opnd *)op4, (Opnd *)op5, (Opnd *)op6);
-    node.addInst(inst);
+    addInst(inst);
     return *inst;
 }
 
@@ -2647,9 +2650,28 @@ Inst& IpfInstCodeSelector::addNewInst(InstCode      instCode,
                                       CG_OpndHandle *op5, 
                                       CG_OpndHandle *op6) {
 
-    Inst* inst = new(mm) Inst(instCode, comp1, comp2, (Opnd *)op1, (Opnd *)op2, (Opnd *)op3, 
+    Inst* inst = new(mm) Inst(mm, instCode, comp1, comp2, (Opnd *)op1, (Opnd *)op2, (Opnd *)op3, 
                                                       (Opnd *)op4, (Opnd *)op5, (Opnd *)op6);
-    node.addInst(inst);
+    addInst(inst);
+    return *inst;
+}
+
+//----------------------------------------------------------------------------//
+
+Inst& IpfInstCodeSelector::addNewInst(InstCode      instCode,
+                                      Completer     comp1, 
+                                      Completer     comp2, 
+                                      Completer     comp3, 
+                                      CG_OpndHandle *op1, 
+                                      CG_OpndHandle *op2, 
+                                      CG_OpndHandle *op3, 
+                                      CG_OpndHandle *op4, 
+                                      CG_OpndHandle *op5, 
+                                      CG_OpndHandle *op6) {
+
+    Inst* inst = new(mm) Inst(mm, instCode, comp1, comp2, comp3, (Opnd *)op1, (Opnd *)op2, (Opnd *)op3, 
+                                                      (Opnd *)op4, (Opnd *)op5, (Opnd *)op6);
+    addInst(inst);
     return *inst;
 }
 

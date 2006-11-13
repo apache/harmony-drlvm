@@ -14,10 +14,9 @@
  *  See the License for the specific language governing permissions and
  *  limitations under the License.
  */
-
+                                                                                                            
 /**
  * @author Intel, Konstantin M. Anisimov, Igor V. Chebykin
- * @version $Revision$
  *
  */
 
@@ -43,26 +42,29 @@ bool greaterPriority(Edge *edge1, Edge *edge2) {
 // TryRegion
 //========================================================================================//
 
-TryRegion::TryRegion(Byte       *startAddr_, 
-                     Byte       *endAddr_, 
-                     Byte       *handlerAddr_, 
-                     ObjectType *exceptionType_, 
-                     bool       isExceptionObjDead_) : 
-    startAddr(startAddr_),
-    endAddr(endAddr_),
-    handlerAddr(handlerAddr_),
-    exceptionType(exceptionType_),
-    isExceptionObjDead(isExceptionObjDead_) {
+TryRegion::TryRegion(Byte       *startAddr, 
+                     Byte       *endAddr, 
+                     Byte       *handlerAddr, 
+                     ObjectType *exceptionType, 
+                     bool       isExceptionObjDead) : 
+    startAddr(startAddr),
+    endAddr(endAddr),
+    handlerAddr(handlerAddr),
+    exceptionType(exceptionType),
+    isExceptionObjDead(isExceptionObjDead) {
 }
 
 //========================================================================================//
 // RuntimeSupport
 //========================================================================================//
 
-RuntimeSupport::RuntimeSupport(Cfg &cfg_, CompilationInterface &compilationInterface_) :
-    mm(cfg_.getMM()), 
-    cfg(cfg_),
-    compilationInterface(compilationInterface_) {
+RuntimeSupport::RuntimeSupport(Cfg &cfg, CompilationInterface &compilationInterface) :
+    mm(cfg.getMM()), 
+    cfg(cfg),
+    compilationInterface(compilationInterface),
+    tryRegions(mm),
+    safePoints(mm),
+    mptr2def(mm) {
         
     opndManager = cfg.getOpndManager();
 }
@@ -95,7 +97,7 @@ void RuntimeSupport::makeRuntimeInfo() {
     IPF_LOG << "    stack info size (bytes): " << stackInfoSize << endl;
     
     IPF_LOG << endl << "  Make Root Seet Info" << endl;
-    Uint32Vector rootSetInfo;
+    Uint32Vector rootSetInfo(mm);
     makeRootSetInfo(rootSetInfo);
     uint32 rootSetInfoSize = ROOT_SET_HEADER_SIZE + rootSetInfo.size() * sizeof(uint32);
     IPF_LOG << "    GC root set info size (bytes): " << rootSetInfoSize << endl;
@@ -258,7 +260,7 @@ StackInfo* RuntimeSupport::makeStackInfo() {
 void RuntimeSupport::buildRootSet() {
     
     NodeVector &nodes = cfg.search(SEARCH_POST_ORDER);
-    RegOpndSet liveSet;
+    RegOpndSet liveSet(mm);
 
     for (uint16 i=0; i<nodes.size(); i++) {              // iterate through CFG nodes
 
@@ -285,14 +287,14 @@ void RuntimeSupport::buildRootSet() {
     }
     
     if (LOG_ON) {
-        IPF_LOG << endl << "    Build mptr to base map:" << endl;
+        IPF_LOG << endl << "    Build mptr to base map" << endl;
         for (MptrDefMapIterator it=mptr2def.begin(); it!=mptr2def.end(); it++) {
             IPF_LOG << "      " << IrPrinter::toString(it->first) << "->";
             IPF_LOG << IrPrinter::toString(it->second.base) << endl;
         }
     }
 
-    IPF_LOG << "    Safe point list:" << endl;
+    IPF_LOG << endl << "    Safe point list" << endl;
     // set mptr->base relations (vector SafePoint.alivePtrs will contain base after each mptr)
     // and extend bases live ranges
     for (uint16 i=0; i<safePoints.size(); i++) {
@@ -307,7 +309,7 @@ void RuntimeSupport::buildRootSet() {
  
 void RuntimeSupport::newSafePoint(BbNode *node, Inst *spInst, RegOpndSet &liveSet) {
     
-    safePoints.push_back(SafePoint(node, spInst));      // create record for current safe point
+    safePoints.push_back(SafePoint(mm, node, spInst));  // create record for current safe point
     RegOpndVector &ptrs = safePoints.back().alivePtrs;  // get vector for mptrs and bases alive on the safe point
     
     for (RegOpndSetIterator it=liveSet.begin(); it!=liveSet.end(); it++) {
@@ -400,7 +402,7 @@ void RuntimeSupport::replaceBase(Inst *inst, Opnd *base, Opnd *commonBase) {
 void RuntimeSupport::insertMovInst(BbNode *node, Inst *inst, Opnd *oldBase, Opnd *commonBase) {
     
     InstVector   &insts   = node->getInsts();
-    Inst         *newInst = new(mm) Inst(INST_MOV, commonBase, oldBase);
+    Inst         *newInst = new(mm) Inst(mm, INST_MOV, commonBase, oldBase);
     InstIterator pos      = find(insts.begin(), insts.end(), inst);
     
     if (LOG_ON) if (pos == insts.end()) IPF_ERR << endl;

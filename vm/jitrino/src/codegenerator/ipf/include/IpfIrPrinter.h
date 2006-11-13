@@ -17,7 +17,6 @@
                                                                                                             
 /**
  * @author Intel, Konstantin M. Anisimov, Igor V. Chebykin
- * @version $Revision$
  *
  */
 
@@ -55,7 +54,7 @@ public:
     static string  toString(EdgeKind);
     static string  toString(OpndKind);
     static string  toString(DataKind);
-
+    
 protected:
     void           printEdgeDot(Edge*);
     void           printNodeDot(Node*);

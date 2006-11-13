@@ -354,7 +354,7 @@ void CodeLayouter::pushFront(Chain *chain, Node *node) {
 void CodeLayouter::layoutNodes() {
     
     // sort chains 
-    ChainMap order;
+    ChainMap order(mm);
     for (ChainListIterator it=chains.begin(); it!=chains.end(); it++) {
         uint32 weight = calculateChainWeight(*it);  // calculate chain weight
         order.insert( make_pair(weight, *it) );     // insert pair weight->chain in map

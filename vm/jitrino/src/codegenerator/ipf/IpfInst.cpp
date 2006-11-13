@@ -17,7 +17,6 @@
                                                                                                             
 /**
  * @author Intel, Konstantin M. Anisimov, Igor V. Chebykin
- * @version $Revision$
  *
  */
 
@@ -30,9 +29,13 @@ namespace IPF {
 // Inst
 //========================================================================================//
 
-Inst::Inst(InstCode instCode_, Opnd *op1, Opnd *op2, Opnd *op3, Opnd *op4, Opnd *op5, Opnd *op6) { 
+Inst::Inst(MemoryManager &mm, InstCode instCode, 
+           Opnd *op1, Opnd *op2, Opnd *op3, Opnd *op4, Opnd *op5, Opnd *op6) : 
+    instCode(instCode),
+    compList(mm), 
+    opndList(mm),
+    addr(0) { 
 
-    instCode = instCode_;
     if(op1 != NULL) opndList.push_back(op1);
     if(op2 != NULL) opndList.push_back(op2);
     if(op3 != NULL) opndList.push_back(op3);
@@ -43,10 +46,13 @@ Inst::Inst(InstCode instCode_, Opnd *op1, Opnd *op2, Opnd *op3, Opnd *op4, Opnd 
 
 //----------------------------------------------------------------------------------------//
 
-Inst::Inst(InstCode instCode_, Completer comp1, 
-           Opnd *op1, Opnd *op2, Opnd *op3, Opnd *op4, Opnd *op5, Opnd *op6) { 
+Inst::Inst(MemoryManager &mm, InstCode instCode, Completer comp1, 
+           Opnd *op1, Opnd *op2, Opnd *op3, Opnd *op4, Opnd *op5, Opnd *op6) :
+    instCode(instCode),
+    compList(mm), 
+    opndList(mm),
+    addr(0) { 
 
-    instCode = instCode_;
     compList.push_back(comp1);
     if(op1 != NULL) opndList.push_back(op1);
     if(op2 != NULL) opndList.push_back(op2);
@@ -58,10 +64,13 @@ Inst::Inst(InstCode instCode_, Completer comp1,
 
 //----------------------------------------------------------------------------------------//
 
-Inst::Inst(InstCode instCode_, Completer comp1, Completer comp2, 
-           Opnd *op1, Opnd *op2, Opnd *op3, Opnd *op4, Opnd *op5, Opnd *op6) { 
+Inst::Inst(MemoryManager &mm, InstCode instCode, Completer comp1, Completer comp2, 
+           Opnd *op1, Opnd *op2, Opnd *op3, Opnd *op4, Opnd *op5, Opnd *op6) : 
+    instCode(instCode),
+    compList(mm), 
+    opndList(mm),
+    addr(0) { 
 
-    instCode = instCode_;
     compList.push_back(comp1);
     compList.push_back(comp2);
     if(op1 != NULL) opndList.push_back(op1);
@@ -74,10 +83,13 @@ Inst::Inst(InstCode instCode_, Completer comp1, Completer comp2,
 
 //----------------------------------------------------------------------------------------//
 
-Inst::Inst(InstCode instCode_, Completer comp1, Completer comp2, Completer comp3,
-           Opnd *op1, Opnd *op2, Opnd *op3, Opnd *op4, Opnd *op5, Opnd *op6) { 
+Inst::Inst(MemoryManager &mm, InstCode instCode, Completer comp1, Completer comp2, Completer comp3,
+           Opnd *op1, Opnd *op2, Opnd *op3, Opnd *op4, Opnd *op5, Opnd *op6) : 
+    instCode(instCode),
+    compList(mm), 
+    opndList(mm),
+    addr(0) { 
 
-    instCode = instCode_;
     compList.push_back(comp1);
     compList.push_back(comp2);
     compList.push_back(comp3);

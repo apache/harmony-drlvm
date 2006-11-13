@@ -14,10 +14,9 @@
  *  See the License for the specific language governing permissions and
  *  limitations under the License.
  */
-
+                                                                                                            
 /**
  * @author Intel, Konstantin M. Anisimov, Igor V. Chebykin
- * @version $Revision$
  *
  */
 
@@ -241,6 +240,8 @@ OpndManager::OpndManager(MemoryManager &mm, CompilationInterface &compilationInt
     p0  = NULL;
     b0  = NULL;
     r12 = NULL;
+    r8  = NULL;
+    f8  = NULL;
     tau = NULL;
 
     containCall = false;
@@ -261,7 +262,7 @@ Opnd *OpndManager::newOpnd(OpndKind opndKind) {
 //----------------------------------------------------------------------------------------//
 
 RegOpnd *OpndManager::newRegOpnd(OpndKind opndKind, DataKind dataKind, int32 location) {
-    return new(mm) RegOpnd(maxOpndId++, opndKind, dataKind, location);
+    return new(mm) RegOpnd(mm, maxOpndId++, opndKind, dataKind, location);
 }
 
 //----------------------------------------------------------------------------------------//
@@ -296,6 +297,8 @@ RegOpnd *OpndManager::getF1()  { if(f1 ==NULL) f1 =newRegOpnd(OPND_F_REG, DATA_F
 RegOpnd *OpndManager::getP0()  { if(p0 ==NULL) p0 =newRegOpnd(OPND_P_REG, DATA_P,    0); return p0;  } 
 RegOpnd *OpndManager::getB0()  { if(b0 ==NULL) b0 =newRegOpnd(OPND_B_REG, DATA_I64,  0); return b0;  } 
 RegOpnd *OpndManager::getR12() { if(r12==NULL) r12=newRegOpnd(OPND_G_REG, DATA_I64, 12); return r12; } 
+RegOpnd *OpndManager::getR8()  { if(r8 ==NULL) r8 =newRegOpnd(OPND_G_REG, DATA_I64,  8); return r8;  } 
+RegOpnd *OpndManager::getF8()  { if(f8 ==NULL) f8 =newRegOpnd(OPND_F_REG, DATA_F,    8); return f8;  } 
 RegOpnd *OpndManager::getTau() { if(tau==NULL) tau=newRegOpnd(OPND_INVALID, DATA_INVALID); return tau; } 
 RegOpnd *OpndManager::getR0(RegOpnd *ref) { return newRegOpnd(OPND_G_REG, ref->getDataKind(), 0); } 
 
@@ -318,7 +321,8 @@ RegOpnd *OpndManager::getVtableBase() {
 Opnd *OpndManager::getVtableOffset() { 
 
     if (vtableOffset == NULL) {
-        vtableOffset = newImm(compilationInterface.getVTableOffset());
+        int64 offset = compilationInterface.getVTableOffset();
+        if (offset != 0) vtableOffset = newImm(offset);
     }
     return vtableOffset;
 }
@@ -335,7 +339,7 @@ void OpndManager::initCompBases(BbNode *enterNode) {
     if (heapBase != NULL) {
         baseValue  = (uint64) compilationInterface.getHeapBase();
         baseImm    = newImm(baseValue);
-        Inst *inst = new(mm) Inst(INST_MOVL, p0, heapBase, baseImm);
+        Inst *inst = new(mm) Inst(mm, INST_MOVL, p0, heapBase, baseImm);
         insts.insert(insts.begin(), inst);
         IPF_LOG << "    HeapBase initialization code inserted" << endl;
     }
@@ -343,24 +347,10 @@ void OpndManager::initCompBases(BbNode *enterNode) {
     if (vtableBase != NULL) {
         baseValue  = (uint64) compilationInterface.getVTableBase();
         baseImm    = newImm(baseValue);
-        Inst *inst = new(mm) Inst(INST_MOVL, p0, vtableBase, baseImm);
+        Inst *inst = new(mm) Inst(mm, INST_MOVL, p0, vtableBase, baseImm);
         insts.insert(insts.begin(), inst);
         IPF_LOG << "    VtableBase initialization code inserted" << endl;
     }
-}
-
-//----------------------------------------------------------------------------------------//
-// assign location for opnd
-
-void OpndManager::assignLocation(RegOpnd *opnd) {
-    
-    OpndKind  opndKind    = opnd->getOpndKind();
-    DataKind  dataKind    = opnd->getDataKind();
-    RegBitSet &usedMask   = opnd->getBusyRegMask();
-    bool      isPreserved = opnd->getCrossCallSite();
-    
-    int32 location = newLocation(opndKind, dataKind, usedMask, isPreserved);
-    opnd->setLocation(location);
 }
 
 //----------------------------------------------------------------------------------------//
@@ -379,7 +369,7 @@ int32 OpndManager::newLocation(OpndKind  opndKind,
         if (location != LOCATION_INVALID) return location;  // if we succeed - return it
     }
                                                             // it is preserved location or we failed to find scratch one
-    location = newPreservReg(opndKind, unusedMask);       // try to find preserved register
+    location = newPreservReg(opndKind, unusedMask);         // try to find preserved register
     if (location != LOCATION_INVALID) return location;      // if we succeed - return it
                                                             // we failed to find available register
     return newLocSlot(dataKind);                            // allocate new slot on memory stack
@@ -465,7 +455,7 @@ void OpndManager::printStackInfo()  {
     IPF_LOG << "  Stack info" << endl;
     IPF_LOG << "    Register: loc=" << locRegSize << " out=" << outRegSize << endl;
     IPF_LOG << "    Memory  : loc=" << locMemSize << " out=" << outMemSize << endl;
-    IPF_LOG << "    Method contains call = " << boolalpha << containCall << endl;
+    IPF_LOG << "    Method contains call: " << boolalpha << containCall << endl;
 }
 
 //----------------------------------------------------------------------------------------//

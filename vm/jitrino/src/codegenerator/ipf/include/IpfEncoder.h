@@ -14,10 +14,9 @@
  *  See the License for the specific language governing permissions and
  *  limitations under the License.
  */
-
+                                                                                                            
 /**
  * @author Intel, Konstantin M. Anisimov, Igor V. Chebykin
- * @version $Revision$
  *
  */
 
@@ -570,8 +569,7 @@ struct CmpltDescription {
 //class Cfg;
 //typedef vector<Opnd*>           OpndVector;
 //typedef vector<Inst*>           InstVector;
-//typedef vector<Completer>       CompVector;
-typedef vector<Completer>       CompVector;
+typedef StlVector<Completer>      CompVector;
 
 class Encoder {
   public:

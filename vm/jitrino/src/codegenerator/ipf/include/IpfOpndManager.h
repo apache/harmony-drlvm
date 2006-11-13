@@ -14,10 +14,9 @@
  *  See the License for the specific language governing permissions and
  *  limitations under the License.
  */
-
+                                                                                                            
 /**
  * @author Intel, Konstantin M. Anisimov, Igor V. Chebykin
- * @version $Revision$
  *
  */
 
@@ -181,6 +180,8 @@ public:
     RegOpnd      *getP0();
     RegOpnd      *getB0();
     RegOpnd      *getR12();
+    RegOpnd      *getR8();
+    RegOpnd      *getF8();
     RegOpnd      *getTau();
 
     void         setContainCall(bool containCall_)    { containCall = containCall_; }
@@ -192,7 +193,6 @@ public:
     // Reg allocation support
     //----------------------------------------------------------------------------//
 
-    void         assignLocation(RegOpnd*);
     int32        newLocation(OpndKind, DataKind, RegBitSet, bool);
     int32        newScratchReg(OpndKind, RegBitSet&);
     int32        newPreservReg(OpndKind, RegBitSet&);
@@ -230,6 +230,8 @@ protected:
     RegOpnd      *p0;                  // true
     RegOpnd      *b0;                  // return address
     RegOpnd      *r12;                 // stack pointer
+    RegOpnd      *r8;                  // return value (general)
+    RegOpnd      *f8;                  // return value (floating point)
     RegOpnd      *tau;                 // opnd ignored
     
     RegOpnd      *heapBase;            // opnd containing base for references decompression

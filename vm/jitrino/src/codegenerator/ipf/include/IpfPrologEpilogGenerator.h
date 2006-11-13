@@ -14,10 +14,9 @@
  *  See the License for the specific language governing permissions and
  *  limitations under the License.
  */
-
+                                                                                                            
 /**
  * @author Intel, Konstantin M. Anisimov, Igor V. Chebykin
- * @version $Revision$
  *
  */
 
@@ -70,7 +69,7 @@ private:
     Cfg           &cfg;
     OpndManager   *opndManager;
     
-    RegOpndVector outRegArgs;       // list of out arg registers
+    RegOpndSet    outRegArgs;       // list of out arg registers
     bool          containCall;      // method contains call
     Opnd          *p0;              // p0 (true predicate)
     Opnd          *sp;              // gr12 (stack pointer)

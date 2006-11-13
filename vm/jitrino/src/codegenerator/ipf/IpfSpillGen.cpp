@@ -14,10 +14,9 @@
  *  See the License for the specific language governing permissions and
  *  limitations under the License.
  */
-
+                                                                                                            
 /**
  * @author Intel, Konstantin M. Anisimov, Igor V. Chebykin
- * @version $Revision$
  *
  */
 
@@ -32,9 +31,11 @@ namespace IPF {
 // SpillGen
 //========================================================================================//
 
-SpillGen::SpillGen(Cfg &cfg_) : 
-    mm(cfg_.getMM()), 
-    cfg(cfg_) {
+SpillGen::SpillGen(Cfg &cfg) : 
+    mm(cfg.getMM()), 
+    cfg(cfg),
+    fillCode(mm),
+    spillCode(mm) {
 
     opndManager = cfg.getOpndManager();
     p0          = opndManager->getP0();
@@ -124,7 +125,7 @@ RegOpnd *SpillGen::spillOpnd(RegOpnd *stackOpnd, bool spillFlag) {
 
     // Create instruction calculating stack address to store to
     Opnd *offset = opndManager->newImm(stackOpnd->getValue());
-    Inst *adds   = new(mm) Inst(INST_ADDS, p0, stackAddr, offset, sp);
+    Inst *adds   = new(mm) Inst(mm, INST_ADDS, p0, stackAddr, offset, sp);
     spillFlag ? spillCode.push_back(adds) : fillCode.push_back(adds);
 
     // Create instruction storing value from scratchOpnd on stack
@@ -190,7 +191,7 @@ void SpillGen::spillGr(RegOpnd *scratchOpnd) {
         default        : IPF_ERR << "invalid size " << IrPrinter::toString(scratchOpnd) << endl;
     }
 
-    Inst *st = new(mm) Inst(INST_ST, completer, p0, stackAddr, scratchOpnd);
+    Inst *st = new(mm) Inst(mm, INST_ST, completer, p0, stackAddr, scratchOpnd);
     spillCode.push_back(st);
 }
 
@@ -211,7 +212,7 @@ void SpillGen::spillFr(RegOpnd *scratchOpnd) {
         default: IPF_ERR << "invalid DataKind " << IrPrinter::toString(scratchOpnd) << endl;
     }
 
-    Inst *st = new(mm) Inst(INST_STF, completer, p0, stackAddr, scratchOpnd);
+    Inst *st = new(mm) Inst(mm, INST_STF, completer, p0, stackAddr, scratchOpnd);
     spillCode.push_back(st);
 }
 
@@ -227,8 +228,8 @@ void SpillGen::spillBr(RegOpnd *scratchOpnd) {
     
     int32 bufReg   = getAvailableSpillReg(OPND_G_REG);
     Opnd  *bufOpnd = opndManager->newRegOpnd(OPND_G_REG, DATA_B, bufReg);
-    Inst  *mov     = new(mm) Inst(INST_MOV, p0, bufOpnd, scratchOpnd);
-    Inst  *st      = new(mm) Inst(INST_ST, CMPLT_SZ_8, p0, stackAddr, bufOpnd);
+    Inst  *mov     = new(mm) Inst(mm, INST_MOV, p0, bufOpnd, scratchOpnd);
+    Inst  *st      = new(mm) Inst(mm, INST_ST, CMPLT_SZ_8, p0, stackAddr, bufOpnd);
 
     spillCode.push_back(mov);
     spillCode.push_back(st);
@@ -248,9 +249,9 @@ void SpillGen::spillPr(RegOpnd *scratchOpnd) {
     int32 bufReg  = getAvailableSpillReg(OPND_G_REG);
     Opnd *bufOpnd = opndManager->newRegOpnd(OPND_G_REG, DATA_P, bufReg);
     Opnd *imm1    = opndManager->newImm(1);
-    Inst *mov1    = new(mm) Inst(INST_MOV, p0, bufOpnd, opndManager->getR0());
-    Inst *mov2    = new(mm) Inst(INST_MOV, scratchOpnd, bufOpnd, imm1);
-    Inst *st      = new(mm) Inst(INST_ST, CMPLT_SZ_1, p0, stackAddr, bufOpnd);
+    Inst *mov1    = new(mm) Inst(mm, INST_MOV, p0, bufOpnd, opndManager->getR0());
+    Inst *mov2    = new(mm) Inst(mm, INST_MOV, scratchOpnd, bufOpnd, imm1);
+    Inst *st      = new(mm) Inst(mm, INST_ST, CMPLT_SZ_1, p0, stackAddr, bufOpnd);
 
     spillCode.push_back(mov1);
     spillCode.push_back(mov2);
@@ -275,12 +276,12 @@ void SpillGen::fillGr(RegOpnd *scratchOpnd) {
         default        : IPF_ERR << "invalid size " << IrPrinter::toString(scratchOpnd) << endl;
     }
 
-    Inst *ld = new(mm) Inst(INST_LD, completer, p0, scratchOpnd, stackAddr);
+    Inst *ld = new(mm) Inst(mm, INST_LD, completer, p0, scratchOpnd, stackAddr);
     fillCode.push_back(ld);
 
     // Create sxt instruction for int32 data type
     if(scratchOpnd->getDataKind() == DATA_I32) {
-        Inst *sxt = new(mm) Inst(INST_SXT, CMPLT_XSZ_4, p0, scratchOpnd, scratchOpnd);
+        Inst *sxt = new(mm) Inst(mm, INST_SXT, CMPLT_XSZ_4, p0, scratchOpnd, scratchOpnd);
         fillCode.push_back(sxt);
     }
 }
@@ -302,7 +303,7 @@ void SpillGen::fillFr(RegOpnd *scratchOpnd) {
         default: IPF_ERR << "invalid DataKind " << IrPrinter::toString(scratchOpnd) << endl;
     }
 
-    Inst *ld = new(mm) Inst(INST_LDF, completer, p0, scratchOpnd, stackAddr);
+    Inst *ld = new(mm) Inst(mm, INST_LDF, completer, p0, scratchOpnd, stackAddr);
     fillCode.push_back(ld);
 }
 
@@ -318,8 +319,8 @@ void SpillGen::fillBr(RegOpnd *scratchOpnd) {
     
     int32 bufReg  = getAvailableSpillReg(OPND_G_REG);
     Opnd *bufOpnd = opndManager->newRegOpnd(OPND_G_REG, DATA_I64, bufReg);
-    Inst *ld      = new(mm) Inst(INST_LD, CMPLT_SZ_8, p0, bufOpnd, stackAddr);
-    Inst *mov     = new(mm) Inst(INST_MOV, p0, scratchOpnd, bufOpnd);
+    Inst *ld      = new(mm) Inst(mm, INST_LD, CMPLT_SZ_8, p0, bufOpnd, stackAddr);
+    Inst *mov     = new(mm) Inst(mm, INST_MOV, p0, scratchOpnd, bufOpnd);
 
     fillCode.push_back(ld);
     fillCode.push_back(mov);
@@ -337,8 +338,8 @@ void SpillGen::fillPr(RegOpnd *scratchOpnd) {
     
     int32 bufReg   = getAvailableSpillReg(OPND_G_REG);
     Opnd  *bufOpnd = opndManager->newRegOpnd(OPND_G_REG, DATA_P, bufReg);
-    Inst  *ld      = new(mm) Inst(INST_LD, CMPLT_SZ_1, p0, bufOpnd, stackAddr);
-    Inst  *cmp     = new(mm) Inst(INST_CMP, CMPLT_CMP_CREL_NE, p0, scratchOpnd, p0, bufOpnd);
+    Inst  *ld      = new(mm) Inst(mm, INST_LD, CMPLT_SZ_1, p0, bufOpnd, stackAddr);
+    Inst  *cmp     = new(mm) Inst(mm, INST_CMP, CMPLT_CMP_CREL_NE, p0, scratchOpnd, p0, bufOpnd);
     cmp->addOpnd(opndManager->getR0());
 
     fillCode.push_back(ld);

@@ -14,10 +14,9 @@
  *  See the License for the specific language governing permissions and
  *  limitations under the License.
  */
-
+                                                                                                            
 /**
  * @author Intel, Konstantin M. Anisimov, Igor V. Chebykin
- * @version $Revision$
  *
  */
 
@@ -35,23 +34,26 @@ namespace IPF {
 
 class RegisterAllocator {
 public:
-                  RegisterAllocator(Cfg&);
-    void          allocate();
+                       RegisterAllocator(Cfg&);
+    void               allocate();
 
 protected:
-    void          buildInterferenceMatrix();
-    void          makeInterferenceMatrixSymmetric();
-    void          removePreassignedOpnds();
-    void          assignLocations();
+    void               buildInterferenceMatrix();
+    void               removeSelfDep();
+    void               assignLocations();
     
-    void          updateAllocSet(Opnd*, uint32);
-    void          checkCallSite(Inst*);
+    void               assignLocation(RegOpnd*);
+    void               updateAllocSet(Opnd*, uint32);
+    void               checkCallSite(Inst*);
+    
+    void               checkCoalescing(uint32, Inst*);
+    void               removeSameRegMoves();
 
-    MemoryManager &mm;
-    Cfg           &cfg;
-    OpndManager   *opndManager;
-    RegOpndSet    allocSet;       // set of all opnds that need allocation
-    RegOpndSet    liveSet;        // set of opnds alive in current node (buildInterferenceMatrix)
+    MemoryManager      &mm;
+    Cfg                &cfg;
+    OpndManager        *opndManager;
+    RegOpndSet         allocSet;       // set of all opnds that need allocation
+    RegOpndSet         liveSet;        // set of opnds alive in current node (buildInterferenceMatrix)
 };
 
 } // IPF
