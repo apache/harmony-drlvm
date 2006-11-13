@@ -49,7 +49,8 @@
 				Description="       ... Copying files to bin/default folder ...."
 				CommandLine="copy $(OutDir)\harmonyvm.dll $(ProjectDir)\..\..\..\win_ia32_msvc_$(ConfigurationName)\deploy\jre\bin\default
 copy $(OutDir)\harmonyvm.pdb $(ProjectDir)\..\..\..\win_ia32_msvc_$(ConfigurationName)\deploy\jre\bin\default
-copy $(OutDir)\harmonyvm.lib $(ProjectDir)\..\..\..\win_ia32_msvc_$(ConfigurationName)\deploy\jre\bin\default"/>
+copy $(OutDir)\harmonyvm.lib $(ProjectDir)\..\..\..\win_ia32_msvc_$(ConfigurationName)\deploy\jre\bin\default
+"/>
 			<Tool
 				Name="VCPreBuildEventTool"/>
 			<Tool
@@ -104,7 +105,8 @@ copy $(OutDir)\harmonyvm.lib $(ProjectDir)\..\..\..\win_ia32_msvc_$(Configuratio
 				Description="       ... Copying files to bin/default folder ...."
 				CommandLine="copy $(OutDir)\harmonyvm.dll $(ProjectDir)\..\..\..\win_ia32_msvc_$(ConfigurationName)\deploy\jre\bin\default
 copy $(OutDir)\harmonyvm.pdb $(ProjectDir)\..\..\..\win_ia32_msvc_$(ConfigurationName)\deploy\jre\bin\default
-copy $(OutDir)\harmonyvm.lib $(ProjectDir)\..\..\..\win_ia32_msvc_$(ConfigurationName)\deploy\jre\bin\default"/>
+copy $(OutDir)\harmonyvm.lib $(ProjectDir)\..\..\..\win_ia32_msvc_$(ConfigurationName)\deploy\jre\bin\default
+"/>
 			<Tool
 				Name="VCPreBuildEventTool"/>
 			<Tool
@@ -588,6 +590,9 @@ copy $(OutDir)\harmonyvm.lib $(ProjectDir)\..\..\..\win_ia32_msvc_$(Configuratio
 				RelativePath="..\..\..\..\vm\vmcore\src\jvmti\jvmti_dasm.cpp">
 			</File>
 			<File
+				RelativePath="..\..\..\..\vm\vmcore\src\jvmti\jvmti_enumerate.cpp">
+			</File>
+			<File
 				RelativePath="..\..\..\..\vm\vmcore\src\jvmti\jvmti_event.cpp">
 			</File>
 			<File
@@ -601,6 +606,9 @@ copy $(OutDir)\harmonyvm.lib $(ProjectDir)\..\..\..\win_ia32_msvc_$(Configuratio
 			</File>
 			<File
 				RelativePath="..\..\..\..\vm\vmcore\src\jvmti\jvmti_heap.cpp">
+			</File>
+			<File
+				RelativePath="..\..\..\..\vm\vmcore\src\jvmti\jvmti_heap.h">
 			</File>
 			<File
 				RelativePath="..\..\..\..\vm\vmcore\src\jvmti\jvmti_internal.cpp">
@@ -630,10 +638,22 @@ copy $(OutDir)\harmonyvm.lib $(ProjectDir)\..\..\..\win_ia32_msvc_$(Configuratio
 				RelativePath="..\..\..\..\vm\vmcore\src\jvmti\jvmti_rawmon.cpp">
 			</File>
 			<File
+				RelativePath="..\..\..\..\vm\vmcore\src\jvmti\jvmti_roots.cpp">
+			</File>
+			<File
+				RelativePath="..\..\..\..\vm\vmcore\src\jvmti\jvmti_roots.h">
+			</File>
+			<File
 				RelativePath="..\..\..\..\vm\vmcore\src\jvmti\jvmti_stack.cpp">
 			</File>
 			<File
 				RelativePath="..\..\..\..\vm\vmcore\src\jvmti\jvmti_step.cpp">
+			</File>
+			<File
+				RelativePath="..\..\..\..\vm\vmcore\src\jvmti\jvmti_tags.cpp">
+			</File>
+			<File
+				RelativePath="..\..\..\..\vm\vmcore\src\jvmti\jvmti_tags.h">
 			</File>
 			<File
 				RelativePath="..\..\..\..\vm\vmcore\src\jvmti\jvmti_thread.cpp">
@@ -645,7 +665,16 @@ copy $(OutDir)\harmonyvm.lib $(ProjectDir)\..\..\..\win_ia32_msvc_$(Configuratio
 				RelativePath="..\..\..\..\vm\vmcore\src\jvmti\jvmti_timer.cpp">
 			</File>
 			<File
+				RelativePath="..\..\..\..\vm\vmcore\src\jvmti\jvmti_trace.cpp">
+			</File>
+			<File
+				RelativePath="..\..\..\..\vm\vmcore\src\jvmti\jvmti_trace.h">
+			</File>
+			<File
 				RelativePath="..\..\..\..\vm\vmcore\src\jvmti\jvmti_watch.cpp">
+			</File>
+			<File
+				RelativePath="..\..\..\..\vm\vmcore\src\jvmti\ulist.h">
 			</File>
 		</Filter>
 		<Filter
