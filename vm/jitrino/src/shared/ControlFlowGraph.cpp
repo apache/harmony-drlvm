@@ -500,6 +500,16 @@ bool ControlFlowGraph::isBlockMergeAllowed(Node* source, Node* target, bool allo
     Node* sourceDispatch = source->getExceptionEdgeTarget();
     Node* targetDispatch = target->getExceptionEdgeTarget();
 
+    //check if there is no problem with header critical insts
+    if (source->getLastInst()!=NULL && !source->getLastInst()->isHeaderCriticalInst()) {
+        //we can't allow target to have critical insts except label
+        CFGInst* inst = target->getFirstInst();
+        inst = inst!=NULL?(inst->isLabel() ? inst->next() : inst) : NULL;
+        if (inst!=NULL && inst->isHeaderCriticalInst()) {
+            return false;
+        }
+    }
+
     if (source->getOutDegree() == 2 && sourceDispatch == 0) {
         return false; // 2 uncond edges, e.g. indirect jumps
     }
