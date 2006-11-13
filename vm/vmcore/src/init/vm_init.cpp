@@ -21,6 +21,8 @@
 
 #include <apr_env.h>
 #include <apr_general.h>
+#include <apr_dso.h>
+#include "port_dso.h"
 
 #include "open/gc.h"
 #include "open/thread_externals.h"
@@ -253,6 +255,45 @@ static jint check_compression() {
         }
     }
     return JNI_OK;
+}
+
+typedef void* (JNICALL *GDBA) (JNIEnv* env, jobject buf);
+typedef jobject (JNICALL *NDB)(JNIEnv* env, void* address, jlong capacity);
+typedef jlong (JNICALL *GDBC)(JNIEnv* env, jobject buf);
+
+/**
+ * Imports NIO functions to JNI functions table from hynio lib.
+ * Note: bootstrap classloader is picky to load classlib's natives earliest,
+ * so this should be called after bcl initialization.
+ */
+static jint populate_jni_nio() {
+    bool just_loaded;
+    NativeLoadStatus loading_status;
+    NativeLibraryHandle handle = natives_load_library(
+        PORT_DSO_NAME("hynio"), &just_loaded, &loading_status);
+    if (!handle || loading_status) {
+        char error_message[1024];
+        natives_describe_error(loading_status, error_message, sizeof(error_message));
+
+        WARN("Failed to initialize JNI NIO support: " << error_message);
+        return JNI_ERR;
+    }
+    
+    apr_dso_handle_sym_t gdba, gdbc, ndb;
+    if( APR_SUCCESS == apr_dso_sym(&gdba, handle, "GetDirectBufferAddress")
+        && APR_SUCCESS == apr_dso_sym(&gdbc, handle, "GetDirectBufferCapacity")
+        && APR_SUCCESS == apr_dso_sym(&ndb, handle, "NewDirectByteBuffer") ) 
+    {
+        jni_vtable.GetDirectBufferAddress = (GDBA)gdba;
+        jni_vtable.GetDirectBufferCapacity = (GDBC)gdbc;
+        jni_vtable.NewDirectByteBuffer = (NDB)ndb;
+        return JNI_OK;
+    } 
+    else 
+    {
+        WARN("Failed to import JNI NIO functions.");
+        return JNI_ERR;
+    }
 }
 
 /**
@@ -663,6 +704,8 @@ int vm_init1(JavaVM_Internal * java_vm, JavaVMInitArgs * vm_arguments) {
     status = preload_classes(vm_env);
     if (status != JNI_OK) return status;
     
+    populate_jni_nio();
+
     // Now the thread is attached to VM and it is valid to disable it.
     hythread_suspend_disable();
     

@@ -59,6 +59,10 @@
 static void JNICALL UnimpStub(JNIEnv*);
 jint JNICALL GetVersion(JNIEnv *);
 
+jobject JNICALL NewDirectByteBuffer(JNIEnv* , void* , jlong );
+void* JNICALL GetDirectBufferAddress(JNIEnv* , jobject );
+jlong JNICALL GetDirectBufferCapacity(JNIEnv* , jobject );
+
 struct JNINativeInterface_ jni_vtable = {
             
     (void*)UnimpStub,
@@ -1408,62 +1412,22 @@ VMEXPORT jobject JNICALL ToReflectedField(JNIEnv *env, jclass UNREF cls, jfieldI
     return reflection_reflect_field(env, fieldID);
 }
 
-VMEXPORT jobject JNICALL NewDirectByteBuffer(JNIEnv* env, void* address, jlong capacity)
+jobject JNICALL NewDirectByteBuffer(JNIEnv* env, void* address, jlong capacity)
 {
-    TRACE2("jni", "NewDirectByteBuffer called");
-    jclass bbcl = FindClass(env, VM_Global_State::loader_env->JavaNioByteBuffer_String);
-    if (NULL == bbcl)
-    {
-        exn_clear();
-        return NULL;
-    }
-    jmethodID id = GetStaticMethodID(env, bbcl, "newDirectByteBuffer", "(JI)Ljava/nio/ByteBuffer;");
-    if (NULL == id)
-    {
-        exn_clear();
-        return NULL;
-    }
-    // There is an inconsistency between JNI and API specifications. JNI spec declares byte buffer 
-    // capacity as jlong. In the same time byte buffer capacity has int type in API spec.  
-    jobject bb = CallStaticObjectMethod(env, bbcl, id, (jlong)POINTER_SIZE_INT(address), (jint)capacity);
-
-    return bb;
+    //no-impl stub replaced by classlib's func at VM startup
+    return NULL;
 }
 
-VMEXPORT void* JNICALL GetDirectBufferAddress(JNIEnv* env, jobject buf)
+void* JNICALL GetDirectBufferAddress(JNIEnv* env, jobject buf)
 {
-    TRACE2("jni", "GetDirectBufferAddress called");
-    jclass bbcl = FindClass(env, VM_Global_State::loader_env->JavaNioByteBuffer_String);
-    if (NULL == bbcl)
-    {
-        exn_clear();
-        return NULL;
-    }
-    jmethodID id = GetStaticMethodID(env, bbcl, "getDirectBufferAddress", "(Ljava/nio/ByteBuffer;)J");
-    if (NULL == id)
-    {
-        exn_clear();
-        return NULL;
-    }
-    return (void*)POINTER_SIZE_INT(CallStaticLongMethod(env, bbcl, id, buf));
+    //no-impl stub replaced by classlib's func at VM startup
+    return NULL; 
 }
 
-VMEXPORT jlong JNICALL GetDirectBufferCapacity(JNIEnv* env, jobject buf)
+jlong JNICALL GetDirectBufferCapacity(JNIEnv* env, jobject buf)
 {
-    TRACE2("jni", "GetDirectBufferCapacity called");
-    jclass bbcl = FindClass(env, VM_Global_State::loader_env->JavaNioByteBuffer_String);
-    if (NULL == bbcl)
-    {
-        exn_clear();
-        return -1;
-    }
-    jmethodID id = GetStaticMethodID(env, bbcl, "getDirectBufferCapacity", "(Ljava/nio/ByteBuffer;)I");
-    if (NULL == id)
-    {
-        exn_clear();
-        return -1;
-    }
-    return (jlong)CallStaticIntMethod(env, bbcl, id, buf);
+    //no-impl stub replaced by classlib's func at VM startup
+    return -1;
 }
 
 /*    BEGIN: Invocation API functions.    */

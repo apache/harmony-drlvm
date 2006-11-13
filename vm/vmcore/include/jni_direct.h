@@ -592,9 +592,10 @@ VMEXPORT jfieldID JNICALL FromReflectedField(JNIEnv *env, jobject field);
 VMEXPORT jobject JNICALL ToReflectedMethod(JNIEnv *env, jclass cls, jmethodID methodID, jboolean isStatic);
 VMEXPORT jobject JNICALL ToReflectedField(JNIEnv *env, jclass cls, jfieldID fieldID, jboolean isStatic);
 
-VMEXPORT jobject JNICALL NewDirectByteBuffer(JNIEnv* env, void* address, jlong capacity);
-VMEXPORT void* JNICALL GetDirectBufferAddress(JNIEnv* env, jobject buf);
-VMEXPORT jlong JNICALL GetDirectBufferCapacity(JNIEnv* env, jobject buf);
+// JNI NIO functions are imported from classlib thus no direct access to them
+//VMEXPORT jobject JNICALL NewDirectByteBuffer(JNIEnv* env, void* address, jlong capacity);
+//VMEXPORT void* JNICALL GetDirectBufferAddress(JNIEnv* env, jobject buf);
+//VMEXPORT jlong JNICALL GetDirectBufferCapacity(JNIEnv* env, jobject buf);
 
 
 VMEXPORT jint JNICALL DestroyJavaVM(JavaVM*);

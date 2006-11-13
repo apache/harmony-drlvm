@@ -31,6 +31,16 @@
 extern "C" {
 #endif
 
+/**
+ * Decorate shared library name (.dll <-> lib*.so).
+ * The "name" parameter should be double-quoted string.
+ * @non_apr
+ */
+#ifdef PLATFORM_POSIX
+#   define PORT_DSO_NAME(name) "lib" name ".so"
+#elif PLATFORM_NT
+#   define PORT_DSO_NAME(name) name ".dll"
+#endif
 
 #define PORT_DSO_DEFAULT 0
 #define PORT_DSO_BIND_NOW 0x1
