@@ -60,7 +60,7 @@ public class ThreadTest extends TestCase {
     }
 
     private class Team {
-        private int i = 0; 
+        public int i = 0; 
         volatile boolean stopProject = false;
         
         public synchronized void work() {
@@ -1030,7 +1030,7 @@ public class ThreadTest extends TestCase {
         RunProject pr1 = new RunProject(team);
         pr1.start();
         waitTime = waitDuration;
-        while (!pr1.isAlive() && !(expired = doSleep(10))) {
+        while (team.i == 0 && !(expired = doSleep(10))) {
         }
         if (expired) {
             fail("pr1 has not been started");
