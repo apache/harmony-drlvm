@@ -48,7 +48,6 @@ Version: $Revision: 1.4.2.4 $
                                                   vm.gc_cc,
                                                   vm.interpreter,
                                                   vm.hythr,
-                                                  vm.jitrino,
                                                   vm.kernel_classes" />
         </select>
         

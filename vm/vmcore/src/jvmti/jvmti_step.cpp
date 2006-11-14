@@ -34,6 +34,8 @@
 #include "jvmti_break_intf.h"
 #include "jni_utils.h"
 
+#define NOT_IMPLEMENTED assert(0); abort()
+
 static inline short
 jvmti_GetHalfWordValue( const unsigned char *bytecode,
                         unsigned location)
@@ -54,6 +56,7 @@ jvmti_GetWordValue( const unsigned char *bytecode,
 NativeCodePtr static get_ip_for_invoke_call_ip(VM_thread* thread,
     unsigned location, unsigned next_location)
 {
+#if (defined _IA32_) || (defined _EM64T_)
     ASSERT_NO_INTERPRETER;
 
     // create stack iterator from native
@@ -123,6 +126,10 @@ NativeCodePtr static get_ip_for_invoke_call_ip(VM_thread* thread,
     // table address and offset inside of it to determine exactly
     // which method is going to invoked in runtime.
     return call_ip;
+#else
+    NOT_IMPLEMENTED;
+    return 0;
+#endif
 } // jvmti_get_invoked_virtual_method
 
 void
@@ -473,6 +480,7 @@ jvmti_set_single_step_breakpoints_for_method(DebugUtilsTI *ti,
 static void jvmti_start_single_step_in_virtual_method(DebugUtilsTI *ti, VMBreakPoint* bp,
                                                       void *data)
 {
+#if (defined _IA32_) || (defined _EM64T_)
     VM_thread *vm_thread = p_TLS_vmthread;
     Registers *regs = &vm_thread->jvmti_saved_exception_registers;
     // This is a virtual breakpoint set exactly on the call
@@ -537,6 +545,9 @@ static void jvmti_start_single_step_in_virtual_method(DebugUtilsTI *ti, VMBreakP
     // invokevirtual or invokeinterface bytecodes. It should be
     // started to be single stepped from the beginning
     jvmti_set_single_step_breakpoints_for_method(ti, vm_thread, method);
+#else
+    NOT_IMPLEMENTED;
+#endif
 }
 
 // Callback function for JVMTI single step processing
@@ -732,6 +743,7 @@ jvmtiError jvmti_get_next_bytecodes_from_native(VM_thread *thread,
     unsigned *count,
     bool invoked_frame)
 {
+#if (defined _IA32_) || (defined _EM64T_)
     ASSERT_NO_INTERPRETER;
     VMBreakPoints *vm_brpt = VM_Global_State::loader_env->TI->vm_brpt;
 
@@ -882,6 +894,9 @@ jvmtiError jvmti_get_next_bytecodes_from_native(VM_thread *thread,
         }
     }
     si_free(si);
+#else
+    NOT_IMPLEMENTED;
+#endif
     return JVMTI_ERROR_NONE;
 } // jvmti_get_next_bytecodes_from_native
 

@@ -27,6 +27,7 @@
 #include "interp_native.h"
 #include "interp_defs.h"
 #include "ini.h"
+#include "open/jthread.h"
 
 
 
@@ -75,7 +76,7 @@ interpreter_execute_native_method(
     assert(!hythread_is_suspend_enabled());
 
     DEBUG_TRACE("\n<<< interpreter_invoke_native: "
-           << method->get_class()->name->bytes << " "
+           << method->get_class()->get_name()->bytes << " "
            << method->get_name()->bytes
            << method->get_descriptor()->bytes << endl);
 
@@ -101,7 +102,7 @@ interpreter_execute_native_method(
 
     jobject _this;
     if (method->is_static()) {
-        _this = (jobject) method->get_class()->class_handle;
+        _this = (jobject) method->get_class()->get_class_handle();
     } else {
         _this = args[pos++].l;
     }
@@ -263,12 +264,12 @@ void
 interpreterInvokeStaticNative(StackFrame& prevFrame, StackFrame& frame, Method *method) {
 
     DEBUG_TRACE("\n<<< native_invoke_static     : "
-           << method->get_class()->name->bytes << " "
+           << method->get_class()->get_name()->bytes << " "
            << method->get_name()->bytes
            << method->get_descriptor()->bytes << endl);
 
     DEBUG_TRACE_PLAIN("interpreter static native: "
-            << frame.method->get_class()->name->bytes
+            << frame.method->get_class()->get_name()->bytes
             << " " << frame.method->get_name()->bytes
             << frame.method->get_descriptor()->bytes << endl);
 
@@ -280,7 +281,7 @@ interpreterInvokeStaticNative(StackFrame& prevFrame, StackFrame& frame, Method *
 
     M2N_ALLOC_MACRO;
     
-    frame.This = *(method->get_class()->class_handle);
+    frame.This = *(method->get_class()->get_class_handle());
     int sz = method->get_num_arg_bytes() >> 2;
     uword *args = (uword*) ALLOC_FRAME((sz + 2) * sizeof(uword));
     uword fpargs[6 + 1/* for fptypes */];
@@ -416,7 +417,7 @@ interpreterInvokeStaticNative(StackFrame& prevFrame, StackFrame& frame, Method *
                         DEBUG2(
                         "VM WARNING: Reference with null value returned from jni function:\n"
                         "VM WARNING: Method name: "
-                        << method->get_class()->name->bytes
+                        << method->get_class()->get_name()->bytes
                         << "/" << method->get_name()->bytes
                         << method->get_descriptor()->bytes <<
                         "\nVM WARNING: Not allowed, return NULL (0) instead\n");
@@ -540,12 +541,12 @@ interpreterInvokeVirtualNative(StackFrame& prevFrame, StackFrame& frame, Method 
     assert(!method->is_static());
 
     DEBUG_TRACE_PLAIN("interpreter virtual native: "
-            << frame.method->get_class()->name->bytes
+            << frame.method->get_class()->get_name()->bytes
             << " " << frame.method->get_name()->bytes
             << frame.method->get_descriptor()->bytes << endl);
 
     DEBUG_TRACE("\n<<< native_invoke_virtual: "
-           << method->get_class()->name->bytes << " "
+           << method->get_class()->get_name()->bytes << " "
            << method->get_name()->bytes
            << method->get_descriptor()->bytes << endl);
 
@@ -690,7 +691,7 @@ interpreterInvokeVirtualNative(StackFrame& prevFrame, StackFrame& frame, Method 
                         DEBUG2(
                         "VM WARNING: Reference with null value returned from jni function:\n"
                         "VM WARNING: Method name: "
-                        << method->get_class()->name->bytes
+                        << method->get_class()->get_name()->bytes
                         << "/" << method->get_name()->bytes
                         << method->get_descriptor()->bytes <<
                         "\nVM WARNING: Not allowed, return NULL (0) instead\n");

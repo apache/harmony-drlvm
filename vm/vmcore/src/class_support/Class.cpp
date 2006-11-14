@@ -38,6 +38,10 @@
 #include "jit_intf_cpp.h"
 #include "type.h"
 
+#ifdef _IPF_
+#include "vm_ipf.h"
+#endif // _IPF_
+
 //
 // private static variable containing the id of the next class
 // access to this needs to be thread safe; also, this will have to

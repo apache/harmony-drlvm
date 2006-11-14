@@ -53,6 +53,7 @@ using namespace std;
 #include "nogc.h"
 
 #include "exceptions.h"
+#include "exceptions_jit.h"
 
 void gen_convert_managed_to_unmanaged_null_ipf(Emitter_Handle emitter,
                                                unsigned reg);

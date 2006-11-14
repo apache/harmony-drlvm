@@ -22,7 +22,7 @@
 #define LOG_DOMAIN "jni"
 #include "cxxlog.h"
 
-#include <apr_atomic.h>
+#include <port_atomic.h>
 #include <apr_pools.h>
 #include <apr_thread_mutex.h>
 
@@ -379,7 +379,7 @@ static jint jni_init()
          status = apr_initialize();
         if (status != APR_SUCCESS) return JNI_ERR;
 
-        if (apr_atomic_cas32((volatile apr_uint32_t *)&get_init_status(), JNI_TRUE, JNI_FALSE) == JNI_FALSE) {
+        if (port_atomic_cas8((volatile uint8 *)&get_init_status(), JNI_TRUE, JNI_FALSE) == JNI_FALSE) {
             APR_RING_INIT(&GLOBAL_VMS, JavaVM_Internal, link);
             status = apr_pool_create(&GLOBAL_POOL, 0);
             if (status != APR_SUCCESS) return JNI_ERR;

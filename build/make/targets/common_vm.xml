@@ -54,6 +54,7 @@ Version: $Revision: 1.6.2.6 $
             <select arch="ipf">
                 <defineset define="_IPF_" />
                 <defineset define="POINTER64" />
+                <defineset define="HYIA64" />
             </select>
 
             <select arch="em64t">

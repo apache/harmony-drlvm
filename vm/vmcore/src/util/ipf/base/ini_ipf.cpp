@@ -142,6 +142,9 @@ JIT_execute_method_default(JIT_Handle jh,
                            jvalue   *return_value,
                            jvalue   *args)
 {
+    assert(("Doesn't compile", 0));
+    abort();
+#if 0
     Method *meth = (Method*) methodID;
     assert(!hythread_is_suspend_enabled());
     void *entry_point = meth->get_code_addr();
@@ -312,5 +315,6 @@ JIT_execute_method_default(JIT_Handle jh,
 #endif
         DIE("Return type " << ret_type << " is not implemented\n");
     }
+#endif
 
 } //vm_execute_java_method_array

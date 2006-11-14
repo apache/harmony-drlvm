@@ -207,13 +207,15 @@ static inline void *reserve_mem(size_t size) {
      * to find some of bad pointers. */
     size_t four_gig = 4 * 1024 * (size_t) 1024 * 1024;
     size_t padding = 4 * 1024 * (size_t) 1024 * 1024;
-    void *addr = mmap(0, padding + four_gig, PROT_READ | PROT_WRITE,
+    four_gig = 0;
+    padding = 0;
+    void *addr = mmap(0, padding + max_heap_size + four_gig, PROT_READ | PROT_WRITE,
             MAP_NORESERVE | MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
     assert(addr != MAP_FAILED);
     UNUSED int err = mprotect((Ptr)addr, padding, PROT_NONE);
     assert(!err);
     err = mprotect((Ptr)addr + padding + max_heap_size,
-                    four_gig - max_heap_size, PROT_NONE);
+                    four_gig, PROT_NONE);
     assert(!err);
     return (Ptr)addr + padding;
 #else
@@ -234,6 +236,7 @@ void init_mem() {
     INFO("max heap size " << mb(max_heap_size) << " mb");
 
     heap_base = 0;
+
 
     heap_base = NULL;
     if (lp_hint) {

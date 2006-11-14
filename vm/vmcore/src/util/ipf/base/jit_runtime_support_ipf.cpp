@@ -52,6 +52,7 @@ using namespace std;
 #include "compile.h"
 #include "method_lookup.h"
 #include "exceptions.h"
+#include "exceptions_jit.h"
 #include "vm_strings.h"
 #include "vm_arrays.h"
 #include "vm_threads.h"
@@ -154,12 +155,15 @@ static ManagedObject* vm_rt_ldc_string(Class *clss, unsigned cp_index)
 extern "C" ManagedObject *vm_rt_new_resolved(Class *c)
 {
     assert(!hythread_is_suspend_enabled());
-    assert(strcmp(c->name->bytes, "java/lang/Class")); 
+    assert(strcmp(c->get_name()->bytes, "java/lang/Class")); 
 #ifdef VM_STATS
     VM_Statistics::get_vm_stats().num_class_alloc_new_object++;
     c->instance_allocated(c->get_instance_data_size());
 #endif //VM_STATS
-    return (ManagedObject *)vm_malloc_with_thread_pointer(c->instance_data_size, c->allocation_handle, vm_get_gc_thread_local());
+    return (ManagedObject *)vm_malloc_with_thread_pointer(
+            c->get_instance_data_size(), c->get_allocation_handle(),
+            vm_get_gc_thread_local());
+
 } //vm_rt_new_resolved
  
 // this is a helper routine for rth_get_lil_multianewarray(see jit_runtime_support.cpp).
@@ -284,7 +288,7 @@ static void update_allocation_stats(int64 size,
 #ifdef VM_STATS
     VTable *vt = ManagedObject::allocation_handle_to_vtable(ah);
     Class *c = vt->clss;
-    c->instance_allocated(get_instance_data_size(c));
+    c->instance_allocated(c->get_instance_data_size());
 #endif
 }
 
@@ -980,8 +984,7 @@ static void emit_get_array_element_class(Merced_Code_Emitter& emitter, int src, 
     const int sc5 = SCRATCH_GENERAL_REG7;
 
     Class *dummy_class = NULL;
-    const int offset_array_element_class = (int) ((Byte*)&dummy_class->array_element_class - (Byte*)dummy_class);
-    assert(sizeof(dummy_class->array_element_class) == 8);
+    const int offset_array_element_class = Class::get_offset_of_array_element_class(dummy_class);
 
     VTable *dummy_vtable = NULL;
     const int offset_clss = (int) ((Byte*)&dummy_vtable->clss - (Byte*)dummy_vtable);
@@ -1064,6 +1067,15 @@ static void *get_vm_rt_aastore_test_address_compactor()
 } //get_vm_rt_aastore_test_address_compactor
 
 
+static Boolean is_class_initialized(Class *clss)
+{
+#ifdef VM_STATS
+    VM_Statistics::get_vm_stats().num_is_class_initialized++;
+    clss->initialization_checked();
+#endif // VM_STATS
+    assert(!hythread_is_suspend_enabled());
+    return clss->is_initialized();
+} //is_class_initialized
 
 static void *get_vm_rt_initialize_class_compactor()
 {
@@ -1094,11 +1106,14 @@ static void *get_vm_rt_initialize_class_compactor()
 #endif // VM_STATS
 
     // Check clss->state==ST_Initialized, quick return if true.
-    emitter.ipf_adds(SCRATCH_GENERAL_REG, (int)((Byte*)&dummy->state-(Byte*)dummy), IN_REG0);
-    emitter.ipf_adds(SCRATCH_GENERAL_REG3, ST_Initialized, 0);
-    assert(sizeof(dummy->state) == 4); // because of int_mem_size_4 below
-    emitter.ipf_ld(int_mem_size_4, mem_ld_none, mem_none, SCRATCH_GENERAL_REG2, SCRATCH_GENERAL_REG);
-    emitter.ipf_cmp(icmp_eq, cmp_none, SCRATCH_PRED_REG, SCRATCH_PRED_REG2, SCRATCH_GENERAL_REG2, SCRATCH_GENERAL_REG3);
+    //emitter.ipf_adds(SCRATCH_GENERAL_REG, (int)((Byte*)&dummy->state-(Byte*)dummy), IN_REG0);
+    emitter.ipf_adds(SCRATCH_GENERAL_REG3, 0, 0);
+
+    Boolean (*p_is_class_initialized)(Class *clss);
+    p_is_class_initialized = is_class_initialized;
+    emit_call_with_gp(emitter, (void**)p_is_class_initialized);
+
+    emitter.ipf_cmp(icmp_ne, cmp_none, SCRATCH_PRED_REG, SCRATCH_PRED_REG2, RETURN_VALUE_REG, SCRATCH_GENERAL_REG3);
     emitter.ipf_brret(br_many, br_sptk, br_none, BRANCH_RETURN_LINK_REG, SCRATCH_PRED_REG);
 
     // push m2n frame
@@ -1142,6 +1157,10 @@ Boolean jit_may_inline_object_synchronization(unsigned *thread_id_register,
                                               unsigned *lock_owner_width,
                                               Boolean  *jit_clears_ccv)
 {
+    // FIXME: code outdated
+    assert(0);
+    abort();
+#if 0
     if (!vm_get_boolean_property_value_with_default("vm.jit_may_inline_sync"))
          return FALSE;
 
@@ -1152,12 +1171,17 @@ Boolean jit_may_inline_object_synchronization(unsigned *thread_id_register,
     *lock_owner_width = 2;
     *jit_clears_ccv = jit_clears_ccv_in_monitor_enter();
     return TRUE;
+#endif
 }
 
 
 
 static void gen_vm_rt_monitorenter_fast_path(Merced_Code_Emitter &emitter, bool check_null)
 {
+    // FIXME: code outdated
+    assert(0);
+    abort();
+#if 0
     const int thread_stack_key_reg          = THREAD_ID_REG;
     const int object_stack_key_addr_reg     = SCRATCH_GENERAL_REG4;
     const int object_old_stack_key_reg      = SCRATCH_GENERAL_REG5;
@@ -1230,12 +1254,17 @@ static void gen_vm_rt_monitorenter_fast_path(Merced_Code_Emitter &emitter, bool 
     }
 
     // If the cmpxchg failed, we fall through and execute the slow monitor enter path by calling vm_monitor_enter.
+#endif
 } //gen_vm_rt_monitorenter_fast_path
 
 
 
 static void gen_vm_rt_monitorexit_fast_path(Merced_Code_Emitter &emitter, bool check_null)
 {
+    // FIXME: code is outdated
+    assert(0);
+    abort();
+#if 0
     const int object_stack_key_addr_reg     = SCRATCH_GENERAL_REG3;
     const int object_lock_info_reg          = SCRATCH_GENERAL_REG4;
     const int thread_stack_key_reg          = THREAD_ID_REG;
@@ -1317,6 +1346,7 @@ static void gen_vm_rt_monitorexit_fast_path(Merced_Code_Emitter &emitter, bool c
 
     // If the object reference is null or the current thread doesn't own the object, we branch to here.
     emitter.set_target(end_of_monitorexit_fast_path_target);
+#endif
 } //gen_vm_rt_monitorexit_fast_path
 
 
@@ -2666,10 +2696,6 @@ void *vm_get_rt_support_addr(VM_RT_SUPPORT f)
         break;
     case VM_RT_MONITOR_ENTER_STATIC:
         fptr =  get_vm_rt_monitor_enter_static_address();
-        dereference_fptr = false;
-        break;
-    case VM_RT_MONITOR_ENTER_NO_EXC:
-        fptr =  get_vm_rt_monitor_enter_address(false);
         dereference_fptr = false;
         break;
     case VM_RT_MONITOR_EXIT:

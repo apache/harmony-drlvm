@@ -101,7 +101,7 @@ void String_Pool::hash_it(const char * s, unsigned * len, POINTER_SIZE_INT * has
     // to be sure that the input string is aligned on the pointer size boundary
     if (((POINTER_SIZE_INT)s & (sizeof(POINTER_SIZE_INT) - 1)) != 0) {
         *len = strlen(s);
-        *hash = hash_it(s, *len);
+        *hash = hash_it_unaligned(s, *len);
         return;
     }
 
@@ -130,11 +130,47 @@ done:
 }
 
 POINTER_SIZE_INT String_Pool::hash_it(const char * s, unsigned len) {
+
+#ifdef _IPF_
+    // aligned loading is critical for _IPF_
+    if (((POINTER_SIZE_INT)s & (sizeof(POINTER_SIZE_INT) - 1)) != 0) {
+        return hash_it_unaligned(s, len);
+    }
+#endif
+
     POINTER_SIZE_INT h1 = 0, h2 = 0;
     const unsigned parts = len / sizeof(POINTER_SIZE_INT);
     
     for (unsigned i = 0; i < parts; i++) {
         h1 += *((POINTER_SIZE_INT *)s + i);
+    }
+
+    for (unsigned j = parts * sizeof(POINTER_SIZE_INT); j < len; j++) {
+        h2 += s[j];
+    }
+    
+    return h1 - h2;
+}
+
+POINTER_SIZE_INT String_Pool::hash_it_unaligned(const char * s, unsigned len) {
+    POINTER_SIZE_INT h1 = 0, h2 = 0;
+    const unsigned parts = len / sizeof(POINTER_SIZE_INT);
+
+    // ATTENTION! we got here with unaligned s!
+
+    for (unsigned i = 0; i < parts; i++) {
+#ifdef _IPF_ /* 64 bit and little endian */
+        h1 +=  (POINTER_SIZE_INT) s[i * 8  + 0]
+            + ((POINTER_SIZE_INT)s[i * 8 + 1] << 8)
+            + ((POINTER_SIZE_INT)s[i * 8 + 2] << 16)
+            + ((POINTER_SIZE_INT)s[i * 8 + 3] << 24)
+            + ((POINTER_SIZE_INT)s[i * 8 + 4] << 32)
+            + ((POINTER_SIZE_INT)s[i * 8 + 5] << 40)
+            + ((POINTER_SIZE_INT)s[i * 8 + 6] << 48)
+            + ((POINTER_SIZE_INT)s[i * 8 + 7] << 56);
+#else /* also unaligned load */
+        h1 += *((POINTER_SIZE_INT *)s + i);
+#endif
     }
 
     for (unsigned j = parts * sizeof(POINTER_SIZE_INT); j < len; j++) {

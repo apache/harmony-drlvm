@@ -761,14 +761,18 @@ void Class::assign_offsets_to_methods(Global_Env* env)
         next_vtable_offset += VTABLE_OVERHEAD;
     }
     unsigned i, j;
+    if (!interpreter_enabled())
+        for(i = 0;  i < m_num_methods;  i++) {
+            Method& method = m_methods[i];
+
+            // check if the method hasn't already been initialized or even compiled
+            assert(method.get_code_addr() == NULL);
+            // initialize method's code address
+            method.set_code_addr((char*)compile_gen_compile_me(&method));
+        }
+
     for(i = 0;  i < m_num_methods;  i++) {
         Method& method = m_methods[i];
-        
-        // check if the method hasn't already been initialized or even compiled
-        assert(method.get_code_addr() == NULL);
-        // initialize method's code address
-        method.set_code_addr((char*)compile_gen_compile_me(&method));
-
         if(!method.is_static()) {
             // A virtual method. Look it up in virtual method tables of the
             // super classes; if not found, then assign a new offset.

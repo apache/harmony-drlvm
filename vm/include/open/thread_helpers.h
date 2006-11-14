@@ -31,16 +31,21 @@
 
 #include "open/types.h"
 #include "open/hythread_ext.h"
+
+typedef void * fast_tls_func();
+
+#ifdef __cplusplus
+extern "C"
+#endif /* __cplusplus */
+fast_tls_func* get_tls_helper(hythread_tls_key_t key);
+
+#if (defined _IA32_) || (defined _EM64T_)
+
 #include "encoder.h"
 
 #ifdef __cplusplus
 extern "C" {
 #endif /* __cplusplus */
-
-
-typedef void * fast_tls_func();
-
-fast_tls_func* get_tls_helper(hythread_tls_key_t key);
 char* gen_hythread_self_helper(char *ss);
 char* gen_monitorenter_fast_path_helper(char *ss, const R_Opnd & input_param1);
 char* gen_monitorenter_slow_path_helper(char *ss, const R_Opnd & input_param1);
@@ -50,5 +55,7 @@ char* gen_monitorexit_slow_path_helper(char *ss, const R_Opnd & input_param1);
 #ifdef __cplusplus
 }
 #endif
+
+#endif /* (defined _IA32_) || (defined _EM64T_) */
 
 #endif  /* OPEN_THREAD_NATIVE_H */

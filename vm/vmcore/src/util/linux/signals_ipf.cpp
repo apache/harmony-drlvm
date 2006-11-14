@@ -28,6 +28,7 @@
 #include "cxxlog.h"
 
 #include "platform.h"
+#include <sys/mman.h>
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <unistd.h>
@@ -67,89 +68,377 @@
 #include "thread_manager.h"
 
 #include "exception_filter.h"
+#include "interpreter.h"
 #include "crash_handler.h"
+#include "stack_dump.h"
+#include "jvmti_break_intf.h"
 
 
 #include <semaphore.h>
 
-static sigset_t signal_set;
+/**
+ * the saved copy of the executable name.
+ */
+static char executable[1024];
 
-extern "C" void get_rnat_and_bspstore(uint64* res);
-extern "C" void do_flushrs();
+void asm_jvmti_exception_catch_callback() {
+    // FIXME: not implemented
+    assert(0);
+    abort();
+}
 
-void get_context_handler(int signal, siginfo_t* info, void* context) {
-    VM_thread* thread = p_active_threads_list;
-    pthread_t self = GetCurrentThreadId();
-    TRACE2("SIGNALLING", "get_context_handler, try to find pthread_t " << self);
+static bool java_throw_from_sigcontext(ucontext_t *uc, Class* exc_clss)
+{
+    // FIXME: not implemented
+    assert(0);
+    abort();
+    return false;
+}
 
-    while (thread) {
+void abort_handler (int signum, siginfo_t* info, void* context) {
+    fprintf(stderr, "FIXME: abort_handler\n");
+    signal(signum, SIG_DFL);
+    kill(getpid(), signum);
+}
 
-        TRACE2("SIGNALLING", "get_context_handler, finding pthread_t " << self);
 
-        if (thread->thread_id != self) {
-        thread = thread->p_active;
-        continue;
+static void throw_from_sigcontext(ucontext_t *uc, Class* exc_clss) {
+    // FIXME: not implemented
+    assert(0);
+    abort();
+}
+
+void linux_ucontext_to_regs(Registers* regs, ucontext_t* uc)
+{
+    //TODO: ADD Copying of IPF registers here like it was done on ia32!!
+    abort();
+}
+
+void null_java_divide_by_zero_handler(int signum, siginfo_t* UNREF info, void* context)
+{
+    ucontext_t *uc = (ucontext_t *)context;
+    Global_Env *env = VM_Global_State::loader_env;
+
+    /* Will not compile on IPF:
+     * TRACE2("signals", "ArithmeticException detected at " <<
+        (void *)uc->uc_mcontext.gregs[REG_EIP]);
+     */
+
+    if (env->shutting_down != 0) {
+        fprintf(stderr, "null_java_divide_by_zero_handler(): called in shutdown stage\n");
+    } else if (!interpreter_enabled()) {
+        if (java_throw_from_sigcontext(
+                    uc, env->java_lang_ArithmeticException_Class)) {
+            return;
+        }
     }
 
-        assert(thread->suspend_request >0);
-        TRACE2("SIGNALLING", "get_context_handler, found pthread_t " << self);
+    fprintf(stderr, "SIGFPE in VM code.\n");
+    Registers regs;
+    linux_ucontext_to_regs(&regs, uc);
+    st_print_stack(&regs);
 
-    ucontext_t* c = (ucontext_t*) context;
+    // crash with default handler
+    signal(signum, 0);
+}
 
-    uint64 ip = c->uc_mcontext.sc_ip;
-    thread->regs.ip = ip;
 
-    TRACE2("SIGNALLING", "get_context_handler, ip is  " << ip);
+/*
+ * Information about stack
+ */
+inline void* find_stack_addr() {
+    int err;
+    void* stack_addr;
+    pthread_attr_t pthread_attr;
+    size_t stack_size;
 
-    uint64* bsp = (uint64*)c->uc_mcontext.sc_ar_bsp;
-    uint64 rnat = c->uc_mcontext.sc_ar_rnat;
-    thread->t[0] = rnat;
-    thread->t[1] = (uint64)bsp;
-    thread->suspended_state = SUSPENDED_IN_SIGNAL_HANDLER;
-    do_flushrs();
+    pthread_t thread = pthread_self();
+    err = pthread_getattr_np(thread, &pthread_attr);
+    assert(!err);
+    err = pthread_attr_getstack(&pthread_attr, &stack_addr, &stack_size);
+    assert(!err);
+    pthread_attr_destroy(&pthread_attr);
+    return (void *)((unsigned char *)stack_addr + stack_size);
+}
+
+inline size_t find_stack_size() {
+    int err;
+    size_t stack_size;
+    pthread_attr_t pthread_attr;
+
+    pthread_attr_init(&pthread_attr);
+    err = pthread_attr_getstacksize(&pthread_attr, &stack_size);
+    pthread_attr_destroy(&pthread_attr);
+    return stack_size;
+}
+
+inline size_t find_guard_stack_size() {
+    return 64*1024;
     
-        TRACE2("SIGNALLING", "HANDLER, before POST thread = " << self);
-        sem_post(&thread->suspend_self);
-        TRACE2("SIGNALLING", "HANDLER, after POST thread = " << self);
+}
 
-        //vm_wait_for_single_object(thread->resume_event, INFINITE);
-        
-        TRACE2("SIGNALLING", "get_context_handler, continue pthread_t " << self);
-        
-    //thread->suspended_state = NOT_SUSPENDED;
-    do_flushrs();
-    return;
+inline size_t find_guard_page_size() {
+    int err;
+    size_t guard_size;
+    pthread_attr_t pthread_attr;
+
+    pthread_attr_init(&pthread_attr);
+    err = pthread_attr_getguardsize(&pthread_attr, &guard_size);
+    pthread_attr_destroy(&pthread_attr);
+    return guard_size;
+}
+
+static size_t common_stack_size;
+static size_t common_guard_stack_size;
+static size_t common_guard_page_size;
+
+inline void* get_stack_addr() {
+    return p_TLS_vmthread->stack_addr;
+}
+
+inline size_t get_stack_size() {
+    return common_stack_size;
+}
+
+inline size_t get_guard_stack_size() {
+    return common_guard_stack_size;
+}
+
+inline size_t get_guard_page_size() {
+    return common_guard_page_size;
+}
+
+
+void init_stack_info() {
+    p_TLS_vmthread->stack_addr = find_stack_addr();
+    common_stack_size = find_stack_size();
+    common_guard_stack_size = find_guard_stack_size();
+    common_guard_page_size =find_guard_page_size();
+
+    /* FIXME: doesn't work, BTW, move this code to common file for all linuxes
+     *        to avoid code duplication
+     *
+     * set_guard_stack();
+     */
+}
+
+void set_guard_stack() {
+    int err;
+    
+    char* stack_addr = (char*) get_stack_addr();
+    size_t stack_size = get_stack_size();
+    size_t guard_stack_size = get_guard_stack_size();
+    size_t guard_page_size = get_guard_page_size();
+
+    // map the guard page and protect it
+    void UNUSED *res = mmap(stack_addr - stack_size + guard_page_size +
+    guard_stack_size, guard_page_size,  PROT_READ | PROT_WRITE,
+    MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+
+    assert(res!=MAP_FAILED);
+
+    err = mprotect(stack_addr - stack_size  + guard_page_size +  
+    guard_stack_size, guard_page_size, PROT_NONE );
+   
+    assert(!err);
+
+    //map the alternate stack on which we want to handle the signal
+    void UNUSED *res2 = mmap(stack_addr - stack_size + guard_page_size,
+    guard_stack_size,  PROT_READ | PROT_WRITE,
+    MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+
+    assert(res2!=MAP_FAILED);
+
+
+    stack_t sigalt;
+    sigalt.ss_sp = stack_addr - stack_size + guard_page_size;
+    sigalt.ss_flags = SS_ONSTACK;
+    sigalt.ss_size = guard_stack_size;
+
+    err = sigaltstack (&sigalt, NULL);
+    assert(!err);
+
+}
+
+size_t get_available_stack_size() {
+    char* stack_adrr = (char*) get_stack_addr();
+    size_t used_stack_size = stack_adrr - ((char*)&stack_adrr);
+    size_t available_stack_size =
+            get_stack_size() - used_stack_size
+            - get_guard_page_size() - get_guard_stack_size();
+    return available_stack_size;
+}
+
+size_t get_default_stack_size() {
+    size_t default_stack_size = get_stack_size();
+    return default_stack_size;
+}
+
+bool check_available_stack_size(size_t required_size) {
+    if (get_available_stack_size() < required_size) {
+        exn_raise_by_name("java/lang/StackOverflowError");
+        return false;
+    } else {
+        return true;
     }
+}
 
-    DIE("Cannot find Java thread using signal context");
+void remove_guard_stack() {
+    int err;
+    char* stack_addr = (char*) get_stack_addr();
+    size_t stack_size = get_stack_size();
+    size_t guard_stack_size = get_guard_stack_size();
+    size_t guard_page_size = get_guard_page_size();
+
+
+    err = mprotect(stack_addr - stack_size + guard_page_size +
+    guard_stack_size, guard_page_size, PROT_READ | PROT_WRITE);
+
+
+    stack_t sigalt;
+    sigalt.ss_sp = stack_addr - stack_size + guard_page_size;
+    sigalt.ss_flags = SS_DISABLE;
+    sigalt.ss_size = guard_stack_size;
+
+    err = sigaltstack (&sigalt, NULL);
+
+}
+
+bool check_stack_overflow(siginfo_t *info, ucontext_t *uc) {
+    char* stack_addr = (char*) get_stack_addr();
+    size_t stack_size = get_stack_size();
+    size_t guard_stack_size = get_guard_stack_size();
+    size_t guard_page_size = get_guard_page_size();
+
+    char* guard_page_begin = stack_addr - stack_size + guard_page_size + guard_stack_size;
+    char* guard_page_end = guard_page_begin + guard_page_size;
+
+    char* fault_addr = (char*)(info->si_addr);
+    //char* esp_value = (char*)(uc->uc_mcontext.gregs[REG_ESP]);
+
+    return((guard_page_begin <= fault_addr) && (fault_addr < guard_page_end));
+}
+
+/*
+ * We find the true signal stack frame set-up by kernel,which is located
+ * by locate_sigcontext() below; then change its content according to 
+ * exception handling semantics, so that when the signal handler is 
+ * returned, application can continue its execution in Java exception handler.
+ */
+
+void stack_overflow_handler(int signum, siginfo_t* UNREF info, void* context)
+{
+    ucontext_t *uc = (ucontext_t *)context;
+    Global_Env *env = VM_Global_State::loader_env;
+
+    if (java_throw_from_sigcontext(
+                uc, env->java_lang_StackOverflowError_Class)) {
+        return;
+    } else {
+        if (is_unwindable()) {
+            if (hythread_is_suspend_enabled()) {
+                tmn_suspend_disable();
+            }
+            throw_from_sigcontext(
+                uc, env->java_lang_StackOverflowError_Class);
+        } else {
+            remove_guard_stack();
+            exn_raise_by_name("java/lang/StackOverflowError");
+            p_TLS_vmthread->restore_guard_page = true;
+        }
+    }
+}
+
+void null_java_reference_handler(int signum, siginfo_t* UNREF info, void* context)
+{ 
+    ucontext_t *uc = (ucontext_t *)context;
+    Global_Env *env = VM_Global_State::loader_env;
+
+
+    /* Will not compile on IPF:
+     TRACE2("signals", "NPE or SOE detected at " <<
+        (void *)uc->uc_mcontext.gregs[REG_EIP]); */
+
+    if (check_stack_overflow(info, uc)) {
+        stack_overflow_handler(signum, info, context);
+        return;
+    }
+     
+    if (env->shutting_down != 0) {
+        fprintf(stderr, "null_java_reference_handler(): called in shutdown stage\n");
+    } else if (!interpreter_enabled()) {
+        if (java_throw_from_sigcontext(
+                    uc, env->java_lang_NullPointerException_Class)) {
+            return;
+        }
+    }
+    fprintf(stderr, "SIGSEGV in VM code.\n");
+    Registers regs;
+    linux_ucontext_to_regs(&regs, uc);
+    st_print_stack(&regs);
+
+    signal(signum, 0);
 }
 
 void initialize_signals() {
     struct sigaction sa;
+/*
+ * MOVED TO PORT, DO NOT USE USR2
+
     sigemptyset(&sa.sa_mask);
     sa.sa_flags = SA_SIGINFO | SA_RESTART;
-    sa.sa_sigaction = get_context_handler;
-    int res = sigaction(SIGUSR2, &sa, NULL);
+    sa.sa_sigaction = yield_other_handler;
+    sigaction(SIGUSR2, &sa, NULL);
+*/
 
-    if (res != 0) {
-        DIE("sigaction fail: SIGUSR2: " << strerror(errno) << "\nDRL VM will exit with error\n");
-    }
+    /* FIXME: handler parameters mismatch
+    sigemptyset(&sa.sa_mask);
+    sa.sa_flags = SA_SIGINFO;
+    sa.sa_sigaction = &jvmti_jit_breakpoint_handler;
+    sigaction(SIGTRAP, &sa, NULL);
+    */
+    
+    sigemptyset(&sa.sa_mask);
+    sa.sa_flags = SA_SIGINFO | SA_ONSTACK;;
+    sa.sa_sigaction = &null_java_reference_handler;
+    sigaction(SIGSEGV, &sa, NULL);
 
-    sigemptyset(&signal_set);
-    sigaddset(&signal_set, SIGCONT);
-    sigprocmask(SIG_BLOCK, &signal_set, NULL);
+    sigemptyset(&sa.sa_mask);
+    sa.sa_flags = SA_SIGINFO;
+    sa.sa_sigaction = &null_java_divide_by_zero_handler;
+    sigaction(SIGFPE, &sa, NULL);
 
     extern void interrupt_handler(int);
     signal(SIGINT, (void (*)(int)) interrupt_handler);
     extern void quit_handler(int);
     signal(SIGQUIT, (void (*)(int)) quit_handler);
 
+    /* install abort_handler to print out call stack on assertion failures */
+    sigemptyset(&sa.sa_mask);
+    sa.sa_flags = SA_SIGINFO;
+    sa.sa_sigaction = &abort_handler;
+    sigaction( SIGABRT, &sa, NULL);
+    /* abort_handler installed */
+
+    extern int get_executable_name(char*, int);
+    /* initialize the name of the executable (to be used by addr2line) */
+    get_executable_name(executable, sizeof(executable));
+
     if (vm_get_boolean_property_value_with_default("vm.crash_handler")) {
         init_crash_handler();
-        install_crash_handler(SIGABRT);
-        install_crash_handler(SIGSEGV); 
+        // can't install crash handler immediately,
+        // as we have already SIGABRT and SIGSEGV handlers
     }
-}
+} //initialize_signals
+
+
+
+#if 0
+
+static sigset_t signal_set;
+
+extern "C" void get_rnat_and_bspstore(uint64* res);
+extern "C" void do_flushrs();
 
 // Variables used to locate the context from the signal handler
 static int sc_nest = -1;
@@ -158,11 +447,6 @@ static uint32 exam_point;
 
 bool SuspendThread(unsigned xx){ return 0; }
 bool ResumeThread(unsigned xx){ return 1; }
-
-void linux_ucontext_to_regs(Registers* regs, ucontext_t* uc)
-{
-//TODO: ADD Copying of IPF registers here like it was done on ia32!!
-}
 
 void linux_regs_to_ucontext(ucontext_t* uc, Registers* regs)
 {
@@ -179,32 +463,21 @@ static void linux_regs_to_sigcontext(sigcontext* sc, Registers* regs)
 //TODO: ADD Copying of IPF registers here like it was done on ia32!!
 }
 
-static void linux_throw_from_sigcontext(uint32* top_ebp, Class* exc_clss)
+static bool linux_throw_from_sigcontext(ucontext_t *uc, Class* exc_clss)
 {
-    sigcontext *sc, *top_sc = NULL;
-    uint32 *ebp;
-    int i;
-
-    ebp = top_ebp;
-
-    for (i = 0; i < sc_nest; i++) {
-        ebp = (uint32 *)((uint64)ebp[0]);
-    }
-    if (!use_ucontext) {
-        sc = (sigcontext *)(ebp + 3);
-        top_sc = (sigcontext *)(top_ebp + 3);
-    } else {
-        sc = (sigcontext *) &((struct ucontext *)((uint64)ebp[4]))->uc_mcontext;
-    }
-
-    assert(vm_identify_eip((void *)sc->sc_ip) == VM_TYPE_JAVA);
-
-    Registers regs;
-//    linux_sigcontext_to_regs(&regs, sc); // FIXME: transfer to linux_ucontext_to_regs
-    exn_athrow_regs(&regs, exc_clss);
-//    linux_regs_to_sigcontext(sc, &regs); // FIXME: transfer to linux_regs_to_ucontext
-//    linux_regs_to_sigcontext(top_sc, &regs); // FIXME: transfer to linux_regs_to_ucontext
+    // FIXME: not implemented
+    assert(0);
+    abort();
+    return false;
 }
+
+static void throw_from_sigcontext(ucontext_t *uc, Class* exc_clss) {
+    // FIXME: not implemented
+    assert(0);
+    abort();
+    return false;
+}
+
 
 /*
  * We find the true signal stack frame set-up by kernel,which is located
@@ -332,71 +605,4 @@ volatile void locate_sigcontext(int signum)
 
 
 
-void initialize_signals_old()
-{
-    // First figure out how to locate the context in the
-    // signal handler.  Apparently you have to do it differently
-    // on different versions of Linux.
-
-    //attach signal handler locate_sigcontext() with SIGTRAP
-
-    signal(SIGTRAP, (void (*)(int))locate_sigcontext);
-
-    //this asm code sequence is to cause a signal SIGTRAP
-    //delivered to itself by operating system
-
-//TODO: ADD correct signal handling here!!
-/*    asm(
-        ".align 16\n\t"
-        ".byte 0xe8\n\t.long 0\n\t" // call 0
-
-        //this is "call 0", which does nothing at runtime
-        //but pushing the return address, i.e. instruction
-        //pointer to next instruction, i.e. "popl %%eax"
-
-        "popl  %%eax\n\t"   // 1 byte
-
-        //pop the return address into eax for arithmetic
-
-        "addb  $9,%%al\n\t" // 2 byte
-
-        //add the return address with 9, which is the address
-        //pointing to instruction after the "int $0x3" below.
-        //The instructions length in byte are shown on the
-        //rightside of each.
-
-        "movl  %%eax,%0\n\t"    // 5 byte
-
-        //move eax content into static memory variable "exam_point",
-        //which is used for sigcontext locating, because when "int 0x3"
-        //happens, operating system will save the return address
-        //into signal context for process execution resumption;
-        //the trick here is that we also save that address in exam_point,
-        //so that we can compare the return EIP saved in signal context
-        //with exam_point to identify the correct stack frame
-
-
-        "int   $0x3" : "=m" (exam_point)
-
-        //trigger int3 into operating system kernel, which sends a
-        //signal SIGTRAP to current process, setups the signal stack
-        //frame on user stack, then returns to user mode execution,
-        //i.e. the signal handler locate_sigcontext()
-
-    ); */
-
-    //when execution goes here, the signal handler locate_sigcontext()
-    //has successfully found the signal context setup method on current
-    //system; resume SIGTRAP handler back to default
-
-    signal(SIGTRAP, SIG_DFL);
-    
-    //Now register the real signal handlers. signal() function in Linux
-    //kernel has SYSV semantics, i.e. the handler is a kind of ONE SHOT
-    //behaviour, which is different from BSD. But glibc2 in Linux
-    //implements BSD semantics.
-
-    signal(SIGSEGV, null_java_reference_handler);
-    signal(SIGFPE, null_java_divide_by_zero_handler);
-    
-} //initialize_signals
+#endif

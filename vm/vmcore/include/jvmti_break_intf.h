@@ -28,7 +28,6 @@
 #include "open/types.h"
 #include "jni.h"
 #include "lock_manager.h"
-#include "jvmti_dasm.h"
 #include "environment.h"
 
 #define INSTRUMENTATION_BYTE_HLT 0xf4 // HLT instruction
@@ -49,6 +48,7 @@ typedef enum {
 } jvmti_BreakPriority;
 
 class VMBreakInterface;
+class InstructionDisassembler;
 
 struct VMBreakPoint
 {

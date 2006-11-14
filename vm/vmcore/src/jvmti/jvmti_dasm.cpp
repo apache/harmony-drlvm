@@ -22,6 +22,11 @@
  * @file
  * @brief Disassembler for JVMTI implementation.
  */
+
+// FIXME: Highly platform specific, should be renamed to jvmti_dasm_x86.cpp
+//        or go to arch specific directory.
+#if (defined _IA32_) || (defined _EM64T_)
+
 #include "jvmti_dasm.h"
 #include "dec_base.h"
 
@@ -196,3 +201,4 @@ InstructionDisassembler::get_target_address_from_context(const Registers* pconte
     return NULL;
 }
 
+#endif

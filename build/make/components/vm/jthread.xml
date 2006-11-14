@@ -46,6 +46,7 @@ vm.hythr" />
             <fileset dir="${src}">
                 <include name="thread/src/*java*.c" />
                 <include name="thread/src/thread_ti_*.c" />
+                <include name="thread/src/*_${build.arch}.c" />
             </fileset>
 
             <select os="win" cfg="release" cxx="icl">

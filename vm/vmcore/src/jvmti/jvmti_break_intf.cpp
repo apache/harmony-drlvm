@@ -25,7 +25,6 @@
 
 #include "cxxlog.h"
 #include "environment.h"
-#include "encoder.h"
 #include "interpreter.h"
 #include "interpreter_exports.h"
 #include "jit_intf_cpp.h"
@@ -39,9 +38,15 @@
 #include "jvmti_break_intf.h"
 #include "cci.h"
 
-// Forvard declarations
+
+#if (defined _IA32_) || (defined _EM64T_)
+
+#include "encoder.h"
+// Forward declarations
 static ConditionCode
 get_condition_code(InstructionDisassembler::CondJumpType jump_type);
+#endif
+
 static bool set_jit_mode_breakpoint(VMBreakPoint* bp);
 static bool set_native_breakpoint(VMBreakPoint* bp);
 static bool clear_native_breakpoint(VMBreakPoint* bp);
@@ -583,6 +588,7 @@ VMBreakPoints::remove_thread_local_break(VMLocalBreak *local)
 void
 VMBreakPoints::process_native_breakpoint()
 {
+#if (defined _IA32_) || (defined _EM64T_)
     // When we get here we know already that breakpoint occurred in JITted code,
     // JVMTI handles it, and registers context is saved for us in TLS
     VM_thread *vm_thread = p_TLS_vmthread;
@@ -618,6 +624,7 @@ VMBreakPoints::process_native_breakpoint()
     m2n_set_frame_type(m2nf, m2nf_type);
 
     jbyte orig_byte = bp->saved_byte;
+
     // Copy disassembler instance in case a breakpoint is deleted
     // inside of callbacks
     InstructionDisassembler idisasm(*bp->disasm);
@@ -804,6 +811,10 @@ VMBreakPoints::process_native_breakpoint()
 
     si_set_ip(si, instruction_buffer, false);
     si_transfer_control(si);
+#else
+    // PLATFORM dependent code
+    abort();
+#endif
 }
 
 jbyte
@@ -1187,6 +1198,7 @@ VMBreakInterface::find_reference(VMBreakPoint* brpt)
 //////////////////////////////////////////////////////////////////////////////
 // Helper functions
 
+#if (defined _IA32_) || (defined _EM64T_)
 static inline ConditionCode
 get_condition_code(InstructionDisassembler::CondJumpType jump_type)
 {
@@ -1194,6 +1206,7 @@ get_condition_code(InstructionDisassembler::CondJumpType jump_type)
     // equal to enums in ia32/em64t encoder, so this statement is ok
     return (ConditionCode)jump_type;
 }
+#endif
 
 static bool set_jit_mode_breakpoint(VMBreakPoint* bp)
 {
@@ -1234,6 +1247,7 @@ static bool set_jit_mode_breakpoint(VMBreakPoint* bp)
 
 static bool set_native_breakpoint(VMBreakPoint* bp)
 {
+#if (defined _IA32_) || (defined _EM64T_)
     assert(bp);
     assert(bp->addr);
 
@@ -1267,6 +1281,9 @@ static bool set_native_breakpoint(VMBreakPoint* bp)
     }
 
     return true;
+#else
+    return false;
+#endif
 }
 
 static bool clear_native_breakpoint(VMBreakPoint* bp)

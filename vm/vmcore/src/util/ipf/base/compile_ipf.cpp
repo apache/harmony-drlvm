@@ -176,10 +176,8 @@ static void emit_newinstance_override(Emitter_Handle eh, Method *method) {
         // (p3) [g1] = g4                                // set new current value
         // (p3) return
         size_t offset_gc_local           = (Byte *)&(p_TLS_vmthread->_gc_private_information) - (Byte *)p_TLS_vmthread;
-        size_t offset_allocation_handle  = (Byte *)&(env->Void_Class->allocation_handle)       - (Byte *)(env->Void_Class);
-        size_t offset_instance_data_size = (Byte *)&(env->Void_Class->instance_data_size)      - (Byte *)(env->Void_Class);
-        assert(sizeof(env->Void_Class->allocation_handle)  == 8);   // else 8 byte load of the class's allocation_handle will fail
-        assert(sizeof(env->Void_Class->instance_data_size) == 4);   // else four byte load of the class's size will fail
+        size_t offset_allocation_handle  = env->Void_Class->get_offset_of_allocation_handle();
+        size_t offset_instance_data_size = env->Void_Class->get_offset_of_instance_data_size();
         current_offset += (unsigned) offset_gc_local;
         limit_offset += (unsigned) offset_gc_local;
         
@@ -459,7 +457,7 @@ static NativeCodePtr compile_get_compile_me_generic() {
     static NativeCodePtr addr = NULL;
     if (!addr) {
         NativeCodePtr (*p_jitter)(Method*) = compile_jit_a_method;
-        NativeCodePtr (*p_rethrow)(Method*) = exn_rethrow_if_pending;
+        void (*p_rethrow)() = exn_rethrow_if_pending;
         LilCodeStub* cs = lil_parse_code_stub(
             "entry 1:managed:arbitrary;"
             "push_m2n 0, %0i;"

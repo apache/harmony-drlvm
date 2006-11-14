@@ -21,9 +21,10 @@
 
 #include "native_stack.h"
 
-void native_get_frame_info(Registers* regs, void** ip, void** ret, void** bp, void** sp)
+void native_get_frame_info(Registers* regs, void** ip, void** bp, void** sp)
 {
-    // TODO: implement copying
+    // FIXME: not implemented
+    abort();
 }
 
 bool native_unwind_bp_based_frame(void* frame, void** ip, void** bp, void** sp)
@@ -66,3 +67,10 @@ void native_unwind_interrupted_frame(VM_thread* pthread, void** p_ip, void** p_b
     *p_bp = NULL;
     *p_sp = NULL;
 }
+
+void si_set_callbak(StackIterator* si, NativeCodePtr* callback) {
+    // FIXME: not implemented
+    assert(0);
+    abort();
+}
+

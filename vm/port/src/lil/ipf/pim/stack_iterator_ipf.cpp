@@ -23,6 +23,7 @@
 #define LOG_DOMAIN "port.old"
 #include "cxxlog.h"
 
+#include "environment.h"
 #include <ostream.h>
 #include <pthread.h>
 #include <signal.h>
@@ -41,6 +42,7 @@ using namespace std;
 #include "stack_iterator.h"
 #include "stub_code_utils.h"
 #include "root_set_enum_internal.h"
+#include "cci.h"
 
 #include "dump.h"
 #include "vm_stats.h"
@@ -134,7 +136,7 @@ static void si_setup_stacked_registers(StackIterator* si)
 static void si_unwind_from_m2n(StackIterator* si)
 {
 #ifdef VM_STATS
-    VM_Statistic::get_vm_stats().num_unwind_native_frames_all++;
+    VM_Statistics::get_vm_stats().num_unwind_native_frames_all++;
 #endif
     // First setup the stack registers for the m2n frame
     si->bsp = m2n_get_bsp(si->m2nfl);
@@ -348,6 +350,10 @@ StackIterator* si_create_from_native()
 #if defined (PLATFORM_POSIX)
 StackIterator* si_create_from_native(VM_thread* thread)
 {
+    // FIXME: code is outdated
+    assert(0);
+    abort();
+#if 0
     // Allocate iterator
     StackIterator* res = (StackIterator*)malloc(sizeof(StackIterator));
     assert(res);
@@ -418,6 +424,7 @@ StackIterator* si_create_from_native(VM_thread* thread)
     res->c.p_eip = &res->ip;
 
     return res;
+#endif
 }
 
 #elif defined (PLATFORM_NT)
@@ -572,6 +579,14 @@ bool si_is_native(StackIterator* si)
 M2nFrame* si_get_m2n(StackIterator* si)
 {
     return si->m2nfl;
+}
+
+void** si_get_return_pointer(StackIterator* si)
+{
+    // FIXME: not implemented
+    assert(0);
+    abort();
+    return 0;
 }
 
 void si_set_return_pointer(StackIterator* si, void** return_value)

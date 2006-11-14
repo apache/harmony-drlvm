@@ -121,14 +121,6 @@ VMEXPORT int ti_is_enabled();
 
 #ifdef __cplusplus
 }
-
-/**
- * all folowing entries is requiried for VM helpers only 
- */
-
-#include "encoder.h"
-
-
 #endif
 
 #endif  /* OPEN_THREAD_EXTERNALS_H */

@@ -28,7 +28,7 @@
 #include "tl/memory_pool.h"
 #include "object_layout.h"
 
-#define STRING_PADDING 4
+#define STRING_PADDING sizeof(void*)
 
 struct String
 {
@@ -37,13 +37,13 @@ struct String
 #endif
     // 20030507 Ref to the interned string used by java.lang.String.intern().
     // It is compressed when compressing refs.
+    unsigned len;
     union {
         // raw reference to interned string if not compressing references
         ManagedObject   * raw_ref;
         // equivalent compressed reference.
         uint32          compressed_ref;
     } intern;
-    unsigned len;
     char bytes[STRING_PADDING];
 };
 
@@ -108,6 +108,9 @@ private:
     POINTER_SIZE_INT hash_it(const char * str, unsigned len);
     String * lookup(const char *str, unsigned len, POINTER_SIZE_INT hash);
     void register_interned_string(String * str);
+    private:
+    POINTER_SIZE_INT hash_it_unaligned(const char * str, unsigned len);
+    public:
     
     // memory pool
     tl::MemoryPool      memory_pool;    

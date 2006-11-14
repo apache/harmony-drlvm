@@ -1190,12 +1190,14 @@ public:
     /** Gets an offset of <code>m_allocation_handle</code> in the class.
      * @note Allocation helpers use returned offset.*/
     size_t get_offset_of_allocation_handle() {
-        return (size_t)((char*)(&m_num_class_init_checks) - (char*)this);
+        assert(sizeof(m_allocation_handle)  == sizeof(void*));
+        return (size_t)((char*)(&m_allocation_handle) - (char*)this);
     }
 
     /** Gets an offset of <code>m_instance_data_size</code> in the class.
      * @note Allocation helpers use returned offset.*/
     size_t get_offset_of_instance_data_size() {
+        assert(sizeof(m_instance_data_size) == 4);
         return (size_t)((char*)(&m_instance_data_size) - (char*)this);
     }
 
@@ -1204,6 +1206,14 @@ public:
      * @note Class initialization helper on IPF uses returned offset.*/
     static size_t get_offset_of_class_init_checks(Class* dummy) {
         return (size_t)((char*)(&dummy->m_num_class_init_checks) - (char*)dummy);
+    }
+
+    /** Gets an offset of <code>m_array_element_class</code> in the class.
+     * @param dummy - dummy variable used to calculate field offset
+     * @note Class initialization helper on IPF uses returned offset.*/
+    static size_t get_offset_of_array_element_class(Class* dummy) {
+        assert(sizeof(dummy->m_array_element_class) == sizeof(void*));
+        return (size_t)((char*)(&dummy->m_array_element_class) - (char*)dummy);
     }
 
     /** Gets the number of array dimensions.
