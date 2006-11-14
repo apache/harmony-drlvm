@@ -1548,9 +1548,6 @@ VMEXPORT jint JNICALL DetachCurrentThread(JavaVM * vm)
     java_thread = jthread_self();
     if (java_thread == NULL) return JNI_EDETACHED;
 
-    // Send thread end event.
-    jvmti_send_thread_start_end_event(0);
-
     status = jthread_detach(java_thread);
     
     return status == TM_ERROR_NONE ? JNI_OK : JNI_ERR;
