@@ -348,8 +348,12 @@ void exn_rethrow()
     } else if (NULL != p_TLS_vmthread->thread_exception.exc_class) {
         Class * exc_class = p_TLS_vmthread->thread_exception.exc_class;
         const char* exc_message = p_TLS_vmthread->thread_exception.exc_message;
-        jthrowable exc_cause = oh_allocate_local_handle();
-        exc_cause->object = p_TLS_vmthread->thread_exception.exc_cause;
+        jthrowable exc_cause = NULL;
+
+        if (p_TLS_vmthread->thread_exception.exc_cause){
+            exc_cause = oh_allocate_local_handle();
+            exc_cause->object = p_TLS_vmthread->thread_exception.exc_cause;
+        }
         clear_exception_internal();
         exn_throw_by_class_internal(exc_class, exc_message, exc_cause);
     } else {

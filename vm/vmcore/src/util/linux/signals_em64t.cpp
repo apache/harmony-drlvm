@@ -113,8 +113,9 @@ static void throw_from_sigcontext(ucontext_t *uc, Class* exc_clss)
     linux_ucontext_to_regs(&regs, uc);
 
     DebugUtilsTI* ti = VM_Global_State::loader_env->TI;
+    bool java_code = (vm_identify_eip((void *)regs.rip) == VM_TYPE_JAVA);
 
-    exn_athrow_regs(&regs, exc_clss);
+    exn_athrow_regs(&regs, exc_clss, java_code);
     linux_regs_to_ucontext(uc, &regs);
 }
 
@@ -128,24 +129,6 @@ static bool java_throw_from_sigcontext(ucontext_t *uc, Class* exc_clss)
     }
 
     throw_from_sigcontext(uc, exc_clss);
-    return true;
-}
-
-static bool linux_throw_from_sigcontext(ucontext_t *uc, Class* exc_clss)
-{
-    ASSERT_NO_INTERPRETER;
-    unsigned *rip = (unsigned *) uc->uc_mcontext.gregs[REG_RIP];
-    VM_Code_Type vmct = vm_identify_eip((void *)rip);
-    if(vmct != VM_TYPE_JAVA) {
-        return false;
-    }
-
-    Registers regs;
-    linux_ucontext_to_regs(&regs, uc);
-
-    exn_athrow_regs(&regs, exc_clss);
-
-    linux_regs_to_ucontext(uc, &regs);
     return true;
 }
 
@@ -305,6 +288,8 @@ void set_guard_stack() {
     sigalt.ss_size = guard_stack_size;
 
     err = sigaltstack (&sigalt, NULL);
+
+    p_TLS_vmthread->restore_guard_page = false;
 }
 
 size_t get_available_stack_size() {
@@ -318,7 +303,8 @@ size_t get_available_stack_size() {
 
 bool check_available_stack_size(size_t required_size) {
     if (get_available_stack_size() < required_size) {
-        exn_raise_by_name("java/lang/StackOverflowError");
+        Global_Env *env = VM_Global_State::loader_env;
+        exn_raise_by_class(env->java_lang_StackOverflowError_Class);
         return false;
     } else {
         return true;
@@ -341,6 +327,8 @@ void remove_guard_stack() {
     sigalt.ss_size = guard_stack_size;
 
     err = sigaltstack (&sigalt, NULL);
+
+    p_TLS_vmthread->restore_guard_page = true;
 }
 
 bool check_stack_overflow(siginfo_t *info, ucontext_t *uc) {
@@ -381,7 +369,7 @@ void stack_overflow_handler(int signum, siginfo_t* UNREF info, void* context)
                 uc, env->java_lang_StackOverflowError_Class);
         } else {
             remove_guard_stack();
-            exn_raise_by_name("java/lang/StackOverflowError");
+            exn_raise_by_class(env->java_lang_StackOverflowError_Class);
             p_TLS_vmthread->restore_guard_page = true;
         }
     }
@@ -401,7 +389,7 @@ void null_java_reference_handler(int signum, siginfo_t* info, void* context)
     if (env->shutting_down != 0) {
         fprintf(stderr, "null_java_reference_handler(): called in shutdown stage\n");
     } else if (!interpreter_enabled()) {
-        if (linux_throw_from_sigcontext(
+        if (java_throw_from_sigcontext(
                     uc, env->java_lang_NullPointerException_Class)) {
             return;
         }
@@ -420,7 +408,7 @@ void null_java_divide_by_zero_handler(int signum, siginfo_t* info, void* context
     if (env->shutting_down != 0) {
         fprintf(stderr, "null_java_divide_by_zero_handler(): called in shutdown stage\n");
     } else if (!interpreter_enabled()) {
-        if (linux_throw_from_sigcontext(
+        if (java_throw_from_sigcontext(
                     uc, env->java_lang_ArithmeticException_Class)) {
             return;
         }

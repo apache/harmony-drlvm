@@ -445,18 +445,27 @@ void exn_athrow(ManagedObject* exn_obj, Class_Handle exn_class,
 // Exception defined as in previous two functions.
 // Mutates the regs value, which should be used to "resume" the managed code.
 
-void exn_athrow_regs(Registers * regs, Class_Handle exn_class)
+void exn_athrow_regs(Registers * regs, Class_Handle exn_class, bool java_code)
 {
     assert(exn_class);
 #ifndef _IPF_
-    M2nFrame *m2nf = m2n_push_suspended_frame(regs);
+    M2nFrame *m2nf;
+
+    if (java_code) {
+        m2nf = m2n_push_suspended_frame(regs);
+    }
+
     StackIterator *si = si_create_from_native();
     ManagedObject *local_exn_obj = NULL;
     exn_propagate_exception(si, &local_exn_obj, exn_class, NULL, NULL, NULL);
     si_copy_to_registers(si, regs);
+
     m2n_set_last_frame(si_get_m2n(si));
     si_free(si);
-    STD_FREE(m2nf);
+
+    if (java_code) {
+        STD_FREE(m2nf);
+    }
 #endif
 }   //exn_athrow_regs
 

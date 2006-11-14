@@ -152,7 +152,8 @@ static void throw_from_sigcontext(ucontext_t *uc, Class* exc_clss)
 
     uint32 exception_esp = regs.esp;
     DebugUtilsTI* ti = VM_Global_State::loader_env->TI;
-    exn_athrow_regs(&regs, exc_clss);
+    bool java_code = (vm_identify_eip((void *)regs.eip) == VM_TYPE_JAVA);
+    exn_athrow_regs(&regs, exc_clss, java_code);
     assert(exception_esp <= regs.esp);
     if (ti->get_global_capability(DebugUtilsTI::TI_GC_ENABLE_EXCEPTION_EVENT)) {
         regs.esp = regs.esp - 4;
@@ -282,6 +283,7 @@ inline size_t find_guard_page_size() {
     pthread_attr_init(&pthread_attr);
     err = pthread_attr_getguardsize(&pthread_attr, &guard_size);
     pthread_attr_destroy(&pthread_attr);
+    
     return guard_size;
 }
 
@@ -305,52 +307,78 @@ inline size_t get_guard_page_size() {
     return common_guard_page_size;
 }
 
+static void __attribute__ ((cdecl)) stack_holder(char* addr) {
+    char buf[1024];
+    
+    if (addr > (buf + ((size_t)1024))) {
+        return;
+    }
+    stack_holder(addr);
+}
 
 void init_stack_info() {
-    p_TLS_vmthread->stack_addr = find_stack_addr();
+    // fins stack parametrs
+    char* stack_addr = (char *)find_stack_addr();
+    p_TLS_vmthread->stack_addr = stack_addr;
     common_stack_size = find_stack_size();
     common_guard_stack_size = find_guard_stack_size();
     common_guard_page_size =find_guard_page_size();
 
+    // stack should be mapped so it's result of future mapping
+    char* res;
+
+    // begin of the stack can be protected by OS, but this part already mapped
+    // found address of current stack page
+    char* current_page_addr =
+            (char*)(((size_t)&res) & (~(common_guard_page_size-1)));
+
+    // leave place for mmap work
+    char* mapping_page_addr = current_page_addr - common_guard_page_size;
+
+    // makes sure that stack allocated till mapping_page_addr
+    stack_holder(mapping_page_addr);
+
+    // found size of the stack area which should be maped
+    size_t stack_mapping_size = (size_t)mapping_page_addr
+            - (size_t)stack_addr + common_stack_size;
+
+    // maps unmapped part of the stack
+    res = (char*) mmap(stack_addr - common_stack_size,
+            stack_mapping_size,
+            PROT_READ | PROT_WRITE,
+            MAP_FIXED | MAP_PRIVATE | MAP_ANONYMOUS | MAP_GROWSDOWN,
+            -1,
+            0);
+
+    // stack should be mapped, checks result
+    assert(res == (stack_addr - common_stack_size));
+
+    // set guard page
     set_guard_stack();
 }
 
 void set_guard_stack() {
     int err;
-    
     char* stack_addr = (char*) get_stack_addr();
     size_t stack_size = get_stack_size();
     size_t guard_stack_size = get_guard_stack_size();
     size_t guard_page_size = get_guard_page_size();
 
-    // map the guard page and protect it
-    void UNUSED *res = mmap(stack_addr - stack_size + guard_page_size +
-    guard_stack_size, guard_page_size,  PROT_READ | PROT_WRITE,
-    MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
-
-    assert(res!=MAP_FAILED);
-
     err = mprotect(stack_addr - stack_size  + guard_page_size +  
-    guard_stack_size, guard_page_size, PROT_NONE );
-   
+            guard_stack_size, guard_page_size, PROT_NONE );
+
     assert(!err);
 
-    //map the alternate stack on which we want to handle the signal
-    void UNUSED *res2 = mmap(stack_addr - stack_size + guard_page_size,
-    guard_stack_size,  PROT_READ | PROT_WRITE,
-    MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
-
-    assert(res2!=MAP_FAILED);
-
-
+    // sets alternative, guard stack
     stack_t sigalt;
     sigalt.ss_sp = stack_addr - stack_size + guard_page_size;
     sigalt.ss_flags = SS_ONSTACK;
     sigalt.ss_size = guard_stack_size;
-
     err = sigaltstack (&sigalt, NULL);
     assert(!err);
 
+    // notify that stack is OK and there are no needs to restore it
+    p_TLS_vmthread->restore_guard_page = false;
 }
 
 size_t get_available_stack_size() {
@@ -367,7 +395,8 @@ size_t get_default_stack_size() {
 }
 bool check_available_stack_size(size_t required_size) {
     if (get_available_stack_size() < required_size) {
-        exn_raise_by_name("java/lang/StackOverflowError");
+        Global_Env *env = VM_Global_State::loader_env;
+        exn_raise_by_class(env->java_lang_StackOverflowError_Class);
         return false;
     } else {
         return true;
@@ -393,6 +422,7 @@ void remove_guard_stack() {
 
     err = sigaltstack (&sigalt, NULL);
 
+    p_TLS_vmthread->restore_guard_page = true;
 }
 
 bool check_stack_overflow(siginfo_t *info, ucontext_t *uc) {
@@ -403,6 +433,9 @@ bool check_stack_overflow(siginfo_t *info, ucontext_t *uc) {
 
     char* guard_page_begin = stack_addr - stack_size + guard_page_size + guard_stack_size;
     char* guard_page_end = guard_page_begin + guard_page_size;
+
+    // FIXME: Workaround for main thread
+    guard_page_end += guard_page_size;
 
     char* fault_addr = (char*)(info->si_addr);
     //char* esp_value = (char*)(uc->uc_mcontext.gregs[REG_ESP]);
@@ -434,7 +467,7 @@ void stack_overflow_handler(int signum, siginfo_t* UNREF info, void* context)
                 uc, env->java_lang_StackOverflowError_Class);
         } else {
             remove_guard_stack();
-            exn_raise_by_name("java/lang/StackOverflowError");
+            exn_raise_by_class(env->java_lang_StackOverflowError_Class);
             p_TLS_vmthread->restore_guard_page = true;
         }
     }

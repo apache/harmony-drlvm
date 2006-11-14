@@ -26,6 +26,7 @@
 #include "Class.h"
 #include "classloader.h"
 #include "exceptions.h"
+#include "exceptions_impl.h"
 #include "exceptions_jit.h"
 #include "exceptions_type.h"
 #include "environment.h"
@@ -36,6 +37,7 @@
 Class *get_exc_class(const char *exception_name)
 {
     ASSERT_RAISE_AREA;
+    assert(hythread_is_suspend_enabled());
     Global_Env *env = VM_Global_State::loader_env;
     String *exc_str = env->string_pool.lookup(exception_name);
     Class *exc_class =
@@ -299,7 +301,6 @@ void exn_throw_object_internal(jthrowable exc_object)
 void exn_throw_by_class_internal(Class* exc_class, const char* exc_message,
     jthrowable exc_cause)
 {
-    assert(is_unwindable());
 #ifdef VM_LAZY_EXCEPTION
     set_unwindable(false);
 
@@ -369,6 +370,7 @@ void exn_raise_by_class_internal(Class* exc_class, const char* exc_message,
     }
     tmn_suspend_enable_recursive();
 #else
+    assert(hythread_is_suspend_enabled());
     jthrowable exc_object = exn_create(exc_class, exc_message, exc_cause);
 
     if (exn_raised()){

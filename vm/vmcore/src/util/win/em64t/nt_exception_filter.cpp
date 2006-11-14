@@ -126,7 +126,8 @@ int NT_exception_filter(LPEXCEPTION_POINTERS p_NT_exception)
 
     nt_to_vm_context(p_NT_exception->ContextRecord, &regs);
 
-    exn_athrow_regs(&regs, exc_clss);
+    bool java_code = (vm_identify_eip((void *)regs.eip) == VM_TYPE_JAVA);
+    exn_athrow_regs(&regs, exc_clss, java_code);
 
     vm_to_nt_context(&regs, p_NT_exception->ContextRecord);
 

@@ -2002,7 +2002,13 @@ void *vm_malloc_with_thread_pointer(
         unsigned size, Allocation_Handle ah, void *tp) {
     ASSERT_THROW_AREA;
     assert(!hythread_is_suspend_enabled());
-    void *result = gc_alloc(size,ah,tp);
+
+    void *result = NULL;
+    BEGIN_RAISE_AREA;
+    result = gc_alloc(size,ah,tp);
+    END_RAISE_AREA;
+    exn_rethrow_if_pending();
+
     if (!result) {
         exn_throw_object(VM_Global_State::loader_env->java_lang_OutOfMemoryError);
         return 0; // whether this return is reached or not is solved via is_unwindable state

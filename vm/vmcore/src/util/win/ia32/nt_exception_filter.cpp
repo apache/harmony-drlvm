@@ -28,6 +28,8 @@
 #include "stack_dump.h"
 #include "jvmti_break_intf.h"
 
+#include "m2n.h"
+
 // Windows specific
 #include <string>
 #include <excpt.h>
@@ -211,7 +213,8 @@ size_t get_default_stack_size() {
 }
 bool check_available_stack_size(size_t required_size) {
     if (get_available_stack_size() < required_size) {
-        exn_raise_by_name("java/lang/StackOverflowError");
+        Global_Env *env = VM_Global_State::loader_env;
+        exn_raise_by_class(env->java_lang_StackOverflowError_Class);
         return false;
     } else {
         return true;
@@ -325,7 +328,9 @@ static LONG NTAPI vectored_exception_handler_internal(LPEXCEPTION_POINTERS nt_ex
                 }
                 run_default_handler = false;
             } else {
-                exn_raise_by_name("java/lang/StackOverflowError");
+                M2nFrame* frame = m2n_get_last_frame();
+                Global_Env *env = VM_Global_State::loader_env;
+                exn_raise_by_class(env->java_lang_StackOverflowError_Class);
                 p_TLS_vmthread->restore_guard_page = true;
                 return EXCEPTION_CONTINUE_EXECUTION;
             }
@@ -456,7 +461,8 @@ static LONG NTAPI vectored_exception_handler_internal(LPEXCEPTION_POINTERS nt_ex
     uint32 exception_esp = regs.esp;
     DebugUtilsTI* ti = VM_Global_State::loader_env->TI;
 
-    exn_athrow_regs(&regs, exc_clss);
+    bool java_code = (vm_identify_eip((void *)regs.eip) == VM_TYPE_JAVA);
+    exn_athrow_regs(&regs, exc_clss, java_code);
 
     assert(exception_esp <= regs.esp);
     if (ti->get_global_capability(DebugUtilsTI::TI_GC_ENABLE_EXCEPTION_EVENT)) {

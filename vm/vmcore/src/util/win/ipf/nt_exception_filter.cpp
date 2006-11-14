@@ -186,7 +186,7 @@ int NT_exception_filter(LPEXCEPTION_POINTERS p_NT_exception)
 
     // The exception object of class exc_clss will be created by vm_null_ptr_throw.
     assert(exc_clss);
-    exn_athrow_regs(&regs, exc_clss);
+    exn_athrow_regs(&regs, exc_clss, true);
 
     vm_to_nt_context(&regs, p_NT_exception->ContextRecord);
 

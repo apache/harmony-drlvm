@@ -15,23 +15,30 @@
  *  limitations under the License.
  */
 
-public class StackTest {
+/**
+ * @author Ivan Volosyuk
+ */  
 
-    static int depth = 0;
+/** 
+ * @file thread_helpers_ipf.c
+ * Missing definition to ipf compile
+ */  
 
-    public static void func() {
-        depth++;
-        func();
-    }
+#include <open/hythread_ext.h>
+#include <open/thread_helpers.h>
+#include "thread_private.h"
+#include "open/thread_externals.h"
+#include "open/jthread.h"
 
-    public static void main(String[] args) {
-        try {
-            func();
-            System.out.println("FAIL");
-        } catch (StackOverflowError soe) {
-            System.out.println("PASS : First SOE depth = " + depth + " : " + soe);
-        } catch (Throwable th) {
-            System.out.println("FAIL");
-        }
-    }
+#include <assert.h>
+
+void *dummy_tls_func() {
+    assert(0);
+    abort();
 }
+
+
+fast_tls_func* get_tls_helper(hythread_tls_key_t key) {
+    return dummy_tls_func;
+}
+
