@@ -129,31 +129,36 @@ template<> CompressedRoots *CompressedRoots::base = 0;
 template<> InteriorRoots *InteriorRoots::active = 0;
 template<> InteriorRoots *InteriorRoots::base = 0;
 
+template<>
 Partial_Reveal_Object* DirectRoots::fetch(Partial_Reveal_Object **r) {
     assert(*r != 0);
     return *r;
 }
+template<>
 void DirectRoots::store(Partial_Reveal_Object **r, Partial_Reveal_Object *o) {
     assert(o != 0);
     assert(*r == o || o != heap_null);
     *r = o;
 }
-
+template<>
 Partial_Reveal_Object* InteriorRoots::fetch(InteriorPointer p) {
     Partial_Reveal_Object *res = (Partial_Reveal_Object*) (*(Ptr*)p.slot - p.offset);
     assert(res != heap_null);
     if (res == 0) return heap_null;
     return res;
 }
+template<>
 void InteriorRoots::store(InteriorPointer p, Partial_Reveal_Object *o) {
     assert(o != 0);
     if (o == heap_null) o = 0;
     *(Ptr*)p.slot = (Ptr)o + p.offset;
 }
 
+template<>
 Partial_Reveal_Object* CompressedRoots::fetch(uint32 *cr) {
     return (Partial_Reveal_Object*) (heap.base + *cr);
 }
+template<>
 void CompressedRoots::store(uint32 *cr, Partial_Reveal_Object *o) {
     assert(o != 0);
     *cr = (uint32)((Ptr)o - heap.base);
