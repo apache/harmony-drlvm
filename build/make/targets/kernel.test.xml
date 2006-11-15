@@ -124,7 +124,7 @@
                 <echo>
                 ==============================================
                 Please set the classpath of junit as follows:
-                build.bat -Djunit.jar=%JUNIT_HOME% test"
+                build.bat -Djunit.jar=%JUNIT_HOME% test
                 ==============================================
                 </echo>
                 <fail message="Kernel tests misconfigured" />

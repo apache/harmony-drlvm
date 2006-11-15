@@ -35,6 +35,7 @@ Version: $Revision: 1.16.2.20 $
                           designated components
         smoke.test      - builds and runs smoke tests for the
                           designated components
+        jvmti.test      - builds and runs JVMTI tests
         test            - builds and runs unit & smoke tests for the
                           designated components
 
@@ -393,14 +394,31 @@ Version: $Revision: 1.16.2.20 $
     </target>
 
     <!-- Main target to run smoke tests -->
-    <target name="smoke.test" depends="init, set.target.to.smoke.test, process.components" />
-    <target name="set.target.to.smoke.test">
+    <target name="smoke.test" depends="setup, init">
         <property name="target" value="smoke.test" />
+        <subant buildpath="." antfile="build_component.xml" target="build" inheritall="true" failonerror="true">
+            <property name="_component" value="vm" />
+            <property name="_target" value="${target}" />
+        </subant>
     </target>
 
     <!-- Main target to run kernel tests -->
     <target name="kernel.test" depends="extern_dep,init" >
         <ant antfile="targets/kernel.test.xml" target="kernel.test"/>
+    </target>
+
+    <!-- Main target to run jvmti tests /-->
+    <target name="jvmti.test" depends="setup, init">
+        <if>
+            <equals arg1="${build.arch}" arg2="ia32" />
+            <then>
+                <property name="target" value="jvmti.test" />
+                <subant buildpath="." antfile="build_component.xml" target="build" inheritall="true" failonerror="true">
+                    <property name="_component" value="vm" />
+                    <property name="_target" value="${target}" />
+                </subant>
+            </then>
+        </if>
     </target>
 
     <!-- process (build/create javadoc/etc...) all the specified components -->

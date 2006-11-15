@@ -1,0 +1,176 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<!--
+    Copyright 2005-2006 The Apache Software Foundation or its licensors, as applicable.
+  
+    Licensed under the Apache License, Version 2.0 (the "License");
+    you may not use this file except in compliance with the License.
+    You may obtain a copy of the License at
+  
+       http://www.apache.org/licenses/LICENSE-2.0
+  
+    Unless required by applicable law or agreed to in writing, software
+    distributed under the License is distributed on an "AS IS" BASIS,
+    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+    See the License for the specific language governing permissions and
+    limitations under the License.
+-->
+<project name="JVMTI TESTS">
+    <property name="jvmti.test.src" location="${build.VM.home}/tests/jvmti" />
+    <property name="jvmti.test.dir" location="${build.semi.dir}/jvmti.tests"/>
+    <property name="jvmti.test.class.path" location="${jvmti.test.dir}/classes"/>
+    <property name="jvmti.test.native.path" location="${jvmti.test.dir}/native"/>
+
+    <patternset id="jvmti.test.src.pattern">
+        <include name="*" />
+        <!-- This test fails -->
+        <!--exclude name="FailingTest" /-->
+    </patternset>
+
+    <property name="jvmti.test.timeout" value="180000" />
+
+    <target name="compile-jvmti-tests-prepare" depends="">
+        <dirset id="jvmti.test.src.dirs.set"
+                dir="${jvmti.test.src}">
+            <patternset refid="jvmti.test.src.pattern" />
+        </dirset>
+
+        <pathconvert pathsep=","
+                     property="jvmti.test.src.dirs.list"
+                     refid="jvmti.test.src.dirs.set" />
+    </target>
+
+    <target name="compile-jvmti-tests-java"
+            depends="compile-jvmti-tests-prepare, init_component">
+        <mkdir dir="${jvmti.test.class.path}" />
+        <for list="${jvmti.test.src.dirs.list}" param="directory"
+             delimiter=",">
+            <sequential>
+                <var name="testdir" unset="true" />
+                <basename property="testdir" file="@{directory}" />
+                <javac destdir="${jvmti.test.class.path}"
+                       source="1.5" target="1.5" listfiles="true"
+                       debug="true">
+                    <src path="${jvmti.test.src}" />
+                    <include name="${testdir}/**/*.java" />
+                </javac>
+            </sequential>
+        </for>
+    </target>
+
+    <target name="compile-jvmti-tests-native"
+        depends="compile-jvmti-tests-prepare, init_component">
+        <mkdir dir="${jvmti.test.native.path}" />
+
+        <for list="${jvmti.test.src.dirs.list}" param="directory"
+             delimiter=",">
+            <sequential>
+                <var name="outputdir" unset="true" />
+                <basename property="outputdir" file="@{directory}" />
+                <echo message="## Compiling JVMTI natives in: @{directory}" />
+                <mkdir dir="${jvmti.test.native.path}/${outputdir}" />
+                <cc name="${build.cxx}"
+                    debug="true"
+                    runtime="dynamic"
+                    multithreaded="true"
+                    link="shared"
+                    outfile="${jvmti.test.native.path}/${outputdir}/${outputdir}">
+                    <includepath path="${build.deploy.dir}/include" />
+                    <select os="lnx">
+                        <linkerarg value="-lstdc++" />
+                    </select>
+                    <fileset dir="@{directory}">
+                        <include name="**/*.cpp" />
+                    </fileset>
+                </cc>
+            </sequential>
+        </for>
+    </target>
+
+    <target name="pre-jvmti-test" depends="compile-jvmti-tests-java,
+                                           compile-jvmti-tests-native">
+        <condition property="junit.jar" value="${junit.home}/junit.jar">
+            <isset property="junit.home" />
+        </condition>
+        <property name="junit.jar"
+                  location="${external.dep.CLASSLIB}/depends/jars/junit_3.8.2/junit.jar" />
+        <if>
+            <not>
+                <available file="${junit.jar}"/>
+            </not>
+            <then>
+                <echo>
+                ==============================================
+                Please set the classpath of junit as follows:
+                build.bat -Djunit.jar=%JUNIT_HOME% test
+                ==============================================
+                </echo>
+                <fail message="JVMTI tests misconfigured" />
+            </then>
+        </if>
+
+        <delete quiet="true" dir="${jvmti.test.dir}/reports" />
+        <delete quiet="true" dir="${jvmti.test.dir}/ref-reports" />
+        <mkdir dir="${jvmti.test.dir}/reports" />
+        <mkdir dir="${jvmti.test.dir}/ref-reports" />
+    </target>
+
+    <target name="run-jvmti-tests">
+        <echo>
+		==================================
+		Run JVMTI tests using ${jvmti.tests.mode}
+		==================================
+		</echo>
+
+        <property name="report.dir" 
+            location="${jvmti.test.dir}/reports/${jvmti.tests.mode}"/>
+        <mkdir dir="${report.dir}" />
+
+        <for list="${jvmti.test.src.dirs.list}" param="directory"
+             delimiter=",">
+            <sequential>
+                <var name="testname" unset="true" />
+                <basename property="testname" file="@{directory}" />
+                <echo message="Running ${testname}" />
+                <junit fork="yes"
+                       failureproperty="${testname}.failed"
+                       timeout="${jvmti.test.timeout}"
+                       jvm="${build.deploy.dir}/bin/java">
+                    <jvmarg value="-Dvm.assert_dialog=0" />
+                    <select os="win">
+                        <jvmarg
+                        value="-agentpath:${jvmti.test.native.path}/${testname}/${testname}.dll"
+                        />
+                    </select>
+                    <select os="lnx">
+                        <jvmarg
+                        value="-agentpath:${jvmti.test.native.path}/${testname}/lib${testname}.so"
+                        />
+                    </select>
+                    <jvmarg line="${jvmti.tests.mode.switch}" />
+                    <formatter type="brief"/>
+                    <formatter type="xml" />
+                    <classpath path="${jvmti.test.class.path}" />
+                    <test name="${testname}.${testname}" todir="${report.dir}" />
+                </junit>
+                <fail if="${testname}.failed" />
+            </sequential>
+        </for>
+    </target>
+
+    <target name="jvmti.test" depends="pre-jvmti-test">
+        <if>
+            <equals arg1="${build.arch}" arg2="ia32" />
+            <then>
+                <antcall target="run-jvmti-tests">
+                    <param name="jvmti.tests.mode" value="jit" />
+                    <param name="jvmti.tests.mode.switch" value ="" />
+                </antcall>
+
+                <antcall target="run-jvmti-tests">
+                    <param name="jvmti.tests.mode" value="interpreter" />
+                    <param name="jvmti.tests.mode.switch" value="-Xint" />
+                </antcall>
+            </then>
+        </if>
+    </target>
+</project>
