@@ -39,7 +39,7 @@ public class Free {
         trace("free = " + free + ", total = " + rt.totalMemory() + ", max = " + rt.maxMemory());
         int size = 1;
         try {
-            while (size < free) {
+            while (size < free/4) {
                 long free_before = rt.freeMemory();
                 Object o = new byte[size];
                 long free_after = rt.freeMemory();
@@ -70,5 +70,6 @@ public class Free {
 
     public static void fail(Object o) {
         System.out.println("FAILED, " + o);
+        System.exit(1);
     }
 }
