@@ -38,7 +38,7 @@ public class ThreadTest extends TestCase {
         "thread has been unexpectedly interrupted";
 
     // max time interval to wait for some events in ms
-    private static final long waitDuration = 3000;
+    private static final long waitDuration = 60000;
 
     // waiting time for some event
     private long waitTime = 0;
@@ -60,7 +60,7 @@ public class ThreadTest extends TestCase {
     }
 
     private class Team {
-        public int i = 0; 
+        public volatile int i = 0; 
         volatile boolean stopProject = false;
         
         public synchronized void work() {
@@ -1322,12 +1322,6 @@ public class ThreadTest extends TestCase {
             }
         };
         t.start();
-        waitTime = waitDuration;
-        while (!t.isAlive() && !(expired = doSleep(10))) {
-        }
-        if (expired) {
-            fail("unexpected: thread has not started");
-        }
         waitTime = waitDuration;
         while (!t.isInterrupted() && !(expired = doSleep(10))) {
         }
