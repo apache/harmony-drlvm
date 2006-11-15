@@ -18,10 +18,12 @@
 public class StackTest {
 
     static int depth = 0;
+    static final int max_depth = 10000000;
 
     public static void func() {
         depth++;
-        func();
+	if (depth < max_depth)
+            func();
     }
 
     public static void main(String[] args) {
@@ -30,8 +32,8 @@ public class StackTest {
             System.out.println("FAIL");
         } catch (StackOverflowError soe) {
             System.out.println("PASS : First SOE depth = " + depth + " : " + soe);
-        } catch (Throwable th) {
-            System.out.println("FAIL");
+            return;
         }
+        System.out.println("FAIL: no SOE in " + max_depth + " iterations");
     }
 }
