@@ -29,11 +29,10 @@ public class StackTest {
     public static void main(String[] args) {
         try {
             func();
-            System.out.println("FAIL");
         } catch (StackOverflowError soe) {
             System.out.println("PASS : First SOE depth = " + depth + " : " + soe);
             return;
         }
-        System.out.println("FAIL: no SOE in " + max_depth + " iterations");
+        System.out.println("PASS: no SOE in " + max_depth + " iterations");
     }
 }
