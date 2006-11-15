@@ -165,6 +165,13 @@ typedef struct HyThreadLibrary {
  */
 typedef struct HyThread {
 
+#ifndef POSIX
+    // This is dummy pointer for Microsoft Visual Studio debugging
+    // If this is removed, Visual Studio, when attached to VM, will show
+    // no symbolic information
+    void* reserved;
+#endif
+
     /**
      * Each thread keeps a pointer to the libary it belongs to.
      */
