@@ -51,7 +51,6 @@ IDATA VMCALL hythread_monitor_init_with_name(hythread_monitor_t *mon_ptr, UDATA 
     hythread_monitor_t mon;
     apr_pool_t *pool = get_local_pool(); 
     apr_status_t apr_status;
-        IDATA status;
         
         mon = apr_pcalloc(pool, sizeof(HyThreadMonitor));
         if(mon == NULL) {
@@ -68,9 +67,6 @@ IDATA VMCALL hythread_monitor_init_with_name(hythread_monitor_t *mon_ptr, UDATA 
     mon->flags = flags;
     mon->name  = name;
     mon->owner = 0;
-
-    status=hythread_monitor_enter(mon);
-        if (status != TM_ERROR_NONE) return status;
 
         *mon_ptr = mon;
     return TM_ERROR_NONE;

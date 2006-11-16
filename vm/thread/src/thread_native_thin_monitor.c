@@ -574,17 +574,14 @@ hythread_monitor_t VMCALL inflate_lock(hythread_thin_monitor_t *lockword_ptr) {
     assert (!hythread_is_suspend_enabled());
 
     TRACE (("inflation begin for %x thread: %d", lockword, tm_self_tls->thread_id));
-    status = hythread_monitor_init(&fat_monitor, 0); // allocate fat fat_monitor
+    status = hythread_monitor_init(&fat_monitor, 0); // allocate fat fat_monitor    
     assert(status == TM_ERROR_NONE);  
+    status = hythread_monitor_enter(fat_monitor);
     if(status != TM_ERROR_NONE) {
         hymutex_unlock(FAT_MONITOR_TABLE_LOCK);
         return NULL;
     } 
     
-    /* removed due to lock acquisition in monitor creation
-     * status = hythread_monitor_enter(fat_monitor); // lock fat fat_monitor   
-     * assert(status == TM_ERROR_NONE);
-     */    
     for (i = RECURSION(lockword); i > 0; i--) {
         TRACE( ("infalte recursion monitor"));
         status = hythread_monitor_enter(fat_monitor);  // transfer recusrion count to fat fat_monitor   

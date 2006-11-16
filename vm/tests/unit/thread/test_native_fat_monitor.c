@@ -56,7 +56,6 @@ int test_wait_signal(void){
     //log_error("BUG IN APR");
     //tf_assert(0);
     status = hythread_monitor_init(&monitor, 0);
-   status = hythread_monitor_exit(monitor);
     tf_assert_same(status, TM_ERROR_NONE);
     waiting_count = 0;
 

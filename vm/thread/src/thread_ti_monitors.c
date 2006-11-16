@@ -47,9 +47,6 @@ IDATA VMCALL jthread_raw_monitor_create(jrawMonitorID* mon_ptr) {
     IDATA status;
         status = hythread_monitor_init(&monitor, 0);
     if (status != TM_ERROR_NONE) return status;
-    //hythread monitor init also locks it
-    status = hythread_monitor_exit(monitor);
-    if (status != TM_ERROR_NONE) return status;
     // possibly should be moved to jvmti(environment?) init section
     //// 
     if (!jvmti_monitor_table) {

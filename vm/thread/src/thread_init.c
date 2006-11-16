@@ -188,10 +188,8 @@ void VMCALL hythread_init(hythread_library_t lib){
         mon = (hythread_monitor_t*)hythread_global(GLOBAL_MONITOR_NAME);
     *mon = p_global_monitor;
     assert(mon);
-    status=hythread_monitor_exit(p_global_monitor);
-    assert (status == TM_ERROR_NONE);
-
 }
+
 /**
  * Shut down the threading library associated with the current thread.
  * 
