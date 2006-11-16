@@ -106,6 +106,10 @@ public:
 
 // Checks that phi insts can start from the second or third position only
 // and goes in a row
+// The first instruction is usually a LabelInst.
+// The second one is Phi (if any). But in catch blocks the second inst
+// is a CatchInst, and phi may be shifted to the third position.
+
 bool SSABuilder::phiInstsOnRightPositionsInBB(Node* node) {
     Inst* inst = (Inst*)node->getSecondInst();
     if(inst && !inst->isPhi()) {
