@@ -105,6 +105,7 @@ public:
     bool fixupVars(ControlFlowGraph* fg, MethodDesc& methodDesc);
     static void deconvertSSA(ControlFlowGraph* fg,OpndManager& opndManager);
     static void splitSsaWebs(ControlFlowGraph* fg,OpndManager& opndManager);
+    static bool phiInstsOnRightPositionsInBB(Node* node);
 private:
     void findDefSites(DefSites& allDefSites);
     void insertPhi(DefSites& allDefSites);

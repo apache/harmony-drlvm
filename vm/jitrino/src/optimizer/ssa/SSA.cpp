@@ -103,6 +103,29 @@ public:
     {};
 };
 
+
+// Checks that phi insts can start from the second or third position only
+// and goes in a row
+bool SSABuilder::phiInstsOnRightPositionsInBB(Node* node) {
+    Inst* inst = (Inst*)node->getSecondInst();
+    if(inst && !inst->isPhi()) {
+        // try the next one (third)
+        inst = inst->getNextInst();
+    }
+    // skip all phis
+    while ( inst!=NULL && inst->isPhi() ) {
+        inst = inst->getNextInst();
+    }
+    // 'true' only if there is no any other phis in the node
+    while ( inst!=NULL ) {
+        if(inst->isPhi()) {
+            return false;
+        }
+        inst = inst->getNextInst();
+    }
+    return true;
+} 
+
 //
 // find def sites (blocks) of var operand
 //
@@ -601,7 +624,16 @@ public:
 bool SSABuilder::checkForTrivialPhis(Node *node, 
                                      StlVector<VarOpnd *> &changedVars)
 {
+    // Check that phi insts can start from the second or third position only
+    // and goes in a row
+    assert(phiInstsOnRightPositionsInBB(node));
+
     Inst* phi = (Inst*)node->getSecondInst();
+    if(phi && !phi->isPhi()) {
+        // try the next one (third)
+        phi = phi->getNextInst();
+    }
+
     bool removedPhi = false;
 #ifdef DEBUG_SSA
     if (Log::isEnabled()) {
@@ -669,7 +701,16 @@ void SSABuilder::checkForTrivialPhis2(Node *node,
                                       StlVector<VarOpnd *> *changedVars,
                                       StlVector<Opnd *> *removedVars)
 {
+    // Check that phi insts can start from the second or third position only
+    // and goes in a row
+    assert(phiInstsOnRightPositionsInBB(node));
+
     Inst* phi = (Inst*)node->getSecondInst();
+    if(phi && !phi->isPhi()) {
+        // try the next one (third)
+        phi = phi->getNextInst();
+    }
+
     Inst *nextphi = NULL;
 #ifdef DEBUG_SSA
     if (Log::isEnabled()) {
