@@ -29,7 +29,27 @@ import org.apache.harmony.lang.ProtectedSuccessor;
 
 import junit.framework.TestCase;
 
-@SuppressWarnings(value={"all"}) public class MethodTestInvoke extends TestCase {
+@SuppressWarnings(value={"all"}) 
+public class MethodTestInvoke extends TestCase {
+    
+    static class MyException extends RuntimeException {}
+    
+    public static void doFail() {
+        throw new MyException();
+    }
+    
+    /**
+     * Tests that correct cause of reflection error is provided.
+     */
+    public void testInvocationTargetExceptionCause() throws Exception {
+        try {
+            this.getClass().getMethod("doFail").invoke(null);
+        } catch (InvocationTargetException e) {
+            Throwable cause = e.getCause();
+            assertTrue("Unexpected cause: " + cause, 
+                    cause instanceof MyException);
+        }
+    }
 
     int state = 0;
     

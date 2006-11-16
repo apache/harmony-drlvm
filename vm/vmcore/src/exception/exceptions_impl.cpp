@@ -281,7 +281,7 @@ jthrowable create_exception(Exception* exception)
 
         if (NULL != exception->exc_cause) {
             tmn_suspend_disable_recursive();
-            jthrowable exc_cause = oh_allocate_local_handle();
+            exc_cause = oh_allocate_local_handle();
             exc_cause->object = exception->exc_cause;
             tmn_suspend_enable_recursive();
         }
