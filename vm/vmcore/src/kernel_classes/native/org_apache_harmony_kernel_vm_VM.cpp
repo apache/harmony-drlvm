@@ -31,10 +31,7 @@
 #include "org_apache_harmony_kernel_vm_VM.h"
 #include "java_lang_VMClassRegistry.h"
 
-/**
- * Implements java.lang.String.intern(..) method.
- * For details see kernel classes component documentation.
- */
+
 JNIEXPORT jobject JNICALL Java_org_apache_harmony_kernel_vm_VM_getClassLoader
 (JNIEnv *jenv, jclass, jclass clazz)
 {
@@ -42,10 +39,6 @@ JNIEXPORT jobject JNICALL Java_org_apache_harmony_kernel_vm_VM_getClassLoader
     return Java_java_lang_VMClassRegistry_getClassLoader0(jenv, NULL, clazz);
 }
 
-/**
- * Implements org.apache.harmony.vm.VM.intern0(..) method.
- * For details see kernel classes component documentation.
- */
 JNIEXPORT jstring JNICALL
 Java_org_apache_harmony_kernel_vm_VM_intern0(JNIEnv *jenv, jclass, jstring str)
 {
