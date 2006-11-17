@@ -15,6 +15,12 @@
  *  limitations under the License.
  */
 
+/**
+ * Excluded from acceptance test set on EM64T.
+ *
+ * @keyword X_em64t_bug
+ */
+
 public class StackTest {
 
     static int depth = 0;
