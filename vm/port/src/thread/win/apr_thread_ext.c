@@ -22,9 +22,8 @@
 #include <windows.h>
 #include <stdio.h>
 #include "apr_thread_ext.h"
-//#include "apr_arch_threadproc.h"
+#include <apr_atomic.h>
 
-static int convert_priority(apr_int32_t priority);
 
 APR_DECLARE(apr_status_t) apr_thread_set_priority(apr_thread_t *thread, 
                 apr_int32_t priority) 
@@ -36,38 +35,49 @@ APR_DECLARE(apr_status_t) apr_thread_set_priority(apr_thread_t *thread,
         return status;
     }
     
-    if (SetThreadPriority(*os_thread, (int)convert_priority(priority))) {
+    if (SetThreadPriority(*os_thread, (int)priority)) {
         return APR_SUCCESS;
     } else {
         return apr_get_os_error();
     }
-    
-    
-}
-
-static int convert_priority(apr_int32_t priority) {
-    return (int)priority;
 }
 
 // touch thread to flash memory
 APR_DECLARE(apr_status_t) apr_thread_yield_other(apr_thread_t* thread) {
     HANDLE *os_thread = NULL;
-    apr_status_t status;   
-    if (status = apr_os_thread_get(&((apr_os_thread_t *)os_thread), thread)) {
+    apr_status_t status;  
+
+    static CRITICAL_SECTION *yield_other_mutex = NULL;
+    if (yield_other_mutex == NULL) {
+        CRITICAL_SECTION *cs = malloc(sizeof(CRITICAL_SECTION));
+        InitializeCriticalSectionAndSpinCount(cs, 400);
+        // there should be the only one CS
+        // do nothing if some one else already init it.
+        if(apr_atomic_casptr ((volatile void**)&yield_other_mutex, (void*)cs, NULL)) {
+            DeleteCriticalSection(cs);
+            free(cs);
+        }
+    }
+
+	if (status = apr_os_thread_get(&((apr_os_thread_t *)os_thread), thread)) {
         return status;
     }
-        if(!os_thread) {
-//        printf ("detached thread\n");
-              return status;
-        }
-       //printf("suspending %d\n", *os_thread);
-    if(-1!=SuspendThread(*os_thread)) {
-         ResumeThread(*os_thread);
- //      printf("resuming %d\n", *os_thread);
-        } else {
-  //            printf("fail to suspend %d\n", *os_thread);
-        }
-  return APR_SUCCESS; 
+	if(!os_thread) {
+        return status;
+    }
+
+    /* 
+     * Synchronization is needed to avoid cyclic (mutual) suspension problem.
+     * Accordingly to MSDN, it is possible on multiprocessor box that
+     * 2 threads suspend each other and become deadlocked.
+     */
+    EnterCriticalSection(yield_other_mutex);
+    if(-1 != SuspendThread(*os_thread)) {
+        /* suspended successfully, so resume it back. */
+        ResumeThread(*os_thread);
+    } 
+    LeaveCriticalSection(yield_other_mutex);
+    return APR_SUCCESS; 
 }
 
 APR_DECLARE(void) apr_memory_rw_barrier() {
