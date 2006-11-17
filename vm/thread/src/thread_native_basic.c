@@ -426,7 +426,12 @@ IDATA thread_sleep_impl(I_64 millis, IDATA nanos, IDATA interruptable) {
     // Report error in case current thread is not attached
     if (!thread) return TM_ERROR_UNATTACHED_THREAD;
     
-    status = sem_wait_impl(thread->sleep_event, millis, nanos, interruptable);
+    hymutex_lock(thread->mutex);
+    thread->state |= TM_THREAD_STATE_SLEEPING;
+    status = condvar_wait_impl(thread->condition, thread->mutex, millis, nanos, interruptable);
+    thread->state &= ~TM_THREAD_STATE_SLEEPING;
+    hymutex_unlock(thread->mutex);
+
     return (status == TM_ERROR_INTERRUPT && interruptable) ? TM_ERROR_INTERRUPT : TM_ERROR_NONE;
 }
 
@@ -644,9 +649,9 @@ static hythread_t allocate_thread() {
     assert (status == TM_ERROR_NONE);
     status = hysem_create(&ptr->resume_event, 0, 1);
     assert (status == TM_ERROR_NONE);
-    status = hysem_create(&ptr->park_event, 0, 1);
+    status = hymutex_create(&ptr->mutex, TM_MUTEX_NESTED);
     assert (status == TM_ERROR_NONE);
-    status = hysem_create(&ptr->sleep_event, 0, 1);
+    status = hycond_create(&ptr->condition);
     assert (status == TM_ERROR_NONE);
     
     ptr->state = TM_THREAD_STATE_ALLOCATED;
@@ -674,10 +679,6 @@ static void reset_thread(hythread_t thread) {
     status = hylatch_set(thread->safe_region_event, 1);
     assert (status == TM_ERROR_NONE);
     status = hysem_set(thread->resume_event, 0);
-    assert (status == TM_ERROR_NONE);
-    status = hysem_set(thread->park_event, 0);
-    assert (status == TM_ERROR_NONE);
-    status = hysem_set(thread->sleep_event, 0);
     assert (status == TM_ERROR_NONE);
     
     thread->state = TM_THREAD_STATE_ALLOCATED;

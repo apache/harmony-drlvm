@@ -311,6 +311,7 @@ int VMCALL hythread_is_daemon(hythread_t thread) ;
 #define TM_THREAD_STATE_SLEEPING JVMTI_THREAD_STATE_SLEEPING // 0x0040  Thread is sleeping -- Thread.sleep(long).  
 #define TM_THREAD_STATE_IN_MONITOR_WAIT JVMTI_THREAD_STATE_IN_OBJECT_WAIT // 0x0100  Thread is waiting on an object monitor -- Object.wait.  
 #define TM_THREAD_STATE_PARKED JVMTI_THREAD_STATE_PARKED // 0x0200  Thread is parked, for example: LockSupport.park, LockSupport.parkUtil and LockSupport.parkNanos.  
+#define TM_THREAD_STATE_UNPARKED  0x0800 // 0x0800  Thread is unparked, to track staled unparks;
 #define TM_THREAD_STATE_SUSPENDED JVMTI_THREAD_STATE_SUSPENDED // 0x100000  Thread suspended. java.lang.Thread.suspend() or a JVMTI suspend function (such as SuspendThread) has been called on the thread. If this bit is set, the other bits refer to the thread state before suspension.  
 #define TM_THREAD_STATE_INTERRUPTED JVMTI_THREAD_STATE_INTERRUPTED // 0x200000  Thread has been interrupted.  
 #define TM_THREAD_STATE_IN_NATIVE JVMTI_THREAD_STATE_IN_NATIVE // 0x400000  Thread is in native code--that is, a native method is running which has not called back into the VM or Java programming language code. 

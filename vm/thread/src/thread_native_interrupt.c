@@ -40,13 +40,25 @@
  */
 void VMCALL hythread_interrupt(hythread_t thread) {
     IDATA status;
+    hymutex_lock(thread->mutex);
     thread->state |= TM_THREAD_STATE_INTERRUPTED;
     
-    // If thread was doing any kind of wait, notify it.
-    if (thread->current_condition) {
-            status=hycond_notify_all(thread->current_condition);   
-                        assert (status == TM_ERROR_NONE);
+    if (thread == tm_self_tls) {
+        hymutex_unlock(thread->mutex);
+        return;
     }
+
+    if (thread->state
+            & (TM_THREAD_STATE_PARKED | TM_THREAD_STATE_SLEEPING
+                | TM_THREAD_STATE_IN_MONITOR_WAIT)) {
+        // If thread was doing any kind of wait, notify it.
+        if (thread->current_condition) {
+            status = hycond_notify_all(thread->current_condition);
+            assert(status == TM_ERROR_NONE);
+        }
+    }
+
+    hymutex_unlock(thread->mutex);
 }
 
 /** 
@@ -56,9 +68,12 @@ void VMCALL hythread_interrupt(hythread_t thread) {
  * @returns TM_ERROR_INTERRUPT if thread was interruped, TM_ERROR_NONE otherwise
  */
 UDATA VMCALL hythread_clear_interrupted_other(hythread_t thread) {
-        int interrupted = thread->state & TM_THREAD_STATE_INTERRUPTED;
-    thread->state &= ~TM_THREAD_STATE_INTERRUPTED;    
-        return interrupted?TM_ERROR_INTERRUPT:TM_ERROR_NONE;
+    int interrupted;
+    hymutex_lock(thread->mutex);
+    interrupted = thread->state & TM_THREAD_STATE_INTERRUPTED;
+    thread->state &= ~TM_THREAD_STATE_INTERRUPTED;
+    hymutex_unlock(thread->mutex);
+    return interrupted ? TM_ERROR_INTERRUPT : TM_ERROR_NONE;
 }
 
 /**

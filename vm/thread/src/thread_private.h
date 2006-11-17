@@ -250,15 +250,15 @@ typedef struct HyThread {
 
 // Synchronization stuff
 
-    /**
-     * Event reserved for parking threads.
+    /*
+     * Thread local lock, used to serialize thread state;
      */
-    hysem_t park_event;
-    
-    /**
-     * Event reserved for sleeping threads.
+    hymutex_t mutex;
+
+    /*
+     * Conditional variable used to implement wait function for sleep/park;
      */
-    hysem_t sleep_event;    
+    hycond_t condition;
 
     /**
      * Event reserved for threads that invoke join.
@@ -269,8 +269,7 @@ typedef struct HyThread {
      * Current conditional variable thread is waiting on (used for interrupting)
      */
     hycond_t current_condition;
-           
-              
+
 // State
 
     /**

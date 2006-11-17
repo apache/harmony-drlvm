@@ -174,7 +174,6 @@ IDATA monitor_wait_impl(hythread_monitor_t mon_ptr, I_64 ms, IDATA nano, IDATA i
         mon_ptr->last_wait=tm_self_tls;
 #endif
     
-    mon_ptr->wait_count++;
         saved_recursion = mon_ptr->recursion_count;
         
     assert(saved_recursion>=0);
@@ -199,10 +198,20 @@ IDATA monitor_wait_impl(hythread_monitor_t mon_ptr, I_64 ms, IDATA nano, IDATA i
         if (status != TM_ERROR_NONE) return status;
     set_suspend_disable(saved_disable_count);
 
-#else 
-    //printf("starting wait: %x, %x \n", mon_ptr->condition, hythread_self());
-        status =  condvar_wait_impl(mon_ptr->condition, mon_ptr->mutex, ms, nano, interruptable);
-    //printf("finishing wait: %x, %x \n", mon_ptr->condition, hythread_self());
+#else
+    mon_ptr->wait_count++;
+    hymutex_lock(self->mutex);
+    self->current_condition = mon_ptr->condition;
+    self->state |= TM_THREAD_STATE_IN_MONITOR_WAIT;
+    hymutex_unlock(self->mutex);
+
+    status =  condvar_wait_impl(mon_ptr->condition, mon_ptr->mutex, ms, nano, interruptable);
+
+    hymutex_lock(self->mutex);
+    self->state &= ~TM_THREAD_STATE_IN_MONITOR_WAIT;
+    self->current_condition = NULL;
+    hymutex_unlock(self->mutex);
+    mon_ptr->wait_count--;
 #endif
         if(self->suspend_request) {
             hymutex_unlock(mon_ptr->mutex);
@@ -308,7 +317,6 @@ IDATA VMCALL hythread_monitor_notify_all(hythread_monitor_t mon_ptr) {
     if(mon_ptr->owner != tm_self_tls) {
         return TM_ERROR_ILLEGAL_STATE;
     }
-    mon_ptr->wait_count = 0;
 #ifdef NO_COND_VARS
         mon_ptr->notify_flag=1;
         return TM_ERROR_NONE;
@@ -334,9 +342,6 @@ IDATA VMCALL hythread_monitor_notify_all(hythread_monitor_t mon_ptr) {
 IDATA VMCALL hythread_monitor_notify(hythread_monitor_t mon_ptr) {      
     if(mon_ptr->owner != tm_self_tls) {
         return TM_ERROR_ILLEGAL_STATE;
-    }
-    if (mon_ptr->wait_count > 0){
-        mon_ptr->wait_count--;
     }
 #ifdef NO_COND_VARS
         mon_ptr->notify_flag=1;
