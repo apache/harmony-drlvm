@@ -15,9 +15,13 @@
 -->
 <!--
 Author:  Marina V. Goldburt
-Version: $Revision: 1.3.2.2 $
 -->
 <project name="ALL TESTS">
-    <target name="test" depends="jvmti.test, cunit.test, smoke.test, kernel.test" />
+    <select arch="ipf">
+        <target name="test" depends="smoke.test" />
+    </select>
+    <select arch="ia32,em64t">
+        <target name="test" depends="jvmti.test, cunit.test, smoke.test, kernel.test" />
+    </select>
 </project>
 

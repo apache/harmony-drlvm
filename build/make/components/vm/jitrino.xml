@@ -26,7 +26,6 @@ Version: $Revision: 1.6.2.8 $
 
 <project name="vm.jitrino">
     <target name="init">
-        <select arch="ia32,em64t">
         <property name="build.depends" value="extra.apr,vm.vmcore,vm.encoder,vm.hythr" />
         <property name="outtype" value="shared" />
         <property name="libname" value="jitrino" />
@@ -343,6 +342,5 @@ Version: $Revision: 1.6.2.8 $
                    <include name="${build.arch}/**" />
               </fileset>
         </copy>
-        </select>
     </target>
 </project>

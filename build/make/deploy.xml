@@ -42,10 +42,12 @@ Description of the product deploy folder.
             <other>bin/default:*</other>
         </interpreter>
 
+        <select arch="ia32,em64t">
         <jitrino>
             <shared>bin/default:jitrino</shared>
             <other>bin/default:*</other>
         </jitrino>
+        </select>
 
         <gc_gen>
             <shared>bin/default:gc_gen</shared>

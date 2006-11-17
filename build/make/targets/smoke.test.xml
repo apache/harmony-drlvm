@@ -52,9 +52,11 @@ Version: $Revision: 1.4.2.11 $
             <pathelement location="${build.dir}/_smoke.tests/classes" />
             <fileset dir="${build.deploy.dir}/lib" includes="*.jar" />
         </path>
+        <select arch="ia32,em64t">
         <antcall target="java_test_smoke_with_jit_or_interpreter">
             <param name="jit.or.interpreter" value="jit" />
         </antcall>
+        </select>
         <antcall target="java_test_smoke_with_jit_or_interpreter">
             <param name="jit.or.interpreter" value="interpreter" />
         </antcall>

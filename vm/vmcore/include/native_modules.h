@@ -22,6 +22,8 @@
 #ifndef _NATIVE_MODULES_H_
 #define _NATIVE_MODULES_H_
 
+#include <stdio.h>
+
 #ifdef __cplusplus
 extern "C" {
 #endif
