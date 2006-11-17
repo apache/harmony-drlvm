@@ -25,7 +25,6 @@
 #include "Environment.h"
 #include "gc_for_vm.h"
 #include "exceptions.h"
-#include "vm_synch.h"
 #include "method_lookup.h"
 #include "vm_strings.h"
 #include "vm_threads.h"

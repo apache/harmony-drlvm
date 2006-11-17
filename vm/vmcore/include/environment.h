@@ -68,6 +68,12 @@ struct Global_Env {
     bool verify_all;                // psrebriy 20050815 Verify all classes including loaded by bootstrap class loader
     bool pin_interned_strings;      // if true, interned strings are never moved
 
+    Lock_Manager *p_jit_a_method_lock;
+    Lock_Manager *p_vtable_patch_lock;
+    Lock_Manager *p_meth_addr_table_lock;
+    Lock_Manager *p_method_call_lock;
+    Lock_Manager *p_handle_lock;
+
     // If set to true by the "-compact_fields" command line option,
     // the VM will not pad out fields of less than 32 bits to four bytes.
     // However, fields will still be aligned to a natural boundary,
@@ -194,20 +200,9 @@ struct Global_Env {
     VTable* JavaLangString_VTable;
     Allocation_Handle JavaLangString_allocation_handle;
 
-    // Keeps uncaught exception for the thread which is destroying VM.
-    jthrowable uncaught_exception;
-
     // Offset to the vm_class field in java.lang.Class;
     unsigned vm_class_offset;
 
-    /**
-     * Shutting down state.
-     * 0 - working
-     * 1 - shutting down
-     * 2 - deadly errors in shutdown
-     */
-    int shutting_down;
-        
     // FIXME
     // The whole environemt will be refactored to VM instance
     // The following contains a cached copy of EM interface table

@@ -207,6 +207,7 @@ static ObjectHandlesOld* global_object_handles = NULL;
 
 ObjectHandle oh_allocate_global_handle()
 {
+    Global_Env * vm_env = VM_Global_State::loader_env;
 
     // Allocate and init handle
     ObjectHandlesOld* h = oh_allocate_object_handle(); //(ObjectHandlesOld*)m_malloc(sizeof(ObjectHandlesOld));
@@ -214,14 +215,14 @@ ObjectHandle oh_allocate_global_handle()
     h->allocated_on_the_stack = false;
     
     hythread_suspend_disable(); // ----------------vvv
-    p_handle_lock->_lock(); 
+    vm_env->p_handle_lock->_lock(); 
     // Insert at beginning of globals list
     h->prev = NULL;
     h->next = global_object_handles;
     global_object_handles = h;
     if(h->next)
         h->next->prev = h;
-    p_handle_lock->_unlock();
+    vm_env->p_handle_lock->_unlock();
     hythread_suspend_enable(); //--------------------------------------------^^^
     return &h->handle;
 } //vm_create_global_object_handle
@@ -235,8 +236,10 @@ static bool UNUSED is_global_handle(ObjectHandle handle)
 
 void oh_deallocate_global_handle(ObjectHandle handle)
 {
+    Global_Env * vm_env = VM_Global_State::loader_env;
+
     tmn_suspend_disable(); // ----------vvv
-    p_handle_lock->_lock();
+    vm_env->p_handle_lock->_lock();
     assert(is_global_handle(handle));
 
     handle->object = NULL;
@@ -245,7 +248,7 @@ void oh_deallocate_global_handle(ObjectHandle handle)
     if (h->prev) h->prev->next = h->next;
     if (h==global_object_handles) global_object_handles = h->next;
 
-    p_handle_lock->_unlock();
+    vm_env->p_handle_lock->_unlock();
     tmn_suspend_enable(); // -------------------------------------^^^
     STD_FREE(h);
 } //vm_delete_global_object_handle

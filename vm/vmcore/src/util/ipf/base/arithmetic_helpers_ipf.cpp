@@ -40,7 +40,6 @@ using namespace std;
 #include "environment.h"
 #include "method_lookup.h"
 #include "exceptions.h"
-#include "vm_synch.h"
 #include "open/gc.h" 
 #include "ini.h"
 #include "open/vm_util.h"

@@ -45,7 +45,6 @@ using namespace std;
 #include "open/vm_util.h"
 #include "nogc.h"
 #include "sync_bits.h"
-#include "vm_synch.h"
 
 #include "lock_manager.h"
 #include "thread_manager.h"

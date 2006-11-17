@@ -66,13 +66,6 @@ private:
     bool m_unlock;
 };
 
-
-extern Lock_Manager *p_jit_a_method_lock;
-extern Lock_Manager *p_vtable_patch_lock;
-extern Lock_Manager *p_meth_addr_table_lock;
-// 20040224 Support for recording which methods (actually, CodeChunkInfo's) call which other methods.
-extern Lock_Manager *p_method_call_lock;
-extern Lock_Manager *p_handle_lock;
 #endif // __cplusplus
 
 #endif // _lock_manager_H_

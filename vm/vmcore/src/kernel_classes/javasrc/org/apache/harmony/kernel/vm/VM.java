@@ -21,15 +21,12 @@
 
 package org.apache.harmony.kernel.vm;
 
-import org.apache.harmony.luni.internal.net.www.protocol.jar.JarURLConnection;
-import org.apache.harmony.luni.util.DeleteOnExit;
-
 import org.apache.harmony.vm.VMStack;
 
 public final class VM {
 
-	private static boolean closeJars = false;
-	private static boolean deleteOnExit = false;
+    public static boolean closeJars = false;
+    public static boolean deleteOnExit = false;
 
     private VM() {
     }
@@ -89,15 +86,7 @@ public final class VM {
      * 2) We've proposed another approach to perform shutdown actions.
      */
     public static void closeJars() {
-    	class CloseJarsHook implements Runnable {
-    		public void run() {
-    			JarURLConnection.closeCachedFiles();
-    		}
-    	}
-    	if (!closeJars) {
-        	closeJars = true;
-        	Runtime.getRuntime().addShutdownHook(new Thread(new CloseJarsHook()));
-    	}
+        closeJars = true;
     }
 
     /**
@@ -105,15 +94,7 @@ public final class VM {
      * 2) We've proposed another approach to perform shutdown actions.
      */
     public static void deleteOnExit() {
-    	class DeleteOnExitHook implements Runnable {
-    		public void run() {
-    			DeleteOnExit.deleteOnExit();
-    		}
-    	}
-    	if (!deleteOnExit) {
-        	deleteOnExit = true;
-        	Runtime.getRuntime().addShutdownHook(new Thread(new DeleteOnExitHook()));
-    	}
+        deleteOnExit = true;
     }
     
     /**

@@ -40,7 +40,6 @@ using namespace std;
 #include "open/thread_helpers.h"
 
 #include "vm_arrays.h"
-#include "vm_synch.h"
 #include "vm_strings.h"
 #include "ini.h"
 #include "nogc.h"

@@ -40,7 +40,6 @@
 #include "open/vm_util.h"
 #include "jit_intf.h"
 #include "object_handles.h"
-#include "vm_synch.h"
 #include "vm_threads.h"
 #include "vm_stats.h"
 #include "vm_arrays.h"
@@ -116,7 +115,7 @@ static struct VmStandardProperty {
                 true, TRUE},
     {"vm.jvmti.enabled",            "Whether JVMTI mode is enabled.",
                 true, FALSE},
-    {"vm.cleanupOnExit",             "Excplicitly free VM resources before exit.",
+    {"vm.noCleanupOnExit",          "Exit without cleaning internal resorces.",
                 true, FALSE},
     {"vm.bootclasspath.appendclasspath", "Append classpath to the bootclasspath",
                 true, FALSE},

@@ -58,7 +58,6 @@ using namespace std;
 #include "open/gc.h"
  
 #include "open/vm_util.h"
-#include "vm_synch.h"
 #include "vm_threads.h"
 #include "ini.h"
 #include "type.h"

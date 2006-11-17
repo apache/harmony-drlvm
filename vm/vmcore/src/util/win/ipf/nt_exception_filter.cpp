@@ -23,7 +23,6 @@
 #include "Class.h"
 #include "Environment.h"
 #include "exceptions.h"
-#include "vm_synch.h"
 #include "method_lookup.h"
 #include "vm_strings.h"
 #include "vm_threads.h"

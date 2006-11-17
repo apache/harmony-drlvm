@@ -56,7 +56,6 @@ using namespace std;
 #include "vm_strings.h"
 #include "vm_arrays.h"
 #include "vm_threads.h"
-#include "vm_synch.h"
 #include "port_malloc.h"
 #include "jni_utils.h" // This is for readInternal override
 

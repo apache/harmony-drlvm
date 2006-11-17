@@ -30,94 +30,14 @@
 #include "environment.h"
 #include "classloader.h"
 #include "compile.h"
-#include "component_manager.h"
 #include "nogc.h"
 #include "jni_utils.h"
-#include "vm_synch.h"
 #include "vm_stats.h"
 #include "thread_dump.h"
 #include "interpreter.h"
 
 #define LOG_DOMAIN "vm.core.shutdown"
 #include "cxxlog.h"
-
-
-/**
- * TODO:
- */
-void vm_cleanup_internal_data() {
-    // Print out gathered data.
-#ifdef VM_STATS
-    ClassLoader::PrintUnloadingStats();
-    VM_Statistics::get_vm_stats().print();
-#endif
-
-    // Unload jit instances.
-    vm_delete_all_jits();
-
-    // Unload component manager and all registered components.
-    // TODO: why do we need to unload "em" explicitly?
-    CmFreeComponent("em");
-    CmRelease();
-
-    // Unload all system native libraries.
-    natives_cleanup();
-
-    // TODO: it seems we don't need to do it!!! At least here!!!
-    gc_wrapup();
-
-    // Release global data.
-    // TODO: move these data to VM space.
-    vm_uninitialize_critical_sections();
-    vm_mem_dealloc();
-}
-
-/**
- * TODO:
- */
-void vm_exit(int exit_code)
-{
-    jthread java_thread;
-    JNIEnv * jni_env;
-    Global_Env * vm_env;
-
-    assert(hythread_is_suspend_enabled());
-
-    java_thread = jthread_self();
-    jni_env = jthread_get_JNI_env(java_thread);
-    vm_env = jni_get_vm_env(jni_env);
-
-    // Send VM_Death event and switch phase to VM_Death
-    jvmti_send_vm_death_event();
-
-    /* FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME *
-     * gregory - JVMTI shutdown should be part of DestroyVM after current VM shutdown      *
-     * problems are fixed                                                                  *
-     * FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME */
-    // call Agent_OnUnload() for agents and unload agents
-    JavaVM *java_vm;
-    jni_env->GetJavaVM(&java_vm);
-    vm_env->TI->Shutdown(java_vm);
-
-    // Raise uncaught exception to current thread.
-    // It will be properly processed in jthread_detach().
-    if (vm_env->uncaught_exception) {
-        exn_raise_object(vm_env->uncaught_exception);
-    }
-
-    // Detach current thread.
-    IDATA UNREF status = jthread_detach(java_thread);
-    assert(status == TM_ERROR_NONE);
-
-    // Cleanup internal data. Disabled by default due to violation access exception.
-    if (vm_get_boolean_property_value_with_default("vm.cleanupOnExit")) {
-        jthread_cancel_all();
-        vm_cleanup_internal_data();
-        LOGGER_EXIT(exit_code);
-    }
-
-    _exit(exit_code);
-}
 
 #define PROCESS_EXCEPTION(message) \
 { \
@@ -133,33 +53,31 @@ void vm_exit(int exit_code)
 } \
 
 /**
- * Calls java.lang.System.exit() method.
- * Current thread should be attached to VM.
+ * Calls java.lang.System.execShutdownSequence() method.
  *
- * @param exit_status VM exit code
+ * @param jni_env JNI environment of the current thread
  */
-static jint run_system_exit(JNIEnv * jni_env, jint exit_status) {
-    jvalue args[1];
+static jint exec_shutdown_sequence(JNIEnv * jni_env) {
+    jclass system_class;
+    jmethodID shutdown_method;
 
     assert(hythread_is_suspend_enabled());
 
-    args[0].i = exit_status;
-
-    jclass system_class = jni_env->FindClass("java/lang/System");
+    system_class = jni_env->FindClass("java/lang/System");
     if (jni_env->ExceptionCheck() == JNI_TRUE || system_class == NULL) {
         // This is debug message only. May appear when VM is already in shutdown stage.
         PROCESS_EXCEPTION("can't find java.lang.System class.");
     }
     
-    jmethodID exit_method = jni_env->GetStaticMethodID(system_class, "exit", "(I)V");
-    if (jni_env->ExceptionCheck() == JNI_TRUE || exit_method == NULL) {
-        PROCESS_EXCEPTION("can't find java.lang.System.exit(int) method.");
+    shutdown_method = jni_env->GetStaticMethodID(system_class, "execShutdownSequence", "()V");
+    if (jni_env->ExceptionCheck() == JNI_TRUE || shutdown_method == NULL) {
+        PROCESS_EXCEPTION("can't find java.lang.System.execShutdownSequence() method.");
     }
 
-    jni_env->CallStaticVoidMethodA(system_class, exit_method, args);
+    jni_env->CallStaticVoidMethod(system_class, shutdown_method);
 
     if (jni_env->ExceptionCheck() == JNI_TRUE) {
-        PROCESS_EXCEPTION("java.lang.System.exit(int) method completed with an exception.");
+        PROCESS_EXCEPTION("java.lang.System.execShutdownSequence() method completed with an exception.");
     }
     return JNI_OK;
 }
@@ -171,10 +89,16 @@ jint vm_destroy(JavaVM_Internal * java_vm, jthread java_thread)
 {
     jint status;
     JNIEnv * jni_env;
+    jobject uncaught_exception;
+    VM_thread * vm_thread;
+    hythread_t native_thread;
+    hythread_t current_native_thread;
+    hythread_iterator_t it;
 
     assert(hythread_is_suspend_enabled());
 
     jni_env = jthread_get_JNI_env(java_thread);
+    current_native_thread = hythread_self();
 
     status = jthread_wait_for_all_nondaemon_threads();
     if (status != TM_ERROR_NONE) {
@@ -182,13 +106,58 @@ jint vm_destroy(JavaVM_Internal * java_vm, jthread java_thread)
         return JNI_ERR;
     }
 
+    // Print out gathered data.
+#ifdef VM_STATS
+    ClassLoader::PrintUnloadingStats();
+    VM_Statistics::get_vm_stats().print();
+#endif
+
     // Remember thread's uncaught exception if any.
-    java_vm->vm_env->uncaught_exception = jni_env->ExceptionOccurred();
+    uncaught_exception = jni_env->ExceptionOccurred();
     jni_env->ExceptionClear();
 
-    status = java_vm->vm_env->uncaught_exception  == NULL ? 0 : 1;
+    // Execute pinding shutdown hooks & finalizers
+    status = exec_shutdown_sequence(jni_env);
+    if (status != JNI_OK) return status;
 
-    return run_system_exit(jni_env, status);
+    // Send VM_Death event and switch to VM_Death phase.
+    // This should be the last event sent by VM.
+    // This event should be sent before Agent_OnUnload called.
+    jvmti_send_vm_death_event();
+
+    // Raise uncaught exception to current thread.
+    // It will be properly processed in jthread_detach().
+    if (uncaught_exception) {
+        exn_raise_object(uncaught_exception);
+    }
+
+    // Detach current thread.
+    status = jthread_detach(java_thread);
+    if (status != TM_ERROR_NONE) return JNI_ERR;
+
+    // Call Agent_OnUnload() for agents and unload agents.
+    java_vm->vm_env->TI->Shutdown(java_vm);
+
+    // Stop all (except current) java and native threads
+    // before destroying VM-wide data.
+
+    // TODO: current implementation doesn't stop java threads :-(
+    // So, don't perform cleanup if there are running java threads.
+    it = hythread_iterator_create(NULL);
+    while (native_thread = hythread_iterator_next(&it)) {
+        vm_thread = get_vm_thread(native_thread);
+        if (vm_thread != NULL && native_thread != current_native_thread) {
+            add_pair_to_properties(*java_vm->vm_env->properties, "vm.noCleanupOnExit", "true");
+            hythread_iterator_release(&it);
+            return JNI_ERR;
+        }
+    }
+    hythread_iterator_release(&it);
+
+    // TODO: ups we don't stop native threads as well :-((
+    // We are lucky! Currently, there are no such threads.
+
+    return JNI_OK;
 }
 
 static inline void dump_all_java_stacks()
@@ -212,13 +181,6 @@ static inline void dump_all_java_stacks()
 }
 
 void quit_handler(int UNREF x) {
-    if (VM_Global_State::loader_env->shutting_down != 0) {
-        // too late for quit handler
-        // required infrastructure can be missing.
-        fprintf(stderr, "quit_handler(): called in shut down stage\n");
-        return;
-    }
-
     if (interpreter_enabled()) {
             dump_all_java_stacks();
     } else {
@@ -229,17 +191,11 @@ void quit_handler(int UNREF x) {
 void interrupt_handler(int UNREF x)
 {
     static bool begin_shutdown_hooks = false;
-    if (VM_Global_State::loader_env->shutting_down != 0) {
-        // too late for quit handler
-        // required infrastructure can be missing.
-        fprintf(stderr, "interrupt_handler(): called in shutdown stage\n");
-        return;
-    }
 
     if(!begin_shutdown_hooks){
         begin_shutdown_hooks = true;
         //FIXME: integration should do int another way.
         //vm_set_event(non_daemon_threads_dead_handle);
     }else
-        exit(1); //vm_exit(1);
+        exit(1);
 }

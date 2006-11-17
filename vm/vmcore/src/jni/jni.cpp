@@ -38,7 +38,6 @@
 #include "environment.h"
 #include "object_handles.h"
 #include "vm_threads.h"
-#include "vm_synch.h"
 #include "exceptions.h"
 #include "reflection.h"
 #include "ini.h"
@@ -1463,8 +1462,8 @@ VMEXPORT jint JNICALL DestroyJavaVM(JavaVM * vm)
     apr_thread_mutex_lock(GLOBAL_LOCK);
     
     status = vm_destroy(java_vm, java_thread);
-    if (status != JNI_OK) return status;
 
+    // Remove current VM from the list of all VMs running in the current adress space.
     APR_RING_REMOVE(java_vm, link);
     
     // Destroy VM environment.
@@ -1472,14 +1471,10 @@ VMEXPORT jint JNICALL DestroyJavaVM(JavaVM * vm)
     
     // Destroy VM pool.
     apr_pool_destroy(java_vm->pool);
-    
-    // TODO: Destroy globals if it is last VM.
 
     apr_thread_mutex_unlock(GLOBAL_LOCK);
     
-    // TODO: error code should be returned until
-    // VM cleanups its internals properly.
-    return JNI_ERR;
+    return status;
 }
 
 static jint attach_current_thread(JavaVM * java_vm, void ** p_jni_env, void * args, jboolean daemon)

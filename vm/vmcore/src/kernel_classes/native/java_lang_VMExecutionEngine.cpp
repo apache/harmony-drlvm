@@ -50,31 +50,14 @@
 /*
  * Class:     java_lang_VMExecutionEngine
  * Method:    exit
- * Signature: (IZ)V
- */
-// FixME: should be removed
-//JNIEXPORT void JNICALL Java_java_lang_VMExecutionEngine_exit
-JNIEXPORT void JNICALL Java_java_lang_VMExecutionEngine_exit__IZ
-  (JNIEnv *, jclass, jint status, jboolean)
-{
-    // ToDo: process jboolean
-    vm_exit(status);
-}
-
-/*
- * Class:     java_lang_VMExecutionEngine
- * Method:    exit
  * Signature: (IZ[Ljava/lang/Runnable;)V
  */
-JNIEXPORT void JNICALL Java_java_lang_VMExecutionEngine_exit__IZ_3Ljava_lang_Runnable_2
-  (JNIEnv *, jclass, jint status, jboolean, jobjectArray)
+JNIEXPORT void JNICALL Java_java_lang_VMExecutionEngine_exit
+  (JNIEnv * jni_env, jclass, jint status, jboolean needFinalization, jobjectArray)
 {
-    // ToDo: process jboolean
     // ToDo: process jobjectArray
-    vm_exit(status);
+    _exit(status);
 }
-
-
 
 /*
  * Class:     java_lang_VMExecutionEngine

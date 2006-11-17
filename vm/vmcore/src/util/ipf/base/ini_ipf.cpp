@@ -40,7 +40,6 @@ using namespace std;
 #include "exceptions.h"
 #include "vm_threads.h"
 
-#include "vm_synch.h"
 #include "compile.h"
 #include "open/vm_util.h"
 

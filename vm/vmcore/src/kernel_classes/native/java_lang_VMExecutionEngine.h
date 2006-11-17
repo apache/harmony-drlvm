@@ -42,15 +42,10 @@ extern "C" {
 /* Native methods */
 
 /*
- * Method: java.lang.VMExecutionEngine.exit(IZ[Ljava/lang/Runnable;)V
- */
-JNIEXPORT void JNICALL Java_java_lang_VMExecutionEngine_exit__IZ
-  (JNIEnv *, jclass, jint, jboolean);
-
 /*
  * Method: java.lang.VMExecutionEngine.exit(IZ[Ljava/lang/Runnable;)V
  */
-JNIEXPORT void JNICALL Java_java_lang_VMExecutionEngine_exit__IZ_3Ljava_lang_Runnable_2
+JNIEXPORT void JNICALL Java_java_lang_VMExecutionEngine_exit
   (JNIEnv *, jclass, jint, jboolean, jobjectArray);
 
 /*

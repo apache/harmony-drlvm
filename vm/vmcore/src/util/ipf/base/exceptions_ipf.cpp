@@ -40,7 +40,6 @@ using namespace std;
 #include "../m2n_ipf_internal.h"
 #include "object_layout.h"
 #include "open/vm_util.h"
-#include "vm_synch.h"
 #include "vm_threads.h"
 #include "jit_intf.h"
 #include "jit_intf_cpp.h"

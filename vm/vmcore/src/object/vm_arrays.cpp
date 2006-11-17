@@ -32,7 +32,6 @@
 #include "object_handles.h"
 #include "object_layout.h"
 #include "vm_arrays.h"
-#include "vm_synch.h"
 #include "open/vm_util.h"
 
 #include "vm_stats.h"

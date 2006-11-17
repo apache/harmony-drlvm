@@ -18,10 +18,7 @@
  * @author Serguei S.Zapreyev
  * @version $Revision: 1.1.2.2.4.5 $
  * 
- * This Core API Runtime class ("Software") is furnished under license and may
- * only be used or copied in accordance with the terms of that license.
- * 
- **/
+ */
 
 /**
  * ###############################################################################
@@ -36,7 +33,7 @@
  *    reimplemented on the native side.
  * ###############################################################################
  * ###############################################################################
- **/
+ */
 
 package java.lang;
 
@@ -48,146 +45,18 @@ import java.io.IOException;
 import java.lang.UnsatisfiedLinkError;
 import java.lang.VMExecutionEngine;
 import java.lang.VMMemoryManager;
-
-import java.util.Vector;
-
+import java.util.ArrayList;
 import org.apache.harmony.vm.VMStack;
-//import org.apache.harmony.vm.VMStack.CallsTraceElement;
+import org.apache.harmony.kernel.vm.VM;
+import org.apache.harmony.luni.util.DeleteOnExit;
+import org.apache.harmony.luni.internal.net.www.protocol.jar.JarURLConnection;
+import org.apache.harmony.lang.RuntimePermissionCollection;
 
 /**
- *
  *  @com.intel.drl.spec_ref
- *
- **/
-
-public class Runtime {
-
-    //--------------------------------------------------------------------------------
-    //  Nested Runtime.ShutdownVM class:
-    //-------------------------------------------------------------------------------- 
-
-    static final class ShutdownVM {
-
-        private static class Synchro {
-        };
-
-        private static Vector hooksList = new Vector();
-
-        private static int VMState = 0; // 0 - normal work
-        // 1 - being shutdown sequence running
-        // 2 - being finalizing
-
-        private static boolean finalizationOnExit = false;
-
-        /**
-         * 
-         *  Support for runFinalizersOnExit(boolean) from Runtime class
-         * 
-         */
-
-        static void runFinalizersOnExit(boolean value) {
-            synchronized (Synchro.class) {
-                FinalizerThread.setFinalizersOnExit(value);
-                finalizationOnExit = value;
-            }
-        }
-
-        /**
-         * 
-         *  Support for exit(int) from Runtime class
-         * 
-         */
-
-        static void exit(int status) {
-            // The virtual machine's shutdown sequence consists of two phases:
-
-            // #1:
-            //  In the first phase all registered shutdown hooks, if any, are started in some
-            //  unspecified order and allowed to run concurrently until they finish.
-            synchronized (Synchro.class) {
-                try {
-                if (VMState == 0) {
-                    VMState = 1;
-                    if (hooksList != null) {
-                        for (int i = 0; i < hooksList.size(); i++) {
-                            ((Thread)hooksList.elementAt(i)).start();
-                        }
-
-                        for (int i = 0; i < hooksList.size(); i++) {
-                            while (true){
-                                try {
-                                    ((Thread)hooksList.elementAt(i)).join();
-                                    break;
-                                } catch (InterruptedException e) {
-                                    continue;
-                                }
-                            }
-                        }
-
-                        hooksList.removeAllElements();
-                    }
-                }
-                } catch (Throwable e) {} // skip any exceptions in shutdown sequence
-            }
-
-            // #2:
-            //  In the second phase all uninvoked finalizers are run if finalization-on-exit has been 
-            //  enabled. Once this is done the virtual machine halts."
-            synchronized (Synchro.class) {
-                VMState = 2;
-                VMExecutionEngine.exit(status, finalizationOnExit); 
-            }
-
-        }
-
-        /**
-         * 
-         * Support for addShutdownHook(Thread) from Runtime class
-         * 
-         */
-
-        static void addShutdownHook(Thread hook) throws IllegalStateException, IllegalArgumentException {
-            if (hook.getState() != Thread.State.NEW) {
-                throw new IllegalArgumentException();
-            }
-            synchronized (hooksList) {
-                if (hooksList.contains((Object) hook)) {
-                    throw new IllegalArgumentException();
-                }
-            }
-            if (VMState > 0) {
-                throw new IllegalStateException();
-            }
-            synchronized (hooksList) {
-                hooksList.addElement((Object) hook);
-            }
-        }
-
-        /**
-         * 
-         *   Support for removeShutdownHook(Thread) from Runtime class
-         * 
-         */
-
-        static boolean removeShutdownHook(Thread hook) throws IllegalStateException {
-            if (VMState > 0) {
-                throw new IllegalStateException();
-            }
-            synchronized (hooksList) {
-                return hooksList == null ? false : hooksList.removeElement((Object) hook);
-            }
-        }
-
-        /**
-         * 
-         *   Support for halt(int) from Runtime class
-         * 
-         */
-
-        static void halt(int status) {
-            VMExecutionEngine.exit(status, false);
-        }
-    }
+ */
+public class Runtime 
+{    
 
     //--------------------------------------------------------------------------------
     //  Nested protected Runtime.SubProcess class:
@@ -202,19 +71,16 @@ public class Runtime {
 
             /**
              * Constructs a new SubInputStream instance. 
-             **/
+             */
             SubInputStream() {
                 this.streamHandle = -1;
             }
 
             /**
-             *
              * Reads the next byte of data from the input stream....
              * 
-             * See:
-             * int read() from InputStream 
-             * 
-             **/
+             * @see int read() from InputStream 
+             */
             private final native int readInputByte0(long handle) throws IOException;
 
             public final int read() throws IOException {
@@ -222,15 +88,12 @@ public class Runtime {
             }
 
             /**
-             *
              * Returns the number of bytes that can be read (or skipped over) from
              * this input stream without blocking by the next caller
              * of a method for this input stream...
              * 
-             * See:
-             * int available() from InputStream 
-             * 
-             **/
+             * @see int available() from InputStream 
+             */
             private final native int available0(long handle);
 
             public final int available() throws IOException {
@@ -238,14 +101,10 @@ public class Runtime {
             }
 
             /**
-             *
              * Reads len bytes from input stream ...
              * 
-             * See:
-             *  void read(byte[], int, int) from InputStream 
-             * 
-             **/
-
+             * @see void read(byte[], int, int) from InputStream 
+             */
             public int read(byte[] b, int off, int len) throws IOException {
                 if (b == null) {
                     throw new NullPointerException();
@@ -284,14 +143,11 @@ public class Runtime {
             }
 
             /**
-             *
              * Closes this input stream and releases any system resources associated
              *  with the stream.
              * 
-             * See:
-             * void close() from InputStream 
-             * 
-             **/
+             * @see void close() from InputStream 
+             */
             private final native void close0(long handle) throws IOException;
 
             public final synchronized void close() throws IOException {
@@ -308,32 +164,24 @@ public class Runtime {
         //-------------------------------------------------------------------------------- 
 
         /**
-         *
          * Extends OutputStream class.
-         *
-         * 
-         **/
-
+         */
         final static class SubOutputStream extends OutputStream {
 
             long streamHandle;
 
             /**
              * Constructs a new SubOutputStream instance. 
-             **/
+             */
             SubOutputStream() {
                 this.streamHandle = -1;
             }
 
             /**
-             *
              * Writes the specified byte to this output stream ...
              * 
-             * See:
-             * void write(int) from OutputStream 
-             * 
-             **/
-
+             * @see void write(int) from OutputStream 
+             */
             private final native void writeOutputByte0(long handle, int bt);
 
             public final void write(int b) throws IOException {
@@ -341,15 +189,11 @@ public class Runtime {
             }
 
             /**
-             *
              * Writes len bytes from the specified byte array starting at 
              * offset off to this output stream ...
              * 
-             * See:
-             *  void write(byte[], int, int) from OutputStream 
-             * 
-             **/
-
+             * @see void write(byte[], int, int) from OutputStream 
+             */
             private final native void writeOutputBytes0(long handle, byte[] b, int off, int len);
 
             public final void write(byte[] b, int off, int len) throws IOException {
@@ -365,28 +209,20 @@ public class Runtime {
             }
 
             /**
-             *
              * Writes b.length bytes from the specified byte array to this output stream...
              * 
-             * See:
-             * void write(byte[]) from OutputStream 
-             * 
-             **/
-
+             * @see void write(byte[]) from OutputStream 
+             */
             public final void write(byte[] b) throws IOException {
                 write(b, 0, b.length);
             }
 
             /**
-             *
              * Flushes this output stream and forces any buffered output 
              * bytes to be written out ...
              * 
-             * See:
-             * void flush() from OutputStream 
-             * 
-             **/
-
+             * @see void flush() from OutputStream 
+             */
             private final native void flush0(long handle);
 
             public final void flush() throws IOException {
@@ -394,15 +230,11 @@ public class Runtime {
             }
 
             /**
-             *
              * Closes this output stream and releases any system resources 
              * associated with this stream ...
              * 
-             * See:
-             * void close() from OutputStream 
-             * 
-             **/
-
+             * @see void close() from OutputStream 
+             */
             private final native void close0(long handle);
 
             public final synchronized void close() throws IOException {
@@ -424,7 +256,10 @@ public class Runtime {
         private SubProcess.SubInputStream is;
         private SubProcess.SubInputStream es;
 
-        protected SubProcess() { // An application cannot create its own instance of this class.
+        /**
+         * An application cannot create its own instance of this class.
+         */
+        protected SubProcess() {
             this.processHandle = -1;
             this.processExitCode = 0;
             this.os = null;
@@ -440,34 +275,22 @@ public class Runtime {
         }
 
         /**
-         *
-         * See:
-         * OutputStream getOutputStream() from Process 
-         *
-         **/
-
+         * @see OutputStream.getOutputStream() from Process 
+         */
         public final OutputStream getOutputStream() {
             return os;
         }
 
         /**
-         *
-         * See:
-         * InputStream getInputStream() from Process 
-         * 
-         **/
-
+         * @see InputStream.getInputStream() from Process 
+         */
         public final InputStream getInputStream() {
             return is;
         }
 
         /**
-         *
-         * See:
-         * InputStream getErrorStream() from Process 
-         * 
-         **/
-
+         * @see InputStream getErrorStream() from Process 
+         */
         public final InputStream getErrorStream() {
             return es;
         }
@@ -504,12 +327,8 @@ public class Runtime {
         }
 
         /**
-         *
-         * See:
-         * int waitFor() from Process 
-         * 
-         **/
-
+         * @seeint waitFor() from Process 
+         */
         public int waitFor() throws InterruptedException {
             while (true) {
                 synchronized (this) {
@@ -522,12 +341,8 @@ public class Runtime {
         }
 
         /**
-         *
-         * See:
-         * int exitValue() from Process 
-         * 
-         **/
-
+         * @see int exitValue() from Process 
+         */
         public synchronized int exitValue() throws IllegalThreadStateException {
             if (!getState0(processHandle)) {
                 throw new IllegalThreadStateException("process has not exited");
@@ -537,12 +352,8 @@ public class Runtime {
         }
 
         /**
-         *
-         * See:
-         * void destroy() from Process 
-         * 
-         **/
-
+         * @see void destroy() from Process 
+         */
         private final native void destroy0(int thisProcessHandle);
 
         public synchronized final void destroy() {
@@ -555,127 +366,175 @@ public class Runtime {
     //////////////////////////////////////////     RUNTIME     BODY     ////////////////////////////////////////
     ////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-    private static Runtime thisApplicationRuntime = new Runtime(); // "Every Java application has a single instance of class Runtime ..."
+    /**
+     * "Every Java application has a single instance of class Runtime ..."
+     */
+    private static Runtime thisApplicationRuntime = new Runtime(); 
 
-    private Runtime() { // "An application cannot create its own instance of this class."
+    private static ArrayList hooksList = new ArrayList();
+    
+    /**
+     * 0 - normal work
+     * 1 - being shutdown sequence running
+     * 2 - being finalizing
+     */
+    private static int VMState = 0;
+    
+    static boolean finalizeOnExit = false;
+
+    /**
+     * An application cannot create its own instance of this class.
+     */
+    private Runtime() { 
     }
 
     /**
-     * 
      * @com.intel.drl.spec_ref  
-     * 
      */
-
     public static Runtime getRuntime() {
         return thisApplicationRuntime;
     }
 
-    /**
-     * 
-     * @com.intel.drl.spec_ref  
-     * 
-     */
+    void execShutdownSequence() {
+        synchronized (hooksList) {
+            if (VMState > 0) {
+                return;
+            }
+            try {
+                // Phase1: Execute all registered hooks.
+                VMState = 1;
+                for (int i = 0; i < hooksList.size(); i++) {
+                    ((Thread)hooksList.get(i)).start();
+                }
+                
+                for (int i = 0; i < hooksList.size(); i++) {
+                    while (true){
+                        try {
+                            ((Thread)hooksList.get(i)).join();
+                            break;
+                        } catch (InterruptedException e) {
+                            continue;
+                        }
+                    }
+                }
+                // Phase2: Execute all finalizers if nessesary.
+                VMState = 2;
+                FinalizerThread.shutdown(finalizeOnExit);
+                
+                // Close connections.
+                if (VM.closeJars) {
+                    JarURLConnection.closeCachedFiles();
+                }
 
+                // Delete files.
+                if (VM.deleteOnExit) {
+                    DeleteOnExit.deleteOnExit();
+                }
+            } catch (Throwable e) {
+                // just catch all exceptions
+            }
+        }
+    }
+
+    /**
+     * @com.intel.drl.spec_ref  
+     */
     public void exit(int status) throws SecurityException {
-        SecurityManager currentSecurity = System.getSecurityManager();
-
-        if (currentSecurity != null) {
-            currentSecurity.checkExit(status);
+        SecurityManager sm = System.getSecurityManager();
+        if (sm != null) {
+            sm.checkExit(status);
         }
-        ShutdownVM.exit(status);
+        // Halt the VM if it is running finalizers.
+        if (VMState == 2 && finalizeOnExit == true && status != 0) {
+            halt(status);
+        }
+
+        execShutdownSequence();
+        // No need to invoke finalizers one more time.
+        //                             vvvvv
+        VMExecutionEngine.exit(status, false);
     }
 
     /**
-     * 
      * @com.intel.drl.spec_ref  
-     * 
      */
-
     public void addShutdownHook(Thread hook) {
-        SecurityManager currentSecurity = System.getSecurityManager();
-
-        if (currentSecurity != null) {
-            currentSecurity.checkPermission(new RuntimePermission("shutdownHooks"));
+        SecurityManager sm = System.getSecurityManager();
+        if (sm != null) {
+            sm.checkPermission(RuntimePermissionCollection.SHUTDOWN_HOOKS_PERMISSION);
         }
-
-        ShutdownVM.addShutdownHook(hook);
+        if (hook == null || hook.getState() != Thread.State.NEW) {
+            throw new IllegalArgumentException();
+        }
+        if (VMState > 0) {
+            throw new IllegalStateException();
+        }
+        synchronized (hooksList) {
+            if (hooksList.contains((Object) hook)) {
+                throw new IllegalArgumentException();
+            }
+            hooksList.add((Object) hook);
+        }
     }
 
     /**
-     * 
      * @com.intel.drl.spec_ref  
-     * 
      */
-
     public boolean removeShutdownHook(Thread hook) {
-        SecurityManager currentSecurity = System.getSecurityManager();
-
-        if (currentSecurity != null) {
-            currentSecurity.checkPermission(new RuntimePermission("shutdownHooks"));
+        SecurityManager sm = System.getSecurityManager();
+        if (sm != null) {
+            sm.checkPermission(RuntimePermissionCollection.SHUTDOWN_HOOKS_PERMISSION);
         }
-
-        return ShutdownVM.removeShutdownHook(hook);
+        if (VMState > 0) {
+            throw new IllegalStateException();
+        }
+        synchronized (hooksList) {
+            return hook == null ? false : hooksList.remove((Object) hook);
+        }
     }
 
     /**
-     * 
      * @com.intel.drl.spec_ref  
-     * 
      */
-
     public void halt(int status) {
-        SecurityManager currentSecurity = System.getSecurityManager();
+        SecurityManager sm = System.getSecurityManager();
 
-        if (currentSecurity != null) {
-            currentSecurity.checkExit(status);
-
+        if (sm != null) {
+            sm.checkExit(status);
         }
-
-        ShutdownVM.halt(status);
+        VMExecutionEngine.exit(status, false); 
     }
 
     /**
-     * 
      * @com.intel.drl.spec_ref  
-     * 
      */
-
     public static void runFinalizersOnExit(boolean value) {
-        SecurityManager currentSecurity = System.getSecurityManager();
-
-        if (currentSecurity != null) {
-            currentSecurity.checkExit(0);
+        SecurityManager sm = System.getSecurityManager();
+        if (sm != null) {
+            sm.checkExit(0);
         }
-
-        ShutdownVM.runFinalizersOnExit(value);
+        synchronized(hooksList) {
+            finalizeOnExit = value;
+        }
     }
 
     /**
-     * 
      * @com.intel.drl.spec_ref  
-     * 
      */
-
     public Process exec(String command) throws IOException {
         return exec(command, null, null);
     }
 
     /**
-     * 
      * @com.intel.drl.spec_ref  
-     * 
      */
-
     public Process exec(String cmd, String[] envp) throws IOException {
         return exec(cmd, envp, null);
     }
 
     /**
-     * 
      * @com.intel.drl.spec_ref  
-     * 
      */
-
     public Process exec(String command, String[] envp, File dir) throws IOException {
         if (command == null) {
             throw new NullPointerException();
@@ -709,33 +568,24 @@ public class Runtime {
     }
 
     /**
-     * 
      * @com.intel.drl.spec_ref  
-     * 
      */
-
     public Process exec(String[] cmdarray) throws IOException {
         return exec(cmdarray, null, null);
 
     }
 
     /**
-     * 
      * @com.intel.drl.spec_ref  
-     * 
      */
-
     public Process exec(String[] cmdarray, String[] envp) throws IOException, NullPointerException, IndexOutOfBoundsException, SecurityException {
         return exec(cmdarray, envp, null);
 
     }
 
     /**
-     * 
      * @com.intel.drl.spec_ref  
-     * 
      */
-
     public Process exec(String[] cmdarray, String[] envp, File dir) throws IOException {
         SecurityManager currentSecurity = System.getSecurityManager();
 
@@ -777,92 +627,64 @@ public class Runtime {
     }
 
     /**
-     * 
      * @com.intel.drl.spec_ref  
-     * 
      */
-
     public int availableProcessors() {
         return VMExecutionEngine.getAvailableProcessors();
     }
 
     /**
-     * 
      * @com.intel.drl.spec_ref  
-     * 
      */
-
     public long freeMemory() {
         return VMMemoryManager.getFreeMemory();
     }
 
     /**
-     * 
      * @com.intel.drl.spec_ref  
-     * 
      */
-
     public long totalMemory() {
         return VMMemoryManager.getTotalMemory();
     }
 
     /**
-     * 
      * @com.intel.drl.spec_ref  
-     * 
      */
-
     public long maxMemory() {
         return VMMemoryManager.getMaxMemory();
     }
 
     /**
-     * 
      * @com.intel.drl.spec_ref  
-     * 
      */
-
     public void gc() {
         VMMemoryManager.runGC();
     }
 
     /**
-     * 
      * @com.intel.drl.spec_ref  
-     * 
      */
-
     public void runFinalization() {
-        //VMMemoryManager.runFinalzation(); 
         VMMemoryManager.runFinalization();
     }
 
     /**
-     * 
      * @com.intel.drl.spec_ref  
-     * 
      */
-
     public void traceInstructions(boolean on) {
         VMExecutionEngine.traceInstructions(on);
     }
 
     /**
-     * 
      * @com.intel.drl.spec_ref  
-     * 
      */
-
     public void traceMethodCalls(boolean on) {
         VMExecutionEngine.traceMethodCalls(on);
     }
 
     /**
-     * 
      * @com.intel.drl.spec_ref  
-     * 
      */
-
     public void load(String filename) throws SecurityException, UnsatisfiedLinkError {
         load0(filename, VMClassRegistry.getClassLoader(VMStack.getCallerClass(0)), true);
     }
@@ -883,11 +705,8 @@ public class Runtime {
     }
 
     /**
-     * 
      * @com.intel.drl.spec_ref  
-     * 
      */
-
     public void loadLibrary(String libname) throws SecurityException, UnsatisfiedLinkError {
         loadLibrary0(libname, VMClassRegistry.getClassLoader(VMStack.getCallerClass(0)), true);
     }
@@ -972,22 +791,16 @@ public class Runtime {
     }
 
     /**
-     * 
      * @com.intel.drl.spec_ref  
-     * 
      */
-
     public InputStream getLocalizedInputStream(InputStream in) {
         //XXX: return new BufferedInputStream( (InputStream) (Object) new InputStreamReader( in ) );
         return in;
     }
 
     /**
-     * 
      * @com.intel.drl.spec_ref  
-     * 
      */
-
     public OutputStream getLocalizedOutputStream(OutputStream out) {
         //XXX: return new BufferedOutputStream( (OutputStream) (Object) new OutputStreamWriter( out ) );
         return out;

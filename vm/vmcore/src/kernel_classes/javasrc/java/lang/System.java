@@ -384,6 +384,13 @@ public final class System {
     }
 
     /**
+     * Initiaies the VM shutdown sequence.
+     */
+    static void execShutdownSequence() {
+        Runtime.getRuntime().execShutdownSequence();
+    }
+
+    /**
      * Sets the value of <code>err</code> field without any security checks
      */
     private static native void setErrUnsecure(PrintStream err);

@@ -46,7 +46,6 @@ using namespace std;
 #include "thread_generic.h"
 
 #include "object_generic.h"
-#include "vm_synch.h"
 #include "vm_stats.h"
 #include "object_handles.h"
 

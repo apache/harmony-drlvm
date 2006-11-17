@@ -26,14 +26,11 @@ import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Modifier;
 import java.security.AccessController;
 import java.security.PrivilegedAction;
+
 /**
- * This class is a VM start point.
- * It does following steps:<ul>
- * <li> starts all helper threads as Finalizer and Execution Manager threads.
- * <li> parse system properties and configure VM environment. 
- * <li> load main class and start main method in new thread.
- * <li> catch Throwable.
- * <li> call System.exit(), to execute shutdown hooks
+ * This class does the following:
+ * <li> starts Finalizer and Execution Manager helper threads.
+ * <li> parses system properties and configure VM environment.
  * </ul> 
  */
 class VMStart {
@@ -58,7 +55,7 @@ class VMStart {
         } catch (Throwable e) {
             System.err.println("Internal error");
             e.printStackTrace(System.err);
-            Runtime.getRuntime().halt(-1);
+            Runtime.getRuntime().halt(1);
         }
     }
     // should shutdown helper threads
@@ -69,7 +66,6 @@ class VMStart {
         }
 
         public void run() {
-            FinalizerThread.shutdown();
             EMThreadSupport.shutdown();
         }
     }

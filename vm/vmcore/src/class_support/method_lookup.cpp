@@ -82,7 +82,9 @@ void Method_Lookup_Table::reallocate(unsigned new_capacity)
 
 void Method_Lookup_Table::add(CodeChunkInfo *m)
 {
-    p_meth_addr_table_lock->_lock();
+    Global_Env * vm_env = VM_Global_State::loader_env;
+
+    vm_env->p_meth_addr_table_lock->_lock();
 
     void *code_block_addr = m->get_code_block_addr();
 
@@ -100,7 +102,7 @@ void Method_Lookup_Table::add(CodeChunkInfo *m)
     _table[idx] = m;
     _next_free_entry++;
 
-    p_meth_addr_table_lock->_unlock();
+    vm_env->p_meth_addr_table_lock->_unlock();
 } //Method_Lookup_Table::add
 
 
@@ -160,6 +162,8 @@ unsigned Method_Lookup_Table::find_index(void *addr)
 
 CodeChunkInfo *Method_Lookup_Table::find(void *addr, bool is_ip_past)
 {
+    Global_Env * vm_env = VM_Global_State::loader_env;
+
     if (addr == NULL) {
         return NULL;
     }
@@ -186,7 +190,7 @@ CodeChunkInfo *Method_Lookup_Table::find(void *addr, bool is_ip_past)
     VM_Statistics::get_vm_stats().num_method_lookup_cache_miss++;
 #endif //VM_STATS
 
-    p_meth_addr_table_lock->_lock();
+    vm_env->p_meth_addr_table_lock->_lock();
 
     unsigned L = 0, R = _next_free_entry;
     while (L < R) {
@@ -205,12 +209,12 @@ CodeChunkInfo *Method_Lookup_Table::find(void *addr, bool is_ip_past)
 #ifdef USE_METHOD_LOOKUP_CACHE
             _cache[cache_idx] = m;
 #endif //USE_METHOD_LOOKUP_CACHE
-            p_meth_addr_table_lock->_unlock();
+            vm_env->p_meth_addr_table_lock->_unlock();
             return m;
         }
     }
 
-    p_meth_addr_table_lock->_unlock();
+    vm_env->p_meth_addr_table_lock->_unlock();
     return NULL;
 } //Method_Lookup_Table::find
 
@@ -218,11 +222,13 @@ CodeChunkInfo *Method_Lookup_Table::find(void *addr, bool is_ip_past)
 
 CodeChunkInfo *Method_Lookup_Table::find_deadlock_free(void *addr)
 {
-    bool ok = p_meth_addr_table_lock->_lock_or_null();             // vvv
+    Global_Env * vm_env = VM_Global_State::loader_env;
+
+    bool ok = vm_env->p_meth_addr_table_lock->_lock_or_null();             // vvv
     if (ok) {
         // We acquired the lock.  Can use the fast lookup.
         CodeChunkInfo *m = find(addr);
-        p_meth_addr_table_lock->_unlock_or_null();                 // ^^^
+        vm_env->p_meth_addr_table_lock->_unlock_or_null();                 // ^^^
         return m;
     } else {
         // We failed to acquire the lock.  Use slow linear search.

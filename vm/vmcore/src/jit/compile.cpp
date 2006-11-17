@@ -145,6 +145,8 @@ Target_Exception_Handler_Ptr CodeChunkInfo::get_target_exception_handler_info(un
 // 20040224 Support for recording which methods (actually, CodeChunkInfo's) call which other methods.
 void CodeChunkInfo::record_call_to_callee(CodeChunkInfo *callee, void *caller_ip)
 {
+    Global_Env * vm_env = VM_Global_State::loader_env;
+
     assert(callee);
     assert(caller_ip);
 
@@ -152,7 +154,7 @@ void CodeChunkInfo::record_call_to_callee(CodeChunkInfo *callee, void *caller_ip
     // 20040422 No, the backedge isn't needed yet. Just record one direction now, and create the other direction later.
 
     // Acquire a lock to ensure that growing the callee array is safe.
-    p_method_call_lock->_lock();                    // vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv
+    vm_env->p_method_call_lock->_lock();                    // vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv
 
     // Is the <callee, caller_ip> pair already in our list?
     unsigned i;
@@ -160,7 +162,7 @@ void CodeChunkInfo::record_call_to_callee(CodeChunkInfo *callee, void *caller_ip
         Callee_Info *c = &(_callee_info[i]);
         if ((c->callee == callee) && (c->caller_ip == caller_ip)) {
             c->num_calls++;
-            p_method_call_lock->_unlock();          // ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+            vm_env->p_method_call_lock->_unlock();          // ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
             return;
         }
     }
@@ -190,7 +192,7 @@ void CodeChunkInfo::record_call_to_callee(CodeChunkInfo *callee, void *caller_ip
     c->num_calls = 1;
     _num_callees++;
 
-    p_method_call_lock->_unlock();                  // ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    vm_env->p_method_call_lock->_unlock();                  // ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 } //CodeChunkInfo::record_call_to_callee
 
 
@@ -677,11 +679,13 @@ static JIT_Result compile_prepare_native_method(Method* method, JIT_Flags flags)
 
 JIT_Result compile_do_compilation_jit(Method* method, JIT* jit)
 {
+    Global_Env * vm_env = VM_Global_State::loader_env;
+
     assert(method);
     assert(jit);
 
     if (!parallel_jit) {
-        p_jit_a_method_lock->_lock();
+        vm_env->p_jit_a_method_lock->_lock();
         // MikhailF reports that each JIT in recompilation chain has its own
         // JIT* pointer.
         // If in addition to recompilation chains one adds recompilation loops,
@@ -689,7 +693,7 @@ JIT_Result compile_do_compilation_jit(Method* method, JIT* jit)
         // modified.
 
         if (NULL != method->get_chunk_info_no_create_mt(jit, CodeChunkInfo::main_code_chunk_id)) {
-            p_jit_a_method_lock->_unlock();
+            vm_env->p_jit_a_method_lock->_unlock();
             return JIT_SUCCESS;
         }
     }
@@ -706,7 +710,7 @@ JIT_Result compile_do_compilation_jit(Method* method, JIT* jit)
 
     if (JIT_SUCCESS != res) {
         if (!parallel_jit) {
-            p_jit_a_method_lock->_unlock();
+            vm_env->p_jit_a_method_lock->_unlock();
         }
         return res;
     }
@@ -728,11 +732,11 @@ JIT_Result compile_do_compilation_jit(Method* method, JIT* jit)
     method->apply_vtable_patches();
     method->unlock();
     if (!parallel_jit) {
-        p_jit_a_method_lock->_unlock();
+        vm_env->p_jit_a_method_lock->_unlock();
     }
 
     // Find TI environment
-    DebugUtilsTI *ti = VM_Global_State::loader_env->TI;
+    DebugUtilsTI *ti = vm_env->TI;
 
     // Call TI callbacks
     if (ti->isEnabled() && ti->getPhase() == JVMTI_PHASE_LIVE) {

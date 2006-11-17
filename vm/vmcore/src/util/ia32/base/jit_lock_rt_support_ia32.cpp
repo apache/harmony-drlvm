@@ -31,7 +31,6 @@ using namespace std;
 
 #include <assert.h>
 
-#include "vm_synch.h"
 #include "open/vm_util.h"
 #include "encoder.h"
 #include "nogc.h"

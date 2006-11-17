@@ -474,7 +474,9 @@ void *Method::allocate_JIT_data_block(size_t size, JIT *jit, size_t alignment)
 
 void Method::add_vtable_patch(void *patch)
 {
-    p_vtable_patch_lock->_lock();                         // vvv
+    Global_Env * vm_env = VM_Global_State::loader_env;
+    
+    vm_env->p_vtable_patch_lock->_lock();                         // vvv
 
     if (_vtable_patch == NULL) {
         VTable_Patches *vp = (VTable_Patches *)STD_MALLOC(sizeof(VTable_Patches));
@@ -487,7 +489,7 @@ void Method::add_vtable_patch(void *patch)
     for (int i = 0; i < MAX_VTABLE_PATCH_ENTRIES; i++) {
         if (curr_vp->patch_table[i] == NULL) {
             curr_vp->patch_table[i] = patch;
-            p_vtable_patch_lock->_unlock();               // ^^
+            vm_env->p_vtable_patch_lock->_unlock();               // ^^
             return;
         }
     }
@@ -497,20 +499,21 @@ void Method::add_vtable_patch(void *patch)
     _vtable_patch = new_vp;
     new_vp->patch_table[0] = patch;
 
-    p_vtable_patch_lock->_unlock();                     // ^^^
+    vm_env->p_vtable_patch_lock->_unlock();                     // ^^^
 } //Method::add_vtable_patch
 
 
 
 void Method::apply_vtable_patches()
 {
-    p_vtable_patch_lock->_lock();
+    Global_Env * vm_env = VM_Global_State::loader_env;
 
     if (_vtable_patch == NULL) {
         // Constructors are never entered into a vtable.
-        p_vtable_patch_lock->_unlock();
         return;
     }
+
+    vm_env->p_vtable_patch_lock->_lock();
 
     void *code_addr = get_code_addr();
 
@@ -523,7 +526,7 @@ void Method::apply_vtable_patches()
         }
     }
 
-    p_vtable_patch_lock->_unlock();
+    vm_env->p_vtable_patch_lock->_unlock();
 } //Method::apply_vtable_patches
 
 

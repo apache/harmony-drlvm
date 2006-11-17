@@ -35,7 +35,6 @@
 #include "compile.h"
 #include "nogc.h"
 #include "jit_runtime_support.h"
-#include "vm_synch.h"
 #include "finalize.h"
 
 

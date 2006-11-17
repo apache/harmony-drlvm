@@ -24,7 +24,6 @@
 
 #include "jni.h"
 #include "Class.h"
-#include "vm_synch.h"
 
 
 JNIEXPORT jlong getFieldOffset

@@ -31,7 +31,6 @@ jint vm_attach_internal(JNIEnv ** p_jni_env, jthread * java_thread,
 jint vm_init1(JavaVM_Internal * java_vm, JavaVMInitArgs * vm_arguments);
 jint vm_init2(JNIEnv * jni_env);
 jint vm_destroy(JavaVM_Internal * java_vm, jthread java_thread);
-void vm_exit(int exit_code);
 
 void initialize_vm_cmd_state(Global_Env *p_env, JavaVMInitArgs* arguments);
 void set_log_levels_from_cmd(JavaVMInitArgs* vm_arguments);

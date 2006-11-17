@@ -56,11 +56,9 @@
 #include "open/gc.h"
  
 #include "exceptions.h"
-#include "vm_synch.h"
 #include "vm_threads.h"
 #include "open/vm_util.h"
 #include "compile.h"
-#include "vm_synch.h"
 #include "vm_stats.h"
 #include "sync_bits.h"
 
@@ -488,13 +486,6 @@ static void throw_from_sigcontext(ucontext_t *uc, Class* exc_clss) {
 
 void null_java_reference_handler(int signum)
 {
-    if (VM_Global_State::loader_env->shutting_down != 0) {
-        fprintf(stderr, "null_java_reference_handler(): called in shutdown stage\n");
-
-        // crash with default handler
-        signal(signum, 0);
-    }
-
     uint32* top_ebp = NULL;
 //TODO: ADD correct stack handling here!!
     Global_Env *env = VM_Global_State::loader_env;
@@ -504,13 +495,6 @@ void null_java_reference_handler(int signum)
 
 void null_java_divide_by_zero_handler(int signum)
 {
-    if (VM_Global_State::loader_env->shutting_down != 0) {
-        fprintf(stderr, "null_java_divide_by_zero_handler(): called in shutdown stage\n");
-
-        // crash with default handler
-        signal(signum, 0);
-    }
-
     uint32* top_ebp = NULL;
 //TODO: ADD correct stack handling here!!
     Global_Env *env = VM_Global_State::loader_env;

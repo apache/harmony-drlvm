@@ -56,11 +56,9 @@
  
 #include "exceptions.h"
 #include "exceptions_jit.h"
-#include "vm_synch.h"
 #include "vm_threads.h"
 #include "open/vm_util.h"
 #include "compile.h"
-#include "vm_synch.h"
 #include "vm_stats.h"
 #include "sync_bits.h"
 
@@ -386,9 +384,7 @@ void null_java_reference_handler(int signum, siginfo_t* info, void* context)
         return;
     }
 
-    if (env->shutting_down != 0) {
-        fprintf(stderr, "null_java_reference_handler(): called in shutdown stage\n");
-    } else if (!interpreter_enabled()) {
+    if (!interpreter_enabled()) {
         if (java_throw_from_sigcontext(
                     uc, env->java_lang_NullPointerException_Class)) {
             return;
@@ -405,9 +401,7 @@ void null_java_divide_by_zero_handler(int signum, siginfo_t* info, void* context
     ucontext_t *uc = (ucontext_t *)context;
     Global_Env *env = VM_Global_State::loader_env;
 
-    if (env->shutting_down != 0) {
-        fprintf(stderr, "null_java_divide_by_zero_handler(): called in shutdown stage\n");
-    } else if (!interpreter_enabled()) {
+    if (!interpreter_enabled()) {
         if (java_throw_from_sigcontext(
                     uc, env->java_lang_ArithmeticException_Class)) {
             return;
@@ -424,14 +418,6 @@ void null_java_divide_by_zero_handler(int signum, siginfo_t* info, void* context
  * 
  
 void yield_other_handler(int signum, siginfo_t* info, void* context) {
-
-    if (VM_Global_State::loader_env->shutting_down != 0) {
-        // Too late for this kind of signals
-        fprintf(stderr, "yield_other_handler(): called in shutdown stage\n");
-
-        // crash with default handler
-        signal(signum, 0);
-    }
 
     VM_thread* thread = p_active_threads_list;
     pthread_t self = GetCurrentThreadId();

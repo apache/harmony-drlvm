@@ -24,26 +24,10 @@
 #include "lock_manager.h"
 #include "vm_threads.h"
 #include "exceptions.h"
-#include "vm_synch.h"
 
 //void vm_thread_enumerate_from_native(VM_thread *thread); // unused anywhere
-
-Lock_Manager *p_jit_a_method_lock;
-Lock_Manager *p_vtable_patch_lock;
-Lock_Manager *p_meth_addr_table_lock;
-Lock_Manager *p_thread_lock;
-Lock_Manager *p_method_call_lock;
-Lock_Manager *p_handle_lock;
  
 extern hythread_library_t hythread_lib;
-
-VMEXPORT void jit_lock() {
-    p_jit_a_method_lock->_lock();
-}
-
-VMEXPORT void jit_unlock() {
-    p_jit_a_method_lock->_unlock();
-}
 
 Lock_Manager::Lock_Manager()
 {

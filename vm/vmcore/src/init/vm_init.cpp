@@ -61,22 +61,6 @@ VMEXPORT bool dump_stubs = false;
 void* Slot::heap_base = NULL;
 void* Slot::heap_ceiling = NULL;
 
-void vm_initialize_critical_sections() {
-    p_jit_a_method_lock = new Lock_Manager();
-    p_vtable_patch_lock = new Lock_Manager();
-    p_meth_addr_table_lock = new Lock_Manager();
-    p_handle_lock = new Lock_Manager();
-    p_method_call_lock = new Lock_Manager();
-}
-
-void vm_uninitialize_critical_sections() {
-    delete p_jit_a_method_lock;
-    delete p_vtable_patch_lock;
-    delete p_meth_addr_table_lock;
-    delete p_handle_lock;
-    delete p_method_call_lock;
-}
-
 Class* preload_class(Global_Env * vm_env, const char * classname) {
     String * s = vm_env->string_pool.lookup(classname);
     return vm_env->LoadCoreClass(s);
@@ -630,7 +614,6 @@ int vm_init1(JavaVM_Internal * java_vm, JavaVMInitArgs * vm_arguments) {
     init_log_system();
     set_log_levels_from_cmd(&vm_env->vm_arguments);
 
-    vm_initialize_critical_sections();
     vm_monitor_init();
 
     status = CmAcquire(&vm_env->cm);

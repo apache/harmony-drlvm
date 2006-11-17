@@ -384,7 +384,7 @@ Destroy() {
     ComponentInfoHandle component_info = component_manager_impl->components;
     while (NULL != component_info) {
         ComponentInfoHandle component_info_next = component_info->next;
-        ret_new = FreeComponentInfo(component_info_next);
+        ret_new = FreeComponentInfo(component_info);
         if (APR_SUCCESS == ret) {
             ret = ret_new;
         }

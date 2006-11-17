@@ -86,7 +86,7 @@ class FinalizerThread extends Thread {
     /**
      * VM calls this method to request finalizer thread shutdown.
      */
-    static void shutdown() {
+    static void shutdown(boolean startFinalizationOnExit) {
         if (TRACE) {
             trace("shutting down finalizer thread");
         }
@@ -99,13 +99,6 @@ class FinalizerThread extends Thread {
             shutdown = true;
             workLock.notifyAll();
         }
-    }
-
-    /*
-     * Support for runFinalizersOnExit(boolean) from Runtime class
-     */
-    static void setFinalizersOnExit(boolean value) {
-        startFinalizationOnExit = value;
     }
 
     /*
@@ -140,9 +133,6 @@ class FinalizerThread extends Thread {
      * Zero means finalization tasks aren't available and finalizer threads aren't working.
      */
     private static int waitFinishCounter = 0;
-
-    // true indicates that finalization on exit should be started
-    private static volatile boolean startFinalizationOnExit = false;
 
     // Indicates processors quantity in the system
     private static int processorsQuantity;

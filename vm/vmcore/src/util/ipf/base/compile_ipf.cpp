@@ -57,7 +57,6 @@ using namespace std;
 #include "nogc.h"
 #include "open/gc.h"
 #include "open/vm_util.h"
-#include "vm_synch.h"
 #include "vm_threads.h"
 
 #include "ini.h"

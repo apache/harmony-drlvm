@@ -28,8 +28,6 @@
 #include "stack_dump.h"
 #include "jvmti_break_intf.h"
 
-#include "m2n.h"
-
 // Windows specific
 #include <string>
 #include <excpt.h>
@@ -302,92 +300,44 @@ static LONG NTAPI vectored_exception_handler_internal(LPEXCEPTION_POINTERS nt_ex
     
     bool run_default_handler = true;
     PCONTEXT context = nt_exception->ContextRecord;
-
-    if (VM_Global_State::loader_env->shutting_down == 0) {
-
-        TRACE2("signals", "VEH received an exception: code = 0x" <<
-                ((void*)nt_exception->ExceptionRecord->ExceptionCode) <<
-                " location IP = 0x" << ((void*)context->Eip));
-
-        // this filter catches _all_ hardware exceptions including those caused by
-        // VM internal code.  To elimate confusion over what caused the
-        // exception, we first make sure the exception was thrown inside a Java
-        // method else crash handler or default handler is executed, this means that
-        // it was thrown by VM C/C++ code.
-        if (((code == STATUS_ACCESS_VIOLATION ||
-                code == STATUS_INTEGER_DIVIDE_BY_ZERO ||
-                code == STATUS_STACK_OVERFLOW) &&
-                vm_identify_eip((void *)context->Eip) == VM_TYPE_JAVA) ||
-            code == JVMTI_EXCEPTION_STATUS)
-        {
+    
+    TRACE2("signals", "VEH received an exception: code = 0x" <<
+        ((void*)nt_exception->ExceptionRecord->ExceptionCode) <<
+        " location IP = 0x" << ((void*)context->Eip));
+    
+    // this filter catches _all_ hardware exceptions including those caused by
+    // VM internal code.  To elimate confusion over what caused the
+    // exception, we first make sure the exception was thrown inside a Java
+    // method else crash handler or default handler is executed, this means that
+    // it was thrown by VM C/C++ code.
+    if (((code == STATUS_ACCESS_VIOLATION ||
+        code == STATUS_INTEGER_DIVIDE_BY_ZERO ||
+        code == STATUS_STACK_OVERFLOW) &&
+        vm_identify_eip((void *)context->Eip) == VM_TYPE_JAVA) ||
+        code == JVMTI_EXCEPTION_STATUS) {
             run_default_handler = false;
-        } else if (code == STATUS_STACK_OVERFLOW) {
-            if (is_unwindable()) {
-                if (hythread_is_suspend_enabled()) {
-                    tmn_suspend_disable();
-                }
-                run_default_handler = false;
-            } else {
-                M2nFrame* frame = m2n_get_last_frame();
+    } else if (code == STATUS_STACK_OVERFLOW) {
+        if (is_unwindable()) {
+            if (hythread_is_suspend_enabled()) {
+                tmn_suspend_disable();
+            }
+            run_default_handler = false;
+        } else {
                 Global_Env *env = VM_Global_State::loader_env;
                 exn_raise_by_class(env->java_lang_StackOverflowError_Class);
-                p_TLS_vmthread->restore_guard_page = true;
-                return EXCEPTION_CONTINUE_EXECUTION;
-            }
-        }
-
-    } else {
-        if (VM_Global_State::loader_env->shutting_down > 1) {
-            // Deadly errors in shutdown.
-            fprintf(stderr, "SEH handler: too many shutdown errors");
-            return EXCEPTION_CONTINUE_SEARCH;
-        } else {
-            fprintf(stderr, "SEH handler: shutdown error");
+            p_TLS_vmthread->restore_guard_page = true;
+            return EXCEPTION_CONTINUE_EXECUTION;
         }
     }
 
     if (run_default_handler) {
-        const char *msg = 0;
-        switch (code) {
-            // list of errors we can handle:
-            case STATUS_ACCESS_VIOLATION:         msg = "ACCESS_VIOLATION"; break;
-            case STATUS_INTEGER_DIVIDE_BY_ZERO:   msg = "INTEGER_DIVIDE_BY_ZERO"; break;
-            case STATUS_PRIVILEGED_INSTRUCTION:   msg = "PRIVILEGED_INSTRUCTION"; break;
-            case STATUS_SINGLE_STEP:              msg = "SINGLE_STEP"; break;
-            case STATUS_BREAKPOINT:               msg = "BREAKPOINT"; break;
-            case STATUS_ILLEGAL_INSTRUCTION:      msg = "ILLEGAL_INSTRUCTION"; break;
-            case STATUS_GUARD_PAGE_VIOLATION:     msg = "GUARD_PAGE_VIOLATION"; break;
-            case STATUS_INVALID_HANDLE:           msg = "INVALID_HANDLE"; break;
-            case STATUS_DATATYPE_MISALIGNMENT:    msg = "DATATYPE_MISALIGNMENT"; break;
-            case STATUS_FLOAT_INVALID_OPERATION:  msg = "FLOAT_INVALID_OPERATION"; break;
-            case STATUS_NONCONTINUABLE_EXCEPTION: msg = "NONCONTINUABLE_EXCEPTION"; break;
-            case STATUS_STACK_OVERFLOW:           msg = "STACK_OVERFLOW"; break;
-            case STATUS_CONTROL_C_EXIT:           msg = "CONTROL_C_EXIT"; break;
-            case STATUS_ARRAY_BOUNDS_EXCEEDED:    msg = "ARRAY_BOUNDS_EXCEEDED"; break;
-            case STATUS_FLOAT_DENORMAL_OPERAND:   msg = "FLOAT_DENORMAL_OPERAND"; break;
-            case STATUS_FLOAT_INEXACT_RESULT:     msg = "FLOAT_INEXACT_RESULT"; break;
-            case STATUS_FLOAT_OVERFLOW:           msg = "FLOAT_OVERFLOW"; break;
-            case STATUS_FLOAT_STACK_CHECK:        msg = "FLOAT_STACK_CHECK"; break;
-            case STATUS_FLOAT_UNDERFLOW:          msg = "FLOAT_UNDERFLOW"; break;
-            case STATUS_INTEGER_OVERFLOW:         msg = "INTEGER_OVERFLOW"; break;
-            case STATUS_IN_PAGE_ERROR:            msg = "IN_PAGE_ERROR"; break;
-            case STATUS_INVALID_DISPOSITION:      msg = "INVALID_DISPOSITION"; break;
-
-            default:
-                return EXCEPTION_CONTINUE_SEARCH;
+#ifndef NDEBUG
+        if (vm_get_boolean_property_value_with_default("vm.assert_dialog")) {
+            if (UnhandledExceptionFilter(nt_exception) == EXCEPTION_CONTINUE_SEARCH) {
+                DebugBreak();
+            }
         }
-
-
-
-        VM_Global_State::loader_env->shutting_down++;
-
-        if (!vm_get_boolean_property_value_with_default("vm.assert_dialog")) {
-            print_state(nt_exception, msg);
-
-            print_callstack(nt_exception);
-            LOGGER_EXIT(-1);
-
-        }
+#endif
         return EXCEPTION_CONTINUE_SEARCH;
     }
 
@@ -461,6 +411,7 @@ static LONG NTAPI vectored_exception_handler_internal(LPEXCEPTION_POINTERS nt_ex
     uint32 exception_esp = regs.esp;
     DebugUtilsTI* ti = VM_Global_State::loader_env->TI;
 
+    // TODO: We already checked that above. Is it possible to reuse the result?
     bool java_code = (vm_identify_eip((void *)regs.eip) == VM_TYPE_JAVA);
     exn_athrow_regs(&regs, exc_clss, java_code);
 

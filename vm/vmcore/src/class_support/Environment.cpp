@@ -32,6 +32,7 @@
 #include "verifier.h"
 #include "native_overrides.h"
 #include "compile.h"
+#include "component_manager.h"
 
 
 Global_Env::Global_Env(apr_pool_t * pool):
@@ -115,6 +116,13 @@ ready_for_exceptions(false)
     verify_all = false;
     pin_interned_strings = false; 
 
+    // initialize critical sections
+    p_jit_a_method_lock = new Lock_Manager();
+    p_vtable_patch_lock = new Lock_Manager();
+    p_meth_addr_table_lock = new Lock_Manager();
+    p_handle_lock = new Lock_Manager();
+    p_method_call_lock = new Lock_Manager();
+
     //
     // preloaded classes
     //
@@ -164,10 +172,7 @@ ready_for_exceptions(false)
     JavaLangString_VTable = NULL;
     JavaLangString_allocation_handle = 0;
 
-    uncaught_exception = NULL;
-
     vm_class_offset = 0;
-    shutting_down = 0;
 
     TI = new DebugUtilsTI; 
     vm_methods = new Method_Lookup_Table;
@@ -178,6 +183,10 @@ ready_for_exceptions(false)
 
 Global_Env::~Global_Env()
 {
+    if (vm_get_boolean_property_value_with_default("vm.noCleanupOnExit")) {
+        return;
+    }
+
     GlobalClassLoaderIterator ClIterator;
     ClassLoader *cl = ClIterator.first();
     
@@ -197,16 +206,37 @@ Global_Env::~Global_Env()
     delete properties;
     properties = NULL;
 
-    delete bootstrap_class_loader;
-    bootstrap_class_loader = NULL;
-
     nso_clear_lookup_table(nsoTable);
     nsoTable = NULL;
 
     compile_clear_dynamic_code_list(dcList);
     dcList = NULL;
 
-    hythread_lib_destroy(hythread_lib);
+    // uninitialize critical sections
+    delete p_jit_a_method_lock;
+    delete p_vtable_patch_lock;
+    delete p_meth_addr_table_lock;
+    delete p_handle_lock;
+    delete p_method_call_lock;
+
+    // Unload jit instances.
+    vm_delete_all_jits();
+
+    // Unload component manager and all registered components.
+    CmRelease();
+
+    // Unload all system native libraries.
+    natives_cleanup();
+
+    // Unload GC-releated resources.
+    gc_wrapup();
+
+    // Deallocate global vtable & jit code pools.
+    vm_mem_dealloc();
+
+    // TODO: Currently, there is only one global thread library instance.
+    // It still can be used after VM is destroyed.
+    // hythread_lib_destroy(hythread_lib);
  }
 
 Class* Global_Env::LoadCoreClass(const String* s)
