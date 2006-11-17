@@ -1,6 +1,18 @@
-# example drlvm.properties to point to the local working_classlib
+# example drlvm.properties 
 #
 #  to use, rename to "drlvm.properties"
 
+#
+#  point to a build classlib or HDK
+#
 external.dep.CLASSLIB.loc=../../../working_classlib
+
+
+#
+# to enable copy of jre into deploy directory
+#
+
+deploy.canonical.flag = true
+
+
 
