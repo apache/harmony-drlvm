@@ -30,32 +30,6 @@ void* nos_boundary = null; /* this is only for speeding up write barrier */
 Boolean forward_first_half;;
 void* object_forwarding_boundary=NULL;
 
-void fspace_save_reloc(Fspace* fspace, Partial_Reveal_Object** p_ref)
-{
-  Block_Header* block = GC_BLOCK_HEADER(p_ref);
-  block->reloc_table->push_back(p_ref);
-  return;
-}
-
-void  fspace_update_reloc(Fspace* fspace)
-{
-  SlotVector* reloc_table;
-  /* update refs in fspace */
-  Block* blocks = fspace->blocks;
-  for(unsigned int i=0; i < fspace->num_managed_blocks; i++){
-    Block_Header* block = (Block_Header*)&(blocks[i]);
-    reloc_table = block->reloc_table;
-    for(unsigned int j=0; j < reloc_table->size(); j++){
-      Partial_Reveal_Object** p_ref = (*reloc_table)[j];
-      Partial_Reveal_Object* p_target_obj = get_forwarding_pointer_in_obj_info(*p_ref);
-      *p_ref = p_target_obj;
-    }
-    reloc_table->clear();
-  }
-  
-  return;  
-}  
-
 Boolean fspace_mark_object(Fspace* fspace, Partial_Reveal_Object *p_obj)
 {  
   obj_mark_in_vt(p_obj);
@@ -66,48 +40,20 @@ Boolean fspace_mark_object(Fspace* fspace, Partial_Reveal_Object *p_obj)
   unsigned int *p_word = &(GC_BLOCK_HEADER(p_obj)->mark_table[obj_word_index]);
   unsigned int word_mask = (1<<obj_offset_in_word);
 	
-  unsigned int result = (*p_word)|word_mask;
-	
-  if( result==(*p_word) ) return FALSE;
+  unsigned int old_value = *p_word;
+  unsigned int new_value = old_value|word_mask;
   
-  *p_word = result; 
-  
-   return TRUE;
-}
-
-Boolean fspace_object_is_marked(Partial_Reveal_Object *p_obj, Fspace* fspace)
-{
-  assert(p_obj);
-  
-#ifdef _DEBUG //TODO:: Cleanup
-  unsigned int obj_word_index = OBJECT_WORD_INDEX_TO_MARKBIT_TABLE(p_obj);
-  unsigned int obj_offset_in_word = OBJECT_WORD_OFFSET_IN_MARKBIT_TABLE(p_obj); 	
-	
-  unsigned int *p_word = &(GC_BLOCK_HEADER(p_obj)->mark_table[obj_word_index]);
-  unsigned int word_mask = (1<<obj_offset_in_word);
-	
-  unsigned int result = (*p_word)|word_mask;
-	
-  if( result==(*p_word) )
-    assert( obj_is_marked_in_vt(p_obj));
-  else 
-    assert(!obj_is_marked_in_vt(p_obj));
-    
-#endif
-
-  return (obj_is_marked_in_vt(p_obj));
-    
+  while(old_value != new_value){
+    unsigned int temp = atomic_cas32(p_word, new_value, old_value);
+    if(temp == old_value) return TRUE;
+    old_value = *p_word;
+    new_value = old_value|word_mask;
+  }
+  return FALSE;
 }
 
 static void fspace_destruct_blocks(Fspace* fspace)
-{ 
-  Block* blocks = (Block*)fspace->blocks; 
-  for(unsigned int i=0; i < fspace->num_managed_blocks; i++){
-    Block_Header* block = (Block_Header*)&(blocks[i]);
-    delete block->reloc_table;
-    block->reloc_table = NULL;
-  }
-  
+{   
   return;
 }
 
@@ -123,7 +69,6 @@ static void fspace_init_blocks(Fspace* fspace)
     block->base = block->free;
     block->block_idx = i + start_idx;
     block->status = BLOCK_FREE;  
-    block->reloc_table = new SlotVector();
     last_block->next = block;
     last_block = block;
   }
@@ -163,10 +108,7 @@ void fspace_initialize(GC* gc, void* start, unsigned int fspace_size)
   
   fspace_init_blocks(fspace);
   
-  fspace->obj_info_map = new ObjectMap();
   fspace->mark_object_func = fspace_mark_object;
-  fspace->save_reloc_func = fspace_save_reloc;
-  fspace->update_reloc_func = fspace_update_reloc;
 
   fspace->move_object = TRUE;
   fspace->num_collections = 0;
@@ -174,10 +116,7 @@ void fspace_initialize(GC* gc, void* start, unsigned int fspace_size)
   gc_set_nos((GC_Gen*)gc, (Space*)fspace);
   /* above is same as Mspace init --> */
   
-  fspace->remslot_sets = new std::vector<RemslotSet *>();
-  fspace->rem_sets_lock = FREE_LOCK;
-
-  nos_boundary = fspace->heap_end;
+  nos_boundary = fspace->heap_start;
 
   forward_first_half = TRUE;
   object_forwarding_boundary = (void*)&fspace->blocks[fspace->first_block_idx + (unsigned int)(fspace->num_managed_blocks * NURSERY_OBJECT_FORWARDING_RATIO)];
@@ -216,7 +155,7 @@ void reset_fspace_for_allocation(Fspace* fspace)
   unsigned int last_idx = fspace->ceiling_block_idx;
   Block* blocks = fspace->blocks;
   unsigned int num_freed = 0;
-  for(unsigned int i = first_idx; i <= last_idx; i++){
+  for(unsigned int i = 0; i <= last_idx-first_idx; i++){
     Block_Header* block = (Block_Header*)&(blocks[i]);
     if(block->status == BLOCK_FREE) continue;
     block_clear_mark_table(block); 
@@ -236,6 +175,8 @@ void fspace_collection(Fspace *fspace)
   fspace->num_collections++;  
   
   GC* gc = fspace->gc;
+
+  pool_iterator_init(gc->metadata->gc_rootset_pool);
 
   if(gc_requires_barriers()){ 
     /* generational GC. Only trace (mark) nos */

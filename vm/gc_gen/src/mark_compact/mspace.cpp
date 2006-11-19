@@ -21,14 +21,7 @@
 #include "mspace.h"
 
 static void mspace_destruct_blocks(Mspace* mspace)
-{ 
-  Block* blocks = (Block*)mspace->blocks; 
-  for(unsigned int i=0; i < mspace->num_managed_blocks; i++){
-    Block_Header* block = (Block_Header*)&(blocks[i]);
-    delete block->reloc_table;
-    block->reloc_table = NULL;
-  }
-  
+{   
   return;
 }
 
@@ -44,7 +37,6 @@ static void mspace_init_blocks(Mspace* mspace)
     block->base = block->free;
     block->block_idx = i + start_idx;
     block->status = BLOCK_FREE;  
-    block->reloc_table = new SlotVector();
     last_block->next = block;
     last_block = block;
   }
@@ -56,6 +48,7 @@ static void mspace_init_blocks(Mspace* mspace)
 
 struct GC_Gen;
 extern void gc_set_mos(GC_Gen* gc, Space* space);
+extern Space* gc_set_nos(GC_Gen* gc);
 void mspace_initialize(GC* gc, void* start, unsigned int mspace_size)
 {
   Mspace* mspace = (Mspace*)STD_MALLOC( sizeof(Mspace));
@@ -83,10 +76,7 @@ void mspace_initialize(GC* gc, void* start, unsigned int mspace_size)
   
   mspace_init_blocks(mspace);
   
-  mspace->obj_info_map = new ObjectMap();
   mspace->mark_object_func = mspace_mark_object;
-  mspace->save_reloc_func = mspace_save_reloc;
-  mspace->update_reloc_func = mspace_update_reloc;
 
   mspace->move_object = TRUE;
   mspace->gc = gc;

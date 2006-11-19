@@ -64,14 +64,11 @@
 
 typedef void (*TaskType)(void*);
 
-#define GC_NUM_ROOTS_HINT  10000
+extern Boolean NEED_BARRIER;
+extern unsigned int NUM_COLLECTORS;
 
 typedef std::stack<Partial_Reveal_Object *> MarkStack;
 typedef std::stack<Partial_Reveal_Object**> TraceStack;
-typedef std::vector<Partial_Reveal_Object*> RemobjSet;
-typedef std::vector<Partial_Reveal_Object**> RootSet;
-typedef std::vector<Partial_Reveal_Object**> RemslotSet;
-typedef std::vector<Partial_Reveal_Object**> SlotVector;
 typedef std::map<Partial_Reveal_Object*, Obj_Info_Type> ObjectMap;
 #include <hash_set>
 typedef stdext::hash_set<void *> HashSet;
@@ -190,8 +187,6 @@ typedef struct Space{
   GC* gc;
   Boolean move_object;
   Boolean (*mark_object_func)(Space* space, Partial_Reveal_Object* p_obj);
-  void (*save_reloc_func)(Space* space, Partial_Reveal_Object** p_ref);
-  void (*update_reloc_func)(Space* space);
 }Space;
 
 inline unsigned int space_committed_size(Space* space){ return space->committed_heap_size;}
@@ -211,7 +206,8 @@ inline Boolean obj_belongs_to_space(Partial_Reveal_Object *p_obj, Space* space)
 /* all GCs inherit this GC structure */
 struct Mutator;
 struct Collector;
-
+struct GC_Metadata;
+struct Vector_Block;
 typedef struct GC{
   void* heap_start;
   void* heap_end;
@@ -229,9 +225,11 @@ typedef struct GC{
   unsigned int num_collectors;
   unsigned int num_active_collectors; /* not all collectors are working */
   
-  /* rootsets for collection (FIXME:: should be distributed to collectors) */
-  RootSet* root_set;
+  /* metadata is the pool for rootset, markstack, etc. */  
+  GC_Metadata* metadata;
   unsigned int collect_kind; /* MAJOR or MINOR */
+  /* FIXME:: this is wrong! root_set belongs to mutator */
+  Vector_Block* root_set;
 
   /* mem info */
   apr_pool_t *aux_pool;
@@ -239,22 +237,10 @@ typedef struct GC{
 
 }GC;
 
-inline void gc_init_rootset(GC* gc) 
-{
-	gc->root_set = new RootSet();
-	gc->root_set->reserve(GC_NUM_ROOTS_HINT);
-	gc->root_set->clear();
-}
-
-inline void gc_reset_rootset(GC* gc) 
-{
-	gc->root_set->clear();
-}
-
-void mark_scan_heap(Collector* collector);
+void mark_scan_heap_par(Collector* collector);
+void mark_scan_heap_seq(Collector* collector);
 
 inline void* gc_heap_base(GC* gc){ return gc->heap_start; }
 inline void* gc_heap_ceiling(GC* gc){ return gc->heap_end; }
-
 
 #endif //_GC_COMMON_H_

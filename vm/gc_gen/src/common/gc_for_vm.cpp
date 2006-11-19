@@ -18,36 +18,125 @@
  * @author Xiao-Feng Li, 2006/10/05
  */
 
+#include <cxxlog.h>
 #include "vm_threads.h"
 
 #include "../gen/gen.h"
 #include "interior_pointer.h"
 
+unsigned int HEAP_SIZE_DEFAULT = 256 * MB;
+
+/* heap size limit is not interesting. only for manual tuning purpose */
+unsigned int min_heap_size_bytes = 32 * MB;
+unsigned int max_heap_size_bytes = 256 * MB;
+
+static size_t parse_size_string(const char* size_string) 
+{
+  size_t len = strlen(size_string);
+  size_t unit = 1;
+  if (tolower(size_string[len - 1]) == 'k') {
+    unit = 1024;
+  } else if (tolower(size_string[len - 1]) == 'm') {
+    unit = 1024 * 1024;
+  } else if (tolower(size_string[len - 1]) == 'g') {
+    unit = 1024 * 1024 * 1024;
+  }
+  size_t size = atol(size_string);
+  size_t res = size * unit;
+  if (res / unit != size) {
+    /* overflow happened */
+    return 0;
+  }
+  return res;
+}
+
+static bool get_property_value_boolean(char* name) 
+{
+  const char* value = vm_get_property_value(name);
+  
+  return (strcmp("0", value) != 0
+    && strcmp("off", value) != 0 
+    && strcmp("false", value) != 0);
+}
+
+static int get_property_value_int(char* name) 
+{
+  const char* value = vm_get_property_value(name);
+  return (NULL == value) ? 0 : atoi(value);
+}
+
+static bool is_property_set(char* name) 
+{
+  const char* value = vm_get_property_value(name);
+  return (NULL != value && 0 != value[0]);
+}
+
+static void parse_configuration_properties() 
+{
+  unsigned int max_heap_size = HEAP_SIZE_DEFAULT;
+  unsigned int min_heap_size = min_heap_size_bytes;
+  
+  if (is_property_set("gc.mx")) {
+    max_heap_size = parse_size_string(vm_get_property_value("gc.mx"));
+
+    if (max_heap_size < min_heap_size)
+      max_heap_size = min_heap_size;
+    if (0 == max_heap_size) 
+      max_heap_size = HEAP_SIZE_DEFAULT;
+ 
+    min_heap_size = max_heap_size / 10;
+    if (min_heap_size < min_heap_size_bytes) min_heap_size = min_heap_size_bytes;
+  }
+
+  if (is_property_set("gc.ms")) {
+    min_heap_size = parse_size_string(vm_get_property_value("gc.ms"));
+    if (min_heap_size < min_heap_size_bytes) 
+      min_heap_size = min_heap_size_bytes;
+  }
+
+  if (min_heap_size > max_heap_size)
+    max_heap_size = min_heap_size;
+
+  min_heap_size_bytes = min_heap_size;
+  max_heap_size_bytes = max_heap_size;
+
+  if (is_property_set("gc.num_collectors")) {
+    unsigned int num = get_property_value_int("gc.num_collectors");
+    NUM_COLLECTORS = (num==0)? NUM_COLLECTORS:num;
+  }
+
+  if (is_property_set("gc.gen_mode")) {
+    NEED_BARRIER = get_property_value_boolean("gc.gen_mode");
+  }
+  
+  return;  
+}
+
 static GC* p_global_gc = NULL;
 
 void gc_init() 
 {  
+  parse_configuration_properties();
+  
   assert(p_global_gc == NULL);
   GC* gc = (GC*)STD_MALLOC(sizeof(GC_Gen));
   assert(gc);
   memset(gc, 0, sizeof(GC));  
   p_global_gc = gc;
   gc_gen_initialize((GC_Gen*)gc, min_heap_size_bytes, max_heap_size_bytes);
-  /* initialize the main thread*/
-  // gc_thread_init(vm_get_gc_thread_local());
   
   return;
 }
 
 /* this interface need reconsidering. is_pinned is unused. */
 void gc_add_root_set_entry(Managed_Object_Handle *ref, Boolean is_pinned) 
-{  	
+{   
   Partial_Reveal_Object** p_ref = (Partial_Reveal_Object**)ref;
-  if (*p_ref == NULL) return;	
-	assert( !obj_is_marked_in_vt(*p_ref));
-	assert( !obj_is_forwarded_in_vt(*p_ref) && !obj_is_forwarded_in_obj_info(*p_ref)); 
-	assert( obj_is_in_gc_heap(*p_ref));
-	p_global_gc->root_set->push_back(p_ref);
+  if (*p_ref == NULL) return;
+  assert( !obj_is_marked_in_vt(*p_ref));
+  assert( !obj_is_forwarded_in_vt(*p_ref) && !obj_is_forwarded_in_obj_info(*p_ref)); 
+  assert( obj_is_in_gc_heap(*p_ref));
+  gc_rootset_add_entry(p_global_gc, p_ref);
 } 
 
 void gc_add_root_set_entry_interior_pointer (void **slot, int offset, Boolean is_pinned) 
@@ -86,13 +175,13 @@ void gc_thread_kill(void* gc_info)
 
 int64 gc_free_memory() 
 {
-	return (int64)gc_gen_free_memory_size((GC_Gen*)p_global_gc);
+  return (int64)gc_gen_free_memory_size((GC_Gen*)p_global_gc);
 }
 
 /* java heap size.*/
 int64 gc_total_memory() 
 {
-	return (int64)((POINTER_SIZE_INT)gc_heap_ceiling(p_global_gc) - (POINTER_SIZE_INT)gc_heap_base(p_global_gc)); 
+  return (int64)((POINTER_SIZE_INT)gc_heap_ceiling(p_global_gc) - (POINTER_SIZE_INT)gc_heap_base(p_global_gc)); 
 }
 
 void gc_vm_initialized()

@@ -44,8 +44,6 @@ typedef struct Fspace {
   GC* gc;
   Boolean move_object;
   Boolean (*mark_object_func)(Fspace* space, Partial_Reveal_Object* p_obj);
-  void (*save_reloc_func)(Fspace* space, Partial_Reveal_Object** p_ref);
-  void (*update_reloc_func)(Fspace* space);
   /* END of Space --> */
 
   Block* blocks; /* short-cut for mpsace blockheader access, not mandatory */
@@ -58,16 +56,8 @@ typedef struct Fspace {
   unsigned int num_used_blocks;
   unsigned int num_managed_blocks;
   unsigned int num_total_blocks;
-
-  /* during compaction, save non-zero obj_info who's overwritten by forwarding pointer */
-  ObjectMap*  obj_info_map; 
   /* END of Blocked_Space --> */
-    
-  /* saved remsets of collectors */
-  /* saved remsets of exited mutators */
-  std::vector<RemslotSet *> *remslot_sets;
-  SpinLock rem_sets_lock;
-  
+      
 } Fspace;
 
 void fspace_initialize(GC* gc, void* start, unsigned int fspace_size);
@@ -81,15 +71,8 @@ inline Boolean fspace_used_memory_size(Fspace* fspace){ return GC_BLOCK_SIZE_BYT
 void* fspace_alloc(unsigned size, Allocator *allocator);
 
 Boolean fspace_mark_object(Fspace* fspace, Partial_Reveal_Object *p_obj);
-void fspace_save_reloc(Fspace* fspace, Partial_Reveal_Object** p_ref);
-void fspace_update_reloc(Fspace* fspace);
+
 void reset_fspace_for_allocation(Fspace* fspace);
-
-inline Block_Header* fspace_get_first_copy_block(Fspace* fspace)
-{  return (Block_Header*)fspace->blocks; }
-
-inline Block_Header* fspace_get_next_copy_block(Fspace* fspace, Block_Header* block)
-{  return block->next; }
 
 
 Boolean fspace_compute_object_target(Collector* collector, Fspace* fspace);

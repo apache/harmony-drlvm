@@ -29,7 +29,7 @@
 
 #define USEC_PER_SEC INT64_C(1000000)
 
-#define VmThreadHandle void*
+#define VmThreadHandle  void*
 #define VmEventHandle   hysem_t
 #define THREAD_OK       TM_ERROR_NONE
 
@@ -71,27 +71,32 @@ inline void *atomic_casptr(volatile void **mem, void *with, const void *cmp) {
 inline uint32 atomic_cas32(volatile apr_uint32_t *mem,
                                            apr_uint32_t swap,
                                            apr_uint32_t cmp) {
-	return (uint32)apr_atomic_cas32(mem, swap, cmp);
+  return (uint32)apr_atomic_cas32(mem, swap, cmp);
 }
 
-inline Boolean pool_create(apr_pool_t **newpool, apr_pool_t *parent) {
-	return (Boolean)apr_pool_create(newpool, parent);
+inline uint32 atomic_inc32(volatile apr_uint32_t *mem){
+  return (uint32)apr_atomic_inc32(mem);
 }
 
-inline void pool_destroy(apr_pool_t *p) {
-	apr_pool_destroy(p);
-}
-
-inline uint32 atomic_inc32(volatile apr_uint32_t *mem) {
-	return (uint32)apr_atomic_inc32(mem);
+inline uint32 atomic_dec32(volatile apr_uint32_t *mem){
+  return (uint32)apr_atomic_dec32(mem);
 }
 
 inline uint32 atomic_add32(volatile apr_uint32_t *mem, apr_uint32_t val) {
-	return (uint32)apr_atomic_add32(mem, val);
+  return (uint32)apr_atomic_add32(mem, val);
 }
 
+inline Boolean pool_create(apr_pool_t **newpool, apr_pool_t *parent) {
+  return (Boolean)apr_pool_create(newpool, parent);
+}
+
+inline void pool_destroy(apr_pool_t *p) {
+  apr_pool_destroy(p);
+}
+
+
 inline int64 time_now() {
-	return apr_time_now();
+  return apr_time_now();
 }
 
 typedef volatile unsigned int SpinLock;
@@ -102,7 +107,7 @@ enum Lock_State{
 };
 
 #define try_lock(x) (!atomic_cas32(&(x), LOCKED, FREE_LOCK))
-#define lock(x)	while( !try_lock(x)){ while( x==LOCKED );}
+#define lock(x) while( !try_lock(x)){ while( x==LOCKED );}
 #define unlock(x) do{ x = FREE_LOCK;}while(0)
 
 #endif //_GC_PLATFORM_H_

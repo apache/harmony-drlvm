@@ -22,6 +22,7 @@
 #define _THREAD_ALLOC_H_
 
 #include "../common/gc_block.h"
+#include "../common/gc_metadata.h"
 
 typedef struct Allocator{
   void *free;

@@ -25,18 +25,18 @@ struct GC_Gen;
 Space* gc_get_nos(GC_Gen* gc);
 void mutator_initialize(GC* gc, void *gc_information) 
 {
-  /* FIXME:: NOTE: gc_info is uncleared */
+  /* FIXME:: make sure gc_info is cleared */
   Mutator *mutator = (Mutator *) gc_information;
   mutator->free = NULL;
   mutator->ceiling = NULL;
   mutator->alloc_block = NULL;
   mutator->alloc_space = gc_get_nos((GC_Gen*)gc);
   mutator->gc = gc;
-  
-  assert(mutator->remslot == NULL);
-  mutator->remslot = new RemslotSet();
-  mutator->remslot->clear();
     
+  if(gc_requires_barriers()){
+    mutator->rem_set = pool_get_entry(gc->metadata->free_set_pool);
+  }
+       
   lock(gc->mutator_list_lock);     // vvvvvvvvvvvvvvvvvvvvvvvvvvvvvv
 
   mutator->next = (Mutator *)gc->mutator_list;
@@ -53,11 +53,12 @@ void mutator_destruct(GC* gc, void *gc_information)
 
   Mutator *mutator = (Mutator *)gc_information;
 
-  lock(gc->mutator_list_lock);     // vvvvvvvvvvvvvvvvvvvvvvvvvvvvvv
+  if(gc_requires_barriers()){ /* put back the remset when a mutator exits */
+    pool_put_entry(gc->metadata->gc_rootset_pool, mutator->rem_set);
+    mutator->rem_set = NULL;
+  }
 
-  Fspace* fspace = (Fspace*)mutator->alloc_space;
-  fspace->remslot_sets->push_back(mutator->remslot);
-  mutator->remslot = NULL;
+  lock(gc->mutator_list_lock);     // vvvvvvvvvvvvvvvvvvvvvvvvvvvvvv
 
   volatile Mutator *temp = gc->mutator_list;
   if (temp == mutator) {  /* it is at the head of the list */
@@ -75,5 +76,4 @@ void mutator_destruct(GC* gc, void *gc_information)
   gc->num_mutators--;
   return;
 }
-
 

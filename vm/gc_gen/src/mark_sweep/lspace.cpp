@@ -61,7 +61,7 @@ void lspace_initialize(GC* gc, void* start, unsigned int lspace_size)
   memset(lspace, 0, sizeof(Lspace));
   
   void* reserved_base = start;
-  unsigned int committed_size = lspace_size >> 1;
+  unsigned int committed_size = lspace_size;
   int status = port_vmem_commit(&reserved_base, committed_size, gc->allocated_memory); 
   assert(status == APR_SUCCESS && reserved_base == start);
   
@@ -77,16 +77,13 @@ void lspace_initialize(GC* gc, void* start, unsigned int lspace_size)
   lspace->mark_table = (unsigned int*)STD_MALLOC( num_words*BYTES_PER_WORD );
   memset(lspace->mark_table, 0, num_words*BYTES_PER_WORD);
   
-  lspace->reloc_table = new SlotVector();
   lspace->mark_object_func = lspace_mark_object;
-  lspace->save_reloc_func = lspace_save_reloc;
-  lspace->update_reloc_func = lspace_update_reloc;
   
   lspace->move_object = FALSE;
   lspace->gc = gc;
   gc_set_los((GC_Gen*)gc, (Space*)lspace);
   
-  los_boundary = start;
+  los_boundary = lspace->heap_end;
   
   return;
 }
@@ -123,33 +120,17 @@ Boolean lspace_mark_object(Lspace* lspace, Partial_Reveal_Object* p_obj)
   unsigned int word_index = OBJECT_WORD_INDEX_TO_LSPACE_MARKBIT_TABLE(lspace, p_obj);
   unsigned int bit_offset_in_word = OBJECT_WORD_OFFSET_IN_LSPACE_MARKBIT_TABLE(lspace, p_obj);
  
-  unsigned int* p_markbits = &(lspace->mark_table[word_index]);
+  unsigned int* p_word = &(lspace->mark_table[word_index]);
   unsigned int word_mask = (1<<bit_offset_in_word);
-	
-  unsigned int result = (*p_markbits)|word_mask;
-	
-  if( result==(*p_markbits) ) return FALSE;
   
-  *p_markbits = result; 
-      
-  return TRUE;
-}
-
-void lspace_save_reloc(Lspace* lspace, Partial_Reveal_Object** p_ref)
-{
-  lspace->reloc_table->push_back(p_ref);
-}
-
-void lspace_update_reloc(Lspace* lspace)
-{
-  SlotVector* reloc_table;
+  unsigned int old_value = *p_word;
+  unsigned int new_value = old_value|word_mask;
   
-  reloc_table = lspace->reloc_table;
-  for(unsigned int j=0; j < reloc_table->size(); j++){
-    Partial_Reveal_Object** p_ref = (*reloc_table)[j];
-    Partial_Reveal_Object* p_target_obj = get_forwarding_pointer_in_obj_info(*p_ref);
-    *p_ref = p_target_obj;
+  while(old_value != new_value){
+    unsigned int temp = atomic_cas32(p_word, new_value, old_value);
+    if(temp == old_value) return TRUE;
+    old_value = *p_word;
+    new_value = old_value|word_mask;
   }
-  reloc_table->clear();
-  return;
+  return FALSE;
 }

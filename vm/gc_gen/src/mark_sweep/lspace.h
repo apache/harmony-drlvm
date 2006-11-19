@@ -34,16 +34,11 @@ typedef struct Lspace{
   GC* gc;
   Boolean move_object;
   Boolean (*mark_object_func)(Lspace* space, Partial_Reveal_Object* p_obj);
-  void (*save_reloc_func)(Lspace* space, Partial_Reveal_Object** p_ref);
-  void (*update_reloc_func)(Lspace* space);
   /* END of Space --> */
 
   void* alloc_free;
     
   unsigned int* mark_table;
-
-  /* support other space moving collection */
-  SlotVector* reloc_table;
 
 }Lspace;
 

@@ -24,7 +24,7 @@
 
 /* All the write barrier interfaces need cleanup */
 
-static Boolean NEED_BARRIER = TRUE;
+Boolean NEED_BARRIER = FALSE;
 
 Boolean gc_requires_barriers() 
 {   return NEED_BARRIER; }
@@ -38,7 +38,7 @@ static void gc_slot_write_barrier(Managed_Object_Handle *p_slot,
   if( address_belongs_to_nursery((void *)p_target, gc) && 
        !address_belongs_to_nursery((void *)p_slot, gc)) 
   {
-    mutator->remslot->push_back((Partial_Reveal_Object **)p_slot);
+    mutator_remset_add_entry(mutator, (Partial_Reveal_Object**)p_slot);
   }
 }
 
@@ -58,7 +58,7 @@ static void gc_object_write_barrier(Managed_Object_Handle p_object)
     for (int i = 0; i < array_length; i++) {
       p_slot = (Partial_Reveal_Object **)vector_get_element_address_ref((Vector_Handle) array, i);
       if( *p_slot != NULL && address_belongs_to_nursery((void *)*p_slot, gc)){
-        mutator->remslot->push_back(p_slot);
+        mutator_remset_add_entry(mutator, p_slot);
       }
     }   
     return;
@@ -71,7 +71,7 @@ static void gc_object_write_barrier(Managed_Object_Handle p_object)
     p_slot = (Partial_Reveal_Object**)offset_get_ref(offset_scanner, p_obj);
     if (p_slot == NULL) break;  
     if( address_belongs_to_nursery((void *)*p_slot, gc)){
-      mutator->remslot->push_back(p_slot);
+      mutator_remset_add_entry(mutator, p_slot);
     }
     offset_scanner = offset_next_ref(offset_scanner);
   }
@@ -96,12 +96,15 @@ void gc_heap_write_ref (Managed_Object_Handle p_obj_holding_ref, unsigned offset
 void gc_heap_slot_write_ref (Managed_Object_Handle p_obj_holding_ref,Managed_Object_Handle *p_slot, Managed_Object_Handle p_target)
 {  
   *p_slot = p_target;
+  
   if( !NEED_BARRIER ) return;
   gc_slot_write_barrier(p_slot, p_target); 
 }
 
-/* this is used for global object update, e.g., strings. Since globals are roots, no barrier here */
+/* this is used for global object update, e.g., strings. */
 void gc_heap_write_global_slot(Managed_Object_Handle *p_slot,Managed_Object_Handle p_target)
 {
   *p_slot = p_target;
+  
+  /* Since globals are roots, no barrier here */
 }

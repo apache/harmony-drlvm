@@ -27,10 +27,13 @@
 #define GC_BLOCK_SIZE_BYTES (1 << GC_BLOCK_SHIFT_COUNT)
 
 enum Block_Status {
-  BLOCK_NIL,
-  BLOCK_FREE,
-  BLOCK_IN_USE,
-  BLOCK_USED
+  BLOCK_NIL = 0,
+  BLOCK_FREE = 0x1,
+  BLOCK_IN_USE = 0x2,
+  BLOCK_USED = 0x4,
+  BLOCK_IN_COMPACT = 0x8,
+  BLOCK_COMPACTED = 0x10,
+  BLOCK_TARGET = 0x20
 };
 
 typedef struct Block_Header {
@@ -39,7 +42,6 @@ typedef struct Block_Header {
   void* ceiling;                    
   unsigned int block_idx;           
   unsigned int status;
-  SlotVector* reloc_table;
   Block_Header* next;
   unsigned int mark_table[1];  /* entry num == MARKBIT_TABLE_SIZE_WORDS */
 }Block_Header;
@@ -91,7 +93,7 @@ inline Partial_Reveal_Object* block_get_first_marked_object(Block_Header* block,
         if( !(markbits& (1<<k)) ){ k++; continue;}
         unsigned int word_index = (j<<BIT_SHIFT_TO_BITS_PER_WORD) + k;
         Partial_Reveal_Object* p_obj = (Partial_Reveal_Object*)((unsigned int*)GC_BLOCK_BODY(block) + word_index);
-        /* only valid before compaction: assert(obj_is_marked_in_vt(p_obj)); */
+        assert(obj_is_marked_in_vt(p_obj)); 
         
         *mark_bit_idx = word_index;
       return p_obj;
@@ -120,7 +122,7 @@ inline Partial_Reveal_Object* block_get_next_marked_object(Block_Header* block, 
       
       unsigned int word_index = (j<<BIT_SHIFT_TO_BITS_PER_WORD) + k;
       Partial_Reveal_Object* p_obj = (Partial_Reveal_Object*)((unsigned int*)GC_BLOCK_BODY(block) + word_index);      
-      /* only valid before compaction: assert(obj_is_marked_in_vt(p_obj)); */
+      assert(obj_is_marked_in_vt(p_obj));
       
       *mark_bit_idx = word_index;
       return p_obj;
@@ -165,5 +167,30 @@ inline void block_clear_markbits(Block_Header* block)
   block_clear_mark_table(block);
   return;     
 }
+
+typedef struct Blocked_Space {
+  /* <-- first couple of fields are overloadded as Space */
+  void* heap_start;
+  void* heap_end;
+  unsigned int reserved_heap_size;
+  unsigned int committed_heap_size;
+  unsigned int num_collections;
+  GC* gc;
+  Boolean move_object;
+  Boolean (*mark_object_func)(Space* space, Partial_Reveal_Object* p_obj);
+  /* END of Space --> */
+
+  Block* blocks; /* short-cut for mpsace blockheader access, not mandatory */
+  
+  /* FIXME:: the block indices should be replaced with block header addresses */
+  unsigned int first_block_idx;
+  unsigned int ceiling_block_idx;
+  volatile unsigned int free_block_idx;
+  
+  unsigned int num_used_blocks;
+  unsigned int num_managed_blocks;
+  unsigned int num_total_blocks;
+  /* END of Blocked_Space --> */
+}Blocked_Space;
 
 #endif //#ifndef _BLOCK_H_

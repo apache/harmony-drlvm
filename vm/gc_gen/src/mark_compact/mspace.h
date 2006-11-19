@@ -35,8 +35,6 @@ typedef struct Mspace{
   GC* gc;
   Boolean move_object;
   Boolean (*mark_object_func)(Mspace* space, Partial_Reveal_Object* p_obj);
-  void (*save_reloc_func)(Mspace* space, Partial_Reveal_Object** p_ref);
-  void (*update_reloc_func)(Mspace* space);
   /* END of Space --> */
     
   Block* blocks; /* short-cut for mpsace blockheader access, not mandatory */
@@ -49,9 +47,7 @@ typedef struct Mspace{
   unsigned int num_used_blocks;
   unsigned int num_managed_blocks;
   unsigned int num_total_blocks;
-
-  /* during compaction, save non-zero obj_info who's overwritten by forwarding pointer */
-  ObjectMap*  obj_info_map; 
+  /* END of Blocked_Space --> */
     
 }Mspace;
 

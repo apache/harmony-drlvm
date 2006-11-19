@@ -20,6 +20,7 @@
 
 #include "fspace.h"
 #include "../thread/collector.h"
+#include "../common/gc_metadata.h"
 
 static Boolean fspace_object_to_be_forwarded(Partial_Reveal_Object *p_obj, Fspace *fspace)
 {
@@ -99,9 +100,10 @@ static void trace_object(Collector* collector, Partial_Reveal_Object **p_ref)
   if (!fspace_object_to_be_forwarded(p_obj, (Fspace*)space)) {
     assert(!obj_is_forwarded_in_vt(p_obj));
     /* this obj remains in fspace, remember its ref slot for next GC. */
-    if( !address_belongs_to_space(p_ref, space) )
-      collector->this_cycle_remset->push_back(p_ref); 
-
+    if( !address_belongs_to_space(p_ref, space) ){
+      collector_remset_add_entry(collector, p_ref); 
+    }
+    
     if(fspace_mark_object((Fspace*)space, p_obj)) 
       scan_object(collector, p_obj);
     
@@ -145,29 +147,35 @@ void trace_root(Collector* collector, Partial_Reveal_Object **ref)
   }
 }
 
-static void collector_trace_remsets(Collector* collector)
+static void collector_trace_rootsets(Collector* collector)
 {
-  Fspace* fspace = (Fspace*)collector->collect_space;
+  GC_Metadata* metadata = collector->gc->metadata;  
   
+  Space* space = collector->collect_space;
   HashSet remslot_hash;
 
   /* find root slots saved by 1. active mutators, 2. exited mutators, 3. last cycle collectors */
-  for(unsigned int i=0; i< fspace->remslot_sets->size(); i++) {
-    RemslotSet* remslot = (*fspace->remslot_sets)[i];
-    for (unsigned int j = 0; j < remslot->size(); j++) {
-      Partial_Reveal_Object **ref = (*remslot)[j];
-      assert(ref);
-      if(*ref == NULL) continue;  
-      if (obj_belongs_to_space(*ref, (Space*)fspace)) {
-        if (remslot_hash.find(ref) == remslot_hash.end()) {
-          remslot_hash.insert(ref);
-          trace_root(collector, ref);
+  pool_iterator_init(metadata->gc_rootset_pool);
+  Vector_Block* root_set = pool_iterator_next(metadata->gc_rootset_pool);
+
+  while(root_set){    
+    unsigned int* iter = vector_block_iterator_init(root_set);
+    while(!vector_block_iterator_end(root_set,iter)){
+      Partial_Reveal_Object** p_ref = (Partial_Reveal_Object** )*iter;
+      iter = vector_block_iterator_advance(root_set,iter);
+
+      assert(p_ref);
+      if(*p_ref == NULL) continue;  
+      if (obj_belongs_to_space(*p_ref, space)) {
+        if (remslot_hash.find(p_ref) == remslot_hash.end()) {
+          remslot_hash.insert(p_ref);
+          trace_root(collector, p_ref);
         }
       }
     }
-    remslot->clear();  
+    pool_put_entry(metadata->free_set_pool, root_set);
+    root_set = pool_iterator_next(metadata->gc_rootset_pool);
   }
-  fspace->remslot_sets->clear();
     
   return;
 }
@@ -186,8 +194,7 @@ void trace_forward_fspace(Collector* collector)
   
   /* FIXME:: Single-threaded trace-forwarding for fspace currently */
 
-  space->remslot_sets->push_back(gc->root_set);
-  collector_trace_remsets(collector);
+  collector_trace_rootsets(collector);
 
   update_relocated_refs(collector);
   reset_fspace_for_allocation(space);  

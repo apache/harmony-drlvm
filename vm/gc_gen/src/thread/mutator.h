@@ -34,8 +34,8 @@ typedef struct Mutator {
   VmThreadHandle thread_handle;   /* This thread; */
   /* END of Allocator --> */
   
-  RemslotSet *remslot;
-  Mutator *next;  /* The gc info area associated with the next active thread. */
+  Vector_Block* rem_set;
+  Mutator* next;  /* The gc info area associated with the next active thread. */
 } Mutator;
 
 void mutator_initialize(GC* gc, void* tls_gc_info);

@@ -21,96 +21,201 @@
 #include "mspace.h"
 #include "../thread/collector.h"
 #include "../trace_forward/fspace.h"
+
 struct GC_Gen;
 Space* gc_get_nos(GC_Gen* gc);
 Space* gc_get_mos(GC_Gen* gc);
 Space* gc_get_los(GC_Gen* gc);
 
+static void reset_mspace_after_compaction(Mspace* mspace)
+{ 
+  unsigned int old_num_used = mspace->num_used_blocks;
+  unsigned int new_num_used = mspace->free_block_idx - mspace->first_block_idx;
+  unsigned int num_used = old_num_used>new_num_used? old_num_used:new_num_used;
+  
+  Block* blocks = mspace->blocks;
+  unsigned int i;
+  for(i=0; i < num_used; i++){
+    Block_Header* block = (Block_Header*)&(blocks[i]);
+    block_clear_mark_table(block); 
+    block->status = BLOCK_USED;
+
+    if(i >= new_num_used){
+      block->status = BLOCK_FREE; 
+      block->free = GC_BLOCK_BODY(block);
+    }
+  }
+  mspace->num_used_blocks = new_num_used;
+  
+  /* we should clear the remaining blocks which are set to be BLOCK_COMPACTED or BLOCK_TARGET */
+  for(; i < mspace->num_managed_blocks; i++){
+    Block_Header* block = (Block_Header*)&(blocks[i]);
+    assert(block->status& (BLOCK_COMPACTED|BLOCK_TARGET));
+    block->status = BLOCK_FREE;
+  }
+}
+
+static volatile Block_Header* next_block_for_compact;
+static volatile Block_Header* next_block_for_target;
+
+static void gc_reset_block_for_collectors(GC* gc, Mspace* mspace)
+{
+  unsigned int free_blk_idx = mspace->free_block_idx;
+  for(unsigned int i=0; i<gc->num_active_collectors; i++){
+    Collector* collector = gc->collectors[i];
+    unsigned int collector_target_idx = collector->cur_target_block->block_idx;
+    if(collector_target_idx > free_blk_idx)
+      free_blk_idx = collector_target_idx;
+    collector->cur_target_block = NULL;
+    collector->cur_compact_block = NULL;
+  }
+  mspace->free_block_idx = free_blk_idx+1;
+  return;
+}
+
+static void gc_init_block_for_collectors(GC* gc, Mspace* mspace)
+{
+  unsigned int i;
+  Block_Header* block;
+  for(i=0; i<gc->num_active_collectors; i++){
+    Collector* collector = gc->collectors[i];
+    block = (Block_Header*)&mspace->blocks[i];
+    collector->cur_target_block = block;
+    collector->cur_compact_block = block;
+    block->status = BLOCK_TARGET;
+  }
+  
+  block = (Block_Header*)&mspace->blocks[i];
+  next_block_for_target = block;
+  next_block_for_compact = block;
+  return;
+}
+
+static unsigned int gc_collection_result(GC* gc)
+{
+  unsigned int result = TRUE;
+  for(unsigned i=0; i<gc->num_active_collectors; i++){
+    Collector* collector = gc->collectors[i];
+    result &= collector->result;
+  }  
+  return result;
+}
+
 static Block_Header* mspace_get_first_compact_block(Mspace* mspace)
 { return (Block_Header*)mspace->blocks; }
-
-static Block_Header* mspace_get_next_compact_block(Mspace* mspace, Block_Header* block)
-{ return block->next; }
 
 static Block_Header* mspace_get_first_target_block(Mspace* mspace)
 { return (Block_Header*)mspace->blocks; }
 
-static Block_Header* mspace_get_next_target_block(Mspace* mspace, Block_Header* block)
-{ return block->next; }
 
-void mspace_save_reloc(Mspace* mspace, Partial_Reveal_Object** p_ref)
-{
-  Block_Header* block = GC_BLOCK_HEADER(p_ref);
-  block->reloc_table->push_back(p_ref);
-  return;
+static Block_Header* mspace_get_next_compact_block1(Mspace* mspace, Block_Header* block)
+{  return block->next; }
+
+static Block_Header* mspace_get_next_compact_block(Collector* collector, Mspace* mspace)
+{ 
+  /* firstly put back the compacted block. If it's not BLOCK_TARGET, it will be set to BLOCK_COMPACTED */
+  unsigned int block_status = collector->cur_compact_block->status;
+  assert( block_status & (BLOCK_IN_COMPACT|BLOCK_TARGET));
+  if( block_status == BLOCK_IN_COMPACT)
+    collector->cur_compact_block->status = BLOCK_COMPACTED;
+
+  Block_Header* cur_compact_block = (Block_Header*)next_block_for_compact;
+  
+  while(cur_compact_block != NULL){
+    Block_Header* next_compact_block = cur_compact_block->next;
+
+    Block_Header* temp = (Block_Header*)atomic_casptr((volatile void **)&next_block_for_compact, next_compact_block, cur_compact_block);
+    if(temp != cur_compact_block){
+      cur_compact_block = (Block_Header*)next_block_for_compact;
+      continue;
+    }
+    /* got it, set its state to be BLOCK_IN_COMPACT. It must be the first time touched by compactor */
+    block_status = cur_compact_block->status;
+    assert( !(block_status & (BLOCK_IN_COMPACT|BLOCK_COMPACTED|BLOCK_TARGET)));
+    cur_compact_block->status = BLOCK_IN_COMPACT;
+    collector->cur_compact_block = cur_compact_block;
+    return cur_compact_block;
+      
+  }
+  /* run out space blocks for compacting */
+  return NULL;
 }
 
-void  mspace_update_reloc(Mspace* mspace)
-{
-  SlotVector* reloc_table;
-  /* update refs in mspace */
-  Block* blocks = mspace->blocks;
-  for(unsigned int i=0; i < mspace->num_used_blocks; i++){
-    Block_Header* block = (Block_Header*)&(blocks[i]);
-    reloc_table = block->reloc_table;
-    for(unsigned int j=0; j < reloc_table->size(); j++){
-      Partial_Reveal_Object** p_ref = (*reloc_table)[j];
-      Partial_Reveal_Object* p_target_obj = get_forwarding_pointer_in_obj_info(*p_ref);
-      *p_ref = p_target_obj;
-    }
-    reloc_table->clear();
+static Block_Header* mspace_get_next_target_block(Collector* collector, Mspace* mspace)
+{    
+  Block_Header* cur_target_block = (Block_Header*)next_block_for_target;
+  /* firstly, we bump the next_block_for_target global var to the first non BLOCK_TARGET block
+     This need not atomic op, because only one thread can own the next_block_for_target */
+
+  while(cur_target_block->status == BLOCK_TARGET){
+      cur_target_block = cur_target_block->next;
   }
-  
-  return;  
-}  
+  next_block_for_target = cur_target_block;
+
+  /* nos is higher than mos, we cant use nos block for compaction target */
+  Block_Header* mspace_heap_end = (Block_Header*)space_heap_end((Space*)mspace);
+  while(cur_target_block < mspace_heap_end){
+    Block_Header* next_target_block = cur_target_block->next;
+    volatile unsigned int* p_block_status = &cur_target_block->status;
+    unsigned int block_status = cur_target_block->status;
+    /* block status has to be BLOCK_IN_COMPACT|BLOCK_COMPACTED|BLOCK_TARGET 
+       but we care only the BLOCK_COMPACTED ones or own BLOCK_IN_COMPACT */
+    assert( block_status & (BLOCK_IN_COMPACT|BLOCK_COMPACTED|BLOCK_TARGET));
+    /* if it is not BLOCK_COMPACTED, let's move on to next */
+    if(block_status != BLOCK_COMPACTED){
+      if(cur_target_block == collector->cur_compact_block){
+        assert( block_status == BLOCK_IN_COMPACT);
+        *p_block_status = BLOCK_TARGET;
+        collector->cur_target_block = cur_target_block;
+        return cur_target_block;
+      }
+      cur_target_block = next_target_block;
+      continue;
+    }    
+    /* ok, find the first BLOCK_COMPACTED before own compact block */    
+    unsigned int temp = atomic_cas32(p_block_status, BLOCK_TARGET, BLOCK_COMPACTED);
+    if(temp == BLOCK_COMPACTED){
+      collector->cur_target_block = cur_target_block;
+      return cur_target_block;
+    }
+    /* missed it, it must be set by other into BLOCK_TARGET */
+    assert(temp == BLOCK_TARGET); 
+    cur_target_block = next_target_block;     
+  }
+  /* mos is run out for major collection */
+  return NULL;  
+}
 
 Boolean mspace_mark_object(Mspace* mspace, Partial_Reveal_Object *p_obj)
 {  
+#ifdef _DEBUG 
+  if( obj_is_marked_in_vt(p_obj)) return FALSE;
+#endif
+
   obj_mark_in_vt(p_obj);
 
   unsigned int obj_word_index = OBJECT_WORD_INDEX_TO_MARKBIT_TABLE(p_obj);
-  unsigned int obj_offset_in_word = OBJECT_WORD_OFFSET_IN_MARKBIT_TABLE(p_obj); 	
-	
+  unsigned int obj_offset_in_word = OBJECT_WORD_OFFSET_IN_MARKBIT_TABLE(p_obj);   
+  
   unsigned int *p_word = &(GC_BLOCK_HEADER(p_obj)->mark_table[obj_word_index]);
   unsigned int word_mask = (1<<obj_offset_in_word);
-	
-  unsigned int result = (*p_word)|word_mask;
-	
-  if( result==(*p_word) ) return FALSE;
   
-  *p_word = result; 
+  unsigned int old_value = *p_word;
+  unsigned int new_value = old_value|word_mask;
   
-   return TRUE;
+  while(old_value != new_value){
+    unsigned int temp = atomic_cas32(p_word, new_value, old_value);
+    if(temp == old_value) return TRUE;
+    old_value = *p_word;
+    new_value = old_value|word_mask;
+  }
+  return FALSE;
 }
 
-Boolean mspace_object_is_marked(Partial_Reveal_Object *p_obj, Mspace* mspace)
-{
-  assert(p_obj);
-  
-#ifdef _DEBUG //TODO:: Cleanup
-  unsigned int obj_word_index = OBJECT_WORD_INDEX_TO_MARKBIT_TABLE(p_obj);
-  unsigned int obj_offset_in_word = OBJECT_WORD_OFFSET_IN_MARKBIT_TABLE(p_obj); 	
-	
-  unsigned int *p_word = &(GC_BLOCK_HEADER(p_obj)->mark_table[obj_word_index]);
-  unsigned int word_mask = (1<<obj_offset_in_word);
-	
-  unsigned int result = (*p_word)|word_mask;
-	
-  if( result==(*p_word) )
-    assert( obj_is_marked_in_vt(p_obj));
-  else 
-    assert(!obj_is_marked_in_vt(p_obj));
-    
-#endif
-
-  return (obj_is_marked_in_vt(p_obj));
-    
-}
-
-static Boolean mspace_compute_object_target(Mspace* mspace)
+static Boolean mspace_compute_object_target(Collector* collector, Mspace* mspace)
 {  
-  Block_Header* dest_block = mspace_get_first_target_block(mspace);    
-  Block_Header* curr_block = mspace_get_first_compact_block(mspace);
+  Block_Header* curr_block = collector->cur_compact_block;
+  Block_Header* dest_block = collector->cur_target_block;
 
   void* dest_addr = GC_BLOCK_BODY(dest_block);
  
@@ -125,17 +230,21 @@ static Boolean mspace_compute_object_target(Mspace* mspace)
       
       if( ((unsigned int)dest_addr + obj_size) > (unsigned int)GC_BLOCK_END(dest_block)){
         dest_block->free = dest_addr;
-        dest_block = mspace_get_next_target_block(mspace, dest_block);
+        dest_block = mspace_get_next_target_block(collector, mspace);
+        if(dest_block == NULL){ 
+          collector->result = 0; 
+          return FALSE; 
+        }
+        
         dest_addr = GC_BLOCK_BODY(dest_block);
       }
       assert(((unsigned int)dest_addr + obj_size) <= (unsigned int)GC_BLOCK_END(dest_block));
       
       Obj_Info_Type obj_info = get_obj_info(p_obj);
       if( obj_info != 0 ) {
-        mspace->obj_info_map->insert(ObjectMap::value_type((Partial_Reveal_Object*)dest_addr, obj_info));
+        collector->obj_info_map->insert(ObjectMap::value_type((Partial_Reveal_Object*)dest_addr, obj_info));
       }
       
-      assert( (unsigned int) p_obj >= (unsigned int)dest_addr );
       set_forwarding_pointer_in_obj_info(p_obj, dest_addr);
 
       /* FIXME: should use alloc to handle alignment requirement */
@@ -143,51 +252,11 @@ static Boolean mspace_compute_object_target(Mspace* mspace)
       p_obj = block_get_next_marked_object(curr_block, &mark_bit_idx);
   
     }
-    curr_block = mspace_get_next_compact_block(mspace, curr_block);
+    curr_block = mspace_get_next_compact_block(collector, mspace);
   }
-
-
-  mspace->free_block_idx = dest_block->block_idx+1;
-
-  /* fail to evacuate any room, FIXME:: do nothing at the moment */
-  if( mspace->free_block_idx == mspace->first_block_idx + mspace->num_used_blocks) 
-    return FALSE;
   
   return TRUE;
 }   
-
-static void mspace_restore_obj_info(Mspace* mspace)
-{
-  ObjectMap* objmap = mspace->obj_info_map;
-  ObjectMap::iterator obj_iter;
-  for( obj_iter=objmap->begin(); obj_iter!=objmap->end(); obj_iter++){
-    Partial_Reveal_Object* p_target_obj = obj_iter->first;
-    Obj_Info_Type obj_info = obj_iter->second;
-    set_obj_info(p_target_obj, obj_info);     
-  }
-  objmap->clear();
-  return;  
-}
-  
-static void reset_mspace_after_compaction(Mspace* mspace)
-{ 
-  unsigned int old_num_used = mspace->num_used_blocks;
-  unsigned int new_num_used = mspace->free_block_idx - mspace->first_block_idx;
-  unsigned int num_used = old_num_used>new_num_used? old_num_used:new_num_used;
-  
-  Block* blocks = mspace->blocks;
-  for(unsigned int i=0; i < num_used; i++){
-    Block_Header* block = (Block_Header*)&(blocks[i]);
-    block_clear_mark_table(block); 
-    block->status = BLOCK_USED;
-
-    if(i >= new_num_used){
-      block->status = BLOCK_FREE; 
-      block->free = GC_BLOCK_BODY(block);
-    }
-  }
-  mspace->num_used_blocks = new_num_used;
-}
 
 #include "../verify/verify_live_heap.h"
 
@@ -218,43 +287,77 @@ static void mspace_sliding_compact(Collector* collector, Mspace* mspace)
       p_obj = block_get_next_marked_object(curr_block, &mark_bit_idx);  
     }
         
-    curr_block = mspace_get_next_compact_block(mspace, curr_block);
+    curr_block = mspace_get_next_compact_block1(mspace, curr_block);
   }
 
-  mspace_restore_obj_info(mspace);
-  reset_mspace_after_compaction(mspace);
-  
   return;
 } 
 
-void gc_gen_update_repointed_refs(Collector* collector);
+void gc_update_repointed_refs(Collector* collector);
+
+static volatile unsigned int num_marking_collectors = 0;
+static volatile unsigned int num_installing_collectors = 0;
 
 static void mark_compact_mspace(Collector* collector) 
 {
-  GC_Gen* gc = (GC_Gen*)collector->gc;
-  Mspace* mspace = (Mspace*)gc_get_mos(gc);
-  Fspace* fspace = (Fspace*)gc_get_nos(gc);
-
-  /* FIXME:: Single-threaded mark-compaction for mspace currently */
+  GC* gc = collector->gc;
+  Mspace* mspace = (Mspace*)gc_get_mos((GC_Gen*)gc);
+  Fspace* fspace = (Fspace*)gc_get_nos((GC_Gen*)gc);
 
   /* Pass 1: mark all live objects in heap, and save all the slots that 
              have references  that are going to be repointed */
-  mark_scan_heap(collector);
+  unsigned int num_active_collectors = gc->num_active_collectors;
+  
+  /* Pass 1: mark all live objects in heap, and save all the slots that 
+             have references  that are going to be repointed */
+  unsigned int old_num = atomic_cas32( &num_marking_collectors, 0, num_active_collectors+1);
+
+  mark_scan_heap_par(collector);
+
+  old_num = atomic_inc32(&num_marking_collectors);
+  if( ++old_num == num_active_collectors ){
+    /* last collector's world here */
+    /* prepare for next phase */
+    gc_init_block_for_collectors(gc, mspace); 
+    /* let other collectors go */
+    num_marking_collectors++; 
+  }
+  
+  while(num_marking_collectors != num_active_collectors + 1);
   
   /* Pass 2: assign target addresses for all to-be-moved objects */
-  Boolean ok;
-  ok = mspace_compute_object_target(mspace); 
-  assert(ok); /* free at least one block */
-  ok = fspace_compute_object_target(collector, fspace); 
-  assert(ok); /* FIXME:: throw out-of-memory exception if not ok */
+  atomic_cas32( &num_installing_collectors, 0, num_active_collectors+1);
+
+  mspace_compute_object_target(collector, mspace);   
   
+  old_num = atomic_inc32(&num_installing_collectors);
+  if( ++old_num == num_active_collectors ){
+    /* single thread world */
+    if(!gc_collection_result(gc)){
+      printf("Out of Memory!\n");
+      assert(0); /* mos is out. FIXME:: throw exception */
+    }
+    gc_reset_block_for_collectors(gc, mspace);
+    num_installing_collectors++; 
+  }
+  
+  while(num_installing_collectors != num_active_collectors + 1);
+
+  /* FIXME:: temporary. let only one thread go forward */
+  if( collector->thread_handle != 0 ) return;
+    
   /* Pass 3: update all references whose objects are to be moved */  
-  gc_gen_update_repointed_refs(collector);
+  gc_update_repointed_refs(collector);
     
   /* Pass 4: do the compaction and reset blocks */  
+  next_block_for_compact = mspace_get_first_compact_block(mspace);
   mspace_sliding_compact(collector, mspace);
-  fspace_copy_collect(collector, fspace);
-     
+  /* FIXME:: should be collector_restore_obj_info(collector) */
+  gc_restore_obj_info(gc);
+
+  reset_mspace_after_compaction(mspace);
+  reset_fspace_for_allocation(fspace);
+  
   return;
 }
 
@@ -263,6 +366,8 @@ void mspace_collection(Mspace* mspace)
   mspace->num_collections++;
 
   GC* gc = mspace->gc;  
+
+  pool_iterator_init(gc->metadata->gc_rootset_pool);
 
   collector_execute_task(gc, (TaskType)mark_compact_mspace, (Space*)mspace);
   

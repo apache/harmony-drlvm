@@ -59,18 +59,20 @@ Version: $Revision: 1.4.2.3 $
                 <include name="mark_sweep/*.cpp" />            
                 <include name="thread/*.cpp" />            
                 <include name="trace_forward/*.cpp" />            
+                <include name="utils/*.cpp" /> 
                 <include name="verify/*.cpp" />            
               </select>
 
-                <select os="lnx">
-                  <exclude name="common/*.cpp" />
-                  <exclude name="gen/*.cpp" />
-                  <exclude name="mark_compact/*.cpp" />
-                  <exclude name="mark_sweep/*.cpp" />
-                  <exclude name="thread/*.cpp" />
-                  <exclude name="trace_forward/*.cpp" />
-                  <exclude name="verify/*.cpp" />
-                </select>
+              <select os="lnx">
+                <exclude name="common/*.cpp" />
+                <exclude name="gen/*.cpp" />
+                <exclude name="mark_compact/*.cpp" />
+                <exclude name="mark_sweep/*.cpp" />
+                <exclude name="thread/*.cpp" />
+                <exclude name="trace_forward/*.cpp" />
+                <exclude name="utils/*.cpp" /> 
+                <exclude name="verify/*.cpp" />
+              </select>
             </fileset>
 
             <defineset define="BUILDING_GC" />

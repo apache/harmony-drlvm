@@ -25,9 +25,6 @@
 #include "../thread/collector.h"
 #include "../verify/verify_live_heap.h"
 
-/* heap size limit is not interesting. only for manual tuning purpose */
-unsigned int min_heap_size_bytes = 32 * MB;
-unsigned int max_heap_size_bytes = 128 * MB;
 
 /* fspace size limit is not interesting. only for manual tuning purpose */
 unsigned int min_nos_size_bytes = 2 * MB;
@@ -41,18 +38,13 @@ static void gc_gen_get_system_info(GC_Gen *gc_gen)
 
 void gc_gen_initialize(GC_Gen *gc_gen, unsigned int min_heap_size, unsigned int max_heap_size) 
 {
-	assert(gc_gen);	
+  assert(gc_gen); 
   assert(max_heap_size <= max_heap_size_bytes);
-	/* FIXME:: we need let virtual space to include unmapped region.
-	   Heuristically for Nursery+MatureFrom+MatureTo(unmapped)+LOS(mapped+unmapped), 
-	   we need almost half more than the user specified virtual space size. 
-	   That's why we have the below. */
-	max_heap_size += max_heap_size>>1;
 
-	min_heap_size = round_up_to_size(min_heap_size, GC_BLOCK_SIZE_BYTES);
-	max_heap_size = round_up_to_size(max_heap_size, GC_BLOCK_SIZE_BYTES);
+  min_heap_size = round_up_to_size(min_heap_size, GC_BLOCK_SIZE_BYTES);
+  max_heap_size = round_up_to_size(max_heap_size, GC_BLOCK_SIZE_BYTES);
 
-	gc_gen_get_system_info(gc_gen); 
+  gc_gen_get_system_info(gc_gen); 
 
   void *reserved_base = NULL;
 
@@ -80,29 +72,31 @@ void gc_gen_initialize(GC_Gen *gc_gen, unsigned int min_heap_size, unsigned int 
   gc_gen->num_collections = 0;
 
   /* heuristic nos + mos + LOS */
+  unsigned int los_size = max_heap_size >> 2;
+  gc_los_initialize(gc_gen, reserved_base, los_size);
+
+  unsigned int mos_size = max_heap_size >> 1;
+  reserved_base = (void*)((unsigned int)reserved_base + los_size);
+  gc_mos_initialize(gc_gen, reserved_base, mos_size);
+  
   unsigned int nos_size =  max_heap_size >> 2; 
   assert(nos_size > min_nos_size_bytes);
-	gc_nos_initialize(gc_gen, reserved_base, nos_size);	
+  reserved_base = (void*)((unsigned int)reserved_base + mos_size);
+  gc_nos_initialize(gc_gen, reserved_base, nos_size); 
 
-	unsigned int mos_size = max_heap_size >> 1;
-	reserved_base = (void*)((unsigned int)reserved_base + nos_size);
-	gc_mos_initialize(gc_gen, reserved_base, mos_size);
+  /* connect mos and nos, so that they can be compacted as one space */
+  Blocked_Space* mos = (Blocked_Space*)gc_get_mos(gc_gen);
+  Blocked_Space* nos = (Blocked_Space*)gc_get_nos(gc_gen);
+  Block_Header* mos_last_block = (Block_Header*)&mos->blocks[mos->num_managed_blocks-1];
+  Block_Header* nos_first_block = (Block_Header*)&nos->blocks[0];
+  mos_last_block->next = nos_first_block;
+  assert(space_heap_end((Space*)mos) == space_heap_start((Space*)nos));
     
-	unsigned int los_size = max_heap_size >> 2;
-	reserved_base = (void*)((unsigned int)gc_gen->heap_end - los_size);
-	gc_los_initialize(gc_gen, reserved_base, los_size);
-
   gc_gen->committed_heap_size = space_committed_size((Space*)gc_gen->nos) +
                                 space_committed_size((Space*)gc_gen->mos) +
                                 space_committed_size((Space*)gc_gen->los);
   
-  gc_init_rootset((GC*)gc_gen);	
-
-	gc_gen->mutator_list = NULL;
-	gc_gen->mutator_list_lock = FREE_LOCK;
-
-  gc_gen->num_mutators = 0;
-  
+  gc_metadata_initialize((GC*)gc_gen); /* root set and mark stack */
   collector_initialize((GC*)gc_gen);
   
   if( verify_live_heap ){  /* for live heap verify*/
@@ -114,24 +108,24 @@ void gc_gen_initialize(GC_Gen *gc_gen, unsigned int min_heap_size, unsigned int 
 
 void gc_gen_destruct(GC_Gen *gc_gen) 
 {
-	gc_nos_destruct(gc_gen);
-	gc_gen->nos = NULL;
-	
-	gc_mos_destruct(gc_gen);	
-	gc_gen->mos = NULL;
+  gc_nos_destruct(gc_gen);
+  gc_gen->nos = NULL;
+  
+  gc_mos_destruct(gc_gen);  
+  gc_gen->mos = NULL;
 
-	gc_los_destruct(gc_gen);	
+  gc_los_destruct(gc_gen);  
   gc_gen->los = NULL;
   
+  gc_metadata_destruct((GC*)gc_gen); /* root set and mark stack */
   collector_destruct((GC*)gc_gen);
 
   if( verify_live_heap ){
     gc_terminate_heap_verification((GC*)gc_gen);
   }
 
-	STD_FREE(gc_gen);
+  STD_FREE(gc_gen);
 }
-
 
 Boolean major_collection_needed(GC_Gen* gc)
 {
@@ -149,111 +143,13 @@ void gc_set_mos(GC_Gen* gc, Space* mos){ gc->mos = (Mspace*)mos;}
 void gc_set_los(GC_Gen* gc, Space* los){ gc->los = (Lspace*)los;}
 unsigned int gc_get_processor_num(GC_Gen* gc){ return gc->_num_processors;}
 
-static void gc_gen_update_rootset(GC* gc)
-{
-  RootSet* root_set = gc->root_set;
-  /* update refs in root set after moving collection */
-  for(unsigned int i=0; i < root_set->size(); i++){
-      Partial_Reveal_Object** p_ref = (*root_set)[i];
-      Partial_Reveal_Object* p_obj = *p_ref;
-      assert(p_obj); /* root ref should never by NULL*/
-      /* FIXME:: this should be reconsidered: forwarded in vt or obj_info */
-      if(!obj_is_forwarded_in_obj_info(p_obj)){
-        /* if an obj is not moved, it must be in LOS or otherwise in MOS for MINOR_COLLECTION */
-#ifdef _DEBUG
-        if( gc->collect_kind == MINOR_COLLECTION )
-          assert( !obj_belongs_to_space(p_obj, gc_get_nos((GC_Gen*)gc)) );
-        else
-          assert( obj_belongs_to_space(p_obj, gc_get_los((GC_Gen*)gc)) ); 
-#endif
-        continue;
-      }
-      Partial_Reveal_Object* p_target_obj = get_forwarding_pointer_in_obj_info(p_obj);
-      *p_ref = p_target_obj; 
-  }
-  
-  return;
-}
-
-void update_rootset_interior_pointer();
-
-void gc_gen_update_repointed_refs(Collector* collector)
-{
-  GC_Gen* gc = (GC_Gen*)collector->gc;
-  Space* space;
-  space = gc_get_nos(gc);  space->update_reloc_func(space);
-  space = gc_get_mos(gc);  space->update_reloc_func(space);
-  space = gc_get_los(gc);  space->update_reloc_func(space);
-
-  gc_gen_update_rootset((GC*)gc);   
-  update_rootset_interior_pointer();
-  
-  return;
-}
-
-void gc_preprocess_collector(Collector *collector)
-{
-  /* for MAJOR_COLLECTION, all the remsets are useless */
-  GC_Gen* gc = (GC_Gen*)collector->gc;
-  if( gc->collect_kind == MAJOR_COLLECTION ){
-    collector->last_cycle_remset->clear();
-    return;
-  }
-
-  Fspace* fspace = (Fspace*)gc_get_nos(gc);
-  fspace->remslot_sets->push_back(collector->last_cycle_remset);
-    
-  /* this_cycle_remset is ready to be used */
-  assert(collector->this_cycle_remset->empty());
-
-  return;
-}
-
-void gc_postprocess_collector(Collector *collector)
-{ 
-  /* for MAJOR_COLLECTION we do nothing */
-  GC_Gen* gc = (GC_Gen*)collector->gc;
-  if( gc->collect_kind == MAJOR_COLLECTION )
-    return;
-      
-  /* for MINOR_COLLECTION */
-  /* switch its remsets, this_cycle_remset data kept in space->remslot_sets */
-  /* last_cycle_remset was in space->remslot_sets and cleared during collection */
-  assert(collector->last_cycle_remset->empty());
-
-  RemslotSet* temp_set = collector->this_cycle_remset;
-  collector->this_cycle_remset = collector->last_cycle_remset;
-  collector->last_cycle_remset = temp_set;
-  
-  return;
-}
-
-void gc_preprocess_mutator(GC_Gen* gc)
-{       
-  Mutator *mutator = gc->mutator_list;
-  Fspace* fspace = (Fspace*)mutator->alloc_space;
-  /* for MAJOR_COLLECTION, all the remsets are useless */
-  while (mutator) {
-    if(gc->collect_kind == MAJOR_COLLECTION){
-      mutator->remslot->clear();
-    }else{        
-      fspace->remslot_sets->push_back(mutator->remslot);
-    }
-    mutator = mutator->next;
-  }
- 
-  return;
-} /////////FIXME::: need clear space remsets
-
-void gc_postprocess_mutator(GC_Gen* gc)
+void reset_mutator_allocation_context(GC_Gen* gc)
 {
   Mutator *mutator = gc->mutator_list;
   while (mutator) {
-    assert(mutator->remslot->empty());
     alloc_context_reset((Allocator*)mutator);    
     mutator = mutator->next;
-  }
-  
+  }  
   return;
 }
 
@@ -274,9 +170,10 @@ void gc_gen_reclaim_heap(GC_Gen* gc, unsigned int cause)
   /* Stop the threads and collect the roots. */
   gc_reset_rootset((GC*)gc);  
   vm_enumerate_root_set_all_threads();
-  
-  gc_preprocess_mutator(gc);
-  
+
+  /* reset metadata (all the rootsets and markstack) */  
+  gc_metadata_reset((GC*)gc); 
+    
   if(verify_live_heap) gc_verify_heap((GC*)gc, TRUE);
 
   if(gc->collect_kind == MINOR_COLLECTION){
@@ -306,8 +203,7 @@ void gc_gen_reclaim_heap(GC_Gen* gc, unsigned int cause)
   
   if(verify_live_heap) gc_verify_heap((GC*)gc, FALSE);
       
-  gc_postprocess_mutator(gc);
-
+  reset_mutator_allocation_context(gc);
   vm_resume_threads_after();
 
   return;

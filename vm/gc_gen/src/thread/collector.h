@@ -22,6 +22,7 @@
 #define _COLLECTOR_H_
 
 #include "../common/gc_common.h"
+struct Block_Header;
 
 typedef struct Collector{
   /* <-- first couple of fields are overloaded as Allocator */
@@ -33,18 +34,27 @@ typedef struct Collector{
   VmThreadHandle thread_handle;   /* This thread; */
   /* End of Allocator --> */
 
+  /* FIXME:: for testing */
   Space* collect_space;
-  /* collector has remsets to remember those stored during copying */  
-  RemslotSet* last_cycle_remset;   /* remembered in last cycle, used in this cycle as roots */
-  RemslotSet* this_cycle_remset;   /* remembered in this cycle, will switch with last_remslot */
 
   TraceStack *trace_stack;
-  MarkStack *mark_stack;
+  MarkStack* mark_stack;
+  
+  Vector_Block* rep_set; /* repointed set */
+  Vector_Block* rem_set;
   
   VmEventHandle task_assigned_event;
   VmEventHandle task_finished_event;
   
+  Block_Header* cur_compact_block;
+  Block_Header* cur_target_block;
+  
+  /* during compaction, save non-zero obj_info who's overwritten by forwarding pointer */
+  ObjectMap*  obj_info_map; 
+
   void(*task_func)(void*) ;   /* current task */
+  
+  unsigned int result;
  
 }Collector;
 
@@ -55,5 +65,8 @@ void collector_reset(GC* gc);
 void collector_execute_task(GC* gc, TaskType task_func, Space* space);
 
 Partial_Reveal_Object* collector_forward_object(Collector* collector, Partial_Reveal_Object* p_obj);
+
+void gc_restore_obj_info(GC* gc);
+
 
 #endif //#ifndef _COLLECTOR_H_
