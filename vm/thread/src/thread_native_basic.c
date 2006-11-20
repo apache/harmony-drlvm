@@ -674,6 +674,7 @@ static void reset_thread(hythread_t thread) {
     // Suspension
     thread->suspend_request = 0;
     thread->suspend_disable_count = 0;
+    thread->safepoint_callback = NULL;
     status = hylatch_set(thread->join_event, 1);
     assert (status == TM_ERROR_NONE);
     status = hylatch_set(thread->safe_region_event, 1);
