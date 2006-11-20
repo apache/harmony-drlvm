@@ -122,9 +122,7 @@ void null_java_divide_by_zero_handler(int signum, siginfo_t* UNREF info, void* c
         (void *)uc->uc_mcontext.gregs[REG_EIP]);
      */
 
-    if (env->shutting_down != 0) {
-        fprintf(stderr, "null_java_divide_by_zero_handler(): called in shutdown stage\n");
-    } else if (!interpreter_enabled()) {
+    if (!interpreter_enabled()) {
         if (java_throw_from_sigcontext(
                     uc, env->java_lang_ArithmeticException_Class)) {
             return;
@@ -362,9 +360,7 @@ void null_java_reference_handler(int signum, siginfo_t* UNREF info, void* contex
         return;
     }
      
-    if (env->shutting_down != 0) {
-        fprintf(stderr, "null_java_reference_handler(): called in shutdown stage\n");
-    } else if (!interpreter_enabled()) {
+    if (!interpreter_enabled()) {
         if (java_throw_from_sigcontext(
                     uc, env->java_lang_NullPointerException_Class)) {
             return;
