@@ -23,6 +23,7 @@ package java.lang;
 
 import java.security.AccessController;
 import java.util.HashMap;
+import java.util.IdentityHashMap;
 import java.util.Iterator;
 import java.util.Map;
 
@@ -906,7 +907,7 @@ public class Thread implements Runnable {
      */
     void setThreadLocal(ThreadLocal<Object> local, Object value) {
         if (localValues == null) {
-            localValues = new HashMap<ThreadLocal<Object>, Object>();
+            localValues = new IdentityHashMap<ThreadLocal<Object>, Object>();
         }
         localValues.put(local, value);
     }
@@ -922,7 +923,7 @@ public class Thread implements Runnable {
     Object getThreadLocal(ThreadLocal<Object> local) {
         Object value;
         if (localValues == null) {
-            localValues = new HashMap<ThreadLocal<Object>, Object>();
+            localValues = new IdentityHashMap<ThreadLocal<Object>, Object>();
             value = local.initialValue();
             localValues.put(local, value);
             return value;
@@ -969,7 +970,7 @@ public class Thread implements Runnable {
         if (parentLocalValues == null) {
            return;
         }
-        localValues = new HashMap<ThreadLocal<Object>, Object>(parentLocalValues.size());
+        localValues = new IdentityHashMap<ThreadLocal<Object>, Object>(parentLocalValues.size());
         for (Iterator<ThreadLocal<Object>> it = parentLocalValues.keySet().iterator(); it.hasNext();) {
             ThreadLocal<Object> local = it.next();
             if (local instanceof InheritableThreadLocal) {
