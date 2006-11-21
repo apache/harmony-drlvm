@@ -559,7 +559,7 @@ jclass JNICALL DefineClass(JNIEnv *jenv,
                            const jbyte *buf,
                            jsize len)
 {
-    TRACE2("jni", "DefineClass called, name = " << name);
+    TRACE2("jni", "DefineClass called, name = " << (NULL != name ? name : "NULL"));
     assert(hythread_is_suspend_enabled());
     Global_Env* env = VM_Global_State::loader_env;
     ClassLoader* cl;
@@ -634,7 +634,10 @@ jclass JNICALL DefineClass(JNIEnv *jenv,
 
     bool ld_result;
     if(clss != NULL)
+    {
+        TRACE2("jni", "Class defined successfully, name = " << res_name->bytes);
         ld_result = clss->verify(env) && clss->prepare(env);
+    }
 
     if(clss && ld_result)
     {

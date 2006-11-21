@@ -223,7 +223,7 @@ Class* ClassLoader::DefineClass(Global_Env* env, const char* class_name,
 {
     const String *className;
 
-    LOG2("classloader.defineclass", "Defining class " << class_name << " with loader " << this);
+    LOG2("classloader.defineclass", "Defining class " << (NULL != class_name ? class_name : "NULL") << " with loader " << this);
     if(class_name) {
         className = env->string_pool.lookup(class_name);
     } else {
