@@ -448,7 +448,7 @@ static char* convert_logging_category(char* category) {
     }
 } //convert_logging_category()
 
-static void set_threshold_list(char* list, LoggingLevel level, bool convert = false) {
+static void set_threshold_list(char* list, LoggingLevel level, const char* file, bool convert) {
     char *next;
     while (list) {
         if ( (next = strchr(list, ',')) ) {
@@ -456,7 +456,13 @@ static void set_threshold_list(char* list, LoggingLevel level, bool convert = fa
         }
 
         char* category = (convert) ? convert_logging_category(list) : list;
+        if (0 == strcmp("*", category)) { //alias to root category
+            category = "root";
+        }
         set_threshold(category, level);
+        if (file) {
+            set_out(category, file);
+        }
 
         if (next) {
             *next = ',';
@@ -476,9 +482,8 @@ static void parse_logger_arg(char* arg, const char* cmd, LoggingLevel level) {
         char *out = strchr(next_sym, ':');
         if (out) { // -cmd:category:file
             *out = '\0';
-            set_out(next_sym, out + 1);
         }
-        set_threshold_list(next_sym, level, false);
+        set_threshold_list(next_sym, level, out ? out + 1 : NULL, false);
         if (out){
             *out = ':';
         }
@@ -527,7 +532,7 @@ void set_log_levels_from_cmd(JavaVMInitArgs* vm_arguments)
                 set_threshold(util::JNI_LOGGER, INFO);
             } else if (*next_sym == ':') { // -verbose:
                 next_sym++;
-                set_threshold_list(next_sym, INFO, true); // true = convert standard categories to internal
+                set_threshold_list(next_sym, INFO, NULL, true); // true = convert standard categories to internal
             } else {
                 ECHO("Unknown option " << option << USE_JAVA_HELP);
                 LOGGER_EXIT(1);
