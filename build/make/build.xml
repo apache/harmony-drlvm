@@ -61,16 +61,21 @@ Version: $Revision: 1.16.2.20 $
     <!-- flag and location for final 'copy to build/deploy directory' step -->
     <!-- <property name="deploy.canonical.flag" value="false"/> -->
     <property name="canonical.deploy.dir" location="../deploy" />
+
+    <property name="hy.test.vm.name" value="drl"/>
     
+    <!-- set the path root for the classlib : must be relative to the build directory -->
+    <property name="external.dep.CLASSLIB.loc" value="../../../working_classlib" />
+
+    <property name="external.dep.CLASSLIB" location="${external.dep.CLASSLIB.loc}" />
+
+    <import file="${external.dep.CLASSLIB}/make/properties.xml"/>
+
     <!-- ===============================================================
         Define locations of external dependencies
       ================================================================== -->
     <target name="extern_dep">
 
-        <!-- set the path root for the classlib : must be relative to the build directory -->
-        <property name="external.dep.CLASSLIB.loc" value="../../../working_classlib" />
-
-        <property name="external.dep.CLASSLIB" location="${external.dep.CLASSLIB.loc}" />
 
         <echo> Using CLASSLIB = ${external.dep.CLASSLIB}</echo>
 
@@ -78,6 +83,7 @@ Version: $Revision: 1.16.2.20 $
         <property name="external.dep.CLASSLIB.includes" value="${external.dep.CLASSLIB}/deploy/include" />
         <property name="external.dep.CLASSLIB.libdir" value="${external.dep.CLASSLIB}/deploy/lib" />
         <property name="external.dep.CLASSLIB.jardir" value="${external.dep.CLASSLIB}/deploy/jdk/jre/lib/boot"/>
+        
     </target>
 
     <target name="detect.os.arch.cxx.cfg">
