@@ -25,8 +25,6 @@
     <property name="test.jvm.exe" value="${build.deploy.dir}/bin/java"/>
     <property file="test.properties"/>
 
-    <property name="exclude.file" location="./excludes/exclude.drlvm_kernel.${hy.platform}.${hy.test.vm.name}" />
-
     <!-- no longer used - leaving here temporarily to be sure people like the change
     <patternset id="kernel.test.java.pattern">
         <include name="org/apache/harmony/**/*Test.java" />
@@ -130,14 +128,16 @@
         <propertycopy property="kernel.mode.name" from="${kernel.mode}.name" override="on"/>       
         <propertycopy property="kernel.mode.switch" from="${kernel.mode}.switch" override="on"/>
 
+        <property name="exclude.file" location="./excludes/exclude.drlvm_kernel.${hy.platform}.${kernel.mode}" />
+
         <loadfile property="foo" srcFile="${exclude.file}"/>
 
         <echo>
         ==================================
         Run kernel tests using ${kernel.mode.name}
         ==================================
- 
-Using exclude file = ${exclude.file}
+             
+Using exclude file = ${exclude.file}   
         
 ${foo}
         </echo>
