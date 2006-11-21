@@ -107,12 +107,6 @@ public abstract class ClassLoader {
     private final HashMap<String, Package> definedPackages;
 
     /**
-     * The following mapping is used <String binaryClassName, Class clazz>, where binaryClassName - class name,
-     * clazz - corresponding class.
-     */
-    private Hashtable<String, Class<?>> initiatedClasses = new Hashtable<String, Class<?>>();
-
-    /**
      * package private to access from the java.lang.Class class. The following
      * mapping is used <String name, Certificate[] certificates>, where name -
      * the name of a package, certificates - array of certificates.
@@ -461,7 +455,7 @@ public abstract class ClassLoader {
      * @com.intel.drl.spec_ref
      */
     protected final Class<?> findLoadedClass(String name) {
-        return initiatedClasses.get(name);
+        return VMClassRegistry.findLoadedClass(name, this);
     }
 
     /**
@@ -547,7 +541,6 @@ public abstract class ClassLoader {
         if (resolve) {
             resolveClass(clazz);
         }
-        initiatedClasses.put(clazz.getName(), clazz);
         return clazz;
     }
 

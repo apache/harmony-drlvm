@@ -706,9 +706,9 @@ import junit.framework.TestCase;
     }
 
     /**
-     *  
+     * FIXME invalid test: only VM can initiate loading class 
      */
-    public void test_findLoadedClass_Str_2() {
+    public void te_st_findLoadedClass_Str_2() {
         // TEST CASE #4:
         try {
             Class c = Class.forName("java.lang.ClassLoaderTest$7LCL", true,
@@ -915,7 +915,8 @@ import junit.framework.TestCase;
                 return 104;
             }
         }
-        new a3().main(new String[] { "" });
+        // FIXME invalid test: only VM can initiate loading class
+        //new a3().main(new String[] { "" });
     }
 
 	
