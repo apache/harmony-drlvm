@@ -68,7 +68,7 @@ Version: $Revision: 1.16.2.20 $
     <target name="extern_dep">
 
         <!-- set the path root for the classlib : must be relative to the build directory -->
-        <property name="external.dep.CLASSLIB.loc" value="../../../../classlib/trunk" />
+        <property name="external.dep.CLASSLIB.loc" value="../../../working_classlib" />
 
         <property name="external.dep.CLASSLIB" location="${external.dep.CLASSLIB.loc}" />
 
