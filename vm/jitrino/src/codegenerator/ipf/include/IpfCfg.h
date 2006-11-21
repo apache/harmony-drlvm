@@ -144,6 +144,8 @@ public:
     virtual int64   getValue()                      { return value; }
 
     bool            isReg()                         { return IpfType::isReg(opndKind); }
+    bool            isGReg()                        { return IpfType::isGReg(opndKind); }
+    bool            isFReg()                        { return IpfType::isFReg(opndKind); }
     bool            isImm()                         { return IpfType::isImm(opndKind); }
     bool            isFloating()                    { return IpfType::isFloating(dataKind); }
     bool            isSigned()                      { return IpfType::isSigned(dataKind); }
@@ -151,9 +153,9 @@ public:
     bool            isWritable();
     bool            isConstant();
     bool            isMem();
-    bool            isImm(int);
 
-    bool            isFoldableImm(int16 size)       { return isFoldableImm(value, size); }
+    bool            isFoldableImm(int16 size) { return isFoldableImm(value, size); }
+    bool            isImm(int);
     static bool     isFoldableImm(int64 value, int16 size);
     
 protected:

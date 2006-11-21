@@ -204,7 +204,9 @@ public:
     bool         areRefsCompressed()       { return refsCompressed; }
     bool         areVtablePtrsCompressed() { return vtablePtrsCompressed; }
     RegOpnd      *getHeapBase();
+    Opnd         *getHeapBaseImm();
     RegOpnd      *getVtableBase();
+    Opnd         *getVtableBaseImm();
     Opnd         *getVtableOffset();
     void         initCompBases(BbNode*);
     
@@ -234,8 +236,10 @@ protected:
     RegOpnd      *f8;                  // return value (floating point)
     RegOpnd      *tau;                 // opnd ignored
     
-    RegOpnd      *heapBase;            // opnd containing base for references decompression
-    RegOpnd      *vtableBase;          // opnd containing base for vtable pointers decompression
+    RegOpnd      *heapBase;            // Reg opnd containing base for references decompression
+    Opnd         *heapBaseImm;         // Imm opnd containing base for references decompression
+    RegOpnd      *vtableBase;          // Reg opnd containing base for vtable pointers decompression
+    Opnd         *vtableBaseImm;       // Imm opnd containing base for vtable pointers decompression
     Opnd         *vtableOffset;        // opnd containing vtable offset inside class object
 
     bool         containCall;          // method contains call instruction

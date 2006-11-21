@@ -47,19 +47,22 @@ namespace IPF {
 //========================================================================================//
 
 //
-//  Constants that describe cache on IPF
+//  Constants that describe cache on Itanium2
 //
 
 //
 //  Level 1 cache
 //
-#define L1_CACHE_LINE_SIZE 64       
+#define L1I_CACHE_LINE_SIZE 64       
+#define L1I_CACHE_BANK_SIZE 16384
+#define L1D_CACHE_LINE_SIZE 64       
+#define L1D_CACHE_BANK_SIZE 16384
 
 //
 //  Level 2 cache
 //
-#define L2_CACHE_BANK_SIZE 16
-#define NUM_L2_CACHE_BANKS 16
+#define L2_CACHE_LINE_SIZE 128
+#define L2_CACHE_BANK_SIZE 262144
 
 
 #define PR(n)  (opndManager->newRegOpnd(OPND_P_REG, DATA_P, n))
@@ -128,7 +131,9 @@ class Bundle {
     
     Inst   * getSlot(int si) { return slot[si]; };
     uint32   getTmplIndex() { return indxtmpl; };
-    uint32   getTmpl();
+    uint32   getTmpl() { return BundleDesc[indxtmpl].tmpl; };
+    bool     hasStop() { uint32 t = getTmpl(); 
+                         if (t%2==1 || t==0x2 || t==0xa) return true; return false; };
     void     emitBundleGeneral(void *);
     void     emitBundleExtended(void *);
     void     emitBundleBranch(void *, int *);
@@ -136,6 +141,8 @@ class Bundle {
     uint64   getSlotBits(int);
     uint64   getSlotBitsBranch(int, int);
     uint64 * getSlotBitsExtended(uint64 *, void *);
+
+    static const BundleDescription BundleDesc[TEMPLATES_COUNT];
 
   protected:
     uint32  indxtmpl;
@@ -174,6 +181,7 @@ class EmitterBb {
     vectorregs   * rregs;
     BundleVector * bundles;
     vectorconst  * consts;
+    bool           istarget;
     
     long           bsize;
     char         * codeoff;   // offset in full code block
@@ -200,8 +208,7 @@ class Emitter {
     void registerDirectCall(Inst *, uint64);
 
     static InstructionType getExecUnitType(int, int);
-
-    static const BundleDescription BundleDesc[TEMPLATES_COUNT];
+    static const char Itanium2_DualIssueBundles[30][30];
     
   protected:
     static void getTmpl(int, BundleDescription &, Inst *, Inst *, Inst *, bool, bool, bool);
@@ -210,6 +217,7 @@ class Emitter {
     static void getReadDpndBitset(Inst *, RegistersBitset *);
     static bool tricking(InstVector & insts, MemoryManager& mm, Cfg& cfg);
     static int  removeUselessInst(Cfg &, CompilationInterface &);
+    static int  removeIgnoreTypeInst(Cfg &, CompilationInterface &);
     bool    parsing();
     bool    parsing(int);
     bool    stopping();
@@ -219,8 +227,10 @@ class Emitter {
     bool    emitData();
     bool    emitCode();
     bool    fixSwitchTables();
+    void    checkForDualIssueBundles();
     bool    isBranchBundle(Bundle *, char *, char *, int *);
     bool    isExtendedBundle(Bundle *bundle) { if (bundle->getTmpl()>=0x4 && bundle->getTmpl()<=0x5) return true; return false; };
+    int     getBbNodeIndex(BbNode * node);
     char  * getBbNodeOff(BbNode * node);
 
     MemoryManager& mm;

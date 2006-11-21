@@ -27,6 +27,7 @@ namespace IPF {
 
 bool ipfLogIsOn = false;
 bool ipfVerifyIsOn = true;
+bool ipfConstantFolding = true;
 
 //============================================================================//
 // IpfType
@@ -74,6 +75,46 @@ bool IpfType::isReg(OpndKind opndKind) {
         case OPND_A_REG   : 
         case OPND_IP_REG  : 
         case OPND_UM_REG  : return true;
+        case OPND_IMM     : return false;
+        case OPND_INVALID : break;
+    }
+
+    IPF_ERR << " unexpected opndKind " << opndKind << endl;
+    return 0;
+}
+    
+//----------------------------------------------------------------------------------------//
+
+bool IpfType::isGReg(OpndKind opndKind) { 
+
+    switch(opndKind) {
+        case OPND_G_REG   : return true; 
+        case OPND_F_REG   : 
+        case OPND_P_REG   : 
+        case OPND_B_REG   : 
+        case OPND_A_REG   : 
+        case OPND_IP_REG  : 
+        case OPND_UM_REG  :
+        case OPND_IMM     : return false;
+        case OPND_INVALID : break;
+    }
+
+    IPF_ERR << " unexpected opndKind " << opndKind << endl;
+    return 0;
+}
+    
+//----------------------------------------------------------------------------------------//
+
+bool IpfType::isFReg(OpndKind opndKind) { 
+
+    switch(opndKind) {
+        case OPND_G_REG   : return false; 
+        case OPND_F_REG   : return true;
+        case OPND_P_REG   : 
+        case OPND_B_REG   : 
+        case OPND_A_REG   : 
+        case OPND_IP_REG  : 
+        case OPND_UM_REG  :
         case OPND_IMM     : return false;
         case OPND_INVALID : break;
     }

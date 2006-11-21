@@ -144,6 +144,9 @@ bool IpfVerifier::verifyNodeInsts(BbNode  * node) {
                 << (res->empty() ? "" : " : ") << *res
                 << "\n";
             ret = false;
+#ifndef NDEBUG
+            verifyInst(res, inst);  // verify again for debugger
+#endif
         }
     }
 

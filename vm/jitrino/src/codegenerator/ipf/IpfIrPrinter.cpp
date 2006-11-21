@@ -169,6 +169,7 @@ void IrPrinter::printHead() {
     *ofs << "  fontpath=\"c:\\winnt\\fonts\";" << ::std::endl;
     *ofs << "  node [shape=record,fontname=\"Courier\",fontsize=9];" << ::std::endl;
     *ofs << "  edge [fontname=\"Courier\",fontsize=9];" << ::std::endl;
+
 }
 
 //----------------------------------------------------------------------------------------//

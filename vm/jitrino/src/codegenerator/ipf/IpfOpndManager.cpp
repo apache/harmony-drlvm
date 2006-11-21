@@ -249,7 +249,9 @@ OpndManager::OpndManager(MemoryManager &mm, CompilationInterface &compilationInt
     refsCompressed       = compilationInterface.areReferencesCompressed();
     vtablePtrsCompressed = compilationInterface.areVTablePtrsCompressed();
     heapBase             = NULL;
+    heapBaseImm          = NULL;
     vtableBase           = NULL;
+    vtableBaseImm        = NULL;
     vtableOffset         = NULL;
 }
 
@@ -309,12 +311,22 @@ RegOpnd *OpndManager::getHeapBase() {
     return heapBase; 
 } 
 
+Opnd *OpndManager::getHeapBaseImm() { 
+    if (heapBaseImm == NULL) heapBaseImm = newImm(0x7777777777777777);
+    return heapBaseImm;
+} 
+
 //----------------------------------------------------------------------------------------//
 
 RegOpnd *OpndManager::getVtableBase() {
     if (vtableBase == NULL) vtableBase = newRegOpnd(OPND_G_REG, DATA_U64);
     return vtableBase;
 } 
+
+Opnd *OpndManager::getVtableBaseImm() {
+    if (vtableBaseImm == NULL) vtableBaseImm = newImm(0x7777777777777777);
+    return vtableBaseImm;
+}
 
 //----------------------------------------------------------------------------------------//
 
@@ -338,18 +350,26 @@ void OpndManager::initCompBases(BbNode *enterNode) {
 
     if (heapBase != NULL) {
         baseValue  = (uint64) compilationInterface.getHeapBase();
+        
         baseImm    = newImm(baseValue);
         Inst *inst = new(mm) Inst(mm, INST_MOVL, p0, heapBase, baseImm);
         insts.insert(insts.begin(), inst);
         IPF_LOG << "    HeapBase initialization code inserted" << endl;
     }
-
+    if (heapBaseImm != NULL) {
+        heapBaseImm->setValue((uint64)compilationInterface.getHeapBase());
+    }
+        
     if (vtableBase != NULL) {
         baseValue  = (uint64) compilationInterface.getVTableBase();
+
         baseImm    = newImm(baseValue);
         Inst *inst = new(mm) Inst(mm, INST_MOVL, p0, vtableBase, baseImm);
         insts.insert(insts.begin(), inst);
         IPF_LOG << "    VtableBase initialization code inserted" << endl;
+    }
+    if (vtableBaseImm != NULL) {
+        vtableBaseImm->setValue((uint64)compilationInterface.getVTableBase());
     }
 }
 

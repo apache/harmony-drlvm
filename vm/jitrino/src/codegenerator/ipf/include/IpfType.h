@@ -109,10 +109,11 @@ class Cfg;
 #define IPF_LOG   if (LOG_ON) LOG_OUT
 #define IPF_STAT  if (STAT_ON) LOG_OUT
 #define IPF_ERR   cerr << IPF_ERROR 
-#define IPF_ASSERT(condition) if (LOG_ON && !(condition)) { IPF_ERR << (#condition) << endl; }
+#define IPF_ASSERT(condition) if (VERIFY_ON && !(condition)) { IPF_ERR << (#condition) << endl; }
 
 extern bool ipfLogIsOn;
 extern bool ipfVerifyIsOn;
+extern bool ipfConstantFolding;
 
 //========================================================================================//
 // Enums
@@ -237,6 +238,8 @@ public:
 
     static int16    getSize(DataKind);     // opnd value size in bytes
     static bool     isReg(OpndKind);       // is opnd resides on register
+    static bool     isGReg(OpndKind);      // is opnd resides on general register
+    static bool     isFReg(OpndKind);      // is opnd resides on general register
     static bool     isImm(OpndKind);       // is opnd resides in imm
     static bool     isSigned(DataKind);    // is opnd value is signed
     static bool     isFloating(DataKind);  // is opnd value can be placed in fp reg

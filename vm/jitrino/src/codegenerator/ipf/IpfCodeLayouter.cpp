@@ -537,7 +537,7 @@ void CodeLayouter::fixUnconditionalBranch(BbNode *node) {
     // Add branch to through edge target
     Opnd    *p0         = cfg.getOpndManager()->getP0();
     NodeRef *targetNode = cfg.getOpndManager()->newNodeRef(target);
-    node->addInst(new(mm) Inst(mm, INST_BR, CMPLT_WH_SPTK, CMPLT_PH_FEW, p0, targetNode));
+    node->addInst(new(mm) Inst(mm, INST_BR, CMPLT_WH_SPTK, CMPLT_PH_MANY, p0, targetNode));
     
     throughEdge->setEdgeKind(EDGE_BRANCH);
     IPF_LOG << " branch on node" << target->getId() << " added" << endl;

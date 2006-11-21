@@ -28,8 +28,15 @@
 namespace Jitrino {
 namespace IPF {
 
-#define HEAPBASE   (opndManager->getHeapBase())
-#define VTABLEBASE (opndManager->getVtableBase())
+#define HEAPBASE      (opndManager->getHeapBase())
+#define HEAPBASEIMM   (opndManager->getHeapBaseImm())
+#define VTABLEBASE    (opndManager->getVtableBase())
+#define VTABLEBASEIMM (opndManager->getVtableBaseImm())
+
+#define IMM32(o)   ((int32)(((Opnd *)(o))->getValue()))
+#define IMM64(o)   ((int64)(((Opnd *)(o))->getValue()))
+#define IMM32U(o)  ((uint32)(((Opnd *)(o))->getValue()))
+#define IMM64U(o)  ((uint64)(((Opnd *)(o))->getValue()))
 
 //===========================================================================//
 // IpfInstCodeSelector
@@ -63,8 +70,21 @@ CG_OpndHandle *IpfInstCodeSelector::add(ArithmeticOp::Types opType,
 
     IPF_LOG << "      add; opType=" << opType << endl;
 
-    RegOpnd *dst = opndManager->newRegOpnd(toOpndKind(opType), toDataKind(opType));
-    add(dst, src1, src2);
+    Opnd *dst;
+    if (ipfConstantFolding && ((Opnd *)src1)->isImm() && ((Opnd *)src2)->isImm()) {
+        switch (opType) {
+        case ArithmeticOp::I4:
+        case ArithmeticOp::I:
+            dst = opndManager->newImm(IMM32(src1) + IMM32(src2)); break;
+        case ArithmeticOp::I8:
+            dst = opndManager->newImm(IMM64(src1) + IMM64(src2)); break;
+        default:
+            IPF_ASSERT(0); dst = NULL; break;
+        }
+    } else {
+        dst = opndManager->newRegOpnd(toOpndKind(opType), toDataKind(opType));
+        add((RegOpnd *)dst, src1, src2);
+    }
     return dst;
 }
 
@@ -77,8 +97,21 @@ CG_OpndHandle *IpfInstCodeSelector::sub(ArithmeticOp::Types opType,
 
     IPF_LOG << "      sub" << endl;
 
-    RegOpnd *dst = opndManager->newRegOpnd(toOpndKind(opType), toDataKind(opType));
-    sub(dst, src1, src2);
+    Opnd *dst;
+    if (ipfConstantFolding && ((Opnd *)src1)->isImm() && ((Opnd *)src2)->isImm()) {
+        switch (opType) {
+        case ArithmeticOp::I4:
+        case ArithmeticOp::I:
+            dst = opndManager->newImm(IMM32(src1) - IMM32(src2)); break;
+        case ArithmeticOp::I8:
+            dst = opndManager->newImm(IMM64(src1) - IMM64(src2)); break;
+        default:
+            IPF_ASSERT(0); dst = NULL; break;
+        }
+    } else {
+        dst = opndManager->newRegOpnd(toOpndKind(opType), toDataKind(opType));
+        sub((RegOpnd *)dst, src1, src2);
+    }
     return dst;
 }
 
@@ -91,24 +124,37 @@ CG_OpndHandle *IpfInstCodeSelector::mul(ArithmeticOp::Types opType,
 
     IPF_LOG << "      mul" << endl;
     
-    RegOpnd *src1 = toRegOpnd(src1_);
-    RegOpnd *src2 = toRegOpnd(src2_);
-    RegOpnd *dst  = opndManager->newRegOpnd(toOpndKind(opType), toDataKind(opType));;
-    RegOpnd *f0   = opndManager->getF0();
-    
-    if (dst->isFloating()) {
-        Completer cmplt = CMPLT_PC_DYNAMIC;
-        
-        switch (dst->getDataKind()) {
-        case DATA_D: cmplt = CMPLT_PC_DOUBLE; break;
-        case DATA_S: cmplt = CMPLT_PC_SINGLE; break;
-        default: IPF_ERR << "bad data kind for float mul\n"; break;
+    Opnd *dst;
+    if (ipfConstantFolding && ((Opnd *)src1_)->isImm() && ((Opnd *)src2_)->isImm()) {
+        // imm is always integer
+        switch (opType) {
+        case ArithmeticOp::I4:
+        case ArithmeticOp::I:
+            dst = opndManager->newImm(IMM32(src1_) * IMM32(src2_)); break;
+        case ArithmeticOp::I8:
+            dst = opndManager->newImm(IMM64(src1_) * IMM64(src2_)); break;
+        default:
+            IPF_ASSERT(0); dst = NULL; break;
         }
-        addNewInst(INST_FMA, cmplt, p0, dst, src1, src2, f0);
     } else {
-        xma(INST_XMA_L, dst, src1, src2);
-    }
+        RegOpnd *src1 = toRegOpnd(src1_);
+        RegOpnd *src2 = toRegOpnd(src2_);
+        RegOpnd *f0   = opndManager->getF0();
 
+        dst  = opndManager->newRegOpnd(toOpndKind(opType), toDataKind(opType));;
+        if (dst->isFloating()) {
+            Completer cmplt = CMPLT_PC_DYNAMIC;
+            
+            switch (dst->getDataKind()) {
+            case DATA_D: cmplt = CMPLT_PC_DOUBLE; break;
+            case DATA_S: cmplt = CMPLT_PC_SINGLE; break;
+            default: IPF_ERR << "bad data kind for float mul\n"; break;
+            }
+            addNewInst(INST_FMA, cmplt, p0, dst, src1, src2, f0);
+        } else {
+            xma(INST_XMA_L, (RegOpnd *)dst, src1, src2);
+        }
+    }
     return dst;
 }
 
@@ -120,6 +166,7 @@ CG_OpndHandle *IpfInstCodeSelector::addRef(RefArithmeticOp::Types opType,
                                            CG_OpndHandle          *intSrc) {
 
     IPF_LOG << "      addRef" << endl;
+    IPF_ASSERT(((Opnd *)refSrc)->isReg());
 
     RegOpnd *dst = opndManager->newRegOpnd(OPND_G_REG, toDataKind(opType));
     add(dst, refSrc, intSrc);
@@ -134,6 +181,7 @@ CG_OpndHandle *IpfInstCodeSelector::subRef(RefArithmeticOp::Types opType,
                                            CG_OpndHandle          *intSrc) {
 
     IPF_LOG << "      subRef" << endl;
+    IPF_ASSERT(((Opnd *)refSrc)->isReg());
 
     RegOpnd *dst = opndManager->newRegOpnd(OPND_G_REG, toDataKind(opType));
     sub(dst, refSrc, intSrc);
@@ -148,6 +196,8 @@ CG_OpndHandle *IpfInstCodeSelector::diffRef(bool          ovf,
                                             CG_OpndHandle *src2) {
 
     IPF_LOG << "      diffRef" << endl;
+    IPF_ASSERT(((Opnd *)src1)->isReg());
+    IPF_ASSERT(((Opnd *)src2)->isReg());
 
     RegOpnd *dst = opndManager->newRegOpnd(OPND_G_REG, DATA_I64);
     sub(dst, src1, src2);
@@ -164,6 +214,8 @@ CG_OpndHandle *IpfInstCodeSelector::scaledDiffRef(CG_OpndHandle *src1_,
 
     IPF_LOG << "      scaledDiffRef" << endl;
     IPF_ASSERT(type1->isManagedPtr() && type1==type2);
+    IPF_ASSERT(((Opnd *)src1_)->isReg());
+    IPF_ASSERT(((Opnd *)src2_)->isReg());
 
     Opnd    *src1     = (Opnd *)src1_;
     Opnd    *src2     = (Opnd *)src2_;
@@ -196,18 +248,42 @@ CG_OpndHandle *IpfInstCodeSelector::tau_div(DivOp::Types  opType,
                                             CG_OpndHandle *src2,
                                             CG_OpndHandle *tau_src1NonZero) {
 
-    IPF_LOG << "      tau_div" << endl;
+    IPF_LOG << "      tau_div" 
+        << "; opType=" << opType
+        << ", src1=" << IrPrinter::toString((Opnd *)src1)
+        << ", src2=" << IrPrinter::toString((Opnd *)src2)
+        << endl;
 
-    RegOpnd *dst = opndManager->newRegOpnd(toOpndKind(opType), toDataKind(opType));
-
-    switch (opType) {
-        case DivOp::I4: divInt   (dst, src1, src2); break;
-        case DivOp::I :  
-        case DivOp::I8: divLong  (dst, src1, src2); break;
-        case DivOp::F :   
-        case DivOp::D : divDouble(dst, src1, src2); break;
-        case DivOp::S : divFloat (dst, src1, src2); break;
-        default       : IPF_ERR << "unexpected type " << opType << endl;
+    Opnd *dst = NULL;
+    if (ipfConstantFolding && ((Opnd *)src1)->isImm() && ((Opnd *)src2)->isImm() && IMM32(src2)!=0){
+        // imm is always integer
+        switch (opType) {
+        case DivOp::I4: 
+            dst = opndManager->newImm(IMM32(src1) / IMM32(src2)); break;
+        case DivOp::U4:
+            dst = opndManager->newImm(IMM32U(src1) / IMM32U(src2)); break;
+        case DivOp::I:
+        case DivOp::I8:
+            dst = opndManager->newImm(IMM64(src1) / IMM64(src2)); break;
+        case DivOp::U:
+        case DivOp::U8:
+            dst = opndManager->newImm(IMM64U(src1) / IMM64U(src2)); break;
+        default:
+            IPF_ASSERT(0);
+            dst = NULL;
+        }
+    } else {
+        dst = opndManager->newRegOpnd(toOpndKind(opType), toDataKind(opType));
+    
+        switch (opType) {
+            case DivOp::I4: divInt((RegOpnd *)dst, toRegOpnd(src1), toRegOpnd(src2)); break;
+            case DivOp::I :  
+            case DivOp::I8: divLong((RegOpnd *)dst, toRegOpnd(src1), toRegOpnd(src2)); break;
+            case DivOp::F :   
+            case DivOp::D : divDouble((RegOpnd *)dst, src1, src2); break;
+            case DivOp::S : divFloat ((RegOpnd *)dst, src1, src2); break;
+            default       : IPF_ERR << "unexpected type " << opType << endl;
+        }
     }
     return dst;
 }
@@ -233,9 +309,9 @@ CG_OpndHandle *IpfInstCodeSelector::tau_rem(DivOp::Types  opType,
         }
     } else {
         if (dst->getSize() > 4) {
-            divLong(dst, src1, src2, true);
+            divLong(dst, toRegOpnd(src1), toRegOpnd(src2), true);
         } else {                   
-            divInt (dst, src1, src2, true);
+            divInt (dst, toRegOpnd(src1), toRegOpnd(src2), true);
         }
     }
 
@@ -250,13 +326,26 @@ CG_OpndHandle *IpfInstCodeSelector::neg(NegOp::Types  opType,
 
     IPF_LOG << "      neg" << endl;
 
-    RegOpnd *src = toRegOpnd(src_);
-    RegOpnd *dst = opndManager->newRegOpnd(toOpndKind(opType), toDataKind(opType));
-    RegOpnd *r0  = opndManager->getR0();
-
-    if (dst->isFloating()) addNewInst(INST_FNEG, p0, dst, src);
-    else                   addNewInst(INST_SUB, p0, dst, r0, src);
-
+    Opnd *dst;
+    if (ipfConstantFolding && ((Opnd *)src_)->isImm()) {
+        switch (opType) {
+        case NegOp::I4: 
+            dst = opndManager->newImm((int32)0 - IMM32(src_)); break;
+        case NegOp::I:
+        case NegOp::I8: 
+            dst = opndManager->newImm(0 - IMM64(src_)); break;
+        default: 
+            IPF_ASSERT(0);
+            dst = NULL;
+        }
+    } else {
+        dst = opndManager->newRegOpnd(toOpndKind(opType), toDataKind(opType));
+        RegOpnd *src = toRegOpnd(src_);
+        RegOpnd *r0  = opndManager->getR0();
+    
+        if (dst->isFloating()) addNewInst(INST_FNEG, p0, dst, src);
+        else                   addNewInst(INST_SUB, p0, dst, r0, src);
+    }
     return dst;
 }
 
@@ -268,9 +357,23 @@ CG_OpndHandle *IpfInstCodeSelector::min_op(NegOp::Types  opType,
                                            CG_OpndHandle *src2) {
 
     IPF_LOG << "      min_op" << endl;
-    RegOpnd *dst = opndManager->newRegOpnd(toOpndKind(opType), toDataKind(opType));
-    
-    minMax(dst, src1, src2, false);
+
+    Opnd *dst;
+    if (ipfConstantFolding && ((Opnd *)src1)->isImm() && ((Opnd *)src2)->isImm()) {
+        switch (opType) {
+        case NegOp::I4: 
+            dst = opndManager->newImm(min(IMM32(src1), IMM32(src2))); break;
+        case NegOp::I:
+        case NegOp::I8: 
+            dst = opndManager->newImm(min(IMM64(src1), IMM64(src2))); break;
+        default: 
+            IPF_ASSERT(0);
+            dst = NULL;
+        }
+    } else {
+        dst = opndManager->newRegOpnd(toOpndKind(opType), toDataKind(opType));
+        minMax((RegOpnd *)dst, src1, src2, false);
+    }
     return dst; 
 }
 
@@ -282,9 +385,23 @@ CG_OpndHandle *IpfInstCodeSelector::max_op(NegOp::Types  opType,
                                            CG_OpndHandle *src2) {
 
     IPF_LOG << "      max_op" << endl;
-    RegOpnd *dst = opndManager->newRegOpnd(toOpndKind(opType), toDataKind(opType));
     
-    minMax(dst, src1, src2, true);
+    Opnd *dst;
+    if (ipfConstantFolding && ((Opnd *)src1)->isImm() && ((Opnd *)src2)->isImm()) {
+        switch (opType) {
+        case NegOp::I4: 
+            dst = opndManager->newImm(max(IMM32(src1), IMM32(src2))); break;
+        case NegOp::I:
+        case NegOp::I8: 
+            dst = opndManager->newImm(max(IMM64(src1), IMM64(src2))); break;
+        default: 
+            IPF_ASSERT(0);
+            dst = NULL;
+        }
+    } else {
+        dst = opndManager->newRegOpnd(toOpndKind(opType), toDataKind(opType));
+        minMax((RegOpnd *)dst, src1, src2, true);
+    }
     return dst; 
 }
 
@@ -293,24 +410,41 @@ CG_OpndHandle *IpfInstCodeSelector::max_op(NegOp::Types  opType,
 
 CG_OpndHandle *IpfInstCodeSelector::abs_op(NegOp::Types  opType,
                                            CG_OpndHandle *src_) {
-    RegOpnd *src = toRegOpnd(src_);
-    RegOpnd *dst = opndManager->newRegOpnd(toOpndKind(opType), toDataKind(opType));
-    
-    if (dst->isFloating()) {
-        // TODO: check all the peculiarities of Math.min/max
-         addNewInst(INST_FABS, p0, dst, src);
+    Opnd *dst;
+    if (ipfConstantFolding && ((Opnd *)src_)->isImm()) {
+        switch (opType) {
+        case NegOp::I4: 
+            dst = opndManager->newImm(abs(IMM32(src_))); break;
+        case NegOp::I:
+        case NegOp::I8: 
+            dst = opndManager->newImm(labs(IMM64(src_))); break;
+        default: 
+            IPF_ASSERT(0);
+            dst = NULL;
+        }
     } else {
-        // cmp.lt truePred, falsePred = src, 0
-        // (truePred)  dst = src
-        // (falsePred) dst = -src
-        RegOpnd *truePred  = opndManager->newRegOpnd(OPND_P_REG, DATA_P);
-        RegOpnd *falsePred = opndManager->newRegOpnd(OPND_P_REG, DATA_P);
-        RegOpnd *r0        = opndManager->getR0(src);
+        RegOpnd *src = toRegOpnd(src_);
+        dst = opndManager->newRegOpnd(toOpndKind(opType), toDataKind(opType));
         
-        cmp(CMPLT_CMP_CREL_LT, truePred, falsePred, src, r0);
-        addNewInst(INST_MOV, truePred, dst, src);
-        addNewInst(INST_SUB, falsePred, dst, r0, src);
-     }
+        if (dst->isFloating()) {
+            // TODO: check all the peculiarities of Math.min/max
+             addNewInst(INST_FABS, p0, dst, src);
+        } else {
+            // cmp.lt truePred, falsePred = src, 0
+            // (truePred)  dst = src
+            // (falsePred) dst = -src
+            RegOpnd *truePred  = opndManager->newRegOpnd(OPND_P_REG, DATA_P);
+            RegOpnd *falsePred = opndManager->newRegOpnd(OPND_P_REG, DATA_P);
+            RegOpnd *r0        = opndManager->getR0(src);
+            
+            addNewInst(INST_DEF, p0, dst);
+            addNewInst(INST_DEF, p0, src);
+
+            cmp(CMPLT_CMP_CREL_LT, truePred, falsePred, src, r0);
+            addNewInst(INST_MOV, truePred, dst, src);
+            addNewInst(INST_SUB, falsePred, dst, r0, src);
+        }
+    }
     return dst;
 }
 
@@ -322,9 +456,24 @@ CG_OpndHandle *IpfInstCodeSelector::and_(IntegerOp::Types opType,
                                          CG_OpndHandle    *src2) {
 
     IPF_LOG << "      and_ " << endl;
-    RegOpnd *dst = opndManager->newRegOpnd(OPND_G_REG, toDataKind(opType));
 
-    binOp(INST_AND, dst, src1, src2);
+    Opnd *dst;
+    if (ipfConstantFolding && ((Opnd *)src1)->isImm() && ((Opnd *)src2)->isImm()) {
+        switch (opType) {
+        case IntegerOp::I4:
+            dst = opndManager->newImm(IMM32(src1) & IMM32(src2)); break;
+        case IntegerOp::I8:
+            dst = opndManager->newImm(IMM64(src1) & IMM64(src2)); break;
+        case IntegerOp::I  : 
+            dst = opndManager->newImm(IMM64U(src1) & IMM64U(src2)); break;
+        default: 
+            IPF_ASSERT(0);
+            dst = NULL;
+        }
+    } else {
+        dst = opndManager->newRegOpnd(OPND_G_REG, toDataKind(opType));
+        binOp(INST_AND, (RegOpnd *)dst, src1, src2);
+    }
     return dst; 
 }
 
@@ -336,9 +485,24 @@ CG_OpndHandle *IpfInstCodeSelector::or_(IntegerOp::Types opType,
                                         CG_OpndHandle    *src2) {
 
     IPF_LOG << "      or_ " << endl;
-    RegOpnd *dst = opndManager->newRegOpnd(OPND_G_REG, toDataKind(opType));
 
-    binOp(INST_OR, dst, src1, src2);
+    Opnd *dst;
+    if (ipfConstantFolding && ((Opnd *)src1)->isImm() && ((Opnd *)src2)->isImm()) {
+        switch (opType) {
+        case IntegerOp::I4:
+            dst = opndManager->newImm(IMM32(src1) | IMM32(src2)); break;
+        case IntegerOp::I8:
+            dst = opndManager->newImm(IMM64(src1) | IMM64(src2)); break;
+        case IntegerOp::I  : 
+            dst = opndManager->newImm(IMM64U(src1) | IMM64U(src2)); break;
+        default: 
+            IPF_ASSERT(0);
+            dst = NULL;
+        }
+    } else {
+        dst = opndManager->newRegOpnd(OPND_G_REG, toDataKind(opType));
+        binOp(INST_OR, (RegOpnd *)dst, src1, src2);
+    }
     return dst; 
 }
 
@@ -350,9 +514,24 @@ CG_OpndHandle *IpfInstCodeSelector::xor_(IntegerOp::Types opType,
                                          CG_OpndHandle    *src2) {
 
     IPF_LOG << "      xor_ " << endl;
-    RegOpnd *dst = opndManager->newRegOpnd(OPND_G_REG, toDataKind(opType));
 
-    binOp(INST_XOR, dst, src1, src2);
+    Opnd *dst;
+    if (ipfConstantFolding && ((Opnd *)src1)->isImm() && ((Opnd *)src2)->isImm()) {
+        switch (opType) {
+        case IntegerOp::I4:
+            dst = opndManager->newImm(IMM32(src1) ^ IMM32(src2)); break;
+        case IntegerOp::I8:
+            dst = opndManager->newImm(IMM64(src1) ^ IMM64(src2)); break;
+        case IntegerOp::I  : 
+            dst = opndManager->newImm(IMM64U(src1) ^ IMM64U(src2)); break;
+        default: 
+            IPF_ASSERT(0);
+            dst = NULL;
+        }
+    } else {
+        dst = opndManager->newRegOpnd(OPND_G_REG, toDataKind(opType));
+        binOp(INST_XOR, (RegOpnd *)dst, src1, src2);
+    }
     return dst; 
 }
 
@@ -364,14 +543,29 @@ CG_OpndHandle *IpfInstCodeSelector::not_(IntegerOp::Types opType,
 
     IPF_LOG << "      not_ " << endl;
     
-    uint64 val = 0;
-    if (opType == IntegerOp::I4) val = 0xFFFFFFFF;
-    else                         val = 0xFFFFFFFFFFFFFFFFL;
-
-    Opnd    *allOnes = opndManager->newImm(val);
-    RegOpnd *dst     = opndManager->newRegOpnd(OPND_G_REG, toDataKind(opType));
-
-    binOp(INST_XOR, dst, src, allOnes);
+    Opnd *dst;
+    if (ipfConstantFolding && ((Opnd *)src)->isImm()) {
+        switch (opType) {
+        case IntegerOp::I4:
+            dst = opndManager->newImm(~IMM32(src)); break;
+        case IntegerOp::I8:
+            dst = opndManager->newImm(~IMM64(src)); break;
+        case IntegerOp::I  : 
+            dst = opndManager->newImm(~IMM64U(src)); break;
+        default: 
+            IPF_ASSERT(0);
+            dst = NULL;
+        }
+    } else {
+        uint64 val = 0;
+        if (opType == IntegerOp::I4) val = 0xFFFFFFFF;
+        else                         val = 0xFFFFFFFFFFFFFFFFL;
+    
+        Opnd    *allOnes = opndManager->newImm(val);
+        dst     = opndManager->newRegOpnd(OPND_G_REG, toDataKind(opType));
+    
+        binOp(INST_XOR, (RegOpnd *)dst, src, allOnes);
+    }
     return dst; 
 }
 
@@ -383,6 +577,10 @@ CG_OpndHandle *IpfInstCodeSelector::shl(IntegerOp::Types  opType,
                                         CG_OpndHandle    *shiftAmount) {
 
     IPF_LOG << "      shl " << endl;
+
+    if (ipfConstantFolding && ((Opnd *)value)->isImm() && ((Opnd *)shiftAmount)->isImm()) {
+        return opndManager->newImm(((Opnd *)value)->getValue() << ((Opnd *)shiftAmount)->getValue());
+    }
 
     RegOpnd *dst = opndManager->newRegOpnd(OPND_G_REG, toDataKind(opType));
     Opnd *shiftcount = (Opnd *)shiftAmount;
@@ -406,6 +604,11 @@ CG_OpndHandle *IpfInstCodeSelector::shr(IntegerOp::Types opType,
                                         CG_OpndHandle    *shiftAmount) {
 
     IPF_LOG << "      shr " << endl;
+
+    if (ipfConstantFolding && ((Opnd *)value)->isImm() && ((Opnd *)shiftAmount)->isImm()) {
+        return opndManager->newImm(((Opnd *)value)->getValue() >> ((Opnd *)shiftAmount)->getValue());
+    }
+
     RegOpnd *dst = opndManager->newRegOpnd(OPND_G_REG, toDataKind(opType));
     int bits = 5;
     
@@ -430,6 +633,15 @@ CG_OpndHandle *IpfInstCodeSelector::shru(IntegerOp::Types opType,
                                          CG_OpndHandle    *shiftAmount) {
 
     IPF_LOG << "      shru " << endl;
+    
+    if (ipfConstantFolding && ((Opnd *)value)->isImm() && ((Opnd *)shiftAmount)->isImm()) {
+        if (opType==IntegerOp::I4) {
+            return opndManager->newImm((uint64)((uint32)((int32)(((Opnd *)value)->getValue()))) >> ((Opnd *)shiftAmount)->getValue());
+        } else {
+            return opndManager->newImm((uint64)(((Opnd *)value)->getValue()) >> ((Opnd *)shiftAmount)->getValue());
+        }
+    }
+
     RegOpnd *dst = opndManager->newRegOpnd(OPND_G_REG, toDataKind(opType));
     int bits = 5;
     
@@ -457,6 +669,10 @@ CG_OpndHandle *IpfInstCodeSelector::shladd(IntegerOp::Types opType,
     IPF_LOG << "      shladd " << endl;
     IPF_ASSERT(imm>=1 && imm<=4);
 
+    if (ipfConstantFolding && ((Opnd *)value_)->isImm() && ((Opnd *)addto_)->isImm()) {
+        return opndManager->newImm((((Opnd *)value_)->getValue() << imm) + ((Opnd *)addto_)->getValue());
+    }
+
     RegOpnd *value = toRegOpnd(value_);
     RegOpnd *addto = toRegOpnd(addto_);
     Opnd    *count = opndManager->newImm(imm);
@@ -477,11 +693,21 @@ CG_OpndHandle *IpfInstCodeSelector::convToInt(ConvertToIntOp::Types       opType
                                               Type                        *dstType, 
                                               CG_OpndHandle               *src_) {
 
-    RegOpnd *src = toRegOpnd(src_);
-    IPF_LOG << "      convToInt " << IrPrinter::toString(src);
-    IPF_LOG << " to " << Type::tag2str(dstType->tag) ;
+    IPF_LOG << "      convToInt " << IrPrinter::toString((Opnd *)src_);
+    IPF_LOG << " to " << Type::tag2str(dstType->tag);
+    IPF_LOG << "; isSigned=" << isSigned;
     IPF_LOG << "; opType=" << opType << endl;
 
+    if (ipfConstantFolding && ((Opnd *)src_)->isImm()) {
+        switch (opType) {
+            case ConvertToIntOp::I1: break;
+            case ConvertToIntOp::I2: break;
+            case ConvertToIntOp::I4: break;
+            default                : return src_;
+        }
+    }
+
+    RegOpnd *src = toRegOpnd(src_);
     RegOpnd *dst = opndManager->newRegOpnd(OPND_G_REG, toDataKind(dstType->tag));
 
     if (src->isFloating()) {
@@ -498,7 +724,9 @@ CG_OpndHandle *IpfInstCodeSelector::convToInt(ConvertToIntOp::Types       opType
             default                : break;
         }
 
-        InstCode instCode = dst->isSigned() ? INST_SXT : INST_ZXT;
+        InstCode instCode = dst->isSigned() 
+            ? INST_SXT 
+            : INST_ZXT;
         if (cmplt == CMPLT_INVALID) addNewInst(INST_MOV, p0, dst, src);
         else                        addNewInst(instCode, cmplt, p0, dst, src);
     }
@@ -530,7 +758,7 @@ CG_OpndHandle *IpfInstCodeSelector::convToFp(ConvertToFpOp::Types opType,
     } else {
         // convert from int to fp
         bool     isSigned = (opType != ConvertToFpOp::FloatFromUnsigned);
-        InstCode instCode = (isSigned ? INST_FCVT_XUF : INST_FCVT_XF);
+        InstCode instCode = (isSigned ? INST_FCVT_XF : INST_FCVT_XUF);
         sxt(src, 8);
         addNewInst(INST_SETF_SIG, p0, dst, src);
         addNewInst(instCode, p0, dst, dst);
@@ -544,11 +772,15 @@ CG_OpndHandle *IpfInstCodeSelector::convToFp(ConvertToFpOp::Types opType,
 
 CG_OpndHandle *IpfInstCodeSelector::ldc_i4(uint32 val) {
 
-    IPF_LOG << "      ldc_i4" << endl;
+    IPF_LOG << "      ldc_i4; val=" << val << endl;
     
-    RegOpnd *dst = opndManager->newRegOpnd(OPND_G_REG, DATA_I32);
-    ldc(dst, (int64)((int32)val));
-
+    Opnd *dst;
+    if (ipfConstantFolding) {
+        dst = opndManager->newImm((int64)((int32)val));
+    } else {
+        dst = opndManager->newRegOpnd(OPND_G_REG, DATA_I32);
+        ldc((RegOpnd *)dst, (int64)((int32)val));
+    }
     return dst;
 }
 
@@ -557,11 +789,15 @@ CG_OpndHandle *IpfInstCodeSelector::ldc_i4(uint32 val) {
 
 CG_OpndHandle *IpfInstCodeSelector::ldc_i8(uint64 val) {
 
-    IPF_LOG << "      ldc_i8" << endl;
+    IPF_LOG << "      ldc_i8; val=" << val << endl;
 
-    RegOpnd *dst = opndManager->newRegOpnd(OPND_G_REG, DATA_I64);
-    ldc(dst, (int64)val);
-
+    Opnd *dst;
+    if (ipfConstantFolding) {
+        dst = opndManager->newImm((int64)val);
+    } else {
+        dst = opndManager->newRegOpnd(OPND_G_REG, DATA_I64);
+        ldc((RegOpnd *)dst, (int64)val);
+    }
     return dst;
 }
 
@@ -570,15 +806,36 @@ CG_OpndHandle *IpfInstCodeSelector::ldc_i8(uint64 val) {
 
 CG_OpndHandle *IpfInstCodeSelector::ldc_s(float val) {
 
-    IPF_LOG << "      ldc_s" << endl;
+    IPF_LOG << "      ldc_s; val=" << val << endl;
 
-    FloatConstant *fc       = new(mm) FloatConstant(val);
-    ConstantRef   *constref = opndManager->newConstantRef(fc);
-    RegOpnd       *r3       = opndManager->newRegOpnd(OPND_G_REG, DATA_I64);
-    RegOpnd       *dst      = opndManager->newRegOpnd(OPND_F_REG, DATA_S);
-   
-    addNewInst(INST_MOVL, p0, r3, constref);
-    addNewInst(INST_LDF, CMPLT_FSZ_S, p0, dst, r3);
+    if (val==0) {
+        return opndManager->getF0();
+    } else if (val==1) {
+        return opndManager->getF1();
+    }
+
+    union {
+        float  fr;
+        uint32 gr;
+    } tmpVal;
+    
+    tmpVal.fr = val;
+    
+    RegOpnd  *dst      = opndManager->newRegOpnd(OPND_F_REG, DATA_S);
+    Opnd     *immOpnd  = opndManager->newImm(tmpVal.gr);
+    RegOpnd  *r3       = opndManager->newRegOpnd(OPND_G_REG, DATA_I64);
+    InstCode  instCode = immOpnd->isFoldableImm(22) ? INST_MOV : INST_MOVL;
+    
+    addNewInst(instCode, p0, r3, immOpnd);
+    addNewInst(INST_SETF_S, p0, dst, r3);
+
+    //FloatConstant *fc       = new(mm) FloatConstant(val);
+    //ConstantRef   *constref = opndManager->newConstantRef(fc);
+    //RegOpnd       *r3       = opndManager->newRegOpnd(OPND_G_REG, DATA_I64);
+    //RegOpnd       *dst      = opndManager->newRegOpnd(OPND_F_REG, DATA_S);
+    //   
+    //addNewInst(INST_MOVL, p0, r3, constref);
+    //addNewInst(INST_LDF, CMPLT_FSZ_S, p0, dst, r3);
 
     return dst;
 }
@@ -588,15 +845,36 @@ CG_OpndHandle *IpfInstCodeSelector::ldc_s(float val) {
 
 CG_OpndHandle *IpfInstCodeSelector::ldc_d(double val) {
 
-    IPF_LOG << "      ldc_d" << endl;
+    IPF_LOG << "      ldc_d; val=" << val << endl;
 
-    DoubleConstant *fc       = new(mm) DoubleConstant(val);
-    ConstantRef    *constref = opndManager->newConstantRef(fc);
-    RegOpnd        *r3       = opndManager->newRegOpnd(OPND_G_REG, DATA_I64);
-    RegOpnd        *dst      = opndManager->newRegOpnd(OPND_F_REG, DATA_D);
+    if (val==0) {
+        return opndManager->getF0();
+    } else if (val==1) {
+        return opndManager->getF1();
+    }
 
-    addNewInst(INST_MOVL, p0, r3, constref);
-    addNewInst(INST_LDF,  CMPLT_FSZ_D, p0, dst, r3);
+    union {
+        double fr;
+        uint64 gr;
+    } tmpVal;
+    
+    tmpVal.fr = val;
+    
+    RegOpnd  *dst      = opndManager->newRegOpnd(OPND_F_REG, DATA_D);
+    Opnd     *immOpnd  = opndManager->newImm(tmpVal.gr);
+    RegOpnd  *r3       = opndManager->newRegOpnd(OPND_G_REG, DATA_I64);
+    InstCode  instCode = immOpnd->isFoldableImm(22) ? INST_MOV : INST_MOVL;
+    
+    addNewInst(instCode, p0, r3, immOpnd);
+    addNewInst(INST_SETF_D, p0, dst, r3);
+    
+    //DoubleConstant *fc       = new(mm) DoubleConstant(val);
+    //ConstantRef    *constref = opndManager->newConstantRef(fc);
+    //RegOpnd        *r3       = opndManager->newRegOpnd(OPND_G_REG, DATA_I64);
+    //RegOpnd        *dst      = opndManager->newRegOpnd(OPND_F_REG, DATA_D);
+    //
+    //addNewInst(INST_MOVL, p0, r3, constref);
+    //addNewInst(INST_LDF,  CMPLT_FSZ_D, p0, dst, r3);
 
     return dst;
 }
@@ -606,16 +884,28 @@ CG_OpndHandle *IpfInstCodeSelector::ldc_d(double val) {
 
 CG_OpndHandle *IpfInstCodeSelector::ldnull(bool compressed) {
 
-    IPF_LOG << "      ldnull; compressed = " << boolalpha << compressed << endl;
+    IPF_LOG << "      ldnull; compressed=" << boolalpha << compressed << endl;
     
-    if (opndManager->areRefsCompressed() == false) {
-        return opndManager->getR0();
-    } 
-
-    if (compressed) {
-        return opndManager->getR0();
+    if (false && ipfConstantFolding) {
+        if (opndManager->areRefsCompressed() == false) {
+            return opndManager->newImm(0); // return opndManager->getR0();
+        } 
+    
+        if (compressed) {
+            return opndManager->newImm(0); // return opndManager->getR0();
+        } else {
+            return HEAPBASEIMM; // return HEAPBASE;
+        }
     } else {
-        return HEAPBASE;
+        if (opndManager->areRefsCompressed() == false) {
+            return opndManager->getR0();
+        } 
+    
+        if (compressed) {
+            return opndManager->getR0();
+        } else {
+            return HEAPBASE;
+        }
     }
 }
 
@@ -624,13 +914,17 @@ CG_OpndHandle *IpfInstCodeSelector::ldnull(bool compressed) {
 
 CG_OpndHandle *IpfInstCodeSelector::ldVar(Type *dstType, uint32 varId) {
 
-    IPF_LOG << "      ldVar " << Type::tag2str(dstType->tag) << " " << varId << endl;
+    IPF_LOG << "      ldVar; dstType=" << Type::tag2str(dstType->tag) << ", varId=" << varId << endl;
 
     if (opnds[varId] == opndManager->getTau()) { 
         IPF_LOG << "        tau operation - ignore" << endl;
         return opndManager->getTau();
     }
 
+    if (ipfConstantFolding && opnds[varId]->isImm()) {
+        return opnds[varId];
+    }
+    
     RegOpnd *src = toRegOpnd(opnds[varId]);
     RegOpnd *dst = opndManager->newRegOpnd(toOpndKind(dstType->tag), toDataKind(dstType->tag));
 
@@ -642,17 +936,30 @@ CG_OpndHandle *IpfInstCodeSelector::ldVar(Type *dstType, uint32 varId) {
 //----------------------------------------------------------------------------//
 // Store variable
 
-void IpfInstCodeSelector::stVar(CG_OpndHandle *src, uint32 varId) {
+void IpfInstCodeSelector::stVar(CG_OpndHandle *_src, uint32 varId) {
 
-    IPF_LOG << "      stVar" << endl;
+    IPF_LOG << "      stVar" 
+        << "; varId=" << varId
+        << "; src=" << IrPrinter::toString((Opnd *)_src)
+        << endl;
     
-    if (src==opndManager->getTau() || opnds[varId]==opndManager->getTau()) { 
+    if (_src==opndManager->getTau() || opnds[varId]==opndManager->getTau()) { 
         IPF_LOG << "        tau operation - ignore" << endl;
         return;
     }
 
+    if (ipfConstantFolding && opnds[varId]->isImm() && ((Opnd *)_src)->isImm()) {
+        opnds[varId]->setValue(((Opnd *)_src)->getValue());
+    }
+    
     IPF_ASSERT(opnds[varId]->isReg());
-    addNewInst(INST_MOV, p0, opnds[varId], src);
+    
+    Opnd *src = (Opnd *)_src;
+    if (src->isReg() || src->isImm(22)) {
+        addNewInst(INST_MOV, p0, opnds[varId], src);
+    } else {
+        addNewInst(INST_MOVL, p0, opnds[varId], src);
+    }
 }
 
 //----------------------------------------------------------------------------//
@@ -675,7 +982,6 @@ CG_OpndHandle *IpfInstCodeSelector::defArg(uint32 inArgPosition, Type *type) {
     RegOpnd *arg = opndManager->newRegOpnd(opndKind, dataKind, location);
     IPF_LOG << "      defArg " << IrPrinter::toString(arg) << " " << type->getName() << endl;
 
-//    addNewInst(INST_DEF, p0, arg);                        // artificial def for in arg opnd
     if (isFp) {
         RegOpnd *newarg = opndManager->newRegOpnd(opndKind, dataKind);
         addNewInst(INST_MOV, p0, newarg, arg);            // if fp arg crosses call site
@@ -693,7 +999,11 @@ CG_OpndHandle *IpfInstCodeSelector::cmp(CompareOp::Operators cmpOp,
                                         CG_OpndHandle        *src1,
                                         CG_OpndHandle        *src2) {
 
-    IPF_LOG << "      cmp; opType=" << opType << endl;
+    IPF_LOG << "      cmp" 
+        << "; opType=" << opType
+        << "; src1=" << IrPrinter::toString((Opnd *)src1)
+        << "; src2=" << IrPrinter::toString((Opnd *)src2)
+        << "\n";
 
     InstCode  instCode   = toInstCmp(opType);
     bool      isFloating = (instCode == INST_FCMP);
@@ -703,8 +1013,9 @@ CG_OpndHandle *IpfInstCodeSelector::cmp(CompareOp::Operators cmpOp,
     RegOpnd   *r0        = opndManager->getR0();
     RegOpnd   *dst       = opndManager->newRegOpnd(OPND_G_REG, DATA_I32);
     
+    addNewInst(INST_DEF, p0, dst);
+
     cmp(instCode, crel, truePred, falsePred, src1, src2);
-//    addNewInst(INST_DEF, p0, dst);
     addNewInst(INST_MOV, truePred, dst, opndManager->newImm(1));
     addNewInst(INST_MOV, falsePred, dst, r0);
     
@@ -717,7 +1028,9 @@ CG_OpndHandle *IpfInstCodeSelector::cmp(CompareOp::Operators cmpOp,
 CG_OpndHandle *IpfInstCodeSelector::czero(CompareZeroOp::Types opType,
                                           CG_OpndHandle        *src) {
 
-    IPF_LOG << "      czero" << endl;
+    IPF_LOG << "      czero" 
+        << "; src=" << IrPrinter::toString((Opnd *)src)
+        << endl;
 
     InstCode  instCode   = toInstCmp(opType);
     Completer crel       = CMPLT_CMP_CREL_EQ;
@@ -726,8 +1039,9 @@ CG_OpndHandle *IpfInstCodeSelector::czero(CompareZeroOp::Types opType,
     RegOpnd   *r0        = opndManager->getR0();
     RegOpnd   *dst       = opndManager->newRegOpnd(OPND_G_REG, DATA_I32);
     
+    addNewInst(INST_DEF, p0, dst);
+
     cmp(instCode, crel, truePred, falsePred, src, r0);
-//    addNewInst(INST_DEF, p0, dst);
     addNewInst(INST_MOV, truePred, dst, opndManager->newImm(1));
     addNewInst(INST_MOV, falsePred, dst, r0);
 
@@ -740,7 +1054,9 @@ CG_OpndHandle *IpfInstCodeSelector::czero(CompareZeroOp::Types opType,
 CG_OpndHandle *IpfInstCodeSelector::cnzero(CompareZeroOp::Types opType,
                                            CG_OpndHandle        *src) {
 
-    IPF_LOG << "      cnzero" << endl;
+    IPF_LOG << "      cnzero" 
+        << "; src=" << IrPrinter::toString((Opnd *)src)
+        << endl;
 
     InstCode  instCode   = toInstCmp(opType);
     Completer crel       = CMPLT_CMP_CREL_NE;
@@ -749,8 +1065,9 @@ CG_OpndHandle *IpfInstCodeSelector::cnzero(CompareZeroOp::Types opType,
     RegOpnd   *r0        = opndManager->getR0();
     RegOpnd   *dst       = opndManager->newRegOpnd(OPND_G_REG, DATA_I32);
     
+    addNewInst(INST_DEF, p0, dst);
+
     cmp(instCode, crel, truePred, falsePred, src, r0);
-//    addNewInst(INST_DEF, p0, dst);
     addNewInst(INST_MOV, truePred, dst, opndManager->newImm(1));
     addNewInst(INST_MOV, falsePred, dst, r0);
 
@@ -762,7 +1079,9 @@ CG_OpndHandle *IpfInstCodeSelector::cnzero(CompareZeroOp::Types opType,
 
 CG_OpndHandle *IpfInstCodeSelector::copy(CG_OpndHandle *src_) {
 
-    IPF_LOG << "      copy" << endl;
+    IPF_LOG << "      copy" 
+        << "; src_=" << IrPrinter::toString((Opnd *)src_)
+        << endl;
 
     if ((Opnd *)src_ == opndManager->getTau()) { 
         IPF_LOG << "        tau operation - ignore" << endl;
@@ -786,6 +1105,10 @@ CG_OpndHandle *IpfInstCodeSelector::tau_staticCast(ObjectType    *toType,
 
     IPF_LOG << "      tau_staticCast" << endl;
 
+    if (((Opnd *)obj)->isImm()) {
+        return obj;
+    }
+    
     RegOpnd *dst = opndManager->newRegOpnd(OPND_G_REG, toDataKind(toType->tag));
     
     addNewInst(INST_MOV, p0, dst, obj);
@@ -800,16 +1123,40 @@ void IpfInstCodeSelector::branch(CompareOp::Operators cmpOp,
                                  CG_OpndHandle        *src1,
                                  CG_OpndHandle        *src2) {
 
-    IPF_LOG << "      branch" << endl;
+    IPF_LOG << "      branch" 
+        << "; src1=" << IrPrinter::toString((Opnd *)src1)
+        << "; src2=" << IrPrinter::toString((Opnd *)src2)
+        << endl;
 
-    InstCode  instCode   = toInstCmp(opType);
-    bool      isFloating = (instCode == INST_FCMP);
-    Completer crel       = toCmpltCrel(cmpOp, isFloating);
-    RegOpnd   *truePred  = opndManager->newRegOpnd(OPND_P_REG, DATA_P);
-    NodeRef   *target    = opndManager->newNodeRef();
-
-    cmp(instCode, crel, truePred, p0, src1, src2);
-    addNewInst(INST_BR, CMPLT_BTYPE_COND, CMPLT_WH_DPNT, CMPLT_PH_FEW, truePred, target);
+    if (false // TODO: need update cfg: branch edge target and "br" instruction target are different
+            && ipfConstantFolding && ((Opnd *)src1)->isImm() && ((Opnd *)src2)->isImm()) {
+        RegOpnd   *truePred  = opndManager->getP0();
+        NodeRef   *target    = opndManager->newNodeRef();
+        int64      v1 = ((Opnd *)src1)->getValue(), v2 = ((Opnd *)src2)->getValue();
+        bool       cmpres = false;
+    
+        switch (cmpOp) {
+        case CompareOp::Eq  : cmpres = (v1 == v2); break;
+        case CompareOp::Ne  : cmpres = (v1 != v2); break;
+        case CompareOp::Gt  : cmpres = (v1 > v2); break;
+        case CompareOp::Gtu : cmpres = ((uint64)v1 > (uint64)v2); break;
+        case CompareOp::Ge  : cmpres = (v1 >= v2); break;
+        case CompareOp::Geu : cmpres = ((uint64)v1 >= (uint64)v2); break;
+        default             : IPF_ERR << "unexpected cmpOp type " << cmpOp << endl;
+        }
+        if (cmpres) {
+            addNewInst(INST_BR, CMPLT_BTYPE_COND, CMPLT_WH_SPTK, CMPLT_PH_MANY, truePred, target);
+        }
+    } else {
+        InstCode  instCode   = toInstCmp(opType);
+        bool      isFloating = (instCode == INST_FCMP);
+        Completer crel       = toCmpltCrel(cmpOp, isFloating);
+        RegOpnd   *truePred  = opndManager->newRegOpnd(OPND_P_REG, DATA_P);
+        NodeRef   *target    = opndManager->newNodeRef();
+    
+        cmp(instCode, crel, truePred, p0, src1, src2);
+        addNewInst(INST_BR, CMPLT_BTYPE_COND, CMPLT_WH_DPTK, CMPLT_PH_MANY, truePred, target);
+    }
 }
 
 //----------------------------------------------------------------------------//
@@ -818,7 +1165,9 @@ void IpfInstCodeSelector::branch(CompareOp::Operators cmpOp,
 void IpfInstCodeSelector::bzero(CompareZeroOp::Types opType,
                                 CG_OpndHandle        *src) {
 
-    IPF_LOG << "      bzero" << endl;
+    IPF_LOG << "      bzero" 
+        << "; src=" << IrPrinter::toString((Opnd *)src)
+        << endl;
     IPF_ASSERT(((Opnd *)src)->isReg());
 
     InstCode instCode  = toInstCmp(opType);
@@ -833,7 +1182,7 @@ void IpfInstCodeSelector::bzero(CompareZeroOp::Types opType,
     }
 
     cmp(instCode, CMPLT_CMP_CREL_EQ, truePred, p0, src, zero);
-    addNewInst(INST_BR, CMPLT_BTYPE_COND, CMPLT_WH_DPNT, CMPLT_PH_FEW, truePred, target);
+    addNewInst(INST_BR, CMPLT_BTYPE_COND, CMPLT_WH_DPTK, CMPLT_PH_MANY, truePred, target);
 }
 
 //----------------------------------------------------------------------------//
@@ -842,7 +1191,9 @@ void IpfInstCodeSelector::bzero(CompareZeroOp::Types opType,
 void IpfInstCodeSelector::bnzero(CompareZeroOp::Types opType,
                                  CG_OpndHandle        *src) {
 
-    IPF_LOG << "      bnzero" << endl;
+    IPF_LOG << "      bnzero" 
+        << "; src=" << IrPrinter::toString((Opnd *)src)
+        << endl;
     IPF_ASSERT(((Opnd *)src)->isReg());
 
     InstCode instCode  = toInstCmp(opType);
@@ -857,7 +1208,7 @@ void IpfInstCodeSelector::bnzero(CompareZeroOp::Types opType,
     } 
 
     cmp(instCode, CMPLT_CMP_CREL_NE, truePred, p0, src, zero);
-    addNewInst(INST_BR, CMPLT_BTYPE_COND, CMPLT_WH_DPNT, CMPLT_PH_FEW, truePred, target);
+    addNewInst(INST_BR, CMPLT_BTYPE_COND, CMPLT_WH_DPTK, CMPLT_PH_MANY, truePred, target);
 }
 
 //----------------------------------------------------------------------------//
@@ -900,6 +1251,11 @@ void IpfInstCodeSelector::tableSwitch(CG_OpndHandle *src, uint32 nTargets) {
     Opnd *tgtAddr             = opndManager->newRegOpnd(OPND_G_REG, DATA_I64);
     Opnd *branchTgt           = opndManager->newRegOpnd(OPND_B_REG, DATA_I64);
     
+    addNewInst(INST_DEF, p0, tgt);
+    addNewInst(INST_DEF, p0, defTgt);
+    addNewInst(INST_DEF, p0, tgtAddr);
+    addNewInst(INST_DEF, p0, branchTgt);
+
     // mov to maxTgtValue, defTgtValue, fallThroughTgtValue to GRs
     addNewInst(INST_MOV, p0, tgt,            tgtValue);
     addNewInst(INST_MOV, p0, maxTgt,         maxTgtValue);
@@ -1120,7 +1476,7 @@ CG_OpndHandle *IpfInstCodeSelector::catchException(Type *exceptionType) {
     RegOpnd *exceptionObj = opndManager->newRegOpnd(OPND_G_REG, DATA_U64, RET_G_REG);
     RegOpnd *dst          = opndManager->newRegOpnd(OPND_G_REG, DATA_U64);
     
-    addNewInst(INST_DEF, p0, exceptionObj);
+    addNewInst(INST_DEF, p0, exceptionObj); // DON'T REMOVE, THIS IS NOT FOR OPTIMIZATION
     addNewInst(INST_MOV, p0, dst, exceptionObj);
     return dst;
 }
@@ -1130,7 +1486,7 @@ CG_OpndHandle *IpfInstCodeSelector::catchException(Type *exceptionType) {
 
 CG_OpndHandle *IpfInstCodeSelector::tau_checkNull(CG_OpndHandle *base, bool checksThisForInlinedMethod) {
     
-    IPF_LOG << "      tau_checkNull" << endl;
+    IPF_LOG << "      tau_checkNull; base=" << IrPrinter::toString((Opnd *)base) << endl;
     IPF_ASSERT(((Opnd *)base)->isReg());
 
     RegOpnd *truePred = opndManager->newRegOpnd(OPND_P_REG, DATA_P);
@@ -1149,7 +1505,7 @@ CG_OpndHandle *IpfInstCodeSelector::tau_checkNull(CG_OpndHandle *base, bool chec
     CompilationInterface::RuntimeHelperId hId = CompilationInterface::Helper_NullPtrException;
     uint64  address        = (uint64) compilationInterface.getRuntimeHelperAddress(hId);
     Opnd    *helperAddress = opndManager->newImm(address);
-    directCall(0, NULL, NULL, helperAddress, truePred, CMPLT_WH_SPNT);
+    directCall(0, NULL, NULL, helperAddress, truePred, CMPLT_WH_DPNT);
 
     return opndManager->getTau();    // return fake value (we do not use tau)
 }
@@ -1170,7 +1526,7 @@ CG_OpndHandle *IpfInstCodeSelector::tau_checkBounds(CG_OpndHandle *arrayLen,
     CompilationInterface::RuntimeHelperId hId = CompilationInterface::Helper_ArrayBoundsException;
     uint64  address        = (uint64) compilationInterface.getRuntimeHelperAddress(hId);
     Opnd    *helperAddress = opndManager->newImm(address);
-    directCall(0, NULL, NULL, helperAddress, truePred, CMPLT_WH_SPNT);
+    directCall(0, NULL, NULL, helperAddress, truePred, CMPLT_WH_DPNT);
 
     return opndManager->getTau();    // return fake value (we do not use tau);
 }
@@ -1191,7 +1547,7 @@ CG_OpndHandle *IpfInstCodeSelector::tau_checkLowerBound(CG_OpndHandle *a,
     CompilationInterface::RuntimeHelperId hId = CompilationInterface::Helper_ArrayBoundsException;
     uint64  address        = (uint64) compilationInterface.getRuntimeHelperAddress(hId);
     Opnd    *helperAddress = opndManager->newImm(address);
-    directCall(0, NULL, NULL, helperAddress, truePred, CMPLT_WH_SPNT);
+    directCall(0, NULL, NULL, helperAddress, truePred, CMPLT_WH_DPNT);
 
     return opndManager->getTau();    // return fake value (we do not use tau);
 }
@@ -1212,7 +1568,7 @@ CG_OpndHandle *IpfInstCodeSelector::tau_checkUpperBound(CG_OpndHandle *a,
     CompilationInterface::RuntimeHelperId hId = CompilationInterface::Helper_ArrayBoundsException;
     uint64  address        = (uint64) compilationInterface.getRuntimeHelperAddress(hId);
     Opnd    *helperAddress = opndManager->newImm(address);
-    directCall(0, NULL, NULL, helperAddress, truePred, CMPLT_WH_SPNT);
+    directCall(0, NULL, NULL, helperAddress, truePred, CMPLT_WH_DPNT);
 
     return opndManager->getTau();    // return fake value (we do not use tau);
 }
@@ -1252,7 +1608,7 @@ CG_OpndHandle *IpfInstCodeSelector::tau_checkElemType(CG_OpndHandle *array,
     hId     = CompilationInterface::Helper_ElemTypeException;
     address = (uint64) compilationInterface.getRuntimeHelperAddress(hId);
     Opnd    *helperAddress2 = opndManager->newImm(address);
-    directCall(0, NULL, NULL, helperAddress2, truePred, CMPLT_WH_SPNT);
+    directCall(0, NULL, NULL, helperAddress2, truePred, CMPLT_WH_DPNT);
     
     return opndManager->getTau();    // return fake value (we do not use tau);
 }
@@ -1262,7 +1618,7 @@ CG_OpndHandle *IpfInstCodeSelector::tau_checkElemType(CG_OpndHandle *array,
 
 CG_OpndHandle *IpfInstCodeSelector::tau_checkZero(CG_OpndHandle *src_) {
 
-    IPF_LOG << "      tau_checkZero" << endl;
+    IPF_LOG << "      tau_checkZero; src=" << IrPrinter::toString((Opnd *)src_) << endl;
 
     // p0  cmp.eq  p2, p0 = base, r0
     RegOpnd *src      = toRegOpnd(src_);
@@ -1274,7 +1630,7 @@ CG_OpndHandle *IpfInstCodeSelector::tau_checkZero(CG_OpndHandle *src_) {
     CompilationInterface::RuntimeHelperId hId = CompilationInterface::Helper_DivideByZeroException;
     uint64  address        = (uint64) compilationInterface.getRuntimeHelperAddress(hId);
     Opnd    *helperAddress = opndManager->newImm(address);
-    directCall(0, NULL, NULL, helperAddress, truePred, CMPLT_WH_SPNT);
+    directCall(0, NULL, NULL, helperAddress, truePred, CMPLT_WH_DPNT);
 
     return opndManager->getTau();    // return fake value (we do not use tau)
 }
@@ -1514,7 +1870,9 @@ CG_OpndHandle *IpfInstCodeSelector::ldFieldAddr(Type          *fieldRefType,
                                                 FieldDesc     *fieldDesc) {
 
     IPF_LOG << "      ldFieldAddr " << fieldDesc->getName() 
-        << "(" << Type::tag2str(fieldRefType->tag) << ")" << endl;
+        << "(" << Type::tag2str(fieldRefType->tag) << ")"
+        << "; base=" << IrPrinter::toString((Opnd *)base)
+        << endl;
 
     Opnd    *fieldOffset  = opndManager->newImm(fieldDesc->getOffset());
     RegOpnd *fieldAddress = opndManager->newRegOpnd(OPND_G_REG, DATA_MPTR);
@@ -1888,6 +2246,7 @@ void IpfInstCodeSelector::makeCallArgs(uint32 numArgs, Opnd **args, Inst *callIn
         }
 
         Opnd *outArg = opndManager->newRegOpnd(opndKind, dataKind, location);
+
         addNewInst(instCode, pred, outArg, opnd); 
         callInst->addOpnd(outArg);                                    // add the opnd in call opnds list (for data flow analysis)
     }
@@ -1996,18 +2355,23 @@ void IpfInstCodeSelector::zxt(CG_OpndHandle *src_, int16 refSize, Completer srcS
 
 //----------------------------------------------------------------------------//
 // If opnd is imm this method generates "mov" from imm to gr
-
+// if imm==0 then return r0
+//
 RegOpnd *IpfInstCodeSelector::toRegOpnd(CG_OpndHandle *opnd_) {
 
     if(((Opnd *)opnd_)->isReg()) return (RegOpnd *)opnd_;
     IPF_ASSERT(((Opnd *)opnd_)->isImm());
 
     Opnd     *opnd    = (Opnd *)opnd_;
-    RegOpnd  *dst     = opndManager->newRegOpnd(OPND_G_REG, DATA_I64);
-    InstCode instCode = opnd->isFoldableImm(22) ? INST_MOV : INST_MOVL;
-    
-    addNewInst(instCode, p0, dst, opnd);
-    return dst;
+    if (opnd->getValue()==0) {
+        return opndManager->getR0();
+    } else {
+        RegOpnd  *dst     = opndManager->newRegOpnd(OPND_G_REG, DATA_I64);
+        InstCode instCode = opnd->isFoldableImm(22) ? INST_MOV : INST_MOVL;
+        
+        addNewInst(instCode, p0, dst, opnd);
+        return dst;
+    }
 }
 
 //----------------------------------------------------------------------------//
@@ -2084,8 +2448,7 @@ void IpfInstCodeSelector::sub(RegOpnd *dst, CG_OpndHandle *src1_, CG_OpndHandle 
 
     // imm opnd must be on first position
     if(src2->isImm()) {
-        Opnd *buf = src1;
-        src1      = src2;
+        Opnd *buf = src2;
         src2      = toRegOpnd(buf);
     }
     
@@ -2120,6 +2483,8 @@ void IpfInstCodeSelector::binOp(InstCode       instCode,
     
     Opnd    *src1 = (Opnd *)src1_;
     Opnd    *src2 = (Opnd *)src2_;
+
+    IPF_ASSERT(src1->isReg() || src2->isReg());
 
     // imm opnd must be on first position
     if(src2->isImm()) {
@@ -2250,6 +2615,9 @@ void IpfInstCodeSelector::xma(InstCode      instCode,
                               CG_OpndHandle *src1, 
                               CG_OpndHandle *src2) {
 
+    IPF_ASSERT(((Opnd *)src1)->isReg());
+    IPF_ASSERT(((Opnd *)src2)->isReg());
+
     RegOpnd *f0   = opndManager->getF0();
     RegOpnd *buf1 = opndManager->newRegOpnd(OPND_F_REG, DATA_D);
     RegOpnd *buf2 = opndManager->newRegOpnd(OPND_F_REG, DATA_D);
@@ -2323,37 +2691,73 @@ void IpfInstCodeSelector::saturatingConv8(RegOpnd *dst, CG_OpndHandle *src_) {
 //      sxt4     dst = t2
 // (p1) shr.u    dst = t1, 33
 // (p2) shl      dst = t1, 31
+//
+// New code
+//             ldfd       tf = MAXINT4
+//             fcmp.lt    p11,p10 = src, tf
+// (p10)       movl       dst = 0x7fffffff
+// (p10)       cmp.ne     p10 = r0,r0
+//
+// (p11)       ldfd       tf = MININT4
+// (p11)       fcmp.gt    p11,p10 = src, tf
+// (p10)       movl       dst = 0x80000000
+//
+// (p11)       fcvt.fx    tf = src
+// (p11)       getf.sig   dst = tf
 
 void IpfInstCodeSelector::saturatingConv4(RegOpnd *dst, CG_OpndHandle *src_) {
 
+    IPF_LOG << "      saturatingConv4" << endl;
+
     IPF_ASSERT(((Opnd *)src_)->isFloating());
     
+    union {
+        float  fr;
+        uint32 gr;
+    } fval;
+    union {
+        double fr;
+        uint64 gr;
+    } dval;
+    
+    RegOpnd *r0  = opndManager->getR0();
     RegOpnd *src = (RegOpnd *)src_;
-    RegOpnd *p1  = opndManager->newRegOpnd(OPND_P_REG, DATA_P);
-    RegOpnd *p2  = opndManager->newRegOpnd(OPND_P_REG, DATA_P);
-    RegOpnd *t1  = opndManager->newRegOpnd(OPND_G_REG, DATA_U64);
-    RegOpnd *t2  = opndManager->newRegOpnd(OPND_G_REG, DATA_U64);
-    RegOpnd *tf1 = NULL;
-    RegOpnd *tf2 = NULL;
-    RegOpnd *tf3 = opndManager->newRegOpnd(OPND_F_REG, src->getDataKind());
+    RegOpnd *p11 = opndManager->newRegOpnd(OPND_P_REG, DATA_P);
+    RegOpnd *p10 = opndManager->newRegOpnd(OPND_P_REG, DATA_P);
+    RegOpnd *tf  = NULL;
+    RegOpnd *tr  = opndManager->newRegOpnd(OPND_G_REG, DATA_I64);
 
     if (src->getDataKind() == DATA_S) {
-        tf1 = (RegOpnd *)ldc_s((float)0x7fffffff);
-        tf2 = (RegOpnd *)ldc_s((float)((int) 0x80000000));
+        tf = opndManager->newRegOpnd(OPND_F_REG, DATA_S);
+        fval.fr = (float)0x7fffffff;
+        addNewInst(INST_MOVL, p0, tr, opndManager->newImm(fval.gr));
+        addNewInst(INST_SETF_S, p0, tf, tr);
     } else {
-        tf1 = (RegOpnd *)ldc_d((double)0x7fffffff);
-        tf2 = (RegOpnd *)ldc_d((double)((int) 0x80000000));
+        tf = opndManager->newRegOpnd(OPND_F_REG, DATA_D);
+        dval.fr = (double)0x7fffffff;
+        addNewInst(INST_MOVL, p0, tr, opndManager->newImm(dval.gr));
+        addNewInst(INST_SETF_D, p0, tf, tr);
     }
+    addNewInst(INST_FCMP, CMPLT_CMP_CREL_LT, p0, p11, p10, src, tf);
+    addNewInst(INST_MOVL, p10, dst, opndManager->newImm(0x7fffffff));
+    addNewInst(INST_CMP, CMPLT_CMP_CREL_NE, p10, p10, p0, r0, r0);
 
-    sxt(src, 8);    // sxt src if appropriate
-    addNewInst(INST_MOV, p0, t1, opndManager->newImm(-1));
-    addNewInst(INST_FCVT_FX_TRUNC, p0, tf3, src);
-    addNewInst(INST_FCMP, CMPLT_CMP_CREL_GT, p0, p1, p0, src, tf1);
-    addNewInst(INST_FCMP, CMPLT_CMP_CREL_LT, p0, p2, p0, src, tf2);
-    addNewInst(INST_GETF_SIG, p0, t2, tf3);
-    addNewInst(INST_SXT, CMPLT_XSZ_4, p0, dst, t2);
-    addNewInst(INST_SHR_U, p1, dst, t1, opndManager->newImm(33));
-    addNewInst(INST_SHL, p2, dst, t1, opndManager->newImm(31));
+    if (src->getDataKind() == DATA_S) {
+        fval.fr = (float)((int)0x80000000);
+        addNewInst(INST_MOVL, p11, tr, opndManager->newImm(fval.gr));
+        addNewInst(INST_SETF_S, p11, tf, tr);
+    } else {
+        tf = opndManager->newRegOpnd(OPND_F_REG, DATA_D);
+        dval.fr = (double)((int) 0x80000000);
+        addNewInst(INST_MOVL, p11, tr, opndManager->newImm(dval.gr));
+        addNewInst(INST_SETF_D, p11, tf, tr);
+    }
+    addNewInst(INST_FCMP, CMPLT_CMP_CREL_GT, p11, p11, p10, src, tf);
+    addNewInst(INST_MOVL, p10, dst, opndManager->newImm(0x80000000));
+
+    addNewInst(INST_FCVT_FX_TRUNC, p11, tf, src);
+    addNewInst(INST_GETF_SIG, p11, dst, tf);
+
 }
 
 //----------------------------------------------------------------------------//
@@ -2375,6 +2779,12 @@ void IpfInstCodeSelector::divInt(RegOpnd *dst, CG_OpndHandle *src1, CG_OpndHandl
 
     sxt(src1, 8);
     sxt(src2, 8);
+
+    addNewInst(INST_DEF,                    p0,f6 );
+    addNewInst(INST_DEF,                    p0,f7 );
+    addNewInst(INST_DEF,                    p0,f8 );
+    addNewInst(INST_DEF,                    p0,f9 );
+    addNewInst(INST_DEF,                    p0,f10);
     
     addNewInst(INST_SETF_SIG, p0, f10, src1);
     addNewInst(INST_SETF_SIG, p0, f9,  src2);
@@ -2410,9 +2820,9 @@ void IpfInstCodeSelector::divLong(RegOpnd *dst, CG_OpndHandle *src1, CG_OpndHand
     IPF_ASSERT(((Opnd *)src1)->isReg());
     IPF_ASSERT(((Opnd *)src2)->isReg());
     
-    RegOpnd *p6   = opndManager->newRegOpnd(OPND_P_REG, DATA_P);
     RegOpnd *f0   = opndManager->getF0();
     RegOpnd *f1   = opndManager->getF1();
+    RegOpnd *p6   = opndManager->newRegOpnd(OPND_P_REG, DATA_P);
     RegOpnd *f6   = opndManager->newRegOpnd(OPND_F_REG, DATA_D);
     RegOpnd *f7   = opndManager->newRegOpnd(OPND_F_REG, DATA_D);
     RegOpnd *f8   = opndManager->newRegOpnd(OPND_F_REG, DATA_D);
@@ -2421,6 +2831,12 @@ void IpfInstCodeSelector::divLong(RegOpnd *dst, CG_OpndHandle *src1, CG_OpndHand
 
     sxt(src1, 8);
     sxt(src2, 8);
+
+    addNewInst(INST_DEF,                    p0,f6 );
+    addNewInst(INST_DEF,                    p0,f7 );
+    addNewInst(INST_DEF,                    p0,f8 );
+    addNewInst(INST_DEF,                    p0,f9 );
+    addNewInst(INST_DEF,                    p0,f10);
     
     addNewInst(INST_SETF_SIG, p0, f10, src1);
     addNewInst(INST_SETF_SIG, p0, f9, src2);
@@ -2496,6 +2912,18 @@ void IpfInstCodeSelector::divDouble(RegOpnd *dst, CG_OpndHandle *src1, CG_OpndHa
         //  Group 6
         //      (pX) fma.d.s0   fRes  = fr,fy3,fq3
         //
+        addNewInst(INST_DEF,                    p0, fe );
+        addNewInst(INST_DEF,                    p0, fq0);
+        addNewInst(INST_DEF,                    p0, fq1);
+        addNewInst(INST_DEF,                    p0, fe2);
+        addNewInst(INST_DEF,                    p0, fy1);
+        addNewInst(INST_DEF,                    p0, fe4);
+        addNewInst(INST_DEF,                    p0, fq2);
+        addNewInst(INST_DEF,                    p0, fy2);
+        addNewInst(INST_DEF,                    p0, fq3);
+        addNewInst(INST_DEF,                    p0, fy3);
+        addNewInst(INST_DEF,                    p0, fr );
+
         addNewInst(INST_FRCPA,                CMPLT_SF0, p0, fRes, pX,   fA,   fB);
 
         addNewInst(INST_FNMA,                 CMPLT_SF1, pX, fe,   fRes, fB,   f1);
@@ -2542,8 +2970,8 @@ void IpfInstCodeSelector::divFloat(RegOpnd *dst, CG_OpndHandle *src1, CG_OpndHan
         RegOpnd *f1 = opndManager->getF1();
 
         RegOpnd *fRes = dst, *fA = (RegOpnd *)src1, *fB = (RegOpnd *)src2;
-        RegOpnd *pX = opndManager->newRegOpnd(OPND_P_REG, DATA_P);
-        RegOpnd *fe = opndManager->newRegOpnd(OPND_F_REG, DATA_F); 
+        RegOpnd *pX  = opndManager->newRegOpnd(OPND_P_REG, DATA_P);
+        RegOpnd *fe  = opndManager->newRegOpnd(OPND_F_REG, DATA_F); 
         RegOpnd *fq0 = opndManager->newRegOpnd(OPND_F_REG, DATA_F); 
         RegOpnd *fq1 = opndManager->newRegOpnd(OPND_F_REG, DATA_F); 
         RegOpnd *fe2 = opndManager->newRegOpnd(OPND_F_REG, DATA_F); 
@@ -2567,7 +2995,15 @@ void IpfInstCodeSelector::divFloat(RegOpnd *dst, CG_OpndHandle *src1, CG_OpndHan
         //      (pX) fma.d.s1   fq3   = fq2,fe4,fq2
         //      (pX) fnorm.s.s0 fRes  = fq3
         //
-        // Group 0
+
+        addNewInst(INST_DEF,                    p0, fe );
+        addNewInst(INST_DEF,                    p0, fq0);
+        addNewInst(INST_DEF,                    p0, fq1);
+        addNewInst(INST_DEF,                    p0, fe2);
+        addNewInst(INST_DEF,                    p0, fe4);
+        addNewInst(INST_DEF,                    p0, fq2);
+        addNewInst(INST_DEF,                    p0, fq3);
+        
         addNewInst(INST_FRCPA,                  CMPLT_SF0, p0, fRes, pX,   fA,   fB);
 
         addNewInst(INST_FNMA,                   CMPLT_SF1, pX, fe,   fRes, fB,   f1);

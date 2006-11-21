@@ -539,21 +539,21 @@ Inst * Encoder::resolvePseudo(Cfg & cfg, Inst * inst) {
 
             if (opndsize == 3) {
                 if (okind1 == OPND_G_REG && opnds[2]->isImm(22)) {
-                    newinst = new(mm) Inst(INST_ADDL, opnds[0], opnds[1], opnds[2]
+                    newinst = new(mm) Inst(mm, INST_ADDL, opnds[0], opnds[1], opnds[2]
                             , cfg.getOpndManager()->getR0());
                 } else if (okind1 == OPND_G_REG && opnds[2]->isImm(64)) {
-                    newinst = new(mm) Inst(INST_MOVL, opnds[0], opnds[1], opnds[2]);
+                    newinst = new(mm) Inst(mm, INST_MOVL, opnds[0], opnds[1], opnds[2]);
                 } else if (okind1 == OPND_G_REG && okind2 == OPND_G_REG 
                          && cmpls.size()==0) {
-                    newinst = new(mm) Inst(INST_ADDS, opnds[0], opnds[1]
+                    newinst = new(mm) Inst(mm, INST_ADDS, opnds[0], opnds[1]
                             , opndManager->newImm(0), opnds[2]);
                 } else if (okind1 == OPND_F_REG && okind2 == OPND_F_REG) {
-                    newinst = new(mm) Inst(INST_FMERGE_S, opnds[0], opnds[1], opnds[2], opnds[2]);
+                    newinst = new(mm) Inst(mm, INST_FMERGE_S, opnds[0], opnds[1], opnds[2], opnds[2]);
                 } else if (okind1 == OPND_B_REG && okind2 == OPND_G_REG) {
-                    newinst = new(mm) Inst(INST_MOV, opnds[0], opnds[1], opnds[2]
+                    newinst = new(mm) Inst(mm, INST_MOV, opnds[0], opnds[1], opnds[2]
                            , opndManager->newImm(0));
                 } else if (okind1 == OPND_G_REG && okind2 == OPND_A_REG) {
-                    newinst = new(mm) Inst(INST_MOV_M, opnds[0], opnds[1], opnds[2]);
+                    newinst = new(mm) Inst(mm, INST_MOV_M, opnds[0], opnds[1], opnds[2]);
                 } else if (okind1 == OPND_G_REG && okind2 == OPND_B_REG) {
                     break;
                 } else if (okind1 == OPND_A_REG
@@ -680,11 +680,11 @@ uint64 Encoder::getInstBits(InstructionType unit, Inst * inst) {
             default: assert(0); break;
             }            
 
-            if (opnds[2]->isImm(14)) {
+            if (opnds[2]->isImm(8)) {
                 x4 += 0x8;
-                return A1(x4, x2b, opnds[3]->getValue(), opnds[2]->getValue(), opnds[1]->getValue(), qp);
-            } else {
                 return A3(x4, x2b, opnds[3]->getValue(), opnds[2]->getValue(), opnds[1]->getValue(), qp);
+            } else {
+                return A1(x4, x2b, opnds[3]->getValue(), opnds[2]->getValue(), opnds[1]->getValue(), qp);
             }
         }
     case INST_CMP:
