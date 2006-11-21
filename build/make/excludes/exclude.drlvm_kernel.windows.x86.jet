@@ -9,3 +9,6 @@ java/lang/RuntimeAdditionalTest40.java
 java/lang/RuntimeAdditionalTest41.java
 java/lang/RuntimeAdditionalTest42.java
 
+java/lang/SystemExtensionTest.java
+java/lang/ObjectTest.java
+
