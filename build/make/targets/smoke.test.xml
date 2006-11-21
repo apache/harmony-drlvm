@@ -78,9 +78,28 @@ Version: $Revision: 1.4.2.11 $
             <contains string="${jit.or.interpreter}" substring="int" />
         </condition>
         <property name="int.or.jit.arg" value="" />
+        
+        <property name="exclude.file" location="./excludes/exclude.drlvm_smoke.${hy.platform}.${jit.or.interpreter}" />
+
+        <loadfile property="foo" srcFile="${exclude.file}"/>
+
+        <echo>
+        ==================================
+        Smoke tests
+        ==================================
+             
+Excluding Tests from ${exclude.file}   
+        
+${foo}
+------------------------------------------------
+        </echo>
         <for param="test">
             <fileset dir="${smoke.test.javasrc}">
-                <patternset refid="smoke.test.java.pattern" />
+               <!--  <patternset refid="smoke.test.java.pattern" /> -->
+                <include name="**/*.java"/>
+                <!-- <exclude name="**/Logger.java"/> -->
+                <excludesfile name="${exclude.file}" />
+
             </fileset>
             <sequential>
                 <basename property="filename.@{test}" file="@{test}" />
