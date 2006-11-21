@@ -7,6 +7,7 @@ classloader/StressLoader.java
 gc/FinAlloc.java
 gc/Finalizer.java
 gc/Fragment.java
+gc/LOS.java
 gc/Mark.java
 gc/MultiThreads.java
 gc/PhantomReferenceQueueTest.java
