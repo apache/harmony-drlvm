@@ -225,6 +225,9 @@ void process_special_roots(slots_vector& array) {
 }
 
 void process_special_references(reference_vector& array) {
+    if (array.empty()) return;
+    pending_finalizers = true;
+
     for(reference_vector::iterator i = array.begin();
             i != array.end(); ++i) {
         Partial_Reveal_Object *ref = *i;

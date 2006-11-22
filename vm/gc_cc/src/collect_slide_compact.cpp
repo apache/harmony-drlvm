@@ -573,6 +573,9 @@ skip:
 }
 
 void gc_slide_process_special_references(reference_vector& array) {
+    if (array.empty()) return;
+    pending_finalizers = true;
+
     for(reference_vector::iterator i = array.begin();
             i != array.end(); ++i) {
         Partial_Reveal_Object *obj = *i;
