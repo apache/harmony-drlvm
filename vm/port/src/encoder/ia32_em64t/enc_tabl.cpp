@@ -276,20 +276,29 @@ unsigned short EncoderBase::getHash(const OpcodeInfo* odesc)
     unsigned short hash = 0;
     // The hash computation, uses fast way - table selection instead of if-s.
     if (odesc->roles.count > 0) {
-        hash = kind_hash[odesc->opnds[0].kind] | 
-               size_hash[odesc->opnds[0].size];
+        OpndKind kind = odesc->opnds[0].kind;
+        OpndSize size = odesc->opnds[0].size;
+        assert(kind<COUNTOF(kind_hash));
+        assert(size<COUNTOF(size_hash));
+        hash = kind_hash[kind] | size_hash[size];
     }
 
     if (odesc->roles.count > 1) {
+        OpndKind kind = odesc->opnds[1].kind;
+        OpndSize size = odesc->opnds[1].size;
+        assert(kind<COUNTOF(kind_hash));
+        assert(size<COUNTOF(size_hash));
         hash = (hash<<HASH_BITS_PER_OPERAND) | 
-               (kind_hash[odesc->opnds[1].kind] | 
-                size_hash[odesc->opnds[1].size]);
+               (kind_hash[kind] | size_hash[size]);
     }
 
     if (odesc->roles.count > 2) {
+        OpndKind kind = odesc->opnds[2].kind;
+        OpndSize size = odesc->opnds[2].size;
+        assert(kind<COUNTOF(kind_hash));
+        assert(size<COUNTOF(size_hash));
         hash = (hash<<HASH_BITS_PER_OPERAND) | 
-               (kind_hash[odesc->opnds[2].kind] | 
-                size_hash[odesc->opnds[2].size]);
+               (kind_hash[kind] | size_hash[size]);
     }
     assert(hash <= HASH_MAX);
     return hash;
@@ -411,12 +420,12 @@ BEGIN_OPCODES()
 END_OPCODES()
 END_MNEMONIC()
 
-BEGIN_MNEMONIC(CMPXCHG, MF_AFFECTS_FLAGS, N)
+BEGIN_MNEMONIC(CMPXCHG, MF_NONE, DU_DU )
 BEGIN_OPCODES()
-    {OpcodeInfo::all, {0x0F, 0xB0, _r},         {r_m8, r8, AL},     DU_DU_DU },
-    {OpcodeInfo::all, {Size16, 0x0F, 0xB1, _r}, {r_m16, r16, AX},   DU_DU_DU },
-    {OpcodeInfo::all, {0x0F, 0xB1, _r},         {r_m32, r32, EAX},   DU_DU_DU},
-    {OpcodeInfo::em64t, {REX_W, 0x0F, 0xB1, _r},{r_m64, r64, RAX},   DU_DU_DU },
+    {OpcodeInfo::all, {0x0F, 0xB0, _r},         {r_m8, r8},     DU_DU },
+    {OpcodeInfo::all, {Size16, 0x0F, 0xB1, _r}, {r_m16, r16},   DU_DU },
+    {OpcodeInfo::all, {0x0F, 0xB1, _r},         {r_m32, r32},   DU_DU },
+    {OpcodeInfo::em64t, {REX_W, 0x0F, 0xB1, _r},{r_m64, r64},   DU_DU },
 END_OPCODES()
 END_MNEMONIC()
 
@@ -435,6 +444,14 @@ BEGIN_OPCODES()
     {OpcodeInfo::all, {0xF3, 0x0F, 0x58, _r},   {xmm32, xmm_m32},   DU_U},
 END_OPCODES()
 END_MNEMONIC()
+
+
+BEGIN_MNEMONIC(BSR, MF_AFFECTS_FLAGS, N)
+BEGIN_OPCODES()
+    {OpcodeInfo::all, {0x0F, 0xBD},   {r32, r_m32},   D_U},
+END_OPCODES()
+END_MNEMONIC()
+
 
 BEGIN_MNEMONIC(CALL, MF_NONE, U )
 BEGIN_OPCODES()
@@ -703,6 +720,12 @@ END_MNEMONIC()
 // ~ FPU
 //
 
+BEGIN_MNEMONIC(DIV, MF_AFFECTS_FLAGS, DU_DU_U)
+BEGIN_OPCODES()
+    {OpcodeInfo::all,   {0xF7, _6},         {EDX, EAX, r_m32},  DU_DU_U },
+END_OPCODES()
+END_MNEMONIC()
+
 BEGIN_MNEMONIC(IDIV, MF_AFFECTS_FLAGS, DU_DU_U)
 BEGIN_OPCODES()
 #if !defined(_EM64T_)
@@ -711,15 +734,19 @@ BEGIN_OPCODES()
 #endif
     {OpcodeInfo::all,   {0xF7, _7},         {EDX, EAX, r_m32},  DU_DU_U },
     {OpcodeInfo::em64t, {REX_W, 0xF7, _7},  {RDX, RAX, r_m64},  DU_DU_U },
-END_OPCODES()
+    END_OPCODES()
 END_MNEMONIC()
+
 
 BEGIN_MNEMONIC(IMUL, MF_AFFECTS_FLAGS, D_DU_U)
 BEGIN_OPCODES()
     /*{OpcodeInfo::all,   {0xF6, _5},               {AH, AL,        r_m8},  D_DU_U },
     {OpcodeInfo::all,     {Size16, 0xF7, _5},       {DX, AX,        r_m16}, D_DU_U },
-    {OpcodeInfo::all,     {0xF7, _5},               {EDX, EAX,      r_m32}, D_DU_U },
-    {OpcodeInfo::em64t,   {REX_W, 0xF7, _5},        {RDX, RAX,      r_m64}, D_DU_U },*/
+    */
+    //
+    {OpcodeInfo::all,     {0xF7, _5},               {EDX, EAX, r_m32},  D_DU_U },
+    {OpcodeInfo::em64t,   {REX_W, 0xF7, _5},        {RDX, RAX, r_m64},  D_DU_U },
+    //
     {OpcodeInfo::all,     {Size16, 0x0F, 0xAF, _r}, {r16,r_m16},        DU_U },
     {OpcodeInfo::all,     {0x0F, 0xAF, _r},         {r32,r_m32},        DU_U },
     {OpcodeInfo::em64t,   {REX_W, 0x0F, 0xAF, _r},  {r64,r_m64},        DU_U },
@@ -737,10 +764,10 @@ END_MNEMONIC()
 
 BEGIN_MNEMONIC(MUL, MF_AFFECTS_FLAGS, U )
 BEGIN_OPCODES()
-    {OpcodeInfo::all,     {0xF6, _4},           {r_m8},            U },
-    {OpcodeInfo::all,     {Size16, 0xF7, _4},   {r_m16},           U },
-    {OpcodeInfo::all,     {0xF7, _4},           {r_m32},           U },
-    {OpcodeInfo::em64t,   {REX_W, 0xF7, _4},    {r_m64},           U },
+    {OpcodeInfo::all,     {0xF6, _4},           {AX, AL, r_m8},     D_DU_U },
+    {OpcodeInfo::all,     {Size16, 0xF7, _4},   {DX, AX, r_m16},    D_DU_U },
+    {OpcodeInfo::all,     {0xF7, _4},           {EDX, EAX, r_m32},  D_DU_U },
+    {OpcodeInfo::em64t,   {REX_W, 0xF7, _4},    {RDX, RAX, r_m64},  D_DU_U },
 END_OPCODES()
 END_MNEMONIC()
 
@@ -1097,8 +1124,8 @@ DEFINE_SETcc_MNEMONIC(NLE)
 
 #undef DEFINE_SETcc_MNEMONIC
 
-#define DEFINE_SHIFT_MNEMONIC( nam, slash_num ) \
-BEGIN_MNEMONIC(nam, MF_AFFECTS_FLAGS, DU_U) \
+#define DEFINE_SHIFT_MNEMONIC(nam, slash_num, flags) \
+BEGIN_MNEMONIC(nam, flags, DU_U) \
 BEGIN_OPCODES()\
 /*  {OpcodeInfo::all,   {0xD0, slash_num},              {r_m8,  const_1},   DU_U },*/\
     {OpcodeInfo::all,   {0xD2, slash_num},              {r_m8,  CL},        DU_U },\
@@ -1119,23 +1146,28 @@ BEGIN_OPCODES()\
 END_OPCODES()\
 END_MNEMONIC()
 
-DEFINE_SHIFT_MNEMONIC(SAL, _4)
-DEFINE_SHIFT_MNEMONIC(SAR, _7)
-DEFINE_SHIFT_MNEMONIC(SHR, _5)
-DEFINE_SHIFT_MNEMONIC(ROR, _1)
+
+DEFINE_SHIFT_MNEMONIC(ROL, _0, MF_AFFECTS_FLAGS)
+DEFINE_SHIFT_MNEMONIC(ROR, _1, MF_AFFECTS_FLAGS)
+DEFINE_SHIFT_MNEMONIC(RCL, _2, MF_AFFECTS_FLAGS|MF_USES_FLAGS)
+DEFINE_SHIFT_MNEMONIC(RCR, _3, MF_AFFECTS_FLAGS|MF_USES_FLAGS)
+
+DEFINE_SHIFT_MNEMONIC(SAL, _4, MF_AFFECTS_FLAGS)
+DEFINE_SHIFT_MNEMONIC(SHR, _5, MF_AFFECTS_FLAGS)
+DEFINE_SHIFT_MNEMONIC(SAR, _7, MF_AFFECTS_FLAGS)
 
 #undef DEFINE_SHIFT_MNEMONIC
+
 BEGIN_MNEMONIC(SHLD, MF_AFFECTS_FLAGS, N)
-// TODO: the def/use info is worng
 BEGIN_OPCODES()
-    {OpcodeInfo::all,     {0x0F, 0xA5},   {r_m32, r32, CL}, DU_DU_U },
+    {OpcodeInfo::all,     {0x0F, 0xA5},   {r_m32, r32, ECX}, DU_DU_U },
 END_OPCODES()
 END_MNEMONIC()
 
 BEGIN_MNEMONIC(SHRD, MF_AFFECTS_FLAGS, N)
 // TODO: the def/use info is wrong
 BEGIN_OPCODES()
-    {OpcodeInfo::all,     {0x0F, 0xAD},   {r_m32, r32, CL}, DU_DU_U },
+    {OpcodeInfo::all,     {0x0F, 0xAD},   {r_m32, r32, ECX}, DU_DU_U },
 END_OPCODES()
 END_MNEMONIC()
 
@@ -1272,6 +1304,34 @@ BEGIN_OPCODES()
 END_OPCODES()
 END_MNEMONIC()
 
+/*
+MOVS is a special case. 
+Most the code in both CG and Encoder do not expect 2 memory operands. 
+Also, they are not supposed to setup constrains on which register the 
+memory reference must reside - m8,m8 or m32,m32 is not the choice.
+We can't use r8,r8 either - will have problem with 8bit EDI, ESI.
+So, as the workaround we do r32,r32 and specify size of the operand through
+the specific mnemonic - the same is in the codegen.
+*/
+BEGIN_MNEMONIC(MOVS8, MF_NONE, DU_DU_DU)
+BEGIN_OPCODES()
+    {OpcodeInfo::ia32,  {0xA4},         {r32,r32,ECX},    DU_DU_DU },
+END_OPCODES()
+END_MNEMONIC()
+
+BEGIN_MNEMONIC(MOVS16, MF_NONE, DU_DU_DU)
+BEGIN_OPCODES()
+    {OpcodeInfo::ia32,  {Size16, 0xA5}, {r32,r32,ECX},  DU_DU_DU },
+END_OPCODES()
+END_MNEMONIC()
+
+BEGIN_MNEMONIC(MOVS32, MF_NONE, DU_DU_DU)
+BEGIN_OPCODES()
+    {OpcodeInfo::ia32,  {0xA5},         {r32,r32,ECX},  DU_DU_DU },
+END_OPCODES()
+END_MNEMONIC()
+
+
 BEGIN_MNEMONIC(WAIT, MF_AFFECTS_FLAGS, N)
 BEGIN_OPCODES()
     {OpcodeInfo::all,     {0x9B},         {},       N },
@@ -1353,7 +1413,7 @@ void EncoderBase::buildMnemonicDesc(const MnemonicInfo * minfo)
             unsigned opcod = oinfo.opcode[j];
             unsigned kind = opcod&OpcodeByteKind_KindMask;
             if (kind == OpcodeByteKind_REX_W) {
-              odesc.opcode[odesc.opcode_len++] = (unsigned char)0x48;
+                odesc.opcode[odesc.opcode_len++] = (unsigned char)0x48;
                 continue;
             }
             else if(kind != 0 && kind != OpcodeByteKind_ZeroOpcodeByte) {
@@ -1373,12 +1433,13 @@ void EncoderBase::buildMnemonicDesc(const MnemonicInfo * minfo)
                 assert((odesc.aux1 & OpcodeByteKind_KindMask) != 0);
             }
         }
-        else if (oinfo.roles.count==2) {
+        else if (oinfo.roles.count>=2) {
             if (((oinfo.opnds[0].kind&OpndKind_Mem) && 
                  (isRegKind(oinfo.opnds[1].kind))) ||
                 ((oinfo.opnds[1].kind&OpndKind_Mem) && 
                  (isRegKind(oinfo.opnds[0].kind)))) {
                  // Example: MOVQ xmm1, xmm/m64 has only opcodes
+                 // same with SHRD
                  // Adding fake /r
                  odesc.aux0 = _r;
             }
@@ -1430,7 +1491,8 @@ void EncoderBase::buildMnemonicDesc(const MnemonicInfo * minfo)
        
         //
         // check whether the operand info is a mask (i.e. r_m*).
-        // in this case, split the info to have separate entries for 'r' and for 'm'. 
+        // in this case, split the info to have separate entries for 'r' 
+        // and for 'm'.
         // the good news is that there can be only one such operand.
         // 
         int opnd2split = -1;

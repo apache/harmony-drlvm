@@ -25,6 +25,7 @@
 #include "Log.h"
 #include "Ia32Printer.h"
 #include "Ia32CodeGenerator.h"
+#include "Dominator.h"
 #include "float.h"
 #include <math.h>
 
@@ -422,7 +423,7 @@ Inst * IRManager::newI8PseudoInst(Mnemonic mnemonic, uint32 defCount,
     if (opnd0!=NULL){       opnds[i] = opnd0; i++;
     if (opnd1!=NULL){       opnds[i] = opnd1; i++;
     if (opnd2!=NULL){       opnds[i] = opnd2; i++;
-    if (opnd3!=NULL){       opnds[i] = opnd3; i++;      assert(opnd3->getSize()==OpndSize_64);
+    if (opnd3!=NULL){       opnds[i] = opnd3; i++;
     }}}};   
     inst->defOpndCount=defCount;
     inst->opndCount = i;
@@ -2204,6 +2205,21 @@ void SessionAction::debugOutput(const char * subKind)
         printDot(subKind);
         printDot(subKind, "liveness");
     }
+}
+
+void SessionAction::computeDominators(void)
+{
+    ControlFlowGraph* cfg = irManager->getFlowGraph();
+    DominatorTree* dominatorTree = cfg->getDominatorTree();
+    if(dominatorTree != NULL && dominatorTree->isValid()) {
+        // Already valid.
+        return;
+    }
+    static CountTime computeDominatorsTimer("ia32::helper::computeDominators");
+    AutoTimer tm(computeDominatorsTimer);
+    DominatorBuilder db;
+    dominatorTree = db.computeDominators(irManager->getMemoryManager(), cfg,false,true);
+    cfg->setDominatorTree(dominatorTree);
 }
 
 

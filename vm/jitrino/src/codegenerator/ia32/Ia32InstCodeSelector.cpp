@@ -804,13 +804,22 @@ Opnd * InstCodeSelector::divOp(DivOp::Types   opType, bool rem, Opnd * src1, Opn
             srcOpnd2=(Opnd*)convert(src2, dstType);
 
 #ifndef _EM64T_
+            //
+            // NOTE: as we don't have IREM mnemonic, then generate I8Inst 
+            // with IDIV mnemonic. The 4th fake non-zero argument means 
+            // what we really need REM, not DIV.
+            // This is handled specially in I8Lowerer. 
+            // The scheme with the fake arg looks ugly, might need to 
+            // reconsider.
+            //
+            Opnd* fakeReminderFlag = NULL;
             if (rem) {
-                Opnd * args[]={ srcOpnd1, srcOpnd2 };
-                CallInst * callInst=irManager.newRuntimeHelperCallInst(CompilationInterface::Helper_RemI64, 2, args, dst);
-                appendInsts(callInst);
-            } else {
-                appendInsts(irManager.newI8PseudoInst(Mnemonic_IDIV, 1, dst,srcOpnd1,srcOpnd2));
+                Type* int32type = irManager.getTypeFromTag(Type::Int32);
+                fakeReminderFlag = irManager.newImmOpnd(int32type, 12345678);
             }
+            Inst* ii = irManager.newI8PseudoInst(Mnemonic_IDIV, 1, dst, srcOpnd1, srcOpnd2, fakeReminderFlag);
+            appendInsts(ii);
+            
 #else
             Opnd * dstOpnd0=irManager.newOpnd(dstType);
             Opnd * dstOpnd1=irManager.newOpnd(dstType);

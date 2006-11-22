@@ -62,7 +62,9 @@ void DCE::runImpl()
             irManager->getLiveAtExit(node, ls);
             for (Inst * inst=(Inst*)node->getLastInst(), * prevInst=NULL; inst!=NULL; inst=prevInst){
                 prevInst=inst->getPrevInst();
-                bool deadInst=!inst->hasSideEffect();
+                // Prevent debug traps or instructions with side effects
+                // like (MOVS) from being removed.
+                bool deadInst=!inst->hasSideEffect() && (inst->getMnemonic() != Mnemonic_INT3);
                 if (deadInst){
                     if (inst->hasKind(Inst::Kind_CopyPseudoInst)){
                         Opnd * opnd=inst->getOpnd(1);

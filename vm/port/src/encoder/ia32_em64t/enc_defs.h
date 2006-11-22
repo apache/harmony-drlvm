@@ -407,6 +407,9 @@ Mnemonic_ADD,                           // Add
 Mnemonic_ADDSD,                         // Add Scalar Double-Precision Floating-Point Values
 Mnemonic_ADDSS,                         // Add Scalar Single-Precision Floating-Point Values
 Mnemonic_AND,                           // Logical AND
+
+Mnemonic_BSR,                           // Bit scan reverse
+
 Mnemonic_CALL,                          // Call Procedure
 Mnemonic_CWD, Mnemonic_CDQ=Mnemonic_CWD,// Convert Word to Doubleword/Convert Doubleword to Qua T dword
 Mnemonic_CMOVcc,                        // Conditional Move
@@ -484,6 +487,7 @@ Mnemonic_FST,                           // Store Floating Point Value
 Mnemonic_FSTP,                          // Store Floating Point Value and pop the FP stack
 
 Mnemonic_XCHG,
+Mnemonic_DIV,                           // Unsigned Divide
 Mnemonic_IDIV,                          // Signed Divide
 Mnemonic_MUL,                           // Unsigned Multiply
 Mnemonic_IMUL,                          // Signed Multiply
@@ -513,8 +517,12 @@ Mnemonic_LOOPE,                          // Loop according to ECX counter
 Mnemonic_LOOPNE, Mnemonic_LOOPNZ = Mnemonic_LOOPNE, // Loop according to ECX 
 Mnemonic_LAHF,                          // Load Flags into AH
 Mnemonic_MOV,                           // Move
-Mnemonic_MOVQ,                          // Move Quadword
 Mnemonic_MOVD,                          // Move Double word
+Mnemonic_MOVQ,                          // Move Quadword
+/*Mnemonic_MOVS,                          // Move Data from String to String*/
+// MOVS is a special case: see encodign table for more details,
+Mnemonic_MOVS8, Mnemonic_MOVS16, Mnemonic_MOVS32,
+//
 Mnemonic_MOVSD,                         // Move Scalar Double-Precision Floating-Point Value
 Mnemonic_MOVSS,                         // Move Scalar Single-Precision Floating-Point Values
 Mnemonic_MOVSX,                         // Move with Sign-Extension
@@ -562,6 +570,9 @@ Mnemonic_SETcc,                         // Set Byte on Condition
 Mnemonic_SAL, Mnemonic_SHL=Mnemonic_SAL,// Shift left
 Mnemonic_SAR,                           // Unsigned shift right
 Mnemonic_ROR,                           // Rotate right
+Mnemonic_RCR,                           // Rotate right through CARRY flag
+Mnemonic_ROL,                           // Rotate left
+Mnemonic_RCL,                           // Rotate left through CARRY flag
 Mnemonic_SHR,                           // Signed shift right
 Mnemonic_SHRD,                          // Double Precision Shift Right
 Mnemonic_SHLD,                          // Double Precision Shift Left

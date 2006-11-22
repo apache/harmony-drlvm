@@ -324,6 +324,9 @@ void IRPrinter::printInst(const Inst * inst)
 
     if (inst->hasKind(Inst::Kind_PseudoInst)){
         os<<getPseudoInstPrintName(inst->getKind());
+        if (inst->getMnemonic() != Mnemonic_Null) {
+            os<< "/" << Encoder::getMnemonicString(inst->getMnemonic());
+        }
     }else{
         if( inst->getMnemonic() != Mnemonic_Null )
             os<< Encoder::getMnemonicString( inst->getMnemonic() );

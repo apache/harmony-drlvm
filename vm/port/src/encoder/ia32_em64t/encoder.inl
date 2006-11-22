@@ -129,8 +129,6 @@ ENCODER_DECLARE_EXPORT char * cmpxchg(char * stream, const RM_Opnd & rm, const R
     EncoderBase::Operands args;
     add_rm(args, rm, sz);
     add_r(args, r, sz);
-    RegName implicitReg = getAliasReg(RegName_EAX, map_size(sz));
-    args.add(implicitReg);
     return (char*)EncoderBase::encode(stream, Mnemonic_CMPXCHG, args);
 }
 
@@ -252,6 +250,8 @@ ENCODER_DECLARE_EXPORT char * shift(char * stream, Shift_Opcode shc, const RM_Op
 // multiply instructions: mul, imul
 ENCODER_DECLARE_EXPORT char * mul(char * stream, const RM_Opnd & rm, Opnd_Size sz) {
     EncoderBase::Operands args;
+    args.add(RegName_EDX);
+    args.add(RegName_EAX);
     add_rm(args, rm, sz);
     return (char*)EncoderBase::encode(stream, Mnemonic_MUL, args);
 }

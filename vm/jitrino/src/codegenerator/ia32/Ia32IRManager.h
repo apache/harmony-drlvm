@@ -617,7 +617,10 @@ protected:
 
     Optional, defaults to all possible side effects */
     virtual uint32 getSideEffects()const;
-
+    /**
+     * Forces dominator tree to be valid
+     */
+    void computeDominators(void);
     virtual bool verify(bool force=false);
 
     virtual void debugOutput(const char * subKind);
