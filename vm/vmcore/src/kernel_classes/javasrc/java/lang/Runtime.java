@@ -151,11 +151,13 @@ public class Runtime
             private final native void close0(long handle) throws IOException;
 
             public final synchronized void close() throws IOException {
+                if (streamHandle == -1) return;
                 close0(streamHandle);
+                streamHandle = -1;
             }
 
             protected void finalize() throws Throwable {
-                close0(streamHandle);
+                close();
             }
         }
 
@@ -238,11 +240,13 @@ public class Runtime
             private final native void close0(long handle);
 
             public final synchronized void close() throws IOException {
+                if (streamHandle == -1) return;
                 close0(streamHandle);
+                streamHandle = -1;
             }
 
             protected void finalize() throws Throwable {
-                close0(streamHandle);
+                close();
             }
         }
 
