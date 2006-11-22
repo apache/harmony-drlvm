@@ -49,18 +49,19 @@ class SessionAction;
 
     // to select which byte code translator optimizations are done
 struct TranslatorFlags {
-    bool propValues       : 1;    // do value propagation
-    bool inlineMethods    : 1;    // do method inlining
-    bool guardedInlining  : 1;    // a step further for inlining
-    bool genCharArrayCopy : 1;    // generate intrinsic calls to CharArrayCopy
-    bool genArrayCopy     : 1;    // inline java/lang/System::arraycopy call
-    bool onlyBalancedSync : 1;    // treat all method synchronization as balanced
-    bool ignoreSync       : 1;    // do not generate monitor enter/exit instructions
-    bool syncAsEnterFence : 1;    // implement monitor enter as enter fence and
-    bool newCatchHandling : 1;    // use fix for catch handler ordering problem
-    bool genMinMaxAbs     : 1;    // gen min/max/abs opcodes instead of using select
-    bool genFMinMaxAbs    : 1;    // gen min/max/abs opcodes for floats
-    bool optArrayInit     : 1;    // skip array initializers from optimizations
+    bool propValues         : 1;    // do value propagation
+    bool inlineMethods      : 1;    // do method inlining
+    bool guardedInlining    : 1;    // a step further for inlining
+    bool genCharArrayCopy   : 1;    // generate intrinsic calls to CharArrayCopy
+    bool genArrayCopy       : 1;    // inline java/lang/System::arraycopy call as a copying loop
+    bool genArrayCopyRepMove: 1;    // inline java/lang/System::arraycopy call as 'rep move' instruction
+    bool onlyBalancedSync   : 1;    // treat all method synchronization as balanced
+    bool ignoreSync         : 1;    // do not generate monitor enter/exit instructions
+    bool syncAsEnterFence   : 1;    // implement monitor enter as enter fence and
+    bool newCatchHandling   : 1;    // use fix for catch handler ordering problem
+    bool genMinMaxAbs       : 1;    // gen min/max/abs opcodes instead of using select
+    bool genFMinMaxAbs      : 1;    // gen min/max/abs opcodes for floats
+    bool optArrayInit       : 1;    // skip array initializers from optimizations
     Method_Table* inlineSkipTable; // do not inline these methods
 };
 

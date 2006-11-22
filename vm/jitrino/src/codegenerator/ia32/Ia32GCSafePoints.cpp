@@ -439,7 +439,16 @@ void GCSafePointsInfo::updatePairsOnInst(Inst* inst, GCSafePointPairs& res) {
             int32 offset = MPTR_OFFSET_UNKNOWN;
             assert(fromOpnd->getType()->isObject() || fromOpnd->getType()->isManagedPtr());
             uint32 useIndex2 = opnds.next(useIndex1);
-            if (useIndex2 < opnds.end()) {
+            if (inst->getMnemonic() == Mnemonic_LEA) {
+                assert(fromOpnd->isPlacedIn(OpndKind_Memory));
+                Opnd* scaleOpnd = fromOpnd->getMemOpndSubOpnd(MemOpndSubOpndKind_Scale);
+                if (scaleOpnd == NULL) {
+                    Opnd* displOpnd = fromOpnd->getMemOpndSubOpnd(MemOpndSubOpndKind_Displacement);
+                    assert(displOpnd!=NULL);
+                    offset = (int32)displOpnd->getImmValue();
+                }
+                fromOpnd = fromOpnd->getMemOpndSubOpnd(MemOpndSubOpndKind_Base);
+            } else if (useIndex2 < opnds.end()) {
                 Opnd* offsetOpnd = inst->getOpnd(useIndex2); 
                 offset = getOffsetFromImmediate(offsetOpnd);
             }
@@ -449,7 +458,10 @@ void GCSafePointsInfo::updatePairsOnInst(Inst* inst, GCSafePointPairs& res) {
     } else { // mode == MODE_2_CALC_OFFSETS   - 2 addr form
         //we can't rely on base/mptr type info here.
         //algorithm:
-        if (inst->hasKind(Inst::Kind_ControlTransferInst)) {
+        if (inst->hasKind(Inst::Kind_ControlTransferInst) ||
+            inst->getMnemonic() == Mnemonic_MOVS8         ||
+            inst->getMnemonic() == Mnemonic_MOVS16        ||
+            inst->getMnemonic() == Mnemonic_MOVS32        ) {
             //Do nothing, calls return only bases
         } else {
             Opnd* fromOpnd = NULL;
@@ -491,6 +503,7 @@ void GCSafePointsInfo::updatePairsOnInst(Inst* inst, GCSafePointPairs& res) {
                         } else {
                             offset = MPTR_OFFSET_UNKNOWN;
                         }
+                        fromOpnd = fromOpnd->getMemOpndSubOpnd(MemOpndSubOpndKind_Base);
                     }
                     break;
                 default: assert(0);
@@ -501,7 +514,7 @@ void GCSafePointsInfo::updatePairsOnInst(Inst* inst, GCSafePointPairs& res) {
             if (fromPair != NULL || offset!=0)  {//opnd is mptr -> update pairs
                 updateMptrInfoInPairs(res, opnd, fromOpnd, offset,  fromPair == NULL);
             } else {
-                //new def of base -> we must to remove all pairs where opnd acts as base or mptr 
+                //new def of base -> we must remove all pairs where opnd acts as base or mptr 
                 //the problem is that in MODE2 we do not save info about bases (no ambiguity resolution is done) 
                 //so we can't match pairs where opnd is a base. 
                 //Solution: let pairs derived from this base to live, due to the fact that 

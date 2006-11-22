@@ -276,9 +276,7 @@ uint8* Encoder::emit(uint8* stream, const Inst * inst)
             break;
         }
     }
-    if (inst->getId() == 12) {
-   //     raise(SIGTRAP);
-    }
+
     return (uint8*)EncoderBase::encode((char*)stream, mnemonic, args);
 }
 

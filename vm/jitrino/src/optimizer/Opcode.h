@@ -264,7 +264,9 @@ enum NewModifier2 {
 };
 
 enum IntrinsicCallId {
-    CharArrayCopy
+    CharArrayCopy,
+    ArrayCopyDirect,
+    ArrayCopyReverse
 };
 
 enum JitHelperCallId {

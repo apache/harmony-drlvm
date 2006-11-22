@@ -87,7 +87,8 @@ static const char* help = \
     "  propValues[={ON|off}]    -  propagate values during translation\n"\
     "  guardedInlining[={on|OFF}]  - do guarded inlining during translation\n"\
     "  genCharArrayCopy[={on|off}] - generate intrinsic calls to char array copy\n"\
-    "  genArrayCopy[={ON|off}] - inline java/lang/System::arraycopy call\n"\
+    "  genArrayCopy[={ON|off}] - inline java/lang/System::arraycopy call as a copying loop\n"\
+    "  genArrayCopyRepMove[={ON|off}] - inline java/lang/System::arraycopy call as 'rep move' instruction\n"\
     "  balancedSync[={on|OFF}] - treat all synchronization as balanced\n"\
     "  ignoreSync[={on|OFF}]   - do not generate synchronization\n"\
     "  syncAsEnterFence[={on|OFF}] - implement synchronization as monitor enter fence\n"\
@@ -115,7 +116,8 @@ void TranslatorAction::readFlags() {
     flags.genCharArrayCopy = getBoolArg("genCharArrayCopy", false); 
     flags.optArrayInit = getBoolArg("optArrayInit", true);
 #endif
-    flags.genArrayCopy = getBoolArg("genArrayCopy", true); 
+    flags.genArrayCopy = getBoolArg("genArrayCopy", false); 
+    flags.genArrayCopyRepMove = getBoolArg("genArrayCopyRepMove", true);
     flags.onlyBalancedSync = getBoolArg("balancedSync", false);
 
     flags.ignoreSync       = getBoolArg("ignoreSync",false);

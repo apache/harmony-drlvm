@@ -624,6 +624,8 @@ MemoryOptInitWalker::applyToInst(Inst *i)
             IntrinsicCallId callId = calli->getIntrinsicId();
             switch (callId) {
             case CharArrayCopy:
+            case ArrayCopyDirect:
+            case ArrayCopyReverse:
                 {
                     assert(calli->getNumSrcOperands() == 7);
 #ifndef NDEBUG
@@ -638,6 +640,8 @@ MemoryOptInitWalker::applyToInst(Inst *i)
                     Opnd *dstoffset = calli->getSrc(5);
                     Opnd *length = calli->getSrc(6);
 
+                    // effectXXXArrayElements actually does not depends on offset parameter
+                    // so we do not need any special managing for the case of reverse copying
                     thePass->effectReadArrayLength(n, i, srcarray);
                     thePass->effectReadArrayElements(n, i, srcarray, srcoffset, length);
                     thePass->effectReadArrayLength(n, i, dstarray);

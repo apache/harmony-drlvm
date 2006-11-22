@@ -2013,10 +2013,13 @@ JavaByteCodeTranslator::invokestatic(uint32 constPoolIndex) {
         returnType = typeManager.getNullObjectType();
     }
     //
-    //  Try to match to charArrayCopy
+    //  Try some optimizations for System::arraycopy(...), Min, Max, Abs...
     //
-    if (translationFlags.genArrayCopy == true &&
-        genArrayCopy(methodDesc,numArgs,srcOpnds,returnType)) {
+    if (translationFlags.genArrayCopyRepMove == true &&
+        genArrayCopyRepMove(methodDesc,numArgs,srcOpnds)) {
+        return;
+    } else if (translationFlags.genArrayCopy == true &&
+        genArrayCopy(methodDesc,numArgs,srcOpnds)) {
         return;
     } else if (translationFlags.genCharArrayCopy == true &&
         genCharArrayCopy(methodDesc,numArgs,srcOpnds,returnType)) {
@@ -2699,18 +2702,16 @@ JavaByteCodeTranslator::newFallthroughBlock() {
 }
 
 bool
-JavaByteCodeTranslator::genArrayCopy(MethodDesc * methodDesc, 
-                                     uint32       numArgs,
-                                     Opnd **      srcOpnds,
-                                     Type *       returnType) {
+JavaByteCodeTranslator::methodIsArraycopy(MethodDesc * methodDesc) {
 
-    //
-    //  Check if method is java/lang/System.arraycopy
-    //  (Object src, int srcPos, Object dst, int dstPos, int len)
-    //
-    if (strcmp(methodDesc->getName(),"arraycopy") != 0 ||
-        strcmp(methodDesc->getParentType()->getName(),"java/lang/System") !=0)
-          return false;
+    return (strcmp(methodDesc->getName(),"arraycopy") == 0 &&
+            strcmp(methodDesc->getParentType()->getName(),"java/lang/System") ==0);
+}
+
+bool
+JavaByteCodeTranslator::arraycopyOptimizable(MethodDesc * methodDesc, 
+                                             uint32       numArgs,
+                                             Opnd **      srcOpnds) {
 
     //
     //  an ArrayStoreException is thrown and the destination is not modified: 
@@ -2725,19 +2726,14 @@ JavaByteCodeTranslator::genArrayCopy(MethodDesc * methodDesc,
     //
     assert(numArgs == 5);
     Opnd * src = srcOpnds[0];
-    Opnd * srcPos = srcOpnds[1];
     Type * srcType = src->getType();
-    Type * srcPosType = srcPos->getType();
     Opnd * dst = srcOpnds[2];
-    Opnd * dstPos = srcOpnds[3];
     Type * dstType = dst->getType();
-    Type * dstPosType = dstPos->getType();
-    Opnd * len = srcOpnds[4];
     assert(srcType->isObject() &&
-           srcPosType->isInt4() &&
+           srcOpnds[1]->getType()->isInt4() && // 1 - srcPos
            dstType->isObject() &&
-           dstPosType->isInt4() &&
-           len->getType()->isInt4());
+           srcOpnds[3]->getType()->isInt4() && // 3 - dstPos
+           srcOpnds[4]->getType()->isInt4());  // 4 - length
 
     bool throwsASE = false;
     bool srcIsArray = srcType->isArray();
@@ -2762,11 +2758,190 @@ JavaByteCodeTranslator::genArrayCopy(MethodDesc * methodDesc,
         throwsASE = ! typeManager.isSubClassOf(srcElemType->getVMTypeHandle(),dstElemType->getVMTypeHandle());
     }
     if ( throwsASE )
-        return false; // reject the inlining of System::arraycopy call
+        return false;
+    else
+        return true;
+}
+
+bool
+JavaByteCodeTranslator::genArrayCopyRepMove(MethodDesc * methodDesc, 
+                                            uint32       numArgs,
+                                            Opnd **      srcOpnds) {
+
+    if( !methodIsArraycopy(methodDesc) ||
+        !arraycopyOptimizable(methodDesc,numArgs,srcOpnds) )
+    {
+        // reject the inlining of System::arraycopy call
+        return false;
+    }
+
+    if (Log::isEnabled()) {
+        Log::out() << "XXX array copy into 'rep move': ";
+        methodDesc->printFullName(Log::out());
+        Log::out() << ::std::endl;
+    }
+
+    assert(numArgs == 5);
+    Opnd * src = srcOpnds[0];
+    Opnd * srcPos = srcOpnds[1];
+    Type * srcPosType = srcPos->getType();
+    Opnd * dst = srcOpnds[2];
+    Opnd * dstPos = srcOpnds[3];
+    Type * dstPosType = dstPos->getType();
+    Opnd * len = srcOpnds[4];
+
+    //
+    //  Generate exception condition checks:
+    //      chknull src
+    //      chknull dst
+    //      cmpbr srcPos < 0, boundsException
+    //      cmpbr dstPos < 0, boundsException
+    //      cmpbr len < 0, boundsException
+    //      srcEnd = add srcPos, len
+    //      srcLen = src.length
+    //      cmpbr srcEnd > srcLen, boundsException
+    //      dstEnd = add dstPos, len
+    //      dstLen = dst.length
+    //      cmpbr dstEnd > dstLen, boundsException
+    //  Skip trivial:
+    //      cmpbr (src == dst) && (dstPos == srcPos), Exit
+    //  Choose a direction:
+    //      cmpbr (dstPos > srcPos) && (src == dst), Reverse
+    //
+    //  Intrinsic calls will be codeselected into rep move instruction.
+    //  Direct:
+    //      IntrinsicCall id=ArrayCopyDirect
+    //      goto Exit
+    //  Reverse:
+    //      srcPos = srcPos + len - 1
+    //      dstPos = dstPos + len - 1
+    //      IntrinsicCall id=ArrayCopyReverse
+    //      goto Exit
+    //
+    //  boundsException:
+    //      chkbounds -1, src
+    //  Exit:
+    //
+    Opnd *tauSrcNullChecked = irBuilder.genTauCheckNull(src);
+    Opnd *tauDstNullChecked = irBuilder.genTauCheckNull(dst);
+    Opnd *tauNullCheckedRefArgs = irBuilder.genTauAnd(tauSrcNullChecked,tauDstNullChecked);
+    
+    LabelInst * reverseCopying = irBuilder.createLabel();
+    LabelInst * boundsException = irBuilder.createLabel();
+    LabelInst * Exit = irBuilder.createLabel();
+    Type * intType = typeManager.getInt32Type();
+    Type * voidType = typeManager.getVoidType();
+
+    newFallthroughBlock();
+    Opnd * zero = irBuilder.genLdConstant((int32)0);
+    irBuilder.genBranch(Type::Int32,Cmp_GT,boundsException,zero,srcPos);        
+
+    newFallthroughBlock();
+    irBuilder.genBranch(Type::Int32,Cmp_GT,boundsException,zero,dstPos);
+
+    newFallthroughBlock();
+    irBuilder.genBranch(Type::Int32,Cmp_GT,boundsException,zero,len);
+
+    Modifier mod = Modifier(Overflow_None)|Modifier(Exception_Never)|Modifier(Strict_No);
+
+    newFallthroughBlock();   
+    Opnd * srcLen = irBuilder.genArrayLen(intType,Type::Int32,src);
+    Opnd * srcEnd = irBuilder.genAdd(intType,mod,srcPos,len);
+    irBuilder.genBranch(Type::Int32,Cmp_GT,boundsException,srcEnd,srcLen);
+    
+    newFallthroughBlock();
+    Opnd * dstEnd = irBuilder.genAdd(intType,mod,dstPos,len);
+    Opnd * dstLen = irBuilder.genArrayLen(intType,Type::Int32,dst);
+    irBuilder.genBranch(Type::Int32,Cmp_GT,boundsException,dstEnd,dstLen);
+
+    newFallthroughBlock();
+
+    // The case of same arrays and same positions
+    Opnd * diff = irBuilder.genCmp3(intType,Type::Int32,Cmp_GT,dstPos,srcPos);
+    Opnd * sameArrays = irBuilder.genCmp(intType,Type::IntPtr,Cmp_EQ,src,dst);
+    Opnd * zeroDiff = irBuilder.genCmp(intType,Type::Int32,Cmp_EQ,diff,zero);
+    Opnd * nothingToCopy = irBuilder.genAnd(intType,sameArrays,zeroDiff);
+    irBuilder.genBranch(Type::Int32,Cmp_GT,Exit,nothingToCopy,zero);
+
+    newFallthroughBlock();
+
+    Opnd* tauTypesChecked = irBuilder.genTauSafe();
+
+    // Choosing direction
+    Opnd * dstIsGreater = irBuilder.genCmp(intType,Type::Int32,Cmp_GT,diff,zero);
+    Opnd * reverseCopy = irBuilder.genAnd(intType,sameArrays,dstIsGreater);
+    irBuilder.genBranch(Type::Int32,Cmp_GT,reverseCopying,reverseCopy,zero);
+
+    newFallthroughBlock();
+
+    {   // Direct Copying
+    irBuilder.genIntrinsicCall(ArrayCopyDirect,voidType,
+                               tauNullCheckedRefArgs,
+                               tauTypesChecked,
+                               numArgs,srcOpnds);
+    irBuilder.genJump(Exit);
+    }   // End of Direct Copying
+
+    irBuilder.genLabel(reverseCopying);
+    cfgBuilder.genBlockAfterCurrent(reverseCopying);
+    {   // Reverse Copying
+
+    Opnd* minusone = irBuilder.genLdConstant((int32)-1);
+    Opnd* lastSrcIdx = irBuilder.genAdd(srcPosType,mod,srcEnd,minusone);
+    Opnd* lastDstIdx = irBuilder.genAdd(dstPosType,mod,dstEnd,minusone);
+
+    Opnd** reverseArgs = new (memManager) Opnd*[numArgs];
+    reverseArgs[0] = srcOpnds[0]; // src
+    reverseArgs[1] = lastSrcIdx;  // srcPos+len-1
+    reverseArgs[2] = srcOpnds[2]; // dst
+    reverseArgs[3] = lastDstIdx;  // dstPos+len-1
+    reverseArgs[4] = srcOpnds[4]; // len
+    // copy
+    irBuilder.genIntrinsicCall(ArrayCopyReverse,voidType,
+                               tauNullCheckedRefArgs,
+                               tauTypesChecked,
+                               numArgs,reverseArgs);
+    irBuilder.genJump(Exit);
+    }   // End of Reverse Copying
+
+    irBuilder.genLabel(boundsException);
+    cfgBuilder.genBlockAfterCurrent(boundsException);
+    Opnd * minusOne = irBuilder.genLdConstant((int32)-1);
+    irBuilder.genTauCheckBounds(src,minusOne,tauSrcNullChecked);
+
+    irBuilder.genLabel(Exit);
+    cfgBuilder.genBlockAfterCurrent(Exit);
+
+    return true;
+}
+
+bool
+JavaByteCodeTranslator::genArrayCopy(MethodDesc * methodDesc, 
+                                     uint32       numArgs,
+                                     Opnd **      srcOpnds) {
+
+    if( !methodIsArraycopy(methodDesc) ||
+        !arraycopyOptimizable(methodDesc,numArgs,srcOpnds) )
+    {
+        // reject the inlining of System::arraycopy call
+        return false;
+    }
 
     if (Log::isEnabled()) {
         Log::out() << "XXX array copy: "; methodDesc->printFullName(Log::out()); Log::out() << ::std::endl;
     }
+
+    assert(numArgs == 5);
+    Opnd * src = srcOpnds[0];
+    Type * srcType = src->getType();
+    Opnd * srcPos = srcOpnds[1];
+    Type * srcPosType = srcPos->getType();
+    Opnd * dst = srcOpnds[2];
+    Type * dstType = dst->getType();
+    Opnd * dstPos = srcOpnds[3];
+    Type * dstPosType = dstPos->getType();
+    Opnd * len = srcOpnds[4];
+
     //
     //  Generate exception condition checks:
     //      chknull src

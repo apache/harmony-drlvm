@@ -428,7 +428,9 @@ public:
     //
     IntrinsicCallOp::Id convertIntrinsicId(IntrinsicCallId callId) {
         switch(callId) {
-        case CharArrayCopy: return IntrinsicCallOp::CharArrayCopy;
+        case CharArrayCopy:      return IntrinsicCallOp::CharArrayCopy;
+        case ArrayCopyDirect:    return IntrinsicCallOp::ArrayCopyDirect;
+        case ArrayCopyReverse:   return IntrinsicCallOp::ArrayCopyReverse;
         }
         assert(0);
         return IntrinsicCallOp::CharArrayCopy; // to keep compiler quiet
@@ -894,13 +896,29 @@ public:
                 IntrinsicCallInst * call = (IntrinsicCallInst *)inst;
                 IntrinsicCallId callId = call->getIntrinsicId();
 
-                cgInst = 
-                    instructionCallback.tau_callintr(inst->getNumSrcOperands()-2, // omit taus
-                                                     genCallArgs(call,2), // omit taus
-                                                     inst->getDst()->getType(),
-                                                     convertIntrinsicId(callId),
-                                                     getCGInst(tauNullChecked),
-                                                     getCGInst(tauTypesChecked));
+                if (callId == ArrayCopyDirect)
+                {
+                    cgInst = 
+                        instructionCallback.arraycopy(inst->getNumSrcOperands()-2, // omit taus
+                                                      genCallArgs(call,2) // omit taus
+                                                     );
+                } else if (callId == ArrayCopyReverse)
+                {
+                    cgInst = 
+                        instructionCallback.arraycopyReverse(inst->getNumSrcOperands()-2, // omit taus
+                                                             genCallArgs(call,2) // omit taus
+                                                            );
+                } else {
+
+                    cgInst = 
+                        instructionCallback.tau_callintr(inst->getNumSrcOperands()-2, // omit taus
+                                                         genCallArgs(call,2), // omit taus
+                                                         inst->getDst()->getType(),
+                                                         convertIntrinsicId(callId),
+                                                         getCGInst(tauNullChecked),
+                                                         getCGInst(tauTypesChecked));
+                }
+   
             }
             break;
         case Op_JitHelperCall:

@@ -156,6 +156,7 @@ public:
     CG_OpndHandle* ldStaticAddr(Type* fieldRefType,FieldDesc *desc); 
     CG_OpndHandle* ldElemBaseAddr(CG_OpndHandle *array);
     CG_OpndHandle* addElemIndex(Type*, CG_OpndHandle *elemBase,CG_OpndHandle* index);
+    CG_OpndHandle* addElemIndexWithLEA(Type*, CG_OpndHandle *elemBase,CG_OpndHandle* index);
     CG_OpndHandle* ldElemAddr(CG_OpndHandle* array,CG_OpndHandle* index) {
         return addElemIndex(NULL,ldElemBaseAddr(array),index);
     }
@@ -215,6 +216,8 @@ public:
                              CG_OpndHandle* tauTypesChecked, InlineInfo* ii = NULL);
     CG_OpndHandle* call(uint32 numArgs, CG_OpndHandle** args, Type* retType,
                         MethodDesc *desc, InlineInfo* ii = NULL);
+    CG_OpndHandle* arraycopyReverse(uint32 numArgs, CG_OpndHandle** args);
+    CG_OpndHandle* arraycopy(uint32 numArgs, CG_OpndHandle** args);
     CG_OpndHandle* tau_call(uint32 numArgs, CG_OpndHandle** args, Type* retType,
                             MethodDesc *desc, CG_OpndHandle *nonNullFirstArgTau,
                             CG_OpndHandle *tauTypesChecked, InlineInfo* ii = NULL);

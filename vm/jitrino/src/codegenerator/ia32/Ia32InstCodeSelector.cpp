@@ -1845,6 +1845,43 @@ CG_OpndHandle*  InstCodeSelector::ldElemBaseAddr(CG_OpndHandle* array)
 //_______________________________________________________________________________________________________________
 //  Compute address of the array element given 
 //  address of the first element and index
+//  using 'LEA' instruction
+
+CG_OpndHandle*  InstCodeSelector::addElemIndexWithLEA(Type          * eType,
+                                                      CG_OpndHandle * array,
+                                                      CG_OpndHandle * index) 
+{
+    ArrayType * arrayType=((Opnd*)array)->getType()->asArrayType();
+    Type * elemType=arrayType->getElementType();
+    Type * dstType=irManager.getManagedPtrType(elemType);
+
+    uint32 elemSize = getByteSize(irManager.getTypeSize(elemType));
+
+    
+#ifdef _EM64T_
+    Type * indexType = typeManager.getInt64Type();
+    Type * offType = typeManager.getInt64Type();
+#else
+    Type * indexType = typeManager.getInt32Type();
+    Type * offType = typeManager.getInt32Type();
+#endif
+        
+    Opnd * indexOpnd = (Opnd *)index;
+    indexOpnd = convert(indexOpnd, indexType);
+    
+    Opnd * addr = irManager.newMemOpnd(dstType,(Opnd*)array, (Opnd*)index,
+                                       irManager.newImmOpnd(indexType, elemSize),
+                                       irManager.newImmOpnd(offType, arrayType->getArrayElemOffset())
+                                       );
+    Opnd * dst = irManager.newOpnd(dstType);
+    appendInsts(irManager.newInstEx(Mnemonic_LEA, 1, dst, addr));
+    return dst;
+}
+
+//_______________________________________________________________________________________________________________
+//  Compute address of the array element given 
+//  address of the first element and index
+//  using 'ADD' instruction
 
 CG_OpndHandle*  InstCodeSelector::addElemIndex(Type          * eType,
                                                CG_OpndHandle * elemBase,
@@ -2505,6 +2542,107 @@ CG_OpndHandle* InstCodeSelector::call(uint32          numArgs,
                                          InlineInfo*       ii)
 {
     return tau_call(numArgs, args, retType, desc, getTauUnsafe(), getTauUnsafe());
+}
+
+//_______________________________________________________________________________________________________________
+//  reverse copying with 'rep move' instruction
+//  start indexes (args[1] and args[3] must be prepared respectively)
+
+CG_OpndHandle* InstCodeSelector::arraycopyReverse(uint32          numArgs, 
+                                                  CG_OpndHandle** args)
+{
+
+
+    appendInsts(irManager.newInst(Mnemonic_PUSHFD));
+    appendInsts(irManager.newInst(Mnemonic_STD));
+
+    arraycopy(numArgs,args);
+
+    appendInsts(irManager.newInst(Mnemonic_POPFD));
+
+    return NULL;
+}
+
+//_______________________________________________________________________________________________________________
+//  Transforming System::arraycopy call into 'rep move'
+
+CG_OpndHandle* InstCodeSelector::arraycopy(uint32          numArgs, 
+                                           CG_OpndHandle** args)
+{
+    assert(numArgs == 5);
+    
+#ifdef _EM64T_
+    RegName counterRegName = RegName_RCX;
+    RegName srcAddrRegName = RegName_RSI;
+    RegName dstAddrRegName = RegName_RDI;
+#else
+    RegName counterRegName = RegName_ECX;
+    RegName srcAddrRegName = RegName_ESI;
+    RegName dstAddrRegName = RegName_EDI;
+#endif
+
+    // prepare counter
+    Type* counterType = typeManager.getInt32Type();
+    Opnd* counter = irManager.newRegOpnd(counterType,counterRegName);
+    copyOpnd(counter,(Opnd*)args[4]);
+
+    // prepare src position
+    Opnd* srcAddr = (Opnd*)addElemIndexWithLEA(NULL,args[0],args[1]);
+    Opnd* srcAddrReg = irManager.newRegOpnd(srcAddr->getType(),srcAddrRegName);
+    copyOpnd(srcAddrReg,srcAddr);
+
+    // prepare dst position
+    Opnd* dstAddr = (Opnd*)addElemIndexWithLEA(NULL,args[2],args[3]);
+    Opnd* dstAddrReg = irManager.newRegOpnd(dstAddr->getType(),dstAddrRegName);
+    copyOpnd(dstAddrReg,dstAddr);
+
+    // double counter if elem type is 64 bits long
+    PtrType* srcAddrType = srcAddr->getType()->asPtrType();
+    assert(srcAddrType);
+    Type::Tag tag = srcAddrType->getPointedToType()->tag;
+    Mnemonic mn = Mnemonic_NULL;
+    switch(tag) {
+        case Type::Int8   :
+        case Type::UInt8  :
+        case Type::Boolean:
+        {
+            mn = Mnemonic_MOVS8; break;
+        }
+        case Type::Char   :
+        case Type::Int16  :
+        case Type::UInt16 :
+        {
+            mn = Mnemonic_MOVS16; break;
+        }
+        case Type::IntPtr :
+        case Type::Int32  :
+        case Type::UIntPtr:
+        case Type::UInt32 :
+        case Type::Single :
+        case Type::Float  : 
+        case Type::Object  : 
+        case Type::SystemObject  : 
+        case Type::SystemString  : 
+        case Type::Array  : 
+        {
+            mn = Mnemonic_MOVS32; break;
+        }
+        case Type::Int64  :
+        case Type::UInt64 :
+        case Type::Double :
+        {
+            appendInsts(irManager.newInst(Mnemonic_SHL, counter, irManager.newImmOpnd(counterType, (int32)1)));
+            mn = Mnemonic_MOVS32; break;
+        }
+    default:
+        assert(0);
+        mn = Mnemonic_MOVS32; break;
+    }
+
+    Inst* copyInst = irManager.newInst(mn,dstAddrReg,srcAddrReg,counter);
+    copyInst->setPrefix(InstPrefix_REP);
+    appendInsts(copyInst);
+    return NULL;
 }
 
 //_______________________________________________________________________________________________________________

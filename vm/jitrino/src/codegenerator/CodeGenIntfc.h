@@ -156,7 +156,9 @@ public:
 class IntrinsicCallOp {
 public:
     enum Id {
-        CharArrayCopy
+        CharArrayCopy,
+        ArrayCopyDirect,
+        ArrayCopyReverse
     };
 };
 
@@ -267,6 +269,8 @@ public:
                                                 NamedType* vtableType) = 0;
     virtual CG_OpndHandle*  call(uint32 numArgs, CG_OpndHandle** args, Type* retType,
                                  MethodDesc *desc, InlineInfo* ii = NULL) = 0;
+    virtual CG_OpndHandle*  arraycopyReverse(uint32 numArgs, CG_OpndHandle** args) = 0;
+    virtual CG_OpndHandle*  arraycopy(uint32 numArgs, CG_OpndHandle** args) = 0;
     virtual CG_OpndHandle*  tau_call(uint32 numArgs, CG_OpndHandle** args, Type* retType,
                                      MethodDesc *desc,
                                      CG_OpndHandle *tauNullChecked,
@@ -345,6 +349,7 @@ public:
     virtual CG_OpndHandle*  ldStaticAddr(Type* fieldRefType,FieldDesc *desc) = 0;
     virtual CG_OpndHandle*  ldElemBaseAddr(CG_OpndHandle* array) = 0;
     virtual CG_OpndHandle*  addElemIndex(Type*, CG_OpndHandle *elemBase,CG_OpndHandle* index) = 0;
+    virtual CG_OpndHandle*  addElemIndexWithLEA(Type*, CG_OpndHandle *elemBase,CG_OpndHandle* index) = 0;
     virtual CG_OpndHandle*  ldElemAddr(CG_OpndHandle* array,CG_OpndHandle* index) = 0;
     // COMPRESSED_PTR note: 
     // if we are using compressed references, and ptr is Ptr<CompressedRef>, then

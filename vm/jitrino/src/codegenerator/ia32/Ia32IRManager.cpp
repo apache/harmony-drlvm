@@ -1750,6 +1750,10 @@ void IRManager::calculateStackDepth()
                             stackDepth+=getByteSize(inst->getOpnd(it)->getSize());
                         } else if (inst->getMnemonic() == Mnemonic_POP) {
                             stackDepth-=getByteSize(inst->getOpnd(it)->getSize());
+                        } else if (inst->getMnemonic() == Mnemonic_PUSHFD) {
+                            stackDepth+=4;
+                        } else if (inst->getMnemonic() == Mnemonic_POPFD) {
+                            stackDepth-=4;
                         } else if (inst->getMnemonic() == Mnemonic_CALL && ((CallInst *)inst)->getCallingConventionClient().getCallingConvention()->calleeRestoresStack()) {
                             stackDepth -= ((CallInst *)inst)->getArgStackDepth();
                         }

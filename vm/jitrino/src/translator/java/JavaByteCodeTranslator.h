@@ -317,8 +317,12 @@ private:
     void    genInvokeStatic(MethodDesc * methodDesc,uint32 numArgs,Opnd ** srcOpnds,Type * returnType);
     void    genMagic(MethodDesc * methodDesc,uint32 numArgs,Opnd ** srcOpnds,Type * returnType);
     
+    bool    methodIsArraycopy(MethodDesc * methodDesc);
+    bool    arraycopyOptimizable(MethodDesc * methodDesc, uint32 numArgs, Opnd ** srcOpnds);
+
     bool    genCharArrayCopy(MethodDesc * methodDesc,uint32 numArgs,Opnd ** srcOpnds, Type * returnType);
-    bool    genArrayCopy(MethodDesc * methodDesc,uint32 numArgs,Opnd ** srcOpnds, Type * returnType);
+    bool    genArrayCopyRepMove(MethodDesc * methodDesc,uint32 numArgs,Opnd ** srcOpnds);
+    bool    genArrayCopy(MethodDesc * methodDesc,uint32 numArgs,Opnd ** srcOpnds);
     bool    genMinMax(MethodDesc * methodDesc,uint32 numArgs,Opnd ** srcOpnds, Type * returnType);
     void    newFallthroughBlock();
 

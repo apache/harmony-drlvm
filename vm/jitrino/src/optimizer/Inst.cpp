@@ -438,6 +438,10 @@ void IntrinsicCallInst::handlePrintEscape(::std::ostream& os, char code) const {
         switch(intrinsicId) {
         case CharArrayCopy:
             os << "charArrayCopy"; break;
+        case ArrayCopyDirect:
+            os << "ArrayCopyDirect"; break;
+        case ArrayCopyReverse:
+            os << "ArrayCopyReverse"; break;
         default:
             assert(0); break;
         }
