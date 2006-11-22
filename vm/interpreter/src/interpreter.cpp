@@ -2182,7 +2182,7 @@ Opcode_JSR_W(StackFrame& frame) {
     uint32 retAddr = frame.ip + 5 - (uint8*)frame.method->get_byte_code_addr();
     frame.stack.push();
     frame.stack.pick().u = retAddr;
-    frame.stack.ref() = FLAG_OBJECT;
+    frame.stack.ref() = FLAG_RET_ADDR;
     DEBUG_BYTECODE("going to instruction");
     frame.ip += read_int32(frame.ip + 1);
 }
