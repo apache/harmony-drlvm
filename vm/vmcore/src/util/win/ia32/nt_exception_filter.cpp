@@ -333,8 +333,10 @@ static LONG NTAPI vectored_exception_handler_internal(LPEXCEPTION_POINTERS nt_ex
     if (run_default_handler) {
 #ifndef NDEBUG
         if (vm_get_boolean_property_value_with_default("vm.assert_dialog")) {
-            if (UnhandledExceptionFilter(nt_exception) == EXCEPTION_CONTINUE_SEARCH) {
-                DebugBreak();
+
+            if (IS_ERROR(code)) {
+                 if (UnhandledExceptionFilter(nt_exception) == EXCEPTION_CONTINUE_SEARCH)
+                     DebugBreak();
             }
         }
 #endif
