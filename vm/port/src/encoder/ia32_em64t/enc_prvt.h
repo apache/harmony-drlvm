@@ -145,6 +145,9 @@ enum OpcodeByteKind {
 
 #define CL          {OpndKind_GPReg, OpndSize_8, RegName_CL}
 #define ECX         {OpndKind_GPReg, OpndSize_32, RegName_ECX}
+#ifdef _EM64T_
+    #define RCX         {OpndKind_GPReg, OpndSize_64, RegName_RCX}
+#endif
 
 #define DX          {OpndKind_GPReg, OpndSize_16, RegName_DX}
 #define EDX         {OpndKind_GPReg, OpndSize_32, RegName_EDX}

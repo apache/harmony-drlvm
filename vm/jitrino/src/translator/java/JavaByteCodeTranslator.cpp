@@ -2768,6 +2768,12 @@ JavaByteCodeTranslator::genArrayCopyRepMove(MethodDesc * methodDesc,
                                             uint32       numArgs,
                                             Opnd **      srcOpnds) {
 
+#ifdef _EM64T_
+    // FIXME: this was not tested (and does not work) on EM64T.
+    if (true) {
+        return false;
+    }
+#endif
     if( !methodIsArraycopy(methodDesc) ||
         !arraycopyOptimizable(methodDesc,numArgs,srcOpnds) )
     {

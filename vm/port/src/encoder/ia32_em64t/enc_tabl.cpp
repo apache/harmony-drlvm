@@ -745,7 +745,10 @@ BEGIN_OPCODES()
     */
     //
     {OpcodeInfo::all,     {0xF7, _5},               {EDX, EAX, r_m32},  D_DU_U },
-    {OpcodeInfo::em64t,   {REX_W, 0xF7, _5},        {RDX, RAX, r_m64},  D_DU_U },
+    //todo: this opcode's hash conflicts with IMUL r64,r_m64 - they're both 0. 
+    // this particular is not currently used, so we may safely drop it, but need to 
+    // revisit the hash implementation
+    // {OpcodeInfo::em64t,   {REX_W, 0xF7, _5},        {RDX, RAX, r_m64},  D_DU_U },
     //
     {OpcodeInfo::all,     {Size16, 0x0F, 0xAF, _r}, {r16,r_m16},        DU_U },
     {OpcodeInfo::all,     {0x0F, 0xAF, _r},         {r32,r_m32},        DU_U },
@@ -1316,18 +1319,21 @@ the specific mnemonic - the same is in the codegen.
 BEGIN_MNEMONIC(MOVS8, MF_NONE, DU_DU_DU)
 BEGIN_OPCODES()
     {OpcodeInfo::ia32,  {0xA4},         {r32,r32,ECX},    DU_DU_DU },
+    {OpcodeInfo::em64t, {0xA4},         {r64,r64,RCX},    DU_DU_DU },
 END_OPCODES()
 END_MNEMONIC()
 
 BEGIN_MNEMONIC(MOVS16, MF_NONE, DU_DU_DU)
 BEGIN_OPCODES()
     {OpcodeInfo::ia32,  {Size16, 0xA5}, {r32,r32,ECX},  DU_DU_DU },
+    {OpcodeInfo::em64t, {Size16, 0xA5}, {r64,r64,RCX},  DU_DU_DU },
 END_OPCODES()
 END_MNEMONIC()
 
 BEGIN_MNEMONIC(MOVS32, MF_NONE, DU_DU_DU)
 BEGIN_OPCODES()
     {OpcodeInfo::ia32,  {0xA5},         {r32,r32,ECX},  DU_DU_DU },
+    {OpcodeInfo::em64t, {0xA5},         {r64,r64,RCX},  DU_DU_DU },
 END_OPCODES()
 END_MNEMONIC()
 
