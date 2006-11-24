@@ -78,6 +78,9 @@
                     <select os="lnx">
                         <linkerarg value="-lstdc++" />
                     </select>
+                    <select os="win">
+                        <compilerarg value="/GX" />
+                    </select>
                     <fileset dir="@{directory}">
                         <include name="**/*.cpp" />
                     </fileset>
