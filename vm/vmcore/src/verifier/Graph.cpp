@@ -66,17 +66,12 @@ vf_check_stack_deep( unsigned nodenum,       // graph node number
  */
 vf_Graph::vf_Graph( unsigned node,      // number of nodes
                     unsigned edge)      // number of edges
+                    : m_nodes(NULL), m_edges(NULL), m_enum(NULL), m_nodenum(0),
+                    m_edgenum(1), m_enummax(0), m_enumcount(0), m_free(true)
 {
-    m_local = 0;
-    m_free = true;
     m_pool = vf_create_pool();
-    m_node = (vf_Node_t*)vf_alloc_pool_memory( m_pool, node * sizeof(vf_Node_t) );
-    m_nodenum = node;
-    m_edge = (vf_Edge_t*)vf_alloc_pool_memory( m_pool, edge * sizeof(vf_Edge_t) );
-    m_edgenum = 0;
-    m_edgemem = edge;
-    m_enum = (unsigned*)vf_alloc_pool_memory( m_pool, m_nodenum * sizeof(unsigned) );
-    m_enumcount = 0;
+    CreateNodes( node );
+    CreateEdges( edge );
     return;
 } // vf_Graph::vf_Graph
 
@@ -86,17 +81,12 @@ vf_Graph::vf_Graph( unsigned node,      // number of nodes
 vf_Graph::vf_Graph( unsigned node,          // number of nodes
                     unsigned edge,          // number of edges
                     vf_VerifyPool_t *pool)  // external pool
+                    : m_nodes(NULL), m_edges(NULL), m_pool(pool), m_enum(NULL),
+                    m_nodenum(0), m_edgenum(1), m_enummax(0), m_enumcount(0),
+                    m_free(false)
 {
-    m_local = 0;
-    m_free = false;
-    m_pool = pool;
-    m_node = (vf_Node_t*)vf_alloc_pool_memory( m_pool, node * sizeof(vf_Node_t) );
-    m_nodenum = node;
-    m_edge = (vf_Edge_t*)vf_alloc_pool_memory( m_pool, edge * sizeof(vf_Edge_t) );
-    m_edgenum = 0;
-    m_edgemem = edge;
-    m_enum = (unsigned*)vf_alloc_pool_memory( m_pool, m_nodenum * sizeof(unsigned) );
-    m_enumcount = 0;
+    CreateNodes( node );
+    CreateEdges( edge );
     return;
 } // vf_Graph::vf_Graph
 
@@ -117,10 +107,73 @@ vf_Graph::~vf_Graph()
 void
 vf_Graph::CreateNodes( unsigned number )    // number of nodes
 {
-    m_node = (vf_Node_t*)vf_alloc_pool_memory( m_pool, number * sizeof(vf_Node_t) );
-    m_nodenum = number;
+    assert(number > 0);
+    vf_NodeContainer_t* nodes;
+    nodes = (vf_NodeContainer_t*)AllocMemory( sizeof(vf_NodeContainer_t)
+            + (number - 1) * sizeof(vf_Node_t) );
+    nodes->m_max = number;
+    if( m_nodes == NULL ) {
+        m_nodes = nodes;
+    } else {
+        vf_NodeContainer_t *index = m_nodes->m_next;
+        while( index->m_next ) {
+            index = index->m_next;
+        }
+        index->m_next = nodes;
+    }
     return;
 } // vf_Graph::CreateNodes
+
+/**
+ * Gets graph node.
+ */
+vf_Node_t*
+vf_Graph::GetNode( unsigned node_num )  // graph node number
+{
+    // get node
+    assert( m_nodes );
+    assert( node_num < m_nodenum );
+    unsigned count = node_num;
+    vf_NodeContainer_t* nodes = m_nodes;
+    while( count > nodes->m_max ) {
+        count -= nodes->m_max;
+        nodes = nodes->m_next;
+        assert(nodes);
+    }
+    return &nodes->m_node[count];
+} // vf_Graph::GetNode
+
+/**
+ * Creates a new node and sets data to it.
+ */
+void
+vf_Graph::NewNode( unsigned begin,      // begin code instruction of node
+                   unsigned end,        // end code instruction of node
+                   unsigned len)        // bytecode length of node
+{
+    // get node
+    assert( m_nodes );
+    unsigned count = m_nodenum;
+    vf_NodeContainer_t* nodes = m_nodes;
+    while( count > nodes->m_max ) {
+        count -= nodes->m_max;
+        nodes = nodes->m_next;
+        assert(nodes);
+    }
+
+    // set node
+    vf_Node_t* node = &nodes->m_node[count];
+    node->m_start = begin;
+    node->m_end = end;
+    node->m_len = len;
+
+    // increment nodes count
+    m_nodenum++;
+    nodes->m_used++;
+    assert( nodes->m_used <= nodes->m_max );
+
+    return;
+} // vf_Graph::NewNode
 
 /**
  * Function set data to graph node.
@@ -131,38 +184,76 @@ vf_Graph::SetNode( unsigned num,        // graph node number
                    unsigned end,        // end code instruction of node
                    unsigned len)        // bytecode length of node
 {
-    // check node number is in range.
-    assert( num < m_nodenum );
-    m_node[num].m_start = begin;
-    m_node[num].m_end = end;
-    m_node[num].m_len = len;
+    vf_Node_t* node = GetNode( num );
+    node->m_start = begin;
+    node->m_end = end;
+    node->m_len = len;
     return;
 } // vf_Graph::SetNode
 
 /**
- * Function set new edge for graph nodes.
+ * Gets graph edge.
+ */
+vf_Edge_t*
+vf_Graph::GetEdge( unsigned edge_num )  // graph edge number
+{
+    // get edge
+    assert( m_edges );
+    assert( edge_num < m_edgenum );
+    assert( edge_num );             // zero edge is reserved
+    unsigned count = edge_num;
+    vf_EdgeContainer_t* edges = m_edges;
+    while( count > edges->m_max ) {
+        count -= edges->m_max;
+        edges = edges->m_next;
+        assert(edges);
+    }
+    return &edges->m_edge[count];
+} // vf_Graph::GetEdge
+
+/**
+ * Creates a new edge for graph nodes.
  */
 void
-vf_Graph::SetNewEdge( unsigned start,   // start graph node of edge
-                      unsigned end)     // end graph node of edge
+vf_Graph::NewEdge( unsigned start,   // start graph node of edge
+                   unsigned end)     // end graph node of edge
 {
-    // check edges pool
-    assert( m_edgenum < m_edgemem );
-    // check node numbers are in range.
+    // check node numbers are in range
     assert( start < m_nodenum );
     assert( end < m_nodenum );
-    // set new edge
-    vf_Edge_t *edge = &m_edge[m_edgenum++];     // zero edge is reserved
+
+    // get edge
+    assert( m_edges );
+    unsigned count = m_edgenum;
+    vf_EdgeContainer_t* edges = m_edges;
+    while( count > edges->m_max ) {
+        count -= edges->m_max;
+        edges = edges->m_next;
+        assert(edges);
+    }
+
+    // get a new edge and edge's nodes
+    vf_Edge_t *edge = &edges->m_edge[count];
+    vf_Node_t *node_start = GetNode( start );
+    vf_Node_t *node_end = GetNode( end );
+
+    // set a new edge
     edge->m_start = start;
     edge->m_end = end;
-    edge->m_outnext = m_node[start].m_outedge;
-    m_node[start].m_outedge = m_edgenum;        // zero edge is reserved
-    m_node[start].m_outnum++;
-    edge->m_innext = m_node[end].m_inedge;
-    m_node[end].m_inedge = m_edgenum;           // zero edge is reserved
-    m_node[end].m_innum++;
+    edge->m_outnext = node_start->m_outedge;
+    node_start->m_outedge = m_edgenum;
+    node_start->m_outnum++;
+    edge->m_innext = node_end->m_inedge;
+    node_end->m_inedge = m_edgenum;
+    node_end->m_innum++;
+
+    // increment edge count
+    m_edgenum++;
+    edges->m_used++;
+    assert( edges->m_used <= edges->m_max );
+
     return;
-} // vf_Graph::SetNewEdge
+} // vf_Graph::NewEdge
 
 /**
  * Function receive first code instruction of graph node.
@@ -172,7 +263,7 @@ vf_Graph::GetNodeFirstInstr( unsigned num )     // graph node number
 {
     // check node number is in range.
     assert( num < m_nodenum );
-    return m_node[num].m_start;
+    return GetNode( num )->m_start;
 } // vf_Graph::GetNodeFirstInstr
 
 /**
@@ -183,18 +274,18 @@ vf_Graph::GetNodeLastInstr( unsigned num )      // graph node number
 {
     // check node number is in range.
     assert( num < m_nodenum );
-    return m_node[num].m_end;
+    return GetNode( num )->m_end;
 } // vf_Graph::GetNodeLastInstr
 
 /**
  * Function receive bytecode length of graph node instructions.
  */
-unsigned
+inline unsigned
 vf_Graph::GetNodeByteCodeLen( unsigned num )    // graph node number
 {
     // check node number is in range.
     assert( num < m_nodenum );
-    return m_node[num].m_len;
+    return GetNode( num )->m_len;
 } // vf_Graph::GetNodeByteCodeLen
 
 /**
@@ -205,19 +296,19 @@ vf_Graph::GetNodeStackModifier( unsigned num )  // graph node number
 {
     // check node number is in range.
     assert( num < m_nodenum );
-    return m_node[num].m_stack;
+    return GetNode( num )->m_stack;
 } // vf_Graph::GetNodeStackModifier
 
 /**
  * Function sets graph node stack modifier.
  */
-void
+inline void
 vf_Graph::SetNodeStackModifier( unsigned num,   // graph node number
                                 int stack)      // stack deep modifier
 {
     // check node number is in range.
     assert( num < m_nodenum );
-    m_node[num].m_stack = stack;
+    GetNode( num )->m_stack = stack;
     return;
 } // vf_Graph::SetNodeStackModifier
 
@@ -239,7 +330,7 @@ vf_Graph::SetNodeMark( unsigned num,    // graph node number
 {
     // check node number is in range.
     assert( num < m_nodenum );
-    m_node[num].m_mark = mark;
+    GetNode( num )->m_mark = mark;
     return;
 } // vf_Graph::SetNodeMark
 
@@ -251,18 +342,18 @@ vf_Graph::GetNodeMark( unsigned num )   // graph node number
 {
     // check node number is in range.
     assert( num < m_nodenum );
-    return m_node[num].m_mark;
+    return GetNode( num )->m_mark;
 } // vf_Graph::GetNodeMark
 
 /**
  * Function checks if node is marked.
  */
-bool
+inline bool
 vf_Graph::IsNodeMarked( unsigned num )  // graph node number
 {
     // check node number is in range.
     assert( num < m_nodenum );
-    return (m_node[num].m_mark != 0);
+    return (GetNode( num )->m_mark != 0);
 } // vf_Graph::IsNodeMarked
 
 /**
@@ -272,11 +363,37 @@ void
 vf_Graph::CleanNodesMark()
 {
     // clean node's mark
-    for( unsigned index = 0; index < m_nodenum; index++ ) {
-        m_node[index].m_mark = 0;
+    assert( m_nodes );
+    vf_NodeContainer_t* nodes = m_nodes;
+    while( nodes != NULL ) {
+        for( unsigned index = 0; index < nodes->m_used; index++ ) {
+            nodes->m_node[index].m_mark = 0;
+        }
+        nodes = nodes->m_next;
     }
     return;
 } // vf_Graph::CleanNodesMark
+
+/**
+ * Function receives IN data flow vector of node.
+ */
+vf_MapVector_t *
+vf_Graph::GetNodeInVector( unsigned node_num )      // graph node number
+{
+    assert( node_num < m_nodenum );
+    return &(GetNode( node_num )->m_invector);
+} // vf_Graph::GetNodeInVector
+
+/**
+ * Function receives OUT data flow vector of node.
+ */
+vf_MapVector_t *
+vf_Graph::GetNodeOutVector( unsigned node_num )     // graph node number
+{
+    assert( node_num <= m_nodenum );
+    return &(GetNode( node_num )->m_outvector);
+} // vf_Graph::GetNodeOutVector
+
 
 /**
  * Function creates IN data flow vector of node.
@@ -288,18 +405,18 @@ vf_Graph::SetNodeInVector( unsigned node_num,           // graph node number
 {
     assert( example );
     assert( node_num < m_nodenum );
-    vf_MapVector_t *vector = &m_node[node_num].m_invector;
+    vf_MapVector_t *vector = GetNodeInVector( node_num );
     // create and set local vector
     if( example->m_maxlocal ) {
-        vector->m_local = (vf_MapEntry_t*)vf_alloc_pool_memory( m_pool, 
-                 example->m_maxlocal * sizeof(vf_MapEntry_t) );
+        vector->m_local = (vf_MapEntry_t*)AllocMemory(example->m_maxlocal
+                                * sizeof(vf_MapEntry_t) );
         vector->m_number = example->m_number;
         vector->m_maxlocal = example->m_maxlocal;
     }
     // create and set stack vector
     if( example->m_maxstack ) {
-        vector->m_stack = (vf_MapEntry_t*)vf_alloc_pool_memory( m_pool, 
-                 example->m_maxstack * sizeof(vf_MapEntry_t) );
+        vector->m_stack = (vf_MapEntry_t*)AllocMemory( example->m_maxstack
+                                * sizeof(vf_MapEntry_t) );
         vector->m_deep = example->m_deep;
         vector->m_maxstack = example->m_maxstack;
     }
@@ -325,18 +442,18 @@ vf_Graph::SetNodeOutVector( unsigned node_num,          // graph node number
 {
     assert( example );
     assert( node_num < m_nodenum );
-    vf_MapVector_t *vector = &m_node[node_num].m_outvector;
+    vf_MapVector_t *vector = GetNodeOutVector( node_num );
     // create and set local vector
     if( example->m_maxlocal ) {
-        vector->m_local = (vf_MapEntry_t*)vf_alloc_pool_memory( m_pool, 
-                 example->m_maxlocal * sizeof(vf_MapEntry_t) );
+        vector->m_local = (vf_MapEntry_t*)AllocMemory( example->m_maxlocal
+                                    * sizeof(vf_MapEntry_t) );
         vector->m_number = example->m_number;
         vector->m_maxlocal = example->m_maxlocal;
     }
     // create and set stack vector
     if( example->m_maxstack ) {
-        vector->m_stack = (vf_MapEntry_t*)vf_alloc_pool_memory( m_pool, 
-                 example->m_maxstack * sizeof(vf_MapEntry_t) );
+        vector->m_stack = (vf_MapEntry_t*)AllocMemory( example->m_maxstack
+                                    * sizeof(vf_MapEntry_t) );
         vector->m_deep = example->m_deep;
         vector->m_maxstack = example->m_maxstack;
     }
@@ -353,33 +470,25 @@ vf_Graph::SetNodeOutVector( unsigned node_num,          // graph node number
 } // vf_Graph::SetNodeOutVector
 
 /**
- * Function receives IN data flow vector of node.
- */
-vf_MapVector_t *
-vf_Graph::GetNodeInVector( unsigned node_num )      // graph node number
-{
-    assert( node_num < m_nodenum );
-    return &m_node[node_num].m_invector;
-} // vf_Graph::GetNodeInVector
-
-/**
- * Function receives OUT data flow vector of node.
- */
-vf_MapVector_t *
-vf_Graph::GetNodeOutVector( unsigned node_num )     // graph node number
-{
-    assert( node_num <= m_nodenum );
-    return &m_node[node_num].m_outvector;
-} // vf_Graph::GetNodeOutVector
-
-/**
  * Function creates graph edges.
  */
 void
 vf_Graph::CreateEdges( unsigned number )        // number of edges
 {
-    m_edge = (vf_Edge_t*)vf_alloc_pool_memory( m_pool, number * sizeof(vf_Edge_t) );
-    m_edgemem = number;
+    assert(number > 0);
+    vf_EdgeContainer_t* edges;
+    edges = (vf_EdgeContainer_t*)AllocMemory( sizeof(vf_EdgeContainer_t)
+                    + number * sizeof(vf_Edge_t) );
+    edges->m_max = number + 1;  // zero edge is reserved
+    if( m_edges == NULL ) {
+        m_edges = edges;
+    } else {
+        vf_EdgeContainer_t *index = m_edges->m_next;
+        while( index->m_next ) {
+            index = index->m_next;
+        }
+        index->m_next = edges;
+    }
     return;
 } // vf_Graph::CreateEdges
 
@@ -390,8 +499,8 @@ unsigned
 vf_Graph::GetEdgeNextInEdge( unsigned num )     // graph node number
 {
     // zero edge is reserved
-    assert( num && num <= m_edgenum );
-    return m_edge[num - 1].m_innext;
+    assert( num && num < m_edgenum );
+    return GetEdge( num )->m_innext;
 } // vf_Graph::GetEdgeNextInEdge
 
 /**
@@ -401,8 +510,8 @@ unsigned
 vf_Graph::GetEdgeNextOutEdge( unsigned num )    // graph node number
 {
     // zero edge is reserved
-    assert( num && num <= m_edgenum );
-    return m_edge[num - 1].m_outnext;
+    assert( num && num < m_edgenum );
+    return GetEdge( num )->m_outnext;
 } // vf_Graph::GetEdgeNextOutEdge
 
 /**
@@ -412,8 +521,8 @@ unsigned
 vf_Graph::GetEdgeStartNode( unsigned num )      // graph node number
 {
     // zero edge is reserved
-    assert( num && num <= m_edgenum );
-    return m_edge[num - 1].m_start;
+    assert( num && num < m_edgenum );
+    return GetEdge( num )->m_start;
 } // vf_Graph::GetEdgeStartNode
 
 /**
@@ -423,8 +532,8 @@ unsigned
 vf_Graph::GetEdgeEndNode( unsigned num )        // graph node number
 {
     // zero edge is reserved
-    assert( num && num <= m_edgenum );
-    return m_edge[num - 1].m_end;
+    assert( num && num < m_edgenum );
+    return GetEdge( num )->m_end;
 } // vf_Graph::GetEdgeStartNode
 
 /**
@@ -434,7 +543,7 @@ unsigned
 vf_Graph::GetNodeInEdgeNumber( unsigned num )   // graph node number
 {
     assert( num < m_nodenum );
-    return m_node[num].m_innum;
+    return GetNode( num )->m_innum;
 } // vf_Graph::GetNodeInEdgeNumber
 
 /**
@@ -444,7 +553,7 @@ unsigned
 vf_Graph::GetNodeOutEdgeNumber( unsigned num )  // graph node number
 {
     assert( num < m_nodenum );
-    return m_node[num].m_outnum;
+    return GetNode( num )->m_outnum;
 } // vf_Graph::GetNodeOutEdgeNumber
 
 /**
@@ -454,7 +563,7 @@ unsigned
 vf_Graph::GetNodeFirstInEdge( unsigned num )    // graph node number
 {
     assert( num < m_nodenum );
-    return m_node[num].m_inedge;
+    return GetNode( num )->m_inedge;
 } // vf_Graph::GetNodeFirstInEdge
 
 /**
@@ -464,7 +573,7 @@ unsigned
 vf_Graph::GetNodeFirstOutEdge( unsigned num )   // graph node number
 {
     assert( num < m_nodenum );
-    return m_node[num].m_outedge;
+    return GetNode( num )->m_outedge;
 } // vf_Graph::GetNodeFirstOutEdge
 
 /**
@@ -485,21 +594,33 @@ vf_Graph::AllocMemory( unsigned size )      // memory block size
 void
 vf_Graph::SetStartCountNode( unsigned node_num )     // graph node number
 {
-    // check node number is in range.
+    // check node number is in range
+    assert( m_nodes );
     assert( node_num < m_nodenum );
- 
-    // clean node enumeration
-    for( unsigned index = 0; index < m_nodenum; index++ ) {
-        m_node[index].m_nodecount = ~0U;
-        m_enum[index] = ~0U;
+
+    // create memory
+    if( m_enummax < m_nodenum ) {
+        m_enum = (unsigned*)AllocMemory( sizeof(unsigned) * m_nodenum );
     }
+
+    // clean node enumeration
+    vf_NodeContainer_t* nodes = m_nodes;
+    unsigned count = 0;
+    while( nodes != NULL ) {
+        for( unsigned index = 0; index < nodes->m_used; index++, count++ ) {
+            nodes->m_node[index].m_nodecount = ~0U;
+            m_enum[count] = ~0U;
+        }
+        nodes = nodes->m_next;
+    }
+    assert( count == m_nodenum );
 
     // set enumeration first element;
     m_enum[0] = node_num;
     m_enumcount = 1;
 
     // set node enumeration number
-    m_node[node_num].m_nodecount = 0;
+    GetNode( node_num )->m_nodecount = 0;
     return;
 } // vf_Graph::SetStartCountNode
 
@@ -526,7 +647,7 @@ vf_Graph::SetNextCountNode( unsigned node_num )   // graph node number
     m_enum[m_enumcount] = node_num;
 
     // set node enumeration number and increase number of enumerated nodes
-    m_node[node_num].m_nodecount = m_enumcount++;
+    GetNode( node_num )->m_nodecount = m_enumcount++;
     return;
 } // vf_Graph::SetNextCountNode
 
@@ -559,7 +680,7 @@ vf_Graph::GetNodeCountElement( unsigned node_num )     // graph node number
 {
     // check node number is in range.
     assert( node_num < m_nodenum );
-    return m_node[node_num].m_nodecount;
+    return GetNode( node_num )->m_nodecount;
 } // vf_Graph::GetNodeCountElement
 
 /************************************************************
@@ -596,24 +717,24 @@ vf_Graph::DumpNode( unsigned num,           // graph node number
     vf_Edge_t *edge;
 
     // print node incoming edges
-    for( index = 0, edge = &m_edge[m_node[num].m_inedge - 1];
-        index < m_node[num].m_innum;
-        index++, edge = &m_edge[edge->m_innext - 1] )
+    for( index = 0, edge = GetEdge( GetNode( num )->m_inedge );
+        index < GetNode( num )->m_innum;
+        index++, edge = GetEdge( edge->m_innext ) )
     {
         VERIFY_DEBUG( " [" << edge->m_start << "] -->" );
     }
 
     // print node
-    if( vf_is_instruction_has_flags( &ctex->m_code[m_node[num].m_start],
+    if( vf_is_instruction_has_flags( &ctex->m_code[GetNode( num )->m_start],
                                      VF_FLAG_START_ENTRY ) )
     { // start node
-        VERIFY_DEBUG( "node[" << num << "]: " << m_node[num].m_start << "[-] start" );
-    } else if( vf_is_instruction_has_flags( &ctex->m_code[m_node[num].m_start],
+        VERIFY_DEBUG( "node[" << num << "]: " << GetNode( num )->m_start << "[-] start" );
+    } else if( vf_is_instruction_has_flags( &ctex->m_code[GetNode( num )->m_start],
                                             VF_FLAG_END_ENTRY ) )
     { // end node
-        VERIFY_DEBUG( "node[" << num << "]: " << m_node[num].m_start << "[-] end" );
+        VERIFY_DEBUG( "node[" << num << "]: " << GetNode( num )->m_start << "[-] end" );
         VERIFY_DEBUG( "-- end --" );
-    } else if( vf_is_instruction_has_flags( &ctex->m_code[m_node[num].m_start],
+    } else if( vf_is_instruction_has_flags( &ctex->m_code[GetNode( num )->m_start],
                                             VF_FLAG_HANDLER ) )
     { // handler node
         VERIFY_DEBUG( "node[" << num << "]: " << num << "handler entry" );
@@ -622,9 +743,9 @@ vf_Graph::DumpNode( unsigned num,           // graph node number
     }
 
     // print node outcoming edges
-    for( index = 0, edge = &m_edge[m_node[num].m_outedge - 1];
-        index < m_node[num].m_outnum;
-        index++, edge = &m_edge[edge->m_outnext - 1] )
+    for( index = 0, edge = GetEdge( GetNode( num )->m_outedge );
+        index < GetNode( num )->m_outnum;
+        index++, edge = GetEdge( edge->m_outnext ) )
     {
         VERIFY_DEBUG( " --> [" << edge->m_end << "]" );
     }
@@ -643,11 +764,11 @@ vf_Graph::DumpNodeInternal( unsigned num,           // graph node number
 #if _VERIFY_DEBUG
     // print node header
     VERIFY_DEBUG( "Node #" << num );
-    VERIFY_DEBUG( "Stack mod: " << m_node[num].m_stack );
+    VERIFY_DEBUG( "Stack mod: " << GetNode( num )->m_stack );
 
     // get code instructions
-    unsigned count = m_node[num].m_end - m_node[num].m_start + 1;
-    vf_Code_t *instr = &( ctex->m_code[ m_node[num].m_start ] );
+    unsigned count = GetNode( num )->m_end - GetNode( num )->m_start + 1;
+    vf_Code_t *instr = &( ctex->m_code[ GetNode( num )->m_start ] );
 
     // print node instructions
     for( unsigned index = 0; index < count; index++, instr++ ) {
@@ -667,21 +788,18 @@ vf_Graph::DumpDotGraph( vf_Context_t *ctex )        // verifier context
 {
 #if _VERIFY_DEBUG
     unsigned index;
-    char *pointer,
-         fname[1024];
 
     // get class and method name
     const char *class_name = class_get_name( ctex->m_class );
     const char *method_name = method_get_name( ctex->m_method );
+    const char *method_desc = method_get_descriptor( ctex->m_method );
 
     // create file name
-    if( !class_name || !method_name
-       || (strlen(class_name) + strlen(method_name) + 10 > 1024 ) )
-    {
-        return;
-    }
-    sprintf( fname, "%s_%s.dot", class_name, method_name );
-    pointer = fname;
+    unsigned len = strlen(class_name) + strlen(method_name)
+                        + strlen(method_desc) + 6;
+    char *fname = (char*)STD_ALLOCA(len);
+    sprintf( fname, "%s_%s%s.dot", class_name, method_name, method_desc );
+    char* pointer = fname;
     while( pointer != NULL ) {
         switch(*pointer)
         {
@@ -711,7 +829,7 @@ vf_Graph::DumpDotGraph( vf_Context_t *ctex )        // verifier context
         vf_error();
     }
     // create name of graph
-    sprintf( fname, "%s::%s", class_name, method_name );
+    sprintf( fname, "%s::%s%s", class_name, method_name, method_desc );
 
     // print graph to file
     DumpDotHeader( fname, fout );
@@ -742,7 +860,6 @@ vf_Graph::DumpDotHeader( char *graph_name,      // graph name
         << "nodesep=\".20\";" << endl
         << "page=\"8.5,11\";" << endl
         << "ratio=auto;" << endl
-        << "fontpath=\"c:\\winnt\\fonts\";" << endl
         << "node [color=lightblue2, style=filled, shape=record, "
                   << "fontname=\"Courier\", fontsize=9];" << endl
         << "label=\"" << graph_name << "\";" << endl;
@@ -763,19 +880,19 @@ vf_Graph::DumpDotNode( unsigned num,            // graph node number
     vf_Edge_t *edge;
 
     // print node to dot file
-    if( vf_is_instruction_has_flags( &ctex->m_code[m_node[num].m_start],
+    if( vf_is_instruction_has_flags( &ctex->m_code[GetNode( num )->m_start],
                                      VF_FLAG_START_ENTRY ) )
     { // start node
         out << "node" << num << " [label=\"START\", color=limegreen]" << endl;
-    } else if( vf_is_instruction_has_flags( &ctex->m_code[m_node[num].m_start],
+    } else if( vf_is_instruction_has_flags( &ctex->m_code[GetNode( num )->m_start],
                                             VF_FLAG_END_ENTRY ) )
     { // end node
         out << "node" << num << " [label=\"END\", color=orangered]" << endl;
-    } else if( vf_is_instruction_has_flags( &ctex->m_code[m_node[num].m_start],
+    } else if( vf_is_instruction_has_flags( &ctex->m_code[GetNode( num )->m_start],
                                             VF_FLAG_HANDLER ) )
     { // handler node
         out << "node" << num << " [label=\"Handler #"
-            << num << "\\n---------\\n" << "Type: #" << m_node[num].m_len
+            << num << "\\n---------\\n" << "Type: #" << GetNode( num )->m_len
             << "\", shape=ellipse, color=aquamarine]" << endl;
     } else { // another nodes
         out << "node" << num 
@@ -785,15 +902,20 @@ vf_Graph::DumpDotNode( unsigned num,            // graph node number
     }
 
     // print node outcoming edges to dot file
-    for( index = 0, edge = &m_edge[m_node[num].m_outedge - 1];
-            index < m_node[num].m_outnum;
-            index++, edge = &m_edge[edge->m_outnext - 1] )
+    for( index = 0, edge = GetEdge( GetNode( num )->m_outedge );
+            index < GetNode( num )->m_outnum;
+            index++, edge = GetEdge( edge->m_outnext ) )
     {
         out << "node" << num << " -> " << "node" << edge->m_end;
-        if( vf_is_instruction_has_flags( &ctex->m_code[m_node[edge->m_end].m_start],
+        if( vf_is_instruction_has_flags( &ctex->m_code[GetNode( edge->m_end )->m_start],
                                          VF_FLAG_HANDLER ) )
         {
             out << "[color=red]" << endl;
+        } else if( num + 1 != edge->m_end     // it's a subroutine call branch
+            && vf_is_instruction_has_flags( &ctex->m_code[GetNode( num )->m_end],
+                        VF_FLAG_SUBROUTINE ) )
+        {
+            out << "[color=blue]" << endl;
         }
         out << ";" << endl;
     }
@@ -814,11 +936,11 @@ vf_Graph::DumpDotNodeInternal( unsigned num,            // graph node number
 #if _VERIFY_DEBUG
     // print node header
     out << "Node " << num << next_node
-        << "Stack mod: " << m_node[num].m_stack << next_node;
+        << "Stack mod: " << GetNode( num )->m_stack << next_node;
 
     // get code instructions
-    unsigned count = m_node[num].m_end - m_node[num].m_start + 1;
-    vf_Code_t *instr = &( ctex->m_code[ m_node[num].m_start ] );
+    unsigned count = GetNode( num )->m_end - GetNode( num )->m_start + 1;
+    vf_Code_t *instr = &( ctex->m_code[ GetNode( num )->m_start ] );
 
     // print node instructions
     for( unsigned index = 0; index < count; index++, instr++ ) {
@@ -887,17 +1009,18 @@ vf_create_graph( vf_Context_t *ctex )   // verifier context
     code2node = (unsigned*)vf_alloc_pool_memory( ctex->m_pool, 
                             codeNum * sizeof(unsigned) );
     /** 
-     * Skip start-entry node and create handler nodes
+     * Create start-entry and handler nodes
      */
+    vGraph->NewNode( 0, 0, 0 );
     for( index = 1; index < handlcount + 1; index++ ) {
-        vGraph->SetNode( index, index, index, 0 );
+        vGraph->NewNode( index, index, 0 );
         vGraph->SetNodeStackModifier( index, 1 ); 
     }
 
     /**
-     * Fill nodes
-     * Node count consists of start-entry node and handler nodes
-     * Skip first instruction, because we create first node 
+     * Create nodes
+     * Node count begins from the first basic block after the last handler node.
+     * Skip the first instruction, because we create the first node
      * at his end instruction.
      */
     for( last = nodeCount = 1 + handlcount, index = last + 1;
@@ -907,7 +1030,7 @@ vf_create_graph( vf_Context_t *ctex )   // verifier context
         if( vf_is_begin_basic_block( &code[index] ) ) {
             // set graph nodes
             len = code[index].m_addr - code[last].m_addr;
-            vGraph->SetNode( nodeCount, last, index - 1, len );
+            vGraph->NewNode( last, index - 1, len );
             vGraph->SetNodeStackModifier( nodeCount, 
                         vf_get_node_stack_deep( &code[last], &code[index - 1] ) );
             code2node[last] = nodeCount++;
@@ -916,12 +1039,12 @@ vf_create_graph( vf_Context_t *ctex )   // verifier context
     }
     // set last node with code segment
     len = code_end - code[last].m_addr;
-    vGraph->SetNode( nodeCount, last, index - 1, len );
+    vGraph->NewNode( last, index - 1, len );
     vGraph->SetNodeStackModifier( nodeCount, 
         vf_get_node_stack_deep( &code[last], &code[index - 1] ) );
     code2node[last] = nodeCount++;
     // set exit node
-    vGraph->SetNode( nodeCount, codeNum - 1, 0, 0 );
+    vGraph->NewNode( codeNum - 1, 0, 0 );
     code2node[codeNum - 1] = nodeCount++;
     assert( ctex->m_nodeNum == nodeCount );
 
@@ -929,7 +1052,7 @@ vf_create_graph( vf_Context_t *ctex )   // verifier context
      * Create edges
      * First edge from start-entry node to first code node
      */
-    vGraph->SetNewEdge( 0, handlcount + 1 );
+    vGraph->NewEdge( 0, handlcount + 1 );
     for( index = 1; index < nodeCount - 1; index++ ) {
         codeInstr = &code[ vGraph->GetNodeLastInstr( index ) ];
         // check correct branching
@@ -952,7 +1075,7 @@ vf_create_graph( vf_Context_t *ctex )   // verifier context
                 }
 #endif // _VERIFY_DEBUG
                 node = code2node[ codeInstr->m_off[count] ];
-                vGraph->SetNewEdge( index, node );
+                vGraph->NewEdge( index, node );
             }
         } else {
             if( index + 1 == nodeCount - 1 ) {
@@ -964,14 +1087,14 @@ vf_create_graph( vf_Context_t *ctex )   // verifier context
                 result = VER_ErrorBranch;
                 goto labelEnd_createGraph; 
             }
-            vGraph->SetNewEdge( index, index + 1 );
+            vGraph->NewEdge( index, index + 1 );
         }
         // set exception handler edges
         if( codeInstr->m_handler != NULL ) {
             for( count = 0; count < handlcount; count++ ) {
                 if( codeInstr->m_handler[count] ) {
                     // set edge to exception handler entry
-                    vGraph->SetNewEdge( index, count + 1 );
+                    vGraph->NewEdge( index, count + 1 );
                 }
             }
         }

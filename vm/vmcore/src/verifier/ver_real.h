@@ -255,6 +255,7 @@ typedef enum {
     SM_DOUBLE_LO,
     SM_LONG_HI,
     SM_DOUBLE_HI,
+    SM_RETURN_ADDR,
     // additional types
     SM_COPY_0,
     SM_COPY_1,
@@ -279,7 +280,8 @@ typedef enum {
     VF_FLAG_END_ENTRY = 4,
     VF_FLAG_HANDLER = 8,
     VF_FLAG_RETURN = 16,
-    VF_FLAG_THROW = 32
+    VF_FLAG_THROW = 32,
+    VF_FLAG_SUBROUTINE = 64
 } vf_InstructionFlag_t;
 
 /**
@@ -293,6 +295,10 @@ typedef enum {
 typedef struct vf_Context vf_Context_t;
 /// Verifier code instruction structure.
 typedef struct vf_Code_s vf_Code_t;
+/// Graph node container structure
+typedef struct vf_NodeContainer_s vf_NodeContainer_t;
+/// Graph edge container structure
+typedef struct vf_EdgeContainer_s vf_EdgeContainer_t;
 /// Verifier graph structure.
 typedef struct vf_Graph vf_Graph_t;
 /// Verifier graph node structure.
@@ -337,7 +343,10 @@ typedef struct {
  */
 typedef struct {
     vf_ValidType_t *m_vtype;        ///< valid type for reference
-    unsigned m_new;                 ///< number of opcode new (for uninitialized)
+    union {
+        unsigned m_new;             ///< program count of opcode new for uninitialized
+        unsigned m_pc;              ///< program count of return address for subroutine
+    };
     union {
         unsigned short m_local;     ///< number of local variable
         unsigned short m_index;     ///< constant pool index for access check
@@ -429,6 +438,28 @@ struct vf_Edge_s
 };
 
 /**
+ * Graph node container structure.
+ */
+struct vf_NodeContainer_s
+{
+    vf_NodeContainer_t* m_next;     ///< next container
+    unsigned m_max;                 ///< max number of nodes in container
+    unsigned m_used;                ///< number of nodes in container
+    vf_Node_t m_node[1];            ///< array of container nodes
+};
+
+/**
+ * Graph edge container structure.
+ */
+struct vf_EdgeContainer_s
+{
+    vf_EdgeContainer_t* m_next;     ///< next container
+    unsigned m_max;                 ///< max number of edges in container
+    unsigned m_used;                ///< number of edges in container
+    vf_Edge_t m_edge[1];            ///< array of container edges
+};
+
+/**
  * Verifier control flow graph structure.
  */
 struct vf_Graph
@@ -466,6 +497,28 @@ public:
     void CreateNodes( unsigned count );
 
     /**
+     * Gets graph node.
+     * Parameter <i>node_num</i> must be in range.
+     *
+     * @param[in] node_num  - node number
+     *
+     * @return The pointer to node structure.
+     */
+    vf_Node_t* GetNode( unsigned node_num );
+
+    /**
+     * Creates a new node and sets data to it.
+     * Node array must have enough free space for a new element.
+     *
+     * @param[in] begin_instr   - begin code instruction of node
+     * @param[in] end_instr     - end code instruction of code
+     * @param[in] bytecode_len  - bytecode length of node instructions
+     */
+    void NewNode( unsigned begin_instr,
+                  unsigned end_instr,
+                  unsigned bytecode_len);
+
+    /**
      * Function set data to graph node.
      * @param node_num      - number of graph node
      * @param begin_instr   - begin code instruction of node
@@ -479,13 +532,24 @@ public:
                   unsigned bytecode_len );
 
     /**
-     * Function set new edge for graph nodes.
+     * Gets graph edge.
+     * Parameter <i>edge_num</i> must be in range.
+     *
+     * @param[in] edge_num  - edge number
+     *
+     * @return The pointer to edge structure.
+     */
+    vf_Edge_t* GetEdge( unsigned edge_num );
+
+    /**
+     * Creates a new edge for graph nodes.
+     *
      * @param start_node    - start edge node
      * @param end_node      - end edge node
      * @note Edge is set as out edge for start_node and as in edge for end_node.
      */
-    void SetNewEdge( unsigned start_node,
-                     unsigned end_node);
+    void NewEdge( unsigned start_node,
+                  unsigned end_node);
 
     /**
      * Function receive first code instruction of graph node.
@@ -740,6 +804,26 @@ public:
     void DumpGraph( vf_Context_t *context );
 
     /**
+     * Function dumps verifier graph in file in DOT format.
+     * @param context - current verifier context
+     * @note Function is valid in debug mode.
+     * @note File name is created from class and method names with .dot extension.
+     * @see vf_Context_t
+     */
+    void DumpDotGraph( vf_Context_t *context );
+
+private:
+    vf_NodeContainer_t *m_nodes;        ///< array of nodes
+    vf_EdgeContainer_t *m_edges;        ///< array of edges
+    vf_VerifyPool_t *m_pool;            ///< graph memory pool
+    unsigned *m_enum;                   ///< graph node enumeration structure
+    unsigned m_nodenum;                 ///< number of nodes
+    unsigned m_edgenum;                 ///< number of edges
+    unsigned m_enummax;                 ///< max number of enumerated elements
+    unsigned m_enumcount;               ///< number of enumerated elements
+    bool m_free;                        ///< need to free pool
+
+    /**
      * Function prints graph node in <code>stderr</code>.
      * @param node_num  - number of graph node
      * @param context      - current verifier context
@@ -760,14 +844,6 @@ public:
     void DumpNodeInternal( unsigned node_num,
                            vf_Context_t *context);
 
-    /**
-     * Function dumps verifier graph in file in DOT format.
-     * @param context - current verifier context
-     * @note Function is valid in debug mode.
-     * @note File name is created from class and method names with .dot extension.
-     * @see vf_Context_t
-     */
-    void DumpDotGraph( vf_Context_t *context );
 
     /**
      * Function dumps graph header in file in DOT format.
@@ -813,17 +889,6 @@ public:
      */
     void DumpDotEnd( ofstream &fout );
 
-private:
-    vf_Node_t *m_node;          ///< array of nodes
-    vf_Edge_t *m_edge;          ///< array of edges
-    vf_VerifyPool_t *m_pool;    ///< graph memory pool
-    unsigned *m_enum;           ///< graph node enumeration structure
-    unsigned m_nodenum;         ///< number of nodes
-    unsigned m_edgenum;         ///< number of edges
-    unsigned m_edgemem;         ///< number of allocted edges
-    unsigned m_local;           ///< number of locals
-    unsigned m_enumcount;       ///< number of enumerated elements
-    bool m_free;                ///< need to free pool
 }; // struct vf_Graph
 
 /**
@@ -1079,8 +1144,11 @@ public:
         m_method(NULL), m_graph(NULL), m_pool(NULL), m_code(NULL), 
         m_codeNum(0), m_nodeNum(0), m_edgeNum(0)
         {
-            vf_ContextDump zero1 = {0}; m_dump = zero1;
-            vf_ContextVType zero2 = {0}; m_vtype = zero2;
+            vf_ContextDump zero1 = {0};
+            vf_ContextVType zero2 = {0};
+
+            m_dump = zero1;
+            m_vtype = zero2;
         }
 
     /**
@@ -1122,6 +1190,7 @@ public:
      */
     struct vf_ContextDump {
         unsigned m_verify : 1;          ///< verify all flag
+        unsigned m_with_subroutine : 1; ///< verified method has subrotine
         unsigned m_constraint : 1;      ///< dump type constraints for class
         unsigned m_code : 1;            ///< print code array in stream
         unsigned m_graph : 1;           ///< print original control flow graph

@@ -127,6 +127,9 @@ vf_verify_method_bytecode( vf_Context_t *ctex )     // verifier context
     result = vf_parse_bytecode( ctex );
     if( result != VER_OK ) {
         goto labelEnd_verifyClassBytecode;
+    } else if( ctex->m_dump.m_with_subroutine ) {
+        result = VER_NoSupportJSR;
+        goto labelEnd_verifyClassBytecode;
     }
     
     /**
@@ -400,11 +403,11 @@ vf_get_single_word_branch_offset( vf_Instr_t *code,        // instruction
  * Function returns recieved offset.
  */
 static inline int
-vf_get_double_branch_offset( vf_Instr_t *code,          // instruction
-                             unsigned code_pc,          // instruction offset in bytcode array
-                             unsigned char *bytecode,   // bytecode array
-                             unsigned *index_p,         // offset index in bytecode array
-                             vf_VerifyPool_t *pool)     // memory pool
+vf_get_double_hword_branch_offset( vf_Instr_t *code,          // instruction
+                                   unsigned code_pc,          // instruction offset in bytcode array
+                                   unsigned char *bytecode,   // bytecode array
+                                   unsigned *index_p,         // offset index in bytecode array
+                                   vf_VerifyPool_t *pool)     // memory pool
 {
     // get first branch offset
     int offset = vf_get_hword_offset( code_pc, bytecode, index_p );
@@ -415,7 +418,30 @@ vf_get_double_branch_offset( vf_Instr_t *code,          // instruction
     // set second edge branch for instruction
     vf_set_instruction_offset( code, 1, (*index_p) );
     return offset;
-} // vf_get_double_branch_offset
+} // vf_get_double_hword_branch_offset
+
+/**
+ * Function receives word (4 bytes) branch offset from bytecode array and
+ * sets reseived offset and next instruction offset into instruction.
+ * Function returns recieved offset.
+ */
+static inline int
+vf_get_double_word_branch_offset( vf_Instr_t *code,          // instruction
+                                  unsigned code_pc,          // instruction offset in bytcode array
+                                  unsigned char *bytecode,   // bytecode array
+                                  unsigned *index_p,         // offset index in bytecode array
+                                  vf_VerifyPool_t *pool)     // memory pool
+{
+    // get first branch offset
+    int offset = vf_get_word_offset( code_pc, bytecode, index_p );
+    // create and set edge branchs for instruction
+    vf_create_instruction_offset( code, 2, pool );
+    // set first edge branch for instruction
+    vf_set_instruction_offset( code, 0, offset );
+    // set second edge branch for instruction
+    vf_set_instruction_offset( code, 1, (*index_p) );
+    return offset;
+} // vf_get_double_word_branch_offset
 
 /**
  * Function receives tableswitch branch from bytecode array and
@@ -652,6 +678,19 @@ vf_set_vector_stack_entry_ref( vf_MapEntry_t *vector,   // stack map vector
 } // vf_set_vector_stack_entry_ref
 
 /**
+ * Function sets return address data type for given stack map vector entry.
+ */
+static inline void
+vf_set_vector_stack_entry_addr( vf_MapEntry_t *vector,   // stack map vector
+                                unsigned num,            // vector entry number
+                                unsigned count)          // program count
+{
+    // set stack map vector entry by return address
+    vector[num].m_type = SM_RETURN_ADDR;
+    vector[num].m_pc = count;
+} // vf_set_vector_stack_entry_addr
+
+/**
  * Function sets signle word data type for given stack map vector entry.
  */
 static inline void
@@ -758,6 +797,22 @@ vf_set_vector_local_var_ref( vf_MapEntry_t *vector,     // local variable vector
     vector[num].m_local = (unsigned short)local;
     return;
 } // vf_set_vector_local_var_ref
+
+/**
+ * Function sets return address data type for given local variable vector entry.
+ */
+static inline void
+vf_set_vector_local_var_addr( vf_MapEntry_t *vector,   // stack map vector
+                              unsigned num,            // vector entry number
+                              unsigned count,          // program count
+                              unsigned local)          // number of local variable
+{
+    // set local variable vector entry to return address
+    vector[num].m_type = SM_RETURN_ADDR;
+    vector[num].m_pc = count;
+    vector[num].m_is_local = true;
+    vector[num].m_local = (unsigned short)local;
+} // vf_set_vector_local_var_addr
 
 /**
  * Function sets a given data type for a given local variable vector entry.
@@ -982,6 +1037,19 @@ vf_set_in_vector_local_var_ref( vf_Code_t *code,                // code instruct
 } // vf_set_in_vector_local_var_ref 
 
 /**
+ * Function sets return address data type for code instruction IN local variable vector entry.
+ */
+static inline void
+vf_set_in_vector_local_var_addr( vf_Code_t *code,                // code instruction
+                                 unsigned num,                   // IN vector entry number
+                                 unsigned count,                 // program count
+                                 unsigned local)                 // local variable number
+{
+    vf_set_vector_local_var_addr( code->m_invector, num, count, local );
+    return;
+} // vf_set_in_vector_local_var_addr
+
+/**
  * Function sets a given data type for code instruction IN local variable vector entry.
  */
 static inline void UNUSED
@@ -1128,6 +1196,18 @@ vf_set_out_vector_stack_entry_ref( vf_Code_t *code,         // code instruction
     vf_set_vector_stack_entry_ref( code->m_outvector, num, type );
     return;
 } // vf_set_out_vector_stack_entry_ref
+
+/**
+ * Function sets return adress data type for code instruction OUT stack map vector entry.
+ */
+static inline void
+vf_set_out_vector_stack_entry_addr( vf_Code_t *code,          // code instruction
+                                    unsigned num,             // OUT vector entry number
+                                    unsigned count)           // program coint
+{
+    vf_set_vector_stack_entry_addr( code->m_outvector, num, count );
+    return;
+} // vf_set_out_vector_stack_entry_addr
 
 /**
  * Function sets int data type for code instruction OUT local variable vector entry.
@@ -4087,21 +4167,36 @@ vf_opcode_ifxnull( vf_Code_t *code,             // code instruction
 } // vf_opcode_ifxnull
 
 /**
- * Function sets code instruction structure for opcode goto.
+ * Function sets code instruction structure for opcodes jsr and jsr_w.
  */
-static inline void UNUSED
-vf_opcode_goto( vf_Code_t *code,            // code instruction
-                vf_VerifyPool_t * pool)     // memory pool
+static inline void
+vf_opcode_jsr( vf_Code_t *code,            // code instruction
+               unsigned code_num,          // program count of instruction
+               vf_VerifyPool_t *pool)      // memory pool
 {
+    // set instruction flag
+    vf_set_instruction_flag( code, VF_FLAG_SUBROUTINE );
     // set stack modifier for instruction
-    vf_set_stack_modifier( code, -1 );
-    // set minimal stack for instruction
-    vf_set_min_stack( code, 1 );
+    vf_set_stack_modifier( code, 1 );
+    // create out vector
+    vf_new_out_vector( code, 1, pool );
+    vf_set_out_vector_stack_entry_addr( code, 0, code_num );
+    return;
+} // vf_opcode_jsr
+
+/**
+ * Function sets code instruction structure for opcode ret.
+ */
+static inline void
+vf_opcode_ret( vf_Code_t *code,              // code instruction
+               unsigned local,               // local variable number
+               vf_VerifyPool_t * pool)       // memory pool
+{
     // create in vector
     vf_new_in_vector( code, 1, pool );
-    vf_set_in_vector_stack_entry_int( code, 0 );
+    vf_set_in_vector_local_var_addr( code, 0, 0, local );
     return;
-} // vf_opcode_goto
+} // vf_opcode_ret
 
 /**
  * Function sets code instruction structure for end-entry.
@@ -4654,7 +4749,7 @@ vf_parse_bytecode( vf_Context_t *ctex )     // verifier context
         case OPCODE_IFGE:           /* 0x9c + s2 */
         case OPCODE_IFGT:           /* 0x9d + s2 */
         case OPCODE_IFLE:           /* 0x9e + s2 */
-            offset = vf_get_double_branch_offset( &codeInstr[instr], 
+            offset = vf_get_double_hword_branch_offset( &codeInstr[instr],
                             instr, bytecode, &index, pool );
             result = vf_check_branch_offset( offset, len, ctex );
             if( result != VER_OK ) {
@@ -4673,7 +4768,7 @@ vf_parse_bytecode( vf_Context_t *ctex )     // verifier context
         case OPCODE_IF_ICMPGE:      /* 0xa2 + s2 */
         case OPCODE_IF_ICMPGT:      /* 0xa3 + s2 */
         case OPCODE_IF_ICMPLE:      /* 0xa4 + s2 */
-            offset = vf_get_double_branch_offset( &codeInstr[instr], 
+            offset = vf_get_double_hword_branch_offset( &codeInstr[instr],
                             instr, bytecode, &index, pool );
             result = vf_check_branch_offset( offset, len, ctex );
             if( result != VER_OK ) {
@@ -4688,7 +4783,7 @@ vf_parse_bytecode( vf_Context_t *ctex )     // verifier context
             break;
         case OPCODE_IF_ACMPEQ:      /* 0xa5 + s2 */
         case OPCODE_IF_ACMPNE:      /* 0xa6 + s2 */
-            offset = vf_get_double_branch_offset( &codeInstr[instr], 
+            offset = vf_get_double_hword_branch_offset( &codeInstr[instr],
                             instr, bytecode, &index, pool );
             result = vf_check_branch_offset( offset, len, ctex );
             if( result != VER_OK ) {
@@ -4714,15 +4809,34 @@ vf_parse_bytecode( vf_Context_t *ctex )     // verifier context
             }
             break;
         case OPCODE_JSR:            /* 0xa8 + s2 */
-            // FIXME - JSR instruction doesn't support in current version
-            result = VER_NoSupportJSR;
-            goto labelEnd_vf_parse_bytecode;
-            //break; // remark #111: statement is unreachable
+            offset = vf_get_double_hword_branch_offset( &codeInstr[instr],
+                            instr, bytecode, &index, pool );
+            result = vf_check_branch_offset( offset, len, ctex );
+            if( result != VER_OK ) {
+                goto labelEnd_vf_parse_bytecode;
+            }
+            result = vf_check_branch_offset( index, len, ctex );
+            if( result != VER_OK ) {
+                goto labelEnd_vf_parse_bytecode;
+            }
+            vf_opcode_jsr( code, codeNum, pool );
+            ctex->m_dump.m_with_subroutine = 1;
+            vf_set_basic_block_flag( &codeInstr[offset] );
+            vf_set_basic_block_flag( &codeInstr[index] );
+            break;
         case OPCODE_RET:            /* 0xa9 + u1|u2  */
-            // FIXME - RET instruction doesn't support in current version
-            result = VER_NoSupportJSR;
-            goto labelEnd_vf_parse_bytecode;
-            // break; // remark #111: statement is unreachable
+            local = (unsigned short)vf_get_local_var_number( code, bytecode, &index );
+            result = vf_check_local_var_number( local, locals, ctex );
+            if( result != VER_OK ) {
+                goto labelEnd_vf_parse_bytecode;
+            }
+            vf_opcode_ret( code, local, pool );
+            // create and set edge branch to exit
+            vf_set_single_instruction_offset( &codeInstr[instr], ~0U, pool );
+            if( index < len ) {
+                vf_set_basic_block_flag( &codeInstr[index] );
+            }
+            break;
         case OPCODE_TABLESWITCH:    /* 0xaa + pad + s4 * (3 + N) */
             vf_opcode_switch( code, pool );
             branches = vf_set_tableswitch_offsets( &codeInstr[instr],
@@ -4985,7 +5099,7 @@ vf_parse_bytecode( vf_Context_t *ctex )     // verifier context
             break;
         case OPCODE_IFNULL:         /* 0xc6 + s2 */
         case OPCODE_IFNONNULL:      /* 0xc7 + s2 */
-            offset = vf_get_double_branch_offset( &codeInstr[instr], 
+            offset = vf_get_double_hword_branch_offset( &codeInstr[instr],
                             instr, bytecode, &index, pool );
             result = vf_check_branch_offset( offset, len, ctex );
             if( result != VER_OK ) {
@@ -5011,10 +5125,21 @@ vf_parse_bytecode( vf_Context_t *ctex )     // verifier context
             }
             break;
         case OPCODE_JSR_W:          /* 0xc9 + s4 */
-            // FIXME - JSR_W instruction doesn't support in current version
-            result = VER_NoSupportJSR;
-            goto labelEnd_vf_parse_bytecode;
-            //break; // remark #111: statement is unreachable
+            offset = vf_get_double_word_branch_offset( &codeInstr[instr],
+                            instr, bytecode, &index, pool );
+            result = vf_check_branch_offset( offset, len, ctex );
+            if( result != VER_OK ) {
+                goto labelEnd_vf_parse_bytecode;
+            }
+            result = vf_check_branch_offset( index, len, ctex );
+            if( result != VER_OK ) {
+                goto labelEnd_vf_parse_bytecode;
+            }
+            vf_opcode_jsr( code, codeNum, pool );
+            ctex->m_dump.m_with_subroutine = 1;
+            vf_set_basic_block_flag( &codeInstr[offset] );
+            vf_set_basic_block_flag( &codeInstr[index] );
+            break;
         case _OPCODE_UNDEFINED:     /* 0xba */
         default:
             VERIFY_REPORT( ctex, "(class: " << class_get_name( ctex->m_class ) 
