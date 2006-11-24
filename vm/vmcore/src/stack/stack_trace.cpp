@@ -242,6 +242,7 @@ void st_print(FILE* f)
     }
     si_free(si);
     fprintf(f, "End Stack Trace (%p, depth=%d)\n", p_TLS_vmthread, depth);
+    fflush(f);
 
 }
 
