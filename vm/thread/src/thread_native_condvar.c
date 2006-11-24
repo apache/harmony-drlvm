@@ -68,7 +68,7 @@ IDATA condvar_wait_impl(hycond_t cond, hymutex_t mutex, I_64 ms, IDATA nano, IDA
         // Delegate to OS wait
     apr_status = (!ms && !nano)?
         apr_thread_cond_wait((apr_thread_cond_t*)cond, (apr_thread_mutex_t*)mutex):
-        apr_thread_cond_timedwait ((apr_thread_cond_t*)cond, (apr_thread_mutex_t*)mutex, ms*1000+ nano / 1000);
+	apr_thread_cond_timedwait ((apr_thread_cond_t*)cond, (apr_thread_mutex_t*)mutex, ms*1000 + ((nano < 1000) ? 1 : (nano / 1000)));
         
     set_suspend_disable(disable_count);
 

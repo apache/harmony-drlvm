@@ -208,8 +208,11 @@ public class ObjectTest extends TestCase {
                 fail("The main thread was interrupted!");
             }
         }
-        assertTrue("Current thread hasn't sleep enough!",
-                finish - start + 1 > millis);
+        long atLeastWait = millis - 1;
+        long actualWait = finish - start;
+        assertTrue("Current thread hasn't slept enough: " + 
+                "expected at least " + atLeastWait + " but was " + actualWait,
+                actualWait >= atLeastWait);
     }
 
     public void testWaitlongint1() {
@@ -277,6 +280,8 @@ public class ObjectTest extends TestCase {
             public void run() {
                 try {
                     synchronized (o) {
+                        threadStarted = true;
+                        o.notify();
                         o.wait();
                     }
                 } catch (InterruptedException e) {
@@ -284,13 +289,15 @@ public class ObjectTest extends TestCase {
                 }
             }
         };
-        t.start();
-        for (int i = 0; !t.isAlive() && i < 60; i++) {
-            try {
-                Thread.sleep(50);
-            } catch (Exception e) {
-                fail("The main thread was interrupted!");
-            }
+        try {
+        	synchronized (o) {
+                t.start();
+                while (!t.threadStarted) {
+                	o.wait();
+                }
+        	} 
+        } catch (InterruptedException e) {
+    		fail("The main thread was interrupted!");
         }
         assertTrue("thread must be alive", t.isAlive());
         t.interrupt();
@@ -298,7 +305,7 @@ public class ObjectTest extends TestCase {
             try {
                 t.join(10);
             } catch (Exception e) {
-                fail("The main thread was interrupted!");
+                fail("The main thread was interrupted_2!");
             }
         }
         assertTrue("An InterruptedException must be thrown in test thread!",
@@ -336,8 +343,8 @@ public class ObjectTest extends TestCase {
     }
 
     private class TestThread extends Thread {
-        boolean srop = false;
         boolean flag = false;
+        volatile boolean threadStarted = false;
     }
 
     private class TestThread1 extends TestThread {
