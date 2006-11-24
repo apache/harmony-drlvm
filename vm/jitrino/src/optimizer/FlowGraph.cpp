@@ -66,10 +66,11 @@ protected:
 
 
 void         
-FlowGraph::foldBranch(ControlFlowGraph& fg, Node* block, BranchInst* br, bool isTaken)
+FlowGraph::foldBranch(ControlFlowGraph& fg, BranchInst* br, bool isTaken)
 {
-    assert(br == block->getLastInst());
-    assert(block->getOutDegree() == 2);
+	Node* block = br->getNode();
+	assert(block->getOutDegree() == 2);
+	
     fg.removeEdge(block->getOutEdge(isTaken ? Edge::Kind_False : Edge::Kind_True));
     br->unlink();
 }

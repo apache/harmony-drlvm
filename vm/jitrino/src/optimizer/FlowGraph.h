@@ -57,7 +57,7 @@ public:
     // If !isTaken, then the false edge is converted, and the true edge
     // is deleted.  In either case, the branch instruction br is removed
     // from block.
-    static void  foldBranch(ControlFlowGraph& fg, Node* block, BranchInst* br, bool isTaken);
+    static void  foldBranch(ControlFlowGraph& fg, BranchInst* br, bool isTaken);
 
     static void  foldSwitch(ControlFlowGraph& fg, Node* block, SwitchInst* sw, uint32 target);
 

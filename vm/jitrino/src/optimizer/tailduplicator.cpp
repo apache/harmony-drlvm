@@ -116,8 +116,8 @@ TailDuplicator::tailDuplicate(DefUseBuilder& defUses, Node* idom, Node* tail)
 
     ControlFlowGraph& fg = _irm.getFlowGraph();
     Node* copy = FlowGraph::tailDuplicate(_irm, t2, tail, defUses);
-    FlowGraph::foldBranch(fg, copy, ((Inst*)copy->getLastInst())->asBranchInst(), true);
-    FlowGraph::foldBranch(fg, tail, ((Inst*)tail->getLastInst())->asBranchInst(), false);
+    FlowGraph::foldBranch(fg, ((Inst*)copy->getLastInst())->asBranchInst(), true);
+    FlowGraph::foldBranch(fg, ((Inst*)tail->getLastInst())->asBranchInst(), false);
 }
 
 void

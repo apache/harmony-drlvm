@@ -21,6 +21,7 @@
  *
  */
 
+
 #include "Opcode.h"
 #include "Opnd.h"
 #include "Type.h"
@@ -3821,7 +3822,7 @@ SimplifierWithInstFactory::SimplifierWithInstFactory(IRManager& irm,
 
 void  
 SimplifierWithInstFactory::foldBranch(BranchInst* br, bool isTaken) {
-    FlowGraph::foldBranch(flowGraph, currentCfgNode,br,isTaken);
+    FlowGraph::foldBranch(flowGraph, br,isTaken);
 }
 
 void  

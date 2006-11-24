@@ -2520,9 +2520,9 @@ public:
             BranchInst *branchi = inst->asBranchInst();
             if (branchi) {
                 if (optimizedOpcode == Op_TauUnsafe) {
-                    FlowGraph::foldBranch(fg, block, branchi, false); // not taken
+                    FlowGraph::foldBranch(fg, branchi, false); // not taken
                 } else {
-                    FlowGraph::foldBranch(fg, block, branchi, true); // taken
+                    FlowGraph::foldBranch(fg, branchi, true); // taken
                 }
                 return;
             }

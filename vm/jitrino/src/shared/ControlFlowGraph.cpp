@@ -223,13 +223,14 @@ void ControlFlowGraph::removeNode(Node* node) {
 void ControlFlowGraph::removeNode(Nodes::iterator pos, bool erase) {
     Node* node = *pos;
     
-    assert(node!=entryNode);
+	if (node == entryNode) {
+		entryNode=NULL;
+	}
     if (node == returnNode) {
         returnNode = NULL;
     } else if(node == unwindNode) {
         unwindNode = NULL;
     } else  if (node == exitNode) {
-        assert(0);
         exitNode = NULL;
     }
     
