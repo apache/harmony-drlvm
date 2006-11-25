@@ -589,11 +589,13 @@ void vm_classloader_iterate_objects(void *iterator) {
 
 ClassLoader* ClassLoader::AddClassLoader( ManagedObject* loader )
 {
+    SuspendDisabledChecker sdc;
+
     LMAutoUnlock aulock( &(ClassLoader::m_tableLock) );
     ClassLoader* cl = new UserDefinedClassLoader();
     TRACE2("classloader.unloading.add", "Adding class loader "
         << cl << " (" << loader << " : "
-        << ((VTable*)(*(unsigned**)(loader)))->clss->get_name()->bytes << ")");
+        << loader->vt()->clss->get_name()->bytes << ")");
     cl->Initialize( loader );
     if( m_capacity <= m_nextEntry )
         ReallocateTable( m_capacity?(2*m_capacity):32 );
