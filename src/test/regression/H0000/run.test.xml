@@ -1,0 +1,13 @@
+<project name="RUN HARMONY-0000 Regression Test">
+    <!-- Test commed from src/test/jni/nio -->
+    <target name="run-test">
+        <!-- extend JUnit test launcher to run JNI test -->
+        <run-junit-test 
+            test="org.apache.harmony.drlvm.tests.regression.h0000.DirectByteBufferTest">
+            <junit-element>
+                <sysproperty key="java.library.path" value="${reg.test.native.path}"/>
+            </junit-element>
+        </run-junit-test>
+    </target>
+</project>
+

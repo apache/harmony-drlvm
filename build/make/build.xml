@@ -427,6 +427,15 @@ Version: $Revision: 1.16.2.20 $
         </if>
     </target>
 
+    <!-- Main target to run regression test /-->
+    <target name="reg.test" depends="setup, init">
+        <property name="target" value="reg.test" />
+        <subant buildpath="." antfile="build_component.xml" target="build" inheritall="true" failonerror="true">
+            <property name="_component" value="vm" />
+            <property name="_target" value="${target}" />
+        </subant>
+    </target>
+
     <!-- process (build/create javadoc/etc...) all the specified components -->
     <target name="process.components">
         <mkdir dir="${build.semi.dir}" />
