@@ -229,14 +229,17 @@ static int walk_native_stack_jit(Registers* pregs, VM_thread* pthread,
         { // Native stub, previous frame is Java frame
             assert(si_is_native(si));
 
-            // Mark first frame (JNI stub) as Java frame
-            if (frame_array && frame_count == 1)
-                frame_array[frame_count - 1].java_depth = java_depth;
+            if (si_get_method(si)) // Frame represents JNI frame
+            {
+                // Mark first frame (JNI stub) as Java frame
+                if (frame_array && frame_count == 1)
+                    frame_array[frame_count - 1].java_depth = java_depth;
 
-            if (frame_array && frame_count > 1)
-                frame_array[frame_count - 2].java_depth = java_depth;
+                if (frame_array && frame_count > 1)
+                    frame_array[frame_count - 2].java_depth = java_depth;
 
-            ++java_depth;
+                ++java_depth;
+            }
 
             // Ge to previous stack frame from StackIterator
             si_goto_previous(si);
