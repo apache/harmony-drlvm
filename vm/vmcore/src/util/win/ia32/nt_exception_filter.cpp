@@ -19,14 +19,16 @@
  * @version $Revision: 1.1.2.1.4.4 $
  */  
 
-#include "cxxlog.h"
+#include "clog.h"
 #include "method_lookup.h"
 #include "Environment.h"
 #include "exceptions.h"
 #include "exceptions_jit.h"
 #include "interpreter_exports.h"
+#include "stack_iterator.h"
 #include "stack_dump.h"
 #include "jvmti_break_intf.h"
+#include "m2n.h"
 
 // Windows specific
 #include <string>
@@ -277,6 +279,7 @@ void __declspec(naked) asm_jvmti_exception_catch_callback() {
 }
 
 static LONG NTAPI vectored_exception_handler_internal(LPEXCEPTION_POINTERS nt_exception);
+static void __cdecl c_exception_handler(Class*, bool);
 
 LONG __declspec(naked) NTAPI vectored_exception_handler(LPEXCEPTION_POINTERS nt_exception)
 {
@@ -297,94 +300,80 @@ LONG __declspec(naked) NTAPI vectored_exception_handler(LPEXCEPTION_POINTERS nt_
 static LONG NTAPI vectored_exception_handler_internal(LPEXCEPTION_POINTERS nt_exception)
 {
     DWORD code = nt_exception->ExceptionRecord->ExceptionCode;
-    
-    bool run_default_handler = true;
     PCONTEXT context = nt_exception->ContextRecord;
-    
-    TRACE2("signals", "VEH received an exception: code = 0x" <<
-        ((void*)nt_exception->ExceptionRecord->ExceptionCode) <<
-        " location IP = 0x" << ((void*)context->Eip));
-    
-    // this filter catches _all_ hardware exceptions including those caused by
-    // VM internal code.  To elimate confusion over what caused the
-    // exception, we first make sure the exception was thrown inside a Java
-    // method else crash handler or default handler is executed, this means that
-    // it was thrown by VM C/C++ code.
-    if (((code == STATUS_ACCESS_VIOLATION ||
-        code == STATUS_INTEGER_DIVIDE_BY_ZERO ||
-        code == STATUS_STACK_OVERFLOW) &&
-        vm_identify_eip((void *)context->Eip) == VM_TYPE_JAVA) ||
-        code == JVMTI_EXCEPTION_STATUS) {
-            run_default_handler = false;
-    } else if (code == STATUS_STACK_OVERFLOW) {
-        if (is_unwindable()) {
-            if (hythread_is_suspend_enabled()) {
-                tmn_suspend_disable();
-            }
-            run_default_handler = false;
-        } else {
-                Global_Env *env = VM_Global_State::loader_env;
-                exn_raise_by_class(env->java_lang_StackOverflowError_Class);
-            p_TLS_vmthread->restore_guard_page = true;
-            return EXCEPTION_CONTINUE_EXECUTION;
-        }
-    }
 
-    if (run_default_handler) {
-#ifndef NDEBUG
-        if (vm_get_boolean_property_value_with_default("vm.assert_dialog")) {
+    TRACE2("signals", ("VEH received an exception: code = %x, eip = %p, esp = %p",
+        nt_exception->ExceptionRecord->ExceptionCode,
+        context->Eip, context->Esp));
 
-            if (IS_ERROR(code)) {
-                 if (UnhandledExceptionFilter(nt_exception) == EXCEPTION_CONTINUE_SEARCH)
-                     DebugBreak();
-            }
-        }
-#endif
+    // the possible reasons for hardware exception are
+    //  - segfault or division by zero in java code
+    //     => NullPointerException or ArithmeticException
+    //
+    //  - breakpoint or privileged instruction in java code
+    //    => send jvmti breakpoint event
+    //
+    //  - stack overflow, either in java or in native
+    //    => StackOverflowError
+    //
+    //  - other (internal VM error or debugger breakpoint)
+    //    => delegate to default handler
+
+    bool in_java = (vm_identify_eip((void*)context->Eip) == VM_TYPE_JAVA);
+
+    // delegate "other" cases to default handler
+    if (!in_java && code != STATUS_STACK_OVERFLOW)
         return EXCEPTION_CONTINUE_SEARCH;
-    }
 
-    // since we are now sure HWE occured in java code, gc should also have been disabled
+    // if HWE occured in java code, suspension should also have been disabled
+    assert(!in_java || !hythread_is_suspend_enabled());
 
-    // gregory - this is not true since for debugging we may use int3
-    // in VM code which produces BREAKPOINT exception. JVMTI has
-    // assertions for breakpoints which it has set in Java inside of
-    // breakpoint handling function. Otherwise this assert should not
-    // fail in case _CrtDbgBreak() was added somewhere in VM.
-    assert(!hythread_is_suspend_enabled() || code == JVMTI_EXCEPTION_STATUS);
-    
     Global_Env *env = VM_Global_State::loader_env;
-    Class *exc_clss = 0;
+    // the actual exception object will be created lazily,
+    // we determine only exception class here
+    Class *exn_class = 0;
 
     switch(nt_exception->ExceptionRecord->ExceptionCode) 
     {
     case STATUS_STACK_OVERFLOW:
-        // stack overflow exception -- see ...\vc\include\winnt.h
         {
-            TRACE2("signals", "StackOverflowError detected at "
-                << (void *) context->Eip << " on the stack at "
-                << (void *) context->Esp);
-            // Lazy exception object creation
-            exc_clss = env->java_lang_StackOverflowError_Class;
+            TRACE2("signals",
+                ("StackOverflowError detected at eip = %p, esp = %p",
+                 context->Eip,context->Esp));
+
             p_TLS_vmthread->restore_guard_page = true;
+            exn_class = env->java_lang_StackOverflowError_Class;
+            if (in_java) {
+                // stack overflow occured in java code:
+                // nothing special to do
+            } else if (is_unwindable()) {
+                // stack overflow occured in native code that can be unwound
+                // safely.
+                // Throwing exception requires suspend disabled status
+                if (hythread_is_suspend_enabled())
+                    hythread_suspend_disable();
+            } else {
+                // stack overflow occured in native code that
+                // cannot be unwound.
+                // Mark raised exception in TLS and resume execution
+                exn_raise_by_class(env->java_lang_StackOverflowError_Class);
+                return EXCEPTION_CONTINUE_EXECUTION;
+            }
         }
         break;
     case STATUS_ACCESS_VIOLATION:
-        // null pointer exception -- see ...\vc\include\winnt.h
         {
-            TRACE2("signals", "NullPointerException detected at " 
-                << (void *) context->Eip);
-            // Lazy exception object creation
-            exc_clss = env->java_lang_NullPointerException_Class;
+            TRACE2("signals",
+                ("NullPointerException detected at eip = %p", context->Eip));
+            exn_class = env->java_lang_NullPointerException_Class;
         }
         break;
 
     case STATUS_INTEGER_DIVIDE_BY_ZERO:
-        // divide by zero exception  -- see ...\vc\include\winnt.h
         {
-            TRACE2("signals", "ArithmeticException detected at "
-                << (void *) context->Eip);
-            // Lazy exception object creation
-            exc_clss = env->java_lang_ArithmeticException_Class;
+            TRACE2("signals",
+                ("ArithmeticException detected at eip = %p", context->Eip));
+            exn_class = env->java_lang_ArithmeticException_Class;
         }
         break;
     case JVMTI_EXCEPTION_STATUS:
@@ -392,8 +381,8 @@ static LONG NTAPI vectored_exception_handler_internal(LPEXCEPTION_POINTERS nt_ex
         {
             Registers regs;
             nt_to_vm_context(context, &regs);
-            TRACE2("signals", "JVMTI breakpoint detected at " <<
-                (void *)regs.eip);
+            TRACE2("signals",
+                ("JVMTI breakpoint detected at eip = %p", regs.eip));
             bool handled = jvmti_jit_breakpoint_handler(&regs);
             if (handled)
             {
@@ -403,21 +392,59 @@ static LONG NTAPI vectored_exception_handler_internal(LPEXCEPTION_POINTERS nt_ex
             else
                 return EXCEPTION_CONTINUE_SEARCH;
         }
-    default: assert(false);
+    default:
+        // unexpected hardware exception occured in java code
+        return EXCEPTION_CONTINUE_SEARCH;
     }
 
-    Registers regs;
+    // we must not call potentially blocking or suspendable code
+    // (i.e. java code of exception constructor) from exception
+    // handler, because this handler may hold a system-wide lock,
+    // and this may result in a deadlock.
 
-    nt_to_vm_context(context, &regs);
+    // it was reported that exception handler grabs a system
+    // lock on Windows XPsp2 and 2003sp0, but not on a 2003sp1
 
-    uint32 exception_esp = regs.esp;
+    // save register context of hardware exception site
+    // into thread-local registers snapshot
+    assert(p_TLS_vmthread);
+    nt_to_vm_context(context, &p_TLS_vmthread->regs);
+
+    // __cdecl <=> push parameters in the reversed order
+    // push in_java argument onto stack
+    context->Esp -= 4;
+    *((uint32*) context->Esp) = (uint32)in_java;
+    // push the exn_class argument onto stack
+    context->Esp -= 4;
+    assert(exn_class);
+    *((uint32*) context->Esp) = (uint32)exn_class;
+    // imitate return IP on stack
+    context->Esp -= 4;
+
+    // set up the real exception handler address
+    context->Eip = (uint32)c_exception_handler;
+
+    // exit NT exception handler and transfer
+    // control to VM exception handler
+    return EXCEPTION_CONTINUE_EXECUTION;
+}
+
+
+static void __cdecl c_exception_handler(Class *exn_class, bool in_java)
+{
+    // this exception handler is executed *after* NT exception handler returned
     DebugUtilsTI* ti = VM_Global_State::loader_env->TI;
+    Registers & regs = p_TLS_vmthread->regs;
 
-    // TODO: We already checked that above. Is it possible to reuse the result?
-    bool java_code = (vm_identify_eip((void *)regs.eip) == VM_TYPE_JAVA);
-    exn_athrow_regs(&regs, exc_clss, java_code);
+    M2nFrame* prev_m2n = m2n_get_last_frame();
+    M2nFrame* m2n = NULL;
+    if (in_java)
+        m2n = m2n_push_suspended_frame(&regs);
 
-    assert(exception_esp <= regs.esp);
+    TRACE2("signals", ("should throw exception %p at EIP=%p, ESP=%p",
+                exn_class, regs.eip, regs.esp));
+    exn_athrow_regs(&regs, exn_class, false);
+
     if (ti->get_global_capability(DebugUtilsTI::TI_GC_ENABLE_EXCEPTION_EVENT)) {
         regs.esp = regs.esp - 4;
         *((uint32*) regs.esp) = regs.eip;
@@ -428,7 +455,10 @@ static LONG NTAPI vectored_exception_handler_internal(LPEXCEPTION_POINTERS nt_ex
         regs.eip = ((uint32)asm_exception_catch_callback);
     }
 
-    vm_to_nt_context(&regs, context);
-
-    return EXCEPTION_CONTINUE_EXECUTION;
-} //vectored_exception_handler
+    StackIterator *si =
+        si_create_from_registers(&regs, false, prev_m2n);
+    if (m2n)
+        STD_FREE(m2n);
+    si_transfer_control(si);
+    assert(!"si_transfer_control should not return");
+}
