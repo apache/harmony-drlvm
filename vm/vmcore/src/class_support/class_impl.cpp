@@ -27,7 +27,18 @@
 #include "classloader.h"
 #include "environment.h"
 
-/** 
+/**
+ * Function returns class major version.
+ */
+unsigned short
+class_get_version( class_handler klass )
+{
+    assert( klass );
+    Class *clss = (Class*)klass;
+    return clss->get_version();
+} // class_get_version
+
+/**
  * Function returns class name.
  */
 const char *

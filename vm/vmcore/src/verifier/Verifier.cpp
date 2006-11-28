@@ -1829,15 +1829,23 @@ vf_check_cp_single_const( unsigned short index,     // constant pool entry index
         vf_set_vector_stack_entry_ref( cp_parse->field.f_vector, 0, type );
         break;
 	case _CONSTANT_Class:
-        type = ctex->m_type->NewType( "Ljava/lang/Class", 16 );
-        vf_set_vector_stack_entry_ref( cp_parse->field.f_vector, 0, type );
-		break;
+        if( !vf_is_class_version_14(ctex) ) {
+            type = ctex->m_type->NewType( "Ljava/lang/Class", 16 );
+            vf_set_vector_stack_entry_ref( cp_parse->field.f_vector, 0, type );
+		    break;
+        }
+        // if class version is 1.4 verifier fails in default
     default:
         VERIFY_REPORT( ctex, "(class: " << class_get_name( ctex->m_class )
             << ", method: " << method_get_name( ctex->m_method )
             << method_get_descriptor( ctex->m_method )
-            << ") Illegal type in constant pool,"
-            << index << ": CONSTANT_Integer, CONSTANT_Float, CONSTANT_String or CONSTANT_Class are expected" );
+            << ") Illegal type for constant pool entry #"
+            << index
+            << (vf_is_class_version_14(ctex)
+                ? ": CONSTANT_Integer, CONSTANT_Float or CONSTANT_String"
+                : ": CONSTANT_Integer, CONSTANT_Float, CONSTANT_String "
+                  "or CONSTANT_Class")
+            << " are expected for ldc/ldc_w instruction" );
         return VER_ErrorConstantPool;
     }
     return VER_OK;
@@ -2638,9 +2646,13 @@ vf_opcode_aastore( vf_Code_t *code,         // code instruction
     vf_set_in_vector_stack_entry_ref( code, 0, NULL );
     vf_set_in_vector_check( code, 0, VF_CHECK_REF_ARRAY );
     vf_set_in_vector_stack_entry_int( code, 1 );
-    vf_set_in_vector_stack_entry_ref( code, 2, NULL );
+    if( vf_is_class_version_14(ctex) ) {
+        vf_set_in_vector_type( code, 2, SM_UP_ARRAY );
+    } else {
+        vf_set_in_vector_stack_entry_ref( code, 2, NULL );
+    }
     return;
-} // vf_opcode_fastore
+} // vf_opcode_aastore
 
 /**
  * Function sets code instruction structure for opcode pop.

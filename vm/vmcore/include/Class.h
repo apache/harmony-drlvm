@@ -829,6 +829,9 @@ private:
     // that points to the corresponding Class data structure.
     ManagedObject** m_class_handle;
 
+    // class file major version
+    uint16 m_version;
+
     // Access and properties flags of a class
     uint16 m_access_flags;
 
@@ -1367,6 +1370,10 @@ public:
 
     /** Gets the class ID.*/
     unsigned get_id() const { return m_id; }
+
+    /** Gets major version of class file.
+     * @return Major version of class file.*/
+    uint16 get_version() const { return m_version; }
 
     /** Gets access and properties flags of the given class.
      * @return The 16-bit integer representing access and properties flags

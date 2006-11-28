@@ -1572,6 +1572,16 @@ vf_set_error_message( stringstream &stream,
     return;
 } // vf_set_error_message
 
+/**
+ * Checks version of class file
+ * @param context - verifier context
+ */
+static inline bool
+vf_is_class_version_14( vf_Context_t *context )
+{
+    return (class_get_version(context->m_class) < 49) ? true : false;
+} // vf_is_class_version_14
+
 } // namespace Verifier
 
 using namespace Verifier;

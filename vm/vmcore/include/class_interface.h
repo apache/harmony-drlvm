@@ -61,6 +61,15 @@ typedef enum {
  * Class interface
  */
 
+/**
+ * Function returns class major version.
+ * @param klass - class handler
+ * @return Class name bytes.
+ * @note Assertion is raised if klass is equal to null.
+ */
+unsigned short
+class_get_version( class_handler klass );
+
 /** 
  * Function returns class name.
  * @param klass - class handler

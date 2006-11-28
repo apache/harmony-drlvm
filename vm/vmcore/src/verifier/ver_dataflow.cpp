@@ -764,7 +764,8 @@ vf_check_instruction_in_vector( vf_MapEntry_t *stack,       // stack map vector
 {
     unsigned index;
     vf_MapEntry_t *entry,
-                  *vector;
+                  *vector,
+                  *newvector;
     Verifier_Result result;
 
     // check IN vector entries
@@ -781,6 +782,27 @@ vf_check_instruction_in_vector( vf_MapEntry_t *stack,       // stack map vector
         case SM_TOP:
             // copy entry
             copy = true;
+            break;
+        case SM_UP_ARRAY:
+            // check reference array element
+            assert( index > 0 );
+            newvector = &buf[index];
+            // check assignment conversion
+            vf_set_array_element_type( newvector, vector, &buf[0], ctex );
+            if( newvector->m_vtype ) {
+                newvector->m_ctype = VF_CHECK_ASSIGN_WEAK;
+            } else {
+                newvector->m_ctype = VF_CHECK_NONE;
+            }
+            // check entry types
+            result = vf_check_entry_refs( entry, newvector, ctex );
+            if( result != VER_OK ) {
+                VERIFY_REPORT( ctex, "(class: " << class_get_name( ctex->m_class )
+                    << ", method: " << method_get_name( ctex->m_method )
+                    << method_get_descriptor( ctex->m_method )
+                    << ") Incompatible types for array assignment" );
+                return result;
+            }
             break;
         case SM_REF:
             // check entry references

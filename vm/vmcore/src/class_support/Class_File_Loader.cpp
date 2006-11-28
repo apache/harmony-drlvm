@@ -2155,18 +2155,17 @@ bool Class::parse(Global_Env* env,
         return false;
     }
 
-    uint16 major_version;
-    if (!cfs.parse_u2_be(&major_version)) {
+    if (!cfs.parse_u2_be(&m_version)) {
         REPORT_FAILED_CLASS_CLASS(m_class_loader, this, "java/lang/ClassFormatError",
             "could not parse major version");
         return false;
     }
 
-    if (!(major_version >= CLASSFILE_MAJOR
-        && major_version <= CLASSFILE_MAJOR_MAX))
+    if (!(m_version >= CLASSFILE_MAJOR
+        && m_version <= CLASSFILE_MAJOR_MAX))
     {
         REPORT_FAILED_CLASS_CLASS(m_class_loader, this, "java/lang/UnsupportedClassVersionError",
-            "class has version number " << major_version);
+            "class has version number " << m_version);
         return false;
     }
 
