@@ -27,6 +27,7 @@
 #include "Class.h"
 #include "class_member.h"
 #include "stack_trace.h"
+#include "interpreter_exports.h"
 #include "cci.h"
 
 #ifdef PLATFORM_NT
@@ -212,11 +213,14 @@ static void st_print_line(int count, MethodInfo* m) {
 }
 
 void st_print_stack(Registers* regs) {
+    if(interpreter_enabled()) {
+       interpreter.stack_dump(get_thread_ptr());
+       return;
+    }
     jint num_frames;
     native_frame_t* frames;
     num_frames = walk_native_stack_registers(regs, p_TLS_vmthread, -1, NULL);
     frames = (native_frame_t*) STD_ALLOCA(sizeof(native_frame_t) * num_frames);
-    
     num_frames = walk_native_stack_registers(regs, p_TLS_vmthread, num_frames, frames);
     StackIterator* si = si_create_from_native();
     fprintf(stderr, "Stack trace:\n");

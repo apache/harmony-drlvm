@@ -638,9 +638,17 @@ void abort_handler (int signum, siginfo_t* UNREF info, void* context) {
     Registers regs;
     ucontext_t *uc = (ucontext_t *)context;
     linux_ucontext_to_regs(&regs, uc);
+    
+    // reset handler to avoid loop in case st_print_stack fails
+    struct sigaction sa;
+    sigemptyset(&sa.sa_mask);
+    sa.sa_flags = 0;
+    sa.sa_handler = SIG_DFL;
+    sigaction(SIGABRT, &sa, NULL);
+
     st_print_stack(&regs);
 
-    signal(signum, 0);
+    signal(signum, SIG_DFL);
 }
 
 /*
