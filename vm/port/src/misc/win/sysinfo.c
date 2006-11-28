@@ -32,7 +32,7 @@ APR_DECLARE(int) port_CPUs_number() {
 APR_DECLARE(apr_status_t) port_OS_name_version(char** os_name, char** os_ver, 
 								   apr_pool_t* pool){
 	
-	char* name_buf;
+	char* name_buf = NULL;
 	char* ver_buf;
 	OSVERSIONINFO vi;
 	vi.dwOSVersionInfoSize = sizeof(OSVERSIONINFO);
