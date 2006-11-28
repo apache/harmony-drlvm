@@ -172,7 +172,7 @@ static inline void dump_all_java_stacks()
     native_thread ;
     while(native_thread = hythread_iterator_next(&iterator)) {
         vm_thread = get_vm_thread(native_thread);
-        assert(vm_thread);
+        if (!vm_thread) continue;
         interpreter.stack_dump(vm_thread);
     }
     hythread_resume_all(NULL);
