@@ -713,15 +713,16 @@ vf_Graph::DumpNode( unsigned num,           // graph node number
                     vf_Context_t *ctex)     // verifier context
 {
 #if _VERIFY_DEBUG
-    unsigned index;
-    vf_Edge_t *edge;
-
     // print node incoming edges
-    for( index = 0, edge = GetEdge( GetNode( num )->m_inedge );
-        index < GetNode( num )->m_innum;
-        index++, edge = GetEdge( edge->m_innext ) )
+    unsigned index;
+    unsigned edge_num;
+    for( index = 0, edge_num = GetNode( num )->m_inedge;
+         index < GetNode( num )->m_innum;
+         index++ )
     {
+        vf_Edge_t *edge = GetEdge( edge_num );
         VERIFY_DEBUG( " [" << edge->m_start << "] -->" );
+        edge_num = edge->m_innext;
     }
 
     // print node
@@ -743,11 +744,13 @@ vf_Graph::DumpNode( unsigned num,           // graph node number
     }
 
     // print node outcoming edges
-    for( index = 0, edge = GetEdge( GetNode( num )->m_outedge );
-        index < GetNode( num )->m_outnum;
-        index++, edge = GetEdge( edge->m_outnext ) )
+    for( index = 0, edge_num = GetNode( num )->m_outedge;
+         index < GetNode( num )->m_outnum;
+         index++ )
     {
+        vf_Edge_t *edge = GetEdge( edge_num );
         VERIFY_DEBUG( " --> [" << edge->m_end << "]" );
+        edge_num = edge->m_outnext;
     }
     VERIFY_DEBUG( "" );
 #endif // _VERIFY_DEBUG
@@ -876,9 +879,6 @@ vf_Graph::DumpDotNode( unsigned num,            // graph node number
                        vf_Context_t *ctex)      // verifier contex
 {
 #if _VERIFY_DEBUG
-    unsigned index;
-    vf_Edge_t *edge;
-
     // print node to dot file
     if( vf_is_instruction_has_flags( &ctex->m_code[GetNode( num )->m_start],
                                      VF_FLAG_START_ENTRY ) )
@@ -902,10 +902,14 @@ vf_Graph::DumpDotNode( unsigned num,            // graph node number
     }
 
     // print node outcoming edges to dot file
-    for( index = 0, edge = GetEdge( GetNode( num )->m_outedge );
-            index < GetNode( num )->m_outnum;
-            index++, edge = GetEdge( edge->m_outnext ) )
+    unsigned index;
+    unsigned edge_num;
+    for( index = 0, edge_num = GetNode( num )->m_outedge;
+         index < GetNode( num )->m_outnum;
+         index++ )
     {
+        vf_Edge_t *edge = GetEdge( edge_num );
+
         out << "node" << num << " -> " << "node" << edge->m_end;
         if( vf_is_instruction_has_flags( &ctex->m_code[GetNode( edge->m_end )->m_start],
                                          VF_FLAG_HANDLER ) )
@@ -918,6 +922,7 @@ vf_Graph::DumpDotNode( unsigned num,            // graph node number
             out << "[color=blue]" << endl;
         }
         out << ";" << endl;
+        edge_num = edge->m_outnext;
     }
 #endif // _VERIFY_DEBUG
     return;

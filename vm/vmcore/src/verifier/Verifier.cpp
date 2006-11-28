@@ -2638,7 +2638,7 @@ vf_opcode_aastore( vf_Code_t *code,         // code instruction
     vf_set_in_vector_stack_entry_ref( code, 0, NULL );
     vf_set_in_vector_check( code, 0, VF_CHECK_REF_ARRAY );
     vf_set_in_vector_stack_entry_int( code, 1 );
-    vf_set_in_vector_type( code, 2, SM_UP_ARRAY );
+    vf_set_in_vector_stack_entry_ref( code, 2, NULL );
     return;
 } // vf_opcode_fastore
 
