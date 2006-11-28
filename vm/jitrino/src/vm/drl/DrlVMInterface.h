@@ -460,8 +460,8 @@ public:
     const char* methodSignatureString(MethodDesc* enclosingMethodDesc, uint32 methodToken);
 
         // resolve-by-name methods
-    virtual ObjectType *    resolveSystemClass( const char * klassName );
-    virtual MethodPtrType * resolveMethod( ObjectType * klass, const char * methodName, const char * methodSig);
+    virtual ObjectType * resolveClassUsingBootstrapClassloader( const char * klassName );
+    virtual MethodDesc * resolveMethod( ObjectType * klass, const char * methodName, const char * methodSig);
 
     void*        loadStringObject(MethodDesc* enclosingMethod,
                                  uint32 stringToken);

@@ -173,13 +173,6 @@ public:
     };
 };
 
-class VMHelperCallOp {
-public:
-    enum Id {
-        ThrowLazy
-    };
-};
-
 class InstructionCallback {
 public:
     virtual ~InstructionCallback() {}
@@ -290,7 +283,8 @@ public:
     virtual CG_OpndHandle*  callhelper(uint32 numArgs, CG_OpndHandle** args, Type* retType,
                                        JitHelperCallOp::Id callId) = 0;
     virtual CG_OpndHandle*  callvmhelper(uint32 numArgs, CG_OpndHandle** args, Type* retType,
-                                         VMHelperCallOp::Id callId, InlineInfo* ii = NULL) = 0;
+                                       CompilationInterface::RuntimeHelperId callId, InlineInfo* ii = NULL) = 0;
+
     virtual CG_OpndHandle*  ldc_i4(uint32 val) = 0;
     virtual CG_OpndHandle*  ldc_i8(uint64 val) = 0;
     virtual CG_OpndHandle*  ldc_s(float val) = 0;

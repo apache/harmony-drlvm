@@ -55,6 +55,7 @@ Description of the product deploy folder.
 
         <gc_cc>
             <shared>bin/default:gc_cc</shared>
+            <jar>bin/default:gc_cc</jar>
         </gc_cc>
 
         <vmi>

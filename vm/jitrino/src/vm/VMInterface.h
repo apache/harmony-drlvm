@@ -289,12 +289,12 @@ public:
      * Resolve a system class by its name. 
      * Returns NULL if no such class found.
      */
-    virtual ObjectType *    resolveSystemClass( const char * klassName ) = 0;
+    virtual ObjectType *    resolveClassUsingBootstrapClassloader( const char * klassName ) = 0;
     /**
      * Recursively looks up for a given method with a given signature in the given class.
      * Returns NULL if no such method found.
      */
-    virtual MethodPtrType * resolveMethod( ObjectType * klass, const char * methodName, const char * methodSig) = 0;
+    virtual MethodDesc* resolveMethod(ObjectType * klass, const char * methodName, const char * methodSig) = 0;
 
     // Class type is a subclass of ch=mh->getParentType()  The function returns
     // a method description for a method overriding mh in type or in the closest
@@ -553,7 +553,7 @@ public:
      * @return runtime handle of the corresponding VM object for the method 
      */
     virtual void* getRuntimeMethodHandle(MethodDesc *method) = 0;
-    
+
     virtual CompilationContext* getCompilationContext() const {return compilationContext;}
 
 protected:

@@ -446,13 +446,6 @@ public:
         assert(0);
         return JitHelperCallOp::InitializeArray; // to keep compiler quiet
     }
-    VMHelperCallOp::Id convertVMHelperId(VMHelperCallId callId) {
-        switch(callId) {
-        case ThrowLazy: return VMHelperCallOp::ThrowLazy;
-        }
-        assert(0);
-        return VMHelperCallOp::ThrowLazy; // to keep compiler quiet
-    }
     CG_OpndHandle ** genCallArgs(Inst * call, uint32 arg0Pos) {
         uint32 nSrc = call->getNumSrcOperands();
         CG_OpndHandle ** args = new(memManager) CG_OpndHandle*[nSrc - arg0Pos];
@@ -941,12 +934,12 @@ public:
         case Op_VMHelperCall:
             {
                 VMHelperCallInst* call = inst->asVMHelperCallInst();
-                VMHelperCallId callId = call->getVMHelperId();
+                CompilationInterface::RuntimeHelperId callId = call->getVMHelperId();
                 cgInst = 
                     instructionCallback.callvmhelper(inst->getNumSrcOperands(),
                                                      genCallArgs(call,0),
                                                      inst->getDst()->getType(),
-                                                     convertVMHelperId(callId));
+                                                     callId);
             }
             break;
         case Op_Return:

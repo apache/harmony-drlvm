@@ -478,21 +478,19 @@ void JitHelperCallInst::handlePrintEscape(::std::ostream& os, char code) const {
 
 void VMHelperCallInst::handlePrintEscape(::std::ostream& os, char code) const {
     switch(code) {
-    case 'd':
-        switch(vmHelperId) {
-    case ThrowLazy:
-        {   os << "ThrowLazyException ";
-            break;
-        }
-    default:
-        assert(0); break;
-        }
+    case 'd': 
+        {
+            CompilationContext* cc = CompilationContext::getCurrentContext();
+            const char* name = cc->getVMCompilationInterface()->getRuntimeHelperName(vmHelperId);
+            os <<name<<" ";
+        } 
         break;
     default:
         Inst::handlePrintEscape(os, code);
         break;
     }
 }
+
 
 void TypeInst::handlePrintEscape(::std::ostream& os, char code) const {
     switch (code) {
@@ -1664,7 +1662,7 @@ InstFactory::makeVMHelperCallInst(Opcode op,
                                     Opnd* dst,
                                     uint32 nArgs,
                                     Opnd** args_,
-                                    VMHelperCallId id,
+                                    CompilationInterface::RuntimeHelperId id,
                                     InlineInfo* inlInfo) {
     VMHelperCallInst * inst = 
         new (memManager) VMHelperCallInst(op, mod, type, dst, nArgs, args_, id);
@@ -2092,13 +2090,14 @@ InstFactory::makeJitHelperCall(Opnd* dst, JitHelperCallId id, uint32 numArgs, Op
 }
 
 Inst*
-InstFactory::makeVMHelperCall(Opnd* dst, VMHelperCallId id, uint32 numArgs,
+InstFactory::makeVMHelperCall(Opnd* dst, CompilationInterface::RuntimeHelperId id, uint32 numArgs,
                               Opnd** args, InlineInfo* inlInfo) {
     Type::Tag returnType = dst->isNull()? Type::Void : dst->getType()->tag;
     args = copyOpnds(args, numArgs);
     return makeVMHelperCallInst(Op_VMHelperCall, Modifier(Exception_Sometimes), 
                                 returnType, dst, numArgs, args, id, inlInfo);
 }
+
 
 // load, store, & move
 Inst*

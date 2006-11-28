@@ -226,7 +226,8 @@ public:
     CG_OpndHandle* tau_callintr(uint32 numArgs, CG_OpndHandle** args, Type* retType,IntrinsicCallOp::Id callId,      CG_OpndHandle *tauNullsChecked, CG_OpndHandle *tauTypesChecked);
     CG_OpndHandle* callhelper(uint32 numArgs, CG_OpndHandle** args, Type* retType,JitHelperCallOp::Id callId);
     CG_OpndHandle* callvmhelper(uint32 numArgs, CG_OpndHandle** args, Type* retType,
-                VMHelperCallOp::Id callId, InlineInfo* ii = NULL);
+                                CompilationInterface::RuntimeHelperId callId, InlineInfo* ii = NULL);
+    
     CG_OpndHandle* box(ObjectType * boxedType, CG_OpndHandle* val);
     CG_OpndHandle* unbox(Type * dstType, CG_OpndHandle* objHandle);
     CG_OpndHandle* ldValueObj(Type* objType, CG_OpndHandle *srcAddr);

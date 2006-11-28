@@ -731,7 +731,7 @@ Inliner::connectRegion(InlineNode* inlineNode) {
 }
 
 void
-Inliner::inlineAndProcessRegion(InlineNode* inlineNode) {
+Inliner::inlineRegion(InlineNode* inlineNode, bool updatePriorityQueue) {
     IRManager &inlinedIRM = inlineNode->getIRManager();
     DominatorTree* dtree = inlinedIRM.getDominatorTree();
     LoopTree* ltree = inlinedIRM.getLoopTree();
@@ -755,7 +755,9 @@ Inliner::inlineAndProcessRegion(InlineNode* inlineNode) {
     //
     // Update priority queue with calls in this region
     //
-    processRegion(inlineNode, dtree, ltree);
+    if (updatePriorityQueue) {
+        processRegion(inlineNode, dtree, ltree);
+    }
     
     //
     // If top level flowgraph 
@@ -919,12 +921,20 @@ Inliner::getNextRegionToInline(CompilationContext& inlineCC) {
     _instFactory.setMethodId(((uint64)id)<<32);
     
     
-    IRManager* inlinedIRM = new (_tmpMM) IRManager(_tmpMM, _toplevelIRM, *methodDesc, NULL);
-    
-    // Augment inline tree
-    InlineNode *inlineNode = new (_tmpMM) InlineNode(*inlinedIRM, call, callNode);
-    
+    InlineNode* inlineNode = createInlineNode(inlineCC, call);
+    assert(inlineNode!=NULL);
+
     inlineParentNode->addChild(inlineNode);
+
+    _currentByteSize = newByteSize;
+    return inlineNode;
+}
+
+InlineNode* Inliner::createInlineNode(CompilationContext& inlineCC, MethodCallInst* call) {
+    MethodDesc *methodDesc = call->getMethodDesc();
+    IRManager* inlinedIRM = new (_tmpMM) IRManager(_tmpMM, _toplevelIRM, *methodDesc, NULL);
+    // Augment inline tree
+    InlineNode *inlineNode = new (_tmpMM) InlineNode(*inlinedIRM, call, call->getNode());
     
     // Call a translator 
     if (isBCmapRequired) {
@@ -937,9 +947,6 @@ Inliner::getNextRegionToInline(CompilationContext& inlineCC) {
     inlineCC.setHIRManager(inlinedIRM);
     runTranslatorSession(inlineCC);
 
-    // Save state.
-    _currentByteSize = newByteSize;
-    assert(inlineNode);
     return inlineNode;
 }
 
@@ -1085,7 +1092,7 @@ InlineTree::computeCheckSum(InlineNode* node) {
     return (uint32) sum;
 }
 
-static void runInlinerPipeline(CompilationContext& inlineCC, const char* pipeName) {
+void Inliner::runInlinerPipeline(CompilationContext& inlineCC, const char* pipeName) {
     PMF::HPipeline p = inlineCC.getCurrentJITContext()->getPMF().getPipeline(pipeName);
     assert(p!=NULL);
     PMF::PipelineIterator pit(p);
@@ -1117,7 +1124,7 @@ void InlinePass::_run(IRManager& irm) {
     MemoryManager tmpMM(1024, "Inliner::tmp_mm");
     Inliner inliner(this, tmpMM, irm, irm.getFlowGraph().hasEdgeProfile());
     InlineNode* rootRegionNode = (InlineNode*) inliner.getInlineTree().getRoot();
-    inliner.inlineAndProcessRegion(rootRegionNode);
+    inliner.inlineRegion(rootRegionNode);
 
     // Inline calls
     do {
@@ -1138,7 +1145,7 @@ void InlinePass::_run(IRManager& irm) {
 
         // Optimize inlined region before splicing
         inlineCC.stageId = cc->stageId;
-        runInlinerPipeline(inlineCC, pipeName);
+        Inliner::runInlinerPipeline(inlineCC, pipeName);
         cc->stageId = inlineCC.stageId;
         
         // Splice into flow graph and find next region.
@@ -1146,7 +1153,7 @@ void InlinePass::_run(IRManager& irm) {
             inliner.connectRegion(regionNode);
         }
         OptPass::computeDominatorsAndLoops(regionManager);
-        inliner.inlineAndProcessRegion(regionNode);
+        inliner.inlineRegion(regionNode);
     } while (true);
     const OptimizerFlags& optimizerFlags = irm.getOptimizerFlags();
     // Print the results to logging / dot file

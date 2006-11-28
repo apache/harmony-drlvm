@@ -2819,12 +2819,12 @@ CG_OpndHandle* InstCodeSelector::callhelper(uint32              numArgs,
 CG_OpndHandle* InstCodeSelector::callvmhelper(uint32              numArgs, 
                                               CG_OpndHandle**     args, 
                                               Type*               retType,
-                                              VMHelperCallOp::Id  callId,
+                                              CompilationInterface::RuntimeHelperId  callId,
                                               InlineInfo* ii) 
 {
     Opnd* dstOpnd=NULL;
     switch(callId) {
-    case ThrowLazy:
+    case CompilationInterface::Helper_Throw_Lazy:
     {
 
         Opnd **hlpArgs = new (memManager) Opnd* [numArgs+1];
@@ -2838,6 +2838,31 @@ CG_OpndHandle* InstCodeSelector::callvmhelper(uint32              numArgs,
                                                Opnd::RuntimeInfo::Kind_MethodRuntimeId, md);
         appendInsts(irManager.newRuntimeHelperCallInst(CompilationInterface::Helper_Throw_Lazy,
                                                        numArgs+1, (Opnd**)hlpArgs, dstOpnd, ii));
+        break;
+    }
+    case CompilationInterface::Helper_GetTLSBase:
+    {
+        assert(numArgs == 0);
+        Opnd * tlsBaseReg = irManager.newOpnd(typeManager.getUnmanagedPtrType(typeManager.getInt8Type()));
+#ifdef PLATFORM_POSIX
+        TypeManager& tm =irManager.getTypeManager();
+        Opnd * callAddrOpnd =irManager.newImmOpnd(tm.getUnmanagedPtrType(tm.getIntPtrType()),
+            Opnd::RuntimeInfo::Kind_HelperAddress, (void*)CompilationInterface::Helper_GetTLSBase);
+        appendInsts(irManager.newCallInst(callAddrOpnd, &CallingConvention_STDCALL, 0, NULL, tlsBaseReg));
+#else 
+        appendInsts(irManager.newCopyPseudoInst(Mnemonic_MOV, tlsBaseReg,  
+            irManager.newMemOpnd(typeManager.getInt32Type(),  MemOpndKind_Any, NULL, 0x14, RegName_FS)));
+#endif
+        dstOpnd  = tlsBaseReg;        
+
+        break;
+    }
+    case CompilationInterface::Helper_NewObj_UsingVtable:
+    {
+        assert(numArgs == 2);
+        dstOpnd = irManager.newOpnd(retType);
+        CallInst * callInst=irManager.newRuntimeHelperCallInst(CompilationInterface::Helper_NewObj_UsingVtable, 2, (Opnd**)args, dstOpnd);
+        appendInsts(callInst);
         break;
     }
     default:

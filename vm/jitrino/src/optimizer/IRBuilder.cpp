@@ -1401,7 +1401,7 @@ IRBuilder::genJitHelperCall(JitHelperCallId helperId,
 }
 
 Opnd*
-IRBuilder::genVMHelperCall(VMHelperCallId helperId,
+IRBuilder::genVMHelperCall(CompilationInterface::RuntimeHelperId helperId,
                             Type* returnType,
                             uint32 numArgs,
                             Opnd*  args[]) {
@@ -1412,6 +1412,7 @@ IRBuilder::genVMHelperCall(VMHelperCallId helperId,
     appendInst(instFactory->makeVMHelperCall(dst, helperId, numArgs, args));
     return dst;
 }
+
 
 void
 IRBuilder::genTauTypeCompare(Opnd *arg0, MethodDesc *methodDesc, LabelInst *target,

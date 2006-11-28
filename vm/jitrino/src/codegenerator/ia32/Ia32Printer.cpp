@@ -532,6 +532,9 @@ void IRPrinter::printOpnd(const Opnd * opnd, uint32 roles, bool isLiveBefore, bo
         if (opnd->isPlacedIn(OpndKind_Reg)){
             os<<"("; printRegName(opnd->getRegName()); os<<")";
         }else if(opnd->isPlacedIn(OpndKind_Mem)){
+            if (opnd->getSegReg() != RegName_Null) {
+                os<<"(";printRegName(opnd->getSegReg());os<<":";
+            }
             os<<"[";
             uint32 oldOpndFlavor=opndFlavor;
             opndFlavor&=~OpndFlavor_Type;
@@ -551,6 +554,9 @@ void IRPrinter::printOpnd(const Opnd * opnd, uint32 roles, bool isLiveBefore, bo
             }
             opndFlavor=oldOpndFlavor;
             os<<"]";
+            if (opnd->getSegReg() != RegName_Null) {
+                os<<")";
+            }
         }else if(opnd->isPlacedIn(OpndKind_Imm)){
             os<<"("<<opnd->getImmValue();
             if (opndFlavor & OpndFlavor_RuntimeInfo){

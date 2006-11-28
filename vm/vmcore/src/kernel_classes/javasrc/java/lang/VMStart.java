@@ -26,6 +26,9 @@ import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Modifier;
 import java.security.AccessController;
 import java.security.PrivilegedAction;
+import java.util.Properties;
+import java.util.Enumeration;
+
 
 /**
  * This class does the following:
@@ -44,7 +47,30 @@ class VMStart {
         parseSystemProperties();
     }
 
+    /** 
+        Any component can ask VMStart to initialize it's class
+        using  vm.component.<component name>.startupclass property
+    */
+    private static final String STARTUP_CLASS_PREFIX="vm.components.";
+    private static final String STARTUP_CLASS_SUFFUX=".startupclass";
+
     public static void parseSystemProperties() {
+        //call class.forName for all startup classes 
+        Properties p = System.getProperties();
+        for (Enumeration it=p.propertyNames(); it.hasMoreElements();) {
+            String key = (String)it.nextElement();
+            if (key.startsWith(STARTUP_CLASS_PREFIX) && key.endsWith(STARTUP_CLASS_SUFFUX)) {
+                String className = p.getProperty(key);
+                try {
+                    Class.forName(className);
+                } catch (Exception e) {
+                    e.printStackTrace();
+                    //TODO: should be call System.exit() here?
+                }
+
+            }
+        }
+        
     }
     
     public static void startHelperThreads() {

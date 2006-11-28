@@ -38,15 +38,17 @@
 
 namespace Jitrino {
 
-    
+// magics support    
 static bool isMagicClass(Type* type) {
 #ifdef _EM64T_
     return false;//magics are not tested on EM64T.
 #else
-    static const char unboxedName[] = "org/vmmagic/unboxed/";
-    static const unsigned nameLen = sizeof(unboxedName)-1;
+    static const char magicPackage[] = "org/vmmagic/unboxed/";
+    static const unsigned magicPackageLen = sizeof(magicPackage)-1;
+
     const char* name = type->getName();
-    return !strncmp(name, unboxedName, nameLen);
+    bool res =  !strncmp(name, magicPackage, magicPackageLen);
+    return res;
 #endif    
 }
 
@@ -85,6 +87,24 @@ Type* convertMagicType2HIR(TypeManager& tm, Type* type) {
     return NULL;
 }
 
+//vm helpers support
+
+bool isVMHelperClass(NamedType* type) {
+#ifdef _EM64T_
+    return false;//natives are not tested on EM64T.
+#else
+    static const char vmhelperPackage[] = "org/apache/harmony/drlvm/VMHelper";
+    static const unsigned vmhelperPackageLen = sizeof(vmhelperPackage)-1;
+
+    const char* name = type->getName();
+    bool res =  !strncmp(name, vmhelperPackage, vmhelperPackageLen);
+    return res;
+#endif
+}
+
+bool isVMHelperMethod(MethodDesc* md) {
+    return isVMHelperClass(md->getParentType());
+} 
 
 
 //-----------------------------------------------------------------------------
@@ -1066,12 +1086,37 @@ void
 JavaByteCodeTranslator::getstatic(uint32 constPoolIndex) {
     FieldDesc* field = resolveStaticField(constPoolIndex, false);
     if (field && field->isStatic()) {
-        Type* fieldType = getFieldType(field,constPoolIndex);
-        assert(fieldType);
-        if (isMagicClass(fieldType)) {
-            fieldType = convertMagicType2HIR(typeManager, fieldType);
+        bool fieldValueInlined = false;
+        if (field->isInitOnly() && !field->getParentType()->needsInitialization()) {
+            //the final static field of the initialized class
+            Type* fieldType = field->getFieldType();
+            if (field->getFieldType()->isNumeric()) {
+                Opnd* constVal = NULL;
+                void* fieldAddr = field->getAddress();
+                switch(fieldType->tag) {
+                    case Type::Int8 :   constVal=irBuilder.genLdConstant(*(int8*)fieldAddr);break;
+                    case Type::Int16:   constVal=irBuilder.genLdConstant(*(int16*)fieldAddr);break;
+                    case Type::Char :   constVal=irBuilder.genLdConstant(*(uint16*)fieldAddr);break;
+                    case Type::Int32:   constVal=irBuilder.genLdConstant(*(int32*)fieldAddr);break;
+                    case Type::Int64:   constVal=irBuilder.genLdConstant(*(int64*)fieldAddr);break;
+                    case Type::Float:   constVal=irBuilder.genLdConstant(*(float*)fieldAddr);break;
+                    case Type::Double:  constVal=irBuilder.genLdConstant(*(double*)fieldAddr);break;
+                    default: assert(0); //??
+                }
+                if (constVal != NULL) {
+                    pushOpnd(constVal);
+                    fieldValueInlined = true;
+                }
+            }
+        } 
+        if (!fieldValueInlined){
+            Type* fieldType = getFieldType(field,constPoolIndex);
+            assert(fieldType);
+            if (isMagicClass(fieldType)) {
+                fieldType = convertMagicType2HIR(typeManager, fieldType);
+            }
+            pushOpnd(irBuilder.genLdStatic(fieldType,field));
         }
-        pushOpnd(irBuilder.genLdStatic(fieldType,field));
         return;
     }
     // generate helper call for throwing respective exception
@@ -2252,6 +2297,9 @@ JavaByteCodeTranslator::monitorexit() {
 void 
 JavaByteCodeTranslator::genLdVar(uint32 varIndex,JavaLabelPrepass::JavaVarType javaType) {
     Opnd *var = getVarOpndLdVar(javaType,varIndex);
+    if (isMagicClass(var->getType())) {
+        var->setType(convertMagicType2HIR(typeManager, var->getType()));
+    }
     Opnd *opnd;
     if (var->isVarOpnd()) {
         opnd = irBuilder.genLdVar(var->getType(),(VarOpnd*)var);
@@ -2662,6 +2710,9 @@ JavaByteCodeTranslator::genInvokeStatic(MethodDesc * methodDesc,
 
     if (isMagicMethod(methodDesc)) {
         genMagic(methodDesc, numArgs, srcOpnds, returnType);    
+        return;
+    } else if (isVMHelperMethod(methodDesc)) {
+        genVMHelper(methodDesc, numArgs, srcOpnds, returnType);
         return;
     }
     if (inlineMethod(methodDesc)) {
@@ -3873,6 +3924,28 @@ void JavaByteCodeTranslator::genMagic(MethodDesc *md, uint32 numArgs, Opnd **src
 
     assert(0);
     return;
+}
+
+
+void JavaByteCodeTranslator::genVMHelper(MethodDesc *md, uint32 numArgs, Opnd **srcOpnds, Type *returnType) {
+    Type* resType = isMagicClass(returnType) ? convertMagicType2HIR(typeManager, returnType) : returnType;
+    const char* mname = md->getName();
+
+    if (!strcmp(mname,"getTlsBaseAddress")) {
+        assert(numArgs == 0);
+        Opnd* res = irBuilder.genVMHelperCall(CompilationInterface::Helper_GetTLSBase, resType, numArgs, srcOpnds);
+        pushOpnd(res);
+        return;
+    }
+
+    if (!strcmp(mname,"newResolvedUsingAllocHandleAndSize")) {
+        assert(numArgs == 2);
+        Opnd* res = irBuilder.genVMHelperCall(CompilationInterface::Helper_NewObj_UsingVtable, resType, numArgs, srcOpnds);
+        pushOpnd(res);
+        return;
+    }
+
+    assert(0);
 }
 
 } //namespace Jitrino 

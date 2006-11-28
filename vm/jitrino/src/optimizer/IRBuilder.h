@@ -156,11 +156,12 @@ public:
                                   uint32 numArgs,
                                   Opnd*  args[]);
 
-    Opnd*  genVMHelperCall(VMHelperCallId helperId,
+    Opnd*  genVMHelperCall(CompilationInterface::RuntimeHelperId helperId,
                             Type* returnType,
                             uint32 numArgs,
                             Opnd*  args[]);
 
+    
     void       genReturn(Opnd* src, Type* retType);//TR
     void       genReturn();//TR
     Opnd*      genCatch(Type* exceptionType); // TR

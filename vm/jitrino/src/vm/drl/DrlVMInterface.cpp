@@ -1014,8 +1014,8 @@ void DrlVMBinaryRewritingInterface::rewriteCodeBlock(Byte* codeBlock, Byte*  new
 }
 
 
-ObjectType * DrlVMCompilationInterface::resolveSystemClass( const char * klassName ) {
-    Class_Handle cls = class_load_class_by_name_using_system_class_loader(klassName);
+ObjectType * DrlVMCompilationInterface::resolveClassUsingBootstrapClassloader( const char * klassName ) {
+    Class_Handle cls = class_load_class_by_name_using_bootstrap_class_loader(klassName);
     if( NULL == cls ) {
         return NULL;
     }
@@ -1023,20 +1023,21 @@ ObjectType * DrlVMCompilationInterface::resolveSystemClass( const char * klassNa
 };
 
 
-MethodPtrType * DrlVMCompilationInterface::resolveMethod( ObjectType* klass, const char * methodName, const char * methodSig) {
+MethodDesc* DrlVMCompilationInterface::resolveMethod( ObjectType* klass, const char * methodName, const char * methodSig) {
     Class_Handle cls = (Class_Handle)klass->getVMTypeHandle();
     assert( NULL != cls );  
     Method_Handle mh = class_lookup_method_recursively( cls, methodName, methodSig);
     if( NULL == mh ) {
         return NULL;
     }
-    return getTypeManager().getMethodPtrType(getMethodDesc(mh));
+    return getMethodDesc(mh, NULL);
 };
 
 JIT_Handle
 DrlVMCompilationInterface::getJitHandle() const {
     return getCompilationContext()->getCurrentJITContext()->getJitHandle();
 }
+
 
 
 } //namespace Jitrino

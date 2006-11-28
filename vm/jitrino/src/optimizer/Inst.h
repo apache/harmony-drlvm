@@ -1025,14 +1025,8 @@ class VMHelperCallInst : public Inst {
 public:
     void visit(InstFormatVisitor& visitor)  {visitor.accept(this);}
     bool isVMHelperCallInst() const { return true; }
-    VMHelperCallId getVMHelperId() const {return vmHelperId;}
-    Opnd* getLEConstructor() const {
-        if (vmHelperId == ThrowLazy)
-            return args[numSrcs];
-        else
-            return NULL;
-    }
-    bool isThrowLazy() const {return vmHelperId == ThrowLazy;}
+    CompilationInterface::RuntimeHelperId getVMHelperId() const {return vmHelperId;}
+    bool isThrowLazy() const {return vmHelperId == CompilationInterface::Helper_Throw_Lazy;}
 InlineInfo* getInlineInfoPtr() { return inlInfo; }
 private:
     virtual void handlePrintEscape(::std::ostream&, char code) const;
@@ -1043,8 +1037,9 @@ private:
                      Opnd* dst,
                      uint32 nArgs,
                      Opnd** args_,
-                     VMHelperCallId id) : Inst(op, mod, type, dst, nArgs),
-                                          vmHelperId(id), inlInfo(NULL) {
+                     CompilationInterface::RuntimeHelperId id) 
+                     : Inst(op, mod, type, dst, nArgs), vmHelperId(id), inlInfo(NULL) 
+    {
         args = args_;
         switch (nArgs) {
         default:
@@ -1060,9 +1055,10 @@ private:
         args[srcIndex] = src;
     }
     Opnd**    args;
-    VMHelperCallId vmHelperId;
+    CompilationInterface::RuntimeHelperId vmHelperId;
     InlineInfo* inlInfo;
 };
+
 
 // phi instructions
 class PhiInst : public MultiSrcInst {
@@ -1153,8 +1149,10 @@ public:
                                Opnd* tauNullChecked, Opnd* tauTypesChecked, 
                                uint32 numArgs, Opnd** args);
     Inst*    makeJitHelperCall(Opnd* dst, JitHelperCallId id, uint32 numArgs, Opnd** args);
-    Inst*    makeVMHelperCall(Opnd* dst, VMHelperCallId id, uint32 numArgs,
+    Inst*    makeVMHelperCall(Opnd* dst, CompilationInterface::RuntimeHelperId id, uint32 numArgs,
                                Opnd** args, InlineInfo* inlInfo = NULL);
+    
+
     Inst*    makeReturn(Opnd* src);
     Inst*    makeReturn();    // void return type
     Inst*    makeCatch(Opnd* dst);
@@ -1538,8 +1536,9 @@ private:
                                            Opnd* dst,
                                            uint32 nArgs,
                                            Opnd** args_,
-                                           VMHelperCallId id,
+                                           CompilationInterface::RuntimeHelperId id,
                                            InlineInfo* inlInfo = NULL);
+
 
     PhiInst* makePhiInst(Type::Tag type, Opnd* dst, uint32 nArgs, Opnd** args_);
 

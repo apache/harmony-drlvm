@@ -54,6 +54,8 @@ VMEXPORT size_t vm_number_of_gc_bytes_in_thread_local();
  */
 VMEXPORT void *vm_get_gc_thread_local();
 
+VMEXPORT size_t vm_get_gc_thread_local_offset();
+
 
 /**
  * Acquire the lock that guards all GC-related operations in the VM.

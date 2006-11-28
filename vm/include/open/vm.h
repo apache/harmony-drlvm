@@ -34,6 +34,8 @@
 
 #include "open/types.h"
 
+#define O_A_H_VM_VMDIR         "org.apache.harmony.vm.vmdir"
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -74,7 +76,7 @@ VMEXPORT Class_Handle get_system_string_class();
 
 // Loads a class of a given name.  If a class cannot be loaded, returns NULL
 VMEXPORT Class_Handle
-class_load_class_by_name_using_system_class_loader(const char *name);
+class_load_class_by_name_using_bootstrap_class_loader(const char *name);
 
 // The following three functions will be eventually renamed to
 // class_is_final, class_is_abstract and class_is_interface,

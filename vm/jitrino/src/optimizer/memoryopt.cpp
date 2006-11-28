@@ -655,18 +655,6 @@ MemoryOptInitWalker::applyToInst(Inst *i)
         }
         break;
     case Op_VMHelperCall:
-        {
-            VMHelperCallInst *vmcalli = i->asVMHelperCallInst();
-            VMHelperCallId callId = vmcalli->getVMHelperId();
-            switch (callId) {
-            case ThrowLazy:
-                assert(vmcalli->getNumSrcOperands() > 0);
-                break;
-            default:
-                assert(0);
-                break;
-            }
-        }
         break;
     case Op_JitHelperCall:
         {
@@ -1404,10 +1392,7 @@ AliasRep AliasManager::getReference(Opnd *addr)
         break;
     case Op_Conv: //the result of a conversion
     case Op_TauLdInd: // the result of static field load
-        {
-            assert(addr->getType()->isUnmanagedPtr());
-            break;
-        }
+        break;
     default:
         assert(0);
         break;

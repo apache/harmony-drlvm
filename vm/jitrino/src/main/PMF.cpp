@@ -459,7 +459,7 @@ void StrSubstitution::seekz ()
 
 static const char* deffmask     = "log/%jit%/%class%/%method%/%log%.log";
 static const char* ct_deffmask  = "log/%jit%/%class%/%method%/ct.log";
-static const char* dot_deffmask = "log/%jit%/%class%/%method%/.dot";
+static const char* dot_deffmask = "log/%jit%/%class%/%method%/dot/.dot";
 
 struct KnownStream 
 {

@@ -316,6 +316,7 @@ private:
     bool    needsReturnLabel(uint32 off);
     void    genInvokeStatic(MethodDesc * methodDesc,uint32 numArgs,Opnd ** srcOpnds,Type * returnType);
     void    genMagic(MethodDesc * methodDesc,uint32 numArgs,Opnd ** srcOpnds,Type * returnType);
+    void    genVMHelper(MethodDesc * methodDesc,uint32 numArgs,Opnd ** srcOpnds,Type * returnType);
     
     bool    methodIsArraycopy(MethodDesc * methodDesc);
     bool    arraycopyOptimizable(MethodDesc * methodDesc, uint32 numArgs, Opnd ** srcOpnds);

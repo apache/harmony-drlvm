@@ -129,6 +129,8 @@ static struct VmStandardProperty {
     {"vm.ee_dlls",                       "A ';'-delimited list of modular dlls (JIT/Interpreter/etc.) to load at startup."},
     {"vm.em_dll",                        "A ';'-execution manager (EM) dll to load at startup."},
     {"vm.other_natives_dlls",            "A " EXPAND(PORT_PATH_SEPARATOR) "-delimited list of dlls contained native methods implementations to load at startup."},
+    {"vm.components.<component>.classpath",     "Part of a <component>'s classpath to append to the JDK booclasspath"},
+    {"vm.components.<component>.startupclass",  "A <component> class to be initialized during startup"}
 };
 
 static const int numStandardProperties = sizeof(standardProperties) / sizeof(standardProperties[0]);
@@ -137,6 +139,9 @@ static bool areStandardPropertiesSet = false;
 
 void check_vm_standard_property(const char *propertyName, const char *propertyValue)
 {
+    if (!strncmp(propertyName, "vm.components.", strlen("vm.components."))) {
+        return;
+    }
     for (int i=0; i<numStandardProperties; i++)
     {
         if (!strcmp(propertyName, standardProperties[i].name))

@@ -84,7 +84,7 @@ public:
     // Inline this method into the current CFG and process it for further
     // inline candidates.  If the argument is the top level CFG, only processing
     // occurs.
-    void inlineAndProcessRegion(InlineNode* inlineNode);
+    void inlineRegion(InlineNode* inlineNode, bool updatePriorityQueue = true);
 
     // Connect input and return operands of the region to the top-level method.  Do not yet splice.
     void connectRegion(InlineNode* inlineNode);
@@ -97,7 +97,11 @@ public:
 
     void reset();
 
+    InlineNode* createInlineNode(CompilationContext& inlineCC, MethodCallInst* call);
+
     static double getProfileMethodCount(CompilationInterface& compileIntf, MethodDesc& methodDesc); 
+    
+    static void runInlinerPipeline(CompilationContext& inlineCC, const char* pipeName);
 
 private:
     class CallSite {

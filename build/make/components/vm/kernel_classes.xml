@@ -42,12 +42,13 @@ Version: $Revision: 1.4.2.5 $
 
             <fileset dir="${external.dep.CLASSLIB.jardir}" includes="*.jar" />
             <fileset dir="${build.ANTLR.home}" includes="antlr-2.7.5.jar" />
+            <fileset dir="${build.MMTK.home}" includes="mmtk-20061012.jar" />
         </path>
 
         <property name="jarname" value="kernel.jar"/>
         
         <property name="manifest.file" 
-	        location="${build.vm.home}/vmcore/src/kernel_classes/resource/MANIFEST.MF" />	
+            location="${build.vm.home}/vmcore/src/kernel_classes/resource/MANIFEST.MF" />   
         
     </target>
 </project>

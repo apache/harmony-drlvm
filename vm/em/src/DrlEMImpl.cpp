@@ -179,7 +179,7 @@ std::string buildDefaultLibPath(const std::string& dll_name) {
     std::string fullPath = dll_name + ".dll";
     
     if (!library_path.empty()) { 
-    	fullPath = library_path + "\\" + fullPath;
+        fullPath = library_path + "\\" + fullPath;
     }
     
 #else
@@ -187,10 +187,10 @@ std::string buildDefaultLibPath(const std::string& dll_name) {
 //
 //    std::string fullPath = library_path + "/lib" + dll_name + ".so";
 
-	std::string fullPath = "lib" + dll_name + ".so";
-	
+    std::string fullPath = "lib" + dll_name + ".so";
+    
     if (!library_path.empty()) {
-  		fullPath = library_path + "/" + fullPath;
+        fullPath = library_path + "/" + fullPath;
     }
     
 #endif
@@ -214,8 +214,7 @@ std::string prepareLibPath(const std::string& origPath) {
 
     std::string path = origPath;
     if (path.find('/') == path.npos && path.find('\\') == path.npos ) {
-// $$$ GMJ        std::string dir = vm_get_property_value("vm.boot.library.path");
-        std::string dir = vm_get_property_value("org.apache.harmony.vm.vmdir");
+        std::string dir = vm_get_property_value(O_A_H_VM_VMDIR);
         if (libPrefix.length() > 0 && !startsWith(path, libPrefix)) {
             path = libPrefix + path;
         }

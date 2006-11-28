@@ -478,15 +478,16 @@ Version: $Revision: 1.16.2.20 $
                                            deploy.getting_started,
                                            deploy.copy_classlib,
                                            deploy.antlr,
+                                           deploy.mmtk,
                                            deploy.tweakname">
-    	
-    	<!-- copy our hythr for the launcher to use -->
-    	
-    	<copy todir="${build.deploy.dir}/bin">
-    		<fileset dir="${build.deploy.dir}/bin/default/">
-    			<include name="*hythr*"/>
-    		</fileset>
-    	</copy>
+        
+        <!-- copy our hythr for the launcher to use -->
+        
+        <copy todir="${build.deploy.dir}/bin">
+            <fileset dir="${build.deploy.dir}/bin/default/">
+                <include name="*hythr*"/>
+            </fileset>
+        </copy>
         
         <!-- copy the harmonyvm.properties to use too -->
         
@@ -507,7 +508,7 @@ Version: $Revision: 1.16.2.20 $
                 </chmod>
             </then>
         </if>
-    	
+        
     </target>
 
     <!-- tweak the names of java -> java.exec and
@@ -539,7 +540,7 @@ Version: $Revision: 1.16.2.20 $
         <copy todir="${canonical.deploy.dir}/jre">
             <fileset dir="${build.deploy.dir}"/>
         </copy>
-    	
+        
         <if>
             <isset property="if.lnx"/>
             <then>
@@ -568,6 +569,24 @@ Version: $Revision: 1.16.2.20 $
 <concat append="true" destfile="${build.deploy.dir}/lib/boot/bootclasspath.properties">
 # Dependency for generics parser
 bootclasspath.99=antlr-2.7.5.jar
+</concat>
+<fixcrlf srcdir="${build.deploy.dir}/lib/boot" includes="bootclasspath.properties"/>
+        </then>
+        </if> 
+    </target>
+
+    <target name="deploy.mmtk">
+        <copy todir="${build.deploy.dir}/lib/boot">
+            <fileset dir="${build.MMTK.home}">
+                <include name="mmtk-20061012.jar" />
+            </fileset>
+        </copy>
+        <loadfile srcFile="${build.deploy.dir}/lib/boot/bootclasspath.properties" property="boot.jars.list" />
+        <if> <not><contains string="${boot.jars.list}" substring="=mmtk-20061012.jar"/></not>
+        <then>
+<concat append="true" destfile="${build.deploy.dir}/lib/boot/bootclasspath.properties">
+# Dependency for unboxed mmtk package
+bootclasspath.100=mmtk-20061012.jar
 </concat>
 <fixcrlf srcdir="${build.deploy.dir}/lib/boot" includes="bootclasspath.properties"/>
         </then>

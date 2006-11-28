@@ -91,15 +91,19 @@ private:
     unsigned id;
 };
 
-#define DEFINE_SESSION_ACTION(classname, tagname, fullname) \
+
+#define DEFINE_SESSION_ACTION_WITH_ACTION(classname, actionclass, tagname, fullname) \
 class classname : public OptPass { \
 protected: \
-           void _run(IRManager& irm); \
-           const char* getName() { return fullname; } \
-           const char* getTagName() { return #tagname; } \
+    void _run(IRManager& irm); \
+    const char* getName() { return fullname; } \
+    const char* getTagName() { return #tagname; } \
 }; \
-ActionFactory<classname> tagname##_(#tagname);
+ActionFactory<classname, actionclass> tagname##_(#tagname);
 
+
+#define DEFINE_SESSION_ACTION(classname, tagname, fullname) \
+DEFINE_SESSION_ACTION_WITH_ACTION(classname, Action, tagname, fullname)
 
 } //namespace Jitrino 
 
