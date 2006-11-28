@@ -14,10 +14,6 @@
  *  See the License for the specific language governing permissions and
  *  limitations under the License.
  */
-/** 
-* @author Alexey V. Varlamov
-* @version $Revision: 1.1.2.1.4.3 $
-*/  
 
 #include <stdio.h>
 #include <windows.h>
@@ -25,7 +21,21 @@
 
 APR_DECLARE(int) port_CPUs_number() {
 	SYSTEM_INFO sys_info;
-	GetSystemInfo(&sys_info);
+	typedef void (WINAPI *PTR_GETNATIVESYSTEM_INFO)(LPSYSTEM_INFO);
+	static PTR_GETNATIVESYSTEM_INFO pTrGetNativeSystemInfo = NULL;
+    if (!pTrGetNativeSystemInfo) {
+        HMODULE h = GetModuleHandleA("kernel32.dll");
+       /* 
+        * Use GetNativeSystemInfo if available in kernel 
+        * It provides more accurate info in WOW64 mode
+        */
+        pTrGetNativeSystemInfo = (PTR_GETNATIVESYSTEM_INFO) GetProcAddress(h, "GetNativeSystemInfo");
+    }
+    if(pTrGetNativeSystemInfo != NULL) {
+		pTrGetNativeSystemInfo(&sys_info);
+    } else {
+		GetSystemInfo(&sys_info);
+    }
 	return sys_info.dwNumberOfProcessors;
 }
 
