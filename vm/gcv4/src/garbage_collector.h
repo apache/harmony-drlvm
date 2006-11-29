@@ -57,10 +57,6 @@ public:
 
     int gc_add_fresh_chunks(unsigned int);
 
-    tl::MemoryPoolMT& get_gcvt_pool() {
-        return gcvt_pool;
-    }
-
     /// Considers statistics and makes a decision to resize the heap.
     void consider_heap_resize(int size_failed);
 
@@ -265,8 +261,6 @@ public:
 /////////////////////////////////////////////////////////////////////////////////////////////////////
 
 private:
-    tl::MemoryPoolMT gcvt_pool;
-
     block_info * get_fresh_chunk_from_block_store(bool stay_above_waterline);
 
     block_info *get_free_chunk_from_global_gc_chunks();

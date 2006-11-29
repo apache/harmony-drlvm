@@ -121,10 +121,6 @@ VMEXPORT VTable_Handle class_get_vtable(Class_Handle ch);
 // routines, given a class handle.
 VMEXPORT Allocation_Handle class_get_allocation_handle(Class_Handle ch);
 
-// Returns the allocation handle to be used for runtime type checks in
-// JIT-generated code, given a class handle.
-VMEXPORT Runtime_Type_Handle class_get_runtime_type_handle(Class_Handle ch);
-
 // Returns the class handle corresponding to a given allocation handle.
 VMEXPORT Class_Handle allocation_handle_get_class(Allocation_Handle ah);
 
@@ -196,6 +192,9 @@ VMEXPORT Method_Handle class_get_method(Class_Handle ch, unsigned index);
 
 // Returns TRUE if all instances of this class are pinned.
 VMEXPORT Boolean class_is_pinned(Class_Handle ch);
+
+// Returns TRUE if all instances of this class are pinned.
+VMEXPORT void* class_alloc_via_classloader(Class_Handle ch, int32 size);
 
 // Returns TRUE if this is an array of primitives.
 VMEXPORT Boolean class_is_non_ref_array(Class_Handle ch);
@@ -678,7 +677,7 @@ VMEXPORT POINTER_SIZE_INT vm_get_vtable_base();
 // information in each object's header.  This is typically used
 // by the JIT for generating type-checking code, e.g. for inlined
 // type checks or for inlining of virtual methods.
-VMEXPORT unsigned vm_get_runtime_type_handle_width();
+VMEXPORT unsigned vm_get_vtable_ptr_size();
 
 // Returns a printable signature.  The character buffer is owned by the
 // caller.  Call free_string_buffer to reclaim the memory.

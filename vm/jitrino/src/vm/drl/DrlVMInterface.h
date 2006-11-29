@@ -100,7 +100,7 @@ public:
         return class_is_initialized((Class_Handle)vmTypeHandle)?true:false;
     }
     void*       getVTable(void* vmTypeHandle) {
-        return (void *) class_get_runtime_type_handle((Class_Handle)vmTypeHandle);
+        return (void *) class_get_vtable((Class_Handle)vmTypeHandle);
     }
 
     // 
@@ -424,7 +424,7 @@ public:
         return (vm_vtable_pointers_are_compressed() != 0);
     }
     uint32        getVTablePtrSize() {
-        return vm_get_runtime_type_handle_width();
+        return vm_get_vtable_ptr_size();
     }
     uint64        getVTableBase() {
         return vm_get_vtable_base();

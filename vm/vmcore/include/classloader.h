@@ -193,7 +193,6 @@ public:
     }
     Class* AllocateAndReportInstance(const Global_Env* env, Class* klass);
     Class* NewClass(const Global_Env* env, const String* name);
-    ManagedObject** RegisterClassInstance(const String* className, ManagedObject* instance);
     Package* ProvidePackage(Global_Env* env, const String *class_name, const char *jar);
     Class* DefineClass(Global_Env* env, const char* class_name,
         uint8* bytecode, unsigned offset, unsigned length, const String** res_name = NULL);
@@ -266,6 +265,18 @@ public:
         Unlock();
         return ptr;
     }
+
+    PoolManager* GetCodePool(){
+        return CodeMemoryManager;
+    }
+
+    inline void* CodeAlloc(size_t size, size_t alignment, Code_Allocation_Action action) {
+        return CodeMemoryManager->alloc(size, alignment, action);
+    }
+    inline void* VTableAlloc(size_t size, size_t alignment, Code_Allocation_Action action) {
+        return VM_Global_State::loader_env->VTableMemoryManager->alloc(size, alignment, action);        
+    }
+
 private:
     static Lock_Manager m_tableLock;
     static unsigned m_capacity;
@@ -294,6 +305,7 @@ protected:
     unsigned m_fullSize;
     void* m_verifyData;
     apr_pool_t* pool;
+    PoolManager *CodeMemoryManager;
 
     // methods
     Class* WaitDefinition(Global_Env* env, const String* className);

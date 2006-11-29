@@ -573,7 +573,7 @@ NativeCodePtr compile_create_lil_jni_stub(Method_Handle method, void* func, Nati
     //***** Now generate code
 
     assert(lil_is_valid(cs));
-    NativeCodePtr addr = LilCodeGenerator::get_platform()->compile(cs);
+    NativeCodePtr addr = LilCodeGenerator::get_platform()->compile(cs, clss->get_class_loader()->GetCodePool());
 
 #ifndef NDEBUG
     char buf[100];

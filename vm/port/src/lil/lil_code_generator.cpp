@@ -54,10 +54,11 @@ LilCodeGenerator::LilCodeGenerator()
 {
 }
 
-NativeCodePtr LilCodeGenerator::compile(LilCodeStub* cs)
+NativeCodePtr LilCodeGenerator::compile(LilCodeStub* cs, PoolManager* code_pool)
 {
+    assert (code_pool);
     size_t stub_size;
-    NativeCodePtr stub = compile_main(cs, &stub_size);
+    NativeCodePtr stub = compile_main(cs, &stub_size, code_pool);
     lil_cs_set_code_size(cs, stub_size);
     
     compile_add_dynamic_generated_code_chunk("unknown", stub, stub_size);
@@ -69,9 +70,10 @@ NativeCodePtr LilCodeGenerator::compile(LilCodeStub* cs)
 }
 
 
-NativeCodePtr LilCodeGenerator::allocate_memory(size_t size)
+NativeCodePtr LilCodeGenerator::allocate_memory(size_t size, PoolManager* code_pool)
 {
-    NativeCodePtr buf = malloc_fixed_code_for_jit(size, DEFAULT_CODE_ALIGNMENT, CODE_BLOCK_HEAT_DEFAULT, CAA_Allocate);
+    assert(code_pool);
+    NativeCodePtr buf = code_pool->alloc(size, DEFAULT_CODE_ALIGNMENT, CAA_Allocate);
 
     // Check for 16-byte alignment
     assert((((POINTER_SIZE_INT)buf)&15)==0);

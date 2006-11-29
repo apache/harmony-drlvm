@@ -224,8 +224,7 @@ NativeCodePtr compile_gen_compile_me(Method_Handle method) {
 #ifdef VM_STATS
     ++VM_Statistics::get_vm_stats().num_compileme_generated;
 #endif
-    char * stub = (char *) malloc_fixed_code_for_jit(STUB_SIZE,
-        DEFAULT_CODE_ALIGNMENT, CODE_BLOCK_HEAT_DEFAULT, CAA_Allocate);
+    char * stub = (char *) method_get_class(method)->code_alloc(STUB_SIZE, DEFAULT_CODE_ALIGNMENT, CAA_Allocate);
     NativeCodePtr addr = stub; 
 #ifndef NDEBUG
     memset(stub, 0xcc /*int 3*/, STUB_SIZE);

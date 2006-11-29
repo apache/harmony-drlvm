@@ -406,7 +406,6 @@ static jint preload_classes(Global_Env * vm_env) {
     vm_env->strings_are_compressed =
         (class_lookup_field_recursive(vm_env->JavaLangString_Class, "bvalue", "[B") != NULL);
     vm_env->JavaLangString_VTable = vm_env->JavaLangString_Class->get_vtable();
-    vm_env->JavaLangString_allocation_handle = vm_env->JavaLangString_Class->get_allocation_handle();
 
     TRACE2("init", "preloading exceptions");
     vm_env->java_lang_Throwable_Class =
@@ -700,7 +699,6 @@ int vm_init1(JavaVM_Internal * java_vm, JavaVMInitArgs * vm_arguments) {
     /*    END: Property processing.    */
 
     // Initialize memory allocation.
-    vm_init_mem_alloc();
     gc_init();
 
     // TODO: change all uses of Class::heap_base to Slot::heap_base

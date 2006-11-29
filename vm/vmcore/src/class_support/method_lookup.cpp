@@ -105,6 +105,60 @@ void Method_Lookup_Table::add(CodeChunkInfo *m)
     vm_env->p_meth_addr_table_lock->_unlock();
 } //Method_Lookup_Table::add
 
+#define USE_METHOD_LOOKUP_CACHE
+
+void Method_Lookup_Table::remove(CodeChunkInfo *m)
+{
+    Global_Env * vm_env = VM_Global_State::loader_env;
+
+    void* addr = m->get_code_block_addr();
+    if (addr == NULL) {
+        return;
+    }
+
+#ifdef USE_METHOD_LOOKUP_CACHE
+    // First remove from cache.  
+    for (unsigned i = 0; i < EIP_CACHE_SIZE; i++){
+        if (_cache[i]){
+            void *guess_start = _cache[i]->get_code_block_addr();
+            void *guess_end   = ((char *)_cache[i]->get_code_block_addr()) + _cache[i]->get_code_block_size();
+            if ((addr >= guess_start) && (addr < guess_end)) {
+                _cache[i] = NULL;
+            }
+        }
+    }
+#endif //USE_METHOD_LOOKUP_CACHE
+
+    vm_env->p_meth_addr_table_lock->_lock();
+
+    unsigned L = 0, R = _next_free_entry;
+    while (L < R) {
+        unsigned M = (L + R) / 2;
+        CodeChunkInfo *m = _table[M];
+        void  *code_block_addr = m->get_code_block_addr();
+        size_t code_block_size = m->get_code_block_size();
+        void  *code_end_addr   = (void *)((char *)code_block_addr + code_block_size);
+
+        if (addr < code_block_addr) {
+            R = M;
+        } else if (addr >= code_end_addr) {
+            // Should this be (addr >= code_end_addr)?
+            L = M + 1;
+        } else {
+            // Shift entries starting at idx one slot to the right, then insert the new entry at idx
+            for (unsigned i = M;  i <  (_next_free_entry - 1);  i++) {
+                _table[i] = _table[i+1];
+            }
+            _next_free_entry--;
+
+            vm_env->p_meth_addr_table_lock->_unlock();
+            return;
+        }
+    }
+
+    vm_env->p_meth_addr_table_lock->_unlock();
+} //Method_Lookup_Table::remove
+
 
 void Method_Lookup_Table::append_unlocked(CodeChunkInfo *m)
 {
@@ -157,8 +211,6 @@ unsigned Method_Lookup_Table::find_index(void *addr)
 } //Method_Lookup_Table::find_index
 
 
-
-#define USE_METHOD_LOOKUP_CACHE
 
 CodeChunkInfo *Method_Lookup_Table::find(void *addr, bool is_ip_past)
 {

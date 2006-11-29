@@ -1461,12 +1461,12 @@ static void main_pass(LilCodeStub* cs, tl::MemoryPool* mem, NativeCodePtr _buf,
 }
 
 
-NativeCodePtr LilCodeGeneratorIa32::compile_main(LilCodeStub* cs, size_t* stub_size)
+NativeCodePtr LilCodeGeneratorIa32::compile_main(LilCodeStub* cs, size_t* stub_size, PoolManager* code_pool)
 {
     LcgIa32PrePassInfo* data;
     tl::MemoryPool mem;
     size_t size = pre_pass(cs, &mem, &data);
-    NativeCodePtr buf = allocate_memory(size);
+    NativeCodePtr buf = allocate_memory(size, code_pool);
     main_pass(cs, &mem, buf, data, stub_size);
     return buf;
 }

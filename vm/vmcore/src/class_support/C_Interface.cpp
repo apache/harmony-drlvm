@@ -2140,6 +2140,14 @@ int class_get_referent_offset(Class_Handle ch)
     return referent->get_offset();
 }
 
+void* class_alloc_via_classloader(Class_Handle ch, int32 size)
+{
+    assert(ch);
+	assert(size >= 0);
+    Class *clss = (Class *)ch;
+    assert (clss->get_class_loader());
+    return clss->get_class_loader()->Alloc(size);
+} //class_alloc_via_classloader
 
 unsigned class_get_alignment(Class_Handle ch)
 {
@@ -2363,14 +2371,7 @@ Allocation_Handle class_get_allocation_handle(Class_Handle ch)
 }
 
 
-Runtime_Type_Handle class_get_runtime_type_handle(Class_Handle ch)
-{
-    assert(ch);
-    return (Runtime_Type_Handle)ch->get_allocation_handle();
-}
-
-
-unsigned vm_get_runtime_type_handle_width()
+unsigned vm_get_vtable_ptr_size()
 {
     if(vm_vtable_pointers_are_compressed())
     {

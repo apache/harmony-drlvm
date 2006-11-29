@@ -25,6 +25,8 @@
 
 #include "lil.h"
 #include "vm_core_types.h"
+#include "environment.h"
+#include "mem_alloc.h"
 
 // This is an abstract base case for LIL code generators
 // Subclasses compile LIL into native code for a particular
@@ -44,7 +46,8 @@ public:
     // The stub_name is for vtune support
     // Dump an ascii version of the compiled stub to stdout if dump_stub
     // If cs_stats is nonnull add the number of bytes of the compiled code to *cs_stats
-    NativeCodePtr compile(LilCodeStub* cs);
+    NativeCodePtr compile(LilCodeStub* cs, PoolManager* code_pool = 
+        VM_Global_State::loader_env->GlobalCodeMemoryManager);
 
 protected:
     LilCodeGenerator();
@@ -52,7 +55,7 @@ protected:
     // allocates a chunk of memory for a LIL stub; the user-provided function
     // compile_main() should call this function instead of allocating memory
     // directly.
-    NativeCodePtr allocate_memory(size_t);
+    NativeCodePtr allocate_memory(size_t, PoolManager*);
 
     // generates compiled code for a LIL stub, and returns its address.  The
     // size of the compiled stub is placed in stub_size.  Called by the
@@ -61,7 +64,7 @@ protected:
     // Each subclass of LilCodeGenerator should provide a platform-dependent
     // implementation of compile_main().  The memory area that holds the
     // compiled code should be allocated by calling allocate_memory().
-    virtual NativeCodePtr compile_main(LilCodeStub* cs, size_t* stub_size) = 0;
+    virtual NativeCodePtr compile_main(LilCodeStub* cs, size_t* stub_size, PoolManager* code_pool) = 0;
 };
 
 #endif // _LIL_CODE_GENERATOR_H_

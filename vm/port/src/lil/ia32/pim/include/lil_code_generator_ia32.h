@@ -32,7 +32,7 @@ class LilCodeGeneratorIa32 : public LilCodeGenerator {
     LilCodeGeneratorIa32();
 
  protected:
-    NativeCodePtr compile_main(LilCodeStub* , size_t*);
+    NativeCodePtr compile_main(LilCodeStub* , size_t*, PoolManager*);
 };
 
 #endif // _LIL_CODE_GENERATOR_IA32_

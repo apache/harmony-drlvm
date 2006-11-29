@@ -1622,7 +1622,7 @@ move_to_destination:
 
 LilCodeGeneratorEM64T::LilCodeGeneratorEM64T(): LilCodeGenerator() {}
 
-NativeCodePtr LilCodeGeneratorEM64T::compile_main(LilCodeStub * cs, size_t * stub_size) {
+NativeCodePtr LilCodeGeneratorEM64T::compile_main(LilCodeStub * cs, size_t * stub_size, PoolManager* code_pool) {
     // start a memory manager
     tl::MemoryPool m;
     // get context
@@ -1631,7 +1631,7 @@ NativeCodePtr LilCodeGeneratorEM64T::compile_main(LilCodeStub * cs, size_t * stu
     LcgEM64TCodeGen codegen(cs, *context, m);
     // copy generated code to the destination
     *stub_size = codegen.get_size();
-    NativeCodePtr buffer = allocate_memory(*stub_size);
+    NativeCodePtr buffer = allocate_memory(*stub_size, code_pool);
     codegen.copy_stub(buffer);
 
     return buffer;

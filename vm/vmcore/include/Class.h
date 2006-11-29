@@ -31,7 +31,7 @@
 #include "port_malloc.h"
 #include "String_Pool.h"
 #include "vtable.h"
-
+#include "jit_intf.h"
 
 // forward declarations
 struct Class;
@@ -764,7 +764,6 @@ enum AccessAndPropertiesFlags {
     /** Enum modifier. Valid for Class, Field (since J2SE 5.0).*/
     ACC_ENUM         = 0x4000
 };
-
 
 /** VM representation of Java class.
  * This class contains methods for parsing classes, querying class properties,
@@ -1783,6 +1782,9 @@ public:
 
     /** Updates throwing statistics for <code>java/lang/Throwable</code> decendants.*/
     void class_thrown() { m_num_throws++; }
+
+    /** Allocates memory for code from pool of defining classloader for the class.*/
+    void* code_alloc(size_t size, size_t alignment, Code_Allocation_Action action);
 
     /** Updates initialization check statistics.*/
     void initialization_checked() { m_num_class_init_checks++; }

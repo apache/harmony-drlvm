@@ -905,7 +905,7 @@ void Class::create_vtable(unsigned n_vtable_entries)
     unsigned vtable_size = VTABLE_OVERHEAD + n_vtable_entries * sizeof(void *);
 
     // Always allocate vtable data from vtable_data_pool
-    void* p_gc_hdr = allocate_vtable_data_from_pool(vtable_size);
+    void *p_gc_hdr = m_class_loader->VTableAlloc(vtable_size, 16, CAA_Allocate);
 
 #ifdef VM_STATS
     // For allocation statistics, include any rounding added to make each

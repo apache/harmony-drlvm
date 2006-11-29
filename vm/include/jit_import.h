@@ -245,13 +245,10 @@ typedef enum Code_Allocation_ActionEnum {
 // heat values.  The JIT is responsible for specifying ids that are unique
 // within the same method.
 // The first instruction of the chunk with id=0 is the entry point of the method.
-// If the CAA_Allocate argument is specified, memory is allocated and a pointer
+// DEPRECATED: If the CAA_Allocate argument is specified, memory is allocated and a pointer
 // to it is returned.  If the CAA_Simulate argument is specified, no memory is
-// actually allocated and the VM returns an address that would have been
-// allocated if CAA_Allocate was specified and all the other arguments were
-// the same.  The VM may return NULL when CAA_Simulate is specified.  This may
-// for instance happen if multiple heat values were mapped to the same code
-// pool or if the specified size would require a new code pool.
+// allocated - the same as pass parameter size = 0 - function returns only current 
+// address for allocation in pool but no memory is allocated.  
 VMEXPORT Byte *
 method_allocate_code_block(Method_Handle m,
                            JIT_Handle j,

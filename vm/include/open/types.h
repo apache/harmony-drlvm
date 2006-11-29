@@ -203,7 +203,6 @@ typedef struct Method *Method_Handle;
 typedef struct Method_Signature *Method_Signature_Handle;
 typedef struct TypeDesc *Type_Info_Handle;
 typedef POINTER_SIZE_INT Allocation_Handle;
-typedef POINTER_SIZE_INT Runtime_Type_Handle;
 typedef void* NativeCodePtr;
 typedef struct ClassLoader* ClassLoaderHandle;
 typedef struct ManagedObject* ManagedPointer;

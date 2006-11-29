@@ -2113,7 +2113,7 @@ LilCodeGeneratorIpf::LilCodeGeneratorIpf()
 {
 }
 
-NativeCodePtr LilCodeGeneratorIpf::compile_main(LilCodeStub* cs, size_t* stub_size) {
+NativeCodePtr LilCodeGeneratorIpf::compile_main(LilCodeStub* cs, size_t* stub_size, PoolManager* code_pool) {
 
     // start a memory manager
     tl::MemoryPool m;
@@ -2131,7 +2131,7 @@ NativeCodePtr LilCodeGeneratorIpf::compile_main(LilCodeStub* cs, size_t* stub_si
     // get the goodies from the emitter
     emitter.flush_buffer();
     *stub_size = emitter.get_size();
-    NativeCodePtr buffer = allocate_memory(*stub_size);
+    NativeCodePtr buffer = allocate_memory(*stub_size, code_pool);
     emitter.copy((char*)buffer);
     flush_hw_cache((Byte*)buffer, *stub_size);
     sync_i_cache();

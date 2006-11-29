@@ -55,16 +55,6 @@ POINTER_SIZE_INT initial_heap_size_bytes = 0;
 POINTER_SIZE_INT final_heap_size_bytes = 0;
 
 //
-// This remembered set has an entry per loaded class.
-// It is used for determining valid vtable pointers
-// when examining candidate objects.
-//
-
-Hash_Table *p_loaded_vtable_directory = NULL;
-
-
-
-//
 // Global to specify the size differentiating
 //
 unsigned los_threshold_bytes = 0;

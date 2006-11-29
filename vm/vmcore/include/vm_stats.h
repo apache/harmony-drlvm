@@ -248,6 +248,12 @@ public:
     Lock_Manager vm_stats_lock;
     apr_pool_t * vm_stats_pool;
 
+    // JIT and stub pools statistics
+    uint64 number_memoryblock_allocations;
+    uint64 total_memory_allocated;
+    uint64 total_memory_used;
+    uint64 number_memorymanager_created;
+
     ~VM_Statistics();
 
     static VM_Statistics & get_vm_stats();

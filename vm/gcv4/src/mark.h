@@ -121,7 +121,6 @@ static inline bool mark_object(Partial_Reveal_Object * p_obj)
 
     uint8 mask = (uint8) (1 << bit_index_into_byte);
 
-    vm_notify_live_object_class(p_obj->vt()->get_gcvt()->gc_clss);
     while (true) {
         uint8 old_val = *p_byte;
         uint8 final_val = (uint8) (old_val | mask);

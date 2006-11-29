@@ -50,6 +50,7 @@
 
 #include "jarfile_util.h"
 #include "jni_utils.h"
+#include "mem_alloc.h"
 
 unsigned ClassLoader::m_capacity = 0;
 unsigned ClassLoader::m_unloadedBytes = 0;
@@ -88,23 +89,28 @@ bool ClassLoader::Initialize( ManagedObject* loader )
     if(!m_failedClasses) return false;
     m_javaTypes = new JavaTypes();
     if(!m_javaTypes) return false;
+
+    Global_Env *env = VM_Global_State::loader_env;
+    assert (env);
+    size_t code_pool_size = IsBootstrap() ? DEFAULT_BOOTSTRAP_JIT_CODE_POOL_SIZE : DEFAULT_CLASSLOADER_JIT_CODE_POOL_SIZE;
+    CodeMemoryManager = new PoolManager(code_pool_size, env->system_page_size, env->use_large_pages, true/*is_code*/, true/*is_resize_allowed*/);
+    if(!CodeMemoryManager) return false;
+
     return true;
 }
 
 ClassLoader::~ClassLoader() 
 {
-    apr_pool_destroy(pool);
-
-    ManagedObject** ppc;
-    ReportedClasses* RepClasses = GetReportedClasses();
-    ReportedClasses::iterator itc;
-    for (itc = RepClasses->begin(); itc != RepClasses->end(); itc++)
+    ClassTable::iterator it;
+    ClassTable* LoadedClasses = GetLoadedClasses();
+    for (it = LoadedClasses->begin(); it != LoadedClasses->end(); it++)
     {
-        ppc = &itc->second;
-        assert(*ppc);
-        Class* c = jclass_to_struct_Class((jclass)ppc);
+        Class* c;
+        c = it->second;
+        assert(c);
         ClassClearInternals(c);
     }
+
     if (GetLoadedClasses())
         delete GetLoadedClasses();
     if (GetFailedClasses())
@@ -127,6 +133,15 @@ ClassLoader::~ClassLoader()
     }
     if (m_package_table)
         delete m_package_table;
+    
+    for(NativeLibInfo* info = m_nativeLibraries; info;info = info->next ) {
+        natives_unload_library(info->handle);        
+    }
+
+    delete CodeMemoryManager;
+    CodeMemoryManager = NULL;
+
+    apr_pool_destroy(pool);
 }
 
 void ClassLoader::LoadingClass::EnqueueInitiator(VM_thread* new_definer, ClassLoader* cl, const String* clsname) 
@@ -208,13 +223,6 @@ Class* ClassLoader::NewClass(const Global_Env* env, const String* name)
         clss = AllocateAndReportInstance(env, clss);
 
     return clss;
-}
-
-ManagedObject** ClassLoader::RegisterClassInstance(const String* className, ManagedObject* instance) 
-{
-    TRACE2("reported:newclass", "DIRECT: inserting class \"" << className->bytes
-        << "\" with key " << className << " and object " << instance);
-    return m_reportedClasses->Insert(className, instance);
 }
 
 Class* ClassLoader::DefineClass(Global_Env* env, const char* class_name,

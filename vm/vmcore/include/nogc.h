@@ -36,13 +36,6 @@
 #define DEFAULT_CODE_ALIGNMENT 16
 #endif // !_IPF_
 
-void vm_init_mem_alloc();
 void *malloc_fixed_code_for_jit(size_t size, size_t alignment, unsigned heat, Code_Allocation_Action action);
-
-// Allocate memory for vtable data.
-void *allocate_vtable_data_from_pool(size_t size);
-
-// deallocate memory when finished
-void vm_mem_dealloc();
 
 #endif // _NOGC_H_

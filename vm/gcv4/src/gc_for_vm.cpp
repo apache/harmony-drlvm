@@ -486,17 +486,6 @@ void gc_wrapup()
         heapTraceFinalize();    
     }
 
-    if (p_loaded_vtable_directory) {
-        p_loaded_vtable_directory->rewind();
-        Partial_Reveal_VTable *vt_handle;
-        vt_handle = (Partial_Reveal_VTable *)p_loaded_vtable_directory->next();
-        while(vt_handle != NULL)  
-        {
-            STD_FREE(vt_handle->get_gcvt());
-            vt_handle = (Partial_Reveal_VTable *)p_loaded_vtable_directory->next();
-        }
-        delete p_loaded_vtable_directory;
-    }
     if (interior_pointer_table)
         delete interior_pointer_table;
     if (compressed_pointer_table)
@@ -1370,7 +1359,7 @@ static int *build_slot_offset_array(Class_Handle ch, Partial_Reveal_VTable *vt)
     unsigned int size = (num_ref_fields+1) * sizeof (unsigned int);
 
     // malloc up the array if we need one.
-    int *new_ref_array = (int*) p_global_gc->get_gcvt_pool().alloc(size);
+    int *new_ref_array = (int*) class_alloc_via_classloader(ch, size);
 
     result = new_ref_array;
     for(idx = 0; idx < num_fields; idx++) {
@@ -1486,20 +1475,15 @@ void gc_class_prepared (Class_Handle ch, VTable_Handle vth)
     assert(ch);
     assert(vth);
     Partial_Reveal_VTable *vt = (Partial_Reveal_VTable *)vth;
-    vt->set_gcvt((GC_VTable_Info *) STD_MALLOC(sizeof(GC_VTable_Info)));
+    void* p = class_alloc_via_classloader(ch, sizeof(GC_VTable_Info));
+    vt->set_gcvt((GC_VTable_Info *) p);
+    assert(vt->get_gcvt());
     memset((void *) vt->get_gcvt(), 0, sizeof(GC_VTable_Info));
     vt->get_gcvt()->gc_clss = ch;
     vt->get_gcvt()->gc_class_properties = 0; // Clear the properties.
     vt->get_gcvt()->gc_object_has_slots = false;
     // Set the properties.
     gc_set_prop_alignment_mask(vt, class_get_alignment(ch));
-
-    // Remember the VTable (vt) in a hash table so that delta_dynopt can check if it has a legal
-    // vtable. (see object_address_seems_valid for an example of its use.)
-    if (!p_loaded_vtable_directory) {
-        p_loaded_vtable_directory = new Hash_Table();
-    }
-    p_loaded_vtable_directory->add_entry(vt);
 
     if(class_is_array(ch)) {
         Class_Handle array_element_class = class_get_array_element_class(ch);
@@ -1589,8 +1573,7 @@ void gc_class_prepared (Class_Handle ch, VTable_Handle vth)
         int gc_number_of_slots = vt->get_gcvt()->gc_number_of_slots;
         int* gc_ref_offset_array = vt->get_gcvt()->gc_ref_offset_array;
 
-        int* gc_strong_ref_offset_array = (int*) p_global_gc->
-            get_gcvt_pool().alloc(gc_number_of_slots * sizeof (unsigned int));
+        int* gc_strong_ref_offset_array = (int*) class_alloc_via_classloader(ch, gc_number_of_slots * sizeof (unsigned int));
         assert(gc_strong_ref_offset_array);
         
         int i,j;

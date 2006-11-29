@@ -299,6 +299,10 @@ VM_Statistics::VM_Statistics()
     
     num_compileme_generated = 0;
     num_compileme_used = 0;
+    number_memoryblock_allocations = 0;
+    total_memory_allocated = 0;
+    total_memory_used = 0;
+    number_memorymanager_created = 0;
 
     num_statics_allocations = 0;
     num_nonempty_statics_allocations = 0;
@@ -902,33 +906,11 @@ void VM_Statistics::print()
 
     printf("\n");
     printf("Use_large_pages = %s\n", (VM_Global_State::loader_env->use_large_pages? "yes" : "no"));
-    printf("%11d ::::system_page_size\n", system_page_size);
-    printf("%11d ::::page_size_for_allocation\n", page_size_for_allocation);
-    printf("%11lu ::::init_pool_size\n",           (unsigned long)initial_code_pool_size);
-    printf("%11" FMT64 "u ::::total_code_pool_size\n",     codemgr_total_code_pool_size);
-    printf("%11" FMT64 "u ::::total_code_allocated\n",     codemgr_total_code_allocated);
-    printf("%11" FMT64 "u ::::total_data_pool_size\n",     codemgr_total_data_pool_size);
-    printf("%11" FMT64 "u ::::total_data_allocated\n",     codemgr_total_data_allocated);
-#ifdef VM_STATS
-    { // print jit_code_pool stats
-        printf("            jit code pool\n");
-        printf("%11" FMT64 "u ::::    num_allocations\n",      jit_code_pool->num_allocations);
-        printf("%11" FMT64 "u ::::    total_size_allocated\n", uint64(jit_code_pool->total_size_allocated));
-        printf("%11" FMT64 "u ::::    num_pool_allocations\n", jit_code_pool->num_pool_allocations);
-        printf("%11" FMT64 "u ::::    total_pool_size\n",      uint64(jit_code_pool->total_pool_size));
-        printf("%11" FMT64 "u ::::    num_resizes\n",          jit_code_pool->num_resizes);
-        printf("%11" FMT64 "u ::::    current_alloc_size\n",   uint64(jit_code_pool->current_alloc_size));
-    }
-    { // print vtable_data_pool stats
-        printf("            vtable data pool\n");
-        printf("%11" FMT64 "u ::::    num_allocations\n",      vtable_data_pool->num_allocations);
-        printf("%11" FMT64 "u ::::    total_size_allocated\n", uint64(vtable_data_pool->total_size_allocated));
-        printf("%11" FMT64 "u ::::    num_pool_allocations\n", vtable_data_pool->num_pool_allocations);
-        printf("%11" FMT64 "u ::::    total_pool_size\n",      uint64(vtable_data_pool->total_pool_size));
-        printf("%11" FMT64 "u ::::    num_resizes\n",          vtable_data_pool->num_resizes);
-        printf("%11" FMT64 "u ::::    current_alloc_size\n",   uint64(vtable_data_pool->current_alloc_size));
-    }
-    
+    printf("%11" FMT64 "u ::::number_memoryblock_allocations\n",     number_memoryblock_allocations);
+    printf("%11" FMT64 "u ::::total_memory_allocated\n",     total_memory_allocated);
+    printf("%11" FMT64 "u ::::total_memory_used\n",     total_memory_used);
+    printf("%11" FMT64 "u ::::number_memorymanager_created\n",     number_memorymanager_created);
+#ifdef VM_STATS    
     fflush(stdout);
 
     print_rt_function_stats();

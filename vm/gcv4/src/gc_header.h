@@ -33,12 +33,6 @@
 #include "open/hythread_ext.h"
 
 #include "hash_table.h"
-//
-// This Hash_Table has an entry per loaded class.
-// It is used for determining valid vtable pointers
-// when examining candidate objects.
-//
-extern Hash_Table *p_loaded_vtable_directory;
 
 // Define USE_COMPRESSED_VTABLE_POINTERS here to enable compressed vtable
 // pointers within objects.
@@ -70,8 +64,8 @@ typedef POINTER_SIZE_INT Obj_Info_Type;
 
 typedef struct Partial_Reveal_Object {
 #ifdef USE_COMPRESSED_VTABLE_POINTERS
-    uint32 vt_offset;
 private:
+    uint32 vt_offset;
     Obj_Info_Type obj_info;
 public:
 
@@ -86,12 +80,10 @@ public:
             return (struct Partial_Reveal_VTable *) (vt_offset + vtable_base); 
     }
     struct Partial_Reveal_VTable *vt() { assert(vt_offset); return (struct Partial_Reveal_VTable *) (vt_offset + vtable_base); }
-    bool vt_valid() {return p_loaded_vtable_directory->is_present((void *) (vt_offset + vtable_base));}
     void set_vtable(Allocation_Handle ah)
     { 
         // vtables are allocated from a fixed-size pool in the VM
         // see the details in mem_alloc.cpp, grep for vtable_data_pool.
-        assert(ah < 8*1048576); 
         vt_offset = (uint32)ah;
     }
 
@@ -139,16 +131,17 @@ public:
     }
     static uint64 max_supported_heap_size() { return (0x100000000) << forwarding_pointer_compression_shift(); }
 #else // !USE_COMPRESSED_VTABLE_POINTERS
+private:
     struct Partial_Reveal_VTable *vt_raw;
     Obj_Info_Type obj_info;
 
+public:
     Obj_Info_Type get_obj_info() { return obj_info; }
     void set_obj_info(Obj_Info_Type new_obj_info) { obj_info = new_obj_info; }
     Obj_Info_Type * obj_info_addr() { return &obj_info; }
 
     struct Partial_Reveal_VTable *vtraw() { return vt_raw; }
     struct Partial_Reveal_VTable *vt() { ASSERT(vt_raw, "incorrect object at " << this); return vt_raw; }
-    bool vt_valid() {return p_loaded_vtable_directory->is_present((void *)vt_raw);}
     void set_vtable(Allocation_Handle ah) { vt_raw = (struct Partial_Reveal_VTable *)ah; }
 
     struct Partial_Reveal_Object *get_forwarding_pointer() {
@@ -180,7 +173,7 @@ public:
     }
     static uint64 max_supported_heap_size() { return ~((uint64)0); }
 #endif // !USE_COMPRESSED_VTABLE_POINTERS
-
+    
     static POINTER_SIZE_INT vtable_base;
     static POINTER_SIZE_INT heap_base;
 

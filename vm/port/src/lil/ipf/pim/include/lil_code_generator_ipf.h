@@ -37,7 +37,7 @@ public:
     LilCodeGeneratorIpf();
 
 protected:
-    NativeCodePtr compile_main(LilCodeStub* , size_t*);
+    NativeCodePtr compile_main(LilCodeStub* , size_t*, PoolManager*);
 };
 
 #endif // _LIL_CODE_GENERATOR_IPF_

@@ -28,6 +28,7 @@
 #include "open/hythread.h"
 #include "open/compmgr.h"
 #include "open/em_vm.h"
+#include "mem_alloc.h"
 
 #include "String_Pool.h"
 #include "vm_core_types.h"
@@ -50,6 +51,9 @@ struct Global_Env {
     void*                     portLib;  // Classlib's port library
     DynamicCode*              dcList;
     Assertion_Registry*       assert_reg;
+    PoolManager*              GlobalCodeMemoryManager;
+    PoolManager*              VTableMemoryManager;
+
     Method_Lookup_Table*      vm_methods;
     hythread_library_t        hythread_lib;
     String_Pool               string_pool;  // string table
@@ -65,6 +69,7 @@ struct Global_Env {
     bool strings_are_compressed;    // 2003-05-19: The VM searches the java.lang.String class for a "byte[] bvalue" field at startup,
                                     // as an indication that the Java class library supports compressed strings with 8-bit characters.
     bool use_large_pages;           // 20040109 Use large pages for class-related data such as vtables.
+    size_t system_page_size;        // system page size according to use_large_pages value
     bool verify_all;                // psrebriy 20050815 Verify all classes including loaded by bootstrap class loader
     bool pin_interned_strings;      // if true, interned strings are never moved
 
@@ -198,7 +203,6 @@ struct Global_Env {
 
     // VTable for the java_lang_String class
     VTable* JavaLangString_VTable;
-    Allocation_Handle JavaLangString_allocation_handle;
 
     // Offset to the vm_class field in java.lang.Class;
     unsigned vm_class_offset;

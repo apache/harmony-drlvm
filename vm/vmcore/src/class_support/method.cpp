@@ -295,7 +295,7 @@ void *Method::allocate_code_block_mt(size_t size, size_t alignment, JIT *jit, un
     if (size == 0) {
         addr = NULL;
     } else {
-        addr = malloc_fixed_code_for_jit(size, alignment, heat, action);
+        addr = get_class()->code_alloc(size, alignment, action);
     }
 
     if (action == CAA_Simulate) {

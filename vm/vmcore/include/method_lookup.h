@@ -48,6 +48,7 @@ public:
 
     CodeChunkInfo *get(unsigned i);
     void           add(CodeChunkInfo *m);
+    void           remove(CodeChunkInfo *m);
 
     // Resembles add, but appends the new entry m at the end of the table. The new entry must have a starting address above all entries
     // in the table. This method does not acquire p_meth_addr_table_lock, so insertion must be protected by another lock or scheme.

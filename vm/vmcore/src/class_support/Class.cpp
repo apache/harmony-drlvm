@@ -37,6 +37,7 @@
 #include "vm_stats.h"
 #include "jit_intf_cpp.h"
 #include "type.h"
+#include "cci.h"
 
 #ifdef _IPF_
 #include "vm_ipf.h"
@@ -652,6 +653,13 @@ Method::Method()
 
 void Method::MethodClearInternals()
 {
+    CodeChunkInfo *jit_info;
+    for (jit_info = _jits;  jit_info;  jit_info = jit_info->_next) {
+        VM_Global_State::loader_env->vm_methods->remove(jit_info);
+        // ensure that jit_info was deleted
+        assert (!VM_Global_State::loader_env->vm_methods->find(jit_info->get_code_block_addr()));
+    }
+
     if (_notify_recompiled_records != NULL)
     {
         Method_Change_Notification_Record *nr, *prev_nr;
@@ -914,18 +922,8 @@ static void mark_classloader(ClassLoader* cl)
 }
 
 
-void vm_notify_live_object_class(Class_Handle clss)
-{
-    if(!clss->is_reachable()) {
-        clss->mark_reachable();
-        mark_classloader(clss->get_class_loader());
-    }
-}
-
 // end pointers between struct Class and java.lang.Class
 ////////////////////////////////////////////////////////////////////
-
-
 
 
 ////////////////////////////////////////////////////////////////////
@@ -1186,3 +1184,11 @@ unsigned Class::calculate_size()
 
     return size;
 }
+
+void* Class::code_alloc(size_t size, size_t alignment, Code_Allocation_Action action)
+{
+	assert (m_class_loader);
+    return m_class_loader->CodeAlloc(size, alignment, action);
+}
+
+

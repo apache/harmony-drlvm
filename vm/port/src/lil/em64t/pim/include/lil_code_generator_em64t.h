@@ -609,7 +609,7 @@ class LilCodeGeneratorEM64T : public LilCodeGenerator {
     LilCodeGeneratorEM64T();
 
  protected:
-    NativeCodePtr compile_main(LilCodeStub* , size_t*);
+    NativeCodePtr compile_main(LilCodeStub* , size_t*, PoolManager*);
 };
 
 #endif // _LIL_CODE_GENERATOR_EM64T_
