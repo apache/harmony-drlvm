@@ -91,9 +91,9 @@ static void gc_init_block_for_collectors(GC* gc, Mspace* mspace)
   return;
 }
 
-static unsigned int gc_collection_result(GC* gc)
+static Boolean gc_collection_result(GC* gc)
 {
-  unsigned int result = TRUE;
+  Boolean result = TRUE;
   for(unsigned i=0; i<gc->num_active_collectors; i++){
     Collector* collector = gc->collectors[i];
     result &= collector->result;
@@ -144,24 +144,35 @@ static Block_Header* mspace_get_next_compact_block(Collector* collector, Mspace*
 static Block_Header* mspace_get_next_target_block(Collector* collector, Mspace* mspace)
 {    
   Block_Header* cur_target_block = (Block_Header*)next_block_for_target;
+  
   /* firstly, we bump the next_block_for_target global var to the first non BLOCK_TARGET block
-     This need not atomic op, because only one thread can own the next_block_for_target */
-
+     This need not atomic op, because the global var is only a hint. */
   while(cur_target_block->status == BLOCK_TARGET){
       cur_target_block = cur_target_block->next;
   }
   next_block_for_target = cur_target_block;
 
+  /* cur_target_block has to be BLOCK_IN_COMPACT|BLOCK_COMPACTED|BLOCK_TARGET. Reason: 
+     Any block after it must be either BLOCK_TARGET, or: 
+     1. Since cur_target_block < cur_compact_block, we at least can get cur_compact_block as target.
+     2. For a block that is >=cur_target_block and <cur_compact_block. 
+        Since it is before cur_compact_block, we know it must be a compaction block of some thread. 
+        So it is either BLOCK_IN_COMPACT or BLOCK_COMPACTED. 
+     We care only the BLOCK_COMPACTED block or own BLOCK_IN_COMPACT. But I can't make the assert
+     as below because of a race condition where the block status is not yet updated by other thread.
+    assert( cur_target_block->status & (BLOCK_IN_COMPACT|BLOCK_COMPACTED|BLOCK_TARGET)); 
+  */
+
   /* nos is higher than mos, we cant use nos block for compaction target */
   Block_Header* mspace_heap_end = (Block_Header*)space_heap_end((Space*)mspace);
-  while(cur_target_block < mspace_heap_end){
+  while( cur_target_block < mspace_heap_end ){
+    assert( cur_target_block <= collector->cur_compact_block);
     Block_Header* next_target_block = cur_target_block->next;
     volatile unsigned int* p_block_status = &cur_target_block->status;
     unsigned int block_status = cur_target_block->status;
-    /* block status has to be BLOCK_IN_COMPACT|BLOCK_COMPACTED|BLOCK_TARGET 
-       but we care only the BLOCK_COMPACTED ones or own BLOCK_IN_COMPACT */
-    assert( block_status & (BLOCK_IN_COMPACT|BLOCK_COMPACTED|BLOCK_TARGET));
-    /* if it is not BLOCK_COMPACTED, let's move on to next */
+    //assert( block_status & (BLOCK_IN_COMPACT|BLOCK_COMPACTED|BLOCK_TARGET));
+
+    /* if it is not BLOCK_COMPACTED, let's move on to next except it's own cur_compact_block */
     if(block_status != BLOCK_COMPACTED){
       if(cur_target_block == collector->cur_compact_block){
         assert( block_status == BLOCK_IN_COMPACT);
@@ -169,10 +180,11 @@ static Block_Header* mspace_get_next_target_block(Collector* collector, Mspace* 
         collector->cur_target_block = cur_target_block;
         return cur_target_block;
       }
+      /* it's not my own cur_compact_block, it can be BLOCK_TARGET or other's cur_compact_block */
       cur_target_block = next_target_block;
       continue;
     }    
-    /* ok, find the first BLOCK_COMPACTED before own compact block */    
+    /* else, find a BLOCK_COMPACTED before own cur_compact_block */    
     unsigned int temp = atomic_cas32(p_block_status, BLOCK_TARGET, BLOCK_COMPACTED);
     if(temp == BLOCK_COMPACTED){
       collector->cur_target_block = cur_target_block;
@@ -212,7 +224,7 @@ Boolean mspace_mark_object(Mspace* mspace, Partial_Reveal_Object *p_obj)
   return FALSE;
 }
 
-static Boolean mspace_compute_object_target(Collector* collector, Mspace* mspace)
+static void mspace_compute_object_target(Collector* collector, Mspace* mspace)
 {  
   Block_Header* curr_block = collector->cur_compact_block;
   Block_Header* dest_block = collector->cur_target_block;
@@ -232,8 +244,8 @@ static Boolean mspace_compute_object_target(Collector* collector, Mspace* mspace
         dest_block->free = dest_addr;
         dest_block = mspace_get_next_target_block(collector, mspace);
         if(dest_block == NULL){ 
-          collector->result = 0; 
-          return FALSE; 
+          collector->result = FALSE; 
+          return; 
         }
         
         dest_addr = GC_BLOCK_BODY(dest_block);
@@ -255,7 +267,7 @@ static Boolean mspace_compute_object_target(Collector* collector, Mspace* mspace
     curr_block = mspace_get_next_compact_block(collector, mspace);
   }
   
-  return TRUE;
+  return;
 }   
 
 #include "../verify/verify_live_heap.h"

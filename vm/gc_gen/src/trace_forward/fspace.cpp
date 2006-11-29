@@ -176,13 +176,12 @@ void fspace_collection(Fspace *fspace)
   
   GC* gc = fspace->gc;
 
-  pool_iterator_init(gc->metadata->gc_rootset_pool);
-
   if(gc_requires_barriers()){ 
     /* generational GC. Only trace (mark) nos */
     collector_execute_task(gc, (TaskType)trace_forward_fspace, (Space*)fspace);
   }else{
     /* non-generational GC. Mark the whole heap (nos, mos, and los) */
+    pool_iterator_init(gc->metadata->gc_rootset_pool);
     collector_execute_task(gc, (TaskType)mark_copy_fspace, (Space*)fspace);
   }
   

@@ -42,4 +42,6 @@ void mutator_initialize(GC* gc, void* tls_gc_info);
 void mutator_destruct(GC* gc, void* tls_gc_info); 
 void mutator_reset(GC *gc);
 
+void gc_reset_mutator_context(GC* gc);
+
 #endif /*ifndef _MUTATOR_H_ */

@@ -39,8 +39,6 @@
 #include "gc_for_class.h"
 #include "gc_platform.h"
 
-#define TRUE 1
-#define FALSE 0
 #define null 0
 
 #define MB  1048576
@@ -64,14 +62,9 @@
 
 typedef void (*TaskType)(void*);
 
-extern Boolean NEED_BARRIER;
-extern unsigned int NUM_COLLECTORS;
-
 typedef std::stack<Partial_Reveal_Object *> MarkStack;
 typedef std::stack<Partial_Reveal_Object**> TraceStack;
 typedef std::map<Partial_Reveal_Object*, Obj_Info_Type> ObjectMap;
-#include <hash_set>
-typedef stdext::hash_set<void *> HashSet;
 
 enum Collection_Kind {
   MINOR_COLLECTION,

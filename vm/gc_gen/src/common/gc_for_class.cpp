@@ -91,7 +91,7 @@ static int *build_ref_offset_array(Class_Handle ch, GC_VTable_Info *gcvt)
   }
 
   /* ref array is NULL-terminated */
-  *new_ref_array = NULL;
+  *new_ref_array = 0;
 
   gcvt->gc_number_of_ref_fields = num_ref_fields;
 

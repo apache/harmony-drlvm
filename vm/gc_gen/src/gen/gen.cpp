@@ -29,6 +29,7 @@
 /* fspace size limit is not interesting. only for manual tuning purpose */
 unsigned int min_nos_size_bytes = 2 * MB;
 unsigned int max_nos_size_bytes = 64 * MB;
+unsigned int NOS_SIZE = 0;
 
 static void gc_gen_get_system_info(GC_Gen *gc_gen) 
 {
@@ -79,8 +80,16 @@ void gc_gen_initialize(GC_Gen *gc_gen, unsigned int min_heap_size, unsigned int 
   reserved_base = (void*)((unsigned int)reserved_base + los_size);
   gc_mos_initialize(gc_gen, reserved_base, mos_size);
   
-  unsigned int nos_size =  max_heap_size >> 2; 
-  assert(nos_size > min_nos_size_bytes);
+  unsigned int nos_size; 
+  if(NOS_SIZE){
+    assert( NOS_SIZE>=min_nos_size_bytes && NOS_SIZE<=max_nos_size_bytes);
+    nos_size = NOS_SIZE;  
+  }else
+    nos_size =  max_heap_size >> 4;
+  
+  if(nos_size < min_nos_size_bytes ) nos_size = min_nos_size_bytes;  
+  if(nos_size > max_nos_size_bytes ) nos_size = max_nos_size_bytes;  
+  
   reserved_base = (void*)((unsigned int)reserved_base + mos_size);
   gc_nos_initialize(gc_gen, reserved_base, nos_size); 
 
@@ -99,9 +108,7 @@ void gc_gen_initialize(GC_Gen *gc_gen, unsigned int min_heap_size, unsigned int 
   gc_metadata_initialize((GC*)gc_gen); /* root set and mark stack */
   collector_initialize((GC*)gc_gen);
   
-  if( verify_live_heap ){  /* for live heap verify*/
-    gc_init_heap_verification((GC*)gc_gen);
-  }
+  gc_init_heap_verification((GC*)gc_gen);
 
   return;
 }
@@ -143,16 +150,6 @@ void gc_set_mos(GC_Gen* gc, Space* mos){ gc->mos = (Mspace*)mos;}
 void gc_set_los(GC_Gen* gc, Space* los){ gc->los = (Lspace*)los;}
 unsigned int gc_get_processor_num(GC_Gen* gc){ return gc->_num_processors;}
 
-void reset_mutator_allocation_context(GC_Gen* gc)
-{
-  Mutator *mutator = gc->mutator_list;
-  while (mutator) {
-    alloc_context_reset((Allocator*)mutator);    
-    mutator = mutator->next;
-  }  
-  return;
-}
-
 static unsigned int gc_decide_collection_kind(GC_Gen* gc, unsigned int cause)
 {
   if(major_collection_needed(gc) || cause== GC_CAUSE_LOS_IS_FULL)
@@ -166,13 +163,14 @@ void gc_gen_reclaim_heap(GC_Gen* gc, unsigned int cause)
   gc->num_collections++;
 
   gc->collect_kind = gc_decide_collection_kind(gc, cause);
+  //gc->collect_kind = MAJOR_COLLECTION;
 
+  gc_metadata_verify((GC*)gc, TRUE);
+  
   /* Stop the threads and collect the roots. */
   gc_reset_rootset((GC*)gc);  
   vm_enumerate_root_set_all_threads();
-
-  /* reset metadata (all the rootsets and markstack) */  
-  gc_metadata_reset((GC*)gc); 
+  gc_set_rootset((GC*)gc); 
     
   if(verify_live_heap) gc_verify_heap((GC*)gc, TRUE);
 
@@ -202,8 +200,10 @@ void gc_gen_reclaim_heap(GC_Gen* gc, unsigned int cause)
   }
   
   if(verify_live_heap) gc_verify_heap((GC*)gc, FALSE);
-      
-  reset_mutator_allocation_context(gc);
+  
+  gc_metadata_verify((GC*)gc, FALSE);
+    
+  gc_reset_mutator_context((GC*)gc);
   vm_resume_threads_after();
 
   return;

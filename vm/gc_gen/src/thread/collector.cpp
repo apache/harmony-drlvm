@@ -52,21 +52,26 @@ static void collector_reset_thread(Collector *collector)
 {
   collector->task_func = NULL;
 
+  /*
   vm_reset_event(collector->task_assigned_event);
   vm_reset_event(collector->task_finished_event);
+  */
   
   alloc_context_reset((Allocator*)collector);
   
   GC_Metadata* metadata = collector->gc->metadata;
-  assert(collector->rep_set==NULL);
-  collector->rep_set = pool_get_entry(metadata->free_set_pool);
-  collector->result = 1;
 
+  assert(collector->rep_set==NULL);
+  if( !gc_requires_barriers() || collector->gc->collect_kind != MINOR_COLLECTION){
+    collector->rep_set = pool_get_entry(metadata->free_set_pool);
+  }
+  
   if(gc_requires_barriers()){
     assert(collector->rem_set==NULL);
     collector->rem_set = pool_get_entry(metadata->free_set_pool);
   }
 
+  collector->result = TRUE;
   return;
 }
 
@@ -114,7 +119,6 @@ static void wait_collection_finish(GC* gc)
     Collector* collector = gc->collectors[i];
     wait_collector_to_finish(collector);
   }
-  gc->num_active_collectors = 0;
   return;
 }
 
@@ -141,21 +145,17 @@ static int collector_thread_func(void *arg)
 
 static void collector_init_thread(Collector *collector) 
 {
-  collector->trace_stack = new TraceStack(); /* only for MINOR_COLLECTION */
   collector->obj_info_map = new ObjectMap();
   collector->rem_set = NULL;
   collector->rep_set = NULL;
 
-  int status = vm_create_event(&collector->task_assigned_event,0,1);
+  int status = vm_create_event(&collector->task_assigned_event);
   assert(status == THREAD_OK);
 
-  status = vm_create_event(&collector->task_finished_event,0,1);
+  status = vm_create_event(&collector->task_finished_event);
   assert(status == THREAD_OK);
 
-  status = (unsigned int)vm_create_thread(NULL,
-                                  0, 0, 0,
-                                  collector_thread_func,
-                                  (void*)collector);
+  status = (unsigned int)vm_create_thread(collector_thread_func, (void*)collector);
 
   assert(status == THREAD_OK);
   
@@ -222,6 +222,6 @@ void collector_execute_task(GC* gc, TaskType task_func, Space* space)
 {
   assign_collector_with_task(gc, task_func, space);
   wait_collection_finish(gc);
-  
+    
   return;
 }

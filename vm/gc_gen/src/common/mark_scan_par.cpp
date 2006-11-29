@@ -97,7 +97,8 @@ void mark_scan_heap_par(Collector* collector)
       iter = vector_block_iterator_advance(root_set,iter);
 
       Partial_Reveal_Object* p_obj = *p_ref;
-      assert(!p_obj == NULL); /* root ref can't be NULL */
+      /* root ref can't be NULL, (remset may have NULL ref entry, but this function is only for MAJOR_COLLECTION */
+      assert((gc->collect_kind==MAJOR_COLLECTION) && (p_obj!= NULL));
       /* we have to mark the object before put it into marktask, because
          it is possible to have two slots containing a same object. They will
          be scanned twice and their ref slots will be recorded twice. Problem

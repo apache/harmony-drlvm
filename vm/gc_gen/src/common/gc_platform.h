@@ -48,9 +48,9 @@ inline int vm_reset_event(VmEventHandle event)
     assert(stat == TM_ERROR_NONE); return stat;
 }
 
-inline int vm_create_event(VmEventHandle* event, unsigned int initial_count, unsigned int max_count)
+inline int vm_create_event(VmEventHandle* event)
 {
-  return hysem_create(event, initial_count, max_count);
+  return hysem_create(event, 0, 1);
 }
 
 inline void vm_thread_yield()
@@ -58,9 +58,14 @@ inline void vm_thread_yield()
   hythread_yield();
 }
 
-inline int vm_create_thread(void* ret_thread, unsigned int stacksize, unsigned int priority, unsigned int suspend, int (*func)(void*), void *data)
+inline int vm_create_thread(int (*func)(void*), void *data)
 { 
-  return hythread_create((hythread_t*)ret_thread, (UDATA)stacksize, (UDATA)priority, (UDATA)suspend, 
+  hythread_t* ret_thread = NULL;
+  UDATA stacksize = 0;
+  UDATA priority = 0;
+  UDATA suspend = 0;
+  
+  return hythread_create(ret_thread, stacksize, priority, suspend, 
                              (hythread_entrypoint_t)func, data);
 }
 

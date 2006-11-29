@@ -35,6 +35,7 @@ void mutator_initialize(GC* gc, void *gc_information)
     
   if(gc_requires_barriers()){
     mutator->rem_set = pool_get_entry(gc->metadata->free_set_pool);
+    assert(vector_block_is_empty(mutator->rem_set));
   }
        
   lock(gc->mutator_list_lock);     // vvvvvvvvvvvvvvvvvvvvvvvvvvvvvv
@@ -54,7 +55,7 @@ void mutator_destruct(GC* gc, void *gc_information)
   Mutator *mutator = (Mutator *)gc_information;
 
   if(gc_requires_barriers()){ /* put back the remset when a mutator exits */
-    pool_put_entry(gc->metadata->gc_rootset_pool, mutator->rem_set);
+    pool_put_entry(gc->metadata->mutator_remset_pool, mutator->rem_set);
     mutator->rem_set = NULL;
   }
 
@@ -77,3 +78,13 @@ void mutator_destruct(GC* gc, void *gc_information)
   return;
 }
 
+void gc_reset_mutator_context(GC* gc)
+{
+  Mutator *mutator = gc->mutator_list;
+  while (mutator) {
+    mutator->rem_set = pool_get_entry(gc->metadata->free_set_pool);
+    alloc_context_reset((Allocator*)mutator);    
+    mutator = mutator->next;
+  }  
+  return;
+}

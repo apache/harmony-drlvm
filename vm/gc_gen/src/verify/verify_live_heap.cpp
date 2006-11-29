@@ -20,6 +20,7 @@
 
 #include "verify_live_heap.h"
 
+Boolean GC_VERIFY = FALSE;
 Boolean verify_live_heap;
 
 void gc_verify_heap(GC* gc, Boolean is_before_gc)

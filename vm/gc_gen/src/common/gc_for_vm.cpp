@@ -26,6 +26,11 @@
 
 unsigned int HEAP_SIZE_DEFAULT = 256 * MB;
 
+extern Boolean NEED_BARRIER;
+extern unsigned int NUM_COLLECTORS;
+extern Boolean GC_VERIFY;
+extern unsigned int NOS_SIZE;
+
 /* heap size limit is not interesting. only for manual tuning purpose */
 unsigned int min_heap_size_bytes = 32 * MB;
 unsigned int max_heap_size_bytes = 256 * MB;
@@ -100,6 +105,10 @@ static void parse_configuration_properties()
   min_heap_size_bytes = min_heap_size;
   max_heap_size_bytes = max_heap_size;
 
+  if (is_property_set("gc.nos_size")) {
+    NOS_SIZE = parse_size_string(vm_get_property_value("gc.nos_size"));
+  }
+
   if (is_property_set("gc.num_collectors")) {
     unsigned int num = get_property_value_int("gc.num_collectors");
     NUM_COLLECTORS = (num==0)? NUM_COLLECTORS:num;
@@ -107,6 +116,10 @@ static void parse_configuration_properties()
 
   if (is_property_set("gc.gen_mode")) {
     NEED_BARRIER = get_property_value_boolean("gc.gen_mode");
+  }
+
+  if (is_property_set("gc.verify")) {
+    GC_VERIFY = get_property_value_boolean("gc.verify");
   }
   
   return;  

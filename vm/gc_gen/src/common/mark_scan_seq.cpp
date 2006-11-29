@@ -89,7 +89,7 @@ void mark_scan_heap_seq(Collector* collector)
       iter = vector_block_iterator_advance(root_set,iter);
 
       Partial_Reveal_Object* p_obj = *p_ref;
-      assert(!p_obj == NULL); /* root ref can't be NULL */
+      assert(p_obj != 0); /* root ref can't be NULL */
   
       Space* space = space_of_addr(collector->gc, p_obj);
       if( !space->mark_object_func(space, p_obj) ) continue;   

@@ -137,3 +137,4 @@ inline unsigned int nonarray_object_size(Partial_Reveal_Object *obj)
 }
 
 #endif //#ifndef _GC_TYPES_H_
+

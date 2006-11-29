@@ -24,7 +24,7 @@
 
 /* All the write barrier interfaces need cleanup */
 
-Boolean NEED_BARRIER = FALSE;
+Boolean NEED_BARRIER = TRUE;
 
 Boolean gc_requires_barriers() 
 {   return NEED_BARRIER; }
@@ -46,7 +46,7 @@ static void gc_object_write_barrier(Managed_Object_Handle p_object)
 {
   Mutator *mutator = (Mutator *)vm_get_gc_thread_local();
   GC_Gen* gc = (GC_Gen*)mutator->gc;
-  if( !address_belongs_to_nursery((void *)p_object, gc)) return;
+  if( address_belongs_to_nursery((void *)p_object, gc)) return;
   
   Partial_Reveal_Object **p_slot; 
   /* scan array object */
