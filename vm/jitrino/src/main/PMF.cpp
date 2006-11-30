@@ -1352,20 +1352,18 @@ void PMF::processCmd (const char* ptr)
 
 void PMF::processVMProperties ()
 {
-    PropertiesIteratorHandle ph = vm_properties_iterator_create();
-    for (;;)
-    {
-        const char* key = vm_properties_get_name(ph);
-        if (strncmp("jit.", key, 4) == 0)
+    char** keys = get_properties_keys(VM_PROPERTIES);
+    int i = 0;
+    while (keys[i] != NULL) {
+        if (strncmp("jit.", keys[i], 4) == 0)
         {
-            const char* value = vm_properties_get_string_value(ph);
-            processCmd(key+4, value);
+            char* value = get_property(keys[i], VM_PROPERTIES);
+            processCmd(keys[i] + 4, value);
+            destroy_property_value(value);
         }
-
-        if (!vm_properties_iterator_advance(ph))
-            break;
+        i++;
     }
-    vm_properties_iterator_destroy(ph);
+    destroy_properties_keys(keys);
 }
 
 

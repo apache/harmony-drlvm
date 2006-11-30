@@ -32,7 +32,6 @@
 #include "open/types.h"
 #include "open/vm_util.h"
 #include "stub_code_utils.h"
-#include "open/vm_util.h" // For vm_get_boolean_property_value_with_default
 #include "interpreter.h"
 
 

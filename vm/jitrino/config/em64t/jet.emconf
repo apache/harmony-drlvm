@@ -20,7 +20,7 @@ chain1.jits=JET
 JET.file=jitrino
 
 #JIT options
--Djit.JET.path=
+-XDjit.JET.path=
 
 
 #system properties

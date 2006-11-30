@@ -1370,7 +1370,7 @@ void Compiler::initStatics(void)
     VTBL_BASE = (const char*)vm_get_vtable_base();
     NULL_REF  = g_refs_squeeze ? OBJ_BASE : NULL;
 
-    g_jvmtiMode = vm_get_property_value_boolean("vm.jvmti.enabled", false);
+    g_jvmtiMode = (bool)get_boolean_property("vm.jvmti.enabled", false, VM_PROPERTIES);
     
     rt_helper_monitor_enter = 
                 (char*)vm_get_rt_support_addr(VM_RT_MONITOR_ENTER);

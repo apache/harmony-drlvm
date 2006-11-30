@@ -76,7 +76,7 @@ HyPortLibrary *JNICALL GetPortLibrary(VMInterface *vmi)
         // First, try to get the portlib pointer from global env (must have been put there during args parse)
         portLibPointer = (HyPortLibrary*)VM_Global_State::loader_env->portLib;
         if (NULL != portLibPointer) {
-			initialized = 1;
+            initialized = 1;
             return portLibPointer;
         }
         // If the above fails, initialize portlib here
@@ -146,9 +146,9 @@ JavaVMInitArgs* JNICALL GetInitArgs(VMInterface *vmi)
 vmiError JNICALL 
 GetSystemProperty(VMInterface *vmi, char *key, char **valuePtr)
 {
-    *valuePtr = const_cast<char *>(
-        properties_get_string_property(
-            (PropertiesHandle)VM_Global_State::loader_env->properties, key));
+    char* value = get_property(key, JAVA_PROPERTIES);
+    *valuePtr = strdup(value);
+    destroy_property_value(value);
     return VMI_ERROR_NONE;
 }
 
@@ -159,34 +159,37 @@ SetSystemProperty(VMInterface *vmi, char *key, char *value)
     /*
      * The possible implemenation might be:
      */
-    add_pair_to_properties(*VM_Global_State::loader_env->properties, key, value);
+    set_property(key, value, JAVA_PROPERTIES);
     return VMI_ERROR_NONE;
 }
 
 vmiError JNICALL CountSystemProperties(VMInterface *vmi, int *countPtr)
 {
-    Properties *p = VM_Global_State::loader_env->properties;
-    Properties::Iterator *iter = p->getIterator();
+    char** keys = get_properties_keys(JAVA_PROPERTIES);
     int count = 0;
-    const Prop_entry *next = NULL;
 
-    while((next = iter->next()))
+    while(keys[count] != NULL) {
         count++;
+    }
 
     *countPtr = count;
+    destroy_properties_keys(keys);
     return VMI_ERROR_NONE;
 }
 
 vmiError JNICALL IterateSystemProperties(VMInterface *vmi,
         vmiSystemPropertyIterator iterator, void *userData)
 {
-    Properties *p = VM_Global_State::loader_env->properties;
-    Properties::Iterator *iter = p->getIterator();
-    const Prop_entry *next = NULL;
+    char** keys = get_properties_keys(JAVA_PROPERTIES);
+    int count = 0;
 
-    while((next = iter->next()))
-        iterator(next->key, const_cast<char *>(next->value->as_string()), userData);
-
+    while(keys[count] != NULL) {
+        char* value = get_property(keys[count], JAVA_PROPERTIES);
+        iterator((char*)strdup(keys[count]), (char*)strdup(value), userData);
+        destroy_property_value(value);
+        count++;
+    }
+    destroy_properties_keys(keys);
     return VMI_ERROR_NONE;
 }
 

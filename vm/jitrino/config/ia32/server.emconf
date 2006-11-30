@@ -37,58 +37,58 @@ SD2_OPT.useProfile=EDGE_PROF
 
 #options for JIT
 
--Djit.JET_CLINIT.path=
+-XDjit.JET_CLINIT.path=
 
 
--Djit.SD1_OPT.path=opt_init,translator,optimizer,hir2lir,codegen
+-XDjit.SD1_OPT.path=opt_init,translator,optimizer,hir2lir,codegen
 
--Djit.SD1_OPT.path.optimizer=ssa,simplify,dce,uce,edge_instrument,dessa,statprof,markglobals
--Djit.SD1_OPT.path.codegen=lock_method,bbp,gcpoints,cafl,dce1,i8l,early_prop,itrace-,native,constraints,dce2,regalloc,spillgen,layout,copy,rce+,stack,break-,iprof-,emitter!,si_insts,gcmap,info,unlock_method
--Djit.SD1_OPT.path.dce1=cg_dce
--Djit.SD1_OPT.path.dce2=cg_dce
--Djit.SD1_OPT.path.regalloc=bp_regalloc1,bp_regalloc2
--Djit.SD1_OPT.path.bp_regalloc1=bp_regalloc
--Djit.SD1_OPT.path.bp_regalloc2=bp_regalloc
+-XDjit.SD1_OPT.path.optimizer=ssa,simplify,dce,uce,edge_instrument,dessa,statprof,markglobals
+-XDjit.SD1_OPT.path.codegen=lock_method,bbp,gcpoints,cafl,dce1,i8l,early_prop,itrace-,native,constraints,dce2,regalloc,spillgen,layout,copy,rce+,stack,break-,iprof-,emitter!,si_insts,gcmap,info,unlock_method
+-XDjit.SD1_OPT.path.dce1=cg_dce
+-XDjit.SD1_OPT.path.dce2=cg_dce
+-XDjit.SD1_OPT.path.regalloc=bp_regalloc1,bp_regalloc2
+-XDjit.SD1_OPT.path.bp_regalloc1=bp_regalloc
+-XDjit.SD1_OPT.path.bp_regalloc2=bp_regalloc
 
--Djit.SD1_OPT.arg.codegen.dce1.early=yes
--Djit.SD1_OPT.arg.codegen.regalloc.bp_regalloc1.regs=ALL_GP
--Djit.SD1_OPT.arg.codegen.regalloc.bp_regalloc2.regs=ALL_XMM
+-XDjit.SD1_OPT.arg.codegen.dce1.early=yes
+-XDjit.SD1_OPT.arg.codegen.regalloc.bp_regalloc1.regs=ALL_GP
+-XDjit.SD1_OPT.arg.codegen.regalloc.bp_regalloc2.regs=ALL_XMM
 
--Djit.SD2_OPT.path=opt_init,translator,optimizer,hir2lir,codegen
+-XDjit.SD2_OPT.path=opt_init,translator,optimizer,hir2lir,codegen
 
--Djit.SD2_OPT.path.optimizer=ssa,simplify,dce,uce,edge_annotate,devirt,inline,uce,purge,simplify,dce,uce,lazyexc,inline_helpers,purge,simplify,uce,dce,dessa,statprof,peel,ssa,hvn,simplify,dce,uce,lower,dce,uce,memopt,reassoc,dce,uce,hvn,dce,uce,abcd,dce,uce,gcm,dessa,statprof,markglobals
--Djit.SD2_OPT.path.codegen=lock_method,bbp,gcpoints,cafl,dce1,i8l,early_prop,itrace-,native,constraints,dce2,regalloc,spillgen,layout,copy,rce+,stack,break-,iprof-,emitter!,si_insts,gcmap,info,unlock_method
--Djit.SD2_OPT.path.dce1=cg_dce
--Djit.SD2_OPT.path.dce2=cg_dce
--Djit.SD2_OPT.path.regalloc=bp_regalloc1,bp_regalloc2
--Djit.SD2_OPT.path.bp_regalloc1=bp_regalloc
--Djit.SD2_OPT.path.bp_regalloc2=bp_regalloc
+-XDjit.SD2_OPT.path.optimizer=ssa,simplify,dce,uce,edge_annotate,devirt,inline,uce,purge,simplify,dce,uce,lazyexc,inline_helpers,purge,simplify,uce,dce,dessa,statprof,peel,ssa,hvn,simplify,dce,uce,lower,dce,uce,memopt,reassoc,dce,uce,hvn,dce,uce,abcd,dce,uce,gcm,dessa,statprof,markglobals
+-XDjit.SD2_OPT.path.codegen=lock_method,bbp,gcpoints,cafl,dce1,i8l,early_prop,itrace-,native,constraints,dce2,regalloc,spillgen,layout,copy,rce+,stack,break-,iprof-,emitter!,si_insts,gcmap,info,unlock_method
+-XDjit.SD2_OPT.path.dce1=cg_dce
+-XDjit.SD2_OPT.path.dce2=cg_dce
+-XDjit.SD2_OPT.path.regalloc=bp_regalloc1,bp_regalloc2
+-XDjit.SD2_OPT.path.bp_regalloc1=bp_regalloc
+-XDjit.SD2_OPT.path.bp_regalloc2=bp_regalloc
 
 #inliner configuration
--Djit.SD2_OPT.SD2_OPT_inliner_pipeline.filter=-
--Djit.SD2_OPT.SD2_OPT_inliner_pipeline.path=ssa,simplify,dce,uce,edge_annotate,devirt
--Djit.SD2_OPT.arg.optimizer.inline.pipeline=SD2_OPT_inliner_pipeline
--Djit.SD2_OPT.arg.optimizer.inline.connect_early=false
+-XDjit.SD2_OPT.SD2_OPT_inliner_pipeline.filter=-
+-XDjit.SD2_OPT.SD2_OPT_inliner_pipeline.path=ssa,simplify,dce,uce,edge_annotate,devirt
+-XDjit.SD2_OPT.arg.optimizer.inline.pipeline=SD2_OPT_inliner_pipeline
+-XDjit.SD2_OPT.arg.optimizer.inline.connect_early=false
 
 #helper inliner configuration
--Djit.SD2_OPT.SD2_OPT_helper_inliner_pipeline.filter=-
--Djit.SD2_OPT.SD2_OPT_helper_inliner_pipeline.path=ssa
--Djit.SD2_OPT.arg.optimizer.inline_helpers.pipeline=SD2_OPT_helper_inliner_pipeline
+-XDjit.SD2_OPT.SD2_OPT_helper_inliner_pipeline.filter=-
+-XDjit.SD2_OPT.SD2_OPT_helper_inliner_pipeline.path=ssa
+-XDjit.SD2_OPT.arg.optimizer.inline_helpers.pipeline=SD2_OPT_helper_inliner_pipeline
 
--Djit.SD2_OPT.arg.optimizer.inline_helpers.newObj=on
--Djit.SD2_OPT.arg.optimizer.inline_helpers.newObj_className=org/apache/harmony/drlvm/gc_cc/GCHelper
--Djit.SD2_OPT.arg.optimizer.inline_helpers.newObj_methodName=alloc
--Djit.SD2_OPT.arg.optimizer.inline_helpers.newObj_hotnessPercent=1
+-XDjit.SD2_OPT.arg.optimizer.inline_helpers.newObj=on
+-XDjit.SD2_OPT.arg.optimizer.inline_helpers.newObj_className=org/apache/harmony/drlvm/gc_cc/GCHelper
+-XDjit.SD2_OPT.arg.optimizer.inline_helpers.newObj_methodName=alloc
+-XDjit.SD2_OPT.arg.optimizer.inline_helpers.newObj_hotnessPercent=1
 
 
--Djit.SD2_OPT.arg.codegen.dce1.early=yes
--Djit.SD2_OPT.arg.codegen.regalloc.bp_regalloc1.regs=ALL_GP
--Djit.SD2_OPT.arg.codegen.regalloc.bp_regalloc2.regs=ALL_XMM
+-XDjit.SD2_OPT.arg.codegen.dce1.early=yes
+-XDjit.SD2_OPT.arg.codegen.regalloc.bp_regalloc1.regs=ALL_GP
+-XDjit.SD2_OPT.arg.codegen.regalloc.bp_regalloc2.regs=ALL_XMM
 
 
 #system properties
 -Djava.compiler=server
 
-#GC properties
+#GC magics support
 -Dvm.components.gc_cc.startupclass=org.apache.harmony.drlvm.gc_cc.GCHelper
 -Dvm.components.gc_cc.classpath=gc_cc.jar

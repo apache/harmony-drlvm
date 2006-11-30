@@ -14,11 +14,6 @@
  *  See the License for the specific language governing permissions and
  *  limitations under the License.
  */
-/** 
- * @author Euguene Ostrovsky
- * @version $Revision: 1.1.2.1.4.6 $
- */  
-
 
 #ifndef _INIT_H
 #define _INIT_H
@@ -37,5 +32,6 @@ void set_log_levels_from_cmd(JavaVMInitArgs* vm_arguments);
 void parse_vm_arguments(Global_Env *p_env);
 void parse_jit_arguments(JavaVMInitArgs* vm_arguments);
 void print_generic_help();
+void initialize_properties(Global_Env *p_env);
 
 #endif //_INIT_H

@@ -400,7 +400,7 @@ private:
         const String* class_name, bool* not_found);
     Class* LoadFromJarFile( JarFile* jar_file,
         const char* class_name_in_jar, const String* class_name, bool* not_found);
-    void SetClasspathFromProperty(const char* prop_string, apr_pool_t *tmp_pool);
+    void SetClasspathFromString(char* prop_string, apr_pool_t *tmp_pool);
     void SetClasspathFromJarFile(JarFile *jar, apr_pool_t *tmp_pool);
 
     BCPElements m_BCPElements;

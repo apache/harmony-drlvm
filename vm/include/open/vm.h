@@ -686,37 +686,47 @@ VMEXPORT char *method_sig_get_string(Method_Signature_Handle msh);
 // Free a string buffer returned by method_sig_get_string.
 VMEXPORT void free_string_buffer(char *buffer);
 
-// Return the value of a global property, e.g. one set by the "-Dproperty=value"
-// command line argument.
-VMEXPORT const char *vm_get_property_value(const char *property_name);
 
-VMEXPORT void vm_properties_set_value(const char* name, const char* value);
 
-typedef void *PropertiesIteratorHandle;
+typedef enum {
+    VM_PROPERTIES  = 0,
+    JAVA_PROPERTIES = 1
+} PropertyTable;
 
-// Create iterator for system properties.
-// All iterators created with this method call 
-// must be destroyed with vm_properties_iterator_destroy 
-VMEXPORT PropertiesIteratorHandle vm_properties_iterator_create();
+//Sets the property for table_number property table. NULL value is supported.
+VMEXPORT void set_property(const char* key, const char* value, PropertyTable table_number);
 
-// Destroy iterator created by vm_properties_iterator_create
-VMEXPORT void vm_properties_iterator_destroy(PropertiesIteratorHandle props_iter);
+//Returns the value of the property from table_number property table if it
+//has been set by set_property function. Otherwise returns NULL.
+VMEXPORT char* get_property(const char* key, PropertyTable table_number);
 
-// Advance iterator to a next property.
-// Return false if no more properties left to iterate
-VMEXPORT Boolean vm_properties_iterator_advance(PropertiesIteratorHandle props_iter);
+//Safety frees memory of value returned by get_property function.
+VMEXPORT void destroy_property_value(char* value);
 
-// Return a name of the current property
-VMEXPORT const char* vm_properties_get_name(PropertiesIteratorHandle props_iter);
+//Checks if the property is set. Return:
+//   -1 if table_number is incorrect.
+//    1 if property is set in table_number property table.
+//    0 otherwise.
+VMEXPORT int is_property_set(const char* key, PropertyTable table_number);
 
-// Return a value of the current property
-VMEXPORT const char* vm_properties_get_string_value(PropertiesIteratorHandle props_iter);
+//Unsets the property in table_number property table.
+VMEXPORT void unset_property(const char* key, PropertyTable table_number);
 
-// Return the boolean value of the property
-VMEXPORT Boolean vm_get_property_value_boolean(const char* property, Boolean default_value);
+//Returns an array of keys from table_number properties table.
+VMEXPORT char** get_properties_keys(PropertyTable table_number);
 
-VMEXPORT Boolean vm_get_boolean_property_value_with_default(const char *property_name);
+//Returns an array of keys which start with specified prefix from table_number properties table.
+VMEXPORT char** get_properties_keys_staring_with(const char* prefix, PropertyTable table_number);
 
+//Safety frees array of keys memory which returned by get_properties_keys
+//or get_properties_keys_staring_with functions.
+VMEXPORT void destroy_properties_keys(char** keys);
+
+//Tries to interpret property value as Boolean and returns it. In case of failure returns default_value.
+VMEXPORT Boolean get_boolean_property(const char* property, Boolean default_value, PropertyTable table_number);
+
+//Tries to interpret property value as int and returns it. In case of failure returns default_value.
+VMEXPORT int get_int_property(const char *property_name, int default_value, PropertyTable table_number);
 // end miscellaneous functions.
 /////////////////////////////////////////////////////////////////
 

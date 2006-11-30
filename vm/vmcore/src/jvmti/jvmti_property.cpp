@@ -78,11 +78,7 @@ jvmtiAddToBootstrapClassLoaderSearch(jvmtiEnv* env,
     const char* bcp_property = XBOOTCLASSPATH_A;
 
     // get bootclasspath property
-    Global_Env *g_env = ((TIEnv*)env)->vm->vm_env;
-    Properties *properties = g_env->properties;
-    const char *bcp_prop = properties_get_string_property(
-        reinterpret_cast<PropertiesHandle>(properties),
-        bcp_property);
+    char *bcp_prop = get_property(bcp_property, VM_PROPERTIES);
 
     size_t len_bcp = 0;
 
@@ -98,13 +94,17 @@ jvmtiAddToBootstrapClassLoaderSearch(jvmtiEnv* env,
         strcpy(new_bcp + len_bcp + 1, segment);
 
         // update bootclasspath property
-        add_pair_to_properties(*properties, bcp_property, new_bcp);
+        set_property(bcp_property, new_bcp, VM_PROPERTIES);
+        set_property(bcp_property, new_bcp, JAVA_PROPERTIES);
 
         STD_FREE(new_bcp);
     } else {
         // update bootclasspath property
-        add_pair_to_properties(*properties, bcp_property, segment);
+        set_property(bcp_property, segment, VM_PROPERTIES);
+        set_property(bcp_property, segment, JAVA_PROPERTIES);
     }
+    
+    destroy_property_value(bcp_prop);
 
     return JVMTI_ERROR_NONE;
 }
@@ -145,9 +145,8 @@ jvmtiGetSystemProperties(jvmtiEnv* env,
 
     jint properties_count = 0;
 
-    Properties::Iterator *iterator = ((TIEnv*)env)->vm->vm_env->properties->getIterator();
-    const Prop_entry *next = NULL;
-    while((next = iterator->next()))
+    char** keys = get_properties_keys(JAVA_PROPERTIES);
+    while(keys[properties_count] != NULL)
         properties_count++;
 
     char **prop_names_array;
@@ -156,24 +155,24 @@ jvmtiGetSystemProperties(jvmtiEnv* env,
         return errorCode;
 
     // Copy properties defined in properties list
-    iterator = ((TIEnv*)env)->vm->vm_env->properties->getIterator();
     for (int iii = 0; iii < properties_count; iii++)
     {
-        next = iterator->next();
-        errorCode = _allocate(strlen(next->key) + 1, (unsigned char **)&prop_names_array[iii]);
+        errorCode = _allocate(strlen(keys[iii]) + 1, (unsigned char **)&prop_names_array[iii]);
         if (JVMTI_ERROR_NONE != errorCode)
         {
             // Free everything that was allocated already
             for (int jjj = 0; jjj < iii; jjj++)
                 _deallocate((unsigned char *)prop_names_array[iii]);
             _deallocate((unsigned char *)prop_names_array);
+            destroy_properties_keys(keys);
             return errorCode;
         }
-        strcpy(prop_names_array[iii], next->key);
+        strcpy(prop_names_array[iii], keys[iii]);
     }
 
     *count_ptr = properties_count;
     *property_ptr = prop_names_array;
+    destroy_properties_keys(keys);
 
     return JVMTI_ERROR_NONE;
 }
@@ -202,23 +201,19 @@ jvmtiGetSystemProperty(jvmtiEnv* env,
     if (NULL == property || NULL == value_ptr)
         return JVMTI_ERROR_NULL_POINTER;
 
-    Prop_Value *prop_value = ((TIEnv*)env)->vm->vm_env->properties->get(property);
-    if (NULL == prop_value)
-        return JVMTI_ERROR_NOT_AVAILABLE;
-
-    const char *value = prop_value->as_string();
+    char *value = get_property(property, JAVA_PROPERTIES);
     if (NULL == value)
         return JVMTI_ERROR_NOT_AVAILABLE;
 
     char *ret;
     jvmtiError errorCode = _allocate(strlen(value) + 1, (unsigned char **)&ret);
-    if (errorCode != JVMTI_ERROR_NONE)
-        return errorCode;
+    if (errorCode == JVMTI_ERROR_NONE) {
+        strcpy(ret, value);
+        *value_ptr = ret;
+    }
+    destroy_property_value(value);
 
-    strcpy(ret, value);
-    *value_ptr = ret;
-
-    return JVMTI_ERROR_NONE;
+    return errorCode;
 }
 
 /*
@@ -249,16 +244,7 @@ jvmtiSetSystemProperty(jvmtiEnv* env,
         return JVMTI_ERROR_NOT_AVAILABLE;
 
     Global_Env *vm_env = ((TIEnv*)env)->vm->vm_env;
-    Prop_String *ps = new Prop_String(strdup(value));
-    Prop_entry *e = new Prop_entry();
-    e->key = strdup(property);
-    e->value = ps;
-
-    Prop_entry *pe = vm_env->properties->get_entry(property);
-    if (NULL == pe)
-        vm_env->properties->add(e);
-    else
-        pe->replace(e);
+    set_property(property, value, JAVA_PROPERTIES);
 
     return JVMTI_ERROR_NONE;
 }

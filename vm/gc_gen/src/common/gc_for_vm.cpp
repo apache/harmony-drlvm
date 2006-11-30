@@ -35,18 +35,20 @@ extern unsigned int NOS_SIZE;
 unsigned int min_heap_size_bytes = 32 * MB;
 unsigned int max_heap_size_bytes = 256 * MB;
 
-static size_t parse_size_string(const char* size_string) 
+static size_t get_size_property(const char* name) 
 {
-  size_t len = strlen(size_string);
-  size_t unit = 1;
-  if (tolower(size_string[len - 1]) == 'k') {
-    unit = 1024;
-  } else if (tolower(size_string[len - 1]) == 'm') {
-    unit = 1024 * 1024;
-  } else if (tolower(size_string[len - 1]) == 'g') {
-    unit = 1024 * 1024 * 1024;
-  }
+  char* size_string = get_property(name, VM_PROPERTIES);
   size_t size = atol(size_string);
+  int sizeModifier = tolower(size_string[strlen(size_string) - 1]);
+  destroy_property_value(size_string);
+
+  size_t unit = 1;
+  switch (sizeModifier) {
+  case 'k': unit = 1024; break;
+  case 'm': unit = 1024 * 1024; break;
+  case 'g': unit = 1024 * 1024 * 1024;break;
+  }
+
   size_t res = size * unit;
   if (res / unit != size) {
     /* overflow happened */
@@ -55,34 +57,13 @@ static size_t parse_size_string(const char* size_string)
   return res;
 }
 
-static bool get_property_value_boolean(char* name) 
-{
-  const char* value = vm_get_property_value(name);
-  
-  return (strcmp("0", value) != 0
-    && strcmp("off", value) != 0 
-    && strcmp("false", value) != 0);
-}
-
-static int get_property_value_int(char* name) 
-{
-  const char* value = vm_get_property_value(name);
-  return (NULL == value) ? 0 : atoi(value);
-}
-
-static bool is_property_set(char* name) 
-{
-  const char* value = vm_get_property_value(name);
-  return (NULL != value && 0 != value[0]);
-}
-
 static void parse_configuration_properties() 
 {
   unsigned int max_heap_size = HEAP_SIZE_DEFAULT;
   unsigned int min_heap_size = min_heap_size_bytes;
   
-  if (is_property_set("gc.mx")) {
-    max_heap_size = parse_size_string(vm_get_property_value("gc.mx"));
+  if (is_property_set("gc.mx", VM_PROPERTIES) == 1) {
+    max_heap_size = get_size_property("gc.mx");
 
     if (max_heap_size < min_heap_size)
       max_heap_size = min_heap_size;
@@ -93,8 +74,8 @@ static void parse_configuration_properties()
     if (min_heap_size < min_heap_size_bytes) min_heap_size = min_heap_size_bytes;
   }
 
-  if (is_property_set("gc.ms")) {
-    min_heap_size = parse_size_string(vm_get_property_value("gc.ms"));
+  if (is_property_set("gc.ms", VM_PROPERTIES) == 1) {
+    min_heap_size = get_size_property("gc.ms");
     if (min_heap_size < min_heap_size_bytes) 
       min_heap_size = min_heap_size_bytes;
   }
@@ -105,22 +86,13 @@ static void parse_configuration_properties()
   min_heap_size_bytes = min_heap_size;
   max_heap_size_bytes = max_heap_size;
 
-  if (is_property_set("gc.nos_size")) {
-    NOS_SIZE = parse_size_string(vm_get_property_value("gc.nos_size"));
+  if (is_property_set("gc.nos_size", VM_PROPERTIES) == 1) {
+    NOS_SIZE = get_size_property("gc.nos_size");
   }
 
-  if (is_property_set("gc.num_collectors")) {
-    unsigned int num = get_property_value_int("gc.num_collectors");
-    NUM_COLLECTORS = (num==0)? NUM_COLLECTORS:num;
-  }
-
-  if (is_property_set("gc.gen_mode")) {
-    NEED_BARRIER = get_property_value_boolean("gc.gen_mode");
-  }
-
-  if (is_property_set("gc.verify")) {
-    GC_VERIFY = get_property_value_boolean("gc.verify");
-  }
+  NUM_COLLECTORS = get_int_property("gc.num_collectors", NUM_COLLECTORS, VM_PROPERTIES);
+  NEED_BARRIER = get_boolean_property("gc.gen_mode", TRUE, VM_PROPERTIES);
+  GC_VERIFY = get_boolean_property("gc.verify", FALSE, VM_PROPERTIES);
   
   return;  
 }

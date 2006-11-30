@@ -48,27 +48,27 @@ EB_PROF.backedgeThreshold=100000
 
 # Options to be passed to JIT
 
--Djit.JET_CLINIT.path=
--Djit.JET_DPGO.path=
+-XDjit.JET_CLINIT.path=
+-XDjit.JET_DPGO.path=
 
--Djit.CD_OPT.path=opt_init,translator,optimizer,hir2lir,codegen
+-XDjit.CD_OPT.path=opt_init,translator,optimizer,hir2lir,codegen
 
--Djit.CD_OPT.path.optimizer=ssa,devirt,inline,uce,purge,simplify,dce,uce,lazyexc,memopt,simplify,dce,uce,lower,dessa,statprof,markglobals
--Djit.CD_OPT.path.codegen=lock_method,bbp,gcpoints,cafl,dce1,i8l,early_prop,itrace-,native,constraints,dce2,regalloc,spillgen,layout,copy,rce+,stack,break-,iprof-,emitter!,si_insts,gcmap,info,unlock_method
--Djit.CD_OPT.path.dce1=cg_dce
--Djit.CD_OPT.path.dce2=cg_dce
--Djit.CD_OPT.path.regalloc=bp_regalloc1,bp_regalloc2
--Djit.CD_OPT.path.bp_regalloc1=bp_regalloc
--Djit.CD_OPT.path.bp_regalloc2=bp_regalloc
+-XDjit.CD_OPT.path.optimizer=ssa,devirt,inline,uce,purge,simplify,dce,uce,lazyexc,memopt,simplify,dce,uce,lower,dessa,statprof,markglobals
+-XDjit.CD_OPT.path.codegen=lock_method,bbp,gcpoints,cafl,dce1,i8l,early_prop,itrace-,native,constraints,dce2,regalloc,spillgen,layout,copy,rce+,stack,break-,iprof-,emitter!,si_insts,gcmap,info,unlock_method
+-XDjit.CD_OPT.path.dce1=cg_dce
+-XDjit.CD_OPT.path.dce2=cg_dce
+-XDjit.CD_OPT.path.regalloc=bp_regalloc1,bp_regalloc2
+-XDjit.CD_OPT.path.bp_regalloc1=bp_regalloc
+-XDjit.CD_OPT.path.bp_regalloc2=bp_regalloc
 
 #inliner configuration
--Djit.CD_OPT.CD_OPT_inliner_pipeline.filter=-
--Djit.CD_OPT.CD_OPT_inliner_pipeline.path=ssa,devirt
--Djit.CD_OPT.arg.optimizer.inline.pipeline=CD_OPT_inliner_pipeline
+-XDjit.CD_OPT.CD_OPT_inliner_pipeline.filter=-
+-XDjit.CD_OPT.CD_OPT_inliner_pipeline.path=ssa,devirt
+-XDjit.CD_OPT.arg.optimizer.inline.pipeline=CD_OPT_inliner_pipeline
 
--Djit.CD_OPT.arg.codegen.dce1.early=yes
--Djit.CD_OPT.arg.codegen.regalloc.bp_regalloc1.regs=ALL_GP
--Djit.CD_OPT.arg.codegen.regalloc.bp_regalloc2.regs=ALL_XMM
+-XDjit.CD_OPT.arg.codegen.dce1.early=yes
+-XDjit.CD_OPT.arg.codegen.regalloc.bp_regalloc1.regs=ALL_GP
+-XDjit.CD_OPT.arg.codegen.regalloc.bp_regalloc2.regs=ALL_XMM
 
 
 #system properties

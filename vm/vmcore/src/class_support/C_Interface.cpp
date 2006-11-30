@@ -2383,37 +2383,6 @@ unsigned vm_get_vtable_ptr_size()
     }
 }
 
-
-const char *vm_get_property_value(const char *property_name)
-{
-    assert(property_name);
-    PropertiesHandle props = (PropertiesHandle)VM_Global_State::loader_env->properties;
-    const char *result = properties_get_string_property(props, property_name);
-    if (result == NULL)
-        result = "";
-    return result;
-}
-
-Boolean vm_get_property_value_boolean(const char *property_name, Boolean default_value)
-{
-    assert(property_name);
-    PropertiesHandle props = (PropertiesHandle)VM_Global_State::loader_env->properties;
-    const char *value = properties_get_string_property(props, property_name);
-
-    // fall back to provided default if the property is not set
-    if (NULL == value || '\0' == value[0]) return default_value;
-
-    // check the common negative strings
-    if (0 == strcmp("no", value)
-        || 0 == strcmp("off", value)
-        || 0 == strcmp("false", value)
-        || 0 == strcmp("0", value)) return FALSE;
-
-    // and treat all other values as positive
-    return TRUE;
-}
-
-
 int vm_max_fast_instanceof_depth()
 {
     return MAX_FAST_INSTOF_DEPTH;
@@ -2627,41 +2596,161 @@ CallingConvention vm_managed_calling_convention()
     return CC_Vm;
 } //vm_managed_calling_convention
 
-
-
-void vm_properties_set_value(const char* name, const char* value) 
+void set_property(const char* key, const char* value, PropertyTable table_number) 
 {
-    PropertiesHandle ph = (PropertiesHandle)VM_Global_State::loader_env->properties;
-    properties_set_string_property(ph, name, value);
+    assert(key);
+    switch(table_number) {
+    case JAVA_PROPERTIES: 
+        VM_Global_State::loader_env->JavaProperties()->set(key, value);
+    	break;
+    case VM_PROPERTIES: 
+        VM_Global_State::loader_env->VmProperties()->set(key, value);
+        break;
+    default:
+        ASSERT(0, "Unknown property table: " << table_number);
+    }
 }
 
-// Create iterator for system properties.
-// All iterators created with this method call 
-// must be destroyed with vm_properties_iterator_destroy 
-PropertiesIteratorHandle vm_properties_iterator_create() {
-    PropertiesHandle ph = (PropertiesHandle)VM_Global_State::loader_env->properties;
-    return properties_iterator_create(ph);
+char* get_property(const char* key, PropertyTable table_number)
+{
+    assert(key);
+    char* value;
+    switch(table_number) {
+    case JAVA_PROPERTIES: 
+        value = VM_Global_State::loader_env->JavaProperties()->get(key);
+        break;
+    case VM_PROPERTIES: 
+        value = VM_Global_State::loader_env->VmProperties()->get(key);
+        break;
+    default:
+        value = NULL;
+        ASSERT(0, "Unknown property table: " << table_number);
+    }
+    return value;
 }
 
-// Destroy iterator created by vm_properties_iterator_create
-void vm_properties_iterator_destroy(PropertiesIteratorHandle props_iter) {
-    PropertiesHandle ph = (PropertiesHandle)VM_Global_State::loader_env->properties;
-    properties_iterator_destroy(ph, props_iter);
+void destroy_property_value(char* value)
+{
+    if (value)
+    {
+        //FIXME which properties?
+        VM_Global_State::loader_env->JavaProperties()->destroy(value);
+    }
 }
 
-// Advance iterator to a next property.
-// Return false if no more properties left to iterate
-Boolean vm_properties_iterator_advance(PropertiesIteratorHandle props_iter) {
-    return properties_iterator_advance(props_iter);
+int is_property_set(const char* key, PropertyTable table_number)
+{
+    int value;
+    assert(key);
+    switch(table_number) {
+    case JAVA_PROPERTIES: 
+        value = VM_Global_State::loader_env->JavaProperties()->is_set(key) ? 1 : 0;
+        break;
+    case VM_PROPERTIES: 
+        value = VM_Global_State::loader_env->VmProperties()->is_set(key) ? 1 : 0;
+        break;
+    default:
+        value = -1;
+        ASSERT(0, "Unknown property table: " << table_number);
+    }
+    return value;
 }
 
-// Return a name of the current property
-const char* vm_properties_get_name(PropertiesIteratorHandle props_iter) {
-    return properties_get_name(props_iter);
-
+void unset_property(const char* key, PropertyTable table_number)
+{
+    assert(key);
+    switch(table_number) {
+    case JAVA_PROPERTIES: 
+        VM_Global_State::loader_env->JavaProperties()->unset(key);
+        break;
+    case VM_PROPERTIES: 
+        VM_Global_State::loader_env->VmProperties()->unset(key);
+        break;
+    default:
+        ASSERT(0, "Unknown property table: " << table_number);
+    }
 }
 
-// Return a value of the current property
-const char* vm_properties_get_string_value(PropertiesIteratorHandle props_iter) {
-    return properties_get_string_value(props_iter);
+char** get_properties_keys(PropertyTable table_number)
+{
+    char** value;
+    switch(table_number) {
+    case JAVA_PROPERTIES: 
+        value = VM_Global_State::loader_env->JavaProperties()->get_keys();
+        break;
+    case VM_PROPERTIES: 
+        value = VM_Global_State::loader_env->VmProperties()->get_keys();
+        break;
+    default:
+        value = NULL;
+        ASSERT(0, "Unknown property table: " << table_number);
+    }
+    return value;
+}
+
+char** get_properties_keys_staring_with(const char* prefix, PropertyTable table_number)
+{
+    assert(prefix);
+    char** value;
+    switch(table_number) {
+    case JAVA_PROPERTIES: 
+        value = VM_Global_State::loader_env->JavaProperties()->get_keys_staring_with(prefix);
+        break;
+    case VM_PROPERTIES: 
+        value = VM_Global_State::loader_env->VmProperties()->get_keys_staring_with(prefix);
+        break;
+    default:
+        value = NULL;
+        ASSERT(0, "Unknown property table: " << table_number);
+    }
+    return value;
+}
+
+void destroy_properties_keys(char** keys)
+{
+    if (keys)
+    {
+        //FIXME which properties?
+        VM_Global_State::loader_env->JavaProperties()->destroy(keys);
+    }
+}
+
+int get_int_property(const char *property_name, int default_value, PropertyTable table_number)
+{
+    assert(property_name);
+    char *value = get_property(property_name, table_number);
+    int return_value = default_value;
+    if (NULL != value)
+    {
+        return_value = atoi(value);
+        destroy_property_value(value);
+    }
+    return return_value;
+}
+
+Boolean get_boolean_property(const char *property_name, Boolean default_value, PropertyTable table_number)
+{
+    assert(property_name);
+    char *value = get_property(property_name, table_number);
+    if (NULL == value)
+    {
+        return default_value;
+    }
+    Boolean return_value = default_value;
+    if (0 == strcmp("no", value)
+        || 0 == strcmp("off", value)
+        || 0 == strcmp("false", value)
+        || 0 == strcmp("0", value))
+    {
+        return_value = FALSE;
+    }
+    else if (0 == strcmp("yes", value)
+             || 0 == strcmp("on", value)
+             || 0 == strcmp("true", value)
+             || 0 == strcmp("1", value))
+    {
+        return_value = TRUE;
+    }
+    destroy_property_value(value);
+    return return_value;
 }

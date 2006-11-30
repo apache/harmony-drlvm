@@ -45,6 +45,7 @@
 #include "nogc.h"
 #include "vm_strings.h"
 #include "slot.h"
+#include "classpath_const.h"
 
 #ifdef PLATFORM_NT
 // 20040427 Used to turn on heap checking on every allocation
@@ -114,17 +115,15 @@ void create_instance_for_class(Global_Env * vm_env, Class *clss)
  */
 static jint process_properties_dlls(Global_Env * vm_env) {
     jint status;
-    char * tok;
-    const char * dlls;
-    const char delimiters[] = {PORT_PATH_SEPARATOR, 0};
 
+    if (!vm_env->VmProperties()->is_set("vm.em_dll")) {
+        vm_env->VmProperties()->set("vm.em_dll", PORT_DSO_NAME("em"));
+    }
 
-    post_initialize_ee_dlls((PropertiesHandle)vm_env->properties);
-
-    const char* dll = properties_get_string_property((PropertiesHandle)vm_env->properties, "vm.em_dll");
+    char* dll = vm_env->VmProperties()->get("vm.em_dll");
     TRACE("analyzing em dll " << dll);
-
     status = CmLoadComponent(dll, "EmInitialize");
+    vm_env->VmProperties()->destroy(dll);
     if (status != JNI_OK) {
         WARN("Cannot load EM component from " << dll);
         return status;
@@ -143,13 +142,12 @@ static jint process_properties_dlls(Global_Env * vm_env) {
         return status;
     }
 
-    dlls = properties_get_string_property((PropertiesHandle)vm_env->properties, "vm.dlls");
-    if (!dlls) return JNI_OK;
+    const char delimiters[] = {PORT_PATH_SEPARATOR, 0};
 
-    dlls = strdup(dlls);
-    assert(dlls);
+    char* dlls = vm_env->VmProperties()->get("vm.dlls");
+    if (!dlls) return JNI_OK;
     
-    tok = strtok((char *)dlls, delimiters);
+    char* tok = strtok((char *)dlls, delimiters);
     while (tok) {
         TRACE("analyzing dll " << tok);
 #ifndef USE_GC_STATIC
@@ -166,13 +164,14 @@ static jint process_properties_dlls(Global_Env * vm_env) {
         }
 #endif
         WARN("Mandatory library cannot be loaded: " << tok);
-        return JNI_ERR;
+        status = JNI_ERR;
+        break;
 next_dll:
         tok = strtok(NULL, delimiters);
     }
-    STD_FREE((void*)dlls);
-    
-    return JNI_OK;
+
+    vm_env->VmProperties()->destroy(dlls);
+    return status;
 }
 
 /**
@@ -280,23 +279,22 @@ static jint populate_jni_nio() {
     }
 }
 
-
 /**
 * Extends bootstrap classpath with jars from components
 */
 static void bootstrap_add_components_classpath(Global_Env *vm_env) {
     static std::string VM_COMPONENT_BOOTSTRAP_PREFIX="vm.components.";
     static std::string VM_COMPONENT_BOOTSTRAP_SUFFIX=".classpath";
-    
+
     // create temp pool for apr functions
     apr_pool_t *tmp_pool;
     apr_pool_create(&tmp_pool, NULL);
-    
-    std::string kernel_dir_path = vm_get_property_value(O_A_H_VM_VMDIR);
-    
-    PropertiesIteratorHandle ph = vm_properties_iterator_create();
-    do {
-        const char* key = vm_properties_get_name(ph);
+
+    std::string kernel_dir_path = get_property(O_A_H_VM_VMDIR, JAVA_PROPERTIES);
+
+    char** keys = get_properties_keys(JAVA_PROPERTIES);
+    for (unsigned i = 0; keys[i] != NULL; ++i) {
+        const char* key = keys[i];
         //check if the property name is VM_COMPONENT_BOOTSTRAP_PREFIX.*.VM_COMPONENT_BOOTSTRAP_SUFFIX form
         if (strncmp(VM_COMPONENT_BOOTSTRAP_PREFIX.c_str(), key, VM_COMPONENT_BOOTSTRAP_PREFIX.length())) {
             continue;
@@ -310,7 +308,7 @@ static void bootstrap_add_components_classpath(Global_Env *vm_env) {
         }
         //all checks passed
         //extends boot class path with the property value
-        const char* path = vm_properties_get_string_value(ph);
+        char* path = get_property(key, JAVA_PROPERTIES);
         // check if path must be extended
         std::string absPath;
         if (strstr(path, PORT_FILE_SEPARATOR_STR)==NULL) {
@@ -318,11 +316,12 @@ static void bootstrap_add_components_classpath(Global_Env *vm_env) {
         } else {
             absPath = path;
         }
+        destroy_property_value(path);
         vm_env->bootstrap_class_loader->SetBCPElement(absPath.c_str(), tmp_pool);
-    } while(vm_properties_iterator_advance(ph));
+    }
 
-    vm_properties_iterator_destroy(ph);
-    
+    destroy_properties_keys(keys);
+
     apr_pool_destroy(tmp_pool);
 }
 
@@ -674,7 +673,7 @@ int vm_init1(JavaVM_Internal * java_vm, JavaVMInitArgs * vm_arguments) {
     // 20030407 Note: property initialization must follow initialization of the default JITs to allow 
     // the command line to override those default JITs.
 
-    initialize_properties(vm_env, *vm_env->properties);
+    initialize_properties(vm_env);
 
     parse_vm_arguments(vm_env);
 
@@ -687,9 +686,9 @@ int vm_init1(JavaVM_Internal * java_vm, JavaVMInitArgs * vm_arguments) {
     parse_jit_arguments(&vm_env->vm_arguments);
 
     vm_env->pin_interned_strings = 
-        (bool)vm_get_property_value_boolean("vm.pin_interned_strings", FALSE);
+        (bool)get_boolean_property("vm.pin_interned_strings", FALSE, VM_PROPERTIES);
 
-    if (!vm_get_boolean_property_value_with_default("vm.assert_dialog")) {
+    if (!get_boolean_property("vm.assert_dialog", TRUE, VM_PROPERTIES)) {
         TRACE("disabling assertion dialogs");
         disable_assert_dialogs();
     }
@@ -821,7 +820,7 @@ jint vm_init2(JNIEnv * jni_env) {
 
     hythread_suspend_enable();
 
-    if (vm_get_boolean_property_value_with_default("vm.finalize")) {
+    if (get_boolean_property("vm.finalize", TRUE, VM_PROPERTIES)) {
         // Load and initialize finalizer thread.
         vm_env->finalizer_thread = preload_class(vm_env, "java/lang/FinalizerThread");
         assert(vm_env->finalizer_thread);

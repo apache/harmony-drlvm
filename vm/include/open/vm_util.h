@@ -76,13 +76,6 @@ Boolean class_is_subtype_fast(VTable *sub, Class *super);
 void __stdcall vm_dump_object_and_return_ip(void *obj, void *eip);
 #endif
 
-// Allows setting a boolean property on the command line.
-// Currently uses on/true/1 for true, and off/false/0 for false.
-VMEXPORT Boolean vm_get_boolean_property_value_with_default(const char *property_name);
-void check_vm_standard_property(const char *propertyName, const char *propertyValue);
-void print_vm_standard_properties();
-
-
 class ExpandableMemBlock
 {
 public:

@@ -40,7 +40,7 @@ bool interpreter_enabled(void) {
     static bool val;
     if (!inited) {
         val = interp_enabled && 
-            vm_get_boolean_property_value_with_default("vm.use_interpreter");
+            get_boolean_property("vm.use_interpreter", FALSE, VM_PROPERTIES);
         inited = true;
         INFO2("init", "Use interpreter = " << val);
     }

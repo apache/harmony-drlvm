@@ -39,7 +39,6 @@ Global_Env::Global_Env(apr_pool_t * pool):
 mem_pool(pool),
 bootstrap_class_loader(NULL),
 system_class_loader(NULL),
-properties(NULL),
 TI(NULL),
 nsoTable(NULL),
 portLib(NULL),
@@ -50,7 +49,8 @@ bootstrapping(false),
 ready_for_exceptions(false)
 {
     // TODO: Use proper MM.
-    properties = new Properties();
+    m_java_properties = new Properties();
+    m_vm_properties = new Properties();
     bootstrap_class_loader = new BootstrapClassLoader(this); 
 
     hythread_lib_create(&hythread_lib);
@@ -203,7 +203,7 @@ ready_for_exceptions(false)
 
 Global_Env::~Global_Env()
 {
-    if (vm_get_boolean_property_value_with_default("vm.noCleanupOnExit")) {
+    if (get_boolean_property("vm.noCleanupOnExit", false, VM_PROPERTIES)) {
         return;
     }
 
@@ -223,8 +223,10 @@ Global_Env::~Global_Env()
     delete vm_methods;
     vm_methods = NULL;
 
-    delete properties;
-    properties = NULL;
+    delete m_java_properties;
+    m_java_properties = NULL;
+    delete m_vm_properties;
+    m_vm_properties = NULL;
 
     nso_clear_lookup_table(nsoTable);
     nsoTable = NULL;

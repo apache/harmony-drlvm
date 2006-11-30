@@ -84,13 +84,10 @@ JIT_init(JIT_Handle jit, const char* name)
     initMessage = initMessage + mode + " compiler mode";
     INFO(initMessage.c_str());
     Jitrino::Init(jit, name);
-#ifndef PLATFORM_POSIX
-    //
-    // Suppress dialog boxes for regression runs.
-    //
-#ifdef _DEBUG
-    if (!vm_get_boolean_property_value_with_default("vm.assert_dialog")) {
 
+#if defined (PLATFORM_NT) && defined (_DEBUG)
+    if (!get_boolean_property("vm.assert_dialog", false, VM_PROPERTIES))
+    {
         _CrtSetReportMode(_CRT_ASSERT, _CRTDBG_MODE_FILE);
         _CrtSetReportFile(_CRT_ASSERT, _CRTDBG_FILE_STDOUT);
         _CrtSetReportMode(_CRT_ERROR,  _CRTDBG_MODE_FILE);
@@ -99,7 +96,6 @@ JIT_init(JIT_Handle jit, const char* name)
         _CrtSetReportFile(_CRT_WARN, _CRTDBG_FILE_STDOUT);
         _set_error_mode(_OUT_TO_STDERR);
     }
-#endif
 #endif
 
 #ifdef USE_FAST_PATH

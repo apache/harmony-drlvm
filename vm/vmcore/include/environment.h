@@ -45,7 +45,6 @@ struct Global_Env {
     apr_pool_t*               mem_pool; // memory pool
     BootstrapClassLoader*     bootstrap_class_loader;
     UserDefinedClassLoader*   system_class_loader;
-    Properties*               properties;
     DebugUtilsTI*             TI;
     NSOTableItem*             nsoTable;
     void*                     portLib;  // Classlib's port library
@@ -262,9 +261,19 @@ struct Global_Env {
         return ready_for_exceptions;
     }
 
+    Properties* JavaProperties() {
+        return m_java_properties;
+    }
+
+    Properties* VmProperties() {
+        return m_vm_properties;
+    }
+
 private:
     bool bootstrapping;
     bool ready_for_exceptions;
+    Properties* m_java_properties;
+    Properties* m_vm_properties;
 };
 
 #endif // _ENVIRONMENT_H

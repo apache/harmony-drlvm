@@ -81,7 +81,7 @@ int NT_exception_filter(LPEXCEPTION_POINTERS p_NT_exception)
     VM_Code_Type vmct =
         vm_identify_eip((void *)p_NT_exception->ContextRecord->Eip);
     if(vmct != VM_TYPE_JAVA) {
-        if (!vm_get_boolean_property_value_with_default("vm.assert_dialog")) {
+        if (!get_boolean_property("vm.assert_dialog", TRUE, VM_PROPERTIES)) {
             WARN("Fatal exception, terminating");
             return EXCEPTION_EXECUTE_HANDLER;
         }

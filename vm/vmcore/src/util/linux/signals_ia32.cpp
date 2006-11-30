@@ -730,7 +730,7 @@ void initialize_signals()
     /* initialize the name of the executable (to be used by addr2line) */
     get_executable_name(executable, sizeof(executable));
 
-    if (vm_get_boolean_property_value_with_default("vm.crash_handler")) {
+    if (get_boolean_property("vm.crash_handler", FALSE, VM_PROPERTIES)) {
         init_crash_handler();
         // can't install crash handler immediately,
         // as we have already SIGABRT and SIGSEGV handlers

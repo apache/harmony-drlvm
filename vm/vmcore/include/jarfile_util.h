@@ -68,12 +68,7 @@ inline const char* archive_get_manifest_attr(JarFile *jarfl, const char *manifes
     }
     // get attribute of manifest
     Properties *prop = manifest->GetMainProperties();
-    // search manifest attribute
-    Prop_String *value = (Prop_String*)prop->get(manifest_attr);
-    if(!value) {
-        return NULL;
-    }
-    return (const char*)value->value;
+    return prop->get(manifest_attr);
 } // archive_get_manifest_attr
 
 inline const char* archive_get_main_class_name(JarFile *jarfl)

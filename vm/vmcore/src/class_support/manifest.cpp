@@ -162,7 +162,7 @@ Manifest::Manifest( const JarFile* jf )
 
         // set property
         if( IsMainProperty( propName ) ) {
-            m_main.add( strdup(propName), new Prop_String(strdup(propValue)) );
+            m_main.set((const char*)propName, (const char*)propValue);
         }
     } while( pointer - manifest <  manifestSize );
 
@@ -174,9 +174,7 @@ Manifest::Manifest( const JarFile* jf )
 
 Manifest::~Manifest()
 {
-    m_main.clear();
 }
-
 
 bool Manifest::IsMainProperty( const char* prop )
 {

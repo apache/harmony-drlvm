@@ -128,8 +128,8 @@ void EXPORT JIT_init(JIT_Handle UNREF h, const char* UNREF name) {
     interpreter->interpreter_ti_pop_frame = &interpreter_ti_pop_frame;
     interpreter->stack_dump = &stack_dump;
 
-#ifdef _WIN32
-    if (!vm_get_boolean_property_value_with_default("vm.assert_dialog"))
+#if defined (PLATFORM_NT) && defined (_DEBUG)
+    if (!get_boolean_property("vm.assert_dialog", false, VM_PROPERTIES))
     {
         disable_assert_dialogs();
     }

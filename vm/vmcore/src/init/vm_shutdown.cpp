@@ -147,7 +147,7 @@ jint vm_destroy(JavaVM_Internal * java_vm, jthread java_thread)
     while (native_thread = hythread_iterator_next(&it)) {
         vm_thread = get_vm_thread(native_thread);
         if (vm_thread != NULL && native_thread != current_native_thread) {
-            add_pair_to_properties(*java_vm->vm_env->properties, "vm.noCleanupOnExit", "true");
+            java_vm->vm_env->VmProperties()->set("vm.noCleanupOnExit", "true");
             hythread_iterator_release(&it);
             return JNI_ERR;
         }

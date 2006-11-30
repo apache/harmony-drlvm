@@ -174,7 +174,9 @@ void DrlEMImpl::deallocateResources() {
  *  deprecated
  */
 std::string buildDefaultLibPath(const std::string& dll_name) {
-    std::string library_path = vm_get_property_value("vm.boot.library.path");
+    char* c_string_tmp_value = get_property("vm.boot.library.path", VM_PROPERTIES);
+    std::string library_path = c_string_tmp_value == NULL ? "" : c_string_tmp_value;
+    destroy_property_value(c_string_tmp_value);
 #ifdef PLATFORM_NT
     std::string fullPath = dll_name + ".dll";
     
@@ -214,7 +216,9 @@ std::string prepareLibPath(const std::string& origPath) {
 
     std::string path = origPath;
     if (path.find('/') == path.npos && path.find('\\') == path.npos ) {
-        std::string dir = vm_get_property_value(O_A_H_VM_VMDIR);
+        char* c_string_tmp_value = get_property(O_A_H_VM_VMDIR, JAVA_PROPERTIES);
+        std::string dir = c_string_tmp_value == NULL ? "" : c_string_tmp_value;
+        destroy_property_value(c_string_tmp_value);
         if (libPrefix.length() > 0 && !startsWith(path, libPrefix)) {
             path = libPrefix + path;
         }
@@ -297,9 +301,15 @@ static std::string readFile(const std::string& fileName) {
             } else if (startsWith(line, "-D") && (idx = line.find('=')) != std::string::npos) {
                 std::string name = line.substr(2, idx-2);                   
                 std::string value = line.substr(idx+1);
-                const char* old_value = vm_get_property_value(name.c_str());
-                if (old_value == NULL || *old_value == 0) {
-                    vm_properties_set_value(name.c_str(), value.c_str());
+                if (!is_property_set(name.c_str(), JAVA_PROPERTIES)) {
+                    set_property(name.c_str(), value.c_str(), JAVA_PROPERTIES);
+                }
+                continue;
+            } else if (startsWith(line, "-XD") && (idx = line.find('=')) != std::string::npos) {
+                std::string name = line.substr(3, idx-3);                   
+                std::string value = line.substr(idx+1);
+                if (!is_property_set(name.c_str(),VM_PROPERTIES)) {
+                    set_property(name.c_str(), value.c_str(), VM_PROPERTIES);
                 }
                 continue;
             } 
@@ -315,10 +325,12 @@ static std::string readFile(const std::string& fileName) {
 }
 
 std::string DrlEMImpl::readConfiguration() {
-    std::string  configFileName = vm_get_property_value("em.properties");
+    char* c_string_tmp_value = get_property("em.properties", VM_PROPERTIES);
+    std::string  configFileName = c_string_tmp_value == NULL ? "" : c_string_tmp_value;
+    destroy_property_value(c_string_tmp_value);
     if (configFileName.empty()) {
-        bool jitTiMode = vm_get_property_value_boolean("vm.jvmti.enabled", false);
-        bool interpreterMode = vm_get_boolean_property_value_with_default("vm.use_interpreter");
+        bool jitTiMode = get_boolean_property("vm.jvmti.enabled", FALSE, VM_PROPERTIES);
+        bool interpreterMode = get_boolean_property("vm.use_interpreter", FALSE, VM_PROPERTIES);
         configFileName = interpreterMode ? "interpreter" : (jitTiMode ? "ti" : "client");
     } 
     if (!endsWith(configFileName, EM_CONFIG_EXT)) {
@@ -326,7 +338,9 @@ std::string DrlEMImpl::readConfiguration() {
     }
 
     if (configFileName.find('/') == configFileName.npos && configFileName.find('\\') == configFileName.npos ) {
-        std::string defaultConfigDir = vm_get_property_value(O_A_H_VM_VMDIR);
+        c_string_tmp_value = get_property(O_A_H_VM_VMDIR, JAVA_PROPERTIES);
+        std::string defaultConfigDir = c_string_tmp_value == NULL ? "" : c_string_tmp_value;
+        destroy_property_value(c_string_tmp_value);
         
         configFileName = defaultConfigDir + "/" + configFileName;
     }
@@ -378,9 +392,13 @@ bool DrlEMImpl::initJIT(const std::string& libName, apr_dso_handle_t* libHandle,
 
 std::string DrlEMImpl::getJITLibFromCmdLine(const std::string& jitName) const {
     std::string propName = std::string("em.")+jitName+".jitPath";
-    std::string jitLib  = vm_get_property_value(propName.c_str());
+    char* c_string_tmp_value = get_property(propName.c_str(), VM_PROPERTIES);
+    std::string jitLib  = c_string_tmp_value == NULL ? "" : c_string_tmp_value;
+    destroy_property_value(c_string_tmp_value);
     if (jitLib.empty()) {
-        jitLib = vm_get_property_value("em.jitPath");
+        c_string_tmp_value = get_property("em.jitPath", VM_PROPERTIES);
+        jitLib = c_string_tmp_value == NULL ? "" : c_string_tmp_value;
+        destroy_property_value(c_string_tmp_value);
     }
     return jitLib;
 }

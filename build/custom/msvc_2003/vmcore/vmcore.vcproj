@@ -508,6 +508,9 @@ copy $(OutDir)\harmonyvm.lib $(ProjectDir)\..\..\..\win_ia32_msvc_$(Configuratio
 				RelativePath="..\..\..\..\vm\vmcore\src\init\vm_main.cpp">
 			</File>
 			<File
+				RelativePath="..\..\..\..\vm\vmcore\src\init\vm_properties.cpp">
+			</File>
+			<File
 				RelativePath="..\..\..\..\vm\vmcore\src\init\vm_shutdown.cpp">
 			</File>
 		</Filter>

@@ -209,17 +209,15 @@ static char* num_suffix(int n) {
 
 void initialize_verify_stack_enumeration()
 {
-    verify_stack_enumeration_flag = vm_get_property_value_boolean("verify.rse", false);
+    verify_stack_enumeration_flag = get_boolean_property("verify.rse", false, VM_PROPERTIES);
     if (verify_stack_enumeration_flag) {
         INFO("verify stack enumeration mode");
 
-        const char* s = vm_get_property_value("verify.rse.after");
-        int n = atoi(s);
+        int n = get_int_property("verify.rse.after", 0, VM_PROPERTIES);
         if (n > 0) verify_stack_enumeration_counter = n;
         INFO(">verify after " << verify_stack_enumeration_counter);
 
-        s = vm_get_property_value("verify.rse.period");
-        n = atoi(s);
+        n = get_int_property("verify.rse.period", 0, VM_PROPERTIES);
         if (n > 0) verify_stack_enumeration_period = n;
         INFO(">verify each " << verify_stack_enumeration_period 
                 << num_suffix(verify_stack_enumeration_period) << " iteration");

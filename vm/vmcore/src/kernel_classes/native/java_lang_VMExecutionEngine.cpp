@@ -14,10 +14,6 @@
  *  See the License for the specific language governing permissions and
  *  limitations under the License.
  */
-/** 
- * @author Alexey V. Varlamov
- * @version $Revision: 1.1.2.2.4.4 $
- */  
 
 /**
  * @file jjava_lang_VMExecutionEngine.cpp
@@ -145,53 +141,6 @@ static bool PropPut(JNIEnv* jenv, jobject properties, const char* key, const cha
     return !exn_raised();
 }
 
-static void insertSystemProperties(JNIEnv *jenv, jobject pProperties, apr_pool_t *pp)
-{
-    char *os_name, *os_version, *path;
-    port_OS_name_version(&os_name, &os_version, pp);
-    apr_filepath_get(&path, APR_FILEPATH_NATIVE, pp);
-    const char *tmp;
-    if (APR_SUCCESS != apr_temp_dir_get(&tmp, pp)) {
-        tmp = ".";
-    }
-    PropPut(jenv, pProperties, "java.tmpdir", tmp);
-    PropPut(jenv, pProperties, "java.class.path",
-        properties_get_string_property( 
-            reinterpret_cast<PropertiesHandle>(jni_get_vm_env(jenv)->properties),
-            "java.class.path") );
-
-    // TODO : fix this - it should come from Class.h
-    PropPut(jenv, pProperties, "java.class.version", "49.0");
-
-    // First, insert all the default properties.
-    if (!PropPut(jenv, pProperties, "user.language", "en")
-        || !PropPut(jenv, pProperties, "user.region", "US")
-        || !PropPut(jenv, pProperties, "file.encoding", "8859_1")
-        //PropPut(jenv, pProperties, "file.encoding", apr_os_default_encoding(p));
-        || !PropPut(jenv, pProperties, "file.separator", PORT_FILE_SEPARATOR_STR)
-        || !PropPut(jenv, pProperties, "path.separator", PORT_PATH_SEPARATOR_STR)
-        || !PropPut(jenv, pProperties, "line.separator", APR_EOL_STR)
-        || !PropPut(jenv, pProperties, "os.arch", port_CPU_architecture())
-        || !PropPut(jenv, pProperties, "os.name", os_name)
-        || !PropPut(jenv, pProperties, "os.version", os_version)
-        || !PropPut(jenv, pProperties, "java.vendor.url", "http://www.intel.com/")
-        || !PropPut(jenv, pProperties, "user.dir", path)
-        || !PropPut(jenv, pProperties, "java.tmpdir", tmp)
-        || !PropPut(jenv, pProperties, "java.class.version", "49.0") )
-    {
-        return;
-    }
-
-    // Next, add runtime specified properties.
-    Properties::Iterator *iterator = VM_Global_State::loader_env->properties->getIterator();
-    const Prop_entry *next = NULL;
-    while((next = iterator->next())){
-        if (!PropPut(jenv, pProperties, next->key, ((Prop_String*)next->value)->value)){
-            break;
-        }
-    }
-} //insertSystemProperties
-
 /*
  * Class:     java_lang_VMExecutionEngine
  * Method:    getProperties
@@ -204,11 +153,17 @@ JNIEXPORT jobject JNICALL Java_java_lang_VMExecutionEngine_getProperties
         VM_Global_State::loader_env->java_util_Properties_Class);
 
     if (jprops) {
-        apr_pool_t *pp;
-        if (APR_SUCCESS == apr_pool_create(&pp, 0)) {
-            insertSystemProperties(jenv, jprops, pp);
-            apr_pool_destroy(pp);
+        Properties *pp = VM_Global_State::loader_env->JavaProperties();
+        char** keys = pp->get_keys();
+        for (int i = 0; keys[i] !=NULL; ++i) {
+            char* value = pp->get(keys[i]);
+            bool added = PropPut(jenv, jprops, keys[i], value);
+            pp->destroy(value);
+            if (!added) {
+                break;
+            }
         }
+        pp->destroy(keys);
     }
 
     return jprops;

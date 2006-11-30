@@ -65,50 +65,33 @@ bool remember_root_set = false;
 const char *lp_hint = NULL;
 bool jvmti_heap_iteration = false;
 
-static size_t parse_size_string(const char* size_string) {
-    size_t len = strlen(size_string);
-    size_t unit = 1;
-    if (tolower(size_string[len - 1]) == 'k') {
-        unit = 1024;
-    } else if (tolower(size_string[len - 1]) == 'm') {
-        unit = 1024 * 1024;
-    } else if (tolower(size_string[len - 1]) == 'g') {
-        unit = 1024 * 1024 * 1024;
-    }
+static size_t get_size_property(const char* name) 
+{
+    char* size_string = get_property(name, VM_PROPERTIES);
     size_t size = atol(size_string);
+    int sizeModifier = tolower(size_string[strlen(size_string) - 1]);
+    destroy_property_value(size_string);
+
+    size_t unit = 1;
+    switch (sizeModifier) {
+    case 'k': unit = 1024; break;
+    case 'm': unit = 1024 * 1024; break;
+    case 'g': unit = 1024 * 1024 * 1024;break;
+    }
+
     size_t res = size * unit;
     if (res / unit != size) {
-        // overflow happened
+        /* overflow happened */
         return 0;
     }
     return res;
 }
 
-static bool get_property_value_boolean(char* name, bool deflt) {
-    const char* value = vm_get_property_value(name);
-    if (value == NULL || 0 == value[0])
-       return deflt;
-
-    return (strcmp("0", value) != 0
-        && strcmp("off", value) != 0 
-        && strcmp("false", value) != 0);
-}
-
-static int get_property_value_int(char* name) {
-    const char* value = vm_get_property_value(name);
-    return (NULL == value) ? 0 : atoi(value);
-}
-
-static bool is_property_set(char* name) {
-    const char* value = vm_get_property_value(name);
-    return (NULL != value && 0 != value[0]);
-}
-
 static void parse_configuration_properties() {
     max_heap_size = HEAP_SIZE_DEFAULT;
     min_heap_size = 16 MB;
-    if (is_property_set("gc.mx")) {
-        max_heap_size = parse_size_string(vm_get_property_value("gc.mx"));
+    if (is_property_set("gc.mx", VM_PROPERTIES) == 1) {
+        max_heap_size = get_size_property("gc.mx");
 
         if (max_heap_size < 16 MB) {
             INFO("max heap size is too small: " << max_heap_size);
@@ -123,8 +106,8 @@ static void parse_configuration_properties() {
         if (min_heap_size < 16 MB) min_heap_size = 16 MB;
     }
 
-    if (is_property_set("gc.ms")) {
-        min_heap_size = parse_size_string(vm_get_property_value("gc.ms"));
+    if (is_property_set("gc.ms", VM_PROPERTIES) == 1) {
+        min_heap_size = get_size_property("gc.ms");
 
         if (min_heap_size < 16 MB) {
             INFO("min heap size is too small: " << min_heap_size);
@@ -152,35 +135,36 @@ static void parse_configuration_properties() {
 #endif
 
 
-    if (is_property_set("gc.lp")) {
-        lp_hint = vm_get_property_value("gc.lp");
+    if (is_property_set("gc.lp", VM_PROPERTIES) == 1) {
+        char* value = get_property("gc.lp", VM_PROPERTIES);
+        lp_hint = strdup(value);
+        destroy_property_value(value);
     }
     
-    if (is_property_set("gc.type"))
-        gc_algorithm = get_property_value_int("gc.type");
+    gc_algorithm = get_int_property("gc.type", 0, VM_PROPERTIES);
 
     // version
     INFO(gc_version_string());
     INFO("GC type = " << gc_algorithm);
 
-    if (get_property_value_boolean("gc.ignore_finalizers", false)) {
+    if (get_boolean_property("gc.ignore_finalizers", false, VM_PROPERTIES)) {
         ignore_finalizers = true;
         INFO("GC will ignore finalizers");
     }
 
-    if (get_property_value_boolean("gc.adaptive", true)) {
+    if (get_boolean_property("gc.adaptive", true, VM_PROPERTIES)) {
         INFO("GC will use adaptive algorithm selection");
     } else {
         INFO("GC will NOT use adaptive algorithm selection");
         gc_adaptive = false;
     }
 
-    if (get_property_value_boolean("gc.remember_root_set", false)) {
+    if (get_boolean_property("gc.remember_root_set", false, VM_PROPERTIES)) {
         remember_root_set = true;
         INFO("GC will retrieve root set before any modification in heap");
     }
 
-    if (get_property_value_boolean("gc.heap_iteration", false)) {
+    if (get_boolean_property("gc.heap_iteration", false, VM_PROPERTIES)) {
         jvmti_heap_iteration = true;
         INFO("GC jvmti heap iteration enabled");
     }
@@ -189,7 +173,7 @@ static void parse_configuration_properties() {
 void gc_vm_initialized() {
     TRACE2("gc.init", "gc_vm_initialized");
 
-    if (get_property_value_boolean("gc.heap_iteration", false)) {
+    if (get_boolean_property("gc.heap_iteration", false, VM_PROPERTIES)) {
         jvmti_heap_iteration = true;
         INFO("GC jvmti heap iteration enabled");
     }

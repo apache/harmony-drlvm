@@ -1139,21 +1139,10 @@ void class_unloading_start() {
 }
 
 inline void
-BootstrapClassLoader::SetClasspathFromProperty(const char* prop_string,
+BootstrapClassLoader::SetClasspathFromString(char* bcp,
                                                apr_pool_t* tmp_pool)
 {
-    // get property value
-    const char *bcp_value = properties_get_string_property(
-        reinterpret_cast<PropertiesHandle>(m_env->properties), prop_string);
-    assert(bcp_value);
-
-    size_t len = strlen(bcp_value) + 1;
-    char *bcp = (char *)STD_ALLOCA( len );
-    memcpy(bcp, bcp_value, len);
-#ifdef PLATFORM_NT
-    //on windows, we change the path to lower case
-    strlwr(bcp);
-#endif // PLATFORM_NT
+    assert(bcp);
 
     // set bootclasspath elements
     const char separator[2] = {PORT_PATH_SEPARATOR, 0};
@@ -1163,6 +1152,7 @@ BootstrapClassLoader::SetClasspathFromProperty(const char* prop_string,
         SetBCPElement(path_name, tmp_pool);
         path_name = strtok(NULL, separator);
     }
+
     return;
 } // BootstrapClassLoader::SetClasspathFromProperty
 
@@ -1233,6 +1223,7 @@ inline void BootstrapClassLoader::SetClasspathFromJarFile(JarFile *jar, apr_pool
     size_t len = strlen(jar_classpath) + 1;
     char* classpath = (char*)STD_ALLOCA(len);
     memcpy(classpath, jar_classpath, len);
+    STD_FREE((void*)jar_classpath); //FIXME inconsistent MM
 #ifdef PLATFORM_NT
     //on windows, we change the path to lower case
     strlwr(classpath);
@@ -1322,19 +1313,11 @@ bool BootstrapClassLoader::Initialize(ManagedObject* UNREF loader)
     ClassLoader::Initialize();
 
     // get list of natives libraries
-    const char *lib_list = 
-        properties_get_string_property(
-            reinterpret_cast<PropertiesHandle>(m_env->properties),
-            "vm.other_natives_dlls" );
+    char *lib_list = m_env->VmProperties()->get("vm.other_natives_dlls");
              
-    size_t len = strlen( lib_list ) + 1;
-
-    char *libraries = (char*)STD_ALLOCA( len );
-    memcpy( libraries, lib_list, len );
-
     // separate natives libraries
     const char separator[2] = {PORT_PATH_SEPARATOR, 0};
-    char *lib_name = strtok( libraries, separator );
+    char *lib_name = strtok( lib_list, separator );
 
     while( lib_name != NULL )
     {
@@ -1344,6 +1327,7 @@ bool BootstrapClassLoader::Initialize(ManagedObject* UNREF loader)
         // find next library
         lib_name = strtok( NULL, separator );
     }
+    m_env->VmProperties()->destroy(lib_list);
 
     /*
      *  at this point, LUNI is loaded, so we can use the boot classpath
@@ -1359,18 +1343,16 @@ bool BootstrapClassLoader::Initialize(ManagedObject* UNREF loader)
      * the kernel
      */
      
-    PropertiesHandle hProps = reinterpret_cast<PropertiesHandle>(m_env->properties);
-     
     /* strdup so that it's freeable w/o extra logic */
-
-    const char *temp = properties_get_string_property(hProps, XBOOTCLASSPATH);    
+    char *temp = m_env->VmProperties()->get(XBOOTCLASSPATH);
     char *bcp_value = (temp ? strdup(temp) : NULL);
-    
+    m_env->VmProperties()->destroy(temp);
+        
     if (bcp_value == NULL) { 
         
         /* not overridden, so lets build, adding the kernel to what luni made for us */
         
-        const char *kernel_dir_path = properties_get_string_property(hProps, O_A_H_VM_VMDIR);
+        char *kernel_dir_path = m_env->JavaProperties()->get(O_A_H_VM_VMDIR);
 
         char *kernel_path = (char *) malloc(strlen(kernel_dir_path == NULL ? "" : kernel_dir_path) 
                                         + strlen(PORT_FILE_SEPARATOR_STR) 
@@ -1379,8 +1361,9 @@ bool BootstrapClassLoader::Initialize(ManagedObject* UNREF loader)
         strcpy(kernel_path, kernel_dir_path);
         strcat(kernel_path, PORT_FILE_SEPARATOR_STR);
         strcat(kernel_path, KERNEL_JAR);
-        
-        const char *luni_path = properties_get_string_property(hProps,O_A_H_BOOT_CLASS_PATH);
+        m_env->JavaProperties()->destroy(kernel_dir_path);
+
+        char *luni_path = m_env->JavaProperties()->get(O_A_H_BOOT_CLASS_PATH);
         
         char *vmboot = (char *) malloc(strlen(luni_path == NULL ? "" : luni_path) 
                                 + strlen(kernel_path) + strlen(PORT_PATH_SEPARATOR_STR) + 1);
@@ -1388,6 +1371,7 @@ bool BootstrapClassLoader::Initialize(ManagedObject* UNREF loader)
         strcpy(vmboot, kernel_path);
         strcat(vmboot, PORT_PATH_SEPARATOR_STR);
         strcat(vmboot, luni_path);
+        m_env->JavaProperties()->destroy(luni_path);
 
         free(kernel_path);
         bcp_value = vmboot;
@@ -1397,8 +1381,8 @@ bool BootstrapClassLoader::Initialize(ManagedObject* UNREF loader)
      *  now if there a pre or post bootclasspath, add those
      */
      
-    const char *prepend = properties_get_string_property(hProps, XBOOTCLASSPATH_P);
-    const char *append = properties_get_string_property(hProps, XBOOTCLASSPATH_A);
+    char *prepend = m_env->VmProperties()->get(XBOOTCLASSPATH_P);
+    char *append = m_env->VmProperties()->get(XBOOTCLASSPATH_A);
     
     if (prepend || append) {
         
@@ -1423,16 +1407,16 @@ bool BootstrapClassLoader::Initialize(ManagedObject* UNREF loader)
        free(bcp_value);
        bcp_value = temp;
     }
-    
+    m_env->VmProperties()->destroy(prepend);
+    m_env->VmProperties()->destroy(append);
     /*
      *  set VM_BOOT_CLASS_PATH and SUN_BOOT_CLASS_PATH for any code 
      *  that needs it
      */
      
-    add_pair_to_properties(*m_env->properties, VM_BOOT_CLASS_PATH, bcp_value);
-    add_pair_to_properties(*m_env->properties, SUN_BOOT_CLASS_PATH, bcp_value);
-    
-    free(bcp_value);
+    m_env->VmProperties()->set(VM_BOOT_CLASS_PATH, bcp_value);
+    m_env->JavaProperties()->set(VM_BOOT_CLASS_PATH, bcp_value);
+    m_env->JavaProperties()->set(SUN_BOOT_CLASS_PATH, bcp_value);
     
     // create temp pool for apr functions
     apr_pool_t *tmp_pool;
@@ -1440,14 +1424,15 @@ bool BootstrapClassLoader::Initialize(ManagedObject* UNREF loader)
 
     // create a bootclasspath collection
 
-    SetClasspathFromProperty(VM_BOOT_CLASS_PATH, tmp_pool);
+    SetClasspathFromString(bcp_value, tmp_pool);
+    free(bcp_value);
         
     // check if vm.bootclasspath.appendclasspath property is set to true
-    Boolean is_enabled =
-        vm_get_boolean_property_value_with_default("vm.bootclasspath.appendclasspath");
-    if( TRUE == is_enabled ) {
+    if( TRUE == get_boolean_property("vm.bootclasspath.appendclasspath", FALSE, VM_PROPERTIES) ) {
         // append classpath to bootclasspath
-        SetClasspathFromProperty("java.class.path", tmp_pool);
+        char * cp = m_env->JavaProperties()->get("java.class.path");
+        SetClasspathFromString(cp, tmp_pool);
+        m_env->JavaProperties()->destroy(cp);
     }
 
     // get a classpath from archive files manifest and
