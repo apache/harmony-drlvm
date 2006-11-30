@@ -197,8 +197,18 @@ IDATA unreserve_lock(hythread_thin_monitor_t *lockword_ptr) {
             hythread_resume(owner);
     }
 
-   /* status = hymutex_unlock(TM_LOCK);*/
-    assert(!IS_RESERVED(*lockword_ptr));
+    /* status = hymutex_unlock(TM_LOCK);*/
+
+    // Gregory - This lock, right after it was unreserved, may be
+    // inflated by another thread and therefore instead of recursion
+    // count and reserved flag it will have the fat monitor ID. The
+    // assertion !IS_RESERVED(lockword) fails in this case. So it is
+    // necessary to check first that monitor is not fat.
+    // To avoid race condition between checking two different
+    // conditions inside of assert, the lockword contents has to be
+    // loaded before checking.
+    lockword = *lockword_ptr;
+    assert(IS_FAT_LOCK(lockword) || !IS_RESERVED(lockword));
     return TM_ERROR_NONE;
 }
 #else
