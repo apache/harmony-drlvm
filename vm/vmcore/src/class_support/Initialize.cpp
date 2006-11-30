@@ -88,8 +88,10 @@ void Class::initialize()
     TRACE2("class.init", "initializing class " << m_name->bytes << "STEP 6" );
 
     assert(m_state == ST_ConstraintsVerified);
-    m_state = ST_Initializing;
     assert(m_initializing_thread == 0);
+    lock();
+    m_state = ST_Initializing;
+    unlock();
     m_initializing_thread = p_TLS_vmthread;
     jthread_monitor_exit(jlc);
 
@@ -105,7 +107,9 @@ void Class::initialize()
                 get_super_class()->get_error_cause());
             tmn_suspend_disable();
             m_initializing_thread = NULL;
+            lock();
             m_state = ST_Error;
+            unlock();
             assert(!hythread_is_suspend_enabled());
             jthread_monitor_notify_all(jlc);
             jthread_monitor_exit(jlc);
@@ -118,7 +122,9 @@ void Class::initialize()
     Method* meth = m_static_initializer;
     if(meth == NULL) {
         jthread_monitor_enter(jlc);
+        lock();
         m_state = ST_Initialized;
+        unlock();
         TRACE2("classloader", "class " << m_name->bytes << " initialized");
         m_initializing_thread = NULL;
         assert(!hythread_is_suspend_enabled());
@@ -139,7 +145,9 @@ void Class::initialize()
 
     if(!p_error_object) {
         jthread_monitor_enter(jlc);
+        lock();
         m_state = ST_Initialized;
+        unlock();
         TRACE2("classloader", "class " << m_name->bytes << " initialized");
         m_initializing_thread = NULL;
         assert(m_error == NULL);
@@ -178,7 +186,9 @@ void Class::initialize()
         // ---  step 11  ----------------------------------------------------------
         assert(!hythread_is_suspend_enabled());
         jthread_monitor_enter(jlc);
+        lock();
         m_state = ST_Error;
+        unlock();
         m_initializing_thread = NULL;
         assert(!hythread_is_suspend_enabled());
         jthread_monitor_notify_all(jlc);

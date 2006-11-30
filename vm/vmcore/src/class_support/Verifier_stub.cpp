@@ -111,9 +111,14 @@ Class::verify_constraints(const Global_Env* env)
 
     // lock class and check result
     lock();
-    if(in_error()) {
+    switch(m_state)
+    {
+    case ST_ConstraintsVerified:
+    case ST_Initializing:
+    case ST_Initialized:
+    case ST_Error:
         unlock();
-        return false;
+        return true;
     }
     if( result != VER_OK ) {
         unlock();
