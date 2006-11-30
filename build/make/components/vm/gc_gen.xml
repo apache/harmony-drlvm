@@ -52,6 +52,7 @@ Version: $Revision: 1.4.2.3 $
             </includepath>
 
             <fileset dir="${src}/gc_gen/src">
+                <select arch="ia32">
                 <include name="common/*.cpp" />            
                 <include name="gen/*.cpp" />            
                 <include name="mark_compact/*.cpp" />            
@@ -60,6 +61,18 @@ Version: $Revision: 1.4.2.3 $
                 <include name="trace_forward/*.cpp" />            
                 <include name="utils/*.cpp" /> 
                 <include name="verify/*.cpp" />            
+                </select>
+
+                <select arch="em64t,ipf">
+                <exclude name="common/*.cpp" />            
+                <exclude name="gen/*.cpp" />            
+                <exclude name="mark_compact/*.cpp" />            
+                <exclude name="mark_sweep/*.cpp" />            
+                <exclude name="thread/*.cpp" />            
+                <exclude name="trace_forward/*.cpp" />            
+                <exclude name="utils/*.cpp" /> 
+                <exclude name="verify/*.cpp" />            
+                </select>
             </fileset>
 
             <defineset define="BUILDING_GC" />
