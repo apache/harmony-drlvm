@@ -96,20 +96,22 @@ static char * gen_restore_monitor_enter(char *ss, char *patch_addr_null_arg)
     ss = branch8(ss, Condition_Z,  Imm_Opnd(size_8, 0));
     char *backpatch_address__null_pointer = ((char *)ss) - 1;
 
-// skip fast path if ti is enabled
-// so all TI events will be generated
-if(!VM_Global_State::loader_env->TI->isEnabled()) {
-    ss = alu(ss, add_opc, ecx_opnd, Imm_Opnd(header_offset)); // pop parameters
-    ss = gen_monitorenter_fast_path_helper(ss, ecx_opnd);
-    ss = test(ss,  eax_opnd,   eax_opnd);
-    ss = branch8(ss, Condition_NZ,  Imm_Opnd(size_8, 0));
-    char *backpatch_address__fast_monitor_failed = ((char *)ss) - 1;
-    ss = ret(ss,  Imm_Opnd(4));
+    // skip fast path if can_generate_monitor_events capability
+    // was requested, so all TI events will be generated
+    if (!VM_Global_State::loader_env->TI->get_global_capability(
+                DebugUtilsTI::TI_GC_ENABLE_MONITOR_EVENTS)) {
+        ss = alu(ss, add_opc, ecx_opnd, Imm_Opnd(header_offset)); // pop parameters
+        ss = gen_monitorenter_fast_path_helper(ss, ecx_opnd);
+        ss = test(ss,  eax_opnd,   eax_opnd);
+        ss = branch8(ss, Condition_NZ,  Imm_Opnd(size_8, 0));
+        char *backpatch_address__fast_monitor_failed = ((char *)ss) - 1;
+        ss = ret(ss,  Imm_Opnd(4));
 
-    // Slow path: happens when the monitor is busy (contention case)
-    offset = (signed)ss - (signed)backpatch_address__fast_monitor_failed - 1;
-    *backpatch_address__fast_monitor_failed = (char)offset;
-}
+        // Slow path: happens when the monitor is busy (contention case)
+        offset = (signed)ss - (signed)backpatch_address__fast_monitor_failed - 1;
+        *backpatch_address__fast_monitor_failed = (char)offset;
+    }
+
     ss = gen_setup_j2n_frame(ss);
     ss = push(ss,  M_Base_Opnd(esp_reg, m2n_sizeof_m2n_frame));
  
@@ -365,10 +367,10 @@ void * getaddress__vm_monitor_exit_naked()
     addr = stub;
     assert((ss - stub) < stub_size);
 
-    compile_add_dynamic_generated_code_chunk("vm_monitor_enter_naked", stub, stub_size);
+    compile_add_dynamic_generated_code_chunk("vm_monitor_exit_naked", stub, stub_size);
 
     if (VM_Global_State::loader_env->TI->isEnabled())
-        jvmti_send_dynamic_code_generated_event("vm_monitor_enter_naked", stub, stub_size);
+        jvmti_send_dynamic_code_generated_event("vm_monitor_exit_naked", stub, stub_size);
 
     DUMP_STUB(stub, "getaddress__vm_monitor_exit_naked", ss - stub);
 

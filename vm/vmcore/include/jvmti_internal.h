@@ -293,6 +293,7 @@ class DebugUtilsTI {
             TI_GC_ENABLE_FIELD_MODIFICATION_EVENT = 0x40,
             TI_GC_ENABLE_POP_FRAME                = 0x80,
             TI_GC_ENABLE_TAG_OBJECTS              = 0x100,
+            TI_GC_ENABLE_MONITOR_EVENTS           = 0x200,
         };
 
         void set_global_capability(GlobalCapabilities ti_gc)

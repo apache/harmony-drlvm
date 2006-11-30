@@ -284,6 +284,9 @@ jvmtiAddCapabilities(jvmtiEnv* env,
     if (capabilities_ptr->can_pop_frame)
         ti->set_global_capability(DebugUtilsTI::TI_GC_ENABLE_POP_FRAME);
 
+    if (capabilities_ptr->can_generate_monitor_events)
+        ti->set_global_capability(DebugUtilsTI::TI_GC_ENABLE_MONITOR_EVENTS);
+
     if (capabilities_ptr->can_tag_objects) {
         ti->set_global_capability(DebugUtilsTI::TI_GC_ENABLE_TAG_OBJECTS);
         ManagedObject::_tag_pointer = true;
@@ -376,6 +379,12 @@ jvmtiRelinquishCapabilities(jvmtiEnv* env,
 
     if (capabilities_ptr->can_pop_frame)
         ti->reset_global_capability(DebugUtilsTI::TI_GC_ENABLE_POP_FRAME);
+
+    // relinquishing following capabilies will not revert VM operation mode
+    // back to optimized, so we do not reset global capabilities
+    //
+    //     TI_GC_ENABLE_MONITOR_EVENTS
+    //     TI_GC_ENABLE_TAG_OBJECTS
 
     return JVMTI_ERROR_NONE;
 }
