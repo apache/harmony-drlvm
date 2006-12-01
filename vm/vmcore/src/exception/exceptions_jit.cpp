@@ -135,7 +135,8 @@ update_handler_address(NativeCodePtr new_handler_ip)
 //////////////////////////////////////////////////////////////////////////
 // Lazy Exception Utilities
 
-// Note: Function runs from unwindable area
+// Note: Function runs from unwindable area before exception throwing
+// function can be safe point & should be called with disable reqursion = 1
 static ManagedObject *create_lazy_exception(
     Class_Handle exn_class,
     Method_Handle exn_constr,
@@ -150,9 +151,12 @@ static ManagedObject *create_lazy_exception(
         result = class_alloc_new_object_and_run_constructor(
             (Class*) exn_class, (Method*) exn_constr, exn_constr_args);
     } else {
+        // exception is throwing, so suspend can be enabled safely
+        tmn_suspend_enable();
         jthrowable exc_object = create_exception(
             (Class*) exn_class, (Method*) exn_constr, vm_exn_constr_args);
         result = exc_object->object;
+        tmn_suspend_disable();
     }
     set_unwindable(unwindable);
     exn_rethrow_if_pending();
@@ -174,6 +178,7 @@ static ManagedObject *create_lazy_exception(
 // The client should either use si_transfer_control to resume it, or use an OS context mechanism
 // copied from the final stack iterator.
 
+// function can be safe point & should be called with disable reqursion = 1
 static void exn_propagate_exception(
     StackIterator * si,
     ManagedObject ** exn_obj,
@@ -383,6 +388,7 @@ static bool UNUSED is_gc_frame_before_m2n_frame()
 }
 #endif // _IPF_
 
+// function can be safe point & should be called with disable reqursion = 1
 void exn_throw_for_JIT(ManagedObject* exn_obj, Class_Handle exn_class,
     Method_Handle exn_constr, uint8* jit_exn_constr_args, jvalue* vm_exn_constr_args)
 {
@@ -433,9 +439,11 @@ void exn_throw_for_JIT(ManagedObject* exn_obj, Class_Handle exn_class,
 // Exception defined as in previous function.
 // Does not return.
 
+// function can be safe point & should be called with disable reqursion = 1
 void exn_athrow(ManagedObject* exn_obj, Class_Handle exn_class,
     Method_Handle exn_constr, uint8* exn_constr_args)
 {
+    assert(!hythread_is_suspend_enabled());
     exn_throw_for_JIT(exn_obj, exn_class, exn_constr, exn_constr_args, NULL);
 }
 
@@ -445,8 +453,10 @@ void exn_athrow(ManagedObject* exn_obj, Class_Handle exn_class,
 // Exception defined as in previous two functions.
 // Mutates the regs value, which should be used to "resume" the managed code.
 
+// function can be safe point & should be called with disable reqursion = 1
 void exn_athrow_regs(Registers * regs, Class_Handle exn_class, bool java_code)
 {
+    assert(!hythread_is_suspend_enabled());
     assert(exn_class);
 #ifndef _IPF_
     M2nFrame *m2nf;

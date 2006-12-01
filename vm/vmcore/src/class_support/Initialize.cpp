@@ -137,8 +137,13 @@ void Class::initialize()
     jthrowable p_error_object;
 
     assert(!hythread_is_suspend_enabled());
+    // it's a safe poin so enviroment should be protected
     vm_execute_java_method_array((jmethodID) meth, 0, 0);
+
+    // suspend can be enabeled in safe enviroment
+    tmn_suspend_enable();
     p_error_object = exn_get();
+    tmn_suspend_disable();
 
     // ---  step 9   ----------------------------------------------------------
     TRACE2("class.init", "initializing class " << m_name->bytes << " STEP 9" ); 

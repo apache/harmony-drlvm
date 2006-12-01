@@ -49,6 +49,8 @@ bool exn_raised()
 //Find all usage and change to lazy use
 jthrowable exn_get()
 {
+    assert(hythread_is_suspend_enabled());
+
     // we can check heap references for equality to NULL
     // without disabling gc, because GC wouldn't change 
     // null to non-null and vice versa.
@@ -62,10 +64,10 @@ jthrowable exn_get()
     jobject exc;
 
     if (NULL != p_TLS_vmthread->thread_exception.exc_object) {
-        tmn_suspend_disable_recursive();
+        tmn_suspend_disable();
         exc = oh_allocate_local_handle();
         exc->object = (ManagedObject *) p_TLS_vmthread->thread_exception.exc_object;
-        tmn_suspend_enable_recursive();
+        tmn_suspend_enable();
     } else if (NULL != p_TLS_vmthread->thread_exception.exc_class) {
         exc = exn_create((Exception*)&(p_TLS_vmthread->thread_exception));
     } else {
@@ -144,6 +146,7 @@ bool set_unwindable(bool unwindable)
 }
 
 jthrowable exn_create(Exception* exception) {
+    assert(hythread_is_suspend_enabled());
     return create_exception(exception);
 }
 
@@ -165,6 +168,7 @@ jthrowable exn_create(Class* exc_class, const char* exc_message)
 jthrowable exn_create(Class* exc_class, const char* exc_message, jthrowable exc_cause)
 {
     ASSERT_RAISE_AREA;
+    assert(hythread_is_suspend_enabled());
     jthrowable exc_object = create_exception(exc_class, exc_message, exc_cause);
 
     if (exc_object == NULL) {
@@ -196,6 +200,7 @@ jthrowable exn_create(const char* exc_name,const char *exc_message)
 jthrowable exn_create(const char *exc_name, const char *exc_message, jthrowable cause)
 {
     ASSERT_RAISE_AREA;
+    assert(hythread_is_suspend_enabled());
     Class *exc_class = get_exc_class(exc_name);
 
     if (exc_class == NULL) {
@@ -206,12 +211,7 @@ jthrowable exn_create(const char *exc_name, const char *exc_message, jthrowable 
 }   // exn_create
 
 void exn_throw_object(jthrowable exc_object) {
-    assert(!hythread_is_suspend_enabled());
     assert(is_unwindable());
-    // XXX salikh: change to unconditional thread_disable_suspend()
-    // we use conditional until all of the VM
-    // is refactored to be definitely gc-safe.
-
     exn_throw_object_internal(exc_object);
 }
 
@@ -233,7 +233,6 @@ void exn_throw_by_class(Class* exc_class, const char* exc_message)
 void exn_throw_by_class(Class* exc_class, const char* exc_message,
     jthrowable exc_cause)
 {
-    assert(!hythread_is_suspend_enabled());
     assert(is_unwindable());
 
     exn_throw_by_class_internal(exc_class, exc_message, exc_cause);
@@ -257,7 +256,6 @@ void exn_throw_by_name(const char* exc_name, const char* exc_message)
 void exn_throw_by_name(const char* exc_name, const char* exc_message,
     jthrowable exc_cause)
 {
-    assert(!hythread_is_suspend_enabled());
     assert(is_unwindable());
 
     exn_throw_by_name_internal(exc_name, exc_message, exc_cause);
@@ -311,11 +309,13 @@ void exn_raise_by_name(const char* exc_name, const char* exc_message)
 void exn_raise_by_name(const char* exc_name, const char* exc_message,
     jthrowable exc_cause)
 {
+    assert(hythread_is_suspend_enabled());
     assert(!is_unwindable());
     assert(exc_name);
     exn_raise_by_name_internal(exc_name, exc_message, exc_cause);
 }
 
+// FIXME moove to exception_impl.cpp
 static void check_pop_frame(ManagedObject *exn) {
     if (exn == VM_Global_State::loader_env->popFrameException->object) {
         exn_clear();
@@ -327,8 +327,16 @@ static void check_pop_frame(ManagedObject *exn) {
     }
 }
 
+// function can be cold from suspen enabled and disabled mode 
 void exn_rethrow()
 {
+    // exception is throwing, so suspend can be disabeled without following enabling
+    if (hythread_is_suspend_enabled()) {
+        tmn_suspend_disable();
+    }
+
+    assert(!hythread_is_suspend_enabled());
+
 #ifndef VM_LAZY_EXCEPTION
     ManagedObject *exn = get_exception_object_internal();
     assert(exn);
@@ -355,6 +363,7 @@ void exn_rethrow()
             exc_cause->object = p_TLS_vmthread->thread_exception.exc_cause;
         }
         clear_exception_internal();
+
         exn_throw_by_class_internal(exc_class, exc_message, exc_cause);
     } else {
         DIE(("There is no exception."));
@@ -377,6 +386,7 @@ void exn_rethrow_if_pending()
 // prints stackTrace via java
 inline void exn_java_print_stack_trace(FILE * UNREF f, jthrowable exc)
 {
+    assert(hythread_is_suspend_enabled());
     // finds java environment
     JNIEnv *jenv = p_TLS_vmthread->jni_env;
 
@@ -539,6 +549,7 @@ inline void exn_jni_print_stack_trace(FILE * f, jthrowable exc)
 inline void exn_native_print_stack_trace(FILE * f, ManagedObject * exn)
 {
 //Afremov Pavel 20050119 Should be changed when classpath will raplaced by DRL
+    assert(hythread_is_suspend_enabled());
     assert(gid_throwable_traceinfo);
 
     // ? 20030428: This code should be elsewhere!

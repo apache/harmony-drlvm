@@ -72,6 +72,7 @@ static Method* prepare_exc_creating(Class* exc_class, jvalue* args,
 // cause can be null
 static Method* prepare_exc_creating(Class* exc_class, jvalue* args) {
     ASSERT_RAISE_AREA;
+    assert(hythread_is_suspend_enabled());
 
     // Finds corresponding constructor
     Method* exc_init = lookup_exc_constructor(exc_class, "()V");
@@ -88,6 +89,7 @@ static Method* prepare_exc_creating(Class* exc_class, jvalue* args) {
 static Method* prepare_exc_creating(Class* exc_class, jvalue* args,
     jthrowable exc_cause) {
     ASSERT_RAISE_AREA;
+    assert(hythread_is_suspend_enabled());
 
     // Checks that it's corresponding method
     if (NULL == exc_cause) {
@@ -112,6 +114,7 @@ static Method* prepare_exc_creating(Class* exc_class, jvalue* args,
 static Method* prepare_exc_creating(Class* exc_class, jvalue* args,
     const char* exc_message) {
     ASSERT_RAISE_AREA;
+    assert(hythread_is_suspend_enabled());
 
     // Checks that it's corresponding method
     if (NULL == exc_message) {
@@ -127,7 +130,7 @@ static Method* prepare_exc_creating(Class* exc_class, jvalue* args,
     }
 
     // Creates string object
-    tmn_suspend_disable_recursive();
+    tmn_suspend_disable();
 
     ManagedObject *arg_obj =
         string_create_from_utf8(exc_message, (unsigned) strlen(exc_message));
@@ -139,7 +142,7 @@ static Method* prepare_exc_creating(Class* exc_class, jvalue* args,
     jobject arg = oh_allocate_local_handle();
     arg->object = arg_obj;
 
-    tmn_suspend_enable_recursive();
+    tmn_suspend_enable();
 
     // Fills arguments for constructor
     args[1].l = arg;
@@ -151,6 +154,7 @@ static Method* prepare_exc_creating(Class* exc_class, jvalue* args,
 static Method* prepare_exc_creating(Class* exc_class, jvalue* args,
     const char* exc_message, jthrowable exc_cause) {
     ASSERT_RAISE_AREA;
+    assert(hythread_is_suspend_enabled());
 
     // Checks that it's corresponding method
     if (NULL == exc_message) {
@@ -196,12 +200,9 @@ static Method* prepare_exc_creating(Class* exc_class, jvalue* args,
 void init_cause(jthrowable exc_object, jthrowable exc_cause) {
     ASSERT_RAISE_AREA;
     assert(exc_cause);
+    assert(hythread_is_suspend_enabled());
 
-    bool suspended_enabled = hythread_is_suspend_enabled();
-
-    if (suspended_enabled) {
-        tmn_suspend_disable();
-    }
+    tmn_suspend_disable();
 
     Class* exc_class = exc_object->object->vt()->clss;
     Method *init_cause_method = class_lookup_method_recursive(exc_class,
@@ -213,10 +214,7 @@ void init_cause(jthrowable exc_object, jthrowable exc_cause) {
     jvalue ret_val;
     vm_execute_java_method_array((jmethodID) init_cause_method, &ret_val,
         args);
-
-    if (suspended_enabled) {
-        tmn_suspend_enable();
-    }
+    tmn_suspend_enable();
 
     if (exn_raised()) {
         DIE(("Exception constructor has thrown an exception"));
@@ -225,6 +223,7 @@ void init_cause(jthrowable exc_object, jthrowable exc_cause) {
 
 jthrowable create_exception(Class* exc_class, Method* exc_init, jvalue* args) {
     ASSERT_RAISE_AREA;
+    assert(hythread_is_suspend_enabled());
 
     bool suspended_enabled = hythread_is_suspend_enabled();
 
@@ -255,6 +254,8 @@ jthrowable create_exception(Class* exc_class, Method* exc_init, jvalue* args) {
 jthrowable create_exception(Class* exc_class,
     const char* exc_message, jthrowable exc_cause)
 {
+    ASSERT_RAISE_AREA;
+    assert(hythread_is_suspend_enabled());
     jvalue args[3];
     Method *exc_init =
         prepare_exc_creating(exc_class, args, exc_message, exc_cause);
@@ -274,6 +275,8 @@ jthrowable create_exception(Class* exc_class,
 jthrowable create_exception(Exception* exception)
 {
     ASSERT_RAISE_AREA;
+    assert(hythread_is_suspend_enabled());
+
     if ( NULL != exception->exc_class) {
         jthrowable exc_cause = NULL;
         Class* exc_class = exception->exc_class;
@@ -286,7 +289,10 @@ jthrowable create_exception(Exception* exception)
             tmn_suspend_enable_recursive();
         }
         exn_clear();
-        return exn_create(exc_class, exc_message, exc_cause);
+        
+        jthrowable exc_exception = NULL;
+        exc_exception = exn_create(exc_class, exc_message, exc_cause);
+        return exc_exception;
     } else {
         return NULL;
     }
@@ -294,6 +300,11 @@ jthrowable create_exception(Exception* exception)
 
 void exn_throw_object_internal(jthrowable exc_object)
 {
+    // functions can be invoked in suspend disabled and enabled state
+    if (hythread_is_suspend_enabled()) {
+        tmn_suspend_disable();
+    }
+    assert(!hythread_is_suspend_enabled());
     TRACE2("exn", ("%s", "exn_throw_object(), delegating to exn_throw_for_JIT()"));
     exn_throw_for_JIT(exc_object->object, NULL, NULL, NULL, NULL);
 }
@@ -301,6 +312,12 @@ void exn_throw_object_internal(jthrowable exc_object)
 void exn_throw_by_class_internal(Class* exc_class, const char* exc_message,
     jthrowable exc_cause)
 {
+    // functions can be invoked in suspend disabled and enabled state
+    if (!hythread_is_suspend_enabled()) {
+        // exception is throwing, so suspend can be enabled safely
+        tmn_suspend_enable();
+    }
+    assert(hythread_is_suspend_enabled());
 #ifdef VM_LAZY_EXCEPTION
     set_unwindable(false);
 
@@ -318,7 +335,11 @@ void exn_throw_by_class_internal(Class* exc_class, const char* exc_message,
     } else {
         TRACE2("exn", ("%s", "exn_throw_by_class(), lazy delegating to exn_throw_for_JIT()"));
         set_unwindable(true);
+
+        // no return, so enable isn't required
+        tmn_suspend_disable();
         exn_throw_for_JIT(NULL, exc_class, exc_init, NULL, args);
+        //tmn_suspend_enable();
     }
 #else
     set_unwindable(false);
@@ -328,9 +349,15 @@ void exn_throw_by_class_internal(Class* exc_class, const char* exc_message,
     exn_throw_object_internal(exc_object);
 #endif
 }
+
 void exn_throw_by_name_internal(const char* exc_name, const char* exc_message,
     jthrowable exc_cause)
 {
+    // functions can be invoked in suspend disabled and enabled state
+    if (!hythread_is_suspend_enabled()) {
+        // exception is throwing, so suspend can be enabled safely
+        tmn_suspend_enable();
+    }
     assert(hythread_is_suspend_enabled());
     set_unwindable(false);
     Class *exc_class = get_exc_class(exc_name);
@@ -393,27 +420,37 @@ void exn_raise_by_name_internal(const char* exc_name, const char* exc_message,
     exn_raise_by_class_internal(exc_class, exc_message, exc_cause);
 }
 
+// function should be called in disable mode
 void __stdcall clear_exception_internal()
 {
+    assert(!hythread_is_suspend_enabled());
     p_TLS_vmthread->thread_exception.exc_object = NULL;
     p_TLS_vmthread->thread_exception.exc_class = NULL;
     p_TLS_vmthread->thread_exception.exc_cause = NULL;
     p_TLS_vmthread->thread_exception.exc_message = NULL;
-}
+} // clear_exception_internal
 
+// function should be called in disable mode
 void __stdcall set_exception_object_internal(ManagedObject * exc)
 {
     assert(!hythread_is_suspend_enabled());
     p_TLS_vmthread->thread_exception.exc_object = exc;
 } // set_exc_object_internal
 
+// function is safe point & should be called in disable mode in safe enviroment
 ManagedObject* __stdcall get_exception_object_internal()
 {
+    assert(!hythread_is_suspend_enabled());
     if (NULL != p_TLS_vmthread->thread_exception.exc_object) {
         return p_TLS_vmthread->thread_exception.exc_object;
     } else if (NULL != p_TLS_vmthread->thread_exception.exc_class) {
         Exception* exception = (Exception*)&(p_TLS_vmthread->thread_exception);
+
+        // suspend can be enabeled in safe enviroment
+        tmn_suspend_enable();
         jthrowable exc_object = create_exception(exception);
+        tmn_suspend_disable();
+
         return exc_object->object;
     } else {
         return NULL;
