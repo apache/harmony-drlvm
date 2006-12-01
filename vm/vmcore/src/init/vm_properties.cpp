@@ -149,7 +149,14 @@ static void init_java_properties(Properties & properties)
     if (NULL == p)
         DIE("Failed to determine executable parent directory");
     *p = '\0';
-    properties.set("java.home", base_path_buf);
+    // home directory
+    char* home_path = apr_pstrdup(prop_pool, base_path_buf);
+    p = strrchr(home_path, PORT_FILE_SEPARATOR);
+    if (NULL == p)
+        DIE("Failed to determine java home directory");
+    *p = '\0';
+
+    properties.set("java.home", home_path);
     properties.set("java.vm.specification.version", "1.0");
     properties.set("java.vm.specification.vendor", "Sun Microsystems Inc.");
     properties.set("java.vm.specification.name", "Java Virtual Machine Specification");
@@ -174,7 +181,7 @@ static void init_java_properties(Properties & properties)
     }
     properties.set("java.library.path", lib_path);
     //java.ext.dirs initialization.
-    char *ext_path = port_filepath_merge(base_path_buf, "lib" PORT_FILE_SEPARATOR_STR "ext", prop_pool);
+    char *ext_path = port_filepath_merge(home_path, "lib" PORT_FILE_SEPARATOR_STR "ext", prop_pool);
     properties.set("java.ext.dirs", ext_path);
     properties.set("os.name", os_name);
     properties.set("os.arch", port_CPU_architecture());
