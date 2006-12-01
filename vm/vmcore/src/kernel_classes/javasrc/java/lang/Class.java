@@ -130,6 +130,9 @@ public final class Class<T> implements Serializable, AnnotatedElement, GenericDe
      */
     public static Class<?> forName(String name, boolean initialize,
             ClassLoader classLoader) throws ClassNotFoundException {
+        if (name == null)
+            throw new NullPointerException();
+            
         Class clazz = null;
         int i = 0;
         try {
