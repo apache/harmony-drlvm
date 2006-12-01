@@ -104,22 +104,6 @@ JNIEXPORT jlong JNICALL Java_java_lang_VMExecutionEngine_nanoTime
 
 /*
 * Class:     java_lang_VMExecutionEngine
-* Method:    getenv
-* Signature: (Ljava/lang/String;)Ljava/lang/String;
-*/
-JNIEXPORT jstring JNICALL Java_java_lang_VMExecutionEngine_getenv__Ljava_lang_String_2
-(JNIEnv *, jclass, jstring);
-
-/*
-* Class:     java_lang_VMExecutionEngine
-* Method:    getenv
-* Signature: ()Ljava/util/Map;
-*/
-JNIEXPORT jobject JNICALL Java_java_lang_VMExecutionEngine_getenv__
-(JNIEnv *, jclass);
-
-/*
-* Class:     java_lang_VMExecutionEngine
 * Method:    mapLibraryName
 * Signature: (Ljava/lang/String;)Ljava/lang/String;
 */

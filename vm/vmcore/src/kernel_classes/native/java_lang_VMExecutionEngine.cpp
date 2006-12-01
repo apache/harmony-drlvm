@@ -215,60 +215,6 @@ JNIEXPORT jlong JNICALL Java_java_lang_VMExecutionEngine_nanoTime
 
 /*
 * Class:     java_lang_VMExecutionEngine
-* Method:    getenv
-* Signature: (Ljava/lang/String;)Ljava/lang/String;
-*/
-JNIEXPORT jstring JNICALL Java_java_lang_VMExecutionEngine_getenv__Ljava_lang_String_2
-(JNIEnv *jenv, jclass, jstring jname) {
-    jstring res = NULL;
-    if(jname) {
-        const char* key = GetStringUTFChars(jenv, jname, NULL);
-        apr_pool_t *pp;
-        char* value;
-        if (APR_SUCCESS == apr_pool_create(&pp, 0) 
-            && APR_SUCCESS == apr_env_get(&value, key, pp)) {
-            res = NewStringUTF(jenv, value);
-            apr_pool_destroy(pp);
-        }
-        ReleaseStringUTFChars(jenv, jname, key);
-    }
-    return res;
-}
-
-/*
-* Class:     java_lang_VMExecutionEngine
-* Method:    getenv
-* Signature: ()Ljava/util/Map;
-*/
-JNIEXPORT jobject JNICALL Java_java_lang_VMExecutionEngine_getenv__
-(JNIEnv *jenv, jclass) {
-    Global_Env * genv = VM_Global_State::loader_env;
-    Class* mapClass = genv->LoadCoreClass("java/util/HashMap");
-    jmethodID put = (jmethodID)class_lookup_method_recursive(mapClass, "put", 
-        "(Ljava/lang/Object;Ljava/lang/Object;)Ljava/lang/Object;");
-    jobject jmap = create_default_instance(mapClass);
-    if (jmap) {
-        apr_pool_t *pp;
-        if (APR_SUCCESS == apr_pool_create(&pp, 0)) {
-            for (char **e = port_env_all(pp) ; *e; ++e){
-                size_t idx = strcspn(*e, "=");
-                char* key = apr_pstrndup(pp, *e, idx);
-                jobject jkey = NewStringUTF(jenv, key);
-                if (!jkey) break;
-                jobject jval = NewStringUTF(jenv, *e+idx+1);
-                if (!jval) break;
-                CallObjectMethod(jenv, jmap, put, jkey, jval); 
-                assert(!exn_raised());
-            }
-            apr_pool_destroy(pp);
-        }
-    }
-
-    return jmap;
-}
-
-/*
-* Class:     java_lang_VMExecutionEngine
 * Method:    mapLibraryName
 * Signature: (Ljava/lang/String;)Ljava/lang/String;
 */

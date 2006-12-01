@@ -25,7 +25,6 @@ import java.io.InputStream;
 import java.io.PrintStream;
 import java.io.IOException;
 import java.security.SecurityPermission;
-import java.util.Collections;
 import java.util.Map;
 import java.util.Properties;
 import java.util.PropertyPermission;
@@ -34,6 +33,7 @@ import java.nio.channels.Channel;
 
 import org.apache.harmony.lang.RuntimePermissionCollection;
 import org.apache.harmony.vm.VMStack;
+import org.apache.harmony.luni.platform.Environment;
 
 /**
  * @com.intel.drl.spec_ref 
@@ -114,7 +114,7 @@ public final class System {
         if (sm != null) {
             sm.checkPermission(new RuntimePermission("getenv." + name));
         }
-        return VMExecutionEngine.getenv(name);
+        return Environment.getenv(name);
     }
 
     /**
@@ -125,7 +125,7 @@ public final class System {
         if (sm != null) {
             sm.checkPermission(RuntimePermissionCollection.GETENV_PERMISSION);
         }
-        return Collections.unmodifiableMap(VMExecutionEngine.getenv());
+        return Environment.getenv();
     }
 
     /**

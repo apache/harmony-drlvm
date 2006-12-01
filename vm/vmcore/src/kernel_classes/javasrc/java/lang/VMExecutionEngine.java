@@ -191,20 +191,6 @@ final class VMExecutionEngine {
     static native long nanoTime();
     
     /**
-     * Returns the value of the environment variable specified by
-     * <code>name</code> argument or <code>null</code> if it is not set.
-     * @api2vm
-     */
-    static native String getenv(String name);
-    
-    /**
-     * Returns the whole environment as a name-value mapping.
-     * May return empty map.
-     * @api2vm
-     */
-    static native Map<String, String> getenv();
-    
-    /**
      * Returns platform-specific name of the specified library.
      * @api2vm
      */
