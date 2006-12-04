@@ -21,7 +21,7 @@
 
 #include "MTable.h"
 #include <assert.h>
-
+#include <algorithm>
 #include "jit_import.h"
 
 MTable::~MTable() {
@@ -34,8 +34,8 @@ MTable::~MTable() {
 
 bool isNum(const std::string& str) {
     return str.size() > 0 && str.size() < 10 
-        && *std::min(str.begin(), str.end()) >= '0'
-        && *std::max(str.begin(), str.end()) <= '9'; 
+        && *std::min_element(str.begin(), str.end()) >= '0'
+        && *std::max_element(str.begin(), str.end()) <= '9'; 
 }
 
 bool MTable::addMethodFilter(const std::string& configLine) {
