@@ -740,10 +740,17 @@ public class Thread implements Runnable {
                 throw new OutOfMemoryError("Failed to create new thread");
             } 
             
+            boolean interrupted = false;
             while(!this.started) {
                 try {
                     lock.wait();
-                } catch (InterruptedException e) {/* continue waiting*/}
+                } catch (InterruptedException e) {
+                    interrupted = true;
+                }
+            }
+
+            if (interrupted) {
+                Thread.currentThread().interrupt();
             }
         }
     }
