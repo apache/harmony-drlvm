@@ -21,6 +21,15 @@
 #ifndef _EE_EM_H_
 #define _EE_EM_H_
 
+/**
+ * @file
+ * JIT interface exposed to EM.
+ *
+ * A just-in-time compiler must implement the given functions to
+ * enable EM initialization and de-initialization of JIT compilers or
+ * to enable profile collection or profile usage in JIT.
+ */
+
 #include "open/types.h"
 #include "open/em.h"
 
@@ -29,17 +38,68 @@
 extern "C" {
 #endif
 
-// Called once by EM during JIT initialization
+  /** 
+   * Initializes JIT. 
+   *
+   * The given method is called only once per JIT instance.
+   * 
+   * @param[in] jit   - the run-time JIT handle used at run-time to refer to 
+   *                the given JIT instance
+   * @param[in] name  - the persistent JIT name that the compiler uses to separate 
+   *                its configuration settings from the ones of other JITs 
+   */
 JITEXPORT void JIT_init(JIT_Handle jit, const char* name);
 
-// Called once by EM during system shutdown. Optional
+  /**  
+   * De-initializes JIT.
+   *
+   * The given method is called only once per JIT during the system shutdown. 
+   *
+   * @param[in] jit - the handle of JIT to de-initialize
+   *
+   * @note The given method is optional.
+   */
 JITEXPORT void JIT_deinit(JIT_Handle jit);
 
 
-//Optional
+  /**  
+   * Sets the profile access interface to JIT.
+   *
+   * The EM passes the pointer to the profile access interface 
+   * to JIT through the given method.
+   *
+   * @param[in] jit          - the JIT instance to pass the profile access interface to
+   * @param[in] em           - the handle to the EM instance
+   * @param[in] pc_interface - the handle to the profile access interface
+   *
+   * @note The given method is optional. A JIT compiler without profiling
+   *        support does not need this method. 
+   */
 JITEXPORT void JIT_set_profile_access_interface(JIT_Handle jit, EM_Handle em, struct EM_ProfileAccessInterface* pc_interface);
  
-//Optional
+  /**  
+   * Requests JIT to enable profiling of the specified type.
+   *
+   * EM uses the given method to request JIT to enable profile 
+   * collection or profile usage.
+   * According to the EM request JIT uses or collects the profile defined 
+   * by the <code>role</code> parameter.
+   * The profile type and the profile collector are defined by the profile 
+   * collector handle.
+
+   *
+   * @param[in] jit  - the JIT instance 
+   * @param[in] pc   - the handle of the profile collector instance
+   * @param[in] role - the role of JIT in profiling defining whether to collect 
+   *               or to use the profile
+   *
+   * @return  <code>TRUE</code> if JIT does profiling of the <code>pc</code> type 
+   *          according the <code>role</code> parameter, <code>FALSE</code> if profiling is not 
+   *          supported.
+   *
+   * @note The given method is optional. A JIT compiler without profiling
+   *        support does not need this method. 
+   */
 JITEXPORT bool JIT_enable_profiling(JIT_Handle jit, PC_Handle pc, EM_JIT_PC_Role role);
 
 #ifdef __cplusplus
