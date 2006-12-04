@@ -33,19 +33,6 @@ ERROR() {
 
 export MACHINE_ARCH=`uname -m`
 
-EXTERNAL_DIR=/nfs/site/proj/drl/share/binaries/externals/clean
-
-# ================================================
-# Set default environment variables
-# ================================================
-
-
-# Apache Ant 1.6.2 or higher (can be obtained at http://ant.apache.org)
-if [ -z "$ANT_HOME" ]; then
-    ANT_HOME=$EXTERNAL_DIR/common/apache-ant-1.6.5-bin/apache-ant-1.6.5
-fi
-
-
 # ================================================
 # Check external resources / software installation
 # ================================================
