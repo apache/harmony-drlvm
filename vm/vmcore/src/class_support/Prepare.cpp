@@ -630,6 +630,7 @@ void inline add_new_fake_method( Class *clss, Class *example, unsigned *next)
                 fake_method->_access_flags = (ACC_PUBLIC | ACC_ABSTRACT);
                 // Setting its "_intf_method_for_fake_method" field marks the method as being fake.
                 fake_method->_intf_method_for_fake_method = intf_method;
+                fake_method->_arguments_size = intf_method->_arguments_size;
                 // The rest of the method's fields were zero'd above 
             }
         }
