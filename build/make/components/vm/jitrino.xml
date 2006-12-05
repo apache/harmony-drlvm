@@ -25,7 +25,7 @@ Version: $Revision: 1.6.2.8 $
   -->
 
 <project name="vm.jitrino">
-    <target name="init">
+    <target name="init" depends="common_vm">
         <property name="build.depends" value="extra.apr,vm.vmcore,vm.encoder,vm.hythr" />
         <property name="outtype" value="shared" />
         <property name="libname" value="jitrino" />
@@ -66,9 +66,9 @@ Version: $Revision: 1.6.2.8 $
 
                 <select arch="ipf">
                     <include name="codegenerator/ipf/*.cpp" />
-                    <include name="codegenerator/ipf/msched/*.cpp" />
+                    <!-- <include name="codegenerator/ipf/msched/*.cpp" />
                     <include name="codegenerator/ipf/msched/MachineModel/common/*.cpp" />
-                    <include name="codegenerator/ipf/msched/MachineModel/mckinley/*.cpp" />
+                    <include name="codegenerator/ipf/msched/MachineModel/mckinley/*.cpp" /> -->
                 </select>
 
                 <select arch="ia32,em64t">
@@ -98,9 +98,10 @@ Version: $Revision: 1.6.2.8 $
 
                     <select arch="ipf">
                         <include name="codegenerator/ipf" />
-                        <include name="codegenerator/ipf/msched" />
+                        <include name="codegenerator/ipf/include" />
+                        <!-- <include name="codegenerator/ipf/msched" />
                         <include name="codegenerator/ipf/msched/MachineModel/common" />
-                        <include name="codegenerator/ipf/msched/MachineModel/mckinley" />
+                        <include name="codegenerator/ipf/msched/MachineModel/mckinley" /> -->
                     </select>
                 </dirset>
             </includepath>

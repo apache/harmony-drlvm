@@ -52,24 +52,20 @@ CodeGenerator::CodeGenerator(MemoryManager        &memoryManager_,
 
 //----------------------------------------------------------------------------------------//
 
-bool CodeGenerator::genCode(MethodCodeSelector &methodCodeSelector) {
+void CodeGenerator::genCode(SessionAction *sa, MethodCodeSelector &methodCodeSelector) {
 
     MemoryManager  mm(0x1000, "IpfCodeGenerator");
     cfg = new(mm) Cfg(mm, compilationInterface);
-    IrPrinter irPrinter(*cfg, (char *)Log::getLogDirName());
+    IrPrinter irPrinter(*cfg, "LOG"); //(char *)Log::getLogDirName());
     methodDesc = compilationInterface.getMethodToCompile();
 
-    bool ipfLogIsOnSaved = ipfLogIsOn;
-    if (isIpfLogoutMethod(methodDesc)) {
-        ipfLogIsOn = true;
-    }
     if(LOG_ON) {
         const char *methodName     = methodDesc->getName();
         const char *methodTypeName = (methodDesc->getParentType()!=NULL
             ? methodDesc->getParentType()->getName()
             : "");
         const char * methodSignature = methodDesc->getSignatureString();
-
+    
         IPF_LOG << endl << methodTypeName << "." << methodName << methodSignature << endl;
     }
 
@@ -128,9 +124,6 @@ bool CodeGenerator::genCode(MethodCodeSelector &methodCodeSelector) {
     
     if(ret) IPF_LOG << endl << "=========== Compilation Successful ===========================" << endl;
     else    IPF_LOG << endl << "=========== Compilation Failed ===============================" << endl;
-
-    ipfLogIsOn = ipfLogIsOnSaved;
-    return ret;
 }
 
 } // IPF

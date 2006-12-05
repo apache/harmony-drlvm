@@ -46,7 +46,7 @@ public:
     void                 genVars(uint32, VarCodeSelector&);
     void                 setMethodDesc(MethodDesc*);
     void                 genCFG(uint32, CFGCodeSelector&, bool);
-    void                 setProfileInfo(CodeProfiler*) {}
+//    void                 setProfileInfo(CodeProfiler*) {}
     virtual              ~IpfMethodCodeSelector() {}
 
 protected:
@@ -298,7 +298,24 @@ public:
     void          tau_stField(CG_OpndHandle*, CG_OpndHandle*, Type::Tag, FieldDesc*, bool, CG_OpndHandle*, CG_OpndHandle*, CG_OpndHandle*) { NOT_IMPLEMENTED_V("tau_stField") }
     void          tau_stElem(CG_OpndHandle*, CG_OpndHandle*, CG_OpndHandle*, bool, CG_OpndHandle*, CG_OpndHandle*, CG_OpndHandle*) { NOT_IMPLEMENTED_V("tau_stElem") }
     void          optimisticBalancedMonitorExit(CG_OpndHandle*, CG_OpndHandle*, CG_OpndHandle*) { NOT_IMPLEMENTED_V("optimisticBalancedMonitorExit") }
-    CG_OpndHandle *callvmhelper(uint32, CG_OpndHandle**, Type *, VMHelperCallOp::Id) { NOT_IMPLEMENTED_C("callvmhelper") }
+
+    //---------------------------------------------------------------------------//
+    // TRANSITION
+    //---------------------------------------------------------------------------//
+
+    CG_OpndHandle* callvmhelper(uint32, CG_OpndHandle**, Type*, VMHelperCallOp::Id, InlineInfo*) { NOT_IMPLEMENTED_C("unbox") }
+
+    CG_OpndHandle* convUPtrToObject(ObjectType*, CG_OpndHandle*)              { NOT_IMPLEMENTED_C("convUPtrToObject") }
+    CG_OpndHandle* convToUPtr(PtrType*, CG_OpndHandle*)                       { NOT_IMPLEMENTED_C("convToUPtr") }
+    CG_OpndHandle* tau_ldIntfTableAddr(Type*, CG_OpndHandle*, NamedType*)     { NOT_IMPLEMENTED_C("tau_ldIntfTableAddr") }
+    CG_OpndHandle* arraycopyReverse(unsigned int, CG_OpndHandle**)            { NOT_IMPLEMENTED_C("arraycopyReverse") }
+    CG_OpndHandle* arraycopy(unsigned int, CG_OpndHandle**)                   { NOT_IMPLEMENTED_C("arraycopy") }
+    CG_OpndHandle* addElemIndexWithLEA(Type*, CG_OpndHandle*, CG_OpndHandle*) { NOT_IMPLEMENTED_C("addElemIndexWithLEA") }
+    CG_OpndHandle* ldRef(Type*, MethodDesc*, unsigned int, bool)              { NOT_IMPLEMENTED_C("ldRef") }
+    void           pseudoInst()                                               { NOT_IMPLEMENTED_V("pseudoInst") }
+    void           methodEntry(MethodDesc*)                                   { NOT_IMPLEMENTED_V("methodEntry") }
+    void           methodEnd(MethodDesc*, CG_OpndHandle*)                     { NOT_IMPLEMENTED_V("methodEnd") }
+    void           tau_stRef(CG_OpndHandle*, CG_OpndHandle*, CG_OpndHandle*, Type::Tag, bool, CG_OpndHandle*, CG_OpndHandle*, CG_OpndHandle*) { NOT_IMPLEMENTED_V("tau_stRef") }
 
     //---------------------------------------------------------------------------//
     // convertors from HLO to IPF::CG types

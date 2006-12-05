@@ -28,45 +28,6 @@
 #include "IpfVerifier.h"
 #include <iomanip>
 
-#define SIGILL_BREAK_ACTION_HANDLER
-
-#ifdef SIGILL_BREAK_ACTION_HANDLER
-#ifndef _GNU_SOURCE
-#define _GNU_SOURCE
-#endif
-#define _REENTRANT
-#include <signal.h>
-#include <errno.h>
-#include <ucontext.h>
-
-void __stdcall sighandler(int sn, siginfo_t *si, void *_sc) {
-    struct sigaction signal_action;
-    struct ucontext * signal_ucontext;
-    int saved_errno = errno;
-
-    if (sn==SIGILL && si->si_code==ILL_BREAK && si->si_imm==INST_BREAKPOINT_IMM_VALUE) {
-        signal_ucontext = (struct ucontext *)_sc;
-
-        if ( (signal_ucontext->_u._mc.sc_ip & 0x03)==2 ) {
-            signal_ucontext->_u._mc.sc_ip = (signal_ucontext->_u._mc.sc_ip & ~0x03) + 0x10;
-        } else {
-            signal_ucontext->_u._mc.sc_ip++;
-        }
-        //printf("-- sighandler() for signal %d, si_code %d, si_imm %x\n", sn, si->si_code, si->si_imm);
-
-        signal_action.sa_flags = SA_SIGINFO;
-        signal_action.sa_sigaction = sighandler;
-        if (sigaction(SIGILL, &signal_action, NULL)) {
-            printf("Sigaction returned error = %d\n", errno);
-        }
-    }
-
-    errno = saved_errno;
-    return;
-}
-
-#endif
-
 namespace Jitrino {
 namespace IPF {
 
@@ -356,36 +317,12 @@ EmitterBb::EmitterBb(Cfg & cfg, CompilationInterface & compilationinterface
                 , new(mm) Inst(mm, INST_NOP, p0, IMM(INST_BREAKPOINT_IMM_VALUE)));
         }
     } else {
-#ifdef SIGILL_BREAK_ACTION_HANDLER
-        if (ipfEnableSigillBreakActionHandler) {
-            struct sigaction signal_action;
-
-            signal_action.sa_flags = SA_SIGINFO;
-            signal_action.sa_sigaction = sighandler;
-            if (sigaction(SIGILL, &signal_action, NULL)) {
-                printf("Sigaction returned error = %d\n", errno);
-            }
-
-            bundles->addBundle(0x01
-                , new(mm) Inst(mm, INST_NOP, p0, IMM(INST_BREAKPOINT_IMM_VALUE))
-                , new(mm) Inst(mm, INST_BREAK, p0, IMM(INST_BREAKPOINT_IMM_VALUE))
-                , new(mm) Inst(mm, INST_NOP, p0, IMM(INST_BREAKPOINT_IMM_VALUE)));
-        } else {
-            if (_nop4cafe) {
-                bundles->addBundle(0x01
-                    , new(mm) Inst(mm, INST_NOP, p0, IMM(INST_BREAKPOINT_IMM_VALUE))
-                    , new(mm) Inst(mm, INST_NOP, p0, IMM(INST_BREAKPOINT_IMM_VALUE))
-                    , new(mm) Inst(mm, INST_NOP, p0, IMM(INST_BREAKPOINT_IMM_VALUE)));
-            }
-        }
-#else
         if (_nop4cafe) {
             bundles->addBundle(0x01
                 , new(mm) Inst(mm, INST_NOP, p0, IMM(INST_BREAKPOINT_IMM_VALUE))
                 , new(mm) Inst(mm, INST_NOP, p0, IMM(INST_BREAKPOINT_IMM_VALUE))
                 , new(mm) Inst(mm, INST_NOP, p0, IMM(INST_BREAKPOINT_IMM_VALUE)));
         }
-#endif
     }
 
 };
@@ -405,22 +342,13 @@ Emitter::Emitter(Cfg & cfg_, CompilationInterface & compilationinterface_) :
     bbs = new(mm) vectorbb;
     BbNode  * node = (BbNode *)cfg.getEnterNode();
     EmitterBb * bbdesc;
-    bool break4cafe = ipfEnableSigillBreakActionHandler
-                && (ipfEnableAutoSigillBreak
-                    || isIpfBreakMethod(compilationinterface.getMethodToCompile()));
+    bool break4cafe = false;
     bool nop4cafe = false;
 
     do {
-        // for debugging
-        // tricking(node->getInsts(), mm, cfg);
-
-        if (isIpfBreakBb(node->getId())) {
-            bbdesc = new(mm) EmitterBb(cfg, compilationinterface, node, true, nop4cafe);
-        } else {
-            bbdesc = new(mm) EmitterBb(cfg, compilationinterface, node, break4cafe, nop4cafe);
-        }
+        bbdesc = new(mm) EmitterBb(cfg, compilationinterface, node, break4cafe, nop4cafe);
         bbs->push_back(bbdesc);
-        if (!ipfSigillBreakAllBB) break4cafe = false;
+        break4cafe = false;
         nop4cafe = false;
     } while( (node = node->getLayoutSucc()) != NULL );
 

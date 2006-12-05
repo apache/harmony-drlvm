@@ -296,16 +296,18 @@ void RuntimeInterface::reportMptr(int32 mptr, int32 base) {
     void **mptrPtr = getContextValue(mptr);
     void **basePtr = getContextValue(base);
 
-//    uint64 *u1 = (uint64 *)basePtr;
-//    uint64 *u2 = (uint64 *)mptrPtr;
+    uint64 *u1    = (uint64 *)basePtr;
+    uint64 *u2    = (uint64 *)mptrPtr;
+    int    offset = *u2 - *u1;
 //    cout << "  report mptr: " << - (mptr+1) << flush; 
 //    cout << " " << u2 << flush;
 //    cout << " " << hex << *u2 << dec << flush;
 //    cout << " base: " << base << flush;
 //    cout << " " << u1 << flush;
-//    cout << " " << hex << *u1  << dec << endl;
-
-    gcInterface->enumerateRootManagedReferenceWithBase(mptrPtr, basePtr);
+//    cout << " " << hex << *u1  << dec; // << endl;
+//    cout << " offset " << offset << endl;
+    
+    gcInterface->enumerateRootManagedReference(mptrPtr, offset);
 }
 
 //----------------------------------------------------------------------------------------//

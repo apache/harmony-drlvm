@@ -1742,7 +1742,7 @@ CG_OpndHandle *IpfInstCodeSelector::ldString(MethodDesc *enclosingMethod,
     };
     
     RegOpnd *retOpnd = opndManager->newRegOpnd(OPND_G_REG, DATA_BASE);
-    CompilationInterface::RuntimeHelperId hId = CompilationInterface::Helper_LdString;
+    CompilationInterface::RuntimeHelperId hId = CompilationInterface::Helper_LdRef;
     uint64  address        = (uint64) compilationInterface.getRuntimeHelperAddress(hId);
     Opnd    *helperAddress = opndManager->newImm(address);
     
@@ -3406,52 +3406,6 @@ Completer IpfInstCodeSelector::toCmpltSz(DataKind dataKind) {
         default        : IPF_ERR << "unexpected dataKind " << dataKind << endl; 
     }
     return CMPLT_INVALID;
-}
-
-//----------------------------------------------------------------------------//
-
-void IpfInstCodeSelector::ipfBreakCounted(RegOpnd *truePred) {
-    addNewInst(INST_BREAK, truePred, opndManager->newImm(INST_BREAKPOINT_IMM_VALUE));
-}
-
-//----------------------------------------------------------------------------//
-
-void IpfInstCodeSelector::ipfBreakCounted(RegOpnd *r2, Completer cmp, int val) {
-    // cmp4.crel.ctype p1, p2 = r2, r3
-
-    RegOpnd *p1 = opndManager->newRegOpnd(OPND_P_REG, DATA_P);
-    RegOpnd *r3 = opndManager->newRegOpnd(OPND_G_REG, DATA_I64);
-    
-    addNewInst(INST_MOVL, p0, r3, opndManager->newImm(val));
-    addNewInst(INST_CMP, cmp, p0, p1, p0, r2, r3);
-    addNewInst(INST_BREAK, p1, opndManager->newImm(INST_BREAKPOINT_IMM_VALUE));
-}
-
-//----------------------------------------------------------------------------------------//
-
-void IpfInstCodeSelector::ipfBreakCounted(int cnt) {
-    if (cnt==-1) cnt = ipfSigillBreakCount;
-
-    if (cnt==0) {
-        addNewInst(INST_BREAK, p0, opndManager->newImm(INST_BREAKPOINT_IMM_VALUE));
-    } else {
-        RegOpnd       *r0       = opndManager->getR0();
-        Int64Constant *ic       = new(mm) Int64Constant(0);
-        ConstantRef   *constref = opndManager->newConstantRef(ic);
-        RegOpnd       *r3       = opndManager->newRegOpnd(OPND_G_REG, DATA_I64);
-        RegOpnd       *r1       = opndManager->newRegOpnd(OPND_G_REG, DATA_I64);
-        RegOpnd       *r2       = opndManager->newRegOpnd(OPND_G_REG, DATA_I64);
-        Completer     cmplt     = toCmpltSz(DATA_I64);
-        RegOpnd       *p1       = opndManager->newRegOpnd(OPND_P_REG, DATA_P);
-        
-        addNewInst(INST_MOVL, p0, r3, constref);
-        addNewInst(INST_LD,  cmplt, p0, r1, r3);
-        addNewInst(INST_ADD, p0, r1, r1, r0, opndManager->newImm(1));
-        addNewInst(INST_ST,  cmplt, p0, r3, r1);
-        addNewInst(INST_MOVL, p0, r2, opndManager->newImm(cnt));
-        addNewInst(INST_CMP, CMPLT_CMP_CREL_LE, p0, p1, p0, r2, r1);
-        addNewInst(INST_BREAK, p1, opndManager->newImm(INST_BREAKPOINT_IMM_VALUE));
-    }
 }
 
 } //namespace IPF

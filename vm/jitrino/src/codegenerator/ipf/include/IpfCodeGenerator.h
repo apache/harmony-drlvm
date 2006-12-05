@@ -14,7 +14,7 @@
  *  See the License for the specific language governing permissions and
  *  limitations under the License.
  */
-                                                                                                            
+
 /**
  * @author Intel, Konstantin M. Anisimov, Igor V. Chebykin
  *
@@ -25,6 +25,7 @@
 
 #include "MemoryManager.h"
 #include "IpfCfg.h"
+#include "PMFAction.h"
 
 namespace Jitrino {
 namespace IPF {
@@ -36,17 +37,16 @@ namespace IPF {
 class CodeGenerator : public ::Jitrino::CodeGenerator {
 public:
                          CodeGenerator(MemoryManager&, CompilationInterface&);
-    bool                 genCode(MethodCodeSelector&);
-//    void                 genCode(SessionAction* s, MethodCodeSelector& m) {} // TODO
+    void                 genCode(SessionAction*, MethodCodeSelector&);
     virtual              ~CodeGenerator() {}
 
 protected:
-    MemoryManager        &memoryManager; 
+    MemoryManager        &memoryManager;
     CompilationInterface &compilationInterface;
     MethodDesc           *methodDesc;
 
     Cfg                  *cfg;
-}; 
+};
 
 } // IPF
 } // Jitrino
