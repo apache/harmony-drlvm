@@ -528,9 +528,10 @@
     <target name="deploy.canonical" if="deploy.canonical.flag">
         <delete dir="${canonical.deploy.dir}" failonerror="false" />
 
-        <mkdir dir="${canonical.deploy.dir}" />
+        <mkdir dir="${canonical.deploy.dir}/jdk/lib" />
+        <mkdir dir="${canonical.deploy.dir}/jdk/bin" />
 
-        <copy todir="${canonical.deploy.dir}/jre">
+        <copy todir="${canonical.deploy.dir}/jdk/jre">
             <fileset dir="${build.deploy.dir}"/>
         </copy>
         
@@ -538,7 +539,7 @@
             <isset property="if.lnx"/>
             <then>
                 <chmod perm="755">
-                    <fileset dir="${canonical.deploy.dir}/jre/bin">
+                    <fileset dir="${canonical.deploy.dir}/jdk/jre/bin">
                         <include name="java" />
                         <include name="javaw" />
                         <include name="eclipse.sh" />
