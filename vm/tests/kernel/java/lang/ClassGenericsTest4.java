@@ -117,8 +117,10 @@ import junit.framework.TestCase;
         if(!$Mc3$02.$Mc3$04.class.getName().equals("java.lang.ClassGenericsTest4$1$Mc3$02$$Mc3$04")) fail("test_1, case 010 FAILED: "+$Mc3$02.$Mc3$04.class.getName());
         if(!$Mc3$02.$Mc3$04.class.getSimpleName().equals("$Mc3$04")) fail("test_1, case 011 FAILED: "+$Mc3$02.$Mc3$04.class.getSimpleName());
         if($Mc3$02.$Mc3$04.class.getCanonicalName() != null) fail("test_1, case 012 FAILED: "+$Mc3$02.$Mc3$04.class.getCanonicalName());
-		Type ab[] = null;ParameterizedType pt = null;if(RuntimeAdditionalSupport1.openingFlag) {
-try{		at = $Mc3$02.$Mc3$04.class.getTypeParameters();
+		Type ab[] = null;ParameterizedType pt = null;
+if(RuntimeAdditionalSupport1.openingFlag) {
+try{
+		at = $Mc3$02.$Mc3$04.class.getTypeParameters();
 		tv = (TypeVariable)at[0];
         if(!tv.getName().equals("T5")) fail("test_1, case 0121 FAILED: "+tv.getName());
 		/*Type*/ ab/*[]*/ = tv.getBounds();
@@ -190,7 +192,8 @@ try{		at = $Mc3$02.$Mc3$04.class.getTypeParameters();
         if(!ac[2].getSimpleName().equals("$Mc3$04")) fail("test_1, case 051 FAILED: "+ac[2].getSimpleName());
         if(ac[2].getCanonicalName() != null) fail("test_1, case 052 FAILED: "+ac[2].getCanonicalName());
 if(RuntimeAdditionalSupport1.openingFlag) {
-try{		at = ac[2].getTypeParameters();
+try{
+		at = ac[2].getTypeParameters();
 		tv = (TypeVariable)at[0];
         if(!tv.getName().equals("T5")) fail("test_1, case 053 FAILED: "+tv.getName());
 		ab = tv.getBounds();

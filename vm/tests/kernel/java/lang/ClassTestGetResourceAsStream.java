@@ -101,8 +101,10 @@ public class ClassTestGetResourceAsStream extends TestCase {
                                     Void.class.getResourceAsStream("/" + afn[j])
                                             .available() >= 0);
                                 return;
-                            }catch(java.io.IOException _){                            }catch(Throwable e){
-								 System.out.println(e.toString());							}
+                            }catch(java.io.IOException _){
+                            }catch(Throwable e){
+								 System.out.println(e.toString());
+							}
                             //return;
                         }
                     }

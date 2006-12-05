@@ -637,7 +637,8 @@ import junit.framework.TestCase;
             cl = ClassLoader.getSystemClassLoader();
 
         // TEST CASE #1:
-        try {            tcl.loadClass("#org.apache.harmony.lang.generics.TemplateSet");
+        try {
+            tcl.loadClass("#org.apache.harmony.lang.generics.TemplateSet");
             assertTrue("Error1", tcl.findLoadedClass("org.apache.harmony.lang.generics.TemplateSet")
                     .getName().equals("org.apache.harmony.lang.generics.TemplateSet"));
             //tcl.loadClass("#javax.imageio.IIOImage");
