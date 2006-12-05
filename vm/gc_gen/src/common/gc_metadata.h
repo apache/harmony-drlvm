@@ -48,8 +48,7 @@ void gc_set_rootset(GC* gc);
 void gc_reset_rootset(GC* gc);
 void gc_update_repointed_refs(Collector* collector);
 
-void collector_marktask_add_entry(Collector* collector, Partial_Reveal_Object* p_obj);
-void collector_tracetask_add_entry(Collector* collector, Partial_Reveal_Object** p_ref);
+void collector_tracestack_push(Collector* collector, void* p_task);
 
 void mutator_remset_add_entry(Mutator* mutator, Partial_Reveal_Object** p_slot);
 void collector_remset_add_entry(Collector* collector, Partial_Reveal_Object** p_slot);

@@ -22,8 +22,6 @@
 #define _GC_COMMON_H_
 
 #include <assert.h>
-#include <vector>
-#include <stack>
 #include <map>
 
 #include "port_vmem.h"
@@ -62,8 +60,6 @@
 
 typedef void (*TaskType)(void*);
 
-typedef std::stack<Partial_Reveal_Object *> MarkStack;
-typedef std::stack<Partial_Reveal_Object**> TraceStack;
 typedef std::map<Partial_Reveal_Object*, Obj_Info_Type> ObjectMap;
 
 enum Collection_Kind {
@@ -218,7 +214,7 @@ typedef struct GC{
   unsigned int num_collectors;
   unsigned int num_active_collectors; /* not all collectors are working */
   
-  /* metadata is the pool for rootset, markstack, etc. */  
+  /* metadata is the pool for rootset, tracestack, etc. */  
   GC_Metadata* metadata;
   unsigned int collect_kind; /* MAJOR or MINOR */
   /* FIXME:: this is wrong! root_set belongs to mutator */
@@ -230,10 +226,16 @@ typedef struct GC{
 
 }GC;
 
-void mark_scan_heap_par(Collector* collector);
-void mark_scan_heap_seq(Collector* collector);
+void mark_scan_heap(Collector* collector);
 
 inline void* gc_heap_base(GC* gc){ return gc->heap_start; }
 inline void* gc_heap_ceiling(GC* gc){ return gc->heap_end; }
+inline Boolean address_belongs_to_gc_heap(void* addr, GC* gc)
+{
+  return (addr >= gc_heap_base(gc) && addr < gc_heap_ceiling(gc));
+}
+
+void gc_parse_options();
+void gc_reclaim_heap(GC* gc, unsigned int gc_cause);
 
 #endif //_GC_COMMON_H_

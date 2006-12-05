@@ -18,23 +18,31 @@
  * @author Xiao-Feng Li, 2006/10/05
  */
 
-#include "thread_alloc.h"
+#include "gc_thread.h"
 
 #include "../gen/gen.h"
 
-Managed_Object_Handle gc_alloc(unsigned size, Allocation_Handle ah, void *gc_tls) 
+/* classloader sometimes sets the bit for finalizible objects (?) */
+inline unsigned int get_instance_data_size (unsigned int encoded_size) 
+{    return (encoded_size & NEXT_TO_HIGH_BIT_CLEAR_MASK); }
+
+Managed_Object_Handle gc_alloc(unsigned size, Allocation_Handle ah, void *unused_gc_tls) 
 {
   Managed_Object_Handle p_obj = NULL;
  
   /* All requests for space should be multiples of 4 (IA32) or 8(IPF) */
   assert((size % GC_OBJECT_ALIGNMENT) == 0);
-  assert(gc_tls == vm_get_gc_thread_local());
   assert(ah);
 
+  /* FIXME:: this is outdated actually */
+  size = get_instance_data_size(size);
+  
+  Allocator* allocator = (Allocator*)gc_get_tls();
+  
   if ( size > GC_OBJ_SIZE_THRESHOLD )
-    p_obj = (Managed_Object_Handle)los_alloc(size, (Allocator*)gc_tls);
+    p_obj = (Managed_Object_Handle)los_alloc(size, allocator);
   else
-    p_obj = (Managed_Object_Handle)nos_alloc(size, (Allocator*)gc_tls);
+    p_obj = (Managed_Object_Handle)nos_alloc(size, allocator);
   
   assert(p_obj);
   obj_set_vt((Partial_Reveal_Object*)p_obj, ah);
@@ -43,19 +51,20 @@ Managed_Object_Handle gc_alloc(unsigned size, Allocation_Handle ah, void *gc_tls
 }
 
 
-Managed_Object_Handle gc_alloc_fast (unsigned size, Allocation_Handle ah, void *gc_tls) 
+Managed_Object_Handle gc_alloc_fast (unsigned size, Allocation_Handle ah, void *unused_gc_tls) 
 {
   /* All requests for space should be multiples of 4 (IA32) or 8(IPF) */
   assert((size % GC_OBJECT_ALIGNMENT) == 0);
-  assert(gc_tls == vm_get_gc_thread_local());
   assert(ah);
   
   /* object shoud be handled specially */
   if ( size > GC_OBJ_SIZE_THRESHOLD ) return NULL;
-  
+ 
+  Allocator* allocator = (Allocator*)gc_get_tls();
+ 
   /* Try to allocate an object from the current Thread Local Block */
-  Managed_Object_Handle p_obj = NULL;
-  p_obj = (Managed_Object_Handle)thread_local_alloc(size, (Allocator*)gc_tls);
+  Managed_Object_Handle p_obj;
+  p_obj = (Managed_Object_Handle)thread_local_alloc(size, allocator);
   if(p_obj == NULL) return NULL;
    
   obj_set_vt((Partial_Reveal_Object*)p_obj, ah);

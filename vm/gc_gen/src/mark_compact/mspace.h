@@ -22,7 +22,7 @@
 #define _MSC_SPACE_H_
 
 #include "../common/gc_block.h"
-#include "../thread/thread_alloc.h"
+#include "../thread/gc_thread.h"
 
 /* Mark-compaction space is orgnized into blocks*/
 typedef struct Mspace{

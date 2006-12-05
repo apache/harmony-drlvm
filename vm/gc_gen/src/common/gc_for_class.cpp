@@ -70,7 +70,7 @@ static int *build_ref_offset_array(Class_Handle ch, GC_VTable_Info *gcvt)
   }
 
   if( num_ref_fields )   
-    gcvt->gc_object_has_slots = true;
+    gcvt->gc_object_has_ref_field = true;
   else 
     return NULL;
      
@@ -119,7 +119,7 @@ void gc_class_prepared (Class_Handle ch, VTable_Handle vth)
   memset((void *)gcvt, 0, sizeof(GC_VTable_Info));
   gcvt->gc_clss = ch;
   gcvt->gc_class_properties = 0;
-  gcvt->gc_object_has_slots = false;
+  gcvt->gc_object_has_ref_field = false;
   
   gc_set_prop_alignment_mask(gcvt, class_get_alignment(ch));
 
@@ -133,7 +133,7 @@ void gc_class_prepared (Class_Handle ch, VTable_Handle vth)
     if (class_is_non_ref_array (ch)) {
       gc_set_prop_non_ref_array(gcvt);
     }else{
-      gcvt->gc_object_has_slots = true;
+      gcvt->gc_object_has_ref_field = true;
     }
   }
 
@@ -151,4 +151,5 @@ void gc_class_prepared (Class_Handle ch, VTable_Handle vth)
   assert (gcvt->gc_class_name);
 
 }  /* gc_class_prepared */
+
 

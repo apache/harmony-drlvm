@@ -22,7 +22,7 @@
 #define _LSPACE_H_
 
 #include "../common/gc_common.h"
-#include "../thread/thread_alloc.h"
+#include "../thread/gc_thread.h"
 
 typedef struct Lspace{
   /* <-- first couple of fields are overloadded as Space */

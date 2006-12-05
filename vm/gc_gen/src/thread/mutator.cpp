@@ -23,10 +23,10 @@
 
 struct GC_Gen;
 Space* gc_get_nos(GC_Gen* gc);
-void mutator_initialize(GC* gc, void *gc_information) 
+void mutator_initialize(GC* gc, void *unused_gc_information) 
 {
   /* FIXME:: make sure gc_info is cleared */
-  Mutator *mutator = (Mutator *) gc_information;
+  Mutator *mutator = (Mutator *)STD_MALLOC(sizeof(Mutator));
   mutator->free = NULL;
   mutator->ceiling = NULL;
   mutator->alloc_block = NULL;
@@ -46,13 +46,16 @@ void mutator_initialize(GC* gc, void *gc_information)
   unlock(gc->mutator_list_lock); // ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
   
   gc->num_mutators++;
+  
+  gc_set_tls(mutator);
+  
   return;
 }
 
-void mutator_destruct(GC* gc, void *gc_information)
+void mutator_destruct(GC* gc, void *unused_gc_information)
 {
 
-  Mutator *mutator = (Mutator *)gc_information;
+  Mutator *mutator = (Mutator *)gc_get_tls();
 
   if(gc_requires_barriers()){ /* put back the remset when a mutator exits */
     pool_put_entry(gc->metadata->mutator_remset_pool, mutator->rem_set);
@@ -75,6 +78,9 @@ void mutator_destruct(GC* gc, void *gc_information)
   unlock(gc->mutator_list_lock); // ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
   gc->num_mutators--;
+  
+  //gc_set_tls(NULL);
+  
   return;
 }
 
@@ -88,3 +94,4 @@ void gc_reset_mutator_context(GC* gc)
   }  
   return;
 }
+

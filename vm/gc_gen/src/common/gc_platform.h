@@ -58,6 +58,11 @@ inline void vm_thread_yield()
   hythread_yield();
 }
 
+inline void* vm_thread_local()
+{
+  return hythread_self();  
+}
+
 inline int vm_create_thread(int (*func)(void*), void *data)
 { 
   hythread_t* ret_thread = NULL;

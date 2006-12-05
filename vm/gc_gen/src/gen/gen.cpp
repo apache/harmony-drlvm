@@ -21,10 +21,6 @@
 #include "port_sysinfo.h"
 
 #include "gen.h"
-#include "../thread/mutator.h"
-#include "../thread/collector.h"
-#include "../verify/verify_live_heap.h"
-
 
 /* fspace size limit is not interesting. only for manual tuning purpose */
 unsigned int min_nos_size_bytes = 2 * MB;
@@ -104,12 +100,6 @@ void gc_gen_initialize(GC_Gen *gc_gen, unsigned int min_heap_size, unsigned int 
   gc_gen->committed_heap_size = space_committed_size((Space*)gc_gen->nos) +
                                 space_committed_size((Space*)gc_gen->mos) +
                                 space_committed_size((Space*)gc_gen->los);
-  
-  gc_metadata_initialize((GC*)gc_gen); /* root set and mark stack */
-  collector_initialize((GC*)gc_gen);
-  
-  gc_init_heap_verification((GC*)gc_gen);
-
   return;
 }
 
@@ -123,20 +113,8 @@ void gc_gen_destruct(GC_Gen *gc_gen)
 
   gc_los_destruct(gc_gen);  
   gc_gen->los = NULL;
-  
-  gc_metadata_destruct((GC*)gc_gen); /* root set and mark stack */
-  collector_destruct((GC*)gc_gen);
 
-  if( verify_live_heap ){
-    gc_terminate_heap_verification((GC*)gc_gen);
-  }
-
-  STD_FREE(gc_gen);
-}
-
-Boolean major_collection_needed(GC_Gen* gc)
-{
-  return mspace_free_memory_size(gc->mos) < fspace_used_memory_size(gc->nos);  
+  return;  
 }
 
 void* mos_alloc(unsigned size, Allocator *allocator){return mspace_alloc(size, allocator);}
@@ -150,7 +128,12 @@ void gc_set_mos(GC_Gen* gc, Space* mos){ gc->mos = (Mspace*)mos;}
 void gc_set_los(GC_Gen* gc, Space* los){ gc->los = (Lspace*)los;}
 unsigned int gc_get_processor_num(GC_Gen* gc){ return gc->_num_processors;}
 
-static unsigned int gc_decide_collection_kind(GC_Gen* gc, unsigned int cause)
+static Boolean major_collection_needed(GC_Gen* gc)
+{
+  return mspace_free_memory_size(gc->mos) < fspace_used_memory_size(gc->nos);  
+}
+
+unsigned int gc_decide_collection_kind(GC_Gen* gc, unsigned int cause)
 {
   if(major_collection_needed(gc) || cause== GC_CAUSE_LOS_IS_FULL)
     return  MAJOR_COLLECTION;
@@ -158,22 +141,8 @@ static unsigned int gc_decide_collection_kind(GC_Gen* gc, unsigned int cause)
   return MINOR_COLLECTION;     
 }
 
-void gc_gen_reclaim_heap(GC_Gen* gc, unsigned int cause)
+void gc_gen_reclaim_heap(GC_Gen* gc)
 {  
-  gc->num_collections++;
-
-  gc->collect_kind = gc_decide_collection_kind(gc, cause);
-  //gc->collect_kind = MAJOR_COLLECTION;
-
-  gc_metadata_verify((GC*)gc, TRUE);
-  
-  /* Stop the threads and collect the roots. */
-  gc_reset_rootset((GC*)gc);  
-  vm_enumerate_root_set_all_threads();
-  gc_set_rootset((GC*)gc); 
-    
-  if(verify_live_heap) gc_verify_heap((GC*)gc, TRUE);
-
   if(gc->collect_kind == MINOR_COLLECTION){
     if( gc_requires_barriers()) /* normal gen gc nos collection */
       fspace_collection(gc->nos);
@@ -199,12 +168,5 @@ void gc_gen_reclaim_heap(GC_Gen* gc, unsigned int cause)
     lspace_collection(gc->los);
   }
   
-  if(verify_live_heap) gc_verify_heap((GC*)gc, FALSE);
-  
-  gc_metadata_verify((GC*)gc, FALSE);
-    
-  gc_reset_mutator_context((GC*)gc);
-  vm_resume_threads_after();
-
   return;
 }

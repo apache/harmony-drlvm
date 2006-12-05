@@ -37,8 +37,7 @@ typedef struct Collector{
   /* FIXME:: for testing */
   Space* collect_space;
 
-  TraceStack *trace_stack;
-  MarkStack* mark_stack;
+  Vector_Block *trace_stack;
   
   Vector_Block* rep_set; /* repointed set */
   Vector_Block* rem_set;

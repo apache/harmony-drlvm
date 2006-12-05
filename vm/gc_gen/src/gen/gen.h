@@ -22,7 +22,7 @@
 #define _GC_GEN_H_
 
 #include "../common/gc_common.h"
-#include "../thread/thread_alloc.h"
+#include "../thread/gc_thread.h"
 #include "../trace_forward/fspace.h"
 #include "../mark_compact/mspace.h"
 #include "../mark_sweep/lspace.h"
@@ -94,8 +94,6 @@ inline unsigned int gc_gen_free_memory_size(GC_Gen* gc)
          mspace_free_memory_size(gc->mos) +
          lspace_free_memory_size(gc->los);  }
                         
-void gc_gen_reclaim_heap(GC_Gen* gc, unsigned int cause);
-
 /////////////////////////////////////////////////////////////////////////////////////////
 
 inline void gc_nos_initialize(GC_Gen* gc, void* start, unsigned int nos_size)
@@ -124,6 +122,7 @@ extern void* los_boundary;
 
 inline Space* space_of_addr(GC* gc, void* addr)
 {
+  assert(address_belongs_to_gc_heap(addr, gc));
   if( addr > nos_boundary) return (Space*)((GC_Gen*)gc)->nos;
   if( addr > los_boundary) return (Space*)((GC_Gen*)gc)->mos;
   return (Space*)((GC_Gen*)gc)->los;
@@ -139,6 +138,9 @@ void gc_set_nos(GC_Gen* gc, Space* nos);
 void gc_set_mos(GC_Gen* gc, Space* mos);
 void gc_set_los(GC_Gen* gc, Space* los);
 unsigned int gc_get_processor_num(GC_Gen* gc);
+
+unsigned int gc_decide_collection_kind(GC_Gen* gc, unsigned int cause);
+void gc_gen_reclaim_heap(GC_Gen* gc);
 
 #endif /* ifndef _GC_GEN_H_ */
 

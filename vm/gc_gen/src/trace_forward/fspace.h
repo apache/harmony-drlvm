@@ -21,18 +21,16 @@
 #ifndef _FROM_SPACE_H_
 #define _FROM_SPACE_H_
 
-#include "../thread/thread_alloc.h"
+#include "../thread/gc_thread.h"
 
 /*
  * In our Gen GC, not all live objects are copied to tspace space, the newer baby will
- * still be preserved in  fspace, that means give them time to die.
+ * still be preserved in  fspace, that means to give them time to die. 
  */
-#define FORWARD_ALL 1.0
-#define FORWARD_HALF 0.5
 
-extern float NURSERY_OBJECT_FORWARDING_RATIO;
 extern Boolean forward_first_half;
-extern void* object_forwarding_boundary; //objects allocated before this boundary remain in fspace
+/* boundary spliting fspace into forwarding part and remaining part */
+extern void* object_forwarding_boundary; 
 
 typedef struct Fspace {
   /* <-- first couple of fields are overloadded as Space */

@@ -30,7 +30,7 @@ typedef void *Thread_Handle;
 typedef POINTER_SIZE_INT Obj_Info_Type;
 
 typedef struct GC_VTable_Info {
-  unsigned int gc_object_has_slots;
+  unsigned int gc_object_has_ref_field;
   unsigned int gc_number_of_ref_fields;
 
   uint32 gc_class_properties;    // This is the same as class_properties in VM's VTable.
@@ -105,10 +105,16 @@ inline GC_VTable_Info *obj_get_gcvt(Partial_Reveal_Object *obj)
   return vtable_get_gcvt(vt);
 }
 
-inline Boolean object_has_slots(Partial_Reveal_Object *obj) 
+inline Boolean object_has_ref_field(Partial_Reveal_Object *obj) 
 {
   GC_VTable_Info *gcvt = obj_get_gcvt(obj);
-  return gcvt->gc_object_has_slots;   
+  return gcvt->gc_object_has_ref_field;   
+}
+
+inline Boolean object_ref_field_num(Partial_Reveal_Object *obj) 
+{
+  GC_VTable_Info *gcvt = obj_get_gcvt(obj);
+  return gcvt->gc_number_of_ref_fields;   
 }
 
 inline Boolean object_is_array(Partial_Reveal_Object *obj) 

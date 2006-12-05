@@ -18,7 +18,7 @@
  * @author Xiao-Feng Li, 2006/10/05
  */
 
-#include "thread_alloc.h"
+#include "gc_thread.h"
 
 void* mos_alloc(unsigned size, Allocator *allocator);
 
@@ -32,17 +32,18 @@ Partial_Reveal_Object* collector_forward_object(Collector* collector, Partial_Re
      assert(!obj_is_marked_in_vt(p_obj));
      return NULL;
   }
+  /* otherwise, get the obj size firstly. The work below will destroy its vtable. */
+  unsigned int size = vm_object_size(p_obj);
     
   /* else, take the obj by setting the forwarding flag atomically 
      we don't put a simple bit in vt because we need compute obj size later. */
-  if ((unsigned int)vt != atomic_cas32((unsigned int*)obj_get_vtraw_addr(p_obj), ((unsigned int)vt|FORWARDING_BIT_MASK), (unsigned int)vt)) {
+  if ((unsigned int)vt != atomic_cas32((unsigned int*)obj_get_vtraw_addr(p_obj), ((unsigned int)FORWARDING_BIT_MASK), (unsigned int)vt)) {
     /* forwarded by other */
     assert( obj_is_forwarded_in_vt(p_obj) && !obj_is_marked_in_vt(p_obj));
     return NULL;
   }
 
   /* we hold the object, now forward it */
-  unsigned int size = vm_object_size(p_obj);
   Partial_Reveal_Object* p_targ_obj = (Partial_Reveal_Object*)mos_alloc(size, (Allocator*)collector);  
   /* mos should always has enough space to hold nos during collection */
   assert(p_targ_obj); 

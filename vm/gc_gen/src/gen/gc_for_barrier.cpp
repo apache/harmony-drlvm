@@ -33,7 +33,7 @@ Boolean gc_requires_barriers()
 static void gc_slot_write_barrier(Managed_Object_Handle *p_slot, 
                       Managed_Object_Handle p_target) 
 {
-  Mutator *mutator = (Mutator *)vm_get_gc_thread_local();
+  Mutator *mutator = (Mutator *)gc_get_tls();
   GC_Gen* gc = (GC_Gen*)mutator->gc;
   if( address_belongs_to_nursery((void *)p_target, gc) && 
        !address_belongs_to_nursery((void *)p_slot, gc)) 
@@ -44,7 +44,7 @@ static void gc_slot_write_barrier(Managed_Object_Handle *p_slot,
 
 static void gc_object_write_barrier(Managed_Object_Handle p_object) 
 {
-  Mutator *mutator = (Mutator *)vm_get_gc_thread_local();
+  Mutator *mutator = (Mutator *)gc_get_tls();
   GC_Gen* gc = (GC_Gen*)mutator->gc;
   if( address_belongs_to_nursery((void *)p_object, gc)) return;
   
@@ -82,7 +82,7 @@ static void gc_object_write_barrier(Managed_Object_Handle p_object)
 void gc_heap_wrote_object (Managed_Object_Handle p_obj_written)
 {
   if( !NEED_BARRIER ) return;
-  if( object_has_slots((Partial_Reveal_Object*)p_obj_written)){
+  if( object_has_ref_field((Partial_Reveal_Object*)p_obj_written)){
     /* for array copy and object clone */
     gc_object_write_barrier(p_obj_written); 
   }

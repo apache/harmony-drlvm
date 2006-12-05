@@ -73,6 +73,7 @@ inline Node* sync_stack_pop(Sync_Stack* stack)
     Node* new_entry = entry->next;
     Node* temp = (Node*)atomic_casptr((volatile void**)&stack->top, new_entry, entry);
     if(temp == entry){ /* got it */ 
+      entry->next = NULL;
       return entry;
     }
     entry = stack->top;
@@ -93,6 +94,7 @@ inline Boolean sync_stack_push(Sync_Stack* stack, Node* node)
     entry = stack->top;
     node->next = entry;
   }
+  /* never comes here */
   return FALSE;
 }
 

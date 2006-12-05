@@ -18,12 +18,15 @@
  * @author Xiao-Feng Li, 2006/10/05
  */
 
-#ifndef INTERIOR_POINTER_H
-#define INTERIOR_POINTER_H 
+#include "gc_thread.h"
 
-#include "gc_common.h"
+static hythread_tls_key_t tls_gc_key;       
+unsigned int tls_gc_offset;
 
-void add_root_set_entry_interior_pointer(void **slot, int offset, Boolean is_pinned);
-void update_rootset_interior_pointer();
-
-#endif //INTERIOR_POINTER_H
+void gc_tls_init()
+{
+  hythread_tls_alloc(&tls_gc_key);
+  tls_gc_offset = hythread_tls_get_offset(tls_gc_key);  
+  
+  return;
+}

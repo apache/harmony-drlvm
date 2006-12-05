@@ -21,8 +21,9 @@
 #include "gc_metadata.h"
 #include "../thread/mutator.h"
 #include "../thread/collector.h"
+#include "interior_pointer.h"
 
-#define GC_METADATA_SIZE_BYTES 32*MB
+#define GC_METADATA_SIZE_BYTES 48*MB
 
 #define METADATA_BLOCK_SIZE_BIT_SHIFT 12
 #define METADATA_BLOCK_SIZE_BYTES (1<<METADATA_BLOCK_SIZE_BIT_SHIFT)
@@ -47,23 +48,22 @@ void gc_metadata_initialize(GC* gc)
     vector_block_init(block, METADATA_BLOCK_SIZE_BYTES);
   }
   
-  /* half of the metadata space is used for mark_stack */
-  unsigned num_tasks = num_blocks >> 1;
+  /* part of the metadata space is used for trace_stack */
+  unsigned num_tasks = num_blocks >> 2;
   gc_metadata.free_task_pool = sync_pool_create();
   for(i=0; i<num_tasks; i++){
     unsigned int block = (unsigned int)metadata + i*METADATA_BLOCK_SIZE_BYTES;    
-    assert(vector_block_is_empty((Vector_Block*)block));
+    vector_stack_init((Vector_Block*)block);
     pool_put_entry(gc_metadata.free_task_pool, (void*)block); 
   }
   gc_metadata.mark_task_pool = sync_pool_create();
 
-  /* the other half is used for root sets (including rem sets) */
-  unsigned num_sets = num_blocks >> 1;
+  /* the other part is used for root sets (including rem sets) */
+  unsigned num_sets = (num_blocks >> 1) + num_tasks;
   gc_metadata.free_set_pool = sync_pool_create();
   /* initialize free rootset pool so that mutators can use them */  
-  for(; i<num_sets+num_tasks; i++){
+  for(; i<num_sets; i++){
     unsigned int block = (unsigned int)metadata + i*METADATA_BLOCK_SIZE_BYTES;    
-    assert(vector_block_is_empty((Vector_Block*)block));
     pool_put_entry(gc_metadata.free_set_pool, (void*)block); 
   }
 
@@ -145,7 +145,7 @@ void gc_set_rootset(GC* gc)
         root_set = pool_get_entry( collector_remset_pool );
     }
 
-  }else{ /* MINOR_COLLECTION */
+  }else{ /* generational MINOR_COLLECTION */
     /* all the remsets are put into the shared pool */
     root_set = pool_get_entry( mutator_remset_pool );
     while(root_set){
@@ -177,6 +177,7 @@ void mutator_remset_add_entry(Mutator* mutator, Partial_Reveal_Object** p_ref)
     
   pool_put_entry(gc_metadata.mutator_remset_pool, root_set);
   mutator->rem_set = pool_get_entry(gc_metadata.free_set_pool);  
+  assert(mutator->rem_set);
 }
 
 void collector_repset_add_entry(Collector* collector, Partial_Reveal_Object** p_ref)
@@ -190,6 +191,7 @@ void collector_repset_add_entry(Collector* collector, Partial_Reveal_Object** p_
     
   pool_put_entry(gc_metadata.collector_repset_pool, root_set);
   collector->rep_set = pool_get_entry(gc_metadata.free_set_pool);  
+  assert(collector->rep_set);
 }
 
 void collector_remset_add_entry(Collector* collector, Partial_Reveal_Object** p_ref)
@@ -203,32 +205,21 @@ void collector_remset_add_entry(Collector* collector, Partial_Reveal_Object** p_
     
   pool_put_entry(gc_metadata.collector_remset_pool, root_set);
   collector->rem_set = pool_get_entry(gc_metadata.free_set_pool);  
+  assert(collector->rem_set);
 }
 
-void collector_marktask_add_entry(Collector* collector, Partial_Reveal_Object* p_obj)
+void collector_tracestack_push(Collector* collector, void* p_task)
 {
-  assert( p_obj>= gc_heap_base_address() && p_obj < gc_heap_ceiling_address()); 
-
-  Vector_Block* mark_task = (Vector_Block*)collector->mark_stack;
-  vector_block_add_entry(mark_task, (unsigned int)p_obj);
-
-  if( !vector_block_is_full(mark_task)) return;
-
-  pool_put_entry(gc_metadata.mark_task_pool, mark_task);
-  collector->mark_stack = (MarkStack*)pool_get_entry(gc_metadata.free_task_pool);
-}
-
-void collector_tracetask_add_entry(Collector* collector, Partial_Reveal_Object** p_ref)
-{
-  assert( p_ref >= gc_heap_base_address() && p_ref < gc_heap_ceiling_address()); 
-  
+  /* we don't have assert as others because p_task is a p_obj for marking,
+     or a p_ref for trace forwarding. The latter can be a root set pointer */
   Vector_Block* trace_task = (Vector_Block*)collector->trace_stack;  
-  vector_block_add_entry(trace_task, (unsigned int)p_ref);
+  vector_stack_push(trace_task, (unsigned int)p_task);
   
-  if( !vector_block_is_full(trace_task)) return;
+  if( !vector_stack_is_full(trace_task)) return;
     
-  pool_put_entry(gc_metadata.gc_rootset_pool, trace_task);
-  collector->trace_stack = (TraceStack*)pool_get_entry(gc_metadata.free_set_pool);  
+  pool_put_entry(gc_metadata.mark_task_pool, trace_task);
+  collector->trace_stack = pool_get_entry(gc_metadata.free_task_pool);  
+  assert(collector->trace_stack);
 }
 
 void gc_rootset_add_entry(GC* gc, Partial_Reveal_Object** p_ref)
@@ -242,6 +233,7 @@ void gc_rootset_add_entry(GC* gc, Partial_Reveal_Object** p_ref)
     
   pool_put_entry(gc_metadata.gc_rootset_pool, root_set);
   gc->root_set = pool_get_entry(gc_metadata.free_set_pool);  
+  assert(gc->root_set);
 }
 
 
@@ -279,16 +271,19 @@ static void gc_update_repointed_sets(GC* gc, Pool* pool)
   return;
 }
 
-void update_rootset_interior_pointer();
-
 void gc_update_repointed_refs(Collector* collector)
 {  
-  GC* gc = collector->gc;
+  GC* gc = collector->gc;  
   GC_Metadata* metadata = gc->metadata;
-  gc_update_repointed_sets(gc, metadata->gc_rootset_pool);
-  gc_update_repointed_sets(gc, metadata->collector_repset_pool);   
-  update_rootset_interior_pointer();
+
+  /* generational MINOR_COLLECTION doesn't need rootset update */
+  if( !gc_requires_barriers() || gc->collect_kind == MAJOR_COLLECTION ){
+    gc_update_repointed_sets(gc, metadata->gc_rootset_pool);
+    gc_update_repointed_sets(gc, metadata->collector_repset_pool);   
+  }
   
+  update_rootset_interior_pointer();
+    
   return;
 }
 
@@ -318,3 +313,4 @@ void gc_metadata_verify(GC* gc, Boolean is_before_gc)
   
   return;  
 }
+

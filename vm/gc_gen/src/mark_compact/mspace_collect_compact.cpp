@@ -60,7 +60,7 @@ static volatile Block_Header* next_block_for_target;
 
 static void gc_reset_block_for_collectors(GC* gc, Mspace* mspace)
 {
-  unsigned int free_blk_idx = mspace->free_block_idx;
+  unsigned int free_blk_idx = mspace->first_block_idx;
   for(unsigned int i=0; i<gc->num_active_collectors; i++){
     Collector* collector = gc->collectors[i];
     unsigned int collector_target_idx = collector->cur_target_block->block_idx;
@@ -324,7 +324,7 @@ static void mark_compact_mspace(Collector* collector)
              have references  that are going to be repointed */
   unsigned int old_num = atomic_cas32( &num_marking_collectors, 0, num_active_collectors+1);
 
-  mark_scan_heap_par(collector);
+  mark_scan_heap(collector);
 
   old_num = atomic_inc32(&num_marking_collectors);
   if( ++old_num == num_active_collectors ){

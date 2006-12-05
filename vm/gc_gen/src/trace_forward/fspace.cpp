@@ -22,12 +22,11 @@
 
 #include "fspace.h"
 
-float NURSERY_OBJECT_FORWARDING_RATIO = FORWARD_ALL;
-//float NURSERY_OBJECT_FORWARDING_RATIO = FORWARD_HALF;
+Boolean NOS_PARTIAL_FORWARD = TRUE;
 
 void* nos_boundary = null; /* this is only for speeding up write barrier */
 
-Boolean forward_first_half;;
+Boolean forward_first_half;
 void* object_forwarding_boundary=NULL;
 
 Boolean fspace_mark_object(Fspace* fspace, Partial_Reveal_Object *p_obj)
@@ -119,7 +118,10 @@ void fspace_initialize(GC* gc, void* start, unsigned int fspace_size)
   nos_boundary = fspace->heap_start;
 
   forward_first_half = TRUE;
-  object_forwarding_boundary = (void*)&fspace->blocks[fspace->first_block_idx + (unsigned int)(fspace->num_managed_blocks * NURSERY_OBJECT_FORWARDING_RATIO)];
+  if( NOS_PARTIAL_FORWARD )
+    object_forwarding_boundary = (void*)&fspace->blocks[fspace->num_managed_blocks >>1 ];
+  else
+    object_forwarding_boundary = (void*)&fspace->blocks[fspace->num_managed_blocks];
 
   return;
 }
@@ -134,34 +136,51 @@ void fspace_destruct(Fspace *fspace)
  
 void reset_fspace_for_allocation(Fspace* fspace)
 { 
-  if( NURSERY_OBJECT_FORWARDING_RATIO == FORWARD_ALL ||
-            fspace->gc->collect_kind == MAJOR_COLLECTION )
+  unsigned int first_idx = fspace->first_block_idx;
+  unsigned int marked_start_idx = 0;
+  unsigned int marked_last_idx = 0;
+
+  if( fspace->gc->collect_kind == MAJOR_COLLECTION || 
+         NOS_PARTIAL_FORWARD == FALSE || !gc_requires_barriers())            
   {
-    fspace->free_block_idx = fspace->first_block_idx;
-    fspace->ceiling_block_idx = fspace->first_block_idx + fspace->num_managed_blocks - 1;  
+    fspace->free_block_idx = first_idx;
+    fspace->ceiling_block_idx = first_idx + fspace->num_managed_blocks - 1;  
     forward_first_half = TRUE; /* only useful for not-FORWARD_ALL*/
   }else{    
     if(forward_first_half){
-      fspace->free_block_idx = fspace->first_block_idx;
+      fspace->free_block_idx = first_idx;
       fspace->ceiling_block_idx = ((Block_Header*)object_forwarding_boundary)->block_idx - 1;
+      marked_start_idx = ((Block_Header*)object_forwarding_boundary)->block_idx - first_idx;
+      marked_last_idx = fspace->num_managed_blocks - 1;
     }else{
       fspace->free_block_idx = ((Block_Header*)object_forwarding_boundary)->block_idx;
-      fspace->ceiling_block_idx = fspace->first_block_idx + fspace->num_managed_blocks - 1;
+      fspace->ceiling_block_idx = first_idx + fspace->num_managed_blocks - 1;
+      marked_start_idx = 0;
+      marked_last_idx = ((Block_Header*)object_forwarding_boundary)->block_idx - 1 - first_idx;
     }
-    forward_first_half = ~forward_first_half;
+    forward_first_half = forward_first_half^1;
   }
 
-  unsigned int first_idx = fspace->free_block_idx;
-  unsigned int last_idx = fspace->ceiling_block_idx;
+  
   Block* blocks = fspace->blocks;
   unsigned int num_freed = 0;
-  for(unsigned int i = 0; i <= last_idx-first_idx; i++){
+  unsigned int new_start_idx = fspace->free_block_idx - first_idx;
+  unsigned int new_last_idx = fspace->ceiling_block_idx - first_idx;
+  for(unsigned int i = new_start_idx; i <= new_last_idx; i++){
     Block_Header* block = (Block_Header*)&(blocks[i]);
     if(block->status == BLOCK_FREE) continue;
-    block_clear_mark_table(block); 
     block->status = BLOCK_FREE; 
     block->free = GC_BLOCK_BODY(block);
+    if( !gc_requires_barriers() || fspace->gc->collect_kind == MAJOR_COLLECTION )
+      block_clear_mark_table(block); 
+
     num_freed ++;
+  }
+
+  for(unsigned int i = marked_start_idx; i <= marked_last_idx; i++){
+    Block_Header* block = (Block_Header*)&(blocks[i]);
+    if(block->status == BLOCK_FREE) continue;
+    block_clear_markbits(block);
   }
   fspace->num_used_blocks = fspace->num_used_blocks - num_freed;
 
@@ -177,7 +196,7 @@ void fspace_collection(Fspace *fspace)
   GC* gc = fspace->gc;
 
   if(gc_requires_barriers()){ 
-    /* generational GC. Only trace (mark) nos */
+    /* generational GC. Only trace nos */
     collector_execute_task(gc, (TaskType)trace_forward_fspace, (Space*)fspace);
   }else{
     /* non-generational GC. Mark the whole heap (nos, mos, and los) */

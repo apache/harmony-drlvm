@@ -25,24 +25,24 @@ typedef struct Vector_Block{
   void* next; /* point to next block */
   unsigned int* head;  /* point to the first filled entry */
   unsigned int* tail;  /* point to the entry after the last filled one */
-  unsigned int* end;   /* point to end of the block (right after the last entry) */
+  unsigned int* heap_end;   /* point to heap_end of the block (right after the last entry) */
   unsigned int* entries[1];
 }Vector_Block;
 
 inline void vector_block_init(Vector_Block* block, unsigned int size)
 {
-    block->end = (unsigned int*)((unsigned int)block + size);
-    block->head = (unsigned int*)block->entries;
-    block->tail = (unsigned int*)block->entries;
-    memset(block->head, 0, (block->end - block->head)*BYTES_PER_WORD);
-    return;  
+  block->heap_end = (unsigned int*)((unsigned int)block + size);
+  block->head = (unsigned int*)block->entries;
+  block->tail = (unsigned int*)block->entries;
+  memset(block->entries, 0, (block->heap_end - (unsigned int*)block->entries)*BYTES_PER_WORD);
+  return;  
 }
 
 inline unsigned int vector_block_entry_count(Vector_Block* block)
 { return (unsigned int)(block->tail - block->head); }
 
 inline Boolean vector_block_is_full(Vector_Block* block)
-{ return block->tail == block->end; }
+{ return block->tail == block->heap_end; }
 
 inline Boolean vector_block_is_empty(Vector_Block* block)
 { return block->tail == block->head; }
@@ -55,11 +55,11 @@ inline void vector_block_add_entry(Vector_Block* block, unsigned int value)
 
 inline void vector_block_clear(Vector_Block* block)
 {
+  block->head = (unsigned int*)block->entries;
+  block->tail = (unsigned int*)block->entries;
 #ifdef _DEBUG
-  memset(block->entries, 0, (block->end - (unsigned int*)block->entries)*BYTES_PER_WORD);
+  memset(block->entries, 0, (block->heap_end - (unsigned int*)block->entries)*BYTES_PER_WORD);
 #endif
-
-  block->tail = block->head; 
 }
 
 /* Below is for sequential local access */
@@ -71,5 +71,54 @@ inline unsigned int* vector_block_iterator_advance(Vector_Block* block, unsigned
 
 inline Boolean vector_block_iterator_end(Vector_Block* block, unsigned int* iter)
 {  return iter == block->tail; }
+
+
+/* Below is to use Vector_Block as stack (for trace-forwarding DFS order ) */
+inline void vector_stack_init(Vector_Block* block)
+{ 
+  block->tail = block->heap_end;
+  block->head = block->heap_end;  
+}
+
+inline void vector_stack_clear(Vector_Block* block)
+{
+  vector_stack_init(block);
+#ifdef _DEBUG
+  memset(block->entries, 0, (block->heap_end - (unsigned int*)block->entries)*BYTES_PER_WORD);
+#endif
+}
+
+inline Boolean vector_stack_is_empty(Vector_Block* block)
+{  return (block->head == block->tail); }
+
+inline Boolean vector_stack_is_full(Vector_Block* block)
+{  return (block->head == (unsigned int*)block->entries); }
+
+inline void vector_stack_push(Vector_Block* block, unsigned int value)
+{ 
+  block->head--;
+  assert(value && !*(block->head));
+  *(block->head) = value;
+}
+
+inline unsigned int vector_stack_pop(Vector_Block* block)
+{   
+  unsigned int value = *block->head;
+#ifdef _DEBUG
+  *block->head = 0;
+#endif
+  block->head++;
+  return value;
+}
+
+inline void vector_block_integrity_check(Vector_Block* block)
+{
+  unsigned int* iter = vector_block_iterator_init(block);
+  while(!vector_block_iterator_end(block, iter)){
+    assert(*iter);
+    iter = vector_block_iterator_advance(block, iter);
+  }    
+  return;
+}
 
 #endif /* #ifndef _VECTOR_BLOCK_H_ */

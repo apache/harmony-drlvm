@@ -16,7 +16,7 @@
 -->
 <!--
 Author: Marina V. Goldburt, Dmitry B. Yershov
-Version: $Revision: 1.4.2.3 $
+Version: $Revision: 1.2 $
 -->
 <!--
     This is build descriptor for the component "vm.gc_gen".
@@ -60,6 +60,7 @@ Version: $Revision: 1.4.2.3 $
                 <include name="thread/*.cpp" />            
                 <include name="trace_forward/*.cpp" />            
                 <include name="utils/*.cpp" /> 
+                <include name="jni/*.cpp" /> 
                 <include name="verify/*.cpp" />            
                 </select>
 
@@ -71,6 +72,7 @@ Version: $Revision: 1.4.2.3 $
                 <exclude name="thread/*.cpp" />            
                 <exclude name="trace_forward/*.cpp" />            
                 <exclude name="utils/*.cpp" /> 
+                <exclude name="jni/*.cpp" /> 
                 <exclude name="verify/*.cpp" />            
                 </select>
             </fileset>
@@ -113,16 +115,23 @@ Version: $Revision: 1.4.2.3 $
                 <linkerarg value="-Bsymbolic" />
             </select>
         </linker>
+
+        <!-- Java helpers -->
+        <property name="build.java.depends" value=""/>
+
         <path id="java.source">
-            <pathelement location="${build.vm.home}/gc_gen/src/tests" />
+            <pathelement location="${build.vm.home}/gc_gen/javasrc" />
         </path>                 
 
         <path id="java.class.path">
             <pathelement location="${java.build.dir}"/>
 
             <fileset dir="${external.dep.CLASSLIB.jardir}" includes="*.jar" />
-            <fileset dir="${build.ANTLR.home}" includes="antlr-2.7.5.jar" />
+            <pathelement location="${vm.kernel_classes.jardir}/kernel.jar"/>
+            <fileset dir="${build.MMTK.home}" includes="mmtk-20061012.jar" />
         </path>
+
+        <property name="jarname" value="gc_gen.jar"/>
 
     </target>
 </project>

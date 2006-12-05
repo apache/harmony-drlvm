@@ -60,9 +60,6 @@ static Boolean fspace_alloc_block(Fspace* fspace, Allocator* allocator)
 }
 
 /* FIXME:: the collection should be seperated from the alloation */
-struct GC_Gen;
-void gc_gen_reclaim_heap(GC_Gen* gc, unsigned int cause);
-
 void* fspace_alloc(unsigned size, Allocator *allocator) 
 {
   void*  p_return = NULL;
@@ -77,7 +74,7 @@ void* fspace_alloc(unsigned size, Allocator *allocator)
     vm_gc_lock_enum();
     /* after holding lock, try if other thread collected already */
     if ( !fspace_has_free_block(fspace) ) {  
-      gc_gen_reclaim_heap((GC_Gen*)allocator->gc, GC_CAUSE_NOS_IS_FULL); 
+      gc_reclaim_heap(allocator->gc, GC_CAUSE_NOS_IS_FULL); 
     }    
     vm_gc_unlock_enum();  
   }

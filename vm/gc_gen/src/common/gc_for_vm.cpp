@@ -23,94 +23,47 @@
 
 #include "../gen/gen.h"
 #include "interior_pointer.h"
-
-unsigned int HEAP_SIZE_DEFAULT = 256 * MB;
-
-extern Boolean NEED_BARRIER;
-extern unsigned int NUM_COLLECTORS;
-extern Boolean GC_VERIFY;
-extern unsigned int NOS_SIZE;
-
-/* heap size limit is not interesting. only for manual tuning purpose */
-unsigned int min_heap_size_bytes = 32 * MB;
-unsigned int max_heap_size_bytes = 256 * MB;
-
-static size_t get_size_property(const char* name) 
-{
-  char* size_string = get_property(name, VM_PROPERTIES);
-  size_t size = atol(size_string);
-  int sizeModifier = tolower(size_string[strlen(size_string) - 1]);
-  destroy_property_value(size_string);
-
-  size_t unit = 1;
-  switch (sizeModifier) {
-  case 'k': unit = 1024; break;
-  case 'm': unit = 1024 * 1024; break;
-  case 'g': unit = 1024 * 1024 * 1024;break;
-  }
-
-  size_t res = size * unit;
-  if (res / unit != size) {
-    /* overflow happened */
-    return 0;
-  }
-  return res;
-}
-
-static void parse_configuration_properties() 
-{
-  unsigned int max_heap_size = HEAP_SIZE_DEFAULT;
-  unsigned int min_heap_size = min_heap_size_bytes;
-  
-  if (is_property_set("gc.mx", VM_PROPERTIES) == 1) {
-    max_heap_size = get_size_property("gc.mx");
-
-    if (max_heap_size < min_heap_size)
-      max_heap_size = min_heap_size;
-    if (0 == max_heap_size) 
-      max_heap_size = HEAP_SIZE_DEFAULT;
- 
-    min_heap_size = max_heap_size / 10;
-    if (min_heap_size < min_heap_size_bytes) min_heap_size = min_heap_size_bytes;
-  }
-
-  if (is_property_set("gc.ms", VM_PROPERTIES) == 1) {
-    min_heap_size = get_size_property("gc.ms");
-    if (min_heap_size < min_heap_size_bytes) 
-      min_heap_size = min_heap_size_bytes;
-  }
-
-  if (min_heap_size > max_heap_size)
-    max_heap_size = min_heap_size;
-
-  min_heap_size_bytes = min_heap_size;
-  max_heap_size_bytes = max_heap_size;
-
-  if (is_property_set("gc.nos_size", VM_PROPERTIES) == 1) {
-    NOS_SIZE = get_size_property("gc.nos_size");
-  }
-
-  NUM_COLLECTORS = get_int_property("gc.num_collectors", NUM_COLLECTORS, VM_PROPERTIES);
-  NEED_BARRIER = get_boolean_property("gc.gen_mode", TRUE, VM_PROPERTIES);
-  GC_VERIFY = get_boolean_property("gc.verify", FALSE, VM_PROPERTIES);
-  
-  return;  
-}
+#include "../thread/collector.h"
+#include "../verify/verify_live_heap.h"
 
 static GC* p_global_gc = NULL;
 
+void gc_tls_init();
+
 void gc_init() 
 {  
-  parse_configuration_properties();
-  
+  gc_parse_options();
+    
   assert(p_global_gc == NULL);
   GC* gc = (GC*)STD_MALLOC(sizeof(GC_Gen));
   assert(gc);
   memset(gc, 0, sizeof(GC));  
   p_global_gc = gc;
-  gc_gen_initialize((GC_Gen*)gc, min_heap_size_bytes, max_heap_size_bytes);
+  gc_tls_init();
   
+  gc_gen_initialize((GC_Gen*)gc, min_heap_size_bytes, max_heap_size_bytes);
+
+  gc_metadata_initialize(gc); /* root set and mark stack */
+  collector_initialize(gc);
+  gc_init_heap_verification(gc);
+
   return;
+}
+
+void gc_wrapup() 
+{ 
+  GC* gc =  p_global_gc;
+  gc_gen_destruct((GC_Gen*)gc);
+  gc_metadata_destruct(gc); /* root set and mark stack */
+  collector_destruct(gc);
+
+  if( verify_live_heap ){
+    gc_terminate_heap_verification(gc);
+  }
+
+  STD_FREE(p_global_gc);
+
+  p_global_gc = NULL;
 }
 
 /* this interface need reconsidering. is_pinned is unused. */
@@ -133,14 +86,8 @@ void gc_add_root_set_entry_interior_pointer (void **slot, int offset, Boolean is
 void gc_force_gc() 
 {
   vm_gc_lock_enum();
-  gc_gen_reclaim_heap((GC_Gen*)p_global_gc, GC_CAUSE_RUNTIME_FORCE_GC);  
+  gc_reclaim_heap(p_global_gc, GC_CAUSE_RUNTIME_FORCE_GC);  
   vm_gc_unlock_enum();
-}
-
-void gc_wrapup() 
-{  
-  gc_gen_destruct((GC_Gen*)p_global_gc);
-  p_global_gc = NULL;
 }
 
 void* gc_heap_base_address() 
@@ -186,4 +133,5 @@ Managed_Object_Handle gc_get_next_live_object(void *iterator)
 
 unsigned int gc_time_since_last_gc()
 {  assert(0); return 0; }
+
 

@@ -72,7 +72,7 @@ void lspace_initialize(GC* gc, void* start, unsigned int lspace_size)
   lspace->heap_end = (void *)((unsigned int)reserved_base + committed_size);
   lspace->alloc_free = reserved_base;
   
-  unsigned int num_bits = lspace_size >> BIT_SHIFT_TO_KILO;
+  unsigned int num_bits = (lspace_size >> BIT_SHIFT_TO_KILO) + 1;
   unsigned int num_words = (num_bits >> BIT_SHIFT_TO_BITS_PER_WORD)+1;
   lspace->mark_table = (unsigned int*)STD_MALLOC( num_words*BYTES_PER_WORD );
   memset(lspace->mark_table, 0, num_words*BYTES_PER_WORD);
@@ -101,7 +101,7 @@ void lspace_collection(Lspace* lspace)
 {
   /* FIXME:: collection */
   unsigned int used_size = (unsigned int)lspace->alloc_free - (unsigned int)lspace->heap_start;
-  memset(lspace->mark_table, 0, (used_size>>BIT_SHIFT_TO_KILO)>>BIT_SHIFT_TO_BITS_PER_BYTE );
+  memset(lspace->mark_table, 0, (((used_size>>BIT_SHIFT_TO_KILO) + 1)>>BIT_SHIFT_TO_BITS_PER_BYTE) + 1);
   
   return;
 }

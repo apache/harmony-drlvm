@@ -172,7 +172,7 @@ void mark_copy_fspace(Collector* collector)
              have references  that are going to be repointed */
   atomic_cas32( &num_marking_collectors, 0, num_active_collectors+1);
              
-  mark_scan_heap_par(collector);
+  mark_scan_heap(collector);
 
   unsigned int old_num = atomic_inc32(&num_marking_collectors);
   if( ++old_num == num_active_collectors ){

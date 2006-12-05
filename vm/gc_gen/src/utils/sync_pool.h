@@ -29,10 +29,22 @@ inline Pool* sync_pool_create(){ return sync_stack_init(); }
 inline void sync_pool_destruct(Pool* pool){ sync_stack_destruct(pool); }
 
 inline Boolean pool_is_empty(Pool* pool){ return stack_is_empty(pool);}
-inline Vector_Block* pool_get_entry(Pool* pool){ return (Vector_Block*)sync_stack_pop(pool); }
-inline void pool_put_entry(Pool* pool, void* value){ assert(value); Boolean ok = sync_stack_push(pool, (Node*)value); assert(ok);}
+inline Vector_Block* pool_get_entry(Pool* pool)
+{ 
+  Vector_Block* block = (Vector_Block*)sync_stack_pop(pool); 
+  return block;
+}
+
+inline void pool_put_entry(Pool* pool, void* value)
+{ 
+  assert(value); 
+  Boolean ok = sync_stack_push(pool, (Node*)value); 
+  assert(ok);
+}
+
 inline void pool_iterator_init(Pool* pool){ sync_stack_iterate_init(pool);}
 inline Vector_Block* pool_iterator_next(Pool* pool){ return (Vector_Block*)sync_stack_iterate_next(pool);}
 
 #endif /* #ifndef _SYNC_POOL_H_ */
+
 
