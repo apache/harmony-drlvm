@@ -389,7 +389,7 @@ public:
         assert (k <= K_LAST_PRIMITIVE ); // primitive types are limited by K_LAST_PRIMITIVE bound
         return primitive_types[k];
     }
-    void SetBCPElement(const char *path, apr_pool_t *tmp_pool);
+
 protected:
     virtual Class* DoLoadClass(Global_Env* env, const String* name);
 
@@ -402,6 +402,7 @@ private:
         const char* class_name_in_jar, const String* class_name, bool* not_found);
     void SetClasspathFromString(char* prop_string, apr_pool_t *tmp_pool);
     void SetClasspathFromJarFile(JarFile *jar, apr_pool_t *tmp_pool);
+    void SetBCPElement(const char *path, apr_pool_t *tmp_pool);
 
     BCPElements m_BCPElements;
     Global_Env* m_env;

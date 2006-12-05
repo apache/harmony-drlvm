@@ -280,52 +280,6 @@ static jint populate_jni_nio() {
 }
 
 /**
-* Extends bootstrap classpath with jars from components
-*/
-static void bootstrap_add_components_classpath(Global_Env *vm_env) {
-    static std::string VM_COMPONENT_BOOTSTRAP_PREFIX="vm.components.";
-    static std::string VM_COMPONENT_BOOTSTRAP_SUFFIX=".classpath";
-
-    // create temp pool for apr functions
-    apr_pool_t *tmp_pool;
-    apr_pool_create(&tmp_pool, NULL);
-
-    std::string kernel_dir_path = get_property(O_A_H_VM_VMDIR, JAVA_PROPERTIES);
-
-    char** keys = get_properties_keys(JAVA_PROPERTIES);
-    for (unsigned i = 0; keys[i] != NULL; ++i) {
-        const char* key = keys[i];
-        //check if the property name is VM_COMPONENT_BOOTSTRAP_PREFIX.*.VM_COMPONENT_BOOTSTRAP_SUFFIX form
-        if (strncmp(VM_COMPONENT_BOOTSTRAP_PREFIX.c_str(), key, VM_COMPONENT_BOOTSTRAP_PREFIX.length())) {
-            continue;
-        }
-        size_t len = strlen(key);
-        if (len < VM_COMPONENT_BOOTSTRAP_PREFIX.length()+ 2 + VM_COMPONENT_BOOTSTRAP_SUFFIX.length()) {
-            continue;
-        }
-        if (strcmp(VM_COMPONENT_BOOTSTRAP_SUFFIX.c_str(), key + len - VM_COMPONENT_BOOTSTRAP_SUFFIX.length())) {
-            continue;
-        }
-        //all checks passed
-        //extends boot class path with the property value
-        char* path = get_property(key, JAVA_PROPERTIES);
-        // check if path must be extended
-        std::string absPath;
-        if (strstr(path, PORT_FILE_SEPARATOR_STR)==NULL) {
-            absPath = kernel_dir_path + path;
-        } else {
-            absPath = path;
-        }
-        destroy_property_value(path);
-        vm_env->bootstrap_class_loader->SetBCPElement(absPath.c_str(), tmp_pool);
-    }
-
-    destroy_properties_keys(keys);
-
-    apr_pool_destroy(tmp_pool);
-}
-
-/**
  * Loads initial classes. For example j.l.Object, j.l.Class, etc.
  */
 static void bootstrap_initial_java_classes(Global_Env * vm_env)
@@ -334,8 +288,6 @@ static void bootstrap_initial_java_classes(Global_Env * vm_env)
     TRACE("bootstrapping initial java classes");
 
     vm_env->bootstrap_class_loader->Initialize();
-
-    bootstrap_add_components_classpath(vm_env);
 
     /*
      *  Bootstrap java.lang.Class class. This requires also loading the other classes 

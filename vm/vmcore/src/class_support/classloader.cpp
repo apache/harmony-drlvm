@@ -1307,6 +1307,50 @@ BootstrapClassLoader::~BootstrapClassLoader()
     }
 }
 
+
+/**
+* Part of bootstrap classpath composed with jars from components.
+*/
+static char* bootstrap_components_classpath(Global_Env *vm_env) {
+    const char* PREFIX = "vm.component.classpath.";
+
+    const char* kernel_dir_path = vm_env->JavaProperties()->get(O_A_H_VM_VMDIR);
+    char* buf = NULL;
+    size_t buf_size = 0, buf_len = 0;
+
+    char** keys = vm_env->VmProperties()->get_keys_staring_with(PREFIX);
+    unsigned i = 0;
+    for (; keys[i]; ++i) 
+    {
+        const char* key = keys[i];
+        const char* path = vm_env->VmProperties()->get(keys[i]);
+        size_t path_len = strlen(path) + strlen(PORT_PATH_SEPARATOR_STR) + 1;
+        // check if path must be extended
+        bool no_dir = (strstr(path, PORT_FILE_SEPARATOR_STR) == NULL);
+        if (no_dir) {
+            path_len += strlen(kernel_dir_path) + 1;
+        }
+        if (buf_len + path_len > buf_size) {
+            buf_size += path_len * 2;
+            buf = (char*)STD_REALLOC(buf, buf_size);
+            buf[buf_len] = '\0';
+        }
+        buf_len += path_len;
+        if (no_dir) {
+            strcat(buf, kernel_dir_path);
+            strcat(buf, PORT_FILE_SEPARATOR_STR);
+        }
+        strcat(buf, path);
+        strcat(buf, PORT_PATH_SEPARATOR_STR);
+        vm_env->VmProperties()->destroy((char*)path);
+    } 
+    vm_env->VmProperties()->destroy(keys);
+    vm_env->JavaProperties()->destroy(const_cast<char*>(kernel_dir_path));
+
+    return buf;
+}
+
+
 bool BootstrapClassLoader::Initialize(ManagedObject* UNREF loader)
 {
     // init bootstrap class loader
@@ -1332,14 +1376,15 @@ bool BootstrapClassLoader::Initialize(ManagedObject* UNREF loader)
     /*
      *  at this point, LUNI is loaded, so we can use the boot classpath
      *  generated there to set vm.boot.class.path since we didn't do
-     *  it before.  We need  to add on the kernel.jar
+     *  it before.  We need  to add on the kernel.jar 
+     *  and magics support jars (if any).
      *  note that parse_arguments.cpp defers any override, postpend or 
-     *  preprend here, storing everything as properties.
+     *  prepend here, storing everything as properties.
      */
      
     /*
      * start with the boot classpath. If overridden, just use that as the basis
-     * and otherwise, contstruct from o.a.h.b.c.p + o.a.h.vm.vmdir to add 
+     * and otherwise, construct from o.a.h.b.c.p + o.a.h.vm.vmdir to add 
      * the kernel
      */
      
@@ -1354,14 +1399,21 @@ bool BootstrapClassLoader::Initialize(ManagedObject* UNREF loader)
         
         char *kernel_dir_path = m_env->JavaProperties()->get(O_A_H_VM_VMDIR);
 
-        char *kernel_path = (char *) malloc(strlen(kernel_dir_path == NULL ? "" : kernel_dir_path) 
+        char* comp_path = bootstrap_components_classpath(m_env);
+        char *kernel_path = (char *) malloc(strlen(kernel_dir_path) 
                                         + strlen(PORT_FILE_SEPARATOR_STR) 
-                                        + strlen(KERNEL_JAR) + 1);
+                                        + strlen(KERNEL_JAR) + 1
+                                        + (comp_path ? strlen(comp_path) + strlen(PORT_PATH_SEPARATOR_STR) : 0) );
     
         strcpy(kernel_path, kernel_dir_path);
         strcat(kernel_path, PORT_FILE_SEPARATOR_STR);
         strcat(kernel_path, KERNEL_JAR);
         m_env->JavaProperties()->destroy(kernel_dir_path);
+        if (comp_path) {
+            strcat(kernel_path, PORT_PATH_SEPARATOR_STR);
+            strcat(kernel_path, comp_path);
+            STD_FREE(comp_path);
+        }
 
         char *luni_path = m_env->JavaProperties()->get(O_A_H_BOOT_CLASS_PATH);
         

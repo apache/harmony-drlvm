@@ -91,4 +91,4 @@ SD2_OPT.useProfile=EDGE_PROF
 
 #GC magics support
 -Dvm.components.gc_cc.startupclass=org.apache.harmony.drlvm.gc_cc.GCHelper
--Dvm.components.gc_cc.classpath=gc_cc.jar
+-XDvm.component.classpath.gc_cc=gc_cc.jar
