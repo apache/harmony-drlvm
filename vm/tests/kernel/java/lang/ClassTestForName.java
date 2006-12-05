@@ -145,6 +145,17 @@ import junit.framework.TestCase;
         }
     }
     
+    
+    /**
+     * Regression test for HARMONY-887
+     */
+    public void testHARMONY887() throws ClassNotFoundException {
+        try {
+            Class.forName(null, true, ClassLoader.getSystemClassLoader());
+        } catch (NullPointerException npe) {return;}
+        fail("NullPointerException exception expected");
+    }
+    
     /**
      * Helper class.
      */
