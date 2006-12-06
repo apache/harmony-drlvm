@@ -119,7 +119,9 @@ APR_DECLARE(apr_status_t) apr_thread_cond_timedwait(apr_thread_cond_t *cond,
                                                     apr_interval_time_t timeout)
 {
     DWORD timeout_ms = (DWORD) apr_time_as_msec(timeout);
-
+    if (timeout % 1000) {
+        timeout_ms++;
+    }  
     return _thread_cond_timedwait(cond, mutex, timeout_ms);
 }
 

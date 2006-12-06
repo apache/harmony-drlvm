@@ -208,7 +208,7 @@ public class ObjectTest extends TestCase {
                 fail("The main thread was interrupted!");
             }
         }
-        long atLeastWait = millis - 1;
+        long atLeastWait = millis - 40;
         long actualWait = finish - start;
         assertTrue("Current thread hasn't slept enough: " + 
                 "expected at least " + atLeastWait + " but was " + actualWait,

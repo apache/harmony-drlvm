@@ -92,7 +92,7 @@ public class ThreadTest extends TestCase {
     static class ThreadRunning extends Thread {
         volatile boolean stopWork = false;
         long startTime;
-        int i = 0;
+        public volatile int i = 0;
 
         ThreadRunning() {
             super();
@@ -131,37 +131,54 @@ public class ThreadTest extends TestCase {
     }
 
     private class ThreadWaiting extends Thread {
+        public volatile boolean started = false;
         private long millis;
         private int nanos;
         private Action action;
         private boolean exceptionReceived = false;
         private long startTime;
+        private long endTime;
+        private Object lock;
               
-        ThreadWaiting(Action action, long millis, int nanos) {
+        ThreadWaiting(Action action, long millis, int nanos, Object lock) {
             this.millis = millis;
             this.nanos = nanos;
             this.action = action;
-            this.startTime = System.currentTimeMillis();
+            this.lock = lock;
         }
 
         public void run () {
             switch (action) {
                 case WAIT:
-                    try {
-                        synchronized (this) {
-                            this.wait(millis, nanos);
-                        }
-                    } catch (InterruptedException e) {
-                        exceptionReceived = true;
+                    synchronized (lock) {
+                        this.started = true;
+                        lock.notify();
                     }
-                case SLEEP:
+                    synchronized (this) {
+                        try {
+                            this.wait(millis, nanos);
+                        } catch (InterruptedException e) {
+                            exceptionReceived = true;
+                        }
+                    }
+               case SLEEP:
                     try {
+                        synchronized (lock) {
+                            started = true;
+                            lock.notify();
+                        }
+                        this.startTime = System.currentTimeMillis();
                         Thread.sleep(millis, nanos);
+                        this.endTime = System.currentTimeMillis();
                     } catch (InterruptedException e) {
                         exceptionReceived = true;
                     }
                 case JOIN:
                     try {
+                        synchronized (lock) {
+                            started = true;
+                            lock.notify();
+                        }
                         this.join(millis, nanos);
                     } catch (InterruptedException e) {
                         exceptionReceived = true;
@@ -171,6 +188,10 @@ public class ThreadTest extends TestCase {
         
         public long getStartTime() {
             return startTime;
+        }
+
+        public long getEndTime() {
+            return endTime;
         }
     }
 
@@ -514,11 +535,6 @@ public class ThreadTest extends TestCase {
         Thread t = new Thread(tg, s, name, 1);
         t.start();
         waitTime = waitDuration;
-        while (!t.isAlive() && !(expired = doSleep(10))) {
-        }
-        if (expired) {
-            fail("unexpected: thread has not started");
-        }
         StackTraceElement ste[] = t.getStackTrace();
         while (ste.length == 0 && !(expired = doSleep(10))) {
             ste = t.getStackTrace();
@@ -541,11 +557,6 @@ public class ThreadTest extends TestCase {
             Thread t = new Thread(tg, s, name, Long.MAX_VALUE);
             t.start();
             waitTime = waitDuration;
-            while (!t.isAlive() && !(expired = doSleep(10))) {
-            }
-            if (expired) {
-                fail("unexpected: thread has not started");
-            }
             ste = t.getStackTrace();
             while (ste.length == 0 && !(expired = doSleep(10))) {
                 ste = t.getStackTrace();
@@ -716,39 +727,67 @@ public class ThreadTest extends TestCase {
      * Test for void sleep(long)
      */
     public void testSleeplong() {
+        Object lock = new Object();
         long millis = 2000;
-        ThreadWaiting tW = new ThreadWaiting(Action.SLEEP, millis, 0);
-        tW.start();
+        ThreadWaiting tW = new ThreadWaiting(Action.SLEEP, millis, 0, lock);
+        try {
+            synchronized (lock) {
+                tW.start();
+                while (!tW.started) {
+                    lock.wait();
+                }
+            }
+        } catch (InterruptedException e) {
+            fail(INTERRUPTED_MESSAGE);
+        }
         try {
             tW.join();
         } catch (InterruptedException e) {
             fail(INTERRUPTED_MESSAGE);
         }
-        long duration = System.currentTimeMillis() - tW.getStartTime();
-        assertTrue("thread has not slept enough",
-                   duration >= millis);
+        long duration = tW.getEndTime() - tW.getStartTime();
+        // we allow the test to wait 2.5% less
+        long atLeast = millis - 50;
+        assertTrue("thread has not slept enough: expected " + atLeast
+                + " but was " + duration,
+                   duration >= atLeast);
     }
 
     /**
      * Test for void sleep(long, int)
      */
     public void testSleeplongint() {
+        Object lock = new Object();
         long millis = 2000;
         int nanos = 123456;
-        ThreadWaiting tW = new ThreadWaiting(Action.SLEEP, millis, nanos);
-        tW.start();
+        ThreadWaiting tW = new ThreadWaiting(Action.SLEEP, millis, nanos, lock);
+        try {
+            synchronized (lock) {
+                tW.start();
+                while (!tW.started) {
+                    lock.wait();
+                }
+            }
+        } catch (InterruptedException e) {
+        	fail(INTERRUPTED_MESSAGE);
+        }
         try {
             tW.join();
         } catch (InterruptedException e) {
             fail(INTERRUPTED_MESSAGE);
         }
-        long duration = System.currentTimeMillis() - tW.getStartTime();
-        duration *= 1000000;
-        long sleepTime = millis * 1000000 + nanos;
-        assertTrue("thread has not slept enough",
-                   duration >= sleepTime);
-        }
+        long duration = tW.getEndTime() - tW.getStartTime();
+        duration *= 1000000; // nano
+        // we allow the test to wait 2.5% less
+        long atLeast = (millis - 50) * 1000000;
+        assertTrue("thread has not slept enough: expected " + atLeast 
+            + " but was " + duration,
+            duration >= atLeast);
+    }
 
+    /**
+     * Test for void yield()
+     */
     public void testYield() {   
         ThreadYielding t1 = new ThreadYielding(1);
         ThreadYielding t2 = new ThreadYielding(2);
@@ -761,7 +800,7 @@ public class ThreadTest extends TestCase {
             fail(INTERRUPTED_MESSAGE);
         }
         int oneCount = 0;
-        int threadNum = ThreadYielding.dim / 2;
+        int threadNum = ThreadYielding.dim;
         for (int i = 0; i < threadNum; i++) {
             if (ThreadYielding.list[i] == 1) {
                 oneCount++;
@@ -772,7 +811,9 @@ public class ThreadTest extends TestCase {
         // while t1 is yelding. In this case the 'list' might start with 1s 
         // and end with 2s and look like threads does not alternate.  
         // We cannot treat this as failure nevertheless.
-        assertTrue("threads have not yielded", oneCount < threadNum);
+        // We just make sure that both threads have finished successfully.
+        assertTrue("threads have not finished successfully", 
+            oneCount == threadNum / 2);
     }
     
     /**
@@ -921,12 +962,6 @@ public class ThreadTest extends TestCase {
         StackTraceElement ste[] = tR.getStackTrace();
         assertEquals("stack dump of a new thread is not empty", ste.length, 0);
         tR.start();
-        waitTime = waitDuration;
-        while (!tR.isAlive() && !(expired = doSleep(10))) {
-        }
-        if (expired) {
-            fail("unexpected: thread has not started");
-        }        
 
         // get stack trace of a running thread
         waitTime = waitDuration;
@@ -1037,12 +1072,6 @@ public class ThreadTest extends TestCase {
         }
         RunProject pr2 = new RunProject(team);
         pr2.start();
-        waitTime = waitDuration;
-        while (!pr2.isAlive() && !(expired = doSleep(10))) {
-        }
-        if (expired) {
-            fail("pr2 has not been started");
-        }
         Thread.State state;
         waitTime = waitDuration;
         do {
@@ -1156,8 +1185,18 @@ public class ThreadTest extends TestCase {
      * Get the state of a timed waiting thread.
      */
      public void testGetStateTimedWaiting() {
-        ThreadWaiting tW = new ThreadWaiting(Action.WAIT, 6000, 0);
-        tW.start();
+        Object lock = new Object();
+        ThreadWaiting tW = new ThreadWaiting(Action.WAIT, 6000, 0, lock);
+        try {
+            synchronized (lock) {
+                tW.start();
+                while (!tW.started) {
+                    lock.wait();
+                }
+            }
+        } catch (InterruptedException e) {
+            fail(INTERRUPTED_MESSAGE);
+        }
         Thread.State state;
         waitTime = waitDuration;
         do {
@@ -1175,8 +1214,18 @@ public class ThreadTest extends TestCase {
      * Get the state of a waiting thread.
      */
      public void testGetStateWaiting() {
-        ThreadWaiting tW = new ThreadWaiting(Action.WAIT, 0, 0);
-        tW.start();
+        Object lock = new Object();
+        ThreadWaiting tW = new ThreadWaiting(Action.WAIT, 0, 0, lock);
+        try {
+            synchronized (lock) {
+                tW.start();
+                while (!tW.started) {
+                    lock.wait();
+                }
+            }
+        } catch (InterruptedException e) {
+            fail(INTERRUPTED_MESSAGE);
+        }
         Thread.State state;
         waitTime = waitDuration;
         do {
@@ -1297,10 +1346,10 @@ public class ThreadTest extends TestCase {
         ThreadRunning t  = new ThreadRunning();
         t.start();
         waitTime = waitDuration;
-        while (!t.isAlive() && !(expired = doSleep(10))) {
+        while (t.i == 0 && !(expired = doSleep(10))) {
         }
         if (expired) {
-            fail("unexpected: thread has not started");
+            fail("unexpected: thread's run() method has not started");
         }
         t.interrupt();
         waitTime = waitDuration;
@@ -1337,10 +1386,10 @@ public class ThreadTest extends TestCase {
         ThreadRunning t  = new ThreadRunning();
         t.start();
         waitTime = waitDuration;
-        while (!t.isAlive() && !(expired = doSleep(10))) {
+        while (t.i == 0 && !(expired = doSleep(10))) {
         }
         if (expired) {
-            fail("thread has not started");
+            fail("thread' run() method has not started");
         }
         t.stopWork = true;
         try {
@@ -1357,13 +1406,17 @@ public class ThreadTest extends TestCase {
      * Interrupt a joining thread
      */
     public void testInterrupt_Joining() {
-        ThreadWaiting t = new ThreadWaiting(Action.JOIN, 10000, 0);
-        t.start();
-        waitTime = waitDuration;
-        while (!t.isAlive() && !(expired = doSleep(10))) {
-        }
-        if (expired) {
-            fail("thread has not started for " + waitDuration + "ms");
+        Object lock = new Object();
+        ThreadWaiting t = new ThreadWaiting(Action.JOIN, 10000, 0, lock);
+        try {
+            synchronized (lock) {
+                t.start();
+                while (!t.started) {
+                    lock.wait();
+                }
+            }
+        } catch (InterruptedException e) {
+            fail(INTERRUPTED_MESSAGE);
         }
         t.interrupt();
         waitTime = waitDuration;
@@ -1380,8 +1433,18 @@ public class ThreadTest extends TestCase {
      * Interrupt a sleeping thread
      */
     public void testInterrupt_Sleeping() {
-        ThreadWaiting t = new ThreadWaiting(Action.SLEEP, 10000, 0);
-        t.start();
+        Object lock = new Object();
+        ThreadWaiting t = new ThreadWaiting(Action.SLEEP, 10000, 0, lock);
+        try {
+            synchronized (lock) {
+                t.start();
+                while (!t.started) {
+                    lock.wait();
+                }
+            }
+        } catch (InterruptedException e) {
+            fail(INTERRUPTED_MESSAGE);
+        }
         waitTime = waitDuration;
         while (!t.isAlive() && !(expired = doSleep(10))) {
         }
@@ -1403,13 +1466,17 @@ public class ThreadTest extends TestCase {
      * Interrupt a waiting thread
      */
     public void testInterrupt_Waiting() {
-        ThreadWaiting t = new ThreadWaiting(Action.WAIT, 10000, 0);
-        t.start();
-        waitTime = waitDuration;
-        while (!t.isAlive() && !(expired = doSleep(10))) {
-        }
-        if (expired) {
-            fail("thread has not started for " + waitDuration + "ms");
+        Object lock = new Object();
+        ThreadWaiting t = new ThreadWaiting(Action.WAIT, 10000, 0, lock);
+        try {
+            synchronized (lock) {
+                t.start();
+                while (!t.started) {
+                    lock.wait();
+                }
+            }
+        } catch (InterruptedException e) {
+            fail(INTERRUPTED_MESSAGE);
         }
         t.interrupt();
         waitTime = waitDuration;
@@ -1420,7 +1487,6 @@ public class ThreadTest extends TestCase {
         }
         assertFalse("interrupt status has not been cleared", 
                 t.isInterrupted());
-
     }
 
     /**
@@ -1428,6 +1494,16 @@ public class ThreadTest extends TestCase {
      */
     public void testIsAliveCurrent() {
         assertTrue("The current thread must be alive!", Thread.currentThread().isAlive());
+    }
+    
+    /**
+     * Verify that a thread is alive just after start
+     */
+    public void testIsAlive() {
+        ThreadRunning t = new ThreadRunning();
+        t.start();
+        assertTrue("The started thread must be alive!", t.isAlive());
+        t.stopWork = true;
     }
     
     /**
@@ -1513,10 +1589,10 @@ public class ThreadTest extends TestCase {
         ThreadRunning t  = new ThreadRunning();
         t.start();
         waitTime = waitDuration;
-        while (!t.isAlive() && !(expired = doSleep(10))) {
+        while (t.i == 0 && !(expired = doSleep(10))) {
         }
         if (expired) {
-            fail("unexpected: thread has not started");
+            fail("unexpected: thread's run() method has not started");
         }
         t.interrupt();
         waitTime = waitDuration;
@@ -1537,17 +1613,22 @@ public class ThreadTest extends TestCase {
         long millis = 2000;
         ThreadRunning t = new ThreadRunning();
         t.start();
-        long joinStartTime = System.currentTimeMillis();
+        long joinStartTime = 0;
+        long curTime = 0;
         try {
+            joinStartTime = System.currentTimeMillis();
             t.join(millis);
+            curTime = System.currentTimeMillis();
         } catch (InterruptedException e) {
             fail(INTERRUPTED_MESSAGE);
         }
-        long curTime = System.currentTimeMillis();
         long duration = curTime - joinStartTime;
+        // we allow the test to wait 2.5% less
+        long atLeast = (millis - 50);
         t.stopWork = true;
-        assertTrue("join(" + millis + ") has waited for " + duration,
-                   duration >= millis);
+        assertTrue("join should wait for at least " + atLeast + 
+                " but waited for " + duration,
+                duration >= atLeast);
         }
 
     /**
@@ -1558,19 +1639,22 @@ public class ThreadTest extends TestCase {
         int nanos = 999999;
         ThreadRunning t = new ThreadRunning();
         t.start();
-        long joinStartTime = System.currentTimeMillis();
+        long joinStartTime = 0;
+        long curTime = 0;
         try {
+            joinStartTime = System.currentTimeMillis();
             t.join(millis, nanos);
+            curTime = System.currentTimeMillis();
         } catch (InterruptedException e) {
             fail(INTERRUPTED_MESSAGE);
         }
-        long curTime = System.currentTimeMillis();
         long duration = 1000000 * (curTime - joinStartTime);
-        long joinTime = 1000000 * millis + nanos;
+        // we allow the test to wait 2.5% less
+        long atLeast = (millis - 50) * 1000000 + nanos;
         t.stopWork = true;
-        assertTrue("join should wait for at least " + joinTime + 
-                   " but waited for " + duration,
-                   duration >= joinTime);
+        assertTrue("join should wait for at least " + atLeast + 
+            " but waited for " + duration,
+            duration >= atLeast);
     }
 
     /**
