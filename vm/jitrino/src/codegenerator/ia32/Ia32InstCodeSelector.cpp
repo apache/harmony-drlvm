@@ -1500,9 +1500,8 @@ CG_OpndHandle* InstCodeSelector::getVTableAddr(Type *       dstType, ObjectType 
     return irManager.newImmOpnd(dstType, Opnd::RuntimeInfo::Kind_VTableConstantAddr, base);
 #else
     Opnd * acc = irManager.newOpnd(dstType);
-    copyOpnd(acc, irManager.newImmOpnd(dstType,(POINTER_SIZE_INT)compilationInterface.getVTableBase()));
-
-    return simpleOp_I8(Mnemonic_ADD, dstType, acc, irManager.newImmOpnd(dstType, Opnd::RuntimeInfo::Kind_VTableConstantAddr, base));
+    copyOpnd(acc, irManager.newImmOpnd(dstType, Opnd::RuntimeInfo::Kind_VTableConstantAddr, base));
+    return acc;
 #endif
 }
 
