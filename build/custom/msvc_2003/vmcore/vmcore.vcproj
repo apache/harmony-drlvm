@@ -132,6 +132,9 @@ copy $(OutDir)\harmonyvm.lib $(ProjectDir)\..\..\..\win_ia32_msvc_$(Configuratio
 			Name="include"
 			Filter="">
 			<File
+				RelativePath="..\..\..\..\vm\vmcore\include\annotation.h">
+			</File>
+			<File
 				RelativePath="..\..\..\..\vm\vmcore\include\annotations.h">
 			</File>
 			<File
@@ -147,10 +150,16 @@ copy $(OutDir)\harmonyvm.lib $(ProjectDir)\..\..\..\win_ia32_msvc_$(Configuratio
 				RelativePath="..\..\..\..\vm\vmcore\include\bytereader.h">
 			</File>
 			<File
+				RelativePath="..\..\..\..\vm\vmcore\include\cci.h">
+			</File>
+			<File
 				RelativePath="..\..\..\..\vm\vmcore\include\Class.h">
 			</File>
 			<File
 				RelativePath="..\..\..\..\vm\vmcore\include\class_interface.h">
+			</File>
+			<File
+				RelativePath="..\..\..\..\vm\vmcore\include\class_member.h">
 			</File>
 			<File
 				RelativePath="..\..\..\..\vm\vmcore\include\classloader.h">
@@ -400,6 +409,9 @@ copy $(OutDir)\harmonyvm.lib $(ProjectDir)\..\..\..\win_ia32_msvc_$(Configuratio
 			</File>
 			<File
 				RelativePath="..\..\..\..\vm\vmcore\include\vm_threads.h">
+			</File>
+			<File
+				RelativePath="..\..\..\..\vm\vmcore\include\vtable.h">
 			</File>
 		</Filter>
 		<Filter
