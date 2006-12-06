@@ -27,7 +27,7 @@ Version: $Revision: 1.2 $
 
 <project name="vm.gc_gen">
     <target name="init" depends="common_vm">
-        <property name="build.depends" value="extra.apr,vm.vmcore,vm.hythr" />
+        <property name="build.depends" value="extra.apr,vm.vmcore,vm.hythr,vm.kernel_classes" />
         <property name="outtype" value="shared" />
         <property name="libname" value="gc_gen" />
         <property name="src" location="${build.vm.home}" />
