@@ -36,6 +36,12 @@ struct HelperInlinerFlags {
     const char* newObj_className;
     const char* newObj_methodName;
     const char* newObj_signature;
+
+    bool  newArray_doInlining;
+    int   newArray_hotnessPercentToInline;
+    const char* newArray_className;
+    const char* newArray_methodName;
+    const char* newArray_signature;
 };
 
 class HelperInlinerAction: public Action {
@@ -57,7 +63,7 @@ void HelperInlinerAction::init() {
     //new obj inlining params;
     flags.newObj_doInlining = getBoolArg("newObj", false);
 
-    flags.newObj_signature = "(II)Ljava/lang/Object;";
+    flags.newObj_signature = "(II)Lorg/vmmagic/unboxed/Address;";
     if (flags.newObj_doInlining) {
         flags.newObj_className = getStringArg("newObj_className", NULL);
         flags.newObj_methodName = getStringArg("newObj_methodName", NULL);
@@ -71,6 +77,26 @@ void HelperInlinerAction::init() {
     if (!flags.newObj_doInlining){
         flags.newObj_className = NULL;
         flags.newObj_methodName = NULL;
+    }
+
+
+    //new array inlining params;
+    flags.newArray_doInlining = getBoolArg("newArray", false);
+
+    flags.newArray_signature = "(III)Lorg/vmmagic/unboxed/Address;";
+    if (flags.newArray_doInlining) {
+        flags.newArray_className = getStringArg("newArray_className", NULL);
+        flags.newArray_methodName = getStringArg("newArray_methodName", NULL);
+        flags.newArray_hotnessPercentToInline = getIntArg("newArray_hotnessPercent", 0);
+        if (flags.newArray_className == NULL || flags.newArray_methodName == NULL) {
+            //TODO:? crash("Invalid newArray fast path helper name: %s::%s\n", flags.newArray_className, flags.newArray_methodName);
+            flags.newArray_doInlining = false;
+        }
+    }
+
+    if (!flags.newArray_doInlining){
+        flags.newArray_className = NULL;
+        flags.newArray_methodName = NULL;
     }
 
 }
@@ -100,7 +126,16 @@ class NewObjHelperInliner : public HelperInliner {
 public:
     NewObjHelperInliner(HelperInlinerSession* session, MemoryManager& tmpMM, CompilationContext* cc, Inst* inst) 
         : HelperInliner(session, tmpMM, cc, inst){}
-        virtual void doInline();
+    
+    virtual void doInline();
+};
+
+
+class NewArrayHelperInliner : public HelperInliner {
+public:
+    NewArrayHelperInliner(HelperInlinerSession* session, MemoryManager& tmpMM, CompilationContext* cc, Inst* inst) 
+        : HelperInliner(session, tmpMM, cc, inst){}
+    virtual void doInline();
 };
 
 
@@ -127,6 +162,11 @@ void HelperInlinerSession::_run(IRManager& irm) {
                     case Op_NewObj:
                         if (flags.newObj_doInlining && nodePercent >= flags.newObj_hotnessPercentToInline) {
                             helperInliners.push_back(new (tmpMM) NewObjHelperInliner(this, tmpMM, cc, inst));
+                        }
+                        break;
+                    case Op_NewArray:
+                        if (flags.newArray_doInlining && nodePercent >= flags.newArray_hotnessPercentToInline) {
+                            helperInliners.push_back(new (tmpMM) NewArrayHelperInliner(this, tmpMM, cc, inst));
                         }
                         break;
                     default: break;
@@ -173,29 +213,67 @@ MethodDesc* HelperInliner::ensureClassIsResolvedAndInitialized(const char* class
 
 }
 
-void HelperInliner::inlineVMHelper(MethodCallInst* call) {
-    CompilationInterface* ci = cc->getVMCompilationInterface();
-    IRManager* irm = cc->getHIRManager();
+typedef StlVector<MethodCallInst*> InlineVector;
 
-    //now inline the call
-    CompilationContext inlineCC(cc->getCompilationLevelMemoryManager(), ci, cc->getCurrentJITContext());
-    inlineCC.setPipeline(cc->getPipeline());
+#define PRAGMA_INLINE "org/vmmagic/pragma/InlinePragma"
 
-    Inliner inliner(action, localMM, *irm, false);
-    InlineNode* regionToInline = inliner.createInlineNode(inlineCC, call);
+void HelperInliner::inlineVMHelper(MethodCallInst* origCall) {
+    InlineVector  methodsToInline(localMM);
+    methodsToInline.push_back(origCall);
+    while (!methodsToInline.empty()) {
+        MethodCallInst* call = *methodsToInline.rbegin();
+        methodsToInline.pop_back();
+        if (Log::isEnabled()) {
+            Log::out()<<"Inlining VMHelper:";call->print(Log::out());Log::out()<<std::endl;
+        }
 
-    inliner.connectRegion(regionToInline);
+        CompilationInterface* ci = cc->getVMCompilationInterface();
+        IRManager* irm = cc->getHIRManager();
 
-    // Optimize inlined region before splicing
-    inlineCC.stageId = cc->stageId;
-    Inliner::runInlinerPipeline(inlineCC, flags.inlinerPipelineName);
-    cc->stageId = inlineCC.stageId;
+        //now inline the call
+        CompilationContext inlineCC(cc->getCompilationLevelMemoryManager(), ci, cc->getCurrentJITContext());
+        inlineCC.setPipeline(cc->getPipeline());
 
-    inliner.inlineRegion(regionToInline, false);
+        Inliner inliner(action, localMM, *irm, false);
+        InlineNode* regionToInline = inliner.createInlineNode(inlineCC, call);
+
+        inliner.connectRegion(regionToInline);
+
+        // Optimize inlined region before splicing
+        inlineCC.stageId = cc->stageId;
+        Inliner::runInlinerPipeline(inlineCC, flags.inlinerPipelineName);
+        cc->stageId = inlineCC.stageId;
+
+        //add all methods with pragma inline into the list.
+        const Nodes& nodesInRegion = regionToInline->getIRManager().getFlowGraph().getNodes();
+        for (Nodes::const_iterator it = nodesInRegion.begin(), end = nodesInRegion.end(); it!=end; ++it) {
+           Node* node = *it;
+            for (Inst* inst = (Inst*)node->getFirstInst(); inst!=NULL; inst = inst->getNextInst()) {
+                if (inst->isMethodCall()) {
+                    MethodCallInst* methodCall = inst->asMethodCallInst();
+                    MethodDesc* md = methodCall->getMethodDesc();
+                    uint32 nThrows = md->getNumThrows();
+                    for (uint32 i=0; i<nThrows;i++) {
+                        NamedType* type = md->getThrowType(i);
+                        const char* name = type->getName();
+                        if (!strcmp(name, PRAGMA_INLINE)) {
+                            methodsToInline.push_back(methodCall);
+                            if (Log::isEnabled()) {
+                                Log::out()<<"Found InlinePragma, adding to the queue:";methodCall->print(Log::out());Log::out()<<std::endl;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        //inline the region
+        inliner.inlineRegion(regionToInline, false);
+    }
 }
 
 void NewObjHelperInliner::doInline() {
-#ifdef _EM64T_
+#if defined  (_EM64T_) || defined (_IPF_)
     return;
 #else
     if (Log::isEnabled())  {
@@ -208,9 +286,9 @@ void NewObjHelperInliner::doInline() {
     if (!method) {
         return;
     }
-    
-    TypeInst *typeInst = (TypeInst*)inst;
-    Type * type = typeInst->getTypeInfo();
+
+    Opnd* dstOpnd= inst->getDst();
+    Type * type = dstOpnd->getType();
     assert(type->isObject());
     ObjectType* objType = type->asObjectType();
 
@@ -231,17 +309,92 @@ void NewObjHelperInliner::doInline() {
 
     Opnd* tauSafeOpnd = opndManager.createSsaTmpOpnd(typeManager.getTauType());
     instFactory.makeTauSafe(tauSafeOpnd)->insertBefore(inst);
-    Opnd* res = inst->getDst();
     Opnd* objSizeOpnd = opndManager.createSsaTmpOpnd(typeManager.getInt32Type());
     Opnd* allocationHandleOpnd = opndManager.createSsaTmpOpnd(typeManager.getInt32Type());
+    Opnd* callResOpnd = opndManager.createSsaTmpOpnd(typeManager.getUnmanagedPtrType(typeManager.getInt8Type()));
     instFactory.makeLdConst(objSizeOpnd, objSize)->insertBefore(inst);
     instFactory.makeLdConst(allocationHandleOpnd, allocationHandle)->insertBefore(inst);
     Opnd* args[2] = {objSizeOpnd, allocationHandleOpnd};
-    MethodCallInst* call = instFactory.makeDirectCall(res, tauSafeOpnd, tauSafeOpnd, 2, args, method)->asMethodCallInst();
+    MethodCallInst* call = instFactory.makeDirectCall(callResOpnd, tauSafeOpnd, tauSafeOpnd, 2, args, method)->asMethodCallInst();
     call->insertBefore(inst);
     inst->unlink();
     assert(call == call->getNode()->getLastInst());
 
+    //convert address type to managed object type
+    Edge* fallEdge= call->getNode()->getUnconditionalEdge();
+    assert(fallEdge && fallEdge->getTargetNode()->isBlockNode());
+    Modifier mod = Modifier(Overflow_None)|Modifier(Exception_Never)|Modifier(Strict_No);
+    Node* fallNode = fallEdge->getTargetNode();
+    if (fallNode->getInDegree()>1) {
+        fallNode = irm->getFlowGraph().spliceBlockOnEdge(fallEdge, instFactory.makeLabel());
+    }
+    fallNode->prependInst(instFactory.makeConv(mod, type->tag, dstOpnd, callResOpnd));
+    
+    //inline the method
+    inlineVMHelper(call);
+#endif
+}
+
+
+void NewArrayHelperInliner::doInline() {
+#if defined  (_EM64T_) || defined (_IPF_)
+    return;
+#else
+    if (Log::isEnabled())  {
+        Log::out() << "Processing inst:"; inst->print(Log::out()); Log::out()<<std::endl;
+    }
+    assert(inst->getOpcode() == Op_NewArray);
+
+    //find the method
+    MethodDesc* method = ensureClassIsResolvedAndInitialized(flags.newArray_className, flags.newArray_methodName, flags.newArray_signature);
+    if (!method) {
+        return;
+    }
+
+
+    //the method signature is (int objSize, int allocationHandle)
+    Opnd* dstOpnd = inst->getDst();
+    ArrayType* arrayType = dstOpnd->getType()->asArrayType();
+    int allocationHandle = (int)arrayType->getAllocationHandle();
+    Type* elemType = arrayType->getElementType();
+    int elemSize = 4; //TODO: EM64T references!
+    if (elemType->isDouble() || elemType->isInt8()) {
+        elemSize = 8;
+    } else if (elemType->isInt2() || elemType->isChar()) {
+        elemSize = 2;
+    } else  if (elemType->isInt1()) {
+        elemSize = 1;
+    }
+
+    IRManager* irm = cc->getHIRManager();
+    InstFactory& instFactory = irm->getInstFactory();
+    OpndManager& opndManager = irm->getOpndManager();
+    TypeManager& typeManager = irm->getTypeManager();
+
+    Opnd* tauSafeOpnd = opndManager.createSsaTmpOpnd(typeManager.getTauType());
+    instFactory.makeTauSafe(tauSafeOpnd)->insertBefore(inst);
+    Opnd* numElements = inst->getSrc(0);
+    Opnd* elemSizeOpnd = opndManager.createSsaTmpOpnd(typeManager.getInt32Type());
+    Opnd* allocationHandleOpnd = opndManager.createSsaTmpOpnd(typeManager.getInt32Type());
+    instFactory.makeLdConst(elemSizeOpnd, elemSize)->insertBefore(inst);
+    instFactory.makeLdConst(allocationHandleOpnd, allocationHandle)->insertBefore(inst);
+    Opnd* args[3] = {numElements, elemSizeOpnd, allocationHandleOpnd};
+    Opnd* callResOpnd = opndManager.createSsaTmpOpnd(typeManager.getUnmanagedPtrType(typeManager.getInt8Type()));
+    MethodCallInst* call = instFactory.makeDirectCall(callResOpnd, tauSafeOpnd, tauSafeOpnd, 3, args, method)->asMethodCallInst();
+    call->insertBefore(inst);
+    inst->unlink();
+    assert(call == call->getNode()->getLastInst());
+
+    //convert address type to managed array type
+    Edge* fallEdge= call->getNode()->getUnconditionalEdge();
+    assert(fallEdge && fallEdge->getTargetNode()->isBlockNode());
+    Modifier mod = Modifier(Overflow_None)|Modifier(Exception_Never)|Modifier(Strict_No);
+    Node* fallNode = fallEdge->getTargetNode();
+    if (fallNode->getInDegree()>1) {
+        fallNode = irm->getFlowGraph().spliceBlockOnEdge(fallEdge, instFactory.makeLabel());
+    }
+    fallNode->prependInst(instFactory.makeConv(mod, arrayType->tag, dstOpnd, callResOpnd));
+    
     //inline the method
     inlineVMHelper(call);
 #endif

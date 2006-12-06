@@ -57,10 +57,12 @@ static bool isMagicMethod(MethodDesc* md) {
 }
 
 Type* convertMagicType2HIR(TypeManager& tm, Type* type) {
-    if (!type->isObject() || !type->isNamedType()) {
+    if (!type->isObject() || !type->isNamedType() || type->isSystemObject()) {
         return type;
     }
+
     assert(isMagicClass(type));
+
     const char* name = type->getName();    
     if (!strcmp(name, "org/vmmagic/unboxed/Address") 
         || !strcmp(name, "org/vmmagic/unboxed/ObjectReference")) 
@@ -3941,6 +3943,13 @@ void JavaByteCodeTranslator::genVMHelper(MethodDesc *md, uint32 numArgs, Opnd **
     if (!strcmp(mname,"newResolvedUsingAllocHandleAndSize")) {
         assert(numArgs == 2);
         Opnd* res = irBuilder.genVMHelperCall(CompilationInterface::Helper_NewObj_UsingVtable, resType, numArgs, srcOpnds);
+        pushOpnd(res);
+        return;
+    }
+
+    if (!strcmp(mname,"newVectorUsingAllocHandle")) {
+        assert(numArgs == 3);
+        Opnd* res = irBuilder.genVMHelperCall(CompilationInterface::Helper_NewVector_UsingVtable, resType, numArgs, srcOpnds);
         pushOpnd(res);
         return;
     }

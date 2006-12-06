@@ -646,9 +646,9 @@ public:
                                                           dstType,
                                                           getCGInst(inst->getSrc(0)));
                 } else if (dstType->isObject()){
-                    cgInst = instructionCallback.convUPtrToObject((ObjectType*)dstType, getCGInst(inst->getSrc(0)));
+                    cgInst = instructionCallback.convUPtrToObject(dstType->asObjectType(), getCGInst(inst->getSrc(0)));
                 } else if (dstType->isUnmanagedPtr()) {
-                    cgInst = instructionCallback.convToUPtr((PtrType*)dstType, getCGInst(inst->getSrc(0)));
+                    cgInst = instructionCallback.convToUPtr(dstType->asPtrType(), getCGInst(inst->getSrc(0)));
                 } else {
                     bool isSigned = Type::isSignedInteger(inst->getType());
                     cgInst = instructionCallback.convToInt(mapToIntConvertOpType(inst),

@@ -158,6 +158,8 @@ public:
     virtual bool        isAddressFinal()    = 0;
     virtual void*       getIndirectAddress()= 0;
     virtual uint32      getNumHandlers()    = 0;
+    virtual uint32      getNumThrows()    = 0;
+    virtual NamedType*  getThrowType(uint32 i) = 0;
     
     // Exception handler and signature parsing API
     virtual unsigned    parseJavaHandlers(ExceptionCallback&) = 0;

@@ -80,6 +80,10 @@ SD2_OPT.useProfile=EDGE_PROF
 -XDjit.SD2_OPT.arg.optimizer.inline_helpers.newObj_methodName=alloc
 -XDjit.SD2_OPT.arg.optimizer.inline_helpers.newObj_hotnessPercent=1
 
+-XDjit.CS_OPT.arg.optimizer.inline_helpers.newArray=on
+-XDjit.CS_OPT.arg.optimizer.inline_helpers.newArray_className=org/apache/harmony/drlvm/gc_cc/GCHelper
+-XDjit.CS_OPT.arg.optimizer.inline_helpers.newArray_methodName=allocArray
+-XDjit.CS_OPT.arg.optimizer.inline_helpers.newArray_hotnessPercent=1
 
 -XDjit.SD2_OPT.arg.codegen.dce1.early=yes
 -XDjit.SD2_OPT.arg.codegen.regalloc.bp_regalloc1.regs=ALL_GP

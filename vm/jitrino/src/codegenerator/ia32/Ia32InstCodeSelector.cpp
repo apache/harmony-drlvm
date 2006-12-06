@@ -467,6 +467,9 @@ Opnd * InstCodeSelector::convert(CG_OpndHandle * oph, Type * dstType, Opnd * dst
     } else if (srcType->isUnmanagedPtr() && !dstType->isUnmanagedPtr()) {
         dstOpnd = convertUnmanagedPtr(srcOpnd, dstType, dstOpnd);
         converted = true;
+    } else  if (srcType->isObject() && dstType->isUnmanagedPtr()) {
+        dstOpnd = convertToUnmanagedPtr(srcOpnd, dstType, dstOpnd);
+        converted = true;
     }
 
     if (!converted){
@@ -586,7 +589,8 @@ Opnd * InstCodeSelector::fpOp(Mnemonic mn, Type * dstType, Opnd * src1, Opnd * s
 Opnd * InstCodeSelector::simpleOp_I4(Mnemonic mn, Type * dstType, Opnd * src1, Opnd * src2)
 {
     Opnd * dst=irManager.newOpnd(dstType);
-    Opnd * srcOpnd1=(Opnd*)convert(src1, dstType), * srcOpnd2=src2==NULL?NULL:(Opnd*)convert(src2, dstType);
+    Opnd * srcOpnd1=(Opnd*)convert(src1, dstType);
+    Opnd * srcOpnd2=src2==NULL?NULL:(Opnd*)convert(src2, dstType);
     if (Encoder::getMnemonicProperties(mn)&Inst::Properties_Symmetric)
         swapIfLastIs(srcOpnd1, srcOpnd2);
     appendInsts(irManager.newInstEx(mn, 1, dst, srcOpnd1, srcOpnd2));
@@ -1887,7 +1891,8 @@ CG_OpndHandle*  InstCodeSelector::addElemIndex(Type          * eType,
                                                CG_OpndHandle * elemBase,
                                                CG_OpndHandle * index) 
 {
-    PtrType * ptrType=((Opnd*)elemBase)->getType()->asPtrType();
+    Type* type = ((Opnd*)elemBase)->getType();
+    PtrType * ptrType=type->asPtrType();
     Type * elemType = ptrType->getPointedToType();
 
     uint32 elemSize=getByteSize(irManager.getTypeSize(elemType));
@@ -2858,10 +2863,10 @@ CG_OpndHandle* InstCodeSelector::callvmhelper(uint32              numArgs,
         break;
     }
     case CompilationInterface::Helper_NewObj_UsingVtable:
+    case CompilationInterface::Helper_NewVector_UsingVtable:
     {
-        assert(numArgs == 2);
         dstOpnd = irManager.newOpnd(retType);
-        CallInst * callInst=irManager.newRuntimeHelperCallInst(CompilationInterface::Helper_NewObj_UsingVtable, 2, (Opnd**)args, dstOpnd);
+        CallInst * callInst=irManager.newRuntimeHelperCallInst(callId, numArgs, (Opnd**)args, dstOpnd);
         appendInsts(callInst);
         break;
     }

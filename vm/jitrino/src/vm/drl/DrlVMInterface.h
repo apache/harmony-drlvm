@@ -274,6 +274,9 @@ public:
     uint32       getByteCodeSize() {return (uint32) method_get_byte_code_size(drlMethod);}
     uint16       getMaxStack()     {return (uint16) method_get_max_stack(drlMethod);}
     uint32       getNumHandlers()  {return method_get_num_handlers(drlMethod);}
+    uint32       getNumThrows() {return method_number_throws(drlMethod);}
+    NamedType*   getThrowType(uint32 i);
+
     //
     // accessors for method info, code and data
     //

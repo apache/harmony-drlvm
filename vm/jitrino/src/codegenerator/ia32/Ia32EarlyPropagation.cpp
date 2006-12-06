@@ -166,7 +166,10 @@ void EarlyPropagation::runImpl()
                         Opnd* origOpnd= irManager->getOpnd(i);
                         Opnd* replacementOpnd = irManager->getOpnd(opndInfos[i].sourceOpndId);
                         //TODO: extends possible convertions.
-                        if (origOpnd->getType()->isUnmanagedPtr() && replacementOpnd->getType()->isInteger()) {
+                        if ( (origOpnd->getType()->isUnmanagedPtr() && replacementOpnd->getType()->isInteger())
+                            //TODO: should we prohibit <type> <-> Mptr|Obj convertion when <type> is not Mptr|Obj ?
+                            || (origOpnd->getType()->isObject() || origOpnd->getType()->isManagedPtr()))
+                        {
                             replacementOpnd->setType(origOpnd->getType());
                         }
                         replacements[i] = replacementOpnd;

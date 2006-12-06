@@ -1040,4 +1040,13 @@ DrlVMCompilationInterface::getJitHandle() const {
 
 
 
+
+NamedType* DrlVMMethodDesc::getThrowType(uint32 i) {
+    assert(i<=method_number_throws(drlMethod));
+    Class_Handle ch = method_get_throws(drlMethod, i);
+    assert(ch);
+    NamedType* res = compilationInterface->getTypeManager().getObjectType(ch);
+    return res;
+}
+
 } //namespace Jitrino

@@ -22,18 +22,21 @@ package org.apache.harmony.drlvm.gc_cc;
 
 import org.apache.harmony.drlvm.VMHelper;
 import org.vmmagic.unboxed.*;
+import org.vmmagic.pragma.*;
 
 public class GCHelper {
 
     static {System.loadLibrary("gc_cc");}
 
-    public static final int TLS_CURRENT_OFFSET = getCurrentOffset();
-    public static final int TLS_CLEANED_OFFSET = getCleanedOffset();
+    private static final int TLS_CURRENT_OFFSET = getCurrentOffset();
+    private static final int TLS_CLEANED_OFFSET = getCleanedOffset();
 
 
+    private static final int ARRAY_LEN_OFFSET = 8;
+    private static final int GC_OBJECT_ALIGNMENT = 4; //TODO: EM64 or IPF could have 8!
 
 
-    public static Object alloc(int objSize, int allocationHandle) {
+    public static Address alloc(int objSize, int allocationHandle) throws InlinePragma {
         Address tlsAddr = VMHelper.getTlsBaseAddress();
 
         Address tlsFreeFieldAddr = tlsAddr.plus(TLS_CURRENT_OFFSET);
@@ -52,6 +55,22 @@ public class GCHelper {
         }
         return VMHelper.newResolvedUsingAllocHandleAndSize(objSize, allocationHandle);    
     }
+
+
+   public static Address allocArray(int arrayLen, int elemSize, int allocationHandle)  throws InlinePragma {
+        if (arrayLen >= 0) {
+            int firstElementOffset = ARRAY_LEN_OFFSET + (elemSize==8?8:4);
+            int size = firstElementOffset + elemSize*arrayLen;
+            size = (((size + (GC_OBJECT_ALIGNMENT - 1)) & (~(GC_OBJECT_ALIGNMENT - 1))));
+
+            Address arrayAddress = alloc(size, allocationHandle); //never null!
+            arrayAddress.store(arrayLen, Offset.fromInt(ARRAY_LEN_OFFSET));
+            return arrayAddress;
+        }
+        return VMHelper.newVectorUsingAllocHandle(arrayLen, elemSize, allocationHandle);
+    }
+
+
 
     private static native int getCurrentOffset();
     private static native int getCleanedOffset();

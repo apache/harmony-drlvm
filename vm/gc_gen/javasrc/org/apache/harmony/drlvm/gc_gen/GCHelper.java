@@ -29,7 +29,7 @@ public class GCHelper {
 
     public static final int TLS_GC_OFFSET = TLSGCOffset();
 
-    public static Object alloc(int objSize, int allocationHandle) {
+    public static Address alloc(int objSize, int allocationHandle) {
   
         Address TLS_BASE = VMHelper.getTlsBaseAddress();
 

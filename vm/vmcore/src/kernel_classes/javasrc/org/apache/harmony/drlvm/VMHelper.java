@@ -30,7 +30,9 @@ public class VMHelper {
 
     public static Address getTlsBaseAddress() {fail(); return null;}
 
-    public static Object newResolvedUsingAllocHandleAndSize(int objSize, int allocationHandle) {fail(); return null;}
+    public static Address newResolvedUsingAllocHandleAndSize(int objSize, int allocationHandle) {fail(); return null;}
+    
+    public static Address newVectorUsingAllocHandle(int arrayLen, int elemSize, int allocationHandle) {fail(); return null;}
 
 
 
