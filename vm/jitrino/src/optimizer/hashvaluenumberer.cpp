@@ -2534,12 +2534,12 @@ public:
                 inst->setDst(OpndManager::getNullOpnd());
                 Inst* copy = NULL;
                 Opnd* srcOpnd = NULL;
-                if (optimizedOpcode == Op_TauUnsafe && instOpcode == Op_Cmp)
-                {  // optimizedInst is tauUnsafe so srcOpnd for copying must be 'false'
+                if (optimizedOpcode == Op_TauUnsafe && instOpcode == Op_Cmp){ 
+                    // optimizedInst is tauUnsafe so srcOpnd for copying must be 'false'
                     copy = irManager.getInstFactory().makeLdConst(dstOpnd,(int32)0);
-                }
-                else
-                {
+                } else  if (optimizedOpcode == Op_TauEdge) {
+                    copy = irManager.getInstFactory().makeLdConst(dstOpnd,(int32)1);
+                } else {
                     srcOpnd = optimizedInst->getDst();
                     //
                     // Note that sometimes dstOpnd could be a null operand because of
