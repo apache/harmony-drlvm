@@ -567,7 +567,7 @@ struct MethInfo
     /** Tests whether the method is constructor. */
     bool meth_is_ctor(void)
     {
-        return strcmp(meth_name(), "<init>");
+        return !strcmp(meth_name(), "<init>");
     }
     /** Tests whether the method is constructor of Exception. */
     bool meth_is_exc_ctor(void)
