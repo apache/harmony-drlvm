@@ -303,7 +303,8 @@ public:
     // TRANSITION
     //---------------------------------------------------------------------------//
 
-    CG_OpndHandle* callvmhelper(uint32, CG_OpndHandle**, Type*, VMHelperCallOp::Id, InlineInfo*) { NOT_IMPLEMENTED_C("unbox") }
+    CG_OpndHandle* callvmhelper(uint32, CG_OpndHandle**, Type*
+                        , CompilationInterface::RuntimeHelperId, InlineInfo*) { NOT_IMPLEMENTED_C("unbox") }
 
     CG_OpndHandle* convUPtrToObject(ObjectType*, CG_OpndHandle*)              { NOT_IMPLEMENTED_C("convUPtrToObject") }
     CG_OpndHandle* convToUPtr(PtrType*, CG_OpndHandle*)                       { NOT_IMPLEMENTED_C("convToUPtr") }
