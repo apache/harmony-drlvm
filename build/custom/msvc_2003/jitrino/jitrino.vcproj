@@ -50,7 +50,8 @@
 				Name="VCPostBuildEventTool"
 				Description="       ... Copying files to bin/default folder ...."
 				CommandLine="copy $(OutDir)\jitrino.dll $(ProjectDir)\..\..\..\win_ia32_msvc_$(ConfigurationName)\deploy\jre\bin\default
-copy $(OutDir)\jitrino.pdb $(ProjectDir)\..\..\..\win_ia32_msvc_$(ConfigurationName)\deploy\jre\bin\default"/>
+copy $(OutDir)\jitrino.pdb $(ProjectDir)\..\..\..\win_ia32_msvc_$(ConfigurationName)\deploy\jre\bin\default
+"/>
 			<Tool
 				Name="VCPreBuildEventTool"/>
 			<Tool
@@ -108,7 +109,8 @@ copy $(OutDir)\jitrino.pdb $(ProjectDir)\..\..\..\win_ia32_msvc_$(ConfigurationN
 				Name="VCPostBuildEventTool"
 				Description="       ... Copying files to bin/default folder ...."
 				CommandLine="copy $(OutDir)\jitrino.dll $(ProjectDir)\..\..\..\win_ia32_msvc_$(ConfigurationName)\deploy\jre\bin\default
-copy $(OutDir)\jitrino.pdb $(ProjectDir)\..\..\..\win_ia32_msvc_$(ConfigurationName)\deploy\jre\bin\default"/>
+copy $(OutDir)\jitrino.pdb $(ProjectDir)\..\..\..\win_ia32_msvc_$(ConfigurationName)\deploy\jre\bin\default
+"/>
 			<Tool
 				Name="VCPreBuildEventTool"/>
 			<Tool
@@ -216,6 +218,9 @@ copy $(OutDir)\jitrino.pdb $(ProjectDir)\..\..\..\win_ia32_msvc_$(ConfigurationN
 			</File>
 			<File
 				RelativePath="..\..\..\..\vm\jitrino\src\optimizer\hashvaluenumberer.h">
+			</File>
+			<File
+				RelativePath="..\..\..\..\vm\jitrino\src\optimizer\helper_inliner.cpp">
 			</File>
 			<File
 				RelativePath="..\..\..\..\vm\jitrino\src\optimizer\inliner.cpp">
@@ -570,6 +575,12 @@ copy $(OutDir)\jitrino.pdb $(ProjectDir)\..\..\..\win_ia32_msvc_$(ConfigurationN
 				</File>
 				<File
 					RelativePath="..\..\..\..\vm\jitrino\src\codegenerator\ia32\Ia32CFG.h">
+				</File>
+				<File
+					RelativePath="..\..\..\..\vm\jitrino\src\codegenerator\ia32\Ia32CgUtils.cpp">
+				</File>
+				<File
+					RelativePath="..\..\..\..\vm\jitrino\src\codegenerator\ia32\Ia32CgUtils.h">
 				</File>
 				<File
 					RelativePath="..\..\..\..\vm\jitrino\src\codegenerator\ia32\Ia32CodeEmitter.cpp">
