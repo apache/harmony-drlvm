@@ -1115,7 +1115,6 @@ void InlinePass::_run(IRManager& irm) {
     CompilationContext* cc = getCompilationContext();
     MemoryManager& mm = cc->getCompilationLevelMemoryManager() ;
     CompilationInterface* ci = cc->getVMCompilationInterface();
-    JITInstanceContext* jit = cc->getCurrentJITContext();
 
     // Set up Inliner
     bool connectEarly = getBoolArg("connect_early", true);
@@ -1128,8 +1127,7 @@ void InlinePass::_run(IRManager& irm) {
 
     // Inline calls
     do {
-        CompilationContext inlineCC(mm, ci, jit);
-        inlineCC.setPipeline(cc->getPipeline());
+        CompilationContext inlineCC(mm, ci, cc);
         InlineNode* regionNode = inliner.getNextRegionToInline(inlineCC);
         if (regionNode == NULL) {
             break;

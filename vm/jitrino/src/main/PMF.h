@@ -202,7 +202,7 @@ protected:
             const char* key; 
             const char* value;
             int  strength;      // relative strength of this argument
-            bool filterspec;    // true if this argument is filter specific
+            Cmd* cmdp;
 
             bool operator == (const char* k) const      {return strcmp(key, k) == 0;}
         };
@@ -212,7 +212,7 @@ protected:
 
         Args (MemoryManager& mm)                : store(mm) {}
 
-        void add (const char* key, const char* value, int strength, bool filterspec);
+        void add (const char* key, const char* value, int strength, Cmd*);
         const char* get (const char* key) const;
     };
 
@@ -224,7 +224,7 @@ protected:
         Files (MemoryManager& mm) : FilesDictionary(mm) {}
     };
 
-    Files files;
+    static Files* pfiles;
 
 public:
 
@@ -283,7 +283,7 @@ protected:
     void initStreams  ();
     LogTemplate& lookStream (Str& streamname, Cmd* cmdp, size_t xpath, size_t xlog);
     void walk (Pipeline&, Pipeline::Alias*, Strs&);
-    Cmd* lookArg (Pipeline&, Strs&);
+    const Cmd* lookArg (Pipeline* pipeline, const Str* fqname, size_t fqsize) const;
     Pipeline* lookup (Str* filtername, bool create = false);
 
 public:
@@ -339,7 +339,7 @@ public:
     JITInstanceContext& getJITInstanceContext () const      {return jitInstanceContext;}
     void summTimes (SummTimes&);
     static Action* getAction (HPipeline, const char* path);
-    static void  showHelp (std::ostream&);
+    static void showHelp (std::ostream&);
 
     HPipeline selectPipeline (const char* classname, const char* methname, const char* sig) const;
 

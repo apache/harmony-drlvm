@@ -165,7 +165,7 @@ static bool operator == (const Str& a, const char* s)
 }
 
 
-static bool compare (Str* p, Str* q, size_t count)
+static bool compare (const Str* p, const Str* q, size_t count)
 {
     for (; count != 0; --count, ++p, ++q)
         if (!(*p == *q))
@@ -185,7 +185,11 @@ ostream& operator << (ostream& os, const Str& a)
 static ostream& operator << (ostream& os, const Strs& fqn)
 {
     for (size_t n = 0; n != fqn.size(); ++n)
-        os << fqn[n] << '.';
+    {
+        if (n != 0)
+            os << '.';
+        os << fqn[n];
+    }
     return os;
 }
 #endif
@@ -691,7 +695,7 @@ LogStreams::LogStreams (MemoryManager& mm_, PMF& pmf_, int t)
             ss.streamname = ltemplate.streamname;
             if (ss.substitute(ltemplate.fmask))
             {// File name doesn't require compilation context (class or method name)
-                AutoUnlock(pmf.files);
+                AutoUnlock lock(*pmf.pfiles);
                 assign(sx, ss.result, ss.rescount);
             }
         }
@@ -710,13 +714,13 @@ LogStreams::~LogStreams ()
     for (size_t sx = 0; sx != nbos; ++sx)
         if ((lsp = streams[sx])->enabled)
         {
-            AutoUnlock(pmf.files);
+            AutoUnlock lock(*pmf.pfiles);
             if (lsp->releaseRef())
-                pmf.files[lsp->fname] = 0;
+                (*pmf.pfiles)[lsp->fname] = 0;
 #ifdef _DEBUG_PMF_STREAMS
 cout << "LogStreams[" << threadnb << "] depth:" << depth << " idx:" << sx
      << "  free '" << lsp->fname
-     << "' closed:" << (pmf.files[lsp->fname] == 0)
+     << "' closed:" << ((*pmf.pfiles)[lsp->fname] == 0)
      << endl;
 #endif
         }
@@ -758,7 +762,7 @@ cout << "LogStreams[" << threadnb << "] depth:" << depth << " idx:" << sx
      << endl;
 #endif
             //  change stream - use new or reuse already open stream
-                AutoUnlock(pmf.files);
+                AutoUnlock lock(*pmf.pfiles);
                 assign(sx, ss.result, ss.rescount);
             }
             else
@@ -783,17 +787,17 @@ void LogStreams::endMethod ()
 
             if (sstack->back() != 0)
             {// Return to the saved stream
-                AutoUnlock(pmf.files);
+                AutoUnlock lock(*pmf.pfiles);
 
             //  If this file no longer needed, close it but remember its name.
             //  Next time the file will be open, it will be open in append mode.
                 if (lsp->releaseRef())
-                    pmf.files[lsp->fname] = 0;
+                    (*pmf.pfiles)[lsp->fname] = 0;
 
 #ifdef _DEBUG_PMF_STREAMS
 cout << "LogStreams[" << threadnb << "] depth:" << depth << " idx:" << sx
      << "  free '" << lsp->fname
-     << "' closed:" << (pmf.files[lsp->fname] == 0)
+     << "' closed:" << ((*pmf.pfiles)[lsp->fname] == 0)
      << endl;
 #endif
                 streams[sx] = sstack->back();
@@ -822,8 +826,8 @@ void LogStreams::assign (size_t sx, const char* fname, size_t fnamesz)
     const LogTemplate& ltemplate = pmf.getLogTemplates()[sx];
     LogStream* lsp;    
 
-    PMF::Files::iterator ptr = pmf.files.find(fname);
-    if (ptr == pmf.files.end() || ptr->second == 0)
+    PMF::Files::iterator ptr = pmf.pfiles->find(fname);
+    if (ptr == pmf.pfiles->end() || ptr->second == 0)
     {// There is no file open with this name.
         lsp = new (pmf.mm) LogStream();
 
@@ -834,14 +838,14 @@ void LogStreams::assign (size_t sx, const char* fname, size_t fnamesz)
             lsp->mutexp  = new (mm) Mutex();
 
         lsp->append = ltemplate.append;
-        if (!ltemplate.append && ptr != pmf.files.end())
+        if (!ltemplate.append && ptr != pmf.pfiles->end())
             lsp->append = true; // the file was opened before
 
         lsp->enabled = lsp->pending_open = true;
 
         lsp->fname = new (mm) char[fnamesz];
         memcpy(lsp->fname, fname, fnamesz);
-        pmf.files[lsp->fname] = lsp;
+        (*pmf.pfiles)[lsp->fname] = lsp;
 
     //  Special case of rt stream - only the single instance of LogStream object can exist
         if (ltemplate.sid == LogStream::RT)
@@ -850,7 +854,7 @@ void LogStreams::assign (size_t sx, const char* fname, size_t fnamesz)
 #ifdef _DEBUG_PMF_STREAMS
 cout << "LogStreams[" << threadnb << "] depth:" << depth << " idx:" << sx
      << "   new '" << lsp->fname 
-     << "' seen before:" << (ptr != pmf.files.end())
+     << "' seen before:" << (ptr != pmf.pfiles->end())
      << endl;
 #endif
     }
@@ -1044,7 +1048,7 @@ const char* PMF::MethodFilter::c_str (MemoryManager& mm) const
 //------ PMF::Args implementation -------------------------------------------//
 
 
-void PMF::Args::add (const char* key, const char* value, int strength, bool filterspec)
+void PMF::Args::add (const char* key, const char* value, int strength, Cmd* cmdp)
 {
     Store::iterator end = store.end(),
                     ptr = find(store.begin(), end, key);
@@ -1054,14 +1058,14 @@ void PMF::Args::add (const char* key, const char* value, int strength, bool filt
         arg.key   = key,
         arg.value = value;
         arg.strength = strength;
-        arg.filterspec = filterspec;
+        arg.cmdp = cmdp;
         store.push_back(arg);
     }
     else if (strength >= ptr->strength)
     {
         ptr->value = value,
         ptr->strength = strength;
-        ptr->filterspec = filterspec;
+        ptr->cmdp = cmdp;
     }
 }
 
@@ -1367,11 +1371,16 @@ void PMF::processVMProperties ()
 }
 
 
+PMF::Files* PMF::pfiles = 0;
+
+
 PMF::PMF (MemoryManager& m, JITInstanceContext& jit)    
 :initialized(false),mm(m), jitInstanceContext(jit)
-,cmds(mm), logtemplates(mm), files(mm), pipelines(mm) 
+,cmds(mm), logtemplates(mm), pipelines(mm) 
 {
     jitname.init(jitInstanceContext.getJITName().c_str());
+    if (pfiles == 0)
+        pfiles = new (mm) Files(mm);
 }
 
 
@@ -1626,7 +1635,7 @@ void PMF::init (bool first_)
             bool filterspec = false;
             if (step.args != 0)
                 for (Args::Store::iterator m = step.args->store.begin(); m != step.args->store.end(); ++m)
-                    if (m->filterspec)
+                    if (!m->cmdp->filtername.empty())
                     {
                         filterspec = true;
                         break;
@@ -1699,7 +1708,6 @@ void PMF::init (bool first_)
                 for (size_t sid = 0; sid < step.logs->streamidxs.size(); ++sid)
                 {
                     size_t idx = step.logs->streamidxs.at(sid);
-                    LogTemplate& lt = logtemplates.at(idx);
                     cout << "      sid#" << sid
                          << " idx#" << idx
                          << endl;
@@ -1943,24 +1951,9 @@ const char* PMF::getArg (HPipeline hpipe, const char* key) const
     for (StrTokenizer tokens('.', key, key + strlen(key)); tokens.next();)
         keys.push_back(tokens.token);
 
-    const Cmd* cmdp;
-    for (Cmds::const_iterator it = cmds.begin(); it != cmds.end(); ++it)
-        if ((cmdp = *it) != 0 && cmdp->arg)
-        {
-            if (hpipe == 0 || hpipe->name.empty())
-            {
-                if (!cmdp->filtername.empty())
-                    continue;
-            }
-            else
-            {
-                if (cmdp->filtername.empty() || !(cmdp->filtername == hpipe->name))
-                    continue;
-            }
-            if (cmdp->left->size() - cmdp->xkeyword - 1 == keys.size())
-                if (compare(&cmdp->left->at(cmdp->xkeyword + 1), &keys.at(0), keys.size()))
-                    return cmdp->right.ptr;
-        }
+    const Cmd* cmdp = lookArg(hpipe, &keys[0], keys.size());
+    if (cmdp != 0)
+        return cmdp->right.ptr;
 
     return 0;
 }
@@ -1997,7 +1990,7 @@ void PMF::walk (Pipeline& pipeline, Pipeline::Alias* aliasp, Strs& fqname)
         //cout << "walk " << fqname << endl;;
 
         bool goon = (child.type != Pipeline::Alias::Child::DEFOFF);
-        Cmd* cmdp = lookArg(pipeline, fqname);
+        const Cmd* cmdp = lookArg(&pipeline, &fqname[0], fqname.size());
         if (cmdp != 0)
         {
             if (cmdp->right == "on")
@@ -2034,31 +2027,31 @@ void PMF::walk (Pipeline& pipeline, Pipeline::Alias* aliasp, Strs& fqname)
 }
 
 
-PMF::Cmd* PMF::lookArg (Pipeline& pipeline, Strs& fqname)
+const PMF::Cmd* PMF::lookArg (Pipeline* pipeline, const Str* fqname, size_t fqsize) const
 {
-    Cmd* cmdp = 0;
+    const Cmd* cmdp = 0;
     int sx = 0;
 
-    for (Cmds::iterator it = cmds.begin(); it != cmds.end(); ++it)
+    for (Cmds::const_iterator it = cmds.begin(); it != cmds.end(); ++it)
         if (*it != 0  && (*it)->arg)
         {
-            Cmd& cmd = **it;
+            const Cmd& cmd = **it;
 
-            if (pipeline.name.empty())
+            if (pipeline == 0 || pipeline->name.empty())
             {
                 if (!cmd.filtername.empty())
                     continue;
             }
             else
             {
-                if (!cmd.filtername.empty() && !(cmd.filtername == pipeline.name))
+                if (!cmd.filtername.empty() && !(cmd.filtername == pipeline->name))
                     continue;
             }
 
-            if (cmd.left->size() - cmd.xkeyword -1 != fqname.size())
+            if (cmd.left->size() - cmd.xkeyword -1 != fqsize)
                 continue;
 
-            if (!compare(&cmd.left->at(cmd.xkeyword+1), &fqname[0], fqname.size()))
+            if (!compare(&cmd.left->at(cmd.xkeyword+1), fqname, fqsize))
                 continue;
 
             int s = cmd.strength();
@@ -2125,7 +2118,7 @@ void  PMF::showHelp (std::ostream& os)
         (*it)->showHelp(os);
 }
 
- 
+
 void PMF::summTimes (SummTimes& summtimes)
 {
     Pipelines::iterator pptr = pipelines.begin(), 
@@ -2139,7 +2132,7 @@ void PMF::summTimes (SummTimes& summtimes)
     }
 }
 
- 
+
 //------ Pipeline implementation --------------------------------------------//
 
 
@@ -2250,7 +2243,7 @@ void PMF::Pipeline::Step::setup (MemoryManager& mm)
         const char* key   = c_str(cmd.left->at(cmd.left->size() - 1)); 
         const char* value = c_str(cmd.right);
         int strength = cmd.strength(cmd.left->size() - cmd.xkeyword - 1);
-        args->add(key, value, strength, !cmd.filtername.empty());
+        args->add(key, value, strength, &cmd);
     }
 
 //  all templates in scope for this step
@@ -2267,10 +2260,14 @@ void PMF::Pipeline::Step::setup (MemoryManager& mm)
         if (!(lt.filtername == pipeline->name))
             continue;
 
-        if (lt.pathp->size() > fqname->size())
+        const size_t pathsz = lt.pathp->size();
+
+        if (pathsz > fqname->size())
             continue;
 
-        if (lt.pathp->size() != 0 && !compare(&lt.pathp->at(0), &fqname->at(0), lt.pathp->size()))
+        if (pathsz == 1 && lt.pathp->at(0) == factory->getName())
+            ;
+        else if (pathsz != 0 && !compare(&lt.pathp->at(0), &fqname->at(0), lt.pathp->size()))
             continue;
 
         vector<LogTemplate*>::iterator it, end = acts.end();
@@ -2281,7 +2278,7 @@ void PMF::Pipeline::Step::setup (MemoryManager& mm)
         if (it == end)
             acts.push_back(&lt);
         else if (cmd_strength(false, !(*it)->filtername.empty(), (*it)->pathp->size()) 
-               < cmd_strength(false, !lt.filtername.empty(),     lt.pathp->size()))
+               < cmd_strength(false, !lt.filtername.empty(),     pathsz))
             *it = &lt;  // this definition is the strongest
     }
 

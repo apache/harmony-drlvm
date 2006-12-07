@@ -1905,7 +1905,7 @@ EscAnalyzer::scanCalleeMethod(Inst* call) {
         ci.setBCMapInfoRequired(false);
     }
     
-    CompilationContext inlineCC(irManager.getMemoryManager(), &ci, ci.getCompilationContext()->getCurrentJITContext());
+    CompilationContext inlineCC(irManager.getMemoryManager(), &ci, ci.getCompilationContext());
     inlineCC.setHIRManager(inlinedIRM);
     runTranslatorSession(inlineCC);
     

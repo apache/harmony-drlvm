@@ -33,10 +33,25 @@ namespace Jitrino {
 static TlsStack<CompilationContext> ccTls;
 
 CompilationContext::CompilationContext(MemoryManager& _mm, CompilationInterface* ci, JITInstanceContext* _jitContext) 
-: mm(_mm), compilationInterface(ci), compilationFailed(false), compilationFinished(false)
-, currentLogStreams(0), pipeline(0), stageId(0)
+: mm(_mm), compilationInterface(ci), jitContext(_jitContext)
 {
-    jitContext = _jitContext;
+    init();
+}
+
+CompilationContext::CompilationContext(MemoryManager& _mm, CompilationInterface* ci, const CompilationContext* cc) 
+: mm(_mm), compilationInterface(ci), jitContext(cc->getCurrentJITContext())
+{
+    init();
+    pipeline = cc->pipeline;
+}
+
+void CompilationContext::init()
+{
+    compilationFailed = compilationFinished = false;
+    currentLogStreams = 0;
+    pipeline = 0;
+    stageId = 0;
+
     hirm = NULL;
 #ifdef _IPF_
 #else 
@@ -56,7 +71,7 @@ CompilationContext::~CompilationContext() {
     ccTls.pop();
 #endif
 }
-    
+
 ProfilingInterface* CompilationContext::getProfilingInterface() const {
     return getCurrentJITContext()->getProfilingInterface();
 }
