@@ -15,11 +15,6 @@
  *  limitations under the License.
  */
 
-/** 
- * @author Artem Aliev
- * @version $Revision: 1.1.2.13 $
- */  
-
 /**
  * @file thread_native_fat_monitor.c
  * @brief Hythread fat monitors related functions
@@ -49,27 +44,26 @@
  */
 IDATA VMCALL hythread_monitor_init_with_name(hythread_monitor_t *mon_ptr, UDATA flags, char *name) {
     hythread_monitor_t mon;
-    apr_pool_t *pool = get_local_pool(); 
+    apr_pool_t *pool = get_local_pool();
     apr_status_t apr_status;
-        
-        mon = apr_pcalloc(pool, sizeof(HyThreadMonitor));
-        if(mon == NULL) {
-                return TM_ERROR_OUT_OF_MEMORY;
-        }
+
+    mon = apr_pcalloc(pool, sizeof(HyThreadMonitor));
+    if (mon == NULL) {
+        return TM_ERROR_OUT_OF_MEMORY;
+    }
     apr_status = apr_thread_mutex_create((apr_thread_mutex_t**)&(mon->mutex), TM_MUTEX_NESTED, pool);
-        if (apr_status != APR_SUCCESS) return CONVERT_ERROR(apr_status);
-        
+    if (apr_status != APR_SUCCESS) return CONVERT_ERROR(apr_status);
+
     apr_status = apr_thread_cond_create((apr_thread_cond_t**)&(mon->condition), pool);
+    if (apr_status != APR_SUCCESS) return CONVERT_ERROR(apr_status);
 
-        if (apr_status != APR_SUCCESS) return CONVERT_ERROR(apr_status);
-
-        mon->pool  = pool;
+    mon->pool  = pool;
     mon->flags = flags;
     mon->name  = name;
     mon->owner = 0;
     mon->notify_flag = 0;
 
-        *mon_ptr = mon;
+    *mon_ptr = mon;
     return TM_ERROR_NONE;
 }
 
@@ -93,12 +87,12 @@ IDATA VMCALL hythread_monitor_enter(hythread_monitor_t mon_ptr) {
         status = hymutex_lock(mon_ptr->mutex);
         mon_ptr->owner = self;
         assert(status == TM_ERROR_NONE);
-     } else {
+    } else {
         assert(mon_ptr->recursion_count >=0);
-            mon_ptr->recursion_count++;
+        mon_ptr->recursion_count++;
         status = TM_ERROR_NONE;
-     }
-     return status;
+    }
+    return status;
 }
 
 
@@ -114,19 +108,19 @@ IDATA VMCALL hythread_monitor_enter(hythread_monitor_t mon_ptr) {
  * @see hythread_monitor_try_enter_using_threadId
  *
  */
-IDATA VMCALL hythread_monitor_try_enter(hythread_monitor_t mon_ptr) {  
+IDATA VMCALL hythread_monitor_try_enter(hythread_monitor_t mon_ptr) {
     IDATA status;
     hythread_t self = tm_self_tls;
     if (mon_ptr->owner != self) {
-            status = hymutex_trylock(mon_ptr->mutex);
-        if(status == TM_ERROR_NONE) {
-             mon_ptr->owner = tm_self_tls;
+        status = hymutex_trylock(mon_ptr->mutex);
+        if (status == TM_ERROR_NONE) {
+            mon_ptr->owner = tm_self_tls;
         }
-            return status;
+        return status;
     } else {
-         assert(mon_ptr->recursion_count >=0);
-         mon_ptr->recursion_count++;
-         return TM_ERROR_NONE;
+        assert(mon_ptr->recursion_count >=0);
+        mon_ptr->recursion_count++;
+        return TM_ERROR_NONE;
     }
 }
 
@@ -143,12 +137,14 @@ IDATA VMCALL hythread_monitor_try_enter(hythread_monitor_t mon_ptr) {
 IDATA VMCALL hythread_monitor_exit(hythread_monitor_t mon_ptr) {
     IDATA status = TM_ERROR_NONE;
     assert(mon_ptr->recursion_count >= 0);
-    
-    if(mon_ptr->owner != tm_self_tls) {
-        TRACE(("exit TM_ERROR_ILLEGAL_STATE  owner: %d self: %d, rec: %d\n", mon_ptr->owner?mon_ptr->owner->thread_id:0, tm_self_tls->thread_id, mon_ptr->recursion_count));
+
+    if (mon_ptr->owner != tm_self_tls) {
+        TRACE(("exit TM_ERROR_ILLEGAL_STATE  owner: %d self: %d, rec: %d\n",
+                mon_ptr->owner ? mon_ptr->owner->thread_id : 0,
+                tm_self_tls->thread_id, mon_ptr->recursion_count));
         return TM_ERROR_ILLEGAL_STATE;
     }
-    if(mon_ptr->recursion_count == 0) {
+    if (mon_ptr->recursion_count == 0) {
         mon_ptr->owner = NULL;
         status = hymutex_unlock(mon_ptr->mutex);
     } else {
@@ -159,47 +155,25 @@ IDATA VMCALL hythread_monitor_exit(hythread_monitor_t mon_ptr) {
 }
 
 
-//Use this define to workaround poor condition variables implmentation.
-//If defined, local wait scheme implementation will be used;
-//#define NO_COND_VARS
 IDATA monitor_wait_impl(hythread_monitor_t mon_ptr, I_64 ms, IDATA nano, IDATA interruptable) {
-        IDATA status;
-        int saved_recursion;
-        //int saved_disable_count;
-        hythread_t self = tm_self_tls;
-    if(mon_ptr->owner != self ) {
+    IDATA status;
+    int saved_recursion;
+    //int saved_disable_count;
+    hythread_t self = tm_self_tls;
+    if (mon_ptr->owner != self) {
         return TM_ERROR_ILLEGAL_STATE;
     }
 
 #ifdef _DEBUG
-        mon_ptr->last_wait=tm_self_tls;
+    mon_ptr->last_wait=tm_self_tls;
 #endif
-    
-        saved_recursion = mon_ptr->recursion_count;
-        
-    assert(saved_recursion>=0);
-    
-    mon_ptr->owner = NULL;
-        mon_ptr->recursion_count =0;
-#ifdef NO_COND_VARS
-    assert(mon_ptr->owner != self);
-    status=hythread_monitor_exit(mon_ptr);
-        if (status != TM_ERROR_NONE) return status;
-    saved_disable_count = reset_suspend_disable();
-    ms = ms*1000;     
-    while(--ms != 0 &&  mon_ptr->notify_flag!=1) {
-        hythread_yield();
-    }
-    if (ms == 0) {
-        status = TM_ERROR_TIMEOUT;
-    } else {
-        status = TM_ERROR_NONE;
-    }
-    status=hythread_monitor_enter(mon_ptr);
-        if (status != TM_ERROR_NONE) return status;
-    set_suspend_disable(saved_disable_count);
 
-#else
+    saved_recursion = mon_ptr->recursion_count;
+
+    assert(saved_recursion>=0);
+
+    mon_ptr->owner = NULL;
+    mon_ptr->recursion_count =0;
     mon_ptr->wait_count++;
     hymutex_lock(self->mutex);
     self->current_condition = mon_ptr->condition;
@@ -240,17 +214,17 @@ IDATA monitor_wait_impl(hythread_monitor_t mon_ptr, I_64 ms, IDATA nano, IDATA i
     self->current_condition = NULL;
     hymutex_unlock(self->mutex);
     mon_ptr->wait_count--;
-#endif
-        if(self->suspend_request) {
-            hymutex_unlock(mon_ptr->mutex);
-            hythread_safe_point();
-            hymutex_lock(mon_ptr->mutex);
-        }
 
-        mon_ptr->recursion_count = saved_recursion;
-        mon_ptr->owner = self;
-        assert(mon_ptr->owner);
-        return status;
+    if (self->suspend_request) {
+        hymutex_unlock(mon_ptr->mutex);
+        hythread_safe_point();
+        hymutex_lock(mon_ptr->mutex);
+    }
+
+    mon_ptr->recursion_count = saved_recursion;
+    mon_ptr->owner = self;
+    assert(mon_ptr->owner);
+    return status;
 }
 
 /**
@@ -267,7 +241,7 @@ IDATA monitor_wait_impl(hythread_monitor_t mon_ptr, I_64 ms, IDATA nano, IDATA i
  *
  */
 IDATA VMCALL hythread_monitor_wait(hythread_monitor_t mon_ptr) {
-        return monitor_wait_impl(mon_ptr,0, 0, WAIT_NONINTERRUPTABLE); 
+    return monitor_wait_impl(mon_ptr,0, 0, WAIT_NONINTERRUPTABLE);
 }
 
 /**
@@ -288,7 +262,7 @@ IDATA VMCALL hythread_monitor_wait(hythread_monitor_t mon_ptr) {
  *
  */
 IDATA VMCALL hythread_monitor_wait_timed(hythread_monitor_t mon_ptr, I_64 ms, IDATA nano) {
-        return monitor_wait_impl(mon_ptr, ms, nano, WAIT_NONINTERRUPTABLE); 
+    return monitor_wait_impl(mon_ptr, ms, nano, WAIT_NONINTERRUPTABLE);
 }
 
 /**
@@ -312,7 +286,7 @@ IDATA VMCALL hythread_monitor_wait_timed(hythread_monitor_t mon_ptr, I_64 ms, ID
  * @see hythread_interrupt, hythread_priority_interrupt *
  */
 IDATA VMCALL hythread_monitor_wait_interruptable(hythread_monitor_t mon_ptr, I_64 ms, IDATA nano) {
-        return monitor_wait_impl(mon_ptr, ms, nano, WAIT_INTERRUPTABLE); 
+    return monitor_wait_impl(mon_ptr, ms, nano, WAIT_INTERRUPTABLE);
 }
 
 /**
@@ -341,17 +315,12 @@ UDATA VMCALL hythread_monitor_num_waiting(hythread_monitor_t mon_ptr) {
  *
  * @see hythread_monitor_notify, hythread_monitor_enter, hythread_monitor_wait
  */
-IDATA VMCALL hythread_monitor_notify_all(hythread_monitor_t mon_ptr) {      
-    if(mon_ptr->owner != tm_self_tls) {
+IDATA VMCALL hythread_monitor_notify_all(hythread_monitor_t mon_ptr) {
+    if (mon_ptr->owner != tm_self_tls) {
         return TM_ERROR_ILLEGAL_STATE;
     }
-#ifdef NO_COND_VARS
-        mon_ptr->notify_flag=1;
-        return TM_ERROR_NONE;
-#else
     mon_ptr->notify_flag = mon_ptr->wait_count;
     return hycond_notify_all(mon_ptr->condition);
-#endif
 }
 
 
@@ -368,18 +337,13 @@ IDATA VMCALL hythread_monitor_notify_all(hythread_monitor_t mon_ptr) {
  *
  * @see hythread_monitor_notify_all, hythread_monitor_enter, hythread_monitor_wait
  */
-IDATA VMCALL hythread_monitor_notify(hythread_monitor_t mon_ptr) {      
-    if(mon_ptr->owner != tm_self_tls) {
+IDATA VMCALL hythread_monitor_notify(hythread_monitor_t mon_ptr) {
+    if (mon_ptr->owner != tm_self_tls) {
         return TM_ERROR_ILLEGAL_STATE;
     }
-#ifdef NO_COND_VARS
-        mon_ptr->notify_flag=1;
-        return TM_ERROR_NONE;
-#else
     if (mon_ptr->notify_flag < mon_ptr->wait_count)
         mon_ptr->notify_flag += 1;
     return hycond_notify(mon_ptr->condition);
-#endif
 }
 
 
@@ -399,20 +363,20 @@ IDATA VMCALL hythread_monitor_notify(hythread_monitor_t mon_ptr) {
  */
 IDATA VMCALL hythread_monitor_destroy(hythread_monitor_t monitor) {
     apr_status_t apr_status;
-        apr_pool_t *pool = monitor->pool;
+    apr_pool_t *pool = monitor->pool;
     if (monitor->owner != NULL || monitor->wait_count > 0) {
         return TM_ERROR_ILLEGAL_STATE;
     }
-    
-    if(pool != get_local_pool()) {
+
+    if (pool != get_local_pool()) {
         return local_pool_cleanup_register(hythread_monitor_destroy, monitor);
     }
     apr_status=apr_thread_mutex_destroy((apr_thread_mutex_t*)monitor->mutex);
-        if (apr_status != APR_SUCCESS) return CONVERT_ERROR(apr_status);
+    if (apr_status != APR_SUCCESS) return CONVERT_ERROR(apr_status);
     apr_status=apr_thread_cond_destroy((apr_thread_cond_t*)monitor->condition);
-        if (apr_status != APR_SUCCESS) return CONVERT_ERROR(apr_status);
+    if (apr_status != APR_SUCCESS) return CONVERT_ERROR(apr_status);
     // apr_pool_free(pool, monitor);
-    return TM_ERROR_NONE;       
+    return TM_ERROR_NONE;
 }
 
 //@}
