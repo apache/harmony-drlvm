@@ -333,7 +333,7 @@ public class RuntimeTest extends TestCase {
         for (int ind2 = 0; ind2 < 1000; ind2++) {
             //assertSame("Runtime.maxMemory() must always return the same value!",
             //        r2, Runtime.getRuntime().maxMemory());
-			assertTrue( "FAILED: test_maxMemory: Runtime.maxMemory method should return same value each time!", r2==Runtime.getRuntime().maxMemory());
+            assertTrue( "FAILED: test_maxMemory: Runtime.maxMemory method should return same value each time!", r2==Runtime.getRuntime().maxMemory());
         }
     }
 
@@ -415,5 +415,33 @@ public class RuntimeTest extends TestCase {
         //System.out.println("test_exit");
         //Runtime.getRuntime().exit(777);
         //fail("what's wrong  ;) ?");
+    }
+
+    /**
+     * Regression test for HARMONY-690 
+     */
+    public void test_addShutdownHook() {
+        // Test for method long java.lang.Runtime.addShutdownHook()
+        boolean exception = false; 
+        try {
+            Runtime.getRuntime().addShutdownHook(null);
+        } catch (NullPointerException npe) {
+            exception = true;
+        }
+        assertTrue("NullPointerException expected!", exception);
+    }
+
+    /**
+     * Regression test for HARMONY-690 
+     */
+    public void test_removeShutdownHook() {
+        // Test for method long java.lang.Runtime.removeShutdownHook()
+        boolean exception = false; 
+        try {
+            Runtime.getRuntime().removeShutdownHook(null);
+        } catch (NullPointerException npe) {
+            exception = true;
+        }
+        assertTrue("NullPointerException expected!", exception);
     }
 }

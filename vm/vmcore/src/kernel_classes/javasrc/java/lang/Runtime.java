@@ -467,7 +467,11 @@ public class Runtime
         if (sm != null) {
             sm.checkPermission(RuntimePermissionCollection.SHUTDOWN_HOOKS_PERMISSION);
         }
-        if (hook == null || hook.getState() != Thread.State.NEW) {
+        // Check hook for null
+        if (hook == null)
+            throw new NullPointerException("null is not allowed here");
+                
+        if (hook.getState() != Thread.State.NEW) {
             throw new IllegalArgumentException();
         }
         if (VMState > 0) {
@@ -489,11 +493,15 @@ public class Runtime
         if (sm != null) {
             sm.checkPermission(RuntimePermissionCollection.SHUTDOWN_HOOKS_PERMISSION);
         }
+        // Check hook for null
+        if (hook == null)
+            throw new NullPointerException("null is not allowed here");
+                
         if (VMState > 0) {
             throw new IllegalStateException();
         }
         synchronized (hooksList) {
-            return hook == null ? false : hooksList.remove((Object) hook);
+            return hooksList.remove((Object) hook);
         }
     }
 
