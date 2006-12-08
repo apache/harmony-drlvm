@@ -67,6 +67,7 @@ IDATA VMCALL hythread_monitor_init_with_name(hythread_monitor_t *mon_ptr, UDATA 
     mon->flags = flags;
     mon->name  = name;
     mon->owner = 0;
+    mon->notify_flag = 0;
 
         *mon_ptr = mon;
     return TM_ERROR_NONE;
@@ -205,8 +206,35 @@ IDATA monitor_wait_impl(hythread_monitor_t mon_ptr, I_64 ms, IDATA nano, IDATA i
     self->state |= TM_THREAD_STATE_IN_MONITOR_WAIT;
     hymutex_unlock(self->mutex);
 
-    status =  condvar_wait_impl(mon_ptr->condition, mon_ptr->mutex, ms, nano, interruptable);
-
+    do {
+        apr_time_t start;
+        assert(0 <= mon_ptr->notify_flag && mon_ptr->notify_flag < mon_ptr->wait_count);
+        start = apr_time_now();
+        status = condvar_wait_impl(mon_ptr->condition, mon_ptr->mutex, ms, nano, interruptable);
+        if (status != TM_ERROR_NONE
+                || mon_ptr->notify_flag || hythread_interrupted(self))
+            break;
+        // we should not change ms and nano if both are 0 (meaning "no timeout")
+        if (ms || nano) {
+            apr_interval_time_t elapsed;
+            elapsed = apr_time_now() - start; // microseconds
+            nano -= (IDATA)((elapsed % 1000) * 1000);
+            if (nano < 0) {
+                ms -= elapsed/1000 + 1;
+                nano += 1000000;
+            } else {
+                ms -= elapsed/1000;
+            }
+            if (ms < 0) {
+                assert(status == TM_ERROR_NONE);
+                status = TM_ERROR_TIMEOUT;
+                break;
+            }
+            assert(0 <= nano && nano < 1000000);
+        }
+    } while (1);
+    if (mon_ptr->notify_flag)
+        mon_ptr->notify_flag -= 1;
     hymutex_lock(self->mutex);
     self->state &= ~TM_THREAD_STATE_IN_MONITOR_WAIT;
     self->current_condition = NULL;
@@ -321,7 +349,8 @@ IDATA VMCALL hythread_monitor_notify_all(hythread_monitor_t mon_ptr) {
         mon_ptr->notify_flag=1;
         return TM_ERROR_NONE;
 #else
-        return hycond_notify_all(mon_ptr->condition);   
+    mon_ptr->notify_flag = mon_ptr->wait_count;
+    return hycond_notify_all(mon_ptr->condition);
 #endif
 }
 
@@ -347,7 +376,9 @@ IDATA VMCALL hythread_monitor_notify(hythread_monitor_t mon_ptr) {
         mon_ptr->notify_flag=1;
         return TM_ERROR_NONE;
 #else
-        return hycond_notify(mon_ptr->condition);   
+    if (mon_ptr->notify_flag < mon_ptr->wait_count)
+        mon_ptr->notify_flag += 1;
+    return hycond_notify(mon_ptr->condition);
 #endif
 }
 
