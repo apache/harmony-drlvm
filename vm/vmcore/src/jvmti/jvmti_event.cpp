@@ -1937,11 +1937,18 @@ void jvmti_send_vm_death_event()
     
     if (ti->is_single_step_enabled())
     {
-        // Stop single step and remove all breakpoints if there were some
+        // Stop single step and remove all step breakpoints if there were some
         jvmtiError errorCode = ti->jvmti_single_step_stop();
         assert(JVMTI_ERROR_NONE == errorCode);
     }
     
+    // Remove all other breakpoints
+    for (ti_env = ti->getEnvironments(); ti_env; ti_env = ti_env->next)
+    {
+        if (ti_env->brpt_intf)
+            ti_env->brpt_intf->remove_all_reference();
+    }
+
     ti->nextPhase(JVMTI_PHASE_DEAD);
 }
 
