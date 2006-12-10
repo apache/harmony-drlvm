@@ -24,8 +24,6 @@ import java.util.ArrayList;
 
 /**
  * plain allocation workload.
- *
- * @keyword gc stress
  */
 public class MultiThreads extends Thread {
 

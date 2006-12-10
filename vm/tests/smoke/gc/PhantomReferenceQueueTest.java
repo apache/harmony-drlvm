@@ -25,9 +25,6 @@ import java.lang.ref.PhantomReference;
 import java.lang.ref.Reference;
 import java.lang.ref.ReferenceQueue;
 
-/**
- * @keyword XXX ref X_ipf_bug_6361
- */
 public class PhantomReferenceQueueTest {
 
     static boolean passed = false;

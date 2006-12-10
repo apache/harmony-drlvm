@@ -28,8 +28,6 @@ import java.util.ArrayList;
  * that allocate small objects. The purpose of this benchmark is to stress
  * module responsible for thread suspension. Threads should be suspended before gc starts its work.
  * That is the reason of long delays.
- *
- * @keyword perf threads
  */
 public class MultiThreadsSimple extends Thread {
 

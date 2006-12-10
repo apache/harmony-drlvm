@@ -22,8 +22,6 @@ package stress;
 
 /**
  * Tries to start at least 100 threads simultaneously.
- * 
- * @keyword stress
  */
 public class Threads extends Thread {
 

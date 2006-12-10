@@ -18,11 +18,6 @@
  * @author Alexei Fedotov, Salikh Zakirov
  * @version $Revision: 1.3.40.3 $
  */  
-/**
- * Excluded from acceptance test set.
- *
- * @keyword XXX
- */
 public class Hi {
     public static void main (String[] args) {
         System.out.println("Hi!");

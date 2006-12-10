@@ -22,9 +22,6 @@ package io;
 
 import java.io.*;
 
-/**
- * @keyword XXX_bug_6363
- */
 public class ArrayList {
     public static void main(String[] args) throws Exception {
         ByteArrayOutputStream baos = new ByteArrayOutputStream();

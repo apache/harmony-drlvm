@@ -20,9 +20,6 @@
  */  
 package stress;
 
-/**
- * @keyword slow
- */
 public class BigStringBuffer {
 
     synchronized boolean test(int ignore) {

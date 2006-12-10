@@ -25,7 +25,6 @@ import java.util.ArrayList;
 /**
  * Exercises the allocation from finalizer.
  *
- * @keyword X_Linux_bug_6084 X_Windows_bug_6475
  */
 public class FinAlloc {
 

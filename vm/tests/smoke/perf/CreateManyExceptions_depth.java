@@ -21,9 +21,6 @@
  
 package perf;
 
-/*
- * @keyword perf exc
- */
 public class CreateManyExceptions_depth{
 
     private final static int MAX_THROW = 100000; 

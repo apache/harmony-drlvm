@@ -28,7 +28,6 @@ import java.util.ArrayList;
  * because off "corner" sizes of allocated objects(30kb and 60kb). Set heap size 128Mb. 
  * Garbage is interleaved with small amount of live objects. Live objects are saved in massive.
  *
- * @keyword perf gc  
  */
 public class StressCornerSize_a {
     static class CornerObject {

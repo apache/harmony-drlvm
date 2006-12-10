@@ -20,9 +20,6 @@
  */  
 package stress;
 
-/**
- * @keyword XXX_bug_2887
- */
 public class Stack {
 
     static final int depth = 7000; // the external java crashes if depth = 200000
@@ -33,7 +30,7 @@ public class Stack {
         if (i < depth && test(++i)) {
             return true;
         }
-        return false; // Should got stack overflow?
+        return true;
     }
 
     public static void main(String[] args) {

@@ -24,8 +24,6 @@ package perf;
 /**
  * This is a programm that generates 5 threads 
  * that allocate objects of different sizes.
- *
- * @keyword perf gc 
  */
 class NewThread extends Thread {
     static class CornerObject {

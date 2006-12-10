@@ -25,11 +25,8 @@ import java.util.Random;
 /**
  * Measures the throughput and the pause times on
  * random object allocation.
- *
- * @keyword slow gc X_int_slow
- *
  * The test is very slow on interpreter and may take more than 5 minutes
- * to complete. X_int_slow prevents false alerts on 'make rel-check'.
+ * to complete.
  */
 public class Mark extends Thread {
 

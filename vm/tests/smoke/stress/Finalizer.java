@@ -21,9 +21,6 @@
 
 package stress;
 
-/**
- * @keyword slow X_int_bug_6695
- */
 public class Finalizer {
 
     static int create_count, finalize_count;

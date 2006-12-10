@@ -23,8 +23,6 @@ package classloader;
  * Test on class loader. It should throw ExceptionInInitializerError
  * and propagate it up the class loading chaing. Instead of it
  * on interpreter it throws NoClassDefFoundError.
- * @keyword XXX_bug_4071 X_ipf_bug_6095
- *
  */
 public class ExceptionInInitializerTest {
     public static void main(String[] args) {

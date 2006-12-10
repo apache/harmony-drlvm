@@ -24,9 +24,6 @@ package gc;
 import java.util.*;
 import java.lang.ref.*;
 
-/**
- * @keyword ref XXX_bug_6317
- */
 public class StressRef {
 
     static long ref_count;

@@ -22,10 +22,7 @@ package gc;
 
 /**
  * The test for Run Finilazers on exit for 3 types of object.
- *
- * @keyword X_jitrino_ipf_bug_6523
  */
-
 public class RunFinalizersOnExitTest {
 
     private static final int ALIVE_QUANTITY = 128;

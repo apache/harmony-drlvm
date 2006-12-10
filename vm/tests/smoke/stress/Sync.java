@@ -21,9 +21,6 @@
 
 package stress;
 
-/**
- * @keyword stress
- */
 public class Sync extends Thread {
 
     final static int number_of_threads = 200;

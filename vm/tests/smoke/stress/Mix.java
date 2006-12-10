@@ -24,9 +24,6 @@ package stress;
 import java.io.*;
 import java.util.*;
 
-/**
- * @keyword stress X_pure_bug_6103
- */
 public class Mix extends Thread {
 
     static Object sync;

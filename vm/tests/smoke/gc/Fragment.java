@@ -24,8 +24,6 @@ package gc;
  * Fragment the heap with large allocations interspersed
  * with medium-size allocation and then check if larger
  * allocation works.
- *
- * @keyword gc XXX_not_implemented_feature
  */
 public class Fragment {
 

@@ -20,9 +20,6 @@
  */  
 package gc;
 
-/**
- * @keyword  XXX
- */
 public class Finalizer {
 
     static volatile boolean passed = false;

@@ -22,7 +22,6 @@ package outofmemory;
 
 /**
  * Out of memory tests have no dependecy on class library.
- * @keyword slow
  */
 public class Ref {
     public static final int N = 10;

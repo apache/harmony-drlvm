@@ -22,7 +22,6 @@ package classloader;
 /**
  * @tested class: java.lang.Class
  * @tested method: getDeclaringClass
- * @keyword XXX_bug_4071
  */
 public class ClassTestGetDeclaringClass {
     

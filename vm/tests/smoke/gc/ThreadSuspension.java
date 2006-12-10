@@ -25,8 +25,6 @@ package gc;
  *
  * VM currently is not able to suspend thread which is running
  * a computation loop.
- *
- * @keyword XXX
  */
 public class ThreadSuspension implements Runnable {
 

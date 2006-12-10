@@ -18,11 +18,6 @@
  * @author Salikh Zakirov
  * @version $Revision: 1.4.12.2.4.4 $
  */  
-/**
- * Excluded from acceptance test set on Windows.
- *
- * @keyword X_Windows_bug
- */
 package gc;
 
 import java.util.ArrayList;

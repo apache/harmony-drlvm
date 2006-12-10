@@ -18,13 +18,10 @@
  * @author Alexei Fedotov
  * @version $Revision: 1.4.8.1.4.3 $
  */
+
 package io;
 
 import java.io.*;
-
-/**
- * @keyword XXX_bug_2509
- */
 import java.util.*;
 
 class Spaghetti implements Serializable {
@@ -36,19 +33,13 @@ class Spaghetti implements Serializable {
     }
 }
 
-
 public class Integers {
     private static final int SPAGHETTI_NUM = 1000;
     private static final Random rnd = new Random();
-    
 
     public static void main(String[] args) throws Exception {
-       if("-out".equals(args[0])) {
-          ObjectOutputStream oos = new ObjectOutputStream(new FileOutputStream
-(args[1]));
-
-
-
+        ByteArrayOutputStream baos = new ByteArrayOutputStream();
+        ObjectOutputStream oos = new ObjectOutputStream(baos);
         Spaghetti[] sa = new Spaghetti[SPAGHETTI_NUM];
 
         //fill array with empty objects
@@ -63,17 +54,11 @@ public class Integers {
         }
 
         oos.writeObject(sa);
-
-
         oos.close();
-       } 
-       if("-in".equals(args[0])) {
-          ObjectInputStream ois = new ObjectInputStream(new FileInputStream(args
-[1]));
-          ois.readObject();
-          ois.close();
-       } 
-       System.out.println("PASSED");
+        ObjectInputStream ois = new ObjectInputStream(new ByteArrayInputStream(baos.toByteArray()));
+        ois.readObject();
+        ois.close();
+        System.out.println("PASSED");
     }
 }
 

@@ -24,8 +24,6 @@ package perf;
  * This test should stress gc_v4 (mark-compact) algorithm
  * because off "corner" size of allocated objects (64kb). Set heap size 128Mb. 
  * Garbage is interleaved with live objects.
- *
- * @keyword perf gc
  */
 public class StressCornerSize {
 
