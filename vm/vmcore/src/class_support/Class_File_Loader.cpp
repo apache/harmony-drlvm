@@ -2694,7 +2694,7 @@ bool Class::parse(Global_Env* env,
         return false;
     }
     //not only ACC_FINAL flag is prohibited if is_interface, also ACC_SUPER, ACC_SYNTHETIC, ACC_ENUM.
-    if(is_interface() && (is_super() || is_synthetic() || is_enum()))
+    if(is_interface() && (is_synthetic() || is_enum()))
     {
         REPORT_FAILED_CLASS_FORMAT(this,
         "if class is interface, no flags except ACC_ABSTRACT or ACC_PUBLIC can be set");
