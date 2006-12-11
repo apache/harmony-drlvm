@@ -26,6 +26,9 @@ namespace Ia32 {
 
 bool OpndUtils::isReg(const Opnd* op, RegName what)
 {
+    if (!op->hasAssignedPhysicalLocation()) {
+        return false;
+    }
     if (!op->isPlacedIn(OpndKind_Reg)) {
         return false;
     }
@@ -243,6 +246,16 @@ void InstUtils::replaceInst(Inst* toBeReplaced, Inst* brandNewInst)
     BasicBlock* bb = toBeReplaced->getBasicBlock();
     bb->appendInst(brandNewInst, toBeReplaced);
     removeInst(toBeReplaced);
+}
+
+void InstUtils::replaceOpnd(Inst* inst, unsigned index, Opnd* newOpnd)
+{
+    Opnd* oldOpnd = inst->getOpnd(index);
+    // to be *replaced*, an operand must exist first
+    assert(oldOpnd != NULL);
+    if (oldOpnd != newOpnd) {
+        inst->replaceOpnd(oldOpnd, newOpnd);
+    }
 }
 
 
