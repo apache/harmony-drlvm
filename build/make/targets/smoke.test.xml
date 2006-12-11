@@ -50,7 +50,7 @@ Version: $Revision: 1.4.2.11 $
         <mkdir dir="${build.dir}/_smoke.tests/reports" />
         <path id="java.class.path">
             <pathelement location="${build.dir}/_smoke.tests/classes" />
-            <fileset dir="${build.deploy.dir}/lib" includes="*.jar" />
+            <fileset dir="${build.deploy.dir}/jdk/jre/lib" includes="*.jar" />
         </path>
         <select arch="ia32,em64t">
         <antcall target="java_test_smoke_with_jit_or_interpreter">
@@ -139,22 +139,22 @@ ${foo}
                                 <equals arg1="${int.or.jit.arg}" arg2="" />
                             </not>
                             <then>
-                                <java newenvironment="yes" output="${build.dir}/_smoke.tests/reports/${class.name}_${jit.or.interpreter}.out" classname="${class.name}" fork="true" jvm="${build.deploy.dir}/bin/java${executable.postfix}" error="${build.dir}/_smoke.tests/reports/${class.name}_${jit.or.interpreter}.out.err">
+                                <java newenvironment="yes" output="${build.dir}/_smoke.tests/reports/${class.name}_${jit.or.interpreter}.out" classname="${class.name}" fork="true" jvm="${build.deploy.dir}/jdk/jre/bin/java${executable.postfix}" error="${build.dir}/_smoke.tests/reports/${class.name}_${jit.or.interpreter}.out.err">
                                     <jvmarg value="-Dvm.assert_dialog=0" />
                                     <jvmarg value="${int.or.jit.arg}" />
                                     <jvmarg value="-classpath" />
                                     <jvmarg value="${build.dir}/_smoke.tests/classes" />
-                                    <env key="JAVA_HOME" value="${build.deploy.dir}" />
-                                    <env key="LD_LIBRARY_PATH" value="${build.deploy.dir}/bin:${env.LD_LIBRARY_PATH}" />
+                                    <env key="JAVA_HOME" value="${build.deploy.dir}/jdk/jre" />
+                                    <env key="LD_LIBRARY_PATH" value="${build.deploy.dir}/jdk/jre/bin:${env.LD_LIBRARY_PATH}" />
                                 </java>
                             </then>
                             <else>
-                                <java newenvironment="yes" output="${build.dir}/_smoke.tests/reports/${class.name}_${jit.or.interpreter}.out" classname="${class.name}" fork="true" jvm="${build.deploy.dir}/bin/java${executable.postfix}" error="${build.dir}/_smoke.tests/reports/${class.name}_${jit.or.interpreter}.out.err">
+                                <java newenvironment="yes" output="${build.dir}/_smoke.tests/reports/${class.name}_${jit.or.interpreter}.out" classname="${class.name}" fork="true" jvm="${build.deploy.dir}/jdk/jre/bin/java${executable.postfix}" error="${build.dir}/_smoke.tests/reports/${class.name}_${jit.or.interpreter}.out.err">
                                     <jvmarg value="-Dvm.assert_dialog=0" />
                                     <jvmarg value="-classpath" />
                                     <jvmarg value="${build.dir}/_smoke.tests/classes" />
-                                    <env key="JAVA_HOME" value="${build.deploy.dir}" />
-                                    <env key="LD_LIBRARY_PATH" value="${build.deploy.dir}/bin:${env.LD_LIBRARY_PATH}" />
+                                    <env key="JAVA_HOME" value="${build.deploy.dir}/jdk/jre" />
+                                    <env key="LD_LIBRARY_PATH" value="${build.deploy.dir}/jdk/jre/bin:${env.LD_LIBRARY_PATH}" />
                                 </java>
                             </else>
                         </if>

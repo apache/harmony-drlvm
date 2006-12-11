@@ -73,7 +73,7 @@ Description of the product deploy folder.
 
 
     <extra>
-        <eclipse_script>
+<!--        <eclipse_script>
             <select os="win">
                 <other>bin/default:eclipse.bat</other>
             </select>
@@ -82,6 +82,7 @@ Description of the product deploy folder.
                 <other>bin/default:eclipse.sh</other>
             </select>
         </eclipse_script>
+-->
         <select os="win">
             <zlib>
                 <shared>bin/default:zlib1</shared>

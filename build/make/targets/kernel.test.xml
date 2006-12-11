@@ -22,7 +22,7 @@
     <property name="test.resource.path" location="${kernel.test.dir}/resources"/>
     <property name="test.class.path" location="${kernel.test.dir}/classes"/>
     
-    <property name="test.jvm.exe" value="${build.deploy.dir}/bin/java"/>
+    <property name="test.jvm.exe" value="${build.deploy.dir}/jdk/jre/bin/java"/>
     <property file="test.properties"/>
 
     <!-- no longer used - leaving here temporarily to be sure people like the change

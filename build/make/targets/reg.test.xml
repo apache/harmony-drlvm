@@ -124,7 +124,7 @@
                     link="shared"
                     outfile="${reg.test.native.path}/${outname}"
                     objdir="${reg.test.native.path}/_obj">
-                    <includepath path="${build.deploy.dir}/include" />
+                    <includepath path="${build.deploy.dir}jdk/jre/include" />
                     <select os="lnx">
                         <linkerarg value="-lstdc++" />
                     </select>

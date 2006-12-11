@@ -30,13 +30,13 @@ Version: $Revision: 1.4.2.4 $
                     <patternset refid="unit.test.java.pattern" />
                     <bootclasspath>
                         <path id="java.classpath">
-                            <pathelement location="${build.deploy.dir}/lib"/>
+                            <pathelement location="${build.deploy.dir}/jdk/jre/lib"/>
                         </path>
                     </bootclasspath>
                 </javac>
                 <mkdir dir="${build.dir}/_unit.tests/report" />
                 <junit printsummary="true" haltonfailure="no"
-                       fork="yes" forkmode="once" jvm="${build.deploy.dir}/bin/java.exe" failureproperty="some.unit.test.is.failed">
+                       fork="yes" forkmode="once" jvm="${build.deploy.dir}/jdk/jre/bin/java.exe" failureproperty="some.unit.test.is.failed">
                     <jvmarg value="-Xbootclasspath/p:${build.dir}/_unit.tests/classes;${build.junit.jar}" />
                     <formatter type="plain" usefile="true" />
                     <batchtest todir="${build.dir}/_unit.tests/report">

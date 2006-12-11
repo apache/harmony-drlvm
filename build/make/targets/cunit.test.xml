@@ -162,14 +162,14 @@ Version: $Revision$
                               executable="${unit.test.c.workdir}/_bin/${filename}${extention}"
                               resultproperty="resultproperty"
                               outputproperty="outputproperty">
-                    <arg value="-Dorg.apache.harmony.vm.vmdir=${build.deploy.dir}/bin/default"/>
-                    <arg value="-Djava.home=${build.deploy.dir}"/>
-                    <env key="JAVA_HOME" value="${build.deploy.dir}" />
+                    <arg value="-Dorg.apache.harmony.vm.vmdir=${build.deploy.dir}/jdk/jre/bin/default"/>
+                    <arg value="-Djava.home=${build.deploy.dir}/jdk/jre"/>
+                    <env key="JAVA_HOME" value="${build.deploy.dir}/jdk/jre" />
                     <select os="win">
-                        <env key="Path" path="${build.deploy.dir}/bin/:${build.deploy.dir}/bin/default:${env.Path}" />
+                        <env key="Path" path="${build.deploy.dir}/jdk/jre/bin/:${build.deploy.dir}/jdk/jre/bin/default:${env.Path}" />
                     </select>
                     <select os="lnx">
-                        <env key="LD_LIBRARY_PATH" path="${build.deploy.dir}/bin/:${build.deploy.dir}/bin/default" />
+                        <env key="LD_LIBRARY_PATH" path="${build.deploy.dir}/jdk/jre/bin/:${build.deploy.dir}/jdk/jre/bin/default" />
                     </select>
                 </exec>
                 <echo file="${unit.test.c.workdir}/report/${filename}.out"

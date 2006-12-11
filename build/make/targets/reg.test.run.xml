@@ -17,8 +17,7 @@
 
 <project name="REGRESSION TESTS RUN">
     <property name="reg.test.timeout" value="180000" />
-    <!-- property name="jvm.under.test" value="C:/ws/JRockit-1.5.0/bin/java.exe"/--> 
-    <property name="jvm.under.test" value="${build.deploy.dir}/bin/java"/>
+    <property name="jvm.under.test" value="${build.deploy.dir}/jdk/jre/bin/java"/>
 
     <target name="run-reg-tests">
         <echo>
