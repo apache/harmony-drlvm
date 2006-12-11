@@ -791,6 +791,12 @@ jint vm_init2(JNIEnv * jni_env) {
     } else {
         vm_env->finalizer_thread = NULL;
     }
+    if(vm_env->TI->isEnabled() && vm_env->TI->needCreateEventThread() ) {
+        vm_env->TI->TIenvs_lock._lock();
+        jvmti_create_event_thread();
+        vm_env->TI->disableEventThreadCreation();
+        vm_env->TI->TIenvs_lock._unlock();
+    }
 
     TRACE("initialization of system classes completed");
 

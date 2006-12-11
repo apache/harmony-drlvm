@@ -181,10 +181,11 @@ static inline void dump_all_java_stacks()
 }
 
 void quit_handler(int UNREF x) {
+    jvmti_notify_data_dump_request();
     if (interpreter_enabled()) {
-            dump_all_java_stacks();
+        dump_all_java_stacks();
     } else {
-            td_dump_all_threads(stderr); 
+        td_dump_all_threads(stderr);
     }
 }
 

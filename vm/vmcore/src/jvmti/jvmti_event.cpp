@@ -164,6 +164,22 @@ jboolean event_enabled(jvmtiEvent event_type) {
     return false;
 }
 
+static inline bool
+check_event_is_disable( jvmtiEvent event_type,
+                        DebugUtilsTI *ti)
+{
+    for (TIEnv *ti_env = ti->getEnvironments(); ti_env;
+         ti_env = ti_env->next)
+    {
+        if (ti_env->global_events[event_type - JVMTI_MIN_EVENT_TYPE_VAL]
+            || ti_env->event_threads[event_type - JVMTI_MIN_EVENT_TYPE_VAL])
+        {
+            return false;
+        }
+    }
+    return true;
+}
+
 /*
  * Set Event Notification Mode
  *
@@ -308,6 +324,7 @@ jvmtiSetEventNotificationMode(jvmtiEnv* env,
     else
         return JVMTI_ERROR_ILLEGAL_ARGUMENT;
 
+    DebugUtilsTI *ti = ((TIEnv *)env)->vm->vm_env->TI;
     if (event_enabled(event_type) != (jboolean)old_state) {
         if (interpreter_enabled())
             interpreter.interpreter_ti_set_notification_mode(event_type, !old_state);
@@ -315,8 +332,6 @@ jvmtiSetEventNotificationMode(jvmtiEnv* env,
         {
             if (JVMTI_EVENT_SINGLE_STEP == event_type)
             {
-                DebugUtilsTI *ti = ((TIEnv *)env)->vm->vm_env->TI;
-
                 if (JVMTI_ENABLE == mode && !ti->is_single_step_enabled())
                 {
                     TRACE2("jvmti.break.ss", "SingleStep event is enabled");
@@ -329,32 +344,29 @@ jvmtiSetEventNotificationMode(jvmtiEnv* env,
                 {
                     // Check that no environment has SingleStep enabled
                     LMAutoUnlock lock(&ti->TIenvs_lock);
-                    bool disable = true;
                     TRACE2("jvmti.break.ss",
                         "SingleStep event is disabled locally for env: "
                         << env);
-
-                    for (TIEnv *ti_env = ti->getEnvironments(); ti_env;
-                         ti_env = ti_env->next)
-                    {
-                        if (ti_env->global_events[JVMTI_EVENT_SINGLE_STEP -
-                                JVMTI_MIN_EVENT_TYPE_VAL] ||
-                            NULL != ti_env->event_threads[JVMTI_EVENT_SINGLE_STEP -
-                                JVMTI_MIN_EVENT_TYPE_VAL])
-                        {
-                            disable = false;
-                            break;
-                        }
-                    }
-
-                    if (disable)
-                    {
+                    bool disable = check_event_is_disable(JVMTI_EVENT_SINGLE_STEP, ti);
+                    if (disable) {
                         TRACE2("jvmti.break.ss", "SingleStep event is disabled");
                         jvmtiError errorCode = ti->jvmti_single_step_stop();
-
                         if (JVMTI_ERROR_NONE != errorCode)
                             return errorCode;
                     }
+                }
+            }
+        }
+        if( JVMTI_EVENT_DATA_DUMP_REQUEST == event_type ) {
+            if(JVMTI_ENABLE == mode) {
+                LMAutoUnlock lock(&ti->TIenvs_lock);
+                jvmti_create_event_thread();
+            } else {
+                LMAutoUnlock lock(&ti->TIenvs_lock);
+                bool disable =
+                    check_event_is_disable(JVMTI_EVENT_DATA_DUMP_REQUEST, ti);
+                if (disable) {
+                    jvmti_destroy_event_thread();
                 }
             }
         }
@@ -2014,4 +2026,162 @@ void jvmti_send_gc_finish_event()
         }
         ti_env = next_env;
     }
+}
+
+static void
+jvmti_process_data_dump_request()
+{
+    assert(hythread_is_suspend_enabled());
+    DebugUtilsTI *ti = VM_Global_State::loader_env->TI;
+    if( !ti->isEnabled() ) {
+        return;
+    }
+
+    //Checking current phase
+    jvmtiPhase phase = ti->getPhase();
+    if( ti->getPhase() != JVMTI_PHASE_LIVE ) {
+        return;
+    }
+    hythread_t thread = hythread_self();
+
+    TIEnv* next_env;
+    for (TIEnv* env = ti->getEnvironments(); env; env = next_env) {
+        next_env = env->next;
+
+        jvmtiEventDataDumpRequest callback = env->event_table.DataDumpRequest;
+
+        if( NULL == callback ) {
+            continue;
+        }
+
+        if( env->global_events[JVMTI_EVENT_DATA_DUMP_REQUEST
+                               - JVMTI_MIN_EVENT_TYPE_VAL] )
+        {
+            TRACE2("jvmti.event", "Calling global DataDumpRequest event");
+            callback((jvmtiEnv*)env);
+            continue;
+        }
+
+        TIEventThread *first_et =
+            env->event_threads[JVMTI_EVENT_DATA_DUMP_REQUEST - JVMTI_MIN_EVENT_TYPE_VAL];
+        for( TIEventThread *et = first_et; NULL != et; et = et->next )
+        {
+            if( et->thread == thread ) {
+                TRACE2("jvmti.event", "Calling local DataDumpRequest event");
+                callback((jvmtiEnv*)env);
+            }
+        }
+    }
+}
+
+static int VMCALL
+jvmti_event_thread_function(void *args)
+{
+    DebugUtilsTI *ti = VM_Global_State::loader_env->TI;
+    JNIEnv* jni_env = (JNIEnv*)args;
+    JavaVM* java_vm;
+    jni_env->GetJavaVM(&java_vm);
+
+    // attaching native thread to VM
+    JavaVMAttachArgs vm_args = {JNI_VERSION_1_2, "TIEventThread", NULL};
+    int status = AttachCurrentThreadAsDaemon(java_vm, (void**)&jni_env, &vm_args);
+    if(status != JNI_OK) {
+        DIE("jvmti_event_thread_function: cannot attach current thread");
+    }
+
+    assert(hythread_is_suspend_enabled());
+
+    // create wait loop environment
+    hymutex_t event_mutex;
+    UNREF IDATA stat = hymutex_create(&event_mutex, TM_MUTEX_NESTED);
+    assert(stat == TM_ERROR_NONE);
+    hycond_t event_cond;
+    stat = hycond_create(&event_cond);
+    assert(stat == TM_ERROR_NONE);
+    ti->event_cond = event_cond;
+
+    // event thread loop
+    while(true) {
+        hymutex_lock(event_mutex);
+        hycond_wait(event_cond, event_mutex);
+        hymutex_unlock(event_mutex);
+
+        if(!ti->event_thread) {
+            // event thread is NULL,
+            // it's time to terminate the current thread
+            break;
+        }
+
+        // process data dump request
+        jvmti_process_data_dump_request();
+    }
+
+    // release wait loop environment
+    stat = hymutex_destroy(event_mutex);
+    assert(stat == TM_ERROR_NONE);
+    stat = hycond_destroy(event_cond);
+    assert(stat == TM_ERROR_NONE);
+
+    return 0;
+}
+
+void
+jvmti_create_event_thread()
+{
+    // IMPORTANT: The function is called under TIenvs_lock
+    DebugUtilsTI *ti = VM_Global_State::loader_env->TI;
+    if(ti->event_thread) {
+        // event thread is already created
+        return;
+    }
+
+    if(ti->getPhase() < JVMTI_PHASE_LIVE) {
+        ti->enableEventThreadCreation();
+        return;
+    }
+
+    // create TI event thread
+    JNIEnv *jni_env = p_TLS_vmthread->jni_env;
+    IDATA status = hythread_create(&ti->event_thread, 0, 0, 0,
+        jvmti_event_thread_function, jni_env);
+    if( status != TM_ERROR_NONE ) {
+        DIE("jvmti_create_event_thread: creating thread is failed!");
+    }
+    return;
+}
+
+void
+jvmti_destroy_event_thread()
+{
+    // IMPORTANT: The function is called under TIenvs_lock
+    DebugUtilsTI *ti = VM_Global_State::loader_env->TI;
+    if(!ti->event_thread) {
+        // event thread is already destroyed
+        return;
+    }
+
+    // getting condition
+    hycond_t event_cond = ti->event_cond;
+    ti->event_thread = NULL;
+    ti->event_cond = NULL;
+
+    // notify event thread
+    assert(event_cond);
+    UNREF IDATA stat = hycond_notify(event_cond);
+    assert(stat == TM_ERROR_NONE);
+    return;
+}
+
+void
+jvmti_notify_data_dump_request()
+{
+    DebugUtilsTI *ti = VM_Global_State::loader_env->TI;
+    if( !ti->event_thread || !ti->event_cond ) {
+        // nothing to do
+        return;
+    }
+    assert(ti->event_cond);
+    UNREF IDATA stat = hycond_notify(ti->event_cond);
+    assert(stat == TM_ERROR_NONE);
+    return;
 }

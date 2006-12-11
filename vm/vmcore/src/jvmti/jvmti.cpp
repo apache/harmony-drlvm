@@ -308,10 +308,13 @@ void DebugUtilsTI::setExecutionMode(Global_Env *p_env)
 }
 
 DebugUtilsTI::DebugUtilsTI() :
+    event_thread(NULL),
+    event_cond(NULL),
     agent_counter(1),
     access_watch_list(NULL),
     modification_watch_list(NULL),
     status(false),
+    need_create_event_thread(false),
     agents(NULL),
     p_TIenvs(NULL),
     MAX_NOTIFY_LIST(1000),
@@ -339,6 +342,7 @@ DebugUtilsTI::~DebugUtilsTI()
     ReleaseNotifyLists();
     hythread_tls_free(TL_ti_enabled);
     delete vm_brpt;
+    jvmti_destroy_event_thread();
     return;
 }
 
@@ -731,6 +735,20 @@ void DebugUtilsTI::setEnabled() {
 
 void DebugUtilsTI::setDisabled() {
     this->status = false;
+    return;
+}
+
+bool DebugUtilsTI::needCreateEventThread() {
+    return need_create_event_thread;
+}
+
+void DebugUtilsTI::enableEventThreadCreation() {
+    need_create_event_thread = true;
+    return;
+}
+
+void DebugUtilsTI::disableEventThreadCreation() {
+    need_create_event_thread = false;
     return;
 }
 

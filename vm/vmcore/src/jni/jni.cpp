@@ -1519,11 +1519,13 @@ static jint attach_current_thread(JavaVM * java_vm, void ** p_jni_env, void * ar
     assert(jthread_self() != NULL);
 
     // Now JVMTIThread keeps global reference. Discared temporary global reference.
-   jni_env->DeleteGlobalRef(java_thread);
+    jni_env->DeleteGlobalRef(java_thread);
 
     // Send thread start event.
     // TODO: Thread start event should be sent before its initial method executes.
-    jvmti_send_thread_start_end_event(1);
+    // 20061207: psrebriy: ThreadStart event is already started in
+    //                     jthread_attach function
+    // jvmti_send_thread_start_end_event(1);
 
     return status == TM_ERROR_NONE ? JNI_OK : JNI_ERR;
 }

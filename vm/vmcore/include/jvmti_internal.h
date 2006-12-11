@@ -149,9 +149,12 @@ class DebugUtilsTI {
     public:
         jint agent_counter;
         Lock_Manager TIenvs_lock;
-        Lock_Manager dcList_lock;
         VMBreakPoints* vm_brpt;
         hythread_tls_key_t TL_ti_enabled; //thread local TI flag
+
+        // TI event thread data
+        hythread_t event_thread;
+        hycond_t event_cond;
 
         DebugUtilsTI();
 
@@ -166,6 +169,10 @@ class DebugUtilsTI {
         bool isEnabled();
         void setEnabled();
         void setDisabled();
+
+        bool needCreateEventThread();
+        void enableEventThreadCreation();
+        void disableEventThreadCreation();
 
         bool isLocallyEnabled();
         void setLocallyEnabled();
@@ -327,6 +334,7 @@ class DebugUtilsTI {
         Watch *access_watch_list;
         Watch *modification_watch_list;
         bool status;
+        bool need_create_event_thread;
         Agent* agents;
         TIEnv* p_TIenvs;
         jvmtiPhase phase;

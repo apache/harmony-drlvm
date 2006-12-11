@@ -35,7 +35,7 @@
 #include "exception_filter.h"
 
 BOOL ctrl_handler(DWORD ctrlType) 
-{ 
+{
     switch (ctrlType) 
     { 
     case CTRL_BREAK_EVENT:

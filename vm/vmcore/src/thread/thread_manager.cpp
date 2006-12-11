@@ -149,6 +149,7 @@ void set_TLS_data(VM_thread *thread) {
 }
 
 IDATA jthread_throw_exception(char* name, char* message) {
+    assert(hythread_is_suspend_enabled());
     jobject jthe = exn_create(name);
     return jthread_throw_exception_object(jthe);
 }

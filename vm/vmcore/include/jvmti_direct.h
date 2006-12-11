@@ -132,6 +132,9 @@ bool jvmti_jit_breakpoint_handler(Registers *regs);
 VMEXPORT void jvmti_process_native_method_bind_event(jmethodID method, 
     NativeCodePtr address, NativeCodePtr* new_address_ptr);
 void jvmti_clean_reclaimed_object_tags();
+void jvmti_create_event_thread();
+void jvmti_destroy_event_thread();
+void jvmti_notify_data_dump_request();
 
 #ifdef __cplusplus
 }
