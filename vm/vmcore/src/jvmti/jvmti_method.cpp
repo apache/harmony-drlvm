@@ -236,7 +236,7 @@ jvmtiGetArgumentsSize(jvmtiEnv* env,
     if( !method ) return JVMTI_ERROR_NULL_POINTER;
     if( !size_ptr ) return JVMTI_ERROR_NULL_POINTER;
 
-    *size_ptr = reinterpret_cast<Method*>(method)->get_num_arg_bytes() / 4;
+    *size_ptr = reinterpret_cast<Method*>(method)->get_num_arg_slots();
 
     return JVMTI_ERROR_NONE;
 }

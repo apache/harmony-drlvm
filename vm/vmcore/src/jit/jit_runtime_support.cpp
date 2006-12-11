@@ -2093,7 +2093,7 @@ class_alloc_new_object_and_run_constructor(Class* clss,
     }
 
     // Every argument is at least 4 bytes long
-    int num_args_estimate = constructor->get_num_arg_bytes() / 4;
+    int num_args_estimate = constructor->get_num_arg_slots();
     jvalue* args = (jvalue*)STD_MALLOC(num_args_estimate * sizeof(jvalue));
     args[0].l = (jobject)obj;
 

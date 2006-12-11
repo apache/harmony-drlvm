@@ -225,7 +225,9 @@ public:
      * @return <code>true</code> if the index is a valid one in the constant
      *         pool; otherwise <code>false</code>.*/
     bool is_valid_index(uint16 index) const {
-        return /*index > 0 && */index < m_size;
+        // index is valid if it's greater than zero and less than m_size
+        // See specification 4.2 about constant_pool_count
+        return index != 0 && index < m_size;
     }
 
     /** Checks whether the constant-pool entry is resolved.
@@ -632,7 +634,7 @@ public:
      * @param[in] clss - the class that the given constant pool belongs to
      * @return <code>true</code> if the constant pool of clss is valid;
      *         otherwise <code>false</code>.*/
-    bool check(Class* clss);
+    bool check(Global_Env *, Class* clss);
 
     /** Clears the constant-pool content: tags and entries arrays.*/
     void clear() {
@@ -1435,6 +1437,12 @@ public:
      * flag is set.
      * @return <code>true</code> if the class is enum.*/
     bool is_enum() const { return (m_access_flags & ACC_ENUM) != 0; }
+
+    /** Checks whether the class has the <code>ACC_SYNTHETIC</code> flag set.
+     * @return <code>true</code> if the class has the <code>ACC_SYNTHETIC</code> 
+     *         access flag set.*/
+
+    bool is_synthetic() const { return (m_access_flags & ACC_SYNTHETIC) != 0; }
     
     /** Checks whether the class is an annotation.
      * @return <code>true</code> if the class is an annotation.*/

@@ -3271,7 +3271,7 @@ interpreterInvokeStatic(StackFrame& prevFrame, Method *method) {
     // Setup locals and stack on C stack.
     SETUP_LOCALS_AND_STACK(frame, method);
 
-    int args = method->get_num_arg_bytes() >> 2;
+    int args = method->get_num_arg_slots();
 
     for(int i = args-1; i >= 0; --i) {
         frame.locals(i) = prevFrame.stack.pick(args-1 - i);
@@ -3425,7 +3425,7 @@ interpreterInvoke(StackFrame& prevFrame, Method *method, int args, ManagedObject
 static void
 interpreterInvokeVirtual(StackFrame& prevFrame, Method *method) {
 
-    int args = method->get_num_arg_bytes() >> 2;
+    int args = method->get_num_arg_slots();
     CREF cr = prevFrame.stack.pick(args-1).cr;
 
     if (cr == 0) {
@@ -3459,7 +3459,7 @@ interpreterInvokeVirtual(StackFrame& prevFrame, Method *method) {
 static void
 interpreterInvokeInterface(StackFrame& prevFrame, Method *method) {
 
-    int args = method->get_num_arg_bytes() >> 2;
+    int args = method->get_num_arg_slots();
     CREF cr = prevFrame.stack.pick(args-1).cr;
 
     if (cr == 0) {
@@ -3515,7 +3515,7 @@ interpreterInvokeInterface(StackFrame& prevFrame, Method *method) {
 static void
 interpreterInvokeSpecial(StackFrame& prevFrame, Method *method) {
 
-    int args = method->get_num_arg_bytes() >> 2;
+    int args = method->get_num_arg_slots();
     CREF cr = prevFrame.stack.pick(args-1).cr;
 
     if (cr == 0) {

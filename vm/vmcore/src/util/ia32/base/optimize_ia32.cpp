@@ -453,7 +453,7 @@ void gen_native_arraycopy_fastpath(Emitter_Handle h, Method *method)
     s = pop(s,  ebx_opnd);
     s = pop(s,  ebp_opnd);
 
-    s = ret(s,  Imm_Opnd(method->get_num_arg_bytes()));
+    s = ret(s,  Imm_Opnd(method->get_num_arg_slots() * 4));
 
     //Fill Patches
     for(; p_c>0 ; p_c--){

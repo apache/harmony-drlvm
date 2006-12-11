@@ -122,7 +122,7 @@ JIT_execute_method_default(JIT_Handle jit, jmethodID methodID, jvalue *return_va
             << method->get_class()->get_name()->bytes << " "
             << method->get_name()->bytes << " "
             << method->get_descriptor()->bytes);
-    int sz = method->get_num_arg_bytes() >> 2;
+    int sz = method->get_num_arg_slots();
     void *meth_addr = method->get_code_addr();
     uint32 *arg_words = (uint32*) STD_ALLOCA(sz * sizeof(uint32));
 

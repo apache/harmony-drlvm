@@ -87,7 +87,7 @@ interpreter_execute_native_method(
     M2N_ALLOC_MACRO;
     hythread_suspend_enable();
 
-    int sz = method->get_num_arg_bytes() >> 2;
+    int sz = method->get_num_arg_slots();
 
     int n_ints = 0;
     int n_fps = 0;
@@ -287,7 +287,7 @@ interpreterInvokeStaticNative(StackFrame& prevFrame, StackFrame& frame, Method *
 
     M2N_ALLOC_MACRO;
     
-    word sz = method->get_num_arg_bytes() >> 2;
+    word sz = method->get_num_arg_slots();
 
     int n_ints = 0;
     int n_fps = 0;

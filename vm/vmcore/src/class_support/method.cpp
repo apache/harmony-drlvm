@@ -201,14 +201,13 @@ Method::get_target_exception_handler_info(JIT *jit, unsigned eh_num)
 } //Method::get_target_exception_handler_info
 
 
-void Method::calculate_arguments_size()
+void Method::calculate_arguments_slot_num() 
 {
-    // Use this old scheme until we can use the new JIT interface's methods
-    // to inspect the types of each method argument. This requires that these
-    // methods support Java, and that they work during VM's bootstrapping.
-    unsigned nb = 0;
+    //This method counts length of method parameters in slots.
+    //See 4.4.3 paragraph 5 in specification.
+    unsigned slot_num = 0;
     if (!is_static()) {
-        nb = 4;
+        slot_num = 1;
     }
     Arg_List_Iterator iter = get_argument_list();
     Java_Type typ;
@@ -216,18 +215,16 @@ void Method::calculate_arguments_size()
         switch(typ) {
         case JAVA_TYPE_LONG:
         case JAVA_TYPE_DOUBLE:
-            nb += 8;
+            slot_num += 2;
             break;
         default:
-            nb += 4;
+            slot_num += 1;
             break;
         }
         iter = advance_arg_iterator(iter);
     }
-    _arguments_size = nb;
-} // Method::get_num_arg_bytes
-
-
+    _arguments_slot_num = slot_num;
+} // Method::calculate_arguments_slot_num
 
 unsigned Method::get_num_ref_args()
 {

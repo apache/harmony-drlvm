@@ -14,10 +14,10 @@
  *  See the License for the specific language governing permissions and
  *  limitations under the License.
  */
-/** 
+/**
  * @author Pavel Pervov, Alexey V. Varlamov
  * @version $Revision: 1.1.2.6.4.6 $
- */  
+ */
 
 #define LOG_DOMAIN util::CLASS_LOGGER
 #include "cxxlog.h"
@@ -47,15 +47,15 @@
  */
 
 //
-// To do: 
+// TODO list:
 //
-//    (1) Check that ConstantValue attribute's type matches field's type
-//    (2) Set the value field of Field, when ConstantValue is parsed
-//    (3) verify correctness of Method access_flags (see pg 115 of the JVM spec)
-//    (4) verify correctness of Field access_flags (pg 113 of the JVM spec)
-//    (5) verify Class access_flags (pg 96 of the JVM spec)
-//    (6) verify that for interfaces, super is always java.lang.Object (pg 36)
-//    (7) interfaces cannot have super classes (assumed in preparation)
+//    (1) verify correctness of Method access_flags for different class file versions
+//    (2) verify correctness of Field access_flags  for different class file versions
+//    (3) verify Class access_flags for different class file versions
+//    (4) check that Signature of attribute LocalVariableTypeTable of Code attribute is valid
+//    (5) implement functionality of RuntimeInvisibleAnnotations
+//        and RuntimeInvisibleParameterAnnotations, not just skip them
+//    (6) check Signature attribute, not only parse it
 //
 
 #define REPORT_FAILED_CLASS_FORMAT(klass, msg)   \
@@ -83,62 +83,39 @@ static String* cp_check_utf8(ConstantPool& cp, unsigned utf8_index)
 
 static String* cp_check_class(ConstantPool& cp, unsigned class_index)
 {
+    //See specification 4.2 about valid index and 4.5.1 about tag value
     if(!cp.is_valid_index(class_index) || !cp.is_class(class_index)) {
+
 #ifdef _DEBUG
         WARN("cp_check_class: illegal const pool class index" << class_index);
 #endif
         return NULL;
-    }    
+    }
     return cp.get_utf8_string(cp.get_class_name_index(class_index));
 } //cp_check_class
 
-
-#define N_COMMON_ATTR   5
-#define N_FIELD_ATTR    1
-#define N_METHOD_ATTR   5
+#define N_FIELD_ATTR    6
+#define N_METHOD_ATTR   10
 #define N_CODE_ATTR     3
-#define N_CLASS_ATTR    4
+#define N_CLASS_ATTR    9
 
-static String *common_attr_strings[N_COMMON_ATTR+1];
-static Attributes common_attrs[N_COMMON_ATTR];
-
-static String *field_attr_strings[N_FIELD_ATTR+1];
+static String *field_attr_strings[N_FIELD_ATTR+1]; //attributes required to be recognized for fields
 static Attributes field_attrs[N_FIELD_ATTR];
 
-static String *method_attr_strings[N_METHOD_ATTR+1];
+static String *method_attr_strings[N_METHOD_ATTR+1]; //attributes required to be recognized for methods
 static Attributes method_attrs[N_METHOD_ATTR];
 
-static String *class_attr_strings[N_CLASS_ATTR+1];
+static String *class_attr_strings[N_CLASS_ATTR+1]; //attributes required to be recognized for class
 static Attributes class_attrs[N_CLASS_ATTR];
 
-static String *code_attr_strings[N_CODE_ATTR+1];
+static String *code_attr_strings[N_CODE_ATTR+1]; //attributes required to be recognized for code attribute
 static Attributes code_attrs[N_CODE_ATTR];
-
-static String *must_recognize_attr_strings[5];
-static Attributes must_recognize_attrs[4];
 
 //
 // initialize string pool by preloading it with commonly used strings
 //
 static bool preload_attrs(String_Pool& string_pool)
 {
-    common_attr_strings[0] = string_pool.lookup("Synthetic");
-    common_attrs[0] = ATTR_Synthetic;
-
-    common_attr_strings[1] = string_pool.lookup("Deprecated");
-    common_attrs[1] = ATTR_Deprecated;
-
-    common_attr_strings[2] = string_pool.lookup("Signature");
-    common_attrs[2] = ATTR_Signature;
-    
-    common_attr_strings[3] = string_pool.lookup("RuntimeVisibleAnnotations");
-    common_attrs[3] = ATTR_RuntimeVisibleAnnotations;
-
-    common_attr_strings[4] = string_pool.lookup("RuntimeInvisibleAnnotations");
-    common_attrs[4] = ATTR_RuntimeInvisibleAnnotations;
-
-    common_attr_strings[5] = NULL;
-
     method_attr_strings[0] = string_pool.lookup("Code");
     method_attrs[0] = ATTR_Code;
 
@@ -154,12 +131,42 @@ static bool preload_attrs(String_Pool& string_pool)
     method_attr_strings[4] = string_pool.lookup("AnnotationDefault");
     method_attrs[4] = ATTR_AnnotationDefault;
 
-    method_attr_strings[5] = NULL;
+    method_attr_strings[5] = string_pool.lookup("Synthetic");
+    method_attrs[5] = ATTR_Synthetic;
+
+    method_attr_strings[6] = string_pool.lookup("Deprecated");
+    method_attrs[6] = ATTR_Deprecated;
+
+    method_attr_strings[7] = string_pool.lookup("Signature");
+    method_attrs[7] = ATTR_Signature;
+
+    method_attr_strings[8] = string_pool.lookup("RuntimeVisibleAnnotations");
+    method_attrs[8] = ATTR_RuntimeVisibleAnnotations;
+
+    method_attr_strings[9] = string_pool.lookup("RuntimeInvisibleAnnotations");
+    method_attrs[9] = ATTR_RuntimeInvisibleAnnotations;
+
+    method_attr_strings[10] = NULL;
 
     field_attr_strings[0] = string_pool.lookup("ConstantValue");
     field_attrs[0] = ATTR_ConstantValue;
 
-    field_attr_strings[1] = NULL;
+    field_attr_strings[1] = string_pool.lookup("Synthetic");
+    field_attrs[1] = ATTR_Synthetic;
+
+    field_attr_strings[2] = string_pool.lookup("Deprecated");
+    field_attrs[2] = ATTR_Deprecated;
+
+    field_attr_strings[3] = string_pool.lookup("Signature");
+    field_attrs[3] = ATTR_Signature;
+
+    field_attr_strings[4] = string_pool.lookup("RuntimeVisibleAnnotations");
+    field_attrs[4] = ATTR_RuntimeVisibleAnnotations;
+
+    field_attr_strings[5] = string_pool.lookup("RuntimeInvisibleAnnotations");
+    field_attrs[5] = ATTR_RuntimeInvisibleAnnotations;
+
+    field_attr_strings[6] = NULL;
 
     class_attr_strings[0] = string_pool.lookup("SourceFile");
     class_attrs[0] = ATTR_SourceFile;
@@ -172,8 +179,23 @@ static bool preload_attrs(String_Pool& string_pool)
 
     class_attr_strings[3] = string_pool.lookup("EnclosingMethod");
     class_attrs[3] = ATTR_EnclosingMethod;
-    
-    class_attr_strings[4] = NULL;
+
+    class_attr_strings[4] = string_pool.lookup("Synthetic");
+    class_attrs[4] = ATTR_Synthetic;
+
+    class_attr_strings[5] = string_pool.lookup("Deprecated");
+    class_attrs[5] = ATTR_Deprecated;
+
+    class_attr_strings[6] = string_pool.lookup("Signature");
+    class_attrs[6] = ATTR_Signature;
+
+    class_attr_strings[7] = string_pool.lookup("RuntimeVisibleAnnotations");
+    class_attrs[7] = ATTR_RuntimeVisibleAnnotations;
+
+    class_attr_strings[8] = string_pool.lookup("RuntimeInvisibleAnnotations");
+    class_attrs[8] = ATTR_RuntimeInvisibleAnnotations;
+
+    class_attr_strings[9] = NULL;
 
     code_attr_strings[0] = string_pool.lookup("LineNumberTable");
     code_attrs[0] = ATTR_LineNumberTable;
@@ -186,36 +208,23 @@ static bool preload_attrs(String_Pool& string_pool)
 
     code_attr_strings[3] = NULL;
 
-    must_recognize_attr_strings[0] = string_pool.lookup("Code");
-    must_recognize_attrs[0] = ATTR_Code;
-
-    must_recognize_attr_strings[1] = string_pool.lookup("ConstantValue");
-    must_recognize_attrs[1] = ATTR_ConstantValue;
-
-    must_recognize_attr_strings[2] = string_pool.lookup("Exceptions");
-    must_recognize_attrs[2] = ATTR_Exceptions;
-
-    must_recognize_attr_strings[3] = string_pool.lookup("Signature");
-    must_recognize_attrs[3] = ATTR_Signature;
-
-    must_recognize_attr_strings[4] = NULL;
-
     return true;
 } //init_loader
 
 
 String* parse_signature_attr(ByteReader &cfs,
-                             uint32 attr_len, 
-                             Class* clss) 
+                             uint32 attr_len,
+                             Class* clss)
 {
+    //See specification 4.8.8 about attribute length
     if (attr_len != 2) {
-        REPORT_FAILED_CLASS_FORMAT(clss, 
+        REPORT_FAILED_CLASS_FORMAT(clss,
             "unexpected length of Signature attribute : " << attr_len);
         return NULL;
     }
     uint16 idx;
     if (!cfs.parse_u2_be(&idx)) {
-        REPORT_FAILED_CLASS_FORMAT(clss, 
+        REPORT_FAILED_CLASS_FORMAT(clss,
             "cannot parse Signature index");
         return NULL;
     }
@@ -227,60 +236,50 @@ String* parse_signature_attr(ByteReader &cfs,
 }
 
 
-Attributes parse_attribute(ByteReader &cfs,
+Attributes parse_attribute(Class *clss,
+                           ByteReader &cfs,
                            ConstantPool& cp,
                            String *attr_strings[],
                            Attributes attrs[],
-                           uint32 *attr_len, 
-                           bool use_common = true)
+                           uint32 *attr_len)
 {
     static bool UNUSED init = preload_attrs(VM_Global_State::loader_env->string_pool);
-
+    //See specification 4.8 about Attributes
     uint16 attr_name_index;
     bool result = cfs.parse_u2_be(&attr_name_index);
     if (!result)
+    {
+        REPORT_FAILED_CLASS_FORMAT(clss,
+            "cannot parse attr_name_index");
         return ATTR_ERROR;
-
+    }
     result = cfs.parse_u4_be(attr_len);
     if (!result)
+    {
+        REPORT_FAILED_CLASS_FORMAT(clss,
+            "parse attribute:cannot parse attribute length");
         return ATTR_ERROR;
-
+    }
     String* attr_name = cp_check_utf8(cp, attr_name_index);
-    if (attr_name == NULL) {
-#ifdef _DEBUG
-        WARN("parse_attribute: illegal const pool attr_name_index");
-#endif
+    if (attr_name == NULL)
+    {
+        REPORT_FAILED_CLASS_FORMAT(clss,
+            "parse_attribute: illegal const pool attr_name_index");
         return ATTR_ERROR;
     }
-    unsigned i;
-    if (use_common) {
-        for (i=0; common_attr_strings[i] != NULL; i++) {
-            if (common_attr_strings[i] == attr_name)
-                return common_attrs[i];
-        }
-    }
-    for (i=0; attr_strings[i] != NULL; i++) {
+    for (unsigned i=0; attr_strings[i] != NULL; i++) {
         if (attr_strings[i] == attr_name)
             return attrs[i];
     }
     //
     // unrecognized attribute; skip
     //
-    uint32 length = *attr_len;
-    while ( length-- > 0) {
-        uint8 val;
-        bool result = cfs.parse_u1(&val);
-        if(!result)
+    if(!cfs.skip(*attr_len))
+    {
+            REPORT_FAILED_CLASS_FORMAT(clss,
+                "Couldn't skip unrecognized attribute: " << attr_name->bytes);
             return ATTR_ERROR;
     }
-    // Code, ConstantValue, Exceptions must be recognized even if illegal in
-    // a particular context
-    for (i = 0; must_recognize_attr_strings[i] != NULL; i++) {
-        if (must_recognize_attr_strings[i] == attr_name) {
-            return must_recognize_attrs[i];
-        }
-    }
-
     return ATTR_UNDEF;
 } //parse_attribute
 
@@ -288,30 +287,30 @@ Attributes parse_attribute(ByteReader &cfs,
 uint32 parse_annotation_value(AnnotationValue& value, ByteReader& cfs, Class* clss);
 
 // returns number of read bytes, 0 if error occurred
-uint32 parse_annotation(Annotation** value, ByteReader& cfs, Class* clss) 
+uint32 parse_annotation(Annotation** value, ByteReader& cfs, Class* clss)
 {
     uint16 type_idx;
     if (!cfs.parse_u2_be(&type_idx)) {
-        REPORT_FAILED_CLASS_FORMAT(clss, 
+        REPORT_FAILED_CLASS_FORMAT(clss,
             "cannot parse type index of annotation");
         return 0;
     }
     String* type = cp_check_utf8(clss->get_constant_pool(), type_idx);
     if (type == NULL) {
-        REPORT_FAILED_CLASS_FORMAT(clss, 
+        REPORT_FAILED_CLASS_FORMAT(clss,
             "invalid type index of annotation : " << type_idx);
         return 0;
     }
 
     uint16 num_elements;
     if (!cfs.parse_u2_be(&num_elements)) {
-        REPORT_FAILED_CLASS_FORMAT(clss, 
+        REPORT_FAILED_CLASS_FORMAT(clss,
             "cannot parse number of annotation elements");
         return 0;
     }
-    
     Annotation* antn = (Annotation*) clss->get_class_loader()->Alloc(
         sizeof(Annotation) + num_elements * sizeof(AnnotationElement));
+    //FIXME: verav should throw OOM
     antn->type = type;
     antn->num_elements = num_elements;
     antn->elements = (AnnotationElement*)((POINTER_SIZE_INT)antn + sizeof(Annotation));
@@ -323,13 +322,13 @@ uint32 parse_annotation(Annotation** value, ByteReader& cfs, Class* clss)
     {
         uint16 name_idx;
         if (!cfs.parse_u2_be(&name_idx)) {
-            REPORT_FAILED_CLASS_FORMAT(clss, 
+            REPORT_FAILED_CLASS_FORMAT(clss,
                 "cannot parse element_name_index of annotation element");
             return 0;
         }
         antn->elements[j].name = cp_check_utf8(clss->get_constant_pool(), name_idx);
         if (antn->elements[j].name == NULL) {
-            REPORT_FAILED_CLASS_FORMAT(clss, 
+            REPORT_FAILED_CLASS_FORMAT(clss,
                 "invalid element_name_index of annotation : " << name_idx);
             return 0;
         }
@@ -349,7 +348,7 @@ uint32 parse_annotation_value(AnnotationValue& value, ByteReader& cfs, Class* cl
 {
     uint8 tag;
     if (!cfs.parse_u1(&tag)) {
-        REPORT_FAILED_CLASS_FORMAT(clss, 
+        REPORT_FAILED_CLASS_FORMAT(clss,
             "cannot parse annotation value tag");
         return 0;
     }
@@ -373,7 +372,7 @@ uint32 parse_annotation_value(AnnotationValue& value, ByteReader& cfs, Class* cl
         {
             uint16 const_idx;
             if (!cfs.parse_u2_be(&const_idx)) {
-                REPORT_FAILED_CLASS_FORMAT(clss, 
+                REPORT_FAILED_CLASS_FORMAT(clss,
                     "cannot parse const index of annotation value");
                 return 0;
             }
@@ -382,54 +381,54 @@ uint32 parse_annotation_value(AnnotationValue& value, ByteReader& cfs, Class* cl
             case AVT_BYTE:
             case AVT_SHORT:
             case AVT_CHAR:
-            case AVT_INT: 
+            case AVT_INT:
                 if (valid_cpi(clss, const_idx, CONSTANT_Integer)) {
                     value.const_value.i = cp.get_int(const_idx);
                     break;
                 }
-            case AVT_FLOAT: 
+            case AVT_FLOAT:
                 if (valid_cpi(clss, const_idx, CONSTANT_Float)) {
                     value.const_value.f = cp.get_float(const_idx);
                     break;
                 }
-            case AVT_LONG: 
+            case AVT_LONG:
                 if (valid_cpi(clss, const_idx, CONSTANT_Long)) {
                     value.const_value.l.lo_bytes = cp.get_8byte_low_word(const_idx);
                     value.const_value.l.hi_bytes = cp.get_8byte_high_word(const_idx);
                     break;
                 }
-            case AVT_DOUBLE: 
+            case AVT_DOUBLE:
                 if (valid_cpi(clss, const_idx, CONSTANT_Double)) {
                     value.const_value.l.lo_bytes = cp.get_8byte_low_word(const_idx);
                     value.const_value.l.hi_bytes = cp.get_8byte_high_word(const_idx);
                     break;
                 }
-            case AVT_STRING: 
+            case AVT_STRING:
                 if (valid_cpi(clss, const_idx, CONSTANT_Utf8)) {
                     value.const_value.string = cp.get_utf8_string(const_idx);
                     break;
                 }
             default:
-                REPORT_FAILED_CLASS_FORMAT(clss, 
+                REPORT_FAILED_CLASS_FORMAT(clss,
                     "invalid const index " << const_idx
                     << " of annotation value of type " <<ctag);
                 return 0;
             }
             read_len += 2;
         }
-    	break;
+        break;
 
     case AVT_CLASS:
         {
             uint16 class_idx;
             if (!cfs.parse_u2_be(&class_idx)) {
-                REPORT_FAILED_CLASS_FORMAT(clss, 
+                REPORT_FAILED_CLASS_FORMAT(clss,
                     "cannot parse class_info_index of annotation value");
                 return 0;
             }
             value.class_name = cp_check_utf8(cp, class_idx);
             if (value.class_name == NULL) {
-                REPORT_FAILED_CLASS_FORMAT(clss, 
+                REPORT_FAILED_CLASS_FORMAT(clss,
                     "invalid class_info_index of annotation value: " << class_idx);
                 return 0;
             }
@@ -441,25 +440,25 @@ uint32 parse_annotation_value(AnnotationValue& value, ByteReader& cfs, Class* cl
         {
             uint16 type_idx;
             if (!cfs.parse_u2_be(&type_idx)) {
-                REPORT_FAILED_CLASS_FORMAT(clss, 
+                REPORT_FAILED_CLASS_FORMAT(clss,
                     "cannot parse type_name_index of annotation enum value");
                 return 0;
             }
             value.enum_const.type = cp_check_utf8(cp, type_idx);
             if (value.enum_const.type == NULL) {
-                REPORT_FAILED_CLASS_FORMAT(clss, 
+                REPORT_FAILED_CLASS_FORMAT(clss,
                     "invalid type_name_index of annotation enum value: " << type_idx);
                 return 0;
             }
             uint16 name_idx;
             if (!cfs.parse_u2_be(&name_idx)) {
-                REPORT_FAILED_CLASS_FORMAT(clss, 
+                REPORT_FAILED_CLASS_FORMAT(clss,
                     "cannot parse const_name_index of annotation enum value");
                 return 0;
             }
             value.enum_const.name = cp_check_utf8(cp, name_idx);
             if (value.enum_const.name == NULL) {
-                REPORT_FAILED_CLASS_FORMAT(clss, 
+                REPORT_FAILED_CLASS_FORMAT(clss,
                     "invalid const_name_index of annotation enum value: " << name_idx);
                 return 0;
             }
@@ -481,7 +480,7 @@ uint32 parse_annotation_value(AnnotationValue& value, ByteReader& cfs, Class* cl
         {
             uint16 num;
             if (!cfs.parse_u2_be(&num)) {
-                REPORT_FAILED_CLASS_FORMAT(clss, 
+                REPORT_FAILED_CLASS_FORMAT(clss,
                     "cannot parse num_values of annotation array value");
                 return 0;
             }
@@ -490,6 +489,7 @@ uint32 parse_annotation_value(AnnotationValue& value, ByteReader& cfs, Class* cl
             if (num) {
                 value.array.items = (AnnotationValue*) clss->get_class_loader()->Alloc(
                     num * sizeof(AnnotationValue));
+                    //FIXME: verav should throw OOM
                 for (int i = 0; i < num; i++) {
                     uint32 size = parse_annotation_value(value.array.items[i], cfs, clss);
                     if (size == 0) {
@@ -502,7 +502,7 @@ uint32 parse_annotation_value(AnnotationValue& value, ByteReader& cfs, Class* cl
         break;
 
     default:
-        REPORT_FAILED_CLASS_FORMAT(clss, 
+        REPORT_FAILED_CLASS_FORMAT(clss,
             "unrecognized annotation value tag : " << ctag);
         return 0;
     }
@@ -511,11 +511,11 @@ uint32 parse_annotation_value(AnnotationValue& value, ByteReader& cfs, Class* cl
 }
 
 // returns number of read bytes, 0 if error occurred
-uint32 parse_annotation_table(AnnotationTable ** table, ByteReader& cfs, Class* clss) 
+uint32 parse_annotation_table(AnnotationTable ** table, ByteReader& cfs, Class* clss)
 {
     uint16 num_annotations;
     if (!cfs.parse_u2_be(&num_annotations)) {
-        REPORT_FAILED_CLASS_FORMAT(clss, 
+        REPORT_FAILED_CLASS_FORMAT(clss,
             "cannot parse number of Annotations");
         return 0;
     }
@@ -524,6 +524,7 @@ uint32 parse_annotation_table(AnnotationTable ** table, ByteReader& cfs, Class* 
     if (num_annotations) {
         *table = (AnnotationTable*) clss->get_class_loader()->Alloc(
             sizeof (AnnotationTable) + (num_annotations - 1)*sizeof(Annotation*));
+        //FIXME:verav should throw OOM
         (*table)->length = num_annotations;
 
         for (unsigned i = 0; i < num_annotations; i++)
@@ -541,71 +542,6 @@ uint32 parse_annotation_table(AnnotationTable ** table, ByteReader& cfs, Class* 
     return read_len;
 }
 
-
-Attributes Class_Member::process_common_attribute(Attributes attr, uint32 attr_len, ByteReader& cfs) 
-{
-    switch(attr) {
-    case ATTR_Synthetic:
-        if(attr_len != 0) {
-            REPORT_FAILED_CLASS_FORMAT(_class,
-                "non-zero length of Synthetic attribute for class member "
-                << _name->bytes << " " <<_descriptor->bytes );
-            return ATTR_ERROR;
-        }
-        _synthetic = true;
-        _access_flags |= ACC_SYNTHETIC;
-        break;
-
-    case ATTR_Deprecated:
-        if(attr_len != 0) {
-            REPORT_FAILED_CLASS_FORMAT(_class,
-                "non-zero length of Deprecated attribute for class member "
-                << _name->bytes << " " <<_descriptor->bytes );
-            return ATTR_ERROR;
-        }
-        _deprecated = true;
-        break;
-
-    case ATTR_Signature:
-        {
-            if (!(_signature = parse_signature_attr(cfs, attr_len, _class))) {
-                return ATTR_ERROR;
-            }
-        }
-        break;
-
-    case ATTR_RuntimeVisibleAnnotations:
-        {
-            uint32 read_len = parse_annotation_table(&_annotations, cfs, _class);
-            if (read_len == 0) {
-                return ATTR_ERROR;
-            } else if (attr_len != read_len) {
-                REPORT_FAILED_CLASS_FORMAT(_class, 
-                    "error parsing Annotations attribute for class member "
-                    << _name->bytes << " " <<_descriptor->bytes 
-                    << "; declared length " << attr_len
-                    << " does not match actual " << read_len);
-                return ATTR_ERROR;
-            }
-        }
-        break;
-
-    case ATTR_RuntimeInvisibleAnnotations:
-        {
-            if(!cfs.skip(attr_len)) {
-                REPORT_FAILED_CLASS_FORMAT(_class,
-                    "failed to skip RuntimeInvisibleAnnotations attribute");
-                return ATTR_ERROR;
-            }
-        }
-        break;
-
-    default:
-        return ATTR_UNDEF;
-    }
-    return attr;
-}
-
 void* Class_Member::Alloc(size_t size) {
     ClassLoader* cl = get_class()->get_class_loader();
     assert(cl);
@@ -621,12 +557,15 @@ bool Class_Member::parse(Class* clss, ByteReader &cfs)
     }
 
     _class = clss;
+
+    //See specification 4.6 about name_index
     uint16 name_index;
     if (!cfs.parse_u2_be(&name_index)) {
         REPORT_FAILED_CLASS_FORMAT(clss, "cannot parse member name index");
         return false;
     }
 
+    //See specification 4.6 about descriptor_index
     uint16 descriptor_index;
     if (!cfs.parse_u2_be(&descriptor_index)) {
         REPORT_FAILED_CLASS_FORMAT(clss, "cannot parse member descriptor index");
@@ -635,17 +574,18 @@ bool Class_Member::parse(Class* clss, ByteReader &cfs)
 
     ConstantPool& cp = clss->get_constant_pool();
     //
-    // look up the name_index and descriptor_index 
-    // utf8 string const pool entries
+    // Look up the name_index and descriptor_index
+    // utf8 string const pool entries.
+    // See specification 4.6 about name_index and desctiptor_index.
     //
     String* name = cp_check_utf8(cp, name_index);
     String* descriptor = cp_check_utf8(cp, descriptor_index);
     if (name == NULL || descriptor == NULL) {
-        REPORT_FAILED_CLASS_FORMAT(clss, 
-            "some of member name or descriptor indexes is not CONSTANT_Utf8 entry : " 
+        REPORT_FAILED_CLASS_FORMAT(clss,
+            "some of member name or descriptor indexes is not CONSTANT_Utf8 entry : "
             << name_index << " or " << descriptor_index);
         return false;
-    } 
+    }
     _name = name;
     _descriptor = descriptor;
     return true;
@@ -656,11 +596,11 @@ bool Class_Member::parse(Class* clss, ByteReader &cfs)
 // further constrained so that, with the exception of the special method names (§3.9)
 // <init> and <clinit>, they must not contain the characters ’<’ or ’>’.
 static inline bool
-check_field_name(const String *name)
+check_field_name(const char *name, unsigned len)
 {
-    for (const char* ch = name->bytes; ch[0] != '\0'; ++ch) {
-        switch(ch[0]){
-        case '.': 
+    for (unsigned i = 0; i < len; i++) {
+        switch(name[i]){
+        case '.':
         case ';':
         case '[':
         case '/':
@@ -671,14 +611,11 @@ check_field_name(const String *name)
 }
 
 static inline bool
-check_method_name(const String *name, const Global_Env& env)
+check_method_name(const char *name, unsigned len)
 {
-    if (name == env.Init_String || name == env.Clinit_String)
-        return true;
-
-    for (const char* ch = name->bytes; ch[0] != '\0'; ++ch) {
-        switch(ch[0]){
-        case '.': 
+    for (unsigned i = 0; i < len; i++) {
+        switch(name[i]){
+        case '.':
         case ';':
         case '[':
         case '/':
@@ -695,7 +632,7 @@ check_field_descriptor( const char *descriptor,
                         const char **next,
                         bool is_void_legal)
 {
-    switch (*descriptor) 
+    switch (*descriptor)
     {
     case 'B':
     case 'C':
@@ -716,19 +653,35 @@ check_field_descriptor( const char *descriptor,
         }
     case 'L':
         {
-            const char* iterator = descriptor + 1;
-            while( *iterator != ';' ) {
-                iterator++;
+            unsigned id_len = 0;
+            //See specification 4.4.2 about field descriptors that
+            //classname represents a fully qualified class or interface name in internal form.
+            const char* iterator;
+            for(iterator = ++descriptor;
+                *iterator != ';';
+                iterator++)
+            {
                 if( *iterator == '\0' ) {
                     // bad Java descriptor
                     return false;
                 }
+                if(*iterator == '/') {
+                    if(!check_field_name(descriptor, id_len))
+                        return false;
+                    id_len = 0;
+                    descriptor = iterator + 1;
+                } else {
+                    id_len++;
+                }
             }
+            if(!check_field_name(descriptor, id_len))
+                return false;
             *next = iterator + 1;
             return true;
         }
     case '[':
         {
+            //See specification 4.4.2 or 4.5.1 about array type descriptor
             unsigned dim = 1;
             while(*(++descriptor) == '[') dim++;
             if (dim > 255) return false;
@@ -748,19 +701,23 @@ bool Field::parse(Class *clss, ByteReader &cfs)
     if(!Class_Member::parse(clss, cfs))
         return false;
 
-    if(!check_field_name(_name)) {
+    if(!check_field_name(_name->bytes, _name->len)) {
         REPORT_FAILED_CLASS_FORMAT(clss, "illegal field name : " << _name->bytes);
         return false;
     }
 
     // check field descriptor
+    //See specification 4.4.2 about field descriptors.
     const char* next;
     if(!check_field_descriptor(_descriptor->bytes, &next, false) || *next != '\0') {
         REPORT_FAILED_CLASS_FORMAT(clss, "illegal field descriptor : " << _descriptor->bytes);
         return false;
     }
-    // check interface fields access flags
+
+    // check fields access flags
+    //See specification 4.6 about access flags
     if( clss->is_interface() ) {
+        // check interface fields access flags
         if(!(is_public() && is_static() && is_final())){
             REPORT_FAILED_CLASS_FORMAT(clss, "interface field " << get_name()->bytes
                 << " does not have one of ACC_PUBLIC, ACC_STATIC, or ACC_FINAL access flags set");
@@ -771,15 +728,16 @@ bool Field::parse(Class *clss, ByteReader &cfs)
                 << " has illegal access flags set : " << _access_flags); //FIXME to literal form
             return false;
         }
-    } else if((is_public() && is_protected() 
-        || is_protected() && is_private() 
+    } else if((is_public() && is_protected()
+        || is_protected() && is_private()
         || is_public() && is_private())
         || (is_final() && is_volatile())) {
-        REPORT_FAILED_CLASS_FORMAT(clss, " field " << get_name()->bytes 
+        REPORT_FAILED_CLASS_FORMAT(clss, " field " << get_name()->bytes
             << " has invalid combination of access flags : " << _access_flags); //FIXME to literal form
         return false;
     }
 
+    //check field attributes
     uint16 attr_count;
     if(!cfs.parse_u2_be(&attr_count)) {
         REPORT_FAILED_CLASS_CLASS(clss->get_class_loader(), clss, "java/lang/ClassFormatError",
@@ -789,150 +747,232 @@ bool Field::parse(Class *clss, ByteReader &cfs)
 
     _offset_computed = 0;
 
-    unsigned n_constval_attr = 0;
-
+    unsigned numConstantValue = 0;
+    unsigned numRuntimeVisibleAnnotations = 0;
+    unsigned numRuntimeInvisibleAnnotations = 0;
     uint32 attr_len = 0;
 
     ConstantPool& cp = clss->get_constant_pool();
 
-    for (unsigned j=0; j<attr_count; j++) 
+    for (unsigned j=0; j<attr_count; j++)
     {
-        Attributes cur_attr = parse_attribute(cfs, cp, field_attr_strings, field_attrs, &attr_len);
+        // See specification 4.6 about attributes[]
+        Attributes cur_attr = parse_attribute(clss, cfs, cp, field_attr_strings, field_attrs, &attr_len);
         switch (cur_attr) {
         case ATTR_ConstantValue:
-        {    // constant value attribute
-            // JVM spec (4.7.2) says that we should silently ignore the
-            // ConstantValue attribute for non-static fields.
-
-            // a field can have at most 1 ConstantValue attribute
-            if (++n_constval_attr > 1) {
-                REPORT_FAILED_CLASS_CLASS(clss->get_class_loader(), clss, "java/lang/ClassFormatError",
-                    clss->get_name()->bytes << ": field " << get_name() << " has more then one ConstantValue attribute");
-                return false;
-            }
-            // attribute length must be two (vm spec reference 4.7.3)
-            if (attr_len != 2) {
-                REPORT_FAILED_CLASS_CLASS(clss->get_class_loader(), clss, "java/lang/ClassFormatError",
-                    clss->get_name()->bytes << ": ConstantValue attribute has invalid length for field " << get_name());
-                return false;
-            }
-
-            if(!cfs.parse_u2_be(&_const_value_index)) {
-                REPORT_FAILED_CLASS_CLASS(clss->get_class_loader(), clss,
-                    "java/lang/ClassFormatError",
-                    clss->get_name()->bytes << ": could not parse "
-                    << "ConstantValue index for field " << get_name());
-                return false;
-            }
-
-            if(_const_value_index == 0 || _const_value_index >= cp.get_size()) {
-                REPORT_FAILED_CLASS_CLASS(clss->get_class_loader(), clss, "java/lang/ClassFormatError",
-                    clss->get_name()->bytes << ": invalid ConstantValue index for field " << get_name());
-                return false;
-            }
-
-            Java_Type java_type = get_java_type();
-
-            switch(cp.get_tag(_const_value_index)) {
-            case CONSTANT_Long:
-                {
-                    if (java_type != JAVA_TYPE_LONG) {
-                        REPORT_FAILED_CLASS_CLASS(clss->get_class_loader(), clss, "java/lang/ClassFormatError",
-                            clss->get_name()->bytes
-                            << ": data type CONSTANT_Long of ConstantValue does not correspond to the type of field "
-                            << get_name());
-                        return false;
-                    }
-                    const_value.l.lo_bytes = cp.get_8byte_low_word(_const_value_index);
-                    const_value.l.hi_bytes = cp.get_8byte_high_word(_const_value_index);
-                    break;
+            {   // constant value attribute
+                // a field can have at most 1 ConstantValue attribute
+                // See specification 4.8.2 about ConstantValueAttribute.
+                if (++numConstantValue > 1) {
+                    REPORT_FAILED_CLASS_CLASS(clss->get_class_loader(), clss, "java/lang/ClassFormatError",
+                        clss->get_name()->bytes << ": field " << get_name() << " has more then one ConstantValue attribute");
+                    return false;
                 }
-            case CONSTANT_Float:
-                {
-                    if (java_type != JAVA_TYPE_FLOAT) {
-                        REPORT_FAILED_CLASS_CLASS(clss->get_class_loader(), clss, "java/lang/ClassFormatError",
-                            clss->get_name()->bytes
-                            << ": data type CONSTANT_Float of ConstantValue does not correspond to the type of field "
-                            << get_name());
-                        return false;
-                    }
-                    const_value.f = cp.get_float(_const_value_index);
-                    break;
+                // attribute length must be two (vm spec reference 4.7.3)
+                if (attr_len != 2) {
+                    REPORT_FAILED_CLASS_CLASS(clss->get_class_loader(), clss, "java/lang/ClassFormatError",
+                        clss->get_name()->bytes << ": ConstantValue attribute has invalid length for field " << get_name());
+                    return false;
                 }
-            case CONSTANT_Double:
+
+                //For non-static field ConstantValue attribute must be silently ignored
+                //See specification 4.8.2, second paragraph
+                if(!is_static())
                 {
-                    if (java_type != JAVA_TYPE_DOUBLE) {
-                        REPORT_FAILED_CLASS_CLASS(clss->get_class_loader(), clss, "java/lang/ClassFormatError",
-                            clss->get_name()->bytes
-                            << ": data type CONSTANT_Double of ConstantValue does not correspond to the type of field "
-                            << get_name());
-                        return false;
-                    }
-                    const_value.l.lo_bytes = cp.get_8byte_low_word(_const_value_index);
-                    const_value.l.hi_bytes = cp.get_8byte_high_word(_const_value_index);
-                    break;
-                }
-            case CONSTANT_Integer:
-                {
-                if ( !(java_type == JAVA_TYPE_INT         || 
-                       java_type == JAVA_TYPE_SHORT       ||
-                       java_type == JAVA_TYPE_BOOLEAN     || 
-                       java_type == JAVA_TYPE_BYTE        ||
-                        java_type == JAVA_TYPE_CHAR) )
+                    if(!cfs.skip(attr_len))
                     {
-                        REPORT_FAILED_CLASS_CLASS(clss->get_class_loader(), clss, "java/lang/ClassFormatError",
-                            clss->get_name()->bytes
-                            << ": data type CONSTANT_Integer of ConstantValue does not correspond to the type of field "
-                            << get_name());
+                        REPORT_FAILED_CLASS_FORMAT(clss,
+                            "couldn't skip ConstantValue attribute for field "
+                            << _name->bytes);
                         return false;
                     }
-                    const_value.i = cp.get_int(_const_value_index);
-                    break;
                 }
-            case CONSTANT_String:
+                else
                 {
-                    if (java_type != JAVA_TYPE_CLASS) {
+                    if(!cfs.parse_u2_be(&_const_value_index)) {
                         REPORT_FAILED_CLASS_CLASS(clss->get_class_loader(), clss,
                             "java/lang/ClassFormatError",
-                            clss->get_name()->bytes
-                            << ": data type " << "CONSTANT_String of "
-                            << "ConstantValue does not correspond "
-                            << "to the type of field " << get_name());
+                            clss->get_name()->bytes << ": could not parse "
+                            << "ConstantValue index for field " << get_name());
                         return false;
                     }
-                    const_value.string = cp.get_string(_const_value_index);
-                    break;
+
+                    if(!cp.is_valid_index(_const_value_index)) {
+                        REPORT_FAILED_CLASS_CLASS(clss->get_class_loader(), clss, "java/lang/ClassFormatError",
+                            clss->get_name()->bytes << ": invalid ConstantValue index for field " << get_name());
+                        return false;
+                    }
+
+                    Java_Type java_type = get_java_type();
+
+                    switch(cp.get_tag(_const_value_index)) {
+                    case CONSTANT_Long:
+                        {
+                            if (java_type != JAVA_TYPE_LONG) {
+                                REPORT_FAILED_CLASS_CLASS(clss->get_class_loader(), clss, "java/lang/ClassFormatError",
+                                    clss->get_name()->bytes
+                                    << ": data type CONSTANT_Long of ConstantValue does not correspond to the type of field "
+                                    << get_name());
+                                return false;
+                            }
+                            const_value.l.lo_bytes = cp.get_8byte_low_word(_const_value_index);
+                            const_value.l.hi_bytes = cp.get_8byte_high_word(_const_value_index);
+                            break;
+                        }
+                    case CONSTANT_Float:
+                        {
+                            if (java_type != JAVA_TYPE_FLOAT) {
+                                REPORT_FAILED_CLASS_CLASS(clss->get_class_loader(), clss, "java/lang/ClassFormatError",
+                                    clss->get_name()->bytes
+                                    << ": data type CONSTANT_Float of ConstantValue does not correspond to the type of field "
+                                    << get_name());
+                                return false;
+                            }
+                            const_value.f = cp.get_float(_const_value_index);
+                            break;
+                        }
+                    case CONSTANT_Double:
+                        {
+                            if (java_type != JAVA_TYPE_DOUBLE) {
+                                REPORT_FAILED_CLASS_CLASS(clss->get_class_loader(), clss, "java/lang/ClassFormatError",
+                                    clss->get_name()->bytes
+                                    << ": data type CONSTANT_Double of ConstantValue does not correspond to the type of field "
+                                    << get_name());
+                                return false;
+                            }
+                            const_value.l.lo_bytes = cp.get_8byte_low_word(_const_value_index);
+                            const_value.l.hi_bytes = cp.get_8byte_high_word(_const_value_index);
+                            break;
+                        }
+                    case CONSTANT_Integer:
+                        {
+                            if ( !(java_type == JAVA_TYPE_INT         ||
+                                java_type == JAVA_TYPE_SHORT       ||
+                                java_type == JAVA_TYPE_BOOLEAN     ||
+                                java_type == JAVA_TYPE_BYTE        ||
+                                java_type == JAVA_TYPE_CHAR) )
+                            {
+                                REPORT_FAILED_CLASS_CLASS(clss->get_class_loader(), clss, "java/lang/ClassFormatError",
+                                clss->get_name()->bytes
+                                    << ": data type CONSTANT_Integer of ConstantValue does not correspond to the type of field "
+                                    << get_name());
+                                return false;
+                            }
+                            const_value.i = cp.get_int(_const_value_index);
+                            break;
+                        }
+                    case CONSTANT_String:
+                        {
+                            if (java_type != JAVA_TYPE_CLASS) {
+                                REPORT_FAILED_CLASS_CLASS(clss->get_class_loader(), clss,
+                                    "java/lang/ClassFormatError",
+                                    clss->get_name()->bytes
+                                    << ": data type " << "CONSTANT_String of "
+                                    << "ConstantValue does not correspond "
+                                    << "to the type of field " << get_name());
+                                return false;
+                            }
+                            const_value.string = cp.get_string(_const_value_index);
+                            break;
+                        }
+                    default:
+                        {
+                            REPORT_FAILED_CLASS_CLASS(clss->get_class_loader(), clss,
+                                "java/lang/ClassFormatError",
+                                clss->get_name()->bytes
+                                << ": invalid data type tag of ConstantValue "
+                                << "for field " << get_name());
+                            return false;
+                        }
+                    }//switch
+                }//else for static field
+            }//case ATTR_ConstanValue
+            break;
+
+        case ATTR_Synthetic:
+            {
+                if(attr_len != 0) {
+                    REPORT_FAILED_CLASS_FORMAT(clss,
+                        "attribute Synthetic has non-zero length");
+                    return false;
                 }
-            default:
-                {
-                    REPORT_FAILED_CLASS_CLASS(clss->get_class_loader(), clss,
-                        "java/lang/ClassFormatError",
-                        clss->get_name()->bytes
-                        << ": invalid data type tag of ConstantValue "
-                        << "for field " << get_name());
+                _access_flags |= ACC_SYNTHETIC;
+            }
+            break;
+
+        case ATTR_Deprecated:
+            {
+                if(attr_len != 0) {
+                    REPORT_FAILED_CLASS_FORMAT(clss,
+                        "attribute Deprecated has non-zero length");
+                    return false;
+                }
+                _deprecated = true;
+            }
+            break;
+
+        case ATTR_Signature:
+            {
+                if(_signature != NULL) {
+                    REPORT_FAILED_CLASS_FORMAT(clss,
+                        "more than one Signature attribute for the class");
+                    return false;
+                }
+                if (!(_signature = parse_signature_attr(cfs, attr_len, clss))) {
                     return false;
                 }
             }
             break;
-        }
+
+        case ATTR_RuntimeVisibleAnnotations:
+            {
+                // Each field_info structure may contain at most one RuntimeVisibleAnnotations attribute.
+                // See specification 4.8.14.
+                if(++numRuntimeVisibleAnnotations > 1) {
+                    REPORT_FAILED_CLASS_FORMAT(clss,
+                        "more than one RuntimeVisibleAnnotations attribute");
+                    return false;
+                }
+
+                uint32 read_len = parse_annotation_table(&_annotations, cfs, clss);
+                if (attr_len != read_len) {
+                    REPORT_FAILED_CLASS_FORMAT(clss,
+                        "error parsing Annotations attribute"
+                        << "; declared length " << attr_len
+                        << " does not match actual " << read_len);
+                    return false;
+                }
+            }
+            break;
+
+        case ATTR_RuntimeInvisibleAnnotations:
+            {
+                if(++numRuntimeInvisibleAnnotations > 1) {
+                    REPORT_FAILED_CLASS_FORMAT(clss,
+                        "more than one RuntimeVisibleAnnotations attribute");
+                    return false;
+                }
+                if(!cfs.skip(attr_len)) {
+                    REPORT_FAILED_CLASS_FORMAT(clss,
+                        "failed to skip RuntimeInvisibleAnnotations attribute");
+                    return false;
+                }
+            }
+            break;
 
         case ATTR_UNDEF:
             // unrecognized attribute; skipped
             break;
+        case ATTR_ERROR:
+            return false;
         default:
-            switch(process_common_attribute(cur_attr, attr_len, cfs)) {
-            case ATTR_ERROR: 
-                // tried and failed
-                return false;
-            case ATTR_UNDEF:
-                // unprocessed
-                REPORT_FAILED_CLASS_CLASS(clss->get_class_loader(), clss, "java/lang/InternalError",
-                    clss->get_name()->bytes
-                    << ": error parsing attributes for field "
-                    << get_name()->bytes
-                    << "; unprocessed attribute " << cur_attr);
-                return false;
-            } // switch
+            REPORT_FAILED_CLASS_CLASS(_class->get_class_loader(), _class, "java/lang/InternalError",
+                _class->get_name()->bytes << ": unknown error occured "
+                "while parsing attributes for field "
+                << _name->bytes << _descriptor->bytes
+                << "; unprocessed attribute " << cur_attr);
+            return false;
+            break;
         } // switch
     } // for
 
@@ -954,6 +994,7 @@ bool Field::parse(Class *clss, ByteReader &cfs)
 bool Handler::parse(ConstantPool& cp, unsigned code_length,
                     ByteReader& cfs)
 {
+    //See specification 4.8.3 about exception_table
     uint16 start = 0;
     if(!cfs.parse_u2_be(&start))
         return false;
@@ -1009,8 +1050,8 @@ bool Method::get_line_number_entry(unsigned index, jlong* pc, jint* line) {
     }
 }
 
-bool Method::get_local_var_entry(unsigned index, jlong* pc, 
-                         jint* length, jint* slot, String** name, 
+bool Method::get_local_var_entry(unsigned index, jlong* pc,
+                         jint* length, jint* slot, String** name,
                          String** type, String** generic_type) {
 
     if (_line_number_table && index < _local_vars_table->length) {
@@ -1043,6 +1084,7 @@ bool Method::_parse_exceptions(ConstantPool& cp, unsigned attr_len,
     }
 
     _exceptions = new String*[_n_exceptions];
+    //FIXME: verav Should throw OOM
     for (unsigned i=0; i<_n_exceptions; i++) {
         uint16 index;
         if(!cfs.parse_u2_be(&index)) {
@@ -1053,6 +1095,7 @@ bool Method::_parse_exceptions(ConstantPool& cp, unsigned attr_len,
             return false;
         }
 
+        //See specification 4.8.4 about exception_index_table[].
         _exceptions[i] = cp_check_class(cp, index);
         if (_exceptions[i] == NULL) {
             REPORT_FAILED_CLASS_CLASS(_class->get_class_loader(), _class, "java/lang/ClassFormatError",
@@ -1080,14 +1123,14 @@ bool Method::_parse_line_numbers(unsigned attr_len, ByteReader &cfs) {
             "while parsing LineNumberTable attribute");
         return false;
     }
-    unsigned real_lnt_attr_len = 2 + n_line_numbers * 4; 
+    //See specification 4.8.10 about attribute_length.
+    unsigned real_lnt_attr_len = 2 + n_line_numbers * 4;
     if(real_lnt_attr_len != attr_len) {
-        REPORT_FAILED_METHOD("real LineNumberTable length differ "
-            "from attribute_length ("
+        REPORT_FAILED_METHOD("LineNumberTable attribute has wrong length  ("
             << attr_len << " vs. " << real_lnt_attr_len << ")" );
         return false;
     }
-    
+
     _line_number_table =
         (Line_Number_Table *)STD_MALLOC(sizeof(Line_Number_Table) +
         sizeof(Line_Number_Entry) * (n_line_numbers - 1));
@@ -1122,41 +1165,24 @@ bool Method::_parse_line_numbers(unsigned attr_len, ByteReader &cfs) {
 } //Method::_parse_line_numbers
 
 
-bool Method::_parse_local_vars(const char* attr_name, Local_Var_Table** lvt_address,
-        ConstantPool& cp, unsigned attr_len, ByteReader &cfs)
+bool Method::_parse_local_vars(Local_Var_Table* table, LocalVarOffset *offset_list,
+            ConstantPool& cp, ByteReader &cfs, const char *attr_name, Attributes attribute)
 {
-    uint16 n_local_vars;
-    if(!cfs.parse_u2_be(&n_local_vars)) {
-        REPORT_FAILED_METHOD("could not parse local variables number "
-            "of " << attr_name << " attribute");
-        return false;
-    }
 
-    unsigned real_lnt_attr_len = 2 + n_local_vars * 10; 
-    if(real_lnt_attr_len != attr_len) {
-        REPORT_FAILED_METHOD("real " << attr_name << " length differ "
-            "from declared length ("
-            << attr_len << " vs. " << real_lnt_attr_len << ")" );
-        return false;
-    }
-    if (!n_local_vars) {
-        return true;
-    }
+    for (unsigned j = 0; j < table->length; j++) {
+        //go to the start of entry
+        if(!cfs.go_to_offset(offset_list->value)){
+            return false;
+        }
 
-    Local_Var_Table* table = (Local_Var_Table *)_class->get_class_loader()->Alloc(
-        sizeof(Local_Var_Table) +
-        sizeof(Local_Var_Entry) * (n_local_vars - 1));
-    // ppervov: FIXME: should throw OOME
-    table->length = n_local_vars;
-
-    for (unsigned j = 0; j < n_local_vars; j++) {
-        uint16 start_pc;    
+        uint16 start_pc;
         if(!cfs.parse_u2_be(&start_pc)) {
             REPORT_FAILED_METHOD("could not parse start_pc "
                 "in " << attr_name << " attribute");
             return false;
         }
-        uint16 length;      
+
+        uint16 length;
         if(!cfs.parse_u2_be(&length)) {
             REPORT_FAILED_METHOD("could not parse length entry "
                 "in " << attr_name << " attribute");
@@ -1191,11 +1217,28 @@ bool Method::_parse_local_vars(const char* attr_name, Local_Var_Table** lvt_addr
             return false;
         }
 
+        if(!check_field_name(name->bytes, name->len))
+        {
+            REPORT_FAILED_METHOD("name of local variable: " << name->bytes <<
+                " in " << attr_name << " attribute is not stored as unqualified name");
+            return false;
+        }
         String* descriptor = cp_check_utf8(cp, descriptor_index);
         if(descriptor == NULL) {
             REPORT_FAILED_METHOD("descriptor index is not valid CONSTANT_Utf8 entry "
                 "in " << attr_name << " attribute");
             return false;
+        }
+
+        if(attribute == ATTR_LocalVariableTable)
+        {
+            const char *next;
+            if(!check_field_descriptor(descriptor->bytes, &next, false) || *next != '\0')
+            {
+                REPORT_FAILED_METHOD("illegal field descriptor:  " << descriptor->bytes <<
+                    " in " << attr_name << " attribute for local variable: " << name->bytes);
+                return false;
+            }
         }
 
         uint16 index;
@@ -1205,7 +1248,6 @@ bool Method::_parse_local_vars(const char* attr_name, Local_Var_Table** lvt_addr
             return false;
         }
 
-        // FIXME Don't work with long and double
         if (index >= _max_locals) {
             REPORT_FAILED_METHOD("invalid local index "
                 "in " << attr_name << " attribute");
@@ -1218,10 +1260,26 @@ bool Method::_parse_local_vars(const char* attr_name, Local_Var_Table** lvt_addr
         table->table[j].name = name;
         table->table[j].type = descriptor;
         table->table[j].generic_type = NULL;
+
+        offset_list = offset_list->next;
     }
 
-    assert(lvt_address);
-    *lvt_address = table;
+    //checks that there are no same LocalVariableTable or LovalVariableTypeTable attribute in Code
+    //Can't check this in simulated mode
+    for (unsigned j = 0; j < table->length; j++)
+    {
+        for(unsigned i = j + 1; i < table->length; i++)
+        {
+            if(table->table[j].start_pc == table->table[i].start_pc
+                &&table->table[j].length == table->table[i].length
+                &&table->table[j].index == table->table[i].index)
+            {
+                REPORT_FAILED_METHOD("Duplicate attribute "<< attr_name
+                    <<" for local variable ");
+                return false;
+            }
+        }
+    }
 
     return true;
 } //Method::_parse_local_vars
@@ -1247,7 +1305,8 @@ bool Method::_parse_code(ConstantPool& cp, unsigned code_attr_len,
         return false;
     }
 
-    if(_max_locals < _arguments_size/4) {
+    //See specification 4.8.3 about Code Attribute, max_locals.
+    if(_max_locals < _arguments_slot_num) {
         REPORT_FAILED_CLASS_CLASS(_class->get_class_loader(), _class, "java/lang/ClassFormatError",
             _class->get_name()->bytes << ": wrong max_locals count "
             << "while parsing Code attribute for method "
@@ -1263,17 +1322,20 @@ bool Method::_parse_code(ConstantPool& cp, unsigned code_attr_len,
         return false;
     }
 
+    // See specification 4.8.3 and 4.10.1 about code_length.
     // code length for non-abstract java methods must not be 0
     if(_byte_code_length == 0
-        || (_byte_code_length >= (1<<16) && !is_native() && !is_abstract()))
+        || (_byte_code_length >= (1<<16)))
     {
         REPORT_FAILED_CLASS_CLASS(_class->get_class_loader(), _class, "java/lang/ClassFormatError",
             _class->get_name()->bytes << ": bytecode length for method "
             << _name->bytes << _descriptor->bytes
-            << " has zero length");
+            << " has zero or exceeding length");
         return false;
     }
-    real_code_attr_len = 8;
+
+    //See specification 4.8.3 about attribute_length value.
+    real_code_attr_len += 8;
 
     //
     // allocate & parse code array
@@ -1300,7 +1362,7 @@ bool Method::_parse_code(ConstantPool& cp, unsigned code_attr_len,
     }
     real_code_attr_len += 2;
 
-    // 
+    //
     // allocate & parse exception handler table
     //
     _handlers = new Handler[_n_handlers];
@@ -1314,7 +1376,7 @@ bool Method::_parse_code(ConstantPool& cp, unsigned code_attr_len,
             return false;
         }
     }
-    real_code_attr_len += _n_handlers*8; // for the size of exception_table entry see JVM Spec 4.7.3
+    real_code_attr_len += _n_handlers*8; // for the size of exception_table entry see JVM Spec 4.8.3
 
     //
     // attributes of the Code attribute
@@ -1329,11 +1391,17 @@ bool Method::_parse_code(ConstantPool& cp, unsigned code_attr_len,
     real_code_attr_len += 2;
 
     static bool TI_enabled = VM_Global_State::loader_env->TI->isEnabled();
-    Local_Var_Table * generic_vars = NULL;
 
     uint32 attr_len = 0;
+    LocalVarOffset* offset_lvt_array = NULL;
+    LocalVarOffset* lvt_iter = NULL;
+    LocalVarOffset* offset_lvtt_array = NULL;
+    LocalVarOffset* lvtt_iter = NULL;
+    unsigned num_lvt_entries = 0;
+    unsigned num_lvtt_entries = 0;
+
     for (i=0; i<n_attrs; i++) {
-        Attributes cur_attr = parse_attribute(cfs, cp, code_attr_strings, code_attrs, &attr_len, false);
+        Attributes cur_attr = parse_attribute(_class, cfs, cp, code_attr_strings, code_attrs, &attr_len);
         switch(cur_attr) {
         case ATTR_LineNumberTable:
             {
@@ -1344,38 +1412,99 @@ bool Method::_parse_code(ConstantPool& cp, unsigned code_attr_len,
             }
         case ATTR_LocalVariableTable:
             {
-                if (TI_enabled)
-                {
-                    if (!_parse_local_vars("LocalVariableTable", &_local_vars_table, cp, attr_len, cfs))
-                    {
-                        return false;
-                    }
+
+                uint16 n_local_vars;
+                if(!cfs.parse_u2_be(&n_local_vars)) {
+                    REPORT_FAILED_METHOD("could not parse local variables number "
+                            "of LocalVariableTable attribute");
+                    return false;
                 }
-                else if (!cfs.skip(attr_len))
+                TRACE2("classloader.spec","number of local vars:" <<n_local_vars);
+                unsigned lnt_attr_len = 2 + n_local_vars * 10;
+                if(lnt_attr_len != attr_len) {
+                    REPORT_FAILED_METHOD("real LocalVariableTable attribute length differ "
+                        "from declared length ("
+                        << attr_len << " vs. " << lnt_attr_len << ")" );
+                    return false;
+                }
+                if(n_local_vars == 0) break;
+
+                if(offset_lvt_array == NULL){
+                    offset_lvt_array = lvt_iter =
+                        (LocalVarOffset*)STD_ALLOCA(sizeof(LocalVarOffset) * n_local_vars);
+                }
+                else
                 {
-                    REPORT_FAILED_METHOD("error skipping Local_Variable_Table");
+                    lvt_iter->next = (LocalVarOffset*)STD_ALLOCA(sizeof(LocalVarOffset) * n_local_vars);
+                    lvt_iter = lvt_iter->next;
+                }
+                int off = cfs.get_offset();
+                
+                int j = 0;
+                for(j = 0; j < n_local_vars - 1; j++, lvt_iter++)
+                {
+                    lvt_iter->value = off + 10*j;
+                    lvt_iter->next = lvt_iter + 1;
+                }
+                lvt_iter->value = off + 10*j;
+                lvt_iter->next = NULL;
+                num_lvt_entries += n_local_vars;
+                if (!cfs.skip(10*n_local_vars))
+                {
+                    REPORT_FAILED_METHOD("error skipping");
+                    return false;
                 }
                 break;
             }
         case ATTR_LocalVariableTypeTable:
             {
-                if (TI_enabled)
-                {
-                    if (!_parse_local_vars("LocalVariableTypeTable", &generic_vars, cp, attr_len, cfs))
-                    {
-                        return false;
-                    }
+                uint16 n_local_vars;
+                if(!cfs.parse_u2_be(&n_local_vars)) {
+                    REPORT_FAILED_METHOD("could not parse local variables number "
+                            "of LocalVariableTypeTable attribute");
+                    return false;
                 }
-                else if (!cfs.skip(attr_len))
-                {
-                    REPORT_FAILED_METHOD("error skipping LocalVariableTypeTable");
+                unsigned lnt_attr_len = 2 + n_local_vars * 10;
+                if(lnt_attr_len != attr_len) {
+                    REPORT_FAILED_METHOD("real LocalVariableTypeTable attribute length differ "
+                        "from declared length ("
+                        << attr_len << " vs. " << lnt_attr_len << ")" );
+                    return false;
                 }
-            }
-            break;
+                if(n_local_vars == 0) break;
 
+                if(offset_lvtt_array == NULL){
+                    offset_lvtt_array = lvtt_iter =
+                        (LocalVarOffset*)STD_ALLOCA(sizeof(LocalVarOffset) * n_local_vars);
+                }
+                else
+                {
+                    lvtt_iter->next = (LocalVarOffset*)STD_ALLOCA(sizeof(LocalVarOffset) * n_local_vars);
+                    lvtt_iter = lvtt_iter->next;
+                }
+                int off = cfs.get_offset();
+                int j = 0;
+                for(j = 0; j < n_local_vars - 1; j++, lvtt_iter++)
+                {
+                    lvtt_iter->value = off + 10*j;
+                    lvtt_iter->next = lvtt_iter + 1;
+                }
+                lvtt_iter->value = off + 10*j;
+                lvtt_iter->next = NULL;
+                num_lvtt_entries += n_local_vars;
+
+                if (!cfs.skip(10*n_local_vars))
+                {
+                    REPORT_FAILED_METHOD("error skipping");
+                    return false;
+                }
+                break;
+            }
         case ATTR_UNDEF:
             // unrecognized attribute; skipped
             break;
+        case ATTR_ERROR:
+            return false;
         default:
             // error occured
             REPORT_FAILED_CLASS_CLASS(_class->get_class_loader(), _class, "java/lang/InternalError",
@@ -1387,7 +1516,6 @@ bool Method::_parse_code(ConstantPool& cp, unsigned code_attr_len,
         } // switch
         real_code_attr_len += 6 + attr_len; // u2 - attribute_name_index, u4 - attribute_length
     } // for
-
     if(code_attr_len != real_code_attr_len) {
         REPORT_FAILED_CLASS_CLASS(_class->get_class_loader(), _class, "java/lang/ClassFormatError",
             _class->get_name()->bytes << ": Code attribute length does not match real length "
@@ -1397,17 +1525,96 @@ bool Method::_parse_code(ConstantPool& cp, unsigned code_attr_len,
         return false;
     }
 
-    // JVM spec hints that LocalVariableTypeTable is meant to be a supplement to LocalVariableTable
-    // so we have no reason to cross-check these tables
-    if (generic_vars && _local_vars_table) {
-        unsigned j;
-        for (i = 0; i < generic_vars->length; ++i) {
-            for (j = 0; j < _local_vars_table->length; ++j) {
-                if (generic_vars->table[i].name == _local_vars_table->table[j].name) {
-                    _local_vars_table->table[j].generic_type = generic_vars->table[i].type;
-                }
+    // we should remember this point to return here
+    // after comlete LVT and LVTT parsing.
+    int return_point = cfs.get_offset();
+    
+    if(num_lvt_entries == 0 && num_lvtt_entries != 0) {
+            REPORT_FAILED_METHOD("if LocalVariableTable is empty "
+                "LocalVariableTypeTable must be empty too");        
+    }
+
+    if(num_lvt_entries != 0) {
+        //lvt and lvtt parsing
+        Local_Var_Table* lv_table = NULL;
+        Local_Var_Table* generic_vars = NULL;
+        static const int LV_ALLOCATION_THRESHOLD = 30;
+
+        if(num_lvtt_entries != 0) {
+            if( num_lvtt_entries < LV_ALLOCATION_THRESHOLD ){
+                generic_vars =
+                    (Local_Var_Table *)STD_ALLOCA(sizeof(Local_Var_Table) +
+                    sizeof(Local_Var_Entry) * (num_lvtt_entries - 1));
+            } else {
+                generic_vars = (Local_Var_Table *)STD_MALLOC(sizeof(Local_Var_Table) +
+                    sizeof(Local_Var_Entry) * (num_lvtt_entries - 1));
+            }
+            generic_vars->length = num_lvtt_entries;
+        }
+
+        if(TI_enabled) {
+            lv_table = (Local_Var_Table *)_class->get_class_loader()->Alloc(
+                sizeof(Local_Var_Table) +
+                sizeof(Local_Var_Entry) * (num_lvt_entries - 1));
+        } else {
+            if( num_lvt_entries < LV_ALLOCATION_THRESHOLD){
+                lv_table =(Local_Var_Table *)STD_ALLOCA(sizeof(Local_Var_Table) +
+                    sizeof(Local_Var_Entry) * (num_lvt_entries - 1));
+            } else {
+                lv_table =(Local_Var_Table *)STD_MALLOC(sizeof(Local_Var_Table) +
+                    sizeof(Local_Var_Entry) * (num_lvt_entries - 1));
             }
         }
+        lv_table->length = num_lvt_entries;
+
+        if (!_parse_local_vars(lv_table, offset_lvt_array, cp, cfs,
+                "LocalVariableTable", ATTR_LocalVariableTable)
+            || (generic_vars && !_parse_local_vars(generic_vars, offset_lvtt_array, cp, cfs,
+                "LocalVariableTypeTable", ATTR_LocalVariableTypeTable)))
+        {
+            return false;
+        }
+        // JVM spec hints that LocalVariableTypeTable is meant to be a supplement to LocalVariableTable
+        // so we have no reason to cross-check these tables
+        // See specification 4.8.12 second paragraph.
+        if (generic_vars && lv_table) {
+            unsigned j = i = 0;
+            for (i = 0; i < generic_vars->length && j != lv_table->length; i++) {
+                for (j = 0; j < lv_table->length; j++) {
+                    if (generic_vars->table[i].name == lv_table->table[j].name
+                        && generic_vars->table[i].start_pc == lv_table->table[j].start_pc
+                        && generic_vars->table[i].length == lv_table->table[j].length
+                        &&  generic_vars->table[i].index == lv_table->table[j].index)
+                    {
+                        lv_table->table[j].generic_type = generic_vars->table[i].type;
+                        break;
+                    }
+                }
+            }
+            String* gvi_name = generic_vars->table[i].name;
+            if( num_lvtt_entries >= LV_ALLOCATION_THRESHOLD ){
+                STD_FREE(generic_vars);
+            }
+            if(j == lv_table->length) {
+                REPORT_FAILED_METHOD("Element: "<< gvi_name <<
+                    " from LocalVariableTypeTable doesn't coincide with element from LocalVariableTable");
+            }
+        }
+
+        if(TI_enabled) {
+            _local_vars_table = lv_table;
+        } else {
+            if(num_lvt_entries >= LV_ALLOCATION_THRESHOLD) {
+                STD_FREE(lv_table);
+            }
+        }
+    }
+
+
+    //return to the right ByteReader point
+    if(!cfs.go_to_offset(return_point))
+    {
+        return false;
     }
 
     return true;
@@ -1436,16 +1643,19 @@ check_method_descriptor( const char *descriptor )
     return result;
 }
 
-
 bool Method::parse(Global_Env& env, Class* clss,
                    ByteReader &cfs)
 {
     if(!Class_Member::parse(clss, cfs))
         return false;
 
-    if(!check_method_name(_name, env)) {
-        REPORT_FAILED_CLASS_FORMAT(clss, "illegal method name : " << _name->bytes);
-        return false;
+    if(!(_name == env.Init_String || _name == env.Clinit_String))
+    {
+        if(!check_method_name(_name->bytes, _name->len))
+        {
+            REPORT_FAILED_CLASS_FORMAT(clss, "illegal method name : " << _name->bytes);
+            return false;
+        }
     }
 
     // check method descriptor
@@ -1456,24 +1666,28 @@ bool Method::parse(Global_Env& env, Class* clss,
             << _name->bytes << _descriptor->bytes);
         return false;
     }
-    calculate_arguments_size();
+    calculate_arguments_slot_num();
 
-    uint16 attr_count;
-    if (!cfs.parse_u2_be(&attr_count)) {
+    //The total length of method parameters should be 255 or less.
+    //See 4.4.3 in specification.
+    if(_arguments_slot_num > 255) {
         REPORT_FAILED_CLASS_CLASS(_class->get_class_loader(), _class, "java/lang/ClassFormatError",
-            _class->get_name()->bytes << ": could not parse attributes count for method "
-            << _name->bytes << _descriptor->bytes);
+            _class->get_name()->bytes <<
+            ": method has more than 255 arguments "
+            << _name->bytes );
         return false;
     }
+    // checked method descriptor
+
     _intf_method_for_fake_method = NULL;
 
     // set the has_finalizer, is_clinit and is_init flags
-    if (_name == env.FinalizeName_String && _descriptor == env.VoidVoidDescriptor_String) {
+    if(_name == env.FinalizeName_String && _descriptor == env.VoidVoidDescriptor_String) {
         _flags.is_finalize = 1;
     }
-    else if (_name == env.Init_String)
+    else if(_name == env.Init_String)
         _flags.is_init = 1;
-    else if (_name == env.Clinit_String)
+    else if(_name == env.Clinit_String)
         _flags.is_clinit = 1;
     // check method access flags
     if(!is_clinit())
@@ -1481,6 +1695,7 @@ bool Method::parse(Global_Env& env, Class* clss,
         if(is_private() && is_protected() || is_private() && is_public() || is_protected() && is_public())
         {
             bool bout = false;
+            //See specification 4.7 Methods about access_flags
             REPORT_FAILED_CLASS_CLASS(_class->get_class_loader(), _class, "java/lang/ClassFormatError",
                 _class->get_name()->bytes << ": invalid combination of access flags ("
                 << ((bout = is_public())?"ACC_PUBLIC":"")
@@ -1492,7 +1707,7 @@ bool Method::parse(Global_Env& env, Class* clss,
                 << _name->bytes << _descriptor->bytes);
             return false;
         }
-        if(is_abstract() 
+        if(is_abstract()
         && (is_final() || is_native() || is_private() || is_static() || is_strict() || is_synchronized()))
         {
             bool bout = false;
@@ -1513,35 +1728,28 @@ bool Method::parse(Global_Env& env, Class* clss,
                 << _name->bytes << _descriptor->bytes);
             return false;
         }
-        if(_class->is_interface() && !(is_abstract() && is_public())) {
-            REPORT_FAILED_CLASS_CLASS(_class->get_class_loader(), _class, "java/lang/ClassFormatError",
-                _class->get_name()->bytes << "." << _name->bytes << _descriptor->bytes
-                << ": interface method cannot have access flags other then "
-                "ACC_ABSTRACT and ACC_PUBLIC set"
-                );
-            return false;
-        }
-        if(_class->is_interface() &&
-            (is_private() || is_protected() || is_static() || is_final()
-            || is_synchronized() || is_native() || is_strict()))
+        if(_class->is_interface())
         {
-            REPORT_FAILED_CLASS_CLASS(_class->get_class_loader(), _class, "java/lang/ClassFormatError",
-                _class->get_name()->bytes << "." << _name->bytes << _descriptor->bytes
-                << ": interface method cannot have access flags other then "
-                "ACC_ABSTRACT and ACC_PUBLIC set");
-            return false;
+            if(!(is_abstract() && is_public())){
+                REPORT_FAILED_CLASS_CLASS(_class->get_class_loader(), _class, "java/lang/ClassFormatError",
+                    _class->get_name()->bytes << "." << _name->bytes << _descriptor->bytes
+                    << ": interface method must have access flags "
+                    "ACC_ABSTRACT and ACC_PUBLIC set"
+                    );
+                return false;
+            }
+            if(_access_flags & ~(ACC_ABSTRACT | ACC_PUBLIC | ACC_VARARGS | ACC_BRIDGE | ACC_SYNTHETIC)){
+                REPORT_FAILED_CLASS_CLASS(_class->get_class_loader(), _class, "java/lang/ClassFormatError",
+                    _class->get_name()->bytes << "." << _name->bytes << _descriptor->bytes
+                    << ": interface method cannot have access flags other then "
+                    "ACC_ABSTRACT, ACC_PUBLIC, ACC_VARARG, ACC_BRIDGES or ACC_SYNTHETIC set");
+                return false;
+            }
         }
-    }    
-    if(is_init() && (is_static() || is_final() || is_synchronized() || is_native() || is_abstract() || is_bridge())) {
-        REPORT_FAILED_CLASS_CLASS(_class->get_class_loader(), _class, "java/lang/ClassFormatError",
-            _class->get_name()->bytes << "." << _name->bytes << _descriptor->bytes
-            << ": constructor cannot have access flags other then "
-            "ACC_STRICT and one of ACC_PUBLIC, ACC_PRIVATE, or ACC_PROTECTED set");
-        return false;
-    }
-    if(is_clinit()) {
+
+    } else {
         // Java VM specification
-        // 4.6 Methods
+        // 4.7 Methods
         // "Class and interface initialization methods (�3.9) are called
         // implicitly by the Java virtual machine; the value of their
         // access_flags item is ignored except for the settings of the
@@ -1553,8 +1761,28 @@ bool Method::parse(Global_Env& env, Class* clss,
         _access_flags |= ACC_STATIC;
     }
 
-    unsigned n_code_attr = 0;
-    unsigned n_exceptions_attr = 0;
+    if(is_init() && (is_static() || is_final() || is_synchronized() || is_native() || is_abstract() || is_bridge())) {
+        REPORT_FAILED_CLASS_CLASS(_class->get_class_loader(), _class, "java/lang/ClassFormatError",
+            _class->get_name()->bytes << "." << _name->bytes << _descriptor->bytes
+            << ": constructor cannot have access flags other then "
+            "ACC_STRICT, ACC_VARARGS, ACC_SYNTHETIC and one of ACC_PUBLIC, ACC_PRIVATE, or ACC_PROTECTED set");
+        return false;
+    }
+
+    //check method attributes
+    uint16 attr_count;
+    if(!cfs.parse_u2_be(&attr_count)) {
+        REPORT_FAILED_CLASS_CLASS(_class->get_class_loader(), _class, "java/lang/ClassFormatError",
+            _class->get_name()->bytes << ": could not parse attributes count for method "
+            << _name->bytes << _descriptor->bytes);
+        return false;
+    }
+
+    unsigned numCode = 0;
+    unsigned numExceptions = 0;
+    unsigned numRuntimeVisibleAnnotations = 0;
+    unsigned numRuntimeInvisibleAnnotations = 0;
+    unsigned numRuntimeInvisibleParameterAnnotations = 0;
     uint32 attr_len = 0;
     ConstantPool& cp = clss->get_constant_pool();
 
@@ -1562,21 +1790,45 @@ bool Method::parse(Global_Env& env, Class* clss,
         //
         // only code and exception attributes are defined for Method
         //
-        Attributes cur_attr = parse_attribute(cfs, cp, method_attr_strings, method_attrs, &attr_len);
+        Attributes cur_attr = parse_attribute(clss, cfs, cp, method_attr_strings, method_attrs, &attr_len);
         switch(cur_attr) {
         case ATTR_Code:
-            n_code_attr++;
+            numCode++;
+            if (numCode > 1) {
+                REPORT_FAILED_CLASS_CLASS(_class->get_class_loader(), _class, "java/lang/ClassFormatError",
+                    _class->get_name()->bytes << ": there is more than one Code attribute for method "
+                    << _name->bytes << _descriptor->bytes);
+                return false;
+            }
+            if((is_abstract() || is_native()) && numCode > 0) {
+                REPORT_FAILED_CLASS_CLASS(_class->get_class_loader(), _class, "java/lang/ClassFormatError",
+                    _class->get_name()->bytes << "." << _name->bytes << _descriptor->bytes
+                    << ": " << (is_abstract()?"abstract":(is_native()?"native":""))
+                    << " method should not have Code attribute present");
+                return false;
+            }
             if(!_parse_code(cp, attr_len, cfs))
                 return false;
             break;
 
         case ATTR_Exceptions:
-            n_exceptions_attr++;
+            if(++numExceptions > 1) {
+                REPORT_FAILED_CLASS_CLASS(_class->get_class_loader(), _class, "java/lang/ClassFormatError",
+                    _class->get_name()->bytes << ": there is more than one Exceptions attribute for method "
+                    << _name->bytes << _descriptor->bytes);
+                return false;
+            }
             if(!_parse_exceptions(cp, attr_len, cfs))
                 return false;
             break;
 
         case ATTR_RuntimeInvisibleParameterAnnotations:
+            if(++numRuntimeInvisibleParameterAnnotations > 1) {
+                REPORT_FAILED_CLASS_FORMAT(clss,
+                    "more than one RuntimeInvisibleParameterAnnotations attribute");
+                return false;
+            }
+
             if (!cfs.skip(attr_len))
             {
                 REPORT_FAILED_METHOD("error skipping RuntimeInvisibleParameterAnnotations");
@@ -1586,6 +1838,7 @@ bool Method::parse(Global_Env& env, Class* clss,
 
         case ATTR_RuntimeVisibleParameterAnnotations:
             {
+                // See specification 4.8.16.
                 if (_param_annotations) {
                     REPORT_FAILED_METHOD(
                         "more than one RuntimeVisibleParameterAnnotations attribute");
@@ -1593,7 +1846,7 @@ bool Method::parse(Global_Env& env, Class* clss,
                 }
 
                 if (!cfs.parse_u1(&_num_param_annotations)) {
-                    REPORT_FAILED_CLASS_FORMAT(clss, 
+                    REPORT_FAILED_CLASS_FORMAT(clss,
                         "cannot parse number of ParameterAnnotations");
                     return false;
                 }
@@ -1601,35 +1854,36 @@ bool Method::parse(Global_Env& env, Class* clss,
                 if (_num_param_annotations) {
                     _param_annotations = (AnnotationTable**)_class->get_class_loader()->Alloc(
                         _num_param_annotations * sizeof (AnnotationTable*));
-
+                    //FIXME: verav should throw OOM
                     for (unsigned i = 0; i < _num_param_annotations; i++)
                     {
                         uint32 next_len = parse_annotation_table(_param_annotations + i, cfs, _class);
                         if (next_len == 0) {
                             return false;
-                        } 
+                        }
                         read_len += next_len;
                     }
                 }
                 if (attr_len != read_len) {
-                    REPORT_FAILED_METHOD( 
+                    REPORT_FAILED_METHOD(
                         "error parsing ParameterAnnotations attribute"
                         << "; declared length " << attr_len
                         << " does not match actual " << read_len);
                     return false;
-                }            
+                }
             }
             break;
 
         case ATTR_AnnotationDefault:
             {
+                //See specification 4.8.18 about default_value
                 if (_default_value) {
                     REPORT_FAILED_METHOD("more than one AnnotationDefault attribute");
                     return false;
                 }
                 _default_value = (AnnotationValue *)_class->get_class_loader()->Alloc(
                     sizeof(AnnotationValue));
-
+                //FIXME: verav should throw OOM
                 uint32 read_len = parse_annotation_value(*_default_value, cfs, clss);
                 if (read_len == 0) {
                     return false;
@@ -1643,59 +1897,107 @@ bool Method::parse(Global_Env& env, Class* clss,
             }
             break;
 
+        case ATTR_Synthetic:
+            {
+                if(attr_len != 0) {
+                    REPORT_FAILED_CLASS_FORMAT(clss,
+                        "attribute Synthetic has non-zero length");
+                    return false;
+                }
+                _access_flags |= ACC_SYNTHETIC;
+            }
+            break;
+
+        case ATTR_Deprecated:
+            {
+                if(attr_len != 0) {
+                    REPORT_FAILED_CLASS_FORMAT(clss,
+                        "attribute Deprecated has non-zero length");
+                    return false;
+                }
+                _deprecated = true;
+            }
+            break;
+
+        case ATTR_Signature:
+            {
+                if(_signature != NULL) {
+                    REPORT_FAILED_CLASS_FORMAT(clss,
+                        "more than one Signature attribute for the class");
+                    return false;
+                }
+                if (!(_signature = parse_signature_attr(cfs, attr_len, clss))) {
+                    return false;
+                }
+            }
+            break;
+
+        case ATTR_RuntimeVisibleAnnotations:
+            {
+                //Each method_info structure may contain at most one RuntimeVisibleAnnotations attribute.
+                // See specification 4.8.14.
+                if(++numRuntimeVisibleAnnotations > 1) {
+                    REPORT_FAILED_CLASS_FORMAT(clss,
+                        "more than one RuntimeVisibleAnnotations attribute");
+                    return false;
+                }
+
+                uint32 read_len = parse_annotation_table(&_annotations, cfs, clss);
+                if (attr_len != read_len) {
+                    REPORT_FAILED_CLASS_FORMAT(clss,
+                        "error parsing Annotations attribute"
+                        << "; declared length " << attr_len
+                        << " does not match actual " << read_len);
+                    return false;
+                }
+            }
+            break;
+
+        case ATTR_RuntimeInvisibleAnnotations:
+            {
+                //Each method_info structure may contain at most one RuntimeInvisibleAnnotations attribute.
+                if(++numRuntimeInvisibleAnnotations > 1) {
+                    REPORT_FAILED_CLASS_FORMAT(clss,
+                        "more than one RuntimeInvisibleAnnotations attribute");
+                    return false;
+                }
+
+                if(!cfs.skip(attr_len)) {
+                    REPORT_FAILED_CLASS_FORMAT(clss,
+                        "failed to skip RuntimeInvisibleAnnotations attribute");
+                    return false;
+                }
+            }
+            break;
+
         case ATTR_UNDEF:
             // unrecognized attribute; skipped
             break;
-
+        case ATTR_ERROR:
+            return false;
         default:
-            switch(process_common_attribute(cur_attr, attr_len, cfs)) {
-            case ATTR_ERROR: 
-                // tried and failed
-                return false;
-            case ATTR_UNDEF:
-                // unprocessed
-                REPORT_FAILED_CLASS_CLASS(clss->get_class_loader(), clss, "java/lang/InternalError",
-                    clss->get_name()->bytes
-                    << " : error parsing attributes for method "
-                    << _name->bytes << _descriptor->bytes
-                    << "; unprocessed attribute " << cur_attr);
-                return false;
-            } // switch
+            REPORT_FAILED_CLASS_CLASS(clss->get_class_loader(), _class, "java/lang/InternalError",
+                _class->get_name()->bytes << ": unknown error occured "
+                "while parsing attributes for method "
+                << _name->bytes << _descriptor->bytes
+                << "; unprocessed attribute " << cur_attr);
+            return false;
         } // switch
     } // for
 
     //
     // there must be no more than 1 code attribute and no more than 1 exceptions
     // attribute per method
+    // See specificaton 4.8.3 and 4.8.4 first paragraphs.
     //
-    if (n_code_attr > 1) {
-        REPORT_FAILED_CLASS_CLASS(_class->get_class_loader(), _class, "java/lang/ClassFormatError",
-            _class->get_name()->bytes << ": there is more than one Code attribute for method "
-            << _name->bytes << _descriptor->bytes);
-        return false;
-    }
-    if(n_exceptions_attr > 1) {
-        REPORT_FAILED_CLASS_CLASS(_class->get_class_loader(), _class, "java/lang/ClassFormatError",
-            _class->get_name()->bytes << ": there is more than one Exceptions attribute for method "
-            << _name->bytes << _descriptor->bytes);
-        return false;
-    }
 
-    if((is_abstract() || is_native()) && n_code_attr > 0) {
-        REPORT_FAILED_CLASS_CLASS(_class->get_class_loader(), _class, "java/lang/ClassFormatError",
-            _class->get_name()->bytes << "." << _name->bytes << _descriptor->bytes
-            << ": " << (is_abstract()?"abstract":(is_native()?"native":""))
-            << " method should not have Code attribute present");
-        return false;
-    }
 
-    if(!(is_abstract() || is_native()) && n_code_attr == 0) {
+    if(!(is_abstract() || is_native()) && numCode == 0) {
         REPORT_FAILED_CLASS_CLASS(_class->get_class_loader(), _class, "java/lang/ClassFormatError",
             _class->get_name()->bytes << "." << _name->bytes << _descriptor->bytes
             << ": Java method should have Code attribute present");
         return false;
     }
-    if(is_native()) _access_flags |= ACC_NATIVE;
     return true;
 } //Method::parse
 
@@ -1753,6 +2055,21 @@ bool Class::parse_fields(Global_Env* env, ByteReader& cfs)
     }
     assert(last_nonstatic_field == m_num_static_fields);
 
+    //See specification 4.6 Fields:
+    //No two fields in one class file may have the same name and descriptor.
+    for (int j = 0; j < num_fields_in_class_file; j++){
+        for(int k = j + 1; k < num_fields_in_class_file; k++){
+            if((m_fields[j].get_name() == m_fields[k].get_name())
+                && (m_fields[j].get_descriptor() == m_fields[k].get_descriptor()))
+            {
+                REPORT_FAILED_CLASS_CLASS(m_class_loader, this, "java/lang/ClassFormatError",
+                    "duplicate field " << get_name()->bytes << "."
+                    << m_fields[j].get_name()->bytes << " " << m_fields[j].get_descriptor()->bytes);
+                return false;
+            }
+        }
+    }
+
     for(i = 0; i < int(sizeof(vm_extra_fields)/sizeof(VMExtraFieldDescription)); i++) {
         if(get_name() == vm_extra_fields[i].classname) {
             Field& f = m_fields[num_fields_in_class_file];
@@ -1786,8 +2103,10 @@ bool Class::parse_methods(Global_Env* env, ByteReader &cfs)
     }
 
     m_methods = new Method[m_num_methods];
+    //FIXME: should throw OOME
 
     _total_method_bytes += sizeof(Method)*m_num_methods;
+
     for(unsigned i = 0;  i < m_num_methods; i++) {
         if(!m_methods[i].parse(*env, this, cfs)) {
             return false;
@@ -1803,16 +2122,65 @@ bool Class::parse_methods(Global_Env* env, ByteReader &cfs)
             }
             m_static_initializer = &(m_methods[i]);
         }
-        // to cache the default constructor 
+        // to cache the default constructor
         if (m->get_name() == VM_Global_State::loader_env->Init_String
             && m->get_descriptor() == VM_Global_State::loader_env->VoidVoidDescriptor_String)
         {
             m_default_constructor = &m_methods[i];
         }
     }
+
+    //See specification 4.7 Methods:
+    //No two methods in one class file may have the same name and descriptor.
+    for (int j = 0; j < m_num_methods; j++){
+        for(int k = j + 1; k < m_num_methods; k++){
+            if((m_methods[j].get_name() == m_methods[k].get_name())
+                && (m_methods[j].get_descriptor() == m_methods[k].get_descriptor()))
+            {
+                REPORT_FAILED_CLASS_CLASS(m_class_loader, this, "java/lang/ClassFormatError",
+                    "duplicate method " << get_name()->bytes << "."
+                    << m_methods[j].get_name()->bytes << m_methods[j].get_descriptor()->bytes);
+                return false;
+            }
+        }
+    }
+
     return true; // success
 } //class_parse_methods
 
+static inline bool
+check_class_name(const char *name, unsigned len)
+{
+    unsigned id_len = 0;
+    const char* iterator = name;
+    if(name[0] == '[')
+    {
+        const char *next = name + 1;
+        if(!check_field_descriptor(name, &next, false) || *next != '\0') {
+            return false;
+        }else {
+            return true;
+        }
+    }
+    else
+    {
+        for( unsigned i = 0; i < len ; i++, iterator++ )
+        {
+            if( *iterator != '/' ) {
+                id_len++;
+            }else
+            {
+                if(!check_field_name(name, id_len))
+                    return false;
+                id_len = 0;
+                name = iterator;
+                name++;
+            }
+        }
+    return check_field_name(name, id_len);
+    }
+    return false; //unreacheable code
+}
 
 static String* class_file_parse_utf8data(String_Pool& string_pool, ByteReader& cfs,
                                          uint16 len)
@@ -1823,7 +2191,7 @@ static String* class_file_parse_utf8data(String_Pool& string_pool, ByteReader& c
 
     // get utf8 bytes and move buffer pointer
     const char* utf8data = (const char*)cfs.get_and_skip(len);
-    
+
     // FIXME: decode 6-byte Java 1.5 encoding
 
     // check utf8 correctness
@@ -1863,6 +2231,7 @@ bool ConstantPool::parse(Class* clss,
 
     //
     // 0'th constant pool entry is a pointer to the tags array
+    // See specification 4.5 about Constant Pool
     //
     m_entries[0].tags = cp_tags;
     cp_tags[0] = CONSTANT_Tags;
@@ -1976,10 +2345,12 @@ bool ConstantPool::parse(Class* clss,
 } // ConstantPool::parse
 
 
-bool ConstantPool::check(Class* clss)
+bool ConstantPool::check(Global_Env* env, Class* clss)
 {
+
+
     for(unsigned i = 1; i < m_size; i++) {
-        switch(get_tag(i))
+        switch(unsigned char tag = get_tag(i))
         {
         case CONSTANT_Class:
         {
@@ -1990,6 +2361,12 @@ bool ConstantPool::check(Class* clss)
                     clss->get_name()->bytes << ": wrong name index for CONSTANT_Class entry");
                 return false;
             }
+            if(!check_class_name(get_utf8_string(name_index)->bytes, get_utf8_string(name_index)->len))
+            {
+                REPORT_FAILED_CLASS_CLASS(clss->get_class_loader(), clss, "java/lang/ClassFormatError",
+                    clss->get_name()->bytes << ": illegal CONSTANT_Class name "<< get_utf8_string(name_index)->bytes);
+                return false;
+            }
             break;
         }
         case CONSTANT_Methodref:
@@ -1998,6 +2375,11 @@ bool ConstantPool::check(Class* clss)
         {
             unsigned class_index = get_ref_class_index(i);
             unsigned name_type_index = get_ref_name_and_type_index(i);
+            const char *next = NULL;
+            String *name;
+            String *descriptor;
+            unsigned name_index = get_name_and_type_name_index(name_type_index);
+            unsigned descriptor_index = get_name_and_type_descriptor_index(name_type_index);
             if (!is_valid_index(class_index) || !is_class(class_index)) {
                 REPORT_FAILED_CLASS_CLASS(clss->get_class_loader(), clss, "java/lang/ClassFormatError",
                     clss->get_name()->bytes << ": wrong class index for CONSTANT_*ref entry");
@@ -2007,6 +2389,88 @@ bool ConstantPool::check(Class* clss)
                 REPORT_FAILED_CLASS_CLASS(clss->get_class_loader(), clss, "java/lang/ClassFormatError",
                     clss->get_name()->bytes << ": wrong name-and-type index for CONSTANT_*ref entry");
                 return false;
+            }
+            if(!is_valid_index(name_index) || !is_utf8(name_index)) {
+                REPORT_FAILED_CLASS_CLASS(clss->get_class_loader(), clss, "java/lang/ClassFormatError",
+                    clss->get_name()->bytes << ": wrong name index for CONSTANT_Methodref entry");
+                return false;
+            }
+            if (!is_valid_index(descriptor_index) || !is_utf8(descriptor_index)) {
+                REPORT_FAILED_CLASS_CLASS(clss->get_class_loader(), clss, "java/lang/ClassFormatError",
+                    clss->get_name()->bytes << ": wrong descriptor index for CONSTANT_Methodref entry");
+                return false;
+            }
+
+            name = get_utf8_string(name_index);
+            descriptor = get_utf8_string(descriptor_index);
+
+            if(tag == CONSTANT_Methodref)
+            {
+                //check method name
+                if(name != env->Init_String)
+                {
+                    if(!check_method_name(name->bytes,name->len))
+                    {
+                        REPORT_FAILED_CLASS_CLASS(clss->get_class_loader(), clss, "java/lang/ClassFormatError",
+                            clss->get_name()->bytes << ": illegal method name for CONSTANT_Methodref entry: " << name->bytes);
+                        return false;
+                    }
+                }
+                //check method descriptor
+                if(!check_method_descriptor(descriptor->bytes))
+                {
+                    REPORT_FAILED_CLASS_CLASS(clss->get_class_loader(), clss, "java/lang/ClassFormatError",
+                        clss->get_name()->bytes << ": illegal method descriptor at CONSTANT_Methodref entry: "
+                        << descriptor->bytes);
+                    return false;
+                }
+                //for <init> method return type must be void
+                //See specification 4.5.2
+                if(name == env->Init_String)
+                {
+                    if(descriptor->bytes[descriptor->len - 1] != 'V')
+                    {
+                        REPORT_FAILED_CLASS_CLASS(clss->get_class_loader(), clss, "java/lang/ClassFormatError",
+                            clss->get_name()->bytes << " return type of <init> method"
+                            " is not void at CONSTANT_Methodref entry");
+                        return false;
+                    }
+                }
+            }
+            if(tag == CONSTANT_Fieldref)
+            {
+                //check field name
+                if(!check_field_name(name->bytes, name->len))
+                {
+                    REPORT_FAILED_CLASS_CLASS(clss->get_class_loader(), clss, "java/lang/ClassFormatError",
+                        clss->get_name()->bytes << ": illegal filed name for CONSTANT_Filedref entry: " << name->bytes);
+                    return false;
+                }
+                //check field descriptor
+                if(!check_field_descriptor(descriptor->bytes, &next, false) || *next != '\0' )
+                {
+                    REPORT_FAILED_CLASS_CLASS(clss->get_class_loader(), clss, "java/lang/ClassFormatError",
+                        clss->get_name()->bytes << ": illegal field descriptor at CONSTANT_Fieldref entry: " << descriptor->bytes);
+                    return false;
+                }
+            }
+            if(tag == CONSTANT_InterfaceMethodref)
+            {
+                //check method name, name can't be <init> or <clinit>
+                //See specification 4.5.2 about name_and_type_index last sentence.
+                if(!check_method_name(name->bytes, name->len))
+                {
+                    REPORT_FAILED_CLASS_CLASS(clss->get_class_loader(), clss, "java/lang/ClassFormatError",
+                        clss->get_name()->bytes << ": illegal filed name for CONSTANT_InterfaceMethod entry: " << name->bytes);
+                    return false;
+                }
+                //check method descriptor
+                if(!check_method_descriptor(descriptor->bytes))
+                {
+                    REPORT_FAILED_CLASS_CLASS(clss->get_class_loader(), clss, "java/lang/ClassFormatError",
+                        clss->get_name()->bytes << ": illegal method descriptor at CONSTANT_InterfaceMethodref entry: " << descriptor->bytes);
+                    return false;
+                }
             }
             break;
         }
@@ -2024,13 +2488,22 @@ bool ConstantPool::check(Class* clss)
             break;
         }
         case CONSTANT_Integer:
-        case CONSTANT_Long:
         case CONSTANT_Float:
-        case CONSTANT_Double:
             // not much to do here
+            break;
+        case CONSTANT_Long:
+        case CONSTANT_Double:
+            //check Long and Double indexes, n+1 index should be valid too.
+            //See specification 4.5.5
+            if( i + 1 > m_size){
+                REPORT_FAILED_CLASS_CLASS(clss->get_class_loader(), clss, "java/lang/ClassFormatError",
+                    clss->get_name()->bytes << ": illegal indexes for Long or Double " << i << " and " << i + 1);
+                return false;
+            }
             break;
         case CONSTANT_NameAndType:
         {
+            //See specification 4.5.6
             unsigned name_index = get_name_and_type_name_index(i);
             unsigned descriptor_index = get_name_and_type_descriptor_index(i);
             if(!is_valid_index(name_index) || !is_utf8(name_index)) {
@@ -2038,11 +2511,13 @@ bool ConstantPool::check(Class* clss)
                     clss->get_name()->bytes << ": wrong name index for CONSTANT_NameAndType entry");
                 return false;
             }
+
             if (!is_valid_index(descriptor_index) || !is_utf8(descriptor_index)) {
                 REPORT_FAILED_CLASS_CLASS(clss->get_class_loader(), clss, "java/lang/ClassFormatError",
                     clss->get_name()->bytes << ": wrong descriptor index for CONSTANT_NameAndType entry");
                 return false;
             }
+
             resolve_entry(i, get_utf8_string(name_index), get_utf8_string(descriptor_index));
             break;
         }
@@ -2078,8 +2553,8 @@ bool Class::parse_interfaces(ByteReader &cfs)
             return false;
         }
         //
-        // verify that entry in constant pool is of type CONSTANT_Class
-        //
+        //Verify that interface index is valid and entry in constant pool is of type CONSTANT_Class
+        //See specification 4.2 about interfaces.
         m_superinterfaces[i].name = cp_check_class(m_const_pool, interface_index);
         if(m_superinterfaces[i].name == NULL) {
             REPORT_FAILED_CLASS_CLASS(m_class_loader, this, "java/lang/ClassFormatError",
@@ -2105,7 +2580,7 @@ bool Class::parse_interfaces(ByteReader &cfs)
 
 /*
  *  Parses and verifies the classfile. Format is (from JVM spec):
- * 
+ *
  *    ClassFile {
  *      u4 magic;
  *      u2 minor_version;
@@ -2138,6 +2613,7 @@ bool Class::parse(Global_Env* env,
         return false;
     }
 
+    //See 4.2 in specification about value of magic number
     if (magic != CLASSFILE_MAGIC) {
         REPORT_FAILED_CLASS_CLASS(m_class_loader, this, "java/lang/ClassFormatError",
             "invalid magic");
@@ -2147,6 +2623,7 @@ bool Class::parse(Global_Env* env,
     /*
      *  get and check major/minor version of classfile
      *  1.1 (45.0-3) 1.2 (46.???) 1.3 (47.???) 1.4 (48.?) 5 (49.0)
+     *  See 4.2 in specification about minor_version, major_version of classfile.
      */
     uint16 minor_version;
     if (!cfs.parse_u2_be(&minor_version)) {
@@ -2161,6 +2638,7 @@ bool Class::parse(Global_Env* env,
         return false;
     }
 
+    //See comment in specification 4.2 about supported versions.
     if (!(m_version >= CLASSFILE_MAJOR
         && m_version <= CLASSFILE_MAJOR_MAX))
     {
@@ -2169,6 +2647,12 @@ bool Class::parse(Global_Env* env,
         return false;
     }
 
+    if(m_version == 49 && minor_version > 0)
+    {
+        REPORT_FAILED_CLASS_CLASS(m_class_loader, this, "java/lang/UnsupportedClassVersionError",
+            "unsupported class file version " << m_version << "." << minor_version);
+        return false;
+    }
     /*
      *  allocate and parse constant pool
      */
@@ -2178,21 +2662,59 @@ bool Class::parse(Global_Env* env,
     /*
      * check and preprocess the constant pool
      */
-    if(!m_const_pool.check(this))
+    if(!m_const_pool.check(env, this))
         return false;
 
+    /*
+    *  parse access flags
+    */
     if(!cfs.parse_u2_be(&m_access_flags)) {
         REPORT_FAILED_CLASS_CLASS(m_class_loader, this, "java/lang/ClassFormatError",
             m_name->bytes << ": could not parse access flags");
         return false;
     }
 
+    //If class is interface, it must be abstract.
+    //See specification 4.2 about access_flags.
     if(is_interface()) {
         // NOTE: Fix for the statement that an interface should have
         // abstract flag set.
-        // spec/harness/BenchmarkDone has interface flag, but it does not 
+        // spec/harness/BenchmarkDone has interface flag, but it does not
         // have abstract flag.
         m_access_flags |= ACC_ABSTRACT;
+    }
+
+    /*
+     *   can't be both final and interface, or both final and abstract
+     *   See specification 4.2 about access_flags.
+     */
+    if(is_final() && is_interface())
+    {
+        REPORT_FAILED_CLASS_FORMAT(this, "interface cannot be final");
+        return false;
+    }
+    //not only ACC_FINAL flag is prohibited if is_interface, also ACC_SUPER, ACC_SYNTHETIC, ACC_ENUM.
+    if(is_interface() && (is_super() || is_synthetic() || is_enum()))
+    {
+        REPORT_FAILED_CLASS_FORMAT(this,
+        "if class is interface, no flags except ACC_ABSTRACT or ACC_PUBLIC can be set");
+        return false;
+    }
+    if(is_final() && is_abstract()) {
+        REPORT_FAILED_CLASS_FORMAT(this, "abstract class cannot be final");
+        return false;
+    }
+
+    if(is_annotation() && !is_interface())
+    {
+        REPORT_FAILED_CLASS_FORMAT(this, "annotation type must be interface");
+        return false;
+    }
+
+    if(!is_interface() && is_annotation())
+    {
+        REPORT_FAILED_CLASS_FORMAT(this, "not interface can't be annotation");
+        return false;
     }
 
     /*
@@ -2205,6 +2727,7 @@ bool Class::parse(Global_Env* env,
         return false;
     }
 
+    //See specification 4.2 about this_class.
     String * class_name = cp_check_class(m_const_pool, this_class);
     if (class_name == NULL) {
         REPORT_FAILED_CLASS_CLASS(m_class_loader, this, "java/lang/ClassFormatError",
@@ -2217,7 +2740,7 @@ bool Class::parse(Global_Env* env,
      * When defineClass from byte stream, there are cases that clss->name is null,
      * so we should add a check here
      */
-    if(m_name != NULL && class_name != m_name) { 
+    if(m_name != NULL && class_name != m_name) {
         REPORT_FAILED_CLASS_CLASS(m_class_loader, this,
             VM_Global_State::loader_env->JavaLangNoClassDefFoundError_String->bytes,
             m_name->bytes << ": class name in class data does not match class name passed");
@@ -2246,12 +2769,13 @@ bool Class::parse(Global_Env* env,
     m_super_class.cp_index = super_class;
     if (super_class == 0) {
         //
-        // this class must represent java.lang.Object
+        // This class must represent java.lang.Object
+        // See 4.2 in specification about super_class.
         //
         if(m_name != env->JavaLangObject_String) {
             REPORT_FAILED_CLASS_CLASS(m_class_loader, this, "java/lang/ClassFormatError",
                 m_name->bytes << ": class does not contain super class "
-                << "but is not java.lang.Object class");
+                << "but is not java.lang.Object class.");
             return false;
         }
         m_super_class.name = NULL;
@@ -2263,6 +2787,12 @@ bool Class::parse(Global_Env* env,
                 << super_class << " is an illegal CONSTANT_Class entry");
             return false;
         }
+        if(is_interface() && m_super_class.name != env->JavaLangObject_String){
+            REPORT_FAILED_CLASS_CLASS(m_class_loader, this, "java/lang/ClassFormatError",
+                m_name->bytes << ": the super class of interface is "
+                << m_super_class.name << "; must be java/lang/Object");
+            return false;
+        }
     }
 
     /*
@@ -2271,20 +2801,19 @@ bool Class::parse(Global_Env* env,
     if(!parse_interfaces(cfs))
         return false;
 
-    /* 
+    /*
      *  allocate and parse class' fields
      */
     if(!parse_fields(env, cfs))
         return false;
 
-    /* 
+    /*
      *  allocate and parse class' methods
      */
     if(!parse_methods(env, cfs))
         return false;
-
     /*
-     *  only the FileName attribute is defined for Class
+     *  parse attributes
      */
     uint16 n_attrs;
     if (!cfs.parse_u2_be(&n_attrs)) {
@@ -2292,25 +2821,26 @@ bool Class::parse(Global_Env* env,
             m_name->bytes << ": could not parse number of attributes");
         return false;
     }
-
-    unsigned n_source_file_attr = 0;
+    unsigned numSourceFile = 0;
     unsigned numSourceDebugExtensions = 0;
     unsigned numEnclosingMethods = 0;
+    unsigned numRuntimeVisibleAnnotations = 0;
+    unsigned numRuntimeInvisibleAnnotations = 0;
     uint32 attr_len = 0;
 
     for (unsigned i=0; i<n_attrs; i++) {
-        Attributes cur_attr = parse_attribute(cfs, m_const_pool, class_attr_strings, class_attrs, &attr_len);
+        Attributes cur_attr = parse_attribute(this, cfs, m_const_pool, class_attr_strings, class_attrs, &attr_len);
         switch(cur_attr){
         case ATTR_SourceFile:
         {
             // a class file can have at most one source file attribute
-            if (++n_source_file_attr > 1) {
+            if (++numSourceFile > 1) {
                 REPORT_FAILED_CLASS_CLASS(m_class_loader, this, "java/lang/ClassFormatError",
                     m_name->bytes << ": there is more than one SourceFile attribute");
                 return false;
             }
 
-            // attribute length must be two (vm spec 4.7.2)
+            // attribute length must be two (vm spec 4.8.2)
             if (attr_len != 2) {
                 REPORT_FAILED_CLASS_CLASS(m_class_loader, this, "java/lang/ClassFormatError",
                     m_name->bytes << ": SourceFile attribute has incorrect length ("
@@ -2339,6 +2869,7 @@ bool Class::parse(Global_Env* env,
 
         case ATTR_InnerClasses:
         {
+            //See specification 4.8.5 about InnerClasses Attribute
             if (m_declaring_class_index || m_innerclasses) {
                 REPORT_FAILED_CLASS_FORMAT(this, "more than one InnerClasses attribute");
             }
@@ -2351,6 +2882,8 @@ bool Class::parse(Global_Env* env,
                 isinner = true;
                 found_myself = 0;
             }
+
+            unsigned read_len = 0;
             //Only handle inner class
             uint16 num_of_classes;
             if(!cfs.parse_u2_be(&num_of_classes)) {
@@ -2359,6 +2892,7 @@ bool Class::parse(Global_Env* env,
                     << " while parsing InnerClasses attribute");
                 return false;
             }
+            read_len += 2;
 
             if(isinner)
                 m_num_innerclasses = (uint16)(num_of_classes - 1); //exclude itself
@@ -2449,8 +2983,13 @@ bool Class::parse(Global_Env* env,
                 } else
                     m_innerclasses[index++].access_flags = inner_clss_access_flag;
             } // for num_of_classes
+            read_len += num_of_classes * 8;
+            if(read_len != attr_len){
+                REPORT_FAILED_CLASS_FORMAT(this,
+                    "unexpected length of InnerClass attribute: " << read_len << ", expected: " << attr_len);
+                return false;
+            }
         }break; //case ATTR_InnerClasses
-
         case ATTR_SourceDebugExtension:
             {
                 // attribute length is already recorded in attr_len
@@ -2474,6 +3013,7 @@ bool Class::parse(Global_Env* env,
 
         case ATTR_EnclosingMethod:
             {
+                //See specification 4.8.6
                 if ( ++numEnclosingMethods > 1 ) {
                     REPORT_FAILED_CLASS_FORMAT(this, "more than one EnclosingMethod attribute");
                     return false;
@@ -2485,27 +3025,27 @@ bool Class::parse(Global_Env* env,
                 }
                 uint16 class_idx;
                 if(!cfs.parse_u2_be(&class_idx)) {
-                    REPORT_FAILED_CLASS_FORMAT(this, 
+                    REPORT_FAILED_CLASS_FORMAT(this,
                         "could not parse class index of EnclosingMethod attribute");
                     return false;
                 }
                 if(!valid_cpi(this, class_idx, CONSTANT_Class))
                 {
-                    REPORT_FAILED_CLASS_FORMAT(this, 
+                    REPORT_FAILED_CLASS_FORMAT(this,
                         "incorrect class index of EnclosingMethod attribute");
                     return false;
                 }
                 m_enclosing_class_index = class_idx;
-
+                //See specification 4.8.6 about method_index.
                 uint16 method_idx;
                 if(!cfs.parse_u2_be(&method_idx)) {
-                    REPORT_FAILED_CLASS_FORMAT(this, 
+                    REPORT_FAILED_CLASS_FORMAT(this,
                         "could not parse method index of EnclosingMethod attribute");
                     return false;
                 }
                 if(method_idx && !valid_cpi(this, method_idx, CONSTANT_NameAndType))
                 {
-                    REPORT_FAILED_CLASS_FORMAT(this, 
+                    REPORT_FAILED_CLASS_FORMAT(this,
                         "incorrect method index of EnclosingMethod attribute");
                     return false;
                 }
@@ -2550,9 +3090,16 @@ bool Class::parse(Global_Env* env,
 
         case ATTR_RuntimeVisibleAnnotations:
             {
+                //ClassFile may contain at most one RuntimeVisibleAnnotations attribute.
+                // See specification 4.8.14.
+                if(++numRuntimeVisibleAnnotations > 1) {
+                    REPORT_FAILED_CLASS_FORMAT(this,
+                        "more than one RuntimeVisibleAnnotations attribute");
+                    return false;
+                }
                 uint32 read_len = parse_annotation_table(&m_annotations, cfs, this);
                 if (attr_len != read_len) {
-                    REPORT_FAILED_CLASS_FORMAT(this, 
+                    REPORT_FAILED_CLASS_FORMAT(this,
                         "error parsing Annotations attribute"
                         << "; declared length " << attr_len
                         << " does not match actual " << read_len);
@@ -2563,6 +3110,12 @@ bool Class::parse(Global_Env* env,
 
         case ATTR_RuntimeInvisibleAnnotations:
             {
+                //ClassFile may contain at most one RuntimeInvisibleAnnotations attribute.
+                if(++numRuntimeInvisibleAnnotations > 1) {
+                    REPORT_FAILED_CLASS_FORMAT(this,
+                        "more than one RuntimeInvisibleAnnotations attribute");
+                    return false;
+                }
                 if(!cfs.skip(attr_len)) {
                     REPORT_FAILED_CLASS_FORMAT(this,
                         "failed to skip RuntimeInvisibleAnnotations attribute");
@@ -2574,11 +3127,14 @@ bool Class::parse(Global_Env* env,
         case ATTR_UNDEF:
             // unrecognized attribute; skipped
             break;
+        case ATTR_ERROR:
+            return false;
+            break;
         default:
             // error occured
             REPORT_FAILED_CLASS_CLASS(m_class_loader, this, "java/lang/InternalError",
                 m_name->bytes << ": unknown error occured"
-                " while parsing attributes for class"  
+                " while parsing attributes for class"
                 << "; unprocessed attribute " << cur_attr);
             return false;
         } // switch
@@ -2594,32 +3150,6 @@ bool Class::parse(Global_Env* env,
             "InnerClasses presence for class " << m_name->bytes);
     }
 
-    /*
-     *   can't be both final and interface, or both final and abstract
-     */
-    if(is_final() && is_interface())
-    {
-        REPORT_FAILED_CLASS_FORMAT(this, "interface cannot be final");
-        return false;
-    }
-    
-    if(is_final() && is_abstract()) {
-        REPORT_FAILED_CLASS_FORMAT(this, "abstract class cannot be final");
-        return false;
-    }
-
-    // This requirement seems to be ignored by some compilers
-    // if(class_is_interface(clss) && !class_is_abstract(clss))
-    //{
-    //    REPORT_FAILED_CLASS_FORMAT(clss, "interface must have ACC_ABSTRACT flag set");
-    //    return false;
-    //}
-
-    if(is_annotation() && !is_interface())
-    {
-        REPORT_FAILED_CLASS_FORMAT(this, "annotation type must be interface");
-        return false;
-    }
 
     return true;
 } // Class::parse
@@ -2789,7 +3319,7 @@ Class *class_load_verify_prepare_by_loader_jni(Global_Env* env,
     // if no class loader passed, re-route to bootstrap
     if(!cl) cl = env->bootstrap_class_loader;
     Class* clss = cl->LoadVerifyAndPrepareClass(env, classname);
-     return clss;
+    return clss;
 }
 
 

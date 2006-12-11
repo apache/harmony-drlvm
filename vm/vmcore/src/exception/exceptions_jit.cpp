@@ -575,7 +575,7 @@ static void rth_throw_lazy(Method * exn_constr)
     ABORT("Lazy exceptions are not supported on this platform");
 #else
     uint8 *args = (uint8 *) (m2n_get_args(m2n_get_last_frame()) + 1);   // +1 to skip constructor
-    args += exn_constr->get_num_arg_bytes() - 4;
+    args += exn_constr->get_num_arg_slots() * 4 - 4;
     exn_athrow(NULL, *(Class_Handle *) args, exn_constr, args);
 #endif
 }   //rth_throw_lazy

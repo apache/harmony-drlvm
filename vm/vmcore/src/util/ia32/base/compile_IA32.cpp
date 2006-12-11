@@ -85,7 +85,7 @@ void compile_protect_arguments(Method_Handle method, GcFrame* gc) {
     assert(!hythread_is_suspend_enabled());
     Method_Signature_Handle msh = method_get_signature(method);
     unsigned num_args = method_args_get_number(msh);
-    unsigned num_arg_words = ((Method*)method)->get_num_arg_bytes()>>2;
+    unsigned num_arg_words = ((Method*)method)->get_num_arg_slots();
 
     unsigned cur_word = 0;
     for(unsigned i=0; i<num_args; i++) {

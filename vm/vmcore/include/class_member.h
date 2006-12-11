@@ -131,13 +131,6 @@ protected:
 
     bool parse(Class* clss, ByteReader& cfs);
 
-   /* 
-    * returns ATTR_ERROR if attribute was recognized but parsing failed;
-    * returns ATTR_UNDEF if attribute was not recognized 
-    * otherwise returns passed attr value
-    */
-    Attributes process_common_attribute(Attributes attr, uint32 attr_len, ByteReader& cfs);
-
 public:
 #ifdef VM_STATS
     uint64 num_accesses;
@@ -432,6 +425,11 @@ public:
     };
     State get_state()                   {return _state;}
     void set_state(State st)            {_state=st;}
+    
+    struct LocalVarOffset{
+        int value;
+        LocalVarOffset* next;
+    }; 
 
     // "Bytecode" exception handlers, i.e., those from the class file
     unsigned num_bc_exception_handlers() const { return _n_handlers; }
@@ -483,7 +481,7 @@ public:
 
     // Returns number of bytes of arguments pushed on the stack.
     // This value depends on the descriptor and the calling convention.
-    unsigned get_num_arg_bytes() const { return _arguments_size; }
+    unsigned get_num_arg_slots() const { return _arguments_slot_num; }
 
     // Returns number of arguments.  For non-static methods, the this pointer
     // is included in this number
@@ -625,8 +623,8 @@ public:
 
     bool parse(Global_Env& env, Class* clss, ByteReader& cfs);
 
-    void calculate_arguments_size();
-
+    void calculate_arguments_slot_num();
+    
     unsigned calculate_size() {
         unsigned size = sizeof(Class_Member) + sizeof(Method);
         if(_local_vars_table)
@@ -651,7 +649,7 @@ private:
     AnnotationValue * _default_value;
 
     unsigned _index;                // index in method table
-    unsigned _arguments_size;   // size of method arguments on the stack
+    unsigned _arguments_slot_num;   // number of slots for method arguments
     uint16 _max_stack;
     uint16 _max_locals;
     uint16 _n_exceptions;           // num exceptions method can throw
@@ -687,8 +685,8 @@ private:
     Line_Number_Table *_line_number_table;
     Local_Var_Table *_local_vars_table;
 
-    bool _parse_local_vars(const char* attr_name, Local_Var_Table** lvt_address,
-        ConstantPool& cp, unsigned attr_len, ByteReader &cfs);
+    bool _parse_local_vars(Local_Var_Table* table, LocalVarOffset* offset_list,
+        ConstantPool& cp, ByteReader &cfs, const char* attr_name, Attributes attr);
 
     // This is the number of breakpoints which should be set in the
     // method when it is compiled. This number does not reflect

@@ -97,7 +97,7 @@ interpreter_execute_native_method(
     M2N_ALLOC_MACRO;
     hythread_suspend_enable();
     
-    int sz = method->get_num_arg_bytes() >> 2;
+    int sz = method->get_num_arg_slots();
     uword *arg_words = (uword*) ALLOC_FRAME((sz + 2) * sizeof(uword));
 
     int argId = 0;
@@ -268,7 +268,7 @@ interpreterInvokeStaticNative(StackFrame& prevFrame, StackFrame& frame, Method *
     M2N_ALLOC_MACRO;
     
     frame.This = *(method->get_class()->get_class_handle());
-    int sz = method->get_num_arg_bytes() >> 2;
+    int sz = method->get_num_arg_slots();
     uword *args = (uword*) ALLOC_FRAME((sz + 2) * sizeof(uword));
     args[0] = (uword) get_jni_native_intf();
     args[1] = (uword) &frame.This; 
