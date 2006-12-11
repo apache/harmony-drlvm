@@ -74,7 +74,7 @@
                     multithreaded="true"
                     link="shared"
                     outfile="${jvmti.test.native.path}/${outputdir}/${outputdir}">
-                    <includepath path="${build.deploy.dir}/include" />
+                    <includepath path="${build.deploy.dir}/jdk/include" />
                     <select os="lnx">
                         <linkerarg value="-lstdc++" />
                     </select>
@@ -137,7 +137,7 @@
                 <junit fork="yes"
                        failureproperty="${testname}.failed"
                        timeout="${jvmti.test.timeout}"
-                       jvm="${build.deploy.dir}/bin/java">
+                       jvm="${build.deploy.dir}/jdk/jre/bin/java">
                     <jvmarg value="-Dvm.assert_dialog=0" />
                     <select os="win">
                         <jvmarg
