@@ -18,11 +18,6 @@
  * @author Pavel Afremov
  * @version $Revision: 1.0 $
  */
-/**
- * Excluded from acceptance test set on EM64T.
- *
- * @keyword X_em64t_bug
- */
 package exception;
 
 class FinalizeStackTest {
