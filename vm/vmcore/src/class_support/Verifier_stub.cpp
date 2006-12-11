@@ -34,11 +34,11 @@ bool
 Class::verify(const Global_Env* env)
 {
     // fast path
-    if(is_at_least_prepared() || in_error())
+    if(m_state >= ST_BytecodesVerified)
         return true;
 
     LMAutoUnlock aulock(m_lock);
-    if(is_at_least_prepared() || m_state == ST_Error)
+    if(m_state >= ST_BytecodesVerified)
         return true;
 
     /**
