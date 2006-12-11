@@ -437,6 +437,7 @@ vf_check_access(vf_MapEntry_t *source,    // stack map entry
 static inline Verifier_Result
 vf_check_entry_refs( vf_MapEntry_t *source,    // stack map entry
                      vf_MapEntry_t *target,    // required map entry
+                     bool local_init,          // initialization flag of locals
                      vf_Context_t *ctex)       // verifier context
 {
     // check entries type
@@ -458,12 +459,15 @@ vf_check_entry_refs( vf_MapEntry_t *source,    // stack map entry
     }
     // check initialization
     if( source->m_type == SM_UNINITIALIZED && target->m_type != SM_UNINITIALIZED) {
-        if( source->m_new == 0                                  // SM_UNINITIALIZED_THIS
-            && (target->m_ctype == VF_CHECK_UNINITIALIZED_THIS  // astore/aload
-                || target->m_ctype == VF_CHECK_ACCESS_FIELD ) ) // putfield/getfield
+        if( (source->m_new == 0 && target->m_ctype == VF_CHECK_ACCESS_FIELD)
+            || (local_init == false && target->m_ctype == VF_CHECK_UNINITIALIZED_THIS) )
         {
-            // uninitialized this could be used in getfield/putfield
-            // and aload/astore instructions
+            // 1. In initialization method instance fields of this
+            //    that are declared in the current class may be assigned
+            //    before calling any instance initialization method
+            // 2. Uninitialized class instance can be stored in
+            //    a local variable if no backward branch is taken or
+            //    the code isn't protected by exception handler.
         } else {
             VERIFY_REPORT( ctex, "(class: " << class_get_name( ctex->m_class ) 
                 << ", method: " << method_get_name( ctex->m_method )
@@ -535,6 +539,7 @@ vf_check_entry_refs( vf_MapEntry_t *source,    // stack map entry
 static inline Verifier_Result
 vf_check_entry_types( vf_MapEntry_t *entry1,    // stack map entry
                       vf_MapEntry_t *entry2,    // required map entry
+                      bool local_init,          // initialization flag of locals
                       bool *need_copy,          // pointer to copy flag
                       vf_Context_t *ctex)       // verifier context
 {
@@ -543,7 +548,8 @@ vf_check_entry_types( vf_MapEntry_t *entry1,    // stack map entry
     case SM_REF:
         // check reference entries
         {
-            Verifier_Result result = vf_check_entry_refs( entry1, entry2, ctex );
+            Verifier_Result result = 
+                vf_check_entry_refs( entry1, entry2, local_init, ctex );
             *need_copy = true;
             return result;
         }
@@ -759,6 +765,7 @@ vf_check_instruction_in_vector( vf_MapEntry_t *stack,       // stack map vector
                                 vf_MapEntry_t *buf,         // buf storage vector
                                 vf_MapEntry_t *invector,    // code instruction IN vector
                                 unsigned len,               // IN vector length
+                                bool local_init,            // initialization flag of locals
                                 bool *need_init,            // init uninitialized entry
                                 vf_Context_t *ctex)         // verifier context
 {
@@ -795,7 +802,7 @@ vf_check_instruction_in_vector( vf_MapEntry_t *stack,       // stack map vector
                 newvector->m_ctype = VF_CHECK_NONE;
             }
             // check entry types
-            result = vf_check_entry_refs( entry, newvector, ctex );
+            result = vf_check_entry_refs( entry, newvector, local_init, ctex );
             if( result != VER_OK ) {
                 VERIFY_REPORT( ctex, "(class: " << class_get_name( ctex->m_class )
                     << ", method: " << method_get_name( ctex->m_method )
@@ -806,7 +813,7 @@ vf_check_instruction_in_vector( vf_MapEntry_t *stack,       // stack map vector
             break;
         case SM_REF:
             // check entry references
-            result = vf_check_entry_refs( entry, vector, ctex );
+            result = vf_check_entry_refs( entry, vector, local_init, ctex );
             if( result != VER_OK ) {
                 if( !ctex->m_error ) {
                     VERIFY_REPORT( ctex, "(class: " << class_get_name( ctex->m_class ) 
@@ -828,7 +835,7 @@ vf_check_instruction_in_vector( vf_MapEntry_t *stack,       // stack map vector
                     << ") Double initialization of object reference" );
                 return VER_ErrorDataFlow;
             }
-            result = vf_check_entry_refs( entry, vector, ctex );
+            result = vf_check_entry_refs( entry, vector, local_init, ctex );
             if( result != VER_OK ) {
                 VERIFY_REPORT( ctex, "(class: " << class_get_name( ctex->m_class ) 
                     << ", method: " << method_get_name( ctex->m_method )
@@ -850,7 +857,7 @@ vf_check_instruction_in_vector( vf_MapEntry_t *stack,       // stack map vector
             break;
         default:
             // check entry types
-            result = vf_check_entry_types( entry, vector, &copy, ctex );
+            result = vf_check_entry_types( entry, vector, local_init, &copy, ctex );
             if( result != VER_OK ) {
                 VERIFY_REPORT( ctex, "(class: " << class_get_name( ctex->m_class ) 
                     << ", method: " << method_get_name( ctex->m_method )
@@ -873,7 +880,8 @@ vf_check_instruction_in_vector( vf_MapEntry_t *stack,       // stack map vector
  * Function receives code instruction OUT data flow vector.
  */
 static Verifier_Result
-vf_get_instruction_out_vector( vf_Code_t *instr,            // code instruction
+vf_get_instruction_out_vector( unsigned node_num,           // graph node
+                               vf_Code_t *instr,            // code instruction
                                vf_MapVector_t *invector,    // incoming data flow vector
                                vf_MapEntry_t *buf,          // buf storage vector
                                vf_Context_t *ctex)          // verifier context
@@ -889,7 +897,8 @@ vf_get_instruction_out_vector( vf_Code_t *instr,            // code instruction
     vf_MapEntry_t *locals = invector->m_local;
     // check instruction in vector
     Verifier_Result result = vf_check_instruction_in_vector( stack, locals, buf,
-        instr->m_invector, instr->m_inlen, &need_init, ctex );
+        instr->m_invector, instr->m_inlen, ctex->m_graph->GetNodeInitFlag(node_num),
+        &need_init, ctex );
     if( result != VER_OK ) {
         return result;
     }
@@ -1020,7 +1029,7 @@ vf_set_node_out_vector( unsigned node_num,          // graph node number
             {
                 continue;
             } else {
-                result = vf_get_instruction_out_vector( &instr[index], invector, 
+                result = vf_get_instruction_out_vector( node_num, &instr[index], invector, 
                     buf, ctex );
             }
             if( result != VER_OK ) {
@@ -1165,7 +1174,7 @@ vf_check_end_node_data_flow( unsigned node_num,         // graph node number
         // check stack type
         vf_MapEntry_t *entry = invector->m_stack + index;
         // check entry types
-        Verifier_Result result = vf_check_entry_types( entry, vector, &copy, ctex );
+        Verifier_Result result = vf_check_entry_types( entry, vector, true, &copy, ctex );
         if( result != VER_OK ) {
             VERIFY_REPORT( ctex, "(class: " << class_get_name( ctex->m_class ) 
                 << ", method: " << method_get_name( ctex->m_method )

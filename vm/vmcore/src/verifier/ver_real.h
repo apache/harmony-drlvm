@@ -412,18 +412,19 @@ typedef struct {
  */
 struct vf_Node_s
 {
-    vf_MapVector_t m_invector;      ///< stack map IN node vector
-    vf_MapVector_t m_outvector;     ///< stack map OUT node vector
-    unsigned m_start;               ///< beginning of the first instruction of the BB
-    unsigned m_end;                 ///< beginning of the last instruction of the BB.
-    unsigned m_inedge;              ///< the first of incoming node edges
-    unsigned m_outedge;             ///< the first of outcoming node edges
-    unsigned m_len;                 ///< length of the basic block
-    unsigned m_innum;               ///< number of incoming edges
-    unsigned m_outnum;              ///< number of outcoming edges
-    unsigned m_nodecount;           ///< node count in enumeration
-    int m_stack;                    ///< stack deep of node
-    int m_mark;                     ///< node mark
+    vf_MapVector_t m_invector;          ///< stack map IN node vector
+    vf_MapVector_t m_outvector;         ///< stack map OUT node vector
+    unsigned m_start;                   ///< beginning of the first instruction of the BB
+    unsigned m_end;                     ///< beginning of the last instruction of the BB.
+    unsigned m_inedge;                  ///< the first of incoming node edges
+    unsigned m_outedge;                 ///< the first of outcoming node edges
+    unsigned m_len;                     ///< length of the basic block
+    unsigned m_innum;                   ///< number of incoming edges
+    unsigned m_outnum;                  ///< number of outcoming edges
+    unsigned m_nodecount;               ///< node count in enumeration
+    int m_stack;                        ///< stack deep of node
+    int m_mark;                         ///< node mark
+    bool m_initialized;                 ///< reference in local variable should be initialized
 };
 
 /**
@@ -625,6 +626,21 @@ public:
      * Function removes node mark.
      */
     void CleanNodesMark();
+
+    /**
+     * Sets local variable reference initialization flag for node.
+     * @param node_num - graph node number
+     * @param flag     - node flag
+     */
+    void SetNodeInitFlag( unsigned node_num, bool flag );
+
+    /**
+     * Gets local variable reference initialization flag for node.
+     * @param node_num - graph node number
+     * @return Returns <code>true</code> if local variable reference have
+     *  to be initialized else returns <code>false</code>.
+     */
+    bool GetNodeInitFlag( unsigned node_num );
 
     /**
      * Function creates <i>IN</i> data flow vector of node.

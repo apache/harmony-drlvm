@@ -375,6 +375,30 @@ vf_Graph::CleanNodesMark()
 } // vf_Graph::CleanNodesMark
 
 /**
+ * Sets local variable reference initialization flag for node.
+ */
+void
+vf_Graph::SetNodeInitFlag( unsigned num,    // graph node number
+                           bool flag)       // node flag
+{
+    // check node number is in range.
+    assert( num < m_nodenum );
+    GetNode( num )->m_initialized = flag;
+    return;
+} // vf_Graph::SetNodeInitFlag
+
+/**
+ * Gets local variable reference initialization flag for node.
+ */
+bool
+vf_Graph::GetNodeInitFlag( unsigned num )   // graph node number
+{
+    // check node number is in range.
+    assert( num < m_nodenum );
+    return GetNode( num )->m_initialized;
+} // vf_Graph::GetNodeInitFlag
+
+/**
  * Function receives IN data flow vector of node.
  */
 vf_MapVector_t *
@@ -979,47 +1003,25 @@ vf_Graph::DumpDotEnd( ofstream &out )   // output file stream
 Verifier_Result
 vf_create_graph( vf_Context_t *ctex )   // verifier context
 {
-    unsigned len,
-             last,
-             node,
-             index,
-             count,
-             codeNum,
-             nodeCount,
-             handlcount,
-             *code2node;
-    vf_Code_t *code,
-               *codeInstr;
-    vf_Graph_t *vGraph;
-    Verifier_Result result = VER_OK;
-
-    /** 
-     * Get context
-     */
-    unsigned char* code_end = method_get_bytecode( ctex->m_method )
-                 + method_get_code_length( ctex->m_method );
-    handlcount = method_get_exc_handler_number( ctex->m_method );
-    code = ctex->m_code;
-    codeNum = ctex->m_codeNum;
-
     /**
      * Create graph
      */
     ctex->m_graph = new vf_Graph( ctex->m_nodeNum, ctex->m_edgeNum, ctex->m_pool );
-    vGraph = ctex->m_graph;
 
     /**
      * Create decoding array: code to node
      */
-    code2node = (unsigned*)vf_alloc_pool_memory( ctex->m_pool, 
-                            codeNum * sizeof(unsigned) );
+    unsigned* code2node = (unsigned*)vf_alloc_pool_memory( ctex->m_pool,
+                            ctex->m_codeNum * sizeof(unsigned) );
     /** 
      * Create start-entry and handler nodes
      */
-    vGraph->NewNode( 0, 0, 0 );
-    for( index = 1; index < handlcount + 1; index++ ) {
-        vGraph->NewNode( index, index, 0 );
-        vGraph->SetNodeStackModifier( index, 1 ); 
+    unsigned index;
+    unsigned short handlcount = method_get_exc_handler_number( ctex->m_method );
+    ctex->m_graph->NewNode( 0, 0, 0 );
+    for( index = 1; index < (unsigned)handlcount + 1; index++ ) {
+        ctex->m_graph->NewNode( index, index, 0 );
+        ctex->m_graph->SetNodeStackModifier( index, 1 );
     }
 
     /**
@@ -1028,38 +1030,43 @@ vf_create_graph( vf_Context_t *ctex )   // verifier context
      * Skip the first instruction, because we create the first node
      * at his end instruction.
      */
+    unsigned len;
+    unsigned last;
+    unsigned nodeCount;
     for( last = nodeCount = 1 + handlcount, index = last + 1;
-         index < codeNum - 1;
+         index < ctex->m_codeNum - 1;
          index++ ) 
     {
-        if( vf_is_begin_basic_block( &code[index] ) ) {
+        if( vf_is_begin_basic_block( &ctex->m_code[index] ) ) {
             // set graph nodes
-            len = code[index].m_addr - code[last].m_addr;
-            vGraph->NewNode( last, index - 1, len );
-            vGraph->SetNodeStackModifier( nodeCount, 
-                        vf_get_node_stack_deep( &code[last], &code[index - 1] ) );
+            len = ctex->m_code[index].m_addr - ctex->m_code[last].m_addr;
+            ctex->m_graph->NewNode( last, index - 1, len );
+            ctex->m_graph->SetNodeStackModifier( nodeCount,
+                        vf_get_node_stack_deep( &ctex->m_code[last], &ctex->m_code[index - 1] ) );
             code2node[last] = nodeCount++;
             last = index;
         }
     }
     // set last node with code segment
-    len = code_end - code[last].m_addr;
-    vGraph->NewNode( last, index - 1, len );
-    vGraph->SetNodeStackModifier( nodeCount, 
-        vf_get_node_stack_deep( &code[last], &code[index - 1] ) );
+    unsigned char* code_end = method_get_bytecode( ctex->m_method )
+                                 + method_get_code_length( ctex->m_method );
+    len = code_end - ctex->m_code[last].m_addr;
+    ctex->m_graph->NewNode( last, index - 1, len );
+    ctex->m_graph->SetNodeStackModifier( nodeCount,
+        vf_get_node_stack_deep( &ctex->m_code[last], &ctex->m_code[index - 1] ) );
     code2node[last] = nodeCount++;
     // set exit node
-    vGraph->NewNode( codeNum - 1, 0, 0 );
-    code2node[codeNum - 1] = nodeCount++;
+    ctex->m_graph->NewNode( ctex->m_codeNum - 1, 0, 0 );
+    code2node[ctex->m_codeNum - 1] = nodeCount++;
     assert( ctex->m_nodeNum == nodeCount );
 
     /**
      * Create edges
      * First edge from start-entry node to first code node
      */
-    vGraph->NewEdge( 0, handlcount + 1 );
+    ctex->m_graph->NewEdge( 0, handlcount + 1 );
     for( index = 1; index < nodeCount - 1; index++ ) {
-        codeInstr = &code[ vGraph->GetNodeLastInstr( index ) ];
+        vf_Code_t* codeInstr = &ctex->m_code[ ctex->m_graph->GetNodeLastInstr( index ) ];
         // check correct branching
         if( codeInstr->m_addr && *codeInstr->m_addr == OPCODE_WIDE ) {
             // node ends in wide instruction
@@ -1067,20 +1074,24 @@ vf_create_graph( vf_Context_t *ctex )   // verifier context
                 << ", method: " << method_get_name( ctex->m_method )
                 << method_get_descriptor( ctex->m_method )
                 << ") Illegal target of jump or branch" );
-            result = VER_ErrorBranch;
-            goto labelEnd_createGraph; 
+            return VER_ErrorBranch;
         }
         // set control flow edges
         if( codeInstr->m_offcount ) {
-            for( count = 0; count < codeInstr->m_offcount; count++ ) {
+            for( unsigned count = 0; count < codeInstr->m_offcount; count++ ) {
 #if _VERIFY_DEBUG
                 if( code2node[ codeInstr->m_off[count] ] == 0 ) {
                     VERIFY_DEBUG( "vf_create_graph: error graph construction" );
                     vf_error();
                 }
 #endif // _VERIFY_DEBUG
-                node = code2node[ codeInstr->m_off[count] ];
-                vGraph->NewEdge( index, node );
+                unsigned node = code2node[ codeInstr->m_off[count] ];
+                ctex->m_graph->NewEdge( index, node );
+                if( node < index ) {
+                    // node has backward branch,
+                    // thus the reference in local variables have to be initialized
+                    ctex->m_graph->SetNodeInitFlag( node, true );
+                }
             }
         } else {
             if( index + 1 == nodeCount - 1 ) {
@@ -1089,17 +1100,20 @@ vf_create_graph( vf_Context_t *ctex )   // verifier context
                     << ", method: " << method_get_name( ctex->m_method )
                     << method_get_descriptor( ctex->m_method )
                     << ") Falling off the end of the code" );
-                result = VER_ErrorBranch;
-                goto labelEnd_createGraph; 
+                return VER_ErrorBranch;
             }
-            vGraph->NewEdge( index, index + 1 );
+            ctex->m_graph->NewEdge( index, index + 1 );
         }
-        // set exception handler edges
         if( codeInstr->m_handler != NULL ) {
-            for( count = 0; count < handlcount; count++ ) {
+            // node is protected by exception handler,
+            // thus the reference in local variables have to be initialized
+            ctex->m_graph->SetNodeInitFlag( index, true );
+
+            // set exception handler edges
+            for( unsigned count = 0; count < handlcount; count++ ) {
                 if( codeInstr->m_handler[count] ) {
                     // set edge to exception handler entry
-                    vGraph->NewEdge( index, count + 1 );
+                    ctex->m_graph->NewEdge( index, count + 1 );
                 }
             }
         }
@@ -1107,16 +1121,14 @@ vf_create_graph( vf_Context_t *ctex )   // verifier context
 
 #if _VERIFY_DEBUG
     if( ctex->m_dump.m_graph ) {
-        vGraph->DumpGraph( ctex );
+        ctex->m_graph->DumpGraph( ctex );
     }
     if( ctex->m_dump.m_dot_graph ) {
-        vGraph->DumpDotGraph( ctex );
+        ctex->m_graph->DumpDotGraph( ctex );
     }
 #endif // _VERIFY_DEBUG
 
-labelEnd_createGraph:
-
-    return result;
+    return VER_OK;
 } // vf_create_graph
 
 /************************************************************
