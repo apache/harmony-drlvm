@@ -226,7 +226,7 @@
         <property name="generated.properties.file" value="${build.semi.dir}/env.properties" />
 
         <!-- product binary deploy location -->
-        <property name="build.deploy.dir" location="../${build.os.short}_${build.arch}_${build.cxx}_${build.cfg}/deploy/jre" />
+        <property name="build.deploy.dir" location="../${build.os.short}_${build.arch}_${build.cxx}_${build.cfg}/deploy" />
 
         <!-- product doc deploy location -->
         <property name="build.deploy.doc.dir" location="../${build.os.short}_${build.arch}_${build.cxx}_${build.cfg}/docs" />
@@ -476,24 +476,24 @@
         
         <!-- copy our hythr for the launcher to use -->
         
-        <copy todir="${build.deploy.dir}/bin">
-            <fileset dir="${build.deploy.dir}/bin/default/">
+        <copy todir="${build.deploy.dir}/jdk/jre/bin">
+            <fileset dir="${build.deploy.dir}/jdk/jre/bin/default/">
                 <include name="*hythr*"/>
             </fileset>
         </copy>
         
         <!-- copy the harmonyvm.properties to use too -->
         
-        <copy file="harmonyvm.properties" todir="${build.deploy.dir}/bin/default"/>
+        <copy file="harmonyvm.properties" todir="${build.deploy.dir}/jdk/jre/bin/default"/>
 
         <if>
             <and>
                 <isset property="if.lnx" />
-                <available type="dir" file="${build.deploy.dir}/bin" />
+                <available type="dir" file="${build.deploy.dir}/jdk/jre/bin" />
             </and>
             <then>
                 <chmod perm="755">
-                    <fileset dir="${build.deploy.dir}/bin">
+                    <fileset dir="${build.deploy.dir}/jdk/jre/bin">
                         <include name="java" />
                         <include name="*.so" />
                         <include name="*.so.*" />
@@ -507,17 +507,6 @@
     <!-- tweak the names of java -> java.exec and
          java.sh -> java so typing "java" works -->
     <target name="deploy.tweakname">
-
- <!--       <if>
-            <isset property="if.lnx"/>
-            <then>
-                <move file="${build.deploy.dir}/bin/java"
-                    tofile="${build.deploy.dir}/bin/java.exec" />
-                <move file="${build.deploy.dir}/bin/java.sh"
-                    tofile="${build.deploy.dir}/bin/java" />
-            </then>
-        </if>
--->
     </target>
 
     <!-- ==================================================================
@@ -530,9 +519,14 @@
 
         <mkdir dir="${canonical.deploy.dir}/jdk/lib" />
         <mkdir dir="${canonical.deploy.dir}/jdk/bin" />
+        <mkdir dir="${canonical.deploy.dir}/jdk/include" />
 
         <copy todir="${canonical.deploy.dir}/jdk/jre">
-            <fileset dir="${build.deploy.dir}"/>
+            <fileset dir="${build.deploy.dir}/jdk/jre"/>
+        </copy>
+
+        <copy todir="${canonical.deploy.dir}/jdk/include">
+            <fileset dir="${build.deploy.dir}/jdk/include"/>
         </copy>
         
         <if>
@@ -552,37 +546,37 @@
     </target>
 
     <target name="deploy.antlr">
-        <copy todir="${build.deploy.dir}/lib/boot">
+        <copy todir="${build.deploy.dir}/jdk/jre/lib/boot">
             <fileset dir="${build.ANTLR.home}">
                 <include name="antlr-2.7.5.jar" />
             </fileset>
         </copy>
-        <loadfile srcFile="${build.deploy.dir}/lib/boot/bootclasspath.properties" property="boot.jars.list" />
+        <loadfile srcFile="${build.deploy.dir}/jdk/jre/lib/boot/bootclasspath.properties" property="boot.jars.list" />
         <if> <not><contains string="${boot.jars.list}" substring="=antlr-2.7.5.jar"/></not>
         <then>
-<concat append="true" destfile="${build.deploy.dir}/lib/boot/bootclasspath.properties">
+<concat append="true" destfile="${build.deploy.dir}/jdk/jre/lib/boot/bootclasspath.properties">
 # Dependency for generics parser
 bootclasspath.99=antlr-2.7.5.jar
 </concat>
-<fixcrlf srcdir="${build.deploy.dir}/lib/boot" includes="bootclasspath.properties"/>
+<fixcrlf srcdir="${build.deploy.dir}/jdk/jre/lib/boot" includes="bootclasspath.properties"/>
         </then>
         </if> 
     </target>
 
     <target name="deploy.mmtk">
-        <copy todir="${build.deploy.dir}/lib/boot">
+        <copy todir="${build.deploy.dir}/jdk/jre/lib/boot">
             <fileset dir="${build.MMTK.home}">
                 <include name="mmtk-20061012.jar" />
             </fileset>
         </copy>
-        <loadfile srcFile="${build.deploy.dir}/lib/boot/bootclasspath.properties" property="boot.jars.list" />
+        <loadfile srcFile="${build.deploy.dir}/jdk/jre/lib/boot/bootclasspath.properties" property="boot.jars.list" />
         <if> <not><contains string="${boot.jars.list}" substring="=mmtk-20061012.jar"/></not>
         <then>
-<concat append="true" destfile="${build.deploy.dir}/lib/boot/bootclasspath.properties">
+<concat append="true" destfile="${build.deploy.dir}/jdk/jre/lib/boot/bootclasspath.properties">
 # Dependency for unboxed mmtk package
 bootclasspath.100=mmtk-20061012.jar
 </concat>
-<fixcrlf srcdir="${build.deploy.dir}/lib/boot" includes="bootclasspath.properties"/>
+<fixcrlf srcdir="${build.deploy.dir}/jdk/jre/lib/boot" includes="bootclasspath.properties"/>
         </then>
         </if> 
     </target>
@@ -590,7 +584,7 @@ bootclasspath.100=mmtk-20061012.jar
     <!-- copies the deploy stuff from classlib -->
     <target name="deploy.copy_classlib">
 
-        <copy todir="${build.deploy.dir}">
+        <copy todir="${build.deploy.dir}/jdk/jre/">
             <fileset dir="${external.dep.CLASSLIB}/deploy/jdk/jre">
                 <include name="**"/>
                 <exclude name="bin/default/**"/>
@@ -602,7 +596,7 @@ bootclasspath.100=mmtk-20061012.jar
 
 
     <target name="deploy.jni.n.jvmti.includes">
-        <copy todir="${build.deploy.dir}/include">
+        <copy todir="${build.deploy.dir}/jdk/include">
             <fileset dir="${build.VM.home}/include">
                 <include name="jni_types.h" />
                 <include name="jvmti_types.h" />
@@ -614,7 +608,7 @@ bootclasspath.100=mmtk-20061012.jar
 
     <!-- create readme.txt in the deploy folder -->
     <target name="deploy.readme" depends="plugin.antcontrib, set.semis.dirs">
-        <echo file="${build.deploy.dir}/readme.txt">
+        <echo file="${build.deploy.dir}/jdk/jre/readme.txt">
 
     Apache Harmony JRE with DRLVM
     Binary Release for ${build.os}*/${build.arch}
@@ -642,7 +636,7 @@ the ${build.os} operating system.
 </echo>
 
 
-        <echo file="${build.deploy.dir}/readme.txt" append="true">
+        <echo file="${build.deploy.dir}/jdk/jre/readme.txt" append="true">
 
 
 JIT EXECUTION MODE
@@ -653,15 +647,15 @@ To start the VM with the interpreter, supply the -Xint command-line option
 right after the executable name.
 
 </echo>
-        <fixcrlf srcDir="${build.deploy.dir}" includes="readme.txt" />
+        <fixcrlf srcDir="${build.deploy.dir}/jdk/jre/" includes="readme.txt" />
     </target>
 
 
     <!-- Deploy the Getting Started document -->
     <target name="deploy.getting_started" depends="plugin.antcontrib, set.semis.dirs">
-        <mkdir dir="${build.deploy.dir}/doc" />
+        <mkdir dir="${build.deploy.dir}/jdk/jre/doc" />
 
-        <copy todir="${build.deploy.dir}/doc">
+        <copy todir="${build.deploy.dir}/jdk/jre/doc">
             <fileset dir="${build.VM.home}/doc">
                 <include name="images/**" />
                 <include name="drl.css" />
@@ -669,7 +663,7 @@ right after the executable name.
             </fileset>
         </copy>
 
-        <fixcrlf srcDir="${build.deploy.dir}/doc" includes="*.htm *.css" />
+        <fixcrlf srcDir="${build.deploy.dir}/jdk/jre/doc" includes="*.htm *.css" />
     </target>
 
 
@@ -700,20 +694,20 @@ right after the executable name.
                             <!-- note the last comma in input and output -->
                             <propertyregex property="component.deploy.filenames" input="${component.deploy.filenames}," regexp="(.+),\s*" replace="${build.@{deploy.property.tail}.pattern}," global="true" defaultValue="${component.deploy.filenames}" override="true" />
 
-                            <mkdir dir="${build.deploy.dir}/${component.deploy.filedir}" />
+                            <mkdir dir="${build.deploy.dir}/jdk/jre/${component.deploy.filedir}" />
                             <switch value="@{deploy.property.tail}">
                                 <case value="jar">
-                                    <copy todir="${build.deploy.dir}/${component.deploy.filedir}" verbose="true">
+                                    <copy todir="${build.deploy.dir}/jdk/jre/${component.deploy.filedir}" verbose="true">
                                         <fileset dir="${build.semi.dir}/${component.as.path}/_jar" includes="${component.deploy.filenames}" />
                                     </copy>
                                 </case>
                                 <case value="other">
-                                    <copy todir="${build.deploy.dir}/${component.deploy.filedir}" verbose="true">
+                                    <copy todir="${build.deploy.dir}/jdk/jre/${component.deploy.filedir}" verbose="true">
                                         <fileset dir="${build.semi.dir}/${component.as.path}/_other" includes="${component.deploy.filenames}" />
                                     </copy>
                                 </case>
                                 <default>
-                                    <copy todir="${build.deploy.dir}/${component.deploy.filedir}" verbose="true">
+                                    <copy todir="${build.deploy.dir}/jdk/jre/${component.deploy.filedir}" verbose="true">
                                         <fileset dir="${build.semi.dir}/${component.as.path}/_bin" includes="${component.deploy.filenames}" />
                                     </copy>
                                 </default>
