@@ -1209,7 +1209,6 @@ jint JNICALL RegisterNatives(JNIEnv * UNREF env,
     TRACE2("jni", "RegisterNatives called");
     assert(hythread_is_suspend_enabled());
     Class_Handle clss = jclass_to_struct_Class(clazz);
-    class_register_methods(clss, methods, nMethods);
     return class_register_methods(clss, methods, nMethods) ? -1 : 0;
 } //RegisterNatives
 

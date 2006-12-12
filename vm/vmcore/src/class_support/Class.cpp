@@ -38,6 +38,7 @@
 #include "jit_intf_cpp.h"
 #include "type.h"
 #include "cci.h"
+#include "interpreter.h"
 
 #ifdef _IPF_
 #include "vm_ipf.h"
@@ -1025,13 +1026,33 @@ class_register_methods(Class_Handle klass,
 
                 // Calling callback for NativeMethodBind event
                 NativeCodePtr native_addr = methods[index].fnPtr;
+
                 jvmti_process_native_method_bind_event( (jmethodID) class_method, native_addr, &native_addr);
 
-                // lock class
-                klass->lock();
-                class_method->set_code_addr( native_addr );
-                class_method->set_registered( true );
-                klass->unlock();
+                if (interpreter_enabled()) {
+                    //lock class
+                    klass->lock();
+                    class_method->set_code_addr( native_addr );
+                    class_method->set_registered( true );
+                    klass->unlock();
+                } else {
+                    NativeCodePtr stub = compile_create_lil_jni_stub(class_method, native_addr, NULL);
+                    if (!stub)
+                        return true;
+
+                    class_method->lock();
+                    class_method->set_code_addr(stub);
+                    class_method->unlock();
+
+                    // the following lines were copy-pasted from compile_do_compilation() function
+                    // it is not obvious that they should be here.
+                    //compile_flush_generated_code();
+                    //class_method->set_state(Method::ST_Compiled);
+                    //class_method->do_jit_recompiled_method_callbacks();
+
+                    class_method->apply_vtable_patches();
+                }
+
                 break;
             }
         }
