@@ -147,9 +147,17 @@ vmiError JNICALL
 GetSystemProperty(VMInterface *vmi, char *key, char **valuePtr)
 {
     char* value = get_property(key, JAVA_PROPERTIES);
-    *valuePtr = strdup(value);
-    destroy_property_value(value);
-    return VMI_ERROR_NONE;
+    if (NULL != value)
+    {
+        *valuePtr = strdup(value);
+        destroy_property_value(value);
+        return VMI_ERROR_NONE;
+    }
+    else
+    {
+        *valuePtr = NULL;
+        return VMI_ERROR_NOT_FOUND;
+    }
 }
 
 vmiError JNICALL
