@@ -81,6 +81,26 @@ Java_java_lang_FinalizerThread_doFinalization(JNIEnv *, jclass,
 JNIEXPORT void JNICALL
 Java_java_lang_FinalizerThread_fillFinalizationQueueOnExit(JNIEnv *, jclass);
 
+/* BEGIN: These three methods are added for NATIVE FINALIZER THREAD */
+/*
+ * Method: java.lang.FinalizerThread.getNativeFinalizerThreadFlagFromVM()Z
+ */
+JNIEXPORT jboolean JNICALL
+Java_java_lang_FinalizerThread_getNativeFinalizerThreadFlagFromVM(JNIEnv *, jclass);
+
+/*
+ * Method: java_lang_FinalizerThread.runFinalizationInNativeFinalizerThreads()V
+ */
+JNIEXPORT void JNICALL
+Java_java_lang_FinalizerThread_runFinalizationInNativeFinalizerThreads(JNIEnv *, jclass);
+
+/*
+ * Method: java_lang_FinalizerThread.finalizerShutDown()V
+ */
+JNIEXPORT void JNICALL
+Java_java_lang_FinalizerThread_finalizerShutDown(JNIEnv *, jclass, jboolean);
+/* END: These three methods are added for NATIVE FINALIZER THREAD */
+
 
 #ifdef __cplusplus
 }

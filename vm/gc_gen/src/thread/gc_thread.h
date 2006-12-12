@@ -48,6 +48,13 @@ typedef struct Allocator{
   VmThreadHandle thread_handle;   /* This thread; */
 }Allocator;
 
+inline void thread_local_unalloc(unsigned int size, Allocator* allocator)
+{
+    void* free = allocator->free;    
+    allocator->free = (void*)((unsigned int)free - size);
+    return;
+}
+
 inline Partial_Reveal_Object* thread_local_alloc(unsigned int size, Allocator* allocator)
 {
     void* free = allocator->free;

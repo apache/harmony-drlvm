@@ -42,6 +42,10 @@ typedef struct Collector{
   Vector_Block* rep_set; /* repointed set */
   Vector_Block* rem_set;
   
+  Vector_Block *softref_set;
+  Vector_Block *weakref_set;
+  Vector_Block *phanref_set;
+  
   VmEventHandle task_assigned_event;
   VmEventHandle task_finished_event;
   

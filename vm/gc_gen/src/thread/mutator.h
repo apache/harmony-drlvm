@@ -35,6 +35,7 @@ typedef struct Mutator {
   /* END of Allocator --> */
   
   Vector_Block* rem_set;
+  Vector_Block* objects_with_finalizer;
   Mutator* next;  /* The gc info area associated with the next active thread. */
 } Mutator;
 

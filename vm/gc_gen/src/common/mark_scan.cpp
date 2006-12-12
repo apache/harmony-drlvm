@@ -22,6 +22,8 @@
 #include "../thread/collector.h"
 #include "../gen/gen.h"
 
+#include "../finalizer_weakref/finalizer_weakref.h"
+
 static void scan_slot(Collector* collector, Partial_Reveal_Object** p_ref)
 {
   Partial_Reveal_Object* p_obj = *p_ref;
@@ -66,6 +68,8 @@ static void scan_object(Collector* collector, Partial_Reveal_Object *p_obj)
     offset_scanner = offset_next_ref(offset_scanner);
   }
 
+  scan_weak_reference(collector, p_obj, scan_slot);
+  
   return;
 }
 
@@ -140,7 +144,7 @@ retry:
   while(mark_task){
     unsigned int* iter = vector_block_iterator_init(mark_task);
     while(!vector_block_iterator_end(mark_task,iter)){
-      Partial_Reveal_Object* p_obj = (Partial_Reveal_Object*)*iter;
+      Partial_Reveal_Object* p_obj = (Partial_Reveal_Object *)*iter;
       iter = vector_block_iterator_advance(mark_task,iter);
 
       /* FIXME:: we should not let mark_task empty during working, , other may want to steal it. 
@@ -176,4 +180,40 @@ retry:
   collector->rep_set = NULL;
 
   return;
+}
+
+void resurrect_obj_tree_after_mark(Collector *collector, Partial_Reveal_Object *p_obj)
+{
+  GC *gc = collector->gc;
+  GC_Metadata* metadata = gc->metadata;
+  
+  Space* space = space_of_addr(gc, p_obj);
+//  if(!space->mark_object_func(space, p_obj)) { assert(0); }
+  space->mark_object_func(space, p_obj);
+  collector->trace_stack = pool_get_entry(metadata->free_task_pool);
+  collector_tracestack_push(collector, p_obj);
+  pool_put_entry(metadata->mark_task_pool, collector->trace_stack);
+  
+//collector->rep_set = pool_get_entry(metadata->free_set_pool); /* has got collector->rep_set in caller */
+  collector->trace_stack = pool_get_entry(metadata->free_task_pool);
+  Vector_Block* mark_task = pool_get_entry(metadata->mark_task_pool);
+  while(mark_task){
+    unsigned int* iter = vector_block_iterator_init(mark_task);
+    while(!vector_block_iterator_end(mark_task,iter)){
+      Partial_Reveal_Object* p_obj = (Partial_Reveal_Object *)*iter;
+      trace_object(collector, p_obj);
+      iter = vector_block_iterator_advance(mark_task, iter);
+    } 
+    /* run out one task, put back to the pool and grab another task */
+    vector_stack_clear(mark_task);
+    pool_put_entry(metadata->free_task_pool, mark_task);
+    mark_task = pool_get_entry(metadata->mark_task_pool);      
+  }
+  
+  mark_task = (Vector_Block*)collector->trace_stack;
+  vector_stack_clear(mark_task);
+  pool_put_entry(metadata->free_task_pool, mark_task);   
+  collector->trace_stack = NULL;
+//pool_put_entry(metadata->collector_repset_pool, collector->rep_set); /* has got collector->rep_set in caller */
+//collector->rep_set = NULL; /* has got collector->rep_set in caller */
 }

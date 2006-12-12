@@ -19,6 +19,7 @@
  */
 
 #include "gc_common.h"
+#include "../finalizer_weakref/finalizer_weakref_metadata.h"
 
 /* Setter functions for the gc class property field. */
 void gc_set_prop_alignment_mask (GC_VTable_Info *gcvt, unsigned int the_mask)
@@ -41,6 +42,10 @@ void gc_set_prop_finalizable (GC_VTable_Info *gcvt)
 {
   gcvt->gc_class_properties |= CL_PROP_FINALIZABLE_MASK;
 }
+void gc_set_prop_reference(Partial_Reveal_VTable *vt, WeakReferenceType type)
+{
+  vtable_get_gcvt(vt)->gc_class_properties |= (unsigned int)type << CL_PROP_REFERENCE_TYPE_SHIFT;
+}
 
 
 /* A comparison function for qsort() called below to order offset slots. */
@@ -56,7 +61,7 @@ intcompare(const void *vi, const void *vj)
   return 0;
 }
 
-static int *build_ref_offset_array(Class_Handle ch, GC_VTable_Info *gcvt)
+static int *build_ref_offset_array(Class_Handle ch, GC_VTable_Info *gcvt, WeakReferenceType type)
 {
   unsigned num_ref_fields = 0;
   unsigned num_fields = class_num_instance_fields_recursive(ch);
@@ -69,11 +74,25 @@ static int *build_ref_offset_array(Class_Handle ch, GC_VTable_Info *gcvt)
     }
   }
 
+  int skip = -1; // not skip any reference
+  if (type != NOT_REFERENCE) {
+    int offset = class_get_referent_offset(ch);
+    unsigned int gc_referent_offset = get_gc_referent_offset();
+    if (gc_referent_offset == 0) {
+      set_gc_referent_offset(offset);
+    } else {
+      assert(gc_referent_offset == offset);
+    }
+
+    skip = offset; // skip global referent offset
+    num_ref_fields--;
+  }
+  
   if( num_ref_fields )   
     gcvt->gc_object_has_ref_field = true;
   else 
     return NULL;
-     
+   
   /* add a null-termination slot */
   unsigned int size = (num_ref_fields+1) * sizeof (unsigned int);
 
@@ -85,6 +104,8 @@ static int *build_ref_offset_array(Class_Handle ch, GC_VTable_Info *gcvt)
   for(idx = 0; idx < num_fields; idx++) {
     Field_Handle fh = class_get_instance_field_recursive(ch, idx);
     if(field_is_reference(fh)) {
+      int offset = field_get_offset(fh);
+      if (offset == skip) continue;
       *new_ref_array = field_get_offset(fh);
       new_ref_array++;
     }
@@ -141,11 +162,14 @@ void gc_class_prepared (Class_Handle ch, VTable_Handle vth)
     gc_set_prop_finalizable(gcvt);
   }
 
+  WeakReferenceType type = class_is_reference(ch);
+  gc_set_prop_reference(vt, type);
+  
   unsigned int size = class_get_boxed_data_size(ch);
   gcvt->gc_allocated_size = size;
   
   /* Build the offset array */
-  build_ref_offset_array(ch, gcvt);
+  build_ref_offset_array(ch, gcvt, type);
 
   gcvt->gc_class_name = class_get_name(ch);
   assert (gcvt->gc_class_name);

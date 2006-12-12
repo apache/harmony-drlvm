@@ -37,6 +37,9 @@
 #include "jit_runtime_support.h"
 #include "finalize.h"
 
+#include "finalizer_thread.h"     /* added for NATIVE FINALIZER THREAD */
+#include "ref_enqueue_thread.h"   /* added for NATIVE REFERENCE ENQUEUE THREAD */
+
 
 #define LOG_DOMAIN "vm.object_queue"
 #include "classloader.h"
@@ -343,8 +346,14 @@ void Objects_To_Finalize::run_finalizers()
 } //Objects_To_Finalize::run_finalizers
 
 int Objects_To_Finalize::do_finalization(int quantity) {
+    /* BEGIN: added for NATIVE FINALIZER THREAD */
+    Boolean native_finalizer_thread_flag = get_native_finalizer_thread_flag();
+    Boolean native_finalizer_shutdown, native_finalizer_on_exit;
+    /* END: added for NATIVE FINALIZER THREAD */
+    
     //SetThreadPriority(GetCurrentThread(),THREAD_PRIORITY_HIGHEST);
-    p_TLS_vmthread->finalize_thread_flags = FINALIZER_THREAD;
+    if(!native_finalizer_thread_flag)    // added for NATIVE FINALIZER THREAD
+        p_TLS_vmthread->finalize_thread_flags = FINALIZER_THREAD;
 
     int i;
     tmn_suspend_disable();
@@ -353,18 +362,28 @@ int Objects_To_Finalize::do_finalization(int quantity) {
     jvalue args[1];
     args[0].l = (jobject) handle;
 
-    assert(VM_Global_State::loader_env->finalizer_thread);
-    jboolean* finalizer_shutdown = VM_Global_State::loader_env->finalizer_shutdown;
-    assert(finalizer_shutdown);
-    jboolean* finalizer_on_exit = VM_Global_State::loader_env->finalizer_on_exit;
-    assert(finalizer_on_exit);
+    /* BEGIN: modified for NATIVE FINALIZER THREAD */
+    jboolean *finalizer_shutdown, *finalizer_on_exit;
+    if(!native_finalizer_thread_flag){
+        assert(VM_Global_State::loader_env->finalizer_thread);
+        finalizer_shutdown = VM_Global_State::loader_env->finalizer_shutdown;
+        assert(finalizer_shutdown);
+        finalizer_on_exit = VM_Global_State::loader_env->finalizer_on_exit;
+        assert(finalizer_on_exit);
+        native_finalizer_shutdown = (Boolean)*finalizer_shutdown;
+        native_finalizer_on_exit = (Boolean)*finalizer_on_exit;
+    }
+    /* END: modified for NATIVE FINALIZER THREAD */
 
     for (i=0; ((i<quantity)||(0==quantity)); i++) {
     
         // shutdown flag in FinalizerThread set after finalization on exit is completed
-        if (*finalizer_shutdown) {
+        /* BEGIN: modified for NATIVE FINALIZER THREAD */
+        if(native_finalizer_thread_flag)
+            native_finalizer_shutdown = get_finalizer_shutdown_flag();
+        if(native_finalizer_shutdown)
             return i;
-        }
+        /* END: modified for NATIVE FINALIZER THREAD */
 
         tmn_suspend_disable();
         ManagedObject* object = remove_object();
@@ -380,10 +399,14 @@ int Objects_To_Finalize::do_finalization(int quantity) {
         Class *clss = handle->object->vt()->clss;
         assert(clss);
         
-        if ((*finalizer_on_exit)  && is_class_ignored(clss)) {
+        /* BEGIN: modified for NATIVE FINALIZER THREAD */
+        if(native_finalizer_thread_flag)
+            native_finalizer_on_exit = get_finalizer_on_exit_flag();
+        if (native_finalizer_on_exit  && is_class_ignored(clss)) {
             tmn_suspend_enable();
             continue;
         }
+        /* END: modified for NATIVE FINALIZER THREAD */
         
         Method *finalize = class_lookup_method_recursive(clss,
             VM_Global_State::loader_env->FinalizeName_String,
@@ -467,7 +490,12 @@ void vm_run_pending_finalizers()
 {
     NativeObjectHandles nhs;
     assert(hythread_is_suspend_enabled());
-    objects_to_finalize.run_finalizers();
+    /* BEGIN: modified for NATIVE FINALIZER THREAD */
+    if(get_native_finalizer_thread_flag())
+        activate_finalizer_threads(FALSE);
+    else
+        objects_to_finalize.run_finalizers();
+    /* END: modified for NATIVE FINALIZER THREAD */
 } //vm_run_pending_finalizers
 
 int vm_do_finalization(int quantity)
@@ -510,5 +538,16 @@ void vm_enqueue_reference(Managed_Object_Handle obj)
 
 void vm_enqueue_references()
 { 
-    references_to_enqueue.enqueue_references();
+    /* BEGIN: modified for NATIVE REFERENCE ENQUEUE THREAD */
+    if(get_native_ref_enqueue_thread_flag())
+        activate_ref_enqueue_thread();
+    else
+        references_to_enqueue.enqueue_references();
+    /* END: modified for NATIVE REFERENCE ENQUEUE THREAD */
 } //vm_enqueue_references
+
+/* added for NATIVE REFERENCE ENQUEUE THREAD */
+void vm_ref_enqueue_func(void)
+{
+    references_to_enqueue.enqueue_references();
+}

@@ -22,6 +22,7 @@
 #include "gc_metadata.h"
 #include "../thread/mutator.h"
 #include "../verify/verify_live_heap.h"
+#include "../finalizer_weakref/finalizer_weakref.h"
 
 extern Boolean NEED_BARRIER;
 extern unsigned int NUM_COLLECTORS;
@@ -169,12 +170,15 @@ void gc_reclaim_heap(GC* gc, unsigned int gc_cause)
   //gc->collect_kind = MAJOR_COLLECTION;
 
   gc_metadata_verify(gc, TRUE);
+  gc_finalizer_weakref_metadata_verify((GC*)gc, TRUE);
   
   /* Stop the threads and collect the roots. */
   gc_reset_rootset(gc);  
   vm_enumerate_root_set_all_threads();
   gc_set_rootset(gc); 
-    
+  
+  gc_set_objects_with_finalizer(gc);
+  
   if(verify_live_heap) gc_verify_heap(gc, TRUE);
 
   gc_gen_reclaim_heap((GC_Gen*)gc);  
@@ -182,8 +186,12 @@ void gc_reclaim_heap(GC* gc, unsigned int gc_cause)
   if(verify_live_heap) gc_verify_heap(gc, FALSE);
   
   gc_metadata_verify(gc, FALSE);
-    
+  gc_finalizer_weakref_metadata_verify(gc, FALSE);
+  
+  gc_reset_finalizer_weakref_metadata(gc);
   gc_reset_mutator_context(gc);
+  
+  gc_activate_finalizer_weakref_threads((GC*)gc);
   vm_resume_threads_after();
 
   return;

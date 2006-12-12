@@ -21,6 +21,7 @@
 #include "mspace.h"
 #include "../thread/collector.h"
 #include "../trace_forward/fspace.h"
+#include "../finalizer_weakref/finalizer_weakref.h"
 
 struct GC_Gen;
 Space* gc_get_nos(GC_Gen* gc);
@@ -331,6 +332,9 @@ static void mark_compact_mspace(Collector* collector)
     /* last collector's world here */
     /* prepare for next phase */
     gc_init_block_for_collectors(gc, mspace); 
+    
+    collector_process_finalizer_weakref(collector);
+    
     /* let other collectors go */
     num_marking_collectors++; 
   }
@@ -360,6 +364,8 @@ static void mark_compact_mspace(Collector* collector)
     
   /* Pass 3: update all references whose objects are to be moved */  
   gc_update_repointed_refs(collector);
+  
+  gc_post_process_finalizer_weakref(gc);
     
   /* Pass 4: do the compaction and reset blocks */  
   next_block_for_compact = mspace_get_first_compact_block(mspace);

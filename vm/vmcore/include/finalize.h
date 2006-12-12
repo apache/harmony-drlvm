@@ -50,5 +50,8 @@ void vm_enumerate_references_to_enqueue();
 
 
 void vm_enqueue_references();
+void vm_ref_enqueue_func(void);   // added for NATIVE REFERENCE ENQUEUE THREAD
+
+Boolean get_native_finalizer_thread_flag(); // added for NATIVE FINALIZER THREAD
 
 #endif

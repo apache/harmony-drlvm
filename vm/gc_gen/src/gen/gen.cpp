@@ -100,6 +100,10 @@ void gc_gen_initialize(GC_Gen *gc_gen, unsigned int min_heap_size, unsigned int 
   gc_gen->committed_heap_size = space_committed_size((Space*)gc_gen->nos) +
                                 space_committed_size((Space*)gc_gen->mos) +
                                 space_committed_size((Space*)gc_gen->los);
+  
+  set_native_finalizer_thread_flag(TRUE);
+  set_native_ref_enqueue_thread_flag(TRUE);
+  
   return;
 }
 

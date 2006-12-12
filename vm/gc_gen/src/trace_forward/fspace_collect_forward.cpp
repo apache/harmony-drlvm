@@ -22,6 +22,7 @@
 #include "fspace.h"
 #include "../thread/collector.h"
 #include "../common/gc_metadata.h"
+#include "../finalizer_weakref/finalizer_weakref.h"
 
 static Boolean fspace_object_to_be_forwarded(Partial_Reveal_Object *p_obj, Fspace *fspace)
 {
@@ -71,6 +72,8 @@ static void scan_object(Collector* collector, Partial_Reveal_Object *p_obj)
     offset_scanner = offset_next_ref(offset_scanner);
   }
 
+  scan_weak_reference(collector, p_obj, scan_slot);
+  
   return;
 }
 
@@ -95,7 +98,7 @@ static void forward_object(Collector* collector, Partial_Reveal_Object **p_ref)
 
   /* Fastpath: object has already been forwarded, update the ref slot */
   if(obj_is_forwarded_in_vt(p_obj)) {
-    *p_ref = obj_get_forwarding_pointer_in_vt(p_obj);    
+    *p_ref = obj_get_forwarding_pointer_in_vt(p_obj);
     return;
   }
 
@@ -122,15 +125,11 @@ static void forward_object(Collector* collector, Partial_Reveal_Object **p_ref)
       is set in the atomic instruction, which requires to roll back the mos_alloced
       space. That is easy for thread local block allocation cancellation. */
   if( p_target_obj == NULL ){
-    Partial_Reveal_Object *forward_ptr = obj_get_forwarding_pointer_in_vt(p_obj);
-    while(forward_ptr == NULL) 
-      forward_ptr = obj_get_forwarding_pointer_in_vt(p_obj);  
-      
-    *p_ref = forward_ptr;
-     return;
+    *p_ref = obj_get_forwarding_pointer_in_vt(p_obj);
+    return;
   }  
   /* otherwise, we successfully forwarded */
-  *p_ref = p_target_obj;  
+  *p_ref = p_target_obj;
 
   /* we forwarded it, we need remember it for verification. */
   if(verify_live_heap) {
@@ -244,9 +243,60 @@ void trace_forward_fspace(Collector* collector)
   /* the rest work is not enough for parallelization, so let only one thread go */
   if( collector->thread_handle != 0 ) return;
 
+  collector_process_finalizer_weakref(collector);
+  
   gc_update_repointed_refs(collector);
+  
+  gc_post_process_finalizer_weakref(gc);
+  
   reset_fspace_for_allocation(space);  
 
   return;
   
+}
+
+Boolean obj_is_dead_in_minor_forward_collection(Collector *collector, Partial_Reveal_Object *p_obj)
+{
+  Space *space = collector->collect_space;
+  Boolean belong_to_nos = obj_belongs_to_space(p_obj, space);
+  
+  if(!belong_to_nos)
+    return FALSE;
+  
+  Boolean space_to_be_forwarded = fspace_object_to_be_forwarded(p_obj, (Fspace*)space);
+  Boolean forwarded = obj_is_forwarded_in_vt(p_obj);
+  Boolean marked = obj_is_marked_in_vt(p_obj);
+  
+  return (space_to_be_forwarded && !forwarded) || (!space_to_be_forwarded && !marked);
+}
+
+void resurrect_obj_tree_after_trace(Collector *collector, Partial_Reveal_Object **p_ref)
+{
+  GC *gc = collector->gc;
+  GC_Metadata* metadata = gc->metadata;
+  
+  collector->trace_stack = pool_get_entry(metadata->free_task_pool);
+  collector_tracestack_push(collector, p_ref);
+  pool_put_entry(metadata->mark_task_pool, collector->trace_stack);
+  
+//collector->rep_set = pool_get_entry(metadata->free_set_pool); /* has got collector->rep_set in caller */
+  collector->trace_stack = pool_get_entry(metadata->free_task_pool);
+  Vector_Block* trace_task = pool_get_entry(metadata->mark_task_pool);
+  while(trace_task){    
+    unsigned int* iter = vector_block_iterator_init(trace_task);
+    while(!vector_block_iterator_end(trace_task,iter)){
+      Partial_Reveal_Object** p_ref = (Partial_Reveal_Object** )*iter;
+      iter = vector_block_iterator_advance(trace_task,iter);
+      assert(*p_ref);
+      trace_object(collector, p_ref);
+    }
+    vector_stack_clear(trace_task);
+    pool_put_entry(metadata->free_task_pool, trace_task);
+    trace_task = pool_get_entry(metadata->mark_task_pool);
+  }
+  
+  trace_task = (Vector_Block*)collector->trace_stack;
+  vector_stack_clear(trace_task);
+  pool_put_entry(metadata->free_task_pool, trace_task);   
+  collector->trace_stack = NULL;
 }

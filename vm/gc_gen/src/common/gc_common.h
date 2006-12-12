@@ -196,6 +196,7 @@ inline Boolean obj_belongs_to_space(Partial_Reveal_Object *p_obj, Space* space)
 struct Mutator;
 struct Collector;
 struct GC_Metadata;
+struct Finalizer_Weakref_Metadata;
 struct Vector_Block;
 typedef struct GC{
   void* heap_start;
@@ -216,6 +217,7 @@ typedef struct GC{
   
   /* metadata is the pool for rootset, tracestack, etc. */  
   GC_Metadata* metadata;
+  Finalizer_Weakref_Metadata *finalizer_weakref_metadata;
   unsigned int collect_kind; /* MAJOR or MINOR */
   /* FIXME:: this is wrong! root_set belongs to mutator */
   Vector_Block* root_set;

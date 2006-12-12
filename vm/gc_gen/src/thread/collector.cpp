@@ -22,6 +22,7 @@
 
 #include "collector.h"
 #include "../mark_compact/mspace.h"
+#include "../finalizer_weakref/finalizer_weakref.h"
 
 
 static void collector_restore_obj_info(Collector* collector)
@@ -70,6 +71,8 @@ static void collector_reset_thread(Collector *collector)
     assert(collector->rem_set==NULL);
     collector->rem_set = pool_get_entry(metadata->free_set_pool);
   }
+  
+  collector_reset_weakref_sets(collector);
 
   collector->result = TRUE;
   return;

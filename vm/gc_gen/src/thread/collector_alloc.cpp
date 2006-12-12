@@ -32,25 +32,26 @@ Partial_Reveal_Object* collector_forward_object(Collector* collector, Partial_Re
      assert(!obj_is_marked_in_vt(p_obj));
      return NULL;
   }
-  /* otherwise, get the obj size firstly. The work below will destroy its vtable. */
+  
+  /* otherwise, try to alloc it. mos should always has enough space to hold nos during collection */
   unsigned int size = vm_object_size(p_obj);
+  Partial_Reveal_Object* p_targ_obj = (Partial_Reveal_Object*)mos_alloc(size, (Allocator*)collector);  
+  assert(p_targ_obj); 
     
   /* else, take the obj by setting the forwarding flag atomically 
      we don't put a simple bit in vt because we need compute obj size later. */
-  if ((unsigned int)vt != atomic_cas32((unsigned int*)obj_get_vtraw_addr(p_obj), ((unsigned int)FORWARDING_BIT_MASK), (unsigned int)vt)) {
-    /* forwarded by other */
+  if ((unsigned int)vt != atomic_cas32((unsigned int*)obj_get_vtraw_addr(p_obj), ((unsigned int)p_targ_obj|FORWARDING_BIT_MASK), (unsigned int)vt)) {
+    /* forwarded by other, we need unalloc the allocated obj. We may waste some space if the allocation switched
+       block. The remaining part of the switched block cannot be revivied for next allocation of 
+       object that has smaller size than this one. */
     assert( obj_is_forwarded_in_vt(p_obj) && !obj_is_marked_in_vt(p_obj));
+    thread_local_unalloc(size, (Allocator*)collector);
     return NULL;
   }
 
-  /* we hold the object, now forward it */
-  Partial_Reveal_Object* p_targ_obj = (Partial_Reveal_Object*)mos_alloc(size, (Allocator*)collector);  
-  /* mos should always has enough space to hold nos during collection */
-  assert(p_targ_obj); 
+  /* we forwarded the object */
   memcpy(p_targ_obj, p_obj, size);
-
-  /* because p_obj has forwarding flag in its vt, we set it here */
-  obj_set_forwarding_pointer_in_vt(p_obj, p_targ_obj);
+  /* because p_obj has forwarding pointer in its vt, we set it seperately here */
   obj_set_vt(p_targ_obj, (Allocation_Handle)vt);
   
   return p_targ_obj;  

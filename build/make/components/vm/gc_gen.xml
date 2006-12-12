@@ -61,7 +61,8 @@ Version: $Revision: 1.2 $
                 <include name="trace_forward/*.cpp" />            
                 <include name="utils/*.cpp" /> 
                 <include name="jni/*.cpp" /> 
-                <include name="verify/*.cpp" />            
+                <include name="verify/*.cpp" />             
+                <include name="finalizer_weakref/*.cpp" />
                 </select>
 
                 <select arch="em64t,ipf">
@@ -74,6 +75,7 @@ Version: $Revision: 1.2 $
                 <exclude name="utils/*.cpp" /> 
                 <exclude name="jni/*.cpp" /> 
                 <exclude name="verify/*.cpp" />            
+                <exclude name="finalizer_weakref/*.cpp" />
                 </select>
             </fileset>
 

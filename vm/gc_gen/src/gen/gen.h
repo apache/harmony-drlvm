@@ -26,6 +26,7 @@
 #include "../trace_forward/fspace.h"
 #include "../mark_compact/mspace.h"
 #include "../mark_sweep/lspace.h"
+#include "../finalizer_weakref/finalizer_weakref_metadata.h"
   
 enum Write_Barrier_Kind{
   WRITE_BARRIER_NIL,  
@@ -64,6 +65,7 @@ typedef struct GC_Gen {
 
   /* metadata is the pool for rootset, markstack, etc. */  
   GC_Metadata* metadata;
+  Finalizer_Weakref_Metadata *finalizer_weakref_metadata;
   unsigned int collect_kind; /* MAJOR or MINOR */
   /* FIXME:: this is wrong! root_set belongs to mutator */
   Vector_Block* root_set;

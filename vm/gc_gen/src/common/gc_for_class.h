@@ -142,5 +142,20 @@ inline unsigned int nonarray_object_size(Partial_Reveal_Object *obj)
   return gcvt->gc_allocated_size;
 }
 
+#define CL_PROP_REFERENCE_TYPE_SHIFT 16
+#define CL_PROP_REFERENCE_TYPE_MASK 0x00030000
+
+inline WeakReferenceType special_reference_type(Partial_Reveal_Object *p_reference)
+{
+  GC_VTable_Info *gcvt = obj_get_gcvt(p_reference);
+  return (WeakReferenceType)((gcvt->gc_class_properties & CL_PROP_REFERENCE_TYPE_MASK) >> CL_PROP_REFERENCE_TYPE_SHIFT);
+}
+
+inline Boolean type_has_finalizer(Partial_Reveal_VTable *vt)
+{
+  GC_VTable_Info *gcvt = vtable_get_gcvt(vt);
+  return gcvt->gc_class_properties & CL_PROP_FINALIZABLE_MASK;
+}
+
 #endif //#ifndef _GC_TYPES_H_
 

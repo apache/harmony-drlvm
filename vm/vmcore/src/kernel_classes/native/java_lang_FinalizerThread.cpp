@@ -34,6 +34,9 @@
 #include "port_sysinfo.h"
 #include "vm_threads.h"
 
+/* added for NATIVE FINALIZER THREAD */
+#include "finalizer_thread.h"
+
 /**
  * Implements getObject(..) method.
  * For details see kernel classes component documentation.
@@ -90,3 +93,41 @@ JNIEXPORT void JNICALL Java_java_lang_FinalizerThread_fillFinalizationQueueOnExi
     gc_finalize_on_exit();
     tmn_suspend_enable();
 }
+
+/* BEGIN: These three methods are added for NATIVE FINALIZER THREAD */
+/*
+ * Class:     java_lang_FinalizerThread
+ * Method:    getNativeFinalizerThreadFlagFromVM
+ * Signature: ()Z
+ */
+JNIEXPORT jboolean JNICALL Java_java_lang_FinalizerThread_getNativeFinalizerThreadFlagFromVM
+  (JNIEnv *, jclass)
+{
+    return (jboolean)get_native_finalizer_thread_flag();
+}
+
+/*
+ * Class:     java_lang_FinalizerThread
+ * Method:    runFinalizationInNativeFinalizerThreads
+ * Signature: ()V
+ */
+JNIEXPORT void JNICALL Java_java_lang_FinalizerThread_runFinalizationInNativeFinalizerThreads
+  (JNIEnv *, jclass)
+{
+    vm_enqueue_references();
+    
+    // Do finalization in dedicated native finalizer threads.
+    vmmemory_manager_runfinalization();
+}
+
+/*
+ * Class:     java_lang_FinalizerThread
+ * Method:    finalizerShutDown
+ * Signature: ()V
+ */
+JNIEXPORT void JNICALL Java_java_lang_FinalizerThread_finalizerShutDown
+  (JNIEnv *, jclass, jboolean value)
+{
+    finalizer_shutdown(value);
+}
+/* END: These three methods are added for NATIVE FINALIZER THREAD */

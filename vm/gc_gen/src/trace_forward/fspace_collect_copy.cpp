@@ -22,6 +22,7 @@
 #include "../mark_compact/mspace.h"
 #include "../mark_sweep/lspace.h"
 #include "../thread/collector.h"
+#include "../finalizer_weakref/finalizer_weakref.h"
 
 static volatile Block_Header* current_copy_block;
 static volatile Block_Header* current_target_block;
@@ -179,6 +180,9 @@ void mark_copy_fspace(Collector* collector)
     /* world for single thread, e.g., verification of last phase, and preparation of next phase */
     current_copy_block = fspace_get_first_copy_block(fspace);
     current_target_block = mspace_get_first_target_block_for_nos(mspace);    
+    
+    collector_process_finalizer_weakref(collector);
+    
     /* let other collectors go */
     num_marking_collectors++; 
   }
@@ -203,6 +207,8 @@ void mark_copy_fspace(Collector* collector)
   if( collector->thread_handle != 0 ) return;
   
   gc_update_repointed_refs(collector);
+  
+  gc_post_process_finalizer_weakref(gc);
 
   /* FIXME:: Pass 2 and 3 can be merged into one pass */
   /* Pass 3: copy live fspace object to new location */

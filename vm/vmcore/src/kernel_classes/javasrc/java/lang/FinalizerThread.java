@@ -51,7 +51,12 @@ class FinalizerThread extends Thread {
      * VM calls this thread from Runtime.runFinalization().
      */
     public static void runFinalization() {
-        startFinalization(true);
+        /* BEGIN: added for NATIVE FINALIZER THREAD */
+        if(NATIVE_FINALIZER_THREAD)
+            runFinalizationInNativeFinalizerThreads();
+        else
+        /* END: added for NATIVE FINALIZER THREAD */
+            startFinalization(true);
     }
 
     /*
@@ -62,6 +67,11 @@ class FinalizerThread extends Thread {
      * Initializes finalization system. Starts permanent thread.
      */
     static void initialize() {
+        /* BEGIN: added for NATIVE FINALIZER THREAD */
+        if (NATIVE_FINALIZER_THREAD)
+            return;
+        /* END: added for NATIVE FINALIZER THREAD */
+        
         if (TRACE) {
             trace("FinalizerThread: static initialization started");
         }
@@ -87,6 +97,12 @@ class FinalizerThread extends Thread {
      * VM calls this method to request finalizer thread shutdown.
      */
     static void shutdown(boolean startFinalizationOnExit) {
+        /* BEGIN: added for NATIVE FINALIZER THREAD */
+        if(NATIVE_FINALIZER_THREAD) {
+            finalizerShutDown(startFinalizationOnExit);
+            return;
+        }
+        /* END: added for NATIVE FINALIZER THREAD */
         if (TRACE) {
             trace("shutting down finalizer thread");
         }
@@ -101,6 +117,29 @@ class FinalizerThread extends Thread {
         }
     }
 
+    /* added for NATIVE FINALIZER THREAD
+     * A flag to indicate whether the finalizer threads are native threads or Java threads.
+     */
+    private static final boolean NATIVE_FINALIZER_THREAD = getNativeFinalizerThreadFlagFromVM();
+
+    /* BEGIN: These three methods are added for NATIVE FINALIZER THREAD */
+    /**
+     * This method gets the flag that indicates
+     * whether VM uses native finalizer threads or Java finalizer threads.
+     */
+    private static native boolean getNativeFinalizerThreadFlagFromVM();
+    
+    /**
+     * This method implements runFinalization() method in native finalizer threads.
+     */
+    private static native void runFinalizationInNativeFinalizerThreads();
+    
+    /**
+     * This method does finalization work related to VM shutdown in native finalizer threads.
+     */
+    private static native void finalizerShutDown(boolean finalizeOnExit);
+    /* END: These three methods are added for NATIVE FINALIZER THREAD */
+    
     /*
      * Staic private part
      */

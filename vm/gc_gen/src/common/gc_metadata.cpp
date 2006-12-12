@@ -22,6 +22,7 @@
 #include "../thread/mutator.h"
 #include "../thread/collector.h"
 #include "interior_pointer.h"
+#include "../finalizer_weakref/finalizer_weakref.h"
 
 #define GC_METADATA_SIZE_BYTES 48*MB
 
@@ -182,7 +183,7 @@ void mutator_remset_add_entry(Mutator* mutator, Partial_Reveal_Object** p_ref)
 
 void collector_repset_add_entry(Collector* collector, Partial_Reveal_Object** p_ref)
 {
-  assert( p_ref >= gc_heap_base_address() && p_ref < gc_heap_ceiling_address()); 
+//  assert( p_ref >= gc_heap_base_address() && p_ref < gc_heap_ceiling_address()); 
 
   Vector_Block* root_set = collector->rep_set;  
   vector_block_add_entry(root_set, (unsigned int)p_ref);
@@ -260,8 +261,7 @@ static void gc_update_repointed_sets(GC* gc, Pool* pool)
       else
 #endif
       if(!obj_is_forwarded_in_obj_info(p_obj)) continue;
-      Partial_Reveal_Object* p_target_obj = get_forwarding_pointer_in_obj_info(p_obj);
-      *p_ref = p_target_obj; 
+      *p_ref = get_forwarding_pointer_in_obj_info(p_obj);
     }
     vector_block_clear(root_set);
     pool_put_entry(metadata->free_set_pool, root_set);
@@ -282,6 +282,7 @@ void gc_update_repointed_refs(Collector* collector)
     gc_update_repointed_sets(gc, metadata->collector_repset_pool);   
   }
   
+  gc_update_finalizer_weakref_repointed_refs(gc);
   update_rootset_interior_pointer();
     
   return;

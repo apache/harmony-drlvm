@@ -25,6 +25,7 @@
 #include "interior_pointer.h"
 #include "../thread/collector.h"
 #include "../verify/verify_live_heap.h"
+#include "../finalizer_weakref/finalizer_weakref.h"
 
 static GC* p_global_gc = NULL;
 
@@ -44,6 +45,7 @@ void gc_init()
   gc_gen_initialize((GC_Gen*)gc, min_heap_size_bytes, max_heap_size_bytes);
 
   gc_metadata_initialize(gc); /* root set and mark stack */
+  gc_finalizer_weakref_metadata_initialize(gc);
   collector_initialize(gc);
   gc_init_heap_verification(gc);
 
@@ -55,6 +57,7 @@ void gc_wrapup()
   GC* gc =  p_global_gc;
   gc_gen_destruct((GC_Gen*)gc);
   gc_metadata_destruct(gc); /* root set and mark stack */
+  gc_finalizer_weakref_metadata_destruct(gc);
   collector_destruct(gc);
 
   if( verify_live_heap ){
@@ -135,3 +138,17 @@ unsigned int gc_time_since_last_gc()
 {  assert(0); return 0; }
 
 
+void gc_finalize_on_exit()
+{
+  process_objects_with_finalizer_on_exit(p_global_gc);
+}
+
+/* for future use
+ * void gc_phantom_ref_enqueue_hook(void *p_reference)
+ * {
+ *   if(special_reference_type((Partial_Reveal_Object *)p_reference) == PHANTOM_REFERENCE){
+ *     Partial_Reveal_Object **p_referent_field = obj_get_referent_field(p_reference);
+ *     *p_referent_field = (Partial_Reveal_Object *)((unsigned int)*p_referent_field | PHANTOM_REF_ENQUEUED_MASK | ~PHANTOM_REF_PENDING_MASK);
+ *   }
+ * }
+ */

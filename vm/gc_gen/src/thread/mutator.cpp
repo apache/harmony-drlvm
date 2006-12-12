@@ -20,6 +20,7 @@
 
 #include "mutator.h"
 #include "../trace_forward/fspace.h"
+#include "../finalizer_weakref/finalizer_weakref.h"
 
 struct GC_Gen;
 Space* gc_get_nos(GC_Gen* gc);
@@ -37,6 +38,8 @@ void mutator_initialize(GC* gc, void *unused_gc_information)
     mutator->rem_set = pool_get_entry(gc->metadata->free_set_pool);
     assert(vector_block_is_empty(mutator->rem_set));
   }
+  
+  mutator->objects_with_finalizer = finalizer_weakref_get_free_block();
        
   lock(gc->mutator_list_lock);     // vvvvvvvvvvvvvvvvvvvvvvvvvvvvvv
 
@@ -60,6 +63,11 @@ void mutator_destruct(GC* gc, void *unused_gc_information)
   if(gc_requires_barriers()){ /* put back the remset when a mutator exits */
     pool_put_entry(gc->metadata->mutator_remset_pool, mutator->rem_set);
     mutator->rem_set = NULL;
+  }
+  
+  if(mutator->objects_with_finalizer){
+    pool_put_entry(gc->finalizer_weakref_metadata->objects_with_finalizer_pool, mutator->objects_with_finalizer);
+    mutator->objects_with_finalizer = NULL;
   }
 
   lock(gc->mutator_list_lock);     // vvvvvvvvvvvvvvvvvvvvvvvvvvvvvv
@@ -90,6 +98,7 @@ void gc_reset_mutator_context(GC* gc)
   while (mutator) {
     mutator->rem_set = pool_get_entry(gc->metadata->free_set_pool);
     alloc_context_reset((Allocator*)mutator);    
+    mutator_reset_objects_with_finalizer(mutator);
     mutator = mutator->next;
   }  
   return;
