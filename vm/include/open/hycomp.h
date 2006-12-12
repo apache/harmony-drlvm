@@ -150,9 +150,9 @@ typedef int I_32;
 typedef short I_16;
 typedef char I_8;
 /* don't typedef BOOLEAN since it's already def'ed on Win32 */
+#endif
 #ifdef LINUX
 #define BOOLEAN UDATA
-#endif
 #endif
 
 #if !defined(HYCONST64)
