@@ -265,9 +265,18 @@ static jint populate_jni_nio() {
     }
     
     apr_dso_handle_sym_t gdba, gdbc, ndb;
-    if( APR_SUCCESS == apr_dso_sym(&gdba, handle, "GetDirectBufferAddress")
-        && APR_SUCCESS == apr_dso_sym(&gdbc, handle, "GetDirectBufferCapacity")
-        && APR_SUCCESS == apr_dso_sym(&ndb, handle, "NewDirectByteBuffer") ) 
+#ifdef WIN32
+#define GET_DIRECT_BUFFER_ADDRESS "_GetDirectBufferAddress@8"
+#define GET_DIRECT_BUFFER_CAPACITY "_GetDirectBufferCapacity@8"
+#define NEW_DIRECT_BYTE_BUFFER "_NewDirectByteBuffer@16"
+#else
+#define GET_DIRECT_BUFFER_ADDRESS "GetDirectBufferAddress"
+#define GET_DIRECT_BUFFER_CAPACITY "GetDirectBufferCapacity"
+#define NEW_DIRECT_BYTE_BUFFER "NewDirectByteBuffer"
+#endif
+    if (APR_SUCCESS == apr_dso_sym(&gdba, handle, GET_DIRECT_BUFFER_ADDRESS)
+        && APR_SUCCESS == apr_dso_sym(&gdbc, handle, GET_DIRECT_BUFFER_CAPACITY)
+        && APR_SUCCESS == apr_dso_sym(&ndb, handle, NEW_DIRECT_BYTE_BUFFER))
     {
         jni_vtable.GetDirectBufferAddress = (GDBA)gdba;
         jni_vtable.GetDirectBufferCapacity = (GDBC)gdbc;
