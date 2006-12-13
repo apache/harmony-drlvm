@@ -213,6 +213,9 @@ jint vm_detach(jthread java_thread) {
     status = run_java_detach(java_thread);
     if (status != JNI_OK) return status;
 
+    // Send Thread End event
+    jvmti_send_thread_start_end_event(0);
+
     hythread_suspend_disable();
 
     p_vm_thread = get_thread_ptr();

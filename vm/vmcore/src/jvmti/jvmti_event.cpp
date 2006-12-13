@@ -427,7 +427,7 @@ void jvmti_send_vm_init_event(Global_Env *env)
     ti->nextPhase(JVMTI_PHASE_LIVE);
     tmn_suspend_disable();
     ObjectHandle hThread = oh_allocate_local_handle();
-    hThread->object = (Java_java_lang_Thread *)jthread_get_java_thread(hythread_self())->object;
+    hThread->object = (Java_java_lang_Thread *)jthread_self()->object;
     tmn_suspend_enable();
     // Send VM_INIT TI events
     TIEnv *ti_env = ti->getEnvironments();
@@ -1403,7 +1403,7 @@ ManagedObject *jvmti_exception_catch_event_callback_call(ManagedObject *exn,
     exn_object->object = exn;
 
     ObjectHandle hThread = oh_allocate_local_handle();
-    hThread->object = (Java_java_lang_Thread *)jthread_get_java_thread(hythread_self())->object;
+    hThread->object = (Java_java_lang_Thread *)jthread_self()->object;
 
     TIEnv *ti_env = ti->getEnvironments();
     TIEnv *next_env;
@@ -1520,7 +1520,7 @@ void jvmti_send_contended_enter_or_entered_monitor_event(jobject obj,
     // Create local handles frame
     NativeObjectHandles lhs;
     ObjectHandle hThread = oh_allocate_local_handle();
-    hThread->object = (Java_java_lang_Thread *)jthread_get_java_thread(hythread_self())->object;
+    hThread->object = (Java_java_lang_Thread *)jthread_self()->object;
     tmn_suspend_enable();
 
     TIEnv *ti_env = ti->getEnvironments();
@@ -1576,7 +1576,7 @@ void jvmti_send_class_load_event(const Global_Env* env, Class* clss)
 
     tmn_suspend_disable();
     ObjectHandle hThread = oh_allocate_local_handle();
-    hThread->object = (Java_java_lang_Thread *)jthread_get_java_thread(hythread_self())->object;
+    hThread->object = (Java_java_lang_Thread *)jthread_self()->object;
     tmn_suspend_enable();
 
     TIEnv *ti_env = ti->getEnvironments();
@@ -1719,7 +1719,7 @@ void jvmti_send_class_prepare_event(Class* clss)
     ObjectHandle hClass = struct_Class_to_jclass(clss);
     tmn_suspend_disable(); // -----------vv
     ObjectHandle hThread = oh_allocate_local_handle();
-    hThread->object = (Java_java_lang_Thread *)jthread_get_java_thread(hythread_self())->object;
+    hThread->object = (Java_java_lang_Thread *)jthread_self()->object;
     tmn_suspend_enable();   // -----------^^
 
     TIEnv *ti_env = ti->getEnvironments();
@@ -1748,7 +1748,7 @@ void jvmti_send_class_prepare_event(Class* clss)
                     TRACE2("jvmti.class.cp", "Class prepare event, class name = " << clss->get_name()->bytes);
                     tmn_suspend_disable(); // -------------------------------vv
                     ObjectHandle hThreadLocal = oh_allocate_local_handle();
-                    hThreadLocal->object = (Java_java_lang_Thread *)jthread_get_java_thread(hythread_self())->object;
+                    hThreadLocal->object = (Java_java_lang_Thread *)jthread_self()->object;
                     tmn_suspend_enable(); // --------------------------------^^
                     func((jvmtiEnv *)ti_env, jni_env, (jthread)hThreadLocal, (jclass)hClass);
                     oh_discard_local_handle( hThreadLocal );
@@ -1768,14 +1768,14 @@ static void call_callback(jvmtiEvent event_type, JNIEnv *jni_env, TIEnv *ti_env,
         case JVMTI_EVENT_THREAD_START:
         case JVMTI_EVENT_THREAD_END: {
             ((jvmtiEventThreadStart)callback_func)((jvmtiEnv*)ti_env, jni_env, 
-                    jthread_get_java_thread(hythread_self()));
+                    jthread_self());
             break;
         }
         case JVMTI_EVENT_MONITOR_CONTENDED_ENTER: 
         case JVMTI_EVENT_MONITOR_CONTENDED_ENTERED: {
             jobject monitor = va_arg(args, jobject);
             ((jvmtiEventMonitorContendedEnter) callback_func)((jvmtiEnv*)ti_env, 
-                    jni_env, jthread_get_java_thread(hythread_self()), monitor);
+                    jni_env, jthread_self(), monitor);
 
             break;
         }
@@ -1784,7 +1784,7 @@ static void call_callback(jvmtiEvent event_type, JNIEnv *jni_env, TIEnv *ti_env,
             jobject monitor = va_arg(args, jobject);
             jlong timeout   = va_arg(args, jlong);
             ((jvmtiEventMonitorWait)callback_func)((jvmtiEnv*)ti_env, jni_env, 
-                    jthread_get_java_thread(hythread_self()), monitor, timeout);
+                    jthread_self(), monitor, timeout);
             break;
         }
 
@@ -1792,7 +1792,7 @@ static void call_callback(jvmtiEvent event_type, JNIEnv *jni_env, TIEnv *ti_env,
             jobject monitor = va_arg(args, jobject);
             jboolean is_timed_out   = va_arg(args, jint);
             ((jvmtiEventMonitorWaited)callback_func)((jvmtiEnv*)ti_env, jni_env, 
-                    jthread_get_java_thread(hythread_self()), monitor, is_timed_out);
+                    jthread_self(), monitor, is_timed_out);
             break;
         }
         default: 
@@ -1905,18 +1905,30 @@ void jvmti_send_thread_start_end_event(int is_start)
 }
 
 void jvmti_send_wait_monitor_event(jobject monitor, jlong timeout) {
+    if (JVMTI_PHASE_LIVE != VM_Global_State::loader_env->TI->getPhase())
+        return;
+
     TRACE2("jvmti.monitor.wait", "Monitor wait event, monitor = " << monitor);
+
     process_jvmti_event(JVMTI_EVENT_MONITOR_WAIT, 1, monitor, timeout);
-        }
+}
 
 void jvmti_send_waited_monitor_event(jobject monitor, jboolean is_timed_out) {
+    if (JVMTI_PHASE_LIVE != VM_Global_State::loader_env->TI->getPhase())
+        return;
+
     TRACE2("jvmti.monitor.waited", "Monitor wait event, monitor = " << monitor);
+
     process_jvmti_event(JVMTI_EVENT_MONITOR_WAITED, 1, monitor, is_timed_out);
-    }
+}
 
 void jvmti_send_contended_enter_or_entered_monitor_event(jobject monitor,
-    int isEnter) {
+        int isEnter) {
+    if (JVMTI_PHASE_LIVE != VM_Global_State::loader_env->TI->getPhase())
+        return;
+
     TRACE2("jvmti.monitor.enter", "Monitor enter event, monitor = " << monitor << " is enter= " << isEnter);
+
     (isEnter)?process_jvmti_event(JVMTI_EVENT_MONITOR_CONTENDED_ENTER, 1, monitor)
             :process_jvmti_event(JVMTI_EVENT_MONITOR_CONTENDED_ENTERED, 1, monitor);
 }

@@ -277,9 +277,6 @@ IDATA jthread_detach(jthread java_thread) {
         countdown_nondaemon_threads(tm_native_thread);
     }
 
-    // Send Thread End event
-    jvmti_send_thread_start_end_event(0);
-
     // Detach from VM.
     status = vm_detach(java_thread);
     if (status != JNI_OK) return TM_ERROR_INTERNAL;

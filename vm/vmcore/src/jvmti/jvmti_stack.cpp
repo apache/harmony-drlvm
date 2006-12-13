@@ -43,7 +43,7 @@
 jthread getCurrentThread() {
     tmn_suspend_disable();
     ObjectHandle hThread = oh_allocate_local_handle();
-    jthread thread = jthread_get_java_thread(hythread_self());
+    jthread thread = jthread_self();
     if(thread) {
         hThread->object = (Java_java_lang_Thread *)thread->object;
     } else {

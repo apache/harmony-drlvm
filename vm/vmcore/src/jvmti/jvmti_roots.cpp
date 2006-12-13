@@ -323,7 +323,7 @@ static void ti_enumerate_thread(TIEnv *ti_env, VM_thread* thread)
     state->root_kind = JVMTI_HEAP_ROOT_THREAD;
     state->thread_tag = ti_env->tags->get(
             (Managed_Object_Handle)
-            jthread_get_java_thread(hythread_self())->object);
+            jthread_self()->object);
 
     if (interpreter_enabled()) {
         interpreter.interpreter_ti_enumerate_thread((jvmtiEnv*)ti_env, thread);
