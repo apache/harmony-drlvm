@@ -9,3 +9,6 @@ exception/FinalizeStackTest.java
 
 # fails on Ubuntu6 x86_64
 gc/Mark.java
+
+# fails intermittently 
+stress/Stack.java

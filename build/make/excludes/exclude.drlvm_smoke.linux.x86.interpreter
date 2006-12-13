@@ -5,7 +5,6 @@ gc/Mark.java
 gc/SynchronizedFinilazersTest.java
 init/ErrorInInitializer.java
 io/Integers.java
-stress/Stack.java
 thread/InfiniteFinalizer.java
 
 # fails on ubuntu 6

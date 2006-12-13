@@ -22,25 +22,64 @@ package stress;
 
 public class Stack {
 
-    static final int depth = 7000; // the external java crashes if depth = 200000
+    // the minimal reference limit for DRLVM on Windows/Interpreter
+    // which does not cause StackOverflowError
+    static final int minDepth = 300;
+    // the maximal reference limit for DRLVM on linux/OPT
+    // which cause StackOverflowError
+    static int depth = 75000;
+    static final int maxDepth = 12000000;
 
-    synchronized boolean test(int i) {
+    synchronized boolean testMinDepth(int i) {
         System.out.println("" + i);
-
-        if (i < depth && test(++i)) {
+        if (i < minDepth && testMinDepth(++i)) {
             return true;
         }
         return true;
     }
 
+    synchronized boolean test(int i) {
+        System.out.println(i);
+        if (i < depth && test(++i)) {
+            return true;
+        }
+        return false;
+    }
+
     public static void main(String[] args) {
         boolean pass = false;
-
+        boolean minDepthPass = false;
+            
+        Stack test = new Stack();
+        
+        // check that StackOverflowError is NOT thrown 
+        // for the predefined minimal number of iterations 
         try {
-            Stack test = new Stack();
-            pass = test.test(0);
-        } catch (Throwable e) {
-            System.out.println("Got exception: " + e.toString());            
+            test.testMinDepth(0);
+            System.out.println("Test passed for " + minDepth + " iterations\n");
+            minDepthPass = true;
+        } catch (StackOverflowError e) {
+            System.out.println("\nStackOverflowError has been thrown too early");
+        }
+
+        // check that StackOverflowError is thrown 
+        // after some reasonable number of iterations 
+        if (minDepthPass) {
+            try {
+                while (!pass && depth <= maxDepth) {
+                    pass = test.test(0);
+                    depth *= 2;
+                }
+                System.out.println("StackOverflowError has not been thrown after " + depth / 2 + " iterations");
+            } catch (Throwable e) {
+                if (e instanceof StackOverflowError) {
+                    System.out.println("\nGot expected StackOverflowError");
+                    pass = true;
+                } else {
+                    System.out.println("\nGot unexpected exception: " + e.toString());
+                    pass = false;
+                }
+            }
         }
         System.out.println("Stack test " + (pass ? "passed" : "failed"));
     }
