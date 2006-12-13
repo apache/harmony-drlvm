@@ -265,7 +265,6 @@ static void init_vm_properties(Properties & properties)
         properties.set("vm.crash_handler", "false");
         properties.set("vm.finalize", "true");
         properties.set("vm.jit_may_inline_sync", "true");
-        properties.set("vm.use_interpreter", "false");
         properties.set("vm.use_verifier", "true");
         properties.set("vm.jvmti.enabled", "false");
         properties.set("vm.cleanupOnExit", "false");
