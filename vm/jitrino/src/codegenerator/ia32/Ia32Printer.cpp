@@ -511,6 +511,16 @@ void IRPrinter::printRuntimeInfo(const Opnd::RuntimeInfo * info)
             os<<"vtso:"; 
             os<<md->getParentType()->getName()<<"."<<md->getName();
             }break;
+        case Opnd::RuntimeInfo::Kind_EM_ProfileAccessInterface:
+            /** The value of the operand is a pointer to the EM_ProfileAccessInterface */
+            {
+                os<<"em_pi"; 
+            }break;
+        case Opnd::RuntimeInfo::Kind_Method_Value_Profile_Handle:
+            /** The value of the operand is Method_Profile_Handle for the value profile of the compiled method */
+            {
+                os<<"mvph"; 
+            }break;
         default:
             assert(0);
     }

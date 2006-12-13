@@ -139,6 +139,12 @@ copy $(OutDir)\em.pdb $(ProjectDir)\..\..\..\win_ia32_msvc_$(ConfigurationName)\
 			<File
 				RelativePath="..\..\..\..\vm\em\src\EdgeProfileCollector.h">
 			</File>
+			<File
+				RelativePath="..\..\..\..\vm\em\src\NValueProfileCollector.cpp">
+			</File>
+			<File
+				RelativePath="..\..\..\..\vm\em\src\NValueProfileCollector.h">
+			</File>
 		</Filter>
 		<File
 			RelativePath="..\..\..\..\vm\em\src\DrlEMImpl.cpp">

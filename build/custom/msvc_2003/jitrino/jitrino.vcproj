@@ -949,6 +949,9 @@ copy $(OutDir)\jitrino.pdb $(ProjectDir)\..\..\..\win_ia32_msvc_$(ConfigurationN
 			<File
 				RelativePath="..\..\..\..\vm\jitrino\src\dynopt\StaticProfiler.h">
 			</File>
+			<File
+				RelativePath="..\..\..\..\vm\jitrino\src\dynopt\ValueProfiler.cpp">
+			</File>
 		</Filter>
 		<Filter
 			Name="translator"

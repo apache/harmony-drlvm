@@ -97,6 +97,7 @@ struct OptimizerFlags {
     bool devirt_skip_exception_path;
     float devirt_block_hotness_multiplier;
     bool devirt_skip_object_methods;
+    bool devirt_intf_methods;
 
     //unguard
     int unguard_dcall_percent;

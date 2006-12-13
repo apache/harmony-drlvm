@@ -552,10 +552,9 @@ int class_get_depth(Class_Handle cl)
 } //class_get_depth
 
 
-VMEXPORT
 Class_Handle vtable_get_class(VTable_Handle vh) {
     return vh->clss;
-}
+} // vtable_get_class
 
 Boolean class_is_initialized(Class_Handle ch)
 {

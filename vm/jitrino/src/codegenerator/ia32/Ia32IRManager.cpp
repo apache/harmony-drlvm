@@ -23,6 +23,7 @@
 #include "Ia32Encoder.h"
 #include "Ia32Printer.h"
 #include "Log.h"
+#include "EMInterface.h"
 #include "Ia32Printer.h"
 #include "Ia32CodeGenerator.h"
 #include "Dominator.h"
@@ -1987,6 +1988,14 @@ void IRManager::resolveRuntimeInfo(Opnd* opnd) const {
         case Opnd::RuntimeInfo::Kind_ConstantAreaItem:
             /** The value of the operand is address of constant pool item  ((ConstantPoolItem*)[0])->getAddress() */
             value=(POINTER_SIZE_INT)((ConstantAreaItem*)info->getValue(0))->getAddress();
+            break;
+        case Opnd::RuntimeInfo::Kind_EM_ProfileAccessInterface:
+            /** The value of the operand is a pointer to the EM_ProfileAccessInterface */
+            value=(POINTER_SIZE_INT)(getProfilingInterface()->getEMProfileAccessInterface());
+            break;
+        case Opnd::RuntimeInfo::Kind_Method_Value_Profile_Handle:
+            /** The value of the operand is Method_Profile_Handle for the value profile of the compiled method */
+            value=(POINTER_SIZE_INT)(getProfilingInterface()->getMethodProfileHandle(ProfileType_Value, getMethodDesc()));
             break;
         default:
             assert(0);

@@ -32,8 +32,11 @@ EDGE_PROF.backedgeThreshold=150000
 EDGE_PROF.tbsTimeout=10
 EDGE_PROF.tbsInitialTimeout=0
 
-SD1_OPT.genProfile=EDGE_PROF
-SD2_OPT.useProfile=EDGE_PROF
+VALUE_PROF.profilerType=VALUE_PROFILER
+VALUE_PROF.vpalgo=TNV_FIRST_N
+VALUE_PROF.vpSteadySize=4
+SD1_OPT.genProfile=EDGE_PROF,VALUE_PROF
+SD2_OPT.useProfile=EDGE_PROF,VALUE_PROF
 
 #options for JIT
 
@@ -42,7 +45,7 @@ SD2_OPT.useProfile=EDGE_PROF
 
 -XDjit.SD1_OPT.path=opt_init,translator,optimizer,hir2lir,codegen
 
--XDjit.SD1_OPT.path.optimizer=ssa,simplify,dce,uce,edge_instrument,dessa,statprof,markglobals
+-XDjit.SD1_OPT.path.optimizer=ssa,simplify,dce,uce,vp_instrument,edge_instrument,dessa,statprof,markglobals
 -XDjit.SD1_OPT.path.codegen=lock_method,bbp,gcpoints,cafl,dce1,i8l-,early_prop-,itrace-,native,constraints,dce2,regalloc,spillgen,layout,copy,rce-,stack,break-,iprof-,emitter!,si_insts,gcmap,info,unlock_method
 -XDjit.SD1_OPT.path.dce1=cg_dce
 -XDjit.SD1_OPT.path.dce2=cg_dce

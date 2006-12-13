@@ -23,6 +23,7 @@
 
 #include "EBProfileCollector.h"
 #include "EdgeProfileCollector.h"
+#include "NValueProfileCollector.h"
 
 #include "jit_import.h"
 #include "em_intf.h"
@@ -41,6 +42,7 @@
 #define LOG_DOMAIN "em"
 
 #define EDGE_PROFILER_STR  "EDGE_PROFILER"
+#define VALUE_PROFILER_STR  "VALUE_PROFILER"
 #define ENTRY_BACKEDGE_PROFILER_STR  "EB_PROFILER"
 
 #define EM_CONFIG_EXT std::string(".emconf")
@@ -140,6 +142,12 @@ void DrlEMImpl::initProfileAccess() {
     profileAccessInterface.edge_profiler_get_entry_counter_addr = edge_profiler_get_entry_counter_addr;
     profileAccessInterface.edge_profiler_get_entry_threshold = edge_profiler_get_entry_threshold;
     profileAccessInterface.edge_profiler_get_backedge_threshold = edge_profiler_get_backedge_threshold;
+    
+    
+    //Value profile
+    profileAccessInterface.value_profiler_create_profile = value_profiler_create_profile;
+    profileAccessInterface.value_profiler_add_value = value_profiler_add_value;
+    profileAccessInterface.value_profiler_get_top_value = value_profiler_get_top_value;
     
     return;
 }
@@ -572,48 +580,80 @@ ProfileCollector* DrlEMImpl::createProfileCollector(const std::string& profilerN
         return NULL;
     }    
     std::string profilerType = getParam(config, profilerName+".profilerType");
-    if (profilerType!=ENTRY_BACKEDGE_PROFILER_STR && profilerType!=EDGE_PROFILER_STR) {
+    if (profilerType!=ENTRY_BACKEDGE_PROFILER_STR && profilerType!=EDGE_PROFILER_STR  && profilerType!=VALUE_PROFILER_STR) {
         ECHO("EM: Unsupported profiler type");
         return NULL;
     }
-    EBProfileCollector::EB_ProfilerMode ebMode = EBProfileCollector::EB_PCMODE_SYNC;
-    std::string mode = profilerType==EDGE_PROFILER_STR ? "ASYNC" : getParam(config, profilerName+".mode");
-    
-    if (mode == "ASYNC") {
-        ebMode = EBProfileCollector::EB_PCMODE_ASYNC;
-    }  else if (mode!="SYNC") {
-        ECHO("EM: unsupported profiler mode");
-        return NULL;
-    }
-    
-    bool ok = false;
-    uint32 eThreshold = toNum(getParam(config, profilerName+".entryThreshold"), &ok);//todo: default values..
-        if (!ok) {
-        ECHO("EM: illegal 'entryThreshold' value");
-        return NULL;
+
+    if (profilerType == ENTRY_BACKEDGE_PROFILER_STR || profilerType == EDGE_PROFILER_STR) {
+        EBProfileCollector::EB_ProfilerMode ebMode = EBProfileCollector::EB_PCMODE_SYNC;
+        std::string mode = profilerType==EDGE_PROFILER_STR ? "ASYNC" : getParam(config, profilerName+".mode");
+        
+        if (mode == "ASYNC") {
+            ebMode = EBProfileCollector::EB_PCMODE_ASYNC;
+        }  else if (mode!="SYNC") {
+            ECHO("EM: unsupported profiler mode");
+            return NULL;
         }
-            uint32 bThreshold = toNum(getParam(config, profilerName+".backedgeThreshold"), &ok);
-    if (!ok) {
-        ECHO("EM: illegal 'backedgeThreshold' value");
-        return NULL;
-    }
-    uint32 tbsTimeout = 0, tbsInitialTimeout = 0;
-    if (ebMode == EBProfileCollector::EB_PCMODE_ASYNC) {
-        tbsTimeout= toNum(getParam(config, profilerName+".tbsTimeout"), &ok);
-        if (!ok) {
-            ECHO("EM: illegal 'tbsTimeout' value");
+        
+        bool ok = false;
+        uint32 eThreshold = toNum(getParam(config, profilerName+".entryThreshold"), &ok);//todo: default values..
+            if (!ok) {
+            ECHO("EM: illegal 'entryThreshold' value");
             return NULL;
             }
-        tbsInitialTimeout= toNum(getParam(config, profilerName+".tbsInitialTimeout"), &ok);
+                uint32 bThreshold = toNum(getParam(config, profilerName+".backedgeThreshold"), &ok);
         if (!ok) {
-            ECHO("EM: illegal 'tbsInitialTimeout' value");
+            ECHO("EM: illegal 'backedgeThreshold' value");
             return NULL;
         }
-    }
-    if (profilerType == EDGE_PROFILER_STR) {
-        pc = new EdgeProfileCollector(this, profilerName, step->jit, tbsInitialTimeout, tbsTimeout, eThreshold, bThreshold);
-    } else {
-    pc = new EBProfileCollector(this, profilerName, step->jit, ebMode, eThreshold, bThreshold, tbsInitialTimeout, tbsTimeout);
+        uint32 tbsTimeout = 0, tbsInitialTimeout = 0;
+        if (ebMode == EBProfileCollector::EB_PCMODE_ASYNC) {
+            tbsTimeout= toNum(getParam(config, profilerName+".tbsTimeout"), &ok);
+            if (!ok) {
+                ECHO("EM: illegal 'tbsTimeout' value");
+                return NULL;
+                }
+            tbsInitialTimeout= toNum(getParam(config, profilerName+".tbsInitialTimeout"), &ok);
+            if (!ok) {
+                ECHO("EM: illegal 'tbsInitialTimeout' value");
+                return NULL;
+            }
+        }
+        if (profilerType == EDGE_PROFILER_STR) {
+            pc = new EdgeProfileCollector(this, profilerName, step->jit, tbsInitialTimeout, tbsTimeout, eThreshold, bThreshold);
+        } else {
+            pc = new EBProfileCollector(this, profilerName, step->jit, ebMode, eThreshold, bThreshold, tbsInitialTimeout, tbsTimeout);
+        }
+    } else if (profilerType == VALUE_PROFILER_STR) {
+        int vpSteadySize = 4, vpClearSize = 0, vpClearInterval = 0;
+        std::string vpalgo = getParam(config, profilerName+".vpalgo");
+        ValueProfileCollector::algotypes vpMode = ValueProfileCollector::TNV_FIRST_N;
+        if (vpalgo == "TNV_DIVIDED") {
+            vpMode = ValueProfileCollector::TNV_DIVIDED;    
+        } else if (vpalgo != "TNV_FIRST_N") {
+            ECHO("EM: unsupported value profiler algotype");
+            return NULL;
+        }
+        bool ok = false;
+        vpSteadySize = toNum(getParam(config, profilerName+".vpSteadySize"), &ok);
+        if (!ok) {
+            ECHO("EM: illegal 'SteadySize' value");
+            return NULL;
+        }
+        if (vpMode == ValueProfileCollector::TNV_DIVIDED) {
+            vpClearSize = toNum(getParam(config, profilerName+".vpClearSize"), &ok);
+            if (!ok) {
+                ECHO("EM: illegal 'ClearSize' value");
+                return NULL;
+            }
+            vpClearInterval = toNum(getParam(config, profilerName+".vpClearInterval"), &ok);
+            if (!ok) {
+                ECHO("EM: illegal 'ClearInterval' value");
+                return NULL;
+            }
+        }
+        pc = new ValueProfileCollector(this, profilerName, step->jit, vpSteadySize, vpClearSize, vpClearInterval, vpMode);
     }
     return pc;
 }
@@ -632,54 +672,60 @@ bool DrlEMImpl::initProfileCollectors(RChain* chain, const std::string& config) 
     bool failed = false;
     for (RSteps::const_iterator it = chain->steps.begin(), end = chain->steps.end(); it!=end; ++it) {
         RStep* step = *it;
-        std::string profilerName = getParam(config, step->jitName + ".genProfile");
-        if (!profilerName.empty()) {
-            ProfileCollector* pc = createProfileCollector(profilerName, config, step);
-            if (pc == NULL) {
-                ECHO(("EM: profile configuration failed: "+ profilerName).c_str());
-                failed = true;
-                break;
-            }
-            bool genOk = step->enable_profiling(step->jit, (PC_Handle)pc, EM_JIT_PROFILE_ROLE_GEN);
-            if (genOk) {
-                collectors.push_back(pc);
-                TbsEMClient* tbsClient = pc->getTbsEmClient();
-                if (tbsClient!=NULL) {
-                    assert(tbsClient->getTimeout() != 0 && tbsClient->getTimeout()!=0);
-                    tbsClient->setNextTick(tbsClient->getInitialTimeout());
-                    tbsClients.push_back(tbsClient);
+        StringList genProfNames = getParamAsList(config, step->jitName + ".genProfile", ',', false);
+        for (StringList::const_iterator profIt = genProfNames.begin(), profEnd = genProfNames.end(); profIt!=profEnd; ++profIt) {
+            std::string profilerName = *profIt;
+            if (!profilerName.empty()) {
+                ProfileCollector* pc = createProfileCollector(profilerName, config, step);
+                if (pc == NULL) {
+                    ECHO(("EM: profile configuration failed: "+ profilerName).c_str());
+                    failed = true;
+                    break;
                 }
-            } else {
-                ECHO(("EM: profile generation is not supported: " + profilerName).c_str());
-                delete pc;
-                failed = true;
-                break;
-            }
+                bool genOk = step->enable_profiling(step->jit, (PC_Handle)pc, EM_JIT_PROFILE_ROLE_GEN);
+                if (genOk) {
+                    collectors.push_back(pc);
+                    TbsEMClient* tbsClient = pc->getTbsEmClient();
+                    if (tbsClient!=NULL) {
+                        assert(tbsClient->getTimeout() != 0 && tbsClient->getTimeout()!=0);
+                        tbsClient->setNextTick(tbsClient->getInitialTimeout());
+                        tbsClients.push_back(tbsClient);
+                    }
+                } else {
+                    ECHO(("EM: profile generation is not supported: " + profilerName).c_str());
+                    delete pc;
+                    failed = true;
+                    break;
+                }
 
+            }
         }
-        profilerName = getParam(config, step->jitName+ ".useProfile");
-        if (!profilerName.empty()) {
-            ProfileCollector* pc = getProfileCollector(profilerName);
-            bool invalidChain = true;
-            if (pc!=NULL) {
-                for(RSteps::const_iterator it2=chain->steps.begin(); it2 <it; ++it2) {
-                    RStep* prevStep = *it2;
-                    if (prevStep->jit == pc->genJit) {
-                        invalidChain = false;
-                        break;
+        StringList useProfNames = getParamAsList(config, step->jitName + ".useProfile", ',', false);
+        for (StringList::const_iterator profIt = useProfNames.begin(), profEnd = useProfNames.end(); profIt!=profEnd; ++profIt) {
+            std::string profilerName = *profIt;
+            if (!profilerName.empty()) {
+                ProfileCollector* pc = getProfileCollector(profilerName);
+                bool invalidChain = true;
+                if (pc!=NULL) {
+                    for(RSteps::const_iterator it2=chain->steps.begin(); it2 <it; ++it2) {
+                        RStep* prevStep = *it2;
+                        if (prevStep->jit == pc->genJit) {
+                            invalidChain = false;
+                            break;
+                        }
                     }
                 }
-            }
-            bool useOk = !invalidChain && (pc!=NULL && step->enable_profiling(step->jit, (PC_Handle)pc, EM_JIT_PROFILE_ROLE_USE));
-            if (useOk) {
-                pc->addUseJit(step->jit);
-            } else {
-                if (pc == NULL) {
-                    ECHO(("EM: profile not found: " + profilerName).c_str());
-                } else if (invalidChain) {
-                    ECHO(("EM: illegal use of profile: " + profilerName).c_str());
+                bool useOk = !invalidChain && (pc!=NULL && step->enable_profiling(step->jit, (PC_Handle)pc, EM_JIT_PROFILE_ROLE_USE));
+                if (useOk) {
+                    pc->addUseJit(step->jit);
                 } else {
-                    ECHO(("EM: profile usage is not supported: " + profilerName).c_str());
+                    if (pc == NULL) {
+                        ECHO(("EM: profile not found: " + profilerName).c_str());
+                    } else if (invalidChain) {
+                        ECHO(("EM: illegal use of profile: " + profilerName).c_str());
+                    } else {
+                        ECHO(("EM: profile usage is not supported: " + profilerName).c_str());
+                    }
                 }
             }
         }

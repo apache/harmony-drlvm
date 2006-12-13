@@ -274,7 +274,8 @@ enum JitHelperCallId {
     PseudoCanThrow,
     SaveThisState, //todo: replace with GetTLS + offset sequence
     ReadThisState, //todo: replace with GetTLS + offset sequence
-    LockedCompareAndExchange
+    LockedCompareAndExchange,
+    AddValueProfileValue
 };
 
 enum Opcode {

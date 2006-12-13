@@ -43,10 +43,15 @@ enum EM_PCTYPE {
       *  Collects profile for method entry and 
       *  all edges in IR Control Flow Graph
       */
-    EM_PCTYPE_EDGE=2
+    EM_PCTYPE_EDGE=2,
+    /** Value profiler
+      * Collects profile for each given instruction
+      */
+    EM_PCTYPE_VALUE=3
+    
 };
 
-/** A EM interface used to access to profile collectos*/
+/** A EM interface used to access to profile collectors*/
 typedef struct EM_ProfileAccessInterface {
 
     /** Request profile collector typ for specified profile collector handle 
@@ -163,7 +168,7 @@ typedef struct EM_ProfileAccessInterface {
     /** Return profile checksum*/
     uint32 (*edge_profiler_get_checksum)(Method_Profile_Handle mph);
 
-    /** Return the address of counter assosiated with key*/
+    /** Return the address of counter associated with key*/
     void* (*edge_profiler_get_counter_addr)(Method_Profile_Handle mph, uint32 key);
 
     /** Return the address of entry counter*/
@@ -176,6 +181,28 @@ typedef struct EM_ProfileAccessInterface {
     /** Return the edge threshold for profile collector
       */
     uint32 (*edge_profiler_get_backedge_threshold)(PC_Handle pch);
+    // Value profiler interface
+
+    /** Create an value profile for a method. 
+    * Only one profile per method can be created for a single 
+    * profile collector instance 
+    * @param pch              - value profile collector handle
+    * @param mh               - method handle to create profile for
+    * @param numKeys          - number of instructions to be profiled
+    * @param keys             - the keys, or numbers, will be associated with 
+    *                           each instruction. The key must be used to access to
+    *                           instruction value
+    */
+    Method_Profile_Handle (*value_profiler_create_profile) (PC_Handle pch, Method_Handle mh, uint32 numKeys, uint32* keys);
+    
+    /** Update frequency or insert the new value of given instruction.
+      */
+    void (*value_profiler_add_value)(Method_Profile_Handle mph, uint32 instructionKey, POINTER_SIZE_INT valueToAdd);
+    
+    /** Return the maximum value(by frequency) of give instruction.
+      */
+    POINTER_SIZE_INT (*value_profiler_get_top_value) (Method_Profile_Handle mph, uint32 instructionKey);
+
 
 
 } EM_ProfileAccessInterface;

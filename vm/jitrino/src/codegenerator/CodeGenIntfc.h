@@ -169,7 +169,8 @@ public:
         PseudoCanThrow,
         SaveThisState,
         ReadThisState,
-        LockedCompareAndExchange
+        LockedCompareAndExchange,
+        AddValueProfileValue
     };
 };
 

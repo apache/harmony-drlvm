@@ -26,6 +26,7 @@
 #include "Dominator.h"
 #include "inliner.h"
 #include "EMInterface.h"
+#include "open/vm.h"
 
 namespace Jitrino {
 
@@ -59,6 +60,7 @@ Devirtualizer::Devirtualizer(IRManager& irm)
     _devirtSkipExceptionPath = optFlags.devirt_skip_exception_path;
     _devirtBlockHotnessMultiplier = optFlags.devirt_block_hotness_multiplier;
     _devirtSkipJLObjectMethods = optFlags.devirt_skip_object_methods;
+    _devirtInterfaceMethods = optFlags.devirt_intf_methods;
 
     _directCallPercent = optFlags.unguard_dcall_percent;
     _directCallPercientOfEntry = optFlags.unguard_dcall_percent_of_entry;
@@ -73,6 +75,8 @@ Devirtualizer::isGuardableVirtualCall(Inst* inst, MethodInst*& methodInst, Opnd*
     Opcode opcode = inst->getOpcode();
     if(opcode == Op_TauVirtualCall) { 
         // Virtual function call
+        // We don't use this instruction any more - indirect calls are used instead
+        assert(0);
         assert(inst->getNumSrcOperands() >= 3);
         MethodCallInst *methodCallInst = inst->asMethodCallInst();
         assert(methodCallInst != NULL);
@@ -168,12 +172,12 @@ Devirtualizer::guardCallsInRegion(IRManager& regionIRM, DominatorTree* dtree) {
 
 
 void
-Devirtualizer::genGuardedDirectCall(IRManager &regionIRM, Node* node, Inst* call, MethodDesc* methodDesc, Opnd *tauNullChecked, Opnd *tauTypesChecked, uint32 argOffset) {
+Devirtualizer::genGuardedDirectCall(IRManager &regionIRM, Node* node, Inst* call, MethodDesc* methodDesc, ObjectType* objectType, Opnd *tauNullChecked, Opnd *tauTypesChecked, uint32 argOffset) {
     ControlFlowGraph &regionFG = regionIRM.getFlowGraph();
     assert(!methodDesc->isStatic());
     assert(call == node->getLastInst());
 
-    Log::out() << "Generating guarded direct call to " << methodDesc->getParentType()->getName() 
+    Log::out() << "Generating guarded direct call to " << objectType->getName()
         << "." << methodDesc->getName() << ::std::endl;
     Log::out() << "Guarded call bytecode size=" << (int) methodDesc->getByteCodeSize() << ::std::endl;
 
@@ -252,6 +256,13 @@ Devirtualizer::genGuardedDirectCall(IRManager &regionIRM, Node* node, Inst* call
                                                              ldSlot->getMethodDesc());
         virtualCallBlock->appendInst(ldSlot2);
         icall->setSrc(0, funPtr2);
+        // Move ldInterfaceVTable to the virtual call block
+        Inst* ldVTable = vtable->getInst();
+        if (ldVTable->getOpcode() == Op_TauLdIntfcVTableAddr) {
+            ldVTable->unlink();
+            ldSlot->unlink();
+            ldVTable->insertBefore(ldSlot2);
+        }
     }
     virtualCallBlock->appendInst(virtualCall);
 
@@ -320,14 +331,13 @@ Devirtualizer::genGuardedDirectCall(IRManager &regionIRM, Node* node, Inst* call
     //
     Opnd* base = directCall->getSrc(2); // skip over taus
     assert(base->getType()->isObject());
-    ObjectType* baseType = (ObjectType*) base->getType();
-    Opnd* dynamicVTableAddr = _opndManager.createSsaTmpOpnd(_typeManager.getVTablePtrType(baseType));
-    Opnd* staticVTableAddr = _opndManager.createSsaTmpOpnd(_typeManager.getVTablePtrType(baseType));
-    guard->appendInst(_instFactory.makeTauLdVTableAddr(dynamicVTableAddr, base,
-                                                  tauNullChecked));
-    guard->appendInst(_instFactory.makeGetVTableAddr(staticVTableAddr, baseType));
+    assert(base->getType()->isInterface() || (((ObjectType*) base->getType()) == objectType));
+    Opnd* dynamicVTableAddr = _opndManager.createSsaTmpOpnd(_typeManager.getVTablePtrType(objectType));
+    Opnd* staticVTableAddr = _opndManager.createSsaTmpOpnd(_typeManager.getVTablePtrType(objectType));
+    guard->appendInst(_instFactory.makeTauLdVTableAddr(dynamicVTableAddr, base, tauNullChecked));
+    guard->appendInst(_instFactory.makeGetVTableAddr(staticVTableAddr, objectType));
     guard->appendInst(_instFactory.makeBranch(Cmp_EQ, Type::VTablePtr, dynamicVTableAddr, staticVTableAddr, (LabelInst*)directCallBlock->getFirstInst()));
-}
+ }
 
 bool
 Devirtualizer::doGuard(IRManager& irm, Node* node, MethodDesc& methodDesc) {
@@ -375,8 +385,7 @@ Devirtualizer::guardCallsInBlock(IRManager& regionIRM, Node* node) {
         Opnd* tauNullChecked = 0;
         Opnd* tauTypesChecked = 0;
         uint32 argOffset = 0;
-        if(isGuardableVirtualCall(last, methodInst, base, tauNullChecked, tauTypesChecked,
-                                  argOffset)) {
+        if(isGuardableVirtualCall(last, methodInst, base, tauNullChecked, tauTypesChecked, argOffset)) {
             assert(methodInst && base && tauNullChecked && tauTypesChecked && argOffset);
 
             assert(base->getType()->isObject());
@@ -384,34 +393,79 @@ Devirtualizer::guardCallsInBlock(IRManager& regionIRM, Node* node) {
             MethodDesc* origMethodDesc = methodInst->getMethodDesc();
             
             // If base type is concrete, consider an explicit guarded test against it
-            if(!baseType->isNullObject() && (!baseType->isAbstract() || baseType->isArray()) && !baseType->isInterface()) {
+            if(!baseType->isNullObject() && ((_devirtInterfaceMethods && baseType->isInterface()) || !baseType->isAbstract() || baseType->isArray())) {
                 MethodDesc* candidateMeth = NULL;
                 int candidateExecCount = 0;
                 CompilationContext* cc = regionIRM.getCompilationContext();
                 bool profileSelection = _devirtUseCHAWithProfile && cc->hasDynamicProfileToUse();
-                if (profileSelection) {
+                if (baseType->isInterface()) {
+                    assert(regionIRM.getCompilationInterface().isBCMapInfoRequired());
+                    MethodDesc& methDesc = regionIRM.getMethodDesc();
+
+                    Log::out() << std::endl << "Devirtualizing interface call in the method :" << std::endl << "\t";
+                    methDesc.printFullName(Log::out());
+                    Log::out() << std::endl << "call to the method: " << std::endl << "\t";
+                    origMethodDesc->printFullName(Log::out());
+                    Log::out() << std::endl;
+
+                    ProfilingInterface* pi = cc->getProfilingInterface();
+                    // Don't devirtualize if there is no value profile
+                    if (!pi->hasMethodProfile(ProfileType_Value, methDesc)) return;
+                    ValueMethodProfile* mp = pi->getValueMethodProfile(regionIRM.getMemoryManager(), methDesc);
+                    MethodDesc* rootMethodDesc = regionIRM.getCompilationInterface().getMethodToCompile();
+
+                    // Get bytecode offset of the call
+                    VectorHandler* bc2HIRMapHandler = new VectorHandler(bcOffset2HIRHandlerName, rootMethodDesc);
+                    uint64 callInstId = (uint64)last->getId();
+                    uint32 bcOffset = (uint32)bc2HIRMapHandler->getVectorEntry(callInstId);
+                    assert(bcOffset != 0);
+                    Log::out() << "Call instruction bcOffset = " << (int32)bcOffset << std::endl;
+
+                    // Get profiled vtable value
+                    POINTER_SIZE_INT vtHandle = mp->getTopValue(bcOffset);
+                    if (vtHandle == 0) {
+                        // Do not devirtualize - there were no real calls here
+                        return;
+                    }
+                    Log::out() << "Valued type: " << class_get_name(vtable_get_class((VTable_Handle)vtHandle)) << std::endl;
+
+                    // get desired MethodDesc object
+                    assert(vtHandle != 0);
+                    ObjectType* clssObjectType = _typeManager.getObjectType(vtable_get_class((VTable_Handle)vtHandle));
+                    candidateMeth = regionIRM.getCompilationInterface().resolveMethod(clssObjectType, origMethodDesc->getName(), origMethodDesc->getSignatureString());
+                    Log::out() << "candidateMeth: "<< std::endl;
+                    candidateMeth->printFullName(Log::out());
+                    Log::out() << std::endl;
+ 
+                    if(doGuard(regionIRM, node, *candidateMeth )) {
+                        Log::out() << "Guard call to " << baseType->getName() << "::" << candidateMeth->getName() << std::endl;
+                        genGuardedDirectCall(regionIRM, node, last, candidateMeth, clssObjectType, tauNullChecked, tauTypesChecked, argOffset);
+                        Log::out() << "Done guarding call to " << baseType->getName() << "::" << candidateMeth->getName() << std::endl;
+                    } else {
+                        Log::out() << "Don't guard call to " << baseType->getName() << "::" << origMethodDesc->getName() << std::endl;
+                    }
+                    
+                    return;
+
+                } else if (profileSelection) {
                     ClassHierarchyMethodIterator* iterator = regionIRM.getCompilationInterface().getClassHierarchyMethodIterator(baseType, origMethodDesc);
                     if(iterator) {
-                        if (profileSelection) {
-                            ProfilingInterface* pi = cc->getProfilingInterface();
-                            while (iterator->hasNext()) {
-                                MethodDesc* tmpMeth = iterator->getNext();
-                                int tmpCount = pi->getProfileMethodCount(*tmpMeth);
-                                Log::out() << "CHA devirt profile-selection" << baseType->getName() << "::" << tmpMeth->getName() << tmpMeth->getSignatureString() 
-                                    << " exec_count=" << tmpCount << std::endl;
-                                if (candidateExecCount < tmpCount) {
-                                    candidateExecCount = tmpCount;
-                                    candidateMeth = tmpMeth;
-                                }
+                        ProfilingInterface* pi = cc->getProfilingInterface();
+                        while (iterator->hasNext()) {
+                            MethodDesc* tmpMeth = iterator->getNext();
+                            int tmpCount = pi->getProfileMethodCount(*tmpMeth);
+                            Log::out() << "CHA devirt profile-selection: " << baseType->getName() << "::" << tmpMeth->getName() << tmpMeth->getSignatureString() 
+                                << " exec_count=" << tmpCount << std::endl;
+                            if (candidateExecCount < tmpCount) {
+                                candidateExecCount = tmpCount;
+                                candidateMeth = tmpMeth;
                             }
                         }
                     }
                 } else {
                     NamedType* methodType = origMethodDesc->getParentType();
                     if (_typeManager.isSubClassOf(baseType, methodType)) {
-                        // only bother if the baseType has the given method
-                        // for an interface call, this may not be the case
-                        candidateMeth = regionIRM.getCompilationInterface().getOverriddenMethod(baseType, origMethodDesc);
+                         candidateMeth = regionIRM.getCompilationInterface().getOverriddenMethod(baseType, origMethodDesc);
                     }
                 }
                 if (candidateMeth) {
@@ -423,7 +477,7 @@ Devirtualizer::guardCallsInBlock(IRManager& regionIRM, Node* node) {
                     if(doGuard(regionIRM, node, *candidateMeth )) {
                         Log::out() << "Guard call to " << baseType->getName() << "::" << candidateMeth->getName() 
                             <<" CHAWithProfile="<<(profileSelection ? "true":"false")<<" execCnt="<<candidateExecCount<< std::endl;
-                        genGuardedDirectCall(regionIRM, node, last, candidateMeth, tauNullChecked, tauTypesChecked, argOffset);
+                        genGuardedDirectCall(regionIRM, node, last, candidateMeth, baseType, tauNullChecked, tauTypesChecked, argOffset);
                         Log::out() << "Done guarding call to " << baseType->getName() << "::" << candidateMeth->getName() << std::endl;
                     } else {
                         Log::out() << "Don't guard call to " << baseType->getName() << "::" << origMethodDesc->getName() << std::endl;

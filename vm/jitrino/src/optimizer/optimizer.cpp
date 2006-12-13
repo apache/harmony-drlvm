@@ -164,6 +164,7 @@ void OptInitAction::readFlags()
     optimizerFlags.devirt_skip_exception_path = getBoolArg("devirt_skip_exception_path", true);
     optimizerFlags.devirt_block_hotness_multiplier= (float)getIntArg("devirt_block_hotness_multiplier", 10);
     optimizerFlags.devirt_skip_object_methods = getBoolArg("devirt_skip_object_methods", false);
+    optimizerFlags.devirt_intf_methods = getBoolArg("devirt_intf_methods", true);
 
     //unguard
     optimizerFlags.unguard_dcall_percent = getIntArg("unguard_dcall_percent", 30);

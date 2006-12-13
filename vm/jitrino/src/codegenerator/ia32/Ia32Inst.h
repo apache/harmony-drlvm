@@ -149,6 +149,11 @@ public:
             /** The value of the operand is address of constant pool item  ((ConstantPoolItem*)[0])->getAddress() */
             Kind_ConstantAreaItem=0x80,
 
+            /** The value of the operand is a pointer to the EM_ProfileAccessInterface */
+            Kind_EM_ProfileAccessInterface,
+            /** The value of the operand is Method_Profile_Handle for the value profile of the compiled method */
+            Kind_Method_Value_Profile_Handle,
+
             /** more ... */
         };
 

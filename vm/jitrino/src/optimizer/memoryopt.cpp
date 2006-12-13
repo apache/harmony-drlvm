@@ -666,6 +666,7 @@ MemoryOptInitWalker::applyToInst(Inst *i)
             case SaveThisState:
             case ReadThisState:
             case LockedCompareAndExchange:
+            case AddValueProfileValue:
                 break;
             default:
                 assert(0);

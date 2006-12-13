@@ -442,6 +442,7 @@ public:
         case SaveThisState: return JitHelperCallOp::SaveThisState;
         case ReadThisState: return JitHelperCallOp::ReadThisState;
         case LockedCompareAndExchange: return JitHelperCallOp::LockedCompareAndExchange;
+        case AddValueProfileValue: return JitHelperCallOp::AddValueProfileValue;
         }
         assert(0);
         return JitHelperCallOp::InitializeArray; // to keep compiler quiet

@@ -29,6 +29,9 @@
 #include "EMInterface.h"
 #include "DrlVMInterface.h"
 #include "Opcode.h"
+#include "open/em_profile_access.h"
+#include "open/vm.h"
+
 
 #include <float.h>
 #include <math.h>
@@ -180,6 +183,12 @@ void __stdcall initialize_array(uint8* array, uint32 elems_offset, uint8* data, 
     }
 }
 
+void __stdcall add_value_profile_value(EM_ProfileAccessInterface* profileAccessInterface, Method_Profile_Handle mpHandle, uint32 index, POINTER_SIZE_INT value) stdcall__;
+void __stdcall add_value_profile_value(EM_ProfileAccessInterface* profileAccessInterface, Method_Profile_Handle mpHandle, uint32 index, POINTER_SIZE_INT value) {
+    profileAccessInterface->value_profiler_add_value(mpHandle, index, value);
+}
+
+
 //_______________________________________________________________________________________________________________
 uint32 InstCodeSelector::_tauUnsafe;
 
@@ -199,6 +208,7 @@ void InstCodeSelector::onCFGInit(IRManager& irManager)
     irManager.registerInternalHelperInfo("remF4", IRManager::InternalHelperInfo((void*)&remF4,&CallingConvention_STDCALL));
 
     irManager.registerInternalHelperInfo("initialize_array", IRManager::InternalHelperInfo((void*)&initialize_array,&CallingConvention_STDCALL));
+    irManager.registerInternalHelperInfo("add_value_profile_value", IRManager::InternalHelperInfo((void*)&add_value_profile_value,&CallingConvention_STDCALL));
 }
 
 //_______________________________________________________________________________________________________________
@@ -2809,6 +2819,16 @@ CG_OpndHandle* InstCodeSelector::callhelper(uint32              numArgs,
         //save the result
         appendInsts(irManager.newInst(Mnemonic_MOV, dstOpnd, irManager.newImmOpnd(typeManager.getInt32Type(), 0)));
         appendInsts(irManager.newInst(Mnemonic_SETZ, dstOpnd));
+        break;
+    }
+    case AddValueProfileValue:
+    {
+        assert(numArgs == 2);
+        Opnd* empiOpnd = irManager.newImmOpnd(getRuntimeIdType(), Opnd::RuntimeInfo::Kind_EM_ProfileAccessInterface);
+        Opnd* mphOpnd = irManager.newImmOpnd(getRuntimeIdType(), Opnd::RuntimeInfo::Kind_Method_Value_Profile_Handle);
+        const uint32 nArgs = 4;
+        Opnd* newArgs[4] = {empiOpnd, mphOpnd, ((Opnd **)args)[0], ((Opnd **)args)[1]};
+        appendInsts(irManager.newInternalRuntimeHelperCallInst("add_value_profile_value", nArgs, newArgs, dstOpnd));
         break;
     }
     default:

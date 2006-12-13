@@ -466,6 +466,8 @@ void JitHelperCallInst::handlePrintEscape(::std::ostream& os, char code) const {
         os << "ReadThisState"; break;
     case LockedCompareAndExchange:
         os << "LockedCmpExchange"; break;
+    case AddValueProfileValue:
+        os << "AddValueProfileValue"; break;
     default:
         assert(0); break;
         }

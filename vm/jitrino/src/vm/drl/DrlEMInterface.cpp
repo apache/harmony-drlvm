@@ -30,16 +30,31 @@
 
 namespace Jitrino {
 
+PC_Handle DrlProfilingInterface::getPCHandle(ProfileType type) const {
+    switch (type) {
+        case ProfileType_EntryBackedge:
+            return ebPCHandle;
+        case ProfileType_Edge:
+            return edgePCHandle;
+        case ProfileType_Value:
+            return valuePCHandle;
+        default:
+            assert(0);
+    }
+    return NULL;
+}
 
 MethodProfile* DrlProfilingInterface::getMethodProfile(MemoryManager& mm, ProfileType type, MethodDesc& md, JITProfilingRole role) const {
-    assert(type == ProfileType_EntryBackedge || type == ProfileType_Edge);
-    Method_Profile_Handle mpHandle = profileAccessInterface->get_method_profile(emHandle, pcHandle, ((DrlVMMethodDesc&)md).getDrlVMMethod());
+    
+    Method_Profile_Handle mpHandle = profileAccessInterface->get_method_profile(emHandle, getPCHandle(type), ((DrlVMMethodDesc&)md).getDrlVMMethod());
     if (mpHandle==0) {
         return NULL;
     }
     MethodProfile* p = NULL;
     if (type == ProfileType_Edge) {
         p = new (mm) DrlEdgeMethodProfile(mpHandle, md, profileAccessInterface);
+    } else if (type == ProfileType_Value) {
+        p = new (mm) DrlValueMethodProfile(mpHandle, md, profileAccessInterface);
     } else {
         uint32* eCounter = (uint32*)profileAccessInterface->eb_profiler_get_entry_counter_addr(mpHandle);
         uint32* bCounter = (uint32*)profileAccessInterface->eb_profiler_get_backedge_counter_addr(mpHandle);
@@ -48,11 +63,19 @@ MethodProfile* DrlProfilingInterface::getMethodProfile(MemoryManager& mm, Profil
     return p;
 }
 
+Method_Profile_Handle DrlProfilingInterface::getMethodProfileHandle(ProfileType type, MethodDesc& md) const {
+    return profileAccessInterface->get_method_profile(emHandle, getPCHandle(type), ((DrlVMMethodDesc&)md).getDrlVMMethod());
+}
+
+
 bool DrlProfilingInterface::hasMethodProfile(ProfileType type, MethodDesc& md, JITProfilingRole role) const {
-    if (type!=pcType) {
+
+    PC_Handle pcHandle = getPCHandle(type);
+
+    if (pcHandle == NULL) {
         return false;
     }
-    if (jitRole!=role) {
+    if (jitRole != role) {
         return false;
     }
     if (profileAccessInterface != NULL) {
@@ -63,8 +86,14 @@ bool DrlProfilingInterface::hasMethodProfile(ProfileType type, MethodDesc& md, J
 }
 
 uint32 DrlProfilingInterface::getProfileMethodCount(MethodDesc& md, JITProfilingRole role) const {
-    assert(pcType ==ProfileType_Edge || pcType == ProfileType_EntryBackedge);
     assert(jitRole == role);
+    PC_Handle pcHandle = getPCHandle(ProfileType_Edge);
+    ProfileType pcType = ProfileType_Edge;
+    if (pcHandle == NULL) {
+        pcHandle = getPCHandle(ProfileType_EntryBackedge);
+        pcType = ProfileType_EntryBackedge;
+    }
+    assert (pcHandle != NULL);
     Method_Handle methodHandle = ((DrlVMMethodDesc&)md).getDrlVMMethod();
     Method_Profile_Handle mph = profileAccessInterface->get_method_profile(emHandle, pcHandle, methodHandle);
     if (mph == NULL) {
@@ -80,9 +109,8 @@ uint32 DrlProfilingInterface::getProfileMethodCount(MethodDesc& md, JITProfiling
 }
 
 bool DrlProfilingInterface::enableProfiling(PC_Handle pc, JITProfilingRole role) {
-    assert(!profilingEnabled);
     EM_PCTYPE _pcType =  profileAccessInterface->get_pc_type(emHandle, pc);
-    if (_pcType != EM_PCTYPE_EDGE && _pcType!=EM_PCTYPE_ENTRY_BACKEDGE) {
+    if (_pcType != EM_PCTYPE_EDGE && _pcType != EM_PCTYPE_ENTRY_BACKEDGE && _pcType != EM_PCTYPE_VALUE) {
         return false;
     }
     JITInstanceContext* jitMode = JITInstanceContext::getContextForJIT(jitHandle);
@@ -96,30 +124,36 @@ bool DrlProfilingInterface::enableProfiling(PC_Handle pc, JITProfilingRole role)
         profilingEnabled = true;
     }
     if (profilingEnabled) {
-        jitRole = role;       
-        pcHandle = pc;
-        pcType = (_pcType == EM_PCTYPE_EDGE) ? ProfileType_Edge : ProfileType_EntryBackedge;
+        jitRole = role;
+        switch(_pcType)
+        {
+        case EM_PCTYPE_EDGE:
+            edgePCHandle = pc;
+            break;
+        case EM_PCTYPE_ENTRY_BACKEDGE:
+            ebPCHandle = pc;
+            break;
+        case EM_PCTYPE_VALUE:
+            valuePCHandle = pc;
+            break;
+        default:
+            assert(0);
+            return false;
+        }
     }
     return profilingEnabled;
 }
 
 bool DrlProfilingInterface::isProfilingEnabled(ProfileType pcType, JITProfilingRole role) const {
-    if( !profilingEnabled || (jitRole != role) ){
+    if(!profilingEnabled || (jitRole != role) || (getPCHandle(pcType) == NULL)){
         return false;
     }
-
-    const EM_PCTYPE emPcType = profileAccessInterface->get_pc_type( emHandle, pcHandle );
-    if( (emPcType == EM_PCTYPE_EDGE) && (pcType == ProfileType_Edge ) ){
-        return true;
-    }
-    if( (emPcType == EM_PCTYPE_ENTRY_BACKEDGE) && (pcType == ProfileType_EntryBackedge) ){
-        return true;
-    }
-    return false;
+    return true;
 }
 
 EntryBackedgeMethodProfile* DrlProfilingInterface::createEBMethodProfile(MemoryManager& mm, MethodDesc& md) {
     assert(isProfilingEnabled(ProfileType_EntryBackedge, JITProfilingRole_GEN));
+    PC_Handle pcHandle = getPCHandle(ProfileType_EntryBackedge);
     Method_Profile_Handle mpHandle = profileAccessInterface->eb_profiler_create_profile(pcHandle, ((DrlVMMethodDesc&)md).getDrlVMMethod());
     assert(mpHandle!=0);
     uint32* eCounter = (uint32*)profileAccessInterface->eb_profiler_get_entry_counter_addr(mpHandle);
@@ -137,6 +171,7 @@ EdgeMethodProfile* DrlProfilingInterface::createEdgeMethodProfile( MemoryManager
                                                                   uint32 checkSum )
 {
     assert(isProfilingEnabled(ProfileType_Edge, JITProfilingRole_GEN));
+    PC_Handle pcHandle = getPCHandle(ProfileType_Edge);
     Method_Profile_Handle mpHandle =  profileAccessInterface->edge_profiler_create_profile( 
         pcHandle, ((DrlVMMethodDesc&)md).getDrlVMMethod(), numCounters, counterKeys, checkSum);
     assert( mpHandle != NULL );
@@ -145,38 +180,51 @@ EdgeMethodProfile* DrlProfilingInterface::createEdgeMethodProfile( MemoryManager
     return p;
 }
 
-uint32 DrlProfilingInterface::getMethodEntryThreshold() const {
-    assert(pcHandle!=NULL);
-    EM_PCTYPE pcType =  profileAccessInterface->get_pc_type(emHandle, pcHandle);
-    if (pcType == EM_PCTYPE_EDGE) {
-        return profileAccessInterface->edge_profiler_get_entry_threshold(pcHandle);
-    } else if ( pcType==EM_PCTYPE_ENTRY_BACKEDGE) {
-        return profileAccessInterface->eb_profiler_get_entry_threshold(pcHandle);
-    } else {
-        assert(0);
-    }
-    return 0;
+ValueMethodProfile* DrlProfilingInterface::createValueMethodProfile(MemoryManager& mm,
+                                                                    MethodDesc& md,
+                                                                    uint32 numKeys,
+                                                                    uint32* Keys)
+{
+    assert(isProfilingEnabled(ProfileType_Value, JITProfilingRole_GEN));
+    PC_Handle pcHandle = getPCHandle(ProfileType_Value);
+    Method_Profile_Handle mpHandle =  profileAccessInterface->value_profiler_create_profile( 
+        pcHandle, ((DrlVMMethodDesc&)md).getDrlVMMethod(), numKeys, Keys);
+    assert(mpHandle != NULL);
+
+    DrlValueMethodProfile* p = new (mm) DrlValueMethodProfile(mpHandle, md, profileAccessInterface);
+    return p;
 }
 
-uint32 DrlProfilingInterface::getBackedgeThreshold() const {
-    assert(pcHandle!=NULL);
-    EM_PCTYPE pcType =  profileAccessInterface->get_pc_type(emHandle, pcHandle);
-    if (pcType == EM_PCTYPE_EDGE) {
-        return profileAccessInterface->edge_profiler_get_backedge_threshold(pcHandle);
-    } else if ( pcType==EM_PCTYPE_ENTRY_BACKEDGE) {
-        return profileAccessInterface->eb_profiler_get_backedge_threshold(pcHandle);
-    } 
+
+uint32 DrlProfilingInterface::getMethodEntryThreshold() const {
+    PC_Handle pcHandle = getPCHandle(ProfileType_Edge);
+    if (pcHandle != NULL) {
+        return profileAccessInterface->edge_profiler_get_entry_threshold(pcHandle);
+    } else if ((pcHandle = getPCHandle(ProfileType_EntryBackedge)) != NULL) {
+        return profileAccessInterface->eb_profiler_get_entry_threshold(pcHandle);
+    }
     assert(0);
     return 0;
 }
 
-bool   DrlProfilingInterface::isEBProfilerInSyncMode() const {
+uint32 DrlProfilingInterface::getBackedgeThreshold() const {
+    PC_Handle pcHandle = getPCHandle(ProfileType_Edge);
+    if (pcHandle != NULL) {
+        return profileAccessInterface->edge_profiler_get_backedge_threshold(pcHandle);
+    } else if ((pcHandle = getPCHandle(ProfileType_EntryBackedge)) != NULL) {
+        return profileAccessInterface->eb_profiler_get_backedge_threshold(pcHandle);
+    }
+    assert(0);
+    return 0;
+}
+
+bool DrlProfilingInterface::isEBProfilerInSyncMode() const {
+    PC_Handle pcHandle = getPCHandle(ProfileType_EntryBackedge);
     assert(pcHandle!=NULL);
     return profileAccessInterface->eb_profiler_is_in_sync_mode(pcHandle)!=0;
 }
 
 PC_Callback_Fn* DrlProfilingInterface::getEBProfilerSyncModeCallback() const {
-    assert(pcHandle!=NULL);
     assert(profileAccessInterface->eb_profiler_sync_mode_callback!=NULL);
     return (PC_Callback_Fn*)profileAccessInterface->eb_profiler_sync_mode_callback;
 }
@@ -207,6 +255,14 @@ uint32* DrlEdgeMethodProfile::getCounter(uint32 key) const  {
     return counter;
 }
 
+// Value profile
+DrlValueMethodProfile::DrlValueMethodProfile(Method_Profile_Handle handle, MethodDesc& md,  EM_ProfileAccessInterface* _profileAccessInterface)
+: ValueMethodProfile(handle, md),  profileAccessInterface(_profileAccessInterface) {
+}
+
+POINTER_SIZE_INT DrlValueMethodProfile::getTopValue(uint32 instructionKey) const {
+    return profileAccessInterface->value_profiler_get_top_value(getHandle(), instructionKey);
+}
 
 } //namespace
 

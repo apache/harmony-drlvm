@@ -37,12 +37,13 @@ public:
 
     void unguardCallsInRegion(IRManager& irm);
 
+    static bool isGuardableVirtualCall(Inst* inst, MethodInst*& methodInst, Opnd*& base, 
+        Opnd* & tauNullChecked, Opnd*&tauTypesChecked, uint32 &argOffset);
+
+
 private:
     void guardCallsInBlock(IRManager& irm, Node* node);
-    void genGuardedDirectCall(IRManager& irm, Node* node, Inst* call, MethodDesc* methodDesc, Opnd *tauNullChecked, Opnd *tauTypesChecked, uint32 argOffset);
-    bool isGuardableVirtualCall(Inst* inst, MethodInst*& methodInst, Opnd*& base,
-                                Opnd* & tauNullChecked, Opnd*&tauTypesChecked,
-                                uint32 &argOffset);
+    void genGuardedDirectCall(IRManager& irm, Node* node, Inst* call, MethodDesc* methodDesc, ObjectType* valuedType, Opnd *tauNullChecked, Opnd *tauTypesChecked, uint32 argOffset);
     bool doGuard(IRManager& irm, Node* node, MethodDesc& methodDesc);
     
     bool _hasProfileInfo;
@@ -53,6 +54,7 @@ private:
     bool _devirtSkipExceptionPath;
     float _devirtBlockHotnessMultiplier;
     bool _devirtSkipJLObjectMethods;
+    bool _devirtInterfaceMethods;
 
 
     //unguard pass params

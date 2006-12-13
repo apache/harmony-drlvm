@@ -324,7 +324,7 @@ Inst* IRBuilder::appendInst(Inst* inst) {
         uint64 instID = inst->getId();
         if (irBuilderFlags.fullBcMap) {
             bc2HIRmapHandler->setVectorEntry(instID, offset);
-        } else if (inst->asMethodCallInst()) {
+        } else if (inst->asMethodCallInst() || inst->asCallInst()) {
             bc2HIRmapHandler->setVectorEntry(instID, offset);
         }
 //#ifdef _DEBUG

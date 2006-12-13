@@ -229,6 +229,9 @@ VMEXPORT Class_Handle class_get_array_element_class(Class_Handle ch);
 // checking.
 VMEXPORT int vtable_get_super_array_offset();
 
+// Returns class handle given object's VTable_Handle.
+VMEXPORT Class_Handle vtable_get_class(VTable_Handle vh);
+
 // Returns the number of superclass hierarchy elements that are
 // stored within the vtable.  This is for use with fast type checking.
 VMEXPORT int vm_max_fast_instanceof_depth();
