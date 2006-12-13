@@ -367,6 +367,10 @@ initialize_properties(Global_Env * p_env)
                 *tok = '\0';
                 p_env->JavaProperties()->set(unquote(src), unquote(tok + 1));
             }
+            else 
+            {
+                p_env->JavaProperties()->set(unquote(src), "");
+            }
             STD_FREE(src);
         } 
         else if (strncmp(option, "-XD", 3) == 0)
@@ -379,6 +383,11 @@ initialize_properties(Global_Env * p_env)
                 *tok = '\0';
                 p_env->VmProperties()->set(unquote(src), unquote(tok + 1));
             }
+            else 
+            {
+                p_env->VmProperties()->set(unquote(src), "");
+            }
+
             STD_FREE(src);
         }
     }
