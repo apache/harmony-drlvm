@@ -14,10 +14,10 @@
  *  See the License for the specific language governing permissions and
  *  limitations under the License.
  */
-/** 
+/**
  * @author Gregory Shimansky
  * @version $Revision: 1.1.2.1.4.4 $
- */  
+ */
 /*
  * JVMTI timer API
  */
@@ -64,7 +64,7 @@ static inline void fill_timer_info(jvmtiTimerInfo* info_ptr)
  */
 jvmtiError JNICALL
 jvmtiGetCurrentThreadCpuTimerInfo(jvmtiEnv* env,
-                                  jvmtiTimerInfo* UNREF info_ptr)
+                                  jvmtiTimerInfo* info_ptr)
 {
     TRACE2("jvmti.timer", "GetCurrentThreadCpuTimerInfo called");
   //  TRACE("GetCurrentThreadCpuTimerInfo called");
@@ -95,7 +95,7 @@ jvmtiGetCurrentThreadCpuTimerInfo(jvmtiEnv* env,
  */
 jvmtiError JNICALL
 jvmtiGetCurrentThreadCpuTime(jvmtiEnv* env,
-                             jlong* UNREF nanos_ptr)
+                             jlong* nanos_ptr)
 {
     TRACE2("jvmti.timer", "GetCurrentThreadCpuTime called");
     IDATA status;
@@ -110,8 +110,10 @@ jvmtiGetCurrentThreadCpuTime(jvmtiEnv* env,
 
     if (NULL == nanos_ptr)
         return JVMTI_ERROR_NULL_POINTER;
-    status=jthread_get_thread_cpu_time(jthread_self(),nanos_ptr);
-    if (status!=TM_ERROR_NONE)
+
+    status = jthread_get_thread_cpu_time(NULL, nanos_ptr);
+
+    if (status != TM_ERROR_NONE)
         return JVMTI_ERROR_INTERNAL;
 
     return JVMTI_ERROR_NONE;
@@ -128,7 +130,7 @@ jvmtiGetCurrentThreadCpuTime(jvmtiEnv* env,
  */
 jvmtiError JNICALL
 jvmtiGetThreadCpuTimerInfo(jvmtiEnv* env,
-                           jvmtiTimerInfo* UNREF info_ptr)
+                           jvmtiTimerInfo* info_ptr)
 {
     TRACE2("jvmti.timer", "GetThreadCpuTimerInfo called");
     SuspendEnabledChecker sec;
@@ -158,8 +160,8 @@ jvmtiGetThreadCpuTimerInfo(jvmtiEnv* env,
  */
 jvmtiError JNICALL
 jvmtiGetThreadCpuTime(jvmtiEnv* env,
-                      jthread UNREF thread,
-                      jlong* UNREF nanos_ptr)
+                      jthread thread,
+                      jlong* nanos_ptr)
 {
     TRACE2("jvmti.timer", "GetThreadCpuTime called");
     IDATA status;
@@ -176,36 +178,38 @@ jvmtiGetThreadCpuTime(jvmtiEnv* env,
     if (NULL == nanos_ptr)
         return JVMTI_ERROR_NULL_POINTER;
 
-    if (NULL != thread)
-    {
-        if (!is_valid_thread_object(thread))
+    if (NULL == thread) {
+        status = jthread_get_thread_cpu_time(NULL, nanos_ptr);
+
+    } else {
+        if (! is_valid_thread_object(thread))
             return JVMTI_ERROR_INVALID_THREAD;
+
+        // lock thread manager to avoid occasional change of thread state
+        hythread_global_lock();
+
+        int state;// =thread_get_thread_state(thread);
+        jvmtiError err = jvmtiGetThreadState(env, thread, &state);
+        if (err != JVMTI_ERROR_NONE){
+   	    return err;
+	    }
+
+        switch (state)
+        {
+        case JVMTI_THREAD_STATE_TERMINATED:     // thread is terminated
+        case JVMTI_JAVA_LANG_THREAD_STATE_NEW:  // thread is new
+            hythread_global_unlock();
+            return JVMTI_ERROR_THREAD_NOT_ALIVE;
+        default:    // thread is alive
+            status = jthread_get_thread_cpu_time(thread, nanos_ptr);
+
+            break;
+        }
+
+        hythread_global_unlock();
     }
-    else
-        thread = jthread_self();
 
-    // lock thread manager to avoid occasional change of thread state
-    hythread_global_lock(); 
-    
-    int state;// =thread_get_thread_state(thread);
-    jvmtiError err=jvmtiGetThreadState(env,thread,&state);
-    if (err != JVMTI_ERROR_NONE){
-   	   return err; 
-	} 
-    switch (state)
-    {
-    case JVMTI_THREAD_STATE_TERMINATED:     // thread is terminated
-    case JVMTI_JAVA_LANG_THREAD_STATE_NEW:  // thread is new
-        hythread_global_unlock(); 
-        return JVMTI_ERROR_THREAD_NOT_ALIVE;
-    default:    // thread is alive
-        status=jthread_get_thread_cpu_time(thread,nanos_ptr);
-
-        break;
-    }
-
-    hythread_global_unlock(); 
-    if (status!=TM_ERROR_NONE)
+    if (status != TM_ERROR_NONE)
         return JVMTI_ERROR_INTERNAL;
 
     return JVMTI_ERROR_NONE;
@@ -223,7 +227,7 @@ jvmtiGetThreadCpuTime(jvmtiEnv* env,
  */
 jvmtiError JNICALL
 jvmtiGetTimerInfo(jvmtiEnv* env,
-                  jvmtiTimerInfo* UNREF info_ptr)
+                  jvmtiTimerInfo* info_ptr)
 {
     TRACE2("jvmti.timer", "GetTimerInfo called");
     SuspendEnabledChecker sec;

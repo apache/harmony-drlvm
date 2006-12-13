@@ -60,9 +60,14 @@ IDATA VMCALL jthread_get_thread_blocked_time(jthread java_thread, jlong *nanos_p
 IDATA VMCALL jthread_get_thread_cpu_time(jthread java_thread, jlong *nanos_ptr) {
 
     hythread_t tm_native_thread;
-    assert(java_thread);
     assert(nanos_ptr);
-    tm_native_thread = vm_jthread_get_tm_data(java_thread);
+
+    if (NULL == java_thread) {
+        tm_native_thread = hythread_self();
+    } else {
+        tm_native_thread = vm_jthread_get_tm_data(java_thread);
+    }
+
     return CONVERT_ERROR(apr_get_thread_time(tm_native_thread->os_handle,
         (apr_int64_t*) nanos_ptr));
 }
