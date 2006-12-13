@@ -483,6 +483,7 @@ void ConstraintsResolverImpl::resolveConstraintsWithOG(Inst * inst)
                     // an operand different to the current replacement 
                     // is required to be over this call site, append splitting below the call site
                     // this is like restoring from a call-safe location under a call
+                    assert(currentOpnd->getType() == opndToSet->getType());
                     Inst * copySequence=irManager.newCopyPseudoInst(Mnemonic_MOV, currentOpnd, opndToSet);  
                     copySequence->insertAfter(inst);
                 }
@@ -564,6 +565,7 @@ void ConstraintsResolverImpl::resolveConstraints(Node * bb)
         if (currentOpnd!=NULL){
             if (currentOpnd!=originalOpnd){
 //              assert(irManager.getLiveAtEntry(bb)->isLive(originalOpnd));
+                assert(currentOpnd->getType() == originalOpnd->getType());
                 Inst * copySequence=irManager.newCopyPseudoInst(Mnemonic_MOV, currentOpnd, originalOpnd);
                 bb->prependInst(copySequence);
             }

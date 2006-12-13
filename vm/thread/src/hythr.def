@@ -148,3 +148,5 @@ array_delete
 array_get
 get_local_pool
 get_java_thread_group
+
+Java_org_apache_harmony_drlvm_thread_ThreadHelper_getThreadIdOffset

@@ -638,6 +638,7 @@ public:
             }
             break;
         case Op_Conv:
+        case Op_ConvUnmanaged:
             {
                 assert(inst->getNumSrcOperands() == 1);
                 Type * dstType = inst->getDst()->getType();

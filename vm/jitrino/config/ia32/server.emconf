@@ -80,10 +80,21 @@ SD2_OPT.useProfile=EDGE_PROF
 -XDjit.SD2_OPT.arg.optimizer.inline_helpers.newObj_methodName=alloc
 -XDjit.SD2_OPT.arg.optimizer.inline_helpers.newObj_hotnessPercent=1
 
--XDjit.CS_OPT.arg.optimizer.inline_helpers.newArray=on
--XDjit.CS_OPT.arg.optimizer.inline_helpers.newArray_className=org/apache/harmony/drlvm/gc_cc/GCHelper
--XDjit.CS_OPT.arg.optimizer.inline_helpers.newArray_methodName=allocArray
--XDjit.CS_OPT.arg.optimizer.inline_helpers.newArray_hotnessPercent=1
+-XDjit.SD2_OPT.arg.optimizer.inline_helpers.newArray=on
+-XDjit.SD2_OPT.arg.optimizer.inline_helpers.newArray_className=org/apache/harmony/drlvm/gc_cc/GCHelper
+-XDjit.SD2_OPT.arg.optimizer.inline_helpers.newArray_methodName=allocArray
+-XDjit.SD2_OPT.arg.optimizer.inline_helpers.newArray_hotnessPercent=1
+
+-XDjit.SD2_OPT.arg.optimizer.inline_helpers.objMonEnter=on
+-XDjit.SD2_OPT.arg.optimizer.inline_helpers.objMonEnter_className=org/apache/harmony/drlvm/thread/ThreadHelper
+-XDjit.SD2_OPT.arg.optimizer.inline_helpers.objMonEnter_methodName=monitorEnterUseReservation
+-XDjit.SD2_OPT.arg.optimizer.inline_helpers.objMonEnter_hotnessPercent=1
+
+-XDjit.SD2_OPT.arg.optimizer.inline_helpers.objMonExit=on
+-XDjit.SD2_OPT.arg.optimizer.inline_helpers.objMonExit_className=org/apache/harmony/drlvm/thread/ThreadHelper
+-XDjit.SD2_OPT.arg.optimizer.inline_helpers.objMonExit_methodName=monitorExit
+-XDjit.SD2_OPT.arg.optimizer.inline_helpers.objMonExit_hotnessPercent=1
+
 
 -XDjit.SD2_OPT.arg.codegen.dce1.early=yes
 -XDjit.SD2_OPT.arg.codegen.regalloc.bp_regalloc1.regs=ALL_GP
@@ -96,3 +107,8 @@ SD2_OPT.useProfile=EDGE_PROF
 #GC magics support
 -Dvm.components.gc_cc.startupclass=org.apache.harmony.drlvm.gc_cc.GCHelper
 -XDvm.component.classpath.gc_cc=gc_cc.jar
+
+#TM properties
+-Dvm.components.hythr.startupclass=org.apache.harmony.drlvm.thread.ThreadHelper
+-XDvm.component.classpath.hythr=hythr.jar
+

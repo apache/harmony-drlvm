@@ -186,6 +186,14 @@ void SimpleStackOpndCoalescer::printCandidates(::std::ostream& os, uint32 detail
     }
 }
 
+static bool isTypeConversionAllowed(Opnd* fromOpnd, Opnd* toOpnd) {
+    Type * fromType = fromOpnd->getType();
+    Type * toType = toOpnd->getType();
+    bool fromIsGCType = fromType->isObject() || fromType->isManagedPtr();
+    bool toIsGCType = toType->isObject() || toType->isManagedPtr();
+    return fromIsGCType == toIsGCType;
+}
+
 //_________________________________________________________________________________________________
 bool SimpleStackOpndCoalescer::isCandidate(const Inst * inst)const
 {
@@ -193,7 +201,7 @@ bool SimpleStackOpndCoalescer::isCandidate(const Inst * inst)const
         Opnd * dstOpnd = inst->getOpnd(0), * srcOpnd = inst->getOpnd(1);
         if (dstOpnd != srcOpnd && 
             intervals[srcOpnd->getId()] != NULL && intervals[dstOpnd->getId()] != NULL
-            && dstOpnd->getSize() == srcOpnd->getSize())
+            && dstOpnd->getSize() == srcOpnd->getSize() && isTypeConversionAllowed(srcOpnd, dstOpnd))
             return true;
     }
     return false;
@@ -322,7 +330,7 @@ class CopyExpansion : public SessionAction {
     void runImpl();
     void restoreRegUsage(Node * bb, Inst * toInst, uint32& gpRegUsageMask, uint32& appRegUsageMask);
     uint32 getNeedInfo()const{ return NeedInfo_LivenessInfo; }
-    uint32 getSideEffects()const{ return 0; }
+    uint32 getSideEffects()const{ return SideEffect_InvalidatesLivenessInfo; }
 };
 
 
@@ -421,7 +429,6 @@ void CopyExpansion::runImpl()
             }
         }
     }
-    irManager->fixLivenessInfo();
 }
 
 //_________________________________________________________________________________________________

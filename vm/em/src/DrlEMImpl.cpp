@@ -728,12 +728,12 @@ void DrlEMImpl::methodProfileIsReady(MethodProfile* mp) {
                         INFO2(nextStep->catName.c_str(), msg.str().c_str());
                     } 
 
-                    vm_compile_method(nextStep->jit, mp->mh);
+                    JIT_Result res = vm_compile_method(nextStep->jit, mp->mh);
 
                     if (nextStep->loggingEnabled) {
                         std::ostringstream msg;
-                        msg << "EM: recompile done:["<<nextStep->jitName.c_str()<<" n="<<n<<"] "
-                            <<className<<"::"<<methodName<<signature;
+                        msg << "EM: recompile done:["<<nextStep->jitName.c_str()<<" n="<<n<<": "
+                            <<(res ==JIT_SUCCESS ? "OK" : "FAILED")<<"] "<<className<<"::"<<methodName<<signature;
                         INFO2(nextStep->catName.c_str(), msg.str().c_str());
                     }
 

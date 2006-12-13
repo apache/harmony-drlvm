@@ -68,7 +68,7 @@ void GCMap::processBasicBlock(IRManager& irm, const Node* block) {
     for (Inst* inst = (Inst*)block->getLastInst(); inst!=NULL; inst = inst->getPrevInst()) {
         if (IRManager::isGCSafePoint(inst)) {
             registerGCSafePoint(irm, ls, inst);
-#ifndef _DEBUG   //for debug mode we collect all hardware exception points too
+#ifndef GCMAP_TRACK_IDS   //for debug mode we collect all hardware exception points too
             if (--safePointsInBlock == 0) {
                 break;
             }
@@ -86,7 +86,7 @@ void  GCMap::registerGCSafePoint(IRManager& irm, const BitSet& ls, Inst* inst) {
     GCSafePoint* gcSafePoint = new (mm) GCSafePoint(mm, eip);
     GCSafePointPairs& pairs = offsetsInfo->getGCSafePointPairs(inst);
     const StlSet<Opnd*>& staticFieldsMptrs = offsetsInfo->getStaticFieldMptrs();
-#ifdef GC_MAP_DUMP_ENABLED
+
     StlVector<int>* offsets = NULL;
     StlVector<Opnd*>* basesAndMptrs = NULL;
     bool loggingGCInst = Log::isEnabled();
@@ -94,8 +94,7 @@ void  GCMap::registerGCSafePoint(IRManager& irm, const BitSet& ls, Inst* inst) {
         offsets = new (mm) StlVector<int>(mm);
         basesAndMptrs = new (mm) StlVector<Opnd*>(mm);
     }
-#endif    
-#ifdef _DEBUG
+#ifdef GCMAP_TRACK_IDS
     gcSafePoint->instId = inst->getId();
 #endif
     BitSet::IterB liveOpnds(ls);
@@ -106,7 +105,21 @@ void  GCMap::registerGCSafePoint(IRManager& irm, const BitSet& ls, Inst* inst) {
         if (callRes == opnd) {
             continue;
         }
-        if (!opnd->getType()->isManagedPtr() && !opnd->getType()->isObject()) {
+        Type* opndType = opnd->getType();
+#ifdef _DEBUG         
+        //check that unmanaged opnd live range does not cross enumeration points
+        if (opndType->isUnmanagedPtr() && opndType->asPtrType()->getPointedToType()->isInt1()) {
+            CallInst * callInst=(CallInst*)inst;
+            Opnd * targetOpnd=callInst->getOpnd(callInst->getTargetOpndIndex());
+            assert(targetOpnd->isPlacedIn(OpndKind_Imm));
+            Opnd::RuntimeInfo * ri=targetOpnd->getRuntimeInfo();
+            if (!ri) {
+                assert (ri->getKind() != Opnd::RuntimeInfo::Kind_MethodVtableSlotOffset);
+                assert (ri->getKind() != Opnd::RuntimeInfo::Kind_MethodDirectAddr);
+            }
+        }
+#endif
+        if (!opndType->isManagedPtr() && !opndType->isObject()) {
             continue;
         }
         if (staticFieldsMptrs.find(opnd) != staticFieldsMptrs.end()) {
@@ -141,19 +154,17 @@ void  GCMap::registerGCSafePoint(IRManager& irm, const BitSet& ls, Inst* inst) {
             assert(opnd->getMemOpndKind() == MemOpndKind_Heap);
             continue;
         }
-#ifdef _DEBUG
+#ifdef GCMAP_TRACK_IDS
         gcOpnd->firstId = opnd->getFirstId();
 #endif
         gcSafePoint->gcOpnds.push_back(gcOpnd);
-#ifdef GC_MAP_DUMP_ENABLED
+
         if (loggingGCInst) {
             basesAndMptrs->push_back(opnd);
             offsets->push_back(gcOpnd->getMPtrOffset());
         }
-#endif
     }
     gcSafePoints.push_back(gcSafePoint);
-#ifdef GC_MAP_DUMP_ENABLED
     if (loggingGCInst && !offsets->empty()) {
         GCInfoPseudoInst* gcInst = irm.newGCInfoPseudoInst(*basesAndMptrs);
         gcInst->desc = "gcmap";
@@ -161,7 +172,6 @@ void  GCMap::registerGCSafePoint(IRManager& irm, const BitSet& ls, Inst* inst) {
         std::copy(offsets->begin(), offsets->end(), gcInst->offsets.begin());
         gcInst->insertAfter(inst);
     }
-#endif
 }
 bool GCMap::isHardwareExceptionPoint(const Inst* inst) const {
     Inst::Opnds opnds(inst, Inst::OpndRole_Explicit|Inst::OpndRole_UseDef);
@@ -177,7 +187,7 @@ bool GCMap::isHardwareExceptionPoint(const Inst* inst) const {
 void  GCMap::registerHardwareExceptionPoint(Inst* inst) {
     POINTER_SIZE_INT eip = (POINTER_SIZE_INT)inst->getCodeStartAddr();
     GCSafePoint* gcSafePoint = new (mm) GCSafePoint(mm, eip);
-#ifdef _DEBUG
+#ifdef GCMAP_TRACK_IDS
     gcSafePoint->instId = inst->getId();
     gcSafePoint->hardwareExceptionPoint = true;
 #endif
@@ -205,7 +215,7 @@ POINTER_SIZE_INT GCMap::readByteSize(const Byte* input) {
 }
 
 
-#ifdef _DEBUG
+#ifdef GCMAP_TRACK_IDS
 struct hwecompare {
     bool operator() (const GCSafePoint* p1, const GCSafePoint* p2) const {
         if (p1->isHardwareExceptionPoint() == p2->isHardwareExceptionPoint()) {
@@ -222,7 +232,7 @@ void GCMap::write(Byte* output)  {
     data[1] = gcSafePoints.size();
     POINTER_SIZE_INT offs = 2;
 
-#ifdef _DEBUG
+#ifdef GCMAP_TRACK_IDS
     // make sure that hwe-points are after normal gcpoints
     // this is depends on findGCSafePointStart algorithm -> choose normal gcpoint
     // if both hwe and normal points are registered for the same IP
@@ -265,13 +275,13 @@ GCSafePoint::GCSafePoint(MemoryManager& mm, const POINTER_SIZE_INT* image) : gcO
     POINTER_SIZE_INT offs = 2;
     for (uint32 i = 0; i< nOpnds; i++, offs+=3) {
         GCSafePointOpnd* gcOpnd= new (mm) GCSafePointOpnd(image[offs], int(image[offs+1]), int32(image[offs+2]));
-#ifdef _DEBUG
+#ifdef GCMAP_TRACK_IDS
         gcOpnd->firstId = image[offs+3];
         offs++;
 #endif
         gcOpnds.push_back(gcOpnd);
     }
-#ifdef _DEBUG
+#ifdef GCMAP_TRACK_IDS
     instId = image[offs];
     hardwareExceptionPoint = (bool)image[offs+1];
 #endif
@@ -279,7 +289,7 @@ GCSafePoint::GCSafePoint(MemoryManager& mm, const POINTER_SIZE_INT* image) : gcO
 
 POINTER_SIZE_INT GCSafePoint::getUint32Size() const {
     POINTER_SIZE_INT size = 1/*ip*/+1/*nOpnds*/+GCSafePointOpnd::IMAGE_SIZE_UINT32 * gcOpnds.size()/*opnds images*/;
-#ifdef _DEBUG
+#ifdef GCMAP_TRACK_IDS
     size++; //instId
     size++; //hardwareExceptionPoint
 #endif
@@ -295,12 +305,12 @@ void GCSafePoint::write(POINTER_SIZE_INT* data) const {
         data[offs] = gcOpnd->flags;
         data[offs+1] = gcOpnd->val;
         data[offs+2] = gcOpnd->mptrOffset;
-#ifdef _DEBUG
+#ifdef GCMAP_TRACK_IDS
         data[offs+3] = gcOpnd->firstId;
         offs++;
 #endif
     }
-#ifdef _DEBUG
+#ifdef GCMAP_TRACK_IDS
     data[offs++] = instId;
     data[offs++] = (POINTER_SIZE_INT)hardwareExceptionPoint;
 #endif
@@ -312,7 +322,7 @@ POINTER_SIZE_INT GCSafePoint::getIP(const POINTER_SIZE_INT* image) {
 }
 
 static inline void m_assert(bool cond)  {
-#ifdef _DEBUG
+#ifdef GCMAP_TRACK_IDS
     assert(cond);
 #else
 #ifdef WIN32
@@ -454,7 +464,8 @@ void RuntimeInterface::getGCRootSet(MethodDesc* methodDesc, GCInterface* gcInter
     const char* methodName = methodDesc->getName();
     const char* className = class_get_name(parentClassHandle);
     const char* methodSignature = methodDesc->getSignatureString();
-    printf("enumerate: %s::%s %s\n", className, methodName, methodSignature);*/
+    printf("enumerate: %s::%s %s ip=%d\n", className, methodName, methodSignature, *context->p_eip);
+*/
 
     // Compute stack information
     uint32 stackInfoSize = StackInfo::getByteSize(methodDesc);
@@ -481,9 +492,7 @@ void RuntimeInterface::getGCRootSet(MethodDesc* methodDesc, GCInterface* gcInter
         }
     } else {
         //NPE + GC -> nothing to enumerate for this frame;
-#ifdef _DEBUG
         assert(0); //in debug mode all hardware exceptions are saved as empty gcsafepoints
-#endif 
     }
 }
 

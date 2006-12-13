@@ -416,6 +416,11 @@ public:
         return inst;
     }
 
+    // conversion
+    Inst* caseConvUnmanaged(Inst* inst) {
+        return inst;
+    }
+
     // shifts
     Inst* caseShladd(Inst* inst) {
         Opnd* opnd = simplifyShladd(inst->getDst()->getType(),

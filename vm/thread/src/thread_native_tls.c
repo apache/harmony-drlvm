@@ -27,7 +27,7 @@
 
 #include <open/hythread_ext.h>
 #include "thread_private.h"
-
+#include <jni.h>
 
 /** @name Thread local storage support
  */
@@ -131,6 +131,16 @@ UDATA VMCALL hythread_tls_get_suspend_request_offset() {
 UDATA VMCALL hythread_tls_get_offset(hythread_tls_key_t key) {
     assert(key < (UDATA)tm_tls_capacity);
     return ((UDATA)&((hythread_t)0)->thread_local_storage) + (key * sizeof(void*));
+}
+
+
+/*
+ * Class:     org_apache_harmony_drlvm_thread_ThreadHelper
+ * Method:    getThreadIdOffset
+ * Signature: ()I
+ */
+JNIEXPORT jint JNICALL Java_org_apache_harmony_drlvm_thread_ThreadHelper_getThreadIdOffset(JNIEnv *e, jclass c) {
+    return (uint32)&((HyThread *)0)->thread_id;
 }
 
 

@@ -22,6 +22,8 @@
 #include "PMFAction.h"
 #include "optpass.h"
 #include "inliner.h"
+#include "LoopTree.h"
+#include "Dominator.h"
 
 namespace Jitrino {
 
@@ -31,17 +33,18 @@ struct HelperInlinerFlags {
     bool insertInitilizers;
     bool doInlining;
 
-    bool  newObj_doInlining;
-    int   newObj_hotnessPercentToInline;
-    const char* newObj_className;
-    const char* newObj_methodName;
-    const char* newObj_signature;
+#define DECLARE_STANDARD_HELPER_FLAGS(name) \
+    bool  name##_doInlining;\
+    int   name##_hotnessPercentToInline;\
+    const char* name##_className;\
+    const char* name##_methodName;\
+    const char* name##_signature;\
 
-    bool  newArray_doInlining;
-    int   newArray_hotnessPercentToInline;
-    const char* newArray_className;
-    const char* newArray_methodName;
-    const char* newArray_signature;
+DECLARE_STANDARD_HELPER_FLAGS(newObj);
+DECLARE_STANDARD_HELPER_FLAGS(newArray);
+DECLARE_STANDARD_HELPER_FLAGS(objMonEnter);
+DECLARE_STANDARD_HELPER_FLAGS(objMonExit);
+    
 };
 
 class HelperInlinerAction: public Action {
@@ -60,45 +63,35 @@ void HelperInlinerAction::init() {
     flags.doInlining = true;
     
     
-    //new obj inlining params;
-    flags.newObj_doInlining = getBoolArg("newObj", false);
+#define READ_STANDARD_HELPER_FLAGS(name)\
+    flags.name##_doInlining = getBoolArg(#name, false);\
+    if (flags.name##_doInlining) {\
+    flags.name##_className = getStringArg(#name"_className", NULL);\
+    flags.name##_methodName = getStringArg(#name"_methodName", NULL);\
+    flags.name##_hotnessPercentToInline = getIntArg(#name"_hotnessPercent", 0);\
+        if (flags.name##_className == NULL || flags.name##_methodName == NULL) {\
+            if (Log::isEnabled()) {\
+                Log::out()<<"Invalid fast path helper name:"<<flags.name##_className<<"::"<<flags.name##_methodName<<std::endl;\
+            }\
+            flags.name##_doInlining = false;\
+        }\
+    }\
+    if (!flags.name##_doInlining){\
+        flags.name##_className = NULL;\
+        flags.name##_methodName = NULL;\
+    }\
 
+    READ_STANDARD_HELPER_FLAGS(newObj);
     flags.newObj_signature = "(II)Lorg/vmmagic/unboxed/Address;";
-    if (flags.newObj_doInlining) {
-        flags.newObj_className = getStringArg("newObj_className", NULL);
-        flags.newObj_methodName = getStringArg("newObj_methodName", NULL);
-        flags.newObj_hotnessPercentToInline = getIntArg("newObj_hotnessPercent", 0);
-        if (flags.newObj_className == NULL || flags.newObj_methodName == NULL) {
-            //TODO:? crash("Invalid newObj fast path helper name: %s::%s\n", flags.newObj_className, flags.newObj_methodName);
-            flags.newObj_doInlining = false;
-        }
-    }
-    
-    if (!flags.newObj_doInlining){
-        flags.newObj_className = NULL;
-        flags.newObj_methodName = NULL;
-    }
 
-
-    //new array inlining params;
-    flags.newArray_doInlining = getBoolArg("newArray", false);
-
+    READ_STANDARD_HELPER_FLAGS(newArray);
     flags.newArray_signature = "(III)Lorg/vmmagic/unboxed/Address;";
-    if (flags.newArray_doInlining) {
-        flags.newArray_className = getStringArg("newArray_className", NULL);
-        flags.newArray_methodName = getStringArg("newArray_methodName", NULL);
-        flags.newArray_hotnessPercentToInline = getIntArg("newArray_hotnessPercent", 0);
-        if (flags.newArray_className == NULL || flags.newArray_methodName == NULL) {
-            //TODO:? crash("Invalid newArray fast path helper name: %s::%s\n", flags.newArray_className, flags.newArray_methodName);
-            flags.newArray_doInlining = false;
-        }
-    }
 
-    if (!flags.newArray_doInlining){
-        flags.newArray_className = NULL;
-        flags.newArray_methodName = NULL;
-    }
+    READ_STANDARD_HELPER_FLAGS(objMonEnter);
+    flags.objMonEnter_signature = "(Ljava/lang/Object;)V";
 
+    READ_STANDARD_HELPER_FLAGS(objMonExit);
+    flags.objMonExit_signature = "(Ljava/lang/Object;)V";
 }
 
 
@@ -106,13 +99,21 @@ class HelperInliner {
 public:
     HelperInliner(HelperInlinerSession* _sessionAction, MemoryManager& tmpMM, CompilationContext* _cc, Inst* _inst)  
         : flags(((HelperInlinerAction*)_sessionAction->getAction())->getFlags()), localMM(tmpMM), 
-        cc(_cc), inst(_inst), action(_sessionAction)
-    {}
-    virtual ~HelperInliner(){};
+        cc(_cc), inst(_inst), action(_sessionAction), method(NULL)
+    {
+        irm = cc->getHIRManager();
+        instFactory = &irm->getInstFactory();
+        opndManager = &irm->getOpndManager();
+        typeManager = &irm->getTypeManager();
+        cfg = &irm->getFlowGraph();
+    }
 
-    virtual void doInline() = 0;
+    virtual ~HelperInliner(){};
+    
+    virtual void run()=0;
 protected:
     MethodDesc* ensureClassIsResolvedAndInitialized(const char* className,  const char* methodName, const char* signature);
+    virtual void doInline() = 0;
     void inlineVMHelper(MethodCallInst* call);
 
     HelperInlinerFlags& flags;
@@ -120,24 +121,37 @@ protected:
     CompilationContext* cc;
     Inst* inst;
     HelperInlinerSession* action;
+    MethodDesc*  method;
+
+//these fields used by almost every subclass -> cache them
+    IRManager* irm;
+    InstFactory* instFactory;
+    OpndManager* opndManager;
+    TypeManager* typeManager;
+    ControlFlowGraph* cfg;
+
 };
+#define DECLARE_HELPER_INLINER(name, flagPrefix)\
+class name : public HelperInliner {\
+public:\
+    name (HelperInlinerSession* session, MemoryManager& tmpMM, CompilationContext* cc, Inst* inst)\
+        : HelperInliner(session, tmpMM, cc, inst){}\
+    \
+    virtual void run() { \
+        if (Log::isEnabled())  {\
+            Log::out() << "Processing inst:"; inst->print(Log::out()); Log::out()<<std::endl; \
+        }\
+        method = ensureClassIsResolvedAndInitialized(flags.flagPrefix##_className, flags.flagPrefix##_methodName, flags.flagPrefix##_signature);\
+        if (!method) return;\
+        doInline();\
+    }\
+    virtual void doInline();\
+};\
 
-class NewObjHelperInliner : public HelperInliner {
-public:
-    NewObjHelperInliner(HelperInlinerSession* session, MemoryManager& tmpMM, CompilationContext* cc, Inst* inst) 
-        : HelperInliner(session, tmpMM, cc, inst){}
-    
-    virtual void doInline();
-};
-
-
-class NewArrayHelperInliner : public HelperInliner {
-public:
-    NewArrayHelperInliner(HelperInlinerSession* session, MemoryManager& tmpMM, CompilationContext* cc, Inst* inst) 
-        : HelperInliner(session, tmpMM, cc, inst){}
-    virtual void doInline();
-};
-
+DECLARE_HELPER_INLINER(NewObjHelperInliner, newObj)
+DECLARE_HELPER_INLINER(NewArrayHelperInliner, newArray)
+DECLARE_HELPER_INLINER(ObjMonitorEnterHelperInliner, objMonEnter)
+DECLARE_HELPER_INLINER(ObjMonitorExitHelperInliner, objMonExit)
 
 void HelperInlinerSession::_run(IRManager& irm) {
     CompilationContext* cc = getCompilationContext();
@@ -155,7 +169,7 @@ void HelperInlinerSession::_run(IRManager& irm) {
     for (Nodes::const_iterator it = nodes.begin(), end = nodes.end(); it!=end; ++it) {
         Node* node = *it;
         int nodePercent = fg.hasEdgeProfile() ? (int)(node->getExecCount()*100/entryExecCount) : 0;
-        if (node->isBlockNode()) { //only block nodes can have helper calls today
+        if (node->isBlockNode()) {
             for (Inst* inst = (Inst*)node->getFirstInst(); inst!=NULL; inst = inst->getNextInst()) {
                 Opcode opcode = inst->getOpcode();
                 switch(opcode) {
@@ -169,6 +183,16 @@ void HelperInlinerSession::_run(IRManager& irm) {
                             helperInliners.push_back(new (tmpMM) NewArrayHelperInliner(this, tmpMM, cc, inst));
                         }
                         break;
+                    case Op_TauMonitorEnter:
+                        if (flags.objMonEnter_doInlining && nodePercent >= flags.objMonEnter_hotnessPercentToInline) {
+                            helperInliners.push_back(new (tmpMM) ObjMonitorEnterHelperInliner(this, tmpMM, cc, inst));
+                        }
+                        break;
+                    case Op_TauMonitorExit:
+                        if (flags.objMonExit_doInlining && nodePercent >= flags.objMonExit_hotnessPercentToInline) {
+                            helperInliners.push_back(new (tmpMM) ObjMonitorExitHelperInliner(this, tmpMM, cc, inst));
+                        }
+                        break;
                     default: break;
                 }
             }
@@ -179,7 +203,7 @@ void HelperInlinerSession::_run(IRManager& irm) {
     //TODO: set inline limit!
     for (StlVector<HelperInliner*>::const_iterator it = helperInliners.begin(), end = helperInliners.end(); it!=end; ++it) {
         HelperInliner* inliner = *it;
-        inliner->doInline();
+        inliner->run();
     }
 }
 
@@ -194,11 +218,9 @@ MethodDesc* HelperInliner::ensureClassIsResolvedAndInitialized(const char* class
         return NULL;
     }
     //helper class is resolved here -> check if initialized
-    IRManager* irm = cc->getHIRManager();
-    InstFactory& instFactory = irm->getInstFactory();
     if (clazz->needsInitialization()) {
         if (flags.insertInitilizers) {
-            instFactory.makeInitType(clazz)->insertBefore(inst);
+            instFactory->makeInitType(clazz)->insertBefore(inst);
         }
         return NULL;
     }
@@ -228,8 +250,7 @@ void HelperInliner::inlineVMHelper(MethodCallInst* origCall) {
         }
 
         CompilationInterface* ci = cc->getVMCompilationInterface();
-        IRManager* irm = cc->getHIRManager();
-
+        
         //now inline the call
         CompilationContext inlineCC(cc->getCompilationLevelMemoryManager(), ci, cc->getCurrentJITContext());
         inlineCC.setPipeline(cc->getPipeline());
@@ -247,7 +268,7 @@ void HelperInliner::inlineVMHelper(MethodCallInst* origCall) {
         //add all methods with pragma inline into the list.
         const Nodes& nodesInRegion = regionToInline->getIRManager().getFlowGraph().getNodes();
         for (Nodes::const_iterator it = nodesInRegion.begin(), end = nodesInRegion.end(); it!=end; ++it) {
-           Node* node = *it;
+        	Node* node = *it;
             for (Inst* inst = (Inst*)node->getFirstInst(); inst!=NULL; inst = inst->getNextInst()) {
                 if (inst->isMethodCall()) {
                     MethodCallInst* methodCall = inst->asMethodCallInst();
@@ -276,16 +297,7 @@ void NewObjHelperInliner::doInline() {
 #if defined  (_EM64T_) || defined (_IPF_)
     return;
 #else
-    if (Log::isEnabled())  {
-        Log::out() << "Processing inst:"; inst->print(Log::out()); Log::out()<<std::endl;
-    }
     assert(inst->getOpcode() == Op_NewObj);
-
-    //find the method
-    MethodDesc* method = ensureClassIsResolvedAndInitialized(flags.newObj_className, flags.newObj_methodName, flags.newObj_signature);
-    if (!method) {
-        return;
-    }
 
     Opnd* dstOpnd= inst->getDst();
     Type * type = dstOpnd->getType();
@@ -302,20 +314,15 @@ void NewObjHelperInliner::doInline() {
     int allocationHandle= (int)objType->getAllocationHandle();
     int objSize=objType->getObjectSize();
 
-    IRManager* irm = cc->getHIRManager();
-    InstFactory& instFactory = irm->getInstFactory();
-    OpndManager& opndManager = irm->getOpndManager();
-    TypeManager& typeManager = irm->getTypeManager();
-
-    Opnd* tauSafeOpnd = opndManager.createSsaTmpOpnd(typeManager.getTauType());
-    instFactory.makeTauSafe(tauSafeOpnd)->insertBefore(inst);
-    Opnd* objSizeOpnd = opndManager.createSsaTmpOpnd(typeManager.getInt32Type());
-    Opnd* allocationHandleOpnd = opndManager.createSsaTmpOpnd(typeManager.getInt32Type());
-    Opnd* callResOpnd = opndManager.createSsaTmpOpnd(typeManager.getUnmanagedPtrType(typeManager.getInt8Type()));
-    instFactory.makeLdConst(objSizeOpnd, objSize)->insertBefore(inst);
-    instFactory.makeLdConst(allocationHandleOpnd, allocationHandle)->insertBefore(inst);
+    Opnd* tauSafeOpnd = opndManager->createSsaTmpOpnd(typeManager->getTauType());
+    instFactory->makeTauSafe(tauSafeOpnd)->insertBefore(inst);
+    Opnd* objSizeOpnd = opndManager->createSsaTmpOpnd(typeManager->getInt32Type());
+    Opnd* allocationHandleOpnd = opndManager->createSsaTmpOpnd(typeManager->getInt32Type());
+    Opnd* callResOpnd = opndManager->createSsaTmpOpnd(typeManager->getUnmanagedPtrType(typeManager->getInt8Type()));
+    instFactory->makeLdConst(objSizeOpnd, objSize)->insertBefore(inst);
+    instFactory->makeLdConst(allocationHandleOpnd, allocationHandle)->insertBefore(inst);
     Opnd* args[2] = {objSizeOpnd, allocationHandleOpnd};
-    MethodCallInst* call = instFactory.makeDirectCall(callResOpnd, tauSafeOpnd, tauSafeOpnd, 2, args, method)->asMethodCallInst();
+    MethodCallInst* call = instFactory->makeDirectCall(callResOpnd, tauSafeOpnd, tauSafeOpnd, 2, args, method)->asMethodCallInst();
     call->insertBefore(inst);
     inst->unlink();
     assert(call == call->getNode()->getLastInst());
@@ -326,31 +333,19 @@ void NewObjHelperInliner::doInline() {
     Modifier mod = Modifier(Overflow_None)|Modifier(Exception_Never)|Modifier(Strict_No);
     Node* fallNode = fallEdge->getTargetNode();
     if (fallNode->getInDegree()>1) {
-        fallNode = irm->getFlowGraph().spliceBlockOnEdge(fallEdge, instFactory.makeLabel());
+        fallNode = irm->getFlowGraph().spliceBlockOnEdge(fallEdge, instFactory->makeLabel());
     }
-    fallNode->prependInst(instFactory.makeConv(mod, type->tag, dstOpnd, callResOpnd));
+    fallNode->prependInst(instFactory->makeConv(mod, type->tag, dstOpnd, callResOpnd));
     
-    //inline the method
     inlineVMHelper(call);
 #endif
 }
-
 
 void NewArrayHelperInliner::doInline() {
 #if defined  (_EM64T_) || defined (_IPF_)
     return;
 #else
-    if (Log::isEnabled())  {
-        Log::out() << "Processing inst:"; inst->print(Log::out()); Log::out()<<std::endl;
-    }
     assert(inst->getOpcode() == Op_NewArray);
-
-    //find the method
-    MethodDesc* method = ensureClassIsResolvedAndInitialized(flags.newArray_className, flags.newArray_methodName, flags.newArray_signature);
-    if (!method) {
-        return;
-    }
-
 
     //the method signature is (int objSize, int allocationHandle)
     Opnd* dstOpnd = inst->getDst();
@@ -366,21 +361,16 @@ void NewArrayHelperInliner::doInline() {
         elemSize = 1;
     }
 
-    IRManager* irm = cc->getHIRManager();
-    InstFactory& instFactory = irm->getInstFactory();
-    OpndManager& opndManager = irm->getOpndManager();
-    TypeManager& typeManager = irm->getTypeManager();
-
-    Opnd* tauSafeOpnd = opndManager.createSsaTmpOpnd(typeManager.getTauType());
-    instFactory.makeTauSafe(tauSafeOpnd)->insertBefore(inst);
+    Opnd* tauSafeOpnd = opndManager->createSsaTmpOpnd(typeManager->getTauType());
+    instFactory->makeTauSafe(tauSafeOpnd)->insertBefore(inst);
     Opnd* numElements = inst->getSrc(0);
-    Opnd* elemSizeOpnd = opndManager.createSsaTmpOpnd(typeManager.getInt32Type());
-    Opnd* allocationHandleOpnd = opndManager.createSsaTmpOpnd(typeManager.getInt32Type());
-    instFactory.makeLdConst(elemSizeOpnd, elemSize)->insertBefore(inst);
-    instFactory.makeLdConst(allocationHandleOpnd, allocationHandle)->insertBefore(inst);
+    Opnd* elemSizeOpnd = opndManager->createSsaTmpOpnd(typeManager->getInt32Type());
+    Opnd* allocationHandleOpnd = opndManager->createSsaTmpOpnd(typeManager->getInt32Type());
+    instFactory->makeLdConst(elemSizeOpnd, elemSize)->insertBefore(inst);
+    instFactory->makeLdConst(allocationHandleOpnd, allocationHandle)->insertBefore(inst);
     Opnd* args[3] = {numElements, elemSizeOpnd, allocationHandleOpnd};
-    Opnd* callResOpnd = opndManager.createSsaTmpOpnd(typeManager.getUnmanagedPtrType(typeManager.getInt8Type()));
-    MethodCallInst* call = instFactory.makeDirectCall(callResOpnd, tauSafeOpnd, tauSafeOpnd, 3, args, method)->asMethodCallInst();
+    Opnd* callResOpnd = opndManager->createSsaTmpOpnd(typeManager->getUnmanagedPtrType(typeManager->getInt8Type()));
+    MethodCallInst* call = instFactory->makeDirectCall(callResOpnd, tauSafeOpnd, tauSafeOpnd, 3, args, method)->asMethodCallInst();
     call->insertBefore(inst);
     inst->unlink();
     assert(call == call->getNode()->getLastInst());
@@ -391,11 +381,69 @@ void NewArrayHelperInliner::doInline() {
     Modifier mod = Modifier(Overflow_None)|Modifier(Exception_Never)|Modifier(Strict_No);
     Node* fallNode = fallEdge->getTargetNode();
     if (fallNode->getInDegree()>1) {
-        fallNode = irm->getFlowGraph().spliceBlockOnEdge(fallEdge, instFactory.makeLabel());
+        fallNode = irm->getFlowGraph().spliceBlockOnEdge(fallEdge, instFactory->makeLabel());
     }
-    fallNode->prependInst(instFactory.makeConv(mod, arrayType->tag, dstOpnd, callResOpnd));
+    fallNode->prependInst(instFactory->makeConv(mod, arrayType->tag, dstOpnd, callResOpnd));
     
-    //inline the method
+    inlineVMHelper(call);
+#endif
+}
+
+
+void ObjMonitorEnterHelperInliner::doInline() {
+#if defined  (_EM64T_) || defined (_IPF_)
+    return;
+#else
+    assert(inst->getOpcode() == Op_TauMonitorEnter);
+
+    Opnd* objOpnd = inst->getSrc(0);
+    assert(objOpnd->getType()->isObject());
+    Opnd* tauSafeOpnd = opndManager->createSsaTmpOpnd(typeManager->getTauType());
+    instFactory->makeTauSafe(tauSafeOpnd)->insertBefore(inst);
+    Opnd* args[1] = {objOpnd};
+    MethodCallInst* call = instFactory->makeDirectCall(opndManager->getNullOpnd(), tauSafeOpnd, tauSafeOpnd, 1, args, method)->asMethodCallInst();
+    call->insertBefore(inst);
+    inst->unlink();
+    
+    
+    //if call is not last inst -> make it last inst
+    if (call != call->getNode()->getLastInst()) {
+        cfg->splitNodeAtInstruction(call, true, true, instFactory->makeLabel());
+    }
+
+    //every call must have exception edge -> add it
+    if (call->getNode()->getExceptionEdge() == NULL) {
+        Node* node = call->getNode();
+        Node* dispatchNode = node->getUnconditionalEdgeTarget()->getExceptionEdgeTarget();
+        if (dispatchNode == NULL) {
+            dispatchNode = cfg->getUnwindNode();
+            assert(dispatchNode != NULL); //method with monitors must have unwind, so no additional checks is done
+        }
+        cfg->addEdge(node, dispatchNode);
+    }
+    
+    inlineVMHelper(call);
+#endif
+}
+
+void ObjMonitorExitHelperInliner::doInline() {
+#if defined  (_EM64T_) || defined (_IPF_)
+    return;
+#else
+    assert(inst->getOpcode() == Op_TauMonitorExit);
+
+    Opnd* objOpnd = inst->getSrc(0);
+    assert(objOpnd->getType()->isObject());
+    Opnd* tauSafeOpnd = opndManager->createSsaTmpOpnd(typeManager->getTauType());
+    instFactory->makeTauSafe(tauSafeOpnd)->insertBefore(inst);
+    Opnd* args[1] = {objOpnd};
+    MethodCallInst* call = instFactory->makeDirectCall(opndManager->getNullOpnd(), tauSafeOpnd, tauSafeOpnd, 1, args, method)->asMethodCallInst();
+    call->insertBefore(inst);
+    inst->unlink();
+
+    assert(call == call->getNode()->getLastInst());
+    assert(call->getNode()->getExceptionEdge()!=NULL);
+
     inlineVMHelper(call);
 #endif
 }

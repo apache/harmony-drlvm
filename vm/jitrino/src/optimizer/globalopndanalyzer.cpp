@@ -223,8 +223,12 @@ AdvancedGlobalOpndAnalyzer::markManagedPointerBases() {
                 Opnd* src = inst->getSrc(0);
                 Opnd* dst = inst->getDst();
                 if(!src->isGlobal() && dst->isGlobal()) {
-                    assert(dst->getType()->isManagedPtr());
-                    src->setIsGlobal(true);
+                    if (dst->getType()->isManagedPtr()) {
+                        src->setIsGlobal(true);
+                    } else {
+                        assert(dst->getType()->isUnmanagedPtr());
+                    }
+
                 }
         };
                 break;

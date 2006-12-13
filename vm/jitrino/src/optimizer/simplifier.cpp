@@ -4083,6 +4083,7 @@ SimplifierWithInstFactory::genConv(Type* type, Type::Tag toType,
     return inst;
 }
 
+
 Inst*
 SimplifierWithInstFactory::genShladd(Type* type,
                                      Opnd* value, Opnd* shiftAmount, 

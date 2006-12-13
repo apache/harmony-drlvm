@@ -607,7 +607,7 @@ CG_OpndHandle* InstCodeSelector::add(ArithmeticOp::Types opType,
     switch(opType){
         case ArithmeticOp::I4:
         case ArithmeticOp::I:{
-            Type * dstType=opType==ArithmeticOp::I?irManager.getManagedPtrType(((Opnd*)src1)->getType()):irManager.getTypeFromTag(Type::Int32);
+            Type * dstType=opType==ArithmeticOp::I?irManager.getTypeFromTag(Type::IntPtr):irManager.getTypeFromTag(Type::Int32);
             return simpleOp_I4(Mnemonic_ADD, dstType, (Opnd*)src1, (Opnd*)src2);
         }
         case ArithmeticOp::I8:
@@ -633,7 +633,7 @@ CG_OpndHandle* InstCodeSelector::sub(ArithmeticOp::Types opType,
     switch(opType){
         case ArithmeticOp::I4:
         case ArithmeticOp::I:{
-            Type * dstType=opType==ArithmeticOp::I?irManager.getManagedPtrType(((Opnd*)src1)->getType()):irManager.getTypeFromTag(Type::Int32);
+            Type * dstType=opType==ArithmeticOp::I?irManager.getTypeFromTag(Type::IntPtr):irManager.getTypeFromTag(Type::Int32);
             return simpleOp_I4(Mnemonic_SUB, dstType, (Opnd*)src1, (Opnd*)src2);
         }
         case ArithmeticOp::I8:
@@ -1032,7 +1032,7 @@ CG_OpndHandle* InstCodeSelector::and_(IntegerOp::Types opType,
     switch(opType){
         case IntegerOp::I4:
         case IntegerOp::I:{
-            Type * dstType=opType==IntegerOp::I?irManager.getManagedPtrType(((Opnd*)src1)->getType()):irManager.getTypeFromTag(Type::Int32);
+            Type * dstType=opType==IntegerOp::I?irManager.getTypeFromTag(Type::IntPtr):irManager.getTypeFromTag(Type::Int32);
             return simpleOp_I4(Mnemonic_AND, dstType, (Opnd*)src1, (Opnd*)src2);
         }
         case IntegerOp::I8:
@@ -1053,7 +1053,7 @@ CG_OpndHandle* InstCodeSelector::or_(IntegerOp::Types opType,
     switch(opType){
         case IntegerOp::I4:
         case IntegerOp::I:{
-            Type * dstType=opType==IntegerOp::I?irManager.getManagedPtrType(((Opnd*)src1)->getType()):irManager.getTypeFromTag(Type::Int32);
+            Type * dstType=opType==IntegerOp::I?irManager.getTypeFromTag(Type::IntPtr):irManager.getTypeFromTag(Type::Int32);
             return simpleOp_I4(Mnemonic_OR, dstType, (Opnd*)src1, (Opnd*)src2);
         }
         case IntegerOp::I8:
@@ -1074,7 +1074,7 @@ CG_OpndHandle*    InstCodeSelector::xor_(IntegerOp::Types opType,
     switch(opType){
         case IntegerOp::I4:
         case IntegerOp::I:{
-            Type * dstType=opType==IntegerOp::I?irManager.getManagedPtrType(((Opnd*)src1)->getType()):irManager.getTypeFromTag(Type::Int32);
+            Type * dstType=opType==IntegerOp::I?irManager.getTypeFromTag(Type::IntPtr):irManager.getTypeFromTag(Type::Int32);
             return simpleOp_I4(Mnemonic_XOR, dstType, (Opnd*)src1, (Opnd*)src2);
         }
         case IntegerOp::I8:
@@ -1094,7 +1094,7 @@ CG_OpndHandle*    InstCodeSelector::not_(IntegerOp::Types opType,
     switch(opType){
         case IntegerOp::I4:
         case IntegerOp::I:{
-            Type * dstType=opType==IntegerOp::I?irManager.getManagedPtrType(((Opnd*)src)->getType()):irManager.getTypeFromTag(Type::Int32);
+            Type * dstType=opType==IntegerOp::I?irManager.getTypeFromTag(Type::IntPtr):irManager.getTypeFromTag(Type::Int32);
             return simpleOp_I4(Mnemonic_NOT, dstType, (Opnd*)src, 0);
         }
         case IntegerOp::I8:
@@ -2863,8 +2863,10 @@ CG_OpndHandle* InstCodeSelector::callvmhelper(uint32              numArgs,
     }
     case CompilationInterface::Helper_NewObj_UsingVtable:
     case CompilationInterface::Helper_NewVector_UsingVtable:
+    case CompilationInterface::Helper_ObjMonitorEnter:
+    case CompilationInterface::Helper_ObjMonitorExit:
     {
-        dstOpnd = irManager.newOpnd(retType);
+        dstOpnd = retType==NULL ? NULL: irManager.newOpnd(retType);
         CallInst * callInst=irManager.newRuntimeHelperCallInst(callId, numArgs, (Opnd**)args, dstOpnd);
         appendInsts(callInst);
         break;

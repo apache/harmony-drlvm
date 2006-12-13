@@ -9,7 +9,7 @@ extern "C" {
 
 /*
  * Class:     org_apache_harmony_drlvm_gc_cc_GCHelper
- * Method:    getGCTlsOffset
+ * Method:    getCurrentOffset
  * Signature: ()I
  */
 JNIEXPORT jint JNICALL Java_org_apache_harmony_drlvm_gc_1cc_GCHelper_getCurrentOffset(JNIEnv *e, jclass c)
@@ -19,7 +19,7 @@ JNIEXPORT jint JNICALL Java_org_apache_harmony_drlvm_gc_1cc_GCHelper_getCurrentO
 
 /*
  * Class:     org_apache_harmony_drlvm_gc_cc_GCHelper
- * Method:    getGCTlsOffset
+ * Method:    getCleanedOffset
  * Signature: ()I
  */
 JNIEXPORT jint JNICALL Java_org_apache_harmony_drlvm_gc_1cc_GCHelper_getCleanedOffset(JNIEnv *e, jclass c)

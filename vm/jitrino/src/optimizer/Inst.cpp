@@ -1873,7 +1873,13 @@ InstFactory::makeSelect(Opnd* dst, Opnd* src1, Opnd* src2, Opnd *src3) {
 
 // conversion
 Inst* InstFactory::makeConv(Modifier mod, Type::Tag toType, Opnd* dst, Opnd* src) {
-    return makeInst(Op_Conv, mod, toType, dst, src);
+    Opcode opcode = Op_Conv;
+    if (dst->getType()->isUnmanagedPtr() && src->getType()->isObject() 
+        || dst->getType()->isObject() && src->getType()->isUnmanagedPtr()) 
+    {
+        opcode = Op_ConvUnmanaged;
+    }
+    return makeInst(opcode, mod, toType, dst, src);
 }
 
 // shifts
@@ -2746,6 +2752,7 @@ InstOptimizer::dispatch(Inst* inst) {
     case Op_Not:                return caseNot(inst);
     case Op_Select:             return caseSelect(inst);
     case Op_Conv:               return caseConv(inst);
+    case Op_ConvUnmanaged:      return caseConvUnmanaged(inst);
     case Op_Shladd:             return caseShladd(inst);
     case Op_Shl:                return caseShl(inst);
     case Op_Shr:                return caseShr(inst);

@@ -250,7 +250,11 @@ JavaByteCodeTranslator::JavaByteCodeTranslator(CompilationInterface& ci,
             //
             arg = irBuilder.genArgDef(NonNullThisArg,argTypes[i]);
         } else {
-            arg = irBuilder.genArgDef(DefArgNoModifier,argTypes[i]);
+            Type* type = argTypes[i];
+            if (isMagicClass(type)) {
+                type = convertMagicType2HIR(typeManager, type);
+            }
+            arg = irBuilder.genArgDef(DefArgNoModifier,type);
         }
         JavaLabelPrepass::JavaVarType javaType = JavaLabelPrepass::getJavaType(argTypes[i]);
         VarOpnd *var = getVarOpndStVar(javaType,j,arg);
@@ -2735,8 +2739,12 @@ JavaByteCodeTranslator::genInvokeStatic(MethodDesc * methodDesc,
                                       jsrEntryMap);
     } else {
         Opnd *tauNullChecked = irBuilder.genTauSafe(); // always safe, is a static method call
+        Type* resType = returnType;
+        if (isMagicClass(resType)) {
+            resType = convertMagicType2HIR(typeManager, resType);
+        }
         dst = irBuilder.genDirectCall(methodDesc, 
-                                      returnType,
+                                      resType,
                                       tauNullChecked,
                                       0, // let IRBuilder check types
                                       numArgs,
@@ -3730,9 +3738,8 @@ void JavaByteCodeTranslator::genMagic(MethodDesc *md, uint32 numArgs, Opnd **src
     else if (!strcmp(mname, "zero"))    { loadConst = true; theConst =  0;}
     else if (!strcmp(mname, "nullReference")) { loadConst = true; theConst =  0;}
     if (loadConst) {
-        //todo: recheck and fix the type of the const:
         ConstInst::ConstValue v; v.i4 = theConst;
-        Opnd* res = irBuilder.genLdConstant(typeManager.getUIntPtrType(), v);//todo:clean typing
+        Opnd* res = irBuilder.genLdConstant(typeManager.getUIntPtrType(), v);
         if (resType->isPtr()) {
             res = irBuilder.genConv(resType, resType->tag, mod, res);
         }
@@ -3951,6 +3958,18 @@ void JavaByteCodeTranslator::genVMHelper(MethodDesc *md, uint32 numArgs, Opnd **
         assert(numArgs == 3);
         Opnd* res = irBuilder.genVMHelperCall(CompilationInterface::Helper_NewVector_UsingVtable, resType, numArgs, srcOpnds);
         pushOpnd(res);
+        return;
+    }
+
+    if (!strcmp(mname,"monitorEnter")) {
+        assert(numArgs == 1);
+        irBuilder.genVMHelperCall(CompilationInterface::Helper_ObjMonitorEnter, resType, numArgs, srcOpnds);
+        return;
+    }
+
+    if (!strcmp(mname,"monitorExit")) {
+        assert(numArgs == 1);
+        irBuilder.genVMHelperCall(CompilationInterface::Helper_ObjMonitorExit, resType, numArgs, srcOpnds);
         return;
     }
 

@@ -1624,6 +1624,10 @@ public:
     virtual Inst*
     caseConv(Inst* inst)=0;//                {return caseDefault(inst);}
 
+    // conversion
+    virtual Inst*
+    caseConvUnmanaged(Inst* inst)=0;//                {return caseDefault(inst);}
+
     // shifts
     virtual Inst*
     caseShladd(Inst* inst)=0;//                 {return caseDefault(inst);}

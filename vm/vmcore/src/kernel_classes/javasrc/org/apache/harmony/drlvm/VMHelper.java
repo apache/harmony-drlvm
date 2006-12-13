@@ -34,6 +34,9 @@ public class VMHelper {
     
     public static Address newVectorUsingAllocHandle(int arrayLen, int elemSize, int allocationHandle) {fail(); return null;}
 
+    public static void monitorEnter(Object obj) {fail();}
+
+    public static void monitorExit(Object obj) {fail();}
 
 
 

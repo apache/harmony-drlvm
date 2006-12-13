@@ -59,6 +59,14 @@ class EarlyPropagation : public SessionAction {
 
 static ActionFactory<EarlyPropagation> _early_prop("early_prop");
 
+static bool isTypeConversionAllowed(Opnd* fromOpnd, Opnd* toOpnd) {
+    Type * fromType = fromOpnd->getType();
+    Type * toType = toOpnd->getType();
+    bool fromIsGCType = fromType->isObject() || fromType->isManagedPtr();
+    bool toIsGCType = toType->isObject() || toType->isManagedPtr();
+    return fromIsGCType == toIsGCType;
+}
+
 //___________________________________________________________________________________________________
 void EarlyPropagation::runImpl()
 { 
@@ -135,7 +143,8 @@ void EarlyPropagation::runImpl()
                     uint32 defOpndId = defOpnd->getId();
                     OpndInfo * opndInfo = opndInfos + defOpndId;
                     bool instHandled=false;
-                    if (opndInfo->defCount == 1 && ! srcOpnd->isPlacedIn(OpndKind_Reg)){
+                    bool typeConvOk = isTypeConversionAllowed(srcOpnd, defOpnd);
+                    if (typeConvOk && opndInfo->defCount == 1 && ! srcOpnd->isPlacedIn(OpndKind_Reg)){
                         if (!defOpnd->hasAssignedPhysicalLocation()){
                             opndInfo->sourceInst = inst;
                             opndInfo->sourceOpndId = srcOpnd->getId();
@@ -165,13 +174,12 @@ void EarlyPropagation::runImpl()
                     if (opndInfos[i].sourceOpndId != i){
                         Opnd* origOpnd= irManager->getOpnd(i);
                         Opnd* replacementOpnd = irManager->getOpnd(opndInfos[i].sourceOpndId);
-                        //TODO: extends possible convertions.
-                        if ( (origOpnd->getType()->isUnmanagedPtr() && replacementOpnd->getType()->isInteger())
-                            //TODO: should we prohibit <type> <-> Mptr|Obj convertion when <type> is not Mptr|Obj ?
-                            || (origOpnd->getType()->isObject() || origOpnd->getType()->isManagedPtr()))
-                        {
+                        assert(isTypeConversionAllowed(replacementOpnd, origOpnd));
+                        if (origOpnd->getType()->isUnmanagedPtr() && replacementOpnd->getType()->isInteger()) {
                             replacementOpnd->setType(origOpnd->getType());
-                        }
+                        }/* else if (origOpnd->getType()->isObject() && replacementOpnd->getType()->isUnmanagedPtr()) {
+                            replacementOpnd->setType(origOpnd->getType());
+                        }*/
                         replacements[i] = replacementOpnd;
                         hasReplacements = true;
                     }

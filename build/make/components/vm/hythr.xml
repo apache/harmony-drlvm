@@ -27,8 +27,7 @@ Version: $Revision: 1.4.2.4 $
 
 <project name="vm.hythr">
     <target name="init" depends="common_vm">
-        <property name="build.depends" value="extra.apr,vm.encoder,
-vm.port,extra.log4cxx, extra.aprutil" />
+        <property name="build.depends" value="extra.apr,vm.encoder,vm.port,extra.log4cxx,extra.aprutil,vm.kernel_classes" />
         <property name="libname" value="hythr" />
         <property name="outtype" value="shared" />
         <property name="src" location="${build.vm.home}" />
@@ -60,10 +59,10 @@ vm.port,extra.log4cxx, extra.aprutil" />
             <select os="lnx">
                 <defineset define="LINUX" />
             </select>
-			<select os="lnx" arch="em64t,ipf">
+            <select os="lnx" arch="em64t,ipf">
                 <defineset define="LINUX64" />
                 <defineset define="LINUXPPC64" />
-			</select>
+            </select>
             <!--
             <select os="lnx">
                 <compilerarg value="-Wno-deprecated" />
@@ -105,5 +104,23 @@ vm.port,extra.log4cxx, extra.aprutil" />
                 <syslibset libs="advapi32,ws2_32" />
             </select>
         </linker>
+
+         <!-- Java helpers -->
+        <property name="build.java.depends" value=""/>
+
+        <path id="java.source">
+            <pathelement location="${build.vm.home}/thread/javasrc" />
+        </path>                 
+
+        <path id="java.class.path">
+            <pathelement location="${java.build.dir}"/>
+
+            <fileset dir="${external.dep.CLASSLIB.jardir}" includes="*.jar" />
+            <pathelement location="${vm.kernel_classes.jardir}/kernel.jar"/>
+            <fileset dir="${build.MMTK.home}" includes="mmtk-20061012.jar" />
+        </path>
+
+        <property name="jarname" value="hythr.jar"/>
+
     </target>
 </project>

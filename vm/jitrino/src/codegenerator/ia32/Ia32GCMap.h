@@ -28,12 +28,14 @@
 #include "Ia32StackInfo.h"
 #include "Ia32BCMap.h"
 #include "DrlVMInterface.h"
+
+#ifdef _DEBUG
+#define GCMAP_TRACK_IDS
+#endif 
+
 namespace Jitrino
 {
 namespace Ia32 {
-#ifdef _DEBUG
-#define GC_MAP_DUMP_ENABLED
-#endif
 
     class GCSafePointsInfo;
     class GCSafePoint;
@@ -74,7 +76,7 @@ namespace Ia32 {
         typedef StlVector<GCSafePointOpnd*> GCOpnds;
     public:
         GCSafePoint(MemoryManager& mm, POINTER_SIZE_INT _ip):gcOpnds(mm), ip(_ip) {
-#ifdef _DEBUG
+#ifdef _GCMAP_TRACK_IDS
             instId = 0;
             hardwareExceptionPoint = false;
 #endif
@@ -93,7 +95,7 @@ namespace Ia32 {
         POINTER_SIZE_INT getOpndSaveAddr(const JitFrameContext* ctx, const StackInfo& sInfo,const GCSafePointOpnd* gcOpnd) const;
         GCOpnds gcOpnds;
         POINTER_SIZE_INT ip;
-#ifdef _DEBUG
+#ifdef GCMAP_TRACK_IDS
         POINTER_SIZE_INT instId;
         bool hardwareExceptionPoint;
     public: 
@@ -109,7 +111,7 @@ namespace Ia32 {
         static const uint32 COMPRESSED_MASK  = 0x4;
 #endif
 
-#ifdef _DEBUG
+#ifdef GCMAP_TRACK_IDS
         // flags + val + mptrOffset + firstId
         static const uint32 IMAGE_SIZE_UINT32 = 4; //do not use sizeof due to the potential struct layout problems
 #else 
@@ -127,7 +129,7 @@ namespace Ia32 {
 #endif
             flags = isObject ? OBJ_MASK : 0;
             flags = flags | (isOnRegister ? REG_MASK: 0);
-#ifdef _DEBUG
+#ifdef GCMAP_TRACK_IDS
             firstId = 0;
 #endif
         }
@@ -147,7 +149,7 @@ namespace Ia32 {
         int32 getMPtrOffset() const {return mptrOffset;}
         void getMPtrOffset(int newOffset) {mptrOffset = newOffset;}
 
-#ifdef _DEBUG
+#ifdef GCMAP_TRACK_IDS
         uint32 firstId;
 #endif
 
@@ -165,13 +167,8 @@ namespace Ia32 {
     class GCMapCreator : public SessionAction {
         void runImpl();
         uint32 getNeedInfo()const{ return NeedInfo_LivenessInfo;}
-#ifdef  GC_MAP_DUMP_ENABLED
         uint32 getSideEffects() {return Log::isEnabled();}
         bool isIRDumpEnabled(){ return true;}
-#else 
-        uint32 getSideEffects() {return 0;}
-        bool isIRDumpEnabled(){ return false;}
-#endif
     };        
 
     class InfoBlockWriter : public SessionAction {

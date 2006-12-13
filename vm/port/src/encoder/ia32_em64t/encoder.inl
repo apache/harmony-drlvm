@@ -129,6 +129,8 @@ ENCODER_DECLARE_EXPORT char * cmpxchg(char * stream, const RM_Opnd & rm, const R
     EncoderBase::Operands args;
     add_rm(args, rm, sz);
     add_r(args, r, sz);
+    RegName implicitReg = getAliasReg(RegName_EAX, map_size(sz));
+    args.add(implicitReg);
     return (char*)EncoderBase::encode(stream, Mnemonic_CMPXCHG, args);
 }
 

@@ -946,7 +946,11 @@ IRBuilder::genConv(Type* dstType,
                    Modifier ovfMod,
                    Opnd* src) {
     src = propagateCopy(src);
-    Operation operation(Op_Conv, toType, ovfMod);
+    Opcode opcode = Op_Conv;
+    if ((dstType->isUnmanagedPtr() && src->getType()->isObject()) || (dstType->isObject() && src->getType()->isUnmanagedPtr())) {
+        opcode = Op_ConvUnmanaged;
+    }
+    Operation operation(opcode, toType, ovfMod);
     uint32 hashcode = operation.encodeForHashing();
     Opnd* dst = lookupHash(hashcode, src->getId());
     if (dst) return dst;

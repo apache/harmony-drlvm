@@ -918,7 +918,10 @@ public:
         }
         // if loop will make multiple iteration exitsFlow becomes equals to inFlow
         double loopCycles = inFlow / exitsFlow;
-        assert(loopCycles > 1);
+        if (loopCycles < 1) {
+            assert(ABS(inFlow-exitsFlow) < PROFILE_ERROR_ALLOWED);
+            loopCycles = 1;
+        }
         cyclicFreqs[cfgLoopHead->getDfNum()] = loopCycles;
     }
 
