@@ -601,17 +601,11 @@ public:
             || is_fieldref(index)
             || is_methodref(index)
             || is_interfacemethodref(index));
-        // ppervov: 'if' clause is changed to 'assert' expression as this
-        // should never happen, i.e. class resolution should never try
-        // to resolve failed entry twice
-        // ppervov: if(!cp.is_entry_in_error(cp_index)) {
-        assert(!is_entry_in_error(index));
         set_entry_error_state(index);
         m_entries[index].error.cause = *((ManagedObject**)exn);
         m_entries[index].error.next = m_failedResolution;
         assert(&(m_entries[index]) != m_failedResolution);
         m_failedResolution = &(m_entries[index]);
-        // ppervov: }
     }
 
     /** Parses in a constant pool for a class.
@@ -661,7 +655,8 @@ private:
         // in class resolution
         //assert(!is_entry_resolved(index));
         // we should not resolve failed entries
-        assert(!is_entry_in_error(index));
+        // see comment above
+        //assert(!is_entry_in_error(index));
         m_entries[0].tags[index] |= RESOLVED_MASK;
     }
 
@@ -674,7 +669,8 @@ private:
         // in class resolution
         //assert(!is_entry_resolved(index));
         // we do not want to reset the reason of the failure
-        assert(!is_entry_in_error(index));
+        // see comment above
+        //assert(!is_entry_in_error(index));
         m_entries[0].tags[index] |= ERROR_MASK;
     }
 
@@ -1004,10 +1000,6 @@ private:
 
     // thread, which currently executes <clinit>
     VM_thread* m_initializing_thread;
-
-    // error, which is the cause of changing class state to ST_Error
-    // enumeratable as static field
-    ManagedObject* m_error;
 
     // Notify JITs whenever tis class is extended by calling their
     // JIT_extended_class_callback callback function,
@@ -1346,14 +1338,6 @@ public:
      * @return A collection of annotations.*/
     AnnotationTable* get_annotations() const { return m_annotations; }
 
-    /** Gets a handle of exception making the class change its state
-     * to <code>ST_Error</code>.
-     * @return A handle of exception.*/
-    jthrowable get_error_cause() const {
-        assert(in_error());
-        return (jthrowable)(&m_error);
-    }
-
     /** Gets a class instance size.
      * @return A size of the allocated instance in bytes.*/
     unsigned int get_allocated_size() const { return m_allocated_size; }
@@ -1530,11 +1514,6 @@ public:
     /** Sets a class handle of <code>java.lang.Class</code> for the given class.
      * @param[in] oh - a class handle of <code>java.lang.Class</code>*/
     void set_class_handle(ManagedObject** oh) { m_class_handle = oh; }
-
-    /** Records a cause of changing state to <code>ST_Error</code> for the given
-     * class.
-     * @param[in] exn - an exception object with error*/
-    void set_error_cause(jthrowable exn);
 
     /** Constructs internal representation of a class from the byte array
      * (defines class).
@@ -1931,11 +1910,6 @@ jobject struct_Class_to_java_lang_Class_Handle(Class* clss);
  * @param[in] jlc - instance of java/lang/Class to retrieve class from.
  * @return Native class from instance of java/lang/Class.*/
 Class* java_lang_Class_to_struct_Class(ManagedObject* jlc);
-/** Gets loading error for a class with the given name.
- * @param[in] cl - class loader which attempted to load the class.
- * @param[in] name - name of a class which loading had failed.
- * @return Exception describing class loading failure.*/
-jthrowable class_get_error(ClassLoaderHandle cl, const char* name);
 
 /** Looks up field in class and its superclasses.
  * @param[in] clss - class to lookup field in.

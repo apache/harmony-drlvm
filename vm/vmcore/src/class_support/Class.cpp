@@ -126,7 +126,6 @@ void Class::init_internals(const Global_Env* env, const String* name, ClassLoade
     m_intfc_table_descriptors = NULL;
 
     m_initializing_thread = NULL;
-    m_error = NULL;
 
     m_num_class_init_checks = m_num_throws = m_num_instanceof_slow
         = m_num_allocations = m_num_bytes_allocated = 0;
@@ -273,11 +272,7 @@ bool Class::load_ancestors(Global_Env* env)
         m_super_class.name = NULL;
         superClass = m_class_loader->LoadVerifyAndPrepareClass(env, superName);
         if(superClass == NULL) {
-            if(!m_class_loader->GetClassError(get_name()->bytes)) {
-                // Don't report failed classes more than one time
-                REPORT_FAILED_CLASS_CLASS_EXN(m_class_loader, this,
-                    m_class_loader->GetClassError(superName->bytes));
-            }
+            assert(exn_raised());
             return false;
         }
 
@@ -331,10 +326,7 @@ bool Class::load_ancestors(Global_Env* env)
         const String* intfc_name = m_superinterfaces[i].name;
         Class* intfc = m_class_loader->LoadVerifyAndPrepareClass(env, intfc_name);
         if(intfc == NULL) {
-            if(!m_class_loader->GetClassError(get_name()->bytes)) {
-                REPORT_FAILED_CLASS_CLASS_EXN(m_class_loader, this,
-                    m_class_loader->GetClassError(intfc_name->bytes));
-            }
+            assert(exn_raised());
             return false;
         }
         if(!intfc->is_interface()) {
@@ -526,17 +518,6 @@ void* Class::helper_get_interface_vtable(ManagedObject* obj, Class* iid)
         }
     }
     return NULL;
-}
-
-
-void Class::set_error_cause(jthrowable exn)
-{
-    tmn_suspend_disable();
-    lock();
-    m_state = ST_Error;
-    m_error = exn->object;
-    unlock();
-    tmn_suspend_enable();
 }
 
 

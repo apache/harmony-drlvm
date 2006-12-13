@@ -564,12 +564,6 @@ VMEXPORT Boolean type_info_is_general_array(Type_Info_Handle tih);
 // class handle for the array type (not the element type).
 VMEXPORT Class_Handle type_info_get_class(Type_Info_Handle tih);
 
-// Returns loading error (jthrowable) from classloader. This function is only
-// valid after type_info_get_class. If type_info_get_class returned no runtime
-// exception then loading error happened which should be obtained by this
-// function.
-VMEXPORT Managed_Object_Handle* type_info_get_loading_error(Type_Info_Handle tih);
-
 // Get the method signature if type_info_is_method_pointer returned TRUE.
 VMEXPORT Method_Signature_Handle type_info_get_method_sig(Type_Info_Handle tih);
 

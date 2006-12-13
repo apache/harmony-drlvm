@@ -102,10 +102,6 @@ void Class::initialize()
 
         if(get_super_class()->in_error()) { 
             jthread_monitor_enter(jlc);
-            tmn_suspend_enable();
-            REPORT_FAILED_CLASS_CLASS_EXN(m_class_loader, this,
-                get_super_class()->get_error_cause());
-            tmn_suspend_disable();
             m_initializing_thread = NULL;
             lock();
             m_state = ST_Error;
@@ -155,7 +151,6 @@ void Class::initialize()
         unlock();
         TRACE2("classloader", "class " << m_name->bytes << " initialized");
         m_initializing_thread = NULL;
-        assert(m_error == NULL);
         assert(!hythread_is_suspend_enabled());
         jthread_monitor_notify_all(jlc);
         jthread_monitor_exit(jlc);
@@ -163,43 +158,39 @@ void Class::initialize()
     }
 
     // ---  step 10  ----------------------------------------------------------
-
-    if(p_error_object) {
-        assert(!hythread_is_suspend_enabled());
-        exn_clear();
-        Class* p_error_class = p_error_object->object->vt()->clss;
-        Class* jle = VM_Global_State::loader_env->java_lang_Error_Class;
-        while(p_error_class && p_error_class != jle) {
-            p_error_class = p_error_class->get_super_class();
-        }
-        assert(!hythread_is_suspend_enabled());
-        if((!p_error_class) || (p_error_class != jle) ) {
-#ifdef _DEBUG_REMOVED
-            Class* eiie = VM_Global_State::loader_env->java_lang_ExceptionInInitializerError_Class;
-            assert(eiie);
-#endif
-            tmn_suspend_enable();
-
-            p_error_object = exn_create("java/lang/ExceptionInInitializerError",
-                p_error_object);
-            tmn_suspend_disable();
-        }
-        tmn_suspend_enable();
-        set_error_cause(p_error_object);
-        tmn_suspend_disable();
-
-        // ---  step 11  ----------------------------------------------------------
-        assert(!hythread_is_suspend_enabled());
-        jthread_monitor_enter(jlc);
-        lock();
-        m_state = ST_Error;
-        unlock();
-        m_initializing_thread = NULL;
-        assert(!hythread_is_suspend_enabled());
-        jthread_monitor_notify_all(jlc);
-        jthread_monitor_exit(jlc);
-        exn_raise_object(p_error_object);
+    assert(p_error_object != NULL);
+    assert(!hythread_is_suspend_enabled());
+    exn_clear();
+    Class* p_error_class = p_error_object->object->vt()->clss;
+    Class* jle = VM_Global_State::loader_env->java_lang_Error_Class;
+    while(p_error_class && p_error_class != jle) {
+        p_error_class = p_error_class->get_super_class();
     }
+    assert(!hythread_is_suspend_enabled());
+    if(p_error_class == NULL) {
+        // class of p_error_object is not a descendant of java/lang/Error
+#ifdef _DEBUG_REMOVED
+        Class* eiie = VM_Global_State::loader_env->
+            java_lang_ExceptionInInitializerError_Class;
+        assert(eiie);
+#endif
+        tmn_suspend_enable();
+        p_error_object = exn_create("java/lang/ExceptionInInitializerError",
+            p_error_object);
+        tmn_suspend_disable();
+    }
+
+    // ---  step 11  ----------------------------------------------------------
+    assert(!hythread_is_suspend_enabled());
+    jthread_monitor_enter(jlc);
+    lock();
+    m_state = ST_Error;
+    unlock();
+    m_initializing_thread = NULL;
+    assert(!hythread_is_suspend_enabled());
+    jthread_monitor_notify_all(jlc);
+    jthread_monitor_exit(jlc);
+    exn_raise_object(p_error_object);
     // end of 11 step class initialization program
 } //class_initialize1
 
@@ -211,11 +202,7 @@ void class_initialize_from_jni(Class *clss)
 
     // check verifier constraints
     if(!clss->verify_constraints(VM_Global_State::loader_env)) {
-        if (!exn_raised()) {
-            tmn_suspend_disable();
-            exn_raise_object(class_get_error(clss->get_class_loader(), clss->get_name()->bytes));
-            tmn_suspend_enable();
-        }
+        assert(exn_raised());
         return;
     }
 
@@ -241,10 +228,8 @@ void class_initialize_ex(Class *clss)
     // check verifier constraints
     tmn_suspend_enable();
     if(!clss->verify_constraints(VM_Global_State::loader_env)) {
-        if (!exn_raised()) {
-            tmn_suspend_disable();
-            exn_raise_object(class_get_error(clss->get_class_loader(), clss->get_name()->bytes));
-        }
+        assert(exn_raised());
+        tmn_suspend_disable();
         return;
     }
     tmn_suspend_disable();

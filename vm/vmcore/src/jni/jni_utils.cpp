@@ -610,16 +610,12 @@ jclass FindClassWithClassLoader(JNIEnv* jenv, String *name, ClassLoader *loader)
     assert(hythread_is_suspend_enabled());
 
     Class* c = loader->LoadVerifyAndPrepareClass( VM_Global_State::loader_env, name);
-    assert(!exn_raised());
-
-    if (!c) { 
-        // actually class loading failed
-        jthrowable exn = loader->GetClassError(name->bytes);
-        assert(exn);
-        Throw(jenv, exn);
+    // if loading failed - exception should be raised
+    if(!c) {
+        assert(exn_raised());
         return NULL;
     }
-    
+
     jclass clazz = struct_Class_to_jclass(c);
 
     return (jclass)clazz;
@@ -704,15 +700,8 @@ jclass FindClass(JNIEnv* env_ext, String* name)
         assert(hythread_is_suspend_enabled());
         return struct_Class_to_jclass(clss);
     } else {
-        // The JNI spec says that we should throw one of: ClassFormatError,
-        // ClassCircularityError, NoClassDefFoundError or OutOfMemoryError.
-        // We don't throw OutOfMemoryError (we assume that we can always
-        // allocate more memory for a class).
-        jthrowable exn = class_get_error(loader, name->bytes);
-        assert(exn);
-        exn_clear();
-        Throw(env, exn);
-        return 0;
+        assert(exn_raised());
+        return NULL;
     }
 }
 
@@ -794,12 +783,7 @@ bool ensure_initialised(JNIEnv* env, Class* clss)
     if(!clss->is_initialized()) {
         class_initialize_from_jni(clss);
         if(clss->in_error()) {
-            // If exception is already raised, no need to
-            // throw new one, just return instead
-            if(!exn_raised()) 
-            {
-                env->Throw(clss->get_error_cause());
-            }
+            assert(exn_raised());
             return false;
         }
     }

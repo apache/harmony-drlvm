@@ -82,10 +82,6 @@ void vm_enumerate_static_fields()
             assert(*ppc);
             Class* c = jclass_to_struct_Class((jclass)ppc);
 
-            if(c->in_error()) {
-                vm_enumerate_root_reference(
-                        (void**)c->get_error_cause() ,FALSE);
-            }
             vm_enumerate_root_reference((void**)ppc, FALSE);
             ConstPoolEntry* cp = c->get_constant_pool().get_error_chain();
             while(cp) {

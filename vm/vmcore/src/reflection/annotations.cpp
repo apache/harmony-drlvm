@@ -77,17 +77,13 @@ static Class* field_descriptor_to_type(JNIEnv* jenv, String* desc, Class* clss,
             return type;
         }
 
-        jthrowable jfailure;
-        if (exn_raised()) {
-            jfailure = exn_get(); 
-            ASSERT(jfailure, "FIXME lazy exceptions handling");
-            exn_clear();
-        } else {
-            jfailure = (jthrowable)type_info_get_loading_error(tih);
-        }
-   	    jthrowable jnewfailure = exn_create("java/lang/TypeNotPresentException",
-	        tih->get_type_name()->bytes, jfailure);
-	    if (jnewfailure) {
+        assert(exn_raised());
+        jthrowable jfailure = exn_get();
+        ASSERT(jfailure, "FIXME lazy exceptions handling");
+        exn_clear();
+        jthrowable jnewfailure = exn_create("java/lang/TypeNotPresentException",
+            tih->get_type_name()->bytes, jfailure);
+        if (jnewfailure) {
             if (cause) {
                 *cause = jnewfailure;
             } else {
@@ -360,7 +356,8 @@ jobject resolve_annotation_value(JNIEnv* jenv, AnnotationValue& value, Class* an
                     if (type_info_is_vector(tih)) {
                         arr_type = type_info_get_class(tih);
                         if (!arr_type) {
-                            *cause= (jthrowable)type_info_get_loading_error(tih);
+                            // if loading failed - exception should be raised
+                            assert(exn_raised());
                             return NULL;
                         }
                     } 

@@ -983,15 +983,16 @@ Class_Handle class_find_loaded(ClassLoaderHandle loader, const char* name)
         if (*p=='.') *p='/';
         p++;
     }
-    String* name2 = VM_Global_State::loader_env->string_pool.lookup(name3);
+    Global_Env* env = VM_Global_State::loader_env;
+    String* name2 = env->string_pool.lookup(name3);
     Class* ch;
     if (loader) {
         ch = loader->LookupClass(name2);
     } else {
-        ch = VM_Global_State::loader_env->bootstrap_class_loader->LookupClass(name2);
+        ch = env->bootstrap_class_loader->LookupClass(name2);
     }
     STD_FREE(name3);
-    //if(ch && ch->state == ST_Error) return NULL;
+    if(ch && (!ch->verify(env) || !ch->prepare(env))) return NULL;
     return ch;
 }
 
@@ -1198,10 +1199,9 @@ Class_Handle method_get_throws(Method_Handle mh, unsigned idx)
     ClassLoader* class_loader = m->get_class()->get_class_loader();
     Class *c =
         class_loader->LoadVerifyAndPrepareClass(VM_Global_State::loader_env, exn_name);
-    if (!c && !exn_raised()) {
-        exn_raise_object(class_loader->GetClassError(exn_name->bytes));
-    }
-    return (Class_Handle)c;
+    // if loading failed - exception should be raised
+    assert((!c && exn_raised()) || (c && !exn_raised()));
+    return c;
 }
 
 unsigned method_get_num_handlers(Method_Handle m)
@@ -2017,20 +2017,6 @@ Class_Handle type_info_get_class(Type_Info_Handle tih)
     if(!c->prepare(VM_Global_State::loader_env)) return NULL;
     return c;
 } //type_info_get_class
-
-Managed_Object_Handle* type_info_get_loading_error(Type_Info_Handle tih) {
-    TypeDesc* td = (TypeDesc*) tih;
-    if (td->is_vector()) {
-        Managed_Object_Handle* err = type_info_get_loading_error((Type_Info_Handle)td->get_element_type());
-        if (err) return err;
-    }
-    const String* name = td->get_type_name();
-    ClassLoader* cl = td->get_classloader();
-    jthrowable ex = class_get_error(cl, name->bytes);
-    assert(ex);
-    return (Managed_Object_Handle*) ex;
-}
-
 
 
 Method_Signature_Handle type_info_get_method_sig(Type_Info_Handle UNREF tih)

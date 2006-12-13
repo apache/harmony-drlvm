@@ -37,13 +37,11 @@
 
 jclass descriptor_to_jclass(Type_Info_Handle desc){
     Class_Handle clss = type_info_get_class(desc);
-
-    if (!clss) {
-        if (!exn_raised()) {
-            exn_raise_object((jthrowable) type_info_get_loading_error(desc));
-        }
+    if(!clss) {
+        assert(exn_raised());
         return NULL;
     }
+
     return struct_Class_to_java_lang_Class_Handle(clss);
 }
 

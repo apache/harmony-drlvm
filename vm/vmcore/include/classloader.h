@@ -57,18 +57,6 @@ ClassCircularityError can be only discovered on the thread, which defines class.
 
 struct ClassLoader
 {
-    struct FailedClass
-    {
-        // class name
-        const String* m_name;
-        // exception object
-        ManagedObject* m_exception;
-
-        FailedClass() : m_name(NULL), m_exception(NULL) {}
-        FailedClass(const FailedClass& fc) : m_name(fc.m_name), m_exception(fc.m_exception) {}
-        bool operator == (FailedClass& fc) { return m_name == fc.m_name; }
-    };
-
     struct LoadingClass
     {
         struct WaitingThread {
@@ -155,11 +143,9 @@ struct ClassLoader
     };
 
 public:
-    friend LoggerString& operator << (LoggerString& log, FailedClass& lc);
     friend LoggerString& operator << (LoggerString& log, LoadingClass& lc);
 
 private:
-    class FailedClasses : public MapEx<const String*, FailedClass> {};
     class LoadingClasses : public MapEx<const String*, LoadingClass > {};
     class ReportedClasses : public MapEx<const String*, ManagedObject* > {};
 
@@ -168,9 +154,9 @@ private:
     friend class GlobalClassLoaderIterator;
 public:
     ClassLoader() : m_loader(NULL), m_parent(NULL), m_package_table(NULL), 
-        m_loadedClasses(NULL), m_failedClasses(NULL), 
-        m_loadingClasses(NULL), m_reportedClasses(NULL), m_javaTypes(NULL), m_nativeLibraries(NULL),
-        m_markBit(0), m_unloading(false), m_fullSize(0), m_verifyData(NULL)
+        m_loadedClasses(NULL), m_loadingClasses(NULL), m_reportedClasses(NULL),
+        m_javaTypes(NULL), m_nativeLibraries(NULL), m_markBit(0),
+        m_unloading(false), m_fullSize(0), m_verifyData(NULL)
     {
         apr_pool_create(&pool, 0);
     }
@@ -202,13 +188,6 @@ public:
     virtual void ReportFailedClass(Class* klass, const char* exnclass, std::stringstream& exnmsg);
     void ReportFailedClass(Class* klass, const jthrowable exn);
     virtual void ReportFailedClass(const char* name, const char* exnclass, std::stringstream& exnmsg);
-    jthrowable GetClassError(const char* name) {
-        LMAutoUnlock aulock(&m_lock);
-        String* nameString = VM_Global_State::loader_env->string_pool.lookup(name);
-        FailedClass* fc = m_failedClasses->Lookup(nameString);
-        if(!fc) return NULL;
-        return (jthrowable)(&(fc->m_exception));
-    }
     void LoadNativeLibrary( const char *name );
     GenericFunctionPointer LookupNative(Method*);
     void SetVerifyData( void *data ) { m_verifyData = data; }
@@ -224,7 +203,6 @@ protected:
     Class* StartLoadingClass(Global_Env* env, const String* className);
     void RemoveLoadingClass(const String* className, LoadingClass* loading);
     void SuccessLoadingClass(const String* className);
-    void AddFailedClass(const String* className, const jthrowable exn);
     void FailedLoadingClass(const String* className);
 
 public:
@@ -237,7 +215,6 @@ public:
     Package_Table* getPackageTable() { return m_package_table; }
     ClassTable* GetLoadedClasses() { return m_loadedClasses; }
     ClassTable* GetInitiatedClasses() { return m_initiatedClasses; }
-    FailedClasses* GetFailedClasses() { return m_failedClasses; }
     LoadingClasses* GetLoadingClasses() { return m_loadingClasses; }
     ReportedClasses* GetReportedClasses() { return m_reportedClasses; }
     JavaTypes* GetJavaTypes() { return m_javaTypes; }
@@ -293,7 +270,6 @@ protected:
     Package_Table* m_package_table;
     ClassTable* m_loadedClasses;
     ClassTable* m_initiatedClasses;
-    FailedClasses* m_failedClasses;
     LoadingClasses* m_loadingClasses;
     ReportedClasses* m_reportedClasses;
     JavaTypes* m_javaTypes;
@@ -314,12 +290,6 @@ protected:
 private:
     void FieldClearInternals(Class*); // clean Field internals in Class
 }; // class ClassLoader
-
-inline LoggerString& operator << (LoggerString& log, ClassLoader::FailedClass& fc)
-{
-    log << fc.m_name->bytes << " status: " << fc.m_exception;
-    return log;
-}
 
 inline LoggerString& operator << (LoggerString& log, ClassLoader::LoadingClass& lc)
 {

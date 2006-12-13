@@ -646,16 +646,8 @@ jclass JNICALL DefineClass(JNIEnv *jenv,
     }
     else
     {
-        if (exn_raised()) {
-            return 0;
-        } else if(res_name) {
-            jthrowable exn = (jthrowable)class_get_error(cl, res_name->bytes);
-            exn_raise_object(exn);
-        } else {
-            exn_raise_by_name("java/lang/LinkageError",
-                "defineClass failed for unnamed class", NULL);
-        }
-        return 0;
+        assert(exn_raised());
+        return NULL;
     }
 } //DefineClass
 

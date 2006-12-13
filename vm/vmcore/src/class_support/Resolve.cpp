@@ -110,10 +110,6 @@ static void class_report_failure(Class* target, uint16 cp_index, jthrowable exn)
     ConstantPool& cp = target->get_constant_pool();
     assert(cp.is_valid_index(cp_index));
     assert(hythread_is_suspend_enabled());
-    if (exn_raised()) {
-        TRACE2("classloader.error", "runtime exception in classloading");
-        return;
-    }
     assert(exn);
 
     tmn_suspend_disable();
@@ -169,12 +165,10 @@ Class* Class::_resolve_class(Global_Env* env,
     Class* other_clss = m_class_loader->LoadVerifyAndPrepareClass(env, classname);
     if(other_clss == NULL)
     {
-        jthrowable exn = class_get_error(m_class_loader, classname->bytes);
-        if (exn) {
-            class_report_failure(this, cp_index, exn);
-        } else {
-            assert(exn_raised());
-        }
+        // FIXMECL should find out if this is VirtualMachineError
+        assert(exn_raised());
+        class_report_failure(this, cp_index, exn_get());
+        exn_clear();
         return NULL;
     }
 

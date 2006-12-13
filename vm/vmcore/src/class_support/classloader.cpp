@@ -63,13 +63,6 @@ const String* class_extract_name(Global_Env* env,
                                  uint8* buffer,
                                  unsigned offset, unsigned length);
 
-/*VMEXPORT*/ jthrowable class_get_error(ClassLoaderHandle clh, const char* name)
-{
-    assert(clh);
-    assert(name);
-    return clh->GetClassError(name);
-}
-
 
 bool ClassLoader::Initialize( ManagedObject* loader )
 {
@@ -85,8 +78,6 @@ bool ClassLoader::Initialize( ManagedObject* loader )
     if(!m_loadingClasses) return false;
     m_reportedClasses = new ReportedClasses();
     if(!m_reportedClasses) return false;
-    m_failedClasses = new FailedClasses();
-    if(!m_failedClasses) return false;
     m_javaTypes = new JavaTypes();
     if(!m_javaTypes) return false;
 
@@ -113,8 +104,6 @@ ClassLoader::~ClassLoader()
 
     if (GetLoadedClasses())
         delete GetLoadedClasses();
-    if (GetFailedClasses())
-        delete GetFailedClasses();
     if (GetLoadingClasses())
         delete GetLoadingClasses();
     if (GetReportedClasses())
@@ -250,14 +239,6 @@ Class* ClassLoader::DefineClass(Global_Env* env, const char* class_name,
     if((clss = WaitDefinition(env, className)) != NULL || exn_raised())
         return clss;
 
-    m_lock._lock();
-    if(m_failedClasses->Lookup(className)) {
-        FailedLoadingClass(className);
-        m_lock._unlock();
-        return NULL;
-    }
-    m_lock._unlock();
-
     uint8 *redef_buf = NULL;
     int redef_buflen = 0;
     jvmti_send_class_file_load_hook_event(env, this, class_name,
@@ -366,48 +347,45 @@ Class* ClassLoader::LoadVerifyAndPrepareClass(Global_Env* env, const String* nam
 }
 
 
-void ClassLoader::AddFailedClass(const String *className, const jthrowable exn) {
-    assert(exn != NULL);
-    tmn_suspend_disable();
-    m_lock._lock();
-
-    FailedClass fc;
-    fc.m_name = className;
-    fc.m_exception = ((ObjectHandle)exn)->object;
-    m_failedClasses->Insert(className, fc);
-
-    m_lock._unlock();
-    tmn_suspend_enable();
-}
-
 void ClassLoader::ReportFailedClass(Class* klass, const jthrowable exn)
 {
-    if (exn == NULL) {
-        assert(exn_raised());
-        return; // OOME
+    if(exn_raised()) {
+        assert(exn == NULL);
+        return;
     }
-    AddFailedClass(klass->get_name(), exn);
-    klass->set_error_cause(exn);
+    exn_raise_object(exn);
 }
+
 
 void ClassLoader::ReportFailedClass(Class* klass, const char* exnclass, std::stringstream& exnmsg)
 {
+    assert(!exn_raised());
     jthrowable exn = exn_create(exnclass, exnmsg.str().c_str());
 
-    // ppervov: FIXME: should throw OOME
-    AddFailedClass(klass->get_name(), exn);
-    klass->set_error_cause(exn);
+    if(exn_raised()) {
+        assert(exn == NULL);
+        return;
+    }
+    exn_raise_object(exn);
 }
 
 
-
-void ClassLoader::ReportFailedClass(const char* klass, const char* exnclass, std::stringstream& exnmsg)
+void ClassLoader::ReportFailedClass(const char* klass, const char* exnclass,
+                                    std::stringstream& exnmsg)
 {
     const String* klassName = VM_Global_State::loader_env->string_pool.lookup(klass);
 
+    assert(!exn_raised());
+
     jthrowable exn = exn_create(exnclass, exnmsg.str().c_str());
     // ppervov: FIXME: should throw OOME
-    AddFailedClass(klassName, exn);
+
+    if(!exn_raised()) {
+        assert(exn != NULL);
+        exn_raise_object(exn);
+    } else {
+        assert(exn == NULL);
+    }
 }
 
 
@@ -421,6 +399,7 @@ void ClassLoader::RemoveLoadingClass(const String* className, LoadingClass* load
         m_loadingClasses->Remove(className);
     }
 }
+
 
 void ClassLoader::SuccessLoadingClass(const String* className) 
 {
@@ -477,23 +456,10 @@ void ClassLoader::gc_enumerate()
 {
     TRACE2("enumeration", "enumerating classes");
     LMAutoUnlock aulock( &(ClassLoader::m_tableLock) );
-    FailedClasses::iterator fci;
-    // should enumerate errors in bootstrap
-    for(fci = VM_Global_State::loader_env->bootstrap_class_loader->m_failedClasses->begin();
-        fci != VM_Global_State::loader_env->bootstrap_class_loader->m_failedClasses->end(); fci++)
-    {
-        vm_enumerate_root_reference((void**)(&(fci->second.m_exception)), FALSE);
-    }
 
     for(unsigned int i = 0; i < m_nextEntry; i++) {
         if(m_table[i]->m_loader != NULL) {
             vm_enumerate_root_reference((void**)(&(m_table[i]->m_loader)), FALSE);
-            // should enumerate errors for classes
-            for(fci = m_table[i]->m_failedClasses->begin();
-                fci != m_table[i]->m_failedClasses->end(); fci++)
-            {
-                vm_enumerate_root_reference((void**)(&(fci->second.m_exception)), FALSE);
-            }
         }
     }
 }
@@ -640,9 +606,6 @@ Class* ClassLoader::StartLoadingClass(Global_Env* UNREF env, const String* class
     while(true)
     {
         LMAutoUnlock aulock(&m_lock);
-        FailedClass* failed = m_failedClasses->Lookup(className);
-        if(failed) return NULL;
-
         // check if the class has been already recorded as initiated by this loader
         pklass = m_initiatedClasses->Lookup(className);
         if (pklass) return *pklass;
@@ -746,10 +709,6 @@ Class* ClassLoader::WaitDefinition(Global_Env* env, const String* className)
     m_lock._lock();
     do
     {
-        if(m_failedClasses->Lookup(className)) {
-            m_lock._unlock();
-            return NULL;
-        }
         loading = m_loadingClasses->Lookup(className);
         if(loading && m_loadedClasses->Lookup(className) == NULL) {
             TRACE2("classloader.collisions", this << " " << cur_thread << " DC " << className->bytes);
@@ -901,14 +860,6 @@ Class* ClassLoader::SetupAsArray(Global_Env* env, const String* classNameString)
         // we should wait here for creating class
         if((klass = WaitDefinition(env, classNameString)) != NULL)
             return klass;
-
-        m_lock._lock();
-        if(m_failedClasses->Lookup(classNameString)) {
-            FailedLoadingClass(classNameString);
-            m_lock._unlock();
-            return NULL;
-        }
-        m_lock._unlock();
 
         // create class
         klass = NewClass(env, classNameString);
@@ -1529,13 +1480,6 @@ Class* BootstrapClassLoader::DoLoadClass(Global_Env* UNREF env,
 {
     assert(env == m_env);
     Class* klass = StartLoadingClass(m_env, className);
-    
-    LMAutoUnlock aulock(&m_lock);
-    if(klass == NULL && m_failedClasses->Lookup(className) != NULL) {
-        // there was an error in loading class
-        return NULL;
-    }
-    aulock.ForceUnlock();
 
     if(klass != NULL) {
         // class is already loaded so return it
@@ -1560,11 +1504,7 @@ Class* UserDefinedClassLoader::DoLoadClass(Global_Env* env, const String* classN
     assert(m_loader != NULL);
 
     Class* klass = StartLoadingClass(env, className);
-    LMAutoUnlock aulock(&m_lock);
-    if(klass == NULL && m_failedClasses->Lookup(className) != NULL) {
-        return NULL;
-    }
-    aulock.ForceUnlock();
+
     if(klass != NULL) {
         return klass;
     }
@@ -1642,39 +1582,35 @@ Class* UserDefinedClassLoader::DoLoadClass(Global_Env* env, const String* classN
     if(exn_raised()) {
         tmn_suspend_enable();
 
-        jthrowable exn = GetClassError(className->bytes);
-        if(!exn) {
-            exn = exn_get();
-            // translate ClassNotFoundException to NoClassDefFoundError (if any)
-            Class* NotFoundExn_class = env->java_lang_ClassNotFoundException_Class;
-            Class *exn_class = jobject_to_struct_Class(exn);
+        jthrowable exn = exn_get();
+        // translate ClassNotFoundException to NoClassDefFoundError (if any)
+        Class* NotFoundExn_class = env->java_lang_ClassNotFoundException_Class;
+        Class* exn_class = jobject_to_struct_Class(exn);
 
-            INFO("Loading of " << className->bytes << " class failed due to "
-                << exn_class->get_name()->bytes);
+        INFO("Loading of " << className->bytes << " class failed due to "
+            << exn_class->get_name()->bytes);
 
-            while(exn_class && exn_class != NotFoundExn_class) {
-                exn_class = exn_class->get_super_class();
-            }
-
-            if (exn_class == NotFoundExn_class) {
-                TRACE("translating ClassNotFoundException to "
-                     "NoClassDefFoundError for " << className->bytes);
-                exn_clear();
-                jthrowable new_exn = CreateNewThrowable(
-                    p_TLS_vmthread->jni_env,
-                    env->java_lang_NoClassDefFoundError_Class, 
-                    className->bytes, exn);
-                if (new_exn) {
-                    exn = new_exn;
-                } else {
-                    LOG("Failed to translate ClassNotFoundException "
-                        "to NoClassDefFoundError for " << className->bytes);
-                }
-            }
-
-            AddFailedClass(className, exn);
+        while(exn_class && exn_class != NotFoundExn_class) {
+            exn_class = exn_class->get_super_class();
         }
-        exn_clear();
+
+        if (exn_class == NotFoundExn_class) {
+            TRACE("translating ClassNotFoundException to "
+                    "NoClassDefFoundError for " << className->bytes);
+            exn_clear();
+            jthrowable new_exn = CreateNewThrowable(
+                p_TLS_vmthread->jni_env,
+                env->java_lang_NoClassDefFoundError_Class,
+                className->bytes, exn);
+            if(new_exn) {
+                exn_raise_object(new_exn);
+            } else {
+                assert(exn_raised());
+                LOG("Failed to translate ClassNotFoundException "
+                    "to NoClassDefFoundError for " << className->bytes);
+            }
+        }
+
         FailedLoadingClass(className);
         return NULL;
     }
