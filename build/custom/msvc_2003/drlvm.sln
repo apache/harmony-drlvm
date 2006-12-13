@@ -43,6 +43,12 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "jthread", "jthread\jthread.
 	ProjectSection(ProjectDependencies) = postProject
 	EndProjectSection
 EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "gc_gen", "gc_gen\gc_gen.vcproj", "{3B33CE22-1196-4B02-A486-E8AED9DDA548}"
+	ProjectSection(ProjectDependencies) = postProject
+		{0FDD6505-BDF8-4574-95FF-7BC800C0EF18} = {0FDD6505-BDF8-4574-95FF-7BC800C0EF18}
+		{65E079BA-B8F1-4057-9307-B80A5B9EC379} = {65E079BA-B8F1-4057-9307-B80A5B9EC379}
+	EndProjectSection
+EndProject
 Global
 	GlobalSection(SolutionConfiguration) = preSolution
 		Debug = Debug
@@ -81,6 +87,10 @@ Global
 		{2D8F4662-5052-497B-8DB7-0452CDDB7AF8}.Debug.Build.0 = Debug|Win32
 		{2D8F4662-5052-497B-8DB7-0452CDDB7AF8}.Release.ActiveCfg = Release|Win32
 		{2D8F4662-5052-497B-8DB7-0452CDDB7AF8}.Release.Build.0 = Release|Win32
+		{3B33CE22-1196-4B02-A486-E8AED9DDA548}.Debug.ActiveCfg = Debug|Win32
+		{3B33CE22-1196-4B02-A486-E8AED9DDA548}.Debug.Build.0 = Debug|Win32
+		{3B33CE22-1196-4B02-A486-E8AED9DDA548}.Release.ActiveCfg = Release|Win32
+		{3B33CE22-1196-4B02-A486-E8AED9DDA548}.Release.Build.0 = Release|Win32
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 	EndGlobalSection

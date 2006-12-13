@@ -47,7 +47,7 @@
 				Name="VCPostBuildEventTool"
 				Description="       ... Copying files to bin/default folder ...."
 				CommandLine="copy $(OutDir)\em.dll $(ProjectDir)\..\..\..\win_ia32_msvc_$(ConfigurationName)\deploy\jre\bin\default
-copy $(OutDir)\em.pdb $(ProjectDir)\..\..\..\win_ia32_msvc_$(ConfigurationName)\deploy\jre\bin\default
+copy $(OutDir)\em.pdb $(ProjectDir)\..\..\..\win_ia32_msvc_$(ConfigurationName)\deploy\jdk\jre\bin\default
 "/>
 			<Tool
 				Name="VCPreBuildEventTool"/>
@@ -101,7 +101,7 @@ copy $(OutDir)\em.pdb $(ProjectDir)\..\..\..\win_ia32_msvc_$(ConfigurationName)\
 				Name="VCPostBuildEventTool"
 				Description="       ... Copying files to bin/default folder ...."
 				CommandLine="copy $(OutDir)\em.dll $(ProjectDir)\..\..\..\win_ia32_msvc_$(ConfigurationName)\deploy\jre\bin\default
-copy $(OutDir)\em.pdb $(ProjectDir)\..\..\..\win_ia32_msvc_$(ConfigurationName)\deploy\jre\bin\default
+copy $(OutDir)\em.pdb $(ProjectDir)\..\..\..\win_ia32_msvc_$(ConfigurationName)\deploy\jdk\jre\bin\default
 "/>
 			<Tool
 				Name="VCPreBuildEventTool"/>

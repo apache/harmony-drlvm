@@ -47,7 +47,8 @@
 				Name="VCPostBuildEventTool"
 				Description="       ... Copying files to bin/default folder ...."
 				CommandLine="copy $(OutDir)\gc_cc.dll $(ProjectDir)\..\..\..\win_ia32_msvc_$(ConfigurationName)\deploy\jre\bin\default
-copy $(OutDir)\gc_cc.pdb $(ProjectDir)\..\..\..\win_ia32_msvc_$(ConfigurationName)\deploy\jre\bin\default"/>
+copy $(OutDir)\gc_cc.pdb $(ProjectDir)\..\..\..\win_ia32_msvc_$(ConfigurationName)\deploy\jdk\jre\bin\default
+"/>
 			<Tool
 				Name="VCPreBuildEventTool"/>
 			<Tool
@@ -99,7 +100,8 @@ copy $(OutDir)\gc_cc.pdb $(ProjectDir)\..\..\..\win_ia32_msvc_$(ConfigurationNam
 				Name="VCPostBuildEventTool"
 				Description="       ... Copying files to bin/default folder ...."
 				CommandLine="copy $(OutDir)\gc_cc.dll $(ProjectDir)\..\..\..\win_ia32_msvc_$(ConfigurationName)\deploy\jre\bin\default
-copy $(OutDir)\gc_cc.pdb $(ProjectDir)\..\..\..\win_ia32_msvc_$(ConfigurationName)\deploy\jre\bin\default"/>
+copy $(OutDir)\gc_cc.pdb $(ProjectDir)\..\..\..\win_ia32_msvc_$(ConfigurationName)\deploy\jdk\jre\bin\default
+"/>
 			<Tool
 				Name="VCPreBuildEventTool"/>
 			<Tool
@@ -144,6 +146,9 @@ copy $(OutDir)\gc_cc.pdb $(ProjectDir)\..\..\..\win_ia32_msvc_$(ConfigurationNam
 		</File>
 		<File
 			RelativePath="..\..\..\..\vm\gc_cc\src\gc_for_vm.cpp">
+		</File>
+		<File
+			RelativePath="..\..\..\..\vm\gc_cc\src\gc_jni.cpp">
 		</File>
 		<File
 			RelativePath="..\..\..\..\vm\gc_cc\src\gc_types.h">

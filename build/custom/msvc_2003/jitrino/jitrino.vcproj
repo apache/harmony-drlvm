@@ -50,7 +50,7 @@
 				Name="VCPostBuildEventTool"
 				Description="       ... Copying files to bin/default folder ...."
 				CommandLine="copy $(OutDir)\jitrino.dll $(ProjectDir)\..\..\..\win_ia32_msvc_$(ConfigurationName)\deploy\jre\bin\default
-copy $(OutDir)\jitrino.pdb $(ProjectDir)\..\..\..\win_ia32_msvc_$(ConfigurationName)\deploy\jre\bin\default
+copy $(OutDir)\jitrino.pdb $(ProjectDir)\..\..\..\win_ia32_msvc_$(ConfigurationName)\deploy\jdk\jre\bin\default
 "/>
 			<Tool
 				Name="VCPreBuildEventTool"/>
@@ -109,7 +109,7 @@ copy $(OutDir)\jitrino.pdb $(ProjectDir)\..\..\..\win_ia32_msvc_$(ConfigurationN
 				Name="VCPostBuildEventTool"
 				Description="       ... Copying files to bin/default folder ...."
 				CommandLine="copy $(OutDir)\jitrino.dll $(ProjectDir)\..\..\..\win_ia32_msvc_$(ConfigurationName)\deploy\jre\bin\default
-copy $(OutDir)\jitrino.pdb $(ProjectDir)\..\..\..\win_ia32_msvc_$(ConfigurationName)\deploy\jre\bin\default
+copy $(OutDir)\jitrino.pdb $(ProjectDir)\..\..\..\win_ia32_msvc_$(ConfigurationName)\deploy\jdk\jre\bin\default
 "/>
 			<Tool
 				Name="VCPreBuildEventTool"/>

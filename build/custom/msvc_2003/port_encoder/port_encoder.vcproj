@@ -38,7 +38,7 @@
 			<Tool
 				Name="VCPostBuildEventTool"
 				Description="       ... Copying files to bin/default folder ...."
-				CommandLine="copy $(OutDir)\encoder.lib $(ProjectDir)\..\..\..\win_ia32_msvc_$(ConfigurationName)\deploy\jre\bin\default"/>
+				CommandLine="copy $(OutDir)\encoder.lib $(ProjectDir)\..\..\..\win_ia32_msvc_$(ConfigurationName)\deploy\jdk\jre\bin\default"/>
 			<Tool
 				Name="VCPreBuildEventTool"/>
 			<Tool
@@ -79,7 +79,7 @@
 			<Tool
 				Name="VCPostBuildEventTool"
 				Description="       ... Copying files to bin/default folder ...."
-				CommandLine="copy $(OutDir)\encoder.lib $(ProjectDir)\..\..\..\win_ia32_msvc_$(ConfigurationName)\deploy\jre\bin\default"/>
+				CommandLine="copy $(OutDir)\encoder.lib $(ProjectDir)\..\..\..\win_ia32_msvc_$(ConfigurationName)\deploy\jdk\jre\bin\default"/>
 			<Tool
 				Name="VCPreBuildEventTool"/>
 			<Tool

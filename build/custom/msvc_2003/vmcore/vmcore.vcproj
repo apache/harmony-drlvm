@@ -49,7 +49,7 @@
 				Description="       ... Copying files to bin/default folder ...."
 				CommandLine="copy $(OutDir)\harmonyvm.dll $(ProjectDir)\..\..\..\win_ia32_msvc_$(ConfigurationName)\deploy\jre\bin\default
 copy $(OutDir)\harmonyvm.pdb $(ProjectDir)\..\..\..\win_ia32_msvc_$(ConfigurationName)\deploy\jre\bin\default
-copy $(OutDir)\harmonyvm.lib $(ProjectDir)\..\..\..\win_ia32_msvc_$(ConfigurationName)\deploy\jre\bin\default
+copy $(OutDir)\harmonyvm.lib $(ProjectDir)\..\..\..\win_ia32_msvc_$(ConfigurationName)\deploy\jdk\jre\bin\default
 "/>
 			<Tool
 				Name="VCPreBuildEventTool"/>
@@ -105,7 +105,7 @@ copy $(OutDir)\harmonyvm.lib $(ProjectDir)\..\..\..\win_ia32_msvc_$(Configuratio
 				Description="       ... Copying files to bin/default folder ...."
 				CommandLine="copy $(OutDir)\harmonyvm.dll $(ProjectDir)\..\..\..\win_ia32_msvc_$(ConfigurationName)\deploy\jre\bin\default
 copy $(OutDir)\harmonyvm.pdb $(ProjectDir)\..\..\..\win_ia32_msvc_$(ConfigurationName)\deploy\jre\bin\default
-copy $(OutDir)\harmonyvm.lib $(ProjectDir)\..\..\..\win_ia32_msvc_$(ConfigurationName)\deploy\jre\bin\default
+copy $(OutDir)\harmonyvm.lib $(ProjectDir)\..\..\..\win_ia32_msvc_$(ConfigurationName)\deploy\jdk\jre\bin\default
 "/>
 			<Tool
 				Name="VCPreBuildEventTool"/>
@@ -505,10 +505,16 @@ copy $(OutDir)\harmonyvm.lib $(ProjectDir)\..\..\..\win_ia32_msvc_$(Configuratio
 				RelativePath="..\..\..\..\vm\vmcore\src\init\finalize.cpp">
 			</File>
 			<File
+				RelativePath="..\..\..\..\vm\vmcore\src\init\finalizer_thread.cpp">
+			</File>
+			<File
 				RelativePath="..\..\..\..\vm\vmcore\src\init\parse_arguments.cpp">
 			</File>
 			<File
 				RelativePath="..\..\..\..\vm\vmcore\src\init\properties.cpp">
+			</File>
+			<File
+				RelativePath="..\..\..\..\vm\vmcore\src\init\ref_enqueue_thread.cpp">
 			</File>
 			<File
 				RelativePath="..\..\..\..\vm\vmcore\src\init\vm.cpp">
