@@ -1436,11 +1436,15 @@ ManagedObject *jvmti_exception_catch_event_callback_call(ManagedObject *exn,
 
             tmn_suspend_enable();
             assert(hythread_is_suspend_enabled());
+            BEGIN_RAISE_AREA;
 
             func((jvmtiEnv *)ti_env, jni_env,
                 reinterpret_cast<jthread>(hThread),
                 reinterpret_cast<jmethodID>(catch_method),
                 catch_location, exn_object);
+
+            END_RAISE_AREA;
+            exn_rethrow_if_pending();
             tmn_suspend_disable();
         }
         ti_env = next_env;
