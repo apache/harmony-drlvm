@@ -866,21 +866,18 @@ jobject JNICALL NewLocalRef(JNIEnv *env, jobject ref)
     if (NULL == ref)
         return NULL;
 
-    tmn_suspend_disable();
-    ObjectHandle h = oh_allocate_local_handle();
-    if (NULL == h)
-    {
-        tmn_suspend_enable();
+    jobject new_ref = oh_copy_to_local_handle(ref);
+
+    if (NULL == new_ref) {
         exn_raise_object(
             (jthrowable)(((JNIEnv_Internal*)env)->vm->vm_env->java_lang_OutOfMemoryError));
         return NULL;
     }
 
-    h->object= ((ObjectHandle)ref)->object;
-    TRACE2("jni", "NewLocalRef class = " << h->object->vt()->clss);
-    tmn_suspend_enable();
-    return (jobject)h;
-}
+    TRACE2("jni", "NewLocalRef class = " << jobject_to_struct_Class(new_ref));
+
+    return new_ref;
+} //NewLocalRef
 
 void JNICALL DeleteLocalRef(JNIEnv * UNREF env, jobject localRef)
 {

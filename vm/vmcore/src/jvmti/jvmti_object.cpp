@@ -126,6 +126,23 @@ jvmtiGetObjectHashCode(jvmtiEnv* env,
     return JVMTI_ERROR_NONE;
 }
 
+static bool is_same_object(jobject obj1, jobject obj2)
+{
+    SuspendEnabledChecker sec;
+
+    // concider not equal if at least one of the objects is null 
+    if (NULL == obj1 || NULL == obj2)
+        return false;
+
+    tmn_suspend_disable();
+
+    bool result = ( obj1->object == obj2->object );
+
+    tmn_suspend_enable();
+
+    return result;
+}
+
 /*
  * Get Object Monitor Usage
  *
@@ -157,68 +174,85 @@ jvmtiGetObjectMonitorUsage(jvmtiEnv* env,
 
     int enter_wait_count = 0;
     int notify_wait_count = 0;
-    jthread_iterator_t  iterator = jthread_iterator_create();
-    jthread thread = jthread_iterator_next(&iterator);
+    jthread_iterator_t iterator = jthread_iterator_create();
     jobject monitor = NULL;
-    assert(thread);
-    while (thread)
+
+    // count threads interacting with the monitor
+    for (jthread thread = jthread_iterator_next(&iterator); 
+            thread != NULL; 
+            thread = jthread_iterator_next(&iterator))
     {
         jthread_get_contended_monitor(thread, &monitor);
-        if (monitor && monitor->object == object->object)
+        if (is_same_object(monitor, object))
             enter_wait_count++;
+
         jthread_get_wait_monitor(thread, &monitor);
-        if (monitor && monitor->object == object->object)
+        if (is_same_object(monitor, object))
             notify_wait_count++;
-        
-        thread = jthread_iterator_next(&iterator);
     }
 
+    // allocate thread arrays
     jthread* enter_wait_array = NULL;
- 	if (enter_wait_count > 0){
-		jvmtiError jvmti_error = _allocate(sizeof(jthread*) *
-				enter_wait_count, (unsigned char **)&enter_wait_array);
-		if (JVMTI_ERROR_NONE != jvmti_error)
-		{
-			jthread_iterator_release(&iterator);
-			return jvmti_error;
-		}
-	}
+     if (enter_wait_count > 0) {
+        jvmtiError jvmti_error = _allocate(sizeof(jthread*) * enter_wait_count,
+                (unsigned char**) &enter_wait_array);
+        if (JVMTI_ERROR_NONE != jvmti_error) {
+            jthread_iterator_release(&iterator);
+            return jvmti_error;
+        }
+    }
 
     jthread* notify_wait_array = NULL;
-	if (notify_wait_count > 0){
-		jvmtiError jvmti_error = _allocate(sizeof(jthread*) *
-				notify_wait_count, (unsigned char **)&notify_wait_array);
-		if (JVMTI_ERROR_NONE != jvmti_error)
-		{
-			jthread_iterator_release(&iterator);
-			return jvmti_error;
-		}
-	}
+    if (notify_wait_count > 0){
+        jvmtiError jvmti_error = _allocate(sizeof(jthread*) *
+                notify_wait_count, (unsigned char**) &notify_wait_array);
+        if (JVMTI_ERROR_NONE != jvmti_error) {
+            jthread_iterator_release(&iterator);
+            if (NULL != enter_wait_array)
+                _deallocate((unsigned char*) enter_wait_array);
+            return jvmti_error;
+        }
+    }
 
     int ii = 0, jj = 0;
-    info_ptr->owner = NULL;
-
     jthread_iterator_reset(&iterator);
-    thread = jthread_iterator_next(&iterator);
-    while (thread)
+
+    // fill the thread arrays
+    // nomber of monitor waiting threads could changed since array allocation
+    for (jthread thread = jthread_iterator_next(&iterator); 
+            thread != NULL; 
+            thread = jthread_iterator_next(&iterator))
     {
-        jthread_get_contended_monitor(thread, &monitor);
-        if (monitor && monitor->object == object->object)
-            enter_wait_array[ii++] = thread;
+        if (ii < enter_wait_count) {
+            jthread_get_contended_monitor(thread, &monitor);
+
+            if (is_same_object(monitor, object))
+                enter_wait_array[ii++] = oh_copy_to_local_handle(thread);
+        }
         
-        jthread_get_wait_monitor(thread, &monitor);
-        if (monitor && monitor->object == object->object)
-            notify_wait_array[jj++] = thread;
-        
-        thread = jthread_iterator_next(&iterator);
+        if (jj < notify_wait_count) {
+            jthread_get_wait_monitor(thread, &monitor);
+
+            if (is_same_object(monitor, object))
+                notify_wait_array[jj++] = oh_copy_to_local_handle(thread);
+        }
     }
+
     jthread_iterator_release(&iterator);
 
-    jthread_get_lock_owner(object, &info_ptr->owner);
+    // get monitor owner
+    jobject owner;
+    jthread_get_lock_owner(object, &owner);
+
+    // create local handle as spec requires
+    if (NULL != owner) 
+        owner = oh_copy_to_local_handle(owner);
+
+    info_ptr->owner = owner;
     info_ptr->entry_count = jthread_get_lock_recursion(object, info_ptr->owner);
-    info_ptr->waiter_count = enter_wait_count;
+    info_ptr->waiter_count = ii;
     info_ptr->waiters = enter_wait_array;
-    info_ptr->notify_waiter_count = notify_wait_count;
+    info_ptr->notify_waiter_count = jj;
     info_ptr->notify_waiters = notify_wait_array;
 
     return JVMTI_ERROR_NONE;
