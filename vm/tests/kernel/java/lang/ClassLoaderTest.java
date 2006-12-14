@@ -684,25 +684,25 @@ import junit.framework.TestCase;
             fail("Error10: " + e.toString());
         }
 
-        //    	// TEST CASE #8:
-        //    	try {
-        //    	    //Class c =
+        //      // TEST CASE #8:
+        //      try {
+        //          //Class c =
         // Class.forName("[[[Ljavax.imageio.plugins.jpeg.JPEGImageReadParam;",
         // true, tcl);
-        //    	    Class c =
+        //          Class c =
         // Class.forName("javax.imageio.plugins.jpeg.JPEGImageReadParamXXX",
         // true, tcl);
-        //    	    ///Class c =
+        //          ///Class c =
         // tcl.loadClass("#javax.imageio.plugins.jpeg.JPEGImageReadParam");
-        //        	System.out.println(c);
-        //        	tcl.findLoadedClass("javax.imageio.plugins.jpeg.JPEGImageReadParam");
-        //        	assertTrue("Error7",
+        //          System.out.println(c);
+        //          tcl.findLoadedClass("javax.imageio.plugins.jpeg.JPEGImageReadParam");
+        //          assertTrue("Error7",
         // tcl.findLoadedClass("javax.imageio.plugins.jpeg.JPEGImageReadParam").getName().equals("javax.imageio.plugins.jpeg.JPEGImageReadParam"));
-        //        	///fail("Error11");
-        //    	} catch (Throwable e) {
-        //        	fail("Error12: " + e.toString());
-        //    	}
-		
+        //          ///fail("Error11");
+        //      } catch (Throwable e) {
+        //          fail("Error12: " + e.toString());
+        //      }
+        
 
     }
 
@@ -920,7 +920,7 @@ import junit.framework.TestCase;
         //new a3().main(new String[] { "" });
     }
 
-	
+    
     /**
      *  
      */
@@ -954,7 +954,7 @@ import junit.framework.TestCase;
             fail("Error3");
         }
     }
-			
+            
     /**
      *  
      */
@@ -2005,11 +2005,11 @@ import junit.framework.TestCase;
             //    Class.forName(longName).newInstance();
             //} catch (Exception ee) {
             //    System.out.println("Warning: "+ee.toString());
-            //	try {
-            //	    Class.forName("java.lang.ClassLoaderTest$3$LC1").newInstance();
+            //  try {
+            //      Class.forName("java.lang.ClassLoaderTest$3$LC1").newInstance();
             //    } catch (Exception eee) {
             //        System.out.println("Warning: "+eee.toString());
-            //	}
+            //  }
             //}
         } catch (Exception e) {
             fail("Error3: " + e.toString());
@@ -2096,9 +2096,9 @@ import junit.framework.TestCase;
             //Class c =
             // Class.forName("[Ljavax.xml.transform.sax.SAXTransformerFactory;",
             // false, cl);
-            //	//try {
-            //	// Object o = c.newInstance(); // to be initialized
-            //	//} catch(Exception e) {System.out.println("Exception 2:"+e);}
+            //  //try {
+            //  // Object o = c.newInstance(); // to be initialized
+            //  //} catch(Exception e) {System.out.println("Exception 2:"+e);}
             //assertTrue("Error4:", c.desiredAssertionStatus() ==
             // c.desiredAssertionStatus() ); // "this method is not guaranteed
             // to return the actual assertion status"
@@ -2203,5 +2203,29 @@ import junit.framework.TestCase;
         Number i[][][] = new Number[1][2][3];
         ClassLoader.getSystemClassLoader().setSigners(i.getClass(),
                 (Object[]) null);
+    }
+
+    /*
+     * Regression test for HARMONY-877
+     * [classlib][lang] compatibility: Harmony method 
+     * ClassLoader.getResource(null) returns null while RI throws NPE 
+     *
+     */
+    public void test_HARMONY_877() {
+        boolean et = false;
+        try { 
+            ClassLoader.getSystemClassLoader().getResource(null); 
+        } catch (NullPointerException e) {
+            et = true;
+        }
+        assertTrue("NullPointerException expected (case 1)", et);
+        et = false;
+
+        try {
+            ClassLoader.getSystemClassLoader().getResourceAsStream(null); 
+        } catch (NullPointerException e) { 
+            et = true;
+        }
+        assertTrue("NullPointerException expected (case 2)", et);
     }
 }
