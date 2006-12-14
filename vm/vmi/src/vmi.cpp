@@ -147,26 +147,17 @@ vmiError JNICALL
 GetSystemProperty(VMInterface *vmi, char *key, char **valuePtr)
 {
     char* value = get_property(key, JAVA_PROPERTIES);
-    if (NULL != value)
-    {
-        *valuePtr = strdup(value);
-        destroy_property_value(value);
-        return VMI_ERROR_NONE;
-    }
-    else
-    {
-        *valuePtr = NULL;
-        return VMI_ERROR_NOT_FOUND;
-    }
+    *valuePtr = value ? strdup(value) : NULL;
+    destroy_property_value(value);
+    return VMI_ERROR_NONE;
 }
 
 vmiError JNICALL
 SetSystemProperty(VMInterface *vmi, char *key, char *value)
 {
-
-    /*
-     * The possible implemenation might be:
-     */
+    if (!value || !key) {
+        return VMI_ERROR_ILLEGAL_ARG;
+    }
     set_property(key, value, JAVA_PROPERTIES);
     return VMI_ERROR_NONE;
 }
@@ -193,8 +184,14 @@ vmiError JNICALL IterateSystemProperties(VMInterface *vmi,
 
     while(keys[count] != NULL) {
         char* value = get_property(keys[count], JAVA_PROPERTIES);
-        iterator((char*)strdup(keys[count]), (char*)strdup(value), userData);
-        destroy_property_value(value);
+        /* 
+         * FIXME: possible inconsistency between iterator and 
+         * properties count.
+         */
+        if (value) {
+            iterator((char*)strdup(keys[count]), (char*)strdup(value), userData);
+            destroy_property_value(value);
+        }
         count++;
     }
     destroy_properties_keys(keys);
