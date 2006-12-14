@@ -680,6 +680,59 @@ void yield_other_handler(int signum, siginfo_t* info, void* context) {
 
 }
 */
+
+void general_signal_handler(int signum, siginfo_t* info, void* context)
+{
+    bool replaced = false;
+    ucontext_t* uc = (ucontext_t *)context;
+    uint32 saved_eip = (uint32)uc->uc_mcontext.gregs[REG_EIP];
+    uint32 new_eip = 0;
+
+    // If exception is occured in processor instruction previously
+    // instrumented by breakpoint, the actual exception address will reside
+    // in jvmti_jit_breakpoints_handling_buffer
+    // We should replace exception address with saved address of instruction
+    uint32 break_buf = (uint32)p_TLS_vmthread->jvmti_jit_breakpoints_handling_buffer;
+    if (saved_eip >= break_buf &&
+        saved_eip < break_buf + 50)
+    {
+        // Breakpoints should not occur in breakpoint buffer
+        assert(signum != SIGTRAP);
+
+        replaced = true;
+        new_eip = p_TLS_vmthread->jvmti_saved_exception_registers.eip;
+        uc->uc_mcontext.gregs[REG_EIP] = (greg_t)new_eip;
+    }
+
+    switch (signum)
+    {
+    case SIGTRAP:
+        jvmti_jit_breakpoint_handler(signum, info, context);
+        break;
+    case SIGSEGV:
+        null_java_reference_handler(signum, info, context);
+        break;
+    case SIGFPE:
+        null_java_divide_by_zero_handler(signum, info, context);
+        break;
+    case SIGABRT:
+        abort_handler(signum, info, context);
+        break;
+    default:
+        // Unknown signal
+        assert(1);
+        break;
+    }
+
+    // If EIP was not changed in specific handler to start another handler,
+    // we should restore original EIP, if it's nesessary
+    if (replaced &&
+        (uint32)uc->uc_mcontext.gregs[REG_EIP] == new_eip)
+    {
+        uc->uc_mcontext.gregs[REG_EIP] = (greg_t)saved_eip;
+    }
+}
+
 void initialize_signals()
 {
     // First figure out how to locate the context in the
@@ -701,17 +754,17 @@ void initialize_signals()
 */
     sigemptyset(&sa.sa_mask);
     sa.sa_flags = SA_SIGINFO;
-    sa.sa_sigaction = &jvmti_jit_breakpoint_handler;
+    sa.sa_sigaction = &general_signal_handler;
     sigaction(SIGTRAP, &sa, NULL);
     
     sigemptyset(&sa.sa_mask);
     sa.sa_flags = SA_SIGINFO | SA_ONSTACK;;
-    sa.sa_sigaction = &null_java_reference_handler;
+    sa.sa_sigaction = &general_signal_handler;
     sigaction(SIGSEGV, &sa, NULL);
 
     sigemptyset(&sa.sa_mask);
     sa.sa_flags = SA_SIGINFO;
-    sa.sa_sigaction = &null_java_divide_by_zero_handler;
+    sa.sa_sigaction = &general_signal_handler;
     sigaction(SIGFPE, &sa, NULL);
 
     extern void interrupt_handler(int);
@@ -722,7 +775,7 @@ void initialize_signals()
     /* install abort_handler to print out call stack on assertion failures */
     sigemptyset(&sa.sa_mask);
     sa.sa_flags = SA_SIGINFO;
-    sa.sa_sigaction = &abort_handler;
+    sa.sa_sigaction = &general_signal_handler;
     sigaction( SIGABRT, &sa, NULL);
     /* abort_handler installed */
 

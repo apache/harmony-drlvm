@@ -699,6 +699,11 @@ VMBreakPoints::process_native_breakpoint()
             }
         }
     }
+
+    // Registers in TLS can be changed in user callbacks
+    // It should be restored to keep original address of instrumented instruction
+    // Exception/signal handlers use it when HWE occurs in instruction buffer
+    vm_thread->jvmti_saved_exception_registers = regs;
     unlock();
 
     // Now we need to return back to normal code execution, it is

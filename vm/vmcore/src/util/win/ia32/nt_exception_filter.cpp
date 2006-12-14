@@ -301,6 +301,20 @@ static LONG NTAPI vectored_exception_handler_internal(LPEXCEPTION_POINTERS nt_ex
 {
     DWORD code = nt_exception->ExceptionRecord->ExceptionCode;
     PCONTEXT context = nt_exception->ContextRecord;
+    bool flag_replaced = false;
+    uint32 saved_eip = context->Eip;
+
+    // If exception is occured in processor instruction previously
+    // instrumented by breakpoint, the actual exception address will reside
+    // in jvmti_jit_breakpoints_handling_buffer
+    // We should replace exception address with saved address of instruction
+    uint32 break_buf = (uint32)p_TLS_vmthread->jvmti_jit_breakpoints_handling_buffer;
+    if (saved_eip >= break_buf &&
+        saved_eip < break_buf + 50)
+    {
+        flag_replaced = true;
+        context->Eip = (uint32)p_TLS_vmthread->jvmti_saved_exception_registers.eip;
+    }
 
     TRACE2("signals", ("VEH received an exception: code = %x, eip = %p, esp = %p",
         nt_exception->ExceptionRecord->ExceptionCode,
@@ -323,7 +337,10 @@ static LONG NTAPI vectored_exception_handler_internal(LPEXCEPTION_POINTERS nt_ex
 
     // delegate "other" cases to default handler
     if (!in_java && code != STATUS_STACK_OVERFLOW)
+    {
+        context->Eip = saved_eip;
         return EXCEPTION_CONTINUE_SEARCH;
+    }
 
     // if HWE occured in java code, suspension should also have been disabled
     assert(!in_java || !hythread_is_suspend_enabled());
@@ -357,6 +374,7 @@ static LONG NTAPI vectored_exception_handler_internal(LPEXCEPTION_POINTERS nt_ex
                 // cannot be unwound.
                 // Mark raised exception in TLS and resume execution
                 exn_raise_by_class(env->java_lang_StackOverflowError_Class);
+                context->Eip = saved_eip;
                 return EXCEPTION_CONTINUE_EXECUTION;
             }
         }
@@ -379,6 +397,9 @@ static LONG NTAPI vectored_exception_handler_internal(LPEXCEPTION_POINTERS nt_ex
     case JVMTI_EXCEPTION_STATUS:
         // JVMTI breakpoint in JITted code
         {
+            // Breakpoints should not occur in breakpoint buffer
+            assert(!flag_replaced);
+
             Registers regs;
             nt_to_vm_context(context, &regs);
             TRACE2("signals",
@@ -394,6 +415,7 @@ static LONG NTAPI vectored_exception_handler_internal(LPEXCEPTION_POINTERS nt_ex
         }
     default:
         // unexpected hardware exception occured in java code
+        context->Eip = saved_eip;
         return EXCEPTION_CONTINUE_SEARCH;
     }
 
@@ -434,7 +456,8 @@ static void __cdecl c_exception_handler(Class *exn_class, bool in_java)
 {
     // this exception handler is executed *after* NT exception handler returned
     DebugUtilsTI* ti = VM_Global_State::loader_env->TI;
-    Registers & regs = p_TLS_vmthread->regs;
+    // Create local copy for registers because registers in TLS can be changed
+    Registers regs = p_TLS_vmthread->regs;
 
     M2nFrame* prev_m2n = m2n_get_last_frame();
     M2nFrame* m2n = NULL;
