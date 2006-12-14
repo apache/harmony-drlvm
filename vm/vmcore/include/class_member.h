@@ -514,6 +514,12 @@ public:
     void add_vtable_patch(void *);
     void apply_vtable_patches();
 
+    NativeCodePtr get_registered_native_func() 
+            { return _registered_native_func; }
+
+    void set_registered_native_func(NativeCodePtr native_func) 
+            { _registered_native_func = native_func; }
+
     /**
      * This returns a block for jitted code. It is not used for native methods.
      * It is safe to call this function from multiple threads.
@@ -587,6 +593,9 @@ private:
     Method_Side_Effects _side_effects;
     Method_Signature *_method_sig;
 
+    /** set by JNI RegisterNatives() funcs */
+    NativeCodePtr _registered_native_func;
+
 public:
     Method();
     // destructor should be instead of this function, but it's not allowed to use it because copy for Method class is
@@ -607,10 +616,7 @@ public:
     bool is_clinit()        {return _flags.is_clinit?true:false;}
     bool is_finalize()      {return _flags.is_finalize?true:false;}
     bool is_overridden()    {return _flags.is_overridden?true:false;}
-    bool is_registered()    {return _flags.is_registered?true:false;}
     Boolean  is_nop()       {return _flags.is_nop;}
-
-    void set_registered( bool flag ) { _flags.is_registered = flag; }
 
     unsigned get_index()    {return _index;}
 
@@ -665,7 +671,6 @@ private:
         unsigned is_finalize    : 1;    // is finalize() method
         unsigned is_overridden  : 1;    // has this virtual method been overridden by a loaded subclass?
         unsigned is_nop         : 1;
-        unsigned is_registered  : 1;    // the method is registred native method
     } _flags;
 
     //

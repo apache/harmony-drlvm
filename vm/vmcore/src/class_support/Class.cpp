@@ -602,6 +602,7 @@ Method::Method()
     _vtable_patch = 0;
 
     _code = NULL;
+    _registered_native_func = NULL;
 
     _state = ST_NotCompiled;
     _jits = NULL;
@@ -622,7 +623,6 @@ Method::Method()
     _flags.is_overridden = 0;
     _flags.is_finalize = 0;
     _flags.is_nop = FALSE;
-    _flags.is_registered = 0;
 
     _line_number_table = NULL;
     _local_vars_table = NULL;
@@ -990,54 +990,50 @@ class_register_methods(Class_Handle klass,
         const String *desc = pool.lookup(methods[index].signature);
 
         // find method from class
-        bool not_found = true;
+        Method *class_method = NULL;
+        bool found = false;
+
         for(int count = 0; count < klass->get_number_of_methods(); count++ ) {
-            Method *class_method = klass->get_method(count);
-            const String *method_name = class_method->get_name();
-            const String *method_desc = class_method->get_descriptor();
-            if( method_name == name && method_desc == desc )
-            {
-                // trace
-                TRACE2("class.native", "Register native method: "
-                    << klass->get_name()->bytes
-                    << "." << name->bytes << desc->bytes);
+            class_method = klass->get_method(count);
 
+            if( class_method->get_name() == name && 
+                    class_method->get_descriptor() == desc ) {
                 // found method
-                not_found = false;
-
-                // Calling callback for NativeMethodBind event
-                NativeCodePtr native_addr = methods[index].fnPtr;
-
-                jvmti_process_native_method_bind_event( (jmethodID) class_method, native_addr, &native_addr);
-
-                if (interpreter_enabled()) {
-                    //lock class
-                    klass->lock();
-                    class_method->set_code_addr( native_addr );
-                    class_method->set_registered( true );
-                    klass->unlock();
-                } else {
-                    NativeCodePtr stub = compile_create_lil_jni_stub(class_method, native_addr, NULL);
-                    if (!stub)
-                        return true;
-
-                    class_method->lock();
-                    class_method->set_code_addr(stub);
-                    class_method->unlock();
-
-                    // the following lines were copy-pasted from compile_do_compilation() function
-                    // it is not obvious that they should be here.
-                    //compile_flush_generated_code();
-                    //class_method->set_state(Method::ST_Compiled);
-                    //class_method->do_jit_recompiled_method_callbacks();
-
-                    class_method->apply_vtable_patches();
-                }
-
+                found = true;
                 break;
             }
         }
-        if( not_found ) {
+
+        if (found) {
+            TRACE2("class.native", "Register native method: "
+                << klass->get_name()->bytes
+                << "." << name->bytes << desc->bytes);
+
+            // Calling callback for NativeMethodBind event
+            NativeCodePtr native_addr = methods[index].fnPtr;
+
+            jvmti_process_native_method_bind_event( (jmethodID) class_method, native_addr, &native_addr);
+
+            if (! interpreter_enabled()) {
+                NativeCodePtr stub = compile_create_lil_jni_stub(class_method, native_addr, NULL);
+                if (!stub)
+                    return true;
+
+                class_method->lock();
+                class_method->set_code_addr(stub);
+                class_method->unlock();
+
+                // the following lines were copy-pasted from compile_do_compilation() function
+                // it is not obvious that they should be here.
+                compile_flush_generated_code();
+                //class_method->set_state(Method::ST_Compiled);
+                //class_method->do_jit_recompiled_method_callbacks();
+
+                class_method->apply_vtable_patches();
+            }
+
+            class_method->set_registered_native_func(native_addr);
+        } else {
             // create error string "<class_name>.<method_name><method_descriptor>
             int clen = klass->get_name()->len;
             int mlen = name->len;
@@ -1050,7 +1046,6 @@ class_register_methods(Class_Handle klass,
             memcpy(error + clen + 1 + mlen, desc->bytes, dlen);
             error[len] = '\0';
 
-            // trace
             TRACE2("class.native", "Native could not be registered: "
                 << klass->get_name()->bytes << "." << name->bytes << desc->bytes);
 
@@ -1071,14 +1066,14 @@ class_unregister_methods(Class_Handle klass)
     klass->lock();
     for(int count = 0; count < klass->get_number_of_methods(); count++ ) {
         Method* method = klass->get_method(count);
-        if( method->is_registered() ) {
+        if (NULL != method->get_registered_native_func()) {
             // trace
             TRACE2("class.native", "Unregister native method: "
                 << klass->get_name() << "." << method->get_name()->bytes
                 << method->get_descriptor()->bytes);
 
-            // reset registered flag
-            method->set_registered(false);
+            // reset registered_native_func
+            method->set_registered_native_func(NULL);
         }
     }
     // unlock class

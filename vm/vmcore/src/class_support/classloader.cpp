@@ -1048,8 +1048,8 @@ GenericFunctionPointer ClassLoader::LookupNative(Method* method)
         << method_name->bytes << method_desc->bytes);
 
     // return if method is already registered
-    if( method->is_registered() ) {
-        return (GenericFunctionPointer)method->get_code_addr();
+    if (NULL != method->get_registered_native_func()) {
+        return (GenericFunctionPointer) method->get_registered_native_func();
     }
     
     // find throughout all the libraries 
