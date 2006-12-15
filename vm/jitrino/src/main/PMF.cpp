@@ -181,7 +181,6 @@ ostream& operator << (ostream& os, const Str& a)
 }
 
 
-#ifdef _DEBUG_PMF
 static ostream& operator << (ostream& os, const Strs& fqn)
 {
     for (size_t n = 0; n != fqn.size(); ++n)
@@ -192,7 +191,6 @@ static ostream& operator << (ostream& os, const Strs& fqn)
     }
     return os;
 }
-#endif
 
 
 //---------------------------------------------------------------------------//
@@ -1248,20 +1246,12 @@ bool PMF::parse (Cmd& cmd, const char* keyword, FilterSpecs& filterspecs)
  
 void PMF::processCmd (Cmd& cmd)
 {
-    if (strncmp(cmd.buff, "help", 4) == 0
-     || strncmp(cmd.buff, "arg.help", 8) == 0)
-    {
-        help_requested = true;
-        return;
-    }
-
 //  Split line into tokens <left0> . <left1> . .... = <right>
 
     const char* ptr0 = cmd.buff ;
-    const char* ptr1;
-    for (ptr1 = ptr0; *ptr1 != '='; ++ptr1)
-        if (*ptr1 == 0)
-            crash("No '=' symbol in command line '%s'\n", ptr0);
+    const char* ptr1 = ptr0;
+    while (*ptr1 != '=' && *ptr1 != 0)
+        ++ptr1;
 
     for (StrTokenizer tokens('.', ptr0, ptr1); tokens.next();)
         cmd.left->push_back(tokens.token);
@@ -1269,8 +1259,13 @@ void PMF::processCmd (Cmd& cmd)
     if (cmd.left->empty())
         crash("Empty left part of command line '%s'", ptr0);
 
-    cmd.right.init(ptr1+1);
-    cmd.right.trim();
+    if (*ptr1 == 0)
+        cmd.right.clear();
+    else
+    {
+        cmd.right.init(ptr1+1);
+        cmd.right.trim();
+    }
 
 //  Special processing for read command
 
@@ -1291,6 +1286,14 @@ void PMF::processCmd (Cmd& cmd)
         }
 
         is.close();
+    }
+
+//  Special processing for help command
+
+    else if (strncmp(cmd.buff, "help", 4) == 0 ||
+             strncmp(cmd.buff, "arg.help", 8) == 0)
+    {
+        help_requested = cmd.right;
     }
 
 //  Any other command lines are simply stored
@@ -1405,7 +1408,7 @@ void PMF::init (bool first_)
         cout << "  " << afp->getName() << endl;
 #endif
 
-    if (first && help_requested)
+    if (first && !help_requested.empty() && !(help_requested == "jit"))
         showHelp(cout);
 
 //  Create common pipeline with empty filter
@@ -1656,6 +1659,9 @@ void PMF::init (bool first_)
                 step.action = step.factory->createAction(mm);
         }
     }
+
+    if (help_requested == "jit" || help_requested == "all")
+        showHelpJits(cout);
 
 //  Debug output
 
@@ -2105,20 +2111,105 @@ static bool compFactories (IActionFactory* a, IActionFactory* b)
 
 void  PMF::showHelp (std::ostream& os)
 {
-    typedef vector<IActionFactory*> Factories;
-    Factories tmp;
+    IActionFactory* afp;
 
-    for (IActionFactory* afp = IActionFactory::getFirst(); afp != 0; afp = afp->getNext())
-        tmp.push_back(afp);
+    if ((afp = IActionFactory::find(help_requested)) != 0)
+        afp->showHelp(os);
+    else
+    {
+        typedef vector<IActionFactory*> Factories;
+        Factories tmp;
 
-    sort(tmp.begin(), tmp.end(), compFactories);
+        for (afp = IActionFactory::getFirst(); afp != 0; afp = afp->getNext())
+            tmp.push_back(afp);
 
-    os << endl << "Help for Jitrino Actions (when available)" << endl;
-    for (Factories::iterator it = tmp.begin(); it != tmp.end(); ++it)
-        (*it)->showHelp(os);
+        sort(tmp.begin(), tmp.end(), compFactories);
+
+        os << endl << "Help for Jitrino Actions (when available)" << endl;
+        for (Factories::iterator it = tmp.begin(); it != tmp.end(); ++it)
+            (*it)->showHelp(os);
+    }
 }
 
 
+void PMF::showHelpJits (std::ostream& os)
+{
+    os << endl << "Jit " << jitname << endl;
+    for (Pipelines::iterator k = pipelines.begin(); k != pipelines.end(); ++k)
+    {
+        Pipeline& pipeline = **k;
+
+        os << "  Pipeline ";
+        if (&pipeline == pipelines.front())
+            os << "<common>";
+        else
+            os << pipeline.name 
+               << " filter " << pipeline.method.classname        
+               << "." << pipeline.method.methodname 
+               << pipeline.method.signature;
+        os << endl;
+
+    //  Print pipeline-wide args 
+        for (Cmds::const_iterator i = cmds.begin(); i != cmds.end(); ++i)
+            if (*i != 0 && (*i)->arg)
+            {
+                const Cmd& cmd = **i;
+                if (cmd.filtername.empty() || (cmd.filtername == pipeline.name))
+                    if (cmd.left->size() - cmd.xkeyword == 2)
+                        os << "    arg " << cmd.left->at(cmd.xkeyword + 1) << "=" << cmd.right << endl;
+            }
+
+
+    //  Print pipeline-wide streams 
+        for (size_t idx = 0; idx != logtemplates.size(); ++idx)
+        {
+            LogTemplate& lt = logtemplates[idx];
+            if (lt.enabled && (lt.filtername == pipeline.name))
+                if (lt.pathp == 0 || lt.pathp->empty())
+                {
+                    os << "    stream " << lt.streamname 
+                       << "[" << idx << "]"
+                       << " file " << lt.fmask 
+                       << endl;
+                }
+        }
+
+    //  Print list of actions and specific args/streams
+        if (!pipeline.steps->empty())
+        {
+            os << "    Actions" << endl;
+            for (Pipeline::Steps::iterator l = pipeline.steps->begin(); l != pipeline.steps->end(); ++l)
+            {
+                Pipeline::Step& step = *l;
+                os << "      " << *step.fqname << endl;
+
+                if (step.args != 0)
+                    for (Args::Store::iterator m = step.args->store.begin(); m != step.args->store.end(); ++m)
+                    {
+                        Args::Arg& arg = *m;
+                    //  Do not print pipeline-wide args
+                        if (arg.cmdp->left->size() - arg.cmdp->xkeyword > 2)
+                            os << "        arg " << arg.key << "=" << arg.value << endl;
+                    }
+
+                if (step.logs != 0)
+                    for (size_t sid = 0; sid < step.logs->streamidxs.size(); ++sid)
+                    {
+                        size_t idx = step.logs->streamidxs.at(sid);
+                        LogTemplate& lt = logtemplates.at(idx);
+                        if (lt.enabled)
+                            if (lt.pathp != 0 && !lt.pathp->empty())
+                                os << "        stream " << lt.streamname 
+                                << "[" << idx << "]"
+                                << " file " << lt.fmask 
+                                << endl;
+                    }
+            }
+        }
+    }
+}
+
+ 
 void PMF::summTimes (SummTimes& summtimes)
 {
     Pipelines::iterator pptr = pipelines.begin(), 

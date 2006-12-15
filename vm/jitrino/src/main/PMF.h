@@ -174,7 +174,7 @@ protected:
     MemoryManager& mm;
     JITInstanceContext& jitInstanceContext;
     Str jitname;
-    bool help_requested;
+    Str help_requested;
 
     struct Cmd;
 
@@ -339,7 +339,8 @@ public:
     JITInstanceContext& getJITInstanceContext () const      {return jitInstanceContext;}
     void summTimes (SummTimes&);
     static Action* getAction (HPipeline, const char* path);
-    static void showHelp (std::ostream&);
+    void showHelp (std::ostream&);
+    void showHelpJits (std::ostream&);
 
     HPipeline selectPipeline (const char* classname, const char* methname, const char* sig) const;
 
