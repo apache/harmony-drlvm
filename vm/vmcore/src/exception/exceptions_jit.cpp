@@ -209,18 +209,13 @@ static void exn_propagate_exception(
         si_goto_previous(si);
     }
 
-    Method *interrupted_method = NULL;
-    NativeCodePtr interrupted_method_location = NULL;
-    JIT *interrupted_method_jit = NULL;
+    assert(!si_is_native(si));
 
-    if (!si_is_native(si))
-    {
-        CodeChunkInfo *interrupted_cci = si_get_code_chunk_info(si);
-        assert(interrupted_cci);
-        interrupted_method = interrupted_cci->get_method();
-        interrupted_method_location = si_get_ip(si);
-        interrupted_method_jit = interrupted_cci->get_jit();
-    }
+    CodeChunkInfo *interrupted_cci = si_get_code_chunk_info(si);
+    assert(interrupted_cci);
+    Method *interrupted_method = interrupted_cci->get_method();
+    NativeCodePtr interrupted_method_location = si_get_ip(si);
+    JIT *interrupted_method_jit = interrupted_cci->get_jit();
 
     // Remove single step breakpoints which could have been set on the
     // exception bytecode
@@ -234,6 +229,13 @@ static void exn_propagate_exception(
             jvmti_remove_single_step_breakpoints(ti, vm_thread);
         }
         ti->vm_brpt->unlock();
+    }
+
+    // When VM is in shutdown stage we need to execute final block to
+    // release monitors and propogate an exception to the upper frames.
+    if (VM_Global_State::loader_env->IsVmShutdowning()) {
+        exn_class = VM_Global_State::loader_env->JavaLangObject_Class;
+        *exn_obj = NULL;
     }
 
     bool same_frame = true;
@@ -262,10 +264,15 @@ static void exn_propagate_exception(
                 // Found a handler that catches the exception.
 #ifdef VM_STATS
                 cci->num_catches++;
-                if (same_frame)
+                if (same_frame) {
                     VM_Statistics::get_vm_stats().num_exceptions_caught_same_frame++;
-                if (handler->is_exc_obj_dead())
+                }
+                if (handler->is_exc_obj_dead()) {
                     VM_Statistics::get_vm_stats().num_exceptions_dead_object++;
+                    if (!*exn_obj) {
+                        VM_Statistics::get_vm_stats().num_exceptions_object_not_created++;
+                    }
+                }
 #endif // VM_STATS
                 // Setup handler context
                 jit->fix_handler_context(method, si_get_jit_context(si));
@@ -293,18 +300,9 @@ static void exn_propagate_exception(
                 }
 
                 // Create exception if necessary
-                if (!*exn_obj) {
-                    if (handler->is_exc_obj_dead()
-                            && !VM_Global_State::loader_env->TI->isEnabled()) {
-#ifdef VM_STATS
-                        VM_Statistics::get_vm_stats().num_exceptions_object_not_created++;
-#endif // VM_STATS
-                    }
-                    else {
-                        *exn_obj =
-                            create_lazy_exception(exn_class, exn_constr,
-                                jit_exn_constr_args, vm_exn_constr_args);
-                    }
+                if (!*exn_obj && !handler->is_exc_obj_dead()) {
+                    *exn_obj = create_lazy_exception(exn_class, exn_constr,
+                        jit_exn_constr_args, vm_exn_constr_args);
                 }
 
                 BEGIN_RAISE_AREA;
@@ -339,12 +337,12 @@ static void exn_propagate_exception(
     }
 
     // Exception propagates to the native code
+    assert(si_is_native(si));
 
     // The current thread exception is set to the exception and we return 0/NULL to the native code
     if (*exn_obj == NULL) {
-        *exn_obj =
-            create_lazy_exception(exn_class, exn_constr,
-                jit_exn_constr_args, vm_exn_constr_args);
+        *exn_obj = create_lazy_exception(exn_class, exn_constr,
+            jit_exn_constr_args, vm_exn_constr_args);
     }
     assert(!hythread_is_suspend_enabled());
 

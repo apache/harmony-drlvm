@@ -33,6 +33,7 @@
 #include "open/vm_util.h"
 #include "stub_code_utils.h"
 #include "interpreter.h"
+#include "exceptions.h"
 
 
 //////////////////////////////////////////////////////////////////////////
@@ -243,14 +244,33 @@ void m2n_gen_set_local_handles_imm(Merced_Code_Emitter* emitter, uint64 imm_val)
     emitter->ipf_movi(M2N_OBJECT_HANDLES, (int)imm_val);
 }
 
-void free_local_object_handles2(ObjectHandles* head);
-
 void m2n_pop_local_handles() {
     assert(!hythread_is_suspend_enabled());
     M2nFrame *m2n = m2n_get_last_frame();
     free_local_object_handles3(m2n_get_local_handles(m2n));
 }
 
+static void m2n_pop_local_handles() {
+    assert(!hythread_is_suspend_enabled());
+    
+    if (exn_raised()) {
+        exn_rethrow();
+    }
+    
+    M2nFrame * m2n = m2n_get_last_frame();
+    free_local_object_handles2(m2n->local_object_handles);
+}
+
+static void m2n_free_local_handles() {
+    assert(!hythread_is_suspend_enabled());
+
+    if (exn_raised()) {
+        exn_rethrow();
+    }
+
+    M2nFrame * m2n = m2n_get_last_frame();
+    free_local_object_handles3(m2n->local_object_handles);
+}
 
 void m2n_gen_pop_m2n(Merced_Code_Emitter* emitter, bool handles, M2nPreserveRet preserve_ret, bool do_alloc, unsigned out_reg, int target)
 {
@@ -260,38 +280,31 @@ void m2n_gen_pop_m2n(Merced_Code_Emitter* emitter, bool handles, M2nPreserveRet 
         unsigned free_target = (unsigned) target;
         emitter->ipf_cmp(icmp_eq, cmp_none, SCRATCH_PRED_REG, SCRATCH_PRED_REG2, M2N_OBJECT_HANDLES, 0);
         emitter->ipf_br(br_cond, br_many, br_spnt, br_none, free_target, SCRATCH_PRED_REG);
-        // Yes, save return register
-        if (preserve_ret==MPR_Gr)
-            emitter->ipf_add(6, RETURN_VALUE_REG, 0);
-        else if (preserve_ret==MPR_Fr)
-            emitter->ipf_stf_inc_imm(float_mem_size_e, mem_st_spill, mem_none, SP_REG, RETURN_VALUE_REG, unsigned(-16));
-        // Do free
-        if (!out_reg) out_reg = 32+8+M2N_NUMBER_LOCALS;
-        emitter->ipf_add(out_reg, M2N_OBJECT_HANDLES, 0);
-        emit_call_with_gp(*emitter, (void**)free_local_object_handles2);
-        // Restore return register
-        if (preserve_ret==MPR_Gr) {
-            emitter->ipf_add(RETURN_VALUE_REG, 6, 0);
-        } else if (preserve_ret==MPR_Fr) {
-            emitter->ipf_adds(SP_REG, 16, SP_REG);
-            emitter->ipf_ldf(float_mem_size_e, mem_ld_fill, mem_none, RETURN_VALUE_REG, SP_REG);
-        }
-        emitter->set_target(free_target);
-    } else {
-        // Yes, save return register
-        if (preserve_ret==MPR_Gr)
-            emitter->ipf_add(6, RETURN_VALUE_REG, 0);
-        else if (preserve_ret==MPR_Fr)
-            emitter->ipf_stf_inc_imm(float_mem_size_e, mem_st_spill, mem_none, SP_REG, RETURN_VALUE_REG, unsigned(-16));
-        // Do free
+    }
+    // Yes, save return register
+    if (preserve_ret == MPR_Gr) {
+        emitter->ipf_add(6, RETURN_VALUE_REG, 0);
+    } else if (preserve_ret == MPR_Fr) {
+        emitter->ipf_stf_inc_imm(float_mem_size_e, mem_st_spill, mem_none, SP_REG, RETURN_VALUE_REG, unsigned(-16));
+    }
+
+    if (handles) {
         emit_call_with_gp(*emitter, (void**)m2n_pop_local_handles);
-        // Restore return register
-        if (preserve_ret==MPR_Gr) {
-            emitter->ipf_add(RETURN_VALUE_REG, 6, 0);
-        } else if (preserve_ret==MPR_Fr) {
-            emitter->ipf_adds(SP_REG, 16, SP_REG);
-            emitter->ipf_ldf(float_mem_size_e, mem_ld_fill, mem_none, RETURN_VALUE_REG, SP_REG);
-        }
+    } else {
+        emit_call_with_gp(*emitter, (void**)m2n_free_local_handles);
+    }
+    
+    // Restore return register
+    if (preserve_ret == MPR_Gr) {
+        emitter->ipf_add(RETURN_VALUE_REG, 6, 0);
+    } else if (preserve_ret == MPR_Fr) {
+        emitter->ipf_adds(SP_REG, 16, SP_REG);
+        emitter->ipf_ldf(float_mem_size_e, mem_ld_fill, mem_none, RETURN_VALUE_REG, SP_REG);
+    }
+
+
+    if (handles) {
+        emitter->set_target(free_target);
     }
 
     // Unlink the M2nFrame from the list of the current thread

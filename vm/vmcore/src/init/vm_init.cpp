@@ -376,8 +376,6 @@ static jint preload_classes(Global_Env * vm_env) {
         preload_class(vm_env, "java/lang/StackTraceElement");
     vm_env->java_lang_Error_Class =
         preload_class(vm_env, "java/lang/Error");
-    vm_env->java_lang_ThreadDeathError_Class =
-        preload_class(vm_env, "java/lang/ThreadDeath");
     vm_env->java_lang_ExceptionInInitializerError_Class =
         preload_class(vm_env, "java/lang/ExceptionInInitializerError");
     vm_env->java_lang_NoClassDefFoundError_Class =
@@ -398,6 +396,8 @@ static jint preload_classes(Global_Env * vm_env) {
         preload_class(vm_env, "java/lang/ClassCastException");
     vm_env->java_lang_OutOfMemoryError_Class = 
         preload_class(vm_env, "java/lang/OutOfMemoryError");
+    vm_env->java_lang_ThreadDeath_Class = 
+        preload_class(vm_env, "java/lang/ThreadDeath");
 
     vm_env->java_lang_Cloneable_Class =
         preload_class(vm_env, vm_env->Clonable_String);
@@ -704,11 +704,19 @@ int vm_init1(JavaVM_Internal * java_vm, JavaVMInitArgs * vm_arguments) {
 
     // Now the thread is attached to VM and it is valid to disable it.
     hythread_suspend_disable();
-    
-    // Create OutOfMemoryError.
+
+    // Create java.lang.Object.    
+    vm_env->java_lang_Object = oh_allocate_global_handle();
+    vm_env->java_lang_Object->object =
+        class_alloc_new_object(vm_env->JavaLangObject_Class);    
+    // Create java.lang.OutOfMemoryError.
     vm_env->java_lang_OutOfMemoryError = oh_allocate_global_handle();
     vm_env->java_lang_OutOfMemoryError->object = 
         class_alloc_new_object(vm_env->java_lang_OutOfMemoryError_Class);
+    // Create java.lang.ThreadDeath.
+    vm_env->java_lang_ThreadDeath = oh_allocate_global_handle();
+    vm_env->java_lang_ThreadDeath->object = 
+        class_alloc_new_object(vm_env->java_lang_ThreadDeath_Class);
 
     // Create pop frame exception.
     vm_env->popFrameException = oh_allocate_global_handle();
@@ -717,8 +725,8 @@ int vm_init1(JavaVM_Internal * java_vm, JavaVMInitArgs * vm_arguments) {
 
     // Precompile StackOverflowError.
     class_alloc_new_object_and_run_default_constructor(vm_env->java_lang_StackOverflowError_Class);
-    // Precompile ThreadDeathError.
-    class_alloc_new_object_and_run_default_constructor(vm_env->java_lang_ThreadDeathError_Class);
+    // Precompile ThreadDeath.
+    class_alloc_new_object_and_run_default_constructor(vm_env->java_lang_ThreadDeath_Class);
     
     hythread_suspend_enable();
 

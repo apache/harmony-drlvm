@@ -168,7 +168,6 @@ ready_for_exceptions(false)
     JavaLangClass_Class = NULL;
     java_lang_Throwable_Class = NULL;
     java_lang_Error_Class = NULL;
-    java_lang_ThreadDeathError_Class = NULL;
     java_lang_ExceptionInInitializerError_Class = NULL;
     java_lang_NullPointerException_Class = NULL;
     java_lang_StackOverflowError_Class = NULL;
@@ -177,6 +176,7 @@ ready_for_exceptions(false)
     java_lang_ArithmeticException_Class = NULL;
     java_lang_ClassCastException_Class = NULL;
     java_lang_OutOfMemoryError_Class = NULL;
+    java_lang_ThreadDeath_Class = NULL;
 
     java_lang_OutOfMemoryError = NULL;
     popFrameException = NULL;
@@ -193,6 +193,7 @@ ready_for_exceptions(false)
     JavaLangString_VTable = NULL;
 
     vm_class_offset = 0;
+    vm_state = VM_INITIALIZING;
 
     TI = new DebugUtilsTI; 
     vm_methods = new Method_Lookup_Table;
@@ -203,10 +204,6 @@ ready_for_exceptions(false)
 
 Global_Env::~Global_Env()
 {
-    if (get_boolean_property("vm.noCleanupOnExit", false, VM_PROPERTIES)) {
-        return;
-    }
-
     GlobalClassLoaderIterator ClIterator;
     ClassLoader *cl = ClIterator.first();
     

@@ -24,6 +24,7 @@
 #include "open/hythread.h"
 #include "open/jthread.h"
 #include "open/gc.h"
+#include "open/thread_externals.h"
 
 #include "jni.h"
 #include "jni_direct.h"
@@ -82,6 +83,85 @@ static jint exec_shutdown_sequence(JNIEnv * jni_env) {
     return JNI_OK;
 }
 
+static void vm_shutdown_callback() {
+    hythread_t   self_native;
+    jthread      self_java;
+    VM_thread *  self_vm;
+    JNIEnv     * jni_env;
+    Global_Env * vm_env;
+        
+    self_native = hythread_self();
+    self_java = jthread_get_java_thread(self_native);
+    self_vm = get_vm_thread(self_native);
+
+    // Make sure the thread is still attached to the VM.
+    if (self_java == NULL || self_vm == NULL) {
+        return;
+    }
+        
+    jni_env = jthread_get_JNI_env(self_java);
+    vm_env = jni_get_vm_env(jni_env);
+
+    // We need to be in suspend disabled state to be able to throw an exception.
+    assert(!hythread_is_suspend_enabled());
+
+    //hythread_suspend_disable();
+
+    // Raise an exception. In shutdown stage it should cause entire stack unwinding.
+    jthread_throw_exception_object(vm_env->java_lang_ThreadDeath);
+
+    //hythread_suspend_enable();
+}
+
+/*
+void vm_shutdown_stop_java_threads(int exit_code)
+{
+    jthread current_java_thread;
+    JNIEnv_Internal * jni_env;
+    Global_Env * vm_env;
+    
+    // Current thread should be in suspend enabled state to prevent
+    // possible dead-locks.
+    assert(hythread_is_suspend_enabled());
+    
+    current_java_thread = jthread_self();
+    // Current thread should be attached to ThreadManager.
+    assert(current_java_thread);
+    jni_env = (JNIEnv_Internal *) jthread_get_JNI_env(current_java_thread);
+    vm_env = jni_env->vm->vm_env;
+    
+    // 2) Acquire VM state lock.
+    apr_thread_mutex_lock(vm_env->vm_state_mutex);
+    assert(vm_env->vm_state != Global_Env::VM_INITIALIZING);
+    
+    // 3) Check VM state.
+    if (vm_env->vm_state == Global_Env::VM_SHUTDOWNING) {
+        apr_thread_mutex_unlock(vm_env->vm_state_mutex);
+        return;
+    }
+
+    assert(vm_env->vm_state == Global_Env::VM_RUNNING);
+
+    // 4) Change VM state. Exception propagation mechanism should be changed
+    // upon setting up this flag.
+    vm_env->vm_state = Global_Env::VM_SHUTDOWNING;
+    
+    // 5) Block thread creation.
+    // TODO: investigate how to achive that with ThreadManager
+    
+    // 6) Execute shutdown callback for the current thread.
+    vm_shutdown_callback(NULL);
+    
+    // 7) Setup shutdown callback to all java threads but current.
+    // It causes an exception to be raised and all java monitors to
+    // be released upon reaching a safepoint.
+    hythread_group_set_suspend_disabled_callback(hythread_group_get_java(), vm_shutdown_callback, NULL);
+    
+    // 8) Unlock VM state mutex.
+    apr_thread_mutex_unlock(vm_env->vm_state_mutex);
+}
+*/
+
 /**
  * TODO:
  */
@@ -92,13 +172,15 @@ jint vm_destroy(JavaVM_Internal * java_vm, jthread java_thread)
     jobject uncaught_exception;
     VM_thread * vm_thread;
     hythread_t native_thread;
-    hythread_t current_native_thread;
+    hythread_t self;
     hythread_iterator_t it;
+    hythread_t * running_threads;
+    int size;
 
     assert(hythread_is_suspend_enabled());
 
     jni_env = jthread_get_JNI_env(java_thread);
-    current_native_thread = hythread_self();
+    self = hythread_self();
 
     status = jthread_wait_for_all_nondaemon_threads();
     if (status != TM_ERROR_NONE) {
@@ -138,21 +220,42 @@ jint vm_destroy(JavaVM_Internal * java_vm, jthread java_thread)
     // Call Agent_OnUnload() for agents and unload agents.
     java_vm->vm_env->TI->Shutdown(java_vm);
 
+    // Block thread creation.
+    // TODO: investigate how to achive that with ThreadManager
+
+    // Starting this moment any exception occured in java thread will cause
+    // entire java stack unwinding to the most recent native frame.
+    // JNI is not available as well.
+    assert(java_vm->vm_env->vm_state == Global_Env::VM_RUNNING);
+    java_vm->vm_env->vm_state = Global_Env::VM_SHUTDOWNING;
+
     // Stop all (except current) java and native threads
     // before destroying VM-wide data.
 
-    // TODO: current implementation doesn't stop java threads :-(
-    // So, don't perform cleanup if there are running java threads.
+    // Stop java threads
+    size = 0;
     it = hythread_iterator_create(NULL);
-    while (native_thread = hythread_iterator_next(&it)) {
+    running_threads = (hythread_t *)apr_palloc(
+        java_vm->vm_env->mem_pool, hythread_iterator_size(it) * sizeof(hythread_t));
+    while(native_thread = hythread_iterator_next(&it)) {
         vm_thread = get_vm_thread(native_thread);
-        if (vm_thread != NULL && native_thread != current_native_thread) {
-            java_vm->vm_env->VmProperties()->set("vm.noCleanupOnExit", "true");
-            hythread_iterator_release(&it);
-            return JNI_ERR;
+        if (vm_thread != NULL && native_thread != self) {
+            running_threads[size] = native_thread;
+            ++size;
+            hythread_set_safepoint_callback(native_thread, vm_shutdown_callback);
         }
     }
     hythread_iterator_release(&it);
+
+    // Interrupt running threads.
+    for (int i = 0; i < size; i++) {
+        hythread_interrupt(running_threads[i]);
+    }
+
+    // Wait for threads completion.
+    for (int i = 0; i < size; i++) {
+        hythread_join(running_threads[i]);
+    }
 
     // TODO: ups we don't stop native threads as well :-((
     // We are lucky! Currently, there are no such threads.
@@ -160,43 +263,134 @@ jint vm_destroy(JavaVM_Internal * java_vm, jthread java_thread)
     return JNI_OK;
 }
 
-static inline void dump_all_java_stacks()
-{
-    hythread_t native_thread;
-    hythread_iterator_t  iterator;
-    VM_thread * vm_thread;
+static int vm_interrupt_process(void * data) {
+    hythread_t * threadBuf;
+    int i;
 
-    INFO("****** BEGIN OF JAVA STACKS *****\n");
-
-    hythread_suspend_all(&iterator, NULL);
-    native_thread ;
-    while(native_thread = hythread_iterator_next(&iterator)) {
-        vm_thread = get_vm_thread(native_thread);
-        if (!vm_thread) continue;
-        interpreter.stack_dump(vm_thread);
+    threadBuf = (hythread_t *)data;
+    i = 0;
+    // Join all threads.
+    while (threadBuf[i] != NULL) {
+        hythread_join(threadBuf[i]);
+        i++;
     }
-    hythread_resume_all(NULL);
-    
-    INFO("****** END OF JAVA STACKS *****\n");
+
+    // Return 130 to be compatible with RI.
+    exit(130);
 }
 
-void quit_handler(int UNREF x) {
-    jvmti_notify_data_dump_request();
-    if (interpreter_enabled()) {
-        dump_all_java_stacks();
-    } else {
-        td_dump_all_threads(stderr);
+/**
+ * Initiates VM shutdown sequence.
+ */
+static int vm_interrupt_entry_point(void * data) {
+    JNIEnv * jni_env;
+    JavaVMAttachArgs args;
+    JavaVM * java_vm;
+    jint status;
+
+    java_vm = (JavaVM *)data;
+    args.version = JNI_VERSION_1_2;
+    args.group = NULL;
+    args.name = "InterruptionHandler";
+
+    status = AttachCurrentThread(java_vm, (void **)&jni_env, &args);
+    if (status == JNI_OK) {
+        exec_shutdown_sequence(jni_env);
+        DetachCurrentThread(java_vm);
     }
+    return status;
 }
 
-void interrupt_handler(int UNREF x)
-{
-    static bool begin_shutdown_hooks = false;
+/**
+ * Dumps all java stacks.
+ */
+static int vm_dump_entry_point(void * data) {
+    JNIEnv * jni_env;
+    JavaVMAttachArgs args;
+    JavaVM * java_vm;
+    jint status;
 
-    if(!begin_shutdown_hooks){
-        begin_shutdown_hooks = true;
-        //FIXME: integration should do int another way.
-        //vm_set_event(non_daemon_threads_dead_handle);
-    }else
-        exit(1);
+    java_vm = (JavaVM *)data;
+    args.version = JNI_VERSION_1_2;
+    args.group = NULL;
+    args.name = "DumpHandler";
+
+    status = AttachCurrentThread(java_vm, (void **)&jni_env, &args);
+    if (status == JNI_OK) {
+        // TODO: specify particular VM to notify.
+        jvmti_notify_data_dump_request();
+        st_print_all(stdout);
+        DetachCurrentThread(java_vm);
+    }
+    return status;
+}
+
+/**
+ * Current process recieved an interruption signal (Ctrl+C pressed).
+ * Shutdown all running VMs and terminate the process.
+ */
+void vm_interrupt_handler(int UNREF x) {
+    JavaVM ** vmBuf;
+    hythread_t * threadBuf;
+    int nVMs;
+    jint status;
+
+    status = JNI_GetCreatedJavaVMs(NULL, 0, &nVMs);
+    assert(nVMs <= 1);
+    if (status != JNI_OK) return;
+
+    vmBuf = (JavaVM **) STD_MALLOC(nVMs * sizeof(JavaVM *));
+    status = JNI_GetCreatedJavaVMs(vmBuf, nVMs, &nVMs);
+    assert(nVMs <= 1);
+    if (status != JNI_OK) goto cleanup;
+
+    status = hythread_attach(NULL);
+    if (status != TM_ERROR_NONE) goto cleanup;
+
+
+    threadBuf = (hythread_t *) STD_MALLOC((nVMs + 1) * sizeof(hythread_t));
+    threadBuf[nVMs] = NULL;
+
+    // Create a new thread for each VM to avoid scalability and deadlock problems.
+    for (int i = 0; i < nVMs; i++) {
+        threadBuf[i] = NULL;
+        hythread_create((threadBuf + i), 0, HYTHREAD_PRIORITY_NORMAL, 0, vm_interrupt_entry_point, (void *)vmBuf[i]);
+    }
+
+    // spawn a new thread which will terminate the proccess.
+    hythread_create(NULL, 0, HYTHREAD_PRIORITY_NORMAL, 0, vm_interrupt_process, (void *)threadBuf);
+
+cleanup:
+    STD_FREE(vmBuf);
+}
+
+/**
+ * Current process recieved an ??? signal (Ctrl+Break pressed).
+ * Prints java stack traces for each VM running in the current procces.
+ */
+void vm_dump_handler(int UNREF x) {
+    JavaVM ** vmBuf;
+    int nVMs;
+    jint status;
+
+    status = JNI_GetCreatedJavaVMs(NULL, 0, &nVMs);
+    assert(nVMs <= 1);
+    if (status != JNI_OK) return;
+
+    vmBuf = (JavaVM **) STD_MALLOC(nVMs * sizeof(JavaVM *));
+    status = JNI_GetCreatedJavaVMs(vmBuf, nVMs, &nVMs);
+    assert(nVMs <= 1);
+
+    if (status != JNI_OK) goto cleanup;
+
+    status = hythread_attach(NULL);
+    if (status != TM_ERROR_NONE) goto cleanup;
+
+    // Create a new thread for each VM to avoid scalability and deadlock problems.
+    for (int i = 0; i < nVMs; i++) {
+        hythread_create(NULL, 0, HYTHREAD_PRIORITY_NORMAL, 0, vm_dump_entry_point, (void *)vmBuf[i]);
+    }
+
+cleanup:
+    STD_FREE(vmBuf);
 }

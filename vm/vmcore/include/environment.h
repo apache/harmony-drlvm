@@ -42,6 +42,9 @@ typedef struct Assertion_Registry Assertion_Registry;
 
 struct Global_Env {
   public:
+     // Global VM states.
+    enum VM_STATE { VM_INITIALIZING, VM_RUNNING, VM_SHUTDOWNING };
+
     apr_pool_t*               mem_pool; // memory pool
     BootstrapClassLoader*     bootstrap_class_loader;
     UserDefinedClassLoader*   system_class_loader;
@@ -167,7 +170,6 @@ struct Global_Env {
     Class* java_lang_ExceptionInInitializerError_Class;
     Class* java_lang_NullPointerException_Class;
     Class* java_lang_StackOverflowError_Class;
-    Class* java_lang_ThreadDeathError_Class;
 
     Class* java_lang_ClassNotFoundException_Class;
     Class* java_lang_NoClassDefFoundError_Class;
@@ -177,8 +179,11 @@ struct Global_Env {
     Class* java_lang_ArithmeticException_Class;
     Class* java_lang_ClassCastException_Class;
     Class* java_lang_OutOfMemoryError_Class;
+    Class* java_lang_ThreadDeath_Class;
+
+    ObjectHandle java_lang_Object;
     ObjectHandle java_lang_OutOfMemoryError;
-    ObjectHandle java_lang_ThreadDeathError;
+    ObjectHandle java_lang_ThreadDeath;
     // object of java.lang.Error class used for JVMTI JIT PopFrame support
     ObjectHandle popFrameException;
 
@@ -205,6 +210,9 @@ struct Global_Env {
 
     // Offset to the vm_class field in java.lang.Class;
     unsigned vm_class_offset;
+
+    // The VM state. See VM_STATE enum above.
+    volatile int vm_state;
 
     // FIXME
     // The whole environemt will be refactored to VM instance
@@ -235,6 +243,18 @@ struct Global_Env {
     void FinishVMBootstrap() {
         assert(bootstrapping);
         bootstrapping = false;
+    }
+
+    int isVmInitializing() {
+        return vm_state == VM_INITIALIZING;
+    }
+
+    int isVmRunning() {
+        return vm_state == VM_RUNNING;
+    }
+
+    int IsVmShutdowning() {
+        return vm_state == VM_SHUTDOWNING;
     }
 
     //load a class via bootstrap classloader

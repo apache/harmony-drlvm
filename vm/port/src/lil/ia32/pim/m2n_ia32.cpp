@@ -19,15 +19,17 @@
  * @version $Revision: 1.1.2.1.4.4 $
  */  
 
+#include "open/types.h"
+#include "open/hythread.h"
 
-#include "port_malloc.h"
 #include "m2n.h"
 #include "m2n_ia32_internal.h"
+#include "port_malloc.h"
 #include "object_handles.h"
 #include "vm_threads.h"
-#include "open/types.h"
 #include "encoder.h"
 #include "interpreter.h" // for asserts only
+#include "exceptions.h"
 
 
 //////////////////////////////////////////////////////////////////////////
@@ -234,8 +236,6 @@ char* m2n_gen_set_local_handles(char* buf, unsigned bytes_to_m2n, R_Opnd* src_re
     return buf;
 }
 
-void free_local_object_handles2(ObjectHandles*);
-
 unsigned m2n_pop_m2n_size(bool handles, unsigned num_callee_saves, unsigned extra_on_stack, unsigned preserve_ret)
 {
     unsigned size = 7+(4-num_callee_saves);
@@ -245,54 +245,69 @@ unsigned m2n_pop_m2n_size(bool handles, unsigned num_callee_saves, unsigned extr
     return size + 128;
 }
 
-void m2n_pop_local_handles() {
-    M2nFrame *m2n = m2n_get_last_frame();
+static void m2n_pop_local_handles() {
+    assert(!hythread_is_suspend_enabled());
+    
+    if (exn_raised()) {
+        exn_rethrow();
+    }
+    
+    M2nFrame * m2n = m2n_get_last_frame();
+    free_local_object_handles2(m2n->local_object_handles);
+}
+
+static void m2n_free_local_handles() {
+    assert(!hythread_is_suspend_enabled());
+
+    if (exn_raised()) {
+        exn_rethrow();
+    }
+
+    M2nFrame * m2n = m2n_get_last_frame();
     free_local_object_handles3(m2n->local_object_handles);
 }
 
 char* m2n_gen_pop_m2n(char* buf, bool handles, unsigned num_callee_saves, unsigned extra_on_stack, unsigned preserve_ret)
 {
-    if (handles) {
-        // Must free the handles
-        unsigned handles_off = 8+extra_on_stack;
-        if (preserve_ret>0) {
-            // Save return value
-            handles_off += 4;
-            buf = push(buf,  eax_opnd);
-            if (preserve_ret>1) {
-                handles_off += 4;
-                buf = push(buf,  edx_opnd);
-            }
+    if (preserve_ret > 0) {
+        // Save return value
+        buf = push(buf,  eax_opnd);
+        if (preserve_ret > 1) {
+            buf = push(buf,  edx_opnd);
         }
-        M_Base_Opnd m(esp_reg, handles_off);
-        buf = push(buf,  m);
-        buf = call(buf, (char*)free_local_object_handles2);
-        Imm_Opnd imm(4);
-        buf = alu(buf, add_opc,  esp_opnd,  imm);
-        if (preserve_ret>0) {
-            // Restore return value
-            if (preserve_ret>1) buf = pop(buf,  edx_opnd);
-            buf = pop(buf,  eax_opnd);
-        }
-    } else {
-        buf = push(buf, eax_opnd);
-        buf = push(buf, ecx_opnd);
-        buf = push(buf, edx_opnd);
-        buf = call(buf, (char*)m2n_pop_local_handles);
-        buf = pop(buf, edx_opnd);
-        buf = pop(buf, ecx_opnd);
-        buf = pop(buf, eax_opnd);
     }
     
+    if (handles) {
+        // There are handles located on the stack
+        buf = call(buf, (char*)m2n_pop_local_handles);
+    } else {
+        buf = call(buf, (char*)m2n_free_local_handles);
+    }
+    
+    if (preserve_ret > 0) {
+        // Restore return value
+        if (preserve_ret > 1) {
+            buf = pop(buf,  edx_opnd);
+        }
+        buf = pop(buf,  eax_opnd);
+    }
+    
+    // pop "garbage" from the stack
     if (extra_on_stack) {
         Imm_Opnd imm(extra_on_stack);
         buf = alu(buf, add_opc,  esp_opnd,  imm);
     }
+    
+    // Unlink the M2nFrame from the list of the current thread
     buf = pop(buf,  esi_opnd);
     buf = pop(buf,  ebx_opnd);
     buf = mov(buf,  M_Base_Opnd(ebx_reg, +0),  esi_opnd);
     buf = alu(buf, add_opc,  esp_opnd,  Imm_Opnd(+16));
-
+    
+    // TODO: check if there is no need to restore callee saved registers
+    // JUSTIFICATION: m2n frame is popped as a result of "normal"
+    //                (opposite to destuctive) stack unwinding
+    // Restore callee saved general registers
     if (num_callee_saves<4) buf = pop(buf,  edi_opnd);
     if (num_callee_saves<3) buf = pop(buf,  esi_opnd);
     if (num_callee_saves<2) buf = pop(buf,  ebx_opnd);

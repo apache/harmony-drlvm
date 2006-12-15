@@ -57,14 +57,17 @@ static Method* lookup_method_clinit(Class* clss)
 } // lookup_method_clinit
 
 
-jmethodID JNICALL GetMethodID(JNIEnv *env,
+jmethodID JNICALL GetMethodID(JNIEnv * jni_env,
                               jclass clazz,
                               const char *name,
                               const char *descr)
 {
-    TRACE2("jni", "GetMethodID called");
+    TRACE2("jni", "GetMethodID called: " << name << descr);
     assert(hythread_is_suspend_enabled());
     assert(clazz);
+
+    Global_Env * vm_env = jni_get_vm_env(jni_env);
+    if (vm_env->IsVmShutdowning()) return NULL;
 
     Class* clss = jclass_to_struct_Class(clazz);
     Method *method;
@@ -72,7 +75,7 @@ jmethodID JNICALL GetMethodID(JNIEnv *env,
         if (!strcmp(name + 1, "init>")) {
             method = lookup_method_init(clss, descr);
         } else {
-            ThrowNew_Quick(env, "java/lang/NoSuchMethodError", name);
+            ThrowNew_Quick(jni_env, "java/lang/NoSuchMethodError", name);
             return NULL;
         }
     } else {
@@ -80,7 +83,7 @@ jmethodID JNICALL GetMethodID(JNIEnv *env,
     }
 
     if(!method || method->is_static()) {
-        ThrowNew_Quick(env, "java/lang/NoSuchMethodError", name);
+        ThrowNew_Quick(jni_env, "java/lang/NoSuchMethodError", name);
         return NULL;
     }
     TRACE2("jni", "GetMethodID " << clss->get_name()->bytes
@@ -91,21 +94,24 @@ jmethodID JNICALL GetMethodID(JNIEnv *env,
 
 
 
-jmethodID JNICALL GetStaticMethodID(JNIEnv *env,
+jmethodID JNICALL GetStaticMethodID(JNIEnv *jni_env,
                                     jclass clazz,
                                     const char *name,
                                     const char *descr)
 {
-    TRACE2("jni", "GetStaticMethodID called");
+    TRACE2("jni", "GetStaticMethodID called: " << name << descr);
     assert(hythread_is_suspend_enabled());
     Class* clss = jclass_to_struct_Class(clazz);
+    
+    Global_Env * vm_env = jni_get_vm_env(jni_env);
+    if (vm_env->IsVmShutdowning()) return NULL;
 
     Method *method;
     if ('<' == *name) {
         if (!strcmp(name + 1, "clinit>") && !strcmp(descr, "()V")) {
             method = lookup_method_clinit(clss);
         } else {
-            ThrowNew_Quick(env, "java/lang/NoSuchMethodError", name);
+            ThrowNew_Quick(jni_env, "java/lang/NoSuchMethodError", name);
             return NULL;
         }
     } else {
@@ -113,7 +119,7 @@ jmethodID JNICALL GetStaticMethodID(JNIEnv *env,
     }
 
     if(!method || !method->is_static()) {
-        ThrowNew_Quick(env, "java/lang/NoSuchMethodError", name);
+        ThrowNew_Quick(jni_env, "java/lang/NoSuchMethodError", name);
         return NULL;
     }
     TRACE2("jni", "GetStaticMethodID " << clss->get_name()->bytes
@@ -146,7 +152,7 @@ static Method *object_lookup_method(jobject obj, const String* name, const Strin
 // begin Call<Type>MethodA functions
 
 
-static void call_method_no_ref_result(JNIEnv *env,
+static void call_method_no_ref_result(JNIEnv * jni_env,
                                       jobject obj,
                                       jmethodID methodID,
                                       jvalue *args,
@@ -166,12 +172,12 @@ static void call_method_no_ref_result(JNIEnv *env,
     // class_parse_methods() in Class_File_Loader.cpp, 
     // and to add similar functionality to interpreter
     if (method->is_abstract()) {
-        ThrowNew_Quick (env, "java/lang/AbstractMethodError", 
+        ThrowNew_Quick (jni_env, "java/lang/AbstractMethodError", 
                 "attempt to invoke abstract method");
         return;
     }
 
-    if (!ensure_initialised(env, method->get_class()))
+    if (!ensure_initialised(jni_env, method->get_class()))
         return;
 
     unsigned num_args = method->get_num_args();
@@ -187,70 +193,78 @@ static void call_method_no_ref_result(JNIEnv *env,
 
 
 
-void JNICALL CallVoidMethod(JNIEnv *env, jobject obj, jmethodID methodID, ...)
+void JNICALL CallVoidMethod(JNIEnv * jni_env, jobject obj, jmethodID methodID, ...)
 {
     TRACE2("jni", "CallVoidMethod called, id = " << methodID);
     assert(hythread_is_suspend_enabled());
     va_list args;
     va_start(args, methodID);
-    CallVoidMethodV(env, obj, methodID, args);
+    CallVoidMethodV(jni_env, obj, methodID, args);
 } //CallVoidMethod
 
 
 
-void JNICALL CallVoidMethodV(JNIEnv *env, jobject obj, jmethodID methodID, va_list args)
+void JNICALL CallVoidMethodV(JNIEnv * jni_env, jobject obj, jmethodID methodID, va_list args)
 {
     TRACE2("jni", "CallVoidMethodV called, id = " << methodID);
     assert(hythread_is_suspend_enabled());
     jvalue *jvalue_args = get_jvalue_arg_array((Method *)methodID, args);
-    CallVoidMethodA(env, obj, methodID, jvalue_args);
+    CallVoidMethodA(jni_env, obj, methodID, jvalue_args);
     STD_FREE(jvalue_args);
 } //CallVoidMethodV
 
 
 
-void JNICALL CallVoidMethodA(JNIEnv *env,
+void JNICALL CallVoidMethodA(JNIEnv * jni_env,
                              jobject obj,
                              jmethodID methodID,
                              jvalue *args)
 {
     TRACE2("jni", "CallVoidMethodA called, id = " << methodID);
     assert(hythread_is_suspend_enabled());
-    call_method_no_ref_result(env, obj, methodID, args, 0, FALSE);
+
+    Global_Env * vm_env = jni_get_vm_env(jni_env);
+    if (vm_env->IsVmShutdowning()) return;
+
+    call_method_no_ref_result(jni_env, obj, methodID, args, 0, FALSE);
 } //CallVoidMethodA
 
 
 
-jobject JNICALL CallObjectMethod(JNIEnv *env, jobject obj, jmethodID methodID, ...)
+jobject JNICALL CallObjectMethod(JNIEnv * jni_env, jobject obj, jmethodID methodID, ...)
 {
     TRACE2("jni", "CallObjectMethod called, id = " << methodID);
     assert(hythread_is_suspend_enabled());
     va_list args;
     va_start(args, methodID);
-    return CallObjectMethodV(env, obj, methodID, args);
+    return CallObjectMethodV(jni_env, obj, methodID, args);
 } //CallObjectMethod
 
 
 
-jobject JNICALL CallObjectMethodV(JNIEnv *env, jobject obj, jmethodID methodID, va_list args)
+jobject JNICALL CallObjectMethodV(JNIEnv * jni_env, jobject obj, jmethodID methodID, va_list args)
 {
     TRACE2("jni", "CallObjectMethodV called, id = " << methodID);
     assert(hythread_is_suspend_enabled());
     jvalue *jvalue_args = get_jvalue_arg_array((Method *)methodID, args);
-    jobject result = CallObjectMethodA(env, obj, methodID, jvalue_args);
+    jobject result = CallObjectMethodA(jni_env, obj, methodID, jvalue_args);
     STD_FREE(jvalue_args);
     return result;
 } //CallObjectMethodV
 
 
 
-jobject JNICALL CallObjectMethodA(JNIEnv *env,
+jobject JNICALL CallObjectMethodA(JNIEnv * jni_env,
                                   jobject obj,
                                   jmethodID methodID,
                                   jvalue *args)
 {
     TRACE2("jni", "CallObjectMethodA called, id = " << methodID);
     assert(hythread_is_suspend_enabled());
+
+    Global_Env * vm_env = jni_get_vm_env(jni_env);
+    if (vm_env->IsVmShutdowning()) return NULL;
+
     jvalue result;
     Method *method = (Method *)methodID; // resolve to actual vtable entry below
 
@@ -264,12 +278,12 @@ jobject JNICALL CallObjectMethodA(JNIEnv *env,
     // class_parse_methods() in Class_File_Loader.cpp, 
     // and to add similar functionality to interpreter
     if (method->is_abstract()) {
-        ThrowNew_Quick (env, "java/lang/AbstractMethodError", 
+        ThrowNew_Quick (jni_env, "java/lang/AbstractMethodError", 
                 "attempt to invoke abstract method");
         return NULL;
     }
 
-    if (!ensure_initialised(env, method->get_class()))
+    if (!ensure_initialised(jni_env, method->get_class()))
         return NULL;
 
     unsigned num_args = method->get_num_args();
@@ -287,301 +301,335 @@ jobject JNICALL CallObjectMethodA(JNIEnv *env,
 
 
 
-jboolean JNICALL CallBooleanMethod(JNIEnv *env, jobject obj, jmethodID methodID, ...)
+jboolean JNICALL CallBooleanMethod(JNIEnv * jni_env, jobject obj, jmethodID methodID, ...)
 {
     TRACE2("jni", "CallBooleanMethod called, id = " << methodID);
     assert(hythread_is_suspend_enabled());
     va_list args;
     va_start(args, methodID);
-    return CallBooleanMethodV(env, obj, methodID, args);
+    return CallBooleanMethodV(jni_env, obj, methodID, args);
 } //CallBooleanMethod
 
 
 
-jboolean JNICALL CallBooleanMethodV(JNIEnv *env, jobject obj, jmethodID methodID, va_list args)
+jboolean JNICALL CallBooleanMethodV(JNIEnv * jni_env, jobject obj, jmethodID methodID, va_list args)
 {
     TRACE2("jni", "CallBooleanMethodV called, id = " << methodID);
     assert(hythread_is_suspend_enabled());
     jvalue *jvalue_args = get_jvalue_arg_array((Method *)methodID, args);
-    jboolean result = CallBooleanMethodA(env, obj, methodID, jvalue_args);
+    jboolean result = CallBooleanMethodA(jni_env, obj, methodID, jvalue_args);
     STD_FREE(jvalue_args);
     return result;
 } //CallBooleanMethodV
 
 
 
-jboolean JNICALL CallBooleanMethodA(JNIEnv *env,
+jboolean JNICALL CallBooleanMethodA(JNIEnv * jni_env,
                                     jobject obj,
                                     jmethodID methodID,
                                     jvalue *args)
 {
     TRACE2("jni", "CallBooleanMethodA called, id = " << methodID);
     assert(hythread_is_suspend_enabled());
+    
+    Global_Env * vm_env = jni_get_vm_env(jni_env);
+    if (vm_env->IsVmShutdowning()) return 0;
+
     jvalue result;
-    call_method_no_ref_result(env, obj, methodID, args, &result, FALSE);
+    call_method_no_ref_result(jni_env, obj, methodID, args, &result, FALSE);
     return result.z;
 } //CallBooleanMethodA
 
 
 
-jbyte JNICALL CallByteMethod(JNIEnv *env, jobject obj, jmethodID methodID, ...)
+jbyte JNICALL CallByteMethod(JNIEnv * jni_env, jobject obj, jmethodID methodID, ...)
 {
     TRACE2("jni", "CallByteMethod called, id = " << methodID);
     assert(hythread_is_suspend_enabled());
     va_list args;
     va_start(args, methodID);
-    return CallByteMethodV(env, obj, methodID, args);
+    return CallByteMethodV(jni_env, obj, methodID, args);
 } //CallByteMethod
 
 
 
-jbyte JNICALL CallByteMethodV(JNIEnv *env, jobject obj, jmethodID methodID, va_list args)
+jbyte JNICALL CallByteMethodV(JNIEnv * jni_env, jobject obj, jmethodID methodID, va_list args)
 {
     TRACE2("jni", "CallByteMethodV called, id = " << methodID);
     assert(hythread_is_suspend_enabled());
     jvalue *jvalue_args = get_jvalue_arg_array((Method *)methodID, args);
-    jbyte result = CallByteMethodA(env, obj, methodID, jvalue_args);
+    jbyte result = CallByteMethodA(jni_env, obj, methodID, jvalue_args);
     STD_FREE(jvalue_args);
     return result;
 } //CallByteMethodV
 
 
 
-jbyte JNICALL CallByteMethodA(JNIEnv *env,
+jbyte JNICALL CallByteMethodA(JNIEnv * jni_env,
                               jobject obj,
                               jmethodID methodID,
                               jvalue *args)
 {
     TRACE2("jni", "CallByteMethodA called, id = " << methodID);
     assert(hythread_is_suspend_enabled());
+
+    Global_Env * vm_env = jni_get_vm_env(jni_env);
+    if (vm_env->IsVmShutdowning()) return 0;
+
     jvalue result;
-    call_method_no_ref_result(env, obj, methodID, args, &result, FALSE);
+    call_method_no_ref_result(jni_env, obj, methodID, args, &result, FALSE);
     return result.b;
 } //CallByteMethodA
 
 
-jchar JNICALL CallCharMethod(JNIEnv *env, jobject obj, jmethodID methodID, ...)
+
+
+jchar JNICALL CallCharMethod(JNIEnv * jni_env, jobject obj, jmethodID methodID, ...)
 {
     TRACE2("jni", "CallCharMethod called, id = " << methodID);
     assert(hythread_is_suspend_enabled());
     va_list args;
     va_start(args, methodID);
-    return CallCharMethodV(env, obj, methodID, args);
+    return CallCharMethodV(jni_env, obj, methodID, args);
 } //CallCharMethod
 
 
 
-jchar JNICALL CallCharMethodV(JNIEnv *env, jobject obj, jmethodID methodID, va_list args)
+jchar JNICALL CallCharMethodV(JNIEnv * jni_env, jobject obj, jmethodID methodID, va_list args)
 {
     TRACE2("jni", "CallCharMethodV called, id = " << methodID);
     assert(hythread_is_suspend_enabled());
     jvalue *jvalue_args = get_jvalue_arg_array((Method *)methodID, args);
-    jchar result = CallCharMethodA(env, obj, methodID, jvalue_args);
+    jchar result = CallCharMethodA(jni_env, obj, methodID, jvalue_args);
     STD_FREE(jvalue_args);
     return result;
 } //CallCharMethodV
 
 
 
-jchar JNICALL CallCharMethodA(JNIEnv *env,
+jchar JNICALL CallCharMethodA(JNIEnv * jni_env,
                               jobject obj,
                               jmethodID methodID,
                               jvalue *args)
 {
     TRACE2("jni", "CallCharMethodA called, id = " << methodID);
     assert(hythread_is_suspend_enabled());
+
+    Global_Env * vm_env = jni_get_vm_env(jni_env);
+    if (vm_env->IsVmShutdowning()) return 0;
+
     jvalue result;
-    call_method_no_ref_result(env, obj, methodID, args, &result, FALSE);
+    call_method_no_ref_result(jni_env, obj, methodID, args, &result, FALSE);
     return result.c;
 } //CallCharMethodA
 
 
 
 
-jshort JNICALL CallShortMethod(JNIEnv *env, jobject obj, jmethodID methodID, ...)
+jshort JNICALL CallShortMethod(JNIEnv * jni_env, jobject obj, jmethodID methodID, ...)
 {
     TRACE2("jni", "CallShortMethod called, id = " << methodID);
     assert(hythread_is_suspend_enabled());
     va_list args;
     va_start(args, methodID);
-    return CallShortMethodV(env, obj, methodID, args);
+    return CallShortMethodV(jni_env, obj, methodID, args);
 } //CallShortMethod
 
 
 
-jshort JNICALL CallShortMethodV(JNIEnv *env, jobject obj, jmethodID methodID, va_list args)
+jshort JNICALL CallShortMethodV(JNIEnv * jni_env, jobject obj, jmethodID methodID, va_list args)
 {
     TRACE2("jni", "CallShortMethodV called, id = " << methodID);
     assert(hythread_is_suspend_enabled());
     jvalue *jvalue_args = get_jvalue_arg_array((Method *)methodID, args);
-    jshort result = CallShortMethodA(env, obj, methodID, jvalue_args);
+    jshort result = CallShortMethodA(jni_env, obj, methodID, jvalue_args);
     STD_FREE(jvalue_args);
     return result;
 } //CallShortMethodV
 
 
 
-jshort JNICALL CallShortMethodA(JNIEnv *env,
+jshort JNICALL CallShortMethodA(JNIEnv * jni_env,
                                 jobject obj,
                                 jmethodID methodID,
                                 jvalue *args)
 {
     TRACE2("jni", "CallShortMethodA called, id = " << methodID);
     assert(hythread_is_suspend_enabled());
+
+    Global_Env * vm_env = jni_get_vm_env(jni_env);
+    if (vm_env->IsVmShutdowning()) return 0;
+
     jvalue result;
-    call_method_no_ref_result(env, obj, methodID, args, &result, FALSE);
+    call_method_no_ref_result(jni_env, obj, methodID, args, &result, FALSE);
     return result.s;
 } //CallShortMethodA
 
 
 
 
-jint JNICALL CallIntMethod(JNIEnv *env, jobject obj, jmethodID methodID, ...)
+jint JNICALL CallIntMethod(JNIEnv * jni_env, jobject obj, jmethodID methodID, ...)
 {
     TRACE2("jni", "CallIntMethod called, id = " << methodID);
     assert(hythread_is_suspend_enabled());
     va_list args;
     va_start(args, methodID);
-    return CallIntMethodV(env, obj, methodID, args);
+    return CallIntMethodV(jni_env, obj, methodID, args);
 } //CallIntMethod
 
 
 
-jint JNICALL CallIntMethodV(JNIEnv *env, jobject obj, jmethodID methodID, va_list args)
+jint JNICALL CallIntMethodV(JNIEnv * jni_env, jobject obj, jmethodID methodID, va_list args)
 {
     TRACE2("jni", "CallIntMethodV called, id = " << methodID);
     assert(hythread_is_suspend_enabled());
     jvalue *jvalue_args = get_jvalue_arg_array((Method *)methodID, args);
-    jint result = CallIntMethodA(env, obj, methodID, jvalue_args);
+    jint result = CallIntMethodA(jni_env, obj, methodID, jvalue_args);
     STD_FREE(jvalue_args);
     return result;
 } //CallIntMethodV
 
 
 
-jint JNICALL CallIntMethodA(JNIEnv *env,
+jint JNICALL CallIntMethodA(JNIEnv * jni_env,
                               jobject obj,
                               jmethodID methodID,
                               jvalue *args)
 {
     TRACE2("jni", "CallIntMethodA called, id = " << methodID);
     assert(hythread_is_suspend_enabled());
+
+    Global_Env * vm_env = jni_get_vm_env(jni_env);
+    if (vm_env->IsVmShutdowning()) return 0;
+
     jvalue result;
-    call_method_no_ref_result(env, obj, methodID, args, &result, FALSE);
+    call_method_no_ref_result(jni_env, obj, methodID, args, &result, FALSE);
     return result.i;
 } //CallIntMethodA
 
 
 
 
-jlong JNICALL CallLongMethod(JNIEnv *env, jobject obj, jmethodID methodID, ...)
+jlong JNICALL CallLongMethod(JNIEnv * jni_env, jobject obj, jmethodID methodID, ...)
 {
     TRACE2("jni", "CallLongMethod called, id = " << methodID);
     assert(hythread_is_suspend_enabled());
     va_list args;
     va_start(args, methodID);
-    return CallLongMethodV(env, obj, methodID, args);
+    return CallLongMethodV(jni_env, obj, methodID, args);
 } //CallLongMethod
 
 
 
-jlong JNICALL CallLongMethodV(JNIEnv *env, jobject obj, jmethodID methodID, va_list args)
+jlong JNICALL CallLongMethodV(JNIEnv * jni_env, jobject obj, jmethodID methodID, va_list args)
 {
     TRACE2("jni", "CallLongMethodV called, id = " << methodID);
     assert(hythread_is_suspend_enabled());
     jvalue *jvalue_args = get_jvalue_arg_array((Method *)methodID, args);
-    jlong result = CallLongMethodA(env, obj, methodID, jvalue_args);
+    jlong result = CallLongMethodA(jni_env, obj, methodID, jvalue_args);
     STD_FREE(jvalue_args);
     return result;
 } //CallLongMethodV
 
 
 
-jlong JNICALL CallLongMethodA(JNIEnv *env,
+jlong JNICALL CallLongMethodA(JNIEnv * jni_env,
                               jobject obj,
                               jmethodID methodID,
                               jvalue *args)
 {
     TRACE2("jni", "CallLongMethodA called, id = " << methodID);
     assert(hythread_is_suspend_enabled());
+
+    Global_Env * vm_env = jni_get_vm_env(jni_env);
+    if (vm_env->IsVmShutdowning()) return 0;
+
     jvalue result;
-    call_method_no_ref_result(env, obj, methodID, args, &result, FALSE);
+    call_method_no_ref_result(jni_env, obj, methodID, args, &result, FALSE);
     return result.j;
 } //CallLongMethodA
 
 
 
 
-jfloat JNICALL CallFloatMethod(JNIEnv *env, jobject obj, jmethodID methodID, ...)
+jfloat JNICALL CallFloatMethod(JNIEnv * jni_env, jobject obj, jmethodID methodID, ...)
 {
     TRACE2("jni", "CallFloatMethod called, id = " << methodID);
     assert(hythread_is_suspend_enabled());
     va_list args;
     va_start(args, methodID);
-    return CallFloatMethodV(env, obj, methodID, args);
+    return CallFloatMethodV(jni_env, obj, methodID, args);
 } //CallFloatMethod
 
 
 
-jfloat JNICALL CallFloatMethodV(JNIEnv *env, jobject obj, jmethodID methodID, va_list args)
+jfloat JNICALL CallFloatMethodV(JNIEnv * jni_env, jobject obj, jmethodID methodID, va_list args)
 {
     TRACE2("jni", "CallFloatMethodV called, id = " << methodID);
     assert(hythread_is_suspend_enabled());
     jvalue *jvalue_args = get_jvalue_arg_array((Method *)methodID, args);
-    jfloat result = CallFloatMethodA(env, obj, methodID, jvalue_args);
+    jfloat result = CallFloatMethodA(jni_env, obj, methodID, jvalue_args);
     STD_FREE(jvalue_args);
     return result;
 } //CallFloatMethodV
 
 
 
-jfloat JNICALL CallFloatMethodA(JNIEnv *env,
+jfloat JNICALL CallFloatMethodA(JNIEnv * jni_env,
                                 jobject obj,
                                 jmethodID methodID,
                                 jvalue *args)
 {
     TRACE2("jni", "CallFloatMethodA called, id = " << methodID);
     assert(hythread_is_suspend_enabled());
+
+    Global_Env * vm_env = jni_get_vm_env(jni_env);
+    if (vm_env->IsVmShutdowning()) return 0;
+
     jvalue result;
-    call_method_no_ref_result(env, obj, methodID, args, &result, FALSE);
+    call_method_no_ref_result(jni_env, obj, methodID, args, &result, FALSE);
     return result.f;
 } //CallFloatMethodA
 
 
 
 
-jdouble JNICALL CallDoubleMethod(JNIEnv *env, jobject obj, jmethodID methodID, ...)
+jdouble JNICALL CallDoubleMethod(JNIEnv * jni_env, jobject obj, jmethodID methodID, ...)
 {
     TRACE2("jni", "CallDoubleMethod called, id = " << methodID);
     assert(hythread_is_suspend_enabled());
     va_list args;
     va_start(args, methodID);
-    return CallDoubleMethodV(env, obj, methodID, args);
+    return CallDoubleMethodV(jni_env, obj, methodID, args);
 } //CallDoubleMethod
 
 
 
-jdouble JNICALL CallDoubleMethodV(JNIEnv *env, jobject obj, jmethodID methodID, va_list args)
+jdouble JNICALL CallDoubleMethodV(JNIEnv * jni_env, jobject obj, jmethodID methodID, va_list args)
 {
     TRACE2("jni", "CallDoubleMethodV called, id = " << methodID);
     assert(hythread_is_suspend_enabled());
     jvalue *jvalue_args = get_jvalue_arg_array((Method *)methodID, args);
-    jdouble result = CallDoubleMethodA(env, obj, methodID, jvalue_args);
+    jdouble result = CallDoubleMethodA(jni_env, obj, methodID, jvalue_args);
     STD_FREE(jvalue_args);
     return result;
 } //CallDoubleMethodV
 
 
 
-jdouble JNICALL CallDoubleMethodA(JNIEnv *env,
+jdouble JNICALL CallDoubleMethodA(JNIEnv * jni_env,
                                   jobject obj,
                                   jmethodID methodID,
                                   jvalue *args)
 {
     TRACE2("jni", "CallDoubleMethodA called, id = " << methodID);
     assert(hythread_is_suspend_enabled());
+
+    Global_Env * vm_env = jni_get_vm_env(jni_env);
+    if (vm_env->IsVmShutdowning()) return 0;
+
     jvalue result;
-    call_method_no_ref_result(env, obj, methodID, args, &result, FALSE);
+    call_method_no_ref_result(jni_env, obj, methodID, args, &result, FALSE);
     return result.d;
 } //CallDoubleMethodA
 
@@ -597,7 +645,7 @@ jdouble JNICALL CallDoubleMethodA(JNIEnv *env,
 // begin CallNonvirtual<Type>MethodA functions
 
 
-void JNICALL CallNonvirtualVoidMethod(JNIEnv *env,
+void JNICALL CallNonvirtualVoidMethod(JNIEnv * jni_env,
                                        jobject obj,
                                        jclass clazz,
                                        jmethodID methodID,
@@ -607,12 +655,12 @@ void JNICALL CallNonvirtualVoidMethod(JNIEnv *env,
     assert(hythread_is_suspend_enabled());
     va_list args;
     va_start(args, methodID);
-    CallNonvirtualVoidMethodV(env, obj, clazz, methodID, args);
+    CallNonvirtualVoidMethodV(jni_env, obj, clazz, methodID, args);
 } //CallNonvirtualVoidMethod
 
 
 
-void JNICALL CallNonvirtualVoidMethodV(JNIEnv *env,
+void JNICALL CallNonvirtualVoidMethodV(JNIEnv * jni_env,
                                        jobject obj,
                                        jclass clazz,
                                        jmethodID methodID,
@@ -621,13 +669,13 @@ void JNICALL CallNonvirtualVoidMethodV(JNIEnv *env,
     TRACE2("jni", "CallNonvirtualVoidMethodV called, id = " << methodID);
     assert(hythread_is_suspend_enabled());
     jvalue *jvalue_args = get_jvalue_arg_array((Method *)methodID, args);
-    CallNonvirtualVoidMethodA(env, obj, clazz, methodID, jvalue_args);
+    CallNonvirtualVoidMethodA(jni_env, obj, clazz, methodID, jvalue_args);
     STD_FREE(jvalue_args);
 } //CallNonvirtualVoidMethodV
 
 
 
-void JNICALL CallNonvirtualVoidMethodA(JNIEnv *env,
+void JNICALL CallNonvirtualVoidMethodA(JNIEnv * jni_env,
                                        jobject obj,
                                        jclass UNREF clazz,
                                        jmethodID methodID,
@@ -635,12 +683,16 @@ void JNICALL CallNonvirtualVoidMethodA(JNIEnv *env,
 {
     TRACE2("jni", "CallNonvirtualVoidMethodA called, id = " << methodID);
     assert(hythread_is_suspend_enabled());
-    call_method_no_ref_result(env, obj, methodID, args, 0, TRUE);
+
+    Global_Env * vm_env = jni_get_vm_env(jni_env);
+    if (vm_env->IsVmShutdowning()) return;
+
+    call_method_no_ref_result(jni_env, obj, methodID, args, 0, TRUE);
 } //CallNonvirtualVoidMethodA
 
 
 
-jobject JNICALL CallNonvirtualObjectMethod(JNIEnv *env,
+jobject JNICALL CallNonvirtualObjectMethod(JNIEnv * jni_env,
                                            jobject obj,
                                            jclass clazz,
                                            jmethodID methodID,
@@ -650,12 +702,12 @@ jobject JNICALL CallNonvirtualObjectMethod(JNIEnv *env,
     assert(hythread_is_suspend_enabled());
     va_list args;
     va_start(args, methodID);
-    return CallNonvirtualObjectMethodV(env, obj, clazz, methodID, args);
+    return CallNonvirtualObjectMethodV(jni_env, obj, clazz, methodID, args);
 } //CallNonvirtualObjectMethod
 
 
 
-jobject JNICALL CallNonvirtualObjectMethodV(JNIEnv *env,
+jobject JNICALL CallNonvirtualObjectMethodV(JNIEnv * jni_env,
                                             jobject obj,
                                             jclass clazz,
                                             jmethodID methodID,
@@ -664,14 +716,14 @@ jobject JNICALL CallNonvirtualObjectMethodV(JNIEnv *env,
     TRACE2("jni", "CallNonvirtualObjectMethodV called, id = " << methodID);
     assert(hythread_is_suspend_enabled());
     jvalue *jvalue_args = get_jvalue_arg_array((Method *)methodID, args);
-    jobject result = CallNonvirtualObjectMethodA(env, obj, clazz, methodID, jvalue_args);
+    jobject result = CallNonvirtualObjectMethodA(jni_env, obj, clazz, methodID, jvalue_args);
     STD_FREE(jvalue_args);
     return result;
 } //CallNonvirtualObjectMethodV
 
 
 
-jobject JNICALL CallNonvirtualObjectMethodA(JNIEnv *env,
+jobject JNICALL CallNonvirtualObjectMethodA(JNIEnv * jni_env,
                                             jobject obj,
                                             jclass UNREF clazz,
                                             jmethodID methodID,
@@ -679,9 +731,13 @@ jobject JNICALL CallNonvirtualObjectMethodA(JNIEnv *env,
 {
     TRACE2("jni", "CallNonvirtualObjectMethodA called, id = " << methodID);
     assert(hythread_is_suspend_enabled());
+
+    Global_Env * vm_env = jni_get_vm_env(jni_env);
+    if (vm_env->IsVmShutdowning()) return NULL;
+
     jvalue result;
     Method *method = (Method *)methodID;
-    if (!ensure_initialised(env, method->get_class()))
+    if (!ensure_initialised(jni_env, method->get_class()))
         return NULL;
     unsigned num_args = method->get_num_args();
     jvalue *all_args = (jvalue*) STD_ALLOCA(num_args * sizeof(jvalue));
@@ -691,14 +747,14 @@ jobject JNICALL CallNonvirtualObjectMethodA(JNIEnv *env,
     memcpy(all_args + 1, args, (num_args - 1) * sizeof(jvalue));
     tmn_suspend_disable();
     vm_execute_java_method_array(methodID, &result, all_args);
-   tmn_suspend_enable();
+    tmn_suspend_enable();
  
     return result.l;
 } //CallNonvirtualObjectMethodA
 
 
 
-jboolean JNICALL CallNonvirtualBooleanMethod(JNIEnv *env,
+jboolean JNICALL CallNonvirtualBooleanMethod(JNIEnv * jni_env,
                                              jobject obj,
                                              jclass clazz,
                                              jmethodID methodID,
@@ -708,12 +764,12 @@ jboolean JNICALL CallNonvirtualBooleanMethod(JNIEnv *env,
     assert(hythread_is_suspend_enabled());
     va_list args;
     va_start(args, methodID);
-    return CallNonvirtualBooleanMethodV(env, obj, clazz, methodID, args);
+    return CallNonvirtualBooleanMethodV(jni_env, obj, clazz, methodID, args);
 } //CallNonvirtualBooleanMethod
 
 
 
-jboolean JNICALL CallNonvirtualBooleanMethodV(JNIEnv *env,
+jboolean JNICALL CallNonvirtualBooleanMethodV(JNIEnv * jni_env,
                                               jobject obj,
                                               jclass clazz,
                                               jmethodID methodID,
@@ -722,14 +778,14 @@ jboolean JNICALL CallNonvirtualBooleanMethodV(JNIEnv *env,
     TRACE2("jni", "CallNonvirtualBooleanMethodV called, id = " << methodID);
     assert(hythread_is_suspend_enabled());
     jvalue *jvalue_args = get_jvalue_arg_array((Method *)methodID, args);
-    jboolean result = CallNonvirtualBooleanMethodA(env, obj, clazz, methodID, jvalue_args);
+    jboolean result = CallNonvirtualBooleanMethodA(jni_env, obj, clazz, methodID, jvalue_args);
     STD_FREE(jvalue_args);
     return result;
 } //CallNonvirtualBooleanMethodV
 
 
 
-jboolean JNICALL CallNonvirtualBooleanMethodA(JNIEnv *env,
+jboolean JNICALL CallNonvirtualBooleanMethodA(JNIEnv * jni_env,
                                               jobject obj,
                                               jclass UNREF clazz,
                                               jmethodID methodID,
@@ -737,14 +793,18 @@ jboolean JNICALL CallNonvirtualBooleanMethodA(JNIEnv *env,
 {
     TRACE2("jni", "CallNonvirtualBooleanMethodA called, id = " << methodID);
     assert(hythread_is_suspend_enabled());
+
+    Global_Env * vm_env = jni_get_vm_env(jni_env);
+    if (vm_env->IsVmShutdowning()) return 0;
+
     jvalue result;
-    call_method_no_ref_result(env, obj, methodID, args, &result, TRUE);
+    call_method_no_ref_result(jni_env, obj, methodID, args, &result, TRUE);
     return result.z;
 } //CallNonvirtualBooleanMethodA
 
 
 
-jbyte JNICALL CallNonvirtualByteMethod(JNIEnv *env,
+jbyte JNICALL CallNonvirtualByteMethod(JNIEnv * jni_env,
                                        jobject obj,
                                        jclass clazz,
                                        jmethodID methodID,
@@ -754,12 +814,12 @@ jbyte JNICALL CallNonvirtualByteMethod(JNIEnv *env,
     assert(hythread_is_suspend_enabled());
     va_list args;
     va_start(args, methodID);
-    return CallNonvirtualByteMethodV(env, obj, clazz, methodID, args);
+    return CallNonvirtualByteMethodV(jni_env, obj, clazz, methodID, args);
 } //CallNonvirtualByteMethod
 
 
 
-jbyte JNICALL CallNonvirtualByteMethodV(JNIEnv *env,
+jbyte JNICALL CallNonvirtualByteMethodV(JNIEnv * jni_env,
                                         jobject obj,
                                         jclass clazz,
                                         jmethodID methodID,
@@ -768,14 +828,14 @@ jbyte JNICALL CallNonvirtualByteMethodV(JNIEnv *env,
     TRACE2("jni", "CallNonvirtualByteMethodV called, id = " << methodID);
     assert(hythread_is_suspend_enabled());
     jvalue *jvalue_args = get_jvalue_arg_array((Method *)methodID, args);
-    jbyte result = CallNonvirtualByteMethodA(env, obj, clazz, methodID, jvalue_args);
+    jbyte result = CallNonvirtualByteMethodA(jni_env, obj, clazz, methodID, jvalue_args);
     STD_FREE(jvalue_args);
     return result;
 } //CallNonvirtualByteMethodV
 
 
 
-jbyte JNICALL CallNonvirtualByteMethodA(JNIEnv *env,
+jbyte JNICALL CallNonvirtualByteMethodA(JNIEnv * jni_env,
                                         jobject obj,
                                         jclass UNREF clazz,
                                         jmethodID methodID,
@@ -783,14 +843,18 @@ jbyte JNICALL CallNonvirtualByteMethodA(JNIEnv *env,
 {
     TRACE2("jni", "CallNonvirtualByteMethodA called, id = " << methodID);
     assert(hythread_is_suspend_enabled());
+
+    Global_Env * vm_env = jni_get_vm_env(jni_env);
+    if (vm_env->IsVmShutdowning()) return 0;
+
     jvalue result;
-    call_method_no_ref_result(env, obj, methodID, args, &result, TRUE);
+    call_method_no_ref_result(jni_env, obj, methodID, args, &result, TRUE);
     return result.b;
 } //CallNonvirtualByteMethodA
 
 
 
-jchar JNICALL CallNonvirtualCharMethod(JNIEnv *env,
+jchar JNICALL CallNonvirtualCharMethod(JNIEnv * jni_env,
                                        jobject obj,
                                        jclass clazz,
                                        jmethodID methodID,
@@ -800,12 +864,12 @@ jchar JNICALL CallNonvirtualCharMethod(JNIEnv *env,
     assert(hythread_is_suspend_enabled());
     va_list args;
     va_start(args, methodID);
-    return CallNonvirtualCharMethodV(env, obj, clazz, methodID, args);
+    return CallNonvirtualCharMethodV(jni_env, obj, clazz, methodID, args);
 } //CallNonvirtualCharMethod
 
 
 
-jchar JNICALL CallNonvirtualCharMethodV(JNIEnv *env,
+jchar JNICALL CallNonvirtualCharMethodV(JNIEnv * jni_env,
                                         jobject obj,
                                         jclass clazz,
                                         jmethodID methodID,
@@ -814,14 +878,14 @@ jchar JNICALL CallNonvirtualCharMethodV(JNIEnv *env,
     TRACE2("jni", "CallNonvirtualCharMethodV called, id = " << methodID);
     assert(hythread_is_suspend_enabled());
     jvalue *jvalue_args = get_jvalue_arg_array((Method *)methodID, args);
-    jchar result = CallNonvirtualCharMethodA(env, obj, clazz, methodID, jvalue_args);
+    jchar result = CallNonvirtualCharMethodA(jni_env, obj, clazz, methodID, jvalue_args);
     STD_FREE(jvalue_args);
     return result;
 } //CallNonvirtualCharMethodV
 
 
 
-jchar JNICALL CallNonvirtualCharMethodA(JNIEnv *env,
+jchar JNICALL CallNonvirtualCharMethodA(JNIEnv * jni_env,
                                         jobject obj,
                                         jclass UNREF clazz,
                                         jmethodID methodID,
@@ -829,14 +893,18 @@ jchar JNICALL CallNonvirtualCharMethodA(JNIEnv *env,
 {
     TRACE2("jni", "CallNonvirtualCharMethodA called, id = " << methodID);
     assert(hythread_is_suspend_enabled());
+
+    Global_Env * vm_env = jni_get_vm_env(jni_env);
+    if (vm_env->IsVmShutdowning()) return 0;
+
     jvalue result;
-    call_method_no_ref_result(env, obj, methodID, args, &result, TRUE);
+    call_method_no_ref_result(jni_env, obj, methodID, args, &result, TRUE);
     return result.c;
 } //CallNonvirtualCharMethodA
 
 
 
-jshort JNICALL CallNonvirtualShortMethod(JNIEnv *env,
+jshort JNICALL CallNonvirtualShortMethod(JNIEnv * jni_env,
                                          jobject obj,
                                          jclass clazz,
                                          jmethodID methodID,
@@ -846,12 +914,12 @@ jshort JNICALL CallNonvirtualShortMethod(JNIEnv *env,
     assert(hythread_is_suspend_enabled());
     va_list args;
     va_start(args, methodID);
-    return CallNonvirtualShortMethodV(env, obj, clazz, methodID, args);
+    return CallNonvirtualShortMethodV(jni_env, obj, clazz, methodID, args);
 } //CallNonvirtualShortMethod
 
 
 
-jshort JNICALL CallNonvirtualShortMethodV(JNIEnv *env,
+jshort JNICALL CallNonvirtualShortMethodV(JNIEnv * jni_env,
                                           jobject obj,
                                           jclass clazz,
                                           jmethodID methodID,
@@ -860,14 +928,14 @@ jshort JNICALL CallNonvirtualShortMethodV(JNIEnv *env,
     TRACE2("jni", "CallNonvirtualShortMethodV called, id = " << methodID);
     assert(hythread_is_suspend_enabled());
     jvalue *jvalue_args = get_jvalue_arg_array((Method *)methodID, args);
-    jshort result = CallNonvirtualShortMethodA(env, obj, clazz, methodID, jvalue_args);
+    jshort result = CallNonvirtualShortMethodA(jni_env, obj, clazz, methodID, jvalue_args);
     STD_FREE(jvalue_args);
     return result;
 } //CallNonvirtualShortMethodV
 
 
 
-jshort JNICALL CallNonvirtualShortMethodA(JNIEnv *env,
+jshort JNICALL CallNonvirtualShortMethodA(JNIEnv * jni_env,
                                           jobject obj,
                                           jclass UNREF clazz,
                                           jmethodID methodID,
@@ -875,14 +943,18 @@ jshort JNICALL CallNonvirtualShortMethodA(JNIEnv *env,
 {
     TRACE2("jni", "CallNonvirtualShortMethodA called, id = " << methodID);
     assert(hythread_is_suspend_enabled());
+
+    Global_Env * vm_env = jni_get_vm_env(jni_env);
+    if (vm_env->IsVmShutdowning()) return 0;
+
     jvalue result;
-    call_method_no_ref_result(env, obj, methodID, args, &result, TRUE);
+    call_method_no_ref_result(jni_env, obj, methodID, args, &result, TRUE);
     return result.s;
 } //CallNonvirtualShortMethodA
 
 
 
-jint JNICALL CallNonvirtualIntMethod(JNIEnv *env,
+jint JNICALL CallNonvirtualIntMethod(JNIEnv * jni_env,
                                      jobject obj,
                                      jclass clazz,
                                      jmethodID methodID,
@@ -892,12 +964,12 @@ jint JNICALL CallNonvirtualIntMethod(JNIEnv *env,
     assert(hythread_is_suspend_enabled());
     va_list args;
     va_start(args, methodID);
-    return CallNonvirtualIntMethodV(env, obj, clazz, methodID, args);
+    return CallNonvirtualIntMethodV(jni_env, obj, clazz, methodID, args);
 } //CallNonvirtualIntMethod
 
 
 
-jint JNICALL CallNonvirtualIntMethodV(JNIEnv *env,
+jint JNICALL CallNonvirtualIntMethodV(JNIEnv * jni_env,
                                       jobject obj,
                                       jclass clazz,
                                       jmethodID methodID,
@@ -906,14 +978,14 @@ jint JNICALL CallNonvirtualIntMethodV(JNIEnv *env,
     TRACE2("jni", "CallNonvirtualIntMethodV called, id = " << methodID);
     assert(hythread_is_suspend_enabled());
     jvalue *jvalue_args = get_jvalue_arg_array((Method *)methodID, args);
-    jint result = CallNonvirtualIntMethodA(env, obj, clazz, methodID, jvalue_args);
+    jint result = CallNonvirtualIntMethodA(jni_env, obj, clazz, methodID, jvalue_args);
     STD_FREE(jvalue_args);
     return result;
 } //CallNonvirtualIntMethodV
 
 
 
-jint JNICALL CallNonvirtualIntMethodA(JNIEnv *env,
+jint JNICALL CallNonvirtualIntMethodA(JNIEnv * jni_env,
                                       jobject obj,
                                       jclass UNREF clazz,
                                       jmethodID methodID,
@@ -921,14 +993,18 @@ jint JNICALL CallNonvirtualIntMethodA(JNIEnv *env,
 {
     TRACE2("jni", "CallNonvirtualIntMethodA called, id = " << methodID);
     assert(hythread_is_suspend_enabled());
+
+    Global_Env * vm_env = jni_get_vm_env(jni_env);
+    if (vm_env->IsVmShutdowning()) return 0;
+
     jvalue result;
-    call_method_no_ref_result(env, obj, methodID, args, &result,  TRUE);
+    call_method_no_ref_result(jni_env, obj, methodID, args, &result,  TRUE);
     return result.i;
 } //CallNonvirtualIntMethodA
 
 
 
-jlong JNICALL CallNonvirtualLongMethod(JNIEnv *env,
+jlong JNICALL CallNonvirtualLongMethod(JNIEnv * jni_env,
                                        jobject obj,
                                        jclass clazz,
                                        jmethodID methodID,
@@ -938,12 +1014,12 @@ jlong JNICALL CallNonvirtualLongMethod(JNIEnv *env,
     assert(hythread_is_suspend_enabled());
     va_list args;
     va_start(args, methodID);
-    return CallNonvirtualLongMethodV(env, obj, clazz, methodID, args);
+    return CallNonvirtualLongMethodV(jni_env, obj, clazz, methodID, args);
 } //CallNonvirtualLongMethod
 
 
 
-jlong JNICALL CallNonvirtualLongMethodV(JNIEnv *env,
+jlong JNICALL CallNonvirtualLongMethodV(JNIEnv * jni_env,
                                         jobject obj,
                                         jclass clazz,
                                         jmethodID methodID,
@@ -952,14 +1028,14 @@ jlong JNICALL CallNonvirtualLongMethodV(JNIEnv *env,
     TRACE2("jni", "CallNonvirtualLongMethodV called, id = " << methodID);
     assert(hythread_is_suspend_enabled());
     jvalue *jvalue_args = get_jvalue_arg_array((Method *)methodID, args);
-    jlong result = CallNonvirtualLongMethodA(env, obj, clazz, methodID, jvalue_args);
+    jlong result = CallNonvirtualLongMethodA(jni_env, obj, clazz, methodID, jvalue_args);
     STD_FREE(jvalue_args);
     return result;
 } //CallNonvirtualLongMethodV
 
 
 
-jlong JNICALL CallNonvirtualLongMethodA(JNIEnv *env,
+jlong JNICALL CallNonvirtualLongMethodA(JNIEnv * jni_env,
                                         jobject obj,
                                         jclass UNREF clazz,
                                         jmethodID methodID,
@@ -967,14 +1043,18 @@ jlong JNICALL CallNonvirtualLongMethodA(JNIEnv *env,
 {
     TRACE2("jni", "CallNonvirtualLongMethodA called, id = " << methodID);
     assert(hythread_is_suspend_enabled());
+
+    Global_Env * vm_env = jni_get_vm_env(jni_env);
+    if (vm_env->IsVmShutdowning()) return 0;
+
     jvalue result;
-    call_method_no_ref_result(env, obj, methodID, args, &result, TRUE);
+    call_method_no_ref_result(jni_env, obj, methodID, args, &result, TRUE);
     return result.j;
 } //CallNonvirtualLongMethodA
 
 
 
-jfloat JNICALL CallNonvirtualFloatMethod(JNIEnv *env,
+jfloat JNICALL CallNonvirtualFloatMethod(JNIEnv * jni_env,
                                          jobject obj,
                                          jclass clazz,
                                          jmethodID methodID,
@@ -984,12 +1064,12 @@ jfloat JNICALL CallNonvirtualFloatMethod(JNIEnv *env,
     assert(hythread_is_suspend_enabled());
     va_list args;
     va_start(args, methodID);
-    return CallNonvirtualFloatMethodV(env, obj, clazz, methodID, args);
+    return CallNonvirtualFloatMethodV(jni_env, obj, clazz, methodID, args);
 } //CallNonvirtualFloatMethod
 
 
 
-jfloat JNICALL CallNonvirtualFloatMethodV(JNIEnv *env,
+jfloat JNICALL CallNonvirtualFloatMethodV(JNIEnv * jni_env,
                                           jobject obj,
                                           jclass clazz,
                                           jmethodID methodID,
@@ -998,29 +1078,33 @@ jfloat JNICALL CallNonvirtualFloatMethodV(JNIEnv *env,
     TRACE2("jni", "CallNonvirtualFloatMethodV called, id = " << methodID);
     assert(hythread_is_suspend_enabled());
     jvalue *jvalue_args = get_jvalue_arg_array((Method *)methodID, args);
-    jfloat result = CallNonvirtualFloatMethodA(env, obj, clazz, methodID, jvalue_args);
+    jfloat result = CallNonvirtualFloatMethodA(jni_env, obj, clazz, methodID, jvalue_args);
     STD_FREE(jvalue_args);
     return result;
 } //CallNonvirtualFloatMethodV
 
 
 
-jfloat JNICALL CallNonvirtualFloatMethodA(JNIEnv *env,
-                                            jobject obj,
-                                            jclass UNREF clazz,
-                                            jmethodID methodID,
-                                            jvalue *args)
+jfloat JNICALL CallNonvirtualFloatMethodA(JNIEnv * jni_env,
+                                          jobject obj,
+                                          jclass UNREF clazz,
+                                          jmethodID methodID,
+                                          jvalue *args)
 {
     TRACE2("jni", "CallNonvirtualFloatMethodA called, id = " << methodID);
     assert(hythread_is_suspend_enabled());
+
+    Global_Env * vm_env = jni_get_vm_env(jni_env);
+    if (vm_env->IsVmShutdowning()) return 0;
+
     jvalue result;
-    call_method_no_ref_result(env, obj, methodID, args, &result, TRUE);
+    call_method_no_ref_result(jni_env, obj, methodID, args, &result, TRUE);
     return result.f;
 } //CallNonvirtualFloatMethodA
 
 
 
-jdouble JNICALL CallNonvirtualDoubleMethod(JNIEnv *env,
+jdouble JNICALL CallNonvirtualDoubleMethod(JNIEnv * jni_env,
                                            jobject obj,
                                            jclass clazz,
                                            jmethodID methodID,
@@ -1030,12 +1114,12 @@ jdouble JNICALL CallNonvirtualDoubleMethod(JNIEnv *env,
     assert(hythread_is_suspend_enabled());
     va_list args;
     va_start(args, methodID);
-    return CallNonvirtualDoubleMethodV(env, obj, clazz, methodID, args);
+    return CallNonvirtualDoubleMethodV(jni_env, obj, clazz, methodID, args);
 } //CallNonvirtualDoubleMethod
 
 
 
-jdouble JNICALL CallNonvirtualDoubleMethodV(JNIEnv *env,
+jdouble JNICALL CallNonvirtualDoubleMethodV(JNIEnv * jni_env,
                                             jobject obj,
                                             jclass clazz,
                                             jmethodID methodID,
@@ -1044,14 +1128,14 @@ jdouble JNICALL CallNonvirtualDoubleMethodV(JNIEnv *env,
     TRACE2("jni", "CallNonvirtualDoubleMethodV called, id = " << methodID);
     assert(hythread_is_suspend_enabled());
     jvalue *jvalue_args = get_jvalue_arg_array((Method *)methodID, args);
-    jdouble result = CallNonvirtualDoubleMethodA(env, obj, clazz, methodID, jvalue_args);
+    jdouble result = CallNonvirtualDoubleMethodA(jni_env, obj, clazz, methodID, jvalue_args);
     STD_FREE(jvalue_args);
     return result;
 } //CallNonvirtualDoubleMethodV
 
 
 
-jdouble JNICALL CallNonvirtualDoubleMethodA(JNIEnv *env,
+jdouble JNICALL CallNonvirtualDoubleMethodA(JNIEnv * jni_env,
                                             jobject obj,
                                             jclass UNREF clazz,
                                             jmethodID methodID,
@@ -1059,8 +1143,12 @@ jdouble JNICALL CallNonvirtualDoubleMethodA(JNIEnv *env,
 {
     TRACE2("jni", "CallNonvirtualDoubleMethodA called, id = " << methodID);
     assert(hythread_is_suspend_enabled());
+
+    Global_Env * vm_env = jni_get_vm_env(jni_env);
+    if (vm_env->IsVmShutdowning()) return 0;
+
     jvalue result;
-    call_method_no_ref_result(env, obj, methodID, args, &result, TRUE);
+    call_method_no_ref_result(jni_env, obj, methodID, args, &result, TRUE);
     return result.d;
 } //CallNonvirtualDoubleMethodA
 
@@ -1075,7 +1163,7 @@ jdouble JNICALL CallNonvirtualDoubleMethodA(JNIEnv *env,
 // begin CallStatic<Type>MethodA functions
 
 
-static void call_static_method_no_ref_result(JNIEnv *env,
+static void call_static_method_no_ref_result(JNIEnv * jni_env,
                                              jclass UNREF clazz,
                                              jmethodID methodID,
                                              jvalue *args,
@@ -1083,7 +1171,7 @@ static void call_static_method_no_ref_result(JNIEnv *env,
 {
     assert(hythread_is_suspend_enabled());
     Method *method = (Method *)methodID;
-    if (!ensure_initialised(env, method->get_class()))
+    if (!ensure_initialised(jni_env, method->get_class()))
         return;
     tmn_suspend_disable();
     vm_execute_java_method_array(methodID, result, args);
@@ -1092,39 +1180,43 @@ static void call_static_method_no_ref_result(JNIEnv *env,
 
 
 
-jobject JNICALL CallStaticObjectMethod(JNIEnv *env, jclass clazz, jmethodID methodID, ...)
+jobject JNICALL CallStaticObjectMethod(JNIEnv * jni_env, jclass clazz, jmethodID methodID, ...)
 {
     TRACE2("jni", "CallStaticObjectMethod called, id = " << methodID);
     assert(hythread_is_suspend_enabled());
     va_list args;
     va_start(args, methodID);
-    return CallStaticObjectMethodV(env, clazz, methodID, args);
+    return CallStaticObjectMethodV(jni_env, clazz, methodID, args);
 } //CallStaticObjectMethod
 
 
 
-jobject JNICALL CallStaticObjectMethodV(JNIEnv *env, jclass clazz, jmethodID methodID, va_list args)
+jobject JNICALL CallStaticObjectMethodV(JNIEnv * jni_env, jclass clazz, jmethodID methodID, va_list args)
 {
     TRACE2("jni", "CallStaticObjectMethodV called, id = " << methodID);
     assert(hythread_is_suspend_enabled());
     jvalue *jvalue_args = get_jvalue_arg_array((Method *)methodID, args);
-    jobject result = CallStaticObjectMethodA(env, clazz, methodID, jvalue_args);
+    jobject result = CallStaticObjectMethodA(jni_env, clazz, methodID, jvalue_args);
     STD_FREE(jvalue_args);
     return result;
 } //CallStaticObjectMethodV
 
 
 
-jobject JNICALL CallStaticObjectMethodA(JNIEnv *env,
+jobject JNICALL CallStaticObjectMethodA(JNIEnv * jni_env,
                                         jclass UNREF clazz,
                                         jmethodID methodID,
                                         jvalue *args)
 {
     TRACE2("jni", "CallStaticObjectMethodA called, id = " << methodID);
     assert(hythread_is_suspend_enabled());
+
+    Global_Env * vm_env = jni_get_vm_env(jni_env);
+    if (vm_env->IsVmShutdowning()) return NULL;
+
     jvalue result;
     Method *method = (Method *)methodID;
-    if (!ensure_initialised(env, method->get_class()))
+    if (!ensure_initialised(jni_env, method->get_class()))
         return NULL;
     unsigned num_args = method->get_num_args();
     jvalue *all_args = (jvalue*) STD_ALLOCA(num_args * sizeof(jvalue));
@@ -1139,332 +1231,368 @@ jobject JNICALL CallStaticObjectMethodA(JNIEnv *env,
 
 
 
-jboolean JNICALL CallStaticBooleanMethod(JNIEnv *env, jclass clazz, jmethodID methodID, ...)
+jboolean JNICALL CallStaticBooleanMethod(JNIEnv * jni_env, jclass clazz, jmethodID methodID, ...)
 {
     TRACE2("jni", "CallStaticBooleanMethod called, id = " << methodID);
     assert(hythread_is_suspend_enabled());
     va_list args;
     va_start(args, methodID);
-    return CallStaticBooleanMethodV(env, clazz, methodID, args);
+    return CallStaticBooleanMethodV(jni_env, clazz, methodID, args);
 } //CallStaticBooleanMethod
 
 
 
-jboolean JNICALL CallStaticBooleanMethodV(JNIEnv *env, jclass clazz, jmethodID methodID, va_list args)
+jboolean JNICALL CallStaticBooleanMethodV(JNIEnv * jni_env, jclass clazz, jmethodID methodID, va_list args)
 {
     TRACE2("jni", "CallStaticBooleanMethodV called, id = " << methodID);
     assert(hythread_is_suspend_enabled());
     jvalue *jvalue_args = get_jvalue_arg_array((Method *)methodID, args);
-    jboolean result = CallStaticBooleanMethodA(env, clazz, methodID, jvalue_args);
+    jboolean result = CallStaticBooleanMethodA(jni_env, clazz, methodID, jvalue_args);
     STD_FREE(jvalue_args);
     return result;
 } //CallStaticBooleanMethodV
 
 
 
-jboolean JNICALL CallStaticBooleanMethodA(JNIEnv *env,
+jboolean JNICALL CallStaticBooleanMethodA(JNIEnv * jni_env,
                                           jclass clazz,
                                           jmethodID methodID,
                                           jvalue *args)
 {
     TRACE2("jni", "CallStaticBooleanMethodA called, id = " << methodID);
     assert(hythread_is_suspend_enabled());
+
+    Global_Env * vm_env = jni_get_vm_env(jni_env);
+    if (vm_env->IsVmShutdowning()) return 0;
+
     jvalue result;
-    call_static_method_no_ref_result(env, clazz, methodID, args, &result);
+    call_static_method_no_ref_result(jni_env, clazz, methodID, args, &result);
     return result.z;
 } //CallStaticBooleanMethodA
 
 
 
-jbyte JNICALL CallStaticByteMethod(JNIEnv *env, jclass clazz, jmethodID methodID, ...)
+jbyte JNICALL CallStaticByteMethod(JNIEnv * jni_env, jclass clazz, jmethodID methodID, ...)
 {
     TRACE2("jni", "CallStaticByteMethod called, id = " << methodID);
     assert(hythread_is_suspend_enabled());
     va_list args;
     va_start(args, methodID);
-    return CallStaticByteMethodV(env, clazz, methodID, args);
+    return CallStaticByteMethodV(jni_env, clazz, methodID, args);
 } //CallStaticByteMethod
 
 
 
-jbyte JNICALL CallStaticByteMethodV(JNIEnv *env, jclass clazz, jmethodID methodID, va_list args)
+jbyte JNICALL CallStaticByteMethodV(JNIEnv * jni_env, jclass clazz, jmethodID methodID, va_list args)
 {
     TRACE2("jni", "CallStaticByteMethodV called, id = " << methodID);
     assert(hythread_is_suspend_enabled());
     jvalue *jvalue_args = get_jvalue_arg_array((Method *)methodID, args);
-    jbyte result = CallStaticByteMethodA(env, clazz, methodID, jvalue_args);
+    jbyte result = CallStaticByteMethodA(jni_env, clazz, methodID, jvalue_args);
     STD_FREE(jvalue_args);
     return result;
 } //CallStaticByteMethodV
 
 
 
-jbyte JNICALL CallStaticByteMethodA(JNIEnv *env,
+jbyte JNICALL CallStaticByteMethodA(JNIEnv * jni_env,
                                     jclass clazz,
                                     jmethodID methodID,
                                     jvalue *args)
 {
     TRACE2("jni", "CallStaticByteMethodA called, id = " << methodID);
     assert(hythread_is_suspend_enabled());
+
+    Global_Env * vm_env = jni_get_vm_env(jni_env);
+    if (vm_env->IsVmShutdowning()) return 0;
+
     jvalue result;
-    call_static_method_no_ref_result(env, clazz, methodID, args, &result);
+    call_static_method_no_ref_result(jni_env, clazz, methodID, args, &result);
     return result.b;
 } //CallStaticByteMethodA
 
 
 
-jchar JNICALL CallStaticCharMethod(JNIEnv *env, jclass clazz, jmethodID methodID, ...)
+jchar JNICALL CallStaticCharMethod(JNIEnv * jni_env, jclass clazz, jmethodID methodID, ...)
 {
     TRACE2("jni", "CallStaticCharMethod called, id = " << methodID);
     assert(hythread_is_suspend_enabled());
     va_list args;
     va_start(args, methodID);
-    return CallStaticCharMethodV(env, clazz, methodID, args);
+    return CallStaticCharMethodV(jni_env, clazz, methodID, args);
 } //CallStaticCharMethod
 
 
 
-jchar JNICALL CallStaticCharMethodV(JNIEnv *env, jclass clazz, jmethodID methodID, va_list args)
+jchar JNICALL CallStaticCharMethodV(JNIEnv * jni_env, jclass clazz, jmethodID methodID, va_list args)
 {
     TRACE2("jni", "CallStaticCharMethodV called, id = " << methodID);
     assert(hythread_is_suspend_enabled());
     jvalue *jvalue_args = get_jvalue_arg_array((Method *)methodID, args);
-    jchar result = CallStaticCharMethodA(env, clazz, methodID, jvalue_args);
+    jchar result = CallStaticCharMethodA(jni_env, clazz, methodID, jvalue_args);
     STD_FREE(jvalue_args);
     return result;
 } //CallStaticCharMethodV
 
 
 
-jchar JNICALL CallStaticCharMethodA(JNIEnv *env,
+jchar JNICALL CallStaticCharMethodA(JNIEnv * jni_env,
                                     jclass clazz,
                                     jmethodID methodID,
                                     jvalue *args)
 {
     TRACE2("jni", "CallStaticCharMethodA called, id = " << methodID);
     assert(hythread_is_suspend_enabled());
+
+    Global_Env * vm_env = jni_get_vm_env(jni_env);
+    if (vm_env->IsVmShutdowning()) return 0;
+
     jvalue result;
-    call_static_method_no_ref_result(env, clazz, methodID, args, &result);
+    call_static_method_no_ref_result(jni_env, clazz, methodID, args, &result);
     return result.c;
 } //CallStaticCharMethodA
 
 
 
-jshort JNICALL CallStaticShortMethod(JNIEnv *env, jclass clazz, jmethodID methodID, ...)
+jshort JNICALL CallStaticShortMethod(JNIEnv * jni_env, jclass clazz, jmethodID methodID, ...)
 {
     TRACE2("jni", "CallStaticShortMethod called, id = " << methodID);
     assert(hythread_is_suspend_enabled());
     va_list args;
     va_start(args, methodID);
-    return CallStaticShortMethodV(env, clazz, methodID, args);
+    return CallStaticShortMethodV(jni_env, clazz, methodID, args);
 } //CallStaticShortMethod
 
 
 
-jshort JNICALL CallStaticShortMethodV(JNIEnv *env, jclass clazz, jmethodID methodID, va_list args)
+jshort JNICALL CallStaticShortMethodV(JNIEnv * jni_env, jclass clazz, jmethodID methodID, va_list args)
 {
     TRACE2("jni", "CallStaticShortMethodV called, id = " << methodID);
     assert(hythread_is_suspend_enabled());
     jvalue *jvalue_args = get_jvalue_arg_array((Method *)methodID, args);
-    jshort result = CallStaticShortMethodA(env, clazz, methodID, jvalue_args);
+    jshort result = CallStaticShortMethodA(jni_env, clazz, methodID, jvalue_args);
     STD_FREE(jvalue_args);
     return result;
 } //CallStaticShortMethodV
 
 
 
-jshort JNICALL CallStaticShortMethodA(JNIEnv *env,
+jshort JNICALL CallStaticShortMethodA(JNIEnv * jni_env,
                                       jclass clazz,
                                       jmethodID methodID,
                                       jvalue *args)
 {
     TRACE2("jni", "CallStaticShortMethodA called, id = " << methodID);
     assert(hythread_is_suspend_enabled());
+
+    Global_Env * vm_env = jni_get_vm_env(jni_env);
+    if (vm_env->IsVmShutdowning()) return 0;
+
     jvalue result;
-    call_static_method_no_ref_result(env, clazz, methodID, args, &result);
+    call_static_method_no_ref_result(jni_env, clazz, methodID, args, &result);
     return result.s;
 } //CallStaticShortMethodA
 
 
 
-jint JNICALL CallStaticIntMethod(JNIEnv *env, jclass clazz, jmethodID methodID, ...)
+jint JNICALL CallStaticIntMethod(JNIEnv * jni_env, jclass clazz, jmethodID methodID, ...)
 {
     TRACE2("jni", "CallStaticIntMethod called, id = " << methodID);
     assert(hythread_is_suspend_enabled());
     va_list args;
     va_start(args, methodID);
-    return CallStaticIntMethodV(env, clazz, methodID, args);
+    return CallStaticIntMethodV(jni_env, clazz, methodID, args);
 } //CallStaticIntMethod
 
 
 
-jint JNICALL CallStaticIntMethodV(JNIEnv *env, jclass clazz, jmethodID methodID, va_list args)
+jint JNICALL CallStaticIntMethodV(JNIEnv * jni_env, jclass clazz, jmethodID methodID, va_list args)
 {
     TRACE2("jni", "CallStaticIntMethodV called, id = " << methodID);
     assert(hythread_is_suspend_enabled());
     jvalue *jvalue_args = get_jvalue_arg_array((Method *)methodID, args);
-    jint result = CallStaticIntMethodA(env, clazz, methodID, jvalue_args);
+    jint result = CallStaticIntMethodA(jni_env, clazz, methodID, jvalue_args);
     STD_FREE(jvalue_args);
     return result;
 } //CallStaticIntMethodV
 
 
 
-jint JNICALL CallStaticIntMethodA(JNIEnv *env,
+jint JNICALL CallStaticIntMethodA(JNIEnv * jni_env,
                                   jclass clazz,
                                   jmethodID methodID,
                                   jvalue *args)
 {
     TRACE2("jni", "CallStaticIntMethodA called, id = " << methodID);
     assert(hythread_is_suspend_enabled());
+
+    Global_Env * vm_env = jni_get_vm_env(jni_env);
+    if (vm_env->IsVmShutdowning()) return 0;
+
     jvalue result;
-    call_static_method_no_ref_result(env, clazz, methodID, args, &result);
+    call_static_method_no_ref_result(jni_env, clazz, methodID, args, &result);
     return result.i;
 } //CallStaticIntMethodA
 
 
 
-jlong JNICALL CallStaticLongMethod(JNIEnv *env, jclass clazz, jmethodID methodID, ...)
+jlong JNICALL CallStaticLongMethod(JNIEnv * jni_env, jclass clazz, jmethodID methodID, ...)
 {
     TRACE2("jni", "CallStaticLongMethod called, id = " << methodID);
     assert(hythread_is_suspend_enabled());
     va_list args;
     va_start(args, methodID);
-    return CallStaticLongMethodV(env, clazz, methodID, args);
+    return CallStaticLongMethodV(jni_env, clazz, methodID, args);
 } //CallStaticLongMethod
 
 
 
-jlong JNICALL CallStaticLongMethodV(JNIEnv *env, jclass clazz, jmethodID methodID, va_list args)
+jlong JNICALL CallStaticLongMethodV(JNIEnv * jni_env, jclass clazz, jmethodID methodID, va_list args)
 {
     TRACE2("jni", "CallStaticLongMethodV called, id = " << methodID);
     assert(hythread_is_suspend_enabled());
     jvalue *jvalue_args = get_jvalue_arg_array((Method *)methodID, args);
-    jlong result = CallStaticLongMethodA(env, clazz, methodID, jvalue_args);
+    jlong result = CallStaticLongMethodA(jni_env, clazz, methodID, jvalue_args);
     STD_FREE(jvalue_args);
     return result;
 } //CallStaticLongMethodV
 
 
 
-jlong JNICALL CallStaticLongMethodA(JNIEnv *env,
+jlong JNICALL CallStaticLongMethodA(JNIEnv * jni_env,
                                     jclass clazz,
                                     jmethodID methodID,
                                     jvalue *args)
 {
     TRACE2("jni", "CallStaticLongMethodA called, id = " << methodID);
     assert(hythread_is_suspend_enabled());
+
+    Global_Env * vm_env = jni_get_vm_env(jni_env);
+    if (vm_env->IsVmShutdowning()) return 0;
+
     jvalue result;
-    call_static_method_no_ref_result(env, clazz, methodID, args, &result);
+    call_static_method_no_ref_result(jni_env, clazz, methodID, args, &result);
     return result.j;
 } //CallStaticLongMethodA
 
 
 
-jfloat JNICALL CallStaticFloatMethod(JNIEnv *env, jclass clazz, jmethodID methodID, ...)
+jfloat JNICALL CallStaticFloatMethod(JNIEnv * jni_env, jclass clazz, jmethodID methodID, ...)
 {
     TRACE2("jni", "CallStaticFloatMethod called, id = " << methodID);
     assert(hythread_is_suspend_enabled());
     va_list args;
     va_start(args, methodID);
-    return CallStaticFloatMethodV(env, clazz, methodID, args);
+    return CallStaticFloatMethodV(jni_env, clazz, methodID, args);
 } //CallStaticFloatMethod
 
 
 
-jfloat JNICALL CallStaticFloatMethodV(JNIEnv *env, jclass clazz, jmethodID methodID, va_list args)
+jfloat JNICALL CallStaticFloatMethodV(JNIEnv * jni_env, jclass clazz, jmethodID methodID, va_list args)
 {
     TRACE2("jni", "CallStaticFloatMethodV called, id = " << methodID);
     assert(hythread_is_suspend_enabled());
     jvalue *jvalue_args = get_jvalue_arg_array((Method *)methodID, args);
-    jfloat result = CallStaticFloatMethodA(env, clazz, methodID, jvalue_args);
+    jfloat result = CallStaticFloatMethodA(jni_env, clazz, methodID, jvalue_args);
     STD_FREE(jvalue_args);
     return result;
 } //CallStaticFloatMethodV
 
 
 
-jfloat JNICALL CallStaticFloatMethodA(JNIEnv *env,
+jfloat JNICALL CallStaticFloatMethodA(JNIEnv * jni_env,
                                       jclass clazz,
                                       jmethodID methodID,
                                       jvalue *args)
 {
     TRACE2("jni", "CallStaticFloatMethodA called, id = " << methodID);
     assert(hythread_is_suspend_enabled());
+
+    Global_Env * vm_env = jni_get_vm_env(jni_env);
+    if (vm_env->IsVmShutdowning()) return 0;
+
     jvalue result;
-    call_static_method_no_ref_result(env, clazz, methodID, args, &result);
+    call_static_method_no_ref_result(jni_env, clazz, methodID, args, &result);
     return result.f;
 } //CallStaticFloatMethodA
 
 
 
-jdouble JNICALL CallStaticDoubleMethod(JNIEnv *env, jclass clazz, jmethodID methodID, ...)
+jdouble JNICALL CallStaticDoubleMethod(JNIEnv * jni_env, jclass clazz, jmethodID methodID, ...)
 {
     TRACE2("jni", "CallStaticDoubleMethod called, id = " << methodID);
     assert(hythread_is_suspend_enabled());
     va_list args;
     va_start(args, methodID);
-    return CallStaticDoubleMethodV(env, clazz, methodID, args);
+    return CallStaticDoubleMethodV(jni_env, clazz, methodID, args);
 } //CallStaticDoubleMethod
 
 
 
-jdouble JNICALL CallStaticDoubleMethodV(JNIEnv *env, jclass clazz, jmethodID methodID, va_list args)
+jdouble JNICALL CallStaticDoubleMethodV(JNIEnv * jni_env, jclass clazz, jmethodID methodID, va_list args)
 {
     TRACE2("jni", "CallStaticDoubleMethodV called, id = " << methodID);
     assert(hythread_is_suspend_enabled());
     jvalue *jvalue_args = get_jvalue_arg_array((Method *)methodID, args);
-    jdouble result = CallStaticDoubleMethodA(env, clazz, methodID, jvalue_args);
+    jdouble result = CallStaticDoubleMethodA(jni_env, clazz, methodID, jvalue_args);
     STD_FREE(jvalue_args);
     return result;
 } //CallStaticDoubleMethodV
 
 
 
-jdouble JNICALL CallStaticDoubleMethodA(JNIEnv *env,
+jdouble JNICALL CallStaticDoubleMethodA(JNIEnv * jni_env,
                                         jclass clazz,
                                         jmethodID methodID,
                                         jvalue *args)
 {
     TRACE2("jni", "CallStaticDoubleMethodA called, id = " << methodID);
     assert(hythread_is_suspend_enabled());
+
+    Global_Env * vm_env = jni_get_vm_env(jni_env);
+    if (vm_env->IsVmShutdowning()) return 0;
+
     jvalue result;
-    call_static_method_no_ref_result(env, clazz, methodID, args, &result);
+    call_static_method_no_ref_result(jni_env, clazz, methodID, args, &result);
     return result.d;
 } //CallStaticDoubleMethodA
 
 
 
-void JNICALL CallStaticVoidMethod(JNIEnv *env, jclass clazz, jmethodID methodID, ...)
+void JNICALL CallStaticVoidMethod(JNIEnv * jni_env, jclass clazz, jmethodID methodID, ...)
 {
     TRACE2("jni", "CallStaticVoidMethod called, id = " << methodID);
     assert(hythread_is_suspend_enabled());
     va_list args;
     va_start(args, methodID);
-    CallStaticVoidMethodV(env, clazz, methodID, args);
+    CallStaticVoidMethodV(jni_env, clazz, methodID, args);
 } //CallStaticVoidMethod
 
 
 
-void JNICALL CallStaticVoidMethodV(JNIEnv *env, jclass clazz, jmethodID methodID, va_list args)
+void JNICALL CallStaticVoidMethodV(JNIEnv * jni_env, jclass clazz, jmethodID methodID, va_list args)
 {
     TRACE2("jni", "CallStaticVoidMethodV called, id = " << methodID);
     assert(hythread_is_suspend_enabled());
     jvalue *jvalue_args = get_jvalue_arg_array((Method *)methodID, args);
-    CallStaticVoidMethodA(env, clazz, methodID, jvalue_args);
+    CallStaticVoidMethodA(jni_env, clazz, methodID, jvalue_args);
     STD_FREE(jvalue_args);
 } //CallStaticVoidMethodV
 
 
 
-void JNICALL CallStaticVoidMethodA(JNIEnv *env,
+void JNICALL CallStaticVoidMethodA(JNIEnv * jni_env,
                                    jclass clazz,
                                    jmethodID methodID,
                                    jvalue *args)
 {
     TRACE2("jni", "CallStaticVoidMethodA called, id = " << methodID);
     assert(hythread_is_suspend_enabled());
-    call_static_method_no_ref_result(env, clazz, methodID, args, 0);
+
+    Global_Env * vm_env = jni_get_vm_env(jni_env);
+    if (vm_env->IsVmShutdowning()) return;
+
+    call_static_method_no_ref_result(jni_env, clazz, methodID, args, 0);
 } //CallStaticVoidMethodA
 
 

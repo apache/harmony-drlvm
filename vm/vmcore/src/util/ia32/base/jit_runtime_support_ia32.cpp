@@ -911,9 +911,9 @@ static void* getaddress__pop_java_to_native_frame()
 #endif
     char *ss = stub;
 
-    ss = pop(ss,  ecx_opnd);
+    ss = pop(ss,  edx_opnd);
     ss = m2n_gen_pop_m2n(ss, false, 0, 0, 2);
-    ss = push(ss,  ecx_opnd);
+    ss = push(ss,  edx_opnd);
     ss = ret(ss);
 
     assert((ss - stub) <= stub_size);

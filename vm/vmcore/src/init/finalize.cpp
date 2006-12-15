@@ -336,12 +336,14 @@ void Objects_To_Finalize::run_finalizers()
     vm_execute_java_method_array((jmethodID) finalize_meth, 0, args);
     tmn_suspend_enable();
 
+#ifndef NDEBUG
     if (exn_raised()) {
         INFO2("finalize", "Uncaught exception "
             << exn_get_name()
-            << " while running a wakeFinalization in FinalizerThread");
-        exn_clear();
+            << " while running a wakeFinalization in FinalizerThread");        
     }
+#endif
+    exn_clear();
     p_TLS_vmthread->finalize_thread_flags &= ~FINALIZER_STARTER;
 } //Objects_To_Finalize::run_finalizers
 
@@ -416,7 +418,8 @@ int Objects_To_Finalize::do_finalization(int quantity) {
         TRACE2("finalize", "finalize object " << class_get_name(handle->object->vt()->clss));
         vm_execute_java_method_array( (jmethodID) finalize, 0, args);
         tmn_suspend_enable();
-        
+
+#ifndef NDEBUG
         if (exn_raised()) {
             tmn_suspend_disable();
             assert(handle->object->vt()->clss);
@@ -424,9 +427,10 @@ int Objects_To_Finalize::do_finalization(int quantity) {
                 << exn_get_name()
                 << " while running a finalize of the object"
                 << class_get_name(object->vt()->clss) << ".");
-            tmn_suspend_enable();
-            exn_clear();
+            tmn_suspend_enable();            
         }
+#endif
+        exn_clear();
     }
     return i;
 } //Objects_To_Finalize::do_finalization
@@ -463,6 +467,7 @@ void References_To_Enqueue::enqueue_references()
         vm_execute_java_method_array( (jmethodID) enqueue, &r, args);
         tmn_suspend_enable();
 
+#ifndef NDEBUG
         if (exn_raised()) {
             tmn_suspend_disable();
             assert(object->vt()->clss);
@@ -471,8 +476,10 @@ void References_To_Enqueue::enqueue_references()
                 << " while running a enqueue method of the object"
                 << class_get_name(object->vt()->clss) << ".");
             tmn_suspend_enable();
-            exn_clear();
+            
         }
+#endif
+        exn_clear();
     }
 
     TRACE2("ref", "enqueue_references() completed");

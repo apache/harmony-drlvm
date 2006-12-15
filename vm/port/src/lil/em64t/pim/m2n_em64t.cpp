@@ -25,6 +25,7 @@
 #include "open/types.h"
 #include "port_malloc.h"
 #include "vm_threads.h"
+#include "exceptions.h"
 
 #include "m2n.h"
 #include "encoder.h"
@@ -313,35 +314,56 @@ char * m2n_gen_push_m2n(char * buf, Method_Handle method,
     return buf;
 }
 
+static void m2n_pop_local_handles() {
+    assert(!hythread_is_suspend_enabled());
+    
+    if (exn_raised()) {
+        exn_rethrow();
+    }
+    
+    M2nFrame * m2n = m2n_get_last_frame();
+    free_local_object_handles2(m2n->local_object_handles);
+}
+
+static void m2n_free_local_handles() {
+    assert(!hythread_is_suspend_enabled());
+
+    if (exn_raised()) {
+        exn_rethrow();
+    }
+
+    M2nFrame * m2n = m2n_get_last_frame();
+    free_local_object_handles3(m2n->local_object_handles);
+}
+
 char * m2n_gen_pop_m2n(char * buf, bool handles, unsigned num_callee_saves,
                       int32 bytes_to_m2n_bottom, unsigned num_preserve_ret) {
-    assert (num_preserve_ret <= 2);    
-    unsigned handles_offset = 2 * LcgEM64TContext::GR_SIZE + bytes_to_m2n_bottom;
+    assert (num_preserve_ret <= 2);
+    assert(LcgEM64TContext::GR_SIZE == 8);
+
+    if (num_preserve_ret > 0) {
+        // Save return value
+        // NOTE: don't break stack allignment by pushing only one register.
+        buf = push(buf,  rax_opnd, size_64);
+        buf = push(buf,  rdx_opnd, size_64);
+    }
+
     if (handles) {
-        if (num_preserve_ret > 0) {
-            // Save return value
-            assert(LcgEM64TContext::GR_SIZE == 8);
-            handles_offset += LcgEM64TContext::GR_SIZE;
-            buf = push(buf,  rax_opnd, size_64);
-            if (num_preserve_ret > 1) {
-                handles_offset += LcgEM64TContext::GR_SIZE;
-                buf = push(buf,  rdx_opnd, size_64);
-            }
-        }
+        // There are handles located on the stack
+        buf = mov(buf, rax_opnd, Imm_Opnd(size_64, (uint64)m2n_pop_local_handles), size_64);
+    } else {
+        buf = mov(buf, rax_opnd, Imm_Opnd(size_64, (uint64)m2n_free_local_handles), size_64);
+    }
+    
+    // NOTE: the following should be true before the call ($rsp % 8 == 0 && $rsp % 16 != 0)!
 
-        // Must free the handles
-        M_Base_Opnd m(rsp_reg, handles_offset);
-        buf = mov(buf,  rdi_opnd, m, size_64);
-        buf = mov(buf, rax_opnd, Imm_Opnd(size_64, (uint64)free_local_object_handles2), size_64);
-        buf = call(buf, rax_opnd, size_64);
-
-        if (num_preserve_ret > 0) {
-            // Restore return value
-            if (num_preserve_ret > 1) {
-                buf = pop(buf,  rdx_opnd, size_64);
-            }
-            buf = pop(buf,  rax_opnd, size_64);
-        }
+    // Call m2n_pop_local_handles or m2n_free_local_handles
+    buf = call(buf, rax_opnd, size_64);
+    
+    if (num_preserve_ret > 0) {
+        // Restore return value
+        buf = pop(buf,  rdx_opnd, size_64);
+        buf = pop(buf,  rax_opnd, size_64);
     }
 
     // pop prev_m2nf

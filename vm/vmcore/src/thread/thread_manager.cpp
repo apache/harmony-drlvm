@@ -184,19 +184,49 @@ extern "C" char *vm_get_object_class_name(void* ptr) {
 
 void* vm_jthread_get_tm_data(jthread thread)
 {
-    JNIEnv *jenv = p_TLS_vmthread->jni_env;
-    jclass jThreadClass = jenv->GetObjectClass(thread);
-    jfieldID field_id = jenv->GetFieldID(jThreadClass, "vm_thread", "J");
-    POINTER_SIZE_INT data = (POINTER_SIZE_INT)jenv->GetLongField(thread, field_id);
+    static int offset = -1;
+    Class * clazz;
+    Field * field;
+    ManagedObject * thread_obj;
+    Byte * java_ref;
+    POINTER_SIZE_INT val;
 
-    return (void *)data;
+    hythread_suspend_disable();
+
+    thread_obj = ((ObjectHandle)thread)->object;
+    if (offset == -1) {
+        clazz = thread_obj->vt()->clss;
+        field = class_lookup_field_recursive(clazz, "vm_thread", "J");
+        offset = field->get_offset();
+    }
+    java_ref = (Byte *)thread_obj;
+    val = *(POINTER_SIZE_INT *)(java_ref + offset);
+
+    hythread_suspend_enable();
+
+    return (void *)val;
 }
 
-void vm_jthread_set_tm_data(jthread jt, void* nt) {
-    JNIEnv *jenv = p_TLS_vmthread->jni_env;
-    jclass jthreadclass = jenv->GetObjectClass(jt);
-    jfieldID field_id = jenv->GetFieldID(jthreadclass, "vm_thread", "J");
-    jenv->SetLongField(jt, field_id, (jlong)(POINTER_SIZE_INT)nt);
+void vm_jthread_set_tm_data(jthread thread, void* val) {
+    static int offset = -1;
+    Class * clazz;
+    Field * field;
+    ManagedObject * thread_obj;
+    Byte * java_ref;
+
+    hythread_suspend_disable();
+
+    thread_obj = ((ObjectHandle)thread)->object;
+    if (offset == -1) {
+        clazz = thread_obj->vt()->clss;
+        field = class_lookup_field_recursive(clazz, "vm_thread", "J");
+        offset = field->get_offset();
+    }
+
+    java_ref = (Byte *)thread_obj;
+    *(jlong *)(java_ref + offset) = (jlong)(POINTER_SIZE_INT)val;
+
+    hythread_suspend_enable();
 }
 
 int vm_objects_are_equal(jobject obj1, jobject obj2){

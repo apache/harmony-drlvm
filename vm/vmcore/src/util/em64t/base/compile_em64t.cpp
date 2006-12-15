@@ -149,7 +149,7 @@ static NativeCodePtr compile_get_compile_me_generic() {
         return addr;
     }
 
-    const int STUB_SIZE = 357;
+    const int STUB_SIZE = 416;
     char * stub = (char *) malloc_fixed_code_for_jit(STUB_SIZE,
         DEFAULT_CODE_ALIGNMENT, CODE_BLOCK_HEAT_DEFAULT, CAA_Allocate);
     addr = stub;
@@ -187,34 +187,29 @@ static NativeCodePtr compile_get_compile_me_generic() {
     // compile the method
     stub = call(stub, (char *)&compile_jit_a_method);
 
-    // rethrow exception if it panding
-    stub = push(stub, rax_opnd);
-    stub = call(stub, (char *)&exn_rethrow_if_pending);
-    stub = pop(stub, rax_opnd);
+    // pop m2n from the stack
+    const int32 bytes_to_m2n_bottom = stack_size - m2n_get_size();
+    stub = m2n_gen_pop_m2n(stub, false, 0, bytes_to_m2n_bottom, 1);
 
     // restore gp inputs from the stack
-    // NOTE: m2n_gen_pop_m2n must not destroy inputs
-    stub = pop(stub, rdi_opnd);
-    stub = pop(stub, rdi_opnd);
-    stub = pop(stub, rsi_opnd);
-    stub = pop(stub, rdx_opnd);
-    stub = pop(stub, rcx_opnd);
-    stub = pop(stub, r8_opnd);
-    stub = pop(stub, r9_opnd);
+    stub = mov(stub, rdi_opnd, M_Base_Opnd(rsp_reg, 8));
+    stub = mov(stub, rsi_opnd, M_Base_Opnd(rsp_reg, 16));
+    stub = mov(stub, rdx_opnd, M_Base_Opnd(rsp_reg, 24));
+    stub = mov(stub, rcx_opnd, M_Base_Opnd(rsp_reg, 32));
+    stub = mov(stub, r8_opnd, M_Base_Opnd(rsp_reg, 40));
+    stub = mov(stub, r9_opnd, M_Base_Opnd(rsp_reg, 48));
     // restore fp inputs from the stack
-    stub = movq(stub, xmm0_opnd, M_Base_Opnd(rsp_reg, 0));
-    stub = movq(stub, xmm1_opnd, M_Base_Opnd(rsp_reg, 8));
-    stub = movq(stub, xmm2_opnd, M_Base_Opnd(rsp_reg, 16));
-    stub = movq(stub, xmm3_opnd, M_Base_Opnd(rsp_reg, 24));
-    stub = movq(stub, xmm4_opnd, M_Base_Opnd(rsp_reg, 32));
-    stub = movq(stub, xmm5_opnd, M_Base_Opnd(rsp_reg, 40));
-    stub = movq(stub, xmm6_opnd, M_Base_Opnd(rsp_reg, 48));
-    stub = movq(stub, xmm7_opnd, M_Base_Opnd(rsp_reg, 56));
-    // pop m2n from the stack
-    const int32 bytes_to_m2n_bottom = 72;
-    stub = m2n_gen_pop_m2n(stub, false, 0, bytes_to_m2n_bottom, 1);
+    stub = movq(stub, xmm0_opnd, M_Base_Opnd(rsp_reg, 56));
+    stub = movq(stub, xmm1_opnd, M_Base_Opnd(rsp_reg, 64));
+    stub = movq(stub, xmm2_opnd, M_Base_Opnd(rsp_reg, 72));
+    stub = movq(stub, xmm3_opnd, M_Base_Opnd(rsp_reg, 80));
+    stub = movq(stub, xmm4_opnd, M_Base_Opnd(rsp_reg, 88));
+    stub = movq(stub, xmm5_opnd, M_Base_Opnd(rsp_reg, 96));
+    stub = movq(stub, xmm6_opnd, M_Base_Opnd(rsp_reg, 104));
+    stub = movq(stub, xmm7_opnd, M_Base_Opnd(rsp_reg, 112));
+
     // adjust stack pointer
-    stub = alu(stub, add_opc, rsp_opnd, Imm_Opnd(bytes_to_m2n_bottom + m2n_get_size()));
+    stub = alu(stub, add_opc, rsp_opnd, Imm_Opnd(stack_size));
     // transfer control to the compiled code
     stub = jump(stub, rax_opnd);
     

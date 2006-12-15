@@ -38,7 +38,7 @@
 #include "jni_utils.h"
 #include "exceptions.h"
 
-jsize JNICALL GetArrayLength(JNIEnv * UNREF env,
+jsize JNICALL GetArrayLength(JNIEnv * UNREF jni_env,
                              jarray array)
 {
     TRACE2("jni", "GetArrayLength called");
@@ -53,7 +53,7 @@ jsize JNICALL GetArrayLength(JNIEnv * UNREF env,
 } //GetArrayLength
 
 
-jarray JNICALL NewObjectArray(JNIEnv * UNREF env,
+jarray JNICALL NewObjectArray(JNIEnv * jni_env,
                               jsize length,
                               jclass elementClass,
                               jobject initialElement)
@@ -61,6 +61,10 @@ jarray JNICALL NewObjectArray(JNIEnv * UNREF env,
     ASSERT_RAISE_AREA;
     TRACE2("jni", "NewObjectArray called");
     assert(hythread_is_suspend_enabled());
+    
+    Global_Env * vm_env = jni_get_vm_env(jni_env);
+    if (vm_env->IsVmShutdowning()) return NULL;
+
     ObjectHandle elem_handle = (ObjectHandle)initialElement;
 
     Class* clss = jclass_to_struct_Class(elementClass);
@@ -68,7 +72,7 @@ jarray JNICALL NewObjectArray(JNIEnv * UNREF env,
     Class *arr_clss = (Class *)class_get_array_of_class(clss);
 
     if(!arr_clss) {
-         return 0;
+        return NULL;
     }
 
     // esostrov: vm_new_vector() may throw an exception. Throwing (not rising) 
@@ -105,8 +109,8 @@ jarray JNICALL NewObjectArray(JNIEnv * UNREF env,
     // only if the elem is non-null.
     if (elem != NULL) {
         ManagedObject **elems = (ManagedObject **)get_vector_element_address_ref(vector, 0);
-        Global_Env *global_env = VM_Global_State::loader_env;
-        if (global_env->compress_references) {
+        Global_Env * vm_env = VM_Global_State::loader_env;
+        if (vm_env->compress_references) {
             COMPRESSED_REFERENCE elem_offset = compress_reference((ManagedObject *)elem);
             COMPRESSED_REFERENCE *compressed_elems = (COMPRESSED_REFERENCE *)elems;
             for (int i = 0; i < length; i++) {
@@ -128,21 +132,20 @@ jarray JNICALL NewObjectArray(JNIEnv * UNREF env,
 
 
 
-jobject JNICALL GetObjectArrayElement(JNIEnv *env, jobjectArray array, jsize index)
+jobject JNICALL GetObjectArrayElement(JNIEnv * jni_env, jobjectArray array, jsize index)
 {
     TRACE2("jni", "GetObjectArrayElement called");
     assert(hythread_is_suspend_enabled());
-    if (array == NULL) {
-        // This should not happen.
-        ASSERT(0, "Input parameter 'array' is NULL");
-        return 0;
-    }
+    assert(array);
 
-    jsize length = GetArrayLength(env, array);
+    Global_Env * vm_env = jni_get_vm_env(jni_env);
+    if (vm_env->IsVmShutdowning()) return NULL;
+
+    jsize length = GetArrayLength(jni_env, array);
     if ((index < 0) || (index >= length)) {
         char msg[20];
         sprintf(msg, "%d", index);
-        ThrowNew_Quick(env, "java/lang/ArrayIndexOutOfBoundsException", msg);
+        ThrowNew_Quick(jni_env, "java/lang/ArrayIndexOutOfBoundsException", msg);
         return 0;
     }
 
@@ -165,39 +168,38 @@ jobject JNICALL GetObjectArrayElement(JNIEnv *env, jobjectArray array, jsize ind
 
 
 
-void JNICALL SetObjectArrayElement(JNIEnv *env,
+void JNICALL SetObjectArrayElement(JNIEnv * jni_env,
                                    jobjectArray array,
                                    jsize index,
                                    jobject value)
 {
     TRACE2("jni", "SetObjectArrayElement called");
     assert(hythread_is_suspend_enabled());
-    if (array == NULL) {
-        // This should not happen.
-        ASSERT(0, "Input parameter 'array' is NULL");
-        return;
-    }
+    assert(array);
 
-    jsize length = GetArrayLength(env, array);
+    Global_Env * vm_env = jni_get_vm_env(jni_env);
+    if (vm_env->IsVmShutdowning()) return;
+
+    jsize length = GetArrayLength(jni_env, array);
     if ((index < 0) || (index >= length)) {
         char msg[20];
         sprintf(msg, "%d", index);
-        ThrowNew_Quick(env, "java/lang/ArrayIndexOutOfBoundsException", msg);
+        ThrowNew_Quick(jni_env, "java/lang/ArrayIndexOutOfBoundsException", msg);
         return;
     }
 
     if (value != NULL) {
-        jclass array_jclass = GetObjectClass(env, array);
-        jclass actual_element_jclass = GetObjectClass(env, value);
+        jclass array_jclass = GetObjectClass(jni_env, array);
+        jclass actual_element_jclass = GetObjectClass(jni_env, value);
         
         Class* array_class = jclass_to_struct_Class(array_jclass);
         Class* actual_element_class = jclass_to_struct_Class(actual_element_jclass);
 
-        DeleteLocalRef(env, array_jclass);
-        DeleteLocalRef(env, actual_element_jclass);
+        DeleteLocalRef(jni_env, array_jclass);
+        DeleteLocalRef(jni_env, actual_element_jclass);
 
         if (!actual_element_class->is_instanceof(array_class->get_array_element_class())) {
-            ThrowNew_Quick(env, "java/lang/ArrayStoreException", actual_element_class->get_name()->bytes);
+            ThrowNew_Quick(jni_env, "java/lang/ArrayStoreException", actual_element_class->get_name()->bytes);
             return;
         }
     }
@@ -227,12 +229,15 @@ void JNICALL SetObjectArrayElement(JNIEnv *env,
 
 
 
-jbooleanArray JNICALL NewBooleanArray(JNIEnv * UNREF env, jsize length)
+jbooleanArray JNICALL NewBooleanArray(JNIEnv * jni_env, jsize length)
 {
     TRACE2("jni", "NewBooleanArray called");
     assert(hythread_is_suspend_enabled());
-    Class *clss = VM_Global_State::loader_env->ArrayOfBoolean_Class;
     
+    Global_Env * vm_env = jni_get_vm_env(jni_env);
+    if (vm_env->IsVmShutdowning()) return NULL;
+    
+    Class *clss = vm_env->ArrayOfBoolean_Class;    
     unsigned sz = clss->calculate_array_size(length);
     tmn_suspend_disable();       //---------------------------------v
     ObjectHandle h = oh_allocate_local_handle();
@@ -259,13 +264,15 @@ jbooleanArray JNICALL NewBooleanArray(JNIEnv * UNREF env, jsize length)
 
 
 
-jbyteArray JNICALL NewByteArray(JNIEnv * UNREF env, jsize length)
+jbyteArray JNICALL NewByteArray(JNIEnv * jni_env, jsize length)
 {
     TRACE2("jni", "NewByteArray called");
     assert(hythread_is_suspend_enabled());
-    Class *clss = VM_Global_State::loader_env->ArrayOfByte_Class;
-    assert(clss);
- 
+    
+    Global_Env * vm_env = jni_get_vm_env(jni_env);
+    if (vm_env->IsVmShutdowning()) return NULL;
+    
+    Class *clss = vm_env->ArrayOfByte_Class;
     unsigned sz = clss->calculate_array_size(length);
     tmn_suspend_disable();       //---------------------------------v
     ObjectHandle h = oh_allocate_local_handle();
@@ -292,12 +299,15 @@ jbyteArray JNICALL NewByteArray(JNIEnv * UNREF env, jsize length)
 
 
 
-jcharArray JNICALL NewCharArray(JNIEnv * UNREF env, jsize length)
+jcharArray JNICALL NewCharArray(JNIEnv * jni_env, jsize length)
 {
     TRACE2("jni", "NewCharArray called");
     assert(hythread_is_suspend_enabled());
-    Class *clss = VM_Global_State::loader_env->ArrayOfChar_Class;
- 
+    
+    Global_Env * vm_env = jni_get_vm_env(jni_env);
+    if (vm_env->IsVmShutdowning()) return NULL;
+
+    Class *clss = vm_env->ArrayOfChar_Class;
     unsigned sz = clss->calculate_array_size(length);
     tmn_suspend_disable();       //---------------------------------v
     ObjectHandle h = oh_allocate_local_handle();
@@ -324,12 +334,15 @@ jcharArray JNICALL NewCharArray(JNIEnv * UNREF env, jsize length)
 
 
 
-jshortArray JNICALL NewShortArray(JNIEnv * UNREF env, jsize length)
+jshortArray JNICALL NewShortArray(JNIEnv * jni_env, jsize length)
 {
     TRACE2("jni", "NewShortArray called");
     assert(hythread_is_suspend_enabled());
-    Class *clss = VM_Global_State::loader_env->ArrayOfShort_Class;
- 
+    
+    Global_Env * vm_env = jni_get_vm_env(jni_env);
+    if (vm_env->IsVmShutdowning()) return NULL;
+    
+    Class *clss = vm_env->ArrayOfShort_Class; 
     unsigned sz = clss->calculate_array_size(length);
     tmn_suspend_disable();       //---------------------------------v
     ObjectHandle h = oh_allocate_local_handle();
@@ -357,11 +370,15 @@ jshortArray JNICALL NewShortArray(JNIEnv * UNREF env, jsize length)
 
 
 
-jintArray JNICALL NewIntArray(JNIEnv * UNREF env, jsize length)
+jintArray JNICALL NewIntArray(JNIEnv * jni_env, jsize length)
 {
     TRACE2("jni", "NewIntArray called");
     assert(hythread_is_suspend_enabled());
-    Class *clss = VM_Global_State::loader_env->ArrayOfInt_Class;
+    
+    Global_Env * vm_env = jni_get_vm_env(jni_env);
+    if (vm_env->IsVmShutdowning()) return NULL;
+    
+    Class *clss = vm_env->ArrayOfInt_Class;
     unsigned sz = clss->calculate_array_size(length);
     tmn_suspend_disable();       //---------------------------------v
     ObjectHandle h = oh_allocate_local_handle();
@@ -388,11 +405,15 @@ jintArray JNICALL NewIntArray(JNIEnv * UNREF env, jsize length)
 
 
 
-jlongArray JNICALL NewLongArray(JNIEnv * UNREF env, jsize length)
+jlongArray JNICALL NewLongArray(JNIEnv * jni_env, jsize length)
 {
     TRACE2("jni", "NewLongArray called");
     assert(hythread_is_suspend_enabled());
-    Class *clss = VM_Global_State::loader_env->ArrayOfLong_Class;
+    
+    Global_Env * vm_env = jni_get_vm_env(jni_env);
+    if (vm_env->IsVmShutdowning()) return NULL;
+
+    Class *clss = vm_env->ArrayOfLong_Class;
     unsigned sz = clss->calculate_array_size(length);
     tmn_suspend_disable();       //---------------------------------v
     ObjectHandle h = oh_allocate_local_handle();
@@ -419,11 +440,15 @@ jlongArray JNICALL NewLongArray(JNIEnv * UNREF env, jsize length)
 
 
 
-jfloatArray JNICALL NewFloatArray(JNIEnv * UNREF env, jsize length)
+jfloatArray JNICALL NewFloatArray(JNIEnv * jni_env, jsize length)
 {
     TRACE2("jni", "NewFloatArray called");
     assert(hythread_is_suspend_enabled());
-    Class *clss = VM_Global_State::loader_env->ArrayOfFloat_Class;
+    
+    Global_Env * vm_env = jni_get_vm_env(jni_env);
+    if (vm_env->IsVmShutdowning()) return NULL;
+    
+    Class *clss = vm_env->ArrayOfFloat_Class;
     unsigned sz = clss->calculate_array_size(length);
     tmn_suspend_disable();       //---------------------------------v
     ObjectHandle h = oh_allocate_local_handle();
@@ -450,11 +475,15 @@ jfloatArray JNICALL NewFloatArray(JNIEnv * UNREF env, jsize length)
 
 
 
-jdoubleArray JNICALL NewDoubleArray(JNIEnv * UNREF env, jsize length)
+jdoubleArray JNICALL NewDoubleArray(JNIEnv * jni_env, jsize length)
 {
     TRACE2("jni", "NewDoubleArray called");
     assert(hythread_is_suspend_enabled());
-    Class *clss = VM_Global_State::loader_env->ArrayOfDouble_Class;
+    
+    Global_Env * vm_env = jni_get_vm_env(jni_env);
+    if (vm_env->IsVmShutdowning()) return NULL;
+    
+    Class *clss = vm_env->ArrayOfDouble_Class;
     unsigned sz = clss->calculate_array_size(length);
     tmn_suspend_disable();       //---------------------------------v
     ObjectHandle h = oh_allocate_local_handle();
@@ -489,12 +518,16 @@ jdoubleArray JNICALL NewDoubleArray(JNIEnv * UNREF env, jsize length)
 // begin Get<Type>ArrayElements functions
 
 
-jboolean *JNICALL GetBooleanArrayElements(JNIEnv * UNREF env,
+jboolean *JNICALL GetBooleanArrayElements(JNIEnv * jni_env,
                                           jbooleanArray array,
                                           jboolean *isCopy)
 {
     TRACE2("jni", "GetBooleanArrayElements called");
     assert(hythread_is_suspend_enabled());
+    
+    Global_Env * vm_env = jni_get_vm_env(jni_env);
+    if (vm_env->IsVmShutdowning()) return NULL;
+
     ObjectHandle h = (ObjectHandle)array;
 
     tmn_suspend_disable();       //---------------------------------v
@@ -529,12 +562,16 @@ jboolean *JNICALL GetBooleanArrayElements(JNIEnv * UNREF env,
 
 
 
-jbyte *JNICALL GetByteArrayElements(JNIEnv * UNREF env,
+jbyte *JNICALL GetByteArrayElements(JNIEnv * jni_env,
                                     jbyteArray array,
                                     jboolean *isCopy)
 {
     TRACE2("jni", "GetByteArrayElements called");
     assert(hythread_is_suspend_enabled());
+
+    Global_Env * vm_env = jni_get_vm_env(jni_env);
+    if (vm_env->IsVmShutdowning()) return NULL;
+
     ObjectHandle h = (ObjectHandle)array;
 
     tmn_suspend_disable();       //---------------------------------v
@@ -569,12 +606,16 @@ jbyte *JNICALL GetByteArrayElements(JNIEnv * UNREF env,
 
 
 
-jchar *JNICALL GetCharArrayElements(JNIEnv * UNREF env,
+jchar *JNICALL GetCharArrayElements(JNIEnv * jni_env,
                                     jcharArray array,
                                     jboolean *isCopy)
 {
     TRACE2("jni", "GetCharArrayElements called");
     assert(hythread_is_suspend_enabled());
+
+    Global_Env * vm_env = jni_get_vm_env(jni_env);
+    if (vm_env->IsVmShutdowning()) return NULL;
+
     ObjectHandle h = (ObjectHandle)array;
 
     tmn_suspend_disable();       //---------------------------------v
@@ -609,12 +650,16 @@ jchar *JNICALL GetCharArrayElements(JNIEnv * UNREF env,
 
 
 
-jshort *JNICALL GetShortArrayElements(JNIEnv * UNREF env,
+jshort *JNICALL GetShortArrayElements(JNIEnv * jni_env,
                                       jshortArray array,
                                       jboolean *isCopy)
 {
     TRACE2("jni", "GetShortArrayElements called");
     assert(hythread_is_suspend_enabled());
+
+    Global_Env * vm_env = jni_get_vm_env(jni_env);
+    if (vm_env->IsVmShutdowning()) return NULL;
+
     ObjectHandle h = (ObjectHandle)array;
 
     tmn_suspend_disable();       //---------------------------------v
@@ -649,12 +694,16 @@ jshort *JNICALL GetShortArrayElements(JNIEnv * UNREF env,
 
 
 
-jint *JNICALL GetIntArrayElements(JNIEnv *env,
+jint *JNICALL GetIntArrayElements(JNIEnv * jni_env,
                                   jintArray array,
                                   jboolean *isCopy)
 {
     TRACE2("jni", "GetIntArrayElements called");
     assert(hythread_is_suspend_enabled());
+
+    Global_Env * vm_env = jni_get_vm_env(jni_env);
+    if (vm_env->IsVmShutdowning()) return NULL;
+
     ObjectHandle h = (ObjectHandle)array;
 
     tmn_suspend_disable();       //---------------------------------v
@@ -670,7 +719,7 @@ jint *JNICALL GetIntArrayElements(JNIEnv *env,
         Vector_Handle java_array = (Vector_Handle)h->object;
         return (jint *)get_vector_element_address_int32(java_array, 0);
     } else {
-        jsize length = GetArrayLength(env, array);
+        jsize length = GetArrayLength(jni_env, array);
 
         jint *primitive_array = (jint *)STD_MALLOC(sizeof(jint) * length);
 
@@ -690,12 +739,16 @@ jint *JNICALL GetIntArrayElements(JNIEnv *env,
 
 
 
-jlong *JNICALL GetLongArrayElements(JNIEnv * UNREF env,
+jlong *JNICALL GetLongArrayElements(JNIEnv * jni_env,
                                     jlongArray array,
                                     jboolean *isCopy)
 {
     TRACE2("jni", "GetLongArrayElements called");
     assert(hythread_is_suspend_enabled());
+
+    Global_Env * vm_env = jni_get_vm_env(jni_env);
+    if (vm_env->IsVmShutdowning()) return NULL;
+
     ObjectHandle h = (ObjectHandle)array;
 
     tmn_suspend_disable();       //---------------------------------v
@@ -730,12 +783,16 @@ jlong *JNICALL GetLongArrayElements(JNIEnv * UNREF env,
 
 
 
-jfloat *JNICALL GetFloatArrayElements(JNIEnv *env,
+jfloat *JNICALL GetFloatArrayElements(JNIEnv * jni_env,
                                       jfloatArray array,
                                       jboolean *isCopy)
 {
     TRACE2("jni", "GetFloatArrayElements called");
     assert(hythread_is_suspend_enabled());
+
+    Global_Env * vm_env = jni_get_vm_env(jni_env);
+    if (vm_env->IsVmShutdowning()) return NULL;
+
     ObjectHandle h = (ObjectHandle)array;
 
     tmn_suspend_disable();       //---------------------------------v
@@ -751,7 +808,7 @@ jfloat *JNICALL GetFloatArrayElements(JNIEnv *env,
         Vector_Handle java_array = (Vector_Handle)h->object;
         return (jfloat *)get_vector_element_address_f32(java_array, 0);
     } else {
-        jsize length = GetArrayLength(env, array);
+        jsize length = GetArrayLength(jni_env, array);
 
         jfloat *primitive_array = (jfloat *)STD_MALLOC(sizeof(jfloat) * length);
 
@@ -771,12 +828,16 @@ jfloat *JNICALL GetFloatArrayElements(JNIEnv *env,
 
 
 
-jdouble *JNICALL GetDoubleArrayElements(JNIEnv * UNREF env,
+jdouble *JNICALL GetDoubleArrayElements(JNIEnv * jni_env,
                                         jdoubleArray array,
                                         jboolean *isCopy)
 {
     TRACE2("jni", "GetDoubleArrayElements called");
     assert(hythread_is_suspend_enabled());
+
+    Global_Env * vm_env = jni_get_vm_env(jni_env);
+    if (vm_env->IsVmShutdowning()) return NULL;
+
     ObjectHandle h = (ObjectHandle)array;
 
     tmn_suspend_disable();       //---------------------------------v
@@ -820,7 +881,7 @@ jdouble *JNICALL GetDoubleArrayElements(JNIEnv * UNREF env,
 // begin Release<Type>ArrayElements functions
 
 
-void JNICALL ReleaseBooleanArrayElements(JNIEnv *env,
+void JNICALL ReleaseBooleanArrayElements(JNIEnv * jni_env,
                                          jbooleanArray array,
                                          jboolean *elems,
                                          jint mode)
@@ -828,6 +889,10 @@ void JNICALL ReleaseBooleanArrayElements(JNIEnv *env,
     TRACE2("jni", "ReleaseBooleanArrayElements called");
     assert(hythread_is_suspend_enabled());
     ObjectHandle h = (ObjectHandle)array;
+
+    // It is better to be user frendly and don't crash if nothing should be released.
+    if (elems == NULL) return;
+
     tmn_suspend_disable();       //---------------------------------v
 
     Vector_Handle java_array = (Vector_Handle)h->object;
@@ -845,7 +910,7 @@ void JNICALL ReleaseBooleanArrayElements(JNIEnv *env,
     case 0:
     case JNI_COMMIT:
         {
-            jsize length = GetArrayLength(env, array);
+            jsize length = GetArrayLength(jni_env, array);
             tmn_suspend_disable();       //---------------------------------v
 
             Vector_Handle java_array = (Vector_Handle)h->object;
@@ -870,7 +935,7 @@ void JNICALL ReleaseBooleanArrayElements(JNIEnv *env,
 
 
 
-void JNICALL ReleaseByteArrayElements(JNIEnv *env,
+void JNICALL ReleaseByteArrayElements(JNIEnv * jni_env,
                                       jbyteArray array,
                                       jbyte *elems,
                                       jint mode)
@@ -878,6 +943,9 @@ void JNICALL ReleaseByteArrayElements(JNIEnv *env,
     TRACE2("jni", "ReleaseByteArrayElements called");
     assert(hythread_is_suspend_enabled());
     ObjectHandle h = (ObjectHandle)array;
+
+    // It is better to be user frendly and don't crash if nothing should be released.
+    if (elems == NULL) return;
 
     tmn_suspend_disable();       //---------------------------------v
 
@@ -896,7 +964,7 @@ void JNICALL ReleaseByteArrayElements(JNIEnv *env,
     case 0:
     case JNI_COMMIT:
         {
-            jsize length = GetArrayLength(env, array);
+            jsize length = GetArrayLength(jni_env, array);
             tmn_suspend_disable();       //---------------------------------v
 
             Vector_Handle java_array = (Vector_Handle)h->object;
@@ -920,7 +988,7 @@ void JNICALL ReleaseByteArrayElements(JNIEnv *env,
 
 
 
-void JNICALL ReleaseCharArrayElements(JNIEnv *env,
+void JNICALL ReleaseCharArrayElements(JNIEnv * jni_env,
                                       jcharArray array,
                                       jchar *elems,
                                       jint mode)
@@ -928,6 +996,10 @@ void JNICALL ReleaseCharArrayElements(JNIEnv *env,
     TRACE2("jni", "ReleaseCharArrayElements called");
     assert(hythread_is_suspend_enabled());
     ObjectHandle h = (ObjectHandle)array;
+
+    // It is better to be user frendly and don't crash if nothing should be released.
+    if (elems == NULL) return;
+
     tmn_suspend_disable();       //---------------------------------v
 
     Vector_Handle java_array = (Vector_Handle)h->object;
@@ -945,7 +1017,7 @@ void JNICALL ReleaseCharArrayElements(JNIEnv *env,
     case 0:
     case JNI_COMMIT:
         {
-            jsize length = GetArrayLength(env, array);
+            jsize length = GetArrayLength(jni_env, array);
             ObjectHandle h = (ObjectHandle)array;
             tmn_suspend_disable();       //---------------------------------v
 
@@ -970,7 +1042,7 @@ void JNICALL ReleaseCharArrayElements(JNIEnv *env,
 
 
 
-void JNICALL ReleaseShortArrayElements(JNIEnv *env,
+void JNICALL ReleaseShortArrayElements(JNIEnv * jni_env,
                                        jshortArray array,
                                        jshort *elems,
                                        jint mode)
@@ -978,6 +1050,10 @@ void JNICALL ReleaseShortArrayElements(JNIEnv *env,
     TRACE2("jni", "ReleaseShortArrayElements called");
     assert(hythread_is_suspend_enabled());
     ObjectHandle h = (ObjectHandle)array;
+ 
+    // It is better to be user frendly and don't crash if nothing should be released.
+    if (elems == NULL) return;
+    
     tmn_suspend_disable();       //---------------------------------v
 
     Vector_Handle java_array = (Vector_Handle)h->object;
@@ -995,7 +1071,7 @@ void JNICALL ReleaseShortArrayElements(JNIEnv *env,
     case 0:
     case JNI_COMMIT:
         {
-            jsize length = GetArrayLength(env, array);
+            jsize length = GetArrayLength(jni_env, array);
             ObjectHandle h = (ObjectHandle)array;
             tmn_suspend_disable();       //---------------------------------v
 
@@ -1020,7 +1096,7 @@ void JNICALL ReleaseShortArrayElements(JNIEnv *env,
 
 
 
-void JNICALL ReleaseIntArrayElements(JNIEnv *env,
+void JNICALL ReleaseIntArrayElements(JNIEnv * jni_env,
                                      jintArray array,
                                      jint *elems,
                                      jint mode)
@@ -1028,6 +1104,10 @@ void JNICALL ReleaseIntArrayElements(JNIEnv *env,
     TRACE2("jni", "ReleaseIntArrayElements called");
     assert(hythread_is_suspend_enabled());
     ObjectHandle h = (ObjectHandle)array;
+
+    // It is better to be user frendly and don't crash if nothing should be released.
+    if (elems == NULL) return;
+
     tmn_suspend_disable();       //---------------------------------v
 
     Vector_Handle java_array = (Vector_Handle)h->object;
@@ -1045,7 +1125,7 @@ void JNICALL ReleaseIntArrayElements(JNIEnv *env,
     case 0:
     case JNI_COMMIT:
         {
-            jsize length = GetArrayLength(env, array);
+            jsize length = GetArrayLength(jni_env, array);
             ObjectHandle h = (ObjectHandle)array;
             tmn_suspend_disable();       //---------------------------------v
 
@@ -1070,7 +1150,7 @@ void JNICALL ReleaseIntArrayElements(JNIEnv *env,
 
 
 
-void JNICALL ReleaseLongArrayElements(JNIEnv *env,
+void JNICALL ReleaseLongArrayElements(JNIEnv * jni_env,
                                       jlongArray array,
                                       jlong *elems,
                                       jint mode)
@@ -1078,6 +1158,10 @@ void JNICALL ReleaseLongArrayElements(JNIEnv *env,
     TRACE2("jni", "ReleaseLongArrayElements called");
     assert(hythread_is_suspend_enabled());
     ObjectHandle h = (ObjectHandle)array;
+
+    // It is better to be user frendly and don't crash if nothing should be released.
+    if (elems == NULL) return;
+
     tmn_suspend_disable();       //---------------------------------v
 
     Vector_Handle java_array = (Vector_Handle)h->object;
@@ -1095,7 +1179,7 @@ void JNICALL ReleaseLongArrayElements(JNIEnv *env,
     case 0:
     case JNI_COMMIT:
         {
-            jsize length = GetArrayLength(env, array);
+            jsize length = GetArrayLength(jni_env, array);
             ObjectHandle h = (ObjectHandle)array;
             tmn_suspend_disable();       //---------------------------------v
 
@@ -1120,7 +1204,7 @@ void JNICALL ReleaseLongArrayElements(JNIEnv *env,
 
 
 
-void JNICALL ReleaseFloatArrayElements(JNIEnv *env,
+void JNICALL ReleaseFloatArrayElements(JNIEnv * jni_env,
                                        jfloatArray array,
                                        jfloat *elems,
                                        jint mode)
@@ -1128,6 +1212,10 @@ void JNICALL ReleaseFloatArrayElements(JNIEnv *env,
     TRACE2("jni", "ReleaseFloatArrayElements called");
     assert(hythread_is_suspend_enabled());
     ObjectHandle h = (ObjectHandle)array;
+
+    // It is better to be user frendly and don't crash if nothing should be released.
+    if (elems == NULL) return;
+
     tmn_suspend_disable();       //---------------------------------v
 
     Vector_Handle java_array = (Vector_Handle)h->object;
@@ -1145,7 +1233,7 @@ void JNICALL ReleaseFloatArrayElements(JNIEnv *env,
     case 0:
     case JNI_COMMIT:
         {
-            jsize length = GetArrayLength(env, array);
+            jsize length = GetArrayLength(jni_env, array);
             ObjectHandle h = (ObjectHandle)array;
             tmn_suspend_disable();       //---------------------------------v
 
@@ -1171,7 +1259,7 @@ void JNICALL ReleaseFloatArrayElements(JNIEnv *env,
 
 
 
-void JNICALL ReleaseDoubleArrayElements(JNIEnv *env,
+void JNICALL ReleaseDoubleArrayElements(JNIEnv * jni_env,
                                         jdoubleArray array,
                                         jdouble *elems,
                                         jint mode)
@@ -1179,6 +1267,10 @@ void JNICALL ReleaseDoubleArrayElements(JNIEnv *env,
     TRACE2("jni", "ReleaseDoubleArrayElements called");
     assert(hythread_is_suspend_enabled());
     ObjectHandle h = (ObjectHandle)array;
+
+    // It is better to be user frendly and don't crash if nothing should be released.
+    if (elems == NULL) return;
+
     tmn_suspend_disable();       //---------------------------------v
 
     Vector_Handle java_array = (Vector_Handle)h->object;
@@ -1196,7 +1288,7 @@ void JNICALL ReleaseDoubleArrayElements(JNIEnv *env,
     case 0:
     case JNI_COMMIT:
         {
-            jsize length = GetArrayLength(env, array);
+            jsize length = GetArrayLength(jni_env, array);
             ObjectHandle h = (ObjectHandle)array;
             tmn_suspend_disable();       //---------------------------------v
 
@@ -1230,7 +1322,7 @@ void JNICALL ReleaseDoubleArrayElements(JNIEnv *env,
 // begin Get<Type>ArrayRegion functions
 
 
-void JNICALL GetBooleanArrayRegion (JNIEnv *env,
+void JNICALL GetBooleanArrayRegion (JNIEnv * jni_env,
                                     jobjectArray array,
                                     jsize start,
                                     jsize len,
@@ -1238,12 +1330,16 @@ void JNICALL GetBooleanArrayRegion (JNIEnv *env,
 {
     TRACE2("jni", "GetBooleanArrayRegion called");
     assert(hythread_is_suspend_enabled());
-    jsize length = GetArrayLength(env, array);
+    
+    Global_Env * vm_env = jni_get_vm_env(jni_env);
+    if (vm_env->IsVmShutdowning()) return;
+
+    jsize length = GetArrayLength(jni_env, array);
     jsize end = start + len;
     if(start < 0 || len < 0 || end > length) {
         char msg[30];
         sprintf(msg, "%d..%d", start, end);
-        ThrowNew_Quick(env, "java/lang/ArrayIndexOutOfBoundsException", msg);
+        ThrowNew_Quick(jni_env, "java/lang/ArrayIndexOutOfBoundsException", msg);
         return;
     }
 
@@ -1259,7 +1355,7 @@ void JNICALL GetBooleanArrayRegion (JNIEnv *env,
 
 
 
-void JNICALL GetByteArrayRegion    (JNIEnv *env,
+void JNICALL GetByteArrayRegion    (JNIEnv * jni_env,
                                     jobjectArray array,
                                     jsize start,
                                     jsize len,
@@ -1267,12 +1363,16 @@ void JNICALL GetByteArrayRegion    (JNIEnv *env,
 {
     TRACE2("jni", "GetByteArrayRegion called");
     assert(hythread_is_suspend_enabled());
-    jsize length = GetArrayLength(env, array);
+
+    Global_Env * vm_env = jni_get_vm_env(jni_env);
+    if (vm_env->IsVmShutdowning()) return;
+
+    jsize length = GetArrayLength(jni_env, array);
     jsize end = start + len;
     if(start < 0 || len < 0 || end > length) {
         char msg[30];
         sprintf(msg, "%d..%d", start, end);
-        ThrowNew_Quick(env, "java/lang/ArrayIndexOutOfBoundsException", msg);
+        ThrowNew_Quick(jni_env, "java/lang/ArrayIndexOutOfBoundsException", msg);
         return;
     }
 
@@ -1288,7 +1388,7 @@ void JNICALL GetByteArrayRegion    (JNIEnv *env,
 
 
 
-void JNICALL GetCharArrayRegion(JNIEnv *env,
+void JNICALL GetCharArrayRegion(JNIEnv * jni_env,
                                 jobjectArray array,
                                 jsize start,
                                 jsize len,
@@ -1296,12 +1396,16 @@ void JNICALL GetCharArrayRegion(JNIEnv *env,
 {
     TRACE2("jni", "GetCharArrayRegion called");
     assert(hythread_is_suspend_enabled());
-    jsize length = GetArrayLength(env, array);
+
+    Global_Env * vm_env = jni_get_vm_env(jni_env);
+    if (vm_env->IsVmShutdowning()) return;
+
+    jsize length = GetArrayLength(jni_env, array);
     jsize end = start + len;
     if(start < 0 || len < 0 || end > length) {
         char msg[30];
         sprintf(msg, "%d..%d", start, end);
-        ThrowNew_Quick(env, "java/lang/ArrayIndexOutOfBoundsException", msg);
+        ThrowNew_Quick(jni_env, "java/lang/ArrayIndexOutOfBoundsException", msg);
         return;
     }
 
@@ -1317,7 +1421,7 @@ void JNICALL GetCharArrayRegion(JNIEnv *env,
 
 
 
-void JNICALL GetShortArrayRegion(JNIEnv *env,
+void JNICALL GetShortArrayRegion(JNIEnv * jni_env,
                                  jobjectArray array, 
                                  jsize start,
                                  jsize len,
@@ -1325,12 +1429,16 @@ void JNICALL GetShortArrayRegion(JNIEnv *env,
 {
     TRACE2("jni", "GetShortArrayRegion called");
     assert(hythread_is_suspend_enabled());
-    jsize length = GetArrayLength(env, array);
+
+    Global_Env * vm_env = jni_get_vm_env(jni_env);
+    if (vm_env->IsVmShutdowning()) return;
+
+    jsize length = GetArrayLength(jni_env, array);
     jsize end = start + len;
     if(start < 0 || len < 0 || end > length) {
         char msg[30];
         sprintf(msg, "%d..%d", start, end);
-        ThrowNew_Quick(env, "java/lang/ArrayIndexOutOfBoundsException", msg);
+        ThrowNew_Quick(jni_env, "java/lang/ArrayIndexOutOfBoundsException", msg);
         return;
     }
 
@@ -1346,7 +1454,7 @@ void JNICALL GetShortArrayRegion(JNIEnv *env,
 
 
 
-void JNICALL GetIntArrayRegion(JNIEnv *env,
+void JNICALL GetIntArrayRegion(JNIEnv * jni_env,
                                jobjectArray array,
                                jsize start,
                                jsize len,
@@ -1354,12 +1462,16 @@ void JNICALL GetIntArrayRegion(JNIEnv *env,
 {
     TRACE2("jni", "GetIntArrayRegion called");
     assert(hythread_is_suspend_enabled());
-    jsize length = GetArrayLength(env, array);
+
+    Global_Env * vm_env = jni_get_vm_env(jni_env);
+    if (vm_env->IsVmShutdowning()) return;
+
+    jsize length = GetArrayLength(jni_env, array);
     jsize end = start + len;
     if(start < 0 || len < 0 || end > length) {
         char msg[30];
         sprintf(msg, "%d..%d", start, end);
-        ThrowNew_Quick(env, "java/lang/ArrayIndexOutOfBoundsException", msg);
+        ThrowNew_Quick(jni_env, "java/lang/ArrayIndexOutOfBoundsException", msg);
         return;
     }
 
@@ -1375,7 +1487,7 @@ void JNICALL GetIntArrayRegion(JNIEnv *env,
 
 
 
-void JNICALL GetLongArrayRegion(JNIEnv *env,
+void JNICALL GetLongArrayRegion(JNIEnv * jni_env,
                                 jobjectArray array,
                                 jsize start,
                                 jsize len,
@@ -1383,12 +1495,16 @@ void JNICALL GetLongArrayRegion(JNIEnv *env,
 {
     TRACE2("jni", "GetLongArrayRegion called");
     assert(hythread_is_suspend_enabled());
-    jsize length = GetArrayLength(env, array);
+
+    Global_Env * vm_env = jni_get_vm_env(jni_env);
+    if (vm_env->IsVmShutdowning()) return;
+
+    jsize length = GetArrayLength(jni_env, array);
     jsize end = start + len;
     if(start < 0 || len < 0 || end > length) {
         char msg[30];
         sprintf(msg, "%d..%d", start, end);
-        ThrowNew_Quick(env, "java/lang/ArrayIndexOutOfBoundsException", msg);
+        ThrowNew_Quick(jni_env, "java/lang/ArrayIndexOutOfBoundsException", msg);
         return;
     }
 
@@ -1404,7 +1520,7 @@ void JNICALL GetLongArrayRegion(JNIEnv *env,
 
 
 
-void JNICALL GetFloatArrayRegion(JNIEnv *env,
+void JNICALL GetFloatArrayRegion(JNIEnv * jni_env,
                                  jobjectArray array,
                                  jsize start,
                                  jsize len,
@@ -1412,12 +1528,16 @@ void JNICALL GetFloatArrayRegion(JNIEnv *env,
 {
     TRACE2("jni", "GetFloatArrayRegion called");
     assert(hythread_is_suspend_enabled());
-    jsize length = GetArrayLength(env, array);
+
+    Global_Env * vm_env = jni_get_vm_env(jni_env);
+    if (vm_env->IsVmShutdowning()) return;
+
+    jsize length = GetArrayLength(jni_env, array);
     jsize end = start + len;
     if(start < 0 || len < 0 || end > length) {
         char msg[30];
         sprintf(msg, "%d..%d", start, end);
-        ThrowNew_Quick(env, "java/lang/ArrayIndexOutOfBoundsException", msg);
+        ThrowNew_Quick(jni_env, "java/lang/ArrayIndexOutOfBoundsException", msg);
         return;
     }
 
@@ -1433,7 +1553,7 @@ void JNICALL GetFloatArrayRegion(JNIEnv *env,
 
 
 
-void JNICALL GetDoubleArrayRegion(JNIEnv *env,
+void JNICALL GetDoubleArrayRegion(JNIEnv * jni_env,
                                   jobjectArray array,
                                   jsize start,
                                   jsize len,
@@ -1441,12 +1561,16 @@ void JNICALL GetDoubleArrayRegion(JNIEnv *env,
 {
     TRACE2("jni", "GetDoubleArrayRegion called");
     assert(hythread_is_suspend_enabled());
-    jsize length = GetArrayLength(env, array);
+
+    Global_Env * vm_env = jni_get_vm_env(jni_env);
+    if (vm_env->IsVmShutdowning()) return;
+
+    jsize length = GetArrayLength(jni_env, array);
     jsize end = start + len;
     if(start < 0 || len < 0 || end > length) {
         char msg[30];
         sprintf(msg, "%d..%d", start, end);
-        ThrowNew_Quick(env, "java/lang/ArrayIndexOutOfBoundsException", msg);
+        ThrowNew_Quick(jni_env, "java/lang/ArrayIndexOutOfBoundsException", msg);
         return;
     }
 
@@ -1470,7 +1594,7 @@ void JNICALL GetDoubleArrayRegion(JNIEnv *env,
 // begin Set<Type>ArrayRegion functions
 
 
-void JNICALL SetBooleanArrayRegion(JNIEnv *env,
+void JNICALL SetBooleanArrayRegion(JNIEnv * jni_env,
                                    jobjectArray array,
                                    jsize start,
                                    jsize len,
@@ -1478,12 +1602,16 @@ void JNICALL SetBooleanArrayRegion(JNIEnv *env,
 {
     TRACE2("jni", "SetBooleanArrayRegion called");
     assert(hythread_is_suspend_enabled());
-    jsize length = GetArrayLength(env, array);
+
+    Global_Env * vm_env = jni_get_vm_env(jni_env);
+    if (vm_env->IsVmShutdowning()) return;
+
+    jsize length = GetArrayLength(jni_env, array);
     jsize end = start + len;
     if(start < 0 || len < 0 || end > length) {
         char msg[30];
         sprintf(msg, "%d..%d", start, end);
-        ThrowNew_Quick(env, "java/lang/ArrayIndexOutOfBoundsException", msg);
+        ThrowNew_Quick(jni_env, "java/lang/ArrayIndexOutOfBoundsException", msg);
         return;
     }
 
@@ -1501,7 +1629,7 @@ void JNICALL SetBooleanArrayRegion(JNIEnv *env,
 
 
 
-void JNICALL SetByteArrayRegion(JNIEnv *env,
+void JNICALL SetByteArrayRegion(JNIEnv * jni_env,
                                 jobjectArray array,
                                 jsize start,
                                 jsize len,
@@ -1509,12 +1637,16 @@ void JNICALL SetByteArrayRegion(JNIEnv *env,
 {
     TRACE2("jni", "SetByteArrayRegion called");
     assert(hythread_is_suspend_enabled());
-    jsize length = GetArrayLength(env, array);
+
+    Global_Env * vm_env = jni_get_vm_env(jni_env);
+    if (vm_env->IsVmShutdowning()) return;
+
+    jsize length = GetArrayLength(jni_env, array);
     jsize end = start + len;
     if(start < 0 || len < 0 || end > length) {
         char msg[30];
         sprintf(msg, "%d..%d", start, end);
-        ThrowNew_Quick(env, "java/lang/ArrayIndexOutOfBoundsException", msg);
+        ThrowNew_Quick(jni_env, "java/lang/ArrayIndexOutOfBoundsException", msg);
         return;
     }
 
@@ -1532,7 +1664,7 @@ void JNICALL SetByteArrayRegion(JNIEnv *env,
 
 
 
-void JNICALL SetCharArrayRegion(JNIEnv *env,
+void JNICALL SetCharArrayRegion(JNIEnv * jni_env,
                                 jobjectArray array,
                                 jsize start,
                                 jsize len,
@@ -1540,12 +1672,16 @@ void JNICALL SetCharArrayRegion(JNIEnv *env,
 {
     TRACE2("jni", "SetCharArrayRegion called");
     assert(hythread_is_suspend_enabled());
-    jsize length = GetArrayLength(env, array);
+
+    Global_Env * vm_env = jni_get_vm_env(jni_env);
+    if (vm_env->IsVmShutdowning()) return;
+
+    jsize length = GetArrayLength(jni_env, array);
     jsize end = start + len;
     if(start < 0 || len < 0 || end > length) {
         char msg[30];
         sprintf(msg, "%d..%d", start, end);
-        ThrowNew_Quick(env, "java/lang/ArrayIndexOutOfBoundsException", msg);
+        ThrowNew_Quick(jni_env, "java/lang/ArrayIndexOutOfBoundsException", msg);
         return;
     }
 
@@ -1563,7 +1699,7 @@ void JNICALL SetCharArrayRegion(JNIEnv *env,
 
 
 
-void JNICALL SetShortArrayRegion(JNIEnv *env,
+void JNICALL SetShortArrayRegion(JNIEnv * jni_env,
                                  jobjectArray array,
                                  jsize start,
                                  jsize len,
@@ -1571,12 +1707,16 @@ void JNICALL SetShortArrayRegion(JNIEnv *env,
 {
     TRACE2("jni", "SetShortArrayRegion called");
     assert(hythread_is_suspend_enabled());
-    jsize length = GetArrayLength(env, array);
+
+    Global_Env * vm_env = jni_get_vm_env(jni_env);
+    if (vm_env->IsVmShutdowning()) return;
+
+    jsize length = GetArrayLength(jni_env, array);
     jsize end = start + len;
     if(start < 0 || len < 0 || end > length) {
         char msg[30];
         sprintf(msg, "%d..%d", start, end);
-        ThrowNew_Quick(env, "java/lang/ArrayIndexOutOfBoundsException", msg);
+        ThrowNew_Quick(jni_env, "java/lang/ArrayIndexOutOfBoundsException", msg);
         return;
     }
 
@@ -1594,7 +1734,7 @@ void JNICALL SetShortArrayRegion(JNIEnv *env,
 
 
 
-void JNICALL SetIntArrayRegion(JNIEnv *env,
+void JNICALL SetIntArrayRegion(JNIEnv * jni_env,
                                jobjectArray array,
                                jsize start,
                                jsize len,
@@ -1602,12 +1742,16 @@ void JNICALL SetIntArrayRegion(JNIEnv *env,
 {
     TRACE2("jni", "SetIntArrayRegion called");
     assert(hythread_is_suspend_enabled());
-    jsize length = GetArrayLength(env, array);
+
+    Global_Env * vm_env = jni_get_vm_env(jni_env);
+    if (vm_env->IsVmShutdowning()) return;
+
+    jsize length = GetArrayLength(jni_env, array);
     jsize end = start + len;
     if(start < 0 || len < 0 || end > length) {
         char msg[30];
         sprintf(msg, "%d..%d", start, end);
-        ThrowNew_Quick(env, "java/lang/ArrayIndexOutOfBoundsException", msg);
+        ThrowNew_Quick(jni_env, "java/lang/ArrayIndexOutOfBoundsException", msg);
         return;
     }
 
@@ -1625,7 +1769,7 @@ void JNICALL SetIntArrayRegion(JNIEnv *env,
 
 
 
-void JNICALL SetLongArrayRegion(JNIEnv *env,
+void JNICALL SetLongArrayRegion(JNIEnv * jni_env,
                                 jobjectArray array,
                                 jsize start,
                                 jsize len,
@@ -1633,12 +1777,16 @@ void JNICALL SetLongArrayRegion(JNIEnv *env,
 {
     TRACE2("jni", "SetLongArrayRegion called");
     assert(hythread_is_suspend_enabled());
-    jsize length = GetArrayLength(env, array);
+
+    Global_Env * vm_env = jni_get_vm_env(jni_env);
+    if (vm_env->IsVmShutdowning()) return;
+
+    jsize length = GetArrayLength(jni_env, array);
     jsize end = start + len;
     if(start < 0 || len < 0 || end > length) {
         char msg[30];
         sprintf(msg, "%d..%d", start, end);
-        ThrowNew_Quick(env, "java/lang/ArrayIndexOutOfBoundsException", msg);
+        ThrowNew_Quick(jni_env, "java/lang/ArrayIndexOutOfBoundsException", msg);
         return;
     }
 
@@ -1656,7 +1804,7 @@ void JNICALL SetLongArrayRegion(JNIEnv *env,
 
 
 
-void JNICALL SetFloatArrayRegion(JNIEnv *env,
+void JNICALL SetFloatArrayRegion(JNIEnv * jni_env,
                                  jobjectArray array,
                                  jsize start,
                                  jsize len,
@@ -1664,12 +1812,16 @@ void JNICALL SetFloatArrayRegion(JNIEnv *env,
 {
     TRACE2("jni", "SetFloatArrayRegion called");
     assert(hythread_is_suspend_enabled());
-    jsize length = GetArrayLength(env, array);
+
+    Global_Env * vm_env = jni_get_vm_env(jni_env);
+    if (vm_env->IsVmShutdowning()) return;
+
+    jsize length = GetArrayLength(jni_env, array);
     jsize end = start + len;
     if(start < 0 || len < 0 || end > length) {
         char msg[30];
         sprintf(msg, "%d..%d", start, end);
-        ThrowNew_Quick(env, "java/lang/ArrayIndexOutOfBoundsException", msg);
+        ThrowNew_Quick(jni_env, "java/lang/ArrayIndexOutOfBoundsException", msg);
         return;
     }
 
@@ -1687,7 +1839,7 @@ void JNICALL SetFloatArrayRegion(JNIEnv *env,
 
 
 
-void JNICALL SetDoubleArrayRegion(JNIEnv *env,
+void JNICALL SetDoubleArrayRegion(JNIEnv * jni_env,
                                   jobjectArray array,
                                   jsize start,
                                   jsize len,
@@ -1695,12 +1847,16 @@ void JNICALL SetDoubleArrayRegion(JNIEnv *env,
 {
     TRACE2("jni", "SetDoubleArrayRegion called");
     assert(hythread_is_suspend_enabled());
-    jsize length = GetArrayLength(env, array);
+
+    Global_Env * vm_env = jni_get_vm_env(jni_env);
+    if (vm_env->IsVmShutdowning()) return;
+
+    jsize length = GetArrayLength(jni_env, array);
     jsize end = start + len;
     if(start < 0 || len < 0 || end > length) {
         char msg[30];
         sprintf(msg, "%d..%d", start, end);
-        ThrowNew_Quick(env, "java/lang/ArrayIndexOutOfBoundsException", msg);
+        ThrowNew_Quick(jni_env, "java/lang/ArrayIndexOutOfBoundsException", msg);
         return;
     }
 

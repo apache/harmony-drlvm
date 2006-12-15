@@ -267,7 +267,6 @@ static void init_vm_properties(Properties & properties)
         properties.set("vm.jit_may_inline_sync", "true");
         properties.set("vm.use_verifier", "true");
         properties.set("vm.jvmti.enabled", "false");
-        properties.set("vm.cleanupOnExit", "false");
         properties.set("vm.bootclasspath.appendclasspath", "false");
 
         /*

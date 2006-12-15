@@ -203,8 +203,6 @@ static void print_help_on_nonstandard_options()
         "              Do not launch compilation in parallel\n"
         "    -Xdumpfile:<file>\n"
         "              Specifies a file name for the dump\n"
-        "    -XnoCleanupOnExit\n"
-        "              Exit without cleaning internal resorces\n"
         "    -XD<name>=<value>\n"
         "              set an internal system property\n");
 } //print_help_on_nonstandard_options
@@ -233,8 +231,6 @@ void print_vm_standard_properties()
         "            Use verifier.\n"
         "    vm.jvmti.enabled (default FALSE):\n"
         "            Whether JVMTI mode is enabled.\n"
-        "    vm.cleanupOnExit (default FALSE):\n"
-        "            Excplicitly free VM resources before exit.\n"
         "    vm.bootclasspath.appendclasspath (default FALSE):\n"
         "            Append classpath to the bootclasspath.\n"
         "\nOther properties:\n\n"
@@ -480,9 +476,6 @@ void parse_vm_arguments(Global_Env *p_env)
         else if (strcmp(option, "-Xdumpfile:") == 0) {
             const char* arg = option + strlen("-Xdumpfile:");
             dump_file_name = arg;
-        }
-        else if (strcmp(option, "-XnoCleanupOnExit") == 0) {
-            p_env->VmProperties()->set("vm.noCleanupOnExit", "true");
         }
         else if (strcmp(option, "_org.apache.harmony.vmi.portlib") == 0) {
             // Store a pointer to the portlib

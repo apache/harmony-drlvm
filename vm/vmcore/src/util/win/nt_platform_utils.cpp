@@ -30,6 +30,7 @@
 #include <string.h>
 #include <process.h>
 
+#include "init.h"
 #include "platform_utils.h"
 #include "open/vm_util.h"
 #include "exception_filter.h"
@@ -39,20 +40,16 @@ BOOL ctrl_handler(DWORD ctrlType)
     switch (ctrlType) 
     { 
     case CTRL_BREAK_EVENT:
-      extern void quit_handler(int);
-      quit_handler(0);
+      vm_dump_handler(0);
       return TRUE; 
     case CTRL_C_EVENT: 
     case CTRL_CLOSE_EVENT:
     case CTRL_LOGOFF_EVENT:
     case CTRL_SHUTDOWN_EVENT:
-        extern void interrupt_handler(int);
-        interrupt_handler(0);
+        vm_interrupt_handler(0);
         return TRUE; 
-    default:
-        ABORT("Unexpected event");
     } 
-        return FALSE; 
+    return FALSE; 
 } 
 
 void initialize_signals(){

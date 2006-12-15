@@ -19,7 +19,10 @@ Author:  Marina V. Goldburt
 Version: $Revision: 1.4.2.11 $
 -->
 <project name="SMOKE TESTS">
-    <property name="smoke.test.javasrc" location="${build.VM.home}/tests/smoke" />
+    <property name="smoke.test.src" location="${build.VM.home}/tests/smoke" />
+    <property name="smoke.test.class.path" location="${build.dir}/_smoke.tests/classes" />
+    <property name="smoke.test.native.path" location="${build.dir}/_smoke.tests/natives" />
+
     <patternset id="smoke.test.java.pattern">
         <include name="**/*.java"/>
         <exclude name="**/Logger.java"/>
@@ -29,11 +32,24 @@ Version: $Revision: 1.4.2.11 $
         <exclude name="**/*$*.class"/>
     </patternset>
 
-    <target name="smoke.test" depends="compile.smoke.tests, java_test_smoke" />
-    <target name="compile.smoke.tests" depends="init_component">
-        <mkdir dir="${build.dir}/_smoke.tests/classes" />
-        <javac includeJavaRuntime="yes" srcdir="${smoke.test.javasrc}" 
-                destdir="${build.dir}/_smoke.tests/classes" 
+    <target name="smoke.test.native.init">
+        <fileset id="smoke.test.native.refid"
+                dir="${smoke.test.src}">
+            <include name="**/*.c"/>
+        </fileset>
+        <pathconvert property="smoke.test.native.list"
+                     refid="smoke.test.native.refid" pathsep="," />
+
+    </target>
+
+    <target name="smoke.test" depends="compile.smoke.test, java_test_smoke" />
+
+    <target name="compile.smoke.test" depends="compile.smoke.test.java, compile.smoke.test.native" />
+
+    <target name="compile.smoke.test.java" depends="init_component">
+        <mkdir dir="${smoke.test.class.path}" />
+        <javac includeJavaRuntime="yes" srcdir="${smoke.test.src}" 
+                destdir="${smoke.test.class.path}" 
                 target="${javac.target}" debug="${java.debug.option}">
             <patternset refid="smoke.test.java.pattern" />
             <bootclasspath>
@@ -41,15 +57,48 @@ Version: $Revision: 1.4.2.11 $
             </bootclasspath>
         </javac>
     </target>
-    <target name="jar.smoke.tests" depends="compile.smoke.tests">
+
+
+    <target name="compile.smoke.test.native" depends="init_component, smoke.test.native.init">
+        <mkdir dir="${smoke.test.native.path}" />
+
+        <for list="${smoke.test.native.list}" param="full.file.path" delimiter=",">
+            <sequential>
+                <var name="outputdir" unset="true" />
+                <var name="tmp.outputdir" unset="true" />
+                <var name="outputfile" unset="true" />
+
+                <basename property="outputfile" file="@{full.file.path}" suffix=".c"/>
+                <dirname property="tmp.outputdir" file="@{full.file.path}" />
+                <basename property="outputdir" file="${tmp.outputdir}" />
+
+                <mkdir dir="${smoke.test.native.path}/${outputdir}" />
+
+                <cc name="${build.cxx}"
+                    debug="true"
+                    runtime="dynamic"
+                    multithreaded="true"
+                    link="shared"
+                    outfile="${smoke.test.native.path}/${outputdir}/${outputfile}">
+                    <includepath path="${build.deploy.dir}/jdk/include" />
+                    <select os="lnx">
+                        <linkerarg value="-lstdc++" />
+                    </select>
+                    <fileset file="@{full.file.path}" />                    
+                </cc>
+            </sequential>
+        </for>
+    </target>
+
+    <target name="jar.smoke.tests" depends="compile.smoke.test">
         <jar jarfile="${build.dir}/_smoke.tests/">
-            <fileset dir="${build.dir}/_smoke.tests/classes" includes="**/*.class" />
+            <fileset dir="${smoke.test.class.path}" includes="**/*.class" />
         </jar>
     </target>
     <target name="java_test_smoke">
         <mkdir dir="${build.dir}/_smoke.tests/reports" />
         <path id="java.class.path">
-            <pathelement location="${build.dir}/_smoke.tests/classes" />
+            <pathelement location="${smoke.test.class.path}" />
             <fileset dir="${build.deploy.dir}/jdk/jre/lib" includes="*.jar" />
         </path>
         <select arch="ia32,em64t">
@@ -67,7 +116,7 @@ Version: $Revision: 1.4.2.11 $
         </condition>
         <property name="using.jit.or.jitrino" value="Using jitrino" />
         <echo message="${using.jit.or.jitrino}" />
-        <property name="classes.location" location="${smoke.test.javasrc}" />
+        <property name="classes.location" location="${smoke.test.src}" />
         <pathconvert property="java.path.property" refid="java.class.path" />
         <condition property="int.or.jit.exclude" value="X_int,X_interpreter">
             <contains string="${jit.or.interpreter}" substring="int" />
@@ -94,7 +143,7 @@ ${foo}
 ------------------------------------------------
         </echo>
         <for param="test">
-            <fileset dir="${smoke.test.javasrc}">
+            <fileset dir="${smoke.test.src}">
                <!--  <patternset refid="smoke.test.java.pattern" /> -->
                 <include name="**/*.java"/>
                 <!-- <exclude name="**/Logger.java"/> -->
@@ -102,6 +151,9 @@ ${foo}
 
             </fileset>
             <sequential>
+                <var name="outdir" unset="true" />
+                <var name="tmp.outdir" unset="true" />
+
                 <basename property="filename.@{test}" file="@{test}" />
                 <propertycopy name="fname" override="true" from="filename.@{test}" />
                 <propertyregex property="classes.location1" override="true" input="${classes.location}" regexp="\\" replace="/" global="true" defaultValue="${classes.location}" />
@@ -112,6 +164,9 @@ ${foo}
                 <propertycopy name="src.file" override="true" from="@{test}.src.file" />
                 <propertyregex property="@{test}.keywords" input="${src.file}" regexp="(?m)@keyword(.*)" select="\1" defaultValue="" />
                 <propertycopy name="file.keywords" override="true" from="@{test}.keywords" />
+                <dirname property="tmp.outdir" file="@{test}" />
+                <basename property="outdir" file="${tmp.outdir}" />
+
                 <for param="keyword" list="${EXCLUDE_KEYWORDS}" delimiter=",">
                     <sequential>
                         <condition property="@{test}.is.excluded" value="@{keyword}">
@@ -139,20 +194,23 @@ ${foo}
                                 <equals arg1="${int.or.jit.arg}" arg2="" />
                             </not>
                             <then>
-                                <java newenvironment="yes" output="${build.dir}/_smoke.tests/reports/${class.name}_${jit.or.interpreter}.out" classname="${class.name}" fork="true" jvm="${build.deploy.dir}/jdk/jre/bin/java${executable.postfix}" error="${build.dir}/_smoke.tests/reports/${class.name}_${jit.or.interpreter}.out.err">
+                                <java newenvironment="yes" dir="${build.deploy.dir}/jdk/jre/bin" output="${build.dir}/_smoke.tests/reports/${class.name}_${jit.or.interpreter}.out" classname="${class.name}" fork="true" jvm="${build.deploy.dir}/jdk/jre/bin/java${executable.postfix}" error="${build.dir}/_smoke.tests/reports/${class.name}_${jit.or.interpreter}.out.err">
                                     <jvmarg value="-Dvm.assert_dialog=0" />
+                                    <jvmarg value="-Djava.library.path=${smoke.test.native.path}/${outdir}" />
                                     <jvmarg value="${int.or.jit.arg}" />
                                     <jvmarg value="-classpath" />
-                                    <jvmarg value="${build.dir}/_smoke.tests/classes" />
+                                    <jvmarg value="${smoke.test.class.path}" />
                                     <env key="JAVA_HOME" value="${build.deploy.dir}/jdk/jre" />
                                     <env key="LD_LIBRARY_PATH" value="${build.deploy.dir}/jdk/jre/bin:${env.LD_LIBRARY_PATH}" />
                                 </java>
                             </then>
                             <else>
-                                <java newenvironment="yes" output="${build.dir}/_smoke.tests/reports/${class.name}_${jit.or.interpreter}.out" classname="${class.name}" fork="true" jvm="${build.deploy.dir}/jdk/jre/bin/java${executable.postfix}" error="${build.dir}/_smoke.tests/reports/${class.name}_${jit.or.interpreter}.out.err">
+                                <java newenvironment="yes" dir="${build.deploy.dir}/jdk/jre/bin" output="${build.dir}/_smoke.tests/reports/${class.name}_${jit.or.interpreter}.out" classname="${class.name}" fork="true" jvm="${build.deploy.dir}/jdk/jre/bin/java${executable.postfix}" error="${build.dir}/_smoke.tests/reports/${class.name}_${jit.or.interpreter}.out.err">
                                     <jvmarg value="-Dvm.assert_dialog=0" />
+                                    <jvmarg value="-Djava.library.path=${smoke.test.native.path}/${outdir}" />
                                     <jvmarg value="-classpath" />
-                                    <jvmarg value="${build.dir}/_smoke.tests/classes" />
+                                    <jvmarg value="${smoke.test.class.path}" />
+
                                     <env key="JAVA_HOME" value="${build.deploy.dir}/jdk/jre" />
                                     <env key="LD_LIBRARY_PATH" value="${build.deploy.dir}/jdk/jre/bin:${env.LD_LIBRARY_PATH}" />
                                 </java>

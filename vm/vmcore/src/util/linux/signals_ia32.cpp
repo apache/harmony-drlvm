@@ -54,7 +54,8 @@
 #include "environment.h"
  
 #include "open/gc.h"
- 
+
+#include "init.h" 
 #include "exceptions.h"
 #include "exceptions_jit.h"
 #include "vm_threads.h"
@@ -767,10 +768,8 @@ void initialize_signals()
     sa.sa_sigaction = &general_signal_handler;
     sigaction(SIGFPE, &sa, NULL);
 
-    extern void interrupt_handler(int);
-    signal(SIGINT, (void (*)(int)) interrupt_handler);
-    extern void quit_handler(int);
-    signal(SIGQUIT, (void (*)(int)) quit_handler);
+    signal(SIGINT, (void (*)(int)) vm_interrupt_handler);
+    signal(SIGQUIT, (void (*)(int)) vm_dump_handler);
 
     /* install abort_handler to print out call stack on assertion failures */
     sigemptyset(&sa.sa_mask);

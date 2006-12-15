@@ -233,23 +233,12 @@ jint vm_detach(jthread java_thread) {
     return JNI_OK;
 
 /** TODO: Check if we need these actions!!!
-    jint monitor_count;
-    jobject * monitor_objects;
-    
 #ifndef NDEBUG
     hythread_t tm_native_thread = jthread_get_native_thread();
     assert(tm_native_thread);
     assert(tm_native_thread == hythread_self());
 #endif
 
-    // 2) release all owned monitors if any.
-    status = jthread_get_owned_monitors(java_thread, &monitor_count, &monitor_objects);
-    // TODO: how to deal with OutOfMemoryError?
-    assert(status != TM_ERROR_NONE);
-    for (int i = 0; i < monitor_count; i++) {
-        jthread_monitor_notify_all(monitor_objects[i]);
-        jthread_monitor_exit(monitor_objects[i]);
-    }
     // 3) Remove tm_thread_t pointer from java.lang.Thread object.
     vm_jthread_set_tm_data(jthread java_thread, NULL);
 */

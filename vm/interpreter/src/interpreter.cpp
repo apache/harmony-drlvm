@@ -2392,11 +2392,10 @@ findCatchMethod(ManagedObject **exception, Method **catch_method, jlocation *cat
 
 
 static inline void
-stackDump(StackFrame& frame) {
+stackDump(FILE * file, StackFrame& frame) {
 
     StackFrame *f = &frame;
 
-    ECHO("****** STACK DUMP: ************");
     while(f) {
         Method *m = f->method;
         Class *c = m->get_class();
@@ -2406,35 +2405,21 @@ stackDump(StackFrame& frame) {
             line = m->get_line_number((uint16)ip);
         }
 #ifdef INTERPRETER_DEEP_DEBUG
-        ECHO(c->name->bytes << "."
-                << m->get_name()->bytes
-                << m->get_descriptor()->bytes << " ("
-                << class_get_source_file_name(c) << ":"
-                << line << ")"
-                << " last bcs: (8 of " << f->n_last_bytecode << "): "
-                << opcodeNames[f->last_bytecodes[
-                        (f->n_last_bytecode-1)&7]] << " "
-                << opcodeNames[f->last_bytecodes[
-                        (f->n_last_bytecode-2)&7]] << " "
-                << opcodeNames[f->last_bytecodes[
-                        (f->n_last_bytecode-3)&7]] << " "
-                << opcodeNames[f->last_bytecodes[
-                        (f->n_last_bytecode-4)&7]] << " "
-                << opcodeNames[f->last_bytecodes[
-                        (f->n_last_bytecode-5)&7]] << " "
-                << opcodeNames[f->last_bytecodes[
-                        (f->n_last_bytecode-6)&7]] << " "
-                << opcodeNames[f->last_bytecodes[
-                        (f->n_last_bytecode-7)&7]] << " "
-                << opcodeNames[f->last_bytecodes[
-                        (f->n_last_bytecode-8)&7]]);
+        fprintf(file, "%s.%s%s (%s:%i) last bcs: (8 of %i): %s %s %s %s %s %s %s %s",
+            c->name->bytes, m->get_name()->bytes, m->get_descriptor()->bytes,
+            class_get_source_file_name(c), line, f->n_last_bytecode,
+            opcodeNames[f->last_bytecodes[(f->n_last_bytecode-1)&7]],
+            opcodeNames[f->last_bytecodes[(f->n_last_bytecode-2)&7]],
+            opcodeNames[f->last_bytecodes[(f->n_last_bytecode-3)&7]],
+            opcodeNames[f->last_bytecodes[(f->n_last_bytecode-4)&7]],
+            opcodeNames[f->last_bytecodes[(f->n_last_bytecode-5)&7]],
+            opcodeNames[f->last_bytecodes[(f->n_last_bytecode-6)&7]],
+            opcodeNames[f->last_bytecodes[(f->n_last_bytecode-7)&7]],
+            opcodeNames[f->last_bytecodes[(f->n_last_bytecode-8)&7]]);
 #else
     const char *filename = class_get_source_file_name(c);
-    ECHO(class_get_name(c) << "."
-        << m->get_name()->bytes
-        << m->get_descriptor()->bytes << " ("
-        << (filename != NULL ? filename : "NULL") << ":"
-        << line << ")");
+    fprintf(file, "  %s.%s%s (%s:%i)\n", class_get_name(c), m->get_name()->bytes,
+        m->get_descriptor()->bytes, (filename != NULL ? filename : "NULL"), line);
 #endif
         f = f->prev;
     }
@@ -2442,14 +2427,13 @@ stackDump(StackFrame& frame) {
 
 void stack_dump(VM_thread *thread) {
     StackFrame *frame = getLastStackFrame(thread);
-    stackDump(*frame);
+    stackDump(stdout, *frame);
 }
 
 void stack_dump() {
     StackFrame *frame = getLastStackFrame();
-    stackDump(*frame);
+    stackDump(stdout, *frame);
 }
-
 
 static inline
 void UNUSED dump_all_java_stacks() {
@@ -2973,14 +2957,14 @@ restart:
                     case OPCODE_RET: Opcode_WIDE_RET(frame); break;
                     default:
                      DEBUG2("wide bytecode 0x" << hex << (int)*ip1 << " not implemented\n");
-                     stackDump(frame);
+                     stackDump(stdout, frame);
                      ABORT("Unexpected wide bytecode");
                 }
                 break;
             }
 
             default: DEBUG2("bytecode 0x" << hex << (int)ip0 << " not implemented\n");
-                     stackDump(frame);
+                     stackDump(stdout, frame);
                      ABORT("Unexpected bytecode");
         }
         assert(&frame == getLastStackFrame());
@@ -2991,6 +2975,20 @@ check_exception:
         if (frame.exc == 0) continue;
 got_exception:
         assert(&frame == getLastStackFrame());
+
+        if (VM_Global_State::loader_env->IsVmShutdowning()) {
+            assert(!hythread_is_suspend_enabled());
+            assert(exn_raised());
+            if (frame.locked_monitors) {
+                M2N_ALLOC_MACRO;
+                vm_monitor_exit_wrapper(frame.locked_monitors->monitor);
+                M2N_FREE_MACRO;
+                assert(!frame.locked_monitors->next);
+            }
+            M2N_FREE_MACRO;
+            return;
+        }
+
         clear_current_thread_exception();
 
         if (interpreter_ti_notification_mode) {

@@ -153,20 +153,30 @@ VMEXPORT void get_file_and_line(Method_Handle method, void *ip, bool is_ip_past,
 void st_print_frame(ExpandableMemBlock* buf, StackTraceFrame* stf);
 
 /**
- * Prints the current thread's trace.
+ * Prints stack trace of all java threads.
  *
- * This function supports and prints all Java and M2N frames.
+ * This function supports and prints all Java frames.
  *
  * @param[in] f - the pointer to the file, where the stack trace will be printed
  *
  * @note Intended for debugging purposes.
  */
-void st_print(FILE* f);
+void st_print_all(FILE* f);
 
 /**
- * Prints the current thread's trace into the <code>stderr</code> stream.
+ * Prints the current java thread stack trace into specified stream.
  *
- * This function supports and prints all Java and M2N frames.
+ * This function supports and prints all Java frames.
+ *
+ * @param[in] f - the pointer to the file, where the stack trace will be printed
+ * @param[in] thread - the thread wich stack should be printed
+ *
+ * @note Intended for debugging purposes.
+ */
+void st_print(FILE* f, hythread_t thread);
+
+/**
+ * Prints the current java thread stack trace into the <code>stderr</code> stream.
  *
  * @note Intended for debugging purposes.
  */

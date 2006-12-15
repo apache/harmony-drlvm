@@ -215,10 +215,6 @@ void init_cause(jthrowable exc_object, jthrowable exc_cause) {
     vm_execute_java_method_array((jmethodID) init_cause_method, &ret_val,
         args);
     tmn_suspend_enable();
-
-    if (exn_raised()) {
-        DIE(("Exception constructor has thrown an exception"));
-    }
 }
 
 jthrowable create_exception(Class* exc_class, Method* exc_init, jvalue* args) {

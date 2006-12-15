@@ -283,7 +283,6 @@ const char *args[][2] =
 {"stats", 
  "type: bool; default: off; scope: global                               \n"
  "Collects and shows various statistics about compiled methods.         \n"
- "Note: you may need to pass -XcleanupOnExit to VM to view the stats.   \n"
 },
 #endif  // ~JIT_STATS
 

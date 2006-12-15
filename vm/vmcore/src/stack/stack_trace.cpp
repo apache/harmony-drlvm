@@ -19,7 +19,6 @@
  * @version $Revision: 1.1.2.1.4.3 $
  */  
 
-
 #include "m2n.h"
 #include "stack_iterator.h"
 #include "stack_trace.h"
@@ -29,6 +28,7 @@
 #include "method_lookup.h"
 #include "cci.h"
 #include "class_member.h"
+#include "open/hythread.h"
 
 void get_file_and_line(Method_Handle mh, void *ip, bool is_ip_past, const char **file, int *line) {
     Method *method = (Method*)mh;
@@ -211,16 +211,50 @@ void st_print_frame(ExpandableMemBlock* buf, StackTraceFrame* stf)
     buf->AppendBlock("\n");
 }
 
-void st_print(FILE* f)
+void st_print_all(FILE* f) {
+    hythread_t native_thread;
+    hythread_iterator_t  iterator;
+
+    assert(hythread_is_suspend_enabled());
+
+    hythread_suspend_all(&iterator, NULL);
+    while(native_thread = hythread_iterator_next(&iterator)) {
+        st_print(f, native_thread);
+    }
+    hythread_resume_all(NULL);
+}
+
+void st_print(FILE* f, hythread_t thread)
 {
-    fprintf(f, "Stack Trace (%p):\n", p_TLS_vmthread);
-    StackIterator* si = si_create_from_native();
+    VM_thread * vm_thread;
+    
+    assert(hythread_is_suspend_enabled());
+
+    vm_thread = get_vm_thread(thread);
+    
+    if (vm_thread == NULL) {
+        // Do not print native stack.
+        return;
+    }
+    if (vm_thread != p_TLS_vmthread) {
+        hythread_suspend_other(thread);
+    }
+    
+    // TODO: print real java name
+    fprintf(f, "The stack trace of the %p java thread:\n", vm_thread);
+
+    if (interpreter_enabled()) {
+        interpreter.stack_dump(vm_thread);
+        return;
+    }
+
+    StackIterator* si = si_create_from_native(vm_thread);
     unsigned depth = 0;
     while (!si_is_past_end(si)) {
-        fprintf(f, "  [%p] %p(%c): ", p_TLS_vmthread, si_get_ip(si), (si_is_native(si) ? 'n' : 'm'));
         Method_Handle m = si_get_method(si);
 
         if (m) {
+            fprintf(f, "  [%p] %p(%c): ", vm_thread, si_get_ip(si), (si_is_native(si) ? 'n' : 'm'));
             CodeChunkInfo* cci = si_get_code_chunk_info(si);
             if ( cci != NULL ) {
                 uint32 inlined_depth = si_get_inline_depth(si);
@@ -234,18 +268,19 @@ void st_print(FILE* f)
                 }
             }
             fprintf(f, "%s.%s%s\n", class_get_name(method_get_class(m)), method_get_name(m), method_get_descriptor(m));
-        }else{
-            fprintf(f, "*null*\n");
         }
         depth++;
         si_goto_previous(si);
     }
     si_free(si);
-    fprintf(f, "End Stack Trace (%p, depth=%d)\n", p_TLS_vmthread, depth);
-    fflush(f);
 
+    if (vm_thread != p_TLS_vmthread) {
+        hythread_resume(thread);
+    }
+    fprintf(f, "\n");
+    fflush(f);
 }
 
 void st_print() {
-    st_print(stderr);
+    st_print(stderr, hythread_self());
 }
