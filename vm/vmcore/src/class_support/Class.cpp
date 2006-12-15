@@ -640,6 +640,12 @@ void Method::MethodClearInternals()
         VM_Global_State::loader_env->vm_methods->remove(jit_info);
         // ensure that jit_info was deleted
         assert (!VM_Global_State::loader_env->vm_methods->find(jit_info->get_code_block_addr()));
+
+        for(unsigned k = 0; k < jit_info->_num_target_exception_handlers; k++) {
+            delete jit_info->_target_exception_handlers[k];
+            jit_info->_target_exception_handlers[k] = NULL;
+        }
+        jit_info->_target_exception_handlers = NULL;
     }
 
     if (_notify_recompiled_records != NULL)
