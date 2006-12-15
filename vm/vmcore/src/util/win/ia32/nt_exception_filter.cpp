@@ -279,7 +279,7 @@ void __declspec(naked) asm_jvmti_exception_catch_callback() {
 }
 
 static LONG NTAPI vectored_exception_handler_internal(LPEXCEPTION_POINTERS nt_exception);
-static void __cdecl c_exception_handler(Class*, bool);
+void __cdecl asm_c_exception_handler(Class *exn_class, bool in_java);
 
 LONG __declspec(naked) NTAPI vectored_exception_handler(LPEXCEPTION_POINTERS nt_exception)
 {
@@ -444,11 +444,32 @@ static LONG NTAPI vectored_exception_handler_internal(LPEXCEPTION_POINTERS nt_ex
     context->Esp -= 4;
 
     // set up the real exception handler address
-    context->Eip = (uint32)c_exception_handler;
+    context->Eip = (uint32)asm_c_exception_handler;
 
     // exit NT exception handler and transfer
     // control to VM exception handler
     return EXCEPTION_CONTINUE_EXECUTION;
+}
+
+static void __cdecl c_exception_handler(Class*, bool);
+
+void __declspec(naked) __cdecl asm_c_exception_handler(Class *exn_class, bool in_java)
+{
+    __asm {
+    push    ebp
+    mov     ebp,esp
+    pushfd
+    cld
+    mov     eax, [ebp + 12]
+    push    eax
+    mov     eax, [ebp + 8]
+    push    eax
+    call    c_exception_handler
+    add     esp, 8
+    popfd
+    pop     ebp
+    ret
+    }
 }
 
 

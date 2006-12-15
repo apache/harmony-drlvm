@@ -106,6 +106,9 @@ VMEXPORT
 jvalue *get_jvalue_arg_array(Method *method, va_list args)
 {
     unsigned num_args = method->get_num_args();
+    if(!num_args) {
+        return NULL;
+    }
     jvalue *jvalue_args = (jvalue *)STD_MALLOC(num_args * sizeof(jvalue));
 
     Arg_List_Iterator iter = method->get_argument_list();

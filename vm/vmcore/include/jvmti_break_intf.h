@@ -220,7 +220,7 @@ private:
 };
 
 // Address of this function is used for stack unwinding througn breakpoint
-void process_native_breakpoint_event();
+void __cdecl process_native_breakpoint_event();
 
 // Callback function for native breakpoint processing
 bool jvmti_jit_breakpoint_handler(Registers *regs);

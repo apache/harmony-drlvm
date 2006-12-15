@@ -1321,11 +1321,29 @@ static bool clear_native_breakpoint(VMBreakPoint* bp)
 // Native breakpoints
 //////////////////////////////////////////////////////////////////////////////
 
-void process_native_breakpoint_event()
+
+void __cdecl process_native_breakpoint_event()
 {
     DebugUtilsTI *ti = VM_Global_State::loader_env->TI;
     ti->vm_brpt->process_native_breakpoint();
 }
+
+#ifdef _WIN32
+static void __declspec(naked)
+asm_process_native_breakpoint_event()
+{
+    __asm {
+    push    ebp
+    mov     ebp,esp
+    pushfd
+    cld
+    call    process_native_breakpoint_event
+    popfd
+    pop     ebp
+    ret
+    }
+}
+#endif // _WIN32
 
 bool jvmti_jit_breakpoint_handler(Registers *regs)
 {
@@ -1351,7 +1369,12 @@ bool jvmti_jit_breakpoint_handler(Registers *regs)
     // Copy original registers to TLS
     vm_thread->jvmti_saved_exception_registers = *regs;
     // Set return address for exception handler
+#if PLATFORM_POSIX
     regs->set_ip((void*)process_native_breakpoint_event);
+#else // PLATFORM_POSIX
+    regs->set_ip((void*)asm_process_native_breakpoint_event);
+#endif //PLATFORM_POSIX
+
     return true;
 }
 
