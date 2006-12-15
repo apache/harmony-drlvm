@@ -278,6 +278,7 @@ static void add_assert_rec(Global_Env *p_env, const char* option, const char* cm
 
 void parse_vm_arguments(Global_Env *p_env)
 {
+    bool version_printed = false;
 #ifdef _DEBUG
     TRACE2("arguments", "p_env->vm_arguments.nOptions  = " << p_env->vm_arguments.nOptions);
     for (int _i = 0; _i < p_env->vm_arguments.nOptions; _i++)
@@ -378,8 +379,11 @@ void parse_vm_arguments(Global_Env *p_env)
             ECHO(VERSION);
             LOGGER_EXIT(0);
         } else if (strcmp(option, "-showversion") == 0) {
-            // Print the version number and continue
-            ECHO(VERSION);
+            if (!version_printed) {
+                // Print the version number and continue
+                ECHO(VERSION);
+                version_printed = true;
+            }
         } else if (strcmp(option, "-fullversion") == 0) {
             // Print the version number and exit
             ECHO(VM_VERSION);
