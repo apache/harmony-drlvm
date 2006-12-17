@@ -239,6 +239,8 @@ jbooleanArray JNICALL NewBooleanArray(JNIEnv * jni_env, jsize length)
     
     Class *clss = vm_env->ArrayOfBoolean_Class;    
     unsigned sz = clss->calculate_array_size(length);
+    if (sz == 0) return NULL;
+
     tmn_suspend_disable();       //---------------------------------v
     ObjectHandle h = oh_allocate_local_handle();
     Vector_Handle array = gc_alloc(sz, clss->get_allocation_handle(),
@@ -274,6 +276,8 @@ jbyteArray JNICALL NewByteArray(JNIEnv * jni_env, jsize length)
     
     Class *clss = vm_env->ArrayOfByte_Class;
     unsigned sz = clss->calculate_array_size(length);
+    if (sz == 0) return NULL;
+
     tmn_suspend_disable();       //---------------------------------v
     ObjectHandle h = oh_allocate_local_handle();
     Vector_Handle array = gc_alloc(sz, clss->get_allocation_handle(),
@@ -309,6 +313,8 @@ jcharArray JNICALL NewCharArray(JNIEnv * jni_env, jsize length)
 
     Class *clss = vm_env->ArrayOfChar_Class;
     unsigned sz = clss->calculate_array_size(length);
+    if (sz == 0) return NULL;
+
     tmn_suspend_disable();       //---------------------------------v
     ObjectHandle h = oh_allocate_local_handle();
     Vector_Handle array = gc_alloc(sz, clss->get_allocation_handle(),
@@ -344,6 +350,8 @@ jshortArray JNICALL NewShortArray(JNIEnv * jni_env, jsize length)
     
     Class *clss = vm_env->ArrayOfShort_Class; 
     unsigned sz = clss->calculate_array_size(length);
+    if (sz == 0) return NULL;
+
     tmn_suspend_disable();       //---------------------------------v
     ObjectHandle h = oh_allocate_local_handle();
 
@@ -380,6 +388,8 @@ jintArray JNICALL NewIntArray(JNIEnv * jni_env, jsize length)
     
     Class *clss = vm_env->ArrayOfInt_Class;
     unsigned sz = clss->calculate_array_size(length);
+    if (sz == 0) return NULL;
+
     tmn_suspend_disable();       //---------------------------------v
     ObjectHandle h = oh_allocate_local_handle();
     Vector_Handle array = gc_alloc(sz, clss->get_allocation_handle(),
@@ -415,6 +425,8 @@ jlongArray JNICALL NewLongArray(JNIEnv * jni_env, jsize length)
 
     Class *clss = vm_env->ArrayOfLong_Class;
     unsigned sz = clss->calculate_array_size(length);
+    if (sz == 0) return NULL;
+
     tmn_suspend_disable();       //---------------------------------v
     ObjectHandle h = oh_allocate_local_handle();
     Vector_Handle array = gc_alloc(sz, clss->get_allocation_handle(),
@@ -450,6 +462,8 @@ jfloatArray JNICALL NewFloatArray(JNIEnv * jni_env, jsize length)
     
     Class *clss = vm_env->ArrayOfFloat_Class;
     unsigned sz = clss->calculate_array_size(length);
+    if (sz == 0) return NULL;
+
     tmn_suspend_disable();       //---------------------------------v
     ObjectHandle h = oh_allocate_local_handle();
     Vector_Handle array = gc_alloc(sz, clss->get_allocation_handle(),
@@ -485,6 +499,8 @@ jdoubleArray JNICALL NewDoubleArray(JNIEnv * jni_env, jsize length)
     
     Class *clss = vm_env->ArrayOfDouble_Class;
     unsigned sz = clss->calculate_array_size(length);
+    if (sz == 0) return NULL;
+
     tmn_suspend_disable();       //---------------------------------v
     ObjectHandle h = oh_allocate_local_handle();
     Vector_Handle array = gc_alloc(sz, clss->get_allocation_handle(),

@@ -109,38 +109,38 @@ static unsigned sizeof_field_type(Field *field, bool do_field_compaction)
 // Given a class that is a primitive array returns the size
 // of an element in an instance of the class
 // NOTE: the class is not fully formed at this time
-unsigned sizeof_primitive_array_element(Class *p_class) 
+unsigned shift_of_primitive_array_element(Class *p_class) 
 {
     const String *elt_type = p_class->get_name();
     char elt = elt_type->bytes[1];
     unsigned int sz;
     switch (elt) {
     case 'C':
-        sz = 2;
+        sz = 1;
         break;
     case 'B':
-        sz = 1;
+        sz = 0;
         break;
     case 'D':
-        sz = 8;
+        sz = 3;
         break;
     case 'F':
-        sz = 4;
-        break;
-    case 'I':
-        sz = 4;
-        break;
-    case 'J':
-        sz = 8;
-        break;
-    case 'S':
         sz = 2;
         break;
-    case 'Z': // boolean
+    case 'I':
+        sz = 2;
+        break;
+    case 'J':
+        sz = 3;
+        break;
+    case 'S':
         sz = 1;
         break;
+    case 'Z': // boolean
+        sz = 0;
+        break;
     case '[':
-        sz = 4; // This works for the H32, V64, R32 version.
+        sz = 2; // This works for the H32, V64, R32 version.
         assert(OBJECT_REF_SIZE == 4);
         break;
     default:
@@ -148,7 +148,7 @@ unsigned sizeof_primitive_array_element(Class *p_class)
         return 0;
     }
     return sz;
-} //sizeof_primitive_array_element
+} //shift_of_primitive_array_element
 
 
 //
@@ -1396,9 +1396,11 @@ bool Class::prepare(Global_Env* env)
     if(is_array()) {
         m_array_element_size = (vm_references_are_compressed()
             ? sizeof(COMPRESSED_REFERENCE) : sizeof(RAW_REFERENCE));
+        m_array_element_shift = m_array_element_size == 8 ? 3 : 2;
         m_vtable->class_properties |= CL_PROP_ARRAY_MASK;
         if(is_vector_of_primitives(this)) {
-            m_array_element_size = sizeof_primitive_array_element(this);
+            m_array_element_shift = shift_of_primitive_array_element(this);
+            m_array_element_size = 1 << m_array_element_shift;
             m_vtable->class_properties |= CL_PROP_NON_REF_ARRAY_MASK;
         }
         m_vtable->array_element_size = (unsigned short)m_array_element_size;

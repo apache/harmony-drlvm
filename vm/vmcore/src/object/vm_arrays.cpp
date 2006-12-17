@@ -71,24 +71,21 @@ static Vector_Handle vm_anewarray_resolved_array_type(Class *arr_clss, int lengt
     assert(!hythread_is_suspend_enabled());
     assert(!arr_clss->is_array_of_primitives());
 
-    if (length < 0) {
-        tmn_suspend_enable();
-        exn_raise_by_name("java/lang/NegativeArraySizeException");
-        tmn_suspend_disable();
-        return NULL;
-    }
-
     unsigned sz = arr_clss->calculate_array_size(length);
-
-    if ((length & TWO_HIGHEST_BITS_SET_MASK) || (sz & TWO_HIGHEST_BITS_SET_MASK)) {
-        // VM does not support arrays of length >= MAXINT>>2
-        // GC does not support objects of length >= 1Gb
+    if (sz == 0) {
         tmn_suspend_enable();
-        exn_raise_by_name("java/lang/OutOfMemoryError",
-            "VM doesn't support arrays of the requested size");
+
+        if (length < 0) {
+            exn_raise_by_name("java/lang/NegativeArraySizeException");
+        } else {
+            exn_raise_by_name("java/lang/OutOfMemoryError",
+                    "VM doesn't support arrays of the requested size");
+        }
         tmn_suspend_disable();
         return NULL;
     }
+
+    assert((sz & NEXT_TO_HIGH_BIT_SET_MASK) == 0);
 
     Vector_Handle object_array = (Vector_Handle )gc_alloc(sz,
         arr_clss->get_allocation_handle(), vm_get_gc_thread_local());
@@ -121,20 +118,21 @@ VMEXPORT // temporary solution for interpreter unplug
 Vector_Handle vm_new_vector_primitive(Class *vector_class, int length) {
     ASSERT_RAISE_AREA;
     assert(!hythread_is_suspend_enabled());
-    // VM does not support arrays of length >= MAXINT>>2
-    if (length & TWO_HIGHEST_BITS_SET_MASK) {
+    assert(vector_class->is_array_of_primitives());
+    unsigned sz = vector_class->calculate_array_size(length);
+
+    if (sz == 0) {
         tmn_suspend_enable();
         if (length < 0) {
             exn_raise_by_name("java/lang/NegativeArraySizeException");
         } else {
             exn_raise_by_name("java/lang/OutOfMemoryError",
-                "VM doesn't support arrays of the requested size");
+                    "VM doesn't support arrays of the requested size");
         }
         tmn_suspend_disable();
         return NULL;
     }
-    assert(vector_class->is_array_of_primitives());
-    unsigned sz = vector_class->calculate_array_size(length);
+
     Vector_Handle vector = (Vector_Handle)gc_alloc(sz, 
         vector_class->get_allocation_handle(), vm_get_gc_thread_local());
 #ifdef VM_STATS
@@ -184,6 +182,7 @@ void vm_new_vector_update_stats(int length, Allocation_Handle vector_handle, voi
     if (0 != (length&TWO_HIGHEST_BITS_SET_MASK)) return;
     VTable *vector_vtable = ManagedObject::allocation_handle_to_vtable(vector_handle);
     unsigned sz = vector_vtable->clss->calculate_array_size(length);
+    assert(sz > 0);
     vector_vtable->clss->instance_allocated(sz);
     if((vector_vtable->class_properties & CL_PROP_NON_REF_ARRAY_MASK) == 0)
     {
@@ -196,21 +195,22 @@ void vm_new_vector_update_stats(int length, Allocation_Handle vector_handle, voi
 Vector_Handle vm_new_vector_using_vtable_and_thread_pointer(int length, Allocation_Handle vector_handle, void *tp)
 {
     assert( ! hythread_is_suspend_enabled());
-    // VM does not support arrays of length >= MAXINT>>2
-    if (length & TWO_HIGHEST_BITS_SET_MASK) {
+
+    VTable *vector_vtable = ManagedObject::allocation_handle_to_vtable(vector_handle);
+    unsigned sz = vector_vtable->clss->calculate_array_size(length);
+    if (sz == 0) {
         tmn_suspend_enable();
         if (length < 0) {
             exn_raise_by_name("java/lang/NegativeArraySizeException");
         } else {
             exn_raise_by_name("java/lang/OutOfMemoryError",
-                "VM doesn't support arrays of the requested size");
+                    "VM doesn't support arrays of the requested size");
         }
         tmn_suspend_disable();
         return NULL;
     }
 
-    VTable *vector_vtable = ManagedObject::allocation_handle_to_vtable(vector_handle);
-    unsigned sz = vector_vtable->clss->calculate_array_size(length);
+
 #ifdef VM_STATSxxx // Functionality moved into vm_new_vector_update_stats().
     vector_vtable->clss->instance_allocated(sz);
 #endif //VM_STATS
@@ -233,14 +233,13 @@ Vector_Handle vm_new_vector_using_vtable_and_thread_pointer(int length, Allocati
 
 Vector_Handle vm_new_vector_or_null_using_vtable_and_thread_pointer(int length, Allocation_Handle vector_handle, void *tp)
 {
-    // VM does not support arrays of length >= MAXINT>>2
-    if (0 != (length&TWO_HIGHEST_BITS_SET_MASK)) {
-        // exception wiil be thown from other method
-        return NULL;
-    }
-
     VTable *vector_vtable = ManagedObject::allocation_handle_to_vtable(vector_handle);
     unsigned sz = vector_vtable->clss->calculate_array_size(length);
+
+    if (sz == 0) {
+        // Unsupported size
+        return NULL;
+    }
     Vector_Handle vector = (Vector_Handle)gc_alloc_fast(sz, vector_handle, tp);
     if (vector == NULL)
     {

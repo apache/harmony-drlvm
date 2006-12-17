@@ -129,6 +129,7 @@ jobject object_clone(JNIEnv *jenv, jobject jobj)
         // clone an array
         int32 length = get_vector_length((Vector_Handle) h->object);
         size = vt->clss->calculate_array_size(length);
+        assert(size > 0);
         result = (ManagedObject*)
             vm_new_vector_using_vtable_and_thread_pointer(length,
                 vt->clss->get_allocation_handle(), vm_get_gc_thread_local());

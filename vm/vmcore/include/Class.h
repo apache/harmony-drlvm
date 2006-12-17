@@ -930,6 +930,9 @@ private:
     // size of element of array; equals zero, if this class is not an array
     unsigned int m_array_element_size;
 
+    // shift corresponding to size of element of array, undefined for non-arrays
+    unsigned int m_array_element_shift;
+
     // type descriptor for array element class
     TypeDesc* m_array_element_type_desc;
 
@@ -1656,18 +1659,35 @@ public:
      * @param[in] length - the length of the array
      * @return The size of the array of specified length in bytes.*/
     unsigned calculate_array_size(int length) const {
+        if (length < 0) {
+            return 0;
+        }
+
+        assert(m_array_element_size);
         assert(length >= 0);
         assert(is_array());
-        assert(m_array_element_size);
         unsigned first_elem_offset;
-        if(m_array_element_size < 8) {
+        if(m_array_element_shift < 3) {
             first_elem_offset = VM_VECTOR_FIRST_ELEM_OFFSET_1_2_4;
         } else {
             first_elem_offset = VM_VECTOR_FIRST_ELEM_OFFSET_8;
         }
-        unsigned size = first_elem_offset + length*m_array_element_size;
+
+        // check overflow, we need:
+        // first_elem_offset + (length << m_array_element_shift)
+        //      + GC_OBJECT_ALIGNMENT < NEXT_TO_HIGH_BIT_CLEAR_MASK
+        //
+        if (((NEXT_TO_HIGH_BIT_CLEAR_MASK - GC_OBJECT_ALIGNMENT - first_elem_offset)
+                    >> m_array_element_shift) < (unsigned)length) {
+            // zero means overflow
+            return 0;
+        }
+
+
+        unsigned size = first_elem_offset + (length << m_array_element_shift);
         size = (((size + (GC_OBJECT_ALIGNMENT - 1)) & (~(GC_OBJECT_ALIGNMENT - 1))));
         assert((size % GC_OBJECT_ALIGNMENT) == 0);
+        assert((size & NEXT_TO_HIGH_BIT_SET_MASK) == 0);
         return size;
     }
 

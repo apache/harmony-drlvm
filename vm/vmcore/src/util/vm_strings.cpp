@@ -244,6 +244,13 @@ static void string_create(unsigned unicode_length, bool eight_bit, ManagedObject
     assert(clss);
 
     unsigned sz = clss->calculate_array_size(unicode_length);
+    if (sz == 0) {
+        // string too long
+        *str = NULL;
+        exn_raise_object(VM_Global_State::loader_env->java_lang_OutOfMemoryError);
+        return;
+    }
+
     Vector_Handle array = vm_alloc_and_report_ti(sz, clss->get_allocation_handle(),
         vm_get_gc_thread_local(), clss);
     if(!array) { // OutOfMemory should be thrown

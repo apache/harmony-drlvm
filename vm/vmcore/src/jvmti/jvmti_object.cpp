@@ -79,6 +79,7 @@ jvmtiGetObjectSize(jvmtiEnv* env,
         *size_ptr = object_clss->calculate_array_size(get_vector_length((Vector_Handle)mo));
     else
         *size_ptr = class_get_boxed_data_size(object_clss);
+    assert(*size_ptr > 0);
 
     tmn_suspend_enable();
     return JVMTI_ERROR_NONE;
