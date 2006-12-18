@@ -189,6 +189,9 @@ ${foo}
                             <isset property="if.win" />
                         </condition>
                         <property name="executable.postfix" value="" />
+
+                        <echo message="Running test : ${class.name}" />
+
                         <if>
                             <not>
                                 <equals arg1="${int.or.jit.arg}" arg2="" />
