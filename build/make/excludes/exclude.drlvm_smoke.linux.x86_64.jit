@@ -12,3 +12,4 @@ gc/Mark.java
 
 # fails intermittently 
 stress/Stack.java
+stress/Mix.java
