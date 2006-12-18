@@ -638,6 +638,14 @@ Class* ClassLoader::StartLoadingClass(Global_Env* UNREF env, const String* class
             TRACE2("classloader.collisions",
                 this << " Collision while loading class " << className->bytes);
             if(m_loader == NULL) {
+                if(loading->AlreadyWaiting(cur_thread)) {
+                    // we spinned one time already;
+                    // loading in some other thread failed
+                    // so, lets try to load once again in this thread
+                    loading->SetInitiator(cur_thread);
+                    loading->RemoveWaitingThread(cur_thread, this, className);
+                    return NULL;
+                }
                 // avoid preliminary removal of LoadingClass
                 loading->AddWaitingThread(cur_thread, this, className);
                 // lazy wait event creation
