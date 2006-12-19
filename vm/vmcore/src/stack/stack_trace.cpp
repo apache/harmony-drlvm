@@ -55,7 +55,7 @@ void get_file_and_line(Method_Handle mh, void *ip, bool is_ip_past, const char *
 
 #if !defined(_IPF_) // appropriate callLength should be put here when IPF bc maping will be implemented
     uint16 bcOffset;
-    POINTER_SIZE_INT callLength = is_ip_past ? 0 : 5;
+    POINTER_SIZE_INT callLength = 5;
 
     Global_Env * vm_env = VM_Global_State::loader_env;
     CodeChunkInfo* jit_info = vm_env->vm_methods->find((unsigned char*)ip - callLength);
