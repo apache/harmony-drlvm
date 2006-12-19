@@ -271,20 +271,29 @@ IDATA VMCALL hythread_attach_ex(hythread_t *handle, hythread_library_t lib) {
  * @see hythread_attach
  */
 void VMCALL hythread_detach(hythread_t thread) {
-    // Acquire global TM lock to prevent concurrent acccess to thread list
     IDATA status;
+
+    if (thread == NULL) {
+        thread = hythread_self();
+    }
     
-    assert(thread == tm_self_tls);
+    // Acquire global TM lock to prevent concurrent acccess to thread list
     status = hythread_global_lock(NULL);
     assert (status == TM_ERROR_NONE);
 
-    thread_set_self(NULL);
-    fast_thread_array[thread->thread_id] = NULL;
-
-    thread->prev->next = thread->next;
-    thread->next->prev = thread->prev;
-    thread->group->threads_count--;
-
+    // No actions required in case the specified thread is detached already.
+    if (thread->group != NULL) {
+        assert(thread == tm_self_tls);
+        
+        thread_set_self(NULL);
+        fast_thread_array[thread->thread_id] = NULL;
+        
+        thread->prev->next = thread->next;
+        thread->next->prev = thread->prev;
+        thread->group->threads_count--;
+        thread->group = NULL;
+    }
+    
     hythread_global_unlock(NULL);
     assert(status == TM_ERROR_NONE);
 }
