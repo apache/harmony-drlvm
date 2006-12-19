@@ -444,4 +444,26 @@ public class RuntimeTest extends TestCase {
         }
         assertTrue("NullPointerException expected!", exception);
     }
+
+    /**
+     * Regression test for HARMONY-920 
+     */
+    public void test_execStrStr() throws Exception {
+        try {
+            String[] cmd = new String [] {null, "gcc"}; 
+            String[] env = new String[] {"aaa", "bbb"}; 
+            Runtime.getRuntime().exec(cmd, env); 
+            fail("1: exception expcected"); 
+        } catch (NullPointerException npe) {
+            //expected
+        }
+        try { 
+            String[] cmd = new String [] {"gcc", "-m"}; 
+            String[] env = new String[] {"aaa", null}; 
+            Runtime.getRuntime().exec(cmd, env); 
+            fail("2: exception expcected"); 
+        } catch (NullPointerException npe) {
+            //expected
+        } 
+    }
 }
