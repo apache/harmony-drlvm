@@ -67,16 +67,6 @@ int get_index_of_jit(JIT *jit)
     return -999;
 } //get_index_of_jit
 
-////////////////////////////////////////////////////////////////////////
-// begin Forward declarations
-
-// A MethodInstrumentationProc that records calls in a call graph weighted by the call counts between methods.
-void count_method_calls(CodeChunkInfo* callee);
-
-// end Forward declarations
-////////////////////////////////////////////////////////////////////////
-
-
 
 ////////////////////////////////////////////////////////////////////////
 // begin CodeChunkInfo
@@ -90,9 +80,6 @@ CodeChunkInfo::CodeChunkInfo()
     _relocatable = TRUE;
     _num_target_exception_handlers = 0;
     _target_exception_handlers     = NULL;
-    _callee_info = _static_callee_info;
-    _max_callees = NUM_STATIC_CALLEE_ENTRIES;
-    _num_callees = 0;
     _heat        = 0;
     _code_block     = NULL;
     _jit_info_block = NULL;
@@ -133,85 +120,6 @@ Target_Exception_Handler_Ptr CodeChunkInfo::get_target_exception_handler_info(un
 }
 
 
-//void CodeChunkInfo::initialize_code_chunk(CodeChunkInfo *chunk)
-//{
-//    memset(chunk, 0, sizeof(CodeChunkInfo));
-//    chunk->_callee_info = chunk->_static_callee_info;
-//    chunk->_max_callees = NUM_STATIC_CALLEE_ENTRIES;
-//    chunk->_relocatable = TRUE;
-//} //CodeChunkInfo::initialize_code_chunk
-
-
-// 20040224 Support for recording which methods (actually, CodeChunkInfo's) call which other methods.
-void CodeChunkInfo::record_call_to_callee(CodeChunkInfo *callee, void *caller_ip)
-{
-    Global_Env * vm_env = VM_Global_State::loader_env;
-
-    assert(callee);
-    assert(caller_ip);
-
-    // The weighted call graph is undirected, so we register the call on both the caller_method and callee's list of calls.
-    // 20040422 No, the backedge isn't needed yet. Just record one direction now, and create the other direction later.
-
-    // Acquire a lock to ensure that growing the callee array is safe.
-    vm_env->p_method_call_lock->_lock();                    // vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv
-
-    // Is the <callee, caller_ip> pair already in our list?
-    unsigned i;
-    for (i = 0;  i < _num_callees;  i++) { 
-        Callee_Info *c = &(_callee_info[i]);
-        if ((c->callee == callee) && (c->caller_ip == caller_ip)) {
-            c->num_calls++;
-            vm_env->p_method_call_lock->_unlock();          // ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-            return;
-        }
-    }
-
-    // Add a new Callee_Info entry to the array
-    assert(_callee_info != NULL);
-    assert(_num_callees <= _max_callees);
-    if (_num_callees == _max_callees) {
-        // grow the array of callee information
-        unsigned old_max = _max_callees;
-        unsigned new_max = (2 * _max_callees);
-        Callee_Info *new_array = (Callee_Info *)STD_MALLOC(new_max * sizeof(Callee_Info));
-        // Initialize the new array, with zeros at the end of the array
-        memcpy(new_array, _callee_info, (old_max * sizeof(Callee_Info)));
-        memset(&(new_array[old_max]), 0, (_max_callees * sizeof(Callee_Info)));
-        if (_callee_info != _static_callee_info) {
-            STD_FREE(_callee_info);
-        }
-        _callee_info = new_array;
-        _max_callees = new_max;
-        assert(_num_callees < _max_callees);
-    }
-
-    Callee_Info *c = &(_callee_info[_num_callees]);
-    c->callee    = callee;
-    c->caller_ip = caller_ip;
-    c->num_calls = 1;
-    _num_callees++;
-
-    vm_env->p_method_call_lock->_unlock();                  // ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-} //CodeChunkInfo::record_call_to_callee
-
-
-uint64 CodeChunkInfo::num_calls_to(CodeChunkInfo *other_chunk) const
-{
-    assert(other_chunk);
-    for (unsigned i = 0;  i < _num_callees;  i++) {
-        Callee_Info *info = &(_callee_info[i]);
-        CodeChunkInfo *callee = info->callee;
-        assert(callee);
-        if (callee == other_chunk) {
-            return info->num_calls;
-        }
-    }
-    // the other chunk wasn't found on our callee list
-    return 0;
-} //CodeChunkInfo::num_calls_to
-
-
 void CodeChunkInfo::print_name() const
 {
     Method *meth = get_method();
@@ -240,24 +148,6 @@ void CodeChunkInfo::print_info(bool print_ellipses) const
     print_name();
     printf(", %d bytes%s\n", (unsigned)code_size, (print_ellipses? "..." : ""));
 } //CodeChunkInfo::print_info
-
-
-void CodeChunkInfo::print_callee_info() const
-{
-    for (unsigned i = 0;  i < _num_callees;  i++) {
-        Callee_Info *info = &(_callee_info[i]);
-        // Don't print the "back edges" (e.g., b calls a whenever a calls b) added to make the graph symmetric
-        if (info->caller_ip != NULL) {
-            CodeChunkInfo *callee = info->callee;
-            assert(callee);
-            unsigned call_offset = (unsigned)((char *)info->caller_ip - (char *)_code_block);
-            assert(call_offset < _code_block_size);
-            printf("%10" FMT64 "u calls at %u to ", info->num_calls, call_offset);
-            callee->print_name();
-            printf("\n");
-        }
-    }
-} //CodeChunkInfo::print_callee_info
 
 // end CodeChunkInfo
 ////////////////////////////////////////////////////////////////////////
@@ -876,59 +766,6 @@ NativeCodePtr compile_jit_a_method(Method* method)
     return NULL;
 } //compile_jit_a_method
 
-//////////////////////////////////////////////////////////////////////////
-// Instrumentation Stubs
-
-// 20040218 Interpose on calls to the specified method by first calling the specified 
-// instrumentation procedure. That procedure must not allocate memory from the collected heap
-// or throw exceptions (no m_to_n frame is pushed).
-NativeCodePtr compile_do_instrumentation(CodeChunkInfo *callee,
-                                         MethodInstrumentationProc instr_proc)
-{
-    assert(callee);
-    NativeCodePtr callee_addr = callee->get_code_block_addr();
-    assert(callee_addr);
-    LilCodeStub *cs = lil_parse_code_stub(
-        "entry 0:managed:arbitrary;"
-        "push_m2n 0, %0I;"
-        "out platform:pint:void;"
-        "o0=%1i;"
-        "call %2i;"       // call instrumentation procedure
-        "pop_m2n;"
-        "tailcall %3i;",  // call original entry point
-        FRAME_POPABLE, callee, instr_proc, lil_npc_to_fp(callee_addr));
-    assert(cs && lil_is_valid(cs));
-    // TODO: 2 & 3 parameters should be removed from the method signature
-    // since it makes sense for debugging only
-    NativeCodePtr addr = LilCodeGenerator::get_platform()->compile(cs);
-
-    DUMP_STUB(addr, "compile_do_instrumentation", lil_cs_get_code_size(cs));
-
-    lil_free_code_stub(cs);
-    return addr;
-} //compile_do_instrumentation
-
-
-// A MethodInstrumentationProc that records calls in a weighted method call graph, where each arc between 
-// a pair of methods has a weight equal to the call counts between those methods.
-void count_method_calls(CodeChunkInfo *callee)
-{
-    assert(callee);
-    // Get the most recent M2nFrame of the given thread
-    M2nFrame *caller_frame = m2n_get_last_frame();
-    assert(caller_frame);
-    // Get the return address from the preceeding managed frame
-    NativeCodePtr ret_ip = m2n_get_ip(caller_frame);
-    assert(ret_ip);
-
-    // Record call from caller to the callee.
-    Global_Env *env = VM_Global_State::loader_env;
-    CodeChunkInfo *caller = env->vm_methods->find(ret_ip);
-    if (caller != NULL) {
-        caller->record_call_to_callee(callee, ret_ip);
-    }
-} //count_method_calls
-
 
 // Adding dynamic generated code info to global list
 // Is used in JVMTI and native frames interface
@@ -960,5 +797,3 @@ void compile_clear_dynamic_code_list(DynamicCode* list)
         list = next;
     }
 }
-
-//////////////////////////////////////////////////////////////////////////

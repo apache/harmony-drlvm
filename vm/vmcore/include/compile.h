@@ -100,19 +100,6 @@ extern int sizeof_stub_override_entries;
 bool needs_override(Method*);
 
 
-//
-// Method instrumentation support.
-//
-
-// Type of the instrumentation procedures called before invoking methods.
-typedef void (*MethodInstrumentationProc)(CodeChunkInfo *callee);
-
-// Interpose on calls to the specified method by calling the instr_proc.
-NativeCodePtr compile_do_instrumentation(CodeChunkInfo *callee, MethodInstrumentationProc instr_proc);
-
-// A MethodInstrumentationProc that records the number of calls from the caller code chunk to the callee.
-void count_method_calls(CodeChunkInfo *callee);
-
 struct DynamicCode
 {
     const char *name;
