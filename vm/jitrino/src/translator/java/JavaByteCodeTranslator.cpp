@@ -2272,7 +2272,53 @@ JavaByteCodeTranslator::instanceof(const uint8* bcp, uint32 constPoolIndex, uint
         return 3;
     }
     jitrino_assert(compilationInterface,type);
-    pushOpnd(irBuilder.genInstanceOf(popOpnd(),type));
+
+    Opnd* src = popOpnd();
+    Type* srcType = src->getType();
+    Opnd* res = NULL;
+
+
+    // if target type is final just compare VTables
+    // This can not be done by Simplifier as it can not generate branches
+    // (srcType->isExactType() case will be simplified by Simplifier)
+    if( !srcType->isInterface() &&
+        !Simplifier::isExactType(src) &&
+        ((ObjectType*)type)->isFinalClass() )
+    {
+        Type* intPtrType = typeManager.getIntPtrType();
+
+        LabelInst* ObjIsNullLabel = irBuilder.createLabel();
+        LabelInst* Exit = irBuilder.createLabel();
+        VarOpnd* resVar = irBuilder.genVarDef(intPtrType, false);
+
+        newFallthroughBlock();
+
+        Opnd * zero = irBuilder.genLdConstant((int32)0);
+        irBuilder.genBranch(Type::IntPtr,Cmp_EQ,ObjIsNullLabel,zero,src);        
+
+        // src is not null here
+        newFallthroughBlock();
+        Opnd* srcIsSafe = irBuilder.genTauSafe();
+        Opnd* dynamicVTable = irBuilder.genTauLdVTable(src, srcIsSafe, srcType);
+        Opnd* staticVTable = irBuilder.genGetVTable((ObjectType*) type);
+        irBuilder.genStVar(resVar, irBuilder.genCmp(intPtrType,Type::IntPtr,Cmp_EQ,staticVTable,dynamicVTable));
+        irBuilder.genJump(Exit);
+
+        // src is null, instanceOf returns 0
+        irBuilder.genLabel(ObjIsNullLabel);
+        cfgBuilder.genBlockAfterCurrent(ObjIsNullLabel);
+        irBuilder.genStVar(resVar, zero);
+        irBuilder.genJump(Exit);
+
+        irBuilder.genLabel(Exit);
+        cfgBuilder.genBlockAfterCurrent(Exit);
+        res = irBuilder.genLdVar(intPtrType,resVar);
+    } else {
+        res = irBuilder.genInstanceOf(src,type);
+    }
+
+    assert(res);
+    pushOpnd(res);
     return 3;
 }
 
