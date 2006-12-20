@@ -441,6 +441,21 @@ void CfgCodeSelector::fixNodeInfo()
                 assert(target!=NULL);
                 fg->addEdge(node, target, 1.0);
             }
+            // fixup empty catch blocks otherwise respective catchEdges will be lost
+            // There is no [catchBlock]-->[catchHandler] edge. Catch block will be removed
+            // as an empty one and exception handling will be incorrect
+            if (node->isCatchBlock() && node->isEmpty()) {
+                assert(node->getInDegree()==1);
+                Edge* catchEdge = node->getInEdges().front();
+                assert(catchEdge->getSourceNode()->isDispatchNode());
+                assert(node->getOutDegree()==1);
+                Node* succ = node->getUnconditionalEdgeTarget();
+                while( succ->isEmpty() && (succ->getOutDegree() == 1) ) {
+                    succ = succ->getUnconditionalEdgeTarget();
+                }
+                assert(succ && ((Inst*)succ->getFirstInst())->hasKind(Inst::Kind_CatchPseudoInst));
+                fg->replaceEdgeTarget(catchEdge,succ,true/*keepOldBody*/);
+            }
         }
     }
 }

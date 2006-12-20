@@ -302,13 +302,19 @@ void ControlFlowGraph::removeEdge(Edge* edge) {
     lastEdgeRemovalTraversalNumber = traversalNumber;
 }
 
-Edge* ControlFlowGraph::replaceEdgeTarget(Edge* edge, Node* newTarget) {
+Edge* ControlFlowGraph::replaceEdgeTarget(Edge* edge, Node* newTarget, bool keepOldBody) {
     Node* source = edge->getSourceNode();
     Node* oldTarget = edge->getTargetNode();
     CFGInst* lastInst = source->getLastInst();
-    
-    removeEdge(edge);
-    Edge* newEdge = addEdge(source, newTarget);
+
+    Edge* newEdge = NULL;
+    if (keepOldBody) {
+        edge->target = newTarget;
+        newEdge = edge;
+    } else {
+        removeEdge(edge);
+        newEdge = addEdge(source, newTarget);
+    }
     if (lastInst!=NULL) {
         lastInst->updateControlTransferInst(oldTarget, newTarget);
     }

@@ -1287,17 +1287,17 @@ public:
    * Removes the edge, creates a new one and connects it to 
    * the <code>newTarget</code> node.
    *
-   * @param[in] edge      - the edge to change the target
-   * @param[in] newTarget - a new <code>Target</code> node
+   * @param[in] edge        - the edge to change the target
+   * @param[in] newTarget   - a new <code>Target</code> node
+   * @param[in] keepOldBody - modify old or create a new edge
    * 
    * @return The edge connecting the <code>Source</code> node of the  
    *         edge and the </code>newTarget</code> node.
    *
-   * @note The removal of the old edge is obsolete and should be refactored.
-   *       The only place to take care is retargeting edges 
+   * @note The removal of the old edge is needed
    *       while inlining CFG: edge IDs must be renewed.
    */
-    Edge* replaceEdgeTarget(Edge* edge, Node *newTarget);
+    Edge* replaceEdgeTarget(Edge* edge, Node *newTarget, bool keepOldBody = false);
 
   /** 
    * Checks if CFG is annotated with the edge profile information.
