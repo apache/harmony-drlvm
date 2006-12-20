@@ -421,12 +421,8 @@
     </target>
 
     <!-- Main target to run regression test /-->
-    <target name="reg.test" depends="setup, init">
-        <property name="target" value="reg.test" />
-        <subant buildpath="." antfile="build_component.xml" target="build" inheritall="true" failonerror="true">
-            <property name="_component" value="vm" />
-            <property name="_target" value="${target}" />
-        </subant>
+    <target name="reg.test" depends="init">
+        <ant antfile="targets/reg.test.xml" target="reg.test"/>
     </target>
 
     <!-- process (build/create javadoc/etc...) all the specified components -->

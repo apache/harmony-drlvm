@@ -1,7 +1,10 @@
 package org.apache.harmony.drlvm.tests.regression.h1694;
 
-class H1694 {
-    public int test() {
+import junit.framework.TestCase;
+
+public class H1694 extends TestCase {
+
+    public void test() {
         Object arrayOfObjects[] = new Object[10000]; // array of objects
 
         // padding memory
@@ -18,11 +21,6 @@ class H1694 {
         }
 
         System.out.println("Test passed");
-        return 104; // return pass
-    }
- 
-    public static void main(String[] args) {
-        System.exit(new H1694().test());
     }
 }
  

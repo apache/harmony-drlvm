@@ -16,15 +16,38 @@
      limitations under the License. -->
 
 <project name="REGRESSION TESTS">
+    
+    <import file="${basedir}/targets/reg.test.run.xml"/>
+    
     <property name="reg.test.src" location="${basedir}/../../src/test/regression"/>
     <property name="reg.test.dir" location="${build.semi.dir}/reg.tests"/>
     <property name="reg.test.class.path" location="${reg.test.dir}/classes"/>
     <property name="reg.test.native.path" location="${reg.test.dir}/native"/>
-    <!-- TODO: check the existence of jasmin.jar -->
     <property name="jasmin.jar" location="./tmp/jasmin.jar"/>
-    <property name="reg.test.package" value="org/apache/harmony/drlvm/tests/regression"/>
+    <property name="reg.test.package" value="org.apache.harmony.drlvm.tests.regression"/>
+    
+    <propertyregex property="reg.test.unpackage" 
+        input="${reg.test.package}" regexp="\." replace="/"/>
 
-    <target name="compile-reg-tests-prepare" depends="init_component">
+    <if> <!-- Set up os specific settings - library suffix and prefix -->
+        <os family="windows"/>
+        <then>
+            <property name="lib.prefix" value=""/>
+            <property name="lib.suffix" value=".dll"/>
+        </then>
+        <elseif>
+            <os family="unix"/>
+            <then>
+                <property name="lib.prefix" value="lib"/>
+                <property name="lib.suffix" value=".so"/>
+            </then>
+        </elseif>
+        <else>
+            <fail>Is not designed for this platform!</fail>
+        </else>
+    </if>
+
+    <target name="compile-reg-tests-prepare" depends="">
         <mkdir dir="${reg.test.class.path}" />
         <mkdir dir="${reg.test.native.path}" />
 
@@ -55,7 +78,7 @@
                         </filtermapper>
                         <regexpmapper from="^(?:.*/)?H(\d\d*)/([^/].*).j$$" 
                                       to="h\1/\2.class"/>
-                        <globmapper from="*" to="${reg.test.package}/*"/>
+                        <globmapper from="*" to="${reg.test.unpackage}/*"/>
                     </chainedmapper>
                 </mapper>
             </depend>
@@ -88,83 +111,85 @@
                         <regexpmapper 
                             from="^(?:.*/)?H(\d\d*)/([^/].*).java$$"
                             to="h\1/\2.class"/>
-                        <globmapper from="*" to="${reg.test.package}/*"/>
+                        <globmapper from="*" to="${reg.test.unpackage}/*"/>
                     </chainedmapper>
                 </mapper>
             </depend>
         </javac>
     </target>
 
-    <target name="compile-reg-tests-native"
-        depends="compile-reg-tests-prepare, init_component">
+    <target name="compile-reg-tests-native" depends="compile-reg-tests-prepare">
 
-        <pathconvert property="reg.test.src.native.list"
-                     refid="reg.test.src.native.set"
-                     pathsep=","/>
-        <mkdir dir="${reg.test.native.path}/_obj"/>
-
-        <for list="${reg.test.src.native.list}" param="csource"
-             delimiter=",">
+        <for param="nativefile">
+            <path>
+                <fileset dir="${reg.test.src}" includes="**/*.c,**/*.cpp">
+                    <depend targetdir="${reg.test.native.path}">
+                        <mapper>
+                        <chainedmapper>
+                            <filtermapper>
+                                <replacestring from="\" to="/"/>
+                            </filtermapper>
+                            <regexpmapper from="(H\d\d*)/([^/]+)\.c.?.?$$" 
+                                          to="\1/${lib.prefix}\2${lib.suffix}"/>
+                        </chainedmapper>
+                        </mapper>
+                    </depend>
+                </fileset>
+            </path>
             <sequential>
-                <var name="outname" unset="true" />
-                <!-- basename property="outname" file="@{csource}" suffix=".cpp"/ -->
-                <pathconvert property="outname">
-                    <path path="@{csource}"/>
+                <var name="outfile" unset="true"/>
+                <pathconvert property="outfile">
+                    <path path="@{nativefile}"/>
                     <chainedmapper>
-                        <flattenmapper/>
-                        <regexpmapper from="^(..*)\.c.?.?$$" to="\1"/>
+                        <filtermapper>
+                            <replacestring from="\" to="/"/>
+                        </filtermapper>
+                        <regexpmapper from="/(H\d\d*)/([^/]+)\.c.?.?$$" to="\1/\2"/>
                     </chainedmapper>
                 </pathconvert>
+                <var name="outdir" unset="true"/>
+                <dirname property="outdir" file="${reg.test.native.path}/${outfile}"/>
+                <!-- mkdir dir="${outdir}"/ -->
+                <var name="objdir" unset="true"/>
+                <property name="objdir" value="${outdir}/_obj"/>
+                <mkdir dir="${objdir}"/>
 
-                <echo message="## Compiling reg native ${outname} in: ${reg.test.native.path}" />
+                <echo message="## Compiling reg native ${outname}" />
                 <cc name="${build.cxx}"
                     debug="true"
                     runtime="dynamic"
                     multithreaded="true"
                     link="shared"
-                    outfile="${reg.test.native.path}/${outname}"
-                    objdir="${reg.test.native.path}/_obj">
-                    <includepath path="${build.deploy.dir}jdk/jre/include" />
-                    <select os="lnx">
+                    outfile="${reg.test.native.path}/${outfile}"
+                    objdir="${objdir}">
+                    <includepath path="${build.deploy.dir}/jdk/include" />
+                    <!--select os="lnx">
                         <linkerarg value="-lstdc++" />
-                    </select>
-                    <fileset file="@{csource}"/>
+                    </select-->
+                    <fileset file="@{nativefile}"/>
                 </cc>
             </sequential>
         </for>
     </target>
 
     <target name="pre-reg-test" depends="compile-reg-tests-java, compile-reg-tests-native">
-    <!--target name="pre-reg-test" depends="compile-reg-tests-native"-->
-    <!-- target name="pre-reg-test" depends="init_component"-->
+        <delete quiet="true" dir="${reg.test.dir}/reports" />
+        <mkdir dir="${reg.test.dir}/reports" />       
+
         <condition property="junit.jar" value="${junit.home}/junit.jar">
             <isset property="junit.home" />
         </condition>
-        <property name="junit.jar"
-                  location="${external.dep.CLASSLIB}/depends/jars/junit_3.8.2/junit.jar" />
-        <if>
-            <not>
-                <available file="${junit.jar}"/>
-            </not>
-            <then>
-                <echo>
+        <property name="junit.jar" 
+            location="${external.dep.CLASSLIB}/depends/jars/junit_3.8.2/junit.jar"/>
+        <available file="${junit.jar}" property="junit.found"/>
+        <fail unless="junit.found">
                 ==============================================
                 Please set the classpath of junit as follows:
                 build.bat -Djunit.jar=%JUNIT_HOME% test
                 ==============================================
-                </echo>
-                <fail message="reg tests misconfigured" />
-            </then>
-        </if>
-        <sequential>
-            <delete quiet="true" dir="${reg.test.dir}/reports" />
-            <delete quiet="true" dir="${reg.test.dir}/ref-reports" />
-            <mkdir dir="${reg.test.dir}/reports" />
-            <mkdir dir="${reg.test.dir}/ref-reports" />
-        </sequential>
+        </fail>
     </target>
 
-    <target name="reg.test" depends="pre-reg-test" >
-        <ant antfile="${ant.file.REGRESSION TESTS RUN}" target="run-reg-tests" inheritAll="true" inheritRefs="true"/>
-    </target>
+    <target name="reg.test" depends="pre-reg-test, do-regression-testing" />
+    
 </project>
