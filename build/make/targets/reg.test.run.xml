@@ -151,6 +151,7 @@
                    dir="${basedir}"
                    failureproperty="reg.test.errors"
                    timeout="${reg.test.timeout}">
+                <jvmarg line="@{vmarg}"/>
                 <test name="@{test}" todir="${reg.test.dir}/reports"/>
                 <classpath>
                     <pathelement path="${reg.test.class.path}"/>
