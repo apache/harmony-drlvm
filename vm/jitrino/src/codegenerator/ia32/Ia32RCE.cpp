@@ -67,8 +67,10 @@ class RCE : public SessionAction {
     void runImpl();
 protected:
 
-    //  check is flags using by conditional instruction affected by instruction
-    bool isUsingFlagsAffected(Inst * inst, Inst * condInst);
+    // check if flags used by the conditional instruction (=condInst)
+    // are affected by the instruction (=inst) in the same way as
+    // a hypothetical CMP follower (with appropriate arguments) does
+    bool instAffectsFlagsAsCmpInst(Inst * inst, Inst * condInst);
 
     //  check instruction inst for possibility of removing
     bool isSuitableToRemove(Inst * inst, Inst * condInst, Inst * cmpInst, Opnd * cmpOp);
@@ -78,14 +80,14 @@ protected:
 static ActionFactory<RCE> _rce("rce");
 
 /**
- *  The algorithm finds conditional instruction first, then corresponded 
- *  CMP instruction and arithmetic instruction which affects flags in the same
- *  way as CMP. Combination is considered as available to be reduced if there 
- *  are no instructions between CMP and arithmetic instruction which influence 
- *  to flags or CMP operands.
+ *  The algorithm finds conditional instruction (=condInst) first, then
+ *  corresponding CMP instruction (=cmpInst) and arithmetic instruction (=inst)
+ *  which affects flags in the same way as CMP. Combination is considered as
+ *  available to be reduced if there are no instructions between CMP and
+ *  arithmetic instruction which influence to flags or CMP operands.
  *
- *  Also it tries to change improper conditional instruction to more optimizable
- *  kind.
+ *  Also it transforms some conditional instruction to make them more suitable
+ *  for optimizations
  */
 void
 RCE::runImpl() 
@@ -103,7 +105,7 @@ RCE::runImpl()
             cmpInst = NULL;
             Inst* prevInst = NULL;
             for(inst = (Inst*)node->getLastInst(); inst != NULL; inst = prevInst) {
-            prevInst = inst->getPrevInst();
+                prevInst = inst->getPrevInst();
                 //find conditional instruction
                 Mnemonic baseMnem = getBaseConditionMnemonic(inst->getMnemonic());
                 if (baseMnem != Mnemonic_NULL) {
@@ -151,16 +153,17 @@ RCE::runImpl()
                             inst->setOpnd(defCount+1, irManager->newImmOpnd(inst->getOpnd(defCount+1)->getType(),0));
                         } 
                     //find flags affected instruction precedes cmpInst
-                    } else if (isUsingFlagsAffected(inst, condInst)) {
+                    } else if (instAffectsFlagsAsCmpInst(inst, condInst)) {
                         if (cmpInst) {
                             if (isSuitableToRemove(inst, condInst, cmpInst, cmpOp))
                             {
-                                cmpInst->unlink();//replace cmp
+                                cmpInst->unlink();
                             } 
                         }
-                        condInst = NULL;
+                        condInst = NULL; // do not optimize cmpInst any more in this block
                     } else {
                         if (inst->getOpndCount(Inst::OpndRole_Implicit|Inst::OpndRole_Def) || inst->getMnemonic() == Mnemonic_CALL) {
+                            // instruction affects flags, skip optimizing cmpInst
                             condInst = NULL;
                         } else {
                             //check for moving cmpInst operands 
@@ -176,15 +179,18 @@ RCE::runImpl()
 }
 
 bool
-RCE::isUsingFlagsAffected(Inst * inst, Inst * condInst) 
+RCE::instAffectsFlagsAsCmpInst(Inst * inst, Inst * condInst) 
 {
     if (!inst->getOpndCount(Inst::OpndRole_Implicit|Inst::OpndRole_Def))
         //instruction doesn't change flags
         return false;
+
+    ConditionMnemonic mn = ConditionMnemonic(condInst->getMnemonic()-getBaseConditionMnemonic(condInst->getMnemonic()));
     switch (inst->getMnemonic()) {
         case Mnemonic_SUB:
-            //instruction changes all flags
-            return true; 
+            // instruction changes all flags, but an overflow may affect the OF flag,
+            // in that case jumping by JL, JLE, etc. is incorrect
+            return (mn != ConditionMnemonic_L && mn != ConditionMnemonic_LE && mn != ConditionMnemonic_GE && mn != ConditionMnemonic_G);
         case Mnemonic_IDIV:
         case Mnemonic_CALL:
         case Mnemonic_IMUL:
@@ -193,7 +199,6 @@ RCE::isUsingFlagsAffected(Inst * inst, Inst * condInst)
             return false;
         default:
             //instruction changes particular flags
-            ConditionMnemonic mn = ConditionMnemonic(condInst->getMnemonic()-getBaseConditionMnemonic(condInst->getMnemonic()));
             return ( mn == ConditionMnemonic_Z || mn == ConditionMnemonic_NZ) ? true : false;
     }
 }
@@ -201,7 +206,7 @@ RCE::isUsingFlagsAffected(Inst * inst, Inst * condInst)
 bool RCE::isSuitableToRemove(Inst * inst, Inst * condInst, Inst * cmpInst, Opnd * cmpOp)
 {
     /*  cmpInst can be removed if inst defines the same operand which will be
-     *  compared with zero by cmpInst or inst is SUB with the same use-operands as cmpInst
+     *  compared with zero by cmpInst
      *  Required: Native form of insts
      */
     uint32 cmpOpCount = cmpInst->getOpndCount(Inst::OpndRole_InstLevel|Inst::OpndRole_UseDef);
