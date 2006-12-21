@@ -134,7 +134,8 @@ void TranslatorAction::readFlags() {
     if(skipMethods == NULL) {
         flags.inlineSkipTable = NULL;
     } else {
-        flags.inlineSkipTable = new Method_Table(strdup(skipMethods), "SKIP_METHODS", true);
+        MemoryManager& mm = Jitrino::getGlobalMM();
+        flags.inlineSkipTable = new (mm) Method_Table(mm, strdup(skipMethods), "SKIP_METHODS", true);
     }
 
 }

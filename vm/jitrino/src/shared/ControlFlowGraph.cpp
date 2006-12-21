@@ -760,9 +760,10 @@ void ControlFlowGraph::resetInEdges(Node* node) {
             }
             if(redundant) {
                 // Edge is redundant - eliminate.
-                if(pred->getOutDegree() == 2) {
+                if(pred->getOutDegree() == 2 || (pred->getOutDegree()==3 && pred->getExceptionEdge()!=NULL)) {
                     // Pred already has edge to node and succ, and no other successors.  
                     // We can eliminate the branch and the edge to succ.
+                    // Another case is branch+exception for extended form
                     if(pred->isBlockNode()) {
                         lastInst->removeRedundantBranch();
                     }

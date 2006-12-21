@@ -73,24 +73,10 @@ namespace Jitrino {
 #define REF_END_CHAR ';'
 #define FILE_CHAR ':'
 
-// Make sure method_table can hold one more element.
-static void resize_table(struct Method_Table::method_record *&table, int &size, int &capacity)
-{
-    if (capacity == 0)
-    {
-        capacity = 100;  // a reasonable initial guess
-        table = (struct Method_Table::method_record *) malloc(capacity * sizeof(*table));
-    }
-    if (size >= capacity)
-    {
-        capacity *= 2;
-        table = (struct Method_Table::method_record *) realloc(table, capacity * sizeof(*table));
-    }
-}
 
 void Method_Table::make_filename(char *str, int len)
 {
-    _method_file = (char *)malloc(1+len);
+    _method_file = new (_mm) char[1+len];
     strncpy(_method_file, str, len);
     _method_file[len] = '\0';
 }
@@ -133,7 +119,7 @@ static bool matching_signature(const char *lenient, const char *exact)
 }
 
 // [class::][method][(signature)]
-static void parse_method_string(char *str, struct Method_Table::method_record *rec)
+static void parse_method_string(MemoryManager& _mm, char *str, Method_Table::method_record *rec)
 {
     int i;
     int len = (int) strlen(str);
@@ -165,7 +151,7 @@ static void parse_method_string(char *str, struct Method_Table::method_record *r
     if (is_at_class_method_separator)
     {
         // extract the class
-        rec->class_name = (char *)malloc(i-1 + 1);
+        rec->class_name = new (_mm) char[i-1 + 1];
         strncpy(rec->class_name, str, i-1);
         rec->class_name[i-1] = '\0';
         // skip ahead to the descriptor
@@ -186,7 +172,7 @@ static void parse_method_string(char *str, struct Method_Table::method_record *r
     // we're at the start of the signature, with the method name preceding
     if (i > 0)
     {
-        rec->method_name = (char *)malloc(i+1);
+        rec->method_name = new (_mm) char[i+1];
         strncpy(rec->method_name, str, i);
         rec->method_name[i] = '\0';
     }
@@ -211,16 +197,15 @@ bool Method_Table::read_method_table()
             buf[buflen-1] = '\0';
         if (buf[buflen-2] == '\r') // file generated on NT and used on Linux,
             buf[buflen-2] = '\0';    // this case happens
-        resize_table(_method_table, _mrec_size, _mrec_capacity);
-        parse_method_string(buf, &_method_table[_mrec_size]);
-        _method_table[_mrec_size].decision = mt_undecided;
-        _mrec_size ++;
+        method_record* rec = new (_mm) method_record();
+        parse_method_string(_mm, buf, rec);
+        _method_table.push_back(rec);
     }
     fclose(file);
     return true;
 }
 
-static bool matches(struct Method_Table::method_record *test_entry,
+static bool matches(Method_Table::method_record *test_entry,
                     const char *class_name, const char *method_name, const char *signature)
 {
     if (test_entry->class_name != NULL && strcmp(test_entry->class_name, class_name) != 0)
@@ -315,49 +300,48 @@ void Method_Table::init(const char *default_envvar, const char *envvarname)
         {
             _default_decision = mt_rejected;
         }
-        if (rangestr[0] >= '0' && rangestr[0] <= '9')
-        {
+        if (rangestr[0] >= '0' && rangestr[0] <= '9') {
             // look for a range of numbers
             sscanf(rangestr, "%d", &start);
             end = start;
-            while (rangestr[0] != '\0' && rangestr[0] != '-')
+            while (rangestr[0] != '\0' && rangestr[0] != '-') {
                 rangestr ++;
-            if (rangestr[0] == '-')
-                sscanf(rangestr+1, "%d", &end);
-            start --;
-            if (start < 0)
-                start = 0;
-            end --;
-            for (i=start; i<=end && i<_mrec_size; i++)
-            {
-                _method_table[i].decision = (opposite ? mt_rejected : mt_accepted);
             }
-        }
-        else
-        {
-            resize_table(_decision_table, _dtable_size, _dtable_capacity);
-            parse_method_string(rangestr, &_decision_table[_dtable_size]);
-            _decision_table[_dtable_size].decision = (opposite ? mt_rejected : mt_accepted);
-            _dtable_size ++;
+            if (rangestr[0] == '-') {
+                sscanf(rangestr+1, "%d", &end);
+            }
+            start --;
+            if (start < 0) {
+                start = 0;
+            }
+            end --;
+            for (i=start; i<=end && i<(int)_method_table.size(); i++) {
+                _method_table[i]->decision = (opposite ? mt_rejected : mt_accepted);
+            }
+        } else {
+            method_record* rec = new (_mm) method_record();
+            parse_method_string(_mm, rangestr, rec);
+            rec->decision = (opposite ? mt_rejected : mt_accepted);
+            _decision_table.push_back(rec);
         }
     }
 
-    // change all "undecided" to default_decision
-    for (i=0; i<_mrec_size; i++)
-        if (_method_table[i].decision == mt_undecided)
-            _method_table[i].decision = _default_decision;
+    // change all "undecided" to default decision
+    for (i=0; i<(int)_method_table.size(); i++) {
+        if (_method_table[i]->decision == mt_undecided) {
+            _method_table[i]->decision = _default_decision;
+        }
+    }
     
 }
 
-Method_Table::Method_Table(const char *default_envvar,
+Method_Table::Method_Table(MemoryManager& memManager, 
+                           const char *default_envvar,
                            const char *envvarname,
                            bool accept_by_default):
-  _method_table     (NULL),
-  _mrec_size        (0),
-  _mrec_capacity    (0),
-  _decision_table   (NULL),
-  _dtable_size      (0),
-  _dtable_capacity  (0),
+  _mm(memManager),
+  _method_table     (_mm),
+  _decision_table   (_mm),
   _default_decision (mt_accepted),
   _accept_all       (false),
   _dump_to_file     (false),
@@ -394,22 +378,20 @@ bool Method_Table::accept_this_method(const char* classname, const char *methodn
     }
 
     // First look through the decision_table strings.
-    for (i=0; i<_dtable_size; i++)
+    for (i=0; i<(int)_decision_table.size(); i++)
     {
-        if (matches(&_decision_table[i], classname, methodname, signature))
-            return (_decision_table[i].decision == mt_accepted);
+        if (matches(_decision_table[i], classname, methodname, signature)) {
+            return (_decision_table[i]->decision == mt_accepted);
+        }
     }
 
     // Then look through the method table.
-    for (i=0; i<_mrec_size; i++)
-    {
-    if (
-        (_method_table[i].class_name==NULL || !strcmp(_method_table[i].class_name, classname)) &&
-        (_method_table[i].method_name==NULL || !strcmp(_method_table[i].method_name, methodname)) &&
-        (_method_table[i].signature==NULL || matching_signature(_method_table[i].signature, signature))
-       )
+    for (i=0; i<(int)_method_table.size(); i++) {
+        if ((_method_table[i]->class_name==NULL || !strcmp(_method_table[i]->class_name, classname)) &&
+            (_method_table[i]->method_name==NULL || !strcmp(_method_table[i]->method_name, methodname)) &&
+            (_method_table[i]->signature==NULL || matching_signature(_method_table[i]->signature, signature)))
         {
-            return (_method_table[i].decision == mt_accepted);
+            return (_method_table[i]->decision == mt_accepted);
         }
     }
     return (_default_decision == mt_rejected ? false : true);
@@ -419,4 +401,28 @@ bool Method_Table::is_in_list_generation_mode() {
     return _dump_to_file;
 }
 
+void Method_Table::add_method_record(const char* className, const char* methodName, const char* signature, Method_Table::Decision decision, bool copyVals) {
+    method_record* rec = new (_mm) method_record();
+    if (copyVals) {
+        size_t len = strlen(className)+1; //+1 == '\0' char
+        rec->class_name = new (_mm) char[len];
+        strncpy(rec->class_name, className, len);
+        
+        len = strlen(methodName)+1; //+1 == '\0' char
+        rec->method_name= new (_mm) char[len];
+        strncpy(rec->method_name, methodName, len);
+
+        len = strlen(signature)+1; //+1 == '\0' char
+        rec->signature= new (_mm) char[len];
+        strncpy(rec->signature, signature, len);
+    } else {
+        rec->class_name = (char*)className;
+        rec->method_name = (char*)methodName;
+        rec->signature = (char*)signature;
+    }
+    rec->decision = decision;
+    _method_table.push_back(rec);
+}
+
 } //namespace Jitrino 
+

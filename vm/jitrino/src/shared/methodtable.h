@@ -24,6 +24,9 @@
 #ifndef _JITRINO_METHOD_TABLE_H
 #define _JITRINO_METHOD_TABLE_H
 
+#include "MemoryManager.h"
+#include "Stl.h"
+
 namespace Jitrino {
 
 class MethodDesc;
@@ -31,31 +34,38 @@ class MethodDesc;
 class Method_Table
 {
 public:
-    Method_Table(const char *default_envvar, const char *envvarname, bool accept_by_default);
+    Method_Table(MemoryManager& mm, const char *default_envvar, const char *envvarname, bool accept_by_default);
     ~Method_Table() {}
+    
     bool accept_this_method(MethodDesc &md);
     bool accept_this_method(const char* classname, const char *methodname, const char *signature);
     bool is_in_list_generation_mode();
-    enum Decision
-    {
+    
+    enum Decision {
         mt_rejected,
         mt_undecided,
         mt_accepted
     };
-    struct method_record
-    {
+
+    class method_record {
+    public:
+        method_record() : class_name(NULL), method_name(NULL), signature(NULL), decision(mt_undecided){}
+        ~method_record(){}
+
         char *class_name;
         char *method_name;
         char *signature;
         Decision decision;
     };
 
+    void add_method_record(const char* className, const char* methodName, const char* signature, Decision decision, bool copyVals);
     
 private:
-    struct method_record *_method_table;
-    int _mrec_size, _mrec_capacity;
-    struct method_record *_decision_table;
-    int _dtable_size, _dtable_capacity;
+    MemoryManager& _mm;
+
+    typedef StlVector<method_record*> Records;
+    Records _method_table;
+    Records _decision_table;
     Decision _default_decision;
     bool _accept_all;
     bool _dump_to_file;

@@ -171,8 +171,9 @@ private:
     int32 _inlineRecursionPenalty;
     int32 _inlineExactArgBonus;
     int32 _inlineExactAllBonus;
-
+    
     bool _inlineSkipExceptionPath;
+    bool _inlineSkipApiMagicMethods;
     Method_Table* _inlineSkipMethodTable;
 
     uint64 oldMethodId;

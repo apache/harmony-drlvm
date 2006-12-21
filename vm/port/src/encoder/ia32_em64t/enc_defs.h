@@ -408,6 +408,7 @@ Mnemonic_ADDSD,                         // Add Scalar Double-Precision Floating-
 Mnemonic_ADDSS,                         // Add Scalar Single-Precision Floating-Point Values
 Mnemonic_AND,                           // Logical AND
 
+Mnemonic_BSF,                           // Bit scan forward
 Mnemonic_BSR,                           // Bit scan reverse
 
 Mnemonic_CALL,                          // Call Procedure

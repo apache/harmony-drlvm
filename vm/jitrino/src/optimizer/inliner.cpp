@@ -116,12 +116,29 @@ Inliner::Inliner(SessionAction* argSource, MemoryManager& mm, IRManager& irm, bo
     _inlineExactAllBonus = argSource->getIntArg("exact_all_parameter_bonus", INLINE_EXACT_ALL_BONUS);
 
     _inlineSkipExceptionPath = argSource->getBoolArg("skip_exception_path", INLINE_SKIP_EXCEPTION_PATH);
-    const char* skipMethods = argSource->getStringArg("skip_methods", NULL);
-    if(skipMethods == NULL) {
-        _inlineSkipMethodTable = NULL;
-    } else {
+#if defined  (_EM64T_) || defined (_IPF_)
+    _inlineSkipApiMagicMethods  = true;
+#else
+    _inlineSkipApiMagicMethods = argSource->getBoolArg("skip_api_magics", false);
+#endif 
+
+    const char* skipMethods = argSource->getStringArg("skip_methods", "");
+    _inlineSkipMethodTable = NULL;
+    if(skipMethods != NULL || !_inlineSkipApiMagicMethods) {
         std::string skipMethodsStr = skipMethods;
-        _inlineSkipMethodTable = new (_tmpMM) Method_Table(skipMethodsStr.c_str(), "SKIP_METHODS", true);
+        _inlineSkipMethodTable = new (_tmpMM) Method_Table(_tmpMM, skipMethodsStr.c_str(), "SKIP_METHODS", true);
+        if (!_inlineSkipApiMagicMethods) {
+#if defined  (_EM64T_) || defined (_IPF_)
+//TODO: IA32 helpers should work on EM64T too -> TODO test
+#else
+            //is_accepted will return 'true' for these methods by skip table-> no inlining will be done
+            Method_Table::Decision des = Method_Table::mt_accepted; 
+            _inlineSkipMethodTable->add_method_record("java/lang/Integer", "numberOfLeadingZeros", "(I)I", des, false);
+            _inlineSkipMethodTable->add_method_record("java/lang/Integer", "numberOfTrailingZeros", "(I)I", des, false);
+            _inlineSkipMethodTable->add_method_record("java/lang/Long", "numberOfLeadingZeros", "(J)I", des, false);
+            _inlineSkipMethodTable->add_method_record("java/lang/Long", "numberOfTrailingZeros", "(J)I", des, false);
+#endif 
+        }
     }
 
     _usesOptimisticBalancedSync = argSource->getBoolArg("sync_optimistic", false) ? argSource->getBoolArg("sync_optcatch", true) : false;
