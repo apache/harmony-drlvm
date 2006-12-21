@@ -225,11 +225,7 @@ struct SpillGen : public SessionAction
     void  assignMem   (Opline&, Instx* begx, Instx* endx);
     void  saveOpnd    (Opline&, Instx*, Opnd*);
     void  saveOpnd    (Opline&, Instx*, Opnd*, RegMask, int, bool);
-#ifdef _OLD_
-    void  loadOpnd    (Opline&, Instx*, Opnd*);
-#else
     bool  loadOpnd    (Opline&, Instx*, Opnd*);
-#endif
     void  loadOpndMem (Opline&);
     Opnd* opndMem     (Opline&);
     Opnd* opndMem     (const Opnd*);
@@ -606,11 +602,7 @@ void SpillGen::runImpl()
             }
 
             lives_start = irManager->getLiveAtEntry(bblock);
-#ifdef _OLD_
-            lives_exit->resize(lives_start->getSetSize());
-#else
             lives_exit->resize(opndcount);
-#endif
             irManager->getLiveAtExit(bblock, *lives_exit);
 
             size_t bfails = 0;
@@ -644,11 +636,7 @@ void SpillGen::runImpl()
                     size_t oldcount = opndcount;
                     opndcount = irManager->getOpndCount();
                     lives_exit->resize(opndcount);
-#ifdef _OLD_
-                    lives_start->resize(opndcount);
-#else
                     irManager->fixLivenessInfo();
-#endif
 
                     actsmap.resize(opndcount);
                     for (; oldcount < opndcount; ++oldcount)
@@ -669,6 +657,8 @@ void SpillGen::runImpl()
     if (fails)
         log(LogStream::DBG) << endl << "FAILS: " << fails << endl;
 #endif
+
+    assert(fails == 0);
 
     if (fails != 0)
         Jitrino::crash("SpillGen failed");
@@ -845,7 +835,7 @@ size_t SpillGen::pass0 ()
                     }
                     else
                     {
-                        DBGOUT("Cannot assign " << *opnd << endl;)
+                        DBGOUT("Cannot assign " << *opnd << " @ " << *opline->instx->inst << endl;)
                     }
                 }
                 else
@@ -956,7 +946,7 @@ size_t SpillGen::pass1 ()
                         if (!tryEvict(opline, c))
                             if (!tryRepair(opline, c))
                             {// Cannot assign operand, so let it remains in the original form
-                                DBGOUT("Cannot assign " << opline.opnd << endl;)
+                                DBGOUT("Cannot assign " << opline.opnd << " @ " << *opline.instx->inst << endl;)
                                 ++fails;
 
                                 if (simplify(opline.instx->inst, opline.opnd))
@@ -1042,15 +1032,11 @@ bool SpillGen::tryRegister (Opline& opline, Constraint c, RegMask prefreg)
     int count = 0;
     for (opline.forw(); opline.go(); opline.forw())
     {
-#ifdef _OLD_
-        RegMask tmp = mk & mkpost & ~opline.instx->regusage[opline.idx];
-#else
         RegMask tmp = mk & mkpost;
         if (opline.isEnd())
             tmp &= ~opline.instx->regusage[opline.idx-1];
         else
             tmp &= ~opline.instx->regusage[opline.idx];
-#endif
 
         if (tmp == 0)
             break;
@@ -1075,8 +1061,8 @@ bool SpillGen::tryRegister (Opline& opline, Constraint c, RegMask prefreg)
         count += cnt;
     }
 
-    DBGOUT("   -reg [" << *begx->inst << " - " << *endx->inst 
-           << "] avail:" << RegMasks(cx, mk) << " count:" << count << endl;)
+    DBGOUT("   -reg [" << (const Inst*)begx->inst << " - " << (const Inst*)endx->inst 
+        << "] avail:" << RegMasks(cx, mk) << " count:" << count << endl;)
 
     if (count == 0)
     {
@@ -1204,18 +1190,24 @@ bool SpillGen::tryRepair (Opline& opline, Constraint c)
             unsigned mask = (1<<inst->getOpndCount())-1;
             Constraint cx = ((Inst*)inst)->getConstraint(it, mask, OpndSize_Default);
             RegMask used = usedRegs(opline.instx, opline.idx, need_load);
-            RegMask usable = (cx  & registers[opline.idx]).getMask() & ~used  & ~mk;
-            if (usable != 0)
+            RegMask usable = (cx  & registers[opline.idx]).getMask() & ~mk;
+            if ((usable & ~used) != 0)
             {
-                rx = findFree(usable, opline.idx, opline.instx);
+                rx = findFree(usable & ~used, opline.idx, opline.instx);
                 ox_out = opndReg(ox, rx);
+                break;
+            }
+            else if (!(cx & OpndKind_Memory).isNull())
+            {
+                ox_out = opndMem(ox);
                 break;
             }
             else
             {
-                if (!(cx & OpndKind_Memory).isNull())
+                rx = findEvict(usable, opline.idx, opline.instx, opline.instx);
+                if (rx != RegName_Null)
                 {
-                    ox_out = opndMem(ox);
+                    ox_out = opndReg(ox, rx);
                     break;
                 }
             }
@@ -1343,12 +1335,8 @@ void  SpillGen::assignReg (Opline& opline, Instx* begx, Instx* endx, RegName rn)
     DBGOUT("assignReg " << *opline.opnd << " [" << *begx->inst 
            << " - " << *endx->inst << "] to " << *opnd_reg << endl;)
 
-#ifdef _OLD_
-    loadOpnd(opline, begx, opnd_reg);
-#else
     if (loadOpnd(opline, begx, opnd_reg))
         (begx-1)->regusage[opline.idx] |= mk;
-#endif
 
     for (Instx* ptrx = begx; ptrx <= endx; ++ptrx)
     {
@@ -1370,16 +1358,9 @@ void  SpillGen::assignReg (Opline& opline, Instx* begx, Instx* endx, RegName rn)
                 ptrx->evicts->push_back(opnd_reg);
         }
 
-#ifdef _OLD_
-        ptrx->regusage[opline.idx] |= mk;
-    }
-    if (begx != endx)
-        endx->regusage[opline.idx] &= ~mk;
-#else
         if (ptrx != endx)
             ptrx->regusage[opline.idx] |= mk;
     }
-#endif
 
     bool before = false;
     if (endx->inst->getMnemonic() == Mnemonic_CALL && !opline.isDef(endx->inst))
@@ -1442,45 +1423,6 @@ void  SpillGen::saveOpnd (Opline& opline, Instx* instx, Opnd* opnd, RegMask regm
 
 //  Load operand from memory to 'opnd' at the poinr 'instx'
 //
-#ifdef _OLD_
-void  SpillGen::loadOpnd (Opline& opline, Instx* instx, Opnd* opnd)
-{
-    if (opline.save_instx == 0)
-        return;
-
-    if (!opline.isUse(instx->inst))
-        return;
-
-    if (opline.save_opnd->hasAssignedPhysicalLocation())
-    {
-        opndMem(opline);
-        if (opline.save_changed)
-        {
-            emitMove(opline.save_before, 
-                     opline.save_instx->inst, 
-                     opline.opnd_mem, 
-                     opline.save_opnd);
-            if (opline.save_regmsk != 0)
-                opline.save_instx->regusage[opline.save_regidx] |= opline.save_regmsk;
-            opline.save_changed = false;
-        }
-        emitMove(true,  instx->inst, opnd, opline.opnd_mem);
-    }
-    else
-    {
-        if (opnd->hasAssignedPhysicalLocation())
-        {// Assigned <- UnAssigned
-            emitMove(true,  instx->inst, opnd, opline.save_opnd);
-        }
-        else
-        {// UnAssigned <- UnAssigned
-            assert(opnd == opline.save_opnd);
-            opline.save_opnd  = opnd;
-            opline.save_instx = instx;
-        }
-    }
-}
-#else
 bool  SpillGen::loadOpnd (Opline& opline, Instx* instx, Opnd* opnd)
 {
     if (opline.save_instx == 0 || !opline.isUse(instx->inst))
@@ -1516,7 +1458,6 @@ bool  SpillGen::loadOpnd (Opline& opline, Instx* instx, Opnd* opnd)
     }
     return true;
 }
-#endif
 
 
 //  Save operand to memory
@@ -1751,18 +1692,6 @@ RegName SpillGen::findEvict (RegMask usable, int idx, Instx* begx, Instx*& endx)
     assert((usable & mk));
 
     Instx* ptrx;
-#ifdef _OLD_
-    for (ptrx = evict->begx; ptrx <= evict->endx; ++ptrx)
-    {
-    //  mark register assigned to the operand as free
-        ptrx->regusage[idx] &= ~mk;
-
-        //  clear the operand as a candidate to evict
-        killEvict(evict->opnd, ptrx);
-    }
-    if (ptrx <= &instxs.back())
-        ptrx->regusage[idx] |= mk;
-#else
     for (ptrx = evict->begx; ptrx <= evict->endx; ++ptrx)
     {
     //  mark register assigned to the operand as free
@@ -1772,7 +1701,6 @@ RegName SpillGen::findEvict (RegMask usable, int idx, Instx* begx, Instx*& endx)
         //  clear the operand as a candidate to evict
         killEvict(evict->opnd, ptrx);
     }
-#endif
 
     return rn;
 }
@@ -1815,7 +1743,6 @@ void SpillGen::setupEvicts ()
                 merge(used[idx], msk);
             }
         }
-
         if (inst->hasKind(Inst::Kind_CallInst) && lives_catch != 0)
         {
             if (catched == 0)
@@ -1835,7 +1762,6 @@ void SpillGen::setupEvicts ()
             }
             used.merge(*catched);
         }
-
         if (inst == instxp->inst)
         {
             if (instxp->evicts == 0)
