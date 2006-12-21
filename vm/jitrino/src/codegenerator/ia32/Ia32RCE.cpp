@@ -124,7 +124,8 @@ RCE::runImpl()
                         if(inst->getOpnd(defCount+1)->isPlacedIn(OpndKind_Imm)) {
                             //try to change conditional instruction to make combination available to optimize
                             cmpOp = inst->getOpnd(defCount);
-                            Inst * newCondInst; Mnemonic mnem;
+                            Inst * newCondInst = NULL; 
+                            Mnemonic mnem;
                             int64 val = inst->getOpnd(defCount+1)->getImmValue();
                             
                             if (val == 0) {
@@ -142,10 +143,17 @@ RCE::runImpl()
                             if (condInst->hasKind(Inst::Kind_BranchInst)) {
                                 BranchInst* br = (BranchInst*)condInst;
                                 newCondInst = irManager->newBranchInst(mnem,br->getTrueTarget(), br->getFalseTarget(), condInst->getOpnd(0));
-                            } else if (condInst->getForm() == Inst::Form_Native ) {
-                                newCondInst = irManager->newInst(mnem, condInst->getOpnd(0), condInst->getOpnd(1));
                             } else {
-                                newCondInst = irManager->newInstEx(mnem, condInst->getOpndCount(Inst::OpndRole_InstLevel|Inst::OpndRole_Def), condInst->getOpnd(0), condInst->getOpnd(1));
+                                Inst::Opnds defs(condInst,Inst::OpndRole_Def|Inst::OpndRole_Explicit);
+                                if (baseMnem == Mnemonic_CMOVcc) {
+                                    Inst::Opnds uses(condInst,Inst::OpndRole_Use|Inst::OpndRole_Explicit);
+                                    newCondInst = irManager->newInst(mnem, condInst->getOpnd(defs.begin()), inst->getOpnd(uses.begin()));
+                                } else if (baseMnem == Mnemonic_SETcc) {
+                                    newCondInst = irManager->newInst(mnem, condInst->getOpnd(defs.begin()));
+                                } else {
+                                    assert(0);
+                                    continue;
+                                }
                             }
                             newCondInst->insertAfter(condInst);
                             condInst->unlink();
