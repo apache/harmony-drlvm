@@ -260,12 +260,7 @@ jthrowable create_exception(Class* exc_class,
         return NULL;
     }
 
-    jthrowable exc_object = create_exception(exc_class, exc_init, args);
-
-    if (exn_raised()) {
-        DIE(("Exception constructor has thrown an exception"));
-    }
-    return exc_object;
+    return create_exception(exc_class, exc_init, args);
 } // create_exception(Class *exc_class, const char *exc_message, jthrowable exc_cause)
 
 jthrowable create_exception(Exception* exception)
