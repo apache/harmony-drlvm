@@ -47,8 +47,8 @@
 			<Tool
 				Name="VCPostBuildEventTool"
 				Description="       ... Copying files to bin/default folder ...."
-				CommandLine="copy $(OutDir)\harmonyvm.dll $(ProjectDir)\..\..\..\win_ia32_msvc_$(ConfigurationName)\deploy\jre\bin\default
-copy $(OutDir)\harmonyvm.pdb $(ProjectDir)\..\..\..\win_ia32_msvc_$(ConfigurationName)\deploy\jre\bin\default
+				CommandLine="copy $(OutDir)\harmonyvm.dll $(ProjectDir)\..\..\..\win_ia32_msvc_$(ConfigurationName)\deploy\jdk\jre\bin\default
+copy $(OutDir)\harmonyvm.pdb $(ProjectDir)\..\..\..\win_ia32_msvc_$(ConfigurationName)\deploy\jdk\jre\bin\default
 copy $(OutDir)\harmonyvm.lib $(ProjectDir)\..\..\..\win_ia32_msvc_$(ConfigurationName)\deploy\jdk\jre\bin\default
 "/>
 			<Tool
@@ -103,8 +103,8 @@ copy $(OutDir)\harmonyvm.lib $(ProjectDir)\..\..\..\win_ia32_msvc_$(Configuratio
 			<Tool
 				Name="VCPostBuildEventTool"
 				Description="       ... Copying files to bin/default folder ...."
-				CommandLine="copy $(OutDir)\harmonyvm.dll $(ProjectDir)\..\..\..\win_ia32_msvc_$(ConfigurationName)\deploy\jre\bin\default
-copy $(OutDir)\harmonyvm.pdb $(ProjectDir)\..\..\..\win_ia32_msvc_$(ConfigurationName)\deploy\jre\bin\default
+				CommandLine="copy $(OutDir)\harmonyvm.dll $(ProjectDir)\..\..\..\win_ia32_msvc_$(ConfigurationName)\deploy\jdk\jre\bin\default
+copy $(OutDir)\harmonyvm.pdb $(ProjectDir)\..\..\..\win_ia32_msvc_$(ConfigurationName)\deploy\jdk\jre\bin\default
 copy $(OutDir)\harmonyvm.lib $(ProjectDir)\..\..\..\win_ia32_msvc_$(ConfigurationName)\deploy\jdk\jre\bin\default
 "/>
 			<Tool

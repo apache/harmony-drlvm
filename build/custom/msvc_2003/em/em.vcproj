@@ -46,7 +46,7 @@
 			<Tool
 				Name="VCPostBuildEventTool"
 				Description="       ... Copying files to bin/default folder ...."
-				CommandLine="copy $(OutDir)\em.dll $(ProjectDir)\..\..\..\win_ia32_msvc_$(ConfigurationName)\deploy\jre\bin\default
+				CommandLine="copy $(OutDir)\em.dll $(ProjectDir)\..\..\..\win_ia32_msvc_$(ConfigurationName)\deploy\jdk\jre\bin\default
 copy $(OutDir)\em.pdb $(ProjectDir)\..\..\..\win_ia32_msvc_$(ConfigurationName)\deploy\jdk\jre\bin\default
 "/>
 			<Tool
@@ -88,7 +88,7 @@ copy $(OutDir)\em.pdb $(ProjectDir)\..\..\..\win_ia32_msvc_$(ConfigurationName)\
 				AdditionalDependencies="harmonyvm.lib hythr.lib"
 				OutputFile="$(OutDir)/em.dll"
 				LinkIncremental="1"
-				AdditionalLibraryDirectories="&quot;$(ProjectDir)\..\..\..\win_ia32_msvc_release\deploy\jre\bin\default&quot;;&quot;$(ProjectDir)\..\..\..\win_ia32_msvc_release\semis\vm\hythr\_bin&quot;"
+				AdditionalLibraryDirectories="&quot;$(ProjectDir)\..\..\..\win_ia32_msvc_release\deploy\jdk\jre\bin\default&quot;;&quot;$(ProjectDir)\..\..\..\win_ia32_msvc_release\semis\vm\hythr\_bin&quot;"
 				GenerateDebugInformation="TRUE"
 				SubSystem="2"
 				OptimizeReferences="2"
@@ -100,7 +100,7 @@ copy $(OutDir)\em.pdb $(ProjectDir)\..\..\..\win_ia32_msvc_$(ConfigurationName)\
 			<Tool
 				Name="VCPostBuildEventTool"
 				Description="       ... Copying files to bin/default folder ...."
-				CommandLine="copy $(OutDir)\em.dll $(ProjectDir)\..\..\..\win_ia32_msvc_$(ConfigurationName)\deploy\jre\bin\default
+				CommandLine="copy $(OutDir)\em.dll $(ProjectDir)\..\..\..\win_ia32_msvc_$(ConfigurationName)\deploy\jdk\jre\bin\default
 copy $(OutDir)\em.pdb $(ProjectDir)\..\..\..\win_ia32_msvc_$(ConfigurationName)\deploy\jdk\jre\bin\default
 "/>
 			<Tool

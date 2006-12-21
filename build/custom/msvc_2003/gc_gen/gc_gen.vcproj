@@ -46,7 +46,7 @@
 			<Tool
 				Name="VCPostBuildEventTool"
 				Description="       ... Copying files to bin/default folder ...."
-				CommandLine="copy $(OutDir)\gc_gen.dll $(ProjectDir)\..\..\..\win_ia32_msvc_$(ConfigurationName)\deploy\jre\bin\default
+				CommandLine="copy $(OutDir)\gc_gen.dll $(ProjectDir)\..\..\..\win_ia32_msvc_$(ConfigurationName)\deploy\jdk\jre\bin\default
 copy $(OutDir)\gc_gen.pdb $(ProjectDir)\..\..\..\win_ia32_msvc_$(ConfigurationName)\deploy\jdk\jre\bin\default
 "/>
 			<Tool
@@ -99,7 +99,7 @@ copy $(OutDir)\gc_gen.pdb $(ProjectDir)\..\..\..\win_ia32_msvc_$(ConfigurationNa
 			<Tool
 				Name="VCPostBuildEventTool"
 				Description="       ... Copying files to bin/default folder ...."
-				CommandLine="copy $(OutDir)\gc_gen.dll $(ProjectDir)\..\..\..\win_ia32_msvc_$(ConfigurationName)\deploy\jre\bin\default
+				CommandLine="copy $(OutDir)\gc_gen.dll $(ProjectDir)\..\..\..\win_ia32_msvc_$(ConfigurationName)\deploy\jdk\jre\bin\default
 copy $(OutDir)\gc_gen.pdb $(ProjectDir)\..\..\..\win_ia32_msvc_$(ConfigurationName)\deploy\jdk\jre\bin\default
 "/>
 			<Tool

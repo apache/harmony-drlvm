@@ -45,7 +45,7 @@
 			<Tool
 				Name="VCPostBuildEventTool"
 				Description="       ... Copying files to bin/default folder ...."
-				CommandLine="copy $(OutDir)\interpreter.dll $(ProjectDir)\..\..\..\win_ia32_msvc_$(ConfigurationName)\deploy\jre\bin\default
+				CommandLine="copy $(OutDir)\interpreter.dll $(ProjectDir)\..\..\..\win_ia32_msvc_$(ConfigurationName)\deploy\jdk\jre\bin\default
 copy $(OutDir)\interpreter.pdb $(ProjectDir)\..\..\..\win_ia32_msvc_$(ConfigurationName)\deploy\jdk\jre\bin\default
 "/>
 			<Tool
@@ -99,7 +99,7 @@ copy $(OutDir)\interpreter.pdb $(ProjectDir)\..\..\..\win_ia32_msvc_$(Configurat
 			<Tool
 				Name="VCPostBuildEventTool"
 				Description="       ... Copying files to bin/default folder ...."
-				CommandLine="copy $(OutDir)\interpreter.dll $(ProjectDir)\..\..\..\win_ia32_msvc_$(ConfigurationName)\deploy\jre\bin\default
+				CommandLine="copy $(OutDir)\interpreter.dll $(ProjectDir)\..\..\..\win_ia32_msvc_$(ConfigurationName)\deploy\jdk\jre\bin\default
 copy $(OutDir)\interpreter.pdb $(ProjectDir)\..\..\..\win_ia32_msvc_$(ConfigurationName)\deploy\jdk\jre\bin\default
 "/>
 			<Tool

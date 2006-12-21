@@ -49,7 +49,7 @@
 			<Tool
 				Name="VCPostBuildEventTool"
 				Description="       ... Copying files to bin/default folder ...."
-				CommandLine="copy $(OutDir)\jitrino.dll $(ProjectDir)\..\..\..\win_ia32_msvc_$(ConfigurationName)\deploy\jre\bin\default
+				CommandLine="copy $(OutDir)\jitrino.dll $(ProjectDir)\..\..\..\win_ia32_msvc_$(ConfigurationName)\deploy\jdk\jre\bin\default
 copy $(OutDir)\jitrino.pdb $(ProjectDir)\..\..\..\win_ia32_msvc_$(ConfigurationName)\deploy\jdk\jre\bin\default
 "/>
 			<Tool
@@ -108,7 +108,7 @@ copy $(OutDir)\jitrino.pdb $(ProjectDir)\..\..\..\win_ia32_msvc_$(ConfigurationN
 			<Tool
 				Name="VCPostBuildEventTool"
 				Description="       ... Copying files to bin/default folder ...."
-				CommandLine="copy $(OutDir)\jitrino.dll $(ProjectDir)\..\..\..\win_ia32_msvc_$(ConfigurationName)\deploy\jre\bin\default
+				CommandLine="copy $(OutDir)\jitrino.dll $(ProjectDir)\..\..\..\win_ia32_msvc_$(ConfigurationName)\deploy\jdk\jre\bin\default
 copy $(OutDir)\jitrino.pdb $(ProjectDir)\..\..\..\win_ia32_msvc_$(ConfigurationName)\deploy\jdk\jre\bin\default
 "/>
 			<Tool
@@ -558,6 +558,9 @@ copy $(OutDir)\jitrino.pdb $(ProjectDir)\..\..\..\win_ia32_msvc_$(ConfigurationN
 			<Filter
 				Name="ia32"
 				Filter="">
+				<File
+					RelativePath="..\..\..\..\vm\jitrino\src\codegenerator\ia32\Ia32APIMagics.cpp">
+				</File>
 				<File
 					RelativePath="..\..\..\..\vm\jitrino\src\codegenerator\ia32\Ia32BBPolling.cpp">
 				</File>
