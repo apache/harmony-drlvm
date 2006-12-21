@@ -17,7 +17,6 @@
 
 #include <apr_file_io.h>
 #include <apr_file_info.h>
-#include <apr_env.h>
 #include <apr_strings.h>
 #include "port_dso.h"
 #include "port_filepath.h"
@@ -40,49 +39,22 @@ inline char* unquote(char *str)
     return str;
 }
 
-#define PROP_ENV_NAME  "VM_PROPERTIES"
-#define PROP_FILE_NAME "vm.properties"
-
-#define MAX_PROP_LINE 5120
-
 // local memory pool for temporary allocation
 static apr_pool_t *prop_pool;
 
-static void
-read_properties(char *fname, Properties & prop)
+static const char *api_dll_files[] =
 {
-    apr_file_t *f;
-    char *src, *tok;
-    if (APR_SUCCESS != apr_file_open(&f, fname, APR_FOPEN_READ, 0, prop_pool))
-        return;
-    WARN("USAGE OF vm.properties FILE IS DEPRECATED. THIS FUNCTIONALITY WILL BE REMOVED SOON. ALL PROPERTIES SHOULD BE SET ON COMMAND LINE");
-    char buf[MAX_PROP_LINE];
-    while (!apr_file_eof(f) && !apr_file_gets(buf, MAX_PROP_LINE, f))
-    {
-        if (buf[0] != '#') {
-            src = strdup(buf);
-            tok = strchr(src, '=');
-            if(tok)
-            {
-                *tok = '\0';
-                prop.set(unquote(src), unquote(tok + 1));
-            }
-            STD_FREE(src);
-        }
-    }
-    apr_file_close(f);
-}
-
-#define API_DLL1 "harmonyvm"
-#define API_DLL2 "hythr"
-#define API_DLL3 "hysig"
-#define API_DLL4 "hyprt"
-#define API_DLL5 "hyzlib"
-#define API_DLL6 "hytext"
-#define API_DLL7 "hynio"
-#define API_DLL8 "vmi"
-#define API_DLLA "hyluni"
-#define API_DLLB "hyarchive"
+    "harmonyvm",
+    "hythr",
+    "hysig",
+    "hyprt",
+    "hyzlib",
+    "hytext",
+    "hynio",
+    "vmi",
+    "hyluni",
+    "hyarchive"
+};
 
 #define GC_DLL "gc_cc"
 
@@ -279,20 +251,6 @@ static void init_vm_properties(Properties & properties)
 
         properties.set("vm.dlls", PORT_DSO_NAME(GC_DLL));
 
-        // vm.other_natives_dlls initialization, the value is location of VM executable.
-        const char *api_dll_files[] =
-        {
-            API_DLL1,
-                API_DLL2,
-                API_DLL3,
-                API_DLL4,
-                API_DLL5,
-                API_DLL6,
-                API_DLL7,
-                API_DLL8,
-                API_DLLA,
-                API_DLLB
-        };
         int n_api_dll_files = sizeof(api_dll_files) / sizeof(char *);
         /*
         *  pass NULL for the pathname as we don't want 
@@ -309,46 +267,14 @@ initialize_properties(Global_Env * p_env)
         apr_pool_create(&prop_pool, 0);
     }
 /*
- * 0. Add predefined properties from property table
+ * 0. Add predefined properties
  */
      
     init_java_properties(*p_env->JavaProperties());
     init_vm_properties(*p_env->VmProperties());
 
-/* 
- * 1. VM looks for an environment variable, say, 
- *    VM_PROPERTIES=d:\xyz\eee\vm.Properties, read the Properties;
- */
-    char *pf;
-    if (apr_env_get(&pf, PROP_ENV_NAME, prop_pool) == APR_SUCCESS){
-        read_properties(pf, *p_env->JavaProperties());
-    }
 /*
- * 2. Looks for vm.Properties in the directory where vm executable resides 
- *    (it's also a global file), read the Properties, if key is duplicated, 
- *    override the value;
- */
-    char *buf;
-    if (port_executable_name(&buf, prop_pool) == APR_SUCCESS)
-    {
-        char *p = strrchr(buf, PORT_FILE_SEPARATOR);
-        if (p)
-        {
-            *(p + 1) = '\0';
-            buf = apr_pstrcat(prop_pool, buf, PROP_FILE_NAME, NULL);
-            read_properties(buf, *p_env->JavaProperties());
-        }
-    }
-
-/*
- * 3. Looks for it in current directory(it's an app-specific file), read the 
- *    Properties, if key is duplicated, override the value;
- */
-    apr_filepath_get(&buf, 0, prop_pool);
-    buf = port_filepath_merge(buf, PROP_FILE_NAME, prop_pool);
-    read_properties(buf, *p_env->JavaProperties());
-/*
- * 4. Check whether there is a command line option, say, 
+ * 2. Check whether there is a command line option, say, 
  *    -Properties-file "d:\xyz\eee\vm.Properties" or -Droperties key=value, 
  *    read the Properties, if key is duplicated, override the value. 
  */
