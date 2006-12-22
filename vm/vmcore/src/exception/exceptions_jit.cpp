@@ -303,14 +303,22 @@ static void exn_propagate_exception(
                         jit_exn_constr_args, vm_exn_constr_args);
                 }
 
-                BEGIN_RAISE_AREA;
-                // Reload exception object pointer because it could have
-                // moved while calling JVMTI callback
-                *exn_obj = jvmti_jit_exception_event_callback_call(*exn_obj,
-                    interrupted_method_jit, interrupted_method,
-                    interrupted_method_location,
-                    jit, method, handler->get_handler_ip());
-                END_RAISE_AREA;
+                if (jvmti_is_exception_event_requested()) {
+                    // Create exception if necessary
+                    if (NULL == *exn_obj) {
+                        *exn_obj = create_lazy_exception(exn_class, exn_constr,
+                            jit_exn_constr_args, vm_exn_constr_args);
+                    }
+
+                    BEGIN_RAISE_AREA;
+                    // Reload exception object pointer because it could have
+                    // moved while calling JVMTI callback
+                    *exn_obj = jvmti_jit_exception_event_callback_call(*exn_obj,
+                        interrupted_method_jit, interrupted_method,
+                        interrupted_method_location,
+                        jit, method, handler->get_handler_ip());
+                    END_RAISE_AREA;
+                }
 
                 TRACE2("exn", ("setting return pointer to %d", exn_obj));
 

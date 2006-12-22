@@ -144,6 +144,7 @@ void jvmti_notify_data_dump_request();
 VMEXPORT void jvmti_interpreter_exception_event_callback_call(
         ManagedObject *exc, Method *method, jlocation location,
         Method *catch_method, jlocation catch_location);
+bool jvmti_is_exception_event_requested();
 ManagedObject *jvmti_jit_exception_event_callback_call(ManagedObject *exn,
     JIT *jit, Method *method, NativeCodePtr native_location,
     JIT *catch_jit, Method *catch_method, NativeCodePtr native_catch_location);

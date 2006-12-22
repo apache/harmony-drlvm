@@ -1322,11 +1322,27 @@ void jvmti_interpreter_exception_event_callback_call(
     assert(!exn_raised());
 }
 
+bool jvmti_is_exception_event_requested()
+{
+    DebugUtilsTI *ti = VM_Global_State::loader_env->TI;
+    if (!ti->isEnabled())
+        return false;
+
+    if (JVMTI_PHASE_LIVE != ti->getPhase())
+        return false;
+
+    if (!ti->get_global_capability(DebugUtilsTI::TI_GC_ENABLE_EXCEPTION_EVENT))
+        return false;
+
+    return true;
+}
+
 ManagedObject *jvmti_jit_exception_event_callback_call(ManagedObject *exn_object,
     JIT *jit, Method *method, NativeCodePtr native_location,
     JIT *catch_jit, Method *catch_method, NativeCodePtr native_catch_location)
 {
     assert(!exn_raised());
+    assert(exn_object);
     SuspendDisabledChecker sdc;
 
     DebugUtilsTI *ti = VM_Global_State::loader_env->TI;
