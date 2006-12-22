@@ -104,7 +104,7 @@ static invoke_managed_func_int_t gen_invoke_managed_func() {
     labels.add_patch_to_label(MOVE_STACK_ARGS_END, stub - 1, LPT_Rel8);
     
     // align stack if required (rsp % 16 == 0)
-    stub = alu(stub, and_opc, rcx_opnd, Imm_Opnd(size_64, 1));
+    stub = test(stub, rcx_opnd, Imm_Opnd(size_32, 1));
     stub = branch8(stub, Condition_Z, Imm_Opnd(size_8, 0));
     labels.add_patch_to_label(COMPUTE_ADDRESS, stub - 1, LPT_Rel8);
     stub = push(stub, rax_opnd);
