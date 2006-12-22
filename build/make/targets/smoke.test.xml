@@ -42,7 +42,16 @@ Version: $Revision: 1.4.2.11 $
 
     </target>
 
-    <target name="smoke.test" depends="compile.smoke.test, java_test_smoke" />
+    <target name="smoke.test" depends="clean, compile.smoke.test, java_test_smoke, build_report">
+        <!-- workaround: setting property doesn't work because of antcall  -->
+        <!-- have to touch file if tests fail and verify if it exists here -->
+        <available property="tests.failed" file="tests.failed" />
+        <fail if="tests.failed"/>
+    </target>
+
+    <target name="clean">
+        <delete file="tests.failed"/>
+    </target>
 
     <target name="compile.smoke.test" depends="compile.smoke.test.java, compile.smoke.test.native" />
 
@@ -110,6 +119,23 @@ Version: $Revision: 1.4.2.11 $
             <param name="jit.or.interpreter" value="interpreter" />
         </antcall>
     </target>
+
+    <target name="build_report">
+        <property name="report.dir" location="${build.dir}/_smoke.tests/reports/html"/>
+        <delete dir="${report.dir}" />
+        <mkdir dir="${report.dir}" />
+        <junitreport todir="${report.dir}">
+            <fileset dir="${build.dir}/_smoke.tests/reports">
+                <include name="*.xml"/>
+            </fileset>
+            <report format="frames" todir="${report.dir}"/>
+        </junitreport>
+
+        <!-- use this property just to get the slashes to display right in the echo -->
+        <property name="display-location" location="${report.dir}/index.html"/>
+        <echo message="The test report is in ${display-location}"/>
+    </target>
+
     <target name="java_test_smoke_with_jit_or_interpreter">
         <condition property="using.jit.or.jitrino" value="Using interpreter">
             <contains string="${jit.or.interpreter}" substring="int" />
@@ -267,12 +293,57 @@ ${foo}
                             <isset property="@{test}.is.passed" />
                             <then>
                                 <echo message=" PASSED : ${class.name}" />
+
+                                <!-- create xml-file with test's results -->
+<echo file="${build.dir}/_smoke.tests/reports/${class.name}_${jit.or.interpreter}.xml"><![CDATA[<?xml version="1.0" encoding="UTF-8" ?>
+<testsuite errors="0" failures="0" name="@@@@@" tests="1" time="0.01">
+<testcase classname="@@@@@" name="test" time="0.1"/>
+<system-out><![CDATA[@out]!]></system-out>
+<system-err><![CDATA[@err]!]></system-err>
+</testsuite>]]> 
+</echo>
+                                <replace file="${build.dir}/_smoke.tests/reports/${class.name}_${jit.or.interpreter}.xml" token="@@@@@" value="${class.name}_${jit.or.interpreter}" /> 
                             </then>
                             <else>
-                                <property name="some.smoke.test.is.failed" value="true" />
+                                <touch file="tests.failed"/>
                                 <echo message="*** FAILED **** : ${class.name}" />
+
+                                <!-- create xml-file with test's results -->
+<echo file="${build.dir}/_smoke.tests/reports/${class.name}_${jit.or.interpreter}.xml"><![CDATA[<?xml version="1.0" encoding="UTF-8" ?>
+<testsuite errors="0" failures="1" name="@@@@@" tests="1" time="0.01">
+<testcase classname="@@@@@" name="test" time="0.1"><error message="FAILED"/></testcase>
+<system-out><![CDATA[@out]!]></system-out>
+<system-err><![CDATA[@err]!]></system-err>
+</testsuite>]]> 
+</echo>
+                                <replace file="${build.dir}/_smoke.tests/reports/${class.name}_${jit.or.interpreter}.xml" token="@@@@@" value="${class.name}_${jit.or.interpreter}" /> 
                             </else>
                         </if>
+
+                        <!-- grab System.out to xml-file -->
+                        <loadfile property="@{test}.tmp.out" srcFile="${build.dir}/_smoke.tests/reports/${class.name}_${jit.or.interpreter}.out" />
+                        <if>
+                            <isset property="@{test}.tmp.out" />
+                            <then>
+                                <replace file="${build.dir}/_smoke.tests/reports/${class.name}_${jit.or.interpreter}.xml" token="@out]!" value="${@{test}.tmp.out}]" />
+                            </then>
+                            <else>
+                                <replace file="${build.dir}/_smoke.tests/reports/${class.name}_${jit.or.interpreter}.xml" token="@out]!" value="]" />
+                            </else>
+                        </if>
+                        
+                        <!-- grab System.err to xml-file -->
+                        <loadfile property="@{test}.tmp.err" srcFile="${build.dir}/_smoke.tests/reports/${class.name}_${jit.or.interpreter}.out.err" />
+                        <if>
+                            <isset property="@{test}.tmp.err" />
+                            <then>
+                                <replace file="${build.dir}/_smoke.tests/reports/${class.name}_${jit.or.interpreter}.xml" token="@err]!" value="${@{test}.tmp.err}]" />
+                            </then>
+                            <else>
+                                <replace file="${build.dir}/_smoke.tests/reports/${class.name}_${jit.or.interpreter}.xml" token="@err]!" value="]" />
+                            </else>
+                        </if>
+
                     </then>
                     <else>
                         <propertycopy override="true" property="exclude.reason" from="@{test}.is.excluded" />
@@ -282,6 +353,5 @@ ${foo}
             </sequential>
         </for>
         <echo message="Please find test classes and results at ${build.dir}/_smoke.tests/" />
-        <fail message="Smoke tests are not passed." if="some.smoke.test.is.failed" />
     </target>
 </project>
