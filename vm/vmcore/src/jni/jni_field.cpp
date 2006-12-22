@@ -45,8 +45,7 @@ jfieldID JNICALL GetFieldID(JNIEnv * jni_env,
     TRACE2("jni", "GetFieldID called");
     assert(hythread_is_suspend_enabled());
 
-    Global_Env * vm_env = jni_get_vm_env(jni_env);
-    if (vm_env->IsVmShutdowning()) return 0;
+    if (exn_raised()) return 0;
 
     Class* clss = jclass_to_struct_Class(clazz);
     Field *field = class_lookup_field_recursive(clss, name, sig);
@@ -73,12 +72,12 @@ jfieldID JNICALL GetFieldID_Quick(JNIEnv * jni_env,
     assert(hythread_is_suspend_enabled());
 
     Global_Env * vm_env = jni_get_vm_env(jni_env);
-    if (vm_env->IsVmShutdowning()) return 0;
+    if (exn_raised()) return 0;
 
-    String *class_string = VM_Global_State::loader_env->string_pool.lookup(class_name);
+    String *class_string = vm_env->string_pool.lookup(class_name);
     assert(hythread_is_suspend_enabled());
     Class *clss =
-        class_load_verify_prepare_from_jni(VM_Global_State::loader_env, class_string);
+        class_load_verify_prepare_from_jni(vm_env, class_string);
     if(!clss) {
         return 0;
     }
@@ -94,8 +93,7 @@ jfieldID JNICALL GetStaticFieldID(JNIEnv * jni_env,
     TRACE2("jni", "GetStaticFieldID called");
     assert(hythread_is_suspend_enabled());
 
-    Global_Env * vm_env = jni_get_vm_env(jni_env);
-    if (vm_env->IsVmShutdowning()) return 0;
+    if (exn_raised()) return 0;
 
     Class* clss = jclass_to_struct_Class(clazz);
     Field *field = class_lookup_field_recursive(clss, name, sig);
@@ -120,8 +118,7 @@ jobject JNICALL GetObjectFieldOffset(JNIEnv* UNREF jni_env, jobject obj, jint of
     assert(hythread_is_suspend_enabled());
     ObjectHandle h = (ObjectHandle)obj;
 
-    Global_Env * vm_env = jni_get_vm_env(jni_env);
-    if (vm_env->IsVmShutdowning()) return NULL;
+    if (exn_raised()) return NULL;
 
     tmn_suspend_disable();       //---------------------------------v
 
@@ -161,8 +158,7 @@ jboolean JNICALL GetBooleanFieldOffset(JNIEnv * UNREF jni_env, jobject obj, jint
     assert(hythread_is_suspend_enabled());
     ObjectHandle h = (ObjectHandle)obj;
 
-    Global_Env * vm_env = jni_get_vm_env(jni_env);
-    if (vm_env->IsVmShutdowning()) return 0;
+    if (exn_raised()) return 0;
 
     tmn_suspend_disable();       //---------------------------------v
 
@@ -194,8 +190,7 @@ jbyte JNICALL GetByteFieldOffset(JNIEnv * UNREF jni_env, jobject obj, jint offse
     assert(hythread_is_suspend_enabled());
     ObjectHandle h = (ObjectHandle)obj;
 
-    Global_Env * vm_env = jni_get_vm_env(jni_env);
-    if (vm_env->IsVmShutdowning()) return 0;
+    if (exn_raised()) return 0;
 
     tmn_suspend_disable();       //---------------------------------v
 
@@ -229,8 +224,7 @@ jchar JNICALL GetCharFieldOffset(JNIEnv * UNREF jni_env, jobject obj, jint offse
     assert(hythread_is_suspend_enabled());
     ObjectHandle h = (ObjectHandle)obj;
 
-    Global_Env * vm_env = jni_get_vm_env(jni_env);
-    if (vm_env->IsVmShutdowning()) return 0;
+    if (exn_raised()) return 0;
 
     tmn_suspend_disable();     //---------------------------------v
 
@@ -264,8 +258,7 @@ jshort JNICALL GetShortFieldOffset(JNIEnv * UNREF jni_env, jobject obj, jint off
     assert(hythread_is_suspend_enabled());
     ObjectHandle h = (ObjectHandle)obj;
 
-    Global_Env * vm_env = jni_get_vm_env(jni_env);
-    if (vm_env->IsVmShutdowning()) return 0;
+    if (exn_raised()) return 0;
 
     tmn_suspend_disable();       //---------------------------------v
 
@@ -299,8 +292,7 @@ jint JNICALL GetIntFieldOffset(JNIEnv * UNREF jni_env, jobject obj, jint offset)
     assert(hythread_is_suspend_enabled());
     ObjectHandle h = (ObjectHandle)obj;
 
-    Global_Env * vm_env = jni_get_vm_env(jni_env);
-    if (vm_env->IsVmShutdowning()) return 0;
+    if (exn_raised()) return 0;
 
     tmn_suspend_disable();       //---------------------------------v
 
@@ -334,8 +326,7 @@ jlong JNICALL GetLongFieldOffset(JNIEnv * UNREF jni_env, jobject obj, jint offse
     assert(hythread_is_suspend_enabled());
     ObjectHandle h = (ObjectHandle)obj;
 
-    Global_Env * vm_env = jni_get_vm_env(jni_env);
-    if (vm_env->IsVmShutdowning()) return 0;
+    if (exn_raised()) return 0;
 
     tmn_suspend_disable();       //---------------------------------v
 
@@ -369,8 +360,7 @@ jfloat JNICALL GetFloatFieldOffset(JNIEnv * UNREF jni_env, jobject obj, jint off
     assert(hythread_is_suspend_enabled());
     ObjectHandle h = (ObjectHandle)obj;
 
-    Global_Env * vm_env = jni_get_vm_env(jni_env);
-    if (vm_env->IsVmShutdowning()) return 0;
+    if (exn_raised()) return 0;
 
     tmn_suspend_disable();       //---------------------------------v
 
@@ -404,8 +394,7 @@ jdouble JNICALL GetDoubleFieldOffset(JNIEnv * UNREF jni_env, jobject obj, jint o
     assert(hythread_is_suspend_enabled());
     ObjectHandle h = (ObjectHandle)obj;
 
-    Global_Env * vm_env = jni_get_vm_env(jni_env);
-    if (vm_env->IsVmShutdowning()) return 0;
+    if (exn_raised()) return 0;
     
     tmn_suspend_disable();       //---------------------------------v
 
@@ -450,8 +439,7 @@ void JNICALL SetObjectFieldOffset(JNIEnv * UNREF jni_env, jobject obj, jint offs
     ObjectHandle h = (ObjectHandle)obj;
     ObjectHandle v = (ObjectHandle)value;
 
-    Global_Env * vm_env = jni_get_vm_env(jni_env);
-    if (vm_env->IsVmShutdowning()) return;
+    if (exn_raised()) return;
 
     tmn_suspend_disable();       //---------------------------------v
 
@@ -493,8 +481,7 @@ void JNICALL SetBooleanFieldOffset(JNIEnv * UNREF jni_env, jobject obj, jint off
     assert(hythread_is_suspend_enabled());
     ObjectHandle h = (ObjectHandle)obj;
 
-    Global_Env * vm_env = jni_get_vm_env(jni_env);
-    if (vm_env->IsVmShutdowning()) return;
+    if (exn_raised()) return;
 
     tmn_suspend_disable();       //---------------------------------v
 
@@ -526,7 +513,7 @@ void JNICALL SetByteFieldOffset(JNIEnv * jni_env, jobject obj, jint offset, jbyt
     ObjectHandle h = (ObjectHandle)obj;
 
     Global_Env * vm_env = jni_get_vm_env(jni_env);
-    if (vm_env->IsVmShutdowning()) return;
+    if (exn_raised()) return;
 
     tmn_suspend_disable();       //---------------------------------v
 
@@ -562,8 +549,7 @@ void JNICALL SetCharFieldOffset(JNIEnv * UNREF jni_env, jobject obj, jint offset
     assert(hythread_is_suspend_enabled());
     ObjectHandle h = (ObjectHandle)obj;
 
-    Global_Env * vm_env = jni_get_vm_env(jni_env);
-    if (vm_env->IsVmShutdowning()) return;
+    if (exn_raised()) return;
 
     tmn_suspend_disable();       //---------------------------------v
 
@@ -597,7 +583,7 @@ void JNICALL SetShortFieldOffset(JNIEnv * UNREF jni_env, jobject obj, jint offse
     ObjectHandle h = (ObjectHandle)obj;
 
     Global_Env * vm_env = jni_get_vm_env(jni_env);
-    if (vm_env->IsVmShutdowning()) return;
+    if (exn_raised()) return;
 
     tmn_suspend_disable();       //---------------------------------v
 
@@ -633,8 +619,7 @@ void JNICALL SetIntFieldOffset(JNIEnv * UNREF jni_env, jobject obj, jint offset,
     assert(hythread_is_suspend_enabled());
     ObjectHandle h = (ObjectHandle)obj;
 
-    Global_Env * vm_env = jni_get_vm_env(jni_env);
-    if (vm_env->IsVmShutdowning()) return;
+    if (exn_raised()) return;
 
     tmn_suspend_disable();       //---------------------------------v
 
@@ -667,8 +652,7 @@ void JNICALL SetLongFieldOffset(JNIEnv * UNREF jni_env, jobject obj, jint offset
     assert(hythread_is_suspend_enabled());
     ObjectHandle h = (ObjectHandle)obj;
 
-    Global_Env * vm_env = jni_get_vm_env(jni_env);
-    if (vm_env->IsVmShutdowning()) return;
+    if (exn_raised()) return;
 
     tmn_suspend_disable();       //---------------------------------v
 
@@ -700,8 +684,7 @@ void JNICALL SetFloatFieldOffset(JNIEnv * UNREF jni_env, jobject obj, jint offse
     assert(hythread_is_suspend_enabled());
     ObjectHandle h = (ObjectHandle)obj;
 
-    Global_Env * vm_env = jni_get_vm_env(jni_env);
-    if (vm_env->IsVmShutdowning()) return;
+    if (exn_raised()) return;
 
     tmn_suspend_disable();       //---------------------------------v
 
@@ -734,8 +717,7 @@ void JNICALL SetDoubleFieldOffset(JNIEnv * UNREF jni_env, jobject obj, jint offs
     assert(hythread_is_suspend_enabled());
     ObjectHandle h = (ObjectHandle)obj;
 
-    Global_Env * vm_env = jni_get_vm_env(jni_env);
-    if (vm_env->IsVmShutdowning()) return;
+    if (exn_raised()) return;
 
     tmn_suspend_disable();       //---------------------------------v
 
@@ -783,8 +765,7 @@ jobject JNICALL GetStaticObjectField(JNIEnv * jni_env,
     TRACE2("jni", "GetStaticObjectField called, id = " << fieldID);
     assert(hythread_is_suspend_enabled());
 
-    Global_Env * vm_env = jni_get_vm_env(jni_env);
-    if (vm_env->IsVmShutdowning()) return NULL;
+    if (exn_raised()) return NULL;
 
     Field *f = (Field *)fieldID;
     assert(f);
@@ -815,8 +796,7 @@ jboolean JNICALL GetStaticBooleanField(JNIEnv * jni_env,
     TRACE2("jni", "GetStaticBooleanField called, id = " << fieldID);
     assert(hythread_is_suspend_enabled());
 
-    Global_Env * vm_env = jni_get_vm_env(jni_env);
-    if (vm_env->IsVmShutdowning()) return 0;
+    if (exn_raised()) return 0;
 
     Field *f = (Field *)fieldID;
     assert(f);
@@ -833,8 +813,7 @@ jbyte JNICALL GetStaticByteField(JNIEnv * jni_env,
     TRACE2("jni", "GetStaticByteField called, id = " << fieldID);
     assert(hythread_is_suspend_enabled());
 
-    Global_Env * vm_env = jni_get_vm_env(jni_env);
-    if (vm_env->IsVmShutdowning()) return 0;
+    if (exn_raised()) return 0;
 
     Field *f = (Field *)fieldID;
     assert(f);
@@ -851,8 +830,7 @@ jchar JNICALL GetStaticCharField(JNIEnv * jni_env,
     TRACE2("jni", "GetStaticCharField called, id = " << fieldID);
     assert(hythread_is_suspend_enabled());
 
-    Global_Env * vm_env = jni_get_vm_env(jni_env);
-    if (vm_env->IsVmShutdowning()) return 0;
+    if (exn_raised()) return 0;
 
     Field *f = (Field *)fieldID;
     assert(f);
@@ -869,8 +847,7 @@ jshort JNICALL GetStaticShortField(JNIEnv * jni_env,
     TRACE2("jni", "GetStaticShortField called, id = " << fieldID);
     assert(hythread_is_suspend_enabled());
 
-    Global_Env * vm_env = jni_get_vm_env(jni_env);
-    if (vm_env->IsVmShutdowning()) return 0;
+    if (exn_raised()) return 0;
 
     Field *f = (Field *)fieldID;
     assert(f);
@@ -887,8 +864,7 @@ jint JNICALL GetStaticIntField(JNIEnv * jni_env,
     TRACE2("jni", "GetStaticIntField called, id = " << fieldID);
     assert(hythread_is_suspend_enabled());
 
-    Global_Env * vm_env = jni_get_vm_env(jni_env);
-    if (vm_env->IsVmShutdowning()) return 0;
+    if (exn_raised()) return 0;
 
     Field *f = (Field *)fieldID;
     assert(f);
@@ -905,8 +881,7 @@ jlong JNICALL GetStaticLongField(JNIEnv * jni_env,
     TRACE2("jni", "GetStaticLongField called, id = " << fieldID);
     assert(hythread_is_suspend_enabled());
 
-    Global_Env * vm_env = jni_get_vm_env(jni_env);
-    if (vm_env->IsVmShutdowning()) return 0;
+    if (exn_raised()) return 0;
 
     Field *f = (Field *)fieldID;
     assert(f);
@@ -923,8 +898,7 @@ jfloat JNICALL GetStaticFloatField(JNIEnv * jni_env,
     TRACE2("jni", "GetStaticFloatField called, id = " << fieldID);
     assert(hythread_is_suspend_enabled());
 
-    Global_Env * vm_env = jni_get_vm_env(jni_env);
-    if (vm_env->IsVmShutdowning()) return 0;
+    if (exn_raised()) return 0;
 
     Field *f = (Field *)fieldID;
     assert(f);
@@ -941,8 +915,7 @@ jdouble JNICALL GetStaticDoubleField(JNIEnv * jni_env,
     TRACE2("jni", "GetStaticDoubleField called, id = " << fieldID);
     assert(hythread_is_suspend_enabled());
 
-    Global_Env * vm_env = jni_get_vm_env(jni_env);
-    if (vm_env->IsVmShutdowning()) return 0;
+    if (exn_raised()) return 0;
 
     Field *f = (Field *)fieldID;
     assert(f);
@@ -972,8 +945,7 @@ void JNICALL SetStaticObjectField(JNIEnv * jni_env,
     TRACE2("jni", "SetStaticObjectField called, id = " << fieldID);
     assert(hythread_is_suspend_enabled());
 
-    Global_Env * vm_env = jni_get_vm_env(jni_env);
-    if (vm_env->IsVmShutdowning()) return;
+    if (exn_raised()) return;
 
     Field *f = (Field *)fieldID;
     assert(f);
@@ -1002,8 +974,7 @@ void JNICALL SetStaticBooleanField(JNIEnv * jni_env,
     TRACE2("jni", "SetStaticBooleanField called, id = " << fieldID << " value = " << value);
     assert(hythread_is_suspend_enabled());
 
-    Global_Env * vm_env = jni_get_vm_env(jni_env);
-    if (vm_env->IsVmShutdowning()) return;
+    if (exn_raised()) return;
 
     Field *f = (Field *)fieldID;
     assert(f);
@@ -1023,7 +994,7 @@ void JNICALL SetStaticByteField(JNIEnv * jni_env,
     assert(hythread_is_suspend_enabled());
 
     Global_Env * vm_env = jni_get_vm_env(jni_env);
-    if (vm_env->IsVmShutdowning()) return;
+    if (exn_raised()) return;
 
     Field *f = (Field *)fieldID;
     assert(f);
@@ -1046,8 +1017,7 @@ void JNICALL SetStaticCharField(JNIEnv * jni_env,
     TRACE2("jni", "SetStaticCharField called, id = " << fieldID << " value = " << value);
     assert(hythread_is_suspend_enabled());
 
-    Global_Env * vm_env = jni_get_vm_env(jni_env);
-    if (vm_env->IsVmShutdowning()) return;
+    if (exn_raised()) return;
 
     Field *f = (Field *)fieldID;
     assert(f);
@@ -1067,7 +1037,7 @@ void JNICALL SetStaticShortField(JNIEnv * jni_env,
     assert(hythread_is_suspend_enabled());
 
     Global_Env * vm_env = jni_get_vm_env(jni_env);
-    if (vm_env->IsVmShutdowning()) return;
+    if (exn_raised()) return;
 
     Field *f = (Field *)fieldID;
     assert(f);
@@ -1090,8 +1060,7 @@ void JNICALL SetStaticIntField(JNIEnv * jni_env,
     TRACE2("jni", "SetStaticIntField called, id = " << fieldID << " value = " << value);
     assert(hythread_is_suspend_enabled());
 
-    Global_Env * vm_env = jni_get_vm_env(jni_env);
-    if (vm_env->IsVmShutdowning()) return;
+    if (exn_raised()) return;
 
     Field *f = (Field *)fieldID;
     assert(f);
@@ -1111,8 +1080,7 @@ void JNICALL SetStaticLongField(JNIEnv * jni_env,
     TRACE2("jni", "SetStaticLongField called, id = " << fieldID << " value = " << value);
     assert(hythread_is_suspend_enabled());
 
-    Global_Env * vm_env = jni_get_vm_env(jni_env);
-    if (vm_env->IsVmShutdowning()) return;
+    if (exn_raised()) return;
 
     Field *f = (Field *)fieldID;
     assert(f);
@@ -1131,8 +1099,7 @@ void JNICALL SetStaticFloatField(JNIEnv * jni_env,
     TRACE2("jni", "SetStaticFloatField called, id = " << fieldID << " value = " << value);
     assert(hythread_is_suspend_enabled());
 
-    Global_Env * vm_env = jni_get_vm_env(jni_env);
-    if (vm_env->IsVmShutdowning()) return;
+    if (exn_raised()) return;
 
     Field *f = (Field *)fieldID;
     assert(f);
@@ -1151,8 +1118,7 @@ void JNICALL SetStaticDoubleField(JNIEnv * jni_env,
     TRACE2("jni", "SetStaticDoubleField called, id = " << fieldID << " value = " << value);
     assert(hythread_is_suspend_enabled());
 
-    Global_Env * vm_env = jni_get_vm_env(jni_env);
-    if (vm_env->IsVmShutdowning()) return;
+    if (exn_raised()) return;
 
     Field *f = (Field *)fieldID;
     assert(f);

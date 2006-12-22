@@ -126,7 +126,11 @@ static IDATA run_java_detach(jthread java_thread) {
 
     // Initialize arguments.
     args[0].l = java_thread;
-    args[1].l = exn_get();
+    if (vm_env->IsVmShutdowning()) {
+        args[1].l = NULL;
+    } else {
+        args[1].l = exn_get();
+    }    
     exn_clear();
 
     hythread_suspend_disable();

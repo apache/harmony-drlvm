@@ -231,12 +231,10 @@ static void exn_propagate_exception(
         ti->vm_brpt->unlock();
     }
 
-    // When VM is in shutdown stage we need to execute final block to
+    // When VM is in shutdown stage we need to execute "finally" clause to
     // release monitors and propogate an exception to the upper frames.
-    if (VM_Global_State::loader_env->IsVmShutdowning()) {
-        exn_class = VM_Global_State::loader_env->JavaLangObject_Class;
-        *exn_obj = NULL;
-    }
+    Class_Handle search_exn_class = !VM_Global_State::loader_env->IsVmShutdowning()
+        ? exn_class : VM_Global_State::loader_env->JavaLangObject_Class;
 
     bool same_frame = true;
     while (!si_is_past_end(si) && !si_is_native(si)) {
@@ -260,7 +258,7 @@ static void exn_propagate_exception(
             if (!handler)
                 continue;
             if (handler->is_in_range(ip, is_ip_past)
-                && handler->is_assignable(exn_class)) {
+                && handler->is_assignable(search_exn_class)) {
                 // Found a handler that catches the exception.
 #ifdef VM_STATS
                 cci->num_catches++;

@@ -656,13 +656,12 @@ jclass JNICALL DefineClass(JNIEnv *jenv,
     TRACE2("jni", "FindClass called, name = " << name);
 
     Global_Env * vm_env = jni_get_vm_env(jni_env);
-    if (exn_raised() || vm_env->IsVmShutdowning()) return NULL;
+
+    if (exn_raised()) return NULL;
     char *ch = strchr(name, '.');
     if (NULL != ch)
     {
-        ThrowNew_Quick(jni_env,
-            VM_Global_State::loader_env->JavaLangNoClassDefFoundError_String->bytes,
-            name);
+        ThrowNew_Quick(jni_env, vm_env->JavaLangNoClassDefFoundError_String->bytes, name);
         return NULL;
     }
 
@@ -676,8 +675,8 @@ jclass JNICALL GetSuperclass(JNIEnv * jni_env, jclass clazz)
     TRACE2("jni", "GetSuperclass called");
     assert(hythread_is_suspend_enabled());
     
-    Global_Env * vm_env = jni_get_vm_env(jni_env);
-    if (vm_env->IsVmShutdowning()) return NULL;
+    if (exn_raised()) return NULL;
+
     Class* clss = jclass_to_struct_Class(clazz);
     if(clss) {
         if(clss->is_interface()) {
@@ -774,21 +773,12 @@ jint JNICALL ThrowNew_Quick(JNIEnv * jni_env, const char *classname, const char 
 // chacks usage of this function and replace by lazy
 jthrowable JNICALL ExceptionOccurred(JNIEnv * jni_env)
 {
+    jthrowable result;
+
     TRACE2("jni", "ExceptionOccurred called");
     assert(hythread_is_suspend_enabled());
-    
-    Global_Env * vm_env = jni_get_vm_env(jni_env);
-    if (vm_env->IsVmShutdowning()) {
-        // Wait until shutdown exception is raised by callback.
-        while (!exn_raised()) {
-            // Switch enable/disable status to give a chance for
-            // callback execution.
-            hythread_suspend_disable();
-            hythread_suspend_enable();
-            hythread_yield();
-        }
-    }
-    jthrowable result = exn_get();
+        
+    result = exn_get();
 
 #ifdef _DEBUG
     hythread_suspend_disable();
@@ -796,9 +786,6 @@ jthrowable JNICALL ExceptionOccurred(JNIEnv * jni_env)
         TRACE2("jni", "Exception occured, class = " << exn_get_name());
     } else {
         TRACE2("jni", "Exception occured, no exception");        
-    }
-    if (vm_env->IsVmShutdowning() && !result) {
-        TRACE2("vm.core.shutdown", "ExceptionOccured: shutdown exception hasn't been raised");
     }
     hythread_suspend_enable();
 #endif
@@ -810,9 +797,11 @@ void JNICALL ExceptionDescribe(JNIEnv * jni_env)
 {
     TRACE2("jni", "ExceptionDescribe called");
     assert(hythread_is_suspend_enabled());
+    
     // we should not report vm shutdown exception to the user
     Global_Env * vm_env = jni_get_vm_env(jni_env);
     if (vm_env->IsVmShutdowning()) return;
+
     if (exn_raised()) {
         exn_print_stack_trace(stderr, exn_get());
     }
@@ -862,8 +851,8 @@ jobject JNICALL NewGlobalRef(JNIEnv * jni_env, jobject obj)
     TRACE2("jni", "NewGlobalRef called");
     assert(hythread_is_suspend_enabled());
     
-    Global_Env * vm_env = jni_get_vm_env(jni_env);
-    if (vm_env->IsVmShutdowning() || !obj) return NULL;
+    if (exn_raised() || !obj) return NULL;
+
     if(!obj) {
         return 0;
     }
@@ -905,7 +894,7 @@ jobject JNICALL NewLocalRef(JNIEnv * jni_env, jobject ref)
     assert(hythread_is_suspend_enabled());
     
     Global_Env * vm_env = jni_get_vm_env(jni_env);
-    if (vm_env->IsVmShutdowning() || ref == NULL) return NULL;
+    if (exn_raised() || ref == NULL) return NULL;
 
     jobject new_ref = oh_copy_to_local_handle(ref);
 
@@ -999,8 +988,7 @@ jobject JNICALL AllocObject(JNIEnv * jni_env,
     TRACE2("jni", "AllocObject called");
     assert(hythread_is_suspend_enabled());
 
-    Global_Env * vm_env = jni_get_vm_env(jni_env);
-    if (vm_env->IsVmShutdowning() || clazz == NULL) return NULL;
+    if (exn_raised() || clazz == NULL) return NULL;
 
     Class* clss = jclass_to_struct_Class(clazz);
 
@@ -1140,8 +1128,7 @@ jstring JNICALL NewString(JNIEnv * jni_env,
     TRACE2("jni", "NewString called, length = " << length);
     assert(hythread_is_suspend_enabled());
 
-    Global_Env * vm_env = jni_get_vm_env(jni_env);
-    if (vm_env->IsVmShutdowning()) return NULL;
+    if (exn_raised()) return NULL;
 
     return (jstring)string_create_from_unicode_h(unicodeChars, length);
 } //NewString
@@ -1164,8 +1151,7 @@ const jchar *JNICALL GetStringChars(JNIEnv * jni_env,
     TRACE2("jni", "GetStringChars called");
     assert(hythread_is_suspend_enabled());
 
-    Global_Env * vm_env = jni_get_vm_env(jni_env);
-    if (!string || vm_env->IsVmShutdowning()) return NULL;
+    if (!string || exn_raised()) return NULL;
 
     assert(check_is_jstring_class(string));
 
@@ -1195,8 +1181,7 @@ jstring JNICALL NewStringUTF(JNIEnv * jni_env,
     TRACE2("jni", "NewStringUTF called, bytes = " << bytes);
     assert(hythread_is_suspend_enabled());
 
-    Global_Env * vm_env = jni_get_vm_env(jni_env);
-    if (vm_env->IsVmShutdowning()) return NULL;
+    if (exn_raised()) return NULL;
 
     return (jstring)string_create_from_utf8_h(bytes, (unsigned)strlen(bytes));
 } //NewStringUTF
@@ -1219,8 +1204,8 @@ const char *JNICALL GetStringUTFChars(JNIEnv * jni_env,
     TRACE2("jni", "GetStringUTFChars called");
     assert(hythread_is_suspend_enabled());
 
-    Global_Env * vm_env = jni_get_vm_env(jni_env);
-    if (vm_env->IsVmShutdowning() || !string) return NULL;
+    if (exn_raised() || !string) return NULL;
+
     assert(check_is_jstring_class(string));
     const char* res = string_get_utf8_chars_h((ObjectHandle)string);
     if (isCopy) *isCopy = JNI_TRUE;
@@ -1247,8 +1232,7 @@ jint JNICALL RegisterNatives(JNIEnv * jni_env,
     TRACE2("jni", "RegisterNatives called");
     assert(hythread_is_suspend_enabled());
 
-    Global_Env * vm_env = jni_get_vm_env(jni_env);
-    if (vm_env->IsVmShutdowning()) return -1;
+    if (exn_raised()) return -1;
 
     Class_Handle clss = jclass_to_struct_Class(clazz);
     return class_register_methods(clss, methods, nMethods) ? -1 : 0;
@@ -1267,8 +1251,7 @@ jint JNICALL MonitorEnter(JNIEnv * jni_env, jobject obj)
     TRACE2("jni", "MonitorEnter called");
     assert(hythread_is_suspend_enabled());
 
-    Global_Env * vm_env = jni_get_vm_env(jni_env);
-    if (vm_env->IsVmShutdowning()) return -1;
+    if (exn_raised()) return -1;
 
     jthread_monitor_enter(obj);
     return exn_raised() ? -1 : 0;
@@ -1302,8 +1285,7 @@ void JNICALL GetStringRegion(JNIEnv * jni_env, jstring s, jsize off, jsize len, 
     TRACE2("jni", "GetStringRegion called");
     assert(hythread_is_suspend_enabled());
 
-    Global_Env * vm_env = jni_get_vm_env(jni_env);
-    if (vm_env->IsVmShutdowning()) return;
+    if (exn_raised()) return;
 
     assert(s);
 
@@ -1400,9 +1382,7 @@ jboolean JNICALL ExceptionCheck(JNIEnv * jni_env)
     TRACE2("jni", "ExceptionCheck called, exception status = " << exn_raised());
     assert(hythread_is_suspend_enabled());
 
-    Global_Env * vm_env = jni_get_vm_env(jni_env);
-    
-    if (exn_raised() || vm_env->IsVmShutdowning())
+    if (exn_raised())
         return JNI_TRUE;
     else
         return JNI_FALSE;
@@ -1432,6 +1412,7 @@ VMEXPORT jfieldID JNICALL FromReflectedField(JNIEnv * jni_env, jobject field)
 {
     TRACE2("jni", "FromReflectedField called");
     Class* clss = jobject_to_struct_Class(field);
+
     Global_Env * vm_env = jni_get_vm_env(jni_env);
 
     if (clss == vm_env->java_lang_reflect_Field_Class) 
@@ -1447,10 +1428,9 @@ VMEXPORT jobject JNICALL ToReflectedMethod(JNIEnv * jni_env, jclass UNREF cls, j
 {
     TRACE2("jni", "ToReflectedMethod called");
 
-    Global_Env * vm_env = jni_get_vm_env(jni_env);
     Method *m = (Method*)methodID;
     // True if flags are different
-    if ((bool)m->is_static() != (bool)isStatic || vm_env->IsVmShutdowning())
+    if ((bool)m->is_static() != (bool)isStatic || exn_raised())
         return NULL;
 
     if (m->is_init())
@@ -1464,9 +1444,8 @@ VMEXPORT jobject JNICALL ToReflectedField(JNIEnv * jni_env, jclass UNREF cls, jf
 {
     TRACE2("jni", "ToReflectedField called");
 
-    Global_Env * vm_env = jni_get_vm_env(jni_env);
     Field *f = (Field*)fieldID;
-    if ((bool)f->is_static() != (bool)isStatic || vm_env->IsVmShutdowning()) // True if flags are different
+    if ((bool)f->is_static() != (bool)isStatic || exn_raised()) // True if flags are different
         return NULL;
 
     return reflection_reflect_field(jni_env, fieldID);

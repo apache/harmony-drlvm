@@ -42,7 +42,7 @@ public class TestNativeAllocation {
                 } catch (Throwable e) {
                     System.out.println("FAILED");
                 } finally {
-                    System.out.println("FAILED");
+                    System.out.print("PAS");
                 }
             }
             System.out.println("FAILED");

@@ -2322,6 +2322,20 @@ findExceptionHandler(StackFrame& frame, ManagedObject **exception, Handler **hh)
     uint32 ip = frame.ip - (uint8*)m->get_byte_code_addr();
     DEBUG_BYTECODE("ip = " << dec << (int)ip << endl);
 
+    // When VM is in shutdown stage we need to execute final block to
+    // release monitors and propogate an exception to the upper frames.
+    if (VM_Global_State::loader_env->IsVmShutdowning()) {
+        for(uint32 i = 0; i < m->num_bc_exception_handlers(); i++) {
+            Handler *h = m->get_bc_exception_handler_info(i);
+            if (h->get_catch_type_index() == 0 &&
+                h->get_start_pc() <= ip && ip < h->get_end_pc()) {
+                *hh = h;
+                return true;
+            }
+        }
+        return false;
+    }
+
     Class *clazz = m->get_class();
 
     for(uint32 i = 0; i < m->num_bc_exception_handlers(); i++) {
@@ -2341,6 +2355,7 @@ findExceptionHandler(StackFrame& frame, ManagedObject **exception, Handler **hh)
 
             DEBUG_BYTECODE("catch type index = " << (int)catch_type_index << endl);
 
+            // WARNING: GC may occur here !!!
             Class *obj = interp_resolve_class(clazz, catch_type_index);
 
             if (!obj) {
@@ -2807,12 +2822,15 @@ restart:
                                     frame.locked_monitors = new_ml;
                                     Opcode_MONITORENTER(frame);
                                     frame.exc = get_current_thread_exception();
+                                    goto check_exception;
+                                    /*
                                     if (frame.exc != 0) {
                                         frame.locked_monitors = new_ml->next;
                                         new_ml->next = frame.free_monitors;
                                         frame.free_monitors = new_ml;
                                         goto got_exception;
                                     }
+                                    */
                                 }
                                 break;
             case OPCODE_MONITOREXIT:
@@ -2975,19 +2993,6 @@ check_exception:
         if (frame.exc == 0) continue;
 got_exception:
         assert(&frame == getLastStackFrame());
-
-        if (VM_Global_State::loader_env->IsVmShutdowning()) {
-            assert(!hythread_is_suspend_enabled());
-            assert(exn_raised());
-            if (frame.locked_monitors) {
-                M2N_ALLOC_MACRO;
-                vm_monitor_exit_wrapper(frame.locked_monitors->monitor);
-                M2N_FREE_MACRO;
-                assert(!frame.locked_monitors->next);
-            }
-            M2N_FREE_MACRO;
-            return;
-        }
 
         clear_current_thread_exception();
 

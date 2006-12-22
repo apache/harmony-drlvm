@@ -19,7 +19,7 @@ JNIEXPORT void JNICALL Java_shutdown_TestNativeAllocation_00024WorkerThread_call
     if (methID == NULL) {
         --allocated;
         if (allocated == 0) {
-            printf("PASSED");
+            printf("SED");
         }
         return;
     }
@@ -28,9 +28,9 @@ JNIEXPORT void JNICALL Java_shutdown_TestNativeAllocation_00024WorkerThread_call
     if ((*jni_env)->ExceptionOccurred(jni_env)) {
         --allocated;
         if (allocated == 0) {
-            printf("PASSED");
+            printf("SED");
         }
         return;
     }
-    printf("FAILED");
+    printf(" FAILED ");
 }

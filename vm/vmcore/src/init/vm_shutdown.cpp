@@ -113,75 +113,97 @@ static void vm_shutdown_callback() {
     //hythread_suspend_enable();
 }
 
-/*
-void vm_shutdown_stop_java_threads(int exit_code)
-{
-    jthread current_java_thread;
-    JNIEnv_Internal * jni_env;
-    Global_Env * vm_env;
-    
-    // Current thread should be in suspend enabled state to prevent
-    // possible dead-locks.
-    assert(hythread_is_suspend_enabled());
-    
-    current_java_thread = jthread_self();
-    // Current thread should be attached to ThreadManager.
-    assert(current_java_thread);
-    jni_env = (JNIEnv_Internal *) jthread_get_JNI_env(current_java_thread);
-    vm_env = jni_env->vm->vm_env;
-    
-    // 2) Acquire VM state lock.
-    apr_thread_mutex_lock(vm_env->vm_state_mutex);
-    assert(vm_env->vm_state != Global_Env::VM_INITIALIZING);
-    
-    // 3) Check VM state.
-    if (vm_env->vm_state == Global_Env::VM_SHUTDOWNING) {
-        apr_thread_mutex_unlock(vm_env->vm_state_mutex);
-        return;
+/**
+ * Stops running java threads by throwing an exception
+ * up to the first native frame.
+ *
+ * @param[in] vm_env a global VM environment
+ */
+static void vm_shutdown_stop_java_threads(Global_Env * vm_env) {
+    hythread_t self;
+    hythread_t * running_threads;
+    hythread_t native_thread;
+    hythread_iterator_t it;
+    VM_thread * vm_thread;
+    int size;
+    bool changed;
+    int left;
+    int prev;
+   
+    self = hythread_self();
+
+    // Collect running java threads.
+    size = 0;
+    it = hythread_iterator_create(NULL);
+    running_threads = (hythread_t *)apr_palloc(vm_env->mem_pool,
+        hythread_iterator_size(it) * sizeof(hythread_t));
+    while(native_thread = hythread_iterator_next(&it)) {
+        vm_thread = get_vm_thread(native_thread);
+        if (vm_thread != NULL && native_thread != self) {
+            running_threads[size] = native_thread;
+            ++size;
+        }
+    }
+    hythread_iterator_release(&it);
+
+    // Interrupt running threads.
+    for (int i = 0; i < size; i++) {
+        hythread_interrupt(running_threads[i]);
     }
 
-    assert(vm_env->vm_state == Global_Env::VM_RUNNING);
+    left = size;
+    prev = -1;
+    // Spin until there is no running threads.
+    while (left > 0) {
+        do {
+            left = 0;
+            changed = false;
+            // Join or Interrupt.
+            for (int i = 0; i < size; i++) {
+                if (running_threads[i] == NULL) continue;
+                if (hythread_join_timed(running_threads[i], 100, 0) == TM_ERROR_NONE) {
+                    changed = true;
+                    running_threads[i] = NULL;
+                } else {
+                    hythread_interrupt(running_threads[i]);
+                    ++left;
+                }
+            }
+        } while(left > 0 && changed);
 
-    // 4) Change VM state. Exception propagation mechanism should be changed
-    // upon setting up this flag.
-    vm_env->vm_state = Global_Env::VM_SHUTDOWNING;
-    
-    // 5) Block thread creation.
-    // TODO: investigate how to achive that with ThreadManager
-    
-    // 6) Execute shutdown callback for the current thread.
-    vm_shutdown_callback(NULL);
-    
-    // 7) Setup shutdown callback to all java threads but current.
-    // It causes an exception to be raised and all java monitors to
-    // be released upon reaching a safepoint.
-    hythread_group_set_suspend_disabled_callback(hythread_group_get_java(), vm_shutdown_callback, NULL);
-    
-    // 8) Unlock VM state mutex.
-    apr_thread_mutex_unlock(vm_env->vm_state_mutex);
+        // We are stuck :-( Need to throw asynchronous exception.
+        if (left > 0) {
+            for (int i = 0; i < size; i++) {
+                if (running_threads[i] == NULL) continue;
+                if (left > 1 && i == prev) { 
+                    continue;
+                } else {
+                    prev = i;
+                    hythread_set_safepoint_callback(running_threads[i], vm_shutdown_callback);
+                }
+            }
+        }
+    }               
 }
-*/
 
 /**
- * TODO:
+ * Waits until all non-daemon threads finish their execution,
+ * initiates VM shutdown sequence and stops running threads if any.
+ *
+ * @param[in] java_vm JVM that should be destroyed
+ * @param[in] java_thread current java thread
  */
 jint vm_destroy(JavaVM_Internal * java_vm, jthread java_thread)
 {
     jint status;
     JNIEnv * jni_env;
     jobject uncaught_exception;
-    VM_thread * vm_thread;
-    hythread_t native_thread;
-    hythread_t self;
-    hythread_iterator_t it;
-    hythread_t * running_threads;
-    int size;
 
     assert(hythread_is_suspend_enabled());
 
     jni_env = jthread_get_JNI_env(java_thread);
-    self = hythread_self();
 
+    // Wait until all non-daemon threads finish their execution.
     status = jthread_wait_for_all_nondaemon_threads();
     if (status != TM_ERROR_NONE) {
         TRACE("Failed to wait for all non-daemon threads completion.");
@@ -233,29 +255,7 @@ jint vm_destroy(JavaVM_Internal * java_vm, jthread java_thread)
     // before destroying VM-wide data.
 
     // Stop java threads
-    size = 0;
-    it = hythread_iterator_create(NULL);
-    running_threads = (hythread_t *)apr_palloc(
-        java_vm->vm_env->mem_pool, hythread_iterator_size(it) * sizeof(hythread_t));
-    while(native_thread = hythread_iterator_next(&it)) {
-        vm_thread = get_vm_thread(native_thread);
-        if (vm_thread != NULL && native_thread != self) {
-            running_threads[size] = native_thread;
-            ++size;
-            hythread_set_safepoint_callback(native_thread, vm_shutdown_callback);
-        }
-    }
-    hythread_iterator_release(&it);
-
-    // Interrupt running threads.
-    for (int i = 0; i < size; i++) {
-        hythread_interrupt(running_threads[i]);
-    }
-
-    // Wait for threads completion.
-    for (int i = 0; i < size; i++) {
-        hythread_join(running_threads[i]);
-    }
+    vm_shutdown_stop_java_threads(java_vm->vm_env);
 
     // TODO: ups we don't stop native threads as well :-((
     // We are lucky! Currently, there are no such threads.
