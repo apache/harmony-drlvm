@@ -219,7 +219,8 @@ NativeCodePtr compile_create_lil_jni_stub(Method_Handle method, void* func, Nati
     bool is_synchronised = (method_is_synchronized(method) ? true : false);
     Method_Signature_Handle msh = method_get_signature(method);
     unsigned num_args = method_args_get_number(msh);
-    VM_Data_Type ret_type = type_info_get_type(method_ret_type_get_type_info(msh));
+    Type_Info_Handle ret_tih = method_ret_type_get_type_info(msh);
+    VM_Data_Type ret_type = type_info_get_type(ret_tih);
     unsigned i;
 
     unsigned num_ref_args = 0; // among original args, does not include jclass for static methods
@@ -306,6 +307,20 @@ NativeCodePtr compile_create_lil_jni_stub(Method_Handle method, void* func, Nati
                                     lil_npc_to_fp(vm_get_rt_support_addr(VM_RT_MONITOR_ENTER)));
             assert(cs);
         }
+    }
+
+    //***** Call JVMTI MethodEntry
+    DebugUtilsTI* ti = VM_Global_State::loader_env->TI;
+    if (ti->isEnabled() &&
+        ti->get_global_capability(DebugUtilsTI::TI_GC_ENABLE_METHOD_ENTRY))
+    {
+        cs = lil_parse_onto_end(cs,
+                                "out platform:pint:void;"
+                                "o0=%0i:pint;"
+                                "call %1i;",
+                                (jmethodID)method,
+                                jvmti_process_method_entry_event);
+        assert(cs);
     }
 
     //***** Part 4: Enable GC
@@ -398,6 +413,39 @@ NativeCodePtr compile_create_lil_jni_stub(Method_Handle method, void* func, Nati
                             hythread_suspend_disable);
     assert(cs);
 
+    // Exception offsets
+    unsigned eoo = (unsigned)(POINTER_SIZE_INT)&((VM_thread*)0)->thread_exception.exc_object;
+    unsigned eco = (unsigned)(POINTER_SIZE_INT)&((VM_thread*)0)->thread_exception.exc_class;
+
+    //***** Call JVMTI MethodExit
+    if (ti->isEnabled() &&
+        ti->get_global_capability(DebugUtilsTI::TI_GC_ENABLE_METHOD_EXIT))
+    {
+        cs = lil_parse_onto_end(cs,
+                                "out platform:pint,g1,g8:void;"
+                                "o0=%0i:pint;"
+                                "o1=%1i:g1;"
+                                "o2=0:g8;"
+                                "l2=ts;"
+                                "ld l2,[l2+%2i:ref];"
+                                "jc l2!=0,_mex_exn_raised;"
+                                "l2=ts;"
+                                "ld l2,[l2+%3i:ref];"
+                                "jc l2!=0,_mex_exn_raised;"
+                                "o2=l1:g8;"
+                                "j _mex_exn_cont;"
+                                ":_mex_exn_raised;"
+                                "o1=%4i:g1;"
+                                ":_mex_exn_cont;"
+                                "call %5i;",
+                                (jmethodID)method,
+                                JNI_FALSE,
+                                eoo, eco,
+                                JNI_TRUE,
+                                jvmti_process_method_exit_event);
+        assert(cs);
+    }
+
     //***** Part 9: Synchronise
     if (is_synchronised) {
         if (is_static) {
@@ -418,7 +466,7 @@ NativeCodePtr compile_create_lil_jni_stub(Method_Handle method, void* func, Nati
     }
 
     //***** Part 10: Unhandle the return if it is a reference
-    if (is_reference(method_ret_type_get_type_info(msh))) {
+    if (is_reference(ret_tih)) {
         cs = lil_parse_onto_end(cs,
                                 "jc l1=0,ret_done;"
                                 "ld l1,[l1+0:ref];"
@@ -434,8 +482,6 @@ NativeCodePtr compile_create_lil_jni_stub(Method_Handle method, void* func, Nati
     }
 
     //***** Part 11: Rethrow exception
-    unsigned eoo = (unsigned)(POINTER_SIZE_INT)&((VM_thread*)0)->thread_exception.exc_object;
-    unsigned eco = (unsigned)(POINTER_SIZE_INT)&((VM_thread*)0)->thread_exception.exc_class;
     cs = lil_parse_onto_end(cs,
                             "l0=ts;"
                             "ld l2,[l0+%0i:ref];"
