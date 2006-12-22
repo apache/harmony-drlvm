@@ -123,9 +123,9 @@ Class::verify_constraints(const Global_Env* env)
     if( result != VER_OK ) {
         unlock();
         if( result == VER_ErrorLoadClass ) {
-            REPORT_FAILED_CLASS_CLASS(m_class_loader, this,
-            VM_Global_State::loader_env->JavaLangNoClassDefFoundError_String->bytes,
-            error);
+            // Exception is raised by class loading
+            // and passed through verifier unchanged
+            assert(exn_raised());
         } else {
             REPORT_FAILED_CLASS_CLASS(m_class_loader, this,
                 "java/lang/VerifyError", error);
