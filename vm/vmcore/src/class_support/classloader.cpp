@@ -1487,12 +1487,20 @@ Class* BootstrapClassLoader::DoLoadClass(Global_Env* UNREF env,
                                        const String* className)
 {
     assert(env == m_env);
+    assert(!exn_raised());
+
     Class* klass = StartLoadingClass(m_env, className);
 
     if(klass != NULL) {
         // class is already loaded so return it
         return klass;
     }
+    if(exn_raised()) {
+        // this is most probably ClassCircularityError
+        // detected in StartLoadingClass
+        return NULL;
+    }
+
     TRACE2("classloader.load", "Loader (" << this << ") loading class: " << className->bytes << "...");
 
     // Not in the class cache: load the class or, if an array class, create it
@@ -1510,11 +1518,17 @@ Class* UserDefinedClassLoader::DoLoadClass(Global_Env* env, const String* classN
 {
     ASSERT_RAISE_AREA;
     assert(m_loader != NULL);
+    assert(!exn_raised());
 
     Class* klass = StartLoadingClass(env, className);
 
     if(klass != NULL) {
         return klass;
+    }
+    if(exn_raised()) {
+        // this is most probably ClassCircularityError
+        // detected in StartLoadingClass
+        return NULL;
     }
 
     TRACE2("classloader.load", "Loader U (" << this << ") loading class: " << className->bytes << "...");
@@ -1544,7 +1558,6 @@ Class* UserDefinedClassLoader::DoLoadClass(Global_Env* env, const String* classN
     //  * (Ljava/lang/String;Z) is not abstract in current JDK version
     //  * Generally (Ljava/lang/String;) are overloaded
     assert(hythread_is_suspend_enabled());
-    assert(!exn_raised());
     tmn_suspend_disable();
 
     jvalue args[2];
