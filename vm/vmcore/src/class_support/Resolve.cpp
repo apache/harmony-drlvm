@@ -915,6 +915,7 @@ Class_Handle resolve_class(Compile_Handle h,
 void class_throw_linking_error(Class_Handle ch, unsigned index, unsigned opcode)
 {
     ASSERT_RAISE_AREA;
+    tmn_suspend_enable();
 
     ConstantPool& cp = ch->get_constant_pool();
     if(cp.is_entry_in_error(index)) {
@@ -966,6 +967,7 @@ void class_throw_linking_error(Class_Handle ch, unsigned index, unsigned opcode)
             //ASSERT(0, "Unexpected opcode: " << opcode);
             break;
     }
+    tmn_suspend_disable();
 }
 
 Class *resolve_class_array_of_class1(Global_Env *env,
