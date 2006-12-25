@@ -137,8 +137,6 @@ void __attribute__ ((cdecl)) asm_jvmti_exception_catch_callback() {
         "movl -28(%%ebp), %%ecx;\n"
         "movl -24(%%ebp), %%edx;\n"
         "addl $36, %%esp;\n"
-        "leave;\n"
-        "ret;\n"
         : /* no output operands */
         : /* no input operands */
     );
