@@ -1,6 +1,8 @@
 Check.java
 PerfCheck.java
 classloader/StressLoader.java
+gc/LOS.java
+gc/MultiThreads.java
 gc/SynchronizedFinilazersTest.java
 init/ErrorInInitializer.java
 thread/InfiniteFinalizer.java
@@ -13,3 +15,4 @@ gc/Mark.java
 # fails intermittently 
 stress/Stack.java
 stress/Mix.java
+
