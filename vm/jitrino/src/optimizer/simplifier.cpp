@@ -3541,23 +3541,30 @@ Simplifier::simplifyTauLdVirtFunAddrSlot(Opnd* vtable, Opnd *tauVtableHasMethod,
     // if vtable is an interface vtable and the base of that
     // interface vtable is exact or final then change this
     // to a ldvirtfunaddrslot
+    // if vtable is of exact type (loaded by getvtable) then
+    // change this to a ldvirtfunaddrslot
     Inst* ldVTableInst = vtable->getInst();
+    Type* baseType = NULL;
     if (ldVTableInst->getOpcode() == Op_TauLdVTableAddr || 
         ldVTableInst->getOpcode() == Op_TauLdIntfcVTableAddr) {
         Opnd* baseRef = ldVTableInst->getSrc(0);
         if (isExactType(baseRef)) {
             // base has exact type
-            Type* baseType = baseRef->getType();
-            MethodDesc* newMethodDesc =
-                irManager.getCompilationInterface().getOverriddenMethod(
-                    (NamedType*)baseType, methodDesc);
-            //
-            // change to ldvirtfunaddrslot of newMethodDesc
-            //
-            if (newMethodDesc)
-                return genLdFunAddrSlot(newMethodDesc)->getDst();
+            baseType = baseRef->getType();
         }
-    } else {
+    } else if (ldVTableInst->getOpcode() == Op_GetVTableAddr) {
+        TypeInst* typeInst = ldVTableInst->asTypeInst();
+        assert(typeInst != NULL);
+        baseType = typeInst->getTypeInfo();
+    }
+    if (baseType != NULL) {
+        MethodDesc* newMethodDesc =
+            irManager.getCompilationInterface().getOverriddenMethod((NamedType*)baseType, methodDesc);
+        if (newMethodDesc) {
+            // change to ldvirtfunaddrslot of newMethodDesc
+            return genLdFunAddrSlot(newMethodDesc)->getDst();
+        }
+
     }
     return NULL;
 }
