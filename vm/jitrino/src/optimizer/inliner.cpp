@@ -117,17 +117,16 @@ Inliner::Inliner(SessionAction* argSource, MemoryManager& mm, IRManager& irm, bo
 
     _inlineSkipExceptionPath = argSource->getBoolArg("skip_exception_path", INLINE_SKIP_EXCEPTION_PATH);
 #if defined  (_EM64T_) || defined (_IPF_)
-    _inlineSkipApiMagicMethods  = true;
+    _inlineSkipApiMagicMethods  = false;
 #else
-    _inlineSkipApiMagicMethods = argSource->getBoolArg("skip_api_magics", false);
+    _inlineSkipApiMagicMethods = argSource->getBoolArg("skip_api_magics", true);
 #endif 
 
-    const char* skipMethods = argSource->getStringArg("skip_methods", "");
+    const char* skipMethods = argSource->getStringArg("skip_methods", NULL);
     _inlineSkipMethodTable = NULL;
-    if(skipMethods != NULL || !_inlineSkipApiMagicMethods) {
-        std::string skipMethodsStr = skipMethods;
-        _inlineSkipMethodTable = new (_tmpMM) Method_Table(_tmpMM, skipMethodsStr.c_str(), "SKIP_METHODS", true);
-        if (!_inlineSkipApiMagicMethods) {
+    if(skipMethods != NULL || _inlineSkipApiMagicMethods) {
+        _inlineSkipMethodTable = new (_tmpMM) Method_Table(_tmpMM, skipMethods, "SKIP_METHODS", false);
+        if (_inlineSkipApiMagicMethods) {
 #if defined  (_EM64T_) || defined (_IPF_)
 //TODO: IA32 helpers should work on EM64T too -> TODO test
 #else

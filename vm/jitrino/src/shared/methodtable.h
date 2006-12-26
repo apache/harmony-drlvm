@@ -67,10 +67,8 @@ private:
     Records _method_table;
     Records _decision_table;
     Decision _default_decision;
-    bool _accept_all;
     bool _dump_to_file;
     char *_method_file;
-    bool _accept_by_default;
 
     void init(const char *default_envvar, const char *envvarname);
     void make_filename(char *str, int len);

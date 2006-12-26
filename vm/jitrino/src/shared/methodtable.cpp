@@ -74,6 +74,14 @@ namespace Jitrino {
 #define FILE_CHAR ':'
 
 
+char* strdup(MemoryManager& mm , const char* str) {
+    size_t len  = strlen(str);
+    char* newstr = new (mm) char[len+1];
+    strncpy(newstr, str, len);
+    newstr[len]='\0';
+    return newstr;
+}
+
 void Method_Table::make_filename(char *str, int len)
 {
     _method_file = new (_mm) char[1+len];
@@ -145,7 +153,7 @@ static void parse_method_string(MemoryManager& _mm, char *str, Method_Table::met
     if (i >= len) // no class or descriptor
     {
         if (str[0] != '\0')
-            rec->method_name = strdup(str);
+            rec->method_name = strdup(_mm, str);
         return;
     }
     if (is_at_class_method_separator)
@@ -165,7 +173,7 @@ static void parse_method_string(MemoryManager& _mm, char *str, Method_Table::met
         if (i >= len) // no descriptor
         {
             if (str[0] != '\0')
-                rec->method_name = strdup(str);
+                rec->method_name = strdup(_mm, str);
             return;
         }
     }
@@ -176,7 +184,7 @@ static void parse_method_string(MemoryManager& _mm, char *str, Method_Table::met
         strncpy(rec->method_name, str, i);
         rec->method_name[i] = '\0';
     }
-    rec->signature = strdup(&str[i]);
+    rec->signature = strdup(_mm, &str[i]);
 }
 
 // Returns true on success, false on failure
@@ -226,7 +234,6 @@ void Method_Table::init(const char *default_envvar, const char *envvarname)
 
     if (envvar == NULL || envvar[0] == '\0')
     {
-        _accept_all = true;
         return;
     }
     // strip away double-quote characters
@@ -257,7 +264,6 @@ void Method_Table::init(const char *default_envvar, const char *envvarname)
     }
     if (i == 0) // no legitimate filename given
     {
-        _accept_all = true;
         return;
     }
     else if (i == evlen-1) // filename only, no ranges
@@ -269,7 +275,6 @@ void Method_Table::init(const char *default_envvar, const char *envvarname)
         {
             fprintf(stderr, "Couldn't truncate method table file %s\n",
                 _method_file);
-            _accept_all = true;
             _dump_to_file = false;
         }
         else
@@ -342,12 +347,10 @@ Method_Table::Method_Table(MemoryManager& memManager,
   _mm(memManager),
   _method_table     (_mm),
   _decision_table   (_mm),
-  _default_decision (mt_accepted),
-  _accept_all       (false),
   _dump_to_file     (false),
-  _method_file      (NULL),
-  _accept_by_default(accept_by_default)
+  _method_file      (NULL)
 {
+    _default_decision = accept_by_default ? mt_accepted : mt_rejected;
     init(default_envvar, envvarname);
 }
   
@@ -363,9 +366,7 @@ bool Method_Table::accept_this_method(const char* classname, const char *methodn
 {
     int i;
     
-    if (_accept_all)
-        return _accept_by_default;
-
+    
     if (_dump_to_file)
     {
         FILE *file = fopen(_method_file, "a");
