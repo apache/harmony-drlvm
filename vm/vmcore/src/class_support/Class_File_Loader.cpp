@@ -48,15 +48,13 @@
 
 //
 // TODO list:
-//
-//    (1) verify correctness of Method access_flags for different class file versions
-//    (2) verify correctness of Field access_flags  for different class file versions
-//    (3) verify Class access_flags for different class file versions
-//    (4) check that Signature of attribute LocalVariableTypeTable of Code attribute is valid
-//    (5) implement functionality of RuntimeInvisibleAnnotations
-//        and RuntimeInvisibleParameterAnnotations, not just skip them
-//    (6) check Signature attribute, not only parse it
-//
+//  (1) Make macro valid_cpi function static bool, add ClassFormatError reporting to valid_cpi,
+//  replace functions is_valid_index and is_<tag> by valid_cpi.
+//  (2) Funtion parse_annotation_value doesn't report ClassFormatError in case
+//  const_inx is invalid.        
+//  (3) Implement field and method name check for 45 and lower versions of class file.
+
+//    
 
 #define REPORT_FAILED_CLASS_FORMAT(klass, msg)   \
     {                                                               \
@@ -68,8 +66,6 @@
 #define valid_cpi(clss, idx, type) \
     (clss->get_constant_pool().is_valid_index(idx) \
     && clss->get_constant_pool().get_tag(idx) == type)
-
-
 
 static String* cp_check_utf8(ConstantPool& cp, unsigned utf8_index)
 {
@@ -542,12 +538,29 @@ uint32 parse_annotation_table(AnnotationTable ** table, ByteReader& cfs, Class* 
     return read_len;
 }
 
+static uint32 parse_parameter_annotations(AnnotationTable *** table,
+                                        uint8 num_annotations,
+                                        ByteReader& cfs, Class* clss)
+{
+    *table = (AnnotationTable**)clss->get_class_loader()->Alloc(
+        num_annotations * sizeof (AnnotationTable*));
+    //FIXME: verav should throw OOM
+    uint32 len = 0;
+    for (unsigned i = 0; i < num_annotations; i++)
+    {
+        uint32 next_len = parse_annotation_table(*table + i, cfs, clss);
+        if(next_len == 0)
+            return 0;
+        len += next_len;
+    }
+    return len;
+}
+
 void* Class_Member::Alloc(size_t size) {
     ClassLoader* cl = get_class()->get_class_loader();
     assert(cl);
     return cl->Alloc(size);
 }
-
 
 bool Class_Member::parse(Class* clss, ByteReader &cfs)
 {
@@ -596,7 +609,7 @@ bool Class_Member::parse(Class* clss, ByteReader &cfs)
 // further constrained so that, with the exception of the special method names (§3.9)
 // <init> and <clinit>, they must not contain the characters ’<’ or ’>’.
 static inline bool
-check_field_name(const char *name, unsigned len)
+check_field_name(const char *name, unsigned len, bool old_version)
 {
     for (unsigned i = 0; i < len; i++) {
         switch(name[i]){
@@ -611,7 +624,7 @@ check_field_name(const char *name, unsigned len)
 }
 
 static inline bool
-check_method_name(const char *name, unsigned len)
+check_method_name(const char *name, unsigned len, bool version)
 {
     for (unsigned i = 0; i < len; i++) {
         switch(name[i]){
@@ -666,7 +679,7 @@ check_field_descriptor( const char *descriptor,
                     return false;
                 }
                 if(*iterator == '/') {
-                    if(!check_field_name(descriptor, id_len))
+                    if(!check_field_name(descriptor, id_len, false))
                         return false;
                     id_len = 0;
                     descriptor = iterator + 1;
@@ -674,7 +687,7 @@ check_field_descriptor( const char *descriptor,
                     id_len++;
                 }
             }
-            if(!check_field_name(descriptor, id_len))
+            if(!check_field_name(descriptor, id_len, false))
                 return false;
             *next = iterator + 1;
             return true;
@@ -696,16 +709,21 @@ check_field_descriptor( const char *descriptor,
     // DIE( "unreachable code!" ); // exclude remark #111: statement is unreachable
 }
 
-bool Field::parse(Class *clss, ByteReader &cfs)
+//checks of field and method name depend on class version 
+static const uint16 JAVA5_CLASS_FILE_VERSION = 49;
+
+bool Field::parse(Global_Env& env, Class *clss, ByteReader &cfs )
 {
     if(!Class_Member::parse(clss, cfs))
         return false;
 
-    if(!check_field_name(_name->bytes, _name->len)) {
+    if(env.verify_all
+            && !check_field_name(_name->bytes, _name->len,
+                   clss->get_version() < JAVA5_CLASS_FILE_VERSION)) 
+    {
         REPORT_FAILED_CLASS_FORMAT(clss, "illegal field name : " << _name->bytes);
         return false;
     }
-
     // check field descriptor
     //See specification 4.4.2 about field descriptors.
     const char* next;
@@ -716,24 +734,32 @@ bool Field::parse(Class *clss, ByteReader &cfs)
 
     // check fields access flags
     //See specification 4.6 about access flags
-    if( clss->is_interface() ) {
+    if(clss->is_interface()) {
         // check interface fields access flags
         if(!(is_public() && is_static() && is_final())){
             REPORT_FAILED_CLASS_FORMAT(clss, "interface field " << get_name()->bytes
-                << " does not have one of ACC_PUBLIC, ACC_STATIC, or ACC_FINAL access flags set");
+                << " has invalid combination of access flags: "
+                << "0x" << std::hex << _access_flags);
             return false;
         }
         if(_access_flags & ~(ACC_FINAL | ACC_PUBLIC | ACC_STATIC | ACC_SYNTHETIC)){
             REPORT_FAILED_CLASS_FORMAT(clss, "interface field " << get_name()->bytes
-                << " has illegal access flags set : " << _access_flags); //FIXME to literal form
+                << " has invalid combination of access flags: "
+                << "0x"<< std::hex << _access_flags);
             return false;
+        }
+        if(clss->get_version() < JAVA5_CLASS_FILE_VERSION) {
+            //for class file version lower than 49 these two flags should be set to zero
+            //See specification 4.5 Fields, for 1.4 Java.
+            _access_flags &= ~(ACC_SYNTHETIC | ACC_ENUM);
         }
     } else if((is_public() && is_protected()
         || is_protected() && is_private()
         || is_public() && is_private())
         || (is_final() && is_volatile())) {
         REPORT_FAILED_CLASS_FORMAT(clss, " field " << get_name()->bytes
-            << " has invalid combination of access flags : " << _access_flags); //FIXME to literal form
+            << " has invalid combination of access flags: "
+            << "0x" << std::hex << _access_flags);
         return false;
     }
 
@@ -875,6 +901,11 @@ bool Field::parse(Class *clss, ByteReader &cfs)
                             const_value.string = cp.get_string(_const_value_index);
                             break;
                         }
+                    case CONSTANT_UnusedEntry:
+                        {
+                            //do nothing here
+                            break;
+                        }
                     default:
                         {
                             REPORT_FAILED_CLASS_CLASS(clss->get_class_loader(), clss,
@@ -935,6 +966,8 @@ bool Field::parse(Class *clss, ByteReader &cfs)
                 }
 
                 uint32 read_len = parse_annotation_table(&_annotations, cfs, clss);
+                if(read_len == 0)
+                    return false;
                 if (attr_len != read_len) {
                     REPORT_FAILED_CLASS_FORMAT(clss,
                         "error parsing Annotations attribute"
@@ -947,15 +980,30 @@ bool Field::parse(Class *clss, ByteReader &cfs)
 
         case ATTR_RuntimeInvisibleAnnotations:
             {
+                // Each field_info structure may contain at most one RuntimeInvisibleAnnotations attribute.
                 if(++numRuntimeInvisibleAnnotations > 1) {
                     REPORT_FAILED_CLASS_FORMAT(clss,
                         "more than one RuntimeVisibleAnnotations attribute");
                     return false;
                 }
-                if(!cfs.skip(attr_len)) {
-                    REPORT_FAILED_CLASS_FORMAT(clss,
-                        "failed to skip RuntimeInvisibleAnnotations attribute");
-                    return false;
+                if(env.retain_invisible_annotations) {
+                    uint32 read_len =
+                        parse_annotation_table(&_invisible_annotations, cfs, clss);
+                    if(read_len == 0)
+                        return false;
+                    if(attr_len != read_len) {
+                        REPORT_FAILED_CLASS_FORMAT(clss,
+                            "error parsing RuntimeInvisibleAnnotations attribute"
+                            << "; declared length " << attr_len
+                            << " does not match actual " << read_len);
+                        return false;
+                    }
+                } else {
+                    if(!cfs.skip(attr_len)) {
+                        REPORT_FAILED_CLASS_FORMAT(clss,
+                            "failed to skip RuntimeInvisibleAnnotations attribute");
+                        return false;
+                    }
                 }
             }
             break;
@@ -1217,7 +1265,8 @@ bool Method::_parse_local_vars(Local_Var_Table* table, LocalVarOffset *offset_li
             return false;
         }
 
-        if(!check_field_name(name->bytes, name->len))
+        if(!check_field_name(name->bytes, name->len,
+                _class->get_version() < JAVA5_CLASS_FILE_VERSION))
         {
             REPORT_FAILED_METHOD("name of local variable: " << name->bytes <<
                 " in " << attr_name << " attribute is not stored as unqualified name");
@@ -1247,10 +1296,18 @@ bool Method::_parse_local_vars(Local_Var_Table* table, LocalVarOffset *offset_li
                 "in " << attr_name << " attribute");
             return false;
         }
+        //See specification about index value 4.8.11 and 4.8.12
+        if((descriptor->bytes[0] == 'D' || descriptor->bytes[0] == 'J')
+                && index >= _max_locals - 1)
+        {
+            REPORT_FAILED_METHOD("invalid local index "
+                << index << " in " << attr_name << " attribute");
+            return false;
+        }
 
         if (index >= _max_locals) {
             REPORT_FAILED_METHOD("invalid local index "
-                "in " << attr_name << " attribute");
+                << index << " in " << attr_name << " attribute");
             return false;
         }
 
@@ -1274,8 +1331,8 @@ bool Method::_parse_local_vars(Local_Var_Table* table, LocalVarOffset *offset_li
                 &&table->table[j].length == table->table[i].length
                 &&table->table[j].index == table->table[i].index)
             {
-                REPORT_FAILED_METHOD("Duplicate attribute "<< attr_name
-                    <<" for local variable ");
+                REPORT_FAILED_METHOD("Duplicate local variable "<< table->table[j].name
+                    << " in attribute " << attr_name);
                 return false;
             }
         }
@@ -1328,9 +1385,9 @@ bool Method::_parse_code(ConstantPool& cp, unsigned code_attr_len,
         || (_byte_code_length >= (1<<16)))
     {
         REPORT_FAILED_CLASS_CLASS(_class->get_class_loader(), _class, "java/lang/ClassFormatError",
-            _class->get_name()->bytes << ": bytecode length for method "
-            << _name->bytes << _descriptor->bytes
-            << " has zero or exceeding length");
+            _class->get_name()->bytes << ": invalid bytecode length "
+            << _byte_code_length << " for method "
+            << _name->bytes << _descriptor->bytes);
         return false;
     }
 
@@ -1648,10 +1705,11 @@ bool Method::parse(Global_Env& env, Class* clss,
 {
     if(!Class_Member::parse(clss, cfs))
         return false;
-
-    if(!(_name == env.Init_String || _name == env.Clinit_String))
+    //check name only if flag verify_all is set from command line
+    if(env.verify_all && !(_name == env.Init_String || _name == env.Clinit_String))
     {
-        if(!check_method_name(_name->bytes, _name->len))
+        if(!check_method_name(_name->bytes, _name->len,
+                clss->get_version() < JAVA5_CLASS_FILE_VERSION))
         {
             REPORT_FAILED_CLASS_FORMAT(clss, "illegal method name : " << _name->bytes);
             return false;
@@ -1673,8 +1731,8 @@ bool Method::parse(Global_Env& env, Class* clss,
     if(_arguments_slot_num > 255) {
         REPORT_FAILED_CLASS_CLASS(_class->get_class_loader(), _class, "java/lang/ClassFormatError",
             _class->get_name()->bytes <<
-            ": method has more than 255 arguments "
-            << _name->bytes );
+            ": method " << _name->bytes << _descriptor->bytes
+            << " has more than 255 arguments " );
         return false;
     }
     // checked method descriptor
@@ -1692,61 +1750,68 @@ bool Method::parse(Global_Env& env, Class* clss,
     // check method access flags
     if(!is_clinit())
     {
-        if(is_private() && is_protected() || is_private() && is_public() || is_protected() && is_public())
-        {
-            bool bout = false;
-            //See specification 4.7 Methods about access_flags
-            REPORT_FAILED_CLASS_CLASS(_class->get_class_loader(), _class, "java/lang/ClassFormatError",
-                _class->get_name()->bytes << ": invalid combination of access flags ("
-                << ((bout = is_public())?"ACC_PUBLIC":"")
-                << (bout?"|":"")
-                << ((bout |= is_protected())?"ACC_PROTECTED":"")
-                << (bout?"|":"")
-                << (is_private()?"ACC_PRIVATE":"")
-                << ") for method "
-                << _name->bytes << _descriptor->bytes);
-            return false;
-        }
-        if(is_abstract()
-        && (is_final() || is_native() || is_private() || is_static() || is_strict() || is_synchronized()))
-        {
-            bool bout = false;
-            REPORT_FAILED_CLASS_CLASS(_class->get_class_loader(), _class, "java/lang/ClassFormatError",
-                _class->get_name()->bytes << ": invalid combination of access flags (ACC_ABSTRACT|"
-                << ((bout = is_final())?"ACC_FINAL":"")
-                << (bout?"|":"")
-                << ((bout |= is_native())?"ACC_NATIVE":"")
-                << (bout?"|":"")
-                << ((bout |= is_private())?"ACC_PRIVATE":"")
-                << (bout?"|":"")
-                << ((bout |= is_static())?"ACC_STATIC":"")
-                << (bout?"|":"")
-                << ((bout |= is_strict())?"ACC_STRICT":"")
-                << (bout?"|":"")
-                << ((bout |= is_synchronized())?"ACC_SYNCHRONIZED":"")
-                << ") for method "
-                << _name->bytes << _descriptor->bytes);
-            return false;
-        }
         if(_class->is_interface())
         {
             if(!(is_abstract() && is_public())){
                 REPORT_FAILED_CLASS_CLASS(_class->get_class_loader(), _class, "java/lang/ClassFormatError",
                     _class->get_name()->bytes << "." << _name->bytes << _descriptor->bytes
-                    << ": interface method must have access flags "
+                    << ": interface method must have both access flags "
                     "ACC_ABSTRACT and ACC_PUBLIC set"
                     );
                 return false;
             }
-            if(_access_flags & ~(ACC_ABSTRACT | ACC_PUBLIC | ACC_VARARGS | ACC_BRIDGE | ACC_SYNTHETIC)){
+            if(_access_flags & ~(ACC_ABSTRACT | ACC_PUBLIC | ACC_VARARGS
+                            | ACC_BRIDGE | ACC_SYNTHETIC)){
                 REPORT_FAILED_CLASS_CLASS(_class->get_class_loader(), _class, "java/lang/ClassFormatError",
-                    _class->get_name()->bytes << "." << _name->bytes << _descriptor->bytes
-                    << ": interface method cannot have access flags other then "
-                    "ACC_ABSTRACT, ACC_PUBLIC, ACC_VARARG, ACC_BRIDGES or ACC_SYNTHETIC set");
+                    _class->get_name()->bytes << " Interface method " 
+                    << _name->bytes << _descriptor->bytes 
+                    << " has invalid combination of access flags "
+                    << "0x" << std::hex << _access_flags);
                 return false;
             }
-        }
-
+            //for class file version lower than 49 these three flags should be set to zero
+            //See specification 4.6 Methods, for 1.4 Java.            
+            if(_class->get_version() < JAVA5_CLASS_FILE_VERSION){
+                _access_flags &= ~(ACC_BRIDGE | ACC_VARARGS | ACC_SYNTHETIC); 
+            }
+        } else {
+            if(is_private() && is_protected()
+                || is_private() && is_public()
+                || is_protected() && is_public())
+            {
+                //See specification 4.7 Methods about access_flags
+                REPORT_FAILED_CLASS_CLASS(_class->get_class_loader(), _class, "java/lang/ClassFormatError",
+                    _class->get_name()->bytes << "Method "
+                    << _name->bytes << _descriptor->bytes 
+                    << " has invalid combination of access flags "
+                    << "0x" << std::hex << _access_flags);
+                return false;
+            }
+            if(is_abstract()
+            && (is_final() || is_native() || is_private()
+                    || is_static() || is_strict() || is_synchronized()))
+            {
+                bool bout = false;
+                REPORT_FAILED_CLASS_CLASS(_class->get_class_loader(), _class, "java/lang/ClassFormatError",
+                    _class->get_name()->bytes << " Method " 
+                    << _name->bytes << _descriptor->bytes
+                    << " has invalid combination of access flags "
+                    << "0x" << std::hex << _access_flags);
+                return false;
+            }
+            if(is_init()) {
+                if(_access_flags & ~(ACC_STRICT | ACC_VARARGS | ACC_SYNTHETIC
+                        | ACC_PUBLIC | ACC_PRIVATE | ACC_PROTECTED))
+                {
+                    REPORT_FAILED_CLASS_CLASS(_class->get_class_loader(), _class, "java/lang/ClassFormatError",
+                        _class->get_name()->bytes << " Method " 
+                        << _name->bytes << _descriptor->bytes
+                        << " has invalid combination of access flags "
+                        << "0x" << std::hex << _access_flags);
+                    return false;
+                }    
+            }
+        }    
     } else {
         // Java VM specification
         // 4.7 Methods
@@ -1759,14 +1824,6 @@ bool Method::parse(Global_Env& env, Class* clss,
         // but VM specification does not require this flag to be present
         // so, enforce it
         _access_flags |= ACC_STATIC;
-    }
-
-    if(is_init() && (is_static() || is_final() || is_synchronized() || is_native() || is_abstract() || is_bridge())) {
-        REPORT_FAILED_CLASS_CLASS(_class->get_class_loader(), _class, "java/lang/ClassFormatError",
-            _class->get_name()->bytes << "." << _name->bytes << _descriptor->bytes
-            << ": constructor cannot have access flags other then "
-            "ACC_STRICT, ACC_VARARGS, ACC_SYNTHETIC and one of ACC_PUBLIC, ACC_PRIVATE, or ACC_PROTECTED set");
-        return false;
     }
 
     //check method attributes
@@ -1823,16 +1880,43 @@ bool Method::parse(Global_Env& env, Class* clss,
             break;
 
         case ATTR_RuntimeInvisibleParameterAnnotations:
-            if(++numRuntimeInvisibleParameterAnnotations > 1) {
-                REPORT_FAILED_CLASS_FORMAT(clss,
-                    "more than one RuntimeInvisibleParameterAnnotations attribute");
-                return false;
-            }
-
-            if (!cfs.skip(attr_len))
             {
-                REPORT_FAILED_METHOD("error skipping RuntimeInvisibleParameterAnnotations");
-                return false;
+                //RuntimeInvisibleParameterAnnotations attribute is parsed only if
+                //command line option -Xinvisible is set. See specification 4.8.17.
+                if(env.retain_invisible_annotations) {
+                    if(++numRuntimeInvisibleParameterAnnotations > 1) {
+                        REPORT_FAILED_CLASS_FORMAT(clss,
+                            "more than one RuntimeInvisibleParameterAnnotations attribute");
+                        return false;
+                    }
+                    if (!cfs.parse_u1(&_num_invisible_param_annotations)) {
+                        REPORT_FAILED_CLASS_FORMAT(clss,
+                            "cannot parse number of InvisibleParameterAnnotations");
+                        return false;
+                    }
+                    uint32 read_len = 1;
+                    if (_num_invisible_param_annotations) {
+                        uint32 len =
+                            parse_parameter_annotations(&_invisible_param_annotations,
+                                        _num_invisible_param_annotations, cfs, _class);  
+                        if(len == 0)
+                            return false;
+                        read_len += len;                        
+                    }
+                    if (attr_len != read_len) {
+                        REPORT_FAILED_METHOD(
+                            "error parsing InvisibleParameterAnnotations attribute"
+                            << "; declared length " << attr_len
+                            << " does not match actual " << read_len);
+                        return false;
+                    }
+                } else {
+                    if (!cfs.skip(attr_len))
+                    {
+                        REPORT_FAILED_METHOD("error skipping RuntimeInvisibleParameterAnnotations");
+                        return false;
+                    }
+                }
             }
             break;
 
@@ -1852,17 +1936,11 @@ bool Method::parse(Global_Env& env, Class* clss,
                 }
                 uint32 read_len = 1;
                 if (_num_param_annotations) {
-                    _param_annotations = (AnnotationTable**)_class->get_class_loader()->Alloc(
-                        _num_param_annotations * sizeof (AnnotationTable*));
-                    //FIXME: verav should throw OOM
-                    for (unsigned i = 0; i < _num_param_annotations; i++)
-                    {
-                        uint32 next_len = parse_annotation_table(_param_annotations + i, cfs, _class);
-                        if (next_len == 0) {
-                            return false;
-                        }
-                        read_len += next_len;
-                    }
+                    uint32 len = parse_parameter_annotations(&_param_annotations,
+                                    _num_param_annotations, cfs, _class);
+                    if(len == 0)
+                        return false;
+                    read_len += len;
                 }
                 if (attr_len != read_len) {
                     REPORT_FAILED_METHOD(
@@ -1943,6 +2021,8 @@ bool Method::parse(Global_Env& env, Class* clss,
                 }
 
                 uint32 read_len = parse_annotation_table(&_annotations, cfs, clss);
+                if(read_len == 0)
+                    return false;
                 if (attr_len != read_len) {
                     REPORT_FAILED_CLASS_FORMAT(clss,
                         "error parsing Annotations attribute"
@@ -1961,11 +2041,26 @@ bool Method::parse(Global_Env& env, Class* clss,
                         "more than one RuntimeInvisibleAnnotations attribute");
                     return false;
                 }
-
-                if(!cfs.skip(attr_len)) {
-                    REPORT_FAILED_CLASS_FORMAT(clss,
-                        "failed to skip RuntimeInvisibleAnnotations attribute");
-                    return false;
+                //RuntimeInvisibleAnnotations attribute is parsed only if
+                //command line option -Xinvisible is set. See specification 4.8.15.
+                if(env.retain_invisible_annotations) {
+                    uint32 read_len =
+                        parse_annotation_table(&_invisible_annotations, cfs, clss);
+                    if(read_len == 0)
+                        return false;
+                    if (attr_len != read_len) {
+                        REPORT_FAILED_CLASS_FORMAT(clss,
+                            "error parsing RuntimeInvisibleAnnotations attribute"
+                            << "; declared length " << attr_len
+                            << " does not match actual " << read_len);
+                        return false;
+                    }
+                }else {
+                    if(!cfs.skip(attr_len)) {
+                        REPORT_FAILED_CLASS_FORMAT(clss,
+                            "failed to skip RuntimeInvisibleAnnotations attribute");
+                        return false;
+                    }
                 }
             }
             break;
@@ -2043,7 +2138,7 @@ bool Class::parse_fields(Global_Env* env, ByteReader& cfs)
     unsigned short last_nonstatic_field = (unsigned short)num_fields_in_class_file;
     for(i=0; i < num_fields_in_class_file; i++) {
         Field fd;
-        if(!fd.parse(this, cfs))
+        if(!fd.parse(*env, this, cfs))
             return false;
         if(fd.is_static()) {
             m_fields[m_num_static_fields] = fd;
@@ -2170,14 +2265,14 @@ check_class_name(const char *name, unsigned len)
                 id_len++;
             }else
             {
-                if(!check_field_name(name, id_len))
+                if(!check_field_name(name, id_len, false))
                     return false;
                 id_len = 0;
                 name = iterator;
                 name++;
             }
         }
-    return check_field_name(name, id_len);
+    return check_field_name(name, id_len, false);
     }
     return false; //unreacheable code
 }
@@ -2187,19 +2282,21 @@ static String* class_file_parse_utf8data(String_Pool& string_pool, ByteReader& c
 {
     // buffer ends before len
     if(!cfs.have(len))
-        return false;
+        return NULL;
 
     // get utf8 bytes and move buffer pointer
-    const char* utf8data = (const char*)cfs.get_and_skip(len);
+    uint8* utf8data = (uint8*)cfs.get_and_skip(len);
 
     // FIXME: decode 6-byte Java 1.5 encoding
 
     // check utf8 correctness
-    if(memchr(utf8data, 0, len) != NULL)
-        return false;
+    int i;
+    for(i = 0; i < len && utf8data[i] != 0x00 && utf8data[i] < 0xf0; i++);
+    if(i < len)
+        return NULL;
 
     // then lookup on utf8 bytes and return string
-    return string_pool.lookup(utf8data, len);
+    return string_pool.lookup((const char*)utf8data, len);
 }
 
 
@@ -2208,7 +2305,7 @@ static String* class_file_parse_utf8(String_Pool& string_pool,
 {
     uint16 len;
     if(!cfs.parse_u2_be(&len))
-        return false;
+        return NULL;
 
     return class_file_parse_utf8data(string_pool, cfs, len);
 }
@@ -2304,7 +2401,11 @@ bool ConstantPool::parse(Class* clss,
                     return false;
                 }
                 // skip next constant pool entry as it is used by next 4 bytes of Long/Double
-                cp_tags[i+1] = cp_tags[i];
+                if(i + 1 < m_size) {
+                    cp_tags[i+1] = CONSTANT_UnusedEntry;
+                    m_entries[i+1].CONSTANT_8byte.high_bytes = m_entries[i].CONSTANT_8byte.high_bytes;
+                    m_entries[i+1].CONSTANT_8byte.low_bytes = m_entries[i].CONSTANT_8byte.low_bytes;
+                }    
                 i++;
                 break;
 
@@ -2337,7 +2438,7 @@ bool ConstantPool::parse(Class* clss,
                 break;
             default:
                 REPORT_FAILED_CLASS_CLASS(clss->get_class_loader(), clss, "java/lang/ClassFormatError",
-                    clss->get_name()->bytes << ": unknown constant pool tag " << cp_tags[i]);
+                    clss->get_name()->bytes << ": unknown constant pool tag " << "0x" << std::hex << (int)cp_tags[i]);
                 return false;
         }
     }
@@ -2347,8 +2448,6 @@ bool ConstantPool::parse(Class* clss,
 
 bool ConstantPool::check(Global_Env* env, Class* clss)
 {
-
-
     for(unsigned i = 1; i < m_size; i++) {
         switch(unsigned char tag = get_tag(i))
         {
@@ -2409,7 +2508,8 @@ bool ConstantPool::check(Global_Env* env, Class* clss)
                 //check method name
                 if(name != env->Init_String)
                 {
-                    if(!check_method_name(name->bytes,name->len))
+                    if(!check_method_name(name->bytes,name->len,
+                            clss->get_version() < JAVA5_CLASS_FILE_VERSION))
                     {
                         REPORT_FAILED_CLASS_CLASS(clss->get_class_loader(), clss, "java/lang/ClassFormatError",
                             clss->get_name()->bytes << ": illegal method name for CONSTANT_Methodref entry: " << name->bytes);
@@ -2440,7 +2540,8 @@ bool ConstantPool::check(Global_Env* env, Class* clss)
             if(tag == CONSTANT_Fieldref)
             {
                 //check field name
-                if(!check_field_name(name->bytes, name->len))
+                if(!check_field_name(name->bytes, name->len,
+                        clss->get_version() < JAVA5_CLASS_FILE_VERSION))
                 {
                     REPORT_FAILED_CLASS_CLASS(clss->get_class_loader(), clss, "java/lang/ClassFormatError",
                         clss->get_name()->bytes << ": illegal filed name for CONSTANT_Filedref entry: " << name->bytes);
@@ -2458,7 +2559,8 @@ bool ConstantPool::check(Global_Env* env, Class* clss)
             {
                 //check method name, name can't be <init> or <clinit>
                 //See specification 4.5.2 about name_and_type_index last sentence.
-                if(!check_method_name(name->bytes, name->len))
+                if(!check_method_name(name->bytes, name->len,
+                        clss->get_version() < JAVA5_CLASS_FILE_VERSION))
                 {
                     REPORT_FAILED_CLASS_CLASS(clss->get_class_loader(), clss, "java/lang/ClassFormatError",
                         clss->get_name()->bytes << ": illegal filed name for CONSTANT_InterfaceMethod entry: " << name->bytes);
@@ -2495,11 +2597,12 @@ bool ConstantPool::check(Global_Env* env, Class* clss)
         case CONSTANT_Double:
             //check Long and Double indexes, n+1 index should be valid too.
             //See specification 4.5.5
-            if( i + 1 > m_size){
+            if(i + 1 == m_size){
                 REPORT_FAILED_CLASS_CLASS(clss->get_class_loader(), clss, "java/lang/ClassFormatError",
                     clss->get_name()->bytes << ": illegal indexes for Long or Double " << i << " and " << i + 1);
                 return false;
             }
+            i++;
             break;
         case CONSTANT_NameAndType:
         {
@@ -2647,7 +2750,7 @@ bool Class::parse(Global_Env* env,
         return false;
     }
 
-    if(m_version == 49 && minor_version > 0)
+    if(m_version == JAVA5_CLASS_FILE_VERSION && minor_version > 0)
     {
         REPORT_FAILED_CLASS_CLASS(m_class_loader, this, "java/lang/UnsupportedClassVersionError",
             "unsupported class file version " << m_version << "." << minor_version);
@@ -2693,7 +2796,7 @@ bool Class::parse(Global_Env* env,
         REPORT_FAILED_CLASS_FORMAT(this, "interface cannot be final");
         return false;
     }
-    //not only ACC_FINAL flag is prohibited if is_interface, also ACC_SUPER, ACC_SYNTHETIC, ACC_ENUM.
+    //not only ACC_FINAL flag is prohibited if is_interface, also ACC_SYNTHETIC and ACC_ENUM.
     if(is_interface() && (is_synthetic() || is_enum()))
     {
         REPORT_FAILED_CLASS_FORMAT(this,
@@ -2716,7 +2819,12 @@ bool Class::parse(Global_Env* env,
         REPORT_FAILED_CLASS_FORMAT(this, "not interface can't be annotation");
         return false;
     }
-
+    //for class file version lower than 49 these three flags should be set to zero
+    //See specification 4.5 Fields, for 1.4 Java.    
+    if(m_version < JAVA5_CLASS_FILE_VERSION) {
+        m_access_flags &= ~(ACC_SYNTHETIC | ACC_ENUM | ACC_ANNOTATION);    
+    }
+    
     /*
      * parse this_class & super_class & verify their constant pool entries
      */
@@ -3098,9 +3206,11 @@ bool Class::parse(Global_Env* env,
                     return false;
                 }
                 uint32 read_len = parse_annotation_table(&m_annotations, cfs, this);
+                if(attr_len == 0)
+                    return false;
                 if (attr_len != read_len) {
                     REPORT_FAILED_CLASS_FORMAT(this,
-                        "error parsing Annotations attribute"
+                        "error parsing RuntimeVisibleAnnotations attribute"
                         << "; declared length " << attr_len
                         << " does not match actual " << read_len);
                     return false;
@@ -3110,16 +3220,29 @@ bool Class::parse(Global_Env* env,
 
         case ATTR_RuntimeInvisibleAnnotations:
             {
-                //ClassFile may contain at most one RuntimeInvisibleAnnotations attribute.
-                if(++numRuntimeInvisibleAnnotations > 1) {
-                    REPORT_FAILED_CLASS_FORMAT(this,
-                        "more than one RuntimeInvisibleAnnotations attribute");
-                    return false;
-                }
-                if(!cfs.skip(attr_len)) {
-                    REPORT_FAILED_CLASS_FORMAT(this,
-                        "failed to skip RuntimeInvisibleAnnotations attribute");
-                    return false;
+                if(env->retain_invisible_annotations) {
+                    //ClassFile may contain at most one RuntimeInvisibleAnnotations attribute.
+                    if(++numRuntimeInvisibleAnnotations > 1) {
+                        REPORT_FAILED_CLASS_FORMAT(this,
+                            "more than one RuntimeInvisibleAnnotations attribute");
+                        return false;
+                    }
+                    uint32 read_len = parse_annotation_table(&m_invisible_annotations, cfs, this);
+                    if(read_len == 0)
+                        return false;
+                    if (attr_len != read_len) {
+                        REPORT_FAILED_CLASS_FORMAT(this,
+                            "error parsing RuntimeInvisibleAnnotations attribute"
+                            << "; declared length " << attr_len
+                            << " does not match actual " << read_len);
+                        return false;
+                    }
+                }else {
+                    if(!cfs.skip(attr_len)) {
+                        REPORT_FAILED_CLASS_FORMAT(this,
+                            "failed to skip RuntimeInvisibleAnnotations attribute");
+                        return false;
+                    }
                 }
             }
             break;

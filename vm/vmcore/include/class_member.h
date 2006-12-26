@@ -86,6 +86,9 @@ public:
     String *get_signature() const {return _signature;}
 
     AnnotationTable* get_declared_annotations() const {return _annotations;}
+    AnnotationTable* get_declared_invisible_annotations() const {
+        return _invisible_annotations;
+    }
 
     friend void assign_offsets_to_class_fields(Class *);
     friend void add_new_fake_method(Class *clss, Class *example, unsigned *next);
@@ -109,6 +112,7 @@ protected:
 #endif
         _synthetic = _deprecated = false;
         _annotations = NULL;
+        _invisible_annotations = NULL;
         _signature = NULL;
     }
 
@@ -122,6 +126,7 @@ protected:
     bool _synthetic;
     bool _deprecated;
     AnnotationTable* _annotations;
+    AnnotationTable* _invisible_annotations;
 
     uint16 _access_flags;
     String* _name;
@@ -208,7 +213,7 @@ public:
     unsigned is_transient() {return (_access_flags&ACC_TRANSIENT);} 
     bool is_enum()          {return (_access_flags&ACC_ENUM)?true:false;} 
 
-    bool parse(Class* clss, ByteReader& cfs);
+    bool parse(Global_Env& env, Class* clss, ByteReader& cfs);
 
     unsigned calculate_size();
 
@@ -647,11 +652,22 @@ public:
     AnnotationTable * get_param_annotations(unsigned index) {
         return index < _num_param_annotations ? _param_annotations[index] : NULL;
     }
+    unsigned get_num_invisible_param_annotations() {
+        return _num_invisible_param_annotations;
+    }
+    AnnotationTable * get_invisible_param_annotations(unsigned index) {
+        return index < _num_invisible_param_annotations ?
+                        _invisible_param_annotations[index] : NULL;
+    }
+    
     AnnotationValue * get_default_value() {return _default_value; }
 
 private:
     uint8 _num_param_annotations;
     AnnotationTable ** _param_annotations;
+    uint8 _num_invisible_param_annotations;
+    AnnotationTable ** _invisible_param_annotations; 
+    
     AnnotationValue * _default_value;
 
     unsigned _index;                // index in method table

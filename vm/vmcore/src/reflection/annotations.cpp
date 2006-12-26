@@ -36,10 +36,15 @@
 #include "primitives_support.h"
 #include "vm_log.h"
 
-jobjectArray get_annotations(JNIEnv* jenv, AnnotationTable* table, Class* clss) 
+jobjectArray get_annotations(JNIEnv* jenv, AnnotationTable* table, AnnotationTable* inv_table, Class* clss) 
 {
-    unsigned num = table ? table->length : 0;
-    TRACE("annotations table size = " << num);
+    unsigned table_num = table ? table->length : 0;
+    TRACE("annotations table size = " << table_num);
+    
+    unsigned inv_table_num = inv_table ? inv_table->length : 0;
+    TRACE("invisible annotations table size = " << inv_table_num);
+    
+    unsigned num = table_num + inv_table_num;
 
     static Class* antn_class = jni_get_vm_env(jenv)->LoadCoreClass(
         "java/lang/annotation/Annotation");
@@ -52,7 +57,8 @@ jobjectArray get_annotations(JNIEnv* jenv, AnnotationTable* table, Class* clss)
         return NULL;
     }
 
-    for (unsigned i = 0; i < num; ++i) {
+    unsigned i;
+    for (i = 0; i < table_num; ++i) {
         jobject element = resolve_annotation(jenv, table->table[i], clss);
         if (!element) {
             assert(exn_raised());
@@ -62,7 +68,16 @@ jobjectArray get_annotations(JNIEnv* jenv, AnnotationTable* table, Class* clss)
             assert(!exn_raised());
         }
     }
-
+    for (i = table_num; i < num; ++i) {
+        jobject element = resolve_annotation(jenv, inv_table->table[i - table_num], clss);
+        if (!element) {
+            assert(exn_raised());
+            return NULL;
+        } else {
+            SetObjectArrayElement(jenv, array, i, element);
+            assert(!exn_raised());
+        }
+    }
     return array;
 }
 

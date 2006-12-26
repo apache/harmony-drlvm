@@ -843,6 +843,14 @@ VM_Data_Type class_get_const_type(Class_Handle cl, unsigned index)
     case CONSTANT_Class:
         jt = JAVA_TYPE_CLASS;
         break;
+    case CONSTANT_UnusedEntry:
+        if(cp.get_tag(index - 1) == CONSTANT_Double) {
+            jt = JAVA_TYPE_DOUBLE;
+            break;
+        } else if(cp.get_tag(index - 1) == CONSTANT_Long) {
+            jt = JAVA_TYPE_LONG;
+            break;
+        }
     default:
         DIE("non-constant type is requested from constant pool : " << cp.get_tag(index));
     }

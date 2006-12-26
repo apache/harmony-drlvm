@@ -627,7 +627,9 @@ Method::Method()
     _line_number_table = NULL;
     _local_vars_table = NULL;
     _num_param_annotations = 0;
+    _num_invisible_param_annotations = 0;    
     _param_annotations = NULL;
+    _invisible_param_annotations = NULL;    
     _default_value = NULL;
 
     pending_breakpoints = 0;

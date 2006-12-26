@@ -161,7 +161,7 @@ union ConstPoolEntry {
 enum ConstPoolTags {
     /** pointer to the tags array.*/
     CONSTANT_Tags               = 0,
-    /** The rest of tag values are taken from
+    /** The next 11 tag values are taken from
      * <a href="http://java.sun.com/docs/books/vmspec/2nd-edition/ClassFileFormat-Java5.pdf">
      * The Java Virtual Machine Specification, Chapter 4</a>, <i>The Constant
      * Pool</i> section.*/
@@ -176,6 +176,9 @@ enum ConstPoolTags {
     CONSTANT_Methodref          = 10,
     CONSTANT_InterfaceMethodref = 11,
     CONSTANT_NameAndType        = 12,
+    CONSTANT_Last               = CONSTANT_NameAndType,
+    /** used to mark second entry of Long and Double*/
+    CONSTANT_UnusedEntry        = CONSTANT_Last + 1,    
 };
 
 
@@ -1001,6 +1004,9 @@ private:
     // annotations for this class
     AnnotationTable* m_annotations;
 
+    //invisible annotations for this class
+    AnnotationTable* m_invisible_annotations;
+ 
     // thread, which currently executes <clinit>
     VM_thread* m_initializing_thread;
 
@@ -1340,7 +1346,11 @@ public:
     /** Gets a collection of annotations.
      * @return A collection of annotations.*/
     AnnotationTable* get_annotations() const { return m_annotations; }
-
+    /** Gets a collection of invisible annotations.
+     * @return A collection of invisible annotations.*/
+    AnnotationTable* get_invisible_annotations() const {
+        return m_invisible_annotations;
+    }
     /** Gets a class instance size.
      * @return A size of the allocated instance in bytes.*/
     unsigned int get_allocated_size() const { return m_allocated_size; }

@@ -29,10 +29,11 @@ struct AnnotationTable;
 struct Annotation;
 struct AnnotationValue;
 
-// Returns array of declared annotations.
+// Returns array of declared visible annotations
+// and in case -Xinvisible command line flag is set also returns array of invisible annotations.
 // Returns zero-sized array if there are no annotations.
 // May raise an exception, in this case returns null.
-jobjectArray get_annotations(JNIEnv* jenv, AnnotationTable* table, Class* clss);
+jobjectArray get_annotations(JNIEnv* jenv, AnnotationTable* table, AnnotationTable *inv_table, Class* clss);
 
 // Returns resolved annotation or null if resolution failed.
 // If the cause parameter is not null, resolution error is assigned to it for upstream processing;

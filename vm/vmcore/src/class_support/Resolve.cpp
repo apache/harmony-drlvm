@@ -1048,6 +1048,7 @@ static bool resolve_const_pool_item(Global_Env* env, Class* clss, unsigned cp_in
             return true;
         case CONSTANT_Double: // fall through
         case CONSTANT_Long:
+        case CONSTANT_UnusedEntry:
             return true;
     }
     return false;

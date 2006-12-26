@@ -177,6 +177,8 @@ static void print_help_on_nonstandard_options()
         "              Log verbose output to a file\n"
         "    -Xverify\n"
         "              Do full bytecode verification\n"
+        "    -Xinvisible\n"
+        "              Retain invisible annotations at runtime\n"
         "    -Xfileline\n"
         "              Add source information to logging messages\n"
         "    -Xthread\n"
@@ -434,6 +436,9 @@ void parse_vm_arguments(Global_Env *p_env)
         }
         else if (strcmp(option, "-Xdebug") == 0) {
             // Do nothing, this option is only for compatibility with old JREs
+        }
+        else if (strcmp(option, "-Xinvisible") == 0) {
+            p_env->retain_invisible_annotations = true;
         }
         else if (strcmp(option, "-Xverify") == 0) {
             p_env->verify_all = true;

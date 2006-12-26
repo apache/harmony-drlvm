@@ -62,7 +62,9 @@ JNIEXPORT jobjectArray JNICALL Java_org_apache_harmony_vm_VMGenericsAndAnnotatio
 {
     Class_Member* member = (Class_Member*) ((POINTER_SIZE_INT) jmember);
     TRACE("Requested annotations for member " << member);
-    return get_annotations(jenv, member->get_declared_annotations(), member->get_class());
+    return get_annotations(jenv, member->get_declared_annotations(),
+                member->get_declared_invisible_annotations(),
+                member->get_class());
 }
 
 JNIEXPORT jobjectArray JNICALL Java_org_apache_harmony_vm_VMGenericsAndAnnotations_getDeclaredAnnotations__Ljava_lang_Class_2
@@ -70,7 +72,8 @@ JNIEXPORT jobjectArray JNICALL Java_org_apache_harmony_vm_VMGenericsAndAnnotatio
 {
     Class* clazz = jclass_to_struct_Class(jclazz);
     TRACE("Requested annotations for class " << clazz);
-    return get_annotations(jenv, clazz->get_annotations(), clazz);
+    return get_annotations(jenv, clazz->get_annotations(),
+                clazz->get_invisible_annotations(), clazz);
 }
 
 JNIEXPORT jobjectArray JNICALL Java_org_apache_harmony_vm_VMGenericsAndAnnotations_getParameterAnnotations
@@ -83,7 +86,8 @@ JNIEXPORT jobjectArray JNICALL Java_org_apache_harmony_vm_VMGenericsAndAnnotatio
     static Class* array_class = genv->LoadCoreClass(
         "[Ljava/lang/annotation/Annotation;");
 
-    unsigned num = method->get_num_param_annotations();
+    unsigned param_num = method->get_num_param_annotations();
+    unsigned num = param_num + method->get_num_invisible_param_annotations();
     TRACE("Requested parameters annotations for method " << method
         << "; num=" << num);
 
@@ -113,8 +117,11 @@ JNIEXPORT jobjectArray JNICALL Java_org_apache_harmony_vm_VMGenericsAndAnnotatio
         return NULL;
     }
 
-    for (unsigned i = 0; i < num; ++i) {
-        jobject element = get_annotations(jenv, method->get_param_annotations(i), declaring_class);
+    unsigned i;
+    for (i = 0; i < param_num; ++i) {
+        jobject element = get_annotations(jenv,
+                                method->get_param_annotations(i),
+                                NULL, declaring_class);
         if (!element) {
             assert(exn_raised());
             return NULL;
@@ -123,7 +130,19 @@ JNIEXPORT jobjectArray JNICALL Java_org_apache_harmony_vm_VMGenericsAndAnnotatio
             assert(!exn_raised());
         }
     }
-
+    for (i = param_num; i < num; ++i) {
+        jobject element = get_annotations(jenv, NULL,
+                method->get_invisible_param_annotations(i - param_num),
+                declaring_class);
+        if (!element) {
+            assert(exn_raised());
+            return NULL;
+        } else {
+            SetObjectArrayElement(jenv, array, i, element);
+            assert(!exn_raised());
+        }
+    }
+    
     return array;
 }
 

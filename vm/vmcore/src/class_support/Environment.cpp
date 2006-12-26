@@ -136,6 +136,7 @@ ready_for_exceptions(false)
 
     verify_all = false;
     pin_interned_strings = false; 
+    retain_invisible_annotations = false;
 
     // initialize critical sections
     p_jit_a_method_lock = new Lock_Manager();
