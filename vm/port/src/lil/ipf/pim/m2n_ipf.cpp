@@ -244,21 +244,13 @@ void m2n_gen_set_local_handles_imm(Merced_Code_Emitter* emitter, uint64 imm_val)
     emitter->ipf_movi(M2N_OBJECT_HANDLES, (int)imm_val);
 }
 
-void m2n_pop_local_handles() {
-    assert(!hythread_is_suspend_enabled());
-    M2nFrame *m2n = m2n_get_last_frame();
-    free_local_object_handles3(m2n_get_local_handles(m2n));
-}
-
 static void m2n_pop_local_handles() {
     assert(!hythread_is_suspend_enabled());
-    
-    if (exn_raised()) {
-        exn_rethrow();
-    }
-    
-    M2nFrame * m2n = m2n_get_last_frame();
-    free_local_object_handles2(m2n->local_object_handles);
+
+    exn_rethrow_if_pending();
+
+    M2nFrame *m2n = m2n_get_last_frame();
+    free_local_object_handles3(m2n_get_local_handles(m2n));
 }
 
 static void m2n_free_local_handles() {
