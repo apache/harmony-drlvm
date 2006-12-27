@@ -478,11 +478,11 @@ END_OPCODES()
 END_MNEMONIC()
 
 #define DEFINE_CMOVcc_MNEMONIC( cc ) \
-        BEGIN_MNEMONIC(CMOV##cc, MF_USES_FLAGS|MF_CONDITIONAL, D_U ) \
+        BEGIN_MNEMONIC(CMOV##cc, MF_USES_FLAGS|MF_CONDITIONAL, DU_U ) \
 BEGIN_OPCODES() \
-    {OpcodeInfo::all,   {Size16, 0x0F, 0x40 + ConditionMnemonic_##cc, _r},  {r16, r_m16},   D_U }, \
-    {OpcodeInfo::all,   {0x0F, 0x40 + ConditionMnemonic_##cc, _r},          {r32, r_m32},   D_U }, \
-    {OpcodeInfo::em64t, {REX_W, 0x0F, 0x40 + ConditionMnemonic_##cc, _r},   {r64, r_m64},   D_U }, \
+    {OpcodeInfo::all,   {Size16, 0x0F, 0x40 + ConditionMnemonic_##cc, _r},  {r16, r_m16},   DU_U }, \
+    {OpcodeInfo::all,   {0x0F, 0x40 + ConditionMnemonic_##cc, _r},          {r32, r_m32},   DU_U }, \
+    {OpcodeInfo::em64t, {REX_W, 0x0F, 0x40 + ConditionMnemonic_##cc, _r},   {r64, r_m64},   DU_U }, \
 END_OPCODES() \
 END_MNEMONIC() 
 
@@ -1108,9 +1108,9 @@ END_OPCODES()
 END_MNEMONIC()
 
 #define DEFINE_SETcc_MNEMONIC( cc ) \
-        BEGIN_MNEMONIC(SET##cc, MF_USES_FLAGS|MF_CONDITIONAL, D) \
+        BEGIN_MNEMONIC(SET##cc, MF_USES_FLAGS|MF_CONDITIONAL, DU) \
 BEGIN_OPCODES() \
-    {OpcodeInfo::all, {0x0F, 0x90 + ConditionMnemonic_##cc}, {r_m8},  D }, \
+    {OpcodeInfo::all, {0x0F, 0x90 + ConditionMnemonic_##cc}, {r_m8},  DU }, \
 END_OPCODES() \
 END_MNEMONIC()
 

@@ -149,7 +149,7 @@ void Integer_numberOfLeadingZeros_Handler_x_I_x_I::run() {
     
     irm->newCopyPseudoInst(Mnemonic_MOV, r2, irm->newImmOpnd(i32Type, -1))->insertBefore(callInst);
     irm->newInstEx(Mnemonic_BSR, 1, r1, arg)->insertBefore(callInst);
-    irm->newInstEx(Mnemonic_CMOVZ, 1, r1, r2)->insertBefore(callInst);
+    irm->newInstEx(Mnemonic_CMOVZ, 1, r1, r1, r2)->insertBefore(callInst);
     irm->newInstEx(Mnemonic_SUB, 1, res, irm->newImmOpnd(i32Type, 31), r1)->insertBefore(callInst);
 
     callInst->unlink();
@@ -168,7 +168,7 @@ void Integer_numberOfTrailingZeros_Handler_x_I_x_I::run() {
 
     irm->newCopyPseudoInst(Mnemonic_MOV, r2, irm->newImmOpnd(i32Type, 32))->insertBefore(callInst);
     irm->newInstEx(Mnemonic_BSF, 1, r1, arg)->insertBefore(callInst);
-    irm->newInstEx(Mnemonic_CMOVZ, 1, r1, r2)->insertBefore(callInst);
+    irm->newInstEx(Mnemonic_CMOVZ, 1, r1, r1, r2)->insertBefore(callInst);
     irm->newCopyPseudoInst(Mnemonic_MOV, res, r1)->insertBefore(callInst);
 
     callInst->unlink();
@@ -219,7 +219,7 @@ void Long_numberOfLeadingZeros_Handler_x_J_x_I::run() {
     //high_part_is_zero
     hiZeroNode->appendInst(irm->newCopyPseudoInst(Mnemonic_MOV, r2, irm->newImmOpnd(i32Type, -1)));
     hiZeroNode->appendInst(irm->newInstEx(Mnemonic_BSR, 1, r1, lwOpnd));
-    hiZeroNode->appendInst(irm->newInstEx(Mnemonic_CMOVZ, 1, r1, r2));
+    hiZeroNode->appendInst(irm->newInstEx(Mnemonic_CMOVZ, 1, r1, r1, r2));
     hiZeroNode->appendInst(irm->newInstEx(Mnemonic_SUB, 1, res, irm->newImmOpnd(i32Type, 63), r1));
 
 
@@ -297,3 +297,4 @@ void Long_numberOfTrailingZeros_Handler_x_J_x_I::run() {
 }
 
 }} //namespace
+

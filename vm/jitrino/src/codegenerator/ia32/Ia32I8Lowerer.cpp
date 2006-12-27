@@ -570,7 +570,6 @@ void I8Lowerer::buildJumpSubGraph(Inst * inst, Opnd * src1_1,Opnd * src1_2,Opnd 
     Node* sinkNode =  subCFG->getReturnNode();
     
     bbHMain->appendInst(irManager->newInst(Mnemonic_CMP, src1_2, src2_2));
-    bbHMain->appendInst(irManager->newBranchInst(Mnemonic_JNZ, sinkNode, bbLMain));
     
     bbLMain->appendInst(irManager->newInst(Mnemonic_CMP, src1_1, src2_1));
     
@@ -588,7 +587,16 @@ void I8Lowerer::buildJumpSubGraph(Inst * inst, Opnd * src1_1,Opnd * src1_2,Opnd 
     }
     bbLMain->appendInst(irManager->newBranchInst(mnem, bbDB, bbFT));
     
-    subCFG->addEdge(bbHMain, sinkNode, 0.1);
+    if (condInst->getMnemonic() == Mnemonic_JZ) {
+        bbHMain->appendInst(irManager->newBranchInst(Mnemonic_JNZ, bbFT, bbLMain));
+        subCFG->addEdge(bbHMain, bbFT, 0.1);
+    } else if (condInst->getMnemonic() == Mnemonic_JNZ) {
+        bbHMain->appendInst(irManager->newBranchInst(Mnemonic_JNZ, bbDB, bbLMain));
+        subCFG->addEdge(bbHMain, bbDB, 0.1);
+    } else {
+        bbHMain->appendInst(irManager->newBranchInst(Mnemonic_JNZ, sinkNode, bbLMain));
+        subCFG->addEdge(bbHMain, sinkNode, 0.1);
+    }
     subCFG->addEdge(bbHMain, bbLMain, 0.9);
     subCFG->addEdge(bbLMain, bbFT, 0.1);
     subCFG->addEdge(bbLMain, bbDB, 0.9);
@@ -611,7 +619,7 @@ void I8Lowerer::buildSetSubGraph(Inst * inst, Opnd * src1_1,Opnd * src1_2,Opnd *
 
     bbLMain->appendInst(irManager->newInst(Mnemonic_CMP, src1_1, src2_1));
     
-    irManager->getFlowGraph()->splitNodeAtInstruction(condInst, false, true, NULL);
+    irManager->getFlowGraph()->splitNodeAtInstruction(condInst, true, true, NULL);
     
     Mnemonic mnem = getBaseConditionMnemonic(condInst->getMnemonic());
 

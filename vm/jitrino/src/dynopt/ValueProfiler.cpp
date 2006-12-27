@@ -99,7 +99,7 @@ void ValueProfilerInstrumentationPass::_run(IRManager& irm)
                         Log::out() << std::endl;
                     }
                 } else {
-                    assert(0);
+                    continue;
                 }
                 VectorHandler* bc2HIRMapHandler = new VectorHandler(bcOffset2HIRHandlerName, &md);
                 uint64 callInstId = (uint64)lastInst->getId();

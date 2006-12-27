@@ -467,9 +467,15 @@ void GCSafePointsInfo::updatePairsOnInst(Inst* inst, GCSafePointPairs& res) {
             Opnd* fromOpnd = NULL;
             int32 offset = 0;
             Mnemonic mn = inst->getMnemonic();
+
+            Mnemonic conditionalMnem = getBaseConditionMnemonic(mn);
+            if (conditionalMnem != Mnemonic_NULL)
+                mn = conditionalMnem;
+
             switch (mn) {
                 case Mnemonic_XOR:
                 case Mnemonic_MOV: 
+                case Mnemonic_CMOVcc:
                     assert(mn != Mnemonic_XOR || inst->getOpnd(useIndex1)==opnd);
                     fromOpnd = inst->getOpnd(useIndex1);
                     break;                

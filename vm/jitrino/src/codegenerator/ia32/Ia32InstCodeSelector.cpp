@@ -1009,7 +1009,7 @@ CG_OpndHandle* InstCodeSelector::abs_op(NegOp::Types   opType,
             Opnd * srcOpnd=convert(src, dstType);
             appendInsts(irManager.newCopyPseudoInst(Mnemonic_MOV, dst, (Opnd*)srcOpnd));
             appendInsts(irManager.newInst(Mnemonic_NEG, dst));
-            appendInsts(irManager.newInstEx(Mnemonic_CMOVL, 1, dst, (Opnd*)srcOpnd));
+            appendInsts(irManager.newInstEx(Mnemonic_CMOVL, 1, dst, dst, (Opnd*)srcOpnd));
             break;
         }
         case NegOp::I8:
@@ -1219,10 +1219,10 @@ CG_OpndHandle*  InstCodeSelector::cmp(CompareOp::Operators cmpOp,
     if (swapped) 
         cm=swapConditionMnemonic(cm);
     appendInsts(irManager.newCopyPseudoInst(Mnemonic_MOV, dst, irManager.newImmOpnd(typeManager.getInt32Type(), 0)));
-    appendInsts(irManager.newInstEx(getMnemonic(Mnemonic_SETcc, cm), 1, dst));
+    appendInsts(irManager.newInstEx(getMnemonic(Mnemonic_SETcc, cm), 1, dst,dst));
 #ifndef _EM64T_
     if (((opType==CompareOp::F) ||(opType==CompareOp::S) ||(opType==CompareOp::D)) && ((cmpOp == CompareOp::Geu) || (cmpOp == CompareOp::Gtu))) {
-        appendInsts(irManager.newInstEx(Mnemonic_CMOVP,1,dst,irManager.newImmOpnd(typeManager.getInt32Type(), 0)));
+        appendInsts(irManager.newInstEx(Mnemonic_CMOVP,1,dst,dst,irManager.newImmOpnd(typeManager.getInt32Type(), 0)));
     }
 #endif
     return dst;
@@ -1238,7 +1238,7 @@ CG_OpndHandle*    InstCodeSelector::czero(CompareZeroOp::Types opType,
 
     cmpToEflags(CompareOp::Eq, getCompareOpTypesFromCompareZeroOpTypes(opType), (Opnd*)src, NULL);
     appendInsts(irManager.newCopyPseudoInst(Mnemonic_MOV, dst, irManager.newImmOpnd(typeManager.getInt32Type(), 0)));
-    appendInsts(irManager.newInstEx(Mnemonic_CMOVZ,  1, dst, irManager.newImmOpnd(typeManager.getInt32Type(), 1)));
+    appendInsts(irManager.newInstEx(Mnemonic_CMOVZ,  1, dst, dst, irManager.newImmOpnd(typeManager.getInt32Type(), 1)));
     return dst;
 }
 
@@ -1251,7 +1251,7 @@ CG_OpndHandle*    InstCodeSelector::cnzero(CompareZeroOp::Types opType,
     Opnd * dst=irManager.newOpnd(typeManager.getInt32Type());
     cmpToEflags(CompareOp::Eq, getCompareOpTypesFromCompareZeroOpTypes(opType), (Opnd*)src, NULL);
     appendInsts(irManager.newCopyPseudoInst(Mnemonic_MOV, dst, irManager.newImmOpnd(typeManager.getInt32Type(), 0)));
-    appendInsts(irManager.newInstEx(Mnemonic_CMOVNZ,     1, dst, irManager.newImmOpnd(typeManager.getInt32Type(), 1)));
+    appendInsts(irManager.newInstEx(Mnemonic_CMOVNZ,     1, dst, dst,irManager.newImmOpnd(typeManager.getInt32Type(), 1)));
     return dst;
 }
 
@@ -2809,15 +2809,15 @@ CG_OpndHandle* InstCodeSelector::callhelper(uint32              numArgs,
         Opnd* ecxOpnd = irManager.getRegOpnd(RegName_ECX);
         Opnd* memOpnd = irManager.newMemOpnd(opnds[0]->getType(), opnds[0]);
         
-        appendInsts(irManager.newInst(Mnemonic_MOV, eaxOpnd, opnds[1]));
-        appendInsts(irManager.newInst(Mnemonic_MOV, ecxOpnd, opnds[2]));
+        appendInsts(irManager.newCopyPseudoInst(Mnemonic_MOV, eaxOpnd, opnds[1]));
+        appendInsts(irManager.newCopyPseudoInst(Mnemonic_MOV, ecxOpnd, opnds[2]));
         
         Inst*  inst = irManager.newInst(Mnemonic_CMPXCHG, memOpnd, ecxOpnd, eaxOpnd);
         inst->setPrefix(InstPrefix_LOCK);
         appendInsts(inst);
 
         //save the result
-        appendInsts(irManager.newInst(Mnemonic_MOV, dstOpnd, irManager.newImmOpnd(typeManager.getInt32Type(), 0)));
+        appendInsts(irManager.newCopyPseudoInst(Mnemonic_MOV, dstOpnd, irManager.newImmOpnd(typeManager.getInt32Type(), 0)));
         appendInsts(irManager.newInst(Mnemonic_SETZ, dstOpnd));
         break;
     }
@@ -3138,7 +3138,7 @@ CG_OpndHandle* InstCodeSelector::tau_asType(ObjectType* type,
     Opnd * dst=irManager.newOpnd(type);
     cmpToEflags(CompareOp::Eq, CompareOp::Ref, (Opnd*)instanceOfResult, NULL);
     appendInsts(irManager.newCopyPseudoInst(Mnemonic_MOV, dst, irManager.newImmOpnd(typeManager.getInt32Type(), 0))); 
-    appendInsts(irManager.newInstEx(Mnemonic_CMOVZ,  1, dst, (Opnd*)obj));
+    appendInsts(irManager.newInstEx(Mnemonic_CMOVZ,  1, dst, dst, (Opnd*)obj));
     return dst;
 }
 
