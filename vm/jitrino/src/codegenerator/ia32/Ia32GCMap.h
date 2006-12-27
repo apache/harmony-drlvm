@@ -76,7 +76,7 @@ namespace Ia32 {
         typedef StlVector<GCSafePointOpnd*> GCOpnds;
     public:
         GCSafePoint(MemoryManager& mm, POINTER_SIZE_INT _ip):gcOpnds(mm), ip(_ip) {
-#ifdef _GCMAP_TRACK_IDS
+#ifdef GCMAP_TRACK_IDS
             instId = 0;
             hardwareExceptionPoint = false;
 #endif
