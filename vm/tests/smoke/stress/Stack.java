@@ -24,7 +24,7 @@ public class Stack {
 
     // the minimal reference limit for DRLVM on Windows/Interpreter
     // which does not cause StackOverflowError
-    static final int minDepth = 300;
+    static final int minDepth = 130;
     // the maximal reference limit for DRLVM on linux/OPT
     // which cause StackOverflowError
     static int depth = 75000;
