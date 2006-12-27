@@ -1043,7 +1043,7 @@ VMBreakInterface::add_reference(jmethodID method, jlocation location,
     // given native address is differ with obtained breapoint.
     // The last case cound be if the same method location points
     // to different native address.
-    if ( !brpt || !brpt->addr || brpt->addr != addr )
+    if ( !brpt || brpt->addr != addr )
     {
         brpt = (VMBreakPoint*)STD_MALLOC(sizeof(VMBreakPoint));
         assert(brpt);
