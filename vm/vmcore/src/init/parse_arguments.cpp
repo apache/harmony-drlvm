@@ -482,7 +482,7 @@ void parse_vm_arguments(Global_Env *p_env)
         else if (strcmp(option, "-Xno_parallel_jit") == 0) {
             parallel_jit = false;
         }
-        else if (strcmp(option, "-Xdumpfile:") == 0) {
+        else if (begins_with(option, "-Xdumpfile:")) {
             const char* arg = option + strlen("-Xdumpfile:");
             dump_file_name = arg;
         }
