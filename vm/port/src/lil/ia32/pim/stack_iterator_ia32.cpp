@@ -421,43 +421,18 @@ void si_set_return_pointer(StackIterator* si, void** return_value)
  *
  * See also function: JIT_execute_method_default
  */
-void cpp_set_last_frame(M2nFrame* lm2nf)
+static void cpp_check_last_frame()
 {
-    TRACE2("exn",("Unwinding.... lm2nf=0x%08x\n", lm2nf));
     void *handler;
     __asm {
         mov eax, fs:[0]
         mov handler, eax
     }
 
-    TRACE2("exn",(" handler=0x%p\n", handler));
-    if (!(handler < lm2nf)) {
-        return;
-    }
-
-    // finding lastFrame > lm2nf, should be last
     void *lastFrame = p_TLS_vmthread->lastFrame;
+
     TRACE2("exn",("  curr = 0x%p\n", lastFrame));
-
-    if (!(lastFrame < lm2nf)) {
-        printf("Unwinding:  Lost lastFrame\n");
-        __asm { int 3 }
-    }
-
-    while(true) {
-        void *prevFrame = *(void**)lastFrame;
-        TRACE2("exn",("  prev = 0x%p\n", prevFrame));
-        if (prevFrame == 0) {
-            break;
-        }
-        if (prevFrame < lm2nf) {
-            fprintf(stderr, "ERROR:  Unwinding native code! Error\n");
-            __asm { int 3 }
-        } else {
-            break;
-        }
-        lastFrame = prevFrame;
-    }
+    TRACE2("exn",(" handler=0x%p\n", handler));
 
     if (!(handler < lastFrame)) {
         TRACE2("exn",("all ok\n"));
@@ -508,7 +483,7 @@ void si_transfer_control(StackIterator* si)
     m2n_set_last_frame(local_si.m2nfl);
 #ifdef _WIN32 // Workaround and detection of possible problems with
               // objects on stack.
-    cpp_set_last_frame(local_si.m2nfl);
+    cpp_check_last_frame();
 #endif // _WIN32
 
     TRACE2("exn", ("generating control transfer stub"));
