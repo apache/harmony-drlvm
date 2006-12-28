@@ -580,7 +580,7 @@ static NativeCodePtr compile_create_jni_stub(Method_Handle method, GenericFuncti
     return compile_create_lil_jni_stub(method, (void*)func, nso);
 } //compile_create_jni_stub
 
-static JIT_Result compile_prepare_native_method(Method* method, JIT_Flags flags)
+static JIT_Result compile_prepare_native_method(Method* method)
 {
     TRACE2("compile", "compile_prepare_native_method(" << method_get_name(method) << ")");
 #ifdef VM_STATS
@@ -681,16 +681,40 @@ JIT_Result compile_do_compilation_jit(Method* method, JIT* jit)
     return JIT_SUCCESS;
 }
 
+// Create an exception from a given type and a message.
+// Set cause to the current thread exception.
+static void compile_raise_exception(const char* name, const char* message, Method* method)
+{
+    assert(hythread_is_suspend_enabled());
+    jthrowable old_exc = exn_get();
 
-// Assumes that GC is disabled, but a GC-safe point
-static JIT_Result compile_do_compilation(Method* method, JIT_Flags flags)
+    const char* c = method->get_class()->get_name()->bytes;
+    const char* m = method->get_name()->bytes;
+    const char* d = method->get_descriptor()->bytes;
+    size_t sz = 3 + // a space, a dot, and a terminator
+        strlen(message) +
+        method->get_class()->get_name()->len +
+        method->get_name()->len +
+        method->get_descriptor()->len;
+    char* msg_raw = (char*)STD_MALLOC(sz);
+    assert(msg_raw);
+    sprintf(msg_raw, "%s%s.%s%s", message, c, m, d);
+    assert(strlen(msg_raw) < sz);
+
+    jthrowable new_exc = exn_create(name, msg_raw, old_exc);
+    exn_raise_object(new_exc);
+    STD_FREE(msg_raw);
+}
+
+
+static JIT_Result compile_do_compilation(Method* method)
 {
     ASSERT_RAISE_AREA;
     assert(hythread_is_suspend_enabled());
     tmn_suspend_disable();
     class_initialize_ex(method->get_class());
     tmn_suspend_enable();
-    
+   
     method->lock();
     if (exn_raised()) {
         method->unlock();
@@ -709,12 +733,15 @@ static JIT_Result compile_do_compilation(Method* method, JIT_Flags flags)
     }
 
     if (method->is_native()) {
-        JIT_Result res = compile_prepare_native_method(method, flags);            
+        JIT_Result res = compile_prepare_native_method(method);            
         if (res == JIT_SUCCESS) {
             compile_flush_generated_code();
             method->set_state(Method::ST_Compiled);
             method->do_jit_recompiled_method_callbacks();
             method->apply_vtable_patches();
+        } else {
+            method->set_state(Method::ST_NotCompiled);
+            compile_raise_exception("java/lang/UnsatisfiedLinkError", "Cannot load native ", method);
         }
         method->unlock();
         return res;
@@ -726,92 +753,43 @@ static JIT_Result compile_do_compilation(Method* method, JIT_Flags flags)
     }
 }
 
-// Make a suitable exception to throw if compilation fails.
-// We try to create the named exception with a message if this is possible,
-// otherwise we create with default constructor.
-// Then we try to set the cause of the exception to the current thread exception if there is one.
-// In all cases we ignore any further sources of exceptions and try to proceed anyway.
-static jthrowable compile_make_exception(const char* name, Method* method)
-{ // FIXME: prototype should be changed to getrid of managed objects .
-  // Now it works in gc disabled mode because of prototype.
-    assert(!hythread_is_suspend_enabled());
-    jthrowable old_exc = exn_get();
-    exn_clear();
 
-    const char* c = method->get_class()->get_name()->bytes;
-    const char* m = method->get_name()->bytes;
-    const char* d = method->get_descriptor()->bytes;
-    size_t sz = 25 +
-        method->get_class()->get_name()->len +
-        method->get_name()->len +
-        method->get_descriptor()->len;
-    char* msg_raw = (char*)STD_MALLOC(sz);
-    assert(msg_raw);
-    sprintf(msg_raw, "Error compiling method %s.%s%s", c, m, d);
-    assert(strlen(msg_raw) < sz);
-
-    jthrowable new_exc = exn_create(name, msg_raw, old_exc);
-    exn_clear();
-    STD_FREE(msg_raw);
-
-    return new_exc;
-}
-
-NativeCodePtr compile_jit_a_method(Method* method)
+NativeCodePtr compile_me(Method* method)
 {
     ASSERT_RAISE_AREA;
-    TRACE2("compile", "compile_jit_a_method " << method );
- 
     ASSERT_NO_INTERPRETER;
+    TRACE2("compile", "compile_me " << method);
 
     GcFrame gc;
-    assert(&gc == p_TLS_vmthread->gc_frames); 
     compile_protect_arguments(method, &gc);
-    assert(&gc == p_TLS_vmthread->gc_frames); 
-    
-    JIT_Flags flags;
-    flags.insert_write_barriers = (gc_requires_barriers());
-    assert(&gc == p_TLS_vmthread->gc_frames);
-    tmn_suspend_enable(); 
-    JIT_Result res = compile_do_compilation(method, flags);
+
+    tmn_suspend_enable();
+    JIT_Result res = compile_do_compilation(method);
+    if (res != JIT_SUCCESS) {
+        INFO2("compile", "Cannot compile " << method);
+        if (!exn_raised()) {
+            compile_raise_exception("java/lang/InternalError", "Cannot compile ", method);
+        }
+        tmn_suspend_disable();
+        return NULL;
+    }
     tmn_suspend_disable();
-    if (res == JIT_SUCCESS) {
-        assert(&gc == p_TLS_vmthread->gc_frames); 
-        NativeCodePtr entry_point = method->get_code_addr();
-        assert(&gc == p_TLS_vmthread->gc_frames); 
-        INFO2("compile.code", "Compiled method " << method
-                << ", entry " << method->get_code_addr());
 
-        if (method->get_pending_breakpoints() != 0)
-            jvmti_set_pending_breakpoints(method);
-        DebugUtilsTI *ti = VM_Global_State::loader_env->TI;
-        if(ti->isEnabled() && ti->is_single_step_enabled()
-            && !method->is_native())
-        {
-            jvmti_set_single_step_breakpoints_for_method(ti, p_TLS_vmthread, method);
-        }
+    NativeCodePtr entry_point = method->get_code_addr();
+    INFO2("compile.code", "Compiled method " << method
+            << ", entry " << entry_point);
 
-        return entry_point;
+    if (method->get_pending_breakpoints() != 0)
+        jvmti_set_pending_breakpoints(method);
+    DebugUtilsTI *ti = VM_Global_State::loader_env->TI;
+    if(ti->isEnabled() && ti->is_single_step_enabled()
+        && !method->is_native())
+    {
+        jvmti_set_single_step_breakpoints_for_method(ti, p_TLS_vmthread, method);
     }
 
-    assert(!hythread_is_suspend_enabled());
-    
-    INFO2("compile", "Could not compile " << method);
-    const char* exn_class;
-
-    if (!exn_raised()) {
-        if (method->is_native()) {
-            method->set_state(Method::ST_NotCompiled);
-            exn_class = "java/lang/UnsatisfiedLinkError";
-        } else {
-            exn_class = "java/lang/InternalError";
-        }
-        jthrowable exn = compile_make_exception(exn_class, method);
-        exn_raise_object(exn);
-    }
-    return NULL;
-} //compile_jit_a_method
-
+    return entry_point;
+} // compile_me
 
 // Adding dynamic generated code info to global list
 // Is used in JVMTI and native frames interface

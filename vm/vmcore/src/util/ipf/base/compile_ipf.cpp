@@ -450,12 +450,10 @@ void patch_code_with_threads_suspended(Byte *code_block, Byte *new_code, size_t 
 
 /*    BEGIN COMPILE-ME STUBS    */
 
-NativeCodePtr compile_jit_a_method(Method * method);
-
 static NativeCodePtr compile_get_compile_me_generic() {
     static NativeCodePtr addr = NULL;
     if (!addr) {
-        NativeCodePtr (*p_jitter)(Method*) = compile_jit_a_method;
+        NativeCodePtr (*p_jitter)(Method*) = compile_me;
         void (*p_rethrow)() = exn_rethrow_if_pending;
         LilCodeStub* cs = lil_parse_code_stub(
             "entry 1:managed:arbitrary;"

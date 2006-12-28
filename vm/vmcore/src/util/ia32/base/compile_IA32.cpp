@@ -171,8 +171,6 @@ char * gen_convert_managed_to_unmanaged_null_ia32(char * ss,
 
 /*    BEGIN COMPILE-ME STUBS    */
 
-NativeCodePtr compile_jit_a_method(Method * method);
-
 static NativeCodePtr compile_get_compile_me_generic() {
     static NativeCodePtr addr = NULL;
     if (addr) {
@@ -192,7 +190,7 @@ static NativeCodePtr compile_get_compile_me_generic() {
     // ecx register should contain correct Mehod_Handle
     stub = push(stub, ecx_opnd);
     // compile the method
-    stub = call(stub, (char *)&compile_jit_a_method);
+    stub = call(stub, (char *)&compile_me);
     // remove ecx from the stack
     stub = pop(stub, ecx_opnd);
     // pop m2n from the stack
@@ -262,36 +260,6 @@ NativeCodePtr compile_gen_compile_me(Method_Handle method) {
 #endif
     return addr;
 } //compile_gen_compile_me
-
-//NativeCodePtr compile_gen_compile_me_exc_throw(int exp)
-//{
-//    // ppervov: FIXME: should rewrite generation stub
-//    //Class* (*p_convert_exn)(unsigned, Class*, Loader_Exception) = linking_error_to_exception_class;
-//    Class* (*p_convert_exn)(unsigned, Class*, unsigned) = NULL;
-//    void (*p_athrow)(ManagedObject*, Class_Handle, Method_Handle, uint8*) = exn_athrow;
-//    LilCodeStub* cs = lil_parse_code_stub("entry 0:rth::void;");
-//    assert(cs);
-//    cs = lil_parse_onto_end(cs,
-//        "push_m2n 0, 0;"
-//        "m2n_save_all;"
-//        "out platform:g4,pint,g4:pint;"
-//        "o0=0:g4;"
-//        "o1=0;"
-//        "o2=%0i:g4;"
-//        "call %1i;"
-//        "out platform:ref,pint,pint,pint:void;"
-//        "o0=0:ref;"
-//        "o1=r;"
-//        "o2=0;"
-//        "o3=0;"
-//        "call.noret %2i;",
-//        exp, p_convert_exn, p_athrow);
-//    assert(cs && lil_is_valid(cs));
-//    NativeCodePtr addr = LilCodeGenerator::get_platform()->compile(cs, "rth_throw_linking_exception", dump_stubs);
-//    lil_free_code_stub(cs);
-//
-//    return addr;
-//} // compile_gen_compile_me_exc_throw
  
 /*    END COMPILE-ME STUBS    */
 

@@ -141,8 +141,6 @@ void compile_protect_arguments(Method_Handle method, GcFrame * gc) {
 //    method handle
 const int32 stack_size = m2n_get_size() + 8 + 120;
 
-NativeCodePtr compile_jit_a_method(Method * method);
-
 static NativeCodePtr compile_get_compile_me_generic() {
     static NativeCodePtr addr = NULL;
     if (addr) {
@@ -185,7 +183,7 @@ static NativeCodePtr compile_get_compile_me_generic() {
     // restore Method_Handle
     stub = mov(stub, rdi_opnd, M_Base_Opnd(rsp_reg, 0));
     // compile the method
-    stub = call(stub, (char *)&compile_jit_a_method);
+    stub = call(stub, (char *)&compile_me);
 
     // pop m2n from the stack
     const int32 bytes_to_m2n_bottom = stack_size - m2n_get_size();

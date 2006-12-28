@@ -52,8 +52,18 @@ void compile_flush_generated_code();
  */
 JIT_Result compile_do_compilation_jit(Method* method, JIT* jit);
 
+/**
+ * Generate a stub in JIT calling convention to pass call
+ * compile_me() on the first method invocation.
+ */
 NativeCodePtr compile_gen_compile_me(Method_Handle method);
-//NativeCodePtr compile_gen_compile_me_exc_throw(int exp);
+
+/**
+ * A function to call on the first method invocation.
+ * @return an entry point of successfully compiled method
+ * @throws an exception otherwise
+ */
+NativeCodePtr compile_me(Method* method);
 
 void patch_code_with_threads_suspended(Byte *code_block, Byte *new_code, size_t size);
 
