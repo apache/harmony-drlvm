@@ -326,7 +326,8 @@ BranchTranslator::runImpl()
                                     }
                                 }
                                 Inst::Opnds flags(defInst,Inst::OpndRole_Def|Inst::OpndRole_Implicit);
-                                if (stopSearch || (defInst->getOpnd(flags.begin())->getRegName() == RegName_EFLAGS))                                     break;
+                                if (stopSearch || ((flags.begin() != flags.end()) && defInst->getOpnd(flags.begin())->getRegName() == RegName_EFLAGS))                                     
+                                    break;
                             }
                             continue;
                         }
