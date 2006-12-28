@@ -261,15 +261,18 @@ static void m2n_free_local_handles() {
     }
 
     M2nFrame * m2n = m2n_get_last_frame();
-    free_local_object_handles3(m2n->local_object_handles);
+    // iche free_local_object_handles3(m2n->local_object_handles);
+    free_local_object_handles3(m2n_get_local_handles(m2n)); // iche
 }
 
 void m2n_gen_pop_m2n(Merced_Code_Emitter* emitter, bool handles, M2nPreserveRet preserve_ret, bool do_alloc, unsigned out_reg, int target)
 {
+    unsigned free_target;
+    
     if (handles) {
         assert(target != -1);  // make sure a target has been provided
         // Do we need to call free?
-        unsigned free_target = (unsigned) target;
+        free_target = (unsigned) target;
         emitter->ipf_cmp(icmp_eq, cmp_none, SCRATCH_PRED_REG, SCRATCH_PRED_REG2, M2N_OBJECT_HANDLES, 0);
         emitter->ipf_br(br_cond, br_many, br_spnt, br_none, free_target, SCRATCH_PRED_REG);
     }
