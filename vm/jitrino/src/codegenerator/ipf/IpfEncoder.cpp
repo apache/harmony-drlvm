@@ -562,13 +562,13 @@ Inst * Encoder::resolvePseudo(Cfg & cfg, Inst * inst) {
                 } else {
                     IPF_ERR << __FILE__ << ": " << __LINE__
                             << ": NOT YET IMPLEMENTED INSTRUCTION: "
-                            << Encoder::getMnemonic(INST_MOV) << "\n";
+                            << IrPrinter::toString(inst) << "\n";
                     assert(0);
                 }
             } else {
                 IPF_ERR << __FILE__ << ": " << __LINE__
                       << ": NOT YET IMPLEMENTED INSTRUCTION: "
-                       << Encoder::getMnemonic(INST_MOV) << "\n";
+                       << IrPrinter::toString(inst) << "\n";
                 assert(0);
             }
             break;

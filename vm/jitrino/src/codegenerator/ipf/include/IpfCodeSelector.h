@@ -207,7 +207,6 @@ public:
     CG_OpndHandle *tau_ldVirtFunAddr(Type*, CG_OpndHandle*, MethodDesc*, CG_OpndHandle*);
     CG_OpndHandle *tau_ldVTableAddr(Type*, CG_OpndHandle*, CG_OpndHandle*);
     CG_OpndHandle *getVTableAddr(Type*, ObjectType*);
-    CG_OpndHandle *tau_ldIntfTableAddr(Type*, CG_OpndHandle*, NamedType*, CG_OpndHandle*);
     CG_OpndHandle *ldFieldAddr(Type*, CG_OpndHandle*, FieldDesc*);
     CG_OpndHandle *ldStaticAddr(Type*, FieldDesc*);
 
@@ -308,14 +307,15 @@ public:
 
     CG_OpndHandle* convUPtrToObject(ObjectType*, CG_OpndHandle*)              { NOT_IMPLEMENTED_C("convUPtrToObject") }
     CG_OpndHandle* convToUPtr(PtrType*, CG_OpndHandle*)                       { NOT_IMPLEMENTED_C("convToUPtr") }
-    CG_OpndHandle* tau_ldIntfTableAddr(Type*, CG_OpndHandle*, NamedType*)     { NOT_IMPLEMENTED_C("tau_ldIntfTableAddr") }
+    CG_OpndHandle *tau_ldIntfTableAddr(Type*, CG_OpndHandle*, NamedType*, CG_OpndHandle*) { NOT_IMPLEMENTED_C("tau_ldIntfTableAddr"); }
+    CG_OpndHandle* tau_ldIntfTableAddr(Type*, CG_OpndHandle*, NamedType*);
     CG_OpndHandle* arraycopyReverse(unsigned int, CG_OpndHandle**)            { NOT_IMPLEMENTED_C("arraycopyReverse") }
     CG_OpndHandle* arraycopy(unsigned int, CG_OpndHandle**)                   { NOT_IMPLEMENTED_C("arraycopy") }
     CG_OpndHandle* addElemIndexWithLEA(Type*, CG_OpndHandle*, CG_OpndHandle*) { NOT_IMPLEMENTED_C("addElemIndexWithLEA") }
-    CG_OpndHandle* ldRef(Type*, MethodDesc*, unsigned int, bool)              { NOT_IMPLEMENTED_C("ldRef") }
+    CG_OpndHandle* ldRef(Type*, MethodDesc*, unsigned int, bool); 
     void           pseudoInst()                                               { NOT_IMPLEMENTED_V("pseudoInst") }
-    void           methodEntry(MethodDesc*)                                   { NOT_IMPLEMENTED_V("methodEntry") }
-    void           methodEnd(MethodDesc*, CG_OpndHandle*)                     { NOT_IMPLEMENTED_V("methodEnd") }
+    void           methodEntry(MethodDesc*);
+    void           methodEnd(MethodDesc*, CG_OpndHandle*);
     void           tau_stRef(CG_OpndHandle*, CG_OpndHandle*, CG_OpndHandle*, Type::Tag, bool, CG_OpndHandle*, CG_OpndHandle*, CG_OpndHandle*) { NOT_IMPLEMENTED_V("tau_stRef") }
 
     //---------------------------------------------------------------------------//

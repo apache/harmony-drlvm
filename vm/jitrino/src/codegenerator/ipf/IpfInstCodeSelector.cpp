@@ -1842,8 +1842,7 @@ CG_OpndHandle *IpfInstCodeSelector::getVTableAddr(Type       *dstType,
 
 CG_OpndHandle *IpfInstCodeSelector::tau_ldIntfTableAddr(Type          *dstType, 
                                                         CG_OpndHandle *base, 
-                                                        NamedType     *vtableType,
-                                                        CG_OpndHandle *) {
+                                                        NamedType     *vtableType) {
 
     IPF_LOG << "      tau_ldIntfTableAddr; dstType==" << Type::tag2str(dstType->tag)  
         << "; vtableType=" << Type::tag2str(vtableType->tag) << endl;
@@ -2958,6 +2957,47 @@ void IpfInstCodeSelector::divDouble(RegOpnd *dst, CG_OpndHandle *src1, CG_OpndHa
 }                                       
 
 //----------------------------------------------------------------------------//
+
+CG_OpndHandle *IpfInstCodeSelector::ldRef(Type *dstType,
+                                          MethodDesc* enclosingMethod,
+                                          uint32 refToken,
+                                          bool uncompress) 
+{
+    assert(dstType->isSystemString() || dstType->isSystemClass());
+    
+    RegOpnd *retOpnd = opndManager->newRegOpnd(OPND_G_REG, toDataKind(dstType->tag));
+    Opnd *helperArgs[] = {
+        opndManager->newImm(refToken),
+        opndManager->newImm((int64) enclosingMethod->getParentType()->getRuntimeIdentifier())
+    };
+    CompilationInterface::RuntimeHelperId hId = CompilationInterface::Helper_LdRef;
+    uint64  address        = (uint64) compilationInterface.getRuntimeHelperAddress(hId);
+    Opnd    *helperAddress = opndManager->newImm(address);
+    
+    directCall(2, helperArgs, retOpnd, helperAddress, p0);
+
+    return retOpnd;
+}
+
+//----------------------------------------------------------------------------//
+
+void IpfInstCodeSelector::methodEntry(MethodDesc *meth) { 
+    
+    if (compilationInterface.getCompilationParams().exe_notify_method_entry) {
+        NOT_IMPLEMENTED_V("methodEntry"); 
+    }
+
+}
+
+void IpfInstCodeSelector::methodEnd(MethodDesc *meth, CG_OpndHandle *retopnd) { 
+    
+    if (compilationInterface.getCompilationParams().exe_notify_method_exit) {
+        NOT_IMPLEMENTED_V("methodEnd"); 
+    }
+
+}
+
+//----------------------------------------------------------------------------//
 // Divide two float values. 
 
 void IpfInstCodeSelector::divFloat(RegOpnd *dst, CG_OpndHandle *src1, CG_OpndHandle *src2, bool rem) {
@@ -3136,6 +3176,7 @@ DataKind IpfInstCodeSelector::toDataKind(Type::Tag tag) {
         case Type::Array                  : return DATA_BASE;
         case Type::Object                 : return DATA_BASE;
         case Type::NullObject             : return DATA_BASE;
+        case Type::SystemClass            : return DATA_BASE;
         case Type::SystemObject           : return DATA_BASE;
         case Type::SystemString           : return DATA_BASE;
         case Type::ManagedPtr             : return DATA_MPTR;
@@ -3158,6 +3199,7 @@ OpndKind IpfInstCodeSelector::toOpndKind(Type::Tag tag) {
         case Type::Object       : return OPND_G_REG;
         case Type::NullObject   : return OPND_G_REG;
         case Type::SystemObject : return OPND_G_REG;
+        case Type::SystemClass  : return OPND_G_REG;
         case Type::Boolean      : return OPND_G_REG;
         case Type::Char         : return OPND_G_REG;
         case Type::Int8         : return OPND_G_REG;
