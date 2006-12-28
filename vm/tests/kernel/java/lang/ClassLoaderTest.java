@@ -2228,4 +2228,24 @@ import junit.framework.TestCase;
         }
         assertTrue("NullPointerException expected (case 2)", et);
     }
+    /*
+     * Regression test for HARMONY-885
+     * [classlib][core][drlvm] unexpected LinkageError for ClassLoader.defineClass
+     *
+     */
+    public void test_HARMONY_885() {
+        try { 
+            byte[] array0 = new byte[] { 2, 2, 2, 2, 2, 2}; 
+            new CL().defineKlass(array0, 0, 3); 
+            fail("exception expected"); 
+        } catch (ClassFormatError e) { 
+            //expected 
+        } 
+    }
+    private class CL extends ClassLoader { 
+        public Class defineKlass(byte[] a, int i1, int i2) throws ClassFormatError { 
+            return super.defineClass(a, i1, i2); 
+        } 
+    } 
+
 }
