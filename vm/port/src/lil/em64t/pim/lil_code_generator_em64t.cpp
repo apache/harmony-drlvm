@@ -134,7 +134,7 @@ LcgEM64TContext::LcgEM64TContext(LilCodeStub * stub, tl::MemoryPool & m):
  */
 class LcgEM64TCodeGen: public LilInstructionVisitor {
 
-    static const size_t     MAX_CODE_LENGTH = 1024; // maximum length of the generated code
+    static const size_t     MAX_CODE_LENGTH = 1524; // maximum length of the generated code
     static const unsigned   MAX_DEC_SIZE = 20; // maximum number of bytes required for string representation of int64
     
     char                    * buf_beg; // pointer to the beginning position of the generated code
