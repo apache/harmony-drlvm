@@ -86,7 +86,7 @@ struct RegAlloc2 : public SessionAction
         Register* assigned;     // 0 or register assigned
         
         size_t length;          // total length of all intervals
-        size_t weight;          // weight coeff (taken from LIR)
+        double weight;          // weight coeff (taken from LIR)
 
         Opand* parentOpand;     // another opand which is a source in a copy instruction defining this opand, hint for coalescing
         bool   ignore;
@@ -95,8 +95,8 @@ struct RegAlloc2 : public SessionAction
 
         void update ();
 
-        static bool smaller (const RegAlloc2::Opand*& x, const RegAlloc2::Opand*& y)
-        {   return x->end - x->beg < y->end - y->beg;   }
+        //static bool smaller (const RegAlloc2::Opand*& x, const RegAlloc2::Opand*& y)
+        //{   return x->end - x->beg < y->end - y->beg;   }
 
         static bool lighter (const RegAlloc2::Opand* x, const RegAlloc2::Opand* y)
         {   return x->weight < y->weight;   }
@@ -145,7 +145,13 @@ struct Dbgout : public  ::std::ofstream
 };
 
 static Dbgout dbgout("regalloc2.txt");
-#endif
+#define DBGOUT(x) dbgout << x;
+
+#else
+
+#define DBGOUT(x) 
+
+#endif //#ifdef _DEBUG_REGALLOC
 
 //========================================================================================
 // class RegAlloc2::Register
@@ -179,13 +185,6 @@ struct RegAlloc2::Register
 
 using ::std::endl;
 using ::std::ostream;
-
-
-#ifdef _DEBUG_REGALLOC
-#   define DBGOUT(x) dbgout << x;
-#else
-#   define DBGOUT(x) 
-#endif
 
 
 #ifdef _DEBUG_REGALLOC
@@ -453,9 +452,7 @@ bool RegAlloc2::verify (bool force)
 //
 void RegAlloc2::buildRegs ()    
 {
-#ifdef _DEBUG_REGALLOC
-        dbgout << endl << "buildRegs" << endl;
-#endif
+    DBGOUT(endl << "buildRegs" << endl;)
 
     OpndKind k = (OpndKind)constrs.getKind(); 
     OpndSize s = constrs.getSize();
@@ -497,9 +494,7 @@ RegAlloc2::Register* RegAlloc2::findReg (RegMask mask) const
 
 void RegAlloc2::buildOpands ()  
 {
-#ifdef _DEBUG_REGALLOC
-        dbgout << endl << "buildOpands" << endl;
-#endif
+    DBGOUT(endl << "buildOpands" << endl;)
 
     opandcount = irManager->getOpndCount();
     candidateCount = 0;
@@ -576,10 +571,7 @@ void RegAlloc2::buildOpands ()
                     opnd = opnds.getOpnd(it);
                     if ( (opand=opandmap[opnd->getId()]) != 0 )
                     {
-                        opand->weight += (size_t)(execCount * (registerPressure > (int)registers.size() ? 4 : 1));
-#ifdef _DEBUG_REGALLOC
-                            dbgout << " Pressure: " << registerPressure << "/" << registers.size() << " Opand: " << *opand << endl;
-#endif
+                        opand->weight += (execCount * (registerPressure > (int)registers.size() ? 4 : 1));
 
                         if (inst->isLiveRangeEnd(it)){
                             opand->stop(instIndex + 1);
@@ -591,9 +583,6 @@ void RegAlloc2::buildOpands ()
                                 ++registerPressure;
                                 if ( definedInCopyOpand != 0 && inst->getMnemonic() == Mnemonic_MOV && definedInCopyOpand->parentOpand == 0){
                                     definedInCopyOpand->parentOpand = opand;
-#ifdef _DEBUG_REGALLOC
-                                        dbgout << *definedInCopyOpand << " => " << *opand << endl;
-#endif
                                 }
                             }
                         }
@@ -675,9 +664,7 @@ void RegAlloc2::buildOpands ()
 
 void RegAlloc2::allocateRegs () 
 {
-#ifdef _DEBUG_REGALLOC
-        dbgout << endl << "allocateRegs" << endl;
-#endif
+    DBGOUT(endl << "allocateRegs" << endl;)
 
     Opands opands(mm);
     opands.reserve(opandmap.size());
