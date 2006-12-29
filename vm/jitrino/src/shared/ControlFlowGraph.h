@@ -1664,8 +1664,9 @@ protected:
     template <class Container>
     void runDFS(Container* preOrderContainer, Container* postOrderContainer, bool isForward) {
         Node* startNode;
+        traversalNumber++;
         if (isForward) {
-            lastOrderingTraversalNumber = ++traversalNumber;
+            lastOrderingTraversalNumber = traversalNumber;
             postOrderCache.clear();
             if (entryNode==NULL) {
                 return;
@@ -1685,7 +1686,7 @@ protected:
         }
     }
     
-  /// Helper for public <code>getNodesPre/PostOrder</code> methods above.
+  /// Helper for public <code>getNodesPre/PostOrder</code> methods above. Warn: increment cfg traversal num before use.
    
     template <class Container>
     void getNodesDFS(Container* preOrderContainer, Container* postOrderContainer, Node* node, bool isForward=true) {

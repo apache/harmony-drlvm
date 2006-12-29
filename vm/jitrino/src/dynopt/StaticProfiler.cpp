@@ -53,6 +53,7 @@ class StaticProfilerContext;
 #define PROB_DEVIRT_GUARD_HEURISTIC 0.62
 #define PROB_REFERENCE              0.60
 #define PROB_STORE_HEURISTIC        0.55
+#define PROB_FALLTHRU_HEURISTIC     0.45
 
 #define ACCEPTABLE_DOUBLE_PRECISION_LOSS  0.000000001 
 
@@ -70,6 +71,7 @@ static double opcodeHeuristic(const StaticProfilerContext*);
 static double storeHeuristic(const StaticProfilerContext*);
 static double referenceHeuristic(const StaticProfilerContext*);
 static double devirtGuardHeuristic(const StaticProfilerContext*);
+static double fallThruHeuristic(const StaticProfilerContext*);
 static void setHeatThreshold(IRManager& irm);
 typedef std::vector<std::string> StringList;
 static void splitString(const char* string, StringList& result, char separator, bool notEmptyTokensOnly);
@@ -90,6 +92,7 @@ Heuristics HEURISTICS[] =  {
     Heuristics("store", storeHeuristic),
     Heuristics("ref", referenceHeuristic),
     Heuristics("guard", devirtGuardHeuristic),
+    Heuristics("ft", fallThruHeuristic),
     Heuristics("", NULL)
 };
 
@@ -154,14 +157,15 @@ private:
         if (!defaultHeuristicsInited) {
             initMutex.lock();
             if (!defaultHeuristicsInited) {
-                getHeuristicsByNamesList("loop,ret,guard", defaultHeuristics);
+                getHeuristicsByNamesList("loop,ret,ft,guard", defaultHeuristics);
+                defaultHeuristicsInited = true;
             }
             initMutex.unlock();
         }
     }
     
     template <class Container> 
-    static void getHeuristicsByNamesList(const char* list, Container result) {
+    static void getHeuristicsByNamesList(const char* list, Container& result) {
         StringList nameList;
         splitString(list, nameList, ',', true);
         for (StringList::const_iterator it = nameList.begin(), end = nameList.end(); it!=end; ++it) {
@@ -332,21 +336,26 @@ static void estimateNode(StaticProfilerContext* c) {
         c->edge2 = falseEdge;
         if (c->doLoopHeuristicsOverride && isLoopHeuristicAcceptable(c)) {
             prob = c->loopTree->isLoopExit(trueEdge) ? PROB_LOOP_EXIT : 1 - PROB_LOOP_EXIT;
-        } else {
+        } else if (c->node->getTraversalNum() == c->fg->getTraversalNum()) {//node is reachable
             // from this point we can apply general heuristics
             for (StlVector<Heuristics*>::const_iterator it = c->heuristics.begin(), end = c->heuristics.end(); it!=end; ++it) {
                 Heuristics* h = *it;
                 HeuristicsFn fn = h->fn;
                 double dprob = (*fn)(c);
+                assert(dprob>0 && dprob<1);
                 if (dprob!=PROB_HEURISTIC_FAIL) {
-                    prob = prob * dprob / (prob*dprob + (1-prob)*(1-dprob));
+                    double newprob = prob * dprob / (prob*dprob + (1-prob)*(1-dprob));
+                    assert(newprob>0 && newprob<1);
+                    prob = newprob;
                 }
             }
         }
         // all other edges (exception, catch..) have lower probability
         double othersProb = edges.size() == 2 ? 0.0 : PROB_ALL_EXCEPTIONS;
-        trueEdge->setEdgeProb(MAX(PROB_ALL_EXCEPTIONS, prob - othersProb/2));
-        falseEdge->setEdgeProb(MAX(PROB_ALL_EXCEPTIONS, 1 - prob - othersProb/2));
+        trueEdge->setEdgeProb(prob - othersProb/2);
+        falseEdge->setEdgeProb(1 - prob - othersProb/2);
+        assert(trueEdge->getEdgeProb()!=0);
+        assert(falseEdge->getEdgeProb()!=0);
         probLeft = othersProb;
         edgesLeft-=2;
     }
@@ -567,6 +576,16 @@ static double storeHeuristic(const StaticProfilerContext* c) {
         return PROB_HEURISTIC_FAIL;
     }
     return node1Accepted ? 1 - PROB_STORE_HEURISTIC: PROB_STORE_HEURISTIC;
+}
+/**
+ * Give more prob to fallthru branch
+ */
+static double fallThruHeuristic(const StaticProfilerContext * c) {
+    Inst* inst = (Inst*)c->node->getLastInst();
+    if (inst->getOpcode() != Op_Branch) {
+        return PROB_HEURISTIC_FAIL;
+    }
+    return PROB_FALLTHRU_HEURISTIC;
 }
 
 /** Reference heuristic (RH)
