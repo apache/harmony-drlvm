@@ -764,6 +764,11 @@ NativeCodePtr compile_me(Method* method)
     compile_protect_arguments(method, &gc);
 
     tmn_suspend_enable();
+    if (method->is_abstract()) { 
+        compile_raise_exception("java/lang/AbstractMethodError", "", method); 
+        tmn_suspend_disable(); 
+        return NULL; 
+    } 
     JIT_Result res = compile_do_compilation(method);
     if (res != JIT_SUCCESS) {
         INFO2("compile", "Cannot compile " << method);
