@@ -11,4 +11,4 @@ thread/InfiniteFinalizer.java
 # fails on ubuntu 6
 
 stress/Threads.java
-
+stress/Mix.java
