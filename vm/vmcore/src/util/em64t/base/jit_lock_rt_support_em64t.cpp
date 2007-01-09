@@ -198,13 +198,16 @@ if(!VM_Global_State::loader_env->TI->isEnabled()) {
         lil_npc_to_fp(exn_get_rth_throw_illegal_monitor_state()));
 }else{
     return lil_parse_onto_end(cs,
-        "push_m2n 0, 0;"
+        "locals 1;"
+        "l0 = o0;"
+        "push_m2n 0, %0i;"
         "out platform:ref:void;"
         "o0 = l0;"
-        "call %0i;"
+        "call %1i;"
         "pop_m2n;"
         "ret;",
-        vm_monitor_exit);    
+        FRAME_NON_UNWINDABLE,
+        vm_monitor_exit);
 }
 }
 
