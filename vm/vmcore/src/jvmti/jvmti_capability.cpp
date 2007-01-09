@@ -380,7 +380,7 @@ jvmtiRelinquishCapabilities(jvmtiEnv* env,
     if (capabilities_ptr->can_pop_frame)
         ti->reset_global_capability(DebugUtilsTI::TI_GC_ENABLE_POP_FRAME);
 
-    // relinquishing following capabilies will not revert VM operation mode
+    // relinquishing following capabilities will not revert VM operation mode
     // back to optimized, so we do not reset global capabilities
     //
     //     TI_GC_ENABLE_MONITOR_EVENTS

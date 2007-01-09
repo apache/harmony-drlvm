@@ -151,11 +151,11 @@ static jvmtiError set_field_watch(jvmtiEnv* env, jclass klass, jfieldID field, W
     switch (watch_type)
     {
     case ACCESS:
-        TRACE("SetFieldAccessWatch successfull");
+        TRACE("SetFieldAccessWatch successful");
         break;
 
     case MODIFICATION:
-        TRACE("SetFieldModificationWatch successfull");
+        TRACE("SetFieldModificationWatch successful");
         break;
     }
 

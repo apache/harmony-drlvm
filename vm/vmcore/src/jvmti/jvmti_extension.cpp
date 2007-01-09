@@ -337,7 +337,7 @@ jvmtiError TIEnv::allocate_extension_event_callbacks_table()
  * Sets the callback function for an extension event and enables
  * the event. Or, if the callback is NULL, disables the event.
  * Note that unlike standard events, setting the callback and
- * nabling the event are a single operation.
+ * enabling the event are a single operation.
  *
  * REQUIRED Functionality.
  */

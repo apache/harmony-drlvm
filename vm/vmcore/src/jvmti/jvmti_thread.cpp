@@ -851,7 +851,7 @@ jvmtiGetThreadLocalStorage(jvmtiEnv* env,
     *data_ptr = NULL;
 
     //if (!vm_thread)
-    //    return JVMTI_ERROR_THREAD_NOT_ALIVE; // non-existant thread
+    //    return JVMTI_ERROR_THREAD_NOT_ALIVE; // non-existent thread
 
     JVMTILocalStorage* lstg = jthread_get_jvmti_local_storage(thread);
     if (lstg -> env == NULL) {

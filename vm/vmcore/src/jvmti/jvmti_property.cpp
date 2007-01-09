@@ -65,7 +65,7 @@ jvmtiAddToBootstrapClassLoaderSearch(jvmtiEnv* env,
     apr_pool_t *tmp_pool;
     apr_pool_create(&tmp_pool, NULL);
 
-    // check existance of a given path
+    // check existence of a given path
     apr_finfo_t finfo;
     if(apr_stat(&finfo, segment, APR_FINFO_SIZE, tmp_pool) != APR_SUCCESS) {
         // broken path to the file

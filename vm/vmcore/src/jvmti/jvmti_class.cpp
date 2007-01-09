@@ -41,7 +41,7 @@
 /*
  * The static function that extracts class from the handle.
  *
- * Also, it checks if TI environmemt is valid, the function may be called
+ * Also, it checks if TI environment is valid, the function may be called
  * in current phase, and the results pointers are not NULL.
  *
  * @param env - the TI environment this function is called for.

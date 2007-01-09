@@ -670,7 +670,7 @@ jint DebugUtilsTI::Init(JavaVM *vm)
     return 0;
 }
 
-/* Calls Agent_OnUnlod() for agents where it was found, then unloads agents.
+/* Calls Agent_OnUnLoad() for agents where it was found, then unloads agents.
 */
 void DebugUtilsTI::Shutdown(JavaVM *vm)
 {

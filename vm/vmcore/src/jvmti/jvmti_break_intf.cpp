@@ -260,7 +260,7 @@ VMBreakPoints::insert_native_breakpoint(VMBreakPoint* bp)
         else
         {
             assert(bp->addr == NULL);
-            TRACE2("jvmti.break.intf", "Skipping setting breakpoing in method "
+            TRACE2("jvmti.break.intf", "Skipping setting breakpoint in method "
                 << class_get_name(method_get_class(m)) << "."
                 << method_get_name(m)
                 << method_get_descriptor(m)
@@ -708,7 +708,7 @@ VMBreakPoints::process_native_breakpoint()
 
     // Now we need to return back to normal code execution, it is
     // necessary to execute the original instruction The idea is to
-    // recreate the original instriction in a special thread local
+    // recreate the original instruction in a special thread local
     // buffer followed by a jump to an instruction next after it. In
     // case the instruction was a relative jump or call it requires
     // special handling.
@@ -725,7 +725,7 @@ VMBreakPoints::process_native_breakpoint()
         char *next_instruction = (char *)interrupted_instruction +
             instruction_length;
 
-        // Copy original instruction to the exeuction buffer
+        // Copy original instruction to the execution buffer
         *instruction_buffer = orig_byte;
         memcpy(instruction_buffer + 1, interrupted_instruction + 1,
             instruction_length - 1);
@@ -1040,8 +1040,8 @@ VMBreakInterface::add_reference(jmethodID method, jlocation location,
     VMBreakPoint* brpt = vm_brpt->find_breakpoint(method, location);
 
     // If breakpoint with the same method location is not found or
-    // given native address is differ with obtained breapoint.
-    // The last case cound be if the same method location points
+    // given native address is differ with obtained breakpoint.
+    // The last case could be if the same method location points
     // to different native address.
     if ( !brpt || brpt->addr != addr )
     {
@@ -1279,7 +1279,7 @@ static bool set_native_breakpoint(VMBreakPoint* bp)
         bp->disasm = new InstructionDisassembler(bp->addr);
         assert(bp->disasm);
 
-        // instrumening code
+        // code instrumentation
         jbyte* target_instruction = (jbyte*)bp->addr;
         bp->saved_byte = *target_instruction;
         *target_instruction = (jbyte)INSTRUMENTATION_BYTE;
@@ -1299,10 +1299,10 @@ static bool clear_native_breakpoint(VMBreakPoint* bp)
     VMBreakPoints* vm_brpt = VM_Global_State::loader_env->TI->vm_brpt;
 
     // Looking for another breakpoint with the same address,
-    // currect breakpoint is already removed from breakpoint list.
+    // current breakpoint is already removed from breakpoint list.
     if (!vm_brpt->find_breakpoint(bp->addr))
     {
-        TRACE2("jvmti.break.intf", "Deinstrumenting native: "
+        TRACE2("jvmti.break.intf", "Deinstrumentation native: "
             << (bp->method ? class_get_name(method_get_class((Method*)bp->method)) : "" )
             << "."
             << (bp->method ? method_get_name((Method*)bp->method) : "" )

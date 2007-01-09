@@ -199,7 +199,7 @@ jvmtiSetBreakpoint(jvmtiEnv* env,
     if (!brpt_intf->add_reference(method, location, NULL))
         return JVMTI_ERROR_INTERNAL;
 
-    TRACE2("jvmti.break", "SetBreakpoint is successfull");
+    TRACE2("jvmti.break", "SetBreakpoint is successful");
     return JVMTI_ERROR_NONE;
 }
 
@@ -278,6 +278,6 @@ jvmtiClearBreakpoint(jvmtiEnv* env,
     if (!brpt_intf->remove_reference(bp_ref))
         return JVMTI_ERROR_INTERNAL;
 
-    TRACE2("jvmti.break", "ClearBreakpoint is successfull");
+    TRACE2("jvmti.break", "ClearBreakpoint is successful");
     return JVMTI_ERROR_NONE;
 }

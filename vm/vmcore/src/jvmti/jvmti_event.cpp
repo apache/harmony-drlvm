@@ -822,7 +822,7 @@ jvmti_process_method_exception_exit_event(jmethodID method,
     if (!ti->get_global_capability(DebugUtilsTI::TI_GC_ENABLE_METHOD_EXIT))
         return;
 
-    // save context from stack interation to m2n frame
+    // save context from stack iteration to m2n frame
     Registers regs;
     si_copy_to_registers(si, &regs);
     M2nFrame* m2nf = m2n_get_last_frame();
@@ -1905,7 +1905,7 @@ void jvmti_send_thread_start_end_event(int is_start)
         // This function is called when no java code in the new thread is
         // executed yet, so this function just sets single step state for this
         // thread. When this thread will be ran, calling the first java method
-        // will set a breakpoint on the first bytecode if this mehod.
+        // will set a breakpoint on the first bytecode if this method.
     }
     else
     {

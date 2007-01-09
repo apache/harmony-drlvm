@@ -346,7 +346,7 @@ jvmtiGetAllStackTraces(jvmtiEnv* env,
        return res;
     }
 
-    // geting thread states
+    // getting thread states
     for(int i = 0; i < count; i++) {
         info[i].thread = threads[i];
         res = jvmtiGetThreadState(env, threads[i], &info[i].state);
@@ -429,7 +429,7 @@ jvmtiGetThreadListStackTraces(jvmtiEnv* env,
 
     int i;
     jthread currentThread = getCurrentThread();
-    // stoping all threads
+    // stopping all threads
     for(i = 0; i < count; i++) {
         // FIXME: thread can be dead at this time
         // event handler for thread death should block thread death
@@ -448,7 +448,7 @@ jvmtiGetThreadListStackTraces(jvmtiEnv* env,
         }
     }
 
-    // geting thread states
+    // getting thread states
     for(i = 0; i < count; i++) {
         // Frame_buffer pointer should pointer to the memory right
         // after the jvmtiStackInfo structures

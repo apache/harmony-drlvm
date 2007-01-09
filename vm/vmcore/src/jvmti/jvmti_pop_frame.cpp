@@ -190,7 +190,7 @@ static void jvmti_jit_prepare_pop_frame(StackIterator* si, uint32* buf) {
     // pop java frame
     si_goto_previous(si);
 
-    // find correct ip and restore required regiksters context
+    // find correct ip and restore required registers context
     NativeCodePtr current_method_addr = NULL;
     NativeCodePtr ip = si_get_ip(si);
     TRACE(("PopFrame method %s.%s%s, set IP begin: %p",
@@ -236,7 +236,7 @@ static void jvmti_jit_prepare_pop_frame(StackIterator* si, uint32* buf) {
         }
     }
 
-    // set corrrrect ip
+    // set correct ip
     ip = (NativeCodePtr)(((char*)ip) - ip_reduce);
     TRACE(("PopFrame method %s.%s%s, set IP end: %p",
         class_get_name(method_get_class(si_get_code_chunk_info(si)->get_method())),
@@ -263,7 +263,7 @@ void jvmti_jit_prepare_pop_frame() {
         method_get_descriptor(si_get_code_chunk_info(si)->get_method()),
         si_get_ip(si) ));
 
-    // preare pop frame - find regs values
+    // prepare pop frame - find regs values
     uint32 buf = 0;
     jvmti_jit_prepare_pop_frame(si, &buf);
 
@@ -338,7 +338,7 @@ jvmti_relocate_single_step_breakpoints( StackIterator *si)
 
 void jvmti_jit_complete_pop_frame() {
     // Destructive Unwinding!!! NO CXX Logging put here.
-    TRACE(("Complite PopFrame for JIT"));
+    TRACE(("Complete PopFrame for JIT"));
 
     // Find top m2n frame
     M2nFrame* top_frame = m2n_get_last_frame();
@@ -358,7 +358,7 @@ void jvmti_jit_complete_pop_frame() {
     // relocate single step breakpoints
     jvmti_relocate_single_step_breakpoints(si);
 
-    // transfer cdontrol
+    // transfer control
     TRACE(("PopFrame transfer control to: %p",  (void*)si_get_ip(si) ));
     si_transfer_control(si);
 }
@@ -378,14 +378,14 @@ void jvmti_jit_do_pop_frame() {
     StackIterator* si = si_create_from_native();
     si_transfer_all_preserved_registers(si);
 
-    // preare pop frame - find regs values
+    // prepare pop frame - find regs values
     uint32 buf = 0;
     jvmti_jit_prepare_pop_frame(si, &buf);
 
     // relocate single step breakpoints
     jvmti_relocate_single_step_breakpoints(si);
 
-    // transfer cdontrol
+    // transfer control
     TRACE(("PopFrame transfer control to: %p",  (void*)si_get_ip(si) ));
     si_transfer_control(si);
 }

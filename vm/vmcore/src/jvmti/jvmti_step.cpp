@@ -90,7 +90,7 @@ NativeCodePtr static get_ip_for_invoke_call_ip(VM_thread* thread,
     else
         disasm = ip;
 
-    // Iterate over this bytecode instructions untill we reach an
+    // Iterate over this bytecode instructions until we reach an
     // indirect call in this bytecode which should be the
     // invikevirtual or invokeinterface call
     NativeCodePtr call_ip = NULL;
@@ -523,7 +523,7 @@ static void jvmti_start_single_step_in_virtual_method(DebugUtilsTI *ti, VMBreakP
             // compile_gen_compile_me.
             InstructionDisassembler stub_disasm(ip);
 #ifdef VM_STATS
-            // In case of VM_STATS first instuction should be
+            // In case of VM_STATS first instruction should be
             // skipped because it is a stats increment
             ip = (NativeCodePtr)((POINTER_SIZE_INT)ip + stub_disasm.get_length_with_prefix());
             stub_disasm = ip;

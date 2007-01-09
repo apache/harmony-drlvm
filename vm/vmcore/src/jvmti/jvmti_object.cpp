@@ -131,7 +131,7 @@ static bool is_same_object(jobject obj1, jobject obj2)
 {
     SuspendEnabledChecker sec;
 
-    // concider not equal if at least one of the objects is null 
+    // consider not equal if at least one of the objects is null 
     if (NULL == obj1 || NULL == obj2)
         return false;
 
@@ -219,7 +219,7 @@ jvmtiGetObjectMonitorUsage(jvmtiEnv* env,
     jthread_iterator_reset(&iterator);
 
     // fill the thread arrays
-    // nomber of monitor waiting threads could changed since array allocation
+    // number of monitor waiting threads could changed since array allocation
     for (jthread thread = jthread_iterator_next(&iterator); 
             thread != NULL; 
             thread = jthread_iterator_next(&iterator))
