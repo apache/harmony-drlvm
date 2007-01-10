@@ -532,7 +532,15 @@ Inliner::connectRegion(InlineNode* inlineNode) {
             {
                 Opnd* dst = inst->getDst(); 
                 Opnd* src = callInst->getSrc(j+2); // omit taus
-                Inst* copy = _instFactory.makeCopy(dst, src);
+                Inst* copy = NULL;
+                // todo: make translators isMagicClass and convertMagic2HIRType methods public
+                // use these methods here
+                if (dst->getType()->isUnmanagedPtr()==src->getType()->isUnmanagedPtr()) {
+                    copy = _instFactory.makeCopy(dst, src);
+                } else {
+                    Modifier mod = Modifier(Overflow_None)|Modifier(Exception_Never)|Modifier(Strict_No);
+                    copy = _instFactory.makeConv(mod, dst->getType()->tag, dst, src);
+                }
                 copy->insertBefore(inst);
                 inst->unlink();
                 inst = copy;

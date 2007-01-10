@@ -1,7 +1,7 @@
 #include <open/vm_gc.h>
 #include <jni.h>
 #include "../thread/gc_thread.h"
-
+#include "../gen/gen.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -16,6 +16,15 @@ JNIEXPORT jint JNICALL Java_org_apache_harmony_drlvm_gc_1gen_GCHelper_TLSGCOffse
 {
     return (jint)tls_gc_offset;
 }
+
+ 
+
+JNIEXPORT jint JNICALL Java_org_apache_harmony_drlvm_gc_1gen_GCHelper_getNosBoundary(JNIEnv *e, jclass c)
+{
+    return (jint)nos_boundary;
+}
+
+
 
 #ifdef __cplusplus
 }

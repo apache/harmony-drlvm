@@ -38,6 +38,7 @@ public class VMHelper {
 
     public static void monitorExit(Object obj) {fail();}
 
+    public static void writeBarrier(Address objBase, Address objSlot, Address source) {fail();}
 
 
     protected static void fail() {throw new RuntimeException("Not supported!");}

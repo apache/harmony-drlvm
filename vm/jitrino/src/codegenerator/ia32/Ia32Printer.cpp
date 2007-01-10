@@ -1184,7 +1184,10 @@ void IRLivenessDotPrinter::printNode(const Node * node)
                 regUsages.push_back(regUsage);
             }
 
-            assert(irManager->getLiveAtEntry(node)->isEqual(*lsCurrent));
+#ifdef _DEBUG
+            BitSet* entrySet = irManager->getLiveAtEntry(node);
+            assert(entrySet->isEqual(*lsCurrent));
+#endif
 
             StlVector<Opnd *> opndsAll(mm);
 

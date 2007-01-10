@@ -1876,8 +1876,8 @@ InstFactory::makeSelect(Opnd* dst, Opnd* src1, Opnd* src2, Opnd *src3) {
 // conversion
 Inst* InstFactory::makeConv(Modifier mod, Type::Tag toType, Opnd* dst, Opnd* src) {
     Opcode opcode = Op_Conv;
-    if (dst->getType()->isUnmanagedPtr() && src->getType()->isObject() 
-        || dst->getType()->isObject() && src->getType()->isUnmanagedPtr()) 
+    if ((dst->getType()->isUnmanagedPtr() && src->getType()->isObject()) 
+        || (dst->getType()->isObject() && src->getType()->isUnmanagedPtr())) 
     {
         opcode = Op_ConvUnmanaged;
     }

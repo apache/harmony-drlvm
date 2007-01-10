@@ -143,13 +143,13 @@ float   __stdcall   remF4   (float v0, float v1)    {
         return fnan;
     } else if (!_finite(v1)){
         return v0;
-	}     
+    }     
     float result = v0-float(int64(v0/v1))*v1;
     if (result == 0 && v1 < 0) {
 #ifdef PLATFORM_POSIX
-		return copysign(result, v1);
+        return copysign(result, v1);
 #else
-		return (float)_copysign(result, v1);
+        return (float)_copysign(result, v1);
 #endif
     } else {
         return result;  
@@ -162,13 +162,13 @@ double  __stdcall   remF8   (double v0, double v1)  {
         return dnan;
     } else if (!_finite(v1)){
         return v0;
-	} 
+    } 
     double result = v0-double(int64(v0/v1))*v1;
     if (result == 0 && v1 < 0) {
 #ifdef PLATFORM_POSIX
-		return copysign(result, v1);
+        return copysign(result, v1);
 #else
-		return _copysign(result, v1);
+        return _copysign(result, v1);
 #endif
     } else {
         return result;  
@@ -1492,7 +1492,7 @@ CG_OpndHandle*    InstCodeSelector::ldc_i4(uint32 val)
 
 CG_OpndHandle*    InstCodeSelector::ldc_i8(uint64 val) 
 { 
-#ifndef _EM64T_	
+#ifndef _EM64T_ 
     return irManager.newImmOpnd(typeManager.getInt64Type(), val);
 #else
     Opnd * tmp = irManager.newOpnd(typeManager.getInt64Type());
@@ -2885,6 +2885,7 @@ CG_OpndHandle* InstCodeSelector::callvmhelper(uint32              numArgs,
     case CompilationInterface::Helper_NewVector_UsingVtable:
     case CompilationInterface::Helper_ObjMonitorEnter:
     case CompilationInterface::Helper_ObjMonitorExit:
+    case CompilationInterface::Helper_WriteBarrier:
     {
         dstOpnd = retType==NULL ? NULL: irManager.newOpnd(retType);
         CallInst * callInst=irManager.newRuntimeHelperCallInst(callId, numArgs, (Opnd**)args, dstOpnd);

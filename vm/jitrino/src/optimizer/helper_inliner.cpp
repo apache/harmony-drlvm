@@ -44,6 +44,7 @@ DECLARE_STANDARD_HELPER_FLAGS(newObj);
 DECLARE_STANDARD_HELPER_FLAGS(newArray);
 DECLARE_STANDARD_HELPER_FLAGS(objMonEnter);
 DECLARE_STANDARD_HELPER_FLAGS(objMonExit);
+DECLARE_STANDARD_HELPER_FLAGS(wb);
     
 };
 
@@ -92,6 +93,10 @@ void HelperInlinerAction::init() {
 
     READ_STANDARD_HELPER_FLAGS(objMonExit);
     flags.objMonExit_signature = "(Ljava/lang/Object;)V";
+
+    READ_STANDARD_HELPER_FLAGS(wb);
+    flags.wb_signature = "(Lorg/vmmagic/unboxed/Address;Lorg/vmmagic/unboxed/Address;Lorg/vmmagic/unboxed/Address;)V";
+
 }
 
 
@@ -152,6 +157,7 @@ DECLARE_HELPER_INLINER(NewObjHelperInliner, newObj)
 DECLARE_HELPER_INLINER(NewArrayHelperInliner, newArray)
 DECLARE_HELPER_INLINER(ObjMonitorEnterHelperInliner, objMonEnter)
 DECLARE_HELPER_INLINER(ObjMonitorExitHelperInliner, objMonExit)
+DECLARE_HELPER_INLINER(WriteBarrierHelperInliner, wb)
 
 void HelperInlinerSession::_run(IRManager& irm) {
     CompilationContext* cc = getCompilationContext();
@@ -193,6 +199,12 @@ void HelperInlinerSession::_run(IRManager& irm) {
                             helperInliners.push_back(new (tmpMM) ObjMonitorExitHelperInliner(this, tmpMM, cc, inst));
                         }
                         break;
+                    case Op_TauStRef:
+                        if (flags.wb_doInlining && nodePercent >= flags.wb_hotnessPercentToInline) {
+                            helperInliners.push_back(new (tmpMM) WriteBarrierHelperInliner(this, tmpMM, cc, inst));
+                        }
+                        break;
+
                     default: break;
                 }
             }
@@ -268,7 +280,7 @@ void HelperInliner::inlineVMHelper(MethodCallInst* origCall) {
         //add all methods with pragma inline into the list.
         const Nodes& nodesInRegion = regionToInline->getIRManager().getFlowGraph().getNodes();
         for (Nodes::const_iterator it = nodesInRegion.begin(), end = nodesInRegion.end(); it!=end; ++it) {
-        	Node* node = *it;
+            Node* node = *it;
             for (Inst* inst = (Inst*)node->getFirstInst(); inst!=NULL; inst = inst->getNextInst()) {
                 if (inst->isMethodCall()) {
                     MethodCallInst* methodCall = inst->asMethodCallInst();
@@ -447,6 +459,49 @@ void ObjMonitorExitHelperInliner::doInline() {
     inlineVMHelper(call);
 #endif
 }
+
+void WriteBarrierHelperInliner::doInline() {
+#if defined  (_EM64T_) || defined (_IPF_)
+    return;
+#else
+    assert(inst->getOpcode() == Op_TauStRef);
+
+    Opnd* srcOpnd = inst->getSrc(0);
+    Opnd* ptrOpnd = inst->getSrc(1);
+    Opnd* objBaseOpnd = inst->getSrc(2);
+    assert(srcOpnd->getType()->isObject());
+    assert(ptrOpnd->getType()->isPtr());
+    assert(objBaseOpnd->getType()->isObject());
+    Opnd* tauSafeOpnd = opndManager->createSsaTmpOpnd(typeManager->getTauType());
+    instFactory->makeTauSafe(tauSafeOpnd)->insertBefore(inst);
+    Opnd* args[3] = {objBaseOpnd, ptrOpnd, srcOpnd};
+    MethodCallInst* call = instFactory->makeDirectCall(opndManager->getNullOpnd(), tauSafeOpnd, tauSafeOpnd, 3, args, method)->asMethodCallInst();
+    call->insertBefore(inst);
+    inst->unlink();
+    
+    if (call != call->getNode()->getLastInst()) {
+        cfg->splitNodeAtInstruction(call, true, true, instFactory->makeLabel());
+    }
+
+    //every call must have exception edge -> add it
+    if (call->getNode()->getExceptionEdge() == NULL) {
+        Node* node = call->getNode();
+        Node* dispatchNode = node->getUnconditionalEdgeTarget()->getExceptionEdgeTarget();
+        if (dispatchNode == NULL) {
+            dispatchNode = cfg->getUnwindNode();
+            if (dispatchNode == NULL) {
+                dispatchNode = cfg->createDispatchNode(instFactory->makeLabel());
+                cfg->setUnwindNode(dispatchNode);
+                cfg->addEdge(dispatchNode, cfg->getExitNode());
+            }
+        }
+        cfg->addEdge(node, dispatchNode);
+    }
+
+    inlineVMHelper(call);
+#endif
+}
+
 
 }//namespace
 

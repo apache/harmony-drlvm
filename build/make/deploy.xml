@@ -51,6 +51,7 @@ Description of the product deploy folder.
 
         <gc_gen>
             <shared>bin/default:gc_gen</shared>
+            <jar>bin/default:gc_gen</jar>
         </gc_gen>
 
         <gc_cc>

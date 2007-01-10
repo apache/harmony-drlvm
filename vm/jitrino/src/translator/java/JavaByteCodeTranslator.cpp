@@ -4019,6 +4019,12 @@ void JavaByteCodeTranslator::genVMHelper(MethodDesc *md, uint32 numArgs, Opnd **
         return;
     }
 
+    if (!strcmp(mname,"writeBarrier")) {
+        assert(numArgs == 3);
+        irBuilder.genVMHelperCall(CompilationInterface::Helper_WriteBarrier, resType, numArgs, srcOpnds);
+        return;
+    }
+
     assert(0);
 }
 
