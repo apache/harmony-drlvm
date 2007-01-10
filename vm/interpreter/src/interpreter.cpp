@@ -2522,6 +2522,7 @@ interpreter(StackFrame &frame) {
     uint8 ip0 = 0;
     bool breakpoint_processed = false;
     int stackLength = 0;
+    size_t available;
     
     DEBUG_TRACE_PLAIN("interpreter: "
             << class_get_name(method_get_class(frame.method))
@@ -2536,14 +2537,18 @@ interpreter(StackFrame &frame) {
          goto got_exception;
     }
     assert(!hythread_is_suspend_enabled());
+
+
+
+    available = get_available_stack_size();
     
-    first = (uint8*) get_thread_ptr()->firstFrame;
-    stackLength = ((uint8*)first) - ((uint8*)&frame);
-    if (stackLength > 500000) { // FIXME: hardcoded stack limit
-        if (!(get_thread_ptr()->interpreter_state & INTERP_STATE_STACK_OVERFLOW)) {
-            get_thread_ptr()->interpreter_state |= INTERP_STATE_STACK_OVERFLOW;
+    if (available < 100000) {
+        int &state = get_thread_ptr()->interpreter_state;
+
+        if (!(state & INTERP_STATE_STACK_OVERFLOW)) {
+            state |= INTERP_STATE_STACK_OVERFLOW;
             interp_throw_exception("java/lang/StackOverflowError");
-            get_thread_ptr()->interpreter_state &= ~INTERP_STATE_STACK_OVERFLOW;
+            state &= ~INTERP_STATE_STACK_OVERFLOW;
 
             if (frame.framePopListener)
                 frame_pop_callback(frame.framePopListener, frame.method, true);
