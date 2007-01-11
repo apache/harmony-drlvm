@@ -341,13 +341,15 @@ bool Inst::replaceOpnd(Opnd * oldOpnd, Opnd * newOpnd, uint32 opndRoleMask)
 
 bool Inst::getPureDefProperty() const {
     if (getProperties() & Properties_PureDef) {
+        assert(getOpndCount(OpndRole_InstLevel|OpndRole_Use)==2);
         Opnd * use = NULL;
         for (uint32 i=0, n=getOpndCount(); i<n; i++){
-            if(!use) {
-                use = getOpnd(i);
-            } else if (getOpndRoles(i)&OpndRole_Use) {
-                assert(getOpndCount(OpndRole_InstLevel|OpndRole_Use)==2);
-                return use == getOpnd(i);
+            if (getOpndRoles(i)&OpndRole_Use) {
+                if(!use) {
+                   use = getOpnd(i);
+                } else {            
+                    return use == getOpnd(i);
+                }
             }
         }
     }
