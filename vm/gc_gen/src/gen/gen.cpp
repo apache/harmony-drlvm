@@ -21,11 +21,25 @@
 #include "port_sysinfo.h"
 
 #include "gen.h"
+#include "../finalizer_weakref/finalizer_weakref.h"
+#include "../verify/verify_live_heap.h"
+#include "../common/space_tuner.h"
 
 /* fspace size limit is not interesting. only for manual tuning purpose */
-unsigned int min_nos_size_bytes = 2 * MB;
-unsigned int max_nos_size_bytes = 64 * MB;
+unsigned int min_nos_size_bytes = 16 * MB;
+unsigned int max_nos_size_bytes = 256 * MB;
 unsigned int NOS_SIZE = 0;
+unsigned int MIN_NOS_SIZE = 0;
+unsigned int MAX_NOS_SIZE = 0;
+
+static unsigned int MINOR_ALGO = 0;
+static unsigned int MAJOR_ALGO = 0;
+
+#ifndef STATIC_NOS_MAPPING
+void* nos_boundary;
+#endif
+
+#define RESERVE_BOTTOM ((void*)0x1000000)
 
 static void gc_gen_get_system_info(GC_Gen *gc_gen) 
 {
@@ -36,73 +50,133 @@ static void gc_gen_get_system_info(GC_Gen *gc_gen)
 void gc_gen_initialize(GC_Gen *gc_gen, unsigned int min_heap_size, unsigned int max_heap_size) 
 {
   assert(gc_gen); 
-  assert(max_heap_size <= max_heap_size_bytes);
 
-  min_heap_size = round_up_to_size(min_heap_size, GC_BLOCK_SIZE_BYTES);
-  max_heap_size = round_up_to_size(max_heap_size, GC_BLOCK_SIZE_BYTES);
+  /*Give GC a hint of gc survive ratio.*/
+  gc_gen->survive_ratio = 0.2f;
+
+  /*fixme: max_heap_size should not beyond 448 MB*/
+  max_heap_size = round_down_to_size(max_heap_size, SPACE_ALLOC_UNIT);
+  min_heap_size = round_up_to_size(min_heap_size, SPACE_ALLOC_UNIT);
+  assert(max_heap_size <= max_heap_size_bytes);
+  assert(max_heap_size > min_heap_size_bytes);
 
   gc_gen_get_system_info(gc_gen); 
+  min_nos_size_bytes *=  gc_gen->_num_processors;
+  
+  if( MIN_NOS_SIZE )  min_nos_size_bytes = MIN_NOS_SIZE;
 
-  void *reserved_base = NULL;
+  unsigned int los_size = max_heap_size >> 7;
+  if(los_size < GC_MIN_LOS_SIZE) 
+    los_size = GC_MIN_LOS_SIZE;
+  
+  los_size = round_down_to_size(los_size, SPACE_ALLOC_UNIT);
+
+  /* let's compute and reserve the space for committing */
+  
+  /* heuristic nos + mos + LOS = max, and nos*ratio = mos */
+  unsigned int nos_reserve_size,  nos_commit_size; 
+  unsigned int mos_reserve_size, mos_commit_size; 
+  unsigned int los_mos_size;
+  
+
+  if(NOS_SIZE){
+    los_mos_size = max_heap_size - NOS_SIZE;
+    mos_reserve_size = los_mos_size - los_size;  
+
+    nos_commit_size = NOS_SIZE;
+    nos_reserve_size = NOS_SIZE;
+  
+  }else{  
+    los_mos_size = max_heap_size;
+    mos_reserve_size = los_mos_size - los_size;
+    nos_commit_size = (unsigned int)(((float)(max_heap_size - los_size))/(1.0f + gc_gen->survive_ratio));
+    nos_reserve_size = mos_reserve_size;
+  }
+    
+  nos_commit_size = round_down_to_size(nos_commit_size, SPACE_ALLOC_UNIT);  
+  mos_commit_size = max_heap_size - los_size - nos_commit_size;
 
   /* allocate memory for gc_gen */
-  gc_gen->allocated_memory = NULL;
-  pool_create(&gc_gen->aux_pool, 0);
-  
-  apr_status_t status = port_vmem_reserve(&gc_gen->allocated_memory, 
-                  &reserved_base, max_heap_size, 
-                  PORT_VMEM_MODE_READ | PORT_VMEM_MODE_WRITE, 
-                  gc_gen->_machine_page_size_bytes, gc_gen->aux_pool);
-  
-  while(APR_SUCCESS != status){
-    max_heap_size -= gc_gen->_machine_page_size_bytes;
-    status = port_vmem_reserve(&gc_gen->allocated_memory, 
-                  &reserved_base, max_heap_size, 
-                  PORT_VMEM_MODE_READ | PORT_VMEM_MODE_WRITE, 
-                  gc_gen->_machine_page_size_bytes, gc_gen->aux_pool);  
+  void* reserved_base;
+  void* reserved_end;
+  void* nos_base;
+
+#ifdef STATIC_NOS_MAPPING
+
+  assert((unsigned int)nos_boundary%SPACE_ALLOC_UNIT == 0);
+  nos_base = vm_reserve_mem(nos_boundary, nos_reserve_size);
+  if( nos_base != nos_boundary ){
+    printf("Static NOS mapping: Can't reserve memory at %x for size %x for NOS.\n", nos_boundary, nos_reserve_size);  
+    printf("Please not use static NOS mapping by undefining STATIC_NOS_MAPPING, or adjusting NOS_BOUNDARY value.\n");
+    exit(0);
   }
-  assert(max_heap_size > min_heap_size_bytes);
-  gc_gen->reserved_heap_size = max_heap_size;
+  reserved_end = (void*)((unsigned int)nos_base + nos_reserve_size);
+
+  void* los_mos_base = (void*)((unsigned int)nos_base - los_mos_size);
+  assert(!((unsigned int)los_mos_base%SPACE_ALLOC_UNIT));
+  reserved_base = vm_reserve_mem(los_mos_base, los_mos_size);
+  while( !reserved_base || reserved_base >= nos_base){
+    los_mos_base = (void*)((unsigned int)los_mos_base - SPACE_ALLOC_UNIT);
+    if(los_mos_base < RESERVE_BOTTOM){
+      printf("Static NOS mapping: Can't allocate memory at address %x for specified size %x for MOS", reserved_base, los_mos_size);  
+      exit(0);      
+    }
+    reserved_base = vm_reserve_mem(los_mos_base, los_mos_size);
+  }
+  
+#else /* STATIC_NOS_MAPPING */
+
+  reserved_base = vm_reserve_mem(0, max_heap_size);
+  while( !reserved_base ){
+    printf("Non-static NOS mapping: Can't allocate memory at address %x for specified size %x", reserved_base, max_heap_size);  
+    exit(0);      
+  }
+  reserved_end = (void*)((unsigned int)reserved_base + max_heap_size);
+    
+  /* compute first time nos_boundary */
+  nos_base = (void*)((unsigned int)reserved_base + mos_commit_size + los_size);
+  /* init nos_boundary if NOS is not statically mapped */
+  nos_boundary = nos_base; 
+
+#endif  /* STATIC_NOS_MAPPING else */
+
+  gc_gen->reserved_heap_size = los_size + nos_reserve_size + mos_reserve_size;
   gc_gen->heap_start = reserved_base;
-  gc_gen->heap_end = (void*)((unsigned int)reserved_base + max_heap_size);
+  gc_gen->heap_end = reserved_end;
   gc_gen->blocks = (Block*)reserved_base;
   gc_gen->num_collections = 0;
-
-  /* heuristic nos + mos + LOS */
-  unsigned int los_size = max_heap_size >> 2;
+  gc_gen->time_collections = 0;
+  gc_gen->force_major_collect = FALSE;
+  
   gc_los_initialize(gc_gen, reserved_base, los_size);
 
-  unsigned int mos_size = max_heap_size >> 1;
   reserved_base = (void*)((unsigned int)reserved_base + los_size);
-  gc_mos_initialize(gc_gen, reserved_base, mos_size);
-  
-  unsigned int nos_size; 
-  if(NOS_SIZE){
-    assert( NOS_SIZE>=min_nos_size_bytes && NOS_SIZE<=max_nos_size_bytes);
-    nos_size = NOS_SIZE;  
-  }else
-    nos_size =  max_heap_size >> 4;
-  
-  if(nos_size < min_nos_size_bytes ) nos_size = min_nos_size_bytes;  
-  if(nos_size > max_nos_size_bytes ) nos_size = max_nos_size_bytes;  
-  
-  reserved_base = (void*)((unsigned int)reserved_base + mos_size);
-  gc_nos_initialize(gc_gen, reserved_base, nos_size); 
+  gc_mos_initialize(gc_gen, reserved_base, mos_reserve_size, mos_commit_size);
 
+  gc_nos_initialize(gc_gen, nos_base, nos_reserve_size, nos_commit_size); 
+    
   /* connect mos and nos, so that they can be compacted as one space */
   Blocked_Space* mos = (Blocked_Space*)gc_get_mos(gc_gen);
   Blocked_Space* nos = (Blocked_Space*)gc_get_nos(gc_gen);
   Block_Header* mos_last_block = (Block_Header*)&mos->blocks[mos->num_managed_blocks-1];
   Block_Header* nos_first_block = (Block_Header*)&nos->blocks[0];
   mos_last_block->next = nos_first_block;
-  assert(space_heap_end((Space*)mos) == space_heap_start((Space*)nos));
+  
+  nos->collect_algorithm = MINOR_ALGO;
+  mos->collect_algorithm = MAJOR_ALGO;
+
+  /*Give GC a hint of space survive ratio.*/
+  nos->survive_ratio = gc_gen->survive_ratio;
+  mos->survive_ratio = gc_gen->survive_ratio;
+  gc_space_tuner_initialize((GC*)gc_gen);
     
   gc_gen->committed_heap_size = space_committed_size((Space*)gc_gen->nos) +
                                 space_committed_size((Space*)gc_gen->mos) +
                                 space_committed_size((Space*)gc_gen->los);
   
-  set_native_finalizer_thread_flag(TRUE);
-  set_native_ref_enqueue_thread_flag(TRUE);
+
+  set_native_finalizer_thread_flag(!IGNORE_FINREF);
+  set_native_ref_enqueue_thread_flag(!IGNORE_FINREF);
   
   return;
 }
@@ -118,6 +192,14 @@ void gc_gen_destruct(GC_Gen *gc_gen)
   gc_los_destruct(gc_gen);  
   gc_gen->los = NULL;
 
+  Space* nos = (Space*)gc_gen->nos;
+  Space* mos = (Space*)gc_gen->mos;
+  Space* los = (Space*)gc_gen->los;
+
+  vm_unmap_mem(nos->heap_start, space_committed_size(nos));
+  vm_unmap_mem(mos->heap_start, space_committed_size(mos));
+  vm_unmap_mem(los->heap_start, space_committed_size(los));
+
   return;  
 }
 
@@ -132,45 +214,138 @@ void gc_set_mos(GC_Gen* gc, Space* mos){ gc->mos = (Mspace*)mos;}
 void gc_set_los(GC_Gen* gc, Space* los){ gc->los = (Lspace*)los;}
 unsigned int gc_get_processor_num(GC_Gen* gc){ return gc->_num_processors;}
 
+
 static Boolean major_collection_needed(GC_Gen* gc)
 {
-  return mspace_free_memory_size(gc->mos) < fspace_used_memory_size(gc->nos);  
+  return space_used_memory_size((Blocked_Space*)gc->nos)*gc->survive_ratio > (space_free_memory_size((Blocked_Space*)gc->mos));
 }
 
-unsigned int gc_decide_collection_kind(GC_Gen* gc, unsigned int cause)
+Boolean FORCE_FULL_COMPACT = FALSE;
+
+void gc_decide_collection_kind(GC_Gen* gc, unsigned int cause)
 {
-  if(major_collection_needed(gc) || cause== GC_CAUSE_LOS_IS_FULL)
-    return  MAJOR_COLLECTION;
-    
-  return MINOR_COLLECTION;     
+  /* this is for debugging. */
+  gc->last_collect_kind = gc->collect_kind;
+  
+  if(gc->force_major_collect || cause== GC_CAUSE_LOS_IS_FULL || FORCE_FULL_COMPACT)
+    gc->collect_kind = MAJOR_COLLECTION;
+  else
+    gc->collect_kind = MINOR_COLLECTION;
+
+  return;
 }
+
+void gc_decide_collection_algorithm(GC_Gen* gc, char* minor_algo, char* major_algo)
+{
+  if(!minor_algo){
+    MINOR_ALGO = MINOR_NONGEN_FORWARD_POOL;      
+    gc_disable_gen_mode();
+  
+  }else{
+    string_to_upper(minor_algo);
+     
+    if(!strcmp(minor_algo, "MINOR_NONGEN_FORWARD_POOL")){  
+      MINOR_ALGO = MINOR_NONGEN_FORWARD_POOL;
+      gc_disable_gen_mode();
+      
+    }else if(!strcmp(minor_algo, "MINOR_GEN_FORWARD_POOL")){
+      MINOR_ALGO = MINOR_GEN_FORWARD_POOL;
+      gc_enable_gen_mode();
+    
+    }else{
+      printf("\nGC algorithm setting incorrect. Will use default value.\n");  
+    
+    }
+  }
+  
+  if(!major_algo){
+    MAJOR_ALGO= MAJOR_COMPACT_SLIDE;
+    
+  }else{
+    string_to_upper(major_algo);
+
+    if(!strcmp(major_algo, "MAJOR_COMPACT_SLIDE")){
+     MAJOR_ALGO= MAJOR_COMPACT_SLIDE;
+          
+    }else if(!strcmp(major_algo, "MAJOR_COMPACT_MOVE")){
+     MAJOR_ALGO= MAJOR_COMPACT_MOVE;
+
+    }else{
+     printf("\nGC algorithm setting incorrect. Will use default algorithm.\n");  
+      
+    }
+  }
+  
+  return;
+  
+}
+
+Boolean IS_FALLBACK_COMPACTION = FALSE; /* only for debugging, don't use it. */
 
 void gc_gen_reclaim_heap(GC_Gen* gc)
-{  
+{ 
+  if(verify_live_heap) gc_verify_heap((GC*)gc, TRUE);
+
+  int64 start_time = time_now();
+
+  Blocked_Space* fspace = (Blocked_Space*)gc->nos;
+  Blocked_Space* mspace = (Blocked_Space*)gc->mos;
+  mspace->num_used_blocks = mspace->free_block_idx - mspace->first_block_idx;
+  fspace->num_used_blocks = fspace->free_block_idx - fspace->first_block_idx;
+
+  gc->collect_result = TRUE;
+  
   if(gc->collect_kind == MINOR_COLLECTION){
-    if( gc_requires_barriers()) /* normal gen gc nos collection */
-      fspace_collection(gc->nos);
-    else{ /* copy nos to mos for non-gen gc */
-      /* we don't move mos objects in MINOR_COLLECTION. This is true for both 
-        gen or non-gen collections, but only meaningful for non-gen GC, because
-        non-gen GC need mark the heap in order to find the refs from mos/los to nos.
-        This can save lots of reloc table space for slots having ref pointing to mos.
-        For gen GC, MINOR_COLLECTION doesn't really mark the heap. It has remsets that
-        have all the refs from mos/los to nos, which are actually the same thing as reloc table */
-      gc->mos->move_object = FALSE;
-      fspace_collection(gc->nos);
-      gc->mos->move_object = TRUE;
+    /* FIXME:: move_object is only useful for nongen_slide_copy */
+    gc->mos->move_object = FALSE;
+    
+    fspace_collection(gc->nos);
+    
+    gc->mos->move_object = TRUE;      
+
       
-      /* these are only needed for non-gen MINOR_COLLECTION, because 
-        both mos and los will be collected (and reset) in MAJOR_COLLECTION */
-      reset_mspace_after_copy_nursery(gc->mos);
-      reset_lspace_after_copy_nursery(gc->los);
-    }
   }else{
+
     /* process mos and nos together in one compaction */
     mspace_collection(gc->mos); /* fspace collection is included */
     lspace_collection(gc->los);
+
+  }
+
+  if(gc->collect_result == FALSE && gc->collect_kind == MINOR_COLLECTION){
+    
+    if(gc_is_gen_mode())
+      gc_clear_remset((GC*)gc);  
+    
+    /* runout mspace in minor collection */
+    assert(mspace->free_block_idx == mspace->ceiling_block_idx + 1);
+    mspace->num_used_blocks = mspace->num_managed_blocks;
+
+    IS_FALLBACK_COMPACTION = TRUE;
+
+    gc_reset_collect_result((GC*)gc);
+    gc->collect_kind = FALLBACK_COLLECTION;    
+
+    mspace_collection(gc->mos); /* fspace collection is included */
+    lspace_collection(gc->los);
+    
+    IS_FALLBACK_COMPACTION = FALSE;
+    
   }
   
+  if( gc->collect_result == FALSE){
+    printf("Out of Memory!\n");
+    assert(0);
+    exit(0);
+  }
+  
+  int64 pause_time = time_now() - start_time;
+  
+  gc->time_collections += pause_time;
+  
+  if(verify_live_heap) gc_verify_heap((GC*)gc, FALSE);
+
+  gc_gen_adapt(gc, pause_time);
+
   return;
 }

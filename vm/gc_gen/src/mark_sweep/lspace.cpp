@@ -30,22 +30,17 @@ void lspace_initialize(GC* gc, void* start, unsigned int lspace_size)
   assert(lspace);
   memset(lspace, 0, sizeof(Lspace));
 
+  /* commit mspace mem */    
   void* reserved_base = start;
   unsigned int committed_size = lspace_size;
-  int status = port_vmem_commit(&reserved_base, committed_size, gc->allocated_memory); 
-  assert(status == APR_SUCCESS && reserved_base == start);
+  vm_commit_mem(reserved_base, lspace_size);
+  memset(reserved_base, 0, lspace_size);
 
-  memset(reserved_base, 0, committed_size);
   lspace->committed_heap_size = committed_size;
-  lspace->reserved_heap_size = lspace_size - committed_size;
+  lspace->reserved_heap_size = committed_size;
   lspace->heap_start = reserved_base;
   lspace->heap_end = (void *)((unsigned int)reserved_base + committed_size);
 
-  /*Treat with mark bit table*/
-  unsigned int num_words = LSPACE_SIZE_TO_MARKTABLE_SIZE_WORDS(lspace_size);
-  lspace->mark_table = (unsigned int*)STD_MALLOC( num_words*BYTES_PER_WORD );
-  memset(lspace->mark_table, 0, num_words*BYTES_PER_WORD);
-  lspace->mark_object_func = lspace_mark_object;
   lspace->move_object = FALSE;
   lspace->gc = gc;
 
@@ -56,6 +51,10 @@ void lspace_initialize(GC* gc, void* start, unsigned int lspace_size)
   initial_fa->size = lspace->committed_heap_size;
   free_pool_add_area(lspace->free_pool, initial_fa);
 
+  lspace->num_collections = 0;
+  lspace->time_collections = 0;
+  lspace->survive_ratio = 0.5f;
+
   gc_set_los((GC_Gen*)gc, (Space*)lspace);
   los_boundary = lspace->heap_end;
 
@@ -64,47 +63,42 @@ void lspace_initialize(GC* gc, void* start, unsigned int lspace_size)
 
 void lspace_destruct(Lspace* lspace)
 {
-  //FIXME:: decommit lspace space
-  STD_FREE(lspace->mark_table);
   STD_FREE(lspace);
   lspace = NULL;
   return;
 }
 
-Boolean lspace_mark_object(Lspace* lspace, Partial_Reveal_Object* p_obj)
+#include "../common/fix_repointed_refs.h"
+
+/* this is minor collection, lspace is not swept, so we need clean markbits */
+void lspace_fix_after_copy_nursery(Collector* collector, Lspace* lspace)
 {
-  assert( obj_belongs_to_space(p_obj, (Space*)lspace));
-  unsigned int word_index = OBJECT_WORD_INDEX_TO_LSPACE_MARKBIT_TABLE(lspace, p_obj);
-  unsigned int bit_offset_in_word = OBJECT_WORD_OFFSET_IN_LSPACE_MARKBIT_TABLE(lspace, p_obj);
-
-  unsigned int* p_word = &(lspace->mark_table[word_index]);
-  unsigned int word_mask = (1<<bit_offset_in_word);
-
-  unsigned int old_value = *p_word;
-  unsigned int new_value = old_value|word_mask;
-
-  while(old_value != new_value){
-    unsigned int temp = atomic_cas32(p_word, new_value, old_value);
-    if(temp == old_value) return TRUE;
-    old_value = *p_word;
-    new_value = old_value|word_mask;
+  unsigned int mark_bit_idx = 0;
+  Partial_Reveal_Object* p_obj = lspace_get_first_marked_object(lspace, &mark_bit_idx);
+  while( p_obj){
+    assert(obj_is_marked_in_vt(p_obj));
+    obj_unmark_in_vt(p_obj);
+    object_fix_ref_slots(p_obj);
+    p_obj = lspace_get_next_marked_object(lspace, &mark_bit_idx);
   }
-
-  return FALSE;
 }
 
-void reset_lspace_after_copy_nursery(Lspace* lspace)
+void lspace_fix_repointed_refs(Collector* collector, Lspace* lspace)
 {
-  unsigned int marktable_size = LSPACE_SIZE_TO_MARKTABLE_SIZE_BYTES(lspace->committed_heap_size);
-  memset(lspace->mark_table, 0, marktable_size); 
-  return;  
+  unsigned int start_pos = 0;
+  Partial_Reveal_Object* p_obj = lspace_get_first_marked_object(lspace, &start_pos);
+  while( p_obj){
+    assert(obj_is_marked_in_vt(p_obj));
+    object_fix_ref_slots(p_obj);
+    p_obj = lspace_get_next_marked_object(lspace, &start_pos);
+  }
 }
 
 void lspace_collection(Lspace* lspace)
 {
   /* heap is marked already, we need only sweep here. */
+  lspace->num_collections ++;
+  lspace_reset_after_collection(lspace);  
   lspace_sweep(lspace);
-  unsigned int marktable_size = LSPACE_SIZE_TO_MARKTABLE_SIZE_BYTES(lspace->committed_heap_size);
-  memset(lspace->mark_table, 0, marktable_size); 
   return;
 }

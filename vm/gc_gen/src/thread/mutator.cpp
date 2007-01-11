@@ -28,18 +28,19 @@ void mutator_initialize(GC* gc, void *unused_gc_information)
 {
   /* FIXME:: make sure gc_info is cleared */
   Mutator *mutator = (Mutator *)STD_MALLOC(sizeof(Mutator));
-  mutator->free = NULL;
-  mutator->ceiling = NULL;
-  mutator->alloc_block = NULL;
+  memset(mutator, 0, sizeof(Mutator));
   mutator->alloc_space = gc_get_nos((GC_Gen*)gc);
   mutator->gc = gc;
     
-  if(gc_requires_barriers()){
-    mutator->rem_set = pool_get_entry(gc->metadata->free_set_pool);
+  if(gc_is_gen_mode()){
+    mutator->rem_set = free_set_pool_get_entry(gc->metadata);
     assert(vector_block_is_empty(mutator->rem_set));
   }
   
-  mutator->objects_with_finalizer = finalizer_weakref_get_free_block();
+  if(!IGNORE_FINREF )
+    mutator->obj_with_fin = finref_get_free_block();
+  else
+    mutator->obj_with_fin = NULL;
        
   lock(gc->mutator_list_lock);     // vvvvvvvvvvvvvvvvvvvvvvvvvvvvvv
 
@@ -60,14 +61,16 @@ void mutator_destruct(GC* gc, void *unused_gc_information)
 
   Mutator *mutator = (Mutator *)gc_get_tls();
 
-  if(gc_requires_barriers()){ /* put back the remset when a mutator exits */
+  alloc_context_reset((Allocator*)mutator);
+
+  if(gc_is_gen_mode()){ /* put back the remset when a mutator exits */
     pool_put_entry(gc->metadata->mutator_remset_pool, mutator->rem_set);
     mutator->rem_set = NULL;
   }
   
-  if(mutator->objects_with_finalizer){
-    pool_put_entry(gc->finalizer_weakref_metadata->objects_with_finalizer_pool, mutator->objects_with_finalizer);
-    mutator->objects_with_finalizer = NULL;
+  if(mutator->obj_with_fin){
+    pool_put_entry(gc->finref_metadata->obj_with_fin_pool, mutator->obj_with_fin);
+    mutator->obj_with_fin = NULL;
   }
 
   lock(gc->mutator_list_lock);     // vvvvvvvvvvvvvvvvvvvvvvvvvvvvvv
@@ -96,9 +99,19 @@ void gc_reset_mutator_context(GC* gc)
 {
   Mutator *mutator = gc->mutator_list;
   while (mutator) {
-    mutator->rem_set = pool_get_entry(gc->metadata->free_set_pool);
     alloc_context_reset((Allocator*)mutator);    
-    mutator_reset_objects_with_finalizer(mutator);
+    mutator = mutator->next;
+  }  
+  return;
+}
+
+void gc_prepare_mutator_remset(GC* gc)
+{
+  Mutator *mutator = gc->mutator_list;
+  while (mutator) {
+    mutator->rem_set = free_set_pool_get_entry(gc->metadata);
+    if(!IGNORE_FINREF )
+      mutator_reset_obj_with_fin(mutator);
     mutator = mutator->next;
   }  
   return;

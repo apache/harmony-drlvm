@@ -27,22 +27,24 @@
 #include "../mark_sweep/lspace.h"
 #include "../gen/gen.h"
 
-/* reset objects_with_finalizer vector block of each mutator */
-void mutator_reset_objects_with_finalizer(Mutator *mutator)
+Boolean IGNORE_FINREF = TRUE;
+
+/* reset obj_with_fin vector block of each mutator */
+void mutator_reset_obj_with_fin(Mutator *mutator)
 {
-  mutator->objects_with_finalizer = finalizer_weakref_get_free_block();
+  mutator->obj_with_fin = finref_get_free_block();
 }
 
-void gc_set_objects_with_finalizer(GC *gc)
+void gc_set_obj_with_fin(GC *gc)
 {
-  Finalizer_Weakref_Metadata *metadata = gc->finalizer_weakref_metadata;
-  Pool *objects_with_finalizer_pool = metadata->objects_with_finalizer_pool;
+  Finref_Metadata *metadata = gc->finref_metadata;
+  Pool *obj_with_fin_pool = metadata->obj_with_fin_pool;
 
-  /* put back last objects_with_finalizer block of each mutator */
+  /* put back last obj_with_fin block of each mutator */
   Mutator *mutator = gc->mutator_list;
   while(mutator){
-    pool_put_entry(objects_with_finalizer_pool, mutator->objects_with_finalizer);
-    mutator->objects_with_finalizer = NULL;
+    pool_put_entry(obj_with_fin_pool, mutator->obj_with_fin);
+    mutator->obj_with_fin = NULL;
     mutator = mutator->next;
   }
   return;
@@ -51,23 +53,23 @@ void gc_set_objects_with_finalizer(GC *gc)
 /* reset weak references vetctor block of each collector */
 void collector_reset_weakref_sets(Collector *collector)
 {
-  collector->softref_set = finalizer_weakref_get_free_block();
-  collector->weakref_set = finalizer_weakref_get_free_block();
-  collector->phanref_set= finalizer_weakref_get_free_block();
+  collector->softref_set = finref_get_free_block();
+  collector->weakref_set = finref_get_free_block();
+  collector->phanref_set= finref_get_free_block();
 }
 
-static void gc_set_weakref_sets(GC *gc)
+void gc_set_weakref_sets(GC *gc)
 {
-  Finalizer_Weakref_Metadata *metadata = gc->finalizer_weakref_metadata;
+  Finref_Metadata *metadata = gc->finref_metadata;
   
   /* put back last weak references block of each collector */
   unsigned int num_active_collectors = gc->num_active_collectors;
   for(unsigned int i = 0; i < num_active_collectors; i++)
   {
     Collector* collector = gc->collectors[i];
-    pool_put_entry(metadata->softref_set_pool, collector->softref_set);
-    pool_put_entry(metadata->weakref_set_pool, collector->weakref_set);
-    pool_put_entry(metadata->phanref_set_pool, collector->phanref_set);
+    pool_put_entry(metadata->softref_pool, collector->softref_set);
+    pool_put_entry(metadata->weakref_pool, collector->weakref_set);
+    pool_put_entry(metadata->phanref_pool, collector->phanref_set);
     collector->softref_set = NULL;
     collector->weakref_set= NULL;
     collector->phanref_set= NULL;
@@ -76,26 +78,14 @@ static void gc_set_weakref_sets(GC *gc)
 }
 
 
-extern Boolean obj_is_dead_in_minor_forward_collection(Collector *collector, Partial_Reveal_Object *p_obj);
-static inline Boolean obj_is_dead_in_minor_copy_collection(Collector *collector, Partial_Reveal_Object *p_obj)
+extern Boolean obj_is_dead_in_minor_forward_gc(Collector *collector, Partial_Reveal_Object *p_obj);
+static inline Boolean obj_is_dead_in_minor_copy_gc(Collector *collector, Partial_Reveal_Object *p_obj)
 {
-  GC *gc = collector->gc;
-  Lspace *los = ((GC_Gen *)gc)->los;
-  
-  if(space_of_addr(gc, p_obj) != (Space *)los)
-    return !obj_is_marked_in_vt(p_obj);
-  else
-    return !lspace_object_is_marked(los, p_obj);
+  return !obj_is_marked_in_vt(p_obj);
 }
-static inline Boolean obj_is_dead_in_major_collection(Collector *collector, Partial_Reveal_Object *p_obj)
+static inline Boolean obj_is_dead_in_major_gc(Collector *collector, Partial_Reveal_Object *p_obj)
 {
-  GC *gc = collector->gc;
-  Lspace *los = ((GC_Gen *)gc)->los;
-  
-  if(space_of_addr(gc, p_obj) != (Space *)los)
-    return !obj_is_marked_in_vt(p_obj);
-  else
-    return !lspace_object_is_marked(los, p_obj);
+  return !obj_is_marked_in_vt(p_obj);
 }
 // clear the two least significant bits of p_obj first
 static inline Boolean obj_is_dead(Collector *collector, Partial_Reveal_Object *p_obj)
@@ -104,17 +94,17 @@ static inline Boolean obj_is_dead(Collector *collector, Partial_Reveal_Object *p
   
   assert(p_obj);
   if(gc->collect_kind == MINOR_COLLECTION){
-    if( gc_requires_barriers())
-      return obj_is_dead_in_minor_forward_collection(collector, p_obj);
+    if( gc_is_gen_mode())
+      return obj_is_dead_in_minor_forward_gc(collector, p_obj);
     else
-      return obj_is_dead_in_minor_copy_collection(collector, p_obj);
+      return obj_is_dead_in_minor_copy_gc(collector, p_obj);
   } else {
-    return obj_is_dead_in_major_collection(collector, p_obj);
+    return obj_is_dead_in_major_gc(collector, p_obj);
   }
 }
 
 
-static inline Boolean fspace_object_to_be_forwarded(Partial_Reveal_Object *p_obj, Space *space)
+static inline Boolean fspace_obj_to_be_forwarded(Partial_Reveal_Object *p_obj, Space *space)
 {
   if(!obj_belongs_to_space(p_obj, (Space*)space)) return FALSE;
   return forward_first_half? (p_obj < object_forwarding_boundary):(p_obj>=object_forwarding_boundary);
@@ -124,8 +114,8 @@ static inline Boolean obj_need_move(Collector *collector, Partial_Reveal_Object 
   assert(!obj_is_dead(collector, p_obj));
   GC *gc = collector->gc;
   
-  if(gc_requires_barriers() && gc->collect_kind == MINOR_COLLECTION)
-    return fspace_object_to_be_forwarded(p_obj, collector->collect_space);
+  if(gc_is_gen_mode() && gc->collect_kind == MINOR_COLLECTION)
+    return fspace_obj_to_be_forwarded(p_obj, collector->collect_space);
   
   Space *space = space_of_addr(gc, p_obj);
   return space->move_object;
@@ -134,11 +124,11 @@ static inline Boolean obj_need_move(Collector *collector, Partial_Reveal_Object 
 
 extern void resurrect_obj_tree_after_trace(Collector *collector, Partial_Reveal_Object **p_ref);
 extern void resurrect_obj_tree_after_mark(Collector *collector, Partial_Reveal_Object *p_obj);
-static inline void resurrect_obj_tree_in_minor_copy_collection(Collector *collector, Partial_Reveal_Object *p_obj)
+static inline void resurrect_obj_tree_in_minor_copy_gc(Collector *collector, Partial_Reveal_Object *p_obj)
 {
   resurrect_obj_tree_after_mark(collector, p_obj);
 }
-static inline void resurrect_obj_tree_in_major_collection(Collector *collector, Partial_Reveal_Object *p_obj)
+static inline void resurrect_obj_tree_in_major_gc(Collector *collector, Partial_Reveal_Object *p_obj)
 {
   resurrect_obj_tree_after_mark(collector, p_obj);
 }
@@ -148,23 +138,23 @@ static inline void resurrect_obj_tree(Collector *collector, Partial_Reveal_Objec
 {
   GC *gc = collector->gc;
   
-  if(!gc_requires_barriers() || !(gc->collect_kind == MINOR_COLLECTION))
+  if(!gc_is_gen_mode() || !(gc->collect_kind == MINOR_COLLECTION))
     collector_repset_add_entry(collector, p_ref);
   if(!obj_is_dead(collector, *p_ref)){
-    if(gc_requires_barriers() && gc->collect_kind == MINOR_COLLECTION && obj_need_move(collector, *p_ref))
-      *p_ref = obj_get_forwarding_pointer_in_vt(*p_ref);
+    if(gc_is_gen_mode() && gc->collect_kind == MINOR_COLLECTION && obj_need_move(collector, *p_ref))
+      *p_ref = obj_get_fw_in_oi(*p_ref);
     return;
   }
   Partial_Reveal_Object* p_obj = *p_ref;
   assert(p_obj);
   
   if(gc->collect_kind == MINOR_COLLECTION){
-    if( gc_requires_barriers())
+    if( gc_is_gen_mode())
       resurrect_obj_tree_after_trace(collector, p_ref);
     else
-      resurrect_obj_tree_in_minor_copy_collection(collector, p_obj);
+      resurrect_obj_tree_in_minor_copy_gc(collector, p_obj);
   } else {
-    resurrect_obj_tree_in_major_collection(collector, p_obj);
+    resurrect_obj_tree_in_major_gc(collector, p_obj);
   }
 }
 
@@ -175,27 +165,27 @@ static inline void collector_reset_repset(Collector *collector)
   GC *gc = collector->gc;
   
   assert(!collector->rep_set);
-  if(gc_requires_barriers() && gc->collect_kind == MINOR_COLLECTION)
+  if(gc_is_gen_mode() && gc->collect_kind == MINOR_COLLECTION)
     return;
-  collector->rep_set = pool_get_entry(gc->metadata->free_set_pool);
+  collector->rep_set = free_set_pool_get_entry(gc->metadata);
 }
 /* called after loop of resurrect_obj_tree() */
 static inline void collector_put_repset(Collector *collector)
 {
   GC *gc = collector->gc;
   
-  if(gc_requires_barriers() && gc->collect_kind == MINOR_COLLECTION)
+  if(gc_is_gen_mode() && gc->collect_kind == MINOR_COLLECTION)
     return;
   pool_put_entry(gc->metadata->collector_repset_pool, collector->rep_set);
   collector->rep_set = NULL;
 }
 
 
-void finalizer_weakref_repset_add_entry_from_pool(Collector *collector, Pool *pool)
+static void finref_add_repset_from_pool(Collector *collector, Pool *pool)
 {
   GC *gc = collector->gc;
   
-  finalizer_weakref_reset_repset(gc);
+  finref_reset_repset(gc);
 
   pool_iterator_init(pool);
   while(Vector_Block *block = pool_iterator_next(pool)){
@@ -206,32 +196,33 @@ void finalizer_weakref_repset_add_entry_from_pool(Collector *collector, Pool *po
       iter = vector_block_iterator_advance(block, iter);
 	  
       if(*p_ref && obj_need_move(collector, *p_ref))
-        finalizer_weakref_repset_add_entry(gc, p_ref);
+        finref_repset_add_entry(gc, p_ref);
     }
   }
-  finalizer_weakref_put_repset(gc);
+  finref_put_repset(gc);
 }
 
 
-static void process_objects_with_finalizer(Collector *collector)
+static void identify_finalizable_objects(Collector *collector)
 {
   GC *gc = collector->gc;
-  Finalizer_Weakref_Metadata *metadata = gc->finalizer_weakref_metadata;
-  Pool *objects_with_finalizer_pool = metadata->objects_with_finalizer_pool;
-  Pool *finalizable_objects_pool = metadata->finalizable_objects_pool;
+  Finref_Metadata *metadata = gc->finref_metadata;
+  Pool *obj_with_fin_pool = metadata->obj_with_fin_pool;
+  Pool *finalizable_obj_pool = metadata->finalizable_obj_pool;
   
   gc_reset_finalizable_objects(gc);
-  pool_iterator_init(objects_with_finalizer_pool);
-  while(Vector_Block *block = pool_iterator_next(objects_with_finalizer_pool)){
+  pool_iterator_init(obj_with_fin_pool);
+  while(Vector_Block *block = pool_iterator_next(obj_with_fin_pool)){
     unsigned int block_has_ref = 0;
     unsigned int *iter = vector_block_iterator_init(block);
     for(; !vector_block_iterator_end(block, iter); iter = vector_block_iterator_advance(block, iter)){
-      Partial_Reveal_Object *p_obj = (Partial_Reveal_Object *)*iter;
+      Partial_Reveal_Object **p_ref = (Partial_Reveal_Object **)iter;
+      Partial_Reveal_Object *p_obj = *p_ref;
       if(!p_obj)
         continue;
       if(obj_is_dead(collector, p_obj)){
-        gc_finalizable_objects_add_entry(gc, p_obj);
-        *iter = NULL;
+        gc_add_finalizable_obj(gc, p_obj);
+        *p_ref = NULL;
       } else {
         ++block_has_ref;
       }
@@ -241,10 +232,10 @@ static void process_objects_with_finalizer(Collector *collector)
   }
   gc_put_finalizable_objects(gc);
   
-  collector_reset_repset(collector);
-  if(!finalizable_objects_pool_is_empty(gc)){
-    pool_iterator_init(finalizable_objects_pool);
-    while(Vector_Block *block = pool_iterator_next(finalizable_objects_pool)){
+  if(!finalizable_obj_pool_is_empty(gc)){
+    collector_reset_repset(collector);
+    pool_iterator_init(finalizable_obj_pool);
+    while(Vector_Block *block = pool_iterator_next(finalizable_obj_pool)){
       unsigned int *iter = vector_block_iterator_init(block);
       while(!vector_block_iterator_end(block, iter)){
         assert(*iter);
@@ -253,20 +244,20 @@ static void process_objects_with_finalizer(Collector *collector)
       }
     }
     metadata->pending_finalizers = TRUE;
+    collector_put_repset(collector);
   }
-  collector_put_repset(collector);
   
-  finalizer_weakref_repset_add_entry_from_pool(collector, objects_with_finalizer_pool);
+  finref_add_repset_from_pool(collector, obj_with_fin_pool);
   /* fianlizable objects have been added to collector repset pool */
-  //finalizer_weakref_repset_add_entry_from_pool(collector, finalizable_objects_pool);
+  //finref_add_repset_from_pool(collector, finalizable_obj_pool);
 }
 
-static void post_process_finalizable_objects(GC *gc)
+static void put_finalizable_obj_to_vm(GC *gc)
 {
-  Pool *finalizable_objects_pool = gc->finalizer_weakref_metadata->finalizable_objects_pool;
-  Pool *free_pool = gc->finalizer_weakref_metadata->free_pool;
+  Pool *finalizable_obj_pool = gc->finref_metadata->finalizable_obj_pool;
+  Pool *free_pool = gc->finref_metadata->free_pool;
   
-  while(Vector_Block *block = pool_get_entry(finalizable_objects_pool)){
+  while(Vector_Block *block = pool_get_entry(finalizable_obj_pool)){
     unsigned int *iter = vector_block_iterator_init(block);
     while(!vector_block_iterator_end(block, iter)){
       assert(*iter);
@@ -279,106 +270,149 @@ static void post_process_finalizable_objects(GC *gc)
   }
 }
 
-static void process_soft_references(Collector *collector)
+static void update_referent_ignore_finref(Collector *collector, Pool *pool)
 {
   GC *gc = collector->gc;
-  if(gc->collect_kind == MINOR_COLLECTION){
-    assert(softref_set_pool_is_empty(gc));
-    return;
-  }
   
-  Finalizer_Weakref_Metadata *metadata = gc->finalizer_weakref_metadata;
-  Pool *softref_set_pool = metadata->softref_set_pool;
-  
-  finalizer_weakref_reset_repset(gc);
-  pool_iterator_init(softref_set_pool);
-  while(Vector_Block *block = pool_iterator_next(softref_set_pool)){
+  while(Vector_Block *block = pool_get_entry(pool)){
     unsigned int *iter = vector_block_iterator_init(block);
     for(; !vector_block_iterator_end(block, iter); iter = vector_block_iterator_advance(block, iter)){
-      Partial_Reveal_Object *p_obj = (Partial_Reveal_Object *)*iter;
+      Partial_Reveal_Object **p_ref = (Partial_Reveal_Object **)iter;
+      Partial_Reveal_Object *p_obj = *p_ref;
       assert(p_obj);
       Partial_Reveal_Object **p_referent_field = obj_get_referent_field(p_obj);
       Partial_Reveal_Object *p_referent = *p_referent_field;
       
       if(!p_referent){  // referent field has been cleared
-        *iter = NULL;
+        *p_ref = NULL;
         continue;
       }
       if(!obj_is_dead(collector, p_referent)){  // referent is alive
         if(obj_need_move(collector, p_referent))
-          finalizer_weakref_repset_add_entry(gc, p_referent_field);
-        *iter = NULL;
+          finref_repset_add_entry(gc, p_referent_field);
+        *p_ref = NULL;
         continue;
       }
       *p_referent_field = NULL; /* referent is softly reachable: clear the referent field */
     }
   }
-  finalizer_weakref_put_repset(gc);
-  
-  finalizer_weakref_repset_add_entry_from_pool(collector, softref_set_pool);
-  return;
 }
 
-static void process_weak_references(Collector *collector)
+void update_ref_ignore_finref(Collector *collector)
 {
   GC *gc = collector->gc;
-  Finalizer_Weakref_Metadata *metadata = gc->finalizer_weakref_metadata;
-  Pool *weakref_set_pool = metadata->weakref_set_pool;
+  Finref_Metadata *metadata = gc->finref_metadata;
   
-  finalizer_weakref_reset_repset(gc);
-  pool_iterator_init(weakref_set_pool);
-  while(Vector_Block *block = pool_iterator_next(weakref_set_pool)){
+  finref_reset_repset(gc);
+  update_referent_ignore_finref(collector, metadata->softref_pool);
+  update_referent_ignore_finref(collector, metadata->weakref_pool);
+  update_referent_ignore_finref(collector, metadata->phanref_pool);
+  finref_put_repset(gc);
+}
+
+static void identify_dead_softrefs(Collector *collector)
+{
+  GC *gc = collector->gc;
+  if(gc->collect_kind == MINOR_COLLECTION){
+    assert(softref_pool_is_empty(gc));
+    return;
+  }
+  
+  Finref_Metadata *metadata = gc->finref_metadata;
+  Pool *softref_pool = metadata->softref_pool;
+  
+  finref_reset_repset(gc);
+  pool_iterator_init(softref_pool);
+  while(Vector_Block *block = pool_iterator_next(softref_pool)){
     unsigned int *iter = vector_block_iterator_init(block);
     for(; !vector_block_iterator_end(block, iter); iter = vector_block_iterator_advance(block, iter)){
-      Partial_Reveal_Object *p_obj = (Partial_Reveal_Object *)*iter;
+      Partial_Reveal_Object **p_ref = (Partial_Reveal_Object **)iter;
+      Partial_Reveal_Object *p_obj = *p_ref;
       assert(p_obj);
       Partial_Reveal_Object **p_referent_field = obj_get_referent_field(p_obj);
       Partial_Reveal_Object *p_referent = *p_referent_field;
       
       if(!p_referent){  // referent field has been cleared
-        *iter = NULL;
+        *p_ref = NULL;
         continue;
       }
       if(!obj_is_dead(collector, p_referent)){  // referent is alive
         if(obj_need_move(collector, p_referent))
-          finalizer_weakref_repset_add_entry(gc, p_referent_field);
-        *iter = NULL;
+          finref_repset_add_entry(gc, p_referent_field);
+        *p_ref = NULL;
+        continue;
+      }
+      *p_referent_field = NULL; /* referent is softly reachable: clear the referent field */
+    }
+  }
+  finref_put_repset(gc);
+  
+  finref_add_repset_from_pool(collector, softref_pool);
+  return;
+}
+
+static void identify_dead_weakrefs(Collector *collector)
+{
+  GC *gc = collector->gc;
+  Finref_Metadata *metadata = gc->finref_metadata;
+  Pool *weakref_pool = metadata->weakref_pool;
+  
+  finref_reset_repset(gc);
+  pool_iterator_init(weakref_pool);
+  while(Vector_Block *block = pool_iterator_next(weakref_pool)){
+    unsigned int *iter = vector_block_iterator_init(block);
+    for(; !vector_block_iterator_end(block, iter); iter = vector_block_iterator_advance(block, iter)){
+      Partial_Reveal_Object **p_ref = (Partial_Reveal_Object **)iter;
+      Partial_Reveal_Object *p_obj = *p_ref;
+      assert(p_obj);
+      Partial_Reveal_Object **p_referent_field = obj_get_referent_field(p_obj);
+      Partial_Reveal_Object *p_referent = *p_referent_field;
+      
+      if(!p_referent){  // referent field has been cleared
+        *p_ref = NULL;
+        continue;
+      }
+      if(!obj_is_dead(collector, p_referent)){  // referent is alive
+        if(obj_need_move(collector, p_referent))
+          finref_repset_add_entry(gc, p_referent_field);
+        *p_ref = NULL;
         continue;
       }
       *p_referent_field = NULL; /* referent is weakly reachable: clear the referent field */
     }
   }
-  finalizer_weakref_put_repset(gc);
+  finref_put_repset(gc);
   
-  finalizer_weakref_repset_add_entry_from_pool(collector, weakref_set_pool);
+  finref_add_repset_from_pool(collector, weakref_pool);
   return;
 }
 
-static void process_phantom_references(Collector *collector)
+static void identify_dead_phanrefs(Collector *collector)
 {
   GC *gc = collector->gc;
-  Finalizer_Weakref_Metadata *metadata = gc->finalizer_weakref_metadata;
-  Pool *phanref_set_pool = metadata->phanref_set_pool;
+  Finref_Metadata *metadata = gc->finref_metadata;
+  Pool *phanref_pool = metadata->phanref_pool;
   
-  finalizer_weakref_reset_repset(gc);
+  finref_reset_repset(gc);
 //  collector_reset_repset(collector);
-  pool_iterator_init(phanref_set_pool);
-  while(Vector_Block *block = pool_iterator_next(phanref_set_pool)){
+  pool_iterator_init(phanref_pool);
+  while(Vector_Block *block = pool_iterator_next(phanref_pool)){
     unsigned int *iter = vector_block_iterator_init(block);
     for(; !vector_block_iterator_end(block, iter); iter = vector_block_iterator_advance(block, iter)){
-      Partial_Reveal_Object *p_obj = (Partial_Reveal_Object *)*iter;
+      Partial_Reveal_Object **p_ref = (Partial_Reveal_Object **)iter;
+      Partial_Reveal_Object *p_obj = *p_ref;
       assert(p_obj);
       Partial_Reveal_Object **p_referent_field = obj_get_referent_field(p_obj);
       Partial_Reveal_Object *p_referent = *p_referent_field;
       
       if(!p_referent){  // referent field has been cleared
-        *iter = NULL;
+        *p_ref = NULL;
         continue;
       }
       if(!obj_is_dead(collector, p_referent)){  // referent is alive
         if(obj_need_move(collector, p_referent))
-          finalizer_weakref_repset_add_entry(gc, p_referent_field);
-        *iter = NULL;
+          finref_repset_add_entry(gc, p_referent_field);
+        *p_ref = NULL;
         continue;
       }
       *p_referent_field = NULL;
@@ -392,15 +426,15 @@ static void process_phantom_references(Collector *collector)
     }
   }
 //  collector_put_repset(collector);
-  finalizer_weakref_put_repset(gc);
+  finref_put_repset(gc);
   
-  finalizer_weakref_repset_add_entry_from_pool(collector, phanref_set_pool);
+  finref_add_repset_from_pool(collector, phanref_pool);
   return;
 }
 
-static inline void post_process_special_reference_pool(GC *gc, Pool *reference_pool)
+static inline void put_dead_refs_to_vm(GC *gc, Pool *reference_pool)
 {
-  Pool *free_pool = gc->finalizer_weakref_metadata->free_pool;
+  Pool *free_pool = gc->finref_metadata->free_pool;
   
   while(Vector_Block *block = pool_get_entry(reference_pool)){
     unsigned int *iter = vector_block_iterator_init(block);
@@ -415,48 +449,48 @@ static inline void post_process_special_reference_pool(GC *gc, Pool *reference_p
   }
 }
 
-static void post_process_special_references(GC *gc)
+static void put_dead_weak_refs_to_vm(GC *gc)
 {
-  if(softref_set_pool_is_empty(gc)
-      && weakref_set_pool_is_empty(gc)
-      && phanref_set_pool_is_empty(gc)){
-    gc_clear_special_reference_pools(gc);
+  if(softref_pool_is_empty(gc)
+      && weakref_pool_is_empty(gc)
+      && phanref_pool_is_empty(gc)){
+    gc_clear_weakref_pools(gc);
     return;
   }
   
-  gc->finalizer_weakref_metadata->pending_weak_references = TRUE;
+  gc->finref_metadata->pending_weakrefs = TRUE;
   
-  Pool *softref_set_pool = gc->finalizer_weakref_metadata->softref_set_pool;
-  Pool *weakref_set_pool = gc->finalizer_weakref_metadata->weakref_set_pool;
-  Pool *phanref_set_pool = gc->finalizer_weakref_metadata->phanref_set_pool;
-  Pool *free_pool = gc->finalizer_weakref_metadata->free_pool;
+  Pool *softref_pool = gc->finref_metadata->softref_pool;
+  Pool *weakref_pool = gc->finref_metadata->weakref_pool;
+  Pool *phanref_pool = gc->finref_metadata->phanref_pool;
+  Pool *free_pool = gc->finref_metadata->free_pool;
   
-  post_process_special_reference_pool(gc, softref_set_pool);
-  post_process_special_reference_pool(gc, weakref_set_pool);
-  post_process_special_reference_pool(gc, phanref_set_pool);
+  put_dead_refs_to_vm(gc, softref_pool);
+  put_dead_refs_to_vm(gc, weakref_pool);
+  put_dead_refs_to_vm(gc, phanref_pool);
 }
 
-void collector_process_finalizer_weakref(Collector *collector)
+void collector_identify_finref(Collector *collector)
 {
   GC *gc = collector->gc;
   
   gc_set_weakref_sets(gc);
-  process_soft_references(collector);
-  process_weak_references(collector);
-  process_objects_with_finalizer(collector);
-  process_phantom_references(collector);
+  identify_dead_softrefs(collector);
+  identify_dead_weakrefs(collector);
+  identify_finalizable_objects(collector);
+  identify_dead_phanrefs(collector);
 }
 
-void gc_post_process_finalizer_weakref(GC *gc)
+void gc_put_finref_to_vm(GC *gc)
 {
-  post_process_special_references(gc);
-  post_process_finalizable_objects(gc);
+  put_dead_weak_refs_to_vm(gc);
+  put_finalizable_obj_to_vm(gc);
 }
 
-void process_objects_with_finalizer_on_exit(GC *gc)
+void put_all_fin_on_exit(GC *gc)
 {
-  Pool *objects_with_finalizer_pool = gc->finalizer_weakref_metadata->objects_with_finalizer_pool;
-  Pool *free_pool = gc->finalizer_weakref_metadata->free_pool;
+  Pool *obj_with_fin_pool = gc->finref_metadata->obj_with_fin_pool;
+  Pool *free_pool = gc->finref_metadata->free_pool;
   
   vm_gc_lock_enum();
   /* FIXME: holding gc lock is not enough, perhaps there are mutators that are allocating objects with finalizer
@@ -465,9 +499,9 @@ void process_objects_with_finalizer_on_exit(GC *gc)
    * allocating mem and adding the objects with finalizer to the pool
    */
   lock(gc->mutator_list_lock);
-  gc_set_objects_with_finalizer(gc);
+  gc_set_obj_with_fin(gc);
   unlock(gc->mutator_list_lock);
-  while(Vector_Block *block = pool_get_entry(objects_with_finalizer_pool)){
+  while(Vector_Block *block = pool_get_entry(obj_with_fin_pool)){
     unsigned int *iter = vector_block_iterator_init(block);
     while(!vector_block_iterator_end(block, iter)){
       Managed_Object_Handle p_obj = (Managed_Object_Handle)*iter;
@@ -481,9 +515,9 @@ void process_objects_with_finalizer_on_exit(GC *gc)
   vm_gc_unlock_enum();
 }
 
-void gc_update_finalizer_weakref_repointed_refs(GC* gc)
+void gc_update_finref_repointed_refs(GC* gc)
 {
-  Finalizer_Weakref_Metadata* metadata = gc->finalizer_weakref_metadata;
+  Finref_Metadata* metadata = gc->finref_metadata;
   Pool *repset_pool = metadata->repset_pool;
   
   /* NOTE:: this is destructive to the root sets. */
@@ -499,17 +533,10 @@ void gc_update_finalizer_weakref_repointed_refs(GC* gc)
       /* For repset, this check is unnecessary, since all slots are repointed; otherwise
          they will not be recorded. For root set, it is possible to point to LOS or other
          non-moved space.  */
-#ifdef _DEBUG
-      if( !gc_requires_barriers() || gc->collect_kind == MAJOR_COLLECTION ){
-        assert(obj_is_forwarded_in_obj_info(p_obj));
-      } else
-        assert(obj_is_forwarded_in_vt(p_obj));
-#endif
       Partial_Reveal_Object* p_target_obj;
-      if( !gc_requires_barriers() || gc->collect_kind == MAJOR_COLLECTION )
-        p_target_obj = get_forwarding_pointer_in_obj_info(p_obj);
-      else
-        p_target_obj = obj_get_forwarding_pointer_in_vt(p_obj);
+      assert(obj_is_fw_in_oi(p_obj));
+      p_target_obj = obj_get_fw_in_oi(p_obj);
+
       *p_ref = p_target_obj;
     }
     vector_block_clear(root_set);
@@ -520,13 +547,13 @@ void gc_update_finalizer_weakref_repointed_refs(GC* gc)
   return;
 }
 
-void gc_activate_finalizer_weakref_threads(GC *gc)
+void gc_activate_finref_threads(GC *gc)
 {
-  Finalizer_Weakref_Metadata* metadata = gc->finalizer_weakref_metadata;
+  Finref_Metadata* metadata = gc->finref_metadata;
   
-  if(metadata->pending_finalizers || metadata->pending_weak_references){
+  if(metadata->pending_finalizers || metadata->pending_weakrefs){
 	  metadata->pending_finalizers = FALSE;
-    metadata->pending_weak_references = FALSE;
+    metadata->pending_weakrefs = FALSE;
     vm_hint_finalize();
   }
 }

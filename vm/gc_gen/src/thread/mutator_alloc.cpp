@@ -22,11 +22,7 @@
 
 #include "../gen/gen.h"
 
-#include "../finalizer_weakref/finalizer_weakref_metadata.h"
-
-/* classloader sometimes sets the bit for finalizible objects (?) */
-inline unsigned int get_instance_data_size (unsigned int encoded_size) 
-{    return (encoded_size & NEXT_TO_HIGH_BIT_CLEAR_MASK); }
+#include "../finalizer_weakref/finalizer_weakref.h"
 
 Managed_Object_Handle gc_alloc(unsigned size, Allocation_Handle ah, void *unused_gc_tls) 
 {
@@ -36,22 +32,20 @@ Managed_Object_Handle gc_alloc(unsigned size, Allocation_Handle ah, void *unused
   assert((size % GC_OBJECT_ALIGNMENT) == 0);
   assert(ah);
 
-  /* FIXME:: this is outdated actually */
-  size = get_instance_data_size(size);
-  
-  Mutator* mutator = (Mutator*)gc_get_tls();
-  
+  Allocator* allocator = (Allocator*)gc_get_tls();
+   
   if ( size > GC_OBJ_SIZE_THRESHOLD )
-    p_obj = (Managed_Object_Handle)los_alloc(size, (Allocator*)mutator);
-  else
-    p_obj = (Managed_Object_Handle)nos_alloc(size, (Allocator*)mutator);
+    p_obj = (Managed_Object_Handle)los_alloc(size, allocator);
+  else{
+    p_obj = (Managed_Object_Handle)nos_alloc(size, allocator);
+  }
   
   if( p_obj == NULL ) return NULL;
     
   obj_set_vt((Partial_Reveal_Object*)p_obj, ah);
   
-  if(type_has_finalizer((Partial_Reveal_VTable *)ah))
-    mutator_finalizer_add_entry(mutator, (Partial_Reveal_Object*)p_obj);
+  if(!IGNORE_FINREF && type_has_finalizer((Partial_Reveal_VTable *)ah))
+    mutator_add_finalizer((Mutator*)allocator, (Partial_Reveal_Object*)p_obj);
     
   return (Managed_Object_Handle)p_obj;
 }

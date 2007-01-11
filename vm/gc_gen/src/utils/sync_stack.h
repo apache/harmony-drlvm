@@ -21,14 +21,35 @@
 #ifndef _SYNC_STACK_H_
 #define _SYNC_STACK_H_
 
+#include "vector_block.h"
+
+#define SYNC_STACK_VERSION_MASK_SHIFT 10
+#define SYNC_STACK_VERSION_MASK ((1 << SYNC_STACK_VERSION_MASK_SHIFT) - 1)
+
 typedef struct Node{
   Node* next;  
 }Node;
 
+/*
+ * ATTENTION: only for reference
+ * Perhaps in some platforms compilers compile this struct in a way different from what we expect
+ */
+typedef struct Stack_Top{
+  unsigned int version: SYNC_STACK_VERSION_MASK_SHIFT;
+  unsigned int entry: (32-SYNC_STACK_VERSION_MASK_SHIFT);
+}Stack_Top;
+
 typedef struct Sync_Stack{
-  Node* top; /* pointing to the first filled entry */
+  Stack_Top top; /* pointing to the first filled entry */
   Node* cur; /* pointing to the current accessed entry, only for iterator */
 }Sync_Stack;
+
+#define stack_top_get_entry(top) ((Node*)((*(unsigned int*)&(top)) & ~SYNC_STACK_VERSION_MASK))
+/* The alternative way: (Node*)(top.entry<<SYNC_STACK_VERSION_MASK_SHIFT) */
+#define stack_top_get_version(top) ((*(unsigned int*)&(top)) & SYNC_STACK_VERSION_MASK)
+/* The alternative way: (top.version) */
+#define stack_top_contruct(entry, version) ((unsigned int)(entry) | (version))
+#define stack_top_get_next_version(top) ((stack_top_get_version(top) + 1) & SYNC_STACK_VERSION_MASK)
 
 inline Sync_Stack* sync_stack_init()
 {
@@ -36,7 +57,8 @@ inline Sync_Stack* sync_stack_init()
   Sync_Stack* stack = (Sync_Stack*)STD_MALLOC(size);
   memset(stack, 0, size);
   stack->cur = NULL;
-  stack->top = NULL; 
+  unsigned int temp_top = 0;
+  stack->top = *(Stack_Top*)&temp_top;
   return stack;
 }
 
@@ -48,7 +70,7 @@ inline void sync_stack_destruct(Sync_Stack* stack)
 
 inline void sync_stack_iterate_init(Sync_Stack* stack)
 {
-  stack->cur = stack->top;
+  stack->cur = stack_top_get_entry(stack->top);
   return;
 }
 
@@ -62,37 +84,49 @@ inline Node* sync_stack_iterate_next(Sync_Stack* stack)
       return entry;
     }
     entry = stack->cur;
-  }  
+  }
   return NULL;
 }
 
 inline Node* sync_stack_pop(Sync_Stack* stack)
 {
-  Node* entry = stack->top;
-  while( entry != NULL ){
-    Node* new_entry = entry->next;
-    Node* temp = (Node*)atomic_casptr((volatile void**)&stack->top, new_entry, entry);
-    if(temp == entry){ /* got it */ 
-      entry->next = NULL;
-      return entry;
+  Stack_Top cur_top = stack->top;
+  Node* top_entry = stack_top_get_entry(cur_top);
+  unsigned int version = stack_top_get_version(cur_top);
+  
+  while( top_entry != NULL ){
+    unsigned int temp = stack_top_contruct(top_entry->next, version);
+    Stack_Top new_top = *(Stack_Top*)&temp;
+    temp = (unsigned int)atomic_casptr((volatile void**)&stack->top, *(void**)&new_top, *(void**)&cur_top);
+    if(temp == *(unsigned int*)&cur_top){ /* got it */ 
+      top_entry->next = NULL;
+      return top_entry;
     }
-    entry = stack->top;
+    cur_top = stack->top;
+    top_entry = stack_top_get_entry(cur_top);
+    version = stack_top_get_version(cur_top);
   }  
   return 0;
 }
 
 inline Boolean sync_stack_push(Sync_Stack* stack, Node* node)
 {
-  Node* entry = stack->top;
-  node->next = entry;
+  Stack_Top cur_top = stack->top;
+  node->next = stack_top_get_entry(cur_top);
+  unsigned int new_version = stack_top_get_next_version(cur_top);
+  unsigned int temp = stack_top_contruct(node, new_version);
+  Stack_Top new_top = *(Stack_Top*)&temp;
   
   while( TRUE ){
-    Node* temp = (Node*)atomic_casptr((volatile void**)&stack->top, node, entry);
-    if(temp == entry){ /* got it */  
+    temp = (unsigned int)atomic_casptr((volatile void**)&stack->top, *(void**)&new_top, *(void**)&cur_top);
+    if(temp == *(unsigned int*)&cur_top){ /* got it */  
       return TRUE;
     }
-    entry = stack->top;
-    node->next = entry;
+    cur_top = stack->top;
+    node->next = stack_top_get_entry(cur_top);
+    new_version = stack_top_get_next_version(cur_top);
+    temp = stack_top_contruct(node, new_version);
+    new_top = *(Stack_Top*)&temp;
   }
   /* never comes here */
   return FALSE;
@@ -100,9 +134,21 @@ inline Boolean sync_stack_push(Sync_Stack* stack, Node* node)
 
 /* it does not matter whether this is atomic or not, because
    it is only invoked when there is no contention or only for rough idea */
-inline Boolean stack_is_empty(Sync_Stack* stack)
+inline Boolean sync_stack_is_empty(Sync_Stack* stack)
 {
-  return (stack->top == NULL);
+  return (stack_top_get_entry(stack->top) == NULL);
+}
+
+inline unsigned int sync_stack_size(Sync_Stack* stack)
+{
+  unsigned int entry_count = 0;
+  
+  sync_stack_iterate_init(stack);
+  while(sync_stack_iterate_next(stack)){
+    ++entry_count;
+  }
+
+  return entry_count;
 }
 
 #endif /* _SYNC_STACK_H_ */

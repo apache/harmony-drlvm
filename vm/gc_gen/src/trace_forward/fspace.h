@@ -22,6 +22,7 @@
 #define _FROM_SPACE_H_
 
 #include "../thread/gc_thread.h"
+#include "../thread/collector_alloc.h"
 
 /*
  * In our Gen GC, not all live objects are copied to tspace space, the newer baby will
@@ -39,9 +40,11 @@ typedef struct Fspace {
   unsigned int reserved_heap_size;
   unsigned int committed_heap_size;
   unsigned int num_collections;
+  int64 time_collections;
+  float survive_ratio;
+  unsigned int collect_algorithm;
   GC* gc;
   Boolean move_object;
-  Boolean (*mark_object_func)(Fspace* space, Partial_Reveal_Object* p_obj);
   /* END of Space --> */
 
   Block* blocks; /* short-cut for mpsace blockheader access, not mandatory */
@@ -58,26 +61,31 @@ typedef struct Fspace {
       
 } Fspace;
 
-void fspace_initialize(GC* gc, void* start, unsigned int fspace_size);
+void fspace_initialize(GC* gc, void* start, unsigned int fspace_size, unsigned int commit_size);
 void fspace_destruct(Fspace *fspace);
 
-inline Boolean fspace_has_free_block(Fspace* fspace){ return fspace->free_block_idx <= fspace->ceiling_block_idx; }
-inline unsigned int fspace_free_memory_size(Fspace* fspace){ return GC_BLOCK_SIZE_BYTES * (fspace->ceiling_block_idx - fspace->free_block_idx + 1);  }
-inline Boolean fspace_used_memory_size(Fspace* fspace){ return GC_BLOCK_SIZE_BYTES * fspace->num_used_blocks; }
-
+inline Boolean obj_is_dead_in_minor_forward_gc(Collector *collector, Partial_Reveal_Object *p_obj)
+{
+  return (!obj_is_marked_or_fw_in_oi(p_obj)) ;
+}
 
 void* fspace_alloc(unsigned size, Allocator *allocator);
 
-Boolean fspace_mark_object(Fspace* fspace, Partial_Reveal_Object *p_obj);
+void fspace_reset_for_allocation(Fspace* fspace);
 
-void reset_fspace_for_allocation(Fspace* fspace);
+/* gen mode */
+void gen_forward_pool(Collector* collector); 
+void gen_forward_steal(Collector* collector);
+/* nongen mode */
+void nongen_slide_copy(Collector* collector); 
 
+#ifdef MARK_BIT_FLIPPING
 
-Boolean fspace_compute_object_target(Collector* collector, Fspace* fspace);
-void fspace_copy_collect(Collector* collector, Fspace* fspace); 
+void nongen_forward_steal(Collector* collector); 
+void nongen_forward_pool(Collector* collector); 
 
-void trace_forward_fspace(Collector* collector); 
-void mark_copy_fspace(Collector* collector); 
+#endif /* MARK_BIT_FLIPPING */
+
 
 void fspace_collection(Fspace* fspace);
   

@@ -21,7 +21,9 @@
 #ifndef _BLOCK_H_
 #define _BLOCK_H_
 
-#include "../common/gc_common.h"
+#include "gc_common.h"
+
+#define SYSTEM_ALLOC_UNIT 0x10000
 
 #define GC_BLOCK_SHIFT_COUNT 15
 #define GC_BLOCK_SIZE_BYTES (1 << GC_BLOCK_SHIFT_COUNT)
@@ -33,17 +35,22 @@ enum Block_Status {
   BLOCK_USED = 0x4,
   BLOCK_IN_COMPACT = 0x8,
   BLOCK_COMPACTED = 0x10,
-  BLOCK_TARGET = 0x20
+  BLOCK_TARGET = 0x20,
+  BLOCK_DEST = 0x40
 };
 
 typedef struct Block_Header {
   void* base;                       
   void* free;                       
   void* ceiling;                    
+  void* new_free; /* used only during compaction */
   unsigned int block_idx;           
   volatile unsigned int status;
+  volatile unsigned int dest_counter;
+  Partial_Reveal_Object* src;
+  Partial_Reveal_Object* next_src;
   Block_Header* next;
-  unsigned int mark_table[1];  /* entry num == MARKBIT_TABLE_SIZE_WORDS */
+  unsigned int table[1]; /* entry num == OFFSET_TABLE_SIZE_WORDS */
 }Block_Header;
 
 typedef union Block{
@@ -51,17 +58,22 @@ typedef union Block{
     unsigned char raw_bytes[GC_BLOCK_SIZE_BYTES];
 }Block;
 
-#define GC_BLOCK_HEADER_VARS_SIZE_BYTES (unsigned int)&(((Block_Header*)0)->mark_table)
+#define GC_BLOCK_HEADER_VARS_SIZE_BYTES (unsigned int)&(((Block_Header*)0)->table)
 
-/* BlockSize - MarkbitTable*32 = HeaderVars + MarkbitTable
-   => MarkbitTable = (BlockSize - HeaderVars)/33 */
-#define MARKBIT_TABLE_COMPUTE_DIVISOR 33
-/* +1 to round up*/
-#define MARKBIT_TABLE_COMPUTED_SIZE_BYTE ((GC_BLOCK_SIZE_BYTES-GC_BLOCK_HEADER_VARS_SIZE_BYTES)/MARKBIT_TABLE_COMPUTE_DIVISOR + 1)
-#define MARKBIT_TABLE_SIZE_BYTES ((MARKBIT_TABLE_COMPUTED_SIZE_BYTE + MASK_OF_BYTES_PER_WORD)&~MASK_OF_BYTES_PER_WORD)
-#define MARKBIT_TABLE_SIZE_WORDS (MARKBIT_TABLE_SIZE_BYTES >> BIT_SHIFT_TO_BYTES_PER_WORD)
+#define SECTOR_SIZE_SHIFT_COUNT  8
+#define SECTOR_SIZE_BYTES        (1 << SECTOR_SIZE_SHIFT_COUNT)
+#define SECTOR_SIZE_WORDS        (SECTOR_SIZE_BYTES >> BIT_SHIFT_TO_BYTES_PER_WORD)
+/* one offset_table word maps to one SECTOR_SIZE_WORDS sector */
 
-#define GC_BLOCK_HEADER_SIZE_BYTES (MARKBIT_TABLE_SIZE_BYTES + GC_BLOCK_HEADER_VARS_SIZE_BYTES)
+/* BlockSize - OffsetTableSize*SECTOR_SIZE_WORDS = HeaderVarsSize + OffsetTableSize
+   => OffsetTableSize = (BlockSize - HeaderVars)/(SECTOR_SIZE_WORDS+1) */
+#define OFFSET_TABLE_COMPUTE_DIVISOR       (SECTOR_SIZE_WORDS + 1)
+#define OFFSET_TABLE_COMPUTED_SIZE_BYTE ((GC_BLOCK_SIZE_BYTES-GC_BLOCK_HEADER_VARS_SIZE_BYTES)/OFFSET_TABLE_COMPUTE_DIVISOR + 1)
+#define OFFSET_TABLE_SIZE_BYTES ((OFFSET_TABLE_COMPUTED_SIZE_BYTE + MASK_OF_BYTES_PER_WORD)&~MASK_OF_BYTES_PER_WORD)
+#define OFFSET_TABLE_SIZE_WORDS (OFFSET_TABLE_SIZE_BYTES >> BIT_SHIFT_TO_BYTES_PER_WORD)
+#define OBJECT_INDEX_TO_OFFSET_TABLE(p_obj)   (ADDRESS_OFFSET_IN_BLOCK_BODY(p_obj) >> SECTOR_SIZE_SHIFT_COUNT)
+
+#define GC_BLOCK_HEADER_SIZE_BYTES (OFFSET_TABLE_SIZE_BYTES + GC_BLOCK_HEADER_VARS_SIZE_BYTES)
 #define GC_BLOCK_BODY_SIZE_BYTES (GC_BLOCK_SIZE_BYTES - GC_BLOCK_HEADER_SIZE_BYTES)
 #define GC_BLOCK_BODY(block) ((void*)((unsigned int)(block) + GC_BLOCK_HEADER_SIZE_BYTES))
 #define GC_BLOCK_END(block) ((void*)((unsigned int)(block) + GC_BLOCK_SIZE_BYTES))
@@ -75,122 +87,168 @@ typedef union Block{
 #define ADDRESS_OFFSET_TO_BLOCK_HEADER(addr) ((unsigned int)((unsigned int)addr&GC_BLOCK_LOW_MASK))
 #define ADDRESS_OFFSET_IN_BLOCK_BODY(addr) ((unsigned int)(ADDRESS_OFFSET_TO_BLOCK_HEADER(addr)- GC_BLOCK_HEADER_SIZE_BYTES))
 
-#define OBJECT_BIT_INDEX_TO_MARKBIT_TABLE(p_obj)    (ADDRESS_OFFSET_IN_BLOCK_BODY(p_obj) >> 2)
-#define OBJECT_WORD_INDEX_TO_MARKBIT_TABLE(p_obj)   (OBJECT_BIT_INDEX_TO_MARKBIT_TABLE(p_obj) >> BIT_SHIFT_TO_BITS_PER_WORD)
-#define OBJECT_WORD_OFFSET_IN_MARKBIT_TABLE(p_obj)  (OBJECT_BIT_INDEX_TO_MARKBIT_TABLE(p_obj) & BIT_MASK_TO_BITS_PER_WORD)
-
-inline Partial_Reveal_Object* block_get_first_marked_object(Block_Header* block, unsigned int* mark_bit_idx)
+inline void block_init(Block_Header* block)
 {
-  unsigned int* mark_table = block->mark_table;
-  unsigned int* table_end = mark_table + MARKBIT_TABLE_SIZE_WORDS;
-  
-  unsigned j=0;
-  unsigned int k=0;
-  while( (mark_table + j) < table_end){
-    unsigned int markbits = *(mark_table+j);
-    if(!markbits){ j++; continue; }
-    while(k<32){
-        if( !(markbits& (1<<k)) ){ k++; continue;}
-        unsigned int word_index = (j<<BIT_SHIFT_TO_BITS_PER_WORD) + k;
-        Partial_Reveal_Object* p_obj = (Partial_Reveal_Object*)((unsigned int*)GC_BLOCK_BODY(block) + word_index);
-        assert(obj_is_marked_in_vt(p_obj)); 
-        
-        *mark_bit_idx = word_index;
-      return p_obj;
-    }
-    j++;
-    k=0;
-  }          
-  *mark_bit_idx = 0;
-  return NULL;   
+  block->free = (void*)((unsigned int)block + GC_BLOCK_HEADER_SIZE_BYTES);
+  block->ceiling = (void*)((unsigned int)block + GC_BLOCK_SIZE_BYTES); 
+  block->base = block->free;
+  block->new_free = block->free;
+  block->status = BLOCK_FREE;
+  block->dest_counter = 0;
+  block->src = NULL;
+  block->next_src = NULL;
 }
 
-inline Partial_Reveal_Object* block_get_next_marked_object(Block_Header* block, unsigned int* mark_bit_idx)
+inline Partial_Reveal_Object *obj_end(Partial_Reveal_Object *obj)
 {
-  unsigned int* mark_table = block->mark_table;
-  unsigned int* table_end = mark_table + MARKBIT_TABLE_SIZE_WORDS;
-  unsigned int bit_index = *mark_bit_idx;
-  
-  unsigned int j = bit_index >> BIT_SHIFT_TO_BITS_PER_WORD;
-  unsigned int k = (bit_index & BIT_MASK_TO_BITS_PER_WORD) + 1;  
-     
-  while( (mark_table + j) < table_end){
-    unsigned int markbits = *(mark_table+j);
-    if(!markbits){ j++; continue; }
-    while(k<32){
-      if( !(markbits& (1<<k)) ){ k++; continue;}
-      
-      unsigned int word_index = (j<<BIT_SHIFT_TO_BITS_PER_WORD) + k;
-      Partial_Reveal_Object* p_obj = (Partial_Reveal_Object*)((unsigned int*)GC_BLOCK_BODY(block) + word_index);      
-      assert(obj_is_marked_in_vt(p_obj));
-      
-      *mark_bit_idx = word_index;
-      return p_obj;
-    }
-    j++;
-    k=0;
-  }        
-  
-  *mark_bit_idx = 0;
-  return NULL;   
-
+  return (Partial_Reveal_Object *)((unsigned int)obj + vm_object_size(obj));
 }
 
-inline void block_clear_mark_table(Block_Header* block)
+inline Partial_Reveal_Object *next_marked_obj_in_block(Partial_Reveal_Object *cur_obj, Partial_Reveal_Object *block_end)
 {
-  unsigned int* mark_table = block->mark_table;
-  memset(mark_table, 0, MARKBIT_TABLE_SIZE_BYTES);
+  while(cur_obj < block_end){
+    if( obj_is_marked_in_vt(cur_obj))
+      return cur_obj;
+    cur_obj = obj_end(cur_obj);
+  }
+  
+  return NULL;
+}
+
+inline Partial_Reveal_Object* block_get_first_marked_object(Block_Header* block, void** start_pos)
+{
+  Partial_Reveal_Object* cur_obj = (Partial_Reveal_Object*)block->base;
+  Partial_Reveal_Object* block_end = (Partial_Reveal_Object*)block->free;
+
+  Partial_Reveal_Object* first_marked_obj = next_marked_obj_in_block(cur_obj, block_end);
+  if(!first_marked_obj)
+    return NULL;
+  
+  *start_pos = obj_end(first_marked_obj);
+  
+  return first_marked_obj;
+}
+
+inline Partial_Reveal_Object* block_get_next_marked_object(Block_Header* block, void** start_pos)
+{
+  Partial_Reveal_Object* cur_obj = *(Partial_Reveal_Object**)start_pos;
+  Partial_Reveal_Object* block_end = (Partial_Reveal_Object*)block->free;
+
+  Partial_Reveal_Object* next_marked_obj = next_marked_obj_in_block(cur_obj, block_end);
+  if(!next_marked_obj)
+    return NULL;
+  
+  *start_pos = obj_end(next_marked_obj);
+  
+  return next_marked_obj;
+}
+
+inline Partial_Reveal_Object *block_get_first_marked_obj_prefetch_next(Block_Header *block, void **start_pos)
+{
+  Partial_Reveal_Object *cur_obj = (Partial_Reveal_Object *)block->base;
+  Partial_Reveal_Object *block_end = (Partial_Reveal_Object *)block->free;
+  
+  Partial_Reveal_Object *first_marked_obj = next_marked_obj_in_block(cur_obj, block_end);
+  if(!first_marked_obj)
+    return NULL;
+  
+  Partial_Reveal_Object *next_obj = obj_end(first_marked_obj);
+  *start_pos = next_obj;
+  
+  if(next_obj >= block_end)
+    return first_marked_obj;
+  
+  Partial_Reveal_Object *next_marked_obj = next_marked_obj_in_block(next_obj, block_end);
+  
+  if(next_marked_obj){
+    if(next_marked_obj != next_obj)
+      set_obj_info(next_obj, (Obj_Info_Type)next_marked_obj);
+  } else {
+    set_obj_info(next_obj, 0);
+  }
+  
+  return first_marked_obj;
+}
+
+inline Partial_Reveal_Object *block_get_first_marked_obj_after_prefetch(Block_Header *block, void **start_pos)
+{
+  return block_get_first_marked_object(block, start_pos);
+}
+
+inline Partial_Reveal_Object *block_get_next_marked_obj_prefetch_next(Block_Header *block, void **start_pos)
+{
+  Partial_Reveal_Object *cur_obj = *(Partial_Reveal_Object **)start_pos;
+  Partial_Reveal_Object *block_end = (Partial_Reveal_Object *)block->free;
+
+  if(cur_obj >= block_end)
+    return NULL;
+  
+  Partial_Reveal_Object *cur_marked_obj;
+  
+  if(obj_is_marked_in_vt(cur_obj))
+    cur_marked_obj = cur_obj;
+  else
+    cur_marked_obj = (Partial_Reveal_Object *)get_obj_info_raw(cur_obj);
+  
+  if(!cur_marked_obj)
+    return NULL;
+  
+  Partial_Reveal_Object *next_obj = obj_end(cur_marked_obj);
+  *start_pos = next_obj;
+  
+  if(next_obj >= block_end)
+    return cur_marked_obj;
+  
+  Partial_Reveal_Object *next_marked_obj = next_marked_obj_in_block(next_obj, block_end);
+  
+  if(next_marked_obj){
+    if(next_marked_obj != next_obj)
+      set_obj_info(next_obj, (Obj_Info_Type)next_marked_obj);
+  } else {
+    set_obj_info(next_obj, 0);
+  }
+  
+  return cur_marked_obj;  
+}
+
+inline Partial_Reveal_Object *block_get_next_marked_obj_after_prefetch(Block_Header *block, void **start_pos)
+{
+  Partial_Reveal_Object *cur_obj = *(Partial_Reveal_Object **)start_pos;
+  Partial_Reveal_Object *block_end = (Partial_Reveal_Object *)block->free;
+
+  if(cur_obj >= block_end)
+    return NULL;
+  
+  Partial_Reveal_Object *cur_marked_obj;
+  
+  if(obj_is_marked_in_vt(cur_obj) || obj_is_fw_in_oi(cur_obj))
+    cur_marked_obj = cur_obj;
+  else
+    cur_marked_obj = (Partial_Reveal_Object *)get_obj_info_raw(cur_obj);
+  
+  if(!cur_marked_obj)
+    return NULL;
+  
+  Partial_Reveal_Object *next_obj = obj_end(cur_marked_obj);
+  *start_pos = next_obj;
+  
+  return cur_marked_obj;
+}
+
+inline Partial_Reveal_Object * obj_get_fw_in_table(Partial_Reveal_Object *p_obj)
+{
+  /* only for inter-sector compaction */
+  unsigned int index    = OBJECT_INDEX_TO_OFFSET_TABLE(p_obj);
+  Block_Header *curr_block = GC_BLOCK_HEADER(p_obj);
+  return (Partial_Reveal_Object *)(((unsigned int)p_obj) - curr_block->table[index]);
+}
+
+inline void block_clear_table(Block_Header* block)
+{
+  unsigned int* table = block->table;
+  memset(table, 0, OFFSET_TABLE_SIZE_BYTES);
   return;
 }
 
-inline void block_clear_markbits(Block_Header* block)
-{
-  unsigned int* mark_table = block->mark_table;
-  unsigned int* table_end = mark_table + MARKBIT_TABLE_SIZE_WORDS;
-  
-  unsigned j=0;
-  while( (mark_table + j) < table_end){
-    unsigned int markbits = *(mark_table+j);
-    if(!markbits){ j++; continue; }
-    unsigned int k=0;
-    while(k<32){
-        if( !(markbits& (1<<k)) ){ k++; continue;}
-        unsigned int word_index = (j<<BIT_SHIFT_TO_BITS_PER_WORD) + k;
-        Partial_Reveal_Object* p_obj = (Partial_Reveal_Object*)((unsigned int*)GC_BLOCK_BODY(block) + word_index);
-        assert(obj_is_marked_in_vt(p_obj));
-        obj_unmark_in_vt(p_obj);
-        k++;
-    }
-    j++;
-  } 
-
-  block_clear_mark_table(block);
-  return;     
-}
-
-typedef struct Blocked_Space {
-  /* <-- first couple of fields are overloadded as Space */
-  void* heap_start;
-  void* heap_end;
-  unsigned int reserved_heap_size;
-  unsigned int committed_heap_size;
-  unsigned int num_collections;
-  GC* gc;
-  Boolean move_object;
-  Boolean (*mark_object_func)(Space* space, Partial_Reveal_Object* p_obj);
-  /* END of Space --> */
-
-  Block* blocks; /* short-cut for mpsace blockheader access, not mandatory */
-  
-  /* FIXME:: the block indices should be replaced with block header addresses */
-  unsigned int first_block_idx;
-  unsigned int ceiling_block_idx;
-  volatile unsigned int free_block_idx;
-  
-  unsigned int num_used_blocks;
-  unsigned int num_managed_blocks;
-  unsigned int num_total_blocks;
-  /* END of Blocked_Space --> */
-}Blocked_Space;
 
 #endif //#ifndef _BLOCK_H_

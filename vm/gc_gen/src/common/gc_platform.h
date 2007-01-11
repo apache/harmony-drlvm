@@ -21,11 +21,25 @@
 #ifndef _GC_PLATFORM_H_
 #define _GC_PLATFORM_H_
 
+#include <assert.h>
+#include <ctype.h>
 
 #include <apr_time.h>
 #include <apr_atomic.h>
 
 #include <open/hythread_ext.h>
+
+
+#ifndef _DEBUG
+
+//#define RELEASE_DEBUG
+
+#ifdef RELEASE_DEBUG
+#undef assert
+#define assert(x) do{ if(!(x)) __asm{int 3}}while(0)
+#endif
+
+#endif //_DEBUG
 
 #define USEC_PER_SEC INT64_C(1000000)
 
@@ -49,19 +63,13 @@ inline int vm_reset_event(VmEventHandle event)
 }
 
 inline int vm_create_event(VmEventHandle* event)
-{
-  return hysem_create(event, 0, 1);
-}
+{  return hysem_create(event, 0, 1); }
 
 inline void vm_thread_yield()
-{
-  hythread_yield();
-}
+{  hythread_yield(); }
 
 inline void* vm_thread_local()
-{
-  return hythread_self();  
-}
+{  return hythread_self();  }
 
 inline int vm_create_thread(int (*func)(void*), void *data)
 { 
@@ -80,34 +88,127 @@ inline void *atomic_casptr(volatile void **mem, void *with, const void *cmp) {
 
 inline uint32 atomic_cas32(volatile apr_uint32_t *mem,
                                            apr_uint32_t swap,
-                                           apr_uint32_t cmp) {
-  return (uint32)apr_atomic_cas32(mem, swap, cmp);
+                                           apr_uint32_t cmp) 
+{  return (uint32)apr_atomic_cas32(mem, swap, cmp); }
+
+inline uint32 atomic_inc32(volatile apr_uint32_t *mem)
+{  return (uint32)apr_atomic_inc32(mem); }
+
+inline uint32 atomic_dec32(volatile apr_uint32_t *mem)
+{  return (uint32)apr_atomic_dec32(mem); }
+
+inline uint32 atomic_add32(volatile apr_uint32_t *mem, apr_uint32_t val) 
+{  return (uint32)apr_atomic_add32(mem, val); }
+
+inline Boolean pool_create(apr_pool_t **newpool, apr_pool_t *parent) 
+{  return (Boolean)apr_pool_create(newpool, parent);}
+
+inline void pool_destroy(apr_pool_t *p) 
+{  apr_pool_destroy(p); }
+
+#ifndef _WIN32
+#include <sys/mman.h>
+#endif
+
+inline void *vm_map_mem(void* start, unsigned int size) 
+{
+  void* address;
+#ifdef _WIN32
+  address = VirtualAlloc(start, size, MEM_RESERVE|MEM_COMMIT, PAGE_READWRITE);
+#else
+  address = mmap(start, size, PROT_READ|PROT_WRITE, MAP_FIXED|MAP_PRIVATE|MAP_ANONYMOUS, -1, 0);
+  if(address == MAP_FAILED) address = NULL;
+    
+#endif /* ifdef _WIN32 else */
+
+  return address;
 }
 
-inline uint32 atomic_inc32(volatile apr_uint32_t *mem){
-  return (uint32)apr_atomic_inc32(mem);
+inline Boolean vm_unmap_mem(void* start, unsigned int size) 
+{
+  unsigned int result;
+#ifdef _WIN32
+  result = VirtualFree(start, 0, MEM_RELEASE);
+#else
+  result = munmap(start, size);
+  if(result == -1) result = 0;
+    
+#endif /* ifdef _WIN32 else */
+
+  return result;
 }
 
-inline uint32 atomic_dec32(volatile apr_uint32_t *mem){
-  return (uint32)apr_atomic_dec32(mem);
+inline void *vm_alloc_mem(void* start, unsigned int size) 
+{
+  void* address;
+#ifdef _WIN32
+  address = VirtualAlloc(start, size, MEM_RESERVE|MEM_COMMIT, PAGE_READWRITE);
+#else
+  address = mmap(start, size, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_ANONYMOUS, -1, 0);
+  if(address == MAP_FAILED) address = NULL;
+    
+#endif /* ifdef _WIN32 else */
+
+  return address;
 }
 
-inline uint32 atomic_add32(volatile apr_uint32_t *mem, apr_uint32_t val) {
-  return (uint32)apr_atomic_add32(mem, val);
+inline Boolean vm_free_mem(void* start, unsigned int size) 
+{
+  return vm_unmap_mem(start, size);
 }
 
-inline Boolean pool_create(apr_pool_t **newpool, apr_pool_t *parent) {
-  return (Boolean)apr_pool_create(newpool, parent);
+inline void *vm_reserve_mem(void* start, unsigned int size) 
+{
+  void* address;
+#ifdef _WIN32
+  address = VirtualAlloc(start, size, MEM_RESERVE, PAGE_READWRITE);
+#else
+  address = mmap(start, size, PROT_READ|PROT_WRITE, MAP_FIXED|MAP_PRIVATE|MAP_ANONYMOUS, -1, 0);
+  if(address == MAP_FAILED) address = NULL;
+    
+#endif /* ifdef _WIN32 else */
+
+  return address;
 }
 
-inline void pool_destroy(apr_pool_t *p) {
-  apr_pool_destroy(p);
+inline void *vm_commit_mem(void* start, unsigned int size) 
+{
+  void* address;
+#ifdef _WIN32
+  address = VirtualAlloc(start, size, MEM_COMMIT, PAGE_READWRITE);
+#else
+    
+#endif /* ifdef _WIN32 else */
+
+  return address;
 }
 
+inline Boolean vm_decommit_mem(void* start, unsigned int size) 
+{
+  unsigned int result;
+#ifdef _WIN32
+  result = VirtualFree(start, size, MEM_DECOMMIT);
+#else
+    
+#endif /* ifdef _WIN32 else */
 
-inline int64 time_now() {
-  return apr_time_now();
+  return result;
 }
+
+inline int64 time_now() 
+{  return apr_time_now(); }
+
+inline void string_to_upper(char* s)
+{
+  while(*s){
+    *s = toupper(*s);
+    s++;
+  }
+}  
+
+#ifdef PLATFORM_POSIX
+#define max(x, y) ((x)>(y)?(x):(y))
+#endif
 
 typedef volatile unsigned int SpinLock;
 

@@ -29,4 +29,7 @@ void gc_terminate_heap_verification(GC* gc);
 void event_collector_move_obj(Partial_Reveal_Object *p_old, Partial_Reveal_Object *p_new, Collector* collector);
 void gc_verify_heap(GC* gc, Boolean is_before_gc);
 
+/* functions used in fall back compaction and the out-of-space cases*/
+void event_collector_doublemove_obj(Partial_Reveal_Object *p_old, Partial_Reveal_Object *p_new, Collector* collector);
+
 #endif

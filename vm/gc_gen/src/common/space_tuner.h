@@ -15,33 +15,31 @@
  */
 
 /**
- * @author Ji Qi, 2006/10/05
+ * @author Xiao-Feng Li, 2006/10/05
  */
 
-#ifndef _BIDIR_LIST_H_
-#define _BIDIR_LIST_H_
+#ifndef _SPACE_TUNER_H_
+#define _SPACE_TUNER_H_
 
-typedef struct Bidir_List{
-  unsigned int zero;
-  Bidir_List* next;
-  Bidir_List* prev;
-}Bidir_List;
+#include "gc_common.h"
+#include "gc_space.h"
 
-inline Bidir_List* bidir_list_add_item(Bidir_List* head, Bidir_List* item)
-{
-  item->next = head->next;
-  item->prev = head;
-  head->next->prev = item;
-  head->next = item;
-  return head;
-}
+//For_LOS_extend
+enum Transform_Kind {
+  TRANS_NOTHING = 0,
+  TRANS_FROM_LOS_TO_MOS = 0x1,
+  TRANS_FROM_MOS_TO_LOS = 0x2,
+};
 
-inline Bidir_List* bidir_list_remove_item(Bidir_List* item)
-{
-  item->prev->next = item->next;
-  item->next->prev = item->prev;
-  item->next = item->prev = item;
-  return item;
-}
+typedef struct Space_Tuner{
+    /*fixme: Now we use static value of GC_LOS_MIN_VARY_SIZE. */
+    unsigned int tuning_threshold;
+    Transform_Kind kind;
+    unsigned int tuning_size;
+}Space_Tuner;
 
-#endif /* _BIDIR_LIST_H_ */
+void gc_space_tune(GC* gc, unsigned int cause);
+void gc_space_tuner_reset(GC* gc);
+void gc_space_tuner_initialize(GC* gc);
+
+#endif /* _SPACE_TUNER_H_ */

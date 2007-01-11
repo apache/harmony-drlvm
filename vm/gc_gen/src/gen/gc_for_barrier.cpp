@@ -19,34 +19,33 @@
  */
 
 #include "../gen/gen.h"
-
 #include "../thread/mutator.h"
+#include "gc_for_barrier.h"
 
 /* All the write barrier interfaces need cleanup */
 
-Boolean NEED_BARRIER = TRUE;
-
-Boolean gc_requires_barriers() 
-{   return NEED_BARRIER; }
+Boolean gen_mode;
 
 /* The implementations are only temporary */
 static void gc_slot_write_barrier(Managed_Object_Handle *p_slot, 
                       Managed_Object_Handle p_target) 
 {
-  Mutator *mutator = (Mutator *)gc_get_tls();
-  GC_Gen* gc = (GC_Gen*)mutator->gc;
-  if( address_belongs_to_nursery((void *)p_target, gc) && 
-       !address_belongs_to_nursery((void *)p_slot, gc)) 
-  {
+  if(p_target >= nos_boundary && p_slot < nos_boundary){
+
+    Mutator *mutator = (Mutator *)gc_get_tls();
+    assert( addr_belongs_to_nos(p_target) && !addr_belongs_to_nos(p_slot)); 
+            
     mutator_remset_add_entry(mutator, (Partial_Reveal_Object**)p_slot);
   }
+  return;
 }
 
 static void gc_object_write_barrier(Managed_Object_Handle p_object) 
 {
+  
+  if( addr_belongs_to_nos(p_object)) return;
+
   Mutator *mutator = (Mutator *)gc_get_tls();
-  GC_Gen* gc = (GC_Gen*)mutator->gc;
-  if( address_belongs_to_nursery((void *)p_object, gc)) return;
   
   Partial_Reveal_Object **p_slot; 
   /* scan array object */
@@ -57,7 +56,7 @@ static void gc_object_write_barrier(Managed_Object_Handle p_object)
     int32 array_length = vector_get_length((Vector_Handle) array);
     for (int i = 0; i < array_length; i++) {
       p_slot = (Partial_Reveal_Object **)vector_get_element_address_ref((Vector_Handle) array, i);
-      if( *p_slot != NULL && address_belongs_to_nursery((void *)*p_slot, gc)){
+      if( *p_slot != NULL && addr_belongs_to_nos(*p_slot)){
         mutator_remset_add_entry(mutator, p_slot);
       }
     }   
@@ -70,7 +69,7 @@ static void gc_object_write_barrier(Managed_Object_Handle p_object)
   while (true) {
     p_slot = (Partial_Reveal_Object**)offset_get_ref(offset_scanner, p_obj);
     if (p_slot == NULL) break;  
-    if( address_belongs_to_nursery((void *)*p_slot, gc)){
+    if( addr_belongs_to_nos(*p_slot)){
       mutator_remset_add_entry(mutator, p_slot);
     }
     offset_scanner = offset_next_ref(offset_scanner);
@@ -81,7 +80,7 @@ static void gc_object_write_barrier(Managed_Object_Handle p_object)
 
 void gc_heap_wrote_object (Managed_Object_Handle p_obj_written)
 {
-  if( !NEED_BARRIER ) return;
+  if( !gc_is_gen_mode() ) return;
   if( object_has_ref_field((Partial_Reveal_Object*)p_obj_written)){
     /* for array copy and object clone */
     gc_object_write_barrier(p_obj_written); 
@@ -97,7 +96,7 @@ void gc_heap_slot_write_ref (Managed_Object_Handle p_obj_holding_ref,Managed_Obj
 {  
   *p_slot = p_target;
   
-  if( !NEED_BARRIER ) return;
+  if( !gc_is_gen_mode() ) return;
   gc_slot_write_barrier(p_slot, p_target); 
 }
 

@@ -21,13 +21,17 @@
 #ifndef _GC_GEN_H_
 #define _GC_GEN_H_
 
+extern unsigned int NOS_SIZE;
+
 #include "../common/gc_common.h"
 #include "../thread/gc_thread.h"
 #include "../trace_forward/fspace.h"
 #include "../mark_compact/mspace.h"
 #include "../mark_sweep/lspace.h"
 #include "../finalizer_weakref/finalizer_weakref_metadata.h"
-  
+
+#define SPACE_ALLOC_UNIT ( ( GC_BLOCK_SIZE_BYTES > SYSTEM_ALLOC_UNIT) ? GC_BLOCK_SIZE_BYTES : SYSTEM_ALLOC_UNIT)
+
 enum Write_Barrier_Kind{
   WRITE_BARRIER_NIL,  
   WRITE_BARRIER_SLOT,  
@@ -52,6 +56,8 @@ typedef struct GC_Gen {
   unsigned int reserved_heap_size;
   unsigned int committed_heap_size;
   unsigned int num_collections;
+  int64 time_collections;
+  float survive_ratio;  
   
   /* mutation related info */
   Mutator *mutator_list;
@@ -65,21 +71,28 @@ typedef struct GC_Gen {
 
   /* metadata is the pool for rootset, markstack, etc. */  
   GC_Metadata* metadata;
-  Finalizer_Weakref_Metadata *finalizer_weakref_metadata;
+  Finref_Metadata *finref_metadata;
+
   unsigned int collect_kind; /* MAJOR or MINOR */
+  unsigned int last_collect_kind;
+  Boolean collect_result; /* succeed or fail */
+  
+  Boolean generate_barrier;
+
   /* FIXME:: this is wrong! root_set belongs to mutator */
   Vector_Block* root_set;
   
-  /* mem info */
-  apr_pool_t *aux_pool;
-  port_vmem_t *allocated_memory;
+  //For_LOS_extend
+  Space_Tuner* tuner;  
   /* END of GC --> */
   
   Block* blocks;
   Fspace *nos;
   Mspace *mos;
   Lspace *los;
-    
+      
+  Boolean force_major_collect;
+  
   /* system info */ 
   unsigned int _machine_page_size_bytes;
   unsigned int _num_processors;
@@ -92,20 +105,25 @@ void gc_gen_initialize(GC_Gen *gc, unsigned int initial_heap_size, unsigned int 
 void gc_gen_destruct(GC_Gen *gc);
                         
 inline unsigned int gc_gen_free_memory_size(GC_Gen* gc)
-{  return fspace_free_memory_size(gc->nos) +
-         mspace_free_memory_size(gc->mos) +
-         lspace_free_memory_size(gc->los);  }
-                        
+{  return space_free_memory_size((Blocked_Space*)gc->nos) +
+          space_free_memory_size((Blocked_Space*)gc->mos) +
+          lspace_free_memory_size(gc->los);  }
+                    
+inline unsigned int gc_gen_total_memory_size(GC_Gen* gc)
+{  return space_committed_size((Space*)gc->nos) +
+          space_committed_size((Space*)gc->mos) +
+          lspace_committed_size(gc->los);  }
+
 /////////////////////////////////////////////////////////////////////////////////////////
 
-inline void gc_nos_initialize(GC_Gen* gc, void* start, unsigned int nos_size)
-{ fspace_initialize((GC*)gc, start, nos_size); }
+inline void gc_nos_initialize(GC_Gen* gc, void* start, unsigned int nos_size, unsigned int commit_size)
+{ fspace_initialize((GC*)gc, start, nos_size, commit_size); }
 
 inline void gc_nos_destruct(GC_Gen* gc)
 { fspace_destruct(gc->nos); }
 
-inline void gc_mos_initialize(GC_Gen* gc, void* start, unsigned int mos_size)
-{ mspace_initialize((GC*)gc, start, mos_size); }
+inline void gc_mos_initialize(GC_Gen* gc, void* start, unsigned int mos_size, unsigned int commit_size)
+{ mspace_initialize((GC*)gc, start, mos_size, commit_size); }
 
 inline void gc_mos_destruct(GC_Gen* gc)
 { mspace_destruct(gc->mos); }
@@ -115,12 +133,6 @@ inline void gc_los_initialize(GC_Gen* gc, void* start, unsigned int los_size)
 
 inline void gc_los_destruct(GC_Gen* gc)
 { lspace_destruct(gc->los); }
-
-inline Boolean address_belongs_to_nursery(void* addr, GC_Gen* gc)
-{ return address_belongs_to_space(addr, (Space*)gc->nos); }
-
-extern void* nos_boundary;
-extern void* los_boundary;
 
 inline Space* space_of_addr(GC* gc, void* addr)
 {
@@ -141,7 +153,11 @@ void gc_set_mos(GC_Gen* gc, Space* mos);
 void gc_set_los(GC_Gen* gc, Space* los);
 unsigned int gc_get_processor_num(GC_Gen* gc);
 
-unsigned int gc_decide_collection_kind(GC_Gen* gc, unsigned int cause);
+void gc_decide_collection_algorithm(GC_Gen* gc, char* minor_algo, char* major_algo);
+void gc_decide_collection_kind(GC_Gen* gc, unsigned int cause);
+
+void gc_gen_adapt(GC_Gen* gc, int64 pause_time);
+
 void gc_gen_reclaim_heap(GC_Gen* gc);
 
 #endif /* ifndef _GC_GEN_H_ */

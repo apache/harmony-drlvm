@@ -15,33 +15,21 @@
  */
 
 /**
- * @author Ji Qi, 2006/10/05
+ * @author Xiao-Feng Li, 2006/10/05
  */
 
-#ifndef _BIDIR_LIST_H_
-#define _BIDIR_LIST_H_
+#ifndef _JAVA_SUPPORT_H_
+#define _JAVA_SUPPORT_H_
 
-typedef struct Bidir_List{
-  unsigned int zero;
-  Bidir_List* next;
-  Bidir_List* prev;
-}Bidir_List;
+#include "open/types.h"
+#include "../common/gc_platform.h"
 
-inline Bidir_List* bidir_list_add_item(Bidir_List* head, Bidir_List* item)
-{
-  item->next = head->next;
-  item->prev = head;
-  head->next->prev = item;
-  head->next = item;
-  return head;
-}
+extern Class_Handle GCHelper_clss;
+extern Boolean java_helper_inlined;
 
-inline Bidir_List* bidir_list_remove_item(Bidir_List* item)
-{
-  item->prev->next = item->next;
-  item->next->prev = item->prev;
-  item->next = item->prev = item;
-  return item;
-}
+void HelperClass_set_GenMode(Boolean status);
+void HelperClass_set_NosBoundary(void* boundary);
 
-#endif /* _BIDIR_LIST_H_ */
+#endif /*_JAVA_SUPPORT_H_*/
+
+

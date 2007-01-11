@@ -35,3 +35,6 @@ void gc_terminate_heap_verification(GC* gc)
 void event_collector_move_obj(Partial_Reveal_Object *p_old, Partial_Reveal_Object *p_new, Collector* collector)
 { return; }
 
+void event_collector_doublemove_obj(Partial_Reveal_Object *p_old, Partial_Reveal_Object *p_new, Collector* collector)
+{ return; }
+

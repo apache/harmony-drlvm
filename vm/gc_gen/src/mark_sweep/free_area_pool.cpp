@@ -23,12 +23,13 @@
 void free_area_pool_init(Free_Area_Pool* pool)
 {
   for(unsigned int i = 0; i < NUM_FREE_LIST; i ++){
-    Bidir_List* list = &pool->sized_area_list[i];
+    Bidir_List* list = (Bidir_List*)(&pool->sized_area_list[i]);
     list->next = list->prev = list;
+    ((Lockable_Bidir_List*)list)->lock = 0;
+    ((Lockable_Bidir_List*)list)->zero = 0;
   }
   
   memset((void*)pool->list_bit_flag, 0, NUM_FLAG_WORDS << BIT_SHIFT_TO_BYTES_PER_WORD);
-  pool->free_pool_lock = 0;
   return;
 }
 
@@ -51,7 +52,7 @@ Free_Area* free_pool_find_size_area(Free_Area_Pool* pool, unsigned int size)
   if(index == NUM_FREE_LIST) 
   return NULL; 
   
-  Bidir_List* list = &pool->sized_area_list[index];
+  Bidir_List* list = (Bidir_List*)&pool->sized_area_list[index];
   Free_Area* area = (Free_Area*)list->next;
   
   if(index != MAX_LIST_INDEX)

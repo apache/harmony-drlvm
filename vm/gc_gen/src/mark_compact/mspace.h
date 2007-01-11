@@ -21,7 +21,6 @@
 #ifndef _MSC_SPACE_H_
 #define _MSC_SPACE_H_
 
-#include "../common/gc_block.h"
 #include "../thread/gc_thread.h"
 
 /* Mark-compaction space is orgnized into blocks*/
@@ -32,9 +31,11 @@ typedef struct Mspace{
   unsigned int reserved_heap_size;
   unsigned int committed_heap_size;
   unsigned int num_collections;
+  int64 time_collections;
+  float survive_ratio;
+  unsigned int collect_algorithm;
   GC* gc;
   Boolean move_object;
-  Boolean (*mark_object_func)(Mspace* space, Partial_Reveal_Object* p_obj);
   /* END of Space --> */
     
   Block* blocks; /* short-cut for mpsace blockheader access, not mandatory */
@@ -48,24 +49,22 @@ typedef struct Mspace{
   unsigned int num_managed_blocks;
   unsigned int num_total_blocks;
   /* END of Blocked_Space --> */
-    
+  
+  volatile Block_Header* block_iterator;  
+  
 }Mspace;
 
-void mspace_initialize(GC* gc, void* reserved_base, unsigned int mspace_size);
+void mspace_initialize(GC* gc, void* reserved_base, unsigned int mspace_size, unsigned int commit_size);
 void mspace_destruct(Mspace* mspace);
-
-inline Boolean mspace_has_free_block(Mspace* mspace){ return mspace->free_block_idx <= mspace->ceiling_block_idx; }
-inline unsigned int mspace_free_memory_size(Mspace* mspace){ return GC_BLOCK_SIZE_BYTES * (mspace->ceiling_block_idx - mspace->free_block_idx + 1);  }
-inline Boolean mspace_used_memory_size(Mspace* mspace){ return GC_BLOCK_SIZE_BYTES * mspace->num_used_blocks; }
 
 void* mspace_alloc(unsigned size, Allocator *allocator);
 void mspace_collection(Mspace* mspace);
 
-void reset_mspace_after_copy_nursery(Mspace* mspace);
+void mspace_block_iterator_init(Mspace* mspace);
+void mspace_block_iterator_init_free(Mspace* mspace);
+Block_Header* mspace_block_iterator_next(Mspace* mspace);
+Block_Header* mspace_block_iterator_get(Mspace* mspace);
 
-
-Boolean mspace_mark_object(Mspace* mspace, Partial_Reveal_Object *p_obj);
-void mspace_save_reloc(Mspace* mspace, Partial_Reveal_Object** p_ref);
-void mspace_update_reloc(Mspace* mspace);
+void mspace_fix_after_copy_nursery(Collector* collector, Mspace* mspace);
 
 #endif //#ifdef _MSC_SPACE_H_

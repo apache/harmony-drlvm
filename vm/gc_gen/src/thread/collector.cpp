@@ -24,29 +24,27 @@
 #include "../mark_compact/mspace.h"
 #include "../finalizer_weakref/finalizer_weakref.h"
 
+unsigned int MINOR_COLLECTORS = 0;
+unsigned int MAJOR_COLLECTORS = 0;
 
-static void collector_restore_obj_info(Collector* collector)
+void collector_restore_obj_info(Collector* collector)
 {
-  ObjectMap* objmap = collector->obj_info_map;
-  ObjectMap::iterator obj_iter;
-  for( obj_iter=objmap->begin(); obj_iter!=objmap->end(); obj_iter++){
-    Partial_Reveal_Object* p_target_obj = obj_iter->first;
-    Obj_Info_Type obj_info = obj_iter->second;
-    set_obj_info(p_target_obj, obj_info);     
-  }
-  objmap->clear();
-  return;  
-}
-
-void gc_restore_obj_info(GC* gc)
-{
-  for(unsigned int i=0; i<gc->num_active_collectors; i++)
-  {
-    Collector* collector = gc->collectors[i];    
-    collector_restore_obj_info(collector);
-  }
-  return;
+  Pool *remset_pool = collector->gc->metadata->collector_remset_pool;
+  Pool *free_pool = collector->gc->metadata->free_set_pool;
+  assert(!collector->rem_set);
   
+  while(Vector_Block *oi_block = pool_get_entry(remset_pool)){
+    unsigned int *iter = vector_block_iterator_init(oi_block);
+    while(!vector_block_iterator_end(oi_block, iter)){
+      Partial_Reveal_Object *p_target_obj = (Partial_Reveal_Object *)*iter;
+      iter = vector_block_iterator_advance(oi_block, iter);
+      Obj_Info_Type obj_info = (Obj_Info_Type)*iter;
+      iter = vector_block_iterator_advance(oi_block, iter);
+      set_obj_info(p_target_obj, obj_info);
+    }
+    vector_block_clear(oi_block);
+    pool_put_entry(free_pool, oi_block);
+  }
 }
 
 static void collector_reset_thread(Collector *collector) 
@@ -57,22 +55,25 @@ static void collector_reset_thread(Collector *collector)
   vm_reset_event(collector->task_assigned_event);
   vm_reset_event(collector->task_finished_event);
   */
-  
-  alloc_context_reset((Allocator*)collector);
-  
+    
   GC_Metadata* metadata = collector->gc->metadata;
 
+/* TO_REMOVE
+
   assert(collector->rep_set==NULL);
-  if( !gc_requires_barriers() || collector->gc->collect_kind != MINOR_COLLECTION){
-    collector->rep_set = pool_get_entry(metadata->free_set_pool);
+  if( !gc_is_gen_mode() || collector->gc->collect_kind != MINOR_COLLECTION){
+    collector->rep_set = free_set_pool_get_entry(metadata);
   }
+*/
   
-  if(gc_requires_barriers()){
+  if(gc_is_gen_mode() && collector->gc->collect_kind==MINOR_COLLECTION && NOS_PARTIAL_FORWARD){
     assert(collector->rem_set==NULL);
-    collector->rem_set = pool_get_entry(metadata->free_set_pool);
+    collector->rem_set = free_set_pool_get_entry(metadata);
   }
   
+#ifndef BUILD_IN_REFERENT
   collector_reset_weakref_sets(collector);
+#endif
 
   collector->result = TRUE;
   return;
@@ -101,7 +102,14 @@ static void collector_notify_work_done(Collector *collector)
 static void assign_collector_with_task(GC* gc, TaskType task_func, Space* space)
 {
   /* FIXME:: to adaptively identify the num_collectors_to_activate */
-  gc->num_active_collectors = gc->num_collectors;
+  if( MINOR_COLLECTORS && gc->collect_kind == MINOR_COLLECTION){
+    gc->num_active_collectors = MINOR_COLLECTORS;      
+  }else if ( MAJOR_COLLECTORS && gc->collect_kind != MINOR_COLLECTION){
+    gc->num_active_collectors = MAJOR_COLLECTORS;  
+  }else{
+    gc->num_active_collectors = gc->num_collectors;
+  }
+  
   for(unsigned int i=0; i<gc->num_active_collectors; i++)
   {
     Collector* collector = gc->collectors[i];
@@ -121,7 +129,7 @@ static void wait_collection_finish(GC* gc)
   {
     Collector* collector = gc->collectors[i];
     wait_collector_to_finish(collector);
-  }
+  }  
   return;
 }
 
@@ -139,7 +147,9 @@ static int collector_thread_func(void *arg)
     if(task_func == NULL) return 1;
       
     task_func(collector);
-    
+
+    alloc_context_reset((Allocator*)collector);
+
     collector_notify_work_done(collector);
   }
 
@@ -148,7 +158,6 @@ static int collector_thread_func(void *arg)
 
 static void collector_init_thread(Collector *collector) 
 {
-  collector->obj_info_map = new ObjectMap();
   collector->rem_set = NULL;
   collector->rep_set = NULL;
 
@@ -193,14 +202,14 @@ unsigned int NUM_COLLECTORS = 0;
 
 struct GC_Gen;
 unsigned int gc_get_processor_num(GC_Gen*);
+
 void collector_initialize(GC* gc)
 {
   //FIXME::
-  unsigned int nthreads = gc_get_processor_num((GC_Gen*)gc);
+  unsigned int num_processors = gc_get_processor_num((GC_Gen*)gc);
   
-  nthreads = (NUM_COLLECTORS==0)?nthreads:NUM_COLLECTORS;
+  unsigned int nthreads = max( max( MAJOR_COLLECTORS, MINOR_COLLECTORS), max(NUM_COLLECTORS, num_processors)); 
 
-  gc->num_collectors = nthreads; 
   unsigned int size = sizeof(Collector *) * nthreads;
   gc->collectors = (Collector **) STD_MALLOC(size); 
   memset(gc->collectors, 0, size);
@@ -217,6 +226,8 @@ void collector_initialize(GC* gc)
     
     gc->collectors[i] = collector;
   }
+
+  gc->num_collectors = NUM_COLLECTORS? NUM_COLLECTORS:num_processors; 
 
   return;
 }

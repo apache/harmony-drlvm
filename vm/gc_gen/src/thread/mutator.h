@@ -21,13 +21,14 @@
 #ifndef _MUTATOR_H_
 #define _MUTATOR_H_
 
-#include "../common/gc_common.h"
+#include "../common/gc_space.h"
 
 /* Mutator thread local information for GC */
 typedef struct Mutator {
   /* <-- first couple of fields are overloaded as Allocator */
-	void*	free;
-	void*	ceiling;
+  void* free;
+  void* ceiling;
+  void* end;
   void* alloc_block;
   Space* alloc_space;
   GC* gc;
@@ -35,7 +36,7 @@ typedef struct Mutator {
   /* END of Allocator --> */
   
   Vector_Block* rem_set;
-  Vector_Block* objects_with_finalizer;
+  Vector_Block* obj_with_fin;
   Mutator* next;  /* The gc info area associated with the next active thread. */
 } Mutator;
 
@@ -44,5 +45,6 @@ void mutator_destruct(GC* gc, void* tls_gc_info);
 void mutator_reset(GC *gc);
 
 void gc_reset_mutator_context(GC* gc);
+void gc_prepare_mutator_remset(GC* gc);
 
 #endif /*ifndef _MUTATOR_H_ */

@@ -21,8 +21,11 @@
 #ifndef _GC_THREAD_H_
 #define _GC_THREAD_H_
 
-#include "../common/gc_block.h"
+#include "../common/gc_space.h"
 #include "../common/gc_metadata.h"
+
+#define ALLOC_ZEROING
+#define ZEROING_SIZE  2*KB
 
 extern unsigned int tls_gc_offset;
 
@@ -42,6 +45,7 @@ inline void gc_set_tls(void* gc_tls_info)
 typedef struct Allocator{
   void *free;
   void *ceiling;
+  void* end;
   Block *alloc_block;
   Space* alloc_space;
   GC   *gc;
@@ -50,31 +54,76 @@ typedef struct Allocator{
 
 inline void thread_local_unalloc(unsigned int size, Allocator* allocator)
 {
-    void* free = allocator->free;    
-    allocator->free = (void*)((unsigned int)free - size);
-    return;
+  void* free = allocator->free;    
+  allocator->free = (void*)((unsigned int)free - size);
+  return;
 }
+
+#ifdef ALLOC_ZEROING
+
+inline Partial_Reveal_Object* thread_local_alloc_zeroing(unsigned int size, Allocator* allocator)
+{
+  unsigned int  free = (unsigned int)allocator->free;
+  unsigned int ceiling = (unsigned int)allocator->ceiling;
+  
+  unsigned int new_free = free + size;
+  
+  unsigned int block_ceiling = (unsigned int)allocator->end;
+  if( new_free > block_ceiling) 
+    return NULL;
+
+  unsigned int new_ceiling;
+  new_ceiling =  new_free + ZEROING_SIZE;
+  if( new_ceiling > block_ceiling )
+    new_ceiling = block_ceiling;
+
+  allocator->ceiling = (void*)new_ceiling;
+  allocator->free = (void*)new_free;
+  memset((void*)ceiling, 0, new_ceiling - ceiling);
+  return (Partial_Reveal_Object*)free;
+
+}
+
+#endif /* ALLOC_ZEROING */
 
 inline Partial_Reveal_Object* thread_local_alloc(unsigned int size, Allocator* allocator)
 {
-    void* free = allocator->free;
-    void* ceiling = allocator->ceiling;
+  unsigned int  free = (unsigned int)allocator->free;
+  unsigned int ceiling = (unsigned int)allocator->ceiling;
+  
+  unsigned int new_free = free + size;
     
-    void* new_free = (void*)((unsigned int)free + size);
-    
-    if (new_free <= ceiling){
-    	allocator->free= new_free;
-    	return (Partial_Reveal_Object*)free;
-    }
+  if (new_free <= ceiling){
+  	allocator->free= (void*)new_free;
+    return (Partial_Reveal_Object*)free;
+  }
 
-    return NULL;
+#ifndef ALLOC_ZEROING
+  
+  return NULL;
+
+#else
+
+  return thread_local_alloc_zeroing(size, allocator);
+
+#endif /* #ifndef ALLOC_ZEROING */
+
 }
 
 inline void alloc_context_reset(Allocator* allocator)
 {
-  allocator->free = NULL;
-  allocator->ceiling = NULL;
-  allocator->alloc_block = NULL;
+  Block_Header* block = (Block_Header*)allocator->alloc_block;
+  /* it can be NULL if GC happens before the mutator resumes, or called by collector */
+  if( block != NULL ){ 
+    assert(block->status == BLOCK_IN_USE);
+    block->free = allocator->free;
+    block->status = BLOCK_USED;
+    allocator->alloc_block = NULL;
+  }
+    
+   allocator->free = NULL;
+   allocator->ceiling = NULL;
+   allocator->end = NULL;
   
   return;
 }

@@ -22,64 +22,20 @@
 
 #include "fspace.h"
 
-Boolean NOS_PARTIAL_FORWARD = TRUE;
-
-void* nos_boundary = null; /* this is only for speeding up write barrier */
+Boolean NOS_PARTIAL_FORWARD = FALSE;
 
 Boolean forward_first_half;
 void* object_forwarding_boundary=NULL;
-
-Boolean fspace_mark_object(Fspace* fspace, Partial_Reveal_Object *p_obj)
-{  
-  obj_mark_in_vt(p_obj);
-
-  unsigned int obj_word_index = OBJECT_WORD_INDEX_TO_MARKBIT_TABLE(p_obj);
-  unsigned int obj_offset_in_word = OBJECT_WORD_OFFSET_IN_MARKBIT_TABLE(p_obj); 	
-	
-  unsigned int *p_word = &(GC_BLOCK_HEADER(p_obj)->mark_table[obj_word_index]);
-  unsigned int word_mask = (1<<obj_offset_in_word);
-	
-  unsigned int old_value = *p_word;
-  unsigned int new_value = old_value|word_mask;
-  
-  while(old_value != new_value){
-    unsigned int temp = atomic_cas32(p_word, new_value, old_value);
-    if(temp == old_value) return TRUE;
-    old_value = *p_word;
-    new_value = old_value|word_mask;
-  }
-  return FALSE;
-}
 
 static void fspace_destruct_blocks(Fspace* fspace)
 {   
   return;
 }
 
-static void fspace_init_blocks(Fspace* fspace)
-{ 
-  Block* blocks = (Block*)fspace->heap_start; 
-  Block_Header* last_block = (Block_Header*)blocks;
-  unsigned int start_idx = fspace->first_block_idx;
-  for(unsigned int i=0; i < fspace->num_managed_blocks; i++){
-    Block_Header* block = (Block_Header*)&(blocks[i]);
-    block->free = (void*)((unsigned int)block + GC_BLOCK_HEADER_SIZE_BYTES);
-    block->ceiling = (void*)((unsigned int)block + GC_BLOCK_SIZE_BYTES); 
-    block->base = block->free;
-    block->block_idx = i + start_idx;
-    block->status = BLOCK_FREE;  
-    last_block->next = block;
-    last_block = block;
-  }
-  last_block->next = NULL;
-  fspace->blocks = blocks;
-   
-  return;
-}
-
 struct GC_Gen;
 void gc_set_nos(GC_Gen* gc, Space* space);
-void fspace_initialize(GC* gc, void* start, unsigned int fspace_size) 
+
+void fspace_initialize(GC* gc, void* start, unsigned int fspace_size, unsigned int commit_size) 
 {    
   assert( (fspace_size%GC_BLOCK_SIZE_BYTES) == 0 );
   Fspace* fspace = (Fspace *)STD_MALLOC(sizeof(Fspace));
@@ -90,14 +46,20 @@ void fspace_initialize(GC* gc, void* start, unsigned int fspace_size)
   fspace->num_total_blocks = fspace_size >> GC_BLOCK_SHIFT_COUNT;
 
   void* reserved_base = start;
-  int status = port_vmem_commit(&reserved_base, fspace_size, gc->allocated_memory); 
-  assert(status == APR_SUCCESS && reserved_base == start);
-    
-  memset(reserved_base, 0, fspace_size);
-  fspace->committed_heap_size = fspace_size;
+  /* commit fspace mem */    
+  vm_commit_mem(reserved_base, commit_size);
+  memset(reserved_base, 0, commit_size);
+  
+  fspace->committed_heap_size = commit_size;
   fspace->heap_start = reserved_base;
+
+#ifdef STATIC_NOS_MAPPING
   fspace->heap_end = (void *)((unsigned int)reserved_base + fspace->reserved_heap_size);
-  fspace->num_managed_blocks = fspace_size >> GC_BLOCK_SHIFT_COUNT;
+#else /* for dynamic mapping, nos->heap_end is gc->heap_end */
+  fspace->heap_end = (void *)((unsigned int)reserved_base + fspace->committed_heap_size);
+#endif
+
+  fspace->num_managed_blocks = commit_size >> GC_BLOCK_SHIFT_COUNT;
   
   fspace->first_block_idx = GC_BLOCK_INDEX_FROM(gc->heap_start, reserved_base);
   fspace->ceiling_block_idx = fspace->first_block_idx + fspace->num_managed_blocks - 1;
@@ -105,47 +67,51 @@ void fspace_initialize(GC* gc, void* start, unsigned int fspace_size)
   fspace->num_used_blocks = 0;
   fspace->free_block_idx = fspace->first_block_idx;
   
-  fspace_init_blocks(fspace);
+  space_init_blocks((Blocked_Space*)fspace);
   
-  fspace->mark_object_func = fspace_mark_object;
-
   fspace->move_object = TRUE;
   fspace->num_collections = 0;
+  fspace->time_collections = 0;
+  fspace->survive_ratio = 0.2f;
+  
   fspace->gc = gc;
   gc_set_nos((GC_Gen*)gc, (Space*)fspace);
   /* above is same as Mspace init --> */
   
-  nos_boundary = fspace->heap_start;
-
   forward_first_half = TRUE;
+  /* we always disable partial forwarding in non-gen mode. */
+  if( !gc_is_gen_mode() )
+    NOS_PARTIAL_FORWARD = FALSE;
+
   if( NOS_PARTIAL_FORWARD )
     object_forwarding_boundary = (void*)&fspace->blocks[fspace->num_managed_blocks >>1 ];
   else
     object_forwarding_boundary = (void*)&fspace->blocks[fspace->num_managed_blocks];
-
+     
   return;
 }
 
 void fspace_destruct(Fspace *fspace) 
 {
   fspace_destruct_blocks(fspace);
-  port_vmem_decommit(fspace->heap_start, fspace->committed_heap_size, fspace->gc->allocated_memory);
-  STD_FREE(fspace);  
- 
+  STD_FREE(fspace);   
 }
  
-void reset_fspace_for_allocation(Fspace* fspace)
+void fspace_reset_for_allocation(Fspace* fspace)
 { 
   unsigned int first_idx = fspace->first_block_idx;
-  unsigned int marked_start_idx = 0;
+  unsigned int marked_start_idx = 0; //was for oi markbit reset, now useless
   unsigned int marked_last_idx = 0;
+  Boolean is_major_collection = (fspace->gc->collect_kind != MINOR_COLLECTION);
+  Boolean gen_mode = gc_is_gen_mode();
 
-  if( fspace->gc->collect_kind == MAJOR_COLLECTION || 
-         NOS_PARTIAL_FORWARD == FALSE || !gc_requires_barriers())            
+  if(  is_major_collection || 
+         NOS_PARTIAL_FORWARD == FALSE || !gen_mode)            
   {
     fspace->free_block_idx = first_idx;
     fspace->ceiling_block_idx = first_idx + fspace->num_managed_blocks - 1;  
     forward_first_half = TRUE; /* only useful for not-FORWARD_ALL*/
+  
   }else{    
     if(forward_first_half){
       fspace->free_block_idx = first_idx;
@@ -160,7 +126,6 @@ void reset_fspace_for_allocation(Fspace* fspace)
     }
     forward_first_half = forward_first_half^1;
   }
-
   
   Block* blocks = fspace->blocks;
   unsigned int num_freed = 0;
@@ -168,25 +133,24 @@ void reset_fspace_for_allocation(Fspace* fspace)
   unsigned int new_last_idx = fspace->ceiling_block_idx - first_idx;
   for(unsigned int i = new_start_idx; i <= new_last_idx; i++){
     Block_Header* block = (Block_Header*)&(blocks[i]);
+    block->src = NULL;
+    block->next_src = NULL;
+    assert(!block->dest_counter);
     if(block->status == BLOCK_FREE) continue;
     block->status = BLOCK_FREE; 
-    block->free = GC_BLOCK_BODY(block);
-    if( !gc_requires_barriers() || fspace->gc->collect_kind == MAJOR_COLLECTION )
-      block_clear_mark_table(block); 
+    block->free = block->base;
 
     num_freed ++;
   }
 
-  for(unsigned int i = marked_start_idx; i <= marked_last_idx; i++){
-    Block_Header* block = (Block_Header*)&(blocks[i]);
-    if(block->status == BLOCK_FREE) continue;
-    block_clear_markbits(block);
-  }
   fspace->num_used_blocks = fspace->num_used_blocks - num_freed;
-
+  return;
 }
 
 void collector_execute_task(GC* gc, TaskType task_func, Space* space);
+
+#include "../gen/gen.h"
+unsigned int mspace_free_block_idx;
 
 /* world is stopped when starting fspace_collection */      
 void fspace_collection(Fspace *fspace)
@@ -194,15 +158,30 @@ void fspace_collection(Fspace *fspace)
   fspace->num_collections++;  
   
   GC* gc = fspace->gc;
+  mspace_free_block_idx = ((GC_Gen*)gc)->mos->free_block_idx;
+    
+  /* we should not destruct rootset structure in case we need fall back */
+  pool_iterator_init(gc->metadata->gc_rootset_pool);
 
-  if(gc_requires_barriers()){ 
-    /* generational GC. Only trace nos */
-    collector_execute_task(gc, (TaskType)trace_forward_fspace, (Space*)fspace);
-  }else{
-    /* non-generational GC. Mark the whole heap (nos, mos, and los) */
-    pool_iterator_init(gc->metadata->gc_rootset_pool);
-    collector_execute_task(gc, (TaskType)mark_copy_fspace, (Space*)fspace);
+  switch(fspace->collect_algorithm){
+
+#ifdef MARK_BIT_FLIPPING
+    
+    case MINOR_NONGEN_FORWARD_POOL:
+      collector_execute_task(gc, (TaskType)nongen_forward_pool, (Space*)fspace);    
+      break;
+        
+#endif /*#ifdef MARK_BIT_FLIPPING */
+
+    case MINOR_GEN_FORWARD_POOL:
+      collector_execute_task(gc, (TaskType)gen_forward_pool, (Space*)fspace);
+      break;
+        
+    default:
+      printf("\nSpecified minor collection algorithm doesn't exist in built module!\n");
+      exit(0);    
+      break;
   }
-  
+
   return; 
 }

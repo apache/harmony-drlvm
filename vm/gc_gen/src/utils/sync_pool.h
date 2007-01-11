@@ -28,7 +28,10 @@ typedef Sync_Stack Pool;
 inline Pool* sync_pool_create(){ return sync_stack_init(); }
 inline void sync_pool_destruct(Pool* pool){ sync_stack_destruct(pool); }
 
-inline Boolean pool_is_empty(Pool* pool){ return stack_is_empty(pool);}
+inline Boolean pool_is_empty(Pool* pool){ return sync_stack_is_empty(pool);}
+
+inline unsigned int pool_size(Pool* pool){ return sync_stack_size(pool); }
+
 inline Vector_Block* pool_get_entry(Pool* pool)
 { 
   Vector_Block* block = (Vector_Block*)sync_stack_pop(pool); 

@@ -19,7 +19,7 @@
  */
 
 #include "gc_common.h"
-#include "../finalizer_weakref/finalizer_weakref_metadata.h"
+#include "../finalizer_weakref/finalizer_weakref.h"
 
 /* Setter functions for the gc class property field. */
 void gc_set_prop_alignment_mask (GC_VTable_Info *gcvt, unsigned int the_mask)
@@ -42,9 +42,9 @@ void gc_set_prop_finalizable (GC_VTable_Info *gcvt)
 {
   gcvt->gc_class_properties |= CL_PROP_FINALIZABLE_MASK;
 }
-void gc_set_prop_reference(Partial_Reveal_VTable *vt, WeakReferenceType type)
+void gc_set_prop_reference(GC_VTable_Info *gcvt, WeakReferenceType type)
 {
-  vtable_get_gcvt(vt)->gc_class_properties |= (unsigned int)type << CL_PROP_REFERENCE_TYPE_SHIFT;
+  gcvt->gc_class_properties |= (unsigned int)type << CL_PROP_REFERENCE_TYPE_SHIFT;
 }
 
 
@@ -61,8 +61,9 @@ intcompare(const void *vi, const void *vj)
   return 0;
 }
 
-static int *build_ref_offset_array(Class_Handle ch, GC_VTable_Info *gcvt, WeakReferenceType type)
+static unsigned int class_num_ref_fields(Class_Handle ch)
 {
+  WeakReferenceType is_reference = class_is_reference(ch);
   unsigned num_ref_fields = 0;
   unsigned num_fields = class_num_instance_fields_recursive(ch);
 
@@ -74,8 +75,8 @@ static int *build_ref_offset_array(Class_Handle ch, GC_VTable_Info *gcvt, WeakRe
     }
   }
 
-  int skip = -1; // not skip any reference
-  if (type != NOT_REFERENCE) {
+#ifndef BUILD_IN_REFERENT
+  if (is_reference != NOT_REFERENCE) {
     int offset = class_get_referent_offset(ch);
     unsigned int gc_referent_offset = get_gc_referent_offset();
     if (gc_referent_offset == 0) {
@@ -84,28 +85,26 @@ static int *build_ref_offset_array(Class_Handle ch, GC_VTable_Info *gcvt, WeakRe
       assert(gc_referent_offset == offset);
     }
 
-    skip = offset; // skip global referent offset
     num_ref_fields--;
   }
+#endif
+
+  return num_ref_fields;
+}
+
+static void build_ref_offset_array(Class_Handle ch, GC_VTable_Info *gcvt)
+{     
+  unsigned num_fields = class_num_instance_fields_recursive(ch);
+  WeakReferenceType is_reference = class_is_reference(ch);
+  unsigned int gc_referent_offset = get_gc_referent_offset();
   
-  if( num_ref_fields )   
-    gcvt->gc_object_has_ref_field = true;
-  else 
-    return NULL;
-   
-  /* add a null-termination slot */
-  unsigned int size = (num_ref_fields+1) * sizeof (unsigned int);
-
-  /* alloc from gcvt pool */
-  int *result = (int*) STD_MALLOC(size);
-  assert(result);
-
-  int *new_ref_array = result;
-  for(idx = 0; idx < num_fields; idx++) {
+  int *new_ref_array = gcvt->gc_ref_offset_array;
+  int *result = new_ref_array;
+  for(unsigned int idx = 0; idx < num_fields; idx++) {
     Field_Handle fh = class_get_instance_field_recursive(ch, idx);
     if(field_is_reference(fh)) {
       int offset = field_get_offset(fh);
-      if (offset == skip) continue;
+      if(is_reference && offset == gc_referent_offset) continue;
       *new_ref_array = field_get_offset(fh);
       new_ref_array++;
     }
@@ -114,15 +113,12 @@ static int *build_ref_offset_array(Class_Handle ch, GC_VTable_Info *gcvt, WeakRe
   /* ref array is NULL-terminated */
   *new_ref_array = 0;
 
-  gcvt->gc_number_of_ref_fields = num_ref_fields;
-
+  unsigned int num_ref_fields = gcvt->gc_number_of_ref_fields;
   /* offsets were built with idx, may not be in order. Let's sort it anyway.
      FIXME: verify_live_heap depends on ordered offset array. */
-  qsort(result, num_ref_fields, sizeof(*result), intcompare);
-
-  gcvt->gc_ref_offset_array  = result;
+  qsort(gcvt->gc_ref_offset_array, num_ref_fields, sizeof(int), intcompare);
   
-  return new_ref_array;
+  return;
 }
 
 void gc_class_prepared (Class_Handle ch, VTable_Handle vth) 
@@ -132,48 +128,70 @@ void gc_class_prepared (Class_Handle ch, VTable_Handle vth)
   assert(vth);
 
   Partial_Reveal_VTable *vt = (Partial_Reveal_VTable *)vth;
+
+  unsigned int num_ref_fields = class_num_ref_fields(ch);
+  unsigned int gcvt_size = sizeof(GC_VTable_Info);
+  if(num_ref_fields){
+    gcvt_size += num_ref_fields * sizeof(unsigned int);  
+  }
   
-  /* FIXME: gcvts are too random is memory */
-  gcvt = (GC_VTable_Info *) STD_MALLOC(sizeof(GC_VTable_Info));
+  gcvt_size = (gcvt_size + GCVT_ALIGN_MASK) & ~GCVT_ALIGN_MASK;
+  gcvt = (GC_VTable_Info*) malloc(gcvt_size);
   assert(gcvt);
-  vtable_set_gcvt(vt, gcvt);
-  memset((void *)gcvt, 0, sizeof(GC_VTable_Info));
+  assert(!((unsigned int)gcvt % GCVT_ALIGNMENT));
+
+  memset((void *)gcvt, 0, gcvt_size);
   gcvt->gc_clss = ch;
   gcvt->gc_class_properties = 0;
-  gcvt->gc_object_has_ref_field = false;
-  
   gc_set_prop_alignment_mask(gcvt, class_get_alignment(ch));
+
+  if(num_ref_fields){
+    gcvt->gc_number_of_ref_fields = num_ref_fields;
+    /* Build the offset array */
+    build_ref_offset_array(ch, gcvt);
+  }
 
   if(class_is_array(ch)) {
     Class_Handle array_element_class = class_get_array_element_class(ch);
     gc_set_prop_array(gcvt);
-    gcvt->gc_array_element_size = class_element_size(ch);
+    
+    gcvt->array_elem_size = class_element_size(ch);
     unsigned int the_offset = vector_first_element_offset_unboxed(array_element_class);
-    gcvt->gc_array_first_element_offset = the_offset;
+    gcvt->array_first_elem_offset = the_offset;
   
     if (class_is_non_ref_array (ch)) {
       gc_set_prop_non_ref_array(gcvt);
     }else{
-      gcvt->gc_object_has_ref_field = true;
+      gcvt->gc_number_of_ref_fields = 1;
     }
   }
-
+  
   if (class_is_finalizable(ch)) {
     gc_set_prop_finalizable(gcvt);
   }
 
   WeakReferenceType type = class_is_reference(ch);
-  gc_set_prop_reference(vt, type);
+  gc_set_prop_reference(gcvt, type);
   
   unsigned int size = class_get_boxed_data_size(ch);
   gcvt->gc_allocated_size = size;
   
-  /* Build the offset array */
-  build_ref_offset_array(ch, gcvt, type);
-
   gcvt->gc_class_name = class_get_name(ch);
   assert (gcvt->gc_class_name);
 
+  /* these should be set last to use the gcvt pointer */
+  if(gcvt->gc_number_of_ref_fields)
+    gcvt = (GC_VTable_Info*)((unsigned int)gcvt | GC_CLASS_FLAG_REFS);
+  
+  if(class_is_array(ch))
+    gcvt = (GC_VTable_Info*)((unsigned int)gcvt | GC_CLASS_FLAG_ARRAY);
+    
+  if(class_is_finalizable(ch))
+    gcvt = (GC_VTable_Info*)((unsigned int)gcvt | GC_CLASS_FLAG_FINALIZER);
+
+  vtable_set_gcvt(vt, gcvt);
+
+  return;
 }  /* gc_class_prepared */
 
 

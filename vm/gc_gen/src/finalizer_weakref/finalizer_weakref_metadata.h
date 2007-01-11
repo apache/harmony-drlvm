@@ -18,8 +18,8 @@
  * @author Li-Gang Wang, 2006/11/29
  */
 
-#ifndef _FINALIZER_WEAKREF_METADATA_H_
-#define _FINALIZER_WEAKREF_METADATA_H_
+#ifndef _FINREF_METADATA_H_
+#define _FINREF_METADATA_H_
 
 #include "../common/gc_common.h"
 #include "../utils/vector_block.h"
@@ -27,90 +27,89 @@
 
 #define POOL_SEGMENT_NUM 256
 
-typedef struct Finalizer_Weakref_Metadata{
+typedef struct Finref_Metadata{
   void *pool_segments[POOL_SEGMENT_NUM];  // malloced free pool segments' addresses array
-  unsigned int next_segment_pos;          // next available position in pool_segments array
+  unsigned int num_alloc_segs;              // next available position in pool_segments array
   
   Pool *free_pool;                        // list of free buffers for the five pools below
   
-  Pool *objects_with_finalizer_pool;      // list of objects that have finalizer;
+  Pool *obj_with_fin_pool;                // list of objects that have finalizer;
                                           // these objects are added in when they are allocated
-  Pool *finalizable_objects_pool;         // temporary buffer for finalizable objects identified during one single GC
+  Pool *finalizable_obj_pool;             // temporary buffer for finalizable objects identified during one single GC
   
-  Pool *softref_set_pool;                 // temporary buffer for soft references identified during one single GC
-  Pool *weakref_set_pool;                 // temporary buffer for weak references identified during one single GC
-  Pool *phanref_set_pool;                 // temporary buffer for phantom references identified during one single GC
+  Pool *softref_pool;                     // temporary buffer for soft references identified during one single GC
+  Pool *weakref_pool;                     // temporary buffer for weak references identified during one single GC
+  Pool *phanref_pool;                     // temporary buffer for phantom references identified during one single GC
   
   Pool *repset_pool;                      // repointed reference slot sets
   
-  Vector_Block *finalizable_objects;      // buffer for finalizable_objects_pool
+  Vector_Block *finalizable_obj_set;      // buffer for finalizable_objects_pool
   Vector_Block *repset;                   // buffer for repset_pool
   
   Boolean pending_finalizers;             // there are objects waiting to be finalized
-  Boolean pending_weak_references;        // there are weak references waiting to be enqueued
+  Boolean pending_weakrefs;               // there are weak references waiting to be enqueued
   
   unsigned int gc_referent_offset;        // the referent field's offset in Reference Class
-}Finalizer_Weakref_Metadata;
+}Finref_Metadata;
 
 extern unsigned int get_gc_referent_offset(void);
 extern void set_gc_referent_offset(unsigned int offset);
 
-extern void gc_finalizer_weakref_metadata_initialize(GC *gc);
-extern void gc_finalizer_weakref_metadata_destruct(GC *gc);
-extern void gc_finalizer_weakref_metadata_verify(GC *gc, Boolean is_before_gc);
-extern void gc_reset_finalizer_weakref_metadata(GC *gc);
-extern Vector_Block *finalizer_weakref_get_free_block(void);
-extern void gc_finalizer_weakref_metadata_shrink(GC *gc);
+extern void gc_finref_metadata_initialize(GC *gc);
+extern void gc_finref_metadata_destruct(GC *gc);
+extern void gc_finref_metadata_verify(GC *gc, Boolean is_before_gc);
+extern void gc_reset_finref_metadata(GC *gc);
+extern Vector_Block *finref_get_free_block(void);
 
-extern void mutator_finalizer_add_entry(Mutator *mutator, Partial_Reveal_Object *ref);
-extern void gc_finalizable_objects_add_entry(GC *gc, Partial_Reveal_Object *ref);
-extern void collector_softref_set_add_entry(Collector *collector, Partial_Reveal_Object *ref);
-extern void collector_weakref_set_add_entry(Collector *collector, Partial_Reveal_Object *ref);
-extern void collector_phanref_set_add_entry(Collector *collector, Partial_Reveal_Object *ref);
-extern void finalizer_weakref_repset_add_entry(GC *gc, Partial_Reveal_Object **ref);
+extern void mutator_add_finalizer(Mutator *mutator, Partial_Reveal_Object *ref);
+extern void gc_add_finalizable_obj(GC *gc, Partial_Reveal_Object *ref);
+extern void collector_add_softref(Collector *collector, Partial_Reveal_Object *ref);
+extern void collector_add_weakref(Collector *collector, Partial_Reveal_Object *ref);
+extern void collector_add_phanref(Collector *collector, Partial_Reveal_Object *ref);
+extern void finref_repset_add_entry(GC *gc, Partial_Reveal_Object **ref);
 
-extern Boolean objects_with_finalizer_pool_is_empty(GC *gc);
-extern Boolean finalizable_objects_pool_is_empty(GC *gc);
-extern Boolean softref_set_pool_is_empty(GC *gc);
-extern Boolean weakref_set_pool_is_empty(GC *gc);
-extern Boolean phanref_set_pool_is_empty(GC *gc);
-extern Boolean finalizer_weakref_repset_pool_is_empty(GC *gc);
+extern Boolean obj_with_fin_pool_is_empty(GC *gc);
+extern Boolean finalizable_obj_pool_is_empty(GC *gc);
+extern Boolean softref_pool_is_empty(GC *gc);
+extern Boolean weakref_pool_is_empty(GC *gc);
+extern Boolean phanref_pool_is_empty(GC *gc);
+extern Boolean finref_repset_pool_is_empty(GC *gc);
 
-extern void gc_clear_special_reference_pools(GC *gc);
+extern void gc_clear_weakref_pools(GC *gc);
 
 
 /* called before loop of recording finalizable objects */
 inline void gc_reset_finalizable_objects(GC *gc)
 {
-  Finalizer_Weakref_Metadata *metadata = gc->finalizer_weakref_metadata;
+  Finref_Metadata *metadata = gc->finref_metadata;
   
-  assert(!metadata->finalizable_objects);
-  metadata->finalizable_objects = pool_get_entry(metadata->free_pool);
+  assert(!metadata->finalizable_obj_set);
+  metadata->finalizable_obj_set = pool_get_entry(metadata->free_pool);
 }
 /* called after loop of recording finalizable objects */
 inline void gc_put_finalizable_objects(GC *gc)
 {
-  Finalizer_Weakref_Metadata *metadata = gc->finalizer_weakref_metadata;
+  Finref_Metadata *metadata = gc->finref_metadata;
   
-  pool_put_entry(metadata->finalizable_objects_pool, metadata->finalizable_objects);
-  metadata->finalizable_objects = NULL;
+  pool_put_entry(metadata->finalizable_obj_pool, metadata->finalizable_obj_set);
+  metadata->finalizable_obj_set = NULL;
 }
 
 /* called before loop of recording repointed reference */
-inline void finalizer_weakref_reset_repset(GC *gc)
+inline void finref_reset_repset(GC *gc)
 {
-  Finalizer_Weakref_Metadata *metadata = gc->finalizer_weakref_metadata;
+  Finref_Metadata *metadata = gc->finref_metadata;
   
   assert(!metadata->repset);
   metadata->repset = pool_get_entry(metadata->free_pool);
 }
 /* called after loop of recording repointed reference */
-inline void finalizer_weakref_put_repset(GC *gc)
+inline void finref_put_repset(GC *gc)
 {
-  Finalizer_Weakref_Metadata *metadata = gc->finalizer_weakref_metadata;
+  Finref_Metadata *metadata = gc->finref_metadata;
   
   pool_put_entry(metadata->repset_pool, metadata->repset);
   metadata->repset = NULL;
 }
 
-#endif // _FINALIZER_WEAKREF_METADATA_H_
+#endif // _FINREF_METADATA_H_

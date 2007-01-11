@@ -31,21 +31,27 @@ static GC* p_global_gc = NULL;
 
 void gc_tls_init();
 
+Boolean gc_requires_barriers() 
+{   return p_global_gc->generate_barrier; }
+
 void gc_init() 
-{  
-  gc_parse_options();
-    
+{      
   assert(p_global_gc == NULL);
   GC* gc = (GC*)STD_MALLOC(sizeof(GC_Gen));
   assert(gc);
   memset(gc, 0, sizeof(GC));  
   p_global_gc = gc;
+
+  gc_parse_options(gc);
+  
   gc_tls_init();
   
   gc_gen_initialize((GC_Gen*)gc, min_heap_size_bytes, max_heap_size_bytes);
 
   gc_metadata_initialize(gc); /* root set and mark stack */
-  gc_finalizer_weakref_metadata_initialize(gc);
+#ifndef BUILD_IN_REFERENT
+  gc_finref_metadata_initialize(gc);
+#endif
   collector_initialize(gc);
   gc_init_heap_verification(gc);
 
@@ -57,7 +63,9 @@ void gc_wrapup()
   GC* gc =  p_global_gc;
   gc_gen_destruct((GC_Gen*)gc);
   gc_metadata_destruct(gc); /* root set and mark stack */
-  gc_finalizer_weakref_metadata_destruct(gc);
+#ifndef BUILD_IN_REFERENT
+  gc_finref_metadata_destruct(gc);
+#endif
   collector_destruct(gc);
 
   if( verify_live_heap ){
@@ -73,10 +81,15 @@ void gc_wrapup()
 void gc_add_root_set_entry(Managed_Object_Handle *ref, Boolean is_pinned) 
 {   
   Partial_Reveal_Object** p_ref = (Partial_Reveal_Object**)ref;
-  if (*p_ref == NULL) return;
-  assert( !obj_is_marked_in_vt(*p_ref));
-  assert( !obj_is_forwarded_in_vt(*p_ref) && !obj_is_forwarded_in_obj_info(*p_ref)); 
-  assert( obj_is_in_gc_heap(*p_ref));
+  Partial_Reveal_Object* p_obj = *p_ref;
+  if (p_obj == NULL) return;
+  assert( !obj_is_marked_in_vt(p_obj));
+  /* for Minor_collection, it's possible for p_obj be forwarded in non-gen mark-forward GC. 
+     The forward bit is actually last cycle's mark bit.
+     For Major collection, it's possible for p_obj be marked in last cycle. Since we don't
+     flip the bit for major collection, we may find it's marked there.
+     So we can't do assert about oi except we really want. */
+  assert( address_belongs_to_gc_heap(p_obj, p_global_gc));
   gc_rootset_add_entry(p_global_gc, p_ref);
 } 
 
@@ -116,7 +129,7 @@ int64 gc_free_memory()
 /* java heap size.*/
 int64 gc_total_memory() 
 {
-  return (int64)((POINTER_SIZE_INT)gc_heap_ceiling(p_global_gc) - (POINTER_SIZE_INT)gc_heap_base(p_global_gc)); 
+  return (int64)((POINTER_SIZE_INT)gc_gen_total_memory_size((GC_Gen*)p_global_gc)); 
 }
 
 void gc_vm_initialized()
@@ -137,10 +150,14 @@ Managed_Object_Handle gc_get_next_live_object(void *iterator)
 unsigned int gc_time_since_last_gc()
 {  assert(0); return 0; }
 
+int32 gc_get_hashcode(Managed_Object_Handle p_object) 
+{  return 23; }
+
 
 void gc_finalize_on_exit()
 {
-  process_objects_with_finalizer_on_exit(p_global_gc);
+  if(!IGNORE_FINREF )
+    put_all_fin_on_exit(p_global_gc);
 }
 
 /* for future use

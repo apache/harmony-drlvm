@@ -26,8 +26,15 @@ typedef struct Vector_Block{
   unsigned int* head;  /* point to the first filled entry */
   unsigned int* tail;  /* point to the entry after the last filled one */
   unsigned int* heap_end;   /* point to heap_end of the block (right after the last entry) */
-  unsigned int* entries[1];
+  unsigned int entries[1];
 }Vector_Block;
+
+
+/* this size better be 2's power */
+#define VECTOR_BLOCK_DATA_SIZE_BYTES (2*KB)
+
+#define VECTOR_BLOCK_HEADER_SIZE_BYTES ((unsigned int)((Vector_Block*)0)->entries)
+#define VECTOR_BLOCK_ENTRY_NUM ((VECTOR_BLOCK_DATA_SIZE_BYTES - VECTOR_BLOCK_HEADER_SIZE_BYTES) >> BIT_SHIFT_TO_BYTES_PER_WORD)
 
 inline void vector_block_init(Vector_Block* block, unsigned int size)
 {
@@ -41,15 +48,26 @@ inline void vector_block_init(Vector_Block* block, unsigned int size)
 inline unsigned int vector_block_entry_count(Vector_Block* block)
 { return (unsigned int)(block->tail - block->head); }
 
+/*
 inline Boolean vector_block_is_full(Vector_Block* block)
 { return block->tail == block->heap_end; }
 
 inline Boolean vector_block_is_empty(Vector_Block* block)
 { return block->tail == block->head; }
+*/
+
+inline Boolean vector_block_is_full(Vector_Block* block)
+{ return (block->tail - block->entries) == VECTOR_BLOCK_ENTRY_NUM; }
+
+inline Boolean vector_block_is_empty(Vector_Block* block)
+{ return block->tail == block->entries; }
 
 inline void vector_block_add_entry(Vector_Block* block, unsigned int value)
-{ 
+{
+#ifdef _DEBUG 
   assert(value && !*(block->tail));
+#endif
+
   *(block->tail++) = value; 
 }
 
@@ -88,16 +106,23 @@ inline void vector_stack_clear(Vector_Block* block)
 #endif
 }
 
+/*
 inline Boolean vector_stack_is_empty(Vector_Block* block)
 {  return (block->head == block->tail); }
+*/
+
+inline Boolean vector_stack_is_empty(Vector_Block* block)
+{ return (block->head - block->entries) == VECTOR_BLOCK_ENTRY_NUM; }
 
 inline Boolean vector_stack_is_full(Vector_Block* block)
-{  return (block->head == (unsigned int*)block->entries); }
+{  return (block->head == block->entries); }
 
 inline void vector_stack_push(Vector_Block* block, unsigned int value)
 { 
   block->head--;
+#ifdef _DEBUG
   assert(value && !*(block->head));
+#endif
   *(block->head) = value;
 }
 

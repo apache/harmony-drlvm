@@ -22,13 +22,7 @@
 
 static Boolean fspace_alloc_block(Fspace* fspace, Allocator* allocator)
 {
-  Block_Header* alloc_block = (Block_Header* )allocator->alloc_block;
-  /* put back the used block */
-  if(alloc_block != NULL){ /* it is NULL at first time */
-    assert(alloc_block->status == BLOCK_IN_USE);
-    alloc_block->status = BLOCK_USED;
-    alloc_block->free = allocator->free;
-  }
+  alloc_context_reset(allocator);
 
   /* now try to get a new block */
   unsigned int old_free_idx = fspace->free_block_idx;
@@ -41,17 +35,30 @@ static Boolean fspace_alloc_block(Fspace* fspace, Allocator* allocator)
       continue;
     }
     /* ok, got one */
-    alloc_block = (Block_Header*)&(fspace->blocks[allocated_idx - fspace->first_block_idx]);
+    Block_Header* alloc_block = (Block_Header*)&(fspace->blocks[allocated_idx - fspace->first_block_idx]);
     assert(alloc_block->status == BLOCK_FREE);
     alloc_block->status = BLOCK_IN_USE;
-    fspace->num_used_blocks++;
-    memset(alloc_block->free, 0, GC_BLOCK_BODY_SIZE_BYTES);
     
     /* set allocation context */
-    allocator->free = alloc_block->free;
+    void* new_free = alloc_block->free;
+    allocator->free = new_free;
+
+#ifndef ALLOC_ZEROING
+
     allocator->ceiling = alloc_block->ceiling;
+    memset(new_free, 0, GC_BLOCK_BODY_SIZE_BYTES);
+
+#else
+    /* the first-time zeroing area includes block header, to make subsequent allocs page aligned */
+    unsigned int zeroing_size = ZEROING_SIZE - GC_BLOCK_HEADER_SIZE_BYTES;
+    allocator->ceiling = (void*)((unsigned int)new_free + zeroing_size);
+    memset(new_free, 0, zeroing_size);
+
+#endif /* #ifndef ALLOC_ZEROING */
+
+    allocator->end = alloc_block->ceiling;
     allocator->alloc_block = (Block*)alloc_block; 
-    
+        
     return TRUE;
   }
 
@@ -73,7 +80,7 @@ void* fspace_alloc(unsigned size, Allocator *allocator)
   while( !fspace_alloc_block(fspace, allocator)){
     vm_gc_lock_enum();
     /* after holding lock, try if other thread collected already */
-    if ( !fspace_has_free_block(fspace) ) {  
+    if ( !space_has_free_block((Blocked_Space*)fspace) ) {  
       gc_reclaim_heap(allocator->gc, GC_CAUSE_NOS_IS_FULL); 
     }    
     vm_gc_unlock_enum();  

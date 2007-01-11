@@ -28,168 +28,168 @@
 #define METADATA_BLOCK_SIZE_BIT_SHIFT 10
 #define METADATA_BLOCK_SIZE_BYTES (1<<METADATA_BLOCK_SIZE_BIT_SHIFT)
 
-static Finalizer_Weakref_Metadata finalizer_weakref_metadata;
+static Finref_Metadata finref_metadata;
 
 unsigned int get_gc_referent_offset(void)
 {
-  return finalizer_weakref_metadata.gc_referent_offset;
+  return finref_metadata.gc_referent_offset;
 }
 void set_gc_referent_offset(unsigned int offset)
 {
-  finalizer_weakref_metadata.gc_referent_offset = offset;
+  finref_metadata.gc_referent_offset = offset;
 }
 
-void gc_finalizer_weakref_metadata_initialize(GC *gc)
+void gc_finref_metadata_initialize(GC *gc)
 {
   void *pool_segment = STD_MALLOC(POOL_SEGMENT_SIZE_BYTES);
   memset(pool_segment, 0, POOL_SEGMENT_SIZE_BYTES);
-  finalizer_weakref_metadata.next_segment_pos = 0;
-  finalizer_weakref_metadata.pool_segments[finalizer_weakref_metadata.next_segment_pos] = pool_segment;
-  ++finalizer_weakref_metadata.next_segment_pos;
+  finref_metadata.num_alloc_segs = 0;
+  finref_metadata.pool_segments[finref_metadata.num_alloc_segs] = pool_segment;
+  ++finref_metadata.num_alloc_segs;
   
-  finalizer_weakref_metadata.free_pool = sync_pool_create();
-  finalizer_weakref_metadata.objects_with_finalizer_pool = sync_pool_create();
-  finalizer_weakref_metadata.finalizable_objects_pool = sync_pool_create();
-  finalizer_weakref_metadata.softref_set_pool = sync_pool_create();
-  finalizer_weakref_metadata.weakref_set_pool = sync_pool_create();
-  finalizer_weakref_metadata.phanref_set_pool = sync_pool_create();
-  finalizer_weakref_metadata.repset_pool = sync_pool_create();
+  finref_metadata.free_pool = sync_pool_create();
+  finref_metadata.obj_with_fin_pool = sync_pool_create();
+  finref_metadata.finalizable_obj_pool = sync_pool_create();
+  finref_metadata.softref_pool = sync_pool_create();
+  finref_metadata.weakref_pool = sync_pool_create();
+  finref_metadata.phanref_pool = sync_pool_create();
+  finref_metadata.repset_pool = sync_pool_create();
   
-  finalizer_weakref_metadata.finalizable_objects = NULL;
-  finalizer_weakref_metadata.repset = NULL;
+  finref_metadata.finalizable_obj_set= NULL;
+  finref_metadata.repset = NULL;
   
   unsigned int num_blocks =  POOL_SEGMENT_SIZE_BYTES >> METADATA_BLOCK_SIZE_BIT_SHIFT;
   for(unsigned int i=0; i<num_blocks; i++){
     Vector_Block *block = (Vector_Block *)((unsigned int)pool_segment + i*METADATA_BLOCK_SIZE_BYTES);
     vector_block_init(block, METADATA_BLOCK_SIZE_BYTES);
     assert(vector_block_is_empty((Vector_Block *)block));
-    pool_put_entry(finalizer_weakref_metadata.free_pool, (void *)block);
+    pool_put_entry(finref_metadata.free_pool, (void *)block);
   }
   
-  finalizer_weakref_metadata.pending_finalizers = FALSE;
-  finalizer_weakref_metadata.pending_weak_references = FALSE;
-  finalizer_weakref_metadata.gc_referent_offset = 0;
+  finref_metadata.pending_finalizers = FALSE;
+  finref_metadata.pending_weakrefs = FALSE;
+  finref_metadata.gc_referent_offset = 0;
   
-  gc->finalizer_weakref_metadata = &finalizer_weakref_metadata;
+  gc->finref_metadata = &finref_metadata;
   return;
 }
 
-void gc_finalizer_weakref_metadata_destruct(GC *gc)
+void gc_finref_metadata_destruct(GC *gc)
 {
-  Finalizer_Weakref_Metadata *metadata = gc->finalizer_weakref_metadata;
+  Finref_Metadata *metadata = gc->finref_metadata;
   
   sync_pool_destruct(metadata->free_pool);
-  sync_pool_destruct(metadata->objects_with_finalizer_pool);
-  sync_pool_destruct(metadata->finalizable_objects_pool);
-  sync_pool_destruct(metadata->softref_set_pool);
-  sync_pool_destruct(metadata->weakref_set_pool);
-  sync_pool_destruct(metadata->phanref_set_pool);
+  sync_pool_destruct(metadata->obj_with_fin_pool);
+  sync_pool_destruct(metadata->finalizable_obj_pool);
+  sync_pool_destruct(metadata->softref_pool);
+  sync_pool_destruct(metadata->weakref_pool);
+  sync_pool_destruct(metadata->phanref_pool);
   sync_pool_destruct(metadata->repset_pool);
   
-  metadata->finalizable_objects = NULL;
+  metadata->finalizable_obj_set = NULL;
   metadata->repset = NULL;
   
-  for(unsigned int i=0; i<metadata->next_segment_pos; i++){
+  for(unsigned int i=0; i<metadata->num_alloc_segs; i++){
     assert(metadata->pool_segments[i]);
     STD_FREE(metadata->pool_segments[i]);
   }
   
-  gc->finalizer_weakref_metadata = NULL;
+  gc->finref_metadata = NULL;
 }
 
-void gc_finalizer_weakref_metadata_verify(GC *gc, Boolean is_before_gc)
+void gc_finref_metadata_verify(GC *gc, Boolean is_before_gc)
 {
-  Finalizer_Weakref_Metadata *metadata = gc->finalizer_weakref_metadata;
+  Finref_Metadata *metadata = gc->finref_metadata;
   
-  assert(pool_is_empty(metadata->finalizable_objects_pool));
-  assert(pool_is_empty(metadata->softref_set_pool));
-  assert(pool_is_empty(metadata->weakref_set_pool));
-  assert(pool_is_empty(metadata->phanref_set_pool));
+  assert(pool_is_empty(metadata->finalizable_obj_pool));
+  assert(pool_is_empty(metadata->softref_pool));
+  assert(pool_is_empty(metadata->weakref_pool));
+  assert(pool_is_empty(metadata->phanref_pool));
   assert(pool_is_empty(metadata->repset_pool));
-  assert(metadata->finalizable_objects == NULL);
+  assert(metadata->finalizable_obj_set == NULL);
   assert(metadata->repset == NULL);
   
   return;
 }
 
-void gc_reset_finalizer_weakref_metadata(GC *gc)
+void gc_reset_finref_metadata(GC *gc)
 {
-  Finalizer_Weakref_Metadata *metadata = gc->finalizer_weakref_metadata;
-  Pool *objects_with_finalizer_pool = metadata->objects_with_finalizer_pool;
-  Pool *finalizable_objects_pool = metadata->finalizable_objects_pool;
+  Finref_Metadata *metadata = gc->finref_metadata;
+  Pool *obj_with_fin_pool = metadata->obj_with_fin_pool;
+  Pool *finalizable_obj_pool = metadata->finalizable_obj_pool;
   
-  assert(pool_is_empty(finalizable_objects_pool));
-  assert(pool_is_empty(metadata->softref_set_pool));
-  assert(pool_is_empty(metadata->weakref_set_pool));
-  assert(pool_is_empty(metadata->phanref_set_pool));
+  assert(pool_is_empty(finalizable_obj_pool));
+  assert(pool_is_empty(metadata->softref_pool));
+  assert(pool_is_empty(metadata->weakref_pool));
+  assert(pool_is_empty(metadata->phanref_pool));
   assert(pool_is_empty(metadata->repset_pool));
-  assert(metadata->finalizable_objects == NULL);
+  assert(metadata->finalizable_obj_set == NULL);
   assert(metadata->repset == NULL);
   
-  while(Vector_Block *block = pool_get_entry(objects_with_finalizer_pool)){
+  while(Vector_Block *block = pool_get_entry(obj_with_fin_pool)){
     unsigned int *iter = vector_block_iterator_init(block);
     if(vector_block_iterator_end(block, iter)){
       vector_block_clear(block);
       pool_put_entry(metadata->free_pool, block);
     } else {
-      pool_put_entry(finalizable_objects_pool, block);
+      pool_put_entry(finalizable_obj_pool, block);
     }
   }
-  assert(pool_is_empty(objects_with_finalizer_pool));
-  metadata->objects_with_finalizer_pool = finalizable_objects_pool;
-  metadata->finalizable_objects_pool = objects_with_finalizer_pool;
+  assert(pool_is_empty(obj_with_fin_pool));
+  metadata->obj_with_fin_pool = finalizable_obj_pool;
+  metadata->finalizable_obj_pool = obj_with_fin_pool;
 }
 
-/* called when there is no Vector_Block in finalizer_weakref_metadata->free_pool
+/* called when there is no Vector_Block in finref_metadata->free_pool
  * extend the pool by a pool segment
  */
-static void gc_finalizer_weakref_metadata_extend(void)
+static void finref_metadata_extend(void)
 {
-  Finalizer_Weakref_Metadata metadata = finalizer_weakref_metadata;
+  Finref_Metadata *metadata = &finref_metadata;
   
-  unsigned int segment_pos = metadata.next_segment_pos;
-  while(segment_pos < POOL_SEGMENT_NUM){
-    unsigned int next_segment_pos = segment_pos + 1;
-    unsigned int temp = (unsigned int)atomic_cas32((volatile unsigned int *)&metadata.next_segment_pos, next_segment_pos, segment_pos);
-    if(temp == segment_pos)
+  unsigned int pos = metadata->num_alloc_segs;
+  while(pos < POOL_SEGMENT_NUM){
+    unsigned int next_pos = pos + 1;
+    unsigned int temp = (unsigned int)atomic_cas32((volatile unsigned int *)&metadata->num_alloc_segs, next_pos, pos);
+    if(temp == pos)
       break;
-    segment_pos = metadata.next_segment_pos;
+    pos = metadata->num_alloc_segs;
   }
-  if(segment_pos > POOL_SEGMENT_NUM)
+  if(pos > POOL_SEGMENT_NUM)
     return;
   
   void *pool_segment = STD_MALLOC(POOL_SEGMENT_SIZE_BYTES);
   memset(pool_segment, 0, POOL_SEGMENT_SIZE_BYTES);
-  metadata.pool_segments[segment_pos] = pool_segment;
+  metadata->pool_segments[pos] = pool_segment;
   
   unsigned int num_blocks =  POOL_SEGMENT_SIZE_BYTES >> METADATA_BLOCK_SIZE_BIT_SHIFT;
   for(unsigned int i=0; i<num_blocks; i++){
     Vector_Block *block = (Vector_Block *)((unsigned int)pool_segment + i*METADATA_BLOCK_SIZE_BYTES);
     vector_block_init(block, METADATA_BLOCK_SIZE_BYTES);
     assert(vector_block_is_empty((Vector_Block *)block));
-    pool_put_entry(metadata.free_pool, (void *)block);
+    pool_put_entry(metadata->free_pool, (void *)block);
   }
   
   return;
 }
 
-Vector_Block *finalizer_weakref_get_free_block(void)
+Vector_Block *finref_get_free_block(void)
 {
   Vector_Block *block;
   
-  while(!(block = pool_get_entry(finalizer_weakref_metadata.free_pool)))
-    gc_finalizer_weakref_metadata_extend();
+  while(!(block = pool_get_entry(finref_metadata.free_pool)))
+    finref_metadata_extend();
   return block;
 }
 
-/* called when GC completes and there is no Vector_Block in the last five pools of gc->finalizer_weakref_metadata
+/* called when GC completes and there is no Vector_Block in the last five pools of gc->finref_metadata
  * shrink the free pool by half
  */
-void gc_finalizer_weakref_metadata_shrink(GC *gc)
+void finref_metadata_shrink(GC *gc)
 {
 }
 
-static inline void finalizer_weakref_metadata_general_add_entry(Vector_Block* &vector_block_in_use, Pool *pool, Partial_Reveal_Object *ref)
+static inline void finref_metadata_add_entry(Vector_Block* &vector_block_in_use, Pool *pool, Partial_Reveal_Object *ref)
 {
   assert(vector_block_in_use);
   assert(ref);
@@ -200,41 +200,41 @@ static inline void finalizer_weakref_metadata_general_add_entry(Vector_Block* &v
   if(!vector_block_is_full(block)) return;
   
   pool_put_entry(pool, block);
-  vector_block_in_use = finalizer_weakref_get_free_block();
+  vector_block_in_use = finref_get_free_block();
 }
 
-void mutator_finalizer_add_entry(Mutator *mutator, Partial_Reveal_Object *ref)
+void mutator_add_finalizer(Mutator *mutator, Partial_Reveal_Object *ref)
 {
-  finalizer_weakref_metadata_general_add_entry(mutator->objects_with_finalizer, finalizer_weakref_metadata.objects_with_finalizer_pool, ref);
+  finref_metadata_add_entry(mutator->obj_with_fin, finref_metadata.obj_with_fin_pool, ref);
 }
 
-void gc_finalizable_objects_add_entry(GC *gc, Partial_Reveal_Object *ref)
+void gc_add_finalizable_obj(GC *gc, Partial_Reveal_Object *ref)
 {
-  finalizer_weakref_metadata_general_add_entry(finalizer_weakref_metadata.finalizable_objects, finalizer_weakref_metadata.finalizable_objects_pool, ref);
+  finref_metadata_add_entry(finref_metadata.finalizable_obj_set, finref_metadata.finalizable_obj_pool, ref);
 }
 
-void collector_softref_set_add_entry(Collector *collector, Partial_Reveal_Object *ref)
+void collector_add_softref(Collector *collector, Partial_Reveal_Object *ref)
 {
-  finalizer_weakref_metadata_general_add_entry(collector->softref_set, finalizer_weakref_metadata.softref_set_pool, ref);
+  finref_metadata_add_entry(collector->softref_set, finref_metadata.softref_pool, ref);
 }
 
-void collector_weakref_set_add_entry(Collector *collector, Partial_Reveal_Object *ref)
+void collector_add_weakref(Collector *collector, Partial_Reveal_Object *ref)
 {
-  finalizer_weakref_metadata_general_add_entry(collector->weakref_set, finalizer_weakref_metadata.weakref_set_pool, ref);
+  finref_metadata_add_entry(collector->weakref_set, finref_metadata.weakref_pool, ref);
 }
 
-void collector_phanref_set_add_entry(Collector *collector, Partial_Reveal_Object *ref)
+void collector_add_phanref(Collector *collector, Partial_Reveal_Object *ref)
 {
-  finalizer_weakref_metadata_general_add_entry(collector->phanref_set, finalizer_weakref_metadata.phanref_set_pool, ref);
+  finref_metadata_add_entry(collector->phanref_set, finref_metadata.phanref_pool, ref);
 }
 
-void finalizer_weakref_repset_add_entry(GC *gc, Partial_Reveal_Object **p_ref)
+void finref_repset_add_entry(GC *gc, Partial_Reveal_Object **p_ref)
 {
   assert(*p_ref);
-  finalizer_weakref_metadata_general_add_entry(finalizer_weakref_metadata.repset, finalizer_weakref_metadata.repset_pool, (Partial_Reveal_Object *)p_ref);
+  finref_metadata_add_entry(finref_metadata.repset, finref_metadata.repset_pool, (Partial_Reveal_Object *)p_ref);
 }
 
-static inline Boolean pool_has_no_reference(Pool *pool)
+static inline Boolean pool_has_no_ref(Pool *pool)
 {
   if(pool_is_empty(pool))
     return TRUE;
@@ -250,48 +250,48 @@ static inline Boolean pool_has_no_reference(Pool *pool)
   return TRUE;
 }
 
-Boolean objects_with_finalizer_pool_is_empty(GC *gc)
+Boolean obj_with_fin_pool_is_empty(GC *gc)
 {
-  return pool_has_no_reference(gc->finalizer_weakref_metadata->objects_with_finalizer_pool);
+  return pool_has_no_ref(gc->finref_metadata->obj_with_fin_pool);
 }
 
-Boolean finalizable_objects_pool_is_empty(GC *gc)
+Boolean finalizable_obj_pool_is_empty(GC *gc)
 {
-  return pool_has_no_reference(gc->finalizer_weakref_metadata->finalizable_objects_pool);
+  return pool_has_no_ref(gc->finref_metadata->finalizable_obj_pool);
 }
 
-Boolean softref_set_pool_is_empty(GC *gc)
+Boolean softref_pool_is_empty(GC *gc)
 {
-  return pool_has_no_reference(gc->finalizer_weakref_metadata->softref_set_pool);
+  return pool_has_no_ref(gc->finref_metadata->softref_pool);
 }
 
-Boolean weakref_set_pool_is_empty(GC *gc)
+Boolean weakref_pool_is_empty(GC *gc)
 {
-  return pool_has_no_reference(gc->finalizer_weakref_metadata->weakref_set_pool);
+  return pool_has_no_ref(gc->finref_metadata->weakref_pool);
 }
 
-Boolean phanref_set_pool_is_empty(GC *gc)
+Boolean phanref_pool_is_empty(GC *gc)
 {
-  return pool_has_no_reference(gc->finalizer_weakref_metadata->phanref_set_pool);
+  return pool_has_no_ref(gc->finref_metadata->phanref_pool);
 }
 
-Boolean finalizer_weakref_repset_pool_is_empty(GC *gc)
+Boolean finref_repset_pool_is_empty(GC *gc)
 {
-  return pool_has_no_reference(gc->finalizer_weakref_metadata->repset_pool);
+  return pool_has_no_ref(gc->finref_metadata->repset_pool);
 }
 
-static inline void finalizer_weakref_metadata_clear_pool(Pool *pool)
+static inline void finref_metadata_clear_pool(Pool *pool)
 {
   while(Vector_Block* block = pool_get_entry(pool))
   {
     vector_block_clear(block);
-    pool_put_entry(finalizer_weakref_metadata.free_pool, block);
+    pool_put_entry(finref_metadata.free_pool, block);
   }
 }
 
-void gc_clear_special_reference_pools(GC *gc)
+void gc_clear_weakref_pools(GC *gc)
 {
-  finalizer_weakref_metadata_clear_pool(gc->finalizer_weakref_metadata->softref_set_pool);
-  finalizer_weakref_metadata_clear_pool(gc->finalizer_weakref_metadata->weakref_set_pool);
-  finalizer_weakref_metadata_clear_pool(gc->finalizer_weakref_metadata->phanref_set_pool);
+  finref_metadata_clear_pool(gc->finref_metadata->softref_pool);
+  finref_metadata_clear_pool(gc->finref_metadata->weakref_pool);
+  finref_metadata_clear_pool(gc->finref_metadata->phanref_pool);
 }

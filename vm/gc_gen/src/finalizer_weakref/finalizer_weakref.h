@@ -18,11 +18,15 @@
  * @author Li-Gang Wang, 2006/11/30
  */
 
-#ifndef _FINALIZER_WEAKREF_H_
-#define _FINALIZER_WEAKREF_H_
+#ifndef _FINREF_H_
+#define _FINREF_H_
+
+#define BUILD_IN_REFERENT
 
 #include "finalizer_weakref_metadata.h"
 #include "../thread/collector.h"
+
+extern Boolean IGNORE_FINREF;
 
 /* Phantom status: for future use
  * #define PHANTOM_REF_ENQUEUE_STATUS_MASK 0x3
@@ -64,13 +68,13 @@ inline void scan_weak_reference(Collector *collector, Partial_Reveal_Object *p_o
       if(collect_kind==MINOR_COLLECTION)
         scan_slot(collector, p_referent_field);
       else
-        collector_softref_set_add_entry(collector, p_obj);
+        collector_add_softref(collector, p_obj);
       break;
     case WEAK_REFERENCE :
-      collector_weakref_set_add_entry(collector, p_obj);
+      collector_add_weakref(collector, p_obj);
       break;
     case PHANTOM_REFERENCE :
-      collector_phanref_set_add_entry(collector, p_obj);
+      collector_add_phanref(collector, p_obj);
       break;
     default :
       assert(0);
@@ -79,15 +83,17 @@ inline void scan_weak_reference(Collector *collector, Partial_Reveal_Object *p_o
 }
 
 
-extern void mutator_reset_objects_with_finalizer(Mutator *mutator);
-extern void gc_set_objects_with_finalizer(GC *gc);
+extern void mutator_reset_obj_with_fin(Mutator *mutator);
+extern void gc_set_obj_with_fin(GC *gc);
 extern void collector_reset_weakref_sets(Collector *collector);
 
-extern void collector_process_finalizer_weakref(Collector *collector);
-extern void gc_post_process_finalizer_weakref(GC *gc);
-extern void process_objects_with_finalizer_on_exit(GC *gc);
+extern void gc_set_weakref_sets(GC *gc);
+extern void update_ref_ignore_finref(Collector *collector);
+extern void collector_identify_finref(Collector *collector);
+extern void gc_put_finref_to_vm(GC *gc);
+extern void put_all_fin_on_exit(GC *gc);
 
-extern void gc_update_finalizer_weakref_repointed_refs(GC* gc);
-extern void gc_activate_finalizer_weakref_threads(GC *gc);
+extern void gc_update_finref_repointed_refs(GC* gc);
+extern void gc_activate_finref_threads(GC *gc);
 
-#endif // _FINALIZER_WEAKREF_H_
+#endif // _FINREF_H_

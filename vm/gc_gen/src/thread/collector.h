@@ -21,13 +21,15 @@
 #ifndef _COLLECTOR_H_
 #define _COLLECTOR_H_
 
-#include "../common/gc_common.h"
+#include "../common/gc_space.h"
 struct Block_Header;
+struct Stealable_Stack;
 
 typedef struct Collector{
   /* <-- first couple of fields are overloaded as Allocator */
   void *free;
   void *ceiling;
+  void *end;
   void *alloc_block;
   Space* alloc_space;
   GC* gc;
@@ -52,9 +54,6 @@ typedef struct Collector{
   Block_Header* cur_compact_block;
   Block_Header* cur_target_block;
   
-  /* during compaction, save non-zero obj_info who's overwritten by forwarding pointer */
-  ObjectMap*  obj_info_map; 
-
   void(*task_func)(void*) ;   /* current task */
   
   unsigned int result;
@@ -67,9 +66,29 @@ void collector_reset(GC* gc);
 
 void collector_execute_task(GC* gc, TaskType task_func, Space* space);
 
-Partial_Reveal_Object* collector_forward_object(Collector* collector, Partial_Reveal_Object* p_obj);
+void collector_restore_obj_info(Collector* collector);
 
-void gc_restore_obj_info(GC* gc);
+inline Boolean gc_collection_result(GC* gc)
+{
+  Boolean result = TRUE;
+  for(unsigned i=0; i<gc->num_active_collectors; i++){
+    Collector* collector = gc->collectors[i];
+    result &= collector->result;
+  }  
+  return result;
+}
+
+inline void gc_reset_collect_result(GC* gc)
+{
+  for(unsigned i=0; i<gc->num_active_collectors; i++){
+    Collector* collector = gc->collectors[i];
+    collector->result = TRUE;
+  }  
+  
+  gc->collect_result = TRUE;
+  return;
+}
+
 
 
 #endif //#ifndef _COLLECTOR_H_

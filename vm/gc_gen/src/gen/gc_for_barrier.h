@@ -15,33 +15,36 @@
  */
 
 /**
- * @author Ji Qi, 2006/10/05
+ * @author Xiao-Feng Li, 2006/10/05
  */
 
-#ifndef _BIDIR_LIST_H_
-#define _BIDIR_LIST_H_
+#ifndef _GC_FOR_BARRIER_H_
+#define _GC_FOR_BARRIER_H_
 
-typedef struct Bidir_List{
-  unsigned int zero;
-  Bidir_List* next;
-  Bidir_List* prev;
-}Bidir_List;
+#include "../jni/java_support.h"
 
-inline Bidir_List* bidir_list_add_item(Bidir_List* head, Bidir_List* item)
-{
-  item->next = head->next;
-  item->prev = head;
-  head->next->prev = item;
-  head->next = item;
-  return head;
+extern Boolean gen_mode;
+
+inline Boolean gc_is_gen_mode()
+{  return gen_mode; }
+
+inline void gc_enable_gen_mode()
+{  
+  gen_mode = TRUE;
+  HelperClass_set_GenMode(TRUE);
 }
 
-inline Bidir_List* bidir_list_remove_item(Bidir_List* item)
-{
-  item->prev->next = item->next;
-  item->next->prev = item->prev;
-  item->next = item->prev = item;
-  return item;
+inline void gc_disable_gen_mode()
+{  
+  gen_mode = FALSE; 
+  HelperClass_set_GenMode(FALSE);
 }
 
-#endif /* _BIDIR_LIST_H_ */
+inline void gc_set_gen_mode(Boolean status)
+{
+  gen_mode = status; 
+  HelperClass_set_GenMode(status);   
+}
+
+#endif /* _GC_FOR_BARRIER_H_ */
+

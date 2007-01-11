@@ -22,13 +22,7 @@
 
 static Boolean mspace_alloc_block(Mspace* mspace, Allocator* allocator)
 {
-  Block_Header* alloc_block = (Block_Header* )allocator->alloc_block;
-  /* put back the used block */
-  if(alloc_block != NULL){ /* it is NULL at first time */
-    assert(alloc_block->status == BLOCK_IN_USE);
-    alloc_block->status = BLOCK_USED;
-    alloc_block->free = allocator->free;
-  }
+  alloc_context_reset(allocator);
 
   /* now try to get a new block */
   unsigned int old_free_idx = mspace->free_block_idx;
@@ -41,27 +35,36 @@ static Boolean mspace_alloc_block(Mspace* mspace, Allocator* allocator)
       continue;
     }
     /* ok, got one */
-    alloc_block = (Block_Header*)&(mspace->blocks[allocated_idx - mspace->first_block_idx]);
+    Block_Header* alloc_block = (Block_Header*)&(mspace->blocks[allocated_idx - mspace->first_block_idx]);
     assert(alloc_block->status == BLOCK_FREE);
     alloc_block->status = BLOCK_IN_USE;
-    mspace->num_used_blocks++;
-    memset(alloc_block->free, 0, GC_BLOCK_BODY_SIZE_BYTES);
     
     /* set allocation context */
-    allocator->free = alloc_block->free;
+    void* new_free = alloc_block->free;
+    allocator->free = new_free;
+
+#ifndef ALLOC_ZEROING
+
     allocator->ceiling = alloc_block->ceiling;
+    memset(new_free, 0, GC_BLOCK_BODY_SIZE_BYTES);
+
+#else
+
+    /* the first-time zeroing area includes block header, to make subsequent allocs page aligned */
+    unsigned int zeroing_size = ZEROING_SIZE - GC_BLOCK_HEADER_SIZE_BYTES;
+    allocator->ceiling = (void*)((unsigned int)new_free + zeroing_size);
+    memset(new_free, 0, zeroing_size);
+
+#endif /* #ifndef ALLOC_ZEROING */
+
+    allocator->end = alloc_block->ceiling;
     allocator->alloc_block = (Block*)alloc_block; 
     
     return TRUE;
   }
 
-  /* if Mspace is used for mutator allocation, here a collection should be triggered. 
-     else if this is only for collector allocation, when code goes here, it means 
-     Mspace is not enough to hold Nursery live objects, so the invoker of this routine 
-     should throw out-of-memory exception.
-     But because in our design, we don't do any Mspace allocation during collection, this
-     path should never be reached. That's why we assert(0) here. */  
-  assert(0);
+  /* Mspace is out, a collection should be triggered. It can be caused by mutator allocation
+     And it can be caused by collector allocation during nos forwarding. */
   return FALSE;
   
 }
@@ -84,7 +87,7 @@ void* mspace_alloc(unsigned int size, Allocator* allocator)
   
   /* grab a new block */
   Boolean ok = mspace_alloc_block(mspace, allocator);
-  assert(ok);
+  if(!ok) return NULL; 
   
   p_return = thread_local_alloc(size, allocator);
   assert(p_return);

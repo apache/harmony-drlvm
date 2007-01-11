@@ -31,8 +31,18 @@
 
 #define NUM_FREE_LIST 128
 
+typedef struct Lockable_Bidir_List{
+  /* <-- First couple of fields overloadded as Bidir_List */
+  unsigned int zero;
+  Bidir_List* next;
+  Bidir_List* prev;
+  /* END of Bidir_List --> */
+  unsigned int lock;	
+}Lockable_Bidir_List;
+
 typedef struct Free_Area{
   /* <-- First couple of fields overloadded as Bidir_List */
+  unsigned int zero;
   Bidir_List* next;
   Bidir_List* prev;
   /* END of Bidir_List --> */
@@ -44,10 +54,13 @@ inline Free_Area* free_area_new(void* start, unsigned int size)
 {
   assert(ADDRESS_IS_KB_ALIGNED(start));
   assert(ADDRESS_IS_KB_ALIGNED(size));
-  
+
+  //memset(start, 0, size);
+ 
   if( size < GC_OBJ_SIZE_THRESHOLD) return NULL;
   Free_Area* area = (Free_Area*)start;
-  memset(area, 0, size);
+  area->zero = 0;
+  area->next = area->prev = (Bidir_List*)area;
   area->size = size;
   return area;
 }
@@ -55,10 +68,9 @@ inline Free_Area* free_area_new(void* start, unsigned int size)
 #define NUM_FLAG_WORDS (NUM_FREE_LIST >> BIT_SHIFT_TO_BITS_PER_WORD)
 
 typedef struct Free_Area_Pool{
-  Bidir_List sized_area_list[NUM_FREE_LIST];
+  Lockable_Bidir_List sized_area_list[NUM_FREE_LIST];
   /* each list corresponds to one bit in below vector */
   unsigned int list_bit_flag[NUM_FLAG_WORDS];
-  volatile unsigned int free_pool_lock;
 }Free_Area_Pool;
 
 #define MAX_LIST_INDEX (NUM_FREE_LIST - 1)
@@ -93,7 +105,7 @@ inline Free_Area* free_pool_add_area(Free_Area_Pool* pool, Free_Area* free_area)
   assert( free_area->size >= GC_OBJ_SIZE_THRESHOLD);
   
   unsigned int index = pool_list_index_with_size(free_area->size);
-  bidir_list_add_item(&(pool->sized_area_list[index]), (Bidir_List*)free_area);
+  bidir_list_add_item((Bidir_List*)&(pool->sized_area_list[index]), (Bidir_List*)free_area);
   
   /* set bit flag of the list */
   pool_list_set_flag(pool, index);
@@ -106,7 +118,7 @@ inline void free_pool_remove_area(Free_Area_Pool* pool, Free_Area* free_area)
   bidir_list_remove_item((Bidir_List*)free_area);
   
   /* set bit flag of the list */
-  Bidir_List* list = &(pool->sized_area_list[index]);
+  Bidir_List* list = (Bidir_List*)&(pool->sized_area_list[index]);
   if(list->next == list){
   	pool_list_clear_flag(pool, index);		
   }

@@ -21,14 +21,26 @@
 #include "gc_common.h"
 #include "gc_metadata.h"
 #include "../thread/mutator.h"
-#include "../verify/verify_live_heap.h"
 #include "../finalizer_weakref/finalizer_weakref.h"
+#include "../gen/gen.h"
+#include "../common/space_tuner.h"
+#include "interior_pointer.h"
 
-extern Boolean NEED_BARRIER;
-extern unsigned int NUM_COLLECTORS;
+unsigned int Cur_Mark_Bit = 0x1;
+unsigned int Cur_Forward_Bit = 0x2;
+
 extern Boolean GC_VERIFY;
+
 extern unsigned int NOS_SIZE;
-extern Boolean NOS_PARTIAL_FORWARD;
+extern unsigned int MIN_NOS_SIZE;
+
+extern Boolean FORCE_FULL_COMPACT;
+extern Boolean MINOR_ALGORITHM;
+extern Boolean MAJOR_ALGORITHM;
+
+extern unsigned int NUM_COLLECTORS;
+extern unsigned int MINOR_COLLECTORS;
+extern unsigned int MAJOR_COLLECTORS;
 
 unsigned int HEAP_SIZE_DEFAULT = 256 * MB;
 unsigned int min_heap_size_bytes = 32 * MB;
@@ -105,7 +117,7 @@ static size_t get_size_property(const char* name)
   return res;
 }
 
-void gc_parse_options() 
+void gc_parse_options(GC* gc) 
 {
   unsigned int max_heap_size = HEAP_SIZE_DEFAULT;
   unsigned int min_heap_size = min_heap_size_bytes;
@@ -138,62 +150,128 @@ void gc_parse_options()
     NOS_SIZE = get_size_property("gc.nos_size");
   }
 
+  if (is_property_set("gc.min_nos_size", VM_PROPERTIES) == 1) {
+    MIN_NOS_SIZE = get_size_property("gc.min_nos_size");
+  }
+
   if (is_property_set("gc.num_collectors", VM_PROPERTIES) == 1) {
     unsigned int num = get_int_property("gc.num_collectors");
     NUM_COLLECTORS = (num==0)? NUM_COLLECTORS:num;
   }
 
-  if (is_property_set("gc.gen_mode", VM_PROPERTIES) == 1) {
-    NEED_BARRIER = get_boolean_property("gc.gen_mode");
+  /* GC algorithm decision */
+  /* Step 1: */
+  char* minor_algo = NULL;
+  char* major_algo = NULL;
+  
+  if (is_property_set("gc.minor_algorithm", VM_PROPERTIES) == 1) {
+    minor_algo = get_property("gc.minor_algorithm", VM_PROPERTIES);
+  }
+  
+  if (is_property_set("gc.major_algorithm", VM_PROPERTIES) == 1) {
+    major_algo = get_property("gc.major_algorithm", VM_PROPERTIES);
+  }
+  
+  gc_decide_collection_algorithm((GC_Gen*)gc, minor_algo, major_algo);
+  gc->generate_barrier = gc_is_gen_mode();
+
+  if( minor_algo) destroy_property_value(minor_algo);
+  if( major_algo) destroy_property_value(major_algo);
+
+  /* Step 2: */
+  /* NOTE:: this has to stay after above!! */
+  if (is_property_set("gc.force_major_collect", VM_PROPERTIES) == 1) {
+    FORCE_FULL_COMPACT = get_boolean_property("gc.force_major_collect");
+    if(FORCE_FULL_COMPACT){
+      gc_disable_gen_mode();
+      gc->generate_barrier = FALSE;
+    }
+  }
+
+  /* Step 3: */
+  /* NOTE:: this has to stay after above!! */
+  if (is_property_set("gc.generate_barrier", VM_PROPERTIES) == 1) {
+    Boolean generate_barrier = get_boolean_property("gc.generate_barrier");
+    gc->generate_barrier = generate_barrier || gc->generate_barrier;
   }
 
   if (is_property_set("gc.nos_partial_forward", VM_PROPERTIES) == 1) {
     NOS_PARTIAL_FORWARD = get_boolean_property("gc.nos_partial_forward");
+  }
+    
+  if (is_property_set("gc.minor_collectors", VM_PROPERTIES) == 1) {
+    MINOR_COLLECTORS = get_int_property("gc.minor_collectors");
+  }
+
+  if (is_property_set("gc.major_collectors", VM_PROPERTIES) == 1) {
+    MAJOR_COLLECTORS = get_int_property("gc.major_collectors");
+  }
+
+  if (is_property_set("gc.ignore_finref", VM_PROPERTIES) == 1) {
+    IGNORE_FINREF = get_boolean_property("gc.ignore_finref");
   }
 
   if (is_property_set("gc.verify", VM_PROPERTIES) == 1) {
     GC_VERIFY = get_boolean_property("gc.verify");
   }
   
-  return;  
+  return;
 }
 
-struct GC_Gen;
-void gc_gen_reclaim_heap(GC_Gen* gc);
-unsigned int gc_decide_collection_kind(GC_Gen* gc, unsigned int gc_cause);
+void gc_copy_interior_pointer_table_to_rootset();
 
 void gc_reclaim_heap(GC* gc, unsigned int gc_cause)
 { 
-  gc->num_collections++;
+  /* FIXME:: before mutators suspended, the ops below should be very careful
+     to avoid racing with mutators. */
+  gc->num_collections++;  
 
-  gc->collect_kind = gc_decide_collection_kind((GC_Gen*)gc, gc_cause);
-  //gc->collect_kind = MAJOR_COLLECTION;
+  gc_decide_collection_kind((GC_Gen*)gc, gc_cause);
 
+
+  //For_LOS_extend!
+  gc_space_tune(gc, gc_cause);
+
+
+#ifdef MARK_BIT_FLIPPING
+  if(gc->collect_kind == MINOR_COLLECTION)
+    mark_bit_flip();
+#endif
+  
   gc_metadata_verify(gc, TRUE);
-  gc_finalizer_weakref_metadata_verify((GC*)gc, TRUE);
+#ifndef BUILD_IN_REFERENT
+  gc_finref_metadata_verify((GC*)gc, TRUE);
+#endif
   
   /* Stop the threads and collect the roots. */
   gc_reset_rootset(gc);  
   vm_enumerate_root_set_all_threads();
+  gc_copy_interior_pointer_table_to_rootset();
   gc_set_rootset(gc); 
   
-  gc_set_objects_with_finalizer(gc);
-  
-  if(verify_live_heap) gc_verify_heap(gc, TRUE);
-
-  gc_gen_reclaim_heap((GC_Gen*)gc);  
-  
-  if(verify_live_heap) gc_verify_heap(gc, FALSE);
-  
-  gc_metadata_verify(gc, FALSE);
-  gc_finalizer_weakref_metadata_verify(gc, FALSE);
-  
-  gc_reset_finalizer_weakref_metadata(gc);
+  /* this has to be done after all mutators are suspended */
   gc_reset_mutator_context(gc);
-  
-  gc_activate_finalizer_weakref_threads((GC*)gc);
-  vm_resume_threads_after();
 
+  if(!IGNORE_FINREF )
+    gc_set_obj_with_fin(gc);
+  
+  gc_gen_reclaim_heap((GC_Gen*)gc);
+  gc_reset_interior_pointer_table();
+    
+  gc_metadata_verify(gc, FALSE);
+
+  if(gc_is_gen_mode())
+    gc_prepare_mutator_remset(gc);
+  
+  if(!IGNORE_FINREF ){
+    gc_reset_finref_metadata(gc);
+    gc_activate_finref_threads((GC*)gc);
+  }
+
+  //For_LOS_extend!
+  gc_space_tuner_reset(gc);
+  
+  vm_resume_threads_after();
   return;
 }
 
