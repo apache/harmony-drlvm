@@ -149,6 +149,9 @@ Version: $Revision$
                 </cc>
             </sequential>
         </for>
+        
+        <delete file="${build.semi.dir}/cunit.test.failed" failonerror="false" />
+            
         <for list="${unit.test.c.files}" param="file" delimiter=",">
             <sequential>
                 <!-- make it possible to overwrite the property -->
@@ -180,8 +183,9 @@ Version: $Revision$
                         <equals arg1="${resultproperty}" arg2="0" />
                     </not>
                     <then>
-                        <property name="some.test.failed" value="true" />
+                        <property name="test.failed" value="true" />
                         <echo message="## TEST FAILED" />
+                        <echo file="${build.semi.dir}/cunit.test.failed" message="${filename} FAILED${line.separator}" append="true"/>
                     </then>
                     <else>
                         <echo message="## TEST PASSED" />
@@ -189,14 +193,8 @@ Version: $Revision$
                 </if>
             </sequential>
         </for>
-        <if>
-            <isset property="some.test.failed" />
-            <then>
-                <echo message="## Please find tests and results at ${build.dir}/_cunit.tests/" />
-                <fail message="## SOME TESTS FAILED" />
-            </then>
-        </if>
+
         <echo message="## Please find tests and results at ${build.dir}/_cunit.tests/" />
-        <echo message="## TESTS PASSED" />
+        <fail unless="run.all.tests" if="test.failed" message="## SOME TESTS FAILED"/>
     </target>
 </project>

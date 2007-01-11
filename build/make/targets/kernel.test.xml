@@ -86,10 +86,10 @@
         <echo message="${line.separator}"/>
         <echo>Please find detailed results under ${kernel.test.dir}/reports directory.</echo>
         
-        <condition property="kernel.failures">
+        <condition property="test.failed">
             <contains string="${kernel.test.summary}" substring="FAILED" />
         </condition>
-        <fail if="kernel.failures" message="There were test failures." />
+        <fail unless="run.all.tests" if="test.failed" message="There were test failures."/>
     </target>
        
     <target name="compile-kernel-test">

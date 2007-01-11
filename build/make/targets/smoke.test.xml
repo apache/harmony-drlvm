@@ -43,14 +43,12 @@ Version: $Revision: 1.4.2.11 $
     </target>
 
     <target name="smoke.test" depends="clean, compile.smoke.test, java_test_smoke, build_report">
-        <!-- workaround: setting property doesn't work because of antcall  -->
-        <!-- have to touch file if tests fail and verify if it exists here -->
-        <available property="tests.failed" file="tests.failed" />
-        <fail if="tests.failed"/>
+        <available property="test.failed" file="${build.semi.dir}/smoke.test.failed" />
+        <fail unless="run.all.tests" if="test.failed"/>
     </target>
 
     <target name="clean">
-        <delete file="tests.failed"/>
+        <delete file="${build.semi.dir}/smoke.test.failed"/>
     </target>
 
     <target name="compile.smoke.test" depends="compile.smoke.test.java, compile.smoke.test.native" />
@@ -305,8 +303,8 @@ ${foo}
                                 <replace file="${build.dir}/_smoke.tests/reports/${class.name}_${jit.or.interpreter}.xml" token="@@@@@" value="${class.name}_${jit.or.interpreter}" /> 
                             </then>
                             <else>
-                                <touch file="tests.failed"/>
                                 <echo message="*** FAILED **** : ${class.name}" />
+                                <echo message="*** FAILED **** : ${class.name} on ${jit.or.interpreter}${line.separator}" file="${build.semi.dir}/smoke.test.failed" append="true"/>
 
                                 <!-- create xml-file with test's results -->
 <echo file="${build.dir}/_smoke.tests/reports/${class.name}_${jit.or.interpreter}.xml"><![CDATA[<?xml version="1.0" encoding="UTF-8" ?>
