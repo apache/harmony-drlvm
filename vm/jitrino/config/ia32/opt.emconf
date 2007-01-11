@@ -44,6 +44,7 @@ CS_OPT.file=jitrino
 
 -XDjit.CS_OPT.arg.codegen.btr.insertCMOVs=no
 -XDjit.CS_OPT.arg.codegen.btr.removeConstCompare=yes
+-XDjit.arg.codegen.emitter.align=4
 
 #-XDjit.CS_OPT.arg.log.irdump.file=log/%jit%/%log%/%seqnb%_%class%.%method%.log
 #-XDjit.CS_OPT.arg.log=ct,ir,irdump,all

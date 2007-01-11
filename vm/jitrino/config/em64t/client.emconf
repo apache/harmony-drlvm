@@ -69,7 +69,7 @@ EB_PROF.backedgeThreshold=100000
 -XDjit.CD_OPT.arg.codegen.dce1.early=yes
 -XDjit.CD_OPT.arg.codegen.regalloc.bp_regalloc1.regs=ALL_GP
 -XDjit.CD_OPT.arg.codegen.regalloc.bp_regalloc2.regs=ALL_XMM
-
+-XDjit.arg.codegen.emitter.align=0
 
 #system properties
 -Djava.compiler=client

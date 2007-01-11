@@ -42,6 +42,7 @@ SS_OPT.file=jitrino
 -XDjit.SS_OPT.arg.codegen.regalloc.bp_regalloc2.regs=ALL_XMM
 -XDjit.SS_OPT.arg.codegen.btr.insertCMOVs=no
 -XDjit.SS_OPT.arg.codegen.btr.removeConstCompare=yes
+-XDjit.arg.codegen.emitter.align=4
 
 
 #system properties

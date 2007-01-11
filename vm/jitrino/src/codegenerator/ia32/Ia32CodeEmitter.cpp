@@ -341,9 +341,18 @@ void CodeEmitter::emitCode( void ) {
     memset(codeStreamStart, 0xCC, maxMethodSize);
 #endif
 
+    int alignment = getIntArg("align", 0);
+    
+    LoopTree * lt = irManager->getFlowGraph()->getLoopTree();
 
     uint8 * ip = codeStreamStart;
     for( BasicBlock * bb = (BasicBlock*)irManager->getFlowGraph()->getEntryNode(); bb != NULL; bb=bb->getLayoutSucc()) {
+
+        
+        if (alignment && lt->isLoopHeader(bb) && ((POINTER_SIZE_INT)ip & (alignment-1))) {
+            POINTER_SIZE_INT align = alignment - ((POINTER_SIZE_INT)ip & (alignment-1));
+            ip = (uint8*)EncoderBase::nops((char*)ip, align);
+        }
 
         uint8 * blockStartIp = ip;
         bb->setCodeOffset( blockStartIp-codeStreamStart );
