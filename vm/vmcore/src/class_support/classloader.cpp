@@ -864,22 +864,22 @@ Class* ClassLoader::SetupAsArray(Global_Env* env, const String* classNameString)
             FailedLoadingClass(classNameString);
         }
         return klass;
-    } else {
-        // we should wait here for creating class
-        if((klass = WaitDefinition(env, classNameString)) != NULL)
-            return klass;
-
-        // create class
-        klass = NewClass(env, classNameString);
-        if (!klass) {
-            FailedLoadingClass(classNameString);
-            return NULL;
-        }
-
-        // setup array-related fields
-        klass->setup_as_array(env, n_dimensions, isArrayOfPrimitives,
-            baseClass, elementClass);
     }
+
+    // we should wait here for creating class
+    if((klass = WaitDefinition(env, classNameString)) != NULL)
+        return klass;
+
+    // create class
+    klass = NewClass(env, classNameString);
+    if (!klass) {
+        FailedLoadingClass(classNameString);
+        return NULL;
+    }
+
+    // setup array-related fields
+    klass->setup_as_array(env, n_dimensions, isArrayOfPrimitives,
+        baseClass, elementClass);
 
     if(!klass->load_ancestors(env)) {
         FailedLoadingClass(classNameString);

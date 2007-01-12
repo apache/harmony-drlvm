@@ -135,6 +135,7 @@ ready_for_exceptions(false)
 	}
 
     verify_all = false;
+    verify_strict = false;
     pin_interned_strings = false; 
     retain_invisible_annotations = false;
 

@@ -41,10 +41,17 @@ Class::verify(const Global_Env* env)
     if(m_state >= ST_BytecodesVerified)
         return true;
 
+    if(is_array()) {
+        // no need do bytecode verification for arrays
+        m_state = ST_BytecodesVerified;
+        return true;
+    }
+
     /**
      * Get verifier enable status
      */
     Boolean is_forced = env->verify_all;
+    Boolean is_strict = env->verify_strict;
     Boolean is_bootstrap = m_class_loader->IsBootstrap();
     Boolean is_enabled = get_boolean_property("vm.use_verifier", TRUE, VM_PROPERTIES);
 
@@ -56,7 +63,7 @@ Class::verify(const Global_Env* env)
         && (is_bootstrap == FALSE || is_forced == TRUE))
     {
         char *error;
-        Verifier_Result result = vf_verify_class((class_handler)this, is_forced, &error);
+        Verifier_Result result = vf_verify_class((class_handler)this, is_strict, &error);
         if( result != VER_OK ) {
             aulock.ForceUnlock();
             REPORT_FAILED_CLASS_CLASS(m_class_loader, this,
@@ -98,8 +105,15 @@ Class::verify_constraints(const Global_Env* env)
     }
     assert(m_state == ST_Prepared);
 
+    if(is_array()) {
+        // no need do constraint verification for arrays
+        m_state = ST_ConstraintsVerified;
+        unlock();
+        return true;
+    }
+
     // get verifier enable status
-    Boolean verify_all = env->verify_all;
+    Boolean is_strict = env->verify_strict;
 
     // unlock a class before calling to verifier
     unlock();
@@ -107,7 +121,7 @@ Class::verify_constraints(const Global_Env* env)
     // check method constraints
     char *error;
     Verifier_Result result =
-        vf_verify_class_constraints((class_handler)this, verify_all, &error);
+        vf_verify_class_constraints((class_handler)this, is_strict, &error);
 
     // lock class and check result
     lock();

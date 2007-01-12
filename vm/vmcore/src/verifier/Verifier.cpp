@@ -5472,8 +5472,7 @@ vf_verify_class( class_handler klass,      // verified class
         }
         if( result == VER_NoSupportJSR ) {
             result = VER_OK;
-        }
-        if (result != VER_OK ) {
+        } else  if (result != VER_OK ) {
             goto labelEnd_verifyClass;
         }
     }

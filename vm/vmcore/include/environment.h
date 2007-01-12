@@ -71,10 +71,11 @@ struct Global_Env {
     bool strings_are_compressed;    // 2003-05-19: The VM searches the java.lang.String class for a "byte[] bvalue" field at startup,
                                     // as an indication that the Java class library supports compressed strings with 8-bit characters.
     bool use_large_pages;           // 20040109 Use large pages for class-related data such as vtables.
-    size_t system_page_size;        // system page size according to use_large_pages value
-    bool verify_all;                // psrebriy 20050815 Verify all classes including loaded by bootstrap class loader
     bool pin_interned_strings;      // if true, interned strings are never moved
     bool retain_invisible_annotations; // retain InvisibleAnnotation and InvisibleParameterAnnotation
+    bool verify_all;                // Verify all classes including loaded by bootstrap class loader
+    bool verify_strict;             // Do strict verification
+    size_t system_page_size;        // system page size according to use_large_pages value
     
     Lock_Manager *p_jit_a_method_lock;
     Lock_Manager *p_vtable_patch_lock;

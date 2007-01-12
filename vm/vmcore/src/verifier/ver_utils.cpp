@@ -848,7 +848,7 @@ vf_is_checkcast_valid( class_handler source,    // checked class
         }
     } else {
         // source class is class
-        if( !strcmp( class_get_name( source ), "java/lang/Object" ) ) {
+        if( !memcmp( class_get_name( source ), "java/lang/Object", 17 ) ) {
             // source class is Object
             return true;
         }
@@ -1164,8 +1164,8 @@ vf_check_without_loading( vf_TypeConstraint_t *restriction,  // checked constrat
         // check assignment reference conversions
         if( restriction->source[0] == '[' ) {
             // source class is array
-            if( !strcmp( restriction->target, "Ljava/lang/Cloneable" )
-                || !strcmp( restriction->target, "Ljava/io/Serializable" ) )
+            if( !memcmp( restriction->target, "Ljava/lang/Cloneable", 21 )
+                || !memcmp( restriction->target, "Ljava/io/Serializable", 22 ) )
             {
                 // target class is java/lang/Cloneable 
                 // or java/lang/Serializable interface
@@ -1216,6 +1216,18 @@ vf_check_constraint( vf_TypeConstraint_t *restriction,  // checked constratint
     // check classes are loaded?
     if( !target || !source ) {
         return VER_ClassNotLoaded;
+    }
+
+    /**
+     * Verifier which is built on Java VM Specification 2nd Edition (4.9.2)
+     * recommendation of verification proccess doesn't check interfaces usage.
+     * Unfortunately, a lot of Java applications depends on this neglect.
+     * To be compatible with those applications we should do full constraint
+     * checks only if -Xverify:all option is present in command line.
+     */
+    if( !ctex->m_dump.m_verify && class_is_interface_( target ) ) {
+        // skip constraint check
+        return VER_OK;
     }
 
     // check restriction
@@ -1280,7 +1292,7 @@ vf_check_access_constraint( const char *super_name,             // name of super
             return VER_OK;
         }
         if( method_is_protected( method ) ) {
-            if( instance_name[0] == '[' && !strcmp( method_get_name( method ), "clone" ) ) {
+            if( instance_name[0] == '[' && !memcmp( method_get_name( method ), "clone", 7 ) ) {
                 // for arrays function clone is public
             } else {
                 need_check = true;
@@ -1403,7 +1415,7 @@ vf_force_check_constraint( vf_TypeConstraint_t *constraint,     // class constra
      * recommendation of verification proccess doesn't check interfaces usage.
      * Unfortunately, a lot of Java applications depends on this neglect.
      * To be compatible with those applications we should do full constraint
-     * checks only if -Xverify option is present in command line.
+     * checks only if -Xverify:all option is present in command line.
      */
     if( !ctex->m_dump.m_verify && class_is_interface_( target ) ) {
         // skip constraint check

@@ -175,7 +175,7 @@ static void print_help_on_nonstandard_options()
         "              Set up logging via log4cxx configuration file\n"
         "    -Xverboselog:<file>\n"
         "              Log verbose output to a file\n"
-        "    -Xverify\n"
+        "    -Xverify[:none|all]\n"
         "              Do full bytecode verification\n"
         "    -Xinvisible\n"
         "              Retain invisible annotations at runtime\n"
@@ -442,6 +442,13 @@ void parse_vm_arguments(Global_Env *p_env)
         }
         else if (strcmp(option, "-Xverify") == 0) {
             p_env->verify_all = true;
+        }
+        else if (strcmp(option, "-Xverify:none") == 0 || strcmp(option, "-noverify") == 0) {
+            p_env->VmProperties()->set("vm.use_verifier", "false");
+        }
+        else if (strcmp(option, "-Xverify:all") == 0) {
+            p_env->verify_all = true;
+            p_env->verify_strict = true;
         }
         else if (strcmp(option, "-verify") == 0) {
             p_env->verify_all = true;
