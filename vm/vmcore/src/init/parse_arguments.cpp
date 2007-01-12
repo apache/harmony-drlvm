@@ -110,6 +110,8 @@ void print_generic_help()
         "                  load JVMTI agent library, library name is platform dependent\n"
         "    -verify\n"
         "                  do full bytecode verification\n"
+        "    -noverify\n"
+        "                  do no bytecode verification\n"
         "    -enableassertions[:<package>...|:<class>]\n"
         "    -ea[:<package>...|:<class>]\n"
         "                  enable assertions\n"
