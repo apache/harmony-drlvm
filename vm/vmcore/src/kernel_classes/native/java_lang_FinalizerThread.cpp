@@ -130,4 +130,14 @@ JNIEXPORT void JNICALL Java_java_lang_FinalizerThread_finalizerShutDown
 {
     finalizer_shutdown(value);
 }
+/*
+ * Class:     java_lang_FinalizerThread
+ * Method:    isNativePartEnabled
+ * Signature: ()Z
+ */
+JNIEXPORT jboolean JNICALL Java_java_lang_FinalizerThread_isNativePartEnabled
+  (JNIEnv *, jclass)
+{
+    return (jboolean) vm_finalization_is_enabled();
+}
 /* END: These three methods are added for NATIVE FINALIZER THREAD */

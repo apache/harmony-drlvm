@@ -102,6 +102,11 @@ Java_java_lang_FinalizerThread_finalizerShutDown(JNIEnv *, jclass, jboolean);
 /* END: These three methods are added for NATIVE FINALIZER THREAD */
 
 
+/*
+ * Method: java_lang_FinalizerThread.isNativePartEnabled()Z
+ */
+JNIEXPORT jboolean JNICALL
+Java_java_lang_FinalizerThread_isNativePartEnabled(JNIEnv *, jclass);
 #ifdef __cplusplus
 }
 #endif

@@ -526,7 +526,12 @@ int vm_get_finalizable_objects_quantity()
 {
     return objects_to_finalize.getLength();
 }
-// -- Code to deal with Reference Queues that need to be notified.
+
+/* returns true if finalization system is turned on, and false otherwise */
+bool vm_finalization_is_enabled()
+{
+    return VM_Global_State::loader_env->finalizer_thread != NULL;
+}// -- Code to deal with Reference Queues that need to be notified.
 
 static References_To_Enqueue references_to_enqueue;
 

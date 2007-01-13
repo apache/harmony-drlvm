@@ -41,6 +41,7 @@ VMEXPORT
 void vm_run_pending_finalizers();
 int vm_do_finalization(int quantity);
 int vm_get_finalizable_objects_quantity();
+bool vm_finalization_is_enabled();
 
 #ifndef USE_GC_STATIC
 VMEXPORT

@@ -78,10 +78,9 @@ class FinalizerThread extends Thread {
 
         String p = System.getProperty("vm.finalize");
         processorsQuantity = getProcessorsQuantity();
-        
-        // -Dvm.finalize=0 disables the finalizer thread
-        if ("0".equalsIgnoreCase(p) || "off".equalsIgnoreCase(p)
-                || "no".equalsIgnoreCase(p) || "false".equalsIgnoreCase(p)) {
+
+        // -XDvm.finalize=0 disables the finalizer thread
+        if (! isNativePartEnabled()) {
             warn("finalizer thread have not been created");
         } else {
             (new FinalizerThread(true)).start();
@@ -198,7 +197,13 @@ class FinalizerThread extends Thread {
     private static native int doFinalization(int quantity);
     
     private static native void fillFinalizationQueueOnExit();
-    
+
+    /**
+     * Returns true if native part of finalization system is
+     * turned on, and false otherwise.
+     */
+    private static native boolean isNativePartEnabled();
+
     /**
      * Returns true if current thread is finalizer thread
      */
