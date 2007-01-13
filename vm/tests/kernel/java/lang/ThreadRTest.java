@@ -59,4 +59,37 @@ public class ThreadRTest extends TestCase {
             fail("NullPointerException has been thrown");
         }
     }
+    /*
+     * Regression test for Harmony-917
+     */
+    public void testJoinJI() throws Exception {
+        Thread th = new Thread(); 
+
+        long mls = 688204075024689866L; 
+        int nn = -10000; 
+        try { 
+            th.join(mls, nn); 
+            fail("1: test failed"); 
+        } catch (IllegalArgumentException e) { 
+            //expected
+        } 
+
+        mls = -1000000000000L; 
+        nn = 90000; 
+        try { 
+            th.join(mls, nn); 
+            fail("2: test failed"); 
+        } catch (IllegalArgumentException e) { 
+            //expected
+        } 
+
+        mls = 10000000000000L; 
+        nn = 1000001; 
+        try { 
+            th.join(mls, nn); 
+            fail("3: Test failed"); 
+        } catch (IllegalArgumentException e) { 
+            //expected
+        } 
+    }                     
 }

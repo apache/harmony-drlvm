@@ -617,6 +617,9 @@ public class Thread implements Runnable {
      */
     public final void join(long millis, int nanos)
         throws InterruptedException {
+        if (millis < 0 || nanos < 0 || nanos > 999999)
+            throw new IllegalArgumentException();
+
         if (millis == 0 && nanos == 0) {
             join();
             return;
