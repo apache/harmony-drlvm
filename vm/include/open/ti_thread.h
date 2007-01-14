@@ -1,10 +1,10 @@
 /*
  *  Licensed to the Apache Software Foundation (ASF) under one or more
- *  contributor license agreements.  See the NOTICE file distributed with
+ *  contributor license agreements. See the NOTICE file distributed with
  *  this work for additional information regarding copyright ownership.
  *  The ASF licenses this file to You under the Apache License, Version 2.0
  *  (the "License"); you may not use this file except in compliance with
- *  the License.  You may obtain a copy of the License at
+ *  the License. You may obtain a copy of the License at
  *
  *     http://www.apache.org/licenses/LICENSE-2.0
  *
@@ -14,10 +14,7 @@
  *  See the License for the specific language governing permissions and
  *  limitations under the License.
  */
-/**
- * @author Andrey Chernyshev
- * @version $Revision$
- */
+
 
 #ifndef OPEN_THREAD_TI_H
 #define OPEN_THREAD_TI_H
@@ -27,8 +24,9 @@
  * @brief JVMTI support 
  * @details
  * TI part of the Java threading interface.
- * The TI part is mostly targeted to address the needs of JVMTI and java.lang.management classes needs.
- * All functions start with jthread_* prefix.
+ * The TI part is mostly targeted to address the needs of JVMTI and 
+ * <code>java.lang.management</code> classes needs.
+ * All functions start with <code>jthread_*</code> prefix.
  */
 
 #include "jvmti_types.h"
@@ -40,7 +38,7 @@ extern "C" {
 #endif /* __cplusplus */
 
 /**
- * JVM TI local storage structure
+ * JVM TI local storage structure.
  *
  * @param[in] thread 
  */

@@ -14,18 +14,14 @@
  *  See the License for the specific language governing permissions and
  *  limitations under the License.
  */
-/** 
- * @author Aleksey Ignatenko 
- * @version $Revision: 1.1.2.1.4.3 $
- */  
 
 // excluding remarks: 
 #if defined (__INTEL_COMPILER)
-#pragma warning (disable:1684)    // conversion from pointer to same-sized integral type (potential portability problem)
-#pragma warning (disable:279)    // controlling expression is constant
-#pragma warning (disable:444)   // destructor for base class is not virtual
-#pragma warning (disable:981) // operands are evaluated in unspecified order
-#pragma warning (disable:181) // argument is incompatible with corresponding format string conversion (in printf)
+#pragma warning (disable:1684) // conversion from pointer to same-sized integral type (potential portability problem)
+#pragma warning (disable:279)  // controlling expression is constant
+#pragma warning (disable:444)  // destructor for base class is not virtual
+#pragma warning (disable:981)  // operands are evaluated in unspecified order
+#pragma warning (disable:181)  // argument is incompatible with corresponding format string conversion (in printf)
 #pragma warning (disable:1599) // declaration hides variable "dclazz" (declared at line NN)
 #endif // _MSC_VER
 
@@ -33,7 +29,9 @@
 #pragma warning (disable:4800)    // forcing value to bool 'true' or 'false' (performance warning)
 #endif
 
-//Warning appears when local variable is defined and not used
+/** 
+ * Warning appears when local variable is defined and not used.
+ */
 #if defined (__INTEL_COMPILER) && defined(__GNUC__)
 #pragma warning (disable:177)
 #define UNUSED
@@ -48,7 +46,10 @@
 #define UNUSED
 #endif // !__GNUC__
 
-//Warning appears when function parameter is not used in function body
+/** 
+ * Warning appears when function parameter is not used in 
+ * function body.
+ */
 #if defined (__INTEL_COMPILER) && defined(__GNUC__)
 #pragma warning (disable:869)
 #define UNREF

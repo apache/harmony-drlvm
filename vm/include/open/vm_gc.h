@@ -14,10 +14,7 @@
  *  See the License for the specific language governing permissions and
  *  limitations under the License.
  */
-/** 
- * @author Intel, Salikh Zakirov
- * @version $Revision: 1.1.2.1.4.3 $
- */  
+
 
 #ifndef _OPEN_VM_GC_H
 #define _OPEN_VM_GC_H
@@ -38,23 +35,21 @@ extern "C" {
 
 
 /**
- * @return the number of bytes allocated by VM in VTable
+ * @return The number of bytes allocated by VM in VTable
  *         for use by GC.
  */
 VMEXPORT size_t vm_number_of_gc_bytes_in_vtable();
 
 /**
- * @return the number of bytes allocated by VM in thread-local
+ * @return The number of bytes allocated by VM in thread-local
  *         storage for use by GC.
  */
 VMEXPORT size_t vm_number_of_gc_bytes_in_thread_local();
 
 /**
- * @return the pointer to thread-local area of current thread.
+ * @return The pointer to thread-local area of current thread.
  */
 VMEXPORT void *vm_get_gc_thread_local();
-
-VMEXPORT size_t vm_get_gc_thread_local_offset();
 
 
 /**
@@ -67,7 +62,7 @@ VMEXPORT void vm_gc_lock_enum();
 
 
 /**
- * Release the system-wide lock acquired by vm_gc_lock_enum().
+ * Release the system-wide lock acquired by <code>vm_gc_lock_enum()</code>.
  * The thread is marked as unsafe for root set enumeration.
  */
 VMEXPORT void vm_gc_unlock_enum();
@@ -94,7 +89,8 @@ VMEXPORT void vm_resume_threads_after();
  * GC calls this function in stop the world state when all live objects
  * are marked. This is the callback to classloader allowing it to
  * gather needed statics for class unloading.
- * See also gc interface functions: gc_get_next_live_object(void *iterator)
+ * 
+ * @sa gc interface functions: gc_get_next_live_object(void *iterator)
  */
 VMEXPORT void vm_classloader_iterate_objects(void *iterator);
 
@@ -103,10 +99,18 @@ VMEXPORT void vm_classloader_iterate_objects(void *iterator);
  * one object. The GC aborts heap iteration if this function
  * returns false.
  *
- * @return true to continue heap iteration, false to abort
- * @see gc.h#gc_iterate_heap()
+ * @return <code>TRUE</code> to continue heap iteration, <code>FALSE</code> to abort
+ * 
+ * @sa gc.h#gc_iterate_heap()
  */
 VMEXPORT bool vm_iterate_object(Managed_Object_Handle object);
+
+/**
+ * GC calls this function for each live object it finds in heap.
+ * This is used for finding unreferenced class loaders for class
+ * unloading.
+ */
+VMEXPORT void vm_notify_live_object_class(Class_Handle);
 
 /**
  * GC calls this function to hint VM that finalizers may need to be run
@@ -127,29 +131,29 @@ enum safepoint_state {
     nill = 0,
 
     /** 
-     * thread is stopped for root set enumeration,
+     * Thread is stopped for root set enumeration,
      * as is the whole world (all managed threads).
      */
     enumerate_the_universe,
 
     /** 
-     * thread is stopped for root set enumeration
+     * Thread is stopped for root set enumeration
      */
     java_suspend_one_thread,
 
     /**
-     * thread is stopped by java debugger.
+     * Thread is stopped by java debugger.
      */
     java_debugger
 };
 
 /**
- * @return thread safepoint state.
+ * @return Thread safepoint state.
  */
 VMEXPORT enum safepoint_state get_global_safepoint_status();
 
 /**
- * @return TRUE if no apparent trash was found in the object.
+ * @return <code>TRUE</code> if no apparent trash was found in the object.
  * 
  * Used for debugging.
  */
@@ -176,15 +180,11 @@ VMEXPORT Boolean verify_object_header(void *ptr);
  */
 VMEXPORT void vm_finalize_object(Managed_Object_Handle p_obj);
 
-VMEXPORT void set_native_finalizer_thread_flag(Boolean flag);
-
 /**
  * GC should call this function when an phantom reference object
  * is to be enqueued, i.e. when the reference is not reachable anymore.
  */
 VMEXPORT void vm_enqueue_reference(Managed_Object_Handle p_obj);
-
-VMEXPORT void set_native_ref_enqueue_thread_flag(Boolean flag);
 
 enum WeakReferenceType {
     NOT_REFERENCE = 0,
@@ -203,39 +203,42 @@ VMEXPORT WeakReferenceType class_is_reference(Class_Handle clss);
 
 /*
  * Returns handle of a class for a specified vtable
+ *
  * @param vh - handle of vtable to retrieve class for
+ *
  * @return class handle for a specified vtable
  */
 VMEXPORT Class_Handle vtable_get_class(VTable_Handle vh);
 
 /**
  * Notifies VM that live object of this class was found in the heap
+ *
  * @param clss - class of live object in Java heap
- **/
+ */
 VMEXPORT void vm_notify_live_object_class(Class_Handle clss);
 
 /**
  * Returns the offset of the referent field 
- * in the java.lang.ref.Reference object.
+ * in the <code>java.lang.ref.Reference</code> object.
  *
  * clss is assumed to represent the reference object,
  * i.e. class_is_reference() returned non-zero value.
  *
- * @note the returned value is most probably a constant,
+ * @note The returned value is most probably a constant,
  *       and is not dependent on the clss.
  *
- * @note this interface allows only one non-strong (i.e. weak
+ * @note This interface allows only one non-strong (i.e. weak
  *       soft or phantom) reference per object.
  *       It seems to be sufficient for JVM Spec.
  */
 VMEXPORT int class_get_referent_offset(Class_Handle clss);
 
 
-#define CL_PROP_ALIGNMENT_MASK      0x00FFF     ///< @see class_properties
-#define CL_PROP_NON_REF_ARRAY_MASK  0x01000     ///< @see class_properties
-#define CL_PROP_ARRAY_MASK          0x02000     ///< @see class_properties
-#define CL_PROP_PINNED_MASK         0x04000     ///< @see class_properties
-#define CL_PROP_FINALIZABLE_MASK    0x08000     ///< @see class_properties
+#define CL_PROP_ALIGNMENT_MASK      0x00FFF     ///< @sa <code>class_properties</code>
+#define CL_PROP_NON_REF_ARRAY_MASK  0x01000     ///< @sa <code>class_properties</code>
+#define CL_PROP_ARRAY_MASK          0x02000     ///< @sa <code>class_properties</code>
+#define CL_PROP_PINNED_MASK         0x04000     ///< @sa <code>class_properties</code>
+#define CL_PROP_FINALIZABLE_MASK    0x08000     ///< @sa <code>class_properties</code>
 
 
 /**

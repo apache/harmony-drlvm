@@ -18,36 +18,54 @@
 #if !defined(hycomp_h)
 #define hycomp_h
 
-/*
-USE_PROTOTYPES:       Use full ANSI prototypes.
-CLOCK_PRIMS:          We want the timer/clock prims to be used
-LITTLE_ENDIAN:        This is for the intel machines or other
-                      little endian processors. Defaults to big endian.
-NO_LVALUE_CASTING:    This is for compilers that don't like the left side
-                      of assigns to be cast.  It hacks around to do the
-                      right thing.
-ATOMIC_FLOAT_ACCESS:  So that float operations will work.
-LINKED_USER_PRIMITIVES: Indicates that user primitives are statically linked
-                        with the VM executeable.
-OLD_SPACE_SIZE_DIFF:  The 68k uses a different amount of old space.
-                      This "legitimizes" the change.
-SIMPLE_SIGNAL:        For machines that don't use real signals in C.
-                      (eg: PC, 68k)
-OS_NAME_LOOKUP:       Use nlist to lookup user primitive addresses.
-VMCALL:               Tag for all functions called by the VM.
-VMAPICALL:            Tag for all functions called via the PlatformFunction
-                      callWith: mechanism.
-      
-SYS_FLOAT:  For some math functions where extended types (80 or 96 bits) are returned
-            Most platforms return as a double
-FLOAT_EXTENDED: If defined, the type name for extended precision floats.
-PLATFORM_IS_ASCII: Must be defined if the platform is ASCII
-EXE_EXTENSION_CHAR: the executable has a delimiter that we want to stop at as part of argv[0].
-*/
-/* By default order doubles in the native (i.e. big/little endian) ordering. */
+/**
+ * USE_PROTOTYPES:         Use full ANSI prototypes.
+ *
+ * CLOCK_PRIMS:            We want the timer/clock prims to be used
+ *
+ * LITTLE_ENDIAN:          This is for the intel machines or other
+ *                         little endian processors. Defaults to big endian.
+ *
+ * NO_LVALUE_CASTING:      This is for compilers that don't like the left side
+ *                         of assigns to be cast.  It hacks around to do the
+ *                         right thing.
+ *
+ * ATOMIC_FLOAT_ACCESS:    So that float operations will work.
+ *
+ * LINKED_USER_PRIMITIVES: Indicates that user primitives are statically linked
+ *                         with the VM executeable.
+ *
+ * OLD_SPACE_SIZE_DIFF:    The 68k uses a different amount of old space.
+ *                         This "legitimizes" the change.
+ *
+ * SIMPLE_SIGNAL:          For machines that don't use real signals in C.
+ *                         (eg: PC, 68k)
+ *
+ * OS_NAME_LOOKUP:         Use nlist to lookup user primitive addresses.
+ *
+ * VMCALL:                 Tag for all functions called by the VM.
+ *
+ * VMAPICALL:              Tag for all functions called via the PlatformFunction
+ *                         callWith: mechanism.
+ *      
+ * SYS_FLOAT:              For some math functions where extended types (80 or 96 bits) are returned
+ *                         Most platforms return as a double
+ *
+ * FLOAT_EXTENDED:         If defined, the type name for extended precision floats.
+ *
+ * PLATFORM_IS_ASCII:      Must be defined if the platform is ASCII
+ *
+ * EXE_EXTENSION_CHAR:     the executable has a delimiter that we want to stop at as part of argv[0].
+ *
+ * By default order doubles in the native (that is big/little endian) ordering. 
+ */
+
 #define HY_PLATFORM_DOUBLE_ORDER
 #if defined(LINUX)
-/* NOTE: Linux supports different processors -- do not assume 386 */
+
+/**
+ * @note Linux supports different processors - do not assume 386. 
+ */
 #if defined(LINUXPPC64) || defined(POINTER64)
 #define DATA_TYPES_DEFINED
 typedef unsigned long int UDATA;        /* 64bits */
@@ -78,7 +96,9 @@ typedef double SYS_FLOAT;
 #define DIR_SEPARATOR '/'
 #define DIR_SEPARATOR_STR "/"
 
-/* no priorities on Linux */
+/**
+ * No priorities on Linux 
+ */
 #define HY_PRIORITY_MAP {0,0,0,0,0,0,0,0,0,0,0,0}
 
 #if (defined(LINUXPPC) && !defined(LINUXPPC64))
@@ -89,7 +109,9 @@ typedef double SYS_FLOAT;
 #define GLOBAL_DATA(symbol) ((void*)&(symbol))
 #define GLOBAL_TABLE(symbol) GLOBAL_DATA(symbol)
 
-/* Win32 - Windows 3.1 & NT using Win32 */
+/**
+ * Win32 - Windows 3.1 & NT using Win32 
+ */
 #if defined(WIN32)
 
 typedef __int64 I_64;
@@ -104,9 +126,17 @@ typedef double SYS_FLOAT;
 #define DIR_SEPARATOR '\\'
 #define DIR_SEPARATOR_STR "\\"
 
-/* Modifications for the Alpha running WIN-NT */
+/** 
+ * Modifications for the Alpha running WIN-NT 
+ */
+
 #if defined(_ALPHA_)
-#undef small                    /* defined as char in rpcndr.h */
+#undef small 
+
+/**
+ * Defined as char in rpcndr.h 
+ */
+
 typedef double FLOAT_EXTENDED;
 #endif
 
@@ -130,26 +160,39 @@ typedef double FLOAT_EXTENDED;
 #define VMAPICALL
 #endif
 #define PVMCALL VMCALL *
-/* Provide some reasonable defaults for the VM "types":
-  UDATA     unsigned data, can be used as an integer or pointer storage.
-  IDATA     signed data, can be used as an integer or pointer storage.
-  U_64 / I_64 unsigned/signed 64 bits.
-  U_32 / I_32 unsigned/signed 32 bits.
-  U_16 / I_16 unsigned/signed 16 bits.
-  U_8 / I_8   unsigned/signed 8 bits (bytes -- not to be confused with char)
-  BOOLEAN something that can be zero or non-zero.
-*/
+
+/**
+ * Provide some reasonable defaults for the VM types:
+ * <ul>
+ * <li><code>UDATA</code>        - unsigned data, can be used as an integer or 
+ *                                 pointer storage</li>
+ * <li><code>IDATA</code>        - signed data, can be used as an integer or 
+ *                                 pointer storage</li>
+ * <li><code>U_64 / I_64</code>  - unsigned/signed 64 bits</li>
+ * <li><code>U_32 / I_32</code>  - unsigned/signed 32 bits</li>
+ * <li><code>U_16 / I_16</code>  - unsigned/signed 16 bits</li>
+ * <li><code>U_8 / I_8</code>    - unsigned/signed 8 bits (bytes -- not to be 
+ *                                 confused with char)</li>
+ * <li><code>BOOLEAN</code>      - something that can be zero or non-zero</li>
+ * </ul>
+ */
 #if !defined(DATA_TYPES_DEFINED)
 typedef unsigned int UDATA;
 typedef unsigned int U_32;
 typedef unsigned short U_16;
 typedef unsigned char U_8;
-/* no generic U_64 or I_64 */
+/** 
+ * No generic U_64 or I_64. 
+ */
 typedef int IDATA;
 typedef int I_32;
 typedef short I_16;
 typedef char I_8;
-/* don't typedef BOOLEAN since it's already def'ed on Win32 */
+
+/**
+ * Don't typedef <code>BOOLEAN</code> since it's already def'ed on Win32. 
+ */
+
 #endif
 #ifdef LINUX
 #define BOOLEAN UDATA
@@ -160,12 +203,22 @@ typedef char I_8;
 #endif
 
 #if !defined(HY_DEFAULT_SCHED)
-/* by default, pthreads platforms use the SCHED_OTHER thread scheduling policy */
+
+/**
+ * By default, pthreads platforms use the <code>SCHED_OTHER</code> thread 
+ * scheduling policy. 
+ */
+
 #define HY_DEFAULT_SCHED SCHED_OTHER
 #endif
 
 #if !defined(HY_PRIORITY_MAP)
-/* if no priority map if provided, priorities will be determined algorithmically */
+
+/** 
+ * If no priority map if provided, priorities will be determined 
+ * algorithmically. 
+ */
+
 #endif
 
 #if !defined(FALSE)
@@ -190,17 +243,29 @@ typedef char I_8;
 #define PROTOTYPE(x)  ()
 #define VARARGS
 #endif
-/* Assign the default line delimiter if it was not set */
+
+/** 
+ * Assign the default line delimiter, if it was not set. 
+ */
+
 #if !defined(PLATFORM_LINE_DELIMITER)
 #define PLATFORM_LINE_DELIMITER "\015\012"
 #endif
-/* Set the max path length if it was not set */
+
+/**
+ * Set the max path length, if it was not set. 
+ */
+
 #if !defined(MAX_IMAGE_PATH_LENGTH)
 #define MAX_IMAGE_PATH_LENGTH (2048)
 #endif
 typedef double ESDOUBLE;
 typedef float ESSINGLE;
-/* helpers for U_64s */
+
+/** 
+ * Helpers for U_64s. 
+ */
+
 #define CLEAR_U64(u64)  (u64 = (U_64)0)
 #define LOW_LONG(l) (*((U_32 *) &(l)))
 #define HIGH_LONG(l)  (*(((U_32 *) &(l)) + 1))
@@ -220,7 +285,11 @@ typedef float ESSINGLE;
 #define CLASSP(x)   ((Class *) (x))
 #define CLASSPP(x)  ((Class **) (x))
 #define BYTEP(x)    ((BYTE *) (x))
-/* Test - was conflicting with OS2.h */
+
+/**
+ * Test - was conflicting with OS2.h 
+ */
+
 #define ESCHAR(x)   ((CHARACTER) (x))
 #define FLT(x)      ((FLOAT) x)
 #define FLTP(x)     ((FLOAT *) (x))
@@ -262,7 +331,11 @@ typedef float ESSINGLE;
 #define LFLT(x)     FLT((x))
 #define LFLTP(x)    FLTP((x))
 #endif
-/* Macros for converting between words and longs and accessing bits */
+
+/**
+ * Macros for converting between words and longs and accessing bits. 
+ */
+
 #define HIGH_WORD(x)  U16(U32((x)) >> 16)
 #define LOW_WORD(x)   U16(U32((x)) & 0xFFFF)
 #define LOW_BIT(o)    (U32((o)) & 1)
@@ -278,24 +351,39 @@ typedef float ESSINGLE;
 #define HY_CFUNC
 #define HY_CDATA
 #endif
-/* Macros for tagging functions which read/write the vm thread */
+
+/**
+ * Macros for tagging functions which read/write the vm thread. 
+ */
+
 #define READSVMTHREAD
 #define WRITESVMTHREAD
 #define REQUIRESSTACKFRAME
-/* macro for tagging functions which never return */
+
+/**
+ * Macro for tagging functions, which never return. 
+ */
+
 #if defined(__GNUC__)
-/* on GCC, we can actually pass this information on to the compiler */
+
+/** 
+ * On GCC, we can actually pass this information on to the compiler. 
+ */
+
 #define NORETURN __attribute__((noreturn))
 #else
 #define NORETURN
 #endif
-/* on some systems va_list is an array type.  This is probably in
- * violation of the ANSI C spec, but it's not entirely clear.  Because of this, we end
- * up with an undesired extra level of indirection if we take the address of a
- * va_list argument. 
+
+/**
+ * On some systems <code>va_list</code> is an array type. This is probably in
+ * violation of the ANSI C spec, but it's not entirely clear. Because of this, 
+ * we end up with an undesired extra level of indirection if we take the address 
+ * of a <code>va_list</code> argument. 
  *
- * To get it right ,always use the VA_PTR macro
+ * To get it right, always use the <code>VA_PTR</code> macro.
  */
+
 #if !defined(VA_PTR)
 #define VA_PTR(valist) (&valist)
 #endif
@@ -306,7 +394,11 @@ typedef float ESSINGLE;
 #if !defined(TOC_STORE_TOC)
 #define TOC_STORE_TOC(dest,wrappedPointer)
 #endif
-/* Macros for accessing I_64 values */
+
+/**
+ * Macros for accessing I_64 values. 
+ */
+
 #if defined(ATOMIC_LONG_ACCESS)
 #define PTR_LONG_STORE(dstPtr, aLongPtr) ((*U32P(dstPtr) = *U32P(aLongPtr)), (*(U32P(dstPtr)+1) = *(U32P(aLongPtr)+1)))
 #define PTR_LONG_VALUE(dstPtr, aLongPtr) ((*U32P(aLongPtr) = *U32P(dstPtr)), (*(U32P(aLongPtr)+1) = *(U32P(dstPtr)+1)))
@@ -314,11 +406,19 @@ typedef float ESSINGLE;
 #define PTR_LONG_STORE(dstPtr, aLongPtr) (*(dstPtr) = *(aLongPtr))
 #define PTR_LONG_VALUE(dstPtr, aLongPtr) (*(aLongPtr) = *(dstPtr))
 #endif
-/* Macro used when declaring tables which require relocations.*/
+
+/** 
+ * Macro used when declaring tables which require relocations.
+ */
+
 #if !defined(HYCONST_TABLE)
 #define HYCONST_TABLE const
 #endif
-/* ANSI qsort is not always available */
+
+/**
+ * ANSI qsort is not always available. 
+ */
+
 #if !defined(HY_SORT)
 #define HY_SORT(base, nmemb, size, compare) qsort((base), (nmemb), (size), (compare))
 #endif

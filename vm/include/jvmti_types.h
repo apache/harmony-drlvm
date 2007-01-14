@@ -1,10 +1,10 @@
 /*
  *  Licensed to the Apache Software Foundation (ASF) under one or more
- *  contributor license agreements.  See the NOTICE file distributed with
+ *  contributor license agreements. See the NOTICE file distributed with
  *  this work for additional information regarding copyright ownership.
  *  The ASF licenses this file to You under the Apache License, Version 2.0
  *  (the "License"); you may not use this file except in compliance with
- *  the License.  You may obtain a copy of the License at
+ *  the License. You may obtain a copy of the License at
  *
  *     http://www.apache.org/licenses/LICENSE-2.0
  *
@@ -14,10 +14,7 @@
  *  See the License for the specific language governing permissions and
  *  limitations under the License.
  */
-/** 
-* @author Gregory Shimansky
-* @version $Revision: 1.1.2.1.4.4 $
-*/  
+ 
 #ifndef _JVMTI_TYPES_H_
 #define _JVMTI_TYPES_H_
 
@@ -115,28 +112,28 @@ extern "C"
      */
     enum
     {
-        /*
-         * Class bytecodes have been verified
+        /**
+         * Class bytecodes have been verified.
          */
         JVMTI_CLASS_STATUS_VERIFIED = 1,
-        /*
-         * Class preparation is complete
+        /**
+         * Class preparation is complete.
          */
         JVMTI_CLASS_STATUS_PREPARED = 2,
-        /*
+        /**
          * Class initialization is complete. Static initializer has been run.
          */
         JVMTI_CLASS_STATUS_INITIALIZED = 4,
-        /*
-         * Error during initialization makes class unusable
+        /**
+         * Error during initialization makes class unusable.
          */
         JVMTI_CLASS_STATUS_ERROR = 8,
-        /*
+        /**
          * Class is an array. If set, all other bits are zero.
          */
         JVMTI_CLASS_STATUS_ARRAY = 16,
-        /*
-         * Class is a primitive class (for example, java.lang.Integer.TYPE).
+        /**
+         * Class is a primitive class (for example, <code>java.lang.Integer.TYPE</code>).
          * If set, all other bits are zero.
          */
         JVMTI_CLASS_STATUS_PRIMITIVE = 32
@@ -244,7 +241,7 @@ extern "C"
 
     /**
      * Event numbers (from spec). Custom events could be added
-     * after JVMTI_MAX_EVENT_TYPE_VAL.
+     * after <code>JVMTI_MAX_EVENT_TYPE_VAL</code>.
      */
     typedef enum
     {
@@ -362,8 +359,8 @@ extern "C"
         jint slot;
     } jvmtiLocalVariableEntry;
 
-    /* ******************************************************
-     * Event management is exposed to other OPEN components.
+    /**
+     * Event management is exposed to other <code>OPEN</code> components.
      */
 
     typedef void (JNICALL * jvmtiEventVMInit)
@@ -598,7 +595,7 @@ extern "C"
     } jvmtiExtensionEventInfo;
 
     /**
-     * OPEN components should be aware of event management
+     * <code>OPEN</code> components should be aware of event management
      * capabilities.
      */
     typedef struct

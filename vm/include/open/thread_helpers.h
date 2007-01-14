@@ -1,6 +1,6 @@
 /*
  *  Licensed to the Apache Software Foundation (ASF) under one or more
- *  contributor license agreements.  See the NOTICE file distributed with
+ *  contributor license agreements. See the NOTICE file distributed with
  *  this work for additional information regarding copyright ownership.
  *  The ASF licenses this file to You under the Apache License, Version 2.0
  *  (the "License"); you may not use this file except in compliance with
@@ -14,10 +14,7 @@
  *  See the License for the specific language governing permissions and
  *  limitations under the License.
  */
-/**
- * @author Artem Aliev
- * @version $Revision$
- */
+
 
 #ifndef OPEN_THREAD_HELPERS_H
 #define OPEN_THREAD_HELPERS_H
@@ -26,7 +23,7 @@
  * @file 
  * @brief Provides optimized assambly code generators for common monitor functions.
  *
- * For more detailes see thread manager component documentation located at vm/thread/doc/ThreadManager.htm
+ * @sa Thread manager component documentation located at vm/thread/doc/ThreadManager.htm
  */
 
 #include "open/types.h"
