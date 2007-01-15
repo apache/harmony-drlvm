@@ -1,10 +1,10 @@
 /*
  *  Licensed to the Apache Software Foundation (ASF) under one or more
- *  contributor license agreements. See the NOTICE file distributed with
+ *  contributor license agreements.  See the NOTICE file distributed with
  *  this work for additional information regarding copyright ownership.
  *  The ASF licenses this file to You under the Apache License, Version 2.0
  *  (the "License"); you may not use this file except in compliance with
- *  the License. You may obtain a copy of the License at
+ *  the License.  You may obtain a copy of the License at
  *
  *     http://www.apache.org/licenses/LICENSE-2.0
  *
@@ -14,7 +14,10 @@
  *  See the License for the specific language governing permissions and
  *  limitations under the License.
  */
-
+/** 
+ * @author Intel, Pavel Afremov
+ * @version $Revision: 1.1.2.1.4.3 $
+ */  
 #ifndef _EXCEPTIONS_H_
 #define _EXCEPTIONS_H_
 
@@ -24,22 +27,27 @@
 #include "open/types.h"
 
 /**
- * @file 
- * ref exceptions
- */
+@file
+\ref exceptions
+*/
 
 /**
-  \ page page1 exceptions Exceptions subsystem
-  \section section1 exn_introduction Introduction
-  The functions to work with exceptions are described in exceptions.h.
-  \section section1 exn_issues Issues
-  \li Interaction with JIT and runtime helpers? -salikh
-  \li Interaction with JIT is implemented via rth_wrap_exn_throw stubs. -pavel.n.afremov
-  \li Existing interface is currently included.
- */
+@page exceptions Exceptions subsystem
+
+\section exn_introduction Introduction
+The functions to work with exceptions are described in exceptions.h.
+
+\section exn_issues Issues
+
+\li Interaction with JIT and runtime helpers? -salikh
+\li Interaction with JIT is implemented via rth_wrap_exn_throw stubs. -pavel.n.afremov
+\li Existing interface is currently included.
+
+*/
+
 /**
- * @return The thread-local exception object, or <code>NULL</code> if no 
- * exception occured.
+ * Returns the thread-local exception object
+ * or NULL if no exception occured.
  */
 VMEXPORT jthrowable exn_get();
 
@@ -48,23 +56,21 @@ VMEXPORT const char* exn_get_name();
 
 
 /**
- * @return <code>TRUE</code> if the thread-local exception object is set.
+ * Returns true if the thread-local exception object is set.
  */
 VMEXPORT bool exn_raised();
 
 /**
  * Clears the thread-local exception object.
  *
- * @note Rename of <code>clear_current_thread_exception()</code>. 
- *       It may be eliminated if exn_catch() will be 
- *       used and will clean thread exception.
+ * @note rename of clear_current_thread_exception(). It may be eliminated if
+ * exn_catch() will be used and will clean thread exception.
  */
 VMEXPORT void exn_clear();
 
 /**
  * Creates exception object.
  */
-
 //FIXME LAZY EXCEPTION (2006.05.06)
 // Maybe change to exn_object_create (whole 7)
 jthrowable exn_create(Exception* exception);
@@ -95,22 +101,21 @@ VMEXPORT jthrowable exn_create(const char* exc_name, const char* message);
 VMEXPORT jthrowable exn_create(const char* exc_name, const char* message, jthrowable cause);
 
 /**
- * @return <code>TRUE</code> if frame is unwindable and false if isn't. 
+ * Returns true if frame is unwindable and false if isn't. 
  */
 VMEXPORT bool is_unwindable();
 
 /**
  * Sets unwindable property of frame. If frame is unwindable property
  * should be true and should be false if frame isn't unwindable.
- *
- * @return Previous value of unwindable property.
+ * Returns previous value of unwindable property.
  */
 bool set_unwindable(bool unwindable);
 
 /**
- * Throws an exception object.
+ * Throws an exception object
  *
- * @note Internal convenience function, may not be exposed to VMI interface.
+ * @note internal convenience function, may not be exposed to VMI interface.
  */
 void exn_throw_object(jthrowable exc_object);
 
@@ -118,7 +123,7 @@ void exn_throw_object(jthrowable exc_object);
  * Throws an exceptionas lazy.
  * Does not return in case of destructive exception propagation.
  *
- * @note Internal convenience function, may not be exposed to VMI interface.
+ * @note internal convenience function, may not be exposed to VMI interface.
  */
 void exn_throw_by_class(Class* exc_class);
 void exn_throw_by_class(Class* exc_class, jthrowable exc_cause);
@@ -153,15 +158,15 @@ VMEXPORT void exn_throw_by_name(const char* exception_name, const char* message,
 /**
  * Sets exceptions as a thread local exception.
  *
- * @note Explicit non-destructive semantics should be deduced from context.
+ * @note explicit non-destructive semantics should be deduced from context.
  */
 VMEXPORT void exn_raise_object(jthrowable exc_object);
 
 /**
  * Sets exception lazy as a thread local exception.
  *
- * @note Internal convenience function, may not be exposed to VMI interface.
- * @note Explicit non-destructive semantics should be deduced from context.
+ * @note internal convenience function, may not be exposed to VMI interface.
+ * @note explicit non-destructive semantics should be deduced from context.
  */
 void exn_raise_by_class(Class* exc_class);
 void exn_raise_by_class(Class* exc_class, jthrowable exc_cause);
@@ -172,28 +177,28 @@ void exn_raise_by_class(Class* exc_class, const char* exc_message,
 /**
  * Sets exception lazy as a thread local exception.
  *
- * @note Explicit non-destructive semantics should be deduced from context.
+ * @note explicit non-destructive semantics should be deduced from context.
  */
 VMEXPORT void exn_raise_by_name(const char* exception_name);
 
 /**
  * Sets exception lazy as a thread local exception.
  *
- * @note Explicit non-destructive semantics should be deduced from context.
+ * @note explicit non-destructive semantics should be deduced from context.
  */
 VMEXPORT void exn_raise_by_name(const char* exception_name, jthrowable exc_cause);
 
 /**
  * Sets exception lazy as a thread local exception.
  *
- * @note Explicit non-destructive semantics should be deduced from context.
+ * @note explicit non-destructive semantics should be deduced from context.
  */
 VMEXPORT void exn_raise_by_name(const char* exception_name, const char* message);
 
 /**
  * Sets exception lazy as a thread local exception.
  *
- * @note Explicit non-destructive semantics should be deduced from context.
+ * @note explicit non-destructive semantics should be deduced from context.
  */
 VMEXPORT void exn_raise_by_name(const char* exception_name, const char* message,
     jthrowable exc_cause);
@@ -203,27 +208,27 @@ VMEXPORT void exn_raise_by_name(const char* exception_name, const char* message,
  * After this returns true. If unwinding is happnened control coming back into
  * this function, and after this it returns false.
  *
- * @note Experimental.
+ * @note experimental
  */
 bool exn_function_try();
 
 /**
- * Pops dummy non-unwindable stack frame.
+ * pops dummy non-unwindable stack frame
  *
- * @retur The current thread exception object, or <code>NULL</code> 
- *        if no exception occured.
+ * returns the current thread exception object
+ * or NULL if no exception occured.
  *
- * @note Experimental.
+ * @note experimental
  */
 jthrowable exn_function_catch();
 
 /**
- * Wrapper for <code>exn_function_try</code>.
+ * Wrapper for exn_function_try.
  */
 #define exn_try (if (exn_function_try()))
 
 /**
- * Wrapper for <code>exn_function_catch</code>.
+ * Wrapper for exn_function_catch.
  */
 #define exn_catch (th) (if ( th = exn_function_catch()))
 
@@ -251,21 +256,16 @@ if (unwindable) exn_rethrow_if_pending();\
 
 struct ManagedObject;
 
-/**
- * Stack Trace support
- */ 
+//**** Stack Trace support
 
-/**
- * Print the stack trace stored in the exception object to the given file.
- */
+// Print the stack trace stored in the exception object to the given file.
 void exn_print_stack_trace(FILE* f, jthrowable exc);
 
 void print_uncaught_exception_message(FILE *f, char* context_message, jthrowable exc);
 
 
-/**
- * Native code exception support
- */
+//**** Native code exception support
+
 void exn_rethrow();
 void exn_rethrow_if_pending();
 

@@ -1,10 +1,10 @@
 /*
  *  Licensed to the Apache Software Foundation (ASF) under one or more
- *  contributor license agreements. See the NOTICE file distributed with
+ *  contributor license agreements.  See the NOTICE file distributed with
  *  this work for additional information regarding copyright ownership.
  *  The ASF licenses this file to You under the Apache License, Version 2.0
  *  (the "License"); you may not use this file except in compliance with
- *  the License. You may obtain a copy of the License at
+ *  the License.  You may obtain a copy of the License at
  *
  *     http://www.apache.org/licenses/LICENSE-2.0
  *
@@ -14,11 +14,16 @@
  *  See the License for the specific language governing permissions and
  *  limitations under the License.
  */
+/** 
+ * @author Intel, Alexei Fedotov
+ * @version $Revision: 1.1.2.1.4.3 $
+ */  
 
-/**
- * These are the functions that a JIT built as a DLL must export for
- * the purpose of runtime interaction.
- */
+
+//
+// These are the functions that a JIT built as a DLL must export for
+// the purpose of runtime interaction.
+//
 
 #ifndef _JIT_EXPORT_RT_H
 #define _JIT_EXPORT_RT_H
@@ -31,16 +36,15 @@
 extern "C" {
 #endif // __cplusplus
 
-/////////
+
+
+///////////////////////////////////////////////////////
 // begin Frame Contexts for JITs
-////////
 
 #ifdef _IPF_
 
-/**
- * @note The code in transfer context is very depend upon the ordering of fields 
- *       in this structure. Be very careful in changing this structure.
- */
+// Note that the code in transfer context is very depend upon the ordering of fields in this structure.
+// Be very careful in changing this structure.
 typedef
 struct JitFrameContext {
     uint64 *p_ar_pfs;
@@ -105,7 +109,7 @@ struct JitFrameContext {
     uint32 *p_ecx;
     uint32 *p_edx;
 
- 
+    // To restore processor flags during transfer
     uint32 eflags;
 
     Boolean is_ip_past;
@@ -124,47 +128,34 @@ typedef void * InlineInfoPtr;
 // begin direct call support
 
 
-/**
- * The following are optional functions used by the direct call-related
- * JIT interface. 
- * These functions are implemented by a JIT and invoked by the VM. They allow 
- * a JIT to be notified whenever, e.g., a VM data structure changes that would 
- * require code patching or recompilation.
- *
- * The callback that corresponds to <code>vm_register_jit_extended_class_callback</code>.
- * The newly loaded class is <code>new_class</code>. 
- *
- * @return <code>TRUE</code> if any code was modified
- *        (consequently the VM will ensure correctness such as synchronizing 
- *         I- and D-caches); otherwise, <code>FALSE</code>.
- */
+// The following are optional functions used by the direct call-related JIT interface. 
+// These functions are implemented by a JIT and invoked by the VM. They allow a JIT 
+// to be notified whenever, e.g., a VM data structure changes that would require 
+// code patching or recompilation.
+ 
+// The callback that corresponds to vm_register_jit_extended_class_callback.  
+// The newly loaded class is new_class.  The JIT should return TRUE if any code was modified
+// (consequently the VM will ensure correctness such as synchronizing I- and D-caches), 
+// and FALSE otherwise.
 JITEXPORT Boolean 
 JIT_extended_class_callback(JIT_Handle jit, 
                             Class_Handle  extended_class,
                             Class_Handle  new_class,
                             void         *callback_data);
 
-/**
- * The callback that corresponds to <codevm_register_jit_overridden_method_callback</code>.
- * The overriding method is <code>new_method</code>. 
- * 
- * @return <code>TRUE</code> if any code was modified (consequently the VM will 
- *         ensure correctness such as synchronizing I- and D-caches); otherwise,
- *         <code>FALSE</code>.
- */
-
+// The callback that corresponds to vm_register_jit_overridden_method_callback. 
+// The overriding method is new_method. The JIT should return TRUE if any code was modified
+// (consequently the VM will ensure correctness such as synchronizing I- and D-caches),
+// and FALSE otherwise.
 JITEXPORT Boolean 
 JIT_overridden_method_callback(JIT_Handle jit,
                                Method_Handle  overridden_method,
                                Method_Handle  new_method, 
                                void          *callback_data);
 
-/**
- * The callback that corresponds to <code>vm_register_jit_recompiled_method_callback</code>.
- * 
- * @return <code>TRUE</code> if any code was modified (consequently the VM will ensure 
- *         correctness such as synchronizing I- and D-caches); otherwise, <code>FALSE</code>.
- */
+// The callback that corresponds to vm_register_jit_recompiled_method_callback.  
+// The JIT should return TRUE if any code was modified (consequently the VM will ensure 
+// correctness such as synchronizing I- and D-caches), and FALSE otherwise.
 JITEXPORT Boolean 
 JIT_recompiled_method_callback(JIT_Handle jit,
                                Method_Handle  recompiled_method,
@@ -237,14 +228,9 @@ JIT_call_returns_a_reference(JIT_Handle               jit,
 // begin compressed references
 
 
-/**
- * @return <code>TRUE</code> if the JIT will compress references within 
- *         objects and vector elements by representing them as offsets 
- *         rather than raw pointers. The JIT should call the VM function 
- *         <code>vm_references_are_compressed()</code> during initialization 
- *         in order to decide whether it should compress references.
- */
-
+// Returns TRUE if the JIT will compress references within objects and vector elements by representing 
+// them as offsets rather than raw pointers. The JIT should call the VM function vm_references_are_compressed()
+// during initialization in order to decide whether it should compress references.
 JITEXPORT Boolean 
 JIT_supports_compressed_references(JIT_Handle jit);
 

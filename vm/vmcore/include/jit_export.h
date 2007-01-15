@@ -1,10 +1,10 @@
 /*
  *  Licensed to the Apache Software Foundation (ASF) under one or more
- *  contributor license agreements. See the NOTICE file distributed with
+ *  contributor license agreements.  See the NOTICE file distributed with
  *  this work for additional information regarding copyright ownership.
  *  The ASF licenses this file to You under the Apache License, Version 2.0
  *  (the "License"); you may not use this file except in compliance with
- *  the License. You may obtain a copy of the License at
+ *  the License.  You may obtain a copy of the License at
  *
  *     http://www.apache.org/licenses/LICENSE-2.0
  *
@@ -14,11 +14,16 @@
  *  See the License for the specific language governing permissions and
  *  limitations under the License.
  */
+/** 
+ * @author Intel, Alexei Fedotov
+ * @version $Revision: 1.1.2.1.4.4 $
+ */  
 
-/**
- * These are the functions that a JIT built as a DLL must export.
- * Some functions may be optional and are marked as such.
- */
+
+//
+// These are the functions that a JIT built as a DLL must export.
+// Some functions may be optional and are marked as such.
+//
 
 #ifndef _JIT_EXPORT_H
 #define _JIT_EXPORT_H
@@ -47,11 +52,10 @@ JITEXPORT void JIT_next_command_line_argument(JIT_Handle jit, const char *name, 
 // Required functions.
 ////////////////////////////////////////////////////////
 
-/**
- * Flags passed from the VM to the JIT.
- *
- * Max 32 bits, so that it fits in one word.
- */
+//
+// Flags passed from the VM to the JIT.
+//
+// Max 32 bits, so that it fits in one word.
 typedef
 struct JIT_Flags {
 
@@ -72,85 +76,71 @@ struct JIT_Flags {
 * call a certain VM helpers at certain places in the code. For JIT,
 * in particular, this means that it will have to generate additional
 * code which will perform these calls.
-* 
+* <p>
 * Each of the requirement is associated with a corresponding ability of
 * the EE to satisfy this requirement. So, elements of the struct should also
 * be used to denote EE capabilities related to method execution.
-* 
+* <p>
 * If an element corresponds to a certain VM helper, concrete contract
 * of calling this helper (arguments, etc.) can be found at the place of
 * definition of this helper (or its ID) within present OPEN specification.
 */
 typedef struct OpenMethodExecutionParams {
-
-    /**
-	 * Call corresponding VM helper upon entry to the managed method.
-	 */
+    /** call corresponding VM helper upon entry to the managed method */
     Boolean  exe_notify_method_entry : 1;
 
-    /** 
-	 * Call corresponding VM helper upon exit from the managed method.
-	 */
+    /** call corresponding VM helper upon exit from the managed method */
     Boolean  exe_notify_method_exit : 1;
 
-    /**
-	 * Call corresponding VM helper upon reading a value of a field which 
-	 * has <field access mask> set 
-	 */
-
+    /** call corresponding VM helper upon reading a value of a field which has <field access mask> set */
     Boolean  exe_notify_field_access  : 1;
 
-    /** 
-	 * Call corresponding VM helper upon setting a value of a field which 
-	 * has <field modification mask> set.
-	 */
+    /** call corresponding VM helper upon setting a value of a field which has <field modification mask> set */
     Boolean  exe_notify_field_modification : 1;
 
     /**
-     * Call corresponding VM helper upon exception throw,
-     * if by default the throw code does not enter any VM helper
-     * (for example, in case of JIT optimizations).
-     */
+    * call corresponding VM helper upon exception throw,
+    * if by default the throw code does not enter any VM helper
+    * (for example, in case of JIT optimizations)
+    */
     Boolean  exe_notify_exception_throw : 1;
 
     /**
-     * Call corresponding VM helper upon exception catch,
-     * if by default the exception propagation code does not enter any VM helper
-     * (for example, in case of JIT optimizations).
-     */
+    * call corresponding VM helper upon exception catch,
+    * if by default the exception propagation code does not enter any VM helper
+    * (for example, in case of JIT optimizations)
+    */
     Boolean  exe_notify_exception_catch : 1;
 
     /**
-     * Call corresponding VM helper upon entering a monitor,
-     * if by default the monitor enter code does not enter any VM helper
-     * (for example, in case of JIT optimizations).
-     */
+    * call corresponding VM helper upon entering a monitor,
+    * if by default the monitor enter code does not enter any VM helper
+    * (for example, in case of JIT optimizations)
+    */
     Boolean  exe_notify_monitor_enter : 1;
 
     /**
-     * Call corresponding VM helper upon exiting a monitor,
-     * if by default the monitor exit code does not enter any VM helper
-     * (for example, in case of JIT optimizations).
-     */
+    * call corresponding VM helper upon exiting a monitor,
+    * if by default the monitor exit code does not enter any VM helper
+    * (for example, in case of JIT optimizations)
+    */
     Boolean  exe_notify_monitor_exit : 1;
 
     /**
-     * Call corresponding VM helper upon entering a contended monitor,
-     * if by default the contended monitor enter code does not enter any VM helper
-     * (for example, in case of JIT optimizations).
-     */
+    * call corresponding VM helper upon entering a contended monitor,
+    * if by default the contended monitor enter code does not enter any VM helper
+    * (for example, in case of JIT optimizations)
+    */
     Boolean  exe_notify_contended_monitor_enter : 1;
 
     /**
-     * Call corresponding VM helper upon exiting a contended monitor,
-     * if by default the contended monitor exit code does not enter any VM helper
-     * (for example, in case of JIT optimizations).
-     */
+    * call corresponding VM helper upon exiting a contended monitor,
+    * if by default the contended monitor exit code does not enter any VM helper
+    * (for example, in case of JIT optimizations)
+    */
     Boolean  exe_notify_contended_monitor_exit : 1;
 
-    /**
-	 * Perform method in-lining during compilation (JIT-specific) 
-	 */
+    /** perform method in-lining during compilation (JIT-specific) */
     Boolean  exe_do_method_inlining : 1;
 
     /**
@@ -170,20 +160,18 @@ typedef struct OpenMethodExecutionParams {
     */
     Boolean  exe_do_local_var_mapping : 1;
 
-    /** 
-	 * Call corresponding VM helper upon setting a value of any field of reference type.
-	 */
+    /** call corresponding VM helper upon setting a value of any field of reference type */
     Boolean  exe_insert_write_barriers : 1;
 
    /**
     * Provide possibility to obtain reference to the current 'this' object by
-    * means of <code>get_address_of_this</code> method. Used for JVMTI debug support.
+    * means of get_address_of_this method. Used for JVMTI debug support.
     */
     Boolean  exe_provide_access_to_this : 1;
 
    /**
     * Provide restoring of arguments in the stack after the call
-    * of the <code>unwind_frame</code> method so that method could be called again
+    * of the unwind_frame method so that method could be called again
     * with the same arguments. Used for JVMTI debug support.
     */
     Boolean  exe_restore_context_after_unwind : 1;
@@ -209,16 +197,14 @@ JIT_compile_method(JIT_Handle jit,
                    JIT_Flags          flags
                    );
 
-   /** 
+/** 
     * Performs compilation of given method.
     *
     * @param method_handle      - handle of the method to be compiled
-    * @param compilation_params - compilation parameters. If <code>NULL</code>, 
-	*                             default compilation parameters should be used by 
-	*                             the JIT (passed in the initialize function). 
-    *                             If either of parameters is not supported by the JIT, 
-	*                             the function should return compilation failure.
-    * @return Compilation status.
+    * @param compilation_params - compilation parameters. If NULL, default compilation parameters
+    *     should be used by the JIT (passed in the initialize function). If either of parameters is
+    *     not supported by the JIT, the function should return compilation failure.
+    * @return compilation status
     */
 JITEXPORT JIT_Result JIT_compile_method_with_params(
     JIT_Handle jit,
@@ -228,10 +214,10 @@ JITEXPORT JIT_Result JIT_compile_method_with_params(
     );
 
 
-   /**
+/**
     * Retrieves method execution-related capabilities supported by the EE.
     *
-    * @return The set of supported capabilities.
+    * @return the set of supported capabilities
     */
 JITEXPORT OpenMethodExecutionParams JIT_get_exe_capabilities (JIT_Handle jit);
 

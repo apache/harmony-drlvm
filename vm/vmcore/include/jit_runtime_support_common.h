@@ -1,10 +1,10 @@
 /*
  *  Licensed to the Apache Software Foundation (ASF) under one or more
- *  contributor license agreements. See the NOTICE file distributed with
+ *  contributor license agreements.  See the NOTICE file distributed with
  *  this work for additional information regarding copyright ownership.
  *  The ASF licenses this file to You under the Apache License, Version 2.0
  *  (the "License"); you may not use this file except in compliance with
- *  the License. You may obtain a copy of the License at
+ *  the License.  You may obtain a copy of the License at
  *
  *     http://www.apache.org/licenses/LICENSE-2.0
  *
@@ -14,6 +14,14 @@
  *  See the License for the specific language governing permissions and
  *  limitations under the License.
  */
+/** 
+ * @author Intel, Evgueni Brevnov, Ivan Volosyuk
+ * @version $Revision: 1.1.2.1.4.4 $
+ */  
+
+
+
+
 
 #ifndef _JIT_RUNTIME_SUPPORT_COMMON_H_
 #define _JIT_RUNTIME_SUPPORT_COMMON_H_
@@ -25,15 +33,11 @@
 VMEXPORT // temporary solution for interpreter unplug
 int __stdcall vm_instanceof(ManagedObject *obj, Class *c) stdcall__;
 
-/**
- * Implements <code>VM_RT_AASTORE</code>.
- */
+// Implements VM_RT_AASTORE
 void * __stdcall
 vm_rt_aastore(ManagedObject *elem, int idx, Vector_Handle array) stdcall__;
 
-/**
- * Implements <code>VM_RT_AASTORE_TEST</code>.
- */
+// Implements VM_RT_AASTORE_TEST
 int __stdcall
 vm_aastore_test(ManagedObject *elem, Vector_Handle array) stdcall__;
 
@@ -52,21 +56,16 @@ Vector_Handle vm_rt_new_vector(Class *vector_class, int length);
 Vector_Handle vm_rt_new_vector_using_vtable_and_thread_pointer(
         int length, Allocation_Handle vector_handle, void *tp);
 
-/** 
- * Creates a LIL code stub for checkcast or instance of
- * can be used by both IA32 and IPF code
- */
-  LilCodeStub *gen_lil_typecheck_stub(bool is_checkcast).
- 
-/**
- * Creates a <code>SPECIALIZED LIL</code> code stub for checkcast or instance of
- * it assumes that the class is suitable for fast instanceof checks.
- *
- * @return Different fast stub for every class. <code>will_inline</code>
- *         is set to <code>TRUE</code>, if this stub will be inlined in a JIT,
- *         and <code>FALSE</code>, if it will be passed to a code generator
- *         (this is due to the slightly different treatment of exceptions).
- */
+// creates a LIL code stub for checkcast or instanceof
+// can be used by both IA32 and IPF code
+LilCodeStub *gen_lil_typecheck_stub(bool is_checkcast);
+
+// creates a SPECIALIZED LIL code stub for checkcast or instanceof
+// it assumes that the class is suitable for fast instanceof checks.
+// The result is a different fast stub for every class.
+// will_inline should be set to TRUE if this stub will be inlined
+// in a JIT, and false if it will be passed to a code generator
+// (this is due to the slightly different treatment of exceptions)
 LilCodeStub *gen_lil_typecheck_stub_specialized(bool is_checkcast,
                                                 bool will_inline,
                                                 Class *superclass);

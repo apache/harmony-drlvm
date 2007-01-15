@@ -1,10 +1,10 @@
 /*
  *  Licensed to the Apache Software Foundation (ASF) under one or more
- *  contributor license agreements. See the NOTICE file distributed with
+ *  contributor license agreements.  See the NOTICE file distributed with
  *  this work for additional information regarding copyright ownership.
  *  The ASF licenses this file to You under the Apache License, Version 2.0
  *  (the "License"); you may not use this file except in compliance with
- *  the License. You may obtain a copy of the License at
+ *  the License.  You may obtain a copy of the License at
  *
  *     http://www.apache.org/licenses/LICENSE-2.0
  *
@@ -14,26 +14,26 @@
  *  See the License for the specific language governing permissions and
  *  limitations under the License.
  */
-
+/**
+ * @author Andrey Chernyshev
+ * @version $Revision$
+ */
 
 #ifndef _OPEN_THREAD_GENERIC_H
 #define _OPEN_THREAD_GENERIC_H
 
 /**
- * @file 
- * Java threading interface
- *
+ * @file jthread_.h
+ * @brief Java threading interface
  * @details
  * Java threading interface - contains functions to work with Java threads. 
  * The generic part od Java thrading interface is mostly targeted to address 
- * the needs of <code>java.lang.Object</code> and <code>java.lang.Thread</code> 
- * classes implementations.
- * All functions in this interface start with <code><>jthread_*</code> prefix.
- * The implemnentation of this layer provides the mapping of Java thrads onto 
- * native/OS threads.
+ * the needs of java.lang.Object and java.lang.Thread classes implementations.
+ * All functions in this interface start with jthread_* prefix.
+ * The implemnentation of this layer provides the mapping of Java thrads onto native/OS threads.
  * 
- * For more detailes, see thread manager component documentation located at 
- * <code>vm/thread/doc/ThreadManager.htm</code>
+ * For more detailes see thread manager component documentation located at vm/thread/doc/ThreadManager.htm
+ * 
  */
 
 #include "open/types.h"
@@ -46,8 +46,7 @@ extern "C" {
 #endif /* __cplusplus */
 
 
-/** 
- * @name Basic manipulation
+/** @name Basic manipulation
  */
 //@{
 
@@ -133,17 +132,15 @@ jboolean jthread_is_daemon(jthread thread);
  *
  * @param[in] thread those attribute is set
  * @param[in] name thread name
- *
- * @sa <code>java.lang.Thread.setName()</code>
+ * @sa java.lang.Thread.setName()
  */
 IDATA jthread_set_name(jthread thread, jstring name);
 
 /**
  * Returns the name for the <code>thread</code>.
  *
- * @param[in] - thread those attribute is read
- *
- * @sa <code>java.lang.Thread.getName()</code>
+ * @param[in] thread those attribute is read
+ * @sa java.lang.Thread.getName()
  */
 jstring jthread_get_name(jthread thread);
 
