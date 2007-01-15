@@ -63,7 +63,8 @@ void BottomUpLayout::linearizeCfgImpl() {
         const Edges& edges = node->getOutEdges();
         sortedEdges.insert(sortedEdges.end(), edges.begin(), edges.end());
     }
-    std::sort(sortedEdges.begin(), sortedEdges.end(), edge_comparator());
+    //GCC 3.4 passes NULLs to comparator if usual std::sort is used here..
+    std::stable_sort(sortedEdges.begin(), sortedEdges.end(), edge_comparator());
     for(StlVector<Edge*>::const_iterator it = sortedEdges.begin(), itEnd = sortedEdges.end(); it!=itEnd; it++) {
         Edge* edge  = *it;
         layoutEdge(edge);
