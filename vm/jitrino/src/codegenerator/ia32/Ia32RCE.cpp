@@ -144,11 +144,12 @@ RCE::runImpl()
                                 BranchInst* br = (BranchInst*)condInst;
                                 newCondInst = irManager->newBranchInst(mnem,br->getTrueTarget(), br->getFalseTarget(), condInst->getOpnd(0));
                             } else {
+                                Mnemonic condMnem = getBaseConditionMnemonic(condInst->getMnemonic());
                                 Inst::Opnds defs(condInst,Inst::OpndRole_Def|Inst::OpndRole_Explicit);
-                                if (baseMnem == Mnemonic_CMOVcc) {
+                                if (condMnem == Mnemonic_CMOVcc) {
                                     Inst::Opnds uses(condInst,Inst::OpndRole_Use|Inst::OpndRole_Explicit);
                                     newCondInst = irManager->newInst(mnem, condInst->getOpnd(defs.begin()), inst->getOpnd(uses.begin()));
-                                } else if (baseMnem == Mnemonic_SETcc) {
+                                } else if (condMnem == Mnemonic_SETcc) {
                                     newCondInst = irManager->newInst(mnem, condInst->getOpnd(defs.begin()));
                                 } else {
                                     assert(0);
