@@ -47,6 +47,16 @@ class DominatorNode;
 class LoopTree;
 class Method_Table;
 
+class InliningContext {
+public:
+    InliningContext(uint32 _nArgs, Type** _argTypes) : nArgs(_nArgs), argTypes(_argTypes) {}
+    uint32 getNumArgs() const {return nArgs;}
+    Type** getArgTypes() const {return argTypes;}
+private:
+    uint32 nArgs;
+    Type** argTypes;
+};
+
 class InlineNode : public TreeNode {
 public:
     InlineNode(IRManager& irm, Inst *callInst, Node *callNode) : _irm(irm), _callInst(callInst), _callNode(callNode) {}

@@ -32,6 +32,7 @@ class IRManager;
 class SessionAction;
 class LogStreams;
 class HPipeline;
+class InliningContext;
 
 #ifdef _IPF_
 #else 
@@ -78,6 +79,9 @@ public:
     void setPipeline(HPipeline* pipe) {pipeline = pipe;}
     HPipeline* getPipeline () const {return pipeline;}
 
+    void setInliningContext(InliningContext* c) {inliningContext = c;}
+    InliningContext* getInliningContext() const {return inliningContext;}
+
     static CompilationContext* getCurrentContext();
 
 #ifdef _IPF_
@@ -102,6 +106,7 @@ private:
     int                     currentSessionNum;
     LogStreams*             currentLogStreams;
     HPipeline*              pipeline;
+    InliningContext*        inliningContext;
 
     void init();
     void initCompilationMode();

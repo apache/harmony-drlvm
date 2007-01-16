@@ -131,11 +131,13 @@ BasicBlock* Linearizer::addJumpBlock(Edge * fallEdge) {
 // Returns true if edge can be converted to a fall-through edge (i.e. an edge
 // not requiring a branch) assuming the edge's head block is laid out after the tail block. 
 bool Linearizer::canEdgeBeMadeToFallThrough(Edge *edge) {
+    Inst *inst = (Inst*)edge->getSourceNode()->getLastInst();
+    if (edge->isUnconditionalEdge()) {
+        return inst == NULL || !inst->hasKind(Inst::Kind_SwitchInst);
+    }
     assert(edge->isTrueEdge());
-    Inst *br = (Inst*)edge->getSourceNode()->getLastInst();
-    assert(br!=NULL);
-    assert(br->hasKind(Inst::Kind_BranchInst));
-    return ((BranchInst*)br)->canReverse();
+    assert(inst->hasKind(Inst::Kind_BranchInst));
+    return ((BranchInst*)inst)->canReverse();
 }
 
 bool Linearizer::isBlockLayoutDone() {

@@ -59,7 +59,7 @@ void CompilationContext::init()
 #endif
     currentSessionAction = NULL;
     currentSessionNum = 0;
-
+    inliningContext = NULL;
     ccTls.push((CompilationContext*)this);
 }
 

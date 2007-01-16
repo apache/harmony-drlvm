@@ -32,6 +32,7 @@
 #include "irmanager.h"
 #include "Jitrino.h"
 #include "EMInterface.h"
+#include "inliner.h"
 
 #include <assert.h>
 #include <stdio.h>
@@ -236,6 +237,8 @@ JavaByteCodeTranslator::JavaByteCodeTranslator(CompilationInterface& ci,
     cfgBuilder.genBlock(irBuilder.genMethodEntryLabel(&methodDesc));
     initLocalVars();
     initArgs();
+    CompilationContext* cc = CompilationContext::getCurrentContext();
+    InliningContext* ic  = cc->getInliningContext();
     //
     // load actual parameters into formal parameters
     //
@@ -251,6 +254,16 @@ JavaByteCodeTranslator::JavaByteCodeTranslator(CompilationInterface& ci,
             arg = irBuilder.genArgDef(NonNullThisArg,argTypes[i]);
         } else {
             Type* type = argTypes[i];
+            if (ic!=NULL) {
+                assert(ic->getNumArgs() == numArgs);
+                Type* newType = ic->getArgTypes()[i];
+                if (newType->isObject()) {
+                    assert(newType->isNullObject() || newType->asObjectType()->isSubClassOf(type->asObjectType()));
+                    type = newType;
+                } else {
+                    //do nothing, numX->numY auto convertion not tested
+                }
+            } 
             if (isMagicClass(type)) {
                 type = convertMagicType2HIR(typeManager, type);
             }

@@ -969,6 +969,16 @@ InlineNode* Inliner::createInlineNode(CompilationContext& inlineCC, MethodCallIn
     }
 
     inlineCC.setHIRManager(inlinedIRM);
+    
+    //prepare type info
+    uint32 nArgs = call->getNumSrcOperands() - 2;
+    Type** types = new (_tmpMM)Type*[nArgs];
+    for (uint32 i = 0; i < nArgs; i++) {
+        types[i] = call->getSrc(i + 2)->getType();
+    }
+
+    InliningContext* ic = new (_tmpMM) InliningContext(nArgs, types);
+    inlineCC.setInliningContext(ic);
     runTranslatorSession(inlineCC);
 
     return inlineNode;
