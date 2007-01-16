@@ -2256,6 +2256,8 @@ Opcode_MONITORENTER(StackFrame& frame) {
     vm_monitor_enter_wrapper(frame.locked_monitors->monitor);
     M2N_FREE_MACRO;
 
+    if (exn_raised()) return;
+
     frame.stack.ref() = FLAG_NONE;
     frame.stack.pop();
     frame.ip++;
@@ -2827,15 +2829,14 @@ restart:
                                     frame.locked_monitors = new_ml;
                                     Opcode_MONITORENTER(frame);
                                     frame.exc = get_current_thread_exception();
-                                    goto check_exception;
-                                    /*
+
                                     if (frame.exc != 0) {
                                         frame.locked_monitors = new_ml->next;
+
                                         new_ml->next = frame.free_monitors;
                                         frame.free_monitors = new_ml;
                                         goto got_exception;
                                     }
-                                    */
                                 }
                                 break;
             case OPCODE_MONITOREXIT:
