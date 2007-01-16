@@ -86,7 +86,7 @@ bool RuntimeInterface::getBcLocationForNative(MethodDesc* method, uint64 native_
         return true;
     } else if (Log::isLogEnabled(LogStream::RT)) {
         methName = method->getName();
-        Log::log(LogStream::RT) << "Byte code for method: " << methName << " IP = " << native_pc 
+        Log::log(LogStream::RT) << "Native code for method: " << methName << " BC = " << bc_pc 
                 << " not found " << std::endl;
     }
     return false;
@@ -106,7 +106,7 @@ bool RuntimeInterface::getNativeLocationForBc(MethodDesc* method, uint16 bc_pc, 
         return true;
     } else if (Log::isLogEnabled(LogStream::RT)) {
         methName = method->getName();
-        Log::log(LogStream::RT) << "Byte code for method: " << methName << " IP = " << native_pc 
+        Log::log(LogStream::RT) << "Native code for method: " << methName << " BC = " << bc_pc 
                 << " not found " << std::endl;
     }
     return false;

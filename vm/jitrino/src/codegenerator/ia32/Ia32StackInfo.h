@@ -151,21 +151,21 @@ public:
 
     uint32 getFrameSize() const {return frameSize;}
 
-    int getRetEIPOffset() const {return eipOffset;}
+    int32 getRetEIPOffset() const {return eipOffset;}
     
     uint32 getIntCalleeMask() const {return icalleeMask;}
     
-    int getIntCalleeOffset() const {return icalleeOffset;}
+    int32 getIntCalleeOffset() const {return icalleeOffset;}
     
     uint32 getFPCalleeMask() const {return fcallee;}
     
-    int getFPCalleeOffset() const {return foffset;}
+    int32 getFPCalleeOffset() const {return foffset;}
 
     uint32 getApplCalleeMask() const {return acallee;}
     
-    int getApplCalleeOffset() const {return aoffset;}
+    int32 getApplCalleeOffset() const {return aoffset;}
 
-    int getLocalOffset() const {return localOffset;}
+    int32 getLocalOffset() const {return localOffset;}
 
     uint32 getOffsetOfThis() const {return offsetOfThis;}
 
@@ -182,28 +182,28 @@ public:
 
 private:
     POINTER_SIZE_INT byteSize;
-    uint32 hashTableSize;
-    uint32  frameSize;
+    uint32  hashTableSize;
+    int32   frameSize;
     
     const char * itraceMethodExitString;
 
-    int     eipOffset;
+    int32   eipOffset;
 
     uint32  icalleeMask;
-    int     icalleeOffset;
+    int32   icalleeOffset;
 
     uint32  fcallee;
-    int     foffset;
+    int32   foffset;
 
     uint32  acallee;
-    int     aoffset;
+    int32   aoffset;
 
-    int     localOffset;
+    int32   localOffset;
     
     DepthMap * stackDepthInfo;
 
     uint32 calleeSaveRegsMask;
-    int stackDepth;
+    int32  stackDepth;
     uint32 offsetOfThis;
 
     friend class StackLayouter;

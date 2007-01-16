@@ -102,35 +102,35 @@ protected:
     */
     void createEpilog();
 
-    int getLocalBase(){ return  localBase; }
-    int getLocalEnd(){ return  localEnd; }
-    int getApplCalleeBase(){ return  acalleeBase; }
-    int getApplCalleeEnd(){ return  acalleeEnd; }
-    int getFloatCalleeBase(){ return  fcalleeBase; }
-    int getFloatCalleeEnd(){ return  fcalleeEnd; }
-    int getIntCalleeBase(){ return  icalleeBase; }
-    int getIntCalleeEnd(){ return  icalleeEnd; }
-    int getRetEIPBase(){ return  retEIPBase; } 
-    int getRetEIPEnd(){ return  retEIPEnd; }
-    int getInArgBase(){ return  inargBase; } 
-    int getInArgEnd(){ return  inargEnd; }
-    uint32 getFrameSize(){ return  frameSize; }
+    int32 getLocalBase(){ return  localBase; }
+    int32 getLocalEnd(){ return  localEnd; }
+    int32 getApplCalleeBase(){ return  acalleeBase; }
+    int32 getApplCalleeEnd(){ return  acalleeEnd; }
+    int32 getFloatCalleeBase(){ return  fcalleeBase; }
+    int32 getFloatCalleeEnd(){ return  fcalleeEnd; }
+    int32 getIntCalleeBase(){ return  icalleeBase; }
+    int32 getIntCalleeEnd(){ return  icalleeEnd; }
+    int32 getRetEIPBase(){ return  retEIPBase; } 
+    int32 getRetEIPEnd(){ return  retEIPEnd; }
+    int32 getInArgBase(){ return  inargBase; } 
+    int32 getInArgEnd(){ return  inargEnd; }
+    int32 getFrameSize(){ return  frameSize; }
     uint32 getOutArgSize(){ return  outArgSize; }
 
-    int localBase;
-    int localEnd;
-    int fcalleeBase;
-    int fcalleeEnd;
-    int acalleeBase;
-    int acalleeEnd;
-    int icalleeBase;
-    int icalleeEnd;
+    int32 localBase;
+    int32 localEnd;
+    int32 fcalleeBase;
+    int32 fcalleeEnd;
+    int32 acalleeBase;
+    int32 acalleeEnd;
+    int32 icalleeBase;
+    int32 icalleeEnd;
 
-    int retEIPBase;
-    int retEIPEnd;
-    int inargBase;
-    int inargEnd;
-    uint32 frameSize;
+    int32 retEIPBase;
+    int32 retEIPEnd;
+    int32 inargBase;
+    int32 inargEnd;
+    int32 frameSize;
     uint32 outArgSize;
 #ifdef _EM64T_
     bool stackCorrection;

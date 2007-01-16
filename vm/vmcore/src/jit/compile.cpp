@@ -687,6 +687,7 @@ static void compile_raise_exception(const char* name, const char* message, Metho
 {
     assert(hythread_is_suspend_enabled());
     jthrowable old_exc = exn_get();
+    exn_clear();
 
     const char* c = method->get_class()->get_name()->bytes;
     const char* m = method->get_name()->bytes;
