@@ -368,7 +368,10 @@ void GCSafePoint::enumerate(GCInterface* gcInterface, const JitFrameContext* con
         POINTER_SIZE_INT mptrAddr = *((POINTER_SIZE_INT*)valPtrAddr); 
         //we looking for a base that  a) located before mptr in memory b) nearest to mptr
         GCSafePointOpnd* baseOpnd = NULL;
-        POINTER_SIZE_INT basePtrAddr = 0, baseAddr = 0;
+#ifdef ENABLE_GC_RT_CHECKS
+        POINTER_SIZE_INT basePtrAddr = 0;
+#endif
+        POINTER_SIZE_INT baseAddr = 0;
         for (uint32 j=0; j<n; j++) {
             GCSafePointOpnd* tmpOpnd = gcOpnds[j];   
             if (tmpOpnd->isObject()) {
@@ -377,7 +380,9 @@ void GCSafePoint::enumerate(GCInterface* gcInterface, const JitFrameContext* con
                 if (tmpBaseAddr <= mptrAddr) {
                     if (baseOpnd == NULL || tmpBaseAddr > baseAddr) {
                         baseOpnd = tmpOpnd;
+#ifdef ENABLE_GC_RT_CHECKS
                         basePtrAddr = tmpPtrAddr;
+#endif
                         baseAddr = tmpBaseAddr;
                     } 
                 }
