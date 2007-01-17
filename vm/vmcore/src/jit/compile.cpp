@@ -244,7 +244,7 @@ NativeCodePtr compile_create_lil_jni_stub(Method_Handle method, void* func, Nati
     if (nso) cs = nso(cs, method);
     assert(cs);
 
-    // Increment stats (number of nonoverriden calls)
+    // Increment stats (number of nonoverridden calls)
 #ifdef VM_STATS
     cs = lil_parse_onto_end(cs,
                             "inc [%0i:pint];",
@@ -261,7 +261,7 @@ NativeCodePtr compile_create_lil_jni_stub(Method_Handle method, void* func, Nati
     cs = oh_gen_allocate_handles(cs, number_of_object_handles, "l0", "l1");
     assert(cs);
 
-    //***** Part 2: Initialise object handles
+    //***** Part 2: Initialize object handles
 
     if (is_static) {
         void *jlc = clss->get_class_handle();
@@ -289,7 +289,7 @@ NativeCodePtr compile_create_lil_jni_stub(Method_Handle method, void* func, Nati
         }
     }
 
-    //***** Part 3: Synchronise
+    //***** Part 3: Synchronize
     if (is_synchronised) {
         if (is_static) {
             cs = lil_parse_onto_end(cs,
@@ -446,7 +446,7 @@ NativeCodePtr compile_create_lil_jni_stub(Method_Handle method, void* func, Nati
         assert(cs);
     }
 
-    //***** Part 9: Synchronise
+    //***** Part 9: Synchronize
     if (is_synchronised) {
         if (is_static) {
             cs = lil_parse_onto_end(cs,

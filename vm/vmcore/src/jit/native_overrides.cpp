@@ -149,7 +149,7 @@ LilCodeStub* nso_newinstance(LilCodeStub* cs, Method_Handle)
         // Is it within limit?
         cs = lil_parse_onto_end(cs, "jc l2<l3,fallback;");
 
-        // Yes, store new frontier, initialise vtable
+        // Yes, store new frontier, initialize vtable
         cs = lil_parse_onto_end(cs, "st [l1+%0i:pint],l3;", current_offset);
         cs = lil_parse_onto_end(cs, "ld l3,[l0+%0i:pint];", offset_allocation_handle);
         cs = lil_parse_onto_end(cs, "l2=r; st [l2+0:pint],l3;");
@@ -268,7 +268,7 @@ static NativeCodePtr fast_array_copy()
     s = jump8(s,  i0);
     char* patch3 = s-1;
 
-    // No, do a rep movsd
+    // No, do a rep MOVSD
     assert(s-patch2-1 < 128);
     *patch2 = (char)(s-patch2-1);
     *s++ = (char)0xF3 ;
@@ -447,7 +447,7 @@ NSOTableItem* nso_init_lookup_table(String_Pool* pstrpool)
     return NSOTable;
 }
 
-// Frees memory occupated by NSO table
+// Frees memory occupied by NSO table
 void nso_clear_lookup_table(NSOTableItem* NSOTable)
 {
     assert(NSOTable);

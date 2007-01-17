@@ -228,7 +228,7 @@ static NativeCodePtr rth_get_lil_ldc_ref(int* dyn_count)
 
 // The generic type test sequence first checks for whether the fast scheme
 // can be used, if so it uses it, otherwise it calls into the VM to do the test.
-// This is parameterised by:
+// This is parameterized by:
 //   * Is there a null test, if so is null in the type or not
 //   * Should the test outcome be returned or should an exception be thrown on failure, object returned on success
 //   * Is the type known
@@ -255,10 +255,10 @@ static LilCodeStub* rth_gen_lil_type_test(LilCodeStub* cs, RthTypeTestNull null,
     // Null check
     if (null!=RTTN_NoNullCheck) {
         if (null==RTTN_NullMember) {
-            cs = lil_parse_onto_end(cs, "jc i0!=%0i:ref,null_check_faild;",
+            cs = lil_parse_onto_end(cs, "jc i0!=%0i:ref,null_check_failed;",
                 VM_Global_State::loader_env->managed_null);
             cs = lil_parse_onto_end(cs, (res==RTTR_ReturnOutcome ? "r=1:g4; ret;" : "r=i0; ret;"));
-            cs = lil_parse_onto_end(cs, ":null_check_faild;");
+            cs = lil_parse_onto_end(cs, ":null_check_failed;");
         } else {
             cs = lil_parse_onto_end(cs, "jc i0=%0i:ref,failed;",
                 VM_Global_State::loader_env->managed_null);
@@ -690,9 +690,9 @@ static NativeCodePtr rth_get_lil_get_interface_vtable(int* dyn_count)
 }
 
 ///////////////////////////////////////////////////////////
-// Class Initialise
+// Class Initialize
 
-// Is a class initialised
+// Is a class initialized
 static POINTER_SIZE_INT is_class_initialized(Class *clss)
 {
 #ifdef VM_STATS
@@ -723,7 +723,7 @@ void vm_rt_class_throw_linking_error(Class_Handle ch, unsigned index, unsigned o
 }
 
 
-// Initialise class helper
+// Initialize class helper
 static NativeCodePtr rth_get_lil_initialize_class(int* dyn_count)
 {
     static NativeCodePtr addr = NULL;
@@ -1687,7 +1687,7 @@ static void * rth_resolve(Class_Handle klass, unsigned cp_idx,
     hythread_suspend_disable();
     if (ret == NULL) {
         vm_rt_class_throw_linking_error(klass, cp_idx, opcode);
-        assert(false); // must be unreachanble
+        assert(false); // must be unreachable
     }
     return ret;
 }
@@ -1949,7 +1949,7 @@ NativeCodePtr rth_get_lil_helper(VM_RT_SUPPORT f)
         return rth_get_lil_lushr(dyn_count);
     case VM_RT_LMUL:
 #ifdef VM_LONG_OPT
-    case VM_RT_LMUL_CONST_MULTIPLIER:  // Not optimised, but functional
+    case VM_RT_LMUL_CONST_MULTIPLIER:  // Not optimized, but functional
 #endif
         return rth_get_lil_lmul(dyn_count);
     case VM_RT_LREM:
@@ -1958,9 +1958,9 @@ NativeCodePtr rth_get_lil_helper(VM_RT_SUPPORT f)
         return rth_get_lil_ldiv(dyn_count);
     case VM_RT_ULDIV:
         return rth_get_lil_ludiv(dyn_count);
-    case VM_RT_CONST_LDIV:             // Not optimised, but functional
+    case VM_RT_CONST_LDIV:             // Not optimized, but functional
         return rth_get_lil_ldiv_const(dyn_count);
-    case VM_RT_CONST_LREM:             // Not optimised, but functional
+    case VM_RT_CONST_LREM:             // Not optimized, but functional
         return rth_get_lil_lrem_const(dyn_count);
     case VM_RT_IMUL:
         return rth_get_lil_imul(dyn_count);
@@ -2250,7 +2250,7 @@ static LilCodeStub *gen_lil_throw_ClassCastException(LilCodeStub *cs) {
 
 // appends code that throws a ClassCastException to a LIL stub
 static LilCodeStub *gen_lil_throw_ClassCastException_for_inlining(LilCodeStub *cs) {
-    ABORT("The funclion is depricated, should be never called");
+    ABORT("The function is deprecated, should be never called");
     // if instanceof returns false, throw an exception
     LilCodeStub *cs2 = lil_parse_onto_end
         (cs,

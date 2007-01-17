@@ -243,42 +243,42 @@ jvalue unwrap_primitive(JNIEnv *env, jobject wobj, char sig)
 
     switch (sig) { // Value argument signature
     case 'Z':
-        // Get the fielID of the value field of a Boolean object:
+        // Get the fieldID of the value field of a Boolean object:
         value_id = gid_boolean_value;
         value.z = GetBooleanField (env, wobj, value_id);
         break;
     case 'B':
-        // Get the fielID of the value field of a Byte object:
+        // Get the fieldID of the value field of a Byte object:
         value_id = gid_byte_value;
         value.b = GetByteField (env, wobj, value_id);
         break;  
     case 'C':
-        // Get the fielID of the value field of a Character object:
+        // Get the fieldID of the value field of a Character object:
         value_id = gid_char_value;
         value.c = GetCharField (env, wobj, value_id);
         break;
     case 'S':
-        // Get the fielID of the value field of a Short object:
+        // Get the fieldID of the value field of a Short object:
         value_id = gid_short_value;
         value.s = GetShortField (env, wobj, value_id);
         break;
     case 'I':
-        // Get the fielID of the value field of a Integer object:
+        // Get the fieldID of the value field of a Integer object:
         value_id = gid_int_value;
         value.i = GetIntField (env, wobj, value_id);
         break;
     case 'J':
-        // Get the fielID of the value field of a Long object:
+        // Get the fieldID of the value field of a Long object:
         value_id = gid_long_value;
         value.j = GetLongField (env, wobj, value_id);
         break;  
     case 'F':
-        // Get the fielID of the value field of a Float object:
+        // Get the fieldID of the value field of a Float object:
         value_id = gid_float_value;
         value.f = GetFloatField (env, wobj, value_id);
         break;
     case 'D':
-        // Get the fielID of the value field of a Double object:
+        // Get the fieldID of the value field of a Double object:
         value_id = gid_double_value;
         value.d = GetDoubleField (env, wobj, value_id);
         break;
