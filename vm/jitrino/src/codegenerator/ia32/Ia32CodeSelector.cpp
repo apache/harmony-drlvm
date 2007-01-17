@@ -423,11 +423,11 @@ void CfgCodeSelector::fixNodeInfo()
                     //now fix prev branch successors
                     BranchInst* prevBranch = (BranchInst*)prevInst;
                     assert(prevBranch->getTrueTarget() == NULL && prevBranch->getFalseTarget() == NULL);
-                    prevBranch->setTrueTarget(nextDB);
+                    prevBranch->setTrueTarget(lastInst->getMnemonic() == Mnemonic_JZ? nextFT : nextDB);
                     prevBranch->setFalseTarget(newBB);
               
                     
-                    fg->addEdge(node, nextDB, 0);
+                    fg->addEdge(node, lastInst->getMnemonic() == Mnemonic_JZ? nextFT : nextDB, 0);
                     fg->addEdge(node, newBB, 0);
                     fg->addEdge(newBB, nextDB, 0); 
                     fg->addEdge(newBB, nextFT, 0);

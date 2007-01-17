@@ -727,28 +727,33 @@ public:
                 CompareOp::Types opType = mapToCompareOpType(inst);
                 CompareOp::Operators cmpOp = mapToComparisonOp(inst);
                 CompareOp::Operators cmpOp2 = cmpOp;
-                
+
+                int ifNaNResult = -1;
+                if (cmpOp == CompareOp::Gtu || cmpOp == CompareOp::Geu)
+                    ifNaNResult = 1;
+
+                CG_OpndHandle* cgInst1 = 
+                    instructionCallback.cmp(cmpOp, opType,
+                                            getCGInst(inst->getSrc(0)),
+                                            getCGInst(inst->getSrc(1)), ifNaNResult);
+
                 // second operator has opposite NaN behavior for Floats
                 if ((opType==CompareOp::F) ||
                     (opType==CompareOp::S) ||
                     (opType==CompareOp::D)) {
                     switch (cmpOp) {
-                    case CompareOp::Gt: cmpOp2 = CompareOp::Gtu; break;
-                    case CompareOp::Gtu: cmpOp2 = CompareOp::Gt; break;
-                    case CompareOp::Ge: cmpOp2 = CompareOp::Geu; break;
-                    case CompareOp::Geu: cmpOp2 = CompareOp::Ge; break;
+                    case CompareOp::Gt: cmpOp2 = CompareOp::Gtu; ifNaNResult = 1; break;
+                    case CompareOp::Gtu: cmpOp2 = CompareOp::Gt; ifNaNResult = -1; break;
+                    case CompareOp::Ge: cmpOp2 = CompareOp::Geu; ifNaNResult = 1; break;
+                    case CompareOp::Geu: cmpOp2 = CompareOp::Ge; ifNaNResult = -1; break;
                     default: break;
                     };
                 }
                 
-                CG_OpndHandle* cgInst1 = 
-                    instructionCallback.cmp(cmpOp, opType,
-                                            getCGInst(inst->getSrc(0)),
-                                            getCGInst(inst->getSrc(1)));
                 CG_OpndHandle* cgInst2 = 
-                    instructionCallback.cmp(cmpOp2, opType,
+                    instructionCallback.cmp(cmpOp2, opType, 
                                             getCGInst(inst->getSrc(1)),
-                                            getCGInst(inst->getSrc(0)));
+                                            getCGInst(inst->getSrc(0)), ifNaNResult);
                 cgInst = 
                     instructionCallback.sub(ArithmeticOp::I4,
                                             cgInst1,

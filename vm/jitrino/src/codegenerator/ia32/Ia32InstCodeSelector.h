@@ -101,7 +101,7 @@ public:
     CG_OpndHandle* shr(IntegerOp::Types,CG_OpndHandle* value,CG_OpndHandle* shiftAmount);
     CG_OpndHandle* shru(IntegerOp::Types,CG_OpndHandle* value,CG_OpndHandle* shiftAmount);
     CG_OpndHandle* select(CompareOp::Types,CG_OpndHandle* src1,CG_OpndHandle* src2,CG_OpndHandle* src3);
-    CG_OpndHandle* cmp(CompareOp::Operators,CompareOp::Types,CG_OpndHandle* src1,CG_OpndHandle* src2);
+    CG_OpndHandle* cmp(CompareOp::Operators,CompareOp::Types, CG_OpndHandle* src1,CG_OpndHandle* src2, int ifNaNResult);
     CG_OpndHandle* czero(CompareZeroOp::Types opType,CG_OpndHandle* src);
     CG_OpndHandle* cnzero(CompareZeroOp::Types opType,CG_OpndHandle* src);
     void           branch(CompareOp::Operators,CompareOp::Types,CG_OpndHandle* src1,CG_OpndHandle* src2);

@@ -216,7 +216,7 @@ public:
     virtual CG_OpndHandle*  select(CompareOp::Types,CG_OpndHandle* src1,CG_OpndHandle* src2,
                                    CG_OpndHandle* src3) = 0;
     // BEGIN PRED DEPRECATED
-    virtual CG_OpndHandle*  cmp(CompareOp::Operators,CompareOp::Types,CG_OpndHandle* src1,CG_OpndHandle* src2) = 0;
+    virtual CG_OpndHandle*  cmp(CompareOp::Operators,CompareOp::Types, CG_OpndHandle* src1,CG_OpndHandle* src2,int ifNaNResult=0) = 0;
     virtual CG_OpndHandle*  cmp3(CompareOp::Operators,CompareOp::Types,CG_OpndHandle* src1,CG_OpndHandle* src2) { return 0; };
     virtual CG_OpndHandle*  czero(CompareZeroOp::Types,CG_OpndHandle* src) = 0;
     virtual CG_OpndHandle*  cnzero(CompareZeroOp::Types,CG_OpndHandle* src) = 0;

@@ -138,41 +138,13 @@ float   __stdcall   convI8F4    (uint64 v) {    return (float)(int64)v; }
 
 // FP remainder internal helpers (temp solution to be optimized)
 float   __stdcall   remF4   (float v0, float v1)stdcall__;
-float   __stdcall   remF4   (float v0, float v1)    { 
-    if(_isnan(v0) || _isnan(v1)|| (!_finite(v0)) || (v1==float(0.0))) {
-        return fnan;
-    } else if (!_finite(v1)){
-        return v0;
-    }     
-    float result = v0-float(int64(v0/v1))*v1;
-    if (result == 0 && v1 < 0) {
-#ifdef PLATFORM_POSIX
-        return copysign(result, v1);
-#else
-        return (float)_copysign(result, v1);
-#endif
-    } else {
-        return result;  
-    }
+float   __stdcall   remF4   (float v0, float v1)   { 
+    return fmodf(v0,v1);
 }
 
 double  __stdcall   remF8   (double v0, double v1)stdcall__;
-double  __stdcall   remF8   (double v0, double v1)  {   
-    if(_isnan(v0) || _isnan(v1) || (!_finite(v0)) || (v1==double(0.0))) {
-        return dnan;
-    } else if (!_finite(v1)){
-        return v0;
-    } 
-    double result = v0-double(int64(v0/v1))*v1;
-    if (result == 0 && v1 < 0) {
-#ifdef PLATFORM_POSIX
-        return copysign(result, v1);
-#else
-        return _copysign(result, v1);
-#endif
-    } else {
-        return result;  
-    }
+double  __stdcall   remF8   (double v0, double v1)  {
+    return  fmod(v0,v1);
 } 
 
 void __stdcall initialize_array(uint8* array, uint32 elems_offset, uint8* data, uint32 num_elems) stdcall__;
@@ -1211,7 +1183,7 @@ CG_OpndHandle*  InstCodeSelector::select(CompareOp::Types     opType,
 CG_OpndHandle*  InstCodeSelector::cmp(CompareOp::Operators cmpOp,
                                          CompareOp::Types     opType,
                                          CG_OpndHandle*       src1,
-                                         CG_OpndHandle*       src2) 
+                                         CG_OpndHandle*       src2, int ifNaNResult) 
 {
     Opnd * dst=irManager.newOpnd(typeManager.getInt32Type());
     bool swapped=cmpToEflags(cmpOp, opType, (Opnd*)src1, (Opnd*)src2);
@@ -1220,11 +1192,9 @@ CG_OpndHandle*  InstCodeSelector::cmp(CompareOp::Operators cmpOp,
         cm=swapConditionMnemonic(cm);
     appendInsts(irManager.newCopyPseudoInst(Mnemonic_MOV, dst, irManager.newImmOpnd(typeManager.getInt32Type(), 0)));
     appendInsts(irManager.newInstEx(getMnemonic(Mnemonic_SETcc, cm), 1, dst,dst));
-#ifndef _EM64T_
-    if (((opType==CompareOp::F) ||(opType==CompareOp::S) ||(opType==CompareOp::D)) && ((cmpOp == CompareOp::Geu) || (cmpOp == CompareOp::Gtu))) {
-        appendInsts(irManager.newInstEx(Mnemonic_CMOVP,1,dst,dst,irManager.newImmOpnd(typeManager.getInt32Type(), 0)));
+    if (ifNaNResult == 1 || (ifNaNResult ==0 && ((opType==CompareOp::F) ||(opType==CompareOp::S) ||(opType==CompareOp::D)) && ((cmpOp == CompareOp::Geu) || (cmpOp == CompareOp::Gtu) || (cmpOp == CompareOp::Ne) || (cmpOp == CompareOp::Eq)))) {
+        appendInsts(irManager.newInstEx(Mnemonic_CMOVP,1,dst,dst,irManager.newImmOpnd(typeManager.getInt32Type(), ifNaNResult)));
     }
-#endif
     return dst;
 }
 
@@ -1314,14 +1284,6 @@ bool InstCodeSelector::cmpToEflags(CompareOp::Operators cmpOp, CompareOp::Types 
             Opnd * srcOpnd2=src2?(Opnd*)convert(src2, srcType):irManager.newFPConstantMemOpnd((double)0.0);
 #endif
             appendInsts(irManager.newInst(Mnemonic_UCOMISD, srcOpnd1, srcOpnd2));
-#ifndef _EM64T_
-            if(cmpOp == CompareOp::Eq || cmpOp == CompareOp::Ne) {
-                Opnd * ah = irManager.newOpnd(typeManager.getInt32Type());
-                appendInsts(irManager.newInst(Mnemonic_LAHF,ah));
-                Opnd * dst = (Opnd *)and_(IntegerOp::I4, ah, irManager.newImmOpnd(typeManager.getInt32Type(),UNORD_FLAGS_MASK));
-                appendInsts(irManager.newInst(Mnemonic_CMP, dst, irManager.newImmOpnd(typeManager.getInt32Type(),ZF)));
-            }
-#endif
             break;
         }
         case CompareOp::S:
@@ -1335,14 +1297,6 @@ bool InstCodeSelector::cmpToEflags(CompareOp::Operators cmpOp, CompareOp::Types 
             Opnd * srcOpnd2=src2?(Opnd*)convert(src2, srcType):irManager.newFPConstantMemOpnd((float)0.0);
 #endif
             appendInsts(irManager.newInst(Mnemonic_UCOMISS, srcOpnd1, srcOpnd2));
-#ifndef _EM64T_
-            if(cmpOp == CompareOp::Eq || cmpOp == CompareOp::Ne) {
-                Opnd * ah = irManager.newOpnd(typeManager.getInt32Type());
-                appendInsts(irManager.newInst(Mnemonic_LAHF,ah));
-                Opnd * dst = (Opnd *)and_(IntegerOp::I4, ah, irManager.newImmOpnd(typeManager.getInt32Type(),UNORD_FLAGS_MASK));
-                appendInsts(irManager.newInst(Mnemonic_CMP, dst, irManager.newImmOpnd(typeManager.getInt32Type(),ZF)));
-            }
-#endif
             break;
         }
         default:
@@ -1361,12 +1315,10 @@ void InstCodeSelector::branch(CompareOp::Operators cmpOp,
 {
     bool swapped=cmpToEflags(cmpOp, opType, (Opnd*)src1, (Opnd*)src2);
     ConditionMnemonic cm=getConditionMnemonicFromCompareOperator(cmpOp, opType);
-#ifndef _EM64T_
-    if (((opType==CompareOp::F) ||(opType==CompareOp::S) ||(opType==CompareOp::D)) && ((cmpOp == CompareOp::Geu) || (cmpOp == CompareOp::Gtu))) {
+    if (((opType==CompareOp::F) ||(opType==CompareOp::S) ||(opType==CompareOp::D)) && ((cmpOp == CompareOp::Geu) || (cmpOp == CompareOp::Gtu)|| (cmpOp == CompareOp::Ne) || (cmpOp == CompareOp::Eq))) {
         //! branch true&false edges & new block for this branch will be added in CodeSelector::fixNodeInfo
         appendInsts(irManager.newBranchInst(Mnemonic_JP, NULL, NULL)); 
     }
-#endif
     //! branch true&false edges are added during genTrue|FalseEdge
     appendInsts(irManager.newBranchInst(getMnemonic(Mnemonic_Jcc, swapped?swapConditionMnemonic(cm):cm), NULL, NULL));
 }
