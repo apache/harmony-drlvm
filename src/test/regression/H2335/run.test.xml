@@ -1,0 +1,13 @@
+<project name="RUN HARMONY-2335 Regression Test">
+  <target name="run-test">
+    <!-- extend JUnit test launcher to run JNI test -->
+    <run-junit-test 
+      test="org.apache.harmony.drlvm.tests.regression.h2335.SimplestLibraryPathTest">
+        <junit-element>
+          <!-- All test is here - one need to set java.library.path variable -->
+          <!-- to any directory (but not '.' or dir with java executable     -->
+          <sysproperty key="java.library.path" value="non-existing-directory"/>
+        </junit-element>
+      </run-junit-test>
+  </target>
+</project>

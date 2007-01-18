@@ -214,6 +214,12 @@ static void init_java_properties(Properties & properties)
     properties.set("sun.boot.library.path", base_path_buf);
 
     /*
+     * This property is used by java/lang/Runtime#loadLibrary0
+     * as path to system native libraries.
+     */
+    properties.set("vm.boot.library.path", base_path_buf);
+
+    /*
     *  it's possible someone forgot to set this property - set to default of .
     */
     if (!properties.is_set(O_A_H_VM_VMDIR)) {
@@ -240,15 +246,6 @@ static void init_vm_properties(Properties & properties)
         properties.set("vm.use_verifier", "true");
         properties.set("vm.jvmti.enabled", "false");
         properties.set("vm.bootclasspath.appendclasspath", "false");
-
-        /*
-        *  vm.boot.library.path initialization, the value is the location of VM executable
-        * 
-        *  2006-09-06 gmj :  there's no reason to ever believe this is true given how the VM can be 
-        *  launched in a mariad of ways, so just set to empty string.
-        */
-        properties.set("vm.boot.library.path", "");
-
         properties.set("vm.dlls", PORT_DSO_NAME(GC_DLL));
 
         int n_api_dll_files = sizeof(api_dll_files) / sizeof(char *);
