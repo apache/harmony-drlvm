@@ -74,7 +74,7 @@ int wrapper_proc(void *arg) {
     jthread java_thread;
     wrapper_proc_data *data = (wrapper_proc_data *)arg;
     
-    // Assocciation should be already done.
+    // Association should be already done.
     native_thread = hythread_self();
     jvmti_thread = hythread_get_private_data(native_thread);
     assert(jvmti_thread);
@@ -153,7 +153,7 @@ IDATA jthread_create_with_function(JNIEnv * jni_env, jthread java_thread, jthrea
         return TM_ERROR_OUT_OF_MEMORY;
     }
     
-    // Prepare argumets for wrapper proc
+    // Prepare arguments for wrapper proc
     status = (*jni_env) -> GetJavaVM(jni_env, &data->java_vm);
     if (status != JNI_OK) return TM_ERROR_INTERNAL;
 
@@ -181,9 +181,9 @@ IDATA jthread_create_with_function(JNIEnv * jni_env, jthread java_thread, jthrea
  * and associate it with the current native thread. Nothing happens
  * if this thread is already attached.
  *
- * @param[in] jni_env JNI environment for cuurent thread
+ * @param[in] jni_env JNI environment for current thread
  * @param[in] java_thread j.l.Thread instance to associate with current thread
- * @param[in] daemon JNI_TRUE if attaching thread is a daemon thread, JNI_FALSE overwise
+ * @param[in] daemon JNI_TRUE if attaching thread is a daemon thread, JNI_FALSE otherwise
  * @sa JNI::AttachCurrentThread ()
  */
 IDATA jthread_attach(JNIEnv * jni_env, jthread java_thread, jboolean daemon) {

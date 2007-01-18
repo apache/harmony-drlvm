@@ -277,7 +277,7 @@ void VMCALL hythread_detach(hythread_t thread) {
         thread = hythread_self();
     }
     
-    // Acquire global TM lock to prevent concurrent acccess to thread list
+    // Acquire global TM lock to prevent concurrent access to thread list
     status = hythread_global_lock(NULL);
     assert (status == TM_ERROR_NONE);
 
@@ -549,7 +549,7 @@ void VMCALL hythread_cancel(hythread_t thread) {
  * Terminates all running threads in the given group.
  * 
  * @param[in] group thread group
- * @see hythread_cancell
+ * @see hythread_cancel
  */
 IDATA VMCALL hythread_cancel_all(hythread_group_t group) {
     hythread_iterator_t iter;
@@ -565,7 +565,7 @@ IDATA VMCALL hythread_cancel_all(hythread_group_t group) {
         if(next != self) {
             hythread_cancel(next);
             //since this method being used at shutdown it does not
-            //males any sence to exit on error, but continue terminating threads
+            //make any sense to exit on error, but continue terminating threads
         }       
     }
 
@@ -596,7 +596,7 @@ static IDATA register_to_group(hythread_t thread, hythread_group_t group) {
     assert(thread);
     assert(group);
     
-    // Acquire global TM lock to prevent concurrent acccess to thread list
+    // Acquire global TM lock to prevent concurrent access to thread list
     status = hythread_global_lock(NULL);
     if (status != TM_ERROR_NONE) return status;
 

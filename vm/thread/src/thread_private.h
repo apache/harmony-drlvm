@@ -109,14 +109,14 @@ __forceinline hythread_t tmn_self_macro() {
 /**
   * get_local_pool() function return apr pool associated with the current thread.
   * the memory could be allocated without lock using this pool
-  * dealocation should be done in the same thread, otherwise 
+  * deallocation should be done in the same thread, otherwise 
   * local_pool_cleanup_register() should be called
   */
  apr_pool_t* get_local_pool();
  
 /**
-  * local_pool_cleanup_register() synchroniously register the cleanup function.
-  * It shold be called to request cleaunp in thread local pool, from other thread
+  * local_pool_cleanup_register() synchronously register the cleanup function.
+  * It should be called to request cleanup in thread local pool, from other thread
   * Usage scenario:
   * IDATA hymutex_destroy (tm_mutex_t *mutex) {
   *        apr_pool_t *pool = apr_thread_mutex_pool_get ((apr_thread_mutex_t*)mutex);
@@ -173,7 +173,7 @@ typedef struct HyThread {
 #endif
 
     /**
-     * Each thread keeps a pointer to the libary it belongs to.
+     * Each thread keeps a pointer to the library it belongs to.
      */
     HyThreadLibrary * library;
 
@@ -390,7 +390,7 @@ typedef struct JVMTIThread {
      apr_pool_t *pool;
 
      /**
-      * weak reference to corresponding java.lang.Thread instace
+      * weak reference to corresponding java.lang.Thread instance
       */
      jobject thread_ref;
 
@@ -427,7 +427,7 @@ typedef struct HyThreadGroup {
     int threads_count;
 
     /**
-     * Group index or key for search perposes
+     * Group index or key for search purposes
      */
     int group_index;
     
@@ -597,7 +597,7 @@ void throw_interrupted_exception(void);
 hythread_group_t  get_java_thread_group(void);
 
 /**
- * Thread cancelation, being used at VM shutdown through
+ * Thread cancellation, being used at VM shutdown through
  * tmj_cancel_all_threads() method call to terminate all java 
  * threads at shutdown.
  */

@@ -46,7 +46,7 @@ public class ThreadHelper {
                                            
         if ((new_lockword & HI_BITS) == 0){
            // comparison above is some kind of tricky, two things are checked at once; 
-           // if we got zero it meants that there is NO fat lock here, and thread_id stored in lockword
+           // if we got zero it means that there is NO fat lock here, and thread_id stored in lockword
            // is the same as current thread_id
 
            if ( new_lockword <= RECURSION_BOUND_IN_PLACE ) { 
@@ -59,7 +59,7 @@ public class ThreadHelper {
                return ;
             }
         } else {
-            // avaliable possiblities here:
+            // available possibilities here:
             // 1. fat lock - 0x80000000 is set to 1      ; need goto slow path
             // 2. captured thin lock for another thread  ; need goto slow path
             // 3. reserved lock for another thread.      ; need goto slow path

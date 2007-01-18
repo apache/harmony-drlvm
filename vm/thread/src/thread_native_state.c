@@ -99,7 +99,7 @@ int VMCALL hythread_is_terminated(hythread_t thread) { return thread->state & TM
 int VMCALL hythread_is_waiting(hythread_t thread) { return thread->state & TM_THREAD_STATE_WAITING ;  };
 
 /**
- * Returns non-zero if thread is waiting indefinitly.
+ * Returns non-zero if thread is waiting indefinitely.
  *
  * @param[in] thread those attribute is read
  */

@@ -137,7 +137,7 @@ suspended:
 /**
  * Denotes a single point where safe suspension is possible.
  *
- * If there was a suspension request set for this thread, this method notifes
+ * If there was a suspension request set for this thread, this method notifies
  * the requesting thread and then blocks until someone calls the tmn_resume() 
  * for this thread.
  * <p>
@@ -165,7 +165,7 @@ static void thread_safe_point_impl(hythread_t thread) {
                 thread->safepoint_callback = NULL;
                 
                 // since set callback suspended the thread
-                // resore its original state
+                // restore its original state
                 hythread_resume(tm_self_tls);
                 callback_func();
             }
@@ -173,7 +173,7 @@ static void thread_safe_point_impl(hythread_t thread) {
             thread->suspend_disable_count = 0;
             
             apr_memory_rw_barrier();
-            // code for Ipf that support StackIterator and immmediate suspend
+            // code for Ipf that support StackIterator and immediate suspend
             // notify suspender
             //  hylatch_count_down(thread->safe_region_event);
 
@@ -200,7 +200,7 @@ static void send_suspend_request(hythread_t thread) {
         return;
     }               
                 
-     //we realy need to suspend thread.
+     //we really need to suspend thread.
 
      hysem_set(thread->resume_event, 0);
                 
@@ -208,11 +208,11 @@ static void send_suspend_request(hythread_t thread) {
 
      apr_thread_yield_other(thread->os_handle);
 
-     TRACE(("TM: suspend requiest sent: %p request count: %d",thread , thread->suspend_request));
+     TRACE(("TM: suspend request sent: %p request count: %d",thread , thread->suspend_request));
 }
 
 
-// the second part of suspention
+// the second part of suspension
 // blocked in case was selfsuspended.
 static IDATA wait_safe_region_event(hythread_t thread) {
     assert(thread->suspend_request >= 1);
@@ -366,7 +366,7 @@ IDATA hythread_set_safepoint_callback(hythread_t thread, tm_thread_event_callbac
  * Returns safepoint callback function.
  * 
  * @param[in] t thread where callback needs to be executed
- * @return callback function currently instralled, or NULL if there was none
+ * @return callback function currently installed, or NULL if there was none
  */
 hythread_event_callback_proc VMCALL hythread_get_safepoint_callback(hythread_t t) {
     return t->safepoint_callback;
@@ -378,7 +378,7 @@ hythread_event_callback_proc VMCALL hythread_get_safepoint_callback(hythread_t t
  * This method sets a suspend request for the every thread in the group 
  * and then returns the iterator that can be used to traverse through the suspended threads.
  * Each invocation of the tmn_iterator_next() method on the iterator will return the next 
- * suspeneded thread.
+ * suspended thread.
  *
  * @param[out] t iterator 
  * @param[in] group thread group to be suspended
@@ -404,7 +404,7 @@ IDATA VMCALL hythread_suspend_all(hythread_iterator_t *t, hythread_group_t group
                 }       
         }
         hythread_iterator_reset(&iter);
-        // all threads should be stoped in safepoints or be in safe region.
+        // all threads should be stopped in safepoints or be in safe region.
         TRACE(("TM: wait suspend responses"));
         while((next = hythread_iterator_next(&iter)) != NULL) {
                 if(next != self) {

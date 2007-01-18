@@ -86,7 +86,7 @@ IDATA VMCALL jthread_unpark(jthread java_thread) {
  * Parks the current thread until the specified deadline
  *
  * Stops the current thread from executing until it is unparked, interrupted,
- * or until the specified dealine.
+ * or until the specified deadline.
  * Unlike wait or sleep, the interrupted flag is NOT cleared by this API.
  *
  * @param[in] millis absolute time in milliseconds to wait until

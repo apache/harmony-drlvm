@@ -44,7 +44,7 @@ static void tls_finalizer_placeholder(void *args) {}
  * 
  * Create and return a new, unique key for thread local storage.  
  * 
- * @note The hande returned will be >=0, so it is safe to test the handle against 0 to see if it's been
+ * @note The handle returned will be >=0, so it is safe to test the handle against 0 to see if it's been
  * allocated yet.
  * 
  * @param[out] handle pointer to a key to be initialized with a key value
@@ -61,7 +61,7 @@ IDATA VMCALL hythread_tls_alloc(hythread_tls_key_t *handle) {
  * 
  * Create and return a new, unique key for thread local storage.  
  * 
- * @note The hande returned will be >=0, so it is safe to test the handle against 0 to see if it's been
+ * @note The handle returned will be >=0, so it is safe to test the handle against 0 to see if it's been
  * allocated yet.
  * 
  * @param[out] handle pointer to a key to be initialized with a key value

@@ -75,7 +75,7 @@ IDATA sem_wait_impl(hysem_t sem, I_64 ms, IDATA nano, IDATA interruptable) {
 
         if (nano || ms) break;
         }
-    //should we check here if timeout is not supposet to happen
+    //should we check here if timeout is not supposed to happen
         if(sem->count==0 /*&& (ms || nano)*/)
         {
                 if (ms || nano) {
@@ -169,7 +169,7 @@ IDATA VMCALL hysem_post(hysem_t sem) {
 }
 
 /**
- * Resets current semaphore count to the specifed numbers.
+ * Resets current semaphore count to the specified numbers.
  *
  * @param[in] count new semaphore count
  * @param[in] sem semaphore

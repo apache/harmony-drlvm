@@ -153,7 +153,7 @@ IDATA VMCALL hylatch_set(hylatch_t latch, IDATA count) {
 /**
  * Decreases the count for latch.
  *
- * If the count reaches zero, all threads awating on the latch are unblocked.
+ * If the count reaches zero, all threads awaiting on the latch are unblocked.
  * @param[in] latch the latch 
  * @sa java.util.concurrent.CountDownLatch.countDown()
  */

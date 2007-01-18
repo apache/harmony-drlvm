@@ -35,7 +35,7 @@
  * resume the thread and cause it to return from the blocking function with
  * HYTHREAD_INTERRUPTED.
  * 
- * @param[in] thread a thead to be interrupted
+ * @param[in] thread a thread to be interrupted
  * @return none
  */
 void VMCALL hythread_interrupt(hythread_t thread) {
@@ -65,7 +65,7 @@ void VMCALL hythread_interrupt(hythread_t thread) {
  *  Returns interrupted status and clear interrupted flag.
  *
  * @param[in] thread where to clear interrupt flag
- * @returns TM_ERROR_INTERRUPT if thread was interruped, TM_ERROR_NONE otherwise
+ * @returns TM_ERROR_INTERRUPT if thread was interrupted, TM_ERROR_NONE otherwise
  */
 UDATA VMCALL hythread_clear_interrupted_other(hythread_t thread) {
     int interrupted;

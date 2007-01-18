@@ -44,7 +44,7 @@ void set_wait_monitor(jobject monitor);
  *  Implementation may use the knowledge of internal object layout in order to allocate lock
  *  and conditional variable in the most efficient manner.
  *
- *  @param[in] monitor object where monitor needs to be initilalized.
+ *  @param[in] monitor object where monitor needs to be initialized.
  */
 IDATA VMCALL jthread_monitor_init(jobject monitor) {        
     
@@ -114,7 +114,7 @@ IDATA VMCALL jthread_monitor_enter(jobject monitor) {
     }
     
     // busy wait and inflate
-    // reload poiter after safepoints
+    // reload pointer after safepoints
     
     lockword = vm_object_get_lockword_addr(monitor);
     while ((status = hythread_thin_monitor_try_enter(lockword)) == TM_ERROR_EBUSY) {
@@ -279,7 +279,7 @@ IDATA VMCALL jthread_monitor_wait(jobject monitor) {
  * and VM chooses this thread to wake up;
  * <LI>another thread invokes <code>thread_notifyAll(object);</code>
  * <LI>another thread invokes <code>thread_interrupt(thread);</code>
- * <LI>real time elapsed from the wating begin is
+ * <LI>real time elapsed from the waiting begin is
  * greater or equal the timeout specified.
  * </UL>
  *

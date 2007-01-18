@@ -22,7 +22,7 @@
 
 /**
  * @file thread_native_attrs.c
- * @brief Hythread priority related finctions
+ * @brief Hythread priority related functions
  */
 
 #include <open/hythread_ext.h>

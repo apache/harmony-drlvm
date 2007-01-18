@@ -22,7 +22,7 @@
 
 /**
  * @file thread_init.c
- * @brief hythread init/shutdown finctions
+ * @brief hythread init/shutdown functions
  */
 
 #undef LOG_DOMAIN
@@ -79,7 +79,7 @@ void hythread_library_init(void) {
  * Creates and initializes a threading library.
  *
  * @param[out] lib pointer to the created thread library
- * @return The thead library's initStatus will be set to 0 on success or 
+ * @return The thread library's initStatus will be set to 0 on success or 
  * a negative value on failure.
  * 
  * @see hythread_attach, hythread_shutdown
@@ -127,7 +127,7 @@ void VMCALL hythread_lib_destroy(hythread_library_t lib) {
  * hythread_attach before accessing any thread library functions. 
  * 
  * @param[in] lib pointer to the thread library to be initialized (non-NULL)
- * @return The thead library's initStatus will be set to 0 on success or 
+ * @return The thread library's initStatus will be set to 0 on success or 
  * a negative value on failure.
  * 
  * @see hythread_attach, hythread_shutdown
@@ -202,7 +202,7 @@ void VMCALL hythread_shutdown() {
 }
 
 /**
- * Acquires global lock of the library assocciated with the current thread.
+ * Acquires global lock of the library associated with the current thread.
  *
  * @param[in] self current thread
  */
@@ -215,7 +215,7 @@ void VMCALL hythread_lib_lock(hythread_t self) {
 }
 
 /**
- * Releases global lock of the library assocciated with the current thread.
+ * Releases global lock of the library associated with the current thread.
  *
  * @param[in] self current thread
  */
@@ -327,7 +327,7 @@ int find_entry (char* name) {
     return -1;
 }
 //add entry to the end of the array
-// retrun new entry index,  -1 if failed.
+// return new entry index,  -1 if failed.
 int add_entry(char* name) {
     int index = size++;
     if(index >= TABLE_SIZE-1) {
