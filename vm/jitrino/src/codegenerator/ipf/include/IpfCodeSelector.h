@@ -276,6 +276,7 @@ public:
     CG_OpndHandle *callhelper(uint32, CG_OpndHandle**, Type*, JitHelperCallOp::Id) { NOT_IMPLEMENTED_C("callhelper") }
     CG_OpndHandle *tau_callvirt(uint32, CG_OpndHandle**, Type*, MethodDesc*, CG_OpndHandle*, CG_OpndHandle*, InlineInfo* ii = NULL)  { NOT_IMPLEMENTED_C("tau_callvirt") }
     CG_OpndHandle *select(CompareOp::Types, CG_OpndHandle*, CG_OpndHandle*, CG_OpndHandle*) { NOT_IMPLEMENTED_C("select") }
+    CG_OpndHandle *cmp(CompareOp::Operators,CompareOp::Types, CG_OpndHandle* src1,CG_OpndHandle* src2,int ifNaNResult=0) { NOT_IMPLEMENTED_C("cmp") }
     CG_OpndHandle *cmp3(CompareOp::Operators,CompareOp::Types, CG_OpndHandle*, CG_OpndHandle*) { NOT_IMPLEMENTED_C("cmp3") }
     CG_OpndHandle *pred_cmp(CompareOp::Operators,CompareOp::Types, CG_OpndHandle*, CG_OpndHandle*) { NOT_IMPLEMENTED_C("pred_cmp") }
     CG_OpndHandle *tau_optimisticBalancedMonitorEnter(CG_OpndHandle*, CG_OpndHandle*, CG_OpndHandle*) { NOT_IMPLEMENTED_C("tau_optimisticBalancedMonitorEnter") }
