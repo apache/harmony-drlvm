@@ -36,10 +36,12 @@
  * <li> Support JVMTI
  * </ul>
  * The middle layer does the following (see hythread.h, hythread_ext.h): 
+ * <ul>
  * <li> Provides API for native threading
  * <li> Wrapping 223shield224 on top of porting layer
  * <li> Provides support for safe suspension and interrupt
  * <li> Additional functionality that missed in porting layer
+ * </ul>
  * <p> 
  * 
  * <h2>Interaction</h2>

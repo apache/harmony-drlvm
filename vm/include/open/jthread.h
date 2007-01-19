@@ -23,7 +23,7 @@
 #define _OPEN_THREAD_GENERIC_H
 
 /**
- * @file jthread_.h
+ * @file
  * @brief Java threading interface
  * @details
  * Java threading interface - contains functions to work with Java threads. 

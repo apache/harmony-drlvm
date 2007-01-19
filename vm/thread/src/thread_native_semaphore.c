@@ -95,7 +95,7 @@ IDATA sem_wait_impl(hysem_t sem, I_64 ms, IDATA nano, IDATA interruptable) {
 /**
  * Wait on a semaphore.
  *
- * @param[in] s semaphore to be waited on
+ * @param[in] sem semaphore to be waited on
  * @return  0 on success or negative value on failure
  *
  * @deprecated Semaphores are no longer supported.
@@ -139,7 +139,7 @@ IDATA VMCALL hysem_wait_interruptable(hysem_t sem, I_64 ms, IDATA nano) {
 /**
  * Release a semaphore by 1.
  *
- * @param[in] s semaphore to be released by 1
+ * @param[in] sem semaphore to be released by 1
  * @return  0 on success or negative value on failure
  *
  * @deprecated Semaphores are no longer supported.
@@ -221,7 +221,7 @@ IDATA VMCALL hysem_getvalue(IDATA *count, hysem_t sem) {
  *
  * Returns the resources associated with a semaphore back to the Hy threading library.
  *
- * @param[in] s semaphore to be destroyed
+ * @param[in] sem semaphore to be destroyed
  * @return  0 on success or negative value on failure
  *
  * @deprecated Semaphores are no longer supported.
