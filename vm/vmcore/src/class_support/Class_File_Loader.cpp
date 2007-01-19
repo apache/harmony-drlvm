@@ -48,12 +48,7 @@
 
 //
 // TODO list:
-//  (1) Make macro valid_cpi function static bool, add ClassFormatError reporting to valid_cpi,
-//  replace functions is_valid_index and is_<tag> by valid_cpi.
-//  (2) Funtion parse_annotation_value doesn't report ClassFormatError in case
-//  const_inx is invalid.        
-//  (3) Implement field and method name check for 45 and lower versions of class file.
-
+//  (1) Implement field and method name check for 45 and lower versions of class file.
 //    
 
 #define REPORT_FAILED_CLASS_FORMAT(klass, msg)   \
@@ -63,32 +58,67 @@
     klass->get_class_loader()->ReportFailedClass(klass, "java/lang/ClassFormatError", ss);              \
     }
 
-#define valid_cpi(clss, idx, type) \
-    (clss->get_constant_pool().is_valid_index(idx) \
-    && clss->get_constant_pool().get_tag(idx) == type)
 
-static String* cp_check_utf8(ConstantPool& cp, unsigned utf8_index)
-{
-    if(!cp.is_valid_index(utf8_index) || !cp.is_utf8(utf8_index)) {
-        return NULL;
+static const char* get_tag_name(ConstPoolTags type) {
+    const char* name = "(Unknown tag)";
+    switch(type) {
+        case CONSTANT_Utf8:
+            name = "CONSTANT_Utf8";
+        break;
+        case CONSTANT_Integer:
+            name = "CONSTANT_Integer";
+            break;
+        case CONSTANT_Float:
+            name = "CONSTANT_Float";
+            break;
+        case CONSTANT_Long:
+            name = "CONSTANT_Long";
+            break;
+        case CONSTANT_Double:
+            name = "CONSTANT_Double";
+            break;
+        case CONSTANT_Class:
+            name = "CONSTANT_Class";
+            break;
+        case CONSTANT_String:
+            name = "CONSTANT_String";
+            break;
+        case CONSTANT_Fieldref:
+            name = "CONSTANT_Fieldref";
+            break;
+        case CONSTANT_Methodref:
+            name = "CONSTANT_Methodref";
+            break;
+        case CONSTANT_InterfaceMethodref:
+            name = "CONSTANT_InterfaceMethodref";
+            break;
+        case CONSTANT_NameAndType:
+            name = "CONSTANT_NameAndType";
+            break;
+        case CONSTANT_UnusedEntry:
+            name = "CONSTANT_UnusedEntry";
+            break;
     }
-    return cp.get_utf8_string(utf8_index);
-} // cp_check_utf8
+    return name;
+}
 
-
-
-static String* cp_check_class(ConstantPool& cp, unsigned class_index)
-{
-    //See specification 4.2 about valid index and 4.5.1 about tag value
-    if(!cp.is_valid_index(class_index) || !cp.is_class(class_index)) {
-
-#ifdef _DEBUG
-        WARN("cp_check_class: illegal const pool class index" << class_index);
-#endif
-        return NULL;
+static bool valid_cpi(Class* clss, uint16 idx, ConstPoolTags type, const char* msg) {
+    if(!clss->get_constant_pool().is_valid_index(idx)) {
+        //report error message about wrong index
+        REPORT_FAILED_CLASS_FORMAT(clss, "invalid constant pool index: "
+            << idx << " " << msg);
+        return false;
     }
-    return cp.get_utf8_string(cp.get_class_name_index(class_index));
-} //cp_check_class
+    if(clss->get_constant_pool().get_tag(idx) != type) {
+        //report error message about wrong tag
+        REPORT_FAILED_CLASS_FORMAT(clss, "invalid constant pool tag "
+            "(expected " << get_tag_name(type) << " got " 
+            << get_tag_name((ConstPoolTags)clss->get_constant_pool().get_tag(idx)) << ") "
+            << msg);
+        return false;
+    }
+    return true;
+}
 
 #define N_FIELD_ATTR    6
 #define N_METHOD_ATTR   10
@@ -224,10 +254,10 @@ String* parse_signature_attr(ByteReader &cfs,
             "cannot parse Signature index");
         return NULL;
     }
-    String* sig = cp_check_utf8(clss->get_constant_pool(), idx);
-    if(!sig) {
-        REPORT_FAILED_CLASS_FORMAT(clss, "invalid Signature index : " << idx);
-    }
+    if(!valid_cpi(clss, idx, CONSTANT_Utf8, "for signature at Signature attribute"))
+        return NULL;
+    String* sig = clss->get_constant_pool().get_utf8_string(idx);
+
     return sig;
 }
 
@@ -256,13 +286,9 @@ Attributes parse_attribute(Class *clss,
             "parse attribute:cannot parse attribute length");
         return ATTR_ERROR;
     }
-    String* attr_name = cp_check_utf8(cp, attr_name_index);
-    if (attr_name == NULL)
-    {
-        REPORT_FAILED_CLASS_FORMAT(clss,
-            "parse_attribute: illegal const pool attr_name_index");
+    if(!valid_cpi(clss, attr_name_index, CONSTANT_Utf8, "for attribute name"))
         return ATTR_ERROR;
-    }
+    String* attr_name = cp.get_utf8_string(attr_name_index);
     for (unsigned i=0; attr_strings[i] != NULL; i++) {
         if (attr_strings[i] == attr_name)
             return attrs[i];
@@ -291,12 +317,9 @@ uint32 parse_annotation(Annotation** value, ByteReader& cfs, Class* clss)
             "cannot parse type index of annotation");
         return 0;
     }
-    String* type = cp_check_utf8(clss->get_constant_pool(), type_idx);
-    if (type == NULL) {
-        REPORT_FAILED_CLASS_FORMAT(clss,
-            "invalid type index of annotation : " << type_idx);
+    if(!valid_cpi(clss, type_idx, CONSTANT_Utf8, "for annotation type"))
         return 0;
-    }
+    String* type = clss->get_constant_pool().get_utf8_string(type_idx);
 
     uint16 num_elements;
     if (!cfs.parse_u2_be(&num_elements)) {
@@ -322,12 +345,9 @@ uint32 parse_annotation(Annotation** value, ByteReader& cfs, Class* clss)
                 "cannot parse element_name_index of annotation element");
             return 0;
         }
-        antn->elements[j].name = cp_check_utf8(clss->get_constant_pool(), name_idx);
-        if (antn->elements[j].name == NULL) {
-            REPORT_FAILED_CLASS_FORMAT(clss,
-                "invalid element_name_index of annotation : " << name_idx);
+        if(!valid_cpi(clss, name_idx, CONSTANT_Utf8, "for annotation element name"))
             return 0;
-        }
+        antn->elements[j].name = clss->get_constant_pool().get_utf8_string(name_idx);
 
         uint32 size = parse_annotation_value(antn->elements[j].value, cfs, clss);
         if (size == 0) {
@@ -372,45 +392,43 @@ uint32 parse_annotation_value(AnnotationValue& value, ByteReader& cfs, Class* cl
                     "cannot parse const index of annotation value");
                 return 0;
             }
+            read_len += 2;
+
             switch (ctag) {
             case AVT_BOOLEAN:
             case AVT_BYTE:
             case AVT_SHORT:
             case AVT_CHAR:
             case AVT_INT:
-                if (valid_cpi(clss, const_idx, CONSTANT_Integer)) {
-                    value.const_value.i = cp.get_int(const_idx);
-                    break;
-                }
+                if (!valid_cpi(clss, const_idx, CONSTANT_Integer, "of const_value for annotation element value"))
+                    return 0;
+                value.const_value.i = cp.get_int(const_idx);
+                break;
             case AVT_FLOAT:
-                if (valid_cpi(clss, const_idx, CONSTANT_Float)) {
-                    value.const_value.f = cp.get_float(const_idx);
-                    break;
-                }
+                if (!valid_cpi(clss, const_idx, CONSTANT_Float, "of const_value for annotation element value"))
+                    return 0;
+                value.const_value.f = cp.get_float(const_idx);
+                break;
             case AVT_LONG:
-                if (valid_cpi(clss, const_idx, CONSTANT_Long)) {
-                    value.const_value.l.lo_bytes = cp.get_8byte_low_word(const_idx);
-                    value.const_value.l.hi_bytes = cp.get_8byte_high_word(const_idx);
-                    break;
-                }
+                if (!valid_cpi(clss, const_idx, CONSTANT_Long, "of const_value for annotation element value"))
+                    return 0;
+                value.const_value.l.lo_bytes = cp.get_8byte_low_word(const_idx);
+                value.const_value.l.hi_bytes = cp.get_8byte_high_word(const_idx);
+                break;
             case AVT_DOUBLE:
-                if (valid_cpi(clss, const_idx, CONSTANT_Double)) {
-                    value.const_value.l.lo_bytes = cp.get_8byte_low_word(const_idx);
-                    value.const_value.l.hi_bytes = cp.get_8byte_high_word(const_idx);
-                    break;
-                }
+                if (!valid_cpi(clss, const_idx, CONSTANT_Double, "of const_value for annotation element value"))
+                    return 0;
+                value.const_value.l.lo_bytes = cp.get_8byte_low_word(const_idx);
+                value.const_value.l.hi_bytes = cp.get_8byte_high_word(const_idx);
+                break;
             case AVT_STRING:
-                if (valid_cpi(clss, const_idx, CONSTANT_Utf8)) {
-                    value.const_value.string = cp.get_utf8_string(const_idx);
-                    break;
-                }
+                if (!valid_cpi(clss, const_idx, CONSTANT_Utf8, "of const_value for annotation element value"))
+                    return 0;
+                value.const_value.string = cp.get_utf8_string(const_idx);
+                break;
             default:
-                REPORT_FAILED_CLASS_FORMAT(clss,
-                    "invalid const index " << const_idx
-                    << " of annotation value of type " <<ctag);
-                return 0;
+                DIE("Annotation parsing internal error");
             }
-            read_len += 2;
         }
         break;
 
@@ -422,12 +440,9 @@ uint32 parse_annotation_value(AnnotationValue& value, ByteReader& cfs, Class* cl
                     "cannot parse class_info_index of annotation value");
                 return 0;
             }
-            value.class_name = cp_check_utf8(cp, class_idx);
-            if (value.class_name == NULL) {
-                REPORT_FAILED_CLASS_FORMAT(clss,
-                    "invalid class_info_index of annotation value: " << class_idx);
+            if(!valid_cpi(clss, class_idx, CONSTANT_Utf8, " of class for annotation element value"))
                 return 0;
-            }
+            value.class_name = cp.get_utf8_string(class_idx);
             read_len += 2;
         }
         break;
@@ -440,24 +455,18 @@ uint32 parse_annotation_value(AnnotationValue& value, ByteReader& cfs, Class* cl
                     "cannot parse type_name_index of annotation enum value");
                 return 0;
             }
-            value.enum_const.type = cp_check_utf8(cp, type_idx);
-            if (value.enum_const.type == NULL) {
-                REPORT_FAILED_CLASS_FORMAT(clss,
-                    "invalid type_name_index of annotation enum value: " << type_idx);
+            if(!valid_cpi(clss, type_idx, CONSTANT_Utf8, "of type_name for annotation enum element value"))
                 return 0;
-            }
+            value.enum_const.type = cp.get_utf8_string(type_idx);
             uint16 name_idx;
             if (!cfs.parse_u2_be(&name_idx)) {
                 REPORT_FAILED_CLASS_FORMAT(clss,
                     "cannot parse const_name_index of annotation enum value");
                 return 0;
             }
-            value.enum_const.name = cp_check_utf8(cp, name_idx);
-            if (value.enum_const.name == NULL) {
-                REPORT_FAILED_CLASS_FORMAT(clss,
-                    "invalid const_name_index of annotation enum value: " << name_idx);
+            if(!valid_cpi(clss, name_idx, CONSTANT_Utf8, "of const_name for annotation enum element value"))
                 return 0;
-            }
+            value.enum_const.name = cp.get_utf8_string(name_idx);
             read_len += 4;
         }
         break;
@@ -499,7 +508,7 @@ uint32 parse_annotation_value(AnnotationValue& value, ByteReader& cfs, Class* cl
 
     default:
         REPORT_FAILED_CLASS_FORMAT(clss,
-            "unrecognized annotation value tag : " << ctag);
+            "unrecognized annotation value tag : " << (ctag < 128) ? ctag : (int)ctag);
         return 0;
     }
 
@@ -591,16 +600,14 @@ bool Class_Member::parse(Class* clss, ByteReader &cfs)
     // utf8 string const pool entries.
     // See specification 4.6 about name_index and desctiptor_index.
     //
-    String* name = cp_check_utf8(cp, name_index);
-    String* descriptor = cp_check_utf8(cp, descriptor_index);
-    if (name == NULL || descriptor == NULL) {
-        REPORT_FAILED_CLASS_FORMAT(clss,
-            "some of member name or descriptor indexes is not CONSTANT_Utf8 entry : "
-            << name_index << " or " << descriptor_index);
+    if(!valid_cpi(clss, name_index, CONSTANT_Utf8, "for member name"))
         return false;
-    }
-    _name = name;
-    _descriptor = descriptor;
+
+    if(!valid_cpi(clss, descriptor_index, CONSTANT_Utf8, "for member descriptor"))
+        return false;
+
+    _name = cp.get_utf8_string(name_index);
+    _descriptor = cp.get_utf8_string(descriptor_index);
     return true;
 } //Class_Member::parse
 
@@ -624,7 +631,7 @@ check_field_name(const char *name, unsigned len, bool old_version)
 }
 
 static inline bool
-check_method_name(const char *name, unsigned len, bool version)
+check_method_name(const char *name, unsigned len, bool old_version)
 {
     for (unsigned i = 0; i < len; i++) {
         switch(name[i]){
@@ -757,7 +764,7 @@ bool Field::parse(Global_Env& env, Class *clss, ByteReader &cfs )
         || is_protected() && is_private()
         || is_public() && is_private())
         || (is_final() && is_volatile())) {
-        REPORT_FAILED_CLASS_FORMAT(clss, " field " << get_name()->bytes
+        REPORT_FAILED_CLASS_FORMAT(clss, "field " << get_name()->bytes
             << " has invalid combination of access flags: "
             << "0x" << std::hex << _access_flags);
         return false;
@@ -1026,10 +1033,6 @@ bool Field::parse(Global_Env& env, Class *clss, ByteReader &cfs )
 
     TypeDesc* td = type_desc_create_from_java_descriptor(get_descriptor()->bytes, clss->get_class_loader());
     if( td == NULL ) {
-        // ppervov: the fact we don't have td indicates we could not allocate one
-        //std::stringstream ss;
-        //ss << clss->get_name()->bytes << ": could not create type descriptor for field " << get_name();
-        //jthrowable exn = exn_create("java/lang/OutOfMemoryError", ss.str().c_str());
         exn_raise_object(VM_Global_State::loader_env->java_lang_OutOfMemoryError);
         return false;
     }
@@ -1039,50 +1042,93 @@ bool Field::parse(Global_Env& env, Class *clss, ByteReader &cfs )
 } //Field::parse
 
 
-bool Handler::parse(ConstantPool& cp, unsigned code_length,
-                    ByteReader& cfs)
+bool Handler::parse(Class* clss, unsigned code_length,
+                    ByteReader& cfs, Method* method)
 {
     //See specification 4.8.3 about exception_table
     uint16 start = 0;
-    if(!cfs.parse_u2_be(&start))
+    if(!cfs.parse_u2_be(&start)) {
+        REPORT_FAILED_CLASS_CLASS(clss->get_class_loader(), clss, "java/lang/ClassFormatError",
+            clss->get_name()->bytes << ": could not parse start_pc"
+            << " for exception handler of code attribute for method "
+            << method->get_name()->bytes << method->get_descriptor()->bytes);
         return false;
-
+    }
+    
     _start_pc = (unsigned) start;
 
-    if (_start_pc >= code_length)
+    if (_start_pc >= code_length){
+        REPORT_FAILED_CLASS_CLASS(clss->get_class_loader(), clss, "java/lang/ClassFormatError",
+            clss->get_name()->bytes << ": illegal start_pc"
+            << " for exception handler of code attribute for method "
+            << method->get_name()->bytes << method->get_descriptor()->bytes);            
         return false;
+    }
 
     uint16 end;
-    if (!cfs.parse_u2_be(&end))
+    if (!cfs.parse_u2_be(&end)){
+        REPORT_FAILED_CLASS_CLASS(clss->get_class_loader(), clss, "java/lang/ClassFormatError",
+            clss->get_name()->bytes << ": could not parse end_pc"
+            << " for exception handler of code attribute for method "
+            << method->get_name()->bytes << method->get_descriptor()->bytes);
         return false;
+    }
+ 
     _end_pc = (unsigned) end;
 
-    if (_end_pc > code_length)
+    if (_end_pc > code_length){
+        REPORT_FAILED_CLASS_CLASS(clss->get_class_loader(), clss, "java/lang/ClassFormatError",
+            clss->get_name()->bytes << ": illegal end_pc"
+            << " for exception handler of code attribute for method "
+            << method->get_name()->bytes << method->get_descriptor()->bytes);
         return false;
+    }
 
-    if (_start_pc >= _end_pc)
+    if (_start_pc >= _end_pc){
+        REPORT_FAILED_CLASS_CLASS(clss->get_class_loader(), clss, "java/lang/ClassFormatError",
+            clss->get_name()->bytes << ": start_pc is not less than end_pc"
+            << " for exception handler of code attribute for method "
+            << method->get_name()->bytes << method->get_descriptor()->bytes);
         return false;
+    }
 
     uint16 handler;
-    if (!cfs.parse_u2_be(&handler))
+    if (!cfs.parse_u2_be(&handler)){
+        REPORT_FAILED_CLASS_CLASS(clss->get_class_loader(), clss, "java/lang/ClassFormatError",
+            clss->get_name()->bytes << ": could not parse handler_pc"
+            << " for exception handler of code attribute for method "
+            << method->get_name()->bytes << method->get_descriptor()->bytes);
         return false;
+    }
     _handler_pc = (unsigned) handler;
 
-    if (_handler_pc >= code_length)
-        return false;
+    if (_handler_pc >= code_length){
+        REPORT_FAILED_CLASS_CLASS(clss->get_class_loader(), clss, "java/lang/ClassFormatError",
+            clss->get_name()->bytes << ": illegal handler_pc"
+            << " for exception handler of code attribute for method "
+            << method->get_name()->bytes << method->get_descriptor()->bytes);
+    }
 
     uint16 catch_index;
-    if (!cfs.parse_u2_be(&catch_index))
+    if (!cfs.parse_u2_be(&catch_index)){
+        REPORT_FAILED_CLASS_CLASS(clss->get_class_loader(), clss, "java/lang/ClassFormatError",
+            clss->get_name()->bytes << ": could not parse catch_type"
+            << " for exception handler of code attribute for method "
+            << method->get_name()->bytes << method->get_descriptor()->bytes);
         return false;
+    }
 
     _catch_type_index = catch_index;
 
     if (catch_index == 0) {
         _catch_type = NULL;
     } else {
-        _catch_type = cp_check_class(cp, catch_index);
-        if (_catch_type == NULL)
+        if(!valid_cpi(clss, catch_index, CONSTANT_Class, "for exception handler class of code attribute"))
             return false;
+        ConstantPool& cp = clss->get_constant_pool();
+        if(!valid_cpi(clss, cp.get_class_name_index(catch_index), CONSTANT_Utf8, "for exception handler class name of code attribute"))
+            return false;
+        _catch_type = cp.get_utf8_string(cp.get_class_name_index(catch_index));
     }
     return true;
 } //Handler::parse
@@ -1144,15 +1190,11 @@ bool Method::_parse_exceptions(ConstantPool& cp, unsigned attr_len,
         }
 
         //See specification 4.8.4 about exception_index_table[].
-        _exceptions[i] = cp_check_class(cp, index);
-        if (_exceptions[i] == NULL) {
-            REPORT_FAILED_CLASS_CLASS(_class->get_class_loader(), _class, "java/lang/ClassFormatError",
-                _class->get_name()->bytes << ": exception class index "
-                << index << "is not a valid CONSTANT_class entry "
-                << "while parsing excpetions for method "
-                << _name->bytes << _descriptor->bytes);
+        if(!valid_cpi(_class, index, CONSTANT_Class, "of exception_table entry for Exception attrubute"))
             return false;
-        }
+        if(!valid_cpi(_class, cp.get_class_name_index(index), CONSTANT_Utf8, "of exception_table entry for Exception attrubute"))
+            return false;
+        _exceptions[i] = cp.get_utf8_string(cp.get_class_name_index(index));
     }
     if (attr_len != _n_exceptions * sizeof(uint16) + sizeof(_n_exceptions) ) {
         REPORT_FAILED_CLASS_CLASS(_class->get_class_loader(), _class, "java/lang/ClassFormatError",
@@ -1257,14 +1299,10 @@ bool Method::_parse_local_vars(Local_Var_Table* table, LocalVarOffset *offset_li
                 "in " << attr_name << " attribute");
             return false;
         }
-
-        String* name = cp_check_utf8(cp, name_index);
-        if(name == NULL) {
-            REPORT_FAILED_METHOD("name index is not valid CONSTANT_Utf8 entry "
-                "in " << attr_name << " attribute");
+        
+        if(!valid_cpi(_class, name_index, CONSTANT_Utf8, "for name of CONSTANT_Utf8 entry"))
             return false;
-        }
-
+        String* name = cp.get_utf8_string(name_index);
         if(!check_field_name(name->bytes, name->len,
                 _class->get_version() < JAVA5_CLASS_FILE_VERSION))
         {
@@ -1272,12 +1310,9 @@ bool Method::_parse_local_vars(Local_Var_Table* table, LocalVarOffset *offset_li
                 " in " << attr_name << " attribute is not stored as unqualified name");
             return false;
         }
-        String* descriptor = cp_check_utf8(cp, descriptor_index);
-        if(descriptor == NULL) {
-            REPORT_FAILED_METHOD("descriptor index is not valid CONSTANT_Utf8 entry "
-                "in " << attr_name << " attribute");
+        if(!valid_cpi(_class, descriptor_index, CONSTANT_Utf8, "for descriptor of CONSTANT_Utf8 entry"))
             return false;
-        }
+        String* descriptor = cp.get_utf8_string(descriptor_index);
 
         if(attribute == ATTR_LocalVariableTable)
         {
@@ -1426,10 +1461,7 @@ bool Method::_parse_code(ConstantPool& cp, unsigned code_attr_len,
     // ppervov: FIXME: should throw OOME
 
     for (i=0; i<_n_handlers; i++) {
-        if(!_handlers[i].parse(cp, _byte_code_length, cfs)) {
-            REPORT_FAILED_CLASS_CLASS(_class->get_class_loader(), _class, "java/lang/ClassFormatError",
-                _class->get_name()->bytes << ": could not parse exceptions for method "
-                << _name->bytes << _descriptor->bytes);
+        if(!_handlers[i].parse(_class, _byte_code_length, cfs, this)) {
             return false;
         }
     }
@@ -1756,8 +1788,8 @@ bool Method::parse(Global_Env& env, Class* clss,
                 REPORT_FAILED_CLASS_CLASS(_class->get_class_loader(), _class, "java/lang/ClassFormatError",
                     _class->get_name()->bytes << "." << _name->bytes << _descriptor->bytes
                     << ": interface method must have both access flags "
-                    "ACC_ABSTRACT and ACC_PUBLIC set"
-                    );
+                    "ACC_ABSTRACT and ACC_PUBLIC set "
+                    << "0x" << std::hex << _access_flags);
                 return false;
             }
             if(_access_flags & ~(ACC_ABSTRACT | ACC_PUBLIC | ACC_VARARGS
@@ -1781,7 +1813,7 @@ bool Method::parse(Global_Env& env, Class* clss,
             {
                 //See specification 4.7 Methods about access_flags
                 REPORT_FAILED_CLASS_CLASS(_class->get_class_loader(), _class, "java/lang/ClassFormatError",
-                    _class->get_name()->bytes << "Method "
+                    _class->get_name()->bytes << " Method "
                     << _name->bytes << _descriptor->bytes 
                     << " has invalid combination of access flags "
                     << "0x" << std::hex << _access_flags);
@@ -2246,6 +2278,8 @@ bool Class::parse_methods(Global_Env* env, ByteReader &cfs)
 static inline bool
 check_class_name(const char *name, unsigned len)
 {
+    if(len == 0)
+        return false;
     unsigned id_len = 0;
     const char* iterator = name;
     if(name[0] == '[')
@@ -2253,18 +2287,15 @@ check_class_name(const char *name, unsigned len)
         const char *next = name + 1;
         if(!check_field_descriptor(name, &next, false) || *next != '\0') {
             return false;
-        }else {
+        } else {
             return true;
         }
-    }
-    else
-    {
-        for( unsigned i = 0; i < len ; i++, iterator++ )
+    } else {
+        for(unsigned i = 0; i < len ; i++, iterator++)
         {
-            if( *iterator != '/' ) {
+            if(*iterator != '/') {
                 id_len++;
-            }else
-            {
+            } else {
                 if(!check_field_name(name, id_len, false))
                     return false;
                 id_len = 0;
@@ -2272,33 +2303,64 @@ check_class_name(const char *name, unsigned len)
                 name++;
             }
         }
-    return check_field_name(name, id_len, false);
+        return check_field_name(name, id_len, false);
     }
     return false; //unreacheable code
 }
 
+
+
 static String* class_file_parse_utf8data(String_Pool& string_pool, ByteReader& cfs,
                                          uint16 len)
 {
+    // See specification 4.5.7 about CONSTANT_Utf8 string format.
     // buffer ends before len
     if(!cfs.have(len))
         return NULL;
-
+    //define bytes of UTF8
+    const uint8 HIGH_NONZERO_BIT =          0x80; // 10000000
+    const uint8 HIGH_TWO_NONZERO_BITS =     0xc0; // 11000000
+    const uint8 HIGH_THREE_NONZERO_BITS =   0xe0; // 11100000
+    const uint8 HIGH_FOUR_NONZERO_BITS =    0xf0; // 11110000
+    
     // get utf8 bytes and move buffer pointer
     uint8* utf8data = (uint8*)cfs.get_and_skip(len);
 
     // FIXME: decode 6-byte Java 1.5 encoding
-
+    
+    uint16 read_len = 0;
     // check utf8 correctness
-    int i;
-    for(i = 0; i < len && utf8data[i] != 0x00 && utf8data[i] < 0xf0; i++);
-    if(i < len)
-        return NULL;
-
+    for(int i = 0; i < len; i++) {
+        if((utf8data[i] & HIGH_NONZERO_BIT) == 0x00)
+        {
+            if(utf8data[i] == 0x00)
+                return NULL;
+            read_len++;
+        } else if((utf8data[i] & HIGH_THREE_NONZERO_BITS) == HIGH_TWO_NONZERO_BITS) {
+            read_len += 2;
+            if(read_len > len)
+                return NULL;
+            i++;
+            if((utf8data[i] & HIGH_TWO_NONZERO_BITS) != HIGH_NONZERO_BIT)
+                return NULL;
+        } else if((utf8data[i] & HIGH_FOUR_NONZERO_BITS) == HIGH_THREE_NONZERO_BITS) {
+            read_len += 3;
+            if(read_len > len)
+                return NULL;
+            i++;
+            if(((utf8data[i] & HIGH_TWO_NONZERO_BITS) != HIGH_NONZERO_BIT))
+                return NULL;
+            i++;
+            if(((utf8data[i] & HIGH_TWO_NONZERO_BITS) != HIGH_NONZERO_BIT))
+                return NULL;
+        }
+        else {
+            return NULL;
+        }
+    }
     // then lookup on utf8 bytes and return string
     return string_pool.lookup((const char*)utf8data, len);
 }
-
 
 static String* class_file_parse_utf8(String_Pool& string_pool,
                                      ByteReader& cfs)
@@ -2430,7 +2492,7 @@ bool ConstantPool::parse(Class* clss,
                     String* str = class_file_parse_utf8(string_pool, cfs);
                     if(!str) {
                         REPORT_FAILED_CLASS_CLASS(clss->get_class_loader(), clss, "java/lang/ClassFormatError",
-                            clss->get_name()->bytes << ": could not parse CONTANT_Utf8 entry");
+                            clss->get_name()->bytes << ": could not parse CONSTANT_Utf8 entry");
                         return false;
                     }
                     m_entries[i].CONSTANT_Utf8.string = str;
@@ -2454,16 +2516,15 @@ bool ConstantPool::check(Global_Env* env, Class* clss)
         case CONSTANT_Class:
         {
             unsigned name_index = get_class_name_index(i);
-            if (!is_valid_index(name_index) || !is_utf8(name_index)) {
+            if (!valid_cpi(clss, name_index, CONSTANT_Utf8, "for class name at CONSTANT_Class entry")) {
                 // illegal name index
-                REPORT_FAILED_CLASS_CLASS(clss->get_class_loader(), clss, "java/lang/ClassFormatError",
-                    clss->get_name()->bytes << ": wrong name index for CONSTANT_Class entry");
                 return false;
             }
-            if(!check_class_name(get_utf8_string(name_index)->bytes, get_utf8_string(name_index)->len))
+            if(env->verify_all && !check_class_name(get_utf8_string(name_index)->bytes, get_utf8_string(name_index)->len))
             {
                 REPORT_FAILED_CLASS_CLASS(clss->get_class_loader(), clss, "java/lang/ClassFormatError",
-                    clss->get_name()->bytes << ": illegal CONSTANT_Class name "<< get_utf8_string(name_index)->bytes);
+                    clss->get_name()->bytes << ": illegal CONSTANT_Class name "
+                    << "\"" << get_utf8_string(name_index)->bytes << "\"");
                 return false;
             }
             break;
@@ -2479,24 +2540,16 @@ bool ConstantPool::check(Global_Env* env, Class* clss)
             String *descriptor;
             unsigned name_index = get_name_and_type_name_index(name_type_index);
             unsigned descriptor_index = get_name_and_type_descriptor_index(name_type_index);
-            if (!is_valid_index(class_index) || !is_class(class_index)) {
-                REPORT_FAILED_CLASS_CLASS(clss->get_class_loader(), clss, "java/lang/ClassFormatError",
-                    clss->get_name()->bytes << ": wrong class index for CONSTANT_*ref entry");
+            if (!valid_cpi(clss, class_index, CONSTANT_Class, "for class name at CONSTANT_*ref entry")) {
                 return false;
             }
-            if (!is_valid_index(name_type_index) || !is_name_and_type(name_type_index)) {
-                REPORT_FAILED_CLASS_CLASS(clss->get_class_loader(), clss, "java/lang/ClassFormatError",
-                    clss->get_name()->bytes << ": wrong name-and-type index for CONSTANT_*ref entry");
+            if (!valid_cpi(clss, name_type_index, CONSTANT_NameAndType, "for name-and-type at CONSTANT_*ref entry")) {
                 return false;
             }
-            if(!is_valid_index(name_index) || !is_utf8(name_index)) {
-                REPORT_FAILED_CLASS_CLASS(clss->get_class_loader(), clss, "java/lang/ClassFormatError",
-                    clss->get_name()->bytes << ": wrong name index for CONSTANT_Methodref entry");
+            if(!valid_cpi(clss, name_index, CONSTANT_Utf8, "for name at CONSTANT_*ref entry")) {
                 return false;
             }
-            if (!is_valid_index(descriptor_index) || !is_utf8(descriptor_index)) {
-                REPORT_FAILED_CLASS_CLASS(clss->get_class_loader(), clss, "java/lang/ClassFormatError",
-                    clss->get_name()->bytes << ": wrong descriptor index for CONSTANT_Methodref entry");
+            if (!valid_cpi(clss, descriptor_index, CONSTANT_Utf8, "for descriptor at CONSTANT_*ref entry")) {
                 return false;
             }
 
@@ -2579,10 +2632,8 @@ bool ConstantPool::check(Global_Env* env, Class* clss)
         case CONSTANT_String:
         {
             unsigned string_index = get_string_index(i);
-            if (!is_valid_index(string_index) || !is_utf8(string_index)) {
+            if (!valid_cpi(clss, string_index, CONSTANT_Utf8, "for string at CONSTANT_String entry")) {
                 // illegal string index
-                REPORT_FAILED_CLASS_CLASS(clss->get_class_loader(), clss, "java/lang/ClassFormatError",
-                    clss->get_name()->bytes << ": wrong string index for CONSTANT_String entry");
                 return false;
             }
             // set entry to the actual string
@@ -2609,15 +2660,11 @@ bool ConstantPool::check(Global_Env* env, Class* clss)
             //See specification 4.5.6
             unsigned name_index = get_name_and_type_name_index(i);
             unsigned descriptor_index = get_name_and_type_descriptor_index(i);
-            if(!is_valid_index(name_index) || !is_utf8(name_index)) {
-                REPORT_FAILED_CLASS_CLASS(clss->get_class_loader(), clss, "java/lang/ClassFormatError",
-                    clss->get_name()->bytes << ": wrong name index for CONSTANT_NameAndType entry");
+            if(!valid_cpi(clss, name_index , CONSTANT_Utf8, "for name at CONSTANT_NameAndType entry")) {
                 return false;
             }
 
-            if (!is_valid_index(descriptor_index) || !is_utf8(descriptor_index)) {
-                REPORT_FAILED_CLASS_CLASS(clss->get_class_loader(), clss, "java/lang/ClassFormatError",
-                    clss->get_name()->bytes << ": wrong descriptor index for CONSTANT_NameAndType entry");
+            if (!valid_cpi(clss, descriptor_index, CONSTANT_Utf8, "for descriptor at CONSTANT_NameAndType entry")) {
                 return false;
             }
 
@@ -2658,14 +2705,11 @@ bool Class::parse_interfaces(ByteReader &cfs)
         //
         //Verify that interface index is valid and entry in constant pool is of type CONSTANT_Class
         //See specification 4.2 about interfaces.
-        m_superinterfaces[i].name = cp_check_class(m_const_pool, interface_index);
-        if(m_superinterfaces[i].name == NULL) {
-            REPORT_FAILED_CLASS_CLASS(m_class_loader, this, "java/lang/ClassFormatError",
-                get_name()->bytes << ": constant pool index "
-                << i << " is not CONSTANT_Class entry"
-                " while parsing superinterfaces");
+        if(!valid_cpi(this, interface_index, CONSTANT_Class, "for superinterface"))
             return false;
-        }
+        if(!valid_cpi(this, m_const_pool.get_class_name_index(interface_index), CONSTANT_Utf8, "for superinterface name"))
+            return false;
+        m_superinterfaces[i].name = m_const_pool.get_utf8_string(m_const_pool.get_class_name_index(interface_index));
         m_superinterfaces[i].cp_index = interface_index;
     }
     return true;
@@ -2836,13 +2880,11 @@ bool Class::parse(Global_Env* env,
     }
 
     //See specification 4.2 about this_class.
-    String * class_name = cp_check_class(m_const_pool, this_class);
-    if (class_name == NULL) {
-        REPORT_FAILED_CLASS_CLASS(m_class_loader, this, "java/lang/ClassFormatError",
-            m_name->bytes << ": this_class constant pool entry "
-            << this_class << " is an illegal CONSTANT_Class entry");
+    if(!valid_cpi(this, this_class, CONSTANT_Class, "for this class"))
         return false;
-    }
+    if(!valid_cpi(this, m_const_pool.get_class_name_index(this_class), CONSTANT_Utf8, "for this class name"))
+        return false;
+    String * class_name = m_const_pool.get_utf8_string(m_const_pool.get_class_name_index(this_class));
 
     /*
      * When defineClass from byte stream, there are cases that clss->name is null,
@@ -2888,13 +2930,11 @@ bool Class::parse(Global_Env* env,
         }
         m_super_class.name = NULL;
     } else {
-        m_super_class.name = cp_check_class(m_const_pool, super_class);
-        if (m_super_class.name == NULL) {
-            REPORT_FAILED_CLASS_CLASS(m_class_loader, this, "java/lang/ClassFormatError",
-                m_name->bytes << ": super_class constant pool entry "
-                << super_class << " is an illegal CONSTANT_Class entry");
+        if(!valid_cpi(this, super_class, CONSTANT_Class, "for super class"))
             return false;
-        }
+        if(!valid_cpi(this, m_const_pool.get_class_name_index(super_class), CONSTANT_Utf8, "for super class name"))
+            return false;
+        m_super_class.name = m_const_pool.get_utf8_string(m_const_pool.get_class_name_index(super_class));
         if(is_interface() && m_super_class.name != env->JavaLangObject_String){
             REPORT_FAILED_CLASS_CLASS(m_class_loader, this, "java/lang/ClassFormatError",
                 m_name->bytes << ": the super class of interface is "
@@ -2964,14 +3004,11 @@ bool Class::parse(Global_Env* env,
                     << " while parsing SourceFile attribute");
                 return false;
             }
-
-            m_src_file_name = cp_check_utf8(m_const_pool, filename_index);
-            if(m_src_file_name == NULL) {
-                REPORT_FAILED_CLASS_CLASS(m_class_loader, this, "java/lang/ClassFormatError",
-                    m_name->bytes << ": filename index points to incorrect constant pool entry"
-                    << " while parsing SourceFile attribute");
+            
+            if(!valid_cpi(this, filename_index, CONSTANT_Utf8, "for source file name at SourceFile attribute")) {
                 return false;
             }
+            m_src_file_name = m_const_pool.get_utf8_string(filename_index);
             break;
         }
 
@@ -3020,16 +3057,16 @@ bool Class::parse(Global_Env* env,
                     return false;
                 }
                 if(inner_clss_info_idx
-                    && !valid_cpi(this, inner_clss_info_idx, CONSTANT_Class))
+                    && !valid_cpi(this, inner_clss_info_idx, CONSTANT_Class, "for inner class at InnerClasses attribute"))
                 {
-                    REPORT_FAILED_CLASS_CLASS(m_class_loader, this, "java/lang/ClassFormatError",
-                        m_name->bytes << ": inner class info index points to incorrect constant pool entry"
-                        << " while parsing InnerClasses attribute");
                     return false;
                 }
 
                 if(!found_myself){
-                    String* clssname = cp_check_class(m_const_pool, inner_clss_info_idx);
+                    if(!valid_cpi(this,m_const_pool.get_class_name_index(inner_clss_info_idx),
+                            CONSTANT_Utf8, "for inner class name at InnerClasses attribute"))
+                        return false;
+                    String* clssname = m_const_pool.get_utf8_string(m_const_pool.get_class_name_index(inner_clss_info_idx));
                     // Only handle this class
                     if(m_name == clssname)
                         found_myself = 1;
@@ -3045,11 +3082,8 @@ bool Class::parse(Global_Env* env,
                     return false;
                 }
                 if(outer_clss_info_idx
-                    && !valid_cpi(this, outer_clss_info_idx, CONSTANT_Class))
+                    && !valid_cpi(this, outer_clss_info_idx, CONSTANT_Class, "for outer class at InnerClasses attribute"))
                 {
-                    REPORT_FAILED_CLASS_CLASS(m_class_loader, this, "java/lang/ClassFormatError",
-                        m_name->bytes << ": outer class info index points to incorrect constant pool entry"
-                        << outer_clss_info_idx << " while parsing InnerClasses attribute");
                     return false;
                 }
                 if(found_myself == 1 && outer_clss_info_idx){
@@ -3063,10 +3097,9 @@ bool Class::parse(Global_Env* env,
                         << " while parsing InnerClasses attribute");
                     return false;
                 }
-                if(inner_name_idx && !valid_cpi(this, inner_name_idx, CONSTANT_Utf8))
+                if(inner_name_idx && !valid_cpi(this, inner_name_idx, CONSTANT_Utf8,
+                        "for inner name of InnerClass attribute"))
                 {
-                    REPORT_FAILED_CLASS_FORMAT(this,
-                        "inner name index points to incorrect constant pool entry");
                     return false;
                 }
                 if(found_myself == 1){
@@ -3137,10 +3170,9 @@ bool Class::parse(Global_Env* env,
                         "could not parse class index of EnclosingMethod attribute");
                     return false;
                 }
-                if(!valid_cpi(this, class_idx, CONSTANT_Class))
+                if(!valid_cpi(this, class_idx, CONSTANT_Class,
+                        "for EnclosingMethod attribute"))
                 {
-                    REPORT_FAILED_CLASS_FORMAT(this,
-                        "incorrect class index of EnclosingMethod attribute");
                     return false;
                 }
                 m_enclosing_class_index = class_idx;
@@ -3151,10 +3183,9 @@ bool Class::parse(Global_Env* env,
                         "could not parse method index of EnclosingMethod attribute");
                     return false;
                 }
-                if(method_idx && !valid_cpi(this, method_idx, CONSTANT_NameAndType))
+                if(method_idx && !valid_cpi(this, method_idx, CONSTANT_NameAndType,
+                        "for EnclosingMethod attribute"))
                 {
-                    REPORT_FAILED_CLASS_FORMAT(this,
-                        "incorrect method index of EnclosingMethod attribute");
                     return false;
                 }
                 m_enclosing_method_index = method_idx;

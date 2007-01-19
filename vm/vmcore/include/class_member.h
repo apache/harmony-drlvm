@@ -285,7 +285,7 @@ private:
 class Handler {
 public:
     Handler();
-    bool parse(ConstantPool& cp, unsigned code_length, ByteReader &cfs);
+    bool parse(Class* clss, unsigned code_length, ByteReader &cfs, Method* method);
     uint32 get_start_pc() {return _start_pc;}
     uint32 get_end_pc() {return _end_pc;}
     uint32 get_handler_pc() {return _handler_pc;}
