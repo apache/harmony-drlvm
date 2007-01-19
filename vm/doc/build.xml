@@ -47,7 +47,9 @@
                  doxygen.thread,
                  doxygen.vmcore,
                  doxygen.vmi,
-                 doxygen.vmstart" />
+                 doxygen.vmstart,
+                 doxygen.tests,
+                 doxygen.drlvm" />
 
     <target name="clean" 
         description="Clean all documentation directories." 
@@ -62,9 +64,20 @@
                  clean.thread,
                  clean.vmcore,
                  clean.vmi,
-                 clean.vmstart" />
+                 clean.vmstart,
+                 clean.tests,
+                 clean.drlvm" />
 
     <!-- Process bundles -->
+    <target name="doxygen.drlvm" depends="init"
+        description="Build all drlvm source documentation.">
+        <generate-bundle bundle="drlvm" />
+    </target>
+
+    <target name="clean.drlvm">
+        <delete dir="${doc.dir}/drlvm${doc.suffix}" />
+    </target>
+
     <target name="doxygen.intf" depends="init"
         description="Build inter-component interface documentation.">
         <generate-bundle bundle="intf" />
@@ -173,6 +186,15 @@
         <delete dir="${doc.dir}/vmstart${doc.suffix}" />
     </target>
 
+    <target name="doxygen.tests" depends="init"
+        description="Build DRLVM tests documentation.">
+        <generate-bundle bundle="tests" />
+    </target>
+
+    <target name="clean.tests">
+        <delete dir="${doc.dir}/tests${doc.suffix}" />
+    </target>
+
     <!-- Initialize -->
     <target name="init" depends="svn.prop" />
 
@@ -223,4 +245,5 @@
     </macrodef>
 
 </project>
+
 
