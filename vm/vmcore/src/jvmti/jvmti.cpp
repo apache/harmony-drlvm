@@ -491,7 +491,7 @@ static void generate_platform_lib_name(apr_pool_t* pool, JavaVM_Internal *vm,
                                        const char *lib_name,
                                        char **p_path1, char **p_path2)
 {
-    char *vm_libs = vm->vm_env->VmProperties()->get("vm.boot.library.path");
+    char *vm_libs = vm->vm_env->JavaProperties()->get("vm.boot.library.path");
     assert(vm_libs);
     char *path1 = apr_pstrdup(pool, vm_libs);
     char *path2 = port_dso_name_decorate(lib_name, pool);

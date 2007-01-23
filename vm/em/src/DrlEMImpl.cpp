@@ -182,7 +182,7 @@ void DrlEMImpl::deallocateResources() {
  *  deprecated
  */
 std::string buildDefaultLibPath(const std::string& dll_name) {
-    char* c_string_tmp_value = get_property("vm.boot.library.path", VM_PROPERTIES);
+    char* c_string_tmp_value = get_property("vm.boot.library.path", JAVA_PROPERTIES);
     std::string library_path = c_string_tmp_value == NULL ? "" : c_string_tmp_value;
     destroy_property_value(c_string_tmp_value);
 #ifdef PLATFORM_NT
