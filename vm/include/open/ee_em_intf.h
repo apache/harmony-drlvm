@@ -1,23 +1,20 @@
 /*
- *  Licensed to the Apache Software Foundation (ASF) under one or more
- *  contributor license agreements.  See the NOTICE file distributed with
- *  this work for additional information regarding copyright ownership.
- *  The ASF licenses this file to You under the Apache License, Version 2.0
- *  (the "License"); you may not use this file except in compliance with
- *  the License.  You may obtain a copy of the License at
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
  *
- *     http://www.apache.org/licenses/LICENSE-2.0
+ *    http://www.apache.org/licenses/LICENSE-2.0
  *
- *  Unless required by applicable law or agreed to in writing, software
- *  distributed under the License is distributed on an "AS IS" BASIS,
- *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- *  See the License for the specific language governing permissions and
- *  limitations under the License.
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
-/** 
- * @author Mikhail Y. Fursov
- * @version $Revision: 1.1.2.1.4.4 $
- */  
+  
 #ifndef _EE_EM_H_
 #define _EE_EM_H_
 
@@ -44,9 +41,9 @@ extern "C" {
    * The given method is called only once per JIT instance.
    * 
    * @param[in] jit   - the run-time JIT handle used at run-time to refer to 
-   *                the given JIT instance
+   *                    the given JIT instance
    * @param[in] name  - the persistent JIT name that the compiler uses to separate 
-   *                its configuration settings from the ones of other JITs 
+   *                    its configuration settings from the ones of other JITs 
    */
 JITEXPORT void JIT_init(JIT_Handle jit, const char* name);
 
@@ -77,7 +74,7 @@ JITEXPORT void JIT_deinit(JIT_Handle jit);
    */
 JITEXPORT void JIT_set_profile_access_interface(JIT_Handle jit, EM_Handle em, struct EM_ProfileAccessInterface* pc_interface);
  
-  /**  
+  /**
    * Requests JIT to enable profiling of the specified type.
    *
    * EM uses the given method to request JIT to enable profile 
@@ -86,19 +83,18 @@ JITEXPORT void JIT_set_profile_access_interface(JIT_Handle jit, EM_Handle em, st
    * by the <code>role</code> parameter.
    * The profile type and the profile collector are defined by the profile 
    * collector handle.
-
    *
    * @param[in] jit  - the JIT instance 
    * @param[in] pc   - the handle of the profile collector instance
    * @param[in] role - the role of JIT in profiling defining whether to collect 
-   *               or to use the profile
+   *                   or to use the profile
    *
    * @return  <code>TRUE</code> if JIT does profiling of the <code>pc</code> type 
-   *          according the <code>role</code> parameter, <code>FALSE</code> if profiling is not 
-   *          supported.
+   *          according to the <code>role</code> parameter; <code>FALSE</code> if 
+   *          profiling is not supported.
    *
    * @note The given method is optional. A JIT compiler without profiling
-   *        support does not need this method. 
+   *       support does not need this method. 
    */
 JITEXPORT bool JIT_enable_profiling(JIT_Handle jit, PC_Handle pc, EM_JIT_PC_Role role);
 
@@ -108,4 +104,5 @@ JITEXPORT bool JIT_enable_profiling(JIT_Handle jit, PC_Handle pc, EM_JIT_PC_Role
 
 
 #endif
+
 

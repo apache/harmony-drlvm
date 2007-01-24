@@ -56,16 +56,21 @@ Vector_Handle vm_rt_new_vector(Class *vector_class, int length);
 Vector_Handle vm_rt_new_vector_using_vtable_and_thread_pointer(
         int length, Allocation_Handle vector_handle, void *tp);
 
-// creates a LIL code stub for checkcast or instanceof
-// can be used by both IA32 and IPF code
+/** 
+ * Creates a LIL code stub for checkcast or instance of
+ * can be used by both IA32 and IPF code
+ */
 LilCodeStub *gen_lil_typecheck_stub(bool is_checkcast);
-
-// creates a SPECIALIZED LIL code stub for checkcast or instanceof
-// it assumes that the class is suitable for fast instanceof checks.
-// The result is a different fast stub for every class.
-// will_inline should be set to TRUE if this stub will be inlined
-// in a JIT, and false if it will be passed to a code generator
-// (this is due to the slightly different treatment of exceptions)
+ 
+/**
+ * Creates a <code>SPECIALIZED LIL</code> code stub for checkcast or instance of
+ * it assumes that the class is suitable for fast instanceof checks.
+ *
+ * @return Different fast stub for every class. <code>will_inline</code>
+ *         is set to <code>TRUE</code>, if this stub will be inlined in a JIT,
+ *         and <code>FALSE</code>, if it will be passed to a code generator
+ *         (this is due to the slightly different treatment of exceptions).
+ */
 LilCodeStub *gen_lil_typecheck_stub_specialized(bool is_checkcast,
                                                 bool will_inline,
                                                 Class *superclass);

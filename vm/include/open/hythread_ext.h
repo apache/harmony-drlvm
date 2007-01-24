@@ -1,10 +1,10 @@
 /* 
  * Licensed to the Apache Software Foundation (ASF) under one or more
- * contributor license agreements.  See the NOTICE file distributed with
+ * contributor license agreements. See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.
  * The ASF licenses this file to You under the Apache License, Version 2.0
  * (the "License"); you may not use this file except in compliance with
- * the License.  You may obtain a copy of the License at
+ * the License. You may obtain a copy of the License at
  * 
  *     http://www.apache.org/licenses/LICENSE-2.0
  * 
@@ -298,11 +298,12 @@ int VMCALL hythread_is_in_native(hythread_t thread) ;
 int VMCALL hythread_is_daemon(hythread_t thread) ;
 
 
-/**
- * //@}
- * TM Thread states constants. They are compatible with JVMTI.
- * //@{
- */
+ //@}
+ /**
+  * TM Thread states constants. They are compatible with JVMTI.
+  */
+//@{
+
 #define TM_THREAD_STATE_ALIVE JVMTI_THREAD_STATE_ALIVE  // 0x0001 Thread is alive. Zero if thread is new (not started) or terminated.  
 #define TM_THREAD_STATE_TERMINATED JVMTI_THREAD_STATE_TERMINATED // 0x0002Thread has completed execution.  
 #define TM_THREAD_STATE_RUNNABLE JVMTI_THREAD_STATE_RUNNABLE // 0x0004 Thread is runnable.  

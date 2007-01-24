@@ -14,11 +14,6 @@
  *  See the License for the specific language governing permissions and
  *  limitations under the License.
  */
-/** 
- * @author Intel, Alexei Fedotov
- * @version $Revision: 1.1.2.2.4.3 $
- */  
-
 
 #ifndef _VM_UTILS_H_
 #define _VM_UTILS_H_
@@ -59,16 +54,17 @@ public:
 
 extern VTable *cached_object_array_vtable_ptr;
 
-
-
-////////////////////////////////////////////////////////////////////////////
-// Runtime support functions exported directly, because they may be called
-// from native code.
-////////////////////////////////////////////////////////////////////////////
+/**
+ * Runtime support functions exported directly, because they 
+ * may be called from native code.
+ */
 
 Boolean class_is_subtype(Class *sub, Class *super);
 
-// Like class_is_subtype, but sub must not be an interface class.
+/**
+ * Like <code>class_is_subtype</code>, but <code>sub</code> must not be an 
+ * interface class.
+ */
 Boolean class_is_subtype_fast(VTable *sub, Class *super);
 
 
@@ -155,17 +151,18 @@ protected:
 /**
  * @brief Generates an VM's helper to invoke the provided function.
  *
- * The helper takes 'void*' parameter which is passed to the function after
- * some preparation made (namely GC and stack info are prepared to allow GC
- * to work properly).
+ * The helper takes the <code>void*</code> parameter, which is passed 
+ * to the function after some preparation made (namely GC and stack 
+ * info are prepared to allow GC to work properly).
  *
- * The function must follow stdcall convention, which takes 'void*' and
- * returns 'void*', so does the helper.
+ * The function must follow stdcall convention, which takes <code>void*</code> and
+ * returns <code>void*</code>, so does the helper.
  * On a return from the function, the helper checks whether an exception
  * was raised for the current thread, and rethrows it if necessary.
  */
 VMEXPORT void * vm_create_helper_for_function(void* (*fptr)(void*));
 
 #endif /* #ifndef _VM_UTILS_H_ */
+
 
 

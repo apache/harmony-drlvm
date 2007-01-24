@@ -14,10 +14,6 @@
  *  See the License for the specific language governing permissions and
  *  limitations under the License.
  */
-/** 
- * @author Intel, Alexei Fedotov
- * @version $Revision: 1.1.2.1.4.3 $
- */  
 
 #ifndef _VM_TYPES_H_
 #define _VM_TYPES_H_
@@ -25,10 +21,9 @@
 #include "common.h"
 
 #define MAX_UINT32 0xffffffff
-
-//////////////////////////////////////////////////////////////////////////
-// DLL stuff
-
+/**
+ * DLL stuff
+ */
 #if defined(PLATFORM_POSIX) || (defined(USE_STATIC_GC) && defined(BUILDING_GC))
 
 #define VMEXPORT
@@ -52,8 +47,9 @@
 
 #endif // !PLATFORM_POSIX
 
-//////////////////////////////////////////////////////////////////////////
-// Various Numeric Types
+/**
+ * Various Numeric Types
+ */
 
 // Boolean, uint8, int8, uint16, int16, uint32, int32, uint64, int64,
 // POINTER_SIZED_INT
@@ -123,10 +119,12 @@ typedef signed int int32;
 
 #endif //!PLATFORM_POSIX
 
-// The integer datatype on the platform that can hold a pointer.
-// ? 02/7/25: addded POINTER_SIZE_SINT, since in some cases
-// a pointer-size integer has to be signed (for example, when specifying LIL offsets)
-#ifdef POINTER64
+/**
+ * The integer datatype on the platform that can hold a pointer.
+ * ? 02/7/25: addded <code>POINTER_SIZE_SINT</code>, since in some cases
+ * a pointer-size integer has to be signed (for example, when specifying LIL offsets)
+ */
+ #ifdef POINTER64
 #define POINTER_SIZE_INT uint64
 #define POINTER_SIZE_SINT int64
 #ifdef PLATFORM_NT
@@ -140,8 +138,9 @@ typedef signed int int32;
 #define PI_FMT ""
 #endif // POINTER64
 
-//////////////////////////////////////////////////////////////////////////
-// VM_Data_Type
+/**
+ * <code>VM_Data_Type</code>
+ */
 
 typedef
 enum VM_Data_Type {
@@ -172,8 +171,10 @@ enum VM_Data_Type {
     VM_DATA_TYPE_END     = ')'         // For the iterator
 } VM_Data_Type; //VM_Data_Type
 
-// (? 20030317) These defines are deprecated.
-// Use VM_Data_Type in all new code.
+/**
+ * (? 20030317) These defines are deprecated.
+ * Use <code>VM_Data_Type</code> in all new code.
+ */
 #define Java_Type           VM_Data_Type
 #define JAVA_TYPE_BYTE      VM_DATA_TYPE_INT8
 #define JAVA_TYPE_CHAR      VM_DATA_TYPE_CHAR
@@ -190,12 +191,12 @@ enum VM_Data_Type {
 #define JAVA_TYPE_INVALID   VM_DATA_TYPE_INVALID
 #define JAVA_TYPE_END       VM_DATA_TYPE_END
 
-//////////////////////////////////////////////////////////////////////////
-// Handles for Various VM Structures
-
-// This header file is also used in pure C sources,
-// thus we use struct instead of classes
-
+/**
+ * Handles for Various VM Structures.
+ *
+ * This header file is also used in pure C sources,
+ * thus we use struct instead of classes.
+ */
 typedef struct Class *Class_Handle;
 typedef struct VTable *VTable_Handle;
 typedef struct Field *Field_Handle;
@@ -203,31 +204,37 @@ typedef struct Method *Method_Handle;
 typedef struct Method_Signature *Method_Signature_Handle;
 typedef struct TypeDesc *Type_Info_Handle;
 typedef POINTER_SIZE_INT Allocation_Handle;
+typedef POINTER_SIZE_INT Runtime_Type_Handle;
 typedef void* NativeCodePtr;
 typedef struct ClassLoader* ClassLoaderHandle;
 typedef struct ManagedObject* ManagedPointer;
 
-// Fields of these types are not directly accessible from the core VM.
-// typedef struct ManagedObject Java_java_lang_Class;
-// typedef ManagedObject Java_java_lang_System;
+/**
+ * Fields of these types are not directly accessible from the core VM.
+ *  typedef struct ManagedObject Java_java_lang_Class;
+ *  typedef ManagedObject Java_java_lang_System;
+ */
 typedef struct ManagedObject Java_java_lang_Throwable;
 typedef struct ManagedObject Java_java_lang_Thread;
 typedef struct ManagedObject Java_java_io_FileInputStream;
 typedef struct ManagedObject Java_java_lang_String;
 
 
-// Used for opaques accesses to managed arrays.  This handle points
-// to an array in the managed heap, so handling must be careful to account
-// for the possiblity of a moving GC.
+/**
+ * Used for opaques accesses to managed arrays. This handle points
+ * to an array in the managed heap, so handling must be careful to account
+ * for the possiblity of a moving GC.
+ */
 typedef void *Vector_Handle;
 
 typedef void *Managed_Object_Handle;
 
 typedef void *GC_Enumeration_Handle;
 
-//For disable warnings in release version.
-//warning type: warning: unused variable <type_of variable> <variable>
+/**
+ * For disable warnings in release version.
+ * warning type: warning: unused variable <type_of variable> <variable>
+ */
 
 
-//////////////////////////////////////////////////////////////////////////
 #endif //!_VM_TYPES_H_

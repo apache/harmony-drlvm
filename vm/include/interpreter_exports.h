@@ -1,10 +1,10 @@
 /*
  *  Licensed to the Apache Software Foundation (ASF) under one or more
- *  contributor license agreements.  See the NOTICE file distributed with
+ *  contributor license agreements. See the NOTICE file distributed with
  *  this work for additional information regarding copyright ownership.
  *  The ASF licenses this file to You under the Apache License, Version 2.0
  *  (the "License"); you may not use this file except in compliance with
- *  the License.  You may obtain a copy of the License at
+ *  the License. You may obtain a copy of the License at
  *
  *     http://www.apache.org/licenses/LICENSE-2.0
  *
@@ -14,10 +14,7 @@
  *  See the License for the specific language governing permissions and
  *  limitations under the License.
  */
-/** 
- * @author Ivan Volosyuk
- * @version $Revision: 1.1.2.1.4.3 $
- */  
+
 #ifndef _INTERPRETER_EXPORTS_H_
 #define _INTERPRETER_EXPORTS_H_
 
@@ -33,7 +30,7 @@ typedef struct {
 
     FrameHandle* (*interpreter_get_last_frame) (class VM_thread *thread);
     FrameHandle* (*interpreter_get_prev_frame) (FrameHandle* frame);
-	// 'end' is not inclusive
+    // 'end' is not inclusive
     bool (*is_frame_in_native_frame) (struct FrameHandle* frame, void* begin, void* end);
 
     void (*interpreter_ti_enumerate_thread) (jvmtiEnv*, class VM_thread *thread);
@@ -54,6 +51,7 @@ typedef struct {
     jvmtiError (*interpreter_ti_setObject) ( jvmtiEnv*, class VM_thread*, int, int, struct _jobject *);
     unsigned int (*interpreter_st_get_interrupted_method_native_bit) (class VM_thread *);
 
+
     // Open interfaces part begins
 
     /**
@@ -61,8 +59,8 @@ typedef struct {
      * that atleast one of jvmtiEnv's enabled the event or the event was
      * disabled in all enviroments.
      *
-     * @param event_type -  jvmti to enable / disable
-     * @param enable - enable or disable the events in exe.
+     * @param event_type  -  jvmti to enable / disable
+     * @param enable      - enable or disable the events in exe.
      */
     void (*interpreter_ti_set_notification_mode)(jvmtiEvent event_type, bool enable);
 
@@ -70,22 +68,24 @@ typedef struct {
      * Set breakpoint in place identified by method and location.
      * No more then one breakpoint will be set at any specific place. Handling
      * for multiple jvmti environments is done by jvmti framework.
-     * @return bytecode has been replaced by instrumentation
+     *
+     * @return Bytecode has been replaced by instrumentation.
      */
     jbyte (*interpreter_ti_set_breakpoint)(jmethodID method, jlocation location);
 
     /**
      * Clear breakpoint in place identified by method and location.
-     * Replaced bytecode (returned by interpreter_ti_set_breakpoint(..)
+     * Replaced bytecode (returned by <code>interpreter_ti_set_breakpoint(..)</code>)
      * is also passed as a parameter.
      */
     void (*interpreter_ti_clear_breakpoint)(jmethodID method, jlocation location, jbyte saved);
 
     /**
      * Set callback to notify JVMTI about frame pop event.
-     * @return JVMTI_ERROR_NONE - successfully added notification.
-     *         JVMTI_ERROR_OPAQUE_FRAME - frame is native.
-     *         JVMTI_ERROR_NO_MORE_FRAMES - depth too large.
+     *
+     * @return JVMTI_ERROR_NONE           - successfully added notification<br>
+     *         JVMTI_ERROR_OPAQUE_FRAME   - frame is native<br>
+     *         JVMTI_ERROR_NO_MORE_FRAMES - depth too large<br>
      */
     jvmtiError (*interpreter_ti_notify_frame_pop) (jvmtiEnv*,
                                                    VM_thread *thread,

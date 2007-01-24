@@ -14,10 +14,6 @@
  *  See the License for the specific language governing permissions and
  *  limitations under the License.
  */
-/** 
- * @author Andrey Chernyshev
- * @version $Revision: 1.1.2.1.4.4 $
- */  
 
 
 #ifndef MON_ENTER_EXIT_HEADER
@@ -35,17 +31,23 @@ extern "C" {
 #define P_HASH_CONTENTION_BYTE(x) ( (uint8 *)(x->get_obj_info_addr()) )
 #define P_HASH_CONTENTION(x)      ((POINTER_SIZE_INT)P_HASH_CONTENTION_BYTE(x))
 
-// This is called once at startup, before any classes are loaded,
-// and after arguments are parsed.  It should set function pointers
-// to the appropriate values.
-void vm_monitor_init();
+/**
+ * This is called once at startup, before any classes are loaded,
+ * and after arguments are parsed. It should set function pointers
+ * to the appropriate values.
+ */
+ void vm_monitor_init();
 
-// monitor exit from synchronized method
-struct StackIterator;
+/** 
+ * Monitor exit from synchronized method
+ */
+ struct StackIterator;
 void vm_monitor_exit_synchronized_method(StackIterator *si);
 
-// Does a monitorexit operation.
-extern void (*vm_monitor_exit)(ManagedObject *p_obj);
+/**
+ * Does a monitorexit operation.
+ */
+ extern void (*vm_monitor_exit)(ManagedObject *p_obj);
 extern void (*vm_monitor_enter)(ManagedObject *p_obj);
 extern uint32 (*vm_monitor_try_enter)(ManagedObject *p_obj);
 extern uint32 (*vm_monitor_try_exit)(ManagedObject *p_obj);

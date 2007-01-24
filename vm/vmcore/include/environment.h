@@ -1,6 +1,6 @@
 /*
  *  Licensed to the Apache Software Foundation (ASF) under one or more
- *  contributor license agreements.  See the NOTICE file distributed with
+ *  contributor license agreements. See the NOTICE file distributed with
  *  this work for additional information regarding copyright ownership.
  *  The ASF licenses this file to You under the Apache License, Version 2.0
  *  (the "License"); you may not use this file except in compliance with
@@ -14,10 +14,6 @@
  *  See the License for the specific language governing permissions and
  *  limitations under the License.
  */
-/** 
- * @author Intel, Alexei Fedotov
- * @version $Revision: 1.1.2.5.4.3 $
- */  
 
 #ifndef _ENVIRONMENT_H
 #define _ENVIRONMENT_H
@@ -62,9 +58,9 @@ struct Global_Env {
     JavaVMInitArgs            vm_arguments;
 
 
-    //
-    // globals
-    //
+ /**
+     * Globals
+     */
     bool is_hyperthreading_enabled; // VM automatically detects HT status at startup.
     bool use_lil_stubs;             // 20030307: Use LIL stubs instead of hand crafted ones.  Default off (IPF) on (IA32).
     bool compress_references;       // 20030311 Compress references in references and vector elements.
@@ -83,31 +79,48 @@ struct Global_Env {
     Lock_Manager *p_method_call_lock;
     Lock_Manager *p_handle_lock;
 
-    // If set to true by the "-compact_fields" command line option,
-    // the VM will not pad out fields of less than 32 bits to four bytes.
-    // However, fields will still be aligned to a natural boundary,
-    // and the num_field_padding_bytes field will reflect those alignment padding bytes.
-    bool compact_fields;
+    /**
+     * If set to true by the <code>-compact_fields</code> command-line option,
+     * the VM will not pad out fields of less than 32 bits to four bytes.
+     * However, fields will still be aligned to a natural boundary,
+     * and the <code>num_field_padding_bytes</code> field will reflect those 
+     * alignment padding bytes.
+     */
+      bool compact_fields;
 
-    // If set to true by the "-sort_fields" command line option,
-    // the VM will sort fields by size before assigning their offset during
-    // class preparation.
+    /**
+     * If set to true by the <code>-sort_fields</code> command line option,
+     * the VM will sort fields by size before assigning their offset during
+     * class preparation.
+     */
     bool sort_fields;
 
-    // Base address of Java heap
+    /*
+     * Base address of Java heap.
+     */
+
     Byte* heap_base;
-    // Ceiling of Java heap.
-    // NOTE: we assume Java heap uses one continuous memory block.
+
+    /**
+     * Ceiling of Java heap.
+     */
+
+    /**
+     * @note We assume Java heap uses one continuous memory block.
+     */
+
     Byte* heap_end;
 
-    // This will be set to either NULL or heap_base depending
-    // on whether compressed references are used.
+    /** 
+     * This will be set to either <code>NULL</code> or <code>heap_base</code> depending
+     * on whether compressed references are used.
+     */
+
     Byte* managed_null;
 
-    //
-    // preloaded strings
-    //
-
+    /**
+     * Preloaded strings
+     */
     String* JavaLangObject_String;
     String* JavaLangClass_String;
     String* Init_String;
@@ -140,9 +153,9 @@ struct Global_Env {
     String* LoadClassDescriptor_String;
     String* InitCauseDescriptor_String;
 
-    //
-    // preloaded classes
-    //
+    /**
+     * Preloaded classes
+     */
     Class* Boolean_Class;
     Class* Char_Class;
     Class* Float_Class;
@@ -186,7 +199,10 @@ struct Global_Env {
     ObjectHandle java_lang_Object;
     ObjectHandle java_lang_OutOfMemoryError;
     ObjectHandle java_lang_ThreadDeath;
-    // object of java.lang.Error class used for JVMTI JIT PopFrame support
+    /**
+     * Object of <code>java.lang.Error</code> class used for 
+     * JVMTI JIT PopFrame support.
+     */
     ObjectHandle popFrameException;
 
     Class* java_io_Serializable_Class;
@@ -202,23 +218,36 @@ struct Global_Env {
     Class* java_lang_reflect_Method_Class;
 
     Class* finalizer_thread;
-    // pointers to 2 static fields in FinalizerThread class. 
+
+    /**
+     * Pointers to two static fields in <code>FinalizerThread</code> class.
+     */
+
     jboolean* finalizer_shutdown;
     jboolean* finalizer_on_exit;
     Class* java_lang_EMThreadSupport_Class;
 
-    // VTable for the java_lang_String class
+    /**
+     * VTable for the <code>java_lang_String</code> class
+     */
     VTable* JavaLangString_VTable;
 
-    // Offset to the vm_class field in java.lang.Class;
+    /**
+     * Offset to the <code>vm_class</code> field in <code>java.lang.Class</code>.
+     */
     unsigned vm_class_offset;
 
-    // The VM state. See VM_STATE enum above.
+    /**
+     * The VM state. See <code>VM_STATE</code> enum above.
+     */
     volatile int vm_state;
 
-    // FIXME
-    // The whole environemt will be refactored to VM instance
-    // The following contains a cached copy of EM interface table
+    /**
+     * FIXME
+     * The whole environemt will be refactored to VM instance.
+     * The following contains a cached copy of EM interface table.
+     */
+
     OpenComponentManagerHandle cm;
     OpenInstanceHandle em_instance;
     OpenEmVmHandle em_interface;
@@ -234,9 +263,10 @@ struct Global_Env {
 
     void operator delete(void * mem, apr_pool_t * pool) {};
 
-    //
-    // determine bootstrapping of root classes
-    //
+    /**
+     * Determine bootstrapping of root classes
+     */
+
     bool InBootstrap() const { return bootstrapping; }
     void StartVMBootstrap() {
         assert(!bootstrapping);
@@ -247,6 +277,12 @@ struct Global_Env {
         bootstrapping = false;
     }
 
+
+    /**
+     * Load a class via bootstrap classloader.
+     */
+
+=======
     int isVmInitializing() {
         return vm_state == VM_INITIALIZING;
     }
@@ -259,25 +295,31 @@ struct Global_Env {
         return vm_state == VM_SHUTDOWNING;
     }
 
-    //load a class via bootstrap classloader
+    /**
+     * Load a class via bootstrap classloader.
+     */
+
+
     Class* LoadCoreClass(const String* name);
     Class* LoadCoreClass(const char* name);
 
     /** 
-    * Set "Ready For Exceptions" state.
-    * This function must be called as, soon as VM becomes able to create 
-    * exception objects. I.e. all required classes (such as "java/lang/Trowable")
-    * are loaded .
-    */
+     * Set <code>Ready For Exceptions</code> state.
+     * This function must be called as, soon as VM becomes able to create 
+     * exception objects. I.e. all required classes (such as </code>java/lang/Trowable</code>)
+     * are loaded.
+     */
+
     void ReadyForExceptions()
     {
         ready_for_exceptions = true;
     }
 
     /** 
-    * Get "Ready For Exceptions" state.
-    * @return true, if VM is able to create exception objects.
-    */
+     * Get <code>Ready For Exceptions</code> state.
+     *
+     * @return <code>TRUE</code>, if VM is able to create exception objects.
+     */
     bool IsReadyForExceptions() const
     {
         return ready_for_exceptions;

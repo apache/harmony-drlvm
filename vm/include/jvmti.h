@@ -1,10 +1,10 @@
 /*
  *  Licensed to the Apache Software Foundation (ASF) under one or more
- *  contributor license agreements.  See the NOTICE file distributed with
+ *  contributor license agreements. See the NOTICE file distributed with
  *  this work for additional information regarding copyright ownership.
  *  The ASF licenses this file to You under the Apache License, Version 2.0
  *  (the "License"); you may not use this file except in compliance with
- *  the License.  You may obtain a copy of the License at
+ *  the License. You may obtain a copy of the License at
  *
  *     http://www.apache.org/licenses/LICENSE-2.0
  *
@@ -14,10 +14,7 @@
  *  See the License for the specific language governing permissions and
  *  limitations under the License.
  */
-/** 
- * @author Gregory Shimansky
- * @version $Revision: 1.1.2.1.4.4 $
- */  
+  
 #ifndef _JVMTI_H_
 #define _JVMTI_H_
 
@@ -61,7 +58,7 @@ extern "C"
 #endif
 
     /**
-     * Agent Start-Up
+     * Agent Start-Up.
      * The library must export a start-up function with the following
      * prototype:
      */
@@ -69,7 +66,7 @@ extern "C"
         Agent_OnLoad(JavaVM * vm, char *options, void *reserved);
 
     /**
-     * Agent Shutdown
+     * Agent Shutdown.
      * The library may optionally export a shutdown function with the
      * following prototype:
      */
