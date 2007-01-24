@@ -375,20 +375,22 @@ public class RuntimeTest2 extends TestCase {
                 }
                 cmnd = cmnd + " /C date";
                 Process pi3 = Runtime.getRuntime().exec(cmnd);
-                // System.out.println("1test_exec_Str");
-                try {
-                    Thread.sleep(2000);
-                } catch (Exception e) {
-                }
                 java.io.OutputStream os = pi3.getOutputStream();
                 pi3.getErrorStream();
                 java.io.InputStream is = pi3.getInputStream();
-                if (is.available() < 1) {
+                // wait for is.available != 0
+                int count = 100;
+                while (is.available() < 1 && count-- > 0) {
+                    try {
+                        Thread.sleep(200);
+                    } catch (Exception e) {
+                    }
+                }
+                if (count == 0) {
                     fail("exec(String[], String[], File).check001: where is " +
                             "the date's answer/request?");
                 }
-                // System.out.println("2test_exec_Str");
-                // System.out.println("is.available()"+is.available());
+
                 int ia = is.available();
                 byte[] bb = new byte[ia];
                 is.read(bb);
@@ -426,11 +428,15 @@ public class RuntimeTest2 extends TestCase {
                 os.write('\n');
                 os.flush();
 
-                try {
-                    Thread.sleep(2000);
-                } catch (Exception e) {
+                // wait for is.available != 0
+                count = 100;
+                while (is.available() < 1 && count-- > 0) {
+                    try {
+                        Thread.sleep(200);
+                    } catch (Exception e) {
+                    }
                 }
-                if (is.available() < 1) {
+                if (count == 0) {
                     fail("exec(String[], String[], File).check003: where is " +
                             "the date's reaction on the incorrect entering?");
                 }
