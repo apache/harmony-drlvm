@@ -131,7 +131,7 @@ public final class ObjectModel extends org.mmtk.vm.ObjectModel implements Consta
   }
 
   /**
-   * Return the reference that an object will be refered to after it is copied
+   * Return the reference that an object will be referred to after it is copied
    * to the specified region. Used in delayed-copy collectors such as compacting
    * collectors.
    *
@@ -148,7 +148,7 @@ public final class ObjectModel extends org.mmtk.vm.ObjectModel implements Consta
   /**
    * Gets a pointer to the address just past the end of the object.
    * 
-   * @param object The objecty.
+   * @param object The object.
    */
   public Address getObjectEndAddress(ObjectReference object) {
     //System.out.println("wjw org.apache.HarmonyDRLVM.mm.mmtk.ObjectModel.getObjectEndAddress() was called");
@@ -389,7 +389,7 @@ public final class ObjectModel extends org.mmtk.vm.ObjectModel implements Consta
   }
 
   /**
-   * Returns an address guaranteed to be inside the storage assocatied
+   * Returns an address guaranteed to be inside the storage associated
    * with and object.
    *
    * @param object the reference address of the object

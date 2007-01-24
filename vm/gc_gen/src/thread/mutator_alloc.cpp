@@ -60,7 +60,7 @@ Managed_Object_Handle gc_alloc_fast (unsigned size, Allocation_Handle ah, void *
   if(type_has_finalizer((Partial_Reveal_VTable *)ah))
     return NULL;
   
-  /* object shoud be handled specially */
+  /* object should be handled specially */
   if ( size > GC_OBJ_SIZE_THRESHOLD ) return NULL;
  
   Allocator* allocator = (Allocator*)gc_get_tls();

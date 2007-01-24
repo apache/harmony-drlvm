@@ -24,9 +24,9 @@ import org.vmmagic.pragma.*;
 
 public final class Statistics extends org.mmtk.vm.Statistics implements Constants, Uninterruptible {
   /**
-   * Returns the number of collections that have occured.
+   * Returns the number of collections that have occurred.
    *
-   * @return The number of collections that have occured.
+   * @return The number of collections that have occurred.
    */
   public final int getCollectionCount()
     throws UninterruptiblePragma {

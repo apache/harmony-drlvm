@@ -249,7 +249,7 @@ void print_vm_standard_properties()
         "    vm.other_natives_dlls:\n"
         "            A \'" PORT_PATH_SEPARATOR_STR "\'-delimited list of dlls contained native methods implementations to load at startup.\n"
         "    vm.components.<component>.classpath:\n" 
-        "            Part of a <component>'s classpath to append to the JDK booclasspath\n"
+        "            Part of a <component>'s classpath to append to the JDK bootclasspath\n"
         "    vm.components.<component>.startupclass:\n"
         "            A <component> class to be initialized during startup\n");
 

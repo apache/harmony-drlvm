@@ -73,7 +73,7 @@ public final class ReferenceGlue extends org.mmtk.vm.ReferenceGlue implements Un
 
     /***********************************************************************
      * 
-     * Reference object field accesors
+     * Reference object field accessors
      */
 
     /**

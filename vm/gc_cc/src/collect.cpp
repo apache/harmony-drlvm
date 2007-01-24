@@ -252,7 +252,7 @@ void process_special_references(reference_vector& array) {
 
         // object not marked
         referent.write(heap_null);
-        TRACE2("gc.ref", "process_special_references: reference enquequed");
+        TRACE2("gc.ref", "process_special_references: reference enqueued");
         vm_enqueue_reference((Managed_Object_Handle)ref);
     }
     array.clear();

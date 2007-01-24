@@ -168,9 +168,9 @@ static void postprocess_array(Partial_Reveal_Object *array, int vector_length, P
     }
 }
 
-// after moving some objects should be rescaned
+// after moving some objects should be rescanned
 // storing references to this object to the linked list
-// of reverers to the right of this one.
+// of reversers to the right of this one.
 // oldobj = original position of object:
 // if this object is pinned and referenced object is moved only original
 // position of this object contains valid (unchanged) information of left/right direction

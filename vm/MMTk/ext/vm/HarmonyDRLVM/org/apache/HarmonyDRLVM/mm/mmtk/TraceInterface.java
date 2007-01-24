@@ -83,7 +83,7 @@ public final class TraceInterface extends org.mmtk.vm.TraceInterface implements 
 
   /**
    * This skips over the frames added by the tracing algorithm, outputs 
-   * information identifying the method the containts the "new" call triggering
+   * information identifying the method the contains the "new" call triggering
    * the allocation, and returns the address of the first non-trace, non-alloc
    * stack frame.
    *

@@ -418,7 +418,7 @@ static void identify_dead_phanrefs(Collector *collector)
       *p_referent_field = NULL;
       /* Phantom status: for future use
        * if((unsigned int)p_referent & PHANTOM_REF_ENQUEUE_STATUS_MASK){
-       *   // enqueued but not explicitly cleared OR pending for enqueueing
+       *   // enqueued but not explicitly cleared OR pending for enqueuing
        *   *iter = NULL;
        * }
        * resurrect_obj_tree(collector, p_referent_field);

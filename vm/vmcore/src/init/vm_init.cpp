@@ -489,10 +489,10 @@ static jint run_java_init(JNIEnv * jni_env) {
  * Creates new j.l.Thread object
  *
  * @param[out] thread_object pointer to created thread object
- * @param[in] jni_env JNI environment assocciated with the current thread
+ * @param[in] jni_env JNI environment associated with the current thread
  * @param[in] group thread group where new thread should be placed in
  * @param[in] name thread's name
- * @param[in] daemon JNI_TRUE if new thread is a daemon, JNI_FALSE overwise
+ * @param[in] daemon JNI_TRUE if new thread is a daemon, JNI_FALSE otherwise
  */
 static jint vm_create_jthread(jthread * thread_object, JNIEnv * jni_env, jobject group, char * name, jboolean daemon) {
     static Method * constructor = NULL;
@@ -562,7 +562,7 @@ static jint vm_create_jthread(jthread * thread_object, JNIEnv * jni_env, jobject
  * @param[in] java_vm VM to attach thread to
  * @param[in] group thread group for attaching thread
  * @param[in] name thread name
- * @param[in] daemon JNI_TRUE if thread is daemon, JNI_FALSE overwise
+ * @param[in] daemon JNI_TRUE if thread is daemon, JNI_FALSE otherwise
  * @return JNI_OK on success.
  */
 jint vm_attach_internal(JNIEnv ** p_jni_env, jthread * java_thread, JavaVM * java_vm, jobject group, char * name, jboolean daemon) {
@@ -627,7 +627,7 @@ int vm_init1(JavaVM_Internal * java_vm, JavaVMInitArgs * vm_arguments) {
 
     status = CmAcquire(&vm_env->cm);
     if (status != JNI_OK) {
-        WARN("Faild to initialize a \"Component Manager\".");
+        WARN("Failed to initialize a \"Component Manager\".");
         return status; 
     }
 
@@ -845,7 +845,7 @@ jint vm_init2(JNIEnv * jni_env) {
         WARN("Failed to initialize system class loader.");
         if(exn_raised()) {
             print_uncaught_exception_message(stderr,
-                "system class loader initialisation", exn_get());
+                "system class loader initialization", exn_get());
         }
         return status;
     }

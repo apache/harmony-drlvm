@@ -187,7 +187,7 @@ static const void* RESERVE_FAILURE = 0;
 #else
 static inline void *reserve_mem(size_t size) {
 #ifdef POINTER64
-    /* We have planty of address space, let's protect unaccessible part of heap
+    /* We have plenty of address space, let's protect unaccessible part of heap
      * to find some of bad pointers. */
     size_t four_gig = 4 * 1024 * (size_t) 1024 * 1024;
     size_t padding = 4 * 1024 * (size_t) 1024 * 1024;
@@ -406,5 +406,5 @@ void heap_shrink(size_t size) {
         heap.pos_limit = heap.ceiling;
     }
     chunk_size = round_down(heap.size / (10 * num_threads),128);
-    INFO("heap shrinked to  " << mb(heap.size) << " mb");
+    INFO("heap shrank to  " << mb(heap.size) << " mb");
 }

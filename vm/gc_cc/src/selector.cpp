@@ -165,7 +165,7 @@ float Smin(float Smax, float Tslow, float Tfast, float dS) {
 
 bool need_compaction_next_gc() {
     if (heap.working_set_size == 0 || !gc_adaptive) {
-        TRACE2("gc.adaptive", "static Smin analisis");
+        TRACE2("gc.adaptive", "static Smin analysis");
         return heap.allocation_region_end() - heap.pos < heap.size * 0.7f;
     } else {
         float smin = Smin(heap.roots_start - heap.base - RESERVED_FOR_HEAP_NULL - heap.working_set_size,

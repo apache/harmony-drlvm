@@ -166,7 +166,7 @@ void Object_Queue::reallocate(unsigned new_capacity)
     assert(new_table);
     assert(num_objects <= capacity);
     
-    // if queue already contains objects, copyes it to new array and free memory for previous one.
+    // if queue already contains objects, copies it to new array and frees memory for previous one.
     if(objects) {
         memcpy(new_table, objects, num_objects * sizeof(ManagedObject *));
         STD_FREE(objects);
@@ -222,12 +222,12 @@ Object_Queue::remove_object() {
 int Object_Queue::getLength() {
    unsigned result;
    
-   // synchronization used there to avoid of retur very old value
+   // synchronization used there to avoid of return very old value
    objects_lock._lock();
    result = this->num_objects;
    objects_lock._unlock();
    
-   // there unfresh value can be returned, but this value was correct after fgunction start 
+   // there unfresh value can be returned, but this value was correct after function start 
    return result;
 }
 
@@ -236,7 +236,7 @@ int Object_Queue::getLength() {
  */
 void Object_Queue::enumerate_for_gc()
 {
-    // locks here because some native code can work during gc untill tmn_suspend_disable() call
+    // locks here because some native code can work during gc until tmn_suspend_disable() call
     objects_lock._lock();
 
     // print trace info about queue enlarge

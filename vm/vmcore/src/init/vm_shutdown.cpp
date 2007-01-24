@@ -220,7 +220,7 @@ jint vm_destroy(JavaVM_Internal * java_vm, jthread java_thread)
     uncaught_exception = jni_env->ExceptionOccurred();
     jni_env->ExceptionClear();
 
-    // Execute pinding shutdown hooks & finalizers
+    // Execute pending shutdown hooks & finalizers
     status = exec_shutdown_sequence(jni_env);
     if (status != JNI_OK) return status;
 
@@ -243,9 +243,9 @@ jint vm_destroy(JavaVM_Internal * java_vm, jthread java_thread)
     java_vm->vm_env->TI->Shutdown(java_vm);
 
     // Block thread creation.
-    // TODO: investigate how to achive that with ThreadManager
+    // TODO: investigate how to achieve that with ThreadManager
 
-    // Starting this moment any exception occured in java thread will cause
+    // Starting this moment any exception occurred in java thread will cause
     // entire java stack unwinding to the most recent native frame.
     // JNI is not available as well.
     assert(java_vm->vm_env->vm_state == Global_Env::VM_RUNNING);
@@ -326,7 +326,7 @@ static int vm_dump_entry_point(void * data) {
 }
 
 /**
- * Current process recieved an interruption signal (Ctrl+C pressed).
+ * Current process received an interruption signal (Ctrl+C pressed).
  * Shutdown all running VMs and terminate the process.
  */
 void vm_interrupt_handler(int UNREF x) {
@@ -357,7 +357,7 @@ void vm_interrupt_handler(int UNREF x) {
         hythread_create((threadBuf + i), 0, HYTHREAD_PRIORITY_NORMAL, 0, vm_interrupt_entry_point, (void *)vmBuf[i]);
     }
 
-    // spawn a new thread which will terminate the proccess.
+    // spawn a new thread which will terminate the process.
     hythread_create(NULL, 0, HYTHREAD_PRIORITY_NORMAL, 0, vm_interrupt_process, (void *)threadBuf);
 
 cleanup:
@@ -365,8 +365,8 @@ cleanup:
 }
 
 /**
- * Current process recieved an ??? signal (Ctrl+Break pressed).
- * Prints java stack traces for each VM running in the current procces.
+ * Current process received an ??? signal (Ctrl+Break pressed).
+ * Prints java stack traces for each VM running in the current process.
  */
 void vm_dump_handler(int UNREF x) {
     JavaVM ** vmBuf;

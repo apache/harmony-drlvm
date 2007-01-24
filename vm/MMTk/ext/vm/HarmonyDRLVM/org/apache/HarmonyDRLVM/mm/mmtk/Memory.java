@@ -104,7 +104,7 @@ public class Memory extends org.mmtk.vm.Memory
     }
     public final void globalReleaseVMSpace() 
     {
-        //System.out.println("org.apache.HarmonyDRLVM.mm.mmtk.Memory.gobalReleaseVMSpace() needs fixing");
+        //System.out.println("org.apache.HarmonyDRLVM.mm.mmtk.Memory.globalReleaseVMSpace() needs fixing");
     }
     public final void setHeapRange(int id, Address start, Address end) 
     {

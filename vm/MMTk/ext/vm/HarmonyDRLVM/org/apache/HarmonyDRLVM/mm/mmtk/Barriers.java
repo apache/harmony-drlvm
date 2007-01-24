@@ -30,7 +30,7 @@ public class Barriers extends org.mmtk.vm.Barriers implements Uninterruptible {
    * @param target The value that the slot will be updated to
    * @param offset The offset from the ref (metaDataA)
    * @param locationMetadata An index of the FieldReference (metaDataB)
-   * @param mode The context in which the write is occuring
+   * @param mode The context in which the write is occurring
    */
   public final void performWriteInBarrier(ObjectReference ref, Address slot, 
                                            ObjectReference target, Offset offset, 
@@ -59,7 +59,7 @@ public class Barriers extends org.mmtk.vm.Barriers implements Uninterruptible {
    * @param target The value that the slot will be updated to
    * @param offset The offset from the ref (metaDataA)
    * @param locationMetadata An index of the FieldReference (metaDataB)
-   * @param mode The context in which the write is occuring
+   * @param mode The context in which the write is occurring
    * @return The value that was replaced by the write.
    */
   public final ObjectReference performWriteInBarrierAtomic(

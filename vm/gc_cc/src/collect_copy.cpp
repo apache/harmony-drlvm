@@ -152,7 +152,7 @@ static bool gc_copy_process_reference(Slot slot, int phase) {
     unsigned vt = obj->vt();
 
     if (info & phase) {
-        // object already marked, need to check if it is forwared still
+        // object already marked, need to check if it is forwarded still
         
         if (vt & FORWARDING_BIT) {
             Partial_Reveal_Object *newpos = fw_to_pointer(vt & ~FORWARDING_BIT);
@@ -208,7 +208,7 @@ static bool gc_copy_process_reference(Slot slot, int phase) {
                         + ((obj->obj_info() & HASHCODE_IS_ALLOCATED_BIT) ? GC_OBJECT_ALIGNMENT : 0));
                 TRACE2("gc.pin", "add failed pinned area = " << pos << " " << pinned_areas_unsorted.back());
                 TRACE2("gc.pin", "failed object = " << pos);
-                // arange transition to slide compaction
+                // arrange transition to slide compaction
                 obj->obj_info() &= ~MARK_BITS;
                 slots.push_back(slot);
                 transition_copy_to_sliding_compaction(slots);
@@ -269,7 +269,7 @@ static bool gc_copy_process_reference(Slot slot, int phase) {
 }
 
 void gc_copy_add_root_set_entry(Slot root) {
-    // FIXME: check for zero here, how it reflect perfomance, should be better!
+    // FIXME: check for zero here, how it reflects performance, should be better!
     // and possibly remove check in gc_copy_process_reference
     // while added check in array handling
 

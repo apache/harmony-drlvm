@@ -50,7 +50,7 @@ extern unsigned int min_nos_size_bytes;
 extern unsigned int max_nos_size_bytes;
 
 typedef struct GC_Gen {
-  /* <-- First couple of fields overloadded as GC */
+  /* <-- First couple of fields overloaded as GC */
   void* heap_start;
   void* heap_end;
   unsigned int reserved_heap_size;

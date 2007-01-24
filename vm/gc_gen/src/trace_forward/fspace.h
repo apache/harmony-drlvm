@@ -30,11 +30,11 @@
  */
 
 extern Boolean forward_first_half;
-/* boundary spliting fspace into forwarding part and remaining part */
+/* boundary splitting fspace into forwarding part and remaining part */
 extern void* object_forwarding_boundary; 
 
 typedef struct Fspace {
-  /* <-- first couple of fields are overloadded as Space */
+  /* <-- first couple of fields are overloaded as Space */
   void* heap_start;
   void* heap_end;
   unsigned int reserved_heap_size;

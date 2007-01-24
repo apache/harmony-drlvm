@@ -272,7 +272,7 @@ initialize_properties(Global_Env * p_env)
 
 /*
  * 2. Check whether there is a command line option, say, 
- *    -Properties-file "d:\xyz\eee\vm.Properties" or -Droperties key=value, 
+ *    -Properties-file "d:\xyz\eee\vm.properties" or -Dproperties key=value, 
  *    read the Properties, if key is duplicated, override the value. 
  */
     char *src, *tok;

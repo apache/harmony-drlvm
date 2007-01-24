@@ -66,7 +66,7 @@ static Boolean fspace_alloc_block(Fspace* fspace, Allocator* allocator)
   
 }
 
-/* FIXME:: the collection should be seperated from the alloation */
+/* FIXME:: the collection should be separated from the allocation */
 void* fspace_alloc(unsigned size, Allocator *allocator) 
 {
   void*  p_return = NULL;
