@@ -282,7 +282,6 @@ struct Global_Env {
      * Load a class via bootstrap classloader.
      */
 
-=======
     int isVmInitializing() {
         return vm_state == VM_INITIALIZING;
     }
