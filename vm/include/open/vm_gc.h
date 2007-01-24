@@ -180,11 +180,15 @@ VMEXPORT Boolean verify_object_header(void *ptr);
  */
 VMEXPORT void vm_finalize_object(Managed_Object_Handle p_obj);
 
+VMEXPORT void set_native_finalizer_thread_flag(Boolean flag);
+
 /**
  * GC should call this function when an phantom reference object
  * is to be enqueued, i.e. when the reference is not reachable anymore.
  */
 VMEXPORT void vm_enqueue_reference(Managed_Object_Handle p_obj);
+
+VMEXPORT void set_native_ref_enqueue_thread_flag(Boolean flag);
 
 enum WeakReferenceType {
     NOT_REFERENCE = 0,
