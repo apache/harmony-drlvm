@@ -1,0 +1,24 @@
+<project name="RUN HARMONY-2083 Regression Test">
+    <target name="run-test">
+        <!-- extend JUnit test launcher to run JNI test -->
+        <delete
+             file="${reg.test.class.path}/org/apache/harmony/drlvm/tests/regression/h2083/Missed.class"
+             verbose="true"/>
+        <echo message="Running on JET"/>
+        <run-junit-test 
+             test="org.apache.harmony.drlvm.tests.regression.h2083.Test"
+             vmarg="-Xem:jet">
+        </run-junit-test>
+        <echo message="Running on OPT"/>
+        <run-junit-test 
+             test="org.apache.harmony.drlvm.tests.regression.h2083.Test"
+             vmarg="-Xem:opt">
+        </run-junit-test>
+        <echo message="Running on interpreter"/>
+        <run-junit-test 
+             test="org.apache.harmony.drlvm.tests.regression.h2083.Test"
+             vmarg="-Xint">
+        </run-junit-test>
+    </target>
+</project>
+
