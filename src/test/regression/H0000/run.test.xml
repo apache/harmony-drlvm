@@ -5,7 +5,7 @@
         <run-junit-test 
             test="org.apache.harmony.drlvm.tests.regression.h0000.DirectByteBufferTest">
             <junit-element>
-                <sysproperty key="java.library.path" value="${reg.test.native.path}"/>
+              <sysproperty key="java.library.path" value="${reg.test.native.path}/H0000"/>
             </junit-element>
         </run-junit-test>
     </target>
