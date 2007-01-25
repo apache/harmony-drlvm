@@ -114,9 +114,11 @@ static void class_report_failure(Class* target, uint16 cp_index, jthrowable exn)
 
     tmn_suspend_disable();
     target->lock();
-    // vvv - This should be atomic change
-    cp.resolve_as_error(cp_index, exn);
-    // ^^^
+    if (!cp.is_entry_in_error(cp_index)) {
+        // vvv - This should be atomic change
+        cp.resolve_as_error(cp_index, exn);
+        // ^^^
+    }
     target->unlock();
     tmn_suspend_enable();
 }
