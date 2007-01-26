@@ -178,10 +178,13 @@ ready_for_exceptions(false)
     java_lang_ArithmeticException_Class = NULL;
     java_lang_ClassCastException_Class = NULL;
     java_lang_OutOfMemoryError_Class = NULL;
+    java_lang_InternalError_Class = NULL;
     java_lang_ThreadDeath_Class = NULL;
 
     java_lang_OutOfMemoryError = NULL;
     popFrameException = NULL;
+
+    java_lang_FinalizerThread_Class = NULL;
 
     java_io_Serializable_Class = NULL;
     java_lang_Cloneable_Class = NULL;

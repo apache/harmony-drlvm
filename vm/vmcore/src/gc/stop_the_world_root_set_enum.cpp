@@ -192,8 +192,8 @@ void vm_hint_finalize() {
     // *after* it releases global GC lock.
 
     // Several Reference Queues may need to be notified because the GC added References to them. Do that now.
-    LOG2("ref", "Enqueueing references");
-    vm_enqueue_references();
+    //LOG2("ref", "Enqueueing references");
+    //vm_enqueue_references();
     
     // For now we run the finalizers immediately in the context of the thread which requested GC.
     // Eventually we may have a different scheme, e.g., a dedicated finalize thread.

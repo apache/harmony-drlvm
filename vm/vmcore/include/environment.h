@@ -194,6 +194,7 @@ struct Global_Env {
     Class* java_lang_ArithmeticException_Class;
     Class* java_lang_ClassCastException_Class;
     Class* java_lang_OutOfMemoryError_Class;
+    Class* java_lang_InternalError_Class;
     Class* java_lang_ThreadDeath_Class;
 
     Class* java_security_ProtectionDomain_Class;
@@ -220,14 +221,8 @@ struct Global_Env {
     Class* java_lang_reflect_Field_Class;
     Class* java_lang_reflect_Method_Class;
 
-    Class* finalizer_thread;
+    Class* java_lang_FinalizerThread_Class;
 
-    /**
-     * Pointers to two static fields in <code>FinalizerThread</code> class.
-     */
-
-    jboolean* finalizer_shutdown;
-    jboolean* finalizer_on_exit;
     Class* java_lang_EMThreadSupport_Class;
 
     /**

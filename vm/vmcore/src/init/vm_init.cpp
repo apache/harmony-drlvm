@@ -46,6 +46,7 @@
 #include "vm_strings.h"
 #include "slot.h"
 #include "classpath_const.h"
+#include "finalize.h"
 #include "finalizer_thread.h"   /* added for NATIVE FINALIZER THREAD */
 #include "ref_enqueue_thread.h" /* added for NATIVE REFERENCE ENQUEUE THREAD */
 
@@ -396,6 +397,8 @@ static jint preload_classes(Global_Env * vm_env) {
         preload_class(vm_env, "java/lang/ClassCastException");
     vm_env->java_lang_OutOfMemoryError_Class = 
         preload_class(vm_env, "java/lang/OutOfMemoryError");
+    vm_env->java_lang_InternalError_Class =
+        preload_class(vm_env, "java/lang/InternalError");
     vm_env->java_lang_ThreadDeath_Class = 
         preload_class(vm_env, "java/lang/ThreadDeath");
 
@@ -728,7 +731,9 @@ int vm_init1(JavaVM_Internal * java_vm, JavaVMInitArgs * vm_arguments) {
     class_alloc_new_object_and_run_default_constructor(vm_env->java_lang_StackOverflowError_Class);
     // Precompile ThreadDeath.
     class_alloc_new_object_and_run_default_constructor(vm_env->java_lang_ThreadDeath_Class);
-    
+    // Precompile InternalError.
+    class_alloc_new_object_and_run_default_constructor(vm_env->java_lang_InternalError_Class);
+
     hythread_suspend_enable();
 
     // Mark j.l.Throwable() constructor as a side effects free.
@@ -797,22 +802,12 @@ jint vm_init2(JNIEnv * jni_env) {
 
     if (get_boolean_property("vm.finalize", TRUE, VM_PROPERTIES)) {
         // Load and initialize finalizer thread.
-        vm_env->finalizer_thread = preload_class(vm_env, "java/lang/FinalizerThread");
-        assert(vm_env->finalizer_thread);
+        vm_env->java_lang_FinalizerThread_Class =
+            preload_class(vm_env, "java/lang/FinalizerThread");
+        assert(vm_env->java_lang_FinalizerThread_Class);
 
-        Field * finalizer_shutdown_field =
-            class_lookup_field_recursive(vm_env->finalizer_thread, "shutdown", "Z");
-        Field* finalizer_on_exit_field =
-            class_lookup_field_recursive(vm_env->finalizer_thread, "onExit", "Z");
-        assert(finalizer_shutdown_field);
-        assert(finalizer_on_exit_field);
-        vm_env->finalizer_shutdown = (jboolean*) finalizer_shutdown_field->get_address();
-        vm_env->finalizer_on_exit = (jboolean*) finalizer_on_exit_field->get_address();
-        assert(vm_env->finalizer_shutdown);
-        assert(vm_env->finalizer_on_exit);
-        class_initialize_from_jni(vm_env->finalizer_thread);
-    } else {
-        vm_env->finalizer_thread = NULL;
+        class_initialize_from_jni(vm_env->java_lang_FinalizerThread_Class);
+        vm_obtain_finalizer_fields();
     }
     if(vm_env->TI->isEnabled() && vm_env->TI->needCreateEventThread() ) {
         vm_env->TI->TIenvs_lock._lock();

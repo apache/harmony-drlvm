@@ -62,6 +62,7 @@ JNIEXPORT jint JNICALL Java_java_lang_FinalizerThread_getProcessorsQuantity
 JNIEXPORT jint JNICALL Java_java_lang_FinalizerThread_doFinalization
   (JNIEnv *, jclass, jint quantity)
 {
+    vm_enqueue_references();
     return (jint) vm_do_finalization(quantity);
 }
 /**
@@ -75,7 +76,8 @@ JNIEXPORT jint JNICALL Java_java_lang_FinalizerThread_doFinalization
 JNIEXPORT jint JNICALL Java_java_lang_FinalizerThread_getFinalizersQuantity
   (JNIEnv *, jclass)
 {
-    return (jint) vm_get_finalizable_objects_quantity();
+    return (jint) vm_get_finalizable_objects_quantity()
+            + vm_get_references_quantity();
 }
 
 /**

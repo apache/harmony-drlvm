@@ -27,10 +27,12 @@
 #include "lock_manager.h"
 #include "object_layout.h"
 #include "open/types.h"
+#include <open/jthread.h>
 #include "Class.h"
 #include "open/vm_util.h"
 #include "environment.h"
 #include "ini.h"
+#include "m2n.h"
 #include "exceptions.h"
 #include "compile.h"
 #include "nogc.h"
@@ -114,15 +116,29 @@ class Objects_To_Finalize: public Object_Queue
     Class* CharsetEncoder;
     Class* FileDescriptor;
     Class* FileOutputStream;
+
+    //jobject get_work_lock();
+    //jboolean* get_work_lock();
+    //jboolean* get_work_lock();
+    bool fields_obtained;
+    void check_fields_obtained();
+    Lock_Manager obtain_fields_lock;
+    jobject work_lock;
+    jboolean* shutdown;
+    jboolean* on_exit;
 public:
     Objects_To_Finalize() : Object_Queue("finalize") {
         classes_cached = false;
+        fields_obtained = false;
+        work_lock = NULL;
+        on_exit = NULL;
     };
     // redefine of add method 
     void add_object(ManagedObject *p_obj);
     
     void run_finalizers();
     int do_finalization(int quantity);
+    void obtain_fields();
 }; //Objects_To_Finalize
 
 class References_To_Enqueue: public Object_Queue
@@ -253,7 +269,8 @@ void Object_Queue::enumerate_for_gc()
 
 void Objects_To_Finalize::add_object(ManagedObject *p_obj)
 {
-    Class* finalizer_thread = VM_Global_State::loader_env->finalizer_thread;
+    Class* finalizer_thread =
+        VM_Global_State::loader_env->java_lang_FinalizerThread_Class;
 
     if (!finalizer_thread) {
         return;
@@ -301,40 +318,106 @@ bool Objects_To_Finalize::is_class_ignored(Class* test) {
             || (test==FileOutputStream));
 }
 
+void Objects_To_Finalize::check_fields_obtained() {
+    if (!fields_obtained) {
+        obtain_fields();
+    }
+}
+
+void Objects_To_Finalize::obtain_fields() {
+    obtain_fields_lock._lock();
+
+    if (!fields_obtained) {
+        Class* finalizer_thread =
+            VM_Global_State::loader_env->java_lang_FinalizerThread_Class;
+
+        if (!finalizer_thread) {
+            obtain_fields_lock._unlock();
+            return;
+        }
+
+        Field* work_lock_field = class_lookup_field_recursive(
+                finalizer_thread,
+                "workLock", "Ljava/lang/Object;");
+        Field* shutdown_field = class_lookup_field_recursive(
+                finalizer_thread,
+                "shutdown", "Z");
+        Field* on_exit_field = class_lookup_field_recursive(
+                finalizer_thread,
+                "onExit", "Z");
+
+        assert(work_lock_field);
+        assert(shutdown_field);
+        assert(on_exit_field);
+
+        tmn_suspend_disable();
+        ManagedObject* work_lock_addr = get_raw_reference_pointer(
+            (ManagedObject **)work_lock_field->get_address());
+        assert(work_lock_addr);
+        work_lock = oh_allocate_global_handle();
+        work_lock->object = work_lock_addr;
+        assert(work_lock);
+        tmn_suspend_enable();
+
+        shutdown = (jboolean*) shutdown_field->get_address();
+        on_exit = (jboolean*) on_exit_field->get_address();
+        assert(shutdown);
+        assert(on_exit);
+
+        fields_obtained = true;
+    }
+    obtain_fields_lock._unlock();
+}
+
 void Objects_To_Finalize::run_finalizers()
 {
     assert(hythread_is_suspend_enabled());
 
-    Class* finalizer_thread = VM_Global_State::loader_env->finalizer_thread;
+    Class* finalizer_thread =
+        VM_Global_State::loader_env->java_lang_FinalizerThread_Class;
 
     if (!finalizer_thread) {
         return;
     }
 
-    int num_objects = getLength();
+    check_fields_obtained();
+
+    int num_objects = getLength() + vm_get_references_quantity();
 
     if (num_objects == 0) {
-        return;
+        //return;
     }
 
     if ((p_TLS_vmthread->finalize_thread_flags & (FINALIZER_STARTER | FINALIZER_THREAD)) != 0) {
         TRACE2("finalize", "recursive finalization prevented");
-        return;
+        //return;
     }
 
     p_TLS_vmthread->finalize_thread_flags |= FINALIZER_STARTER;
     TRACE2("finalize", "run_finalizers() started");
     
-    jvalue args[1];
-    args[0].z = false;
+    if (FRAME_COMPILATION ==
+            (FRAME_COMPILATION | m2n_get_frame_type(m2n_get_last_frame()))) {
+        assert(work_lock);
 
-    Method* finalize_meth = class_lookup_method_recursive(finalizer_thread,
-        "startFinalization", "(Z)V");
-    assert(finalize_meth);
+        IDATA r = jthread_monitor_try_enter(work_lock);
 
-    tmn_suspend_disable();
-    vm_execute_java_method_array((jmethodID) finalize_meth, 0, args);
-    tmn_suspend_enable();
+        if (r == TM_ERROR_NONE) {
+            jthread_monitor_notify_all(work_lock);
+            jthread_monitor_exit(work_lock);
+        }
+    } else {
+        Method* finalize_meth = class_lookup_method_recursive(finalizer_thread,
+            "startFinalization", "(Z)V");
+        assert(finalize_meth);
+
+        jvalue args[1];
+        args[0].z = false;
+
+        tmn_suspend_disable();
+        vm_execute_java_method_array((jmethodID) finalize_meth, 0, args);
+        tmn_suspend_enable();
+    }
 
 #ifndef NDEBUG
     if (exn_raised()) {
@@ -365,15 +448,13 @@ int Objects_To_Finalize::do_finalization(int quantity) {
     args[0].l = (jobject) handle;
 
     /* BEGIN: modified for NATIVE FINALIZER THREAD */
-    jboolean *finalizer_shutdown, *finalizer_on_exit;
     if(!native_finalizer_thread_flag){
-        assert(VM_Global_State::loader_env->finalizer_thread);
-        finalizer_shutdown = VM_Global_State::loader_env->finalizer_shutdown;
-        assert(finalizer_shutdown);
-        finalizer_on_exit = VM_Global_State::loader_env->finalizer_on_exit;
-        assert(finalizer_on_exit);
-        native_finalizer_shutdown = (Boolean)*finalizer_shutdown;
-        native_finalizer_on_exit = (Boolean)*finalizer_on_exit;
+        assert(VM_Global_State::loader_env->java_lang_FinalizerThread_Class);
+        check_fields_obtained();
+        assert(shutdown);
+        assert(on_exit);
+        native_finalizer_shutdown = (Boolean)*shutdown;
+        native_finalizer_on_exit = (Boolean)*on_exit;
     }
     /* END: modified for NATIVE FINALIZER THREAD */
 
@@ -402,13 +483,19 @@ int Objects_To_Finalize::do_finalization(int quantity) {
         assert(clss);
         
         /* BEGIN: modified for NATIVE FINALIZER THREAD */
-        if(native_finalizer_thread_flag)
+        if(native_finalizer_thread_flag) {
             native_finalizer_on_exit = get_finalizer_on_exit_flag();
-        if (native_finalizer_on_exit  && is_class_ignored(clss)) {
+
+            if (native_finalizer_on_exit  && is_class_ignored(clss)) {
+                tmn_suspend_enable();
+                continue;
+            }
+        }
+        /* END: modified for NATIVE FINALIZER THREAD */
+        if ((*on_exit)  && is_class_ignored(clss)) {
             tmn_suspend_enable();
             continue;
         }
-        /* END: modified for NATIVE FINALIZER THREAD */
         
         Method *finalize = class_lookup_method_recursive(clss,
             VM_Global_State::loader_env->FinalizeName_String,
@@ -530,8 +617,14 @@ int vm_get_finalizable_objects_quantity()
 /* returns true if finalization system is turned on, and false otherwise */
 bool vm_finalization_is_enabled()
 {
-    return VM_Global_State::loader_env->finalizer_thread != NULL;
-}// -- Code to deal with Reference Queues that need to be notified.
+    return VM_Global_State::loader_env->java_lang_FinalizerThread_Class != NULL;
+}
+
+void vm_obtain_finalizer_fields() {
+    objects_to_finalize.obtain_fields();
+}
+
+// -- Code to deal with Reference Queues that need to be notified.
 
 static References_To_Enqueue references_to_enqueue;
 
@@ -549,7 +642,7 @@ void vm_enqueue_reference(Managed_Object_Handle obj)
 } // vm_enqueue_reference
 
 void vm_enqueue_references()
-{ 
+{
     /* BEGIN: modified for NATIVE REFERENCE ENQUEUE THREAD */
     if(get_native_ref_enqueue_thread_flag())
         activate_ref_enqueue_thread();
@@ -557,6 +650,11 @@ void vm_enqueue_references()
         references_to_enqueue.enqueue_references();
     /* END: modified for NATIVE REFERENCE ENQUEUE THREAD */
 } //vm_enqueue_references
+
+int vm_get_references_quantity()
+{
+    return references_to_enqueue.getLength();
+}
 
 /* added for NATIVE REFERENCE ENQUEUE THREAD */
 void vm_ref_enqueue_func(void)
