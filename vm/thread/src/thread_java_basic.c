@@ -147,6 +147,7 @@ IDATA jthread_create_with_function(JNIEnv * jni_env, jthread java_thread, jthrea
 
     tm_java_thread = hythread_get_private_data(tm_native_thread);
     assert(tm_java_thread);
+    tm_java_thread->thread_object = (*jni_env)->NewGlobalRef(jni_env, java_thread);
 
     data = apr_palloc(tm_java_thread->pool, sizeof(wrapper_proc_data));
     if (data == NULL) {
@@ -202,6 +203,7 @@ IDATA jthread_attach(JNIEnv * jni_env, jthread java_thread, jboolean daemon) {
 
     jvmti_thread = hythread_get_private_data(tm_native_thread);
     assert(jvmti_thread);
+    jvmti_thread->thread_object = (*jni_env)->NewGlobalRef(jni_env, java_thread);
     jvmti_thread->jenv = jni_env;
     jvmti_thread->daemon = daemon;
 
@@ -320,7 +322,6 @@ IDATA associate_native_and_java_thread(JNIEnv * jni_env, jthread java_thread, hy
     }
     // JNI environment is created when this thread attaches to VM.
     tm_java_thread->jenv = NULL;
-    tm_java_thread->thread_object = (*jni_env)->NewGlobalRef(jni_env, java_thread);
     tm_java_thread->thread_ref    = (thread_ref) ? (*jni_env)->NewGlobalRef(jni_env, thread_ref) : NULL; 
     tm_java_thread->contended_monitor = 0;
     tm_java_thread->wait_monitor = 0;
