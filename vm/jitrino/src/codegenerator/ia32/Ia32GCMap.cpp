@@ -497,7 +497,9 @@ void RuntimeInterface::getGCRootSet(MethodDesc* methodDesc, GCInterface* gcInter
         }
     } else {
         //NPE + GC -> nothing to enumerate for this frame;
-        assert(0); //in debug mode all hardware exceptions are saved as empty gcsafepoints
+        //in debug mode all hardware exceptions are saved as empty gcsafepoints
+        // yet there are some issues with SOE: 
+        // e.g. we are in trouble if SOE is caught in the same method...
     }
 }
 
