@@ -49,6 +49,10 @@ public final class System {
     private System() {
     }
 
+    static String getPropertyUnsecure(String key) {
+        return getPropertiesUnsecure().getProperty(key);
+    }
+
     /**
      * @com.intel.drl.spec_ref
      */

@@ -633,7 +633,32 @@ public abstract class ClassLoader {
                 "Recursive invocation while initializing system class loader");
         }
         systemClassLoader = SystemClassLoader.getInstance();
-        String className = System.getProperty("java.system.class.loader");
+        
+        String smName = System.getPropertyUnsecure("java.security.manager");
+        if (smName != null) {
+            try {
+                final Class<SecurityManager> smClass;
+                if ("".equals(smName) || "default".equalsIgnoreCase(smName)) {
+                    smClass = java.lang.SecurityManager.class;
+                } else {
+                    smClass = (Class<SecurityManager>)systemClassLoader.loadClass(smName);
+                    if (!SecurityManager.class.isAssignableFrom(smClass)) {
+                        throw new Error(smClass
+                            + " must inherit java.lang.SecurityManager");
+                    }
+                }   
+                AccessController.doPrivileged(new PrivilegedExceptionAction() {
+                    public Object run() throws Exception {
+                        System.setSecurityManager(smClass.newInstance());
+                        return null;
+                    }
+                });
+            } catch (Exception e) {
+                throw (Error)new InternalError().initCause(e);
+            }
+        }
+
+        String className = System.getPropertyUnsecure("java.system.class.loader");
         if (className != null) {
             try {
                 final Class<?> userClassLoader = systemClassLoader
