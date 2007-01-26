@@ -381,6 +381,25 @@
             <property name="_target" value="${target}" />
         </subant>
     </target>
+    
+    <target name="test2" depends="init">
+        <parallel threadsPerProcessor="1" failonany="no">
+        <ant antfile="${external.dep.CLASSLIB}/build.xml" inheritAll="no" output="${build.semi.dir}/hut.log">
+            <target name="properties"/>
+            <target name="test"/>
+            <property name="hy.test.vm.name" value="drl"/>
+            <property name="test.jre.home" value="${build.deploy.dir}/jdk/jre"/>
+        </ant>
+        <!--ant antfile="targets/kernel.test.xml" target="kernel.test" output="${build.semi.dir}/kernel.log"/-->
+        <ant antfile="targets/ehwa.test.xml" target="ehwa" output="${build.semi.dir}/ehwa.log"/>
+        <ant target="test" output="${build.semi.dir}/test.log"/>
+        <!--sequential>
+            <ant target="cunit.test" output="${build.semi.dir}/cunit.log"/>
+            <ant target="smoke.test" output="${build.semi.dir}/smoke.log"/>
+            <ant target="jvmti.test" output="${build.semi.dir}/jvmti.log"/>
+        </sequential-->
+        </parallel>
+    </target>
 
     <target name="set.target.to.test">
         <property name="target" value="test" />
