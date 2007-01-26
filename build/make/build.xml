@@ -406,6 +406,11 @@
         <ant antfile="targets/kernel.test.xml" target="kernel.test"/>
     </target>
 
+    <!-- Main target to run Eclipse HelloWorld test scenario -->
+    <target name="ehwa.test" depends="init" >
+        <ant antfile="targets/ehwa.test.xml" target="ehwa"/>
+    </target>
+
     <!-- Main target to run jvmti tests /-->
     <target name="jvmti.test" depends="setup, init">
         <if>

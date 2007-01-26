@@ -1,0 +1,172 @@
+<!--
+     Licensed to the Apache Software Foundation (ASF) under one or more
+     contributor license agreements.  See the NOTICE file distributed with
+     this work for additional information regarding copyright ownership.
+     The ASF licenses this file to You under the Apache License, Version 2.0
+     (the "License"); you may not use this file except in compliance with
+     the License.  You may obtain a copy of the License at
+
+         http://www.apache.org/licenses/LICENSE-2.0
+
+     Unless required by applicable law or agreed to in writing, software
+     distributed under the License is distributed on an "AS IS" BASIS,
+     WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+     See the License for the specific language governing permissions and
+     limitations under the License.
+-->
+
+<project name="Eclipse HelloWorld test scenario">
+
+    <property name="test.jvm.exe" value="${build.deploy.dir}/jdk/jre/bin/java"/>
+    <property file="test.properties"/>
+    <property environment="env" />
+    
+    <condition property="os" value="win">
+        <os family="Windows" />
+    </condition>
+    <condition property="os" value="linux">
+        <os name="linux" />
+    </condition>
+    <condition property="arch" value="x86_64">
+        <or>
+            <equals arg1="x86_64" arg2="${os.arch}"/>
+            <equals arg1="amd64" arg2="${os.arch}"/>
+        </or>
+    </condition>
+    <condition property="arch" value="x86">
+        <or>
+            <equals arg1="x86" arg2="${os.arch}"/>
+            <equals arg1="i386" arg2="${os.arch}"/>
+        </or>
+    </condition>
+    <condition property="arch" value="ia64">
+        <equals arg1="ia64" arg2="${os.arch}"/>
+    </condition>
+
+    <propertycopy name="eclipse.url" from="eclipse.${os}.${arch}.url"/>
+    <basename file="${eclipse.url}" property="eclipse.zip"/>
+
+    <target name="ehwa" depends="setup-ehwa, run-ehwa, check-ehwa-result"/>
+
+    <target name="setup-ehwa" depends="check-depends, install-eclipse, install-plugin">
+        <delete quiet="true" file="${build.semi.dir}/ehwa/ehwa.status" />
+        <echo>Using Eclipse located at ${eclipse.home}</echo>
+    </target>
+
+    <target name="run-ehwa">
+        <for list="${ehwa.test.mode}" param="mode"
+            trim="true" keepgoing="true">
+            <sequential>
+                <antcall target="-run-ehwa-batch">
+                    <param name="ehwa.mode" value="@{mode}" />
+                </antcall>
+            </sequential>
+        </for>
+    </target>
+    
+    <target name="-run-ehwa-batch">
+        <property name="ehwa.workspace" value="${build.semi.dir}/ehwa/wksp"/>
+        <delete quiet="true" dir="${ehwa.workspace}" />
+        <mkdir dir="${ehwa.workspace}"/>
+        <propertycopy property="ehwa.mode.name" from="${ehwa.mode}.name" override="on"/>
+        <propertycopy property="ehwa.mode.switch" from="${ehwa.mode}.switch" override="on"/>
+        <echo>
+        ==================================
+        Run Eclipse HelloWorld using ${ehwa.mode.name}
+        ==================================
+        </echo>
+
+        <java fork="true" jvm="${test.jvm.exe}" jar="${eclipse.home}/startup.jar" resultproperty="ehwa.result">
+            <jvmarg value="${ehwa.mode.switch}" />
+            <arg line="-application org.eclipse.test.uitestapplication"/>
+            <arg line="-dev bin"/>
+            <arg line="-data ${ehwa.workspace}"/>
+            <arg line="formatter=org.apache.tools.ant.taskdefs.optional.junit.PlainJUnitResultFormatter"/>
+            <arg line="-testPluginName HelloAuto"/>
+            <arg line="-className HelloAuto.CreateAndRunTest"/>
+        </java>
+        <condition property="ehwa.status" value="PASSED" else="FAILED">
+            <equals arg1="${ehwa.result}" arg2="0"/>
+        </condition>
+        <concat append="on" destfile="${build.semi.dir}/ehwa/ehwa.status" 
+            >      ${ehwa.mode.name} ${ehwa.status} (Return code is ${ehwa.result})${line.separator}</concat>
+    </target>
+
+    <target name="check-ehwa-result">
+        <loadfile property="ehwa.test.summary" 
+            srcFile="${build.semi.dir}/ehwa/ehwa.status"/>
+        <echo message="  ***************************${line.separator}"/>
+        <echo message="  **** Eclipse HWA status ***${line.separator}"/>
+        <echo message="  ***************************${line.separator}"/>
+        <echo message="${line.separator}"/>
+        <echo message="${ehwa.test.summary}"/>
+        <echo message="${line.separator}"/>
+
+        <condition property="test.failed">
+            <contains string="${ehwa.test.summary}" substring="FAILED" />
+        </condition>
+        <fail unless="run.all.tests" if="test.failed" message="Eclipse HelloWorld scenario FAILED"/>
+    </target>
+
+    <target name="check-depends">
+        <condition property="eclipse.home" value="${env.ECLIPSE_HOME}">
+            <and>
+                <isset property="env.ECLIPSE_HOME"/>
+                <available file="${env.ECLIPSE_HOME}/startup.jar"/>
+          </and>
+        </condition>
+        <condition property="eclipse.home" value="${build.semi.dir}/ehwa/eclipse">
+            <available file="${build.semi.dir}/ehwa/eclipse/startup.jar"/>
+        </condition>
+        <condition property="eclipse.available">
+            <or>
+                <isset property="eclipse.home"/>
+                <available file="${build.precopied.dir}/archives/${eclipse.zip}"/>
+            </or>
+        </condition>
+        <condition property="ehwa.plugin.installed">
+            <and>
+                <isset property="eclipse.home"/>
+                <available file="${eclipse.home}/plugins/HelloAuto_0.0.1/HelloAuto.jar"/>
+            </and>
+        </condition>
+    </target>
+
+    <target name="download-eclipse" unless="eclipse.available">
+        <get dest="${build.precopied.dir}/archives/${eclipse.zip}" src="${eclipse.url}"
+            usetimestamp="true" verbose="true"/>
+    </target>
+
+    <target name="install-eclipse" depends="download-eclipse" unless="eclipse.home">
+        <delete quiet="true" dir="${build.semi.dir}/ehwa" />
+        <mkdir dir="${build.semi.dir}/ehwa"/>
+        
+        <if>
+            <isfileselected file="${eclipse.zip}">
+                <filename name="**/*.tar.gz"/>
+            </isfileselected>
+            <then>
+                <gunzip src="${build.precopied.dir}/archives/${eclipse.zip}" dest="${build.semi.dir}/ehwa/eclipse.tar" />
+                <untar src="${build.semi.dir}/ehwa/eclipse.tar" dest="${build.semi.dir}/ehwa" />
+                <delete file="${build.semi.dir}/ehwa/eclipse.tar"/>
+            </then>
+            <elseif>
+                <isfileselected file="${eclipse.zip}">
+                    <filename name="**/*.zip"/>
+                </isfileselected>
+                <then>
+                    <unzip dest="${build.semi.dir}/ehwa" src="${build.precopied.dir}/archives/${eclipse.zip}"/>
+                </then>
+            </elseif>
+            <else>
+                <fail>Unhandled archive type: ${eclipse.zip}</fail>
+            </else>
+        </if>
+        <property name="eclipse.home" value="${build.semi.dir}/ehwa/eclipse"/>
+    </target>
+
+    <target name="install-plugin" unless="ehwa.plugin.installed">
+        <unzip src="${build.VM.home}/tests/ehwa/ehwa.zip" dest="${eclipse.home}"/>
+    </target>
+
+</project>
