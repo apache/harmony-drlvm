@@ -14,10 +14,6 @@
  *  See the License for the specific language governing permissions and
  *  limitations under the License.
  */
-/**
-* @author Alexander V. Astapchuk
-* @version $Revision: 1.1.2.2.4.3 $
-*/
 
 package java.security;
 
@@ -25,8 +21,6 @@ import java.util.ArrayList;
 import java.util.WeakHashMap;
 
 import org.apache.harmony.fortress.security.SecurityUtils;
-
-import org.apache.harmony.vm.VMStack;
 
 /**
  * @com.intel.drl.spec_ref
@@ -197,50 +191,27 @@ public final class AccessController {
             throw new NullPointerException("permission can not be null");
         }
 
-        Class[] trace = VMStack.getClasses(-1, true);
-
-        // do a quick check: always trust to doSecure_XXX calls from AC
-        for (int i = 0; i < trace.length; i++) {
-            if (DoSecure.class == trace[i]) {
-                return;
-            }
-        }
-        buildContext(trace).checkPermission(perm);
+        getContext().checkPermission(perm);
     }
 
+    /**
+     * Returns array of ProtectionDomains of classes residing 
+     * on the stack of the current thread, up to the caller of nearest
+     * privileged frame; reflection frames are skipped. 
+     * The returned array is never null and never contains null elements, 
+     * meaning that bootstrap classes are effectively ignored.
+     * @see org.apache.harmony.vm.VMStack.getClasses()
+     */
+    private static native ProtectionDomain[] getStackDomains();
+    
     /**
      * @com.intel.drl.spec_ref 
      */
     public static AccessControlContext getContext() {
-        Class[] trace = VMStack.getClasses(-1, true);
-        return buildContext(trace);
-    };
 
-    /**
-     * Builds AccessControllerContext from the passed stack trace, loading
-     * inherited context if neccessary. It's taken out as a separate method as
-     * both the getContext() and checkPermission() query the stack trace and I
-     * want to avoid additional unnecessary trip to VM.
-     * 
-     * @param trace
-     *            stack trace
-     * @return current AccessControllerContext basing on the <code>trace</code>
-     *         passed
-     */
-    private static AccessControlContext buildContext(Class[] trace) {
-
-        ArrayList<ProtectionDomain> a = new ArrayList<ProtectionDomain>();
-        for (int i = 0; i < trace.length; i++) {
-            ProtectionDomain pd = DoSecure.doSecure_getProtectionDomain(trace[i]);
-            
-            if (!a.contains(pd)) { // remove dups
-                a.add(pd);
-            }
-        }
-
-        ProtectionDomain[] stack = new ProtectionDomain[a.size()];
-        a.toArray(stack);
-
+        // duplicates (if any) will be removed in ACC constructor
+        ProtectionDomain[] stack = getStackDomains();
+        
         Thread currThread = Thread.currentThread();
         if (currThread == null || contexts == null) {
             // Big boo time. No need to check anything ? 
@@ -265,41 +236,18 @@ public final class AccessController {
 
         if (that != null && that.combiner != null) {
             ProtectionDomain[] assigned = null;
-            if (that.context != null) {
-                if (that.context.length == 0) {
-                    assigned = new ProtectionDomain[0];
-                } else {
+            if (that.context != null && that.context.length != 0) {
                     assigned = new ProtectionDomain[that.context.length];
                     System.arraycopy(that.context, 0, assigned, 0,
                             assigned.length);
-                }
             }
             ProtectionDomain[] allpds = that.combiner.combine(stack, assigned);
+            if (allpds == null) {
+                allpds = new ProtectionDomain[0];
+            }
             return new AccessControlContext(allpds, that.combiner);
         }
 
         return new AccessControlContext(stack, that);
-    }
-
-    private static final class DoSecure {
-        /**
-         * The doSecure_XXX method acts like a doPrivileged() does.<br>
-         * The exception is a special processing in the checkPermission() method. 
-         * doPrivileged() calls always go through the full check with the stack inspection.<br>
-         * doSecure_XXX() calls are always trusted as they always get called from AccessController 
-         * only, and this is quick-checked in the checkPermission() without inspecting the
-         * full call chain.<br>
-         * There are currently only one doSecure_XXX method - doSecure_getProtectionDomain(Class klass)<br>
-         * The reasons why this is done via this specific and not general (like 'doSecure(PrivilegedAction)')
-         * method are:<br>
-         * 1. I only need this 1 action and I don't need anything more general<br>
-         * 2. I do not want to create additional Class-es/Object-s on each checkPermssion/getContext call.
-         * 
-         * @param klass
-         * @return klass.getProtectionDomain()
-         */
-        private static ProtectionDomain doSecure_getProtectionDomain(Class<?> klass) {
-            return klass.getProtectionDomain();
-        }
     }
 }

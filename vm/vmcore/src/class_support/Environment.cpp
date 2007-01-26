@@ -194,6 +194,9 @@ ready_for_exceptions(false)
 
     JavaLangString_VTable = NULL;
 
+    java_security_ProtectionDomain_Class = NULL;
+    Class_domain_field_offset = 0;
+
     vm_class_offset = 0;
     vm_state = VM_INITIALIZING;
 

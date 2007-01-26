@@ -14,10 +14,6 @@
  *  See the License for the specific language governing permissions and
  *  limitations under the License.
  */
-/** 
- * @author Euguene Ostrovsky
- * @version $Revision: 1.1.6.6 $
- */  
 
 /**
  * @file org_apache_harmony_vm_VMStack.cpp
@@ -29,6 +25,8 @@
 
 #define LOG_DOMAIN "kernel.stack"
 #include "cxxlog.h"
+
+#include <vector>
 
 #include "open/jthread.h"
 #include "stack_trace.h"
@@ -42,6 +40,7 @@
 #include "java_lang_VMClassRegistry.h"
 
 #include "org_apache_harmony_vm_VMStack.h"
+#include "java_security_AccessController.h"
 
 /*
  * Class:     org_apache_harmony_vm_VMStack
@@ -173,6 +172,75 @@ JNIEXPORT jobjectArray JNICALL Java_org_apache_harmony_vm_VMStack_getClasses
     assert(hythread_is_suspend_enabled());
     return arr;
 }
+
+/*
+* Method: java.security.AccessController.getStackDomains()[Ljava/security/ProtectionDomain;
+*/
+JNIEXPORT jobjectArray JNICALL
+Java_java_security_AccessController_getStackDomains(JNIEnv *jenv, jclass UNREF)
+{
+    assert(hythread_is_suspend_enabled());
+    unsigned size;
+    StackTraceFrame* frames;
+    st_get_trace(get_thread_ptr(), &size, &frames);
+
+    std::vector<jobject> domains = std::vector<jobject>();
+    Global_Env* genv = jni_get_vm_env(jenv);
+
+    unsigned domain_field_offset = genv->Class_domain_field_offset;
+
+    if (domain_field_offset == 0) {
+        // initialize preloaded values
+        genv->java_security_ProtectionDomain_Class = genv->LoadCoreClass("java/security/ProtectionDomain");
+        String* name = genv->string_pool.lookup("domain");
+        String* desc = genv->string_pool.lookup("Ljava/security/ProtectionDomain;");
+        Field* f = genv->JavaLangClass_Class->lookup_field(name, desc);
+        assert(f);
+        domain_field_offset = genv->Class_domain_field_offset = f->get_offset();
+    }
+
+    // The caller of the caller of this method is stored as a first element of the array.
+    // For details look at the org/apache/harmony/vm/VMStack.java file. Thus skipping 2 frames.
+    unsigned s = 2;
+    for (; s < size; s++) {
+        Method_Handle method = frames[s].method;
+
+        if (isReflectionFrame(method, genv))
+            continue;
+
+        if (isPrivilegedFrame(method, genv)) {
+            // find nearest non-reflection frame and finish looping
+            while (++s < size && isReflectionFrame(frames[s].method, genv));
+            TRACE("Privileged frame at " << s << " of " << size);
+            size = s;
+            method = frames[s].method;
+        }
+
+        jobject pd = GetObjectFieldOffset(jenv, 
+            struct_Class_to_java_lang_Class_Handle(method->get_class()), domain_field_offset);
+        if (pd) {
+            domains.push_back(pd);
+        }
+    }
+
+    jclass pdc = struct_Class_to_java_lang_Class_Handle(genv->java_security_ProtectionDomain_Class);
+    assert(pdc);
+    size = domains.size();
+    TRACE("Domains on stack: " << size);
+    // create & fill  java array
+    jarray arr = jenv->NewObjectArray(size, pdc, NULL);
+    if (arr != NULL) {
+        for (s = 0; s < size; s++) {
+            jenv->SetObjectArrayElement(arr, s, domains[s]);
+        }
+    } else {
+        // OutOfMemoryError
+        assert(exn_raised());
+    }
+    core_free(frames);
+    return arr;
+}
+
 
 /*
  * Class:     org_apache_harmony_vm_VMStack

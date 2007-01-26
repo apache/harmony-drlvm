@@ -196,6 +196,9 @@ struct Global_Env {
     Class* java_lang_OutOfMemoryError_Class;
     Class* java_lang_ThreadDeath_Class;
 
+    Class* java_security_ProtectionDomain_Class;
+    unsigned Class_domain_field_offset;
+
     ObjectHandle java_lang_Object;
     ObjectHandle java_lang_OutOfMemoryError;
     ObjectHandle java_lang_ThreadDeath;
