@@ -516,7 +516,8 @@ static jint vm_create_jthread(jthread * thread_object, JNIEnv * jni_env, jobject
     thread_handle = oh_allocate_global_handle();
     thread_handle->object = class_alloc_new_object(thread_class);
     if (thread_handle->object == NULL) {
-        assert(exn_raised() && exn_get()->object == vm_env->java_lang_OutOfMemoryError->object);
+        assert(!hythread_is_suspend_enabled());
+        assert(exn_raised() && p_TLS_vmthread->thread_exception.exc_object == vm_env->java_lang_OutOfMemoryError->object);
         return JNI_ENOMEM;
     }
     *thread_object = thread_handle;
