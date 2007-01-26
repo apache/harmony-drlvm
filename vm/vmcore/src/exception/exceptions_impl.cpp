@@ -42,11 +42,19 @@ Class *get_exc_class(const char *exception_name)
     String *exc_str = env->string_pool.lookup(exception_name);
     Class *exc_class =
         env->bootstrap_class_loader->LoadVerifyAndPrepareClass(env, exc_str);
-    if (exc_class == NULL) return NULL;
+
+    if (exc_class == NULL) {
+        return NULL;
+    }
+
     tmn_suspend_disable();
     class_initialize(exc_class);
     tmn_suspend_enable();
-    assert(!exn_raised());
+
+    if (exn_raised()) {
+        return NULL;
+    }
+
     return exc_class;
 }
 

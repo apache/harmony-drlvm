@@ -218,6 +218,7 @@ Class* ClassLoader::DefineClass(Global_Env* env, const char* class_name,
                                 uint8* bytecode, unsigned offset, unsigned length,
                                 const String** res_name)
 {
+    assert(!exn_raised());
     const String *className;
 
     LOG2("classloader.defineclass", "Defining class " << (NULL != class_name ? class_name : "NULL") << " with loader " << this);
@@ -226,6 +227,7 @@ Class* ClassLoader::DefineClass(Global_Env* env, const char* class_name,
     } else {
         className = class_extract_name(env, bytecode, offset, length);
         if(className == NULL) {
+            FailedLoadingClass(className);
             exn_raise_by_name("java/lang/ClassFormatError",
                 "class name could not be extracted from provided class data", NULL);
             return NULL;
@@ -235,7 +237,7 @@ Class* ClassLoader::DefineClass(Global_Env* env, const char* class_name,
         *res_name = className;
     }
 
-    Class* clss;
+    Class* clss = NULL;
     if((clss = WaitDefinition(env, className)) != NULL || exn_raised())
         return clss;
 
@@ -336,6 +338,7 @@ Package* ClassLoader::ProvidePackage(Global_Env* env, const String* class_name,
 
 Class* ClassLoader::LoadVerifyAndPrepareClass(Global_Env* env, const String* name)
 {
+    assert(!exn_raised());
     assert(hythread_is_suspend_enabled());
 
     Class* clss = LoadClass(env, name);
@@ -908,6 +911,7 @@ static void set_struct_Class_field_in_java_lang_Class(const Global_Env* env, Man
 */
 Class* ClassLoader::AllocateAndReportInstance(const Global_Env* env, Class* clss)
 {
+     ASSERT_RAISE_AREA;
     const String* name = clss->get_name();
     assert(name);
 
@@ -1486,6 +1490,7 @@ Class* ClassLoader::LoadClass(Global_Env* env, const String* className)
 Class* BootstrapClassLoader::DoLoadClass(Global_Env* UNREF env,
                                        const String* className)
 {
+    assert(!exn_raised());
     assert(env == m_env);
     assert(!exn_raised());
 
@@ -1669,6 +1674,8 @@ void BootstrapClassLoader::ReportAndExit(const char* exnclass, std::stringstream
 
 Class* BootstrapClassLoader::LoadFromFile(const String* class_name)
 {
+    assert(!exn_raised());
+
     // the symptom of circularity (illegal) is that a null class name is passed,
     // so detect this immediately
     if( !class_name->bytes || *(class_name->bytes) == 0 ) {
@@ -1788,6 +1795,8 @@ Class* BootstrapClassLoader::LoadFromClassFile(const String* dir_name,
 Class* BootstrapClassLoader::LoadFromJarFile( JarFile* jar_file,
     const char* class_name_in_jar, const String* class_name, bool* not_found)
 {
+    assert(!exn_raised());
+
     // find archive entry in archive file
     *not_found = false;
     const JarEntry *entry = jar_file->Lookup(class_name_in_jar);
