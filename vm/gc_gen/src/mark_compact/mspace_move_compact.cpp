@@ -15,7 +15,7 @@
  */
 
 /**
- * @author Chunrong Lai, 2006/12/01
+ * @author Chunrong Lai, 2006/12/25
  */
 
 #include "mspace_collect_compact.h"
@@ -56,22 +56,22 @@ static void mspace_move_objects(Collector* collector, Mspace* mspace)
       /* we don't check if it's set, since only remaining objs from last NOS partial collection need it. */
       obj_unmark_in_oi(p_obj); 
       
-      unsigned int curr_sector_size = (unsigned int)start_pos - (unsigned int)src_sector_addr;
+      POINTER_SIZE_INT curr_sector_size = (POINTER_SIZE_INT)start_pos - (POINTER_SIZE_INT)src_sector_addr;
 
       /* check if dest block is not enough to hold this sector. If yes, grab next one */      
-      unsigned int block_end = (unsigned int)GC_BLOCK_END(dest_block);
-      if( ((unsigned int)dest_sector_addr + curr_sector_size) > block_end ){
+      POINTER_SIZE_INT block_end = (POINTER_SIZE_INT)GC_BLOCK_END(dest_block);
+      if( ((POINTER_SIZE_INT)dest_sector_addr + curr_sector_size) > block_end ){
         dest_block->new_free = dest_sector_addr; 
         dest_block = mspace_get_next_target_block(collector, mspace);
         if(dest_block == NULL){ 
           collector->result = FALSE; 
           return; 
         }
-        block_end = (unsigned int)GC_BLOCK_END(dest_block);
+        block_end = (POINTER_SIZE_INT)GC_BLOCK_END(dest_block);
         dest_sector_addr = dest_block->base;
       }
         
-      assert(((unsigned int)dest_sector_addr + curr_sector_size) <= block_end );
+      assert(((POINTER_SIZE_INT)dest_sector_addr + curr_sector_size) <= block_end );
 
       /* check if current sector has no more sector. If not, loop back. FIXME:: we should add a condition for block check */      
       p_obj =  block_get_next_marked_object(curr_block, &start_pos);
@@ -79,26 +79,26 @@ static void mspace_move_objects(Collector* collector, Mspace* mspace)
         continue;
 
       /* current sector is done, let's move it. */
-      unsigned int sector_distance = (unsigned int)src_sector_addr - (unsigned int)dest_sector_addr;
+      POINTER_SIZE_INT sector_distance = (POINTER_SIZE_INT)src_sector_addr - (POINTER_SIZE_INT)dest_sector_addr;
       curr_block->table[curr_sector] = sector_distance;
 
       if (verify_live_heap) {
-      	   Partial_Reveal_Object *rescan_obj = (Partial_Reveal_Object *)src_sector_addr;
-      	   void *rescan_pos = (Partial_Reveal_Object *)((unsigned int)rescan_obj + vm_object_size(rescan_obj));
-      	   while ((unsigned int)rescan_obj < (unsigned int)src_sector_addr + curr_sector_size) {
-    	      Partial_Reveal_Object* targ_obj = (Partial_Reveal_Object *)((unsigned int)rescan_obj- sector_distance);
+           Partial_Reveal_Object *rescan_obj = (Partial_Reveal_Object *)src_sector_addr;
+           void *rescan_pos = (Partial_Reveal_Object *)((POINTER_SIZE_INT)rescan_obj + vm_object_size(rescan_obj));
+           while ((POINTER_SIZE_INT)rescan_obj < (POINTER_SIZE_INT)src_sector_addr + curr_sector_size) {
+            Partial_Reveal_Object* targ_obj = (Partial_Reveal_Object *)((POINTER_SIZE_INT)rescan_obj- sector_distance);
              if(is_fallback)
                event_collector_doublemove_obj(rescan_obj, targ_obj, collector);
              else
                event_collector_move_obj(rescan_obj, targ_obj, collector);
-      	      rescan_obj = block_get_next_marked_object(curr_block, &rescan_pos);	
-      	      if(rescan_obj == NULL) break;
-      	   }
+              rescan_obj = block_get_next_marked_object(curr_block, &rescan_pos);  
+              if(rescan_obj == NULL) break;
+           }
       }
          
       memmove(dest_sector_addr, src_sector_addr, curr_sector_size);
 
-      dest_sector_addr = (void*)((unsigned int) dest_sector_addr + curr_sector_size);
+      dest_sector_addr = (void*)((POINTER_SIZE_INT)dest_sector_addr + curr_sector_size);
       src_sector_addr = p_obj;
       curr_sector  = OBJECT_INDEX_TO_OFFSET_TABLE(p_obj);
     }
@@ -147,7 +147,7 @@ void move_compact_mspace(Collector* collector)
   if(gc->collect_kind != FALLBACK_COLLECTION)    
        mark_scan_heap(collector);  
   else
-       fallback_mark_scan_heap(collector);  	
+       fallback_mark_scan_heap(collector);    
 
   old_num = atomic_inc32(&num_marking_collectors);
   if( ++old_num == num_active_collectors ){
@@ -160,10 +160,9 @@ void move_compact_mspace(Collector* collector)
 #ifndef BUILD_IN_REFERENT
     else {
       gc_set_weakref_sets(gc);
-      update_ref_ignore_finref(collector);
+      gc_update_weakref_ignore_finref(gc);
     }
 #endif
-
     
     /* let other collectors go */
     num_marking_collectors++; 
@@ -208,7 +207,7 @@ void move_compact_mspace(Collector* collector)
   }
   while(num_fixing_collectors != num_active_collectors + 1);
 
-   /* Dealing with out of space in mspace */  
+   /* Dealing with out of memory in mspace */  
   if(mspace->free_block_idx > fspace->first_block_idx){    
      atomic_cas32( &num_extending_collectors, 0, num_active_collectors);        
      mspace_extend_compact(collector);        
@@ -219,10 +218,6 @@ void move_compact_mspace(Collector* collector)
   /* Leftover: **************************************************
    */
   if( collector->thread_handle != 0 ) return;
-
-
-  if(!IGNORE_FINREF )
-    gc_put_finref_to_vm(gc);
 
   mspace_reset_after_compaction(mspace);
   fspace_reset_for_allocation(fspace);

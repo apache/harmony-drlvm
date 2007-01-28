@@ -154,7 +154,7 @@ inline GC_VTable_Info *vtable_get_gcvt_raw(Partial_Reveal_VTable *vt)
 {  assert(vt && vt->gcvt); return vt->gcvt; }
 
 inline GC_VTable_Info *vtable_get_gcvt(Partial_Reveal_VTable *vt) 
-{  assert(vt && vt->gcvt); return (GC_VTable_Info*)((unsigned int)vt->gcvt & GC_CLASS_FLAGS_MASK); }
+{  assert(vt && vt->gcvt); return (GC_VTable_Info*)((POINTER_SIZE_INT)vt->gcvt & GC_CLASS_FLAGS_MASK); }
 
 inline void vtable_set_gcvt(Partial_Reveal_VTable *vt, GC_VTable_Info *new_gcvt) 
 {  assert(vt && new_gcvt); vt->gcvt = new_gcvt; }
@@ -174,14 +174,14 @@ inline GC_VTable_Info *obj_get_gcvt(Partial_Reveal_Object *obj)
 inline Boolean object_has_ref_field(Partial_Reveal_Object *obj) 
 {
   GC_VTable_Info *gcvt = obj_get_gcvt_raw(obj);
-  return (unsigned int)gcvt & GC_CLASS_FLAG_REFS;   
+  return (POINTER_SIZE_INT)gcvt & GC_CLASS_FLAG_REFS;   
 }
 
 inline Boolean object_has_ref_field_before_scan(Partial_Reveal_Object *obj) 
 {
   Partial_Reveal_VTable *vt = obj_get_vt_raw(obj);  
   GC_VTable_Info *gcvt = vtable_get_gcvt_raw(vt);
-  return (unsigned int)gcvt & GC_CLASS_FLAG_REFS;   
+  return (POINTER_SIZE_INT)gcvt & GC_CLASS_FLAG_REFS;   
 }
 
 inline unsigned int object_ref_field_num(Partial_Reveal_Object *obj) 
@@ -193,7 +193,7 @@ inline unsigned int object_ref_field_num(Partial_Reveal_Object *obj)
 inline Boolean object_is_array(Partial_Reveal_Object *obj) 
 {
   GC_VTable_Info *gcvt = obj_get_gcvt_raw(obj);
-  return ((unsigned int)gcvt & GC_CLASS_FLAG_ARRAY);
+  return ((POINTER_SIZE_INT)gcvt & GC_CLASS_FLAG_ARRAY);
 } 
 
 inline Boolean obj_is_primitive_array(Partial_Reveal_Object *obj) 
@@ -244,7 +244,7 @@ inline WeakReferenceType special_reference_type(Partial_Reveal_Object *p_referen
 inline Boolean type_has_finalizer(Partial_Reveal_VTable *vt)
 {
   GC_VTable_Info *gcvt = vtable_get_gcvt_raw(vt);
-  return (unsigned int)gcvt & GC_CLASS_FLAG_FINALIZER;
+  return (POINTER_SIZE_INT)gcvt & GC_CLASS_FLAG_FINALIZER;
 }
 
 #endif //#ifndef _GC_TYPES_H_

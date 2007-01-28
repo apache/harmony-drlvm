@@ -52,7 +52,7 @@ inline unsigned int words_get_next_set_lsb(unsigned int* words, unsigned int cou
 {
   unsigned int bit_offset;
   
-  assert((start_idx >= 0) && (start_idx < 128));
+  assert(start_idx < 128);
   
   unsigned int start_word_index = start_idx >> BIT_SHIFT_TO_BITS_PER_WORD;
   unsigned int start_bit_offset = start_idx & BIT_MASK_TO_BITS_PER_WORD;
@@ -79,9 +79,9 @@ inline unsigned int words_get_next_set_lsb(unsigned int* words, unsigned int cou
 
 inline void words_set_bit(unsigned int* words, unsigned int count, unsigned int start_idx)
 {
-  assert((start_idx >= 0) && (start_idx < 128));
+  assert(start_idx < 128);
   
-  unsigned int word_index = start_idx >> BIT_SHIFT_TO_BITS_PER_WORD;	
+  unsigned int word_index = start_idx >> BIT_SHIFT_TO_BITS_PER_WORD;  
   unsigned int bit_offset = start_idx & BIT_MASK_TO_BITS_PER_WORD;
   
   if(word_index >= count) return;
@@ -98,7 +98,7 @@ inline void words_set_bit(unsigned int* words, unsigned int count, unsigned int 
 
 inline void words_clear_bit(unsigned int* words, unsigned int count, unsigned int start_idx)
 {
-  assert((start_idx >= 0) && (start_idx < 128));
+  assert(start_idx < 128);
   
   unsigned int word_index = start_idx >> BIT_SHIFT_TO_BITS_PER_WORD;
   unsigned int bit_offset = start_idx & BIT_MASK_TO_BITS_PER_WORD;

@@ -74,6 +74,9 @@ void mspace_reset_after_compaction(Mspace* mspace)
     }
   }
   mspace->num_used_blocks = new_num_used;
+  /*For_statistic mos infomation*/
+  mspace->surviving_size = new_num_used * GC_BLOCK_SIZE_BYTES;
+  mspace->alloced_size = 0;
   
   /* we should clear the remaining blocks which are set to be BLOCK_COMPACTED or BLOCK_TARGET */
   for(; i < mspace->num_managed_blocks; i++){
@@ -183,6 +186,9 @@ Block_Header* mspace_get_next_compact_block(Collector* collector, Mspace* mspace
   return NULL;
 }
 
+#include "../trace_forward/fspace.h"
+#include "../gen/gen.h"
+
 Block_Header* mspace_get_next_target_block(Collector* collector, Mspace* mspace)
 {    
   Block_Header* cur_target_block = (Block_Header*)next_block_for_target;
@@ -205,8 +211,13 @@ Block_Header* mspace_get_next_target_block(Collector* collector, Mspace* mspace)
     assert( cur_target_block->status & (BLOCK_IN_COMPACT|BLOCK_COMPACTED|BLOCK_TARGET)); 
   */
 
-  /* nos is higher than mos, we cant use nos block for compaction target */
-  while( cur_target_block ){
+  /* mos may be out of space, so we can use nos blocks for compaction target.
+   * but we can't use the blocks which are given to los when los extension happens.
+   * in this case, an out-of-mem should be given to user.
+   */
+  Fspace *nos = ((GC_Gen*)collector->gc)->nos;
+  Block_Header *nos_end = ((Block_Header *)&nos->blocks[nos->num_managed_blocks-1])->next;
+  while( cur_target_block != nos_end){
     //For_LOS_extend
     //assert( cur_target_block <= collector->cur_compact_block);
     Block_Header* next_target_block = cur_target_block->next;
@@ -242,8 +253,6 @@ Block_Header* mspace_get_next_target_block(Collector* collector, Mspace* mspace)
 
 void mspace_collection(Mspace* mspace) 
 {
-  // printf("Major Collection ");
-
   mspace->num_collections++;
 
   GC* gc = mspace->gc;  
@@ -259,16 +268,13 @@ void mspace_collection(Mspace* mspace)
 
   //For_LOS_extend
   if(gc->tuner->kind != TRANS_NOTHING){
-    // printf("for LOS extention");
     collector_execute_task(gc, (TaskType)slide_compact_mspace, (Space*)mspace);
     
   }else if (gc->collect_kind == FALLBACK_COLLECTION){
-    // printf("for Fallback");
     collector_execute_task(gc, (TaskType)slide_compact_mspace, (Space*)mspace);  
     //IS_MOVE_COMPACT = TRUE;
     //collector_execute_task(gc, (TaskType)move_compact_mspace, (Space*)mspace);
     //IS_MOVE_COMPACT = FALSE;
-
   }else{
 
     switch(mspace->collect_algorithm){
@@ -281,7 +287,7 @@ void mspace_collection(Mspace* mspace)
         collector_execute_task(gc, (TaskType)move_compact_mspace, (Space*)mspace);
         IS_MOVE_COMPACT = FALSE;
         break;
-        
+  
       default:
         printf("\nThe speficied major collection algorithm doesn't exist!\n");
         exit(0);
@@ -289,8 +295,6 @@ void mspace_collection(Mspace* mspace)
     }
 
   }  
-
-  // printf("...end.\n");
   return;  
 } 
 

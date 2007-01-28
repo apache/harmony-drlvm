@@ -33,7 +33,7 @@ public class GCHelper {
 
     public static final int TLS_GC_OFFSET = TLSGCOffset();
 
-    public static Address alloc(int objSize, int allocationHandle) throws InlinePragma {
+    public static Address alloc(int objSize, int allocationHandle)  throws InlinePragma {
         Address TLS_BASE = VMHelper.getTlsBaseAddress();
 
         Address allocator_addr = TLS_BASE.plus(TLS_GC_OFFSET);
@@ -74,13 +74,13 @@ public class GCHelper {
        be a constant in future.
     */
 
-    public static final int NOS_BOUNDARY = getNosBoundary();
+    public static Address NOS_BOUNDARY = getNosBoundary();
     public static boolean GEN_MODE = getGenMode();
 
     public static void write_barrier_slot_rem(Address p_objBase, Address p_objSlot, Address p_target)  throws InlinePragma {
       
        /* If the slot is in NOS or the target is not in NOS, we simply return*/
-        if(p_objSlot.toInt() >= NOS_BOUNDARY || p_target.toInt() < NOS_BOUNDARY || !GEN_MODE) {
+        if(p_objSlot.GE(NOS_BOUNDARY) || p_target.LT(NOS_BOUNDARY) || !GEN_MODE) {
             p_objSlot.store(p_target);
             return;
         }
@@ -90,7 +90,7 @@ public class GCHelper {
 
     private static native int helperCallback();
     private static native boolean getGenMode(); 
-    private static native int getNosBoundary();    
+    private static native Address getNosBoundary();    
     private static native int TLSGCOffset();
 }
 

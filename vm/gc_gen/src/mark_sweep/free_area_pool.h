@@ -25,9 +25,9 @@
 #include "../utils/bit_ops.h"
 #include "../utils/bidir_list.h"
 
-#define ADDRESS_IS_KB_ALIGNED(addr) (!(((unsigned int)addr) & ((1 << BIT_SHIFT_TO_KILO)-1)))
-#define ALIGN_UP_TO_KILO(addr) (((unsigned int)(addr) + (KB - 1)) & (~(KB- 1)))
-#define ALIGN_DOWN_TO_KILO(addr) ((unsigned int)(addr) & (~(KB- 1)))
+#define ADDRESS_IS_KB_ALIGNED(addr) (!(((POINTER_SIZE_INT)addr) & ((1 << BIT_SHIFT_TO_KILO)-1)))
+#define ALIGN_UP_TO_KILO(addr) (((POINTER_SIZE_INT)(addr) + (KB - 1)) & (~(KB- 1)))
+#define ALIGN_DOWN_TO_KILO(addr) ((POINTER_SIZE_INT)(addr) & (~(KB- 1)))
 
 #define NUM_FREE_LIST 128
 
@@ -37,7 +37,7 @@ typedef struct Lockable_Bidir_List{
   Bidir_List* next;
   Bidir_List* prev;
   /* END of Bidir_List --> */
-  unsigned int lock;	
+  SpinLock lock;  
 }Lockable_Bidir_List;
 
 typedef struct Free_Area{
@@ -120,7 +120,7 @@ inline void free_pool_remove_area(Free_Area_Pool* pool, Free_Area* free_area)
   /* set bit flag of the list */
   Bidir_List* list = (Bidir_List*)&(pool->sized_area_list[index]);
   if(list->next == list){
-  	pool_list_clear_flag(pool, index);		
+  	pool_list_clear_flag(pool, index);    
   }
 }
 

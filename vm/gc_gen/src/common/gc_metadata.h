@@ -30,7 +30,7 @@
 
 typedef struct GC_Metadata{
   void *segments[GC_METADATA_SEGMENT_NUM]; /* address array of malloced segments for free pool */
-  unsigned int num_alloc_segs; /* next available position in pool_segments array */
+  unsigned int num_alloc_segs; /* allocated segment number */
   SpinLock  alloc_lock;
     
   Pool* free_task_pool; /* list of free buffers for mark tasks */
@@ -107,7 +107,7 @@ inline void mutator_remset_add_entry(Mutator* mutator, Partial_Reveal_Object** p
   assert( p_ref >= gc_heap_base_address() && p_ref < gc_heap_ceiling_address()); 
 
   Vector_Block* root_set = mutator->rem_set;  
-  vector_block_add_entry(root_set, (unsigned int)p_ref);
+  vector_block_add_entry(root_set, (POINTER_SIZE_INT)p_ref);
   
   if( !vector_block_is_full(root_set)) return;
     
@@ -121,7 +121,7 @@ inline void collector_repset_add_entry(Collector* collector, Partial_Reveal_Obje
 //  assert( p_ref >= gc_heap_base_address() && p_ref < gc_heap_ceiling_address()); 
 
   Vector_Block* root_set = collector->rep_set;  
-  vector_block_add_entry(root_set, (unsigned int)p_ref);
+  vector_block_add_entry(root_set, (POINTER_SIZE_INT)p_ref);
   
   if( !vector_block_is_full(root_set)) return;
     
@@ -135,7 +135,7 @@ inline void collector_remset_add_entry(Collector* collector, Partial_Reveal_Obje
   //assert( p_ref >= gc_heap_base_address() && p_ref < gc_heap_ceiling_address()); 
 
   Vector_Block* root_set = collector->rem_set;  
-  vector_block_add_entry(root_set, (unsigned int)p_ref);
+  vector_block_add_entry(root_set, (POINTER_SIZE_INT)p_ref);
   
   if( !vector_block_is_full(root_set)) return;
     
@@ -149,7 +149,7 @@ inline void collector_tracestack_push(Collector* collector, void* p_task)
   /* we don't have assert as others because p_task is a p_obj for marking,
      or a p_ref for trace forwarding. The latter can be a root set pointer */
   Vector_Block* trace_task = (Vector_Block*)collector->trace_stack;  
-  vector_stack_push(trace_task, (unsigned int)p_task);
+  vector_stack_push(trace_task, (POINTER_SIZE_INT)p_task);
   
   if( !vector_stack_is_full(trace_task)) return;
     
@@ -163,7 +163,7 @@ inline void gc_rootset_add_entry(GC* gc, Partial_Reveal_Object** p_ref)
   assert( p_ref < gc_heap_base_address() || p_ref >= gc_heap_ceiling_address()); 
   
   Vector_Block* root_set = gc->root_set;  
-  vector_block_add_entry(root_set, (unsigned int)p_ref);
+  vector_block_add_entry(root_set, (POINTER_SIZE_INT)p_ref);
   
   if( !vector_block_is_full(root_set)) return;
     

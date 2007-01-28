@@ -34,7 +34,7 @@ void collector_restore_obj_info(Collector* collector)
   assert(!collector->rem_set);
   
   while(Vector_Block *oi_block = pool_get_entry(remset_pool)){
-    unsigned int *iter = vector_block_iterator_init(oi_block);
+    POINTER_SIZE_INT *iter = vector_block_iterator_init(oi_block);
     while(!vector_block_iterator_end(oi_block, iter)){
       Partial_Reveal_Object *p_target_obj = (Partial_Reveal_Object *)*iter;
       iter = vector_block_iterator_advance(oi_block, iter);

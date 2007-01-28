@@ -40,13 +40,13 @@ void gc_metadata_initialize(GC* gc)
   void* metadata = STD_MALLOC(seg_size);
   memset(metadata, 0, seg_size);
   gc_metadata.segments[0] = metadata;
-  metadata = (void*)round_up_to_size((unsigned int)metadata, METADATA_BLOCK_SIZE_BYTES);
+  metadata = (void*)round_up_to_size((POINTER_SIZE_INT)metadata, METADATA_BLOCK_SIZE_BYTES);
   gc_metadata.num_alloc_segs = 1;
 
   unsigned int i=0;       
   unsigned int num_blocks =  GC_METADATA_SIZE_BYTES/METADATA_BLOCK_SIZE_BYTES;
   for(i=0; i<num_blocks; i++){
-    Vector_Block* block = (Vector_Block*)((unsigned int)metadata + i*METADATA_BLOCK_SIZE_BYTES);
+    Vector_Block* block = (Vector_Block*)((POINTER_SIZE_INT)metadata + i*METADATA_BLOCK_SIZE_BYTES);
     vector_block_init(block, METADATA_BLOCK_SIZE_BYTES);
   }
   
@@ -54,7 +54,7 @@ void gc_metadata_initialize(GC* gc)
   unsigned num_tasks = num_blocks >> 1;
   gc_metadata.free_task_pool = sync_pool_create();
   for(i=0; i<num_tasks; i++){
-    unsigned int block = (unsigned int)metadata + i*METADATA_BLOCK_SIZE_BYTES;    
+    Vector_Block *block = (Vector_Block*)((POINTER_SIZE_INT)metadata + i*METADATA_BLOCK_SIZE_BYTES);
     vector_stack_init((Vector_Block*)block);
     pool_put_entry(gc_metadata.free_task_pool, (void*)block); 
   }
@@ -64,7 +64,7 @@ void gc_metadata_initialize(GC* gc)
   gc_metadata.free_set_pool = sync_pool_create();
   /* initialize free rootset pool so that mutators can use them */  
   for(; i<num_blocks; i++){
-    unsigned int block = (unsigned int)metadata + i*METADATA_BLOCK_SIZE_BYTES;    
+    POINTER_SIZE_INT block = (POINTER_SIZE_INT)metadata + i*METADATA_BLOCK_SIZE_BYTES;    
     pool_put_entry(gc_metadata.free_set_pool, (void*)block); 
   }
 
@@ -106,7 +106,7 @@ Vector_Block* gc_metadata_extend(Pool* pool)
     unlock(metadata->alloc_lock);
     return block;
   }
- 
+  
   unsigned int num_alloced = metadata->num_alloc_segs;
   if(num_alloced == GC_METADATA_SEGMENT_NUM){
     printf("Run out GC metadata, please give it more segments!\n");
@@ -116,36 +116,35 @@ Vector_Block* gc_metadata_extend(Pool* pool)
   void *new_segment = STD_MALLOC(seg_size);
   memset(new_segment, 0, seg_size);
   metadata->segments[num_alloced] = new_segment;
-  new_segment = (void*)round_up_to_size((unsigned int)new_segment, METADATA_BLOCK_SIZE_BYTES);
+  new_segment = (void*)round_up_to_size((POINTER_SIZE_INT)new_segment, METADATA_BLOCK_SIZE_BYTES);
   metadata->num_alloc_segs = num_alloced + 1;
   
   unsigned int num_blocks =  GC_METADATA_EXTEND_SIZE_BYTES/METADATA_BLOCK_SIZE_BYTES;
 
   unsigned int i=0;
   for(i=0; i<num_blocks; i++){
-    Vector_Block* block = (Vector_Block*)((unsigned int)new_segment + i*METADATA_BLOCK_SIZE_BYTES);
+    Vector_Block* block = (Vector_Block*)((POINTER_SIZE_INT)new_segment + i*METADATA_BLOCK_SIZE_BYTES);
     vector_block_init(block, METADATA_BLOCK_SIZE_BYTES);
-    assert(vector_block_is_empty((Vector_Block *)block));
+    assert(vector_block_is_empty(block));
   }
 
   if( pool == gc_metadata.free_task_pool){  
     for(i=0; i<num_blocks; i++){
-      unsigned int block = (unsigned int)new_segment + i*METADATA_BLOCK_SIZE_BYTES;    
-      vector_stack_init((Vector_Block*)block);
-      pool_put_entry(gc_metadata.free_task_pool, (void*)block); 
+      Vector_Block *block = (Vector_Block *)((POINTER_SIZE_INT)new_segment + i*METADATA_BLOCK_SIZE_BYTES);
+      vector_stack_init(block);
+      pool_put_entry(gc_metadata.free_task_pool, (void*)block);
     }
   
   }else{ 
     assert( pool == gc_metadata.free_set_pool );
     for(i=0; i<num_blocks; i++){
-      unsigned int block = (unsigned int)new_segment + i*METADATA_BLOCK_SIZE_BYTES;    
+      POINTER_SIZE_INT block = (POINTER_SIZE_INT)new_segment + i*METADATA_BLOCK_SIZE_BYTES;    
       pool_put_entry(gc_metadata.free_set_pool, (void*)block); 
     }
   }
   
   block = pool_get_entry(pool);
   unlock(metadata->alloc_lock);
- 
   return block;
 }
 
@@ -160,7 +159,7 @@ static void gc_update_repointed_sets(GC* gc, Pool* pool)
   Vector_Block* root_set = pool_iterator_next(pool);
 
   while(root_set){
-    unsigned int* iter = vector_block_iterator_init(root_set);
+    POINTER_SIZE_INT* iter = vector_block_iterator_init(root_set);
     while(!vector_block_iterator_end(root_set,iter)){
       Partial_Reveal_Object** p_ref = (Partial_Reveal_Object** )*iter;
       iter = vector_block_iterator_advance(root_set,iter);
@@ -175,7 +174,7 @@ static void gc_update_repointed_sets(GC* gc, Pool* pool)
           /* Condition obj_is_moved(p_obj) is for preventing mistaking previous mark bit of large obj as fw bit when fallback happens.
            * Because until fallback happens, perhaps the large obj hasn't been marked. So its mark bit remains as the last time.
            * In major collection condition obj_is_fw_in_oi(p_obj) can be omitted,
-           * for whose which can be scanned in MOS & NOS must have been set fw bit in oi.
+           * since those which can be scanned in MOS & NOS must have been set fw bit in oi.
            */
           assert(address_belongs_to_gc_heap(obj_get_fw_in_oi(p_obj), gc));
           *p_ref = obj_get_fw_in_oi(p_obj);
@@ -197,7 +196,7 @@ void gc_fix_rootset(Collector* collector)
   if( gc->collect_kind != MINOR_COLLECTION ) /* MINOR but not forwarding */
     gc_update_repointed_sets(gc, metadata->gc_rootset_pool);
   else
-  gc_set_pool_clear(metadata->gc_rootset_pool);
+    gc_set_pool_clear(metadata->gc_rootset_pool);
   
 #ifndef BUILD_IN_REFERENT
   gc_update_finref_repointed_refs(gc);
@@ -337,7 +336,6 @@ void gc_metadata_verify(GC* gc, Boolean is_before_gc)
 
   if(verify_live_heap ){
     unsigned int free_pool_size = pool_size(metadata->free_set_pool);
-    printf("===========%s, free_pool_size = %d =============\n", is_before_gc?"before GC":"after GC", free_pool_size);
   }
   
   return;  

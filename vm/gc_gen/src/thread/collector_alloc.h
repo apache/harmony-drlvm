@@ -26,12 +26,12 @@
 void* mos_alloc(unsigned size, Allocator *allocator);
 
 /* NOS forward obj to MOS in MINOR_COLLECTION */
-inline Partial_Reveal_Object* collector_forward_object(Collector* collector, Partial_Reveal_Object* p_obj)
+FORCE_INLINE Partial_Reveal_Object* collector_forward_object(Collector* collector, Partial_Reveal_Object* p_obj)
 {
   Obj_Info_Type oi = get_obj_info_raw(p_obj);
 
   /* forwarded by somebody else */
-  if ((unsigned int)oi & FORWARD_BIT){
+  if ((POINTER_SIZE_INT)oi & FORWARD_BIT){
      return NULL;
   }
   
@@ -50,7 +50,7 @@ inline Partial_Reveal_Object* collector_forward_object(Collector* collector, Par
     
   /* else, take the obj by setting the forwarding flag atomically 
      we don't put a simple bit in vt because we need compute obj size later. */
-  if ((unsigned int)oi != atomic_cas32((unsigned int*)get_obj_info_addr(p_obj), ((unsigned int)p_targ_obj|FORWARD_BIT), (unsigned int)oi)) {
+  if ((void*)oi != atomic_casptr((volatile void**)get_obj_info_addr(p_obj), (void*)((POINTER_SIZE_INT)p_targ_obj|FORWARD_BIT), (void*)oi)) {
     /* forwarded by other, we need unalloc the allocated obj. We may waste some space if the allocation switched
        block. The remaining part of the switched block cannot be revivied for next allocation of 
        object that has smaller size than this one. */

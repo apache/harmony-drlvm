@@ -20,6 +20,8 @@
 
 #include "mspace.h"
 
+#include "../common/gc_space.h"
+
 static void mspace_destruct_blocks(Mspace* mspace)
 {   
   return;
@@ -40,12 +42,19 @@ void mspace_initialize(GC* gc, void* start, unsigned int mspace_size, unsigned i
 
   void* reserved_base = start;
   /* commit mspace mem */
-  vm_commit_mem(reserved_base, commit_size);
+  if(!large_page_hint)
+    vm_commit_mem(reserved_base, commit_size);
   memset(reserved_base, 0, commit_size);
   
   mspace->committed_heap_size = commit_size;
   mspace->heap_start = reserved_base;
-  mspace->heap_end = (void *)((unsigned int)reserved_base + mspace_size);
+  
+#ifdef STATIC_NOS_MAPPING
+  mspace->heap_end = (void *)((POINTER_SIZE_INT)reserved_base + mspace_size);
+#else
+  mspace->heap_end = (void *)((POINTER_SIZE_INT)reserved_base + commit_size);
+#endif
+
   mspace->num_managed_blocks = commit_size >> GC_BLOCK_SHIFT_COUNT;
   
   mspace->first_block_idx = GC_BLOCK_INDEX_FROM(gc->heap_start, reserved_base);
@@ -62,6 +71,10 @@ void mspace_initialize(GC* gc, void* start, unsigned int mspace_size, unsigned i
 
   mspace->move_object = TRUE;
   mspace->gc = gc;
+
+  /*For_LOS adaptive: The threshold is initiated by half of MOS + NOS commit size.*/
+  mspace->expected_threshold = (unsigned int)( ( (float)mspace->committed_heap_size * (1.f + 1.f / gc->survive_ratio) ) * 0.5f );
+
   gc_set_mos((GC_Gen*)gc, (Space*)mspace);
 
   return;
@@ -147,3 +160,16 @@ void mspace_fix_after_copy_nursery(Collector* collector, Mspace* mspace)
    
   return;  
 }
+
+/*For_LOS adaptive.*/
+void mspace_set_expected_threshold(Mspace* mspace, POINTER_SIZE_INT threshold)
+{
+    mspace->expected_threshold = threshold;
+    return;
+}
+
+unsigned int mspace_get_expected_threshold(Mspace* mspace)
+{
+    return mspace->expected_threshold;
+}
+

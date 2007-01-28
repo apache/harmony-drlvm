@@ -36,6 +36,10 @@ typedef struct Mspace{
   unsigned int collect_algorithm;
   GC* gc;
   Boolean move_object;
+  /*Size allocted after last collection.*/
+  unsigned int alloced_size;
+  /*For_statistic: size survived after major*/  
+  unsigned int surviving_size;
   /* END of Space --> */
     
   Block* blocks; /* short-cut for mpsace blockheader access, not mandatory */
@@ -50,8 +54,9 @@ typedef struct Mspace{
   unsigned int num_total_blocks;
   /* END of Blocked_Space --> */
   
-  volatile Block_Header* block_iterator;  
-  
+  volatile Block_Header* block_iterator;    
+  /*Threshold computed by NOS adaptive*/
+  POINTER_SIZE_INT expected_threshold;
 }Mspace;
 
 void mspace_initialize(GC* gc, void* reserved_base, unsigned int mspace_size, unsigned int commit_size);
@@ -66,5 +71,7 @@ Block_Header* mspace_block_iterator_next(Mspace* mspace);
 Block_Header* mspace_block_iterator_get(Mspace* mspace);
 
 void mspace_fix_after_copy_nursery(Collector* collector, Mspace* mspace);
+
+void mspace_set_expected_threshold(Mspace* mspace, unsigned int threshold);
 
 #endif //#ifdef _MSC_SPACE_H_

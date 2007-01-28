@@ -23,22 +23,11 @@
 #include "../mark_sweep/lspace.h"
 #include "../finalizer_weakref/finalizer_weakref.h"
 
-//#define VERIFY_SLIDING_COMPACT
 
 struct GC_Gen;
 Space* gc_get_nos(GC_Gen* gc);
 Space* gc_get_mos(GC_Gen* gc);
 Space* gc_get_los(GC_Gen* gc);
-
-#ifdef VERIFY_SLIDING_COMPACT
-typedef struct {
-  unsigned int addr;
-  unsigned int dest_counter;
-  unsigned int collector;
-  Block_Header *src_list[1021];
-} Block_Verify_Info;
-static Block_Verify_Info block_info[32*1024][2];
-#endif
 
 static volatile Block_Header *last_block_for_dest;
 
@@ -48,10 +37,6 @@ static void mspace_compute_object_target(Collector* collector, Mspace* mspace)
   Block_Header *dest_block = collector->cur_target_block;
   void *dest_addr = dest_block->base;
   Block_Header *last_src;
-  
-#ifdef VERIFY_SLIDING_COMPACT
-  block_info[(Block*)dest_block-mspace->blocks][0].collector = (unsigned int)collector->thread_handle + 1;
-#endif
   
   assert(!collector->rem_set);
   collector->rem_set = free_set_pool_get_entry(collector->gc->metadata);
@@ -72,9 +57,9 @@ static void mspace_compute_object_target(Collector* collector, Mspace* mspace)
     while( p_obj ){
       assert( obj_is_marked_in_vt(p_obj));
 
-      unsigned int obj_size = (unsigned int)start_pos - (unsigned int)p_obj;
+      unsigned int obj_size = (unsigned int)((POINTER_SIZE_INT)start_pos - (POINTER_SIZE_INT)p_obj);
       
-      if( ((unsigned int)dest_addr + obj_size) > (unsigned int)GC_BLOCK_END(dest_block)){
+      if( ((POINTER_SIZE_INT)dest_addr + obj_size) > (POINTER_SIZE_INT)GC_BLOCK_END(dest_block)){
         dest_block->new_free = dest_addr;
         dest_block = mspace_get_next_target_block(collector, mspace);
         if(dest_block == NULL){ 
@@ -86,12 +71,8 @@ static void mspace_compute_object_target(Collector* collector, Mspace* mspace)
         last_src = curr_block;
         if(p_obj != first_obj)
           ++curr_block->dest_counter;
-
-#ifdef VERIFY_SLIDING_COMPACT
-        block_info[(Block*)dest_block-mspace->blocks][0].collector = (unsigned int)collector->thread_handle + 1;
-#endif
       }
-      assert(((unsigned int)dest_addr + obj_size) <= (unsigned int)GC_BLOCK_END(dest_block));
+      assert(((POINTER_SIZE_INT)dest_addr + obj_size) <= (POINTER_SIZE_INT)GC_BLOCK_END(dest_block));
       
       Obj_Info_Type obj_info = get_obj_info(p_obj);
 
@@ -103,7 +84,7 @@ static void mspace_compute_object_target(Collector* collector, Mspace* mspace)
       obj_set_fw_in_oi(p_obj, dest_addr);
       
       /* FIXME: should use alloc to handle alignment requirement */
-      dest_addr = (void *)((unsigned int) dest_addr + obj_size);
+      dest_addr = (void *)((POINTER_SIZE_INT) dest_addr + obj_size);
       p_obj = block_get_next_marked_obj_prefetch_next(curr_block, &start_pos);
     }
     
@@ -177,37 +158,28 @@ static Block_Header *get_next_dest_block(Mspace *mspace)
   } else {
     cur_dest_block = set_next_block_for_dest(mspace);
   }
-
-//  printf("Getting next dest block:\n");
-//  printf("next_block_for_dest: %d\n\n", next_block_for_dest ? next_block_for_dest->block_idx : 0);
   
   unsigned int total_dest_counter = 0;
   Block_Header *last_dest_block = (Block_Header *)last_block_for_dest;
   for(; cur_dest_block <= last_dest_block; cur_dest_block = cur_dest_block->next){
     if(cur_dest_block->status == BLOCK_DEST){
-//      printf("idx: %d  DEST  ", cur_dest_block->block_idx);
       continue;
     }
     if(cur_dest_block->dest_counter == 0 && cur_dest_block->src){
-//      printf("idx: %d  DEST  FOUND!\n\n", cur_dest_block->block_idx);
       cur_dest_block->status = BLOCK_DEST;
       return cur_dest_block;
     } else if(cur_dest_block->dest_counter == 1 && GC_BLOCK_HEADER(cur_dest_block->src) == cur_dest_block){
-//      printf("idx: %d  NON_DEST  FOUND!\n\n", cur_dest_block->block_idx);
       return cur_dest_block;
     } else if(cur_dest_block->dest_counter == 0 && !cur_dest_block->src){
-//      printf("idx: %d  NO_SRC  ", cur_dest_block->block_idx);
       cur_dest_block->status = BLOCK_DEST;
     } else {
-//      printf("OTHER  ");
       total_dest_counter += cur_dest_block->dest_counter;
     }
   }
   
-  if(total_dest_counter){
-//    printf("\nNeed refind!\n\n");
+  if(total_dest_counter)
     return DEST_NOT_EMPTY;
-  }
+  
   return NULL;
 }
 
@@ -316,7 +288,7 @@ static void mspace_sliding_compact(Collector* collector, Mspace* mspace)
       assert(obj_is_marked_in_vt(p_obj));
       obj_unmark_in_vt(p_obj);
       
-      unsigned int obj_size = (unsigned int)start_pos - (unsigned int)p_obj;
+      unsigned int obj_size = (unsigned int)((POINTER_SIZE_INT)start_pos - (POINTER_SIZE_INT)p_obj);
       if(p_obj != p_target_obj){
         memmove(p_target_obj, p_obj, obj_size);
 
@@ -336,100 +308,11 @@ static void mspace_sliding_compact(Collector* collector, Mspace* mspace)
       p_target_obj = obj_get_fw_in_oi(p_obj);
     
     } while(GC_BLOCK_HEADER(p_target_obj) == dest_block);
-
-#ifdef VERIFY_SLIDING_COMPACT
-    printf("dest_block: %x   src_block: %x   collector: %x\n", (unsigned int)dest_block, (unsigned int)src_block, (unsigned int)collector->thread_handle);
-#endif
-
+    
     atomic_dec32(&src_block->dest_counter);
   }
 
-#ifdef VERIFY_SLIDING_COMPACT
-  static unsigned int fax = 0;
-  fax++;
-  printf("\n\n\nCollector %d   Sliding compact ends!   %d  \n\n\n", (unsigned int)collector->thread_handle, fax);
-#endif
-
 }
-
-#ifdef VERIFY_SLIDING_COMPACT
-
-static void verify_sliding_compact(Mspace *mspace, Boolean before)
-{
-  unsigned int i, j, k;
-  Block_Header *header;
-  
-  if(before)
-    j = 0;
-  else
-    j = 1;
-  
-  for(i = 0, header = (Block_Header *)mspace->blocks;
-      header;
-      header=header->next, ++i)
-  {
-    block_info[i][j].addr = (unsigned int)header;
-    block_info[i][j].dest_counter = header->dest_counter;
-    if(header->src){
-      Partial_Reveal_Object *src_obj = header->src;
-      k = 0;
-      printf("\nHeader: %x %x Collector: %x  ", (unsigned int)header, block_info[i][j].dest_counter, block_info[i][j].collector);
-      Block_Header *dest_header = GC_BLOCK_HEADER(obj_get_fw_in_oi(src_obj));
-      while(dest_header == header){
-        block_info[i][j].src_list[k] = dest_header;
-        Block_Header *src_header = GC_BLOCK_HEADER(src_obj);
-        printf("%x %x ", (unsigned int)src_header, src_header->dest_counter);
-        src_obj = src_header->next_src;
-        if(!src_obj)
-          break;
-        dest_header = GC_BLOCK_HEADER(obj_get_fw_in_oi(src_obj));
-        if(++k >= 1021)
-          assert(0);
-      }
-    }
-  }
-  
-  if(!before){
-    for(i = 0, header = (Block_Header *)mspace->blocks;
-        header;
-        header=header->next, ++i)
-    {
-      Boolean correct = TRUE;
-      if(block_info[i][0].addr != block_info[i][1].addr)
-        correct = FALSE;
-      if(block_info[i][0].dest_counter != block_info[i][1].dest_counter)
-        correct = FALSE;
-      for(k = 0; k < 1021; k++){
-        if(block_info[i][0].src_list[k] != block_info[i][1].src_list[k]){
-          correct = FALSE;
-          break;
-        }
-      }
-      if(!correct)
-        printf("header: %x %x   dest_counter: %x %x   src: %x %x",
-                block_info[i][0].addr, block_info[i][1].addr,
-                block_info[i][0].dest_counter, block_info[i][1].dest_counter,
-                block_info[i][0].src_list[k], block_info[i][1].src_list[k]);
-    }
-    
-    unsigned int *array = (unsigned int *)block_info;
-    memset(array, 0, 1024*32*1024*2);
-  }
-}
-#endif
-
-/*
-#define OI_RESTORING_THRESHOLD 8
-static volatile Boolean parallel_oi_restoring;
-unsigned int mspace_saved_obj_info_size(GC*gc){ return pool_size(gc->metadata->collector_remset_pool);} 
-*/
-
-static volatile unsigned int num_marking_collectors = 0;
-static volatile unsigned int num_repointing_collectors = 0;
-static volatile unsigned int num_fixing_collectors = 0;
-static volatile unsigned int num_moving_collectors = 0;
-static volatile unsigned int num_restoring_collectors = 0;
-static volatile unsigned int num_extending_collectors = 0;
 
 //For_LOS_extend
 void mspace_restore_block_chain(Mspace* mspace)
@@ -441,6 +324,13 @@ void mspace_restore_block_chain(Mspace* mspace)
       fspace_last_block->next = NULL;
   }
 }
+
+static volatile unsigned int num_marking_collectors = 0;
+static volatile unsigned int num_repointing_collectors = 0;
+static volatile unsigned int num_fixing_collectors = 0;
+static volatile unsigned int num_moving_collectors = 0;
+static volatile unsigned int num_restoring_collectors = 0;
+static volatile unsigned int num_extending_collectors = 0;
 
 void slide_compact_mspace(Collector* collector) 
 {
@@ -472,7 +362,7 @@ void slide_compact_mspace(Collector* collector)
 #ifndef BUILD_IN_REFERENT
     else {
       gc_set_weakref_sets(gc);
-      update_ref_ignore_finref(collector);
+      gc_update_weakref_ignore_finref(gc);
     }
 #endif
     
@@ -494,8 +384,7 @@ void slide_compact_mspace(Collector* collector)
     /* single thread world */
     gc->collect_result = gc_collection_result(gc);
     if(!gc->collect_result){
-      num_repointing_collectors++; 
-      assert(0);    // Now we should not be out of mem here. mspace_extend_compact() is backing up for this case.
+      num_repointing_collectors++;
       return;
     }
     
@@ -517,15 +406,9 @@ void slide_compact_mspace(Collector* collector)
     /* last collector's world here */
     lspace_fix_repointed_refs(collector, lspace);
     gc_fix_rootset(collector);
-
-    if(!IGNORE_FINREF )
-      gc_put_finref_to_vm(gc);
-      
-#ifdef VERIFY_SLIDING_COMPACT
-    verify_sliding_compact(mspace, TRUE);
-#endif
     
     gc_init_block_for_sliding_compact(gc, mspace);
+
     num_fixing_collectors++; 
   }
   while(num_fixing_collectors != num_active_collectors + 1);
@@ -547,6 +430,7 @@ void slide_compact_mspace(Collector* collector)
   
   old_num = atomic_inc32(&num_restoring_collectors);
   if( ++old_num == num_active_collectors ){
+    
     update_mspace_info_for_los_extension(mspace);
     
     num_restoring_collectors++;

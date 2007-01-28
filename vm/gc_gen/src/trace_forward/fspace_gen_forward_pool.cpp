@@ -24,13 +24,13 @@
 #include "../common/gc_metadata.h"
 #include "../finalizer_weakref/finalizer_weakref.h"
 
-static Boolean fspace_object_to_be_forwarded(Partial_Reveal_Object *p_obj, Fspace *fspace)
+static FORCE_INLINE Boolean fspace_object_to_be_forwarded(Partial_Reveal_Object *p_obj, Fspace *fspace)
 {
   assert(obj_belongs_to_nos(p_obj));  
   return forward_first_half? (p_obj < object_forwarding_boundary):(p_obj>=object_forwarding_boundary);
 }
 
-static void scan_slot(Collector* collector, Partial_Reveal_Object **p_ref) 
+static FORCE_INLINE void scan_slot(Collector* collector, Partial_Reveal_Object **p_ref) 
 {
   Partial_Reveal_Object *p_obj = *p_ref;
   if (p_obj == NULL) return;  
@@ -43,7 +43,7 @@ static void scan_slot(Collector* collector, Partial_Reveal_Object **p_ref)
   return;
 }
 
-static void scan_object(Collector* collector, Partial_Reveal_Object *p_obj) 
+static FORCE_INLINE void scan_object(Collector* collector, Partial_Reveal_Object *p_obj) 
 {
   if (!object_has_ref_field(p_obj)) return;
     
@@ -90,7 +90,7 @@ static void scan_object(Collector* collector, Partial_Reveal_Object *p_obj)
 
 #include "../verify/verify_live_heap.h"
 
-static void forward_object(Collector* collector, Partial_Reveal_Object **p_ref) 
+static FORCE_INLINE void forward_object(Collector* collector, Partial_Reveal_Object **p_ref) 
 {
   Space* space = collector->collect_space; 
   GC* gc = collector->gc;
@@ -184,7 +184,7 @@ static void collector_trace_rootsets(Collector* collector)
 
   /* first step: copy all root objects to trace tasks. */ 
   while(root_set){
-    unsigned int* iter = vector_block_iterator_init(root_set);
+    POINTER_SIZE_INT* iter = vector_block_iterator_init(root_set);
     while(!vector_block_iterator_end(root_set,iter)){
       Partial_Reveal_Object** p_ref = (Partial_Reveal_Object** )*iter;
       iter = vector_block_iterator_advance(root_set,iter);
@@ -205,7 +205,7 @@ retry:
   Vector_Block* trace_task = pool_get_entry(metadata->mark_task_pool);
 
   while(trace_task){    
-    unsigned int* iter = vector_block_iterator_init(trace_task);
+    POINTER_SIZE_INT* iter = vector_block_iterator_init(trace_task);
     while(!vector_block_iterator_end(trace_task,iter)){
       Partial_Reveal_Object** p_ref = (Partial_Reveal_Object** )*iter;
       iter = vector_block_iterator_advance(trace_task,iter);
@@ -266,14 +266,11 @@ void gen_forward_pool(Collector* collector)
 #ifndef BUILD_IN_REFERENT
   else {
       gc_set_weakref_sets(gc);
-      update_ref_ignore_finref(collector);
+      gc_update_weakref_ignore_finref(gc);
     }
 #endif
   
   gc_fix_rootset(collector);
-  
-  if(!IGNORE_FINREF )
-    gc_put_finref_to_vm(gc);
   
   fspace_reset_for_allocation(space);  
 
@@ -281,33 +278,7 @@ void gen_forward_pool(Collector* collector)
   
 }
 
-void resurrect_obj_tree_after_trace(Collector *collector, Partial_Reveal_Object **p_ref)
+void trace_obj_in_gen_fw(Collector *collector, void *p_ref)
 {
-  GC *gc = collector->gc;
-  GC_Metadata* metadata = gc->metadata;
-  
-  collector->trace_stack = free_task_pool_get_entry(metadata);
-  collector_tracestack_push(collector, p_ref);
-  pool_put_entry(metadata->mark_task_pool, collector->trace_stack);
-  
-//collector->rep_set = free_set_pool_get_entry(metadata); /* has got collector->rep_set in caller */
-  collector->trace_stack = free_task_pool_get_entry(metadata);
-  Vector_Block* trace_task = pool_get_entry(metadata->mark_task_pool);
-  while(trace_task){    
-    unsigned int* iter = vector_block_iterator_init(trace_task);
-    while(!vector_block_iterator_end(trace_task,iter)){
-      Partial_Reveal_Object** p_ref = (Partial_Reveal_Object** )*iter;
-      iter = vector_block_iterator_advance(trace_task,iter);
-      assert(*p_ref);
-      trace_object(collector, p_ref);
-    }
-    vector_stack_clear(trace_task);
-    pool_put_entry(metadata->free_task_pool, trace_task);
-    trace_task = pool_get_entry(metadata->mark_task_pool);
-  }
-  
-  trace_task = (Vector_Block*)collector->trace_stack;
-  vector_stack_clear(trace_task);
-  pool_put_entry(metadata->free_task_pool, trace_task);   
-  collector->trace_stack = NULL;
+  trace_object(collector, (Partial_Reveal_Object **)p_ref);
 }

@@ -45,6 +45,10 @@ typedef struct Fspace {
   unsigned int collect_algorithm;
   GC* gc;
   Boolean move_object;
+  /*Size allocted after last collection. Not available in fspace now.*/
+  unsigned int alloced_size;
+  /*For_statistic: not available now for fspace*/  
+  unsigned int surviving_size;
   /* END of Space --> */
 
   Block* blocks; /* short-cut for mpsace blockheader access, not mandatory */
@@ -63,11 +67,6 @@ typedef struct Fspace {
 
 void fspace_initialize(GC* gc, void* start, unsigned int fspace_size, unsigned int commit_size);
 void fspace_destruct(Fspace *fspace);
-
-inline Boolean obj_is_dead_in_minor_forward_gc(Collector *collector, Partial_Reveal_Object *p_obj)
-{
-  return (!obj_is_marked_or_fw_in_oi(p_obj)) ;
-}
 
 void* fspace_alloc(unsigned size, Allocator *allocator);
 
@@ -88,5 +87,5 @@ void nongen_forward_pool(Collector* collector);
 
 
 void fspace_collection(Fspace* fspace);
-  
+
 #endif // _FROM_SPACE_H_

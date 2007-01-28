@@ -29,10 +29,13 @@
 unsigned int Cur_Mark_Bit = 0x1;
 unsigned int Cur_Forward_Bit = 0x2;
 
+unsigned int SPACE_ALLOC_UNIT;
+
 extern Boolean GC_VERIFY;
 
 extern unsigned int NOS_SIZE;
 extern unsigned int MIN_NOS_SIZE;
+extern unsigned int MIN_LOS_SIZE;
 
 extern Boolean FORCE_FULL_COMPACT;
 extern Boolean MINOR_ALGORITHM;
@@ -45,6 +48,8 @@ extern unsigned int MAJOR_COLLECTORS;
 unsigned int HEAP_SIZE_DEFAULT = 256 * MB;
 unsigned int min_heap_size_bytes = 32 * MB;
 unsigned int max_heap_size_bytes = 0;
+
+extern Boolean JVMTI_HEAP_ITERATION ;
 
 static int get_int_property(const char *property_name)
 {
@@ -154,6 +159,10 @@ void gc_parse_options(GC* gc)
     MIN_NOS_SIZE = get_size_property("gc.min_nos_size");
   }
 
+  if (is_property_set("gc.min_los_size", VM_PROPERTIES) == 1) {
+    MIN_LOS_SIZE = get_size_property("gc.min_los_size");
+  }  
+
   if (is_property_set("gc.num_collectors", VM_PROPERTIES) == 1) {
     unsigned int num = get_int_property("gc.num_collectors");
     NUM_COLLECTORS = (num==0)? NUM_COLLECTORS:num;
@@ -214,6 +223,21 @@ void gc_parse_options(GC* gc)
   if (is_property_set("gc.verify", VM_PROPERTIES) == 1) {
     GC_VERIFY = get_boolean_property("gc.verify");
   }
+
+  if (is_property_set("gc.gen_nongen_switch", VM_PROPERTIES) == 1){
+    GEN_NONGEN_SWITCH= get_boolean_property("gc.gen_nongen_switch");
+    gc->generate_barrier = TRUE;
+  }
+
+  if (is_property_set("gc.heap_iteration", VM_PROPERTIES) == 1) {
+    JVMTI_HEAP_ITERATION = get_boolean_property("gc.heap_iteration");
+  }
+
+  if (is_property_set("gc.use_large_page", VM_PROPERTIES) == 1){
+    char* value = get_property("gc.use_large_page", VM_PROPERTIES);
+    large_page_hint = strdup(value);
+    destroy_property_value(value);
+  }
   
   return;
 }
@@ -222,16 +246,22 @@ void gc_copy_interior_pointer_table_to_rootset();
 
 void gc_reclaim_heap(GC* gc, unsigned int gc_cause)
 { 
+  int64 start_time =  time_now();
+
   /* FIXME:: before mutators suspended, the ops below should be very careful
      to avoid racing with mutators. */
   gc->num_collections++;  
-
+  gc->cause = gc_cause;
   gc_decide_collection_kind((GC_Gen*)gc, gc_cause);
 
 
   //For_LOS_extend!
-  gc_space_tune(gc, gc_cause);
-
+#ifdef GC_FIXED_SIZE_TUNER
+  gc_space_tune_before_gc_simplified(gc, gc_cause);
+#else
+  gc_space_tune_prepare(gc, gc_cause);
+  gc_space_tune_before_gc(gc, gc_cause);
+#endif
 
 #ifdef MARK_BIT_FLIPPING
   if(gc->collect_kind == MINOR_COLLECTION)
@@ -254,18 +284,28 @@ void gc_reclaim_heap(GC* gc, unsigned int gc_cause)
 
   if(!IGNORE_FINREF )
     gc_set_obj_with_fin(gc);
-  
+
   gc_gen_reclaim_heap((GC_Gen*)gc);
+  
   gc_reset_interior_pointer_table();
     
   gc_metadata_verify(gc, FALSE);
+
+  int64 pause_time = time_now() - start_time;  
+  gc->time_collections += pause_time;
+  gc_gen_adapt((GC_Gen*)gc, pause_time);
 
   if(gc_is_gen_mode())
     gc_prepare_mutator_remset(gc);
   
   if(!IGNORE_FINREF ){
+    gc_put_finref_to_vm(gc);
     gc_reset_finref_metadata(gc);
     gc_activate_finref_threads((GC*)gc);
+#ifndef BUILD_IN_REFERENT
+  } else {
+    gc_clear_weakref_pools(gc);
+#endif
   }
 
   //For_LOS_extend!

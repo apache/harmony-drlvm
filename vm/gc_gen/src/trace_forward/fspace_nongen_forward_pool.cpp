@@ -27,7 +27,7 @@
 
 #ifdef MARK_BIT_FLIPPING
 
-static void scan_slot(Collector* collector, Partial_Reveal_Object **p_ref) 
+static FORCE_INLINE void scan_slot(Collector* collector, Partial_Reveal_Object **p_ref) 
 {
   Partial_Reveal_Object *p_obj = *p_ref;
   if(p_obj == NULL) return;  
@@ -36,7 +36,7 @@ static void scan_slot(Collector* collector, Partial_Reveal_Object **p_ref)
   return;
 }
 
-static void scan_object(Collector* collector, Partial_Reveal_Object *p_obj) 
+static FORCE_INLINE void scan_object(Collector* collector, Partial_Reveal_Object *p_obj) 
 {
   if (!object_has_ref_field_before_scan(p_obj)) return;
     
@@ -46,7 +46,7 @@ static void scan_object(Collector* collector, Partial_Reveal_Object *p_obj)
   
     Partial_Reveal_Array* array = (Partial_Reveal_Array*)p_obj;
     unsigned int array_length = array->array_len; 
-    p_ref = (Partial_Reveal_Object**)((int)array + (int)array_first_element_offset(array));
+    p_ref = (Partial_Reveal_Object**)((POINTER_SIZE_INT)array + (int)array_first_element_offset(array));
 
     for (unsigned int i = 0; i < array_length; i++) {
       scan_slot(collector, p_ref+i);
@@ -81,7 +81,7 @@ static void scan_object(Collector* collector, Partial_Reveal_Object *p_obj)
 */
 
 #include "../verify/verify_live_heap.h"
-static void forward_object(Collector* collector, Partial_Reveal_Object **p_ref) 
+static FORCE_INLINE void forward_object(Collector* collector, Partial_Reveal_Object **p_ref) 
 {
   GC* gc = collector->gc;
   Partial_Reveal_Object *p_obj = *p_ref;
@@ -157,7 +157,7 @@ static void collector_trace_rootsets(Collector* collector)
 
   /* first step: copy all root objects to trace tasks. */ 
   while(root_set){
-    unsigned int* iter = vector_block_iterator_init(root_set);
+    POINTER_SIZE_INT* iter = vector_block_iterator_init(root_set);
     while(!vector_block_iterator_end(root_set,iter)){
       Partial_Reveal_Object** p_ref = (Partial_Reveal_Object** )*iter;
       iter = vector_block_iterator_advance(root_set,iter);
@@ -179,7 +179,7 @@ retry:
   Vector_Block* trace_task = pool_get_entry(metadata->mark_task_pool);
 
   while(trace_task){    
-    unsigned int* iter = vector_block_iterator_init(trace_task);
+    POINTER_SIZE_INT* iter = vector_block_iterator_init(trace_task);
     while(!vector_block_iterator_end(trace_task,iter)){
       Partial_Reveal_Object** p_ref = (Partial_Reveal_Object** )*iter;
       iter = vector_block_iterator_advance(trace_task,iter);
@@ -237,19 +237,21 @@ void nongen_forward_pool(Collector* collector)
 #ifndef BUILD_IN_REFERENT
   else {
       gc_set_weakref_sets(gc);
-      update_ref_ignore_finref(collector);
+      gc_update_weakref_ignore_finref(gc);
     }
 #endif
   
   gc_fix_rootset(collector);
   
-  if(!IGNORE_FINREF )
-    gc_put_finref_to_vm(gc);
-  
-  fspace_reset_for_allocation(space);  
+  fspace_reset_for_allocation(space);
 
   return;
   
+}
+
+void trace_obj_in_nongen_fw(Collector *collector, void *p_ref)
+{
+  trace_object(collector, (Partial_Reveal_Object **)p_ref);
 }
 
 #endif /* MARK_BIT_FLIPPING */

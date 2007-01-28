@@ -25,9 +25,6 @@
 #include "../thread/gc_thread.h"
 #include "free_area_pool.h"
 
-#define GC_MIN_LOS_SIZE ( 4 * 1024 * 1024)
-
-
 typedef struct Lspace{
   /* <-- first couple of fields are overloadded as Space */
   void* heap_start;
@@ -37,13 +34,18 @@ typedef struct Lspace{
   unsigned int num_collections;
   int64 time_collections;
   float survive_ratio;
+  unsigned int collect_algorithm;  
   GC* gc;
   Boolean move_object;
+  /*For_statistic: size allocated science last time collect los, ie. last major*/
+  unsigned int alloced_size;
+  /*For_statistic: size survived after lspace_sweep*/  
+  unsigned int surviving_size;
   /* END of Space --> */
 
-//  void* alloc_free;
   Free_Area_Pool* free_pool;
-  
+  /*Size of allocation which caused lspace alloc failure.*/
+  unsigned int failure_size;
 }Lspace;
 
 void lspace_initialize(GC* gc, void* reserved_base, unsigned int lspace_size);
@@ -58,7 +60,7 @@ inline unsigned int lspace_committed_size(Lspace* lspace){ return lspace->commit
 
 inline Partial_Reveal_Object* lspace_get_next_marked_object( Lspace* lspace, unsigned int* iterate_index)
 {
-    unsigned int next_area_start = (unsigned int)lspace->heap_start + (*iterate_index) * KB;
+    POINTER_SIZE_INT next_area_start = (POINTER_SIZE_INT)lspace->heap_start + (*iterate_index) * KB;
     BOOLEAN reach_heap_end = 0;
 
     while(!reach_heap_end){
@@ -66,11 +68,11 @@ inline Partial_Reveal_Object* lspace_get_next_marked_object( Lspace* lspace, uns
         while(!*((unsigned int *)next_area_start)){
                 next_area_start += ((Free_Area*)next_area_start)->size;
         }
-        if(next_area_start < (unsigned int)lspace->heap_end){
+        if(next_area_start < (POINTER_SIZE_INT)lspace->heap_end){
             //If there is a living object at this addr, return it, and update iterate_index
             if(obj_is_marked_in_vt((Partial_Reveal_Object*)next_area_start)){
                 unsigned int obj_size = ALIGN_UP_TO_KILO(vm_object_size((Partial_Reveal_Object*)next_area_start));
-                *iterate_index = (next_area_start + obj_size - (unsigned int)lspace->heap_start) >> BIT_SHIFT_TO_KILO;
+                *iterate_index = (unsigned int)((next_area_start + obj_size - (POINTER_SIZE_INT)lspace->heap_start) >> BIT_SHIFT_TO_KILO);
                 return (Partial_Reveal_Object*)next_area_start;
             //If this is a dead object, go on to find  a living one.
             }else{
@@ -93,5 +95,7 @@ inline Partial_Reveal_Object* lspace_get_first_marked_object(Lspace* lspace, uns
 void lspace_fix_after_copy_nursery(Collector* collector, Lspace* lspace);
 
 void lspace_fix_repointed_refs(Collector* collector, Lspace* lspace);
+
+unsigned int lspace_get_failure_size(Lspace* lspace);
 
 #endif /*_LSPACE_H_ */

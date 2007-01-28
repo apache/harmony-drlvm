@@ -52,7 +52,7 @@ Version: $Revision: 1.2 $
             </includepath>
 
             <fileset dir="${src}/gc_gen/src">
-                <select arch="ia32">
+                <select arch="ia32,em64t">
                 <include name="common/*.cpp" />            
                 <include name="gen/*.cpp" />            
                 <include name="mark_compact/*.cpp" />            
@@ -65,7 +65,7 @@ Version: $Revision: 1.2 $
                 <include name="finalizer_weakref/*.cpp" />
                 </select>
 
-                <select arch="em64t,ipf">
+                <select arch="ipf">
                 <exclude name="common/*.cpp" />            
                 <exclude name="gen/*.cpp" />            
                 <exclude name="mark_compact/*.cpp" />            

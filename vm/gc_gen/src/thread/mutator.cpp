@@ -38,7 +38,7 @@ void mutator_initialize(GC* gc, void *unused_gc_information)
   }
   
   if(!IGNORE_FINREF )
-    mutator->obj_with_fin = finref_get_free_block();
+    mutator->obj_with_fin = finref_get_free_block(gc);
   else
     mutator->obj_with_fin = NULL;
        
@@ -110,8 +110,6 @@ void gc_prepare_mutator_remset(GC* gc)
   Mutator *mutator = gc->mutator_list;
   while (mutator) {
     mutator->rem_set = free_set_pool_get_entry(gc->metadata);
-    if(!IGNORE_FINREF )
-      mutator_reset_obj_with_fin(mutator);
     mutator = mutator->next;
   }  
   return;

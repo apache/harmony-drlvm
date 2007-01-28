@@ -23,46 +23,47 @@
 
 typedef struct Vector_Block{
   void* next; /* point to next block */
-  unsigned int* head;  /* point to the first filled entry */
-  unsigned int* tail;  /* point to the entry after the last filled one */
-  unsigned int* heap_end;   /* point to heap_end of the block (right after the last entry) */
-  unsigned int entries[1];
+  POINTER_SIZE_INT* head;  /* point to the first filled entry */
+  POINTER_SIZE_INT* tail;  /* point to the entry after the last filled one */
+  POINTER_SIZE_INT* heap_end;   /* point to heap_end of the block (right after the last entry) */
+  POINTER_SIZE_INT entries[1];
 }Vector_Block;
 
 
 /* this size better be 2's power */
 #define VECTOR_BLOCK_DATA_SIZE_BYTES (2*KB)
 
-#define VECTOR_BLOCK_HEADER_SIZE_BYTES ((unsigned int)((Vector_Block*)0)->entries)
-#define VECTOR_BLOCK_ENTRY_NUM ((VECTOR_BLOCK_DATA_SIZE_BYTES - VECTOR_BLOCK_HEADER_SIZE_BYTES) >> BIT_SHIFT_TO_BYTES_PER_WORD)
+#define VECTOR_BLOCK_HEADER_SIZE_BYTES ((POINTER_SIZE_INT)((Vector_Block*)0)->entries)
+#define VECTOR_BLOCK_ENTRY_NUM ((VECTOR_BLOCK_DATA_SIZE_BYTES - VECTOR_BLOCK_HEADER_SIZE_BYTES) >> BIT_SHIFT_TO_BYTES_OF_POINTER_SIZE_INT )
 
 inline void vector_block_init(Vector_Block* block, unsigned int size)
 {
-  block->heap_end = (unsigned int*)((unsigned int)block + size);
-  block->head = (unsigned int*)block->entries;
-  block->tail = (unsigned int*)block->entries;
-  memset(block->entries, 0, (block->heap_end - (unsigned int*)block->entries)*BYTES_PER_WORD);
+  block->heap_end = (POINTER_SIZE_INT*)((POINTER_SIZE_INT)block + size);
+  block->head = (POINTER_SIZE_INT*)block->entries;
+  block->tail = (POINTER_SIZE_INT*)block->entries;
+  memset(block->entries, 0, (POINTER_SIZE_INT)block->heap_end - (POINTER_SIZE_INT)block->entries);
   return;  
 }
 
 inline unsigned int vector_block_entry_count(Vector_Block* block)
 { return (unsigned int)(block->tail - block->head); }
 
-/*
+
 inline Boolean vector_block_is_full(Vector_Block* block)
 { return block->tail == block->heap_end; }
 
+/*
 inline Boolean vector_block_is_empty(Vector_Block* block)
 { return block->tail == block->head; }
-*/
 
 inline Boolean vector_block_is_full(Vector_Block* block)
 { return (block->tail - block->entries) == VECTOR_BLOCK_ENTRY_NUM; }
+*/
 
 inline Boolean vector_block_is_empty(Vector_Block* block)
 { return block->tail == block->entries; }
 
-inline void vector_block_add_entry(Vector_Block* block, unsigned int value)
+inline void vector_block_add_entry(Vector_Block* block, POINTER_SIZE_INT value)
 {
 #ifdef _DEBUG 
   assert(value && !*(block->tail));
@@ -73,21 +74,21 @@ inline void vector_block_add_entry(Vector_Block* block, unsigned int value)
 
 inline void vector_block_clear(Vector_Block* block)
 {
-  block->head = (unsigned int*)block->entries;
-  block->tail = (unsigned int*)block->entries;
+  block->head = (POINTER_SIZE_INT*)block->entries;
+  block->tail = (POINTER_SIZE_INT*)block->entries;
 #ifdef _DEBUG
-  memset(block->entries, 0, (block->heap_end - (unsigned int*)block->entries)*BYTES_PER_WORD);
+ memset(block->entries, 0, (POINTER_SIZE_INT)block->heap_end - (POINTER_SIZE_INT)block->entries);
 #endif
 }
 
 /* Below is for sequential local access */
-inline unsigned int* vector_block_iterator_init(Vector_Block* block)
+inline POINTER_SIZE_INT* vector_block_iterator_init(Vector_Block* block)
 {  return block->head;  }
 
-inline unsigned int* vector_block_iterator_advance(Vector_Block* block, unsigned int* iter)
+inline POINTER_SIZE_INT* vector_block_iterator_advance(Vector_Block* block, POINTER_SIZE_INT* iter)
 {  return ++iter; }
 
-inline Boolean vector_block_iterator_end(Vector_Block* block, unsigned int* iter)
+inline Boolean vector_block_iterator_end(Vector_Block* block, POINTER_SIZE_INT* iter)
 {  return iter == block->tail; }
 
 
@@ -102,22 +103,22 @@ inline void vector_stack_clear(Vector_Block* block)
 {
   vector_stack_init(block);
 #ifdef _DEBUG
-  memset(block->entries, 0, (block->heap_end - (unsigned int*)block->entries)*BYTES_PER_WORD);
+  memset(block->entries, 0, (POINTER_SIZE_INT)block->heap_end - (POINTER_SIZE_INT)block->entries);
 #endif
 }
 
-/*
 inline Boolean vector_stack_is_empty(Vector_Block* block)
 {  return (block->head == block->tail); }
-*/
 
+/*
 inline Boolean vector_stack_is_empty(Vector_Block* block)
 { return (block->head - block->entries) == VECTOR_BLOCK_ENTRY_NUM; }
+*/
 
 inline Boolean vector_stack_is_full(Vector_Block* block)
 {  return (block->head == block->entries); }
 
-inline void vector_stack_push(Vector_Block* block, unsigned int value)
+inline void vector_stack_push(Vector_Block* block, POINTER_SIZE_INT value)
 { 
   block->head--;
 #ifdef _DEBUG
@@ -126,9 +127,9 @@ inline void vector_stack_push(Vector_Block* block, unsigned int value)
   *(block->head) = value;
 }
 
-inline unsigned int vector_stack_pop(Vector_Block* block)
+inline POINTER_SIZE_INT vector_stack_pop(Vector_Block* block)
 {   
-  unsigned int value = *block->head;
+  POINTER_SIZE_INT value = *block->head;
 #ifdef _DEBUG
   *block->head = 0;
 #endif
@@ -138,7 +139,7 @@ inline unsigned int vector_stack_pop(Vector_Block* block)
 
 inline void vector_block_integrity_check(Vector_Block* block)
 {
-  unsigned int* iter = vector_block_iterator_init(block);
+  POINTER_SIZE_INT* iter = vector_block_iterator_init(block);
   while(!vector_block_iterator_end(block, iter)){
     assert(*iter);
     iter = vector_block_iterator_advance(block, iter);

@@ -33,13 +33,14 @@ void lspace_initialize(GC* gc, void* start, unsigned int lspace_size)
   /* commit mspace mem */    
   void* reserved_base = start;
   unsigned int committed_size = lspace_size;
-  vm_commit_mem(reserved_base, lspace_size);
+  if(!large_page_hint)
+    vm_commit_mem(reserved_base, lspace_size);
   memset(reserved_base, 0, lspace_size);
 
   lspace->committed_heap_size = committed_size;
   lspace->reserved_heap_size = committed_size;
   lspace->heap_start = reserved_base;
-  lspace->heap_end = (void *)((unsigned int)reserved_base + committed_size);
+  lspace->heap_end = (void *)((POINTER_SIZE_INT)reserved_base + committed_size);
 
   lspace->move_object = FALSE;
   lspace->gc = gc;
@@ -101,4 +102,9 @@ void lspace_collection(Lspace* lspace)
   lspace_reset_after_collection(lspace);  
   lspace_sweep(lspace);
   return;
+}
+
+unsigned int lspace_get_failure_size(Lspace* lspace)
+{
+  return lspace->failure_size;
 }

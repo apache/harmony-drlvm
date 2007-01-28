@@ -32,13 +32,13 @@ extern unsigned int tls_gc_offset;
 inline void* gc_get_tls()
 { 
   void* tls_base = vm_thread_local();
-  return (void*)*(unsigned int*)((char*)tls_base + tls_gc_offset);
+  return (void*)*(POINTER_SIZE_INT*)((char*)tls_base + tls_gc_offset);
 }
 
 inline void gc_set_tls(void* gc_tls_info)
 { 
   void* tls_base = vm_thread_local();
-  *(unsigned int*)((char*)tls_base + tls_gc_offset) = (unsigned int)gc_tls_info;
+  *(POINTER_SIZE_INT*)((char*)tls_base + tls_gc_offset) = (POINTER_SIZE_INT)gc_tls_info;
 }
 
 /* NOTE:: don't change the position of free/ceiling, because the offsets are constants for inlining */
@@ -55,7 +55,7 @@ typedef struct Allocator{
 inline void thread_local_unalloc(unsigned int size, Allocator* allocator)
 {
   void* free = allocator->free;    
-  allocator->free = (void*)((unsigned int)free - size);
+  allocator->free = (void*)((POINTER_SIZE_INT)free - size);
   return;
 }
 
@@ -63,16 +63,16 @@ inline void thread_local_unalloc(unsigned int size, Allocator* allocator)
 
 inline Partial_Reveal_Object* thread_local_alloc_zeroing(unsigned int size, Allocator* allocator)
 {
-  unsigned int  free = (unsigned int)allocator->free;
-  unsigned int ceiling = (unsigned int)allocator->ceiling;
+  POINTER_SIZE_INT free = (POINTER_SIZE_INT)allocator->free;
+  POINTER_SIZE_INT ceiling = (POINTER_SIZE_INT)allocator->ceiling;
   
-  unsigned int new_free = free + size;
+  POINTER_SIZE_INT new_free = free + size;
   
-  unsigned int block_ceiling = (unsigned int)allocator->end;
+  POINTER_SIZE_INT block_ceiling = (POINTER_SIZE_INT)allocator->end;
   if( new_free > block_ceiling) 
     return NULL;
 
-  unsigned int new_ceiling;
+  POINTER_SIZE_INT new_ceiling;
   new_ceiling =  new_free + ZEROING_SIZE;
   if( new_ceiling > block_ceiling )
     new_ceiling = block_ceiling;
@@ -88,10 +88,10 @@ inline Partial_Reveal_Object* thread_local_alloc_zeroing(unsigned int size, Allo
 
 inline Partial_Reveal_Object* thread_local_alloc(unsigned int size, Allocator* allocator)
 {
-  unsigned int  free = (unsigned int)allocator->free;
-  unsigned int ceiling = (unsigned int)allocator->ceiling;
+  POINTER_SIZE_INT free = (POINTER_SIZE_INT)allocator->free;
+  POINTER_SIZE_INT ceiling = (POINTER_SIZE_INT)allocator->ceiling;
   
-  unsigned int new_free = free + size;
+  POINTER_SIZE_INT new_free = free + size;
     
   if (new_free <= ceiling){
   	allocator->free= (void*)new_free;

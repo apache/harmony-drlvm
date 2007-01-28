@@ -23,8 +23,6 @@
 
 #include "gc_common.h"
 
-#define SYSTEM_ALLOC_UNIT 0x10000
-
 #define GC_BLOCK_SHIFT_COUNT 15
 #define GC_BLOCK_SIZE_BYTES (1 << GC_BLOCK_SHIFT_COUNT)
 
@@ -50,7 +48,7 @@ typedef struct Block_Header {
   Partial_Reveal_Object* src;
   Partial_Reveal_Object* next_src;
   Block_Header* next;
-  unsigned int table[1]; /* entry num == OFFSET_TABLE_SIZE_WORDS */
+  POINTER_SIZE_INT table[1]; /* entry num == OFFSET_TABLE_SIZE_WORDS */
 }Block_Header;
 
 typedef union Block{
@@ -58,7 +56,7 @@ typedef union Block{
     unsigned char raw_bytes[GC_BLOCK_SIZE_BYTES];
 }Block;
 
-#define GC_BLOCK_HEADER_VARS_SIZE_BYTES (unsigned int)&(((Block_Header*)0)->table)
+#define GC_BLOCK_HEADER_VARS_SIZE_BYTES (POINTER_SIZE_INT)&(((Block_Header*)0)->table)
 
 #define SECTOR_SIZE_SHIFT_COUNT  8
 #define SECTOR_SIZE_BYTES        (1 << SECTOR_SIZE_SHIFT_COUNT)
@@ -75,22 +73,22 @@ typedef union Block{
 
 #define GC_BLOCK_HEADER_SIZE_BYTES (OFFSET_TABLE_SIZE_BYTES + GC_BLOCK_HEADER_VARS_SIZE_BYTES)
 #define GC_BLOCK_BODY_SIZE_BYTES (GC_BLOCK_SIZE_BYTES - GC_BLOCK_HEADER_SIZE_BYTES)
-#define GC_BLOCK_BODY(block) ((void*)((unsigned int)(block) + GC_BLOCK_HEADER_SIZE_BYTES))
-#define GC_BLOCK_END(block) ((void*)((unsigned int)(block) + GC_BLOCK_SIZE_BYTES))
+#define GC_BLOCK_BODY(block) ((void*)((POINTER_SIZE_INT)(block) + GC_BLOCK_HEADER_SIZE_BYTES))
+#define GC_BLOCK_END(block) ((void*)((POINTER_SIZE_INT)(block) + GC_BLOCK_SIZE_BYTES))
 
-#define GC_BLOCK_LOW_MASK ((unsigned int)(GC_BLOCK_SIZE_BYTES - 1))
+#define GC_BLOCK_LOW_MASK ((POINTER_SIZE_INT)(GC_BLOCK_SIZE_BYTES - 1))
 #define GC_BLOCK_HIGH_MASK (~GC_BLOCK_LOW_MASK)
-#define GC_BLOCK_HEADER(addr) ((Block_Header *)((unsigned int)(addr) & GC_BLOCK_HIGH_MASK))
+#define GC_BLOCK_HEADER(addr) ((Block_Header *)((POINTER_SIZE_INT)(addr) & GC_BLOCK_HIGH_MASK))
 #define GC_BLOCK_INDEX(addr) ((unsigned int)(GC_BLOCK_HEADER(addr)->block_idx))
-#define GC_BLOCK_INDEX_FROM(heap_start, addr) ((unsigned int)(((unsigned int)(addr)-(unsigned int)(heap_start)) >> GC_BLOCK_SHIFT_COUNT))
+#define GC_BLOCK_INDEX_FROM(heap_start, addr) ((unsigned int)(((POINTER_SIZE_INT)(addr)-(POINTER_SIZE_INT)(heap_start)) >> GC_BLOCK_SHIFT_COUNT))
 
-#define ADDRESS_OFFSET_TO_BLOCK_HEADER(addr) ((unsigned int)((unsigned int)addr&GC_BLOCK_LOW_MASK))
+#define ADDRESS_OFFSET_TO_BLOCK_HEADER(addr) ((unsigned int)((POINTER_SIZE_INT)addr&GC_BLOCK_LOW_MASK))
 #define ADDRESS_OFFSET_IN_BLOCK_BODY(addr) ((unsigned int)(ADDRESS_OFFSET_TO_BLOCK_HEADER(addr)- GC_BLOCK_HEADER_SIZE_BYTES))
 
 inline void block_init(Block_Header* block)
 {
-  block->free = (void*)((unsigned int)block + GC_BLOCK_HEADER_SIZE_BYTES);
-  block->ceiling = (void*)((unsigned int)block + GC_BLOCK_SIZE_BYTES); 
+  block->free = (void*)((POINTER_SIZE_INT)block + GC_BLOCK_HEADER_SIZE_BYTES);
+  block->ceiling = (void*)((POINTER_SIZE_INT)block + GC_BLOCK_SIZE_BYTES); 
   block->base = block->free;
   block->new_free = block->free;
   block->status = BLOCK_FREE;
@@ -101,7 +99,7 @@ inline void block_init(Block_Header* block)
 
 inline Partial_Reveal_Object *obj_end(Partial_Reveal_Object *obj)
 {
-  return (Partial_Reveal_Object *)((unsigned int)obj + vm_object_size(obj));
+  return (Partial_Reveal_Object *)((POINTER_SIZE_INT)obj + vm_object_size(obj));
 }
 
 inline Partial_Reveal_Object *next_marked_obj_in_block(Partial_Reveal_Object *cur_obj, Partial_Reveal_Object *block_end)
@@ -240,12 +238,12 @@ inline Partial_Reveal_Object * obj_get_fw_in_table(Partial_Reveal_Object *p_obj)
   /* only for inter-sector compaction */
   unsigned int index    = OBJECT_INDEX_TO_OFFSET_TABLE(p_obj);
   Block_Header *curr_block = GC_BLOCK_HEADER(p_obj);
-  return (Partial_Reveal_Object *)(((unsigned int)p_obj) - curr_block->table[index]);
+  return (Partial_Reveal_Object *)(((POINTER_SIZE_INT)p_obj) - curr_block->table[index]);
 }
 
 inline void block_clear_table(Block_Header* block)
 {
-  unsigned int* table = block->table;
+  POINTER_SIZE_INT* table = block->table;
   memset(table, 0, OFFSET_TABLE_SIZE_BYTES);
   return;
 }

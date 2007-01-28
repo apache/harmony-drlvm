@@ -30,8 +30,6 @@ extern unsigned int NOS_SIZE;
 #include "../mark_sweep/lspace.h"
 #include "../finalizer_weakref/finalizer_weakref_metadata.h"
 
-#define SPACE_ALLOC_UNIT ( ( GC_BLOCK_SIZE_BYTES > SYSTEM_ALLOC_UNIT) ? GC_BLOCK_SIZE_BYTES : SYSTEM_ALLOC_UNIT)
-
 enum Write_Barrier_Kind{
   WRITE_BARRIER_NIL,  
   WRITE_BARRIER_SLOT,  
@@ -48,6 +46,8 @@ extern unsigned int max_heap_size_bytes;
 /* fspace size is variable, adjusted adaptively within the range */
 extern unsigned int min_nos_size_bytes;
 extern unsigned int max_nos_size_bytes;
+
+struct Gen_Mode_Adaptor;
 
 typedef struct GC_Gen {
   /* <-- First couple of fields overloaded as GC */
@@ -75,6 +75,7 @@ typedef struct GC_Gen {
 
   unsigned int collect_kind; /* MAJOR or MINOR */
   unsigned int last_collect_kind;
+  unsigned int cause;/*GC_CAUSE_LOS_IS_FULL, GC_CAUSE_NOS_IS_FULL, or GC_CAUSE_RUNTIME_FORCE_GC*/  
   Boolean collect_result; /* succeed or fail */
   
   Boolean generate_barrier;
@@ -92,8 +93,11 @@ typedef struct GC_Gen {
   Lspace *los;
       
   Boolean force_major_collect;
+  Gen_Mode_Adaptor* gen_mode_adaptor;
+  Boolean force_gen_mode;
   
   /* system info */ 
+  unsigned int _system_alloc_unit;
   unsigned int _machine_page_size_bytes;
   unsigned int _num_processors;
   
@@ -159,6 +163,12 @@ void gc_decide_collection_kind(GC_Gen* gc, unsigned int cause);
 void gc_gen_adapt(GC_Gen* gc, int64 pause_time);
 
 void gc_gen_reclaim_heap(GC_Gen* gc);
+
+void gc_gen_mode_adapt_init(GC_Gen *gc);
+
+void gc_gen_iterate_heap(GC_Gen *gc);
+
+extern Boolean GEN_NONGEN_SWITCH ;
 
 #endif /* ifndef _GC_GEN_H_ */
 

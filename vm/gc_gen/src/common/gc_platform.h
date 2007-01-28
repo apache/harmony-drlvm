@@ -21,25 +21,40 @@
 #ifndef _GC_PLATFORM_H_
 #define _GC_PLATFORM_H_
 
+#include "port_vmem.h"
+
 #include <assert.h>
+
+#ifdef __linux__
 #include <ctype.h>
+#endif
 
 #include <apr_time.h>
 #include <apr_atomic.h>
 
 #include <open/hythread_ext.h>
 
+extern char* large_page_hint;
 
 #ifndef _DEBUG
 
 //#define RELEASE_DEBUG
-
 #ifdef RELEASE_DEBUG
 #undef assert
 #define assert(x) do{ if(!(x)) __asm{int 3}}while(0)
 #endif
 
 #endif //_DEBUG
+
+#ifdef _WINDOWS_
+#define FORCE_INLINE __forceinline   
+#else 
+
+#ifdef __linux__
+#define FORCE_INLINE inline  __attribute__((always_inline))
+#endif
+
+#endif
 
 #define USEC_PER_SEC INT64_C(1000000)
 
@@ -106,20 +121,31 @@ inline Boolean pool_create(apr_pool_t **newpool, apr_pool_t *parent)
 inline void pool_destroy(apr_pool_t *p) 
 {  apr_pool_destroy(p); }
 
-#ifndef _WIN32
+#ifndef _WINDOWS_
 #include <sys/mman.h>
 #endif
+
+inline unsigned int vm_get_system_alloc_unit()
+{
+#ifdef _WINDOWS_  
+  SYSTEM_INFO si;
+  GetSystemInfo(&si);
+  return si.dwAllocationGranularity;
+#else 
+  return port_vmem_page_sizes()[0];
+#endif
+}
 
 inline void *vm_map_mem(void* start, unsigned int size) 
 {
   void* address;
-#ifdef _WIN32
+#ifdef _WINDOWS_
   address = VirtualAlloc(start, size, MEM_RESERVE|MEM_COMMIT, PAGE_READWRITE);
-#else
+#else 
   address = mmap(start, size, PROT_READ|PROT_WRITE, MAP_FIXED|MAP_PRIVATE|MAP_ANONYMOUS, -1, 0);
   if(address == MAP_FAILED) address = NULL;
     
-#endif /* ifdef _WIN32 else */
+#endif /* ifdef _WINDOWS_ else */
 
   return address;
 }
@@ -127,13 +153,13 @@ inline void *vm_map_mem(void* start, unsigned int size)
 inline Boolean vm_unmap_mem(void* start, unsigned int size) 
 {
   unsigned int result;
-#ifdef _WIN32
+#ifdef _WINDOWS_
   result = VirtualFree(start, 0, MEM_RELEASE);
 #else
   result = munmap(start, size);
-  if(result == -1) result = 0;
-    
-#endif /* ifdef _WIN32 else */
+  if(result == 0) result = TRUE;
+  else result = FALSE;  
+#endif /* ifdef _WINDOWS_ else */
 
   return result;
 }
@@ -141,13 +167,13 @@ inline Boolean vm_unmap_mem(void* start, unsigned int size)
 inline void *vm_alloc_mem(void* start, unsigned int size) 
 {
   void* address;
-#ifdef _WIN32
+#ifdef _WINDOWS_
   address = VirtualAlloc(start, size, MEM_RESERVE|MEM_COMMIT, PAGE_READWRITE);
 #else
   address = mmap(start, size, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_ANONYMOUS, -1, 0);
   if(address == MAP_FAILED) address = NULL;
     
-#endif /* ifdef _WIN32 else */
+#endif /* ifdef _WINDOWS_ else */
 
   return address;
 }
@@ -160,25 +186,36 @@ inline Boolean vm_free_mem(void* start, unsigned int size)
 inline void *vm_reserve_mem(void* start, unsigned int size) 
 {
   void* address;
-#ifdef _WIN32
+#ifdef _WINDOWS_
   address = VirtualAlloc(start, size, MEM_RESERVE, PAGE_READWRITE);
 #else
-  address = mmap(start, size, PROT_READ|PROT_WRITE, MAP_FIXED|MAP_PRIVATE|MAP_ANONYMOUS, -1, 0);
+  if(start == 0)
+    address = mmap(0, size, PROT_NONE, MAP_PRIVATE|MAP_ANONYMOUS, -1, 0);
+  else
+    address = mmap(start, size, PROT_NONE, MAP_FIXED|MAP_PRIVATE|MAP_ANONYMOUS, -1, 0);
+  
   if(address == MAP_FAILED) address = NULL;
     
-#endif /* ifdef _WIN32 else */
+#endif /* ifdef _WINDOWS_ else */
 
   return address;
+}
+
+inline Boolean vm_release_mem(void* start, unsigned int size) 
+{
+  return vm_unmap_mem(start, size);
 }
 
 inline void *vm_commit_mem(void* start, unsigned int size) 
 {
   void* address;
-#ifdef _WIN32
+#ifdef _WINDOWS_
   address = VirtualAlloc(start, size, MEM_COMMIT, PAGE_READWRITE);
 #else
-    
-#endif /* ifdef _WIN32 else */
+  int result = mprotect(start, size, PROT_READ|PROT_WRITE);
+  if(result == 0) address = start;
+  else address = NULL;  
+#endif /* ifdef _WINDOWS_ else */
 
   return address;
 }
@@ -186,11 +223,14 @@ inline void *vm_commit_mem(void* start, unsigned int size)
 inline Boolean vm_decommit_mem(void* start, unsigned int size) 
 {
   unsigned int result;
-#ifdef _WIN32
+#ifdef _WINDOWS_
   result = VirtualFree(start, size, MEM_DECOMMIT);
 #else
+  result = mprotect(start, size, PROT_NONE);
+  if(result == 0) result = TRUE;
+  else result = FALSE;  
     
-#endif /* ifdef _WIN32 else */
+#endif /* ifdef _WINDOWS_ else */
 
   return result;
 }
@@ -207,7 +247,7 @@ inline void string_to_upper(char* s)
 }  
 
 #ifdef PLATFORM_POSIX
-#define max(x, y) ((x)>(y)?(x):(y))
+#define max(x, y) (((x)>(y))?(x):(y))
 #endif
 
 typedef volatile unsigned int SpinLock;

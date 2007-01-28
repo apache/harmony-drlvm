@@ -51,7 +51,7 @@ static Boolean fspace_alloc_block(Fspace* fspace, Allocator* allocator)
 #else
     /* the first-time zeroing area includes block header, to make subsequent allocs page aligned */
     unsigned int zeroing_size = ZEROING_SIZE - GC_BLOCK_HEADER_SIZE_BYTES;
-    allocator->ceiling = (void*)((unsigned int)new_free + zeroing_size);
+    allocator->ceiling = (void*)((POINTER_SIZE_INT)new_free + zeroing_size);
     memset(new_free, 0, zeroing_size);
 
 #endif /* #ifndef ALLOC_ZEROING */

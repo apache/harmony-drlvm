@@ -24,6 +24,33 @@
 
 #include "../finalizer_weakref/finalizer_weakref.h"
 
+//#define GC_OBJ_SIZE_STATISTIC
+
+#ifdef GC_OBJ_SIZE_STATISTIC
+#define GC_OBJ_SIZE_STA_MAX 256*KB
+unsigned int obj_size_distribution_map[GC_OBJ_SIZE_STA_MAX>>10];
+void gc_alloc_statistic_obj_distrubution(unsigned int size)
+{
+    unsigned int sta_precision = 16*KB;
+    unsigned int max_sta_size = 128*KB;
+    unsigned int sta_current = 0;    
+
+    assert(!(GC_OBJ_SIZE_STA_MAX % sta_precision));
+    assert(!(max_sta_size % sta_precision));    
+    while( sta_current < max_sta_size ){
+        if(size < sta_current){
+            unsigned int index = sta_current >> 10;
+            obj_size_distribution_map[index] ++;
+            return;
+        }
+        sta_current += sta_precision;
+    }
+    unsigned int index = sta_current >> 10;
+    obj_size_distribution_map[index]++;
+    return;
+}
+#endif
+
 Managed_Object_Handle gc_alloc(unsigned size, Allocation_Handle ah, void *unused_gc_tls) 
 {
   Managed_Object_Handle p_obj = NULL;
@@ -33,7 +60,11 @@ Managed_Object_Handle gc_alloc(unsigned size, Allocation_Handle ah, void *unused
   assert(ah);
 
   Allocator* allocator = (Allocator*)gc_get_tls();
-   
+
+#ifdef GC_OBJ_SIZE_STATISTIC
+  gc_alloc_statistic_obj_distrubution(size);
+#endif
+
   if ( size > GC_OBJ_SIZE_THRESHOLD )
     p_obj = (Managed_Object_Handle)los_alloc(size, allocator);
   else{
@@ -59,6 +90,10 @@ Managed_Object_Handle gc_alloc_fast (unsigned size, Allocation_Handle ah, void *
   
   if(type_has_finalizer((Partial_Reveal_VTable *)ah))
     return NULL;
+
+#ifdef GC_OBJ_SIZE_STATISTIC
+  gc_alloc_statistic_obj_distrubution(size);
+#endif
   
   /* object should be handled specially */
   if ( size > GC_OBJ_SIZE_THRESHOLD ) return NULL;

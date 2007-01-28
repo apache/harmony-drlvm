@@ -38,6 +38,8 @@ static Boolean mspace_alloc_block(Mspace* mspace, Allocator* allocator)
     Block_Header* alloc_block = (Block_Header*)&(mspace->blocks[allocated_idx - mspace->first_block_idx]);
     assert(alloc_block->status == BLOCK_FREE);
     alloc_block->status = BLOCK_IN_USE;
+    /*For_statistic mos allocation infomation*/
+    mspace->alloced_size += GC_BLOCK_SIZE_BYTES;
     
     /* set allocation context */
     void* new_free = alloc_block->free;
@@ -52,7 +54,7 @@ static Boolean mspace_alloc_block(Mspace* mspace, Allocator* allocator)
 
     /* the first-time zeroing area includes block header, to make subsequent allocs page aligned */
     unsigned int zeroing_size = ZEROING_SIZE - GC_BLOCK_HEADER_SIZE_BYTES;
-    allocator->ceiling = (void*)((unsigned int)new_free + zeroing_size);
+    allocator->ceiling = (void*)((POINTER_SIZE_INT)new_free + zeroing_size);
     memset(new_free, 0, zeroing_size);
 
 #endif /* #ifndef ALLOC_ZEROING */

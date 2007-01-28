@@ -53,6 +53,9 @@
 #define BIT_SHIFT_TO_KILO 10 
 
 #define BIT_MASK_TO_BITS_PER_WORD ((1<<BIT_SHIFT_TO_BITS_PER_WORD)-1)
+#define BITS_OF_POINTER_SIZE_INT (sizeof(POINTER_SIZE_INT) << BIT_SHIFT_TO_BITS_PER_BYTE)
+#define BYTES_OF_POINTER_SIZE_INT (sizeof(POINTER_SIZE_INT))
+#define BIT_SHIFT_TO_BYTES_OF_POINTER_SIZE_INT ((sizeof(POINTER_SIZE_INT)==4)? 2: 3)
 
 #define GC_OBJ_SIZE_THRESHOLD (4*KB)
 
@@ -76,7 +79,8 @@ enum Collection_Algorithm{
 enum Collection_Kind {
   MINOR_COLLECTION,
   MAJOR_COLLECTION,
-  FALLBACK_COLLECTION  
+  FALLBACK_COLLECTION,
+  EXTEND_COLLECTION
 };
 
 extern Boolean IS_FALLBACK_COMPACTION;  /* only for mark/fw bits debugging purpose */
@@ -104,7 +108,7 @@ inline int* object_ref_iterator_init(Partial_Reveal_Object *obj)
 
 inline Partial_Reveal_Object** object_ref_iterator_get(int* iterator, Partial_Reveal_Object* obj)
 {
-  return (Partial_Reveal_Object**)((int)obj + *iterator);
+  return (Partial_Reveal_Object**)((POINTER_SIZE_INT)obj + *iterator);
 }
 
 inline int* object_ref_iterator_next(int* iterator)
@@ -133,15 +137,15 @@ inline Boolean obj_is_marked_in_vt(Partial_Reveal_Object *obj)
 inline Boolean obj_mark_in_vt(Partial_Reveal_Object *obj) 
 {  
   Partial_Reveal_VTable* vt = obj_get_vt_raw(obj);
-  if((unsigned int)vt & CONST_MARK_BIT) return FALSE;
-  obj_set_vt(obj, (unsigned int)vt | CONST_MARK_BIT);
+  if((POINTER_SIZE_INT)vt & CONST_MARK_BIT) return FALSE;
+  obj_set_vt(obj, (POINTER_SIZE_INT)vt | CONST_MARK_BIT);
   return TRUE;
 }
 
 inline void obj_unmark_in_vt(Partial_Reveal_Object *obj) 
 { 
   Partial_Reveal_VTable* vt = obj_get_vt_raw(obj);
-  obj_set_vt(obj, (unsigned int)vt & ~CONST_MARK_BIT);
+  obj_set_vt(obj, (POINTER_SIZE_INT)vt & ~CONST_MARK_BIT);
 }
 
 inline Boolean obj_is_marked_or_fw_in_oi(Partial_Reveal_Object *obj)
@@ -285,6 +289,7 @@ typedef struct GC{
 
   unsigned int collect_kind; /* MAJOR or MINOR */
   unsigned int last_collect_kind;
+  unsigned int cause;/*GC_CAUSE_LOS_IS_FULL, GC_CAUSE_NOS_IS_FULL, or GC_CAUSE_RUNTIME_FORCE_GC*/
   Boolean collect_result; /* succeed or fail */
 
   Boolean generate_barrier;
@@ -325,7 +330,7 @@ extern Boolean NOS_PARTIAL_FORWARD;
   //#define NOS_BOUNDARY ((void*)0x2ea20000)  //this is for 512M
   #define NOS_BOUNDARY ((void*)0x40000000) //this is for 256M
 
-	#define nos_boundary NOS_BOUNDARY
+  #define nos_boundary NOS_BOUNDARY
 
 #else /* STATIC_NOS_MAPPING */
 

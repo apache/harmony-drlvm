@@ -28,12 +28,18 @@
 /* fspace size limit is not interesting. only for manual tuning purpose */
 unsigned int min_nos_size_bytes = 16 * MB;
 unsigned int max_nos_size_bytes = 256 * MB;
+unsigned int min_los_size_bytes = 4*MB;
 unsigned int NOS_SIZE = 0;
+unsigned int MIN_LOS_SIZE = 0;
 unsigned int MIN_NOS_SIZE = 0;
 unsigned int MAX_NOS_SIZE = 0;
 
 static unsigned int MINOR_ALGO = 0;
 static unsigned int MAJOR_ALGO = 0;
+
+Boolean GEN_NONGEN_SWITCH = FALSE;
+
+Boolean JVMTI_HEAP_ITERATION = false;
 
 #ifndef STATIC_NOS_MAPPING
 void* nos_boundary;
@@ -45,29 +51,35 @@ static void gc_gen_get_system_info(GC_Gen *gc_gen)
 {
   gc_gen->_machine_page_size_bytes = port_vmem_page_sizes()[0];
   gc_gen->_num_processors = port_CPUs_number();
+  gc_gen->_system_alloc_unit = vm_get_system_alloc_unit();
+  SPACE_ALLOC_UNIT = max(gc_gen->_system_alloc_unit, GC_BLOCK_SIZE_BYTES);
 }
+
+void* alloc_large_pages(size_t size, const char* hint);
 
 void gc_gen_initialize(GC_Gen *gc_gen, unsigned int min_heap_size, unsigned int max_heap_size) 
 {
   assert(gc_gen); 
+  gc_gen_get_system_info(gc_gen); 
 
-  /*Give GC a hint of gc survive ratio.*/
-  gc_gen->survive_ratio = 0.2f;
-
-  /*fixme: max_heap_size should not beyond 448 MB*/
   max_heap_size = round_down_to_size(max_heap_size, SPACE_ALLOC_UNIT);
   min_heap_size = round_up_to_size(min_heap_size, SPACE_ALLOC_UNIT);
   assert(max_heap_size <= max_heap_size_bytes);
-  assert(max_heap_size > min_heap_size_bytes);
+  assert(max_heap_size >= min_heap_size_bytes);
 
-  gc_gen_get_system_info(gc_gen); 
   min_nos_size_bytes *=  gc_gen->_num_processors;
+
+  unsigned int min_nos_size_threshold = max_heap_size>>5;
+  if(min_nos_size_bytes  > min_nos_size_threshold){
+    min_nos_size_bytes = round_down_to_size(min_nos_size_threshold,SPACE_ALLOC_UNIT);
+  }
   
   if( MIN_NOS_SIZE )  min_nos_size_bytes = MIN_NOS_SIZE;
 
   unsigned int los_size = max_heap_size >> 7;
-  if(los_size < GC_MIN_LOS_SIZE) 
-    los_size = GC_MIN_LOS_SIZE;
+  if(MIN_LOS_SIZE) min_los_size_bytes = MIN_LOS_SIZE;
+  if(los_size < min_los_size_bytes ) 
+    los_size = min_los_size_bytes ;
   
   los_size = round_down_to_size(los_size, SPACE_ALLOC_UNIT);
 
@@ -78,6 +90,8 @@ void gc_gen_initialize(GC_Gen *gc_gen, unsigned int min_heap_size, unsigned int 
   unsigned int mos_reserve_size, mos_commit_size; 
   unsigned int los_mos_size;
   
+  /*Give GC a hint of gc survive ratio.*/
+  gc_gen->survive_ratio = 0.2f;
 
   if(NOS_SIZE){
     los_mos_size = max_heap_size - NOS_SIZE;
@@ -103,20 +117,23 @@ void gc_gen_initialize(GC_Gen *gc_gen, unsigned int min_heap_size, unsigned int 
 
 #ifdef STATIC_NOS_MAPPING
 
-  assert((unsigned int)nos_boundary%SPACE_ALLOC_UNIT == 0);
+  //FIXME: no large page support in static nos mapping
+  assert(large_page_hint==NULL);
+  
+  assert((POINTER_SIZE_INT)nos_boundary%SPACE_ALLOC_UNIT == 0);
   nos_base = vm_reserve_mem(nos_boundary, nos_reserve_size);
   if( nos_base != nos_boundary ){
     printf("Static NOS mapping: Can't reserve memory at %x for size %x for NOS.\n", nos_boundary, nos_reserve_size);  
     printf("Please not use static NOS mapping by undefining STATIC_NOS_MAPPING, or adjusting NOS_BOUNDARY value.\n");
     exit(0);
   }
-  reserved_end = (void*)((unsigned int)nos_base + nos_reserve_size);
+  reserved_end = (void*)((POINTER_SIZE_INT)nos_base + nos_reserve_size);
 
-  void* los_mos_base = (void*)((unsigned int)nos_base - los_mos_size);
-  assert(!((unsigned int)los_mos_base%SPACE_ALLOC_UNIT));
+  void* los_mos_base = (void*)((POINTER_SIZE_INT)nos_base - los_mos_size);
+  assert(!((POINTER_SIZE_INT)los_mos_base%SPACE_ALLOC_UNIT));
   reserved_base = vm_reserve_mem(los_mos_base, los_mos_size);
   while( !reserved_base || reserved_base >= nos_base){
-    los_mos_base = (void*)((unsigned int)los_mos_base - SPACE_ALLOC_UNIT);
+    los_mos_base = (void*)((POINTER_SIZE_INT)los_mos_base - SPACE_ALLOC_UNIT);
     if(los_mos_base < RESERVE_BOTTOM){
       printf("Static NOS mapping: Can't allocate memory at address %x for specified size %x for MOS", reserved_base, los_mos_size);  
       exit(0);      
@@ -126,15 +143,31 @@ void gc_gen_initialize(GC_Gen *gc_gen, unsigned int min_heap_size, unsigned int 
   
 #else /* STATIC_NOS_MAPPING */
 
-  reserved_base = vm_reserve_mem(0, max_heap_size);
-  while( !reserved_base ){
-    printf("Non-static NOS mapping: Can't allocate memory at address %x for specified size %x", reserved_base, max_heap_size);  
-    exit(0);      
+  reserved_base = NULL;
+  if(large_page_hint){
+    reserved_base = alloc_large_pages(max_heap_size, large_page_hint);
+    if(reserved_base == NULL) {
+      free(large_page_hint);
+      large_page_hint = NULL;
+      printf("GC use small pages.\n");
+    }
   }
-  reserved_end = (void*)((unsigned int)reserved_base + max_heap_size);
+  
+  if(reserved_base==NULL){
+    reserved_base = vm_reserve_mem((void*)0, max_heap_size + SPACE_ALLOC_UNIT);
+    reserved_base = (void*)round_up_to_size((POINTER_SIZE_INT)reserved_base, SPACE_ALLOC_UNIT);
+    assert((POINTER_SIZE_INT)reserved_base%SPACE_ALLOC_UNIT == 0);
+
+    while( !reserved_base ){
+      printf("Non-static NOS mapping: Can't allocate memory at address %x for specified size %x", reserved_base, max_heap_size);  
+      exit(0);      
+    }
+  }
+
+  reserved_end = (void*)((POINTER_SIZE_INT)reserved_base + max_heap_size);
     
   /* compute first time nos_boundary */
-  nos_base = (void*)((unsigned int)reserved_base + mos_commit_size + los_size);
+  nos_base = (void*)((POINTER_SIZE_INT)reserved_base + mos_commit_size + los_size);
   /* init nos_boundary if NOS is not statically mapped */
   nos_boundary = nos_base; 
 
@@ -147,10 +180,11 @@ void gc_gen_initialize(GC_Gen *gc_gen, unsigned int min_heap_size, unsigned int 
   gc_gen->num_collections = 0;
   gc_gen->time_collections = 0;
   gc_gen->force_major_collect = FALSE;
+  gc_gen->force_gen_mode = FALSE;
   
   gc_los_initialize(gc_gen, reserved_base, los_size);
 
-  reserved_base = (void*)((unsigned int)reserved_base + los_size);
+  reserved_base = (void*)((POINTER_SIZE_INT)reserved_base + los_size);
   gc_mos_initialize(gc_gen, reserved_base, mos_reserve_size, mos_commit_size);
 
   gc_nos_initialize(gc_gen, nos_base, nos_reserve_size, nos_commit_size); 
@@ -166,9 +200,11 @@ void gc_gen_initialize(GC_Gen *gc_gen, unsigned int min_heap_size, unsigned int 
   mos->collect_algorithm = MAJOR_ALGO;
 
   /*Give GC a hint of space survive ratio.*/
-  nos->survive_ratio = gc_gen->survive_ratio;
-  mos->survive_ratio = gc_gen->survive_ratio;
+//  nos->survive_ratio = gc_gen->survive_ratio;
+//  mos->survive_ratio = gc_gen->survive_ratio;
   gc_space_tuner_initialize((GC*)gc_gen);
+
+  gc_gen_mode_adapt_init(gc_gen);
     
   gc_gen->committed_heap_size = space_committed_size((Space*)gc_gen->nos) +
                                 space_committed_size((Space*)gc_gen->mos) +
@@ -183,6 +219,14 @@ void gc_gen_initialize(GC_Gen *gc_gen, unsigned int min_heap_size, unsigned int 
 
 void gc_gen_destruct(GC_Gen *gc_gen) 
 {
+  Space* nos = (Space*)gc_gen->nos;
+  Space* mos = (Space*)gc_gen->mos;
+  Space* los = (Space*)gc_gen->los;
+
+  vm_unmap_mem(nos->heap_start, space_committed_size(nos));
+  vm_unmap_mem(mos->heap_start, space_committed_size(mos));
+  vm_unmap_mem(los->heap_start, space_committed_size(los));
+
   gc_nos_destruct(gc_gen);
   gc_gen->nos = NULL;
   
@@ -191,14 +235,6 @@ void gc_gen_destruct(GC_Gen *gc_gen)
 
   gc_los_destruct(gc_gen);  
   gc_gen->los = NULL;
-
-  Space* nos = (Space*)gc_gen->nos;
-  Space* mos = (Space*)gc_gen->mos;
-  Space* los = (Space*)gc_gen->los;
-
-  vm_unmap_mem(nos->heap_start, space_committed_size(nos));
-  vm_unmap_mem(mos->heap_start, space_committed_size(mos));
-  vm_unmap_mem(los->heap_start, space_committed_size(los));
 
   return;  
 }
@@ -259,17 +295,17 @@ void gc_decide_collection_algorithm(GC_Gen* gc, char* minor_algo, char* major_al
   }
   
   if(!major_algo){
-    MAJOR_ALGO= MAJOR_COMPACT_SLIDE;
+    MAJOR_ALGO= MAJOR_COMPACT_MOVE;
     
   }else{
     string_to_upper(major_algo);
 
     if(!strcmp(major_algo, "MAJOR_COMPACT_SLIDE")){
      MAJOR_ALGO= MAJOR_COMPACT_SLIDE;
-          
+      
     }else if(!strcmp(major_algo, "MAJOR_COMPACT_MOVE")){
      MAJOR_ALGO= MAJOR_COMPACT_MOVE;
-
+    
     }else{
      printf("\nGC algorithm setting incorrect. Will use default algorithm.\n");  
       
@@ -285,8 +321,6 @@ Boolean IS_FALLBACK_COMPACTION = FALSE; /* only for debugging, don't use it. */
 void gc_gen_reclaim_heap(GC_Gen* gc)
 { 
   if(verify_live_heap) gc_verify_heap((GC*)gc, TRUE);
-
-  int64 start_time = time_now();
 
   Blocked_Space* fspace = (Blocked_Space*)gc->nos;
   Blocked_Space* mspace = (Blocked_Space*)gc->mos;
@@ -339,13 +373,63 @@ void gc_gen_reclaim_heap(GC_Gen* gc)
     exit(0);
   }
   
-  int64 pause_time = time_now() - start_time;
-  
-  gc->time_collections += pause_time;
-  
   if(verify_live_heap) gc_verify_heap((GC*)gc, FALSE);
 
-  gc_gen_adapt(gc, pause_time);
-
   return;
+}
+
+void gc_gen_iterate_heap(GC_Gen *gc)
+{
+  /** the function is called after stoped the world **/
+  Mutator *mutator = gc->mutator_list;
+  bool cont = true;   
+  while (mutator) {
+    Block_Header* block = (Block_Header*)mutator->alloc_block;
+  	if(block != NULL) block->free = mutator->free;
+  	mutator = mutator->next;
+  }
+
+  Mspace* mspace = gc->mos;
+  Block_Header *curr_block = (Block_Header*)mspace->blocks;
+  Block_Header *space_end = (Block_Header*)&mspace->blocks[mspace->free_block_idx - mspace->first_block_idx];
+  while(curr_block < space_end) {
+    POINTER_SIZE_INT p_obj = (POINTER_SIZE_INT)curr_block->base;
+    POINTER_SIZE_INT block_end = (POINTER_SIZE_INT)curr_block->free;
+    while(p_obj < block_end){
+      cont = vm_iterate_object((Managed_Object_Handle)p_obj);
+      if (!cont) return;
+      p_obj = p_obj + vm_object_size((Partial_Reveal_Object *)p_obj);
+    }
+    curr_block = curr_block->next;
+    if(curr_block == NULL) break;
+  }
+  
+  Fspace* fspace = gc->nos;
+  curr_block = (Block_Header*)fspace->blocks;
+  space_end = (Block_Header*)&fspace->blocks[fspace->free_block_idx - fspace->first_block_idx];
+  while(curr_block < space_end) {
+   	POINTER_SIZE_INT p_obj = (POINTER_SIZE_INT)curr_block->base;
+    POINTER_SIZE_INT block_end = (POINTER_SIZE_INT)curr_block->free;
+    while(p_obj < block_end){
+      cont = vm_iterate_object((Managed_Object_Handle)p_obj);
+      if (!cont) return;
+      p_obj = p_obj + vm_object_size((Partial_Reveal_Object *)p_obj);
+    }
+    	curr_block = curr_block->next;
+      if(curr_block == NULL) break;
+    }
+
+  Lspace* lspace = gc->los;
+  POINTER_SIZE_INT lspace_obj = (POINTER_SIZE_INT)lspace->heap_start;
+  POINTER_SIZE_INT lspace_end = (POINTER_SIZE_INT)lspace->heap_end;
+  while (lspace_obj < lspace_end) {
+    if(!*((unsigned int *)lspace_obj)){
+      lspace_obj = lspace_obj + ((Free_Area*)lspace_obj)->size;
+    }else{
+      cont = vm_iterate_object((Managed_Object_Handle)lspace_obj);
+      if (!cont) return;
+      unsigned int obj_size = ALIGN_UP_TO_KILO(vm_object_size((Partial_Reveal_Object *)lspace_obj));
+      lspace_obj = lspace_obj + obj_size;
+    }
+  }
 }

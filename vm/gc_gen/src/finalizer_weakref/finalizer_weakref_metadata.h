@@ -25,31 +25,32 @@
 #include "../utils/vector_block.h"
 #include "../utils/sync_pool.h"
 
-#define POOL_SEGMENT_NUM 256
+#define FINREF_METADATA_SEGMENT_NUM 256
 
 typedef struct Finref_Metadata{
-  void *pool_segments[POOL_SEGMENT_NUM];  // malloced free pool segments' addresses array
-  unsigned int num_alloc_segs;              // next available position in pool_segments array
+  void *segments[FINREF_METADATA_SEGMENT_NUM];  // malloced free pool segments' addresses array
+  unsigned int num_alloc_segs;                  // allocated segment number
+  SpinLock alloc_lock;                          // thread must hold this lock when allocating new segment
   
-  Pool *free_pool;                        // list of free buffers for the five pools below
+  Pool *free_pool;                              // list of free buffers for the five pools below
   
-  Pool *obj_with_fin_pool;                // list of objects that have finalizer;
-                                          // these objects are added in when they are allocated
-  Pool *finalizable_obj_pool;             // temporary buffer for finalizable objects identified during one single GC
+  Pool *obj_with_fin_pool;                      // list of objects that have finalizer;
+                                                // these objects are added in when they are allocated
+  Pool *finalizable_obj_pool;                   // temporary buffer for finalizable objects identified during one single GC
   
-  Pool *softref_pool;                     // temporary buffer for soft references identified during one single GC
-  Pool *weakref_pool;                     // temporary buffer for weak references identified during one single GC
-  Pool *phanref_pool;                     // temporary buffer for phantom references identified during one single GC
+  Pool *softref_pool;                           // temporary buffer for soft references identified during one single GC
+  Pool *weakref_pool;                           // temporary buffer for weak references identified during one single GC
+  Pool *phanref_pool;                           // temporary buffer for phantom references identified during one single GC
   
-  Pool *repset_pool;                      // repointed reference slot sets
+  Pool *repset_pool;                            // repointed reference slot sets
   
-  Vector_Block *finalizable_obj_set;      // buffer for finalizable_objects_pool
-  Vector_Block *repset;                   // buffer for repset_pool
+  Vector_Block *finalizable_obj_set;            // buffer for finalizable_objects_pool
+  Vector_Block *repset;                         // buffer for repset_pool
   
-  Boolean pending_finalizers;             // there are objects waiting to be finalized
-  Boolean pending_weakrefs;               // there are weak references waiting to be enqueued
+  Boolean pending_finalizers;                   // there are objects waiting to be finalized
+  Boolean pending_weakrefs;                     // there are weak references waiting to be enqueued
   
-  unsigned int gc_referent_offset;        // the referent field's offset in Reference Class
+  unsigned int gc_referent_offset;              // the referent field's offset in Reference Class
 }Finref_Metadata;
 
 extern unsigned int get_gc_referent_offset(void);
@@ -58,8 +59,11 @@ extern void set_gc_referent_offset(unsigned int offset);
 extern void gc_finref_metadata_initialize(GC *gc);
 extern void gc_finref_metadata_destruct(GC *gc);
 extern void gc_finref_metadata_verify(GC *gc, Boolean is_before_gc);
+
+extern void gc_set_obj_with_fin(GC *gc);
+extern void collector_reset_weakref_sets(Collector *collector);
+extern void gc_set_weakref_sets(GC *gc);
 extern void gc_reset_finref_metadata(GC *gc);
-extern Vector_Block *finref_get_free_block(void);
 
 extern void mutator_add_finalizer(Mutator *mutator, Partial_Reveal_Object *ref);
 extern void gc_add_finalizable_obj(GC *gc, Partial_Reveal_Object *ref);
@@ -76,6 +80,18 @@ extern Boolean phanref_pool_is_empty(GC *gc);
 extern Boolean finref_repset_pool_is_empty(GC *gc);
 
 extern void gc_clear_weakref_pools(GC *gc);
+
+extern Vector_Block *finref_metadata_extend(void);
+inline Vector_Block *finref_get_free_block(GC *gc)
+{
+  Vector_Block *block = pool_get_entry(gc->finref_metadata->free_pool);
+  
+  while(!block)
+    block = finref_metadata_extend();
+  
+  assert(vector_block_is_empty(block));
+  return block;
+}
 
 
 /* called before loop of recording finalizable objects */

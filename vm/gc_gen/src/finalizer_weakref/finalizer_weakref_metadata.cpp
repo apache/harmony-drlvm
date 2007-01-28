@@ -22,13 +22,15 @@
 #include "../thread/mutator.h"
 #include "../thread/collector.h"
 
-#define POOL_SEGMENT_SIZE_BIT_SHIFT 20
-#define POOL_SEGMENT_SIZE_BYTES (1 << POOL_SEGMENT_SIZE_BIT_SHIFT)
+#define FINREF_METADATA_SEG_SIZE_BIT_SHIFT          20
+#define FINREF_METADATA_SEG_SIZE_BYTES                (1 << FINREF_METADATA_SEG_SIZE_BIT_SHIFT)
 
-#define METADATA_BLOCK_SIZE_BIT_SHIFT 10
-#define METADATA_BLOCK_SIZE_BYTES (1<<METADATA_BLOCK_SIZE_BIT_SHIFT)
+//#define FINREF_METADATA_BLOCK_SIZE_BYTES    must be equal to   VECTOR_BLOCK_DATA_SIZE_BYTES
+#define FINREF_METADATA_BLOCK_SIZE_BIT_SHIFT  11
+#define FINREF_METADATA_BLOCK_SIZE_BYTES        (1 << FINREF_METADATA_BLOCK_SIZE_BIT_SHIFT)
 
 static Finref_Metadata finref_metadata;
+
 
 unsigned int get_gc_referent_offset(void)
 {
@@ -39,13 +41,16 @@ void set_gc_referent_offset(unsigned int offset)
   finref_metadata.gc_referent_offset = offset;
 }
 
+
 void gc_finref_metadata_initialize(GC *gc)
 {
-  void *pool_segment = STD_MALLOC(POOL_SEGMENT_SIZE_BYTES);
-  memset(pool_segment, 0, POOL_SEGMENT_SIZE_BYTES);
-  finref_metadata.num_alloc_segs = 0;
-  finref_metadata.pool_segments[finref_metadata.num_alloc_segs] = pool_segment;
-  ++finref_metadata.num_alloc_segs;
+  unsigned int seg_size =  FINREF_METADATA_SEG_SIZE_BYTES + FINREF_METADATA_BLOCK_SIZE_BYTES;
+  void *first_segment = STD_MALLOC(seg_size);
+  memset(first_segment, 0, seg_size);
+  finref_metadata.segments[0] = first_segment;
+  first_segment = (void*)round_up_to_size((POINTER_SIZE_INT)first_segment, FINREF_METADATA_BLOCK_SIZE_BYTES);
+  finref_metadata.num_alloc_segs = 1;
+  finref_metadata.alloc_lock = FREE_LOCK;
   
   finref_metadata.free_pool = sync_pool_create();
   finref_metadata.obj_with_fin_pool = sync_pool_create();
@@ -58,10 +63,10 @@ void gc_finref_metadata_initialize(GC *gc)
   finref_metadata.finalizable_obj_set= NULL;
   finref_metadata.repset = NULL;
   
-  unsigned int num_blocks =  POOL_SEGMENT_SIZE_BYTES >> METADATA_BLOCK_SIZE_BIT_SHIFT;
+  unsigned int num_blocks =  FINREF_METADATA_SEG_SIZE_BYTES >> FINREF_METADATA_BLOCK_SIZE_BIT_SHIFT;
   for(unsigned int i=0; i<num_blocks; i++){
-    Vector_Block *block = (Vector_Block *)((unsigned int)pool_segment + i*METADATA_BLOCK_SIZE_BYTES);
-    vector_block_init(block, METADATA_BLOCK_SIZE_BYTES);
+    Vector_Block *block = (Vector_Block *)((POINTER_SIZE_INT)first_segment + i*FINREF_METADATA_BLOCK_SIZE_BYTES);
+    vector_block_init(block, FINREF_METADATA_BLOCK_SIZE_BYTES);
     assert(vector_block_is_empty((Vector_Block *)block));
     pool_put_entry(finref_metadata.free_pool, (void *)block);
   }
@@ -90,8 +95,8 @@ void gc_finref_metadata_destruct(GC *gc)
   metadata->repset = NULL;
   
   for(unsigned int i=0; i<metadata->num_alloc_segs; i++){
-    assert(metadata->pool_segments[i]);
-    STD_FREE(metadata->pool_segments[i]);
+    assert(metadata->segments[i]);
+    STD_FREE(metadata->segments[i]);
   }
   
   gc->finref_metadata = NULL;
@@ -112,6 +117,107 @@ void gc_finref_metadata_verify(GC *gc, Boolean is_before_gc)
   return;
 }
 
+
+/* called when there is no Vector_Block in finref_metadata->free_pool
+ * extend the pool by a segment
+ */
+Vector_Block *finref_metadata_extend(void)
+{
+  Finref_Metadata *metadata = &finref_metadata;
+  lock(metadata->alloc_lock);
+  Vector_Block* block = pool_get_entry(metadata->free_pool);
+  if( block ){
+    unlock(metadata->alloc_lock);
+    return block;
+  }
+  
+  unsigned int num_alloced = metadata->num_alloc_segs;
+  if(num_alloced == FINREF_METADATA_SEGMENT_NUM){
+    printf("Run out Finref metadata, please give it more segments!\n");
+    exit(0);
+  }
+  
+  unsigned int seg_size =  FINREF_METADATA_SEG_SIZE_BYTES + FINREF_METADATA_BLOCK_SIZE_BYTES;
+  void *new_segment = STD_MALLOC(seg_size);
+  memset(new_segment, 0, seg_size);
+  metadata->segments[num_alloced] = new_segment;
+  new_segment = (void*)round_up_to_size((POINTER_SIZE_INT)new_segment, FINREF_METADATA_BLOCK_SIZE_BYTES);
+  metadata->num_alloc_segs++;
+  
+  unsigned int num_blocks =  FINREF_METADATA_SEG_SIZE_BYTES >> FINREF_METADATA_BLOCK_SIZE_BIT_SHIFT;
+  for(unsigned int i=0; i<num_blocks; i++){
+    Vector_Block *block = (Vector_Block *)((POINTER_SIZE_INT)new_segment + i*FINREF_METADATA_BLOCK_SIZE_BYTES);
+    vector_block_init(block, FINREF_METADATA_BLOCK_SIZE_BYTES);
+    assert(vector_block_is_empty((Vector_Block *)block));
+    pool_put_entry(metadata->free_pool, (void *)block);
+  }
+  
+  block = pool_get_entry(metadata->free_pool);
+  unlock(metadata->alloc_lock);
+  return block;
+}
+
+/* called when GC completes and there is no Vector_Block in the last five pools of gc->finref_metadata
+ * shrink the free pool by half
+ */
+static void finref_metadata_shrink(GC *gc)
+{
+}
+
+
+/* reset obj_with_fin vector block of each mutator */
+static void gc_reset_obj_with_fin(GC *gc)
+{
+  Mutator *mutator = gc->mutator_list;
+  while(mutator){
+    assert(!mutator->obj_with_fin);
+    mutator->obj_with_fin = finref_get_free_block(gc);
+    mutator = mutator->next;
+  }
+}
+
+/* put back last obj_with_fin block of each mutator */
+void gc_set_obj_with_fin(GC *gc)
+{
+  Pool *obj_with_fin_pool = gc->finref_metadata->obj_with_fin_pool;
+
+  Mutator *mutator = gc->mutator_list;
+  while(mutator){
+    pool_put_entry(obj_with_fin_pool, mutator->obj_with_fin);
+    mutator->obj_with_fin = NULL;
+    mutator = mutator->next;
+  }
+}
+
+/* reset weak references vetctor block of each collector */
+void collector_reset_weakref_sets(Collector *collector)
+{
+  GC *gc = collector->gc;
+  
+  collector->softref_set = finref_get_free_block(gc);
+  collector->weakref_set = finref_get_free_block(gc);
+  collector->phanref_set= finref_get_free_block(gc);
+}
+
+/* put back last weak references block of each collector */
+void gc_set_weakref_sets(GC *gc)
+{
+  Finref_Metadata *metadata = gc->finref_metadata;
+  
+  unsigned int num_active_collectors = gc->num_active_collectors;
+  for(unsigned int i = 0; i < num_active_collectors; i++)
+  {
+    Collector* collector = gc->collectors[i];
+    pool_put_entry(metadata->softref_pool, collector->softref_set);
+    pool_put_entry(metadata->weakref_pool, collector->weakref_set);
+    pool_put_entry(metadata->phanref_pool, collector->phanref_set);
+    collector->softref_set = NULL;
+    collector->weakref_set= NULL;
+    collector->phanref_set= NULL;
+  }
+  return;
+}
+
 void gc_reset_finref_metadata(GC *gc)
 {
   Finref_Metadata *metadata = gc->finref_metadata;
@@ -127,7 +233,7 @@ void gc_reset_finref_metadata(GC *gc)
   assert(metadata->repset == NULL);
   
   while(Vector_Block *block = pool_get_entry(obj_with_fin_pool)){
-    unsigned int *iter = vector_block_iterator_init(block);
+    POINTER_SIZE_INT *iter = vector_block_iterator_init(block);
     if(vector_block_iterator_end(block, iter)){
       vector_block_clear(block);
       pool_put_entry(metadata->free_pool, block);
@@ -138,100 +244,54 @@ void gc_reset_finref_metadata(GC *gc)
   assert(pool_is_empty(obj_with_fin_pool));
   metadata->obj_with_fin_pool = finalizable_obj_pool;
   metadata->finalizable_obj_pool = obj_with_fin_pool;
+  
+  gc_reset_obj_with_fin(gc);
 }
 
-/* called when there is no Vector_Block in finref_metadata->free_pool
- * extend the pool by a pool segment
- */
-static void finref_metadata_extend(void)
-{
-  Finref_Metadata *metadata = &finref_metadata;
-  
-  unsigned int pos = metadata->num_alloc_segs;
-  while(pos < POOL_SEGMENT_NUM){
-    unsigned int next_pos = pos + 1;
-    unsigned int temp = (unsigned int)atomic_cas32((volatile unsigned int *)&metadata->num_alloc_segs, next_pos, pos);
-    if(temp == pos)
-      break;
-    pos = metadata->num_alloc_segs;
-  }
-  if(pos > POOL_SEGMENT_NUM)
-    return;
-  
-  void *pool_segment = STD_MALLOC(POOL_SEGMENT_SIZE_BYTES);
-  memset(pool_segment, 0, POOL_SEGMENT_SIZE_BYTES);
-  metadata->pool_segments[pos] = pool_segment;
-  
-  unsigned int num_blocks =  POOL_SEGMENT_SIZE_BYTES >> METADATA_BLOCK_SIZE_BIT_SHIFT;
-  for(unsigned int i=0; i<num_blocks; i++){
-    Vector_Block *block = (Vector_Block *)((unsigned int)pool_segment + i*METADATA_BLOCK_SIZE_BYTES);
-    vector_block_init(block, METADATA_BLOCK_SIZE_BYTES);
-    assert(vector_block_is_empty((Vector_Block *)block));
-    pool_put_entry(metadata->free_pool, (void *)block);
-  }
-  
-  return;
-}
 
-Vector_Block *finref_get_free_block(void)
-{
-  Vector_Block *block;
-  
-  while(!(block = pool_get_entry(finref_metadata.free_pool)))
-    finref_metadata_extend();
-  return block;
-}
-
-/* called when GC completes and there is no Vector_Block in the last five pools of gc->finref_metadata
- * shrink the free pool by half
- */
-void finref_metadata_shrink(GC *gc)
-{
-}
-
-static inline void finref_metadata_add_entry(Vector_Block* &vector_block_in_use, Pool *pool, Partial_Reveal_Object *ref)
+static inline void finref_metadata_add_entry(GC *gc, Vector_Block* &vector_block_in_use, Pool *pool, Partial_Reveal_Object *ref)
 {
   assert(vector_block_in_use);
   assert(ref);
 
   Vector_Block* block = vector_block_in_use;
-  vector_block_add_entry(block, (unsigned int)ref);
+  vector_block_add_entry(block, (POINTER_SIZE_INT)ref);
   
   if(!vector_block_is_full(block)) return;
   
   pool_put_entry(pool, block);
-  vector_block_in_use = finref_get_free_block();
+  vector_block_in_use = finref_get_free_block(gc);
 }
 
 void mutator_add_finalizer(Mutator *mutator, Partial_Reveal_Object *ref)
 {
-  finref_metadata_add_entry(mutator->obj_with_fin, finref_metadata.obj_with_fin_pool, ref);
+  finref_metadata_add_entry(mutator->gc, mutator->obj_with_fin, finref_metadata.obj_with_fin_pool, ref);
 }
 
 void gc_add_finalizable_obj(GC *gc, Partial_Reveal_Object *ref)
 {
-  finref_metadata_add_entry(finref_metadata.finalizable_obj_set, finref_metadata.finalizable_obj_pool, ref);
+  finref_metadata_add_entry(gc, finref_metadata.finalizable_obj_set, finref_metadata.finalizable_obj_pool, ref);
 }
 
 void collector_add_softref(Collector *collector, Partial_Reveal_Object *ref)
 {
-  finref_metadata_add_entry(collector->softref_set, finref_metadata.softref_pool, ref);
+  finref_metadata_add_entry(collector->gc, collector->softref_set, finref_metadata.softref_pool, ref);
 }
 
 void collector_add_weakref(Collector *collector, Partial_Reveal_Object *ref)
 {
-  finref_metadata_add_entry(collector->weakref_set, finref_metadata.weakref_pool, ref);
+  finref_metadata_add_entry(collector->gc, collector->weakref_set, finref_metadata.weakref_pool, ref);
 }
 
 void collector_add_phanref(Collector *collector, Partial_Reveal_Object *ref)
 {
-  finref_metadata_add_entry(collector->phanref_set, finref_metadata.phanref_pool, ref);
+  finref_metadata_add_entry(collector->gc, collector->phanref_set, finref_metadata.phanref_pool, ref);
 }
 
 void finref_repset_add_entry(GC *gc, Partial_Reveal_Object **p_ref)
 {
   assert(*p_ref);
-  finref_metadata_add_entry(finref_metadata.repset, finref_metadata.repset_pool, (Partial_Reveal_Object *)p_ref);
+  finref_metadata_add_entry(gc, finref_metadata.repset, finref_metadata.repset_pool, (Partial_Reveal_Object *)p_ref);
 }
 
 static inline Boolean pool_has_no_ref(Pool *pool)
@@ -240,7 +300,7 @@ static inline Boolean pool_has_no_ref(Pool *pool)
     return TRUE;
   pool_iterator_init(pool);
   while(Vector_Block *block = pool_iterator_next(pool)){
-    unsigned int *iter = vector_block_iterator_init(block);
+    POINTER_SIZE_INT *iter = vector_block_iterator_init(block);
     while(!vector_block_iterator_end(block, iter)){
       if(*iter)
         return FALSE;

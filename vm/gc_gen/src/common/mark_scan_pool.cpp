@@ -23,7 +23,7 @@
 #include "../gen/gen.h"
 #include "../finalizer_weakref/finalizer_weakref.h"
 
-static void scan_slot(Collector* collector, Partial_Reveal_Object** p_ref)
+static FORCE_INLINE void scan_slot(Collector* collector, Partial_Reveal_Object** p_ref)
 {
   Partial_Reveal_Object* p_obj = *p_ref;
   if(p_obj==NULL) return;
@@ -35,7 +35,7 @@ static void scan_slot(Collector* collector, Partial_Reveal_Object** p_ref)
 }
 
 
-static void scan_object(Collector* collector, Partial_Reveal_Object *p_obj)
+static FORCE_INLINE void scan_object(Collector* collector, Partial_Reveal_Object *p_obj)
 {
   if( !object_has_ref_field(p_obj) ) return;
   
@@ -46,7 +46,7 @@ static void scan_object(Collector* collector, Partial_Reveal_Object *p_obj)
     Partial_Reveal_Array* array = (Partial_Reveal_Array*)p_obj;
     unsigned int array_length = array->array_len;
   
-    p_ref = (Partial_Reveal_Object**)((int)array + (int)array_first_element_offset(array));
+    p_ref = (Partial_Reveal_Object**)((POINTER_SIZE_INT)array + (int)array_first_element_offset(array));
 
     for (unsigned int i = 0; i < array_length; i++) {
       scan_slot(collector, p_ref+i);
@@ -120,7 +120,7 @@ void mark_scan_pool(Collector* collector)
   /* first step: copy all root objects to mark tasks. 
       FIXME:: can be done sequentially before coming here to eliminate atomic ops */ 
   while(root_set){
-    unsigned int* iter = vector_block_iterator_init(root_set);
+    POINTER_SIZE_INT* iter = vector_block_iterator_init(root_set);
     while(!vector_block_iterator_end(root_set,iter)){
       Partial_Reveal_Object** p_ref = (Partial_Reveal_Object** )*iter;
       iter = vector_block_iterator_advance(root_set,iter);
@@ -152,7 +152,7 @@ retry:
   Vector_Block* mark_task = pool_get_entry(metadata->mark_task_pool);
   
   while(mark_task){
-    unsigned int* iter = vector_block_iterator_init(mark_task);
+    POINTER_SIZE_INT* iter = vector_block_iterator_init(mark_task);
     while(!vector_block_iterator_end(mark_task,iter)){
       Partial_Reveal_Object* p_obj = (Partial_Reveal_Object *)*iter;
       iter = vector_block_iterator_advance(mark_task,iter);
@@ -188,37 +188,7 @@ retry:
   return;
 }
 
-/* this is to resurrect p_obj and its decedants for some reason, here for finalizables */
-void resurrect_obj_tree_after_mark(Collector *collector, Partial_Reveal_Object *p_obj)
+void trace_obj_in_marking(Collector *collector, void *p_obj)
 {
-  GC *gc = collector->gc;
-  GC_Metadata* metadata = gc->metadata;
-  
-  obj_mark_in_vt(p_obj);
-  collector->trace_stack = free_task_pool_get_entry(metadata);
-  collector_tracestack_push(collector, p_obj);
-  pool_put_entry(metadata->mark_task_pool, collector->trace_stack);
-  
-//collector->rep_set = free_set_pool_get_entry(metadata); /* has got collector->rep_set in caller */
-  collector->trace_stack = free_task_pool_get_entry(metadata);
-  Vector_Block* mark_task = pool_get_entry(metadata->mark_task_pool);
-  while(mark_task){
-    unsigned int* iter = vector_block_iterator_init(mark_task);
-    while(!vector_block_iterator_end(mark_task,iter)){
-      Partial_Reveal_Object* p_obj = (Partial_Reveal_Object *)*iter;
-      trace_object(collector, p_obj);
-      iter = vector_block_iterator_advance(mark_task, iter);
-    } 
-    /* run out one task, put back to the pool and grab another task */
-    vector_stack_clear(mark_task);
-    pool_put_entry(metadata->free_task_pool, mark_task);
-    mark_task = pool_get_entry(metadata->mark_task_pool);      
-  }
-  
-  mark_task = (Vector_Block*)collector->trace_stack;
-  vector_stack_clear(mark_task);
-  pool_put_entry(metadata->free_task_pool, mark_task);   
-  collector->trace_stack = NULL;
-//pool_put_entry(metadata->collector_repset_pool, collector->rep_set); /* has got collector->rep_set in caller */
-//collector->rep_set = NULL; /* has got collector->rep_set in caller */
+  trace_object(collector, (Partial_Reveal_Object *)p_obj);
 }

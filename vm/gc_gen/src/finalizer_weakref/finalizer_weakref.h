@@ -28,7 +28,7 @@
 
 extern Boolean IGNORE_FINREF;
 
-/* Phantom status: for future use
+/* Phanref status: for future use
  * #define PHANTOM_REF_ENQUEUE_STATUS_MASK 0x3
  * #define PHANTOM_REF_ENQUEUED_MASK 0x1
  * #define PHANTOM_REF_PENDING_MASK 0x2
@@ -82,13 +82,7 @@ inline void scan_weak_reference(Collector *collector, Partial_Reveal_Object *p_o
   }
 }
 
-
-extern void mutator_reset_obj_with_fin(Mutator *mutator);
-extern void gc_set_obj_with_fin(GC *gc);
-extern void collector_reset_weakref_sets(Collector *collector);
-
-extern void gc_set_weakref_sets(GC *gc);
-extern void update_ref_ignore_finref(Collector *collector);
+extern void gc_update_weakref_ignore_finref(GC *gc);
 extern void collector_identify_finref(Collector *collector);
 extern void gc_put_finref_to_vm(GC *gc);
 extern void put_all_fin_on_exit(GC *gc);

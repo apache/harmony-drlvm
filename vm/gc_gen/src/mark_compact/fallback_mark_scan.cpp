@@ -116,7 +116,7 @@ void fallback_mark_scan_heap(Collector* collector)
   /* first step: copy all root objects to mark tasks. 
       FIXME:: can be done sequentially before coming here to eliminate atomic ops */ 
   while(root_set){
-    unsigned int* iter = vector_block_iterator_init(root_set);
+    POINTER_SIZE_INT* iter = vector_block_iterator_init(root_set);
     while(!vector_block_iterator_end(root_set,iter)){
       Partial_Reveal_Object** p_ref = (Partial_Reveal_Object** )*iter;
       iter = vector_block_iterator_advance(root_set,iter);
@@ -141,7 +141,7 @@ retry:
   Vector_Block* mark_task = pool_get_entry(metadata->mark_task_pool);
   
   while(mark_task){
-    unsigned int* iter = vector_block_iterator_init(mark_task);
+    POINTER_SIZE_INT* iter = vector_block_iterator_init(mark_task);
     while(!vector_block_iterator_end(mark_task,iter)){
       Partial_Reveal_Object** p_ref = (Partial_Reveal_Object **)*iter;
       iter = vector_block_iterator_advance(mark_task,iter);
@@ -175,4 +175,9 @@ retry:
   collector->trace_stack = NULL;
   
   return;
+}
+
+void trace_obj_in_fallback_marking(Collector *collector, void *p_ref)
+{
+  trace_object(collector, (Partial_Reveal_Object **)p_ref);
 }

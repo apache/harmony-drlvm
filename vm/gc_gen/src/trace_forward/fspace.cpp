@@ -47,16 +47,17 @@ void fspace_initialize(GC* gc, void* start, unsigned int fspace_size, unsigned i
 
   void* reserved_base = start;
   /* commit fspace mem */    
-  vm_commit_mem(reserved_base, commit_size);
+  if(!large_page_hint)    
+    vm_commit_mem(reserved_base, commit_size);
   memset(reserved_base, 0, commit_size);
   
   fspace->committed_heap_size = commit_size;
   fspace->heap_start = reserved_base;
 
 #ifdef STATIC_NOS_MAPPING
-  fspace->heap_end = (void *)((unsigned int)reserved_base + fspace->reserved_heap_size);
+  fspace->heap_end = (void *)((POINTER_SIZE_INT)reserved_base + fspace->reserved_heap_size);
 #else /* for dynamic mapping, nos->heap_end is gc->heap_end */
-  fspace->heap_end = (void *)((unsigned int)reserved_base + fspace->committed_heap_size);
+  fspace->heap_end = (void *)((POINTER_SIZE_INT)reserved_base + fspace->committed_heap_size);
 #endif
 
   fspace->num_managed_blocks = commit_size >> GC_BLOCK_SHIFT_COUNT;
@@ -111,6 +112,7 @@ void fspace_reset_for_allocation(Fspace* fspace)
     fspace->free_block_idx = first_idx;
     fspace->ceiling_block_idx = first_idx + fspace->num_managed_blocks - 1;  
     forward_first_half = TRUE; /* only useful for not-FORWARD_ALL*/
+	fspace->num_used_blocks = 0;
   
   }else{    
     if(forward_first_half){
@@ -124,6 +126,7 @@ void fspace_reset_for_allocation(Fspace* fspace)
       marked_start_idx = 0;
       marked_last_idx = ((Block_Header*)object_forwarding_boundary)->block_idx - 1 - first_idx;
     }
+    fspace->num_used_blocks = marked_last_idx - marked_start_idx + 1;
     forward_first_half = forward_first_half^1;
   }
   
@@ -140,10 +143,8 @@ void fspace_reset_for_allocation(Fspace* fspace)
     block->status = BLOCK_FREE; 
     block->free = block->base;
 
-    num_freed ++;
   }
 
-  fspace->num_used_blocks = fspace->num_used_blocks - num_freed;
   return;
 }
 
@@ -159,7 +160,13 @@ void fspace_collection(Fspace *fspace)
   
   GC* gc = fspace->gc;
   mspace_free_block_idx = ((GC_Gen*)gc)->mos->free_block_idx;
-    
+
+  if(gc_is_gen_mode()){
+    fspace->collect_algorithm = MINOR_GEN_FORWARD_POOL;
+  }else{
+    fspace->collect_algorithm = MINOR_NONGEN_FORWARD_POOL;
+  }
+  
   /* we should not destruct rootset structure in case we need fall back */
   pool_iterator_init(gc->metadata->gc_rootset_pool);
 
@@ -178,7 +185,7 @@ void fspace_collection(Fspace *fspace)
       break;
         
     default:
-      printf("\nSpecified minor collection algorithm doesn't exist in built module!\n");
+      printf("\nSpecified minor collection algorithm doesn't exist!\n");
       exit(0);    
       break;
   }

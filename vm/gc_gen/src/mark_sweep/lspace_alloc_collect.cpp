@@ -22,30 +22,28 @@
 #include "../gen/gen.h"
 #include "../common/space_tuner.h"
 
-inline void free_pool_lock_nr_list(Free_Area_Pool* pool, unsigned int list_index){
+static void free_pool_lock_nr_list(Free_Area_Pool* pool, unsigned int list_index)
+{
     Lockable_Bidir_List* list_head = &pool->sized_area_list[list_index];
-    while (apr_atomic_casptr( 
-                (volatile void **) &(list_head->lock),
-                (void *) 1, (void *) 0) 
-            != (void *) 0) {
-        while (list_head->lock ==  1) {
-            ;   
-        }
-    }
+    lock(list_head->lock);
+}
 
+static void free_pool_unlock_nr_list(Free_Area_Pool* pool, unsigned int list_index)
+{
+    Lockable_Bidir_List* list_head = &pool->sized_area_list[list_index];
+    unlock(list_head->lock);
 }
-inline void free_pool_unlock_nr_list(Free_Area_Pool* pool, unsigned int list_index){
-    ((Lockable_Bidir_List*)(&pool->sized_area_list[list_index]))->lock = 0;
-}
-inline unsigned int free_pool_nr_list_is_empty(Free_Area_Pool* pool, unsigned int list_index){
+
+static unsigned int free_pool_nr_list_is_empty(Free_Area_Pool* pool, unsigned int list_index)
+{
     Bidir_List* head = (Bidir_List*)(&pool->sized_area_list[list_index]);
     return (head->next == head);
 }
-inline void* free_pool_former_lists_atomic_take_area_piece(Free_Area_Pool* pool, unsigned int list_hint, unsigned int size)
+static void* free_pool_former_lists_atomic_take_area_piece(Free_Area_Pool* pool, unsigned int list_hint, unsigned int size)
 {
     Free_Area* free_area;
     void* p_result;
-    unsigned int remain_size;
+    int remain_size;
     unsigned int alloc_size = ALIGN_UP_TO_KILO(size);
     unsigned int new_list_nr = 0;
     Lockable_Bidir_List* head = &pool->sized_area_list[list_hint];
@@ -60,10 +58,12 @@ inline void* free_pool_former_lists_atomic_take_area_piece(Free_Area_Pool* pool,
     }
 
     free_area = (Free_Area*)(head->next);
+    /*if the list head is not NULL, it definitely satisfies the request. */   
     remain_size = free_area->size - alloc_size;
+    assert(remain_size >= 0);
     if( remain_size >= GC_OBJ_SIZE_THRESHOLD){
         new_list_nr = pool_list_index_with_size(remain_size);
-        p_result = (void*)((unsigned int)free_area + remain_size);
+        p_result = (void*)((POINTER_SIZE_INT)free_area + remain_size);
         if(new_list_nr == list_hint){
             free_area->size = remain_size;
             free_pool_unlock_nr_list(pool, list_hint);
@@ -78,23 +78,22 @@ inline void* free_pool_former_lists_atomic_take_area_piece(Free_Area_Pool* pool,
             return p_result;            
         }
     }
-    else if(remain_size >= 0)
+    else
     {
         free_pool_remove_area(pool, free_area);
         free_pool_unlock_nr_list(pool, list_hint);
-        p_result = (void*)((unsigned int)free_area + remain_size);
+        p_result = (void*)((POINTER_SIZE_INT)free_area + remain_size);
         if(remain_size > 0){
             assert((remain_size >= KB) && (remain_size < GC_OBJ_SIZE_THRESHOLD));
             free_area->size = remain_size;
         }
         return p_result;
     }
-    /*We never get here, because if the list head is not NULL, it definitely satisfy the request. */
     assert(0);
     return NULL;
 }
 
-inline void* free_pool_last_list_atomic_take_area_piece(Free_Area_Pool* pool, unsigned int size)
+static void* free_pool_last_list_atomic_take_area_piece(Free_Area_Pool* pool, unsigned int size)
 {
     void* p_result;
     int remain_size = 0;
@@ -116,7 +115,7 @@ inline void* free_pool_last_list_atomic_take_area_piece(Free_Area_Pool* pool, un
         remain_size = free_area->size - alloc_size;
         if( remain_size >= GC_OBJ_SIZE_THRESHOLD){
             new_list_nr = pool_list_index_with_size(remain_size);
-            p_result = (void*)((unsigned int)free_area + remain_size);
+            p_result = (void*)((POINTER_SIZE_INT)free_area + remain_size);
             if(new_list_nr == MAX_LIST_INDEX){
                 free_area->size = remain_size;
                 free_pool_unlock_nr_list(pool, MAX_LIST_INDEX);
@@ -135,7 +134,7 @@ inline void* free_pool_last_list_atomic_take_area_piece(Free_Area_Pool* pool, un
         {
             free_pool_remove_area(pool, free_area);
             free_pool_unlock_nr_list(pool, MAX_LIST_INDEX);
-            p_result = (void*)((unsigned int)free_area + remain_size);
+            p_result = (void*)((POINTER_SIZE_INT)free_area + remain_size);
             if(remain_size > 0){
                 assert((remain_size >= KB) && (remain_size < GC_OBJ_SIZE_THRESHOLD));
                 free_area->size = remain_size;
@@ -167,6 +166,12 @@ void* lspace_alloc(unsigned int size, Allocator *allocator)
                 p_result = free_pool_former_lists_atomic_take_area_piece(pool, list_hint, alloc_size);
                 if(p_result){
                     memset(p_result, 0, size);
+                    unsigned int vold = lspace->alloced_size;
+                    unsigned int vnew = vold + alloc_size;
+                    while( vold != atomic_cas32(&lspace->alloced_size, vnew, vold) ){
+                        vold = lspace->alloced_size;
+                        vnew = vold + alloc_size;
+                    }
                     return p_result;
                 }else{
                     list_hint ++;
@@ -180,6 +185,12 @@ void* lspace_alloc(unsigned int size, Allocator *allocator)
                 p_result = free_pool_last_list_atomic_take_area_piece(pool, alloc_size);
                 if(p_result){
                     memset(p_result, 0, size);
+                    unsigned int vold = lspace->alloced_size;
+                    unsigned int vnew = vold + alloc_size;
+                    while( vold != atomic_cas32(&lspace->alloced_size, vnew, vold) ){
+                        vold = lspace->alloced_size;
+                        vnew = vold + alloc_size;
+                    }
                     return p_result;
                 }
                 else break;
@@ -188,6 +199,7 @@ void* lspace_alloc(unsigned int size, Allocator *allocator)
         /*Failled, no adequate area found in all lists, so GC at first, then get another try.*/   
         if(try_count == 0){
             vm_gc_lock_enum();
+            lspace->failure_size = alloc_size;
             gc_reclaim_heap(allocator->gc, GC_CAUSE_LOS_IS_FULL);
             vm_gc_unlock_enum();
             try_count ++;
@@ -214,18 +226,24 @@ void lspace_reset_after_collection(Lspace* lspace)
         lspace->committed_heap_size += trans_size;
         lspace->reserved_heap_size += trans_size;
     }
+    /*For_statistic los information.*/
+    lspace->alloced_size = 0;    
+
+    lspace->failure_size = 0;
+
     los_boundary = lspace->heap_end;
 }
 
 void lspace_sweep(Lspace* lspace)
 {
+
+  lspace->surviving_size = 0;
+  
   /* reset the pool first because its info is useless now. */
   free_area_pool_reset(lspace->free_pool);
 
   unsigned int mark_bit_idx = 0, cur_size = 0;
   void *cur_area_start, *cur_area_end;
-
-
 
   Partial_Reveal_Object* p_prev_obj = (Partial_Reveal_Object *)lspace->heap_start;
   Partial_Reveal_Object* p_next_obj = lspace_get_first_marked_object(lspace, &mark_bit_idx);
@@ -235,6 +253,8 @@ void lspace_sweep(Lspace* lspace)
        in non_gen_mode, and not reset in gen_mode. When it switches back from gen_mode to non_gen_mode,
        the last time marked object is thought to be already marked and not scanned for this cycle. */
     obj_clear_dual_bits_in_oi(p_next_obj);
+    /*For_statistic: sum up the size of suvived large objects, useful to deciede los extention.*/
+    lspace->surviving_size += ALIGN_UP_TO_KILO(vm_object_size(p_next_obj));    
   }
 
   cur_area_start = (void*)ALIGN_UP_TO_KILO(p_prev_obj);
@@ -242,7 +262,7 @@ void lspace_sweep(Lspace* lspace)
 
 
   while(cur_area_end){
-    cur_size = (unsigned int)cur_area_end - (unsigned int)cur_area_start;
+    cur_size = (POINTER_SIZE_INT)cur_area_end - (POINTER_SIZE_INT)cur_area_start;
       
     Free_Area* cur_area = free_area_new(cur_area_start, cur_size);
     /* successfully create an area */
@@ -254,16 +274,18 @@ void lspace_sweep(Lspace* lspace)
     if(p_next_obj){
       obj_unmark_in_vt(p_next_obj);
       obj_clear_dual_bits_in_oi(p_next_obj);
+      /*For_statistic: sum up the size of suvived large objects, useful to deciede los extention.*/
+      lspace->surviving_size += ALIGN_UP_TO_KILO(vm_object_size(p_next_obj));
     }
 
-    cur_area_start = (void*)ALIGN_UP_TO_KILO((unsigned int)p_prev_obj + vm_object_size(p_prev_obj));
+    cur_area_start = (void*)ALIGN_UP_TO_KILO((POINTER_SIZE_INT)p_prev_obj + vm_object_size(p_prev_obj));
     cur_area_end = (void*)ALIGN_DOWN_TO_KILO(p_next_obj);
     
   }
 
    /* cur_area_end == NULL */
   cur_area_end = (void*)ALIGN_DOWN_TO_KILO(lspace->heap_end);
-  cur_size = (unsigned int)cur_area_end - (unsigned int)cur_area_start;
+  cur_size = (POINTER_SIZE_INT)cur_area_end - (POINTER_SIZE_INT)cur_area_start;
   Free_Area* cur_area = free_area_new(cur_area_start, cur_size);
   /* successfully create an area */
   if( cur_area )
@@ -271,6 +293,11 @@ void lspace_sweep(Lspace* lspace)
 
    mark_bit_idx = 0;
    assert(!lspace_get_first_marked_object(lspace, &mark_bit_idx));
-   return;
+
+  /*Update survive ratio here. If we tune LOS this time, the ratio is computed by the new committed size.*/
+  /*Fixme: We should keep the surviving size of last time, and set denominator to last_survive + current_alloc*/
+  lspace->survive_ratio = (float)lspace->surviving_size / (float)lspace->committed_heap_size;
+
+  return;
 
 }

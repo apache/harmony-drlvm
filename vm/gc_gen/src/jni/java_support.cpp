@@ -32,6 +32,7 @@ void HelperClass_set_GenMode(Boolean status)
 
   unsigned int nfields = class_number_fields(GCHelper_clss);
   unsigned int i;
+  
   for(i=0; i<nfields; i++){
     Field_Handle field = class_get_field(GCHelper_clss, i);
     if(!strcmp(field_get_name(field), "GEN_MODE")){
@@ -65,11 +66,14 @@ void HelperClass_set_NosBoundary(void* boundary)
 
   unsigned int nfields = class_number_fields(GCHelper_clss);
   unsigned int i;
+  
   for(i=0; i<nfields; i++){
     Field_Handle field = class_get_field(GCHelper_clss, i);
     if(!strcmp(field_get_name(field), "NOS_BOUNDARY")){
-      jint* p_nos_boundary = (jint*)field_get_address(field);
-      *p_nos_boundary = (jint)boundary;
+      //jint* p_nos_boundary = (jint*)field_get_address(field);
+      //*p_nos_boundary = (jint)boundary;
+      jobject* p_nos_boundary = (jobject*)field_get_address(field);
+      *p_nos_boundary = (jobject)boundary;
       break;
     }
   }

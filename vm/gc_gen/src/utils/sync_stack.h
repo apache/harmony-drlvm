@@ -33,22 +33,32 @@ typedef struct Node{
 /*
  * ATTENTION: only for reference
  * Perhaps in some platforms compilers compile this struct in a way different from what we expect
- */
+ * GCC requires to specify "packed" attribute
+#ifdef __linux__
 typedef struct Stack_Top{
-  unsigned int version: SYNC_STACK_VERSION_MASK_SHIFT;
-  unsigned int entry: (32-SYNC_STACK_VERSION_MASK_SHIFT);
+  POINTER_SIZE_INT version: SYNC_STACK_VERSION_MASK_SHIFT;
+  POINTER_SIZE_INT entry: (BITS_OF_POINTER_SIZE_INT-SYNC_STACK_VERSION_MASK_SHIFT);
+}Stack_Top __attribute__((packed));
+#else
+typedef struct Stack_Top{
+  POINTER_SIZE_INT version: SYNC_STACK_VERSION_MASK_SHIFT;
+  POINTER_SIZE_INT entry: (BITS_OF_POINTER_SIZE_INT-SYNC_STACK_VERSION_MASK_SHIFT);
 }Stack_Top;
+#endif
+ */
+
+typedef POINTER_SIZE_INT Stack_Top;
 
 typedef struct Sync_Stack{
   Stack_Top top; /* pointing to the first filled entry */
   Node* cur; /* pointing to the current accessed entry, only for iterator */
 }Sync_Stack;
 
-#define stack_top_get_entry(top) ((Node*)((*(unsigned int*)&(top)) & ~SYNC_STACK_VERSION_MASK))
+#define stack_top_get_entry(top) ((Node*)((*(POINTER_SIZE_INT*)&(top)) & ~SYNC_STACK_VERSION_MASK))
 /* The alternative way: (Node*)(top.entry<<SYNC_STACK_VERSION_MASK_SHIFT) */
-#define stack_top_get_version(top) ((*(unsigned int*)&(top)) & SYNC_STACK_VERSION_MASK)
+#define stack_top_get_version(top) ((*(POINTER_SIZE_INT*)&(top)) & SYNC_STACK_VERSION_MASK)
 /* The alternative way: (top.version) */
-#define stack_top_contruct(entry, version) ((unsigned int)(entry) | (version))
+#define stack_top_contruct(entry, version) ((POINTER_SIZE_INT)(entry) | (version))
 #define stack_top_get_next_version(top) ((stack_top_get_version(top) + 1) & SYNC_STACK_VERSION_MASK)
 
 inline Sync_Stack* sync_stack_init()
@@ -57,7 +67,7 @@ inline Sync_Stack* sync_stack_init()
   Sync_Stack* stack = (Sync_Stack*)STD_MALLOC(size);
   memset(stack, 0, size);
   stack->cur = NULL;
-  unsigned int temp_top = 0;
+  POINTER_SIZE_INT temp_top = 0;
   stack->top = *(Stack_Top*)&temp_top;
   return stack;
 }
@@ -92,13 +102,13 @@ inline Node* sync_stack_pop(Sync_Stack* stack)
 {
   Stack_Top cur_top = stack->top;
   Node* top_entry = stack_top_get_entry(cur_top);
-  unsigned int version = stack_top_get_version(cur_top);
+  POINTER_SIZE_INT version = stack_top_get_version(cur_top);
   
   while( top_entry != NULL ){
-    unsigned int temp = stack_top_contruct(top_entry->next, version);
+    POINTER_SIZE_INT temp = stack_top_contruct(top_entry->next, version);
     Stack_Top new_top = *(Stack_Top*)&temp;
-    temp = (unsigned int)atomic_casptr((volatile void**)&stack->top, *(void**)&new_top, *(void**)&cur_top);
-    if(temp == *(unsigned int*)&cur_top){ /* got it */ 
+    temp = (POINTER_SIZE_INT)atomic_casptr((volatile void**)&stack->top, *(void**)&new_top, *(void**)&cur_top);
+    if(temp == *(POINTER_SIZE_INT*)&cur_top){ /* got it */ 
       top_entry->next = NULL;
       return top_entry;
     }
@@ -113,13 +123,13 @@ inline Boolean sync_stack_push(Sync_Stack* stack, Node* node)
 {
   Stack_Top cur_top = stack->top;
   node->next = stack_top_get_entry(cur_top);
-  unsigned int new_version = stack_top_get_next_version(cur_top);
-  unsigned int temp = stack_top_contruct(node, new_version);
+  POINTER_SIZE_INT new_version = stack_top_get_next_version(cur_top);
+  POINTER_SIZE_INT temp = stack_top_contruct(node, new_version);
   Stack_Top new_top = *(Stack_Top*)&temp;
   
   while( TRUE ){
-    temp = (unsigned int)atomic_casptr((volatile void**)&stack->top, *(void**)&new_top, *(void**)&cur_top);
-    if(temp == *(unsigned int*)&cur_top){ /* got it */  
+    temp = (POINTER_SIZE_INT)atomic_casptr((volatile void**)&stack->top, *(void**)&new_top, *(void**)&cur_top);
+    if(temp == *(POINTER_SIZE_INT*)&cur_top){ /* got it */  
       return TRUE;
     }
     cur_top = stack->top;

@@ -104,7 +104,9 @@ static void build_ref_offset_array(Class_Handle ch, GC_VTable_Info *gcvt)
     Field_Handle fh = class_get_instance_field_recursive(ch, idx);
     if(field_is_reference(fh)) {
       int offset = field_get_offset(fh);
+#ifndef BUILD_IN_REFERENT
       if(is_reference && offset == gc_referent_offset) continue;
+#endif
       *new_ref_array = field_get_offset(fh);
       new_ref_array++;
     }
@@ -138,7 +140,7 @@ void gc_class_prepared (Class_Handle ch, VTable_Handle vth)
   gcvt_size = (gcvt_size + GCVT_ALIGN_MASK) & ~GCVT_ALIGN_MASK;
   gcvt = (GC_VTable_Info*) malloc(gcvt_size);
   assert(gcvt);
-  assert(!((unsigned int)gcvt % GCVT_ALIGNMENT));
+  assert(!((POINTER_SIZE_INT)gcvt % GCVT_ALIGNMENT));
 
   memset((void *)gcvt, 0, gcvt_size);
   gcvt->gc_clss = ch;
@@ -181,13 +183,13 @@ void gc_class_prepared (Class_Handle ch, VTable_Handle vth)
 
   /* these should be set last to use the gcvt pointer */
   if(gcvt->gc_number_of_ref_fields)
-    gcvt = (GC_VTable_Info*)((unsigned int)gcvt | GC_CLASS_FLAG_REFS);
+    gcvt = (GC_VTable_Info*)((POINTER_SIZE_INT)gcvt | GC_CLASS_FLAG_REFS);
   
   if(class_is_array(ch))
-    gcvt = (GC_VTable_Info*)((unsigned int)gcvt | GC_CLASS_FLAG_ARRAY);
+    gcvt = (GC_VTable_Info*)((POINTER_SIZE_INT)gcvt | GC_CLASS_FLAG_ARRAY);
     
   if(class_is_finalizable(ch))
-    gcvt = (GC_VTable_Info*)((unsigned int)gcvt | GC_CLASS_FLAG_FINALIZER);
+    gcvt = (GC_VTable_Info*)((POINTER_SIZE_INT)gcvt | GC_CLASS_FLAG_FINALIZER);
 
   vtable_set_gcvt(vt, gcvt);
 

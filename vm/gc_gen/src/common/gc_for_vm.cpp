@@ -82,7 +82,10 @@ void gc_add_root_set_entry(Managed_Object_Handle *ref, Boolean is_pinned)
 {   
   Partial_Reveal_Object** p_ref = (Partial_Reveal_Object**)ref;
   Partial_Reveal_Object* p_obj = *p_ref;
-  if (p_obj == NULL) return;
+  /* we don't enumerate NULL reference and nos_boundary
+     FIXME:: nos_boundary is a static field in GCHelper.java for fast write barrier, not a real object reference 
+     this should be fixed that magic Address field should not be enumerated. */
+  if (p_obj == NULL || p_obj == nos_boundary ) return;
   assert( !obj_is_marked_in_vt(p_obj));
   /* for Minor_collection, it's possible for p_obj be forwarded in non-gen mark-forward GC. 
      The forward bit is actually last cycle's mark bit.
@@ -153,7 +156,6 @@ unsigned int gc_time_since_last_gc()
 int32 gc_get_hashcode(Managed_Object_Handle p_object) 
 {  return 23; }
 
-
 void gc_finalize_on_exit()
 {
   if(!IGNORE_FINREF )
@@ -169,3 +171,14 @@ void gc_finalize_on_exit()
  *   }
  * }
  */
+
+extern Boolean JVMTI_HEAP_ITERATION;
+void gc_iterate_heap() {
+    // data structures in not consistent for heap iteration
+    if (!JVMTI_HEAP_ITERATION) return;
+
+    gc_gen_iterate_heap((GC_Gen *)p_global_gc);
+}
+
+
+
