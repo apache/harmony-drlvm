@@ -922,6 +922,7 @@ void class_throw_linking_error(Class_Handle ch, unsigned index, unsigned opcode)
     ConstantPool& cp = ch->get_constant_pool();
     if(cp.is_entry_in_error(index)) {
         exn_raise_object(cp.get_error_cause(index));
+        tmn_suspend_disable();
         return; // will return in interpreter mode
     }
 
