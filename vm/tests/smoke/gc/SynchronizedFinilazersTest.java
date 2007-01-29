@@ -22,8 +22,6 @@ package gc;
 
 /**
  * Tests synchronized finalizers in multiple threads.
- *
- * @keyword stress X_int_bug_6022
  */
 public class SynchronizedFinilazersTest implements Runnable {
     int n;

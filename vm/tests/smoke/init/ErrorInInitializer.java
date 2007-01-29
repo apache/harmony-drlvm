@@ -21,9 +21,8 @@
 package init;
 
 /**
- *  $$$ GMJ
- *  @keyword XXX_woogie
- *keyword ignore_status
+ * $$$ GMJ
+ * keyword ignore_status
  */
 public class ErrorInInitializer {
     public static void main (String[] args) {

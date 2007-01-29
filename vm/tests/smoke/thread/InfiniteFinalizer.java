@@ -22,7 +22,7 @@
 package thread;
 
 /**
- * @keyword X_jitrino_ipf_bug_6591
+ * 
  */
 public class InfiniteFinalizer {
 

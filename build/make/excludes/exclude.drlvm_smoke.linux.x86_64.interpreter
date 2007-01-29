@@ -3,10 +3,7 @@ PerfCheck.java
 classloader/StressLoader.java
 gc/Mark.java
 gc/MultiThreads.java
-gc/SynchronizedFinilazersTest.java
-init/ErrorInInitializer.java
 io/Integers.java
 stress/Stack.java
-thread/InfiniteFinalizer.java
 stress/Mix.java
 
