@@ -99,29 +99,18 @@
         <condition property="build.arch" value="ia32">
             <!-- os.arch: different values on Windows and Linux -->
             <or>
-                <and>
-                    <isset property="if.win" />
-                    <equals arg1="${os.arch}" arg2="x86" />
-                </and>
-                <and>
-                    <isset property="if.lnx" />
-                    <equals arg1="${machine.arch}" arg2="i686" />
-                </and>
+                <equals arg1="${os.arch}" arg2="x86" />
+                <equals arg1="${machine.arch}" arg2="i686" />
+                <equals arg1="${machine.arch}" arg2="i386" />
             </or>
         </condition>
 
         <condition property="build.arch" value="ipf">
-            <and>
-                <isset property="if.lnx" />
-                <equals arg1="${machine.arch}" arg2="ia64" />
-            </and>
+            <equals arg1="${machine.arch}" arg2="ia64" />
         </condition>
 
         <condition property="build.arch" value="em64t">
-            <and>
-                <isset property="if.lnx" />
-                <equals arg1="${machine.arch}" arg2="x86_64" />
-            </and>
+            <equals arg1="${machine.arch}" arg2="x86_64" />
         </condition>
 
         <condition property="properties.file" value="${env.properties.file}">
