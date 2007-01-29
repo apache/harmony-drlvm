@@ -374,8 +374,7 @@ uint32 parse_annotation_value(AnnotationValue& value, ByteReader& cfs, Class* cl
     ConstantPool& cp = clss->get_constant_pool();
     unsigned cp_size = cp.get_size();
 
-    char ctag = (char)tag;
-    switch(ctag) {
+    switch(tag) {
     case AVT_BOOLEAN:
     case AVT_BYTE:
     case AVT_SHORT:
@@ -394,7 +393,7 @@ uint32 parse_annotation_value(AnnotationValue& value, ByteReader& cfs, Class* cl
             }
             read_len += 2;
 
-            switch (ctag) {
+            switch (tag) {
             case AVT_BOOLEAN:
             case AVT_BYTE:
             case AVT_SHORT:
@@ -508,7 +507,7 @@ uint32 parse_annotation_value(AnnotationValue& value, ByteReader& cfs, Class* cl
 
     default:
         REPORT_FAILED_CLASS_FORMAT(clss,
-            "unrecognized annotation value tag : " << (ctag < 128) ? ctag : (int)ctag);
+            "unrecognized annotation value tag : " << (tag < 128) ? tag : (int)tag);
         return 0;
     }
 
