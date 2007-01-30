@@ -425,16 +425,16 @@ public abstract class ClassLoader {
                                     String implTitle, String implVersion,
                                     String implVendor, URL sealBase)
         throws IllegalArgumentException {
-        if (getPackage(name) != null) {
-            throw new IllegalArgumentException("Package " + name
-                + "has been already defined.");
-        }
-        Package pkg = new Package(this, name, specTitle, specVersion, specVendor,
-            implTitle, implVersion, implVendor, sealBase);
         synchronized (definedPackages) {
+            if (getPackage(name) != null) {
+                throw new IllegalArgumentException("Package " + name
+                    + "has been already defined.");
+            }
+            Package pkg = new Package(this, name, specTitle, specVersion, specVendor,
+                implTitle, implVersion, implVendor, sealBase);
             definedPackages.put(name, pkg);
+            return pkg;
         }
-        return pkg;
     }
 
     /**
@@ -518,7 +518,7 @@ public abstract class ClassLoader {
     /**
      * @com.intel.drl.spec_ref
      */
-    protected Class<?> loadClass(String name, boolean resolve)
+    protected synchronized Class<?> loadClass(String name, boolean resolve)
         throws ClassNotFoundException {
         checkInitialized();
         Class<?> clazz = findLoadedClass(name);
