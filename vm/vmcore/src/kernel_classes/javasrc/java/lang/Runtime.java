@@ -38,6 +38,8 @@
 package java.lang;
 
 import java.util.StringTokenizer;
+import java.io.BufferedInputStream;
+import java.io.BufferedOutputStream;
 import java.io.File;
 import java.io.InputStream;
 import java.io.OutputStream;
@@ -256,9 +258,9 @@ public class Runtime
 
         private int processHandle;
         private int processExitCode;
-        private SubProcess.SubOutputStream os;
-        private SubProcess.SubInputStream is;
-        private SubProcess.SubInputStream es;
+        private OutputStream os;
+        private InputStream is;
+        private InputStream es;
 
         /**
          * An application cannot create its own instance of this class.
@@ -307,9 +309,9 @@ public class Runtime
             // Do all java heap allocation first, in order to throw OutOfMemory
             // exception early, before we have actually executed the process.
             // Otherwise we should do somewhat complicated cleanup.
-            os = new SubProcess.SubOutputStream();
-            is = new SubProcess.SubInputStream();
-            es = new SubProcess.SubInputStream();
+            SubProcess.SubOutputStream os1 = new SubProcess.SubOutputStream();
+            SubProcess.SubInputStream is1 = new SubProcess.SubInputStream();
+            SubProcess.SubInputStream es1 = new SubProcess.SubInputStream();
 
             long[] la = new long[4];
             createProcess0(cmdarray, envp, dir, la);
@@ -325,9 +327,12 @@ public class Runtime
                 throw new IOException("The creation of the Process has just failed: " + cmd); 
             }
             this.processHandle = (int)la[0];
-            os.streamHandle = la[1];
-            is.streamHandle = la[2];
-            es.streamHandle = la[3];
+            os1.streamHandle = la[1];
+            is1.streamHandle = la[2];
+            es1.streamHandle = la[3];
+            os = new BufferedOutputStream(os1);
+            is = new BufferedInputStream(is1);
+            es = new BufferedInputStream(es1);
         }
 
         /**
