@@ -227,7 +227,7 @@ static NativeCodePtr compile_get_compile_me_generic() {
 }
 
 NativeCodePtr compile_gen_compile_me(Method_Handle method) {
-    int STUB_SIZE = 32;
+    int STUB_SIZE = 64;
 #ifdef VM_STATS
     ++VM_Statistics::get_vm_stats().num_compileme_generated;
 #endif

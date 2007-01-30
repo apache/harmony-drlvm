@@ -2624,7 +2624,7 @@ CG_OpndHandle* InstCodeSelector::tau_call(uint32          numArgs,
                                              CG_OpndHandle* tauTypesChecked,
                                              InlineInfo*       ii)
 {
-    Opnd * target=irManager.newImmOpnd(typeManager.getInt32Type(), Opnd::RuntimeInfo::Kind_MethodDirectAddr, desc);
+    Opnd * target=irManager.newImmOpnd(typeManager.getIntPtrType(), Opnd::RuntimeInfo::Kind_MethodDirectAddr, desc);
     Opnd * retOpnd=createResultOpnd(retType);
     CallInst * callInst=irManager.newCallInst(target, irManager.getDefaultManagedCallingConvention(), 
         numArgs, (Opnd **)args, retOpnd, ii);
