@@ -20,7 +20,7 @@ import java.io.BufferedInputStream;
 import java.io.FileDescriptor;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
-import java.io.FilterOutputStream;
+import java.io.BufferedOutputStream;
 import java.io.InputStream;
 import java.io.PrintStream;
 import java.io.IOException;
@@ -342,17 +342,8 @@ public final class System {
      * for initialization of <code>err</code> field
      */
     private static PrintStream createErr() {
-        //return new PrintStream(new BufferedOutputStream(new FileOutputStream(
-        //    FileDescriptor.err)), true);
-        //FIXME: WORKAROUND FOR BUG
-        // We can't use here simple FileOutputStream cuz such code causes our VM
-        // crash while initialization of main Thread object
-        //
-        // Correct fix of the problem is closing out and err print streams on VM
-        // exit for example, in Runtime.exit(). Another bug	 prevents us of doing
-        // such thing
-        return new PrintStream(new FilterOutputStream(new FileOutputStream(
-            FileDescriptor.err)), true);
+        return new PrintStream(new BufferedOutputStream(new FileOutputStream(
+                FileDescriptor.err)), true);
     }
 
     /**
@@ -368,11 +359,8 @@ public final class System {
      * for initialization of <code>out</code> field
      */
     private static PrintStream createOut() {
-        //return new PrintStream(new BufferedOutputStream(new FileOutputStream(
-        //    FileDescriptor.out)), true);
-        //FIXME: WORKAROUND FOR BUG
-        return new PrintStream(new FilterOutputStream(new FileOutputStream(
-            FileDescriptor.out)), true);
+        return new PrintStream(new BufferedOutputStream(new FileOutputStream(
+                FileDescriptor.out)), true);
     }
 
     /**
