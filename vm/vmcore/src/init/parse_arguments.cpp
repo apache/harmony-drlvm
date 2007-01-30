@@ -439,6 +439,9 @@ void parse_vm_arguments(Global_Env *p_env)
         else if (strcmp(option, "-Xdebug") == 0) {
             // Do nothing, this option is only for compatibility with old JREs
         }
+        else if (strcmp(option, "-Xfuture") == 0) {
+            // Do nothing, this option is only for compatibility with old JREs
+        }
         else if (strcmp(option, "-Xinvisible") == 0) {
             p_env->retain_invisible_annotations = true;
         }
