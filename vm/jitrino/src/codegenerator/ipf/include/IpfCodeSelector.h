@@ -156,7 +156,7 @@ public:
     void          stVar(CG_OpndHandle*, uint32);
     CG_OpndHandle *defArg(uint32, Type*);
 
-    CG_OpndHandle *cmp   (CompareOp::Operators, CompareOp::Types, CG_OpndHandle*, CG_OpndHandle*);
+    CG_OpndHandle *cmp   (CompareOp::Operators, CompareOp::Types, CG_OpndHandle*, CG_OpndHandle*, int);
     CG_OpndHandle *czero (CompareZeroOp::Types, CG_OpndHandle*);
     CG_OpndHandle *cnzero(CompareZeroOp::Types, CG_OpndHandle*);
 
@@ -276,7 +276,6 @@ public:
     CG_OpndHandle *callhelper(uint32, CG_OpndHandle**, Type*, JitHelperCallOp::Id) { NOT_IMPLEMENTED_C("callhelper") }
     CG_OpndHandle *tau_callvirt(uint32, CG_OpndHandle**, Type*, MethodDesc*, CG_OpndHandle*, CG_OpndHandle*, InlineInfo* ii = NULL)  { NOT_IMPLEMENTED_C("tau_callvirt") }
     CG_OpndHandle *select(CompareOp::Types, CG_OpndHandle*, CG_OpndHandle*, CG_OpndHandle*) { NOT_IMPLEMENTED_C("select") }
-    CG_OpndHandle *cmp(CompareOp::Operators,CompareOp::Types, CG_OpndHandle* src1,CG_OpndHandle* src2,int ifNaNResult=0) { NOT_IMPLEMENTED_C("cmp") }
     CG_OpndHandle *cmp3(CompareOp::Operators,CompareOp::Types, CG_OpndHandle*, CG_OpndHandle*) { NOT_IMPLEMENTED_C("cmp3") }
     CG_OpndHandle *pred_cmp(CompareOp::Operators,CompareOp::Types, CG_OpndHandle*, CG_OpndHandle*) { NOT_IMPLEMENTED_C("pred_cmp") }
     CG_OpndHandle *tau_optimisticBalancedMonitorEnter(CG_OpndHandle*, CG_OpndHandle*, CG_OpndHandle*) { NOT_IMPLEMENTED_C("tau_optimisticBalancedMonitorEnter") }
@@ -310,8 +309,8 @@ public:
     CG_OpndHandle* convToUPtr(PtrType*, CG_OpndHandle*)                       { NOT_IMPLEMENTED_C("convToUPtr") }
     CG_OpndHandle *tau_ldIntfTableAddr(Type*, CG_OpndHandle*, NamedType*, CG_OpndHandle*) { NOT_IMPLEMENTED_C("tau_ldIntfTableAddr"); }
     CG_OpndHandle* tau_ldIntfTableAddr(Type*, CG_OpndHandle*, NamedType*);
-    CG_OpndHandle* arraycopyReverse(unsigned int, CG_OpndHandle**)            { NOT_IMPLEMENTED_C("arraycopyReverse") }
-    CG_OpndHandle* arraycopy(unsigned int, CG_OpndHandle**)                   { NOT_IMPLEMENTED_C("arraycopy") }
+    CG_OpndHandle* arraycopyReverse(unsigned int, CG_OpndHandle**);
+    CG_OpndHandle* arraycopy(unsigned int, CG_OpndHandle**);
     CG_OpndHandle* addElemIndexWithLEA(Type*, CG_OpndHandle*, CG_OpndHandle*) { NOT_IMPLEMENTED_C("addElemIndexWithLEA") }
     CG_OpndHandle* ldRef(Type*, MethodDesc*, unsigned int, bool); 
     void           pseudoInst()                                               { NOT_IMPLEMENTED_V("pseudoInst") }

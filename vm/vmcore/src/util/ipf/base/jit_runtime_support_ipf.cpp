@@ -1177,10 +1177,12 @@ Boolean jit_may_inline_object_synchronization(unsigned *thread_id_register,
 
 static void gen_vm_rt_monitorenter_fast_path(Merced_Code_Emitter &emitter, bool check_null)
 {
+    return; // ichebyki
+#if 1
     // FIXME: code outdated
     assert(0);
     abort();
-#if 0
+#else
     const int thread_stack_key_reg          = THREAD_ID_REG;
     const int object_stack_key_addr_reg     = SCRATCH_GENERAL_REG4;
     const int object_old_stack_key_reg      = SCRATCH_GENERAL_REG5;
@@ -1260,6 +1262,7 @@ static void gen_vm_rt_monitorenter_fast_path(Merced_Code_Emitter &emitter, bool 
 
 static void gen_vm_rt_monitorexit_fast_path(Merced_Code_Emitter &emitter, bool check_null)
 {
+    return; // ichebyki
     // FIXME: code is outdated
     assert(0);
     abort();
@@ -2695,6 +2698,10 @@ void *vm_get_rt_support_addr(VM_RT_SUPPORT f)
         break;
     case VM_RT_MONITOR_ENTER_STATIC:
         fptr =  get_vm_rt_monitor_enter_static_address();
+        dereference_fptr = false;
+        break;
+    case VM_RT_MONITOR_ENTER_NON_NULL:
+        fptr =  get_vm_rt_monitor_enter_address(false);
         dereference_fptr = false;
         break;
     case VM_RT_MONITOR_EXIT:

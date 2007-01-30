@@ -292,6 +292,45 @@ void Bundle::print() {
 }
 
 //============================================================================//
+#ifndef _GNU_SOURCE
+#define _GNU_SOURCE
+#endif
+#ifndef _REENTRANT
+#define _REENTRANT
+#endif
+#include <signal.h>
+#include <errno.h>
+#include <ucontext.h>
+
+void __stdcall sighandler(int sn, siginfo_t *si, void *_sc) {
+    struct sigaction signal_action;
+    struct ucontext * signal_ucontext;
+    int saved_errno = errno;
+    
+    if (sn==SIGILL && si->si_code==ILL_BREAK && si->si_imm==INST_BREAKPOINT_IMM_VALUE) {
+        signal_ucontext = (struct ucontext *)_sc;
+    
+        if ( (signal_ucontext->_u._mc.sc_ip & 0x03)==2 ) {
+            signal_ucontext->_u._mc.sc_ip = (signal_ucontext->_u._mc.sc_ip & ~0x03) + 0x10;
+        } else {
+            signal_ucontext->_u._mc.sc_ip++;
+        }
+        //printf("-- sighandler() for signal %d, si_code %d, si_imm %x\n", sn, si->si_code, si->si_imm);
+    
+        signal_action.sa_flags = SA_SIGINFO;
+        signal_action.sa_sigaction = sighandler;
+        if (sigaction(SIGILL, &signal_action, NULL)) {
+            printf("Sigaction returned error = %d\n", errno);
+        }
+    }
+    
+    errno = saved_errno;
+    return;
+}
+
+
+//============================================================================//
+
 EmitterBb::EmitterBb(Cfg & cfg, CompilationInterface & compilationinterface
         , BbNode  * node_, bool _break4cafe, bool _nop4cafe) :
     node(node_),
@@ -317,18 +356,24 @@ EmitterBb::EmitterBb(Cfg & cfg, CompilationInterface & compilationinterface
                 , new(mm) Inst(mm, INST_NOP, p0, IMM(INST_BREAKPOINT_IMM_VALUE)));
         }
     } else {
-        if (_nop4cafe) {
-            bundles->addBundle(0x01
-                , new(mm) Inst(mm, INST_NOP, p0, IMM(INST_BREAKPOINT_IMM_VALUE))
-                , new(mm) Inst(mm, INST_NOP, p0, IMM(INST_BREAKPOINT_IMM_VALUE))
-                , new(mm) Inst(mm, INST_NOP, p0, IMM(INST_BREAKPOINT_IMM_VALUE)));
+        struct sigaction signal_action;
+        
+        signal_action.sa_flags = SA_SIGINFO;
+        signal_action.sa_sigaction = sighandler;
+        if (sigaction(SIGILL, &signal_action, NULL)) {
+            printf("Sigaction returned error = %d\n", errno);
         }
+
+        bundles->addBundle(0x01
+            , new(mm) Inst(mm, INST_NOP, p0, IMM(INST_BREAKPOINT_IMM_VALUE))
+            , new(mm) Inst(mm, INST_BREAK, p0, IMM(INST_BREAKPOINT_IMM_VALUE))
+            , new(mm) Inst(mm, INST_NOP, p0, IMM(INST_BREAKPOINT_IMM_VALUE)));
     }
 
 };
 
 //============================================================================//
-Emitter::Emitter(Cfg & cfg_, CompilationInterface & compilationinterface_) :
+Emitter::Emitter(Cfg & cfg_, CompilationInterface & compilationinterface_, bool _break4cafe) :
         mm(cfg_.getMM()),
         cfg(cfg_),
         compilationinterface(compilationinterface_)
@@ -342,7 +387,7 @@ Emitter::Emitter(Cfg & cfg_, CompilationInterface & compilationinterface_) :
     bbs = new(mm) vectorbb;
     BbNode  * node = (BbNode *)cfg.getEnterNode();
     EmitterBb * bbdesc;
-    bool break4cafe = false;
+    bool break4cafe = _break4cafe;
     bool nop4cafe = false;
 
     do {
@@ -1243,7 +1288,7 @@ bool Emitter::emit() {
     if (!ret) { IPF_ERR << "Bad results for emitCode\n"; return ret; }
 
     // 5 pass: fix switch tables
-    ret = fixSwitchTables();
+    ret &= fixSwitchTables();
     if (!ret) { IPF_ERR << "Bad results for fixSwitchTables\n"; return ret; }
 
     // checkForDualIssueBundles();

@@ -196,7 +196,7 @@ typedef vector<EmitterBb *> vectorbb;
 
 class Emitter {
   public:
-    Emitter(Cfg & cfg_, CompilationInterface & compilationinterface_);
+    Emitter(Cfg & cfg_, CompilationInterface & compilationinterface_, bool _break4cafe=false);
 
     bool emit();
     void printInsts(char *);

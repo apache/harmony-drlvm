@@ -147,7 +147,7 @@ void RuntimeInterface::getGCRootSet(MethodDesc            *methodDesc,
 
 uint32 RuntimeInterface::getInlineDepth(InlineInfoPtr ptr, uint32 offset) {
 
-    cout << "IPF::RuntimeInterface::getInlineDepth" << endl;
+    std::cout << "FIXME: IPF::RuntimeInterface::getInlineDepth" << endl;
     return 0;
 }
 
@@ -157,7 +157,7 @@ Method_Handle RuntimeInterface::getInlinedMethod(InlineInfoPtr ptr,
                                                  uint32        offset, 
                                                  uint32        inline_depth) {
 
-    cout << "IPF::RuntimeInterface::getInlinedMethod" << endl;
+    std::cout << "FIXME: IPF::RuntimeInterface::getInlinedMethod" << endl;
     return NULL;
 }
 
@@ -165,14 +165,14 @@ Method_Handle RuntimeInterface::getInlinedMethod(InlineInfoPtr ptr,
 
 bool RuntimeInterface::canEnumerate(MethodDesc *methodDesc, NativeCodePtr eip) {
 
-    cout << "IPF::RuntimeInterface::canEnumerate" << endl;
+    std::cout << "FIXME: IPF::RuntimeInterface::canEnumerate " << methodDesc->getName() << endl;
     return true;
 }
 
 //----------------------------------------------------------------------------------------//
 
 void RuntimeInterface::fixHandlerContext(MethodDesc *methodDesc, JitFrameContext *context, bool isFirst) {
-//    cout << "IPF::RuntimeInterface::fixHandlerContext" << endl;
+   //std::cout << "FIXME: IPF::RuntimeInterface::fixHandlerContext " << methodDesc->getName() << endl;
 }
 
 //----------------------------------------------------------------------------------------//
@@ -191,7 +191,7 @@ void* RuntimeInterface::getAddressOfThis(MethodDesc              *methodDesc,
 void* RuntimeInterface::getAddressOfSecurityObject(MethodDesc              *methodDesc, 
                                                    const ::JitFrameContext *jitFrameContext) { 
 
-    cout << "IPF::RuntimeInterface::getAddressOfSecurityObject" << endl;
+    std::cout << "FIXME: IPF::RuntimeInterface::getAddressOfSecurityObject " << methodDesc->getName() << endl;
     assert(0); 
     return NULL; 
 }
@@ -201,8 +201,7 @@ void* RuntimeInterface::getAddressOfSecurityObject(MethodDesc              *meth
 bool RuntimeInterface::recompiledMethodEvent(BinaryRewritingInterface &binaryRewritingInterface,
                                              MethodDesc               *methodDesc, 
                                              void                     *data) {
-
-//    cout << "IPF::RuntimeInterface::recompiledMethodEvent " << methodDesc->getName() << endl;
+    //std::cout << "IPF::RuntimeInterface::recompiledMethodEvent " << methodDesc->getName() << endl;
 
     char *callAddr      = (char *)(~(((uint64)0x4cafe) << 32) & (uint64)data);
     char **indirectAddr = (char **)methodDesc->getIndirectAddress();
@@ -213,9 +212,9 @@ bool RuntimeInterface::recompiledMethodEvent(BinaryRewritingInterface &binaryRew
 
 //----------------------------------------------------------------------------------------//
 
-bool RuntimeInterface::getBcLocationForNative(MethodDesc *method, uint64 native_pc, uint16 *bc_pc) {
+bool RuntimeInterface::getBcLocationForNative(MethodDesc *methodDesc, uint64 native_pc, uint16 *bc_pc) {
 
-//    cout << "IPF::RuntimeInterface::getBcLocationForNative" << endl;
+    std::cout << "FIXME: IPF::RuntimeInterface::getBcLocationForNative " << methodDesc->getName() << endl;
 //    assert(0);
 //    return false;
     return true;
@@ -223,9 +222,9 @@ bool RuntimeInterface::getBcLocationForNative(MethodDesc *method, uint64 native_
 
 //----------------------------------------------------------------------------------------//
 
-bool RuntimeInterface::getNativeLocationForBc(MethodDesc *method,  uint16 bc_pc, uint64 *native_pc) {
+bool RuntimeInterface::getNativeLocationForBc(MethodDesc *methodDesc,  uint16 bc_pc, uint64 *native_pc) {
 
-    cout << "IPF::RuntimeInterface::getNativeLocationForBc" << endl;
+    std::cout << "FIXME: IPF::RuntimeInterface::getNativeLocationForBc " << methodDesc->getName() << endl;
     assert(0);
     return false;
 }

@@ -42,6 +42,7 @@ using namespace std;
 
 #include "compile.h"
 #include "open/vm_util.h"
+#include "open/hythread_ext.h"
 
 #include "merced.h"
 #include "vm_stats.h"
@@ -141,9 +142,9 @@ JIT_execute_method_default(JIT_Handle jh,
                            jvalue   *return_value,
                            jvalue   *args)
 {
-    assert(("Doesn't compile", 0));
-    abort();
-#if 0
+    //assert(("Doesn't compile", 0));
+    //abort();
+#if 1
     Method *meth = (Method*) methodID;
     assert(!hythread_is_suspend_enabled());
     void *entry_point = meth->get_code_addr();
@@ -202,7 +203,7 @@ JIT_execute_method_default(JIT_Handle jh,
                     ManagedObject *object = (ManagedObject *)i64;
                     if(object) {
                         Class *clss = object->vt()->clss;
-                        sprintf(msg, " of class '%s'", clss->name->bytes);
+                        sprintf(msg, " of class '%s'", clss->get_name()->bytes);
                     }
                 }
             }
@@ -240,7 +241,7 @@ JIT_execute_method_default(JIT_Handle jh,
         iter = advance_arg_iterator(iter);
     }
 
-    assert(nargs <= 8);
+    // assert(nargs <= 8);
     double double_result;
 
     static void* addr_execute = get_vm_execute_java_method();
@@ -256,8 +257,9 @@ JIT_execute_method_default(JIT_Handle jh,
         void *thread_pointer, uint64 tid) = (uint64 (__cdecl * )(void *entry_point, int nargs, uint64 args[],
         double *double_result_addr, int double_nargs, double double_args[], 
         void *thread_pointer, uint64 tid))&fptr;
+    IDATA id = hythread_get_id(hythread_self());
     uint64 int_result = (uint64)fpp_exec(entry_point, nargs, arg_words, &double_result,
-        double_nargs, double_args, p_TLS_vmthread, p_TLS_vmthread->stack_key);
+        double_nargs, double_args, p_TLS_vmthread, id);
 
     // Save the result
     Java_Type ret_type = meth->get_return_java_type();
@@ -308,11 +310,12 @@ JIT_execute_method_default(JIT_Handle jh,
         break;
     default:
 #ifdef _DEBUG
-        printf("Returned to C from %s.%s%s\n",
-               meth->get_class()->name->bytes, meth->get_name()->bytes,
-               meth->get_descriptor()->bytes);
+        std::clog << "Returned to C from "
+               << meth->get_class()->get_name()->bytes << "." << meth->get_name()->bytes
+               << meth->get_descriptor()->bytes << "\n";
 #endif
-        DIE("Return type " << ret_type << " is not implemented\n");
+        //DIE("Return type ");// <<  (int)ret_type << " is not implemented\n");
+        std::clog << "Return type " <<  (int)ret_type << " is not implemented\n";
     }
 #endif
 

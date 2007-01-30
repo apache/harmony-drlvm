@@ -116,7 +116,7 @@ void CodeGenerator::genCode(SessionAction *sa, MethodCodeSelector &methodCodeSel
     if(LOG_ON) irPrinter.printAsm(LOG_OUT);
 
     IPF_LOG << endl << "=========== Stage: Code Emitter ==============================" << endl;
-    Emitter emitter(*cfg, compilationInterface);
+    Emitter emitter(*cfg, compilationInterface, false);
     bool ret = emitter.emit();
 
     IPF_LOG << endl << "=========== Stage: Make Runtime Info =========================" << endl;

@@ -167,7 +167,8 @@ static void si_unwind_bsp(StackIterator* si)
 {
     uint64 pfs = *si->c.p_ar_pfs;
     unsigned sol = (unsigned)EXTRACT64_SOL(pfs);
-    assert(sol<96);
+    assert(sol<=96); // ichebyki
+    // ichebyki assert(sol<96);
     uint64* bsp = si->bsp;
 
     // Direct computation, see IPF arch manual, volume 3, table 6.2.
@@ -350,10 +351,29 @@ StackIterator* si_create_from_native()
 #if defined (PLATFORM_POSIX)
 StackIterator* si_create_from_native(VM_thread* thread)
 {
+	hythread_suspend_disable();
+    // Allocate iterator
+    StackIterator* res = (StackIterator*)STD_MALLOC(sizeof(StackIterator));
+    assert(res);
+
+    // Setup last_legal_rsnat and extra_nats
+    uint64 t[2];
+    get_rnat_and_bsp(t);
+    si_init_nats(res, (uint64*)t[1], t[0]);
+
+    // Setup current frame
+    res->cci = NULL;
+    res->m2nfl = m2n_get_last_frame(thread);
+    res->ip = 0;
+    res->c.p_eip = &res->ip;
+    hythread_suspend_enable();
+    return res;
+
+#if 0	
     // FIXME: code is outdated
     assert(0);
     abort();
-#if 0
+
     // Allocate iterator
     StackIterator* res = (StackIterator*)malloc(sizeof(StackIterator));
     assert(res);

@@ -462,10 +462,11 @@ static NativeCodePtr compile_get_compile_me_generic() {
             "out platform:pint:pint;"
             "o0=sp0;"
             "call %1i;"
-            "pop_m2n;"
 	    "locals 1;"
 	    "l0 = r;"
+	    "out platform::void;"
             "call %2i;"
+            "pop_m2n;"
             "tailcall l0;",
             FRAME_COMPILATION, p_jitter, p_rethrow);
         assert(cs && lil_is_valid(cs));

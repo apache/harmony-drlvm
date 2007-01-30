@@ -997,7 +997,8 @@ CG_OpndHandle *IpfInstCodeSelector::defArg(uint32 inArgPosition, Type *type) {
 CG_OpndHandle *IpfInstCodeSelector::cmp(CompareOp::Operators cmpOp,
                                         CompareOp::Types     opType,
                                         CG_OpndHandle        *src1,
-                                        CG_OpndHandle        *src2) {
+                                        CG_OpndHandle        *src2,
+                                        int ifNaNResult) {
 
     IPF_LOG << "      cmp" 
         << "; opType=" << opType
@@ -1827,9 +1828,9 @@ CG_OpndHandle *IpfInstCodeSelector::getVTableAddr(Type       *dstType,
                                                   ObjectType *base) {
 
     uint64 value = (uint64) base->getVTable();
-    if (dstType->tag==Type::VTablePtr && opndManager->areVtablePtrsCompressed()) {
-        value += (uint64) compilationInterface.getVTableBase();
-    }
+//    if (dstType->tag==Type::VTablePtr && opndManager->areVtablePtrsCompressed()) {
+//        value += (uint64) compilationInterface.getVTableBase();
+//    }
     
     Opnd *addr = opndManager->newImm(value);
     IPF_LOG << "      getVTableAddr" << endl << "        addr " << IrPrinter::toString(addr) << endl;
@@ -1859,6 +1860,20 @@ CG_OpndHandle *IpfInstCodeSelector::tau_ldIntfTableAddr(Type          *dstType,
 
     directCall(2, helperArgs, retOpnd, helperAddress, p0);
     return retOpnd;
+}
+
+//----------------------------------------------------------------------------//
+
+CG_OpndHandle* IpfInstCodeSelector::arraycopy(unsigned int numArgs, 
+                                              CG_OpndHandle** args) { 
+    NOT_IMPLEMENTED_C("arraycopy") 
+}
+
+//----------------------------------------------------------------------------//
+
+CG_OpndHandle* IpfInstCodeSelector::arraycopyReverse(unsigned int numArgs, 
+                                                     CG_OpndHandle** args) { 
+    NOT_IMPLEMENTED_C("arraycopyReverse") 
 }
 
 //----------------------------------------------------------------------------//
@@ -3181,6 +3196,7 @@ DataKind IpfInstCodeSelector::toDataKind(Type::Tag tag) {
         case Type::SystemString           : return DATA_BASE;
         case Type::ManagedPtr             : return DATA_MPTR;
         case Type::Tau                    : return DATA_INVALID;
+        case Type::CompressedSystemClass  :
         case Type::CompressedSystemString :
         case Type::CompressedSystemObject : 
         case Type::CompressedObject       :
