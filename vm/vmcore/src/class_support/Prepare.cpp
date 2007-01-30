@@ -1263,7 +1263,7 @@ bool Class::prepare(Global_Env* env)
     // STEP 7 ::: ASSIGN OFFSETS to the class and virtual METHODS
     //
     assign_offsets_to_methods(env);
-    if(in_error())
+    if(exn_raised())
         return false;
 
     //
