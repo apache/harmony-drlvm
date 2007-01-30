@@ -27,7 +27,6 @@
 #include <assert.h>
 #include <errno.h>
 
-#include "platform.h"
 #include "port_malloc.h"
 
 #ifndef __SMP__

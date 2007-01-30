@@ -27,8 +27,6 @@
 #ifndef _FINALIZE_H_
 #define _FINALIZE_H_
 
-#include "platform.h"
-
 #include "open/types.h"
 
 #ifdef USE_GC_STATIC

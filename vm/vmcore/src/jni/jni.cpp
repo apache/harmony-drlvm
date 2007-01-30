@@ -31,7 +31,6 @@
 #include "open/jthread.h"
 #include "open/vm_util.h"
 
-#include "platform.h"
 #include "lock_manager.h"
 #include "Class.h"
 #include "classloader.h"

@@ -22,7 +22,6 @@
 #define LOG_DOMAIN "interpreter.unspecified"
 #include "cxxlog.h"
 
-#include "platform.h"
 #include "environment.h"
 #include "vm_threads.h"
 #include "open/bytecodes.h"

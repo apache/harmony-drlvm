@@ -331,7 +331,6 @@ ManagedObject * String_Pool::intern(String * str) {
             (COMPRESSED_REFERENCE)((POINTER_SIZE_INT)lang_string
             - (POINTER_SIZE_INT)VM_Global_State::loader_env->heap_base);
         assert(is_compressed_reference(compressed_lang_string));     
-        assert(sizeof(LONG) == sizeof(uint32));
         uint32 result = apr_atomic_cas32(
             /*destination*/ (volatile uint32 *)&str->intern.compressed_ref, 
             /*exchange*/    compressed_lang_string,  

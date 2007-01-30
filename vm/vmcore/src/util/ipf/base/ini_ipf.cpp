@@ -23,9 +23,6 @@
 // Internal Native Interface
 //
 
-
-#include "platform.h"
-
 //MVM
 #include <iostream>
 

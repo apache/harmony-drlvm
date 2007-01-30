@@ -78,15 +78,7 @@ Hash_Table::Hash_Table()
     //TRACE("Making new hash table with size_in_entries " << _size_in_entries 
     //    << " and threashhold_entries " << _threshold_entries);
     _table = (volatile void **)STD_MALLOC(_size_in_bytes);
-    if (_table == NULL) {
-        DWORD LastError = IJGetLastError();
-        fprintf(stderr,
-                "Error: STD_MALLOC failed when creating hash table "
-                "%d (0x%x)\n",
-                LastError, LastError);
-        assert(LastError);
-    }
-
+    assert(_table != NULL);
     memset(_table, 0, _size_in_bytes);
 
     //TRACE("Created hash_table " << (void *)this);
@@ -547,27 +539,12 @@ Count_Hash_Table::Count_Hash_Table()
     _save_pointer         = 0;
 
     _key_table = (volatile void **)STD_MALLOC(_size_in_bytes);
-    if (_key_table == NULL) {
-        DWORD LastError = IJGetLastError();
-        fprintf(stderr,
-                "Error: STD_MALLOC failed when creating key val hash table "
-                "%d (0x%x)\n",
-                LastError, LastError);
-        assert(LastError);
-    }
+    assert(_key_table != NULL);
     memset(_key_table, 0, _size_in_bytes);
 
     int val_size_in_bytes = _size_in_entries * (sizeof(LONG));
     _val_table = (LONG *)STD_MALLOC(val_size_in_bytes);
-
-    if (_val_table == NULL) {
-        DWORD LastError = IJGetLastError();
-        fprintf(stderr,
-                "Error: STD_MALLOC failed when creating key val hash table "
-                "%d (0x%x)\n",
-                LastError, LastError);
-        assert(LastError);
-    }
+    assert(_val_table != NULL); 
     memset((void *)_val_table, 0, val_size_in_bytes);
 
     return;

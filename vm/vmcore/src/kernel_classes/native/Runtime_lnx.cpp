@@ -266,7 +266,7 @@ static jboolean waitFor(JNIEnv *env, jobject obj, jint handle) {
     return true;
 }
 
-boolean JNICALL Java_java_lang_Runtime_00024SubProcess_getState0 (JNIEnv *env, jobject obj, jint handle) { 
+jboolean JNICALL Java_java_lang_Runtime_00024SubProcess_getState0 (JNIEnv *env, jobject obj, jint handle) { 
     return waitFor(env, obj, handle);
 }
 

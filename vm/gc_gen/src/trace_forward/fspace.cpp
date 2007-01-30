@@ -18,8 +18,6 @@
  * @author Xiao-Feng Li, 2006/10/05
  */
 
-#include "platform.h"
-
 #include "fspace.h"
 
 Boolean NOS_PARTIAL_FORWARD = FALSE;

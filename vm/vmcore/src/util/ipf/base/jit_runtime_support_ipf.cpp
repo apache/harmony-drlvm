@@ -41,7 +41,6 @@ using namespace std;
 #include "open/gc.h"
 #include "open/vm_util.h"
 
-#include "platform.h"
 #include "environment.h"
 #include "Class.h"
 #include "object_generic.h"

@@ -36,8 +36,6 @@ using namespace std;
 #include <stdio.h>
 #include <stdlib.h>
 
-#include "platform.h"
-
 #include "Class.h"
 #include "environment.h"
 #include "exceptions.h"

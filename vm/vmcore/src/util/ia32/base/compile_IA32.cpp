@@ -22,8 +22,6 @@
 #define LOG_DOMAIN "vm.helpers"
 #include "cxxlog.h"
 
-#include "platform.h"
-
 //MVM
 #include <iostream>
 

@@ -26,8 +26,6 @@
 // appropriate stub.
 //
 
-#include "platform.h"
-
 //MVM
 #include <iostream>
 

@@ -23,7 +23,6 @@
 #define LOG_DOMAIN "jni"
 #include "cxxlog.h"
 
-#include "platform.h"
 #include "Class.h"
 #include "environment.h"
 #include "object_handles.h"

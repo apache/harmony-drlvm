@@ -21,8 +21,6 @@
 //  Routines used by the VM to emit stub code for the ipf. These routines use the ipf code compactor.
 //
 
-
-#include "platform.h"
 #include <assert.h>
 
 #include "environment.h"

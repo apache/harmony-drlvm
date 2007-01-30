@@ -62,10 +62,7 @@ using namespace std;
 #include "interpreter.h"
 #include "exceptions_int.h"
 
-#ifdef PLATFORM_NT
-// wjw -- following lines needs to be generic for all OSs
-#include "java_lang_thread_nt.h"
-#elif defined _IPF_
+#ifdef _IPF_
 #include "java_lang_thread_ipf.h"
 #elif defined _EM64T_
 //#include "java_lang_thread_em64t.h"

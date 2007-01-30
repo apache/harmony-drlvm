@@ -21,8 +21,9 @@
 #ifndef _PLATFORM_LOWLEVEL_H_
 #define _PLATFORM_LOWLEVEL_H_
 
-#include "platform.h"
 #include "stdlib.h"
+#include <limits.h>
+//#include <ctype.h>
 
 inline void disable_assert_dialogs() {
     /* NOP on Linux */
@@ -31,5 +32,24 @@ inline void disable_assert_dialogs() {
 inline void debug_break() {
     abort();
 }
+#ifdef __cplusplus
+extern "C" {
+#endif
 
+#define __fastcall
+#if defined(_IPF_) || defined(_EM64T_)
+#define __stdcall
+#else
+#define __stdcall  __attribute__ ((__stdcall__))
+#endif
+#define __cdecl
+
+#define dllexport
+#define __declspec(junk)
+
+#define _MAX_PATH PATH_MAX
+
+#ifdef __cplusplus
+}
+#endif
 #endif // _PLATFORM_LOWLEVEL_H_

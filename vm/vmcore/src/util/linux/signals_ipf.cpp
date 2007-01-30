@@ -27,7 +27,6 @@
 #define LOG_DOMAIN "port.old"
 #include "cxxlog.h"
 
-#include "platform.h"
 #include <sys/mman.h>
 #include <sys/types.h>
 #include <sys/stat.h>

@@ -23,8 +23,6 @@
 #ifndef _L1A_DEFINES_H
 #define _L1A_DEFINES_H
 
-#include "platform.h"
-
 #define Array_Operand L1a_Array_Operand
 #define Bounds_Checking L1a_Bounds_Checking
 #define Branch_Patch L1a_Branch_Patch

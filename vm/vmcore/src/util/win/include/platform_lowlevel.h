@@ -39,8 +39,6 @@
 
 #include <crtdbg.h>
 
-#include "platform.h"
-
 inline void disable_assert_dialogs() {
     _CrtSetReportMode(_CRT_ASSERT, _CRTDBG_MODE_FILE);
     _CrtSetReportFile(_CRT_ASSERT, _CRTDBG_FILE_STDOUT);
@@ -53,11 +51,6 @@ inline void disable_assert_dialogs() {
 
 inline void debug_break() {
     _CrtDbgBreak();
-}
-
-inline DWORD IJGetLastError(VOID)
-{
-    return GetLastError();
 }
 
 struct timespec {

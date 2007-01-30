@@ -493,7 +493,7 @@ static void* vm_aastore_arraystore()
 static void *__stdcall
 aastore_ia32(volatile ManagedObject *elem,
              int idx,
-             Vector_Handle array) stdcall__;
+             Vector_Handle array);
 
 
 // 20030321 This JIT support routine expects to be called directly from managed code. 
@@ -1034,7 +1034,7 @@ void * getaddress__gc_write_barrier_fastcall()
 } //getaddress__gc_write_barrier_fastcall
 
 
-static int64 __stdcall vm_lrem(int64 m, int64 n) stdcall__;
+static int64 __stdcall vm_lrem(int64 m, int64 n);
 
 static int64 __stdcall vm_lrem(int64 m, int64 n)
 {
@@ -1082,7 +1082,7 @@ void * getaddress__vm_lrem_naked()
 } //getaddress__vm_lrem_naked
 
 
-static int64 __stdcall vm_ldiv(int64 m, int64 n) stdcall__;
+static int64 __stdcall vm_ldiv(int64 m, int64 n);
 
 static int64 __stdcall vm_ldiv(int64 m, int64 n)
 {

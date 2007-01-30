@@ -19,9 +19,6 @@
  * @version $Revision: 1.23.8.2.4.4 $
  */
 
-#ifdef VM_POSIX
-#include "platform.h"
-#endif
 #include "Log.h"
 #include "Ia32InstCodeSelector.h"
 #include "Ia32CodeGenerator.h"

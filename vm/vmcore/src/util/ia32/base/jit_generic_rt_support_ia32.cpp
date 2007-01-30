@@ -32,7 +32,7 @@
 #include "cxxlog.h"
 
 #include "jit_runtime_support.h"
-
+#include "platform_lowlevel.h"
 #include "nogc.h" // for malloc_fixed_code_for_jit()
 #include "encoder.h"
 #include "vm_arrays.h"
@@ -204,7 +204,7 @@ void * getaddress__vm_lushr_naked()
 } //getaddress__vm_lushr_naked
 
 
-static int64 __stdcall vm_lmul(int64 m, int64 n) stdcall__;
+static int64 __stdcall vm_lmul(int64 m, int64 n);
 
 static int64 __stdcall vm_lmul(int64 m, int64 n)
 {
@@ -214,7 +214,7 @@ static int64 __stdcall vm_lmul(int64 m, int64 n)
 } //vm_lmul
 
 #ifdef VM_LONG_OPT
-static int64 __stdcall vm_lmul_const_multiplier(int64 m, int64 n) stdcall__;
+static int64 __stdcall vm_lmul_const_multiplier(int64 m, int64 n);
 
 static int64 __stdcall vm_lmul_const_multiplier(int64 m, int64 n)
 {
@@ -232,7 +232,7 @@ static int64 __stdcall vm_lmul_const_multiplier(int64 m, int64 n)
 #endif
 
 
-static int64 __stdcall do_lrem(int64 m, int64 n) stdcall__;
+static int64 __stdcall do_lrem(int64 m, int64 n);
 
 static int64 __stdcall do_lrem(int64 m, int64 n)
 {
@@ -675,7 +675,7 @@ void *getaddress__vm_d2l()
 } //getaddress__vm_d2l
 
 
-static int64 __stdcall vm_d2l(double d) stdcall__;
+static int64 __stdcall vm_d2l(double d);
 
 static int64 __stdcall vm_d2l(double d)
 {
@@ -851,7 +851,7 @@ static void *getaddress__vm_f2l()
 } //getaddress__vm_f2l
 
 
-static int64 __stdcall vm_f2l(float f) stdcall__;
+static int64 __stdcall vm_f2l(float f);
 
 static int64 __stdcall vm_f2l(float f)
 {

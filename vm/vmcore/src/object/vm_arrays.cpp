@@ -24,7 +24,6 @@
 #define LOG_DOMAIN "vm.arrays"
 #include "cxxlog.h"
 
-#include "platform.h"
 #include <assert.h>
 
 #include "environment.h"

@@ -102,7 +102,7 @@ public:
 Method_Profile_Handle eb_profiler_create_profile(PC_Handle ph, Method_Handle mh);
 void* eb_profiler_get_entry_counter_addr(Method_Profile_Handle mph);
 void*eb_profiler_get_backedge_counter_addr(Method_Profile_Handle mph);
-void  __stdcall eb_profiler_sync_mode_callback(PC_Handle mph) stdcall__;
+void  __stdcall eb_profiler_sync_mode_callback(PC_Handle mph);
 char  eb_profiler_is_in_sync_mode(PC_Handle pch);
 uint32 eb_profiler_get_entry_threshold(PC_Handle pch);
 uint32 eb_profiler_get_backedge_threshold(PC_Handle pch);

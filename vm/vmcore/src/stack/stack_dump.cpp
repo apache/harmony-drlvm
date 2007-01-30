@@ -29,6 +29,7 @@
 #include "stack_trace.h"
 #include "interpreter_exports.h"
 #include "cci.h"
+#include <ctype.h>
 
 #ifdef PLATFORM_NT
 

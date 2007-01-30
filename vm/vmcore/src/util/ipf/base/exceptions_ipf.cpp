@@ -19,8 +19,6 @@
  * @version $Revision: 1.1.2.1.4.3 $
  */  
 
-#include "platform.h"
-
 //MVM
 #include <iostream>
 

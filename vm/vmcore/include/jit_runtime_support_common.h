@@ -27,19 +27,19 @@
 #define _JIT_RUNTIME_SUPPORT_COMMON_H_
 
 #include "lil.h"
-
+#include "platform_lowlevel.h"
 #include "heap.h"
 
 VMEXPORT // temporary solution for interpreter unplug
-int __stdcall vm_instanceof(ManagedObject *obj, Class *c) stdcall__;
+int __stdcall vm_instanceof(ManagedObject *obj, Class *c);
 
 // Implements VM_RT_AASTORE
 void * __stdcall
-vm_rt_aastore(ManagedObject *elem, int idx, Vector_Handle array) stdcall__;
+vm_rt_aastore(ManagedObject *elem, int idx, Vector_Handle array);
 
 // Implements VM_RT_AASTORE_TEST
 int __stdcall
-vm_aastore_test(ManagedObject *elem, Vector_Handle array) stdcall__;
+vm_aastore_test(ManagedObject *elem, Vector_Handle array);
 
 
 void *vm_get_interface_vtable(ManagedObject *obj, Class *iid);

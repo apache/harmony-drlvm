@@ -23,7 +23,6 @@
 #define LOG_DOMAIN "thread"
 #include "cxxlog.h"
 
-#include "platform.h"
 #include "vm_process.h"
 #include <assert.h>
 
@@ -78,12 +77,6 @@ using namespace std;
 #include "mon_enter_exit.h"
 #include "jni_direct.h"
 #include "port_malloc.h"
-
-
-#ifdef PLATFORM_NT
-// wjw -- following lines needs to be generic for all OSs
-#include "java_lang_thread_nt.h"
-#endif
 
 #ifdef _IPF_
 #include "java_lang_thread_ipf.h"

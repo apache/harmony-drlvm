@@ -20,7 +20,6 @@
  */  
 
 
-#include "platform.h"
 #include "lock_manager.h"
 #include "vm_threads.h"
 #include "exceptions.h"

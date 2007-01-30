@@ -20,9 +20,6 @@
  */  
 //
 
-
-#include "platform.h"
-
 //MVM
 #include <iostream>
 

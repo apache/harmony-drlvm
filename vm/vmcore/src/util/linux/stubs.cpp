@@ -23,7 +23,6 @@
 #define LOG_DOMAIN "port.old"
 #include "cxxlog.h"
 
-#include "platform.h"
 #include "vm_threads.h"
 #include "exceptions.h"
 #include "method_lookup.h"
@@ -35,13 +34,6 @@
 #pragma warning (disable:584) // omission of exception specification is incompatible with previous function "__errno_location" (declared at line 38 of "/usr/include/bits/errno.h")
 #endif
 
-extern int errno;
-
 #if defined (__INTEL_COMPILER)
 #pragma warning( pop )
 #endif
-
-DWORD IJGetLastError(VOID)
-{
-    return errno;
-}

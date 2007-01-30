@@ -23,7 +23,6 @@
 #ifndef _hash_table_H_
 #define _hash_table_H_
 
-#include "platform_lowlevel.h"
 #include "open/types.h"
 
 //

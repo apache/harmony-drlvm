@@ -23,7 +23,7 @@
 #include <memory.h>
 #include <sys/types.h>
 #include <unistd.h>
-#include "platform.h"
+#include "platform_lowlevel.h"
 #include "open/types.h"
 #include "port_malloc.h"
 #include "native_modules.h"

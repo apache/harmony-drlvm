@@ -20,7 +20,6 @@
  */  
 
 
-//#include "platform.h"
 #include "cxxlog.h"
 #include "jni.h"
 #include "jni_direct.h"

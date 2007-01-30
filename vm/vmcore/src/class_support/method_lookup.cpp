@@ -25,7 +25,6 @@
 #include "cxxlog.h"
 
 #include "environment.h"
-#include "platform.h"
 #include <assert.h>
 #include "lock_manager.h"
 #include "nogc.h"

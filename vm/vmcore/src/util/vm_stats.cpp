@@ -24,7 +24,6 @@
 #define LOG_DOMAIN "vm.stats"
 #include "cxxlog.h"
 
-#include "platform.h"
 #include "environment.h"
 #include "open/vm_util.h"
 #include "method_lookup.h"

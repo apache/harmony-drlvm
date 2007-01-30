@@ -26,7 +26,7 @@
 
 #ifdef PLATFORM_POSIX
 #include <semaphore.h>
-#include "platform.h"
+#include "platform_lowlevel.h"
 #else
 #include "vm_process.h"
 #endif
