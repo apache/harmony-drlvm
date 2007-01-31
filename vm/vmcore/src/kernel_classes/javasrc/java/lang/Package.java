@@ -272,6 +272,14 @@ public class Package implements AnnotatedElement {
         if (specVersion == null) { 
             throw new NumberFormatException("No version defined for implementation");
         }
+
+        if (specVersion.startsWith(".") || specVersion.endsWith(".")) {
+            throw new NumberFormatException("Wrong implementation version: should not start or end with '.'");
+        }
+
+        if (desiredVersion.startsWith(".") || desiredVersion.endsWith(".")) {
+            throw new NumberFormatException("Wrong version to check: should not start or end with '.'");
+        }
         
         StringTokenizer specVersionTokens = new StringTokenizer(specVersion,
                 ".");
