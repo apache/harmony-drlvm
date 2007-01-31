@@ -2888,12 +2888,6 @@ JavaByteCodeTranslator::genArrayCopyRepMove(MethodDesc * methodDesc,
                                             uint32       numArgs,
                                             Opnd **      srcOpnds) {
 
-#ifdef _EM64T_
-    // FIXME: this was not tested (and does not work) on EM64T.
-    if (true) {
-        return false;
-    }
-#endif
     if( !methodIsArraycopy(methodDesc) ||
         !arraycopyOptimizable(methodDesc,numArgs,srcOpnds) )
     {
@@ -2955,48 +2949,52 @@ JavaByteCodeTranslator::genArrayCopyRepMove(MethodDesc * methodDesc,
     LabelInst * reverseCopying = irBuilder.createLabel();
     LabelInst * boundsException = irBuilder.createLabel();
     LabelInst * Exit = irBuilder.createLabel();
+
     Type * intType = typeManager.getInt32Type();
+    Type::Tag intTag = intType->tag;
     Type * voidType = typeManager.getVoidType();
 
     newFallthroughBlock();
     Opnd * zero = irBuilder.genLdConstant((int32)0);
-    irBuilder.genBranch(Type::Int32,Cmp_GT,boundsException,zero,srcPos);        
+    Opnd * minusone = irBuilder.genLdConstant((int32)-1);
+
+    irBuilder.genBranch(intTag,Cmp_GT,boundsException,zero,srcPos);        
 
     newFallthroughBlock();
-    irBuilder.genBranch(Type::Int32,Cmp_GT,boundsException,zero,dstPos);
+    irBuilder.genBranch(intTag,Cmp_GT,boundsException,zero,dstPos);
 
     newFallthroughBlock();
-    irBuilder.genBranch(Type::Int32,Cmp_GT,boundsException,zero,len);
+    irBuilder.genBranch(intTag,Cmp_GT,boundsException,zero,len);
 
     Modifier mod = Modifier(Overflow_None)|Modifier(Exception_Never)|Modifier(Strict_No);
 
     newFallthroughBlock();   
-    Opnd * srcLen = irBuilder.genArrayLen(intType,Type::Int32,src);
+    Opnd * srcLen = irBuilder.genArrayLen(intType,intTag,src);
     Opnd * srcEnd = irBuilder.genAdd(intType,mod,srcPos,len);
-    irBuilder.genBranch(Type::Int32,Cmp_GT,boundsException,srcEnd,srcLen);
+    irBuilder.genBranch(intTag,Cmp_GT,boundsException,srcEnd,srcLen);
     
     newFallthroughBlock();
     Opnd * dstEnd = irBuilder.genAdd(intType,mod,dstPos,len);
-    Opnd * dstLen = irBuilder.genArrayLen(intType,Type::Int32,dst);
-    irBuilder.genBranch(Type::Int32,Cmp_GT,boundsException,dstEnd,dstLen);
+    Opnd * dstLen = irBuilder.genArrayLen(intType,intTag,dst);
+    irBuilder.genBranch(intTag,Cmp_GT,boundsException,dstEnd,dstLen);
 
     newFallthroughBlock();
 
     // The case of same arrays and same positions
-    Opnd * diff = irBuilder.genCmp3(intType,Type::Int32,Cmp_GT,dstPos,srcPos);
+    Opnd * diff = irBuilder.genCmp3(intType,intTag,Cmp_GT,dstPos,srcPos);
     Opnd * sameArrays = irBuilder.genCmp(intType,Type::IntPtr,Cmp_EQ,src,dst);
-    Opnd * zeroDiff = irBuilder.genCmp(intType,Type::Int32,Cmp_EQ,diff,zero);
+    Opnd * zeroDiff = irBuilder.genCmp(intType,intTag,Cmp_EQ,diff,zero);
     Opnd * nothingToCopy = irBuilder.genAnd(intType,sameArrays,zeroDiff);
-    irBuilder.genBranch(Type::Int32,Cmp_GT,Exit,nothingToCopy,zero);
+    irBuilder.genBranch(intTag,Cmp_GT,Exit,nothingToCopy,zero);
 
     newFallthroughBlock();
 
     Opnd* tauTypesChecked = irBuilder.genTauSafe();
 
     // Choosing direction
-    Opnd * dstIsGreater = irBuilder.genCmp(intType,Type::Int32,Cmp_GT,diff,zero);
+    Opnd * dstIsGreater = irBuilder.genCmp(intType,intTag,Cmp_GT,diff,zero);
     Opnd * reverseCopy = irBuilder.genAnd(intType,sameArrays,dstIsGreater);
-    irBuilder.genBranch(Type::Int32,Cmp_GT,reverseCopying,reverseCopy,zero);
+    irBuilder.genBranch(intTag,Cmp_GT,reverseCopying,reverseCopy,zero);
 
     newFallthroughBlock();
 
@@ -3012,7 +3010,6 @@ JavaByteCodeTranslator::genArrayCopyRepMove(MethodDesc * methodDesc,
     cfgBuilder.genBlockAfterCurrent(reverseCopying);
     {   // Reverse Copying
 
-    Opnd* minusone = irBuilder.genLdConstant((int32)-1);
     Opnd* lastSrcIdx = irBuilder.genAdd(srcPosType,mod,srcEnd,minusone);
     Opnd* lastDstIdx = irBuilder.genAdd(dstPosType,mod,dstEnd,minusone);
 
@@ -3032,8 +3029,7 @@ JavaByteCodeTranslator::genArrayCopyRepMove(MethodDesc * methodDesc,
 
     irBuilder.genLabel(boundsException);
     cfgBuilder.genBlockAfterCurrent(boundsException);
-    Opnd * minusOne = irBuilder.genLdConstant((int32)-1);
-    irBuilder.genTauCheckBounds(src,minusOne,tauSrcNullChecked);
+    irBuilder.genTauCheckBounds(src,minusone,tauSrcNullChecked);
 
     irBuilder.genLabel(Exit);
     cfgBuilder.genBlockAfterCurrent(Exit);

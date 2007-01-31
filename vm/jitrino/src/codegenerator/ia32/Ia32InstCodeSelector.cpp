@@ -1817,9 +1817,6 @@ CG_OpndHandle*  InstCodeSelector::addElemIndexWithLEA(Type          * eType,
     Type * elemType=arrayType->getElementType();
     Type * dstType=irManager.getManagedPtrType(elemType);
 
-    uint32 elemSize = getByteSize(irManager.getTypeSize(elemType));
-
-    
 #ifdef _EM64T_
     Type * indexType = typeManager.getInt64Type();
     Type * offType = typeManager.getInt64Type();
@@ -1828,11 +1825,32 @@ CG_OpndHandle*  InstCodeSelector::addElemIndexWithLEA(Type          * eType,
     Type * offType = typeManager.getInt32Type();
 #endif
         
+    uint32 elemSize = 0;
+    if (elemType->isReference()
+        && Type::isCompressedReference(elemType->tag, compilationInterface) 
+        && !elemType->isCompressedReference()) {
+        elemSize = 4;
+    } else {
+        elemSize = getByteSize(irManager.getTypeSize(elemType));
+    }
+    Opnd * elemSizeOpnd  = irManager.newImmOpnd(indexType, elemSize);
+    
     Opnd * indexOpnd = (Opnd *)index;
     indexOpnd = convert(indexOpnd, indexType);
-    
-    Opnd * addr = irManager.newMemOpnd(dstType,(Opnd*)array, (Opnd*)index,
-                                       irManager.newImmOpnd(indexType, elemSize),
+
+    if ( indexOpnd->isPlacedIn(OpndKind_Imm) ) {
+        // wee need to put index operand on a register to satisfy LEA constraint
+        uint64 immValue = indexOpnd->getImmValue();
+        if (immValue == 0) {
+            indexOpnd = NULL;
+            elemSizeOpnd = NULL;
+        } else {
+            Opnd * indexReg = irManager.newOpnd(indexType);
+            copyOpnd(indexReg,indexOpnd);
+            indexOpnd = indexReg;
+        }
+    }    
+    Opnd * addr = irManager.newMemOpnd(dstType,(Opnd*)array, indexOpnd, elemSizeOpnd,
                                        irManager.newImmOpnd(offType, arrayType->getArrayElemOffset())
                                        );
     Opnd * dst = irManager.newOpnd(dstType);

@@ -1752,9 +1752,9 @@ void IRManager::calculateStackDepth()
                         } else if (inst->getMnemonic() == Mnemonic_POP) {
                             stackDepth-=getByteSize(inst->getOpnd(it)->getSize());
                         } else if (inst->getMnemonic() == Mnemonic_PUSHFD) {
-                            stackDepth+=4;
+                            stackDepth+=sizeof(POINTER_SIZE_INT);
                         } else if (inst->getMnemonic() == Mnemonic_POPFD) {
-                            stackDepth-=4;
+                            stackDepth-=sizeof(POINTER_SIZE_INT);
                         } else if (inst->getMnemonic() == Mnemonic_CALL && ((CallInst *)inst)->getCallingConventionClient().getCallingConvention()->calleeRestoresStack()) {
                             stackDepth -= ((CallInst *)inst)->getArgStackDepth();
                         }
