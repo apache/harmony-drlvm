@@ -15,11 +15,6 @@
  *  limitations under the License.
  */
 
-/**
- * @author Roman S. Bushmanov
- * @version $Revision$
- */
-
 package java.lang;
 
 import junit.framework.TestCase;
@@ -1487,6 +1482,73 @@ public class ThreadTest extends TestCase {
         }
         assertFalse("interrupt status has not been cleared", 
                 t.isInterrupted());
+    }
+
+    static final int COUNT = 100;
+    volatile int base;
+    
+    /**
+     * Check that interrupt and notify happen exactly once for each
+     * <code>notify()</code> and <code>interrupt()</code> call.
+     */
+    public void testInterrupt_Staging() {
+        ThreadStaging t = new ThreadStaging();
+
+        base = 0;
+        t.start();
+
+        try {
+            for (base = 0; base < COUNT; ) {
+                synchronized (t) {
+                    t.waitStage("notify");
+                    t.notify();
+
+                    t.waitStage("interrupt");
+                    t.interrupt();
+                }
+            }
+        }  catch (InterruptedException e) {
+            fail("Unexpected exception: " + e);
+        }
+    }
+
+    private class ThreadStaging extends Thread {
+        static final long TIMEOUT = 100;
+        int stage;
+        
+        public void run() {
+            for (stage = 0; stage < COUNT; ) {
+
+                try {
+                    waitBase();
+                } catch (InterruptedException e) {
+                    fail("Unexpected exception: " + e);
+                }
+                assertEquals("Stages are not synchronized after interrupt", stage, base);
+
+                try {
+                    waitBase();
+                    fail("The thread should be interrupted");
+                } catch (InterruptedException e) {
+                    assertEquals("Stages are not synchronized after interrupt", stage, base);
+                    continue;
+                }
+                fail("The thread should be interrupted by (InterruptedException");
+            }
+        }
+
+        public synchronized void waitStage(String stageName) throws InterruptedException {
+            for (int i = 0; (base == stage) && (i < COUNT); i++) {
+                wait(TIMEOUT);
+            }
+            assertEquals("waitFor " + stageName + ": stages are not synchronized before", stage, ++base);
+        }
+
+        synchronized void waitBase() throws InterruptedException {
+            stage++;
+            notify();
+            wait(TIMEOUT);
+        }
     }
 
     /**
