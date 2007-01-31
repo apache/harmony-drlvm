@@ -1,45 +1,21 @@
 Check.java
-Hi.java
 PerfCheck.java
-classloader/ClassTestGetDeclaringClass.java
-classloader/ExceptionInInitializerTest.java
-classloader/StressLoader.java
-gc/FinAlloc.java
-gc/Finalizer.java
-gc/Fragment.java
+
+# HARMONY-3018
+StackTest.java
+exception/FinalizeStackTest.java
+
+# HARMONY-3033
 gc/Mark.java
+
+gc/LOS.java
 gc/MultiThreads.java
-gc/PhantomReferenceQueueTest.java
-gc/RunFinalizersOnExitTest.java
-gc/ThreadSuspension.java
-gc/StressRef.java
-gc/SynchronizedFinilazersTest.java
-init/ErrorInInitializer.java
-io/ArrayList.java
-io/Integers.java
+
+# HARMONY-3032
 outofmemory/Double.java
 outofmemory/Int.java
 outofmemory/Plain.java
 outofmemory/Ref.java
-outofmemory/Throw.java
-outofmemory/Vector.java
-outofmemory/VectorDouble.java
-outofmemory/VectorInt.java
-perf/CreateManyExceptions.java
-perf/CreateManyExceptions_depth.java
-perf/MultiThreadsSimple.java
-perf/SeveralThreads.java
-perf/StressCornerSize.java
-perf/StressCornerSize_a.java
-perf/ThrowMany.java
-perf/ThrowManyExceptions.java
-perf/ThrowManyExceptions_depth.java
-perf/ThrowMany_depth.java
-stress/BigStringBuffer.java
-stress/Finalizer.java
-stress/Mix.java
-stress/Stack.java
-stress/Sync.java
-stress/Threads.java
-thread/InfiniteFinalizer.java
 
+# fails intermittently: HARMONY-3038
+perf/MultiThreadsSimple.java
