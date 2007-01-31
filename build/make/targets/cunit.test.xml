@@ -186,13 +186,48 @@ Version: $Revision$
                         <property name="test.failed" value="true" />
                         <echo message="## TEST FAILED" />
                         <echo file="${build.semi.dir}/cunit.test.failed" message="${filename} FAILED${line.separator}" append="true"/>
+
+<echo file="${unit.test.c.workdir}/report/${filename}.xml"><![CDATA[<?xml version="1.0" encoding="UTF-8" ?>
+<testsuite errors="0" failures="1" name="@@@@@" tests="1" time="0.01">
+<testcase classname="@@@@@" name="test" time="0.1"><error message="FAILED"/></testcase>
+<system-out><![CDATA[@out]!]></system-out>
+</testsuite>]]> 
+</echo>
+
                     </then>
                     <else>
                         <echo message="## TEST PASSED" />
+<echo file="${unit.test.c.workdir}/report/${filename}.xml"><![CDATA[<?xml version="1.0" encoding="UTF-8" ?>
+<testsuite errors="0" failures="0" name="@@@@@" tests="1" time="0.01">
+<testcase classname="@@@@@" name="test" time="0.1"></testcase>
+<system-out><![CDATA[@out]!]></system-out>
+</testsuite>]]> 
+</echo>
+                    </else>
+                </if>
+                <replace file="${unit.test.c.workdir}/report/${filename}.xml" token="@@@@@" value="${filename}" /> 
+                <!-- grab System.out to xml-file -->
+                <if>
+                    <isset property="outputproperty" />
+                    <then>
+                        <replace file="${unit.test.c.workdir}/report/${filename}.xml" token="@out]!" value="${outputproperty}]" />
+                    </then>
+                    <else>
+                        <replace file="${unit.test.c.workdir}/report/${filename}.xml" token="@out]!" value="]" />
                     </else>
                 </if>
             </sequential>
         </for>
+
+        <property name="cunit.tests.report.dir" location="${unit.test.c.workdir}/report/html"/>
+        <delete dir="${cunit.tests.report.dir}" />
+        <mkdir dir="${cunit.tests.report.dir}" />
+        <junitreport todir="${cunit.tests.report.dir}">
+            <fileset dir="${unit.test.c.workdir}/report">
+                <include name="*.xml"/>
+            </fileset>
+            <report format="frames" todir="${cunit.tests.report.dir}"/>
+        </junitreport>
 
         <echo message="## Please find tests and results at ${build.dir}/_cunit.tests/" />
         <fail unless="run.all.tests" if="test.failed" message="## SOME TESTS FAILED"/>
