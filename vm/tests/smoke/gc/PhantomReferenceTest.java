@@ -41,13 +41,22 @@ public class PhantomReferenceTest {
 
         System.gc();
         System.out.println("waiting for a reference..");
-        Reference enqueued = queue.poll();
-        if (ref.get() != null) {
-            System.out.println("FAIL: reference was not cleared.");
+        // wait a little before calling poll()
+        Reference enqueued;
+        int count = 500;
+        do {
+            try {
+                Thread.sleep(20);
+            } catch (Exception e) {
+            }
+            enqueued = queue.poll();
+        } while (enqueued == null && count-- > 0);
+        if (count == 0) {
+            System.out.println("FAIL: reference was not enqueued");
             return;
         }
-        if (enqueued == null) {
-            System.out.println("FAIL: reference was not enqueued");
+        if (ref.get() != null) {
+            System.out.println("FAIL: reference was not cleared.");
             return;
         }
         if (enqueued.get() != null) {
