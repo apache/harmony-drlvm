@@ -455,6 +455,10 @@ void parse_vm_arguments(Global_Env *p_env)
             p_env->verify_all = true;
             p_env->verify_strict = true;
         }
+        else if (strcmp(option, "-Xverify:strict") == 0) {
+            p_env->verify_all = true;
+            p_env->verify_strict = true;
+        }
         else if (strcmp(option, "-verify") == 0) {
             p_env->verify_all = true;
         }

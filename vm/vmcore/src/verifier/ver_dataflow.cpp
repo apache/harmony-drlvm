@@ -460,14 +460,20 @@ vf_check_entry_refs( vf_MapEntry_t *source,    // stack map entry
     // check initialization
     if( source->m_type == SM_UNINITIALIZED && target->m_type != SM_UNINITIALIZED) {
         if( (source->m_new == 0 && target->m_ctype == VF_CHECK_ACCESS_FIELD)
-            || (local_init == false && target->m_ctype == VF_CHECK_UNINITIALIZED_THIS) )
+            || (local_init == false && target->m_ctype == VF_CHECK_UNINITIALIZED_THIS)
+            || (!ctex->m_dump.m_verify && source->m_new == 0
+                    && target->m_ctype == VF_CHECK_UNINITIALIZED_THIS) )
         {
             // 1. In initialization method instance fields of this
             //    that are declared in the current class may be assigned
-            //    before calling any instance initialization method
+            //    before calling any instance initialization method.
             // 2. Uninitialized class instance can be stored in
             //    a local variable if no backward branch is taken or
             //    the code isn't protected by exception handler.
+            // 3. In default mode (without any verifier control options)
+            //    uninitiliazed class reference in initialization method
+            //    can be stored in a local variable if backward branch is
+            //    taken or the code is protected by exception handler.
         } else {
             VERIFY_REPORT( ctex, "(class: " << class_get_name( ctex->m_class ) 
                 << ", method: " << method_get_name( ctex->m_method )
@@ -715,16 +721,16 @@ vf_set_instruction_out_vector( vf_Code_t *code,         // code instruction
  * Function clears stack map vector.
  */
 static inline void
-vf_clear_stack( vf_MapVector_t *vector )    // stack map vector
+vf_clear_stack( vf_MapVector_t *vector )    // map vector
 {
-    unsigned short index;
     vf_MapEntry_t zero_entry = {0};
 
     // zero stack vector
-    for( index = 0; index < vector->m_deep; index++ ) {
+    for( unsigned index = 0; index < vector->m_deep; index++ ) {
         vector->m_stack[index] = zero_entry;
     }
     vector->m_deep = 0;
+
     return;
 } // vf_clear_stack
 
@@ -915,12 +921,7 @@ vf_get_instruction_out_vector( unsigned node_num,           // graph node
                                   instr->m_inlen, ctex );
         return VER_OK;
     } else if( vf_is_instruction_has_flags( instr, VF_FLAG_THROW ) ) {
-        // clear stack
-        unsigned deep = invector->m_deep;
-        vf_clear_stack( invector );
         // set result vector stack deep
-        invector->m_deep = (unsigned short)(deep + instr->m_stack);
-        // set out vector
         invector->m_stack->m_type = SM_TERMINATE;
         return VER_OK;
     }
@@ -1131,7 +1132,11 @@ vf_check_end_node_data_flow( unsigned node_num,         // graph node number
     if( !memcmp( method_get_name( ctex->m_method ), "<init>", 7 )
         && ctex->m_vtype.m_class != ctex->m_vtype.m_object )
     {
-        if( invector->m_local->m_type == SM_UNINITIALIZED ) {
+        if( invector->m_local->m_type != SM_UNINITIALIZED
+            && invector->m_local->m_vtype == ctex->m_vtype.m_class)
+        {
+            // constructor returns initialized reference of a given class
+        } else {
             VERIFY_REPORT( ctex, "(class: " << class_get_name( ctex->m_class ) 
                 << ", method: " << method_get_name( ctex->m_method )
                 << method_get_descriptor( ctex->m_method )

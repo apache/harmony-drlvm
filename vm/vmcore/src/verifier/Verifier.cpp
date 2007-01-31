@@ -5496,7 +5496,7 @@ labelEnd_verifyClass:
     *message = context.m_error;
 #if _VERIFY_DEBUG
     if( result != VER_OK ) {
-        VERIFY_DEBUG( "VerifyError: " << (context.m_error ? context.m_error : "NULL") );
+        TRACE2("verifier", "VerifyError: " << (context.m_error ? context.m_error : "NULL") );
     }
 #endif // _VERIFY_DEBUG
 

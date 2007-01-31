@@ -1292,7 +1292,7 @@ vf_check_access_constraint( const char *super_name,             // name of super
             return VER_OK;
         }
         if( method_is_protected( method ) ) {
-            if( instance_name[0] == '[' && !memcmp( method_get_name( method ), "clone", 7 ) ) {
+            if( instance_name[0] == '[' && !memcmp( method_get_name( method ), "clone", 6 ) ) {
                 // for arrays function clone is public
             } else {
                 need_check = true;
