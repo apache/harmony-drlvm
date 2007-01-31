@@ -1175,7 +1175,7 @@ jvmti_dump_compiled_method(Method *method)
         }
         assert(res == EXE_ERROR_NONE);
 
-        TRACE2("jvmti.break.ss", "bytecode " << bc_number << ": "
+        ECHO("bytecode " << bc_number << ": "
             << location << " = " << native_location);
 
         location = jvmti_GetNextBytecodeLocation(method, location);

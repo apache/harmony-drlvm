@@ -2400,7 +2400,7 @@ findCatchMethod(ManagedObject **exception, Method **catch_method, jlocation *cat
 
         if(findExceptionHandler(*frame, exception, &h)) {
             *catch_method = frame->method;
-            *catch_location = frame->ip - (uint8*)(*catch_method)->get_byte_code_addr();
+            *catch_location = h->get_handler_pc();
             return;
         }
         clear_current_thread_exception();

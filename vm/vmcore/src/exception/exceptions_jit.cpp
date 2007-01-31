@@ -194,15 +194,6 @@ static void exn_propagate_exception(
     // Save the throw context
     StackIterator *throw_si = si_dup(si);
 
-    // Determine the type of the exception for the type tests below.
-    if (*exn_obj)
-        exn_class = (*exn_obj)->vt()->clss;
-
-#ifdef VM_STATS
-    exn_class->class_thrown();
-    VM_Statistics::get_vm_stats().num_exceptions++;
-#endif // VM_STATS
-
     // Skip first frame if it is an M2nFrame (which is always a transition from managed to the throw code).
     // The M2nFrame will be removed from the thread's M2nFrame list but transfer control or copy to registers.
     if (si_is_native(si)) {
@@ -216,6 +207,26 @@ static void exn_propagate_exception(
     Method *interrupted_method = interrupted_cci->get_method();
     NativeCodePtr interrupted_method_location = si_get_ip(si);
     JIT *interrupted_method_jit = interrupted_cci->get_jit();
+
+    if (NULL != *exn_obj)
+    {
+        // Gregory - When *exn_obj is NULL it means we're called from exn_athrow_regs
+        // which means that IP points exactly to the right location. But
+        // when *exn_obj is not NULL, it means that we're called from exn_throw_for_JIT
+        // where *exn_obj is already constructed and is thrown by code via athrow.
+        // So in this case IP reported by stack iterator is past the athrow bytecode
+        // and should be moved back to be inside of bytecode location for interrupted
+        // method.
+        interrupted_method_location = (NativeCodePtr)((POINTER_SIZE_INT)interrupted_method_location - 1);
+
+        // Determine the type of the exception for the type tests below.
+        exn_class = (*exn_obj)->vt()->clss;
+    }
+
+#ifdef VM_STATS
+    exn_class->class_thrown();
+    VM_Statistics::get_vm_stats().num_exceptions++;
+#endif // VM_STATS
 
     // Remove single step breakpoints which could have been set on the
     // exception bytecode
