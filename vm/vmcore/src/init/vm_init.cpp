@@ -513,7 +513,14 @@ static jint vm_create_jthread(jthread * thread_object, JNIEnv * jni_env, jobject
 
     thread_class = vm_env->java_lang_Thread_Class;
     class_initialize(thread_class);
-    if (exn_raised()) return TM_ERROR_INTERNAL;
+    if (exn_raised())
+    {
+        TRACE("Failed to initialize class for java/lang/Thread class = " << exn_get_name());
+        hythread_suspend_enable();
+        exn_print_stack_trace(stderr, exn_get());
+        hythread_suspend_disable();
+        return JNI_ERR;
+    }
 
     // Allocate new j.l.Thread object.
     thread_handle = oh_allocate_global_handle();
@@ -553,6 +560,9 @@ static jint vm_create_jthread(jthread * thread_object, JNIEnv * jni_env, jobject
     vm_execute_java_method_array((jmethodID) constructor, 0, args);
     if (exn_raised()) {
         TRACE("Failed to initialize new thread object, exception = " << exn_get_name());
+        hythread_suspend_enable();
+        exn_print_stack_trace(stderr, exn_get());
+        hythread_suspend_disable();
         return JNI_ERR;
     }
     return JNI_OK;
