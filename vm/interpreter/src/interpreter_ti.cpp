@@ -392,6 +392,9 @@ void interpreter_ti_set_notification_mode(jvmtiEvent event_type, bool UNREF enab
 
     if (enable) interpreter_ti_notification_mode |= new_mask;
     else interpreter_ti_notification_mode &= ~new_mask;
+
+    if (!interpreter_ti_notification_mode)
+        get_thread_ptr()->p_exception_object_ti = NULL;
 }
 
 void method_entry_callback(Method *method) {

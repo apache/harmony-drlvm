@@ -168,11 +168,13 @@
         <attribute name="test"/>
         <attribute name="vmarg" default=""/>
         <attribute name="agent"/>
+        <element name="jvmti-junit-element" optional="true"/>
         <sequential>
             <run-junit-test test="@{test}" vmarg="@{vmarg}">
                 <junit-element>
+                    <jvmti-junit-element/>
                     <jvmarg value="-Dvm.assert_dialog=0" />
-                        <jvmarg
+                    <jvmarg
                         value="-agentpath:${reg.test.2launch.native.path}/${lib.prefix}@{agent}${lib.suffix}"
                         />
                 </junit-element>

@@ -2620,6 +2620,10 @@ restart:
             }
             breakpoint_processed = false;
 
+            if (get_thread_ptr()->p_exception_object_ti || exn_raised()) {
+                frame.exc = get_current_thread_exception();
+                goto got_exception;
+            }
         }
 
 #ifdef INTERPRETER_DEEP_DEBUG
@@ -2629,11 +2633,6 @@ restart:
         assert(!hythread_is_suspend_enabled());
         assert(&frame == getLastStackFrame());
         
-        if (get_thread_ptr()->p_exception_object_ti || exn_raised()) {
-             frame.exc = get_current_thread_exception();
-             goto got_exception;
-        }
-
         switch(ip0) {
             case OPCODE_NOP:
                 Opcode_NOP(frame); break;
@@ -3035,7 +3034,8 @@ got_exception:
                 jvmti_interpreter_exception_event_callback_call(frame.exc, method, loc, catch_method, catch_location);
                 M2N_FREE_MACRO;
                 assert(!exn_raised());
-                p_TLS_vmthread->p_exception_object_ti = (volatile ManagedObject*) frame.exc;
+                if (interpreter_ti_notification_mode)
+                    p_TLS_vmthread->p_exception_object_ti = (volatile ManagedObject*) frame.exc;
             }
         }
 
