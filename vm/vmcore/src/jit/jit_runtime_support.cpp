@@ -265,9 +265,8 @@ static LilCodeStub* rth_gen_lil_type_test(LilCodeStub* cs, RthTypeTestNull null,
     }
 
     // Fast sequence
-    Class* dummy = NULL;
-    const size_t is_fast_off = Class::get_offset_of_fast_instanceof_flag(dummy);
-    const size_t depth_off = Class::get_offset_of_depth(dummy);
+    const size_t is_fast_off = Class::get_offset_of_fast_instanceof_flag();
+    const size_t depth_off = Class::get_offset_of_depth();
     const POINTER_SIZE_INT supertable_off = (POINTER_SIZE_INT)&((VTable*)NULL)->superclasses;
     bool do_slow = true;
     if (type) {
@@ -647,7 +646,7 @@ static NativeCodePtr rth_get_lil_throw_linking_exception(int* dyn_count)
 static void* rth_get_interface_vtable(ManagedObject* obj, Class* iid)
 {
     assert(obj && obj->vt() && obj->vt()->clss);
-    return obj->vt()->clss->helper_get_interface_vtable(obj, iid);
+    return Class::helper_get_interface_vtable(obj, iid);
 }
 
 // Get interface vtable helper
@@ -2352,13 +2351,12 @@ static LilCodeStub* gen_lil_typecheck_fastpath(LilCodeStub *cs,
             object_get_vtable_offset());
     }
 
-    Class* dummy = NULL;
     cs2 = lil_parse_onto_end
         (cs2,
          "ld l1, [i1 + %0i: g4],zx;"
          "ld l2, [l0 + %1i*l1 + %2i: pint];"
          "jc i1 != l2, failed;",
-         Class::get_offset_of_depth(dummy),
+         Class::get_offset_of_depth(),
          sizeof(Class*),
          OFFSET(VTable, superclasses) - sizeof(Class*) + (vm_vtable_pointers_are_compressed() ? vm_get_vtable_base() : 0)
          );
@@ -2422,7 +2420,6 @@ LilCodeStub *gen_lil_typecheck_stub(bool is_checkcast)
          VM_Global_State::loader_env->managed_null);
     }
 
-    Class* dummy = NULL;
     // check whether the fast or the slow path is appropriate
     cs = lil_parse_onto_end
         (cs,
@@ -2431,7 +2428,7 @@ LilCodeStub *gen_lil_typecheck_stub(bool is_checkcast)
          // check if super->is_suitable_for_fast_instanceof
          "ld l0, [i1 + %0i: g4];"
          "jc l0!=0:g4, fast;",
-         Class::get_offset_of_fast_instanceof_flag(dummy));
+         Class::get_offset_of_fast_instanceof_flag());
 
     // append the slow path right here
     cs = gen_lil_typecheck_slowpath(cs, is_checkcast);

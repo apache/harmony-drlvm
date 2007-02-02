@@ -45,6 +45,9 @@ DECLARE_STANDARD_HELPER_FLAGS(newArray);
 DECLARE_STANDARD_HELPER_FLAGS(objMonEnter);
 DECLARE_STANDARD_HELPER_FLAGS(objMonExit);
 DECLARE_STANDARD_HELPER_FLAGS(wb);
+DECLARE_STANDARD_HELPER_FLAGS(ldInterface);
+DECLARE_STANDARD_HELPER_FLAGS(checkCast);
+DECLARE_STANDARD_HELPER_FLAGS(instanceOf);
     
 };
 
@@ -97,6 +100,14 @@ void HelperInlinerAction::init() {
     READ_STANDARD_HELPER_FLAGS(wb);
     flags.wb_signature = "(Lorg/vmmagic/unboxed/Address;Lorg/vmmagic/unboxed/Address;Lorg/vmmagic/unboxed/Address;)V";
 
+    READ_STANDARD_HELPER_FLAGS(ldInterface);
+    flags.ldInterface_signature = "(Ljava/lang/Object;I)Lorg/vmmagic/unboxed/Address;";
+    
+    READ_STANDARD_HELPER_FLAGS(checkCast);
+    flags.checkCast_signature = "(Ljava/lang/Object;IZZZI)Ljava/lang/Object;";
+    
+    READ_STANDARD_HELPER_FLAGS(instanceOf);
+    flags.instanceOf_signature = "(Ljava/lang/Object;IZZZI)Z";
 }
 
 
@@ -120,6 +131,7 @@ protected:
     MethodDesc* ensureClassIsResolvedAndInitialized(const char* className,  const char* methodName, const char* signature);
     virtual void doInline() = 0;
     void inlineVMHelper(MethodCallInst* call);
+    void finalizeCall(MethodCallInst* call);
 
     HelperInlinerFlags& flags;
     MemoryManager& localMM;
@@ -158,15 +170,16 @@ DECLARE_HELPER_INLINER(NewArrayHelperInliner, newArray)
 DECLARE_HELPER_INLINER(ObjMonitorEnterHelperInliner, objMonEnter)
 DECLARE_HELPER_INLINER(ObjMonitorExitHelperInliner, objMonExit)
 DECLARE_HELPER_INLINER(WriteBarrierHelperInliner, wb)
+DECLARE_HELPER_INLINER(LdInterfaceHelperInliner, ldInterface)
+DECLARE_HELPER_INLINER(CheckCastHelperInliner, checkCast)
+DECLARE_HELPER_INLINER(InstanceOfHelperInliner, instanceOf)
 
 void HelperInlinerSession::_run(IRManager& irm) {
     CompilationContext* cc = getCompilationContext();
     MemoryManager tmpMM(1024, "Inline VM helpers");
     HelperInlinerAction* action = (HelperInlinerAction*)getAction();
     HelperInlinerFlags& flags = action->getFlags();
-    if (!flags.doInlining) {
-        return;
-    }
+
     //finding all helper calls
     ControlFlowGraph& fg = irm.getFlowGraph();
     double entryExecCount = fg.hasEdgeProfile() ? fg.getEntryNode()->getExecCount(): 1;
@@ -204,7 +217,21 @@ void HelperInlinerSession::_run(IRManager& irm) {
                             helperInliners.push_back(new (tmpMM) WriteBarrierHelperInliner(this, tmpMM, cc, inst));
                         }
                         break;
-
+                    case Op_TauLdIntfcVTableAddr:
+                        if (flags.ldInterface_doInlining && nodePercent >= flags.ldInterface_hotnessPercentToInline) {
+                            helperInliners.push_back(new (tmpMM) LdInterfaceHelperInliner(this, tmpMM, cc, inst));
+                        }
+                        break;
+                    case Op_TauCheckCast:
+                        if (flags.checkCast_doInlining && nodePercent >= flags.checkCast_hotnessPercentToInline) {
+                            helperInliners.push_back(new (tmpMM) CheckCastHelperInliner(this, tmpMM, cc, inst));
+                        }
+                        break;
+                    case Op_TauInstanceOf:
+                        if (flags.instanceOf_doInlining && nodePercent >= flags.instanceOf_hotnessPercentToInline) {
+                            helperInliners.push_back(new (tmpMM) InstanceOfHelperInliner(this, tmpMM, cc, inst));
+                        }
+                        break;
                     default: break;
                 }
             }
@@ -226,7 +253,6 @@ MethodDesc* HelperInliner::ensureClassIsResolvedAndInitialized(const char* class
     ObjectType* clazz = ci->resolveClassUsingBootstrapClassloader(className);
     if (!clazz) {
         if (Log::isEnabled()) Log::out()<<"Error: class not found:"<<className<<std::endl;
-        flags.doInlining=false;
         return NULL;
     }
     //helper class is resolved here -> check if initialized
@@ -305,6 +331,30 @@ void HelperInliner::inlineVMHelper(MethodCallInst* origCall) {
     }
 }
 
+void HelperInliner::finalizeCall(MethodCallInst* callInst) {
+    //if call is not last inst -> make it last inst
+    if (callInst != callInst->getNode()->getLastInst()) {
+        cfg->splitNodeAtInstruction(callInst, true, true, instFactory->makeLabel());
+    }
+
+    //every call must have exception edge -> add it
+    if (callInst->getNode()->getExceptionEdge() == NULL) {
+        Node* node = callInst->getNode();
+        Node* dispatchNode = node->getUnconditionalEdgeTarget()->getExceptionEdgeTarget();
+        if (dispatchNode == NULL) {
+            dispatchNode = cfg->getUnwindNode();
+            if (dispatchNode==NULL) {
+                dispatchNode = cfg->createDispatchNode(instFactory->makeLabel());
+                cfg->setUnwindNode(dispatchNode);
+                cfg->addEdge(dispatchNode, cfg->getExitNode());
+            }
+        }
+        cfg->addEdge(node, dispatchNode);
+    }
+}
+
+
+
 void NewObjHelperInliner::doInline() {
 #if defined  (_EM64T_) || defined (_IPF_)
     return;
@@ -337,7 +387,10 @@ void NewObjHelperInliner::doInline() {
     MethodCallInst* call = instFactory->makeDirectCall(callResOpnd, tauSafeOpnd, tauSafeOpnd, 2, args, method)->asMethodCallInst();
     call->insertBefore(inst);
     inst->unlink();
+
     assert(call == call->getNode()->getLastInst());
+
+    //todo: use finalizeCall here!
 
     //convert address type to managed object type
     Edge* fallEdge= call->getNode()->getUnconditionalEdge();
@@ -348,7 +401,7 @@ void NewObjHelperInliner::doInline() {
         fallNode = irm->getFlowGraph().spliceBlockOnEdge(fallEdge, instFactory->makeLabel());
     }
     fallNode->prependInst(instFactory->makeConv(mod, type->tag, dstOpnd, callResOpnd));
-    
+
     inlineVMHelper(call);
 #endif
 }
@@ -502,6 +555,141 @@ void WriteBarrierHelperInliner::doInline() {
 #endif
 }
 
+void LdInterfaceHelperInliner::doInline() {
+#if defined  (_EM64T_) || defined (_IPF_)
+    return;
+#else
+    assert(inst->getOpcode() == Op_TauLdIntfcVTableAddr);
+
+    Opnd* baseOpnd = inst->getSrc(0);
+    assert(baseOpnd->getType()->isObject());
+    Type* type = inst->asTypeInst()->getTypeInfo();
+    int typeId = (int)type->asNamedType()->getRuntimeIdentifier(); //TODO: EM64T or IPF incompatible convertion
+    Opnd* typeOpnd  = opndManager->createSsaTmpOpnd(typeManager->getInt32Type());
+    instFactory->makeLdConst(typeOpnd, typeId)->insertBefore(inst);
+    Opnd* resOpnd = inst->getDst();
+    Opnd* tauSafeOpnd = opndManager->createSsaTmpOpnd(typeManager->getTauType());
+    instFactory->makeTauSafe(tauSafeOpnd)->insertBefore(inst);
+    Opnd* args[2] = {baseOpnd, typeOpnd};
+    MethodCallInst* call = instFactory->makeDirectCall(resOpnd, tauSafeOpnd, tauSafeOpnd, 2, args, method)->asMethodCallInst();
+    call->insertBefore(inst);
+    inst->unlink();
+
+    finalizeCall(call);
+    
+    inlineVMHelper(call);
+#endif
+}
+
+
+
+void CheckCastHelperInliner::doInline() {
+#if defined  (_EM64T_) || defined (_IPF_)
+    return;
+#else
+    //TODO: this is 99% clone of instanceof but result of the slow call's result is handled differently. 
+    //to merge these 2 helpers into the one we need to change IA32CG codegen tau_checkcast handling:
+    //call VM helper for static_cast opcode but not for tau!
+
+    assert(inst->getOpcode() == Op_TauCheckCast);
+
+    Opnd* objOpnd = inst->getSrc(0);
+    assert(objOpnd->getType()->isObject());
+    Type* type = inst->asTypeInst()->getTypeInfo();
+    assert(type->isObject());
+    ObjectType* castType = type->asObjectType();
+
+    int  typeId = (int)castType->getRuntimeIdentifier();
+    bool isArrayType = castType->isArrayType();
+    bool isInterfaceType = castType->isInterface();
+    bool isFastInstanceOf = castType->getFastInstanceOfFlag();
+    bool isFinalTypeCast = castType->isFinalClass();
+    int  fastCheckDepth = isFastInstanceOf ? castType->getClassDepth() : 0;
+    
+    Opnd* typeIdOpnd = opndManager->createSsaTmpOpnd(typeManager->getInt32Type()); //TODO: em64t & ipf!
+    instFactory->makeLdConst(typeIdOpnd, typeId)->insertBefore(inst);
+
+    Opnd* isArrayOpnd = opndManager->createSsaTmpOpnd(typeManager->getBooleanType());
+    instFactory->makeLdConst(isArrayOpnd, isArrayType)->insertBefore(inst);
+
+    Opnd* isInterfaceOpnd = opndManager->createSsaTmpOpnd(typeManager->getBooleanType());
+    instFactory->makeLdConst(isInterfaceOpnd, isInterfaceType)->insertBefore(inst);
+
+    Opnd* isFinalOpnd = opndManager->createSsaTmpOpnd(typeManager->getBooleanType());
+    instFactory->makeLdConst(isFinalOpnd, isFinalTypeCast)->insertBefore(inst);
+
+    Opnd* fastCheckDepthOpnd = opndManager->createSsaTmpOpnd(typeManager->getInt32Type());
+    instFactory->makeLdConst(fastCheckDepthOpnd, fastCheckDepth)->insertBefore(inst);
+
+    Opnd* tauSafeOpnd = opndManager->createSsaTmpOpnd(typeManager->getTauType());
+    instFactory->makeTauSafe(tauSafeOpnd)->insertBefore(inst);
+
+    Opnd* args[6] = {objOpnd, typeIdOpnd, isArrayOpnd, isInterfaceOpnd, isFinalOpnd, fastCheckDepthOpnd};
+    MethodCallInst* call = instFactory->makeDirectCall(opndManager->getNullOpnd(), tauSafeOpnd, tauSafeOpnd, 6, args, method)->asMethodCallInst();
+    
+    call->insertBefore(inst);
+
+    // after the call the cast is safe
+    Opnd* tauSafeOpnd2 = opndManager->createSsaTmpOpnd(typeManager->getTauType());
+    instFactory->makeTauSafe(tauSafeOpnd2)->insertBefore(inst);
+    instFactory->makeCopy(inst->getDst(), tauSafeOpnd2)->insertBefore(inst);
+
+    inst->unlink();
+
+    finalizeCall(call);
+
+    inlineVMHelper(call);
+#endif
+}
+
+
+void InstanceOfHelperInliner::doInline() {
+#if defined  (_EM64T_) || defined (_IPF_)
+    return;
+#else
+    assert(inst->getOpcode() == Op_TauInstanceOf);
+
+    Opnd* objOpnd = inst->getSrc(0);
+    assert(objOpnd->getType()->isObject());
+    Type* type = inst->asTypeInst()->getTypeInfo();
+    assert(type->isObject());
+    ObjectType* castType = type->asObjectType();
+
+    int  typeId = (int)castType->getRuntimeIdentifier();
+    bool isArrayType = castType->isArrayType();
+    bool isInterfaceType = castType->isInterface();
+    bool isFastInstanceOf = castType->getFastInstanceOfFlag();
+    bool isFinalTypeCast = castType->isFinalClass();
+    int  fastCheckDepth = isFastInstanceOf ? castType->getClassDepth() : 0;
+
+    Opnd* typeIdOpnd = opndManager->createSsaTmpOpnd(typeManager->getInt32Type()); //TODO: em64t & ipf!
+    instFactory->makeLdConst(typeIdOpnd, typeId)->insertBefore(inst);
+
+    Opnd* isArrayOpnd = opndManager->createSsaTmpOpnd(typeManager->getBooleanType());
+    instFactory->makeLdConst(isArrayOpnd, isArrayType)->insertBefore(inst);
+
+    Opnd* isInterfaceOpnd = opndManager->createSsaTmpOpnd(typeManager->getBooleanType());
+    instFactory->makeLdConst(isInterfaceOpnd, isInterfaceType)->insertBefore(inst);
+
+    Opnd* isFinalOpnd = opndManager->createSsaTmpOpnd(typeManager->getBooleanType());
+    instFactory->makeLdConst(isFinalOpnd, isFinalTypeCast)->insertBefore(inst);
+
+    Opnd* fastCheckDepthOpnd = opndManager->createSsaTmpOpnd(typeManager->getInt32Type());
+    instFactory->makeLdConst(fastCheckDepthOpnd, fastCheckDepth)->insertBefore(inst);
+
+    Opnd* tauSafeOpnd = opndManager->createSsaTmpOpnd(typeManager->getTauType());
+    instFactory->makeTauSafe(tauSafeOpnd)->insertBefore(inst);
+
+    Opnd* args[6] = {objOpnd, typeIdOpnd, isArrayOpnd, isInterfaceOpnd, isFinalOpnd, fastCheckDepthOpnd};
+    MethodCallInst* call = instFactory->makeDirectCall(inst->getDst(), tauSafeOpnd, tauSafeOpnd, 6, args, method)->asMethodCallInst();
+
+    call->insertBefore(inst);
+    inst->unlink();
+
+    finalizeCall(call);
+
+    inlineVMHelper(call);
+#endif
+}
 
 }//namespace
-

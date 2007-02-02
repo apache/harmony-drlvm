@@ -240,6 +240,16 @@ DrlVMTypeManager::isBeforeFieldInit(void* vmTypeHandle) {
     return class_is_before_field_init((Class_Handle) vmTypeHandle)?true:false;
 }
 
+bool        
+DrlVMTypeManager::getClassFastInstanceOfFlag(void* vmTypeHandle) {
+    return class_get_fast_instanceof_flag((Class_Handle) vmTypeHandle)?true:false;
+}
+
+int 
+DrlVMTypeManager::getClassDepth(void* vmTypeHandle) {
+    return class_get_depth((Class_Handle) vmTypeHandle);
+}
+
 uint32
 DrlVMTypeManager::getArrayLengthOffset() {
     return vector_length_offset();

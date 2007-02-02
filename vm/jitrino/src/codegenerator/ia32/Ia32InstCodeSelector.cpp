@@ -398,7 +398,7 @@ Opnd * InstCodeSelector::convertUnmanagedPtr(Opnd * srcOpnd, Type * dstType, Opn
     if (dstType->isObject()) {
         appendInsts(irManager.newCopyPseudoInst(Mnemonic_MOV, dstOpnd, srcOpnd));
     } else {
-        assert(dstType->isInteger());
+        assert(dstType->isInteger() || dstType->isVTablePtr());
         OpndSize srcSize=irManager.getTypeSize(srcType);
         OpndSize dstSize=irManager.getTypeSize(dstType);
         if (dstSize<=srcSize) {
@@ -2835,6 +2835,9 @@ CG_OpndHandle* InstCodeSelector::callvmhelper(uint32              numArgs,
     case CompilationInterface::Helper_ObjMonitorEnter:
     case CompilationInterface::Helper_ObjMonitorExit:
     case CompilationInterface::Helper_WriteBarrier:
+    case CompilationInterface::Helper_LdInterface:
+    case CompilationInterface::Helper_Cast:
+    case CompilationInterface::Helper_IsInstanceOf:
     {
         dstOpnd = retType==NULL ? NULL: irManager.newOpnd(retType);
         CallInst * callInst=irManager.newRuntimeHelperCallInst(callId, numArgs, (Opnd**)args, dstOpnd);

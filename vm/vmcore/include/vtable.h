@@ -20,11 +20,13 @@
  * @file
  * virtual method table of a class
  */
-extern "C" {
+#include <open/types.h>
+struct Class;
 
+extern "C" {
 typedef struct {
     unsigned char** table;  // pointer into methods array of Intfc_Table below
-    unsigned intfc_id;      // id of interface
+    Class* intfc_class;      // id of interface
 } Intfc_Table_Entry;
 
 typedef struct Intfc_Table {
@@ -66,6 +68,15 @@ typedef struct VTable {
 
     unsigned short array_element_size;
     unsigned short array_element_shift;
+    
+    // cached values, used for helper inlining to avoid extra memory access
+    unsigned char** intfc_table_0;
+    Class*          intfc_class_0;
+    unsigned char** intfc_table_1;
+    Class*          intfc_class_1;
+    unsigned char** intfc_table_2;
+    Class*          intfc_class_2;
+
     Intfc_Table* intfc_table;   // interface table; NULL if no intfc table
     Class *superclasses[MAX_FAST_INSTOF_DEPTH];
     unsigned char* methods[1];  // code for methods

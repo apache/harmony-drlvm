@@ -832,7 +832,6 @@ protected:
     uint32                                      reservedFlags2:8;
 
     Encoder::OpcodeGroup                *   opcodeGroup;
-    BasicBlock *                                basicBlock;
 
     uint32                                      index;
     uint32                                      codeOffset;

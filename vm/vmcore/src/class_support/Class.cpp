@@ -110,8 +110,7 @@ void Class::init_internals(const Global_Env* env, const String* name, ClassLoade
 
     m_num_instance_refs = 0;
 
-    m_num_virtual_method_entries = m_num_intfc_method_entries =
-        m_num_intfc_table_entries = 0;
+    m_num_virtual_method_entries = m_num_intfc_method_entries = 0;
 
     m_finalize_method = m_static_initializer = m_default_constructor = NULL;
 
@@ -123,7 +122,6 @@ void Class::init_internals(const Global_Env* env, const String* name, ClassLoade
     m_allocation_handle = 0;
 
     m_vtable_descriptors = NULL;
-    m_intfc_table_descriptors = NULL;
 
     m_initializing_thread = NULL;
 
@@ -490,7 +488,9 @@ ManagedObject* Class::allocate_instance()
 
 void* Class::helper_get_interface_vtable(ManagedObject* obj, Class* iid)
 {
-    unsigned num_intfc = m_num_intfc_table_entries;
+    VTable* vt = obj->vt();
+    Intfc_Table* intfTable  = vt->intfc_table;
+    unsigned num_intfc = intfTable->n_entries;
 #ifdef VM_STATS
     VM_Statistics::get_vm_stats().num_invokeinterface_calls++;
     switch(num_intfc) {
@@ -502,7 +502,8 @@ void* Class::helper_get_interface_vtable(ManagedObject* obj, Class* iid)
         VM_Statistics::get_vm_stats().invokeinterface_calls_size_max = num_intfc;
 #endif
     for(unsigned i = 0; i < num_intfc; i++) {
-        Class* intfc = m_intfc_table_descriptors[i];
+        const Intfc_Table_Entry& intfEntry = intfTable->entry[i];
+        Class* intfc = intfEntry.intfc_class;
         if(intfc == iid) {
 #ifdef VM_STATS
             switch(i) {
@@ -513,7 +514,7 @@ void* Class::helper_get_interface_vtable(ManagedObject* obj, Class* iid)
             if(i > VM_Statistics::get_vm_stats().invokeinterface_calls_searched_max)
                 VM_Statistics::get_vm_stats().invokeinterface_calls_searched_max = i;
 #endif
-            unsigned char** table = m_vtable->intfc_table->entry[i].table;
+            unsigned char** table = intfEntry.table;
             return (void*)table;
         }
     }
@@ -1179,7 +1180,6 @@ unsigned Class::calculate_size()
     size += m_static_data_size;
     if(!is_interface())
         size += sizeof(VTable);
-    size += m_num_intfc_table_entries*sizeof(Class*);
     for(Class_Extended_Notification_Record* mcnr = m_notify_extended_records;
         mcnr != NULL; mcnr = mcnr->next)
     {

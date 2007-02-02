@@ -41,6 +41,8 @@
 #include "lil_code_generator.h"
 #include "vm_stats.h"
 
+#include <algorithm>
+
 #ifdef _DEBUG
 #include "jni.h"
 #include "jvmti_direct.h"
@@ -492,6 +494,16 @@ bool assign_values_to_class_static_final_fields(Class *clss)
 } //assign_values_to_class_static_final_fields
 
 
+class class_comparator{
+public:
+    bool operator() (Class* c1, Class* c2) { 
+        if (c1==c2) return false;
+        int c1Weight = (c1->get_number_of_methods() << 16) + c1->get_id();
+        int c2Weight = (c2->get_number_of_methods() << 16) + c2->get_id();
+        return !(c1Weight < c2Weight); //descending compare
+    }
+};
+
 //
 // create_intfc_table
 //
@@ -500,91 +512,36 @@ Intfc_Table *create_intfc_table(Class* clss, unsigned n_entries)
     unsigned size = INTFC_TABLE_OVERHEAD + (n_entries * sizeof(Intfc_Table_Entry));
     Intfc_Table *table = (Intfc_Table*) clss->get_class_loader()->Alloc(size);
     memset(table,0,size);
+    table->n_entries = n_entries;
     return table;
 }
 
 
-void Class::build_interface_table_descriptors()
+static void build_interface_table_descriptors(Class* cls, std::vector<Class*>& result, int depth)
 {
-    // Compute the number of methods that are in the interface part of
-    // the vtable. Also, create the array of interfaces (intfc_table_descriptors[])
-    // this class directly or indirectly implements. Note that
-    // m_num_intfc_table_entries was initialized earlier. This is an upperbound
-    // because we eliminate duplicate entries in the table below.
-    unsigned i, k;
-    for (i = 0;  i < m_num_superinterfaces;  i++) {
-        Class* intfc = get_superinterface(i);
-        m_num_intfc_table_entries += intfc->m_num_intfc_table_entries;
-    }
-    // allocate the class's intfc_table_descriptors[] array
-    if(m_num_intfc_table_entries != 0) {
-        m_intfc_table_descriptors = (Class**)m_class_loader
-            ->Alloc(m_num_intfc_table_entries * sizeof(Class*));
-    }
-    for(k = 0; k < m_num_intfc_table_entries; k++) {
-        m_intfc_table_descriptors[k] = NULL;
-    }
     // fill in intfc_table_descriptors with the descriptors from the superclass and the superinterfaces
-    unsigned intfc_table_entry = 0;
-    if(has_super_class()) {
-        for(unsigned i = 0; i < get_super_class()->m_num_intfc_table_entries; i++) {
-            m_intfc_table_descriptors[intfc_table_entry] =
-                get_super_class()->m_intfc_table_descriptors[i];
-            intfc_table_entry++;
+    if(depth == 0 && cls->has_super_class()) {
+        Intfc_Table* superIntfcTable = cls->get_super_class()->get_vtable()->intfc_table;
+        for(unsigned i = 0; i < superIntfcTable->n_entries; i++) {
+            result.push_back(superIntfcTable->entry[i].intfc_class);
         }
     }
-    for(k = 0; k < m_num_superinterfaces; k++) {
-        Class* intfc = get_superinterface(k);
-        for(i = 0; i < intfc->m_num_intfc_table_entries; i++) {
-            m_intfc_table_descriptors[intfc_table_entry] =
-                intfc->m_intfc_table_descriptors[i];
-            intfc_table_entry++;
-        }
+    uint16 num_superinterfaces = cls->get_number_of_superinterfaces();
+    for(unsigned k = 0; k < num_superinterfaces; k++) {
+        Class* intfc = cls->get_superinterface(k);
+        build_interface_table_descriptors(intfc, result, depth+1);
     }
     // if this class is an interface, add it to the interface table
-    if(is_interface()) {
-        m_intfc_table_descriptors[intfc_table_entry] = this;
-        intfc_table_entry++;
+    if(cls->is_interface()) {
+        result.push_back(cls);
     }
-    // sort the interfaces in intfc_table_descriptors, eliminating duplicate entries
-    unsigned last_min_id = 0;
-    for (i = 0;  i < m_num_intfc_table_entries;  i++) {
-        //
-        // select the next interface C with smallest id and insert 
-        // into i'th position; delete entry of C if C is the same
-        // as i-1'th entry
-        //
-        Class* intfc = m_intfc_table_descriptors[i];
-        unsigned min_index = i;            // index of intfc with min id
-        unsigned min_id = intfc->get_id(); // id of intfc with min id
-        for(unsigned k = i + 1; k < m_num_intfc_table_entries; k++) {
-            unsigned id = m_intfc_table_descriptors[k]->get_id();
-            if (id < min_id) {
-                // new min
-                min_index = k;
-                min_id = id;
-                continue;
-            }
-        }
-        // if the id of the min is the same as the i-1'th entry's id,
-        // then we have a duplicate
-        if(min_id == last_min_id) {
-            // duplicate found - insert the last entry in place of the duplicate's entry
-            m_intfc_table_descriptors[min_index] =
-                m_intfc_table_descriptors[m_num_intfc_table_entries-1];
-            m_num_intfc_table_entries--;
-            continue;
-        }
-        last_min_id = min_id;
-        if(min_index == i) {
-            continue;
-        }
-        // swap i'th entry with min entry
-        Class* min_intfc = m_intfc_table_descriptors[min_index];
-        m_intfc_table_descriptors[min_index] = m_intfc_table_descriptors[i];
-        m_intfc_table_descriptors[i] = min_intfc;
+    if (depth==0) {
+        // sort the interfaces eliminating duplicate entries
+        std::sort(result.begin(), result.end(), class_comparator());
+        std::vector<Class*>::iterator newEnd = std::unique(result.begin(), result.end());
+        result.erase(newEnd, result.end());
     }
-} // Class::build_interface_table_descriptors
+}
 
 
 // Returns the method matching the Signature "sig" that is implemented directly or indirectly by "clss", or NULL if not found.
@@ -945,7 +902,7 @@ void Class::create_vtable(unsigned n_vtable_entries)
 } // Class::create_vtable
 
 
-void Class::populate_vtable_descriptors_table_and_override_methods()
+void Class::populate_vtable_descriptors_table_and_override_methods(const std::vector<Class*>& intfc_table_entries)
 {
     // Populate _vtable_descriptors first with _n_virtual_method_entries
     // from super class
@@ -972,8 +929,8 @@ void Class::populate_vtable_descriptors_table_and_override_methods()
     }
     // finally, the interface methods
     unsigned index = m_num_virtual_method_entries;
-    for(i = 0; i < m_num_intfc_table_entries;  i++) {
-        Class* intfc = m_intfc_table_descriptors[i];
+    for(i = 0; i < intfc_table_entries.size();  i++) {
+        Class* intfc = intfc_table_entries[i];
         for(unsigned k = 0; k < intfc->get_number_of_methods(); k++) {
             if(intfc->get_method(k)->is_clinit()) {
                 continue;
@@ -1105,17 +1062,15 @@ NativeCodePtr prepare_gen_throw_illegal_access_error(Class_Handle to, Method_Han
     return addr;
 }
 
-Intfc_Table* Class::create_and_populate_interface_table()
+Intfc_Table* Class::create_and_populate_interface_table(const std::vector<Class*>& intfc_table_entries)
 {
-    Intfc_Table* intfc_table;
-    if(m_num_intfc_table_entries != 0) {
+    // shouldn't it be called vtable_index?
+    Intfc_Table* intfc_table = create_intfc_table(this, intfc_table_entries.size());
+    if(intfc_table_entries.size() != 0) {
         unsigned vtable_offset = m_num_virtual_method_entries;
-        // shouldn't it be called vtable_index?
-        intfc_table = create_intfc_table(this, m_num_intfc_table_entries);
-        unsigned i;
-        for (i = 0; i < m_num_intfc_table_entries; i++) {
-            Class* intfc = m_intfc_table_descriptors[i];
-            intfc_table->entry[i].intfc_id = intfc->get_id();
+        for (unsigned i = 0; i < intfc_table_entries.size(); i++) {
+            Class* intfc = intfc_table_entries[i];
+            intfc_table->entry[i].intfc_class = intfc;
             intfc_table->entry[i].table = &m_vtable->methods[vtable_offset];
             vtable_offset += intfc->get_number_of_methods();
             if(intfc->m_static_initializer) {
@@ -1125,8 +1080,8 @@ Intfc_Table* Class::create_and_populate_interface_table()
         }
         // Set the vtable entries to point to the code address.
         unsigned meth_idx = m_num_virtual_method_entries;
-        for (i = 0; i < m_num_intfc_table_entries; i++) {
-            Class* intfc = m_intfc_table_descriptors[i];
+        for (unsigned i = 0; i < intfc_table_entries.size(); i++) {
+            Class* intfc = intfc_table_entries[i];
             for(unsigned k = 0; k < intfc->get_number_of_methods(); k++) {
                 if (intfc->get_method(k)->is_clinit()) {
                     continue;
@@ -1153,8 +1108,6 @@ Intfc_Table* Class::create_and_populate_interface_table()
                 meth_idx++;
             }
         }
-    } else {
-        intfc_table = NULL;
     }
     return intfc_table;
 } // Class::create_and_populate_interface_table
@@ -1235,17 +1188,13 @@ bool Class::prepare(Global_Env* env)
             // and interface methods of super class
             m_num_virtual_method_entries =
                 get_super_class()->m_num_virtual_method_entries;
-            m_num_intfc_table_entries = get_super_class()->m_num_intfc_table_entries;
         } else {
             // this is java/lang/Object
             // FIXME: primitive classes also get here, but this assignment
             // has no effect on them really
             m_unpadded_instance_data_size = (unsigned)ManagedObject::get_size();
         }
-    } else {
-         // this is interface
-         m_num_intfc_table_entries = 1;    // need table entry for this interface
-     }
+    }
 
     //
     // STEP 5 ::: ASSIGN OFFSETS to the class and instance data FIELDS.
@@ -1257,7 +1206,8 @@ bool Class::prepare(Global_Env* env)
     //
     // STEP 6 ::: Calculate # of INTERFACES METHODS and build interface table DESCRIPTORS for C
     //
-    build_interface_table_descriptors();
+    std::vector<Class*> intfc_table_entries;
+    build_interface_table_descriptors(this, intfc_table_entries, 0);
 
     //
     // STEP 7 ::: ASSIGN OFFSETS to the class and virtual METHODS
@@ -1308,8 +1258,8 @@ bool Class::prepare(Global_Env* env)
     //
     // STEP 10 ::: COMPUTE number of interface method entries.
     //
-    for(i = 0; i < m_num_intfc_table_entries; i++) {
-        Class* intfc = m_intfc_table_descriptors[i];
+    for(i = 0; i < intfc_table_entries.size(); i++) {
+        Class* intfc = intfc_table_entries[i];
         m_num_intfc_method_entries += intfc->get_number_of_methods();
         if(intfc->m_static_initializer) {
             // Don't count static initializers of interfaces.
@@ -1331,7 +1281,7 @@ bool Class::prepare(Global_Env* env)
     // STEP 12 ::: POPULATE with interface descriptors and virtual method descriptors
     //             Also, OVERRIDE superclass' methods with those of this one's
     //
-    populate_vtable_descriptors_table_and_override_methods();
+    populate_vtable_descriptors_table_and_override_methods(intfc_table_entries);
 
     //
     // STEP 13 ::: CREATE VTABLE and set the Vtable entries to point to the
@@ -1361,7 +1311,21 @@ bool Class::prepare(Global_Env* env)
     //
     // STEP 14 ::: CREATE and POPULATE the CLASS INTERFACE TABLE
     //
-    m_vtable->intfc_table = create_and_populate_interface_table();
+    m_vtable->intfc_table = create_and_populate_interface_table(intfc_table_entries);
+    
+    //cache first values
+    if (m_vtable->intfc_table->n_entries >= 1 ) {
+        m_vtable->intfc_class_0 = m_vtable->intfc_table->entry[0].intfc_class;
+        m_vtable->intfc_table_0 = m_vtable->intfc_table->entry[0].table;
+    }
+    if (m_vtable->intfc_table->n_entries >= 2 ) {
+        m_vtable->intfc_class_1 = m_vtable->intfc_table->entry[1].intfc_class;
+        m_vtable->intfc_table_1 = m_vtable->intfc_table->entry[1].table;
+    }
+    if (m_vtable->intfc_table->n_entries >= 3 ) {
+        m_vtable->intfc_class_2 = m_vtable->intfc_table->entry[2].intfc_class;
+        m_vtable->intfc_table_2 = m_vtable->intfc_table->entry[2].table;
+    }
 
     //
     // STEP 15 ::: HANDLE JAVA CLASS CLASS separately

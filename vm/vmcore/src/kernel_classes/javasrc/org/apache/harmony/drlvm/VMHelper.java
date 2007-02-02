@@ -40,6 +40,12 @@ public class VMHelper {
 
     public static void writeBarrier(Address objBase, Address objSlot, Address source) {fail();}
 
+    public static Address getInterfaceVTable(Object obj, int intfTypeId) {fail(); return null;}
+ 
+    public static Object checkCast(Object obj, int castType) {fail(); return null;}
+ 
+    public static boolean instanceOf(Object obj, int castType) {fail(); return false;}
+
 
     protected static void fail() {throw new RuntimeException("Not supported!");}
 

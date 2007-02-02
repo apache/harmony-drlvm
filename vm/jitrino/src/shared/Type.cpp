@@ -643,6 +643,16 @@ ObjectType::getNameQualifier() {
     return typeManager.getTypeNameQualifier(vmTypeHandle);
 }
 
+bool 
+ObjectType::getFastInstanceOfFlag() {
+    return typeManager.getClassFastInstanceOfFlag(vmTypeHandle);
+}
+
+int 
+ObjectType::getClassDepth() {
+    return typeManager.getClassDepth(vmTypeHandle);
+}
+
 //
 // for array types, returns byte offset of the first element of the array
 //

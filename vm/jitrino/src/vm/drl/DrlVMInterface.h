@@ -90,6 +90,8 @@ public:
     bool        isSystemObjectType(void* vmTypeHandle);
     bool        isSystemClassType(void* vmTypeHandle);
     bool        isBeforeFieldInit(void* vmTypeHandle);
+    bool        getClassFastInstanceOfFlag(void* vmTypeHandle);
+    int         getClassDepth(void* vmTypeHandle);
     bool        needsInitialization(void* vmTypeHandle) {
         return class_needs_initialization((Class_Handle)vmTypeHandle)?true:false;
     }

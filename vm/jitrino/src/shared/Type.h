@@ -529,6 +529,9 @@ public:
     ObjectType*     getSuperType();
     const    char*    getName();
     const    char*    getNameQualifier();
+    bool getFastInstanceOfFlag();
+    int getClassDepth();
+
     //
     // returns the vtable address of this boxed type
     // returns NULL if the type has not yet been prepared by the VM kernel
@@ -921,6 +924,8 @@ public:
     virtual bool        needsInitialization(void* vmTypeHandle) = 0;
     virtual bool        isFinalizable(void* vmTypeHandle) = 0;
     virtual bool        isBeforeFieldInit(void* vmTypeHandle) = 0;
+    virtual bool        getClassFastInstanceOfFlag(void* vmTypeHandle) = 0;
+    virtual int         getClassDepth(void* vmTypeHandle) = 0;
     virtual bool        isInitialized(void* vmTypeHandle) = 0;
     virtual bool        isVariableSizeType(void* vmTypeHandle) = 0;
     virtual void*       getVTable(void* vmTypeHandle) = 0;

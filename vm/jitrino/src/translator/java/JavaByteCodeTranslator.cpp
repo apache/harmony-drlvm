@@ -97,10 +97,9 @@ bool isVMHelperClass(NamedType* type) {
     return false;//natives are not tested on EM64T.
 #else
     static const char vmhelperPackage[] = "org/apache/harmony/drlvm/VMHelper";
-    static const unsigned vmhelperPackageLen = sizeof(vmhelperPackage)-1;
-
+    
     const char* name = type->getName();
-    bool res =  !strncmp(name, vmhelperPackage, vmhelperPackageLen);
+    bool res =  !strcmp(name, vmhelperPackage);
     return res;
 #endif
 }
@@ -4035,6 +4034,27 @@ void JavaByteCodeTranslator::genVMHelper(MethodDesc *md, uint32 numArgs, Opnd **
     if (!strcmp(mname,"writeBarrier")) {
         assert(numArgs == 3);
         irBuilder.genVMHelperCall(CompilationInterface::Helper_WriteBarrier, resType, numArgs, srcOpnds);
+        return;
+    }
+
+    if (!strcmp(mname,"getInterfaceVTable")) {
+        assert(numArgs == 2);
+        Opnd* res = irBuilder.genVMHelperCall(CompilationInterface::Helper_LdInterface, resType, numArgs, srcOpnds);
+        pushOpnd(res);
+        return;
+    }
+
+    if (!strcmp(mname,"checkCast")) {
+        assert(numArgs == 2);
+        Opnd* res = irBuilder.genVMHelperCall(CompilationInterface::Helper_Cast, resType, numArgs, srcOpnds);
+        pushOpnd(res);
+        return;
+    }
+
+    if (!strcmp(mname,"instanceOf")) {
+        assert(numArgs == 2);
+        Opnd* res = irBuilder.genVMHelperCall(CompilationInterface::Helper_IsInstanceOf, resType, numArgs, srcOpnds);
+        pushOpnd(res);
         return;
     }
 

@@ -33,6 +33,8 @@
 #include "vtable.h"
 #include "jit_intf.h"
 
+#include <vector>
+
 // forward declarations
 struct Class;
 
@@ -906,17 +908,9 @@ private:
     // number of interface methods in vtable
     unsigned m_num_intfc_method_entries;
 
-    // number intfc tables in intfc_table
-    // same as vtable->intfc_table->n_entries
-    unsigned m_num_intfc_table_entries;
-
     // An array of pointers to Method descriptors, one descriptor
     // for each corresponding entry in m_vtable.methods[].
     Method** m_vtable_descriptors;
-
-    // An array of pointers to Class descriptors, one descriptor
-    // for each corresponding entry in m_intf_table.entry[].
-    Class** m_intfc_table_descriptors;
 
     // number of dimensions in array; current VM limitation is 255
     // Note, that you can derive the base component type of the array
@@ -1172,38 +1166,43 @@ public:
     /** Gets offset of m_depth field in struct Class.
      * @param dummy - dummy variable used to calculate field offset
      * @note Instanceof helpers use returned offset.*/
-    static size_t get_offset_of_depth(Class* dummy) {
-        return (size_t)((char*)(&dummy->m_depth) - (char*)dummy);
+    static size_t get_offset_of_depth() {
+        Class* dummy=NULL;
+        return (size_t)((char*)(&dummy->m_depth));
     }
 
     /** Gets offset of m_is_suitable_for_fast_instanceof field in struct Class.
      * @param dummy - dummy variable used to calculate field offset
      * @note Instanceof helper uses returned offset.*/
-    static size_t get_offset_of_fast_instanceof_flag(Class* dummy) {
-        return (size_t)((char*)(&dummy->m_is_suitable_for_fast_instanceof) - (char*)dummy);
+    static size_t get_offset_of_fast_instanceof_flag() {
+        Class* dummy=NULL;
+        return (size_t)((char*)(&dummy->m_is_suitable_for_fast_instanceof));
     }
-
+    
     /** Gets an offset of <code>m_is_fast_allocation_possible</code> in
      * the class.
      * @note Allocation helpers use returned offset.*/
     size_t get_offset_of_fast_allocation_flag() {
         // else one byte ld in helpers will fail
         assert(sizeof(m_is_fast_allocation_possible) == 1);
-        return (size_t)((char*)(&m_is_fast_allocation_possible) - (char*)this);
+        Class* dummy=NULL;
+        return (size_t)((char*)(&dummy->m_is_fast_allocation_possible));
     }
 
     /** Gets an offset of <code>m_allocation_handle</code> in the class.
      * @note Allocation helpers use returned offset.*/
     size_t get_offset_of_allocation_handle() {
         assert(sizeof(m_allocation_handle)  == sizeof(void*));
-        return (size_t)((char*)(&m_allocation_handle) - (char*)this);
+        Class* dummy=NULL;
+        return (size_t)((char*)(&dummy->m_allocation_handle));
     }
 
     /** Gets an offset of <code>m_instance_data_size</code> in the class.
      * @note Allocation helpers use returned offset.*/
     size_t get_offset_of_instance_data_size() {
         assert(sizeof(m_instance_data_size) == 4);
-        return (size_t)((char*)(&m_instance_data_size) - (char*)this);
+        Class* dummy=NULL;
+        return (size_t)((char*)(&dummy->m_instance_data_size));
     }
 
     /** Gets an offset of <code>m_num_class_init_checks</code> in the class.
@@ -1711,7 +1710,7 @@ public:
      * @param[in] iid - an interface class to retrieve vtable for
      * @return An interface vtable from object; <code>NULL</code>, if no 
      *         such interface exists for the object.*/
-    void* helper_get_interface_vtable(ManagedObject* obj, Class* iid);
+    static void* helper_get_interface_vtable(ManagedObject* obj, Class* iid);
 
     /** Registers a callback that is called to notify the given JIT
      * whenever the given class is extended. The <code>callback_data</code> 
@@ -1888,17 +1887,17 @@ private:
      * @param[in] n_vtable_entries - a number of entries for the vtable*/
     void create_vtable(unsigned n_vtable_entries);
 
-    /** Populates the vtable descriptors table with methods overriding as neccessary.*/
-    void populate_vtable_descriptors_table_and_override_methods();
+    /** Populates the vtable descriptors table with methods overriding as necessary.
+     * @param[in] intfc_table_entries - must contain all interfaces of the given class
+     */
+    void populate_vtable_descriptors_table_and_override_methods(const std::vector<Class*>& intfc_table_entries);
 
     /** Creates and populates an interface table for a class.
+     *  @param[in] intfc_table_entries - must contain all interfaces of the given class
      * @return The created interface table.*/
-    Intfc_Table* create_and_populate_interface_table();
+    Intfc_Table* create_and_populate_interface_table(const std::vector<Class*>& intfc_table_entries);
 
-    /** Constructs an interface table descriptors table.*/
-    void build_interface_table_descriptors();
-
-    /** Sets vtable entries to methods addresses.*/
+     /** Sets vtable entries to methods addresses.*/
     void point_vtable_entries_to_stubs();
 
     /** Adds any required "fake" methods to a class. These are interface methods

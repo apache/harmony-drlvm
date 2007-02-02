@@ -265,6 +265,9 @@ VMEXPORT Field_Handle class_get_instance_field_recursive(Class_Handle ch, unsign
  */
  VMEXPORT unsigned class_get_number_methods(Class_Handle ch);
 
+/// Check if fast_instanceof is applicable for the class
+VMEXPORT Boolean class_get_fast_instanceof_flag(Class_Handle cl);
+
 /**
  * Get handle for a method declared in class.
  */

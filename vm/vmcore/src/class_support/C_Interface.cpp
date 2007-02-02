@@ -551,6 +551,12 @@ int class_get_depth(Class_Handle cl)
     return cl->get_depth();
 } //class_get_depth
 
+Boolean class_get_fast_instanceof_flag(Class_Handle cl)
+{
+    assert(cl);
+    return cl->get_fast_instanceof_flag();
+} //class_get_depth
+
 
 Class_Handle vtable_get_class(VTable_Handle vh) {
     return vh->clss;
