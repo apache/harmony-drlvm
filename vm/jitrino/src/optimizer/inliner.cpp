@@ -140,6 +140,12 @@ Inliner::Inliner(SessionAction* argSource, MemoryManager& mm, IRManager& irm, bo
         }
     }
 
+    const char* bonusMethods = argSource->getStringArg("bonus_methods", NULL);
+    _inlineBonusMethodTable = NULL;
+    if(bonusMethods!=NULL) {
+        _inlineBonusMethodTable = new (_tmpMM) Method_Table(_tmpMM, bonusMethods, "BONUS_METHODS", false);
+    }
+
     _usesOptimisticBalancedSync = argSource->getBoolArg("sync_optimistic", false) ? argSource->getBoolArg("sync_optcatch", true) : false;
 }
 
@@ -153,6 +159,13 @@ Inliner::computeInlineBenefit(Node* node, MethodDesc& methodDesc, InlineNode* pa
                                << methodDesc.getParentType()->getName()
                                << "." << methodDesc.getName() << ::std::endl;
     }
+    if (_inlineBonusMethodTable!=NULL && _inlineBonusMethodTable->accept_this_method(methodDesc)) {
+        benefit+=1000;
+        if (Log::isEnabled()) {
+            Log::out() << "Method is in bonus table benefit+=1000"<<std::endl;
+        }
+    }
+
     //
     // Size impact
     //

@@ -52,7 +52,8 @@ public:
     Allows to provide an optinal title
     */
     Printer(const IRManager * irm=0, const char * _title=0)
-        :irManager(irm), title(_title), os(0){}
+        :irManager(irm), title(_title), os(0)
+         {if (irManager==NULL) irManager = CompilationContext::getCurrentContext()->getLIRManager();}
 
     /** destructs Printer instance */
     virtual ~Printer() {}

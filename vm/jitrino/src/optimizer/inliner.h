@@ -185,6 +185,7 @@ private:
     bool _inlineSkipExceptionPath;
     bool _inlineSkipApiMagicMethods;
     Method_Table* _inlineSkipMethodTable;
+    Method_Table* _inlineBonusMethodTable;
 
     uint64 oldMethodId;
 
