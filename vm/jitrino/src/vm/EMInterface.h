@@ -132,7 +132,8 @@ class ValueMethodProfile: public MethodProfile {
 public:
     ValueMethodProfile (Method_Profile_Handle handle, MethodDesc& md) : MethodProfile(handle, ProfileType_Value, md){}
 
-	virtual POINTER_SIZE_INT getTopValue(uint32 instructionKey) const = 0;
+    virtual POINTER_SIZE_INT getTopValue(uint32 instructionKey) const = 0;
+    virtual void dumpValues(std::ostream& os) const = 0;
 };
 
 

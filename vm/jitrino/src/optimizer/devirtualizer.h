@@ -31,7 +31,7 @@ namespace Jitrino {
 
 class Devirtualizer {
 public:
-    Devirtualizer(IRManager& irm);
+    Devirtualizer(IRManager& irm, SessionAction* sa = NULL);
 
     void guardCallsInRegion(IRManager& irm, DominatorTree* tree);
 
@@ -45,7 +45,7 @@ private:
     void guardCallsInBlock(IRManager& irm, Node* node);
     void genGuardedDirectCall(IRManager& irm, Node* node, Inst* call, MethodDesc* methodDesc, ObjectType* valuedType, Opnd *tauNullChecked, Opnd *tauTypesChecked, uint32 argOffset);
     bool doGuard(IRManager& irm, Node* node, MethodDesc& methodDesc);
-    
+
     bool _hasProfileInfo;
     bool _doProfileOnlyGuardedDevirtualization;
     bool _doAggressiveGuardedDevirtualization;
@@ -54,7 +54,8 @@ private:
     bool _devirtSkipExceptionPath;
     float _devirtBlockHotnessMultiplier;
     bool _devirtSkipJLObjectMethods;
-    bool _devirtInterfaceMethods;
+    bool _devirtInterfaceCalls;
+    bool _devirtVirtualCalls;
 
 
     //unguard pass params

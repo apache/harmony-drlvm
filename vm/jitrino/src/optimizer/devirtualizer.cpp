@@ -36,7 +36,7 @@ void
 GuardedDevirtualizationPass::_run(IRManager& irm) {
     computeDominators(irm);
     DominatorTree* dominatorTree = irm.getDominatorTree();
-    Devirtualizer pass(irm);
+    Devirtualizer pass(irm, this);
     pass.guardCallsInRegion(irm, dominatorTree);
 }
 
@@ -44,14 +44,15 @@ DEFINE_SESSION_ACTION(GuardRemovalPass, unguard, "Removal of Cold Guards")
 
 void
 GuardRemovalPass::_run(IRManager& irm) {
-    Devirtualizer pass(irm);
+    Devirtualizer pass(irm, this);
     pass.unguardCallsInRegion(irm);
 }
 
-Devirtualizer::Devirtualizer(IRManager& irm) 
+Devirtualizer::Devirtualizer(IRManager& irm, SessionAction* sa) 
 : _hasProfileInfo(irm.getFlowGraph().hasEdgeProfile()), 
   _typeManager(irm.getTypeManager()), 
-  _instFactory(irm.getInstFactory()), _opndManager (irm.getOpndManager()) {
+  _instFactory(irm.getInstFactory()),
+  _opndManager (irm.getOpndManager()) {
     
     const OptimizerFlags& optFlags = irm.getOptimizerFlags();
     _doAggressiveGuardedDevirtualization = !_hasProfileInfo || optFlags.devirt_do_aggressive_guarded_devirtualization;
@@ -60,7 +61,8 @@ Devirtualizer::Devirtualizer(IRManager& irm)
     _devirtSkipExceptionPath = optFlags.devirt_skip_exception_path;
     _devirtBlockHotnessMultiplier = optFlags.devirt_block_hotness_multiplier;
     _devirtSkipJLObjectMethods = optFlags.devirt_skip_object_methods;
-    _devirtInterfaceMethods = optFlags.devirt_intf_methods;
+    _devirtInterfaceCalls = sa ? sa->getBoolArg("devirt_intf_calls", false) : optFlags.devirt_intf_calls;
+    _devirtVirtualCalls = sa ? sa->getBoolArg("devirt_virtual_calls", true) : true;
 
     _directCallPercent = optFlags.unguard_dcall_percent;
     _directCallPercientOfEntry = optFlags.unguard_dcall_percent_of_entry;
@@ -139,6 +141,13 @@ Devirtualizer::guardCallsInRegion(IRManager& regionIRM, DominatorTree* dtree) {
     // Perform guarded de-virtualization on calls in region
     //
     
+    Log::out() << "Devirt params: " << std::endl;
+    Log::out() << "  _doAggressiveGuardedDevirtualization: " << _doAggressiveGuardedDevirtualization << std::endl;
+    Log::out() << "  _devirtUseCHAWithProfile: " << _devirtUseCHAWithProfile << std::endl;
+    Log::out() << "  _devirtSkipJLObjectMethods: " << _devirtSkipJLObjectMethods << std::endl;
+    Log::out() << "  _devirtInterfaceCalls: " << _devirtInterfaceCalls << std::endl;
+    Log::out() << "  _devirtVirtualCalls: " << _devirtVirtualCalls << std::endl;
+
     assert(dtree->isValid());
     StlDeque<DominatorNode *> dom_stack(regionIRM.getMemoryManager());
 
@@ -348,6 +357,7 @@ Devirtualizer::doGuard(IRManager& irm, Node* node, MethodDesc& methodDesc) {
     if (_devirtSkipJLObjectMethods) {
         const char* className = methodDesc.getParentType()->getName();
         if (!strcmp(className, "java/lang/Object")) {
+            Log::out() << "  Don't guard calls to java/lang/Object methods"<< std::endl;
             return false;
         }
     }
@@ -356,6 +366,7 @@ Devirtualizer::doGuard(IRManager& irm, Node* node, MethodDesc& methodDesc) {
         // 
         // In this mode, always guard in the first pass
         //
+        Log::out() << "  Guarding calls to all methods aggressively"<< std::endl;
         return true;
     }
 
@@ -364,12 +375,20 @@ Devirtualizer::doGuard(IRManager& irm, Node* node, MethodDesc& methodDesc) {
     // node and the apparent target.
     //
     if(!_hasProfileInfo) {
+        Log::out() << "  The node doesn't have profile info - don't guard"<< std::endl;
         return false;
     }
 
     double methodCount = irm.getFlowGraph().getEntryNode()->getExecCount();
     double blockCount = node->getExecCount();
-    return (blockCount >= methodCount / _devirtBlockHotnessMultiplier);
+    if (blockCount < (methodCount / _devirtBlockHotnessMultiplier)) {
+        Log::out() << "  Too small block count - don't guard"<< std::endl;
+        Log::out() << "  methodCount: " << methodCount << ", blockCount = " << blockCount
+            << ", hotness factor: " << _devirtBlockHotnessMultiplier << std::endl;
+        return false;
+    }
+
+    return true;
 }
 
 void
@@ -390,10 +409,13 @@ Devirtualizer::guardCallsInBlock(IRManager& regionIRM, Node* node) {
 
             assert(base->getType()->isObject());
             ObjectType* baseType = (ObjectType*) base->getType();
-            MethodDesc* origMethodDesc = methodInst->getMethodDesc();
-            
+            bool intfCall = baseType->isInterface();
+            if (! ((_devirtInterfaceCalls && intfCall) || (_devirtVirtualCalls && !intfCall))) {
+                return;
+            }
             // If base type is concrete, consider an explicit guarded test against it
-            if(!baseType->isNullObject() && ((_devirtInterfaceMethods && baseType->isInterface()) || !baseType->isAbstract() || baseType->isArray())) {
+            if(!baseType->isNullObject() && ((_devirtInterfaceCalls && intfCall) || !baseType->isAbstract() || baseType->isArray())) {
+                MethodDesc* origMethodDesc = methodInst->getMethodDesc();
                 MethodDesc* candidateMeth = NULL;
                 int candidateExecCount = 0;
                 CompilationContext* cc = regionIRM.getCompilationContext();
@@ -406,12 +428,16 @@ Devirtualizer::guardCallsInBlock(IRManager& regionIRM, Node* node) {
                     methDesc.printFullName(Log::out());
                     Log::out() << std::endl << "call to the method: " << std::endl << "\t";
                     origMethodDesc->printFullName(Log::out());
-                    Log::out() << std::endl;
+                    Log::out() << std::endl << "from the CFG node: " << node->getId() <<
+                        ", node exec count: " << node->getExecCount() << std::endl;
 
                     ProfilingInterface* pi = cc->getProfilingInterface();
                     // Don't devirtualize if there is no value profile
                     if (!pi->hasMethodProfile(ProfileType_Value, methDesc)) return;
                     ValueMethodProfile* mp = pi->getValueMethodProfile(regionIRM.getMemoryManager(), methDesc);
+                    if (Log::isLogEnabled(LogStream::DBG)) {
+                        mp->dumpValues(Log::out());
+                    }
                     MethodDesc* rootMethodDesc = regionIRM.getCompilationInterface().getMethodToCompile();
 
                     // Get bytecode offset of the call

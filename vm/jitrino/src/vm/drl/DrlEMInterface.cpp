@@ -264,6 +264,11 @@ POINTER_SIZE_INT DrlValueMethodProfile::getTopValue(uint32 instructionKey) const
     return profileAccessInterface->value_profiler_get_top_value(getHandle(), instructionKey);
 }
 
+void DrlValueMethodProfile::dumpValues(std::ostream& os) const {
+    profileAccessInterface->value_profiler_dump_values(getHandle(), os);
+}
+
+
 } //namespace
 
 

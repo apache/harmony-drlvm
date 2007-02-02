@@ -148,6 +148,7 @@ void DrlEMImpl::initProfileAccess() {
     profileAccessInterface.value_profiler_create_profile = value_profiler_create_profile;
     profileAccessInterface.value_profiler_add_value = value_profiler_add_value;
     profileAccessInterface.value_profiler_get_top_value = value_profiler_get_top_value;
+    profileAccessInterface.value_profiler_dump_values = value_profiler_dump_values;
     
     return;
 }

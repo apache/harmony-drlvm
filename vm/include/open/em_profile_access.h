@@ -20,6 +20,7 @@
 
 #include "open/types.h"
 #include "open/em.h"
+#include <iostream>
 
 #ifdef __cplusplus
 extern "C" {
@@ -246,7 +247,7 @@ typedef struct EM_ProfileAccessInterface {
      */
     POINTER_SIZE_INT (*value_profiler_get_top_value) (Method_Profile_Handle mph, uint32 instructionKey);
 
-
+    void (*value_profiler_dump_values) (Method_Profile_Handle mph, std::ostream& os);
 
 } EM_ProfileAccessInterface;
 

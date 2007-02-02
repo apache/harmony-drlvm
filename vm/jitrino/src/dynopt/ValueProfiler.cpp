@@ -37,8 +37,6 @@ DEFINE_SESSION_ACTION(ValueProfilerInstrumentationPass, vp_instrument, "Perform 
 void ValueProfilerInstrumentationPass::_run(IRManager& irm)
 {
     // Currently value profile is used by interface devirtualization only
-    const OptimizerFlags& optFlags = irm.getOptimizerFlags();
-    if (!optFlags.devirt_intf_methods) return;
 
     ControlFlowGraph& flowGraph = irm.getFlowGraph();
     MemoryManager mm( 1024, "Value Profiler Instrumentation Pass");
@@ -116,8 +114,8 @@ void ValueProfilerInstrumentationPass::_run(IRManager& irm)
                 const uint32 numArgs = 2;
                 Opnd* args[numArgs] = {indexOpnd, valueOpnd};
                 Inst* addValueInst = instFactory.makeJitHelperCall(opndManager.getNullOpnd(), AddValueProfileValue, numArgs, args);
-                ((CFGInst *)loadIndexInst)->insertAfter(vtableInst);
-                ((CFGInst *)addValueInst)->insertAfter(loadIndexInst);
+                ((CFGInst *)addValueInst)->insertBefore(call);
+                ((CFGInst *)loadIndexInst)->insertBefore(addValueInst);
             }
         }
     }

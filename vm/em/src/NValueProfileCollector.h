@@ -49,23 +49,22 @@ public:
     uint32 TNV_clear_size;
     uint32 clear_interval;
     algotypes TNV_algo_type;
-    struct Simple_TNV_Table * TNV_clear_part;
-    struct Simple_TNV_Table * TNV_steady_part;
 public:
     ValueProfileCollector(EM_PC_Interface* em, const std::string& name, JIT_Handle genJit,
                                                 uint32 _TNV_steady_size, uint32 _TNV_clear_size,
                                                 uint32 _clear_interval, algotypes _TNV_algo_type);
     virtual TbsEMClient* getTbsEmClient() const {return (NULL);}
-    virtual ~ValueProfileCollector();   MethodProfile* getMethodProfile(Method_Handle mh) const ;
+    virtual ~ValueProfileCollector();
+    MethodProfile* getMethodProfile(Method_Handle mh) const ;
     ValueMethodProfile* createProfile(Method_Handle mh, uint32 numkeys, uint32 keys[]);
-    POINTER_SIZE_INT getResult(Method_Profile_Handle mph, uint32 instructionKey);
-    void addNewValue(Method_Profile_Handle mph, uint32 instructionKey, POINTER_SIZE_INT valueToAdd);
-private:
+    
     int32  search_in_tnv_table (struct Simple_TNV_Table * TNV_where, POINTER_SIZE_INT value_to_search, uint32 number_of_objects);
     int32  min_in_tnv (struct Simple_TNV_Table * TNV_where, uint32 number_of_objects);
     void insert_into_tnv_table (struct Simple_TNV_Table* TNV_table, struct Simple_TNV_Table* TNV_clear_part, POINTER_SIZE_INT value_to_insert, uint32 times_met);
     POINTER_SIZE_INT find_max(struct Simple_TNV_Table* TNV_where);
     void simple_tnv_clear (struct Simple_TNV_Table* TNV_where);
+
+private:
     std::string catName;
     bool   loggingEnabled;
     typedef std::map<Method_Handle, ValueMethodProfile*> ValueProfilesMap;
@@ -94,14 +93,20 @@ public:
     ~ValueMethodProfile();
     void lockProfile() {hymutex_lock(lock);}
     void unlockProfile() {hymutex_unlock(lock);}
+    void dumpValues(std::ostream& os);
+    void addNewValue(uint32 instructionKey, POINTER_SIZE_INT valueToAdd);
+    POINTER_SIZE_INT getResult(uint32 instructionKey);
 private:
+    // unsynchronized method - must be called from synchronized ones
+    void flushInstProfile(VPInstructionProfileData* instProfile);
+    ValueProfileCollector* getVPC() const;
+
     hymutex_t lock;
 };
-
-Method_Profile_Handle value_profiler_create_profile(PC_Handle ph, Method_Handle mh, uint32 instructionKey, ValueProfileCollector::algotypes, uint32 steadySize, uint32 clearSize, uint32 clearInterval);
 
 POINTER_SIZE_INT value_profiler_get_top_value (Method_Profile_Handle mph, uint32 instructionKey);
 void value_profiler_add_value (Method_Profile_Handle mph, uint32 instructionKey, POINTER_SIZE_INT valueToAdd);
 Method_Profile_Handle value_profiler_create_profile(PC_Handle pch, Method_Handle mh, uint32 numkeys, uint32 keys[]);
+void value_profiler_dump_values(Method_Profile_Handle mph, std::ostream& os);
 
 #endif

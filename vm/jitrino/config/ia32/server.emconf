@@ -45,7 +45,8 @@ SD2_OPT.useProfile=EDGE_PROF,VALUE_PROF
 
 -XDjit.SD1_OPT.path=opt_init,translator,optimizer,hir2lir,codegen
 
--XDjit.SD1_OPT.path.optimizer=ssa,simplify,dce,uce,vp_instrument,edge_instrument,dessa,statprof,markglobals
+-XDjit.SD1_OPT.path.optimizer=ssa,simplify,dce,uce,vp_instrument,devirt_virtual,edge_instrument,dessa,statprof,markglobals
+-XDjit.SD1_OPT.path.devirt_virtual=devirt
 -XDjit.SD1_OPT.path.codegen=lock_method,bbp,btr,gcpoints,cafl,dce1,i8l,api_magic,early_prop,peephole,itrace-,native,constraints,dce2,regalloc,spillgen,layout,copy,rce+,stack,break-,iprof-,peephole,emitter!,si_insts,gcmap,info,unlock_method
 -XDjit.SD1_OPT.path.dce1=cg_dce
 -XDjit.SD1_OPT.path.dce2=cg_dce
@@ -59,9 +60,10 @@ SD2_OPT.useProfile=EDGE_PROF,VALUE_PROF
 -XDjit.SD1_OPT.arg.codegen.btr.insertCMOVs=no
 -XDjit.SD1_OPT.arg.codegen.btr.removeConstCompare=yes
 
+
 -XDjit.SD2_OPT.path=opt_init,translator,optimizer,hir2lir,codegen
 
--XDjit.SD2_OPT.path.optimizer=ssa,simplify,dce,uce,edge_annotate,devirt,inline,uce,purge,simplify,dce,uce,lazyexc,inline_helpers,purge,simplify,uce,dce,dessa,statprof,peel,ssa,hvn,simplify,dce,uce,lower,dce,uce,memopt,reassoc,dce,uce,hvn,dce,uce,abcd,dce,uce,gcm,dessa,statprof,markglobals
+-XDjit.SD2_OPT.path.optimizer=ssa,simplify,dce,uce,devirt_virtual,edge_annotate,unguard,devirt_intf,inline,uce,purge,simplify,dce,uce,lazyexc,inline_helpers,purge,simplify,uce,dce,dessa,statprof,peel,ssa,hvn,simplify,dce,uce,lower,dce,uce,memopt,reassoc,dce,uce,hvn,dce,uce,abcd,dce,uce,gcm,dessa,statprof,markglobals
 -XDjit.SD2_OPT.path.codegen=lock_method,bbp,btr,gcpoints,cafl,dce1,i8l,api_magic,early_prop,peephole,itrace-,native,constraints,dce2,regalloc,spillgen,layout,copy,rce+,stack,break-,iprof-,peephole,emitter!,si_insts,gcmap,info,unlock_method
 -XDjit.SD2_OPT.path.dce1=cg_dce
 -XDjit.SD2_OPT.path.dce2=cg_dce
@@ -69,11 +71,22 @@ SD2_OPT.useProfile=EDGE_PROF,VALUE_PROF
 -XDjit.SD2_OPT.path.bp_regalloc1=bp_regalloc
 -XDjit.SD2_OPT.path.bp_regalloc2=bp_regalloc
 
+#devirt configuration
+-XDjit.SD2_OPT.path.devirt_virtual=devirt
+-XDjit.SD2_OPT.path.devirt_intf=devirt
+-XDjit.SD2_OPT.arg.optimizer.devirt_intf.devirt_intf_calls=true
+-XDjit.SD2_OPT.arg.optimizer.devirt_intf.devirt_virtual_calls=false
+
 #inliner configuration
 -XDjit.SD2_OPT.SD2_OPT_inliner_pipeline.filter=-
--XDjit.SD2_OPT.SD2_OPT_inliner_pipeline.path=ssa,simplify,dce,uce,edge_annotate,devirt
+-XDjit.SD2_OPT.SD2_OPT_inliner_pipeline.path=ssa,simplify,dce,uce,devirt_virtual,edge_annotate,unguard,devirt_intf
 -XDjit.SD2_OPT.arg.optimizer.inline.pipeline=SD2_OPT_inliner_pipeline
 -XDjit.SD2_OPT.arg.optimizer.inline.connect_early=false
+#devirt configuration for inliner pipeline
+-XDjit.SD2_OPT.SD2_OPT_inliner_pipeline.path.devirt_virtual=devirt
+-XDjit.SD2_OPT.SD2_OPT_inliner_pipeline.path.devirt_intf=devirt
+-XDjit.SD2_OPT.SD2_OPT_inliner_pipeline.arg.devirt_intf.devirt_intf_calls=true
+-XDjit.SD2_OPT.SD2_OPT_inliner_pipeline.arg.devirt_intf.devirt_virtual_calls=false
 
 #helper inliner configuration
 -XDjit.SD2_OPT.SD2_OPT_helper_inliner_pipeline.filter=-

@@ -104,6 +104,7 @@ class DrlValueMethodProfile: public ValueMethodProfile {
 public:
     DrlValueMethodProfile (Method_Profile_Handle handle, MethodDesc& md,  EM_ProfileAccessInterface* profileAccessInterface);
     virtual POINTER_SIZE_INT getTopValue(uint32 instructionKey) const;
+    virtual void dumpValues(std::ostream& os) const;
 private:
     EM_ProfileAccessInterface* profileAccessInterface;
 

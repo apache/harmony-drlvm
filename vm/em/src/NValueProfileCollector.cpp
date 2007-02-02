@@ -64,6 +64,7 @@ int32 ValueProfileCollector::search_in_tnv_table (struct Simple_TNV_Table * TNV_
     }
     return (-1);
 }
+
 void ValueProfileCollector::insert_into_tnv_table (struct Simple_TNV_Table* TNV_table, struct Simple_TNV_Table* TNV_clear_part, POINTER_SIZE_INT value_to_insert, uint32 times_met)
 {
     uint32 insert_index, temp_min_index;
@@ -150,57 +151,18 @@ ValueMethodProfile* ValueProfileCollector::createProfile(Method_Handle mh, uint3
     return profile;
 }
 
-
-
-void ValueProfileCollector::addNewValue(Method_Profile_Handle mph, uint32 instructionKey, POINTER_SIZE_INT valueToAdd)
-{
-    POINTER_SIZE_INT curr_value = valueToAdd;
-    ValueMethodProfile* vmp = ((ValueMethodProfile*)mph);
-    vmp->lockProfile();
-    VPInstructionProfileData* _temp_vp = vmp->ValueMap[instructionKey];
-    POINTER_SIZE_INT* last_value = &(_temp_vp->last_value);
-    uint32* profile_tick = &(_temp_vp->profile_tick);
-    uint32* num_times_profiled = &(_temp_vp->num_times_profiled);
-    struct Simple_TNV_Table * TNV_clear_part = _temp_vp->TNV_clear_part;
-    struct Simple_TNV_Table * TNV_steady_part = _temp_vp->TNV_Table;
-    if ( TNV_algo_type == TNV_DIVIDED){
-        if (*profile_tick == clear_interval){
-            *profile_tick = 0;
-            simple_tnv_clear(TNV_clear_part);
-        }
-        (*profile_tick)++;
-    }
-    if (curr_value == *last_value){
-        (*num_times_profiled)++;
-    }
-    else {
-        *num_times_profiled = 1;
-        insert_into_tnv_table (TNV_steady_part, TNV_clear_part, valueToAdd, *num_times_profiled);
-        *last_value = curr_value;
-    }
-    vmp->unlockProfile();
-}
-
 POINTER_SIZE_INT ValueProfileCollector::find_max(Simple_TNV_Table *TNV_where)
 {
     POINTER_SIZE_INT max_value = 0;
     uint32 temp_index, temp_max_frequency = 0;
-    for (temp_index = 0; temp_index < TNV_steady_size; temp_index++)
-        if (TNV_where->frequency > temp_max_frequency){
-            temp_max_frequency = TNV_where->frequency;
-            max_value = TNV_where->value;
+    for (temp_index = 0; temp_index < TNV_steady_size; temp_index++) {
+        Simple_TNV_Table *TNV_current = &(TNV_where[temp_index]);
+        if (TNV_current->frequency > temp_max_frequency){
+            temp_max_frequency = TNV_current->frequency;
+            max_value = TNV_current->value;
         }
+    }
     return (max_value);
-}
-
-POINTER_SIZE_INT ValueProfileCollector::getResult(Method_Profile_Handle mph, uint32 instructionKey)
-{
-    ValueMethodProfile* vmp = ((ValueMethodProfile*)mph);
-    vmp->lockProfile();
-    VPInstructionProfileData* _temp_vp = vmp->ValueMap[instructionKey];
-    POINTER_SIZE_INT result = (_temp_vp == NULL) ? 0 : find_max(_temp_vp->TNV_Table);
-    vmp->unlockProfile();
-    return result; 
 }
 
 ValueProfileCollector::ValueProfileCollector(EM_PC_Interface* em, const std::string& name, JIT_Handle genJit, 
@@ -243,6 +205,108 @@ ValueMethodProfile::~ValueMethodProfile()
     hymutex_destroy(lock);
 }
 
+void ValueMethodProfile::addNewValue(uint32 instructionKey, POINTER_SIZE_INT valueToAdd)
+{
+    POINTER_SIZE_INT curr_value = valueToAdd;
+    lockProfile();
+    VPInstructionProfileData* _temp_vp = ValueMap[instructionKey];
+    POINTER_SIZE_INT* last_value = &(_temp_vp->last_value);
+    uint32* profile_tick = &(_temp_vp->profile_tick);
+    uint32* num_times_profiled = &(_temp_vp->num_times_profiled);
+    struct Simple_TNV_Table* TNV_clear_part = _temp_vp->TNV_clear_part;
+    struct Simple_TNV_Table* TNV_steady_part = _temp_vp->TNV_Table;
+    if ( getVPC()->TNV_algo_type == ValueProfileCollector::TNV_DIVIDED){
+        if (*profile_tick == getVPC()->clear_interval){
+            *profile_tick = 0;
+            getVPC()->simple_tnv_clear(TNV_clear_part);
+        }
+        (*profile_tick)++;
+    }
+    if (curr_value == *last_value){
+        (*num_times_profiled)++;
+    }
+    else {
+        flushInstProfile(_temp_vp);
+        *num_times_profiled = 1;
+        getVPC()->insert_into_tnv_table (TNV_steady_part, TNV_clear_part, valueToAdd, *num_times_profiled);
+        *last_value = curr_value;
+    }
+    unlockProfile();
+}
+
+
+POINTER_SIZE_INT ValueMethodProfile::getResult(uint32 instructionKey)
+{
+    lockProfile();
+    VPInstructionProfileData* _temp_vp = ValueMap[instructionKey];
+    flushInstProfile(_temp_vp);
+    POINTER_SIZE_INT result = (_temp_vp == NULL) ? 0 : getVPC()->find_max(_temp_vp->TNV_Table);
+    unlockProfile();
+    return result; 
+}
+
+void ValueMethodProfile::flushInstProfile(VPInstructionProfileData* instProfile)
+{
+    POINTER_SIZE_INT last_value = instProfile->last_value;
+    uint32* num_times_profiled = &(instProfile->num_times_profiled);
+    struct Simple_TNV_Table* TNV_clear_part = instProfile->TNV_clear_part;
+    struct Simple_TNV_Table* TNV_steady_part = instProfile->TNV_Table;
+    getVPC()->insert_into_tnv_table (TNV_steady_part, TNV_clear_part, last_value, *num_times_profiled);
+    *num_times_profiled = 0;
+}
+
+void ValueMethodProfile::dumpValues(std::ostream& os)
+{
+    std::map<uint32, VPInstructionProfileData*>::const_iterator mapIter;
+    assert(pc->type == EM_PCTYPE_VALUE);
+    lockProfile();
+    os << "===== Value profile dump, " << ValueMap.size() << " element(s) ===" << std::endl;
+    for (mapIter = ValueMap.begin(); mapIter != ValueMap.end(); mapIter++) {
+        os << "=== Instruction key: " << mapIter->first;
+        VPInstructionProfileData* _temp_vp = mapIter->second;
+        flushInstProfile(_temp_vp);
+        os << ", num_times_profiled: " << _temp_vp->num_times_profiled << ", profile_tick: " << _temp_vp->profile_tick << std::endl;
+        struct Simple_TNV_Table * TNV_steady_part = _temp_vp->TNV_Table;
+        if (TNV_steady_part != NULL) {
+            uint32 size = ((ValueProfileCollector*)pc)->TNV_steady_size;
+            os << "= TNV_steady_part, size = " << size << std::endl;
+            for (uint32 i = 0; i < size; i++) {
+                os << "== Frequency: " << TNV_steady_part[i].frequency << " = Value: ";
+                POINTER_SIZE_INT value = TNV_steady_part[i].value;
+                if (value != 0) {
+                    os << class_get_name(vtable_get_class((VTable_Handle)value));
+                } else {
+                    os << "NULL";
+                }
+                os << " ==" << std::endl;
+            }
+        }
+        struct Simple_TNV_Table * TNV_clear_part = _temp_vp->TNV_clear_part;
+        if (TNV_clear_part != NULL) {
+            uint32 size = ((ValueProfileCollector*)pc)->TNV_clear_size;
+            os << "= TNV_clear_part, size = " << size << std::endl;
+            for (uint32 i = 0; i < size; i++) {
+                os << "== " << TNV_clear_part[i].frequency << " = Value: ";
+                POINTER_SIZE_INT value = TNV_clear_part[i].value;
+                if (value != 0) {
+                    os << class_get_name(vtable_get_class((VTable_Handle)value));
+                } else {
+                    os << "NULL";
+                }
+                os << " ==" << std::endl;
+            }
+        }
+    }
+    unlockProfile();
+    os << "====== End of dump ======================" << std::endl;
+}
+
+ValueProfileCollector* ValueMethodProfile::getVPC() const {
+    assert(pc->type == EM_PCTYPE_VALUE);
+    return ((ValueProfileCollector*)pc);
+}
+
+
 MethodProfile* ValueProfileCollector::getMethodProfile(Method_Handle mh) const
 {
     ValueProfilesMap::const_iterator it = profilesByMethod.find(mh);
@@ -260,16 +324,27 @@ POINTER_SIZE_INT value_profiler_get_top_value (Method_Profile_Handle mph, uint32
     MethodProfile* mp = (MethodProfile*)mph;
     assert(mp->pc->type == EM_PCTYPE_VALUE);
     ValueMethodProfile* vmp = (ValueMethodProfile*)mp;
-    return ((ValueProfileCollector*)(vmp->pc))->getResult(mph, instructionKey);
+    return vmp->getResult(instructionKey);
 }
+
 void value_profiler_add_value (Method_Profile_Handle mph, uint32 instructionKey, POINTER_SIZE_INT valueToAdd)
 {
     assert(mph != NULL);
     MethodProfile* mp = (MethodProfile*)mph;
     assert(mp->pc->type == EM_PCTYPE_VALUE);
     ValueMethodProfile* vmp = (ValueMethodProfile*)mp;
-    return ((ValueProfileCollector*)(vmp->pc))->addNewValue(mph, instructionKey, valueToAdd);
+    return vmp->addNewValue(instructionKey, valueToAdd);
 }
+
+void value_profiler_dump_values(Method_Profile_Handle mph, std::ostream& os)
+{
+    assert(mph != NULL);
+    MethodProfile* mp = (MethodProfile*)mph;
+    assert(mp->pc->type == EM_PCTYPE_VALUE);
+    ValueMethodProfile* vmp = (ValueMethodProfile*)mp;
+    vmp->dumpValues(os);
+}
+
 Method_Profile_Handle value_profiler_create_profile(PC_Handle pch, Method_Handle mh, uint32 numkeys, uint32 keys[])
 {
     assert(pch!=NULL);
