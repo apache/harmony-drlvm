@@ -97,6 +97,9 @@ public final class Class<T> implements Serializable, AnnotatedElement, GenericDe
 
     private transient ProtectionDomain domain;
 
+    /** It is required for synchronization in newInstance method. */
+    private boolean isDefaultConstructorInitialized;
+
     // TODO make it soft reference
     transient ReflectionData reflectionData;
     transient SoftReference<GACache> softCache;
@@ -699,35 +702,63 @@ public final class Class<T> implements Serializable, AnnotatedElement, GenericDe
             sc.checkMemberAccess(this, Member.PUBLIC);
             sc.checkPackageAccess(reflectionData.packageName);
         }
-        try {
-            if (reflectionData.defaultConstructor == null) {
-                reflectionData.initDefaultConstructor();
+
+        /*
+         * HARMONY-1930: The synchronization issue is possible here.
+         *
+         * The issues is caused by fact that:
+         * - first thread starts defaultConstructor initialization, including
+         *   setting "isAccessible" flag to "true" for Constrcutor object
+         * - another thread bypasses initialization and calls "newInstance" 
+         *   for defaultConstructor (while isAccessible is "false" yet)
+         * - so, for this "another" thread the Constructor.newInstance checks
+         *   the access rights by mistake and IllegalAccessException happens
+         */
+        while (!isDefaultConstructorInitialized) {
+            synchronized (reflectionData) {
+                if (isDefaultConstructorInitialized) {
+                    break; // non-first threads can be here - nothing to do
+                }
+
+                // only first thread can reach this point & do initialization
+                try {
+                    reflectionData.initDefaultConstructor();
+                } catch (NoSuchMethodException e) {
+                    throw new InstantiationException(e.getMessage()
+                            + " method not found");
+                }
                 final Constructor<T> c = reflectionData.defaultConstructor;
+
                 try {
                     AccessController.doPrivileged(new PrivilegedAction<Object>() {
-
-                        public Object run() {
+                            public Object run() {
                             c.setAccessible(true);
                             return null;
-                        }
-                    });
+                            }
+                            });
                 } catch (SecurityException e) {
                     // can't change accessibilty of the default constructor
                     IllegalAccessException ex = new IllegalAccessException();
                     ex.initCause(e);
                     throw ex;
                 }
+
+                // default constructor is initialized, access flag is set
+                isDefaultConstructorInitialized = true;
+                break;
             }
-            Reflection.checkMemberAccess(
+        }
+
+        // initialization is done, threads may work from here in any order
+        Reflection.checkMemberAccess(
                 VMStack.getCallerClass(0),
                 reflectionData.defaultConstructor.getDeclaringClass(),
                 reflectionData.defaultConstructor.getDeclaringClass(),
                 reflectionData.defaultConstructor.getModifiers()
             );
+
+        try {
             newInstance = reflectionData.defaultConstructor.newInstance();
-        } catch (NoSuchMethodException e) {
-            throw new InstantiationException(e.getMessage()
-                + " method not found");
         } catch (InvocationTargetException e) {
             System.rethrow(e.getCause());
         }
