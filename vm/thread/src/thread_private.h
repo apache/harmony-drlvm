@@ -50,13 +50,13 @@
 #define MAX_OWNED_MONITOR_NUMBER 200 //FIXME: switch to dynamic resize
 #define FAST_LOCAL_STORAGE_SIZE 10
 
-#if !defined (_EM64T_) && !defined (_IPF_)
+#if !defined (_IPF_)
 //use lock reservation
 #define LOCK_RESERVATION
 // spin with try_lock SPIN_COUNT times
 #define SPIN_COUNT 5
 
-#endif //!defined (_EM64T_) && !defined (_IPF_)
+#endif // !defined (_IPF_)
 
 #ifdef WIN32
 //use optimized asm monitor enter and exit helpers 
