@@ -45,6 +45,9 @@ Version: $Revision: 1.4.2.5 $
             <fileset dir="${build.MMTK.home}" includes="mmtk-20061012.jar" />
         </path>
 
+        <!-- compile time debug information - true by default for kernel classes -->
+        <property name="java.debug.option" value="true"/>
+
         <property name="jarname" value="kernel.jar"/>
         
         <property name="manifest.file" 
