@@ -1,0 +1,14 @@
+<project name="RUN HARMONY-3027 Regression Test">
+    <target name="run-test">
+        <run-junit-test 
+            test="org.apache.harmony.drlvm.tests.regression.h3027.AgentLibTest">
+            <junit-element>
+                <jvmarg value="-Dvm.assert_dialog=0"/>
+                <jvmarg value="-agentlib:AgentLib"/>
+                <env key="PATH" path="${reg.test.2launch.native.path}:${env.PATH}"/>
+                <env key="LD_LIBRARY_PATH" path="${reg.test.2launch.native.path}:${env.LD_LIBRARY_PATH}"/>
+            </junit-element>
+        </run-junit-test>
+    </target>
+</project>
+
