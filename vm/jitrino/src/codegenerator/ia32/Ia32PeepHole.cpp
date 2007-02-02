@@ -88,6 +88,7 @@ private:
     Changed handleInst_HelperCall(Inst* inst, const  Opnd::RuntimeInfo* ri);
     Changed handleInst_Convert_F2I_D2I(Inst* inst);
     Changed handleInst_ALU(Inst* inst);
+    Changed handleInst_MUL(Inst* inst);
     Changed handleInst_SSEMov(Inst* inst);
     Changed handleInst_SSEXor(Inst* inst);
     //
@@ -100,6 +101,7 @@ private:
 void PeepHoleOpt::runImpl(void)
 {
     setIRManager(irManager);
+    irManager->calculateOpndStatistics();
     m_bHadAnyChange = false;
     // organize an infinity loop and keep spinning till we have any change.
     // thought have a safety counter to prevent a really infinity in case 
@@ -192,6 +194,9 @@ PeepHoleOpt::Changed PeepHoleOpt::handleInst(Inst* inst)
     case Mnemonic_CMP:
     case Mnemonic_TEST:
         return handleInst_ALU(inst);
+    case Mnemonic_IMUL:
+    case Mnemonic_MUL:
+        return handleInst_MUL(inst);
     case Mnemonic_MOVSS:
     case Mnemonic_MOVSD:
         return handleInst_SSEMov(inst);
@@ -376,6 +381,79 @@ PeepHoleOpt::Changed PeepHoleOpt::handleInst_Convert_F2I_D2I(Inst* inst)
     return Changed_Node;
 }
 
+static int getMinBit(uint32 val) {
+    uint32 currentVal = val;
+    int i=0;
+    do {
+        if ((currentVal & 1)) {
+            return i;
+        }
+        currentVal = currentVal >> 1;
+    } while (++i<32);
+    return i;
+}
+
+static int getMaxBit(uint32 val) {
+    uint32 currentVal = val;
+    int i=31;
+    do {
+        if ((currentVal & (1<<31))) {
+            return i;
+        }
+        currentVal = currentVal << 1;
+    } while (--i>=0);
+    return i;
+}
+
+PeepHoleOpt::Changed PeepHoleOpt::handleInst_MUL(Inst* inst) {
+    assert(inst->getMnemonic()==Mnemonic_IMUL || inst->getMnemonic()==Mnemonic_MUL);
+    if (inst->getForm() == Inst::Form_Native) {
+        return Changed_Nothing;
+    }
+    Inst::Opnds defs(inst, Inst::OpndRole_Explicit|Inst::OpndRole_Def);
+    Opnd* dst = inst->getOpnd(defs.begin());
+    if (defs.next(defs.begin())!=defs.end()) {
+        return Changed_Nothing;
+    }
+    Inst::Opnds uses(inst, Inst::OpndRole_Explicit|Inst::OpndRole_Use);
+    Opnd* src1= inst->getOpnd(uses.begin());
+    Opnd* src2= inst->getOpnd(uses.next(uses.begin()));
+    assert(src1!=NULL && src2!=NULL && dst!=NULL);
+    if (isImm(src1)) {
+        Opnd* tmp = src1; src1 = src2; src2 = tmp;
+    }
+    if (isImm(src2) && irManager->getTypeSize(src2->getType()) <=32) {
+        int immVal = (int)src2->getImmValue();
+        if (immVal == 0) {
+            if (Log::isEnabled()) Log::out()<<"I"<<inst->getId()<<" -> MUL with 0"<<std::endl;
+            irManager->newCopyPseudoInst(Mnemonic_MOV, dst, src2)->insertAfter(inst);
+            inst->unlink();
+            return Changed_Inst;
+        } else if (immVal == 1) {
+            if (Log::isEnabled()) Log::out()<<"I"<<inst->getId()<<" -> MUL with 1"<<std::endl;
+            irManager->newCopyPseudoInst(Mnemonic_MOV, dst, src1)->insertAfter(inst);
+            inst->unlink();
+            return Changed_Inst;
+        } else if (immVal == 2) {
+            if (Log::isEnabled()) Log::out()<<"I"<<inst->getId()<<" -> MUL with 2"<<std::endl;
+            irManager->newInstEx(Mnemonic_ADD, 1, dst, src1, src1)->insertAfter(inst);
+            inst->unlink();
+            return Changed_Inst;
+        } else {
+            int minBit=getMinBit(immVal);   
+            int maxBit=getMaxBit(immVal);
+            if (minBit == maxBit) {
+                assert(minBit>=2);
+                if (Log::isEnabled()) Log::out()<<"I"<<inst->getId()<<" -> MUL with 2^"<<minBit<<std::endl;
+                Type* int32Type = irManager->getTypeManager().getUInt32Type();
+                irManager->newInstEx(Mnemonic_SHL, 1, dst, src1, irManager->newImmOpnd(int32Type, minBit))->insertAfter(inst);
+                inst->unlink();
+                return Changed_Inst;
+            }
+        }
+    }
+    return Changed_Nothing;
+}
 
 PeepHoleOpt::Changed PeepHoleOpt::handleInst_ALU(Inst* inst)
 {
@@ -393,6 +471,42 @@ PeepHoleOpt::Changed PeepHoleOpt::handleInst_ALU(Inst* inst)
            mnemonic == Mnemonic_AND || 
            mnemonic == Mnemonic_CMP || mnemonic == Mnemonic_TEST);
 
+    
+    if (mnemonic == Mnemonic_AND && inst->getForm() == Inst::Form_Extended) {
+        Inst::Opnds defs(inst, Inst::OpndRole_Explicit|Inst::OpndRole_Def);
+        Opnd* dst = inst->getOpnd(defs.begin());
+        Inst::Opnds uses(inst, Inst::OpndRole_Explicit|Inst::OpndRole_Use);
+        Opnd* src1= inst->getOpnd(uses.begin());
+        Opnd* src2= inst->getOpnd(uses.next(uses.begin()));
+        if (!isImm(src2) && isImm(src1)) {
+            Opnd* tmp = src1; src1 = src2; src2 = tmp;
+        }
+        if (isImm32(src2)) {
+            Inst* nextInst = inst->getNextInst();
+            bool dstIsNotUsed = dst->getRefCount() == 1;
+            bool removeNextInst = false;
+            if (dst->getRefCount()==2 && nextInst!=NULL && nextInst->getMnemonic() == Mnemonic_CMP) {
+                Inst::Opnds cmp_uses(nextInst, Inst::OpndRole_Explicit|Inst::OpndRole_Use);
+                Opnd* cmp_src1= nextInst->getOpnd(cmp_uses.begin());
+                Opnd* cmp_src2= nextInst->getOpnd(cmp_uses.next(cmp_uses.begin()));
+                if (cmp_src1 == dst && isImm(cmp_src2) && cmp_src2->getImmValue() == 0) {
+                    removeNextInst = true;
+                    dstIsNotUsed = true;
+                }
+            }
+            if (dstIsNotUsed) {            
+                if (Log::isEnabled()) Log::out()<<"I"<<inst->getId()<<" replacing AND with TEST"<<std::endl;
+                irManager->newInst(Mnemonic_TEST, src1, src2)->insertBefore(inst);
+                if (removeNextInst) {
+                    nextInst->unlink();
+                }
+                inst->unlink();
+                return Changed_Inst;
+            }
+        }
+    }
+
+    
     // Only process simple variants: ALU opcodes that either define flags 
     //and use 2 operands, or simply use 2 operands
     unsigned leftIndex = 0;
