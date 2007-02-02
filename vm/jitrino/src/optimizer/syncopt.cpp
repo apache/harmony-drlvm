@@ -2110,4 +2110,53 @@ void SyncOpt::removeUnwindMonitorExit(Opnd *syncMethodOpnd,
 
 
 
+
+DEFINE_SESSION_ACTION(SO2, so2, "SyncOpt2")
+
+ 
+
+void SO2::_run(IRManager& irm) {
+    OptPass::computeDominators(irm);
+    ControlFlowGraph& fg = irm.getFlowGraph();
+    MemoryManager tmpMM(1024, "SO2MM");
+    StlVector<Inst*> monenters(tmpMM);   
+    DominatorTree* dom = fg.getDominatorTree();
+ 
+    const Nodes& nodes = fg.getNodesPostOrder();
+    for (Nodes::const_iterator it = nodes.begin(), end = nodes.end(); it!=end; ++it) {
+        Node* node = *it;
+        for (Inst* inst = (Inst*)node->getFirstInst(); inst!=NULL; inst = inst->getNextInst()) {
+            if (inst->getOpcode()== Op_TauMonitorEnter) {
+                monenters.push_back(inst);
+                for (size_t i = 0; i<monenters.size()-1; i++) {
+                    Inst* child = monenters[i];
+                    if (child->getNode()==NULL) {
+                        continue;
+                    }
+                    if (child->getSrc(0) == inst->getSrc(0) && dom->dominates(inst->getNode(), child->getNode())) {
+                        //clean child
+                        int nExits=0;
+                        Node* enterNode = child->getNode();
+                        Node* exitNode = NULL;
+                        for (Nodes::const_iterator it2 = nodes.begin();exitNode!=enterNode; ++it2) {
+                            exitNode = *it2;
+                            Inst* exit = (Inst*)exitNode->getLastInst();
+                            if (exit->getOpcode() == Op_TauMonitorExit && exit->getSrc(0) == child->getSrc(0) && dom->dominates(enterNode, exitNode)) {
+//                                printf("+++++++++++++++++++++++++++++++FOUND\n");
+                                Edge* exc = exitNode->getExceptionEdge();
+                                fg.removeEdge(exc);
+                                exit->unlink();
+                                nExits++;
+                            }
+                        }
+                        assert(nExits>0);
+                        child->unlink();
+                    }
+                }
+            }
+        }
+    }
+}
+
+
 } //namespace Jitrino 
