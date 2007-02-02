@@ -127,7 +127,7 @@ bool OpndUtils::isConstAreaItem(const Opnd* op)
 bool OpndUtils::isFPConst(const Opnd* op, double dVal)
 {
     const void* addr = extractAddrOfConst(op);
-    return (addr == NULL) ? false : (dVal == *(const float*)addr);
+    return (addr == NULL) ? false : (dVal == *(const double*)addr);
 }
 
 bool OpndUtils::isFPConst(const Opnd* op, float fVal)
