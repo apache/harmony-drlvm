@@ -86,15 +86,49 @@ namespace Ia32{
  *
  */
 
+static const char* help = 
+"  The 'constraints' action accepts 3 sets of 3 parameters which \n"
+"  define profile-guided operand splitting for operand\n"
+"  uses, defs, and crossing call sites if these factors make\n"
+"  operand constraints worse (permitting less registers).\n"
+"  Each parameter defines a threshold enabling the splitting.\n"
+"  The threshold is applied to basic block execution count divided \n"
+"  by method entry execution count.\n"
+"  Thus, the threshold being 0 means never, and being 1000000000 means always.\n"
+"  Parameters:\n"
+"      callSplitThresholdForNoRegs=<integer>\n"
+"        Applied if crossing a call site narrows an operand constraint to NO regs.\n"
+"        Default value is 'always'.\n"
+"      callSplitThresholdFor1Reg=<integer>\n"
+"        Applied if crossing a call site narrows an operand constraint to <=1 reg.\n"
+"        Default value is 1 (very cold code).\n"
+"      callSplitThresholdFor4Regs=<integer>\n"
+"        Applied if crossing a call site narrows an operand constraint to <=4 regs.\n"
+"        Default value is 4 (very cold code).\n"
+"      defSplitThresholdForNoRegs=<integer>\n"
+"        Default value is 0 ('never').\n"
+"      defSplitThresholdFor1Reg=<integer>\n"
+"        Default value is 0 ('never').\n"
+"      defSplitThresholdFor4Regs=<integer>\n"
+"        Default value is 0 ('never').\n"
+"      useSplitThresholdForNoRegs=<integer>\n"
+"        Default value is 0 ('never').\n"
+"      useSplitThresholdFor1Reg=<integer>\n"
+"        Default value is 0 ('never').\n"
+"      useSplitThresholdFor4Regs=<integer>\n"
+"        Default value is 0 ('never').\n"
+;
+
 class ConstraintsResolver : public SessionAction {
     /** runImpl is required override, calls ConstraintsResolverImpl.runImpl */
     void runImpl();
     /** This transformer requires up-to-date liveness info */
     uint32 getNeedInfo()const{ return NeedInfo_LivenessInfo; }
     uint32 getSideEffects()const{ return 0; }
+
 };
 
-static ActionFactory<ConstraintsResolver> _constraints("constraints");
+static ActionFactory<ConstraintsResolver> _constraints("constraints", help);
 
 //========================================================================================
 // class ConstraintsResolverImpl
@@ -184,7 +218,8 @@ public:
         liveAtDispatchBlockEntry(memoryManager,0),
         needsOriginalOpnd(memoryManager,0),
         hoveringOpnds(memoryManager,0),
-        opndReplaceWorkset(memoryManager,0)
+        opndReplaceWorkset(memoryManager,0),
+        opndUsage(memoryManager,0)
     {
     }
     
@@ -214,6 +249,11 @@ private:
     Constraint getCalleeSaveConstraint(Inst * inst, Opnd * opnd);
     /** returns constraint describing safe locations for operands live at dispatch node entries */
     Constraint getDispatchEntryConstraint(Opnd * opnd);
+
+    static bool constraintIsWorse(Constraint cnew, Constraint cold, unsigned normedBBExecCount, 
+        unsigned splitThresholdForNoRegs, unsigned splitThresholdFor1Reg, unsigned splitThresholdFor4Regs
+        );
+   
 
 
     /** Reference to IRManager */ 
@@ -249,6 +289,23 @@ private:
      *  Reset for each basic blocks (all replacements are local within basic blocks)
      */
     StlVector<Opnd*>            opndReplaceWorkset;
+
+
+    StlVector<uint32>           opndUsage;
+
+    unsigned callSplitThresholdForNoRegs;
+    unsigned callSplitThresholdFor1Reg;
+    unsigned callSplitThresholdFor4Regs;
+
+    unsigned defSplitThresholdForNoRegs;
+    unsigned defSplitThresholdFor1Reg;
+    unsigned defSplitThresholdFor4Regs;
+
+    unsigned useSplitThresholdForNoRegs;
+    unsigned useSplitThresholdFor1Reg;
+    unsigned useSplitThresholdFor4Regs;
+
+    friend class ConstraintsResolver;
 };
 
 
@@ -284,6 +341,11 @@ void ConstraintsResolverImpl::run()
     opndReplaceWorkset.resize(originalOpndCount);
     for (uint32 i=0; i<originalOpndCount; i++)
         opndReplaceWorkset[i]=NULL;
+
+    opndUsage.resize(originalOpndCount);
+    for (uint32 i=0; i<originalOpndCount; i++)
+        opndUsage[i]=0;
+
 
     hoveringOpnds.resize(originalOpndCount);
 // Fill array of basic blocks and order it
@@ -372,11 +434,34 @@ void ConstraintsResolverImpl::calculateStartupOpndConstraints()
 }   
 
 //_________________________________________________________________________________________________
+bool ConstraintsResolverImpl::constraintIsWorse(Constraint cnew, Constraint cold, unsigned normedBBExecCount, 
+    unsigned splitThresholdForNoRegs, unsigned splitThresholdFor1Reg, unsigned splitThresholdFor4Regs
+    )
+{
+    if (cnew.isNull())
+        return true;
+    uint32 newMask = cnew.getMask(), oldMask = cold.getMask();
+    if ((newMask & oldMask) != oldMask){
+        uint32 newMaskCount = countOnes(newMask);
+        return 
+            (newMaskCount == 0 && normedBBExecCount < splitThresholdForNoRegs) ||
+            (newMaskCount <= 1 && normedBBExecCount < splitThresholdFor1Reg) ||
+            (newMaskCount <= 4 && normedBBExecCount < splitThresholdFor4Regs);
+    }
+    return false;
+}
+
+//_________________________________________________________________________________________________
 void ConstraintsResolverImpl::resolveConstraintsWithOG(Inst * inst)
 {   
     // Initialize hoveringOpnds with operands live after the call if the inst is CALL
     if (inst->getMnemonic()==Mnemonic_CALL)
         hoveringOpnds.copyFrom(liveOpnds);
+
+    double dblExecCount = 1000. * inst->getBasicBlock()->getExecCount() / irManager.getFlowGraph()->getEntryNode()->getExecCount();
+    if (dblExecCount > 100000000.)
+        dblExecCount = 100000000.;
+    unsigned execCount = (unsigned)dblExecCount;
 
     // first handle all defs
     {Inst::Opnds opnds(inst, Inst::OpndRole_AllDefs);
@@ -390,8 +475,10 @@ void ConstraintsResolverImpl::resolveConstraintsWithOG(Inst * inst)
 
         // currentOpnd is either the current replacement or the original operand
         Opnd * currentOpnd=opndReplaceWorkset[originalOpnd->getId()];
-        if (currentOpnd==NULL)
+        if (currentOpnd==NULL){
             currentOpnd=originalOpnd;
+            opndUsage[originalOpnd->getId()]+=execCount;
+        }
         // get what is already collected
         Constraint cc=currentOpnd->getConstraint(Opnd::ConstraintKind_Calculated);
         assert(!cc.isNull());
@@ -401,7 +488,7 @@ void ConstraintsResolverImpl::resolveConstraintsWithOG(Inst * inst)
         // & the result
         Constraint cr=cc & ci;
         Opnd * opndToSet=currentOpnd;
-        if (!cr.isNull()){
+        if (!constraintIsWorse(cr, cc, execCount, defSplitThresholdForNoRegs, defSplitThresholdFor1Reg, defSplitThresholdFor4Regs)){
             // can substitute currentReplacementOpnd into this position
             currentOpnd->setCalculatedConstraint(cr);
         }else{
@@ -421,6 +508,7 @@ void ConstraintsResolverImpl::resolveConstraintsWithOG(Inst * inst)
                     Inst * copySequence=irManager.newCopyPseudoInst(Mnemonic_MOV, opndToSet, originalOpnd); 
                     // split above the instruction
                     copySequence->insertBefore(inst);
+                    opndUsage[originalOpnd->getId()]+=execCount;
                 }
             }
         }   
@@ -446,8 +534,10 @@ void ConstraintsResolverImpl::resolveConstraintsWithOG(Inst * inst)
             assert(!needsOriginalOpnd.getBit(originalOpnd->getId())||opndReplaceWorkset[originalOpnd->getId()]==NULL);
             // currentOpnd is either the current replacement or the original operand
             Opnd * currentOpnd=opndReplaceWorkset[originalOpnd->getId()];
-            if (currentOpnd==NULL)
+            if (currentOpnd==NULL){
                 currentOpnd=originalOpnd;
+                opndUsage[originalOpnd->getId()]+=execCount;
+            }
             Opnd * opndToSet=NULL;
             // was live and is not redefined by this inst
             if (liveOpnds.getBit(originalOpnd->getId())){ 
@@ -460,7 +550,7 @@ void ConstraintsResolverImpl::resolveConstraintsWithOG(Inst * inst)
                 // & the result
                 Constraint cr=cc & ci;
                 opndToSet=currentOpnd;
-                if ((cr.getMask()!=0 || cc.getMask()==0) && !cr.isNull()){
+                if (!constraintIsWorse(cr, cc, execCount, callSplitThresholdForNoRegs, callSplitThresholdFor1Reg, callSplitThresholdFor4Regs)){
                     // can substitute currentReplacementOpnd into this position
                     opndToSet->setCalculatedConstraint(cr);
                 }else{
@@ -468,7 +558,7 @@ void ConstraintsResolverImpl::resolveConstraintsWithOG(Inst * inst)
                     // Try to use originalOpnd over this instruction and for the instructions above
                     Constraint co=originalOpnd->getConstraint(Opnd::ConstraintKind_Calculated);
                     Constraint cr=co & ci;
-                    if ((cr.getMask()!=0 || co.getMask()==0)&& !cr.isNull()){ 
+                    if (!constraintIsWorse(cr, cc, execCount, callSplitThresholdForNoRegs, callSplitThresholdFor1Reg, callSplitThresholdFor4Regs)){
                         opndToSet=originalOpnd;
                         opndToSet->setCalculatedConstraint(cr);
                     }else{
@@ -483,7 +573,6 @@ void ConstraintsResolverImpl::resolveConstraintsWithOG(Inst * inst)
                     // an operand different to the current replacement 
                     // is required to be over this call site, append splitting below the call site
                     // this is like restoring from a call-safe location under a call
-                    assert(currentOpnd->getType() == opndToSet->getType());
                     Inst * copySequence=irManager.newCopyPseudoInst(Mnemonic_MOV, currentOpnd, opndToSet);  
                     copySequence->insertAfter(inst);
                 }
@@ -495,6 +584,7 @@ void ConstraintsResolverImpl::resolveConstraintsWithOG(Inst * inst)
                     assert(currentOpnd==originalOpnd);
                     Inst * copySequence=irManager.newCopyPseudoInst(Mnemonic_MOV, opndToSet, originalOpnd);
                     copySequence->insertBefore(inst);
+                    opndUsage[originalOpnd->getId()]+=execCount;
                 }
             }
         }
@@ -510,8 +600,10 @@ void ConstraintsResolverImpl::resolveConstraintsWithOG(Inst * inst)
             assert(!needsOriginalOpnd.getBit(originalOpnd->getId())||opndReplaceWorkset[originalOpnd->getId()]==NULL);
             // currentOpnd is either the current replacement or the original operand
             Opnd * currentOpnd=opndReplaceWorkset[originalOpnd->getId()];
-            if (currentOpnd==NULL)
+            if (currentOpnd==NULL){
                 currentOpnd=originalOpnd;
+                opndUsage[originalOpnd->getId()]+=execCount;
+            }
             // get what is already collected
             Constraint cc=currentOpnd->getConstraint(Opnd::ConstraintKind_Calculated);
             assert(!cc.isNull());
@@ -522,7 +614,7 @@ void ConstraintsResolverImpl::resolveConstraintsWithOG(Inst * inst)
 
             Opnd * opndToSet=currentOpnd;
 
-            if (!cr.isNull()){
+            if (!constraintIsWorse(cr, cc, execCount, useSplitThresholdForNoRegs, useSplitThresholdFor1Reg, useSplitThresholdFor4Regs)){
                 // can substitute currentReplacementOpnd into this position
                 currentOpnd->setCalculatedConstraint(cr);
             }else{
@@ -556,6 +648,7 @@ void ConstraintsResolverImpl::resolveConstraints(Node * bb)
 
     // if we come to bb entry with some replacement for an operand and the operand is live at the entry
     // insert copying from the original operand to the replacement operand
+    uint32 execCount = (uint32)bb->getExecCount();
     BitSet * ls = irManager.getLiveAtEntry(bb);
     BitSet::IterB ib(*ls);
     for (int i = ib.getNext(); i != -1; i = ib.getNext()){
@@ -565,9 +658,9 @@ void ConstraintsResolverImpl::resolveConstraints(Node * bb)
         if (currentOpnd!=NULL){
             if (currentOpnd!=originalOpnd){
 //              assert(irManager.getLiveAtEntry(bb)->isLive(originalOpnd));
-                assert(currentOpnd->getType() == originalOpnd->getType());
                 Inst * copySequence=irManager.newCopyPseudoInst(Mnemonic_MOV, currentOpnd, originalOpnd);
                 bb->prependInst(copySequence);
+                opndUsage[originalOpnd->getId()]+=execCount;
             }
             opndReplaceWorkset[originalOpnd->getId()]=NULL;
         }
@@ -587,13 +680,34 @@ void ConstraintsResolverImpl::resolveConstraints()
 void ConstraintsResolver::runImpl()
 {
     // call the private implementation of the algorithm
-    ConstraintsResolverImpl(*irManager).run();
+    ConstraintsResolverImpl impl(*irManager);
+    
+    impl.callSplitThresholdForNoRegs = (unsigned)-1; // always
+    getArg("callSplitThresholdForNoRegs", impl.callSplitThresholdForNoRegs);
+    impl.callSplitThresholdFor1Reg = 1; // for very cold code
+    getArg("callSplitThresholdFor1Reg", impl.callSplitThresholdFor1Reg);
+    impl.callSplitThresholdFor4Regs = 1; // for very cold code
+    getArg("callSplitThresholdFor4Regs", impl.callSplitThresholdFor4Regs);
+
+    impl.defSplitThresholdForNoRegs = 0; // never
+    getArg("defSplitThresholdForNoRegs", impl.defSplitThresholdForNoRegs);
+    impl.defSplitThresholdFor1Reg = 0; // never
+    getArg("defSplitThresholdFor1Reg", impl.defSplitThresholdFor1Reg);
+    impl.defSplitThresholdFor4Regs = 0; // never
+    getArg("defSplitThresholdFor4Regs", impl.defSplitThresholdFor4Regs);
+
+    impl.useSplitThresholdForNoRegs = 0; // never
+    getArg("useSplitThresholdForNoRegs", impl.useSplitThresholdForNoRegs);
+    impl.useSplitThresholdFor1Reg = 0; // never
+    getArg("useSplitThresholdFor1Reg", impl.useSplitThresholdFor1Reg);
+    impl.useSplitThresholdFor4Regs = 0; // never
+    getArg("useSplitThresholdFor4Regs", impl.useSplitThresholdFor4Regs);
+
+    impl.run();
 }
 
 
 //_________________________________________________________________________________________________
-
-
 
 }}; //namespace Ia32
 

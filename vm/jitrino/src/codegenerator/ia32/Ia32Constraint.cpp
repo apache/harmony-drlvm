@@ -114,7 +114,7 @@ Constraint Constraint::getAliasConstraint(OpndSize s, uint32 offset)const
 
     uint32 newKind=kind, newMask=0;
     uint32 newRegKind=newKind & OpndKind_Reg;
-    if (newRegKind==OpndKind_GPReg){
+    if (newRegKind == OpndKind_GPReg || ( (newRegKind & OpndKind_GPReg) && sz <= OpndSize_16) ){
 #ifndef _EM64T_
         if (sz==OpndSize_8 && (s==OpndSize_16 || s==OpndSize_32))
             newMask=((mask>>4)|mask)&0xf;
