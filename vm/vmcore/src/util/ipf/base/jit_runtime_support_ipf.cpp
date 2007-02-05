@@ -690,9 +690,8 @@ static void emit_fast_type_check_without_vm_stats(Merced_Code_Emitter& emitter,
     const unsigned sc8 = SCRATCH_GENERAL_REG8;
     const unsigned sc9 = SCRATCH_GENERAL_REG9;
 
-    Class *dummy_class = NULL;
-    const int offset_is_suitable = (int)Class::get_offset_of_fast_instanceof_flag(dummy_class);
-    const int offset_depth = (int)Class::get_offset_of_depth(dummy_class);
+    const int offset_is_suitable = (int)Class::get_offset_of_fast_instanceof_flag();
+    const int offset_depth = (int)Class::get_offset_of_depth();
 
     VTable *dummy_vtable = NULL;
     const int offset_superclasses = (int) ((Byte*)&dummy_vtable->superclasses[-1] - (Byte*)dummy_vtable);
@@ -981,8 +980,7 @@ static void emit_get_array_element_class(Merced_Code_Emitter& emitter, int src, 
     const int sc4 = SCRATCH_GENERAL_REG4;
     const int sc5 = SCRATCH_GENERAL_REG7;
 
-    Class *dummy_class = NULL;
-    const int offset_array_element_class = Class::get_offset_of_array_element_class(dummy_class);
+    const int offset_array_element_class = Class::get_offset_of_array_element_class();
 
     VTable *dummy_vtable = NULL;
     const int offset_clss = (int) ((Byte*)&dummy_vtable->clss - (Byte*)dummy_vtable);
