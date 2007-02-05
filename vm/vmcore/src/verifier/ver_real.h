@@ -46,7 +46,7 @@ namespace Verifier {
  */
 //===========================================================
 /**
- * Define debug mode for verifer.
+ * Define debug mode for verifier.
  */
 #ifdef NDEBUG
 #define _VERIFY_DEBUG 0
@@ -289,7 +289,7 @@ typedef enum {
  */
 //===========================================================
 /**
- * Predefined stuctures
+ * Predefined structures
  */
 /// Verifier context structure.
 typedef struct vf_Context vf_Context_t;
@@ -790,13 +790,13 @@ public:
     void SetNextCountNode( unsigned node_num );
 
     /**
-     * Function recieves first enumerated graph node.
+     * Function receives first enumerated graph node.
      * @return First enumerated graph node in graph enumeration structure.
      */
     unsigned GetStartCountNode();
 
     /**
-     * Function recieves graph node relevant to enumeration element.
+     * Function receives graph node relevant to enumeration element.
      * @param count - given enumeration element
      * @return Graph node relevant to enumeration element.
      * @note Assertion is raised if <i>count</i> is out of range.
@@ -804,7 +804,7 @@ public:
     unsigned GetCountElementNode( unsigned count );
 
     /**
-     * Function recieves graph node enumeration count.
+     * Function receives graph node enumeration count.
      * @param node_num - given node
      * @return Graph node enumeration count.
      * @note Assertion is raised if <i>node_num</i> is out of range.
@@ -885,7 +885,7 @@ private:
      * Function dumps graph node instruction in file stream in DOT format.
      * @param node_num   - number of graph node
      * @param next_node  - separator between nodes in stream
-     * @param next_instr - separator between intructions in stream
+     * @param next_instr - separator between instructions in stream
      * @param fout       - output file stream
      * @param context    - current verifier context
      * @note Function is valid in debug mode.
@@ -1190,7 +1190,7 @@ public:
     unsigned m_edgeNum;                 ///< graph edge number
 
     /**
-     * Stucture contains useful valid types
+     * Structure contains useful valid types
      */
     struct vf_ContextVType {
         vf_ValidType_t *m_class;        ///< context a given class valid type
@@ -1202,11 +1202,11 @@ public:
     } m_vtype;
 
     /**
-     * Stucture contains debug dump flags
+     * Structure contains debug dump flags
      */
     struct vf_ContextDump {
         unsigned m_verify : 1;          ///< verify all flag
-        unsigned m_with_subroutine : 1; ///< verified method has subrotine
+        unsigned m_with_subroutine : 1; ///< verified method has subroutine
         unsigned m_constraint : 1;      ///< dump type constraints for class
         unsigned m_code : 1;            ///< print code array in stream
         unsigned m_graph : 1;           ///< print original control flow graph
@@ -1427,7 +1427,7 @@ vf_parse_description( const char *descr, int *inlen, int *outlen);
  * Function parses descriptor and sets input and output data flow vectors.
  * @param descr     - descriptor of method, class or field
  * @param inlen     - number of entries for <i>IN</i> data flow vector
- * @param add       - additional number of enties to <i>IN</i> data flow vector
+ * @param add       - additional number of entries to <i>IN</i> data flow vector
  * @param outlen    - number of entries for <i>OUT</i> data flow vector (for method)
  * @param invector  - pointer to <i>IN</i> data flow vector
  * @param outvector - pointer to <i>OUT</i> data flow vector
@@ -1461,7 +1461,7 @@ vf_ValidType_t *
 vf_create_class_valid_type( const char *class_name, vf_Context_t *context );
 
 /**
- * Function provides contraint checks for current class.
+ * Function provides constraint checks for current class.
  * @param context - verifier context
  * @return Check result.
  * @note Provides only checks with loaded classes.

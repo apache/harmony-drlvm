@@ -377,7 +377,7 @@ vf_TypePool::SetMethod( method_handler method )
 void
 vf_TypePool::SetRestriction( const char *target,                // target class name
                              const char *source,                // source class name
-                             unsigned short index,              // constrant pool index
+                             unsigned short index,              // constant pool index
                              vf_CheckConstraint_t check_type)   // constraint check type
 {
     vf_TypeConstraint_t *restriction;
@@ -706,7 +706,7 @@ vf_resolve_class( const char *name,         // resolved class name
 } // vf_resolve_class
 
 /**
- * Function checkes if target class is super class of source class. 
+ * Function checks if target class is super class of source class. 
  */
 static inline bool
 vf_is_super_class( class_handler source,        // checked class
@@ -722,7 +722,7 @@ vf_is_super_class( class_handler source,        // checked class
 } // vf_is_super_class
 
 /**
- * Function checkes if target class is super interface of source class. 
+ * Function checks if target class is super interface of source class. 
  */
 static inline bool
 vf_is_super_interface( class_handler source,    // checked class
@@ -773,7 +773,7 @@ vf_is_param_valid( class_handler source,    // checked class
 } // vf_is_param_valid
 
 /**
- * Function checkes narrow reference conversion between interface classes.
+ * Function checks narrow reference conversion between interface classes.
  * If class1 has method1 and class2 has method2, correspondingly,
  * and methods are the same name and signature, function returns 1.
  * If methods have different return types, function returns 0.
@@ -812,7 +812,7 @@ vf_check_interface_methods( class_handler class1,   // first interface class
 } // vf_check_interface_methods
 
 /**
- * Function checkes casting conversion between classes.
+ * Function checks casting conversion between classes.
  */
 static bool
 vf_is_checkcast_valid( class_handler source,    // checked class
@@ -867,7 +867,7 @@ vf_is_checkcast_valid( class_handler source,    // checked class
 } // vf_is_checkcast_valid
 
 /**
- * Function checkes assignment conversion between classes.
+ * Function checks assignment conversion between classes.
  *
  * If strict flag is true, strict assignment compatible check is provided,
  * else if strict flag is false, weak assignment compatible check is provided.
@@ -984,7 +984,7 @@ vf_is_assign_valid( class_handler source,   // checked class
 } // vf_is_assign_valid
 
 /**
- * Function checkes conversions between classes.
+ * Function checks conversions between classes.
  */
 static bool
 vf_is_valid( class_handler source,              // checked class
@@ -1007,7 +1007,7 @@ vf_is_valid( class_handler source,              // checked class
     case VF_CHECK_DIRECT_SUPER:     // check if target is a direct super class of source
         return class_is_same_class( class_get_super_class( source ), target );
     case VF_CHECK_ACCESS_FIELD:     // protected field access
-    case VF_CHECK_ACCESS_METHOD:    // protected method acceess
+    case VF_CHECK_ACCESS_METHOD:    // protected method access
         return vf_is_super_class( source, current );
     case VF_CHECK_INVOKESPECIAL:    // check object for invokespecial instruction
         return vf_is_super_class( source, current )
@@ -1089,7 +1089,7 @@ vf_set_error( method_handler method,        // failed method
  * Checks some constraints without loading of needed classes.
  */
 static inline Verifier_Result
-vf_check_without_loading( vf_TypeConstraint_t *restriction,  // checked constratint
+vf_check_without_loading( vf_TypeConstraint_t *restriction,  // checked constraint
                           vf_Context_t *ctex)                // verifier context
 {
     switch( restriction->check_type )
@@ -1194,7 +1194,7 @@ vf_check_without_loading( vf_TypeConstraint_t *restriction,  // checked constrat
  * to store restriction to the class for future constraint check.
  */
 static inline Verifier_Result
-vf_check_constraint( vf_TypeConstraint_t *restriction,  // checked constratint
+vf_check_constraint( vf_TypeConstraint_t *restriction,  // checked constraint
                      vf_Context_t *ctex)                // verifier context
 {
     /**
@@ -1321,8 +1321,8 @@ vf_check_access_constraint( const char *super_name,             // name of super
 } // vf_check_access_constraint
 
 /**
- * Function provides initial contraint checks for current class.
- * Function checkes only loaded classes, and stores restriction for unloaded ones.
+ * Function provides initial constraint checks for current class.
+ * Function checks only loaded classes, and stores restriction for unloaded ones.
  */
 Verifier_Result
 vf_check_class_constraints( vf_Context_t *ctex )    // verifier context
@@ -1365,7 +1365,7 @@ vf_check_class_constraints( vf_Context_t *ctex )    // verifier context
 } // vf_check_class_constraints
 
 /**
- * Function checkes constraint for given class.
+ * Function checks constraint for given class.
  * Function loads classes if it's needed.
  */
 static inline Verifier_Result
@@ -1412,7 +1412,7 @@ vf_force_check_constraint( vf_TypeConstraint_t *constraint,     // class constra
 
     /**
      * Verifier which is built on Java VM Specification 2nd Edition (4.9.2)
-     * recommendation of verification proccess doesn't check interfaces usage.
+     * recommendation of verification process doesn't check interfaces usage.
      * Unfortunately, a lot of Java applications depends on this neglect.
      * To be compatible with those applications we should do full constraint
      * checks only if -Xverify:all option is present in command line.

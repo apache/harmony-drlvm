@@ -1833,7 +1833,7 @@ Type_Info_Handle method_vars_get_type_info(Method_Handle mh,
                                            unsigned UNREF idx)
 {
     assert(mh);
-    // Alwyas NULL for Java.
+    // Always NULL for Java.
     return 0;
 } //method_vars_get_type_info
 
@@ -2461,7 +2461,7 @@ void vm_recompile_method(JIT_Handle jit, Method_Handle method)
     compile_do_compilation_jit((Method*) method, (JIT*) jit);
 } // vm_recompile_method
 
-// Called by JIT during compialtion to have the VM synchronously request a JIT (maybe another one)
+// Called by JIT during compilation to have the VM synchronously request a JIT (maybe another one)
 // to compile another method.
 JIT_Result vm_compile_method(JIT_Handle jit, Method_Handle method)
 {

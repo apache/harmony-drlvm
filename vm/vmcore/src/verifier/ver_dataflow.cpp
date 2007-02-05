@@ -213,7 +213,7 @@ vf_is_types_equal( vf_ValidType_t *type1,   // first checked type
 
 /**
  * Function merges two vectors and saves result vector to first vector.
- * If first vector was changed, returns true, esle - false.
+ * If first vector was changed, returns true, else - false.
  */
 static inline bool
 vf_merge_vectors( vf_MapVector_t *first,    // first vector
@@ -446,7 +446,7 @@ vf_check_entry_refs( vf_MapEntry_t *source,    // stack map entry
     {
         return VER_ErrorDataFlow;
     }
-    // check local varible type
+    // check local variable type
     if( source->m_is_local 
         && (!target->m_is_local || source->m_local != target->m_local) )
     {
@@ -489,7 +489,7 @@ vf_check_entry_refs( vf_MapEntry_t *source,    // stack map entry
     {
     case VF_CHECK_NONE:
     case VF_CHECK_UNINITIALIZED_THIS:
-    case VF_CHECK_PARAM:                // check method invocation convertion
+    case VF_CHECK_PARAM:                // check method invocation conversion
         if( target->m_vtype != NULL ) {
             is_error = ctex->m_type->CheckTypes( target->m_vtype,
                             source->m_vtype, 0, VF_CHECK_PARAM );
@@ -599,7 +599,7 @@ vf_check_entry_types( vf_MapEntry_t *entry1,    // stack map entry
         return VER_ErrorDataFlow;
     }
 
-    // check local varible type
+    // check local variable type
     if( entry1->m_is_local 
         && (!entry2->m_is_local || entry1->m_local != entry2->m_local) )
     {
@@ -1199,7 +1199,7 @@ vf_check_node_data_flow( unsigned node_num,             // graph node number
                          vf_MapVector_t *incoming,      // incoming data flow vector
                          vf_MapEntry_t *buf,            // buf stack map vector
                          unsigned *node_count,          // last graph node in recursion
-                         bool *need_recheck,            // set to true if need to recheck privious nodes
+                         bool *need_recheck,            // set to true if need to recheck previous nodes
                          vf_Context_t *ctex)            // verifier context
 {
     // get graph
@@ -1399,7 +1399,7 @@ vf_enumerate_graph_node( vf_Context_t *ctex )
     vf_Graph_t *graph = ctex->m_graph;
     graph->CleanNodesMark();
 
-    // set first enumiration node
+    // set first enumeration node
     graph->SetStartCountNode(0);
     graph->SetNodeMark( 0, VERIFY_START_MARK );
 
@@ -1408,7 +1408,7 @@ vf_enumerate_graph_node( vf_Context_t *ctex )
         // get node by count element
         unsigned node_num = graph->GetCountElementNode( index );
         if( node_num == ~0U ) {
-            // remove dead nodes from enumiration
+            // remove dead nodes from enumeration
             continue;
         }
 

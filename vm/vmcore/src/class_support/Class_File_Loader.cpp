@@ -597,7 +597,7 @@ bool Class_Member::parse(Class* clss, ByteReader &cfs)
     //
     // Look up the name_index and descriptor_index
     // utf8 string const pool entries.
-    // See specification 4.6 about name_index and desctiptor_index.
+    // See specification 4.6 about name_index and descriptor_index.
     //
     if(!valid_cpi(clss, name_index, CONSTANT_Utf8, "for member name"))
         return false;
@@ -923,7 +923,7 @@ bool Field::parse(Global_Env& env, Class *clss, ByteReader &cfs )
                         }
                     }//switch
                 }//else for static field
-            }//case ATTR_ConstanValue
+            }//case ATTR_ConstantValue
             break;
 
         case ATTR_Synthetic:
@@ -1183,7 +1183,7 @@ bool Method::_parse_exceptions(ConstantPool& cp, unsigned attr_len,
         if(!cfs.parse_u2_be(&index)) {
             REPORT_FAILED_CLASS_CLASS(_class->get_class_loader(), _class, "java/lang/ClassFormatError",
                 _class->get_name()->bytes << ": could not parse exception class index "
-                << "while parsing excpetions for method "
+                << "while parsing exceptions for method "
                 << _name->bytes << _descriptor->bytes);
             return false;
         }
@@ -1198,7 +1198,7 @@ bool Method::_parse_exceptions(ConstantPool& cp, unsigned attr_len,
     if (attr_len != _n_exceptions * sizeof(uint16) + sizeof(_n_exceptions) ) {
         REPORT_FAILED_CLASS_CLASS(_class->get_class_loader(), _class, "java/lang/ClassFormatError",
             _class->get_name()->bytes << ": invalid Exceptions attribute length "
-            << "while parsing excpetions for method "
+            << "while parsing exceptions for method "
             << _name->bytes << _descriptor->bytes);
         return false;
     }
@@ -1614,7 +1614,7 @@ bool Method::_parse_code(ConstantPool& cp, unsigned code_attr_len,
     }
 
     // we should remember this point to return here
-    // after comlete LVT and LVTT parsing.
+    // after complete LVT and LVTT parsing.
     int return_point = cfs.get_offset();
     
     if(num_lvt_entries == 0 && num_lvtt_entries != 0) {
@@ -2114,7 +2114,7 @@ bool Method::parse(Global_Env& env, Class* clss,
     //
     // there must be no more than 1 code attribute and no more than 1 exceptions
     // attribute per method
-    // See specificaton 4.8.3 and 4.8.4 first paragraphs.
+    // See specification 4.8.3 and 4.8.4 first paragraphs.
     //
 
 
@@ -2304,7 +2304,7 @@ check_class_name(const char *name, unsigned len)
         }
         return check_field_name(name, id_len, false);
     }
-    return false; //unreacheable code
+    return false; //unreachable code
 }
 
 

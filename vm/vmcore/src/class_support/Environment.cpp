@@ -255,7 +255,7 @@ Global_Env::~Global_Env()
     // Unload all system native libraries.
     natives_cleanup();
 
-    // Unload GC-releated resources.
+    // Unload GC-related resources.
     gc_wrapup();
 
     delete GlobalCodeMemoryManager;

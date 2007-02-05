@@ -789,7 +789,7 @@ Class* ClassLoader::SetupAsArray(Global_Env* env, const String* classNameString)
     // make sure it is array name
     assert(className && className[0] == '[');
 
-    // count number of dimentions in requested array
+    // count number of dimensions in requested array
     unsigned n_dimensions = 1;
     while(className[n_dimensions] == '[') n_dimensions++;
 
@@ -1132,7 +1132,7 @@ inline void BootstrapClassLoader::SetBCPElement(const char *path, apr_pool_t *tm
         }
     }
 
-    // check existance of a given path
+    // check existence of a given path
     apr_finfo_t finfo;
     if(apr_stat(&finfo, new_path->bytes, APR_FINFO_SIZE, tmp_pool) != APR_SUCCESS) {
         // broken path to the file
@@ -1341,7 +1341,7 @@ bool BootstrapClassLoader::Initialize(ManagedObject* UNREF loader)
      *  generated there to set vm.boot.class.path since we didn't do
      *  it before.  We need  to add on the kernel.jar 
      *  and magics support jars (if any).
-     *  note that parse_arguments.cpp defers any override, postpend or 
+     *  note that parse_arguments.cpp defers any override, append or 
      *  prepend here, storing everything as properties.
      */
      
@@ -1475,7 +1475,7 @@ Class* ClassLoader::LoadClass(Global_Env* env, const String* className)
     if (klass) {
         LMAutoUnlock aulock(&m_lock);
 
-        // check if class has been alredy recorded as initiated by DefineClass()
+        // check if class has been already recorded as initiated by DefineClass()
         Class** pklass = m_initiatedClasses->Lookup(className);
         if (NULL == pklass) {
             m_initiatedClasses->Insert(className, klass);
@@ -1728,7 +1728,7 @@ Class* BootstrapClassLoader::LoadFromFile(const String* class_name)
                 class_name, &not_found);
         }
 
-        // chech if a given class is found
+        // check if a given class is found
         if(!not_found) {
             return clss;
         }
@@ -1754,7 +1754,7 @@ Class* BootstrapClassLoader::LoadFromClassFile(const String* dir_name,
     char* full_name = apr_pstrcat(local_pool, dir_name->bytes,
         PORT_FILE_SEPARATOR_STR, class_name_in_fs, NULL );
 
-    // check file existance
+    // check file existence
     apr_finfo_t finfo;
     if(apr_stat(&finfo, full_name, APR_FINFO_SIZE, local_pool) != APR_SUCCESS) {
         // file does not exist

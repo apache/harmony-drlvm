@@ -676,7 +676,7 @@ vf_Graph::SetNextCountNode( unsigned node_num )   // graph node number
 } // vf_Graph::SetNextCountNode
 
 /**
- * Function recieves first enumerated graph node.
+ * Function receives first enumerated graph node.
  */
 unsigned
 vf_Graph::GetStartCountNode()
@@ -686,7 +686,7 @@ vf_Graph::GetStartCountNode()
 } // vf_Graph::GetStartCountNode
 
 /**
- * Function recieves graph node relevant to enumeration element.
+ * Function receives graph node relevant to enumeration element.
  */
 unsigned
 vf_Graph::GetCountElementNode( unsigned count )       // graph node number
@@ -697,7 +697,7 @@ vf_Graph::GetCountElementNode( unsigned count )       // graph node number
 } // vf_Graph::GetCountElementNode
 
 /**
- * Function recieves graph node enumeration count.
+ * Function receives graph node enumeration count.
  */
 unsigned
 vf_Graph::GetNodeCountElement( unsigned node_num )     // graph node number
@@ -958,7 +958,7 @@ vf_Graph::DumpDotNode( unsigned num,            // graph node number
 void
 vf_Graph::DumpDotNodeInternal( unsigned num,            // graph node number
                                char *next_node,         // separator between nodes in stream
-                               char *next_instr,        // separator between intructions in stream
+                               char *next_instr,        // separator between instructions in stream
                                ofstream &out,           // output file stream
                                vf_Context_t *ctex)      // verifier contex
 {
@@ -1209,7 +1209,7 @@ vf_graph_checks( vf_Context_t *ctex )   // verifier context
     if( index )
     {
         /** 
-         * Identify dead code nodes and fill by nop inctruction
+         * Identify dead code nodes and fill by nop instruction
          */
         for( index = handlcount + 1; index < vGraph->GetNodeNumber() - 1; index++ ) {
             if( !vGraph->IsNodeMarked( index ) ) {

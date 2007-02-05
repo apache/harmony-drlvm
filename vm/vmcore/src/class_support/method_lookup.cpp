@@ -285,7 +285,7 @@ CodeChunkInfo *Method_Lookup_Table::find_deadlock_free(void *addr)
         // We failed to acquire the lock.  Use slow linear search.
         // The linear search is safe even is someone else is adding a method
         // because of the way the table is modified:
-        // 1. If neecssary, the table is reallocated.  This operation is
+        // 1. If necessary, the table is reallocated.  This operation is
         //    atomic, so we never see a partially initialized table.
         // 2. Space is made for the new method by shifting all methods
         //    with higher addresses by 1.  The shift is done from the right,

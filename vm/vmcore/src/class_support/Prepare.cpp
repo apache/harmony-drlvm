@@ -787,10 +787,10 @@ void Class::assign_offsets_to_methods(Global_Env* env)
                         {
                             off   = m->get_offset();
                             index = m->get_index();
-                            // mark superclass' method "m" as being overwridden
+                            // mark superclass' method "m" as being overridden
                             m->method_was_overridden();
 
-                            // notify interested JITs that "m" was overwridden by "method"
+                            // notify interested JITs that "m" was overridden by "method"
                             m->do_jit_overridden_method_callbacks(&method);
                         }
                         break;
@@ -1237,7 +1237,7 @@ bool Class::prepare(Global_Env* env)
     assert((((POINTER_SIZE_INT)(m_static_data_block)) % 8) == 0);
 
     //
-    // STEP 9 ::: For INTERFACES intialize static fields and return.
+    // STEP 9 ::: For INTERFACES initialize static fields and return.
     //
     if(is_interface()) {
         bool init_fields = initialize_static_fields_for_interface();
@@ -1330,7 +1330,7 @@ bool Class::prepare(Global_Env* env)
     //
     // STEP 15 ::: HANDLE JAVA CLASS CLASS separately
     //
-    // Make sure noone hasn't prematurely set these fields since all calculations
+    // Make sure no one hasn't prematurely set these fields since all calculations
     // up to this point should be based on clss->unpadded_instance_data_size.
     assert(m_instance_data_size == 0);
     assert(m_allocated_size == 0);
@@ -1410,7 +1410,7 @@ bool Class::prepare(Global_Env* env)
         if(m_alignment != GC_OBJECT_ALIGNMENT) { 
             // The GC will align on 4 byte boundaries by default on IA32....
 #ifdef POINTER64
-            ASSERT(0, "Allignment is supposed to be appropriate");
+            ASSERT(0, "Alignment is supposed to be appropriate");
 #endif
             // Make sure it is a legal mask.
             assert((m_alignment & CL_PROP_ALIGNMENT_MASK) <= CL_PROP_ALIGNMENT_MASK);
@@ -1451,7 +1451,7 @@ bool Class::prepare(Global_Env* env)
     //
     // STEP 20 ::: ASSIGN VALUE to static final fields
     //
-    // Generally speaking final value is inlined, so we wooldn't need to worry
+    // Generally speaking final value is inlined, so we wouldn’t need to worry
     // about the initialization of those static final fields. But when we use
     // reflection mechanisms - Field.getXXX() - to access them, we got
     // null values. Considering this, we must initialize those static

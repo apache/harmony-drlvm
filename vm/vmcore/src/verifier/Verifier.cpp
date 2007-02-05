@@ -399,8 +399,8 @@ vf_get_single_word_branch_offset( vf_Instr_t *code,        // instruction
 
 /**
  * Function receives half word (2 bytes) branch offset from bytecode array and
- * sets reseived offset and next instruction offset into instruction.
- * Function returns recieved offset.
+ * sets received offset and next instruction offset into instruction.
+ * Function returns received offset.
  */
 static inline int
 vf_get_double_hword_branch_offset( vf_Instr_t *code,          // instruction
@@ -411,7 +411,7 @@ vf_get_double_hword_branch_offset( vf_Instr_t *code,          // instruction
 {
     // get first branch offset
     int offset = vf_get_hword_offset( code_pc, bytecode, index_p );
-    // create and set edge branchs for instruction
+    // create and set edge branches for instruction
     vf_create_instruction_offset( code, 2, pool );
     // set first edge branch for instruction
     vf_set_instruction_offset( code, 0, offset );
@@ -422,8 +422,8 @@ vf_get_double_hword_branch_offset( vf_Instr_t *code,          // instruction
 
 /**
  * Function receives word (4 bytes) branch offset from bytecode array and
- * sets reseived offset and next instruction offset into instruction.
- * Function returns recieved offset.
+ * sets received offset and next instruction offset into instruction.
+ * Function returns received offset.
  */
 static inline int
 vf_get_double_word_branch_offset( vf_Instr_t *code,          // instruction
@@ -434,7 +434,7 @@ vf_get_double_word_branch_offset( vf_Instr_t *code,          // instruction
 {
     // get first branch offset
     int offset = vf_get_word_offset( code_pc, bytecode, index_p );
-    // create and set edge branchs for instruction
+    // create and set edge branches for instruction
     vf_create_instruction_offset( code, 2, pool );
     // set first edge branch for instruction
     vf_set_instruction_offset( code, 0, offset );
@@ -445,8 +445,8 @@ vf_get_double_word_branch_offset( vf_Instr_t *code,          // instruction
 
 /**
  * Function receives tableswitch branch from bytecode array and
- * sets reseived offset into instruction.
- * Function returns recieved branch.
+ * sets received offset into instruction.
+ * Function returns received branch.
  */
 static inline int
 vf_get_tableswitch_alternative( vf_Instr_t *code,           // instruction
@@ -503,7 +503,7 @@ vf_set_tableswitch_offsets( vf_Instr_t *code,           // instruction
  * Function returns number of alternatives.
  */
 static inline Verifier_Result
-vf_set_lookupswitch_offsets( vf_Instr_t *code,          // inctruction
+vf_set_lookupswitch_offsets( vf_Instr_t *code,          // instruction
                              unsigned code_pc,          // instruction offset in bytecode
                              unsigned *index_p,         // offset index in bytecode array
                              unsigned char *bytecode,   // array of bytecode
@@ -691,7 +691,7 @@ vf_set_vector_stack_entry_addr( vf_MapEntry_t *vector,   // stack map vector
 } // vf_set_vector_stack_entry_addr
 
 /**
- * Function sets signle word data type for given stack map vector entry.
+ * Function sets single word data type for given stack map vector entry.
  */
 static inline void
 vf_set_vector_stack_entry_word( vf_MapEntry_t *vector,  // stack map vector
@@ -1198,12 +1198,12 @@ vf_set_out_vector_stack_entry_ref( vf_Code_t *code,         // code instruction
 } // vf_set_out_vector_stack_entry_ref
 
 /**
- * Function sets return adress data type for code instruction OUT stack map vector entry.
+ * Function sets return address data type for code instruction OUT stack map vector entry.
  */
 static inline void
 vf_set_out_vector_stack_entry_addr( vf_Code_t *code,          // code instruction
                                     unsigned num,             // OUT vector entry number
-                                    unsigned count)           // program coint
+                                    unsigned count)           // program count
 {
     vf_set_vector_stack_entry_addr( code->m_outvector, num, count );
     return;
@@ -1398,7 +1398,7 @@ vf_set_array_ref( const char *type,
 void
 vf_set_description_vector( const char *descr,           // descriptor
                            int inlen,                   // number of entries for IN vector
-                           int add,                     // additional number of enties
+                           int add,                     // additional number of entries
                                                         // to IN data flow vector
                            int outlen,                  // number of entries for OUT vector
                            vf_MapEntry_t **invector,    // pointer to IN vector
@@ -3874,7 +3874,7 @@ vf_opcode_newarray( vf_Code_t *code,        // code instruction
 } // vf_opcode_newarray
 
 /**
- * Function recieves valid type string of array by array element name.
+ * Function receives valid type string of array by array element name.
  */
 static inline const char *
 vf_get_class_array_valid_type( const char *element_name,    // array element name
@@ -5027,7 +5027,7 @@ vf_parse_bytecode( vf_Context_t *ctex )     // verifier context
                 result = VER_ErrorInstruction;
                 goto labelEnd_vf_parse_bytecode;
             }
-            // skip 2 parametrs (u1 + u1)
+            // skip 2 parameters (u1 + u1)
             index += 1 + 1;
             break;
         case OPCODE_NEW:            /* 0xbb + u2 */
@@ -5239,14 +5239,14 @@ vf_parse_bytecode( vf_Context_t *ctex )     // verifier context
         vf_set_out_vector_stack_entry_ref( &code[index + 1], 0, type );
 
         /** 
-         * Set handler branchs
+         * Set handler branches
          * Set handler branches to last instructions of basic blocks
          */
         for( count = start_pc + 1; count <= end_pc; count++ ) {
             if( count < len && codeInstr[count].m_mark ) {
                 // calculate code instruction number
                 instr = codeInstr[count].m_instr - 1;
-                // check existen of handler array
+                // check existence of handler array
                 if( code[instr].m_handler == NULL ) {
                     // create handler array for code instruction
                     code[instr].m_handler = 
@@ -5313,7 +5313,7 @@ vf_parse_bytecode( vf_Context_t *ctex )     // verifier context
 labelEnd_vf_parse_bytecode:
 
     /**
-     * Free alocated memory
+     * Free allocated memory
      */
     ctex->m_codeNum = codeNum;
     ctex->m_nodeNum = bbCount;

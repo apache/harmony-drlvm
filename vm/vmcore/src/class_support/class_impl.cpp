@@ -449,7 +449,7 @@ method_is_protected( method_handler hmethod )
     assert( hmethod );
     Method *method = (Method*)hmethod;
     return method->is_protected();
-} // method_is_proctected
+} // method_is_protected
 
 /**
  * Function returns number of method exception handlers.
@@ -594,6 +594,6 @@ field_is_protected( field_handler hfield )
     assert( hfield );
     Field *field = (Field*)hfield;
     return field->is_protected();
-} // field_is_proctected
+} // field_is_protected
 
 
