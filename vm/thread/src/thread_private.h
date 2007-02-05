@@ -67,10 +67,11 @@
 #define FS14_TLS_USE
 #endif
 
+/*
 #ifdef _EM64T_
 #define APR_TLS_USE
 #endif
-
+*/
 
 #ifdef __cplusplus
 extern "C" {
