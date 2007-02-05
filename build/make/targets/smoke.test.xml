@@ -293,28 +293,28 @@ ${foo}
                                 <echo message=" PASSED : ${class.name}" />
 
                                 <!-- create xml-file with test's results -->
-<echo file="${build.dir}/_smoke.tests/reports/${class.name}_${jit.or.interpreter}.xml"><![CDATA[<?xml version="1.0" encoding="UTF-8" ?>
+<echo file="${build.dir}/_smoke.tests/reports/TEST-${class.name}_${jit.or.interpreter}.xml"><![CDATA[<?xml version="1.0" encoding="UTF-8" ?>
 <testsuite errors="0" failures="0" name="@@@@@" tests="1" time="0.01">
 <testcase classname="@@@@@" name="test" time="0.1"/>
 <system-out><![CDATA[@out]!]></system-out>
 <system-err><![CDATA[@err]!]></system-err>
 </testsuite>]]> 
 </echo>
-                                <replace file="${build.dir}/_smoke.tests/reports/${class.name}_${jit.or.interpreter}.xml" token="@@@@@" value="${class.name}_${jit.or.interpreter}" /> 
+                                <replace file="${build.dir}/_smoke.tests/reports/TEST-${class.name}_${jit.or.interpreter}.xml" token="@@@@@" value="${class.name}_${jit.or.interpreter}" /> 
                             </then>
                             <else>
                                 <echo message="*** FAILED **** : ${class.name}" />
                                 <echo message="*** FAILED **** : ${class.name} on ${jit.or.interpreter}${line.separator}" file="${build.semi.dir}/smoke.test.failed" append="true"/>
 
                                 <!-- create xml-file with test's results -->
-<echo file="${build.dir}/_smoke.tests/reports/${class.name}_${jit.or.interpreter}.xml"><![CDATA[<?xml version="1.0" encoding="UTF-8" ?>
+<echo file="${build.dir}/_smoke.tests/reports/TEST-${class.name}_${jit.or.interpreter}.xml"><![CDATA[<?xml version="1.0" encoding="UTF-8" ?>
 <testsuite errors="0" failures="1" name="@@@@@" tests="1" time="0.01">
 <testcase classname="@@@@@" name="test" time="0.1"><error message="FAILED"/></testcase>
 <system-out><![CDATA[@out]!]></system-out>
 <system-err><![CDATA[@err]!]></system-err>
 </testsuite>]]> 
 </echo>
-                                <replace file="${build.dir}/_smoke.tests/reports/${class.name}_${jit.or.interpreter}.xml" token="@@@@@" value="${class.name}_${jit.or.interpreter}" /> 
+                                <replace file="${build.dir}/_smoke.tests/reports/TEST-${class.name}_${jit.or.interpreter}.xml" token="@@@@@" value="${class.name}_${jit.or.interpreter}" /> 
                             </else>
                         </if>
 
@@ -323,10 +323,10 @@ ${foo}
                         <if>
                             <isset property="@{test}.tmp.out" />
                             <then>
-                                <replace file="${build.dir}/_smoke.tests/reports/${class.name}_${jit.or.interpreter}.xml" token="@out]!" value="${@{test}.tmp.out}]" />
+                                <replace file="${build.dir}/_smoke.tests/reports/TEST-${class.name}_${jit.or.interpreter}.xml" token="@out]!" value="${@{test}.tmp.out}]" />
                             </then>
                             <else>
-                                <replace file="${build.dir}/_smoke.tests/reports/${class.name}_${jit.or.interpreter}.xml" token="@out]!" value="]" />
+                                <replace file="${build.dir}/_smoke.tests/reports/TEST-${class.name}_${jit.or.interpreter}.xml" token="@out]!" value="]" />
                             </else>
                         </if>
                         
@@ -335,10 +335,10 @@ ${foo}
                         <if>
                             <isset property="@{test}.tmp.err" />
                             <then>
-                                <replace file="${build.dir}/_smoke.tests/reports/${class.name}_${jit.or.interpreter}.xml" token="@err]!" value="${@{test}.tmp.err}]" />
+                                <replace file="${build.dir}/_smoke.tests/reports/TEST-${class.name}_${jit.or.interpreter}.xml" token="@err]!" value="${@{test}.tmp.err}]" />
                             </then>
                             <else>
-                                <replace file="${build.dir}/_smoke.tests/reports/${class.name}_${jit.or.interpreter}.xml" token="@err]!" value="]" />
+                                <replace file="${build.dir}/_smoke.tests/reports/TEST-${class.name}_${jit.or.interpreter}.xml" token="@err]!" value="]" />
                             </else>
                         </if>
 
