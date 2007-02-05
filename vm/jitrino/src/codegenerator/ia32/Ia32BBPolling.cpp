@@ -131,7 +131,8 @@ private:
 
     // version of BBPolling:
     //  0 - must be discarded in runImpl()
-    //  1 - insert bbpCFG at all backedges
+    //  1 - insert bbpCFG at all backedges except those going from initiallyInterruptable nodes
+    //      (initialInterruptability is not being propagated to the successors. This is the feature of version 5)
     //  2 - path analysis based on searching of pairs [isOnThreadInterruptablePath]->[!isOnThreadInterruptablePath]
     //  3 - recursive version of "2"
     //  4 - "1" + suspension flag addr [TLS base + offset] is calculated before the loop header
