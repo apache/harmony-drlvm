@@ -14,30 +14,29 @@
     See the License for the specific language governing permissions and
     limitations under the License.
 -->
-<!--
-Author:  Marina V. Goldburt
-Version: $Revision: 1.5.2.33 $
--->
 
 <project name="get.resources" default="update.external.resources">
 
+    <!-- check we are using ant 1.6.5 or above -->        
     <target name="check.ant.version">
         <propertyregex property="ant.sub.sub.version" input="${ant.version}" regexp="version (\d*)\.(\d*)\.(\d*)" select="\3" defaultValue="0" />
         <propertyregex property="ant.sub.version" input="${ant.version}" regexp="version (\d*)\.(\d*)\.(\d*)" select="\2" defaultValue="0" />
         <propertyregex property="ant.version1" input="${ant.version}" regexp="version (\d*)\.(\d*)\.(\d*)" select="\1" defaultValue="0" />
 
-        <math result="ch1" operand1="${ant.version1}" operation="min" operand2="1" datatype="int" />
-        <math result="ch2" operand1="${ant.sub.version}" operation="min" operand2="6" datatype="int" />
-        <math result="ch3" operand1="${ant.sub.sub.version}" operation="min" operand2="5" datatype="int" />
+        <math result="ch1">
+            <op op="+" datatype="int">
+                <op arg1="${ant.version1}" arg2="10000" op="*" datatype="int"/>
+                <op arg1="${ant.sub.version}" arg2="100" op="*" datatype="int"/>
+                <num value="${ant.sub.sub.version}"/>
+            </op>
+        </math>
+        <math result="ch2" operand1="10605" operand2="${ch1}" operation="min" datatype="int"/>
+        
 
         <fail>
             <condition>
                 <not>
-                    <and>
-                        <equals arg1="${ch1}" arg2="1" />
-                        <equals arg1="${ch2}" arg2="6" />
-                        <equals arg1="${ch3}" arg2="5" />
-                    </and>
+                    <equals arg1="10605" arg2="${ch2}"/>
                 </not>
             </condition>
 * You have wrong version of ANT :${ant.version}
