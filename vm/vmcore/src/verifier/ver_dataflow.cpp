@@ -1112,7 +1112,7 @@ vf_create_node_vectors( unsigned node_num,          // graph node number
 } // vf_create_node_vectors
 
 /**
- * Function checkes data flow for end graph node.
+ * Function checks data flow for end graph node.
  */
 static Verifier_Result
 vf_check_end_node_data_flow( unsigned node_num,         // graph node number

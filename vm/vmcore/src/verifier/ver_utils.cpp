@@ -1220,7 +1220,7 @@ vf_check_constraint( vf_TypeConstraint_t *restriction,  // checked constraint
 
     /**
      * Verifier which is built on Java VM Specification 2nd Edition (4.9.2)
-     * recommendation of verification proccess doesn't check interfaces usage.
+     * recommendation of verification process doesn't check interfaces usage.
      * Unfortunately, a lot of Java applications depends on this neglect.
      * To be compatible with those applications we should do full constraint
      * checks only if -Xverify:all option is present in command line.
