@@ -1164,7 +1164,6 @@ public:
     Class* get_next_sibling() const { return m_cha_next_sibling; }
 
     /** Gets offset of m_depth field in struct Class.
-     * @param dummy - dummy variable used to calculate field offset
      * @note Instanceof helpers use returned offset.*/
     static size_t get_offset_of_depth() {
         Class* dummy=NULL;
@@ -1172,7 +1171,6 @@ public:
     }
 
     /** Gets offset of m_is_suitable_for_fast_instanceof field in struct Class.
-     * @param dummy - dummy variable used to calculate field offset
      * @note Instanceof helper uses returned offset.*/
     static size_t get_offset_of_fast_instanceof_flag() {
         Class* dummy=NULL;
@@ -1206,16 +1204,16 @@ public:
     }
 
     /** Gets an offset of <code>m_num_class_init_checks</code> in the class.
-     * @param dummy - dummy variable used to calculate field offset
      * @note Class initialization helper on IPF uses returned offset.*/
-    static size_t get_offset_of_class_init_checks(Class* dummy) {
+    static size_t get_offset_of_class_init_checks() {
+        Class* dummy = NULL;
         return (size_t)((char*)(&dummy->m_num_class_init_checks) - (char*)dummy);
     }
 
     /** Gets an offset of <code>m_array_element_class</code> in the class.
-     * @param dummy - dummy variable used to calculate field offset
      * @note Class initialization helper on IPF uses returned offset.*/
-    static size_t get_offset_of_array_element_class(Class* dummy) {
+    static size_t get_offset_of_array_element_class() {
+        Class* dummy = NULL;
         assert(sizeof(dummy->m_array_element_class) == sizeof(void*));
         return (size_t)((char*)(&dummy->m_array_element_class) - (char*)dummy);
     }

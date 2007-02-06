@@ -1086,8 +1086,6 @@ static void *get_vm_rt_initialize_class_compactor()
     emitter.disallow_instruction_exchange();
     emitter.memory_type_is_unknown();
 
-    Class *dummy = NULL;
-
 #ifdef VM_STATS
     increment_stats_counter(emitter, &VM_Statistics::get_vm_stats().num_is_class_initialized);
     // Update the per-class counter.
@@ -1095,7 +1093,7 @@ static void *get_vm_rt_initialize_class_compactor()
     // reg1 = [reg0]
     // reg1 = reg1 + 1
     // [reg0] = reg1
-    emitter.ipf_adds(SCRATCH_GENERAL_REG, (int)Class::get_offset_of_class_init_checks(dummy), IN_REG0);
+    emitter.ipf_adds(SCRATCH_GENERAL_REG, (int)Class::get_offset_of_class_init_checks(), IN_REG0);
     emitter.ipf_ld(int_mem_size_8, mem_ld_none, mem_none, SCRATCH_GENERAL_REG2, SCRATCH_GENERAL_REG);
     emitter.ipf_adds(SCRATCH_GENERAL_REG2, 1, SCRATCH_GENERAL_REG2);
     emitter.ipf_st(int_mem_size_8, mem_st_none, mem_none, SCRATCH_GENERAL_REG, SCRATCH_GENERAL_REG2);
