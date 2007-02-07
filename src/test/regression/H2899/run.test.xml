@@ -1,0 +1,12 @@
+<project name="RUN HARMONY-2899 Regression Test">
+    <target name="run-test">
+        <run-junit-test 
+            test="org.apache.harmony.drlvm.tests.regression.h2899.ManyArgsTest"
+            vmarg="-Xint">
+            <junit-element>
+              <sysproperty key="java.library.path" value="${reg.test.native.path}/H2899"/>
+            </junit-element>
+        </run-junit-test>
+    </target>
+</project>
+
