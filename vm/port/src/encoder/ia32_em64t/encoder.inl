@@ -52,12 +52,12 @@ inline static Mnemonic map_shift(Shift_Opcode shc) {
     return map_of_shift_opcode_2_mnemonic[shc];
 }
 
-inline static bool fit8(int64 val) {
+inline bool fit8(int64 val) {
     return (CHAR_MIN <= val) && (val <= CHAR_MAX);
 }
 
-inline static bool fit32(int64 val) {
-    return val == (int64)(int32)val;
+inline bool fit32(int64 val) {
+    return (INT_MIN <= val) && (val <= INT_MAX);
 }
 
 inline static void add_r(EncoderBase::Operands & args, const R_Opnd & r, Opnd_Size sz) {

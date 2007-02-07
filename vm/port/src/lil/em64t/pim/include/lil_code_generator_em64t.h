@@ -133,6 +133,11 @@ private:
     unsigned n_gr_outputs; // total number of GRs reserved for outputs
     unsigned n_fr_outputs; // total number of FRs reserved for outputs
 
+    /// Number of GR registers currently allocated for temporary needs.
+    unsigned m_tmp_grs_used;
+    /// Number of XMM registers currently allocated for temporary needs.
+    unsigned m_tmp_xmms_used;
+
     unsigned stk_m2n_size;              // size reserved for the m2n frame
     unsigned stk_input_gr_save_size;    // size reserved for saving GR inputs
     unsigned stk_input_fr_save_size;    // size reserved for saving FR inputs
@@ -151,6 +156,7 @@ private:
     bool save_inputs;       // true if inputs are accessed after a normal call
 
 public:
+
 
     LcgEM64TContext(LilCodeStub * stub, tl::MemoryPool & m);
 
@@ -244,6 +250,20 @@ public:
         return n_gr_inputs;
     }
 
+    /**
+     * Returns *reference* to the number of temporary GR registers currently allocated.
+     */
+    unsigned& get_tmp_grs_used(void) {
+	return m_tmp_grs_used;
+    }
+
+    /**
+     * Returns *reference* to the number of temporary XMM registers currently allocated.
+     */
+    unsigned& get_tmp_xmms_used(void) {
+        return m_tmp_xmms_used;
+    }
+    
     /**
      * returns the number of incoming arguments stored in FRs
      */

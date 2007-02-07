@@ -55,6 +55,9 @@ LcgEM64TContext::LcgEM64TContext(LilCodeStub * stub, tl::MemoryPool & m):
     n_gr_outputs = 0;
     n_fr_outputs = 0;
 
+    m_tmp_grs_used = 0;
+    m_tmp_xmms_used = 0;
+
     stk_input_gr_save_size = 0;
     stk_input_fr_save_size = 0;
     stk_output_size = 0;
@@ -134,7 +137,18 @@ LcgEM64TContext::LcgEM64TContext(LilCodeStub * stub, tl::MemoryPool & m):
  */
 class LcgEM64TCodeGen: public LilInstructionVisitor {
 
-    static const size_t     MAX_CODE_LENGTH = 1524; // maximum length of the generated code
+    /**
+     * Maximum possible size of code generated for a single LIL instruction.
+     *
+     * Speculatevely calculated as a sequence of code that used all available 
+     * registers (e.g. potential prolog or epilog) * 2. The real maximum sizes 
+     * are far this speculation (about 120 bytes), so I hardly believe we will 
+     * ever reach this theoretical limit even with deep changes in the LIL codegen.
+     * As the buffer size is predicted basing on this high estimation, we're safe 
+     * in the terms of buffer overruns in current codeged.
+     */
+    static const unsigned   MAX_LIL_INSTRUCTION_CODE_LENGTH = 512*2;
+    
     static const unsigned   MAX_DEC_SIZE = 20; // maximum number of bytes required for string representation of int64
     
     char                    * buf_beg; // pointer to the beginning position of the generated code
@@ -162,14 +176,15 @@ private:
     class Tmp_GR_Opnd: public R_Opnd {
 
     private:
-
-        unsigned & get_num_used_reg() {
-            static unsigned used_tmp_reg_count = 0;
-            return used_tmp_reg_count;
-        }
+	/// Ref to compilation context
+	LcgEM64TContext& m_context;
+	/// Returns *reference* to the counter of currently allocated GR registers
+	unsigned & get_num_used_reg(void) {
+            return m_context.get_tmp_grs_used();
+	}
 
     public:
-        Tmp_GR_Opnd(LcgEM64TContext & context, LilInstructionContext * ic): R_Opnd(n_reg) {
+        Tmp_GR_Opnd(LcgEM64TContext & context, LilInstructionContext * ic): R_Opnd(n_reg), m_context(context) {
             // next temporary register is allocated from unused scratched
             // registers in the following order:
             // ret, std0, std1, out0, out1, out2, out3, out4, out5
@@ -212,14 +227,15 @@ private:
     class Tmp_FR_Opnd: public XMM_Opnd {
 
     private:
-
-        unsigned & get_num_used_reg() {
-            static unsigned used_tmp_reg_count = 0;
-            return used_tmp_reg_count;
-        }
+	/// Ref to compilation context
+	LcgEM64TContext& m_context;
+	/// Returns *reference* to the counter of currently allocated XMM registers
+	unsigned & get_num_used_reg(void) {
+	    return m_context.get_tmp_xmms_used();
+	}
 
     public:
-        Tmp_FR_Opnd(LilInstructionContext * ic): XMM_Opnd(0) {
+        Tmp_FR_Opnd(LcgEM64TContext& context, LilInstructionContext * ic): XMM_Opnd(0), m_context(context) {
             // next temporary register is allocated from unused scratched
             // registers in the following order:
             // xmm8, xmm9, ... xmm15
@@ -236,6 +252,14 @@ private:
     };
 
     /*    Helper functions */
+    
+    /**
+     * Estimates maximum possible code size for the current stub.
+     */
+    unsigned estimate_code_size(void) {
+	unsigned num_insts = lil_cs_get_num_instructions(cs);
+	return num_insts*MAX_LIL_INSTRUCTION_CODE_LENGTH;
+    }
 
     /**
      * returns the location of the n'th int local
@@ -472,10 +496,6 @@ private:
         return NULL;  // should never be reached
     }
 
-    inline bool fit32(int64 value) const {
-        return value == (int64)(int32)value;
-    }
-
     inline int64 get_imm_value(LilOperand * op) const {
         assert(lil_operand_is_immed(op));
         return lil_operand_get_immed(op);
@@ -574,7 +594,7 @@ private:
                 }
                 // src->kind != LLK_Gr
                 // use temporary register
-                Tmp_FR_Opnd tmp_reg(ic);
+                Tmp_FR_Opnd tmp_reg(context, ic);
                 buf = sse_mov(buf, tmp_reg, get_m_opnd(src), true);
                 buf = sse_mov(buf, get_m_opnd(dest), tmp_reg, true);
             } else { // src->kind == LLK_Gr || src->kind == LLK_GStk
@@ -1013,22 +1033,58 @@ public:
      * constructor
      */
     LcgEM64TCodeGen(LilCodeStub * cs, LcgEM64TContext & c, tl::MemoryPool & m):
-        buf_beg((char *)m.alloc(MAX_CODE_LENGTH)), buf(buf_beg),
+        buf_beg(NULL), buf(NULL),
         labels(&m, buf_beg), cs(cs), context(c), mem(m), iter(cs, true), ic(NULL), inst(NULL),        
         rsp_loc(new(m) LcgEM64TLoc(LLK_Gr, LcgEM64TContext::RSP_OFFSET)), take_inputs_from_stack(false),
         current_alloc(0) {
 
+	unsigned max_code_size = estimate_code_size();
+	
+	buf = buf_beg = (char *)m.alloc(max_code_size);
+	char* buf_end = buf_beg + max_code_size;
+	
+	static unsigned max_code = 0;
+	
         // emit entry code
+	char* i_start = buf;
+	
+	// the size of code for prolog accounted in estimate_code_size
+	// as the code for 'entry' instruction.
+	
         prolog();
-        move_inputs();        
-
+        move_inputs();
+	
+	// debug code: check the estimate	
+        char* i_end = buf;
+	unsigned i_len = i_end - i_start;
+	if (i_len > MAX_LIL_INSTRUCTION_CODE_LENGTH) {
+	    // the MAX_LIL_INSTRUCTION_CODE_LENGTH was underestimated.
+	    // most likely will not cause problems in real life, though still requires correction.
+	    assert(false);
+	}
+	    
         // go through the instructions
         while (!iter.at_end()) {
+	    char* i_start = buf;
+	    
             ic = iter.get_context();
             inst = iter.get_current();
             lil_visit_instruction(inst, this);
             iter.goto_next();
+	    
+	    // debug code: see above for the rationale
+	    char* i_end = buf;
+	    unsigned i_len = i_end - i_start;
+	    if (i_len > MAX_LIL_INSTRUCTION_CODE_LENGTH) {
+		assert(false);
+	    }
         }
+	
+	if (buf>buf_end) {
+	    /// Ugh. Buffer overrun.
+	    /// Must be accompanied with previous assert()-s on MAX_LIL_INSTRUCTION_CODE_LENGTH?
+	    assert(false);
+	}
     }
 
     /**
@@ -1042,7 +1098,6 @@ public:
      * returns actual size of the generated code
      */
     size_t get_size() const {
-        assert((unsigned)(buf - buf_beg) < MAX_CODE_LENGTH);
         return buf - buf_beg;
     }
 
