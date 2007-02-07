@@ -15,127 +15,127 @@
      See the License for the specific language governing permissions and
      limitations under the License. -->
 
- <project name="REGRESSION TESTS RUN" default="do-regression-testing">
-     
-     <property name="jvm.under.test" value="${build.deploy.dir}/jdk/jre/bin/java"/>
-     <property name="reg.test.timeout" value="180000" />
-     <property name="reg.test.halt.on.error" value="false"/>
-     <!-- Mark used by custom test launchers for test failure notification -->
-     <property name="reg.test.failed.mark" value="-=@@@ Reg Test Failed @@@=-"/>
-  
-     <target name="do-regression-testing" 
-             depends="launch-tests,make-report,check-results">
-     </target>
- 
-     <target name="launch-tests">
-          <echo>
-  ==================================
-       Run regression tests
-  ==================================
-          </echo>
-  
-         <for param="reg.test.2launch.src.dir">
-             <!-- Go through directories containing regression tests -->
-             <dirset dir="${reg.test.src}">
-                 <include name="H*"/>
-             </dirset>
-             <sequential>
-                 <!-- Set up the property pointing to the natives path -->
-                 <var name="reg.test.2launch.native.path" unset="true"/>
-                 <pathconvert property="reg.test.2launch.native.path">
-                     <path path="@{reg.test.2launch.src.dir}"/>
-                     <map from="${reg.test.src}" to="${reg.test.native.path}"/>
-                 </pathconvert>
-                 <if>
-                     <available file="@{reg.test.2launch.src.dir}/run.test.xml"/>
-                     <then>
-                         <!-- Launch the tests with a custom launchers 
-                                                 placed near the tests -->
-                         <run-custom-launcher 
-                             launcher="@{reg.test.2launch.src.dir}/run.test.xml"/>
-                     </then>
-                     <else>
-                         <!-- Execution of unit tests checking for regression -->
-                         <for param="reg.unit.test.src">
-                             <!-- Go through unit tests in the directory -->
-                             <fileset dir="@{reg.test.2launch.src.dir}">
-                                 <include name="*Test.java"/>
-                             </fileset>
-                             <sequential>
-                                 <propertyregex override="yes"
-                                   property="unit.test.class" 
-                                   input="@{reg.unit.test.src}"
-                                   regexp=".*H(\d\d*)[/\\](..*)\.java" 
-                                   replace="${reg.test.package}.h\1.\2"/>
-                                 <run-junit-test test="${unit.test.class}"/>
-                             </sequential>
-                         </for>
-                     </else>
-                 </if>
-             </sequential>
-         </for>
-  
-     </target>
- 
-     <target name="make-report">
-          <junitreport todir="${reg.test.dir}/reports">
-              <fileset dir="${reg.test.dir}/reports">
-                  <include name="TEST*-*.xml"/>
-              </fileset>
-              <report format="frames" todir="${reg.test.dir}/reports/html"/>
-          </junitreport>
-         <echo message="========================================"/>
-         <echo message="Regression testing report was stored in:"/>
-         <echo message="========================================"/>
-         <echo message="${reg.test.dir}/reports/html"/>
-         <echo message="========================================"/>
-     </target>
-     
-     <target name="check-results">
-         <fail if="reg.test.errors" 
-             message="There were test failures"/>
-     </target>
-  
-      <!-- Macrodefinition launching the custom launcher -->
-      <macrodef name="run-custom-launcher">
-          <attribute name="launcher"/>
-          <sequential>
-             <!-- 
-                 Set up try-catch block to catch the test failure.
- 
-                 It's possible to use <antfetch> task for this purpose:
-                     <antfetch 
-                         antfile="@{launcher}" target="run-test" 
-                         return="reg.test.errors" 
-                         inheritAll="true" inheritRefs="true"/>
-                 but it fails with NPE while <macrodef> processing...
-             -->
-             <trycatch property="reg.test.failure.message"
-                       reference="reg.test.failure.reference">
-                 <try>
-                     <ant antfile="@{launcher}" target="run-test" 
-                              inheritAll="true" inheritRefs="true">
-                          <property name="reg.test.custom.launched" value="true"/>
-                     </ant>
-                 </try>
-                 <catch>
-                     <if>
-                         <!-- it was a test failure -->
-                         <contains string="${reg.test.failure.message}" 
-                                   substring="${reg.test.failed.mark}"/>
-                         <then>
-                             <!-- set up the property -->
-                             <property name="reg.test.errors" value="true"/>
-                         </then>
-                         <else>
-                             <!-- propagate the error -->
-                             <throw refid="reg.test.failure.reference"/>
-                         </else>
-                     </if>
-                 </catch>
-             </trycatch>
-          </sequential>
-      </macrodef>
+<project name="REGRESSION TESTS RUN" default="do-regression-testing">
+    
+    <property name="jvm.under.test" value="${build.deploy.dir}/jdk/jre/bin/java"/>
+    <property name="reg.test.timeout" value="180000" />
+    <property name="reg.test.halt.on.error" value="false"/>
+    <!-- Mark used by custom test launchers for test failure notification -->
+    <property name="reg.test.failed.mark" value="-=@@@ Reg Test Failed @@@=-"/>
+
+    <target name="do-regression-testing" 
+            depends="launch-tests,make-report,check-results">
+    </target>
+
+    <target name="launch-tests">
+        <echo>
+==================================
+     Run regression tests
+==================================
+        </echo>
+
+        <for param="reg.test.2launch.src.dir">
+            <!-- Go through directories containing regression tests -->
+            <dirset dir="${reg.test.src}">
+                <include name="H*"/>
+            </dirset>
+            <sequential>
+                <!-- Set up the property pointing to the natives path -->
+                <var name="reg.test.2launch.native.path" unset="true"/>
+                <pathconvert property="reg.test.2launch.native.path">
+                    <path path="@{reg.test.2launch.src.dir}"/>
+                    <map from="${reg.test.src}" to="${reg.test.native.path}"/>
+                </pathconvert>
+                <if>
+                    <available file="@{reg.test.2launch.src.dir}/run.test.xml"/>
+                    <then>
+                        <!-- Launch the tests with a custom launchers 
+                                                placed near the tests -->
+                        <run-custom-launcher 
+                            launcher="@{reg.test.2launch.src.dir}/run.test.xml"/>
+                    </then>
+                    <else>
+                        <!-- Execution of unit tests checking for regression -->
+                        <for param="reg.unit.test.src">
+                            <!-- Go through unit tests in the directory -->
+                            <fileset dir="@{reg.test.2launch.src.dir}">
+                                <include name="*Test.java"/>
+                            </fileset>
+                            <sequential>
+                                <propertyregex override="yes"
+                                  property="unit.test.class" 
+                                  input="@{reg.unit.test.src}"
+                                  regexp=".*H(\d\d*)[/\\](..*)\.java" 
+                                  replace="${reg.test.package}.h\1.\2"/>
+                                <run-junit-test test="${unit.test.class}"/>
+                            </sequential>
+                        </for>
+                    </else>
+                </if>
+            </sequential>
+        </for>
+
+    </target>
+
+    <target name="make-report">
+        <junitreport todir="${reg.test.dir}/reports">
+            <fileset dir="${reg.test.dir}/reports">
+                <include name="TEST*-*.xml"/>
+            </fileset>
+            <report format="frames" todir="${reg.test.dir}/reports/html"/>
+        </junitreport>
+        <echo message="========================================"/>
+        <echo message="Regression testing report was stored in:"/>
+        <echo message="========================================"/>
+        <echo message="${reg.test.dir}/reports/html"/>
+        <echo message="========================================"/>
+    </target>
+    
+    <target name="check-results">
+        <fail if="reg.test.errors" 
+            message="There were test failures"/>
+    </target>
+
+    <!-- Macrodefinition launching the custom launcher -->
+    <macrodef name="run-custom-launcher">
+        <attribute name="launcher"/>
+        <sequential>
+            <!-- 
+                Set up try-catch block to catch the test failure.
+
+                It's possible to use <antfetch> task for this purpose:
+                    <antfetch 
+                        antfile="@{launcher}" target="run-test" 
+                        return="reg.test.errors" 
+                        inheritAll="true" inheritRefs="true"/>
+                but it fails with NPE while <macrodef> processing...
+            -->
+            <trycatch property="reg.test.failure.message"
+                      reference="reg.test.failure.reference">
+                <try>
+                    <ant antfile="@{launcher}" target="run-test" 
+                             inheritAll="true" inheritRefs="true">
+                         <property name="reg.test.custom.launched" value="true"/>
+                    </ant>
+                </try>
+                <catch>
+                    <if>
+                        <!-- it was a test failure -->
+                        <contains string="${reg.test.failure.message}" 
+                                  substring="${reg.test.failed.mark}"/>
+                        <then>
+                            <!-- set up the property -->
+                            <property name="reg.test.errors" value="true"/>
+                        </then>
+                        <else>
+                            <!-- propagate the error -->
+                            <throw refid="reg.test.failure.reference"/>
+                        </else>
+                    </if>
+                </catch>
+            </trycatch>
+        </sequential>
+    </macrodef>
 
     <!-- Macrodefinition launching JUnit test -->
     <macrodef name="run-junit-test">
@@ -146,7 +146,7 @@
             <junit jvm="${jvm.under.test}"
                    fork="yes"
                    haltonfailure="false"
-                   haltonerror="false"
+                   haltonerror="${reg.test.halt.on.error}"
                    printsummary="withOutAndErr"
                    dir="${basedir}"
                    failureproperty="reg.test.errors"
@@ -160,9 +160,19 @@
                 <formatter type="brief"/>
                 <formatter type="xml"/>
             </junit>
+            <if>
+                <isset property="reg.test.custom.launched"/>
+                <then>
+                    <fail message="${reg.test.failed.mark}">
+                        <condition>
+                            <istrue value="${reg.test.errors}"/>
+                        </condition>
+                    </fail>
+                </then>
+            </if>
         </sequential>
     </macrodef>
-     
+
     <!-- Macrodefinition launching JVMTI JUnit test -->
     <macrodef name="run-jvmti-test">
         <attribute name="test"/>
