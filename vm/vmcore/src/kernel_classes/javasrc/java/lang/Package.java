@@ -14,10 +14,6 @@
  *  See the License for the specific language governing permissions and
  *  limitations under the License.
  */
-/**
- * @author Evgueni Brevnov, Alexey V. Varlamov, Serguei S. Zapreyev
- * @version $Revision: 1.1.2.2.4.4 $
- */
 
 package java.lang;
 
@@ -263,22 +259,25 @@ public class Package implements AnnotatedElement {
             init();
         }
 
-        /*
-         *  yes, it's not as performant as catching an NPE down below when
-         *  something blows up, but it's very clear to those that read this.
-         *  Spec says that an NFE is thrown if the current or desired version
-         *  is not of the correct dotted form.  Lack of a version is such...
-         */
-        if (specVersion == null) { 
-            throw new NumberFormatException("No version defined for implementation");
+        if (specVersion == null || specVersion.length() == 0) { 
+            throw new NumberFormatException(
+                    "No specification version defined for the package");
         }
 
-        if (specVersion.startsWith(".") || specVersion.endsWith(".")) {
-            throw new NumberFormatException("Wrong implementation version: should not start or end with '.'");
+        if (!specVersion.matches("[\\p{javaDigit}]+(.[\\p{javaDigit}]+)*")) {
+            throw new NumberFormatException(
+                    "Package specification version is not of the correct dotted form : " 
+                    + specVersion);
+        }
+        
+        if (desiredVersion == null || desiredVersion.length() == 0) {
+            throw new NumberFormatException("Empty version to check");
         }
 
-        if (desiredVersion.startsWith(".") || desiredVersion.endsWith(".")) {
-            throw new NumberFormatException("Wrong version to check: should not start or end with '.'");
+        if (!desiredVersion.matches("[\\p{javaDigit}]+(.[\\p{javaDigit}]+)*")) {
+            throw new NumberFormatException(
+                    "Desired version is not of the correct dotted form : " 
+                    + desiredVersion);
         }
         
         StringTokenizer specVersionTokens = new StringTokenizer(specVersion,
@@ -288,9 +287,6 @@ public class Package implements AnnotatedElement {
                 desiredVersion, ".");
 
         try {
-            if (!specVersionTokens.hasMoreElements() || !desiredVersionTokens.hasMoreElements()) {
-                throw new NumberFormatException("Empty version string");
-            }
             while (specVersionTokens.hasMoreElements()) {
                 int desiredVer = Integer.parseInt(desiredVersionTokens
                         .nextToken());
@@ -300,11 +296,9 @@ public class Package implements AnnotatedElement {
                 }
             }
         } catch (NoSuchElementException e) {
-        	
-        	/* 
-        	 * ignore - this seems to be the case when we run out of tokens
-        	 * for desiredVersion
-        	 */
+           /*
+            * run out of tokens for desiredVersion
+            */
         }
         
         /*
