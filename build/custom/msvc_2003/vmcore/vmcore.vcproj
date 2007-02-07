@@ -768,16 +768,85 @@ copy $(OutDir)\harmonyvm.lib $(ProjectDir)\..\..\..\win_ia32_msvc_$(Configuratio
 				RelativePath="..\..\..\..\vm\vmcore\src\kernel_classes\native\java_lang_VMThreadManager.h">
 			</File>
 			<File
+				RelativePath="..\..\..\..\vm\vmcore\src\kernel_classes\native\java_security_AccessController.h">
+			</File>
+			<File
 				RelativePath="..\..\..\..\vm\vmcore\src\kernel_classes\native\java_util_concurrent_locks_LockSupport.cpp">
 			</File>
 			<File
 				RelativePath="..\..\..\..\vm\vmcore\src\kernel_classes\native\java_util_concurrent_locks_LockSupport.h">
 			</File>
 			<File
+				RelativePath="..\..\..\..\vm\vmcore\src\kernel_classes\native\org_apache_harmony_drlvm_VMHelperFastPath.cpp">
+			</File>
+			<File
+				RelativePath="..\..\..\..\vm\vmcore\src\kernel_classes\native\org_apache_harmony_drlvm_VMHelperFastPath.h">
+			</File>
+			<File
 				RelativePath="..\..\..\..\vm\vmcore\src\kernel_classes\native\org_apache_harmony_kernel_vm_VM.cpp">
 			</File>
 			<File
 				RelativePath="..\..\..\..\vm\vmcore\src\kernel_classes\native\org_apache_harmony_kernel_vm_VM.h">
+			</File>
+			<File
+				RelativePath="..\..\..\..\vm\vmcore\src\kernel_classes\native\org_apache_harmony_lang_management_ClassLoadingMXBeanImpl.cpp">
+			</File>
+			<File
+				RelativePath="..\..\..\..\vm\vmcore\src\kernel_classes\native\org_apache_harmony_lang_management_ClassLoadingMXBeanImpl.h">
+			</File>
+			<File
+				RelativePath="..\..\..\..\vm\vmcore\src\kernel_classes\native\org_apache_harmony_lang_management_CompilationMXBeanImpl.cpp">
+			</File>
+			<File
+				RelativePath="..\..\..\..\vm\vmcore\src\kernel_classes\native\org_apache_harmony_lang_management_CompilationMXBeanImpl.h">
+			</File>
+			<File
+				RelativePath="..\..\..\..\vm\vmcore\src\kernel_classes\native\org_apache_harmony_lang_management_GarbageCollectorMXBeanImpl.cpp">
+			</File>
+			<File
+				RelativePath="..\..\..\..\vm\vmcore\src\kernel_classes\native\org_apache_harmony_lang_management_GarbageCollectorMXBeanImpl.h">
+			</File>
+			<File
+				RelativePath="..\..\..\..\vm\vmcore\src\kernel_classes\native\org_apache_harmony_lang_management_MemoryManagerMXBeanImpl.cpp">
+			</File>
+			<File
+				RelativePath="..\..\..\..\vm\vmcore\src\kernel_classes\native\org_apache_harmony_lang_management_MemoryManagerMXBeanImpl.h">
+			</File>
+			<File
+				RelativePath="..\..\..\..\vm\vmcore\src\kernel_classes\native\org_apache_harmony_lang_management_MemoryMXBeanImpl.cpp">
+			</File>
+			<File
+				RelativePath="..\..\..\..\vm\vmcore\src\kernel_classes\native\org_apache_harmony_lang_management_MemoryMXBeanImpl.h">
+			</File>
+			<File
+				RelativePath="..\..\..\..\vm\vmcore\src\kernel_classes\native\org_apache_harmony_lang_management_MemoryNotificationThread.cpp">
+			</File>
+			<File
+				RelativePath="..\..\..\..\vm\vmcore\src\kernel_classes\native\org_apache_harmony_lang_management_MemoryNotificationThread.h">
+			</File>
+			<File
+				RelativePath="..\..\..\..\vm\vmcore\src\kernel_classes\native\org_apache_harmony_lang_management_MemoryNotificationThreadShutdown.cpp">
+			</File>
+			<File
+				RelativePath="..\..\..\..\vm\vmcore\src\kernel_classes\native\org_apache_harmony_lang_management_MemoryNotificationThreadShutdown.h">
+			</File>
+			<File
+				RelativePath="..\..\..\..\vm\vmcore\src\kernel_classes\native\org_apache_harmony_lang_management_MemoryPoolMXBeanImpl.cpp">
+			</File>
+			<File
+				RelativePath="..\..\..\..\vm\vmcore\src\kernel_classes\native\org_apache_harmony_lang_management_MemoryPoolMXBeanImpl.h">
+			</File>
+			<File
+				RelativePath="..\..\..\..\vm\vmcore\src\kernel_classes\native\org_apache_harmony_lang_management_RuntimeMXBeanImpl.cpp">
+			</File>
+			<File
+				RelativePath="..\..\..\..\vm\vmcore\src\kernel_classes\native\org_apache_harmony_lang_management_RuntimeMXBeanImpl.h">
+			</File>
+			<File
+				RelativePath="..\..\..\..\vm\vmcore\src\kernel_classes\native\org_apache_harmony_lang_management_ThreadMXBeanImpl.cpp">
+			</File>
+			<File
+				RelativePath="..\..\..\..\vm\vmcore\src\kernel_classes\native\org_apache_harmony_lang_management_ThreadMXBeanImpl.h">
 			</File>
 			<File
 				RelativePath="..\..\..\..\vm\vmcore\src\kernel_classes\native\org_apache_harmony_util_concurrent_Atomics.cpp">

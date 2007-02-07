@@ -127,6 +127,9 @@ copy $(OutDir)\gc_gen.pdb $(ProjectDir)\..\..\..\win_ia32_msvc_$(ConfigurationNa
 			Name="common"
 			Filter="">
 			<File
+				RelativePath="..\..\..\..\vm\gc_gen\src\common\fix_repointed_refs.h">
+			</File>
+			<File
 				RelativePath="..\..\..\..\vm\gc_gen\src\common\gc_block.h">
 			</File>
 			<File
@@ -154,10 +157,16 @@ copy $(OutDir)\gc_gen.pdb $(ProjectDir)\..\..\..\win_ia32_msvc_$(ConfigurationNa
 				RelativePath="..\..\..\..\vm\gc_gen\src\common\gc_platform.h">
 			</File>
 			<File
+				RelativePath="..\..\..\..\vm\gc_gen\src\common\gc_space.h">
+			</File>
+			<File
 				RelativePath="..\..\..\..\vm\gc_gen\src\common\interior_pointer.cpp">
 			</File>
 			<File
 				RelativePath="..\..\..\..\vm\gc_gen\src\common\interior_pointer.h">
+			</File>
+			<File
+				RelativePath="..\..\..\..\vm\gc_gen\src\common\large_pages.cpp">
 			</File>
 			<File
 				RelativePath="..\..\..\..\vm\gc_gen\src\common\mark_scan.cpp">
@@ -166,7 +175,16 @@ copy $(OutDir)\gc_gen.pdb $(ProjectDir)\..\..\..\win_ia32_msvc_$(ConfigurationNa
 				RelativePath="..\..\..\..\vm\gc_gen\src\common\mark_scan_par.cpp">
 			</File>
 			<File
+				RelativePath="..\..\..\..\vm\gc_gen\src\common\mark_scan_pool.cpp">
+			</File>
+			<File
 				RelativePath="..\..\..\..\vm\gc_gen\src\common\mark_scan_seq.cpp">
+			</File>
+			<File
+				RelativePath="..\..\..\..\vm\gc_gen\src\common\space_tuner.cpp">
+			</File>
+			<File
+				RelativePath="..\..\..\..\vm\gc_gen\src\common\space_tuner.h">
 			</File>
 		</Filter>
 		<Filter
@@ -176,10 +194,16 @@ copy $(OutDir)\gc_gen.pdb $(ProjectDir)\..\..\..\win_ia32_msvc_$(ConfigurationNa
 				RelativePath="..\..\..\..\vm\gc_gen\src\gen\gc_for_barrier.cpp">
 			</File>
 			<File
+				RelativePath="..\..\..\..\vm\gc_gen\src\gen\gc_for_barrier.h">
+			</File>
+			<File
 				RelativePath="..\..\..\..\vm\gc_gen\src\gen\gen.cpp">
 			</File>
 			<File
 				RelativePath="..\..\..\..\vm\gc_gen\src\gen\gen.h">
+			</File>
+			<File
+				RelativePath="..\..\..\..\vm\gc_gen\src\gen\gen_adapt.cpp">
 			</File>
 		</Filter>
 		<Filter
@@ -188,10 +212,22 @@ copy $(OutDir)\gc_gen.pdb $(ProjectDir)\..\..\..\win_ia32_msvc_$(ConfigurationNa
 			<File
 				RelativePath="..\..\..\..\vm\gc_gen\src\jni\helper.cpp">
 			</File>
+			<File
+				RelativePath="..\..\..\..\vm\gc_gen\src\jni\java_natives.cpp">
+			</File>
+			<File
+				RelativePath="..\..\..\..\vm\gc_gen\src\jni\java_support.cpp">
+			</File>
+			<File
+				RelativePath="..\..\..\..\vm\gc_gen\src\jni\java_support.h">
+			</File>
 		</Filter>
 		<Filter
 			Name="mark_compact"
 			Filter="">
+			<File
+				RelativePath="..\..\..\..\vm\gc_gen\src\mark_compact\fallback_mark_scan.cpp">
+			</File>
 			<File
 				RelativePath="..\..\..\..\vm\gc_gen\src\mark_compact\mspace.cpp">
 			</File>
@@ -209,6 +245,18 @@ copy $(OutDir)\gc_gen.pdb $(ProjectDir)\..\..\..\win_ia32_msvc_$(ConfigurationNa
 			</File>
 			<File
 				RelativePath="..\..\..\..\vm\gc_gen\src\mark_compact\mspace_collect_compact.cpp">
+			</File>
+			<File
+				RelativePath="..\..\..\..\vm\gc_gen\src\mark_compact\mspace_collect_compact.h">
+			</File>
+			<File
+				RelativePath="..\..\..\..\vm\gc_gen\src\mark_compact\mspace_extend_compact.cpp">
+			</File>
+			<File
+				RelativePath="..\..\..\..\vm\gc_gen\src\mark_compact\mspace_move_compact.cpp">
+			</File>
+			<File
+				RelativePath="..\..\..\..\vm\gc_gen\src\mark_compact\mspace_slide_compact.cpp">
 			</File>
 		</Filter>
 		<Filter
@@ -241,6 +289,9 @@ copy $(OutDir)\gc_gen.pdb $(ProjectDir)\..\..\..\win_ia32_msvc_$(ConfigurationNa
 			</File>
 			<File
 				RelativePath="..\..\..\..\vm\gc_gen\src\thread\collector_alloc.cpp">
+			</File>
+			<File
+				RelativePath="..\..\..\..\vm\gc_gen\src\thread\collector_alloc.h">
 			</File>
 			<File
 				RelativePath="..\..\..\..\vm\gc_gen\src\thread\gc_thread.cpp">
@@ -290,6 +341,12 @@ copy $(OutDir)\gc_gen.pdb $(ProjectDir)\..\..\..\win_ia32_msvc_$(ConfigurationNa
 			</File>
 			<File
 				RelativePath="..\..\..\..\vm\gc_gen\src\trace_forward\fspace_forward.cpp">
+			</File>
+			<File
+				RelativePath="..\..\..\..\vm\gc_gen\src\trace_forward\fspace_gen_forward_pool.cpp">
+			</File>
+			<File
+				RelativePath="..\..\..\..\vm\gc_gen\src\trace_forward\fspace_nongen_forward_pool.cpp">
 			</File>
 		</Filter>
 		<Filter
