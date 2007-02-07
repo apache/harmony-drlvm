@@ -37,7 +37,6 @@ VMEXPORT jclass jni_class_from_handle(JNIEnv*, Class_Handle);
 VMEXPORT jobject jni_class_loader_from_handle(JNIEnv*, ClassLoaderHandle);
 VMEXPORT ClassLoaderHandle class_loader_lookup(jobject loader);
 VMEXPORT void class_loader_load_native_lib(const char* lib, ClassLoaderHandle loader);
-VMEXPORT ClassLoaderHandle class_loader_find_if_exists(jobject loader);
 
 VMEXPORT jvalue *get_jvalue_arg_array(Method *method, va_list args);
 

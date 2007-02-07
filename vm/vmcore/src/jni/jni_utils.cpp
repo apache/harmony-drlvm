@@ -90,17 +90,6 @@ void class_loader_load_native_lib(const char* lib,
 }
 
 
-ClassLoaderHandle class_loader_find_if_exists(jobject loader)
-{
-    ObjectHandle h = (ObjectHandle)loader;
-
-    hythread_suspend_disable();       //---------------------------------v
-    ClassLoader* cl = ClassLoader::FindByObject(h->object);
-    hythread_suspend_enable();        //---------------------------------^
-
-    return cl;
-} //class_loader_find_if_exists
-
 VMEXPORT
 jvalue *get_jvalue_arg_array(Method *method, va_list args)
 {

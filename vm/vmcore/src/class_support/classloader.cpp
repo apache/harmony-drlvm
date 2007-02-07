@@ -415,7 +415,7 @@ void ClassLoader::SuccessLoadingClass(const String* className)
 
 ClassLoader* ClassLoader::FindByObject(ManagedObject* loader)
 {
-    LMAutoUnlock aulock( &(ClassLoader::m_tableLock) );
+    LMAutoUnlock aulock(&(ClassLoader::m_tableLock));
     ClassLoader* cl;
     for(unsigned i = 0; i < m_nextEntry; i++)
     {
@@ -428,6 +428,7 @@ ClassLoader* ClassLoader::FindByObject(ManagedObject* loader)
 
 ClassLoader* ClassLoader::LookupLoader( ManagedObject* loader )
 {
+    LMAutoUnlock aulock(&(ClassLoader::m_tableLock));
     if( !loader ) return NULL;
     ClassLoader *cl = FindByObject( loader );
     if( cl )
@@ -568,7 +569,6 @@ ClassLoader* ClassLoader::AddClassLoader( ManagedObject* loader )
 {
     SuspendDisabledChecker sdc;
 
-    LMAutoUnlock aulock( &(ClassLoader::m_tableLock) );
     ClassLoader* cl = new UserDefinedClassLoader();
     TRACE2("classloader.unloading.add", "Adding class loader "
         << cl << " (" << loader << " : "
