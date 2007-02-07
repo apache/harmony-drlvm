@@ -239,8 +239,13 @@ POINTER_SIZE_INT ValueMethodProfile::getResult(uint32 instructionKey)
 {
     lockProfile();
     VPInstructionProfileData* _temp_vp = ValueMap[instructionKey];
+    if (_temp_vp == NULL) {
+        assert(0);
+        unlockProfile();
+        return 0;
+    }
     flushInstProfile(_temp_vp);
-    POINTER_SIZE_INT result = (_temp_vp == NULL) ? 0 : getVPC()->find_max(_temp_vp->TNV_Table);
+    POINTER_SIZE_INT result = getVPC()->find_max(_temp_vp->TNV_Table);
     unlockProfile();
     return result; 
 }

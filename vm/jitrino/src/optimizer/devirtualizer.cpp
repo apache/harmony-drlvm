@@ -69,7 +69,7 @@ Devirtualizer::Devirtualizer(IRManager& irm, SessionAction* sa)
 }
 
 bool
-Devirtualizer::isGuardableVirtualCall(Inst* inst, MethodInst*& methodInst, Opnd*& base, Opnd*& tauNullChecked, Opnd *&tauTypesChecked, uint32 &argOffset)
+Devirtualizer::isGuardableVirtualCall(Inst* inst, MethodInst*& methodInst, Opnd*& base, Opnd*& tauNullChecked, Opnd *&tauTypesChecked, uint32 &argOffset, bool &isIntfCall)
 {
     //
     // Returns true if this call site may be considered for guarded devirtualization
@@ -120,10 +120,14 @@ Devirtualizer::isGuardableVirtualCall(Inst* inst, MethodInst*& methodInst, Opnd*
             (methodOpcode == Op_TauLdVirtFunAddr)) {
             Inst *vtableInst = methodSrc0->getInst();
             Opcode vtableInstOpcode = vtableInst->getOpcode();
-            if ((vtableInstOpcode == Op_TauLdVTableAddr) ||
-                (vtableInstOpcode == Op_TauLdIntfcVTableAddr)) {
+            if (vtableInstOpcode == Op_TauLdVTableAddr) {
+                isIntfCall = false;
+            } else if (vtableInstOpcode == Op_TauLdIntfcVTableAddr) {
+                isIntfCall = true;
             } else {
-                // must be a copy or something, too hard to check
+                // Need a real example when this assertion fires
+                // This can be handled with copy propagation
+                assert(0);
             }
         } else {
             assert(base == methodInst->getSrc(0));
@@ -404,17 +408,17 @@ Devirtualizer::guardCallsInBlock(IRManager& regionIRM, Node* node) {
         Opnd* tauNullChecked = 0;
         Opnd* tauTypesChecked = 0;
         uint32 argOffset = 0;
-        if(isGuardableVirtualCall(last, methodInst, base, tauNullChecked, tauTypesChecked, argOffset)) {
+        bool isIntfCall = false;
+        if(isGuardableVirtualCall(last, methodInst, base, tauNullChecked, tauTypesChecked, argOffset, isIntfCall)) {
             assert(methodInst && base && tauNullChecked && tauTypesChecked && argOffset);
 
             assert(base->getType()->isObject());
             ObjectType* baseType = (ObjectType*) base->getType();
-            bool intfCall = baseType->isInterface();
-            if (! ((_devirtInterfaceCalls && intfCall) || (_devirtVirtualCalls && !intfCall))) {
+            if (! ((_devirtInterfaceCalls && isIntfCall) || (_devirtVirtualCalls && !isIntfCall))) {
                 return;
             }
             // If base type is concrete, consider an explicit guarded test against it
-            if(!baseType->isNullObject() && ((_devirtInterfaceCalls && intfCall) || !baseType->isAbstract() || baseType->isArray())) {
+            if(!baseType->isNullObject() && ((_devirtInterfaceCalls && isIntfCall) || !baseType->isAbstract() || baseType->isArray())) {
                 MethodDesc* origMethodDesc = methodInst->getMethodDesc();
                 MethodDesc* candidateMeth = NULL;
                 int candidateExecCount = 0;

@@ -38,7 +38,7 @@ public:
     void unguardCallsInRegion(IRManager& irm);
 
     static bool isGuardableVirtualCall(Inst* inst, MethodInst*& methodInst, Opnd*& base, 
-        Opnd* & tauNullChecked, Opnd*&tauTypesChecked, uint32 &argOffset);
+        Opnd* & tauNullChecked, Opnd*&tauTypesChecked, uint32 &argOffset, bool &isIntfCall);
 
 
 private:

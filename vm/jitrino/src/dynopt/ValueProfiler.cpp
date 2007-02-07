@@ -59,7 +59,8 @@ void ValueProfilerInstrumentationPass::_run(IRManager& irm)
             Opnd* tauNullChecked = NULL;
             Opnd* tauTypesChecked = NULL;
             uint32 argOffset = 0;
-            if(Devirtualizer::isGuardableVirtualCall(lastInst, methodInst, base, tauNullChecked, tauTypesChecked, argOffset)) {
+            bool isIntfCall = false;
+            if(Devirtualizer::isGuardableVirtualCall(lastInst, methodInst, base, tauNullChecked, tauTypesChecked, argOffset, isIntfCall)) {
                 assert(methodInst && base && tauNullChecked && tauTypesChecked && argOffset);
                 assert(base->getType()->isObject());
 
@@ -75,17 +76,7 @@ void ValueProfilerInstrumentationPass::_run(IRManager& irm)
                 }
 
                 Inst* vtableInst = methodInst->getSrc(0)->getInst();
-                Opcode vtableInstOpcode = vtableInst->getOpcode();
-                if (vtableInstOpcode == Op_TauLdVTableAddr) {
-                    // That is what we are looking for
-                    if (debug) {
-                        Log::out() << "\tFound ldVTable instruction to instrument: ";
-                        vtableInst->print(Log::out());
-                        Log::out() << std::endl;
-                    }
-                    // Don't profile virtual calls so far
-                    continue;
-                } else if (vtableInstOpcode == Op_TauLdIntfcVTableAddr) {
+                if (isIntfCall) {
                     // Need to generate VTable loading
                     Opnd* vTable = opndManager.createSsaTmpOpnd(typeManager.getVTablePtrType(typeManager.getSystemObjectType()));
                     Inst* ldVtableInst = instFactory.makeTauLdVTableAddr(vTable, base, tauNullChecked);
@@ -97,6 +88,13 @@ void ValueProfilerInstrumentationPass::_run(IRManager& irm)
                         Log::out() << std::endl;
                     }
                 } else {
+                    // That is what we are looking for
+                    if (debug) {
+                        Log::out() << "\tFound ldVTable instruction to instrument: ";
+                        vtableInst->print(Log::out());
+                        Log::out() << std::endl;
+                    }
+                    // Don't profile virtual calls so far
                     continue;
                 }
                 VectorHandler* bc2HIRMapHandler = new VectorHandler(bcOffset2HIRHandlerName, &md);
