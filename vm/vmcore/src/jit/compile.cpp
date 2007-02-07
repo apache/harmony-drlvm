@@ -807,13 +807,16 @@ DynamicCode* compile_get_dynamic_code_list(void)
 // Adding dynamic generated code info to global list
 void compile_add_dynamic_generated_code_chunk(const char* name, const void* address, jint length)
 {
-    DynamicCode** pdcList = &VM_Global_State::loader_env->dcList;
-    // FIXME linked list modification without synchronization
     DynamicCode *dc = (DynamicCode *)STD_MALLOC(sizeof(DynamicCode));
     assert(dc);
     dc->name = name;
     dc->address = address;
     dc->length = length;
+
+    // Synchronizing access to dynamic code list
+    LMAutoUnlock dcll(VM_Global_State::loader_env->p_dclist_lock);
+
+    DynamicCode** pdcList = &VM_Global_State::loader_env->dcList;
     dc->next = *pdcList;
     *pdcList = dc;
 }

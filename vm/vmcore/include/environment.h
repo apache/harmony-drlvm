@@ -78,6 +78,7 @@ struct Global_Env {
     Lock_Manager *p_meth_addr_table_lock;
     Lock_Manager *p_method_call_lock;
     Lock_Manager *p_handle_lock;
+    Lock_Manager *p_dclist_lock;
 
     /**
      * If set to true by the <code>-compact_fields</code> command-line option,

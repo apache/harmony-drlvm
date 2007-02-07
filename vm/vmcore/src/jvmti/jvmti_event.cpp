@@ -611,10 +611,15 @@ jvmtiGenerateEvents(jvmtiEnv* env,
     }
     else
     {
-        // FIXME: linked list usage without sync
+        Lock_Manager* dclock = VM_Global_State::loader_env->p_dclist_lock;
+        // Synchronizing access to dynamic code list
+        dclock->_lock();
+
         for (DynamicCode *dcList = compile_get_dynamic_code_list();
             NULL != dcList; dcList = dcList->next)
             jvmti_send_dynamic_code_generated_event(dcList->name, dcList->address, dcList->length);
+
+        dclock->_unlock();
     }
 
     return JVMTI_ERROR_NONE;

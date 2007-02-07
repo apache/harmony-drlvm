@@ -80,6 +80,9 @@ bool native_is_ip_in_modules(native_module_t* modules, void* ip)
 
 bool native_is_ip_stub(void* ip)
 {
+    // Synchronizing access to dynamic code list
+    LMAutoUnlock dcll(VM_Global_State::loader_env->p_dclist_lock);
+
     for (DynamicCode *dcList = compile_get_dynamic_code_list();
          NULL != dcList; dcList = dcList->next)
     {
