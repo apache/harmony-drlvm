@@ -216,7 +216,7 @@ static void send_suspend_request(hythread_t thread) {
 // blocked in case was selfsuspended.
 static IDATA wait_safe_region_event(hythread_t thread) {
     assert(thread->suspend_request >= 1);
-    if(thread->suspend_request > 1 || thread == tm_self_tls) {
+    if(thread == tm_self_tls) {
         TRACE(("TM: suspend wait self exit thread: %p request count: %d",thread , thread->suspend_request));
         return TM_ERROR_NONE;
     }               
