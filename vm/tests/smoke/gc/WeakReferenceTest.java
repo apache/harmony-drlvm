@@ -44,18 +44,13 @@ public class WeakReferenceTest {
         referent = null;
 
         System.gc();
-        System.out.println("waiting for a reference..");
-        // wait a little before calling poll()
+        
+        // run finalization to be sure that the reference is enqueued
+        System.runFinalization();
+        
         Reference enqueued;
-        int count = 500;
-        do {
-            try {
-                Thread.sleep(20);
-            } catch (Exception e) {
-            }
-            enqueued = queue.poll();
-        } while (enqueued == null && count-- > 0);
-        if (count == 0) {
+        enqueued = queue.poll();
+        if (enqueued == null) {
             System.out.println("FAIL: reference was not enqueued");
             return;
         }
