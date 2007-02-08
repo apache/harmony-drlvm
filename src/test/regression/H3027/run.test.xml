@@ -5,8 +5,8 @@
             <junit-element>
                 <jvmarg value="-Dvm.assert_dialog=0"/>
                 <jvmarg value="-agentlib:AgentLib"/>
-                <env key="PATH" path="${reg.test.2launch.native.path}:${env.PATH}"/>
-                <env key="LD_LIBRARY_PATH" path="${reg.test.2launch.native.path}:${env.LD_LIBRARY_PATH}"/>
+                <env key="Path" path="${reg.test.2launch.native.path}${path.separator}${env.Path}"/>
+                <env key="LD_LIBRARY_PATH" path="${reg.test.2launch.native.path}${path.separator}${env.LD_LIBRARY_PATH}"/>
             </junit-element>
         </run-junit-test>
     </target>
