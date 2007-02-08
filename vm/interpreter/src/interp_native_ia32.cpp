@@ -182,11 +182,16 @@ interpreter_execute_native_method(
             {
                 jobject obj = (jobject) invokeJNI_Obj(arg_words, argId, f);
                 hythread_suspend_disable();
-                ManagedObject *ref = obj->object;
-                M2N_FREE_MACRO;
-                ObjectHandle new_handle = oh_allocate_local_handle();
-                new_handle->object = ref;
-                resultPtr->l = new_handle;
+                if (obj) {
+                    ManagedObject *ref = obj->object;
+                    M2N_FREE_MACRO;
+                    ObjectHandle new_handle = oh_allocate_local_handle();
+                    new_handle->object = ref;
+                    resultPtr->l = new_handle;
+                } else {
+                    M2N_FREE_MACRO;
+                    resultPtr->l = NULL;
+                }
             }
             break;
 

@@ -1,0 +1,12 @@
+<project name="RUN HARMONY-3130 Regression Test">
+    <target name="run-test">
+        <run-junit-test 
+            test="org.apache.harmony.drlvm.tests.regression.h3130.CallNativeTest"
+            vmarg="-Xint">
+            <junit-element>
+              <sysproperty key="java.library.path" value="${reg.test.native.path}/H3130"/>
+            </junit-element>
+        </run-junit-test>
+    </target>
+</project>
+
