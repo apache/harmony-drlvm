@@ -57,6 +57,7 @@ Version: $Revision: 1.5.2.3 $
         <compiler id="c.compiler" extends="common.c.compiler">
             <includepath>
                 <pathelement location="${build.vm.home}/include" />
+		<pathelement location="${external.dep.CLASSLIB.includes}/icu4c" />		
                 <pathelement location="${extra.apr.includes}/apr-1" />
                 <pathelement location="${extra.apr.includes}" />
                 <pathelement location="${extra.log4cxx.includes}" />
@@ -177,6 +178,7 @@ Version: $Revision: 1.5.2.3 $
                 <pathelement location="${extra.apr.includes}" />
                 <pathelement location="${extra.apr.includes}/apr-1" />
                 <pathelement location="${extra.log4cxx.includes}" />
+		<pathelement location="${external.dep.CLASSLIB.includes}/icu4c" />		
                 <select os="win">
                     <pathelement location="${extra.zlib.includes}" />
                 </select>
@@ -188,7 +190,8 @@ Version: $Revision: 1.5.2.3 $
                     <include name="vmcore/include" />
                     <include name="port/include" />
                 </dirset>
-
+		
+		<pathelement path="${external.dep.CLASSLIB.includes}/icu4c" />
                 <pathelement path="${extra.log4cxx.includes}" />
 
                 <select os="win">
@@ -262,6 +265,21 @@ Version: $Revision: 1.5.2.3 $
             </fileset>
         </select>
 
+	<select os="lnx" >
+		<select arch="ia32">
+			<symlink overwrite="yes" link="${external.dep.CLASSLIB}/depends/libs/linux.x86/libicuuc.so"
+				resource="${external.dep.CLASSLIB}/depends/libs/linux.x86/libicuuc.so.34"/>
+			<symlink overwrite="yes" link="${external.dep.CLASSLIB}/depends/libs/linux.x86/libicudata.so"
+				resource="${external.dep.CLASSLIB}/depends/libs/linux.x86/libicudata.so.34"/>
+		</select>
+		<select arch="em64t">
+			<symlink overwrite="yes" link="${external.dep.CLASSLIB}/depends/libs/linux.x86_64/libicuuc.so"
+				resource="${external.dep.CLASSLIB}/depends/libs/linux.x86_64/libicuuc.so.34"/>
+			<symlink overwrite="yes" link="${external.dep.CLASSLIB}/depends/libs/linux.x86_64/libicudata.so"
+				resource="${external.dep.CLASSLIB}/depends/libs/linux.x86_64/libicudata.so.34"/>
+		</select>		
+	</select>
+
         <linker id="linker" extends="common.linker">
             <libset libs="${vm.port.lib}"
                     dir="${vm.port.libdir}" />
@@ -292,6 +310,9 @@ Version: $Revision: 1.5.2.3 $
             <select os="win">
                 <libset libs="${extra.zlib.lib}"
                         dir="${extra.zlib.libdir}" />
+
+       	        <libset libs="icuuc"
+                        dir="${external.dep.CLASSLIB.libdir}" />			
             </select>
 
             <select os="win" cfg="debug">
@@ -301,6 +322,14 @@ Version: $Revision: 1.5.2.3 $
             <select os="lnx">
                 <syslibset type="shared" libs="m,dl,stdc++,z,xml2,pthread,gcc_s,rt" /> 
                 <linkerarg value="--export-dynamic" />
+		<select arch="ia32">
+			<libset type="shared" libs="icuuc"
+                        	dir="${external.dep.CLASSLIB}/depends/libs/linux.x86" />
+		</select>
+		<select arch="em64t">
+			<libset type="shared" libs="icuuc"
+                        	dir="${external.dep.CLASSLIB}/depends/libs/linux.x86_64" />
+		</select>		
                 <!--linkerarg value="-lz" />
                 <linkerarg value="-lxml2" />
                 <linkerarg value="-lm" />

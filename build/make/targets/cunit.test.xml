@@ -138,12 +138,25 @@ Version: $Revision$
                         <libset libs="hyzlib" dir="${external.dep.CLASSLIB}/deploy/jdk/jre/bin" />
                         <libset libs="jthread" dir="${build.semi.dir}/vm/jthread/_bin" />
                         <libset libs="harmonyvm" dir="${build.semi.dir}/vm/vmcore/_bin" />
+                        <libset libs="icuuc" dir="${external.dep.CLASSLIB.libdir}" />
                         <select os="win">
                             <syslibset libs="advapi32, ws2_32, mswsock, user32, userenv, odbc32" />
                             <linkerarg value="/NODEFAULTLIB:libcmt.lib" />
                         </select>
                         <select os="lnx">
                             <syslibset type="shared" libs="stdc++, gcc_s, pthread, rt" />
+                            <select arch="ia32">
+			        <libset type="shared" libs="icuuc"
+                                    dir="${external.dep.CLASSLIB}/depends/libs/linux.x86" />
+			        <libset type="shared" libs="icudata"
+                                    dir="${external.dep.CLASSLIB}/depends/libs/linux.x86" />
+                                </select>				
+                            <select arch="em64t">
+                                <libset type="shared" libs="icuuc"
+                                    dir="${external.dep.CLASSLIB}/depends/libs/linux.x86_64" />
+			        <libset type="shared" libs="icudata"
+                                    dir="${external.dep.CLASSLIB}/depends/libs/linux.x86_64" />
+                            </select>			    
                         </select>
                     </linker>
                 </cc>

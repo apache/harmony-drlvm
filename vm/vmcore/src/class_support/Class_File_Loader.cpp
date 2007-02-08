@@ -37,6 +37,8 @@
 #include "interpreter_exports.h"
 #include "jarfile_util.h"
 
+#include "unicode/uchar.h"
+
 #ifdef _IPF_
 #include "vm_ipf.h"
 #endif //_IPF_
@@ -617,13 +619,25 @@ bool Class_Member::parse(Class* clss, ByteReader &cfs)
 static inline bool
 check_field_name(const char *name, unsigned len, bool old_version)
 {
-    for (unsigned i = 0; i < len; i++) {
-        switch(name[i]){
-        case '.':
-        case ';':
-        case '[':
-        case '/':
+    TRACE2("field", "field: " << name << " " << len)
+    if(old_version) {
+        TRACE2("field", "symbol: " << *name);
+        if(!(u_isalpha(*name) || *name == '$' || *name == '_'))
             return false;
+        for (unsigned i = 1; i < len; i++) {
+            TRACE2("field", "symbol: " << name[i]);
+            if(!(u_isalnum(name[i]) || name[i] == '$' || name[i] == '_'))
+                return false;
+        }
+    }else {
+        for (unsigned i = 0; i < len; i++) {
+            switch(name[i]){
+            case '.':
+            case ';':
+            case '[':
+            case '/':
+                return false;
+            }
         }
     }
     return true;
@@ -632,15 +646,25 @@ check_field_name(const char *name, unsigned len, bool old_version)
 static inline bool
 check_method_name(const char *name, unsigned len, bool old_version)
 {
-    for (unsigned i = 0; i < len; i++) {
-        switch(name[i]){
-        case '.':
-        case ';':
-        case '[':
-        case '/':
-        case '<':
-        case '>':
+    if(old_version) {
+        if(!(u_isalpha(*name) || *name == '$' || *name == '_'))
             return false;
+        for (unsigned i = 1; i < len; i++) {
+            TRACE2("field", "symbol: " << name[i]);
+            if(!(u_isalnum(name[i]) || name[i] == '$' || name[i] == '_'))
+                return false;
+        }
+    }else {
+        for (unsigned i = 0; i < len; i++) {
+            switch(name[i]){
+            case '.':
+            case ';':
+            case '[':
+            case '/':
+            case '<':
+            case '>':
+                return false;
+            }
         }
     }
     return true;
@@ -722,7 +746,6 @@ bool Field::parse(Global_Env& env, Class *clss, ByteReader &cfs )
 {
     if(!Class_Member::parse(clss, cfs))
         return false;
-
     if(env.verify_all
             && !check_field_name(_name->bytes, _name->len,
                    clss->get_version() < JAVA5_CLASS_FILE_VERSION)) 
@@ -2558,15 +2581,12 @@ bool ConstantPool::check(Global_Env* env, Class* clss)
             if(tag == CONSTANT_Methodref)
             {
                 //check method name
-                if(name != env->Init_String)
+                if(env->verify_all && (name != env->Init_String)
+                    && !check_method_name(name->bytes,name->len, clss->get_version() < JAVA5_CLASS_FILE_VERSION))
                 {
-                    if(!check_method_name(name->bytes,name->len,
-                            clss->get_version() < JAVA5_CLASS_FILE_VERSION))
-                    {
                         REPORT_FAILED_CLASS_CLASS(clss->get_class_loader(), clss, "java/lang/ClassFormatError",
                             clss->get_name()->bytes << ": illegal method name for CONSTANT_Methodref entry: " << name->bytes);
                         return false;
-                    }
                 }
                 //check method descriptor
                 if(!check_method_descriptor(descriptor->bytes))
@@ -2592,7 +2612,7 @@ bool ConstantPool::check(Global_Env* env, Class* clss)
             if(tag == CONSTANT_Fieldref)
             {
                 //check field name
-                if(!check_field_name(name->bytes, name->len,
+                if(env->verify_all && !check_field_name(name->bytes, name->len,
                         clss->get_version() < JAVA5_CLASS_FILE_VERSION))
                 {
                     REPORT_FAILED_CLASS_CLASS(clss->get_class_loader(), clss, "java/lang/ClassFormatError",
@@ -2783,7 +2803,6 @@ bool Class::parse(Global_Env* env,
             "could not parse major version");
         return false;
     }
-
     //See comment in specification 4.2 about supported versions.
     if (!(m_version >= CLASSFILE_MAJOR
         && m_version <= CLASSFILE_MAJOR_MAX))
