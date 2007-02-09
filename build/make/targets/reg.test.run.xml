@@ -29,15 +29,22 @@
 
     <target name="launch-tests">
         <echo>
-==================================
-     Run regression tests
-==================================
+=====================================
+DRLVM Regression Testing on platform: ${hy.platform}
+=====================================
         </echo>
+
+        <!-- Check for exclude list presence -->
+        <condition property="exclude.list" 
+                   value="${reg.test.src}/excludes/exclude.${hy.platform}">
+            <available file="${reg.test.src}/excludes/exclude.${hy.platform}"/>
+        </condition>
 
         <for param="reg.test.2launch.src.dir">
             <!-- Go through directories containing regression tests -->
             <dirset dir="${reg.test.src}">
                 <include name="H*"/>
+                <excludesfile name="${exclude.list}" if="exclude.list"/>
             </dirset>
             <sequential>
                 <!-- Set up the property pointing to the natives path -->

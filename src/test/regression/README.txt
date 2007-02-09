@@ -92,3 +92,24 @@ points:
             regression testing framework. The entry point for the test
             is JUnit test implemented by Test.java source file.
 
+
+Test Exclusion
+--------------
+
+If there is a serious reason to exclude some test from regression testing
+it can be done by means of exclude lists placed under 'excludes' directory.
+To exclude the test, say H1234, from regression testing on operating
+system OS running on top of platform PLATFORM just put line 'H1234'
+(without quotes) in file exclude.OS.PLATFORM . That's all. The possible
+values for OS are linux and windows, for PLATFORM are x86 and x86_64 .
+
+
+Test Execution
+--------------
+To execute the Regression Test Suite type
+
+    > build reg.test
+
+in build directory of DRLVM workspace.
+
+
