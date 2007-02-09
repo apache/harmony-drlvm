@@ -95,7 +95,7 @@ static COND flip(COND cond)
 void Compiler::gen_goto(unsigned target)
 {
     gen_bb_leave(target);
-    if (target < m_pc) {
+    if (target <= m_pc) {
         // Back branch
         gen_prof_be();
         gen_gc_safe_point();
@@ -105,7 +105,7 @@ void Compiler::gen_goto(unsigned target)
 
 void Compiler::gen_if(JavaByteCodes opcod, unsigned target)
 {
-    if (target < m_pc) {
+    if (target <= m_pc) {
         // have back branch here
         gen_prof_be();
         gen_gc_safe_point();
@@ -149,7 +149,7 @@ void Compiler::gen_if(JavaByteCodes opcod, unsigned target)
 
 void Compiler::gen_if_icmp(JavaByteCodes opcod, unsigned target)
 {
-    if (target < m_pc) {
+    if (target <= m_pc) {
         // have back branch here
         gen_prof_be();
         gen_gc_safe_point();
