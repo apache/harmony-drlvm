@@ -15,11 +15,6 @@
  *  limitations under the License.
  */
 
-/** 
- * @author Nikolay Kuznetsov
- * @version $Revision: 1.1.2.7 $
- */  
-
 /**
  * @file thread_native_tls.c
  * @brief Hythread TLS related functions

@@ -15,11 +15,6 @@
  *  limitations under the License.
  */
 
-/* 
- * @author Nikolay Kuznetsov
- * @version $Revision: 1.1.2.14 $
- */  
-
 /**
  * @file thread_init.c
  * @brief hythread init/shutdown functions
@@ -38,7 +33,7 @@
 hythread_library_t TM_LIBRARY = NULL;
 
 //Thread manager memory pool
-apr_pool_t     *TM_POOL = NULL;
+apr_pool_t *TM_POOL = NULL;
 
 //TLS key
 apr_threadkey_t *TM_THREAD_KEY;
@@ -56,7 +51,7 @@ hythread_group_t group_list;
 hythread_monitor_t *lock_table = NULL;
 int table_size = 8024;
 
-IDATA       groups_count;
+IDATA groups_count;
 
 static IDATA init_group_list();
 static IDATA destroy_group_list();
@@ -132,7 +127,7 @@ void VMCALL hythread_lib_destroy(hythread_library_t lib) {
  * 
  * @see hythread_attach, hythread_shutdown
  */
-void VMCALL hythread_init(hythread_library_t lib){
+void VMCALL hythread_init(hythread_library_t lib) {
     apr_status_t apr_status;
     IDATA status;
     hythread_monitor_t *mon;
@@ -160,32 +155,33 @@ void VMCALL hythread_init(hythread_library_t lib){
     assert(apr_status == APR_SUCCESS);
     
     status = hymutex_create(&lib->TM_LOCK, TM_MUTEX_NESTED);
-    assert (status == TM_ERROR_NONE);
+    assert(status == TM_ERROR_NONE);
     status = hymutex_create(&TM_START_LOCK, TM_MUTEX_NESTED);
-    assert (status == TM_ERROR_NONE);
+    assert(status == TM_ERROR_NONE);
     status = hymutex_create(&FAT_MONITOR_TABLE_LOCK, TM_MUTEX_NESTED);
-    assert (status == TM_ERROR_NONE);
+    assert(status == TM_ERROR_NONE);
     
     status = init_group_list();
-    assert (status == TM_ERROR_NONE);
+    assert(status == TM_ERROR_NONE);
 
     // Create default group - hosts any thread crated with NULL group
     status = hythread_group_create(&TM_DEFAULT_GROUP);
-    assert (status == TM_ERROR_NONE);
+    assert(status == TM_ERROR_NONE);
 
     //nondaemon thread barrier
     ////
     lib->nondaemon_thread_count = 0;
     status = hycond_create(&lib->nondaemon_thread_cond);
-    assert (status == TM_ERROR_NONE);
+    assert(status == TM_ERROR_NONE);
     
     lock_table = (hythread_monitor_t *)malloc(sizeof(hythread_monitor_t)*table_size);
     assert(lock_table);
     
     // init global monitor
     status=hythread_monitor_init_with_name(&p_global_monitor, 0, "Thread Global Monitor");
-    assert (status == TM_ERROR_NONE);
-        mon = (hythread_monitor_t*)hythread_global(GLOBAL_MONITOR_NAME);
+    assert(status == TM_ERROR_NONE);
+
+    mon = (hythread_monitor_t*)hythread_global(GLOBAL_MONITOR_NAME);
     *mon = p_global_monitor;
     assert(mon);
 }
@@ -244,7 +240,7 @@ IDATA VMCALL hythread_global_unlock() {
     return hymutex_unlock(TM_LIBRARY->TM_LOCK);;
 }
 
-hythread_group_t  get_java_thread_group(void){
+hythread_group_t  get_java_thread_group(void) {
     return TM_DEFAULT_GROUP;
 }
 
@@ -257,7 +253,8 @@ static IDATA init_group_list() {
     //the same pool for them
     ////
     dummy = (hythread_group_t)apr_pcalloc(TM_POOL, sizeof(HyThreadGroup));
-        assert(dummy);
+    assert(dummy);
+
     dummy->next = dummy->prev = dummy;
     group_list = dummy;
     groups_count = 0;
@@ -272,7 +269,8 @@ static IDATA destroy_group_list() {
     // This method works only if there are no running threads.
     // there is no good way to kill running threads 
     status=hythread_global_lock();
-        if (status != TM_ERROR_NONE) return status;
+    if (status != TM_ERROR_NONE) return status;
+
     cur = group_list->next;
     status = TM_ERROR_NONE;
     
@@ -302,9 +300,9 @@ IDATA release_start_lock() {
 // current scenario use only one global so it works well
 // need to be hashtable in the future
 */
-#define  TABLE_SIZE 256
-char *names [TABLE_SIZE];
-UDATA data [TABLE_SIZE];
+#define TABLE_SIZE 256
+char *names[TABLE_SIZE];
+UDATA data[TABLE_SIZE];
 int size = 0;
 
 /*
@@ -330,7 +328,7 @@ int find_entry (char* name) {
 // return new entry index,  -1 if failed.
 int add_entry(char* name) {
     int index = size++;
-    if(index >= TABLE_SIZE-1) {
+    if (index >= TABLE_SIZE-1) {
         return -1;
     }
     names[index] = name;
@@ -352,7 +350,7 @@ int add_entry(char* name) {
 UDATA* VMCALL hythread_global (char* name) {
     //hythread_monitor_enter(*p_global_monitor);
     int index = find_entry(name);
-    if(index == -1) {
+    if (index == -1) {
         index = add_entry(name);
         assert(index >=0);
         if (index < 0) {
@@ -393,7 +391,7 @@ IDATA array_destroy(array_t array) {
 
 UDATA array_add(array_t array, void *value) {
     UDATA index;
-        if (!array) return 0;   
+    if (!array) return 0;   
     if (array->next_index) {
         index = array->next_index;
     } else {
@@ -409,7 +407,7 @@ UDATA array_add(array_t array, void *value) {
     
     array->next_index = array->entries[index].next_free;
     array->entries[index].entry = value;
-        array->size++;
+    array->size++;
 
     return index;
 }

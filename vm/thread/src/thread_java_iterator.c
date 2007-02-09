@@ -15,11 +15,6 @@
  *  limitations under the License.
  */
 
-/** 
- * @author Dmitry Demin
- * @version $Revision: 1.1.2.8 $
- */  
-
 /**
  * @file thread_java_iterator.c
  * @brief Java thread iterator related functions
@@ -66,11 +61,11 @@ jthread VMCALL jthread_iterator_next(jthread_iterator_t *it) {
     hythread_t tm_native_thread;
     jvmti_thread_t tm_java_thread;
     tm_native_thread = hythread_iterator_next((hythread_iterator_t *)it);
-    while(tm_native_thread!=NULL)
+    while (tm_native_thread!=NULL)
     {
         if (hythread_is_alive(tm_native_thread)) {
             tm_java_thread = hythread_get_private_data(tm_native_thread);
-            if (tm_java_thread){
+            if (tm_java_thread) {
                 return (jthread)tm_java_thread->thread_object;
             }
         }
@@ -86,19 +81,17 @@ jthread VMCALL jthread_iterator_next(jthread_iterator_t *it) {
  * @param[in] iterator
  */
 IDATA VMCALL jthread_iterator_size(jthread_iterator_t iterator) {
-        jthread res;
-        IDATA status;
-        int count=0;
-        status=jthread_iterator_reset(&iterator);
-        assert (status == TM_ERROR_NONE);
+    jthread res;
+    IDATA status;
+    int count=0;
+    status=jthread_iterator_reset(&iterator);
+    assert(status == TM_ERROR_NONE);
+    res = jthread_iterator_next(&iterator);
+    while (res!=NULL) {
+        count++;        
         res = jthread_iterator_next(&iterator);
-        while(res!=NULL){
-            count++;        
-            res = jthread_iterator_next(&iterator);
-        }
-        status=jthread_iterator_reset(&iterator);
-        assert (status == TM_ERROR_NONE);
-        return count;
+    }
+    status=jthread_iterator_reset(&iterator);
+    assert(status == TM_ERROR_NONE);
+    return count;
 }
-
-

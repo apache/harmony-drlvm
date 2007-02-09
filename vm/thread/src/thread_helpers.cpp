@@ -15,11 +15,6 @@
  *  limitations under the License.
  */
 
-/**
- * @author Artem Aliev
- * @version $Revision: 1.1.2.11 $
- */  
-
 /** 
  * @file thread_helpers.cpp
  * @brief Set of VM helpers
@@ -85,7 +80,7 @@ char* gen_monitorenter_fast_path_helper(char *ss, const R_Opnd & input_param1) {
 #ifdef LOCK_RESERVATION
     //get lock_id
     ss = mov(ss, eax_opnd,  M_Base_Opnd(ecx_reg, 0));
-   // move thread_id to AX
+    // move thread_id to AX
     ss = shift(ss, ror_opc,  eax_opnd,  Imm_Opnd(16));
 
     // test this recursion call
@@ -131,7 +126,7 @@ char* gen_monitorenter_fast_path_helper(char *ss, const R_Opnd & input_param1) {
     offset2 = (signed)ss - (signed)backpatch_address__recursion_inc2 - 1;
     *backpatch_address__recursion_inc2 = (char)offset2;
 
-   // restore lock_id
+    // restore lock_id
     ss = shift(ss, ror_opc,  eax_opnd,  Imm_Opnd(16));
     ss = alu(ss, add_opc,  eax_opnd,  Imm_Opnd(size_16, 0x800), size_16);
     ss = mov(ss,  M_Base_Opnd(ecx_reg, 0), eax_opnd, size_16);
@@ -203,11 +198,11 @@ char* gen_monitor_exit_helper(char *ss, const R_Opnd & input_param1) {
     ss = test(ss,  eax_opnd,   eax_opnd);
     ss = branch8(ss, Condition_NZ,  Imm_Opnd(size_8, 0));
     char *backpatch_address__fat_monitor = ((char *)ss) - 1;
-    
+
     // recursion or reservation => dec recursion count
-   ss = alu(ss, sub_opc,  edx_opnd, Imm_Opnd(0x800));
-   ss = mov(ss, M_Base_Opnd(ecx_reg,0),  edx_opnd);
-   ss = ret(ss,  Imm_Opnd(4));
+    ss = alu(ss, sub_opc,  edx_opnd, Imm_Opnd(0x800));
+    ss = mov(ss, M_Base_Opnd(ecx_reg,0),  edx_opnd);
+    ss = ret(ss,  Imm_Opnd(4));
 
     signed offset = (signed)ss - (signed)backpatch_address__thin_monitor - 1;
     *backpatch_address__thin_monitor = (char)offset;
@@ -215,8 +210,8 @@ char* gen_monitor_exit_helper(char *ss, const R_Opnd & input_param1) {
     ss = ret(ss,  Imm_Opnd(4));
 
 
-   offset = (signed)ss - (signed)backpatch_address__fat_monitor - 1;
-   *backpatch_address__fat_monitor = (char)offset;
+    offset = (signed)ss - (signed)backpatch_address__fat_monitor - 1;
+    *backpatch_address__fat_monitor = (char)offset;
 
 #endif
 

@@ -15,11 +15,6 @@
  *  limitations under the License.
  */
 
-/** 
- * @author Nikolay Kuznetsov
- * @version $Revision: 1.1.2.7 $
- */  
-
 /**
  * @file thread_native_attrs.c
  * @brief Hythread priority related functions
@@ -44,7 +39,7 @@
  * 
  * 
  */
-IDATA VMCALL hythread_set_priority(hythread_t thread, UDATA priority){
+IDATA VMCALL hythread_set_priority(hythread_t thread, UDATA priority) {
     apr_status_t apr_status = apr_thread_set_priority(thread->os_handle, priority); 
     if (apr_status != APR_SUCCESS) return CONVERT_ERROR(apr_status);
     thread->priority = priority;

@@ -15,11 +15,6 @@
  *  limitations under the License.
  */
 
-/** 
- * @author Artem Aliev
- * @version $Revision: 1.1.2.7 $
- */  
-
 /**
  * @file thread_native_interrupt.c
  * @brief Hythread interruption related functions
@@ -82,7 +77,7 @@ UDATA VMCALL hythread_clear_interrupted_other(hythread_t thread) {
  * @return  previous value of interrupted flag: non-zero if the thread had been interrupted.
  */
 UDATA VMCALL hythread_clear_interrupted() {
-        return hythread_clear_interrupted_other(tm_self_tls);
+    return hythread_clear_interrupted_other(tm_self_tls);
 }
 
 /**
@@ -92,7 +87,7 @@ UDATA VMCALL hythread_clear_interrupted() {
  * @return 0 if not interrupted, non-zero if interrupted
  */
 UDATA VMCALL hythread_interrupted(hythread_t thread) {
-        int interrupted = thread->state & TM_THREAD_STATE_INTERRUPTED;
-        return interrupted?TM_ERROR_INTERRUPT:TM_ERROR_NONE;
+    int interrupted = thread->state & TM_THREAD_STATE_INTERRUPTED;
+    return interrupted?TM_ERROR_INTERRUPT:TM_ERROR_NONE;
 }
 

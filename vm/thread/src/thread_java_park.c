@@ -15,11 +15,6 @@
  *  limitations under the License.
  */
 
-/** 
- * @author Sergey Petrovsky
- * @version $Revision: 1.1.2.6 $
- */  
-
 /**
  * @file thread_java_park.c
  * @brief Java thread park/unpark functions
@@ -39,7 +34,7 @@
  * @sa java.util.concurrent.locks.LockSupport.park() 
  */
 IDATA VMCALL jthread_park() {
-    return hythread_park(0,0);
+    return hythread_park(0, 0);
 }
 
 /**
@@ -71,12 +66,10 @@ IDATA VMCALL jthread_timed_park(jlong millis, jint nanos) {
  * @sa java.util.concurrent.locks.LockSupport.unpark() 
  */
 IDATA VMCALL jthread_unpark(jthread java_thread) {
+    hythread_t tm_native_thread;
 
-        hythread_t tm_native_thread;
-
-        assert(java_thread);
+    assert(java_thread);
     tm_native_thread = jthread_get_native_thread(java_thread);
-    
     hythread_unpark(tm_native_thread);
     
     return TM_ERROR_NONE;

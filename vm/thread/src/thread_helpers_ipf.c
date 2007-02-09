@@ -15,10 +15,6 @@
  *  limitations under the License.
  */
 
-/**
- * @author Ivan Volosyuk
- */  
-
 /** 
  * @file thread_helpers_ipf.c
  * Missing definition to ipf compile

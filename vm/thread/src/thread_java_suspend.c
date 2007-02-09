@@ -15,11 +15,6 @@
  *  limitations under the License.
  */
 
-/** 
- * @author Sergey Petrovsky
- * @version $Revision: 1.1.2.5 $
- */  
-
 /**
  * @file thread_java_suspend.c
  * @brief Java thread suspend/resume functions
@@ -41,7 +36,7 @@
  */
 IDATA VMCALL jthread_resume(jthread java_thread) {
     hythread_t tm_native_thread = vm_jthread_get_tm_data(java_thread);
-        hythread_resume(tm_native_thread);
+    hythread_resume(tm_native_thread);
     return TM_ERROR_NONE;
 }
 
@@ -54,13 +49,12 @@ IDATA VMCALL jthread_resume(jthread java_thread) {
  * @sa JVMTI::ResumeThreadList()
  */
 IDATA VMCALL jthread_resume_all(jvmtiError* results, jint count, const jthread* thread_list) {
-    
-        int i;
+    int i;
 
-        for (i = 0; i < count; i++){
-                results[i] = (jvmtiError)jthread_resume(thread_list[i]);
-        }
-        return TM_ERROR_NONE;
+    for (i = 0; i < count; i++) {
+        results[i] = (jvmtiError)jthread_resume(thread_list[i]);
+    }
+    return TM_ERROR_NONE;
 }
 
 /**
@@ -82,9 +76,8 @@ IDATA VMCALL jthread_resume_all(jvmtiError* results, jint count, const jthread* 
  * @sa java.lang.Thread.suspend(), JVMTI::SuspendThread()
  */
 IDATA VMCALL jthread_suspend(jthread java_thread) {
-        hythread_t tm_native_thread = vm_jthread_get_tm_data(java_thread);
-        return hythread_suspend_other(tm_native_thread);
-    
+    hythread_t tm_native_thread = vm_jthread_get_tm_data(java_thread);
+    return hythread_suspend_other(tm_native_thread);
 }
 
 /**
@@ -108,10 +101,10 @@ IDATA VMCALL jthread_suspend(jthread java_thread) {
  * @sa JVMTI::SuspendThreadList()
  */
 IDATA VMCALL jthread_suspend_all(jvmtiError* results, jint count, const jthread* thread_list) {
-        int i;
-        for (i = 0; i < count; i++){
-                results[i] = (jvmtiError)jthread_suspend(thread_list[i]);
-        }
+    int i;
+    for (i = 0; i < count; i++) {
+        results[i] = (jvmtiError)jthread_suspend(thread_list[i]);
+    }
     return TM_ERROR_NONE;
 }
 

@@ -45,16 +45,16 @@ IDATA VMCALL hythread_group_create(hythread_group_t *group) {
     hythread_t dummy;
     apr_pool_t  *group_pool;
     apr_status_t apr_status;
-        IDATA status;
+    IDATA status;
     
     apr_status = apr_pool_create(&(group_pool), TM_POOL);
     if (apr_status != APR_SUCCESS) return CONVERT_ERROR(apr_status);
     
     status=hythread_global_lock();
-        if (status != TM_ERROR_NONE) return status;
+    if (status != TM_ERROR_NONE) return status;
     
     (*group) = (hythread_group_t )apr_palloc(group_pool, sizeof(HyThreadGroup));
-    if (! *group){
+    if (!*group) {
        hythread_global_unlock();
        return TM_ERROR_OUT_OF_MEMORY;
     }
@@ -69,7 +69,7 @@ IDATA VMCALL hythread_group_create(hythread_group_t *group) {
     //dummy thread as the head of the group
     ////
     dummy = (hythread_t)apr_pcalloc(group_pool, sizeof(HyThread));
-    if (! dummy){
+    if (!dummy) {
         hythread_global_unlock();
         return TM_ERROR_OUT_OF_MEMORY;
     }
@@ -125,7 +125,7 @@ IDATA VMCALL hythread_group_release(hythread_group_t group) {
          return status;
      (*size) = groups_count;
      array_for_list=(hythread_group_t*)malloc(sizeof(hythread_group_t)*groups_count);
-     if(array_for_list==NULL)
+     if (array_for_list==NULL)
      { 
          status=hythread_global_unlock();
          return TM_ERROR_OUT_OF_MEMORY;

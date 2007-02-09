@@ -15,11 +15,6 @@
  *  limitations under the License.
  */
 
-/** 
- * @author Sergey Petrovsky
- * @version $Revision: 1.1.2.7 $
- */  
-
 /**
  * @file thread_ti_timing.c
  * @brief JVMTI timing related functions
@@ -39,13 +34,13 @@
  */
 IDATA VMCALL jthread_get_thread_blocked_time(jthread java_thread, jlong *nanos_ptr) {
 
-        jvmti_thread_t tm_java_thread;
+    jvmti_thread_t tm_java_thread;
     hythread_t tm_native_thread;
 
-        assert(java_thread);
-        assert(nanos_ptr);
-        tm_native_thread = vm_jthread_get_tm_data(java_thread);
-        tm_java_thread = hythread_get_private_data(tm_native_thread);
+    assert(java_thread);
+    assert(nanos_ptr);
+    tm_native_thread = vm_jthread_get_tm_data(java_thread);
+    tm_java_thread = hythread_get_private_data(tm_native_thread);
     *nanos_ptr = tm_java_thread->blocked_time;
 
     return TM_ERROR_NONE;
@@ -90,13 +85,13 @@ IDATA VMCALL jthread_get_thread_cpu_timer_info(jvmtiTimerInfo* info_ptr) {
 IDATA VMCALL jthread_get_thread_user_cpu_time(jthread java_thread, jlong *nanos_ptr) {
 
     hythread_t tm_native_thread;
-        apr_time_t kernel_time;
-        apr_time_t user_time;
+    apr_time_t kernel_time;
+    apr_time_t user_time;
 
-        assert(java_thread);
-        assert(nanos_ptr);
-        tm_native_thread = vm_jthread_get_tm_data(java_thread);
-        apr_thread_times(tm_native_thread->os_handle, &user_time, &kernel_time);
+    assert(java_thread);
+    assert(nanos_ptr);
+    tm_native_thread = vm_jthread_get_tm_data(java_thread);
+    apr_thread_times(tm_native_thread->os_handle, &user_time, &kernel_time);
     *nanos_ptr = user_time;
 
     return TM_ERROR_NONE;
@@ -110,13 +105,13 @@ IDATA VMCALL jthread_get_thread_user_cpu_time(jthread java_thread, jlong *nanos_
  */
 IDATA VMCALL jthread_get_thread_waited_time(jthread java_thread, jlong *nanos_ptr) {
 
-        jvmti_thread_t tm_java_thread;
+    jvmti_thread_t tm_java_thread;
     hythread_t tm_native_thread;
 
-        assert(java_thread);
-        assert(nanos_ptr);
-        tm_native_thread = vm_jthread_get_tm_data(java_thread);
-        tm_java_thread = hythread_get_private_data(tm_native_thread);
+    assert(java_thread);
+    assert(nanos_ptr);
+    tm_native_thread = vm_jthread_get_tm_data(java_thread);
+    tm_java_thread = hythread_get_private_data(tm_native_thread);
     *nanos_ptr = tm_java_thread->waited_time;
 
     return TM_ERROR_NONE;

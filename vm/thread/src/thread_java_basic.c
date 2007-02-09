@@ -15,11 +15,6 @@
  *  limitations under the License.
  */
 
-/** 
- * @author Nikolay Kuznetsov
- * @version $Revision: 1.1.2.21 $
- */  
-
 /**
  * @file thread_java_basic.c
  * @brief Key threading operations like thread creation and pointer conversion.
@@ -91,12 +86,9 @@ int wrapper_proc(void *arg) {
     // Send Thread Start event.
     jvmti_send_thread_start_end_event(1);
 
-    if(data->tiProc != NULL)
-    {
+    if (data->tiProc != NULL) {
         data->tiProc(data->tiEnv, jni_env, data->tiProcArgs);
-    }
-    else
-    {
+    } else {
         // for jthread_create();
         (*jni_env) -> CallVoidMethodA(jni_env, java_thread, getRunMethod(jni_env), NULL);
     }
@@ -139,7 +131,7 @@ IDATA jthread_create_with_function(JNIEnv * jni_env, jthread java_thread, jthrea
     // This is for irregular use. In ordinary live valid jthread instance
     // contains weak reference associated with it and native thread to reuse. 
     if (tm_native_thread == NULL) {
-        if( !jthread_thread_init(NULL, jni_env, java_thread, NULL, 0)) {
+        if ( !jthread_thread_init(NULL, jni_env, java_thread, NULL, 0)) {
             return TM_ERROR_OUT_OF_MEMORY;
         }
         tm_native_thread = vm_jthread_get_tm_data(java_thread);
@@ -229,7 +221,7 @@ IDATA jthread_attach(JNIEnv * jni_env, jthread java_thread, jboolean daemon) {
  * @return the native thread
  */
 jlong jthread_thread_init(jvmti_thread_t *ret_thread, JNIEnv* env, jthread java_thread, jobject weak_ref, jlong old_thread) {
-    hythread_t     tm_native_thread = NULL;
+    hythread_t tm_native_thread = NULL;
     jvmti_thread_t tmj_thread;
     IDATA status;
 
@@ -275,7 +267,7 @@ IDATA jthread_detach(jthread java_thread) {
     tm_jvmti_thread = hythread_get_private_data(tm_native_thread);
     jni_env = tm_jvmti_thread->jenv;
 
-    if (!tm_jvmti_thread->daemon){
+    if (!tm_jvmti_thread->daemon) {
         countdown_nondaemon_threads(tm_native_thread);
     }
 
@@ -371,15 +363,15 @@ IDATA jthread_join(jthread java_thread) {
 IDATA jthread_timed_join(jthread java_thread, jlong millis, jint nanos) {
         
     hythread_t  tm_native_thread;
-        IDATA status;
+    IDATA status;
 
-        if (java_thread == NULL){
-            return TM_ERROR_NULL_POINTER;
-        }
+    if (java_thread == NULL) {
+        return TM_ERROR_NULL_POINTER;
+    }
     tm_native_thread = jthread_get_native_thread(java_thread);
-        if(!tm_native_thread) {
-                return TM_ERROR_NONE;
-        }
+    if (!tm_native_thread) {
+            return TM_ERROR_NONE;
+    }
     status = hythread_join_interruptable(tm_native_thread, millis, nanos);
     TRACE(("TM: jthread %d joined %d", hythread_self()->thread_id, tm_native_thread->thread_id));
 
@@ -390,7 +382,7 @@ IDATA jthread_timed_join(jthread java_thread, jlong millis, jint nanos) {
  * Lets an another thread to pass.
  * @sa java.lang.Thread.yield()
  */
-IDATA jthread_yield(){
+IDATA jthread_yield() {
     hythread_yield();
     return TM_ERROR_NONE;
 }
@@ -477,7 +469,7 @@ IDATA jthread_exception_stop(jthread java_thread, jobject excn) {
 IDATA jthread_sleep(jlong millis, jint nanos) {
 
     hythread_t tm_native_thread = hythread_self();
-        IDATA status;
+    IDATA status;
 
     tm_native_thread->state &= ~TM_THREAD_STATE_RUNNABLE;
     tm_native_thread->state |= TM_THREAD_STATE_WAITING | TM_THREAD_STATE_SLEEPING |
@@ -641,7 +633,7 @@ IDATA VMCALL jthread_wait_for_all_nondaemon_threads() {
         status = hycond_wait(lib->nondaemon_thread_cond, lib->TM_LOCK);
         //check interruption and other problems
         TRACE(("TM wait for nondaemons notified, count: %d", lib->nondaemon_thread_count));
-        if(status != TM_ERROR_NONE) {
+        if (status != TM_ERROR_NONE) {
             hymutex_unlock(lib->TM_LOCK);
             return status;
         }
@@ -655,7 +647,7 @@ IDATA VMCALL jthread_wait_for_all_nondaemon_threads() {
  *  Auxiliary function to throw java.lang.InterruptedException
  */
 
-void throw_interrupted_exception(void){
+void throw_interrupted_exception(void) {
 
     jvmti_thread_t tm_java_thread;
     hythread_t tm_native_thread;
@@ -676,7 +668,7 @@ jmethodID getRunMethod(JNIEnv *env) {
     IDATA status;
     
     status=acquire_start_lock();
-    assert (status == TM_ERROR_NONE);
+    assert(status == TM_ERROR_NONE);
     //printf("run method find enter\n");
     if (!run_method) {
         clazz = (*env) -> FindClass(env, "java/lang/Thread");
@@ -684,7 +676,7 @@ jmethodID getRunMethod(JNIEnv *env) {
     }
     status=release_start_lock();
     //printf("run method find exit\n");
-    assert (status == TM_ERROR_NONE);
+    assert(status == TM_ERROR_NONE);
     return run_method;
 }
 
@@ -711,7 +703,7 @@ IDATA countdown_nondaemon_threads(hythread_t self) {
     status = hymutex_lock(lib->TM_LOCK);
     if (status != TM_ERROR_NONE) return status;
     
-    if(lib->nondaemon_thread_count <= 0) {
+    if (lib->nondaemon_thread_count <= 0) {
         status = hymutex_unlock(lib->TM_LOCK);
         if (status != TM_ERROR_NONE) return status;
         return TM_ERROR_ILLEGAL_STATE;
@@ -719,10 +711,10 @@ IDATA countdown_nondaemon_threads(hythread_t self) {
     
     TRACE(("TM: nondaemons decreased, thread: %p count: %d\n", self, lib->nondaemon_thread_count));
     lib->nondaemon_thread_count--;
-    if(lib->nondaemon_thread_count <= 1) {
+    if (lib->nondaemon_thread_count <= 1) {
         status = hycond_notify_all(lib->nondaemon_thread_cond); 
         TRACE(("TM: nondaemons all dead, thread: %p count: %d\n", self, lib->nondaemon_thread_count));
-        if (status != TM_ERROR_NONE){
+        if (status != TM_ERROR_NONE) {
             hymutex_unlock(lib->TM_LOCK);
             return status;
         }

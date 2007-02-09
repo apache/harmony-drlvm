@@ -15,11 +15,6 @@
  *  limitations under the License.
  */
 
-/** 
- * @author Nikolay Kuznetsov
- * @version $Revision: 1.1.2.6 $
- */  
-
 /**
  * @file thread_native_iterator.c
  * @brief Hythread iterator related functions
@@ -38,9 +33,9 @@
  * @param[in] group thread group number
  */
 hythread_iterator_t VMCALL hythread_iterator_create(hythread_group_t group) {
-        IDATA status;
-    status=hythread_global_lock();
-        assert (status == TM_ERROR_NONE);
+    IDATA status;
+    status = hythread_global_lock();
+    assert(status == TM_ERROR_NONE);
     group = (group)?group:TM_DEFAULT_GROUP;
     TRACE(("TM iterator created: %p head: %p", group->thread_list, group->thread_list->next));
     return (hythread_iterator_t)group->thread_list->next;

@@ -15,11 +15,6 @@
  *  limitations under the License.
  */
 
-/** 
- * @author Sergey Petrovsky
- * @version $Revision: 1.1.2.5 $
- */  
-
 /**
  * @file thread_java_interrupt.c
  * @brief Java thread interruption related functions
@@ -56,7 +51,7 @@ IDATA VMCALL jthread_interrupt(jthread java_thread) {
  * @sa java.lang.Thread.isInterrupted()
  */
 jboolean jthread_is_interrupted(jthread java_thread) {   
-        hythread_t tm_native_thread = jthread_get_native_thread(java_thread);
+    hythread_t tm_native_thread = jthread_get_native_thread(java_thread);
     return hythread_interrupted(tm_native_thread) > 0;
    
 }

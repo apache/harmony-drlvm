@@ -15,11 +15,6 @@
  *  limitations under the License.
  */
 
-/** 
- * @author Nikolay Kuznetsov
- * @version $Revision: 1.1.2.8 $
- */  
-
 /**
  * @file thread_native_condvar.c
  * @brief Hythread condvar related functions
@@ -48,41 +43,40 @@ IDATA VMCALL hycond_create (hycond_t *cond) {
 }
 
 IDATA condvar_wait_impl(hycond_t cond, hymutex_t mutex, I_64 ms, IDATA nano, IDATA interruptable) {
-        apr_status_t apr_status;
-        int disable_count;
-        hythread_t this_thread;
+    apr_status_t apr_status;
+    int disable_count;
+    hythread_t this_thread;
     
     this_thread = tm_self_tls;    
     
     // Store provided cond into current thread cond
     this_thread->current_condition = interruptable ? cond : NULL;
 
-        // check interrupted flag
+    // check interrupted flag
     if (interruptable && (this_thread->state & TM_THREAD_STATE_INTERRUPTED)) {
         // clean interrupted flag
         this_thread->state &= (~TM_THREAD_STATE_INTERRUPTED);
                 return TM_ERROR_INTERRUPT;
     }
 
-        disable_count = reset_suspend_disable(); 
-        // Delegate to OS wait
+    disable_count = reset_suspend_disable(); 
+    // Delegate to OS wait
     apr_status = (!ms && !nano)?
         apr_thread_cond_wait((apr_thread_cond_t*)cond, (apr_thread_mutex_t*)mutex):
 	apr_thread_cond_timedwait ((apr_thread_cond_t*)cond, (apr_thread_mutex_t*)mutex, ms*1000 + ((nano < 1000) ? 1 : (nano / 1000)));
         
     set_suspend_disable(disable_count);
 
-        this_thread->current_condition = NULL;
+    this_thread->current_condition = NULL;
    
     // check interrupted flag
     if (interruptable &&  (this_thread->state & TM_THREAD_STATE_INTERRUPTED)) {
         // clean interrupted flag
         this_thread->state &= (~TM_THREAD_STATE_INTERRUPTED);
-                return TM_ERROR_INTERRUPT;
+        return TM_ERROR_INTERRUPT;
     }
 
-        return CONVERT_ERROR(apr_status);
-
+    return CONVERT_ERROR(apr_status);
 }
 
 /**
@@ -150,8 +144,8 @@ IDATA VMCALL hycond_notify (hycond_t cond) {
  * @sa apr_thread_cond_broadcast()
  */
 IDATA VMCALL hycond_notify_all (hycond_t cond) {
-        apr_status_t apr_status = apr_thread_cond_broadcast((apr_thread_cond_t*)cond);
-        if (apr_status != APR_SUCCESS) return CONVERT_ERROR(apr_status);
+    apr_status_t apr_status = apr_thread_cond_broadcast((apr_thread_cond_t*)cond);
+    if (apr_status != APR_SUCCESS) return CONVERT_ERROR(apr_status);
     return TM_ERROR_NONE;   
 }
 
@@ -162,14 +156,13 @@ IDATA VMCALL hycond_notify_all (hycond_t cond) {
  * @sa apr_thread_cond_destroy()
  */
 IDATA VMCALL hycond_destroy (hycond_t cond) {
-        apr_status_t apr_status;
+    apr_status_t apr_status;
     apr_pool_t *pool = apr_thread_cond_pool_get ((apr_thread_cond_t*)cond);
-    if(pool != get_local_pool()) {
+    if (pool != get_local_pool()) {
           return local_pool_cleanup_register(hycond_destroy, cond);
     }
     apr_status=apr_thread_cond_destroy((apr_thread_cond_t*)cond);
     return CONVERT_ERROR(apr_status);
-
 }
 
 //@}

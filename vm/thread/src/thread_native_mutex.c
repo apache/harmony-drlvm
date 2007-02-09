@@ -15,11 +15,6 @@
  *  limitations under the License.
  */
 
-/** 
- * @author Artem Aliev
- * @version $Revision: 1.1.2.8 $
- */  
-
 /**
  * @file thread_native_mutex.c
  * @brief Hythread mutex related functions
@@ -53,11 +48,10 @@
  */
 IDATA VMCALL hymutex_create (hymutex_t *mutex, UDATA flags) {
     apr_pool_t *pool = get_local_pool(); 
-        apr_status_t apr_status;
+    apr_status_t apr_status;
         
     apr_status = apr_thread_mutex_create((apr_thread_mutex_t**)mutex, flags, pool);
-
-        return CONVERT_ERROR(apr_status);
+    return CONVERT_ERROR(apr_status);
 }
 
 /**
@@ -68,8 +62,8 @@ IDATA VMCALL hymutex_create (hymutex_t *mutex, UDATA flags) {
  * @sa apr_thread_mutex_lock()
  */
 IDATA VMCALL hymutex_lock(hymutex_t mutex) {
-        apr_status_t apr_status;
-        apr_status = apr_thread_mutex_lock((apr_thread_mutex_t*)mutex);
+    apr_status_t apr_status;
+    apr_status = apr_thread_mutex_lock((apr_thread_mutex_t*)mutex);
 
     return CONVERT_ERROR(apr_status);
 }
@@ -91,8 +85,8 @@ IDATA VMCALL hymutex_trylock (hymutex_t mutex) {
  * @sa apr_thread_mutex_unlock()
  */
 IDATA VMCALL hymutex_unlock (hymutex_t mutex) {
-        apr_status_t apr_status = apr_thread_mutex_unlock((apr_thread_mutex_t*)mutex);
-        assert(apr_status == APR_SUCCESS);
+    apr_status_t apr_status = apr_thread_mutex_unlock((apr_thread_mutex_t*)mutex);
+    assert(apr_status == APR_SUCCESS);
     return CONVERT_ERROR(apr_status);
 }
 
@@ -103,9 +97,9 @@ IDATA VMCALL hymutex_unlock (hymutex_t mutex) {
  * @sa apr_thread_mutex_destroy()
  */
 IDATA VMCALL hymutex_destroy (hymutex_t mutex) {
-        apr_pool_t *pool = apr_thread_mutex_pool_get ((apr_thread_mutex_t*)mutex);
-        apr_status_t apr_status;
-    if(pool != get_local_pool()) {
+    apr_pool_t *pool = apr_thread_mutex_pool_get ((apr_thread_mutex_t*)mutex);
+    apr_status_t apr_status;
+    if (pool != get_local_pool()) {
         return local_pool_cleanup_register(hymutex_destroy, mutex);
     }
     apr_status=apr_thread_mutex_destroy((apr_thread_mutex_t*)mutex);

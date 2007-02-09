@@ -15,11 +15,6 @@
  *  limitations under the License.
  */
 
-/** 
- * @author Sergey Petrovsky
- * @version $Revision: 1.1.2.10 $
- */  
-
 /**
  * @file thread_ti_instr.c
  * @brief JVMTI basic related functions
@@ -39,81 +34,80 @@
 IDATA VMCALL jthread_get_all_threads(jthread** threads, jint *count_ptr) {
 
     hythread_group_t  java_thread_group = get_java_thread_group();
-        hythread_iterator_t  iterator;
-        hythread_t tm_native_thread;
-        jvmti_thread_t tm_java_thread;
-        jthread* java_threads;
-        int i;
-        int count = 0;
-        int java_thread_count = 0;
-        IDATA status;
+    hythread_iterator_t  iterator;
+    hythread_t tm_native_thread;
+    jvmti_thread_t tm_java_thread;
+    jthread* java_threads;
+    int i;
+    int count = 0;
+    int java_thread_count = 0;
+    IDATA status;
     //apr_status_t apr_status; 
     //apr_pool_t *pool;
 
     assert(java_thread_group);
-        iterator = hythread_iterator_create(java_thread_group);
-        count = hythread_iterator_size (iterator);
-        for (i = 0; i < count; i++){
+    iterator = hythread_iterator_create(java_thread_group);
+    count = hythread_iterator_size (iterator);
+    for (i = 0; i < count; i++) {
         tm_native_thread = hythread_iterator_next(&iterator);
-            tm_java_thread = hythread_get_private_data(tm_native_thread);
-                if (tm_java_thread){
-                        java_thread_count++;
-                }
+        tm_java_thread = hythread_get_private_data(tm_native_thread);
+        if (tm_java_thread) {
+            java_thread_count++;
         }
+    }
     /*apr_status = apr_pool_create(&pool, 0);
-        if (apr_status != APR_SUCCESS){
+        if (apr_status != APR_SUCCESS) {
                 hythread_iterator_release(&iterator);
                 return CONVERT_ERROR(apr_status);
         }
     java_threads = apr_palloc(pool, sizeof(jthread)* java_thread_count);*/
     java_threads = (jthread*)malloc(sizeof(jthread)* java_thread_count);
-        if (!java_threads){
-                hythread_iterator_release(&iterator);
-                return TM_ERROR_OUT_OF_MEMORY;
-        }
-        hythread_iterator_reset(&iterator);
-        java_thread_count = 0;
-        for (i = 0; i < count; i++){
+    if (!java_threads) {
+        hythread_iterator_release(&iterator);
+        return TM_ERROR_OUT_OF_MEMORY;
+    }
+    hythread_iterator_reset(&iterator);
+    java_thread_count = 0;
+    for (i = 0; i < count; i++) {
         tm_native_thread = hythread_iterator_next(&iterator);
-            tm_java_thread = hythread_get_private_data(tm_native_thread);
-                if (tm_java_thread){
-                    java_threads[java_thread_count] = tm_java_thread->thread_object;
-                        java_thread_count++;
-                }
+        tm_java_thread = hythread_get_private_data(tm_native_thread);
+        if (tm_java_thread) {
+            java_threads[java_thread_count] = tm_java_thread->thread_object;
+            java_thread_count++;
         }
+    }
     *threads = java_threads;
-        *count_ptr = java_thread_count;
+    *count_ptr = java_thread_count;
     status = hythread_iterator_release(&iterator);
 
     return status;
 }
 /*
  */
-IDATA deads_expand(jthread **deads, int deads_size){
+IDATA deads_expand(jthread **deads, int deads_size) {
 
     jthread *new_deads;
         int i;
     new_deads = (jthread *)malloc(sizeof(jthread) * deads_size * 2);
-        if (!new_deads) return TM_ERROR_OUT_OF_MEMORY;
+    if (!new_deads) return TM_ERROR_OUT_OF_MEMORY;
 
-        for (i = 0; i < deads_size; i++){
+    for (i = 0; i < deads_size; i++) {
         new_deads[i] = (*deads)[i];
-        }
+    }
     *deads = new_deads;
-        return TM_ERROR_NONE;
+    return TM_ERROR_NONE;
 }
 /*
  */
-int deads_find(jobject thread, jobject *deads, int base, int top, int deads_size){
+int deads_find(jobject thread, jobject *deads, int base, int top, int deads_size) {
+    int i;
 
-        int i;
-
-        for (i = 0; i < top; i++){
-                if (vm_objects_are_equal(thread, deads[i])){
-                        return 1;
-                }
+    for (i = 0; i < top; i++) {
+        if (vm_objects_are_equal(thread, deads[i])) {
+            return 1;
         }
-        return 0;
+    }
+    return 0;
 }
 // FIXME: synchronization and maybe thread suspension needed
 /**
@@ -125,74 +119,73 @@ int deads_find(jobject thread, jobject *deads, int base, int top, int deads_size
  * @param[out] dead_count number of deadlocked threads
  */
 IDATA VMCALL jthread_get_deadlocked_threads(jthread *thread_list, jint thread_count, jthread **dead_list, jint *dead_count) {
-    
-        jthread *deads;
-        int deads_size = 1;
-        int deads_base = 0;
-        int deads_top = 0;
+    jthread *deads;
+    int deads_size = 1;
+    int deads_base = 0;
+    int deads_top = 0;
     jthread *output;
-        int output_top = 0;
-        jobject monitor;
-        jthread thread;
+    int output_top = 0;
+    jobject monitor;
+    jthread thread;
     //apr_pool_t *pool;
     /*apr_pool_t *pool_out;
     apr_status_t apr_status;*/
-        IDATA status;
-        int i;
+    IDATA status;
+    int i;
 
     /*apr_status = apr_pool_create(&pool, NULL);
-        if (apr_status != APR_SUCCESS) return CONVERT_ERROR(apr_status);
+    if (apr_status != APR_SUCCESS) return CONVERT_ERROR(apr_status);
 
-        deads = apr_palloc(pool, sizeof(jthread) * deads_size);
+    deads = apr_palloc(pool, sizeof(jthread) * deads_size);
     output = apr_palloc(pool, sizeof(jthread) * thread_count);
     if (!deads || !output) return TM_ERROR_OUT_OF_MEMORY;*/
 
     deads = (jthread *)malloc(sizeof(jthread) * deads_size);
     output = (jthread *)malloc(sizeof(jthread) * thread_count);
-    if ((deads==NULL)||(output==NULL))
-    {
+    if ((deads==NULL)||(output==NULL)) {
         return TM_ERROR_OUT_OF_MEMORY;
     }
-        for (i = 0; i < thread_count; i++){
-                thread = thread_list[i];
-                while (1){
-                        status=jthread_get_contended_monitor(thread, &monitor);
-                        if (status != TM_ERROR_NONE) return status;
-                        if (! monitor){
-                                deads_top = deads_base; // remove frame
-                                break;
-                        }
-                        if (deads_find(thread, deads, deads_base, deads_top, deads_size)){
-                                output[output_top] = thread;
+    for (i = 0; i < thread_count; i++) {
+        thread = thread_list[i];
+        while (1) {
+            status=jthread_get_contended_monitor(thread, &monitor);
+            if (status != TM_ERROR_NONE) return status;
+            if (! monitor) {
+                deads_top = deads_base; // remove frame
+                break;
+            }
+            if (deads_find(thread, deads, deads_base, deads_top, deads_size)) {
+                output[output_top] = thread;
                 output_top++;
-                                deads_base = deads_top; // add frame
-                                break;
-                        }
-                        if (deads_top == deads_size){
-            status = deads_expand(&deads, deads_size);
-                    if (status != TM_ERROR_NONE) return status;
-                        }
-                        deads[deads_top] = thread;
-            deads_top++;
-                        status = jthread_get_lock_owner(monitor, &thread);
+                deads_base = deads_top; // add frame
+                break;
+            }
+            if (deads_top == deads_size) {
+                status = deads_expand(&deads, deads_size);
                 if (status != TM_ERROR_NONE) return status;
-                }
+            }
+            deads[deads_top] = thread;
+            deads_top++;
+            status = jthread_get_lock_owner(monitor, &thread);
+            if (status != TM_ERROR_NONE) return status;
         }
-        if (output_top > 0){
+    }
+
+    if (output_top > 0) {
         /* apr_status = apr_pool_create(&pool_out, NULL);
         if (apr_status != APR_SUCCESS) return CONVERT_ERROR(apr_status);*/
         *dead_list = (jthread *)malloc(sizeof(jthread) * output_top);
-            if (! *dead_list) return TM_ERROR_OUT_OF_MEMORY;
+        if (! *dead_list) return TM_ERROR_OUT_OF_MEMORY;
 
-                for (i = 0; i < output_top; i++){
+        for (i = 0; i < output_top; i++) {
             (*dead_list)[i] = output[i];
-                }
-        } else {
-                *dead_list = NULL;
         }
+    } else {
+        *dead_list = NULL;
+    }
     *dead_count = output_top;
 
-        return TM_ERROR_NONE;
+    return TM_ERROR_NONE;
 }
 
 /**
@@ -203,25 +196,25 @@ IDATA VMCALL jthread_get_deadlocked_threads(jthread *thread_list, jint thread_co
 IDATA VMCALL jthread_get_thread_count(jint *count_ptr) {
 
     hythread_group_t  java_thread_group = get_java_thread_group();
-        hythread_iterator_t  iterator;
-        hythread_t tm_native_thread;
-        jvmti_thread_t tm_java_thread;
-        int i;
-        int count = 0;
-        int java_thread_count = 0;
-        IDATA status;
+    hythread_iterator_t  iterator;
+    hythread_t tm_native_thread;
+    jvmti_thread_t tm_java_thread;
+    int i;
+    int count = 0;
+    int java_thread_count = 0;
+    IDATA status;
 
     assert(java_thread_group);
-        iterator = hythread_iterator_create(java_thread_group);
-        count = hythread_iterator_size (iterator);
-        for (i = 0; i < count; i++){
+    iterator = hythread_iterator_create(java_thread_group);
+    count = hythread_iterator_size (iterator);
+    for (i = 0; i < count; i++) {
         tm_native_thread = hythread_iterator_next(&iterator);
-            tm_java_thread = hythread_get_private_data(tm_native_thread);
-                if (tm_java_thread){
-                        java_thread_count++;
-                }
+        tm_java_thread = hythread_get_private_data(tm_native_thread);
+        if (tm_java_thread) {
+            java_thread_count++;
         }
-        *count_ptr = java_thread_count;
+    }
+    *count_ptr = java_thread_count;
     status = hythread_iterator_release(&iterator);
 
     return status;
@@ -235,23 +228,23 @@ IDATA VMCALL jthread_get_thread_count(jint *count_ptr) {
 IDATA VMCALL jthread_get_blocked_count(jint* count_ptr) {
 
     hythread_group_t  java_thread_group = get_java_thread_group();
-        hythread_iterator_t  iterator;
-        hythread_t tm_native_thread;
-        int nmb = 0;
-        int count;
-        IDATA status;
+    hythread_iterator_t  iterator;
+    hythread_t tm_native_thread;
+    int nmb = 0;
+    int count;
+    IDATA status;
 
     assert(java_thread_group);
-        iterator = hythread_iterator_create(java_thread_group);
-        count = hythread_iterator_size (iterator);
+    iterator = hythread_iterator_create(java_thread_group);
+    count = hythread_iterator_size (iterator);
 
-        while(hythread_iterator_has_next(iterator)){
-                tm_native_thread = hythread_iterator_next(&iterator);
-                if (tm_native_thread && hythread_is_blocked_on_monitor_enter(tm_native_thread)){
-                        nmb++;
-                }
+    while (hythread_iterator_has_next(iterator)) {
+        tm_native_thread = hythread_iterator_next(&iterator);
+        if (tm_native_thread && hythread_is_blocked_on_monitor_enter(tm_native_thread)) {
+            nmb++;
         }
-        *count_ptr = nmb;
+    }
+    *count_ptr = nmb;
     status = hythread_iterator_release(&iterator);
 
         return status;
@@ -265,22 +258,22 @@ IDATA VMCALL jthread_get_blocked_count(jint* count_ptr) {
 IDATA VMCALL jthread_get_waited_count(jint* count) {
 
     hythread_group_t  java_thread_group = get_java_thread_group();
-        hythread_iterator_t  iterator;
-        hythread_t tm_native_thread;
-        int nmb = 0;
-        IDATA status;
+    hythread_iterator_t  iterator;
+    hythread_t tm_native_thread;
+    int nmb = 0;
+    IDATA status;
 
     assert(java_thread_group);
-        iterator = hythread_iterator_create(java_thread_group);
+    iterator = hythread_iterator_create(java_thread_group);
 
-        while(hythread_iterator_has_next(iterator)){
-                tm_native_thread = hythread_iterator_next(&iterator);
-                //if (hythread_is_in_monitor_wait(tm_native_thread)){ ???????????????????????
-                if (hythread_is_waiting(tm_native_thread)){
-                        nmb++;
-                }
+    while (hythread_iterator_has_next(iterator)) {
+        tm_native_thread = hythread_iterator_next(&iterator);
+        //if (hythread_is_in_monitor_wait(tm_native_thread)) { ???????????????????????
+        if (hythread_is_waiting(tm_native_thread)) {
+            nmb++;
         }
-        *count = nmb;
+    }
+    *count = nmb;
     status = hythread_iterator_release(&iterator);
 
     return status;
@@ -296,29 +289,28 @@ IDATA VMCALL jthread_get_waited_count(jint* count) {
  * 
  */
 IDATA VMCALL jthread_get_state(jthread java_thread, jint *state) {
-
-        hythread_t tm_native_thread;
+    hythread_t tm_native_thread;
 
     assert(java_thread);
     assert(state);
-        tm_native_thread = vm_jthread_get_tm_data(java_thread);
+    tm_native_thread = vm_jthread_get_tm_data(java_thread);
 
-        *state = 0;
-        if (! tm_native_thread) return TM_ERROR_NONE; // Not started yet
+    *state = 0;
+    if (! tm_native_thread) return TM_ERROR_NONE; // Not started yet
 
-        if (hythread_is_alive(tm_native_thread)) {*state |= JVMTI_THREAD_STATE_ALIVE;}
-        if (hythread_is_runnable(tm_native_thread)) {*state |= JVMTI_THREAD_STATE_RUNNABLE;}
-        if (hythread_is_blocked_on_monitor_enter(tm_native_thread)) {*state |= JVMTI_THREAD_STATE_BLOCKED_ON_MONITOR_ENTER;}
-        if (hythread_is_waiting(tm_native_thread)) {*state |= JVMTI_THREAD_STATE_WAITING;}
-        if (hythread_is_waiting_indefinitely(tm_native_thread)) {*state |= JVMTI_THREAD_STATE_WAITING_INDEFINITELY;}
-        if (hythread_is_waiting_with_timeout(tm_native_thread)) {*state |= JVMTI_THREAD_STATE_WAITING_WITH_TIMEOUT;}
-        if (hythread_is_sleeping(tm_native_thread)) {*state |= JVMTI_THREAD_STATE_SLEEPING;}
-        if (hythread_is_in_monitor_wait(tm_native_thread)) {*state |= JVMTI_THREAD_STATE_IN_OBJECT_WAIT;}
-        if (hythread_is_parked(tm_native_thread)) {*state |= JVMTI_THREAD_STATE_PARKED;}
-        if (hythread_is_suspended(tm_native_thread)) {*state |= JVMTI_THREAD_STATE_SUSPENDED;}
-        if (hythread_interrupted(tm_native_thread)) {*state |= JVMTI_THREAD_STATE_INTERRUPTED;}
-        if (hythread_is_in_native(tm_native_thread)) {*state |= JVMTI_THREAD_STATE_IN_NATIVE;}
-        if (hythread_is_terminated(tm_native_thread)) {*state |= JVMTI_THREAD_STATE_TERMINATED;}
+    if (hythread_is_alive(tm_native_thread)) {*state |= JVMTI_THREAD_STATE_ALIVE;}
+    if (hythread_is_runnable(tm_native_thread)) {*state |= JVMTI_THREAD_STATE_RUNNABLE;}
+    if (hythread_is_blocked_on_monitor_enter(tm_native_thread)) {*state |= JVMTI_THREAD_STATE_BLOCKED_ON_MONITOR_ENTER;}
+    if (hythread_is_waiting(tm_native_thread)) {*state |= JVMTI_THREAD_STATE_WAITING;}
+    if (hythread_is_waiting_indefinitely(tm_native_thread)) {*state |= JVMTI_THREAD_STATE_WAITING_INDEFINITELY;}
+    if (hythread_is_waiting_with_timeout(tm_native_thread)) {*state |= JVMTI_THREAD_STATE_WAITING_WITH_TIMEOUT;}
+    if (hythread_is_sleeping(tm_native_thread)) {*state |= JVMTI_THREAD_STATE_SLEEPING;}
+    if (hythread_is_in_monitor_wait(tm_native_thread)) {*state |= JVMTI_THREAD_STATE_IN_OBJECT_WAIT;}
+    if (hythread_is_parked(tm_native_thread)) {*state |= JVMTI_THREAD_STATE_PARKED;}
+    if (hythread_is_suspended(tm_native_thread)) {*state |= JVMTI_THREAD_STATE_SUSPENDED;}
+    if (hythread_interrupted(tm_native_thread)) {*state |= JVMTI_THREAD_STATE_INTERRUPTED;}
+    if (hythread_is_in_native(tm_native_thread)) {*state |= JVMTI_THREAD_STATE_IN_NATIVE;}
+    if (hythread_is_terminated(tm_native_thread)) {*state |= JVMTI_THREAD_STATE_TERMINATED;}
 
     return TM_ERROR_NONE;
 }
@@ -330,14 +322,13 @@ IDATA VMCALL jthread_get_state(jthread java_thread, jint *state) {
  * @param[in] data data to be put
  */
 IDATA VMCALL jthread_set_local_storage(jthread java_thread, const void* data) {
-
-        hythread_t tm_native_thread;
+    hythread_t tm_native_thread;
 
     assert(java_thread);
-        tm_native_thread = vm_jthread_get_tm_data(java_thread);
+    tm_native_thread = vm_jthread_get_tm_data(java_thread);
     assert(tm_native_thread);
 
-        return hythread_set_private_data(tm_native_thread, (void *)data);
+    return hythread_set_private_data(tm_native_thread, (void *)data);
 }
 
 /**
@@ -347,14 +338,13 @@ IDATA VMCALL jthread_set_local_storage(jthread java_thread, const void* data) {
  * @param[out] data_ptr pointer to the data
  */
 IDATA VMCALL jthread_get_local_storage(jthread java_thread, void** data_ptr) {
-
-        hythread_t tm_native_thread;
+    hythread_t tm_native_thread;
 
     assert(java_thread);
     assert(data_ptr);
-        tm_native_thread = vm_jthread_get_tm_data(java_thread);
+    tm_native_thread = vm_jthread_get_tm_data(java_thread);
     assert(tm_native_thread);
-        *data_ptr = hythread_get_private_data (tm_native_thread);
+    *data_ptr = hythread_get_private_data (tm_native_thread);
 
     return TM_ERROR_NONE;
 }
@@ -391,14 +381,14 @@ jboolean VMCALL jthread_holds_lock(jthread thread, jobject monitor) {
  */
 IDATA VMCALL jthread_get_contended_monitor(jthread java_thread, jobject* monitor) {
 
-        hythread_t tm_native_thread;
-        jvmti_thread_t tm_java_thread;
+    hythread_t tm_native_thread;
+    jvmti_thread_t tm_java_thread;
 
     assert(java_thread);
-        tm_native_thread = vm_jthread_get_tm_data(java_thread);
+    tm_native_thread = vm_jthread_get_tm_data(java_thread);
     tm_java_thread = hythread_get_private_data(tm_native_thread);
-        assert(tm_java_thread);
-        *monitor = tm_java_thread->contended_monitor;
+    assert(tm_java_thread);
+    *monitor = tm_java_thread->contended_monitor;
     return TM_ERROR_NONE;
 }
 
@@ -411,14 +401,14 @@ IDATA VMCALL jthread_get_contended_monitor(jthread java_thread, jobject* monitor
  */
 IDATA VMCALL jthread_get_wait_monitor(jthread java_thread, jobject* monitor) {
 
-        hythread_t tm_native_thread;
-        jvmti_thread_t tm_java_thread;
+    hythread_t tm_native_thread;
+    jvmti_thread_t tm_java_thread;
 
     assert(java_thread);
-        tm_native_thread = vm_jthread_get_tm_data(java_thread);
+    tm_native_thread = vm_jthread_get_tm_data(java_thread);
     tm_java_thread = hythread_get_private_data(tm_native_thread);
-        assert(tm_java_thread);
-        *monitor = tm_java_thread->wait_monitor;
+    assert(tm_java_thread);
+    *monitor = tm_java_thread->wait_monitor;
     return TM_ERROR_NONE;
 }
 
@@ -440,7 +430,7 @@ IDATA VMCALL jthread_get_lock_owner(jobject monitor, jthread* lock_owner) {
     hythread_suspend_disable();
     lockword = vm_object_get_lockword_addr(monitor);
     tm_native_thread = hythread_thin_monitor_get_owner(lockword);
-    if (!tm_native_thread){
+    if (!tm_native_thread) {
         *lock_owner = NULL;
     } else {
         tm_java_thread = hythread_get_private_data(tm_native_thread);
@@ -466,19 +456,19 @@ IDATA VMCALL jthread_get_lock_recursion(jobject monitor, jthread owner) {
     hythread_thin_monitor_t *lockword;
     IDATA recursion = 0;
 
-        assert(monitor);
+    assert(monitor);
     given_thread = owner?vm_jthread_get_tm_data(owner):NULL;
-        hythread_suspend_disable();
+    hythread_suspend_disable();
     
-        lockword = vm_object_get_lockword_addr(monitor);
+    lockword = vm_object_get_lockword_addr(monitor);
     lock_owner = hythread_thin_monitor_get_owner(lockword);
         
     if (lock_owner && (!given_thread || lock_owner->thread_id == given_thread->thread_id))
-                recursion = hythread_thin_monitor_get_recursion(lockword);
+        recursion = hythread_thin_monitor_get_recursion(lockword);
     
-        hythread_suspend_enable();
+    hythread_suspend_enable();
 
-        return recursion;
+    return recursion;
 }
 
 /**
@@ -489,22 +479,22 @@ IDATA VMCALL jthread_get_lock_recursion(jobject monitor, jthread owner) {
  * @param[out] monitors_ptr array of owned monitors
  */
 IDATA VMCALL jthread_get_owned_monitors(jthread java_thread, 
-                                                       jint* monitor_count_ptr, jobject** monitors_ptr) {
+                       jint* monitor_count_ptr, jobject** monitors_ptr) {
 
-        hythread_t tm_native_thread;
-        jvmti_thread_t tm_java_thread;
+    hythread_t tm_native_thread;
+    jvmti_thread_t tm_java_thread;
     // apr_pool_t* pool;
     // apr_status_t apr_status;
     jobject* monitors;
-        int i;
-        IDATA status;
-    
-        status =hythread_global_lock();
-        if (status != TM_ERROR_NONE) return status;
+    int i;
+    IDATA status;
+
+    status =hythread_global_lock();
+    if (status != TM_ERROR_NONE) return status;
     assert(java_thread);
-        tm_native_thread = vm_jthread_get_tm_data(java_thread);
+    tm_native_thread = vm_jthread_get_tm_data(java_thread);
     tm_java_thread = hythread_get_private_data(tm_native_thread);
-        assert(tm_java_thread);
+    assert(tm_java_thread);
     /* apr_status = apr_pool_create(&pool, 0);
     if (apr_status != APR_SUCCESS) {
         hythread_global_unlock();
@@ -516,12 +506,12 @@ IDATA VMCALL jthread_get_owned_monitors(jthread java_thread,
         hythread_global_unlock();
         return TM_ERROR_OUT_OF_MEMORY;
     }
-        for (i = 0; i < tm_java_thread->owned_monitors_nmb; i++){
-                monitors[i] = tm_java_thread->owned_monitors[i];
-        }
+    for (i = 0; i < tm_java_thread->owned_monitors_nmb; i++) {
+        monitors[i] = tm_java_thread->owned_monitors[i];
+    }
     *monitors_ptr = monitors;
-        *monitor_count_ptr = tm_java_thread->owned_monitors_nmb;
+    *monitor_count_ptr = tm_java_thread->owned_monitors_nmb;
 
     status = hythread_global_unlock();
-        return status;
+    return status;
 }

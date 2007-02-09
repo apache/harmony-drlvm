@@ -14,12 +14,6 @@
  *  See the License for the specific language governing permissions and
  *  limitations under the License.
  */
-/**
- * @author Andrey Chernyshev
- * @version $Revision: 1.1.2.14 $
- */
-
-
 #ifndef THREAD_PRIVATE_H
 #define THREAD_PRIVATE_H
 
@@ -44,7 +38,7 @@
 //#include "clog.h"
 
 // FIXME move to the global header, add error converter 
-#define RET_ON_ERROR(stat) if(stat) { return -1; }
+#define RET_ON_ERROR(stat) if (stat) { return -1; }
 #define CONVERT_ERROR(stat)	(stat)
 
 #define MAX_OWNED_MONITOR_NUMBER 200 //FIXME: switch to dynamic resize
@@ -108,27 +102,27 @@ __forceinline hythread_t tmn_self_macro() {
 #endif
 
 /**
-  * get_local_pool() function return apr pool associated with the current thread.
-  * the memory could be allocated without lock using this pool
-  * deallocation should be done in the same thread, otherwise 
-  * local_pool_cleanup_register() should be called
-  */
- apr_pool_t* get_local_pool();
+ * get_local_pool() function return apr pool associated with the current thread.
+ * the memory could be allocated without lock using this pool
+ * deallocation should be done in the same thread, otherwise 
+ * local_pool_cleanup_register() should be called
+ */
+apr_pool_t* get_local_pool();
  
 /**
-  * local_pool_cleanup_register() synchronously register the cleanup function.
-  * It should be called to request cleanup in thread local pool, from other thread
-  * Usage scenario:
-  * IDATA hymutex_destroy (tm_mutex_t *mutex) {
-  *        apr_pool_t *pool = apr_thread_mutex_pool_get ((apr_thread_mutex_t*)mutex);
-  *        if(pool != get_local_pool()) {
-  *              return local_pool_cleanup_register(hymutex_destroy, mutex);
-  *      }
-  *      apr_thread_mutex_destroy(mutex);
-  *  return TM_ERROR_NONE;
-  * }
-  *  
-  */
+ * local_pool_cleanup_register() synchronously register the cleanup function.
+ * It should be called to request cleanup in thread local pool, from other thread
+ * Usage scenario:
+ * IDATA hymutex_destroy (tm_mutex_t *mutex) {
+ *        apr_pool_t *pool = apr_thread_mutex_pool_get ((apr_thread_mutex_t*)mutex);
+ *        if (pool != get_local_pool()) {
+ *              return local_pool_cleanup_register(hymutex_destroy, mutex);
+ *      }
+ *      apr_thread_mutex_destroy(mutex);
+ *  return TM_ERROR_NONE;
+ * }
+ *  
+ */
 IDATA local_pool_cleanup_register(void* func, void* data); 
 
 
@@ -208,23 +202,22 @@ typedef struct HyThread {
 
 // Basic manipulation fields
 
-   /**
-    * Group for this thread. Different groups are needed in order 
-    * to be able to quickly iterate over the specific group.
-    * Examples are: Java threads, GC private threads.
-    * Equal to the address of the head of the list of threads for this group.
-    */
+    /**
+     * Group for this thread. Different groups are needed in order 
+     * to be able to quickly iterate over the specific group.
+     * Examples are: Java threads, GC private threads.
+     * Equal to the address of the head of the list of threads for this group.
+     */
     hythread_group_t  group; 
     
-   /**
-    * Points to the next thread within the group.
-    */    
+    /**
+     * Points to the next thread within the group.
+     */    
     hythread_t next;
 
-   /**
+    /**
      * Points to the last thread within the group.
      */
-
     hythread_t prev;
     
     /**
@@ -457,39 +450,41 @@ typedef struct HyThreadGroup {
  */
 typedef struct HyThreadMonitor {
     
-        /**
-         * Mutex
-         */
-        hymutex_t mutex;
+    /**
+     * Mutex
+     */
+    hymutex_t mutex;
 
-        /**
-         * Condition variable
-         */
-        hycond_t condition;
-        
-        /**
-         * Recursion count 
-         */
-        IDATA recursion_count;
-        hythread_t owner; 
-        hythread_t inflate_owner;
-        hythread_t last_wait;
-        int inflate_count;
-        int wait_count;
-        int notify_flag;
-        /**
-         * monitor sub pool
-         * will be destroyed by monitor_destroy()
-         */
-        apr_pool_t *pool;
-        /**
-         * Owner thread ID. 
-         */
-        IDATA thread_id;
+    /**
+     * Condition variable
+     */
+    hycond_t condition;
+    
+    /**
+     * Recursion count 
+     */
+    IDATA recursion_count;
+    hythread_t owner; 
+    hythread_t inflate_owner;
+    hythread_t last_wait;
+    int inflate_count;
+    int wait_count;
+    int notify_flag;
 
-        UDATA flags;
+    /**
+     * monitor sub pool
+     * will be destroyed by monitor_destroy()
+     */
+    apr_pool_t *pool;
 
-        char *name;
+    /**
+     * Owner thread ID. 
+     */
+    IDATA thread_id;
+
+    UDATA flags;
+
+    char *name;
 
 } HyThreadMonitor;
 
@@ -498,25 +493,25 @@ typedef struct HyThreadMonitor {
  */
 typedef struct HyLatch {
     
-        /**
-         * Latch count
-         */
-        int count;
+    /**
+     * Latch count
+     */
+    int count;
+
+    /**
+     * Condition event used to signal threads which are waiting on the latch.
+     */
+    hycond_t condition; 
     
-        /**
-         * Condition event used to signal threads which are waiting on the latch.
-         */
-        hycond_t condition; 
-        
-        /**
-         * Mutex associated with the latch data.
-         */
-        hymutex_t mutex;  
-        /**
-          * latch sub pool
-          * will be destroyed by latch_destroy()
-         */
-        apr_pool_t *pool;       
+    /**
+     * Mutex associated with the latch data.
+     */
+    hymutex_t mutex;  
+    /**
+      * latch sub pool
+      * will be destroyed by latch_destroy()
+     */
+    apr_pool_t *pool;       
     
 } HyLatch;
 
@@ -526,30 +521,31 @@ typedef struct HyLatch {
  */
 typedef struct HySemaphore {
     
-        /**
-         * Semaphore count
-         */
-        int count;
+    /**
+     * Semaphore count
+     */
+    int count;
+
+    /**
+     * Semaphore max count
+     */
+    int max_count;
+
+    /**
+     * Condition event used to signal threads which are waiting on the semaphore.
+     */
+    hycond_t condition; 
     
-        /**
-         * Semaphore max count
-         */
-        int max_count;
-    
-        /**
-         * Condition event used to signal threads which are waiting on the semaphore.
-         */
-        hycond_t condition; 
-        
-        /**
-         * Mutex associated with the semaphore data.
-         */
-        hymutex_t mutex;         
-        /**
-          * semaphore sub pool
-          * will be destroyed by sem_destroy()
-         */
-        apr_pool_t *pool;     
+    /**
+     * Mutex associated with the semaphore data.
+     */
+    hymutex_t mutex;         
+
+    /**
+     * semaphore sub pool
+     * will be destroyed by sem_destroy()
+     */
+    apr_pool_t *pool;     
 } HySemaphore;
 
 // Global variables 

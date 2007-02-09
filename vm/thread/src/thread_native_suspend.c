@@ -15,11 +15,6 @@
  *  limitations under the License.
  */
 
-/** 
- * @author Artem Aliev
- * @version $Revision: 1.1.2.11 $
- */
-
 /**
  * @file thread_native_suspend.c
  * @brief Hythread suspend/resume related functions
@@ -42,8 +37,8 @@ static void thread_safe_point_impl(hythread_t thread);
 /**
  * Returns non-zero if thread is suspended.
  */
-IDATA VMCALL hythread_is_suspend_enabled(){
-        return tm_self_tls->suspend_disable_count == 0;
+IDATA VMCALL hythread_is_suspend_enabled() {
+    return tm_self_tls->suspend_disable_count == 0;
 }
 
 
@@ -81,7 +76,7 @@ suspended:
     thread->suspend_disable_count--;
 
 #endif
- //   if(!thread->suspend_request  || thread->suspend_disable_count!=0) {
+ //   if (!thread->suspend_request  || thread->suspend_disable_count!=0) {
    //     return;
    // }
         
@@ -126,7 +121,7 @@ suspended:
     thread->suspend_disable_count++;
 #endif
 
-    if(!thread->suspend_request  || thread->suspend_disable_count!=1) {
+    if (!thread->suspend_request  || thread->suspend_disable_count!=1) {
         return;
     }
     thread_safe_point_impl(thread);
@@ -151,7 +146,7 @@ void VMCALL hythread_safe_point() {
 
 static void thread_safe_point_impl(hythread_t thread) { 
     hythread_event_callback_proc callback_func;
-    if(thread->suspend_request >0) {   
+    if (thread->suspend_request >0) {
         
         int old_status = thread->suspend_disable_count;
         do {
@@ -195,20 +190,20 @@ static void send_suspend_request(hythread_t thread) {
 
     assert(thread->suspend_request >=0);
     // already suspended?
-    if(thread->suspend_request > 0) {
+    if (thread->suspend_request > 0) {
         apr_atomic_inc32((apr_uint32_t *)&(thread->suspend_request));
         return;
     }               
                 
-     //we really need to suspend thread.
+    //we really need to suspend thread.
 
-     hysem_set(thread->resume_event, 0);
+    hysem_set(thread->resume_event, 0);
                 
-     apr_atomic_inc32((apr_uint32_t *)&(thread->suspend_request));
+    apr_atomic_inc32((apr_uint32_t *)&(thread->suspend_request));
 
-     apr_thread_yield_other(thread->os_handle);
+    apr_thread_yield_other(thread->os_handle);
 
-     TRACE(("TM: suspend request sent: %p request count: %d",thread , thread->suspend_request));
+    TRACE(("TM: suspend request sent: %p request count: %d",thread , thread->suspend_request));
 }
 
 
@@ -281,18 +276,18 @@ IDATA VMCALL hythread_suspend_other(hythread_t thread) {
     hythread_t self;
     self = tm_self_tls;
     TRACE(("TM: suspend one enter thread: %p self: %p request count: %d",thread , tm_self_tls, thread->suspend_request));
-    if(self == thread) {
+    if (self == thread) {
         hythread_suspend();
         return TM_ERROR_NONE; 
     }
-        send_suspend_request(thread);
-        while(wait_safe_region_event(thread)!=TM_ERROR_NONE) {
-            if(self->suspend_request>0)
-            {
-                hythread_resume(thread);
-                return TM_ERROR_EBUSY;
-            }
+
+    send_suspend_request(thread);
+    while (wait_safe_region_event(thread)!=TM_ERROR_NONE) {
+        if (self->suspend_request>0) {
+            hythread_resume(thread);
+            return TM_ERROR_EBUSY;
         }
+    }
     TRACE(("TM: suspend one exit thread: %p request count: %d",thread , thread->suspend_request));
         
     return TM_ERROR_NONE;
@@ -311,20 +306,20 @@ IDATA VMCALL hythread_suspend_other(hythread_t thread) {
  * @see hythread_create, hythread_suspend
  */
 void VMCALL hythread_resume(hythread_t thread) {
-        TRACE(("TM: start resuming: %p request count: %d",thread , thread->suspend_request));
+    TRACE(("TM: start resuming: %p request count: %d",thread , thread->suspend_request));
     // If there was request for suspension, decrease the request counter
- //       printf("resume other now lock %d  %d  %d  %d\n",tm_self_tls->thread_id,tm_self_tls->suspend_disable_count,thread->thread_id,thread->suspend_disable_count);
-    if(thread->suspend_request > 0) {
+    //printf("resume other now lock %d  %d  %d  %d\n",tm_self_tls->thread_id,tm_self_tls->suspend_disable_count,thread->thread_id,thread->suspend_disable_count);
+    if (thread->suspend_request > 0) {
         if (thread->safepoint_callback && thread->suspend_request < 2) return;
         apr_atomic_dec32((apr_uint32_t *)&(thread->suspend_request));
-        if(thread->suspend_request == 0) {  
+        if (thread->suspend_request == 0) {
             // Notify the thread that it may wake up now
             hysem_post(thread->resume_event);            
             TRACE(("TM: resume one thread: %p request count: %d",thread , thread->suspend_request));
             thread->state &= ~TM_THREAD_STATE_SUSPENDED;
         }
     }
-   // printf("resume other now lock-compl %d  %d  %d  %d\n",tm_self_tls->thread_id,tm_self_tls->suspend_disable_count,thread->thread_id,thread->suspend_disable_count);
+    //printf("resume other now lock-compl %d  %d  %d  %d\n",tm_self_tls->thread_id,tm_self_tls->suspend_disable_count,thread->thread_id,thread->suspend_disable_count);
 }
 
 /**
@@ -338,7 +333,7 @@ void VMCALL hythread_resume(hythread_t thread) {
 IDATA hythread_set_safepoint_callback(hythread_t thread, tm_thread_event_callback_proc callback) {
     IDATA status;
     while (apr_atomic_casptr((volatile void **)&thread->safepoint_callback, (void *)callback, (void *)NULL) != NULL);
-    if(tm_self_tls == thread) {
+    if (tm_self_tls == thread) {
         int old_status = thread->suspend_disable_count;
         thread->suspend_disable_count = 1;
         hythread_suspend();
@@ -356,7 +351,7 @@ IDATA hythread_set_safepoint_callback(hythread_t thread, tm_thread_event_callbac
     
     if (thread->current_condition) {
         status=hycond_notify_all(thread->current_condition);   
-        assert (status == TM_ERROR_NONE);
+        assert(status == TM_ERROR_NONE);
     }
 
     return TM_ERROR_NONE;
@@ -391,37 +386,35 @@ IDATA VMCALL hythread_suspend_all(hythread_iterator_t *t, hythread_group_t group
     
     self = tm_self_tls;
     // try to prevent cyclic suspend dead-lock
-    while(self->suspend_request > 0) {
+    while (self->suspend_request > 0) {
         thread_safe_point_impl(self);
     }
 
     iter = hythread_iterator_create(group);
-        // send suspend requests to all threads
+    // send suspend requests to all threads
     TRACE(("TM: send suspend requests"));
-        while((next = hythread_iterator_next(&iter)) != NULL) {
-                if(next != self) {
-                        send_suspend_request(next);
-                }       
-        }
-        hythread_iterator_reset(&iter);
-        // all threads should be stopped in safepoints or be in safe region.
-        TRACE(("TM: wait suspend responses"));
-        while((next = hythread_iterator_next(&iter)) != NULL) {
-                if(next != self) {
-                        while (wait_safe_region_event(next)!=TM_ERROR_NONE)
-                        {
-                            thread_safe_point_impl(tm_self_tls);
-                            hythread_yield();
-                        }
-                }       
-        }
-        
-        hythread_iterator_reset(&iter);
-        hythread_iterator_release(&iter);
-        if(t) 
-        {
-                *t=iter;
-        }
+    while ((next = hythread_iterator_next(&iter)) != NULL) {
+        if (next != self) {
+            send_suspend_request(next);
+        }       
+    }
+    hythread_iterator_reset(&iter);
+    // all threads should be stopped in safepoints or be in safe region.
+    TRACE(("TM: wait suspend responses"));
+    while ((next = hythread_iterator_next(&iter)) != NULL) {
+        if (next != self) {
+            while (wait_safe_region_event(next)!=TM_ERROR_NONE) {
+                thread_safe_point_impl(tm_self_tls);
+                hythread_yield();
+            }
+        }       
+    }
+    
+    hythread_iterator_reset(&iter);
+    hythread_iterator_release(&iter);
+    if (t) {
+        *t=iter;
+    }
        
     return TM_ERROR_NONE;
 }
@@ -439,11 +432,11 @@ IDATA VMCALL hythread_resume_all(hythread_group_t  group) {
     hythread_iterator_t iter;
     iter = hythread_iterator_create(group);
     TRACE(("TM: resume all"));
-        // send suspend requests to all threads
-    while((next = hythread_iterator_next(&iter)) != NULL) {
-          if(next != self) {
-                hythread_resume(next);
-          }       
+    // send suspend requests to all threads
+    while ((next = hythread_iterator_next(&iter)) != NULL) {
+        if (next != self) {
+            hythread_resume(next);
+        }       
     }
         
     hythread_iterator_release(&iter); 
@@ -454,22 +447,22 @@ IDATA VMCALL hythread_resume_all(hythread_group_t  group) {
 // Private functionality
 
 int reset_suspend_disable() {
-        hythread_t self = tm_self_tls;
-        int dis = self->suspend_disable_count;
-        self->suspend_disable_count = 0;
-        if(self->suspend_request >0) {   
-            // notify suspender
-            hylatch_count_down(self->safe_region_event);
-        }
-        return dis;
+    hythread_t self = tm_self_tls;
+    int dis = self->suspend_disable_count;
+    self->suspend_disable_count = 0;
+    if (self->suspend_request >0) {
+        // notify suspender
+        hylatch_count_down(self->safe_region_event);
+    }
+    return dis;
 }
 
 void set_suspend_disable(int count) {
     hythread_t self = tm_self_tls;
     assert(count>=0);
     self->suspend_disable_count = count;
-    if(count) {
-           thread_safe_point_impl(self);
+    if (count) {
+        thread_safe_point_impl(self);
     }
 }
 

@@ -46,14 +46,13 @@ static void reset_thread(hythread_t thread);
 static IDATA register_to_group(hythread_t thread, hythread_group_t group);
 //#define APR_TLS_USE 1
 
-#define NAKED __declspec( naked )
+#define NAKED __declspec(naked)
 
-#if !defined (APR_TLS_USE ) && !defined (FS14_TLS_USE)
+#if !defined (APR_TLS_USE) && !defined (FS14_TLS_USE)
 #ifdef PLATFORM_POSIX
 __thread hythread_t tm_self_tls = NULL;
 #else
 __declspec(thread) hythread_t tm_self_tls = NULL;
-
 #endif
 #endif
 
@@ -279,7 +278,7 @@ void VMCALL hythread_detach(hythread_t thread) {
     
     // Acquire global TM lock to prevent concurrent access to thread list
     status = hythread_global_lock(NULL);
-    assert (status == TM_ERROR_NONE);
+    assert(status == TM_ERROR_NONE);
 
     // No actions required in case the specified thread is detached already.
     if (thread->group != NULL) {
@@ -428,7 +427,7 @@ IDATA thread_sleep_impl(I_64 millis, IDATA nanos, IDATA interruptable) {
     
     hythread_t thread = tm_self_tls;
     
-    if(nanos == 0 && millis == 0) {
+    if (nanos == 0 && millis == 0) {
         hythread_yield();
         return TM_ERROR_NONE;
     }         
@@ -503,7 +502,7 @@ hythread_t VMCALL hythread_get_thread(IDATA id) {
  * @param[in] t thread those private data to get
  * @return pointer to thread private data
  */
-void* VMCALL hythread_get_private_data(hythread_t  t){
+void* VMCALL hythread_get_private_data(hythread_t t) {
     assert(t);
     return t->private_data;
 }
@@ -513,7 +512,7 @@ void* VMCALL hythread_get_private_data(hythread_t  t){
  * @param t thread
  * @param data pointer to private data
  */
-IDATA VMCALL hythread_set_private_data(hythread_t  t, void* data) {
+IDATA VMCALL hythread_set_private_data(hythread_t t, void* data) {
     assert(t);
     t->private_data = data;
     return TM_ERROR_NONE;
@@ -561,8 +560,8 @@ IDATA VMCALL hythread_cancel_all(hythread_group_t group) {
     }
     
     iter = hythread_iterator_create(group);
-    while((next = hythread_iterator_next (&iter)) != NULL) {
-        if(next != self) {
+    while ((next = hythread_iterator_next (&iter)) != NULL) {
+        if (next != self) {
             hythread_cancel(next);
             //since this method being used at shutdown it does not
             //make any sense to exit on error, but continue terminating threads
@@ -638,7 +637,7 @@ static hythread_t allocate_thread() {
     IDATA status;
 
     apr_status = apr_pool_create(&pool, TM_POOL);
-    if((apr_status != APR_SUCCESS) || (pool == NULL)) return NULL;
+    if ((apr_status != APR_SUCCESS) || (pool == NULL)) return NULL;
 
     ptr = (hythread_t )apr_pcalloc(pool, sizeof(HyThread));
     if (ptr == NULL) return NULL;
@@ -653,15 +652,15 @@ static hythread_t allocate_thread() {
     ptr->suspend_request = 0;
     ptr->suspend_disable_count = 0;
     status = hylatch_create(&ptr->join_event, 1);
-    assert (status == TM_ERROR_NONE);
+    assert(status == TM_ERROR_NONE);
     status = hylatch_create(&ptr->safe_region_event, 1);
-    assert (status == TM_ERROR_NONE);
+    assert(status == TM_ERROR_NONE);
     status = hysem_create(&ptr->resume_event, 0, 1);
-    assert (status == TM_ERROR_NONE);
+    assert(status == TM_ERROR_NONE);
     status = hymutex_create(&ptr->mutex, TM_MUTEX_NESTED);
-    assert (status == TM_ERROR_NONE);
+    assert(status == TM_ERROR_NONE);
     status = hycond_create(&ptr->condition);
-    assert (status == TM_ERROR_NONE);
+    assert(status == TM_ERROR_NONE);
     
     ptr->state = TM_THREAD_STATE_ALLOCATED;
     return ptr;
@@ -685,11 +684,11 @@ static void reset_thread(hythread_t thread) {
     thread->suspend_disable_count = 0;
     thread->safepoint_callback = NULL;
     status = hylatch_set(thread->join_event, 1);
-    assert (status == TM_ERROR_NONE);
+    assert(status == TM_ERROR_NONE);
     status = hylatch_set(thread->safe_region_event, 1);
-    assert (status == TM_ERROR_NONE);
+    assert(status == TM_ERROR_NONE);
     status = hysem_set(thread->resume_event, 0);
-    assert (status == TM_ERROR_NONE);
+    assert(status == TM_ERROR_NONE);
     
     thread->state = TM_THREAD_STATE_ALLOCATED;
 }
@@ -716,7 +715,7 @@ static void* APR_THREAD_FUNC thread_start_proc(apr_thread_t* thd, void *p_args) 
     // Also, should it be executed under TM global lock?
     thread->os_handle = thd; // DELETE?
     status = hythread_set_priority(thread, thread->priority);
-    //assert (status == TM_ERROR_NONE);//now we down - fixme
+    //assert(status == TM_ERROR_NONE);//now we down - fixme
     thread->state |= TM_THREAD_STATE_RUNNABLE;
 
     // Do actual call of the thread body supplied by the user.
@@ -724,7 +723,7 @@ static void* APR_THREAD_FUNC thread_start_proc(apr_thread_t* thd, void *p_args) 
 
     // Shutdown sequence.
     status = hythread_global_lock(NULL);
-    assert (status == TM_ERROR_NONE);
+    assert(status == TM_ERROR_NONE);
     assert(hythread_is_suspend_enabled()); 
     thread->state = TM_THREAD_STATE_TERMINATED | (TM_THREAD_STATE_INTERRUPTED  & thread->state);
     thread->exit_value = 0;
@@ -734,7 +733,7 @@ static void* APR_THREAD_FUNC thread_start_proc(apr_thread_t* thd, void *p_args) 
     hylatch_count_down(thread->join_event);
 
     status = hythread_global_unlock(NULL);
-    assert (status == TM_ERROR_NONE);    
+    assert(status == TM_ERROR_NONE);    
     
     // TODO: It seems it is there is no need to call apr_thread_exit.
     // Current thread should automatically exit upon returning from this function.

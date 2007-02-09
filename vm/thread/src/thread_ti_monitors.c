@@ -15,11 +15,6 @@
  *  limitations under the License.
  */
 
-/** 
- * @author Artem Aliev
- * @version $Revision: 1.1.2.7 $
- */  
-
 /**
  * @file thread_ti_monitors.c
  * @brief JVMTI raw monitors related functions
@@ -51,28 +46,29 @@ IDATA VMCALL jthread_raw_monitor_create(jrawMonitorID* mon_ptr) {
     //// 
     if (!jvmti_monitor_table) {
         status =hythread_global_lock();
-                if (status != TM_ERROR_NONE) return status;
+        if (status != TM_ERROR_NONE) return status;
         if (!jvmti_monitor_table) {
                         
             if (array_create(&jvmti_monitor_table)) {
-                                hythread_global_unlock();
-                                return TM_ERROR_OUT_OF_MEMORY;
+                hythread_global_unlock();
+                return TM_ERROR_OUT_OF_MEMORY;
             }
-            status =hymutex_create(&jvmti_monitor_table_lock, TM_MUTEX_NESTED);
-                        if (status != TM_ERROR_NONE){
-                                hythread_global_unlock();
-                                return status;
-                        }
+            status = hymutex_create(&jvmti_monitor_table_lock, TM_MUTEX_NESTED);
+            if (status != TM_ERROR_NONE) {
+                hythread_global_unlock();
+                return status;
+            }
         }
         status =hythread_global_unlock();
-                if (status != TM_ERROR_NONE) return status;
+        if (status != TM_ERROR_NONE) return status;
     }
     
     status =hymutex_lock(jvmti_monitor_table_lock);
-        if (status != TM_ERROR_NONE) return status;
+    if (status != TM_ERROR_NONE) return status;
     *mon_ptr = array_add(jvmti_monitor_table, monitor);
+
     status =hymutex_unlock(jvmti_monitor_table_lock);
-        if (status != TM_ERROR_NONE) return status;
+    if (status != TM_ERROR_NONE) return status;
     if (!(*mon_ptr)) return TM_ERROR_OUT_OF_MEMORY;
 
     return TM_ERROR_NONE;
@@ -92,14 +88,14 @@ IDATA VMCALL jthread_raw_monitor_destroy(jrawMonitorID mon_ptr) {
         return TM_ERROR_INVALID_MONITOR;
     }
 
-    while(hythread_monitor_destroy((hythread_monitor_t)monitor) != TM_ERROR_NONE) {
+    while (hythread_monitor_destroy((hythread_monitor_t)monitor) != TM_ERROR_NONE) {
         if ((status = hythread_monitor_exit((hythread_monitor_t)monitor)) != TM_ERROR_NONE)
-                return status;
+            return status;
     }
     
     status =hymutex_lock(jvmti_monitor_table_lock);
-        if (status != TM_ERROR_NONE) return status;
-        array_delete(jvmti_monitor_table, (UDATA)mon_ptr);
+    if (status != TM_ERROR_NONE) return status;
+    array_delete(jvmti_monitor_table, (UDATA)mon_ptr);
     status =hymutex_unlock(jvmti_monitor_table_lock);
     return status;
 }
@@ -129,7 +125,7 @@ IDATA VMCALL jthread_raw_monitor_enter(jrawMonitorID mon_ptr) {
  * @return 0 in case of successful attempt.
  */
 IDATA VMCALL jthread_raw_monitor_try_enter(jrawMonitorID mon_ptr) {    
-        hythread_monitor_t monitor;
+    hythread_monitor_t monitor;
     if (!(monitor = (hythread_monitor_t)array_get(jvmti_monitor_table, (UDATA)mon_ptr))) {
         return TM_ERROR_INVALID_MONITOR;
     }
@@ -197,7 +193,7 @@ IDATA VMCALL jthread_raw_monitor_notify(jrawMonitorID mon_ptr) {
     if (!(monitor = (hythread_monitor_t)array_get(jvmti_monitor_table, (UDATA)mon_ptr))) {
         return TM_ERROR_INVALID_MONITOR;
     }
-        return hythread_monitor_notify(monitor);    
+    return hythread_monitor_notify(monitor);    
 }
 
 /**
@@ -213,5 +209,5 @@ IDATA VMCALL jthread_raw_monitor_notify_all(jrawMonitorID mon_ptr) {
     if (!(monitor = (hythread_monitor_t)array_get(jvmti_monitor_table, (UDATA)mon_ptr))) {
         return TM_ERROR_INVALID_MONITOR;
     }
-        return hythread_monitor_notify_all(monitor);    
+    return hythread_monitor_notify_all(monitor);    
 }

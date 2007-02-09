@@ -15,11 +15,6 @@
  *  limitations under the License.
  */
 
-/** 
- * @author Nikolay Kuznetsov
- * @version $Revision: 1.1.2.7 $
- */  
-
 /**
  * @file thread_native_park.c
  * @brief Hythread park/unpark related functions
@@ -84,7 +79,7 @@ IDATA VMCALL hythread_park(I_64 millis, IDATA nanos) {
  * @see hythread_park
  */
 void VMCALL hythread_unpark(hythread_t thread) {
-    if(thread ==  NULL) {
+    if (thread ==  NULL) {
         return;
     }
     

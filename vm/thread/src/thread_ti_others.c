@@ -15,11 +15,6 @@
  *  limitations under the License.
  */
 
-/** 
- * @author Sergey Petrovsky
- * @version $Revision: 1.1.2.4 $
- */  
-
 /**
  * @file thread_ti_others.c
  * @brief JVMTI peak related functions
@@ -53,14 +48,14 @@ IDATA  jthread_get_peak_thread_count (jint *threads_count_ptr) {
  *
  * @param[in] java_thread
  */
-JVMTILocalStorage* jthread_get_jvmti_local_storage(jthread java_thread){
+JVMTILocalStorage* jthread_get_jvmti_local_storage(jthread java_thread) {
 
     jvmti_thread_t tm_java_thread;
     hythread_t tm_native_thread;
 
-        tm_native_thread = vm_jthread_get_tm_data(java_thread);
-        tm_java_thread = hythread_get_private_data(tm_native_thread);
+    tm_native_thread = vm_jthread_get_tm_data(java_thread);
+    tm_java_thread = hythread_get_private_data(tm_native_thread);
 
-        return &tm_java_thread->jvmti_local_storage;
+    return &tm_java_thread->jvmti_local_storage;
 
 }

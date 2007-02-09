@@ -15,11 +15,6 @@
  *  limitations under the License.
  */
 
-/** 
- * @author Sergey Petrovsky
- * @version $Revision: 1.1.2.5 $
- */
-
 /**
  * @file thread_java_attrs.c
  * @brief Java thread priority related functions
@@ -37,7 +32,7 @@
  */
 int jthread_get_priority(jthread java_thread) {
     hythread_t tm_native_thread = jthread_get_native_thread(java_thread);
-        return hythread_get_priority(tm_native_thread);
+    return hythread_get_priority(tm_native_thread);
 }
 
 /**
@@ -47,7 +42,7 @@ int jthread_get_priority(jthread java_thread) {
  * @param[in] priority thread priority
  * @sa java.lang.Thread.setPriority()
  */
-IDATA VMCALL jthread_set_priority(jthread java_thread, int priority){
+IDATA VMCALL jthread_set_priority(jthread java_thread, int priority) {
     hythread_t tm_native_thread = jthread_get_native_thread(java_thread);
     return hythread_set_priority(tm_native_thread, priority);
 }

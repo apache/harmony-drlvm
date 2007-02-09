@@ -15,11 +15,6 @@
  *  limitations under the License.
  */
 
-/** 
- * @author Andrey Chernyshev
- * @version $Revision: 1.1.2.4 $
- */  
-
 /**
  * @file thread_native_state.c
  * @brief Hythread state related functions
