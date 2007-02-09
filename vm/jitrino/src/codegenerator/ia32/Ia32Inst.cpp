@@ -89,7 +89,7 @@ void Opnd::assignMemLocation(MemOpndKind k, Opnd * _base, Opnd * _index, Opnd * 
 void Opnd::setMemOpndSubOpnd(MemOpndSubOpndKind so, Opnd * opnd)
 {
     assert(opnd);
-    assert((so != MemOpndSubOpndKind_Displacement)  || ((uint64)abs((int64)opnd->getImmValue()) <= 0xffffffff));
+    assert((so != MemOpndSubOpndKind_Displacement)  || (INT_MAX >= opnd->getImmValue() && INT_MIN <= opnd->getImmValue()));
     assert((so != MemOpndSubOpndKind_Scale)         || ((uint64)opnd->getImmValue() <= 8));
     assert(memOpndKind!=MemOpndKind_Null);
     memOpndSubOpnds[so]=opnd;
