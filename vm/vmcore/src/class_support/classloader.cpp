@@ -968,15 +968,14 @@ void ClassLoader::LoadNativeLibrary( const char *name )
     apr_pool_t* tmp_pool;
     apr_status_t stat = apr_pool_create(&tmp_pool, this->pool);
     // FIXME: process failure properly
-    
-   //
-   // $$$ GMJ - we don't want it to be where we're running from, but
-   //    where everything else came from.  For now, let it be
-   //    so that apr_dso_load() will do the right thing.  This is
-   //    going to be weird, because we have native code in both
-   //    / as well as /default...  FIXME
-   //
-   // const char* canoname = port_filepath_canonical(name, tmp_pool); 
+
+    // $$$ GMJ - we don't want it to be where we're running from, but
+    //    where everything else came from.  For now, let it be
+    //    so that apr_dso_load() will do the right thing.  This is
+    //    going to be weird, because we have native code in both
+    //    / as well as /default...  FIXME
+    //
+    // const char* canoname = port_filepath_canonical(name, tmp_pool); 
 
     const char *canoname = name;
     
@@ -1006,7 +1005,10 @@ void ClassLoader::LoadNativeLibrary( const char *name )
     // load native library
     bool just_loaded;
     NativeLoadStatus status;
+    // FIXME: add storing class loader here
+    p_TLS_vmthread->onload_caller = this;
     NativeLibraryHandle handle = natives_load_library(lib_name->bytes, &just_loaded, &status);
+    p_TLS_vmthread->onload_caller = NULL;
     if( !handle || !just_loaded ) {
         // create error message
         char apr_error_message[1024];

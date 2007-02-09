@@ -676,12 +676,14 @@ jclass FindClass(JNIEnv* env_ext, String* name)
     assert(hythread_is_suspend_enabled());
     // Determine loader
     StackTraceFrame stf;
-    bool res = st_get_frame(0, &stf);
-    ClassLoader* loader;
-    if (res)
-        loader = (ClassLoader*)class_get_class_loader(method_get_class(stf.method));
-    else
-        loader = env->vm->vm_env->system_class_loader;
+    ClassLoader* loader = p_TLS_vmthread->onload_caller;
+    if(loader == NULL) {
+        bool res = st_get_frame(0, &stf);
+        if (res)
+            loader = (ClassLoader*)class_get_class_loader(method_get_class(stf.method));
+        else
+            loader = env->vm->vm_env->system_class_loader;
+    }
     String *s = name;
     Class* clss =
         class_load_verify_prepare_by_loader_jni(VM_Global_State::loader_env, s, loader);

@@ -81,6 +81,11 @@ public:
      */
     JNIEnv_Internal * jni_env;
 
+    /**
+     * Class loader which loads native library and calls to its JNI_OnLoad
+     */
+    ClassLoader* onload_caller;
+
     // In case exception is thrown, Exception object is put here
     // TODO: Needs to be replaced with jobject!
     //volatile ManagedObject*           p_exception_object;
@@ -133,8 +138,7 @@ public:
     //gc_enable_disable_state           gc_enabled_status;
     bool                              gc_wait_for_enumeration;
     bool                              restore_context_after_gc_and_resume;
-    
-    
+
 #if defined(PLATFORM_POSIX) && defined(_IPF_)
     // Linux/IPF
     sem_t                             suspend_sem;     // To suspend thread in signal handler
