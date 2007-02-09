@@ -11,11 +11,5 @@ gc/Mark.java
 gc/LOS.java
 gc/MultiThreads.java
 
-# HARMONY-3032
-outofmemory/Double.java
-outofmemory/Int.java
-outofmemory/Plain.java
-outofmemory/Ref.java
-
 # fails intermittently: HARMONY-3038
 perf/MultiThreadsSimple.java

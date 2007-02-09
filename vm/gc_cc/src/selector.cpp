@@ -242,7 +242,7 @@ static void update_evacuation_area() {
         reserve_old_object_space(heap.predicted_pos - heap.old_objects.end);
         return;
     }
-    assert(incr > 0);
+    assert(incr >= 0);
 
     /*INFO2("gc.logic", 
             "mb overflow = " << overflow / 1024 / 1024
