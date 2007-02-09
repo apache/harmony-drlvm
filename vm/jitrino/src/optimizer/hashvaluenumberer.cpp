@@ -999,12 +999,26 @@ public:
     Inst* caseDefault(Inst* inst)                   { return inst; }
 private:
     CSEHashKey getKey(Inst *inst) {
+   
+        if(inst->isType()) {
+            return getKey(inst->asTypeInst());
+        } else if(inst->isFieldAccess()) {
+            return getKey(inst->asFieldAccessInst());
+        } else if(inst->isConst()) {
+            return getKey(inst->asConstInst());
+        } else if(inst->isToken()) {
+            return getKey(inst->asTokenInst());
+        } else if(inst->isMethod()) {
+            return getKey(inst->asMethodInst());
+        } else if(inst->isBranch()) {
+            return getKey(inst->asBranchInst());
+        }
+
         // eliminate tau operands from the key
         // they will always be trailing operands
         // but: some instructions have just tau operands,
         //  (tauAnd, ldvar)
         // so if first operand is a tau, don't skip any
-
 
         uint32 numSrcs = inst->getNumSrcOperands();
         if (numSrcs > 0) {
@@ -1258,7 +1272,7 @@ private:
             (mod.hasExceptionModifier() && mod.getExceptionModifier() != Exception_Never))
         {
             Inst* optInst = lookupInst(inst);
-            if (!optInst) {
+            if (inst == optInst) {
                 setHashToInst(inst, getKey(inst));
                 return inst;
             } else {
