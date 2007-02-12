@@ -156,7 +156,13 @@ Version: $Revision$
                                     dir="${external.dep.CLASSLIB}/depends/libs/linux.x86_64" />
 			        <libset type="shared" libs="icudata"
                                     dir="${external.dep.CLASSLIB}/depends/libs/linux.x86_64" />
-                            </select>			    
+                            </select>
+                            <select arch="ipf">
+                                <libset type="shared" libs="icuuc"
+                                    dir="${external.dep.CLASSLIB}/depends/libs/linux.ia64" />
+			        <libset type="shared" libs="icudata"
+                                    dir="${external.dep.CLASSLIB}/depends/libs/linux.ia64" />
+                            </select>
                         </select>
                     </linker>
                 </cc>

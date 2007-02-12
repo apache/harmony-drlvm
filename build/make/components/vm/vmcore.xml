@@ -277,7 +277,13 @@ Version: $Revision: 1.5.2.3 $
 				resource="${external.dep.CLASSLIB}/depends/libs/linux.x86_64/libicuuc.so.34"/>
 			<symlink overwrite="yes" link="${external.dep.CLASSLIB}/depends/libs/linux.x86_64/libicudata.so"
 				resource="${external.dep.CLASSLIB}/depends/libs/linux.x86_64/libicudata.so.34"/>
-		</select>		
+		</select>
+		<select arch="ipf">
+			<symlink overwrite="yes" link="${external.dep.CLASSLIB}/depends/libs/linux.ia64/libicuuc.so"
+				resource="${external.dep.CLASSLIB}/depends/libs/linux.ia64/libicuuc.so.34"/>
+			<symlink overwrite="yes" link="${external.dep.CLASSLIB}/depends/libs/linux.ia64/libicudata.so"
+				resource="${external.dep.CLASSLIB}/depends/libs/linux.ia64/libicudata.so.34"/>
+		</select>
 	</select>
 
         <linker id="linker" extends="common.linker">
@@ -329,7 +335,11 @@ Version: $Revision: 1.5.2.3 $
 		<select arch="em64t">
 			<libset type="shared" libs="icuuc"
                         	dir="${external.dep.CLASSLIB}/depends/libs/linux.x86_64" />
-		</select>		
+		</select>
+		<select arch="ipf">
+			<libset type="shared" libs="icuuc"
+                        	dir="${external.dep.CLASSLIB}/depends/libs/linux.ia64" />
+		</select>
                 <!--linkerarg value="-lz" />
                 <linkerarg value="-lxml2" />
                 <linkerarg value="-lm" />
