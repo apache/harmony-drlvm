@@ -1005,7 +1005,6 @@ void ClassLoader::LoadNativeLibrary( const char *name )
     // load native library
     bool just_loaded;
     NativeLoadStatus status;
-    // FIXME: add storing class loader here
     p_TLS_vmthread->onload_caller = this;
     NativeLibraryHandle handle = natives_load_library(lib_name->bytes, &just_loaded, &status);
     p_TLS_vmthread->onload_caller = NULL;
