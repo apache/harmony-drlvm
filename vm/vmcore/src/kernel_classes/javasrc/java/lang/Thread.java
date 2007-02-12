@@ -838,10 +838,12 @@ public class Thread implements Runnable {
             throw new NullPointerException("The argument is null!");
         }
         synchronized (lock) {
-            int status = VMThreadManager.stop(this, throwable);
-            if (status != VMThreadManager.TM_ERROR_NONE) {
-                throw new InternalError(
-                    "Thread Manager internal error " + status);
+            if (isAlive()) {
+                int status = VMThreadManager.stop(this, throwable);
+                if (status != VMThreadManager.TM_ERROR_NONE) {
+                    throw new InternalError(
+                        "Thread Manager internal error " + status);
+                }
             }
         }
     }
