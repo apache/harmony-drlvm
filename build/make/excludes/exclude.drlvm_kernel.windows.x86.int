@@ -11,3 +11,6 @@ java/lang/RuntimeAdditionalTest42.java
 
 # HARMONY-2453 
 java/lang/SystemTest.java
+
+# HARMONY-3171
+java/lang/ThreadRTest.java

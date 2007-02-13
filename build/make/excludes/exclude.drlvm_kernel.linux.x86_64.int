@@ -12,3 +12,5 @@ java/lang/RuntimeAdditionalTest42.java
 java/lang/ClassGenericsTest.java
 java/lang/ClassGenericsTest4.java
     
+# HARMONY-3171
+java/lang/ThreadRTest.java

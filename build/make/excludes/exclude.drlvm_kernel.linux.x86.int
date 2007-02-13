@@ -9,3 +9,5 @@ java/lang/RuntimeAdditionalTest40.java
 java/lang/RuntimeAdditionalTest41.java
 java/lang/RuntimeAdditionalTest42.java
 
+# HARMONY-3171
+java/lang/ThreadRTest.java

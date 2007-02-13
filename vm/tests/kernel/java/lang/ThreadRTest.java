@@ -91,5 +91,40 @@ public class ThreadRTest extends TestCase {
         } catch (IllegalArgumentException e) { 
             //expected
         } 
-    }                     
+    }    
+
+    static class TT implements Runnable {
+        public volatile boolean started = false;
+        public volatile boolean finished = false;
+        public void run() { 
+            started = true; 
+            try{ 
+                synchronized(this) { 
+                    while (true){ 
+                    } 
+                } 
+            } finally { 
+                finished = true; 
+            } 
+        } 
+    } 
+
+    /*
+     * Regression test for Harmony-3116
+     */
+    public void testStopFinally() throws Exception {
+        TT tt = new TT();
+        Thread t = new Thread(tt); 
+        t.start(); 
+        while(!tt.started){ 
+        } 
+        t.stop(); 
+        
+        int count = 10;
+        while(!tt.finished && count-- > 0 ){
+            Thread.sleep(100);
+        }          
+        assertTrue(tt.finished);
+    } 
+
 }
