@@ -30,9 +30,11 @@ public class VMHelper {
 
     public static Address getTlsBaseAddress() {fail(); return null;}
 
+    //TODO: allocation handle is int only on 32bit OS or (64bit OS && compressed mode)
     public static Address newResolvedUsingAllocHandleAndSize(int objSize, int allocationHandle) {fail(); return null;}
     
-    public static Address newVectorUsingAllocHandle(int arrayLen, int elemSize, int allocationHandle) {fail(); return null;}
+    //TODO: allocation handle is int only on 32bit OS or (64bit OS && compressed mode)
+    public static Address newVectorUsingAllocHandle(int arrayLen, int allocationHandle) {fail(); return null;}
 
     public static void monitorEnter(Object obj) {fail();}
 
@@ -40,13 +42,34 @@ public class VMHelper {
 
     public static void writeBarrier(Address objBase, Address objSlot, Address source) {fail();}
 
-    public static Address getInterfaceVTable(Object obj, int intfTypeId) {fail(); return null;}
+    public static Address getInterfaceVTable(Object obj, Address intfTypePtr) {fail(); return null;}
  
-    public static Object checkCast(Object obj, int castType) {fail(); return null;}
+    public static Object checkCast(Object obj, Address castTypePtr) {fail(); return null;}
  
-    public static boolean instanceOf(Object obj, int castType) {fail(); return false;}
-
+    public static boolean instanceOf(Object obj, Address castTypePtr) {fail(); return false;}
 
     protected static void fail() {throw new RuntimeException("Not supported!");}
 
+
+    public static final int POINTER_TYPE_SIZE          = getPointerTypeSize();
+    public static final boolean COMPRESSED_REFS_MODE   = isCompressedRefsMode();
+    public static final boolean COMPRESSED_VTABLE_MODE = isCompressedVTableMode();
+    public static final long COMPRESSED_VTABLE_BASE_OFFSET    = getCompressedModeVTableBaseOffset();
+    public static final long COMPRESSED_REFS_OBJ_BASE_OFFSET  = getCompressedModeObjectBaseOffset();
+
+    /** @return pointer-type size. 4 or 8 */
+    private static native int getPointerTypeSize();
+
+    /** @return true if VM is run in compressed reference mode */
+    private static native boolean isCompressedRefsMode();
+
+    /** @return true if VM is run in compressed vtables mode */
+    private static native boolean isCompressedVTableMode();
+
+    /** @return vtable base offset if is in compressed-refs mode or -1*/
+    private static native long getCompressedModeVTableBaseOffset();
+
+    /** @return object base offset if is in compressed-refs mode or -1*/
+    private static native long getCompressedModeObjectBaseOffset();
 }
+

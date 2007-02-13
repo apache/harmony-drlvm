@@ -42,7 +42,7 @@ Version: $Revision: 1.4.2.5 $
 
             <fileset dir="${external.dep.CLASSLIB.jardir}" includes="*.jar" />
             <fileset dir="${build.ANTLR.home}" includes="antlr-2.7.5.jar" />
-            <fileset dir="${build.MMTK.home}" includes="mmtk-20061012.jar" />
+            <fileset dir="${build.VMMAGIC.home}" includes="vmmagic-20070207.jar" />
         </path>
 
         <!-- compile time debug information - true by default for kernel classes -->

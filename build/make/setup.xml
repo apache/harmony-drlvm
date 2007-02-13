@@ -106,7 +106,7 @@
         <property name="XALAN.check.file" value="xalan.jar" />
         <property name="VM.check.file" value="vmcore/src/init/vm_init.cpp" />
         <property name="ANTLR.check.file" value="antlr-2.7.5.jar" />
-        <property name="MMTK.check.file" value="mmtk-20061012.jar" />
+        <property name="VMMAGIC.check.file" value="vmmagic-20070207.jar" />
         <property name="PATCHES.check.file" value="README.txt" />
     </target>
 
@@ -181,7 +181,7 @@
 
 
     <target name="setup.resources" depends="plugin.antcontrib">
-        <property name="common.resources" value="LOG4CXX,CPPTASKS,XALAN,VM,ANTLR,PATCHES,JASMIN,MMTK" />
+        <property name="common.resources" value="LOG4CXX,CPPTASKS,XALAN,VM,ANTLR,PATCHES,JASMIN,VMMAGIC" />
         <property name="build.resources" value="CPPTASKS" />
         <if>
             <isset property="if.lnx" />

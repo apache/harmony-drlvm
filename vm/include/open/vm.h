@@ -431,13 +431,13 @@ VMEXPORT Boolean class_get_fast_instanceof_flag(Class_Handle cl);
  VMEXPORT Class_Handle field_get_class(Field_Handle fh);
 
 /**
- * @return <code>TRUE</code> if the field is of a reference type.
+ * @return <code>TRUE</code> if the field must be enumerated by GC
  *
  * This function doesn't cause resolution of the class of the field.
  */
- VMEXPORT Boolean field_is_reference(Field_Handle fh);
+ VMEXPORT Boolean field_is_gc_enumerable(Field_Handle fh);
 
-/**
+ /**
  * @return <code>TRUE</code> if the field is literal. In Java, it means that the
  *          field had the ConstantValue attribute set (JVMS2, Section  4.7.2).
  */

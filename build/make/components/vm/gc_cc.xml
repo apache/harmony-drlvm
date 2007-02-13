@@ -106,7 +106,7 @@ Version: $Revision: 1.4.2.3 $
 
             <fileset dir="${external.dep.CLASSLIB.jardir}" includes="*.jar" />
             <pathelement location="${vm.kernel_classes.jardir}/kernel.jar"/>
-            <fileset dir="${build.MMTK.home}" includes="mmtk-20061012.jar" />
+            <fileset dir="${build.VMMAGIC.home}" includes="vmmagic-20070207.jar" />
         </path>
 
         <property name="jarname" value="gc_cc.jar"/>

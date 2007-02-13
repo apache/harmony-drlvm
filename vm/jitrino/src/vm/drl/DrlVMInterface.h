@@ -278,6 +278,7 @@ public:
     uint32       getNumHandlers()  {return method_get_num_handlers(drlMethod);}
     uint32       getNumThrows() {return method_number_throws(drlMethod);}
     NamedType*   getThrowType(uint32 i);
+    bool         hasAnnotation(NamedType* type);
 
     //
     // accessors for method info, code and data

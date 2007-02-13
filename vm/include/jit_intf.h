@@ -196,6 +196,7 @@ VMEXPORT void method_set_inline_assumption(Compile_Handle h,
                                             Method_Handle caller,
                                             Method_Handle callee);
 
+VMEXPORT Boolean method_has_annotation(Method_Handle target, Class_Handle antn_type);
 
 //
 // Class

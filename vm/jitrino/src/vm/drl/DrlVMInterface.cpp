@@ -1059,4 +1059,8 @@ NamedType* DrlVMMethodDesc::getThrowType(uint32 i) {
     return res;
 }
 
+bool DrlVMMethodDesc::hasAnnotation(NamedType* type) {
+    return method_has_annotation(drlMethod, (Class_Handle)type->getVMTypeHandle());
+}
+
 } //namespace Jitrino

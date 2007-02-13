@@ -70,7 +70,7 @@ static unsigned int class_num_ref_fields(Class_Handle ch)
   unsigned idx;
   for(idx = 0; idx < num_fields; idx++) {
     Field_Handle fh = class_get_instance_field_recursive(ch, idx);
-    if(field_is_reference(fh)) {
+    if(field_is_gc_enumerable(fh)) {
       num_ref_fields++;
     }
   }
@@ -102,7 +102,7 @@ static void build_ref_offset_array(Class_Handle ch, GC_VTable_Info *gcvt)
   int *result = new_ref_array;
   for(unsigned int idx = 0; idx < num_fields; idx++) {
     Field_Handle fh = class_get_instance_field_recursive(ch, idx);
-    if(field_is_reference(fh)) {
+    if(field_is_gc_enumerable(fh)) {
       int offset = field_get_offset(fh);
 #ifndef BUILD_IN_REFERENT
       if(is_reference && offset == gc_referent_offset) continue;

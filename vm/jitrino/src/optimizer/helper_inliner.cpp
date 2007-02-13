@@ -27,6 +27,8 @@
 
 namespace Jitrino {
 
+#define PRAGMA_INLINE "org/vmmagic/pragma/Inline"
+
 struct HelperInlinerFlags {
     const char* inlinerPipelineName;
 
@@ -53,8 +55,11 @@ DECLARE_STANDARD_HELPER_FLAGS(instanceOf);
 
 class HelperInlinerAction: public Action {
 public:
+    HelperInlinerAction() : inlinePragma(NULL){}
     void init();
     HelperInlinerFlags& getFlags() {return flags;}
+    
+    NamedType* inlinePragma;
 protected:
     HelperInlinerFlags flags;
 };
@@ -101,13 +106,13 @@ void HelperInlinerAction::init() {
     flags.wb_signature = "(Lorg/vmmagic/unboxed/Address;Lorg/vmmagic/unboxed/Address;Lorg/vmmagic/unboxed/Address;)V";
 
     READ_STANDARD_HELPER_FLAGS(ldInterface);
-    flags.ldInterface_signature = "(Ljava/lang/Object;I)Lorg/vmmagic/unboxed/Address;";
+    flags.ldInterface_signature = "(Ljava/lang/Object;Lorg/vmmagic/unboxed/Address;)Lorg/vmmagic/unboxed/Address;";
     
     READ_STANDARD_HELPER_FLAGS(checkCast);
-    flags.checkCast_signature = "(Ljava/lang/Object;IZZZI)Ljava/lang/Object;";
+    flags.checkCast_signature = "(Ljava/lang/Object;Lorg/vmmagic/unboxed/Address;ZZZI)Ljava/lang/Object;";
     
     READ_STANDARD_HELPER_FLAGS(instanceOf);
-    flags.instanceOf_signature = "(Ljava/lang/Object;IZZZI)Z";
+    flags.instanceOf_signature = "(Ljava/lang/Object;Lorg/vmmagic/unboxed/Address;ZZZI)Z";
 }
 
 
@@ -115,7 +120,7 @@ class HelperInliner {
 public:
     HelperInliner(HelperInlinerSession* _sessionAction, MemoryManager& tmpMM, CompilationContext* _cc, Inst* _inst)  
         : flags(((HelperInlinerAction*)_sessionAction->getAction())->getFlags()), localMM(tmpMM), 
-        cc(_cc), inst(_inst), action(_sessionAction), method(NULL)
+        cc(_cc), inst(_inst), session(_sessionAction), method(NULL)
     {
         irm = cc->getHIRManager();
         instFactory = &irm->getInstFactory();
@@ -137,7 +142,7 @@ protected:
     MemoryManager& localMM;
     CompilationContext* cc;
     Inst* inst;
-    HelperInlinerSession* action;
+    HelperInlinerSession* session;
     MethodDesc*  method;
 
 //these fields used by almost every subclass -> cache them
@@ -160,6 +165,12 @@ public:\
         }\
         method = ensureClassIsResolvedAndInitialized(flags.flagPrefix##_className, flags.flagPrefix##_methodName, flags.flagPrefix##_signature);\
         if (!method) return;\
+        HelperInlinerAction* action = (HelperInlinerAction*)session->getAction();\
+        if (!action->inlinePragma) { \
+            action->inlinePragma = cc->getVMCompilationInterface()->resolveClassUsingBootstrapClassloader(PRAGMA_INLINE);\
+        } \
+        if (!action->inlinePragma) return;\
+        \
         doInline();\
     }\
     virtual void doInline();\
@@ -275,9 +286,11 @@ MethodDesc* HelperInliner::ensureClassIsResolvedAndInitialized(const char* class
 
 typedef StlVector<MethodCallInst*> InlineVector;
 
-#define PRAGMA_INLINE "org/vmmagic/pragma/InlinePragma"
 
 void HelperInliner::inlineVMHelper(MethodCallInst* origCall) {
+    NamedType* inlinePragma = ((HelperInlinerAction*)session->getAction())->inlinePragma;
+    assert(inlinePragma!=0);
+
     InlineVector  methodsToInline(localMM);
     methodsToInline.push_back(origCall);
     while (!methodsToInline.empty()) {
@@ -293,7 +306,7 @@ void HelperInliner::inlineVMHelper(MethodCallInst* origCall) {
         CompilationContext inlineCC(cc->getCompilationLevelMemoryManager(), ci, cc->getCurrentJITContext());
         inlineCC.setPipeline(cc->getPipeline());
 
-        Inliner inliner(action, localMM, *irm, false);
+        Inliner inliner(session, localMM, *irm, false);
         InlineNode* regionToInline = inliner.createInlineNode(inlineCC, call);
 
         inliner.connectRegion(regionToInline);
@@ -311,15 +324,10 @@ void HelperInliner::inlineVMHelper(MethodCallInst* origCall) {
                 if (inst->isMethodCall()) {
                     MethodCallInst* methodCall = inst->asMethodCallInst();
                     MethodDesc* md = methodCall->getMethodDesc();
-                    uint32 nThrows = md->getNumThrows();
-                    for (uint32 i=0; i<nThrows;i++) {
-                        NamedType* type = md->getThrowType(i);
-                        const char* name = type->getName();
-                        if (!strcmp(name, PRAGMA_INLINE)) {
-                            methodsToInline.push_back(methodCall);
-                            if (Log::isEnabled()) {
-                                Log::out()<<"Found InlinePragma, adding to the queue:";methodCall->print(Log::out());Log::out()<<std::endl;
-                            }
+                    if (md->hasAnnotation(inlinePragma)) {
+                        methodsToInline.push_back(methodCall);
+                        if (Log::isEnabled()) {
+                            Log::out()<<"Found Inline pragma, adding to the queue:";methodCall->print(Log::out());Log::out()<<std::endl;
                         }
                     }
                 }
@@ -563,10 +571,15 @@ void LdInterfaceHelperInliner::doInline() {
 
     Opnd* baseOpnd = inst->getSrc(0);
     assert(baseOpnd->getType()->isObject());
+    
     Type* type = inst->asTypeInst()->getTypeInfo();
-    int typeId = (int)type->asNamedType()->getRuntimeIdentifier(); //TODO: EM64T or IPF incompatible convertion
-    Opnd* typeOpnd  = opndManager->createSsaTmpOpnd(typeManager->getInt32Type());
-    instFactory->makeLdConst(typeOpnd, typeId)->insertBefore(inst);
+    Opnd* typeOpnd  = opndManager->createSsaTmpOpnd(typeManager->getUnmanagedPtrType(typeManager->getInt8Type()));
+    Opnd* typeValOpnd = opndManager->createSsaTmpOpnd(typeManager->getUIntPtrType());
+    void* typeId = type->asNamedType()->getRuntimeIdentifier();
+    instFactory->makeLdConst(typeValOpnd, (int)typeId)->insertBefore(inst); //TODO: fix this for EM64T
+    Modifier mod = Modifier(Overflow_None)|Modifier(Exception_Never)|Modifier(Strict_No);
+    instFactory->makeConv(mod, Type::UnmanagedPtr, typeOpnd, typeValOpnd)->insertBefore(inst);
+    
     Opnd* resOpnd = inst->getDst();
     Opnd* tauSafeOpnd = opndManager->createSsaTmpOpnd(typeManager->getTauType());
     instFactory->makeTauSafe(tauSafeOpnd)->insertBefore(inst);
@@ -599,15 +612,19 @@ void CheckCastHelperInliner::doInline() {
     assert(type->isObject());
     ObjectType* castType = type->asObjectType();
 
-    int  typeId = (int)castType->getRuntimeIdentifier();
+    void* typeId = castType->getRuntimeIdentifier();
     bool isArrayType = castType->isArrayType();
     bool isInterfaceType = castType->isInterface();
     bool isFastInstanceOf = castType->getFastInstanceOfFlag();
     bool isFinalTypeCast = castType->isFinalClass();
     int  fastCheckDepth = isFastInstanceOf ? castType->getClassDepth() : 0;
     
-    Opnd* typeIdOpnd = opndManager->createSsaTmpOpnd(typeManager->getInt32Type()); //TODO: em64t & ipf!
-    instFactory->makeLdConst(typeIdOpnd, typeId)->insertBefore(inst);
+    Opnd* typeValOpnd = opndManager->createSsaTmpOpnd(typeManager->getInt32Type()); 
+    instFactory->makeLdConst(typeValOpnd, (int)typeId)->insertBefore(inst);//TODO: em64t & ipf!
+
+    Opnd* typeOpnd = opndManager->createSsaTmpOpnd(typeManager->getUnmanagedPtrType(typeManager->getInt8Type())); 
+    Modifier mod = Modifier(Overflow_None)|Modifier(Exception_Never)|Modifier(Strict_No);
+    instFactory->makeConv(mod, Type::UnmanagedPtr, typeOpnd, typeValOpnd)->insertBefore(inst);
 
     Opnd* isArrayOpnd = opndManager->createSsaTmpOpnd(typeManager->getBooleanType());
     instFactory->makeLdConst(isArrayOpnd, isArrayType)->insertBefore(inst);
@@ -624,7 +641,7 @@ void CheckCastHelperInliner::doInline() {
     Opnd* tauSafeOpnd = opndManager->createSsaTmpOpnd(typeManager->getTauType());
     instFactory->makeTauSafe(tauSafeOpnd)->insertBefore(inst);
 
-    Opnd* args[6] = {objOpnd, typeIdOpnd, isArrayOpnd, isInterfaceOpnd, isFinalOpnd, fastCheckDepthOpnd};
+    Opnd* args[6] = {objOpnd, typeOpnd, isArrayOpnd, isInterfaceOpnd, isFinalOpnd, fastCheckDepthOpnd};
     MethodCallInst* call = instFactory->makeDirectCall(opndManager->getNullOpnd(), tauSafeOpnd, tauSafeOpnd, 6, args, method)->asMethodCallInst();
     
     call->insertBefore(inst);
@@ -655,15 +672,19 @@ void InstanceOfHelperInliner::doInline() {
     assert(type->isObject());
     ObjectType* castType = type->asObjectType();
 
-    int  typeId = (int)castType->getRuntimeIdentifier();
+    void* typeId = castType->getRuntimeIdentifier();
     bool isArrayType = castType->isArrayType();
     bool isInterfaceType = castType->isInterface();
     bool isFastInstanceOf = castType->getFastInstanceOfFlag();
     bool isFinalTypeCast = castType->isFinalClass();
     int  fastCheckDepth = isFastInstanceOf ? castType->getClassDepth() : 0;
 
-    Opnd* typeIdOpnd = opndManager->createSsaTmpOpnd(typeManager->getInt32Type()); //TODO: em64t & ipf!
-    instFactory->makeLdConst(typeIdOpnd, typeId)->insertBefore(inst);
+    Opnd* typeValOpnd = opndManager->createSsaTmpOpnd(typeManager->getInt32Type()); 
+    instFactory->makeLdConst(typeValOpnd, (int)typeId)->insertBefore(inst);//TODO: em64t & ipf!
+
+    Opnd* typeOpnd = opndManager->createSsaTmpOpnd(typeManager->getUnmanagedPtrType(typeManager->getInt8Type())); 
+    Modifier mod = Modifier(Overflow_None)|Modifier(Exception_Never)|Modifier(Strict_No);
+    instFactory->makeConv(mod, Type::UnmanagedPtr, typeOpnd, typeValOpnd)->insertBefore(inst);
 
     Opnd* isArrayOpnd = opndManager->createSsaTmpOpnd(typeManager->getBooleanType());
     instFactory->makeLdConst(isArrayOpnd, isArrayType)->insertBefore(inst);
@@ -680,7 +701,7 @@ void InstanceOfHelperInliner::doInline() {
     Opnd* tauSafeOpnd = opndManager->createSsaTmpOpnd(typeManager->getTauType());
     instFactory->makeTauSafe(tauSafeOpnd)->insertBefore(inst);
 
-    Opnd* args[6] = {objOpnd, typeIdOpnd, isArrayOpnd, isInterfaceOpnd, isFinalOpnd, fastCheckDepthOpnd};
+    Opnd* args[6] = {objOpnd, typeOpnd, isArrayOpnd, isInterfaceOpnd, isFinalOpnd, fastCheckDepthOpnd};
     MethodCallInst* call = instFactory->makeDirectCall(inst->getDst(), tauSafeOpnd, tauSafeOpnd, 6, args, method)->asMethodCallInst();
 
     call->insertBefore(inst);

@@ -174,6 +174,7 @@ public:
         _field_type_desc = 0;
         _offset_computed = 0;
         _is_injected = 0;
+        _is_magic_type = 0;
         track_access = 0;
         track_modification = 0;
     }
@@ -212,7 +213,7 @@ public:
     unsigned is_volatile()  {return (_access_flags&ACC_VOLATILE);} 
     unsigned is_transient() {return (_access_flags&ACC_TRANSIENT);} 
     bool is_enum()          {return (_access_flags&ACC_ENUM)?true:false;} 
-
+    
     bool parse(Global_Env& env, Class* clss, ByteReader& cfs);
 
     unsigned calculate_size();
@@ -223,6 +224,8 @@ public:
     Boolean is_injected() {return _is_injected;}
     void set_injected() { _is_injected = 1; }
 
+    Boolean is_magic_type()    {return  _is_magic_type;}
+    
     void set_track_access(bool value) {
         track_access = value ? 1 : 0 ;
     }
@@ -252,6 +255,7 @@ private:
     Const_Java_Value const_value;
     TypeDesc* _field_type_desc;
     unsigned _is_injected : 1;
+    unsigned _is_magic_type : 1;
     unsigned _offset_computed : 1;
 
     /** Turns on sending FieldAccess events on access to this field */

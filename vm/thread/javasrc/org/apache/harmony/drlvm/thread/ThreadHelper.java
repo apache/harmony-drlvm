@@ -32,12 +32,14 @@ public class ThreadHelper {
 
     public static final int TLS_THREAD_ID_OFFSET=getThreadIdOffset();
 
-    static int getThreadId() throws InlinePragma {
+    @Inline
+    static int getThreadId() {
         Address tlsAddr = VMHelper.getTlsBaseAddress();
         Address tlsThreadIdFieldAddr = tlsAddr.plus(TLS_THREAD_ID_OFFSET);
         return tlsThreadIdFieldAddr.loadInt();
     }
 
+    @Inline
     static void monitorEnterUseReservation(Object obj) {
         Address lockWordPtr = ObjectReference.fromObject(obj).toAddress().plus(LOCK_WORD_OFFSET);
         int threadId = getThreadId();
@@ -85,6 +87,7 @@ public class ThreadHelper {
     public static final int FAT_LOCK_MASK = 0x80000000;
     public static final int RECURSION_MASK = 0x0000f800;
 
+    @Inline
     static void monitorExit(Object obj) {
         Address lockWordPtr = ObjectReference.fromObject(obj).toAddress().plus(LOCK_WORD_OFFSET);
         int lockword = lockWordPtr.loadInt();

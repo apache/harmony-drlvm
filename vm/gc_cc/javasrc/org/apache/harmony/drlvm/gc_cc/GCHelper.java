@@ -36,7 +36,8 @@ public class GCHelper {
     private static final int GC_OBJECT_ALIGNMENT = 4; //TODO: EM64 or IPF could have 8!
 
 
-    public static Address alloc(int objSize, int allocationHandle) throws InlinePragma {
+    @Inline
+    public static Address alloc(int objSize, int allocationHandle) {
         Address tlsAddr = VMHelper.getTlsBaseAddress();
 
         Address tlsFreeFieldAddr = tlsAddr.plus(TLS_CURRENT_OFFSET);
@@ -57,17 +58,18 @@ public class GCHelper {
     }
 
 
-   public static Address allocArray(int arrayLen, int elemSize, int allocationHandle)  throws InlinePragma {
+    @Inline   
+    public static Address allocArray(int arrayLen, int elemSize, int allocationHandle) {
         if (arrayLen >= 0) {
             int firstElementOffset = ARRAY_LEN_OFFSET + (elemSize==8?8:4);
             int size = firstElementOffset + elemSize*arrayLen;
             size = (((size + (GC_OBJECT_ALIGNMENT - 1)) & (~(GC_OBJECT_ALIGNMENT - 1))));
 
             Address arrayAddress = alloc(size, allocationHandle); //never null!
-            arrayAddress.store(arrayLen, Offset.fromInt(ARRAY_LEN_OFFSET));
+            arrayAddress.store(arrayLen, Offset.fromIntZeroExtend(ARRAY_LEN_OFFSET));
             return arrayAddress;
         }
-        return VMHelper.newVectorUsingAllocHandle(arrayLen, elemSize, allocationHandle);
+        return VMHelper.newVectorUsingAllocHandle(arrayLen, allocationHandle);
     }
 
 

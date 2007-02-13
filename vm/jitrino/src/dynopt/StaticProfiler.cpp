@@ -32,6 +32,8 @@
 
 /** see article:  "Static Branch Frequency and Program Profile Analysis / Wu, Laurus, IEEE/ACM 1994" */
 
+//TODO: avoid using postdom information. A lot of exceptions-paths make it useless.
+
 namespace Jitrino{
 
 DEFINE_SESSION_ACTION(StaticProfilerPass, statprof, "Perform edge annotation pass based on static heuristics");
@@ -188,20 +190,20 @@ static void estimateNode(StaticProfilerContext* c);
 
 /** looks for unconditional path to inner loop header.
  */
-static bool hasUncondPathToInnerLoopHeader(Node* parentLoopHeader, LoopTree* loopTree,  Edge* edge) {
+static Node* findLoopHeaderOnUncondPath(Node* parentLoopHeader, LoopTree* loopTree,  Edge* edge) {
     Node* node = edge->getTargetNode();
     if (!node->isBlockNode() || node == parentLoopHeader) {
-        return false;
+        return NULL;
     }
 
     if (loopTree->isLoopHeader(node)) {
-        return true;
+        return node;
     }
     Edge* uncondEdge = node->getUnconditionalEdge();
     if (uncondEdge==NULL) {
-        return false;
+        return NULL;
     }
-    return hasUncondPathToInnerLoopHeader(parentLoopHeader, loopTree, uncondEdge);
+    return findLoopHeaderOnUncondPath(parentLoopHeader, loopTree, uncondEdge);
 }
 
 /** returns TRUE if
@@ -458,22 +460,25 @@ static double returnHeuristic(const StaticProfilerContext* c) {
 
 
 /**  Loop header heuristic (LHH)
- *   Predict a successor that is a loop header or loop pre-header
- *   and does not post-dominate will be taken
+ *   Predict a successor that is a loop header or loop pre-header will be taken
  */
 static double loopHeaderHeuristic(const StaticProfilerContext* c) {
     Node* parentLoopHeader = c->loopTree->getLoopHeader(c->node, true);
     
-    bool edge1Accepted = hasUncondPathToInnerLoopHeader(parentLoopHeader, c->loopTree, c->edge1) 
-        && !c->postDomTree->dominates(c->edge1->getTargetNode(), c->node);
-    
-    bool edge2Accepted = hasUncondPathToInnerLoopHeader(parentLoopHeader, c->loopTree, c->edge2) 
-        && !c->postDomTree->dominates(c->edge2->getTargetNode(), c->node);
-    
-    if (edge1Accepted == edge2Accepted) {
+    Node* edge1Loop = findLoopHeaderOnUncondPath(parentLoopHeader, c->loopTree, c->edge1);
+    Node* edge2Loop = findLoopHeaderOnUncondPath(parentLoopHeader, c->loopTree, c->edge2);
+        
+    if ( (edge1Loop!=NULL && edge2Loop!=NULL) || edge2Loop==edge2Loop) {
         return PROB_HEURISTIC_FAIL;
     }
-    return edge1Accepted ? PROB_LOOP_HEADER_HEURISTIC : 1 - PROB_LOOP_HEADER_HEURISTIC;
+    Node* edge1Target = c->edge1->getTargetNode();
+    Node* edge2Target = c->edge2->getTargetNode();
+    if ((edge1Loop != NULL && !c->domTree->dominates(edge1Target, edge1Loop))
+        || (edge2Loop != NULL && !c->domTree->dominates(edge2Target, edge2Loop))) 
+    {
+        return PROB_HEURISTIC_FAIL;
+    }
+    return edge1Loop!=NULL? PROB_LOOP_HEADER_HEURISTIC : 1 - PROB_LOOP_HEADER_HEURISTIC;
 }
 
 

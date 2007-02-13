@@ -51,6 +51,11 @@
 #include "dump.h"
 
 
+static unsigned get_magic_type_size(Field* field) {
+    //all magic sizes use size==machine word today
+    return sizeof(char*);
+}
+
 // For Java currently, fields are not packed: an int16 occupies a full 32 bit word.
 // "do_field_compaction" is true, e.g., for packed ("sequential") layout.
 // If the "clss" pointer is non-NULL, the type must be that of an instance field and any
@@ -88,8 +93,10 @@ static unsigned sizeof_field_type(Field *field, bool do_field_compaction)
     case 'L': 
     case '[': 
         {
-            // compress static reference fields.
-            if (VM_Global_State::loader_env->compress_references) {
+            if (field->is_magic_type()) {
+                sz = get_magic_type_size(field);
+            } else if (VM_Global_State::loader_env->compress_references) {
+                // compress static reference fields.
                 sz = sizeof(COMPRESSED_REFERENCE);
             } else {
                 sz = OBJECT_REF_SIZE;

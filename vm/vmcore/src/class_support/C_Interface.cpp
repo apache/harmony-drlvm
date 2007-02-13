@@ -1790,11 +1790,11 @@ Class_Handle field_get_class_of_field_value(Field_Handle fh)
 } //field_get_class_of_field_value
 
 
-Boolean field_is_reference(Field_Handle fh)
+Boolean field_is_gc_enumerable(Field_Handle fh)
 {
     assert((Field *)fh);
     Java_Type typ = field_get_type(fh);
-    return typ == JAVA_TYPE_CLASS || typ == JAVA_TYPE_ARRAY;
+    return (typ == JAVA_TYPE_CLASS || typ == JAVA_TYPE_ARRAY) && !fh->is_magic_type();
 } //field_is_reference
 
 
@@ -2752,4 +2752,31 @@ Boolean get_boolean_property(const char *property_name, Boolean default_value, P
     }
     destroy_property_value(value);
     return return_value;
+}
+
+
+static Annotation* lookup_annotation(AnnotationTable* table, Class* owner, Class* antn_type) {
+    for (unsigned i = table->length - 1; i >= 0; --i) {
+        Annotation* antn = table->table[i];
+        Type_Info_Handle tih = (Type_Info_Handle) type_desc_create_from_java_descriptor(antn->type->bytes, owner->get_class_loader());
+        if (tih) {
+            Class* type = type_info_get_class(tih);
+            if (antn_type == type) {
+                return antn;
+            }
+        }
+    }
+    LOG("No such annotation " << antn_type->get_name()->bytes);
+    return NULL;
+}
+
+
+Boolean method_has_annotation(Method_Handle target, Class_Handle antn_type) {
+    assert(target);
+    assert(antn_type);
+    if (target->get_declared_annotations()) {
+        Annotation* antn = lookup_annotation(target->get_declared_annotations(), target->get_class(), antn_type);
+        return antn!=NULL;
+    }
+    return false;
 }

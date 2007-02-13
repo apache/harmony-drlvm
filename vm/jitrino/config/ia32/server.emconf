@@ -148,4 +148,6 @@ SD2_OPT.useProfile=EDGE_PROF,VALUE_PROF
 -XDvm.component.classpath.hythr=hythr.jar
 
 #VM helpers
--Dvm.components.vmcore.startupclass=org.apache.harmony.drlvm.VMHelperFastPath
+-Dvm.components.vmcore1.startupclass=org.apache.harmony.drlvm.VMHelper
+-Dvm.components.vmcore2.startupclass=org.apache.harmony.drlvm.VMHelperFastPath
+

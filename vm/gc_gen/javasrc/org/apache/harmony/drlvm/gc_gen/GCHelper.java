@@ -33,7 +33,8 @@ public class GCHelper {
 
     public static final int TLS_GC_OFFSET = TLSGCOffset();
 
-    public static Address alloc(int objSize, int allocationHandle)  throws InlinePragma {
+    @Inline
+    public static Address alloc(int objSize, int allocationHandle) {
         Address TLS_BASE = VMHelper.getTlsBaseAddress();
 
         Address allocator_addr = TLS_BASE.plus(TLS_GC_OFFSET);
@@ -56,17 +57,18 @@ public class GCHelper {
     private static final int ARRAY_LEN_OFFSET = 8;
     private static final int GC_OBJECT_ALIGNMENT = 4; //TODO: EM64 or IPF could have 8!
 
-    public static Address allocArray(int arrayLen, int elemSize, int allocationHandle)  throws InlinePragma {
+    @Inline
+    public static Address allocArray(int arrayLen, int elemSize, int allocationHandle) {
         if (arrayLen >= 0) {
             int firstElementOffset = ARRAY_LEN_OFFSET + (elemSize==8?8:4);
             int size = firstElementOffset + elemSize*arrayLen;
             size = (((size + (GC_OBJECT_ALIGNMENT - 1)) & (~(GC_OBJECT_ALIGNMENT - 1))));
 
             Address arrayAddress = alloc(size, allocationHandle); //never null!
-            arrayAddress.store(arrayLen, Offset.fromInt(ARRAY_LEN_OFFSET));
+            arrayAddress.store(arrayLen, Offset.fromIntZeroExtend(ARRAY_LEN_OFFSET));
             return arrayAddress;
         }
-        return VMHelper.newVectorUsingAllocHandle(arrayLen, elemSize, allocationHandle);
+        return VMHelper.newVectorUsingAllocHandle(arrayLen, allocationHandle);
     }
 
     /** NOS (nursery object space) is higher in address than other spaces.
@@ -77,7 +79,8 @@ public class GCHelper {
     public static Address NOS_BOUNDARY = getNosBoundary();
     public static boolean GEN_MODE = getGenMode();
 
-    public static void write_barrier_slot_rem(Address p_objBase, Address p_objSlot, Address p_target)  throws InlinePragma {
+    @Inline
+    public static void write_barrier_slot_rem(Address p_objBase, Address p_objSlot, Address p_target) {
       
        /* If the slot is in NOS or the target is not in NOS, we simply return*/
         if(p_objSlot.GE(NOS_BOUNDARY) || p_target.LT(NOS_BOUNDARY) || !GEN_MODE) {

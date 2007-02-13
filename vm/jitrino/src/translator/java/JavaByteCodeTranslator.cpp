@@ -66,6 +66,7 @@ Type* convertMagicType2HIR(TypeManager& tm, Type* type) {
 
     const char* name = type->getName();    
     if (!strcmp(name, "org/vmmagic/unboxed/Address") 
+        //TODO: ObjectReference must have a ManagedPointer/Object type
         || !strcmp(name, "org/vmmagic/unboxed/ObjectReference")) 
     {
         return tm.getUnmanagedPtrType(tm.getInt8Type());
@@ -73,7 +74,7 @@ Type* convertMagicType2HIR(TypeManager& tm, Type* type) {
         || !strcmp(name, "org/vmmagic/unboxed/Offset")
         || !strcmp(name, "org/vmmagic/unboxed/Extent")) 
     {
-            return tm.getUIntPtrType();
+        return tm.getUIntPtrType();
     } else if (!strcmp(name, "org/vmmagic/unboxed/WordArray")
         || !strcmp(name, "org/vmmagic/unboxed/OffsetArray")
         || !strcmp(name, "org/vmmagic/unboxed/ExtentArray") 
@@ -1108,7 +1109,7 @@ JavaByteCodeTranslator::getstatic(uint32 constPoolIndex) {
         if (field->isInitOnly() && !field->getParentType()->needsInitialization()) {
             //the final static field of the initialized class
             Type* fieldType = field->getFieldType();
-            if (field->getFieldType()->isNumeric()) {
+            if (field->getFieldType()->isNumeric() || field->getFieldType()->isBoolean()) {
                 Opnd* constVal = NULL;
                 void* fieldAddr = field->getAddress();
                 switch(fieldType->tag) {
@@ -1119,6 +1120,7 @@ JavaByteCodeTranslator::getstatic(uint32 constPoolIndex) {
                     case Type::Int64:   constVal=irBuilder.genLdConstant(*(int64*)fieldAddr);break;
                     case Type::Float:   constVal=irBuilder.genLdConstant(*(float*)fieldAddr);break;
                     case Type::Double:  constVal=irBuilder.genLdConstant(*(double*)fieldAddr);break;
+                    case Type::Boolean: constVal=irBuilder.genLdConstant(*(bool*)fieldAddr);break;
                     default: assert(0); //??
                 }
                 if (constVal != NULL) {
@@ -3808,7 +3810,7 @@ void JavaByteCodeTranslator::genMagic(MethodDesc *md, uint32 numArgs, Opnd **src
     //
     // fromXXX, toXXX - static creation from something
     //
-    if (!strcmp(mname, "fromInt") 
+    if (!strcmp(mname, "fromLong") 
         || !strcmp(mname, "fromIntSignExtend") 
         || !strcmp(mname, "fromIntZeroExtend")
         || !strcmp(mname, "fromObject")  
@@ -4013,7 +4015,7 @@ void JavaByteCodeTranslator::genVMHelper(MethodDesc *md, uint32 numArgs, Opnd **
     }
 
     if (!strcmp(mname,"newVectorUsingAllocHandle")) {
-        assert(numArgs == 3);
+        assert(numArgs == 2);
         Opnd* res = irBuilder.genVMHelperCall(CompilationInterface::Helper_NewVector_UsingVtable, resType, numArgs, srcOpnds);
         pushOpnd(res);
         return;

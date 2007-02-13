@@ -739,6 +739,22 @@ check_field_descriptor( const char *descriptor,
     // DIE( "unreachable code!" ); // exclude remark #111: statement is unreachable
 }
 
+static bool is_magic_type_name(const String* name) {
+    static String* MAGIC_TYPE_NAMES[]={
+        VM_Global_State::loader_env->string_pool.lookup("org/vmmagic/unboxed/Address"),
+        VM_Global_State::loader_env->string_pool.lookup("org/vmmagic/unboxed/Offset"), 
+        VM_Global_State::loader_env->string_pool.lookup("org/vmmagic/unboxed/Word"),
+        VM_Global_State::loader_env->string_pool.lookup("org/vmmagic/unboxed/Extent"),
+        NULL
+    };
+    for (int i=0;;i++)    {
+        String* magicClassName = MAGIC_TYPE_NAMES[i];
+        if (magicClassName == NULL) break;
+        if (magicClassName == name) return true;
+    }
+    return false;
+}
+
 //checks of field and method name depend on class version 
 static const uint16 JAVA5_CLASS_FILE_VERSION = 49;
 
@@ -791,6 +807,11 @@ bool Field::parse(Global_Env& env, Class *clss, ByteReader &cfs )
             << "0x" << std::hex << _access_flags);
         return false;
     }
+
+    //check if field is magic type
+     if (is_magic_type_name(clss->get_name())) {
+         _is_magic_type = 1;
+     }
 
     //check field attributes
     uint16 attr_count;

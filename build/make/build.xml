@@ -480,7 +480,7 @@
                                            deploy.getting_started,
                                            deploy.copy_classlib,
                                            deploy.antlr,
-                                           deploy.mmtk,
+                                           deploy.vmmagic,
                                            deploy.tweakname">
         
         <!-- copy our hythr for the launcher to use -->
@@ -572,18 +572,18 @@ bootclasspath.99=antlr-2.7.5.jar
         </if> 
     </target>
 
-    <target name="deploy.mmtk">
+    <target name="deploy.vmmagic">
         <copy todir="${build.deploy.dir}/jdk/jre/lib/boot">
-            <fileset dir="${build.MMTK.home}">
-                <include name="mmtk-20061012.jar" />
+            <fileset dir="${build.VMMAGIC.home}">
+                <include name="vmmagic-20070207.jar" />
             </fileset>
         </copy>
         <loadfile srcFile="${build.deploy.dir}/jdk/jre/lib/boot/bootclasspath.properties" property="boot.jars.list" />
-        <if> <not><contains string="${boot.jars.list}" substring="=mmtk-20061012.jar"/></not>
+        <if> <not><contains string="${boot.jars.list}" substring="=vmmagic-20070207.jar"/></not>
         <then>
 <concat append="true" destfile="${build.deploy.dir}/jdk/jre/lib/boot/bootclasspath.properties">
-# Dependency for unboxed mmtk package
-bootclasspath.100=mmtk-20061012.jar
+# Dependency for vmmagic package
+bootclasspath.100=vmmagic-20070207.jar
 </concat>
 <fixcrlf srcdir="${build.deploy.dir}/jdk/jre/lib/boot" includes="bootclasspath.properties"/>
         </then>
