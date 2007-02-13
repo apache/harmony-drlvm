@@ -612,48 +612,61 @@ bool Class_Member::parse(Class* clss, ByteReader &cfs)
     return true;
 } //Class_Member::parse
 
-// JVM spec:
-// Unqualified names must not contain the characters ’.’, ’;’, ’[’ or ’/’. Method names are
-// further constrained so that, with the exception of the special method names (§3.9)
-// <init> and <clinit>, they must not contain the characters ’<’ or ’>’.
-static inline bool
-check_field_name(const char *name, unsigned len, bool old_version)
+static bool
+is_identifier(const char *name, unsigned len)
 {
-    TRACE2("field", "field: " << name << " " << len)
-    if(old_version) {
-        TRACE2("field", "symbol: " << *name);
-        if(!(u_isalpha(*name) || *name == '$' || *name == '_'))
-            return false;
-        for (unsigned i = 1; i < len; i++) {
-            TRACE2("field", "symbol: " << name[i]);
-            if(!(u_isalnum(name[i]) || name[i] == '$' || name[i] == '_'))
-                return false;
-        }
-    }else {
-        for (unsigned i = 0; i < len; i++) {
-            switch(name[i]){
-            case '.':
-            case ';':
-            case '[':
-            case '/':
-                return false;
+    uint32 u_ch;    
+    for(unsigned i = 0; i < len; i++) {
+        if(name[i] & 0x80) {
+            assert(name[i] & 0x40);
+            if(name[i] & 0x20) {
+                uint32 x = name[i];
+                i++;
+                uint32 y = name[i];
+                i++;
+                uint32 z = name[i];
+                u_ch = (uint32)(((0x0f & x) << 12) + ((0x3f & y) << 6) + ((0x3f & z)));
+                if(i == 2) {
+                    if(!(u_isalpha(u_ch) || u_ch == '$' ||  u_ch == '_'))
+                        return false;
+                } else {
+                    if(!(u_isalnum(u_ch) || u_ch == '$' ||  u_ch == '_'))
+                        return false;
+                }        
+            } else {
+                uint32 x = name[i];
+                i++;
+                uint32 y = name[i];
+                u_ch = (uint32)(((0x1f & x) << 6) + (0x3f & y));
+                if(i == 1) {
+                    if(!(u_isalpha(u_ch) || u_ch == '$' ||  u_ch == '_'))
+                        return false;                    
+                }
+                if(!(u_isalnum(u_ch) || u_ch == '$' ||  u_ch == '_'))
+                    return false;
             }
+        } else {
+            u_ch = name[i];
+            if(i == 0) {
+                if(!(u_isalpha(u_ch) || u_ch == '$' ||  u_ch == '_'))
+                    return false;                
+            }
+            if(!(u_isalnum(u_ch) || u_ch == '$' ||  u_ch == '_'))
+                return false;
         }
     }
     return true;
 }
 
+// JVM spec:
+// Unqualified names must not contain the characters ’.’, ’;’, ’[’ or ’/’. Method names are
+// further constrained so that, with the exception of the special method names (§3.9)
+// <init> and <clinit>, they must not contain the characters ’<’ or ’>’.
 static inline bool
-check_method_name(const char *name, unsigned len, bool old_version)
+check_member_name(const char *name, unsigned len, bool old_version, bool is_method)
 {
     if(old_version) {
-        if(!(u_isalpha(*name) || *name == '$' || *name == '_'))
-            return false;
-        for (unsigned i = 1; i < len; i++) {
-            TRACE2("field", "symbol: " << name[i]);
-            if(!(u_isalnum(name[i]) || name[i] == '$' || name[i] == '_'))
-                return false;
-        }
+        return is_identifier(name, len);
     }else {
         for (unsigned i = 0; i < len; i++) {
             switch(name[i]){
@@ -661,9 +674,11 @@ check_method_name(const char *name, unsigned len, bool old_version)
             case ';':
             case '[':
             case '/':
+                return false;
             case '<':
             case '>':
-                return false;
+                if(is_method)
+                    return false;
             }
         }
     }
@@ -709,7 +724,7 @@ check_field_descriptor( const char *descriptor,
                     return false;
                 }
                 if(*iterator == '/') {
-                    if(!check_field_name(descriptor, id_len, false))
+                    if(!check_member_name(descriptor, id_len, false, false))
                         return false;
                     id_len = 0;
                     descriptor = iterator + 1;
@@ -717,7 +732,7 @@ check_field_descriptor( const char *descriptor,
                     id_len++;
                 }
             }
-            if(!check_field_name(descriptor, id_len, false))
+            if(!check_member_name(descriptor, id_len, false, false))
                 return false;
             *next = iterator + 1;
             return true;
@@ -763,8 +778,8 @@ bool Field::parse(Global_Env& env, Class *clss, ByteReader &cfs )
     if(!Class_Member::parse(clss, cfs))
         return false;
     if(env.verify_all
-            && !check_field_name(_name->bytes, _name->len,
-                   clss->get_version() < JAVA5_CLASS_FILE_VERSION)) 
+            && !check_member_name(_name->bytes, _name->len,
+                   clss->get_version() < JAVA5_CLASS_FILE_VERSION, false)) 
     {
         REPORT_FAILED_CLASS_FORMAT(clss, "illegal field name : " << _name->bytes);
         return false;
@@ -1346,8 +1361,8 @@ bool Method::_parse_local_vars(Local_Var_Table* table, LocalVarOffset *offset_li
         if(!valid_cpi(_class, name_index, CONSTANT_Utf8, "for name of CONSTANT_Utf8 entry"))
             return false;
         String* name = cp.get_utf8_string(name_index);
-        if(!check_field_name(name->bytes, name->len,
-                _class->get_version() < JAVA5_CLASS_FILE_VERSION))
+        if(!check_member_name(name->bytes, name->len,
+                _class->get_version() < JAVA5_CLASS_FILE_VERSION, false))
         {
             REPORT_FAILED_METHOD("name of local variable: " << name->bytes <<
                 " in " << attr_name << " attribute is not stored as unqualified name");
@@ -1783,8 +1798,8 @@ bool Method::parse(Global_Env& env, Class* clss,
     //check name only if flag verify_all is set from command line
     if(env.verify_all && !(_name == env.Init_String || _name == env.Clinit_String))
     {
-        if(!check_method_name(_name->bytes, _name->len,
-                clss->get_version() < JAVA5_CLASS_FILE_VERSION))
+        if(!check_member_name(_name->bytes, _name->len,
+                clss->get_version() < JAVA5_CLASS_FILE_VERSION, true))
         {
             REPORT_FAILED_CLASS_FORMAT(clss, "illegal method name : " << _name->bytes);
             return false;
@@ -2339,14 +2354,14 @@ check_class_name(const char *name, unsigned len)
             if(*iterator != '/') {
                 id_len++;
             } else {
-                if(!check_field_name(name, id_len, false))
+                if(!check_member_name(name, id_len, false, false))
                     return false;
                 id_len = 0;
                 name = iterator;
                 name++;
             }
         }
-        return check_field_name(name, id_len, false);
+        return check_member_name(name, id_len, false, false);
     }
     return false; //unreachable code
 }
@@ -2603,7 +2618,7 @@ bool ConstantPool::check(Global_Env* env, Class* clss)
             {
                 //check method name
                 if(env->verify_all && (name != env->Init_String)
-                    && !check_method_name(name->bytes,name->len, clss->get_version() < JAVA5_CLASS_FILE_VERSION))
+                    && !check_member_name(name->bytes,name->len, clss->get_version() < JAVA5_CLASS_FILE_VERSION, true))
                 {
                         REPORT_FAILED_CLASS_CLASS(clss->get_class_loader(), clss, "java/lang/ClassFormatError",
                             clss->get_name()->bytes << ": illegal method name for CONSTANT_Methodref entry: " << name->bytes);
@@ -2633,11 +2648,11 @@ bool ConstantPool::check(Global_Env* env, Class* clss)
             if(tag == CONSTANT_Fieldref)
             {
                 //check field name
-                if(env->verify_all && !check_field_name(name->bytes, name->len,
-                        clss->get_version() < JAVA5_CLASS_FILE_VERSION))
+                if(env->verify_all && !check_member_name(name->bytes, name->len,
+                        clss->get_version() < JAVA5_CLASS_FILE_VERSION, false))
                 {
                     REPORT_FAILED_CLASS_CLASS(clss->get_class_loader(), clss, "java/lang/ClassFormatError",
-                        clss->get_name()->bytes << ": illegal filed name for CONSTANT_Filedref entry: " << name->bytes);
+                        clss->get_name()->bytes << ": illegal field name for CONSTANT_Filedref entry: " << name->bytes);
                     return false;
                 }
                 //check field descriptor
@@ -2652,11 +2667,11 @@ bool ConstantPool::check(Global_Env* env, Class* clss)
             {
                 //check method name, name can't be <init> or <clinit>
                 //See specification 4.5.2 about name_and_type_index last sentence.
-                if(!check_method_name(name->bytes, name->len,
-                        clss->get_version() < JAVA5_CLASS_FILE_VERSION))
+                if(!check_member_name(name->bytes, name->len,
+                        clss->get_version() < JAVA5_CLASS_FILE_VERSION, true))
                 {
                     REPORT_FAILED_CLASS_CLASS(clss->get_class_loader(), clss, "java/lang/ClassFormatError",
-                        clss->get_name()->bytes << ": illegal filed name for CONSTANT_InterfaceMethod entry: " << name->bytes);
+                        clss->get_name()->bytes << ": illegal field name for CONSTANT_InterfaceMethod entry: " << name->bytes);
                     return false;
                 }
                 //check method descriptor
