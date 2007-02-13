@@ -527,7 +527,7 @@ vf_TypePool::CheckTypes( vf_ValidType_t *required,        // required type
         }
         return false;
     default:
-        DIE("Verifier: CompareTypes: unknown check type in switch");
+        LDIE(39, "Verifier: CompareTypes: unknown check type in switch");
         return true;
     }
     // unreachable code
@@ -1013,7 +1013,7 @@ vf_is_valid( class_handler source,              // checked class
         return vf_is_super_class( source, current )
                     && vf_is_super_class( current, target );
     default:
-        DIE( "Verifier: vf_is_valid: invalid check type" );
+        LDIE(40, "Verifier: vf_is_valid: invalid check type" );
         return false;
     }
     // unreachable code
@@ -1079,7 +1079,7 @@ vf_set_error( method_handler method,        // failed method
             << ") Incompatible object argument for invokespecial" );
         break;
     default:
-        DIE( "Verifier: vf_set_error: unknown check type" );
+        LDIE(41, "Verifier: vf_set_error: unknown check type" );
         break;
     }
     return;
@@ -1514,7 +1514,7 @@ vf_verify_class_constraints( vf_Context_t *ctex )        // verifier context
 void
 vf_error_func( VERIFY_SOURCE_PARAMS )
 {
-    DIE( VERIFY_REPORT_SOURCE << "Verifier: abort!" );
+    LDIE(42, "{0} Verifier: abort!" << VERIFY_REPORT_SOURCE );
     exit(1);
 } // vf_error_func
 
@@ -1531,7 +1531,7 @@ vf_calloc_func( unsigned num,            // number of elements
     void *result = STD_CALLOC( num, size );
     if( result == NULL ) {
         // out of memory error
-        ECHO( "Verifier: vf_calloc_func: out of memory" );
+        LECHO(41, "Verifier: {0}: out of memory" << "vf_calloc_func");
         vf_error();
     }
 
@@ -1556,7 +1556,7 @@ vf_malloc_func( unsigned size,          // size of memory block
     void *result = STD_MALLOC( size );
     if( result == NULL ) {
         // out of memory error
-        ECHO( "Verifier: vf_malloc_func: out of memory" );
+        LECHO(41, "Verifier: {0}: out of memory" << "vf_malloc_func");
         vf_error();
     }
 
@@ -1582,7 +1582,7 @@ vf_realloc_func( void *pointer,             // old pointer
     void *result = STD_REALLOC( pointer, size );
     if( result == NULL ) {
         // out of memory error
-        ECHO( "Verifier: vf_realloc_func: out of memory" );
+        LECHO(41, "Verifier: {0}: out of memory" << "vf_realloc_func");
         vf_error();
     }
 
@@ -1606,7 +1606,7 @@ vf_free_func( void *pointer,            // free pointer
     if( pointer ) {
         STD_FREE( pointer );
     } else {
-        ECHO( "Verifier: vf_free_func: null pointer for free" );
+        LECHO(41, "Verifier: {0}: null pointer for free" << "vf_free_func" );
         vf_error();
     }
 

@@ -343,7 +343,7 @@ jobject reflection_get_enum_value(JNIEnv *jenv, Class* enum_type, String* name)
                 || strncmp(desc->bytes + 1, type->bytes, type->len)
                 || desc->bytes[type->len + 1] != ';')
             {
-                DIE("Invalid enum field descriptor: " << desc->bytes);
+                LDIE(26, "Invalid enum field descriptor: {0}" << desc->bytes);
             }
 #endif
             return GetStaticObjectField(jenv, 0, (jfieldID)(enum_type->get_field(i)));

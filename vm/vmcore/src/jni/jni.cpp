@@ -578,7 +578,7 @@ jclass JNICALL DefineClass(JNIEnv *jenv,
                 bool f = exn_class != env->java_lang_OutOfMemoryError_Class;
                 tmn_suspend_enable();
                 if(f)
-                    DIE("Fatal: an access to findLoadedClass method of java.lang.Class is not provided");
+                    LDIE(19, "Fatal: an access to findLoadedClass method of java.lang.Class is not provided");
                 // OutOfMemoryError should be rethrown after this JNI method exits
                 return 0;
             }
@@ -1610,11 +1610,11 @@ VMEXPORT jint JNICALL GetEnv(JavaVM * vm, void ** penv, jint ver)
     } else if((ver & JVMTI_VERSION_MASK_INTERFACE_TYPE) == JVMTI_VERSION_INTERFACE_JVMTI) {
         return create_jvmti_environment(vm, penv, ver);
     } else if((ver & JVMTI_VERSION_MASK_INTERFACE_TYPE) == 0x10000000) {
-        WARN("GetEnv requested unsupported JVMPI environment!! Only JVMTI is supported by VM.");
+        LWARN(30, "GetEnv requested unsupported {0} environment!! Only JVMTI is supported by VM." << "JVMPI");
     } else if((ver & JVMTI_VERSION_MASK_INTERFACE_TYPE) == 0x20000000) {
-        WARN("GetEnv requested unsupported JVMDI environment!! Only JVMTI is supported by VM.");
+        LWARN(30, "GetEnv requested unsupported {0} environment!! Only JVMTI is supported by VM." << "JVMDI");
     } else {
-        WARN("GetEnv called with unsupported interface version 0x" << ((void *)((POINTER_SIZE_INT)ver)));
+        LWARN(31, "GetEnv called with unsupported interface version 0x{0}" << ((void *)((POINTER_SIZE_INT)ver)));
     }
 
     *penv = NULL;
@@ -1671,7 +1671,7 @@ static void check_for_unexpected_exception(){
     assert(hythread_is_suspend_enabled());
     if (exn_raised()) {
         print_uncaught_exception_message(stderr, "static initializing", exn_get());
-        DIE("Error initializing java machine\n");
+        LDIE(20, "Error initializing java machine");
     }
 }
 

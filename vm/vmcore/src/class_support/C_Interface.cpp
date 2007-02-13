@@ -858,7 +858,7 @@ VM_Data_Type class_get_const_type(Class_Handle cl, unsigned index)
             break;
         }
     default:
-        DIE("non-constant type is requested from constant pool : " << cp.get_tag(index));
+        LDIE(5, "non-constant type is requested from constant pool : {0}" << cp.get_tag(index));
     }
 
     return (VM_Data_Type)jt;
@@ -2134,7 +2134,7 @@ int class_get_referent_offset(Class_Handle ch)
     Field_Handle referent =
         class_lookup_field_recursive(ch, "referent", "Ljava/lang/Object;");
     if (!referent) {
-        DIE("Class " << class_get_name(ch) << " have no 'Object referent' field");
+        LDIE(6, "Class {0} has no 'Object referent' field" << class_get_name(ch));
     }
     return referent->get_offset();
 }

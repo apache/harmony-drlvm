@@ -131,7 +131,7 @@ static apr_dso_handle_sym_t getFunction(apr_dso_handle_t *handle, const char *na
 {
     apr_dso_handle_sym_t fn; 
     if (apr_dso_sym(&fn, handle, name) != APR_SUCCESS) {
-        WARN("Couldn't load GC dll " << dllName << ": missing entry point " << name);
+        LWARN(6, "Couldn't load GC dll {0}: missing entry point {1}" << dllName << name);
         return 0;
     }
     return fn;
@@ -163,7 +163,7 @@ void vm_add_gc(const char *dllName)
     apr_dso_handle_t *handle;
     if (apr_dso_load(&handle, dllName, pool) != APR_SUCCESS)
     {
-        WARN("Failure to open GC dll " << dllName);
+        LWARN(7, "Failure to open GC dll {0}" << dllName);
         return;
     }
 
@@ -321,7 +321,7 @@ bool vm_is_a_gc_dll(const char *dll_filename)
     } else {
         char buf[1024];
         apr_dso_error(handle, buf, 1024);
-        WARN("Loading error" << buf);
+        LWARN(8, "Loading error {0}" << buf);
         //apr_strerror(stat, buf, 1024);
         //printf("error %s, is %d, expected %d\n", buf, stat, APR_SUCCESS);
     }
@@ -409,7 +409,7 @@ static void default_gc_heap_wrote_object(Managed_Object_Handle UNREF p_base_of_o
 
 static void default_gc_add_compressed_root_set_entry(uint32 * UNREF ref)
 {
-    DIE("Fatal GC error: compressed references are not supported\n");
+    LDIE(7, "Fatal GC error: compressed references are not supported.");
 } //default_gc_add_compressed_root_set_entry
 
 
@@ -417,7 +417,7 @@ static void default_gc_add_compressed_root_set_entry(uint32 * UNREF ref)
 static void default_gc_add_root_set_entry_managed_pointer(void ** UNREF slot,
                                                           Boolean UNREF is_pinned)
 {
-    DIE("Fatal GC error: managed pointers are not supported\n");
+    LDIE(8,"Fatal GC error: managed pointers are not supported.");
 } //default_gc_add_root_set_entry_managed_pointer
 
 
@@ -452,11 +452,11 @@ static void default_gc_test_safepoint()
     // Do nothing.
 } // default_gc_test_safepoint
 
-#define WARN_ONCE(message) \
+#define WARN_ONCE(message_number, messagedef_and_params) \
     {                               \
         static bool warning = true; \
         if (warning) {              \
-            WARN(message);          \
+            LWARN(message_number, messagedef_and_params);\
             warning = false;        \
         }                           \
     }
@@ -464,12 +464,12 @@ static void default_gc_test_safepoint()
 
 static void default_gc_pin_object(Managed_Object_Handle*)
 {
-    WARN_ONCE("The GC did not provide gc_pin_object()");
+    WARN_ONCE(9, "The GC did not provide {0}" << "gc_pin_object()");
 }
 
 static void default_gc_unpin_object(Managed_Object_Handle*)
 {
-    WARN_ONCE("The GC did not provide gc_unpin_object()");
+    WARN_ONCE(9, "The GC did not provide {0}" << "gc_unpin_object()");
 }
 
 /* $$$ GMJ
@@ -481,23 +481,23 @@ static int32 default_gc_get_hashcode(Managed_Object_Handle obj)
 
 static Managed_Object_Handle default_gc_get_next_live_object(void*)
 {
-    WARN_ONCE("The GC did not provide live object iterator");
+    WARN_ONCE(10, "The GC did not provide live object iterator");
     return NULL;
 }
 
 static void default_gc_iterate_heap()
 {
-    WARN_ONCE("The GC did not provide heap iteration");
+    WARN_ONCE(11, "The GC did not provide heap iteration");
 }
 
 static void default_gc_finalize_on_exit()
 {
-    WARN_ONCE("The GC did not provide finalization on exit");
+    WARN_ONCE(12, "The GC did not provide finalization on exit");
 }
 
 static int64 default_gc_max_memory()
 {
-    WARN_ONCE("The GC did not provide gc_max_memory()");
+    WARN_ONCE(9, "The GC did not provide {0}" << "gc_max_memory()");
     return 0x7fffFFFFl;
 }
 
@@ -508,7 +508,7 @@ static void default_gc_write_barrier(Managed_Object_Handle)
 static void default_gc_add_weak_root_set_entry(
         Managed_Object_Handle* root, Boolean pinned, Boolean is_short)
 {
-    WARN_ONCE("The GC did not provide gc_add_weak_root_set_entry()");
+    WARN_ONCE(9, "The GC did not provide {0}" << "gc_add_weak_root_set_entry()");
     // default to strong reference semantics
     gc_add_root_set_entry(root, pinned);
 }

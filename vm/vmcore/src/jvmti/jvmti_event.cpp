@@ -1364,7 +1364,7 @@ ManagedObject *jvmti_jit_exception_event_callback_call(ManagedObject *exn_object
 
     if (NULL == jit)
     {
-        WARN("Zero interrupted method encountered");
+        LWARN(37, "Zero interrupted method encountered");
         return exn_object;
     }
 
@@ -1374,10 +1374,9 @@ ManagedObject *jvmti_jit_exception_event_callback_call(ManagedObject *exn_object
     TRACE2("jvmti.event.exn",
         "Exception method = " << (Method_Handle)method << " location " << bc);
     if (EXE_ERROR_NONE != result)
-        WARN("JIT " << jit <<
-            " get_bc_location_for_native returned error " <<
-            result << " for exception method " << (Method_Handle)method <<
-            " location " << native_location);
+        LWARN(38, "JIT {0} {1} returned error {2} for exception method {3} location {4}" 
+                  << jit << "get_bc_location_for_native"
+                  << result << (Method_Handle)method << native_location);
     location = bc;
 
     if (catch_method)
@@ -1389,10 +1388,9 @@ ManagedObject *jvmti_jit_exception_event_callback_call(ManagedObject *exn_object
             "Exception catch method = " << (Method_Handle)catch_method <<
             " location " << bc);
         if (EXE_ERROR_NONE != result)
-            WARN("JIT " << jit <<
-                " get_bc_location_for_native returned error " <<
-                result << " for catch method " << (Method_Handle)catch_method <<
-                " location " << native_catch_location);
+            LWARN(39, "JIT {0} {1} returned error {2} for catch method {3} location {4}"
+                     << jit << "get_bc_location_for_native" << result
+                     << (Method_Handle)catch_method << native_catch_location);
         catch_location = bc;
     }
 
@@ -1498,10 +1496,9 @@ ManagedObject *jvmti_jit_exception_catch_event_callback_call(ManagedObject *exn_
     TRACE2("jvmti.event.exn",
         "Exception method = " << (Method_Handle)catch_method << " location " << bc);
     if (EXE_ERROR_NONE != result)
-        WARN("JIT " << catch_jit <<
-            " get_bc_location_for_native returned error " <<
-            result << " for exception method " << (Method_Handle)catch_method <<
-            " location " << native_catch_location);
+        LWARN(38, "JIT {0} {1} returned error {2} for exception method {3} location {4}" 
+                  << catch_jit << "get_bc_location_for_native"
+                  << result << (Method_Handle)catch_method << native_catch_location);
     catch_location = bc;
 
     exn_object = jvmti_exception_catch_event_callback_call(exn_object,
@@ -2123,7 +2120,7 @@ jvmti_event_thread_function(void *args)
     JavaVMAttachArgs vm_args = {JNI_VERSION_1_2, "TIEventThread", NULL};
     int status = AttachCurrentThreadAsDaemon(java_vm, (void**)&jni_env, &vm_args);
     if(status != JNI_OK) {
-        DIE("jvmti_event_thread_function: cannot attach current thread");
+        LDIE(24, "{0} cannot attach current thread" << "jvmti_event_thread_function:");
     }
 
     assert(hythread_is_suspend_enabled());

@@ -348,5 +348,15 @@ Version: $Revision: 1.5.2.3 $
                 <linkerarg value="-lstdc++" /-->
             </select>
         </linker>
+        <echo message="Copying files for internationalization..."/>
+
+        <mkdir dir="${build.semi.dir}/vm/vmcore/_other"/> 
+        <copy todir="${build.semi.dir}/vm/vmcore/_other" 
+              flatten="true" 
+              includeEmptyDirs="false">
+              <fileset dir="${build.VM.home}/vmcore/src/init">
+                   <include name="harmony*.properties" />
+              </fileset>
+        </copy>
     </target>
 </project>

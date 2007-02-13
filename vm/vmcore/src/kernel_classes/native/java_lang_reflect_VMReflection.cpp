@@ -113,7 +113,7 @@ static bool rethrow_invocation_exception(JNIEnv* jenv)
     jthrowable exn = exn_get(); 
     //FIXME need better handling for lazy exceptions
     if (!exn) {
-        WARN("ATTENTION! Could not get cause exception from lazy machinery");
+        LWARN(40, "ATTENTION! Could not get cause exception from lazy machinery");
     }
     exn_clear();
     //static Class* ITE_class = genv->LoadCoreClass(

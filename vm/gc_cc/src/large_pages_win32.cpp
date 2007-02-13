@@ -94,7 +94,7 @@ void *alloc_large_pages(size_t size, const char *hint) {
                            "gc.lp: become fragmented and unusable after a while\n"
                            "gc.lp: Heap size should be multiple of large page size");
         } else {
-            WARN2("gc.lp", "large pages allocation failed, use -verbose:gc.lp for more info");
+            LWARN2("gc.lp", 1, "large pages allocation failed, use -verbose:gc.lp for more info");
         }
         return NULL;
     } else {

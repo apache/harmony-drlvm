@@ -1371,7 +1371,7 @@ vf_parse_description( const char *descr,    // descriptor of method, class or fi
             count = outlen;
             break;
         default:
-            DIE( "Verifier: vf_parse_description: incorrect structure of constant pool" );
+            LDIE(37, "Verifier: vf_parse_description: incorrect structure of constant pool" );
             break;
         }
     }

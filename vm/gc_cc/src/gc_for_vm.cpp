@@ -404,7 +404,7 @@ void gc_pin_object (Managed_Object_Handle* p_object) {
     volatile uint8 *info = (volatile uint8 *)&obj->obj_info_byte();
     uint8 value = *info;
     if ((value & OBJECT_IS_PINNED_BITS) == OBJECT_IS_PINNED_BITS) {
-        DIE2("gc", "no handling for pin overflow");
+        LDIE2("gc", 1, "no handling for pin overflow");
     }
 
     while (true) {

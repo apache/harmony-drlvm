@@ -24,6 +24,7 @@
 #include <assert.h>
 #include "logger.h"
 #include "loggerstring.h"
+#include "logparams.h"
 #include "log_macro.h"
 
 namespace util
@@ -54,10 +55,24 @@ namespace util
     log4cxx_from_c("root", DIE, logger_string.release(), __FILE__, __LOG4CXX_FUNC__, __LINE__); \
 }
 
+#define LECHO(message_number, messagedef_and_params) { \
+    LogParams log_params(0x4543484f, message_number); \
+    log_params << messagedef_and_params; \
+    log4cxx_from_c("root", DIE, log_params.release(), __FILE__, __LOG4CXX_FUNC__, __LINE__); \
+}
+
 #define DIE2(category, message) { \
     LoggerString logger_string; \
     logger_string << message; \
     log4cxx_from_c(category, DIE, logger_string.release(), __FILE__, __LOG4CXX_FUNC__, __LINE__); \
+    shutdown_log_system(); \
+    ::abort(); \
+}
+
+#define LDIE2(category, message_number, messagedef_and_params) { \
+    LogParams log_params(0x4c444945, message_number); \
+    log_params << messagedef_and_params; \
+    log4cxx_from_c(category, DIE, log_params.release(), __FILE__, __LOG4CXX_FUNC__, __LINE__); \
     shutdown_log_system(); \
     ::abort(); \
 }
@@ -67,6 +82,14 @@ namespace util
     LoggerString logger_string; \
     logger_string << message; \
     log4cxx_from_c(category, WARN, logger_string.release(), __FILE__, __LOG4CXX_FUNC__, __LINE__); \
+    } \
+}
+
+#define LWARN2(category, message_number, messagedef_and_params) { \
+    if (is_warn_enabled(category)) { \
+    LogParams log_params(0x5741524e, message_number); \
+    log_params << messagedef_and_params; \
+    log4cxx_from_c(category, WARN, log_params.release(), __FILE__, __LOG4CXX_FUNC__, __LINE__); \
     } \
 }
 
@@ -111,7 +134,11 @@ namespace util
 #ifdef LOG_DOMAIN
 
 #define DIE(message) DIE2(LOG_DOMAIN, message)
+#define LDIE(message_number, messagedef_and_params) \
+LDIE2(LOG_DOMAIN, message_number, messagedef_and_params)
 #define WARN(message) WARN2(LOG_DOMAIN, message)
+#define LWARN(message_number, messagedef_and_params) \
+LWARN2(LOG_DOMAIN, message_number, messagedef_and_params)
 #define INFO(message) INFO2(LOG_DOMAIN, message)
 #define LOG(message) LOG2(LOG_DOMAIN, message)
 #define TRACE(message) TRACE2(LOG_DOMAIN, message)
@@ -149,4 +176,3 @@ namespace util
 #endif // LOG_DOMAIN
 
 #endif // _CXX_LOG_H_
-

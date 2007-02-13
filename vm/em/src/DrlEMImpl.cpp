@@ -327,8 +327,7 @@ static std::string readFile(const std::string& fileName) {
         rc = !config.empty();
     } 
     if (!rc) {
-        std::string errMsg = "EM: Can't read configuration from '" + fileName+ "'";
-        ECHO(errMsg.c_str());
+        LECHO(1, "EM: Can't read configuration from '{0}'" << fileName.c_str());
     }
     return config;
 }
@@ -377,7 +376,7 @@ static bool enable_profiling_stub(JIT_Handle jit, PC_Handle pc, EM_JIT_PC_Role r
 bool DrlEMImpl::initJIT(const std::string& libName, apr_dso_handle_t* libHandle, RStep& step) {
     apr_dso_handle_sym_t fn = NULL;
     if (apr_dso_sym(&fn, libHandle, "JIT_init") != APR_SUCCESS) {
-        ECHO(("EM: Not a JIT shared lib: '" + libName + "'").c_str());
+        LECHO(2, "EM: Not a JIT shared lib: '{0}'" << libName.c_str());
         return false;
     }
     void (*_init)(JIT_Handle, const char*) = (void (*)(JIT_Handle, const char*)) fn;
@@ -416,7 +415,7 @@ void DrlEMImpl::buildChains(std::string& config) {
     bool loggingEnabled =  is_info_enabled(LOG_DOMAIN);
     StringList chainNames = getParamAsList(config, "chains", ',', true);
     if (chainNames.empty()) {
-        ECHO("EM: No 'chains' property found in configuration");
+        LECHO(3, "EM: No 'chains' property found in configuration");
         return;
     }
     bool failed = false;
@@ -436,7 +435,7 @@ void DrlEMImpl::buildChains(std::string& config) {
                 jitLib = getParam(config, jitName+".file");
             } 
             if (jitLib.empty()) {
-                ECHO(("EM: No JIT library specified for JIT :'"  + jitLib + "'").c_str());
+                LECHO(4, "EM: No JIT library specified for JIT :'{0}'" << jitLib.c_str());
                 failed = true;
                 break;
             }
@@ -444,7 +443,7 @@ void DrlEMImpl::buildChains(std::string& config) {
             apr_dso_handle_t* libHandle;
             JIT_Handle jh = vm_load_jit(fullJitLibPath.c_str(), &libHandle); //todo: do not load the same dll twice!!!
             if (jh == NULL) {
-                ECHO(("EM: JIT library loading error:'"  + fullJitLibPath + "'").c_str());
+                LECHO(5, "EM: JIT library loading error:'{0}'" << fullJitLibPath.c_str());
                 failed = true;
                 break;
             }
@@ -465,7 +464,7 @@ void DrlEMImpl::buildChains(std::string& config) {
                 const std::string& filter = *filterIt;
                 bool res = chain->addMethodFilter(filter);
                 if (!res) {
-                    ECHO(("EM: Invalid filter :'"  + filter+ "'").c_str());
+                    LECHO(6, "EM: Invalid filter :'{0}'" << filter.c_str());
                 }
             }
         }
@@ -582,7 +581,7 @@ ProfileCollector* DrlEMImpl::createProfileCollector(const std::string& profilerN
     }    
     std::string profilerType = getParam(config, profilerName+".profilerType");
     if (profilerType!=ENTRY_BACKEDGE_PROFILER_STR && profilerType!=EDGE_PROFILER_STR  && profilerType!=VALUE_PROFILER_STR) {
-        ECHO("EM: Unsupported profiler type");
+        LECHO(7, "EM: Unsupported profiler type");
         return NULL;
     }
 
@@ -593,31 +592,31 @@ ProfileCollector* DrlEMImpl::createProfileCollector(const std::string& profilerN
         if (mode == "ASYNC") {
             ebMode = EBProfileCollector::EB_PCMODE_ASYNC;
         }  else if (mode!="SYNC") {
-            ECHO("EM: unsupported profiler mode");
+            LECHO(8, "EM: unsupported profiler mode");
             return NULL;
         }
         
         bool ok = false;
         uint32 eThreshold = toNum(getParam(config, profilerName+".entryThreshold"), &ok);//todo: default values..
             if (!ok) {
-            ECHO("EM: illegal 'entryThreshold' value");
+            LECHO(9, "EM: illegal '{0}' value" << "entryThreshold");
             return NULL;
             }
                 uint32 bThreshold = toNum(getParam(config, profilerName+".backedgeThreshold"), &ok);
         if (!ok) {
-            ECHO("EM: illegal 'backedgeThreshold' value");
+            LECHO(9, "EM: illegal '{0}' value" << "backedgeThreshold");
             return NULL;
         }
         uint32 tbsTimeout = 0, tbsInitialTimeout = 0;
         if (ebMode == EBProfileCollector::EB_PCMODE_ASYNC) {
             tbsTimeout= toNum(getParam(config, profilerName+".tbsTimeout"), &ok);
             if (!ok) {
-                ECHO("EM: illegal 'tbsTimeout' value");
+                LECHO(9, "EM: illegal '{0}' value" << "tbsTimeout");
                 return NULL;
                 }
             tbsInitialTimeout= toNum(getParam(config, profilerName+".tbsInitialTimeout"), &ok);
             if (!ok) {
-                ECHO("EM: illegal 'tbsInitialTimeout' value");
+                LECHO(9, "EM: illegal '{0}' value" << "tbsInitialTimeout");
                 return NULL;
             }
         }
@@ -633,24 +632,24 @@ ProfileCollector* DrlEMImpl::createProfileCollector(const std::string& profilerN
         if (vpalgo == "TNV_DIVIDED") {
             vpMode = ValueProfileCollector::TNV_DIVIDED;    
         } else if (vpalgo != "TNV_FIRST_N") {
-            ECHO("EM: unsupported value profiler algotype");
+            LECHO(10, "EM: unsupported value profiler algotype");
             return NULL;
         }
         bool ok = false;
         vpSteadySize = toNum(getParam(config, profilerName+".vpSteadySize"), &ok);
         if (!ok) {
-            ECHO("EM: illegal 'SteadySize' value");
+            LECHO(9, "EM: illegal '{0}' value" << "SteadySize");
             return NULL;
         }
         if (vpMode == ValueProfileCollector::TNV_DIVIDED) {
             vpClearSize = toNum(getParam(config, profilerName+".vpClearSize"), &ok);
             if (!ok) {
-                ECHO("EM: illegal 'ClearSize' value");
+                LECHO(9, "EM: illegal '{0}' value" << "ClearSize");
                 return NULL;
             }
             vpClearInterval = toNum(getParam(config, profilerName+".vpClearInterval"), &ok);
             if (!ok) {
-                ECHO("EM: illegal 'ClearInterval' value");
+                LECHO(9, "EM: illegal '{0}' value" << "ClearInterval");
                 return NULL;
             }
         }
@@ -679,7 +678,7 @@ bool DrlEMImpl::initProfileCollectors(RChain* chain, const std::string& config) 
             if (!profilerName.empty()) {
                 ProfileCollector* pc = createProfileCollector(profilerName, config, step);
                 if (pc == NULL) {
-                    ECHO(("EM: profile configuration failed: "+ profilerName).c_str());
+                    LECHO(11, "EM: profile configuration failed: {0}" << profilerName.c_str());
                     failed = true;
                     break;
                 }
@@ -693,7 +692,7 @@ bool DrlEMImpl::initProfileCollectors(RChain* chain, const std::string& config) 
                         tbsClients.push_back(tbsClient);
                     }
                 } else {
-                    ECHO(("EM: profile generation is not supported: " + profilerName).c_str());
+                    LECHO(12, "EM: profile generation is not supported: {0}" << profilerName.c_str());
                     delete pc;
                     failed = true;
                     break;
@@ -721,11 +720,11 @@ bool DrlEMImpl::initProfileCollectors(RChain* chain, const std::string& config) 
                     pc->addUseJit(step->jit);
                 } else {
                     if (pc == NULL) {
-                        ECHO(("EM: profile not found: " + profilerName).c_str());
+                        LECHO(13, "EM: profile not found: {0}" << profilerName.c_str());
                     } else if (invalidChain) {
-                        ECHO(("EM: illegal use of profile: " + profilerName).c_str());
+                        LECHO(14, "EM: illegal use of profile: {0}" << profilerName.c_str());
                     } else {
-                        ECHO(("EM: profile usage is not supported: " + profilerName).c_str());
+                        LECHO(15, "EM: profile usage is not supported: {0}" << profilerName.c_str());
                     }
                 }
             }

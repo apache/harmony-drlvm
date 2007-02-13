@@ -28,6 +28,7 @@
 #include <stdarg.h>
 #include "port_malloc.h"
 #include "logger.h"
+#include "logparams.h"
 #include <log4cxx/logger.h>
 #include <log4cxx/logmanager.h>
 #include <log4cxx/level.h>
@@ -39,6 +40,8 @@
 #include <log4cxx/filter/stringmatchfilter.h>
 #include <log4cxx/helpers/transcoder.h>
 #include <log4cxx/propertyconfigurator.h>
+#include <apr_env.h>
+#include "hyport.h"
 
 #if defined(_MSC_VER) && !defined (__INTEL_COMPILER)
 #pragma warning( pop )
@@ -67,6 +70,38 @@ static void clear_cached_sites() {
     }
 }
 
+void* portlib_for_logger = NULL;
+
+const char* LogParams::release() {
+
+    if (portlib_for_logger) {
+        messageId = (char*) ((HyPortLibrary*)portlib_for_logger)->nls_lookup_message ((HyPortLibrary*)portlib_for_logger,
+        HYNLS_DO_NOT_PRINT_MESSAGE_TAG | HYNLS_DO_NOT_APPEND_NEWLINE ,
+        prefix, message_number, def_messageId);
+    } else {
+        messageId = def_messageId;
+    }
+    if (portlib_for_logger) {
+        messageId = ((HyPortLibrary *)portlib_for_logger)->buf_write_text((struct HyPortLibrary *)portlib_for_logger, (const char *)messageId, (IDATA) strlen(messageId));
+    }
+    int i = 0;
+    while(messageId[i] != '\0') {
+        if (messageId[i] == '{' && messageId[i + 1] >= '0' &&
+            messageId[i + 1] <= '9' && messageId[i + 2] == '}') {
+                int arg = messageId[i + 1] - '0';
+                result_string += values[arg];
+                i += 3;
+            } else {
+                result_string += messageId[i];
+                i++;
+            }
+    }
+    if (portlib_for_logger) {
+        ((HyPortLibrary *)portlib_for_logger)->mem_free_memory ((struct HyPortLibrary *)portlib_for_logger, (void*)messageId);
+    }
+    return (const char*)result_string.c_str();
+}
+
 static LevelPtr get_log4cxx_level(LoggingLevel level) {
     switch(level) {
         case DIE:
@@ -92,7 +127,39 @@ static LoggerPtr get_logger(const char* category) {
     }
 }
 
-void init_log_system() {
+int set_locale(char* logger_locale) {
+    char* lang = strdup(logger_locale);
+    char* region = NULL;
+    char* variant = NULL;
+    if (portlib_for_logger) {
+        region = strchr(lang, '_');
+        if (region == NULL) {
+            ((HyPortLibrary *)portlib_for_logger)->nls_set_locale((HyPortLibrary *)portlib_for_logger, lang, "", "");
+            free((void*)lang);
+            return 1;
+        } else {
+            region[0] = 0;
+            region++;
+            variant = strchr(region, '.');
+            if (variant == NULL) {
+                ((HyPortLibrary *)portlib_for_logger)->nls_set_locale((HyPortLibrary *)portlib_for_logger, lang, region, "");
+                free((void*)lang);
+                return 1;
+            } else {
+                variant[0] = 0;
+                variant++;
+                ((HyPortLibrary *)portlib_for_logger)->nls_set_locale((HyPortLibrary *)portlib_for_logger, lang, region, variant);
+                free((void*)lang);
+                return 1;
+            }
+        }
+    }
+    free((void*)lang);
+    return 0;
+}
+
+void init_log_system(void *portlib) {
+    int set_locale_success = 0;
     trace_levelPtr = new Level(Level::TRACE_INT, LOG4CXX_STR("TRACE"), 7);
 
     LoggerPtr logger = Logger::getRootLogger();
@@ -102,6 +169,32 @@ void init_log_system() {
 
     LoggerPtr info_logger = get_logger("info");
     info_logger->setLevel(Level::getInfo());
+
+    portlib_for_logger = portlib;
+
+    apr_pool_t *pool;
+    apr_pool_create(&pool, 0);
+    char* value;
+
+    if (APR_SUCCESS == apr_env_get(&value, "LC_ALL", pool)) {
+        if (set_locale(value)) {
+            set_locale_success = 1;
+        }
+    } else if (APR_SUCCESS == apr_env_get(&value, "LC_MESSAGES", pool)) {
+        if (!set_locale_success) {
+            if (set_locale(value)) {
+                set_locale_success = 1;
+            }
+        }
+    } else if (APR_SUCCESS == apr_env_get(&value, "LANG", pool)) {
+        if (!set_locale_success) {
+            if (set_locale(value)) {
+                set_locale_success = 1;
+            }
+        }
+    }
+    apr_pool_destroy(pool);
+
 }
 
 void shutdown_log_system() {

@@ -184,7 +184,7 @@ static void parse_configuration_properties() {
         if (sz > 0) {
             initial_heap_size_bytes = sz;
         } else {
-            ECHO("WARNING: Incorrect minimum gc size specified, using default");
+            LECHO(18, "WARNING: Incorrect {0} gc size specified, using default" << minimum);
         }
     }
     
@@ -193,7 +193,7 @@ static void parse_configuration_properties() {
         if (sz > 0) {
             final_heap_size_bytes = sz;
         } else {
-            ECHO("WARNING: Incorrect maximum gc size specified, using default");
+            LECHO(18, "WARNING: Incorrect {0} gc size specified, using default" << "maximum");
         }
     }
 

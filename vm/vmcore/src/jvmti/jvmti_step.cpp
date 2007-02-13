@@ -419,7 +419,7 @@ jvmti_SingleStepLocation( VM_thread* thread,
         // ret instruction
         case OPCODE_RET:            /* 0xa9 + u1|u2  */
             // FIXME - need to obtain return address from stack.
-            DIE2("jvmti", "SingleStepLocation: not implemented ret instruction");
+            LDIE2("jvmti", 25, "SingleStepLocation: not implemented ret instruction");
             break;
         }
         break;

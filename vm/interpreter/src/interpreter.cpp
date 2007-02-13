@@ -979,8 +979,8 @@ ldc(StackFrame& frame, uint32 index) {
             break;
         default:
             DEBUG_BYTECODE("#" << dec << (int)index << " Unknown type = " << cp.get_tag(index));
-            DIE("ldc instruction: unexpected type (" << cp.get_tag(index)
-                << ") of constant pool entry [" << index << "]");
+            LDIE(4, "ldc instruction: unexpected type ({0}) of constant pool entry [{1}]"
+                 << cp.get_tag(index) << index);
             break;
     }
 #endif

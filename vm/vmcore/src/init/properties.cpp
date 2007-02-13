@@ -35,12 +35,12 @@ public:
 Properties::Properties() 
 {
     if (APR_SUCCESS != apr_pool_create(&local_ht_pool, NULL)) {
-        DIE("Cannot initialize properties pool");
+        LDIE(9, "Cannot initialize properties pool");
     }
     hashtables_array = apr_hash_make(local_ht_pool);
     rwlock_array = NULL;
     if (APR_SUCCESS != apr_thread_rwlock_create(&rwlock_array, local_ht_pool)) {
-        DIE("Cannot initialize properties table mutex");
+        LDIE(10, "Cannot initialize properties table mutex");
     }
 }
 
@@ -49,7 +49,7 @@ void Properties::set(const char * key, const char * value)
     TRACE("set property " << key << " = " << value);
 
     if (APR_SUCCESS != apr_thread_rwlock_wrlock(rwlock_array)) {
-        DIE("Cannot lock properties table");
+        LDIE(11, "Cannot lock properties table");
     }
     PropValue* val = (PropValue*) apr_hash_get(hashtables_array, (const void*) key, APR_HASH_KEY_STRING);
     apr_hash_set(hashtables_array, (const void*) strdup(key), APR_HASH_KEY_STRING, (const void*) new PropValue(value));
@@ -57,21 +57,21 @@ void Properties::set(const char * key, const char * value)
         delete(val);
     }
     if (APR_SUCCESS != apr_thread_rwlock_unlock(rwlock_array)) {
-        DIE("Cannot unlock properties table");
+        LDIE(12, "Cannot unlock properties table");
     }
 }
 
 char* Properties::get(const char * key) {
     char* return_value= NULL;
     if (APR_SUCCESS != apr_thread_rwlock_rdlock(rwlock_array)) {
-        DIE("Cannot lock properties table");
+        LDIE(11, "Cannot lock properties table");
     }
     PropValue* val = (PropValue*) apr_hash_get(hashtables_array, (const void*) key, APR_HASH_KEY_STRING);
     if (val != NULL) {
         return_value = strdup(val->value);
     }
     if (APR_SUCCESS != apr_thread_rwlock_unlock(rwlock_array)) {
-        DIE("Cannot unlock properties table");
+        LDIE(12, "Cannot unlock properties table");
     }
     return return_value;
 }
@@ -92,7 +92,7 @@ void Properties::unset(const char * key) {
     apr_hash_index_t* hi;
     const void* deleted_key;
     if (APR_SUCCESS != apr_thread_rwlock_wrlock(rwlock_array)) {
-        DIE("Cannot lock properties table");
+        LDIE(11, "Cannot lock properties table");
     }
     PropValue* val = (PropValue*) apr_hash_get(hashtables_array, (const void*) key, APR_HASH_KEY_STRING);
     if (val != NULL) {
@@ -108,7 +108,7 @@ void Properties::unset(const char * key) {
         delete(val);
     }
     if (APR_SUCCESS != apr_thread_rwlock_unlock(rwlock_array)) {
-        DIE("Cannot unlock properties table");
+        LDIE(12, "Cannot unlock properties table");
     }
 }
 
@@ -118,7 +118,7 @@ char** Properties::get_keys() {
     const void* key;
 
     if (APR_SUCCESS != apr_thread_rwlock_rdlock(rwlock_array)) {
-        DIE("Cannot lock properties table");
+        LDIE(11, "Cannot lock properties table");
     }
     for (hi = apr_hash_first(local_ht_pool, hashtables_array); hi; hi = apr_hash_next(hi)) {
         properties_count++;
@@ -131,7 +131,7 @@ char** Properties::get_keys() {
     }
     return_value[properties_count] = NULL;
     if (APR_SUCCESS != apr_thread_rwlock_unlock(rwlock_array)) {
-        DIE("Cannot unlock properties table");
+        LDIE(12, "Cannot unlock properties table");
     }
     return return_value;
 }
@@ -142,7 +142,7 @@ char** Properties::get_keys_staring_with(const char* prefix) {
     const void* key;
 
     if (APR_SUCCESS != apr_thread_rwlock_rdlock(rwlock_array)) {
-        DIE("Cannot lock properties table");
+        LDIE(11, "Cannot lock properties table");
     }
     for (hi = apr_hash_first(local_ht_pool, hashtables_array); hi; hi = apr_hash_next(hi)) {
         apr_hash_this(hi, &key, NULL, NULL);
@@ -159,7 +159,7 @@ char** Properties::get_keys_staring_with(const char* prefix) {
     }
     return_value[properties_count] = NULL;
     if (APR_SUCCESS != apr_thread_rwlock_unlock(rwlock_array)) {
-        DIE("Cannot unlock properties table");
+        LDIE(12, "Cannot unlock properties table");
     }
     return return_value;
 }

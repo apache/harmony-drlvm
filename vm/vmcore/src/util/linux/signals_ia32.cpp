@@ -184,7 +184,7 @@ void addr2line (char *buf) {
 
     if ('\0' == executable[0]) {
         // no executable name is available, degrade gracefully
-        WARN("Execution stack follows, consider using addr2line\n" << buf);
+        LWARN(41, "Execution stack follows, consider using addr2line\n{0}" << buf);
         return;
     }
 
@@ -227,7 +227,7 @@ void addr2line (char *buf) {
  */
 void print_native_stack (unsigned *ebp) {
     int depth = 17;
-    WARN("Fatal error");
+    LWARN(42, "Fatal error");
     char buf[1024];
     unsigned int n = 0;
     while (ebp && ebp[1] && --depth >= 0 && (n<sizeof(buf)-20)) {
@@ -674,7 +674,7 @@ void yield_other_handler(int signum, siginfo_t* info, void* context) {
     return;
     }
 
-    DIE("Cannot find Java thread using signal context");
+    LDIE(35, "Cannot find Java thread using signal context");
 
 }
 */

@@ -129,16 +129,14 @@ PoolDescriptor* PoolManager::allocate_pool_storage(size_t size)
     apr_status_t status = port_vmem_reserve(&pDesc->_descriptor, &pool_storage, 
          size, mem_protection, ps, aux_pool);
     if (status != APR_SUCCESS)  {
-         DIE("Cannot allocate pool storage: " << (void *)size 
-             << " bytes of virtual memory for code or data.\n"
-             "Error code = " << status);
+         LDIE(27, "Cannot allocate pool storage: {0} bytes of virtual memory for code or data.\n"
+             "Error code = {1}" << (void *)size << status);
      }
  
     status = port_vmem_commit(&pool_storage, size, pDesc->_descriptor);
     if (status != APR_SUCCESS || pool_storage == NULL)  {
-        DIE("Cannot allocate pool storage: " << (void *)size 
-            << " bytes of virtual memory for code or data.\n"
-            "Error code = " << status);
+         LDIE(27, "Cannot allocate pool storage: {0} bytes of virtual memory for code or data.\n"
+             "Error code = {1}" << (void *)size << status);
      }
  
 #ifdef VM_STATS
@@ -175,7 +173,7 @@ void* PoolManager::alloc(size_t size, size_t alignment, Code_Allocation_Action a
      size_t mem_left_in_pool = (pool_end - pool_start);
     while (size > mem_left_in_pool) {
         if (!_is_resize_allowed) {
-            DIE("Error: VTable pool overflow, resize is not allowed. Please, extand VTable pool size.\n");
+            LDIE(28, "Error: VTable pool overflow, resize is not allowed. Please, extand VTable pool size.\n");
             // TODO: add functionality to commit additional part of memory if reserved enough:
             // need for (is_resize_allowed = false) case - commit every time by little pieces 
          }

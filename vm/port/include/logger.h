@@ -68,7 +68,7 @@ typedef unsigned HeaderFormat;
 /**
 * Inits log system.  
 */
-VMEXPORT void init_log_system();
+VMEXPORT void init_log_system(void *portLib);
 
 /**
 * shutdown log system.  
@@ -79,6 +79,7 @@ VMEXPORT void shutdown_log_system();
 * Sets loggers logging levels from file  
 */
 VMEXPORT void set_logging_level_from_file(const char* filename);
+
 /**
  * Passes the message specified with level assigned to the category specified for logging.  
  */

@@ -65,7 +65,7 @@ lib_handle(NULL)
     apr_dso_handle_t *handle;
     if ((stat = apr_dso_load(&handle, dll_filename, pool)) != APR_SUCCESS)
     {
-        WARN("Failure to open JIT dll " << dll_filename << stat);
+        LWARN(28, "Failure to open JIT dll {0} {1}" << dll_filename << stat);
         printf("apr code: %s\n", apr_dso_error(handle, buf, 1024));
         return;
     }
@@ -76,7 +76,7 @@ lib_handle(NULL)
 
 #define GET_FUNCTION(fn, handle, name) \
     if (apr_dso_sym(&fn, handle, name) != APR_SUCCESS) {\
-    WARN("Couldn't load dll " << dll_filename << ": missing entry point " << name); \
+    LWARN(29, "Couldn't load dll {0}: missing entry point {1}" << dll_filename << name); \
     return; \
     }
 

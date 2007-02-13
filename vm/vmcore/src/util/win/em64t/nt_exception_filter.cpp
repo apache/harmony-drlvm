@@ -82,7 +82,7 @@ int NT_exception_filter(LPEXCEPTION_POINTERS p_NT_exception)
         vm_identify_eip((void *)p_NT_exception->ContextRecord->Eip);
     if(vmct != VM_TYPE_JAVA) {
         if (!get_boolean_property("vm.assert_dialog", TRUE, VM_PROPERTIES)) {
-            WARN("Fatal exception, terminating");
+            LWARN(43, "Fatal exception, terminating");
             return EXCEPTION_EXECUTE_HANDLER;
         }
         return EXCEPTION_CONTINUE_SEARCH;
@@ -113,7 +113,7 @@ int NT_exception_filter(LPEXCEPTION_POINTERS p_NT_exception)
 
     case STATUS_PRIVILEGED_INSTRUCTION:
         {
-            DIE("Unexpected exception code");
+            LDIE(36, "Unexpected exception code");
         }
         break;
 

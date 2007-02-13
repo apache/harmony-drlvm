@@ -37,7 +37,7 @@ struct RootArray {
         heap_chunk = (Reference*) heap.roots_pos;
         heap.roots_pos += ROOTS_CAPACITY * sizeof(Reference);
         if (heap.roots_pos > heap.roots_end) {
-            DIE2("gc", "not enough reserved space for roots");
+            LDIE2("gc", 3, "not enough reserved space for roots");
         }
     }
 

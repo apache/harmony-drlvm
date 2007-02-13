@@ -3339,8 +3339,8 @@ bool Class::parse(Global_Env* env,
     }
 
     if (m_enclosing_class_index && m_simple_name == NULL) {
-        WARN("Attention: EnclosingMethod attribute does not imply "
-            "InnerClasses presence for class " << m_name->bytes);
+        LWARN(3, "Attention: EnclosingMethod attribute does not imply "
+            "InnerClasses presence for class {0}" << m_name->bytes);
     }
 
 

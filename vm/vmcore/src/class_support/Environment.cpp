@@ -276,7 +276,7 @@ Class* Global_Env::LoadCoreClass(const String* s)
         bootstrap_class_loader->LoadVerifyAndPrepareClass(this, s);
     if(clss == NULL) {
         // print error diagnostics and exit VM
-        WARN("Failed to load bootstrap class " << s->bytes);
+        LWARN(4, "Failed to load bootstrap class {0}" << s->bytes);
         LOGGER_EXIT(1);
     }
     return clss;

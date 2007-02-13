@@ -965,7 +965,7 @@ void class_throw_linking_error(Class_Handle ch, unsigned index, unsigned opcode)
         default:
             // FIXME Potentially this can be any RuntimeException or Error
             // The most probable case is OutOfMemoryError.
-            WARN("**Java exception occured during resolution under compilation");
+            LWARN(5, "**Java exception occured during resolution under compilation");
             exn_raise_object(VM_Global_State::loader_env->java_lang_OutOfMemoryError);
             //ASSERT(0, "Unexpected opcode: " << opcode);
             break;

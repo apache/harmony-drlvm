@@ -529,7 +529,7 @@ vf_check_entry_refs( vf_MapEntry_t *source,    // stack map entry
                     0, VF_CHECK_INVOKESPECIAL );
         break;
     default:
-        DIE( "Verifier: vf_check_entry_refs: unknown check in switch" );
+        LDIE(38, "Verifier: vf_check_entry_refs: unknown check in switch" );
     }
     // check error
     if( is_error ) {

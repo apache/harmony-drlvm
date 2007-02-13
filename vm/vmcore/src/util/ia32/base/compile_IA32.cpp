@@ -137,7 +137,7 @@ void compile_protect_arguments(Method_Handle method, GcFrame* gc) {
                 // This should never cause loading
                 Class_Handle UNUSED c = type_info_get_class(tih);
                 assert(c);
-                DIE("This functionality is not currently supported");
+                LDIE(30, "This functionality is not currently supported");
                 break;
             }
         default:

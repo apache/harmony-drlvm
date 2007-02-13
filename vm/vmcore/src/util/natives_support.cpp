@@ -267,7 +267,7 @@ natives_load_library(const char* library_name, bool* just_loaded,
         apr_dso_unload(handle);
         jni_libs.lock._unlock();
 
-        DIE("natives_load_library: apr_palloc failed");
+        LDIE(29,"{0} apr_palloc failed" << "natives_load_library: ");
 
         returnCode = NULL;
 

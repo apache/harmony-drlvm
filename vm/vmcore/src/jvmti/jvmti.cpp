@@ -429,7 +429,7 @@ bool open_agent_library(Agent *agent, const char *lib_name, bool print_error)
     {
         if (print_error) {
             char buf[256];
-            WARN("Failed to open agent library " << lib_name << " : " 
+            LWARN(32, "Failed to open agent library {0} : {1}" << lib_name
                 << apr_dso_error(agent->agentLib, buf, 256));
         }
         return false;
@@ -465,7 +465,7 @@ jint load_agentpath(Agent *agent, const char *str, JavaVM_Internal *vm)
     if (!find_agent_onload_function(agent, callback))
     {
         char buf[256];
-        WARN("No agent entry function found in library " << lib_name << " : " 
+        LWARN(33, "No agent entry function found in library {0} : {1}" << lib_name
             << apr_dso_error(agent->agentLib, buf, 256));
         return -1;
     }
@@ -483,7 +483,7 @@ jint load_agentpath(Agent *agent, const char *str, JavaVM_Internal *vm)
     assert(agent->Agent_OnLoad_func);
     jint result = agent->Agent_OnLoad_func(vm, agent_options, NULL);
     if (0 != result)
-        WARN("Agent library " << lib_name << " initialization function returned " << result);
+        LWARN(34, "Agent library {0} initialization function returned {1}" << lib_name << result);
     return result;
 }
 
@@ -514,7 +514,7 @@ jint load_agentlib(Agent *agent, const char *str, JavaVM_Internal *vm)
         status = open_agent_library(agent, path2, true);
         if (!status)
         {
-            WARN("Failed to open agent library " << path2);
+            LWARN(35, "Failed to open agent library {0}" << path2);
             return -1;
         }
         else
@@ -530,7 +530,7 @@ jint load_agentlib(Agent *agent, const char *str, JavaVM_Internal *vm)
     if (!find_agent_onload_function(agent, callback))
     {
         char buf[256];
-        WARN("No agent entry function found in library " << path << " : " 
+        LWARN(33, "No agent entry function found in library {0} : {1}" << path
             << apr_dso_error(agent->agentLib, buf, 256));
         return -1;
     }
@@ -548,7 +548,7 @@ jint load_agentlib(Agent *agent, const char *str, JavaVM_Internal *vm)
     assert(agent->Agent_OnLoad_func);
     jint result = agent->Agent_OnLoad_func(vm, agent_options, NULL);
     if (0 != result)
-        WARN("Agent library " << path << " initialization function returned " << result);
+        LWARN(34, "Agent library {0} initialization function returned {1}" << path << result);
     return result;
 }
 
@@ -565,7 +565,7 @@ jint load_xrun(Agent *agent, const char *str, JavaVM_Internal *vm)
         status = open_agent_library(agent, path2, true);
         if (!status)
         {
-            WARN("Failed to open agent library " << path2);
+            LWARN(35, "Failed to open agent library {0}" << path2);
             return -1;
         }
         else
@@ -584,7 +584,7 @@ jint load_xrun(Agent *agent, const char *str, JavaVM_Internal *vm)
         if (!find_agent_onload_function(agent, callback2))
         {
             char buf[256];
-            WARN("No agent entry function found in library" << path << " : " 
+            LWARN(33, "No agent entry function found in library {0} : {1}" << path 
                 << apr_dso_error(agent->agentLib, buf, 256));
             return -1;
         }
@@ -606,7 +606,7 @@ jint load_xrun(Agent *agent, const char *str, JavaVM_Internal *vm)
     assert(agent->Agent_OnLoad_func);
     jint result = agent->Agent_OnLoad_func(vm, agent_options, NULL);
     if (0 != result)
-        WARN("Agent library " << path << " initialization function returned " << result);
+        LWARN(34, "Agent library {0} initialization function returned {1}" << path << result);
     return result;
 }
 
@@ -655,7 +655,7 @@ jint DebugUtilsTI::Init(JavaVM *vm)
             else if (strncmp(str, "-Xrun:", 5) == 0)
                 result = load_xrun(agent, str, (JavaVM_Internal*)vm);
             else
-                DIE("Unknown agent loading option " << str);
+                LDIE(22, "Unknown agent loading option {0}" << str);
             current_loading_agent = NULL;
 
 
@@ -687,7 +687,7 @@ void DebugUtilsTI::Shutdown(JavaVM *vm)
         if (APR_SUCCESS != apr_dso_unload(agent->agentLib))
         {
             char buf[256];
-            WARN("Failed to unload agent library " << agent->agentName << " : " 
+            LWARN(36, "Failed to unload agent library {0} : {1}" << agent->agentName
                 << apr_dso_error(agent->agentLib, buf, 256));
         }
 

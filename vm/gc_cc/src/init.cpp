@@ -247,13 +247,13 @@ void init_mem() {
                 max_heap_size -= dec;
                 assert(max_heap_size > 0);
             }
-            ECHO("WARNING: max heap size is too large, reduced to " << mb(max_heap_size) << " Mb");
+            LECHO(19, "WARNING: max heap size is too large, reduced to {0} Mb" << mb(max_heap_size));
         }
     }
 
     if (min_heap_size > max_heap_size) {
         min_heap_size = max_heap_size;
-        ECHO("WARNING: min heap size reduced to " << mb(min_heap_size) << " Mb");
+        LECHO(20, "WARNING: min heap size reduced to {0} Mb" << mb(min_heap_size));
     }
 
     heap.ceiling = heap_base + min_heap_size - RESERVED_FOR_LAST_HASH;
@@ -268,7 +268,7 @@ void init_mem() {
     void *res;
     if (heap_base && !lp_hint) {
         res = VirtualAlloc(heap.base, heap.size, MEM_COMMIT, PAGE_READWRITE);
-        if (!res) DIE("Can't create heap_L");
+        if (!res) LDIE(2, "Can't create heap_L");
     }
 #endif
     chunk_size = round_down(heap.size / 10, 65536);

@@ -32,6 +32,7 @@ void vm_dump_handler(int);
 void initialize_vm_cmd_state(Global_Env *p_env, JavaVMInitArgs* arguments);
 void set_log_levels_from_cmd(JavaVMInitArgs* vm_arguments);
 void parse_vm_arguments(Global_Env *p_env);
+void* get_portlib_for_logger(Global_Env *p_env);
 void parse_jit_arguments(JavaVMInitArgs* vm_arguments);
 void print_generic_help();
 void initialize_properties(Global_Env *p_env);

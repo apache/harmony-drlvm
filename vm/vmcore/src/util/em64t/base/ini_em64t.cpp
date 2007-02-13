@@ -299,7 +299,7 @@ void JIT_execute_method_default(JIT_Handle jh, jmethodID methodID,
             }
             break;
         default:
-            DIE("INTERNAL ERROR: Unexpected type of the argument: " << type);
+            LDIE(31, "INTERNAL ERROR: Unexpected type of the argument: {0}" << type);
         }
         iter = advance_arg_iterator(iter);
     }
@@ -351,7 +351,7 @@ void JIT_execute_method_default(JIT_Handle jh, jmethodID methodID,
             gr_args, fr_args, stack_args);
         break;
     default:
-        DIE("INTERNAL ERROR: Unexpected return type: " << type);
+        LDIE(32, "INTERNAL ERROR: Unexpected return type: {0}" << type);
     }
 
     STD_FREE(stack_args);

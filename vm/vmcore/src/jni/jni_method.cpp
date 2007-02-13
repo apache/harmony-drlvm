@@ -138,8 +138,7 @@ static Method *object_lookup_method(jobject obj, const String* name, const Strin
 
     Method *method = class_lookup_method_recursive(vtable->clss, name, desc);
     if (method == 0) {
-        DIE(" Can't find method " << name->bytes << " " 
-            << desc->bytes);
+        LDIE(21, "Can't find method {0} {1}" << name->bytes << desc->bytes);
     }
 
     return method;

@@ -125,7 +125,7 @@ jlong get_current_time(); // This is for system_currenttimemillis override
 
 static void unimplemented_rt_support_func1(int f, const char *name)
 {
-    DIE("This runtime support function is not implemented: f=" << f << ", " << name);
+    LDIE(34, "This runtime support function is not implemented: f={0}, {1}" << f << name);
 } //unimplemented_rt_support_func1
 
 

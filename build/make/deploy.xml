@@ -35,6 +35,7 @@ Description of the product deploy folder.
         <vmcore>
             <static>bin/default:harmonyvm</static>
             <shared>bin/default:harmonyvm</shared>
+            <other>bin/default:*</other>
         </vmcore>
 
         <interpreter>

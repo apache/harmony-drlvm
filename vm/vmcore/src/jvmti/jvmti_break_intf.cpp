@@ -138,7 +138,7 @@ VMBreakPoints::release_intf(VMBreakInterface* intf)
             return;
         }
     }
-    DIE2("jvmti.break", "VMBreakPoints::release_intf: try to release unknown interface");
+    LDIE2("jvmti.break", 23, "{0} try to release unknown interface" << "VMBreakPoints::release_intf:");
 }
 
 VMBreakInterface*

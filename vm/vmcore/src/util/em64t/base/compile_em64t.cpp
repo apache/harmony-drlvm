@@ -124,7 +124,7 @@ void compile_protect_arguments(Method_Handle method, GcFrame * gc) {
             }
             break;
         case VM_DATA_TYPE_VALUE:
-            DIE("This functionality is not currently supported");
+            LDIE(30, "This functionality is not currently supported");
         default:
             ASSERT(0, "Unexpected data type: " << type_info_get_type(tih));
         }

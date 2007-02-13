@@ -220,12 +220,12 @@ Block_Store::Block_Store(POINTER_SIZE_INT initial_heap_size, POINTER_SIZE_INT fi
             final_heap_size -= dec;
             VERIFY(final_heap_size > 0, "Are we able to allocate heap");
         }
-        ECHO("WARNING: final heap size is too large, reduced to " << mb(final_heap_size) << " Mb");
+        LECHO(16, "WARNING: final heap size is too large, reduced to {0} Mb" << mb(final_heap_size));
     }
 
     if (initial_heap_size > final_heap_size) {
         initial_heap_size = final_heap_size;
-        ECHO("WARNING: initial heap size reduced to " << mb(initial_heap_size) << " Mb");
+        LECHO(17, "WARNING: initial heap size reduced to {0} Mb" << mb(initial_heap_size));
     }
 
     // Check that ceiling is block aligned

@@ -128,20 +128,20 @@ static jint process_properties_dlls(Global_Env * vm_env) {
     status = CmLoadComponent(dll, "EmInitialize");
     vm_env->VmProperties()->destroy(dll);
     if (status != JNI_OK) {
-        WARN("Cannot load EM component from " << dll);
+        LWARN(13, "Cannot load EM component from {0}" << dll);
         return status;
     }
     
     status = vm_env->cm->CreateInstance(&(vm_env->em_instance), "em");
     if (status != JNI_OK) {
-        WARN("Cannot instantiate EM");
+        LWARN(14, "Cannot instantiate EM");
         return status;
     }
 
     status = vm_env->em_instance->intf->GetInterface(
         (OpenInterfaceHandle*) &(vm_env->em_interface), OPEN_INTF_EM_VM);
     if (status != JNI_OK) {
-        WARN("Cannot get EM_VM interface");
+        LWARN(15, "Cannot get EM_VM interface");
         return status;
     }
 
@@ -166,7 +166,7 @@ static jint process_properties_dlls(Global_Env * vm_env) {
             goto next_dll;
         }
 #endif
-        WARN("Mandatory library cannot be loaded: " << tok);
+        LWARN(16, "Mandatory library cannot be loaded: {0}" << tok);
         status = JNI_ERR;
         break;
 next_dll:
@@ -212,7 +212,7 @@ static jint check_compression() {
     Boolean gc_compression = gc_supports_compressed_references();
     if (vm_compression) {
         if (!gc_compression) {
-            WARN("VM component mismatch: the VM compresses references but the GC doesn't.");
+            LWARN(17, "VM component mismatch: the VM compresses references but the GC doesn't.");
             return JNI_ERR;
         }
         
@@ -222,20 +222,20 @@ static jint check_compression() {
         if (!interpreter_enabled()) {
             Boolean jit_compression = (*jit)->supports_compressed_references();
             if (!jit_compression) {
-                WARN("VM component mismatch: the VM compresses references but a JIT doesn't");
+                LWARN(18, "VM component mismatch: the VM compresses references but a JIT doesn't");
                 return JNI_ERR;
             }
         }
     } else {
         if (gc_compression) {
-            WARN("VM component mismatch: the VM doesn't compress references but the GC does.");
+            LWARN(19, "VM component mismatch: the VM doesn't compress references but the GC does.");
             return JNI_ERR;
         }
         JIT **jit = &jit_compilers[0];
         if (!interpreter_enabled()) {
             Boolean jit_compression = (*jit)->supports_compressed_references();
             if (jit_compression) {
-                WARN("VM component mismatch: the VM doesn't compress references but a JIT does");
+                LWARN(20, "VM component mismatch: the VM doesn't compress references but a JIT does");
                 return JNI_ERR;
             }
         }
@@ -261,7 +261,7 @@ static jint populate_jni_nio() {
         char error_message[1024];
         natives_describe_error(loading_status, error_message, sizeof(error_message));
 
-        WARN("Failed to initialize JNI NIO support: " << error_message);
+        LWARN(21, "Failed to initialize JNI NIO support: {0}" << error_message);
         return JNI_ERR;
     }
     
@@ -286,7 +286,7 @@ static jint populate_jni_nio() {
     } 
     else 
     {
-        WARN("Failed to import JNI NIO functions.");
+        LWARN(22, "Failed to import JNI NIO functions.");
         return JNI_ERR;
     }
 }
@@ -452,9 +452,9 @@ static jint initialize_system_class_loader(JNIEnv * jni_env) {
     return JNI_OK;
 }
 
-#define PROCESS_EXCEPTION(message) \
+#define PROCESS_EXCEPTION(messageId, message) \
 { \
-    ECHO("Internal error: " << message); \
+    LECHO(messageId, message << "Internal error: "); \
 \
     if (jni_env->ExceptionCheck()== JNI_TRUE) \
     { \
@@ -473,17 +473,17 @@ static jint run_java_init(JNIEnv * jni_env) {
 
     jclass start_class = jni_env->FindClass("java/lang/VMStart");
     if (jni_env->ExceptionCheck()== JNI_TRUE || start_class == NULL) {
-        PROCESS_EXCEPTION("can't find starter class: java.lang.VMStart.");
+        PROCESS_EXCEPTION(35, "{0}can't find starter class: java.lang.VMStart.");
     }
 
     jmethodID init_method = jni_env->GetStaticMethodID(start_class, "initialize", "()V");
     if (jni_env->ExceptionCheck()== JNI_TRUE || init_method == NULL) {
-        PROCESS_EXCEPTION("can't find java.lang.VMStart.initialize() method.");
+        PROCESS_EXCEPTION(36, "{0}can't find java.lang.VMStart.initialize() method.");
     }
 
     jni_env->CallStaticVoidMethod(start_class, init_method);
     if (jni_env->ExceptionCheck()== JNI_TRUE) {
-        PROCESS_EXCEPTION("java.lang.VMStart.initialize() method completed with an exception.");
+        PROCESS_EXCEPTION(37, "{0}java.lang.VMStart.initialize() method completed with an exception.");
     }
     return JNI_OK;
 }
@@ -634,14 +634,14 @@ int vm_init1(JavaVM_Internal * java_vm, JavaVMInitArgs * vm_arguments) {
     initialize_vm_cmd_state(vm_env, vm_arguments);
 
     // Initialize logging system as soon as possible.
-    init_log_system();
+    init_log_system(get_portlib_for_logger(vm_env));
     set_log_levels_from_cmd(&vm_env->vm_arguments);
 
     vm_monitor_init();
 
     status = CmAcquire(&vm_env->cm);
     if (status != JNI_OK) {
-        WARN("Failed to initialize a \"Component Manager\".");
+        LWARN(23, "Failed to initialize a \"Component Manager\".");
         return status; 
     }
 
@@ -707,7 +707,7 @@ int vm_init1(JavaVM_Internal * java_vm, JavaVMInitArgs * vm_arguments) {
     // "Tool Interface" initialization
     status = vm_env->TI->Init(java_vm);
     if (status != JNI_OK) {
-        WARN("Failed to initialize JVMTI.");
+        LWARN(24, "Failed to initialize JVMTI.");
         return status;
     }
 
@@ -769,7 +769,7 @@ int vm_init1(JavaVM_Internal * java_vm, JavaVMInitArgs * vm_arguments) {
     extern int resolve_const_pool(Global_Env& env, Class *clss);
     status = resolve_const_pool(*vm_env, vm_env->java_lang_Throwable_Class);
     if(status != 0) {
-        WARN("Failed to resolve class java/lang/Throwable");
+        LWARN(25, "Failed to resolve class {0}" << "java/lang/Throwable");
         return JNI_ERR;
     }
 
@@ -837,7 +837,7 @@ jint vm_init2(JNIEnv * jni_env) {
     err = WSAStartup(wVersionRequested, &wsaData);
     if (err != 0) {
         // Tell the user that we could not find a usable WinSock DLL.                                      
-        WARN("Couldn't startup Winsock 2.0 dll ");
+        LWARN(26, "Couldn't startup Winsock 2.0 dll");
     }
 #endif
 
@@ -848,7 +848,7 @@ jint vm_init2(JNIEnv * jni_env) {
     TRACE2("init", "initializing system class loader");
     status = initialize_system_class_loader(jni_env);
     if (status != JNI_OK) {
-        WARN("Failed to initialize system class loader.");
+        LWARN(27, "Failed to initialize system class loader.");
         if(exn_raised()) {
             print_uncaught_exception_message(stderr,
                 "system class loader initialization", exn_get());

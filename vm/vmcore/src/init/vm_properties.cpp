@@ -114,18 +114,18 @@ static void init_java_properties(Properties & properties)
     // java.home to the parent directory.
     char *base_path_buf;
     if (port_executable_name(&base_path_buf, prop_pool) != APR_SUCCESS) {
-        DIE("Failed to find executable location");
+        LDIE(13, "Failed to find executable location");
     }
     // directory for the executable
     char *p = strrchr(base_path_buf, PORT_FILE_SEPARATOR);
     if (NULL == p)
-        DIE("Failed to determine executable parent directory");
+        LDIE(14, "Failed to determine executable parent directory");
     *p = '\0';
     // home directory
     char* home_path = apr_pstrdup(prop_pool, base_path_buf);
     p = strrchr(home_path, PORT_FILE_SEPARATOR);
     if (NULL == p)
-        DIE("Failed to determine java home directory");
+        LDIE(15, "Failed to determine java home directory");
     *p = '\0';
 
     properties.set("java.home", home_path);
@@ -165,14 +165,14 @@ static void init_java_properties(Properties & properties)
     char *user_buf;
     apr_status_t status = port_user_name(&user_buf, prop_pool);
     if (APR_SUCCESS != status) {
-        DIE("Failed to get user name from the system. Error code " << status);
+        LDIE(16, "Failed to get user name from the system. Error code {0}" << status);
     }
     properties.set("user.name", user_buf);
     // user.home initialization, try to get home from the system.
     char *user_home;
     status = port_user_home(&user_home, prop_pool);
     if (APR_SUCCESS != status) {
-        DIE("Failed to get user home from the system. Error code " << status);
+        LDIE(17, "Failed to get user home from the system. Error code {0}" << status);
     }
     properties.set("user.home", user_home);
     // java.io.tmpdir initialization. 

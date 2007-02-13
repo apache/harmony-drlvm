@@ -2153,7 +2153,7 @@ class_alloc_new_object_and_run_constructor(Class* clss,
     vm_execute_java_method_array((jmethodID) constructor, 0, args);
 
     if (exn_raised()) {
-        DIE("class constructor has thrown an exception");
+        LDIE(18, "class constructor has thrown an exception");
     }
 
     STD_FREE(args);

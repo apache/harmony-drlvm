@@ -66,10 +66,10 @@ extern unsigned long    btb_interval;
 //------ End DYNOPT support ----------------------------------------
 
 #define EXECUTABLE_NAME "java"
-#define USE_JAVA_HELP "\nUse " EXECUTABLE_NAME " -help to get help on" \
-    " command line options"
-
-
+#define USE_JAVA_HELP LECHO(29, "Use {0} -help to get help on command line options" << EXECUTABLE_NAME)
+#define LECHO_VERSION LECHO(32, VERSION << VERSION_SVN_TAG << __DATE__ << VERSION_OS \
+        << VERSION_ARCH << VERSION_COMPILER << VERSION_DEBUG_STRING)
+#define LECHO_VM_VERSION LECHO(33, VM_VERSION)
 extern bool dump_stubs;
 extern bool parallel_jit;
 extern const char * dump_file_name;
@@ -88,15 +88,15 @@ static inline bool begins_with(const char* str, const char* beginning)
 
 void print_generic_help()
 {
-    ECHO("Usage: " EXECUTABLE_NAME " [-options] class [args...]\n"
+    LECHO(21, "Usage: {0} [-options] class [args...]\n"
         "        (to execute a method main() of the class)\n"
-        "    or " EXECUTABLE_NAME " [-options] -jar jarfile [args...]\n"
+        "    or {0} [-options] -jar jarfile [args...]\n"
         "        (to execute the jar file)\n"
         "\n"
         "where options include:\n"
         "    -classpath <class search path of directories and zip/jar files>\n"
         "    -cp        <class search path of directories and zip/jar files>\n"
-        "                  A " PORT_PATH_SEPARATOR_STR " separated list of directories, jar archives,\n"
+        "                  A {1} separated list of directories, jar archives,\n"
         "                  and zip archives to search for class file\n"
         "    -D<name>=<value>\n"
         "                  set a system property\n"
@@ -125,31 +125,13 @@ void print_generic_help()
         "    -? -help      print this help message\n"
         "    -help properties\n"
         "                  help on system properties\n"
-        "    -X            print help on non-standard options");
+        "    -X            print help on non-standard options" 
+        <<  EXECUTABLE_NAME << PORT_PATH_SEPARATOR_STR);
 }
 
 static void print_help_on_nonstandard_options()
 {
-#ifdef _DEBUG
-#    define DEBUG_OPTIONS_HELP \
-    "    -Xlog[:<category>[:<file>]\n" \
-    "              Switch debug logging on [for specified category only\n" \
-    "              [and log that category to a file]]\n" \
-    "    -Xtrace[:<category>[:<file>]\n" \
-    "              Switch trace logging on [for specified category only\n" \
-    "              [and log that category to a file]]\n"
-#else
-#    define DEBUG_OPTIONS_HELP
-#endif //_DEBUG
-#ifdef VM_STATS
-#    define STATS_OPTIONS_HELP \
-    "    -Xstats:<mask>\n" \
-    "              Generates different statistics\n"
-#else
-#    define STATS_OPTIONS_HELP
-#endif // VM_STATS
-
-    ECHO("    -Xbootclasspath:<PATH>\n"
+    LECHO(22, "    -Xbootclasspath:<PATH>\n"
         "              Set bootclasspath to the specified value\n"
         "    -Xbootclasspath/a:<PATH>\n"
         "              Append specified directories and files to bootclasspath\n"
@@ -190,10 +172,21 @@ static void print_help_on_nonstandard_options()
         "    -Xtimestamp\n"
         "              Add timestamp to logging messages\n"
         "    -Xfunction\n"
-        "              Add function signature to logging messages\n"
-        DEBUG_OPTIONS_HELP
-        STATS_OPTIONS_HELP
-        "    -Xint\n"
+        "              Add function signature to logging messages");
+#ifdef _DEBUG
+    LECHO(23, "    -Xlog[:<category>[:<file>]\n"
+        "              Switch debug logging on [for specified category only\n"
+        "              [and log that category to a file]]\n"
+        "    -Xtrace[:<category>[:<file>]\n"
+        "              Switch trace logging on [for specified category only\n"
+        "              [and log that category to a file]]");
+#endif //_DEBUG
+
+#ifdef VM_STATS
+    LECHO(24, "    -Xstats:<mask>\n"
+    "              Generates different statistics");
+#endif // VM_STATS
+    LECHO(25, "    -Xint\n"
         "              Use interpreter to execute the program\n"
         "    -Xgc:<gc options>\n"
         "              Specify gc specific options\n"
@@ -208,24 +201,19 @@ static void print_help_on_nonstandard_options()
         "    -Xdumpfile:<file>\n"
         "              Specifies a file name for the dump\n"
         "    -XD<name>=<value>\n"
-        "              set an internal system property\n");
+        "              set an internal system property");
 } //print_help_on_nonstandard_options
 
 void print_vm_standard_properties()
 {
-#ifdef PLATFORM_POSIX
-#    define PLATFORM_POSIX_STANDARD_PROPERTIES \
-            "    vm.crash_handler (default FALSE):\n" \
-            "            Invoke gdb on crashes.\n"
-#else
-#    define PLATFORM_POSIX_STANDARD_PROPERTIES
-#endif // PLATFORM_POSIX
-
-    ECHO("Boolean-valued properties (set to one of {on,true,1,off,false,0} through -XD<name>=<value>):\n\n"
+    LECHO(26, "Boolean-valued properties (set to one of {on,true,1,off,false,0} through -XD<name>=<value>):\n\n"
         "    vm.assert_dialog (default TRUE):\n"
-        "            If false, prevent assertion failures from popping up a dialog box.\n"
-        PLATFORM_POSIX_STANDARD_PROPERTIES
-        "    vm.finalize (default TRUE):\n"
+        "            If false, prevent assertion failures from popping up a dialog box.");
+#ifdef PLATFORM_POSIX
+    LECHO(27, "    vm.crash_handler (default FALSE):\n"
+        "            Invoke gdb on crashes.");
+#endif // PLATFORM_POSIX
+    LECHO(28, "    vm.finalize (default TRUE):\n"
         "            Run finalizers.\n"
         "    vm.jit_may_inline_sync (default TRUE):\n"
         "            The JIT is allowed to inline part of the synchronization sequence.\n"
@@ -243,15 +231,15 @@ void print_vm_standard_properties()
         "    vm.boot.class.path:\n"
         "            Virtual machine bootclasspath.\n"
         "    vm.dlls:\n"
-        "            A \'" PORT_PATH_SEPARATOR_STR "\'-delimited list of modular dlls (GC/etc.) to load at startup.\n"
+        "            A '{0}'-delimited list of modular dlls (GC/etc.) to load at startup.\n"
         "    vm.em_dll:\n"
-        "            A \'" PORT_PATH_SEPARATOR_STR "\'-execution manager (EM) dll to load at startup.\n"
+        "            A '{0}'-execution manager (EM) dll to load at startup.\n"
         "    vm.other_natives_dlls:\n"
-        "            A \'" PORT_PATH_SEPARATOR_STR "\'-delimited list of dlls contained native methods implementations to load at startup.\n"
+        "            A '{0}'-delimited list of dlls contained native methods implementations to load at startup.\n"
         "    vm.components.<component>.classpath:\n" 
         "            Part of a <component>'s classpath to append to the JDK bootclasspath\n"
         "    vm.components.<component>.startupclass:\n"
-        "            A <component> class to be initialized during startup\n");
+        "            A <component> class to be initialized during startup" << PORT_PATH_SEPARATOR_STR);
 
 }
 
@@ -268,7 +256,8 @@ static void add_assert_rec(Global_Env *p_env, const char* option, const char* cm
     if ('\0' == arg[0]) {
         get_assert_reg(p_env)->enable_all = value ? ASRT_ENABLED : ASRT_DISABLED;
     } else if (':' != arg[0]) {
-        ECHO("Unknown option " << option << USE_JAVA_HELP);
+        LECHO(30, "Unknown option {0}" << option);
+        USE_JAVA_HELP;
         LOGGER_EXIT(1);
     } else {
         unsigned len = strlen(++arg);
@@ -278,6 +267,16 @@ static void add_assert_rec(Global_Env *p_env, const char* option, const char* cm
             get_assert_reg(p_env)->add_class(p_env, arg, len, value);
         }
     }
+}
+
+void* get_portlib_for_logger(Global_Env *p_env) {
+    for (int i = 0; i < p_env->vm_arguments.nOptions; i++) {
+        const char* option = p_env->vm_arguments.options[i].optionString;
+        if (strcmp(option, "_org.apache.harmony.vmi.portlib") == 0) {
+            return p_env->vm_arguments.options[i].extraInfo;
+        }
+    }
+    return NULL;
 }
 
 void parse_vm_arguments(Global_Env *p_env)
@@ -364,7 +363,7 @@ void parse_vm_arguments(Global_Env *p_env)
                 print_vm_standard_properties();
 
             } else {
-                ECHO("Unknown argument " << arg << " of -Xhelp: option");
+                LECHO(31, "Unknown argument {0} of -Xhelp: option" << arg);
             }
 
             LOGGER_EXIT(0);
@@ -380,17 +379,17 @@ void parse_vm_arguments(Global_Env *p_env)
 #endif
         } else if (strcmp(option, "-version") == 0) {
             // Print the version number and exit
-            ECHO(VERSION);
+            LECHO_VERSION;
             LOGGER_EXIT(0);
         } else if (strcmp(option, "-showversion") == 0) {
             if (!version_printed) {
                 // Print the version number and continue
-                ECHO(VERSION);
+                LECHO_VERSION;
                 version_printed = true;
             }
         } else if (strcmp(option, "-fullversion") == 0) {
             // Print the version number and exit
-            ECHO(VM_VERSION);
+            LECHO_VM_VERSION;
             LOGGER_EXIT(0);
 
         } else if (begins_with(option, "-Xgc:")) {
@@ -410,7 +409,7 @@ void parse_vm_arguments(Global_Env *p_env)
             const char* arg = option + 4;
             TRACE2("init", "gc.ms = " << arg);
             if (atoi(arg) == 0) {
-                ECHO("Negative or invalid heap size. Default value will be used!");
+                LECHO(34, "Negative or invalid heap size. Default value will be used!");
             }
             p_env->VmProperties()->set("gc.ms", arg);
 
@@ -419,7 +418,7 @@ void parse_vm_arguments(Global_Env *p_env)
             const char* arg = option + 4;
             TRACE2("init", "gc.mx = " << arg);
             if (atoi(arg) == 0) {
-                ECHO("Negative or invalid heap size. Default value will be used!");
+                LECHO(34, "Negative or invalid heap size. Default value will be used!");
             }
             p_env->VmProperties()->set("gc.mx", arg);
         }
@@ -540,7 +539,8 @@ void parse_vm_arguments(Global_Env *p_env)
         }
 
         else {
-            ECHO("Unknown option " << option << USE_JAVA_HELP);
+            LECHO(30, "Unknown option {0}" << option);
+            USE_JAVA_HELP;
             LOGGER_EXIT(1);
        }
     } // for
@@ -620,7 +620,8 @@ static void parse_logger_arg(char* arg, const char* cmd, LoggingLevel level) {
             *out = ':';
         }
     } else {
-        ECHO("Unknown option " << arg << USE_JAVA_HELP);
+        LECHO(30, "Unknown option {0}" << arg);
+        USE_JAVA_HELP;
         LOGGER_EXIT(1); 
     }
 }
@@ -666,7 +667,8 @@ void set_log_levels_from_cmd(JavaVMInitArgs* vm_arguments)
                 next_sym++;
                 set_threshold_list(next_sym, INFO, NULL, true); // true = convert standard categories to internal
             } else {
-                ECHO("Unknown option " << option << USE_JAVA_HELP);
+                LECHO(30, "Unknown option {0}" << option);
+                USE_JAVA_HELP;
                 LOGGER_EXIT(1);
             }
         } else if (begins_with(option, "-Xverboseconf:")) {

@@ -40,9 +40,9 @@
 #define LOG_DOMAIN "vm.core.shutdown"
 #include "cxxlog.h"
 
-#define PROCESS_EXCEPTION(message) \
+#define PROCESS_EXCEPTION(messageId, message) \
 { \
-    ECHO("Internal error: " << message); \
+    LECHO(messageId, message << "Internal error: "); \
 \
     if (jni_env->ExceptionCheck()== JNI_TRUE) \
     { \
@@ -67,18 +67,18 @@ static jint exec_shutdown_sequence(JNIEnv * jni_env) {
     system_class = jni_env->FindClass("java/lang/System");
     if (jni_env->ExceptionCheck() == JNI_TRUE || system_class == NULL) {
         // This is debug message only. May appear when VM is already in shutdown stage.
-        PROCESS_EXCEPTION("can't find java.lang.System class.");
+        PROCESS_EXCEPTION(38, "{0}can't find java.lang.System class.");
     }
     
     shutdown_method = jni_env->GetStaticMethodID(system_class, "execShutdownSequence", "()V");
     if (jni_env->ExceptionCheck() == JNI_TRUE || shutdown_method == NULL) {
-        PROCESS_EXCEPTION("can't find java.lang.System.execShutdownSequence() method.");
+        PROCESS_EXCEPTION(39, "{0}can't find java.lang.System.execShutdownSequence() method.");
     }
 
     jni_env->CallStaticVoidMethod(system_class, shutdown_method);
 
     if (jni_env->ExceptionCheck() == JNI_TRUE) {
-        PROCESS_EXCEPTION("java.lang.System.execShutdownSequence() method completed with an exception.");
+        PROCESS_EXCEPTION(40, "{0}java.lang.System.execShutdownSequence() method completed with an exception.");
     }
     return JNI_OK;
 }
