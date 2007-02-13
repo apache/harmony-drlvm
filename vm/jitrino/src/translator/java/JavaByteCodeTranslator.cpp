@@ -2219,6 +2219,7 @@ JavaByteCodeTranslator::anewarray(uint32 constPoolIndex) {
     NamedType* type = resolveType(constPoolIndex);
     if (!type) {
         linkingException(constPoolIndex, OPCODE_ANEWARRAY);
+        popOpnd();
         pushOpnd(irBuilder.genLdNull());
         return;
     }

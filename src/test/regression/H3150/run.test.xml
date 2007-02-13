@@ -1,0 +1,14 @@
+<project name="RUN HARMONY-3150 Regression Test">
+    <target name="run-test">
+        <!-- extend JUnit test launcher to run JNI test -->
+        <delete
+             file="${reg.test.class.path}/org/apache/harmony/drlvm/tests/regression/h3150/classToDelete.class"
+             verbose="true"/>
+        <echo message="Running on OPT"/>
+        <run-junit-test 
+             test="org.apache.harmony.drlvm.tests.regression.h3150.Test"
+             vmarg="-Xem:opt">
+        </run-junit-test>
+    </target>
+</project>
+
