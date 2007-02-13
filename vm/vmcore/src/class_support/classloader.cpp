@@ -535,6 +535,7 @@ void ClassLoader::PrintUnloadingStats()
     unsigned i;
     TRACE2("classloader.unloading.stats", "----------------------------------------------");
     TRACE2("classloader.unloading.stats", "Class unloading statistics:");
+    hythread_suspend_disable();
     for(i = 0; i < m_nextEntry; i++) {
         if(m_table[i]->m_unloading) {
             TRACE2("classloader.unloading.stats", "  Class loader "
@@ -543,6 +544,7 @@ void ClassLoader::PrintUnloadingStats()
                 << ") contains " << m_table[i]->GetFullSize() << " bytes in C heap");
         }
     }
+    hythread_suspend_enable();
     TRACE2("classloader.unloading.stats", "A total of "
         << m_unloadedBytes << " bytes would be freed in C heap for this scenario");
     TRACE2("classloader.unloading.stats", "----------------------------------------------");
