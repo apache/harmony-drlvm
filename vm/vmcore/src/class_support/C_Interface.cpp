@@ -2756,7 +2756,7 @@ Boolean get_boolean_property(const char *property_name, Boolean default_value, P
 
 
 static Annotation* lookup_annotation(AnnotationTable* table, Class* owner, Class* antn_type) {
-    for (unsigned i = table->length - 1; i >= 0; --i) {
+    for (int i = table->length - 1; i >= 0; --i) {
         Annotation* antn = table->table[i];
         Type_Info_Handle tih = (Type_Info_Handle) type_desc_create_from_java_descriptor(antn->type->bytes, owner->get_class_loader());
         if (tih) {
