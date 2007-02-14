@@ -780,6 +780,8 @@ void jvmti_get_compilation_flags(OpenMethodExecutionParams *flags)
     if (!ti->isEnabled())
         return;
 
+    flags->exe_notify_compiled_method_load = 1;
+
     flags->exe_do_code_mapping = flags->exe_do_local_var_mapping = 1;
 
     if (ti->get_global_capability(DebugUtilsTI::TI_GC_ENABLE_METHOD_ENTRY))

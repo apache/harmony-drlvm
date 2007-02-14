@@ -31,6 +31,7 @@ typedef ::std::size_t size_t;
 
 #include "open/types.h"
 #include "jit_export.h"
+#include "jit_intf.h"
 #include <iostream>
 #include <ostream>
 #include "PlatformDependant.h"
@@ -49,7 +50,6 @@ class MethodPtrType;
 class PersistentInstructionId;
 class MemoryManager;
 class CompilationContext;
-struct AddrLocation;
 
 ///////////////////////////////////////////////////////////////////////////////////////
 ///////////////////////////////////////////////////////////////////////////////////////
@@ -509,7 +509,7 @@ public:
     virtual bool isCompileLoadEventRequired() = 0;
 
     // send compile
-    virtual void sendCompiledMethodLoadEvent(MethodDesc * methodDesc, 
+    virtual void sendCompiledMethodLoadEvent(MethodDesc* methodDesc, MethodDesc* outerDesc,
         uint32 codeSize, void* codeAddr, uint32 mapLength, 
         AddrLocation* addrLocationMap, void* compileInfo) = 0;
 
@@ -565,12 +565,6 @@ protected:
       * changes in JIT subcomponents interfaces CompilationContext struct is placed here.
       */
     CompilationContext* compilationContext;
-};
-
-// AddrLocation data structure should be put in VM-JIT interface
-struct AddrLocation {
-    void* start_addr;
-    uint16 location;
 };
 
 class DataInterface {

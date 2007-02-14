@@ -994,17 +994,14 @@ bool DrlVMCompilationInterface::mayInlineObjectSynchronization(ObjectSynchroniza
     return mayInline == TRUE;
 }
 
-void DrlVMCompilationInterface::sendCompiledMethodLoadEvent(MethodDesc * methodDesc, 
+void DrlVMCompilationInterface::sendCompiledMethodLoadEvent(MethodDesc* methodDesc, MethodDesc* outerDesc,
         uint32 codeSize, void* codeAddr, uint32 mapLength, 
         AddrLocation* addrLocationMap, void* compileInfo) {
-    // VM-JIT interface function should be called here instead of logging
-    if (Log::isEnabled()) {
-        Log::out() << "   ** Inlined method: " 
-                << methodDesc->getName() << std::endl;
-        Log::out() << "   ** Number of locations:" << mapLength 
-                << std::endl;
-    }
-    
+
+    Method_Handle method = (Method_Handle)getRuntimeMethodHandle(methodDesc);
+    Method_Handle outer  = (Method_Handle)getRuntimeMethodHandle(outerDesc);
+
+    compiled_method_load(method, codeSize, codeAddr, mapLength, addrLocationMap, compileInfo, outer); 
 }
 
 bool DrlVMDataInterface::areReferencesCompressed() {

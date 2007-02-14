@@ -452,7 +452,70 @@ void jvmti_send_vm_init_event(Global_Env *env)
     oh_discard_local_handle(hThread);
 }
 
-void jvmti_send_compiled_method_load_event(Method *method)
+void jvmti_send_region_compiled_method_load_event(Method *method, uint32 codeSize, 
+                                  const void* codeAddr, uint32 mapLength, 
+                                  const AddrLocation* addrLocationMap, 
+                                  const void* compileInfo)
+{
+    SuspendEnabledChecker sec;
+
+    if (codeSize <= 0 || NULL == codeAddr)
+        return;
+
+    // convert AddrLocation[] to jvmtiAddrLocationMap[]
+    jvmtiAddrLocationMap* jvmtiLocationMap = (jvmtiAddrLocationMap*) 
+            STD_MALLOC( mapLength * sizeof(jvmtiAddrLocationMap) );
+    for (uint32 i = 0; i < mapLength; i++) {
+        jlocation location = (jlocation) addrLocationMap[i].location;
+
+        if (location == 65535)
+            location = -1;
+
+        jvmtiLocationMap[i].location = location;
+
+        jvmtiLocationMap[i].start_address = addrLocationMap[i].start_addr;
+    }
+
+    TIEnv *ti_env = VM_Global_State::loader_env->TI->getEnvironments();
+    TIEnv *next_env;
+    while (NULL != ti_env)
+    {
+        next_env = ti_env->next;
+        if (ti_env->global_events[JVMTI_EVENT_COMPILED_METHOD_LOAD - JVMTI_MIN_EVENT_TYPE_VAL])
+        {
+            jvmtiEventCompiledMethodLoad func =
+                (jvmtiEventCompiledMethodLoad)ti_env->get_event_callback(JVMTI_EVENT_COMPILED_METHOD_LOAD);
+            if (NULL != func)
+            {
+                TRACE2("jvmti.event.cml",
+                    "Callback JVMTI_EVENT_COMPILED_METHOD_LOAD calling, method = " <<
+                    method->get_class()->get_name()->bytes << "." << method->get_name()->bytes <<
+                    method->get_descriptor()->bytes);
+
+                func((jvmtiEnv*)ti_env, (jmethodID)method, codeSize,
+                    codeAddr, mapLength, jvmtiLocationMap, NULL);
+
+                TRACE2("jvmti.event.cml",
+                    "Callback JVMTI_EVENT_COMPILED_METHOD_LOAD finished, method = " <<
+                    method->get_class()->get_name()->bytes << "." << method->get_name()->bytes <<
+                    method->get_descriptor()->bytes);
+            }
+        }
+
+        ti_env = next_env;
+    }
+
+    STD_FREE(jvmtiLocationMap);
+} // jvmti_send_region_compiled_method_load_event
+
+void jvmti_send_inlined_compiled_method_load_event(Method *method)
+{
+    SuspendEnabledChecker sec;
+
+    method->send_inlined_method_load_events(method);
+} // jvmti_send_inlined_compiled_method_load_event
+
+void jvmti_send_chunks_compiled_method_load_event(Method *method)
 {
     SuspendEnabledChecker sec;
 
@@ -468,18 +531,55 @@ void jvmti_send_compiled_method_load_event(Method *method)
             if (NULL != func)
             {
                 TRACE2("jvmti.event.cml",
-                    "Callback JVMTI_EVENT_COMPILED_METHOD_LOAD called, method = " <<
+                    "Emitting JVMTI_EVENT_COMPILED_METHOD_LOAD for chuncks of " <<
                     method->get_class()->get_name()->bytes << "." << method->get_name()->bytes <<
                     method->get_descriptor()->bytes);
 
                 for (CodeChunkInfo* cci = method->get_first_JIT_specific_info();  cci;  cci = cci->_next)
-                    if (cci->get_code_block_size() > 0 &&
-                        cci->get_code_block_addr() != NULL)
-                        func((jvmtiEnv*)ti_env, (jmethodID)method, cci->get_code_block_size(),
-                            cci->get_code_block_addr(), 0, NULL, NULL);
+                {
+                    jint code_size = cci->get_code_block_size();
+                    const void* code_addr = cci->get_code_block_addr();
+
+                    if ( code_size <= 0 || code_addr == NULL)
+                        continue;
+
+                    JIT* jit = cci->get_jit();
+
+                    jvmtiAddrLocationMap* jvmtiLocationMap = (jvmtiAddrLocationMap*) 
+                            STD_MALLOC( code_size * sizeof(jvmtiAddrLocationMap) );
+
+                    jint map_length = 0;
+
+                    for (int i = 0; i < code_size; i++)
+                    {
+                        NativeCodePtr ip = (NativeCodePtr) (((uint8*) code_addr) + i);
+                        uint16 bc = 12345;
+
+                        OpenExeJpdaError UNREF result =
+                            jit->get_bc_location_for_native(
+                                method, ip, &bc);
+
+                        jlocation location = (jlocation) bc;
+
+                        if (result != EXE_ERROR_NONE) 
+                            location = -1;
+
+                        if ( i == 0 || location != jvmtiLocationMap[map_length - 1].location )
+                        {
+                            jvmtiLocationMap[map_length].location = location;
+                            jvmtiLocationMap[map_length].start_address = ip;
+                            map_length ++;
+                        }
+                    }
+
+                    func((jvmtiEnv*)ti_env, (jmethodID)method, code_size,
+                            code_addr, map_length, jvmtiLocationMap, NULL);
+
+                    STD_FREE(jvmtiLocationMap);
+                }
 
                 TRACE2("jvmti.event.cml",
-                    "Callback JVMTI_EVENT_COMPILED_METHOD_LOAD finished, method = " <<
+                    "Emitting JVMTI_EVENT_COMPILED_METHOD_LOAD done for chuncks of " <<
                     method->get_class()->get_name()->bytes << "." << method->get_name()->bytes <<
                     method->get_descriptor()->bytes);
             }
@@ -487,7 +587,7 @@ void jvmti_send_compiled_method_load_event(Method *method)
 
         ti_env = next_env;
     }
-}
+} // jvmti_send_chunks_compiled_method_load_event
 
 void jvmti_send_dynamic_code_generated_event(const char *name, const void *address, jint length)
 {
@@ -511,6 +611,80 @@ void jvmti_send_dynamic_code_generated_event(const char *name, const void *addre
         ti_env = next_env;
     }
 }
+
+static jvmtiError generate_events_compiled_method_load(jvmtiEnv* env)
+{
+    // Capabilities checking
+    jvmtiCapabilities capa;
+    jvmtiGetCapabilities(env, &capa);
+    if (!capa.can_generate_compiled_method_load_events)
+        return JVMTI_ERROR_MUST_POSSESS_CAPABILITY;
+
+    ClassLoader::LockLoadersTable();
+
+    /**
+    * First class loader is bootstrap class loader
+    */
+    int index = 0;
+    int cl_count = ClassLoader::GetClassLoaderNumber();
+    ClassLoader *classloader = VM_Global_State::loader_env->bootstrap_class_loader;
+    do
+    {
+        /**
+        * Create jclass handle for classes and set in jclass table
+        */
+        classloader->Lock();
+        ClassTable* tbl;
+        Class **klass;
+        ClassTable::iterator it;
+        tbl = classloader->GetLoadedClasses();
+        for(it = tbl->begin(); it != tbl->end(); it++)
+        {
+            klass = &it->second;
+            TRACE2("jvmti.event", "Class = " << (*klass)->get_name()->bytes);
+            if((*klass)->is_primitive())
+                continue;
+            if((*klass)->get_class_loader() != classloader)
+                continue;
+            if((*klass)->is_at_least_prepared())
+                for (int jjj = 0; jjj < (*klass)->get_number_of_methods(); jjj++)
+                {
+                    Method* method = (*klass)->get_method(jjj);
+                    TRACE2("jvmti.event", "    Method = " << method->get_name()->bytes <<
+                        method->get_descriptor()->bytes <<
+                        (method->get_state() == Method::ST_Compiled ? " compiled" : " not compiled"));
+                    if (method->get_state() == Method::ST_Compiled) {
+                        jvmti_send_chunks_compiled_method_load_event(method);
+                        jvmti_send_inlined_compiled_method_load_event(method);
+                    }
+                }
+        }
+        classloader->Unlock();
+
+        /**
+        * Get next class loader
+        */
+        if( index < cl_count ) {
+            classloader = (ClassLoader::GetClassLoaderTable())[index++];
+        } else {
+            break;
+        }
+    } while(true);
+
+    ClassLoader::UnlockLoadersTable();
+
+    return JVMTI_ERROR_NONE;
+} // generate_events_compiled_method_load
+
+static jvmtiError generate_events_dynamic_code_generated(jvmtiEnv* env)
+{
+    // FIXME: linked list usage without sync
+    for (DynamicCode *dcList = compile_get_dynamic_code_list();
+        NULL != dcList; dcList = dcList->next)
+        jvmti_send_dynamic_code_generated_event(dcList->name, dcList->address, dcList->length);
+
+    return JVMTI_ERROR_NONE;
+} // generate_events_dynamic_code_generated
 
 /*
  * Generate Events
@@ -546,84 +720,15 @@ jvmtiGenerateEvents(jvmtiEnv* env,
            72 == event_type || ((event_type >= 77) && (event_type <= 80)))
         return JVMTI_ERROR_INVALID_EVENT_TYPE;
 
-    if (JVMTI_EVENT_COMPILED_METHOD_LOAD != event_type &&
-        JVMTI_EVENT_DYNAMIC_CODE_GENERATED != event_type)
-        return JVMTI_ERROR_ILLEGAL_ARGUMENT;
+    if (JVMTI_EVENT_COMPILED_METHOD_LOAD == event_type) {
+        return generate_events_compiled_method_load(env);
 
-    if (JVMTI_EVENT_COMPILED_METHOD_LOAD == event_type)
-    {
-        // Capabilities checking
-        jvmtiCapabilities capa;
-        jvmtiGetCapabilities(env, &capa);
-        if (!capa.can_generate_compiled_method_load_events)
-            return JVMTI_ERROR_MUST_POSSESS_CAPABILITY;
-
-        ClassLoader::LockLoadersTable();
-
-        /**
-         * First class loader is bootstrap class loader
-         */
-        int index = 0;
-        int cl_count = ClassLoader::GetClassLoaderNumber();
-        ClassLoader *classloader = VM_Global_State::loader_env->bootstrap_class_loader;
-        do
-        {
-            /**
-             * Create jclass handle for classes and set in jclass table
-             */
-            classloader->Lock();
-            ClassTable* tbl;
-            Class **klass;
-            ClassTable::iterator it;
-            tbl = classloader->GetLoadedClasses();
-            for(it = tbl->begin(); it != tbl->end(); it++)
-            {
-                klass = &it->second;
-                TRACE2("jvmti.event", "Class = " << (*klass)->get_name()->bytes);
-                if((*klass)->is_primitive())
-                    continue;
-                if((*klass)->get_class_loader() != classloader)
-                    continue;
-                if((*klass)->is_at_least_prepared())
-                    for (int jjj = 0; jjj < (*klass)->get_number_of_methods(); jjj++)
-                    {
-                        Method* method = (*klass)->get_method(jjj);
-                        TRACE2("jvmti.event", "    Method = " << method->get_name()->bytes <<
-                            method->get_descriptor()->bytes <<
-                            (method->get_state() == Method::ST_Compiled ? " compiled" : " not compiled"));
-                        if (method->get_state() == Method::ST_Compiled)
-                            jvmti_send_compiled_method_load_event(method);
-                    }
-            }
-            classloader->Unlock();
-
-            /**
-             * Get next class loader
-             */
-            if( index < cl_count ) {
-                classloader = (ClassLoader::GetClassLoaderTable())[index++];
-            } else {
-                break;
-            }
-        } while(true);
-
-        ClassLoader::UnlockLoadersTable();
-    }
-    else
-    {
-        Lock_Manager* dclock = VM_Global_State::loader_env->p_dclist_lock;
-        // Synchronizing access to dynamic code list
-        dclock->_lock();
-
-        for (DynamicCode *dcList = compile_get_dynamic_code_list();
-            NULL != dcList; dcList = dcList->next)
-            jvmti_send_dynamic_code_generated_event(dcList->name, dcList->address, dcList->length);
-
-        dclock->_unlock();
+    } else if (JVMTI_EVENT_DYNAMIC_CODE_GENERATED == event_type) {
+        return generate_events_dynamic_code_generated(env);
     }
 
-    return JVMTI_ERROR_NONE;
-}
+    return JVMTI_ERROR_ILLEGAL_ARGUMENT;
+} // jvmtiGenerateEvents
 
 VMEXPORT void
 jvmti_process_method_entry_event(jmethodID method) {

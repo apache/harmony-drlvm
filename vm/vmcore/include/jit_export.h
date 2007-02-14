@@ -176,6 +176,11 @@ typedef struct OpenMethodExecutionParams {
     */
     Boolean  exe_restore_context_after_unwind : 1;
 
+    /**
+    * Sent CompileMethodLoad event when a method is compiled and loaded into memory 
+    */
+    Boolean  exe_notify_compiled_method_load : 1;
+
 } OpenMethodExecutionParams;
 
 

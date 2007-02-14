@@ -109,7 +109,12 @@ extern "C" {
     
 void jvmti_send_vm_start_event(Global_Env *env, JNIEnv *jni_env);
 void jvmti_send_vm_init_event(Global_Env *env);
-void jvmti_send_compiled_method_load_event(Method *method);
+void jvmti_send_region_compiled_method_load_event(Method *method, uint32 codeSize, 
+                                  const void* codeAddr, uint32 mapLength, 
+                                  const AddrLocation* addrLocationMap, 
+                                  const void* compileInfo);
+void jvmti_send_chunks_compiled_method_load_event(Method *method);
+void jvmti_send_inlined_compiled_method_load_event(Method *method);
 void jvmti_send_dynamic_code_generated_event(const char *name, const void *address, jint length);
 VMEXPORT void jvmti_send_contended_enter_or_entered_monitor_event(jobject obj, int isEnter);
 VMEXPORT void jvmti_send_wait_monitor_event(jobject obj, jlong timeout);

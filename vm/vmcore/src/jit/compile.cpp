@@ -18,7 +18,7 @@
  * @author Intel, Alexei Fedotov
  * @version $Revision: 1.1.2.4.2.2.2.3 $
  */  
-#define LOG_DOMAIN "vm.core"
+#define LOG_DOMAIN "compile"
 #include "cxxlog.h"
 #include "vm_log.h"
 
@@ -582,7 +582,7 @@ static NativeCodePtr compile_create_jni_stub(Method_Handle method, GenericFuncti
 
 static JIT_Result compile_prepare_native_method(Method* method)
 {
-    TRACE2("compile", "compile_prepare_native_method(" << method_get_name(method) << ")");
+    TRACE("compile_prepare_native_method(" << method_get_name(method) << ")");
 #ifdef VM_STATS
     VM_Statistics::get_vm_stats().num_native_methods++;
 #endif
@@ -642,7 +642,11 @@ JIT_Result compile_do_compilation_jit(Method* method, JIT* jit)
     ch.env = VM_Global_State::loader_env;
     ch.jit = jit;
 
+    TRACE("compile_do_compilation_jit(): calling jit->compile_method_with_params() for method " << method );
+
     JIT_Result res = jit->compile_method_with_params(&ch, method, flags);
+
+    TRACE("compile_do_compilation_jit(): returned from jit->compile_method_with_params() for method " << method );
 
     if (JIT_SUCCESS != res) {
         if (!parallel_jit) {
@@ -676,7 +680,7 @@ JIT_Result compile_do_compilation_jit(Method* method, JIT* jit)
 
     // Call TI callbacks
     if (ti->isEnabled() && ti->getPhase() == JVMTI_PHASE_LIVE) {
-        jvmti_send_compiled_method_load_event(method);
+        jvmti_send_chunks_compiled_method_load_event(method);
     }
     return JIT_SUCCESS;
 }
@@ -759,7 +763,7 @@ NativeCodePtr compile_me(Method* method)
 {
     ASSERT_RAISE_AREA;
     ASSERT_NO_INTERPRETER;
-    TRACE2("compile", "compile_me " << method);
+    TRACE("compile_me " << method);
 
     GcFrame gc;
     compile_protect_arguments(method, &gc);
@@ -830,3 +834,26 @@ void compile_clear_dynamic_code_list(DynamicCode* list)
         list = next;
     }
 }
+
+VMEXPORT void compiled_method_load(Method_Handle method, uint32 codeSize, 
+                                  void* codeAddr, uint32 mapLength, 
+                                  AddrLocation* addrLocationMap, 
+                                  void* compileInfo, Method_Handle outer_method) 
+{
+    assert(method);
+    assert(outer_method);
+
+    outer_method->add_inline_info_entry(method, codeSize, codeAddr, mapLength,
+            addrLocationMap);
+
+    // Find TI environment
+    DebugUtilsTI *ti = VM_Global_State::loader_env->TI;
+
+    // Call TI callbacks
+    if (ti->isEnabled() && ti->getPhase() == JVMTI_PHASE_LIVE) {
+        jvmti_send_region_compiled_method_load_event(method, codeSize,
+            codeAddr, mapLength, addrLocationMap, NULL);
+    }
+}
+  
+

@@ -286,6 +286,33 @@ VMEXPORT void core_free(void*);
 // Deprecated.  Please use vector_first_element_offset instead.
 //VMEXPORT int get_array_offset(Java_Type element_type);
 
+/**
+ * One entry of correspondence table between native addresses and bytecode
+ * locations.
+ */
+struct AddrLocation {
+    /** Native code address. */
+    void* start_addr;
+
+    /** Bytecode location. */
+    uint16 location;
+};
+
+/**
+ * Adds information about inlined method.
+ * @param[in] method - method which is inlined
+ * @param[in] codeSize - size of inlined code block
+ * @param[in] codeAddr - size of inlined code block
+ * @param[in] mapLength - number of AddrLocation elements in addrLocationMap
+ * @param[in] addrLocationMap - native addresses to bytecode locations
+ *       correspondence table
+ * @param[in] compileInfo - VM specific information.
+ * @param[in] outer_method - target method to which inlining was made
+ */
+VMEXPORT void compiled_method_load(Method_Handle method, uint32 codeSize, 
+                                  void* codeAddr, uint32 mapLength, 
+                                  AddrLocation* addrLocationMap, 
+                                  void* compileInfo, Method_Handle outer_method);
 
 //////////////// end C interface
 

@@ -417,6 +417,7 @@ struct Local_Var_Table {
     Local_Var_Entry table[1];
 };
 
+class InlineInfo;
 
 struct Method : public Class_Member {
     friend void add_new_fake_method(Class* clss, Class* example, unsigned* next);
@@ -718,7 +719,37 @@ private:
     // multiple breakpoints that are set in the same location by
     // different environments, it counts only unique locations
     uint32 pending_breakpoints;
+
+    /** Information about methods inlined to this. */
+    InlineInfo* _inline_info;
 public:
+
+    /**
+     * Gets inlined methods information.
+     * @return InlineInfo object pointer.
+     */
+    InlineInfo* get_inline_info() {
+        return _inline_info;
+    }
+
+    /**
+     * Adds information about inlined method.
+     * @param[in] method - method which is inlined
+     * @param[in] codeSize - size of inlined code block
+     * @param[in] codeAddr - size of inlined code block
+     * @param[in] mapLength - number of AddrLocation elements in addrLocationMap
+     * @param[in] addrLocationMap - native address to bytecode location
+     * correspondence table
+     */
+    void add_inline_info_entry(Method* method, uint32 codeSize, void* codeAddr,
+            uint32 mapLength, AddrLocation* addrLocationMap);
+
+    /**
+     * Sends JVMTI_EVENT_COMPILED_METHOD_LOAD event for every inline method 
+     * recorded in this InlineInfo object.
+     * @param[in] method - outer method this InlineInfo object belogs to.
+     */
+    void send_inlined_method_load_events(Method *method);
 
     unsigned get_line_number_table_size() {
         return (_line_number_table) ? _line_number_table->length : 0;

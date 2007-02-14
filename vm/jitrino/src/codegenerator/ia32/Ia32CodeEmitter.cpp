@@ -46,7 +46,7 @@ public:
         :memoryManager(0x1000, "CodeEmitter"),
         exceptionHandlerInfos(memoryManager), constantAreaLayout(memoryManager),
         traversalInfo(memoryManager), methodLocationMap(memoryManager), 
-        entryExitMap(memoryManager)
+        entryExitMap(memoryManager), instSizeMap(memoryManager)
     {
     }
 
@@ -72,6 +72,7 @@ protected:
     void orderNodesAndMarkInlinees(StlList<MethodMarkerPseudoInst*>& container, 
         Node * node, bool isForward);
     void reportCompiledInlinees();
+    void reportInlinedMethod(CompiledMethodInfo* methInfo, MethodMarkerPseudoInst* methEntryInst);
 
     //------------------------------------------------------------------------------------
     class ConstantAreaLayout
@@ -131,22 +132,48 @@ protected:
     StlVector<int> traversalInfo;
     StlMap<MethodMarkerPseudoInst*, CompiledMethodInfo* > methodLocationMap;
     StlMap<MethodMarkerPseudoInst*, MethodMarkerPseudoInst* > entryExitMap;
+    StlMap<POINTER_SIZE_INT, unsigned> instSizeMap;
 };
+
+typedef StlMap<POINTER_SIZE_INT, uint16> LocationMap;
+
 class CompiledMethodInfo {
 public:
-    CompiledMethodInfo(MemoryManager& mm): locationList(mm) {}
+    CompiledMethodInfo(MemoryManager& mm, POINTER_SIZE_INT addr, MethodMarkerPseudoInst* outerEntry, uint32 idpth):
+        memoryManager(mm),
+        locationMap(memoryManager),
+        codeSize(0),
+        codeAddr(addr),
+        outerMethodEntry(outerEntry),
+        inlineDepth(idpth)
+    {}
     uint32 getCodeSize() { return codeSize; }
-    void* getCodeAddr() { return codeAddr; }
+    uint32 getInlineDepth() { return inlineDepth; }
+    POINTER_SIZE_INT getCodeAddr() { return codeAddr; }
+    MethodMarkerPseudoInst* getOuterMethodEntry() { return outerMethodEntry; }
 
 protected:
     friend class CodeEmitter;
-    StlList<std::pair<POINTER_SIZE_INT, uint16>* > locationList;
+    MemoryManager& memoryManager;
+    LocationMap locationMap;
     uint32 codeSize;
-    void* codeAddr;
-    void setCodeSize(uint32 size) { codeSize = size; }
-    void setCodeAddr(void* addr) { codeAddr = addr; }
-    void addLocation(std::pair<POINTER_SIZE_INT, uint16>* entry) {
-        locationList.push_back(entry);
+    POINTER_SIZE_INT codeAddr;
+    MethodMarkerPseudoInst* outerMethodEntry;
+    // inlineDepth == 1 means that CompiledMethod is inlined into irManager->getMethodDesc()
+    uint32 inlineDepth;
+
+    void addCodeSize(uint32 size) { codeSize += size; }
+
+    void includeInst(Inst* inst, uint64 bcOffset) {
+        if( inst->hasKind(Inst::Kind_PseudoInst)) {
+            return;
+        } else {
+            addCodeSize(inst->getCodeSize());
+        }
+
+        POINTER_SIZE_INT instStartAddr = (POINTER_SIZE_INT) inst->getCodeStartAddr();
+        assert(!locationMap.has(instStartAddr));
+        locationMap[instStartAddr] = (uint16)bcOffset;
     }
 private:
 
@@ -357,7 +384,12 @@ void CodeEmitter::emitCode( void ) {
         uint8 * blockStartIp = ip;
         bb->setCodeOffset( blockStartIp-codeStreamStart );
         for (Inst* inst = (Inst*)bb->getFirstInst(); inst!=NULL; inst = inst->getNextInst()) {
-            if( inst->hasKind(Inst::Kind_PseudoInst)) continue;
+            if( inst->hasKind(Inst::Kind_PseudoInst)) {
+                
+                uint8 * instStartIp = ip;
+                inst->setCodeOffset( instStartIp-blockStartIp );
+                continue;
+            }
 
 #ifdef _EM64T_
             if (inst->hasKind(Inst::Kind_ControlTransferInst) && 
@@ -688,32 +720,40 @@ void CodeEmitter::orderNodesAndMarkInlinees(StlList<MethodMarkerPseudoInst*>& in
 
         for (Inst* inst = (Inst*)node->getFirstInst(); inst!=NULL; inst = inst->getNextInst()) {
             if (inst->getKind() == Inst::Kind_MethodEntryPseudoInst) {
+                // keep old method entry
+                MethodMarkerPseudoInst* oldMethodEntryInst = methMarkerInst;
+                assert(!oldMethodEntryInst || oldMethodEntryInst->getKind() == Inst::Kind_MethodEntryPseudoInst);
+                // set new methMarkerInst
                 methMarkerInst = (MethodMarkerPseudoInst*)inst;
-                inlineStack.push_back(methMarkerInst);
-                methInfo = new(memoryManager) CompiledMethodInfo(memoryManager);
-                methInfo->setCodeAddr(methMarkerInst->getCodeStartAddr());
+                inlineStack.push_back(methMarkerInst); 
+                // construct new inlined method info
+                methInfo = new(memoryManager) CompiledMethodInfo(memoryManager,
+                                                                 (POINTER_SIZE_INT)methMarkerInst->getCodeStartAddr(),
+                                                                 oldMethodEntryInst,
+                                                                 inlineStack.size());
+
                 methodLocationMap[methMarkerInst] = methInfo;
             } else if (inst->getKind() == Inst::Kind_MethodEndPseudoInst) {
                 methMarkerInst = (MethodMarkerPseudoInst*)inst;
                 assert(((MethodMarkerPseudoInst*)inlineStack.back())->getMethodDesc() == methMarkerInst->getMethodDesc());
                 entryExitMap[methMarkerInst] = inlineStack.back();
-                if (methInfo != NULL) {
-                    Inst* entryInst = inlineStack.back();
-                    POINTER_SIZE_INT codeSize = (POINTER_SIZE_INT)entryInst->getCodeStartAddr() 
-                            - (POINTER_SIZE_INT)methMarkerInst->getCodeStartAddr();
-                    methInfo->setCodeSize((uint32)codeSize);
-                }
                 inlineStack.pop_back();
                 methMarkerInst = NULL;
             } else {              //handle usual instructions
                 if (methMarkerInst != NULL) {    // inlined locations for methMarkerInst 
                     assert(methInfo == methodLocationMap[methMarkerInst]);
+                    if( ! inst->hasKind(Inst::Kind_PseudoInst)) {
+                        instSizeMap[(POINTER_SIZE_INT) inst->getCodeStartAddr()] = inst->getCodeSize();
+                    }
                     uint64 instID = inst->getId();
                     uint64 bcOffset = bc2LIRMapHandler->getVectorEntry(instID);
-
-                    if (bcOffset != ILLEGAL_VALUE) {
-                        POINTER_SIZE_INT instStartAddr = (POINTER_SIZE_INT) inst->getCodeStartAddr();
-                        methInfo->addLocation(new(memoryManager) std::pair<POINTER_SIZE_INT, uint16>(instStartAddr, (uint16)bcOffset));
+                    methInfo->includeInst(inst,bcOffset);
+                    // addLocation with ILLEGAL_VALUE for all outers
+                    MethodMarkerPseudoInst* outerEntry = methInfo->getOuterMethodEntry();
+                    while (outerEntry) {
+                        CompiledMethodInfo* outerInfo = methodLocationMap[outerEntry];
+                        outerInfo->includeInst(inst, ILLEGAL_VALUE);
+                        outerEntry = outerInfo->getOuterMethodEntry();
                     }
                 }
             }
@@ -752,6 +792,70 @@ void CodeEmitter::orderNodesAndMarkInlinees(StlList<MethodMarkerPseudoInst*>& in
     
 }
 
+void CodeEmitter::reportInlinedMethod(CompiledMethodInfo* methInfo, MethodMarkerPseudoInst* methEntryInst) {
+    AddrLocation* addrLocationMap = new(memoryManager) AddrLocation[methInfo->locationMap.size()];
+
+    MethodDesc* method = methEntryInst->getMethodDesc();
+    MethodMarkerPseudoInst* outerEntry = methInfo->getOuterMethodEntry();
+    MethodDesc* outer = (outerEntry != NULL) ? outerEntry->getMethodDesc() : &irManager->getMethodDesc();
+
+    LocationMap::const_iterator lit, 
+                litStart = methInfo->locationMap.begin(),
+                litEnd = methInfo->locationMap.end();
+
+    POINTER_SIZE_INT methodStartAddr = litStart == litEnd ? methInfo->getCodeAddr() : (*litStart).first;
+    POINTER_SIZE_INT prevAddr = 0;
+    uint32 methodSize = 0;
+    uint32 locationMapSize = 0;
+
+    for (lit = litStart; lit != litEnd; lit++) {
+
+        POINTER_SIZE_INT addr = (*lit).first;
+        uint16 bcOffset = (*lit).second;
+        assert( addr > prevAddr); // locationMap content must be ordered
+
+        if (addr != prevAddr + instSizeMap[prevAddr] && methodSize > 0) {
+            // gap in layout
+            assert(instSizeMap.has(prevAddr));
+            assert(addr > prevAddr + instSizeMap[prevAddr]);
+
+            // report already gathered
+            irManager->getCompilationInterface().sendCompiledMethodLoadEvent(method, outer, methodSize,
+                            (void*)methodStartAddr, locationMapSize, addrLocationMap, NULL);
+            if (Log::isEnabled()) {
+                Log::out() << "Reporting Inlinee (part)  " << method->getParentType()->getName() << "."
+                                                           << method->getName() << " ";
+                Log::out() << "Outer = " << outer->getParentType()->getName() << "." << outer->getName();
+                Log::out() << " start=" << methodStartAddr << " size=" << methodSize << ::std::endl;
+            }
+
+            // reset values
+            methodStartAddr = addr;
+            addrLocationMap += locationMapSize; // shift pointer
+            locationMapSize = 0;
+            methodSize = 0;
+
+        } 
+
+        // process current location
+        addrLocationMap[locationMapSize].start_addr = (void*)addr;
+        addrLocationMap[locationMapSize].location = bcOffset;
+        locationMapSize++;
+        methodSize += instSizeMap[addr];
+        prevAddr = addr;
+    }
+    // report final
+    irManager->getCompilationInterface().sendCompiledMethodLoadEvent(method, outer, methodSize,
+                    (void*)methodStartAddr, locationMapSize, addrLocationMap, NULL);
+    if (Log::isEnabled()) {
+        Log::out() << "Reporting Inlinee (final) " << method->getParentType()->getName() << "."
+                                                   << method->getName() << " ";
+        Log::out() << "Outer = " << outer->getParentType()->getName() << "." << outer->getName();
+        Log::out() << " start=" << methodStartAddr << " size=" << methodSize << ::std::endl;
+    }
+
+}
+
 void CodeEmitter::reportCompiledInlinees() {
     StlList<MethodMarkerPseudoInst*> inlineList(memoryManager);
     traversalInfo.resize(irManager->getFlowGraph()->getMaxNodeId() + 1, 0);
@@ -760,23 +864,23 @@ void CodeEmitter::reportCompiledInlinees() {
 
     StlMap<MethodMarkerPseudoInst*, CompiledMethodInfo* >::const_iterator i, 
             itEnd = methodLocationMap.end();
-    //std::cout << " * Method: " << irManager.getMethodDesc().getName() << std::endl;
-    for (i = methodLocationMap.begin(); i != itEnd; i++) {
-        MethodMarkerPseudoInst* metEntryInst = (MethodMarkerPseudoInst*)i->first;
-        CompiledMethodInfo* methInfo = (CompiledMethodInfo*)i->second;
-        AddrLocation* addrLocationMap = new(memoryManager) AddrLocation[methInfo->locationList.size()];
 
-        StlList<std::pair<POINTER_SIZE_INT, uint16>* >::const_iterator lit, 
-                litEnd = methInfo->locationList.end();
-        int j = 0;
-        for (lit = methInfo->locationList.begin(); lit != litEnd; lit++) {
-            addrLocationMap[j].start_addr = (void*)(*lit)->first;
-            addrLocationMap[j].location = (*lit)->second;
+    // send events according to inlining depth
+    // depth == 1 - the first level inlinees
+    bool found = false;
+    uint32 depth = 1;
+    do {
+        found = false;
+        for (i = methodLocationMap.begin(); i != itEnd; i++) {
+            MethodMarkerPseudoInst* methEntryInst = (MethodMarkerPseudoInst*)i->first;
+            CompiledMethodInfo* methInfo = (CompiledMethodInfo*)i->second;
+            if (depth == methInfo->getInlineDepth()) {
+                found = true;
+                reportInlinedMethod(methInfo, methEntryInst);
+            }
         }
-        irManager->getCompilationInterface().sendCompiledMethodLoadEvent(metEntryInst->getMethodDesc(), 
-                methInfo->codeSize, methInfo->codeAddr, (uint32)methInfo->locationList.size(), 
-                addrLocationMap, NULL);
-    }
+        depth++;
+    } while (found);
 }
 
 

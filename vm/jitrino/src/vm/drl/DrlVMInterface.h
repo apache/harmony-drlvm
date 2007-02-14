@@ -552,11 +552,10 @@ public:
     }
 
     bool isCompileLoadEventRequired() {
-        // additional compilation param is needed to handle this event
-        return false;
+        return compilation_params.exe_notify_compiled_method_load;
     }
 
-    virtual void sendCompiledMethodLoadEvent(MethodDesc * methodDesc, 
+    virtual void sendCompiledMethodLoadEvent(MethodDesc* methodDesc, MethodDesc* outerDesc,
         uint32 codeSize, void* codeAddr, uint32 mapLength, 
         AddrLocation* addrLocationMap, void* compileInfo);
 

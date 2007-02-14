@@ -323,6 +323,9 @@ JITEXPORT OpenMethodExecutionParams JIT_get_exe_capabilities (JIT_Handle jit)
         false, // exe_do_code_mapping
         false, // exe_do_local_var_mapping
         false, // exe_insert_write_barriers
+        false, // exe_provide_access_to_this
+        false, // exe_restore_context_after_unwind
+        false, // exe_notify_compiled_method_load
     };
     return compilation_capabilities;
 }

@@ -40,6 +40,8 @@
 #include "cci.h"
 #include "interpreter.h"
 
+#include "inline_info.h"
+
 #ifdef _IPF_
 #include "vm_ipf.h"
 #endif // _IPF_
@@ -634,6 +636,7 @@ Method::Method()
     _default_value = NULL;
 
     pending_breakpoints = 0;
+    _inline_info = NULL;
 } //Method::Method
 
 void Method::MethodClearInternals()
@@ -703,6 +706,8 @@ void Method::MethodClearInternals()
         _vtable_patch = _vtable_patch->next;
         STD_FREE(patch);
     }
+
+    delete _inline_info;
 }
 
 void Method::lock()
@@ -715,6 +720,21 @@ void Method::unlock()
     _class->unlock();
 }
 
+void Method::add_inline_info_entry(Method* method, uint32 codeSize, void* codeAddr,
+        uint32 mapLength, AddrLocation* addrLocationMap) {
+    if (NULL == _inline_info) 
+        _inline_info = new InlineInfo();
+
+    _inline_info->add(method, codeSize, codeAddr, mapLength, 
+            addrLocationMap);
+}
+
+void Method::send_inlined_method_load_events(Method *method) {
+    if (NULL == _inline_info) 
+        return;
+
+    _inline_info->send_compiled_method_load_event(method);
+}
 
 ////////////////////////////////////////////////////////////////////
 // beginpointers between struct Class and java.lang.Class
