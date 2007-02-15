@@ -101,7 +101,7 @@ void Class::initialize()
     if(has_super_class()) {
         class_initialize_ex(get_super_class());
 
-        if(get_super_class()->in_error()) { 
+        if(exn_raised()) { 
             jthread_monitor_enter(jlc);
             m_initializing_thread = NULL;
             lock();
