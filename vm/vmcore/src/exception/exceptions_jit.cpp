@@ -45,6 +45,7 @@
 #include "cci.h"
 
 #ifdef _IPF_
+#include "../m2n_ipf_internal.h"
 #elif defined _EM64T_
 #include "../m2n_em64t_internal.h"
 #else
@@ -439,12 +440,20 @@ void exn_throw_for_JIT(ManagedObject* exn_obj, Class_Handle exn_class,
     exn_propagate_exception(si, &local_exn_obj, exn_class, exn_constr,
         jit_exn_constr_args, vm_exn_constr_args);
 
+    M2nFrame* m2nFrame = m2n_get_last_frame();
+	ObjectHandles* last_m2n_frame_handles = m2nFrame->local_object_handles;
+
+	if (last_m2n_frame_handles) {
+            free_local_object_handles2(last_m2n_frame_handles);
+	}
+
     if (ti->get_global_capability(DebugUtilsTI::TI_GC_ENABLE_EXCEPTION_EVENT)) {
         NativeCodePtr callback = (NativeCodePtr)
                 asm_jvmti_exception_catch_callback;
-        si_set_callbak(si, &callback);
+        si_set_callback(si, &callback);
     }
 
+    // don't put any call here
     si_transfer_control(si);
 }   //exn_throw_for_JIT
 
@@ -605,9 +614,25 @@ NativeCodePtr exn_get_rth_throw_lazy()
         return addr;
     }
 
-    LilCodeStub *cs = lil_parse_code_stub("entry 0:managed:pint:void;"
-        "push_m2n 0, 0;"
-        "m2n_save_all;" "in2out platform:void;" "call.noret %0i;",
+    const unsigned cap_off = (unsigned)(POINTER_SIZE_INT)&((ObjectHandlesNew*)0)->capacity;
+    const unsigned next_off = (unsigned)(POINTER_SIZE_INT)&((ObjectHandlesNew*)0)->next;
+    const unsigned handles_size = (unsigned)(sizeof(ObjectHandlesNew)+sizeof(ManagedObject*)*16);
+    const unsigned cap_and_size = (unsigned)((0<<16) | 16);
+
+    LilCodeStub *cs = lil_parse_code_stub(
+		"entry 0:managed:pint:void;"
+        "push_m2n 0, 0, handles;"
+        "m2n_save_all;"
+		"locals 1;"
+		"alloc l0, %0i;"
+		"st[l0+%1i:g4], %2i;"
+		"st[l0+%3i:pint], 0;"
+		"handles=l0;"
+		"in2out platform:void;"
+		"call.noret %4i;",
+		handles_size,
+        cap_off, cap_and_size,
+        next_off,
         rth_throw_lazy);
     assert(lil_is_valid(cs));
     addr = LilCodeGenerator::get_platform()->compile(cs);
@@ -628,11 +653,24 @@ NativeCodePtr exn_get_rth_throw_lazy_trampoline()
         return addr;
     }
 
+    const unsigned cap_off = (unsigned)(POINTER_SIZE_INT)&((ObjectHandlesNew*)0)->capacity;
+    const unsigned next_off = (unsigned)(POINTER_SIZE_INT)&((ObjectHandlesNew*)0)->next;
+    const unsigned handles_size = (unsigned)(sizeof(ObjectHandlesNew)+sizeof(ManagedObject*)*16);
+    const unsigned cap_and_size = (unsigned)((0<<16) | 16);
+
     LilCodeStub *cs = lil_parse_code_stub("entry 1:managed::void;"
-        "push_m2n 0, 0;"
+        "push_m2n 0, 0, handles;"
         "m2n_save_all;"
+		"locals 1;"
+		"alloc l0, %0i;"
+		"st[l0+%1i:g4], %2i;"
+		"st[l0+%3i:pint], 0;"
+		"handles=l0;"
         "out platform:ref,pint,pint,pint:void;"
-        "o0=0:ref;" "o1=sp0;" "o2=0;" "o3=0;" "call.noret %0i;",
+        "o0=0:ref;" "o1=sp0;" "o2=0;" "o3=0;" "call.noret %4i;",
+		handles_size,
+        cap_off, cap_and_size,
+        next_off,
         exn_athrow);
     assert(lil_is_valid(cs));
     addr = LilCodeGenerator::get_platform()->compile(cs);

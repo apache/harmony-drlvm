@@ -656,6 +656,10 @@ void si_copy_to_registers(StackIterator* si, Registers*)
     ABORT("Not implemented");
 }
 
+void si_set_callback(StackIterator* si, NativeCodePtr* callback) {
+    ABORT("Not implemented");
+}
+
 extern "C" void do_loadrs_asm(int loadrs);
 
 void si_reload_registers()

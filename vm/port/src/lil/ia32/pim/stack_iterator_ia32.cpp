@@ -512,7 +512,7 @@ void si_copy_to_registers(StackIterator* si, Registers* regs)
     regs->eax = unref_reg(si->c.p_eax);
 }
 
-void si_set_callbak(StackIterator* si, NativeCodePtr* callback) {
+void si_set_callback(StackIterator* si, NativeCodePtr* callback) {
     si->c.esp = si->c.esp - 4;
     *((uint32*) si->c.esp) = *(si->c.p_eip);
     si->c.p_eip = ((uint32*)callback);

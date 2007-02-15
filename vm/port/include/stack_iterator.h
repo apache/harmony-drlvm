@@ -296,6 +296,6 @@ uint32 si_get_inline_depth(StackIterator* si);
  * @param[in] callback - pointer to the native cose adress which should be
  *                       called, after transfer control
  */
-void si_set_callbak(StackIterator* si, NativeCodePtr* callback);
+void si_set_callback(StackIterator* si, NativeCodePtr* callback);
 
 #endif //!_STACK_ITERATOR_H_
