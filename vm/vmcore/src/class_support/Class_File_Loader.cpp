@@ -615,45 +615,35 @@ bool Class_Member::parse(Class* clss, ByteReader &cfs)
 static bool
 is_identifier(const char *name, unsigned len)
 {
-    uint32 u_ch;    
-    for(unsigned i = 0; i < len; i++) {
+    uint32 u_ch;
+    for(unsigned i = 0; i < len;) {
+        unsigned ch_len = 0;
         if(name[i] & 0x80) {
             assert(name[i] & 0x40);
             if(name[i] & 0x20) {
                 uint32 x = name[i];
-                i++;
-                uint32 y = name[i];
-                i++;
-                uint32 z = name[i];
+                uint32 y = name[i + 1];
+                uint32 z = name[i + 2];
                 u_ch = (uint32)(((0x0f & x) << 12) + ((0x3f & y) << 6) + ((0x3f & z)));
-                if(i == 2) {
-                    if(!(u_isalpha(u_ch) || u_ch == '$' ||  u_ch == '_'))
-                        return false;
-                } else {
-                    if(!(u_isalnum(u_ch) || u_ch == '$' ||  u_ch == '_'))
-                        return false;
-                }        
+                ch_len = 3;
             } else {
                 uint32 x = name[i];
-                i++;
-                uint32 y = name[i];
+                uint32 y = name[i + 1];
                 u_ch = (uint32)(((0x1f & x) << 6) + (0x3f & y));
-                if(i == 1) {
-                    if(!(u_isalpha(u_ch) || u_ch == '$' ||  u_ch == '_'))
-                        return false;                    
-                }
-                if(!(u_isalnum(u_ch) || u_ch == '$' ||  u_ch == '_'))
-                    return false;
+                ch_len = 2;
             }
         } else {
             u_ch = name[i];
-            if(i == 0) {
-                if(!(u_isalpha(u_ch) || u_ch == '$' ||  u_ch == '_'))
-                    return false;                
-            }
+            ch_len = 1;
+        }
+        if(i == 0) {
+            if(!(u_isalpha(u_ch) || u_ch == '$' ||  u_ch == '_'))
+                return false;                
+        } else {
             if(!(u_isalnum(u_ch) || u_ch == '$' ||  u_ch == '_'))
                 return false;
-        }
+        }    
+        i += ch_len;
     }
     return true;
 }
@@ -679,6 +669,7 @@ check_member_name(const char *name, unsigned len, bool old_version, bool is_meth
             case '>':
                 if(is_method)
                     return false;
+                break;    
             }
         }
     }
