@@ -55,11 +55,9 @@ DECLARE_STANDARD_HELPER_FLAGS(instanceOf);
 
 class HelperInlinerAction: public Action {
 public:
-    HelperInlinerAction() : inlinePragma(NULL){}
+    HelperInlinerAction() {}
     void init();
     HelperInlinerFlags& getFlags() {return flags;}
-    
-    NamedType* inlinePragma;
 protected:
     HelperInlinerFlags flags;
 };
@@ -120,7 +118,7 @@ class HelperInliner {
 public:
     HelperInliner(HelperInlinerSession* _sessionAction, MemoryManager& tmpMM, CompilationContext* _cc, Inst* _inst)  
         : flags(((HelperInlinerAction*)_sessionAction->getAction())->getFlags()), localMM(tmpMM), 
-        cc(_cc), inst(_inst), session(_sessionAction), method(NULL)
+        cc(_cc), inst(_inst), session(_sessionAction), method(NULL), inlinePragma(NULL)
     {
         irm = cc->getHIRManager();
         instFactory = &irm->getInstFactory();
@@ -144,6 +142,7 @@ protected:
     Inst* inst;
     HelperInlinerSession* session;
     MethodDesc*  method;
+    NamedType* inlinePragma;
 
 //these fields used by almost every subclass -> cache them
     IRManager* irm;
@@ -165,11 +164,10 @@ public:\
         }\
         method = ensureClassIsResolvedAndInitialized(flags.flagPrefix##_className, flags.flagPrefix##_methodName, flags.flagPrefix##_signature);\
         if (!method) return;\
-        HelperInlinerAction* action = (HelperInlinerAction*)session->getAction();\
-        if (!action->inlinePragma) { \
-            action->inlinePragma = cc->getVMCompilationInterface()->resolveClassUsingBootstrapClassloader(PRAGMA_INLINE);\
+        if (!inlinePragma) { \
+            inlinePragma = cc->getVMCompilationInterface()->resolveClassUsingBootstrapClassloader(PRAGMA_INLINE);\
         } \
-        if (!action->inlinePragma) return;\
+        if (!inlinePragma) return;\
         \
         doInline();\
     }\
@@ -288,7 +286,6 @@ typedef StlVector<MethodCallInst*> InlineVector;
 
 
 void HelperInliner::inlineVMHelper(MethodCallInst* origCall) {
-    NamedType* inlinePragma = ((HelperInlinerAction*)session->getAction())->inlinePragma;
     assert(inlinePragma!=0);
 
     InlineVector  methodsToInline(localMM);

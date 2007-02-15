@@ -106,19 +106,6 @@ void  GCMap::registerGCSafePoint(IRManager& irm, const BitSet& ls, Inst* inst) {
             continue;
         }
         Type* opndType = opnd->getType();
-#ifdef _DEBUG         
-        //check that unmanaged opnd live range does not cross enumeration points
-        if (opndType->isUnmanagedPtr() && opndType->asPtrType()->getPointedToType()->isInt1()) {
-            CallInst * callInst=(CallInst*)inst;
-            Opnd * targetOpnd=callInst->getOpnd(callInst->getTargetOpndIndex());
-            assert(targetOpnd->isPlacedIn(OpndKind_Imm));
-            Opnd::RuntimeInfo * ri=targetOpnd->getRuntimeInfo();
-            if (!ri) {
-                assert (ri->getKind() != Opnd::RuntimeInfo::Kind_MethodVtableSlotOffset);
-                assert (ri->getKind() != Opnd::RuntimeInfo::Kind_MethodDirectAddr);
-            }
-        }
-#endif
         if (!opndType->isManagedPtr() && !opndType->isObject()) {
             continue;
         }
