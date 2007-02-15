@@ -527,7 +527,7 @@ DrlVMCompilationInterface::getTypeFromDrlVMTypeHandle(Type_Info_Handle typeHandl
         // void return type
         type = typeManager.getVoidType();
     } else if (type_info_is_reference(typeHandle)) {
-        Class_Handle classHandle = type_info_get_class(typeHandle);
+        Class_Handle classHandle = type_info_get_class_no_exn(typeHandle);
         if (!classHandle)
             return NULL;
         type = typeManager.getObjectType(classHandle);

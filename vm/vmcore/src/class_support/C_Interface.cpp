@@ -2031,6 +2031,12 @@ Class_Handle type_info_get_class(Type_Info_Handle tih)
     return c;
 } //type_info_get_class
 
+Class_Handle type_info_get_class_no_exn(Type_Info_Handle tih)
+{
+    Class_Handle ch = type_info_get_class(tih);
+    exn_clear();
+    return ch;
+} // type_info_get_class_no_exn
 
 Method_Signature_Handle type_info_get_method_sig(Type_Info_Handle UNREF tih)
 {
