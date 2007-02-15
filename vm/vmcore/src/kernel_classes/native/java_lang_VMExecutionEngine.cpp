@@ -31,8 +31,6 @@
 #include <apr_time.h>
 
 #include "port_dso.h"
-#include "port_env.h"
-#include "port_filepath.h"
 #include "port_sysinfo.h"
 #include "port_timer.h"
 #include "environment.h"
