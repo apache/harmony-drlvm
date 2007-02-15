@@ -29,7 +29,6 @@
 
 #include "open/gc.h"
 #include "open/vm_gc.h"
-#include "open/thread.h"
 #include "open/hythread_ext.h"
 
 #include "object_layout.h"
