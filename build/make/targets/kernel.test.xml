@@ -50,7 +50,7 @@
         <condition property="kernel.test.continue" value="true" else="false">
             <isfalse value="${kernel.test.failfast}"/>
         </condition>
-        <for list="${kernel.test.mode}" param="mode"
+        <for list="${test.mode}" param="mode"
             trim="true" keepgoing="${kernel.test.continue}">
             <sequential>
                 <antcall target="-run-kernel-test-batch"> 
@@ -61,7 +61,7 @@
     </target>
    
     <target name="report-kernel-test">
-        <for list="${kernel.test.mode}" param="mode"
+        <for list="${test.mode}" param="mode"
             trim="true" keepgoing="true">
             <sequential>
                 <junitreport todir="${kernel.test.dir}/reports/@{mode}.mode">
@@ -150,7 +150,7 @@ ${foo}
             filtertrace="no" printsummary="on" showoutput="off"
             haltonfailure="${kernel.test.failfast}"
             forkmode="${kernel.test.forkmode}" 
-            timeout="${kernel.test.timeout}"
+            timeout="${test.timeout}"
             jvm="${test.jvm.exe}">
 
             <jvmarg value="-XX:-vm.assert_dialog" />
