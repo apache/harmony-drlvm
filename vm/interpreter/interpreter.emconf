@@ -23,4 +23,4 @@ int.file=interpreter
 
 #system properties
 -Djava.compiler=interpreter
--XDvm.use_interpreter=true
+-XX:+vm.use_interpreter

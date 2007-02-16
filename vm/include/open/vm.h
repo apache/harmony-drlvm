@@ -1050,6 +1050,9 @@ VMEXPORT Boolean get_boolean_property(const char* property, Boolean default_valu
  */
 VMEXPORT int get_int_property(const char *property_name, int default_value, PropertyTable table_number);
 
+//Tries to interpret property value as int and returns it. In case of failure returns default_value.
+// Numbers can include 'm' or 'M' for megabytes, 'k' or 'K' for kilobytes, and 'g' or 'G' for gigabytes (for example, 32k is the same as 32768).
+VMEXPORT int64 get_numerical_property(const char *property_name, int64 default_value, PropertyTable table_number);
 
 ////
 // end miscellaneous functions.

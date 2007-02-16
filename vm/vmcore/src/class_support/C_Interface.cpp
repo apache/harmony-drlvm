@@ -2733,6 +2733,32 @@ int get_int_property(const char *property_name, int default_value, PropertyTable
     return return_value;
 }
 
+int64 get_numerical_property(const char *property_name, int64 default_value, PropertyTable table_number)
+{
+    assert(property_name);
+    char *value = get_property(property_name, table_number);
+    int64 return_value = default_value;
+    if (NULL != value)
+    {
+        int64 size = atol(value);
+        int sizeModifier = tolower(value[strlen(value) - 1]);
+        destroy_property_value(value);
+
+        size_t unit = 1;
+        switch (sizeModifier) {
+        case 'k': unit = 1024; break;
+        case 'm': unit = 1024 * 1024; break;
+        case 'g': unit = 1024 * 1024 * 1024;break;
+        }
+
+        return_value = size * unit;
+        if (return_value / unit != size) {
+            /* overflow happened */
+            return_value = default_value;
+        }
+    }
+    return return_value;
+}
 Boolean get_boolean_property(const char *property_name, Boolean default_value, PropertyTable table_number)
 {
     assert(property_name);

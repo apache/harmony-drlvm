@@ -136,7 +136,7 @@
                        failureproperty="${testname}.failed"
                        timeout="${jvmti.test.timeout}"
                        jvm="${build.deploy.dir}/jdk/jre/bin/java">
-                    <jvmarg value="-XDvm.assert_dialog=0" />
+                    <jvmarg value="-XX:-vm.assert_dialog" />
                     <select os="win">
                         <jvmarg
                         value="-agentpath:${jvmti.test.native.path}/${testname}/${testname}.dll"

@@ -264,16 +264,20 @@ initialize_properties(Global_Env * p_env)
         apr_pool_create(&prop_pool, 0);
     }
 /*
- * 0. Add predefined properties
+ * 1. Add predefined properties
  */
-     
     init_java_properties(*p_env->JavaProperties());
     init_vm_properties(*p_env->VmProperties());
 
 /*
- * 2. Check whether there is a command line option, say, 
- *    -Properties-file "d:\xyz\eee\vm.properties" or -Dproperties key=value, 
- *    read the Properties, if key is duplicated, override the value. 
+ * 2. Process command line options, possibly overriding the default values. 
+ * Java properties are set as -Dkey[=value];
+ * VM properties are set with the following syntax ("fully compatible" with RI):
+ * - options are set with -XX:<option>=<string>
+ * - Boolean options may be turned on with -XX:+<option> and turned off with -XX:-<option>
+ * - Numeric options are set with -XX:<option>=<number>. 
+ *   Numbers can include 'm' or 'M' for megabytes, 'k' or 'K' for kilobytes, and 'g' or
+ *   'G' for gigabytes (for example, 32k is the same as 32768).
  */
     char *src, *tok;
     for (int arg_num = 0; arg_num < p_env->vm_arguments.nOptions; arg_num++)
@@ -297,6 +301,7 @@ initialize_properties(Global_Env * p_env)
         } 
         else if (strncmp(option, "-XD", 3) == 0)
         {
+            WARN("Deprecated syntax to set internal property, use -XX:key=value instead: " << option);
             TRACE("setting internal property " << option + 3);
             src = strdup(option + 3);
             tok = strchr(src, '=');
@@ -309,6 +314,35 @@ initialize_properties(Global_Env * p_env)
             {
                 p_env->VmProperties()->set(unquote(src), "");
             }
+
+            STD_FREE(src);
+        }
+        else if (strncmp(option, "-XX:", 4) == 0)
+        {
+            TRACE("setting internal property " << option + 4);
+            src = strdup(option + 4);
+            char* name = unquote(src);
+            char* value = strchr(src, '=');
+            if(value)
+            {
+                *value = '\0';
+                ++value;
+            }
+            else 
+            {
+                if (name[0] == '-' ) {
+                    value = "off";
+                    ++name;
+                } else if (src[0] == '+') {
+                    value = "on";
+                    ++name;
+                } else {
+                    value = "";
+                }
+            }
+
+            TRACE("parsed internal property " << name << " = " << value << ";");
+            p_env->VmProperties()->set(name, value);
 
             STD_FREE(src);
         }

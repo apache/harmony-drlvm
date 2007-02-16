@@ -222,7 +222,7 @@ ${foo}
                             </not>
                             <then>
                                 <java newenvironment="yes" dir="${build.deploy.dir}/jdk/jre/bin" output="${build.dir}/_smoke.tests/reports/${class.name}_${jit.or.interpreter}.out" classname="${class.name}" fork="true" jvm="${build.deploy.dir}/jdk/jre/bin/java${executable.postfix}" error="${build.dir}/_smoke.tests/reports/${class.name}_${jit.or.interpreter}.out.err">
-                                    <jvmarg value="-XDvm.assert_dialog=0" />
+                                    <jvmarg value="-XX:-vm.assert_dialog" />
                                     <jvmarg value="-Djava.library.path=${smoke.test.native.path}/${outdir}" />
                                     <jvmarg value="${int.or.jit.arg}" />
                                     <jvmarg value="-classpath" />
@@ -233,7 +233,7 @@ ${foo}
                             </then>
                             <else>
                                 <java newenvironment="yes" dir="${build.deploy.dir}/jdk/jre/bin" output="${build.dir}/_smoke.tests/reports/${class.name}_${jit.or.interpreter}.out" classname="${class.name}" fork="true" jvm="${build.deploy.dir}/jdk/jre/bin/java${executable.postfix}" error="${build.dir}/_smoke.tests/reports/${class.name}_${jit.or.interpreter}.out.err">
-                                    <jvmarg value="-XDvm.assert_dialog=0" />
+                                    <jvmarg value="-XX:vm.assert_dialog=0" />
                                     <jvmarg value="-Djava.library.path=${smoke.test.native.path}/${outdir}" />
                                     <jvmarg value="-classpath" />
                                     <jvmarg value="${smoke.test.class.path}" />

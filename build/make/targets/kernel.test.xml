@@ -153,7 +153,7 @@ ${foo}
             timeout="${kernel.test.timeout}"
             jvm="${test.jvm.exe}">
 
-            <jvmarg value="-XDvm.assert_dialog=0" />
+            <jvmarg value="-XX:-vm.assert_dialog" />
             <jvmarg value="-Dtest.resource.path=${test.resource.path}"/>
             <jvmarg value="${kernel.mode.switch}" />
             <jvmarg value="-Xbootclasspath/a:${junit.jar}${path.separator}${test.class.path}" />

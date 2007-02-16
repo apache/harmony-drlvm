@@ -321,7 +321,32 @@ static std::string readFile(const std::string& fileName) {
                     set_property(name.c_str(), value.c_str(), VM_PROPERTIES);
                 }
                 continue;
+            } else if (startsWith(line, "-XX:") && line.length() >= 5) {
+                idx = line.find('=');
+                std::string name;
+                std::string value;
+                if (idx != std::string::npos) {
+                    std::string name = line.substr(4, idx-4);                   
+                    std::string value = line.substr(idx+1);
+                } else {
+                    if (line[4] == '-' ) {
+                        value = "off";
+                        name = line.substr(5);
+                    } else if (line[4] == '+') {
+                        value = "on";
+                        name = line.substr(5);
+                    } else {
+                        value = "";
+                        name = line.substr(4);
+                    }
+                }
+
+                if (!is_property_set(name.c_str(),VM_PROPERTIES)) {
+                    set_property(name.c_str(), value.c_str(), VM_PROPERTIES);
+                }
+                continue;
             } 
+ 
             config+=line + "\n";
         }
         rc = !config.empty();

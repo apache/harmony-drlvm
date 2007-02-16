@@ -88,7 +88,8 @@ static inline bool begins_with(const char* str, const char* beginning)
 
 void print_generic_help()
 {
-    LECHO(21, "Usage: {0} [-options] class [args...]\n"
+    LECHO(21, 
+        "Usage: {0} [-options] class [args...]\n"
         "        (to execute a method main() of the class)\n"
         "    or {0} [-options] -jar jarfile [args...]\n"
         "        (to execute the jar file)\n"
@@ -98,6 +99,8 @@ void print_generic_help()
         "    -cp        <class search path of directories and zip/jar files>\n"
         "                  A {1} separated list of directories, jar archives,\n"
         "                  and zip archives to search for class file\n"
+        "    -client       select the 'client' VM (same as -Xem:client)\n"
+        "    -server       select the 'server' VM (same as -Xem:server)\n"
         "    -D<name>=<value>\n"
         "                  set a system property\n"
         "    -showversion  print product version and continue\n"
@@ -131,7 +134,8 @@ void print_generic_help()
 
 static void print_help_on_nonstandard_options()
 {
-    LECHO(22, "    -Xbootclasspath:<PATH>\n"
+    LECHO(22, 
+        "    -Xbootclasspath:<PATH>\n"
         "              Set bootclasspath to the specified value\n"
         "    -Xbootclasspath/a:<PATH>\n"
         "              Append specified directories and files to bootclasspath\n"
@@ -174,7 +178,8 @@ static void print_help_on_nonstandard_options()
         "    -Xfunction\n"
         "              Add function signature to logging messages");
 #ifdef _DEBUG
-    LECHO(23, "    -Xlog[:<category>[:<file>]\n"
+    LECHO(23, 
+        "    -Xlog[:<category>[:<file>]\n"
         "              Switch debug logging on [for specified category only\n"
         "              [and log that category to a file]]\n"
         "    -Xtrace[:<category>[:<file>]\n"
@@ -183,10 +188,12 @@ static void print_help_on_nonstandard_options()
 #endif //_DEBUG
 
 #ifdef VM_STATS
-    LECHO(24, "    -Xstats:<mask>\n"
-    "              Generates different statistics");
+    LECHO(24, 
+        "    -Xstats:<mask>\n"
+        "              Generates different statistics");
 #endif // VM_STATS
-    LECHO(25, "    -Xint\n"
+    LECHO(25, 
+        "    -Xint\n"
         "              Use interpreter to execute the program\n"
         "    -Xgc:<gc options>\n"
         "              Specify gc specific options\n"
@@ -200,13 +207,21 @@ static void print_help_on_nonstandard_options()
         "              Do not launch compilation in parallel\n"
         "    -Xdumpfile:<file>\n"
         "              Specifies a file name for the dump\n"
-        "    -XD<name>=<value>\n"
-        "              set an internal system property");
+        "    -XX:<name>=<value>\n"
+        "              set an internal system property.\n"
+        "              Boolean options may be turned on with -XX:+<option>\n"
+        "              and turned off with -XX:-<option>\n"
+        "              Numeric options are set with -XX:<option>=<number>.\n"
+        "              Numbers can include suffix 'm' or 'M' for megabytes,\n"
+        "              'k' or 'K' for kilobytes, and 'g' or 'G' for gigabytes\n" 
+        "              (for example, 32k is the same as 32768).\n"
+    );
 } //print_help_on_nonstandard_options
 
 void print_vm_standard_properties()
 {
-    LECHO(26, "Boolean-valued properties (set to one of {on,true,1,off,false,0} through -XD<name>=<value>):\n\n"
+    LECHO(26, 
+        "Boolean-valued properties (set to one of {on,true,1,off,false,0} through -XD<name>=<value>):\n\n"
         "    vm.assert_dialog (default TRUE):\n"
         "            If false, prevent assertion failures from popping up a dialog box.");
 #ifdef PLATFORM_POSIX
@@ -404,6 +419,9 @@ void parse_vm_arguments(Global_Env *p_env)
             const char* arg = option + strlen("-Xem:");
             p_env->VmProperties()->set("em.properties", arg);
 
+        } else if (strcmp(option, "-client") == 0 || strcmp(option, "-server") == 0) {
+            p_env->VmProperties()->set("em.properties", option + 1);
+
         } else if (begins_with(option, "-Xms")) {
             // cut -Xms
             const char* arg = option + 4;
@@ -486,7 +504,7 @@ void parse_vm_arguments(Global_Env *p_env)
         }
         else if (strncmp(option, "-D", 2) == 0) {
         }
-        else if (strncmp(option, "-XD", 3) == 0) {
+        else if (strncmp(option, "-XD", 3) == 0 || strncmp(option, "-XX:", 4) == 0) {
         }
         else if (strcmp(option, "-Xdumpstubs") == 0) {
             dump_stubs = true;
