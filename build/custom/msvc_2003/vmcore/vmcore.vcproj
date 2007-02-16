@@ -1060,7 +1060,16 @@ copy $(OutDir)\harmonyvm.lib $(ProjectDir)\..\..\..\win_ia32_msvc_$(Configuratio
 				RelativePath="..\..\..\..\vm\vmcore\src\verifier\ver_dataflow.cpp">
 			</File>
 			<File
+				RelativePath="..\..\..\..\vm\vmcore\src\verifier\ver_graph.h">
+			</File>
+			<File
 				RelativePath="..\..\..\..\vm\vmcore\src\verifier\ver_real.h">
+			</File>
+			<File
+				RelativePath="..\..\..\..\vm\vmcore\src\verifier\ver_subroutine.cpp">
+			</File>
+			<File
+				RelativePath="..\..\..\..\vm\vmcore\src\verifier\ver_subroutine.h">
 			</File>
 			<File
 				RelativePath="..\..\..\..\vm\vmcore\src\verifier\ver_utils.cpp">

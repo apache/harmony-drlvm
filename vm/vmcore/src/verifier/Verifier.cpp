@@ -22,7 +22,6 @@
 #include <limits.h>
 #include "ver_real.h"
 
-
 /**
  * Debug flag macros
  */
@@ -30,15 +29,6 @@
 #define VERIFY_CLASS           0
 // Macro sets verification only for defined method
 #define VERIFY_METHOD          0
-// Macro dumps type constraints for class
-#define VERIFY_DUMP_CONSTRAINT 0
-// Macro prints code array in stream
-#define PRINT_CODE_ARRAY       0
-
-/**
- * Set namespace Verifier
- */
-namespace Verifier {
 
 /**
  * Function parse bytecode, determines code instructions, fills code array and 
@@ -105,7 +95,7 @@ vf_verify_method_bytecode( vf_Context_t *ctex )     // verifier context
     /**
      * Getting bytecode array and its length
      */
-    if( !(len = method_get_code_length( ctex->m_method) ) ) {
+    if( !( len = method_get_code_length( ctex->m_method ) ) ) {
         return VER_OK;
     }
 
@@ -115,46 +105,41 @@ vf_verify_method_bytecode( vf_Context_t *ctex )     // verifier context
     ctex->m_type->SetMethod( ctex->m_method );
 
     /**
-     * Allocate memory for code array
-     * (+2) for start-entry and end-entry instruction
+     * Allocate memory for code and bytecode annotations.
      */
-    ctex->m_code = (vf_Code_t*)vf_alloc_pool_memory( ctex->m_pool, (len + 2
-        + method_get_exc_handler_number( ctex->m_method )) * sizeof(vf_Code_t) );
+    ctex->m_code = (vf_Code_t*)vf_alloc_pool_memory( ctex->m_pool,
+        len * sizeof( vf_Code_t ) );
+    ctex->m_bc = (vf_BCode_t*)vf_alloc_pool_memory( ctex->m_pool,
+        len * sizeof( vf_BCode_t ) );
 
     /**
-     * Parse bytecode, fill instruction codeArray
+     * Parse bytecode, fill instruction code.
      */
     result = vf_parse_bytecode( ctex );
     if( result != VER_OK ) {
         goto labelEnd_verifyClassBytecode;
-    } else if( ctex->m_dump.m_with_subroutine ) {
-        result = VER_NoSupportJSR;
-        goto labelEnd_verifyClassBytecode;
     }
-    
     /**
      * Build bytecode graph
      */
     result = vf_create_graph( ctex );
-    if( result != VER_OK ) {
+    if( ctex->m_dump.m_with_subroutine ) {
+        result = VER_NoSupportJSR;
         goto labelEnd_verifyClassBytecode;
+        result = vf_inline_subroutines( ctex );
+        if ( VER_OK != result ) {
+            goto labelEnd_verifyClassBytecode;
+        }
     }
 
-    /**
-     * Handle graph
-     */
-    result = vf_graph_checks( ctex );
+    // check control and data flow
+    result = vf_check_graph( ctex );
     if( result != VER_OK ) {
         goto labelEnd_verifyClassBytecode;
     }
 
 labelEnd_verifyClassBytecode:
-    /**
-     * Free memory
-     */
-    if( ctex->m_graph ) {
-        delete ctex->m_graph;
-    }
+    vf_free_graph( ctex );
 
     return result;
 } // vf_verify_method_bytecode
@@ -167,39 +152,39 @@ labelEnd_verifyClassBytecode:
  * Function creates array of instruction branch offsets.
  */
 static inline void
-vf_create_instruction_offset( vf_Instr_t *instr,           // given instruction
-                              unsigned offcount,           // number of offets
-                              vf_VerifyPool_t *pool)      // memory pool
+vf_create_code_offset( vf_Code_t *code,            // given instruction
+                       unsigned offcount,          // number of offets
+                       vf_VerifyPool_t *pool)      // memory pool
 {
-    assert( !instr->m_off );
-    instr->m_off = (unsigned*)vf_alloc_pool_memory( pool, offcount * sizeof(unsigned) );
-    instr->m_offcount = offcount;
+    assert( !code->m_off );
+    code->m_off = (unsigned*)vf_alloc_pool_memory( pool, offcount * sizeof( unsigned ) );
+    code->m_offcount = offcount;
     return;
 } // vf_create_instruction_offset
 
 /**
- * Function sets instruction branch offset.
+ * Function sets code branch offset.
  */
 static inline void
-vf_set_instruction_offset( vf_Instr_t *instr,      // given instruction
-                           unsigned offnum,        // offset index in array
-                           unsigned value)         // offset value
+vf_set_code_offset( vf_Code_t *code,        // given instruction
+                    unsigned offnum,        // offset index in array
+                    unsigned value)         // offset value
 {
-    assert( instr->m_off && offnum < instr->m_offcount );
-    instr->m_off[offnum] = value;
+    assert( code->m_off && offnum < code->m_offcount );
+    code->m_off[offnum] = value;
     return;
 } // vf_set_instruction_offset
 
 /**
- * Function creates branch offset array on 1 element and sets given value.
+ * Function creates a single branch.
  */
 static inline void
-vf_set_single_instruction_offset( vf_Instr_t *instr,    // given instruction    
-                          unsigned value,               // offset value
-                          vf_VerifyPool_t *pool)        // memory pool
+vf_set_single_branch_offset( vf_Code_t *code,       // given instruction 
+                             unsigned value,        // offset value
+                             vf_VerifyPool_t *pool) // memory pool
 {
-    vf_create_instruction_offset( instr, 1, pool );
-    vf_set_instruction_offset( instr, 0, value );
+    vf_create_code_offset( code, 1, pool );
+    vf_set_code_offset( code, 0, value );
     return;
 } // vf_set_single_instruction_offset
 
@@ -235,7 +220,7 @@ vf_set_min_stack( vf_Code_t *code,      // code instruction
  * Function sets basic block attribute for instruction.
  */
 static inline void
-vf_set_basic_block_flag( vf_Instr_t *code )     // instruction
+vf_set_basic_block_flag( vf_BCode_t *code )     // instruction
 {
     // set begin of basic block for instruction
     code->m_mark = 1;
@@ -243,16 +228,16 @@ vf_set_basic_block_flag( vf_Instr_t *code )     // instruction
 } // vf_set_basic_block_flag
 
 /**
- * Function sets flags for code instruction.
+ * Sets flags for the instruction.
  */
 static inline void
-vf_set_instruction_flag( vf_Code_t *code,   // code instruction
-                         unsigned flag)     // given flags
+vf_set_code_type( vf_Code_t *code,     // instruction
+                  vf_CodeType type)    // given flags
 {
     // set flag for instruction
-    code->m_base |= flag;
+    code->m_type = type;
     return;
-} // vf_set_instruction_flag
+} // vf_set_code_type
 
 /**
  * Function checks local number.
@@ -264,10 +249,7 @@ vf_check_local_var_number( unsigned local,      // local number
 {
     // check local variable number
     if( local >= maxlocal ) {
-        VERIFY_REPORT( ctex, "(class: " << class_get_name( ctex->m_class ) 
-            << ", method: " << method_get_name( ctex->m_method )
-            << method_get_descriptor( ctex->m_method )
-            << ") Incorrect usage of local variable" );
+        VERIFY_REPORT_METHOD( ctex, "Incorrect usage of local variable" );
         return VER_ErrorLocals;
     }
     return VER_OK;
@@ -283,10 +265,7 @@ vf_check_branch_offset( int offset,         // given instruction offset
 
 {
     if( offset < 0 || (unsigned)offset >= maxlen ) {
-        VERIFY_REPORT( ctex, "(class: " << class_get_name( ctex->m_class ) 
-            << ", method: " << method_get_name( ctex->m_method )
-            << method_get_descriptor( ctex->m_method )
-            << ") Instruction branch offset is out of range" );
+        VERIFY_REPORT_METHOD( ctex, "Instruction branch offset is out of range" );
         return VER_ErrorBranch;
     }
     return VER_OK;
@@ -298,11 +277,12 @@ vf_check_branch_offset( int offset,         // given instruction offset
 static inline unsigned
 vf_get_local_var_number( vf_Code_t *code,           // code instruction
                          unsigned char *bytecode,   // method bytecode
-                         unsigned *index_p)         // index in bytecode array
+                         unsigned *index_p,         // index in bytecode array
+                         bool wide_flag)            // if this is a wide instruction
 {
     unsigned local;
 
-    if( (*index_p) != 1 && *((code - 1)->m_addr) == OPCODE_WIDE ) {
+    if( (wide_flag) ) {
         // get number of local variable
         local = (unsigned)( (bytecode[(*index_p)] << 8)|(bytecode[(*index_p)+ 1]) );
         // skip parameter (u2)
@@ -315,17 +295,6 @@ vf_get_local_var_number( vf_Code_t *code,           // code instruction
     }
     return local;
 } // vf_get_local_var_number
-
-/**
- * Function returns instruction branch offset for given branch number.
- */
-static inline int
-vf_get_instruction_branch( vf_Instr_t *code,        // instruction
-                           unsigned branch_num)     // branch number
-{
-    assert( branch_num < code->m_offcount );
-    return code->m_off[branch_num];
-} // vf_get_instruction_branch
 
 /**
  * Function receives half word (2 bytes) instruction branch offset
@@ -366,7 +335,7 @@ vf_get_word_offset( unsigned code_pc,          // instruction offset in bytecode
  * sets into instruction and returns it.
  */
 static inline int
-vf_get_single_hword_branch_offset( vf_Instr_t *code,        // instruction
+vf_get_single_hword_branch_offset( vf_Code_t *code,         // instruction
                                    unsigned code_pc,        // offset in bytecode array
                                    unsigned char *bytecode, // bytecode array
                                    unsigned *index_p,       // offset index in bytecode array
@@ -375,7 +344,7 @@ vf_get_single_hword_branch_offset( vf_Instr_t *code,        // instruction
     // get first branch offset
     int offset = vf_get_hword_offset( code_pc, bytecode, index_p );
     // create and set edge branch for instruction
-    vf_set_single_instruction_offset( code, offset, pool );
+    vf_set_single_branch_offset( code, offset, pool );
     return offset;
 } // vf_get_single_hword_branch_offset
 
@@ -384,7 +353,7 @@ vf_get_single_hword_branch_offset( vf_Instr_t *code,        // instruction
  * sets into instruction and returns it.
  */
 static inline int
-vf_get_single_word_branch_offset( vf_Instr_t *code,        // instruction
+vf_get_single_word_branch_offset( vf_Code_t *code,         // instruction
                                   unsigned code_pc,        // offset in bytecode array
                                   unsigned char *bytecode, // bytecode array
                                   unsigned *index_p,       // offset index in bytecode array
@@ -393,7 +362,7 @@ vf_get_single_word_branch_offset( vf_Instr_t *code,        // instruction
     // get first branch offset
     int offset = vf_get_word_offset( code_pc, bytecode, index_p );
     // create and set edge branch for instruction
-    vf_set_single_instruction_offset( code, offset, pool );
+    vf_set_single_branch_offset( code, offset, pool );
     return offset;
 } // vf_get_single_word_branch_offset
 
@@ -403,7 +372,7 @@ vf_get_single_word_branch_offset( vf_Instr_t *code,        // instruction
  * Function returns received offset.
  */
 static inline int
-vf_get_double_hword_branch_offset( vf_Instr_t *code,          // instruction
+vf_get_double_hword_branch_offset( vf_Code_t *code,           // instruction
                                    unsigned code_pc,          // instruction offset in bytcode array
                                    unsigned char *bytecode,   // bytecode array
                                    unsigned *index_p,         // offset index in bytecode array
@@ -412,11 +381,11 @@ vf_get_double_hword_branch_offset( vf_Instr_t *code,          // instruction
     // get first branch offset
     int offset = vf_get_hword_offset( code_pc, bytecode, index_p );
     // create and set edge branches for instruction
-    vf_create_instruction_offset( code, 2, pool );
+    vf_create_code_offset( code, 2, pool );
     // set first edge branch for instruction
-    vf_set_instruction_offset( code, 0, offset );
+    vf_set_code_offset( code, 0, offset );
     // set second edge branch for instruction
-    vf_set_instruction_offset( code, 1, (*index_p) );
+    vf_set_code_offset( code, 1, (*index_p) );
     return offset;
 } // vf_get_double_hword_branch_offset
 
@@ -426,7 +395,7 @@ vf_get_double_hword_branch_offset( vf_Instr_t *code,          // instruction
  * Function returns received offset.
  */
 static inline int
-vf_get_double_word_branch_offset( vf_Instr_t *code,          // instruction
+vf_get_double_word_branch_offset( vf_Code_t *code,           // instruction
                                   unsigned code_pc,          // instruction offset in bytcode array
                                   unsigned char *bytecode,   // bytecode array
                                   unsigned *index_p,         // offset index in bytecode array
@@ -435,11 +404,11 @@ vf_get_double_word_branch_offset( vf_Instr_t *code,          // instruction
     // get first branch offset
     int offset = vf_get_word_offset( code_pc, bytecode, index_p );
     // create and set edge branches for instruction
-    vf_create_instruction_offset( code, 2, pool );
+    vf_create_code_offset( code, 2, pool );
     // set first edge branch for instruction
-    vf_set_instruction_offset( code, 0, offset );
+    vf_set_code_offset( code, 0, offset );
     // set second edge branch for instruction
-    vf_set_instruction_offset( code, 1, (*index_p) );
+    vf_set_code_offset( code, 1, (*index_p) );
     return offset;
 } // vf_get_double_word_branch_offset
 
@@ -449,7 +418,7 @@ vf_get_double_word_branch_offset( vf_Instr_t *code,          // instruction
  * Function returns received branch.
  */
 static inline int
-vf_get_tableswitch_alternative( vf_Instr_t *code,           // instruction
+vf_get_tableswitch_alternative( vf_Code_t *code,            // instruction
                                 unsigned code_pc,           // offset in bytcode array
                                 unsigned alternative,       // number of tableswitch branch
                                 unsigned char *bytecode,    // bytecode array
@@ -458,7 +427,7 @@ vf_get_tableswitch_alternative( vf_Instr_t *code,           // instruction
     // get first branch offset
     int offset = vf_get_word_offset( code_pc, bytecode, index_p );
     // set first edge branch for instruction
-    vf_set_instruction_offset( code, alternative, offset );
+    vf_set_code_offset( code, alternative, offset );
     return offset;
 } // vf_get_tableswitch_alternative
 
@@ -468,7 +437,7 @@ vf_get_tableswitch_alternative( vf_Instr_t *code,           // instruction
  * Function returns number of alternatives.
  */
 static inline int
-vf_set_tableswitch_offsets( vf_Instr_t *code,           // instruction
+vf_set_tableswitch_offsets( vf_Code_t *code,            // instruction
                             unsigned code_pc,           // instruction offset in bytecode array
                             unsigned *index_p,          // offset index in bytecode array
                             unsigned char *bytecode,    // bytecode array
@@ -484,7 +453,7 @@ vf_set_tableswitch_offsets( vf_Instr_t *code,           // instruction
     int high = vf_get_word_offset( code_pc, bytecode, &index );
     int number = high - low + 2;
     // create tableswitch branches
-    vf_create_instruction_offset( code, number, pool );
+    vf_create_code_offset( code, number, pool );
     // set default offset
     vf_get_tableswitch_alternative( code, code_pc, 0, bytecode, &default_off );
     // set another instruction offsets
@@ -503,7 +472,7 @@ vf_set_tableswitch_offsets( vf_Instr_t *code,           // instruction
  * Function returns number of alternatives.
  */
 static inline Verifier_Result
-vf_set_lookupswitch_offsets( vf_Instr_t *code,          // instruction
+vf_set_lookupswitch_offsets( vf_Code_t *code,           // instruction
                              unsigned code_pc,          // instruction offset in bytecode
                              unsigned *index_p,         // offset index in bytecode array
                              unsigned char *bytecode,   // array of bytecode
@@ -519,7 +488,7 @@ vf_set_lookupswitch_offsets( vf_Instr_t *code,          // instruction
     int number = vf_get_word_offset( 0, bytecode, &index ) + 1;
     *branch_p = number;
     // create and tableswitch branches
-    vf_create_instruction_offset( code, number, ctex->m_pool );
+    vf_create_code_offset( code, number, ctex->m_pool );
     // set default offset
     vf_get_tableswitch_alternative( code, code_pc, 0, bytecode, &default_off );
     // set another instruction offsets
@@ -530,10 +499,8 @@ vf_set_lookupswitch_offsets( vf_Instr_t *code,          // instruction
         if( old_key < key ) {
             old_key = key;
         } else if( key != INT_MIN ) {
-            VERIFY_REPORT( ctex, "(class: " << class_get_name( ctex->m_class )
-                << ", method: " << method_get_name( ctex->m_method )
-                << method_get_descriptor( ctex->m_method )
-                << ") Instruction lookupswitch has unsorted key values" );
+            VERIFY_REPORT_METHOD( ctex,
+                "Instruction lookupswitch has unsorted key values" );
             return VER_ErrorInstruction;
         }
         // get lookupswitch alternative and set offset to instruction
@@ -548,20 +515,6 @@ vf_set_lookupswitch_offsets( vf_Instr_t *code,          // instruction
 /************************************************************
  ********************* Vector functions *********************
  ************************************************************/
-
-/**
- * Function allocates memory for new stack map vector.
- */
-static inline void 
-vf_new_vector( vf_MapEntry_t **vector,      // pointer to vector
-               unsigned len,                // vector length
-               vf_VerifyPool_t *pool)       // memory pool
-{
-    // create new vector
-    (*vector) = (vf_MapEntry_t*)vf_alloc_pool_memory( pool, 
-                                    len * sizeof(vf_MapEntry_t) );
-    return;
-} // vf_new_vector
 
 /**
  * Function sets check type for a given stack map vector entry.
@@ -663,19 +616,6 @@ vf_set_vector_stack_entry_double( vf_MapEntry_t *vector,    // stack map vector
     vector[num + 1].m_type = SM_DOUBLE_LO;
     return;
 } // vf_set_vector_stack_entry_double
-
-/**
- * Function sets reference data type for given stack map vector entry.
- */
-static inline void
-vf_set_vector_stack_entry_ref( vf_MapEntry_t *vector,   // stack map vector
-                               unsigned num,            // vector entry number
-                               vf_ValidType_t *type)    // reference type
-{
-    // set stack map vector entry by ref
-    vector[num].m_type = SM_REF;
-    vector[num].m_vtype = type;
-} // vf_set_vector_stack_entry_ref
 
 /**
  * Function sets return address data type for given stack map vector entry.
@@ -835,7 +775,7 @@ vf_set_vector_local_var_type( vf_MapEntry_t *vector,    // local variable vector
  ************************************************************/
 
 /**
- * Function allocates memory for new code instruction IN stack map vector.
+ * Allocates memory for new code instruction in the IN stack map vector.
  */
 static inline void 
 vf_new_in_vector( vf_Code_t *code,          // code instruction
@@ -846,12 +786,12 @@ vf_new_in_vector( vf_Code_t *code,          // code instruction
     code->m_inlen = (unsigned short)len;
     code->m_invector = 
         (vf_MapEntry_t*)vf_alloc_pool_memory( pool, 
-                                len * sizeof(vf_MapEntry_t) );
+                                len * sizeof( vf_MapEntry_t) );
     return;
 } // vf_new_in_vector
 
 /**
- * Function sets check attribute for a code instruction IN stack map vector entry.
+ * Sets check attribute for a code instruction in the IN stack map vector entry.
  */
 static inline void
 vf_set_in_vector_check( vf_Code_t *code,              // code instruction
@@ -1078,7 +1018,7 @@ vf_new_out_vector( vf_Code_t *code,         // code instruction
     code->m_outlen = (unsigned short)len;
     code->m_outvector = 
         (vf_MapEntry_t*)vf_alloc_pool_memory( pool, 
-                                len * sizeof(vf_MapEntry_t) );
+                                len * sizeof( vf_MapEntry_t ) );
     return;
 } // vf_new_out_vector
 
@@ -1590,20 +1530,6 @@ vf_get_decriptor_from_cp_nameandtype( unsigned short index,  // constant pool en
 } // vf_get_cp_nameandtype
 
 /**
- * Function receives class name string.
- * Function returns result of constant pool UTF8 entry check and class name string.
- */
-static inline const char *
-vf_get_cp_class_name( unsigned short index,     // constant pool entry index
-                      vf_Context_t *ctex)       // verifier context
-{
-    unsigned short class_name_index =
-        class_get_cp_class_name_index( ctex->m_class, index );
-    const char* name = class_get_cp_utf8_bytes( ctex->m_class, class_name_index );
-    return name;
-} // vf_get_cp_class_name
-
-/**
  * Function returns valid type string by given class name.
  */
 static inline const char *
@@ -1680,14 +1606,14 @@ vf_check_cp_ref( unsigned short index,      // constant pool entry index
                  const char **class_name,   // pointer to class name
                  vf_Context_t *ctex)        // verifier context
 {
-    assert(name);
-    assert(descr);
+    assert( name );
+    assert( descr );
 
     // get class name if it's needed
     if( class_name ) {
         unsigned short class_cp_index = 
             class_get_cp_ref_class_index( ctex->m_class, index );
-        *class_name = vf_get_cp_class_name( class_cp_index, ctex );
+        *class_name = vf_get_cp_class_name( ctex->m_class, class_cp_index );
     }
 
     // get name and descriptor from NameAndType constant pool entry
@@ -1741,7 +1667,7 @@ vf_check_cp_method( unsigned short index,       // constant pool entry index
     if( stack_with_ref ) {
         vf_set_description_vector( descr, cp_parse->method.m_inlen, 1 /* ref + vector */, 
             cp_parse->method.m_outlen, &cp_parse->method.m_invector,
-            &cp_parse->method.m_outvector, ctex);
+            &cp_parse->method.m_outvector, ctex );
         // set first ref
         cp_parse->method.m_inlen += 1;
         vf_ValidType_t *type = vf_create_class_valid_type( class_name, ctex );
@@ -1749,7 +1675,7 @@ vf_check_cp_method( unsigned short index,       // constant pool entry index
     } else {
         vf_set_description_vector( descr, cp_parse->method.m_inlen, 0 /* only vector */, 
             cp_parse->method.m_outlen, &cp_parse->method.m_invector,
-            &cp_parse->method.m_outvector, ctex);
+            &cp_parse->method.m_outvector, ctex );
     }
     return VER_OK;
 } // vf_check_cp_method
@@ -1785,14 +1711,14 @@ vf_check_cp_field( unsigned short index,    // constant pool entry index
     // create instruction vectors
     if( stack_with_ref ) {
         vf_set_description_vector( descr, cp_parse->field.f_vlen, 1 /* ref + vector */, 
-            0, &cp_parse->field.f_vector, NULL, ctex);
+            0, &cp_parse->field.f_vector, NULL, ctex );
         // set first ref
         cp_parse->field.f_vlen += 1;
         vf_ValidType_t *type = vf_create_class_valid_type( class_name, ctex );
         vf_set_vector_stack_entry_ref( cp_parse->field.f_vector, 0, type );
     } else {
         vf_set_description_vector( descr, cp_parse->field.f_vlen, 0 /* only vector */, 
-            0, &cp_parse->field.f_vector, NULL, ctex);
+            0, &cp_parse->field.f_vector, NULL, ctex );
     }
     return VER_OK;
 } // vf_check_cp_field
@@ -1829,22 +1755,19 @@ vf_check_cp_single_const( unsigned short index,     // constant pool entry index
         vf_set_vector_stack_entry_ref( cp_parse->field.f_vector, 0, type );
         break;
 	case _CONSTANT_Class:
-        if( !vf_is_class_version_14(ctex) ) {
+        if( !vf_is_class_version_14( ctex ) ) {
             type = ctex->m_type->NewType( "Ljava/lang/Class", 16 );
             vf_set_vector_stack_entry_ref( cp_parse->field.f_vector, 0, type );
 		    break;
         }
         // if class version is 1.4 verifier fails in default
     default:
-        VERIFY_REPORT( ctex, "(class: " << class_get_name( ctex->m_class )
-            << ", method: " << method_get_name( ctex->m_method )
-            << method_get_descriptor( ctex->m_method )
-            << ") Illegal type for constant pool entry #"
+        VERIFY_REPORT_METHOD( ctex, "Illegal type for constant pool entry #"
             << index
-            << (vf_is_class_version_14(ctex)
+            << (vf_is_class_version_14( ctex )
                 ? ": CONSTANT_Integer, CONSTANT_Float or CONSTANT_String"
                 : ": CONSTANT_Integer, CONSTANT_Float, CONSTANT_String "
-                  "or CONSTANT_Class")
+                  "or CONSTANT_Class" )
             << " are expected for ldc/ldc_w instruction" );
         return VER_ErrorConstantPool;
     }
@@ -1878,10 +1801,7 @@ vf_check_cp_double_const( unsigned short index,     // constant pool entry index
         vf_set_vector_stack_entry_long( cp_parse->field.f_vector, 0 );
         break;
     default:
-        VERIFY_REPORT( ctex, "(class: " << class_get_name( ctex->m_class )
-            << ", method: " << method_get_name( ctex->m_method )
-            << method_get_descriptor( ctex->m_method )
-            << ") Illegal type in constant pool,"
+        VERIFY_REPORT_METHOD( ctex, "Illegal type in constant pool, "
             << index << ": CONSTANT_Double or CONSTANT_Long are expected" );
         return VER_ErrorConstantPool;
     }
@@ -1904,7 +1824,7 @@ vf_check_cp_class( unsigned short index,        // constant pool entry index
     CHECK_CONST_POOL_CLASS( ctex, index );
     if( cp_parse ) {
         // create valid type
-        const char *name = vf_get_cp_class_name( index, ctex );
+        const char* name = vf_get_cp_class_name( ctex->m_class, index );
         // check result
         assert( name );
 
@@ -2646,7 +2566,7 @@ vf_opcode_aastore( vf_Code_t *code,         // code instruction
     vf_set_in_vector_stack_entry_ref( code, 0, NULL );
     vf_set_in_vector_check( code, 0, VF_CHECK_REF_ARRAY );
     vf_set_in_vector_stack_entry_int( code, 1 );
-    if( vf_is_class_version_14(ctex) ) {
+    if( vf_is_class_version_14( ctex ) ) {
         vf_set_in_vector_type( code, 2, SM_UP_ARRAY );
     } else {
         vf_set_in_vector_stack_entry_ref( code, 2, NULL );
@@ -3401,8 +3321,8 @@ vf_opcode_dcmpx( vf_Code_t *code,               // code instruction
  */
 static inline void
 vf_opcode_ifeq( vf_Code_t *code,            // code instruction
-                vf_Instr_t *icode1,         // first branch instruction
-                vf_Instr_t *icode2,         // second branch instruction
+                vf_BCode_t *icode1,         // first branch instruction
+                vf_BCode_t *icode2,         // second branch instruction
                 vf_VerifyPool_t * pool)     // memory pool
 {
     // set stack modifier for instruction
@@ -3424,8 +3344,8 @@ vf_opcode_ifeq( vf_Code_t *code,            // code instruction
  */
 static inline void
 vf_opcode_if_icmpeq( vf_Code_t *code,           // code instruction
-                     vf_Instr_t *icode1,        // first branch instruction
-                     vf_Instr_t *icode2,        // second branch instruction
+                     vf_BCode_t *icode1,        // first branch instruction
+                     vf_BCode_t *icode2,        // second branch instruction
                      vf_VerifyPool_t * pool)    // memory pool
 {
     // set stack modifier for instruction
@@ -3448,8 +3368,8 @@ vf_opcode_if_icmpeq( vf_Code_t *code,           // code instruction
  */
 static inline void
 vf_opcode_if_acmpeq( vf_Code_t *code,           // code instruction
-                     vf_Instr_t *icode1,        // first branch instruction
-                     vf_Instr_t *icode2,        // second branch instruction
+                     vf_BCode_t *icode1,        // first branch instruction
+                     vf_BCode_t *icode2,        // second branch instruction
                      vf_VerifyPool_t * pool)    // memory pool
 {
     // set stack modifier for instruction
@@ -3492,7 +3412,7 @@ vf_opcode_ireturn( vf_Code_t *code,             // code instruction
                    vf_VerifyPool_t * pool)      // memory pool
 {
     // set instruction flag
-    vf_set_instruction_flag( code, VF_FLAG_RETURN );
+    vf_set_code_type( code, VF_TYPE_INSTR_RETURN );
     // set minimal stack for instruction
     vf_set_min_stack( code, 1 );
     // create in vector
@@ -3509,7 +3429,7 @@ vf_opcode_lreturn( vf_Code_t *code,             // code instruction
                    vf_VerifyPool_t * pool)      // memory pool
 {
     // set instruction flag
-    vf_set_instruction_flag( code, VF_FLAG_RETURN );
+    vf_set_code_type( code, VF_TYPE_INSTR_RETURN );
     // set minimal stack for instruction
     vf_set_min_stack( code, 2 );
     // create in vector
@@ -3526,7 +3446,7 @@ vf_opcode_freturn( vf_Code_t *code,             // code instruction
                    vf_VerifyPool_t * pool)      // memory pool
 {
     // set instruction flag
-    vf_set_instruction_flag( code, VF_FLAG_RETURN );
+    vf_set_code_type( code, VF_TYPE_INSTR_RETURN );
     // set minimal stack for instruction
     vf_set_min_stack( code, 1 );
     // create in vector
@@ -3543,7 +3463,7 @@ vf_opcode_dreturn( vf_Code_t *code,             // code instruction
                    vf_VerifyPool_t * pool)      // memory pool
 {
     // set instruction flag
-    vf_set_instruction_flag( code, VF_FLAG_RETURN );
+    vf_set_code_type( code, VF_TYPE_INSTR_RETURN );
     // set minimal stack for instruction
     vf_set_min_stack( code, 2 );
     // create in vector
@@ -3560,7 +3480,7 @@ vf_opcode_areturn( vf_Code_t *code,             // code instruction
                    vf_VerifyPool_t * pool)      // memory pool
 {
     // set instruction flag
-    vf_set_instruction_flag( code, VF_FLAG_RETURN );
+    vf_set_code_type( code, VF_TYPE_INSTR_RETURN );
     // set minimal stack for instruction
     vf_set_min_stack( code, 1 );
     // create in vector
@@ -3703,18 +3623,14 @@ vf_opcode_invoke( vf_Code_t *code,              // code instruction
     }
     // check method name
     if( cp_parse.method.m_name[0] == '<' ) {
-        VERIFY_REPORT( ctex, "(class: " << class_get_name( ctex->m_class ) 
-            << ", method: " << method_get_name( ctex->m_method )
-            << method_get_descriptor( ctex->m_method )
-            << ") Must call initializers using invokespecial" );
+        VERIFY_REPORT_METHOD( ctex,
+            "Must call initializers using invokespecial" );
         return VER_ErrorConstantPool;
     }
     // check number of arguments
     if( cp_parse.method.m_inlen > 255 ) {
-        VERIFY_REPORT( ctex, "(class: " << class_get_name( ctex->m_class ) 
-            << ", method: " << method_get_name( ctex->m_method )
-            << method_get_descriptor( ctex->m_method )
-            << ") The number of method parameters is limited to 255" );
+        VERIFY_REPORT_METHOD( ctex,
+            "The number of method parameters is limited to 255" );
         return VER_ErrorInstruction;
     }
     // set stack modifier for instruction
@@ -3754,10 +3670,8 @@ vf_opcode_invokespecial( vf_Code_t *code,              // code instruction
     }
     // check number of arguments
     if( cp_parse.method.m_inlen > 255 ) {
-        VERIFY_REPORT( ctex, "(class: " << class_get_name( ctex->m_class ) 
-            << ", method: " << method_get_name( ctex->m_method )
-            << method_get_descriptor( ctex->m_method )
-            << ") The number of method parameters is limited to 255" );
+        VERIFY_REPORT_METHOD( ctex,
+            "The number of method parameters is limited to 255" );
         return VER_ErrorInstruction;
     }
     // set stack modifier for instruction
@@ -3805,10 +3719,7 @@ vf_opcode_new( vf_Code_t *code,             // code instruction
     // check created reference
     assert( cp_parse.field.f_vector->m_vtype->number == 1 );
     if( cp_parse.field.f_vector->m_vtype->string[0][0] != 'L' ) {
-        VERIFY_REPORT( ctex, "(class: " << class_get_name( ctex->m_class ) 
-            << ", method: " << method_get_name( ctex->m_method )
-            << method_get_descriptor( ctex->m_method )
-            << ") Illegal creation of array" );
+        VERIFY_REPORT_METHOD( ctex, "Illegal creation of array" );
         return VER_ErrorInstruction;
     }
     // set stack out vector
@@ -3856,10 +3767,7 @@ vf_opcode_newarray( vf_Code_t *code,        // code instruction
         vtype = ctex->m_type->NewType( "[J", 2 );
         break;
     default:
-        VERIFY_REPORT( ctex, "(class: " << class_get_name( ctex->m_class ) 
-            << ", method: " << method_get_name( ctex->m_method )
-            << method_get_descriptor( ctex->m_method )
-            << ") Incorrect type in instruction newarray" );
+        VERIFY_REPORT_METHOD( ctex, "Incorrect type in instruction newarray" );
         return VER_ErrorInstruction;
     }
     // set minimal stack for instruction
@@ -3949,7 +3857,7 @@ vf_opcode_anewarray( vf_Code_t *code,           // code instruction
     }
 
     // get array element type name
-    const char *name = vf_get_cp_class_name( cp_index, ctex );
+    const char* name = vf_get_cp_class_name( ctex->m_class, cp_index);
     assert( name );
 
     // create valid type string
@@ -3964,10 +3872,7 @@ vf_opcode_anewarray( vf_Code_t *code,           // code instruction
         continue;
     }
     if( index > 255 ) {
-        VERIFY_REPORT( ctex, "(class: " << class_get_name( ctex->m_class ) 
-            << ", method: " << method_get_name( ctex->m_method )
-            << method_get_descriptor( ctex->m_method )
-            << ") Array with too many dimensions" );
+        VERIFY_REPORT_METHOD( ctex, "Array with too many dimensions" );
         return VER_ErrorInstruction;
     }
 
@@ -4014,7 +3919,7 @@ vf_opcode_athrow( vf_Code_t *code,          // code instruction
                   vf_Context_t *ctex)       // verifier context
 {
     // set instruction flag
-    vf_set_instruction_flag( code, VF_FLAG_THROW );
+    vf_set_code_type( code, VF_TYPE_INSTR_THROW );
     // set minimal stack for instruction
     vf_set_min_stack( code, 1 );
     // create in vector
@@ -4099,7 +4004,7 @@ vf_opcode_monitorx( vf_Code_t *code,            // code instruction
 static inline Verifier_Result
 vf_opcode_multianewarray( vf_Code_t *code,              // code instruction
                           unsigned short cp_index,      // constant pool entry index
-                          unsigned short dimension,     // dimension of array
+                          unsigned char dimensions,     // dimension of array
                           vf_Context_t *ctex)           // verifier context
 {
     // check constant pool for instruction
@@ -4109,7 +4014,7 @@ vf_opcode_multianewarray( vf_Code_t *code,              // code instruction
     }
 
     // get array element type name
-    const char *name = vf_get_cp_class_name( cp_index, ctex );
+    const char *name = vf_get_cp_class_name( ctex->m_class, cp_index);
     assert( name );
 
     // get valid type string
@@ -4123,17 +4028,11 @@ vf_opcode_multianewarray( vf_Code_t *code,              // code instruction
         continue;
     }
     if( index > 255 ) {
-        VERIFY_REPORT( ctex, "(class: " << class_get_name( ctex->m_class ) 
-            << ", method: " << method_get_name( ctex->m_method )
-            << method_get_descriptor( ctex->m_method )
-            << ") Array with too many dimensions" );
+        VERIFY_REPORT_METHOD( ctex, "Array with too many dimensions" );
         return VER_ErrorInstruction;
     }
-    if( dimension == 0 || index < dimension ) {
-        VERIFY_REPORT( ctex, "(class: " << class_get_name( ctex->m_class ) 
-            << ", method: " << method_get_name( ctex->m_method )
-            << method_get_descriptor( ctex->m_method )
-            << ") Illegal dimension argument" );
+    if( dimensions == 0 || index < dimensions ) {
+        VERIFY_REPORT_METHOD( ctex, "Illegal dimension argument" );
         return VER_ErrorInstruction;
     }
 
@@ -4141,12 +4040,12 @@ vf_opcode_multianewarray( vf_Code_t *code,              // code instruction
     vf_ValidType_t *type = ctex->m_type->NewType( array, len );
 
     // set stack modifier for instruction
-    vf_set_stack_modifier( code, 1 - dimension );
+    vf_set_stack_modifier( code, 1 - dimensions );
     // set minimal stack for instruction
-    vf_set_min_stack( code, dimension );
+    vf_set_min_stack( code, dimensions );
     // create in vector
-    vf_new_in_vector( code, dimension, ctex->m_pool );
-    for( index = 0; index < dimension; index++ ) {
+    vf_new_in_vector( code, dimensions, ctex->m_pool );
+    for( index = 0; index < dimensions; index++ ) {
         vf_set_in_vector_stack_entry_int( code, index );
     }
     // create out vector
@@ -4160,8 +4059,8 @@ vf_opcode_multianewarray( vf_Code_t *code,              // code instruction
  */
 static inline void
 vf_opcode_ifxnull( vf_Code_t *code,             // code instruction
-                   vf_Instr_t *icode1,          // first branch instruction
-                   vf_Instr_t *icode2,          // second branch instruction
+                   vf_BCode_t *icode1,          // first branch instruction
+                   vf_BCode_t *icode2,          // second branch instruction
                    vf_VerifyPool_t * pool)      // memory pool
 {
     // set stack modifier for instruction
@@ -4187,7 +4086,7 @@ vf_opcode_jsr( vf_Code_t *code,            // code instruction
                vf_VerifyPool_t *pool)      // memory pool
 {
     // set instruction flag
-    vf_set_instruction_flag( code, VF_FLAG_SUBROUTINE );
+    vf_set_code_type( code, VF_TYPE_INSTR_SUBROUTINE );
     // set stack modifier for instruction
     vf_set_stack_modifier( code, 1 );
     // create out vector
@@ -4211,48 +4110,17 @@ vf_opcode_ret( vf_Code_t *code,              // code instruction
 } // vf_opcode_ret
 
 /**
- * Function sets code instruction structure for end-entry.
- */
-static inline void
-vf_create_end_entry( vf_Code_t *code,           // code instruction
-                     vf_Context_t *ctex)        // verifier context
-{
-    int inlen,
-        outlen;
-    vf_MapEntry_t *invector,
-                  *outvector;
-
-    // set end-entry flag
-    vf_set_instruction_flag( code, VF_FLAG_BEGIN_BASIC_BLOCK | VF_FLAG_END_ENTRY);
-    // get method description
-    char *descr = (char*)method_get_descriptor( ctex->m_method );
-    // parse description
-    vf_parse_description( descr, &inlen, &outlen );
-    // set minimal stack for instruction
-    vf_set_min_stack( code, outlen );
-    // create method vectors
-    vf_set_description_vector( descr, inlen, 0, outlen, &invector, &outvector, ctex );
-    // set stack in vector
-    code->m_invector = outvector;
-    code->m_inlen = (unsigned short)outlen;
-    return;
-} // vf_create_end_entry
-
-/**
- * Function parse bytecode, determines code instructions, fills code array and 
- * provides checks of simple verifications.
+ * Parses bytecode, determines code instructions, fills code array and 
+ * provides simple verifications.
  */
 static Verifier_Result
-vf_parse_bytecode( vf_Context_t *ctex )     // verifier context
+vf_parse_bytecode( vf_Context_t *ctex )
 {
-    int offset,
-        number;
-    unsigned edges = 0,
-             index,
-             count,
-             bbCount = 0;
-    unsigned short local,
-                   constIndex;
+    int offset;
+    unsigned index, count;
+    unsigned short local, const_index;
+    unsigned char u1;
+
     Verifier_Result result = VER_OK;
 
     /**
@@ -4261,52 +4129,62 @@ vf_parse_bytecode( vf_Context_t *ctex )     // verifier context
     unsigned len = method_get_code_length( ctex->m_method );
     unsigned char *bytecode = method_get_bytecode( ctex->m_method );
     unsigned short locals = method_get_max_local( ctex->m_method );
-    unsigned short handlcount = method_get_exc_handler_number( ctex->m_method );
-    unsigned short constlen = class_get_cp_size( ctex->m_class );
     
-    /**
-     * Allocate memory for codeInstr
-     * +1 more instruction is the end of exception handler
-     */
-    vf_Instr_t *codeInstr = (vf_Instr_t*)vf_alloc_pool_memory( ctex->m_pool,
-                                    (len + 1) * sizeof(vf_Instr_t) );
-    /**
-     * Create start-entry instruction
-     */
-    unsigned codeNum = 0;
-    vf_set_instruction_flag( &ctex->m_code[codeNum], 
-        VF_FLAG_BEGIN_BASIC_BLOCK | VF_FLAG_START_ENTRY);
-    codeNum++;
-
-    /** 
-     * Create handler instructions
-     */
-    vf_Code_t *code;
-    for( index = 0, code = &ctex->m_code[codeNum];
-         index < handlcount;
-         index++, codeNum++, code = &ctex->m_code[codeNum] )
-    {
-        vf_set_instruction_flag( code, VF_FLAG_BEGIN_BASIC_BLOCK | VF_FLAG_HANDLER );
-    }
+    // first instruction is always begin of basic block
+    vf_BCode_t* bc = ctex->m_bc;
+    bc[0].m_mark = 1;
 
     /**
-     * Define bytecode instructions and fill code array
+     * Parse bytecode instructions and fill a code array
      */
     unsigned instr;
     unsigned branches;
+    unsigned codeNum = 0;
+
+    vf_Code_t *code;
     vf_VerifyPool_t *pool = ctex->m_pool;
-    for( index = 0, code = &ctex->m_code[codeNum];
-         index < len;
-         codeNum++, code = &ctex->m_code[codeNum] )
+    for( index = 0; index < len; codeNum++ )
     {
+        code = &ctex->m_code[codeNum];
         code->m_addr = &bytecode[index];
-        codeInstr[index].m_instr = codeNum;
+        // Note:
+        //    bc[ index ].m_instr is assigned to a positive
+        //    value to differentiate with non-assignd values:
+        //    the correspondent index in vf_Context.m_code array
+        //    is increased by one.
+        bc[ index ].m_instr = codeNum + 1;
+
+        bool wide = ( OPCODE_WIDE == bytecode[index] ); /* 0xc4 */
+        if( wide )
+        {
+            switch( bytecode[++index] ) // check the next instruction
+            {
+            case OPCODE_ILOAD:
+            case OPCODE_FLOAD:
+            case OPCODE_ALOAD:
+            case OPCODE_LLOAD:
+            case OPCODE_DLOAD:
+            case OPCODE_ISTORE:
+            case OPCODE_FSTORE:
+            case OPCODE_ASTORE:
+            case OPCODE_LSTORE:
+            case OPCODE_DSTORE:
+            case OPCODE_RET:
+            case OPCODE_IINC:
+                break;
+            default:
+                VERIFY_REPORT_METHOD( ctex, "Instruction wide should be followed "
+                    "by iload, fload, aload, lload, dload, istore, fstore, astore, "
+                    "lstore, dstore, ret or iinc" );
+                return VER_ErrorInstruction;
+            }
+        }
         instr = index;  // remember offset of instruction
         index++; // skip bytecode
+
         switch( bytecode[instr] )
         {
         case OPCODE_NOP:            /* 0x00 */
-        case OPCODE_WIDE:           /* 0xc4 */
             break;
         case OPCODE_ACONST_NULL:    /* 0x01 */
             vf_opcode_aconst_null( code, pool );
@@ -4339,62 +4217,62 @@ vf_parse_bytecode( vf_Context_t *ctex )     // verifier context
             break;
         case OPCODE_LDC:            /* 0x12 + u1 */
             // get constant pool index
-            constIndex = (unsigned short)bytecode[index];
+            const_index = (unsigned short)bytecode[index];
             // skip constant pool index (u1)
             index++;
-            result = vf_opcode_ldcx( code, 1, constIndex, ctex );
+            result = vf_opcode_ldcx( code, 1, const_index, ctex );
             if( result != VER_OK ) {
-                goto labelEnd_vf_parse_bytecode;
+                return result;
             }
             break;
         case OPCODE_LDC_W:          /* 0x13 + u2 */
         case OPCODE_LDC2_W:         /* 0x14 + u2 */
             // get constant pool index
-            constIndex = (unsigned short)( (bytecode[index] << 8)|(bytecode[index + 1]) );
+            const_index = (unsigned short)( (bytecode[index] << 8)|(bytecode[index + 1]) );
             // skip constant pool index (u2)
             index += 2;
-            result = vf_opcode_ldcx( code, bytecode[instr] - OPCODE_LDC, constIndex,  ctex );
+            result = vf_opcode_ldcx( code, bytecode[instr] - OPCODE_LDC, const_index,  ctex );
             if( result != VER_OK ) {
-                goto labelEnd_vf_parse_bytecode;
+                return result;
             }
             break;
         case OPCODE_ILOAD:          /* 0x15 + u1|u2 */
-            local = (unsigned short)vf_get_local_var_number( code, bytecode, &index );
+            local = (unsigned short)vf_get_local_var_number( code, bytecode, &index, wide );
             result = vf_check_local_var_number( local, locals, ctex );
             if( result != VER_OK ) {
-                goto labelEnd_vf_parse_bytecode;
+                return result;
             }
             vf_opcode_iloadx( code, local, pool );
             break;
         case OPCODE_LLOAD:          /* 0x16 + u1|u2 */
-            local = (unsigned short)vf_get_local_var_number( code, bytecode, &index );
+            local = (unsigned short)vf_get_local_var_number( code, bytecode, &index, wide );
             result = vf_check_local_var_number( local + 1, locals, ctex );
             if( result != VER_OK ) {
-                goto labelEnd_vf_parse_bytecode;
+                return result;
             }
             vf_opcode_lloadx( code, local, pool );
             break;
         case OPCODE_FLOAD:          /* 0x17 + u1|u2 */
-            local = (unsigned short)vf_get_local_var_number( code, bytecode, &index );
+            local = (unsigned short)vf_get_local_var_number( code, bytecode, &index, wide );
             result = vf_check_local_var_number( local, locals, ctex );
             if( result != VER_OK ) {
-                goto labelEnd_vf_parse_bytecode;
+                return result;
             }
             vf_opcode_floadx( code, local, pool );
             break;
         case OPCODE_DLOAD:          /* 0x18 + u1|u2 */
-            local = (unsigned short)vf_get_local_var_number( code, bytecode, &index );
+            local = (unsigned short)vf_get_local_var_number( code, bytecode, &index, wide );
             result = vf_check_local_var_number( local + 1, locals, ctex );
             if( result != VER_OK ) {
-                goto labelEnd_vf_parse_bytecode;
+                return result;
             }
             vf_opcode_dloadx( code, local, pool );
             break;
         case OPCODE_ALOAD:          /* 0x19 + u1|u2 */
-            local = (unsigned short)vf_get_local_var_number( code, bytecode, &index );
+            local = (unsigned short)vf_get_local_var_number( code, bytecode, &index, wide );
             result = vf_check_local_var_number( local, locals, ctex );
             if( result != VER_OK ) {
-                goto labelEnd_vf_parse_bytecode;
+                return result;
             }
             vf_opcode_aloadx( code, local, pool );
             break;
@@ -4406,7 +4284,7 @@ vf_parse_bytecode( vf_Context_t *ctex )     // verifier context
             local = (unsigned short)(bytecode[instr] - OPCODE_ILOAD_0);
             result = vf_check_local_var_number( local, locals, ctex );
             if( result != VER_OK ) {
-                goto labelEnd_vf_parse_bytecode;
+                return result;
             }
             vf_opcode_iloadx( code, local, pool );
             break;
@@ -4418,7 +4296,7 @@ vf_parse_bytecode( vf_Context_t *ctex )     // verifier context
             local = (unsigned short)(bytecode[instr] - OPCODE_LLOAD_0);
             result = vf_check_local_var_number( local + 1, locals, ctex );
             if( result != VER_OK ) {
-                goto labelEnd_vf_parse_bytecode;
+                return result;
             }
             vf_opcode_lloadx( code, local, pool );
             break;
@@ -4430,7 +4308,7 @@ vf_parse_bytecode( vf_Context_t *ctex )     // verifier context
             local = (unsigned short)(bytecode[instr] - OPCODE_FLOAD_0);
             result = vf_check_local_var_number( local, locals, ctex );
             if( result != VER_OK ) {
-                goto labelEnd_vf_parse_bytecode;
+                return result;
             }
             vf_opcode_floadx( code, local, pool );
             break;
@@ -4442,7 +4320,7 @@ vf_parse_bytecode( vf_Context_t *ctex )     // verifier context
             local = (unsigned short)(bytecode[instr] - OPCODE_DLOAD_0);
             result = vf_check_local_var_number( local + 1, locals, ctex );
             if( result != VER_OK ) {
-                goto labelEnd_vf_parse_bytecode;
+                return result;
             }
             vf_opcode_dloadx( code, local, pool );
             break;
@@ -4454,7 +4332,7 @@ vf_parse_bytecode( vf_Context_t *ctex )     // verifier context
             local = (unsigned short)(bytecode[instr] - OPCODE_ALOAD_0);
             result = vf_check_local_var_number( local, locals, ctex );
             if( result != VER_OK ) {
-                goto labelEnd_vf_parse_bytecode;
+                return result;
             }
             vf_opcode_aloadx( code, local, pool );
             break;
@@ -4483,42 +4361,42 @@ vf_parse_bytecode( vf_Context_t *ctex )     // verifier context
             vf_opcode_aaload( code, ctex );
             break;
         case OPCODE_ISTORE:         /* 0x36 + u1|u2 */
-            local = (unsigned short)vf_get_local_var_number( code, bytecode, &index );
+            local = (unsigned short)vf_get_local_var_number( code, bytecode, &index, wide );
             result = vf_check_local_var_number( local, locals, ctex );
             if( result != VER_OK ) {
-                goto labelEnd_vf_parse_bytecode;
+                return result;
             }
             vf_opcode_istorex( code, local, pool );
             break;
         case OPCODE_LSTORE:         /* 0x37 + u1|u2 */
-            local = (unsigned short)vf_get_local_var_number( code, bytecode, &index );
+            local = (unsigned short)vf_get_local_var_number( code, bytecode, &index, wide );
             result = vf_check_local_var_number( local + 1, locals, ctex );
             if( result != VER_OK ) {
-                goto labelEnd_vf_parse_bytecode;
+                return result;
             }
             vf_opcode_lstorex( code, local, pool );
             break;
         case OPCODE_FSTORE:         /* 0x38 +  u1|u2 */
-            local = (unsigned short)vf_get_local_var_number( code, bytecode, &index );
+            local = (unsigned short)vf_get_local_var_number( code, bytecode, &index, wide );
             result = vf_check_local_var_number( local, locals, ctex );
             if( result != VER_OK ) {
-                goto labelEnd_vf_parse_bytecode;
+                return result;
             }
             vf_opcode_fstorex( code, local, pool );
             break;
         case OPCODE_DSTORE:         /* 0x39 +  u1|u2 */
-            local = (unsigned short)vf_get_local_var_number( code, bytecode, &index );
+            local = (unsigned short)vf_get_local_var_number( code, bytecode, &index, wide );
             result = vf_check_local_var_number( local + 1, locals, ctex );
             if( result != VER_OK ) {
-                goto labelEnd_vf_parse_bytecode;
+                return result;
             }
             vf_opcode_dstorex( code, local, pool );
             break;
         case OPCODE_ASTORE:         /* 0x3a + u1|u2 */
-            local = (unsigned short)vf_get_local_var_number( code, bytecode, &index );
+            local = (unsigned short)vf_get_local_var_number( code, bytecode, &index, wide );
             result = vf_check_local_var_number( local, locals, ctex );
             if( result != VER_OK ) {
-                goto labelEnd_vf_parse_bytecode;
+                return result;
             }
             vf_opcode_astorex( code, local, pool );
             break;
@@ -4530,7 +4408,7 @@ vf_parse_bytecode( vf_Context_t *ctex )     // verifier context
             local = (unsigned short)(bytecode[instr] - OPCODE_ISTORE_0);
             result = vf_check_local_var_number( local, locals, ctex );
             if( result != VER_OK ) {
-                goto labelEnd_vf_parse_bytecode;
+                return result;
             }
             vf_opcode_istorex( code, local, pool );
             break;
@@ -4542,7 +4420,7 @@ vf_parse_bytecode( vf_Context_t *ctex )     // verifier context
             local = (unsigned short)(bytecode[instr] - OPCODE_LSTORE_0);
             result = vf_check_local_var_number( local + 1, locals, ctex );
             if( result != VER_OK ) {
-                goto labelEnd_vf_parse_bytecode;
+                return result;
             }
             vf_opcode_lstorex( code, local, pool );
             break;
@@ -4554,7 +4432,7 @@ vf_parse_bytecode( vf_Context_t *ctex )     // verifier context
             local = (unsigned short)(bytecode[instr] - OPCODE_FSTORE_0);
             result = vf_check_local_var_number( local, locals, ctex );
             if( result != VER_OK ) {
-                goto labelEnd_vf_parse_bytecode;
+                return result;
             }
             vf_opcode_fstorex( code, local, pool );
             break;
@@ -4566,7 +4444,7 @@ vf_parse_bytecode( vf_Context_t *ctex )     // verifier context
             local = (unsigned short)(bytecode[instr] - OPCODE_DSTORE_0);
             result = vf_check_local_var_number( local + 1, locals, ctex );
             if( result != VER_OK ) {
-                goto labelEnd_vf_parse_bytecode;
+                return result;
             }
             vf_opcode_dstorex( code, local, pool );
             break;
@@ -4578,7 +4456,7 @@ vf_parse_bytecode( vf_Context_t *ctex )     // verifier context
             local = (unsigned short)(bytecode[instr] - OPCODE_ASTORE_0);
             result = vf_check_local_var_number( local, locals, ctex );
             if( result != VER_OK ) {
-                goto labelEnd_vf_parse_bytecode;
+                return result;
             }
             vf_opcode_astorex( code, local, pool );
             break;
@@ -4693,11 +4571,11 @@ vf_parse_bytecode( vf_Context_t *ctex )     // verifier context
             break;
         case OPCODE_IINC:           /* 0x84 + u1|u2 + s1|s2 */
             count = index;
-            local = (unsigned short)vf_get_local_var_number( code, bytecode, &index );
+            local = (unsigned short)vf_get_local_var_number( code, bytecode, &index, wide );
             count = index - count;
             result = vf_check_local_var_number( local, locals, ctex );
             if( result != VER_OK ) {
-                goto labelEnd_vf_parse_bytecode;
+                return result;
             }
             vf_opcode_iinc( code, local, pool );
             // skip 2nd parameter (s1|s2)
@@ -4761,18 +4639,17 @@ vf_parse_bytecode( vf_Context_t *ctex )     // verifier context
         case OPCODE_IFGE:           /* 0x9c + s2 */
         case OPCODE_IFGT:           /* 0x9d + s2 */
         case OPCODE_IFLE:           /* 0x9e + s2 */
-            offset = vf_get_double_hword_branch_offset( &codeInstr[instr],
+            offset = vf_get_double_hword_branch_offset( code,
                             instr, bytecode, &index, pool );
             result = vf_check_branch_offset( offset, len, ctex );
             if( result != VER_OK ) {
-                goto labelEnd_vf_parse_bytecode;
+                return result;
             }
             result = vf_check_branch_offset( index, len, ctex );
             if( result != VER_OK ) {
-                goto labelEnd_vf_parse_bytecode;
+                return result;
             }
-            vf_opcode_ifeq( code, &codeInstr[offset],
-                            &codeInstr[index], pool );
+            vf_opcode_ifeq( code, &bc[offset], &bc[index], pool );
             break;
         case OPCODE_IF_ICMPEQ:      /* 0x9f + s2 */
         case OPCODE_IF_ICMPNE:      /* 0xa0 + s2 */
@@ -4780,284 +4657,272 @@ vf_parse_bytecode( vf_Context_t *ctex )     // verifier context
         case OPCODE_IF_ICMPGE:      /* 0xa2 + s2 */
         case OPCODE_IF_ICMPGT:      /* 0xa3 + s2 */
         case OPCODE_IF_ICMPLE:      /* 0xa4 + s2 */
-            offset = vf_get_double_hword_branch_offset( &codeInstr[instr],
+            offset = vf_get_double_hword_branch_offset( code,
                             instr, bytecode, &index, pool );
             result = vf_check_branch_offset( offset, len, ctex );
             if( result != VER_OK ) {
-                goto labelEnd_vf_parse_bytecode;
+                return result;
             }
             result = vf_check_branch_offset( index, len, ctex );
             if( result != VER_OK ) {
-                goto labelEnd_vf_parse_bytecode;
+                return result;
             }
-            vf_opcode_if_icmpeq( code, &codeInstr[offset],
-                                 &codeInstr[index], pool );
+            vf_opcode_if_icmpeq( code, &bc[offset], &bc[index], pool );
             break;
         case OPCODE_IF_ACMPEQ:      /* 0xa5 + s2 */
         case OPCODE_IF_ACMPNE:      /* 0xa6 + s2 */
-            offset = vf_get_double_hword_branch_offset( &codeInstr[instr],
+            offset = vf_get_double_hword_branch_offset( code,
                             instr, bytecode, &index, pool );
             result = vf_check_branch_offset( offset, len, ctex );
             if( result != VER_OK ) {
-                goto labelEnd_vf_parse_bytecode;
+                return result;
             }
             result = vf_check_branch_offset( index, len, ctex );
             if( result != VER_OK ) {
-                goto labelEnd_vf_parse_bytecode;
+                return result;
             }
-            vf_opcode_if_acmpeq( code, &codeInstr[offset],
-                                 &codeInstr[index], pool );
+            vf_opcode_if_acmpeq( code, &bc[offset], &bc[index], pool );
             break;
         case OPCODE_GOTO:           /* 0xa7 + s2 */
-            offset = vf_get_single_hword_branch_offset( &codeInstr[instr], 
+            offset = vf_get_single_hword_branch_offset( code, 
                             instr, bytecode, &index, pool );
             result = vf_check_branch_offset( offset, len, ctex );
             if( result != VER_OK ) {
-                goto labelEnd_vf_parse_bytecode;
+                return result;
             }
-            vf_set_basic_block_flag( &codeInstr[offset] );
+            vf_set_basic_block_flag( &bc[offset] );
             if( index < len ) {
-                vf_set_basic_block_flag( &codeInstr[index] );
+                vf_set_basic_block_flag( &bc[index] );
             }
             break;
         case OPCODE_JSR:            /* 0xa8 + s2 */
-            offset = vf_get_double_hword_branch_offset( &codeInstr[instr],
+            offset = vf_get_single_hword_branch_offset( code,
                             instr, bytecode, &index, pool );
             result = vf_check_branch_offset( offset, len, ctex );
             if( result != VER_OK ) {
-                goto labelEnd_vf_parse_bytecode;
+                return result;
             }
             result = vf_check_branch_offset( index, len, ctex );
             if( result != VER_OK ) {
-                goto labelEnd_vf_parse_bytecode;
+                return result;
             }
             vf_opcode_jsr( code, codeNum, pool );
             ctex->m_dump.m_with_subroutine = 1;
-            vf_set_basic_block_flag( &codeInstr[offset] );
-            vf_set_basic_block_flag( &codeInstr[index] );
+            vf_set_basic_block_flag( &bc[offset] );
+            vf_set_basic_block_flag( &bc[index] );
             break;
         case OPCODE_RET:            /* 0xa9 + u1|u2  */
-            local = (unsigned short)vf_get_local_var_number( code, bytecode, &index );
+            local = (unsigned short)vf_get_local_var_number( code, bytecode, &index, wide );
             result = vf_check_local_var_number( local, locals, ctex );
             if( result != VER_OK ) {
-                goto labelEnd_vf_parse_bytecode;
+                return result;
             }
             vf_opcode_ret( code, local, pool );
             // create and set edge branch to exit
-            vf_set_single_instruction_offset( &codeInstr[instr], ~0U, pool );
             if( index < len ) {
-                vf_set_basic_block_flag( &codeInstr[index] );
+                vf_set_basic_block_flag( &bc[index] );
             }
             break;
         case OPCODE_TABLESWITCH:    /* 0xaa + pad + s4 * (3 + N) */
             vf_opcode_switch( code, pool );
-            branches = vf_set_tableswitch_offsets( &codeInstr[instr],
+            branches = vf_set_tableswitch_offsets( code,
                                     instr, &index, bytecode, pool);
             // check tableswitch branches and set begin of basic blocks
             for( count = 0; count < branches; count++ )
             {
-                offset = vf_get_instruction_branch( &codeInstr[instr], count );
+                offset = vf_get_code_branch( code, count );
                 result = vf_check_branch_offset( offset, len, ctex );
                 if( result != VER_OK ) {
-                    goto labelEnd_vf_parse_bytecode;
+                    return result;
                 }
-                vf_set_basic_block_flag( &codeInstr[offset] );
+                vf_set_basic_block_flag( &bc[offset] );
             }
             if( index < len ) {
-                vf_set_basic_block_flag( &codeInstr[index] );
+                vf_set_basic_block_flag( &bc[index] );
             }
             break;
         case OPCODE_LOOKUPSWITCH:   /* 0xab + pad + s4 * 2 * (N + 1) */
             vf_opcode_switch( code, pool );
-            result = vf_set_lookupswitch_offsets( &codeInstr[instr],
+            result = vf_set_lookupswitch_offsets( code,
                                     instr, &index, bytecode, &branches, ctex);
             if( result != VER_OK ) {
-                goto labelEnd_vf_parse_bytecode;
+                return result;
             }
             // check tableswitch branches and set begin of basic blocks
             for( count = 0; count < branches; count++ )
             {
-                offset = vf_get_instruction_branch( &codeInstr[instr], count );
+                offset = vf_get_code_branch( code, count );
                 result = vf_check_branch_offset( offset, len, ctex );
                 if( result != VER_OK ) {
-                    goto labelEnd_vf_parse_bytecode;
+                    return result;
                 }
-                vf_set_basic_block_flag( &codeInstr[offset] );
+                vf_set_basic_block_flag( &bc[offset] );
             }
             if( index < len ) {
-                vf_set_basic_block_flag( &codeInstr[index] );
+                vf_set_basic_block_flag( &bc[index] );
             }
             break;
         case OPCODE_IRETURN:        /* 0xac */
             vf_opcode_ireturn( code, pool );
             // create and set edge branch to exit
-            vf_set_single_instruction_offset( &codeInstr[instr], ~0U, pool );
             if( index < len ) {
-                vf_set_basic_block_flag( &codeInstr[index] );
+                vf_set_basic_block_flag( &bc[index] );
             }
             break;
         case OPCODE_LRETURN:        /* 0xad */
             vf_opcode_lreturn( code, pool );
             // create and set edge branch to exit
-            vf_set_single_instruction_offset( &codeInstr[instr], ~0U, pool );
             if( index < len ) {
-                vf_set_basic_block_flag( &codeInstr[index] );
+                vf_set_basic_block_flag( &bc[index] );
             }
             break;
         case OPCODE_FRETURN:        /* 0xae */
             vf_opcode_freturn( code, pool );
             // create and set edge branch to exit
-            vf_set_single_instruction_offset( &codeInstr[instr], ~0U, pool );
             if( index < len ) {
-                vf_set_basic_block_flag( &codeInstr[index] );
+                vf_set_basic_block_flag( &bc[index] );
             }
             break;
         case OPCODE_DRETURN:        /* 0xaf */
             vf_opcode_dreturn( code, pool );
             // create and set edge branch to exit
-            vf_set_single_instruction_offset( &codeInstr[instr], ~0U, pool );
             if( index < len ) {
-                vf_set_basic_block_flag( &codeInstr[index] );
+                vf_set_basic_block_flag( &bc[index] );
             }
             break;
         case OPCODE_ARETURN:        /* 0xb0 */
             vf_opcode_areturn( code, pool );
             // create and set edge branch to exit
-            vf_set_single_instruction_offset( &codeInstr[instr], ~0U, pool );
             if( index < len ) {
-                vf_set_basic_block_flag( &codeInstr[index] );
+                vf_set_basic_block_flag( &bc[index] );
             }
             break;
         case OPCODE_RETURN:         /* 0xb1 */
             // set instruction flag
-            vf_set_instruction_flag( code, VF_FLAG_RETURN );
+            vf_set_code_type( code, VF_TYPE_INSTR_RETURN );
             // create and set edge branch to exit
-            vf_set_single_instruction_offset( &codeInstr[instr], ~0U, pool );
             if( index < len ) {
-                vf_set_basic_block_flag( &codeInstr[index] );
+                vf_set_basic_block_flag( &bc[index] );
             }
             break;
         case OPCODE_GETSTATIC:      /* 0xb2 + u2 */
             // get constant pool index
-            constIndex = (unsigned short)( (bytecode[index] << 8)|(bytecode[index + 1]) );
+            const_index = (unsigned short)( (bytecode[index] << 8)|(bytecode[index + 1]) );
             // skip constant pool index (u2)
             index += 2;
-            result = vf_opcode_getstatic( code, constIndex, ctex );
+            result = vf_opcode_getstatic( code, const_index, ctex );
             if( result != VER_OK ) {
-                goto labelEnd_vf_parse_bytecode;
+                return result;
             }
             break;
         case OPCODE_PUTSTATIC:      /* 0xb3 + u2 */
             // get constant pool index
-            constIndex = (unsigned short)( (bytecode[index] << 8)|(bytecode[index + 1]) );
+            const_index = (unsigned short)( (bytecode[index] << 8)|(bytecode[index + 1]) );
             // skip constant pool index (u2)
             index += 2;
-            result = vf_opcode_putstatic( code, constIndex, ctex );
+            result = vf_opcode_putstatic( code, const_index, ctex );
             if( result != VER_OK ) {
-                goto labelEnd_vf_parse_bytecode;
+                return result;
             }
             break;
         case OPCODE_GETFIELD:       /* 0xb4 + u2 */
             // get constant pool index
-            constIndex = (unsigned short)( (bytecode[index] << 8)|(bytecode[index + 1]) );
+            const_index = (unsigned short)( (bytecode[index] << 8)|(bytecode[index + 1]) );
             // skip constant pool index (u2)
             index += 2;
-            result = vf_opcode_getfield( code, constIndex, ctex );
+            result = vf_opcode_getfield( code, const_index, ctex );
             if( result != VER_OK ) {
-                goto labelEnd_vf_parse_bytecode;
+                return result;
             }
             break;
         case OPCODE_PUTFIELD:       /* 0xb5 + u2 */
             // get constant pool index
-            constIndex = (unsigned short)( (bytecode[index] << 8)|(bytecode[index + 1]) );
+            const_index = (unsigned short)( (bytecode[index] << 8)|(bytecode[index + 1]) );
             // skip constant pool index (u2)
             index += 2;
-            result = vf_opcode_putfield( code, constIndex, ctex );
+            result = vf_opcode_putfield( code, const_index, ctex );
             if( result != VER_OK ) {
-                goto labelEnd_vf_parse_bytecode;
+                return result;
             }
             break;
         case OPCODE_INVOKEVIRTUAL:  /* 0xb6 + u2 */
             // get constant pool index
-            constIndex = (unsigned short)( (bytecode[index] << 8)|(bytecode[index + 1]) );
+            const_index = (unsigned short)( (bytecode[index] << 8)|(bytecode[index + 1]) );
             // skip constant pool index (u2)
             index += 2;
-            result = vf_opcode_invoke( code, constIndex, ctex );
+            result = vf_opcode_invoke( code, const_index, ctex );
             if( result != VER_OK ) {
-                goto labelEnd_vf_parse_bytecode;
+                return result;
             }
             break;
         case OPCODE_INVOKESPECIAL:  /* 0xb7 + u2 */
             // get constant pool index
-            constIndex = (unsigned short)( (bytecode[index] << 8)|(bytecode[index + 1]) );
+            const_index = (unsigned short)( (bytecode[index] << 8)|(bytecode[index + 1]) );
             // skip constant pool index (u2)
             index += 2;
-            result = vf_opcode_invokespecial( code, constIndex, ctex );
+            result = vf_opcode_invokespecial( code, const_index, ctex );
             if( result != VER_OK ) {
-                goto labelEnd_vf_parse_bytecode;
+                return result;
             }
             break;
         case OPCODE_INVOKESTATIC:   /* 0xb8 + u2 */
             // get constant pool index
-            constIndex = (unsigned short)( (bytecode[index] << 8)|(bytecode[index + 1]) );
+            const_index = (unsigned short)( (bytecode[index] << 8)|(bytecode[index + 1]) );
             // skip constant pool index (u2)
             index += 2;
-            result = vf_opcode_invoke( code, constIndex, ctex );
+            result = vf_opcode_invoke( code, const_index, ctex );
             if( result != VER_OK ) {
-                goto labelEnd_vf_parse_bytecode;
+                return result;
             }
             break;
         case OPCODE_INVOKEINTERFACE:/* 0xb9 + u2 + u1 + u1 */
             // get constant pool index
-            constIndex = (unsigned short)( (bytecode[index] << 8)|(bytecode[index + 1]) );
+            const_index = (unsigned short)( (bytecode[index] << 8)|(bytecode[index + 1]) );
             // skip constant pool index (u2)
             index += 2;
-            result = vf_opcode_invoke( code, constIndex, ctex );
+            result = vf_opcode_invoke( code, const_index, ctex );
             if( result != VER_OK ) {
-                goto labelEnd_vf_parse_bytecode;
+                return result;
             }
             // check the number of arguments and last opcode byte
             if( ctex->m_code[codeNum].m_inlen != (unsigned short)bytecode[index]
                || bytecode[index + 1] != 0 )
             {
-                VERIFY_REPORT( ctex, "(class: " << class_get_name( ctex->m_class ) 
-                    << ", method: " << method_get_name( ctex->m_method )
-                    << method_get_descriptor( ctex->m_method )
-                    << ") Incorrect operand byte of invokeinterface");
-                result = VER_ErrorInstruction;
-                goto labelEnd_vf_parse_bytecode;
+                VERIFY_REPORT_METHOD( ctex,
+                    "Incorrect operand byte of invokeinterface");
+                return VER_ErrorInstruction;
             }
             // skip 2 parameters (u1 + u1)
             index += 1 + 1;
             break;
         case OPCODE_NEW:            /* 0xbb + u2 */
             // get constant pool index
-            constIndex = (unsigned short)( (bytecode[index] << 8)|(bytecode[index + 1]) );
+            const_index = (unsigned short)( (bytecode[index] << 8)|(bytecode[index + 1]) );
             // skip constant pool index (u2)
             index += 2;
-            result = vf_opcode_new( code, constIndex, codeNum, ctex );
+            result = vf_opcode_new( code, const_index, codeNum, ctex );
             if( result != VER_OK ) {
-                goto labelEnd_vf_parse_bytecode;
+                return result;
             }
             break;
         case OPCODE_NEWARRAY:       /* 0xbc + u1 */
             // get array type
-            number = (int)bytecode[index];
+            u1 = (unsigned char)bytecode[index];
             // skip parameter (u1)
             index++;
-            result = vf_opcode_newarray( code, (unsigned char)number, ctex );
+            result = vf_opcode_newarray( code, u1, ctex );
             if( result != VER_OK ) {
-                goto labelEnd_vf_parse_bytecode;
+                return result;
             }
             break;
         case OPCODE_ANEWARRAY:      /* 0xbd + u2 */
             // get constant pool index
-            constIndex = (unsigned short)( (bytecode[index] << 8)|(bytecode[index + 1]) );
+            const_index = (unsigned short)( (bytecode[index] << 8)|(bytecode[index + 1]) );
             // skip constant pool index (u2)
             index += 2;
-            result = vf_opcode_anewarray( code, constIndex, ctex );
+            result = vf_opcode_anewarray( code, const_index, ctex );
             if( result != VER_OK ) {
-                goto labelEnd_vf_parse_bytecode;
+                return result;
             }
             break;
         case OPCODE_ARRAYLENGTH:    /* 0xbe */
@@ -5066,29 +4931,28 @@ vf_parse_bytecode( vf_Context_t *ctex )     // verifier context
         case OPCODE_ATHROW:         /* 0xbf */
             vf_opcode_athrow( code, ctex );
             // create and set edge branch to exit
-            vf_set_single_instruction_offset( &codeInstr[instr], ~0U, pool );
             if( index < len ) {
-                vf_set_basic_block_flag( &codeInstr[index] );
+                vf_set_basic_block_flag( &bc[index] );
             }
             break;
         case OPCODE_CHECKCAST:      /* 0xc0 + u2 */
             // get constant pool index
-            constIndex = (unsigned short)( (bytecode[index] << 8)|(bytecode[index + 1]) );
+            const_index = (unsigned short)( (bytecode[index] << 8)|(bytecode[index + 1]) );
             // skip constant pool index (u2)
             index += 2;
-            result = vf_opcode_checkcast( code, constIndex, ctex );
+            result = vf_opcode_checkcast( code, const_index, ctex );
             if( result != VER_OK ) {
-                goto labelEnd_vf_parse_bytecode;
+                return result;
             }
             break;
         case OPCODE_INSTANCEOF:     /* 0xc1 + u2 */
             // get constant pool index
-            constIndex = (unsigned short)( (bytecode[index] << 8)|(bytecode[index + 1]) );
+            const_index = (unsigned short)( (bytecode[index] << 8)|(bytecode[index + 1]) );
             // skip constant pool index (u2)
             index += 2;
-            result = vf_opcode_instanceof( code, constIndex, ctex );
+            result = vf_opcode_instanceof( code, const_index, ctex );
             if( result != VER_OK ) {
-                goto labelEnd_vf_parse_bytecode;
+                return result;
             }
             break;
         case OPCODE_MONITORENTER:   /* 0xc2 */
@@ -5097,226 +4961,183 @@ vf_parse_bytecode( vf_Context_t *ctex )     // verifier context
             break;
         case OPCODE_MULTIANEWARRAY: /* 0xc5 + u2 + u1 */
             // get constant pool index
-            constIndex = (unsigned short)( (bytecode[index] << 8)|(bytecode[index + 1]) );
+            const_index = (unsigned short)( (bytecode[index] << 8)|(bytecode[index + 1]) );
             // skip constant pool index (u2)
             index += 2;
             // get dimensions of array
-            number = (int)bytecode[index];
+            u1 = bytecode[index];
             // skip dimensions of array (u1)
             index++;
-            result = vf_opcode_multianewarray( code, constIndex, (unsigned short)number, ctex );
+            result = vf_opcode_multianewarray( code, const_index, u1, ctex );
             if( result != VER_OK ) {
-                goto labelEnd_vf_parse_bytecode;
+                return result;
             }
             break;
         case OPCODE_IFNULL:         /* 0xc6 + s2 */
         case OPCODE_IFNONNULL:      /* 0xc7 + s2 */
-            offset = vf_get_double_hword_branch_offset( &codeInstr[instr],
+            offset = vf_get_double_hword_branch_offset( code,
                             instr, bytecode, &index, pool );
             result = vf_check_branch_offset( offset, len, ctex );
             if( result != VER_OK ) {
-                goto labelEnd_vf_parse_bytecode;
+                return result;
             }
             result = vf_check_branch_offset( index, len, ctex );
             if( result != VER_OK ) {
-                goto labelEnd_vf_parse_bytecode;
+                return result;
             }
-            vf_opcode_ifxnull( &ctex->m_code[codeNum], &codeInstr[offset],
-                               &codeInstr[index], pool );
+            vf_opcode_ifxnull( &ctex->m_code[codeNum], &bc[offset],
+                               &bc[index], pool );
             break;
         case OPCODE_GOTO_W:         /* 0xc8 + s4 */
-            offset = vf_get_single_word_branch_offset( &codeInstr[instr], 
+            offset = vf_get_single_word_branch_offset( code, 
                             instr, bytecode, &index, pool );
             result = vf_check_branch_offset( offset, len, ctex );
             if( result != VER_OK ) {
-                goto labelEnd_vf_parse_bytecode;
+                return result;
             }
-            vf_set_basic_block_flag( &codeInstr[offset] );
+            vf_set_basic_block_flag( &bc[offset] );
             if( index < len ) {
-                vf_set_basic_block_flag( &codeInstr[index] );
+                vf_set_basic_block_flag( &bc[index] );
             }
             break;
         case OPCODE_JSR_W:          /* 0xc9 + s4 */
-            offset = vf_get_double_word_branch_offset( &codeInstr[instr],
+            offset = vf_get_single_word_branch_offset( code,
                             instr, bytecode, &index, pool );
             result = vf_check_branch_offset( offset, len, ctex );
             if( result != VER_OK ) {
-                goto labelEnd_vf_parse_bytecode;
+                return result;
             }
             result = vf_check_branch_offset( index, len, ctex );
             if( result != VER_OK ) {
-                goto labelEnd_vf_parse_bytecode;
+                return result;
             }
             vf_opcode_jsr( code, codeNum, pool );
             ctex->m_dump.m_with_subroutine = 1;
-            vf_set_basic_block_flag( &codeInstr[offset] );
-            vf_set_basic_block_flag( &codeInstr[index] );
+            vf_set_basic_block_flag( &bc[offset] );
+            vf_set_basic_block_flag( &bc[index] );
             break;
         case _OPCODE_UNDEFINED:     /* 0xba */
         default:
-            VERIFY_REPORT( ctex, "(class: " << class_get_name( ctex->m_class ) 
-                    << ", method: " << method_get_name( ctex->m_method )
-                    << method_get_descriptor( ctex->m_method )
-                    << ") Unknown instruction bytecode" );
-            result = VER_ErrorInstruction;
-            goto labelEnd_vf_parse_bytecode;
+            VERIFY_REPORT_METHOD( ctex, "Unknown bytecode instruction " );
+            return VER_ErrorInstruction;
         }
     }
 
-    /**
-     * Create end-entry instruction
-     */
-    code = ctex->m_code;
-    vf_create_end_entry( &code[codeNum], ctex );
-    codeInstr[index].m_instr = codeNum;
-    codeNum++;
+    if (index > len) {
+        VERIFY_REPORT_METHOD( ctex,
+            "The last instruction doesn't fit bytecode array" );
+        return VER_ErrorInstruction;
+    }
 
     /**
-     * Set handler basic blocks
+     * Set handler basic blocks.
      */
-    edges = 0;
-    for( index = 0; index < handlcount; index++ ) {
+    unsigned short handler_count = method_get_exc_handler_number( ctex->m_method );
+    unsigned short constLen = class_get_cp_size( ctex->m_class );
+    for( unsigned short handler_index = 0;
+         handler_index < handler_count;
+         handler_index++ )
+    {
+        unsigned short start_pc, end_pc, handler_pc, handler_cp_index;
+        method_get_exc_handler_info( ctex->m_method,
+            handler_index, &start_pc, &end_pc, &handler_pc,
+            &handler_cp_index );
         // check instruction range
-        unsigned short start_pc;
-        unsigned short end_pc;
-        unsigned short handler_pc;
-        unsigned short handler_cp_index;
-        method_get_exc_handler_info( ctex->m_method, (unsigned short)index, &start_pc, &end_pc,
-            &handler_pc, &handler_cp_index );
-        if( ( start_pc >= len ) || ( end_pc > len ) || ( handler_pc >= len ) )
+        if( ( start_pc >= len )
+            || ( end_pc > len )
+            || ( handler_pc >= len ) )
         {
-            VERIFY_REPORT( ctex, "(class: " << class_get_name( ctex->m_class ) 
-                    << ", method: " << method_get_name( ctex->m_method )
-                    << method_get_descriptor( ctex->m_method )
-                    << ") Handler pc is out of range" );
-            result = VER_ErrorHandler;
-            goto labelEnd_vf_parse_bytecode;
+            VERIFY_REPORT_METHOD( ctex, "Exception handler pc is out of range" );
+            return VER_ErrorHandler;
         }
-        // check constant pool index
-        CHECK_HANDLER_CONST_POOL_ID( handler_cp_index, constlen, ctex );
-        CHECK_HANDLER_CONST_POOL_CLASS( ctex, handler_cp_index );
-        // check instruction relations
-        if( (codeInstr[ start_pc ].m_instr == 0)
-            || (codeInstr[ end_pc ].m_instr == 0) 
-            || (codeInstr[ handler_pc ].m_instr == 0) )
+        if( start_pc >= end_pc )
         {
-            VERIFY_REPORT( ctex, "(class: " << class_get_name( ctex->m_class ) 
-                    << ", method: " << method_get_name( ctex->m_method )
-                    << method_get_descriptor( ctex->m_method )
-                    << ") Handler pc is out of instruction set" );
-            result = VER_ErrorHandler;
-            goto labelEnd_vf_parse_bytecode;
+            VERIFY_REPORT_METHOD( ctex,
+                "Exception handler range starting point should be before ending point" );
+            return VER_ErrorHandler;
         }
-        // set handler basic blocks
-        codeInstr[ start_pc ].m_mark = 1;
-        codeInstr[ end_pc ].m_mark = 1;
-        codeInstr[ handler_pc ].m_mark = 1;
 
-        /**
-         * Set handler branch offset
-         */
-        edges++;
-        code[index + 1].m_offcount = 1;
-        code[index + 1].m_off = (unsigned*)vf_alloc_pool_memory( pool, 
-                                                sizeof(unsigned) );
-        // fill offset array for code instruction
-        code[index + 1].m_off[0] = codeInstr[ handler_pc ].m_instr;
-        // create handler valid type
-        vf_ValidType_t *type = NULL;
-        if( handler_cp_index ) {
-            const char* name = vf_get_cp_class_name( handler_cp_index, ctex );
-            assert(name);
-
-            type = vf_create_class_valid_type( name, ctex );
-            // set restriction for handler class
-            if( ctex->m_vtype.m_throwable->string[0] != type->string[0] ) {
-                ctex->m_type->SetRestriction( ctex->m_vtype.m_throwable->string[0],
-                    type->string[0], 0, VF_CHECK_SUPER );
-            }
+        // check that handlers point to instruction
+        // boundaries
+        if( bc[ start_pc ].m_instr == 0 
+            || bc[ end_pc ].m_instr == 0
+            || bc[ handler_pc ].m_instr == 0)
+        {
+            VERIFY_REPORT_METHOD( ctex, "Exception handler parameters ["
+                << start_pc << ", " << end_pc << ", " << handler_pc
+                << "] are out of instruction set" );
+            return VER_ErrorHandler;
         }
-        // create out vector for handler
-        vf_new_out_vector( &code[index + 1], 1, pool );
-        vf_set_out_vector_stack_entry_ref( &code[index + 1], 0, type );
-
-        /** 
-         * Set handler branches
-         * Set handler branches to last instructions of basic blocks
-         */
-        for( count = start_pc + 1; count <= end_pc; count++ ) {
-            if( count < len && codeInstr[count].m_mark ) {
-                // calculate code instruction number
-                instr = codeInstr[count].m_instr - 1;
-                // check existence of handler array
-                if( code[instr].m_handler == NULL ) {
-                    // create handler array for code instruction
-                    code[instr].m_handler = 
-                        (unsigned char*)vf_alloc_pool_memory( pool,
-                        handlcount * sizeof(unsigned char) );
-                }
-                // count handler edges
-                edges++;
-                // set handler branch
-                code[instr].m_handler[index] = 1;
-            }
+        bc[ start_pc ].m_mark = 1;
+        if( end_pc < len ) {
+            bc[ end_pc ].m_mark = 1;
         }
+        bc[ handler_pc ].m_mark = 1;
     }
 
     /** 
-     * Initialize basic block count
-     * Include start-entry basic block, handler basic blocks, 
-     * end-entry basic block.
+     * Count edges from basic blocks from exception range to the
+     * corresponding exception handlers.
      */
-    bbCount = 1 + handlcount + 1;
+    unsigned edges = 0;
+    for( unsigned short handler_index = 0;
+         handler_index < handler_count;
+         handler_index++ )
+    {
+        unsigned short start_pc, end_pc, handler_pc, handler_cp_index;
+        method_get_exc_handler_info( ctex->m_method, handler_index,
+            &start_pc, &end_pc, &handler_pc, &handler_cp_index );
+
+        // number of basic blocks in the exception range
+        unsigned handler_edges = 0;
+        for( count = start_pc; count < end_pc; count++ ) {
+            handler_edges += bc[ count ].m_mark;
+        }
+
+        edges += handler_edges;
+    }
+
+    /** 
+     * Initialize a node counter with handler nodes
+     * and 2 terminator nodes.
+     */
+    unsigned nodes = handler_count + 2;
 
     /**
-     * Set code offsets
-     * Check code instructions
+     * Check code offsets, count basic blocks and edges.
      */
     for( index = 0; index < len; index++ ) {
-        if( !index || codeInstr[index].m_mark ) {
-            // first instruction is always begin of basic block
-            if( (count = codeInstr[index].m_instr) == 0 ) {
-                VERIFY_REPORT( ctex, "(class: " << class_get_name( ctex->m_class ) 
-                    << ", method: " << method_get_name( ctex->m_method )
-                    << method_get_descriptor( ctex->m_method )
-                    << ") Illegal target of jump or branch" );
-                result = VER_ErrorBranch;
-                goto labelEnd_vf_parse_bytecode;
-            }
-            vf_set_instruction_flag( &code[count], VF_FLAG_BEGIN_BASIC_BLOCK );
-            bbCount++;
-            if( !index || code[count - 1].m_offcount == 0 ) {
-                // considering first edge from start-entry to first instruction
-                // count only edges that catenate 2 nearby instructions
-                edges++;
+        instr = bc[ index ].m_instr;
+        if (instr == 0) {
+            if( bc[ index ].m_mark ) {
+                VERIFY_REPORT_METHOD( ctex, "Illegal target of jump or branch" );
+                return VER_ErrorBranch;
+            } else {
+                continue;
             }
         }
-        if( codeInstr[index].m_offcount ) {
-            // calculate code instruction number
-            instr = codeInstr[index].m_instr;
-            // create offset array for code instruction
-            edges += codeInstr[index].m_offcount;
-            code[instr].m_offcount = codeInstr[index].m_offcount;
-            code[instr].m_off = codeInstr[index].m_off;
-            // fill offset array for code instruction
-            for( count = 0; count < codeInstr[index].m_offcount; count++ ) {
-                offset = codeInstr[index].m_off[count];
-                if( offset == -1 ) {
-                    code[instr].m_off[count] = codeNum - 1;
-                } else {
-                    code[instr].m_off[count] = codeInstr[offset].m_instr;
-                }
-            }
+
+        code = &ctex->m_code[instr - 1];
+        if( bc[ index ].m_mark ) {
+            code->m_basic_block_start = true;
+            nodes++;
+        }
+
+        if( code->m_offcount ) {
+            // basic block should start next, so we will
+            // count one branch anyway
+            edges += code->m_offcount - 1;
         }
     }
 
-labelEnd_vf_parse_bytecode:
-
     /**
-     * Free allocated memory
+     * Each node except the ending node emits at least one branch.
      */
+    edges += nodes - 1;
+
+    // store context values
     ctex->m_codeNum = codeNum;
-    ctex->m_nodeNum = bbCount;
+    ctex->m_nodeNum = nodes;
     ctex->m_edgeNum = edges;
 
 #if _VERIFY_DEBUG
@@ -5336,59 +5157,61 @@ labelEnd_vf_parse_bytecode:
 void
 vf_dump_bytecode( vf_Context_t *ctex )  // verifier context
 {
-    unsigned char* bytecode;
-    unsigned index,
-             count,
-             handlcount;
-    vf_Code_t *code = ctex->m_code;
-    
-    bytecode = method_get_bytecode( ctex->m_method );
-    handlcount = method_get_exc_handler_number( ctex->m_method );
     VERIFY_DEBUG( "======================== VERIFIER METHOD DUMP ========================" );
     VERIFY_DEBUG( "Method: " << class_get_name( ctex->m_class )
               << "." << method_get_name( ctex->m_method )
               << method_get_descriptor( ctex->m_method ) << endl );
     VERIFY_DEBUG( "0 [-]: -> START-ENTRY" );
-    for( index = 0; index < handlcount; index++ ) {
-        VERIFY_DEBUG( index + 1 << " [-]: -> HANDLER #" << index + 1 );
-        if( code[index + 1].m_offcount ) {
-            for( count = 0; count < code[index + 1].m_offcount; count++ )
-                if( code[index + 1].m_off[count] == ctex->m_codeNum - 1 ) {
-                    VERIFY_DEBUG( " --> " << code[index + 1].m_off[count] << " [-]" );
-                } else {
-                    VERIFY_DEBUG( " --> " << code[index + 1].m_off[count]
-                                   << " [" 
-                                   << code[ code[index + 1].m_off[count] ].m_addr 
-                                        - bytecode  << "]" );
-                }
+
+    unsigned short handler_count =
+        method_get_exc_handler_number( ctex->m_method );
+    for( unsigned short handler_index = 0;
+        handler_index < handler_count;
+        handler_index++ )
+    {
+        VERIFY_DEBUG( handler_index + 1 << " [-]: -> HANDLER #" << handler_index + 1 );
+        unsigned short start_pc, end_pc, handler_pc, handler_cp_index;
+        method_get_exc_handler_info( ctex->m_method,
+            handler_index, &start_pc, &end_pc,
+            &handler_pc, &handler_cp_index );
+
+        VERIFY_DEBUG( 
+            " from " << ctex->m_bc[start_pc].m_instr + handler_count
+            << " [" << start_pc << "]"
+            " to " << ctex->m_bc[end_pc].m_instr + handler_count
+            << " [" << end_pc << "]"
+            " --> " << ctex->m_bc[handler_pc].m_instr + handler_count
+            << " [" << handler_pc << "]"
+            ", CP type " << handler_cp_index );
+    }
+
+    unsigned char* bytecode = method_get_bytecode( ctex->m_method );
+    unsigned end_code = ctex->m_codeNum + handler_count + 1;
+    vf_Code_t* code = ctex->m_code;
+    for( unsigned index = handler_count + 1; 
+         index < end_code;
+         index++, code++)
+    {
+        VERIFY_DEBUG( index
+            << " [" << code->m_addr - bytecode << "]:"
+            << ((code->m_basic_block_start) ? " -> " : "    ")
+            << ((code->m_stack < 0) ? "" : " " )
+            << code->m_stack 
+            << "|" << code->m_minstack << "    "
+            << vf_opcode_names[*(code->m_addr)] );
+        for( unsigned count = 0; count < code->m_offcount; count++ ) {
+            unsigned offset = code->m_off[count];
+            VERIFY_DEBUG( " --> "
+                << ctex->m_bc[offset].m_instr + handler_count
+                << " [" << offset << "]" );
         }
     }
-    for( index = handlcount + 1; index < ctex->m_codeNum - 1; index++ ) {
-        VERIFY_DEBUG( index << " [" << code[index].m_addr - bytecode << "]:"
-                     << (vf_is_begin_basic_block( &code[index] ) ? " -> " : "    ")
-                     << ((code[index].m_stack < 0) ? "" : " " )
-                     << code[index].m_stack 
-                     << "|" << code[index].m_minstack << "    "
-                     << vf_opcode_names[*(code[index].m_addr)] );
-        if( code[index].m_offcount ) {
-            for( count = 0; count < code[index].m_offcount; count++ )
-                if( code[index].m_off[count] == ctex->m_codeNum - 1 ) {
-                    VERIFY_DEBUG( " --> " << code[index].m_off[count] << " [-]" );
-                } else {
-                    VERIFY_DEBUG( " --> " << code[index].m_off[count]
-                                   << " [" 
-                                   << code[ code[index].m_off[count] ].m_addr 
-                                        - bytecode  << "]" );
-                }
-        }
-    }
-    VERIFY_DEBUG( index << " [-]: -> END-ENTRY" << endl );
+    VERIFY_DEBUG( end_code << " [-]: -> END-ENTRY" << endl );
     VERIFY_DEBUG( "======================================================================" );
     return;
 } // vf_dump_bytecode
-#endif //_VERIFY_DEBUG
 
-} // namespace Verifier
+#endif //_VERIFY_DEBUG
 
 /**
  * Function provides initial verification of class.
@@ -5467,6 +5290,7 @@ vf_verify_class( class_handler klass,      // verified class
             //context.m_dump.m_node_vector = 1;
             //context.m_dump.m_code_vector = 1;
             //context.m_dump.m_merge_vector = 1;
+            //context.m_dump.m_dot_graph = 1;
             result = vf_verify_method_bytecode( &context );
             context.ClearContext();
         }
@@ -5496,7 +5320,7 @@ labelEnd_verifyClass:
     *message = context.m_error;
 #if _VERIFY_DEBUG
     if( result != VER_OK ) {
-        TRACE2("verifier", "VerifyError: " << (context.m_error ? context.m_error : "NULL") );
+        TRACE2( "verifier", "VerifyError: " << (context.m_error ? context.m_error : "NULL") );
     }
 #endif // _VERIFY_DEBUG
 

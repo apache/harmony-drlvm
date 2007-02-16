@@ -20,6 +20,7 @@
  */  
 
 #include "ver_real.h"
+#include "ver_graph.h"
 
 /**
  * Debug flag macros
@@ -28,11 +29,6 @@
 #define DUMP_NODE_VECTOR       0
 // Macro prints data flow node instruction vectors
 #define DUMP_NODE_INSTR_VECTOR 0
-
-/**
- * Set namespace Verifier
- */
-namespace Verifier {
 
 /************************************************************
  **************** Graph Data Flow Analysis ******************
@@ -96,7 +92,7 @@ vf_dump_vector_entry( vf_MapEntry_t *entry,     // stack map entry
  * Function prints data flow vector into output stream.
  */
 void
-vf_dump_vector( vf_MapVector_t *vector,     // data flow vector
+vf_dump_vector( vf_MapVectorHandle vector,     // data flow vector
                 vf_Code_t *code,            // code instruction
                 ostream *stream)            // output stream (can be NULL)
 {
@@ -152,7 +148,7 @@ vf_dump_vector( vf_MapVector_t *vector,     // data flow vector
     }
     // dump stack vector
     *stream << "S:";
-    for( index = 0; index < vector->m_deep; index++ ) {
+    for( index = 0; index < vector->m_depth; index++ ) {
         vf_dump_vector_entry( &vector->m_stack[index], stream );
         if( vector->m_stack[index].m_is_local ) {
             *stream << "!";
@@ -162,7 +158,7 @@ vf_dump_vector( vf_MapVector_t *vector,     // data flow vector
     }
     *stream << endl;
     // dump stack references
-    for( index = 0; index < vector->m_deep; index++ ) {
+    for( index = 0; index < vector->m_depth; index++ ) {
         if( vector->m_stack[index].m_type == SM_REF ) {
             *stream << " REF #" << index << ": ";
         } else if( vector->m_stack[index].m_type == SM_UNINITIALIZED ) {
@@ -216,10 +212,10 @@ vf_is_types_equal( vf_ValidType_t *type1,   // first checked type
  * If first vector was changed, returns true, else - false.
  */
 static inline bool
-vf_merge_vectors( vf_MapVector_t *first,    // first vector
-                  vf_MapVector_t *second,   // second vector
-                  bool handler_flag,        // if merged node is handler
-                  vf_Context_t *ctex)       // verifier context
+vf_merge_vectors( vf_MapVector* first,          // first vector
+                  vf_MapVectorHandle second,    // second vector
+                  bool handler_flag,            // if merged node is handler
+                  vf_Context_t *ctex)           // verifier context
 {
     bool is_changed = false;
     vf_MapEntry_t zero = {0};
@@ -288,8 +284,8 @@ vf_merge_vectors( vf_MapVector_t *first,    // first vector
     }
 
     // merge stack map vector
-    assert( first->m_deep == second->m_deep );
-    for( index = 0; index < second->m_deep; index++ ) {
+    assert( first->m_depth == second->m_depth );
+    for( index = 0; index < second->m_depth; index++ ) {
         // merge entries type
         if( first->m_stack[index].m_type == SM_TOP ) {
             // no need to merge
@@ -327,8 +323,8 @@ vf_merge_vectors( vf_MapVector_t *first,    // first vector
  * Function copies source vector to data vector.
  */
 static inline void
-vf_copy_vector( vf_MapVector_t *source,     // copied vector
-                vf_MapVector_t *data)       // data vector
+vf_copy_vector( vf_MapVectorHandle source,     // copied vector
+                vf_MapVector* data)            // data vector
 {
     unsigned index;
     vf_MapEntry_t zero = {0};
@@ -344,8 +340,8 @@ vf_copy_vector( vf_MapVector_t *source,     // copied vector
         data->m_local[index] = zero;
     }
     // copy stack
-    data->m_deep = source->m_deep;
-    for( index = 0; index < source->m_deep; index++ ) {
+    data->m_depth = source->m_depth;
+    for( index = 0; index < source->m_depth; index++ ) {
         data->m_stack[index] = source->m_stack[index];
     }
     for( ; index < data->m_maxstack; index++ ) {
@@ -358,14 +354,14 @@ vf_copy_vector( vf_MapVector_t *source,     // copied vector
  * Function compares two vectors.
  */
 static inline bool
-vf_compare_vectors( vf_MapVector_t *first,      // first vector
-                    vf_MapVector_t *second)     // second vector
+vf_compare_vectors( vf_MapVectorHandle first,      // first vector
+                    vf_MapVectorHandle second)     // second vector
 {
     // compare vector parameters
     if( first->m_maxlocal != second->m_maxlocal
         || first->m_maxstack != second->m_maxstack
         || first->m_number != second->m_number
-        || first->m_deep != second->m_deep )
+        || first->m_depth != second->m_depth )
     {
         return false;
     }
@@ -383,7 +379,7 @@ vf_compare_vectors( vf_MapVector_t *first,      // first vector
         }
     }
     // compare stack
-    for( index = 0; index < first->m_deep; index++ ) {
+    for( index = 0; index < first->m_depth; index++ ) {
         if( first->m_stack[index].m_type != second->m_stack[index].m_type
             || first->m_stack[index].m_vtype != second->m_stack[index].m_vtype ) 
         {
@@ -397,9 +393,9 @@ vf_compare_vectors( vf_MapVector_t *first,      // first vector
  * Function check access constraint for two stack map references.
  */
 static inline Verifier_Result
-vf_check_access(vf_MapEntry_t *source,    // stack map entry
-                vf_MapEntry_t *target,    // required map entry
-                vf_Context_t *ctex)       // verifier context
+vf_check_access( vf_MapEntry_t *source,    // stack map entry
+                 vf_MapEntry_t *target,    // required map entry
+                 vf_Context_t *ctex)       // verifier context
 {
     // compare types
     assert( target->m_vtype->number == 1 );
@@ -475,10 +471,7 @@ vf_check_entry_refs( vf_MapEntry_t *source,    // stack map entry
             //    can be stored in a local variable if backward branch is
             //    taken or the code is protected by exception handler.
         } else {
-            VERIFY_REPORT( ctex, "(class: " << class_get_name( ctex->m_class ) 
-                << ", method: " << method_get_name( ctex->m_method )
-                << method_get_descriptor( ctex->m_method )
-                << ") Uninitialized reference usage" );
+            VERIFY_REPORT_METHOD( ctex, "Uninitialized reference usage" );
             return VER_ErrorDataFlow;
         }
     }
@@ -721,15 +714,15 @@ vf_set_instruction_out_vector( vf_Code_t *code,         // code instruction
  * Function clears stack map vector.
  */
 static inline void
-vf_clear_stack( vf_MapVector_t *vector )    // map vector
+vf_clear_stack( vf_MapVector* vector )    // map vector
 {
     vf_MapEntry_t zero_entry = {0};
 
     // zero stack vector
-    for( unsigned index = 0; index < vector->m_deep; index++ ) {
+    for( unsigned index = 0; index < vector->m_depth; index++ ) {
         vector->m_stack[index] = zero_entry;
     }
-    vector->m_deep = 0;
+    vector->m_depth = 0;
 
     return;
 } // vf_clear_stack
@@ -810,10 +803,8 @@ vf_check_instruction_in_vector( vf_MapEntry_t *stack,       // stack map vector
             // check entry types
             result = vf_check_entry_refs( entry, newvector, local_init, ctex );
             if( result != VER_OK ) {
-                VERIFY_REPORT( ctex, "(class: " << class_get_name( ctex->m_class )
-                    << ", method: " << method_get_name( ctex->m_method )
-                    << method_get_descriptor( ctex->m_method )
-                    << ") Incompatible types for array assignment" );
+                VERIFY_REPORT_METHOD( ctex, 
+                    "Incompatible types for array assignment" );
                 return result;
             }
             break;
@@ -822,10 +813,7 @@ vf_check_instruction_in_vector( vf_MapEntry_t *stack,       // stack map vector
             result = vf_check_entry_refs( entry, vector, local_init, ctex );
             if( result != VER_OK ) {
                 if( !ctex->m_error ) {
-                    VERIFY_REPORT( ctex, "(class: " << class_get_name( ctex->m_class ) 
-                        << ", method: " << method_get_name( ctex->m_method )
-                        << method_get_descriptor( ctex->m_method )
-                        << ") Data flow analysis error" );
+                    VERIFY_REPORT_METHOD( ctex, "Data flow analysis error" );
                 }
                 return result;
             }
@@ -835,18 +823,14 @@ vf_check_instruction_in_vector( vf_MapEntry_t *stack,       // stack map vector
             // check entry references
             if( entry->m_type == SM_REF ) {
                 // double initialization
-                VERIFY_REPORT( ctex, "(class: " << class_get_name( ctex->m_class ) 
-                    << ", method: " << method_get_name( ctex->m_method )
-                    << method_get_descriptor( ctex->m_method )
-                    << ") Double initialization of object reference" );
+                VERIFY_REPORT_METHOD( ctex, 
+                    "Double initialization of object reference" );
                 return VER_ErrorDataFlow;
             }
             result = vf_check_entry_refs( entry, vector, local_init, ctex );
             if( result != VER_OK ) {
-                VERIFY_REPORT( ctex, "(class: " << class_get_name( ctex->m_class ) 
-                    << ", method: " << method_get_name( ctex->m_method )
-                    << method_get_descriptor( ctex->m_method )
-                    << ") Data flow analysis error (uninitialized)" );
+                VERIFY_REPORT_METHOD( ctex, 
+                    "Data flow analysis error (uninitialized)" );
                 return result;
             }
             // check initialization class in constructor
@@ -865,10 +849,7 @@ vf_check_instruction_in_vector( vf_MapEntry_t *stack,       // stack map vector
             // check entry types
             result = vf_check_entry_types( entry, vector, local_init, &copy, ctex );
             if( result != VER_OK ) {
-                VERIFY_REPORT( ctex, "(class: " << class_get_name( ctex->m_class ) 
-                    << ", method: " << method_get_name( ctex->m_method )
-                    << method_get_descriptor( ctex->m_method )
-                    << ") Data flow analysis error" );
+                VERIFY_REPORT_METHOD( ctex, "Data flow analysis error" );
                 return result;
             }
         }
@@ -888,7 +869,7 @@ vf_check_instruction_in_vector( vf_MapEntry_t *stack,       // stack map vector
 static Verifier_Result
 vf_get_instruction_out_vector( unsigned node_num,           // graph node
                                vf_Code_t *instr,            // code instruction
-                               vf_MapVector_t *invector,    // incoming data flow vector
+                               vf_MapVector* invector,      // incoming data flow vector
                                vf_MapEntry_t *buf,          // buf storage vector
                                vf_Context_t *ctex)          // verifier context
 {
@@ -897,31 +878,30 @@ vf_get_instruction_out_vector( unsigned node_num,           // graph node
     vf_MapEntry_t zero_entry = {0};
 
     // set stack vector
-    assert( invector->m_deep - instr->m_minstack >= 0 );
-    vf_MapEntry_t *stack = invector->m_stack + invector->m_deep - instr->m_minstack;
+    assert( invector->m_depth - instr->m_minstack >= 0 );
+    vf_MapEntry_t *stack = invector->m_stack + invector->m_depth - instr->m_minstack;
     // set locals vector
     vf_MapEntry_t *locals = invector->m_local;
     // check instruction in vector
     Verifier_Result result = vf_check_instruction_in_vector( stack, locals, buf,
-        instr->m_invector, instr->m_inlen, ctex->m_graph->GetNodeInitFlag(node_num),
+        instr->m_invector, instr->m_inlen, ctex->m_graph->GetNodeInitFlag( node_num ),
         &need_init, ctex );
     if( result != VER_OK ) {
         return result;
     }
 
     // create out vector for return instructions
-    if( vf_is_instruction_has_flags( instr, VF_FLAG_RETURN ) ) {
+    if( VF_TYPE_INSTR_RETURN == instr->m_type ) {
         // clear stack
-        unsigned deep = invector->m_deep;
+        unsigned deep = invector->m_depth;
         vf_clear_stack( invector );
         // set result vector stack deep
-        invector->m_deep = (unsigned short)(deep + instr->m_stack);
+        invector->m_depth = (unsigned short)(deep + instr->m_stack);
         // set out vector
         vf_set_return_out_vector( invector->m_stack, buf, instr->m_invector,
                                   instr->m_inlen, ctex );
         return VER_OK;
-    } else if( vf_is_instruction_has_flags( instr, VF_FLAG_THROW ) ) {
-        // set result vector stack deep
+    } else if( VF_TYPE_INSTR_THROW == instr->m_type ) {
         invector->m_stack->m_type = SM_TERMINATE;
         return VER_OK;
     }
@@ -944,7 +924,7 @@ vf_get_instruction_out_vector( unsigned node_num,           // graph node
             }
         }
         // init stack reference
-        for( index = 0; index < (unsigned)invector->m_deep - instr->m_minstack; index++ ) {
+        for( index = 0; index < (unsigned)invector->m_depth - instr->m_minstack; index++ ) {
             if( invector->m_stack[index].m_type == SM_UNINITIALIZED
                 && invector->m_stack[index].m_new == buf[0].m_new )
             {
@@ -955,8 +935,8 @@ vf_get_instruction_out_vector( unsigned node_num,           // graph node
     }
 
     // set instruction OUT vector
-    invector->m_deep = (unsigned short )(invector->m_deep + instr->m_stack);
-    assert( invector->m_deep <= invector->m_maxstack );
+    invector->m_depth = (unsigned short )(invector->m_depth + instr->m_stack);
+    assert( invector->m_depth <= invector->m_maxstack );
     index = invector->m_number;
     vf_set_instruction_out_vector( instr, stack, locals, &invector->m_number, buf, ctex );
     assert( invector->m_number <= invector->m_maxlocal );
@@ -972,19 +952,25 @@ vf_get_instruction_out_vector( unsigned node_num,           // graph node
 } // vf_get_instruction_out_vector
 
 /**
- * Function receives handler OUT data flow vector.
+ * Copies a stored handler vector to the out vector.
  */
 static inline Verifier_Result
-vf_get_handler_out_vector( vf_Code_t *instr,            // handler code instruction
-                           vf_MapVector_t *invector)    // incoming data flow vector
+vf_get_handler_out_vector( vf_MapVector* invector,            // IN handler vector
+                           vf_MapVectorHandle handler_vector) // stored handler vector
 {
+    assert( 0 == invector->m_depth );
+    assert( 1 == handler_vector->m_depth );
+    assert( SM_REF == handler_vector->m_stack->m_type );
+
+    // clear stack for exception handler
+    vf_clear_stack( invector );
+
     // set handler out vector
-    assert( invector->m_deep == 0 );
-    assert( instr->m_outlen == 1 );
-    invector->m_stack->m_type = instr->m_outvector->m_type;
-    invector->m_stack->m_vtype = instr->m_outvector->m_vtype;
+    invector->m_stack->m_type = handler_vector->m_stack->m_type;
+    invector->m_stack->m_vtype = handler_vector->m_stack->m_vtype;
+
     // set modify vector value
-    invector->m_deep++;
+    invector->m_depth = 1;
     return VER_OK;
 } // vf_get_handler_out_vector
 
@@ -993,59 +979,56 @@ vf_get_handler_out_vector( vf_Code_t *instr,            // handler code instruct
  */
 static Verifier_Result
 vf_set_node_out_vector( unsigned node_num,          // graph node number
-                        vf_MapVector_t *invector,   // incoming data flow vector
+                        vf_MapVector* invector,     // incoming data flow vector
                         vf_MapEntry_t *buf,         // buf stack map vector
                         vf_Context_t *ctex)         // verifier context
 {
-    unsigned index,
-             instruction;
-    vf_Code_t *instr;
     Verifier_Result result;
 
     // get node instruction number
-    vf_Graph_t *graph = ctex->m_graph;
-    instruction = graph->GetNodeLastInstr( node_num ) 
-        - graph->GetNodeFirstInstr( node_num ) + 1;
-    // get first instruction
-    instr = &ctex->m_code[graph->GetNodeFirstInstr( node_num )];
+    vf_Graph* graph = ctex->m_graph;
+    vf_NodeHandle node = graph->GetNode( node_num );
 
     /** 
      * For start-entry node doesn't need to check data flow
      */
-    if( vf_is_instruction_has_flags( instr, VF_FLAG_START_ENTRY ) ) {
-        assert( instruction == 1 );
+    if (VF_TYPE_NODE_START_ENTRY == node->m_type) {
         return VER_OK;
-    } else if( vf_is_instruction_has_flags( instr, VF_FLAG_HANDLER ) ) {
-        assert( instruction == 1 );
-        // set out vector for handler node
-        result = vf_get_handler_out_vector( instr, invector );
+    }
+
+    if (VF_TYPE_NODE_HANDLER == node->m_type) {
+        // set OUT vector for a handler node
+        return vf_get_handler_out_vector( invector, &node->m_outMapVector );
+    }
+
+    // get first instruction
+    vf_Code_t* instr = &ctex->m_code[graph->GetNodeFirstInstr( node_num )];
+    unsigned instruction = graph->GetNodeLastInstr( node_num ) 
+        - graph->GetNodeFirstInstr( node_num ) + 1;
+
+    // set out vector for each instruction
+    for( unsigned index = 0; index < instruction; index++ )
+    {
+        if( ( 0 == instr[index].m_inlen + instr[index].m_outlen )
+            && ( VF_TYPE_INSTR_NONE == instr->m_type ) )
+        {
+            continue;
+        } else {
+            result = vf_get_instruction_out_vector( node_num, &instr[index],
+                invector, buf, ctex );
+        }
         if( result != VER_OK ) {
             return result;
         }
-    } else {
-        // set out vector for each instruction
-        for( index = 0; index < instruction; index++ ) {
-            if( instr[index].m_inlen + instr[index].m_outlen == 0 
-                && !vf_is_instruction_has_any_flags( instr ) )
-            {
-                continue;
-            } else {
-                result = vf_get_instruction_out_vector( node_num, &instr[index], invector, 
-                    buf, ctex );
-            }
-            if( result != VER_OK ) {
-                return result;
-            }
 #if _VERIFY_DEBUG
-            if( ctex->m_dump.m_code_vector ) {
-                // dump instruction OUT vector
-                cerr << "-------------- instruction #" << index << " out: " << endl;
-                vf_dump_vector( invector, &instr[index], &cerr );
-            }
-#endif // _VERIFY_DEBUG
+        if( ctex->m_dump.m_code_vector )
+        {
+            // dump instruction OUT vector
+            cerr << "-------------- instruction #" << index << " out: " << endl;
+            vf_dump_vector( invector, &instr[index], &cerr );
         }
+#endif // _VERIFY_DEBUG
     }
-
     return VER_OK;
 } // vf_set_node_out_vector
 
@@ -1054,13 +1037,13 @@ vf_set_node_out_vector( unsigned node_num,          // graph node number
  */
 static Verifier_Result
 vf_create_node_vectors( unsigned node_num,          // graph node number
-                        vf_MapVector_t *incoming,   // vector for instruction data flow change
+                        vf_MapVector* incoming,     // vector for instruction data flow change
                         vf_MapEntry_t *buf,         // buf stack map vector
                         bool *is_out_changed,       // pointer to OUT vector change flag
                         vf_Context_t *ctex)         // verifier context
 {
     // copy IN vector to buf
-    vf_Graph_t *graph = ctex->m_graph;
+    vf_Graph* graph = ctex->m_graph;
     vf_copy_vector( graph->GetNodeInVector( node_num ), incoming );
 
 #if _VERIFY_DEBUG
@@ -1082,12 +1065,12 @@ vf_create_node_vectors( unsigned node_num,          // graph node number
     }
 
     // set node OUT vector
-    vf_MapVector_t *outcoming = graph->GetNodeOutVector( node_num );
+    vf_MapVector* outcoming = (vf_MapVector*) graph->GetNodeOutVector( node_num );
     if( !outcoming->m_maxlocal || !outcoming->m_maxstack )
     {
         // create node OUT vector
         graph->SetNodeOutVector( node_num, incoming, true );
-        outcoming = graph->GetNodeOutVector( node_num );
+        outcoming = (vf_MapVector*) graph->GetNodeOutVector( node_num );
         *is_out_changed = true;
     } else if( !vf_compare_vectors( outcoming, incoming ) ) {
         // vectors are differ
@@ -1104,32 +1087,27 @@ vf_create_node_vectors( unsigned node_num,          // graph node number
 #endif // _VERIFY_DEBUG
 
     // check stack modifier
-    assert( (int)((graph->GetNodeOutVector( node_num )->m_deep
-        - graph->GetNodeInVector( node_num )->m_deep))
+    assert( (int)((graph->GetNodeOutVector( node_num )->m_depth
+        - graph->GetNodeInVector( node_num )->m_depth))
         == graph->GetNodeStackModifier( node_num ) );
 
     return VER_OK;
 } // vf_create_node_vectors
 
 /**
- * Function checks data flow for end graph node.
+ * Checks data flow for an end graph node.
  */
 static Verifier_Result
-vf_check_end_node_data_flow( unsigned node_num,         // graph node number
-                             vf_MapVector_t *invector,  // end node incoming data flow vector
-                             vf_Context_t *ctex)        // verifier context
+vf_check_end_node_data_flow( vf_MapVectorHandle invector,  // end node incoming data flow vector
+                             vf_Context_t *ctex)           // verifier context
 {
-    bool copy;
-    unsigned index;
-    vf_MapEntry_t *vector;
-
     // don't need check
     if( invector->m_stack && invector->m_stack->m_type == SM_TERMINATE ) {
         return VER_OK;
     }
 
     // check <init> method
-    if( !memcmp( method_get_name( ctex->m_method ), "<init>", 7 )
+    if( ctex->m_is_constructor
         && ctex->m_vtype.m_class != ctex->m_vtype.m_object )
     {
         if( invector->m_local->m_type != SM_UNINITIALIZED
@@ -1137,19 +1115,16 @@ vf_check_end_node_data_flow( unsigned node_num,         // graph node number
         {
             // constructor returns initialized reference of a given class
         } else {
-            VERIFY_REPORT( ctex, "(class: " << class_get_name( ctex->m_class ) 
-                << ", method: " << method_get_name( ctex->m_method )
-                << method_get_descriptor( ctex->m_method )
-                << ") Constructor must be invoked" );
+            VERIFY_REPORT_METHOD( ctex, "Constructor must be invoked" );
             return VER_ErrorDataFlow;
         }
     }
 
-    // get first instruction
-    vf_Code_t *instr = &ctex->m_code[ctex->m_graph->GetNodeFirstInstr( node_num )];
+    // get the end entry
+    vf_NodeHandle node = ctex->m_graph->GetNode( ctex->m_nodeNum - 1 );
 
     // check void return
-    if( !instr->m_inlen ) {
+    if( 0 == node->m_inMapVector.m_depth ) {
         if( invector->m_stack ) {
             if( invector->m_stack->m_type == SM_TOP ) {
                 // no return value, empty stack - all is ok
@@ -1159,32 +1134,32 @@ vf_check_end_node_data_flow( unsigned node_num,         // graph node number
             // no stack, no return value - all is ok
             return VER_OK;
         }
-        VERIFY_REPORT( ctex, "(class: " << class_get_name( ctex->m_class ) 
-            << ", method: " << method_get_name( ctex->m_method )
-            << method_get_descriptor( ctex->m_method )
-            << ") Wrong return type in function" );
+        VERIFY_REPORT_METHOD( ctex, "Wrong return type in function" );
         return VER_ErrorDataFlow;
     }
-    assert( invector->m_deep - instr->m_minstack >= 0 );
+    // stack size should be greater or equal than a minimal
+    // stack size which is a number of words to return (0, 1 or 2)
+    assert( invector->m_depth - node->m_inMapVector.m_depth >= 0 );
 
     /**
      * Check end-entry IN vector
      */
-    for( index = 0, vector = &instr->m_invector[0];
-         index < instr->m_inlen;
-         index++, vector = &instr->m_invector[index] )
+    for( unsigned index = 0;
+         index < node->m_inMapVector.m_depth;
+         index++ )
     {
         // get check entry
+        vf_MapEntry_t* vector = node->m_inMapVector.m_stack + index;
         assert( vector->m_is_local == 0 );
+
         // check stack type
         vf_MapEntry_t *entry = invector->m_stack + index;
+
         // check entry types
+        bool copy;
         Verifier_Result result = vf_check_entry_types( entry, vector, true, &copy, ctex );
         if( result != VER_OK ) {
-            VERIFY_REPORT( ctex, "(class: " << class_get_name( ctex->m_class ) 
-                << ", method: " << method_get_name( ctex->m_method )
-                << method_get_descriptor( ctex->m_method )
-                << ") Wrong return type in function" );
+            VERIFY_REPORT_METHOD( ctex, "Wrong return type in function" );
             return result;
         }
     }
@@ -1196,18 +1171,18 @@ vf_check_end_node_data_flow( unsigned node_num,         // graph node number
  */
 static Verifier_Result
 vf_check_node_data_flow( unsigned node_num,             // graph node number
-                         vf_MapVector_t *incoming,      // incoming data flow vector
+                         vf_MapVector* incoming,        // incoming data flow vector
                          vf_MapEntry_t *buf,            // buf stack map vector
                          unsigned *node_count,          // last graph node in recursion
                          bool *need_recheck,            // set to true if need to recheck previous nodes
                          vf_Context_t *ctex)            // verifier context
 {
     // get graph
-    vf_Graph_t *graph = ctex->m_graph;
+    vf_Graph* graph = ctex->m_graph;
 
     // skip end-entry node
-    if( vf_is_instruction_has_flags( &ctex->m_code[graph->GetNodeFirstInstr( node_num )],
-            VF_FLAG_END_ENTRY) )
+    vf_NodeHandle node = graph->GetNode( node_num );
+    if( VF_TYPE_NODE_END_ENTRY == node->m_type )
     {
         return VER_OK;
     }
@@ -1233,7 +1208,7 @@ vf_check_node_data_flow( unsigned node_num,             // graph node number
     }
 
     // set incoming vector for following nodes
-    vf_MapVector_t *in_node_vector = graph->GetNodeOutVector( node_num );
+    vf_MapVectorHandle in_node_vector = graph->GetNodeOutVector( node_num );
     for( unsigned out_edge = graph->GetNodeFirstOutEdge( node_num );
          out_edge;
          out_edge = graph->GetEdgeNextOutEdge( out_edge ) )
@@ -1242,12 +1217,10 @@ vf_check_node_data_flow( unsigned node_num,             // graph node number
         unsigned out_node = graph->GetEdgeEndNode( out_edge );
 
         // check vectors for end-entry
-        if( vf_is_instruction_has_flags( 
-            &ctex->m_code[graph->GetNodeFirstInstr( out_node )],
-            VF_FLAG_END_ENTRY) )
+        if( VF_TYPE_NODE_END_ENTRY == graph->GetNode( out_node )->m_type )
         {
-            Verifier_Result result = vf_check_end_node_data_flow( out_node,
-                                        in_node_vector, ctex );
+            Verifier_Result result = 
+                vf_check_end_node_data_flow( in_node_vector, ctex );
             if( result != VER_OK ) {
                 return result;
             }
@@ -1255,13 +1228,12 @@ vf_check_node_data_flow( unsigned node_num,             // graph node number
         }
 
         // get out node IN vector
-        vf_MapVector_t *out_node_vector = graph->GetNodeInVector( out_node );
+        vf_MapVector* out_node_vector = (vf_MapVector*)
+            graph->GetNodeInVector( out_node );
         if( !out_node_vector->m_maxlocal || !out_node_vector->m_maxstack )
         {
             // node's IN vector is invalid, set it
-            if( vf_is_instruction_has_flags( 
-                    &ctex->m_code[graph->GetNodeFirstInstr( out_node )],
-                    VF_FLAG_HANDLER) )
+            if( VF_TYPE_NODE_HANDLER == graph->GetNode( out_node )->m_type )
             {
                 // it's exception node, create IN vector for it
                 vf_copy_vector( in_node_vector, incoming );
@@ -1279,9 +1251,7 @@ vf_check_node_data_flow( unsigned node_num,             // graph node number
             }
 #endif // _VERIFY_DEBUG
             // node's IN vector is valid, merge them
-            bool is_handler = vf_is_instruction_has_flags( 
-                    &ctex->m_code[graph->GetNodeFirstInstr( out_node )],
-                    VF_FLAG_HANDLER);
+            bool is_handler = VF_TYPE_NODE_HANDLER == graph->GetNode( out_node )->m_type;
             is_changed = vf_merge_vectors( out_node_vector, in_node_vector, is_handler, ctex );
             if( is_changed ) {
                 // node IN vector is changed, reset node OUT vector results
@@ -1316,57 +1286,64 @@ vf_check_node_data_flow( unsigned node_num,             // graph node number
 } // vf_check_node_data_flow
 
 /**
- * Function creates initial data flow vector for method.
+ * Creates input and output stack maps.
  */
-static vf_MapVector_t*
-vf_create_method_begin_vector( vf_Context_t *ctex )     // verifier context
+static vf_MapVectorHandle
+vf_create_terminal_maps( vf_Context_t *ctex )     // verifier context
 {
-    int index,
-        count,
-        inlen,
-        begin,
-        outlen;
-    unsigned locals,
-             maxstack;
-    vf_MapEntry_t *invector,
-                  *outvector;
-    vf_MapVector_t *vector;
+    vf_MapEntry_t  *invector;
 
     // get method values
-    locals = method_get_max_local( ctex->m_method );
-    maxstack = method_get_max_stack( ctex->m_method );
+    unsigned locals = method_get_max_local( ctex->m_method );
+    unsigned maxstack = method_get_max_stack( ctex->m_method );
 
     // alloc memory for vector structure
-    vector = (vf_MapVector_t*)ctex->m_graph->AllocMemory( sizeof(vf_MapVector_t) );
+    vf_MapVector* vector = 
+        (vf_MapVector*) ctex->m_graph->AllocMemory( sizeof( vf_MapVector ) );
+        
     // alloc memory for stack vector
     if( maxstack ) {
         vector->m_maxstack = (unsigned short)maxstack;
         vector->m_stack = (vf_MapEntry_t*)ctex->m_graph->
-            AllocMemory( maxstack * sizeof(vf_MapEntry_t) );
+            AllocMemory( maxstack * sizeof( vf_MapEntry_t ) );
     }
     // alloc memory for locals vector
     if( locals ) {
         vector->m_maxlocal = (unsigned short)locals;
         vector->m_local = (vf_MapEntry_t*)ctex->m_graph->
-            AllocMemory( locals * sizeof(vf_MapEntry_t) );
+            AllocMemory( locals * sizeof( vf_MapEntry_t ) );
     }
 
     // get method signature
     const char *descr = method_get_descriptor( ctex->m_method );
 
-    // get method vectors
+    // get the end node IN vector
+    vf_MapVector* p_outvector = 
+        (vf_MapVector*)ctex->m_graph->GetNodeInVector( ctex->m_nodeNum - 1 );
+
+    // get vectors sizes
+    int inlen, outlen;
     vf_parse_description( descr, &inlen, &outlen );
-    vf_set_description_vector( descr, inlen, 0, outlen, &invector, &outvector, ctex );
+    p_outvector->m_depth = outlen;
+
+    // get method vectors
+    vf_set_description_vector( descr, inlen, 0, outlen, &invector,
+        &p_outvector->m_stack, ctex );
+
+    // cache in the context if the method is a constructor
+    ctex->m_is_constructor =
+        memcmp( method_get_name( ctex->m_method ), "<init>", 7 ) == 0;
 
     // set "this" reference in local variable
+    int start;
     if( method_is_static( ctex->m_method ) ) {
-        begin = 0;
+        start = 0;
     } else {
-        begin = 1;
+        start = 1;
         // fill "this" entry
         const char *name = class_get_name( ctex->m_class );
         vf_ValidType_t *type = vf_create_class_valid_type( name, ctex );
-        if( !memcmp( method_get_name( ctex->m_method ), "<init>", 7 ) ) {
+        if( ctex->m_is_constructor ) {
             vector->m_local->m_type = SM_UNINITIALIZED;
         } else {
             vector->m_local->m_type = SM_REF;
@@ -1377,7 +1354,8 @@ vf_create_method_begin_vector( vf_Context_t *ctex )     // verifier context
     }
 
     // set start vector
-    for( index = begin, count = 0; count < inlen; index++, count++ ) {
+    int index, count;
+    for( index = start, count = 0; count < inlen; index++, count++ ) {
         vector->m_local[index].m_type = invector[count].m_type;
         vector->m_local[index].m_vtype = invector[count].m_vtype;
         vector->m_local[index].m_is_local = 1;
@@ -1385,7 +1363,6 @@ vf_create_method_begin_vector( vf_Context_t *ctex )     // verifier context
     }
     vector->m_number = (unsigned short)index;
 
-    // FIXME - need set end entry vector
     return vector;
 } // vf_create_method_begin_vector
 
@@ -1396,15 +1373,15 @@ void
 vf_enumerate_graph_node( vf_Context_t *ctex )
 {
     // clear graph node marks
-    vf_Graph_t *graph = ctex->m_graph;
+    vf_Graph* graph = ctex->m_graph;
     graph->CleanNodesMark();
 
     // set first enumeration node
-    graph->SetStartCountNode(0);
+    graph->SetStartCountNode( 0 );
     graph->SetNodeMark( 0, VERIFY_START_MARK );
 
     // enumerate graph nodes
-    for( unsigned index = 0; index < graph->GetNodeNumber(); index++ ) {
+    for( unsigned index = 0; index < graph->GetNodeCount(); index++ ) {
         // get node by count element
         unsigned node_num = graph->GetCountElementNode( index );
         if( node_num == ~0U ) {
@@ -1447,26 +1424,26 @@ vf_check_graph_data_flow( vf_Context_t *ctex )  // verifier context
     // enumerate graph
     vf_enumerate_graph_node( ctex );
 
-    // get begin vector
-    vf_MapVector_t *begin = vf_create_method_begin_vector( ctex );
+    // get a start vector
+    vf_MapVector* start = (vf_MapVector*)vf_create_terminal_maps( ctex );
 
     // create buf stack map vector (max 4 entry)
     vf_MapEntry_t *buf = (vf_MapEntry_t*)vf_alloc_pool_memory( ctex->m_pool,
-            sizeof(vf_MapEntry_t) * method_get_max_stack( ctex->m_method ) );
+            sizeof( vf_MapEntry_t ) * method_get_max_stack( ctex->m_method ) );
 
     // clean graph mark
-    vf_Graph_t *graph = ctex->m_graph;
+    vf_Graph* graph = ctex->m_graph;
     graph->CleanNodesMark();
 
     // set start node IN vector
-    graph->SetNodeInVector( 0, begin, true );
+    graph->SetNodeInVector( 0, start, true );
 
     // check graph data flow
     bool need_recheck = false;
     unsigned count = 0;
     do {
         unsigned node = graph->GetCountElementNode( count );
-        Verifier_Result result = vf_check_node_data_flow( node, begin, buf, &count, &need_recheck, ctex );
+        Verifier_Result result = vf_check_node_data_flow( node, start, buf, &count, &need_recheck, ctex );
         if( result != VER_OK ) {
             return result;
         }
@@ -1480,5 +1457,3 @@ vf_check_graph_data_flow( vf_Context_t *ctex )  // verifier context
 
     return VER_OK;
 } // vf_check_graph_data_flow
-
-} // namespace Verifier

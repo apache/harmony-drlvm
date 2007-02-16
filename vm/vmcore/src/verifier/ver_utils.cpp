@@ -28,11 +28,6 @@
 // Macro enable verifier memory trace
 #define VERIFY_TRACE_MEMORY 0
 
-/**
- * Set namespace Verifier
- */
-namespace Verifier {
-
 /************************************************************
  *********************** Hash class *************************
  ************************************************************/
@@ -1031,52 +1026,36 @@ vf_set_error( method_handler method,        // failed method
     switch( check )
     {
     case VF_CHECK_PARAM:
-        VERIFY_REPORT( ctex, "(class: " << class_get_name( ctex->m_class ) 
-            << ", method: " << method_get_name( method )
-            << method_get_descriptor( method )
-            << ") Incompatible argument for function" );
+        VERIFY_REPORT_METHOD( ctex,
+            "Incompatible argument for function" );
         break;
     case VF_CHECK_ASSIGN:
-        VERIFY_REPORT( ctex, "(class: " << class_get_name( ctex->m_class ) 
-            << ", method: " << method_get_name( method )
-            << method_get_descriptor( method )
-            << ") Incompatible types for field assignment" );
+        VERIFY_REPORT_METHOD( ctex,
+            "Incompatible types for field assignment" );
         break;
     case VF_CHECK_ASSIGN_WEAK:
-        VERIFY_REPORT( ctex, "(class: " << class_get_name( ctex->m_class ) 
-            << ", method: " << method_get_name( method )
-            << method_get_descriptor( method )
-            << ") Incompatible types for array assignment" );
+        VERIFY_REPORT_METHOD( ctex, 
+            "Incompatible types for array assignment" );
         break;
     case VF_CHECK_SUPER:
-        VERIFY_REPORT( ctex, "(class: " << class_get_name( ctex->m_class ) 
-            << ", method: " << method_get_name( method )
-            << method_get_descriptor( method )
-            << ") Exception class not a subclass of Throwable" );
+        VERIFY_REPORT_METHOD( ctex,
+            "Exception class not a subclass of Throwable" );
         break;
     case VF_CHECK_ACCESS_FIELD:
-        VERIFY_REPORT( ctex, "(class: " << class_get_name( ctex->m_class ) 
-            << ", method: " << method_get_name( method )
-            << method_get_descriptor( method )
-            << ") Bad access to protected field" );
+        VERIFY_REPORT_METHOD( ctex,
+            "Bad access to protected field" );
         break;
     case VF_CHECK_ACCESS_METHOD:
-        VERIFY_REPORT( ctex, "(class: " << class_get_name( ctex->m_class ) 
-            << ", method: " << method_get_name( method )
-            << method_get_descriptor( method )
-            << ") Bad access to protected method" );
+        VERIFY_REPORT_METHOD( ctex,
+            "Bad access to protected method" );
         break;
     case VF_CHECK_DIRECT_SUPER:
-        VERIFY_REPORT( ctex, "(class: " << class_get_name( ctex->m_class ) 
-            << ", method: " << method_get_name( method )
-            << method_get_descriptor( method )
-            << ") Call to wrong initialization method" );
+        VERIFY_REPORT_METHOD( ctex,
+            "Call to wrong initialization method" );
         break;
     case VF_CHECK_INVOKESPECIAL:
-        VERIFY_REPORT( ctex, "(class: " << class_get_name( ctex->m_class ) 
-            << ", method: " << method_get_name( method )
-            << method_get_descriptor( method )
-            << ") Incompatible object argument for invokespecial" );
+        VERIFY_REPORT_METHOD( ctex,
+            "Incompatible object argument for invokespecial" );
         break;
     default:
         LDIE(41, "Verifier: vf_set_error: unknown check type" );
@@ -1396,7 +1375,8 @@ vf_force_check_constraint( vf_TypeConstraint_t *constraint,     // class constra
         while( constraint->target[index++] != 'L' ) {
             assert( constraint->target[index] != '\0' );
         }
-        VERIFY_REPORT( ctex, &(constraint->target[index]) );
+        VERIFY_REPORT( ctex, "Couldn't load class: "
+            << &(constraint->target[index]) );
         return VER_ErrorLoadClass;
     }
 
@@ -1448,7 +1428,8 @@ vf_force_check_constraint( vf_TypeConstraint_t *constraint,     // class constra
         while( constraint->source[index++] != 'L' ) {
             assert( constraint->source[index] != '\0' );
         }
-        VERIFY_REPORT( ctex, &(constraint->source[index]) );
+        VERIFY_REPORT( ctex, "Couldn't load class: "
+            << &(constraint->source[index]) );
         return VER_ErrorLoadClass;
     }
 
@@ -1479,7 +1460,7 @@ vf_force_check_constraint( vf_TypeConstraint_t *constraint,     // class constra
 /**
  * Function verifies class constraints.
  */
-Verifier_Result
+static Verifier_Result
 vf_verify_class_constraints( vf_Context_t *ctex )        // verifier context
 {
     // get method verify data
@@ -1815,8 +1796,6 @@ vf_delete_pool_func( vf_VerifyPool_t *hpool,    // memory pool
     return;
 } // vf_delete_pool_func
 
-} // namespace Verifier
-
 /**
  * Function provides final constraint checks for a given class.
  */
@@ -1834,7 +1813,7 @@ vf_verify_class_constraints( class_handler klass,      // a given class
     context.m_dump.m_verify = verifyAll ? 1 : 0;
 
     // verified constraint for a given method
-    Verifier_Result result = Verifier::vf_verify_class_constraints( &context );
+    Verifier_Result result = vf_verify_class_constraints( &context );
     *message = context.m_error;
 
 #if _VERIFY_DEBUG
