@@ -67,6 +67,9 @@ const String* class_extract_name(Global_Env* env,
 bool ClassLoader::Initialize( ManagedObject* loader )
 {
     m_loader = loader;
+    if(m_loader != NULL) {
+        m_name = m_loader->vt()->clss->get_name();
+    }
     if(!(m_package_table = new Package_Table())){
         return false;
     }

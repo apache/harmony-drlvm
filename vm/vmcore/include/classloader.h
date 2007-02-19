@@ -153,7 +153,7 @@ private:
 
     friend class GlobalClassLoaderIterator;
 public:
-    ClassLoader() : m_loader(NULL), m_parent(NULL), m_package_table(NULL), 
+    ClassLoader() : m_loader(NULL), m_parent(NULL), m_name(NULL), m_package_table(NULL), 
         m_loadedClasses(NULL), m_loadingClasses(NULL), m_reportedClasses(NULL),
         m_javaTypes(NULL), m_nativeLibraries(NULL), m_markBit(0),
         m_unloading(false), m_fullSize(0), m_verifyData(NULL)
@@ -211,6 +211,7 @@ public:
     bool NotMarked() { return (m_markBit == 0); }
     unsigned GetFullSize();
     ManagedObject* GetLoader() { return m_loader; }
+    const String* GetName() { return m_name; }
     ClassLoader* GetParent() { return m_parent; }
     Package_Table* getPackageTable() { return m_package_table; }
     ClassTable* GetLoadedClasses() { return m_loadedClasses; }
@@ -267,6 +268,7 @@ protected:
     // data
     ManagedObject* m_loader;
     ClassLoader* m_parent;
+    const String* m_name; 
     Package_Table* m_package_table;
     ClassTable* m_loadedClasses;
     ClassTable* m_initiatedClasses;

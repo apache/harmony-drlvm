@@ -630,10 +630,13 @@ public:
      * <li>Sets #CONSTANT_String entries to point directly to the
      * <code>String</code> representation. 
      * <li>Preresolves #CONSTANT_NameAndType entries to signatures. </ul>
-     * @param[in] clss - the class that the given constant pool belongs to
+     * @param[in] env           - VM environment
+     * @param[in] clss          - the class that the given constant pool belongs to
+     * @param[in] is_trusted_cl - defines whether class was loaded by
+     *                            trusted classloader. User defined classloaders are not trusted.
      * @return <code>true</code> if the constant pool of clss is valid;
      *         otherwise <code>false</code>.*/
-    bool check(Global_Env *, Class* clss);
+    bool check(Global_Env * env, Class* clss, bool is_trusted_cl);
 
     /** Clears the constant-pool content: tags and entries arrays.*/
     void clear() {
@@ -1836,18 +1839,22 @@ private:
     bool parse_interfaces(ByteReader &cfs);
 
     /** Parses class fields from a class-file stream.
-     * @param[in] env - VM enviroment
-     * @param[in] cfs - a class-file stream
+     * @param[in] env           - VM enviroment
+     * @param[in] cfs           - a class-file stream
+     * @param[in] is_trusted_cl - defines whether class was loaded by
+     *                            trusted classloader. User defined classloaders are not trusted.
      * @return <code>true</code> if successfully parses fields; <code>false</code> 
      *         if any parse error occurs.*/
-    bool parse_fields(Global_Env* env, ByteReader &cfs);
+    bool parse_fields(Global_Env* env, ByteReader &cfs, bool is_trusted_cl);
 
     /** Parses class methods from a class-file stream.
-     * @param[in] env - VM enviroment
-     * @param[in] cfs - a class file stream
+     * @param[in] env           - VM enviroment
+     * @param[in] cfs           - a class file stream
+     * @param[in] is_trusted_cl - defines whether class was loaded by
+     *                            trusted classloader. User defined classloaders are not trusted.     
      * @return <code>true</code> if successfully parses methods; <code>false</code> 
      *         if any parse error occurs.*/
-    bool parse_methods(Global_Env* env, ByteReader &cfs);
+    bool parse_methods(Global_Env* env, ByteReader &cfs, bool is_trusted_cl);
 
     /** Calculates and assigns offsets to class fields during preparation.*/
     void assign_offsets_to_fields();

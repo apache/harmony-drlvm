@@ -214,7 +214,7 @@ public:
     unsigned is_transient() {return (_access_flags&ACC_TRANSIENT);} 
     bool is_enum()          {return (_access_flags&ACC_ENUM)?true:false;} 
     
-    bool parse(Global_Env& env, Class* clss, ByteReader& cfs);
+    bool parse(Global_Env& env, Class* clss, ByteReader& cfs, bool is_trusted_cl);
 
     unsigned calculate_size();
 
@@ -637,7 +637,7 @@ public:
     bool is_fake_method()           {return (_intf_method_for_fake_method != NULL);}
     Method *get_real_intf_method()  {return _intf_method_for_fake_method;}
 
-    bool parse(Global_Env& env, Class* clss, ByteReader& cfs);
+    bool parse(Global_Env& env, Class* clss, ByteReader& cfs, bool is_trusted_cl);
 
     void calculate_arguments_slot_num();
     
