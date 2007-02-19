@@ -189,7 +189,7 @@ void m2n_set_frame_type(M2nFrame* m2nf, frame_type m2nf_type) {
     do_flushrs();
     uint64 * UNUSED bsp = (uint64 *)m2nf;
     assert(bsp);
-    (frame_type)*get_stacked_register_address(m2n_get_bsp(m2nf), M2N_FRAME_TYPE) = m2nf_type;
+    *get_stacked_register_address(m2n_get_bsp(m2nf), M2N_FRAME_TYPE) = m2nf_type;
 }
 
 //***** Stub Interface

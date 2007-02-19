@@ -15,6 +15,7 @@
 -->
 <project name="ALL TESTS">
     <select arch="ipf">
+        <property name="test.mode" value="int" />
         <target name="test" depends="smoke.test, check-result"/>
     </select>
     <select arch="ia32,em64t">
