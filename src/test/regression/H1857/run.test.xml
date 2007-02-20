@@ -1,0 +1,12 @@
+<project name="RUN HARMONY-1857 Regression Test">
+    <target name="run-test">
+        <delete
+             file="${reg.test.class.path}/org/apache/harmony/drlvm/tests/regression/h1857/MissedThrowable.class"
+             verbose="true"/>
+        <run-junit-test 
+             test="org.apache.harmony.drlvm.tests.regression.h1857.Test"
+             vmarg="-Xem:opt">
+        </run-junit-test>
+    </target>
+</project>
+
