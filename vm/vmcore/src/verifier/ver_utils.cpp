@@ -1007,12 +1007,8 @@ vf_is_valid( class_handler source,              // checked class
     case VF_CHECK_INVOKESPECIAL:    // check object for invokespecial instruction
         return vf_is_super_class( source, current )
                     && vf_is_super_class( current, target );
-    default:
-        LDIE(40, "Verifier: vf_is_valid: invalid check type" );
-        return false;
     }
-    // unreachable code
-    assert(0);
+    LDIE(40, "Verifier: vf_is_valid: invalid check type" );
 } // vf_is_valid
 
 /**
@@ -1026,42 +1022,39 @@ vf_set_error( method_handler method,        // failed method
     switch( check )
     {
     case VF_CHECK_PARAM:
-        VERIFY_REPORT_METHOD( ctex,
+        VERIFY_REPORT_CLASS( ctex, method,
             "Incompatible argument for function" );
-        break;
+        return;
     case VF_CHECK_ASSIGN:
-        VERIFY_REPORT_METHOD( ctex,
+        VERIFY_REPORT_CLASS( ctex, method,
             "Incompatible types for field assignment" );
-        break;
+        return;
     case VF_CHECK_ASSIGN_WEAK:
-        VERIFY_REPORT_METHOD( ctex, 
+        VERIFY_REPORT_CLASS( ctex, method, 
             "Incompatible types for array assignment" );
-        break;
+        return;
     case VF_CHECK_SUPER:
-        VERIFY_REPORT_METHOD( ctex,
+        VERIFY_REPORT_CLASS( ctex, method,
             "Exception class not a subclass of Throwable" );
-        break;
+        return;
     case VF_CHECK_ACCESS_FIELD:
-        VERIFY_REPORT_METHOD( ctex,
+        VERIFY_REPORT_CLASS( ctex, method,
             "Bad access to protected field" );
-        break;
+        return;
     case VF_CHECK_ACCESS_METHOD:
-        VERIFY_REPORT_METHOD( ctex,
+        VERIFY_REPORT_CLASS( ctex, method,
             "Bad access to protected method" );
-        break;
+        return;
     case VF_CHECK_DIRECT_SUPER:
-        VERIFY_REPORT_METHOD( ctex,
+        VERIFY_REPORT_CLASS( ctex, method,
             "Call to wrong initialization method" );
-        break;
+        return;
     case VF_CHECK_INVOKESPECIAL:
-        VERIFY_REPORT_METHOD( ctex,
+        VERIFY_REPORT_CLASS( ctex, method,
             "Incompatible object argument for invokespecial" );
-        break;
-    default:
-        LDIE(41, "Verifier: vf_set_error: unknown check type" );
-        break;
+        return;
     }
-    return;
+    LDIE(41, "Verifier: vf_set_error: unknown check type" );
 } // vf_set_error
 
 /**

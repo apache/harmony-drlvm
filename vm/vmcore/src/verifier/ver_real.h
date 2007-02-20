@@ -71,12 +71,14 @@ using namespace std;
         stream << error_message;                    \
         vf_set_error_message( stream, (context) );  \
     }
-#define VERIFY_REPORT_METHOD(context, error_message )               \
+#define VERIFY_REPORT_CLASS(context, method, error_message )        \
     VERIFY_REPORT(context,                                          \
         "(class: " << class_get_name( (context)->m_class )          \
-        << ", method: " << method_get_name( (context)->m_method )   \
-        << method_get_descriptor( (context)->m_method )             \
+        << ", method: " << method_get_name( method )                \
+        << method_get_descriptor( method )                          \
         << ") " << error_message )
+#define VERIFY_REPORT_METHOD(context, error_message )               \
+    VERIFY_REPORT_CLASS(context, (context)->m_method, error_message )
 
 /**
  * Define source code line and source file name parameters and arguments.
