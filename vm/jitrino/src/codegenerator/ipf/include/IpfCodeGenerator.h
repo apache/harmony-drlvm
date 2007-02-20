@@ -34,17 +34,15 @@ namespace IPF {
 // CodeGenerator
 //========================================================================================//
 
-class CodeGenerator : public ::Jitrino::CodeGenerator {
+class CodeGenerator : public SessionAction {
 public:
-                         CodeGenerator(MemoryManager&, CompilationInterface&);
-    void                 genCode(SessionAction*, MethodCodeSelector&);
+                         CodeGenerator();
+    void                 run();
     virtual              ~CodeGenerator() {}
 
 protected:
-    MemoryManager        &memoryManager;
-    CompilationInterface &compilationInterface;
+    CompilationInterface *compilationInterface;
     MethodDesc           *methodDesc;
-
     Cfg                  *cfg;
 };
 

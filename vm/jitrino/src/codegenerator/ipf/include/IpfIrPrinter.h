@@ -37,7 +37,7 @@ namespace IPF {
 
 class IrPrinter {
 public:
-                   IrPrinter(Cfg&, char*);
+                   IrPrinter(Cfg&);
     void           printCfgDot(char*);
     void           printLayoutDot(char*);
     void           printAsm(ostream&);
@@ -65,7 +65,6 @@ protected:
     
     MemoryManager  &mm;
     Cfg            &cfg;
-    char           *logDirName;   // name of log dir
     ostream        *os;           // output stream
     ofstream       *ofs;          // file output stream
 };

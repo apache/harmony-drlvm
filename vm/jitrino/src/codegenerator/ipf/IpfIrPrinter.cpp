@@ -35,20 +35,17 @@ bool greaterOpnd (Opnd *o1, Opnd *o2) { return o1->getId() > o2->getId(); }
 // IrPrinter
 //========================================================================================//
 
-IrPrinter::IrPrinter(Cfg &cfg_, char *logDirName_) :
+IrPrinter::IrPrinter(Cfg &cfg_) :
     mm(cfg_.getMM()),
     cfg(cfg_),
-    logDirName(logDirName_),
     ofs(NULL) {
 }
 
 //----------------------------------------------------------------------------------------//
 
-void IrPrinter::printLayoutDot(char *logFileName) {
+void IrPrinter::printLayoutDot(char *logName) {
 
-    string logName(logDirName);
-    logName.append(logFileName);
-    ofs = new(mm) ofstream(logName.c_str());
+    ofs = new(mm) ofstream(logName);
     
     BbNode *node = (BbNode *)cfg.getEnterNode();
     BbNode *succ = node->getLayoutSucc();
@@ -69,11 +66,9 @@ void IrPrinter::printLayoutDot(char *logFileName) {
 
 //----------------------------------------------------------------------------------------//
 
-void IrPrinter::printCfgDot(char *logFileName) {
+void IrPrinter::printCfgDot(char *logName) {
 
-    string logName(logDirName);
-    logName.append(logFileName);
-    ofs = new(mm) ofstream(logName.c_str());
+    ofs = new(mm) ofstream(logName);
     
     NodeVector &nodes = cfg.search(SEARCH_POST_ORDER);
 

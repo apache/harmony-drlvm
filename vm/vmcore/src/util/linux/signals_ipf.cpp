@@ -81,6 +81,7 @@ static char executable[1024];
 
 void asm_jvmti_exception_catch_callback() {
     // FIXME: not implemented
+    fprintf(stderr, "FIXME: asm_jvmti_exception_catch_callback: not implemented\n");
     assert(0);
     abort();
 }
@@ -88,6 +89,7 @@ void asm_jvmti_exception_catch_callback() {
 static bool java_throw_from_sigcontext(ucontext_t *uc, Class* exc_clss)
 {
     // FIXME: not implemented
+    fprintf(stderr, "FIXME: java_throw_from_sigcontext: not implemented\n");
     assert(0);
     abort();
     return false;
@@ -102,6 +104,7 @@ void abort_handler (int signum, siginfo_t* info, void* context) {
 
 static void throw_from_sigcontext(ucontext_t *uc, Class* exc_clss) {
     // FIXME: not implemented
+    fprintf(stderr, "FIXME: throw_from_sigcontext: not implemented\n");
     assert(0);
     abort();
 }
