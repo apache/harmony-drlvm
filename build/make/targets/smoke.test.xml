@@ -141,11 +141,6 @@ Version: $Revision: 1.4.2.11 $
         <propertycopy property="mode.name" from="${jit.or.interpreter}.name" override="on"/>       
         <propertycopy property="mode.switch" from="${jit.or.interpreter}.switch" override="on"/>
 
-        <condition property="using.jit.or.jitrino" value="Using interpreter">
-            <contains string="${jit.or.interpreter}" substring="int" />
-        </condition>
-        <property name="using.jit.or.jitrino" value="Using jitrino" />
-        <echo message="${using.jit.or.jitrino}" />
         <property name="classes.location" location="${smoke.test.src}" />
         <pathconvert property="java.path.property" refid="java.class.path" />
         <condition property="int.or.jit.exclude" value="X_int,X_interpreter">
@@ -158,26 +153,30 @@ Version: $Revision: 1.4.2.11 $
         </condition>
         <property name="int.or.jit.arg" value="" />
         
-        <property name="exclude.file" location="./excludes/exclude.drlvm_smoke.${hy.platform}.${jit.or.interpreter}" />
-
-        <loadfile property="foo" srcFile="${exclude.file}"/>
-
         <echo>
         ==================================
-        Smoke tests
+        Smoke tests on ${mode.name}
         ==================================
-             
-Excluding Tests from ${exclude.file}   
+        </echo>
+        <property name="exclude.file" location="./excludes/exclude.drlvm_smoke.${hy.platform}.${jit.or.interpreter}" />
+        <if>
+            <available file="${exclude.file}" />
+            <then>
+                  <property name="smoke.exclude.file.${jit.or.interpreter}.present" value="true" />
+                  <loadfile property="foo" srcFile="${exclude.file}"/>
+                  <echo>
+Using exclude file = ${exclude.file}   
         
 ${foo}
-------------------------------------------------
-        </echo>
+                  </echo>
+            </then>
+        </if>
         <for param="test">
             <fileset dir="${smoke.test.src}">
                <!--  <patternset refid="smoke.test.java.pattern" /> -->
                 <include name="**/*.java"/>
                 <!-- <exclude name="**/Logger.java"/> -->
-                <excludesfile name="${exclude.file}" />
+                <excludesfile name="${exclude.file}" if="smoke.exclude.file.${jit.or.interpreter}.present" />
 
             </fileset>
             <sequential>

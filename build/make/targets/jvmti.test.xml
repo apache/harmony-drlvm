@@ -120,22 +120,24 @@
     <target name="run-jvmti-tests">
         <propertycopy property="mode.name" from="${jvmti.tests.mode}.name" override="on"/>       
         <propertycopy property="mode.switch" from="${jvmti.tests.mode}.switch" override="on"/>
-        <if>
-            <available file="./excludes/exclude.drlvm_jvmti.${hy.platform}.${jvmti.tests.mode}" />
-            <then>
-                  <property name="exclude.file" location="./excludes/exclude.drlvm_jvmti.${hy.platform}.${jvmti.tests.mode}" />
-            </then>
-            <else>
-                  <tempfile property="temp.file" />
-                  <touch file="${temp.file}" />
-                  <property name="exclude.file" location="${temp.file}" />
-            </else>
-        </if>
         <echo>
 		==================================
 		Run JVMTI tests using ${mode.name}
 		==================================
 		</echo>
+        <property name="exclude.file" location="./excludes/exclude.drlvm_jvmti.${hy.platform}.${jvmti.tests.mode}" />
+        <if>
+            <available file="${exclude.file}" />
+            <then>                  
+                  <property name="jvmti.exclude.file.${jvmti.tests.mode}.present" value="true" />
+                  <loadfile property="foo" srcFile="${exclude.file}"/>
+                  <echo>
+Using exclude file = ${exclude.file}   
+        
+${foo}
+                  </echo>
+            </then>
+        </if>
 
         <property name="report.dir" 
             location="${jvmti.test.dir}/reports/${jvmti.tests.mode}"/>
@@ -171,7 +173,7 @@
                     <batchtest todir="${report.dir}">
                         <fileset dir="${jvmti.test.src}" >
                             <include name="**/${testname}.java"/>
-                            <excludesfile name="${exclude.file}" />
+                            <excludesfile name="${exclude.file}" if="jvmti.exclude.file.${jvmti.tests.mode}.present"/>
                         </fileset>
                     </batchtest>
                 </junit>
@@ -184,14 +186,6 @@
 
             </sequential>
         </for>
-        <if>
-            <not>
-                <contains string="${exclude.file}" substring="${jvmti.tests.mode}" />
-            </not>
-            <then>
-                <delete file="${exclude.file}" quiet="true" failonerror="false" />
-            </then>
-        </if>
     </target>
   
     <target name="jvmti.test" depends="pre-jvmti-test">

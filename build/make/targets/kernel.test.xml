@@ -25,24 +25,6 @@
     <property name="test.jvm.exe" value="${build.deploy.dir}/jdk/jre/bin/java"/>
     <property file="test.properties"/>
 
-    <!-- no longer used - leaving here temporarily to be sure people like the change
-    <patternset id="kernel.test.java.pattern">
-        <include name="org/apache/harmony/**/*Test.java" />
-        <include name="java/lang/**/*Test*.java" />
-
-        **These tests are too slow **
-        <exclude name="java/lang/RuntimeAdditionalTest*.java" />
-
-        ** These tests are unstable and hang often **
-        <exclude name="java/lang/RuntimeAdditionalTest11.java" />
-        <exclude name="java/lang/RuntimeAdditionalTest34.java" />
-        <exclude name="java/lang/RuntimeAdditionalTest39.java" />
-        <exclude name="java/lang/RuntimeAdditionalTest40.java" />
-        <exclude name="java/lang/RuntimeAdditionalTest41.java" />
-        <exclude name="java/lang/RuntimeAdditionalTest42.java" />
-    </patternset>
-    -->
-    
     <target name="kernel.test" 
         depends="compile-kernel-test, run-kernel-test, report-kernel-test, check-kernel-test"/>
     
@@ -127,20 +109,24 @@
     <target name="-run-kernel-test-batch">
         <propertycopy property="kernel.mode.name" from="${kernel.mode}.name" override="on"/>       
         <propertycopy property="kernel.mode.switch" from="${kernel.mode}.switch" override="on"/>
-
-        <property name="exclude.file" location="./excludes/exclude.drlvm_kernel.${hy.platform}.${kernel.mode}" />
-
-        <loadfile property="foo" srcFile="${exclude.file}"/>
-
         <echo>
         ==================================
         Run kernel tests using ${kernel.mode.name}
         ==================================
-             
+        </echo>
+        <property name="exclude.file" location="./excludes/exclude.drlvm_kernel.${hy.platform}.${kernel.mode}" />
+        <if>
+            <available file="${exclude.file}" />
+            <then>
+                  <property name="kernel.exclude.file.${kernel.mode}.present" value="true" />
+                  <loadfile property="foo" srcFile="${exclude.file}"/>
+                  <echo>
 Using exclude file = ${exclude.file}   
         
 ${foo}
-        </echo>
+                  </echo>
+            </then>
+        </if>
         
         <property name="report.dir"
             location="${kernel.test.dir}/reports/${kernel.mode}.mode"/>
@@ -163,7 +149,7 @@ ${foo}
                    <!-- <patternset refid="kernel.test.java.pattern"/> -->
                     <include name="org/apache/harmony/**/*Test.java" />
                     <include name="java/lang/**/*Test*.java" />
-                    <excludesfile name="${exclude.file}" />
+                    <excludesfile name="${exclude.file}" if="kernel.exclude.file.${kernel.mode}.present" />
                     
                 </fileset>
             </batchtest>
