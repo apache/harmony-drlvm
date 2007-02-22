@@ -121,8 +121,8 @@ INLINE uint64 port_atomic_cas64(volatile uint64 * data , uint64 value, uint64 co
 
 #elif defined(_EM64T_) && defined (_WIN64)
 
-#pragma intrinsic(_InterlockedCompareExchange16);
-#pragma intrinsic(_InterlockedCompareExchange64);
+#pragma intrinsic(_InterlockedCompareExchange16)
+#pragma intrinsic(_InterlockedCompareExchange64)
 
 APR_DECLARE(uint8) port_atomic_cas8(volatile uint8 * data, 
                                                uint8 value, uint8 comp);
