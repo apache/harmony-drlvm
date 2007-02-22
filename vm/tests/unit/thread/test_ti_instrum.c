@@ -119,6 +119,7 @@ int test_jthread_get_blocked_count(void) {
     tested_threads_run(run_for_test_jthread_get_blocked_count);
 
     for (i = 0; i < MAX_TESTED_THREAD_NUMBER; i++){
+        int cycles = MAX_TIME_TO_WAIT / CLICK_TIME_MSEC;
 
         waiting_on_monitor_nmb = 0;
         critical_tts = NULL;
@@ -132,7 +133,6 @@ int test_jthread_get_blocked_count(void) {
                 critical_tts = tts;
             }
         }
-        int cycles = MAX_TIME_TO_WAIT / CLICK_TIME_MSEC;
         while ((MAX_TESTED_THREAD_NUMBER - i > waiting_on_monitor_nmb + 1) && (cycles-- > 0)) {
             tf_assert_same(jthread_get_blocked_count(&waiting_on_monitor_nmb), TM_ERROR_NONE);
             sleep_a_click();
