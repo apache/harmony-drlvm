@@ -36,18 +36,9 @@
 // ppervov: HACK: allows using STL modifiers (dec/hex) and special constants (endl)
 using namespace std;
 
-#ifdef _WIN32
-static int64 /*__declspec(naked)*/ __stdcall invokeJNI(uint64 *args, uword n_fps, uword n_stacks,
-        GenericFunctionPointer f) {
-    abort();
-    return(0);
-}
-#else /* Linux */
 extern "C" {
     int64 invokeJNI(uint64 *args, uword n_fps, uword n_stacks, GenericFunctionPointer f);
 }
-
-#endif
 
 typedef double (*DoubleFuncPtr)(uword*,uword,word,GenericFunctionPointer);
 typedef ManagedObject** (*RefFuncPtr)(uword*,uword,word,GenericFunctionPointer);
@@ -67,12 +58,21 @@ ShortFuncPtr invokeJNI_Short = (ShortFuncPtr) invokeJNI;
 CharFuncPtr invokeJNI_Char = (CharFuncPtr) invokeJNI;
 ByteFuncPtr invokeJNI_Byte = (ByteFuncPtr) invokeJNI;
 
+#ifdef _WIN32
+#define MAX_REG_FLOATS  4
+#define MAX_REG_INTS  4
+#else
+#define MAX_REG_FLOATS  8
+#define MAX_REG_INTS  6
+#endif
+
 void
 interpreter_execute_native_method(
         Method *method,
         jvalue *return_value,
         jvalue *args) {
     assert(!hythread_is_suspend_enabled());
+
 
     DEBUG_TRACE("\n<<< interpreter_invoke_native: "
            << method->get_class()->get_name()->bytes << " "
@@ -92,10 +92,10 @@ interpreter_execute_native_method(
     int n_ints = 0;
     int n_fps = 0;
     int n_stacks = 0;
-    uword *out_args = (uword*) ALLOC_FRAME(8 + sizeof(char) + (8 + sz + 2) * sizeof(uword));
+    uword *out_args = (uword*) ALLOC_FRAME(8 + sizeof(char) + (MAX_REG_FLOATS + sz + 2) * sizeof(uword));
     uword *fps = out_args + 1;
-    uword *ints = fps + 8;
-    uword *stacks = ints + 6;
+    uword *ints = fps + MAX_REG_FLOATS;
+    uword *stacks = ints + MAX_REG_INTS;
 
     int pos = 0;
     ints[n_ints++] = (uword) get_jni_native_intf();
@@ -118,7 +118,7 @@ interpreter_execute_native_method(
                 {
                     jobject obj = args[pos++].l;
                     ObjectHandle UNUSED h = (ObjectHandle) obj;
-                    if (n_ints != 6) {
+                    if (n_ints != MAX_REG_INTS) {
                         ints[n_ints++] = (uword) obj;
                     } else {
                         stacks[n_stacks++] = (uword) obj;
@@ -133,7 +133,7 @@ interpreter_execute_native_method(
             case JAVA_TYPE_BYTE:
             case JAVA_TYPE_INT:
                 // sign extend
-                if (n_ints != 6) {
+                if (n_ints != MAX_REG_INTS) {
                     ints[n_ints++] = (uword)(word) args[pos++].i;
                 } else {
                     stacks[n_stacks++] = (uword)(word) args[pos++].i;
@@ -143,7 +143,7 @@ interpreter_execute_native_method(
             case JAVA_TYPE_BOOLEAN:
             case JAVA_TYPE_CHAR:
                 // zero extend
-                if (n_ints != 6) {
+                if (n_ints != MAX_REG_INTS) {
                     ints[n_ints++] = (word) args[pos++].i;
                 } else {
                     stacks[n_stacks++] = (word) args[pos++].i;
@@ -151,7 +151,7 @@ interpreter_execute_native_method(
                 break;
 
             case JAVA_TYPE_LONG:
-                if (n_ints != 6) {
+                if (n_ints != MAX_REG_INTS) {
                     ints[n_ints++] = args[pos++].j;
                 } else {
                     stacks[n_stacks++] = args[pos++].j;
@@ -159,14 +159,14 @@ interpreter_execute_native_method(
                 break;
 
             case JAVA_TYPE_FLOAT:
-                if (n_fps != 8) {
+                if (n_fps != MAX_REG_FLOATS) {
                     *(float*)&fps[n_fps++] = args[pos++].f;
                 } else {
                     *(float*)&stacks[n_stacks++] = args[pos++].f;
                 }
 
             case JAVA_TYPE_DOUBLE:
-                if (n_fps != 8) {
+                if (n_fps != MAX_REG_FLOATS) {
                     fps[n_fps++] = args[pos++].j;
                 } else {
                     stacks[n_stacks++] = args[pos++].j;
@@ -297,10 +297,10 @@ interpreterInvokeStaticNative(StackFrame& prevFrame, StackFrame& frame, Method *
     int n_ints = 0;
     int n_fps = 0;
     int n_stacks = 0;
-    uword *out_args = (uword*) ALLOC_FRAME(8 + sizeof(char) + (8 + sz + 2) * sizeof(uword));
+    uword *out_args = (uword*) ALLOC_FRAME(8 + sizeof(char) + (MAX_REG_FLOATS + sz + 2) * sizeof(uword));
     uword *fps = out_args + 1;
-    uword *ints = fps + 8;
-    uword *stacks = ints + 6;
+    uword *ints = fps + MAX_REG_FLOATS;
+    uword *stacks = ints + MAX_REG_INTS;
 
     frame.This = *(method->get_class()->get_class_handle());
     ints[n_ints++] = (uword) get_jni_native_intf();
@@ -331,7 +331,7 @@ interpreterInvokeStaticNative(StackFrame& prevFrame, StackFrame& frame, Method *
                         arg = (uword) &cr;
 #endif
                     }
-                    if (n_ints != 6) {
+                    if (n_ints != MAX_REG_INTS) {
                         ints[n_ints++] = arg;
                     } else {
                         stacks[n_stacks++] = arg;
@@ -348,7 +348,7 @@ interpreterInvokeStaticNative(StackFrame& prevFrame, StackFrame& frame, Method *
                 ASSERT_TAGS(!prevFrame.stack.ref(pos));
                 // sign extend
                 arg = (uword)(word) prevFrame.stack.pick(pos--).i;
-                if (n_ints != 6) {
+                if (n_ints != MAX_REG_INTS) {
                     ints[n_ints++] = arg;
                 } else {
                     stacks[n_stacks++] = arg;
@@ -360,7 +360,7 @@ interpreterInvokeStaticNative(StackFrame& prevFrame, StackFrame& frame, Method *
                 ASSERT_TAGS(!prevFrame.stack.ref(pos));
                 // zero extend
                 arg = prevFrame.stack.pick(pos--).u;
-                if (n_ints != 6) {
+                if (n_ints != MAX_REG_INTS) {
                     ints[n_ints++] = arg;
                 } else {
                     stacks[n_stacks++] = arg;
@@ -371,7 +371,7 @@ interpreterInvokeStaticNative(StackFrame& prevFrame, StackFrame& frame, Method *
                 ASSERT_TAGS(!prevFrame.stack.ref(pos));
                 ASSERT_TAGS(!prevFrame.stack.ref(pos-1));
                 arg = prevFrame.stack.getLong(pos-1).u64;
-                if (n_ints != 6) {
+                if (n_ints != MAX_REG_INTS) {
                     ints[n_ints++] = arg;
                 } else {
                     stacks[n_stacks++] = arg;
@@ -384,7 +384,7 @@ interpreterInvokeStaticNative(StackFrame& prevFrame, StackFrame& frame, Method *
                     ASSERT_TAGS(!prevFrame.stack.ref(pos));
                     // zero extend
                     float farg = prevFrame.stack.pick(pos--).f;
-                    if (n_fps != 8) {
+                    if (n_fps != MAX_REG_FLOATS) {
                         *(float*)&fps[n_fps++] = farg;
                     } else {
                         *(float*)&stacks[n_stacks++] = farg;
@@ -397,7 +397,7 @@ interpreterInvokeStaticNative(StackFrame& prevFrame, StackFrame& frame, Method *
                 ASSERT_TAGS(!prevFrame.stack.ref(pos-1));
                 arg = prevFrame.stack.getLong(pos-1).u64;
 
-                if (n_fps != 8) {
+                if (n_fps != MAX_REG_FLOATS) {
                     fps[n_fps++] = arg;
                 } else {
                     stacks[n_stacks++] = arg;
@@ -576,10 +576,10 @@ interpreterInvokeVirtualNative(StackFrame& prevFrame, StackFrame& frame, Method 
     int n_ints = 0;
     int n_fps = 0;
     int n_stacks = 0;
-    uword *out_args = (uword*) ALLOC_FRAME(8 + sizeof(char) + (8 + sz + 2) * sizeof(uword));
+    uword *out_args = (uword*) ALLOC_FRAME(8 + sizeof(char) + (MAX_REG_FLOATS + sz + 2) * sizeof(uword));
     uword *fps = out_args + 1;
-    uword *ints = fps + 8;
-    uword *stacks = ints + 6;
+    uword *ints = fps + MAX_REG_FLOATS;
+    uword *stacks = ints + MAX_REG_INTS;
 
     ints[n_ints++] = (uword) get_jni_native_intf();
     ints[n_ints++] = (uword) &frame.This;
@@ -616,7 +616,7 @@ interpreterInvokeVirtualNative(StackFrame& prevFrame, StackFrame& frame, Method 
                         arg = (uword) &cr;
 #endif
                     }
-                    if (n_ints != 6) {
+                    if (n_ints != MAX_REG_INTS) {
                         ints[n_ints++] = arg;
                     } else {
                         stacks[n_stacks++] = arg;
@@ -632,7 +632,7 @@ interpreterInvokeVirtualNative(StackFrame& prevFrame, StackFrame& frame, Method 
                 // zero extend
                 ASSERT_TAGS(!prevFrame.stack.ref(pos));
                 arg = prevFrame.stack.pick(pos--).u;
-                if (n_ints != 6) {
+                if (n_ints != MAX_REG_INTS) {
                     ints[n_ints++] = arg;
                 } else {
                     stacks[n_stacks++] = arg;
@@ -645,7 +645,7 @@ interpreterInvokeVirtualNative(StackFrame& prevFrame, StackFrame& frame, Method 
                 // sign extend
                 ASSERT_TAGS(!prevFrame.stack.ref(pos));
                 arg = (uword)(word) prevFrame.stack.pick(pos--).i;
-                if (n_ints != 6) {
+                if (n_ints != MAX_REG_INTS) {
                     ints[n_ints++] = arg;
                 } else {
                     stacks[n_stacks++] = arg;
@@ -656,7 +656,7 @@ interpreterInvokeVirtualNative(StackFrame& prevFrame, StackFrame& frame, Method 
                 ASSERT_TAGS(!prevFrame.stack.ref(pos));
                 ASSERT_TAGS(!prevFrame.stack.ref(pos-1));
                 arg = prevFrame.stack.getLong(pos-1).u64;
-                if (n_ints != 6) {
+                if (n_ints != MAX_REG_INTS) {
                     ints[n_ints++] = arg;
                 } else {
                     stacks[n_stacks++] = arg;
@@ -668,7 +668,7 @@ interpreterInvokeVirtualNative(StackFrame& prevFrame, StackFrame& frame, Method 
                 {
                     ASSERT_TAGS(!prevFrame.stack.ref(pos));
                     float farg = prevFrame.stack.pick(pos--).f;
-                    if (n_fps != 8) {
+                    if (n_fps != MAX_REG_FLOATS) {
                         *(float*)&fps[n_fps++] = farg;
                     } else {
                         *(float*)&stacks[n_stacks++] = farg;
@@ -679,7 +679,7 @@ interpreterInvokeVirtualNative(StackFrame& prevFrame, StackFrame& frame, Method 
                 ASSERT_TAGS(!prevFrame.stack.ref(pos));
                 ASSERT_TAGS(!prevFrame.stack.ref(pos-1));
                 arg = prevFrame.stack.getLong(pos-1).u64;
-                if (n_fps != 8) {
+                if (n_fps != MAX_REG_FLOATS) {
                     fps[n_fps++] = arg;
                 } else {
                     stacks[n_stacks++] = arg;

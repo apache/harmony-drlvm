@@ -81,6 +81,12 @@ Version: $Revision: 1.5.2.6 $
             <equals arg1="${cfg.build}" arg2="debug" />
         </condition>
         <property name="is.cfg.debug" value="false" />
+
+        <condition property="object.suffix" value="obj">
+            <isset property="if.win" />
+        </condition>
+        <property name="object.suffix" value="o" />
+
             
         <property name="obj.out.dir" location="${build.dir}/_obj" />
         <mkdir dir="${obj.out.dir}" />
@@ -127,8 +133,14 @@ Version: $Revision: 1.5.2.6 $
             <property name="asm.executable" value="icc" />
         </select>
         <select os="win">
-            <property name="asm.executable" value="ml" />
-            <property name="asm.add.arg" value="/c /Cp /W3 /nologo /coff /Zm /Zd /Zi /Gd   -DWIN32" />
+            <select arch="em64t">
+                <property name="asm.executable" value="ml64" />
+                <property name="asm.add.arg" value="/c /Cp /W3 /nologo /Zd /Zi -DWIN32" />
+            </select>
+            <select arch="ia32">
+                <property name="asm.executable" value="ml" />
+                <property name="asm.add.arg" value="/c /Cp /W3 /nologo /coff /Zm /Zd /Zi /Gd -DWIN32" />
+            </select>
         </select>
 
         <condition property="asm.add.arg" value="-Wa,--fatal-warnings -c -x assembler-with-cpp -g">
@@ -147,21 +159,21 @@ Version: $Revision: 1.5.2.6 $
                 <propertyregex override="yes" property="object" input="@{file}" regexp=".*[/\\]([^\.]*)\.[^\.]*" replace="\1" defaultValue="@{file}" />
                 <dependset>
                     <srcfileset refid="asm.fileset" />
-                    <targetfilelist dir="${build.dir}" files="${object}.o" />
+                    <targetfilelist dir="${build.dir}" files="${object}.${object.suffix}" />
                 </dependset>
                 <if>
                     <not>
-                        <available file="${build.dir}/${object}.o" />
+                        <available file="${build.dir}/${object}.${object.suffix}" />
                     </not>
                     <then>
                         <exec executable="${asm.executable}" failonerror="true">
                             <arg line="${asm.args}" />
                             <arg line="${asm.add.arg}" />
                             <select os="lnx">
-                                <arg line=" -o${build.dir}/_obj/${object}.o @{file} " />
+                                <arg line=" -o${build.dir}/_obj/${object}.${object.suffix} @{file} " />
                             </select>
                             <select os="win">
-                                <arg line="/Fo${build.dir}/_obj/${object}.o @{file} " />
+                                <arg line="/Fo${build.dir}/_obj/${object}.${object.suffix} @{file} " />
                             </select>
                         </exec>
                     </then>

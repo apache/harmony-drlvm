@@ -126,25 +126,29 @@ Version: $Revision: 1.3.2.3 $
             </select>
         </compiler>
 
-        <select os="lnx">
-            <fileset id="asm.fileset" dir="${src}">
-                <select os="lnx" arch="ia32">
-                    <include name="invokeJNI_ia32.asm" />
-                </select>
+        <fileset id="asm.fileset" dir="${src}">
+            <select os="lnx" arch="ia32">
+                <include name="invokeJNI_ia32.asm" />
+            </select>
 
-                <select os="lnx" arch="em64t">
-                    <include name="invokeJNI_em64t.asm" />
-                </select>
+            <select os="lnx" arch="em64t">
+                <include name="invokeJNI_em64t.asm" />
+            </select>
 
-                <select os="lnx" arch="ipf">
-                    <include name="invokeJNI_ipf.asm" />
-                </select>
+            <select os="lnx" arch="ipf">
+                <include name="invokeJNI_ipf.asm" />
+            </select>
 
-                <select os="win" arch="ipf">
-                    <include name="invokeJNI_Windows_ipf.asm" />
-                </select>
-            </fileset>
-        </select>
+            <select os="win" arch="ia32">
+                <exclude name="*" />
+            </select>
+            <select os="win" arch="ipf">
+                <include name="invokeJNI_Windows_ipf.asm" />
+            </select>
+            <select os="win" arch="em64t">
+                <include name="invokeJNI_Windows_em64t.asm" />
+            </select>
+        </fileset>
 
         <linker id="linker" extends="common.linker">
             <select os="lnx">
