@@ -41,7 +41,7 @@ void get_file_and_line(Method_Handle mh, void *ip, bool is_ip_past, const char *
 
     *line = -1;
     if (interpreter_enabled()) {
-        int bc = (uint8*)ip - (uint8*)method->get_byte_code_addr();
+        int bc = (int)((uint8*)ip - (uint8*)method->get_byte_code_addr());
         *line = method->get_line_number((uint16)bc);
         return;
     }
@@ -107,7 +107,9 @@ bool st_get_frame(unsigned target_depth, StackTraceFrame* stf)
 
                 if (target_depth < depth + inlined_depth) {
                     CodeChunkInfo* cci = si_get_code_chunk_info(si);
-                    uint32 offset = (POINTER_SIZE_INT)stf->ip - (POINTER_SIZE_INT)cci->get_code_block_addr();
+                    // FIXME64: no support for large methods
+                    // with compiled code size greater than 4GB
+                    uint32 offset = (uint32)((POINTER_SIZE_INT)stf->ip - (POINTER_SIZE_INT)cci->get_code_block_addr());
                     stf->method = cci->get_jit()->get_inlined_method(
                             cci->get_inline_info(), offset, target_depth - depth);
                 }
@@ -165,7 +167,9 @@ void st_get_trace(VM_thread *p_vmthread, unsigned* res_depth, StackTraceFrame** 
             } else {
                 JIT *jit = cci->get_jit();
                 uint32 inlined_depth = si_get_inline_depth(si);
-                uint32 offset = (POINTER_SIZE_INT)ip - (POINTER_SIZE_INT)cci->get_code_block_addr();
+                // FIXME64: no support for large methods
+                // with compiled code greater than 4GB
+                uint32 offset = (uint32)((POINTER_SIZE_INT)ip - (POINTER_SIZE_INT)cci->get_code_block_addr());
 
                 for (uint32 i = 0; i < inlined_depth; i++) {
                     stf->method = jit->get_inlined_method(cci->get_inline_info(), offset, i);
@@ -258,7 +262,9 @@ void st_print(FILE* f, hythread_t thread)
             CodeChunkInfo* cci = si_get_code_chunk_info(si);
             if ( cci != NULL ) {
                 uint32 inlined_depth = si_get_inline_depth(si);
-                uint32 offset = (POINTER_SIZE_INT)si_get_ip(si) - (POINTER_SIZE_INT)cci->get_code_block_addr();
+                // FIXME64: no support for large methods
+                // with compiled code size greater than 4GB
+                uint32 offset = (uint32)((POINTER_SIZE_INT)si_get_ip(si) - (POINTER_SIZE_INT)cci->get_code_block_addr());
                 
                 for (uint32 i = 0; i < inlined_depth; i++) {
                     Method *real_method = cci->get_jit()->get_inlined_method(cci->get_inline_info(), offset, i);

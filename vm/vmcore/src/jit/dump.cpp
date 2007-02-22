@@ -31,7 +31,7 @@
 // this variable is filled in by parse_args()
 const char * dump_file_name = "file.dump";
 
-int dump(const char * code, const char * name, unsigned int length) {
+int dump(const char * code, const char * name, size_t length) {
     static apr_pool_t * pool  = NULL;
     static port_disassembler_t * disassembler;
     static apr_file_t * file = NULL;
@@ -54,7 +54,9 @@ int dump(const char * code, const char * name, unsigned int length) {
     }
 
     apr_file_printf(file, "Function dump begin: %s\n", name);
-    port_disasm_to_file(disassembler, code, length, file);
+    // FIXME64: no support for large methods
+    // with compiled code size greater than 2GB
+    port_disasm_to_file(disassembler, code, (int)length, file);
     apr_file_printf(file, "Function dump end: %s\n", name);
 
 //    apr_pool_destroy(pool);

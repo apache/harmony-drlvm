@@ -165,7 +165,7 @@ Vector_Handle rth_multianewarrayhelper()
     // compute the base address of an array
     uint64* lens_base = (uint64*)(args+2);
     for(unsigned i = 0; i < dims; i++) {
-        lens[i] = lens_base[dims-i-1];
+        lens[i] = (int)lens_base[dims-i-1];
     }
     return vm_rt_multianewarray_recursive(c, lens, dims);
 }

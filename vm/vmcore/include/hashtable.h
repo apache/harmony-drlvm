@@ -267,6 +267,7 @@ public:
         else
         {
             ABORT( "Element was inserted second time in MapEx!");
+            return NULL; // not reachable; to satisfy compiler warning
         }
     }
     inline void Remove(Key key)
@@ -275,7 +276,7 @@ public:
     }
     inline unsigned int GetItemCount()
     {
-        return this->size();
+        return (unsigned int)(this->size());
     }
 };
 

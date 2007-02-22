@@ -53,7 +53,7 @@ public:
 
     // lookup string in string table & insert if not found
     String * lookup(const char *str);
-    String * lookup(const char *str, unsigned len);
+    String * lookup(const char *str, size_t len);
 
     // Iterators for GC
     String * get_first_string_intern();
@@ -75,7 +75,7 @@ private:
     public:
         Entry   * next;
         String  str;
-        Entry(const char *s, unsigned len, Entry *n);
+        Entry(const char *s, size_t len, Entry *n);
         /**
          * Memory is already allocated for this object.
          */
@@ -104,12 +104,12 @@ private:
 #endif
 
     bool has_line_end(POINTER_SIZE_INT val);
-    void hash_it(const char * str, unsigned * len, POINTER_SIZE_INT * hash);
-    POINTER_SIZE_INT hash_it(const char * str, unsigned len);
-    String * lookup(const char *str, unsigned len, POINTER_SIZE_INT hash);
+    void hash_it(const char * str, size_t* len, POINTER_SIZE_INT * hash);
+    POINTER_SIZE_INT hash_it(const char * str, size_t len);
+    String * lookup(const char *str, size_t len, POINTER_SIZE_INT hash);
     void register_interned_string(String * str);
     private:
-    POINTER_SIZE_INT hash_it_unaligned(const char * str, unsigned len);
+    POINTER_SIZE_INT hash_it_unaligned(const char * str, size_t len);
     public:
     
     // memory pool

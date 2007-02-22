@@ -1789,7 +1789,8 @@ Class* BootstrapClassLoader::LoadFromClassFile(const String* dir_name,
     apr_file_close(file_handle);
 
     // define class
-    Class* clss = DefineClass(m_env, class_name->bytes, buf, 0, buf_len); 
+    Class* clss = DefineClass(m_env, class_name->bytes, buf, 0,
+        (unsigned)buf_len); 
     if(clss) {
         clss->set_class_file_name(m_env->string_pool.lookup(full_name));
     }

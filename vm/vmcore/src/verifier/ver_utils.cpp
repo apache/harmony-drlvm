@@ -81,7 +81,7 @@ vf_Hash::CheckKey( vf_HashEntry_t *hash_entry,  // checked hash entry
 inline bool
 vf_Hash::CheckKey( vf_HashEntry_t *hash_entry,  // checked hash entry
                    const char *key,             // checked key
-                   unsigned len)                // key length
+                   size_t len)                  // key length
 {
     if( !strncmp( hash_entry->key, key, len ) && hash_entry->key[len] == '\0'  ) {
         return true;
@@ -109,7 +109,7 @@ vf_Hash::HashFunc( const char *key )    // key for hash function
  */
 inline unsigned
 vf_Hash::HashFunc( const char *key,     // key for hash function
-                   unsigned len)        // key length
+                   size_t len)          // key length
 {
     unsigned result = 0;
 
@@ -178,7 +178,7 @@ vf_Hash::NewHashEntry( const char *key )    // hash key
     }
 
     // create key string
-    unsigned len = strlen(key);
+    size_t len = strlen(key);
     char *hash_key = (char*)vf_alloc_pool_memory( m_pool, len + 1 );
     memcpy( hash_key, key, len );
 
@@ -196,7 +196,7 @@ vf_Hash::NewHashEntry( const char *key )    // hash key
  */
 inline vf_HashEntry_t *
 vf_Hash::NewHashEntry( const char *key,     // hash key
-                       unsigned len)        // key length
+                       size_t len)          // key length
 {
     // lookup type in hash
     assert( key );
@@ -252,7 +252,7 @@ vf_TypePool::~vf_TypePool()
  */
 vf_ValidType_t *
 vf_TypePool::NewType( const char *type,     // class name
-                      unsigned len)         // name length
+                      size_t len)           // name length
 {
     vf_ValidType_t *result;
     vf_HashEntry_t *hash;
@@ -675,7 +675,7 @@ vf_resolve_class( const char *name,         // resolved class name
         } while( name[index] == '[' );
         if( name[index] == 'L' ) {
             // array of objects, construct array name
-            unsigned len = strlen( name );
+            size_t len = strlen( name );
             char *buf = (char *)STD_ALLOCA( len + 2 );
             memcpy( buf, name, len );
             buf[len] = ';';
@@ -791,7 +791,7 @@ vf_check_interface_methods( class_handler class1,   // first interface class
                 const char *sig1 = method_get_descriptor( method1 );
                 const char *sig2 = method_get_descriptor( method2 );
                 char *end_params = (char *)strrchr( sig1, ')' );
-                unsigned len = end_params - sig1 + 1;
+                unsigned len = (unsigned)(end_params - sig1 + 1);
                 if( !memcmp( sig1, sig2, len ) ) {
                     // methods arguments are the same
                     if( strcmp( &sig1[len], &sig2[len] ) ) {
@@ -1009,6 +1009,7 @@ vf_is_valid( class_handler source,              // checked class
                     && vf_is_super_class( current, target );
     }
     LDIE(40, "Verifier: vf_is_valid: invalid check type" );
+    return false;
 } // vf_is_valid
 
 /**
@@ -1497,7 +1498,7 @@ vf_error_func( VERIFY_SOURCE_PARAMS )
  */
 void*
 vf_calloc_func( unsigned num,            // number of elements
-                unsigned size,           // size of element
+                size_t size,             // size of element
                 VERIFY_SOURCE_PARAMS)    // debug info
 {
     assert(num);
@@ -1523,7 +1524,7 @@ vf_calloc_func( unsigned num,            // number of elements
  * Function allocates memory blocks.
  */
 void *
-vf_malloc_func( unsigned size,          // size of memory block
+vf_malloc_func( size_t size,          // size of memory block
                 VERIFY_SOURCE_PARAMS)   // debug info
 {
     assert( size );
@@ -1549,7 +1550,7 @@ vf_malloc_func( unsigned size,          // size of memory block
  */
 void *
 vf_realloc_func( void *pointer,             // old pointer
-                 unsigned size,             // size of memory block
+                 size_t size,               // size of memory block
                  VERIFY_SOURCE_PARAMS)      // debug info
 {
     assert( size );
@@ -1597,7 +1598,7 @@ vf_free_func( void *pointer,            // free pointer
  * Function creates wide memory pool structure.
  */
 static inline vf_VerifyPoolInternal_t *
-vf_create_pool_element( unsigned size,             // initial pool size
+vf_create_pool_element( size_t size,               // initial pool size
                         VERIFY_SOURCE_PARAMS)      // debug info
 {
     vf_VerifyPoolInternal_t *result;
@@ -1656,7 +1657,7 @@ vf_create_pool_func( VERIFY_SOURCE_PARAMS )
  */
 void *
 vf_alloc_pool_memory_func( vf_VerifyPool_t *hpool,     // a given pool
-                           unsigned size,              // memory size
+                           size_t size,              // memory size
                            VERIFY_SOURCE_PARAMS)       // debug info
 {
     const unsigned align = sizeof(void*) - 1;
@@ -1736,7 +1737,8 @@ vf_clean_pool_memory_func( vf_VerifyPool_t *hpool,   // memory pool
     vf_VerifyPoolInternal_t *pool = hpool->m_pool;
     while( pool ) {
         // clean pool element space
-        unsigned used_size = pool->m_free - (char*)pool->m_memory;
+        unsigned used_size =
+            (unsigned)(pool->m_free - (char*)pool->m_memory);
         memset(pool->m_memory, 0, used_size);
         pool->m_free = (char*)pool->m_memory;
         pool->m_freesize += used_size;

@@ -1072,7 +1072,8 @@ NativeCodePtr prepare_gen_throw_illegal_access_error(Class_Handle to, Method_Han
 Intfc_Table* Class::create_and_populate_interface_table(const std::vector<Class*>& intfc_table_entries)
 {
     // shouldn't it be called vtable_index?
-    Intfc_Table* intfc_table = create_intfc_table(this, intfc_table_entries.size());
+    Intfc_Table* intfc_table = create_intfc_table(this,
+        (unsigned)intfc_table_entries.size());
     if(intfc_table_entries.size() != 0) {
         unsigned vtable_offset = m_num_virtual_method_entries;
         for (unsigned i = 0; i < intfc_table_entries.size(); i++) {

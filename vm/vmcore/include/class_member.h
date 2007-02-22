@@ -478,7 +478,7 @@ public:
     // The value returned by getByteCodeAddr may be NULL in which case the
     // bytecodes are not available (presumably they have been garbage collected by VM).
     const Byte  *get_byte_code_addr()   {return _byte_codes;}
-    size_t       get_byte_code_size()   {return _byte_code_length;}
+    unsigned     get_byte_code_size()   {return _byte_code_length;}
 
     // From the class file (Sec. 4.7.4)
     unsigned get_max_stack()                       { return _max_stack; }

@@ -146,7 +146,7 @@ bool JarFile::Parse( const char* fileName )
 
     m_jars.push_back(fileName);
     JarEntry je;
-    m_jarFileIdx = je.m_jarFileIdx = m_jars.size()-1;
+    m_jarFileIdx = je.m_jarFileIdx = (int)(m_jars.size() - 1);
 
     struct stat fs;
     if(stat(fileName, &fs) == -1) return false;

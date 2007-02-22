@@ -285,7 +285,7 @@ VMBreakPoints::insert_interpreter_breakpoint(VMBreakPoint* bp)
     assert(interpreter_enabled());
     bool UNREF check = check_insert_breakpoint(bp);
     assert(check);
-    bp->saved_byte = (POINTER_SIZE_INT)
+    bp->saved_byte =
         interpreter.interpreter_ti_set_breakpoint(bp->method, bp->location);
 
     insert_breakpoint(bp);
@@ -761,7 +761,7 @@ VMBreakPoints::process_native_breakpoint()
         char *branch_address = code - 1;
 
         code = jump(code, next_instruction);
-        jint offset = code - branch_address - 1;
+        jint offset = (jint)(code - branch_address - 1);
         *branch_address = offset;
 
         jump(code, jump_target);
@@ -774,7 +774,7 @@ VMBreakPoints::process_native_breakpoint()
         char *code = (char *)instruction_buffer;
 
         // Push "return address" to the $next_instruction
-        code = push(code, Imm_Opnd((POINTER_SIZE_INT)next_instruction));
+        code = push(code, Imm_Opnd(size_platf, (POINTER_SIZE_INT)next_instruction));
 
         // Jump to the target address of the call instruction
         jump(code, jump_target);
@@ -797,7 +797,7 @@ VMBreakPoints::process_native_breakpoint()
         char *code = (char *)instruction_buffer;
 
         // Push "return address" to the $next_instruction
-        code = push(code, Imm_Opnd((POINTER_SIZE_INT)next_instruction));
+        code = push(code, Imm_Opnd(size_platf, (POINTER_SIZE_INT)next_instruction));
 
         // Jump to the target address of the call instruction
         jump(code, jump_target);

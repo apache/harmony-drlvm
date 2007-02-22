@@ -275,7 +275,7 @@ static void add_assert_rec(Global_Env *p_env, const char* option, const char* cm
         USE_JAVA_HELP;
         LOGGER_EXIT(1);
     } else {
-        unsigned len = strlen(++arg);
+        unsigned len = (unsigned)strlen(++arg);
         if (len >= 3 && strncmp("...", arg + len - 3, 3) == 0) {
             get_assert_reg(p_env)->add_package(p_env, arg, len - 3, value);
         } else {

@@ -300,8 +300,8 @@ jvmtiGetClassSignature( jvmtiEnv* env,
 {
     TRACE2("jvmti.class", "GetClassSignature called");
     SuspendEnabledChecker sec;
-    int len,
-        sig_len;
+    int len;
+    size_t sig_len;
     char *pointer,
          *signature;
     Class *klass;

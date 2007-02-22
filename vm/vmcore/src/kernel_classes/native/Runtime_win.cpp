@@ -115,7 +115,7 @@ void JNICALL Java_java_lang_Runtime_00024SubProcess_createProcess0 (
         jstring jo = (jstring)env->GetObjectArrayElement(cmdarray, (jsize) i);
         const char *strChain = env->GetStringUTFChars(jo, 0);
         bool need_esc = (*strChain != '\"' && strchr(strChain, ' ') != NULL);
-        cur_pos += strlen(strChain) + (i == 0 ? 0 : 1) + (need_esc ? 0 : 2);
+        cur_pos += (int)strlen(strChain) + (i == 0 ? 0 : 1) + (need_esc ? 0 : 2);
         while (l <= cur_pos) {
             char *strtmp = (char*)malloc(l + btl);
             memcpy(strtmp, strCmnd, l);
@@ -146,8 +146,8 @@ void JNICALL Java_java_lang_Runtime_00024SubProcess_createProcess0 (
         for ( i = 0; i < len; i++ ) {
             jstring jo = (jstring)env->GetObjectArrayElement(envp, (jsize) i);
             const char* strChain = env->GetStringUTFChars(jo, 0);
-            size_t tmp = strlen(strChain) + 1;
-            while ((unsigned)l <= (cur_pos + tmp)) {
+            int tmp = (int)strlen(strChain) + 1;
+            while (l <= (cur_pos + tmp)) {
                 char *strtmp = (char*)malloc(l + btl);
                 memcpy(strtmp, strEnvp, l);
                 l += btl;

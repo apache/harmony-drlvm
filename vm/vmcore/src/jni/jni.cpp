@@ -600,8 +600,8 @@ jclass JNICALL DefineClass(JNIEnv *jenv,
                 else
                 {
                     static const char* mess_templ = "duplicate class definition: ";
-                    static unsigned mess_templ_len = strlen(mess_templ);
-                    unsigned mess_size = mess_templ_len + strlen(name) + 1; // 1 is for trailing '\0'
+                    static size_t mess_templ_len = strlen(mess_templ);
+                    size_t mess_size = mess_templ_len + strlen(name) + 1; // 1 is for trailing '\0'
                     char* err_mess = (char*)STD_ALLOCA(mess_size);
                     sprintf(err_mess, "%s%s", mess_templ, name);
                     exn = exn_create("java/lang/LinkageError", err_mess);

@@ -102,7 +102,7 @@ LcgEM64TContext::LcgEM64TContext(LilCodeStub * stub, tl::MemoryPool & m):
     /*    4) INITILIZE STACK INFORMATION    */
 
     if (has_m2n) {
-        stk_m2n_size = m2n_get_size();
+        stk_m2n_size = (unsigned)m2n_get_size();
     } else {
         // preserve space for callee-saves registers
         stk_m2n_size = lil_cs_get_max_locals(stub) * GR_SIZE;
@@ -515,12 +515,12 @@ private:
     
     inline const R_Opnd & get_r_opnd(const LcgEM64TLoc * loc) const {
         assert(loc->kind == LLK_Gr);
-        return context.get_reg_from_map(loc->addr);
+        return context.get_reg_from_map((unsigned)loc->addr);
     }
 
     inline const XMM_Opnd & get_xmm_r_opnd(const LcgEM64TLoc * loc) const {
         assert(loc->kind == LLK_Fr);
-        return context.get_xmm_reg_from_map(loc->addr);
+        return context.get_xmm_reg_from_map((unsigned)loc->addr);
     }
 
     inline const M_Opnd & get_m_opnd(const LcgEM64TLoc * loc) const {
@@ -1056,7 +1056,7 @@ public:
 	
 	// debug code: check the estimate	
         char* i_end = buf;
-	unsigned i_len = i_end - i_start;
+	unsigned i_len = (unsigned)(i_end - i_start);
 	if (i_len > MAX_LIL_INSTRUCTION_CODE_LENGTH) {
 	    // the MAX_LIL_INSTRUCTION_CODE_LENGTH was underestimated.
 	    // most likely will not cause problems in real life, though still requires correction.
@@ -1074,7 +1074,7 @@ public:
 	    
 	    // debug code: see above for the rationale
 	    char* i_end = buf;
-	    unsigned i_len = i_end - i_start;
+	    unsigned i_len = (unsigned)(i_end - i_start);
 	    if (i_len > MAX_LIL_INSTRUCTION_CODE_LENGTH) {
 		assert(false);
 	    }

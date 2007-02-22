@@ -58,13 +58,13 @@ void String_Pool::unlock_pool () {
     string_pool_lock = 0;
 } //String_Pool::unlock_pool
 
-String_Pool::Entry::Entry(const char * s, unsigned len, Entry *n) : next(n) {
+String_Pool::Entry::Entry(const char * s, size_t len, Entry *n) : next(n) {
 // This constructor can be run very early on during VM execution--even before main is entered.
 // This is before we have had a chance to process any command line arguments. So, initialize the 
 // interned Java_lang_String reference to NULL in a way that will work whether references are compressed or not.
     str.intern.raw_ref = NULL;
-    str.len = (len);
-    assert(strlen(s) >= (len));
+    str.len = (unsigned)len;
+    assert(strlen(s) >= len);
     memcpy(str.bytes, s, len);
     str.bytes[len] = '\0';
 } //String_Pool::Entry::Entry
@@ -92,7 +92,7 @@ inline bool String_Pool::has_line_end(POINTER_SIZE_INT val) {
     return (val ^ ~(val + BIT_MASK)) & ~BIT_MASK;
 }
 
-void String_Pool::hash_it(const char * s, unsigned * len, POINTER_SIZE_INT * hash) {
+void String_Pool::hash_it(const char * s, size_t* len, POINTER_SIZE_INT * hash) {
     POINTER_SIZE_INT h1 = 0;
     POINTER_SIZE_INT h2 = 0;
     const char * p_val = s;
@@ -129,7 +129,7 @@ done:
     *hash = h1 - h2;
 }
 
-POINTER_SIZE_INT String_Pool::hash_it(const char * s, unsigned len) {
+POINTER_SIZE_INT String_Pool::hash_it(const char * s, size_t len) {
 
 #ifdef _IPF_
     // aligned loading is critical for _IPF_
@@ -139,7 +139,7 @@ POINTER_SIZE_INT String_Pool::hash_it(const char * s, unsigned len) {
 #endif
 
     POINTER_SIZE_INT h1 = 0, h2 = 0;
-    const unsigned parts = len / sizeof(POINTER_SIZE_INT);
+    const unsigned parts = (unsigned)(len / sizeof(POINTER_SIZE_INT));
     
     for (unsigned i = 0; i < parts; i++) {
         h1 += *((POINTER_SIZE_INT *)s + i);
@@ -152,13 +152,13 @@ POINTER_SIZE_INT String_Pool::hash_it(const char * s, unsigned len) {
     return h1 - h2;
 }
 
-POINTER_SIZE_INT String_Pool::hash_it_unaligned(const char * s, unsigned len) {
+POINTER_SIZE_INT String_Pool::hash_it_unaligned(const char * s, size_t len) {
     POINTER_SIZE_INT h1 = 0, h2 = 0;
-    const unsigned parts = len / sizeof(POINTER_SIZE_INT);
+    const size_t parts = len / sizeof(POINTER_SIZE_INT);
 
     // ATTENTION! we got here with unaligned s!
 
-    for (unsigned i = 0; i < parts; i++) {
+    for (size_t i = 0; i < parts; i++) {
 #ifdef _IPF_ /* 64 bit and little endian */
         h1 +=  (POINTER_SIZE_INT) s[i * 8  + 0]
             + ((POINTER_SIZE_INT)s[i * 8 + 1] << 8)
@@ -173,14 +173,14 @@ POINTER_SIZE_INT String_Pool::hash_it_unaligned(const char * s, unsigned len) {
 #endif
     }
 
-    for (unsigned j = parts * sizeof(POINTER_SIZE_INT); j < len; j++) {
+    for (size_t j = parts * sizeof(POINTER_SIZE_INT); j < len; j++) {
         h2 += s[j];
     }
     
     return h1 - h2;
 }
 
-String * String_Pool::lookup(const char *s, unsigned len, POINTER_SIZE_INT raw_hash) {
+String * String_Pool::lookup(const char *s, size_t len, POINTER_SIZE_INT raw_hash) {
 #ifdef VM_STATS
     // we need a lock here since apr_palloc & apr_hash_set is single threaded
     LMAutoUnlock auto_lock(&VM_Statistics::get_vm_stats().vm_stats_lock);
@@ -200,7 +200,7 @@ String * String_Pool::lookup(const char *s, unsigned len, POINTER_SIZE_INT raw_h
     ++key_stats->num_lookup;
 #endif
 
-    int hash = raw_hash % STRING_TABLE_SIZE;
+    int hash = (int)(raw_hash % STRING_TABLE_SIZE);
 
     // search bucket for string, no lock
     for (Entry *e = table[hash]; e != NULL; e = e->next) {
@@ -241,7 +241,7 @@ String * String_Pool::lookup(const char *s, unsigned len, POINTER_SIZE_INT raw_h
     // compute size of Entry record
     // add one to str_len for '\0'
     // subtract STRING_PADDING already in Entry
-    unsigned entry_size = sizeof(Entry) + len + 1 - STRING_PADDING;
+    size_t entry_size = sizeof(Entry) + len + 1 - STRING_PADDING;
     
     /* Synchronized via String_Pool lock */
     void * mem = memory_pool.alloc(entry_size);
@@ -258,14 +258,14 @@ String * String_Pool::lookup(const char *s, unsigned len, POINTER_SIZE_INT raw_h
 
 String * String_Pool::lookup(const char *s) {
     POINTER_SIZE_INT hash;
-    unsigned len;
+    size_t len;
     
     hash_it(s, &len, &hash);
     return lookup(s, len, hash);
 } //String_Pool::lookup
 
 
-String * String_Pool::lookup(const char *s, unsigned len) {
+String * String_Pool::lookup(const char *s, size_t len) {
     return lookup(s, len, hash_it(s, len));
 } //String_Pool::lookup
 

@@ -206,8 +206,10 @@ jvmtiGetStackTrace(jvmtiEnv* env,
                     if (NULL != cci)
                     {
                         NativeCodePtr ip = si_get_ip(si);
-                        uint32 offset = (POINTER_SIZE_INT)ip -
-                            (POINTER_SIZE_INT)cci->get_code_block_addr();
+                        // FIXME64: missing support for methods
+                        // with compiled code greater than 2GB
+                        uint32 offset = (uint32)((POINTER_SIZE_INT)ip -
+                            (POINTER_SIZE_INT)cci->get_code_block_addr());
                         JIT *jit = cci->get_jit();
 
                         uint16 bc;
@@ -715,8 +717,10 @@ jvmtiGetFrameLocation(jvmtiEnv* env,
                     if (NULL != cci)
                     {
                         NativeCodePtr ip = si_get_ip(si);
-                        uint32 offset = (POINTER_SIZE_INT)ip -
-                            (POINTER_SIZE_INT)cci->get_code_block_addr();
+                        // FIXME64: no support for methods
+                        // with compiled code greated than 4GB
+                        uint32 offset = (uint32)((POINTER_SIZE_INT)ip -
+                            (POINTER_SIZE_INT)cci->get_code_block_addr());
                         JIT *jit = cci->get_jit();
 
                         uint16 bc;

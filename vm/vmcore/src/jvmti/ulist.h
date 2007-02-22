@@ -89,7 +89,7 @@ public:
         }
     };
 
-    ulist(int initial)
+    ulist(size_t initial)
         : used(0), capacity(initial), next(NULL)
     {
         chunk = new T[capacity];
@@ -173,9 +173,9 @@ public:
         ulist<T>* current = this;
         while (current) {
             if (current->chunk <= t && t < current->chunk + current->capacity) {
-                int index = t - current->chunk;
+                int index = (int)(t - current->chunk);
                 assert(0 <= index && (size_t)index < current->used && "deleted or moved element");
-                return iterator(current, t - current->chunk);
+                return iterator(current, (int)(t - current->chunk));
             }
             current = current->next;
         }

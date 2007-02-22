@@ -547,7 +547,8 @@ static jint vm_create_jthread(jthread * thread_object, JNIEnv * jni_env, jobject
 
     if (name) {
         args[2].l = oh_allocate_local_handle();
-        args[2].l->object = string_create_from_utf8(name, strlen(name));
+        args[2].l->object = string_create_from_utf8(name,
+            (unsigned)strlen(name));
     } else {
         args[2].l = NULL;
     }

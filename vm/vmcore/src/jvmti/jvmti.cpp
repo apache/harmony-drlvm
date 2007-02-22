@@ -404,10 +404,10 @@ int DebugUtilsTI::getVersion(char* UNREF version)
 static char *parse_agent_option(apr_pool_t* pool, const char *str, const char *option_str,
                          const char option_separator, char **options)
 {
-    int cmd_length = strlen(option_str);
+    size_t cmd_length = strlen(option_str);
     const char *lib_name = str + cmd_length;
     char *opts_start = (char *)strchr(lib_name, option_separator);
-    int lib_name_length;
+    size_t lib_name_length;
 
     if (NULL == opts_start)
         lib_name_length = strlen(lib_name);

@@ -225,7 +225,7 @@ Java_java_security_AccessController_getStackDomains(JNIEnv *jenv, jclass UNREF)
 
     jclass pdc = struct_Class_to_java_lang_Class_Handle(genv->java_security_ProtectionDomain_Class);
     assert(pdc);
-    size = domains.size();
+    size = (unsigned)domains.size();
     TRACE("Domains on stack: " << size);
     // create & fill  java array
     jarray arr = jenv->NewObjectArray(size, pdc, NULL);

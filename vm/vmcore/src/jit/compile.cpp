@@ -809,7 +809,7 @@ DynamicCode* compile_get_dynamic_code_list(void)
 }
 
 // Adding dynamic generated code info to global list
-void compile_add_dynamic_generated_code_chunk(const char* name, const void* address, jint length)
+void compile_add_dynamic_generated_code_chunk(const char* name, const void* address, size_t length)
 {
     DynamicCode *dc = (DynamicCode *)STD_MALLOC(sizeof(DynamicCode));
     assert(dc);

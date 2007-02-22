@@ -59,7 +59,8 @@ uint32 si_get_inline_depth(StackIterator* si)
     if ( cci != NULL && cci->has_inline_info()) {
         return cci->get_jit()->get_inline_depth(
                 cci->get_inline_info(),
-                (POINTER_SIZE_INT)si_get_ip(si) - (POINTER_SIZE_INT)cci->get_code_block_addr());
+                // FIXME64: no support for large methods
+                (uint32)((POINTER_SIZE_INT)si_get_ip(si) - (POINTER_SIZE_INT)cci->get_code_block_addr()));
     }
     return 0;
 }

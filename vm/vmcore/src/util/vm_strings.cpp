@@ -84,10 +84,10 @@ unsigned get_utf8_length_of_unicode(const uint16 *unicode, unsigned unicode_leng
     return length;
 } //get_utf8_length_of_unicode
 
-unsigned get_utf8_length_of_8bit(const uint8* chars, unsigned length)
+unsigned get_utf8_length_of_8bit(const uint8* chars, size_t length)
 {
     unsigned len = 0;
-    for(unsigned i=0; i<length; i++)
+    for(unsigned i=0; i < length; i++)
         if (chars[i]!=0 && chars[i]<0x80)
             len++;
         else
@@ -122,7 +122,7 @@ void pack_utf8(char *utf8_string, const uint16 *unicode, unsigned unicode_length
     *s = 0;
 } //pack_utf8
 
-void utf8_from_8bit(char* utf8_string, const uint8* chars, unsigned length)
+void utf8_from_8bit(char* utf8_string, const uint8* chars, size_t length)
 {
     char* s = utf8_string;
     for(unsigned i=0; i<length; i++) {

@@ -56,9 +56,9 @@ Java_java_lang_String *vm_instantiate_cp_string_resolved(String*);
  */
 unsigned get_utf8_length_of_unicode(const uint16 *str, unsigned unicode_length);
 int get_unicode_length_of_utf8(const char *utf8);
-unsigned get_utf8_length_of_8bit(const uint8* chars, unsigned length);
+unsigned get_utf8_length_of_8bit(const uint8* chars, size_t length);
 void pack_utf8(char *utf8_string, const uint16 *unicode, unsigned unicode_length);
-void utf8_from_8bit(char* utf8_string, const uint8* chars, unsigned length);
+void utf8_from_8bit(char* utf8_string, const uint8* chars, size_t length);
 void unpack_utf8(uint16 *unicode, const char *utf8);
 
 Java_java_lang_String *vm_instantiate_cp_string_slow(Class*, unsigned cp_index);

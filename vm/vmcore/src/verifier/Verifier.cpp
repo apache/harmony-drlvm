@@ -1534,8 +1534,8 @@ vf_get_decriptor_from_cp_nameandtype( unsigned short index,  // constant pool en
  */
 static inline const char *
 vf_get_class_valid_type( const char *class_name,    // class name
-                         unsigned name_len,         // class name length
-                         unsigned *len,             // length of created string
+                         size_t name_len,           // class name length
+                         size_t *len,               // length of created string
                          vf_VerifyPool_t *pool)     // memory pool
 {
     char *result;
@@ -1582,12 +1582,12 @@ vf_ValidType_t *
 vf_create_class_valid_type( const char *class_name,     // class name
                             vf_Context_t *ctex)         // verifier context
 {
-    unsigned len;
+    size_t len;
     vf_ValidType_t *result;
 
     // get class valid type
-    unsigned class_name_len = strlen( class_name );
-    const char *type = vf_get_class_valid_type( class_name, class_name_len,
+    const char *type = vf_get_class_valid_type( class_name,
+                                                strlen( class_name ),
                                                 &len, ctex->m_pool );
     // create valid type
     result = ctex->m_type->NewType( type, len );
@@ -3786,13 +3786,13 @@ vf_opcode_newarray( vf_Code_t *code,        // code instruction
  */
 static inline const char *
 vf_get_class_array_valid_type( const char *element_name,    // array element name
-                               unsigned name_len,           // element name length
+                               size_t name_len,             // element name length
                                unsigned dimension,          // dimension of array
-                               unsigned *result_len,        // pointer to result string length
+                               size_t *result_len,          // pointer to result string length
                                vf_VerifyPool_t *pool)       // memory pool
 {
-    unsigned len,
-             index;
+    size_t len;
+    unsigned index;
     char *result;
 
     // create valid type
@@ -3861,9 +3861,9 @@ vf_opcode_anewarray( vf_Code_t *code,           // code instruction
     assert( name );
 
     // create valid type string
-    unsigned len;
-    unsigned class_name_len = strlen( name );
-    const char *array = vf_get_class_array_valid_type( name, class_name_len, 1,
+    size_t len;
+    const char *array = vf_get_class_array_valid_type( name,
+        strlen( name ), 1,
         &len, ctex->m_pool );
 
     // check dimension
@@ -4018,9 +4018,9 @@ vf_opcode_multianewarray( vf_Code_t *code,              // code instruction
     assert( name );
 
     // get valid type string
-    unsigned len;
-    unsigned class_name_len = strlen( name );
-    const char *array = vf_get_class_valid_type( name, class_name_len,
+    size_t len;
+    const char *array = vf_get_class_valid_type( name,
+                                                 strlen( name ),
                                                  &len, ctex->m_pool );
     // check dimension
     unsigned short index;
@@ -5255,7 +5255,7 @@ vf_verify_class( class_handler klass,      // verified class
      * Set valid types
      */
     const char *class_name = class_get_name( klass );
-    unsigned class_name_len = strlen( class_name );
+    size_t class_name_len = strlen( class_name );
     char *type_name = (char*)STD_ALLOCA( class_name_len + 1 + 1 );
     // it will be a funny name for array :)
     memcpy( &type_name[1], class_name, class_name_len );

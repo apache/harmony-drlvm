@@ -239,7 +239,9 @@ void st_print_stack(Registers* regs) {
                 st_get_c_method_info(&m, frames[i].ip);
             } else { // Java method
                 uint32 inlined_depth = si_get_inline_depth(si);
-                uint32 offset = (POINTER_SIZE_INT)si_get_ip(si) - (POINTER_SIZE_INT)cci->get_code_block_addr();
+                // FIXME64: on 64-bit architectures method bodies can be
+                // potentially greater than 2GB in size
+                uint32 offset = (uint32)((POINTER_SIZE_INT)si_get_ip(si) - (POINTER_SIZE_INT)cci->get_code_block_addr());
                 for (uint32 j = 0; j < inlined_depth; j++) {
                     Method *real_method = cci->get_jit()->get_inlined_method(cci->get_inline_info(), offset, j);
                     st_get_java_method_info(&m, real_method, frames[i].ip, 0 == i);

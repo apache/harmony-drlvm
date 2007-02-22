@@ -371,7 +371,7 @@ JNIEXPORT jobjectArray JNICALL Java_java_lang_VMClassRegistry_getSystemPackages
         (genv->bootstrap_class_loader);
     Package_Table* ptab = cl->getPackageTable();
     cl->Lock();
-    unsigned p_num = ptab->size();
+    unsigned p_num = (unsigned)ptab->size();
     if (p_num == (unsigned)len) 
     {
         cl->Unlock();

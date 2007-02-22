@@ -73,7 +73,7 @@ static inline long cut_continuation_separators(char* manifest)
         *dst = *src;
     } while (*src != '\0');
 
-    return dst - manifest;
+    return (long)(dst - manifest);
 }
 
 Manifest::Manifest( const JarFile* jf )
@@ -117,7 +117,7 @@ Manifest::Manifest( const JarFile* jf )
     {
         // parse property name
         // skip useless characters
-        long skipSpace = strspn( pointer, WHITESPACE_CHARS );
+        size_t skipSpace = strspn( pointer, WHITESPACE_CHARS );
         pointer += skipSpace;
         // set property name
         char *propName = pointer;
@@ -128,8 +128,8 @@ Manifest::Manifest( const JarFile* jf )
             break;
         }
         // find first whitespace character after property name, cut tail
-        long findSpace = strcspn( pointer, WHITESPACE_CHARS );
-        if( findSpace < nextPart - pointer ) {
+        size_t findSpace = strcspn( pointer, WHITESPACE_CHARS );
+        if( findSpace < (size_t)(nextPart - pointer) ) {
             pointer[findSpace] = '\0';
         } else {
             *nextPart = '\0';

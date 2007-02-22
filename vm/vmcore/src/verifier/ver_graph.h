@@ -284,7 +284,8 @@ public:
                 + method_get_code_length( context->m_method )
             : context->m_code[node->m_end + 1].m_addr;
 
-        unsigned len = code_end - context->m_code[node->m_start].m_addr;
+        unsigned len = (unsigned)(code_end -
+            context->m_code[node->m_start].m_addr);
         return len;
     } // GetNodeBytecodeLen
 

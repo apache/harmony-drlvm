@@ -391,7 +391,7 @@ vf_Graph::DumpDotGraph( vf_Context_t *ctex )        // verifier context
     const char *method_desc = method_get_descriptor( ctex->m_method );
 
     // create file name
-    unsigned len = strlen( class_name ) + strlen( method_name )
+    size_t len = strlen( class_name ) + strlen( method_name )
                         + strlen( method_desc ) + 6;
     char *fname = (char*)STD_ALLOCA( len );
     sprintf( fname, "%s_%s%s.dot", class_name, method_name, method_desc );

@@ -629,7 +629,7 @@ jvmtiGetObjectsWithTags(jvmtiEnv* env,
     hythread_suspend_disable(); // ---------------vv
 
     ti_env->tags->get_objects_with_tags(tag_set, objects);
-    int count = objects.size();
+    int count = (int)objects.size();
     *count_ptr = count;
     if (count == 0) {
         // set output args to NULL

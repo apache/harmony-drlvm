@@ -81,7 +81,7 @@
                         <linkerarg value="-lstdc++" />
                     </select>
                     <select os="win">
-                        <compilerarg value="/GX" />
+                        <compilerarg value="/EHsc" />
                     </select>
                     <fileset dir="@{directory}">
                         <include name="**/*.cpp" />

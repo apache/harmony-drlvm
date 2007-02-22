@@ -139,7 +139,7 @@ void compile_protect_arguments(Method_Handle method, GcFrame * gc) {
 //    6 xmm registers
 //    6 gp registers
 //    method handle
-const int32 stack_size = m2n_get_size() + 8 + 120;
+const int32 stack_size = (int32)m2n_get_size() + 8 + 120;
 
 static NativeCodePtr compile_get_compile_me_generic() {
     static NativeCodePtr addr = NULL;
@@ -186,7 +186,7 @@ static NativeCodePtr compile_get_compile_me_generic() {
     stub = call(stub, (char *)&compile_me);
 
     // pop m2n from the stack
-    const int32 bytes_to_m2n_bottom = stack_size - m2n_get_size();
+    const int32 bytes_to_m2n_bottom = (int32)(stack_size - m2n_get_size());
     stub = m2n_gen_pop_m2n(stub, false, 0, bytes_to_m2n_bottom, 1);
 
     // restore gp inputs from the stack

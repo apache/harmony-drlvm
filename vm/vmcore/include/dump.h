@@ -22,6 +22,8 @@
 #ifndef _DUMP_H_
 #define _DUMP_H_
 
+#include <stddef.h>
+
 #ifndef NDEBUG
     extern bool dump_stubs;
 
@@ -32,6 +34,6 @@
     #define DUMP_STUB(addr, name, len)
 #endif
 
-int dump(const char * code, const char * name, unsigned int length);
+int dump(const char * code, const char * name, size_t length);
 
 #endif // _DUMP_H_

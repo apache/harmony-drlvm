@@ -537,7 +537,9 @@ void jvmti_send_chunks_compiled_method_load_event(Method *method)
 
                 for (CodeChunkInfo* cci = method->get_first_JIT_specific_info();  cci;  cci = cci->_next)
                 {
-                    jint code_size = cci->get_code_block_size();
+                    // FIXME64: no support for large methods
+                    // with compiled code size greater than 2GB
+                    jint code_size = (jint)cci->get_code_block_size();
                     const void* code_addr = cci->get_code_block_addr();
 
                     if ( code_size <= 0 || code_addr == NULL)
@@ -681,7 +683,8 @@ static jvmtiError generate_events_dynamic_code_generated(jvmtiEnv* env)
     // FIXME: linked list usage without sync
     for (DynamicCode *dcList = compile_get_dynamic_code_list();
         NULL != dcList; dcList = dcList->next)
-        jvmti_send_dynamic_code_generated_event(dcList->name, dcList->address, dcList->length);
+        jvmti_send_dynamic_code_generated_event(dcList->name,
+            dcList->address, (jint)dcList->length);
 
     return JVMTI_ERROR_NONE;
 } // generate_events_dynamic_code_generated

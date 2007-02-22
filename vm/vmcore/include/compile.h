@@ -146,7 +146,7 @@ struct DynamicCode
 {
     const char *name;
     const void *address;
-    jint length;
+    size_t length;
     DynamicCode *next;
 };
 
@@ -158,7 +158,7 @@ DynamicCode* compile_get_dynamic_code_list(void);
 /** 
  * Adding dynamic generated code info to global list.
  */
-void compile_add_dynamic_generated_code_chunk(const char* name, const void* address, jint length);
+void compile_add_dynamic_generated_code_chunk(const char* name, const void* address, size_t length);
 void compile_clear_dynamic_code_list(DynamicCode* list);
 
 #endif

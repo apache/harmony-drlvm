@@ -320,7 +320,7 @@ vf_error_func( VERIFY_SOURCE_PARAMS );
  * @note Trace is available with argument <b>verifier:memory</b>.
  */
 void *
-vf_calloc_func( unsigned number, unsigned element_size, VERIFY_SOURCE_PARAMS );
+vf_calloc_func( unsigned number, size_t element_size, VERIFY_SOURCE_PARAMS );
 
 /**
  * Function allocates memory blocks.
@@ -334,7 +334,7 @@ vf_calloc_func( unsigned number, unsigned element_size, VERIFY_SOURCE_PARAMS );
  * @note Trace is available with argument <b>verifier:memory</b>.
  */
 void *
-vf_malloc_func( unsigned size, VERIFY_SOURCE_PARAMS );
+vf_malloc_func( size_t size, VERIFY_SOURCE_PARAMS );
 
 /**
  * Function releases allocated memory blocks.
@@ -362,7 +362,7 @@ vf_free_func( void *pointer, VERIFY_SOURCE_PARAMS );
  * @note Trace is available with argument <b>verifier:memory</b>.
  */
 void *
-vf_realloc_func( void *pointer, unsigned resize, VERIFY_SOURCE_PARAMS );
+vf_realloc_func( void *pointer, size_t resize, VERIFY_SOURCE_PARAMS );
 
 /**
  * Function creates memory pool structure.
@@ -388,7 +388,7 @@ vf_create_pool_func( VERIFY_SOURCE_PARAMS );
  * @note Trace is available with argument <b>verifier:memory:pool</b>.
  */
 void *
-vf_alloc_pool_memory_func( vf_VerifyPool_t *pool, unsigned size, VERIFY_SOURCE_PARAMS );
+vf_alloc_pool_memory_func( vf_VerifyPool_t *pool, size_t size, VERIFY_SOURCE_PARAMS );
 
 /**
  * Function cleans given pool.
@@ -560,7 +560,7 @@ public:
      * @see vf_HashEntry_t
      * @note Created hash key and hash entry is allocated into hash memory pool.
      */
-    vf_HashEntry_t * NewHashEntry( const char *key, unsigned len );
+    vf_HashEntry_t * NewHashEntry( const char *key, size_t len );
 
 private:
     vf_VerifyPool_t *m_pool;    ///< hash memory pool
@@ -587,7 +587,7 @@ private:
      *         else returns <code>false</code>.
      * @see vf_HashEntry_t
      */
-    bool CheckKey( vf_HashEntry_t *hash_entry, const char *key, unsigned len );
+    bool CheckKey( vf_HashEntry_t *hash_entry, const char *key, size_t len );
 
     /**
      * Hash function.
@@ -602,7 +602,7 @@ private:
      * @param len - key length
      * @return Hash index relevant to key.
      */
-    unsigned HashFunc( const char *key, unsigned len );
+    unsigned HashFunc( const char *key, size_t len );
 }; // struct vf_Hash
 
 //===========================================================
@@ -646,7 +646,7 @@ public:
      * @return Created valid type structure.
      * @see vf_ValidType_t
      */
-    vf_ValidType_t * NewType( const char *type, unsigned len );
+    vf_ValidType_t * NewType( const char *type, size_t len );
 
     /**
      * Function creates valid type which is identical to an element of a given array type.
@@ -825,9 +825,9 @@ public:
  */
 struct vf_VerifyPool {
     vf_VerifyPoolInternal_t *m_pool;    ///< pool entry
-    unsigned m_memory;                  ///< allocated memory size
-    unsigned m_used;                    ///< used memory size
-    unsigned m_maxuse;                  ///< max used memory size
+    size_t m_memory;                    ///< allocated memory size
+    size_t m_used;                      ///< used memory size
+    size_t m_maxuse;                    ///< max used memory size
 };
 
 /**
@@ -837,7 +837,7 @@ struct vf_VerifyPoolInternal {
     void *m_memory;                     ///< pool entry memory
     char *m_free;                       ///< free space in pool entry
     vf_VerifyPoolInternal_t *m_next;    ///< next pool entry
-    unsigned m_freesize;                ///< size of free space in pool entry
+    size_t m_freesize;                  ///< size of free space in pool entry
 };
 
 /**
@@ -1019,7 +1019,7 @@ vf_set_error_message( stringstream &stream,
         vf_free( ctex->m_error );
     }
     // create message
-    int len = stream.str().length();
+    size_t len = stream.str().length();
     if( len ) {
         ctex->m_error = (char*)vf_malloc( len + 1 );
         memcpy( ctex->m_error, stream.str().c_str(), len );

@@ -73,19 +73,19 @@ Version: $Revision: 1.6.2.6 $
                 </defineset>
 
                 <compilerarg value="/Fp${build.dir}/_obj\" />
-                <compilerarg value="/Fr${build.dir}/_obj\" />
+                <compilerarg value="/FR${build.dir}/_obj\" />
                 <compilerarg value="/Fd${build.dir}/_obj\" />
                 <compilerarg value="/nologo" />
                 <compilerarg value="/W3" />
 
-                <select arch="em64t">
-                    <compilerarg value="/W0" />
-                </select>
                 <select arch="ia32,ipf">
                     <compilerarg value="/WX" />
                 </select>
-
                 <compilerarg value="/Zi" />
+
+                <select arch="em64t">
+                    <compilerarg value="/wd4996" />
+                </select>
             </select>
 
             <select os="lnx">
@@ -137,15 +137,11 @@ Version: $Revision: 1.6.2.6 $
                     <compilerarg value="/QxN" />
                     <compilerarg value="/Qip" />
                 </select>
-
-                <select os="win" cxx="msvc">
-                    <compilerarg value="/Ox" />
-                </select>
             </select>
         </compiler>
 
         <compiler id="common.cpp.compiler" name="${build.cxx}" extends="common.compiler">
-            <select arch="em64t,ipf">
+            <select arch="em64t,ipf" os="lnx">
                 <compilerarg value="-fPIC" />
             </select>
 
@@ -165,7 +161,7 @@ Version: $Revision: 1.6.2.6 $
                 </select>
 
                 <select cxx="msvc">
-                    <compilerarg value="/GX" />
+                    <compilerarg value="/EHsc" />
                 </select>
 
                 <select cxx="icl">

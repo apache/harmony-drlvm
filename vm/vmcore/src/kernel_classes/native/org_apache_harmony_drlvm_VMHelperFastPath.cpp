@@ -69,5 +69,5 @@ JNIEXPORT jint JNICALL Java_org_apache_harmony_drlvm_VMHelperFastPath_getVtableS
 
 JNIEXPORT jint JNICALL Java_org_apache_harmony_drlvm_VMHelperFastPath_getClassDepthOffset(JNIEnv *, jclass)
 {
-    return Class::get_offset_of_depth();
+    return (jint)Class::get_offset_of_depth();
 }

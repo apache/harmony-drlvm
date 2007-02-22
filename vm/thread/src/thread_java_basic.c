@@ -404,7 +404,7 @@ IDATA jthread_yield() {
  * Callback which is executed in the target thread at safe point 
  * whenever Thread.stop() method is called.
  */
-void stop_callback() {  
+void stop_callback(void) {  
     hythread_t tm_native_thread;
     jvmti_thread_t tm_java_thread;
     jobject excn;
