@@ -47,7 +47,7 @@ int HYTHREAD_PROC run_for_test_jthread_attach(void *args){
         }
     }
 
-    status = vm_attach(GLOBAL_VM, &jni_env);
+    status = vm_attach(GLOBAL_VM, &jni_env, NULL);
     if (status != JNI_OK) {
         tts->phase = TT_PHASE_ERROR;
         return 0;

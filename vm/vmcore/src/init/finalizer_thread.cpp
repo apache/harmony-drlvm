@@ -151,7 +151,7 @@ static int finalizer_thread_func(void **args)
     JavaVM *java_vm = (JavaVM *)args[0];
     JNIEnv *jni_env = (JNIEnv *)args[1];
     
-    IDATA status = vm_attach(java_vm, &jni_env);
+    IDATA status = vm_attach(java_vm, &jni_env, NULL);
     if(status != TM_ERROR_NONE)
         return status;
     

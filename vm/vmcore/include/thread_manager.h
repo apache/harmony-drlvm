@@ -32,7 +32,7 @@ extern "C" {
 
 void free_this_thread_block(VM_thread *);
 VM_thread * get_a_thread_block(JavaVM_Internal * java_vm);
-
+VM_thread * allocate_thread_block(JavaVM_Internal * java_vm);
 
 extern volatile VM_thread *p_the_safepoint_control_thread;  // only set when a gc is happening
 extern volatile safepoint_state global_safepoint_status;

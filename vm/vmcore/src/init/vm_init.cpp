@@ -592,7 +592,7 @@ jint vm_attach_internal(JNIEnv ** p_jni_env, jthread * java_thread, JavaVM * jav
     }
     assert(native_thread);
 
-    status = vm_attach(java_vm, &jni_env);
+    status = vm_attach(java_vm, &jni_env, NULL);
     if (status != JNI_OK) return status;
 
     *p_jni_env = jni_env;
@@ -698,7 +698,7 @@ int vm_init1(JavaVM_Internal * java_vm, JavaVMInitArgs * vm_arguments) {
     extern void initialize_signals();
     initialize_signals(); 
 
-    status = vm_attach(java_vm, &jni_env);
+    status = vm_attach(java_vm, &jni_env, NULL);
     if (status != JNI_OK) return status;
     
     finalizer_threads_init(java_vm, jni_env);   /* added for NATIVE FINALIZER THREAD */

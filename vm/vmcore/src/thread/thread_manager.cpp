@@ -89,20 +89,34 @@ volatile safepoint_state global_safepoint_status = nill;
 
 void init_TLS_data();
 
-VM_thread * get_a_thread_block(JavaVM_Internal * java_vm) {
+VM_thread * allocate_thread_block(JavaVM_Internal * java_vm) {
     VM_thread * p_vmthread;
     apr_pool_t * thread_pool;
+  
+    if (apr_pool_create(&thread_pool, java_vm->vm_env->mem_pool) != APR_SUCCESS) {
+	return NULL;
+    }
+    p_vmthread = (VM_thread *) apr_pcalloc(thread_pool, sizeof(VM_thread));
+
+    if (!p_vmthread) return NULL;
+    
+    p_vmthread->pool = thread_pool;
+
+    return p_vmthread;
+}
+  
+
+
+VM_thread * get_a_thread_block(JavaVM_Internal * java_vm) {
+    VM_thread * p_vmthread;
 
     p_vmthread = p_TLS_vmthread;
     if (!p_vmthread) {
-        if (apr_pool_create(&thread_pool, java_vm->vm_env->mem_pool) != APR_SUCCESS) {
-            return NULL;
-        }
-        p_vmthread = (VM_thread *) apr_pcalloc(thread_pool, sizeof(VM_thread));
-        if (!p_vmthread) return NULL;
+      p_vmthread = allocate_thread_block(java_vm);
+      
+      if (!p_vmthread) return NULL;
+      set_TLS_data(p_vmthread);
 
-        p_vmthread->pool = thread_pool;
-        set_TLS_data(p_vmthread);
     } else {
         memset(p_vmthread, 0, sizeof(VM_thread));
     }

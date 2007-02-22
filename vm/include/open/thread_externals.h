@@ -72,8 +72,10 @@ VMEXPORT void *vm_jthread_get_tm_data(jthread thread);
  *
  * @param[in] java_vm    - current thread will be attached to the specified VM
  * @param[out] p_jni_env - will point to JNI environment assocciated with the thread
+ * @param[in] vm_thread_dummies - memory preallocated for Java thread structures (if NULL, memory will be allocated automatically)
  */
-VMEXPORT jint vm_attach(JavaVM * java_vm, JNIEnv ** p_jni_env);
+VMEXPORT jint vm_attach(JavaVM * java_vm, JNIEnv ** p_jni_env, 
+			void *vm_thread_dummies);
 
 /**
  * Frees java related resources before thread exit.
@@ -118,6 +120,14 @@ VMEXPORT int vm_objects_are_equal(jobject obj1, jobject obj2);
  * @return <code>int</code>
  */
 VMEXPORT int ti_is_enabled();
+
+/** 
+ * Allocates memory needed for creating new vm thread
+ *
+ * @param[in] java_vm    - current thread will be attached to the specified VM
+ */
+
+VMEXPORT void *vm_allocate_thread_dummies(JavaVM *java_vm);
 
 #ifdef __cplusplus
 }

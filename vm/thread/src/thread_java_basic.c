@@ -40,6 +40,7 @@ typedef struct  {
     jvmtiEnv *tiEnv;
     jvmtiStartFunction tiProc;
     void *tiProcArgs;
+    void *vm_thread_dummies;
 } wrapper_proc_data;
 
 
@@ -75,16 +76,21 @@ int wrapper_proc(void *arg) {
     assert(jvmti_thread);
     java_thread = jvmti_thread->thread_object;
 
-    status = vm_attach(data->java_vm, &jni_env);
-    if (status != JNI_OK) return TM_ERROR_INTERNAL;
+    status = vm_attach(data->java_vm, &jni_env, data->vm_thread_dummies);
+    assert (status == JNI_OK);
 
     jvmti_thread->jenv = jni_env;
     jvmti_thread->daemon = data->daemon;
 
     TRACE(("TM: Java thread started: id=%d OS_handle=%p", native_thread->thread_id, apr_os_thread_current()));
 
+    if (!jvmti_thread->daemon) {
+        increase_nondaemon_threads_count(native_thread);
+    }
+
     // Send Thread Start event.
     jvmti_send_thread_start_end_event(1);
+
 
     if (data->tiProc != NULL) {
         data->tiProc(data->tiEnv, jni_env, data->tiProcArgs);
@@ -120,6 +126,8 @@ IDATA jthread_create_with_function(JNIEnv * jni_env, jthread java_thread, jthrea
 {
     hythread_t tm_native_thread = NULL;
     jvmti_thread_t tm_java_thread;
+    void *vm_thread_dummies;
+    
     wrapper_proc_data * data;
     IDATA status;
     
@@ -145,20 +153,25 @@ IDATA jthread_create_with_function(JNIEnv * jni_env, jthread java_thread, jthrea
     if (data == NULL) {
         return TM_ERROR_OUT_OF_MEMORY;
     }
-    
-    // Prepare arguments for wrapper proc
+
+    // Get JavaVM 
     status = (*jni_env) -> GetJavaVM(jni_env, &data->java_vm);
     if (status != JNI_OK) return TM_ERROR_INTERNAL;
 
+    // Allocate memory needed by soon to be born thread
+    vm_thread_dummies = vm_allocate_thread_dummies(data->java_vm);
+
+    if (vm_thread_dummies == NULL) {
+	return TM_ERROR_OUT_OF_MEMORY;
+    }
+
+    // prepare args for wrapper_proc
     data->daemon = attrs->daemon;
     data->tiEnv  = attrs->jvmti_env;
     data->tiProc = proc;
     data->tiProcArgs = (void *)arg;
+    data->vm_thread_dummies = vm_thread_dummies;
 
-    if (!data->daemon) {
-        increase_nondaemon_threads_count(hythread_self());
-    }
-    
     status = hythread_create(&tm_native_thread, (attrs->stacksize)?attrs->stacksize:1024000,
                                attrs->priority, 0, wrapper_proc, data);
 

@@ -91,6 +91,59 @@ using namespace std;
 
 extern struct JNINativeInterface_ jni_vtable;
 
+struct vmthread_dummies {
+    VM_thread *p_vm_thread;
+    ObjectHandles *p_object_handles;
+    M2nFrame *p_m2n_frame;
+};
+
+
+void *vm_allocate_thread_dummies(JavaVM *java_vm) {
+    struct vmthread_dummies *p_vmt_dummies;
+    VM_thread *vmt = allocate_thread_block((JavaVM_Internal *)java_vm);
+    
+    if (vmt == NULL) 
+	goto err;
+    
+    p_vmt_dummies = 
+	(struct vmthread_dummies *)apr_palloc(vmt->pool, sizeof(vmthread_dummies));
+    
+    if (p_vmt_dummies == NULL)
+	goto err;
+    
+    // Create top level M2N frame.
+    p_vmt_dummies->p_m2n_frame = 
+	(M2nFrame*) apr_palloc(vmt->pool, sizeof(M2nFrame));
+    // Create local handles.
+    p_vmt_dummies->p_object_handles = 
+	(ObjectHandles*) apr_palloc(vmt->pool, sizeof(ObjectHandlesNew));
+    // allocate jni env internal structures
+    vmt->jni_env = (JNIEnv_Internal *) apr_palloc(vmt->pool, 
+						  sizeof(JNIEnv_Internal));
+
+    if (vmt->jni_env == NULL || p_vmt_dummies->p_object_handles == NULL ||
+	p_vmt_dummies->p_m2n_frame == NULL)
+	goto err;
+    
+    p_vmt_dummies->p_vm_thread = vmt;
+
+    return (void*)p_vmt_dummies;
+
+ err:
+    if (p_vmt_dummies->p_m2n_frame)
+      free (p_vmt_dummies->p_m2n_frame);
+    if (p_vmt_dummies->p_object_handles)
+      free(p_vmt_dummies->p_object_handles);
+    if (vmt->jni_env)
+      free(vmt->jni_env);
+    if (p_vmt_dummies) 
+      free(p_vmt_dummies);
+    if (vmt) 
+      free(vmt);
+
+    return NULL;
+}
+    
 /**
  * Runs java.lang.Thread.detach() method.
  */
@@ -140,48 +193,64 @@ static IDATA run_java_detach(jthread java_thread) {
 /**
  * Attaches thread current thread to VM.
  */
-jint vm_attach(JavaVM * java_vm, JNIEnv ** p_jni_env) {
+jint vm_attach(JavaVM * java_vm, JNIEnv ** p_jni_env,
+	       void *pv_vmt_dummies) {
     M2nFrame * p_m2n;
     VM_thread * p_vm_thread;
     ObjectHandles * p_handles;
-    
+    struct vmthread_dummies *p_vmt_dummies = 
+	(struct vmthread_dummies *)pv_vmt_dummies;
+
+    if (p_vmt_dummies != NULL) {
+	p_m2n = p_vmt_dummies->p_m2n_frame;
+	p_vm_thread = p_vmt_dummies->p_vm_thread;
+	p_handles = p_vmt_dummies->p_object_handles;
+    }
+
     // It seems to be reasonable to have suspend enabled state here.
     // It is unsafe to perform operations which require suspend disabled
     // mode until current thread is not attaced to VM.
     assert(hythread_is_suspend_enabled());
 
-    p_vm_thread = p_TLS_vmthread;
-    if (p_vm_thread != NULL) {
-        if (java_vm != p_vm_thread->jni_env->vm) {
-            return TM_ERROR_INTERNAL;
-        }
-        *p_jni_env = p_vm_thread->jni_env;
-        return JNI_OK;
+    hythread_t hythread = hythread_self();
+
+    if (p_vmt_dummies != NULL) {
+	// VMThread structure is already allocated, we only need to set
+	// TLS
+	set_TLS_data (p_vm_thread);
+    } else {
+	p_vm_thread = get_vm_thread(hythread);
+	
+	if (p_vm_thread != NULL) {
+	    assert (java_vm == p_vm_thread->jni_env->vm); 
+	    *p_jni_env = p_vm_thread->jni_env;
+	    return JNI_OK;
+	}
+	
+	p_vm_thread = get_a_thread_block((JavaVM_Internal *)java_vm);
     }
 
-    p_vm_thread = get_a_thread_block((JavaVM_Internal *)java_vm);
-    if (p_vm_thread == NULL) {
-        TRACE2("thread", "can't get a thread block for a new thread");
-        return JNI_ENOMEM;
+    // if the assertion is false we cannot notify the parent thread
+    // that we started and it would hang in waitloop
+    assert (p_vm_thread != NULL);
+    
+    if (p_vmt_dummies == NULL) {
+	// Create top level M2N frame.
+	p_m2n = (M2nFrame*) apr_palloc(p_vm_thread->pool, sizeof(M2nFrame));
+	// Create local handles.
+	p_handles = (ObjectHandles*) apr_palloc(p_vm_thread->pool, sizeof(ObjectHandlesNew));
+	p_vm_thread->jni_env = (JNIEnv_Internal *) apr_palloc(p_vm_thread->pool, sizeof(JNIEnv_Internal));
     }
-    
-    // Create JNI environment for current thread.
-    p_vm_thread->jni_env = (JNIEnv_Internal *) apr_palloc(p_vm_thread->pool, sizeof(JNIEnv_Internal));
-    
+
+    assert (p_m2n != NULL && p_handles != NULL && p_vm_thread->jni_env != NULL);
+
     // Initialize JNI environment.
     p_vm_thread->jni_env->functions = &jni_vtable;
     p_vm_thread->jni_env->vm = (JavaVM_Internal *)java_vm;
     p_vm_thread->jni_env->reserved0 = (void *)0x1234abcd;
     *p_jni_env = p_vm_thread->jni_env;
-    
-    // Create top level M2N frame.
-    p_m2n = (M2nFrame*) apr_palloc(p_vm_thread->pool, sizeof(M2nFrame));
-    // Create local handles.
-    p_handles = (ObjectHandles*) apr_palloc(p_vm_thread->pool, sizeof(ObjectHandlesNew));
-    if (p_vm_thread->jni_env == NULL || p_m2n == NULL ||p_handles == NULL) {
-        TRACE2("thread", "can't get a thread block for a new thread");
-        return JNI_ENOMEM;
-    }
+
+
     
     init_stack_info();
 
