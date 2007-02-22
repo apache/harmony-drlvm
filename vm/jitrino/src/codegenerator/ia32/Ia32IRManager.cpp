@@ -2006,6 +2006,9 @@ void IRManager::resolveRuntimeInfo(Opnd* opnd) const {
 //_____________________________________________________________________________________________
 bool IRManager::verify()
 {
+    if (!verifyOpnds())
+        return false;
+
     updateLivenessInfo();
     if (!verifyLiveness())
         return false;
@@ -2032,6 +2035,82 @@ bool IRManager::verify()
     }
 #endif
     return true;
+}
+
+//_____________________________________________________________________________________________
+//
+//  This routine checks that every memory heap operand is referenced by single instruction only.
+//
+//  There are two kinds of operands - instruction-level, which are saved in Ia32::Inst structure,
+//  and sub-operands (of instruction-level operands), which are saved in Ia32::Opnd structure.
+//  Of course, not all instruction-level operands have sub-operands.
+//
+//  With this design, it would be impossible to replace sub-operand in one instruction without
+//  affecting all other instructions that reference the same instruction-level operand of which
+//  the sub-operand is part of.
+//
+//  For some codegen modules (SpillGen, ConstraintResolver) it is critically important to be able
+//  to replace operand (Inst::replaceOpnd) in one instruction, without side-effect on all other
+//  instruction. More specifically, only heap operands are manipulated in such way.
+//
+//  NOTE
+//      For some obscure reason, AliasPseudoInst violates this principle, but experiments show 
+//      that AliasPseudoInst can be ignored. Otherwise, massive errors from this instruction
+//      make the check meanigless.
+//
+bool IRManager::verifyOpnds() const
+{
+    bool ok = true;
+
+    typedef StlVector<Inst*> InstList;      // to register all instruction referenced an operand
+    typedef StlVector<InstList*> OpndList;  // one entry for each operand, instruction register or 0
+
+    const uint32 opnd_count = getOpndCount();
+    OpndList opnd_list(getMemoryManager(), opnd_count); // fixed size
+
+//  Watch only MemOpndKind_Heap operands - all others are simply ignored.
+    for (uint32 i = 0; i != opnd_count; ++i) {
+        InstList* ilp = 0; 
+        if (getOpnd(i)->getMemOpndKind() == MemOpndKind_Heap)
+            ilp = new (getMemoryManager()) InstList(getMemoryManager());
+        opnd_list[i] = ilp;
+    }
+
+    const Nodes& nodes = fg->getNodes();
+    for (Nodes::const_iterator nd = nodes.begin(), nd_end = nodes.end(); nd != nd_end; ++nd) {
+        Node* node = *nd;
+        if (node->isBlockNode()) {
+            for (Inst* inst = (Inst*)node->getFirstInst(); inst != NULL; inst = inst->getNextInst()) 
+                if (!inst->hasKind(Inst::Kind_AliasPseudoInst)) {
+                //  Inspect instruction-level operand only (but all of them), ignore sub-operands.
+                    Inst::Opnds opnds(inst, Inst::OpndRole_InstLevel | Inst::OpndRole_UseDef);
+                    for (Inst::Opnds::iterator op = opnds.begin(), op_end = opnds.end(); op != op_end; op = opnds.next(op)) {
+                        Opnd* opnd = opnds.getOpnd(op);
+                    //  If this is a watched operand, then register the instruction that referenced it.
+                        InstList* ilp = opnd_list.at(opnd->getId());
+                        if (ilp != 0) 
+                            ilp->push_back(inst);
+                    }
+                }
+        }
+    }
+
+    for (uint32 i = 0; i != opnd_count; ++i) {
+        InstList* ilp = opnd_list.at(i);
+        if (ilp != 0 && ilp->size() > 1) {
+        //  Error found
+            ok = false;
+
+            VERIFY_OUT("MemOpnd " << getOpnd(i) << " was referenced in the instructions:");
+            for (InstList::iterator it = ilp->begin(), end = ilp->end(); it != end; ++it) {
+                Inst* inst = *it;
+                VERIFY_OUT(" I" << inst->getId());
+            }
+            VERIFY_OUT(std::endl);
+        }
+    }
+
+    return ok;
 }
 
 //_____________________________________________________________________________________________
@@ -2206,7 +2285,7 @@ void SessionAction::debugOutput(const char * subKind)
 
     if (isLogEnabled(LogStream::IRDUMP)) {
         irManager->updateLoopInfo();
-        irManager->updateLivenessInfo();
+        irManager->fixLivenessInfo();
         dumpIR(subKind, "opnds");
         dumpIR(subKind, "liveness");
         dumpIR(subKind);
@@ -2214,7 +2293,7 @@ void SessionAction::debugOutput(const char * subKind)
 
     if (isLogEnabled(LogStream::DOTDUMP)) {
         irManager->updateLoopInfo();
-        irManager->updateLivenessInfo();
+        irManager->fixLivenessInfo();
         printDot(subKind);
         printDot(subKind, "liveness");
     }

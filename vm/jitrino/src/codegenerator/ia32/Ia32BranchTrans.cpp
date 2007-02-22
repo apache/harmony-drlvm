@@ -230,7 +230,8 @@ BranchTranslator::runImpl()
                                     bool found = false;
                                     for (Inst * prevInst=NULL; nextInst!=NULL && !found; nextInst=prevInst){
                                         Inst::Opnds opnds(nextInst, Inst::OpndRole_Def|Inst::OpndRole_ForIterator);
-                                        if (i==-1 && nextInst != cmpInst && nextInst->getMnemonic() != Mnemonic_MOV) {
+
+                                        if (i==-1 && nextInst != cmpInst && (nextInst->getMnemonic() != Mnemonic_MOV || nextInst->getOpnd(0)->isPlacedIn(OpndKind_Mem) || nextInst->getOpnd(1)->isPlacedIn(OpndKind_Mem))) {
                                             stopSearch = true;
                                             break;
                                         }

@@ -258,7 +258,7 @@ JavaByteCodeTranslator::JavaByteCodeTranslator(CompilationInterface& ci,
                 assert(ic->getNumArgs() == numArgs);
                 Type* newType = ic->getArgTypes()[i];
                 if (newType->isObject()) {
-                    assert(newType->isNullObject() || newType->asObjectType()->isSubClassOf(type->asObjectType()));
+                    assert(newType->isNullObject() || newType->asObjectType()->isSubClassOf(type->asObjectType()) || newType->isSystemObject());
                     type = newType;
                 } else {
                     //do nothing, numX->numY auto convertion not tested

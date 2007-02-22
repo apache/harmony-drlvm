@@ -426,6 +426,7 @@ public:
     void calculateStackDepth();
     //-----------------------------------------------------------------------------------------------
     bool verify();
+    bool verifyOpnds() const;
     bool verifyLiveness();
     bool verifyHeapAddressTypes();
 
