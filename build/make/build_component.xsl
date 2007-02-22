@@ -30,32 +30,62 @@ Version: $Revision: 1.2.2.3 $
 
     <xsl:template match="property[@name='libname']">
         <xsl:copy-of select="." />
-        <property name="{$component}.libname" value="{concat('${','libname}')}" />
+        <xsl:call-template name="insert-property">
+            <xsl:with-param name="suffix">libname</xsl:with-param>
+        </xsl:call-template>
     </xsl:template>
 
     <xsl:template match="property[@name='includes']">
         <xsl:copy-of select="." />
-        <property name="{$component}.includes" value="{concat('${','includes}')}" />
+        <xsl:call-template name="insert-property">
+            <xsl:with-param name="suffix">includes</xsl:with-param>
+        </xsl:call-template>
     </xsl:template>
 
     <xsl:template match="property[@name='src']">
         <xsl:copy-of select="." />
-        <property name="{$component}.src" value="{concat('${','src}')}" />
+        <xsl:call-template name="insert-property">
+            <xsl:with-param name="suffix">src</xsl:with-param>
+        </xsl:call-template>
     </xsl:template>
 
     <xsl:template match="property[@name='libdir']">
         <xsl:copy-of select="." />
-        <property name="{$component}.libdir" value="{concat('${','libdir}')}" />
+        <xsl:call-template name="insert-property">
+            <xsl:with-param name="suffix">libdir</xsl:with-param>
+        </xsl:call-template>
     </xsl:template>
 
     <xsl:template match="property[@name='jardir']">
         <xsl:copy-of select="." />
-        <property name="{$component}.jardir" value="{concat('${','jardir}')}" />
+        <xsl:call-template name="insert-property">
+            <xsl:with-param name="suffix">jardir</xsl:with-param>
+        </xsl:call-template>
     </xsl:template>
 
     <xsl:template match="property[@name='jarname']">
         <xsl:copy-of select="." />
-        <property name="{$component}.jarname" value="{concat('${','jarname}')}" />
+        <xsl:call-template name="insert-property">
+            <xsl:with-param name="suffix">jarname</xsl:with-param>
+        </xsl:call-template>
     </xsl:template>
 
+    <xsl:template name="insert-property">
+        <xsl:param name="suffix"/>
+        <xsl:element name="property">
+            <xsl:attribute name="name">
+                <xsl:value-of select="$component"/>
+                <xsl:text>.</xsl:text>
+                <xsl:value-of select="$suffix"/>
+            </xsl:attribute>
+            <xsl:attribute name="value">
+                <xsl:text>${</xsl:text>
+                <xsl:value-of select="$suffix"/>
+                <xsl:text>}</xsl:text>
+            </xsl:attribute>
+        </xsl:element>
+    </xsl:template>
+    
+
+    
 </xsl:stylesheet>

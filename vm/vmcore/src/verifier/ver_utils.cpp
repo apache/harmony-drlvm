@@ -790,7 +790,7 @@ vf_check_interface_methods( class_handler class1,   // first interface class
                 // interfaces have methods with the same name
                 const char *sig1 = method_get_descriptor( method1 );
                 const char *sig2 = method_get_descriptor( method2 );
-                char *end_params = strrchr( sig1, ')' );
+                char *end_params = (char *)strrchr( sig1, ')' );
                 unsigned len = end_params - sig1 + 1;
                 if( !memcmp( sig1, sig2, len ) ) {
                     // methods arguments are the same

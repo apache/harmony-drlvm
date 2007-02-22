@@ -406,7 +406,7 @@ static char *parse_agent_option(apr_pool_t* pool, const char *str, const char *o
 {
     int cmd_length = strlen(option_str);
     const char *lib_name = str + cmd_length;
-    char *opts_start = strchr(lib_name, option_separator);
+    char *opts_start = (char *)strchr(lib_name, option_separator);
     int lib_name_length;
 
     if (NULL == opts_start)

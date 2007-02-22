@@ -657,7 +657,7 @@ jclass JNICALL DefineClass(JNIEnv *jenv,
     Global_Env * vm_env = jni_get_vm_env(jni_env);
 
     if (exn_raised()) return NULL;
-    char *ch = strchr(name, '.');
+    char *ch = (char *)strchr(name, '.');
     if (NULL != ch)
     {
         ThrowNew_Quick(jni_env, vm_env->JavaLangNoClassDefFoundError_String->bytes, name);

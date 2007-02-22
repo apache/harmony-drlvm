@@ -291,7 +291,12 @@ NativeCodePtr compile_gen_compile_me(Method_Handle method) {
 
 /*    BEGIN SUPPORT FOR STUB OVERRIDE CODE SEQUENCES    */
 
+#if defined(_EM64T_) && defined(_WIN64)
+// TODO: couldn't compile "as is" under windows/em64t 
+static Stub_Override_Entry _stub_override_entries_base[1];
+#else
 static Stub_Override_Entry _stub_override_entries_base[] = {};
+#endif
 
 Stub_Override_Entry * stub_override_entries = &(_stub_override_entries_base[0]);
 

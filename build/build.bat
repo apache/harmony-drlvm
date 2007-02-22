@@ -79,10 +79,17 @@ IF NOT DEFINED COMPILER_CFG_SCRIPT (
 )
 
 :CONFIG
+IF "%COMPILER_CFG_SCRIPT%" == "EM64T" (
+    ECHO ON
+    CALL "c:\Program Files (x86)\Microsoft Visual Studio 8\VC\vcvarsall.bat" amd64 %COMPILER_CFG_ARG%
+    @ECHO OFF
+    GOTO WO_CONFIG	
+)
 ECHO ON
 CALL "%COMPILER_CFG_SCRIPT%" %COMPILER_CFG_ARG%
 @ECHO OFF
 
+:WO_CONFIG
 IF NOT %ERRORLEVEL% == 0 (
     ECHO *
     ECHO * Failed to call C compiler configuration script:
@@ -90,7 +97,6 @@ IF NOT %ERRORLEVEL% == 0 (
     ECHO *
     GOTO ERROR
  )
-
 REM ================================================
 REM Check JAVA_HOME & ANT_HOME
 REM ================================================
@@ -142,3 +148,4 @@ ECHO *
 EXIT /B 1
 
 :THEEND
+

@@ -63,6 +63,9 @@ Version: $Revision: 1.4.2.4 $
                 <defineset define="LINUX64" />
                 <defineset define="LINUXPPC64" />
             </select>
+            <select os="win" arch="em64t">
+                <defineset define="_EM64T_" />
+            </select>
             <!--
             <select os="lnx">
                 <compilerarg value="-Wno-deprecated" />

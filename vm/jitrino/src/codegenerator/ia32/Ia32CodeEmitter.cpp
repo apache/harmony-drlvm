@@ -510,6 +510,7 @@ void CodeEmitter::postPass()
                     int64 offset=targetCodeStartAddr-instCodeEndAddr;
 
 #ifdef _EM64T_
+#ifndef WIN32
                     if (llabs(offset) > 0xFFFFFFFF) {
                         const RegName TMP_BASE = RegName_R14;
                         EncoderBase::Operands args;
@@ -521,6 +522,10 @@ void CodeEmitter::postPass()
                         args.add(TMP_BASE);
                         EncoderBase::encode(ip, Mnemonic_CALL, args);
                     } else {
+#else
+                    // TODO: 
+                    assert(0);
+#endif
 #endif
                     inst->getOpnd(targetOpndIndex)->assignImmValue((int64)offset);
                     // re-emit the instruction: 
@@ -530,7 +535,9 @@ void CodeEmitter::postPass()
                         registerDirectCall(inst);
                     }
 #ifdef _EM64T_
+#ifndef WIN32
                     }
+#endif
 #endif
                 }   
             // todo64

@@ -52,7 +52,7 @@
 
 #endif // !defined (_IPF_)
 
-#ifdef WIN32
+#if defined(WIN32) && !defined (_EM64T_)
 //use optimized asm monitor enter and exit helpers 
 #define ASM_MONITOR_HELPER
 // FS14_TLS_USE define turns on windows specific TLS access optimization 

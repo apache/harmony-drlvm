@@ -75,7 +75,7 @@ APR_DECLARE(uint16) port_atomic_cas16(volatile uint16 * data,
 APR_DECLARE(uint64) port_atomic_cas64(volatile uint64 * data, 
                                                  uint64 value, uint64 comp);
 
-#elif defined( WIN32 )
+#elif defined(WIN32) && !defined(_WIN64)
 
 INLINE uint8 port_atomic_cas8(volatile uint8 * data , uint8 value, uint8 comp) {
     __asm {
@@ -118,6 +118,17 @@ INLINE uint64 port_atomic_cas64(volatile uint64 * data , uint64 value, uint64 co
     }
     return comp;
 }
+
+#elif defined(_EM64T_) && defined (_WIN64)
+
+APR_DECLARE(uint8) port_atomic_cas8(volatile uint8 * data, 
+                                               uint8 value, uint8 comp);
+
+APR_DECLARE(uint16) port_atomic_cas16(volatile uint16 * data, 
+                                                 uint16 value, uint16 comp);
+
+APR_DECLARE(uint64) port_atomic_cas64(volatile uint64 * data, 
+                                                 uint64 value, uint64 comp);
 
 #elif defined (PLATFORM_POSIX)  
 

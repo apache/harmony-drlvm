@@ -323,6 +323,7 @@ Version: $Revision: 1.5.2.3 $
 
             <select os="win" cfg="debug">
                 <linkerarg value="/NODEFAULTLIB:libcmt.lib" />
+                <linkerarg value="/NODEFAULTLIB:msvcrt.lib" />
             </select>
 
             <select os="lnx">

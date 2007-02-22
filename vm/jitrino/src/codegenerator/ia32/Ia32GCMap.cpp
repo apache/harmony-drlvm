@@ -312,12 +312,16 @@ static inline void m_assert(bool cond)  {
 #ifdef GCMAP_TRACK_IDS
     assert(cond);
 #else
-#ifdef WIN32
+#if defined(WIN32) && !defined(_EM64T_)
     if (!cond) {
         __asm {
             int 3;
         }
     }
+#endif
+#if defined (_EM64T_) && defined(_WIN64)
+    // TODO: add proper code
+    assert(0);
 #endif
 #endif    
 }

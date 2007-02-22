@@ -281,7 +281,8 @@ BBPolling::getOrCreateTLSBaseReg(Edge* e)
          bbpFlagAddrBlock->appendInst(irManager.newCallInst(target, &CallingConvention_STDCALL, 0, NULL, tlsBase));
 #else // PLATFORM_POSIX
 #ifdef _EM64T_
-#error "BBP not implemented on windows/em64t"
+	// TODO: #error "BBP not implemented on windows/em64t"
+	assert(0);
 #endif
         // TLS base can be obtained from [fs:0x14]
         Opnd* tlsBase = irManager.newMemOpnd(tlsBaseType, MemOpndKind_Any, NULL, 0x14, RegName_FS);

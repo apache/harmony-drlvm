@@ -56,9 +56,9 @@ EXPORT void JIT_get_root_set_from_stack_frame(JIT_Handle, Method_Handle, GC_Enum
 EXPORT void JIT_get_root_set_for_thread_dump(JIT_Handle, Method_Handle, GC_Enumeration_Handle, JitFrameContext *) {return;}
 EXPORT Boolean JIT_can_enumerate(JIT_Handle, Method_Handle, NativeCodePtr) { abort(); return true; }
 EXPORT void JIT_fix_handler_context(JIT_Handle, Method_Handle, JitFrameContext *) { abort(); }
-EXPORT void * JIT_get_address_of_this(JIT_Handle, Method_Handle, const JitFrameContext *) { abort(); }
+EXPORT void * JIT_get_address_of_this(JIT_Handle, Method_Handle, const JitFrameContext *) { abort(); return (void *)JIT_FAILURE;}
 EXPORT Boolean JIT_call_returns_a_reference(JIT_Handle, Method_Handle, const JitFrameContext *) { abort(); return true; }
-EXPORT JIT_Result JIT_gen_method_info(JIT_Handle,Compile_Handle, Method_Handle, JIT_Flags) { abort(); }
+EXPORT JIT_Result JIT_gen_method_info(JIT_Handle,Compile_Handle, Method_Handle, JIT_Flags) { abort(); return JIT_FAILURE;}
 EXPORT void JIT_init_with_data(JIT_Handle, void *) { abort(); }
 
 

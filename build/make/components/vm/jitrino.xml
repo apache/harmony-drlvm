@@ -135,7 +135,8 @@ Version: $Revision: 1.6.2.8 $
             <select os="win">
                 <compilerarg value="/Fo${build.semi.dir}/vm/jitrino/_obj/" />
 
-                <defineset define="PLATFORM_NT,_WINDLL,_MBCS,_REENTRANT,__SMP__,WIN32,_WIN32" />
+                <!-- _CRT_SECURE_NO_DEPRECATE added to suppress a huge amount of complaints from msvc em64t compiler -->
+                <defineset define="PLATFORM_NT,_WINDLL,_MBCS,_REENTRANT,__SMP__,WIN32,_WIN32,_CRT_SECURE_NO_DEPRECATE" />
 
                 <compilerarg value="/nologo" />
                 <compilerarg value="/EHsc" />
@@ -308,6 +309,13 @@ Version: $Revision: 1.6.2.8 $
 
                 <select arch="em64t">
                     <linkerarg value="/MACHINE:AMD64" />
+                    <linkerarg value="/NODEFAULTLIB:libcmt.lib" /> 
+                    <linkerarg value="/NODEFAULTLIB:libcmtd.lib" /> 
+                    <linkerarg value="/NODEFAULTLIB:libcpmt.lib" />
+                </select>
+
+                <select arch="em64t">
+                    <syslibset type="static" libs="msvcrtd,msvcmrtd,msvcrt,msvcurtd,libcpmtd,mscoree" />
                 </select>
 
                 <select arch="ia32">

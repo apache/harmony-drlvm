@@ -803,7 +803,7 @@ private:
         assert(src->kind == LLK_Gr || src->kind == LLK_GStk);
 
         const Tmp_GR_Opnd tmp_reg(context, ic);
-        const R_Opnd & dest_reg = dest->kind == LLK_Gr ? get_r_opnd(dest) : tmp_reg;
+        const R_Opnd & dest_reg = (dest->kind == LLK_Gr ? get_r_opnd(dest) : tmp_reg);
 
         switch (o) {
         case LO_Neg:

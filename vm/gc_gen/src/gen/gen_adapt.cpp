@@ -318,6 +318,12 @@ Boolean gc_compute_new_space_size(GC_Gen* gc, POINTER_SIZE_INT* mos_size, POINTE
   return TRUE;;
 }
 
+// this function is added to disambiguate on windows/em64t calls to asm() below 
+POINTER_SIZE_SINT abs(POINTER_SIZE_SINT x) 
+{
+    return x<0?-x:x;    
+}
+    
 #ifndef STATIC_NOS_MAPPING
 
 void gc_gen_adapt(GC_Gen* gc, int64 pause_time)

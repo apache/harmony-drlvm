@@ -287,12 +287,12 @@ void InternalProfilerAct::readConfig(Config * config) {
                         config->counters[num].name =    line.substr(pos1+1, pos2-pos1-1);
                     }
                     if((int)line.find(".Title=")!=-1) {
-                        char * val = std::strstr(line.c_str(),"=")+1;
+                        char * val = (char *)std::strstr(line.c_str(),"=")+1;
                         config->counters[num].title=std::string(val);
                     } else if (((int)line.find(".IsOR=")!=-1) && ((int)line.find("true")!=-1)) {
                         config->counters[num].filter.isOR=true;
                     } else if ((int)line.find(std::string(config->counters[num].name)+"=")!=-1) {
-                        char * val = std::strstr(line.c_str(),"=")+1;
+                        char * val = (char *)std::strstr(line.c_str(),"=")+1;
                         for(uint32 i = 0; i < config->counters.size(); i++) {
                             if(std::string(config->counters[i].name) == val) {
                                 config->counters[num].filter = config->counters[i].filter;
@@ -300,7 +300,7 @@ void InternalProfilerAct::readConfig(Config * config) {
                             }
                         }
                     } else if((int)line.find(".Mnemonic")!=-1) {
-                        char * mnem = std::strstr(line.c_str(),"=")+1;
+                        char * mnem = (char *)std::strstr(line.c_str(),"=")+1;
                         if ((std::string(mnem) == "true") && (std::strstr(line.c_str(), "IsNegative"))) {
                             config->counters[num].filter.mnemonic.isNegative=true;
                         } else {
@@ -309,7 +309,7 @@ void InternalProfilerAct::readConfig(Config * config) {
                             config->counters[num].filter.mnemonic.isInitialized=true;
                         }
                     } else if (std::strstr(line.c_str(), ".OpndNumber")) {
-                        char * val = std::strstr(line.c_str(),"=")+1;
+                        char * val = (char *)std::strstr(line.c_str(),"=")+1;
                         if ((std::string(val) == "true") && (std::strstr(line.c_str(), "IsNegative"))) {
                             config->counters[num].filter.operandNumber.isNegative=true;
                         } else {
@@ -318,7 +318,7 @@ void InternalProfilerAct::readConfig(Config * config) {
                             config->counters[num].filter.operandNumber.isInitialized=true;
                         }
                     } else if ((int)line.find(".Operand.") != -1) {
-                        char * val = std::strstr(line.c_str(),"=")+1;
+                        char * val = (char *)std::strstr(line.c_str(),"=")+1;
                         int pos = int(line.find(".Operand.")+9);
                         std::string v = line.substr(pos, line.find_first_of(".", pos)-pos);
                         int opNum;
@@ -368,7 +368,7 @@ void InternalProfilerAct::readConfig(Config * config) {
                             }
                         }
                     } else if ((int)line.find(".RuntimeInfo.Kind") != -1) {
-                        char * val = std::strstr(line.c_str(),"=")+1;
+                        char * val = (char *)std::strstr(line.c_str(),"=")+1;
                         if ((std::string(val) == "true") && (std::strstr(line.c_str(), "IsNegative"))) {
                             config->counters[num].filter.rtKind.isNegative=true;
                         } else {
@@ -381,7 +381,7 @@ void InternalProfilerAct::readConfig(Config * config) {
                             config->counters[num].filter.rtKind.isInitialized=true;
                         }
                     } else if ((int)line.find(".RuntimeInfo.HelperID") != -1) {
-                        char * val = std::strstr(line.c_str(),"=")+1;
+                        char * val = (char *)std::strstr(line.c_str(),"=")+1;
                         if ((std::string(val) == "true") && (std::strstr(line.c_str(), "IsNegative"))) {
                             config->counters[num].filter.rtHelperID.isNegative=true;
                         } else {
@@ -390,7 +390,7 @@ void InternalProfilerAct::readConfig(Config * config) {
                             config->counters[num].filter.rtHelperID.isInitialized=true;
                         }
                     } else if ((int)line.find(".RuntimeInfo.IntHelperName") != -1) {
-                        char * val = std::strstr(line.c_str(),"=")+1;
+                        char * val = (char *)std::strstr(line.c_str(),"=")+1;
                         if ((std::string(val) == "true") && (std::strstr(line.c_str(), "IsNegative"))) {
                             config->counters[num].filter.rtIntHelperName.isNegative=true;
                         } else {
@@ -399,7 +399,7 @@ void InternalProfilerAct::readConfig(Config * config) {
                             config->counters[num].filter.rtIntHelperName.isInitialized=true;
                         }
                     } else if ((int)line.find(".isNative") != -1) {
-                        char * val = std::strstr(line.c_str(),"=")+1;
+                        char * val = (char *)std::strstr(line.c_str(),"=")+1;
                         if ((std::string(val) == "true") && (std::strstr(line.c_str(), "IsNegative"))) {
                             config->counters[num].filter.isNative.isNegative=true;
                         } else {
@@ -408,7 +408,7 @@ void InternalProfilerAct::readConfig(Config * config) {
                             config->counters[num].filter.isNative.isInitialized=true;
                         }
                     } else if ((int)line.find(".isStatic") != -1) {
-                        char * val = std::strstr(line.c_str(),"=")+1;
+                        char * val = (char *)std::strstr(line.c_str(),"=")+1;
                         if ((std::string(val) == "true") && (std::strstr(line.c_str(), "IsNegative"))) {
                             config->counters[num].filter.isStatic.isNegative=true;
                         } else {
@@ -417,7 +417,7 @@ void InternalProfilerAct::readConfig(Config * config) {
                             config->counters[num].filter.isStatic.isInitialized=true;
                         }
                     } else if ((int)line.find(".isSynchronized") != -1) {
-                        char * val = std::strstr(line.c_str(),"=")+1;
+                        char * val = (char *)std::strstr(line.c_str(),"=")+1;
                         if ((std::string(val) == "true") && (std::strstr(line.c_str(), "IsNegative"))) {
                             config->counters[num].filter.isSynchronized.isNegative=true;
                         } else {
@@ -426,7 +426,7 @@ void InternalProfilerAct::readConfig(Config * config) {
                             config->counters[num].filter.isSynchronized.isInitialized=true;
                         }
                     } else if ((int)line.find(".isNoInlining") != -1) {
-                        char * val = std::strstr(line.c_str(),"=")+1;
+                        char * val = (char *)std::strstr(line.c_str(),"=")+1;
                         if ((std::string(val) == "true") && (std::strstr(line.c_str(), "IsNegative"))) {
                             config->counters[num].filter.isNoInlining.isNegative=true;
                         } else {
@@ -435,7 +435,7 @@ void InternalProfilerAct::readConfig(Config * config) {
                             config->counters[num].filter.isNoInlining.isInitialized=true;
                         }
                     } else if ((int)line.find(".isInstance") != -1) {
-                        char * val = std::strstr(line.c_str(),"=")+1;
+                        char * val = (char *)std::strstr(line.c_str(),"=")+1;
                         if ((std::string(val) == "true") && (std::strstr(line.c_str(), "IsNegative"))) {
                             config->counters[num].filter.isInstance.isNegative=true;
                         } else {
@@ -444,7 +444,7 @@ void InternalProfilerAct::readConfig(Config * config) {
                             config->counters[num].filter.isInstance.isInitialized=true;
                         }
                     } else if ((int)line.find(".isFinal") != -1) {
-                        char * val = std::strstr(line.c_str(),"=")+1;
+                        char * val = (char *)std::strstr(line.c_str(),"=")+1;
                         if ((std::string(val) == "true") && (std::strstr(line.c_str(), "IsNegative"))) {
                             config->counters[num].filter.isFinal.isNegative=true;
                         } else {
@@ -453,7 +453,7 @@ void InternalProfilerAct::readConfig(Config * config) {
                             config->counters[num].filter.isFinal.isInitialized=true;
                         }
                     } else if ((int)line.find(".isVirtual") != -1) {
-                        char * val = std::strstr(line.c_str(),"=")+1;
+                        char * val = (char *)std::strstr(line.c_str(),"=")+1;
                         if ((std::string(val) == "true") && (std::strstr(line.c_str(), "IsNegative"))) {
                             config->counters[num].filter.isVirtual.isNegative=true;
                         } else {
@@ -462,7 +462,7 @@ void InternalProfilerAct::readConfig(Config * config) {
                             config->counters[num].filter.isVirtual.isInitialized=true;
                         }
                     } else if ((int)line.find(".isAbstract") != -1) {
-                        char * val = std::strstr(line.c_str(),"=")+1;
+                        char * val = (char *)std::strstr(line.c_str(),"=")+1;
                         if ((std::string(val) == "true") && (std::strstr(line.c_str(), "IsNegative"))) {
                             config->counters[num].filter.isAbstract.isNegative=true;
                         } else {
@@ -471,7 +471,7 @@ void InternalProfilerAct::readConfig(Config * config) {
                             config->counters[num].filter.isAbstract.isInitialized=true;
                         }
                     } else if ((int)line.find(".isClassInitializer") != -1) {
-                        char * val = std::strstr(line.c_str(),"=")+1;
+                        char * val = (char *)std::strstr(line.c_str(),"=")+1;
                         if ((std::string(val) == "true") && (std::strstr(line.c_str(), "IsNegative"))) {
                             config->counters[num].filter.isClassInitializer.isNegative=true;
                         } else {
@@ -480,7 +480,7 @@ void InternalProfilerAct::readConfig(Config * config) {
                             config->counters[num].filter.isClassInitializer.isInitialized=true;
                         }
                     } else if ((int)line.find(".isInstanceInitializer") != -1) {
-                        char * val = std::strstr(line.c_str(),"=")+1;
+                        char * val = (char *)std::strstr(line.c_str(),"=")+1;
                         if ((std::string(val) == "true") && (std::strstr(line.c_str(), "IsNegative"))) {
                             config->counters[num].filter.isInstanceInitializer.isNegative=true;
                         } else {
@@ -489,7 +489,7 @@ void InternalProfilerAct::readConfig(Config * config) {
                             config->counters[num].filter.isInstanceInitializer.isInitialized=true;
                         }
                     } else if ((int)line.find(".isStrict") != -1) {
-                        char * val = std::strstr(line.c_str(),"=")+1;
+                        char * val = (char *)std::strstr(line.c_str(),"=")+1;
                         if ((std::string(val) == "true") && (std::strstr(line.c_str(), "IsNegative"))) {
                             config->counters[num].filter.isStrict.isNegative=true;
                         } else {
@@ -498,7 +498,7 @@ void InternalProfilerAct::readConfig(Config * config) {
                             config->counters[num].filter.isStrict.isInitialized=true;
                         }
                     } else if ((int)line.find(".isRequireSecObject") != -1) {
-                        char * val = std::strstr(line.c_str(),"=")+1;
+                        char * val = (char *)std::strstr(line.c_str(),"=")+1;
                         if ((std::string(val) == "true") && (std::strstr(line.c_str(), "IsNegative"))) {
                             config->counters[num].filter.isRequireSecObject.isNegative=true;
                         } else {
@@ -507,7 +507,7 @@ void InternalProfilerAct::readConfig(Config * config) {
                             config->counters[num].filter.isRequireSecObject.isInitialized=true;
                         }
                     } else if ((int)line.find(".isInitLocals") != -1) {
-                        char * val = std::strstr(line.c_str(),"=")+1;
+                        char * val = (char *)std::strstr(line.c_str(),"=")+1;
                         if ((std::string(val) == "true") && (std::strstr(line.c_str(), "IsNegative"))) {
                             config->counters[num].filter.isInitLocals.isNegative=true;
                         } else {
@@ -516,7 +516,7 @@ void InternalProfilerAct::readConfig(Config * config) {
                             config->counters[num].filter.isInitLocals.isInitialized=true;
                         }
                     } else if ((int)line.find(".isOverridden") != -1) {
-                        char * val = std::strstr(line.c_str(),"=")+1;
+                        char * val = (char *)std::strstr(line.c_str(),"=")+1;
                         if ((std::string(val) == "true") && (std::strstr(line.c_str(), "IsNegative"))) {
                             config->counters[num].filter.isOverridden.isNegative=true;
                         } else {

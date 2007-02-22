@@ -25,6 +25,11 @@
 #include "jni.h"
 #include "Class.h"
 
+#if defined(_EM64T_) && defined(_WIN64)
+#include <intrin.h>
+#pragma intrinsic (_ReadWriteBarrier)
+#pragma intrinsic (_WriteBarrier)
+#endif
 
 JNIEXPORT jlong getFieldOffset
   (JNIEnv * env, jobject field);
@@ -81,10 +86,18 @@ JNIEXPORT jboolean compareAndSetLongArray
         }
     #else
         inline void MemoryReadWriteBarrier() {
+        #if defined(_EM64T_) && defined(_WIN64)
+            _ReadWriteBarrier();
+        #else
             __asm mfence;
+        #endif
         }
         inline void MemoryWriteBarrier() {
+        #if defined(_EM64T_) && defined(_WIN64)
+            _WriteBarrier();
+        #else
             __asm sfence;
+        #endif
         }
     #endif
 #endif

@@ -102,6 +102,7 @@
         <property name="APRICONV.check.file" value="lib/api_version.c" />
         <property name="LOG4CXX.check.file" value="configure.in" />
         <property name="ZLIB.check.file" value="zlib1.dll" />
+        <property name="ZLIB-x86_64.check.file" value="zlib1.dll" />
         <property name="CLASSLIB.check.file" value="native-src/README.txt" />
         <property name="XALAN.check.file" value="xalan.jar" />
         <property name="VM.check.file" value="vmcore/src/init/vm_init.cpp" />
@@ -191,7 +192,15 @@
             </then>
             <else>
                 <property name="build.os.short" value="win" />
-                <property name="os.resources" value="APR,APRUTIL,APRICONV,ZLIB" />
+                <if>
+                    <equals arg1="${build.arch}" arg2="em64t" />
+                    <then>
+                        <property name="os.resources" value="APR,APRUTIL,APRICONV,ZLIB-x86_64" />
+                    </then>
+                    <else>
+                        <property name="os.resources" value="APR,APRUTIL,APRICONV,ZLIB" />
+                    </else>
+                </if>
             </else>
         </if>
     </target>

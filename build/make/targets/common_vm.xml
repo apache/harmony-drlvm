@@ -78,7 +78,13 @@ Version: $Revision: 1.6.2.6 $
                 <compilerarg value="/nologo" />
                 <compilerarg value="/W3" />
 
-                <compilerarg value="/WX" />
+                <select arch="em64t">
+                    <compilerarg value="/W0" />
+                </select>
+                <select arch="ia32,ipf">
+                    <compilerarg value="/WX" />
+                </select>
+
                 <compilerarg value="/Zi" />
             </select>
 
@@ -203,11 +209,13 @@ Version: $Revision: 1.6.2.6 $
                 <linkerarg value="/MDd" />
                 <linkerarg value="/Zi" />
                 <linkerarg value="/Od" />
+                <linkerarg value="/NODEFAULTLIB"/>
             </select>
 
             <select os="win">
                 <syslibset libs="advapi32,odbc32,userenv,ws2_32,mswsock" />
             </select>
+
             <select os="lnx" arch="ia32">
                 <syslibset type="static" libs="z,pthread,xml2" />
                 <syslibset type="shared" libs="m,dl,stdc++,rt" />

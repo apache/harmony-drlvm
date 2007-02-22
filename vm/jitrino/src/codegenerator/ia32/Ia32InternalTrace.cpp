@@ -42,11 +42,16 @@ static inline void m_assert(bool cond)  {
         assert(cond);
 #else
 #ifdef WIN32
+#ifndef _EM64T_
         if (!cond) {
             __asm {
                 int 3;
             }
         }
+#else
+    // TODO: add proper code
+    assert(0);
+#endif
 #endif
 #endif    
     }

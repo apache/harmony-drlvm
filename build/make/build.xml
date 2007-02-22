@@ -110,9 +110,14 @@
         </condition>
 
         <condition property="build.arch" value="em64t">
-            <equals arg1="${machine.arch}" arg2="x86_64" />
+            <or>
+                <equals arg1="${os.arch}" arg2="x86_64" />
+                <equals arg1="${os.arch}" arg2="amd64" />
+                <equals arg1="${machine.arch}" arg2="x86_64" />
+                <equals arg1="${machine.arch}" arg2="amd64" />
+            </or>
         </condition>
-
+        
         <condition property="properties.file" value="${env.properties.file}">
             <isset property="env.properties.file"/>
         </condition>

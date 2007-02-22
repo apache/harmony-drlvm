@@ -467,6 +467,7 @@ int32 gc_get_hashcode(Managed_Object_Handle p_object) {
 Managed_Object_Handle gc_get_next_live_object(void *iterator) {
     TRACE2("gc.iter", "gc_get_next_live_object - NOT IMPLEMENTED");
     abort();
+    return 0;
 }
 
 unsigned int gc_time_since_last_gc() {

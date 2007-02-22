@@ -36,6 +36,7 @@
 #include "port_malloc.h"
 #include "tl/memory_pool.h"
 #include "encoder.h"
+#include "ini.h"
 #include "lil_code_generator_utils.h"
 
 #define LOG_DOMAIN "vm.helpers"

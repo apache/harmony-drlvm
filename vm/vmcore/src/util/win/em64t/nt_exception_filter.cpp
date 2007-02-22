@@ -19,16 +19,17 @@
  * @version $Revision: 1.1.2.1.4.5 $
  */  
 
+#undef LOG_DOMAIN
+#define LOG_DOMAIN "nt_exception_filter"
 
 #include "platform_lowlevel.h"
 #include "Class.h"
 #include "Environment.h"
-#include "gc_for_vm.h"
 #include "exceptions.h"
+#include "exceptions_jit.h"
 #include "method_lookup.h"
 #include "vm_strings.h"
 #include "vm_threads.h"
-#include "vm_utils.h"
 #include "compile.h"
 #include "ini.h"
 #include "cxxlog.h"
@@ -44,28 +45,28 @@
 
 void nt_to_vm_context(PCONTEXT pcontext, Registers* regs)
 {
-    regs->rax = pcontext->Eax;
-    regs->rcx = pcontext->Ecx;
-    regs->rdx = pcontext->Edx;
-    regs->rdi = pcontext->Edi;
-    regs->rsi = pcontext->Esi;
-    regs->rbx = pcontext->Ebx;
-    regs->rbp = pcontext->Ebp;
-    regs->rip = pcontext->Eip;
-    regs->rsp = pcontext->Esp;
+    regs->rax = pcontext->Rax;
+    regs->rcx = pcontext->Rcx;
+    regs->rdx = pcontext->Rdx;
+    regs->rdi = pcontext->Rdi;
+    regs->rsi = pcontext->Rsi;
+    regs->rbx = pcontext->Rbx;
+    regs->rbp = pcontext->Rbp;
+    regs->rip = pcontext->Rip;
+    regs->rsp = pcontext->Rsp;
 }
 
 void vm_to_nt_context(Registers* regs, PCONTEXT pcontext)
 {
-    pcontext->Esp = regs->rsp;
-    pcontext->Eip = regs->rip;
-    pcontext->Ebp = regs->rbp;
-    pcontext->Ebx = regs->rbx;
-    pcontext->Esi = regs->rsi;
-    pcontext->Edi = regs->rdi;
-    pcontext->Eax = regs->rax;
-    pcontext->Ecx = regs->rcx;
-    pcontext->Edx = regs->rdx;
+    pcontext->Rsp = regs->rsp;
+    pcontext->Rip = regs->rip;
+    pcontext->Rbp = regs->rbp;
+    pcontext->Rbx = regs->rbx;
+    pcontext->Rsi = regs->rsi;
+    pcontext->Rdi = regs->rdi;
+    pcontext->Rax = regs->rax;
+    pcontext->Rcx = regs->rcx;
+    pcontext->Rdx = regs->rdx;
 }
 
 int NT_exception_filter(LPEXCEPTION_POINTERS p_NT_exception) 
@@ -79,7 +80,7 @@ int NT_exception_filter(LPEXCEPTION_POINTERS p_NT_exception)
     Global_Env *env = VM_Global_State::loader_env;
 
     VM_Code_Type vmct =
-        vm_identify_eip((void *)p_NT_exception->ContextRecord->Eip);
+        vm_identify_eip((void *)p_NT_exception->ContextRecord->Rip);
     if(vmct != VM_TYPE_JAVA) {
         if (!get_boolean_property("vm.assert_dialog", TRUE, VM_PROPERTIES)) {
             LWARN(43, "Fatal exception, terminating");
@@ -125,7 +126,7 @@ int NT_exception_filter(LPEXCEPTION_POINTERS p_NT_exception)
 
     nt_to_vm_context(p_NT_exception->ContextRecord, &regs);
 
-    bool java_code = (vm_identify_eip((void *)regs.eip) == VM_TYPE_JAVA);
+    bool java_code = (vm_identify_eip((void *)regs.rip) == VM_TYPE_JAVA);
     exn_athrow_regs(&regs, exc_clss, java_code);
 
     vm_to_nt_context(&regs, p_NT_exception->ContextRecord);
@@ -138,8 +139,10 @@ int call_the_run_method3( void * p_xx ){
     int NT_exception_filter(LPEXCEPTION_POINTERS p_NT_exception);
 
     // NT null pointer exception support
-    __try {  
-        call_the_run_method(p_xx);
+    __try {
+        // TODO: couldn't find where call_the_run_method() body is
+        //call_the_run_method(p_xx); 
+        assert(0);
         return 0;
     }
     __except ( p_NT_exception = GetExceptionInformation(), 
@@ -151,3 +154,28 @@ int call_the_run_method3( void * p_xx ){
     }  // NT null pointer exception support
 
 }
+
+// TODO: the functions below need an implementation
+static void asm_exception_catch_callback() {
+assert(0);
+}
+
+void asm_jvmti_exception_catch_callback() {
+assert(0);
+}
+
+LONG NTAPI vectored_exception_handler(LPEXCEPTION_POINTERS nt_exception)
+{
+assert(0);
+return 0;
+}
+
+void init_stack_info() {
+assert(0);
+}
+
+size_t get_available_stack_size() { 
+assert(0);
+return 0;
+}
+
