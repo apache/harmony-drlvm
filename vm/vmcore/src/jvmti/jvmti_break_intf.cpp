@@ -1385,9 +1385,6 @@ void jvmti_set_pending_breakpoints(Method *method)
     if (!ti->isEnabled())
         return;
 
-    if( !method->get_pending_breakpoints() )
-        return;
-
     VMBreakPoints* vm_brpt = ti->vm_brpt;
     LMAutoUnlock lock(vm_brpt->get_lock());
 

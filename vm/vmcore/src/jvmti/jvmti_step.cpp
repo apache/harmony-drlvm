@@ -466,6 +466,9 @@ jvmti_set_single_step_breakpoints_for_method(DebugUtilsTI *ti,
 {
     if (ti->isEnabled() && ti->is_single_step_enabled())
     {
+        if (method->is_native()) // Must not single step through native methods
+            return;
+
         LMAutoUnlock lock(ti->vm_brpt->get_lock());
         if (NULL != vm_thread->ss_state)
         {
