@@ -132,10 +132,12 @@ int test_jthread_get_blocked_count(void) {
                 critical_tts = tts;
             }
         }
-        // TODO: unsafe .... need to find another way of synchronization
-        hythread_sleep(1000);
-        tf_assert_same(jthread_get_blocked_count(&waiting_on_monitor_nmb), TM_ERROR_NONE);
-        if (MAX_TESTED_THREAD_NUMBER - i != waiting_on_monitor_nmb + 1){
+        int cycles = MAX_TIME_TO_WAIT / CLICK_TIME_MSEC;
+        while ((MAX_TESTED_THREAD_NUMBER - i > waiting_on_monitor_nmb + 1) && (cycles-- > 0)) {
+            tf_assert_same(jthread_get_blocked_count(&waiting_on_monitor_nmb), TM_ERROR_NONE);
+            sleep_a_click();
+        }
+        if (cycles < 0){
             tf_fail("Wrong number waiting on monitor threads");
         }
         tested_thread_send_stop_request(critical_tts);
