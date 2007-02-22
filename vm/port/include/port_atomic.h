@@ -121,14 +121,24 @@ INLINE uint64 port_atomic_cas64(volatile uint64 * data , uint64 value, uint64 co
 
 #elif defined(_EM64T_) && defined (_WIN64)
 
+#pragma intrinsic(_InterlockedCompareExchange16);
+#pragma intrinsic(_InterlockedCompareExchange64);
+
 APR_DECLARE(uint8) port_atomic_cas8(volatile uint8 * data, 
                                                uint8 value, uint8 comp);
 
-APR_DECLARE(uint16) port_atomic_cas16(volatile uint16 * data, 
-                                                 uint16 value, uint16 comp);
+INLINE uint16 port_atomic_cas16(volatile uint16 * data, 
+                                                 uint16 value, uint16 comp)
+{
+    return _InterlockedCompareExchange16((volatile SHORT *)data, value, comp);
+}    
 
-APR_DECLARE(uint64) port_atomic_cas64(volatile uint64 * data, 
-                                                 uint64 value, uint64 comp);
+INLINE uint64 port_atomic_cas64(volatile uint64 * data, 
+                                                 uint64 value, uint64 comp)
+{
+    return _InterlockedCompareExchange64((volatile LONG64 *)data, value, comp);
+}
+    
 
 #elif defined (PLATFORM_POSIX)  
 

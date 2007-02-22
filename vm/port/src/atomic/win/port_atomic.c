@@ -20,28 +20,3 @@
  */  
 
 /* All code from this file was inlinied in port_atomic.h */
-
-#include <port_atomic.h>
-#include <assert.h>
-
-#if defined(_EM64T_) && defined(_WIN64)
-// TODO: these functions need to be implemented
-APR_DECLARE(uint8) port_atomic_cas8(volatile uint8 * data, 
-                                               uint8 value, uint8 comp) {
-	assert(0);
-	return 0;
-}
-
-APR_DECLARE(uint16) port_atomic_cas16(volatile uint16 * data, 
-                                                 uint16 value, uint16 comp) {
-	assert(0);
-	return 0;
-}
-
-APR_DECLARE(uint64) port_atomic_cas64(volatile uint64 * data, 
-                                                 uint64 value, uint64 comp) {
-	assert(0);
-	return 0;
-}
-
-#endif
