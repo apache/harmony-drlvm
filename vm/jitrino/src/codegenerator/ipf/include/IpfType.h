@@ -100,10 +100,10 @@ class Cfg;
 #define ROOT_SET_HEADER_SIZE    4   // header size in root set info block
 #define SAFE_POINT_HEADER_SIZE 12   // header size in safe points info block
 
-#define LOG_ON                ipfLogIsOn      // Log for Code Generator is on
-#define VERIFY_ON             ipfVerifyIsOn   // verification for Code Generator is on
+#define LOG_ON                1     // Log for Code Generator is on
+#define VERIFY_ON             1     // verification for Code Generator is on
 #define LOG_OUT               Log::out()
-#define STAT_ON               0               // Log for statistic
+#define STAT_ON               0     // Log for statistic
 
 #define IPF_ERROR "ERROR in file " << __FILE__ << " line " << __LINE__ << " "
 #define IPF_LOG   if (LOG_ON) LOG_OUT

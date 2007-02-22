@@ -37,6 +37,9 @@ static ActionFactory<HIR2LIRSelectorSessionAction> _hir2lir("hir2lir");
 // code generator entry point
 //
 void HIR2LIRSelectorSessionAction::run() {
+
+#if defined(_IPF_)
+#else
     CompilationContext* cc = getCompilationContext();
     IRManager& irManager = *cc->getHIRManager();
     CompilationInterface* ci = cc->getVMCompilationInterface();
@@ -48,12 +51,10 @@ void HIR2LIRSelectorSessionAction::run() {
 
     MethodCodeSelector* mcs = new (mm) _MethodCodeSelector(irManager,methodDesc,varOpnds,&irManager.getFlowGraph(),
         opndManager, optFlags.sink_constants, optFlags.sink_constants1);
-#if defined(_IPF_)
-    IPF::CodeGenerator cg(mm, *ci);
-#else
+
     Ia32::CodeGenerator cg;
-#endif
     cg.genCode(this, *mcs);
+#endif
 }
 
 POINTER_SIZE_INT

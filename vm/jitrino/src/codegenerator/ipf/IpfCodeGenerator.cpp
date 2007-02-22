@@ -33,7 +33,7 @@
 #include "IpfPrologEpilogGenerator.h"
 #include "IpfRuntimeSupport.h"
 #include "IpfCfgVerifier.h"
-#include "CodeGenerator.h"
+#include "CodeSelectors.h"
 //#include "IpfInstrumentator.h"
 
 namespace Jitrino {
