@@ -83,7 +83,7 @@ Version: $Revision: 1.4.2.3 $
                 <syslibset libs="AdvAPI32" />
             </select>
 
-            <select os="win" cfg="debug">
+            <select os="win" cfg="debug" arch="ia32">
                 <linkerarg value="/NODEFAULTLIB:libcmtd.lib" />
                 <syslibset libs="msvcrtd" />
             </select>

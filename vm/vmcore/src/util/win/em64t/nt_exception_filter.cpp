@@ -166,16 +166,13 @@ assert(0);
 
 LONG NTAPI vectored_exception_handler(LPEXCEPTION_POINTERS nt_exception)
 {
-assert(0);
-return 0;
+    return EXCEPTION_CONTINUE_SEARCH;
 }
 
 void init_stack_info() {
-assert(0);
 }
 
 size_t get_available_stack_size() { 
-assert(0);
-return 0;
+    return 1000000;
 }
 
