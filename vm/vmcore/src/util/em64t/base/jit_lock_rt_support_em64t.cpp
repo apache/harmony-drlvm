@@ -41,33 +41,35 @@
 #include "dump.h"
 
 static LilCodeStub * rth_get_lil_monitor_enter_generic(LilCodeStub * cs) {
-if(!VM_Global_State::loader_env->TI->isEnabled()) {
-    return lil_parse_onto_end(cs,
-        "out platform:ref:g4;"
-        "o0 = l0;"
-        "call %0i;"
-        "jc r!=%1i,slow_path;"
-        "ret;"
-        ":slow_path;"
-        "push_m2n 0, 0;"
-        "out platform:ref:void;"
-        "o0 = l0;"
-        "call %2i;"
-        "pop_m2n;"
-        "ret;",
-        vm_monitor_try_enter,
-        TM_ERROR_NONE,
-        vm_monitor_enter);
-} else {
-    return lil_parse_onto_end(cs,
-        "push_m2n 0, 0;"
-        "out platform:ref:void;"
-        "o0 = l0;"
-        "call %0i;"
-        "pop_m2n;"
-        "ret;",
-        vm_monitor_enter);
-}
+    if(VM_Global_State::loader_env->TI->isEnabled() &&
+            VM_Global_State::loader_env->TI->get_global_capability(
+                            DebugUtilsTI::TI_GC_ENABLE_MONITOR_EVENTS) ) {
+        return lil_parse_onto_end(cs,
+            "push_m2n 0, 0;"
+            "out platform:ref:void;"
+            "o0 = l0;"
+            "call %0i;"
+            "pop_m2n;"
+            "ret;",
+            vm_monitor_enter);
+    } else {
+        return lil_parse_onto_end(cs,
+            "out platform:ref:g4;"
+            "o0 = l0;"
+            "call %0i;"
+            "jc r!=%1i,slow_path;"
+            "ret;"
+            ":slow_path;"
+            "push_m2n 0, 0;"
+            "out platform:ref:void;"
+            "o0 = l0;"
+            "call %2i;"
+            "pop_m2n;"
+            "ret;",
+            vm_monitor_try_enter,
+            TM_ERROR_NONE,
+            vm_monitor_enter);
+    }
 }
 
 NativeCodePtr rth_get_lil_monitor_enter_static() {    
@@ -185,30 +187,32 @@ NativeCodePtr rth_get_lil_monitor_enter_non_null() {
 /*    MONITOR EXIT RUNTIME SUPPORT    */
 
 static LilCodeStub * rth_get_lil_monitor_exit_generic(LilCodeStub * cs) {
-if(!VM_Global_State::loader_env->TI->isEnabled()) {
-    return lil_parse_onto_end(cs,
-        "call %0i;"
-        "jc r!=%1i, illegal_monitor;"
-        "ret;"
-        ":illegal_monitor;"
-        "out managed::void;"
-        "call.noret %2i;",
-        vm_monitor_try_exit,
-        TM_ERROR_NONE,
-        lil_npc_to_fp(exn_get_rth_throw_illegal_monitor_state()));
-}else{
-    return lil_parse_onto_end(cs,
-        "locals 1;"
-        "l0 = o0;"
-        "push_m2n 0, %0i;"
-        "out platform:ref:void;"
-        "o0 = l0;"
-        "call %1i;"
-        "pop_m2n;"
-        "ret;",
-        FRAME_NON_UNWINDABLE,
-        vm_monitor_exit);
-}
+    if(VM_Global_State::loader_env->TI->isEnabled() &&
+            VM_Global_State::loader_env->TI->get_global_capability(
+                            DebugUtilsTI::TI_GC_ENABLE_MONITOR_EVENTS) ) {
+        return lil_parse_onto_end(cs,
+            "locals 1;"
+            "l0 = o0;"
+            "push_m2n 0, %0i;"
+            "out platform:ref:void;"
+            "o0 = l0;"
+            "call %1i;"
+            "pop_m2n;"
+            "ret;",
+            FRAME_NON_UNWINDABLE,
+            vm_monitor_exit);
+    } else {
+        return lil_parse_onto_end(cs,
+            "call %0i;"
+            "jc r!=%1i, illegal_monitor;"
+            "ret;"
+            ":illegal_monitor;"
+            "out managed::void;"
+            "call.noret %2i;",
+            vm_monitor_try_exit,
+            TM_ERROR_NONE,
+            lil_npc_to_fp(exn_get_rth_throw_illegal_monitor_state()));
+    }
 }
 
 NativeCodePtr rth_get_lil_monitor_exit_static() {    
