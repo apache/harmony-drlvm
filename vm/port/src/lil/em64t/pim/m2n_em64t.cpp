@@ -237,12 +237,7 @@ char * m2n_gen_ts_to_register(char * buf, const R_Opnd * reg,
                 size_64);
         }
 #else //!PLATFORM_POSIX
-        
-// TODO: couldn't compile under windows/em64t with the line below
-#if !defined(_EM64T_) || !defined(_WIN64)
-    buf = prefix(buf, fs_prefix);
-#endif
-    
+    buf = prefix(buf, prefix_fs);
     buf = mov(buf, *reg,  M_Opnd(0x14), size_64);
 #endif //!PLATFORM_POSIX
     return buf;

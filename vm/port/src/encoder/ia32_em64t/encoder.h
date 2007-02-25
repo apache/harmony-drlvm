@@ -288,11 +288,8 @@ public:
     R_Opnd(Reg_No r): RM_Opnd(Reg), _reg_no(r) {}
     Reg_No  reg_no() const { return _reg_no; }
 
-// TODO: couldn't compile with "private:" under windows/em64t
-#if !defined(_EM64T_) || !defined(_WIN64)
 private:
     // disallow copying
-#endif
     R_Opnd(const R_Opnd &): RM_Opnd(Reg) { assert(false); }
 };
 

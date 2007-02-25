@@ -290,16 +290,15 @@ NativeCodePtr compile_gen_compile_me(Method_Handle method) {
 
 
 /*    BEGIN SUPPORT FOR STUB OVERRIDE CODE SEQUENCES    */
-
-#if defined(_EM64T_) && defined(_WIN64)
-// TODO: couldn't compile "as is" under windows/em64t 
+// FIXME: as we now do not have native overrides on em64t
+// we declare this array as having 1 element to make it compilable
+// by Microsoft Visual C++ compilers and have 1 subtracted from
+// sizeof_stub_override_entries to keep it of zero length.
+// Once we have some NSO implemented on em64t that -1 should be removed.
 static Stub_Override_Entry _stub_override_entries_base[1];
-#else
-static Stub_Override_Entry _stub_override_entries_base[] = {};
-#endif
 
 Stub_Override_Entry * stub_override_entries = &(_stub_override_entries_base[0]);
 
-int sizeof_stub_override_entries = sizeof(_stub_override_entries_base) / sizeof(_stub_override_entries_base[0]);
+int sizeof_stub_override_entries = sizeof(_stub_override_entries_base) / sizeof(_stub_override_entries_base[0]) - 1; // <<< Remove -1 if NSO implemented;
 
 /*    END SUPPORT FOR STUB OVERRIDE CODE SEQUENCES    */

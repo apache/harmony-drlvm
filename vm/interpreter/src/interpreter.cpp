@@ -2169,7 +2169,8 @@ Opcode_GOTO_W(StackFrame& frame) {
 
 static inline void
 Opcode_JSR(StackFrame& frame) {
-    uint32 retAddr = frame.ip + 3 - (uint8*)frame.method->get_byte_code_addr();
+    uint32 retAddr = (uint32)(frame.ip + 3 -
+        (uint8*)frame.method->get_byte_code_addr());
     frame.stack.push();
     frame.stack.pick().u = retAddr;
     frame.stack.ref() = FLAG_RET_ADDR;
@@ -2179,7 +2180,8 @@ Opcode_JSR(StackFrame& frame) {
 
 static inline void
 Opcode_JSR_W(StackFrame& frame) {
-    uint32 retAddr = frame.ip + 5 - (uint8*)frame.method->get_byte_code_addr();
+    uint32 retAddr = (uint32)(frame.ip + 5 -
+        (uint8*)frame.method->get_byte_code_addr());
     frame.stack.push();
     frame.stack.pick().u = retAddr;
     frame.stack.ref() = FLAG_RET_ADDR;
@@ -2321,7 +2323,7 @@ findExceptionHandler(StackFrame& frame, ManagedObject **exception, Handler **hh)
             << m->get_name()->bytes
             << m->get_descriptor()->bytes << endl);
 
-    uint32 ip = frame.ip - (uint8*)m->get_byte_code_addr();
+    uint32 ip = (uint32)(frame.ip - (uint8*)m->get_byte_code_addr());
     DEBUG_BYTECODE("ip = " << dec << (int)ip << endl);
 
     // When VM is in shutdown stage we need to execute final block to
@@ -2418,7 +2420,7 @@ stackDump(FILE * file, StackFrame& frame) {
         Class *c = m->get_class();
         int line = -2;
         if ( !m->is_native() ) {
-            int ip = (uint8*)frame.ip - (uint8*)m->get_byte_code_addr();
+            int ip = (int)((uint8*)frame.ip - (uint8*)m->get_byte_code_addr());
             line = m->get_line_number((uint16)ip);
         }
 #ifdef INTERPRETER_DEEP_DEBUG
