@@ -339,7 +339,7 @@ import junit.framework.TestCase;
     /**
      * use "$" symbol in identifiers for generalized method
      */
-    class $Mc3$09 extends Throwable implements java.io.Serializable, Cloneable {
+    static class $Mc3$09 extends Throwable implements java.io.Serializable, Cloneable {
         private static final long serialVersionUID = 0L;
     };
     public <U$uUuU_ extends Throwable, TM1, TM2 extends Thread &java.io.Serializable &Cloneable> void foo1For_5(U$uUuU_ a1) throws U$uUuU_, java.io.IOException {}

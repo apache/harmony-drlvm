@@ -405,7 +405,7 @@ import junit.framework.TestCase;
     /**
      * getGenericExceptionTypes(), getGenericParameterTypes(), getGenericReturnType(), getTypeParameters(), toGenericString() of generalized method
      */
-    class Mc009\u0576\u06C0\u06F1 extends Throwable 
+    static class Mc009\u0576\u06C0\u06F1 extends Throwable 
             implements java.io.Serializable, Cloneable {
         private static final long serialVersionUID = 0L;
     };

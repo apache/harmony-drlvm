@@ -206,7 +206,7 @@ import junit.framework.TestCase;
     class Mc205 extends Thread implements java.io.Serializable, Cloneable {
         private static final long serialVersionUID = 0L;
     };
-    class Mc209 extends Throwable implements java.io.Serializable, Cloneable {
+    static class Mc209 extends Throwable implements java.io.Serializable, Cloneable {
         private static final long serialVersionUID = 0L;
     };
     public <UuUuU extends Throwable, TM1, TM2 extends Thread &java.io.Serializable &Cloneable> void foo1For_5(UuUuU a1) throws UuUuU, java.io.IOException {}

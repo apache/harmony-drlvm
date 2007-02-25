@@ -67,7 +67,7 @@ public class TemplateSet<X> {
     public TemplateSet<? super Class>.Mc002<TemplateSet>.Mc004<TemplateSet> f0;
     public X f111;
     public TemplateSet f112;
-    class Mc009\u0576\u06C0\u06F1 extends Throwable implements java.io.Serializable, Cloneable {private static final long serialVersionUID = 0L;};
+    static class Mc009\u0576\u06C0\u06F1 extends Throwable implements java.io.Serializable, Cloneable {private static final long serialVersionUID = 0L;};
     @igt(author="*****") public <UuUuU extends Throwable, TM1, TM2 extends Thread &java.io.Serializable &Cloneable> void foo1For_5(UuUuU a1) throws UuUuU, java.io.IOException {}
     public <\u0391 extends Throwable, TM1, TM2, TM3, TM4, TM5, TM6, TM7> X foo2For_5()  throws \u0391, java.io.IOException {X f = null; return f;}
     public <\u0576\u06C0\u06F1 extends Throwable, \u0576\u06C0\u06F11 extends Throwable, \u0576\u06C0\u06F12 extends Throwable, \u0576\u06C0\u06F13 extends Throwable, TM1, TM2 extends Thread &java.io.Serializable &Cloneable> TM2 foo3For_5(\u0576\u06C0\u06F1[] BAAB, TM1 a1, TM2 a2, TemplateSet<? super Class>.Mc002<TemplateSet>.Mc004<TemplateSet> a3) throws \u0576\u06C0\u06F1, Throwable, \u0576\u06C0\u06F13, \u0576\u06C0\u06F12, \u0576\u06C0\u06F11, TemplateSet.Mc009\u0576\u06C0\u06F1 {TM2 f = null; return f;}
