@@ -319,7 +319,7 @@ Boolean gc_compute_new_space_size(GC_Gen* gc, POINTER_SIZE_INT* mos_size, POINTE
 }
 
 // this function is added to disambiguate on windows/em64t calls to asm() below 
-POINTER_SIZE_SINT abs(POINTER_SIZE_SINT x) 
+POINTER_SIZE_SINT POINTER_SIZE_abs(POINTER_SIZE_SINT x) 
 {
     return x<0?-x:x;    
 }
@@ -344,7 +344,7 @@ void gc_gen_adapt(GC_Gen* gc, int64 pause_time)
 
   POINTER_SIZE_INT curr_nos_size = space_committed_size((Space*)fspace);
 
-  if( abs((POINTER_SIZE_SINT)new_nos_size - (POINTER_SIZE_SINT)curr_nos_size) < NOS_COPY_RESERVE_DELTA )
+  if( POINTER_SIZE_abs((POINTER_SIZE_SINT)new_nos_size - (POINTER_SIZE_SINT)curr_nos_size) < NOS_COPY_RESERVE_DELTA )
     return;
   
   /* below are ajustment */  
@@ -396,7 +396,7 @@ void gc_gen_adapt(GC_Gen* gc, int64 pause_time)
   
   POINTER_SIZE_INT curr_nos_size = space_committed_size((Space*)fspace);
 
-  if( abs((POINTER_SIZE_SINT)new_nos_size - (POINTER_SIZE_SINT)curr_nos_size) < NOS_COPY_RESERVE_DELTA )
+  if( POINTER_SIZE_abs((POINTER_SIZE_SINT)new_nos_size - (POINTER_SIZE_SINT)curr_nos_size) < NOS_COPY_RESERVE_DELTA )
     return;
       
   POINTER_SIZE_INT used_mos_size = space_used_memory_size((Blocked_Space*)mspace);  
