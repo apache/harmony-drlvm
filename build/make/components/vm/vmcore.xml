@@ -125,10 +125,12 @@ Version: $Revision: 1.5.2.3 $
 
                 <select os="win" arch="ia32">
                     <include name="util/win/ia32/*.cpp" />
+                    <include name="util/win/ia32_em64t/*.cpp" />
                 </select>
 
                 <select os="win" arch="em64t">
                     <include name="util/win/em64t/*.cpp" />
+                    <include name="util/win/ia32_em64t/*.cpp" />
                 </select>
 
                 <select os="win" arch="ipf">
@@ -262,6 +264,13 @@ Version: $Revision: 1.5.2.3 $
             <fileset id="asm.fileset"
                  dir="${build.vm.home}/vmcore">
                 <include name="src/util/ipf/base/*.asm" />
+            </fileset>
+        </select>
+
+        <select os="win" arch="em64t">
+            <fileset id="asm.fileset"
+                 dir="${build.vm.home}/vmcore">
+                <include name="src/util/win/em64t/*.asm" />
             </fileset>
         </select>
 

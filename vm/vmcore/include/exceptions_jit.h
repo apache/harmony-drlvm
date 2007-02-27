@@ -94,6 +94,6 @@ NativeCodePtr exn_get_rth_throw_illegal_state_exception();
 Class_Handle exn_get_class_cast_exception_type();
 
 // Exception catch callback for jvm ti support implementation
-void asm_jvmti_exception_catch_callback();
+extern "C" void asm_jvmti_exception_catch_callback();
 
 #endif // _EXCEPTIONS_JIT_H_

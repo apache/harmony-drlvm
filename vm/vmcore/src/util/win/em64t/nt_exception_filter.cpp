@@ -19,160 +19,95 @@
  * @version $Revision: 1.1.2.1.4.5 $
  */  
 
-#undef LOG_DOMAIN
-#define LOG_DOMAIN "nt_exception_filter"
-
+#include <stdio.h>
 #include "platform_lowlevel.h"
-#include "Class.h"
-#include "Environment.h"
-#include "exceptions.h"
-#include "exceptions_jit.h"
-#include "method_lookup.h"
-#include "vm_strings.h"
-#include "vm_threads.h"
-#include "compile.h"
-#include "ini.h"
-#include "cxxlog.h"
+#include "vm_core_types.h"
 
-#include "exception_filter.h"
-
-#include "thread_generic.h"
-
-
-
-// Afremov Pavel 20050117
-#include "../m2n_em64t_internal.h"
 
 void nt_to_vm_context(PCONTEXT pcontext, Registers* regs)
 {
+    regs->rsp = pcontext->Rsp;
+    regs->rbp = pcontext->Rbp;
+    regs->rip = pcontext->Rip;
+
+    regs->rbx = pcontext->Rbx;
+    regs->r12 = pcontext->R12;
+    regs->r13 = pcontext->R13;
+    regs->r14 = pcontext->R14;
+    regs->r15 = pcontext->R15;
+
     regs->rax = pcontext->Rax;
     regs->rcx = pcontext->Rcx;
     regs->rdx = pcontext->Rdx;
-    regs->rdi = pcontext->Rdi;
     regs->rsi = pcontext->Rsi;
-    regs->rbx = pcontext->Rbx;
-    regs->rbp = pcontext->Rbp;
-    regs->rip = pcontext->Rip;
-    regs->rsp = pcontext->Rsp;
+    regs->rdi = pcontext->Rdi;
+    regs->r8  = pcontext->R8;
+    regs->r9  = pcontext->R9;
+    regs->r10 = pcontext->R10;
+    regs->r11 = pcontext->R11;
+
+    regs->eflags = pcontext->EFlags;
 }
 
 void vm_to_nt_context(Registers* regs, PCONTEXT pcontext)
 {
     pcontext->Rsp = regs->rsp;
-    pcontext->Rip = regs->rip;
     pcontext->Rbp = regs->rbp;
+    pcontext->Rip = regs->rip;
+
     pcontext->Rbx = regs->rbx;
-    pcontext->Rsi = regs->rsi;
-    pcontext->Rdi = regs->rdi;
+    pcontext->R12 = regs->r12;
+    pcontext->R13 = regs->r13;
+    pcontext->R14 = regs->r14;
+    pcontext->R15 = regs->r15;
+
     pcontext->Rax = regs->rax;
     pcontext->Rcx = regs->rcx;
     pcontext->Rdx = regs->rdx;
+    pcontext->Rsi = regs->rsi;
+    pcontext->Rdi = regs->rdi;
+    pcontext->R8  = regs->r8;
+    pcontext->R9  = regs->r9;
+    pcontext->R10 = regs->r10;
+    pcontext->R11 = regs->r11;
+
+    pcontext->EFlags = regs->eflags;
 }
 
-int NT_exception_filter(LPEXCEPTION_POINTERS p_NT_exception) 
+void print_state(LPEXCEPTION_POINTERS nt_exception, const char *msg)
 {
+    fprintf(stderr, "...VM Crashed!\n");
+    if (msg != 0)
+        fprintf(stderr, "Windows reported exception: %s\n", msg);
+    else
+        fprintf(stderr, "Windows reported exception: 0x%x\n", nt_exception->ExceptionRecord->ExceptionCode);
 
-    // this filter catches _all_ null ptr exceptions including those caused by
-    // VM internal code.  To elimate confusion over what caused the null ptr
-    // exception, we first make sure the exception was thrown inside a Java
-    // method else assert(0); <--- means it was thrown by VM C/C++ code.
-
-    Global_Env *env = VM_Global_State::loader_env;
-
-    VM_Code_Type vmct =
-        vm_identify_eip((void *)p_NT_exception->ContextRecord->Rip);
-    if(vmct != VM_TYPE_JAVA) {
-        if (!get_boolean_property("vm.assert_dialog", TRUE, VM_PROPERTIES)) {
-            LWARN(43, "Fatal exception, terminating");
-            return EXCEPTION_EXECUTE_HANDLER;
-        }
-        return EXCEPTION_CONTINUE_SEARCH;
-    }
-
-    // since we are now sure NPE occured in java code, gc should also have been disabled
-    assert(!hythread_is_suspend_enabled());
-
-    
-    volatile ManagedObject *exc = 0;
-    Class *exc_clss = 0;
-    switch(p_NT_exception->ExceptionRecord->ExceptionCode) {
-    case STATUS_ACCESS_VIOLATION:
-        // null pointer exception -- see ...\vc\include\winnt.h
-        {
-            // Lazy exception object creation
-            exc_clss = env->java_lang_NullPointerException_Class;
-        }
-        break;
-
-    case STATUS_INTEGER_DIVIDE_BY_ZERO:
-        // divide by zero exception  -- see ...\vc\include\winnt.h
-        {
-            // Lazy exception object creation
-            exc_clss = env->java_lang_ArithmeticException_Class;
-        }
-        break;
-
-    case STATUS_PRIVILEGED_INSTRUCTION:
-        {
-            LDIE(36, "Unexpected exception code");
-        }
-        break;
-
-    default:
-        return EXCEPTION_CONTINUE_SEARCH;
-    }
-
-    Registers regs;
-
-    nt_to_vm_context(p_NT_exception->ContextRecord, &regs);
-
-    bool java_code = (vm_identify_eip((void *)regs.rip) == VM_TYPE_JAVA);
-    exn_athrow_regs(&regs, exc_clss, java_code);
-
-    vm_to_nt_context(&regs, p_NT_exception->ContextRecord);
-
-    return EXCEPTION_CONTINUE_EXECUTION;
-} //NT_exception_filter
-
-int call_the_run_method3( void * p_xx ){
-    LPEXCEPTION_POINTERS p_NT_exception;
-    int NT_exception_filter(LPEXCEPTION_POINTERS p_NT_exception);
-
-    // NT null pointer exception support
-    __try {
-        // TODO: couldn't find where call_the_run_method() body is
-        //call_the_run_method(p_xx); 
-        assert(0);
-        return 0;
-    }
-    __except ( p_NT_exception = GetExceptionInformation(), 
-        NT_exception_filter(p_NT_exception) ) {
-
-        ABORT("Uncaught exception");  // get here only if NT_null_ptr_filter() screws up
-
-        return 0;
-    }  // NT null pointer exception support
-
+    fprintf(stderr, "Registers:\n");
+    fprintf(stderr, "    RAX: 0x%16lx, RBX: 0x%16lx\n",
+        nt_exception->ContextRecord->Rax, nt_exception->ContextRecord->Rbx);
+   fprintf(stderr, "    RCX: 0x%16lx, RDX: 0x%16lx\n",
+        nt_exception->ContextRecord->Rcx, nt_exception->ContextRecord->Rdx);
+    fprintf(stderr, "    RSI: 0x%16lx, RDI: 0x%16lx\n",
+        nt_exception->ContextRecord->Rsi, nt_exception->ContextRecord->Rdi);
+   fprintf(stderr, "    RSP: 0x%16lx, RBP: 0x%16lx\n",
+        nt_exception->ContextRecord->Rsp, nt_exception->ContextRecord->Rbp);
+   fprintf(stderr, "    R8:  0x%16lx, R9: 0x%16lx\n",
+        nt_exception->ContextRecord->R8, nt_exception->ContextRecord->R9);
+   fprintf(stderr, "    R10: 0x%16lx, R11P: 0x%16lx\n",
+        nt_exception->ContextRecord->R10, nt_exception->ContextRecord->R11);
+    fprintf(stderr, "    RS12: 0x%16lx, R13: 0x%16lx\n",
+        nt_exception->ContextRecord->R12, nt_exception->ContextRecord->R13);
+    fprintf(stderr, "    RS14: 0x%16lx, R15: 0x%16lx\n",
+        nt_exception->ContextRecord->R14, nt_exception->ContextRecord->R15);
 }
 
-// TODO: the functions below need an implementation
-static void asm_exception_catch_callback() {
-assert(0);
-}
-
-void asm_jvmti_exception_catch_callback() {
-assert(0);
-}
-
-LONG NTAPI vectored_exception_handler(LPEXCEPTION_POINTERS nt_exception)
+void* regs_get_sp(Registers* pregs)
 {
-    return EXCEPTION_CONTINUE_SEARCH;
+    return (void*)pregs->rsp;
 }
 
-void init_stack_info() {
+void regs_push_param_onto_stack(Registers* pregs, POINTER_SIZE_INT param)
+{
+    pregs->rsp = pregs->rsp - 8;
+    *((uint64*)pregs->rsp) = param;
 }
-
-size_t get_available_stack_size() { 
-    return 1000000;
-}
-

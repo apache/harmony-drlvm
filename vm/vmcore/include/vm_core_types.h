@@ -99,6 +99,8 @@ struct Registers {
     uint64 r10;
     uint64 r11;
 
+    uint32 eflags;
+
     void reset_ip() { rip = 0; }
     void* get_ip() { return (void*)rip; }
     void set_ip(void* src_ip) { rip = (uint64)src_ip; }
