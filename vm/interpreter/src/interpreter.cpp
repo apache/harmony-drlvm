@@ -2866,8 +2866,8 @@ restart:
 
             case OPCODE_TABLESWITCH: Opcode_TABLESWITCH(frame); break;
             case OPCODE_LOOKUPSWITCH: Opcode_LOOKUPSWITCH(frame); break;
-            case OPCODE_GOTO: Opcode_GOTO(frame); break;
-            case OPCODE_GOTO_W: Opcode_GOTO_W(frame); break;
+            case OPCODE_GOTO: Opcode_GOTO(frame); goto check_exception;
+            case OPCODE_GOTO_W: Opcode_GOTO_W(frame); goto check_exception;
             case OPCODE_JSR: Opcode_JSR(frame); break;
             case OPCODE_JSR_W: Opcode_JSR_W(frame); break;
             case OPCODE_RET: Opcode_RET(frame); break;
@@ -2917,7 +2917,7 @@ restart:
             case OPCODE_LDC2_W: Opcode_LDC2_W(frame); break;
 
             case OPCODE_IFNULL:
-            case OPCODE_IFEQ: Opcode_IFEQ(frame); break;
+            case OPCODE_IFEQ: Opcode_IFEQ(frame); goto check_exception;
 
             case OPCODE_IFNONNULL:
             case OPCODE_IFNE: Opcode_IFNE(frame); goto check_exception;
