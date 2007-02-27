@@ -1697,7 +1697,8 @@ bool Method::_parse_code(ConstantPool& cp, unsigned code_attr_len,
     
     if(num_lvt_entries == 0 && num_lvtt_entries != 0) {
             REPORT_FAILED_METHOD("if LocalVariableTable is empty "
-                "LocalVariableTypeTable must be empty too");        
+                "LocalVariableTypeTable must be empty too");
+        return false;
     }
 
     if(num_lvt_entries != 0) {
