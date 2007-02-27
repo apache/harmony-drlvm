@@ -147,8 +147,8 @@ public:
     CG_OpndHandle *convToInt(ConvertToIntOp::Types, bool, ConvertToIntOp::OverflowMod, Type*, CG_OpndHandle*);
     CG_OpndHandle *convToFp(ConvertToFpOp::Types, Type*, CG_OpndHandle*);
 
-    CG_OpndHandle *ldc_i4(uint32);
-    CG_OpndHandle *ldc_i8(uint64);
+    CG_OpndHandle *ldc_i4(int32);
+    CG_OpndHandle *ldc_i8(int64);
     CG_OpndHandle *ldc_s(float);
     CG_OpndHandle *ldc_d(double);
     CG_OpndHandle *ldnull(bool);

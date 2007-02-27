@@ -770,16 +770,16 @@ CG_OpndHandle *IpfInstCodeSelector::convToFp(ConvertToFpOp::Types opType,
 //----------------------------------------------------------------------------//
 // Load 32-bit integer constant
 
-CG_OpndHandle *IpfInstCodeSelector::ldc_i4(uint32 val) {
+CG_OpndHandle *IpfInstCodeSelector::ldc_i4(int32 val) {
 
     IPF_LOG << "      ldc_i4; val=" << val << endl;
     
     Opnd *dst;
     if (ipfConstantFolding) {
-        dst = opndManager->newImm((int64)((int32)val));
+        dst = opndManager->newImm((int64)val);
     } else {
         dst = opndManager->newRegOpnd(OPND_G_REG, DATA_I32);
-        ldc((RegOpnd *)dst, (int64)((int32)val));
+        ldc((RegOpnd *)dst, (int64)val);
     }
     return dst;
 }
@@ -787,16 +787,16 @@ CG_OpndHandle *IpfInstCodeSelector::ldc_i4(uint32 val) {
 //----------------------------------------------------------------------------//
 // Load 64-bit integer constant
 
-CG_OpndHandle *IpfInstCodeSelector::ldc_i8(uint64 val) {
+CG_OpndHandle *IpfInstCodeSelector::ldc_i8(int64 val) {
 
     IPF_LOG << "      ldc_i8; val=" << val << endl;
 
     Opnd *dst;
     if (ipfConstantFolding) {
-        dst = opndManager->newImm((int64)val);
+        dst = opndManager->newImm(val);
     } else {
         dst = opndManager->newRegOpnd(OPND_G_REG, DATA_I64);
-        ldc((RegOpnd *)dst, (int64)val);
+        ldc((RegOpnd *)dst, val);
     }
     return dst;
 }
