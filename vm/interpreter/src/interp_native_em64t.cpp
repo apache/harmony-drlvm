@@ -90,7 +90,11 @@ interpreter_execute_native_method(
     int sz = method->get_num_arg_slots();
 
     int n_ints = 0;
+#ifdef _WIN32 /* important difference in calling conventions */
+#define n_fps n_ints
+#else
     int n_fps = 0;
+#endif
     int n_stacks = 0;
     uword *out_args = (uword*) ALLOC_FRAME(8 + sizeof(char) + (MAX_REG_FLOATS + sz + 2) * sizeof(uword));
     uword *fps = out_args + 1;
@@ -292,10 +296,14 @@ interpreterInvokeStaticNative(StackFrame& prevFrame, StackFrame& frame, Method *
 
     M2N_ALLOC_MACRO;
     
-    word sz = method->get_num_arg_slots();
+    int sz = method->get_num_arg_slots();
 
     int n_ints = 0;
+#ifdef _WIN32 /* important difference in calling conventions */
+#define n_fps n_ints
+#else
     int n_fps = 0;
+#endif
     int n_stacks = 0;
     uword *out_args = (uword*) ALLOC_FRAME(8 + sizeof(char) + (MAX_REG_FLOATS + sz + 2) * sizeof(uword));
     uword *fps = out_args + 1;
@@ -305,7 +313,7 @@ interpreterInvokeStaticNative(StackFrame& prevFrame, StackFrame& frame, Method *
     frame.This = *(method->get_class()->get_class_handle());
     ints[n_ints++] = (uword) get_jni_native_intf();
     ints[n_ints++] = (uword) &frame.This; 
-    word pos = sz - 1;
+    int pos = sz - 1;
     uword arg;
 
     const char *mtype = method->get_descriptor()->bytes + 1;
@@ -574,7 +582,11 @@ interpreterInvokeVirtualNative(StackFrame& prevFrame, StackFrame& frame, Method 
            << method->get_descriptor()->bytes << endl);
 
     int n_ints = 0;
+#ifdef _WIN32 /* important difference in calling conventions */
+#define n_fps n_ints
+#else
     int n_fps = 0;
+#endif
     int n_stacks = 0;
     uword *out_args = (uword*) ALLOC_FRAME(8 + sizeof(char) + (MAX_REG_FLOATS + sz + 2) * sizeof(uword));
     uword *fps = out_args + 1;
@@ -583,7 +595,7 @@ interpreterInvokeVirtualNative(StackFrame& prevFrame, StackFrame& frame, Method 
 
     ints[n_ints++] = (uword) get_jni_native_intf();
     ints[n_ints++] = (uword) &frame.This;
-    word pos = sz - 2;
+    int pos = sz - 2;
 
     GenericFunctionPointer f = interpreterGetNativeMethodAddr(method);
     if (f == 0) {
