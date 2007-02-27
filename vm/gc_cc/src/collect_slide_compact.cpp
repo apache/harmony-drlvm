@@ -30,7 +30,7 @@
 #include "slide_compact.h"
 
 unsigned char *mark_bits;
-int mark_bits_size;
+size_t mark_bits_size;
 fast_list<Partial_Reveal_Object*, 65536> objects;
 reference_vector references_to_enqueue;
 
@@ -232,7 +232,7 @@ void gc_slide_move_all() {
     if (pinned_areas.size() != 0) compact_pos_limit = pinned_areas[0];
 
 #if _DEBUG
-    int pin_size = 0;
+    POINTER_SIZE_INT pin_size = 0;
     for(pinned_areas_unsorted_t::iterator iii = pinned_areas_unsorted.begin();
             iii != pinned_areas_unsorted.end(); ++iii) {
         unsigned char *start = *iii; ++iii;
@@ -245,7 +245,7 @@ void gc_slide_move_all() {
     partial_sort_copy(pinned_areas_unsorted.begin(), pinned_areas_unsorted.end(), pinned_areas.begin(), pinned_areas.end());
 
 #if _DEBUG
-    int sorted_pin_size = 0;
+    POINTER_SIZE_INT sorted_pin_size = 0;
     for(unsigned ii = 0; ii < pinned_areas.size(); ii+=2) {
         TRACE2("gc.pin", "pinned_areas[" << ii << "] = " << pinned_areas[ii]);
         TRACE2("gc.pin", "pinned_areas[" << ii+1 << "] = " << pinned_areas[ii+1]);
@@ -272,10 +272,10 @@ void gc_slide_move_all() {
 
     int *mark_words = (int*) mark_bits;
     // Searching marked bits
-    unsigned start = (unsigned)(heap.compaction_region_start() - heap_base) / GC_OBJECT_ALIGNMENT / sizeof(int) / 8;
-    unsigned end = (unsigned)(heap.compaction_region_end() - heap_base + GC_OBJECT_ALIGNMENT * sizeof(int) * 8 - 1) / GC_OBJECT_ALIGNMENT / sizeof(int) / 8;
+    size_t start = (size_t)(heap.compaction_region_start() - heap_base) / GC_OBJECT_ALIGNMENT / sizeof(int) / 8;
+    size_t end = (size_t)(heap.compaction_region_end() - heap_base + GC_OBJECT_ALIGNMENT * sizeof(int) * 8 - 1) / GC_OBJECT_ALIGNMENT / sizeof(int) / 8;
     if (end > mark_bits_size/sizeof(int)) end = mark_bits_size/sizeof(int);
-    for(unsigned i = start; i < end; i++) {
+    for(size_t i = start; i < end; i++) {
         // no marked bits in word - skip
 
         int word = mark_words[i];

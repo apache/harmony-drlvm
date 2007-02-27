@@ -126,8 +126,9 @@ unsigned char* allocate_from_chunk(int size) {
 }
 
 Managed_Object_Handle gc_alloc_fast(unsigned in_size, 
-                                             Allocation_Handle ah,
+                                             Allocation_Handle _ah,
                                              void *thread_pointer) {
+    VT32 ah = (VT32) _ah;
 
     //TRACE2("gc.alloc", "gc_alloc_fast");
     assert((in_size % GC_OBJECT_ALIGNMENT) == 0);
@@ -175,8 +176,9 @@ Managed_Object_Handle gc_alloc_fast(unsigned in_size,
 }
 
 Managed_Object_Handle gc_alloc(unsigned in_size, 
-                                        Allocation_Handle ah,
+                                        Allocation_Handle _ah,
                                         void *thread_pointer) {
+    VT32 ah = (VT32) _ah;
     TRACE2("gc.alloc", "gc_alloc: " << in_size);
     assert((in_size % GC_OBJECT_ALIGNMENT) == 0);
     assert (ah);

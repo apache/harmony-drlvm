@@ -104,6 +104,8 @@ struct GC_Thread_Info {
 
 // Heap layout
 #define RESERVED_FOR_HEAP_NULL (4 * 32)
+#define RESERVED_FOR_LAST_HASH (GC_OBJECT_ALIGNMENT)
+
 
 // FLAGS
 extern const char *lp_hint; // Use large pages
@@ -205,10 +207,12 @@ class Partial_Reveal_Object {
 unsigned
 GC_VTable_Info::array_size(int length) {
     assert(is_array());
-    unsigned f = flags();
-    unsigned element_shift = f >> GC_VT_ARRAY_ELEMENT_SHIFT;
-    unsigned first_element = element_shift >> (GC_VT_ARRAY_FIRST_SHIFT - GC_VT_ARRAY_ELEMENT_SHIFT);
-    return (first_element + (length << (element_shift & GC_VT_ARRAY_ELEMENT_MASK)) + (GC_OBJECT_ALIGNMENT - 1)) & ~(GC_OBJECT_ALIGNMENT - 1);
+    POINTER_SIZE_INT f = flags();
+    POINTER_SIZE_INT element_shift = f >> GC_VT_ARRAY_ELEMENT_SHIFT;
+    POINTER_SIZE_INT first_element = element_shift >> (GC_VT_ARRAY_FIRST_SHIFT - GC_VT_ARRAY_ELEMENT_SHIFT);
+    POINTER_SIZE_INT size = first_element + (length << (element_shift & GC_VT_ARRAY_ELEMENT_MASK));
+    POINTER_SIZE_INT aligned_size = (size + (GC_OBJECT_ALIGNMENT - 1)) & ~(GC_OBJECT_ALIGNMENT - 1);
+    return (unsigned) aligned_size;
 }
 
 static inline int get_object_size(Partial_Reveal_Object *obj, GC_VTable_Info *gcvt) {
@@ -292,7 +296,7 @@ extern HeapSegment heap;
 extern Ptr heap_base;
 
 extern int pending_finalizers;
-extern uint32 chunk_size;
+extern POINTER_SIZE_INT chunk_size;
 extern bool cleaning_needed;
 extern std::vector<unsigned char*> pinned_areas;
 extern unsigned pinned_areas_pos;
@@ -312,7 +316,7 @@ extern int gc_adaptive;
 
 // for slide compaction algorithms
 extern unsigned char *mark_bits;
-extern int mark_bits_size;
+extern size_t mark_bits_size;
 
 
 // FUNCTIONS PROTOTYPES
@@ -325,6 +329,8 @@ unsigned char * full_gc(int size);
 unsigned char * slide_gc(int size);
 unsigned char* allocate_from_chunk(int size);
 
+void enable_heap_region(void *start, size_t size);
+void disable_heap_region(void *start, size_t size);
 void gc_reserve_mark_bits();
 void gc_unreserve_mark_bits();
 void gc_allocate_mark_bits();

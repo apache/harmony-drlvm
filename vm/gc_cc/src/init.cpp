@@ -42,11 +42,9 @@
 unsigned int heap_mark_phase;
 
 HeapSegment heap;
-uint32 chunk_size;
+POINTER_SIZE_INT chunk_size;
 
 int pending_finalizers = false;
-
-#define RESERVED_FOR_LAST_HASH 4
 
 #define MB * (1024 * 1024)
 size_t HEAP_SIZE_DEFAULT = 256 MB;
@@ -64,6 +62,46 @@ bool ignore_finalizers = false;
 bool remember_root_set = false;
 const char *lp_hint = NULL;
 bool jvmti_heap_iteration = false;
+
+#ifdef _WIN32
+ /* WINDOWS */
+static const void* MEM_FAILURE = 0;
+void* mem_reserve(size_t size) {
+    return VirtualAlloc(NULL, size, MEM_RESERVE, PAGE_READWRITE);
+}
+void  mem_unreserve(void *ptr, size_t size) {
+    bool UNUSED res = VirtualFree(ptr, 0, MEM_RELEASE);
+	int err = GetLastError();
+    assert(res);
+}
+
+void  mem_commit(void *ptr, size_t size) {
+    bool UNUSED res = VirtualAlloc(ptr, size, MEM_COMMIT, PAGE_READWRITE);
+    assert(res);
+}
+
+void  mem_decommit(void *ptr, size_t size) {
+    bool UNUSED res = VirtualFree(ptr, size, MEM_DECOMMIT);
+    assert (res);
+}
+#else
+ /* LINUX */
+static const void* MEM_FAILURE = MAP_FAILED;
+void* mem_reserve(size_t size) {
+    return mmap(0, size, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+}
+void  mem_unreserve(void *ptr, size_t size) {
+    int UNUSED res = munmap(ptr, size);
+    assert (res != -1);
+}
+void* mem_commit(void *ptr, size_t size) {
+}
+void mem_decommit(void *ptr, size_t size) {
+    UNUSED void *res = mmap(ptr, size, PROT_READ | PROT_WRITE, MAP_FIXED | MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+    assert(res != MAP_FAILED);
+}
+#endif
+
 
 static size_t get_size_property(const char* name) 
 {
@@ -179,38 +217,12 @@ void gc_vm_initialized() {
     }
 }
 
-#ifdef _WIN32
-static inline void *reserve_mem(size_t size) {
-    return VirtualAlloc(NULL, size, MEM_RESERVE, PAGE_READWRITE);
+void enable_heap_region(void *start, size_t size) {
+    if (!lp_hint) mem_commit(start, size);
 }
-static const void* RESERVE_FAILURE = 0;
-#else
-static inline void *reserve_mem(size_t size) {
-#ifdef POINTER64
-    /* We have plenty of address space, let's protect unaccessible part of heap
-     * to find some of bad pointers. */
-    size_t four_gig = 4 * 1024 * (size_t) 1024 * 1024;
-    size_t padding = 4 * 1024 * (size_t) 1024 * 1024;
-    four_gig = 0;
-    padding = 0;
-    void *addr = mmap(0, padding + max_heap_size + four_gig, PROT_READ | PROT_WRITE,
-            MAP_NORESERVE | MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
-    assert(addr != MAP_FAILED);
-    UNUSED int err = mprotect((Ptr)addr, padding, PROT_NONE);
-    assert(!err);
-    err = mprotect((Ptr)addr + padding + max_heap_size,
-                    four_gig, PROT_NONE);
-    assert(!err);
-    return (Ptr)addr + padding;
-#else
-    return mmap(0, max_heap_size, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
-#endif
+void disable_heap_region(void *start, size_t size) {
+    if (!lp_hint) mem_decommit(start, size);
 }
-static const void* RESERVE_FAILURE = MAP_FAILED;
-#endif
-
-
-
 
 void init_mem() {
     parse_configuration_properties();
@@ -236,14 +248,14 @@ void init_mem() {
     }
 
     if (heap_base == NULL) {
-        heap_base = (unsigned char*) reserve_mem(max_heap_size);
-        if (heap_base == RESERVE_FAILURE) {
+        heap_base = (unsigned char*) mem_reserve(max_heap_size);
+        if (heap_base == (Ptr) MEM_FAILURE) {
             size_t dec = 100 * 1024 * 1024;
             max_heap_size = max_heap_size / dec * dec;
 
             while(true) {
-                heap_base = (unsigned char*) reserve_mem(max_heap_size);
-                if (heap_base != RESERVE_FAILURE) break;
+                heap_base = (unsigned char*) mem_reserve(max_heap_size);
+                if (heap_base != (Ptr) MEM_FAILURE) break;
                 max_heap_size -= dec;
                 assert(max_heap_size > 0);
             }
@@ -262,18 +274,16 @@ void init_mem() {
     heap.size = min_heap_size;
     heap.max_size = max_heap_size;
     heap.roots_start = heap.roots_pos = heap.roots_end =
-        heap.base + heap.max_size - RESERVED_FOR_LAST_HASH;
+        heap.base + heap.max_size;
 
-#ifdef _WIN32
-    void *res;
-    if (heap_base && !lp_hint) {
-        res = VirtualAlloc(heap.base, heap.size, MEM_COMMIT, PAGE_READWRITE);
-        if (!res) LDIE(2, "Can't create heap_L");
-    }
-#endif
+    enable_heap_region(heap.base, heap.size);
+
     chunk_size = round_down(heap.size / 10, 65536);
     init_gcvt();
-    gc_reserve_mark_bits();
+
+    mark_bits_size = max_heap_size / sizeof(void*) / 8;
+    mark_bits = (Ptr) mem_reserve(mark_bits_size);
+    assert(mark_bits != MEM_FAILURE);
 }
 
 void gc_init() {
@@ -297,37 +307,10 @@ gc_wrapup() {
         << "gc/user " << (int)(total_gc_time*100.f/total_user_time) << " %"
     );
     INFO2("gc.init", "gc_wrapup called");
-    gc_unreserve_mark_bits();
+    mem_unreserve(heap_base, max_heap_size);
+    mem_unreserve(mark_bits, mark_bits_size);
     deinit_gcvt();
-#ifdef _WIN32
-    bool UNUSED res = VirtualFree(heap_base, max_heap_size, MEM_DECOMMIT);
-    assert (res);
-#else
-    int UNUSED res = munmap(heap_base, max_heap_size);
-    assert (res != -1);
-#endif
     INFO2("gc.init", "gc_wrapup done");
-}
-
-void gc_reserve_mark_bits() {
-    mark_bits_size = max_heap_size / sizeof(void*) / 8;
-#ifdef _WIN32
-    mark_bits = (unsigned char*) VirtualAlloc(NULL, mark_bits_size, MEM_RESERVE, PAGE_READWRITE);
-    assert(mark_bits);
-#else
-    mark_bits = (unsigned char*) mmap(0, mark_bits_size, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
-    assert(mark_bits != MAP_FAILED);
-#endif
-}
-
-void gc_unreserve_mark_bits() {
-#ifdef _WIN32
-    bool UNUSED res = VirtualFree(mark_bits, 0, MEM_RELEASE);
-    assert(res);
-#else
-    int UNUSED res = munmap(mark_bits, mark_bits_size);
-    assert(res != -1);
-#endif
 }
 
 static unsigned char *mark_bits_allocated_start;
@@ -340,23 +323,11 @@ void gc_allocate_mark_bits() {
     int page = 4096; // FIXME
     mark_bits_allocated_start = (unsigned char*)((POINTER_SIZE_INT)start & ~(page - 1));
     mark_bits_allocated_end = (unsigned char*)(((POINTER_SIZE_INT)end + page - 1) & ~(page - 1));
-#ifdef _WIN32
-    unsigned char *res = (unsigned char*) VirtualAlloc(mark_bits_allocated_start,
-            mark_bits_allocated_end - mark_bits_allocated_start, MEM_COMMIT, PAGE_READWRITE);
-    assert(res);
-#endif
+    mem_commit(mark_bits_allocated_start, mark_bits_allocated_end - mark_bits_allocated_start);
 }
 
 void gc_deallocate_mark_bits() {
-#ifdef _WIN32
-    bool UNUSED res = VirtualFree(mark_bits_allocated_start,
-            mark_bits_allocated_end - mark_bits_allocated_start, MEM_DECOMMIT);
-    assert(res);
-#else
-    void UNUSED *res = mmap(mark_bits, mark_bits_size, PROT_READ | PROT_WRITE, MAP_FIXED | MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
-    assert(res == (void*)mark_bits);
-    assert(mark_bits[0] == 0);
-#endif
+    mem_decommit(mark_bits, mark_bits_size);
 }
 
 void heap_extend(size_t size) {
@@ -365,10 +336,8 @@ void heap_extend(size_t size) {
     if (size > max_size) size = max_size;
     if (size <= heap.size) return;
 
-#ifdef _WIN32
-    void* UNUSED res = VirtualAlloc(heap.base + heap.size, size - heap.size, MEM_COMMIT, PAGE_READWRITE);
-    assert(res);
-#endif
+    enable_heap_region(heap.base + heap.size, size - heap.size);
+
     heap.size = size;
     unsigned char *old_ceiling = heap.ceiling;
     heap.ceiling = heap.base + heap.size - RESERVED_FOR_LAST_HASH;
@@ -391,13 +360,7 @@ void heap_shrink(size_t size) {
     }
     if (size >= heap.size) return;
 
-#ifdef _WIN32
-    bool UNUSED res = VirtualFree(heap.base + size, heap.size - size, MEM_DECOMMIT);
-    assert(res);
-#else
-    void UNUSED *res = mmap(heap.base + size, heap.size - size, PROT_READ | PROT_WRITE, MAP_FIXED | MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
-    assert(res == (void*)(heap.base + size));
-#endif
+    disable_heap_region(heap.base + size, heap.size - size);
 
     heap.size = size;
     heap.ceiling = heap.base + heap.size - RESERVED_FOR_LAST_HASH;

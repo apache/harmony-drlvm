@@ -52,7 +52,7 @@ class Slot {
     void* ptr() { return (void*) s; }
 
 #ifdef POINTER64
-    void write(Partial_Reveal_Object *obj) { *s = (Ptr)obj - heap_base; }
+    void write(Partial_Reveal_Object *obj) { *s = (Reference)((Ptr)obj - heap_base); }
     Partial_Reveal_Object *read() { return (Partial_Reveal_Object*)(heap_base + *s); }
 
     void write_raw(Reference data) { *s = data; }
@@ -86,7 +86,7 @@ class Slot {
   }
 
   inline Reference pointer_to_fw(Partial_Reveal_Object *obj) {
-      return (Ptr)obj - (Ptr) heap_base + FORWARDING_BIT;
+      return (Reference)((Ptr)obj - (Ptr) heap_base) + FORWARDING_BIT;
   }
       
   extern Slot make_direct_root(Partial_Reveal_Object **root);

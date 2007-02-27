@@ -181,8 +181,10 @@ static inline Slot make_compressed_root(uint32 *cr) {
 
 void init_slots() {
     heap.roots_start = heap.roots_pos = heap.roots_end - 1024 * 1024;
-    if (heap.ceiling > heap.roots_start) heap.ceiling = heap.roots_start;
+    if (heap.ceiling + RESERVED_FOR_LAST_HASH > heap.roots_start)
+        heap.ceiling = heap.roots_start - RESERVED_FOR_LAST_HASH;
     heap_null = (Partial_Reveal_Object*) heap.base;
+    enable_heap_region(heap.roots_start, heap.roots_end - heap.roots_start);
 }
 
 void roots_clear() {
