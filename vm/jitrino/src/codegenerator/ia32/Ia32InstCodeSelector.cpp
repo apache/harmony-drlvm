@@ -1431,7 +1431,7 @@ void InstCodeSelector::throwSystemException(CompilationInterface::SystemExceptio
 //_______________________________________________________________________________________________________________
 //  Load 32-bit integer constant
 
-CG_OpndHandle*    InstCodeSelector::ldc_i4(uint32 val) 
+CG_OpndHandle*    InstCodeSelector::ldc_i4(int32 val) 
 {
     return irManager.newImmOpnd(typeManager.getInt32Type(), val);
 }
@@ -1439,7 +1439,7 @@ CG_OpndHandle*    InstCodeSelector::ldc_i4(uint32 val)
 //_______________________________________________________________________________________________________________
 //  Load 64-bit integer constant
 
-CG_OpndHandle*    InstCodeSelector::ldc_i8(uint64 val) 
+CG_OpndHandle*    InstCodeSelector::ldc_i8(int64 val) 
 { 
 #ifndef _EM64T_ 
     return irManager.newImmOpnd(typeManager.getInt64Type(), val);

@@ -123,8 +123,8 @@ public:
     CG_OpndHandle*  convToUPtr(PtrType * dstType, CG_OpndHandle* src);
 
 
-    CG_OpndHandle* ldc_i4(uint32 val);
-    CG_OpndHandle* ldc_i8(uint64 val);
+    CG_OpndHandle* ldc_i4(int32 val);
+    CG_OpndHandle* ldc_i8(int64 val);
     CG_OpndHandle* ldc_s(float val);
     CG_OpndHandle* ldc_d(double val);
     CG_OpndHandle* ldnull(bool compressed);
