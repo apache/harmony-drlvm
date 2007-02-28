@@ -56,6 +56,7 @@
 
 #include "init.h" 
 #include "exceptions.h"
+#include "exceptions_jit.h"
 #include "vm_threads.h"
 #include "open/vm_util.h"
 #include "compile.h"
