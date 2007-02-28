@@ -90,6 +90,8 @@ int wrapper_proc(void *arg) {
 
     // Send Thread Start event.
     jvmti_send_thread_start_end_event(1);
+    
+    thread_start_count();
 
 
     if (data->tiProc != NULL) {
@@ -219,6 +221,8 @@ IDATA jthread_attach(JNIEnv * jni_env, jthread java_thread, jboolean daemon) {
     // Send Thread Start event.
     jvmti_send_thread_start_end_event(1);
 
+    thread_start_count();
+
     TRACE(("TM: Current thread attached to jthread=%p", java_thread));
     return TM_ERROR_NONE;
 }
@@ -293,6 +297,8 @@ IDATA jthread_detach(jthread java_thread) {
     // jthread_self() will return NULL now.
     tm_jvmti_thread->thread_object = NULL;
 
+    // Decrease alive thread counter
+    thread_end_count();
 
     // Deallocate tm_jvmti_thread 
     //apr_pool_destroy(tm_jvmti_thread->pool);
@@ -330,6 +336,10 @@ IDATA associate_native_and_java_thread(JNIEnv * jni_env, jthread java_thread, hy
     tm_java_thread->thread_ref    = (thread_ref) ? (*jni_env)->NewGlobalRef(jni_env, thread_ref) : NULL; 
     tm_java_thread->contended_monitor = 0;
     tm_java_thread->wait_monitor = 0;
+    tm_java_thread->blocked_count = 0;
+    tm_java_thread->blocked_time = 0;
+    tm_java_thread->waited_count = 0;
+    tm_java_thread->waited_time = 0;
     tm_java_thread->owned_monitors = 0;
     tm_java_thread->owned_monitors_nmb = 0;
     tm_java_thread->jvmti_local_storage.env = 0;

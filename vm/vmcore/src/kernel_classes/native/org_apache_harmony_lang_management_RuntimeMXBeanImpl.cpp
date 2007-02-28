@@ -28,19 +28,34 @@
  */
 
 #include <apr_time.h>
+#include <apr_network_io.h>
 #include <cxxlog.h>
-#include "java_lang_System.h"
+#include "environment.h"
 #include "org_apache_harmony_lang_management_RuntimeMXBeanImpl.h"
+
+/**
+ * The number of digits in decimal print for max unsigned long
+ */
+#define MAX_LONG_LENGTH_AS_DECIMAL 20
+
 /*
  * Method: org.apache.harmony.lang.management.RuntimeMXBeanImpl.getNameImpl()Ljava/lang/String;
  */
 JNIEXPORT jstring JNICALL
 Java_org_apache_harmony_lang_management_RuntimeMXBeanImpl_getNameImpl(JNIEnv *env, jobject)
 {
-    // TODO implement this method stub correctly
-    TRACE2("management","RuntimeMXBeanImpl_getNameImpl stub invocation");
-    char *buf = "DRLVM";
-    return env->NewStringUTF(buf);
+    TRACE2("management", "RuntimeMXBeanImpl_getNameImpl called");
+    JavaVM * vm = NULL;
+    env->GetJavaVM(&vm);
+
+    char host_name[APRMAXHOSTLEN + 1] = {0};
+    apr_pool_t *pool;
+    apr_pool_create(&pool, 0);
+    apr_gethostname(host_name, APRMAXHOSTLEN + 1, pool);
+    char result[MAX_LONG_LENGTH_AS_DECIMAL + 1 + APRMAXHOSTLEN + 1] = {0};
+    sprintf(result, "%d@%s", getpid(), host_name);
+    apr_pool_destroy(pool);
+    return env->NewStringUTF(result);
 };
 
 /*
@@ -49,20 +64,21 @@ Java_org_apache_harmony_lang_management_RuntimeMXBeanImpl_getNameImpl(JNIEnv *en
 JNIEXPORT jlong JNICALL
 Java_org_apache_harmony_lang_management_RuntimeMXBeanImpl_getStartTimeImpl(JNIEnv *env, jobject )
 {
-    // TODO implement this method stub correctly
-    TRACE2("management","RuntimeMXBeanImpl_getStartTimeImpl stub invocation");
-    return apr_time_now()/1000;
+    TRACE2("management","RuntimeMXBeanImpl_getStartTimeImpl called");
+    JavaVM * vm = NULL;
+    env->GetJavaVM(&vm);
+    return ((JavaVM_Internal*)vm)->vm_env->start_time;
 };
 
 /*
  * Method: org.apache.harmony.lang.management.RuntimeMXBeanImpl.getUptimeImpl()J
  */
 JNIEXPORT jlong JNICALL
-Java_org_apache_harmony_lang_management_RuntimeMXBeanImpl_getUptimeImpl(JNIEnv *, jobject)
+Java_org_apache_harmony_lang_management_RuntimeMXBeanImpl_getUptimeImpl(JNIEnv *env, jobject obj)
 {
-    // TODO implement this method stub correctly
-    TRACE2("management","RuntimeMXBeanImpl_getUptimeImpl stub invocation");
-    return 1L<<10;
+    TRACE2("management","RuntimeMXBeanImpl_getUptimeImpl called");
+    return apr_time_now()/1000 -
+        Java_org_apache_harmony_lang_management_RuntimeMXBeanImpl_getStartTimeImpl(env, obj);
 };
 
 /*
@@ -71,8 +87,7 @@ Java_org_apache_harmony_lang_management_RuntimeMXBeanImpl_getUptimeImpl(JNIEnv *
 JNIEXPORT jboolean JNICALL
 Java_org_apache_harmony_lang_management_RuntimeMXBeanImpl_isBootClassPathSupportedImpl(JNIEnv *, jobject)
 {
-    // TODO implement this method stub correctly
-    TRACE2("management","isBootClassPathSupportedImpl stub invocation");
+    TRACE2("management","RuntimeMXBeanImpl_isBootClassPathSupportedImpl called");
     return JNI_TRUE;
 };
 

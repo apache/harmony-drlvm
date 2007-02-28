@@ -33,6 +33,7 @@
 #include "environment.h"
 #include "java_lang_System.h"
 #include "org_apache_harmony_lang_management_ThreadMXBeanImpl.h"
+#include "open/jthread.h"
 
 /* Native methods */
 
@@ -40,11 +41,50 @@
  * Method: org.apache.harmony.lang.management.ThreadMXBeanImpl.findMonitorDeadlockedThreadsImpl()[J
  */
 JNIEXPORT jlongArray JNICALL
-Java_org_apache_harmony_lang_management_ThreadMXBeanImpl_findMonitorDeadlockedThreadsImpl(JNIEnv *jenv, jobject)
+Java_org_apache_harmony_lang_management_ThreadMXBeanImpl_findMonitorDeadlockedThreadsImpl
+(JNIEnv *jenv_ext, jobject)
 {
-    // TODO implement this method stub correctly
-    TRACE2("management","findMonitorDeadlockedThreadsImpl stub invocation");
-    jlongArray array = jenv->NewLongArray(0);
+    TRACE2("management", "findMonitorDeadlockedThreadsImpl invocation");
+    JNIEnv_Internal *jenv = (JNIEnv_Internal *)jenv_ext;
+    jthread* threads;
+    jthread* dead_threads;
+    jint count;
+    jint dead_count;
+
+    IDATA UNUSED status = jthread_get_all_threads(&threads, &count);
+    assert(!status);
+
+    status = jthread_get_deadlocked_threads(threads, count, &dead_threads, &dead_count);
+    assert(!status);
+
+    free(threads);
+    if (dead_count == 0){
+        return NULL;
+    }
+
+    jlong* ids = (jlong*)malloc(sizeof(jlong)* dead_count);
+    assert(ids);
+
+    jclass cl = jenv->FindClass("java/lang/Thread");
+    if (jenv->ExceptionCheck()) return NULL;
+
+    jmethodID mid = jenv->GetMethodID(cl, "getId","()J");
+    if (jenv->ExceptionCheck()) return NULL;
+
+    for (int i = 0; i < dead_count; i++){
+        ids[i] = jenv->CallLongMethod(dead_threads[i], mid);
+        if (jenv->ExceptionCheck()) return NULL;
+    }
+    
+    free(dead_threads);
+
+    jlongArray array = jenv->NewLongArray(dead_count);
+    if (jenv->ExceptionCheck()) return NULL;
+
+    jenv->SetLongArrayRegion(array, 0, dead_count, ids);
+    if (jenv->ExceptionCheck()) return NULL;
+
+    free(ids);
 
     return array;
 };
@@ -53,32 +93,39 @@ Java_org_apache_harmony_lang_management_ThreadMXBeanImpl_findMonitorDeadlockedTh
  * Method: org.apache.harmony.lang.management.ThreadMXBeanImpl.getAllThreadIdsImpl()[J
  */
 JNIEXPORT jlongArray JNICALL
-Java_org_apache_harmony_lang_management_ThreadMXBeanImpl_getAllThreadIdsImpl(JNIEnv *jenv_ext, jobject)
+Java_org_apache_harmony_lang_management_ThreadMXBeanImpl_getAllThreadIdsImpl
+(JNIEnv *jenv_ext, jobject)
 {
-    // TODO implement this method stub correctly
-    TRACE2("management","getAllThreadIdsImpl stub invocation");
+    TRACE2("management", "getAllThreadIdsImpl invocation");
     JNIEnv_Internal *jenv = (JNIEnv_Internal *)jenv_ext;
+    jthread* threads;
+    jint count;
 
-    jlongArray array = jenv->NewLongArray(1);
+    IDATA UNUSED status = jthread_get_all_threads(&threads, &count);
+    assert(!status);
+    jlong* ids = (jlong*)malloc(sizeof(jlong)* count);
+    assert(ids);
+
+    jclass cl =jenv->FindClass("java/lang/Thread");
     if (jenv->ExceptionCheck()) return NULL;
 
-    jclass threadClazz =jenv->FindClass("java/lang/Thread");
+    jmethodID mid = jenv->GetMethodID(cl, "getId","()J");
     if (jenv->ExceptionCheck()) return NULL;
 
-    jmethodID currentThreadMethod = jenv->GetStaticMethodID(threadClazz, "currentThread",
-        "()Ljava/lang/Thread;");
+    for (int i = 0; i < count; i++){
+        ids[i] = jenv->CallLongMethod(threads[i], mid);
+        if (jenv->ExceptionCheck()) return NULL;
+    }
+
+    free(threads);
+
+    jlongArray array = jenv->NewLongArray(count);
     if (jenv->ExceptionCheck()) return NULL;
 
-    jobject currentThread = jenv->CallStaticObjectMethod(threadClazz, currentThreadMethod, NULL);
+    jenv->SetLongArrayRegion(array, 0, count, ids);
     if (jenv->ExceptionCheck()) return NULL;
 
-    jmethodID getIdMethod = jenv->GetMethodID(threadClazz, "getId", "()J");
-    if (jenv->ExceptionCheck()) return NULL;
-
-    jlong id = jenv->CallLongMethod(currentThread, getIdMethod);
-    if (jenv->ExceptionCheck()) return NULL;
-
-    jenv->SetLongArrayRegion(array, 0, 1, &id);
+    free(ids);
 
     return array;
 };
@@ -87,11 +134,30 @@ Java_org_apache_harmony_lang_management_ThreadMXBeanImpl_getAllThreadIdsImpl(JNI
  * Method: org.apache.harmony.lang.management.ThreadMXBeanImpl.getDaemonThreadCountImpl()I
  */
 JNIEXPORT jint JNICALL
-Java_org_apache_harmony_lang_management_ThreadMXBeanImpl_getDaemonThreadCountImpl(JNIEnv *, jobject)
+Java_org_apache_harmony_lang_management_ThreadMXBeanImpl_getDaemonThreadCountImpl(JNIEnv *jenv, jobject)
 {
-    // TODO implement this method stub correctly
-    TRACE2("management","getDaemonThreadCountImpl stub invocation");
-    return 0;
+    jthread* threads;
+    jint count;
+    jint daemon_count = 0;
+
+    TRACE2("management", "getDaemonThreadCountImpl invocation");
+    IDATA UNUSED status = jthread_get_all_threads(&threads, &count);
+    assert(!status);
+
+    jclass cl = jenv->FindClass("java/lang/Thread");
+    if (jenv->ExceptionCheck()) return 0;
+    jmethodID id = jenv->GetMethodID(cl, "isDaemon","()Z");
+    if (jenv->ExceptionCheck()) return 0;
+
+    for (int i = 0; i < count; i++){
+        int is_daemon = jenv->CallBooleanMethod(threads[i], id);
+        if (jenv->ExceptionCheck()) return 0;
+        if (is_daemon){
+            daemon_count++;
+        }
+    }
+    free(threads);
+    return daemon_count;
 };
 
 /*
@@ -100,9 +166,11 @@ Java_org_apache_harmony_lang_management_ThreadMXBeanImpl_getDaemonThreadCountImp
 JNIEXPORT jint JNICALL
 Java_org_apache_harmony_lang_management_ThreadMXBeanImpl_getPeakThreadCountImpl(JNIEnv *, jobject)
 {
-    // TODO implement this method stub correctly
-    TRACE2("management","getPeakThreadCountImpl stub invocation");
-    return 1;
+    jint count = 0;
+    TRACE2("management", "getPeakThreadCountImpl invocation");
+    IDATA UNUSED status = jthread_get_peak_thread_count(&count);
+    assert(!status);
+    return count;
 };
 
 /*
@@ -111,26 +179,31 @@ Java_org_apache_harmony_lang_management_ThreadMXBeanImpl_getPeakThreadCountImpl(
 JNIEXPORT jint JNICALL
 Java_org_apache_harmony_lang_management_ThreadMXBeanImpl_getThreadCountImpl(JNIEnv *, jobject)
 {
-    // TODO implement this method stub correctly
-    TRACE2("management","getThreadCountImpl stub invocation");
-    return 1;
+    jint count;
+    TRACE2("management", "getThreadCountImpl invocation");
+    IDATA UNUSED status = jthread_get_thread_count(&count);
+    assert(!status);
+    return count;
 };
 
 /*
  * Method: org.apache.harmony.lang.management.ThreadMXBeanImpl.getThreadCpuTimeImpl(J)J
  */
 JNIEXPORT jlong JNICALL
-Java_org_apache_harmony_lang_management_ThreadMXBeanImpl_getThreadCpuTimeImpl(JNIEnv *jenv, jobject,
-                                                                              jlong id)
+Java_org_apache_harmony_lang_management_ThreadMXBeanImpl_getThreadCpuTimeImpl
+(JNIEnv * jenv_ext, jobject obj, jlong thread_id)
 {
-    // TODO implement this method stub correctly
-    TRACE2("management","getThreadCpuTimeImpl stub invocation");
-    if (id <= 0) {
-        TRACE2("management","getThreadCpuTimeImpl java/lang/IllegalArgumentException is thrown");
-        ThrowNew_Quick(jenv, "java/lang/IllegalArgumentException", "id <= 0");
-    };
-
-    return 1L<<10;
+    JNIEnv_Internal *jenv = (JNIEnv_Internal *)jenv_ext;
+    jlong nanos;
+    TRACE2("management", "getThreadCpuTimeImpl invocation");
+    jthread thread = Java_org_apache_harmony_lang_management_ThreadMXBeanImpl_getThreadByIdImpl(jenv_ext, obj, thread_id);
+    if (jenv->ExceptionCheck()) return 0;
+    if (! thread){
+         return -1;
+    }
+    IDATA UNUSED status = jthread_get_thread_cpu_time(thread, &nanos);
+    assert(status == TM_ERROR_NONE);
+    return nanos;
 };
 
 /*
@@ -138,24 +211,40 @@ Java_org_apache_harmony_lang_management_ThreadMXBeanImpl_getThreadCpuTimeImpl(JN
  */
 JNIEXPORT jobject JNICALL
 Java_org_apache_harmony_lang_management_ThreadMXBeanImpl_getThreadByIdImpl(
-    JNIEnv *jenv_ext,
+    JNIEnv * jenv_ext,
     jobject,
-    jlong)
+    jlong thread_id)
 {
-    // TODO implement this method stub correctly
-    TRACE2("management","getThreadByIdImpl stub invocation");
+    TRACE2("management", "getThreadByIdImpl invocation");
 
     JNIEnv_Internal *jenv = (JNIEnv_Internal *)jenv_ext;
+    jthread* threads;
+    jint count;
+    jlong id;
+    jobject res = NULL;
 
-    jclass threadClazz =jenv->FindClass("java/lang/Thread");
+    IDATA UNUSED status = jthread_get_all_threads(&threads, &count);
+    assert(!status);
+
+    jclass cl =jenv->FindClass("java/lang/Thread");
     if (jenv->ExceptionCheck()) return NULL;
 
-    jmethodID currentThreadMethod = jenv->GetStaticMethodID(threadClazz, "currentThread",
-        "()Ljava/lang/Thread;");
+    jmethodID jmid = jenv->GetMethodID(cl, "getId","()J");
     if (jenv->ExceptionCheck()) return NULL;
 
-    jobject jresult = jenv->CallStaticObjectMethod(threadClazz, currentThreadMethod, NULL);
-    return jresult;
+    for (int i = 0; i < count; i++){
+        id = jenv->CallLongMethod(threads[i], jmid);
+        if (jenv->ExceptionCheck()) return NULL;
+        
+        if (id == thread_id){
+            res = jenv->NewGlobalRef(threads[i]);
+            break;
+        }
+    }
+
+    free(threads);
+
+    return res;
 };
 
 /*
@@ -163,11 +252,18 @@ Java_org_apache_harmony_lang_management_ThreadMXBeanImpl_getThreadByIdImpl(
  */
 JNIEXPORT jobject JNICALL
 Java_org_apache_harmony_lang_management_ThreadMXBeanImpl_getObjectThreadIsBlockedOnImpl(JNIEnv *, jobject,
-                                                                                        jobject)
+                                                                                        jobject thread)
 {
-    // TODO implement this method stub correctly
-    TRACE2("management","getObjectThreadIsBlockedOnImpl stub invocation");
-    return NULL;
+    jobject monitor;
+    TRACE2("management", "getObjectThreadIsBlockedOnImpl invocation");
+    IDATA UNUSED status = jthread_get_contended_monitor(thread, &monitor);
+    assert(!status);
+    if (monitor){
+        return monitor;
+    }
+    status = jthread_get_wait_monitor(thread, &monitor);
+    assert(!status);
+    return monitor;
 };
 
 /*
@@ -175,11 +271,13 @@ Java_org_apache_harmony_lang_management_ThreadMXBeanImpl_getObjectThreadIsBlocke
  */
 JNIEXPORT jobject JNICALL
 Java_org_apache_harmony_lang_management_ThreadMXBeanImpl_getThreadOwningObjectImpl(JNIEnv *, jobject,
-                                                                                   jobject)
+                                                                                   jobject monitor)
 {
-    // TODO implement this method stub correctly
-    TRACE2("management","getThreadOwningObjectImpl stub invocation");
-    return NULL;
+    jthread lock_owner;
+    TRACE2("management", "getThreadOwningObjectImpl invocation");
+    IDATA UNUSED status = jthread_get_lock_owner(monitor, &lock_owner);
+    assert(!status);
+    return lock_owner;
 };
 
 /*
@@ -187,11 +285,13 @@ Java_org_apache_harmony_lang_management_ThreadMXBeanImpl_getThreadOwningObjectIm
  */
 JNIEXPORT jboolean JNICALL
 Java_org_apache_harmony_lang_management_ThreadMXBeanImpl_isSuspendedImpl(JNIEnv *, jobject,
-                                                                         jobject)
+                                                                         jobject thread)
 {
-    // TODO implement this method stub correctly
-    TRACE2("management","ThreadMXBeanImpl_isSuspendedImpl stub invocation");
-    return JNI_TRUE;
+    jint thread_state;
+    TRACE2("management", "ThreadMXBeanImpl_isSuspendedImpl invocation");
+    IDATA UNUSED status = jthread_get_state(thread, &thread_state);
+    assert(!status);
+    return thread_state & TM_THREAD_STATE_SUSPENDED;
 };
 
 /*
@@ -199,11 +299,10 @@ Java_org_apache_harmony_lang_management_ThreadMXBeanImpl_isSuspendedImpl(JNIEnv 
  */
 JNIEXPORT jlong JNICALL
 Java_org_apache_harmony_lang_management_ThreadMXBeanImpl_getThreadWaitedCountImpl(JNIEnv *, jobject,
-                                                                                  jobject)
+                                                                                  jobject thread)
 {
-    // TODO implement this method stub correctly
-    TRACE2("management","getThreadWaitedCountImpl stub invocation");
-    return 2L;
+    TRACE2("management", "getThreadWaitedCountImpl invocation");
+    return jthread_get_thread_waited_times_count(thread);
 };
 
 /*
@@ -211,11 +310,13 @@ Java_org_apache_harmony_lang_management_ThreadMXBeanImpl_getThreadWaitedCountImp
  */
 JNIEXPORT jlong JNICALL
 Java_org_apache_harmony_lang_management_ThreadMXBeanImpl_getThreadWaitedTimeImpl(JNIEnv *, jobject,
-                                                                                 jobject)
+                                                                                 jobject thread)
 {
-    // TODO implement this method stub correctly
-    TRACE2("management","getThreadWaitedCountImpl stub invocation");
-    return 1L<<12;
+    jlong nanos;
+    TRACE2("management", "getThreadWaitedCountImpl invocation");
+    IDATA UNUSED status = jthread_get_thread_waited_time(thread, &nanos);
+    assert(status == TM_ERROR_NONE);
+    return nanos;
 };
 
 /*
@@ -223,11 +324,13 @@ Java_org_apache_harmony_lang_management_ThreadMXBeanImpl_getThreadWaitedTimeImpl
  */
 JNIEXPORT jlong JNICALL
 Java_org_apache_harmony_lang_management_ThreadMXBeanImpl_getThreadBlockedTimeImpl(JNIEnv *, jobject,
-                                                                                  jobject)
+                                                                                  jobject thread)
 {
-    // TODO implement this method stub correctly
-    TRACE2("management","getThreadBlockedTimeImpl stub invocation");
-    return 1L<<11;
+    jlong nanos;
+    TRACE2("management", "getThreadBlockedTimeImpl invocation");
+    IDATA UNUSED status = jthread_get_thread_blocked_time(thread, &nanos);
+    assert(status == TM_ERROR_NONE);
+    return nanos;
 };
 
 /*
@@ -235,11 +338,10 @@ Java_org_apache_harmony_lang_management_ThreadMXBeanImpl_getThreadBlockedTimeImp
  */
 JNIEXPORT jlong JNICALL
 Java_org_apache_harmony_lang_management_ThreadMXBeanImpl_getThreadBlockedCountImpl(JNIEnv *, jobject,
-                                                                                   jobject)
+                                                                                   jobject thread)
 {
-    // TODO implement this method stub correctly
-    TRACE2("management","getThreadBlockedCountImpl stub invocation");
-    return 5L;
+    TRACE2("management", "getThreadBlockedCountImpl invocation");
+    return jthread_get_thread_blocked_times_count(thread);
 };
 
 /*
@@ -263,11 +365,9 @@ Java_org_apache_harmony_lang_management_ThreadMXBeanImpl_createThreadInfoImpl(
     jstring lockOwnerNameVal,
     jobjectArray stackTraceVal)
 {
-    // TODO implement this method stub correctly
-    TRACE2("management","createThreadInfoImpl stub invocation");
-
     JNIEnv_Internal *jenv = (JNIEnv_Internal *)jenv_ext;
 
+    TRACE2("management", "createThreadInfoImpl invocation");
     jclass threadInfoClazz =jenv->FindClass("java/lang/management/ThreadInfo");
     if (jenv->ExceptionCheck()) return NULL;
     jmethodID threadInfoClazzConstructor = jenv->GetMethodID(threadInfoClazz, "<init>",
@@ -292,8 +392,6 @@ Java_org_apache_harmony_lang_management_ThreadMXBeanImpl_createThreadInfoImpl(
         lockOwnerNameVal,
         stackTraceVal);
 
-    assert(!exn_raised());
-
     return threadInfo;
 };
 
@@ -301,12 +399,20 @@ Java_org_apache_harmony_lang_management_ThreadMXBeanImpl_createThreadInfoImpl(
  * Method: org.apache.harmony.lang.management.ThreadMXBeanImpl.getThreadUserTimeImpl(J)J
  */
 JNIEXPORT jlong JNICALL
-Java_org_apache_harmony_lang_management_ThreadMXBeanImpl_getThreadUserTimeImpl(JNIEnv *, jobject,
-                                                                               jlong)
+Java_org_apache_harmony_lang_management_ThreadMXBeanImpl_getThreadUserTimeImpl
+(JNIEnv * jenv_ext, jobject obj, jlong threadId)
 {
-    // TODO implement this method stub correctly
-    TRACE2("management","getThreadUserTimeImpl stub invocation");
-    return 1L<<11;
+    TRACE2("management", "getThreadUserTimeImpl invocation");
+    JNIEnv_Internal *jenv = (JNIEnv_Internal *)jenv_ext;
+    jlong nanos;
+    jthread thread = Java_org_apache_harmony_lang_management_ThreadMXBeanImpl_getThreadByIdImpl(jenv_ext, obj, threadId);
+    if (jenv->ExceptionCheck()) return 0;
+    if (! thread){
+         return -1;
+    }
+    IDATA UNUSED status = jthread_get_thread_user_cpu_time(thread, &nanos);
+    assert(status == TM_ERROR_NONE);
+    return nanos;
 };
 
 /*
@@ -315,9 +421,11 @@ Java_org_apache_harmony_lang_management_ThreadMXBeanImpl_getThreadUserTimeImpl(J
 JNIEXPORT jlong JNICALL
 Java_org_apache_harmony_lang_management_ThreadMXBeanImpl_getTotalStartedThreadCountImpl(JNIEnv *, jobject)
 {
-    // TODO implement this method stub correctly
-    TRACE2("management","getTotalStartedThreadCountImpl stub invocation");
-    return 5L;
+    jint count;
+    TRACE2("management", "getTotalStartedThreadCountImpl invocation");
+    IDATA UNUSED status = jthread_get_total_started_thread_count(&count);
+    assert(status == TM_ERROR_NONE);
+    return count;
 };
 
 /*
@@ -326,12 +434,9 @@ Java_org_apache_harmony_lang_management_ThreadMXBeanImpl_getTotalStartedThreadCo
 JNIEXPORT jboolean JNICALL
 Java_org_apache_harmony_lang_management_ThreadMXBeanImpl_isCurrentThreadCpuTimeSupportedImpl(JNIEnv *, jobject)
 {
-    // TODO implement this method stub correctly
-    TRACE2("management","isCurrentThreadCpuTimeSupportedImpl stub invocation");
-    return JNI_TRUE;
+    TRACE2("management", "isCurrentThreadCpuTimeSupportedImpl invocation");
+    return jthread_is_current_thread_cpu_time_supported();
 };
-
-jboolean thread_contention_monitoring = JNI_TRUE;
 
 /*
  * Method: org.apache.harmony.lang.management.ThreadMXBeanImpl.isThreadContentionMonitoringEnabledImpl()Z
@@ -339,9 +444,8 @@ jboolean thread_contention_monitoring = JNI_TRUE;
 JNIEXPORT jboolean JNICALL
 Java_org_apache_harmony_lang_management_ThreadMXBeanImpl_isThreadContentionMonitoringEnabledImpl(JNIEnv *, jobject)
 {
-    // TODO implement this method stub correctly
-    TRACE2("management","isThreadContentionMonitoringEnabledImpl stub invocation");
-    return thread_contention_monitoring;
+    TRACE2("management", "isThreadContentionMonitoringEnabledImpl invocation");
+    return jthread_is_thread_contention_monitoring_enabled();
 };
 
 /*
@@ -350,12 +454,9 @@ Java_org_apache_harmony_lang_management_ThreadMXBeanImpl_isThreadContentionMonit
 JNIEXPORT jboolean JNICALL
 Java_org_apache_harmony_lang_management_ThreadMXBeanImpl_isThreadContentionMonitoringSupportedImpl(JNIEnv *, jobject)
 {
-    // TODO implement this method stub correctly
-    TRACE2("management","isThreadContentionMonitoringSupportedImpl stub invocation");
-    return JNI_TRUE;
+    TRACE2("management", "isThreadContentionMonitoringSupportedImpl invocation");
+    return jthread_is_thread_contention_monitoring_supported();
 };
-
-jboolean thread_cpu_time_enabled = JNI_TRUE;
 
 /*
  * Method: org.apache.harmony.lang.management.ThreadMXBeanImpl.isThreadCpuTimeEnabledImpl()Z
@@ -363,9 +464,8 @@ jboolean thread_cpu_time_enabled = JNI_TRUE;
 JNIEXPORT jboolean JNICALL
 Java_org_apache_harmony_lang_management_ThreadMXBeanImpl_isThreadCpuTimeEnabledImpl(JNIEnv *, jobject)
 {
-    // TODO implement this method stub correctly
-    TRACE2("management","isThreadCpuTimeEnabledImpl stub invocation");
-    return thread_cpu_time_enabled;
+    TRACE2("management", "isThreadCpuTimeEnabledImpl invocation");
+    return jthread_is_thread_cpu_time_enabled();
 };
 
 /*
@@ -374,9 +474,8 @@ Java_org_apache_harmony_lang_management_ThreadMXBeanImpl_isThreadCpuTimeEnabledI
 JNIEXPORT jboolean JNICALL
 Java_org_apache_harmony_lang_management_ThreadMXBeanImpl_isThreadCpuTimeSupportedImpl(JNIEnv *, jobject)
 {
-    // TODO implement this method stub correctly
-    TRACE2("management","isThreadCpuTimeSupportedImpl stub invocation");
-    return JNI_TRUE;
+    TRACE2("management", "isThreadCpuTimeSupportedImpl invocation");
+    return jthread_is_thread_cpu_time_supported();
 };
 
 /*
@@ -385,8 +484,9 @@ Java_org_apache_harmony_lang_management_ThreadMXBeanImpl_isThreadCpuTimeSupporte
 JNIEXPORT void JNICALL
 Java_org_apache_harmony_lang_management_ThreadMXBeanImpl_resetPeakThreadCountImpl(JNIEnv *, jobject)
 {
-    // TODO implement this method stub correctly
-    TRACE2("management","resetPeakThreadCountImpl stub invocation");
+    TRACE2("management", "resetPeakThreadCountImpl invocation");
+    IDATA UNUSED status = jthread_reset_peak_thread_count();
+    assert(status == TM_ERROR_NONE);
 };
 
 /*
@@ -399,8 +499,8 @@ Java_org_apache_harmony_lang_management_ThreadMXBeanImpl_setThreadContentionMoni
     jboolean new_value)
 {
     // TODO implement this method stub correctly
-    TRACE2("management","setThreadContentionMonitoringEnabledImpl stub invocation");
-    thread_contention_monitoring = new_value;
+    TRACE2("management", "setThreadContentionMonitoringEnabledImpl invocation");
+    jthread_set_thread_contention_monitoring_enabled(new_value);
 };
 
 /*
@@ -410,9 +510,8 @@ JNIEXPORT void JNICALL
 Java_org_apache_harmony_lang_management_ThreadMXBeanImpl_setThreadCpuTimeEnabledImpl(JNIEnv *, jobject,
                                                                                      jboolean new_value)
 {
-    // TODO implement this method stub correctly
-    TRACE2("management","setThreadCpuTimeEnabledImpl stub invocation");
-    thread_cpu_time_enabled = new_value;
+    TRACE2("management", "setThreadCpuTimeEnabledImpl invocation");
+    jthread_set_thread_cpu_time_enabled(new_value);
 };
 
 

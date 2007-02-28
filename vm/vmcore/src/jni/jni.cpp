@@ -25,6 +25,7 @@
 #include <port_atomic.h>
 #include <apr_pools.h>
 #include <apr_thread_mutex.h>
+#include <apr_time.h>
 
 #include "open/types.h"
 #include "open/hythread.h"
@@ -483,6 +484,8 @@ JNIEXPORT jint JNICALL JNI_CreateJavaVM(JavaVM ** p_vm, JNIEnv ** p_jni_env,
         goto done;
     }
 
+    vm_env->start_time = apr_time_now()/1000;
+
     java_vm->functions = &java_vm_vtable;
     java_vm->pool = vm_global_pool;
     java_vm->vm_env = vm_env;
@@ -508,7 +511,7 @@ JNIEXPORT jint JNICALL JNI_CreateJavaVM(JavaVM ** p_vm, JNIEnv ** p_jni_env,
     *p_jni_env = jni_env;
 
     // Now JVMTIThread keeps global reference. Discared temporary global reference.
-   jni_env->DeleteGlobalRef(java_thread);
+    jni_env->DeleteGlobalRef(java_thread);
 
     // Send VM start event. JNI services are available now.
     // JVMTI services permited in the start phase are available as well.

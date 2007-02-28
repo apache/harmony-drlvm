@@ -20,6 +20,7 @@
 
 #include <apr_pools.h>
 #include <apr_thread_mutex.h>
+#include <apr_time.h>
 
 #include "open/hythread.h"
 #include "open/compmgr.h"
@@ -235,6 +236,11 @@ struct Global_Env {
      * Offset to the <code>vm_class</code> field in <code>java.lang.Class</code>.
      */
     unsigned vm_class_offset;
+ 
+    /**
+     * VM initialization timestamp
+     */
+    apr_time_t start_time;
 
     /**
      * The VM state. See <code>VM_STATE</code> enum above.

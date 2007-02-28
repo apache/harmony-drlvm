@@ -26,6 +26,13 @@
 #include "thread_private.h"
 #include "apr_thread_ext.h"
 
+#define THREAD_CPU_TIME_SUPPORTED 1
+
+/*
+ *  Thread CPU time enabled flag.
+ */
+int thread_cpu_time_enabled = 0;
+
 /**
  * Returns time spent by the specific thread while contending for monitors.
  *
@@ -115,4 +122,69 @@ IDATA VMCALL jthread_get_thread_waited_time(jthread java_thread, jlong *nanos_pt
     *nanos_ptr = tm_java_thread->waited_time;
 
     return TM_ERROR_NONE;
+}
+
+/**
+ * Returns number of times the specific thread contending for monitors.
+ *
+ * @param[in] java_thread
+ * @return number of times the specific thread contending for monitors
+ */
+jlong VMCALL jthread_get_thread_blocked_times_count(jthread java_thread) {
+    
+    hythread_t tm_native_thread = jthread_get_native_thread(java_thread); 
+    jvmti_thread_t tm_java_thread = hythread_get_private_data(tm_native_thread);
+
+    return tm_java_thread->blocked_count;
+}
+
+/**
+ * Returns number of times the specific thread waiting on monitors for notification.
+ *
+ * @param[in] java_thread
+ * @return number of times the specific thread waiting on monitors for notification
+ */
+jlong VMCALL jthread_get_thread_waited_times_count(jthread java_thread) {
+    
+    hythread_t tm_native_thread = jthread_get_native_thread(java_thread); 
+    jvmti_thread_t tm_java_thread = hythread_get_private_data(tm_native_thread);
+
+    return tm_java_thread->waited_count;
+}
+
+/**
+ * Returns true if VM supports current thread CPU and USER time requests
+ *
+ * @return true if current thread CPU and USER time requests are supported, false otherwise;
+ */
+jboolean jthread_is_current_thread_cpu_time_supported(){
+    return THREAD_CPU_TIME_SUPPORTED;
+}
+
+/**
+ * Returns true if VM supports thread CPU and USER time requests
+ *
+ * @return true if thread CPU and USER time requests are supported, false otherwise;
+ */
+jboolean jthread_is_thread_cpu_time_supported(){
+    return THREAD_CPU_TIME_SUPPORTED;
+}
+
+/**
+ * Returns true if VM supports (current) thread CPU and USER time requests and 
+ * this feature is enabled 
+ *
+ * @return true if thread CPU and USER time requests are enabled, false otherwise;
+ */
+jboolean jthread_is_thread_cpu_time_enabled(){
+    return thread_cpu_time_enabled;
+}
+
+/**
+ * Enabled or diabled thread CPU and USER time requests
+ *
+ * @param[in] true or false to enable or disable the feature
+ */
+void jthread_set_thread_cpu_time_enabled(jboolean flag){
+     thread_cpu_time_enabled = THREAD_CPU_TIME_SUPPORTED ? flag : 0;
 }

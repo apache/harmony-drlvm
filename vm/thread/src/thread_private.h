@@ -344,9 +344,19 @@ typedef struct JVMTIThread {
     jthrowable stop_exception;
 
     /**
+     * Blocked on monitor times count
+     */
+     jlong blocked_count;
+       
+    /**
      * Blocked on monitor time in nanoseconds
      */
      jlong blocked_time;
+       
+    /**
+     * Waited on monitor times count
+     */
+     jlong waited_count;
        
     /**
      * Waited on monitor time in nanoseconds
@@ -559,6 +569,7 @@ extern apr_threadkey_t *TM_THREAD_KEY; // Key used to store tm_thread_t structur
 
 extern int max_group_index;     // max number of groups
 
+extern int total_started_thread_count; // Total started thread counter.
 
 #define THREAD_ID_SIZE 16  //size of thread ID in bits. Also defines max number of threads
 
@@ -633,6 +644,11 @@ UDATA array_add(array_t array, void *value);
 void *array_delete(array_t array, UDATA index);
 void *array_get(array_t array, UDATA index);
 
+/**
+ *  Auxiliary function to update thread count
+ */
+void thread_start_count();
+void thread_end_count();
 
 
 #ifdef __cplusplus

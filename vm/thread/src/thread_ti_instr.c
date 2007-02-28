@@ -221,6 +221,16 @@ IDATA VMCALL jthread_get_thread_count(jint *count_ptr) {
 }
 
 /**
+ * Returns the number of total started Java threads.
+ *
+ * @param[out] count_ptr number of started threads.
+ */
+IDATA VMCALL jthread_get_total_started_thread_count(jint *count_ptr) {
+    *count_ptr = total_started_thread_count;
+    return TM_ERROR_NONE;
+}
+
+/**
  * Returns the number of blocked threads.
  *
  * @param[out] count_ptr number of threads.

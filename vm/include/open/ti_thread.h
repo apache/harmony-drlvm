@@ -64,6 +64,7 @@ IDATA jthread_get_deadlocked_threads(jthread* thread_list, jint thread_count, jt
 IDATA jthread_get_thread_count(jint *count);
 IDATA jthread_get_blocked_count(jint* count);
 IDATA jthread_get_waited_count(jint* count);
+IDATA jthread_get_total_started_thread_count(jint* count);
 
 //@}
 /** @name Local storage
@@ -85,6 +86,10 @@ IDATA jthread_get_lock_owner(jobject monitor, jthread* lock_owner);
 IDATA jthread_get_lock_recursion(jobject monitor, jthread lock_owner);
 IDATA jthread_get_owned_monitors(jthread thread, jint* mon_count_ptr, jobject** monitors);
 
+jboolean jthread_is_thread_contention_monitoring_enabled();
+jboolean jthread_is_thread_contention_monitoring_supported();
+void jthread_set_thread_contention_monitoring_enabled(jboolean flag);
+
 //@}
 /** @name CPU timing
  */
@@ -95,6 +100,15 @@ IDATA jthread_get_thread_user_cpu_time(jthread thread, jlong *nanos_ptr);
 IDATA jthread_get_thread_blocked_time(jthread thread, jlong *nanos_ptr);
 IDATA jthread_get_thread_waited_time(jthread thread, jlong *nanos_ptr);
 IDATA jthread_get_thread_cpu_timer_info(jvmtiTimerInfo* info_ptr);
+
+jlong jthread_get_thread_blocked_times_count(jthread java_thread);
+jlong jthread_get_thread_waited_times_count(jthread java_thread);
+
+jboolean jthread_is_current_thread_cpu_time_supported();
+jboolean jthread_is_thread_cpu_time_enabled();
+jboolean jthread_is_thread_cpu_time_supported();
+
+void jthread_set_thread_cpu_time_enabled(jboolean flag);
 
 //@}
 /** @name Peak count

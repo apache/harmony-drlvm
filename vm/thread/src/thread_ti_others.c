@@ -25,14 +25,34 @@
 #include <open/ti_thread.h>
 #include "thread_private.h"
 
+#define THREAD_CONTENTION_MONITORING_SUPPORTED 1
+
+/*
+ *  Monitors contentions requests enabled flag.
+ */
+int thread_contention_monitoring_enabled = 0;
+
+/*
+ *  Total started thread counter.
+ */
+int total_started_thread_count = 0;
+
+/*
+ *  Alive thread counter.
+ */
+int alive_thread_count = 0;
+
 /*
  *  Peak count
  */
+int peak_thread_count = 0;
  
 /**
- * Resets the thread peak counter.
+ * Resets the thread peak counter to current value.
  */
 IDATA  jthread_reset_peak_thread_count () {
+
+    peak_thread_count = alive_thread_count;
     return TM_ERROR_NONE;
 } 
 
@@ -40,8 +60,39 @@ IDATA  jthread_reset_peak_thread_count () {
  * Returns the peak thread count since the last peak reset. 
  */
 IDATA  jthread_get_peak_thread_count (jint *threads_count_ptr) {
+    *threads_count_ptr = peak_thread_count;
     return TM_ERROR_NONE;
-} 
+}
+ 
+/**
+ * Returns true if VM supports monitors contention requests and 
+ * this feature is enabled 
+ *
+ * @return true if monitors contention requests are enabled, false otherwise;
+ */
+jboolean jthread_is_thread_contention_monitoring_enabled(){
+    return thread_contention_monitoring_enabled;
+}
+
+/**
+ * Returns true if VM supports monitors contention requests
+ *
+ * @return true if monitors contention requests are supported, false otherwise;
+ */
+jboolean jthread_is_thread_contention_monitoring_supported(){
+
+    return THREAD_CONTENTION_MONITORING_SUPPORTED;
+}
+
+/**
+ * Enabled or diabled thread monitors contention requests
+ *
+ * @param[in] true or false to enable or disable the feature
+ */
+void jthread_set_thread_contention_monitoring_enabled(jboolean flag){
+
+    thread_contention_monitoring_enabled = THREAD_CONTENTION_MONITORING_SUPPORTED ? flag : 0;
+}
 
 /**
  * Returns JVMTILocalStorage pointer.
@@ -59,3 +110,22 @@ JVMTILocalStorage* jthread_get_jvmti_local_storage(jthread java_thread) {
     return &tm_java_thread->jvmti_local_storage;
 
 }
+
+/**
+ * Increase thread counters.
+ */
+void thread_start_count(){
+    alive_thread_count++;
+    total_started_thread_count++;
+    if (peak_thread_count < alive_thread_count) {
+        peak_thread_count = alive_thread_count;
+    }
+}
+
+/**
+ * Decrease alive thread counter.
+ */
+void thread_end_count(){
+    alive_thread_count--;
+}
+
