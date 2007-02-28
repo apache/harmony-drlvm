@@ -9,3 +9,6 @@ io/Integers.java
 shutdown/TestInterrupt.java
 
 stress/Mix.java
+
+# HARMONY-3266
+shutdown/TestNativeAllocation.java

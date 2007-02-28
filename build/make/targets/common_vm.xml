@@ -113,6 +113,8 @@ Version: $Revision: 1.6.2.6 $
 
                 <select cfg="debug">
                     <compilerarg value="-O0" />
+                    <compilerarg value="-g" />
+                    <compilerarg value="-ggdb3" />
                 </select>
             </select>
 

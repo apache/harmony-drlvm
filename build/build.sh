@@ -63,8 +63,6 @@ export CLASSPATH
 
 ANT_COMMAND="$ANT_HOME/bin/ant --noconfig"
 
-# it is necessarily to compile 'vm.jitrino' in release mode
-
-$ANT_COMMAND -f ./make/build.xml -Dvm.jitrino.cfg=release "$@"  || ERROR
+$ANT_COMMAND -f ./make/build.xml "$@"  || ERROR
 
 

@@ -49,8 +49,7 @@ Version: $Revision: 1.6.2.8 $
 
         <patternset id="java.classes.pattern" includes="empty_pattern"/>
 
-        <!-- the compiler doesn't extend common compiler -->
-        <compiler name="${build.cxx}" id="cpp.compiler">
+        <compiler id="cpp.compiler" extends="common.cpp.compiler">
             <fileset dir="${src}">
                 <include name="dynopt/*.cpp" />
                 <include name="main/*.cpp" />

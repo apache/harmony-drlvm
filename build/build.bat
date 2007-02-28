@@ -136,8 +136,7 @@ SET CLASSPATH=.\make\tmp\ant-contrib.jar;%CLASSPATH%
 
 SET ANT_COMMAND=%ANT_HOME%\bin\ant.bat
 
-REM  Note: vm.jitrino is always complied in release mode, otherwise it makes VM debug too slow
-CALL "%ANT_COMMAND%" -f make/build.xml -Dvm.jitrino.cfg=release %*
+CALL "%ANT_COMMAND%" -f make/build.xml %*
 
 GOTO THEEND
 
