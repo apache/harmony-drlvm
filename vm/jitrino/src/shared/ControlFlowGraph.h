@@ -719,14 +719,14 @@ public:
    *
    * @return The number of outgoing edges of the node.
    */
-    uint32 getOutDegree() const {return getOutEdges().size();}
+    uint32 getOutDegree() const {return (uint32)getOutEdges().size();}
     
   /** 
    * Gets the number of incoming edges to the node. 
    *
    * @return The number of incoming edges to the node.
    */
-    uint32 getInDegree() const {return getInEdges().size();}
+    uint32 getInDegree() const {return (uint32)getInEdges().size();}
 
   /** 
    * Checks whether the node has only one outgoing edge. 

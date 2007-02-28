@@ -418,7 +418,7 @@ uint8* Inst::emit(uint8* stream)
         assert(form==Form_Native);
         instEnd = Encoder::emit(stream, this);
     }
-    setCodeSize(instEnd - stream);
+    setCodeSize((uint32)(instEnd - stream));
     return instEnd;
 }
 
@@ -799,12 +799,12 @@ void CallingConventionClient::finalizeInfos(Inst::OpndRole role, CallingConventi
 {
     assert(callingConvention!=NULL);
     StlVector<CallingConvention::OpndInfo> & infos = getInfos(role);
-    callingConvention->getOpndInfo(argKind, infos.size(), &infos.front());
+    callingConvention->getOpndInfo(argKind, (uint32)infos.size(), &infos.front());
     bool lastToFirst=callingConvention->pushLastToFirst();
     uint32 slotNumber=0;
     for (
-        uint32 i=lastToFirst?0:infos.size()-1, 
-        end=lastToFirst?infos.size():(uint32)-1, 
+        uint32 i=lastToFirst?0:(uint32)infos.size()-1, 
+        end=lastToFirst?(uint32)infos.size():(uint32)-1, 
         inc=lastToFirst?1:-1;
         i!=end;
         i+=inc
@@ -827,7 +827,7 @@ void CallingConventionClient::layoutAuxilaryOpnds(Inst::OpndRole role, OpndKind 
     uint32 regArgCount=0, stackArgCount=0;
     Inst::Opnds opnds(ownerInst, Inst::OpndRole_Auxilary|role);
     Inst::Opnds::iterator handledOpnds=opnds.begin();
-    for (uint32 i=0, n=infos.size(); i<n; i++){
+    for (uint32 i=0, n=(uint32)infos.size(); i<n; i++){
         const CallingConvention::OpndInfo& info=infos[i];
 #ifdef _DEBUG
         bool eachSlotRequiresOpnd=false;

@@ -30,8 +30,12 @@
     #define strnicmp strncasecmp
 #else
     #pragma warning( push, 4 )
-    #pragma warning( disable : 4100 4127 4201 4511 4512 )
+    #pragma warning( disable : 4100 4127 4201 4511 4512)
     #pragma conform( forScope, on )
+
+    #define strdup _strdup
+    #define strcmpi _strcmpi
+    #define stricmp _stricmp
 #endif //_MSC_VER
 
 #undef stdcall__
@@ -70,5 +74,10 @@
     //----
 
 #endif
+
+inline bool fit32(int64 val) {
+    return (INT_MIN <= val) && (val <= INT_MAX);
+}
+
 
 #endif // _PLATFORMDEPENDANT_H_

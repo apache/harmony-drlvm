@@ -84,7 +84,7 @@ public:
 #endif
     }
 
-    uint32  numberOfAffectedEdges()     { return eligibleEdges.size(); }
+    uint32  numberOfAffectedEdges()     { return (uint32)eligibleEdges.size(); }
     Edge*   getAffectedEdge(uint32 i)   { assert(i < eligibleEdges.size()); return eligibleEdges[i]; }
 
     Opnd*   getOrCreateTLSBaseReg(Edge* e);
@@ -280,10 +280,6 @@ BBPolling::getOrCreateTLSBaseReg(Edge* e)
          Opnd* tlsBase  = irManager.newOpnd(tlsBaseType);
          bbpFlagAddrBlock->appendInst(irManager.newCallInst(target, &CallingConvention_STDCALL, 0, NULL, tlsBase));
 #else // PLATFORM_POSIX
-#ifdef _EM64T_
-	// TODO: #error "BBP not implemented on windows/em64t"
-	assert(0);
-#endif
         // TLS base can be obtained from [fs:0x14]
         Opnd* tlsBase = irManager.newMemOpnd(tlsBaseType, MemOpndKind_Any, NULL, 0x14, RegName_FS);
 #endif // PLATFORM_POSIX
@@ -484,7 +480,7 @@ BBPolling::calculateInitialInterruptability(bool doPassingDown)
             if ( !toppestLoopHeader[id] ) {
                 toppestLoopHeader[id] = loopHeader;
                 // here we need to remember all otheredges and their start index for particular loopHeader
-                otherStartNdx[loopHeader->getId()] = otherEdges.size();
+                otherStartNdx[loopHeader->getId()] = (uint32)otherEdges.size();
                 const Edges& edges = loopHeader->getInEdges();
                 for (Edges::const_iterator ite = edges.begin(), ende = edges.end(); ite!=ende; ++ite) {
                     Edge* e = *ite;

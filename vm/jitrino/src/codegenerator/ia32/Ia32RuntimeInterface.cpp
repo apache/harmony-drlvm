@@ -75,8 +75,8 @@ bool RuntimeInterface::getBcLocationForNative(MethodDesc* method, uint64 native_
     StackInfo stackInfo;
 
     Byte* infoBlock = method->getInfoBlock();
-    uint32 stackInfoSize = stackInfo.readByteSize(infoBlock);
-    uint32 gcMapSize = GCMap::readByteSize(infoBlock + stackInfoSize);
+    POINTER_SIZE_INT stackInfoSize = stackInfo.readByteSize(infoBlock);
+    POINTER_SIZE_INT gcMapSize = GCMap::readByteSize(infoBlock + stackInfoSize);
 
     const char* methName;
 
@@ -95,8 +95,8 @@ bool RuntimeInterface::getNativeLocationForBc(MethodDesc* method, uint16 bc_pc, 
     StackInfo stackInfo;
 
     Byte* infoBlock = method->getInfoBlock();
-    uint32 stackInfoSize = stackInfo.readByteSize(infoBlock);
-    uint32 gcMapSize = GCMap::readByteSize(infoBlock + stackInfoSize);
+    POINTER_SIZE_INT stackInfoSize = stackInfo.readByteSize(infoBlock);
+    POINTER_SIZE_INT gcMapSize = GCMap::readByteSize(infoBlock + stackInfoSize);
 
     const char* methName;
 

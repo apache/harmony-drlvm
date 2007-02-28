@@ -47,7 +47,7 @@ public:
     }
 
     POINTER_SIZE_INT getByteSize() {
-        POINTER_SIZE_INT mapSize = theMap->size();
+        POINTER_SIZE_INT mapSize = (POINTER_SIZE_INT)theMap->size();
 
         return  (mapSize * (byteCodeOffsetSize + wordSize) + wordSize);
     }
@@ -58,7 +58,7 @@ public:
         POINTER_SIZE_INT mapSize;
         POINTER_SIZE_INT i = 0;
 
-        mapSize = theMap->size();
+        mapSize = (POINTER_SIZE_INT)theMap->size();
         data[0] = mapSize; //store map size
         data = data + 1;
 

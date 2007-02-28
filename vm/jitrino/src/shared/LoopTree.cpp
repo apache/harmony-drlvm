@@ -209,7 +209,7 @@ Edge* LoopTree::coalesceEdges(Edges& edges) {
     Node* block = fg->createNode(header->getKind());
     
     if (coalesceCallback!=NULL) {
-        coalesceCallback->coalesce(header, block, edges.size());
+        coalesceCallback->coalesce(header, block, (uint32)edges.size());
     }
     //retarget all edges
     for (Edges::const_iterator ite = edges.begin(), ende = edges.end(); ite!=ende; ++ite) {

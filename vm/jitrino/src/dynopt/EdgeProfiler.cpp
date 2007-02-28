@@ -87,7 +87,7 @@ void EdgeProfilerInstrumentationPass::_run(IRManager& irm)
         //compute edge-ids before CFG modification: edge-ids are part of CFG consistency check.
         for (Edges::const_iterator it = edgesToInstrument.begin(), end = edgesToInstrument.end(); it!=end; ++it) {
             Edge* edge = *it;
-            uint32 key = genKey(counterKeys.size() + 1, edge, bcLevelProfiling, debug);
+            uint32 key = genKey((uint32)counterKeys.size() + 1, edge, bcLevelProfiling, debug);
             assert( key != 0 );
             counterKeys.push_back(key);
         }
@@ -110,7 +110,7 @@ void EdgeProfilerInstrumentationPass::_run(IRManager& irm)
     
     ProfilingInterface* pi = irm.getProfilingInterface();
     if (!pi->hasMethodProfile(ProfileType_Edge, md, JITProfilingRole_GEN)) {
-        pi->createEdgeMethodProfile(mm , md,  counterKeys.size(),  (uint32*)&counterKeys.front(), _checkSum);
+        pi->createEdgeMethodProfile(mm , md,  (uint32)counterKeys.size(),  (uint32*)&counterKeys.front(), _checkSum);
     }
 
     irm.getCompilationInterface().unlockMethodData();

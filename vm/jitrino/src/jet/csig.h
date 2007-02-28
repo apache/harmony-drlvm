@@ -264,7 +264,7 @@ public:
     unsigned count(void) const
     {
         assert(m_data.size() == m_args.size());
-        return m_args.size();
+        return (unsigned) m_args.size();
     }
     
     /**

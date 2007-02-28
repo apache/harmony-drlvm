@@ -287,7 +287,7 @@ public:
     virtual uint32   getInfoBlockSize();
     virtual Byte*    getCodeBlockAddress(int32 id);
     virtual uint32   getCodeBlockSize(int32 id);
-    virtual uint32      getUniqueId();
+    virtual POINTER_SIZE_INT    getUniqueId();
     
     //
     // DRL kernel

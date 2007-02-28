@@ -375,7 +375,7 @@ void Compiler::gen_prolog(void) {
         if (is_set(DBG_TRACE_CG)) {dbg(";;>locals.gc_map\n");}
         Opnd reg(i32, valloc(i32));
         alu(alu_xor, reg, reg);
-        for (unsigned i=locals_map.size(); i<locals_gc_size; i++) {
+        for (unsigned i=(uint32)locals_map.size(); i<locals_gc_size; i++) {
             st4(reg.reg(), m_base, voff(m_stack.info_gc_locals()+i*sizeof(int)));
         }
     }

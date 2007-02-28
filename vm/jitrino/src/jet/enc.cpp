@@ -53,13 +53,8 @@ void Encoder::debug(void)
 {
 #ifdef PLATFORM_POSIX
     raise(SIGTRAP);
-#elif !defined (_EM64T_)
-    __asm {
-        int 3
-    }
 #else
-    // TODO:
-    assert(0);
+    DebugBreak();
 #endif
 }
 

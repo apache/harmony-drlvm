@@ -932,7 +932,7 @@ struct PMF::Cmd
 
 static int cmd_strength (bool jit_known, bool filter_known, size_t path_size)
 {
-    return ((1 + (filter_known ? 2 : 0) + (jit_known ? 4 : 0)) << 16) + path_size;
+    return int( ((1 + (filter_known ? 2 : 0) + (jit_known ? 4 : 0)) << 16) + path_size );
 }
 
 
@@ -1758,10 +1758,10 @@ void PMF::initStreams ()
                 continue;
 
             cmdp->log = true;
-            cmdp->xlog = i - leftbeg;
+            cmdp->xlog = int(i - leftbeg);
 
             int xpath = cmdp->xkeyword + 1,
-                xlast = cmdp->left->size() - 1;
+                xlast = (int)cmdp->left->size() - 1;
 
             if (cmdp->xlog == xlast)
             {// stream enable command
@@ -1787,7 +1787,7 @@ void PMF::initStreams ()
                     continue;
 
                 int xpath  = cmdp->xkeyword + 1,
-                    xlast  = cmdp->left->size() - 1,
+                    xlast  = (int)cmdp->left->size() - 1,
                     pathsz = cmdp->xlog - xpath;
 
                 Str& key = cmdp->left->at(xlast);

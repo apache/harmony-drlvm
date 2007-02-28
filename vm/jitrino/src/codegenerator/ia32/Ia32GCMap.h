@@ -85,7 +85,7 @@ namespace Ia32 {
 
         POINTER_SIZE_INT getUint32Size() const;
         void write(POINTER_SIZE_INT* image) const;
-        uint32 getNumOpnds() const {return gcOpnds.size();}
+        uint32 getNumOpnds() const {return (uint32)gcOpnds.size();}
         static POINTER_SIZE_INT getIP(const POINTER_SIZE_INT* image);
 
         void enumerate(GCInterface* gcInterface, const JitFrameContext* c, const StackInfo& stackInfo) const;

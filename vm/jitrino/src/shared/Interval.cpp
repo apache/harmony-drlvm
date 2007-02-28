@@ -79,13 +79,13 @@ bool Interval::conflict (const Interval * r, int& adj) const
 
         while (i != iend && k != kend)
         {
-            if ((d = i->end - k->beg) < 0)
+            if ((d = int(i->end - k->beg)) < 0)
             {
                 if (d == -1)
                     ++adj;
                 ++i;
             }
-            else if ((d = i->beg - k->end) > 0)
+            else if ((d = int(i->beg - k->end)) > 0)
             {
                 if (d == 1)
                     ++adj;

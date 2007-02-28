@@ -98,7 +98,7 @@ const size_t MaxRegs = IRMaxRegNamesSameKind*IRMaxRegKinds;
 
 static RegName regName (int x)
 {
-    size_t k = x / IRMaxRegNamesSameKind;
+    uint32 k = x / IRMaxRegNamesSameKind;
     return getRegName((OpndKind)k, Constraint::getDefaultSize(k), x % IRMaxRegNamesSameKind);
 }
 
@@ -122,7 +122,7 @@ void RegAllocCheck::checkLiveness ()
 {
     lastbb = 0;
 
-    BitSet lives(mm, opandcount);
+    BitSet lives(mm, (uint32)opandcount);
     irm.getLiveAtExit(bblock, lives);
 
     Opnd* regdefs[MaxRegs],
@@ -148,7 +148,7 @@ void RegAllocCheck::checkLiveness ()
             else
                 if (regnxts[ridx] != opnd)
                 {
-                    error() << "at end of block," << regName(ridx) 
+                    error() << "at end of block," << regName((int)ridx) 
                             << " assigned to " << *regnxts[ridx] << " and " << *opnd << endl;
                 }
         }
@@ -175,7 +175,7 @@ void RegAllocCheck::checkLiveness ()
                     else
                         if (regdefs[ridx] != opnd)
                         {
-                            error() << "  Invalid definitions at " << *inst << " " << regName(ridx) 
+                            error() << "  Invalid definitions at " << *inst << " " << regName((int)ridx) 
                                     << " of " << *regdefs[ridx] << " or " << *opnd << endl;
                         }
                 }
@@ -187,7 +187,7 @@ void RegAllocCheck::checkLiveness ()
                     else
                         if (reguses[ridx] != opnd)
                         {
-                            error() << "  Invalid usages at " << *inst << " " << regName(ridx) 
+                            error() << "  Invalid usages at " << *inst << " " << regName((int)ridx) 
                                     << " of " << *reguses[ridx] << " or " << *opnd << endl;
                         }
                 }
@@ -203,7 +203,7 @@ void RegAllocCheck::checkLiveness ()
                     if (regdefs[ridx] != regnxts[ridx])
                         if (regnxts[ridx] != 0)
                         {
-                            error() << "  " << *inst << " " << regName(ridx) 
+                            error() << "  " << *inst << " " << regName((int)ridx) 
                                     << " invalid usage of " << *regnxts[ridx]
                                     << " instead of " << *regdefs[ridx] << endl;
                         }
@@ -220,7 +220,7 @@ void RegAllocCheck::checkLiveness ()
             {
                 if (reguses[ridx] != regnxts[ridx] && regnxts[ridx] != 0)
                 {
-                    error() << "  " << *inst << " " << regName(ridx) 
+                    error() << "  " << *inst << " " << regName((int)ridx) 
                             << " invalid usage of " << *reguses[ridx]
                             << " or " << *regnxts[ridx] << endl;
                 }
@@ -240,7 +240,7 @@ void RegAllocCheck::checkLocations ()
 {
     for (size_t i = 0; i != opandcount; ++i)
     {
-        Opnd* opnd = irm.getOpnd(i);
+        Opnd* opnd = irm.getOpnd((uint32)i);
         if (!opnd->hasAssignedPhysicalLocation())
         {
             header() << "Not assigned opand " << *opnd << endl;

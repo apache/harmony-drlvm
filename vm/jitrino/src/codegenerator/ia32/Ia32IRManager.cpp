@@ -51,7 +51,7 @@ const char * newString(MemoryManager& mm, const char * str, uint32 length)
 {
     assert(str!=NULL);
     if (length==EmptyUint32)
-        length=strlen(str);
+        length=(uint32)strlen(str);
     char * psz=new(mm) char[length+1];
     strncpy(psz, str, length);
     psz[length]=0;
@@ -82,7 +82,7 @@ void IRManager::addOpnd(Opnd * opnd)
 { 
     assert(opnd->id>=opnds.size());
     opnds.push_back(opnd);
-    opnd->id=opnds.size()-1;
+    opnd->id=(uint32)opnds.size()-1;
 }
 
 //_____________________________________________________________________________________________
@@ -152,7 +152,7 @@ ConstantAreaItem *  IRManager::newInternalStringConstantAreaItem(const char * st
     if (str==NULL)
         str="";
     return new(memoryManager) ConstantAreaItem(
-        ConstantAreaItem::Kind_InternalStringConstantAreaItem, strlen(str)+1, 
+        ConstantAreaItem::Kind_InternalStringConstantAreaItem, (uint32)strlen(str)+1, 
         (void*)newInternalString(str)
     );
 }
@@ -638,15 +638,15 @@ GCInfoPseudoInst* IRManager::newGCInfoPseudoInst(const StlVector<Opnd*>& basesAn
         assert(opnd->getType()->isObject() || opnd->getType()->isManagedPtr());
     }
 #endif
-    GCInfoPseudoInst* inst = new(memoryManager, basesAndMptrs.size()) GCInfoPseudoInst(this, instId++);
+    GCInfoPseudoInst* inst = new(memoryManager, (uint32)basesAndMptrs.size()) GCInfoPseudoInst(this, instId++);
     Opnd ** opnds = inst->getOpnds();
     Constraint * constraints = inst->getConstraints();
-    for (uint32 i = 0, n = basesAndMptrs.size(); i < n; i++){
+    for (uint32 i = 0, n = (uint32)basesAndMptrs.size(); i < n; i++){
         Opnd * opnd = basesAndMptrs[i];
         opnds[i] = opnd;
         constraints[i] = Constraint(OpndKind_Any, opnd->getSize());
     }
-    inst->opndCount = basesAndMptrs.size();
+    inst->opndCount = (uint32)basesAndMptrs.size();
     inst->assignOpcodeGroup(this);
     return inst;
 }
@@ -1391,7 +1391,7 @@ void IRManager::indexInsts() {
 uint32 IRManager::calculateOpndStatistics(bool reindex)
 {
     POpnd * arr=&opnds.front();
-    for (uint32 i=0, n=opnds.size(); i<n; i++){
+    for (uint32 i=0, n=(uint32)opnds.size(); i<n; i++){
         Opnd * opnd=arr[i];
         if (opnd==NULL) {
             continue;
@@ -1443,7 +1443,7 @@ void IRManager::packOpnds()
 
     uint32 maxIndex=calculateOpndStatistics(true);
 
-    uint32 opndsBefore=opnds.size();
+    uint32 opndsBefore=(uint32)opnds.size();
     opnds.resize(opnds.size()+maxIndex);
     POpnd * arr=&opnds.front();
     for (uint32 i=0; i<opndsBefore; i++){
@@ -1668,7 +1668,7 @@ void IRManager::finalizeCallSites()
                     Opnd * const * opnds = callInst->getOpnds();
 #ifdef _EM64T_
                     unsigned sz = 0;
-                    for (uint32 i=0, n=stackOpndInfos.size(); i<n; i++) {
+                    for (uint32 i=0, n=(uint32)stackOpndInfos.size(); i<n; i++) {
                         sz += sizeof(POINTER_SIZE_INT); 
                     }
                     if(sz&15) {
@@ -1678,7 +1678,7 @@ void IRManager::finalizeCallSites()
                     }
                     sz = 0;
 #endif
-                    for (uint32 i=0, n=stackOpndInfos.size(); i<n; i++) {
+                    for (uint32 i=0, n=(uint32)stackOpndInfos.size(); i<n; i++) {
 #ifdef _EM64T_
                         uint32 index = callInst->getCallingConventionClient().getCallingConvention()->pushLastToFirst()?i:n-1-i;
                         Inst * pushInst=newCopyPseudoInst(Mnemonic_PUSH, opnds[stackOpndInfos[index].opndIndex]);
@@ -1954,7 +1954,7 @@ void IRManager::resolveRuntimeInfo(Opnd* opnd) const {
             /** The value of the operand is the address where the interned version of the string is stored*/
             {
             MethodDesc*  mDesc = (MethodDesc*)info->getValue(0);
-            POINTER_SIZE_INT token = (POINTER_SIZE_INT)info->getValue(1);
+            uint32 token = (uint32)(POINTER_SIZE_INT)info->getValue(1);
             value = (POINTER_SIZE_INT) compilationInterface.loadStringObject(mDesc,token);
             }break;
         case Opnd::RuntimeInfo::Kind_StaticFieldAddress:

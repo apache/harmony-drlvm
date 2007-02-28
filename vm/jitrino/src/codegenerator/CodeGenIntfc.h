@@ -600,6 +600,7 @@ public:
 class InlineInfoMap {
     class OffsetPair {
     public:
+        OffsetPair() : offset(0), inline_info(NULL) {}
         OffsetPair(uint32 off, InlineInfo* ii) : offset(off), inline_info(ii) {}
         uint32 offset;
         InlineInfo* inline_info;

@@ -76,7 +76,11 @@
     #define snprintf    _snprintf
     #define vsnprintf    _vsnprintf
     #ifndef strcasecmp
-        #define strcasecmp  stricmp
+        #ifdef _MSC_VER
+            #define strcasecmp  _stricmp
+        #else
+            #define strcasecmp  stricmp
+        #endif
     #endif
 #else
     // stdcall has no meaning on platforms other than Lin32

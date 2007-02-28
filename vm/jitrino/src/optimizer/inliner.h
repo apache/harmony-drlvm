@@ -187,8 +187,6 @@ private:
     Method_Table* _inlineSkipMethodTable;
     Method_Table* _inlineBonusMethodTable;
 
-    uint64 oldMethodId;
-
     bool _usesOptimisticBalancedSync;
     bool isBCmapRequired;
     VectorHandler* bc2HIRMapHandler;

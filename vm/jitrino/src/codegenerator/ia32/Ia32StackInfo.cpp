@@ -361,7 +361,7 @@ void StackInfo::registerInsts(IRManager& irm)
             }
         }
     }
-    hashTableSize = stackDepthInfo->size();
+    hashTableSize = (uint32)stackDepthInfo->size();
 }
 
 void StackInfo::setMethodExitString(IRManager& irm)

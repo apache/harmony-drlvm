@@ -395,7 +395,7 @@ void RegAlloc3::Registers::parse (const char* params)
         indexes[i] = -1;
 
     for (size_t i = 0; i != size(); ++i)
-        indexes[operator[](i).getKind()] = i;
+        indexes[operator[](i).getKind()] = (int)i;
 }
 
 
@@ -409,7 +409,7 @@ int RegAlloc3::Registers::merge (const Constraint& c, bool add)
             if (r.getKind() == c.getKind())
             {
                 r.setMask(r.getMask() | c.getMask());
-                return i;
+                return (int)i;
             }
         }
 
@@ -588,7 +588,7 @@ bool RegAlloc3::buildGraph ()
 
     for (size_t i = 0; i != opandcount; ++i)
     {
-        Opnd* opnd  = getIRManager().getOpnd(i);
+        Opnd* opnd  = getIRManager().getOpnd((uint32)i);
         int mapto = -1;
 
         int ridx;
@@ -613,7 +613,7 @@ bool RegAlloc3::buildGraph ()
                 opndx.ridx  = ridx;
                 opndx.alloc = 0;
                 opndx.avail = loc.getMask() & registers[ridx].getMask();
-                opndx.nbavails = bitCount(opndx.avail);
+                opndx.nbavails = (int)bitCount(opndx.avail);
                 assert(opndx.nbavails != 0);
                 opndx.spillcost = 1;
                 opndx.spilled = false;
@@ -641,7 +641,7 @@ bool RegAlloc3::buildGraph ()
 
     BoolMatrix matrix(mm, graphsize);
 
-    BitSet lives(mm, opandcount);
+    BitSet lives(mm, (uint32)opandcount);
 
     const Nodes& nodes = irManager->getFlowGraph()->getNodesPostOrder();
     for (Nodes::const_iterator it = nodes.begin(), end = nodes.end(); it!=end; ++it) {
@@ -1007,7 +1007,7 @@ bool RegAlloc3::assignReg (int x)
         opndx.alloc = findHighest(alloc);
         opndx.opnd->assignRegName(getRegName((OpndKind)registers[opndx.ridx].getKind(), 
                                              opndx.opnd->getSize(), 
-                                             bitNumber(opndx.alloc)));
+                                             (int)bitNumber(opndx.alloc)));
 
         ++count_assigned;
         DBGOUT("assigned (" << x << ") = <" << getRegNameString(opndx.opnd->getRegName()) << ">" << endl;)

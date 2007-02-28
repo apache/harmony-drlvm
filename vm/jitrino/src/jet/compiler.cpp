@@ -224,7 +224,7 @@ JIT_Result Compiler::compile(Compile_Handle ch, Method_Handle method,
                 while(NULL != fgets(buf, sizeof(buf)-1, f)) {
                     // Skip comments
                     if (buf[0] == '#') continue;
-                    int len = strlen(buf);
+                    int len = (int)strlen(buf);
                     // Trim CRLF
                     if (len>=1 && buf[len-1]<=' ') { buf[len-1] = 0; }
                     if (len>=2 && buf[len-2]<=' ') { buf[len-2] = 0; }
@@ -298,7 +298,7 @@ JIT_Result Compiler::compile(Compile_Handle ch, Method_Handle method,
 
     m_max_native_stack_depth = 0;
     m_bc = (unsigned char*)method_get_byte_code_addr(m_method);
-    unsigned bc_size = method_get_byte_code_size(m_method);
+    unsigned bc_size = (unsigned)method_get_byte_code_size(m_method);
     unsigned num_locals = method_vars_get_number(m_method);
     unsigned max_stack = method_get_max_stack(m_method);
     
@@ -312,7 +312,7 @@ JIT_Result Compiler::compile(Compile_Handle ch, Method_Handle method,
     m_ra.resize(num_locals, ar_x);
     //
     
-    m_codeStream.init((size_t)(bc_size*NATIVE_CODE_SIZE_2_BC_SIZE_RATIO));
+    m_codeStream.init((unsigned)(bc_size*NATIVE_CODE_SIZE_2_BC_SIZE_RATIO));
     m_stack.init(num_locals, max_stack, num_input_slots);
     // We need to report 'this' additionally for the following cases:
     // - non-static sync methods - to allow VM to call monitor_exit() for
@@ -369,7 +369,7 @@ JIT_Result Compiler::compile(Compile_Handle ch, Method_Handle method,
     comp_parse_bytecode();
     comp_alloc_regs();
     // Statistics:: number of basic blocks
-    STATS_MEASURE_MIN_MAX_VALUE(bbs, m_bbs.size(), meth_fname());
+    STATS_MEASURE_MIN_MAX_VALUE(bbs, (unsigned)m_bbs.size(), meth_fname());
 
     if (is_set(DBG_DUMP_BBS)) {
         dbg_dump_bbs();
@@ -378,7 +378,7 @@ JIT_Result Compiler::compile(Compile_Handle ch, Method_Handle method,
     // Phase 2 - code generation.
     //
     SmartPtr<BBState> allStates;
-    allStates.alloc(m_bbs.size());
+    allStates.alloc((unsigned)m_bbs.size());
     unsigned c = 0;
     for (BBMAP::iterator i=m_bbs.begin(); i != m_bbs.end(); i++, c++) {
         m_bbStates[i->first] = &allStates[c];
@@ -1130,7 +1130,7 @@ bool Compiler::comp_resolve_ehandlers(void)
 void Compiler::comp_set_ehandlers(void)
 {
     unsigned real_num_handlers = 0;
-    for (unsigned i=0, n=m_handlers.size(); i<n; i++) {
+    for (unsigned i=0, n=(unsigned)m_handlers.size(); i<n; i++) {
         HandlerInfo& hi = m_handlers[i];
         if (comp_hi_to_native(hi)) {
             ++real_num_handlers;
@@ -1145,7 +1145,7 @@ void Compiler::comp_set_ehandlers(void)
 
     method_set_num_target_handlers(m_method, m_hjit, real_num_handlers);
     
-    for (unsigned i=0, handlerID=0, n=m_handlers.size(); i<n; i++) {
+    for (unsigned i=0, handlerID=0, n=(unsigned)m_handlers.size(); i<n; i++) {
         const HandlerInfo& hi = m_handlers[i];
         if (hi.handler_ip == NULL) {
             continue;

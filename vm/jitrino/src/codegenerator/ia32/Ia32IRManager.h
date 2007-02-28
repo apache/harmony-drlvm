@@ -400,7 +400,7 @@ public:
         are no longer in the LIR.
     */
     uint32 getOpndCount()const
-    { return opnds.size(); }
+    { return (uint32)opnds.size(); }
 
     /** returns an operand from the internal array of all operands by its ID. */
     Opnd * getOpnd(uint32 id)const

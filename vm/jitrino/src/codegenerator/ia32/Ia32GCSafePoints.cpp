@@ -50,7 +50,7 @@ static void dbg_point() {}
 // WARN: elements order could be changed!
 static void removeElementAt(GCSafePointPairs& pairs, uint32 idx) {
     assert(!pairs.empty());
-    uint32 newSize = pairs.size() - 1;
+    uint32 newSize = (uint32)pairs.size() - 1;
     assert(idx<=newSize);
     if (idx < newSize) {
         pairs[idx] = pairs[newSize];
@@ -63,7 +63,7 @@ void GCSafePointsInfo::removePairByMPtrOpnd(GCSafePointPairs& pairs, const Opnd*
 #ifdef _DEBUG_
     uint32 nPairs = 0;
 #endif 
-    for (int i = pairs.size(); --i>=0;) {
+    for (int i = (int)pairs.size(); --i>=0;) {
         MPtrPair& p = pairs[i];
         if (p.mptr == mptr) {
             removeElementAt(pairs, i);
@@ -341,7 +341,7 @@ void GCSafePointsInfo::runLivenessFilter(Inst* inst, GCSafePointPairs& pairs) co
     if (!pairs.empty()) {
         const BitSet* livenessFilter = findLivenessFilter(inst);
         if (livenessFilter!=NULL) {
-            for (int i = pairs.size(); --i>=0;) {
+            for (int i = (int)pairs.size(); --i>=0;) {
                 MPtrPair& p = pairs[i];
                 if (!livenessFilter->getBit(p.mptr->getId())) {
                     removeElementAt(pairs, i);
@@ -562,7 +562,7 @@ void GCSafePointsInfo::derivePairsOnEntry(const Node* node, GCSafePointPairs& re
     bool needToFilterDeadPairs = false;
     uint32 instsAddedBefore = instsAdded;
     std::sort(res.begin(), res.end());
-    for (uint32 i=0, n = res.size(); i < n; i++) {
+    for (uint32 i=0, n = (uint32)res.size(); i < n; i++) {
         MPtrPair& p1 = res[i];
         Opnd* newBase = NULL; //new base opnd to merge ambiguos mptrs
         while (i+1 < n) {
@@ -660,7 +660,7 @@ void GCSafePointsInfo::filterLiveMPtrsOnGCSafePoints() {
                 GCSafePointPairs& pairs  = *pairsByGCSafePointInstId[inst->getId()];
                 if (!pairs.empty()) {
                     nSafePointsTmp--;
-                    for (int i =pairs.size(); --i>=0;) {
+                    for (int i = (int)pairs.size(); --i>=0;) {
                         MPtrPair& p = pairs[i];
                         if (!ls.getBit(p.mptr->getId())) {
                             removeElementAt(pairs, i);
@@ -702,7 +702,7 @@ void GCSafePointsInfo::checkPairsOnNodeExits() const {
                 Node * predNode2 =edge2->getSourceNode();
                 const GCSafePointPairs& pairs2 = *pairsByNode[predNode2->getDfNum()];
                 //now check that for every mptr in pairs1 there is a pair in pairs2 with the same mptr
-                for (uint32 i1 = 0, n1 = pairs1.size();i1<n1; i1++) {
+                for (uint32 i1 = 0, n1 = (uint32)pairs1.size();i1<n1; i1++) {
                     const MPtrPair& p1 = pairs1[i1];
                     if (ls->getBit(p1.mptr->getId())) {
                         for (uint32 i2 = 0; ; i2++) {
@@ -715,7 +715,7 @@ void GCSafePointsInfo::checkPairsOnNodeExits() const {
                     }
                 }
                 // and vice versa
-                for (uint32 i2 = 0, n2 = pairs2.size();i2<n2; i2++) {
+                for (uint32 i2 = 0, n2 = (uint32)pairs2.size();i2<n2; i2++) {
                     const MPtrPair& p2 = pairs2[i2];
                     if (ls->getBit(p2.mptr->getId())) {
                         for (uint32 i1 = 0; ; i1++) {

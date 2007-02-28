@@ -953,11 +953,7 @@ Inliner::getNextRegionToInline(CompilationContext& inlineCC) {
         methodDesc->getSignatureString() << ::std::endl;
     
     // Generate flowgraph for new region
-    oldMethodId = _instFactory.getMethodId();
-    uint32 id = methodDesc->getUniqueId();
-    _instFactory.setMethodId(((uint64)id)<<32);
-    
-    
+   
     InlineNode* inlineNode = createInlineNode(inlineCC, call);
     assert(inlineNode!=NULL);
 

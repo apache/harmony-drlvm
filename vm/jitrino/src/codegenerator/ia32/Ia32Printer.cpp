@@ -24,6 +24,7 @@
 #include "../../vm/drl/DrlVMInterface.h"
 #include "../../shared/PlatformDependant.h"
 #include "CGSupport.h"
+#include "PlatformDependant.h"
 
 namespace Jitrino
 {
@@ -364,7 +365,7 @@ void IRPrinter::printInst(const Inst * inst)
         os<<"[phase:"<<gcInst->desc<<"]";
         os<<"(";
         assert(!offsets.empty());
-        for (uint32 i = 0, n = offsets.size(); i<n; i++) {
+        for (uint32 i = 0, n = (uint32)offsets.size(); i<n; i++) {
                 int32 offset = offsets[i];
                 Opnd* opnd = uses[i];
                 if (i>0) {
@@ -1107,7 +1108,7 @@ char * IRLivenessDotPrinter::getRegString(char * str, Constraint c, StlVector<Op
 {
     char * retStr=NULL;
     uint32 si=0;
-    for (uint32 i=0, n=opnds.size(); i<n; i++){
+    for (uint32 i=0, n=(uint32)opnds.size(); i<n; i++){
         Opnd * o=opnds[i];
         if (o->isPlacedIn(c)){
             retStr=str;
@@ -1218,7 +1219,7 @@ void IRLivenessDotPrinter::printNode(const Node * node)
             }
 
             out << "|\\" << std::endl;
-            for (uint32 i=0, n=opndsAll.size(); i<n; i++){
+            for (uint32 i=0, n=(uint32)opndsAll.size(); i<n; i++){
                 out<<opndsAll[i]->getFirstId()<<'_';
             }
             out << "\\l\\" << std::endl;
@@ -1228,7 +1229,7 @@ void IRLivenessDotPrinter::printNode(const Node * node)
                     out << regStrings[i] << "\\l\\" << ::std::endl;
             }
 
-            uint32 idx=liveSets.size()-1;
+            uint32 idx=(uint32)liveSets.size()-1;
 
             for (Inst * inst = (Inst*)bb->getFirstInst(); inst != NULL; inst = inst->getNextInst(), idx--) {
                 printLivenessForInst(opndsAll, liveSets[idx], liveSets[idx-1]); // output at entry
@@ -1274,7 +1275,7 @@ void IRLivenessDotPrinter::printNode(const Node * node)
 void IRLivenessDotPrinter::printLivenessForInst(const StlVector<Opnd*> opnds, const BitSet * ls0, const BitSet * ls1)
 {
     ::std::ostream& out=getStream();
-    for (uint32 i=0, n=opnds.size(); i<n; i++){
+    for (uint32 i=0, n=(uint32)opnds.size(); i<n; i++){
         Opnd * opnd=opnds[i];
         bool isLiveBefore=ls0!=NULL && ls0->getBit(opnd->getId());
         bool isLiveAfter=ls1!=NULL && ls1->getBit(opnd->getId());

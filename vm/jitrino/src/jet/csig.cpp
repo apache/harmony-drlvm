@@ -38,7 +38,7 @@ void CallSig::init(void)
     assert( !(m_cc&(CCONV_STACK_ALIGN16|CCONV_STACK_ALIGN_HALF16)) || 
             (m_cc&CCONV_CALLER_POPS));
     
-    unsigned num = m_args.size();
+    unsigned num = (unsigned)m_args.size();
     m_data.resize(num);
     unsigned fps = 0, gps = 0;
 

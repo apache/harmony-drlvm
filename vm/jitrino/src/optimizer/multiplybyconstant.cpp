@@ -496,7 +496,7 @@ void planMulNeg(MulMethod &m, inttype d, int depth) {
         inttype dinv = ~d;
         int numones = nlz<inttype, width>(dinv);
         int shiftby = width - numones;
-        inttype newd = d + (1 << shiftby);
+        inttype newd = d + ((inttype)1 << shiftby);
         if (shiftby <= m.SMALL_SHIFT_MAXBITS) {
             DEBUGPRINT("planMulNeg(" << (int) d << ") case 2a, shiftby=" << shiftby);
             res2.append(MulOp::pushy); res2.append(MulOp::neg);
@@ -711,7 +711,7 @@ void planMulCompound(MulMethod &m, inttype d, int depth) {
                 if ((rightzeros <= small_shift_maxbits) &&
                     (rightzeros + bitswidth >= 2 * small_shift_maxbits)) {
                     DEBUGPRINT("case smallshiftadd");
-                    inttype newd = d + (1 << rightzeros);
+                    inttype newd = d + ((inttype)1 << rightzeros);
                     m.append(MulOp::pushy); m.append(MulOp::neg); 
                     planMul<inttype, width>(m, newd, depth+1); 
                     m.append(MulOp::shladd, rightzeros);
@@ -723,12 +723,12 @@ void planMulCompound(MulMethod &m, inttype d, int depth) {
                 }
             } else {
                 DEBUGPRINT("case even, wider");
-                inttype deltasubright = delta - (1 << deltaright);
+                inttype deltasubright = delta - ((inttype)1 << deltaright);
                 int deltasubright_ntz = ntz<inttype, width>(deltasubright);
                 int region2 = deltasubright_ntz - deltaright +1;
                 assert(region2 > 0);
                 if (region2 > 2) {
-                    inttype newd = d + (1 << rightzeros);
+                    inttype newd = d + ((inttype)1 << rightzeros);
                     if (rightzeros <= small_shift_maxbits) {
                         DEBUGPRINT("case wide smalladdshift");
                         m.append(MulOp::pushy); m.append(MulOp::neg);
@@ -758,7 +758,7 @@ void planMulCompound(MulMethod &m, inttype d, int depth) {
                         m.append(MulOp::shladd, small_shift_maxbits);
                     }
                 } else { // region2 == 1
-                    inttype newd = d - (1 << rightzeros);
+                    inttype newd = d - ((inttype)1 << rightzeros);
                     if (rightzeros <= small_shift_maxbits) {
                         DEBUGPRINT("case wide smalladdshift1");
                         m.append(MulOp::pushy);

@@ -239,7 +239,7 @@ void StackLayouter::createProlog()
         const StlVector<CallingConventionClient::StackOpndInfo>& stackOpndInfos = 
             ((const EntryPointPseudoInst*)entryPointInst)->getCallingConventionClient().getStackOpndInfos(Inst::OpndRole_Def);
 
-        for (uint32 i=0, n=stackOpndInfos.size(); i<n; i++) {//assign displacements for input operands
+        for (uint32 i=0, n=(uint32)stackOpndInfos.size(); i<n; i++) {//assign displacements for input operands
 
             uint64 argOffset = 
 #ifdef _EM64T_

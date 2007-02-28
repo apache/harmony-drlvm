@@ -279,10 +279,10 @@ void InternalProfilerAct::readConfig(Config * config) {
                 } else if (line.find("Counter.") == 0) {
                     if(!opened) {
                         opened = true;
-                        num = config->counters.size();
+                        num = (int)config->counters.size();
                         config->counters.push_back(Counter());
-                        int pos1 = line.find(".");
-                        int pos2 = line.find_first_of(".=" , pos1+1);
+                        int pos1 = (int)line.find(".");
+                        int pos2 = (int)line.find_first_of(".=" , pos1+1);
 
                         config->counters[num].name =    line.substr(pos1+1, pos2-pos1-1);
                     }
@@ -623,7 +623,7 @@ void InternalProfiler::addCounters(MethodDesc& methodDesc) {
     InternalProfilerAct& storage = *static_cast<InternalProfilerAct*>(getAction());
     storage.statistics->push_back(ms);
     //method external properties, no need to count
-    uint32 cSize = storage.config->counters.size();
+    uint32 cSize = (uint32)storage.config->counters.size();
     if (!cSize)
         return;
     ms->bbStats[-1].counters= new(mm) uint32[cSize];

@@ -235,7 +235,7 @@ void RegAlloc2::Opand::update ()
         beg = spans.front().beg,
         end = spans.back().end;
         length=0;
-        for (int i=0, n=spans.size(); i<n; i++){
+        for (int i=0, n=(int)spans.size(); i<n; i++){
             assert(pspans[i].beg != 0);
             length += pspans[i].end - pspans[i].beg; // no +1 as this is the number of instructions "hovered" by this opand
 #ifdef _DEBUG
@@ -281,13 +281,13 @@ bool RegAlloc2::Register::canBeAssigned (const RegAlloc2::Opand* x, int& adj) co
     adj = 0;
 
     int d;
-    if ( (d = x->end - beg) < 0 ){
+    if ( (d = int(x->end - beg)) < 0 ){
         if (d==-1)
             adj=1;
         DBGOUT(" -free (below lower bound)!" << endl;)
         return true;
     }
-    if ( (d = x->beg - end) > 0 ){
+    if ( (d = int(x->beg - end)) > 0 ){
         if (d==1)
             adj=1;
         DBGOUT(" -free (above upper bound)!" << endl;)
@@ -533,7 +533,7 @@ void RegAlloc2::buildOpands ()
 
     //irManager->indexInsts();
 
-    BitSet lives(mm, opandcount);
+    BitSet lives(mm, (uint32)opandcount);
 
     const Nodes& nodes = irManager->getFlowGraph()->getNodesPostOrder();
     for (Nodes::const_iterator it = nodes.begin(), end = nodes.end(); it!=end; ++it) {

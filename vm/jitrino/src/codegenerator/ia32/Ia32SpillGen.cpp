@@ -410,7 +410,7 @@ void SpillGen::Registers::parse (const char* params)
         indexes[i] = -1;
 
     for (size_t i = 0; i != size(); ++i)
-        indexes[operator[](i).getKind()] = i;
+        indexes[operator[](i).getKind()] = (int)i;
 }
 
 
@@ -441,7 +441,7 @@ int SpillGen::Registers::merge (const Constraint& c, bool add)
             if (r.getKind() == c.getKind())
             {
                 r.setMask(r.getMask() | c.getMask());
-                return i;
+                return (int)i;
             }
         }
 
@@ -585,7 +585,7 @@ void SpillGen::runImpl()
     emitted = 0;
 
     opndcount = irManager->getOpndCount();
-    lives_exit = new (mm) BitSet(mm, opndcount); 
+    lives_exit = new (mm) BitSet(mm, (uint32)opndcount); 
 
     actsmap.resize(opndcount);
     for (size_t i = 0; i < opndcount; ++i)
@@ -602,7 +602,7 @@ void SpillGen::runImpl()
             }
 
             lives_start = irManager->getLiveAtEntry(bblock);
-            lives_exit->resize(opndcount);
+            lives_exit->resize((uint32)opndcount);
             irManager->getLiveAtExit(bblock, *lives_exit);
 
             size_t bfails = 0;
@@ -635,7 +635,7 @@ void SpillGen::runImpl()
                 {
                     size_t oldcount = opndcount;
                     opndcount = irManager->getOpndCount();
-                    lives_exit->resize(opndcount);
+                    lives_exit->resize((uint32)opndcount);
                     irManager->fixLivenessInfo();
 
                     actsmap.resize(opndcount);
@@ -888,7 +888,7 @@ size_t SpillGen::pass1 ()
         for (Oplines::iterator it = actives.begin(); it != actives.end(); ++it)
         {
             Opline& opline = *it;
-            opline.weight = bitCount(opline.initial.getMask());
+            opline.weight = (int)bitCount(opline.initial.getMask());
         }
         sort(actives.begin(), actives.end(), Opline::smaller);
     }
@@ -1632,7 +1632,7 @@ RegName SpillGen::findFree (RegMask usable, int idx, Instx* instx)
 
     return xbest == INT_MAX ? 
             RegName_Null : 
-            getRegName(static_cast<OpndKind>(c.getKind()), c.getSize(), xbest);
+            getRegName(static_cast<OpndKind>(c.getKind()), c.getSize(), (int)xbest);
 }
 
 
@@ -1805,7 +1805,7 @@ SpillGen::Evict* SpillGen::pickEvict (Evicts& evicts)
         for (ptrx = evict.endx+1; ptrx <  endx && isEvict(evict.opnd, ptrx); ++ptrx)
             evict.endx = ptrx;
 
-        evict.weight = evict.endx - evict.begx;
+        evict.weight = int(evict.endx - evict.begx);
 
         DBGOUT(" evict " << *evict.opnd << " [" << *evict.begx->inst 
                << " - " << *evict.endx->inst << "] w:" << evict.weight << endl;)

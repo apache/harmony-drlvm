@@ -315,7 +315,7 @@ static void estimateNode(StaticProfilerContext* c) {
     Edge* falseEdge = c->node->getFalseEdge();
     Edge* trueEdge = c->node->getTrueEdge();
     double probLeft = 1.0;
-    uint32 edgesLeft = edges.size();
+    uint32 edgesLeft = (uint32)edges.size();
     if (falseEdge == NULL || trueEdge == NULL) { // can't apply general heuristics.
         Edge* uncondEdge = c->node->getUnconditionalEdge();
         if (uncondEdge) {

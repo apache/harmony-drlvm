@@ -124,7 +124,8 @@ public:
      */
     void    ip(char * _ip)
     {
-        m_size = _ip - m_buf;
+        assert((uint32)(_ip - m_buf) == (uint64)(_ip - m_buf));
+        m_size = (uint32)(_ip - m_buf);
         assert(m_size < total_size);
         // Need to be done here, and not in ip(void).
         // Otherwise, the following usage template:
@@ -1258,7 +1259,7 @@ public:
      */
     unsigned patch_count(void) const
     {
-        return m_patches.size();
+        return (unsigned) m_patches.size();
     }
     /**
      * @brief Returns info about next patch record.

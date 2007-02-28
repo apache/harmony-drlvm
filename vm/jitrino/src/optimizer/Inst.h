@@ -137,10 +137,6 @@ public:
 
     uint32 getId() const {return id;}
 
-    uint64 getMethodId() const {return methodId; }
-
-    void   setMethodId(uint64 id) {methodId = id; }
-
     PersistentInstructionId getPersistentInstructionId() const {return pid; }
 
     void   setPersistentInstructionId(PersistentInstructionId id) {pid = id; }
@@ -386,7 +382,6 @@ protected:
     uint32  numSrcs;
     Opnd*   srcs[MAX_INST_SRCS];
     Opnd*   dst;
-    uint64  methodId;
     PersistentInstructionId pid;
     uint32  id;
     
@@ -1319,14 +1314,10 @@ public:
     uint32   createLabelNumber()     {return maxNumLabels++; }
     uint32   getMaxNumLabels()       {return maxNumLabels;   }
     uint32   getNumInsts()           {return numInsts;       }
-    uint64   getMethodId()           {return numMethodInsts; }
-    void     setMethodId(uint64 mid) {numMethodInsts = mid;  }
-    void     decMethodId()           {numMethodInsts--;      }
-
+    
 private:
     uint32   maxNumLabels;        // number of labels generated
     uint32   numInsts;            // number of instructions generated
-    uint64   numMethodInsts;      // a combination of <method,instruction id>
     MemoryManager& memManager;
 
     //

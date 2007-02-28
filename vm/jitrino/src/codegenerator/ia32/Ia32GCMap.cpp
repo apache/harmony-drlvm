@@ -133,9 +133,10 @@ void  GCMap::registerGCSafePoint(IRManager& irm, const BitSet& ls, Inst* inst) {
         } else if (opnd->getMemOpndKind() == MemOpndKind_StackAutoLayout) {
             const Opnd* displOpnd = opnd->getMemOpndSubOpnd(MemOpndSubOpndKind_Displacement);
             assert(displOpnd!=NULL);
+            assert(fit32(displOpnd->getImmValue()) && fit32(inst->getStackDepth()));
             int offset_from_esp0 =  (int)displOpnd->getImmValue(); //opnd saving offset from the esp on method call
             int inst_offset_from_esp0 = (int)inst->getStackDepth();
-            POINTER_SIZE_INT ptrToAddrOffset = inst_offset_from_esp0 + offset_from_esp0; //opnd saving offset from the esp on inst
+            int ptrToAddrOffset = inst_offset_from_esp0 + offset_from_esp0; //opnd saving offset from the esp on inst
             gcOpnd = new (mm) GCSafePointOpnd(isObject, false, ptrToAddrOffset, offset);
         } else {
             assert(opnd->getMemOpndKind() == MemOpndKind_Heap);
@@ -185,8 +186,8 @@ void  GCMap::registerHardwareExceptionPoint(Inst* inst) {
 POINTER_SIZE_INT GCMap::getByteSize() const {
     POINTER_SIZE_INT slotSize = sizeof(POINTER_SIZE_INT);
     POINTER_SIZE_INT size = slotSize/*byte number */ + slotSize/*number of safepoints*/ 
-            + slotSize*gcSafePoints.size()/*space to save safepoints sizes*/;
-    for (int i=0, n = gcSafePoints.size(); i<n;i++) {
+            + (POINTER_SIZE_INT)slotSize*gcSafePoints.size()/*space to save safepoints sizes*/;
+    for (int i=0, n = (int)gcSafePoints.size(); i<n;i++) {
         GCSafePoint* gcSite = gcSafePoints[i];
         size+= slotSize*gcSite->getUint32Size();
     }
@@ -216,7 +217,7 @@ struct hwecompare {
 void GCMap::write(Byte* output)  {
     POINTER_SIZE_INT* data = (POINTER_SIZE_INT*)output;
     data[0] = getByteSize();
-    data[1] = gcSafePoints.size();
+    data[1] = (POINTER_SIZE_INT)gcSafePoints.size();
     POINTER_SIZE_INT offs = 2;
 
 #ifdef GCMAP_TRACK_IDS
@@ -226,7 +227,7 @@ void GCMap::write(Byte* output)  {
     std::sort(gcSafePoints.begin(), gcSafePoints.end(), hwecompare());
 #endif
 
-    for (int i=0, n = gcSafePoints.size(); i<n;i++) {
+    for (int i=0, n = (int)gcSafePoints.size(); i<n;i++) {
         GCSafePoint* gcSite = gcSafePoints[i];
         POINTER_SIZE_INT siteUint32Size = gcSite->getUint32Size();
         data[offs++] = siteUint32Size;
@@ -261,9 +262,9 @@ GCSafePoint::GCSafePoint(MemoryManager& mm, const POINTER_SIZE_INT* image) : gcO
     gcOpnds.reserve(nOpnds);
     POINTER_SIZE_INT offs = 2;
     for (uint32 i = 0; i< nOpnds; i++, offs+=3) {
-        GCSafePointOpnd* gcOpnd= new (mm) GCSafePointOpnd(image[offs], int(image[offs+1]), int32(image[offs+2]));
+        GCSafePointOpnd* gcOpnd= new (mm) GCSafePointOpnd(uint32(image[offs]), int(image[offs+1]), int32(image[offs+2]));
 #ifdef GCMAP_TRACK_IDS
-        gcOpnd->firstId = image[offs+3];
+        gcOpnd->firstId = uint32(image[offs+3]);
         offs++;
 #endif
         gcOpnds.push_back(gcOpnd);
@@ -275,7 +276,7 @@ GCSafePoint::GCSafePoint(MemoryManager& mm, const POINTER_SIZE_INT* image) : gcO
 }
 
 POINTER_SIZE_INT GCSafePoint::getUint32Size() const {
-    POINTER_SIZE_INT size = 1/*ip*/+1/*nOpnds*/+GCSafePointOpnd::IMAGE_SIZE_UINT32 * gcOpnds.size()/*opnds images*/;
+    POINTER_SIZE_INT size = 1/*ip*/+1/*nOpnds*/+GCSafePointOpnd::IMAGE_SIZE_UINT32 * (POINTER_SIZE_INT)gcOpnds.size()/*opnds images*/;
 #ifdef GCMAP_TRACK_IDS
     size++; //instId
     size++; //hardwareExceptionPoint
@@ -286,8 +287,8 @@ POINTER_SIZE_INT GCSafePoint::getUint32Size() const {
 void GCSafePoint::write(POINTER_SIZE_INT* data) const {
     POINTER_SIZE_INT offs=0;
     data[offs++] = ip;
-    data[offs++] = gcOpnds.size();
-    for (uint32 i = 0, n = gcOpnds.size(); i<n; i++, offs+=3) {
+    data[offs++] = (POINTER_SIZE_INT)gcOpnds.size();
+    for (uint32 i = 0, n = (uint32)gcOpnds.size(); i<n; i++, offs+=3) {
         GCSafePointOpnd* gcOpnd = gcOpnds[i];
         data[offs] = gcOpnd->flags;
         data[offs+1] = gcOpnd->val;
@@ -312,16 +313,10 @@ static inline void m_assert(bool cond)  {
 #ifdef GCMAP_TRACK_IDS
     assert(cond);
 #else
-#if defined(WIN32) && !defined(_EM64T_)
+#ifdef _WIN32 // any windows
     if (!cond) {
-        __asm {
-            int 3;
-        }
+        DebugBreak();
     }
-#endif
-#if defined (_EM64T_) && defined(_WIN64)
-    // TODO: add proper code
-    assert(0);
 #endif
 #endif    
 }
@@ -349,7 +344,7 @@ void GCSafePoint::enumerate(GCInterface* gcInterface, const JitFrameContext* con
     //In this case it's impossible to derive valid base for mptr with unknown offset.
 
     //1. Derive all offsets. Use GCSafePointOpnd.mptrOffset to store the result.
-    for (uint32 i=0, n = gcOpnds.size(); i<n; i++) {
+    for (uint32 i=0, n = (uint32)gcOpnds.size(); i<n; i++) {
         GCSafePointOpnd* gcOpnd = gcOpnds[i];
         POINTER_SIZE_INT valPtrAddr = getOpndSaveAddr(context, stackInfo, gcOpnd);
         if (gcOpnd->isObject() || gcOpnd->getMPtrOffset()!=MPTR_OFFSET_UNKNOWN) {
@@ -389,7 +384,7 @@ void GCSafePoint::enumerate(GCInterface* gcInterface, const JitFrameContext* con
     }
 
     //2. Report the results
-    for (uint32 i=0, n = gcOpnds.size(); i<n; i++) {
+    for (uint32 i=0, n = (uint32)gcOpnds.size(); i<n; i++) {
         GCSafePointOpnd* gcOpnd = gcOpnds[i];
         POINTER_SIZE_INT valPtrAddr = getOpndSaveAddr(context, stackInfo, gcOpnd);
         if (gcOpnd->isObject()) {
@@ -424,7 +419,7 @@ POINTER_SIZE_INT GCSafePoint::getOpndSaveAddr(const JitFrameContext* ctx,const S
     } else { 
         assert(gcOpnd->isOnStack());
 #ifdef _EM64T_
-        addr = ctx->rsp + gcOpnd->getDistFromInstESP();
+        addr = ctx->rsp + (POINTER_SIZE_INT)gcOpnd->getDistFromInstESP();
 #else
         addr = ctx->esp + gcOpnd->getDistFromInstESP();
 #endif
@@ -464,7 +459,7 @@ void RuntimeInterface::getGCRootSet(MethodDesc* methodDesc, GCInterface* gcInter
 */
 
     // Compute stack information
-    uint32 stackInfoSize = StackInfo::getByteSize(methodDesc);
+    uint32 stackInfoSize = (uint32)StackInfo::getByteSize(methodDesc);
     Byte* infoBlock = methodDesc->getInfoBlock();
     Byte* gcBlock = infoBlock + stackInfoSize;
 #ifdef _EM64T_
@@ -516,10 +511,10 @@ void InfoBlockWriter::runImpl() {
         inlineInfo->write(compIntf.allocateJITDataBlock(inlineInfo->computeSize(), 8));
     }
 
-    uint32 stackInfoSize = stackInfo->getByteSize();
-    uint32 gcInfoSize = gcMap->getByteSize();
-    uint32 bcMapSize = bcMap->getByteSize(); // we should write at least the size of map  in the info block
-    assert(bcMapSize >= sizeof(POINTER_SIZE_INT));               // so  bcMapSize should be more than 4 for ia32
+    uint32 stackInfoSize = (uint32)stackInfo->getByteSize();
+    uint32 gcInfoSize = (uint32)gcMap->getByteSize();
+    uint32 bcMapSize = (uint32)bcMap->getByteSize(); // we should write at least the size of map  in the info block
+    assert(bcMapSize >= sizeof(POINTER_SIZE_INT));   // so  bcMapSize should be more than 4 for ia32
 
     Byte* infoBlock = compIntf.allocateInfoBlock(stackInfoSize + gcInfoSize + bcMapSize);
     stackInfo->write(infoBlock);

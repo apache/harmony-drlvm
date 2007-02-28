@@ -384,7 +384,7 @@ void ConstraintsResolverImpl::createBasicBlockArray()
         if (node->isBlockNode()){
             double bbecv = getBasicBlockPriority(node);
             uint32 ibb=0;
-            for (uint32 nbb=basicBlocks.size(); ibb<nbb; ++ibb){
+            for (uint32 nbb=(uint32)basicBlocks.size(); ibb<nbb; ++ibb){
                 if (bbecv > getBasicBlockPriority(basicBlocks[ibb]))
                     break;
             }
@@ -671,7 +671,7 @@ void ConstraintsResolverImpl::resolveConstraints(Node * bb)
 void ConstraintsResolverImpl::resolveConstraints()
 {   
     // for all basic blocks in the array
-    for (uint32 ibb=0, nbb=basicBlocks.size(); ibb<nbb; ++ibb){
+    for (uint32 ibb=0, nbb=(uint32)basicBlocks.size(); ibb<nbb; ++ibb){
         resolveConstraints(basicBlocks[ibb]);
     }
 }   

@@ -46,10 +46,10 @@ bool rt_check_method(JIT_Handle jit, Method_Handle method)
 }
 
 static JitFrameContext* dummyCTX = NULL;
-static unsigned sp_off = (char*)devirt(sp, dummyCTX) - (char*)dummyCTX;
-static unsigned ip_off = (char*)devirt(gr_x, dummyCTX) - (char*)dummyCTX;
+static POINTER_SIZE_INT sp_off = (char*)devirt(sp, dummyCTX) - (char*)dummyCTX;
+static POINTER_SIZE_INT ip_off = (char*)devirt(gr_x, dummyCTX) - (char*)dummyCTX;
 
-static const unsigned bp_off = (char*)devirt(bp, dummyCTX) - (char*)dummyCTX;
+static const POINTER_SIZE_INT bp_off = (char*)devirt(bp, dummyCTX) - (char*)dummyCTX;
 static const unsigned bp_idx = ar_idx(bp);
 static const unsigned bp_bytes = word_no(bp_idx)*WORD_SIZE/CHAR_BIT;
 static const unsigned bp_mask  = 1<<bit_no(bp_idx);
@@ -137,7 +137,7 @@ void rt_unwind(JIT_Handle jit, Method_Handle method,
     // the JitFrameContext. The good news is that the callee-save registers 
     // are also untouched yet, so we only need to restore SP and IP
     char * meth_start = infoBlock.get_code_start();
-    unsigned whereLen = where - meth_start;
+    unsigned whereLen = (unsigned)(where - meth_start);
     if (whereLen<infoBlock.get_warmup_len()) {
         *psp = sp_val + sframe.size();
         // Now, [sp] = retIP
@@ -284,7 +284,7 @@ void rt_enum(JIT_Handle jit, Method_Handle method,
     void *** pip = (void***)((char*)context + ip_off);
     char * where = (char*)**pip;
     char * meth_start = infoBlock.get_code_start();
-    unsigned whereLen = where - meth_start;
+    unsigned whereLen = (unsigned)(where - meth_start);
     if (whereLen<infoBlock.get_warmup_len()) {
         return;
     }
@@ -391,7 +391,7 @@ void rt_fix_handler_context(JIT_Handle jit, Method_Handle method,
     void *** pip = (void***)((char*)context + ip_off);
     char * where = (char*)**pip;
     char * meth_start = infoBlock.get_code_start();
-    unsigned whereLen = where - meth_start;
+    unsigned whereLen = (unsigned)(where - meth_start);
     if (whereLen<infoBlock.get_warmup_len()) {
         return;
     }
@@ -426,7 +426,7 @@ void * rt_get_address_of_this(JIT_Handle jit, Method_Handle method,
     void *** pip = (void***)((char*)context + ip_off);
     char * where = (char*)**pip;
     char * meth_start = infoBlock.get_code_start();
-    unsigned whereLen = where - meth_start;
+    unsigned whereLen = (unsigned)(where - meth_start);
     if (whereLen<infoBlock.get_warmup_len()) {
         return NULL;
     }

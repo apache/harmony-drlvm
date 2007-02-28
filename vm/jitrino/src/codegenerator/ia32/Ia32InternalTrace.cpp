@@ -41,18 +41,11 @@ static inline void m_assert(bool cond)  {
 #ifdef _DEBUG
         assert(cond);
 #else
-#ifdef WIN32
-#ifndef _EM64T_
-        if (!cond) {
-            __asm {
-                int 3;
-            }
+    #ifdef _WIN32 // any windows
+        if(!cond) {
+            DebugBreak();
         }
-#else
-    // TODO: add proper code
-    assert(0);
-#endif
-#endif
+    #endif
 #endif    
     }
 
@@ -146,7 +139,7 @@ void InternalTrace::runImpl()
         EntryPointPseudoInst * entryPointPseudoInst = (EntryPointPseudoInst *)inst;
         entryPointPseudoInst->getCallingConventionClient().finalizeInfos(Inst::OpndRole_Def, CallingConvention::ArgKind_InArg);
         const StlVector<CallingConvention::OpndInfo> & infos=((const EntryPointPseudoInst *)entryPointPseudoInst)->getCallingConventionClient().getInfos(Inst::OpndRole_Def);
-        Opnd * argInfoOpnd=irManager->newBinaryConstantImmOpnd(infos.size()*sizeof(CallingConvention::OpndInfo), &infos.front());
+        Opnd * argInfoOpnd=irManager->newBinaryConstantImmOpnd((uint32)infos.size()*sizeof(CallingConvention::OpndInfo), &infos.front());
         Opnd * args[3]={ methodNameOpnd, 
             irManager->newImmOpnd(irManager->getTypeManager().getInt32Type(), infos.size()), 
             argInfoOpnd,

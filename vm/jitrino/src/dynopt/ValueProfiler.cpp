@@ -118,7 +118,7 @@ void ValueProfilerInstrumentationPass::_run(IRManager& irm)
         }
     }
 
-    uint32 cc_size = counterKeys.size();
+    uint32 cc_size = (uint32)counterKeys.size();
     if (cc_size == 0) return;
 
     irm.getCompilationInterface().lockMethodData();

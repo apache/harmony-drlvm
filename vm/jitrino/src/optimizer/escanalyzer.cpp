@@ -162,7 +162,7 @@ EscAnalyzer::doAnalysis() {
     const char* mn = mh.getName();
     const Nodes& nodes = irManager.getFlowGraph().getNodes();
     ControlFlowGraph& fg = irManager.getFlowGraph();
-    uint32 nodeNum = nodes.size();
+    uint32 nodeNum = (uint32)nodes.size();
     uint32 num2 = fg.getNodeCount();
     uint32 num3 = fg.getMaxNodeId();
     Nodes::const_iterator niter;

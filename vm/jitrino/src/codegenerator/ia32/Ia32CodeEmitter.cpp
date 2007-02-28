@@ -221,7 +221,7 @@ void CodeEmitter::ConstantAreaLayout::collectItems()
 void CodeEmitter::ConstantAreaLayout::calculateItemOffsets()
 {
     POINTER_SIZE_INT offset=0;
-    for (uint32 i=0, n=items.size(); i<n; ++i){
+    for (size_t i=0, n=items.size(); i<n; ++i){
         ConstantAreaItem * item=items[i];
         POINTER_SIZE_INT size=item->getSize();
         POINTER_SIZE_INT alignment=size; 
@@ -250,7 +250,7 @@ void CodeEmitter::ConstantAreaLayout::doLayout(IRManager* irm)
     dataBlock=(dataBlock+blockAlignment-1)&~(blockAlignment-1);
     assert(dataBlock % blockAlignment == 0);
 
-    for (uint32 i=0, n=items.size(); i<n; ++i){
+    for (size_t i=0, n=items.size(); i<n; ++i){
         ConstantAreaItem * item=items[i];
         POINTER_SIZE_INT offset=(POINTER_SIZE_INT)item->getAddress();
         item->setAddress((void*)(dataBlock+offset));
@@ -265,7 +265,7 @@ void CodeEmitter::ConstantAreaLayout::finalizeSwitchTables()
 #ifdef _DEBUG
     const Nodes& nodes = irManager->getFlowGraph()->getNodes();
 #endif
-    for (uint32 i=0, n=items.size(); i<n; ++i){
+    for (size_t i=0, n=items.size(); i<n; ++i){
         ConstantAreaItem * item=items[i];
         if (item->hasKind(ConstantAreaItem::Kind_SwitchTableConstantAreaItem)){
             void ** table = (void **)item->getAddress();
@@ -323,7 +323,9 @@ void CodeEmitter::registerInlineInfoOffsets()
                         Log::out() << "has inline info:" << std::endl;
                         callinst->getInlineInfo()->printLevels(Log::out());
                         // report offset 1 bundle forward
-                        inlineMap->registerOffset((POINTER_SIZE_INT)inst->getCodeStartAddr()+inst->getCodeSize() - (POINTER_SIZE_INT)irManager->getCodeStartAddr(), callinst->getInlineInfo());
+                        POINTER_SIZE_INT offset = (POINTER_SIZE_INT)inst->getCodeStartAddr() + inst->getCodeSize() - (POINTER_SIZE_INT)irManager->getCodeStartAddr();
+                        assert(fit32(offset));
+                        inlineMap->registerOffset((uint32)offset, callinst->getInlineInfo());
                     }
                     Log::out() << std::endl;
                 }
@@ -377,17 +379,18 @@ void CodeEmitter::emitCode( void ) {
 
         
         if (alignment && lt->isLoopHeader(bb) && ((POINTER_SIZE_INT)ip & (alignment-1))) {
-            POINTER_SIZE_INT align = alignment - ((POINTER_SIZE_INT)ip & (alignment-1));
+            unsigned align = alignment - (unsigned)((POINTER_SIZE_INT)ip & (alignment-1));
             ip = (uint8*)EncoderBase::nops((char*)ip, align);
         }
 
         uint8 * blockStartIp = ip;
-        bb->setCodeOffset( blockStartIp-codeStreamStart );
+        assert(fit32(blockStartIp-codeStreamStart));
+        bb->setCodeOffset( (uint32)(blockStartIp-codeStreamStart) );
         for (Inst* inst = (Inst*)bb->getFirstInst(); inst!=NULL; inst = inst->getNextInst()) {
             if( inst->hasKind(Inst::Kind_PseudoInst)) {
                 
                 uint8 * instStartIp = ip;
-                inst->setCodeOffset( instStartIp-blockStartIp );
+                inst->setCodeOffset( (uint32)(instStartIp-blockStartIp) );
                 continue;
             }
 
@@ -398,23 +401,25 @@ void CodeEmitter::emitCode( void ) {
             {
                 if ((POINTER_SIZE_INT)ip & 0xF) 
                 {
-                    uint64 align = 0x10 - ((POINTER_SIZE_INT)ip & 0xF);
+                    unsigned align = 0x10 - (unsigned)((POINTER_SIZE_INT)ip & 0xF);
                     ip = (uint8*)EncoderBase::nops((char*)ip, align);
                 }
                 uint8 * instStartIp = ip;
-                inst->setCodeOffset( instStartIp-blockStartIp );
+                assert(fit32(instStartIp-blockStartIp));
+                inst->setCodeOffset( (uint32)(instStartIp-blockStartIp) );
                 ip = inst->emit(ip);
                 ip = (uint8*)EncoderBase::nops((char*)ip, 0x10 - inst->getCodeSize());
             } else {
 #endif
             uint8 * instStartIp = ip;
-            inst->setCodeOffset( instStartIp-blockStartIp );
+            assert(fit32(instStartIp-blockStartIp));
+            inst->setCodeOffset( (uint32)(instStartIp-blockStartIp) );
             ip = inst->emit(ip);
 #ifdef _EM64T_
             }
 #endif
         }
-        bb->setCodeSize( ip-blockStartIp );
+        bb->setCodeSize( (uint32)(ip-blockStartIp) );
     }
     unsigned codeSize = (unsigned)(ip-codeStreamStart);
     assert( codeSize < maxMethodSize );
@@ -453,7 +458,7 @@ void CodeEmitter::packCode() {
                     if (offset >= -128 && offset < 127 && inst->getOpnd(targetOpndIndex)->getSize() != OpndSize_8) {
                         inst->setOpnd(targetOpndIndex, irManager->newImmOpnd(irManager->getTypeFromTag(Type::Int8), offset));
                         uint8 * newInstCodeEndAddr = inst->emit(instCodeStartAddr);
-                        bb->setCodeSize(bb->getCodeSize() + (newInstCodeEndAddr - instCodeEndAddr));
+                        bb->setCodeSize(bb->getCodeSize() + (uint32)(newInstCodeEndAddr - instCodeEndAddr));
                         newOpndsCreated = true;
                     } 
                 }
@@ -510,8 +515,7 @@ void CodeEmitter::postPass()
                     int64 offset=targetCodeStartAddr-instCodeEndAddr;
 
 #ifdef _EM64T_
-#ifndef WIN32
-                    if (llabs(offset) > 0xFFFFFFFF) {
+                    if (!fit32(offset)) { // offset as a signed value does not fits into 32 bits
                         const RegName TMP_BASE = RegName_R14;
                         EncoderBase::Operands args;
                         args.clear();
@@ -522,10 +526,6 @@ void CodeEmitter::postPass()
                         args.add(TMP_BASE);
                         EncoderBase::encode(ip, Mnemonic_CALL, args);
                     } else {
-#else
-                    // TODO: 
-                    assert(0);
-#endif
 #endif
                     inst->getOpnd(targetOpndIndex)->assignImmValue((int64)offset);
                     // re-emit the instruction: 
@@ -535,9 +535,7 @@ void CodeEmitter::postPass()
                         registerDirectCall(inst);
                     }
 #ifdef _EM64T_
-#ifndef WIN32
                     }
-#endif
 #endif
                 }   
             // todo64
@@ -581,7 +579,8 @@ bool RuntimeInterface::recompiledMethodEvent(BinaryRewritingInterface& binaryRew
     Byte ** indirectAddr = (Byte **)recompiledMethodDesc->getIndirectAddress();
     Byte * targetAddr = *indirectAddr;
     Byte * callAddr = (Byte*)data;
-    uint32 offset = targetAddr - callAddr-5;
+    assert(fit32(targetAddr - callAddr-5));
+    uint32 offset = (uint32)(targetAddr - callAddr-5);
 
     //FIXME
     //if (Log::cat_rt()->isDebugEnabled()) {
@@ -630,7 +629,7 @@ void CodeEmitter::registerExceptionHandlers()
         registerExceptionRegion((void*)regionStart, (void*)regionEnd, regionDispatchNode);
     }
 
-    uint32 handlerInfoCount=exceptionHandlerInfos.size();
+    uint32 handlerInfoCount=(uint32)exceptionHandlerInfos.size();
     irManager->getCompilationInterface().setNumExceptionHandler(handlerInfoCount);
     for (uint32 i=0; i<handlerInfoCount; i++){
         const ExceptionHandlerInfo & info=exceptionHandlerInfos[i];
@@ -737,7 +736,7 @@ void CodeEmitter::orderNodesAndMarkInlinees(StlList<MethodMarkerPseudoInst*>& in
                 methInfo = new(memoryManager) CompiledMethodInfo(memoryManager,
                                                                  (POINTER_SIZE_INT)methMarkerInst->getCodeStartAddr(),
                                                                  oldMethodEntryInst,
-                                                                 inlineStack.size());
+                                                                 (uint32)inlineStack.size());
 
                 methodLocationMap[methMarkerInst] = methInfo;
             } else if (inst->getKind() == Inst::Kind_MethodEndPseudoInst) {

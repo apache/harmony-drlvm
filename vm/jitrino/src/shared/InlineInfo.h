@@ -108,7 +108,7 @@ public:
         os << ::std::endl;
     }
 
-    uint32 countLevels() { return inlineChain ? inlineChain->size() : 0; }
+    uint32 countLevels() { return inlineChain ? (uint32)inlineChain->size() : 0; }
 
 protected:
     friend class InlineInfoMap;

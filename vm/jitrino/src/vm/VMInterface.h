@@ -182,7 +182,7 @@ public:
     //
     // accessors for DynoptInfo of this method
     // 
-    virtual uint32      getUniqueId() = 0;
+    virtual POINTER_SIZE_INT    getUniqueId() = 0;
     
     virtual void* getHandleMap() = 0;
     virtual void setHandleMap(void* ) = 0;

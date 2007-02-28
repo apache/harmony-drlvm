@@ -92,7 +92,8 @@ flagTLSThreadStateOffset() {
         hythread_tls_alloc(&key);
         offset = hythread_tls_get_offset(key);
     }
-    return offset;
+    assert(fit32(offset));
+    return (uint32)offset;
 }
 
 //////////////////////////////////////////////////////////////////////////////
@@ -412,7 +413,7 @@ uint32        DrlVMMethodDesc::getCodeBlockSize(int32 id) {
     return method_get_code_block_size_jit_new(drlMethod,getJitHandle(), id);
 }
 
-uint32
+POINTER_SIZE_INT
 DrlVMMethodDesc::getUniqueId()
 {
 #ifdef _IPF_

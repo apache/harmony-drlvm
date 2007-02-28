@@ -79,7 +79,7 @@ struct WebMaker : public SessionAction
 
     struct Nodex
     {
-        Nodex (MemoryManager& mm, size_t s) :globentrys(mm,s), 
+        Nodex (MemoryManager& mm, size_t s) :globentrys(mm,(uint32)s), 
                                              globdefsp (0), 
                                              globkillsp(0),
                                              globexitsp(0) {}
@@ -212,12 +212,12 @@ void WebMaker::phase1()
     for (size_t i = 0; i != opandcount; ++i)
     {
         Opndx* opndxp = 0;
-        if (!irManager->getOpnd(i)->hasAssignedPhysicalLocation())
+        if (!irManager->getOpnd((uint32)i)->hasAssignedPhysicalLocation())
             opndxp = new Opndx(mm);
         opndxs[i] = opndxp;
     }
 
-    BitSet lives(mm, opandcount);
+    BitSet lives(mm, (uint32)opandcount);
     globcount = 0;
 
     const Nodes& postOrder = irManager->getFlowGraph()->getNodesPostOrder();
@@ -236,7 +236,7 @@ void WebMaker::phase1()
                     Opndx* opndxp = opndxs.at(opndp->getId());
                     if (opndxp != 0)
                     {
-                        const uint32 oprole = const_cast<const Inst*>(instp)->getOpndRoles(itx);
+                        const uint32 oprole = const_cast<const Inst*>(instp)->getOpndRoles((uint32)itx);
                         const bool isdef = ((oprole & Inst::OpndRole_UseDef) == Inst::OpndRole_Def)
                                         && ((iprops & Inst::Properties_Conditional) == 0 );
                         if (isdef)
@@ -264,7 +264,7 @@ void WebMaker::phase1()
                     OpDef& opdef = opndxp->opdefs.back();
                     if (opdef.defp->getNode() == nodep)
                     {
-                        opdef.globid = globcount++;
+                        opdef.globid = (int)globcount++;
                         bitsetp(opndxp->globdefsp)->setBit(opdef.globid, true);
                     }
                 }
@@ -327,7 +327,7 @@ void WebMaker::phase2()
 
     
     
-    BitSet wrkbs(mm, globcount);
+    BitSet wrkbs(mm, (uint32)globcount);
     bool   wrkbsvalid;
     size_t passnb = 0;
     const Nodes& postOrder = irManager->getFlowGraph()->getNodesPostOrder();
@@ -433,7 +433,7 @@ void WebMaker::phase3()
                     if (opndxp != 0)
                     {
                         OpDef* opdefp = 0;
-                        const uint32 oprole = const_cast<const Inst*>(instp)->getOpndRoles(itx);
+                        const uint32 oprole = const_cast<const Inst*>(instp)->getOpndRoles((uint32)itx);
                         const bool isdef = ((oprole & Inst::OpndRole_UseDef) == Inst::OpndRole_Def)
                                         && ((iprops & Inst::Properties_Conditional) == 0 );
                         DBGOUT(" O#" << opndp->getFirstId() << "(#" << opndp->getId() << ") def:" << isdef;)
@@ -527,7 +527,7 @@ void WebMaker::phase4()
     for (size_t i = 0; i != opandcount; ++i)
         if ((opndxp = opndxs[i]) != 0  && !opndxp->opdefs.empty())
         {
-            Opnd* opndp = irManager->getOpnd(i);
+            Opnd* opndp = irManager->getOpnd((uint32)i);
             Opndx::OpDefs& opdefs = opndxp->opdefs;
             DBGOUT(" O#" << opndp->getFirstId() << "(#" << i << ")" << endl;)
 
@@ -591,9 +591,9 @@ void WebMaker::linkDef(Opndx::OpDefs& opdefs, OpDef* lastdefp, OpDef* opdefp)
 BitSet* WebMaker::bitsetp (BitSet*& bsp)
 {
     if (bsp == 0)
-        bsp = new BitSet(mm, globcount);
+        bsp = new BitSet(mm, (uint32)globcount);
     else
-        bsp->resize(globcount);
+        bsp->resize((uint32)globcount);
     return bsp;
 }
 

@@ -704,8 +704,6 @@ InstFactory::makeClone(Inst* inst,
         assert(0);
     }
     newInst->setPersistentInstructionId(inst->getPersistentInstructionId());
-    decMethodId();
-    newInst->setMethodId(inst->getMethodId());
     return newInst;
 }
 
@@ -713,8 +711,6 @@ LabelInst*
 InstFactory::makeClone(LabelInst* inst, OpndManager& opndManager, OpndRenameTable& table) {
     LabelInst *newInst = makeLabel();
     newInst->setPersistentInstructionId(inst->getPersistentInstructionId());
-    decMethodId();
-    newInst->setMethodId(inst->getMethodId());
     return newInst;
 }
 
@@ -731,8 +727,6 @@ InstFactory::makeClone(CatchLabelInst* inst,
     CatchLabelInst *newInst =makeCatchLabelInst(createLabelNumber(), 
                                                 inst->getOrder(), inst->getExceptionType());
     newInst->setPersistentInstructionId(inst->getPersistentInstructionId());
-    decMethodId();
-    newInst->setMethodId(inst->getMethodId());
     return newInst;
 }
 
@@ -743,8 +737,6 @@ InstFactory::makeClone(MethodEntryInst* inst,
     MethodEntryInst *newInst = makeMethodEntryInst(createLabelNumber(),
                                                    inst->methodDesc);
     newInst->setPersistentInstructionId(inst->getPersistentInstructionId());
-    decMethodId();
-    newInst->setMethodId(inst->getMethodId());
     return newInst;
 }
 
@@ -760,8 +752,6 @@ InstFactory::makeClone(MethodMarkerInst* inst,
         newInst = makeMethodMarkerInst(inst->kind, inst->methodDesc);
     }
     newInst->setPersistentInstructionId(inst->getPersistentInstructionId());
-    decMethodId();
-    newInst->setMethodId(inst->getMethodId());
     return newInst;
 }
 
@@ -790,8 +780,6 @@ InstFactory::makeClone(BranchInst* inst, OpndManager& opndManager, OpndRenameTab
     default: assert(0);
     }
     newInst->setPersistentInstructionId(inst->getPersistentInstructionId());
-    decMethodId();
-    newInst->setMethodId(inst->getMethodId());
     return newInst;
 }
 
@@ -807,8 +795,6 @@ InstFactory::makeClone(SwitchInst* inst,
         newTargets[i] = targets[i];
     SwitchInst *newInst = makeSwitchInst(src, newTargets, numTargets, inst->getDefaultTarget());
     newInst->setPersistentInstructionId(inst->getPersistentInstructionId());
-    decMethodId();
-    newInst->setMethodId(inst->getMethodId());
     return newInst;
 }
 
@@ -843,8 +829,6 @@ InstFactory::makeClone(ConstInst* inst,
     default: assert(0);
     }
     newInst->setPersistentInstructionId(inst->getPersistentInstructionId());
-    decMethodId();
-    newInst->setMethodId(inst->getMethodId());
     return newInst;
 }
 
@@ -859,8 +843,6 @@ InstFactory::makeClone(TokenInst* inst,
                                        inst->getToken(),
                                        inst->getEnclosingMethod());
     newInst->setPersistentInstructionId(inst->getPersistentInstructionId());
-    decMethodId();
-    newInst->setMethodId(inst->getMethodId());
     return newInst;
 }
 
@@ -876,8 +858,6 @@ InstFactory::makeClone(LinkingExcInst* inst,
                                        inst->getCPIndex(),
                                        inst->getOperation());
     newInst->setPersistentInstructionId(inst->getPersistentInstructionId());
-    decMethodId();
-    newInst->setMethodId(inst->getMethodId());
     return newInst;
 }
 
@@ -912,8 +892,6 @@ InstFactory::makeClone(VarAccessInst* inst,
         }
     }
     newInst->setPersistentInstructionId(inst->getPersistentInstructionId());
-    decMethodId();
-    newInst->setMethodId(inst->getMethodId());
     return newInst;
 }
 
@@ -944,8 +922,6 @@ InstFactory::makeClone(TypeInst* inst, OpndManager& opndManager, OpndRenameTable
         break;
     }
     newInst->setPersistentInstructionId(inst->getPersistentInstructionId());
-    decMethodId();
-    newInst->setMethodId(inst->getMethodId());
     return newInst;
 }
 
@@ -977,8 +953,6 @@ InstFactory::makeClone(FieldAccessInst* inst, OpndManager& opndManager, OpndRena
         break;
     }
     newInst->setPersistentInstructionId(inst->getPersistentInstructionId());
-    decMethodId();
-    newInst->setMethodId(inst->getMethodId());
     return newInst;
 }
 
@@ -1008,8 +982,6 @@ InstFactory::makeClone(MethodInst* inst,
         break;
     }
     newInst->setPersistentInstructionId(inst->getPersistentInstructionId());
-    decMethodId();
-    newInst->setMethodId(inst->getMethodId());
     return newInst;
 }
 
@@ -1030,8 +1002,6 @@ InstFactory::makeClone(MethodCallInst* inst,
                              newArgs,
                              inst->getMethodDesc());
     newInst->setPersistentInstructionId(inst->getPersistentInstructionId());
-    decMethodId();
-    newInst->setMethodId(inst->getMethodId());
     InlineInfo* ii = newInst->getInlineInfoPtr();
     ii->getInlineChainFrom(*inst->getInlineInfoPtr());
     return newInst;
@@ -1054,8 +1024,6 @@ InstFactory::makeClone(CallInst* inst,
                         inst->getNumArgs(),
                         newArgs);
     newInst->setPersistentInstructionId(inst->getPersistentInstructionId());
-    decMethodId();
-    newInst->setMethodId(inst->getMethodId());
     InlineInfo* ii = newInst->getInlineInfoPtr();
     ii->getInlineChainFrom(*inst->getInlineInfoPtr());
     return newInst;
@@ -1077,8 +1045,6 @@ InstFactory::makeClone(IntrinsicCallInst* inst,
                                  newArgs,
                                  inst->getIntrinsicId());
     newInst->setPersistentInstructionId(inst->getPersistentInstructionId());
-    decMethodId();
-    newInst->setMethodId(inst->getMethodId());
     return newInst;
 }
 
@@ -1100,8 +1066,6 @@ InstFactory::makeClone(JitHelperCallInst* inst,
                                  newArgs,
                                  inst->getJitHelperId());
     newInst->setPersistentInstructionId(inst->getPersistentInstructionId());
-    decMethodId();
-    newInst->setMethodId(inst->getMethodId());
     return newInst;
 }
 
@@ -1117,8 +1081,6 @@ InstFactory::makeClone(PhiInst* inst, OpndManager& opndManager, OpndRenameTable&
                        numArgs,
                        newArgs);
     newInst->setPersistentInstructionId(inst->getPersistentInstructionId());
-    decMethodId();
-    newInst->setMethodId(inst->getMethodId());
     return newInst;
 }
 
@@ -1148,8 +1110,6 @@ InstFactory::makeClone(MultiSrcInst* inst, OpndManager& opndManager, OpndRenameT
         break;
     }
     newInst->setPersistentInstructionId(inst->getPersistentInstructionId());
-    decMethodId();
-    newInst->setMethodId(inst->getMethodId());
     return newInst;
 }
 
@@ -1159,7 +1119,6 @@ InstFactory::makeClone(MultiSrcInst* inst, OpndManager& opndManager, OpndRenameT
 InstFactory::InstFactory(MemoryManager& mm, MethodDesc &md) : memManager(mm) {
     maxNumLabels = 0;
     numInsts = 0;
-    numMethodInsts = ((uint64)md.getUniqueId())<<32;
 }
 
 Opnd**
@@ -1229,14 +1188,12 @@ Inst*
 InstFactory::makeInst(Opcode op, Modifier mod, Type::Tag type, Opnd* dst) {
     Inst* inst = new (memManager) Inst(op, mod, type, dst);
     inst->id       = numInsts++;
-    inst->methodId = numMethodInsts++;
     return inst;
 }
 Inst*
 InstFactory::makeInst(Opcode op, Modifier mod, Type::Tag type, Opnd* dst, Opnd* src) {
     Inst* inst = new (memManager) Inst(op, mod, type, dst, src);
     inst->id       = numInsts++;
-    inst->methodId = numMethodInsts++;
     return inst;
 }
 Inst*
@@ -1248,28 +1205,24 @@ InstFactory::makeInst(Opcode op,
                       Opnd* src2) {
     Inst* inst = new (memManager) Inst(op, mod, type, dst, src1, src2);
     inst->id       = numInsts++;
-    inst->methodId = numMethodInsts++;
     return inst;
 }
 LabelInst*
 InstFactory::makeLabelInst(uint32 labelId) {
     LabelInst* inst = new (memManager) LabelInst(labelId);
     inst->id       = numInsts++;
-    inst->methodId = numMethodInsts++;
     return inst;
 }
 LabelInst*
 InstFactory::makeLabelInst(Opcode opc, uint32 labelId) {
     LabelInst* inst = new (memManager) LabelInst(opc, labelId);
     inst->id       = numInsts++;
-    inst->methodId = numMethodInsts++;
     return inst;
 }
 DispatchLabelInst*
 InstFactory::makeDispatchLabelInst(uint32 labelId) {
     DispatchLabelInst* inst = new (memManager) DispatchLabelInst(labelId);
     inst->id       = numInsts++;
-    inst->methodId = numMethodInsts++;
     return inst;
 }
 
@@ -1279,7 +1232,6 @@ InstFactory::makeCatchLabelInst(uint32 labelId,
                                    Type *exceptionType) {
     CatchLabelInst* inst = new (memManager) CatchLabelInst(labelId, ord, exceptionType);
     inst->id       = numInsts++;
-    inst->methodId = numMethodInsts++;
     return inst;
 }
 
@@ -1287,7 +1239,6 @@ MethodEntryInst*
 InstFactory::makeMethodEntryInst(uint32 labelId, MethodDesc* md)  {
     MethodEntryInst* inst = new (memManager) MethodEntryInst(labelId, md);
     inst->id       = numInsts++;
-    inst->methodId = numMethodInsts++;
     return inst;
 }
 
@@ -1297,7 +1248,6 @@ InstFactory::makeMethodMarkerInst(MethodMarkerInst::Kind k, MethodDesc* md,
     assert(obj && !obj->isNull());
     MethodMarkerInst* inst = new (memManager) MethodMarkerInst(k, md, obj, retOpnd);
     inst->id = numInsts++;
-    inst->methodId = numMethodInsts++;
     return inst;
 }
 
@@ -1306,7 +1256,6 @@ InstFactory::makeMethodMarkerInst(MethodMarkerInst::Kind k, MethodDesc* md,
         Opnd *retOpnd) {
     MethodMarkerInst* inst = new (memManager) MethodMarkerInst(k, md, retOpnd);
     inst->id       = numInsts++;
-    inst->methodId = numMethodInsts++;
     return inst;
 }
 
@@ -1314,7 +1263,6 @@ MethodMarkerInst*
 InstFactory::makeMethodMarkerInst(MethodMarkerInst::Kind k, MethodDesc* md) {
     MethodMarkerInst* inst = new (memManager) MethodMarkerInst(k, md);
     inst->id       = numInsts++;
-    inst->methodId = numMethodInsts++;
     return inst;
 }
 
@@ -1322,7 +1270,6 @@ BranchInst*
 InstFactory::makeBranchInst(Opcode op, LabelInst* target) {
     BranchInst* inst = new (memManager) BranchInst(op, target);
     inst->id       = numInsts++;
-    inst->methodId = numMethodInsts++;
     return inst;
 }
 BranchInst*
@@ -1331,7 +1278,6 @@ InstFactory::makeBranchInst(Opcode op,
                             LabelInst* target) {
     BranchInst* inst = new (memManager) BranchInst(op, src, target);
     inst->id       = numInsts++;
-    inst->methodId = numMethodInsts++;
     return inst;
 }
 BranchInst*
@@ -1342,7 +1288,6 @@ InstFactory::makeBranchInst(Opcode op,
                             LabelInst* target) {
     BranchInst* inst = new (memManager) BranchInst(op, mod, type, src, target);
     inst->id       = numInsts++;
-    inst->methodId = numMethodInsts++;
     return inst;
 }
 BranchInst*
@@ -1354,7 +1299,6 @@ InstFactory::makeBranchInst(Opcode op,
                             LabelInst* target) {
     BranchInst* inst = new (memManager) BranchInst(op, mod, type, src1, src2, target);
     inst->id       = numInsts++;
-    inst->methodId = numMethodInsts++;
     return inst;
 }
 
@@ -1363,56 +1307,48 @@ InstFactory::makeSwitchInst(Opnd* src, LabelInst** targets, uint32 nTargets,
                             LabelInst* defTarget) {
     SwitchInst* inst = new (memManager) SwitchInst(src, targets, nTargets, defTarget);
     inst->id       = numInsts++;
-    inst->methodId = numMethodInsts++;
     return inst;
 }
 ConstInst*
 InstFactory::makeConstInst(Opnd* dst, int32 i4) {
     ConstInst* inst = new (memManager) ConstInst(dst, i4);
     inst->id       = numInsts++;
-    inst->methodId = numMethodInsts++;
     return inst;
 }
 ConstInst*
 InstFactory::makeConstInst(Opnd* dst, int64 i8)  {
     ConstInst* inst = new (memManager) ConstInst(dst, i8);
     inst->id       = numInsts++;
-    inst->methodId = numMethodInsts++;
     return inst;
 }
 ConstInst*
 InstFactory::makeConstInst(Opnd* dst, float fs) {
     ConstInst* inst = new (memManager) ConstInst(dst, fs);
     inst->id       = numInsts++;
-    inst->methodId = numMethodInsts++;
     return inst;
 }
 ConstInst*
 InstFactory::makeConstInst(Opnd* dst, double fd)  {
     ConstInst* inst = new (memManager) ConstInst(dst, fd);
     inst->id       = numInsts++;
-    inst->methodId = numMethodInsts++;
     return inst;
 }
 ConstInst*
 InstFactory::makeConstInst(Opnd* dst, ConstInst::ConstValue val) {
     ConstInst* inst = new (memManager) ConstInst(dst, val);
     inst->id       = numInsts++;
-    inst->methodId = numMethodInsts++;
     return inst;
 }
 ConstInst*
 InstFactory::makeConstInst(Opnd* dst) {
     ConstInst* inst = new (memManager) ConstInst(dst);
     inst->id       = numInsts++;
-    inst->methodId = numMethodInsts++;
     return inst;
 }
 TokenInst*
 InstFactory::makeTokenInst(Opcode opc, Modifier mod, Type::Tag type, Opnd* dst, uint32 t, MethodDesc* encMethod) {
     TokenInst* inst = new (memManager) TokenInst(opc, mod, type, dst, t, encMethod);
     inst->id       = numInsts++;
-    inst->methodId = numMethodInsts++;
     return inst;
 }
 LinkingExcInst*
@@ -1421,42 +1357,36 @@ InstFactory::makeLinkingExcInst(Opcode opc, Modifier mod, Type::Tag type, Opnd* 
     LinkingExcInst* inst =
         new (memManager) LinkingExcInst(opc, mod, type, dst, encClass, CPIndex, operation);
     inst->id       = numInsts++;
-    inst->methodId = numMethodInsts++;
     return inst;
 }
 VarAccessInst*
 InstFactory::makeVarAccessInst(Opcode op, Type::Tag type, Opnd* dst, VarOpnd* var) {
     VarAccessInst* inst = new (memManager) VarAccessInst(op, type, dst, var);
     inst->id       = numInsts++;
-    inst->methodId = numMethodInsts++;
     return inst;
 }
 VarAccessInst*
 InstFactory::makeVarAccessInst(Opcode op, Type::Tag type, VarOpnd* var, Opnd* src) {
     VarAccessInst* inst = new (memManager) VarAccessInst(op, type, var, src);
     inst->id       = numInsts++;
-    inst->methodId = numMethodInsts++;
     return inst;
 }
 VarAccessInst*
 InstFactory::makeVarAccessInst(Opcode op, Type::Tag type, Opnd* dst, SsaVarOpnd* var) {
     VarAccessInst* inst = new (memManager) VarAccessInst(op, type, dst, var);
     inst->id       = numInsts++;
-    inst->methodId = numMethodInsts++;
     return inst;
 }
 VarAccessInst*
 InstFactory::makeVarAccessInst(Opcode op, Type::Tag type, SsaVarOpnd* var, Opnd* src) {
     VarAccessInst* inst = new (memManager) VarAccessInst(op, type, var, src);
     inst->id       = numInsts++;
-    inst->methodId = numMethodInsts++;
     return inst;
 }
 TypeInst*
 InstFactory::makeTypeInst(Opcode op, Modifier mod, Type::Tag ty, Opnd* dst, Type* td) {
     TypeInst* inst = new (memManager) TypeInst(op, mod, ty, dst, td);
     inst->id       = numInsts++;
-    inst->methodId = numMethodInsts++;
     return inst;
 }
 TypeInst*
@@ -1464,7 +1394,6 @@ InstFactory::makeTypeInst(Opcode op, Modifier mod, Type::Tag ty, Opnd* dst,
     Opnd* src, Type* td) {
     TypeInst* inst = new (memManager) TypeInst(op, mod, ty, dst, src, td);
     inst->id       = numInsts++;
-    inst->methodId = numMethodInsts++;
     return inst;
 }
 TypeInst*
@@ -1472,7 +1401,6 @@ InstFactory::makeTypeInst(Opcode op, Modifier mod, Type::Tag ty, Opnd* dst,
     Opnd* src1, Opnd* src2, Type* td) {
     TypeInst* inst = new (memManager) TypeInst(op, mod, ty, dst, src1, src2, td);
     inst->id       = numInsts++;
-    inst->methodId = numMethodInsts++;
     return inst;
 }
 TypeInst*
@@ -1482,7 +1410,6 @@ InstFactory::makeTypeInst(Opcode op, Modifier mod, Type::Tag ty, Opnd* dst,
     Opnd** srcs = copyOpnds(srcs_local, 3);
     TypeInst* inst = new (memManager) TypeInst(op, mod, ty, dst, 3, srcs, td);
     inst->id       = numInsts++;
-    inst->methodId = numMethodInsts++;
     return inst;
 }
 TypeInst*
@@ -1492,7 +1419,6 @@ InstFactory::makeTypeInst(Opcode op, Modifier mod, Type::Tag ty, Opnd* dst,
     Opnd** srcs = copyOpnds(srcs_local, 4);
     TypeInst* inst = new (memManager) TypeInst(op, mod, ty, dst, 4, srcs, td);
     inst->id       = numInsts++;
-    inst->methodId = numMethodInsts++;
     return inst;
 }
 TypeInst*
@@ -1500,7 +1426,6 @@ InstFactory::makeTypeInst(Opcode op, Modifier mod, Type::Tag ty, Opnd* dst,
     uint32 nArgs, Opnd** args_, Type* td) {
     TypeInst* inst = new (memManager) TypeInst(op, mod, ty, dst, nArgs, args_, td);
     inst->id       = numInsts++;
-    inst->methodId = numMethodInsts++;
     return inst;
 }
 FieldAccessInst*
@@ -1511,7 +1436,6 @@ InstFactory::makeFieldAccessInst(Opcode op,
                 FieldDesc* fd) {
     FieldAccessInst* inst = new (memManager) FieldAccessInst(op, mod, type, dst, fd);
     inst->id       = numInsts++;
-    inst->methodId = numMethodInsts++;
     return inst;
 }
 FieldAccessInst*
@@ -1523,7 +1447,6 @@ InstFactory::makeFieldAccessInst(Opcode op,
                 FieldDesc* fd) {
     FieldAccessInst* inst = new (memManager) FieldAccessInst(op, mod, type, dst, src, fd);
     inst->id       = numInsts++;
-    inst->methodId = numMethodInsts++;
     return inst;
 }
 FieldAccessInst*
@@ -1536,7 +1459,6 @@ InstFactory::makeFieldAccessInst(Opcode op,
                 FieldDesc* fd) {
     FieldAccessInst* inst = new (memManager) FieldAccessInst(op, mod, type, dst, src1, src2, fd);
     inst->id       = numInsts++;
-    inst->methodId = numMethodInsts++;
     return inst;
 }
 FieldAccessInst*
@@ -1550,21 +1472,18 @@ InstFactory::makeFieldAccessInst(Opcode op,
     srcs = copyOpnds(srcs, numSrcs);
     FieldAccessInst* inst = new (memManager) FieldAccessInst(op, mod, type, dst, numSrcs, srcs, fd);
     inst->id       = numInsts++;
-    inst->methodId = numMethodInsts++;
     return inst;
 }
 MethodInst*
 InstFactory::makeMethodInst(Opcode op, Modifier mod, Type::Tag type, Opnd* dst, MethodDesc* md) {
     MethodInst* inst = new (memManager) MethodInst(op, mod, type, dst, md);
     inst->id       = numInsts++;
-    inst->methodId = numMethodInsts++;
     return inst;
 }
 MethodInst*
 InstFactory::makeMethodInst(Opcode op, Modifier mod, Type::Tag type, Opnd* dst, Opnd* base, MethodDesc* md) {
     MethodInst* inst = new (memManager) MethodInst(op, mod, type, dst, base, md);
     inst->id       = numInsts++;
-    inst->methodId = numMethodInsts++;
     return inst;
 }
 MethodInst*
@@ -1573,7 +1492,6 @@ InstFactory::makeMethodInst(Opcode op, Modifier mod, Type::Tag type, Opnd* dst, 
     assert(tauHasMethod->getType()->tag == Type::Tau);
     MethodInst* inst = new (memManager) MethodInst(op, mod, type, dst, base, tauHasMethod, md);
     inst->id       = numInsts++;
-    inst->methodId = numMethodInsts++;
     return inst;
 }
 MethodInst*
@@ -1585,7 +1503,6 @@ InstFactory::makeMethodInst(Opcode op,
                             MethodDesc* md) {
     MethodInst* inst = new (memManager) MethodInst(op, mod, type, dst, nArgs, 0, md);
     inst->id       = numInsts++;
-    inst->methodId = numMethodInsts++;
     return inst;
 }
 MethodInst*
@@ -1599,7 +1516,6 @@ InstFactory::makeMethodInst(Opcode op,
     srcs = copyOpnds(srcs, numSrcs);
     MethodInst* inst = new (memManager) MethodInst(op, mod, type, dst, numSrcs, srcs, md);
     inst->id       = numInsts++;
-    inst->methodId = numMethodInsts++;
     return inst;
 }
 MethodCallInst*
@@ -1611,7 +1527,6 @@ InstFactory::makeMethodCallInst(Opcode op, Modifier mod,
                MethodDesc* md) {
     MethodCallInst* inst = new (memManager) MethodCallInst(op, mod, type, dst, numArgs, args, md, memManager);
     inst->id       = numInsts++;
-    inst->methodId = numMethodInsts++;
     return inst;
 }
 
@@ -1624,7 +1539,6 @@ InstFactory::makeCallInst(Opcode op, Modifier mod,
                           Opnd** args) {
     CallInst* inst = new (memManager) CallInst(op, mod, type, dst, funptr, numArgs, args, memManager);
     inst->id       = numInsts++;
-    inst->methodId = numMethodInsts++;
     return inst;
 }
 
@@ -1638,7 +1552,6 @@ InstFactory::makeIntrinsicCallInst(Opcode op, Modifier mod,
     IntrinsicCallInst * inst = 
         new (memManager) IntrinsicCallInst(op, mod, type, dst, nArgs, args_, id);
     inst->id       = numInsts++;
-    inst->methodId = numMethodInsts++;
     return inst;
 }
 
@@ -1653,7 +1566,6 @@ InstFactory::makeJitHelperCallInst(Opcode op,
     JitHelperCallInst * inst = 
         new (memManager) JitHelperCallInst(op, mod, type, dst, nArgs, args_, id);
     inst->id       = numInsts++;
-    inst->methodId = numMethodInsts++;
     return inst;
 }
 
@@ -1669,7 +1581,6 @@ InstFactory::makeVMHelperCallInst(Opcode op,
     VMHelperCallInst * inst = 
         new (memManager) VMHelperCallInst(op, mod, type, dst, nArgs, args_, id);
     inst->id       = numInsts++;
-    inst->methodId = numMethodInsts++;
     inst->inlInfo = inlInfo;
     return inst;
 }
@@ -1683,7 +1594,6 @@ InstFactory::makePhiInst(Type::Tag type, Opnd* dst, uint32 nArgs, Opnd** args_) 
 #endif
     PhiInst* inst = new (memManager) PhiInst(type, dst, nArgs, args_);
     inst->id       = numInsts++;
-    inst->methodId = numMethodInsts++;
     return inst;
 }
 
@@ -1694,7 +1604,6 @@ InstFactory::makeMultiSrcInst(Opcode opc,
                           Opnd* dst) {
     MultiSrcInst* inst = new (memManager) MultiSrcInst(opc, mod, ty, dst);
     inst->id       = numInsts++;
-    inst->methodId = numMethodInsts++;
     return inst;
 }
 MultiSrcInst*
@@ -1705,7 +1614,6 @@ InstFactory::makeMultiSrcInst(Opcode opc,
                           Opnd* src) {
     MultiSrcInst* inst = new (memManager) MultiSrcInst(opc, mod, ty, dst, src);
     inst->id       = numInsts++;
-    inst->methodId = numMethodInsts++;
     return inst;
 }
 MultiSrcInst*
@@ -1717,7 +1625,6 @@ InstFactory::makeMultiSrcInst(Opcode opc,
                           Opnd* src2) {
     MultiSrcInst* inst = new (memManager) MultiSrcInst(opc, mod, ty, dst, src1, src2);
     inst->id       = numInsts++;
-    inst->methodId = numMethodInsts++;
     return inst;
 }
 MultiSrcInst*
@@ -1756,7 +1663,6 @@ InstFactory::makeMultiSrcInst(Opcode opc,
                           Opnd** srcs) {
     MultiSrcInst* inst = new (memManager) MultiSrcInst(opc, mod, ty, dst, nSrcs, srcs);
     inst->id       = numInsts++;
-    inst->methodId = numMethodInsts++;
     return inst;
 }
 
@@ -2051,7 +1957,6 @@ InstFactory::makeIndirectCall(Opnd* dst,
     Inst* inst = makeCallInst(Op_IndirectCall, Modifier(Exception_Sometimes), 
                               returnType, dst, funAddr, numArgs+2, newArgs);
     inst->id = numInsts++;
-    inst->methodId = numMethodInsts++;
     return inst;
 }
 
@@ -2070,7 +1975,6 @@ InstFactory::makeIndirectMemoryCall(Opnd* dst,
     Inst* inst = makeCallInst(Op_IndirectMemoryCall, Modifier(Exception_Sometimes), 
                               returnType, dst, funAddr, numArgs+2, newArgs);
     inst->id = numInsts++;
-    inst->methodId = numMethodInsts++;
     return inst;
 }
 
@@ -2128,7 +2032,6 @@ InstFactory::makeTauPi(Opnd* dst, Opnd* src, Opnd *tauDep, PiCondition *cond) {
     Type::Tag atype = src->getType()->tag;
     TauPiInst* inst = new (memManager) TauPiInst(atype, dst, src, tauDep, cond);
     inst->id       = numInsts++;
-    inst->methodId = numMethodInsts++;
     return inst;
 }
 
