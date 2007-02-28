@@ -1,4 +1,5 @@
 @ECHO OFF
+set
 
 rem    Copyright 2005-2006 The Apache Software Foundation or its licensors, as applicable.
 rem  
@@ -42,6 +43,7 @@ REM Script for configuring C/C++ compiler, Intel C compiler by default.
 
 REM Select configuration depending on 64-bitness of Windows
 IF _%PROCESSOR_ARCHITEW6432%_==_AMD64_ GOTO X86_64_CONFIG
+IF _%PROCESSOR_ARCHITECTURE%_==_AMD64_ GOTO X86_64_CONFIG
 IF _%CXX%_ == _msvc_ GOTO MSVC_COMPILER
 GOTO DEFAULT_COMPILER
 
