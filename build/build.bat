@@ -1,5 +1,4 @@
 @ECHO OFF
-set
 
 rem    Copyright 2005-2006 The Apache Software Foundation or its licensors, as applicable.
 rem  
