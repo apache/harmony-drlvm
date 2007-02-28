@@ -38,65 +38,77 @@ REM  ANT_HOME = <Path to Apache Ant 1.6.5>
 REM  COMPILER_CFG_SCRIPT = <Whatever script that is configuring environment for C/C++ compiler>
 REM ================================================
 
-
 REM Script for configuring C/C++ compiler, Intel C compiler by default.
 
-IF DEFINED COMPILER_CFG_SCRIPT GOTO CONFIG
+REM Select configuration depending on 64-bitness of Windows
+IF _%PROCESSOR_ARCHITEW6432%_==_AMD64_ GOTO X86_64_CONFIG
+IF _%CXX%_ == _msvc_ GOTO MSVC_COMPILER
+GOTO DEFAULT_COMPILER
 
-IF "%CXX%" == "msvc" (
-    IF EXIST "C:\Program Files\Microsoft Platform SDK\SetEnv.Cmd" (
-        SET COMPILER_CFG_SCRIPT=C:\Program Files\Microsoft Platform SDK\SetEnv.Cmd
-    ) ELSE IF EXIST "C:\Program Files\Microsoft SDK\SetEnv.bat" (
-        SET COMPILER_CFG_SCRIPT=C:\Program Files\Microsoft SDK\SetEnv.bat
-    ) ELSE IF EXIST "C:\Program Files\Microsoft Visual Studio .NET 2003\Common7\Tools\vsvars32.bat" (
-        SET COMPILER_CFG_SCRIPT=C:\Program Files\Microsoft Visual Studio .NET 2003\Common7\Tools\vsvars32.bat
-    ) ELSE IF EXIST "c:\Program Files\Microsoft Visual Studio\VC98\Bin\VCVARS32.BAT" (
-        SET COMPILER_CFG_SCRIPT=C:\Program Files\Microsoft Visual Studio\VC98\Bin\VCVARS32.BAT
-    )
+:MSVC_COMPILER
+REM Try Platform SDK first
+SET COMPILER_CFG_SCRIPT=C:\Program Files\Microsoft Platform SDK\SetEnv.Cmd
+IF EXIST "%COMPILER_CFG_SCRIPT%" GOTO CHOOSE_ARGS
 
-    IF "%BUILD_CFG%" == "release" (
-        SET COMPILER_CFG_ARG=/RETAIL
-    ) ELSE (
-        SET COMPILER_CFG_ARG=/DEBUG
-    )
-            
+REM Try Platform SDK at another location
+SET COMPILER_CFG_SCRIPT=C:\Program Files\Microsoft SDK\SetEnv.bat
+IF EXIST "%COMPILER_CFG_SCRIPT%" GOTO CHOOSE_ARGS
+
+REM Then try Mirosoft Visual Studio .NET 2003
+SET COMPILER_CFG_SCRIPT=C:\Program Files\Microsoft Visual Studio .NET 2003\Common7\Tools\vsvars32.bat
+IF EXIST "%COMPILER_CFG_SCRIPT%" GOTO CHOOSE_ARGS
+
+REM Otherwise try Mocrosoft Visual Studio 6
+SET COMPILER_CFG_SCRIPT=C:\Program Files\Microsoft Visual Studio\VC98\Bin\VCVARS32.BAT
+IF EXIST "%COMPILER_CFG_SCRIPT%" GOTO CHOOSE_ARGS
+GOTO NO_CFG_SCRIPT
+
+:CHOOSE_ARGS
+IF "%BUILD_CFG%" == "release" (
+    SET COMPILER_CFG_ARG=/RETAIL
 ) ELSE (
-    IF NOT DEFINED VS71COMNTOOLS (
-        IF EXIST "C:\Program Files\Microsoft Visual Studio .NET 2003\Common7\Tools" (
-            SET VS71COMNTOOLS=C:\Program Files\Microsoft Visual Studio .NET 2003\Common7\Tools\
-        )
+    SET COMPILER_CFG_ARG=/DEBUG
+)
+GOTO RUN_COMPILER_CONFIGURATION
+
+:DEFAULT_COMPILER
+IF NOT DEFINED VS71COMNTOOLS (
+    IF EXIST "C:\Program Files\Microsoft Visual Studio .NET 2003\Common7\Tools" (
+        SET VS71COMNTOOLS=C:\Program Files\Microsoft Visual Studio .NET 2003\Common7\Tools\
     )
-
-    IF EXIST "C:\Program Files\Intel\Compiler\C++\9.0\IA32\Bin\iclvars.bat" (
-        SET COMPILER_CFG_SCRIPT=C:\Program Files\Intel\Compiler\C++\9.0\IA32\Bin\iclvars.bat
-    ) 
-) 
-
-IF NOT DEFINED COMPILER_CFG_SCRIPT (
-    ECHO error: Cannot guess the location of compiler configuration script
-    ECHO Please set COMPILER_CFG_SCRIPT and/or CXX
-    GOTO ERROR
 )
 
-:CONFIG
-IF "%COMPILER_CFG_SCRIPT%" == "EM64T" (
-    ECHO ON
-    CALL "c:\Program Files (x86)\Microsoft Visual Studio 8\VC\vcvarsall.bat" amd64 %COMPILER_CFG_ARG%
-    @ECHO OFF
-    GOTO WO_CONFIG	
-)
+SET COMPILER_CFG_SCRIPT=C:\Program Files\Intel\Compiler\C++\9.0\IA32\Bin\iclvars.bat
+IF EXIST "%COMPILER_CFG_SCRIPT%" GOTO RUN_COMPILER_CONFIGURATION
+GOTO NO_CFG_SCRIPT
+
+:X86_64_CONFIG
+REM Select Microsoft Visual Studio 2005 on Windows x64 edition
+SET COMPILER_CFG_SCRIPT=C:\Program Files (x86)\Microsoft Visual Studio 8\VC\vcvarsall.bat
+SET PLATFORM_64BIT=amd64
+IF EXIST "%COMPILER_CFG_SCRIPT%" GOTO RUN_COMPILER_CONFIGURATION
+
+:NO_CFG_SCRIPT
+ECHO error: Cannot guess the location of compiler configuration script
+ECHO Please set COMPILER_CFG_SCRIPT and/or CXX
+GOTO ERROR
+
+:RUN_COMPILER_CONFIGURATION
+ECHO COMPILER_CFG_SCRIPT="%COMPILER_CFG_SCRIPT%"
+ECHO PLATFORM_64BIT="%PLATFORM_64BIT%"
+ECHO COMPILER_CFG_ARG="%COMPILER_CFG_ARG%"
 ECHO ON
-CALL "%COMPILER_CFG_SCRIPT%" %COMPILER_CFG_ARG%
+CALL "%COMPILER_CFG_SCRIPT%" %PLATFORM_64BIT% %COMPILER_CFG_ARG%
 @ECHO OFF
 
-:WO_CONFIG
-IF NOT %ERRORLEVEL% == 0 (
+IF NOT ERRORLEVEL 0 (
     ECHO *
     ECHO * Failed to call C compiler configuration script:
-    ECHO * %COMPILER_CFG_SCRIPT%
+    ECHO * "%COMPILER_CFG_SCRIPT%"
     ECHO *
     GOTO ERROR
  )
+
 REM ================================================
 REM Check JAVA_HOME & ANT_HOME
 REM ================================================
