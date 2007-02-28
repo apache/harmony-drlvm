@@ -110,7 +110,7 @@ APR_DECLARE(const char *) port_CPU_architecture(void){
 #if defined(_IPF_)
 	return "ia64";
 #elif defined (_EM64T_)
-    return "em64t";
+    return "x86_64";
 #else
     return "x86";
 #endif
