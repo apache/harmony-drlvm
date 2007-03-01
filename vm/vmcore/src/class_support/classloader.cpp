@@ -223,7 +223,7 @@ Class* ClassLoader::DefineClass(Global_Env* env, const char* class_name,
 {
     assert(!exn_raised());
     const String *className;
-
+    
     LOG2("classloader.defineclass", "Defining class " << (NULL != class_name ? class_name : "NULL") << " with loader " << this);
     if(class_name) {
         className = env->string_pool.lookup(class_name);
@@ -233,9 +233,20 @@ Class* ClassLoader::DefineClass(Global_Env* env, const char* class_name,
             FailedLoadingClass(className);
             exn_raise_by_name("java/lang/ClassFormatError",
                 "class name could not be extracted from provided class data", NULL);
+            TRACE("No class name, DefineClass failed with CFE");
             return NULL;
         }
     }
+    if (LookupClass(className) != NULL) {
+        static const char* mess_templ = "Illegal attempt to redefine class : %s";
+        unsigned mess_size = strlen(mess_templ) + className->len + 1;
+        char* err_mess = (char*)STD_ALLOCA(mess_size);
+        sprintf(err_mess, mess_templ, className->bytes);
+        exn_raise_by_name("java/lang/LinkageError", err_mess);
+        TRACE(err_mess);
+        return NULL;
+    }
+    
     if(res_name) {
         *res_name = className;
     }
@@ -274,6 +285,7 @@ Class* ClassLoader::DefineClass(Global_Env* env, const char* class_name,
         if (NULL != redef_buf)
             _deallocate(redef_buf);
         FailedLoadingClass(className);
+        TRACE("Parsing classdata failed: " << className->bytes);
         return NULL;
     }
     if (NULL != redef_buf)
@@ -1684,7 +1696,7 @@ Class* BootstrapClassLoader::LoadFromFile(const String* class_name)
 
     // the symptom of circularity (illegal) is that a null class name is passed,
     // so detect this immediately
-    if( !class_name->bytes || *(class_name->bytes) == 0 ) {
+    if(!class_name->bytes) {
         REPORT_FAILED_CLASS_NAME(this, class_name->bytes,
             "java/lang/ClassCircularityError", class_name->bytes);
         return NULL;
@@ -1736,6 +1748,7 @@ Class* BootstrapClassLoader::LoadFromFile(const String* class_name)
 
         // check if a given class is found
         if(!not_found) {
+            p_TLS_vmthread->class_not_found = false;
             return clss;
         }
         assert(clss == NULL);

@@ -38,34 +38,21 @@
 #include "vm_strings.h"
 
 #include "java_lang_VMClassRegistry.h"
+#include "java_lang_ClassLoader.h"
 
 /*
  * Class:     java_lang_VMClassRegistry
  * Method:    defineClass
  * Signature: (Ljava/lang/String;[BII)Ljava/lang/Class;
  */
-JNIEXPORT jclass JNICALL Java_java_lang_VMClassRegistry_defineClass
-  (JNIEnv *jenv, jclass, jstring name, jobject cl, jbyteArray data, jint offset, jint len)
+JNIEXPORT jclass JNICALL Java_java_lang_ClassLoader_defineClass0 
+  (JNIEnv *jenv, jobject cl, jstring name, jbyteArray data, jint offset, jint len)
 {
     const char* clssname = NULL;
 
     // obtain char * for the name if provided
     if(name) {
         clssname = GetStringUTFChars(jenv, name, NULL);
-        if (NULL != strchr(clssname, '/'))
-        {
-            std::stringstream ss;
-            ss << "The name is expected in binary (canonical) form,"
-                " therefore '/' symbols are not allowed: " << clssname;
-
-            ReleaseStringUTFChars(jenv, name, clssname);
-            exn_raise_object(
-                exn_create(
-                    VM_Global_State::loader_env->JavaLangNoClassDefFoundError_String->bytes,
-                    ss.str().c_str()));
-
-            return NULL;
-        }
     }
 
     // obtain raw classfile data data pointer
@@ -85,86 +72,49 @@ JNIEXPORT jclass JNICALL Java_java_lang_VMClassRegistry_defineClass
     return clss;
 }
 
+JNIEXPORT jclass JNICALL Java_java_lang_VMClassRegistry_loadBootstrapClass
+    (JNIEnv *jenv, jclass, jstring name)
+{
+    // obtain char* for the name
+    const char* buf = GetStringUTFChars(jenv, name, NULL);
+    // set flag to detect if the requested class is not on the bootclasspath
+    p_TLS_vmthread->class_not_found = true;
+    Class_Handle clss = class_find_class_from_loader(NULL, buf, FALSE);
+    ReleaseStringUTFChars(jenv, name, buf);
+    if (clss) {
+        // filter out primitive types for compatibility
+        return clss->is_primitive() ? NULL : jni_class_from_handle(jenv, clss);
+    } else {
+        assert(exn_raised());
+        if(p_TLS_vmthread->class_not_found) 
+        {
+            // the requested class is not on the bootclasspath
+            // delegation model requires letting child loader(s) to continue 
+            // with searching on their paths, so reset the exception
+            exn_clear();
+        }
+        return NULL;
+    }
+}
+
 /*
  * Class:     java_lang_VMClassRegistry
  * Method:    findLoadedClass
  * Signature: (Ljava/lang/String;Ljava/lang/ClassLoader;)Ljava/lang/Class;
  */
-JNIEXPORT jclass JNICALL Java_java_lang_VMClassRegistry_findLoadedClass
-    (JNIEnv *jenv, jclass, jstring name, jobject cl)
+JNIEXPORT jclass JNICALL Java_java_lang_ClassLoader_findLoadedClass
+    (JNIEnv *jenv, jobject cl, jstring name)
 {
-    ASSERT_RAISE_AREA;
-
-    // check the name is provided
-    if (name == NULL) {
-        ThrowNew_Quick(jenv, "java/lang/NullPointerException", "null class name value.");
+    if (NULL == name) {
         return NULL;
-    }
-
-    // obtain char* for the name
-    unsigned length = GetStringUTFLength(jenv, name);
-    char* buf = (char*)STD_MALLOC(length+1);
-    assert(buf);
-    GetStringUTFRegion(jenv, name, 0, GetStringLength(jenv, name), buf);
-
-    // check for wrong symbols
-    if (strcspn(buf, "/[;") < length) {
-        STD_FREE(buf);
-        return NULL;
-    }
-
-    // filter out primitive types
-
-    Global_Env *ge = jni_get_vm_env(jenv);
-    Class* primitives[] = {
-        ge->Boolean_Class,
-        ge->Char_Class,
-        ge->Float_Class,
-        ge->Double_Class,
-        ge->Byte_Class,
-        ge->Short_Class,
-        ge->Int_Class,
-        ge->Long_Class,
-        ge->Void_Class,
-    };
-    int primitives_len = sizeof(primitives) / sizeof(Class*);
-
-    for (int i = 0; i < primitives_len; i++) {
-        if (primitives[i] && primitives[i]->get_name()) {
-            char *pname = (char*)primitives[i]->get_name()->bytes;
-            if (0 == strcmp(buf, pname)) {
-                STD_FREE(buf);
-                return NULL;
-            }
-        }
-    }
-
-    ClassLoaderHandle loader = NULL;
-    Class_Handle clss = NULL;
-    jclass jclss = NULL;
-
-    if(cl) {
-        // if non null class loader is provided, search among loaded classes
-        loader = class_loader_lookup(cl);
-        clss = class_find_loaded(loader, buf);
-    } else {
-        // if null class loader is specified
-        // load class using bootstrap class loader
-        // clss = class_find_class_from_loader(NULL, buf, TRUE);
-        clss = class_find_class_from_loader(NULL, buf, FALSE);
-    }
-
-    STD_FREE(buf);
-
-    if (clss)
-        jclss = jni_class_from_handle(jenv, clss);
-
-    if (ExceptionOccurred(jenv)) {
-        ExceptionClear(jenv);
-        assert(jclss == NULL);
-    }
-
-    return jclss;
+    } 
+    
+    const char* buf = GetStringUTFChars(jenv, name, NULL);
+    ClassLoaderHandle loader = class_loader_lookup(cl);
+    Class_Handle clss = class_find_loaded(loader, buf);
+    ReleaseStringUTFChars(jenv, name, buf);
+    
+    return clss ? jni_class_from_handle(jenv, clss) : NULL; 
 }
 
 /*
@@ -448,6 +398,7 @@ JNIEXPORT void JNICALL Java_java_lang_VMClassRegistry_initializeClass
   (JNIEnv *jenv, jclass unused, jclass clazz)
 {
     ASSERT_RAISE_AREA;
+    assert(clazz != NULL);
     Class *clss = jni_get_class_handle(jenv, clazz);
     Java_java_lang_VMClassRegistry_linkClass(jenv, unused, clazz);
     if(jenv->ExceptionCheck())
@@ -535,25 +486,6 @@ JNIEXPORT void JNICALL Java_java_lang_VMClassRegistry_linkClass
     // ppervov: this method intentionally left blank
     //      as in our VM classes will never get to Java
     //      unlinked (except resolution stage)
-}
-
-/*
- * Class:     java_lang_VMClassRegistry
- * Method:    loadArray
- * Signature: (Ljava/lang/Class;I)Ljava/lang/Class;
- */
-JNIEXPORT jclass JNICALL Java_java_lang_VMClassRegistry_loadArray
-  (JNIEnv *jenv, jclass, jclass compType, jint dims)
-{
-    Class *clss = jni_get_class_handle(jenv, compType);
-    Class *arr_clss = clss;
-
-    for (int i = 0; i < dims; i++) {
-        arr_clss = (Class *)class_get_array_of_class(arr_clss);
-        if (!arr_clss)   return 0;
-    }
-
-    return jni_class_from_handle(jenv, arr_clss);
 }
 
 /*

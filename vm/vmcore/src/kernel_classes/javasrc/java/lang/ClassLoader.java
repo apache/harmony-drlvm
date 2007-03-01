@@ -404,18 +404,31 @@ public abstract class ClassLoader {
                 throw new SecurityException(
                     "It is not allowed to define classes inside the java.* package: " + name);
             }
+            if (name.indexOf('/') != -1) {
+                throw new NoClassDefFoundError(
+                        "The name is expected in binary (canonical) form,"
+                        + " therefore '/' symbols are not allowed: " + name);
+            }
             int lastDot = name.lastIndexOf('.');
             packageName = lastDot == -1 ? "" : name.substring(0, lastDot);
             certs = getCertificates(packageName, domain.getCodeSource());
         }
-        Class<?> clazz = VMClassRegistry
-            .defineClass(name, this, data, offset, len);
+        Class<?> clazz = defineClass0(name, data, offset, len);
         clazz.setProtectionDomain(domain);
         if (certs != null) {
             packageCertificates.put(packageName, certs);
         }
         return clazz;
     }
+    
+    /**
+     * Loads new type into the classloader name space. 
+     * The class loader is marked as defining class loader. 
+     * @api2vm
+     */
+    private native Class<?> defineClass0(String name, byte[] data, int off, int len) 
+    throws ClassFormatError;
+
 
     /**
      * @com.intel.drl.spec_ref
@@ -454,9 +467,7 @@ public abstract class ClassLoader {
     /**
      * @com.intel.drl.spec_ref
      */
-    protected final Class<?> findLoadedClass(String name) {
-        return VMClassRegistry.findLoadedClass(name, this);
-    }
+    protected final native Class<?> findLoadedClass(String name);
 
     /**
      * @com.intel.drl.spec_ref
@@ -521,10 +532,17 @@ public abstract class ClassLoader {
     protected synchronized Class<?> loadClass(String name, boolean resolve)
         throws ClassNotFoundException {
         checkInitialized();
+        if (name == null) {
+            throw new NullPointerException();
+        }
+        if(name.indexOf("/") != -1) {
+            throw new ClassNotFoundException(name);
+        }
+
         Class<?> clazz = findLoadedClass(name);
         if (clazz == null) {
             if (parentClassLoader == null) {
-                clazz = VMClassRegistry.findLoadedClass(name, null);
+                clazz = VMClassRegistry.loadBootstrapClass(name);
             } else {
                 try {
                     clazz = parentClassLoader.loadClass(name);

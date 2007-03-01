@@ -568,54 +568,6 @@ jclass JNICALL DefineClass(JNIEnv *jenv,
     ClassLoader* cl;
     if (loader != NULL)
     {
-        if(name)
-        {
-            jclass clazz = GetObjectClass(jenv, loader);
-            jmethodID meth_id = GetMethodID(jenv, clazz, "findLoadedClass", "(Ljava/lang/String;)Ljava/lang/Class;");
-            if (NULL == meth_id)
-            {
-                jobject exn = exn_get();
-                tmn_suspend_disable();
-                Class *exn_class = exn->object->vt()->clss;
-                assert(exn_class);
-                bool f = exn_class != env->java_lang_OutOfMemoryError_Class;
-                tmn_suspend_enable();
-                if(f)
-                    LDIE(19, "Fatal: an access to findLoadedClass method of java.lang.Class is not provided");
-                // OutOfMemoryError should be rethrown after this JNI method exits
-                return 0;
-            }
-            jstring str = NewStringUTF(jenv, name);
-            if (NULL == str)
-            {
-                // the only OutOfMemoryError can be a reason to be here; it will be rethrown after this JNI method exits
-                return 0;
-            }
-            jobject obj = CallObjectMethod(jenv, loader, meth_id, str);
-            if(obj)
-            {
-                jthrowable exn;
-                if(exn_raised())
-                {
-                    // pending exception will be rethrown after the JNI method exits
-                    return 0;
-                }
-                else
-                {
-                    static const char* mess_templ = "duplicate class definition: ";
-                    static size_t mess_templ_len = strlen(mess_templ);
-                    size_t mess_size = mess_templ_len + strlen(name) + 1; // 1 is for trailing '\0'
-                    char* err_mess = (char*)STD_ALLOCA(mess_size);
-                    sprintf(err_mess, "%s%s", mess_templ, name);
-                    exn = exn_create("java/lang/LinkageError", err_mess);
-                }
-
-                assert(exn);
-                jint UNUSED ok = Throw(jenv, exn);
-                assert(ok == 0);
-                return 0;
-            }
-        }
         cl = class_loader_lookup(loader);
     }
     else

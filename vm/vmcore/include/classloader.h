@@ -170,6 +170,8 @@ public:
     Class* LookupClass(const String* name) { 
         LMAutoUnlock aulock(&m_lock);
         Class** klass = m_loadedClasses->Lookup(name);
+        if(klass == NULL)
+            klass = m_initiatedClasses->Lookup(name);
         return klass?*klass:NULL;
     }
     void InsertClass(Class* clss) {

@@ -90,46 +90,13 @@ final class VMClassRegistry
     private VMClassRegistry() 
     {
     }
-
+   
     /**
-     * Loads new type into specified class loader name space. The class loader
-     * should be marked as defining class loader. This method is used for the
-     * {@link ClassLoader#defineClass(String, byte[], int, int, java.security.ProtectionDomain)
-     * ClassLoader.defineClass(String name, byte[] b, int off, int len,
-     * ProtectionDomain protectionDomain)} method implementation.
-     * 
-     * @param name the name of class to be defined
-     * @param classLoader defining class loader
-     * @param data bytes pool containing the class data
-     * @param off start position of the class data in the pool
-     * @param len the length of the class data
-     * @return an object representing the defined class
-     * @throws ClassFormatError if the class data is incorrect.
-     * @throws NoClassDefFoundError if the specified name doesn't match class
-     *         name defined in the data array.
+     * Loads the specified class with the bootstrap classloader.  
+     * @throws LinkageError (or any subtype) if loading failed
      * @api2vm
      */
-    static native Class<?> defineClass(String name, ClassLoader classLoader,
-    byte[] data, int off, int len) throws ClassFormatError;
-
-    /**
-     * This method satisfies the requirements of the specification for the
-     * {@link ClassLoader#findLoadedClass(String)
-     * ClassLoader.findLoadedClass(String name)} method. But it differs in
-     * several ways.
-     * <p>
-     * First, it takes additional class loader parameter.
-     * <p>
-     * Second, if the specified class loader is equal to null it should make an
-     * attempt to load a class with the specified name. If class can not be
-     * loaded by any reason null should be returned.
-     * 
-     * @param loader the class loader which is used to find loaded classes. if
-     *        the specified class loader is equal to null than the bootstrap
-     *        class loader will be searched.
-     * @api2vm
-     */
-    static native Class<?> findLoadedClass(String name, ClassLoader loader);
+    static native Class<?> loadBootstrapClass(String name);
 
     /**
      * This method satisfies the requirements of the specification for the
@@ -302,24 +269,6 @@ final class VMClassRegistry
      * @api2vm
      */
     static native void linkClass(Class<?> clazz);
-
-    /**
-     * This method is used for the
-     * {@link Class#forName(java.lang.String, boolean, java.lang.ClassLoader)
-     * Class.forName(String name, boolean initialize, ClassLoader loader)}
-     * method implementation. If the name parameter represents an array then this  
-     * method should be invoked in order to load an array class. For example, an
-     * expression (loadArray(Integer.TYPE, 1) == new int[0].getClass()) must be
-     * true. 
-     * <p>
-     * <b>Note:</b> Under design yet. Subjected to change.
-     * 
-     * @param componentType the type of array components. It must not be null.
-     * @param dimensions array dimension. It must be greater or equal to 0.
-     * @return a class which represents array
-     * @api2vm
-     */
-    static native Class loadArray(Class componentType, int dimensions);
 
     /**
      * This method is used for implementation of the

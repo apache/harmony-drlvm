@@ -86,6 +86,13 @@ public:
      */
     ClassLoader* onload_caller;
 
+    /**
+    * Flag to detect if a class is not found on bootclasspath,
+    * as opposed to linkage errors.
+    * Used for implementing default delegation model.
+    */
+    bool class_not_found;
+
     // In case exception is thrown, Exception object is put here
     // TODO: Needs to be replaced with jobject!
     //volatile ManagedObject*           p_exception_object;

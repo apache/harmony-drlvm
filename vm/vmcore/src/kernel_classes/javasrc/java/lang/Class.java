@@ -134,68 +134,14 @@ public final class Class<T> implements Serializable, AnnotatedElement, GenericDe
      */
     public static Class<?> forName(String name, boolean initialize,
             ClassLoader classLoader) throws ClassNotFoundException {
-        if (name == null)
+        if (name == null) {
             throw new NullPointerException();
-            
-        Class clazz = null;
-        int i = 0;
-        try {
-            // First, if the name is array name convert it to simple reference
-            // name. For example, the name "[[Ljava.lang.Object;" will be
-            // converted to "java.lang.Object".
-            while (name.charAt(i) == '[') {
-                i++;
-            }
-            if (i > 0) {
-                switch (name.charAt(i)) {
-                case 'L':
-                    if (!name.endsWith(";")) {
-                        throw new ClassNotFoundException(name);
-                    }
-                    name = name.substring(i + 1, name.length() - 1);
-                    break;
-                case 'Z':
-                    clazz = Boolean.TYPE;
-                    break;
-                case 'B':
-                    clazz = Byte.TYPE;
-                    break;
-                case 'C':
-                    clazz = Character.TYPE;
-                    break;
-                case 'D':
-                    clazz = Double.TYPE;
-                    break;
-                case 'F':
-                    clazz = Float.TYPE;
-                    break;
-                case 'I':
-                    clazz = Integer.TYPE;
-                    break;
-                case 'J':
-                    clazz = Long.TYPE;
-                    break;
-                case 'S':
-                    clazz = Short.TYPE;
-                    break;
-                }
-                if (clazz != null) {
-                    //To reject superfluous symbols
-                    if (name.length() > i + 1) {
-                        throw new ClassNotFoundException(name);
-                    }
-                    clazz = VMClassRegistry.loadArray(clazz, i);
-                    if (initialize) {
-                        VMClassRegistry.initializeClass(clazz);
-                    } else {
-                        VMClassRegistry.linkClass(clazz);
-                    }
-                    return clazz;
-                }
-            }
-        } catch (RuntimeException e) {
+        }
+        if(name.indexOf("/") != -1) {
             throw new ClassNotFoundException(name);
         }
+
+        Class clazz = null;
 
         if (classLoader == null) {
             SecurityManager sc = System.getSecurityManager();
@@ -203,18 +149,12 @@ public final class Class<T> implements Serializable, AnnotatedElement, GenericDe
                 VMClassRegistry.getClassLoader(VMStack.getCallerClass(0)) != null) {
                 sc.checkPermission(RuntimePermissionCollection.GET_CLASS_LOADER_PERMISSION);
             }
-            clazz = VMClassRegistry.findLoadedClass(name, null);
-            if (clazz == null) {
-                throw new ClassNotFoundException(name);
-            }
+                clazz = VMClassRegistry.loadBootstrapClass(name);
         } else {
             clazz = classLoader.loadClass(name);
-            if (clazz == null) {
-                throw new ClassNotFoundException(name);
-            }
         }
-        if (i > 0) {
-            clazz = VMClassRegistry.loadArray(clazz, i);
+        if(clazz == null) {
+            throw new ClassNotFoundException(name);
         }
         if (initialize) {
             VMClassRegistry.initializeClass(clazz);

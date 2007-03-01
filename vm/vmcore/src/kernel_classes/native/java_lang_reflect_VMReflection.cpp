@@ -239,17 +239,12 @@ JNIEXPORT jobject JNICALL Java_java_lang_reflect_VMReflection_invokeMethod
 } // Java_java_lang_reflect_VMReflection_invokeMethod
 
 // create multidimensional array with depth dimensions specified by dims
-jobject createArray(JNIEnv *jenv, jclass compType, jint *dims, int depth)
+jobject createArray(JNIEnv *jenv, Class* arrType, jint *dims, int depth)
 {
     jint size = dims[0];
-    jclass clazz;
-    
-    if (depth > 1) 
-        clazz = Java_java_lang_VMClassRegistry_loadArray(jenv, NULL, compType, (jint)(depth - 1));
-    else
-        clazz = compType;
 
-    jobjectArray jarray = NewObjectArray(jenv, size, clazz, NULL);
+    jobjectArray jarray = NewObjectArray(jenv, size, 
+        struct_Class_to_java_lang_Class_Handle(arrType), NULL);
 
     if (exn_raised()) {
         return NULL;
@@ -257,6 +252,7 @@ jobject createArray(JNIEnv *jenv, jclass compType, jint *dims, int depth)
 
     if (depth > 1)
     {
+        Class* compType = arrType->get_array_element_class();
         for (int i = 0; i < size; i++)
         {
             jobject elem = createArray(jenv, compType, dims + 1, depth - 1);
@@ -274,7 +270,7 @@ JNIEXPORT jobject JNICALL Java_java_lang_reflect_VMReflection_newArrayInstance
     TRACE("new array: depth=" << depth);
 
     if (depth <= 0 || depth > 255) {
-        const char *message = (depth <= 0) ? "zero-dimensional array specified." : 
+        const char *message = (depth <= 0) ? "negative or zero dimensional array specified." : 
                 "requested dimensions number exceeds 255 supported limit." ;
         ThrowNew_Quick(jenv, "java/lang/IllegalArgumentException", message);
         return NULL;
@@ -291,7 +287,17 @@ JNIEXPORT jobject JNICALL Java_java_lang_reflect_VMReflection_newArrayInstance
         }
     }
 
-    jobject jarray = createArray(jenv, compType, dims, depth);
+    Class* arrClss = jclass_to_struct_Class(compType);
+    for (int i = depth - 1; i > 0; --i) {
+        arrClss = class_get_array_of_class(arrClss);
+        if (!arrClss) {
+            assert(exn_raised());
+            break;
+        }
+        WARN(arrClss->get_name()->bytes);
+    }
+
+    jobject jarray = arrClss ? createArray(jenv, arrClss, dims, depth) : NULL;
 
     ReleaseIntArrayElements(jenv, jdims, dims, JNI_ABORT);
 
