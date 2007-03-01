@@ -24,7 +24,8 @@ Version: $Revision: 1.5.2.6 $
                      build.native.c,
                      build.native.cpp,
                      build.native.asm,
-                     build.native.link" />
+                     build.native.link,
+                     build.native.manifest" />
     <target name="build.native.init" depends="init_component">
         <echo message="## Building native of '${component}'" />
 
@@ -214,11 +215,30 @@ Version: $Revision: 1.5.2.6 $
             outfile="${lib.out.dir}/${libname}"
             outtype="${outtype}"  subsystem="console">
             <select os="win">
-                <linkerarg value="/pdb:${build.dir}/_bin/${libname}.pdb" />
-                <linkerarg value="/debug" />
+                <linkerarg value="/pdb:${build.dir}/_bin/${libname}.pdb" if="not.static" />
+                <linkerarg value="/debug" if="not.static" />
             </select>
             <linker refid="linker" />
             <fileset refid="link.fileset" />
         </cc>
+        <condition property="add.manifest">
+            <and>
+                <os family="windows" />
+                <isset property="not.static" />
+                <available file="${lib.out.dir}/${libname}${shlib.suffix}${manifest.suffix}" />
+            </and>
+        </condition>
+    </target>
+
+    <target name="build.native.manifest"
+        depends="build.native.link"
+        if="add.manifest">
+        <echo message="Adding manifest to ${lib.out.dir}/${libname}${shlib.suffix}" />
+        <exec executable="mt.exe">
+            <arg value="-nologo" />
+            <arg value="-manifest" />
+            <arg value="${lib.out.dir}/${libname}${shlib.suffix}${manifest.suffix}" />
+            <arg value="-outputresource:${lib.out.dir}/${libname}${shlib.suffix};#2" />
+        </exec>
     </target>
 </project>
