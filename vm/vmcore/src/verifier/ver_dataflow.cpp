@@ -1010,7 +1010,7 @@ vf_set_node_out_vector( unsigned node_num,          // graph node number
     for( unsigned index = 0; index < instruction; index++ )
     {
         if( ( 0 == instr[index].m_inlen + instr[index].m_outlen )
-            && ( VF_TYPE_INSTR_NONE == instr->m_type ) )
+            && ( VF_TYPE_INSTR_NONE == instr[index].m_type ) )
         {
             continue;
         } else {

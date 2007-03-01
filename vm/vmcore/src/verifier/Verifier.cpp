@@ -4900,7 +4900,8 @@ vf_parse_bytecode( vf_Context_t *ctex )
             const_index = (unsigned short)( (bytecode[index] << 8)|(bytecode[index + 1]) );
             // skip constant pool index (u2)
             index += 2;
-            result = vf_opcode_new( code, const_index, codeNum, ctex );
+            // Zero number of opcode new is reserved for "uninitialized this"
+            result = vf_opcode_new( code, const_index, codeNum + 1, ctex );
             if( result != VER_OK ) {
                 return result;
             }
