@@ -215,8 +215,8 @@ Version: $Revision: 1.5.2.6 $
             outfile="${lib.out.dir}/${libname}"
             outtype="${outtype}"  subsystem="console">
             <select os="win">
-                <linkerarg value="/pdb:${build.dir}/_bin/${libname}.pdb" if="not.static" />
-                <linkerarg value="/debug" if="not.static" />
+                <linkerarg value="/pdb:${build.dir}/_bin/${libname}.pdb" if="${not.static}" />
+                <linkerarg value="/debug" if="${not.static}" />
             </select>
             <linker refid="linker" />
             <fileset refid="link.fileset" />
