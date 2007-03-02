@@ -34,16 +34,34 @@ DRLVM Regression Testing on platform: ${hy.platform}
 =====================================
         </echo>
 
-        <!-- Check for exclude list presence -->
-        <condition property="exclude.list" 
-                   value="${reg.test.src}/excludes/exclude.${hy.platform}">
-            <available file="${reg.test.src}/excludes/exclude.${hy.platform}"/>
+        <property name="exclude.list.file" 
+                  location="${reg.test.src}/excludes/exclude.${hy.platform}"/>
+
+        <!-- Check up exclude list to use -->
+        <condition property="exclude.list" value="${exclude.list.file}">
+            <and>
+                <!-- don't look into xlist if we're 
+                     checking particular regression -->
+                <not>
+                    <isset property="test.case"/>
+                </not>
+                <!-- use this xlist, if it is available for 
+                     this platform configuration -->
+                <available file="${exclude.list.file}"/>
+            </and>
         </condition>
+
+        <!-- Choose regression tests to execute.
+             Use 
+                    -Dtest.case=H1234
+             or 
+                    -Dtest.case="H1234,H4321"
+             to specify particular tests to execute -->
+        <property name="test.case" value="H*"/>
 
         <for param="reg.test.2launch.src.dir">
             <!-- Go through directories containing regression tests -->
-            <dirset dir="${reg.test.src}">
-                <include name="H*"/>
+            <dirset dir="${reg.test.src}" includes="${test.case}">
                 <excludesfile name="${exclude.list}" if="exclude.list"/>
             </dirset>
             <sequential>

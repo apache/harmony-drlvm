@@ -110,6 +110,24 @@ To execute the Regression Test Suite type
 
     > build reg.test
 
-in build directory of DRLVM workspace.
+in build directory of DRLVM workspace. This will execute all non-excluded
+regression tests for your platform configuration.
 
+Also by providing the value for 'test.case' property you can choose 
+which particular regression tests to execute. 
+For example, to run only H1234 regression test type the following 
+on your command line:
+
+    > build -Dtest.case=H1234 reg.test
+
+To check for several regressions use coma or space separated list as a value for
+the property. So the following command:
+
+    > build -Dtest.case="H1234,H4321" reg.test
+
+will execute two regression tests - H1234 and H4321.
+ 
+ Note:  If some of the tests selected by test.case property are in
+ -----  exclude list, they will be executed anyway. So you can use this property
+        to go around exclude lists.
 
