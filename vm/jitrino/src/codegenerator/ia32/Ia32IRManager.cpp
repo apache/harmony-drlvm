@@ -420,7 +420,7 @@ Inst * IRManager::newI8PseudoInst(Mnemonic mnemonic, uint32 defCount,
     inst->kind = Inst::Kind_I8PseudoInst;
     uint32 i=0;
     Opnd ** opnds = inst->getOpnds();
-    assert(opnd0->getType()->isInteger());
+    assert(opnd0->getType()->isInteger() ||opnd0->getType()->isPtr());
     if (opnd0!=NULL){       opnds[i] = opnd0; i++;
     if (opnd1!=NULL){       opnds[i] = opnd1; i++;
     if (opnd2!=NULL){       opnds[i] = opnd2; i++;
@@ -1340,6 +1340,10 @@ OpndSize IRManager::getTypeSize(Type::Tag tag)
         case Type::Char:
             size = OpndSize_16;
             break;
+#ifndef _EM64T_
+        case Type::IntPtr:   
+        case Type::UIntPtr:   
+#endif
         case Type::Int32:   
         case Type::UInt32:
             size = OpndSize_32;

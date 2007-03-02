@@ -268,7 +268,7 @@ void InstCodeSelector::throwLinkingException(Class_Handle encClass, uint32 cp_nd
 Opnd * InstCodeSelector::convertIntToInt(Opnd * srcOpnd, Type * dstType, Opnd * dstOpnd)
 {
     Type * srcType=srcOpnd->getType();
-    assert(isIntegerType(srcType) && isIntegerType(dstType));
+    assert(isIntegerType(srcType) && (isIntegerType(dstType) || dstType->isPtr()));
 
     OpndSize srcSize=irManager.getTypeSize(srcType);
     OpndSize dstSize=irManager.getTypeSize(dstType);
@@ -377,8 +377,10 @@ Opnd * InstCodeSelector::convertToUnmanagedPtr(Opnd * srcOpnd, Type * dstType, O
         dstOpnd = irManager.newOpnd(dstType);
     }
 
-    if (srcType->isObject() || srcType->isInteger()) {
+    if (srcType->isObject()) {
         appendInsts(irManager.newCopyPseudoInst(Mnemonic_MOV, dstOpnd, srcOpnd));
+    } else if (srcType->isInteger()) {
+        convertIntToInt(srcOpnd, dstType, dstOpnd);
     } else {
         assert(0);
     }
