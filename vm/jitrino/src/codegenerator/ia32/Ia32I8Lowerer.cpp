@@ -451,11 +451,10 @@ void I8Lowerer::processOpnds(Inst * inst)
             {
                 assert(src1 && src2);
                 Inst * condInst = inst->getNextInst();
-                Mnemonic mnem = getBaseConditionMnemonic(condInst->getMnemonic());
-                if (condInst->getMnemonic() == Mnemonic_MOV) {
+                while (condInst && condInst->getMnemonic() == Mnemonic_MOV) {
                     condInst = condInst->getNextInst();
-                    mnem = getBaseConditionMnemonic(condInst->getMnemonic());
                 }
+                Mnemonic mnem = condInst ? getBaseConditionMnemonic(condInst->getMnemonic()) : Mnemonic_NULL;
                 if (mnem != Mnemonic_NULL) {
                             if(condInst->hasKind(Inst::Kind_BranchInst)) {
                                 buildJumpSubGraph(inst,src1_1,src1_2,src2_1,src2_2,condInst);
