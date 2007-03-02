@@ -2111,18 +2111,31 @@ void SyncOpt::removeUnwindMonitorExit(Opnd *syncMethodOpnd,
 
 
 
-DEFINE_SESSION_ACTION(SO2, so2, "SyncOpt2")
+DEFINE_SESSION_ACTION(SO2, so2, "Nested synchronizations removal")
 
- 
+class SyncOpt2 {
+public:
+    SyncOpt2(IRManager& irm)
+        : irManager(irm) {};
+    void runPass();
+    void eliminateClosestMonExits(Node* enterNode, Opnd* monObject, int& nExits, BitSet& monexits);
+private:
+    IRManager& irManager;
+};
 
 void SO2::_run(IRManager& irm) {
-    OptPass::computeDominators(irm);
-    ControlFlowGraph& fg = irm.getFlowGraph();
+    SyncOpt2 opt(irm);
+    opt.runPass();
+}
+
+void SyncOpt2::runPass() {
     MemoryManager tmpMM(1024, "SO2MM");
+    ControlFlowGraph& flowGraph = irManager.getFlowGraph();
+    OptPass::computeDominators(irManager);
+    DominatorTree* domTree = flowGraph.getDominatorTree();
     StlVector<Inst*> monenters(tmpMM);   
-    DominatorTree* dom = fg.getDominatorTree();
- 
-    const Nodes& nodes = fg.getNodesPostOrder();
+    const Nodes& nodes = flowGraph.getNodesPostOrder();
+
     for (Nodes::const_iterator it = nodes.begin(), end = nodes.end(); it!=end; ++it) {
         Node* node = *it;
         for (Inst* inst = (Inst*)node->getFirstInst(); inst!=NULL; inst = inst->getNextInst()) {
@@ -2133,23 +2146,16 @@ void SO2::_run(IRManager& irm) {
                     if (child->getNode()==NULL) {
                         continue;
                     }
-                    if (child->getSrc(0) == inst->getSrc(0) && dom->dominates(inst->getNode(), child->getNode())) {
-                        //clean child
-                        int nExits=0;
+                    Opnd* monObject = child->getSrc(0);
+                    if ((monObject == inst->getSrc(0)) && domTree->dominates(inst->getNode(), child->getNode())) {
+                        // Find a proper child to clean
+                        int nExits = 0;
                         Node* enterNode = child->getNode();
-                        Node* exitNode = NULL;
-                        for (Nodes::const_iterator it2 = nodes.begin();exitNode!=enterNode; ++it2) {
-                            exitNode = *it2;
-                            Inst* exit = (Inst*)exitNode->getLastInst();
-                            if (exit->getOpcode() == Op_TauMonitorExit && exit->getSrc(0) == child->getSrc(0) && dom->dominates(enterNode, exitNode)) {
-//                                printf("+++++++++++++++++++++++++++++++FOUND\n");
-                                Edge* exc = exitNode->getExceptionEdge();
-                                fg.removeEdge(exc);
-                                exit->unlink();
-                                nExits++;
-                            }
-                        }
-                        assert(nExits>0);
+                        BitSet monexits(tmpMM,flowGraph.getMaxNodeId());
+
+                        eliminateClosestMonExits(enterNode, monObject, nExits, monexits);
+
+                        assert(nExits > 0);
                         child->unlink();
                     }
                 }
@@ -2158,5 +2164,28 @@ void SO2::_run(IRManager& irm) {
     }
 }
 
+void SyncOpt2::eliminateClosestMonExits(Node* enterNode, Opnd* monObject, int& nExits, BitSet& monexits) {
+    ControlFlowGraph& flowGraph = irManager.getFlowGraph();
+    const Edges& outEdges = enterNode->getOutEdges();
+    Edges::const_iterator eit;
+    Node* exitNode; 
+    for (eit = outEdges.begin(); eit != outEdges.end(); ++eit) {
+        exitNode = (*eit)->getTargetNode();
+        assert(exitNode != flowGraph.getExitNode());
+        if (monexits.getBit(exitNode->getId())) {
+            continue;
+        }
+        Inst* exit = (Inst*)exitNode->getLastInst();
+        if ((exit->getOpcode() == Op_TauMonitorExit) && (exit->getSrc(0) == monObject)) {
+            Edge* excEdge = exitNode->getExceptionEdge();
+            flowGraph.removeEdge(excEdge);
+            exit->unlink();
+            nExits++;
+            monexits.setBit(exitNode->getId());
+        } else {
+            eliminateClosestMonExits(exitNode, monObject, nExits, monexits);
+        }
+    }
+}
 
 } //namespace Jitrino 
