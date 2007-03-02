@@ -80,6 +80,8 @@ static void init_context_from_registers(JitFrameContext & context,
     context.p_r10 = &regs.r10;
     context.p_r11 = &regs.r11;
     
+    context.eflags = regs.eflags;
+
     context.is_ip_past = is_ip_past;
 }
 
@@ -124,13 +126,44 @@ static void si_unwind_from_m2n(StackIterator * si) {
     }
 }
 
-static inline char * get_reg(char * ss, const R_Opnd & dst, Reg_No base, int64 offset) {
-    assert(Imm_Opnd(offset).get_size() <= size_32);
+static char* get_reg(char* ss, const R_Opnd & dst, Reg_No base, int64 offset,
+                       bool check_null = false, bool preserve_flags = false)
+{
+    char* patch_offset = NULL;
+
     ss = mov(ss, dst,  M_Base_Opnd(base, (int32)offset));
-    return mov(ss, dst,  M_Base_Opnd(dst.reg_no(), 0));
+
+    if (check_null)
+    {
+        if (preserve_flags)
+            *ss++ = (char)0x9C; // PUSHFD
+
+        ss = test(ss, dst, dst);
+        ss = branch8(ss, Condition_Z,  Imm_Opnd(size_8, 0));
+        patch_offset = ((char*)ss) - 1; // Store location for jump patch
+    }
+
+    ss = mov(ss, dst,  M_Base_Opnd(dst.reg_no(), 0));
+
+    if (check_null)
+    {
+        // Patch conditional jump
+        POINTER_SIZE_SINT offset =
+            (POINTER_SIZE_SINT)ss - (POINTER_SIZE_SINT)patch_offset - 1;
+        assert(offset >= -128 && offset < 127);
+        *patch_offset = (char)offset;
+
+        if (preserve_flags)
+            *ss++ = (char)0x9D; // POPFD
+    }
+
+    return ss;
 }
 
 typedef void (* transfer_control_stub_type)(StackIterator *);
+
+#define CONTEXT_OFFSET(_field_) \
+    ((int64)&((StackIterator*)0)->jit_frame_context._field_)
 
 static transfer_control_stub_type gen_transfer_control_stub()
 {
@@ -140,7 +173,7 @@ static transfer_control_stub_type gen_transfer_control_stub()
         return addr;
     }
 
-    const int STUB_SIZE = 68;
+    const int STUB_SIZE = 240;
     char * stub = (char *)malloc_fixed_code_for_jit(STUB_SIZE,
         DEFAULT_CODE_ALIGNMENT, CODE_BLOCK_HEAT_COLD, CAA_Allocate);
     char * ss = stub;
@@ -153,42 +186,123 @@ static transfer_control_stub_type gen_transfer_control_stub()
     // This code sequence must be atomic.  The "atomicity" effect is achieved by
     // changing the rsp at the very end of the sequence.
 
-    // rdx holds the pointer to the stack iterator (skip return ip)
-    ss = mov(ss, rdx_opnd, rdi_opnd); //M_Base_Opnd(rsp_reg, GR_STACK_SIZE));
+    // rdx holds the pointer to the stack iterator
+#if defined (PLATFORM_POSIX) // RDI holds 1st parameter on Linux
+    ss = mov(ss, rdx_opnd, rdi_opnd);
+#else // RCX holds 1st parameter on Windows
+    ss = mov(ss, rdx_opnd, rcx_opnd);
+#endif
 
-    // restore eax (return value)
-    ss = get_reg(ss, rax_opnd, rdx_reg,
-        (int64)&((StackIterator*)0)->jit_frame_context.p_rax);
-    // Restore callee saves registers
-    ss = get_reg(ss, r15_opnd, rdx_reg,
-        (int64)&((StackIterator*)0)->jit_frame_context.p_r15);
-    ss = get_reg(ss, r14_opnd, rdx_reg,
-        (int64)&((StackIterator*)0)->jit_frame_context.p_r14);
-    ss = get_reg(ss, r13_opnd, rdx_reg,
-        (int64)&((StackIterator*)0)->jit_frame_context.p_r13);
-    ss = get_reg(ss, r12_opnd, rdx_reg,
-        (int64)&((StackIterator*)0)->jit_frame_context.p_r12);
-    ss = get_reg(ss, rbx_opnd, rdx_reg,
-        (int64)&((StackIterator*)0)->jit_frame_context.p_rbx);
-    ss = get_reg(ss, rbp_opnd, rdx_reg,
-        (int64)&((StackIterator*)0)->jit_frame_context.p_rbp);
-    // cut the stack
-    ss = mov(ss,  rsp_opnd,  M_Base_Opnd(rdx_reg,
-        (int64)&((StackIterator *)0)->jit_frame_context.rsp));
-    // grab the new ip
-    ss = get_reg(ss, rdx_opnd, rdx_reg,
-        (int64)&((StackIterator*)0)->jit_frame_context.p_rip);
-    // jump
-    ss = jump(ss,  rdx_opnd);
+    // Restore general registers
+    ss = get_reg(ss, rbp_opnd, rdx_reg, CONTEXT_OFFSET(p_rbp), false);
+    ss = get_reg(ss, rbx_opnd, rdx_reg, CONTEXT_OFFSET(p_rbx), true);
+    ss = get_reg(ss, r12_opnd, rdx_reg, CONTEXT_OFFSET(p_r12), true);
+    ss = get_reg(ss, r13_opnd, rdx_reg, CONTEXT_OFFSET(p_r13), true);
+    ss = get_reg(ss, r14_opnd, rdx_reg, CONTEXT_OFFSET(p_r14), true);
+    ss = get_reg(ss, r15_opnd, rdx_reg, CONTEXT_OFFSET(p_r15), true);
+    ss = get_reg(ss, rsi_opnd, rdx_reg, CONTEXT_OFFSET(p_rsi), true);
+    ss = get_reg(ss, rdi_opnd, rdx_reg, CONTEXT_OFFSET(p_rdi), true);
+    ss = get_reg(ss, r8_opnd,  rdx_reg, CONTEXT_OFFSET(p_r8),  true);
+    ss = get_reg(ss, r9_opnd,  rdx_reg, CONTEXT_OFFSET(p_r9),  true);
+    ss = get_reg(ss, r10_opnd, rdx_reg, CONTEXT_OFFSET(p_r10), true);
+    ss = get_reg(ss, r11_opnd, rdx_reg, CONTEXT_OFFSET(p_r11), true);
+
+    // Get the new RSP
+    M_Base_Opnd saved_rsp(rdx_reg, CONTEXT_OFFSET(rsp));
+    ss = mov(ss, rax_opnd, saved_rsp);
+    // Store it over return address for future use
+    ss = mov(ss, M_Base_Opnd(rsp_reg, 0), rax_opnd);
+    // Get the new RIP
+    ss = get_reg(ss, rcx_opnd, rdx_reg, CONTEXT_OFFSET(p_rip), false);
+    // Store RIP to [<new RSP> - 136] to preserve 128 bytes under RSP
+    // which are 'reserved' on Linux
+    ss = mov(ss,  M_Base_Opnd(rax_reg, -136), rcx_opnd);
+
+    ss = get_reg(ss, rax_opnd, rdx_reg, CONTEXT_OFFSET(p_rax), true);
+
+    // Restore processor flags
+    ss = alu(ss, xor_opc, rcx_opnd,  rcx_opnd);
+    ss = mov(ss, rcx_opnd,  M_Base_Opnd(rdx_reg, CONTEXT_OFFSET(eflags)), size_32);
+    ss = test(ss, rcx_opnd, rcx_opnd);
+    ss = branch8(ss, Condition_Z,  Imm_Opnd(size_8, 0));
+    char* patch_offset = ((char*)ss) - 1; // Store location for jump patch
+    ss = push(ss,  rcx_opnd);
+    *ss++ = (char)0x9D; // POPFD
+    // Patch conditional jump
+    POINTER_SIZE_SINT offset =
+        (POINTER_SIZE_SINT)ss - (POINTER_SIZE_SINT)patch_offset - 1;
+    *patch_offset = (char)offset;
+
+    ss = get_reg(ss, rcx_opnd, rdx_reg, CONTEXT_OFFSET(p_rcx), true, true);
+    ss = get_reg(ss, rdx_opnd, rdx_reg, CONTEXT_OFFSET(p_rdx), true, true);
+
+    // Setup stack pointer to previously saved value
+    ss = mov(ss,  rsp_opnd,  M_Base_Opnd(rsp_reg, 0));
+
+    // Jump to address stored to [<new RSP> - 136]
+    ss = jump(ss,  M_Base_Opnd(rsp_reg, -136));
 
     addr = (transfer_control_stub_type)stub;
     assert(ss-stub <= STUB_SIZE);
+
+    /*
+       The following code will be generated:
+
+        mov         rdx,rcx
+        mov         rbp,qword ptr [rdx+10h]
+        mov         rbp,qword ptr [rbp]
+        mov         rbx,qword ptr [rdx+20h]
+        test        rbx,rbx
+        je          __label1__
+        mov         rbx,qword ptr [rbx]
+__label1__
+        ; .... The same for r12,r13,r14,r15,rsi,rdi,r8,r9,r10
+        mov         r11,qword ptr [rdx+88h]
+        test        r11,r11
+        je          __label11__
+        mov         r11,qword ptr [r11]
+__label11__
+        mov         rax,qword ptr [rdx+8]
+        mov         qword ptr [rsp],rax
+        mov         rcx,qword ptr [rdx+18h]
+        mov         rcx,qword ptr [rcx]
+        mov         qword ptr [rax-88h],rcx
+        mov         rax,qword ptr [rdx+48h]
+        test        rax,rax
+        je          __label12__
+        mov         rax,qword ptr [rax]
+__label12__
+        xor         rcx,rcx
+        mov         ecx,dword ptr [rdx+90h]
+        test        rcx,rcx
+        je          __label13__
+        push        rcx
+        popfq
+__label13__
+        mov         rcx,qword ptr [rdx+50h]
+        pushfq
+        test        rcx,rcx
+        je          __label14__
+        mov         rcx,qword ptr [rcx]
+__label14__
+        popfq
+        mov         rdx,qword ptr [rdx+58h]
+        pushfq
+        test        rdx,rdx
+        je          __label15__
+        mov         rdx,qword ptr [rdx]
+__label15__
+        popfq
+        mov         rsp,qword ptr [rsp]
+        jmp         qword ptr [rsp-88h]
+    */
 
     DUMP_STUB(stub, "getaddress__transfer_control", ss-stub);
 
     return addr;
 }
 
+#undef CONTEXT_OFFSET
 //////////////////////////////////////////////////////////////////////////
 // Stack Iterator Interface
 
@@ -370,6 +484,8 @@ void si_copy_to_registers(StackIterator * si, Registers * regs) {
     regs->r9 = *si->jit_frame_context.p_r9;
     regs->r10 = *si->jit_frame_context.p_r10;
     regs->r11 = *si->jit_frame_context.p_r11;
+
+    regs->eflags = si->jit_frame_context.eflags;
 }
 
 void si_set_callback(StackIterator* si, NativeCodePtr* callback) {

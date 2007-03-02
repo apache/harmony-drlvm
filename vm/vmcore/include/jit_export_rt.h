@@ -88,6 +88,9 @@ struct JitFrameContext {
     uint64 * p_r10;
     uint64 * p_r11;
 
+    // To restore processor flags during transfer
+    uint32 eflags;
+
     Boolean is_ip_past;
 } JitFrameContext;
 
