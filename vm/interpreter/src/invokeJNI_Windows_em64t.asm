@@ -1,7 +1,7 @@
 
-PUBLIC	invokeJNI
+PUBLIC  invokeJNI
 
-_TEXT	SEGMENT
+_TEXT   SEGMENT
 
 invokeJNI PROC
 
@@ -11,8 +11,8 @@ invokeJNI PROC
 ;   r8  - n mem args
 ;   r9  - function ptr
 
-	push	rbp
-	mov	rbp, rsp
+    push    rbp
+    mov rbp, rsp
     mov rax, rcx ; mem
     mov rcx, r8 ; n mem args
 
@@ -22,15 +22,27 @@ invokeJNI PROC
     movsd xmm2, qword ptr [rax+24]
     movsd xmm3, qword ptr [rax+32]
 
-; store memory args
-	mov r10, r9 ; func ptr
-	lea	r9, qword ptr [rax+rcx*8+64]
-	sub	r9, rsp ; offset
+    mov r10, r9 ; func ptr
+; check for memory args
     cmp rcx, 0
     jz cycle_end
+
+    mov rdx, rsp  ; Check stack alignment on 16 bytes
+    and rdx, 8    ; This code may be removed after we make sure that
+    jz  no_abort  ; compiler always calls us with aligned stack
+    int 3
+no_abort:
+    mov rdx, rcx  ; Align stack on 16 bytes before pushing stack
+    and rdx, 1    ; arguments in case we have odd number of stack
+    shl rdx, 3    ; arguments
+    sub rsp, rdx
+
+; store memory args
+    lea r9, qword ptr [rax + rcx * 8 + 64]
+    sub r9, rsp ; offset
 cycle:
-	push qword ptr [rsp+r9]
-	loop cycle
+    push qword ptr [rsp+r9]
+    loop cycle
 cycle_end:
     mov rcx, [rax + 40]
     mov rdx, [rax + 48]
@@ -39,14 +51,14 @@ cycle_end:
 
     sub rsp, 32 ; shadow space
 
-	call	r10
-	leave
-	ret
+    call    r10
+    leave
+    ret
 
 invokeJNI ENDP
 
 
-_TEXT	ENDS
+_TEXT   ENDS
 
 END
 
