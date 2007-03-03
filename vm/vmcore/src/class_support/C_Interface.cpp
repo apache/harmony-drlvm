@@ -2296,9 +2296,7 @@ enum safepoint_state get_global_safepoint_status()
 
 void vm_gc_lock_enum()
 {
-    tmn_suspend_enable();
     hythread_global_lock();
-    tmn_suspend_disable();
 } // vm_gc_lock_enum
 
 

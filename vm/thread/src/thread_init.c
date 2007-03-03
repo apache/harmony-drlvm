@@ -229,7 +229,38 @@ void VMCALL hythread_lib_unlock(hythread_t self) {
  * The lock blocks new thread creation and thread exit operations. 
  */
 IDATA VMCALL hythread_global_lock() {
-    return hymutex_lock(TM_LIBRARY->TM_LOCK);
+    IDATA r = 0;
+    hythread_t self = tm_self_tls;
+    int saved_count;
+
+    // we need not care about suspension if the thread
+    // is not even tattached to hythread
+    if (self == NULL)
+        return hymutex_lock(TM_LIBRARY->TM_LOCK);
+
+    // suspend_disable_count must be 0 on potentially
+    // blocking operation to prevent suspension deadlocks,
+    // meaning that the thread is safe for suspension
+    saved_count = reset_suspend_disable();
+    r = hymutex_lock(TM_LIBRARY->TM_LOCK);
+    if (r) return r;
+
+    // make sure we do not get a global thread lock
+    // while being requested to suspend
+    while (self->suspend_request) {
+        // give up global thread lock before safepoint,
+        // because this thread can be suspended at a safepoint
+        r = hymutex_unlock(TM_LIBRARY->TM_LOCK);
+        if (r) return r;
+        hythread_safe_point();
+        r = hymutex_lock(TM_LIBRARY->TM_LOCK);
+        if (r) return r;
+    }
+
+    // do not use set_suspend_disable() as we do not
+    // want safe points happening under global lock
+    self->suspend_disable_count = saved_count;
+    return 0;
 }
 
 /**
