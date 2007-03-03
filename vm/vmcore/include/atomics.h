@@ -58,6 +58,8 @@ JNIEXPORT jboolean compareAndSetIntArray
 JNIEXPORT jboolean compareAndSetLongArray
 (JNIEnv * env, jobject self, jlongArray array, jint index, jlong expected, jlong value);
 
+JNIEXPORT jboolean vmSupportsCAS8();
+
 //void MemoryReadWriteBarrier();
 
 #if defined (PLATFORM_POSIX) 

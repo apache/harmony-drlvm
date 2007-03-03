@@ -162,3 +162,10 @@ Java_org_apache_harmony_util_concurrent_Atomics_compareAndSetObject___3Ljava_lan
 {
     return compareAndSetObjectArray(env, self, array, index, expected, value);
 }
+
+JNIEXPORT jboolean JNICALL 
+Java_java_util_concurrent_atomic_AtomicLong_VMSupportsCS8
+(JNIEnv *, jclass) 
+{
+    return vmSupportsCAS8();
+}

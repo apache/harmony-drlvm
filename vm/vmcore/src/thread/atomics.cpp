@@ -262,3 +262,7 @@ JNIEXPORT jboolean compareAndSetLongArray
     tmn_suspend_enable();
     return (jboolean)(result?JNI_TRUE:JNI_FALSE);
 }
+
+JNIEXPORT jboolean vmSupportsCAS8() {
+    return JNI_TRUE;
+}
