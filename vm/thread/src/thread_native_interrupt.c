@@ -23,6 +23,8 @@
 #include "thread_private.h"
 #include <open/hythread_ext.h>
 
+static int interrupter_thread_function(void *args);
+
 /** 
  * Interrupt a thread.
  * 
@@ -35,6 +37,7 @@
  */
 void VMCALL hythread_interrupt(hythread_t thread) {
     IDATA status;
+    hythread_t thr = NULL;
     hymutex_lock(thread->mutex);
     thread->state |= TM_THREAD_STATE_INTERRUPTED;
     
@@ -43,17 +46,45 @@ void VMCALL hythread_interrupt(hythread_t thread) {
         return;
     }
 
-    if (thread->state
-            & (TM_THREAD_STATE_PARKED | TM_THREAD_STATE_SLEEPING
-                | TM_THREAD_STATE_IN_MONITOR_WAIT)) {
-        // If thread was doing any kind of wait, notify it.
+    // If thread was doing any kind of wait, notify it.
+    if (thread->state & (TM_THREAD_STATE_PARKED | TM_THREAD_STATE_SLEEPING)) {
         if (thread->current_condition) {
-            status = hycond_notify_all(thread->current_condition);
-            assert(status == TM_ERROR_NONE);
-        }
+	    status = hycond_notify_all(thread->current_condition);
+	    assert(status == TM_ERROR_NONE);
+	}
+    } else if (thread->state & TM_THREAD_STATE_IN_MONITOR_WAIT) {
+        if (thread->current_condition && (hythread_monitor_try_enter(thread->waited_monitor) == TM_ERROR_NONE)) {
+            hythread_monitor_notify_all(thread->waited_monitor);
+            hythread_monitor_exit(thread->waited_monitor);
+        } else {
+            status = hythread_create(&thr, 0, 0, 0, interrupter_thread_function, (void *)thread);
+            assert (status == TM_ERROR_NONE);
+	}
     }
 
     hymutex_unlock(thread->mutex);
+}
+static int interrupter_thread_function(void *args) {
+    hythread_t thread = (hythread_t)args; 
+    hythread_monitor_t monitor = NULL;
+    hymutex_lock(thread->mutex);
+
+    if (thread->waited_monitor) {
+        monitor = thread->waited_monitor;
+    } else {
+        hymutex_unlock(thread->mutex);
+        hythread_exit(NULL);
+        return 0; 
+    } 
+
+    hymutex_unlock(thread->mutex);
+
+
+   hythread_monitor_enter(monitor);
+   hythread_monitor_notify_all(monitor);
+
+   hythread_exit(monitor);
+   return 0;
 }
 
 /** 

@@ -289,11 +289,14 @@ typedef struct HyThread {
 // Monitors
     
     /**
+     *  Monitor this thread is waiting on now.
+     **/
+    hythread_monitor_t waited_monitor;
+
+    /**
      * ID for this thread. The maximum number of threads is governed by the size of lockword record.
      */
     IDATA thread_id;
-
-       
 
     /**
      * Memory pool in with this thread allocated

@@ -178,6 +178,7 @@ IDATA monitor_wait_impl(hythread_monitor_t mon_ptr, I_64 ms, IDATA nano, IDATA i
     hymutex_lock(self->mutex);
     self->current_condition = mon_ptr->condition;
     self->state |= TM_THREAD_STATE_IN_MONITOR_WAIT;
+    self->waited_monitor = mon_ptr;
     hymutex_unlock(self->mutex);
 
     do {
@@ -212,6 +213,7 @@ IDATA monitor_wait_impl(hythread_monitor_t mon_ptr, I_64 ms, IDATA nano, IDATA i
     hymutex_lock(self->mutex);
     self->state &= ~TM_THREAD_STATE_IN_MONITOR_WAIT;
     self->current_condition = NULL;
+    self->waited_monitor = NULL;
     hymutex_unlock(self->mutex);
     mon_ptr->wait_count--;
 
