@@ -615,6 +615,9 @@ static JIT_Result compile_prepare_native_method(Method* method)
 
 JIT_Result compile_do_compilation_jit(Method* method, JIT* jit)
 {
+    // Time stamp for counting the total compilation time
+    apr_time_t start;
+
     Global_Env * vm_env = VM_Global_State::loader_env;
 
     assert(method);
@@ -642,11 +645,16 @@ JIT_Result compile_do_compilation_jit(Method* method, JIT* jit)
     ch.env = VM_Global_State::loader_env;
     ch.jit = jit;
 
+    start = apr_time_now();
+
     TRACE("compile_do_compilation_jit(): calling jit->compile_method_with_params() for method " << method );
 
     JIT_Result res = jit->compile_method_with_params(&ch, method, flags);
 
     TRACE("compile_do_compilation_jit(): returned from jit->compile_method_with_params() for method " << method );
+
+    // Convertion from microseconds to milliseconds
+    vm_env->total_compilation_time += ((apr_time_now() - start)/1000);
 
     if (JIT_SUCCESS != res) {
         if (!parallel_jit) {

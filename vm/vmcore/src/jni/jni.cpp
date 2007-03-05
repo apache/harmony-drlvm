@@ -485,6 +485,7 @@ JNIEXPORT jint JNICALL JNI_CreateJavaVM(JavaVM ** p_vm, JNIEnv ** p_jni_env,
     }
 
     vm_env->start_time = apr_time_now()/1000;
+    vm_env->total_compilation_time = 0;
 
     java_vm->functions = &java_vm_vtable;
     java_vm->pool = vm_global_pool;

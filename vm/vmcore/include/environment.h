@@ -241,6 +241,11 @@ struct Global_Env {
      * VM initialization timestamp
      */
     apr_time_t start_time;
+ 
+    /**
+     * Total method compilation time in msec
+     */
+    apr_time_t total_compilation_time;
 
     /**
      * The VM state. See <code>VM_STATE</code> enum above.
