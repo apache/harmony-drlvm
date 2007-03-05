@@ -18,3 +18,6 @@ stress/Mix.java
 
 # HARMONY-3266
 shutdown/TestNativeAllocation.java
+
+# HARMONY-3299 intermittent
+stress/Sync.java
