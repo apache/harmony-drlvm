@@ -148,6 +148,15 @@ jobject wrap_primitive(JNIEnv *env, jvalue value, char sig)
     jobject retobj = NULL;
     jclass clazz;
 
+    // Initialization of static variables in scope changed to ifs
+    // because Microsoft Visual Studio (.NET 2003) generates the code
+    // which first checks variable initialization mask and than calls
+    // to initialization code. This may lead to race condition between
+    // two threads initializing the variable and one of threads works
+    // with unitialized value for some time.
+    // This implementation may lead to several initializations of the
+    // static variable, but this is harmful in terms of stability.
+    // NB: it is worth checking all usage of statics in DRLVM code.
     switch (sig) {
     case 'Z':
     {
@@ -155,7 +164,10 @@ jobject wrap_primitive(JNIEnv *env, jvalue value, char sig)
 
         // Allocate java/lang/Boolean object:
         clazz = (jclass)gh_jlboolean;
-        static jmethodID init_Boolean = GetMethodID(env, clazz, "<init>",  "(Z)V");
+        static jmethodID init_Boolean;
+        if(!init_Boolean) {
+            init_Boolean = GetMethodID(env, clazz, "<init>",  "(Z)V");
+        }
         retobj = NewObjectA (env, clazz, init_Boolean, args);
         break;
     }
@@ -165,7 +177,10 @@ jobject wrap_primitive(JNIEnv *env, jvalue value, char sig)
 
         // Allocate java/lang/Byte object
         clazz = (jclass)gh_jlbyte;
-        static jmethodID init_Byte = GetMethodID(env, clazz, "<init>",  "(B)V");
+        static jmethodID init_Byte;
+        if(!init_Byte) {
+            init_Byte = GetMethodID(env, clazz, "<init>",  "(B)V");
+        }
         retobj = NewObjectA (env, clazz, init_Byte, args);
         break;
     }
@@ -175,7 +190,10 @@ jobject wrap_primitive(JNIEnv *env, jvalue value, char sig)
 
         // Allocate java/lang/Character object:
         clazz = (jclass)gh_jlchar;
-        static jmethodID init_Char = GetMethodID(env, clazz, "<init>",  "(C)V");
+        static jmethodID init_Char;
+        if(!init_Char) {
+            init_Char = GetMethodID(env, clazz, "<init>",  "(C)V");
+        }
         retobj = NewObjectA (env, clazz, init_Char, args);
         break;
     }
@@ -185,7 +203,10 @@ jobject wrap_primitive(JNIEnv *env, jvalue value, char sig)
 
         // Allocate java/lang/Short object:
         clazz = (jclass)gh_jlshort;
-        static jmethodID init_Short = GetMethodID(env, clazz, "<init>",  "(S)V");
+        static jmethodID init_Short;
+        if(!init_Short) {
+            init_Short = GetMethodID(env, clazz, "<init>",  "(S)V");
+        }
         retobj = NewObjectA (env, clazz, init_Short, args);
         break;
     }
@@ -195,7 +216,11 @@ jobject wrap_primitive(JNIEnv *env, jvalue value, char sig)
 
         // Allocate java/lang/Integer object:
         clazz = (jclass)gh_jlint;
-        static jmethodID init_Int = GetMethodID(env, clazz, "<init>",  "(I)V");
+        static jmethodID init_Int;
+        if(!init_Int) {
+            init_Int = GetMethodID(env, clazz, "<init>",  "(I)V");
+        }
+        assert(init_Int);
         retobj = NewObjectA (env, clazz, init_Int, args);
         break;
     }
@@ -205,7 +230,10 @@ jobject wrap_primitive(JNIEnv *env, jvalue value, char sig)
 
         // Allocate java/lang/Long object:
         clazz = (jclass)gh_jllong;
-        static jmethodID init_Long = GetMethodID(env, clazz, "<init>",  "(J)V");
+        static jmethodID init_Long;
+        if(!init_Long) {
+           init_Long = GetMethodID(env, clazz, "<init>",  "(J)V");
+        }
         retobj = NewObjectA (env, clazz, init_Long, args);
         break;
     }
@@ -215,7 +243,10 @@ jobject wrap_primitive(JNIEnv *env, jvalue value, char sig)
 
         // Allocate java/lang/Float object:
         clazz = (jclass)gh_jlfloat;
-        static jmethodID init_Float = GetMethodID(env, clazz, "<init>",  "(F)V");
+        static jmethodID init_Float;
+        if(!init_Float) {
+            init_Float = GetMethodID(env, clazz, "<init>",  "(F)V");
+        }
         retobj = NewObjectA (env, clazz, init_Float, args);
         break;
     }
@@ -225,7 +256,10 @@ jobject wrap_primitive(JNIEnv *env, jvalue value, char sig)
 
         // Allocate java/lang/Double object:
         clazz = (jclass)gh_jldouble;
-        static jmethodID init_Double = GetMethodID(env, clazz, "<init>",  "(D)V");
+        static jmethodID init_Double;
+        if(!init_Double) {
+            init_Double = GetMethodID(env, clazz, "<init>",  "(D)V");
+        }
         retobj = NewObjectA (env, clazz, init_Double, args);
         break;
     }
