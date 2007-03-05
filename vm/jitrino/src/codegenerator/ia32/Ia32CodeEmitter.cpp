@@ -492,64 +492,75 @@ void CodeEmitter::postPass()
     bool isBcRequired = irManager->getCompilationInterface().isBCMapInfoRequired();
     BcMap* bcMap = new(irmm) BcMap(irmm);
     irManager->setInfo("bcMap", bcMap);
+    bool newOpndsCreated = false;
     for( BasicBlock * bb = (BasicBlock*)irManager->getFlowGraph()->getEntryNode(); bb != NULL; bb=bb->getLayoutSucc()) {
-        uint64 bcOffset;
         for (Inst* inst = (Inst*)bb->getFirstInst(); inst!=NULL; inst = inst->getNextInst()) {
-                if (inst->hasKind(Inst::Kind_ControlTransferInst) && 
-                    ((ControlTransferInst*)inst)->isDirect()
-                ){
-                    uint8 * instCodeStartAddr=(uint8*)inst->getCodeStartAddr();
-                    uint8 * instCodeEndAddr=(uint8*)instCodeStartAddr+inst->getCodeSize();
-                    uint8 * targetCodeStartAddr=0;
-                    uint32 targetOpndIndex = ((ControlTransferInst*)inst)->getTargetOpndIndex();
-                    if (inst->hasKind(Inst::Kind_BranchInst)){
-                        BasicBlock * bbTarget=(BasicBlock*)((BranchInst*)inst)->getTrueTarget();
-                        targetCodeStartAddr=(uint8*)bbTarget->getCodeStartAddr();
-                    } else if (inst->hasKind(Inst::Kind_JmpInst)){
-                        BasicBlock* bbTarget = (BasicBlock*)bb->getUnconditionalEdgeTarget();
-                        targetCodeStartAddr=(uint8*)bbTarget->getCodeStartAddr();
-                    } else if (inst->hasKind(Inst::Kind_CallInst)){
-                        targetCodeStartAddr=(uint8*)(POINTER_SIZE_INT)inst->getOpnd(targetOpndIndex)->getImmValue();
-                    }else 
-                        continue;
-                    int64 offset=targetCodeStartAddr-instCodeEndAddr;
+            if (inst->hasKind(Inst::Kind_ControlTransferInst) && 
+                ((ControlTransferInst*)inst)->isDirect()
+            ){
+                uint8 * instCodeStartAddr=(uint8*)inst->getCodeStartAddr();
+                uint8 * instCodeEndAddr=(uint8*)instCodeStartAddr+inst->getCodeSize();
+                uint8 * targetCodeStartAddr=0;
+                uint32 targetOpndIndex = ((ControlTransferInst*)inst)->getTargetOpndIndex();
+                if (inst->hasKind(Inst::Kind_BranchInst)){
+                    BasicBlock * bbTarget=(BasicBlock*)((BranchInst*)inst)->getTrueTarget();
+                    targetCodeStartAddr=(uint8*)bbTarget->getCodeStartAddr();
+                } else if (inst->hasKind(Inst::Kind_JmpInst)){
+                    BasicBlock* bbTarget = (BasicBlock*)bb->getUnconditionalEdgeTarget();
+                    targetCodeStartAddr=(uint8*)bbTarget->getCodeStartAddr();
+                } else if (inst->hasKind(Inst::Kind_CallInst)){
+                    targetCodeStartAddr=(uint8*)(POINTER_SIZE_INT)inst->getOpnd(targetOpndIndex)->getImmValue();
+                }else 
+                    continue;
+                int64 offset=targetCodeStartAddr-instCodeEndAddr;
 
+                uint64 bcOffset = isBcRequired ? bc2LIRMapHandler->getVectorEntry(inst->getId()) : ILLEGAL_VALUE;
 #ifdef _EM64T_
-                    if (!fit32(offset)) { // offset as a signed value does not fits into 32 bits
-                        const RegName TMP_BASE = RegName_R14;
-                        EncoderBase::Operands args;
-                        args.clear();
-                        args.add(TMP_BASE);
-                        args.add(EncoderBase::Operand(OpndSize_64, offset));
-                        char * ip = EncoderBase::encode((char*)instCodeStartAddr, Mnemonic_MOV, args);
-                        args.clear();
-                        args.add(TMP_BASE);
-                        EncoderBase::encode(ip, Mnemonic_CALL, args);
-                    } else {
+                if ( !fit32(offset) ) { // offset is not a signed value that fits into 32 bits
+                    Type* targetType = irManager->getTypeManager().getInt64Type();
+
+                    Opnd* targetVal = irManager->newImmOpnd(targetType,(int64)targetCodeStartAddr);
+                    Opnd* targetReg = irManager->newRegOpnd(targetType, RegName_R14);
+                    
+                    Inst* movInst = irManager->newInst(Mnemonic_MOV, targetReg, targetVal);
+
+                    inst->setOpnd(targetOpndIndex,targetReg);
+
+                    bb->prependInst(movInst,inst);
+
+                    uint8* blockStartIp = (uint8*)bb->getCodeStartAddr();
+                    uint8* ip = movInst->emit(instCodeStartAddr);
+                    movInst->setCodeOffset(instCodeStartAddr - blockStartIp);
+                    inst->emit(ip);
+                    inst->setCodeOffset(ip - blockStartIp);
+
+                    if (bcOffset != ILLEGAL_VALUE) {
+                        bcMap->setEntry((uint64)(POINTER_SIZE_INT)instCodeStartAddr, bcOffset); // MOV
+                        bcMap->setEntry((uint64)(POINTER_SIZE_INT)ip, bcOffset); // CALL
+                    }
+
+                    newOpndsCreated = true;
+                } 
+                else 
 #endif
-                    inst->getOpnd(targetOpndIndex)->assignImmValue((int64)offset);
+                {
+                    inst->getOpnd(targetOpndIndex)->assignImmValue(offset);
                     // re-emit the instruction: 
                     inst->emit(instCodeStartAddr);
 
                     if (inst->hasKind(Inst::Kind_CallInst)){
                         registerDirectCall(inst);
                     }
-#ifdef _EM64T_
-                    }
-#endif
-                }   
-            // todo64
-                    if (isBcRequired) {
-                            uint64 instID = inst->getId();
-                            bcOffset = bc2LIRMapHandler->getVectorEntry(instID);
 
-                            if (bcOffset != ILLEGAL_VALUE) {
-                                POINTER_SIZE_INT instStartAddr = (POINTER_SIZE_INT) inst->getCodeStartAddr();
-                                bcMap->setEntry((uint64) instStartAddr, bcOffset);
-                            }
+                    if (bcOffset != ILLEGAL_VALUE) {
+                        bcMap->setEntry((uint64)(POINTER_SIZE_INT)instCodeStartAddr, bcOffset);
                     }
+                }
+            }   
         }
-        }  
+    }  
+    if (newOpndsCreated)
+        irManager->fixLivenessInfo();
 }
 
 //________________________________________________________________________________________
@@ -579,15 +590,25 @@ bool RuntimeInterface::recompiledMethodEvent(BinaryRewritingInterface& binaryRew
     Byte ** indirectAddr = (Byte **)recompiledMethodDesc->getIndirectAddress();
     Byte * targetAddr = *indirectAddr;
     Byte * callAddr = (Byte*)data;
-    assert(fit32(targetAddr - callAddr-5));
-    uint32 offset = (uint32)(targetAddr - callAddr-5);
 
-    //FIXME
-    //if (Log::cat_rt()->isDebugEnabled()) {
-    //    Log::cat_rt()->out() << "patching call to "<<recompiledMethodDesc->getName()<<" at "<<(void*)callAddr<<"; new target address is "<<(void*)targetAddr<< ::std::endl;
-    //}
-
-    *(uint32*)(callAddr+1)=offset;
+    uint64 offset = targetAddr - callAddr-5;
+  
+#ifdef _EM64T_
+    if ( !fit32(offset) ) { // offset is not a signed value that fits into 32 bits
+        EncoderBase::Operands args;
+        args.clear();
+        args.add(RegName_R14);
+        // direct call <imm> is relative, but call <reg> use an absolute address to jump
+        args.add(EncoderBase::Operand(OpndSize_64, (int64)targetAddr));
+        char * ip = EncoderBase::encode((char*)callAddr, Mnemonic_MOV, args);
+        args.clear();
+        args.add(RegName_R14);
+        EncoderBase::encode(ip, Mnemonic_CALL, args);
+    } else
+#endif
+    { // offset fits into 32 bits
+        *(uint32*)(callAddr+1) = (uint32)offset;
+    }
 
     return true;
 }
@@ -891,5 +912,6 @@ void CodeEmitter::reportCompiledInlinees() {
 
 
 }}; // ~Jitrino::Ia32
+
 
 
