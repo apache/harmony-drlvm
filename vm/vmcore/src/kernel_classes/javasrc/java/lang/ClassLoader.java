@@ -386,6 +386,11 @@ public abstract class ClassLoader {
                                              ProtectionDomain domain)
         throws ClassFormatError {
         checkInitialized();
+        if (name != null && name.indexOf('/') != -1) {
+            throw new NoClassDefFoundError(
+                    "The name is expected in binary (canonical) form,"
+                    + " therefore '/' symbols are not allowed: " + name);
+        }
         if (offset < 0 || len < 0 || offset + len > data.length) {
             throw new IndexOutOfBoundsException(
                 "Either offset or len is outside of the data array");
@@ -403,11 +408,6 @@ public abstract class ClassLoader {
             if (name.startsWith("java.")) {
                 throw new SecurityException(
                     "It is not allowed to define classes inside the java.* package: " + name);
-            }
-            if (name.indexOf('/') != -1) {
-                throw new NoClassDefFoundError(
-                        "The name is expected in binary (canonical) form,"
-                        + " therefore '/' symbols are not allowed: " + name);
             }
             int lastDot = name.lastIndexOf('.');
             packageName = lastDot == -1 ? "" : name.substring(0, lastDot);
