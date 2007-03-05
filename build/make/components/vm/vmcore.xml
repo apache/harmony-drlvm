@@ -330,9 +330,14 @@ Version: $Revision: 1.5.2.3 $
                         dir="${external.dep.CLASSLIB.libdir}" />			
             </select>
 
-            <select os="win" cfg="debug">
-                <linkerarg value="/NODEFAULTLIB:libcmt.lib" />
-                <linkerarg value="/NODEFAULTLIB:msvcrt.lib" />
+            <select os="win">
+                <select cfg="debug">
+                    <linkerarg value="/NODEFAULTLIB:libcmt.lib" />
+                    <linkerarg value="/NODEFAULTLIB:msvcrt.lib" />
+                </select>
+                <select arch="em64t" cfg="release">
+                    <linkerarg value="/NODEFAULTLIB:msvcrt.lib" />
+                </select>
             </select>
 
             <select os="lnx">
