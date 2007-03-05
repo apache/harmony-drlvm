@@ -184,3 +184,12 @@ void jvmti_clean_reclaimed_object_tags()
         ti_env = next_env;
     }
 }
+
+void TITags::clear()
+{
+    assert(!hythread_is_suspend_enabled());
+    tag_pair_list::iterator i;
+    for (i = tags.begin(); i != tags.end(); i++) {
+        update(i->obj, 0, ti_get_object_tptr(i->obj));
+    }
+}

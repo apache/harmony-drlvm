@@ -459,12 +459,21 @@ jvmtiInterruptThread(jvmtiEnv* env,
     if (err != JVMTI_ERROR_NONE){
        return err; 
     } 
+
     if (capa.can_signal_thread == 0){
         return JVMTI_ERROR_MUST_POSSESS_CAPABILITY;
     }
+
     if (!is_valid_thread_object(thread)){
         return JVMTI_ERROR_INVALID_THREAD;
     }
+
+    jint thread_state;
+    IDATA UNUSED status = jthread_get_state(thread, &thread_state);
+    assert(status == TM_ERROR_NONE);
+
+    if (! (JVMTI_THREAD_STATE_ALIVE & thread_state))
+        return JVMTI_ERROR_THREAD_NOT_ALIVE;
 
     return (jvmtiError)jthread_interrupt(thread);
 }

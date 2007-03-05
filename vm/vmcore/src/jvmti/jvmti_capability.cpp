@@ -24,6 +24,7 @@
 
 #include "jvmti_direct.h"
 #include "jvmti_utils.h"
+#include "jvmti_tags.h"
 #include "cxxlog.h"
 #include "suspend_checker.h"
 #include "environment.h"
@@ -142,6 +143,44 @@ static const jvmtiCapabilities jvmti_enable_on_live_flags =
     1  // can_generate_object_free_events
 };
 
+// Implementation for jvmtiGetPotentialCapabilities()
+void static get_available_caps(jvmtiEnv* env,
+                               jvmtiPhase phase,
+                               jvmtiCapabilities* capabilities_ptr)
+{
+    TIEnv *ti_env = reinterpret_cast<TIEnv *>(env);
+
+    if (JVMTI_PHASE_ONLOAD == phase)
+        *capabilities_ptr = interpreter_enabled() ?
+            jvmti_supported_interpreter_capabilities : jvmti_supported_jit_capabilities;
+    else
+    {
+        // Add all capabilities from supported on live phase to already posessed capabilities
+        unsigned char* puchar_ptr = (unsigned char*)capabilities_ptr;
+        unsigned char* enable_ptr = (unsigned char*)&jvmti_enable_on_live_flags;
+
+        *capabilities_ptr = ti_env->posessed_capabilities;
+
+        for (int i = 0; i < int(sizeof(jvmtiCapabilities)); i++)
+            puchar_ptr[i] |= enable_ptr[i]; 
+    }
+
+    DebugUtilsTI* ti = VM_Global_State::loader_env->TI;
+
+    // can_tag_objects capability can only be possessed by one environment.
+    // The feature should be globally enabled in OnLoad phase. If not, it
+    // can't be possesed in live phase.
+    // Thus can_tag_objects is available IF
+    // ( we're in the OnLoad phase OR the feature is already enabled ) AND
+    // no other environment possesses this capability.
+    if ( (JVMTI_PHASE_ONLOAD == phase || ManagedObject::_tag_pointer) && 
+        (!ti->get_global_capability(DebugUtilsTI::TI_GC_ENABLE_TAG_OBJECTS) ||
+            ti_env->posessed_capabilities.can_tag_objects) )
+        capabilities_ptr->can_tag_objects = 1;
+    else
+        capabilities_ptr->can_tag_objects = 0;
+}
+
 /*
  * Get Potential Capabilities
  *
@@ -171,21 +210,7 @@ jvmtiGetPotentialCapabilities(jvmtiEnv* env,
     if (errorCode != JVMTI_ERROR_NONE)
         return errorCode;
 
-    if (JVMTI_PHASE_ONLOAD == phase)
-        *capabilities_ptr = interpreter_enabled() ?
-            jvmti_supported_interpreter_capabilities : jvmti_supported_jit_capabilities;
-    else
-    {
-        // Add all capabilities from supported on live phase to already posessed capabilities
-        TIEnv *ti_env = reinterpret_cast<TIEnv *>(env);
-        unsigned char* puchar_ptr = (unsigned char*)capabilities_ptr;
-        unsigned char* enable_ptr = (unsigned char*)&jvmti_enable_on_live_flags;
-
-        *capabilities_ptr = ti_env->posessed_capabilities;
-
-        for (int i = 0; i < int(sizeof(jvmtiCapabilities)); i++)
-            puchar_ptr[i] |= enable_ptr[i]; 
-    }
+    get_available_caps(env, phase, capabilities_ptr);
 
     return JVMTI_ERROR_NONE;
 }
@@ -220,41 +245,32 @@ jvmtiAddCapabilities(jvmtiEnv* env,
     if (errorCode != JVMTI_ERROR_NONE)
         return errorCode;
 
+    // make a copy of already possessed caps
     TIEnv *ti_env = reinterpret_cast<TIEnv *>(env);
-    jvmtiCapabilities posessed = ti_env->posessed_capabilities;
+    jvmtiCapabilities possessed_caps = ti_env->posessed_capabilities;
     
-    const jvmtiCapabilities* available_caps =
-        (phase == JVMTI_PHASE_LIVE) ? &jvmti_enable_on_live_flags :
-        (interpreter_enabled() ?
-            &jvmti_supported_interpreter_capabilities :
-            &jvmti_supported_jit_capabilities);
+    jvmtiCapabilities available_caps;
+    get_available_caps(env, phase, &available_caps);
 
-    unsigned char* requested = (unsigned char*)capabilities_ptr;
-    unsigned char* available = (unsigned char*)available_caps;
-    unsigned char* p_posessed = (unsigned char*)&posessed;
+    unsigned char* p_requested = (unsigned char*) capabilities_ptr;
+    unsigned char* p_available = (unsigned char*) &available_caps;
+    unsigned char* p_possessed = (unsigned char*) &possessed_caps;
 
     DebugUtilsTI *ti = ti_env->vm->vm_env->TI;
-
-    // if the global capability can_tag_objects has already been enabled,
-    // requested by this environment, but not yet posessed by this environment,
-    // reject the request
-    if (ti->get_global_capability(DebugUtilsTI::TI_GC_ENABLE_TAG_OBJECTS)
-            && !posessed.can_tag_objects && capabilities_ptr->can_tag_objects)
-        return JVMTI_ERROR_NOT_AVAILABLE;
 
     // Allow to turn on any capabilities that are listed in potential capabilities
     for (int i = 0; i < int(sizeof(jvmtiCapabilities)); i++)
     {
-        unsigned char adding_new = requested[i] & ~p_posessed[i];
+        unsigned char adding_new = p_requested[i] & ~p_possessed[i];
 
-        if (adding_new & ~available[i])
+        if (adding_new & ~p_available[i])
             return JVMTI_ERROR_NOT_AVAILABLE;
 
-        p_posessed[i] |= adding_new;
+        p_possessed[i] |= adding_new;
     }
 
     // Add new capabilities after checking was done
-    ti_env->posessed_capabilities = posessed;
+    ti_env->posessed_capabilities = possessed_caps;
 
     // Update global capabilities
     if (capabilities_ptr->can_generate_method_entry_events)
@@ -289,11 +305,14 @@ jvmtiAddCapabilities(jvmtiEnv* env,
 
     if (capabilities_ptr->can_tag_objects) {
         ti->set_global_capability(DebugUtilsTI::TI_GC_ENABLE_TAG_OBJECTS);
+
+        // this flag could be set only once and mustn't be reset by
+        // RelinquishCapabilities.
         ManagedObject::_tag_pointer = true;
     }
 
     return JVMTI_ERROR_NONE;
-}
+} // jvmtiAddCapabilities
 
 /*
  * Relinquish Capabilities
@@ -377,17 +396,31 @@ jvmtiRelinquishCapabilities(jvmtiEnv* env,
     if (removed_caps.can_generate_field_modification_events)
         ti->reset_global_capability(DebugUtilsTI::TI_GC_ENABLE_FIELD_MODIFICATION_EVENT);
 
-    if (capabilities_ptr->can_pop_frame)
+    if (removed_caps.can_pop_frame)
         ti->reset_global_capability(DebugUtilsTI::TI_GC_ENABLE_POP_FRAME);
+
+    if (removed_caps.can_tag_objects) {
+        // clear tags on relinquishing can_tag_objects capability
+        ti_env = reinterpret_cast<TIEnv *>(env);
+        assert(ti_env->lock);
+        hymutex_lock(ti_env->lock);
+        if (ti_env->tags) {
+            ti_env->tags->clear();
+            delete ti_env->tags;
+            ti_env->tags = NULL;
+        }
+        hymutex_unlock(ti_env->lock);
+
+        ti->reset_global_capability(DebugUtilsTI::TI_GC_ENABLE_TAG_OBJECTS);
+    }
 
     // relinquishing following capabilities will not revert VM operation mode
     // back to optimized, so we do not reset global capabilities
     //
     //     TI_GC_ENABLE_MONITOR_EVENTS
-    //     TI_GC_ENABLE_TAG_OBJECTS
 
     return JVMTI_ERROR_NONE;
-}
+} // jvmtiRelinquishCapabilities
 
 /*
  * Get Capabilities
@@ -424,5 +457,5 @@ jvmtiGetCapabilities(jvmtiEnv* env,
     *capabilities_ptr = ti_env->posessed_capabilities;
 
     return JVMTI_ERROR_NONE;
-}
+} // jvmtiGetCapabilities
 

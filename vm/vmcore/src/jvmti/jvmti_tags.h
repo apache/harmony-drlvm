@@ -78,6 +78,9 @@ struct TITags {
     /// @param ti_env - the pass-through parameter 
     ///   to jvmti_send_object_free_event()
     void clean_reclaimed_object_tags(bool send_event, TIEnv* ti_env);
+
+    /// deletes all tags.
+    void clear();
 };
 
 /**
