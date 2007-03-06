@@ -15,7 +15,7 @@
 -->
 <project name="ALL TESTS">
     <select arch="ipf">
-        <property name="test.mode" value="int" />
+        <propertyregex property="test.mode" input="int" regexp="" replace="" override="on" />
         <target name="test" depends="smoke.test, check-result"/>
     </select>
     <select arch="ia32,em64t">
