@@ -144,7 +144,10 @@ char * m2n_gen_ts_to_register(char * buf, const R_Opnd * reg,
                               unsigned num_ret_need_to_save) {
     // we can't preserve rax and return value on it at the same time
     assert (num_ret_need_to_save == 0 || reg != &rax_opnd);
-#ifdef PLATFORM_POSIX
+
+
+//#ifdef PLATFORM_POSIX
+
     // preserve std places
     unsigned i;
     unsigned num_std_saved = 0;
@@ -193,7 +196,13 @@ char * m2n_gen_ts_to_register(char * buf, const R_Opnd * reg,
 
     // TODO: FIXME: only absolute addressing mode is supported now
     buf = mov(buf, rax_opnd, Imm_Opnd(size_64, (uint64)get_thread_ptr), size_64);
+#ifdef _WIN64
+    buf = alu(buf, add_opc, rsp_opnd, Imm_Opnd(-SHADOW));
+#endif
     buf = call(buf, rax_opnd, size_64);
+#ifdef _WIN64
+    buf = alu(buf, add_opc, rsp_opnd, Imm_Opnd(SHADOW));
+#endif
     if (reg != &rax_opnd) {
         buf = mov(buf, *reg,  rax_opnd, size_64);
     }
@@ -236,10 +245,10 @@ char * m2n_gen_ts_to_register(char * buf, const R_Opnd * reg,
                 LcgEM64TContext::GR_LOCALS_OFFSET + num_callee_saves_used + num_std_saved),
                 size_64);
         }
-#else //!PLATFORM_POSIX
-    buf = prefix(buf, prefix_fs);
-    buf = mov(buf, *reg,  M_Opnd(0x14), size_64);
-#endif //!PLATFORM_POSIX
+//#else //!PLATFORM_POSIX
+//    buf = prefix(buf, prefix_fs);
+//    buf = mov(buf, *reg,  M_Opnd(0x14), size_64);
+//#endif //!PLATFORM_POSIX
     return buf;
 }
 
@@ -358,7 +367,13 @@ char * m2n_gen_pop_m2n(char * buf, bool handles, unsigned num_callee_saves,
     // NOTE: the following should be true before the call ($rsp % 8 == 0 && $rsp % 16 != 0)!
 
     // Call m2n_pop_local_handles or m2n_free_local_handles
+#ifdef _WIN64
+    buf = alu(buf, add_opc, rsp_opnd, Imm_Opnd(-SHADOW));
+#endif
     buf = call(buf, rax_opnd, size_64);
+#ifdef _WIN64
+    buf = alu(buf, add_opc, rsp_opnd, Imm_Opnd(SHADOW));
+#endif
     
     if (num_preserve_ret > 0) {
         // Restore return value

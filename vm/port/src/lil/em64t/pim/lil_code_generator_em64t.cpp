@@ -239,7 +239,8 @@ private:
             // next temporary register is allocated from unused scratched
             // registers in the following order:
             // xmm8, xmm9, ... xmm15
-            ASSERT(get_num_used_reg() < LcgEM64TContext::MAX_FR_TEMPORARY,
+            ASSERT(get_num_used_reg() < LcgEM64TContext::MAX_FR_TEMPORARY + LcgEM64TContext:: MAX_FR_LOCALS,
+            //ASSERT(get_num_used_reg() < LcgEM64TContext::MAX_FR_TEMPORARY ,
                 "LIL INTERNAL ERROR: Not enough temporary registers");
             m_idx = LcgEM64TContext::get_xmm_reg_from_map(
                 LcgEM64TContext::FR_TEMPORARY_OFFSET + get_num_used_reg()).get_idx();
@@ -1587,6 +1588,9 @@ move_to_destination:
         }
         case LCK_Call:
         case LCK_CallNoRet: {
+#ifdef _WIN64
+            buf = alu(buf, add_opc, rsp_opnd, Imm_Opnd(-SHADOW), size_64);
+#endif
             if (lil_operand_is_immed(target)) {
                 // check if we can perform relative call
                 int64 target_value = lil_operand_get_immed(target);
@@ -1618,6 +1622,9 @@ move_to_destination:
                 const LcgEM64TLoc * loc = get_op_loc(target, false);
                 buf = ::call(buf, get_rm_opnd(loc), size_64);
             }
+#ifdef _WIN64
+            buf = alu(buf, add_opc, rsp_opnd, Imm_Opnd(SHADOW), size_64);
+#endif
             take_inputs_from_stack = true;
             break;
         }

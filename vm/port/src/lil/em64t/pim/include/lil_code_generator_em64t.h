@@ -85,20 +85,43 @@ enum LcgEM64TLocKind {
 class LcgEM64TContext: public LilInstructionVisitor {
 
 public:
+#ifdef _WIN64
+    // maximum number of GR reserved for returns
+    static const unsigned MAX_GR_RETURNS = 1;
+    // maximum number of GR reserved for outputs/inputs
+    static const unsigned MAX_GR_OUTPUTS = 4;    
+    // maximum number of locals that can be placed in GR
+    static const unsigned MAX_GR_LOCALS = 8;
+    // maximum number of stand places
+    static const unsigned MAX_STD_PLACES = 2;
+
+    // maximum number of FR reserved for returns
+    static const unsigned MAX_FR_RETURNS = 1;
+    // maximum number of FR reserved for outputs/inputs
+    static const unsigned MAX_FR_OUTPUTS = 4;
+    // maximum number of temporary XMM registers
+    static const unsigned MAX_FR_LOCALS = 10;
+    // maximum number of temporary XMM registers
+    static const unsigned MAX_FR_TEMPORARY = 2;
+#else
+    // maximum number of GR reserved for returns
+    static const unsigned MAX_GR_RETURNS = 2;
+    // maximum number of GR reserved for outputs/inputs
+    static const unsigned MAX_GR_OUTPUTS = 6;    
     // maximum number of locals that can be placed in GR
     static const unsigned MAX_GR_LOCALS = 6;
     // maximum number of stand places
-    static const unsigned MAX_STD_PLACES = 2;    
-    // maximum number of GR reserved for outputs/inputs
-    static const unsigned MAX_GR_OUTPUTS = 6;    
-    // maximum number of FR reserved for outputs/inputs
-    static const unsigned MAX_FR_OUTPUTS = 8;
-    // maximum number of GR reserved for returns
-    static const unsigned MAX_GR_RETURNS = 2;
+    static const unsigned MAX_STD_PLACES = 2;
+
     // maximum number of FR reserved for returns
     static const unsigned MAX_FR_RETURNS = 2;
+    // maximum number of FR reserved for outputs/inputs
+    static const unsigned MAX_FR_OUTPUTS = 8;
     // maximum number of temporary XMM registers
-    static const unsigned MAX_FR_TEMPORARY = 8;
+    static const unsigned MAX_FR_LOCALS = 8;
+    // maximum number of temporary XMM registers
+    static const unsigned MAX_FR_TEMPORARY = 0;
+#endif
 
     // size of GR in bytes
     // TODO: Think about using GR_STACK_SIZE
@@ -118,6 +141,7 @@ public:
     static const unsigned FR_OUTPUTS_OFFSET = 0;
     static const unsigned FR_RETURNS_OFFSET = FR_OUTPUTS_OFFSET + MAX_FR_OUTPUTS;
     static const unsigned FR_TEMPORARY_OFFSET = FR_RETURNS_OFFSET + MAX_FR_RETURNS;
+    static const unsigned FR_LOCALS_OFFSET = FR_TEMPORARY_OFFSET + MAX_FR_TEMPORARY;
 
 private:
 
@@ -160,10 +184,79 @@ public:
 
     LcgEM64TContext(LilCodeStub * stub, tl::MemoryPool & m);
 
+#ifdef _WIN64
      /**
       * returns general purpose register associated with given index
       * this association is used across whole lil code generator
       */
+    static const R_Opnd & get_reg_from_map(unsigned index) {
+        static const R_Opnd * REG_MAP[] = {
+            // std places (scratched)
+            &r10_opnd, &r11_opnd,
+            // GR locals (calee-saved)
+            &r12_opnd, &r13_opnd, &r14_opnd, &r15_opnd,
+            &rdi_opnd, &rsi_opnd, &rbp_opnd, &rbx_opnd,
+            // gr inputs/outputs (scratched)
+            &rcx_opnd, &rdx_opnd, &r8_opnd, &r9_opnd,
+            // gr returns (scratched)
+            &rax_opnd,
+            // rsp
+            &rsp_opnd
+        };
+        return *REG_MAP[index];
+    }
+
+    /**
+     * returns xmm register associated with given index
+     * this association is used across whole lil code generator
+     */
+    static const XMM_Opnd & get_xmm_reg_from_map(unsigned index) {
+        static const XMM_Opnd * XMM_REG_MAP[] = {
+            // fr inputs/outputs (scratched)
+            &xmm0_opnd, &xmm1_opnd, &xmm2_opnd, &xmm3_opnd,
+            // fr returns (scratched)
+            &xmm0_opnd,
+            // temporary xmm registers (scratched)
+            &xmm4_opnd, &xmm5_opnd,
+            // locals xmm registers
+            &xmm6_opnd, &xmm7_opnd, &xmm8_opnd, &xmm9_opnd,
+            &xmm10_opnd, &xmm11_opnd, &xmm12_opnd, &xmm13_opnd,
+            &xmm14_opnd, &xmm15_opnd
+        };
+        return *XMM_REG_MAP[index];
+    }
+
+    /**
+     * an association between register number and index in the REG_MAP array
+     */
+    static unsigned get_index_in_map(const Reg_No reg) {
+        static const unsigned INDEX_MAP[] = {
+            //  rax_reg,                rbx_reg,            rcx_reg,
+            GR_RETURNS_OFFSET, GR_LOCALS_OFFSET + 7, GR_OUTPUTS_OFFSET + 0,
+            //  rdx_reg,                rdi_reg,            rsi_reg,
+            GR_OUTPUTS_OFFSET + 1, GR_LOCALS_OFFSET + 4, GR_LOCALS_OFFSET + 5,
+            //  rsp_reg,            rbp_reg,                r8_reg,
+            RSP_OFFSET, GR_LOCALS_OFFSET + 6, GR_OUTPUTS_OFFSET + 2,
+            //  r9_reg,                 r10_reg,            r11_reg,
+            GR_OUTPUTS_OFFSET + 3, STD_PLACES_OFFSET, STD_PLACES_OFFSET + 1,
+            //  r12_reg,                r13_reg,            r14_reg,
+            GR_LOCALS_OFFSET, GR_LOCALS_OFFSET + 1, GR_LOCALS_OFFSET + 2,
+            //  r15_reg,                xmm0_reg,           xmm1_reg,
+            GR_LOCALS_OFFSET + 3, FR_OUTPUTS_OFFSET, FR_OUTPUTS_OFFSET + 1,
+            //  xmm2_reg,               xmm3_reg,           xmm4_reg,
+            FR_OUTPUTS_OFFSET + 2, FR_OUTPUTS_OFFSET + 3, FR_TEMPORARY_OFFSET,
+            //  xmm5_reg,               xmm6_reg,           xmm7_reg,
+            FR_TEMPORARY_OFFSET + 1, FR_LOCALS_OFFSET, FR_LOCALS_OFFSET + 1,
+            //  xmm8_reg,               xmm9_reg,           xmm10_reg,
+            FR_LOCALS_OFFSET + 2, FR_LOCALS_OFFSET + 3, FR_LOCALS_OFFSET + 4,
+            //  xmm11_reg,              xmm12_reg,          xmm13_reg,
+            FR_LOCALS_OFFSET + 5, FR_LOCALS_OFFSET + 6, FR_LOCALS_OFFSET + 7,
+            //  xmm14_reg,              xmm15_reg
+            FR_LOCALS_OFFSET + 8, FR_LOCALS_OFFSET + 9
+        };
+        return INDEX_MAP[reg];
+    }
+#else
     static const R_Opnd & get_reg_from_map(unsigned index) {
         static const R_Opnd * REG_MAP[] = {
             // std places (scratched)
@@ -228,7 +321,7 @@ public:
         };
         return INDEX_MAP[reg];
     }
-        
+#endif        
     void * operator new(size_t sz, tl::MemoryPool & m) {
         return m.alloc(sz);
     }
@@ -517,7 +610,11 @@ private:
 
         // reserve enough GR & FR outputs
         unsigned gp_out_cnt = 0;
+#ifdef _WIN64
+#       define fp_out_cnt gp_out_cnt
+#else
         unsigned fp_out_cnt = 0;
+#endif
         for (unsigned i = 0;  i < lil_sig_get_num_args(sig);  i++) {
             LilType t = lil_sig_get_arg_type(sig, i);
             if (is_fp_type(t)) {

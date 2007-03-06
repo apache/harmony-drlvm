@@ -57,6 +57,10 @@ struct M2nFrame {
     frame_type           current_frame_type;
     uint64               rbx;
     uint64               rbp;
+#ifdef _WIN64
+    uint64               rsi;
+    uint64               rdi;
+#endif
     uint64               r15;
     uint64               r14;
     uint64               r13;

@@ -41,14 +41,38 @@
 #include "enc_base.h"
 #include "open/types.h"
 
-#ifdef _EM64T_
+#ifdef _EM64T_ 
 // size of general-purpose value on the stack in bytes
 #define GR_STACK_SIZE 8
 // size of floating-point value on the stack in bytes
 #define FR_STACK_SIZE 8
+
+#if defined(WIN32) || defined(_WIN64)
+    // maximum number of GP registers for inputs
+    const int MAX_GR = 4;
+    // maximum number of FP registers for inputs
+    const int MAX_FR = 4;
+    // WIN64 reserves 4 words for shadow space
+    const int SHADOW = 4 * GR_STACK_SIZE;
 #else
+    // maximum number of GP registers for inputs
+    const int MAX_GR = 6;
+    // maximum number of FP registers for inputs
+    const int MAX_FR = 8;
+    // Linux x64 doesn't reserve shadow space
+    const int SHADOW = 0;
+#endif
+
+#else
+// size of general-purpose value on the stack in bytes
 #define GR_STACK_SIZE 4
+// size of general-purpose value on the stack in bytes
 #define FR_STACK_SIZE 8
+
+// maximum number of GP registers for inputs
+const int MAX_GR = 0;
+// maximum number of FP registers for inputs
+const int MAX_FR = 0;
 #endif
 
 enum Reg_No {
@@ -70,7 +94,7 @@ enum Reg_No {
     xmm4_reg,   xmm5_reg,   xmm6_reg,   xmm7_reg,
     fs_reg,
 #endif
-	/** @brief Total number of registers.*/
+    /** @brief Total number of registers.*/
     n_reg
 };
 //

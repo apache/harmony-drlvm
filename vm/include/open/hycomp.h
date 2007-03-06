@@ -112,7 +112,7 @@ typedef double SYS_FLOAT;
 /**
  * Win32 - Windows 3.1 & NT using Win32 
  */
-#if defined(WIN32)
+#if defined(WIN32) || defined(_WIN64)
 
 typedef __int64 I_64;
 typedef unsigned __int64 U_64;

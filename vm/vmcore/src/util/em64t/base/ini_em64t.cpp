@@ -44,16 +44,29 @@
 
 #include "dump.h"
 
+#if defined(WIN32) || defined(_WIN64)
+
+// four fake parameters should be passed over GR
+#define FAKE_PARAMETERS void *, void *, void *, void *
+#define FAKE_ARGUMENTS  NULL,   NULL,   NULL,   NULL
+
+#else // defined(WIN32) || defined(_WIN64)
+
+// six fake parameters should be passed over GR
+#define FAKE_PARAMETERS void *, void *, void *, void *, void *, void *
+#define FAKE_ARGUMENTS  NULL,   NULL,   NULL,   NULL,   NULL,   NULL
+
+#endif // defined(WIN32) || defined(_WIN64)
+
+
 typedef int64 ( * invoke_managed_func_int_t) (
-    // six fake parameters should be passed over GR
-    void *, void *, void *, void *, void *, void *,
+    FAKE_PARAMETERS,
     const void * const method_entry_point,
     int64 gr_nargs, int64 fr_nargs, int64 stack_nargs,
     uint64 gr_args[], double fr_args[], uint64 stack_args[]);
 
 typedef double ( * invoke_managed_func_double_t)(
-    // six fake parameters should be passed over GR
-    void *, void *, void *, void *, void *, void *,
+    FAKE_PARAMETERS,
     const void * const method_entry_point,
     int64 gr_nargs, int64 fr_nargs, int64 stack_nargs,
     uint64 gr_args[], double fr_args[], uint64 stack_args[]);
@@ -76,13 +89,13 @@ static invoke_managed_func_int_t gen_invoke_managed_func() {
     // [rbp + 48] - gr_args
     // [rbp + 56] - fr_args
     // [rbp + 64] - stack_args
-    const int32 METHOD_ENTRY_POINT_OFFSET = 16;
-    const int32 UNUSED GR_NARGS_OFFSET = 24;
-    const int32 FR_NARGS_OFFSET = 32;
-    const int32 STACK_NARGS_OFFSET = 40;
-    const int32 GR_ARGS_OFFSET = 48;
-    const int32 FR_ARGS_OFFSET = 56;
-    const int32 STACK_ARGS_OFFSET = 64;
+    const int32 METHOD_ENTRY_POINT_OFFSET = 16 + SHADOW;
+    const int32 UNUSED GR_NARGS_OFFSET = 24 + SHADOW;
+    const int32 FR_NARGS_OFFSET = 32 + SHADOW;
+    const int32 STACK_NARGS_OFFSET = 40 + SHADOW;
+    const int32 GR_ARGS_OFFSET = 48 + SHADOW;
+    const int32 FR_ARGS_OFFSET = 56 + SHADOW;
+    const int32 STACK_ARGS_OFFSET = 64 + SHADOW;
     
     const int STUB_SIZE = 200;
     char * stub = (char *) malloc_fixed_code_for_jit(STUB_SIZE,
@@ -126,6 +139,12 @@ static invoke_managed_func_int_t gen_invoke_managed_func() {
     
     labels.define_label(MOVE_STACK_ARGS_END, stub, false);
 
+#ifdef _WIN64
+    // 1a) WIN64, reserve 4 words of shadow space
+    //stub = alu(stub, sub_opc, rsp_opnd, Imm_Opnd(SHADOW));
+    // but jit doesn't suppoert it now
+#endif
+
     // 2) move from fr_args to registers
     stub = mov(stub, rcx_opnd, M_Base_Opnd(rbp_reg, FR_NARGS_OFFSET));
     stub = alu(stub, or_opc, rcx_opnd, rcx_opnd);
@@ -137,14 +156,23 @@ static invoke_managed_func_int_t gen_invoke_managed_func() {
     stub = movq(stub, xmm1_opnd, M_Base_Opnd(r10_reg, 1 * FR_STACK_SIZE));
     stub = movq(stub, xmm2_opnd, M_Base_Opnd(r10_reg, 2 * FR_STACK_SIZE));
     stub = movq(stub, xmm3_opnd, M_Base_Opnd(r10_reg, 3 * FR_STACK_SIZE));
+#ifndef _WIN64
     stub = movq(stub, xmm4_opnd, M_Base_Opnd(r10_reg, 4 * FR_STACK_SIZE));
     stub = movq(stub, xmm5_opnd, M_Base_Opnd(r10_reg, 5 * FR_STACK_SIZE));
     stub = movq(stub, xmm6_opnd, M_Base_Opnd(r10_reg, 6 * FR_STACK_SIZE));
     stub = movq(stub, xmm7_opnd, M_Base_Opnd(r10_reg, 7 * FR_STACK_SIZE));
+#endif
 
     labels.define_label(MOVE_FR_ARGS_END, stub, false);
     
     // 3) unconditionally move from gr_args to registers
+#ifdef _WIN64
+    stub = mov(stub, r10_opnd, M_Base_Opnd(rbp_reg, GR_ARGS_OFFSET));
+    stub = mov(stub, rcx_opnd, M_Base_Opnd(r10_reg, 0 * GR_STACK_SIZE));
+    stub = mov(stub, rdx_opnd, M_Base_Opnd(r10_reg, 1 * GR_STACK_SIZE));
+    stub = mov(stub, r8_opnd, M_Base_Opnd(r10_reg, 2 * GR_STACK_SIZE));
+    stub = mov(stub, r9_opnd, M_Base_Opnd(r10_reg, 3 * GR_STACK_SIZE));
+#else
     stub = mov(stub, r10_opnd, M_Base_Opnd(rbp_reg, GR_ARGS_OFFSET));
     stub = mov(stub, rdi_opnd, M_Base_Opnd(r10_reg, 0 * GR_STACK_SIZE));
     stub = mov(stub, rsi_opnd, M_Base_Opnd(r10_reg, 1 * GR_STACK_SIZE));
@@ -152,6 +180,7 @@ static invoke_managed_func_int_t gen_invoke_managed_func() {
     stub = mov(stub, rcx_opnd, M_Base_Opnd(r10_reg, 3 * GR_STACK_SIZE));
     stub = mov(stub, r8_opnd, M_Base_Opnd(r10_reg, 4 * GR_STACK_SIZE));
     stub = mov(stub, r9_opnd, M_Base_Opnd(r10_reg, 5 * GR_STACK_SIZE));
+#endif
 
     // 4) transfer control
     stub = mov(stub, r10_opnd, M_Base_Opnd(rbp_reg, METHOD_ENTRY_POINT_OFFSET));
@@ -176,10 +205,7 @@ void JIT_execute_method_default(JIT_Handle jh, jmethodID methodID,
 
     static const invoke_managed_func_int_t invoke_managed_func = 
         (invoke_managed_func_int_t) gen_invoke_managed_func();
-    // maximum number of GP registers for inputs
-    const int MAX_GR = 6;
-    // maximum number of FP registers for inputs
-    const int MAX_FR = 8;
+
     // holds arguments that should be placed in GR's
     uint64 gr_args[MAX_GR];
     // holds arguments that should be placed in FR's
@@ -195,7 +221,11 @@ void JIT_execute_method_default(JIT_Handle jh, jmethodID methodID,
     uint64 * const stack_args = (uint64 *) STD_MALLOC(sizeof(uint64) * method->get_num_args());
     
     int64 gr_nargs = 0;
-    int64 fr_nargs = 0;
+#ifdef _WIN64
+#  define fr_nargs gr_nargs
+#else
+     int64 fr_nargs = 0;
+#endif
     int64 stack_nargs = 0;
     int64 arg_num = 0;
 
@@ -309,7 +339,7 @@ void JIT_execute_method_default(JIT_Handle jh, jmethodID methodID,
     type = method->get_return_java_type();
     switch(type) {
     case JAVA_TYPE_VOID:
-        invoke_managed_func(NULL, NULL, NULL, NULL, NULL, NULL,
+        invoke_managed_func(FAKE_ARGUMENTS,
             method_entry_point,
             gr_nargs,  fr_nargs, stack_nargs,
             gr_args, fr_args, stack_args);
@@ -317,7 +347,7 @@ void JIT_execute_method_default(JIT_Handle jh, jmethodID methodID,
     case JAVA_TYPE_ARRAY:
     case JAVA_TYPE_CLASS: {
         ObjectHandle handle = NULL;
-        uint64 ref = invoke_managed_func(NULL, NULL, NULL, NULL, NULL, NULL,
+        uint64 ref = invoke_managed_func(FAKE_ARGUMENTS,
             method_entry_point,
             gr_nargs,  fr_nargs, stack_nargs,
             gr_args, fr_args, stack_args);
@@ -338,7 +368,7 @@ void JIT_execute_method_default(JIT_Handle jh, jmethodID methodID,
     case JAVA_TYPE_CHAR:
     case JAVA_TYPE_BYTE:
     case JAVA_TYPE_BOOLEAN:
-        result->j = invoke_managed_func(NULL, NULL, NULL, NULL, NULL, NULL,
+        result->j = invoke_managed_func(FAKE_ARGUMENTS,
             method_entry_point,
             gr_nargs,  fr_nargs, stack_nargs,
             gr_args, fr_args, stack_args);
@@ -346,7 +376,7 @@ void JIT_execute_method_default(JIT_Handle jh, jmethodID methodID,
     case JAVA_TYPE_DOUBLE:
     case JAVA_TYPE_FLOAT:
         result->d = (invoke_managed_func_double_t(invoke_managed_func))(
-            NULL, NULL, NULL, NULL, NULL, NULL,
+            FAKE_ARGUMENTS,
             method_entry_point,
             gr_nargs,  fr_nargs, stack_nargs,
             gr_args, fr_args, stack_args);

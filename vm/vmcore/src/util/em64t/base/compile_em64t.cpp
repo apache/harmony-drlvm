@@ -52,16 +52,23 @@ void patch_code_with_threads_suspended(Byte * UNREF code_block, Byte * UNREF new
 }
 
 void compile_protect_arguments(Method_Handle method, GcFrame * gc) {
-    const unsigned MAX_GP = 6;
-    const unsigned MAX_FP = 8;
     // adress of the top of m2n frame
     uint64 * const m2n_base_addr = (uint64 *)m2n_get_frame_base(m2n_get_last_frame());
      // 6(scratched registers on the stack)
     assert(m2n_get_size() % 8 == 0);
-    // 15 = 1(alignment) + 8(fp) + 6(gp) registers were preserved on the stack
-    uint64 * const inputs_addr = m2n_base_addr - (m2n_get_size() / 8) - 15;
+    // 15 = 1(alignment) + n(fp) + n(gp) registers were preserved on the stack
+    uint64 * const inputs_addr = m2n_base_addr
+            - (m2n_get_size() / 8)
+            - 1 - MAX_GR - MAX_FR;
      // 1(return ip);
+#ifdef _WIN64
+    // WIN64, reserve 4 words of shadow space
+    //uint64 * extra_inputs_addr = m2n_base_addr + SHADOW/8 + 1;
+    // but jit doesn't suppoert it now
     uint64 * extra_inputs_addr = m2n_base_addr + 1;
+#else
+    uint64 * extra_inputs_addr = m2n_base_addr + 1;
+#endif
 
     assert(!hythread_is_suspend_enabled());
     Method_Signature_Handle msh = method_get_signature(method);
@@ -84,7 +91,7 @@ void compile_protect_arguments(Method_Handle method, GcFrame * gc) {
         case VM_DATA_TYPE_BOOLEAN:
         case VM_DATA_TYPE_CHAR:
         case VM_DATA_TYPE_UP:
-            if (num_gp_used < MAX_GP) {
+            if (num_gp_used < MAX_GR) {
                 ++num_gp_used;
             } else {
                 ++extra_inputs_addr;
@@ -93,7 +100,7 @@ void compile_protect_arguments(Method_Handle method, GcFrame * gc) {
         case VM_DATA_TYPE_CLASS:
         case VM_DATA_TYPE_ARRAY: {
             uint64 * ref_addr;
-            if (num_gp_used < MAX_GP) {
+            if (num_gp_used < MAX_GR) {
                 ref_addr =  inputs_addr + num_gp_used;
                 ++num_gp_used;
             } else {
@@ -105,7 +112,7 @@ void compile_protect_arguments(Method_Handle method, GcFrame * gc) {
         }
         case VM_DATA_TYPE_MP: {
             uint64 * ref_addr;
-            if (num_gp_used < MAX_GP) {
+            if (num_gp_used < MAX_GR) {
                 ref_addr =  inputs_addr + num_gp_used;
                 ++num_gp_used;
             } else {
@@ -117,7 +124,7 @@ void compile_protect_arguments(Method_Handle method, GcFrame * gc) {
         }
         case VM_DATA_TYPE_F4:
         case VM_DATA_TYPE_F8:
-            if (num_fp_used < MAX_FP) {
+            if (num_fp_used < MAX_FR) {
                 ++num_fp_used;
             } else {
                 ++extra_inputs_addr;
@@ -136,10 +143,19 @@ void compile_protect_arguments(Method_Handle method, GcFrame * gc) {
 // compile_me stack frame
 //    m2n frame
 //    8 byte alignment
-//    6 xmm registers
-//    6 gp registers
+//    8 xmm registers on linux and 4 on windows
+//    6 gp registers on linux and 4 on windows
+//    0 byte shadow on linux and 32 byte on windows
 //    method handle
-const int32 stack_size = (int32)m2n_get_size() + 8 + 120;
+
+// Stack size should be (% 8 == 0) but shouldn't be (% 16 == 0)
+const int ALIGNMENT = 8;
+
+const int32 gr_stack_size = (1 + MAX_GR)*GR_STACK_SIZE
+        + SHADOW;
+const int32 stack_size = (int32)m2n_get_size()
+        + MAX_FR*FR_STACK_SIZE
+        + gr_stack_size + ALIGNMENT;
 
 static NativeCodePtr compile_get_compile_me_generic() {
     static NativeCodePtr addr = NULL;
@@ -147,7 +163,11 @@ static NativeCodePtr compile_get_compile_me_generic() {
         return addr;
     }
 
+#ifdef _WIN64
+    const int STUB_SIZE = 400;
+#else
     const int STUB_SIZE = 416;
+#endif
     char * stub = (char *) malloc_fixed_code_for_jit(STUB_SIZE,
         DEFAULT_CODE_ALIGNMENT, CODE_BLOCK_HEAT_DEFAULT, CAA_Allocate);
     addr = stub;
@@ -156,32 +176,49 @@ static NativeCodePtr compile_get_compile_me_generic() {
 #endif
     assert(stack_size % 8 == 0);
     assert(stack_size % 16 != 0);
+
     // set up stack frame
     stub = alu(stub, sub_opc, rsp_opnd, Imm_Opnd(stack_size));
+
     // TODO: think over saving xmm registers conditionally
-    stub = movq(stub, M_Base_Opnd(rsp_reg, 112), xmm7_opnd);
-    stub = movq(stub, M_Base_Opnd(rsp_reg, 104), xmm6_opnd);
-    stub = movq(stub, M_Base_Opnd(rsp_reg, 96), xmm5_opnd);
-    stub = movq(stub, M_Base_Opnd(rsp_reg, 88), xmm4_opnd);
-    stub = movq(stub, M_Base_Opnd(rsp_reg, 80), xmm3_opnd);
-    stub = movq(stub, M_Base_Opnd(rsp_reg, 72), xmm2_opnd);
-    stub = movq(stub, M_Base_Opnd(rsp_reg, 64), xmm1_opnd);
-    stub = movq(stub, M_Base_Opnd(rsp_reg, 56), xmm0_opnd);
+#ifndef _WIN64
+    stub = movq(stub, M_Base_Opnd(rsp_reg, 7*FR_STACK_SIZE + gr_stack_size), xmm7_opnd);
+    stub = movq(stub, M_Base_Opnd(rsp_reg, 6*FR_STACK_SIZE + gr_stack_size), xmm6_opnd);
+    stub = movq(stub, M_Base_Opnd(rsp_reg, 5*FR_STACK_SIZE + gr_stack_size), xmm5_opnd);
+    stub = movq(stub, M_Base_Opnd(rsp_reg, 4*FR_STACK_SIZE + gr_stack_size), xmm4_opnd);
+#endif
+    stub = movq(stub, M_Base_Opnd(rsp_reg, 3*FR_STACK_SIZE + gr_stack_size), xmm3_opnd);
+    stub = movq(stub, M_Base_Opnd(rsp_reg, 2*FR_STACK_SIZE + gr_stack_size), xmm2_opnd);
+    stub = movq(stub, M_Base_Opnd(rsp_reg, 1*FR_STACK_SIZE + gr_stack_size), xmm1_opnd);
+    stub = movq(stub, M_Base_Opnd(rsp_reg, 0*FR_STACK_SIZE + gr_stack_size), xmm0_opnd);
+
     // we need to preserve all general purpose registers here
     // to protect managed objects from GC during compilation
-    stub = mov(stub, M_Base_Opnd(rsp_reg, 48), r9_opnd);
-    stub = mov(stub, M_Base_Opnd(rsp_reg, 40), r8_opnd);
-    stub = mov(stub, M_Base_Opnd(rsp_reg, 32), rcx_opnd);
-    stub = mov(stub, M_Base_Opnd(rsp_reg, 24), rdx_opnd);
-    stub = mov(stub, M_Base_Opnd(rsp_reg, 16), rsi_opnd);
-    stub = mov(stub, M_Base_Opnd(rsp_reg, 8), rdi_opnd);
+#ifdef _WIN64
+    stub = mov(stub, M_Base_Opnd(rsp_reg, (1 + 3)*GR_STACK_SIZE + SHADOW), r9_opnd);
+    stub = mov(stub, M_Base_Opnd(rsp_reg, (1 + 2)*GR_STACK_SIZE + SHADOW), r8_opnd);
+    stub = mov(stub, M_Base_Opnd(rsp_reg, (1 + 1)*GR_STACK_SIZE + SHADOW), rdx_opnd);
+    stub = mov(stub, M_Base_Opnd(rsp_reg, (1 + 0)*GR_STACK_SIZE + SHADOW), rcx_opnd);
+#else
+    stub = mov(stub, M_Base_Opnd(rsp_reg, (1 + 5)*GR_STACK_SIZE + SHADOW), r9_opnd);
+    stub = mov(stub, M_Base_Opnd(rsp_reg, (1 + 4)*GR_STACK_SIZE + SHADOW), r8_opnd);
+    stub = mov(stub, M_Base_Opnd(rsp_reg, (1 + 3)*GR_STACK_SIZE + SHADOW), rcx_opnd);
+    stub = mov(stub, M_Base_Opnd(rsp_reg, (1 + 2)*GR_STACK_SIZE + SHADOW), rdx_opnd);
+    stub = mov(stub, M_Base_Opnd(rsp_reg, (1 + 1)*GR_STACK_SIZE + SHADOW), rsi_opnd);
+    stub = mov(stub, M_Base_Opnd(rsp_reg, (1 + 0)*GR_STACK_SIZE + SHADOW), rdi_opnd);
+#endif
+
     // push m2n to the stack
-    // skip m2n frame, 6 xmm registers, 6 gp registers and method handle
-    
     stub = m2n_gen_push_m2n(stub, NULL,
         FRAME_COMPILATION, false, 0, 0, stack_size);
+
     // restore Method_Handle
+#ifdef _WIN64
+    stub = mov(stub, rcx_opnd, M_Base_Opnd(rsp_reg, 0 + SHADOW));
+#else
     stub = mov(stub, rdi_opnd, M_Base_Opnd(rsp_reg, 0));
+#endif
+
     // compile the method
     stub = call(stub, (char *)&compile_me);
 
@@ -190,21 +227,31 @@ static NativeCodePtr compile_get_compile_me_generic() {
     stub = m2n_gen_pop_m2n(stub, false, 0, bytes_to_m2n_bottom, 1);
 
     // restore gp inputs from the stack
-    stub = mov(stub, rdi_opnd, M_Base_Opnd(rsp_reg, 8));
-    stub = mov(stub, rsi_opnd, M_Base_Opnd(rsp_reg, 16));
-    stub = mov(stub, rdx_opnd, M_Base_Opnd(rsp_reg, 24));
-    stub = mov(stub, rcx_opnd, M_Base_Opnd(rsp_reg, 32));
-    stub = mov(stub, r8_opnd, M_Base_Opnd(rsp_reg, 40));
-    stub = mov(stub, r9_opnd, M_Base_Opnd(rsp_reg, 48));
+#ifdef _WIN64
+    stub = mov(stub, rcx_opnd, M_Base_Opnd(rsp_reg, (1 + 0)*GR_STACK_SIZE + SHADOW));
+    stub = mov(stub, rdx_opnd, M_Base_Opnd(rsp_reg, (1 + 1)*GR_STACK_SIZE + SHADOW));
+    stub = mov(stub, r8_opnd, M_Base_Opnd(rsp_reg, (1 + 2)*GR_STACK_SIZE + SHADOW));
+    stub = mov(stub, r9_opnd, M_Base_Opnd(rsp_reg, (1 + 3)*GR_STACK_SIZE + SHADOW));
+#else
+    stub = mov(stub, rdi_opnd, M_Base_Opnd(rsp_reg, (1 + 0)*GR_STACK_SIZE + SHADOW));
+    stub = mov(stub, rsi_opnd, M_Base_Opnd(rsp_reg, (1 + 1)*GR_STACK_SIZE + SHADOW));
+    stub = mov(stub, rdx_opnd, M_Base_Opnd(rsp_reg, (1 + 2)*GR_STACK_SIZE + SHADOW));
+    stub = mov(stub, rcx_opnd, M_Base_Opnd(rsp_reg, (1 + 3)*GR_STACK_SIZE + SHADOW));
+    stub = mov(stub, r8_opnd, M_Base_Opnd(rsp_reg, (1 + 4)*GR_STACK_SIZE + SHADOW));
+    stub = mov(stub, r9_opnd, M_Base_Opnd(rsp_reg, (1 + 5)*GR_STACK_SIZE + SHADOW));
+#endif
+
     // restore fp inputs from the stack
-    stub = movq(stub, xmm0_opnd, M_Base_Opnd(rsp_reg, 56));
-    stub = movq(stub, xmm1_opnd, M_Base_Opnd(rsp_reg, 64));
-    stub = movq(stub, xmm2_opnd, M_Base_Opnd(rsp_reg, 72));
-    stub = movq(stub, xmm3_opnd, M_Base_Opnd(rsp_reg, 80));
-    stub = movq(stub, xmm4_opnd, M_Base_Opnd(rsp_reg, 88));
-    stub = movq(stub, xmm5_opnd, M_Base_Opnd(rsp_reg, 96));
-    stub = movq(stub, xmm6_opnd, M_Base_Opnd(rsp_reg, 104));
-    stub = movq(stub, xmm7_opnd, M_Base_Opnd(rsp_reg, 112));
+    stub = movq(stub, xmm0_opnd, M_Base_Opnd(rsp_reg, 0*FR_STACK_SIZE + gr_stack_size));
+    stub = movq(stub, xmm1_opnd, M_Base_Opnd(rsp_reg, 1*FR_STACK_SIZE + gr_stack_size));
+    stub = movq(stub, xmm2_opnd, M_Base_Opnd(rsp_reg, 2*FR_STACK_SIZE + gr_stack_size));
+    stub = movq(stub, xmm3_opnd, M_Base_Opnd(rsp_reg, 3*FR_STACK_SIZE + gr_stack_size));
+#ifndef _WIN64
+    stub = movq(stub, xmm4_opnd, M_Base_Opnd(rsp_reg, 4*FR_STACK_SIZE + gr_stack_size));
+    stub = movq(stub, xmm5_opnd, M_Base_Opnd(rsp_reg, 5*FR_STACK_SIZE + gr_stack_size));
+    stub = movq(stub, xmm6_opnd, M_Base_Opnd(rsp_reg, 6*FR_STACK_SIZE + gr_stack_size));
+    stub = movq(stub, xmm7_opnd, M_Base_Opnd(rsp_reg, 7*FR_STACK_SIZE + gr_stack_size));
+#endif
 
     // adjust stack pointer
     stub = alu(stub, add_opc, rsp_opnd, Imm_Opnd(stack_size));
@@ -245,7 +292,7 @@ NativeCodePtr compile_gen_compile_me(Method_Handle method) {
 #endif
     // preserve method handle
     stub = mov(stub, r10_opnd, Imm_Opnd(size_64, (int64)method));
-    stub = mov(stub, M_Base_Opnd(rsp_reg, -stack_size), r10_opnd);
+    stub = mov(stub, M_Base_Opnd(rsp_reg, - stack_size + SHADOW), r10_opnd);
     // transfer control to generic part
     stub = jump(stub, (char *)compile_get_compile_me_generic());
     assert(stub - (char *)addr <= STUB_SIZE);
