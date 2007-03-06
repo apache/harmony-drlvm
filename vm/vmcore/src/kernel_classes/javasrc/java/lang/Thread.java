@@ -792,7 +792,13 @@ public class Thread implements Runnable {
      * @com.intel.drl.spec_ref
      */
     public Thread.State  getState() {
-        
+
+	boolean dead = false;
+	synchronized(lock) {
+		if(started && !isAlive() ) dead = true;
+	}
+	if (dead) return State.TERMINATED;
+     
         int state = (VMThreadManager.getState(this));
 
         if (0 != (state & VMThreadManager.JVMTI_THREAD_STATE_TERMINATED)) {         
