@@ -1,0 +1,20 @@
+Check.java
+PerfCheck.java
+classloader/StressLoader.java
+gc/LOS.java
+gc/Finalizer.java
+gc/MultiThreads.java
+gc/PhantomReferenceTest.java
+gc/RunFinalizersOnExitTest.java
+StackTest.java
+exception/FinalizeStackTest.java
+
+# fails on Ubuntu6 x86_64
+gc/Mark.java
+
+# fails intermittently 
+stress/Stack.java
+stress/Mix.java
+
+# HARMONY-3266
+shutdown/TestNativeAllocation.java
