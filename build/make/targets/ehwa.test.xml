@@ -54,7 +54,7 @@
     </target>
 
     <target name="run-ehwa">
-        <for list="${ehwa.test.mode}" param="mode"
+        <for list="${test.mode}" param="mode"
             trim="true" keepgoing="true">
             <sequential>
                 <antcall target="-run-ehwa-batch">
