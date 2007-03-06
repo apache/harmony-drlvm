@@ -615,7 +615,7 @@ NativeCodePtr exn_get_rth_throw_lazy()
     }
 
     const unsigned cap_off = (unsigned)(POINTER_SIZE_INT)&((ObjectHandlesNew*)0)->capacity;
-    const unsigned next_off = (unsigned)(POINTER_SIZE_INT)&((ObjectHandlesNew*)0)->next;
+    const POINTER_SIZE_INT next_off = (POINTER_SIZE_INT)&((ObjectHandlesNew*)0)->next;
     const unsigned handles_size = (unsigned)(sizeof(ObjectHandlesNew)+sizeof(ManagedObject*)*16);
     const unsigned cap_and_size = (unsigned)((0<<16) | 16);
 
@@ -654,7 +654,7 @@ NativeCodePtr exn_get_rth_throw_lazy_trampoline()
     }
 
     const unsigned cap_off = (unsigned)(POINTER_SIZE_INT)&((ObjectHandlesNew*)0)->capacity;
-    const unsigned next_off = (unsigned)(POINTER_SIZE_INT)&((ObjectHandlesNew*)0)->next;
+    const POINTER_SIZE_INT next_off = (POINTER_SIZE_INT)&((ObjectHandlesNew*)0)->next;
     const unsigned handles_size = (unsigned)(sizeof(ObjectHandlesNew)+sizeof(ManagedObject*)*16);
     const unsigned cap_and_size = (unsigned)((0<<16) | 16);
 

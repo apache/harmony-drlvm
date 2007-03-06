@@ -74,7 +74,11 @@ void compile_protect_arguments(Method_Handle method, GcFrame * gc) {
     Method_Signature_Handle msh = method_get_signature(method);
     
     unsigned num_gp_used = 0;
+#ifdef _WIN64
+#define num_fp_used num_gp_used
+#else // _WIN64
     unsigned num_fp_used = 0;
+#endif // _WIN64
     for(unsigned i = 0; i < method_args_get_number(msh); i++) {
         Type_Info_Handle tih = method_args_get_type_info(msh, i);
         switch (type_info_get_type(tih)) {
