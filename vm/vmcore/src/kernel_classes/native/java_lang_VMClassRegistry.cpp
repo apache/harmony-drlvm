@@ -490,6 +490,25 @@ JNIEXPORT void JNICALL Java_java_lang_VMClassRegistry_linkClass
 
 /*
  * Class:     java_lang_VMClassRegistry
+ * Method:    loadArray
+ * Signature: (Ljava/lang/Class;I)Ljava/lang/Class;
+ */
+JNIEXPORT jclass JNICALL Java_java_lang_VMClassRegistry_loadArray
+  (JNIEnv *jenv, jclass, jclass compType, jint dims)
+{
+    Class *clss = jni_get_class_handle(jenv, compType);
+    Class *arr_clss = clss;
+
+    for (int i = 0; i < dims; i++) {
+        arr_clss = (Class *)class_get_array_of_class(arr_clss);
+        if (!arr_clss)   return 0;
+    }
+
+    return jni_class_from_handle(jenv, arr_clss);
+}
+
+/*
+ * Class:     java_lang_VMClassRegistry
  * Method:    loadLibrary
  * Signature: (Ljava/lang/String;Ljava/lang/ClassLoader;)V
  */

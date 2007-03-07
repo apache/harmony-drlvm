@@ -149,9 +149,27 @@ public final class Class<T> implements Serializable, AnnotatedElement, GenericDe
                 VMClassRegistry.getClassLoader(VMStack.getCallerClass(0)) != null) {
                 sc.checkPermission(RuntimePermissionCollection.GET_CLASS_LOADER_PERMISSION);
             }
-                clazz = VMClassRegistry.loadBootstrapClass(name);
+            clazz = VMClassRegistry.loadBootstrapClass(name);
         } else {
-            clazz = classLoader.loadClass(name);
+            int dims = 0;
+            int len = name.length();
+            while (dims < len && name.charAt(dims) == '[') dims++;
+            if (dims > 0 && len > dims + 1 
+                    && name.charAt(dims) == 'L' && name.endsWith(";")) {
+                /*
+                 * an array of a reference type is requested.
+                 * do not care of arrays of primitives as 
+                 * they are perfectly loaded by bootstrap classloader. 
+                 */
+                try {
+                    clazz = classLoader.loadClass(name.substring(dims + 1, len - 1));
+                } catch (ClassNotFoundException ignore) {}
+                if (clazz != null ) {
+                    clazz = VMClassRegistry.loadArray(clazz, dims);
+                }
+            } else {
+                clazz = classLoader.loadClass(name);
+            }
         }
         if(clazz == null) {
             throw new ClassNotFoundException(name);

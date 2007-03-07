@@ -178,6 +178,13 @@ Java_java_lang_VMClassRegistry_linkClass(JNIEnv *, jclass,
     jclass);
 
 /*
+ * Method: java.lang.VMClassRegistry.loadArray(Ljava/lang/Class;I)Ljava/lang/Class;
+ */
+JNIEXPORT jclass JNICALL
+Java_java_lang_VMClassRegistry_loadArray(JNIEnv *, jclass, 
+    jclass, jint);
+
+/*
  * Method: java.lang.VMClassRegistry.loadLibrary(Ljava/lang/String;Ljava/lang/ClassLoader;)V
  */
 JNIEXPORT void JNICALL

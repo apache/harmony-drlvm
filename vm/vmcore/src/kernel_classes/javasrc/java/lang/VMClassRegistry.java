@@ -271,6 +271,24 @@ final class VMClassRegistry
     static native void linkClass(Class<?> clazz);
 
     /**
+     * This method is used for the
+     * {@link Class#forName(java.lang.String, boolean, java.lang.ClassLoader)
+     * Class.forName(String name, boolean initialize, ClassLoader loader)}
+     * method implementation. If the name parameter represents an array then this  
+     * method should be invoked in order to load an array class. For example, an
+     * expression (loadArray(Integer.TYPE, 1) == new int[0].getClass()) must be
+     * true. 
+     * <p>
+     * <b>Note:</b> Under design yet. Subjected to change.
+     * 
+     * @param componentType the type of array components. It must not be null.
+     * @param dimensions array dimension. It must be greater or equal to 0.
+     * @return a class which represents array
+     * @api2vm
+     */
+    static native Class loadArray(Class componentType, int dimensions);
+
+    /**
      * This method is used for implementation of the
      * {@link Runtime#load(java.lang.String) Runtime.load(String filename)}
      * method.
