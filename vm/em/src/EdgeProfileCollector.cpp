@@ -61,7 +61,7 @@ uint32 edge_profiler_get_num_counters(Method_Profile_Handle mph)
 {
     MethodProfile* mp = (MethodProfile*)mph;
     assert(mp->pc->type == EM_PCTYPE_EDGE);
-    return ((EdgeMethodProfile*)mp)->counters.size();
+    return (uint32)((EdgeMethodProfile*)mp)->counters.size();
 }
 
 

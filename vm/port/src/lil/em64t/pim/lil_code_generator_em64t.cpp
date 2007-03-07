@@ -527,7 +527,7 @@ private:
     inline const M_Opnd & get_m_opnd(const LcgEM64TLoc * loc) const {
         assert(loc->kind == LLK_GStk || loc->kind == LLK_FStk);
         void * const mem_ptr = mem.alloc(sizeof(M_Base_Opnd));
-        return *(new(mem_ptr) M_Base_Opnd(rsp_reg, loc->addr));
+        return *(new(mem_ptr) M_Base_Opnd(rsp_reg, (int32)loc->addr));
     }
 
     inline const RM_Opnd & get_rm_opnd(const LcgEM64TLoc * loc) const {
@@ -1154,8 +1154,10 @@ public:
         if (lil_operation_is_binary(o)) {
             if (lil_operand_is_immed(op1) && lil_operand_is_immed(op2)) {
                 // type-convert to get signed types of same length
-                int32 op1_imm = get_imm_value(op1);
-                int32 op2_imm = get_imm_value(op2); 
+                assert(fit32(get_imm_value(op1)));
+                int32 op1_imm = (int32)get_imm_value(op1);
+                assert(fit32(get_imm_value(op2)));
+                int32 op2_imm = (int32)get_imm_value(op2); 
                 int32 result = 0;
                 switch (o) {
                 case LO_Add:
@@ -1175,7 +1177,8 @@ public:
                 }
                 move_imm(dest_loc, result);
             } else if (lil_operand_is_immed(op1)) {
-                const int32 op1_imm = get_imm_value(op1);
+                assert(fit32(get_imm_value(op1)));
+                const int32 op1_imm = (int32)get_imm_value(op1);
                 const LcgEM64TLoc * op2_loc = get_op_loc(op2, false);
                 switch (o) {
                 case LO_Add:
@@ -1194,7 +1197,8 @@ public:
                 }
             } else if (lil_operand_is_immed(op2)) {
                 const LcgEM64TLoc*  op1_loc = get_op_loc(op1, false);
-                const int32 op2_imm = get_imm_value(op2);
+                assert(fit32(get_imm_value(op2)));
+                const int32 op2_imm = (int32)get_imm_value(op2);
                 bin_op_rm_imm(o, dest_loc, op1_loc, op2_imm);
             } else {  // both operands non-immediate
                 const LcgEM64TLoc * src1_loc = get_op_loc(op1, false);
@@ -1203,7 +1207,8 @@ public:
             }
         } else { // unary operation
             if (lil_operand_is_immed(op1)) {
-                int32 imm = get_imm_value(op1);
+                assert(fit32(get_imm_value(op1)));
+                int32 imm = (int32)get_imm_value(op1);
                 int32 result = 0;
                 switch (o) {
                 case LO_Neg:

@@ -75,7 +75,7 @@ inline static void add_m(EncoderBase::Operands & args, const M_Opnd & m, Opnd_Si
         assert(n_size != sz);
         args.add(EncoderBase::Operand(map_size(sz),
             map_reg(m.base().reg_no()), map_reg(m.index().reg_no()),
-            m.scale().get_value(), m.disp().get_value()));
+            (unsigned)m.scale().get_value(), (int)m.disp().get_value()));
 }
 
 inline static void add_rm(EncoderBase::Operands & args, const RM_Opnd & rm, Opnd_Size sz) {
