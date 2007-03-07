@@ -6,7 +6,6 @@ gc/MultiThreads.java
 gc/PhantomReferenceTest.java
 gc/RunFinalizersOnExitTest.java
 io/Integers.java
-shutdown/TestInterrupt.java
 
 stress/Mix.java
 
