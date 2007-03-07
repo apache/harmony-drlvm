@@ -286,13 +286,14 @@ void init_mem() {
     assert(mark_bits != MEM_FAILURE);
 }
 
-void gc_init() {
+int gc_init() {
     INFO2("gc.init", "GC init called\n");
     init_mem();
     init_slots();
     init_select_gc();
     gc_end = apr_time_now();
     timer_init();
+    return JNI_OK;
 }
 
 void

@@ -51,7 +51,7 @@
 Boolean gc_supports_compressed_references ();
 void gc_next_command_line_argument (const char *name, const char *arg);
 void gc_class_loaded (VTable_Handle vth);
-void gc_init();
+int gc_init();
 void gc_vm_initialized();
 void gc_wrapup();
 Boolean gc_requires_barriers();
@@ -343,7 +343,7 @@ POINTER_SIZE_INT Partial_Reveal_Object::heap_base = 0;
 //
 // This also needs to do the work of gc_thread_init for the main thread.
 //
-void gc_init()
+int gc_init()
 {
     INFO(GC_NAME " " GC_VERSION);
     TRACE2("gc.sizeof", "sizeof(block_info) = " << sizeof(block_info));
@@ -433,6 +433,7 @@ void gc_init()
     assert (sizeof(block_info) <= 4096); 
     // If we hit this we should take a close look at our defines. While it is possible
     // to use more than one page that seems real expensive.
+    return JNI_OK;
 }
 
 

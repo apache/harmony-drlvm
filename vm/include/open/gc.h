@@ -88,7 +88,7 @@ extern "C" {
  * The GC assumes that the VM is ready to support a GC if it 
  * calls this function.
  */
-GCExport void gc_init();
+GCExport int gc_init();
 
 /**
  * May be called at various points the VM decides are GC-safe.
@@ -536,7 +536,7 @@ extern void (*gc_add_root_set_entry_managed_pointer)(void **slot, Boolean is_pin
 extern void (*gc_class_prepared)(Class_Handle ch, VTable_Handle vth);
 VMEXPORT extern void (*gc_force_gc)();
 VMEXPORT extern int64 (*gc_free_memory)();
-extern void (*gc_init)();
+extern int (*gc_init)();
 extern Boolean (*gc_supports_frontier_allocation)(unsigned *offset_of_current, unsigned *offset_of_limit);
 extern Boolean (*gc_is_object_pinned)(Managed_Object_Handle obj);
 extern Managed_Object_Handle (*gc_alloc)(unsigned size, 

@@ -676,7 +676,8 @@ int vm_init1(JavaVM_Internal * java_vm, JavaVMInitArgs * vm_arguments) {
     /*    END: Property processing.    */
 
     // Initialize memory allocation.
-    gc_init();
+    status = gc_init();
+    if (status != JNI_OK) return status;
 
     // TODO: change all uses of Class::heap_base to Slot::heap_base
     Slot::init(gc_heap_base_address(), gc_heap_ceiling_address());

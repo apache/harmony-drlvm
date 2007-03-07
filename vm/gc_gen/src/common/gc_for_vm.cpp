@@ -34,7 +34,7 @@ void gc_tls_init();
 Boolean gc_requires_barriers() 
 {   return p_global_gc->generate_barrier; }
 
-void gc_init() 
+int gc_init() 
 {      
   assert(p_global_gc == NULL);
   GC* gc = (GC*)STD_MALLOC(sizeof(GC_Gen));
@@ -55,7 +55,7 @@ void gc_init()
   collector_initialize(gc);
   gc_init_heap_verification(gc);
 
-  return;
+  return JNI_OK;
 }
 
 void gc_wrapup() 

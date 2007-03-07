@@ -93,7 +93,7 @@ void (*gc_heap_write_ref)(Managed_Object_Handle p_base_of_object_with_slot,
                                  unsigned offset,
                                  Managed_Object_Handle value) = 0;
 void (*gc_heap_wrote_object)(Managed_Object_Handle p_base_of_object_just_written) = 0;
-void (*gc_init)() = 0;
+int (*gc_init)() = 0;
 Boolean (*gc_is_object_pinned)(Managed_Object_Handle obj) = 0;
 
 Managed_Object_Handle (*gc_alloc)(unsigned size, 
@@ -226,7 +226,7 @@ void vm_add_gc(const char *dllName)
                             "gc_heap_wrote_object",
                             dllName,
                             (apr_dso_handle_sym_t)default_gc_heap_wrote_object);
-    gc_init = (void (*)()) getFunction(handle, "gc_init", dllName);
+    gc_init = (int (*)()) getFunction(handle, "gc_init", dllName);
     gc_is_object_pinned = (Boolean (*)(Managed_Object_Handle obj)) getFunction(handle, "gc_is_object_pinned", dllName);
 
 
