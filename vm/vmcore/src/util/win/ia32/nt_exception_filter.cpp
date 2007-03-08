@@ -155,8 +155,14 @@ void* regs_get_sp(Registers* pregs)
     return (void*)pregs->esp;
 }
 
-void regs_push_param_onto_stack(Registers* pregs, POINTER_SIZE_INT param)
+void regs_push_param(Registers* pregs, POINTER_SIZE_INT param, int UNREF num)
 {
     pregs->esp = pregs->esp - 4;
     *((uint32*)pregs->esp) = param;
+}
+
+void regs_push_return_address(Registers* pregs, void* ret_addr)
+{
+    pregs->esp = pregs->esp - 4;
+    *((void**)pregs->esp) = ret_addr;
 }

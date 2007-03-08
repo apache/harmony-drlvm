@@ -334,9 +334,8 @@ StackIterator * si_create_from_registers(Registers * regs, bool is_ip_past,
 
     Global_Env *env = VM_Global_State::loader_env;
     // Setup current frame
+    // It's possible that registers represent native code and res->cci==NULL
     si->cci = env->vm_methods->find((NativeCodePtr)regs->rip, is_ip_past);
-    assert(si->cci);
-
     init_context_from_registers(si->jit_frame_context, *regs, is_ip_past);
     
     si->m2n_frame = lm2nf;

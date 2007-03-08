@@ -62,7 +62,8 @@ void vm_to_nt_context(Registers* regs, PCONTEXT context);
 
 // Fuctions to manipulate with Registers structure
 void* regs_get_sp(Registers* pregs);
-void regs_push_param_onto_stack(Registers* pregs, POINTER_SIZE_INT param);
+void regs_push_param(Registers* pregs, POINTER_SIZE_INT param, int num);
+void regs_push_return_address(Registers* pregs, void* ret_addr);
 
 
 #endif // nt_exception_filter_h

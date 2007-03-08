@@ -106,8 +106,28 @@ void* regs_get_sp(Registers* pregs)
     return (void*)pregs->rsp;
 }
 
-void regs_push_param_onto_stack(Registers* pregs, POINTER_SIZE_INT param)
+// Max. 4 arguments can be set up
+void regs_push_param(Registers* pregs, POINTER_SIZE_INT param, int num)
+{ // RCX, RDX, R8, R9
+    switch (num)
+    {
+    case 0:
+        pregs->rcx = param;
+        return;
+    case 1:
+        pregs->rdx = param;
+        return;
+    case 2:
+        pregs->r8 = param;
+        return;
+    case 3:
+        pregs->r9 = param;
+        return;
+    }
+}
+
+void regs_push_return_address(Registers* pregs, void* ret_addr)
 {
     pregs->rsp = pregs->rsp - 8;
-    *((uint64*)pregs->rsp) = param;
+    *((void**)pregs->rsp) = ret_addr;
 }

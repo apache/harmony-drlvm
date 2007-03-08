@@ -321,12 +321,12 @@ LONG NTAPI vectored_exception_handler_internal(LPEXCEPTION_POINTERS nt_exception
 
     // __cdecl <=> push parameters in the reversed order
     // push in_java argument onto stack
-    regs_push_param_onto_stack(&regs, in_java);
+    regs_push_param(&regs, in_java, 1/*2nd arg */);
     // push the exn_class argument onto stack
     assert(exn_class);
-    regs_push_param_onto_stack(&regs, (POINTER_SIZE_INT)exn_class);
+    regs_push_param(&regs, (POINTER_SIZE_INT)exn_class, 0/* 1st arg */);
     // imitate return IP on stack
-    regs_push_param_onto_stack(&regs, 0);
+    regs_push_return_address(&regs, NULL);
 
     // set up the real exception handler address
     regs.set_ip(asm_c_exception_handler);
@@ -356,12 +356,12 @@ void __cdecl c_exception_handler(Class* exn_class, bool in_java)
 
     if (ti->get_global_capability(DebugUtilsTI::TI_GC_ENABLE_EXCEPTION_EVENT)) {
         // Set return address to current IP
-        regs_push_param_onto_stack(&regs, (POINTER_SIZE_INT)regs.get_ip());
+        regs_push_return_address(&regs, regs.get_ip());
         // Set IP to callback address
         regs.set_ip(asm_jvmti_exception_catch_callback);
     } else if (p_TLS_vmthread->restore_guard_page) {
         // Set return address to current IP
-        regs_push_param_onto_stack(&regs, (POINTER_SIZE_INT)regs.get_ip());
+        regs_push_return_address(&regs, regs.get_ip());
         // Set IP to callback address
         regs.set_ip(asm_exception_catch_callback);
     }
