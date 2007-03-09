@@ -27,7 +27,7 @@ Version: $Revision: 1.4.2.2 $
         <patternset id="java.source.pattern"  includes="**/*.java"/>
 
         <javac destdir="${java.build.dir}" source="${javac.source}"
-                target="${javac.target}" debug="${java.debug.option}">
+                target="${javac.target}" debug="${java.debug.option}" compiler="${hy.javac.compiler}">
             <src refid="java.source" />
             <patternset refid="java.source.pattern" />
             <classpath refid="java.class.path"/>
