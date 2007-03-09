@@ -1790,12 +1790,26 @@ Class_Handle field_get_class_of_field_value(Field_Handle fh)
 } //field_get_class_of_field_value
 
 
-Boolean field_is_gc_enumerable(Field_Handle fh)
+Boolean field_is_reference(Field_Handle fh)
 {
     assert((Field *)fh);
     Java_Type typ = field_get_type(fh);
-    return (typ == JAVA_TYPE_CLASS || typ == JAVA_TYPE_ARRAY) && !fh->is_magic_type();
+    return (typ == JAVA_TYPE_CLASS || typ == JAVA_TYPE_ARRAY);
 } //field_is_reference
+
+Boolean field_is_magic(Field_Handle fh)
+{
+    assert((Field *)fh);
+    
+    return fh->is_magic_type();
+} //field_is_magic
+
+
+Boolean field_is_enumerable_reference(Field_Handle fh)
+{
+    assert((Field *)fh);
+    return ((field_is_reference(fh) && !field_is_magic(fh)));
+} //field_is_enumerable_reference
 
 
 Boolean field_is_injected(Field_Handle f)

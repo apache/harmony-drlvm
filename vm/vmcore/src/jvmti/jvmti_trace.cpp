@@ -100,7 +100,7 @@ static void ti_trace_object(TIEnv *ti_env, ManagedObject* referrer)
         unsigned i;
         for (i = 0; i < num_fields; i++) {
             Field_Handle fh = class_get_instance_field_recursive(ch, i);
-            if (field_is_gc_enumerable(fh)) {
+			if(field_is_enumerable_reference(fh)){
                 int offset = field_get_offset(fh);
                 Slot slot((void*)((UDATA)referrer + offset));
                 if (slot.is_null()) continue;

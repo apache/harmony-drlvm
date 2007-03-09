@@ -64,7 +64,7 @@ static GC_VTable_Info* build_slot_offset_array(Class_Handle ch, Partial_Reveal_V
     unsigned idx;
     for(idx = 0; idx < num_fields; idx++) {
         Field_Handle fh = class_get_instance_field_recursive(ch, idx);
-        if(field_is_gc_enumerable(fh)) {
+		if(field_is_enumerable_reference(fh)) {
             num_ref_fields++;
         }
     }
@@ -93,7 +93,7 @@ static GC_VTable_Info* build_slot_offset_array(Class_Handle ch, Partial_Reveal_V
 
     for(idx = 0; idx < num_fields; idx++) {
         Field_Handle fh = class_get_instance_field_recursive(ch, idx);
-        if(field_is_gc_enumerable(fh)) {
+		if(field_is_enumerable_reference(fh)){
             int offset = field_get_offset(fh);
             if (offset == skip) continue;
             *refs = offset;

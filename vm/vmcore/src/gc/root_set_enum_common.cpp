@@ -95,7 +95,7 @@ void vm_enumerate_static_fields()
                 for(unsigned i = 0; i < n_fields; i++) {
                     Field* f = c->get_field(i);
                     if(f->is_static()) {
-                        if(field_is_gc_enumerable(f)) {
+						if(field_is_enumerable_reference(f)){
                             // The field is static and it is a reference.
                             if (global_env->compress_references) {
                                 vm_enumerate_compressed_root_reference((uint32 *)f->get_address(), FALSE);
