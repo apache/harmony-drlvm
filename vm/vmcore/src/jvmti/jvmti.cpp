@@ -41,7 +41,7 @@
 #include "port_dso.h"
 #include <apr_strings.h>
 
-#ifdef PLATFORM_NT
+#if defined(PLATFORM_NT) && !defined(_WIN64)
 #define AGENT_ONLOAD "_Agent_OnLoad@12"
 #define AGENT_ONUNLOAD "_Agent_OnUnload@4"
 #define JVM_ONLOAD "_JVM_OnLoad@12"
