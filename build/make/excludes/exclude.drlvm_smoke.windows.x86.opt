@@ -1,8 +1,6 @@
 Check.java
 PerfCheck.java
-classloader/StressLoader.java
 gc/Finalizer.java
-gc/MultiThreads.java
 gc/PhantomReferenceTest.java
 gc/RunFinalizersOnExitTest.java
 io/Integers.java

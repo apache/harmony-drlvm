@@ -1,7 +1,5 @@
 Check.java
 PerfCheck.java
-classloader/StressLoader.java
-gc/MultiThreads.java
 io/Integers.java
 
 stress/Mix.java

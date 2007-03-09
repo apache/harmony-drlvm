@@ -1,8 +1,13 @@
 Check.java
 PerfCheck.java
-classloader/StressLoader.java
-gc/LOS.java
+
+# HARMONY-3338
 gc/MultiThreads.java
+perf/MultiThreadsSimple.java
+
+# HARMONY-3235
+gc/ThreadSuspension.java
+
 StackTest.java
 exception/FinalizeStackTest.java
 
