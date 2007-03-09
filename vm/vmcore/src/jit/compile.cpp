@@ -338,7 +338,9 @@ NativeCodePtr compile_create_lil_jni_stub(Method_Handle method, void* func, Nati
                             "l1=ts;"
                             "ld o0,[l1 + %1i:pint];"
                             "o1=l0+%2i;",
-                            method, APR_OFFSETOF(VM_thread, jni_env), oh_get_handle_offset(0));
+                            method,
+                            (POINTER_SIZE_INT)APR_OFFSETOF(VM_thread, jni_env),
+                            oh_get_handle_offset(0));
     assert(cs);
 
     // Loop over arguments proper, setting rest of outputs
@@ -346,7 +348,7 @@ NativeCodePtr compile_create_lil_jni_stub(Method_Handle method, void* func, Nati
     hn = 1;
     for(i=(is_static?0:1); i<num_args; i++) {
         if (is_reference(method_args_get_type_info(msh, i))) {
-            unsigned handle_offset = oh_get_handle_offset(hn);
+            POINTER_SIZE_INT handle_offset = oh_get_handle_offset(hn);
             if (VM_Global_State::loader_env->compress_references) {
                 cs = lil_parse_onto_end(cs,
                                         "jc i%0i=%1i:ref,%n;"
@@ -414,8 +416,8 @@ NativeCodePtr compile_create_lil_jni_stub(Method_Handle method, void* func, Nati
     assert(cs);
 
     // Exception offsets
-    unsigned eoo = (unsigned)(POINTER_SIZE_INT)&((VM_thread*)0)->thread_exception.exc_object;
-    unsigned eco = (unsigned)(POINTER_SIZE_INT)&((VM_thread*)0)->thread_exception.exc_class;
+    POINTER_SIZE_INT eoo = (POINTER_SIZE_INT)&((VM_thread*)0)->thread_exception.exc_object;
+    POINTER_SIZE_INT eco = (POINTER_SIZE_INT)&((VM_thread*)0)->thread_exception.exc_class;
 
     //***** Call JVMTI MethodExit
     if (ti->isEnabled() &&

@@ -207,7 +207,7 @@ LilCodeStub* oh_gen_allocate_handles(LilCodeStub*, unsigned number_handles, char
 
 // Calculate the offset of the base of a previously allocated structure to a particular handle
 // The base variable (see oh_gen_allocate_handles) plus this offset is the value to use for the handle
-unsigned oh_get_handle_offset(unsigned handle_indx);
+POINTER_SIZE_INT oh_get_handle_offset(unsigned handle_indx);
 
 // Initialise a handle in a previously allocated structure
 //   base_var    - LIL variable that points to the base of the handles structure

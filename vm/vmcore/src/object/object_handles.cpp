@@ -524,23 +524,24 @@ LilCodeStub* oh_gen_allocate_handles(LilCodeStub* cs, unsigned number_handles, c
     return cs;
 }
 
-unsigned oh_get_handle_offset(unsigned handle_indx)
+POINTER_SIZE_INT oh_get_handle_offset(unsigned handle_indx)
 {
-    const unsigned refs_off = (unsigned)(POINTER_SIZE_INT)&((ObjectHandlesNew*)0)->refs;
+    const POINTER_SIZE_INT refs_off = (POINTER_SIZE_INT)&((ObjectHandlesNew*)0)->refs;
     return refs_off+handle_indx*sizeof(ManagedObject*);
 }
 
 LilCodeStub* oh_gen_init_handle(LilCodeStub* cs, char* base_var, unsigned handle_indx, char* val, bool null_check)
 {
     char buf[200];
-    unsigned offset = oh_get_handle_offset(handle_indx);
+    POINTER_SIZE_INT offset = oh_get_handle_offset(handle_indx);
     if (null_check && VM_Global_State::loader_env->compress_references) {
         sprintf(buf,
-                "jc %s=%p:ref,%%n; st [%s+%d:ref],%s; j %%o; :%%g; st [%s+%d:ref],0; :%%g;",
-                val, VM_Global_State::loader_env->heap_base, base_var, offset,
+                "jc %s=0x%"PI_FMT"X:ref,%%n; st [%s+%"PI_FMT"d:ref],%s; j %%o; :%%g; st [%s+%"PI_FMT"d:ref],0; :%%g;",
+                val, (POINTER_SIZE_INT)VM_Global_State::loader_env->heap_base,
+                base_var, offset,
                 val, base_var, offset);
     } else {
-        sprintf(buf, "st [%s+%d:ref],%s;", base_var, offset, val);
+        sprintf(buf, "st [%s+%"PI_FMT"d:ref],%s;", base_var, offset, val);
     }
     cs = lil_parse_onto_end(cs, buf);
     return cs;
