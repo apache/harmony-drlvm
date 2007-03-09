@@ -82,6 +82,7 @@ Version: $Revision: 1.4.2.11 $
 
                 <mkdir dir="${smoke.test.native.path}/${outputdir}" />
 
+                <echo message="Compiling ${smoke.test.native.path}/${outputdir}/${outputfile}" />
                 <cc name="${build.cxx}"
                     debug="true"
                     runtime="dynamic"
@@ -94,8 +95,27 @@ Version: $Revision: 1.4.2.11 $
                     </select>
                     <fileset file="@{full.file.path}" />                    
                 </cc>
+
+                <condition property="add.manifest">
+                    <and>
+                        <os family="windows" />
+                        <available file="${smoke.test.native.path}/${outputdir}/${outputfile}${shlib.suffix}${manifest.suffix}" />
+                    </and>
+                </condition>
+
+                <antcall target="embed.manifest" />
             </sequential>
         </for>
+    </target>
+
+    <target name="embed.manifest" if="add.manifest">
+        <echo message="Adding manifest to ${smoke.test.native.path}/${outputdir}/${outputfile}${shlib.suffix}" />
+        <exec executable="mt.exe">
+            <arg value="-nologo" />
+            <arg value="-manifest" />
+            <arg value="${smoke.test.native.path}/${outputdir}/${outputfile}${shlib.suffix}${manifest.suffix}" />
+            <arg value="-outputresource:${smoke.test.native.path}/${outputdir}/${outputfile}${shlib.suffix};#2" />
+        </exec>
     </target>
 
     <target name="jar.smoke.tests" depends="compile.smoke.test">

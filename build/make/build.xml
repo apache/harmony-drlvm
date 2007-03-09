@@ -426,16 +426,16 @@
 
     <!-- Main target to run jvmti tests /-->
     <target name="jvmti.test" depends="setup, init">
-        <if>
+        <!-- <if>
             <equals arg1="${build.arch}" arg2="ia32" />
-            <then>
+            <then> -->
                 <property name="target" value="jvmti.test" />
                 <subant buildpath="." antfile="build_component.xml" target="build" inheritall="true" failonerror="true">
                     <property name="_component" value="vm" />
                     <property name="_target" value="${target}" />
                 </subant>
-            </then>
-        </if>
+            <!-- </then>
+        </if> -->
     </target>
 
     <!-- Main target to run regression test /-->

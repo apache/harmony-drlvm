@@ -87,8 +87,27 @@
                         <include name="**/*.cpp" />
                     </fileset>
                 </cc>
+
+                <condition property="add.manifest">
+                    <and>
+                        <os family="windows" />
+                        <available file="${jvmti.test.native.path}/${outputdir}/${outputdir}${shlib.suffix}${manifest.suffix}" />
+                    </and>
+                </condition>
+
+                <antcall target="embed.manifest" />
             </sequential>
         </for>
+    </target>
+
+    <target name="embed.manifest" if="add.manifest">
+        <echo message="Adding manifest to ${jvmti.test.native.path}/${outputdir}/${outputdir}${shlib.suffix}" />
+        <exec executable="mt.exe">
+            <arg value="-nologo" />
+            <arg value="-manifest" />
+            <arg value="${jvmti.test.native.path}/${outputdir}/${outputdir}${shlib.suffix}${manifest.suffix}" />
+            <arg value="-outputresource:${jvmti.test.native.path}/${outputdir}/${outputdir}${shlib.suffix};#2" />
+        </exec>
     </target>
 
     <target name="pre-jvmti-test" depends="compile-jvmti-tests-java,
@@ -190,19 +209,22 @@ ${foo}
   
     <target name="jvmti.test" depends="pre-jvmti-test">
         <delete file="${build.semi.dir}/jvmti.test.failed" failonerror="false" />
-        <if>
-            <equals arg1="${build.arch}" arg2="ia32" />
-            <then>
-                <for list="${test.mode}" param="mode" trim="true">
-                    <sequential>
+        <for list="${test.mode}" param="mode" trim="true">
+            <sequential>
+                <if>
+                    <or>
+                        <equals arg1="@{mode}" arg2="int" />
+                        <equals arg1="${build.arch}" arg2="ia32" />
+                    </or>
+                    <then>
                         <antcall target="run-jvmti-tests" > 
                             <param name="jvmti.tests.mode" value="@{mode}" />
                         </antcall>
-                    </sequential>
-                </for>
-            </then>
-        </if>
-        
+                    </then>
+                </if>
+            </sequential>
+        </for>
+
         <available property="test.failed" file="${build.semi.dir}/jvmti.test.failed" />
         <fail unless="run.all.tests" if="test.failed" message="Some tests failed"/>
     </target>

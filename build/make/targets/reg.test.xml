@@ -168,8 +168,26 @@
                     </select-->
                     <fileset file="@{nativefile}"/>
                 </cc>
+                <condition property="add.manifest">
+                    <and>
+                        <os family="windows" />
+                        <available file="${reg.test.native.path}/${outfile}${shlib.suffix}${manifest.suffix}" />
+                    </and>
+                </condition>
+
+                <antcall target="embed.manifest" />
             </sequential>
         </for>
+    </target>
+
+    <target name="embed.manifest" if="add.manifest">
+        <echo message="Adding manifest to ${reg.test.native.path}/${outfile}${shlib.suffix}" />
+        <exec executable="mt.exe">
+            <arg value="-nologo" />
+            <arg value="-manifest" />
+            <arg value="${reg.test.native.path}/${outfile}${shlib.suffix}${manifest.suffix}" />
+            <arg value="-outputresource:${reg.test.native.path}/${outfile}${shlib.suffix};#2" />
+        </exec>
     </target>
 
     <target name="pre-reg-test" depends="compile-reg-tests-java, compile-reg-tests-native">
