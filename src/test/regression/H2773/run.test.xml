@@ -1,0 +1,9 @@
+<project name="RUN HARMONY-2773 Regression Test">
+    <target name="run-test">
+        <run-junit-test
+            test="org.apache.harmony.drlvm.tests.regression.H2773.InfinityTest"
+            vmarg="-Xem:opt">
+        </run-junit-test>
+    </target>
+</project>
+
