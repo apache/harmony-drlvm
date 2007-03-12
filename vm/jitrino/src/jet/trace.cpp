@@ -629,19 +629,21 @@ void CodeGen::dbg_dump_state(const char *name, BBState * pState)
         dbg(" %s", toStr2(s, true).c_str());
         dbg("\n;;  ");
     }
-    dbg("\n;;\n");
-    dbg(";; regs: ");
-    bool not_first = false;
-    for (unsigned i=0; i<ar_num; i++) {
-        AR ar = _ar(i);
-        if (rrefs(ar) != 0 || rlocks(ar) != 0) {
-            if (not_first) {
-                dbg(",");
+    if (m_bbstate == pState) {
+        dbg("\n;;\n");
+        dbg(";; regs: ");
+        bool not_first = false;
+        for (unsigned i=0; i<ar_num; i++) {
+            AR ar = _ar(i);
+            if (rrefs(ar) != 0 || rlocks(ar) != 0) {
+                if (not_first) {
+                    dbg(",");
+                }
+                if (rlocks(ar)!=0) { dbg(">"); }
+                dbg("%s[%d]", Encoder::to_str(ar).c_str(), rrefs(ar));
+                if (rlocks(ar)!=0) { dbg("<,%d", rlocks(ar)); }
+                not_first = true;
             }
-            if (rlocks(ar)!=0) { dbg(">"); }
-            dbg("%s[%d]", Encoder::to_str(ar).c_str(), rrefs(ar));
-            if (rlocks(ar)!=0) { dbg("<,%d", rlocks(ar)); }
-            not_first = true;
         }
     }
     dbg("\n;;\n");

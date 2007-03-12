@@ -50,6 +50,7 @@ public:
     {
         m_stack = m_vars = NULL;
         max_stack = num_locals = 0;
+        m_top = -1;
     };
     ~JFrame()
     {
@@ -64,6 +65,7 @@ public:
     {
         m_stack = m_vars = NULL;
         max_stack = num_locals = 0;
+        m_top = -1;
         *this = that;
     }
 public:

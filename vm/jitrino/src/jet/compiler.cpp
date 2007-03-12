@@ -17,7 +17,6 @@
  */
 /**
  * @author Alexander Astapchuk
- * @version $Revision$
  */
  /**
   * @file
@@ -827,7 +826,10 @@ void Compiler::comp_gen_code_bb(unsigned pc)
             unsigned next = lastInst.next;
             // If last inst was JSR, then when generating fall through,
             // specify the JSR leader as 'parent PC', so the BBState 
-            // to inherit will be taken the JSR's one.
+            // to inherit will be taken from the JSR's one. This also 
+            // processed in a special way in comp_gen_insts() - when we see 
+            // that a block's parent is JSR lead, we take the state from 
+            // m_jsrStates, rather than from the m_bbStates.
             unsigned h = lastInst.is_jsr() ? lastInst.get_target(0): head;
             if (lastInst.single_suc() && !m_bbs[next].processed) {
                 // If instruction has only one successor, so its BBState 
@@ -883,7 +885,25 @@ bool Compiler::comp_gen_insts(unsigned pc, unsigned parentPC,
         return false;
     }
     BBState* pState = m_bbStates[pc];
-    BBState * parentState = m_bbStates[parentPC];
+    BBState * parentState;
+    {
+        const BBInfo& parentBB = m_bbs[parentPC];
+        // If we see that parent block was a JSR subroutine, this in fact 
+        // means that the parent block ended with a JSR call, and then 
+        // 'parentPC' of this block was substituted (see the appropriate 
+        // code in comp_gen_code_bb()).
+        // So, in this block we must use the state after the JSR subroutine.
+        // The 'jsr_lead != parentPC' prevents from taking state from m_jsrStates
+        // when the parentPC is the real parent, that is in a JSR subroutine
+        // with several blocks.
+        if (parentBB.jsr_target && jsr_lead != parentPC) {
+            assert(m_jsrStates.find(parentPC) != m_jsrStates.end());
+            parentState = m_jsrStates[parentPC];
+        }
+        else {
+            parentState = m_bbStates[parentPC];
+        }
+    }
 
     JInst& bbhead = m_insts[pc];
     if (pc != parentPC) {
