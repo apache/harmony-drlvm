@@ -67,7 +67,7 @@ static LilCodeStub * rth_get_lil_monitor_enter_generic(LilCodeStub * cs) {
             "pop_m2n;"
             "ret;",
             vm_monitor_try_enter,
-            TM_ERROR_NONE,
+            (POINTER_SIZE_INT)TM_ERROR_NONE,
             vm_monitor_enter);
     }
 }
@@ -199,7 +199,7 @@ static LilCodeStub * rth_get_lil_monitor_exit_generic(LilCodeStub * cs) {
             "call %1i;"
             "pop_m2n;"
             "ret;",
-            FRAME_NON_UNWINDABLE,
+            (POINTER_SIZE_INT)FRAME_NON_UNWINDABLE,
             vm_monitor_exit);
     } else {
         return lil_parse_onto_end(cs,
@@ -210,7 +210,7 @@ static LilCodeStub * rth_get_lil_monitor_exit_generic(LilCodeStub * cs) {
             "out managed::void;"
             "call.noret %2i;",
             vm_monitor_try_exit,
-            TM_ERROR_NONE,
+            (POINTER_SIZE_INT)TM_ERROR_NONE,
             lil_npc_to_fp(exn_get_rth_throw_illegal_monitor_state()));
     }
 }

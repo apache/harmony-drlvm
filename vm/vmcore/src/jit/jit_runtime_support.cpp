@@ -137,7 +137,7 @@ static NativeCodePtr rth_get_lil_multianewarray(int* dyn_count)
             "call %1i;"
             "pop_m2n;"
             "ret;",
-            FRAME_POPABLE,
+            (POINTER_SIZE_INT)FRAME_POPABLE,
             rth_multianewarrayhelper);
         assert(cs && lil_is_valid(cs));
         
@@ -208,7 +208,7 @@ static NativeCodePtr rth_get_lil_ldc_ref(int* dyn_count)
             "call %1i;"
             "pop_m2n;"
             "ret;",
-            FRAME_POPABLE,
+            (POINTER_SIZE_INT)FRAME_POPABLE,
             p_instantiate_ref);
         assert(cs && lil_is_valid(cs));
         addr = LilCodeGenerator::get_platform()->compile(cs);
@@ -276,8 +276,8 @@ static LilCodeStub* rth_gen_lil_type_test(LilCodeStub* cs, RthTypeTestNull null,
                 vtable_off);            
             assert(cs);
             cs = lil_parse_onto_end(cs,
-                "ld l0,[l0+%1i:pint];"
-                "jc l0!=%2i,failed;",
+                "ld l0,[l0+%0i:pint];"
+                "jc l0!=%1i,failed;",
                 vtable_add+supertable_off+sizeof(Class*)*(type->get_depth()-1), type);
             do_slow = false;
             assert(cs);
@@ -296,7 +296,8 @@ static LilCodeStub* rth_gen_lil_type_test(LilCodeStub* cs, RthTypeTestNull null,
         cs = lil_parse_onto_end(cs,
             "ld l0,[l0+%0i*l1+%1i:pint];"
             "jc l0!=i1,failed;",
-            sizeof(Class*), vtable_add+supertable_off-sizeof(Class*));  // -4/8 because we want to index with depth-1
+            (POINTER_SIZE_INT)sizeof(Class*),
+            vtable_add+supertable_off-sizeof(Class*));  // -4/8 because we want to index with depth-1
         assert(cs);
     }
 
@@ -757,7 +758,7 @@ static NativeCodePtr rth_get_lil_initialize_class(int* dyn_count)
             ":_exn_raised;"
             "out platform::void;"
             "call.noret %5i;",
-            p_is_inited, (FRAME_JNI | FRAME_POPABLE), p_init,
+            p_is_inited, (POINTER_SIZE_INT)(FRAME_JNI | FRAME_POPABLE), p_init,
             OFFSET(VM_thread, thread_exception.exc_object),
             OFFSET(VM_thread, thread_exception.exc_class),
             p_rethrow);
@@ -1598,7 +1599,7 @@ static NativeCodePtr rth_get_lil_gc_safe_point(int * dyn_count) {
         "call %1i;"
         "pop_m2n;"
         "ret;",
-        (FRAME_POPABLE | FRAME_SAFE_POINT),
+        (POINTER_SIZE_INT)(FRAME_POPABLE | FRAME_SAFE_POINT),
         hythread_safe_point_ptr);
     assert(cs && lil_is_valid(cs));
     addr = LilCodeGenerator::get_platform()->compile(cs);
@@ -1708,7 +1709,7 @@ static NativeCodePtr rth_get_lil_resolve(int * dyn_count)
         "call %1i;"
         "pop_m2n;"
         "ret;",
-        FRAME_POPABLE,
+        (POINTER_SIZE_INT)FRAME_POPABLE,
         (void*)&rth_resolve);
     assert(cs && lil_is_valid(cs));
     addr = LilCodeGenerator::get_platform()->compile(cs);
@@ -1737,7 +1738,7 @@ static NativeCodePtr rth_get_lil_jvmti_method_enter_callback(int * dyn_count) {
         "call %1i;"
         "pop_m2n;"
         "ret;",
-        FRAME_POPABLE,
+        (POINTER_SIZE_INT)FRAME_POPABLE,
         jvmti_method_enter_callback_ptr);
     assert(cs && lil_is_valid(cs));
     addr = LilCodeGenerator::get_platform()->compile(cs);
@@ -1768,7 +1769,7 @@ static NativeCodePtr rth_get_lil_jvmti_method_exit_callback(int * dyn_count) {
         "call %1i;"
         "pop_m2n;"
         "ret;",
-        FRAME_POPABLE,
+        (POINTER_SIZE_INT)FRAME_POPABLE,
         jvmti_method_exit_callback_ptr);
     assert(cs && lil_is_valid(cs));
     addr = LilCodeGenerator::get_platform()->compile(cs);
@@ -1799,7 +1800,7 @@ static NativeCodePtr rth_get_lil_jvmti_field_access_callback(int * dyn_count) {
             "call %1i;"
             "pop_m2n;"
             "ret;",
-            FRAME_POPABLE,
+            (POINTER_SIZE_INT)FRAME_POPABLE,
             jvmti_field_access_callback_ptr);
     assert(cs && lil_is_valid(cs));
     addr = LilCodeGenerator::get_platform()->compile(cs);
@@ -1846,7 +1847,7 @@ static NativeCodePtr rth_get_lil_jvmti_field_modification_callback(int * dyn_cou
             "call %1i;"
             "pop_m2n;"
             "ret;",
-            FRAME_POPABLE,
+            (POINTER_SIZE_INT)FRAME_POPABLE,
             jvmti_field_modification_callback_ptr);
     assert(cs && lil_is_valid(cs));
     addr = LilCodeGenerator::get_platform()->compile(cs);
@@ -2280,14 +2281,14 @@ static LilCodeStub* gen_lil_typecheck_slowpath(LilCodeStub *cs,
         cs2 = lil_parse_onto_end
             (cs,
             "ld l0, [i0+%0i:g4],zx;",
-            /*OFFSET(ManagedObject, vt_offset)*/object_get_vtable_offset());
+            (POINTER_SIZE_INT)object_get_vtable_offset());
     }
     else
     {
         cs2 = lil_parse_onto_end
             (cs, 
             "ld l0, [i0+%0i:ref];",
-            /*OFFSET(ManagedObject, vt_raw)*/object_get_vtable_offset());
+            (POINTER_SIZE_INT)object_get_vtable_offset());
     }
 
     cs2 = lil_parse_onto_end
@@ -2341,14 +2342,14 @@ static LilCodeStub* gen_lil_typecheck_fastpath(LilCodeStub *cs,
         cs2 = lil_parse_onto_end
             (cs,
             "ld l0, [i0+%0i:g4],zx;",
-            object_get_vtable_offset());
+            (POINTER_SIZE_INT)object_get_vtable_offset());
     }
     else
     {
         cs2 = lil_parse_onto_end
             (cs, 
             "ld l0, [i0+%0i:ref];",
-            object_get_vtable_offset());
+            (POINTER_SIZE_INT)object_get_vtable_offset());
     }
 
     cs2 = lil_parse_onto_end
@@ -2357,7 +2358,7 @@ static LilCodeStub* gen_lil_typecheck_fastpath(LilCodeStub *cs,
          "ld l2, [l0 + %1i*l1 + %2i: pint];"
          "jc i1 != l2, failed;",
          Class::get_offset_of_depth(),
-         sizeof(Class*),
+         (POINTER_SIZE_INT)sizeof(Class*),
          OFFSET(VTable, superclasses) - sizeof(Class*) + (vm_vtable_pointers_are_compressed() ? vm_get_vtable_base() : 0)
          );
 
@@ -2497,14 +2498,14 @@ LilCodeStub *gen_lil_typecheck_stub_specialized(bool is_checkcast,
         cs = lil_parse_onto_end
             (cs,
             "ld l0, [i0+%0i:g4];",
-            object_get_vtable_offset());
+            (POINTER_SIZE_INT)object_get_vtable_offset());
     }
     else
     {
         cs = lil_parse_onto_end
             (cs,
             "ld l0, [i0+%0i:ref];",
-            object_get_vtable_offset());
+            (POINTER_SIZE_INT)object_get_vtable_offset());
     }
 
     cs = lil_parse_onto_end

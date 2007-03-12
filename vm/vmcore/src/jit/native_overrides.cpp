@@ -124,11 +124,11 @@ LilCodeStub* nso_newinstance(LilCodeStub* cs, Method_Handle)
         cs = lil_parse_onto_end(cs, "locals 4;");
 
         // Get Class_Handle from java.lang.Class object
-        cs = lil_parse_onto_end(cs, "ld l0,[i0+%0i:pint];", (int)env->vm_class_offset);
+        cs = lil_parse_onto_end(cs, "ld l0,[i0+%0i:pint];", (POINTER_SIZE_INT)env->vm_class_offset);
         
         // Determine if this class supports fast allocation
         size_t offset_is_fast_allocation_possible = env->Void_Class->get_offset_of_fast_allocation_flag();
-        cs = lil_parse_onto_end(cs, "ld l1,[l0+%0i:g1];", (int)offset_is_fast_allocation_possible);
+        cs = lil_parse_onto_end(cs, "ld l1,[l0+%0i:g1];", offset_is_fast_allocation_possible);
         cs = lil_parse_onto_end(cs, "jc l1=0,fallback;");
 
         // Class supports fast allocation, now use frontier allocation technique
@@ -140,8 +140,8 @@ LilCodeStub* nso_newinstance(LilCodeStub* cs, Method_Handle)
 
         // Get frontier into r, limit into l2, instance size into l3
         cs = lil_parse_onto_end(cs, "l1=ts;");
-        cs = lil_parse_onto_end(cs, "ld r,[l1+%0i:ref];", current_offset);
-        cs = lil_parse_onto_end(cs, "ld l2,[l1+%0i:pint];", limit_offset);
+        cs = lil_parse_onto_end(cs, "ld r,[l1+%0i:ref];", (POINTER_SIZE_INT)current_offset);
+        cs = lil_parse_onto_end(cs, "ld l2,[l1+%0i:pint];", (POINTER_SIZE_INT)limit_offset);
         cs = lil_parse_onto_end(cs, "ld l3,[l0+%0i:g4];", offset_instance_data_size);
 
         // Compute new frontier
@@ -150,7 +150,7 @@ LilCodeStub* nso_newinstance(LilCodeStub* cs, Method_Handle)
         cs = lil_parse_onto_end(cs, "jc l2<l3,fallback;");
 
         // Yes, store new frontier, initialize vtable
-        cs = lil_parse_onto_end(cs, "st [l1+%0i:pint],l3;", current_offset);
+        cs = lil_parse_onto_end(cs, "st [l1+%0i:pint],l3;", (POINTER_SIZE_INT)current_offset);
         cs = lil_parse_onto_end(cs, "ld l3,[l0+%0i:pint];", offset_allocation_handle);
         cs = lil_parse_onto_end(cs, "l2=r; st [l2+0:pint],l3;");
 
@@ -185,7 +185,7 @@ LilCodeStub* nso_array_copy(LilCodeStub* cs, Method_Handle)
         "jc r!=%1i,bad;"
         "ret;"
         ":bad;",
-        p_array_copy, ACR_Okay);
+        p_array_copy, (POINTER_SIZE_INT)ACR_Okay);
     return cs;
 }
 
@@ -308,8 +308,9 @@ static NativeCodePtr fast_array_copy()
 LilCodeStub* nso_char_array_copy(LilCodeStub* cs, Method_Handle)
 {
     Global_Env *env = VM_Global_State::loader_env;
-    unsigned length_offset = vector_length_offset();
-    unsigned body_offset = vector_first_element_offset(VM_DATA_TYPE_CHAR);
+    POINTER_SIZE_INT length_offset = (POINTER_SIZE_INT)vector_length_offset();
+    POINTER_SIZE_INT body_offset =
+        (POINTER_SIZE_INT)vector_first_element_offset(VM_DATA_TYPE_CHAR);
     NativeCodePtr custom_stub = fast_array_copy();
 
     // Check all array copy error conditions and that both arrays are [C
@@ -337,8 +338,10 @@ LilCodeStub* nso_char_array_copy(LilCodeStub* cs, Method_Handle)
         "jc l0:g4<l1,slowpath;",                   // dst offset + length <= dst length
         VM_Global_State::loader_env->managed_null,
         VM_Global_State::loader_env->managed_null,
-        object_get_vtable_offset(), class_get_vtable(env->ArrayOfChar_Class),
-        object_get_vtable_offset(), length_offset, length_offset);
+        (POINTER_SIZE_INT)object_get_vtable_offset(),
+        class_get_vtable(env->ArrayOfChar_Class),
+        (POINTER_SIZE_INT)object_get_vtable_offset(),
+        length_offset, length_offset);
     assert(cs);
 
     // At this point array copy will happen, now decide how to do it
