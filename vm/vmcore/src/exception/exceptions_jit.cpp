@@ -441,11 +441,11 @@ void exn_throw_for_JIT(ManagedObject* exn_obj, Class_Handle exn_class,
         jit_exn_constr_args, vm_exn_constr_args);
 
     M2nFrame* m2nFrame = m2n_get_last_frame();
-	ObjectHandles* last_m2n_frame_handles = m2nFrame->local_object_handles;
+    ObjectHandles* last_m2n_frame_handles = m2n_get_local_handles(m2nFrame);
 
-	if (last_m2n_frame_handles) {
-            free_local_object_handles2(last_m2n_frame_handles);
-	}
+    if (last_m2n_frame_handles) {
+        free_local_object_handles2(last_m2n_frame_handles);
+    }
 
     if (ti->get_global_capability(DebugUtilsTI::TI_GC_ENABLE_EXCEPTION_EVENT)) {
         NativeCodePtr callback = (NativeCodePtr)
@@ -619,21 +619,31 @@ NativeCodePtr exn_get_rth_throw_lazy()
     const unsigned handles_size = (unsigned)(sizeof(ObjectHandlesNew)+sizeof(ManagedObject*)*16);
     const unsigned cap_and_size = (unsigned)((0<<16) | 16);
 
+#ifdef _IPF_
     LilCodeStub *cs = lil_parse_code_stub(
-		"entry 0:managed:pint:void;"
+        "entry 0:managed:pint:void;"
         "push_m2n 0, 0, handles;"
         "m2n_save_all;"
-		"locals 1;"
-		"alloc l0, %0i;"
-		"st[l0+%1i:g4], %2i;"
-		"st[l0+%3i:pint], 0;"
-		"handles=l0;"
-		"in2out platform:void;"
-		"call.noret %4i;",
-		handles_size,
+        "in2out platform:void;"
+        "call.noret %0i;",
+        rth_throw_lazy);
+#else
+    LilCodeStub *cs = lil_parse_code_stub(
+        "entry 0:managed:pint:void;"
+        "push_m2n 0, 0, handles;"
+        "m2n_save_all;"
+        "locals 1;"
+        "alloc l0, %0i;"
+        "st[l0+%1i:g4], %2i;"
+        "st[l0+%3i:pint], 0;"
+        "handles=l0;"
+        "in2out platform:void;"
+        "call.noret %4i;",
+        handles_size,
         cap_off, cap_and_size,
         next_off,
         rth_throw_lazy);
+#endif
     assert(lil_is_valid(cs));
     addr = LilCodeGenerator::get_platform()->compile(cs);
 
@@ -658,20 +668,29 @@ NativeCodePtr exn_get_rth_throw_lazy_trampoline()
     const unsigned handles_size = (unsigned)(sizeof(ObjectHandlesNew)+sizeof(ManagedObject*)*16);
     const unsigned cap_and_size = (unsigned)((0<<16) | 16);
 
+#ifdef _IPF_
     LilCodeStub *cs = lil_parse_code_stub("entry 1:managed::void;"
         "push_m2n 0, 0, handles;"
         "m2n_save_all;"
-		"locals 1;"
-		"alloc l0, %0i;"
-		"st[l0+%1i:g4], %2i;"
-		"st[l0+%3i:pint], 0;"
-		"handles=l0;"
+        "out platform:ref,pint,pint,pint:void;"
+        "o0=0:ref;" "o1=sp0;" "o2=0;" "o3=0;" "call.noret %0i;",
+        exn_athrow);
+#else
+    LilCodeStub *cs = lil_parse_code_stub("entry 1:managed::void;"
+        "push_m2n 0, 0, handles;"
+        "m2n_save_all;"
+        "locals 1;"
+        "alloc l0, %0i;"
+        "st[l0+%1i:g4], %2i;"
+        "st[l0+%3i:pint], 0;"
+        "handles=l0;"
         "out platform:ref,pint,pint,pint:void;"
         "o0=0:ref;" "o1=sp0;" "o2=0;" "o3=0;" "call.noret %4i;",
-		handles_size,
+        handles_size,
         cap_off, cap_and_size,
         next_off,
         exn_athrow);
+#endif
     assert(lil_is_valid(cs));
     addr = LilCodeGenerator::get_platform()->compile(cs);
 
