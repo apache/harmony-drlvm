@@ -197,31 +197,49 @@ static void add_args_same_size(EncoderBase::Operands& args,
     }
 }
 
-AR get_cconv_fr(unsigned i) {
+AR get_cconv_fr(unsigned i, unsigned pos_in_args) {
 #ifdef _EM64T_
+#ifdef _WIN64
+    bool compact = false;
+#else
+    bool compact = true;
+#endif
     static const AR frs[] = {
         virt(RegName_XMM0), virt(RegName_XMM1), 
         virt(RegName_XMM2), virt(RegName_XMM3), 
+#ifndef _WIN64
         virt(RegName_XMM4), virt(RegName_XMM5), 
         virt(RegName_XMM6), virt(RegName_XMM7), 
+#endif
     };
     const unsigned  count = COUNTOF(frs);
-    return (i<count) ? frs[i] : fr_x;
+    unsigned pos = compact ? i : pos_in_args;
+    return (pos<count) ? frs[pos] : fr_x;
 #else
     assert(false);
     return gr_x;
 #endif
 }
 
-AR get_cconv_gr(unsigned i) {
+AR get_cconv_gr(unsigned i, unsigned pos_in_args) {
 #ifdef _EM64T_
+#ifdef _WIN64
+    bool compact = false;
+	static const AR grs[] = {
+		virt(RegName_RCX),  virt(RegName_RDX), 
+		virt(RegName_R8),  virt(RegName_R9), 
+	};
+#else
+    bool compact = true;
     static const AR grs[] = {
         virt(RegName_RDI),  virt(RegName_RSI), 
         virt(RegName_RDX),  virt(RegName_RCX), 
         virt(RegName_R8),   virt(RegName_R9), 
     };
+#endif
     const unsigned count = COUNTOF(grs);
-    return (i<count) ? grs[i] : gr_x;
+    unsigned pos = compact ? i : pos_in_args;
+    return (pos<count) ? grs[pos] : gr_x;
 #else
     assert(false);
     return gr_x;

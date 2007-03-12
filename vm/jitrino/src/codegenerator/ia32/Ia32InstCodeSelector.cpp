@@ -1937,7 +1937,8 @@ CG_OpndHandle* InstCodeSelector::simpleLdInd(Type * dstType, Opnd * addr,
         appendInsts(irManager.newCopyPseudoInst(Mnemonic_MOV, dst, irManager.newImmOpnd(typeManager.getInt64Type(),0)));
         appendInsts(irManager.newCopyPseudoInst(Mnemonic_MOV, tmp, opnd));
         copyOpnd(dst, tmp);
-        dst = simpleOp_I8(Mnemonic_ADD, dstType, dst, irManager.newImmOpnd(dstType, (POINTER_SIZE_INT)compilationInterface.getHeapBase()));
+        Type* unmanagedPtrType = typeManager.getUnmanagedPtrType(typeManager.getInt8Type());
+        dst = simpleOp_I8(Mnemonic_ADD, dstType, dst, irManager.newImmOpnd(unmanagedPtrType, (POINTER_SIZE_INT)compilationInterface.getHeapBase()));
         return dst;
     } else {
         Opnd * opnd = irManager.newMemOpndAutoKind(irManager.getTypeFromTag(memType), addr);
@@ -2440,8 +2441,8 @@ CG_OpndHandle* InstCodeSelector::tau_ldVTableAddr(Type* dstType,
     int64 heapBase = (int64) compilationInterface.getVTableBase();
     Opnd * acc =  simpleOp_I8(Mnemonic_ADD, dstType, (Opnd *)base, irManager.newImmOpnd(dstType, Opnd::RuntimeInfo::Kind_VTableAddrOffset));
     Opnd * sourceVTableAddr=irManager.newMemOpnd(typeManager.getInt32Type(), acc, 0, 0, irManager.newImmOpnd(typeManager.getUInt32Type(), 0));
-    acc=irManager.newOpnd(typeManager.getInt64Type());
-    copyOpnd(acc, sourceVTableAddr);
+    acc=irManager.newOpnd(dstType);
+    appendInsts(irManager.newInstEx(Mnemonic_MOVZX, 1, acc, sourceVTableAddr));
     vtableAddr =  simpleOp_I8(Mnemonic_ADD, dstType, acc,  irManager.newImmOpnd(dstType, heapBase));
     return vtableAddr;
 #endif

@@ -799,7 +799,7 @@ void CallingConventionClient::finalizeInfos(Inst::OpndRole role, CallingConventi
 {
     assert(callingConvention!=NULL);
     StlVector<CallingConvention::OpndInfo> & infos = getInfos(role);
-    callingConvention->getOpndInfo(argKind, (uint32)infos.size(), &infos.front());
+    callingConvention->getOpndInfo(argKind, (uint32)infos.size(), infos.empty()?(CallingConvention::OpndInfo*)NULL:&infos.front());
     bool lastToFirst=callingConvention->pushLastToFirst();
     uint32 slotNumber=0;
     for (

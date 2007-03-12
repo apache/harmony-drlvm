@@ -486,13 +486,13 @@ unsigned gen_num_calle_save(void);
  * registers (i.e. fastcall6 & fastcall4) then this presumption need to 
  * be revisited.
  */
-AR get_cconv_fr(unsigned i);
+AR get_cconv_fr(unsigned i, unsigned pos_in_args);
 /**
  * @brief Returns i-th general-purpose register for register-based calling 
  *        conventions.
  * @see get_cconv_fr
  */
-AR get_cconv_gr(unsigned i);
+AR get_cconv_gr(unsigned i, unsigned pos_in_args);
 
 /**
  * @brief Kind of operand.

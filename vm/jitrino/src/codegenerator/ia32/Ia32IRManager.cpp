@@ -2289,7 +2289,7 @@ void SessionAction::debugOutput(const char * subKind)
 
     if (isLogEnabled(LogStream::IRDUMP)) {
         irManager->updateLoopInfo();
-        irManager->fixLivenessInfo();
+        irManager->updateLivenessInfo();
         dumpIR(subKind, "opnds");
         dumpIR(subKind, "liveness");
         dumpIR(subKind);
@@ -2297,7 +2297,7 @@ void SessionAction::debugOutput(const char * subKind)
 
     if (isLogEnabled(LogStream::DOTDUMP)) {
         irManager->updateLoopInfo();
-        irManager->fixLivenessInfo();
+        irManager->updateLivenessInfo();
         printDot(subKind);
         printDot(subKind, "liveness");
     }

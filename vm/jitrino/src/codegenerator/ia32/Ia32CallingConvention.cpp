@@ -57,8 +57,13 @@ CDECLCallingConvention          CallingConvention_CDECL;
 //========================================================================================
 
 #ifdef _EM64T_
+#ifdef _WIN64
+const RegName fastCallGPRegs[4] = {RegName_RCX, RegName_RDX, RegName_R8, RegName_R9} ;
+const RegName fastCallFPRegs[4] = {RegName_XMM0,RegName_XMM1,RegName_XMM2,RegName_XMM3};
+#else 
 const RegName fastCallGPRegs[6] = {RegName_RDI, RegName_RSI, RegName_RDX, RegName_RCX, RegName_R8, RegName_R9} ;
 const RegName fastCallFPRegs[8] = {RegName_XMM0,RegName_XMM1,RegName_XMM2,RegName_XMM3,RegName_XMM4,RegName_XMM5,RegName_XMM6,RegName_XMM7};
+#endif
 #endif
 
 //______________________________________________________________________________________
@@ -66,8 +71,12 @@ void    STDCALLCallingConvention::getOpndInfo(ArgKind kind, uint32 count, OpndIn
 {
     if (kind==ArgKind_InArg){
 #ifdef _EM64T_
-            uint32 gpreg = 0;
-            uint32 fpreg = 0;
+        uint32 gpreg = 0;
+#ifdef _WIN64
+#define fpreg gpreg
+#else
+        uint32 fpreg = 0;
+#endif
 #endif
         for (uint32 i=0; i<count; i++){
     

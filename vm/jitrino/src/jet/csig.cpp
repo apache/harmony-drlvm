@@ -53,12 +53,12 @@ void CallSig::init(void)
     
     for (unsigned i=0; i<num; i++) {
         jtype jt = m_args[i];
-        if (regs && is_f(jt) && get_cconv_fr(fps) != fr_x) {
-            m_data[i] = get_cconv_fr(fps);
+        if (regs && is_f(jt) && get_cconv_fr(fps, i) != fr_x) {
+            m_data[i] = get_cconv_fr(fps, i);
             ++fps;
         }
-        else if (regs && !is_f(jt) && get_cconv_gr(gps) != gr_x) {
-            m_data[i] = get_cconv_gr(gps);
+        else if (regs && !is_f(jt) && get_cconv_gr(gps, i) != gr_x) {
+            m_data[i] = get_cconv_gr(gps, i);
             ++gps;
         }
         else {

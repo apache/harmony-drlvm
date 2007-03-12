@@ -530,9 +530,9 @@ void CodeEmitter::postPass()
 
                     uint8* blockStartIp = (uint8*)bb->getCodeStartAddr();
                     uint8* ip = movInst->emit(instCodeStartAddr);
-                    movInst->setCodeOffset(instCodeStartAddr - blockStartIp);
+                    movInst->setCodeOffset((uint32)(instCodeStartAddr - blockStartIp));
                     inst->emit(ip);
-                    inst->setCodeOffset(ip - blockStartIp);
+                    inst->setCodeOffset((uint32)(ip - blockStartIp));
 
                     if (bcOffset != ILLEGAL_VALUE) {
                         bcMap->setEntry((uint64)(POINTER_SIZE_INT)instCodeStartAddr, bcOffset); // MOV

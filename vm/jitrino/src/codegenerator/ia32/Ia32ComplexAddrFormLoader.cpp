@@ -172,7 +172,7 @@ ComplexAddrFormLoader::walkThroughOpnds(SubOpndsTable& table) {
             table.baseOp = table.suspOp;
             table.baseCand1 = NULL;
             table.baseCand2 = NULL;
-            table.dispOp = NULL;
+//            table.dispOp = NULL;
         }
         return;
     } 

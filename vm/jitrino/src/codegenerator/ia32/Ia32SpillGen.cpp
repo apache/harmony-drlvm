@@ -254,7 +254,7 @@ static ActionFactory<SpillGen> _spillgen("spillgen", help);
 #endif //#ifdef _MSC_VER
 #include "Ia32SpillGenDbgHead.h"
 #else
-#define DBGOUT(s) 
+#define DBGOUT(s)
 #endif //#ifdef _DEBUG_SPILLGEN
 
 
@@ -513,6 +513,7 @@ void SpillGen::Opline::start ()
 void SpillGen::Opline::forw ()
 {
     assert(op != 0);
+    assert(!ops->empty());
     if (op == &ops->front())
     {
         op = 0;
@@ -532,6 +533,7 @@ void SpillGen::Opline::back (const Instx* x)
 {
     if (op == 0)
     {
+        assert(!ops->empty());
         op = &ops->front();
         instx = op->instx;
     }
@@ -650,7 +652,6 @@ void SpillGen::runImpl()
 
     static Counter<size_t> count_emits("ia32:spillgen:emits", 0);
     count_emits += emitted;
-
 #ifdef _DEBUG_SPILLGEN
     log(LogStream::DBG) << endl << "Emitted movs :" << emitted << endl;
 
@@ -867,8 +868,8 @@ size_t SpillGen::pass0 ()
     }
 
     assert(instxp == instxs.begin());
-
     return actives.size();
+
 }
 
 
@@ -934,13 +935,12 @@ size_t SpillGen::pass1 ()
 
     //  Process instructions that are using the operand
 
-        while (opline.go())
+        while (opline.go()) {
             if (opline.isProc())
             {
                 Constraint c(opline.opnd->getConstraint(Opnd::ConstraintKind_Initial));
                 update(opline.instx->inst, opline.opnd, c);
                 opline.idx = registers.getIndex(c);
-
                 if (!tryRegister(opline, c, prefreg))
                     if (!tryMemory(opline, c))
                         if (!tryEvict(opline, c))
@@ -966,15 +966,14 @@ size_t SpillGen::pass1 ()
             {
                 opline.forw();
             }
+        }
 
     //  End-block processing
 
         assert(opline.instx == opline.ops->front().instx);
-
         if (opline.at_exit)
             loadOpndMem(opline);
     }
-
     return fails;
 }
 
@@ -1013,7 +1012,6 @@ bool SpillGen::tryRegister (Opline& opline, Constraint c, RegMask prefreg)
     Constraint cr((OpndKind)cx.getKind(), c.getSize(), cx.getMask());
 
 //  handle first instruction of the interval
-
     RegMask mk = cr.getMask() & ~usedRegs(opline.instx, opline.idx, opline.isUse());
     if (mk == 0)
     {
@@ -1026,6 +1024,7 @@ bool SpillGen::tryRegister (Opline& opline, Constraint c, RegMask prefreg)
         mkpost = callRegs(opline.instx, opline.idx);
 
 //  handle second and all others instructions
+
 
     Instx* begx = opline.instx;
     Instx* endx = begx;
@@ -1060,7 +1059,6 @@ bool SpillGen::tryRegister (Opline& opline, Constraint c, RegMask prefreg)
         mkpost = callRegs(opline.instx, opline.idx);
         count += cnt;
     }
-
     DBGOUT("   -reg [" << (const Inst*)begx->inst << " - " << (const Inst*)endx->inst 
         << "] avail:" << RegMasks(cx, mk) << " count:" << count << endl;)
 
@@ -1075,7 +1073,6 @@ bool SpillGen::tryRegister (Opline& opline, Constraint c, RegMask prefreg)
             return true;
         }
     }
-
     if ((mk & prefreg) != 0)
     {
         mk &= prefreg;
@@ -1387,7 +1384,6 @@ void  SpillGen::assignMem (Opline& opline, Instx* begx, Instx* endx)
            << " - " << *endx->inst << "] to " << *opline.opnd_mem << endl;)
 
     loadOpnd(opline, begx, opline.opnd_mem);
-
     if (opline.opnd != opline.opnd_mem)
         for (; begx <= endx; ++begx)
         {
@@ -1576,10 +1572,10 @@ RegName SpillGen::findFree (RegMask usable, int idx, Instx* instx)
     Constraint c = registers[idx];
     usable &= c.getMask();  // search only from available registers
 
-    Instx* begx = &*instxs.begin(); ++begx;
-    Instx* endx = &*instxs.end();
+    Instx* begx = instxs.empty()? (Instx*)NULL:&*instxs.begin(); 
+    Instx* endx = begx + instxs.size() ;
+    ++begx;
     Instx* ptrx;
-
     size_t xbest = INT_MAX,
            xbest_free  = INT_MAX,
            xlgth_free  = 0,
@@ -1588,7 +1584,7 @@ RegName SpillGen::findFree (RegMask usable, int idx, Instx* instx)
 
     size_t x, found;
     RegMask msk;
-    for (x = 0, found = 0, msk = 1; usable != 0; ++x, msk <<= 1)
+    for (x = 0, found = 0, msk = 1; usable != 0; ++x, msk <<= 1) {
         if ((usable & msk) != 0)
         {
             usable ^= msk, ++found;
@@ -1606,13 +1602,11 @@ RegName SpillGen::findFree (RegMask usable, int idx, Instx* instx)
                 ++lgth;
                 press |= (ptrx->regpress[idx] & msk) != 0;
             }
-
             for (ptrx = instx+1; ptrx <  endx && (ptrx->regusage[idx] & msk) == 0; ++ptrx)
             {
                 ++lgth;
                 press |= (ptrx->regpress[idx] & msk) != 0;
             }
-
             if (press)
             {
                 if (xbest_press == INT_MAX || xlgth_press >= lgth)
@@ -1626,9 +1620,10 @@ RegName SpillGen::findFree (RegMask usable, int idx, Instx* instx)
                     xlgth_free = lgth;
             }
         }
-
-    if (xbest == INT_MAX)
+    }
+    if (xbest == INT_MAX) {
         xbest = xbest_free != INT_MAX ? xbest_free : xbest_press;
+    }
 
     return xbest == INT_MAX ? 
             RegName_Null : 
@@ -1790,8 +1785,9 @@ void SpillGen::setupEvicts ()
 
 SpillGen::Evict* SpillGen::pickEvict (Evicts& evicts)
 {
-    Instx* begx = &*instxs.begin(); ++begx;
-    Instx* endx = &*instxs.end();
+    Instx* begx = instxs.empty()? (Instx*)NULL:&*instxs.begin(); 
+    Instx* endx = begx + instxs.size();
+    ++begx;
     Instx* ptrx;
 
     DBGOUT("Evicts" << endl;)
@@ -1810,7 +1806,7 @@ SpillGen::Evict* SpillGen::pickEvict (Evicts& evicts)
         DBGOUT(" evict " << *evict.opnd << " [" << *evict.begx->inst 
                << " - " << *evict.endx->inst << "] w:" << evict.weight << endl;)
     }
-
+    assert(!evicts.empty());
     return &*max_element(evicts.begin(), evicts.end());
 }
 
