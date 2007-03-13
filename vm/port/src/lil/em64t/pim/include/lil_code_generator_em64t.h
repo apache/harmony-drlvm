@@ -151,11 +151,21 @@ private:
 
     unsigned n_inputs;     // total number of inputs
     unsigned n_gr_inputs;  // total number of GRs reserved for inputs
+#ifdef _WIN64
+    // Windows x64 has 4 slots for both integer and float inputs
+#define n_fr_inputs n_gr_inputs
+#else
     unsigned n_fr_inputs;  // total number of FRs reserved for inputs
+#endif
 
     unsigned n_outputs;    // total number of outputs
     unsigned n_gr_outputs; // total number of GRs reserved for outputs
+#ifdef _WIN64
+    // Windows x64 has 4 slots for both integer and float inputs
+#define n_fr_outputs n_gr_outputs
+#else
     unsigned n_fr_outputs; // total number of FRs reserved for outputs
+#endif
 
     /// Number of GR registers currently allocated for temporary needs.
     unsigned m_tmp_grs_used;

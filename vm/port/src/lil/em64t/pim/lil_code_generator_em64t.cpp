@@ -325,8 +325,12 @@ private:
         }
 #endif
         LilType t;
-        unsigned fp_param_cnt = 0;
         unsigned gp_param_cnt = 0;
+#ifdef _WIN64
+#define fp_param_cnt gp_param_cnt
+#else
+        unsigned fp_param_cnt = 0;
+#endif
         for (unsigned i = 0; i < n; i++) {
             t = lil_sig_get_arg_type(lil_cs_get_sig(cs), i);
             if (context.is_fp_type(t)) {
@@ -348,7 +352,7 @@ private:
                     return new(mem) LcgEM64TLoc(LLK_FStk, offset);
                 } else {
                     return new(mem) LcgEM64TLoc(LLK_Fr,
-                        LcgEM64TContext::FR_OUTPUTS_OFFSET + fp_param_cnt);                    
+                        LcgEM64TContext::FR_OUTPUTS_OFFSET + fp_param_cnt);
                 }
             } else {
                 unsigned gp_on_stack = gp_param_cnt > LcgEM64TContext::MAX_GR_OUTPUTS
@@ -362,7 +366,10 @@ private:
                 // skip rip
                 offset += LcgEM64TContext::GR_SIZE;
                 // skip size allocated for preceding inputs
-                offset += gp_on_stack + fp_on_stack ;
+                offset += gp_on_stack;
+#ifndef _WIN64
+                offset += fp_on_stack;
+#endif
                 return new(mem) LcgEM64TLoc(LLK_FStk, offset);
             }
         } else { // if (context.is_fp_type(t))
@@ -388,7 +395,10 @@ private:
                 // skip rip
                 offset += LcgEM64TContext::GR_SIZE;
                 // skip size allocated for preceding inputs
-                offset += gp_on_stack + fp_on_stack ;
+                offset += gp_on_stack;
+#ifndef _WIN64
+                offset += fp_on_stack;
+#endif
                 return new(mem) LcgEM64TLoc(LLK_GStk, offset);
             }
         }
@@ -400,8 +410,12 @@ private:
         assert(n <= context.get_num_outputs());
 
         LilType t;
-        unsigned fp_param_cnt = 0;
         unsigned gp_param_cnt = 0;
+#ifdef _WIN64
+#define fp_param_cnt gp_param_cnt
+#else
+        unsigned fp_param_cnt = 0;
+#endif
         for (unsigned i = 0; i < n; i++) {
             t = lil_sig_get_arg_type(out_sig, i);
             if (context.is_fp_type(t)) {
@@ -425,7 +439,10 @@ private:
                 unsigned fp_on_stack = fp_param_cnt > LcgEM64TContext::MAX_FR_OUTPUTS
                     ? (fp_param_cnt - LcgEM64TContext::MAX_FR_OUTPUTS)
                     * LcgEM64TContext::FR_SIZE : 0;
-                int32 offset = gp_on_stack + fp_on_stack;
+                int32 offset = gp_on_stack;
+#ifndef _WIN64
+                offset += fp_on_stack;
+#endif
                 return new(mem) LcgEM64TLoc(LLK_FStk, offset);
             }
         } else {
@@ -439,7 +456,10 @@ private:
                 unsigned fp_on_stack = fp_param_cnt > LcgEM64TContext::MAX_FR_OUTPUTS
                     ? (fp_param_cnt - LcgEM64TContext::MAX_FR_OUTPUTS)
                     * LcgEM64TContext::FR_SIZE : 0;
-                int32 offset = gp_on_stack + fp_on_stack;
+                int32 offset = gp_on_stack;
+#ifndef _WIN64
+                offset += fp_on_stack;
+#endif
                 return new(mem) LcgEM64TLoc(LLK_GStk, offset);
             }
         }

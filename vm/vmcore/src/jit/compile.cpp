@@ -345,7 +345,7 @@ NativeCodePtr compile_create_lil_jni_stub(Method_Handle method, void* func, Nati
     assert(cs);
 
     // Loop over arguments proper, setting rest of outputs
-    POINTER_SIZE_INT arg_base = 1 + (is_static ? 1 : 0);
+    unsigned int arg_base = 1 + (is_static ? 1 : 0);
     hn = 1;
     for(i=(is_static?0:1); i<num_args; i++) {
         if (is_reference(method_args_get_type_info(msh, i))) {
@@ -358,7 +358,7 @@ NativeCodePtr compile_create_lil_jni_stub(Method_Handle method, void* func, Nati
                                         ":%g;"
                                         "o%4i=0;"
                                         ":%g;",
-                                        (POINTER_SIZE_INT)i,
+                                        i,
                                         VM_Global_State::loader_env->managed_null,
                                         arg_base+i, handle_offset, arg_base+i);
             } else {
@@ -369,13 +369,13 @@ NativeCodePtr compile_create_lil_jni_stub(Method_Handle method, void* func, Nati
                                         ":%g;"
                                         "o%3i=0;"
                                         ":%g;",
-                                        (POINTER_SIZE_INT)i,
+                                        i,
                                         arg_base+i, handle_offset,
                                         arg_base+i);
             }
             hn++;
         } else {
-            cs = lil_parse_onto_end(cs, "o%0i=i%1i;", arg_base+i, (POINTER_SIZE_INT)i);
+            cs = lil_parse_onto_end(cs, "o%0i=i%1i;", arg_base+i, i);
         }
         assert(cs);
     }
