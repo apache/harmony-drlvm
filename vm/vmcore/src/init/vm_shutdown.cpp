@@ -84,33 +84,7 @@ static jint exec_shutdown_sequence(JNIEnv * jni_env) {
 }
 
 static void vm_shutdown_callback() {
-    hythread_t   self_native;
-    jthread      self_java;
-    VM_thread *  self_vm;
-    JNIEnv     * jni_env;
-    Global_Env * vm_env;
-        
-    self_native = hythread_self();
-    self_java = jthread_get_java_thread(self_native);
-    self_vm = get_vm_thread(self_native);
-
-    // Make sure the thread is still attached to the VM.
-    if (self_java == NULL || self_vm == NULL) {
-        return;
-    }
-        
-    jni_env = jthread_get_JNI_env(self_java);
-    vm_env = jni_get_vm_env(jni_env);
-
-    // We need to be in suspend disabled state to be able to throw an exception.
-    assert(!hythread_is_suspend_enabled());
-
-    //hythread_suspend_disable();
-
-    // Raise an exception. In shutdown stage it should cause entire stack unwinding.
-    jthread_throw_exception_object(vm_env->java_lang_ThreadDeath);
-
-    //hythread_suspend_enable();
+    hythread_exit(NULL);
 }
 
 /**
@@ -124,66 +98,50 @@ static void vm_shutdown_stop_java_threads(Global_Env * vm_env) {
     hythread_t * running_threads;
     hythread_t native_thread;
     hythread_iterator_t it;
-    VM_thread * vm_thread;
-    int size;
-    bool changed;
-    int left;
-    int prev;
+    VM_thread *vm_thread;
    
     self = hythread_self();
 
     // Collect running java threads.
-    size = 0;
+    // Set callbacks to let threads exit
+    TRACE2("shutdown", "stopping threads, self " << self);
     it = hythread_iterator_create(NULL);
     running_threads = (hythread_t *)apr_palloc(vm_env->mem_pool,
         hythread_iterator_size(it) * sizeof(hythread_t));
+    int size = 0;
     while(native_thread = hythread_iterator_next(&it)) {
-        vm_thread = get_vm_thread(native_thread);
-        if (vm_thread != NULL && native_thread != self) {
+    vm_thread = get_vm_thread(native_thread);
+        if (native_thread != self && vm_thread != NULL) {
+            hythread_set_safepoint_callback(native_thread, vm_shutdown_callback);
             running_threads[size] = native_thread;
             ++size;
         }
     }
     hythread_iterator_release(&it);
 
-    // Interrupt running threads.
+    TRACE2("shutdown", "joining threads");
+    // join running threads
+    // blocked and waiting threads won't be joined
     for (int i = 0; i < size; i++) {
-        hythread_interrupt(running_threads[i]);
+        hythread_join_timed(running_threads[i], 100/size + 1, 0);
     }
 
-    left = size;
-    prev = -1;
-    // Spin until there is no running threads.
-    while (left > 0) {
-        do {
-            left = 0;
-            changed = false;
-            // Join or Interrupt.
-            for (int i = 0; i < size; i++) {
-                if (running_threads[i] == NULL) continue;
-                if (hythread_join_timed(running_threads[i], 100, 0) == TM_ERROR_NONE) {
-                    changed = true;
-                    running_threads[i] = NULL;
-                } else {
-                    hythread_interrupt(running_threads[i]);
-                    ++left;
-                }
-            }
-        } while(left > 0 && changed);
-
-        // We are stuck :-( Need to throw asynchronous exception.
-        if (left > 0) {
-            for (int i = 0; i < size; i++) {
-                if (running_threads[i] == NULL) continue;
-                if (left > 1 && i == prev) { 
-                    continue;
-                } else {
-                    prev = i;
-                    hythread_set_safepoint_callback(running_threads[i], vm_shutdown_callback);
-                }
-            }
+    TRACE2("shutdown", "cancelling threads");
+    // forcedly kill remaining threads
+    // There is a small chance that some of these threads are not in the point
+    // safe for killing, e.g. in malloc()
+    it = hythread_iterator_create(NULL);
+    while(native_thread = hythread_iterator_next(&it)) {
+    vm_thread = get_vm_thread(native_thread);
+    // we should not cancel self and
+    // non-java threads (i.e. vm_thread == NULL)
+        if (native_thread != self && vm_thread != NULL) {
+            hythread_cancel(native_thread);
+            TRACE2("shutdown", "cancelling " << native_thread);
         }
-    }               
+    }
+    hythread_iterator_release(&it);
+    TRACE2("shutdown", "shutting down threads complete");
 }
 
 /**
@@ -224,16 +182,25 @@ jint vm_destroy(JavaVM_Internal * java_vm, jthread java_thread)
     status = exec_shutdown_sequence(jni_env);
     if (status != JNI_OK) return status;
 
-    // Send VM_Death event and switch to VM_Death phase.
-    // This should be the last event sent by VM.
-    // This event should be sent before Agent_OnUnload called.
-    jvmti_send_vm_death_event();
-
     // Raise uncaught exception to current thread.
     // It will be properly processed in jthread_detach().
     if (uncaught_exception) {
         exn_raise_object(uncaught_exception);
     }
+
+    // Stop all (except current) java and native threads
+    // before destroying VM-wide data.
+
+    // Stop java threads
+    vm_shutdown_stop_java_threads(java_vm->vm_env);
+
+    // TODO: ups we don't stop native threads as well :-((
+    // We are lucky! Currently, there are no such threads.
+
+    // Send VM_Death event and switch to DEAD phase.
+    // This should be the last event sent by VM.
+    // This event should be sent before Agent_OnUnload called.
+    jvmti_send_vm_death_event();
 
     // Detach current thread.
     status = jthread_detach(java_thread);
@@ -251,15 +218,7 @@ jint vm_destroy(JavaVM_Internal * java_vm, jthread java_thread)
     assert(java_vm->vm_env->vm_state == Global_Env::VM_RUNNING);
     java_vm->vm_env->vm_state = Global_Env::VM_SHUTDOWNING;
 
-    // Stop all (except current) java and native threads
-    // before destroying VM-wide data.
-
-    // Stop java threads
-    vm_shutdown_stop_java_threads(java_vm->vm_env);
-
-    // TODO: ups we don't stop native threads as well :-((
-    // We are lucky! Currently, there are no such threads.
-
+    TRACE2("shutdown", "vm_destroy complete");
     return JNI_OK;
 }
 
