@@ -244,6 +244,12 @@ IDATA hythread_thin_monitor_try_enter(hythread_thin_monitor_t *lockword_ptr) {
     assert(!hythread_is_suspend_enabled());
     assert((UDATA)lockword_ptr > 4);    
     assert(tm_self_tls);
+    
+    // By DRLVM design rules lockword (see description in thin locks paper)
+    // is only modified without compare-and-exchange by owner thread. If tools
+    // like Intel Thread Checker find a bug about this line, it may actually be a 
+    // false-positive.
+
     lockword = *lockword_ptr;       
     lock_id = THREAD_ID(lockword);
     //TRACE(("try lock %x %d", this_id, RECURSION(lockword)));
