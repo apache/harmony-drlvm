@@ -1,6 +1,9 @@
 package shutdown;
 
-public class TestNativeAllocation {
+/**
+ * Tests that VM doen't hang on shutdown if a daemon thread is on Object.wait()
+ */
+public class TestDaemonOnWait {
     private static Object start = new Object();
     private static Object sync = new Object();
 
@@ -14,43 +17,45 @@ public class TestNativeAllocation {
             } catch (InterruptedException e) {
                 System.out.println("FAILED");
             }
+
+            System.out.println("PASSED");
         }
     }
 
     static class WorkerThread extends Thread {
         private int recursion = 0;
-    
+
         static {
-            System.loadLibrary("TestNativeAllocation");
+            System.loadLibrary("TestDaemonOnWait");
         }
 
 
         public native void callJNI();
-    
-        public void calledFromJNI() {
+
+        public void calledFromJNI() throws InterruptedException {
             if (recursion < 30) {
                  ++recursion;
                  run();
             }
+
+            // when desired stack frame count is achieved
             synchronized (sync) {
                 synchronized (start) {
+                    // release main thread in order to initiate VM shutdown
                     start.notify();
                 }
-                try {
-                    // wait here forever
-                    sync.wait();
-                } catch (Throwable e) {
-                    System.out.println("FAILED");
-                } finally {
-                    System.out.print("PAS");
-                }
+
+                // wait here forever.
+                // actually this whait() will be interrupted by VM shutdown
+                // process with the exception.
+                sync.wait();
             }
-            System.out.println("FAILED");
         }
 
         public void run() {
+            // recursively calls JNI method which calls java method in order
+            // to create a number of M2n and java frames on stack.
             callJNI();
-            System.out.println("FAILED");
         }
     }
 }

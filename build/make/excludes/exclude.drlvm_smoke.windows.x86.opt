@@ -6,6 +6,3 @@ gc/RunFinalizersOnExitTest.java
 io/Integers.java
 
 stress/Mix.java
-
-# HARMONY-3266
-shutdown/TestNativeAllocation.java
