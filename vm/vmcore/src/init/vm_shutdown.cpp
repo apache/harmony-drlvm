@@ -13,10 +13,10 @@
  *  See the License for the specific language governing permissions and
  *  limitations under the License.
  */
-/** 
+/**
  * @author Intel, Evgueni Brevnov
  * @version $Revision: 1.1 $
- */  
+ */
 
 #include <stdlib.h>
 #include <apr_thread_mutex.h>
@@ -69,7 +69,7 @@ static jint exec_shutdown_sequence(JNIEnv * jni_env) {
         // This is debug message only. May appear when VM is already in shutdown stage.
         PROCESS_EXCEPTION(38, "{0}can't find java.lang.System class.");
     }
-    
+
     shutdown_method = jni_env->GetStaticMethodID(system_class, "execShutdownSequence", "()V");
     if (jni_env->ExceptionCheck() == JNI_TRUE || shutdown_method == NULL) {
         PROCESS_EXCEPTION(39, "{0}can't find java.lang.System.execShutdownSequence() method.");
@@ -99,7 +99,7 @@ static void vm_shutdown_stop_java_threads(Global_Env * vm_env) {
     hythread_t native_thread;
     hythread_iterator_t it;
     VM_thread *vm_thread;
-   
+
     self = hythread_self();
 
     // Collect running java threads.
@@ -107,12 +107,13 @@ static void vm_shutdown_stop_java_threads(Global_Env * vm_env) {
     TRACE2("shutdown", "stopping threads, self " << self);
     it = hythread_iterator_create(NULL);
     running_threads = (hythread_t *)apr_palloc(vm_env->mem_pool,
-        hythread_iterator_size(it) * sizeof(hythread_t));
+            hythread_iterator_size(it) * sizeof(hythread_t));
     int size = 0;
     while(native_thread = hythread_iterator_next(&it)) {
-    vm_thread = get_vm_thread(native_thread);
+        vm_thread = get_vm_thread(native_thread);
         if (native_thread != self && vm_thread != NULL) {
-            hythread_set_safepoint_callback(native_thread, vm_shutdown_callback);
+            hythread_set_safepoint_callback(native_thread,
+                    vm_shutdown_callback);
             running_threads[size] = native_thread;
             ++size;
         }
@@ -132,15 +133,16 @@ static void vm_shutdown_stop_java_threads(Global_Env * vm_env) {
     // safe for killing, e.g. in malloc()
     it = hythread_iterator_create(NULL);
     while(native_thread = hythread_iterator_next(&it)) {
-    vm_thread = get_vm_thread(native_thread);
-    // we should not cancel self and
-    // non-java threads (i.e. vm_thread == NULL)
+        vm_thread = get_vm_thread(native_thread);
+        // we should not cancel self and
+        // non-java threads (i.e. vm_thread == NULL)
         if (native_thread != self && vm_thread != NULL) {
             hythread_cancel(native_thread);
             TRACE2("shutdown", "cancelling " << native_thread);
         }
     }
     hythread_iterator_release(&it);
+
     TRACE2("shutdown", "shutting down threads complete");
 }
 
