@@ -383,6 +383,7 @@
             <target name="test"/>
             <property name="hy.test.vm.name" value="drl"/>
             <property name="test.jre.home" value="${build.deploy.dir}/jdk/jre"/>
+            <property name="short.report" value="true"/>
         </ant>
         <!--ant antfile="targets/kernel.test.xml" target="kernel.test" output="${build.semi.dir}/kernel.log"/-->
         <ant antfile="targets/ehwa.test.xml" target="ehwa" output="${build.semi.dir}/ehwa.log"/>
