@@ -60,9 +60,9 @@ namespace Jet {
 class CallSig;
 class Encoder;
 /**
- * @brief A signed interger type, with the same size as a pointer.
+ * @brief A signed integer type, with the same size as a pointer.
  */
-typedef long int_ptr;
+typedef POINTER_SIZE_SINT int_ptr;
 
 /**
  * @brief A dynamically grown byte array.
@@ -535,9 +535,9 @@ public:
      * The width of any_val is wide enough to fit any necessary value - 
      * a pointer, #dbl64 or #i64.
      */
-    Opnd(jtype jt, jlong any_val)
+    Opnd(jtype jt, int_ptr any_val)
     {
-        clear(); m_jt = jt; m_kind = opnd_imm; m_lval = (long)any_val;
+        clear(); m_jt = jt; m_kind = opnd_imm; m_lval = any_val;
     }
     
     /**
@@ -703,7 +703,7 @@ public:
      * Returns long value for immediate operand, or 0 for 
      *        operands of other kinds.
      */
-    long   lval(void) const { return is_imm() ? m_lval : 0; }
+    int_ptr lval(void) const { return is_imm() ? m_lval : 0; }
     
     /**
      * Returns base register for memory operand, or ar_x for operands of 
@@ -772,7 +772,7 @@ private:
         /**
          * Integer or long value of immediate operand.
          */
-        long        m_lval;
+        int_ptr     m_lval;
     };
     /**
      * Base register for memory operand.

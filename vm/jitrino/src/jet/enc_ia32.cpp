@@ -135,7 +135,7 @@ static void add_arg(EncoderBase::Operands& args, const Opnd& op,
             args.add(imm);
         }
         else if (op.jt() == jobj) {
-            EncoderBase::Operand imm(sz, (long)(void*)op.lval());
+            EncoderBase::Operand imm(sz, (int_ptr)(void*)op.lval());
             args.add(imm);
         }
         else {
@@ -192,7 +192,7 @@ static void add_args_same_size(EncoderBase::Operands& args,
     }
     else {
         assert(!is_f(op1.jt()));
-        EncoderBase::Operand imm(sz, (long)(void*)op1.lval());
+        EncoderBase::Operand imm(sz, (int_ptr)(void*)op1.lval());
         args.add(imm);
     }
 }

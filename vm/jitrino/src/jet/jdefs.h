@@ -125,7 +125,7 @@ namespace Jet {
 /**
  * @brief Represents a Java's long aka 'signed int64'.
  */
-typedef long long   jlong;
+typedef int64   jlong;
 
 /**
  * @brief A maximum, positive value a #jlong can have.

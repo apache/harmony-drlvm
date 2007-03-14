@@ -371,9 +371,9 @@ void Encoder::call_va(bool check_stack, AR ar, const void *target,
                 mov(Opnd(i32, sp, cs.off(i)), val);
             }
             else {
-                int val = lo32((long)addr);
+                int val = lo32((jlong)(int_ptr)addr);
                 mov(Opnd(i32, sp, cs.off(i)), val);
-                val = hi32((long)addr);
+                val = hi32((jlong)(int_ptr)addr);
                 mov(Opnd(i32, sp, cs.off(i)+4), val);
             }
         }

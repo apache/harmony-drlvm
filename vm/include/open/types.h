@@ -120,9 +120,17 @@ typedef signed int int32;
 #endif //!PLATFORM_POSIX
 
 /**
- * The integer datatype on the platform that can hold a pointer.
- * ? 02/7/25: addded <code>POINTER_SIZE_SINT</code>, since in some cases
- * a pointer-size integer has to be signed (for example, when specifying LIL offsets)
+ * printf format specifier for 64-bit integers
+ */
+#ifdef _WIN32
+#define FMT64 "I64"
+#else 
+#define FMT64 "ll"
+#endif
+
+
+/**
+ * The integer datatypes on the platform that can hold a pointer.
  */
  #ifdef POINTER64
 #define POINTER_SIZE_INT uint64

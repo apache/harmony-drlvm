@@ -294,7 +294,7 @@ static ::std::string toStr(int i)
                 snprintf(buf, sizeof(buf), "%d(0x%X)", s.ival(), s.ival());
             }
             else {
-                snprintf(buf, sizeof(buf), "%ld(0x%LX)", (long int)s.lval(), (long long)s.lval());
+                snprintf(buf, sizeof(buf), "%"FMT64"d(0x%"FMT64"X)", s.lval(), s.lval());
             }
         }
         str += buf;

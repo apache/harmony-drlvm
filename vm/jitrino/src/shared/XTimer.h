@@ -25,7 +25,7 @@
 #define _XTIMER_H_
 
 #include "Counter.h"
-#include "open/types.h" //typedef unsigned long long in64;
+#include "open/types.h"
 #include <vector>
 
 

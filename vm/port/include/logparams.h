@@ -24,12 +24,6 @@
 #include <vector>
 #include "port_malloc.h"
 
-#ifdef PLATFORM_NT
-#define FMT64 "I64"
-#else // !PLATFORM_NT
-#define FMT64 "ll"
-#endif // !PLATFORM_NT
-
 using std::string;
 using std::vector;
 

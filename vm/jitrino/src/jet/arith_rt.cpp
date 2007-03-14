@@ -182,7 +182,7 @@ jlong __stdcall rt_h_i64_shift(jlong v1, int v2, JavaByteCodes op)
         return v1 >> (v2&0x3F);
         //  case OPCODE_IUSHR:  return ( v1 >= 0 ) ? v1 >> (v2&0x3F) : (v1 >> (v2&0x3F)) + (2L << ~(v2&0x3F));
     case OPCODE_IUSHR:
-        return ((unsigned long long)v1) >> (v2&0x3F);
+        return ((uint64)v1) >> (v2&0x3F);
     default:
         break;
     }
