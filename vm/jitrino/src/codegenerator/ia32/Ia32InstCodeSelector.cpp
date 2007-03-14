@@ -2642,7 +2642,12 @@ CG_OpndHandle* InstCodeSelector::tau_call(uint32          numArgs,
                                              CG_OpndHandle* tauTypesChecked,
                                              InlineInfo*       ii)
 {
-    Opnd * target=irManager.newImmOpnd(typeManager.getIntPtrType(), Opnd::RuntimeInfo::Kind_MethodDirectAddr, desc);
+    // target address here has Int32 type. On EM64T platform it can be larger, but this situations are managed
+    // in Ia32CodeEmitter::postPass method (transforming direct calls into register form if target offset
+    // does not fit into 32 bits). If on EM64T we set IntPtrType for target address here constraint resolver work makes all
+    // calls a register-form ones. (Even for those with a short offset). But immediate calls are faster and takes
+    // less space. We should keep them when it is possible.
+    Opnd * target=irManager.newImmOpnd(typeManager.getInt32Type(), Opnd::RuntimeInfo::Kind_MethodDirectAddr, desc);
     Opnd * retOpnd=createResultOpnd(retType);
     CallInst * callInst=irManager.newCallInst(target, irManager.getDefaultManagedCallingConvention(), 
         numArgs, (Opnd **)args, retOpnd, ii);

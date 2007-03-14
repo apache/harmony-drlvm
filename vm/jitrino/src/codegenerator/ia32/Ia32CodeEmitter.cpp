@@ -595,6 +595,14 @@ bool RuntimeInterface::recompiledMethodEvent(BinaryRewritingInterface& binaryRew
   
 #ifdef _EM64T_
     if ( !fit32(offset) ) { // offset is not a signed value that fits into 32 bits
+        return true;
+        // this place should be rewritten to perform code patching safely:
+        // - there should be nops before call inst (sufficient for self jump and regiscter call encodeing)
+        // - encode self jump before call inst
+        // - encode mov reg, newTarget (before)
+        // - replace old call by nops
+        // - replace self-jump by nops
+/*
         EncoderBase::Operands args;
         args.clear();
         args.add(RegName_R14);
@@ -604,6 +612,7 @@ bool RuntimeInterface::recompiledMethodEvent(BinaryRewritingInterface& binaryRew
         args.clear();
         args.add(RegName_R14);
         EncoderBase::encode(ip, Mnemonic_CALL, args);
+*/
     } else
 #endif
     { // offset fits into 32 bits
