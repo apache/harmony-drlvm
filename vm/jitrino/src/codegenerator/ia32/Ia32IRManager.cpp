@@ -1502,16 +1502,21 @@ void IRManager::calculateLivenessInfo()
         for (Nodes::const_iterator it = nodes.begin(),end = nodes.end();it!=end; ++it) {
             CGNode* node = (CGNode*)*it;
             if (node == exitNode) {
-#ifndef _EM64T_
                 if (!methodDesc.isStatic() 
                     && (methodDesc.isSynchronized() || methodDesc.isMethodClassIsLikelyExceptionType())) 
                 {
                     BitSet * exitLs  = node->getLiveAtEntry();
                     EntryPointPseudoInst * entryPointInst = getEntryPointInst();
+#ifdef _EM64T_
+                    Opnd * thisOpnd  = entryPointInst->thisOpnd;
+                    //on EM64T 'this' opnd is spilled to stack only after finalizeCallSites call (copy expansion pass)
+                    //TODO: do it after code selector and tune early propagation and regalloc to skip this opnd from optimizations.
+                    if (thisOpnd == NULL) continue; 
+#else
                     Opnd * thisOpnd = entryPointInst->getOpnd(0);
+#endif
                     exitLs->setBit(thisOpnd->getId(), true);
                 } 
-#endif
                 continue;
             }
             bool processNode = true;
@@ -1653,7 +1658,8 @@ void IRManager::finalizeCallSites()
 {
 #ifdef _EM64T_
     if (!getMethodDesc().isStatic()) {
-        entryPointInst->thisOpnd = newMemOpnd(getTypeFromTag(Type::UnmanagedPtr), MemOpndKind_StackAutoLayout, getRegOpnd(STACK_REG), 0); 
+        Type* thisType = entryPointInst->getOpnd(0)->getType();
+        entryPointInst->thisOpnd = newMemOpnd(thisType, MemOpndKind_StackAutoLayout, getRegOpnd(STACK_REG), 0); 
         entryPointInst->getBasicBlock()->appendInst(newCopyPseudoInst(Mnemonic_MOV, entryPointInst->thisOpnd, entryPointInst->getOpnd(0)));
     }
 #endif
