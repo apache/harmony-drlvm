@@ -1747,9 +1747,9 @@ void JavaByteCodeTranslator::pseudoInvoke(const char* methodSig)
     uint32 numArgs = JavaLabelPrepass::getNumArgsBySignature(methodSig); 
 
     // pop numArgs items
-    for (uint32 i=numArgs-1; i>=0; i--)
+    while (numArgs--) {
         popOpnd();
-
+    }
     // recognize and push respective returnType
     Type* retType = JavaLabelPrepass::getRetTypeBySignature(methodSig, typeManager);
     assert(retType);
