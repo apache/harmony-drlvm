@@ -247,10 +247,11 @@ public abstract class ClassLoader {
      */
     public InputStream getResourceAsStream(String name) {
         URL foundResource = getResource(name);
-        try {
-            return foundResource.openStream();
-        } catch (IOException e) {
-        } catch (NullPointerException e) {
+        if (foundResource != null) {
+            try {
+                return foundResource.openStream();
+            } catch (IOException e) {
+            }
         }
         return null;
     }
@@ -578,13 +579,12 @@ public abstract class ClassLoader {
     protected final void setSigners(Class<?> clazz, Object[] signers) {
         checkInitialized();
         String name = clazz.getName();
-        try {
-            ClassLoader classLoader = VMClassRegistry.getClassLoader(clazz);
+        ClassLoader classLoader = VMClassRegistry.getClassLoader(clazz);
+        if (classLoader != null) {
             if (classLoader.classSigners == null) {
                 classLoader.classSigners = new Hashtable<String, Object[]>();
             }
             classLoader.classSigners.put(name, signers);
-        } catch (NullPointerException e) {
         }
     }
 
