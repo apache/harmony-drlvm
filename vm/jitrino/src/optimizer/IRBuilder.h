@@ -104,6 +104,8 @@ public:
     Opnd* genNot(Type* dstType, Opnd* src);//TR //SI
     // Conversion
     Opnd* genConv(Type* dstType, Type::Tag toType, Modifier ovfMod, Opnd* src); //TR //SI
+    Opnd* genConvZE(Type* dstType, Type::Tag toType, Modifier ovfMod, Opnd* src); //TR //SI
+    Opnd* genConvUnmanaged(Type* dstType, Type::Tag toType, Modifier ovfMod, Opnd* src); //TR //SI
     // Shift
     Opnd* genShl(Type* dstType, Modifier mod, Opnd* value, Opnd* shiftAmount);//TR //SI
     Opnd* genShr(Type* dstType, Modifier mods, Opnd* value, Opnd* shiftAmount);//TR //SI

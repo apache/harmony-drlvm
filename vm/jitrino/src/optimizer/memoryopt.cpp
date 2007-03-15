@@ -930,7 +930,7 @@ MemoryOptInitWalker::applyToInst(Inst *i)
     case Op_Add: case Op_Mul: case Op_Sub: case Op_TauDiv: case Op_TauRem: 
     case Op_Neg: case Op_MulHi: case Op_Min: case Op_Max: case Op_Abs:
     case Op_And: case Op_Or: case Op_Xor: 
-    case Op_Not: case Op_Select: case Op_Conv: case Op_ConvUnmanaged: case Op_Shladd: case Op_Shl: 
+    case Op_Not: case Op_Select: case Op_Conv: case Op_ConvZE: case Op_ConvUnmanaged: case Op_Shladd: case Op_Shl: 
     case Op_Shr: case Op_Cmp: case Op_Cmp3: 
     case Op_Branch: case Op_Jump: case Op_Switch:
     case Op_LdConstant: 
@@ -1393,6 +1393,7 @@ AliasRep AliasManager::getReference(Opnd *addr)
     case Op_DefArg: //magic as method param
         break;
     case Op_Conv: //the result of a conversion
+    case Op_ConvZE:
     case Op_ConvUnmanaged:
     case Op_TauLdInd: // the result of static field load
         break;

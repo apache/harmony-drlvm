@@ -689,6 +689,7 @@ CG_OpndHandle *IpfInstCodeSelector::shladd(IntegerOp::Types opType,
 
 CG_OpndHandle *IpfInstCodeSelector::convToInt(ConvertToIntOp::Types       opType,
                                               bool                        isSigned,
+					      bool                        isZeroExtend,
                                               ConvertToIntOp::OverflowMod ovfMod,
                                               Type                        *dstType, 
                                               CG_OpndHandle               *src_) {

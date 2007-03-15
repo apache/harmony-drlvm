@@ -113,7 +113,7 @@ public:
     void           tableSwitch(CG_OpndHandle* src, uint32 nTargets);       
     void           throwException(CG_OpndHandle* exceptionObj, bool createStackTrace);
     void            throwSystemException(CompilationInterface::SystemExceptionId);
-    CG_OpndHandle* convToInt(ConvertToIntOp::Types,bool isSigned,
+    CG_OpndHandle* convToInt(ConvertToIntOp::Types,bool isSigned, bool isZeroExtend,
                               ConvertToIntOp::OverflowMod,Type* dstType, CG_OpndHandle* src);
     CG_OpndHandle* convToFp(ConvertToFpOp::Types, Type* dstType, CG_OpndHandle* src);
 
@@ -318,19 +318,19 @@ private:
     //
     uint64 currentHIRInstrID;
 
-    Opnd *  convertIntToInt(Opnd * srcOpnd, Type * dstType, Opnd * dstOpnd=NULL);
+    Opnd *  convertIntToInt(Opnd * srcOpnd, Type * dstType, Opnd * dstOpnd=NULL, bool isZeroExtend=false);
     Opnd *  convertIntToFp(Opnd * srcOpnd, Type * dstType, Opnd * dstOpnd=NULL);
     Opnd *  convertFpToInt(Opnd * srcOpnd, Type * dstType, Opnd * dstOpnd=NULL);
     Opnd *  convertFpToFp(Opnd * srcOpnd, Type * dstType, Opnd * dstOpnd=NULL);
     Opnd*   convertUnmanagedPtr(Opnd * srcOpnd, Type * dstType, Opnd * dstOpnd=NULL);
-    Opnd*   convertToUnmanagedPtr(Opnd * srcOpnd, Type * dstType, Opnd * dstOpnd=NULL);
+    Opnd*   convertToUnmanagedPtr(Opnd * srcOpnd, Type * dstType, Opnd * dstOpnd=NULL, bool isZeroExtend=false);
     
     bool    isIntegerType(Type * type)
     { return type->isInteger()||type->isBoolean()||type->isChar(); }
     void    copyOpnd(Opnd *dst, Opnd *src);
     void    copyOpndTrivialOrTruncatingConversion(Opnd *dst, Opnd *src);
 
-    Opnd * convert(CG_OpndHandle * oph, Type * dstType, Opnd * dstOpnd=NULL);
+    Opnd * convert(CG_OpndHandle * oph, Type * dstType, Opnd * dstOpnd=NULL, bool isZeroExtend=false);
 
     Opnd * simpleOp_I8(Mnemonic mn, Type * dstType, Opnd * src1, Opnd * src2);
 

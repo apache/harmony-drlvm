@@ -292,6 +292,7 @@ enum Opcode {
     Op_Select,                      // (src1 ? src2 : src3)
     // Conversion
     Op_Conv,                        // OverflowModifier, ExceptionModifier
+    Op_ConvZE,                      // OverflowModifier, ExceptionModifier    
     Op_ConvUnmanaged,               // OverflowModifier, ExceptionModifier
     // Shift
     Op_Shladd,                      // no mods, 2nd operand must be LdConstant

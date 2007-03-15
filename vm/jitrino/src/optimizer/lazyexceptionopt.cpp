@@ -874,6 +874,7 @@ LazyExceptionOpt::instHasSideEffect(Inst* inst) {
         case Op_Select:
             return false;
         case Op_Conv:
+        case Op_ConvZE:
         case Op_ConvUnmanaged:
             return true;
         case Op_Shladd:

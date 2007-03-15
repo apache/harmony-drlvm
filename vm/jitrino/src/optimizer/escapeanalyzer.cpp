@@ -136,6 +136,7 @@ isEscapingSrcObject(Inst* inst,uint32 srcIndex) {
         // conversion to unmanaged pointer is also an escape!
         //
     case Op_Conv:
+    case Op_ConvZE:
     case Op_ConvUnmanaged:
         break;
         // in the absence of ssa form, stores to vars can conservatively escape

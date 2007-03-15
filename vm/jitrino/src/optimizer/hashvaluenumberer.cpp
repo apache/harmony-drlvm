@@ -157,6 +157,7 @@ public:
     
     // conversion
     Inst* caseConv(Inst* inst)              { return hashIfNoException(inst); }
+    Inst* caseConvZE(Inst* inst)            { return hashIfNoException(inst); }
     Inst* caseConvUnmanaged(Inst* inst)     { return caseDefault(inst); }
     
     // shifts
@@ -2359,7 +2360,7 @@ void InstValueNumberer::addInfoFromBranchCompare(Node* targetNode,
 void InstValueNumberer::addInfoFromPEI(Inst *pei, bool isExceptionEdge)
 {
     switch (pei->getOpcode()) {
-    case Op_Add: case Op_Mul: case Op_Sub: case Op_Conv: case Op_ConvUnmanaged:
+    case Op_Add: case Op_Mul: case Op_Sub: case Op_Conv: case Op_ConvZE: case Op_ConvUnmanaged:
     case Op_TauCheckDivOpnds:
         break;
     case Op_DirectCall: case Op_TauVirtualCall: case Op_IndirectCall:

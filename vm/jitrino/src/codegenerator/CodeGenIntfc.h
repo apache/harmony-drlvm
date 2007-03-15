@@ -246,7 +246,7 @@ public:
     /// convert object or integer to unmanaged pointer. Unboxing
     virtual CG_OpndHandle*  convToUPtr(PtrType * dstType, CG_OpndHandle* op) = 0;
 
-    virtual CG_OpndHandle*  convToInt(ConvertToIntOp::Types, bool isSigned, 
+    virtual CG_OpndHandle*  convToInt(ConvertToIntOp::Types, bool isSigned, bool isZeroExtend, 
                                       ConvertToIntOp::OverflowMod,
                                       Type* dstType, CG_OpndHandle* src) = 0;
     virtual CG_OpndHandle*  convToFp(ConvertToFpOp::Types, Type* dstType, CG_OpndHandle* src) = 0;

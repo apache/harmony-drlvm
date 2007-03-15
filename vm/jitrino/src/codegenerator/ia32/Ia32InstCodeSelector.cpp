@@ -29,7 +29,6 @@
 #include "open/em_profile_access.h"
 #include "open/vm.h"
 
-
 #include <float.h>
 #include <math.h>
 
@@ -265,7 +264,7 @@ void InstCodeSelector::throwLinkingException(Class_Handle encClass, uint32 cp_nd
     appendInsts(irManager.newRuntimeHelperCallInst(CompilationInterface::Helper_Throw_LinkingException, lengthof(args), args, NULL));
 }
 //_______________________________________________________________________________________________________________
-Opnd * InstCodeSelector::convertIntToInt(Opnd * srcOpnd, Type * dstType, Opnd * dstOpnd)
+Opnd * InstCodeSelector::convertIntToInt(Opnd * srcOpnd, Type * dstType, Opnd * dstOpnd, bool isZeroExtend)
 {
     Type * srcType=srcOpnd->getType();
     assert(isIntegerType(srcType) && (isIntegerType(dstType) || dstType->isPtr()));
@@ -290,16 +289,15 @@ Opnd * InstCodeSelector::convertIntToInt(Opnd * srcOpnd, Type * dstType, Opnd * 
         if (dstOpnd==NULL)
             dstOpnd=irManager.newOpnd(dstType);
 #ifdef _EM64T_
-            appendInsts(irManager.newInstEx(srcType->isSignedInteger()?Mnemonic_MOVSX:Mnemonic_MOVZX, 1, dstOpnd, srcOpnd));
+            appendInsts(irManager.newInstEx(srcType->isSignedInteger() & !isZeroExtend ? Mnemonic_MOVSX:Mnemonic_MOVZX, 1, dstOpnd, srcOpnd));
 #else
         if (dstSize<OpndSize_64){
-            appendInsts(irManager.newInstEx(srcType->isSignedInteger()?Mnemonic_MOVSX:Mnemonic_MOVZX, 1, dstOpnd, srcOpnd));
+            appendInsts(irManager.newInstEx(srcType->isSignedInteger() && !isZeroExtend ? Mnemonic_MOVSX:Mnemonic_MOVZX, 1, dstOpnd, srcOpnd));
         }else{
             appendInsts(irManager.newI8PseudoInst(srcType->isSignedInteger()?Mnemonic_MOVSX:Mnemonic_MOVZX, 1, dstOpnd, srcOpnd));
         }
 #endif
     }
-
     return dstOpnd;
 }
 
@@ -370,15 +368,26 @@ Opnd * InstCodeSelector::convertFpToFp(Opnd * srcOpnd, Type * dstType, Opnd * ds
 }
 
 //_______________________________________________________________________________________________________________
-Opnd * InstCodeSelector::convertToUnmanagedPtr(Opnd * srcOpnd, Type * dstType, Opnd * dstOpnd) {
+Opnd * InstCodeSelector::convertToUnmanagedPtr(Opnd * srcOpnd, Type * dstType, Opnd * dstOpnd, bool isZeroExtend) {
     assert(dstType->isUnmanagedPtr());
     Type* srcType = srcOpnd->getType();
     if (dstOpnd == NULL) {
         dstOpnd = irManager.newOpnd(dstType);
     }
-
     if (srcType->isObject()) {
-        appendInsts(irManager.newCopyPseudoInst(Mnemonic_MOV, dstOpnd, srcOpnd));
+        OpndSize srcSize=irManager.getTypeSize(srcType);
+        OpndSize dstSize=irManager.getTypeSize(dstType);
+        if (srcSize == dstSize) {
+            appendInsts(irManager.newCopyPseudoInst(Mnemonic_MOV, dstOpnd, srcOpnd));
+        } else {
+#ifdef _EM64T_
+            if (srcType->isInteger()) {
+                appendInsts(irManager.newInstEx(isZeroExtend?Mnemonic_MOVZX:Mnemonic_MOVSX, 1, dstOpnd, srcOpnd)); 
+            }       
+#else
+            assert(0);
+#endif
+        }
     } else if (srcType->isInteger()) {
         convertIntToInt(srcOpnd, dstType, dstOpnd);
     } else {
@@ -418,7 +427,7 @@ Opnd * InstCodeSelector::convertUnmanagedPtr(Opnd * srcOpnd, Type * dstType, Opn
 }
 
 //_______________________________________________________________________________________________________________
-Opnd * InstCodeSelector::convert(CG_OpndHandle * oph, Type * dstType, Opnd * dstOpnd)
+Opnd * InstCodeSelector::convert(CG_OpndHandle * oph, Type * dstType, Opnd * dstOpnd, bool isZeroExtend)
 {
     if (!oph)
         return NULL;
@@ -428,13 +437,13 @@ Opnd * InstCodeSelector::convert(CG_OpndHandle * oph, Type * dstType, Opnd * dst
     bool converted=false;
     if (isIntegerType(srcType)){
         if (isIntegerType(dstType)){
-            dstOpnd=convertIntToInt(srcOpnd, dstType, dstOpnd);
+            dstOpnd=convertIntToInt(srcOpnd, dstType, dstOpnd, isZeroExtend);
             converted=true;
         } else if (dstType->isFP()){
             dstOpnd=convertIntToFp(srcOpnd, dstType, dstOpnd);
             converted=true;
         } else if (dstType->isUnmanagedPtr()) {
-            dstOpnd = convertToUnmanagedPtr(srcOpnd, dstType, dstOpnd);
+            dstOpnd = convertToUnmanagedPtr(srcOpnd, dstType, dstOpnd, isZeroExtend);
             converted = true;
         }
     }else if (srcType->isFP()){
@@ -452,7 +461,6 @@ Opnd * InstCodeSelector::convert(CG_OpndHandle * oph, Type * dstType, Opnd * dst
         dstOpnd = convertToUnmanagedPtr(srcOpnd, dstType, dstOpnd);
         converted = true;
     }
-
     if (!converted){
         assert(irManager.getTypeSize(dstType)==srcOpnd->getSize());
         if (dstOpnd==NULL)
@@ -460,7 +468,6 @@ Opnd * InstCodeSelector::convert(CG_OpndHandle * oph, Type * dstType, Opnd * dst
         else
             copyOpndTrivialOrTruncatingConversion(dstOpnd, srcOpnd);
     }
-
     return dstOpnd;
 }
 
@@ -470,6 +477,7 @@ Opnd * InstCodeSelector::convert(CG_OpndHandle * oph, Type * dstType, Opnd * dst
 
 CG_OpndHandle* InstCodeSelector::convToInt(ConvertToIntOp::Types       opType,
                                                 bool                        isSigned,
+						bool                        isZeroExtend,
                                                 ConvertToIntOp::OverflowMod ovfMod,
                                                 Type*                       dstType, 
                                                 CG_OpndHandle*              src) 
@@ -482,17 +490,25 @@ CG_OpndHandle* InstCodeSelector::convToInt(ConvertToIntOp::Types       opType,
         case ConvertToIntOp::I2:
             sizeType=isSigned?typeManager.getInt16Type():typeManager.getUInt16Type();
             break;
+
+#ifdef _IA32_	    
         case ConvertToIntOp::I:
+#endif	
         case ConvertToIntOp::I4:
             sizeType=isSigned?typeManager.getInt32Type():typeManager.getUInt32Type();
             break;
+
+#ifdef _EM64T_
+        case ConvertToIntOp::I:
+#endif	
         case ConvertToIntOp::I8:
-            sizeType=typeManager.getInt64Type();
+            sizeType=isSigned?typeManager.getInt64Type():typeManager.getUInt64Type();
             break;
         default: assert(0);
     }
-    Opnd * tmpOpnd=convert(src, sizeType); 
-    return convert(tmpOpnd, dstType);
+    Opnd * tmpOpnd = convert(src, sizeType, NULL, isZeroExtend); 
+    CG_OpndHandle* res =  convert(tmpOpnd, dstType, NULL, isZeroExtend);
+    return res;
 }
 
 //_______________________________________________________________________________________________________________
@@ -1930,7 +1946,7 @@ CG_OpndHandle* InstCodeSelector::simpleLdInd(Type * dstType, Opnd * addr,
     copyOpnd(dst, opnd);
     return dst;
 #else
-    if(memType > Type::Float) {
+    if(memType > Type::Float && memType!=Type::UnmanagedPtr) {
         Opnd * opnd = irManager.newMemOpndAutoKind(typeManager.getInt32Type(), addr);
         Opnd * tmp =  irManager.newOpnd(typeManager.getInt32Type());
         Opnd * dst = irManager.newOpnd(typeManager.getInt64Type());
@@ -1963,7 +1979,11 @@ void InstCodeSelector::simpleStInd(Opnd * addr,
     Opnd * dst = irManager.newMemOpndAutoKind(irManager.getTypeFromTag(memType), addr);
     copyOpnd(dst, src);
 #else
-    if(memType > Type::Float) {
+    if (src->getType()->isUnmanagedPtr()) {
+        assert(src->getType()->asPtrType()->getPointedToType()->isInt1());
+        Opnd* dst = irManager.newMemOpndAutoKind(irManager.getTypeFromTag(memType), addr);
+        copyOpnd(dst, src);
+    } else  if(memType > Type::Float) {
         src = simpleOp_I8(Mnemonic_SUB, src->getType(), src, irManager.newImmOpnd(typeManager.getIntPtrType(), (POINTER_SIZE_INT)compilationInterface.getHeapBase()));
         Opnd * opnd = irManager.newMemOpndAutoKind(typeManager.compressType(src->getType()), addr);
         appendInsts(irManager.newCopyPseudoInst(Mnemonic_MOV, opnd, src));
@@ -2780,10 +2800,21 @@ CG_OpndHandle* InstCodeSelector::callhelper(uint32              numArgs,
         Opnd** opnds = (Opnd**)args;
 
         //deal with constraints       
+#ifdef _EM64T_
+        Type* opnd1Type = opnds[1]->getType();
+        assert(irManager.getTypeSize(opnd1Type)==OpndSize_32 || irManager.getTypeSize(opnd1Type)==OpndSize_64);
+        assert(irManager.getTypeSize(opnds[1]->getType())==irManager.getTypeSize(opnds[2]->getType()));
+        bool is64bit = irManager.getTypeSize(opnd1Type) == OpndSize_64;
+//        Type* opType = is64bit ? typeManager.getInt64Type():typeManager.getInt32Type();
+        Constraint ceax(OpndKind_GPReg, is64bit?OpndSize_64:OpndSize_32, 1<<getRegIndex(is64bit?RegName_RAX:RegName_EAX));
+        Constraint cecx(OpndKind_GPReg, is64bit?OpndSize_64:OpndSize_32, 1<<getRegIndex(is64bit?RegName_RCX:RegName_ECX));
+        Opnd* eaxOpnd = irManager.newOpnd(opnds[1]->getType(), ceax);
+        Opnd* ecxOpnd = irManager.newOpnd(opnds[2]->getType(), cecx);
+#else
         Opnd* eaxOpnd = irManager.getRegOpnd(RegName_EAX);
         Opnd* ecxOpnd = irManager.getRegOpnd(RegName_ECX);
-        Opnd* memOpnd = irManager.newMemOpnd(opnds[0]->getType(), opnds[0]);
-        
+#endif
+        Opnd* memOpnd = irManager.newMemOpnd(opnds[1]->getType(), opnds[0]);//use opnd1 type for memopnd
         appendInsts(irManager.newCopyPseudoInst(Mnemonic_MOV, eaxOpnd, opnds[1]));
         appendInsts(irManager.newCopyPseudoInst(Mnemonic_MOV, ecxOpnd, opnds[2]));
         

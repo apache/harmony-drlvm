@@ -109,6 +109,15 @@ protected:
     virtual Inst* genConv(Type* dstType, Type::Tag toType, Modifier ovfMod, Opnd* src){
         return irBuilder.genConv(dstType, toType, ovfMod, src)->getInst();
     }
+
+    virtual Inst* genConvZE(Type* dstType, Type::Tag toType, Modifier ovfMod, Opnd* src){
+        return irBuilder.genConvZE(dstType, toType, ovfMod, src)->getInst();
+    }
+    
+    virtual Inst* genConvUnmanaged(Type* dstType, Type::Tag toType, Modifier ovfMod, Opnd* src){
+        return irBuilder.genConvUnmanaged(dstType, toType, ovfMod, src)->getInst();
+    }
+    
     // shifts
     virtual Inst* genShladd(Type* type, Opnd* src1, Opnd* src2, Opnd *src3){
         return irBuilder.genShladd(type, src1, src2, src3)->getInst();
@@ -944,13 +953,10 @@ Opnd*
 IRBuilder::genConv(Type* dstType,
                    Type::Tag toType,
                    Modifier ovfMod,
-                   Opnd* src) {
+                   Opnd* src) 
+{
     src = propagateCopy(src);
-    Opcode opcode = Op_Conv;
-    if ((dstType->isUnmanagedPtr() && src->getType()->isObject()) || (dstType->isObject() && src->getType()->isUnmanagedPtr())) {
-        opcode = Op_ConvUnmanaged;
-    }
-    Operation operation(opcode, toType, ovfMod);
+    Operation operation(Op_Conv, toType, ovfMod);
     uint32 hashcode = operation.encodeForHashing();
     Opnd* dst = lookupHash(hashcode, src->getId());
     if (dst) return dst;
@@ -960,7 +966,60 @@ IRBuilder::genConv(Type* dstType,
     }
     if (!dst) {
         dst = createOpnd(dstType);
-        appendInst(instFactory->makeConv(ovfMod, toType, dst, src));
+	Inst* inst = instFactory->makeConv(ovfMod, toType, dst, src);
+        appendInst(inst);
+    }
+    insertHash(hashcode, src->getId(), dst->getInst());
+    return dst;
+}
+
+Opnd*
+IRBuilder::genConvUnmanaged(Type* dstType,
+                   Type::Tag toType,
+                   Modifier ovfMod,
+                   Opnd* src) 
+{
+    assert((dstType->isUnmanagedPtr() && src->getType()->isObject()) 
+            || (dstType->isObject() && src->getType()->isUnmanagedPtr()));
+    src = propagateCopy(src);
+    Operation operation(Op_ConvUnmanaged, toType, ovfMod);
+    uint32 hashcode = operation.encodeForHashing();
+    Opnd* dst = lookupHash(hashcode, src->getId());
+    if (dst) return dst;
+
+    if (irBuilderFlags.doSimplify) {
+        dst = simplifier->simplifyConvUnmanaged(dstType, toType, ovfMod, src);
+    }
+    if (!dst) {
+        dst = createOpnd(dstType);
+        Inst* inst = instFactory->makeConvUnmanaged(ovfMod, toType, dst, src);
+        appendInst(inst);
+    }
+    
+    insertHash(hashcode, src->getId(), dst->getInst());
+    return dst;
+}
+
+Opnd*
+IRBuilder::genConvZE(Type* dstType,
+                   Type::Tag toType,
+                   Modifier ovfMod,
+                   Opnd* src) 
+{
+    assert(src->getType()->isInteger() && (dstType->isInteger() || dstType->isUnmanagedPtr()));
+    src = propagateCopy(src);
+    Operation operation(Op_ConvZE, toType, ovfMod);
+    uint32 hashcode = operation.encodeForHashing();
+    Opnd* dst = lookupHash(hashcode, src->getId());
+    if (dst) return dst;
+
+    if (irBuilderFlags.doSimplify) {
+        dst = simplifier->simplifyConvZE(dstType, toType, ovfMod, src);
+    }
+    if (!dst) {
+        dst = createOpnd(dstType);
+	Inst* inst = instFactory->makeConvZE(ovfMod, toType, dst, src);
+        appendInst(inst);
     }
     insertHash(hashcode, src->getId(), dst->getInst());
     return dst;

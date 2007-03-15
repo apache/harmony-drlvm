@@ -41,16 +41,12 @@ namespace Jitrino {
 
 // magics support    
 static bool isMagicClass(Type* type) {
-#ifdef _EM64T_
-    return false;//magics are not tested on EM64T.
-#else
     static const char magicPackage[] = "org/vmmagic/unboxed/";
     static const unsigned magicPackageLen = sizeof(magicPackage)-1;
 
     const char* name = type->getName();
     bool res =  !strncmp(name, magicPackage, magicPackageLen);
     return res;
-#endif    
 }
 
 static bool isMagicMethod(MethodDesc* md) {
@@ -3712,6 +3708,7 @@ uint32 JavaByteCodeTranslator::getNumericValue(const uint8* byteCodes, uint32 of
 void JavaByteCodeTranslator::genMagic(MethodDesc *md, uint32 numArgs, Opnd **srcOpnds, Type *magicRetType) {
     const char* mname = md->getName();
     Type* resType = convertMagicType2HIR(typeManager, magicRetType);
+    Type* cmpResType = typeManager.getInt32Type();
     Opnd* tauSafe = irBuilder.genTauSafe();
     Opnd* arg0 = numArgs > 0 ? srcOpnds[0]: NULL;
     Opnd* arg1 = numArgs > 1 ? srcOpnds[1]: NULL;
@@ -3719,15 +3716,21 @@ void JavaByteCodeTranslator::genMagic(MethodDesc *md, uint32 numArgs, Opnd **src
 
     
     // max, one, zero
-    int theConst = 0;
+    POINTER_SIZE_INT theConst = 0;
     bool loadConst = false;
-    if (!strcmp(mname, "max"))          { loadConst = true; theConst = -1;}
+    if (!strcmp(mname, "max"))          { loadConst = true; theConst = ~(POINTER_SIZE_INT)0;}
     else if (!strcmp(mname, "one"))     { loadConst = true; theConst =  1;}
     else if (!strcmp(mname, "zero"))    { loadConst = true; theConst =  0;}
     else if (!strcmp(mname, "nullReference")) { loadConst = true; theConst =  0;}
     if (loadConst) {
-        ConstInst::ConstValue v; v.i4 = theConst;
+        ConstInst::ConstValue v;
+#ifdef _EM64T_
+	v.i8 = theConst;
+#else
+	v.i4 = theConst;	
+#endif
         Opnd* res = irBuilder.genLdConstant(typeManager.getUIntPtrType(), v);
+	
         if (resType->isPtr()) {
             res = irBuilder.genConv(resType, resType->tag, mod, res);
         }
@@ -3754,11 +3757,22 @@ void JavaByteCodeTranslator::genMagic(MethodDesc *md, uint32 numArgs, Opnd **src
         || !strcmp(mname, "toOffset"))
     {
         assert(numArgs == 1);
-        if (resType == arg0->getType()) {
+        Type* srcType = arg0->getType();
+        if (resType == srcType) {
             pushOpnd(irBuilder.genCopy(arg0));
             return;
-        } 
-        Opnd* res = irBuilder.genConv(resType, resType->tag, mod, arg0);
+        }
+        Opnd* res = NULL;
+        
+        if ((srcType->isObject() && resType->isUnmanagedPtr())
+            || (resType->isObject() && srcType->isUnmanagedPtr())) 
+        {
+            res = irBuilder.genConvUnmanaged(resType, resType->tag, mod, arg0);
+        } else if (!strcmp(mname, "fromIntZeroExtend")) {
+            res = irBuilder.genConvZE(resType, resType->tag, mod, arg0);
+        } else {
+            res = irBuilder.genConv(resType, resType->tag, mod, arg0);
+        }
         pushOpnd(res);
         return;
     }
@@ -3768,11 +3782,11 @@ void JavaByteCodeTranslator::genMagic(MethodDesc *md, uint32 numArgs, Opnd **src
     //
     bool isOp = false;
     if (!strcmp(mname, "isZero")) { isOp = true; theConst = 0; }
-    else if (!strcmp(mname, "isMax")) { isOp = true; theConst = ~0; }
+    else if (!strcmp(mname, "isMax")) { isOp = true; theConst = ~(POINTER_SIZE_INT)0; }
     else if (!strcmp(mname, "isNull")) { isOp = true; theConst = 0; }
     if (isOp) {
         assert(numArgs == 1);
-        Opnd* res = irBuilder.genCmp(typeManager.getInt32Type(), Type::Int32, Cmp_EQ, arg0, irBuilder.genLdConstant(theConst));
+        Opnd* res = irBuilder.genCmp(cmpResType, arg0->getType()->tag, Cmp_EQ, arg0, irBuilder.genLdConstant((POINTER_SIZE_SINT)theConst));
         pushOpnd(res);
         return;
     }
@@ -3800,7 +3814,7 @@ void JavaByteCodeTranslator::genMagic(MethodDesc *md, uint32 numArgs, Opnd **src
         assert(arg0->getType() == arg1->getType());
         Opnd* op0 = commuteOpnds ? arg1 : arg0;
         Opnd* op1 = commuteOpnds ? arg0 : arg1;
-        Opnd* res = irBuilder.genCmp(typeManager.getInt32Type(), Type::Int32, cm, op0, op1);
+        Opnd* res = irBuilder.genCmp(cmpResType, arg0->getType()->tag, cm, op0, op1);
         pushOpnd(res);
         return;
     }
@@ -3821,7 +3835,8 @@ void JavaByteCodeTranslator::genMagic(MethodDesc *md, uint32 numArgs, Opnd **src
     if (!strcmp(mname, "minus")){ 
         assert(numArgs==2); 
         if (resType->isPtr()) {
-            Opnd* negArg1 = irBuilder.genNeg(typeManager.getInt32Type(), arg1);
+            Type* negType = arg1->getType()->isUIntPtr() ? typeManager.getIntPtrType() : arg1->getType();
+            Opnd* negArg1 = irBuilder.genNeg(negType, arg1);
             pushOpnd(irBuilder.genAddScaledIndex(arg0, negArg1)); 
         } else {
             pushOpnd(irBuilder.genSub(resType, mod, arg0, arg1)); 

@@ -144,7 +144,7 @@ public:
     CG_OpndHandle *shru  (IntegerOp::Types, CG_OpndHandle*, CG_OpndHandle*);
     CG_OpndHandle *shladd(IntegerOp::Types, CG_OpndHandle*, uint32, CG_OpndHandle*);
 
-    CG_OpndHandle *convToInt(ConvertToIntOp::Types, bool, ConvertToIntOp::OverflowMod, Type*, CG_OpndHandle*);
+    CG_OpndHandle *convToInt(ConvertToIntOp::Types, bool, bool, ConvertToIntOp::OverflowMod, Type*, CG_OpndHandle*);
     CG_OpndHandle *convToFp(ConvertToFpOp::Types, Type*, CG_OpndHandle*);
 
     CG_OpndHandle *ldc_i4(int32);

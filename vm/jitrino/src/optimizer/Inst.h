@@ -1113,6 +1113,8 @@ public:
     Inst*    makeSelect(Opnd* dst, Opnd* src1, Opnd* src2, Opnd* src3);
     // conversion
     Inst*    makeConv(Modifier mod, Type::Tag toType, Opnd* dst, Opnd* src);
+    Inst*    makeConvZE(Modifier mod, Type::Tag toType, Opnd* dst, Opnd* src);
+    Inst*    makeConvUnmanaged(Modifier mod, Type::Tag toType, Opnd* dst, Opnd* src);
     // shifts
     Inst*    makeShladd(Opnd* dst, Opnd* value, Opnd* shiftAmount, Opnd *addTo); // shiftAmount must be constant
     Inst*    makeShl(Modifier mod, Opnd* dst, Opnd* value, Opnd* shiftAmount);
@@ -1614,6 +1616,10 @@ public:
     // conversion
     virtual Inst*
     caseConv(Inst* inst)=0;//                {return caseDefault(inst);}
+
+    // conversion
+    virtual Inst*
+    caseConvZE(Inst* inst)=0;//                {return caseDefault(inst);}
 
     // conversion
     virtual Inst*

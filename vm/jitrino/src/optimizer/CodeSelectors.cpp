@@ -607,6 +607,7 @@ void _BlockCodeSelector::genInstCode(InstructionCallback& instructionCallback,
             }
             break;
         case Op_Conv:
+        case Op_ConvZE:
         case Op_ConvUnmanaged:
             {
                 assert(inst->getNumSrcOperands() == 1);
@@ -621,8 +622,10 @@ void _BlockCodeSelector::genInstCode(InstructionCallback& instructionCallback,
                     cgInst = instructionCallback.convToUPtr(dstType->asPtrType(), getCGInst(inst->getSrc(0)));
                 } else {
                     bool isSigned = Type::isSignedInteger(inst->getType());
+                    bool isZeroExtend = inst->getOpcode() == Op_ConvZE;
                     cgInst = instructionCallback.convToInt(mapToIntConvertOpType(inst),
                         isSigned, 
+                        isZeroExtend,
                         mapToIntConvertOvfMod(inst), 
                         dstType,
                         getCGInst(inst->getSrc(0)));
@@ -984,12 +987,19 @@ void _BlockCodeSelector::genInstCode(InstructionCallback& instructionCallback,
                 if (!genConsts) break;
                 ConstInst* constInst = (ConstInst*)inst;
                 switch (inst->getType()) {
-        case Type::UIntPtr://mfursov todo!
-        case Type::IntPtr://mfursov todo!
-        case Type::UnmanagedPtr://mfursov todo!
+#ifdef _IA32_
+        case Type::UIntPtr:
+        case Type::IntPtr:
+        case Type::UnmanagedPtr:
+#endif
         case Type::Int32:
             cgInst = instructionCallback.ldc_i4(constInst->getValue().i4);
             break;
+#ifdef _EM64T_
+        case Type::UIntPtr:
+        case Type::IntPtr:
+        case Type::UnmanagedPtr:
+#endif
         case Type::Int64:
             cgInst = instructionCallback.ldc_i8(constInst->getValue().i8);
             break;

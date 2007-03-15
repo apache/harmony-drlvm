@@ -62,6 +62,8 @@ public:
     Opnd* simplifyNot(Type*, Opnd* src1);
     Opnd* simplifySelect(Type*, Opnd* src1, Opnd* src2, Opnd* src3);
     Opnd* simplifyConv(Type*, Type::Tag toType, Modifier, Opnd* src);
+    Opnd* simplifyConvZE(Type*, Type::Tag toType, Modifier, Opnd* src);
+    Opnd* simplifyConvUnmanaged(Type*, Type::Tag toType, Modifier, Opnd* src);
     Opnd* simplifyShladd(Type* dstType, Opnd* value, Opnd* shiftAmount, Opnd *addto);
     Opnd* simplifyShl(Type* dstType, Modifier, Opnd* value, Opnd* shiftAmount);
     Opnd* simplifyShr(Type* dstType, Modifier, Opnd* value, Opnd* shiftAmount);
@@ -205,6 +207,10 @@ protected:
                             Opnd* src1, Opnd* src2, Opnd* src3) = 0;
     // conversion
     virtual Inst* genConv(Type*, Type::Tag toType, Modifier, 
+                          Opnd* src1) = 0;
+    virtual Inst* genConvZE(Type*, Type::Tag toType, Modifier, 
+                          Opnd* src1) = 0;
+    virtual Inst* genConvUnmanaged(Type*, Type::Tag toType, Modifier, 
                           Opnd* src1) = 0;
     // shifts
     virtual Inst* genShladd(Type*, Opnd *value,
@@ -420,6 +426,11 @@ public:
     Inst* caseConvUnmanaged(Inst* inst) {
         return inst;
     }
+    
+    Inst* caseConvZE(Inst* inst) {
+        return inst;
+    }
+
 
     // shifts
     Inst* caseShladd(Inst* inst) {
@@ -1114,6 +1125,11 @@ protected:
 
     virtual Inst* genConv(Type*, Type::Tag toType, Modifier, 
                           Opnd* src1);
+    virtual Inst* genConvZE(Type*, Type::Tag toType, Modifier, 
+                          Opnd* src1);
+    virtual Inst* genConvUnmanaged(Type*, Type::Tag toType, Modifier, 
+                          Opnd* src1);
+
     virtual Inst* genShladd(Type*, Opnd *value,
                             Opnd* shiftAmount, Opnd* addTo);
     virtual Inst* genShl(Type*, Modifier,

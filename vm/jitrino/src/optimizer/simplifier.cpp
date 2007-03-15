@@ -1803,6 +1803,25 @@ Simplifier::simplifyConv(Type* dstType,
 }
 
 Opnd*
+Simplifier::simplifyConvZE(Type* dstType,
+                         Type::Tag toType,
+                         Modifier ovfmod,
+                         Opnd* src) 
+{
+    return NULL;
+}
+
+Opnd*
+Simplifier::simplifyConvUnmanaged(Type* dstType,
+                         Type::Tag toType,
+                         Modifier ovfmod,
+                         Opnd* src) 
+{
+    return NULL;
+}
+
+
+Opnd*
 Simplifier::simplifyShladd(Type* dstType,
                            Opnd* value,
                            Opnd* shiftAmount,
@@ -4086,6 +4105,27 @@ SimplifierWithInstFactory::genConv(Type* type, Type::Tag toType,
 {
     Opnd* dst = opndManager.createSsaTmpOpnd(type);
     Inst* inst = instFactory.makeConv(ovfMod, toType, dst, src);
+    insertInst(inst);
+    return inst;
+}
+
+Inst* 
+SimplifierWithInstFactory::genConvZE(Type* type, Type::Tag toType, 
+                                   Modifier ovfMod, 
+                                   Opnd* src)
+{
+    Opnd* dst = opndManager.createSsaTmpOpnd(type);
+    Inst* inst = instFactory.makeConvZE(ovfMod, toType, dst, src);
+    insertInst(inst);
+    return inst;
+}
+Inst* 
+SimplifierWithInstFactory::genConvUnmanaged(Type* type, Type::Tag toType, 
+                                   Modifier ovfMod, 
+                                   Opnd* src)
+{
+    Opnd* dst = opndManager.createSsaTmpOpnd(type);
+    Inst* inst = instFactory.makeConvUnmanaged(ovfMod, toType, dst, src);
     insertInst(inst);
     return inst;
 }

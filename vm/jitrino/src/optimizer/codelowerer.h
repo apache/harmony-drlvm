@@ -104,6 +104,9 @@ private:
     Inst* caseConv(Inst* inst) {return caseDefault(inst);}
 
     // conversion
+    Inst* caseConvZE(Inst* inst) {return caseDefault(inst);}
+
+    // conversion
     Inst* caseConvUnmanaged(Inst* inst) {return caseDefault(inst);}
 
     // shifts

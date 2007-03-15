@@ -92,7 +92,8 @@ static OpcodeInfo opcodeTable[] = {
     { Op_Not,                   false, MB::Movable,       MK::None,                                  "not   ",        "not       %s -) %l",           },
     { Op_Select,                false, MB::Movable,       MK::None,                                  "select",        "select %s -) %l",              }, // (src1 ? src2 : src3)
     { Op_Conv,                  false, MB::Movable,       MK::Overflow_and_Exception_and_Strict,     "conv  ",        "conv%t%m %s -) %l",            }, 
-    { Op_ConvUnmanaged,         false, MB::StoreOrSync,   MK::Overflow_and_Exception_and_Strict,     "convu ",        "convu%t%m %s -) %l",           }, 
+    { Op_ConvZE,                false, MB::Movable,       MK::Overflow_and_Exception_and_Strict,     "convze ",        "conv_ze_%t%m %s -) %l",            }, 
+    { Op_ConvUnmanaged,         false, MB::StoreOrSync,   MK::Overflow_and_Exception_and_Strict,     "convu ",        "conv_unm_%t%m %s -) %l",           }, 
     { Op_Shladd,                false, MB::Movable,       MK::None,                                  "shladd",        "shladd %s -) %l",              }, // no mods, 2nd operand must be LdConstant
     { Op_Shl,                   false, MB::Movable,       MK::ShiftMask,                             "shl   ",        "shl%m  %s -) %l",              }, 
     { Op_Shr,                   false, MB::Movable,       MK::ShiftMask_and_Signed,                  "shr   ",        "shr%m  %s -) %l",              }, 
