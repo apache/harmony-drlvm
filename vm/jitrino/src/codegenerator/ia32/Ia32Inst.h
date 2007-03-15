@@ -1123,10 +1123,8 @@ public:
     
     virtual void verify() const;
 protected:
-    SwitchInst(Mnemonic mnemonic,  int id, Opnd * addr = 0)  : ControlTransferInst(mnemonic, id)
-#ifdef _EM64T_
-                                              , tableAddr(addr)
-#endif
+    SwitchInst(Mnemonic mnemonic,  int id, Opnd * addr = 0) : 
+            ControlTransferInst(mnemonic, id), tableAddr(addr)
         {kind=Kind_SwitchInst; }
 
 
@@ -1138,11 +1136,7 @@ protected:
     virtual void removeRedundantBranch();
 
     void replaceTarget(Node* bbFrom, Node* bbTo);
-
-#ifdef _EM64T_
     Opnd * tableAddr;
-#endif
-
 };
 
 //=========================================================================================================

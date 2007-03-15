@@ -220,10 +220,16 @@ SwitchInst * IRManager::newSwitchInst(uint32 numTargets, Opnd * index)
 {
     Inst * instList = NULL;
 #ifndef _EM64T_
-    SwitchInst * inst=new(memoryManager, 1) SwitchInst(Mnemonic_JMP, instId++);
     assert(numTargets>0);
     assert(index!=NULL);
-    Opnd * targetOpnd=newSwitchTableConstantMemOpnd(numTargets, index);
+    Opnd* targetOpnd=newSwitchTableConstantMemOpnd(numTargets, index);
+    // Extract the switch table constant address that is stored as 
+    // displacement on IA32. 
+    // This tableAddress in SwitchInst is kept separately [from getOpnd(0)]
+    // so it allows to replace an Opnd (used in SpillGen) and keep the table 
+    // itself intact.
+    Opnd* tableAddr = targetOpnd->getMemOpndSubOpnd(MemOpndSubOpndKind_Displacement);
+    SwitchInst * inst=new(memoryManager, 1) SwitchInst(Mnemonic_JMP, instId++, tableAddr);
 #else
     
     ConstantAreaItem * item=newSwitchTableConstantAreaItem(numTargets);

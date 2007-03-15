@@ -755,11 +755,7 @@ void SwitchInst::removeRedundantBranch()
 //_________________________________________________________________________________________________
 Opnd * SwitchInst::getTableAddress() const
 {
-#ifdef _EM64T_
     return tableAddr;
-#else
-    return getOpnd(0)->getMemOpndSubOpnd(MemOpndSubOpndKind_Displacement);
-#endif
 }
 
 //_________________________________________________________________________________________________
