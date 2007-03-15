@@ -459,6 +459,8 @@ CodeChunkInfo *Method_Lookup_Table::get(unsigned i) {
 VM_Code_Type vm_identify_eip(void *addr)
 {
     Global_Env *env = VM_Global_State::loader_env;
+    if (NULL == env || NULL == env->vm_methods)
+        return VM_TYPE_UNKNOWN;
     CodeChunkInfo *m = env->vm_methods->find(addr);
     if (m == NULL) {
         return VM_TYPE_UNKNOWN;
