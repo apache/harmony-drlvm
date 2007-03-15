@@ -1746,95 +1746,24 @@ JavaByteCodeTranslator::linkingException(uint32 constPoolIndex, uint32 operation
 //-----------------------------------------------------------------------------
 // for invoke emulation if resolution fails
 //-----------------------------------------------------------------------------
-void JavaByteCodeTranslator::pseudoInvoke(const char* mdesc) {
+void JavaByteCodeTranslator::pseudoInvoke(const char* methodSig) 
+{
+    uint32 numArgs = JavaLabelPrepass::getNumArgsBySignature(methodSig); 
 
-    assert(mdesc);
-    unsigned numArgs = 0; 
-    unsigned index;
-
-    // start just after '(' and go until ')' counting 'numArgs' 
-    for( index = 1; mdesc[index] != ')'; index++ ) {
-        switch( mdesc[index] ) 
-        {
-        case 'L':
-            // skip method name
-            do {
-                index++;
-                assert( mdesc[index] );
-            } while( mdesc[index] != ';' );
-            numArgs++;
-            break;
-        case 'B':
-        case 'C':
-        case 'D':
-        case 'F':
-        case 'I':
-        case 'J':
-        case 'S':
-        case 'Z':
-            numArgs++;
-            break;
-        case '[': // do nothing
-            break;
-        case '(': // we have started from index = 1
-        case ')': // must go out earlier
-        case 'V': // 'V' can not be in the argument list
-            assert(0);
-            break;
-        default:
-            assert(0); // impossible! Verifier must check and catch this
-            break;
-        }
-    } 
     // pop numArgs items
-    for (int i=numArgs-1; i>=0; i--)
+    for (uint32 i=numArgs-1; i>=0; i--)
         popOpnd();
-    // move index to the first position after ')'
-    index++;
-    // recognize and push respective returnType
-    Type* retType = 0;
-    switch( mdesc[index] ) 
-    {
-    case 'L':
-        retType = typeManager.getNullObjectType();
-        break;
-    case 'B':
-        retType = typeManager.getInt8Type();
-    case 'C':
-        retType = typeManager.getCharType();
-    case 'D':
-        retType = typeManager.getDoubleType();
-    case 'F':
-        retType = typeManager.getSingleType();
-    case 'I':
-        retType = typeManager.getInt32Type();
-    case 'J':
-        retType = typeManager.getInt64Type();
-    case 'S':
-        retType = typeManager.getInt16Type();
-    case 'Z':
-        retType = typeManager.getBooleanType();
-        break;
-    case '[': {
-        retType = typeManager.getNullObjectType();
-        break;
 
-    }
-    case '(': // we have already pass it
-    case ')': // we have just leave it back
-    case 'V':
-        retType = typeManager.getVoidType();
-        break; // leave stack as is
-    default:
-        assert(0); // impossible! Verifier must check and catch this
-        break;
-    }
+    // recognize and push respective returnType
+    Type* retType = JavaLabelPrepass::getRetTypeBySignature(methodSig, typeManager);
     assert(retType);
-    // push NULL as a return type
+
+    // push NULL as a returned object
     if (retType->tag != Type::Void) {
         pushOpnd(irBuilder.genLdNull());
     }
 }
+
 //-----------------------------------------------------------------------------
 // method invocation byte codes
 //-----------------------------------------------------------------------------
@@ -1978,7 +1907,8 @@ JavaByteCodeTranslator::invokevirtual(uint32 constPoolIndex) {
         // inside the callee (with some "magic" custom class loader for example)
         // Or respective exception will be thrown there (in the callee) at the attempt to create (new)
         // an object of unresolved type
-        returnType = typeManager.getNullObjectType();
+        const char* methodSig_string = methodSignatureString(constPoolIndex);
+        returnType = JavaLabelPrepass::getRetTypeBySignature(methodSig_string, typeManager);
     }
 
     Opnd* dst = irBuilder.genTauVirtualCall(methodDesc,returnType,
@@ -2110,9 +2040,9 @@ JavaByteCodeTranslator::invokeinterface(uint32 constPoolIndex,uint32 count) {
     jitrino_assert(compilationInterface,methodDesc);
     MethodSignatureDesc* methodSig = methodDesc->getMethodSig();
     jitrino_assert(compilationInterface,methodSig);
+    Type* returnType = methodSig->getReturnType();
     uint32 numArgs = methodSig->getNumParams();
     Opnd** srcOpnds = popArgs(methodSig);
-    Type* returnType = methodSig->getReturnType();
     // callintf can throw a null pointer exception
     Opnd *tauNullChecked = irBuilder.genTauCheckNull(srcOpnds[0]);
     Opnd* thisOpnd = srcOpnds[0];
@@ -2153,7 +2083,8 @@ JavaByteCodeTranslator::invokeinterface(uint32 constPoolIndex,uint32 count) {
             // inside the callee (with some "magic" custom class loader for example)
             // Or respective exception will be thrown there (in the callee) at the attempt to create (new)
             // an object of unresolved type
-            returnType = typeManager.getNullObjectType();
+            const char* methodSig_string = methodSignatureString(constPoolIndex);
+            returnType = JavaLabelPrepass::getRetTypeBySignature(methodSig_string, typeManager);
         }
         dst = irBuilder.genTauVirtualCall(methodDesc,
                                           returnType,

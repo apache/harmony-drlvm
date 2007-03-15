@@ -427,7 +427,7 @@ TypeManager::getArrayType(Type* elemType, bool isCompressed, void* arrayVMTypeHa
             }
             type = new (memManager) 
                 ArrayType(elemNamedType,arrayVMTypeHandle,*this, isCompressed);
-            if (type->getAllocationHandle()!=0) { // type is resolved
+            if (arrayVMTypeHandle != (void*)(POINTER_SIZE_INT)0xdeadbeef && type->getAllocationHandle()!=0) { // type is resolved
                 lookupTable.insert(elemNamedType,type);
             }
         }

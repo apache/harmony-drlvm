@@ -265,6 +265,10 @@ DrlVMTypeManager::getArrayElemOffset(void* vmElemTypeHandle,bool isUnboxed) {
 
 bool
 DrlVMTypeManager::isSubClassOf(void* vmTypeHandle1,void* vmTypeHandle2) {
+    if (vmTypeHandle1 == (void*)(POINTER_SIZE_INT)0xdeadbeef ||
+        vmTypeHandle2 == (void*)(POINTER_SIZE_INT)0xdeadbeef ) {
+        return false;
+    }
     return class_is_instanceof((Class_Handle) vmTypeHandle1,(Class_Handle) vmTypeHandle2)?true:false;
 }    
 

@@ -1413,24 +1413,38 @@ void JavaLabelPrepass::multianewarray(uint32 constPoolIndex,uint8 dimensions) {
     pushType(type);
 }
 
-void JavaLabelPrepass::pseudoInvoke(const char* mdesc) {
+void JavaLabelPrepass::pseudoInvoke(const char* methodSig) {
 
-    assert(mdesc);
-    unsigned numArgs = 0; 
-    unsigned index;
+    assert(methodSig);
+    uint32 numArgs = getNumArgsBySignature(methodSig); 
+
+    // pop numArgs items
+    for (int i=numArgs-1; i>=0; i--)
+        popType();
+
+    // recognize and push respective returnType
+    Type* retType = getRetTypeBySignature(methodSig, typeManager);
+    assert(retType);
+
+    // push the return type
+    if (retType->tag != Type::Void) {
+        pushType(typeManager.toInternalType(retType));
+    }
+}
+
+uint32 JavaLabelPrepass::getNumArgsBySignature(const char*& methodSig) 
+{
+    assert(methodSig);
+    assert(*methodSig == '(');
+    uint32 numArgs = 0; 
 
     // start just after '(' and go until ')' counting 'numArgs' 
-    for( index = 1; mdesc[index] != ')'; index++ ) {
-        switch( mdesc[index] ) 
+    for(++methodSig ;*methodSig != ')'; methodSig++) {
+        switch( *methodSig ) 
         {
         case 'L':
-            // skip method name
-            do {
-                index++;
-                assert( mdesc[index] );
-            } while( mdesc[index] != ';' );
-            numArgs++;
-            break;
+            // skip class name
+            while( *(++methodSig) != ';' ) assert(*methodSig);
         case 'B':
         case 'C':
         case 'D':
@@ -1446,22 +1460,36 @@ void JavaLabelPrepass::pseudoInvoke(const char* mdesc) {
         case '(': // we have started from index = 1
         case ')': // must go out earlier
         case 'V': // 'V' can not be in the argument list
-            assert(0);
-            break;
         default:
             assert(0); // impossible! Verifier must check and catch this
             break;
         }
-    } 
-    // pop numArgs items
-    for (int i=numArgs-1; i>=0; i--)
-        popType();
-    // move index to the first position after ')'
-    index++;
-    // recognize and push respective returnType
-    Type* retType = 0;
-    switch( mdesc[index] ) 
+    }
+    // the last observed index should point to ')' after getNumArgsBySignature call
+    assert(*methodSig == ')');
+    
+    return numArgs;
+}
+
+Type* JavaLabelPrepass::getRetTypeBySignature(const char* methodSig, TypeManager& typeManager) 
+{
+    assert(*methodSig == '(' || *methodSig == ')');
+    while( *(methodSig++) != ')' ); // in case getNumArgsBySignature was not run earlier
+
+    Type* retType = NULL;
+    uint32 arrayDim = 0;
+
+    // collect array dimension if any
+    while( *(methodSig) == '[' ) {
+        arrayDim++;
+        methodSig++;
+    }
+
+    switch( *methodSig ) 
     {
+    case 'L':
+        retType = typeManager.getNullObjectType();
+        break;
     case 'B':
         retType = typeManager.getInt8Type();
         break;
@@ -1486,25 +1514,29 @@ void JavaLabelPrepass::pseudoInvoke(const char* mdesc) {
     case 'Z':
         retType = typeManager.getBooleanType();
         break;
-    case 'L':
-    case '[': {
-        retType = typeManager.getNullObjectType();
-        break;
-    }
-    case '(': // we have already pass it
-    case ')': // we have just leave it back
     case 'V':
         retType = typeManager.getVoidType();
         break; // leave stack as is
-    default:
-        assert(0); // impossible! Verifier must check and catch this
+    case '[': // all '[' are already skipped
+    case '(': // we have already pass it
+    case ')': // we have just leave it back
+    default: // impossible! Verifier must check and catch this
+        assert(0);
+        retType = typeManager.getNullObjectType();
         break;
     }
     assert(retType);
-    // push the return type
-    if (retType->tag != Type::Void) {
-        pushType(typeManager.toInternalType(retType));
+
+    void* arrVMTypeHandle = NULL;
+    if(retType == typeManager.getNullObjectType()) {
+        // VM can not operate with an array of NullObjects
+        // Let's cheat here
+        arrVMTypeHandle = (void*)(POINTER_SIZE_INT)0xdeadbeef;
     }
+    for (;arrayDim > 0; arrayDim--) {
+        retType = typeManager.getArrayType(retType, false, arrVMTypeHandle);
+    }
+    return retType;
 }
 
 void JavaLabelPrepass::invoke(MethodDesc* methodDesc) {
