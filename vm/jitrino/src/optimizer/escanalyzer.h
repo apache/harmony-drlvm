@@ -59,8 +59,10 @@ public:
     static const uint32 NT_ACTARG   = 128;          // Op_DirectCall,Op_IndirectMemoryCall
     static const uint32 NT_EXITVAL  = 256;          // returned value - Op_Return
     static const uint32 NT_THRVAL   = NT_EXITVAL+1; // thrown value - Op_Throw
-    static const uint32 NT_OBJS     = NT_OBJECT|NT_RETVAL|NT_LDOBJ;  //for findCnGNode_op
+    static const uint32 NT_LDVAL    = 512;          // Op_TauLdInd, Op_TauStInd
+	static const uint32 NT_OBJS     = NT_OBJECT|NT_RETVAL|NT_LDOBJ;  //for findCnGNode_op
 // CnG node reference types
+    static const uint32 NR_PRIM = 0;
     static const uint32 NR_REF = 1;
     static const uint32 NR_ARR = 2;
     static const uint32 NR_REFARR = 3;
@@ -153,9 +155,16 @@ public:
     
     uint32 allProps;
     const char* debug_method;
+    bool do_sync_removal;
+    bool do_scalar_repl;
+    bool do_esc_scalar_repl;
+    bool do_scalar_repl_only_final_fields;
+    bool scalarize_final_fields;
+    const char* execCountMultiplier_string;
+    double ec_mult;
 
 private:
-    static const int maxMethodExamLevel_default = 5;
+    static const int maxMethodExamLevel_default = 0;
 
     struct CnGEdge {
         CnGNode* cngNodeFrom;
@@ -187,6 +196,7 @@ private:
     int defArgNumber;
     uint32 method_ea_level;
     ObjIds *scannedObjs;
+    ObjIds *scannedObjsRev;
     ObjIds *scannedInsts;
     ObjIds *scannedSucNodes;
     uint32 initNodeType;  // type of initial scanned node
@@ -194,7 +204,20 @@ private:
     SsaTmpOpnd* i32_0;
     SsaTmpOpnd* i32_1;
     TranslatorAction* translatorAction;
+    Insts* methodEndInsts;
+    Insts* checkInsts;
 
+    std::ostream& os_sc;
+    bool print_scinfo;
+
+    struct ScObjFld {
+        VarOpnd* fldVarOpnd;
+        Insts* ls_insts;
+        FieldDesc* fd;
+        bool isFinalFld;
+    };
+
+    typedef StlList<ScObjFld*> ScObjFlds; 
 
 #ifdef _DEBUG
     void prPrN(cfgNode pr_n[],int maxInd) {
@@ -210,6 +233,8 @@ private:
 #endif
     //common method for both EscAnalyzer constructors
     void init();
+    void showFlags(std::ostream& os);
+    void eaFixupVars(IRManager& irm);
     void instrExam(cfgNode* node);
     void instrExam2(cfgNode* node);
     void addEdge(CnGNode* cgnfrom, CnGNode* cgnto, uint32 etype, Inst* inst);
@@ -235,14 +260,15 @@ private:
     void printCnGNodeRefs(CnGNode* cgn, std::string text,::std::ostream& os);
     void printRefInfo(::std::ostream& os); 
     void addInst(cfgNode* cfgn, Inst* inst);
-    void scanCnGNodeRefsGE(CnGNode* cgn);
-    void scanCnGNodeRefsEV(CnGNode* cgn);
-    void scanCnGNodeRefsDA(CnGNode* cgn);
-    void scanCnGNodeRefsAE(CnGNode* cgn);
+    void scanCnGNodeRefsGE(CnGNode* cgn, bool check_var_src, bool check_field_elem=true);
+//    void scanCnGNodeRefsEV(CnGNode* cgn);
+//    void scanCnGNodeRefsDA(CnGNode* cgn);
+    void scanCnGNodeRefsAE(CnGNode* cgn, bool check_var_src, bool check_field_elem=true);
     void scanCalleeMethod(Inst* call);
     void optimizeTranslatedCode(IRManager& irManager);
     void setCreatedObjectStates();
     void printCreatedObjectsInfo(::std::ostream& os);
+//    void printLocalObjectsInfo(::std::ostream& os);  //nvg
     void printMethodInfos();        //?
     void printMethodInfo(CalledMethodInfo* mi);
     CalledMethodInfo* getMethodInfo(const char* ch1,const char* ch2,const char* ch3);
@@ -250,9 +276,7 @@ private:
     void saveScannedMethodInfo();
     uint32 getMethodParamState(CalledMethodInfo* mi, uint32 np);
     void markNotEscInsts();
-    bool checkScannedObjs(uint32 id);
-    bool checkScannedInsts(uint32 id);
-    bool checkScannedSucNodes(uint32 id);
+
     void createdObjectInfo();
     void addMonInst(Inst* inst);
     void addMonUnitVCall(MonUnit* mu, Inst* inst); 
@@ -278,6 +302,23 @@ private:
     void findObject1(Inst* inst,std::string text="  ");
     void lObjectHistory(Inst* inst,std::string text,::std::ostream& os);
     uint32 getSubobjectStates(CnGNode* node);
+
+    bool checkScanned(ObjIds* ids, uint32 id) {
+        ObjIds::iterator it;
+        if (ids == NULL) {
+            return false;
+        }
+        for (it = ids->begin( ); it != ids->end( ); it++ ) {
+            if ((*it)==id) {
+                return true;
+            }
+        }
+        return false;
+    }
+    bool checkScannedObjs(uint32 id) {return checkScanned(scannedObjs, id);}
+    bool checkScannedObjsRev(uint32 id) {return checkScanned(scannedObjsRev, id);}
+    bool checkScannedInsts(uint32 id) {return checkScanned(scannedInsts, id);}
+    bool checkScannedSucNodes(uint32 id) {return checkScanned(scannedSucNodes, id);}
 
     uint32 getEscState(CnGNode* n) {
         return (n->state)&ESC_MASK;
@@ -331,6 +372,201 @@ private:
     }
     void runTranslatorSession(CompilationContext& inlineCC);
 
+
+    // Scalar replacement optimization
+/**
+ * Performs scalar replacement optimization for local objects 
+ * (class instances and arrays).
+ */
+    void scanLocalObjects();
+
+/**
+ * Performs scalar replacement optimization for method escaped class instances.
+ */
+    void scanEscapedObjects();
+
+/**
+ * Performs scalar replacement optimization for local objects from the specified list.
+ * @param loids - list of local objects CnG nodes Ids
+ * @param os - output stream
+ */
+    void doLOScalarReplacement(ObjIds* loids);
+
+/**
+ * Performs scalar replacement optimization for method escaped objects from the specified list.
+ * @param loids - list of local objects CnG nodes Ids
+ */
+    void doEOScalarReplacement(ObjIds* loids);
+
+/**
+ * Collects (using connection graph) information of onode object fields usage.
+ * @param onode - connection graph node fields usage of which is collected
+ * @param scObjFlds - list to collect onode fields usage
+ */
+    void collectStLdInsts(CnGNode* onode, ScObjFlds* scObjFlds);
+
+/**
+ * Collects (using connection graph) call instructions which use optimized object 
+ * as a parameter.
+ * @param n - optimized obgect connection graph node Id;
+ * @param vc_insts - list of call instructions;
+ * @param vcids - list of call instructions ids.
+ */
+    void collectCallInsts(uint32 n, Insts* vc_insts, ObjIds* vcids);
+
+/**
+ * Performs scalar replacement optimization for optimized object field usage.
+ * @param scfld       - optimized object scalarizable field
+ */
+    void scalarizeOFldUsage(ScObjFld* scfld);
+
+/**
+ * Checks if an object from the specified list can be removed and its fields/elements scalarized.
+ * If an object cannot be optimized it is removed from the list.
+ * @param loids - list of local object CnG nodes Ids
+ * @param check_loc - if <code>true</code> checks for local objects,
+ *                    if <code>false</code> checks for virtual call escaped objects.
+ */
+    void checkOpndUsage(ObjIds* lnoids, ObjIds* lloids, bool check_loc);
+
+/**
+ * Checks if an object can be removed and its fields/elements scalarized.
+ * @param lobjid - object CnG nodes Ids
+ * @return <code>true</code> if an object is used only in ldflda or ldbase instructions; 
+ *         <code>false<code> otherwise.
+ */
+    bool checkOpndUsage(uint32 lobjid);
+
+/**
+ * Performs checks for CnGNode operand using connection graph.
+ * @param scnode - CnG node of optimized operand
+ * @param check_loc - <true> * @param check_loc - if <code>true</code> checks for local objects,
+ *                    if <code>false</code> checks for virtual call escaped objects.
+ * @return CnGNode* for operand that may be optimized; 
+ *         <code>NULL<code> otherwise.
+ */
+    CnGNode* checkCnG(CnGNode* scnode, bool check_loc);
+
+/**
+ * Checks if there is a path in CFG from node where object created by a nob_inst instruction
+ * to EXIT node and this object is not escaped to any method call.
+ * @param nob_inst - object creation instruction.
+ * @return <code>execCount</code> of this path execution; 
+ *         <code>0<code> otherwise.
+ */
+    double checkLocalPath(Inst* nob_inst);
+
+/**
+ * Checks if there is a path in CFG from node where object created by a nob_inst instruction
+ * to EXIT node and this object is not escaped to any method call.
+ * @param n - CFG node to scan
+ * @param obId - escaped optimized object Id
+ * @param cExecCount - current execCount
+ * @return <code>execCount</code> the most value of <code>execCount</code> and 
+ *                                checkNextNodes execution for next after n node; 
+ */
+    double checkNextNodes(Node* n, uint32 obId, double cExecCount, std::string text="");
+
+/**
+ * Checks flag and creates object before call instruction (if it was not created yet).
+ * @param vc_insts    - list of call instructions optimized object is escaped to
+ * @param objs        - list of optimized object fields
+ * @param ob_var_opnd -  varOpnd replacing optimized object
+ * @param ob_flag_var_opnd - sign if optimized object was created
+ * @param tnode       - target CFG node for newobj instruction exception edge
+ * @param oid         - escaped optimized object Id 
+ */
+    void restoreEOCreation(Insts* vc_insts, ScObjFlds* objs, VarOpnd* ob_var_opnd, 
+        VarOpnd* ob_flag_var_opnd, Node* tnode, uint32 oid);
+
+/**
+ * Removes specified instruction from ControlFlowGraph.
+ * If instruction can throw exception removes corresponding CFGEdge.
+ * @param reminst - removed instruction
+ */
+    void removeInst(Inst* reminst);
+
+/**
+ * Returns MethodDesc* for Op_IndirectMemoryCall and Op_DirectCall instructions.
+ * @param inst - call instruction.
+ * @return MethodDesc for <code>Op_IndirectMemoryCall</code> and <code>Op_DirectCall</code>; 
+ *         <code>NULL<code> otherwise.
+ */
+    MethodDesc* getMD(Inst* inst);
+
+/**
+ * Replaces first source operand of Op_MethodEnd instruction by NULL
+ * for scalar replacement optimized object.
+ * @param ob_id - optimized object Id
+ */
+    void fixMethodEndInsts(uint32 ob_id);
+
+/**
+ * Finds (using connection graph) load varOpnd that should be optimized with 
+ * new object operand.
+ * @param vval - CnG node of target stvar instruction varOpnd 
+ * @return CnGNode* - found optimized load varOpnd CnG node
+ *         <code>NULL</code> otherwise.
+ */
+    CnGNode* getLObj(CnGNode* vval);
+
+/**
+ * Checks that all sources of optimized load varOpnd aren't null and
+ * satisfy to specified conditions.
+ * @param inst - ldvar instruction created optimized load varOpnd.
+ * @return <code>true</code> if satisfied; 
+ *         <code>false<code> otherwise.
+ */
+    bool checkVVarSrcs(Inst* inst);
+
+/**
+ * Checks that optimized object type satisfied to specified types.
+ * @param otn - object type name.
+ * @return <code>true</code> if satisfied; 
+ *         <code>false<code> otherwise.
+ */
+    bool checkObjectType(const char* otn);
+
+/**
+ * Checks that all load varOpnd fields are in new object field usage list.
+ * @param nscObjFlds - list of used fields of optimized new object
+ * @param lscObjFlds - list of used fields of optimized load varOpnd
+ * @return <code>true</code> if list of new object used field contains all 
+ *                           load varOpnd used field; 
+ *         <code>false<code> otherwise.
+ */
+    bool checkObjFlds(ScObjFlds* nscObjFlds, ScObjFlds* lscObjFlds);
+
+/**
+ * Removes check instructions for optimized load varOpnd.
+ * @param ob_id - optimized load variable operand Id
+ */
+    void fixCheckInsts(uint32 opId);
+
+/**
+ * Checks (using connection graph) if CnGNode operand has final fields and adds it to
+ * the list of posible optimized final fields operands.
+ * @param onode - CnG node of optimized operand
+ * @param scObjFlds - list to collect onode operand field usage
+ */
+    void checkToScalarizeFinalFiels(CnGNode* onode, ScObjFlds* scObjFlds);
+
+
+    // BCMap support
+/**
+ * Sets bcmap offset in bc2HIRMapHandler.
+ * @param new_i - instruction to set offset
+ * @param old_i - offset of old_i instruction is set to new_i instruction
+ */
+    void setNewBCMap(Inst* new_i, Inst* old_i);
+
+/**
+ * Removes bcmap offset in bc2HIRMapHandler.
+ * @param inst - instruction to remove offset
+ */
+    void remBCMap(Inst* inst);
+
+
     int _cfgirun;
     int _instrInfo;
     int _instrInfo2;
@@ -341,8 +577,14 @@ private:
     int _printstat;
     int _eainfo;
     int _seinfo;
+    int _scinfo;
 #define  prsNum  10
     int prsArr[prsNum];
+
+    CompilationInterface &compInterface;
+    // Byte code map info
+    bool isBCmapRequired;
+    VectorHandler* bc2HIRMapHandler;
 };
 
 } //namespace Jitrino 
