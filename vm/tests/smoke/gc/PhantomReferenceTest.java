@@ -31,10 +31,14 @@ import java.lang.ref.ReferenceQueue;
  */
 public class PhantomReferenceTest {
 
+    // declare 'ref' static to be sure that it is not cleared
+    // due to all its methods are inlined
+    static Reference ref;
+
     public static void main(String[] args) throws Exception {
         ReferenceQueue queue = new ReferenceQueue();
         Object referent = new PhantomReferenceTest();
-        Reference ref = new PhantomReference(referent, queue);
+        ref = new PhantomReference(referent, queue);
 
         // drop strong reference
         referent = null;
