@@ -43,11 +43,11 @@
                  doxygen.gcv4,
                  doxygen.interpreter,
                  doxygen.jitrino,
-                 doxygen.port,
+                 doxygen.apr_extension,
                  doxygen.thread,
                  doxygen.vmcore,
                  doxygen.vmi,
-                 doxygen.vmstart,
+                 doxygen.component_manager,
                  doxygen.tests,
                  doxygen.drlvm" />
 
@@ -60,11 +60,11 @@
                  clean.gcv4,
                  clean.interpreter,
                  clean.jitrino,
-                 clean.port,
+                 clean.apr_extension,
                  clean.thread,
                  clean.vmcore,
                  clean.vmi,
-                 clean.vmstart,
+                 clean.component_manager,
                  clean.tests,
                  clean.drlvm" />
 
@@ -141,13 +141,13 @@
         <delete dir="${doc.dir}/jitrino${doc.suffix}" />
     </target>
 
-    <target name="doxygen.port" depends="init"
+    <target name="doxygen.apr_extension" depends="init"
         description="Build porting layer documentation.">
-        <generate-bundle bundle="port" />
+        <generate-bundle bundle="apr_extension" />
     </target>
 
-    <target name="clean.port">
-        <delete dir="${doc.dir}/port${doc.suffix}" />
+    <target name="clean.apr_extension">
+        <delete dir="${doc.dir}/apr_extension${doc.suffix}" />
     </target>
 
     <target name="doxygen.thread" depends="init"
@@ -177,13 +177,13 @@
         <delete dir="${doc.dir}/vmi${doc.suffix}" />
     </target>
 
-    <target name="doxygen.vmstart" depends="init"
+    <target name="doxygen.component_manager" depends="init"
         description="Build component manager documentation.">
-        <generate-bundle bundle="vmstart" />
+        <generate-bundle bundle="component_manager" />
     </target>
 
-    <target name="clean.vmstart">
-        <delete dir="${doc.dir}/vmstart${doc.suffix}" />
+    <target name="clean.component_manager">
+        <delete dir="${doc.dir}/component_manager${doc.suffix}" />
     </target>
 
     <target name="doxygen.tests" depends="init"
