@@ -1,0 +1,8 @@
+<project name="RUN HARMONY-3380 Regression Test">
+  <target name="run-test">
+    <run-junit-test 
+        test="org.apache.harmony.drlvm.tests.regression.h3380.LongToBitsTest"
+        vmarg="-Xem:jet">
+    </run-junit-test>
+  </target>
+</project>
