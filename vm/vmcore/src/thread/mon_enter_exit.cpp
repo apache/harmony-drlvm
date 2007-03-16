@@ -84,14 +84,13 @@ void vm_monitor_exit_synchronized_method(StackIterator *si)
     assert(cci);
     Method *method = cci->get_method();
 
+    assert(!hythread_is_suspend_enabled());
     if (method->is_synchronized()) {
-        bool unwindable = set_unwindable(false);
         if (method->is_static()) {
-            assert(!hythread_is_suspend_enabled());
             TRACE2("tm.locks", ("unlock static sync methods...%x",
                 struct_Class_to_java_lang_Class(method->get_class())));
-            vm_monitor_exit(struct_Class_to_java_lang_Class(method->
-                    get_class()));
+            IDATA UNREF status = vm_monitor_try_exit(
+                struct_Class_to_java_lang_Class(method->get_class()));
         }
         else {
             JIT *jit = cci->get_jit();
@@ -99,10 +98,8 @@ void vm_monitor_exit_synchronized_method(StackIterator *si)
                 (void **) jit->get_address_of_this(method,
                 si_get_jit_context(si));
             TRACE2("tm.locks", ("unlock sync methods...%x" , *p_this));
-            vm_monitor_exit((ManagedObject *) * p_this);
+            IDATA UNREF status = vm_monitor_try_exit((ManagedObject *) * p_this);
         }
-        exn_clear();
-        set_unwindable(unwindable);
     }
 }
 
