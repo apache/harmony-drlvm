@@ -1,11 +1,5 @@
 Check.java
 PerfCheck.java
-gc/Finalizer.java
-gc/PhantomReferenceTest.java
-gc/RunFinalizersOnExitTest.java
+
+# HARMONY-2977
 io/Integers.java
-
-stress/Mix.java
-
-# HARMONY-3266
-shutdown/TestNativeAllocation.java

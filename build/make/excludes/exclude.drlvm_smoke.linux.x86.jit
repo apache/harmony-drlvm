@@ -1,12 +1,6 @@
 Check.java
 PerfCheck.java
-gc/Finalizer.java
-gc/PhantomReferenceTest.java
-gc/RunFinalizersOnExitTest.java
 
 # breaks on ubuntu 6 w/ OOME
 stress/Threads.java
-stress/Mix.java
 
-# HARMONY-3266
-shutdown/TestNativeAllocation.java

@@ -1,25 +1,18 @@
 Check.java
 PerfCheck.java
-gc/Finalizer.java
 
 # HARMONY-3338
+gc/LOS.java
 gc/MultiThreads.java
 perf/MultiThreadsSimple.java
 
-# HARMONY-3235
-gc/ThreadSuspension.java
-
-gc/PhantomReferenceTest.java
-gc/RunFinalizersOnExitTest.java
+# HARMONY-2972
 StackTest.java
 exception/FinalizeStackTest.java
+stress/Stack.java
 
 # fails on Ubuntu6 x86_64
 gc/Mark.java
 
-# fails intermittently 
-stress/Stack.java
+# HARMONY-2772 
 stress/Mix.java
-
-# HARMONY-3266
-shutdown/TestNativeAllocation.java

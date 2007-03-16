@@ -1,15 +1,8 @@
 Check.java
 PerfCheck.java
+
+# slow
 gc/Mark.java
 
-# HARMONY-3338
-gc/MultiThreads.java
-perf/MultiThreadsSimple.java
-
-# HARMONY-3235
-gc/ThreadSuspension.java
-
+# HARMONY-2977
 io/Integers.java
-stress/Stack.java
-stress/Mix.java
-

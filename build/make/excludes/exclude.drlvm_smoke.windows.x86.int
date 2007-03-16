@@ -1,6 +1,8 @@
 Check.java
 PerfCheck.java
-gc/Mark.java
-io/Integers.java
 
-stress/Mix.java
+# slow
+gc/Mark.java
+
+# HARMONY-2977
+io/Integers.java

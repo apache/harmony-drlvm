@@ -1,5 +1,5 @@
 Check.java
 PerfCheck.java
-io/Integers.java
 
-stress/Mix.java
+# HARMONY-2977
+io/Integers.java
