@@ -61,12 +61,12 @@ static void collector_reset_thread(Collector *collector)
 /* TO_REMOVE
 
   assert(collector->rep_set==NULL);
-  if( !gc_is_gen_mode() || collector->gc->collect_kind != MINOR_COLLECTION){
+  if( !gc_is_gen_mode() || !gc_match_kind(collector->gc, MINOR_COLLECTION)){
     collector->rep_set = free_set_pool_get_entry(metadata);
   }
 */
   
-  if(gc_is_gen_mode() && collector->gc->collect_kind==MINOR_COLLECTION && NOS_PARTIAL_FORWARD){
+  if(gc_is_gen_mode() && gc_match_kind(collector->gc, MINOR_COLLECTION) && NOS_PARTIAL_FORWARD){
     assert(collector->rem_set==NULL);
     collector->rem_set = free_set_pool_get_entry(metadata);
   }
@@ -102,9 +102,9 @@ static void collector_notify_work_done(Collector *collector)
 static void assign_collector_with_task(GC* gc, TaskType task_func, Space* space)
 {
   /* FIXME:: to adaptively identify the num_collectors_to_activate */
-  if( MINOR_COLLECTORS && gc->collect_kind == MINOR_COLLECTION){
+  if( MINOR_COLLECTORS && gc_match_kind(gc, MINOR_COLLECTION)){
     gc->num_active_collectors = MINOR_COLLECTORS;      
-  }else if ( MAJOR_COLLECTORS && gc->collect_kind != MINOR_COLLECTION){
+  }else if ( MAJOR_COLLECTORS && !gc_match_kind(gc, MINOR_COLLECTION)){
     gc->num_active_collectors = MAJOR_COLLECTORS;  
   }else{
     gc->num_active_collectors = gc->num_collectors;

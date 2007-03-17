@@ -20,6 +20,7 @@
 
 #include "mspace_collect_compact.h"
 
+
 Boolean IS_MOVE_COMPACT;
 
 struct GC_Gen;
@@ -269,8 +270,7 @@ void mspace_collection(Mspace* mspace)
   //For_LOS_extend
   if(gc->tuner->kind != TRANS_NOTHING){
     collector_execute_task(gc, (TaskType)slide_compact_mspace, (Space*)mspace);
-    
-  }else if (gc->collect_kind == FALLBACK_COLLECTION){
+  }else if (gc_match_kind(gc, FALLBACK_COLLECTION)){
     collector_execute_task(gc, (TaskType)slide_compact_mspace, (Space*)mspace);  
     //IS_MOVE_COMPACT = TRUE;
     //collector_execute_task(gc, (TaskType)move_compact_mspace, (Space*)mspace);
@@ -295,6 +295,8 @@ void mspace_collection(Mspace* mspace)
     }
 
   }  
+
   return;  
 } 
+
 

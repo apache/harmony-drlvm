@@ -31,7 +31,7 @@ FORCE_INLINE Partial_Reveal_Object* collector_forward_object(Collector* collecto
   Obj_Info_Type oi = get_obj_info_raw(p_obj);
 
   /* forwarded by somebody else */
-  if ((POINTER_SIZE_INT)oi & FORWARD_BIT){
+  if (oi & FORWARD_BIT){
      return NULL;
   }
   
@@ -50,7 +50,8 @@ FORCE_INLINE Partial_Reveal_Object* collector_forward_object(Collector* collecto
     
   /* else, take the obj by setting the forwarding flag atomically 
      we don't put a simple bit in vt because we need compute obj size later. */
-  if ((void*)oi != atomic_casptr((volatile void**)get_obj_info_addr(p_obj), (void*)((POINTER_SIZE_INT)p_targ_obj|FORWARD_BIT), (void*)oi)) {
+  REF target = compress_ref(p_targ_obj);
+  if (oi != (Obj_Info_Type)atomic_cas32(get_obj_info_addr(p_obj), ( ( (POINTER_SIZE_INT)target |FORWARD_BIT)), oi)) {
     /* forwarded by other, we need unalloc the allocated obj. We may waste some space if the allocation switched
        block. The remaining part of the switched block cannot be revivied for next allocation of 
        object that has smaller size than this one. */

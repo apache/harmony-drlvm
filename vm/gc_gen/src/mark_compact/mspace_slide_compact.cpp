@@ -110,7 +110,7 @@ static void mspace_compute_object_target(Collector* collector, Mspace* mspace)
 static void mspace_fix_repointed_refs(Collector* collector, Mspace* mspace)
 {
   Block_Header* curr_block = mspace_block_iterator_next(mspace);
-
+  
   /* for MAJOR_COLLECTION, we must iterate over all compact blocks */
   while( curr_block){
     block_fix_ref_after_repointing(curr_block); 
@@ -242,7 +242,7 @@ static inline Partial_Reveal_Object *get_next_first_src_obj(Mspace *mspace)
     }
     
     Partial_Reveal_Object *next_src_obj = GC_BLOCK_HEADER(first_src_obj)->next_src;
-    if(next_src_obj && GC_BLOCK_HEADER(get_obj_info_raw(next_src_obj)) != next_dest_block){
+    if(next_src_obj && GC_BLOCK_HEADER(uncompress_ref((REF)get_obj_info_raw(next_src_obj))) != next_dest_block){
       next_src_obj = NULL;
     }
     next_dest_block->src = next_src_obj;
@@ -270,7 +270,7 @@ static void mspace_sliding_compact(Collector* collector, Mspace* mspace)
 {
   void *start_pos;
   Block_Header *nos_fw_start_block = (Block_Header *)&mspace->blocks[mspace_free_block_idx - mspace->first_block_idx];
-  Boolean is_fallback = (collector->gc->collect_kind == FALLBACK_COLLECTION);
+  Boolean is_fallback = gc_match_kind(collector->gc, FALLBACK_COLLECTION);
   
   while(Partial_Reveal_Object *p_obj = get_next_first_src_obj(mspace)){
     Block_Header *src_block = GC_BLOCK_HEADER(p_obj);
@@ -340,13 +340,13 @@ void slide_compact_mspace(Collector* collector)
   Lspace* lspace = (Lspace*)gc_get_los((GC_Gen*)gc);
   
   unsigned int num_active_collectors = gc->num_active_collectors;
-  
+
   /* Pass 1: **************************************************
      mark all live objects in heap, and save all the slots that 
             have references  that are going to be repointed */
   unsigned int old_num = atomic_cas32( &num_marking_collectors, 0, num_active_collectors+1);
 
-  if(gc->collect_kind != FALLBACK_COLLECTION)
+  if(!gc_match_kind(gc, FALLBACK_COLLECTION))
     mark_scan_heap(collector);
   else
     fallback_mark_scan_heap(collector);
@@ -372,7 +372,7 @@ void slide_compact_mspace(Collector* collector)
     num_marking_collectors++; 
   }
   while(num_marking_collectors != num_active_collectors + 1);
-  
+
   /* Pass 2: **************************************************
      assign target addresses for all to-be-moved objects */
   atomic_cas32( &num_repointing_collectors, 0, num_active_collectors+1);
@@ -394,21 +394,17 @@ void slide_compact_mspace(Collector* collector)
   }
   while(num_repointing_collectors != num_active_collectors + 1);
   if(!gc->collect_result) return;
-    
+
   /* Pass 3: **************************************************
      update all references whose objects are to be moved */  
   old_num = atomic_cas32( &num_fixing_collectors, 0, num_active_collectors+1);
-
   mspace_fix_repointed_refs(collector, mspace);
-
   old_num = atomic_inc32(&num_fixing_collectors);
   if( ++old_num == num_active_collectors ){
     /* last collector's world here */
     lspace_fix_repointed_refs(collector, lspace);
     gc_fix_rootset(collector);
-    
     gc_init_block_for_sliding_compact(gc, mspace);
-
     num_fixing_collectors++; 
   }
   while(num_fixing_collectors != num_active_collectors + 1);
@@ -421,7 +417,7 @@ void slide_compact_mspace(Collector* collector)
   
   atomic_inc32(&num_moving_collectors);
   while(num_moving_collectors != num_active_collectors);
-  
+
   /* Pass 5: **************************************************
      restore obj_info                                         */
   atomic_cas32( &num_restoring_collectors, 0, num_active_collectors+1);
@@ -430,13 +426,13 @@ void slide_compact_mspace(Collector* collector)
   
   old_num = atomic_inc32(&num_restoring_collectors);
   if( ++old_num == num_active_collectors ){
-    
+
     update_mspace_info_for_los_extension(mspace);
     
     num_restoring_collectors++;
   }
   while(num_restoring_collectors != num_active_collectors + 1);
-  
+
   /* Dealing with out of memory in mspace */
   if(mspace->free_block_idx > fspace->first_block_idx){
     atomic_cas32( &num_extending_collectors, 0, num_active_collectors);
@@ -446,7 +442,6 @@ void slide_compact_mspace(Collector* collector)
     atomic_inc32(&num_extending_collectors);
     while(num_extending_collectors != num_active_collectors);
   }
-  
   if( collector->thread_handle != 0 )
     return;
   
@@ -458,7 +453,7 @@ void slide_compact_mspace(Collector* collector)
 
   //For_LOS_extend
   mspace_restore_block_chain(mspace);
-  
+
   gc_set_pool_clear(gc->metadata->gc_rootset_pool);
   
   return;

@@ -47,25 +47,24 @@ extern Boolean IGNORE_FINREF;
  * }
  */
 
-inline Partial_Reveal_Object **obj_get_referent_field(Partial_Reveal_Object *p_obj)
+inline REF* obj_get_referent_field(Partial_Reveal_Object *p_obj)
 {
   assert(p_obj);
-  return (Partial_Reveal_Object **)(( Byte*)p_obj+get_gc_referent_offset());
+  return (REF*)(( Byte*)p_obj+get_gc_referent_offset());
 }
 
-typedef void (* Scan_Slot_Func)(Collector *collector, Partial_Reveal_Object **p_ref);
+typedef void (* Scan_Slot_Func)(Collector *collector, REF* p_ref);
 inline void scan_weak_reference(Collector *collector, Partial_Reveal_Object *p_obj, Scan_Slot_Func scan_slot)
 {
   WeakReferenceType type = special_reference_type(p_obj);
   if(type == NOT_REFERENCE)
     return;
-  unsigned int collect_kind = collector->gc->collect_kind;
-  Partial_Reveal_Object **p_referent_field = obj_get_referent_field(p_obj);
-  Partial_Reveal_Object *p_referent = *p_referent_field;
+  REF* p_referent_field = obj_get_referent_field(p_obj);
+  REF p_referent = *p_referent_field;
   if (!p_referent) return;
   switch(type){
     case SOFT_REFERENCE :
-      if(collect_kind==MINOR_COLLECTION)
+      if(gc_match_kind(collector->gc, MINOR_COLLECTION))
         scan_slot(collector, p_referent_field);
       else
         collector_add_softref(collector, p_obj);
@@ -84,6 +83,7 @@ inline void scan_weak_reference(Collector *collector, Partial_Reveal_Object *p_o
 
 extern void gc_update_weakref_ignore_finref(GC *gc);
 extern void collector_identify_finref(Collector *collector);
+extern void fallback_finref_cleanup(GC *gc);
 extern void gc_put_finref_to_vm(GC *gc);
 extern void put_all_fin_on_exit(GC *gc);
 

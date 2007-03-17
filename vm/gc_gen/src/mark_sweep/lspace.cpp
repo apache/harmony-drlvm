@@ -24,6 +24,13 @@ void* los_boundary = NULL;
 struct GC_Gen;
 void gc_set_los(GC_Gen* gc, Space* lspace);
 
+/*Fixme: This macro is for handling HEAP_NULL issues caused by JIT OPT*/
+#ifdef COMPRESS_REFERENCE
+  #define LOS_HEAD_RESERVE_FOR_HEAP_NULL (4*KB)
+#else
+  #define LOS_HEAD_RESERVE_FOR_HEAP_NULL (0*KB)
+#endif
+
 void lspace_initialize(GC* gc, void* start, unsigned int lspace_size)
 {
   Lspace* lspace = (Lspace*)STD_MALLOC( sizeof(Lspace));
@@ -37,9 +44,9 @@ void lspace_initialize(GC* gc, void* start, unsigned int lspace_size)
     vm_commit_mem(reserved_base, lspace_size);
   memset(reserved_base, 0, lspace_size);
 
-  lspace->committed_heap_size = committed_size;
-  lspace->reserved_heap_size = committed_size;
-  lspace->heap_start = reserved_base;
+  lspace->committed_heap_size = committed_size - LOS_HEAD_RESERVE_FOR_HEAP_NULL;
+  lspace->reserved_heap_size = committed_size - LOS_HEAD_RESERVE_FOR_HEAP_NULL;
+  lspace->heap_start = (void*)((POINTER_SIZE_INT)reserved_base + LOS_HEAD_RESERVE_FOR_HEAP_NULL);
   lspace->heap_end = (void *)((POINTER_SIZE_INT)reserved_base + committed_size);
 
   lspace->move_object = FALSE;

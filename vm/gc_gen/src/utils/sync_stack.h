@@ -106,9 +106,8 @@ inline Node* sync_stack_pop(Sync_Stack* stack)
   
   while( top_entry != NULL ){
     POINTER_SIZE_INT temp = stack_top_contruct(top_entry->next, version);
-    Stack_Top new_top = *(Stack_Top*)&temp;
-    temp = (POINTER_SIZE_INT)atomic_casptr((volatile void**)&stack->top, *(void**)&new_top, *(void**)&cur_top);
-    if(temp == *(POINTER_SIZE_INT*)&cur_top){ /* got it */ 
+    temp = (POINTER_SIZE_INT)atomic_casptr((volatile void**)&stack->top, (void*)temp, (void*)cur_top);
+    if(temp == *(POINTER_SIZE_INT*)&cur_top){ // got it  
       top_entry->next = NULL;
       return top_entry;
     }
@@ -125,20 +124,18 @@ inline Boolean sync_stack_push(Sync_Stack* stack, Node* node)
   node->next = stack_top_get_entry(cur_top);
   POINTER_SIZE_INT new_version = stack_top_get_next_version(cur_top);
   POINTER_SIZE_INT temp = stack_top_contruct(node, new_version);
-  Stack_Top new_top = *(Stack_Top*)&temp;
-  
+ 
   while( TRUE ){
-    temp = (POINTER_SIZE_INT)atomic_casptr((volatile void**)&stack->top, *(void**)&new_top, *(void**)&cur_top);
-    if(temp == *(POINTER_SIZE_INT*)&cur_top){ /* got it */  
+    temp = (POINTER_SIZE_INT)atomic_casptr((volatile void**)&stack->top, (void*)temp, (void*)cur_top);
+    if(temp == *(POINTER_SIZE_INT*)&cur_top){ // got it   
       return TRUE;
     }
     cur_top = stack->top;
     node->next = stack_top_get_entry(cur_top);
     new_version = stack_top_get_next_version(cur_top);
     temp = stack_top_contruct(node, new_version);
-    new_top = *(Stack_Top*)&temp;
   }
-  /* never comes here */
+  // never comes here 
   return FALSE;
 }
 

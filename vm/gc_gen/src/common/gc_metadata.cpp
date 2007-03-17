@@ -22,6 +22,8 @@
 #include "interior_pointer.h"
 #include "../finalizer_weakref/finalizer_weakref.h"
 #include "gc_block.h"
+#include "compressed_ref.h"
+#include "../utils/sync_stack.h"
 
 #define GC_METADATA_SIZE_BYTES (1*MB)
 #define GC_METADATA_EXTEND_SIZE_BYTES (1*MB)
@@ -64,11 +66,12 @@ void gc_metadata_initialize(GC* gc)
   gc_metadata.free_set_pool = sync_pool_create();
   /* initialize free rootset pool so that mutators can use them */  
   for(; i<num_blocks; i++){
-    POINTER_SIZE_INT block = (POINTER_SIZE_INT)metadata + i*METADATA_BLOCK_SIZE_BYTES;    
+    POINTER_SIZE_INT block = (POINTER_SIZE_INT)metadata + i*METADATA_BLOCK_SIZE_BYTES;
     pool_put_entry(gc_metadata.free_set_pool, (void*)block); 
   }
 
   gc_metadata.gc_rootset_pool = sync_pool_create();
+  gc_metadata.gc_uncompressed_rootset_pool = sync_pool_create();
   gc_metadata.mutator_remset_pool = sync_pool_create();
   gc_metadata.collector_remset_pool = sync_pool_create();
   gc_metadata.collector_repset_pool = sync_pool_create();
@@ -84,8 +87,9 @@ void gc_metadata_destruct(GC* gc)
   sync_pool_destruct(metadata->mark_task_pool);
   
   sync_pool_destruct(metadata->free_set_pool);
-  sync_pool_destruct(metadata->gc_rootset_pool); 
-  sync_pool_destruct(metadata->mutator_remset_pool);  
+  sync_pool_destruct(metadata->gc_rootset_pool);
+  sync_pool_destruct(metadata->gc_uncompressed_rootset_pool);
+  sync_pool_destruct(metadata->mutator_remset_pool);
   sync_pool_destruct(metadata->collector_remset_pool);
   sync_pool_destruct(metadata->collector_repset_pool);
 
@@ -106,12 +110,13 @@ Vector_Block* gc_metadata_extend(Pool* pool)
     unlock(metadata->alloc_lock);
     return block;
   }
-  
+ 
   unsigned int num_alloced = metadata->num_alloc_segs;
   if(num_alloced == GC_METADATA_SEGMENT_NUM){
     printf("Run out GC metadata, please give it more segments!\n");
     exit(0);
   }
+
   unsigned int seg_size =  GC_METADATA_EXTEND_SIZE_BYTES + METADATA_BLOCK_SIZE_BYTES;
   void *new_segment = STD_MALLOC(seg_size);
   memset(new_segment, 0, seg_size);
@@ -145,6 +150,7 @@ Vector_Block* gc_metadata_extend(Pool* pool)
   
   block = pool_get_entry(pool);
   unlock(metadata->alloc_lock);
+
   return block;
 }
 
@@ -161,10 +167,10 @@ static void gc_update_repointed_sets(GC* gc, Pool* pool)
   while(root_set){
     POINTER_SIZE_INT* iter = vector_block_iterator_init(root_set);
     while(!vector_block_iterator_end(root_set,iter)){
-      Partial_Reveal_Object** p_ref = (Partial_Reveal_Object** )*iter;
+      REF* p_ref = (REF* )*iter;
       iter = vector_block_iterator_advance(root_set,iter);
 
-      Partial_Reveal_Object* p_obj = *p_ref;
+      Partial_Reveal_Object* p_obj = read_slot(p_ref);
       if(IS_MOVE_COMPACT){
         if(obj_is_moved(p_obj))
           *p_ref = obj_get_fw_in_table(p_obj);
@@ -177,7 +183,7 @@ static void gc_update_repointed_sets(GC* gc, Pool* pool)
            * since those which can be scanned in MOS & NOS must have been set fw bit in oi.
            */
           assert(address_belongs_to_gc_heap(obj_get_fw_in_oi(p_obj), gc));
-          *p_ref = obj_get_fw_in_oi(p_obj);
+          write_slot(p_ref , obj_get_fw_in_oi(p_obj));
         }
       }
     }
@@ -192,20 +198,25 @@ void gc_fix_rootset(Collector* collector)
   GC* gc = collector->gc;  
   GC_Metadata* metadata = gc->metadata;
 
-  /* generational MINOR_COLLECTION doesn't need rootset update, but need reset */
-  if( gc->collect_kind != MINOR_COLLECTION ) /* MINOR but not forwarding */
+  /* MINOR_COLLECTION doesn't need rootset update, but need reset */
+  if( !gc_match_kind(gc, MINOR_COLLECTION)){
     gc_update_repointed_sets(gc, metadata->gc_rootset_pool);
-  else
-    gc_set_pool_clear(metadata->gc_rootset_pool);
-  
 #ifndef BUILD_IN_REFERENT
-  gc_update_finref_repointed_refs(gc);
+    gc_update_finref_repointed_refs(gc);
 #endif
+  } else {
+    gc_set_pool_clear(metadata->gc_rootset_pool);
+  }
+
+#ifdef COMPRESS_REFERENCE
+  gc_fix_uncompressed_rootset(gc);
+#endif
+
 
   update_rootset_interior_pointer();
   /* it was pointing to the last root_set entry in gc_rootset_pool (before rem_sets). */
   gc->root_set = NULL;
-      
+  
   return;
 }
 
@@ -218,7 +229,9 @@ void gc_set_rootset(GC* gc)
   Pool* free_set_pool = metadata->free_set_pool;
 
   Vector_Block* root_set = NULL;
-  
+#ifdef COMPRESS_REFERENCE  
+  gc_set_uncompressed_rootset(gc);
+#endif
   /* put back last rootset block */
   pool_put_entry(gc_rootset_pool, gc->root_set);
   
@@ -250,7 +263,7 @@ void gc_set_rootset(GC* gc)
     collector->rem_set = NULL;
   }
 
-  if( gc->collect_kind != MINOR_COLLECTION ){
+  if( !gc_match_kind(gc, MINOR_COLLECTION )){
     /* all the remsets are useless now */
     /* clean and put back mutator remsets */  
     root_set = pool_get_entry( mutator_remset_pool );
@@ -293,11 +306,18 @@ void gc_reset_rootset(GC* gc)
 {
   assert(pool_is_empty(gc_metadata.gc_rootset_pool));
   assert(gc->root_set == NULL);
-  gc->root_set = free_set_pool_get_entry(&gc_metadata); 
-  
-  assert(vector_block_is_empty(gc->root_set)); 
+  gc->root_set = free_set_pool_get_entry(&gc_metadata);
+  assert(vector_block_is_empty(gc->root_set));
+
+#ifdef COMPRESS_REFERENCE
+  assert(pool_is_empty(gc_metadata.gc_uncompressed_rootset_pool));
+  assert(gc->uncompressed_root_set == NULL);
+  gc->uncompressed_root_set = free_set_pool_get_entry(&gc_metadata);
+  assert(vector_block_is_empty(gc->uncompressed_root_set));
+#endif
+
   return;
-}  
+}
 
 void gc_clear_remset(GC* gc)
 {
