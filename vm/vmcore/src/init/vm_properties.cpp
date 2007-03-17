@@ -209,6 +209,10 @@ static void init_java_properties(Properties & properties)
 #else
         "java.util.prefs.FilePreferencesFactoryImpl");
 #endif
+    // Property for xalan.jar
+    properties.set("javax.xml.transform.TransformerFactory",
+                   "org.apache.xalan.xsltc.trax.TransformerFactoryImpl");     
+
 
     // Added for compatibility with the external java JDWP agent
     properties.set("sun.boot.library.path", base_path_buf);
