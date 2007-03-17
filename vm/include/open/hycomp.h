@@ -61,105 +61,6 @@
  */
 
 #define HY_PLATFORM_DOUBLE_ORDER
-#if defined(LINUX)
-
-/**
- * @note Linux supports different processors - do not assume 386. 
- */
-#if defined(LINUXPPC64) || defined(POINTER64)
-#define DATA_TYPES_DEFINED
-typedef unsigned long int UDATA;        /* 64bits */
-typedef unsigned long int U_64;
-typedef unsigned int U_32;
-typedef unsigned short U_16;
-typedef unsigned char U_8;
-typedef signed long int IDATA;  /* 64bits */
-typedef long int I_64;
-typedef signed int I_32;
-typedef signed short I_16;
-typedef signed char I_8;
-//typedef U_32 BOOLEAN;
-#if defined(LINUXPPC64) || defined(POINTER64)
-#define TOC_UNWRAP_ADDRESS(wrappedPointer) ((void *) (wrappedPointer)[0])
-#define TOC_STORE_TOC(dest,wrappedPointer) (dest = ((UDATA*)wrappedPointer)[1])
-#endif
-#else
-typedef long long I_64;
-typedef unsigned long long U_64;
-#endif
-typedef double SYS_FLOAT;
-#define HYCONST64(x) x##LL
-#define NO_LVALUE_CASTING
-#define FLOAT_EXTENDED  long double
-#define PLATFORM_IS_ASCII
-#define PLATFORM_LINE_DELIMITER "\012"
-#define DIR_SEPARATOR '/'
-#define DIR_SEPARATOR_STR "/"
-
-/**
- * No priorities on Linux 
- */
-#define HY_PRIORITY_MAP {0,0,0,0,0,0,0,0,0,0,0,0}
-
-#if (defined(LINUXPPC) && !defined(LINUXPPC64))
-#define VA_PTR(valist) (&valist[0])
-#endif
-#endif
-
-#define GLOBAL_DATA(symbol) ((void*)&(symbol))
-#define GLOBAL_TABLE(symbol) GLOBAL_DATA(symbol)
-
-/**
- * Win32 - Windows 3.1 & NT using Win32 
- */
-#if defined(WIN32) || defined(_WIN64)
-
-typedef __int64 I_64;
-typedef unsigned __int64 U_64;
-
-typedef double SYS_FLOAT;
-#define NO_LVALUE_CASTING
-#define VMAPICALL _stdcall
-#define VMCALL _cdecl
-#define EXE_EXTENSION_CHAR  '.'
-
-#define DIR_SEPARATOR '\\'
-#define DIR_SEPARATOR_STR "\\"
-
-/** 
- * Modifications for the Alpha running WIN-NT 
- */
-
-#if defined(_ALPHA_)
-#undef small 
-
-/**
- * Defined as char in rpcndr.h 
- */
-
-typedef double FLOAT_EXTENDED;
-#endif
-
-#define HY_PRIORITY_MAP { \
-  THREAD_PRIORITY_IDLE,             /* 0 */\
-  THREAD_PRIORITY_LOWEST,           /* 1 */\
-  THREAD_PRIORITY_BELOW_NORMAL,     /* 2 */\
-  THREAD_PRIORITY_BELOW_NORMAL,     /* 3 */\
-  THREAD_PRIORITY_BELOW_NORMAL,     /* 4 */\
-  THREAD_PRIORITY_NORMAL,           /* 5 */\
-  THREAD_PRIORITY_ABOVE_NORMAL,     /* 6 */\
-  THREAD_PRIORITY_ABOVE_NORMAL,     /* 7 */\
-  THREAD_PRIORITY_ABOVE_NORMAL,     /* 8 */\
-  THREAD_PRIORITY_ABOVE_NORMAL,     /* 9 */\
-  THREAD_PRIORITY_HIGHEST,          /*10 */\
-  THREAD_PRIORITY_TIME_CRITICAL     /*11 */}
-#endif
-
-#if !defined(VMCALL)
-#define VMCALL
-#define VMAPICALL
-#endif
-#define PVMCALL VMCALL *
 
 /**
  * Provide some reasonable defaults for the VM types:
@@ -176,24 +77,79 @@ typedef double FLOAT_EXTENDED;
  * <li><code>BOOLEAN</code>      - something that can be zero or non-zero</li>
  * </ul>
  */
-#if !defined(DATA_TYPES_DEFINED)
+#ifdef LINUX
+typedef long long I_64;
+typedef unsigned long long U_64;
+
+typedef double SYS_FLOAT;
+#define HYCONST64(x) x##LL
+#define NO_LVALUE_CASTING
+#define FLOAT_EXTENDED  long double
+#define PLATFORM_IS_ASCII
+#define PLATFORM_LINE_DELIMITER "\012"
+#define DIR_SEPARATOR '/'
+#define DIR_SEPARATOR_STR "/"
+/**
+ * No priorities on Linux 
+ */
+#define HY_PRIORITY_MAP {0,0,0,0,0,0,0,0,0,0,0,0}
+#else
+typedef __int64 I_64;
+typedef unsigned __int64 U_64;
+
+typedef double SYS_FLOAT;
+#define NO_LVALUE_CASTING
+#define VMAPICALL _stdcall
+#define VMCALL _cdecl
+#define EXE_EXTENSION_CHAR  '.'
+
+#define DIR_SEPARATOR '\\'
+#define DIR_SEPARATOR_STR "\\"
+
+#define HY_PRIORITY_MAP { \
+  THREAD_PRIORITY_IDLE,             /* 0 */\
+  THREAD_PRIORITY_LOWEST,           /* 1 */\
+  THREAD_PRIORITY_BELOW_NORMAL,     /* 2 */\
+  THREAD_PRIORITY_BELOW_NORMAL,     /* 3 */\
+  THREAD_PRIORITY_BELOW_NORMAL,     /* 4 */\
+  THREAD_PRIORITY_NORMAL,           /* 5 */\
+  THREAD_PRIORITY_ABOVE_NORMAL,     /* 6 */\
+  THREAD_PRIORITY_ABOVE_NORMAL,     /* 7 */\
+  THREAD_PRIORITY_ABOVE_NORMAL,     /* 8 */\
+  THREAD_PRIORITY_ABOVE_NORMAL,     /* 9 */\
+  THREAD_PRIORITY_HIGHEST,          /*10 */\
+  THREAD_PRIORITY_TIME_CRITICAL     /*11 */}
+#endif
+
+#ifdef POINTER64
+typedef U_64 UDATA;        /* 64bits */
+typedef unsigned int U_32;
+typedef unsigned short U_16;
+typedef unsigned char U_8;
+typedef I_64 IDATA;  /* 64bits */
+typedef signed int I_32;
+typedef signed short I_16;
+typedef signed char I_8;
+#else
 typedef unsigned int UDATA;
 typedef unsigned int U_32;
 typedef unsigned short U_16;
 typedef unsigned char U_8;
-/** 
- * No generic U_64 or I_64. 
- */
 typedef int IDATA;
 typedef int I_32;
 typedef short I_16;
 typedef char I_8;
-
-/**
- * Don't typedef <code>BOOLEAN</code> since it's already def'ed on Win32. 
- */
-
 #endif
+
+#define GLOBAL_DATA(symbol) ((void*)&(symbol))
+#define GLOBAL_TABLE(symbol) GLOBAL_DATA(symbol)
+
+#if !defined(VMCALL)
+#define VMCALL
+#define VMAPICALL
+#endif
+#define PVMCALL VMCALL *
+
 #ifdef LINUX
 #define BOOLEAN UDATA
 #endif
@@ -373,26 +329,6 @@ typedef float ESSINGLE;
 #define NORETURN __attribute__((noreturn))
 #else
 #define NORETURN
-#endif
-
-/**
- * On some systems <code>va_list</code> is an array type. This is probably in
- * violation of the ANSI C spec, but it's not entirely clear. Because of this, 
- * we end up with an undesired extra level of indirection if we take the address 
- * of a <code>va_list</code> argument. 
- *
- * To get it right, always use the <code>VA_PTR</code> macro.
- */
-
-#if !defined(VA_PTR)
-#define VA_PTR(valist) (&valist)
-#endif
-#if !defined(TOC_UNWRAP_ADDRESS)
-#define TOC_UNWRAP_ADDRESS(wrappedPointer) (wrappedPointer)
-#endif
-
-#if !defined(TOC_STORE_TOC)
-#define TOC_STORE_TOC(dest,wrappedPointer)
 #endif
 
 /**
