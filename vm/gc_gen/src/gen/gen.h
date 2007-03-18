@@ -82,6 +82,7 @@ typedef struct GC_Gen {
 
   /* FIXME:: this is wrong! root_set belongs to mutator */
   Vector_Block* root_set;
+  Vector_Block* uncompressed_root_set;
   
   //For_LOS_extend
   Space_Tuner* tuner;  
@@ -171,4 +172,5 @@ void gc_gen_iterate_heap(GC_Gen *gc);
 extern Boolean GEN_NONGEN_SWITCH ;
 
 #endif /* ifndef _GC_GEN_H_ */
+
 

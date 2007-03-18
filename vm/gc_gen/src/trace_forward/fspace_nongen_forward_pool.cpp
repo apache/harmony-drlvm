@@ -27,11 +27,11 @@
 
 #ifdef MARK_BIT_FLIPPING
 
-static FORCE_INLINE void scan_slot(Collector* collector, Partial_Reveal_Object **p_ref) 
+static FORCE_INLINE void scan_slot(Collector *collector, REF *p_ref)
 {
-  Partial_Reveal_Object *p_obj = *p_ref;
-  if(p_obj == NULL) return;  
-    
+  REF ref = *p_ref;
+  if(ref == COMPRESSED_NULL) return;
+  
   collector_tracestack_push(collector, p_ref); 
   return;
 }
@@ -40,13 +40,13 @@ static FORCE_INLINE void scan_object(Collector* collector, Partial_Reveal_Object
 {
   if (!object_has_ref_field_before_scan(p_obj)) return;
     
-  Partial_Reveal_Object **p_ref;
+  REF *p_ref;
 
   if (object_is_array(p_obj)) {   /* scan array object */
   
     Partial_Reveal_Array* array = (Partial_Reveal_Array*)p_obj;
     unsigned int array_length = array->array_len; 
-    p_ref = (Partial_Reveal_Object**)((POINTER_SIZE_INT)array + (int)array_first_element_offset(array));
+    p_ref = (REF *)((POINTER_SIZE_INT)array + (int)array_first_element_offset(array));
 
     for (unsigned int i = 0; i < array_length; i++) {
       scan_slot(collector, p_ref+i);
@@ -81,10 +81,10 @@ static FORCE_INLINE void scan_object(Collector* collector, Partial_Reveal_Object
 */
 
 #include "../verify/verify_live_heap.h"
-static FORCE_INLINE void forward_object(Collector* collector, Partial_Reveal_Object **p_ref) 
+static FORCE_INLINE void forward_object(Collector* collector, REF *p_ref) 
 {
   GC* gc = collector->gc;
-  Partial_Reveal_Object *p_obj = *p_ref;
+  Partial_Reveal_Object *p_obj = read_slot(p_ref);
 
   if(!obj_belongs_to_nos(p_obj)){
     if(obj_mark_in_oi(p_obj))
@@ -110,11 +110,11 @@ static FORCE_INLINE void forward_object(Collector* collector, Partial_Reveal_Obj
 
     Partial_Reveal_Object *p_new_obj = obj_get_fw_in_oi(p_obj);
     assert(p_new_obj);
-    *p_ref = p_new_obj;
+    write_slot(p_ref, p_new_obj);
     return;
   }
   /* otherwise, we successfully forwarded */
-  *p_ref = p_target_obj;
+  write_slot(p_ref, p_target_obj);
 
   /* we forwarded it, we need remember it for verification. */
   if(verify_live_heap) {
@@ -125,13 +125,13 @@ static FORCE_INLINE void forward_object(Collector* collector, Partial_Reveal_Obj
   return;
 }
 
-static void trace_object(Collector* collector, Partial_Reveal_Object **p_ref)
+static void trace_object(Collector *collector, REF *p_ref)
 { 
   forward_object(collector, p_ref);
 
   Vector_Block* trace_stack = (Vector_Block*)collector->trace_stack;
   while( !vector_stack_is_empty(trace_stack)){
-    p_ref = (Partial_Reveal_Object **)vector_stack_pop(trace_stack); 
+    p_ref = (REF *)vector_stack_pop(trace_stack); 
     forward_object(collector, p_ref);
     trace_stack = (Vector_Block*)collector->trace_stack;
   }
@@ -159,11 +159,10 @@ static void collector_trace_rootsets(Collector* collector)
   while(root_set){
     POINTER_SIZE_INT* iter = vector_block_iterator_init(root_set);
     while(!vector_block_iterator_end(root_set,iter)){
-      Partial_Reveal_Object** p_ref = (Partial_Reveal_Object** )*iter;
-      iter = vector_block_iterator_advance(root_set,iter);
+      REF *p_ref = (REF *)*iter;
+      iter = vector_block_iterator_advance(root_set, iter);
 
-      Partial_Reveal_Object* p_obj = *p_ref;
-      assert(p_obj != NULL);  /* root ref cann't be NULL, but remset can be */
+      assert(*p_ref);  /* root ref cann't be NULL, but remset can be */
 
       collector_tracestack_push(collector, p_ref);
     } 
@@ -181,8 +180,8 @@ retry:
   while(trace_task){    
     POINTER_SIZE_INT* iter = vector_block_iterator_init(trace_task);
     while(!vector_block_iterator_end(trace_task,iter)){
-      Partial_Reveal_Object** p_ref = (Partial_Reveal_Object** )*iter;
-      iter = vector_block_iterator_advance(trace_task,iter);
+      REF *p_ref = (REF *)*iter;
+      iter = vector_block_iterator_advance(trace_task, iter);
       trace_object(collector, p_ref);
       
       if(collector->result == FALSE)  break; /* force return */
@@ -230,10 +229,17 @@ void nongen_forward_pool(Collector* collector)
   if( collector->thread_handle != 0 ) return;
 
   gc->collect_result = gc_collection_result(gc);
-  if(!gc->collect_result) return;
+  if(!gc->collect_result){
+#ifndef BUILD_IN_REFERENT
+    fallback_finref_cleanup(gc);
+#endif
+    return;
+  }
 
-  if(!IGNORE_FINREF )
+  if(!IGNORE_FINREF ){
     collector_identify_finref(collector);
+    if(!gc->collect_result) return;
+  }
 #ifndef BUILD_IN_REFERENT
   else {
       gc_set_weakref_sets(gc);
@@ -251,7 +257,7 @@ void nongen_forward_pool(Collector* collector)
 
 void trace_obj_in_nongen_fw(Collector *collector, void *p_ref)
 {
-  trace_object(collector, (Partial_Reveal_Object **)p_ref);
+  trace_object(collector, (REF*)p_ref);
 }
 
 #endif /* MARK_BIT_FLIPPING */

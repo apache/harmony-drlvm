@@ -23,6 +23,7 @@
 #include "../thread/collector.h"
 #include "../common/gc_metadata.h"
 #include "../finalizer_weakref/finalizer_weakref.h"
+#include "../common/compressed_ref.h"
 
 static FORCE_INLINE Boolean fspace_object_to_be_forwarded(Partial_Reveal_Object *p_obj, Fspace *fspace)
 {
@@ -30,13 +31,14 @@ static FORCE_INLINE Boolean fspace_object_to_be_forwarded(Partial_Reveal_Object 
   return forward_first_half? (p_obj < object_forwarding_boundary):(p_obj>=object_forwarding_boundary);
 }
 
-static FORCE_INLINE void scan_slot(Collector* collector, Partial_Reveal_Object **p_ref) 
+static FORCE_INLINE void scan_slot(Collector *collector, REF *p_ref) 
 {
-  Partial_Reveal_Object *p_obj = *p_ref;
-  if (p_obj == NULL) return;  
+  REF ref = *p_ref;
+  if(ref == COMPRESSED_NULL) return;
     
   /* the slot can be in tspace or fspace, we don't care.
      we care only if the reference in the slot is pointing to fspace */
+  Partial_Reveal_Object *p_obj = uncompress_ref(ref);
   if (obj_belongs_to_nos(p_obj))
     collector_tracestack_push(collector, p_ref); 
 
@@ -47,7 +49,7 @@ static FORCE_INLINE void scan_object(Collector* collector, Partial_Reveal_Object
 {
   if (!object_has_ref_field(p_obj)) return;
     
-  void *slot;
+  REF *p_ref;
 
   /* scan array object */
   if (object_is_array(p_obj)) {
@@ -56,8 +58,8 @@ static FORCE_INLINE void scan_object(Collector* collector, Partial_Reveal_Object
 
     int32 array_length = vector_get_length((Vector_Handle) array);        
     for (int i = 0; i < array_length; i++) {
-      slot = vector_get_element_address_ref((Vector_Handle) array, i);
-      scan_slot(collector, (Partial_Reveal_Object **)slot);
+      p_ref= (REF *)vector_get_element_address_ref((Vector_Handle) array, i);
+      scan_slot(collector, p_ref);
     }   
     return;
   }
@@ -65,10 +67,10 @@ static FORCE_INLINE void scan_object(Collector* collector, Partial_Reveal_Object
   /* scan non-array object */
   int *offset_scanner = init_object_scanner(p_obj);
   while (true) {
-    slot = offset_get_ref(offset_scanner, p_obj);
-    if (slot == NULL) break;
+    p_ref = (REF *)offset_get_ref(offset_scanner, p_obj);
+    if (p_ref == NULL) break;
   
-    scan_slot(collector, (Partial_Reveal_Object **)slot);
+    scan_slot(collector, p_ref);
     offset_scanner = offset_next_ref(offset_scanner);
   }
 
@@ -90,17 +92,18 @@ static FORCE_INLINE void scan_object(Collector* collector, Partial_Reveal_Object
 
 #include "../verify/verify_live_heap.h"
 
-static FORCE_INLINE void forward_object(Collector* collector, Partial_Reveal_Object **p_ref) 
+static FORCE_INLINE void forward_object(Collector *collector, REF *p_ref) 
 {
   Space* space = collector->collect_space; 
   GC* gc = collector->gc;
-  Partial_Reveal_Object *p_obj = *p_ref;
+  Partial_Reveal_Object *p_obj = read_slot(p_ref);
 
   if(!obj_belongs_to_nos(p_obj)) return; 
 
   /* Fastpath: object has already been forwarded, update the ref slot */
   if(obj_is_fw_in_oi(p_obj)) {
-    *p_ref = obj_get_fw_in_oi(p_obj);
+    Partial_Reveal_Object* p_target_obj = obj_get_fw_in_oi(p_obj);
+    write_slot(p_ref, p_target_obj);
     return;
   }
 
@@ -110,7 +113,7 @@ static FORCE_INLINE void forward_object(Collector* collector, Partial_Reveal_Obj
     /* this obj remains in fspace, remember its ref slot for next GC if p_ref is not root. 
        we don't need remember root ref. Actually it's wrong to rem root ref since they change in next GC */
     if( !addr_belongs_to_nos(p_ref) && address_belongs_to_gc_heap(p_ref, gc))
-      collector_remset_add_entry(collector, p_ref); 
+      collector_remset_add_entry(collector, ( Partial_Reveal_Object**) p_ref); 
     
     if(obj_mark_in_oi(p_obj)) 
       scan_object(collector, p_obj);
@@ -136,28 +139,24 @@ static FORCE_INLINE void forward_object(Collector* collector, Partial_Reveal_Obj
 
     Partial_Reveal_Object *p_new_obj = obj_get_fw_in_oi(p_obj);
     assert(p_new_obj);
-    *p_ref = p_new_obj;
+    write_slot(p_ref, p_new_obj);
     return;
   }  
   /* otherwise, we successfully forwarded */
-  *p_ref = p_target_obj;
+  write_slot(p_ref, p_target_obj);
 
-  /* we forwarded it, we need remember it for verification. */
-  if(verify_live_heap) {
-    event_collector_move_obj(p_obj, p_target_obj, collector);
-  }
 
   scan_object(collector, p_target_obj); 
   return;
 }
 
-static void trace_object(Collector* collector, Partial_Reveal_Object **p_ref)
+static void trace_object(Collector *collector, REF *p_ref)
 { 
   forward_object(collector, p_ref);
   
   Vector_Block* trace_stack = (Vector_Block*)collector->trace_stack;
   while( !vector_stack_is_empty(trace_stack)){
-    p_ref = (Partial_Reveal_Object **)vector_stack_pop(trace_stack); 
+    p_ref = (REF *)vector_stack_pop(trace_stack); 
     forward_object(collector, p_ref);
     trace_stack = (Vector_Block*)collector->trace_stack;
   }
@@ -186,10 +185,12 @@ static void collector_trace_rootsets(Collector* collector)
   while(root_set){
     POINTER_SIZE_INT* iter = vector_block_iterator_init(root_set);
     while(!vector_block_iterator_end(root_set,iter)){
-      Partial_Reveal_Object** p_ref = (Partial_Reveal_Object** )*iter;
+      REF *p_ref = (REF *)*iter;
       iter = vector_block_iterator_advance(root_set,iter);
-      if(*p_ref == NULL) continue;  /* root ref cann't be NULL, but remset can be */
-      if(obj_belongs_to_nos(*p_ref)){
+      
+      if(!*p_ref) continue;  /* root ref cann't be NULL, but remset can be */
+      Partial_Reveal_Object *p_obj = read_slot(p_ref);
+      if(obj_belongs_to_nos(p_obj)){
         collector_tracestack_push(collector, p_ref);
       }
     } 
@@ -207,7 +208,7 @@ retry:
   while(trace_task){    
     POINTER_SIZE_INT* iter = vector_block_iterator_init(trace_task);
     while(!vector_block_iterator_end(trace_task,iter)){
-      Partial_Reveal_Object** p_ref = (Partial_Reveal_Object** )*iter;
+      REF *p_ref = (REF *)*iter;
       iter = vector_block_iterator_advance(trace_task,iter);
       assert(*p_ref); /* a task can't be NULL, it was checked before put into the task stack */
       /* in sequential version, we only trace same object once, but we were using a local hashset for that,
@@ -259,10 +260,17 @@ void gen_forward_pool(Collector* collector)
   if( collector->thread_handle != 0 ) return;
 
   gc->collect_result = gc_collection_result(gc);
-  if(!gc->collect_result) return;
+  if(!gc->collect_result){
+#ifndef BUILD_IN_REFERENT
+    fallback_finref_cleanup(gc);
+#endif
+    return;
+  }
 
-  if(!IGNORE_FINREF )
+  if(!IGNORE_FINREF ){
     collector_identify_finref(collector);
+    if(!gc->collect_result) return;
+  }
 #ifndef BUILD_IN_REFERENT
   else {
       gc_set_weakref_sets(gc);
@@ -280,5 +288,5 @@ void gen_forward_pool(Collector* collector)
 
 void trace_obj_in_gen_fw(Collector *collector, void *p_ref)
 {
-  trace_object(collector, (Partial_Reveal_Object **)p_ref);
+  trace_object(collector, (REF *)p_ref);
 }

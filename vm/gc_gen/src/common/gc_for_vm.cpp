@@ -20,6 +20,7 @@
 
 #include <cxxlog.h>
 #include "vm_threads.h"
+#include "compressed_ref.h"
 
 #include "../gen/gen.h"
 #include "interior_pointer.h"
@@ -77,15 +78,27 @@ void gc_wrapup()
   p_global_gc = NULL;
 }
 
+#ifdef COMPRESS_REFERENCE
+Boolean gc_supports_compressed_references()
+{
+  vtable_base = vm_get_vtable_base();
+  return TRUE;
+}
+#endif
+
 /* this interface need reconsidering. is_pinned is unused. */
 void gc_add_root_set_entry(Managed_Object_Handle *ref, Boolean is_pinned) 
-{   
+{
   Partial_Reveal_Object** p_ref = (Partial_Reveal_Object**)ref;
   Partial_Reveal_Object* p_obj = *p_ref;
   /* we don't enumerate NULL reference and nos_boundary
      FIXME:: nos_boundary is a static field in GCHelper.java for fast write barrier, not a real object reference 
      this should be fixed that magic Address field should not be enumerated. */
+#ifdef COMPRESS_REFERENCE
+  if (p_obj == (Partial_Reveal_Object*)HEAP_NULL || p_obj == NULL || p_obj == nos_boundary ) return;
+#else
   if (p_obj == NULL || p_obj == nos_boundary ) return;
+#endif  
   assert( !obj_is_marked_in_vt(p_obj));
   /* for Minor_collection, it's possible for p_obj be forwarded in non-gen mark-forward GC. 
      The forward bit is actually last cycle's mark bit.
@@ -99,6 +112,16 @@ void gc_add_root_set_entry(Managed_Object_Handle *ref, Boolean is_pinned)
 void gc_add_root_set_entry_interior_pointer (void **slot, int offset, Boolean is_pinned) 
 {  
   add_root_set_entry_interior_pointer(slot, offset, is_pinned); 
+}
+
+void gc_add_compressed_root_set_entry(REF* ref, Boolean is_pinned)
+{
+  REF *p_ref = (REF *)ref;
+  if(*p_ref == COMPRESSED_NULL) return;
+  Partial_Reveal_Object* p_obj = read_slot(p_ref);
+  assert(!obj_is_marked_in_vt(p_obj));
+  assert( address_belongs_to_gc_heap(p_obj, p_global_gc));
+  gc_compressed_rootset_add_entry(p_global_gc, p_ref);
 }
 
 /* VM to force GC */
@@ -179,6 +202,7 @@ void gc_iterate_heap() {
 
     gc_gen_iterate_heap((GC_Gen *)p_global_gc);
 }
+
 
 
 

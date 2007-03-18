@@ -23,30 +23,30 @@
 #include "../gen/gen.h"
 #include "../finalizer_weakref/finalizer_weakref.h"
 
-static FORCE_INLINE void scan_slot(Collector* collector, Partial_Reveal_Object** p_ref)
+static FORCE_INLINE void scan_slot(Collector* collector, REF *p_ref)
 {
-  Partial_Reveal_Object* p_obj = *p_ref;
-  if(p_obj==NULL) return;
+  REF ref = *p_ref;
+  if(ref == COMPRESSED_NULL) return;
 
+  Partial_Reveal_Object *p_obj = uncompress_ref(ref);
   if(obj_mark_in_vt(p_obj))
     collector_tracestack_push(collector, p_obj);
   
   return;
 }
 
-
 static FORCE_INLINE void scan_object(Collector* collector, Partial_Reveal_Object *p_obj)
 {
   if( !object_has_ref_field(p_obj) ) return;
   
-  Partial_Reveal_Object **p_ref;
+  REF *p_ref;
 
   if (object_is_array(p_obj)) {   /* scan array object */
   
     Partial_Reveal_Array* array = (Partial_Reveal_Array*)p_obj;
     unsigned int array_length = array->array_len;
   
-    p_ref = (Partial_Reveal_Object**)((POINTER_SIZE_INT)array + (int)array_first_element_offset(array));
+    p_ref = (REF *)((POINTER_SIZE_INT)array + (int)array_first_element_offset(array));
 
     for (unsigned int i = 0; i < array_length; i++) {
       scan_slot(collector, p_ref+i);
@@ -122,10 +122,10 @@ void mark_scan_pool(Collector* collector)
   while(root_set){
     POINTER_SIZE_INT* iter = vector_block_iterator_init(root_set);
     while(!vector_block_iterator_end(root_set,iter)){
-      Partial_Reveal_Object** p_ref = (Partial_Reveal_Object** )*iter;
+      REF *p_ref = (REF *)*iter;
       iter = vector_block_iterator_advance(root_set,iter);
 
-      Partial_Reveal_Object* p_obj = *p_ref;
+      Partial_Reveal_Object *p_obj = read_slot(p_ref);
       /* root ref can't be NULL, (remset may have NULL ref entry, but this function is only for MAJOR_COLLECTION */
       assert(p_obj!=NULL);
       /* we have to mark the object before put it into marktask, because
