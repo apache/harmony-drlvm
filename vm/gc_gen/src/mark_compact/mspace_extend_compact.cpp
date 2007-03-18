@@ -149,13 +149,13 @@ inline void object_refix_ref_slots(Partial_Reveal_Object* p_obj, void *start_add
     assert(!obj_is_primitive_array(p_obj));
     
     int32 array_length = array->array_len;
-    REF* p_refs = (REF*)((POINTER_SIZE_INT)array + (int)array_first_element_offset(array));
+    Partial_Reveal_Object** p_refs = (Partial_Reveal_Object**)((POINTER_SIZE_INT)array + (int)array_first_element_offset(array));
 
     for (int i = 0; i < array_length; i++) {
-      REF* p_ref = p_refs + i;
-      Partial_Reveal_Object*  p_element = read_slot(p_ref);
+      Partial_Reveal_Object** p_ref = p_refs + i;
+      Partial_Reveal_Object*  p_element = *p_ref;
       if((p_element > start_address) && (p_element < end_address))
-        write_slot(p_ref, (Partial_Reveal_Object*)((POINTER_SIZE_INT)p_element - addr_diff));
+          *p_ref = (Partial_Reveal_Object*)((POINTER_SIZE_INT)p_element - addr_diff);
     }
     return;
   }
@@ -163,12 +163,12 @@ inline void object_refix_ref_slots(Partial_Reveal_Object* p_obj, void *start_add
   /* scan non-array object */
   int *offset_scanner = init_object_scanner(p_obj);
   while (true) {
-    REF* p_ref = (REF*)offset_get_ref(offset_scanner, p_obj);
+    Partial_Reveal_Object** p_ref = (Partial_Reveal_Object**)offset_get_ref(offset_scanner, p_obj);
     if (p_ref == NULL) break; /* terminating ref slot */
   
-    Partial_Reveal_Object*  p_element = read_slot(p_ref);
+    Partial_Reveal_Object*  p_element = *p_ref;
     if((p_element > start_address) && (p_element < end_address))
-      write_slot(p_ref, (Partial_Reveal_Object*)((POINTER_SIZE_INT)p_element - addr_diff));
+      *p_ref = (Partial_Reveal_Object*)((POINTER_SIZE_INT)p_element - addr_diff);
     offset_scanner = offset_next_ref(offset_scanner);
   }
 
@@ -204,7 +204,7 @@ static void lspace_refix_repointed_refs(Collector* collector, Lspace* lspace, vo
 static void gc_reupdate_repointed_sets(GC* gc, Pool* pool, void *start_address, void *end_address, unsigned int addr_diff)
 {
   GC_Metadata *metadata = gc->metadata;
-  assert(gc_match_kind(gc, EXTEND_COLLECTION));
+  assert(gc->collect_kind != MINOR_COLLECTION);
   
   pool_iterator_init(pool);
 
@@ -216,7 +216,7 @@ static void gc_reupdate_repointed_sets(GC* gc, Pool* pool, void *start_address, 
 
       Partial_Reveal_Object *p_obj = *p_ref;
       if((p_obj > start_address) && (p_obj < end_address))
-        *p_ref = (Partial_Reveal_Object*)((POINTER_SIZE_INT)p_obj - addr_diff);
+          *p_ref = (Partial_Reveal_Object*)((POINTER_SIZE_INT)p_obj - addr_diff);
     }
   }
 }
@@ -227,13 +227,9 @@ static void gc_refix_rootset(Collector *collector, void *start_address, void *en
   GC_Metadata *metadata = gc->metadata;
 
   /* only for MAJOR_COLLECTION and FALLBACK_COLLECTION */
-  assert(gc_match_kind(gc, EXTEND_COLLECTION));
+  assert(gc->collect_kind != MINOR_COLLECTION);
   
   gc_reupdate_repointed_sets(gc, metadata->gc_rootset_pool, start_address, end_address, addr_diff);
-
-#ifdef COMPRESS_REFERENCE
-  gc_fix_uncompressed_rootset(gc);
-#endif
   
 #ifndef BUILD_IN_REFERENT
   gc_update_finref_repointed_refs(gc);
@@ -256,6 +252,11 @@ static void move_compacted_blocks_to_mspace(Collector *collector, unsigned int a
     Block_Header *dest_block = GC_BLOCK_HEADER((void *)((POINTER_SIZE_INT)src_base - addr_diff));
     memmove(dest_block->base, src_base, size);
     dest_block->new_free = (void *)((POINTER_SIZE_INT)block_end - addr_diff);
+    if(verify_live_heap)
+      while (p_obj < block_end) {
+        event_collector_doublemove_obj(p_obj, (Partial_Reveal_Object *)((POINTER_SIZE_INT)p_obj - addr_diff), collector);
+         p_obj = obj_end(p_obj);
+      }
   }
 }
 
@@ -270,7 +271,7 @@ void mspace_extend_compact(Collector *collector)
   Lspace *lspace = gc_gen->los;
 
   /*For_LOS adaptive: when doing EXTEND_COLLECTION, mspace->survive_ratio should not be updated in gc_decide_next_collect( )*/
-  gc_gen->collect_kind |= EXTEND_COLLECTION;
+  gc_gen->collect_kind = EXTEND_COLLECTION;
   
   unsigned int num_active_collectors = gc_gen->num_active_collectors;
   unsigned int old_num;
@@ -314,7 +315,7 @@ void mspace_extend_compact(Collector *collector)
   Lspace *lspace = gc_gen->los;
 
   /*For_LOS adaptive: when doing EXTEND_COLLECTION, mspace->survive_ratio should not be updated in gc_decide_next_collect( )*/
-  gc_gen->collect_kind |= EXTEND_COLLECTION;
+  gc_gen->collect_kind = EXTEND_COLLECTION;
   
   unsigned int num_active_collectors = gc_gen->num_active_collectors;
   unsigned int old_num;

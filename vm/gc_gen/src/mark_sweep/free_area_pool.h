@@ -33,16 +33,16 @@
 
 typedef struct Lockable_Bidir_List{
   /* <-- First couple of fields overloadded as Bidir_List */
-  POINTER_SIZE_INT zero;
+  unsigned int zero;
   Bidir_List* next;
   Bidir_List* prev;
   /* END of Bidir_List --> */
-  SpinLock lock;	
+  SpinLock lock;  
 }Lockable_Bidir_List;
 
 typedef struct Free_Area{
   /* <-- First couple of fields overloadded as Bidir_List */
-  POINTER_SIZE_INT zero;
+  unsigned int zero;
   Bidir_List* next;
   Bidir_List* prev;
   /* END of Bidir_List --> */
@@ -70,7 +70,7 @@ inline Free_Area* free_area_new(void* start, unsigned int size)
 typedef struct Free_Area_Pool{
   Lockable_Bidir_List sized_area_list[NUM_FREE_LIST];
   /* each list corresponds to one bit in below vector */
-  POINTER_SIZE_INT list_bit_flag[NUM_FLAG_WORDS];
+  unsigned int list_bit_flag[NUM_FLAG_WORDS];
 }Free_Area_Pool;
 
 #define MAX_LIST_INDEX (NUM_FREE_LIST - 1)
@@ -120,7 +120,7 @@ inline void free_pool_remove_area(Free_Area_Pool* pool, Free_Area* free_area)
   /* set bit flag of the list */
   Bidir_List* list = (Bidir_List*)&(pool->sized_area_list[index]);
   if(list->next == list){
-  	pool_list_clear_flag(pool, index);		
+  	pool_list_clear_flag(pool, index);    
   }
 }
 

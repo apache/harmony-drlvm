@@ -44,8 +44,6 @@ typedef struct Finref_Metadata{
   
   Pool *repset_pool;                            // repointed reference slot sets
   
-  Pool *fallback_ref_pool;                      // temporary buffer for weakref needing to be put to vm when resurrection fallback happens
-  
   Vector_Block *finalizable_obj_set;            // buffer for finalizable_objects_pool
   Vector_Block *repset;                         // buffer for repset_pool
   
@@ -68,13 +66,11 @@ extern void gc_set_weakref_sets(GC *gc);
 extern void gc_reset_finref_metadata(GC *gc);
 
 extern void mutator_add_finalizer(Mutator *mutator, Partial_Reveal_Object *ref);
-extern void gc_add_finalizer(GC *gc, Vector_Block* &vector_block_in_use, Partial_Reveal_Object *ref);
 extern void gc_add_finalizable_obj(GC *gc, Partial_Reveal_Object *ref);
 extern void collector_add_softref(Collector *collector, Partial_Reveal_Object *ref);
 extern void collector_add_weakref(Collector *collector, Partial_Reveal_Object *ref);
 extern void collector_add_phanref(Collector *collector, Partial_Reveal_Object *ref);
-extern void finref_repset_add_entry(GC *gc, REF* ref);
-extern void finref_add_fallback_ref(GC *gc, Vector_Block* &vector_block_in_use, Partial_Reveal_Object *p_ref);
+extern void finref_repset_add_entry(GC *gc, Partial_Reveal_Object **ref);
 
 extern Boolean obj_with_fin_pool_is_empty(GC *gc);
 extern Boolean finalizable_obj_pool_is_empty(GC *gc);

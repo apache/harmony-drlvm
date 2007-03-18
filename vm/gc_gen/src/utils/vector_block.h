@@ -48,6 +48,7 @@ inline void vector_block_init(Vector_Block* block, unsigned int size)
 inline unsigned int vector_block_entry_count(Vector_Block* block)
 { return (unsigned int)(block->tail - block->head); }
 
+
 inline Boolean vector_block_is_full(Vector_Block* block)
 { return block->tail == block->heap_end; }
 
@@ -76,7 +77,7 @@ inline void vector_block_clear(Vector_Block* block)
   block->head = (POINTER_SIZE_INT*)block->entries;
   block->tail = (POINTER_SIZE_INT*)block->entries;
 #ifdef _DEBUG
-  memset(block->entries, 0, (POINTER_SIZE_INT)block->heap_end - (POINTER_SIZE_INT)block->entries);
+ memset(block->entries, 0, (POINTER_SIZE_INT)block->heap_end - (POINTER_SIZE_INT)block->entries);
 #endif
 }
 

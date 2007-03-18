@@ -58,8 +58,8 @@ void gc_copy_interior_pointer_table_to_rootset()
   unsigned int i;
   for( i = 0; i<interior_pointer_num_count; i++)
   {
-    slot_offset_entry* entry_traverser = (slot_offset_entry*)&interior_pointer_set[i];
-    gc_add_root_set_entry((Managed_Object_Handle*)(&(entry_traverser->base)), FALSE);
+  slot_offset_entry* entry_traverser = (slot_offset_entry*)&interior_pointer_set[i];
+  gc_add_root_set_entry((Managed_Object_Handle*)(&(entry_traverser->base)), FALSE);
   }
 }
 
@@ -68,14 +68,14 @@ void update_rootset_interior_pointer()
   unsigned int i;
   for( i = 0; i<interior_pointer_num_count; i++)
   {
-    slot_offset_entry* entry_traverser = (slot_offset_entry*)&interior_pointer_set[i];
-    void** root_slot = entry_traverser->slot;
-    Partial_Reveal_Object* root_base = (Partial_Reveal_Object*)entry_traverser->base;
-    unsigned int root_offset = entry_traverser->offset;
-    void *new_slot_contents = (void *)((Byte*)root_base + root_offset);	
-    *root_slot = new_slot_contents;
+  slot_offset_entry* entry_traverser = (slot_offset_entry*)&interior_pointer_set[i];
+  void** root_slot = entry_traverser->slot;
+  Partial_Reveal_Object* root_base = (Partial_Reveal_Object*)entry_traverser->base;
+  unsigned int root_offset = entry_traverser->offset;
+  void *new_slot_contents = (void *)((Byte*)root_base + root_offset);
+  *root_slot = new_slot_contents;
   }
-  //can not reset the table here, for the rootset may be updated multi times
+       //can not reset the table here, for the rootset may be updated multi times
 }
 
 void gc_reset_interior_pointer_table()

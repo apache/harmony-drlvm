@@ -15,7 +15,7 @@
  */
 
 /**
- * @author Ji Qi, 2006/10/05
+ * @author Xiao-Feng Li, 2006/10/05
  */
 
 #ifndef _SPACE_TUNER_H_
@@ -24,7 +24,7 @@
 #include "gc_common.h"
 #include "gc_space.h"
 
-#define GC_LOS_MIN_VARY_SIZE ( 8 * MB ) 
+#define GC_LOS_MIN_VARY_SIZE ( 2 * MB ) 
 #define GC_FIXED_SIZE_TUNER
 
 //For_LOS_extend
@@ -69,7 +69,7 @@ typedef struct Space_Tuner{
 
 void gc_space_tune_prepare(GC* gc, unsigned int cause);
 void gc_space_tune_before_gc(GC* gc, unsigned int cause);
-void gc_space_tune_before_gc_fixed_size(GC* gc, unsigned int cause);
+void gc_space_tune_before_gc_simplified(GC* gc, unsigned int cause);
 void gc_space_tuner_reset(GC* gc);
 void gc_space_tuner_initialize(GC* gc);
 

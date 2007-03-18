@@ -23,25 +23,26 @@
 #include "../gen/gen.h"
 #include "../finalizer_weakref/finalizer_weakref.h"
 
-static void scan_slot(Collector* collector, REF *p_ref)
+static void scan_slot(Collector* collector, Partial_Reveal_Object** p_ref)
 {
-  REF ref = *p_ref;
-  if(ref == COMPRESSED_NULL) return;
+  Partial_Reveal_Object* p_obj = *p_ref;
+  if(p_obj==NULL) return;
 
   collector_tracestack_push(collector, p_ref);
+  
   return;
 }
 
-static void scan_object(Collector* collector, REF *p_ref)
+static void scan_object(Collector* collector, Partial_Reveal_Object **p_ref)
 {
-  Partial_Reveal_Object *p_obj = read_slot(p_ref);
+  Partial_Reveal_Object *p_obj = *p_ref;
   assert(p_obj);
   
   if(obj_belongs_to_nos(p_obj) && obj_is_fw_in_oi(p_obj)){
     assert(obj_get_vt(p_obj) == obj_get_vt(obj_get_fw_in_oi(p_obj)));
     p_obj = obj_get_fw_in_oi(p_obj);
     assert(p_obj);
-    write_slot(p_ref, p_obj);
+    *p_ref = p_obj;
   }
   
   if(!obj_mark_in_vt(p_obj))
@@ -56,7 +57,7 @@ static void scan_object(Collector* collector, REF *p_ref)
     
     int32 array_length = vector_get_length((Vector_Handle) array);
     for (int i = 0; i < array_length; i++) {
-      REF *p_ref = (REF*)vector_get_element_address_ref((Vector_Handle) array, i);
+      Partial_Reveal_Object** p_ref = (Partial_Reveal_Object**)vector_get_element_address_ref((Vector_Handle) array, i);
       scan_slot(collector, p_ref);
     }   
     return;
@@ -65,7 +66,7 @@ static void scan_object(Collector* collector, REF *p_ref)
   /* scan non-array object */
   int *offset_scanner = init_object_scanner(p_obj);
   while (true) {
-    REF *p_ref = (REF*)offset_get_ref(offset_scanner, p_obj);
+    Partial_Reveal_Object** p_ref = (Partial_Reveal_Object**)offset_get_ref(offset_scanner, p_obj);
     if (p_ref == NULL) break; /* terminating ref slot */
   
     scan_slot(collector, p_ref);
@@ -80,13 +81,13 @@ static void scan_object(Collector* collector, REF *p_ref)
 }
 
 
-static void trace_object(Collector* collector, REF *p_ref)
+static void trace_object(Collector* collector, Partial_Reveal_Object **p_ref)
 { 
   scan_object(collector, p_ref);
   
   Vector_Block* trace_stack = collector->trace_stack;
   while( !vector_stack_is_empty(trace_stack)){
-    p_ref = (REF *)vector_stack_pop(trace_stack); 
+    p_ref = (Partial_Reveal_Object **)vector_stack_pop(trace_stack); 
     scan_object(collector, p_ref);
     trace_stack = collector->trace_stack;
   }
@@ -102,7 +103,7 @@ void fallback_mark_scan_heap(Collector* collector)
   GC* gc = collector->gc;
   GC_Metadata* metadata = gc->metadata;
   
-  assert(gc_match_kind(gc, FALLBACK_COLLECTION));
+  assert(gc->collect_kind == FALLBACK_COLLECTION);
 
   /* reset the num_finished_collectors to be 0 by one collector. This is necessary for the barrier later. */
   unsigned int num_active_collectors = gc->num_active_collectors;
@@ -117,11 +118,12 @@ void fallback_mark_scan_heap(Collector* collector)
   while(root_set){
     POINTER_SIZE_INT* iter = vector_block_iterator_init(root_set);
     while(!vector_block_iterator_end(root_set,iter)){
-      REF *p_ref = (REF *)*iter;
+      Partial_Reveal_Object** p_ref = (Partial_Reveal_Object** )*iter;
       iter = vector_block_iterator_advance(root_set,iter);
 
+      Partial_Reveal_Object* p_obj = *p_ref;
       /* root ref can't be NULL, (remset may have NULL ref entry, but this function is only for MAJOR_COLLECTION */
-      assert(*p_ref);
+      assert(p_obj != NULL);
       
       collector_tracestack_push(collector, p_ref);
 
@@ -141,7 +143,7 @@ retry:
   while(mark_task){
     POINTER_SIZE_INT* iter = vector_block_iterator_init(mark_task);
     while(!vector_block_iterator_end(mark_task,iter)){
-      REF* p_ref = (REF *)*iter;
+      Partial_Reveal_Object** p_ref = (Partial_Reveal_Object **)*iter;
       iter = vector_block_iterator_advance(mark_task,iter);
 
       /* FIXME:: we should not let mark_task empty during working, , other may want to steal it. 
@@ -177,5 +179,5 @@ retry:
 
 void trace_obj_in_fallback_marking(Collector *collector, void *p_ref)
 {
-  trace_object(collector, (REF *)p_ref);
+  trace_object(collector, (Partial_Reveal_Object **)p_ref);
 }

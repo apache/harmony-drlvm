@@ -101,7 +101,7 @@ void fspace_reset_for_allocation(Fspace* fspace)
   unsigned int first_idx = fspace->first_block_idx;
   unsigned int marked_start_idx = 0; //was for oi markbit reset, now useless
   unsigned int marked_last_idx = 0;
-  Boolean is_major_collection = !gc_match_kind(fspace->gc, MINOR_COLLECTION);
+  Boolean is_major_collection = (fspace->gc->collect_kind != MINOR_COLLECTION);
   Boolean gen_mode = gc_is_gen_mode();
 
   if(  is_major_collection || 

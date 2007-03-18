@@ -26,20 +26,20 @@
 struct Queue_Node;
 
 typedef struct Queue_Link{
-  struct Queue_Node* ptr;
-  unsigned int count;
+	struct Queue_Node* ptr;
+	unsigned int count;
 }Queue_Link;
 
 typedef struct Queue_Node{
-  __declspec(align(8))
-  Queue_Link next; /* must be aligned to 8Byte*/
-  unsigned int* value;
+	__declspec(align(8))
+	Queue_Link next; /* must be aligned to 8Byte*/
+	unsigned int* value;
 }Queue_Node;
 
 typedef struct Sync_Queue{
-  __declspec(align(8)) 
-  Queue_Link head; /* must be aligned to 8Byte*/
-  Queue_Link tail; 
+	__declspec(align(8)) 
+	Queue_Link head; /* must be aligned to 8Byte*/
+	Queue_Link tail; 
 }Sync_Queue;
 
 inline Queue_Node * new_queue_node()
@@ -56,9 +56,9 @@ inline void sync_queue_init(Sync_Queue *queue)
 {
   Queue_Node *node = new_queue_node();
   node->next.ptr = NULL;
-  node->next.count = 0;
+	node->next.count = 0;
   queue->head.ptr = queue->tail.ptr = node;
-  queue->head.count = queue->tail.count = 0;
+	queue->head.count = queue->tail.count = 0;
   return;
 }
 
@@ -67,63 +67,64 @@ inline void sync_queue_init(Sync_Queue *queue)
 
 inline void sync_queue_push(Sync_Queue* queue, unsigned int* value)
 {
-  Queue_Link tail, next, tmp1, tmp2;
-  Queue_Node* node = new_queue_node();
-  node->value = value;
-  node->next.ptr = NULL;
-  while(TRUE){
-    QLINK_VAL(tail) = QLINK_VAL(queue->tail);
-    QLINK_VAL(next) = QLINK_VAL(tail.ptr->next);
-    if( QLINK_VAL(tail) == QLINK_VAL(queue->tail)){
-      if( next.ptr==NULL ){
-        tmp1.ptr = node;
-        tmp1.count = next.count + 1;
-        node->next.count = tmp1.count; 
-        QLINK_VAL(tmp2) = atomic_cas64(QLINK_PTR(tail.ptr->next), QLINK_VAL(next), QLINK_VAL(tmp1))
-        if( QLINK_VAL(tmp1) == QLINK_VAL(tmp2))
+	Queue_Link tail, next, tmp1, tmp2;
+	Queue_Node* node = new_queue_node();
+	node->value = value;
+	node->next.ptr = NULL;
+	while(TRUE){
+  	QLINK_VAL(tail) = QLINK_VAL(queue->tail);
+  	QLINK_VAL(next) = QLINK_VAL(tail.ptr->next);
+  	if( QLINK_VAL(tail) == QLINK_VAL(queue->tail)){
+    	if( next.ptr==NULL ){
+      	tmp1.ptr = node;
+      	tmp1.count = next.count + 1;
+      	node->next.count = tmp1.count; 
+      	QLINK_VAL(tmp2) = atomic_cas64(QLINK_PTR(tail.ptr->next), QLINK_VAL(next), QLINK_VAL(tmp1))
+      	if( QLINK_VAL(tmp1) == QLINK_VAL(tmp2))
           break;
+          
       }else{
-        tmp1.ptr = next.ptr;
-        tmp1.count = tail.count + 1;
-        atomic_cas64(QLINK_PTR(queue->tail), QLINK_VAL(tail), QLINK_VAL(tmp1));
+      	tmp1.ptr = next.ptr;
+      	tmp1.count = tail.count + 1;
+      	atomic_cas64(QLINK_PTR(queue->tail), QLINK_VAL(tail), QLINK_VAL(tmp1));
       }
     }
   }
-  tmp1.ptr = node;
-  tmp1.count = tail.count + 1;
-  atomic_cas64(QLINK_PTR(queue->tail), QLINK_VAL(tail), QLINK_VAL(tmp1));
-  return;
+	tmp1.ptr = node;
+	tmp1.count = tail.count + 1;
+	atomic_cas64(QLINK_PTR(queue->tail), QLINK_VAL(tail), QLINK_VAL(tmp1));
+	return;
 }
 
 Boolean sync_queue_pull(Sync_Queue* queue, unsigned int * pvalue)
 {
-  Queue_Link head, tail, next, tmp1, tmp2;
-  while(TRUE){
-    QLINK_VAL(head) = QLINK_VAL(queue->head);
-    QLINK_VAL(tail) = QLINK_VAL(queue->tail);
-    QLINK_VAL(next) = QLINK_VAL(head.ptr->next);
-
-    if( QLINK_VAL(head) == QLINK_VAL(queue->head)){
-      if( head.ptr== tail.ptr )
+	Queue_Link head, tail, next, tmp1, tmp2;
+	while(TRUE){
+  	QLINK_VAL(head) = QLINK_VAL(queue->head);
+  	QLINK_VAL(tail) = QLINK_VAL(queue->tail);
+  	QLINK_VAL(next) = QLINK_VAL(head.ptr->next);
+    
+  	if( QLINK_VAL(head) == QLINK_VAL(queue->head)){
+    	if( head.ptr== tail.ptr )
       	if( next.ptr == NULL )
-        return FALSE;
+        	return FALSE;
       	else{
-        tmp1.ptr = next.ptr;
-        tmp1.count = tail.count+1;
-        atomic_cas64(QLINK_PTR(queue->tail), QLINK_VAL(tail), QLINK_VAL(tmp1));
-      	}
-      else{
-        *pvalue = next.ptr->value;
-        tmp1.ptr = next.ptr;
-        tmp1.count = head.count+1;
-        QLINK_VAL(tmp2) =	atomic_cas64(QLINK_PTR(queue->head), QLINK_VAL(head), QLINK_VAL(tmp1));
-        if( QLINK_VAL(tmp2) == QLINK_VAL(tmp1))
-          break;
+        	tmp1.ptr = next.ptr;
+        	tmp1.count = tail.count+1;
+        	atomic_cas64(QLINK_PTR(queue->tail), QLINK_VAL(tail), QLINK_VAL(tmp1));
         }
+    	else{
+        *pvalue = next.ptr->value;
+      	tmp1.ptr = next.ptr;
+      	tmp1.count = head.count+1;
+      	QLINK_VAL(tmp2) =	atomic_cas64(QLINK_PTR(queue->head), QLINK_VAL(head), QLINK_VAL(tmp1));
+      	if( QLINK_VAL(tmp2) == QLINK_VAL(tmp1))
+        	break;
+      }
     }
   }
-  free( head.ptr );
-  return TRUE;
+	free( head.ptr );
+	return TRUE;
 }
-	
+  
 #endif /* _SYNC_QUEUE_H_ */

@@ -51,8 +51,6 @@ unsigned int max_heap_size_bytes = 0;
 
 extern Boolean JVMTI_HEAP_ITERATION ;
 
-extern Boolean IS_MOVE_COMPACT;
-
 static int get_int_property(const char *property_name)
 {
     assert(property_name);
@@ -236,7 +234,7 @@ void gc_parse_options(GC* gc)
   }
 
   if (is_property_set("gc.use_large_page", VM_PROPERTIES) == 1){
-    char* value = get_property("gc.large_page", VM_PROPERTIES);
+    char* value = get_property("gc.use_large_page", VM_PROPERTIES);
     large_page_hint = strdup(value);
     destroy_property_value(value);
   }
@@ -259,14 +257,14 @@ void gc_reclaim_heap(GC* gc, unsigned int gc_cause)
 
   //For_LOS_extend!
 #ifdef GC_FIXED_SIZE_TUNER
-  gc_space_tune_before_gc_fixed_size(gc, gc_cause);
+  gc_space_tune_before_gc_simplified(gc, gc_cause);
 #else
   gc_space_tune_prepare(gc, gc_cause);
   gc_space_tune_before_gc(gc, gc_cause);
 #endif
 
 #ifdef MARK_BIT_FLIPPING
-  if(gc_match_kind(gc, MINOR_COLLECTION))
+  if(gc->collect_kind == MINOR_COLLECTION)
     mark_bit_flip();
 #endif
   

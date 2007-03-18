@@ -36,7 +36,7 @@ static void mspace_move_objects(Collector* collector, Mspace* mspace)
   Block_Header* dest_block = collector->cur_target_block;
   
   void* dest_sector_addr = dest_block->base;
-  Boolean is_fallback = gc_match_kind(collector->gc, FALLBACK_COLLECTION);
+  Boolean is_fallback = (collector->gc->collect_kind == FALLBACK_COLLECTION);
   
  
   while( curr_block ){
@@ -91,11 +91,11 @@ static void mspace_move_objects(Collector* collector, Mspace* mspace)
                event_collector_doublemove_obj(rescan_obj, targ_obj, collector);
              else
                event_collector_move_obj(rescan_obj, targ_obj, collector);
-              rescan_obj = block_get_next_marked_object(curr_block, &rescan_pos);
+              rescan_obj = block_get_next_marked_object(curr_block, &rescan_pos);  
               if(rescan_obj == NULL) break;
            }
       }
-      
+         
       memmove(dest_sector_addr, src_sector_addr, curr_sector_size);
 
       dest_sector_addr = (void*)((POINTER_SIZE_INT)dest_sector_addr + curr_sector_size);
@@ -144,10 +144,10 @@ void move_compact_mspace(Collector* collector)
             have references  that are going to be repointed */
   unsigned int old_num = atomic_cas32( &num_marking_collectors, 0, num_active_collectors+1);
 
-  if(!gc_match_kind(gc, FALLBACK_COLLECTION))
+  if(gc->collect_kind != FALLBACK_COLLECTION)    
        mark_scan_heap(collector);  
   else
-       fallback_mark_scan_heap(collector);
+       fallback_mark_scan_heap(collector);    
 
   old_num = atomic_inc32(&num_marking_collectors);
   if( ++old_num == num_active_collectors ){
@@ -163,7 +163,6 @@ void move_compact_mspace(Collector* collector)
       gc_update_weakref_ignore_finref(gc);
     }
 #endif
-
     
     /* let other collectors go */
     num_marking_collectors++; 
@@ -223,8 +222,7 @@ void move_compact_mspace(Collector* collector)
   mspace_reset_after_compaction(mspace);
   fspace_reset_for_allocation(fspace);
 
-
-  gc_set_pool_clear(gc->metadata->gc_rootset_pool);
+  gc_set_pool_clear(gc->metadata->gc_rootset_pool);  
   
   return;
 }

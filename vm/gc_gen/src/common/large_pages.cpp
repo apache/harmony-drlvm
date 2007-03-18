@@ -134,7 +134,6 @@ static void parse_proc_meminfo(size_t required_size){
     } else {
       printf("GC large_page: Not enough reserved large pages.\n");
     }
-    printf("GC large_page: Large pages can be only allocated.\n");
   }
 }
 
@@ -149,9 +148,9 @@ void* mmap_large_pages(size_t size, const char* path)
 
   int fd = open(buf, O_CREAT | O_RDWR, 0700);
   if (fd == -1){
-    printf("GC large_page: Can't open Mount hugetlbfs with: mount none /mnt/huge -t hugetlbfsi.\n");
+    printf("GC large_page: Can't open Mount hugetlbfs with: mount none /mnt/huge -t hugetlbfs.\n");
     printf("GC large_page: Check you have appropriate permissions to /mnt/huge.\n");
-    printf("GC large_page: Use command line switch -Dgc.lp=/mnt/huge.\n");
+    printf("GC large_page: Use command line switch -Dgc.use_large_page=/mnt/huge.\n");
     free(buf);
     return NULL;
   }
@@ -172,7 +171,7 @@ void* mmap_large_pages(size_t size, const char* path)
 void* alloc_large_pages(size_t size, const char* hint){
   parse_proc_meminfo(size);
   void* alloc_addr = mmap_large_pages(size, hint);
-  if(alloc_addr == NULL){
+  if(alloc_addr == NULL || ((POINTER_SIZE_INT)alloc_addr%proc_huge_page_size!=0)){
     printf("GC large_page: Large pages allocation failed.\n");
     return NULL;
   }

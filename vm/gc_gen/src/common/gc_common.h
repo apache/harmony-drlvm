@@ -41,28 +41,17 @@
 #define KB  (1<<10)
 #define MB  (1<<20)
 
+#define BYTES_PER_WORD 4
 #define BITS_PER_BYTE 8 
-#define BYTES_PER_WORD (sizeof(POINTER_SIZE_INT))
-#define BITS_PER_WORD (BITS_PER_BYTE * BYTES_PER_WORD)
-
+#define BITS_PER_WORD 32
 
 #define MASK_OF_BYTES_PER_WORD (BYTES_PER_WORD-1) /* 0x11 */
 
+#define BIT_SHIFT_TO_BYTES_PER_WORD 2 /* 2 */
 #define BIT_SHIFT_TO_BITS_PER_BYTE 3
-
-#ifdef POINTER64
-  #define BIT_SHIFT_TO_BYTES_PER_WORD 3 /* 3 */
-#else
-  #define BIT_SHIFT_TO_BYTES_PER_WORD 2 /* 2 */
-#endif
-
-#ifdef POINTER64
-  #define BIT_SHIFT_TO_BITS_PER_WORD 6
-#else
-  #define BIT_SHIFT_TO_BITS_PER_WORD 5
-#endif
-
+#define BIT_SHIFT_TO_BITS_PER_WORD 5
 #define BIT_SHIFT_TO_KILO 10 
+
 #define BIT_MASK_TO_BITS_PER_WORD ((1<<BIT_SHIFT_TO_BITS_PER_WORD)-1)
 #define BITS_OF_POINTER_SIZE_INT (sizeof(POINTER_SIZE_INT) << BIT_SHIFT_TO_BITS_PER_BYTE)
 #define BYTES_OF_POINTER_SIZE_INT (sizeof(POINTER_SIZE_INT))
@@ -87,18 +76,11 @@ enum Collection_Algorithm{
   
 };
 
-/* Possible combinations:
- * MINOR_COLLECTION
- * MAJOR_COLLECTION
- * FALLBACK_COLLECTION
- * MAJOR_COLLECTION | EXTEND_COLLECTION
- * FALLBACK_COLLECTION | EXTEND_COLLECTION
- */
 enum Collection_Kind {
-  MINOR_COLLECTION = 0x1,
-  MAJOR_COLLECTION = 0x2,
-  FALLBACK_COLLECTION = 0x4,
-  EXTEND_COLLECTION = 0x8
+  MINOR_COLLECTION,
+  MAJOR_COLLECTION,
+  FALLBACK_COLLECTION,
+  EXTEND_COLLECTION
 };
 
 extern Boolean IS_FALLBACK_COMPACTION;  /* only for mark/fw bits debugging purpose */
@@ -109,70 +91,6 @@ enum GC_CAUSE{
   GC_CAUSE_LOS_IS_FULL,
   GC_CAUSE_RUNTIME_FORCE_GC
 };
-
-/*Fixme: There is only compressed mode under em64t currently.*/
-#ifdef POINTER64
-  #define COMPRESS_REFERENCE
-#endif
-
-#define COMPRESSED_NULL ((REF)0)
-extern POINTER_SIZE_INT HEAP_NULL;
-
-#ifdef POINTER64
-  #ifdef COMPRESS_REFERENCE
-    #define REF uint32
-  #else
-    #define REF Partial_Reveal_Object*
-  #endif
-#else/*ifdef POINTER64*/
-  #define REF Partial_Reveal_Object*
-#endif
-
-/////////////////////////////////////////////
-//Compress reference related!///////////////////
-/////////////////////////////////////////////
-#ifdef COMPRESS_REFERENCE
-FORCE_INLINE REF compress_ref(Partial_Reveal_Object *p_obj)
-{
-  if(!p_obj){
-  /*Fixme: em64t: vm performs a simple compress/uncompress machenism*/
-  /* i.e. just add or minus HEAP_NULL to p_obj*/
-  /*But in gc we distinguish zero from other p_obj*/
-  /*Now only in prefetch next live object we can hit this point.*/
-    return COMPRESSED_NULL;
-  }
-  else
-    return (REF) ( (POINTER_SIZE_INT) p_obj - HEAP_NULL);
-}
-
-FORCE_INLINE Partial_Reveal_Object *uncompress_ref(REF ref)
-{
-  if(!ref){
-    return NULL; 
-  }
-  return (Partial_Reveal_Object *)(HEAP_NULL + ref);
-}
-
-FORCE_INLINE Partial_Reveal_Object *read_slot(REF *p_slot)
-{  return uncompress_ref(*p_slot); }
-
-FORCE_INLINE void write_slot(REF *p_slot, Partial_Reveal_Object *p_obj)
-{  *p_slot = compress_ref(p_obj); }
-
-#else /* COMPRESS_REFERENCE */
-
-FORCE_INLINE REF compress_ref(Partial_Reveal_Object *p_obj)
-{  return (REF)p_obj; }
-
-FORCE_INLINE Partial_Reveal_Object *uncompress_ref(REF ref)
-{  return (Partial_Reveal_Object *)ref; }
-
-FORCE_INLINE Partial_Reveal_Object *read_slot(REF *p_slot)
-{  return *p_slot; }
-
-FORCE_INLINE void write_slot(REF *p_slot, Partial_Reveal_Object *p_obj)
-{  *p_slot = p_obj; }
-#endif
 
 inline POINTER_SIZE_INT round_up_to_size(POINTER_SIZE_INT size, int block_size) 
 {  return (size + block_size - 1) & ~(block_size - 1); }
@@ -188,9 +106,9 @@ inline int* object_ref_iterator_init(Partial_Reveal_Object *obj)
   return gcvt->gc_ref_offset_array;    
 }
 
-inline REF* object_ref_iterator_get(int* iterator, Partial_Reveal_Object *obj)
+inline Partial_Reveal_Object** object_ref_iterator_get(int* iterator, Partial_Reveal_Object* obj)
 {
-  return (REF*)((POINTER_SIZE_INT)obj + *iterator);
+  return (Partial_Reveal_Object**)((POINTER_SIZE_INT)obj + *iterator);
 }
 
 inline int* object_ref_iterator_next(int* iterator)
@@ -214,20 +132,20 @@ inline int *offset_next_ref (int *offset)
 /****************************************/
 
 inline Boolean obj_is_marked_in_vt(Partial_Reveal_Object *obj) 
-{  return (Boolean)((POINTER_SIZE_INT)obj_get_vt_raw(obj) & CONST_MARK_BIT); }
+{  return ((POINTER_SIZE_INT)obj_get_vt_raw(obj) & CONST_MARK_BIT); }
 
 inline Boolean obj_mark_in_vt(Partial_Reveal_Object *obj) 
 {  
-  VT vt = obj_get_vt_raw(obj);
+  Partial_Reveal_VTable* vt = obj_get_vt_raw(obj);
   if((POINTER_SIZE_INT)vt & CONST_MARK_BIT) return FALSE;
-  obj_set_vt(obj,  (VT)( (POINTER_SIZE_INT)vt | CONST_MARK_BIT ) );
+  obj_set_vt(obj, (POINTER_SIZE_INT)vt | CONST_MARK_BIT);
   return TRUE;
 }
 
 inline void obj_unmark_in_vt(Partial_Reveal_Object *obj) 
 { 
-  VT vt = obj_get_vt_raw(obj);
-  obj_set_vt(obj, (VT)((POINTER_SIZE_INT)vt & ~CONST_MARK_BIT));
+  Partial_Reveal_VTable* vt = obj_get_vt_raw(obj);
+  obj_set_vt(obj, (POINTER_SIZE_INT)vt & ~CONST_MARK_BIT);
 }
 
 inline Boolean obj_is_marked_or_fw_in_oi(Partial_Reveal_Object *obj)
@@ -246,7 +164,7 @@ inline void obj_clear_dual_bits_in_oi(Partial_Reveal_Object *obj)
 inline Partial_Reveal_Object *obj_get_fw_in_oi(Partial_Reveal_Object *obj) 
 {
   assert(get_obj_info_raw(obj) & CONST_FORWARD_BIT);
-  return (Partial_Reveal_Object*)(uncompress_ref((REF)(get_obj_info_raw(obj) & ~CONST_FORWARD_BIT)));
+  return (Partial_Reveal_Object*) (get_obj_info_raw(obj) & ~CONST_FORWARD_BIT);
 }
 
 inline Boolean obj_is_fw_in_oi(Partial_Reveal_Object *obj) 
@@ -255,7 +173,6 @@ inline Boolean obj_is_fw_in_oi(Partial_Reveal_Object *obj)
 inline void obj_set_fw_in_oi(Partial_Reveal_Object *obj,void *dest)
 {  
   assert(!(get_obj_info_raw(obj) & CONST_FORWARD_BIT));
-  REF dest = compress_ref((Partial_Reveal_Object *) dest);
   set_obj_info(obj,(Obj_Info_Type)dest | CONST_FORWARD_BIT); 
 }
 
@@ -292,7 +209,7 @@ inline void mark_bit_flip()
 inline Partial_Reveal_Object *obj_get_fw_in_oi(Partial_Reveal_Object *obj) 
 {
   assert(get_obj_info_raw(obj) & FLIP_FORWARD_BIT);
-  return (Partial_Reveal_Object*) ( uncompress_ref( (REF)get_obj_info(obj) ) );
+  return (Partial_Reveal_Object*) get_obj_info(obj);
 }
 
 inline Boolean obj_is_fw_in_oi(Partial_Reveal_Object *obj) 
@@ -308,8 +225,7 @@ inline void obj_set_fw_in_oi(Partial_Reveal_Object *obj, void *dest)
   /* It's important to clear the FLIP_FORWARD_BIT before collection ends, since it is the same as
      next minor cycle's FLIP_MARK_BIT. And if next cycle is major, it is also confusing
      as FLIP_FORWARD_BIT. (The bits are flipped only in minor collection). */
-  Obj_Info_Type dst = (Obj_Info_Type)compress_ref((Partial_Reveal_Object *) dest);     
-  set_obj_info(obj, dst | FLIP_FORWARD_BIT); 
+  set_obj_info(obj,(Obj_Info_Type)dest | FLIP_FORWARD_BIT); 
 }
 
 inline Boolean obj_mark_in_oi(Partial_Reveal_Object* p_obj)
@@ -380,7 +296,6 @@ typedef struct GC{
   
   /* FIXME:: this is wrong! root_set belongs to mutator */
   Vector_Block* root_set;
-  Vector_Block* uncompressed_root_set;
 
   //For_LOS_extend
   Space_Tuner* tuner;
@@ -401,12 +316,6 @@ inline Boolean address_belongs_to_gc_heap(void* addr, GC* gc)
   return (addr >= gc_heap_base(gc) && addr < gc_heap_ceiling(gc));
 }
 
-inline Boolean gc_match_kind(GC *gc, unsigned int kind)
-{
-  assert(gc->collect_kind && kind);
-  return gc->collect_kind & kind;
-}
-
 void gc_parse_options(GC* gc);
 void gc_reclaim_heap(GC* gc, unsigned int gc_cause);
 
@@ -421,7 +330,7 @@ extern Boolean NOS_PARTIAL_FORWARD;
   //#define NOS_BOUNDARY ((void*)0x2ea20000)  //this is for 512M
   #define NOS_BOUNDARY ((void*)0x40000000) //this is for 256M
 
-	#define nos_boundary NOS_BOUNDARY
+  #define nos_boundary NOS_BOUNDARY
 
 #else /* STATIC_NOS_MAPPING */
 

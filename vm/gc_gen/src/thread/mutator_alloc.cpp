@@ -73,9 +73,9 @@ Managed_Object_Handle gc_alloc(unsigned size, Allocation_Handle ah, void *unused
   
   if( p_obj == NULL ) return NULL;
     
-  obj_set_vt((Partial_Reveal_Object*)p_obj, (VT)ah);
+  obj_set_vt((Partial_Reveal_Object*)p_obj, ah);
   
-  if(!IGNORE_FINREF && type_has_finalizer( (Partial_Reveal_VTable *) uncompress_vt((VT)ah) ))
+  if(!IGNORE_FINREF && type_has_finalizer((Partial_Reveal_VTable *)ah))
     mutator_add_finalizer((Mutator*)allocator, (Partial_Reveal_Object*)p_obj);
     
   return (Managed_Object_Handle)p_obj;
@@ -88,14 +88,14 @@ Managed_Object_Handle gc_alloc_fast (unsigned size, Allocation_Handle ah, void *
   assert((size % GC_OBJECT_ALIGNMENT) == 0);
   assert(ah);
   
-  if(type_has_finalizer((Partial_Reveal_VTable *) uncompress_vt((VT)ah)))
+  if(type_has_finalizer((Partial_Reveal_VTable *)ah))
     return NULL;
 
 #ifdef GC_OBJ_SIZE_STATISTIC
   gc_alloc_statistic_obj_distrubution(size);
 #endif
   
-  /* object shoud be handled specially */
+  /* object should be handled specially */
   if ( size > GC_OBJ_SIZE_THRESHOLD ) return NULL;
  
   Allocator* allocator = (Allocator*)gc_get_tls();
@@ -105,7 +105,7 @@ Managed_Object_Handle gc_alloc_fast (unsigned size, Allocation_Handle ah, void *
   p_obj = (Managed_Object_Handle)thread_local_alloc(size, allocator);
   if(p_obj == NULL) return NULL;
    
-  obj_set_vt((Partial_Reveal_Object*)p_obj, (VT)ah);
+  obj_set_vt((Partial_Reveal_Object*)p_obj, ah);
   
   return p_obj;
 }

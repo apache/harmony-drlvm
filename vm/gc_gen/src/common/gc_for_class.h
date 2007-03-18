@@ -41,7 +41,6 @@
    
 */
 #define CONST_MARK_BIT 0x1
-#define CLEAR_VT_MARK 0x03
 
 #define DUAL_MARKBITS  0x3
 #define DUAL_MARKBITS_MASK  (~DUAL_MARKBITS)
@@ -64,19 +63,6 @@
 
 #endif /* else MARK_BIT_FLIPPING */
 
-/*emt64 related!*/
-#define COMPRESS_VTABLE
-
-#ifdef POINTER64
-  #ifdef COMPRESS_VTABLE
-    #define VT uint32
-  #else
-    #define VT Partial_Reveal_VTable*
-  #endif
-#else/*ifdef POINTER64*/
-  #define VT Partial_Reveal_VTable*
-#endif
-
 typedef void *Thread_Handle; 
 
 #define GC_CLASS_FLAG_FINALIZER 1
@@ -89,7 +75,7 @@ typedef void *Thread_Handle;
 #define GCVT_ALIGNMENT 8
 #define GCVT_ALIGN_MASK (GCVT_ALIGNMENT-1)
 
-typedef uint32 Obj_Info_Type;
+typedef POINTER_SIZE_INT Obj_Info_Type;
 
 typedef struct GC_VTable_Info {
 
@@ -117,47 +103,19 @@ typedef struct GC_VTable_Info {
 } GC_VTable_Info;
 
 typedef struct Partial_Reveal_VTable {
-  //--Fixme: emt64
   GC_VTable_Info *gcvt;
 } Partial_Reveal_VTable;
 
 typedef struct Partial_Reveal_Object {
-  VT vt_raw;
+  Partial_Reveal_VTable *vt_raw;
   Obj_Info_Type obj_info;
 } Partial_Reveal_Object;
 
 typedef struct Partial_Reveal_Array {
-  VT vt_raw;
+  Partial_Reveal_VTable *vt_raw;
   Obj_Info_Type obj_info;
   unsigned int array_len;
 } Partial_Reveal_Array;
-
-//////////////////////////////////////////
-//Compress vtable related!///////////////////
-//////////////////////////////////////////
-extern POINTER_SIZE_INT vtable_base;
-
-#ifdef COMPRESS_VTABLE
-FORCE_INLINE VT compress_vt(Partial_Reveal_VTable* vt)
-{
-  assert(vt);
-  return (VT)((POINTER_SIZE_INT)vt - vtable_base);
-}
-
-FORCE_INLINE Partial_Reveal_VTable* uncompress_vt(VT vt)
-{
-  assert(vt);
-  return (Partial_Reveal_VTable*)((POINTER_SIZE_INT)vt + vtable_base);
-}
-#else/*ifdef COMPRESS_VTABLE*/
-
-FORCE_INLINE VT compress_vt(Partial_Reveal_VTable* vt)
-{  return (VT)vt; }
-
-FORCE_INLINE Partial_Reveal_VTable* uncompress_vt(VT vt)
-{  return (Partial_Reveal_VTable*) vt;  }
-#endif
-
 
 inline Obj_Info_Type get_obj_info_raw(Partial_Reveal_Object *obj) 
 {  assert(obj); return obj->obj_info; }
@@ -180,56 +138,50 @@ inline void set_obj_info(Partial_Reveal_Object *obj, Obj_Info_Type new_obj_info)
 inline Obj_Info_Type *get_obj_info_addr(Partial_Reveal_Object *obj) 
 {  assert(obj); return &obj->obj_info; }
 
-inline VT obj_get_vt_raw(Partial_Reveal_Object *obj) 
+inline Partial_Reveal_VTable *obj_get_vt_raw(Partial_Reveal_Object *obj) 
 {  assert(obj && obj->vt_raw); return obj->vt_raw; }
 
-inline VT *obj_get_vt_addr(Partial_Reveal_Object *obj) 
+inline Partial_Reveal_VTable **obj_get_vt_addr(Partial_Reveal_Object *obj) 
 {  assert(obj && obj->vt_raw); return &obj->vt_raw; }
 
-/*Fixme: emt64*/
-inline VT obj_get_vt(Partial_Reveal_Object *obj) 
-{  assert(obj && obj->vt_raw); return (VT)((POINTER_SIZE_INT)obj->vt_raw & ~CLEAR_VT_MARK); }
+inline Partial_Reveal_VTable *obj_get_vt(Partial_Reveal_Object *obj) 
+{  assert(obj && obj->vt_raw); return (Partial_Reveal_VTable *)((POINTER_SIZE_INT)obj->vt_raw & ~CONST_MARK_BIT); }
 
-inline void obj_set_vt(Partial_Reveal_Object *obj, VT ah) 
-{  assert(obj && ah); obj->vt_raw = ah; }
+inline void obj_set_vt(Partial_Reveal_Object *obj, Allocation_Handle ah) 
+{  assert(obj && ah); obj->vt_raw = (Partial_Reveal_VTable *)ah; }
 
-/*Fixme: emt64, we should check whether gcvt is compressed first!*/
-inline GC_VTable_Info *vtable_get_gcvt_raw(Partial_Reveal_VTable* vt) 
+inline GC_VTable_Info *vtable_get_gcvt_raw(Partial_Reveal_VTable *vt) 
 {  assert(vt && vt->gcvt); return vt->gcvt; }
 
-inline GC_VTable_Info *vtable_get_gcvt(Partial_Reveal_VTable* vt) 
-{
-  assert(vt && vt->gcvt);
-  return (GC_VTable_Info*)((POINTER_SIZE_INT)vt->gcvt & GC_CLASS_FLAGS_MASK);
-}
+inline GC_VTable_Info *vtable_get_gcvt(Partial_Reveal_VTable *vt) 
+{  assert(vt && vt->gcvt); return (GC_VTable_Info*)((POINTER_SIZE_INT)vt->gcvt & GC_CLASS_FLAGS_MASK); }
 
 inline void vtable_set_gcvt(Partial_Reveal_VTable *vt, GC_VTable_Info *new_gcvt) 
-/*Fixme: emt64*/
 {  assert(vt && new_gcvt); vt->gcvt = new_gcvt; }
 
 inline GC_VTable_Info *obj_get_gcvt_raw(Partial_Reveal_Object *obj) 
 {
-  Partial_Reveal_VTable *vtable = uncompress_vt(obj_get_vt(obj));
-  return vtable_get_gcvt_raw(vtable);
+  Partial_Reveal_VTable *vt = obj_get_vt(obj);
+  return vtable_get_gcvt_raw(vt);
 }
 
 inline GC_VTable_Info *obj_get_gcvt(Partial_Reveal_Object *obj) 
 {
-  Partial_Reveal_VTable* vtable = uncompress_vt(obj_get_vt(obj) );
-  return vtable_get_gcvt(vtable);
+  Partial_Reveal_VTable *vt = obj_get_vt(obj);
+  return vtable_get_gcvt(vt);
 }
 
 inline Boolean object_has_ref_field(Partial_Reveal_Object *obj) 
 {
   GC_VTable_Info *gcvt = obj_get_gcvt_raw(obj);
-  return (Boolean)((POINTER_SIZE_INT)gcvt & GC_CLASS_FLAG_REFS);
+  return (POINTER_SIZE_INT)gcvt & GC_CLASS_FLAG_REFS;   
 }
 
 inline Boolean object_has_ref_field_before_scan(Partial_Reveal_Object *obj) 
 {
-  Partial_Reveal_VTable *vt = uncompress_vt(obj_get_vt_raw(obj));
+  Partial_Reveal_VTable *vt = obj_get_vt_raw(obj);  
   GC_VTable_Info *gcvt = vtable_get_gcvt_raw(vt);
-  return (Boolean)((POINTER_SIZE_INT)gcvt & GC_CLASS_FLAG_REFS);
+  return (POINTER_SIZE_INT)gcvt & GC_CLASS_FLAG_REFS;   
 }
 
 inline unsigned int object_ref_field_num(Partial_Reveal_Object *obj) 
@@ -241,7 +193,7 @@ inline unsigned int object_ref_field_num(Partial_Reveal_Object *obj)
 inline Boolean object_is_array(Partial_Reveal_Object *obj) 
 {
   GC_VTable_Info *gcvt = obj_get_gcvt_raw(obj);
-  return (Boolean)((POINTER_SIZE_INT)gcvt & GC_CLASS_FLAG_ARRAY);
+  return ((POINTER_SIZE_INT)gcvt & GC_CLASS_FLAG_ARRAY);
 } 
 
 inline Boolean obj_is_primitive_array(Partial_Reveal_Object *obj) 
@@ -292,9 +244,8 @@ inline WeakReferenceType special_reference_type(Partial_Reveal_Object *p_referen
 inline Boolean type_has_finalizer(Partial_Reveal_VTable *vt)
 {
   GC_VTable_Info *gcvt = vtable_get_gcvt_raw(vt);
-  return (Boolean)(POINTER_SIZE_INT)gcvt & GC_CLASS_FLAG_FINALIZER;
+  return (POINTER_SIZE_INT)gcvt & GC_CLASS_FLAG_FINALIZER;
 }
 
 #endif //#ifndef _GC_TYPES_H_
-
 

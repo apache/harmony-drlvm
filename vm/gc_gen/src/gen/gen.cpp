@@ -24,7 +24,6 @@
 #include "../finalizer_weakref/finalizer_weakref.h"
 #include "../verify/verify_live_heap.h"
 #include "../common/space_tuner.h"
-#include "../common/compressed_ref.h"
 
 /* fspace size limit is not interesting. only for manual tuning purpose */
 unsigned int min_nos_size_bytes = 16 * MB;
@@ -151,8 +150,6 @@ void gc_gen_initialize(GC_Gen *gc_gen, unsigned int min_heap_size, unsigned int 
       free(large_page_hint);
       large_page_hint = NULL;
       printf("GC use small pages.\n");
-    }else{
-      printf("GC use large pages.\n");
     }
   }
   
@@ -176,8 +173,6 @@ void gc_gen_initialize(GC_Gen *gc_gen, unsigned int min_heap_size, unsigned int 
 
 #endif  /* STATIC_NOS_MAPPING else */
 
-  HEAP_NULL = (POINTER_SIZE_INT)reserved_base;
-  
   gc_gen->reserved_heap_size = los_size + nos_reserve_size + mos_reserve_size;
   gc_gen->heap_start = reserved_base;
   gc_gen->heap_end = reserved_end;
@@ -334,7 +329,7 @@ void gc_gen_reclaim_heap(GC_Gen* gc)
 
   gc->collect_result = TRUE;
   
-  if(gc_match_kind((GC*)gc, MINOR_COLLECTION)){
+  if(gc->collect_kind == MINOR_COLLECTION){
     /* FIXME:: move_object is only useful for nongen_slide_copy */
     gc->mos->move_object = FALSE;
     
@@ -351,7 +346,7 @@ void gc_gen_reclaim_heap(GC_Gen* gc)
 
   }
 
-  if(gc->collect_result == FALSE && gc_match_kind((GC*)gc, MINOR_COLLECTION)){
+  if(gc->collect_result == FALSE && gc->collect_kind == MINOR_COLLECTION){
     
     if(gc_is_gen_mode())
       gc_clear_remset((GC*)gc);  
@@ -379,11 +374,6 @@ void gc_gen_reclaim_heap(GC_Gen* gc)
   }
   
   if(verify_live_heap) gc_verify_heap((GC*)gc, FALSE);
-
-  /*Fixme: clear root set here to support verify.*/
-#ifdef COMPRESS_REFERENCE
-  gc_set_pool_clear(gc->metadata->gc_uncompressed_rootset_pool);
-#endif
 
   return;
 }

@@ -102,24 +102,6 @@ inline Partial_Reveal_Object *obj_end(Partial_Reveal_Object *obj)
   return (Partial_Reveal_Object *)((POINTER_SIZE_INT)obj + vm_object_size(obj));
 }
 
-inline void obj_set_prefetched_next_pointer(Partial_Reveal_Object* obj, Partial_Reveal_Object* raw_prefetched_next){
-  /*Fixme: em64t: This may be not necessary!*/
-  if(raw_prefetched_next == 0){
-    *((REF*)obj + 1) = 0;
-    return;
-  }
-  REF ref = compress_ref(raw_prefetched_next);
-  *((REF*)obj + 1) = ref;
-}
-
-inline  Partial_Reveal_Object* obj_get_prefetched_next_pointer(Partial_Reveal_Object* obj){
-  /*Fixme: em64t: This may be not necessary!*/
-  assert(obj);
-  
-  REF ref = *( (REF*)obj + 1);
-  return uncompress_ref(ref);
-}
-
 inline Partial_Reveal_Object *next_marked_obj_in_block(Partial_Reveal_Object *cur_obj, Partial_Reveal_Object *block_end)
 {
   while(cur_obj < block_end){
@@ -178,10 +160,11 @@ inline Partial_Reveal_Object *block_get_first_marked_obj_prefetch_next(Block_Hea
   
   if(next_marked_obj){
     if(next_marked_obj != next_obj)
-      obj_set_prefetched_next_pointer(next_obj, next_marked_obj);
+      set_obj_info(next_obj, (Obj_Info_Type)next_marked_obj);
   } else {
-      obj_set_prefetched_next_pointer(next_obj, 0);
+    set_obj_info(next_obj, 0);
   }
+  
   return first_marked_obj;
 }
 
@@ -203,8 +186,8 @@ inline Partial_Reveal_Object *block_get_next_marked_obj_prefetch_next(Block_Head
   if(obj_is_marked_in_vt(cur_obj))
     cur_marked_obj = cur_obj;
   else
-    cur_marked_obj = (Partial_Reveal_Object *)obj_get_prefetched_next_pointer(cur_obj);
-
+    cur_marked_obj = (Partial_Reveal_Object *)get_obj_info_raw(cur_obj);
+  
   if(!cur_marked_obj)
     return NULL;
   
@@ -218,9 +201,9 @@ inline Partial_Reveal_Object *block_get_next_marked_obj_prefetch_next(Block_Head
   
   if(next_marked_obj){
     if(next_marked_obj != next_obj)
-      obj_set_prefetched_next_pointer(next_obj, next_marked_obj);
+      set_obj_info(next_obj, (Obj_Info_Type)next_marked_obj);
   } else {
-      obj_set_prefetched_next_pointer(next_obj, 0);
+    set_obj_info(next_obj, 0);
   }
   
   return cur_marked_obj;  
@@ -228,7 +211,7 @@ inline Partial_Reveal_Object *block_get_next_marked_obj_prefetch_next(Block_Head
 
 inline Partial_Reveal_Object *block_get_next_marked_obj_after_prefetch(Block_Header *block, void **start_pos)
 {
-  Partial_Reveal_Object *cur_obj = (Partial_Reveal_Object *)(*start_pos);
+  Partial_Reveal_Object *cur_obj = *(Partial_Reveal_Object **)start_pos;
   Partial_Reveal_Object *block_end = (Partial_Reveal_Object *)block->free;
 
   if(cur_obj >= block_end)
@@ -239,7 +222,7 @@ inline Partial_Reveal_Object *block_get_next_marked_obj_after_prefetch(Block_Hea
   if(obj_is_marked_in_vt(cur_obj) || obj_is_fw_in_oi(cur_obj))
     cur_marked_obj = cur_obj;
   else
-    cur_marked_obj = obj_get_prefetched_next_pointer(cur_obj);
+    cur_marked_obj = (Partial_Reveal_Object *)get_obj_info_raw(cur_obj);
   
   if(!cur_marked_obj)
     return NULL;
@@ -250,14 +233,12 @@ inline Partial_Reveal_Object *block_get_next_marked_obj_after_prefetch(Block_Hea
   return cur_marked_obj;
 }
 
-inline REF obj_get_fw_in_table(Partial_Reveal_Object *p_obj)
+inline Partial_Reveal_Object * obj_get_fw_in_table(Partial_Reveal_Object *p_obj)
 {
   /* only for inter-sector compaction */
   unsigned int index    = OBJECT_INDEX_TO_OFFSET_TABLE(p_obj);
   Block_Header *curr_block = GC_BLOCK_HEADER(p_obj);
-  Partial_Reveal_Object* new_addr = (Partial_Reveal_Object *)(((POINTER_SIZE_INT)p_obj) - curr_block->table[index]);
-  REF new_ref = compress_ref(new_addr);
-  return new_ref;
+  return (Partial_Reveal_Object *)(((POINTER_SIZE_INT)p_obj) - curr_block->table[index]);
 }
 
 inline void block_clear_table(Block_Header* block)
@@ -267,5 +248,5 @@ inline void block_clear_table(Block_Header* block)
   return;
 }
 
-#endif //#ifndef _BLOCK_H_
 
+#endif //#ifndef _BLOCK_H_

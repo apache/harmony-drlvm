@@ -15,7 +15,7 @@
  */
 
 /**
- * @author Ji Qi, 2006/10/05
+ * @author Xiao-Feng Li, 2006/10/05
  */
 
 #include "space_tuner.h"
@@ -34,8 +34,8 @@ unsigned int lspace_get_failure_size(Lspace* lspace);
 /*Now just prepare the alloc_size field of mspace, used to compute new los size.*/
 void gc_space_tune_prepare(GC* gc, unsigned int cause)
 {
-  if(gc_match_kind(gc, MINOR_COLLECTION))
-  	return;
+  if(gc->collect_kind == MINOR_COLLECTION)
+    return;
   
   Blocked_Space* mspace = (Blocked_Space*)gc_get_mos((GC_Gen*)gc);
   Blocked_Space* fspace = (Blocked_Space*)gc_get_nos((GC_Gen*)gc);  
@@ -76,7 +76,7 @@ void gc_space_tune_prepare(GC* gc, unsigned int cause)
 
 void gc_space_tune_before_gc(GC* gc, unsigned int cause)
 {
-  if(gc_match_kind(gc, MINOR_COLLECTION)) return;
+  if(gc->collect_kind == MINOR_COLLECTION) return;
 
   Space_Tuner* tuner = gc->tuner;
 
@@ -123,18 +123,21 @@ void gc_space_tune_before_gc(GC* gc, unsigned int cause)
         
      tuner->tuning_size = tuner->least_tuning_size;
 
-     if((tuner->tuning_size + gc->num_active_collectors * GC_BLOCK_SIZE_BYTES) >= none_los_size){
-       tuner->tuning_size = 0;
-     }
-
      if(tuner->tuning_size == 0) tuner->kind = TRANS_NOTHING;
+     
+     if(tuner->tuning_size < none_los_size) return;
+     
+     printf("Out of Memory!\n");
+     assert(0);
+     exit(0);    
+
   }
 }
 
-void gc_space_tune_before_gc_fixed_size(GC* gc, unsigned int cause)
+void gc_space_tune_before_gc_simplified(GC* gc, unsigned int cause)
 {
-  if(gc_match_kind(gc, MINOR_COLLECTION) || (cause != GC_CAUSE_LOS_IS_FULL) )
-  	 return;
+  if((gc->collect_kind == MINOR_COLLECTION) || (cause != GC_CAUSE_LOS_IS_FULL) )
+    return;
 
   Space_Tuner* tuner = gc->tuner;
   tuner->kind = TRANS_FROM_MOS_TO_LOS;
@@ -187,13 +190,16 @@ void gc_space_tune_before_gc_fixed_size(GC* gc, unsigned int cause)
     if(tuner->tuning_size > none_los_size){
       tuner->tuning_size = tuner->least_tuning_size;
     }
-    if((tuner->tuning_size + gc->num_active_collectors * GC_BLOCK_SIZE_BYTES) >= none_los_size){
-      tuner->tuning_size = 0;
+    if(tuner->tuning_size > none_los_size){
+      printf("Out of Memory!\n");
+      assert(0);
+      exit(0);    
     }
+
   }
   
   /*Fixme: Should MOS heap_start must be 64k aligned?*/
-  tuner->tuning_size = round_up_to_size(tuner->tuning_size, SPACE_ALLOC_UNIT);
+  tuner->tuning_size = round_down_to_size(tuner->tuning_size, SPACE_ALLOC_UNIT);
   if(tuner->tuning_size == 0) tuner->kind = TRANS_NOTHING;
 
   return;  
@@ -201,7 +207,7 @@ void gc_space_tune_before_gc_fixed_size(GC* gc, unsigned int cause)
 
 void  gc_space_tuner_reset(GC* gc)
 {
-  if( !gc_match_kind(gc, MINOR_COLLECTION) && (gc->tuner->kind != TRANS_NOTHING)){
+  if((gc->collect_kind != MINOR_COLLECTION) && (gc->tuner->kind != TRANS_NOTHING)){
     Space_Tuner* tuner = gc->tuner;
     memset(tuner, 0, sizeof(Space_Tuner));
   }

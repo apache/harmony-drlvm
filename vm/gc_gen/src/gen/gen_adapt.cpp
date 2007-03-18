@@ -106,7 +106,7 @@ void gc_gen_mode_adapt(GC_Gen* gc, int64 pause_time)
   POINTER_SIZE_INT nos_free_size = space_free_memory_size(fspace);
   POINTER_SIZE_INT total_free_size = mos_free_size  + nos_free_size;
   
-  if(!gc_match_kind((GC*)gc, MINOR_COLLECTION)) {
+  if(gc->collect_kind != MINOR_COLLECTION) {
     assert(!gc_is_gen_mode());
     
     if(gen_mode_adaptor->major_survive_ratio_threshold != 0 && mspace->survive_ratio > gen_mode_adaptor->major_survive_ratio_threshold){    
@@ -199,9 +199,9 @@ static void gc_decide_next_collect(GC_Gen* gc, int64 pause_time)
   POINTER_SIZE_INT mos_free_size = space_free_memory_size(mspace);
   POINTER_SIZE_INT nos_free_size = space_free_memory_size(fspace);
   POINTER_SIZE_INT total_free_size = mos_free_size  + nos_free_size;
-  if(!gc_match_kind((GC*)gc, MINOR_COLLECTION)) gc->force_gen_mode = FALSE;
+  if(gc->collect_kind != MINOR_COLLECTION) gc->force_gen_mode = FALSE;
   if(!gc->force_gen_mode){  
-    if(!gc_match_kind((GC*)gc, MINOR_COLLECTION)){
+    if(gc->collect_kind != MINOR_COLLECTION){
       mspace->time_collections += pause_time;
   
       Tslow = (float)pause_time;
@@ -210,7 +210,7 @@ static void gc_decide_next_collect(GC_Gen* gc, int64 pause_time)
       
       POINTER_SIZE_INT major_survive_size = space_committed_size((Space*)mspace) - mos_free_size;
       /*If major is caused by LOS, or collection kind is EXTEND_COLLECTION, all survive ratio is not updated.*/
-      if((gc->cause != GC_CAUSE_LOS_IS_FULL) && (!gc_match_kind((GC*)gc, EXTEND_COLLECTION))){
+      if((gc->cause != GC_CAUSE_LOS_IS_FULL) && (gc->collect_kind != EXTEND_COLLECTION)){
         survive_ratio = (float)major_survive_size/(float)space_committed_size((Space*)mspace);
         mspace->survive_ratio = survive_ratio;
       }
@@ -289,7 +289,7 @@ Boolean gc_compute_new_space_size(GC_Gen* gc, POINTER_SIZE_INT* mos_size, POINTE
   /*
   if(curr_nos_size <= min_nos_size_bytes){
     //after major, should not allow this size 
-    assert(gc_match_kind((GC*)gc, MINOR_COLLECTION));
+    assert(gc->collect_kind == MINOR_COLLECTION);
     return FALSE;
   }
   */
@@ -318,6 +318,12 @@ Boolean gc_compute_new_space_size(GC_Gen* gc, POINTER_SIZE_INT* mos_size, POINTE
   return TRUE;;
 }
 
+// this function is added to disambiguate on windows/em64t calls to asm() below 
+POINTER_SIZE_SINT POINTER_SIZE_abs(POINTER_SIZE_SINT x) 
+{
+    return x<0?-x:x;    
+}
+    
 #ifndef STATIC_NOS_MAPPING
 
 void gc_gen_adapt(GC_Gen* gc, int64 pause_time)
@@ -338,7 +344,7 @@ void gc_gen_adapt(GC_Gen* gc, int64 pause_time)
 
   POINTER_SIZE_INT curr_nos_size = space_committed_size((Space*)fspace);
 
-  if( abs((POINTER_SIZE_SINT)new_nos_size - (POINTER_SIZE_SINT)curr_nos_size) < NOS_COPY_RESERVE_DELTA )
+  if( POINTER_SIZE_abs((POINTER_SIZE_SINT)new_nos_size - (POINTER_SIZE_SINT)curr_nos_size) < NOS_COPY_RESERVE_DELTA )
     return;
   
   /* below are ajustment */  
@@ -390,7 +396,7 @@ void gc_gen_adapt(GC_Gen* gc, int64 pause_time)
   
   POINTER_SIZE_INT curr_nos_size = space_committed_size((Space*)fspace);
 
-  if( abs((POINTER_SIZE_SINT)new_nos_size - (POINTER_SIZE_SINT)curr_nos_size) < NOS_COPY_RESERVE_DELTA )
+  if( POINTER_SIZE_abs((POINTER_SIZE_SINT)new_nos_size - (POINTER_SIZE_SINT)curr_nos_size) < NOS_COPY_RESERVE_DELTA )
     return;
       
   POINTER_SIZE_INT used_mos_size = space_used_memory_size((Blocked_Space*)mspace);  
