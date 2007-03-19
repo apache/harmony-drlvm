@@ -2658,6 +2658,11 @@ bool ConstantPool::check(Global_Env* env, Class* clss, bool is_trusted_cl)
                                 clss->get_name()->bytes << ": illegal method name for CONSTANT_Methodref entry: " << name->bytes);
                         return false;
                     }
+                    if(name->bytes[0] == '<' && name != env->Init_String) {
+                        REPORT_FAILED_CLASS_CLASS(clss->get_class_loader(), clss, "java/lang/ClassFormatError",
+                                clss->get_name()->bytes << ": illegal method name "<< name->bytes << " at constant pool index " << name_index);
+                        return false;
+                    }
                 } else { //always check method name if classloader is not system 
                     if((name != env->Init_String) 
                         && !check_member_name(name->bytes,name->len, clss->get_version() < JAVA5_CLASS_FILE_VERSION, true))
