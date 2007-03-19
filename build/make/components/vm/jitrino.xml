@@ -314,7 +314,12 @@ Version: $Revision: 1.6.2.8 $
                 </select>
 
                 <select arch="em64t">
-                    <syslibset type="static" libs="msvcrtd,msvcmrtd,msvcrt,msvcurtd,libcpmtd,mscoree" />
+                    <select cfg="debug">
+                        <syslibset type="static" libs="msvcrtd,msvcmrtd,msvcrt,msvcurtd,libcpmtd,mscoree" />
+                    </select>
+                    <select cfg="release">
+                        <syslibset type="static" libs="msvcrt,msvcmrt,msvcrt,msvcrt,libcpmt,mscoree" />
+                    </select>
                 </select>
 
                 <select arch="ia32">
