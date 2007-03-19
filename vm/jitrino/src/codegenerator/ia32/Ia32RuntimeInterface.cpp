@@ -75,6 +75,10 @@ bool RuntimeInterface::getBcLocationForNative(MethodDesc* method, uint64 native_
     StackInfo stackInfo;
 
     Byte* infoBlock = method->getInfoBlock();
+    if (infoBlock == NULL) {
+        assert(0 && "missing info block for method");
+        return false;
+    }
     POINTER_SIZE_INT stackInfoSize = stackInfo.readByteSize(infoBlock);
     POINTER_SIZE_INT gcMapSize = GCMap::readByteSize(infoBlock + stackInfoSize);
 
