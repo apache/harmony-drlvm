@@ -140,6 +140,7 @@ interpreter_st_get_trace(VM_thread *p_vmthread, unsigned* res_depth, StackTraceF
         if (method) {
             stf->method = method;
             stf->ip = interp_si_get_ip(si);
+            stf->depth = -1;
             stf->outdated_this = si->This;
             assert(stf->outdated_this || method->is_static());
             stf++;

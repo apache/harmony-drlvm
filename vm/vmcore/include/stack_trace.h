@@ -60,6 +60,7 @@ extern "C" {
 struct StackTraceFrame {
     Method_Handle method;
     NativeCodePtr ip;
+    int depth; // Inlined depth for inlined methods, or -1 otherwise
     void *outdated_this;
 };
 
@@ -134,10 +135,13 @@ VMEXPORT void st_get_trace(VM_thread *p_vmthread, unsigned* depth,
  *
  * @param[in]  method - the handle of the method information to identify the source file
  * @param[in]  ip     - the instruction pointer to identify the JIT and using the JIT line number
+ * @param[in]  depth  - the inlined depth for inlined methods, starting from 0;
+ *                      (-1) for native methods and methods which were not inlined
  * @param[out] file   - the pointer to the file reference to be filled by this function
  * @param[out] line   - the pointer to the line number to be filled by this function
  */
-VMEXPORT void get_file_and_line(Method_Handle method, void *ip, bool is_ip_past, const char **file, int *line);
+VMEXPORT void get_file_and_line(Method_Handle method, void *ip, bool is_ip_past,
+                                int depth, const char **file, int *line);
 
 #ifdef __cplusplus
 }

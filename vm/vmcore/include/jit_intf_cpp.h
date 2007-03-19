@@ -155,6 +155,11 @@ public:
                        uint32         offset,
                        uint32         inline_depth) { return NULL; }
 
+    virtual uint16
+    get_inlined_bc(InlineInfoPtr  ptr,
+                       uint32         offset,
+                       uint32         inline_depth) { return 0; }
+
     virtual Boolean
     can_enumerate(Method_Handle method,
                   NativeCodePtr eip

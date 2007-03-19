@@ -29,6 +29,7 @@
 #include "stack_trace.h"
 #include "interpreter_exports.h"
 #include "cci.h"
+#include "m2n.h"
 #include <ctype.h>
 
 #ifdef PLATFORM_NT
@@ -169,17 +170,10 @@ static void st_get_c_method_info(MethodInfo* info, void* ip) {
 #endif
 }
 
-static void st_get_java_method_info(MethodInfo* info, Method* m, void* ip, bool is_ip_past) {
-    info->file_name = NULL;
-    info->line = -1;
-    info->method_name = NULL;
-    assert(m);
-    if (m->get_class()->has_source_information() && m->get_class()->get_source_file_name()) {
-        const char* fname = m->get_class()->get_source_file_name();
-        size_t flen = m->get_class()->get_source_file_name_length();
-        info->file_name = (char*) STD_MALLOC(flen + 1);
-        strcpy(info->file_name, fname);
-    }
+static char* construct_java_method_name(Method* m)
+{
+    if (!m)
+        return NULL;
 
     const char* mname = m->get_name()->bytes;
     size_t mlen = m->get_name()->len;
@@ -188,15 +182,43 @@ static void st_get_java_method_info(MethodInfo* info, Method* m, void* ip, bool 
     const char* descr = m->get_descriptor()->bytes;
     size_t dlen = m->get_descriptor()->len;
     
-    info->method_name = (char*) STD_MALLOC(mlen + clen + dlen + 2);
-    memcpy(info->method_name, cname, clen);
-    info->method_name[clen] = '.';
-    memcpy(info->method_name + clen + 1, mname, mlen);
-    memcpy(info->method_name + clen + mlen + 1, descr, dlen);
-    info->method_name[clen + mlen + dlen + 1] = '\0';
+    char* method_name = (char*)STD_MALLOC(mlen + clen + dlen + 2);
+    if (!method_name)
+        return NULL;
 
-    const char* f;
-    get_file_and_line(m, ip, is_ip_past, &f, &info->line);
+    char* ptr = method_name;
+    memcpy(ptr, cname, clen);
+    ptr += clen;
+    *ptr++ = '.';
+    memcpy(ptr, mname, mlen);
+    ptr += mlen;
+    memcpy(ptr, descr, dlen);
+    ptr[dlen] = '\0';
+
+    return method_name;
+}
+
+static void st_get_java_method_info(MethodInfo* info, Method* m, void* ip,
+                                    bool is_ip_past, int inl_depth)
+{
+    info->method_name = NULL;
+    info->file_name = NULL;
+    info->line = -1;
+
+    if (!m || !method_get_class(m))
+        return;
+
+    info->method_name = construct_java_method_name(m);
+    const char* fname = NULL;
+    get_file_and_line(m, ip, is_ip_past, inl_depth, &fname, &info->line);
+
+    if (fname)
+    {
+        size_t fsize = strlen(fname) + 1;
+        info->file_name = (char*)STD_MALLOC(fsize);
+        if (info->file_name)
+            memcpy(info->file_name, fname, fsize);
+    }
 }
 
 static void st_print_line(int count, MethodInfo* m) {
@@ -205,53 +227,187 @@ static void st_print_line(int count, MethodInfo* m) {
         m->method_name ? m->method_name : "??",
         m->file_name ? m->file_name : "??",
         m->line);
-    if (m->file_name) {
-        STD_FREE(m->file_name);
-    }
-    if (m->method_name) {
+
+    if (m->method_name)
         STD_FREE(m->method_name);
+
+    if (m->file_name)
+        STD_FREE(m->file_name);
+}
+
+
+void st_print_stack_jit(VM_thread* thread,
+                        native_frame_t* frames, jint num_frames)
+{
+    jint frame_num = 0;
+    jint count = 0;
+    StackIterator* si = NULL;
+
+    if (thread)
+        si = si_create_from_native(thread);
+
+    while ((si && !si_is_past_end(si)) || frame_num < num_frames)
+    {
+        MethodInfo m = {NULL, NULL, 0};
+
+        if (frame_num < num_frames && frames[frame_num].java_depth < 0)
+        {
+            if (native_is_ip_stub(frames[frame_num].ip)) // Generated stub
+            {
+                fprintf(stderr, "\t%d: <Generated stub> IP is %p\n",
+                    count++, frames[frame_num].ip);
+                ++frame_num;
+                continue;
+            }
+
+            // pure native frame
+            st_get_c_method_info(&m, frames[frame_num].ip);
+            st_print_line(count++, &m);
+            ++frame_num;
+            continue;
+        }
+
+        // Java/JNI frame, look into stack iterator
+
+        // If iterator is exhausted
+        if (si_is_past_end(si) ||
+            (si_is_native(si) && !m2n_get_previous_frame(si_get_m2n(si))))
+            break;
+
+        if (si_is_native(si) && frame_num < num_frames)
+        {
+            // Print information from native stack trace for JNI frames
+            st_get_c_method_info(&m, frames[frame_num].ip);
+            st_print_line(count, &m);
+        }
+        else if (si_is_native(si) && frame_num >= num_frames)
+        {
+            // Print information about JNI frames from iterator
+            // when native stack trace is not available
+            Method* method = m2n_get_method(si_get_m2n(si));
+            void* ip = m2n_get_ip(si_get_m2n(si));
+            st_get_java_method_info(&m, method, ip, false, -1);
+            st_print_line(count, &m);
+        }
+        else // !si_is_native(si)
+        {
+            // Print information about Java method from iterator
+            CodeChunkInfo* cci = si_get_code_chunk_info(si);
+            Method* method = cci->get_method();
+            void* ip = (void*)si_get_ip(si);
+
+            uint32 inlined_depth = si_get_inline_depth(si);
+            uint32 offset = (uint32)((POINTER_SIZE_INT)ip -
+                (POINTER_SIZE_INT)cci->get_code_block_addr());
+            bool is_ip_past = (frame_num != 0);
+
+            for (uint32 i = 0; i < inlined_depth; i++)
+            {
+                Method* inl_method = cci->get_jit()->get_inlined_method(
+                                            cci->get_inline_info(), offset, i);
+
+                st_get_java_method_info(&m, inl_method, ip, is_ip_past, i);
+                st_print_line(count++, &m);
+
+                if (frame_num < num_frames)
+                    ++frame_num; // Go to the next native frame
+            }
+
+            st_get_java_method_info(&m, method, ip, is_ip_past, -1);
+            st_print_line(count, &m);
+        }
+
+        ++count;
+        si_goto_previous(si);
+
+        if (frame_num < num_frames)
+            ++frame_num; // Go to the next native frame
+    }
+
+    if (si)
+        si_free(si);
+}
+
+void st_print_stack_interpreter(VM_thread* thread,
+    native_frame_t* frames, jint num_frames)
+{
+    FrameHandle* frame = interpreter.interpreter_get_last_frame(thread);
+    jint frame_num = 0;
+    jint count = 0;
+
+    while (frame || frame_num < num_frames)
+    {
+        MethodInfo m = {NULL, NULL, 0};
+
+        if (frame_num < num_frames && frames[frame_num].java_depth < 0)
+        { // pure native frame
+            st_get_c_method_info(&m, frames[frame_num].ip);
+            st_print_line(count++, &m);
+            ++frame_num;
+            continue;
+        }
+
+        // Java/JNI frame, look into stack iterator
+
+        Method* method = (Method*)interpreter.interpreter_get_frame_method(frame);
+        uint8* bc_ptr = interpreter.interpreter_get_frame_bytecode_ptr(frame);
+
+        // Print information from native stack trace
+        // when method is not available or is native
+        if (frame_num < num_frames &&
+            (!method || method_is_native(method)))
+        {
+            st_get_c_method_info(&m, frames[frame_num].ip);
+            st_print_line(count, &m);
+        }
+
+        // Print information about method from iterator
+        // when is Java method or when native stack trace is not available
+        if (method &&
+            (!method_is_native(method) || frame_num >= num_frames))
+        {
+            st_get_java_method_info(&m, method, (void*)bc_ptr, false, -1);
+            st_print_line(count, &m);
+        }
+
+        ++count;
+        frame = interpreter.interpreter_get_prev_frame(frame);
+
+        if (frame_num < num_frames)
+            ++frame_num; // Go to the next native frame
     }
 }
 
-void st_print_stack(Registers* regs) {
-    if(interpreter_enabled()) {
-       interpreter.stack_dump(get_thread_ptr());
-       return;
-    }
-    jint num_frames;
-    native_frame_t* frames;
-    num_frames = walk_native_stack_registers(regs, p_TLS_vmthread, -1, NULL);
-    frames = (native_frame_t*) STD_ALLOCA(sizeof(native_frame_t) * num_frames);
-    num_frames = walk_native_stack_registers(regs, p_TLS_vmthread, num_frames, frames);
-    StackIterator* si = si_create_from_native();
-    fprintf(stderr, "Stack trace:\n");
-    for (int i = 0; i < num_frames; i++) {		
-        static int count = 0;
-        MethodInfo m;
-        if (frames[i].java_depth == -1 && !native_is_ip_stub(frames[i].ip)) { // Pure native method
-            st_get_c_method_info(&m, frames[i].ip);
-        } else if (frames[i].java_depth == -1) { // Generated stub
-            fprintf(stderr, "\t%d: IP is 0x%08X <native code>\n", ++count, (POINTER_SIZE_INT) frames[i].ip); //FIXME: IA32 ONLY
-            continue;
-        } else { // Java/JNI native method
-            CodeChunkInfo* cci = si_get_code_chunk_info(si);
-            if (!cci) { // JNI native method
-                st_get_c_method_info(&m, frames[i].ip);
-            } else { // Java method
-                uint32 inlined_depth = si_get_inline_depth(si);
-                // FIXME64: on 64-bit architectures method bodies can be
-                // potentially greater than 2GB in size
-                uint32 offset = (uint32)((POINTER_SIZE_INT)si_get_ip(si) - (POINTER_SIZE_INT)cci->get_code_block_addr());
-                for (uint32 j = 0; j < inlined_depth; j++) {
-                    Method *real_method = cci->get_jit()->get_inlined_method(cci->get_inline_info(), offset, j);
-                    st_get_java_method_info(&m, real_method, frames[i].ip, 0 == i);
-                    st_print_line(++count, &m);
-                }
-                st_get_java_method_info(&m, cci->get_method(), frames[i].ip, 0 == i);
-          }
-          si_goto_previous(si);
-      }
-      st_print_line(++count, &m);
-  }
+void st_print_stack(Registers* regs)
+{
+    // We are trying to get native stack trace using walk_native_stack_registers
+    // function and get corresponding Java methods for stack trace from
+    // JIT/interpreter stack iterator.
+    // When native stack trace is not complete (for example, when
+    // walk_native_stack_registers cannot unwind frames in release build),
+    // we will use JIT/interpreter stack iterator to complete stack trace.
+
+    VM_thread* thread = get_thread_ptr(); // Can be NULL for pure native thread
+    native_frame_t* frames = NULL;
+
+    jint num_frames =
+        walk_native_stack_registers(regs, thread, -1, NULL);
+
+    if (num_frames)
+        frames = (native_frame_t*)STD_ALLOCA(sizeof(native_frame_t)*num_frames);
+
+    if (num_frames && frames)
+        walk_native_stack_registers(regs, thread, num_frames, frames);
+    else
+        num_frames = 0; // Consider native stack trace empty
+
+   fprintf(stderr, "Stack trace:\n");
+
+    if(interpreter_enabled() && thread)
+        st_print_stack_interpreter(thread, frames, num_frames);
+    else // It should be used also for threads without VM_thread structure
+        st_print_stack_jit(thread, frames, num_frames);
+
   fprintf(stderr, "<end of stack trace>\n");
+  fflush(stderr);
 }

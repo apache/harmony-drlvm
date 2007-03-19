@@ -26,6 +26,11 @@
 #include "logger.h"
 #include "port_malloc.h"
 
+#define LOGGER_EXIT(code) { \
+    shutdown_log_system(); \
+    ::exit(code); \
+}
+
 #define DIE2(category, message) { \
     const char* formatted = log_printf message; \
     log4cxx_from_c(category, DIE, formatted, __FILE__, __LOG4CXX_FUNC__, __LINE__); \

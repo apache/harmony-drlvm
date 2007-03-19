@@ -86,7 +86,7 @@ JIT_init(JIT_Handle jit, const char* name)
     Jitrino::Init(jit, name);
 
 #if defined (PLATFORM_NT) && defined (_DEBUG)
-    if (!get_boolean_property("vm.assert_dialog", false, VM_PROPERTIES))
+    if (!get_boolean_property("vm.assert_dialog", TRUE, VM_PROPERTIES))
     {
         _CrtSetReportMode(_CRT_ASSERT, _CRTDBG_MODE_FILE);
         _CrtSetReportFile(_CRT_ASSERT, _CRTDBG_FILE_STDOUT);

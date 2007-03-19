@@ -30,7 +30,8 @@
 #include "class_member.h"
 #include "open/hythread.h"
 
-void get_file_and_line(Method_Handle mh, void *ip, bool is_ip_past, const char **file, int *line) {
+void get_file_and_line(Method_Handle mh, void *ip, bool is_ip_past,
+                        int depth, const char **file, int *line) {
     Method *method = (Method*)mh;
     *file = class_get_source_file_name(method_get_class(method));
 
@@ -58,18 +59,30 @@ void get_file_and_line(Method_Handle mh, void *ip, bool is_ip_past, const char *
     POINTER_SIZE_INT callLength = 5;
 
     Global_Env * vm_env = VM_Global_State::loader_env;
-    CodeChunkInfo* jit_info = vm_env->vm_methods->find((unsigned char*)ip - callLength);
-    if (jit_info->get_jit()->get_bc_location_for_native(
-        method,
-        (NativeCodePtr) ((POINTER_SIZE_INT) ip - callLength),
-        &bcOffset) != EXE_ERROR_NONE) {
-        //
-        return;
+    CodeChunkInfo* cci = vm_env->vm_methods->find(ip, is_ip_past);
+    assert(cci);
+
+    POINTER_SIZE_INT eff_ip = (POINTER_SIZE_INT)ip -
+                                (is_ip_past ? callLength : 0);
+
+    if (depth < 0) // Not inlined method
+    {
+        if (cci->get_jit()->get_bc_location_for_native(
+            method, (NativeCodePtr)eff_ip, &bcOffset) != EXE_ERROR_NONE)
+            return;
+    }
+    else // Inlined method
+    {
+        InlineInfoPtr inl_info = cci->get_inline_info();
+
+        if (inl_info)
+        {
+            uint32 offset = (uint32) ((POINTER_SIZE_INT)ip -
+                (POINTER_SIZE_INT)cci->get_code_block_addr());
+            bcOffset = cci->get_jit()->get_inlined_bc(inl_info, offset, depth);
+        }
     }
 
-    if (is_ip_past) {
-        bcOffset--;
-    }
     *line = method->get_line_number(bcOffset);
 #endif        
 }
@@ -99,6 +112,7 @@ bool st_get_frame(unsigned target_depth, StackTraceFrame* stf)
     unsigned depth = 0;
     while (!si_is_past_end(si)) {
         stf->method = si_get_method(si);
+        stf->depth = -1;
         if (stf->method) {
             uint32 inlined_depth = si_get_inline_depth(si);
             if ( (target_depth >= depth) && 
@@ -112,6 +126,7 @@ bool st_get_frame(unsigned target_depth, StackTraceFrame* stf)
                     uint32 offset = (uint32)((POINTER_SIZE_INT)stf->ip - (POINTER_SIZE_INT)cci->get_code_block_addr());
                     stf->method = cci->get_jit()->get_inlined_method(
                             cci->get_inline_info(), offset, target_depth - depth);
+                    stf->depth = target_depth - depth;
                 }
 
                 si_free(si);
@@ -173,7 +188,8 @@ void st_get_trace(VM_thread *p_vmthread, unsigned* res_depth, StackTraceFrame** 
 
                 for (uint32 i = 0; i < inlined_depth; i++) {
                     stf->method = jit->get_inlined_method(cci->get_inline_info(), offset, i);
-                    stf->ip = NULL;
+                    stf->ip = ip;
+                    stf->depth = i;
                     stf->outdated_this = get_this(jit, method, si);
                     stf++;
                     depth++;
@@ -182,6 +198,7 @@ void st_get_trace(VM_thread *p_vmthread, unsigned* res_depth, StackTraceFrame** 
             }
             stf->method = method;
             stf->ip = ip;
+            stf->depth = -1;
             stf++;
             depth++;
         }
@@ -200,7 +217,7 @@ void st_print_frame(ExpandableMemBlock* buf, StackTraceFrame* stf)
     buf->AppendFormatBlock("\tat %s.%s%s", cname, mname, dname);
     const char *file;
     int line;
-    get_file_and_line(stf->method, stf->ip, false, &file, &line);
+    get_file_and_line(stf->method, stf->ip, false, stf->depth, &file, &line);
 
     if (line==-2)
         // Native method

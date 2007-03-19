@@ -2418,15 +2418,15 @@ stackDump(FILE * file, StackFrame& frame) {
     while(f) {
         Method *m = f->method;
         Class *c = m->get_class();
+        const char* fname = NULL;
         int line = -2;
-        if ( !m->is_native() ) {
-            int ip = (int)((uint8*)frame.ip - (uint8*)m->get_byte_code_addr());
-            line = m->get_line_number((uint16)ip);
-        }
+        get_file_and_line(m, f->ip, false, -1, &fname, &line);
+        const char* filename = fname ? fname : "NULL";
+
 #ifdef INTERPRETER_DEEP_DEBUG
         fprintf(file, "%s.%s%s (%s:%i) last bcs: (8 of %i): %s %s %s %s %s %s %s %s",
             c->name->bytes, m->get_name()->bytes, m->get_descriptor()->bytes,
-            class_get_source_file_name(c), line, f->n_last_bytecode,
+            filename, line, f->n_last_bytecode,
             opcodeNames[f->last_bytecodes[(f->n_last_bytecode-1)&7]],
             opcodeNames[f->last_bytecodes[(f->n_last_bytecode-2)&7]],
             opcodeNames[f->last_bytecodes[(f->n_last_bytecode-3)&7]],
@@ -2436,9 +2436,8 @@ stackDump(FILE * file, StackFrame& frame) {
             opcodeNames[f->last_bytecodes[(f->n_last_bytecode-7)&7]],
             opcodeNames[f->last_bytecodes[(f->n_last_bytecode-8)&7]]);
 #else
-    const char *filename = class_get_source_file_name(c);
     fprintf(file, "  %s.%s%s (%s:%i)\n", class_get_name(c), m->get_name()->bytes,
-        m->get_descriptor()->bytes, (filename != NULL ? filename : "NULL"), line);
+        m->get_descriptor()->bytes, filename, line);
 #endif
         f = f->prev;
     }
@@ -2446,12 +2445,12 @@ stackDump(FILE * file, StackFrame& frame) {
 
 void stack_dump(VM_thread *thread) {
     StackFrame *frame = getLastStackFrame(thread);
-    stackDump(stdout, *frame);
+    stackDump(stderr, *frame);
 }
 
 void stack_dump() {
     StackFrame *frame = getLastStackFrame();
-    stackDump(stdout, *frame);
+    stackDump(stderr, *frame);
 }
 
 static inline

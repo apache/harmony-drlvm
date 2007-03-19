@@ -134,6 +134,17 @@ public:
         return NULL;
     }
 
+    uint16
+    get_inlined_bc(InlineInfoPtr  ptr,
+                     uint32         offset,
+                     uint32         inline_depth)
+    {
+        if (_get_inlined_bc != NULL) {
+            return _get_inlined_bc(this, ptr, offset, inline_depth);
+        }
+        return 0;
+    }
+
     Boolean
     can_enumerate(Method_Handle method,
                   NativeCodePtr eip
@@ -328,6 +339,12 @@ private:
     Method_Handle
     (*_get_inlined_method)(JIT_Handle jit,
                             InlineInfoPtr  ptr, 
+                            uint32         offset,
+                            uint32         inline_depth);
+
+    uint16
+    (*_get_inlined_bc)(JIT_Handle jit,
+                            InlineInfoPtr  ptr,
                             uint32         offset,
                             uint32         inline_depth);
 

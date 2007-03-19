@@ -30,6 +30,8 @@ typedef struct {
 
     FrameHandle* (*interpreter_get_last_frame) (class VM_thread *thread);
     FrameHandle* (*interpreter_get_prev_frame) (FrameHandle* frame);
+    Method_Handle (*interpreter_get_frame_method) (FrameHandle* frame);
+    uint8* (*interpreter_get_frame_bytecode_ptr) (FrameHandle* frame);
     // 'end' is not inclusive
     bool (*is_frame_in_native_frame) (struct FrameHandle* frame, void* begin, void* end);
 

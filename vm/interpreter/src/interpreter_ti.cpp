@@ -513,15 +513,25 @@ FrameHandle* interpreter_get_last_frame(class VM_thread *thread)
 
 FrameHandle* interpreter_get_prev_frame(FrameHandle* frame)
 {
-	if (frame == NULL)
-		return NULL;
+    if (frame == NULL)
+        return NULL;
 
-	return (FrameHandle*)(((StackFrame*)frame)->prev);
+    return (FrameHandle*)(((StackFrame*)frame)->prev);
+}
+
+Method_Handle interpreter_get_frame_method(FrameHandle* frame)
+{
+    return (Method_Handle)((StackFrame*)frame)->method;
+}
+
+uint8* interpreter_get_frame_bytecode_ptr(FrameHandle* frame)
+{
+    return ((StackFrame*)frame)->ip;
 }
 
 bool is_frame_in_native_frame(FrameHandle* frame, void* begin, void* end)
 {
-	return (frame >= begin && frame < end);
+    return (frame >= begin && frame < end);
 }
 
 /////////////////////////////////

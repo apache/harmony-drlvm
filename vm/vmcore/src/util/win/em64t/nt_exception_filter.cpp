@@ -14,10 +14,6 @@
  *  See the License for the specific language governing permissions and
  *  limitations under the License.
  */
-/** 
- * @author Intel, Evgueni Brevnov
- * @version $Revision: 1.1.2.1.4.5 $
- */  
 
 #include <stdio.h>
 #include "platform_lowlevel.h"
@@ -76,29 +72,29 @@ void vm_to_nt_context(Registers* regs, PCONTEXT pcontext)
 
 void print_state(LPEXCEPTION_POINTERS nt_exception, const char *msg)
 {
-    fprintf(stderr, "...VM Crashed!\n");
     if (msg != 0)
         fprintf(stderr, "Windows reported exception: %s\n", msg);
     else
         fprintf(stderr, "Windows reported exception: 0x%x\n", nt_exception->ExceptionRecord->ExceptionCode);
 
     fprintf(stderr, "Registers:\n");
-    fprintf(stderr, "    RAX: 0x%16lx, RBX: 0x%16lx\n",
+    fprintf(stderr, "    RAX: 0x%016I64x, RBX: 0x%016I64x\n",
         nt_exception->ContextRecord->Rax, nt_exception->ContextRecord->Rbx);
-   fprintf(stderr, "    RCX: 0x%16lx, RDX: 0x%16lx\n",
+    fprintf(stderr, "    RCX: 0x%016I64x, RDX: 0x%016I64x\n",
         nt_exception->ContextRecord->Rcx, nt_exception->ContextRecord->Rdx);
-    fprintf(stderr, "    RSI: 0x%16lx, RDI: 0x%16lx\n",
+    fprintf(stderr, "    RSI: 0x%016I64x, RDI: 0x%016I64x\n",
         nt_exception->ContextRecord->Rsi, nt_exception->ContextRecord->Rdi);
-   fprintf(stderr, "    RSP: 0x%16lx, RBP: 0x%16lx\n",
+    fprintf(stderr, "    RSP: 0x%016I64x, RBP: 0x%016I64x\n",
         nt_exception->ContextRecord->Rsp, nt_exception->ContextRecord->Rbp);
-   fprintf(stderr, "    R8:  0x%16lx, R9: 0x%16lx\n",
+    fprintf(stderr, "    R8 : 0x%016I64x, R9 : 0x%016I64x\n",
         nt_exception->ContextRecord->R8, nt_exception->ContextRecord->R9);
-   fprintf(stderr, "    R10: 0x%16lx, R11P: 0x%16lx\n",
+    fprintf(stderr, "    R10: 0x%016I64x, R11: 0x%016I64x\n",
         nt_exception->ContextRecord->R10, nt_exception->ContextRecord->R11);
-    fprintf(stderr, "    RS12: 0x%16lx, R13: 0x%16lx\n",
+    fprintf(stderr, "    R12: 0x%016I64x, R13: 0x%016I64x\n",
         nt_exception->ContextRecord->R12, nt_exception->ContextRecord->R13);
-    fprintf(stderr, "    RS14: 0x%16lx, R15: 0x%16lx\n",
+    fprintf(stderr, "    R14: 0x%016I64x, R15: 0x%016I64x\n",
         nt_exception->ContextRecord->R14, nt_exception->ContextRecord->R15);
+    fprintf(stderr, "    RIP: 0x%016I64x\n", nt_exception->ContextRecord->Rip);
 }
 
 void* regs_get_sp(Registers* pregs)

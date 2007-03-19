@@ -67,6 +67,7 @@
 
 #include "exception_filter.h"
 #include "interpreter.h"
+#include "stack_dump.h"
 
 // Variables used to locate the context from the signal handler
 static int sc_nest = -1;
@@ -178,21 +179,6 @@ void addr2line (char *buf) {
         int status;
         wait(&status); // wait for the child to complete
     }
-}
-
-/**
- * Print out the call stack.
- */
-void print_native_stack (unsigned *rbp) {
-    int depth = 17;
-    LWARN(42, "Fatal error");
-    char buf[1024];
-    int n = 0;
-    while (rbp && rbp[1] && --depth >= 0 && (n<int(sizeof(buf))-20)) {
-        n += sprintf(buf+n,"%08x\n",rbp[1]);
-        rbp = (unsigned *)POINTER_SIZE_INT(rbp[0]);
-    }
-    addr2line(buf);
 }
 
 /*
@@ -391,6 +377,11 @@ void null_java_reference_handler(int signum, siginfo_t* info, void* context)
         }
     }
 
+    fprintf(stderr, "SIGSEGV in VM code.\n");
+    Registers regs;
+    linux_ucontext_to_regs(&regs, uc);
+    st_print_stack(&regs);
+
     // crash with default handler
     signal(signum, 0);
 }
@@ -408,6 +399,11 @@ void null_java_divide_by_zero_handler(int signum, siginfo_t* info, void* context
         }
     }
     
+    fprintf(stderr, "SIGFPE in VM code.\n");
+    Registers regs;
+    linux_ucontext_to_regs(&regs, uc);
+    st_print_stack(&regs);
+
     // crash with default handler
     signal(signum, 0);
 }
@@ -532,9 +528,11 @@ void locate_sigcontext(int signum)
  * @note call stacks may be used for debugging
  */
 void abort_handler (int signal, siginfo_t* info, void* context) {
+    fprintf(stderr, "SIGABRT in VM code.\n");
     ucontext_t *uc = (ucontext_t *)context;
-    unsigned *rbp = (unsigned *) uc->uc_mcontext.gregs[REG_RBP];
-    print_native_stack(rbp);
+    Registers regs;
+    linux_ucontext_to_regs(&regs, uc);
+    st_print_stack(&regs);
 }
 
 void initialize_signals()

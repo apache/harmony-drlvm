@@ -14,10 +14,6 @@
  *  See the License for the specific language governing permissions and
  *  limitations under the License.
  */
-/** 
- * @author Intel, Evgueni Brevnov
- * @version $Revision: 1.1.2.1.4.4 $
- */  
 
 #include <stdio.h>
 #include "platform_lowlevel.h"
@@ -56,18 +52,16 @@ void vm_to_nt_context(Registers* regs, PCONTEXT context)
 
 void print_state(LPEXCEPTION_POINTERS nt_exception, const char *msg)
 {
-    fprintf(stderr, "...VM Crashed!\n");
-
-   if (msg != 0)
+    if (msg != 0)
         fprintf(stderr, "Windows reported exception: %s\n", msg);
     else
         fprintf(stderr, "Windows reported exception: 0x%x\n", nt_exception->ExceptionRecord->ExceptionCode);
 
     fprintf(stderr, "Registers:\n");
-   fprintf(stderr, "    EAX: 0x%08x, EBX: 0x%08x, ECX: 0x%08x, EDX: 0x%08x\n",
+    fprintf(stderr, "    EAX: 0x%08x, EBX: 0x%08x, ECX: 0x%08x, EDX: 0x%08x\n",
         nt_exception->ContextRecord->Eax, nt_exception->ContextRecord->Ebx,
         nt_exception->ContextRecord->Ecx, nt_exception->ContextRecord->Edx);
-   fprintf(stderr, "    ESI: 0x%08x, EDI: 0x%08x, ESP: 0x%08x, EBP: 0x%08x\n",
+    fprintf(stderr, "    ESI: 0x%08x, EDI: 0x%08x, ESP: 0x%08x, EBP: 0x%08x\n",
         nt_exception->ContextRecord->Esi, nt_exception->ContextRecord->Edi,
         nt_exception->ContextRecord->Esp, nt_exception->ContextRecord->Ebp);
     fprintf(stderr, "    EIP: 0x%08x\n", nt_exception->ContextRecord->Eip);

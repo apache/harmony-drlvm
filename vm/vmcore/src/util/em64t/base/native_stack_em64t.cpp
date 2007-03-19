@@ -22,54 +22,170 @@
 #include "method_lookup.h"
 #include "native_stack.h"
 
-void native_get_frame_info(Registers* regs, void** ip, /* void** ret, */ void** bp, void** sp)
+void native_get_frame_info(Registers* regs, void** ip, void** bp, void** sp)
 {
     *ip = (void*)regs->rip;
-    //
-    // FIXME: number of parameters should be fixed in public interface
-    //
-    //*ret = ((void**)regs->rbp)[1];
     *bp = (void*)regs->rbp;
     *sp = (void*)regs->rsp;
 }
 
 bool native_unwind_bp_based_frame(void* frame, void** ip, void** bp, void** sp)
 {
-    return false; // Not implemented
+    void** frame_ptr = (void**)frame;
+
+    *ip = frame_ptr[1];
+    *bp = frame_ptr[0];
+
+    *sp = (void*)((POINTER_SIZE_INT)frame + 2*sizeof(void*));
+
+    return (*bp != NULL && *ip != NULL);
 }
 
 void native_get_ip_bp_from_si_jit_context(StackIterator* si, void** ip, void** bp)
-{ // Not implemented
+{
+    JitFrameContext* jfc = si_get_jit_context(si);
+    *ip = (void*)*jfc->p_rip;
+    *bp = (void*)*jfc->p_rbp;
 }
 
 void native_get_sp_from_si_jit_context(StackIterator* si, void** sp)
-{ // Not implemented
+{
+    *sp = (void*)si_get_jit_context(si)->rsp;
 }
 
 bool native_is_out_of_stack(void* value)
 {
-    return true; // Not implemented
+    // FIXME: Invalid criterion
+    return (value < (void*)0x10000) || (value > (void*)0x800000000000);
 }
 
 bool native_is_frame_valid(native_module_t* modules, void* bp, void* sp)
 {
-    return false; // Not implemented
+    // Check for frame layout and stack values
+    if ((bp < sp) || native_is_out_of_stack(bp))
+        return false; // Invalid frame
+
+    void** dw_ptr = (void**)bp;
+    void* ret_ip = *(dw_ptr + 1); // Return address for frame
+
+    // Check return address for meaning
+    if (!native_is_ip_in_modules(modules, ret_ip) && !native_is_ip_stub(ret_ip))
+        return false;
+
+    return true;
 }
 
+// Searches for correct return address in the stack
+// Returns stack address pointing to return address
+static void** native_search_special_frame(native_module_t* modules, void* sp)
+{
+// Max search depth for return address
+#define MAX_SPECIAL_DEPTH 0x100
+
+    POINTER_SIZE_INT sp_begin = (POINTER_SIZE_INT)sp;
+    for (POINTER_SIZE_INT sp_int = sp_begin;
+         sp_int < sp_begin + MAX_SPECIAL_DEPTH;
+         sp_int += 8) // 8 is granularity of stack
+    {
+        void** sp_pointer = (void**)sp_int;
+
+        if (native_is_ip_in_modules(modules, *sp_pointer))
+            return sp_pointer;
+    }
+
+    return NULL;
+}
+
+// Tests if stack contains non-BP-based frames on top
 int native_test_unwind_special(native_module_t* modules, void* sp)
 {
-    return false; // Not implemented
+#define MAX_SPECIAL_COUNT 16
+
+#if (!defined PLATFORM_POSIX)
+    return -1; // Because we cannot identify executable code on Windows
+#endif
+
+    if (modules == NULL)
+        return false;
+
+    int count = 0;
+    void** sp_pointer = (void**)sp;
+
+    do
+    {
+        if (native_is_ip_stub(sp_pointer[-1]))
+            break; // We've found JNI stub
+
+        // We've reached Java without native stub
+        if (vm_identify_eip(sp_pointer[-1]) == VM_TYPE_JAVA)
+            break;
+
+        void** next_sp = native_search_special_frame(modules, sp_pointer);
+
+        if (next_sp == NULL)
+            break; // We cannot unwind anymore
+
+        if (count > 0 &&                     // Check BP-frame for upper frames
+            sp_pointer[-2] >= sp_pointer &&  // Correct frame layout
+            sp_pointer[-2] == next_sp - 1 && // is RBP saved correctly
+            next_sp[-1] >= next_sp + 1)      // Correct next frame layout
+        {
+            break;
+        }
+
+        sp_pointer = next_sp + 1;
+
+    } while (++count <= MAX_SPECIAL_COUNT);
+
+    return count;
 }
 
 bool native_unwind_special(native_module_t* modules,
                 void* stack, void** ip, void** sp, void** bp, bool is_last)
 {
-    return false; // Not implemented
+    if (modules == NULL)
+    {
+        *ip = NULL;
+        return false;
+    }
+
+    void** found = NULL;
+
+    POINTER_SIZE_INT sp_begin = (POINTER_SIZE_INT)stack;
+    for (POINTER_SIZE_INT sp_int = sp_begin;
+         sp_int < sp_begin + MAX_SPECIAL_DEPTH;
+         sp_int += 8) // 8 is granularity of stack
+    {
+        void** sp_pointer = (void**)sp_int;
+
+        if (native_is_ip_in_modules(modules, *sp_pointer))
+        {
+            found = sp_pointer;
+            break;
+        }
+    }
+
+    if (!found)
+    {
+        *ip = NULL;
+        return false;
+    }
+
+    *ip = *found;
+    *sp = found + 1;
+
+    if (is_last && !native_is_ip_stub(*ip))
+        *bp = found[-1];
+    else
+        *bp = *sp;
+
+    return true;
 }
 
 void native_unwind_interrupted_frame(VM_thread* pthread, void** p_ip, void** p_bp, void** p_sp)
-{ // Not implemented yet
-    *p_ip = NULL;
-    *p_bp = NULL;
-    *p_sp = NULL;
+{
+    Registers* pregs = &pthread->jvmti_saved_exception_registers;
+    *p_ip = (void*)pregs->rip;
+    *p_bp = (void*)pregs->rbp;
+    *p_sp = (void*)pregs->rsp;
 }

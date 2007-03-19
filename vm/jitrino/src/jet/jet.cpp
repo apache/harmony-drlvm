@@ -940,6 +940,17 @@ Method_Handle JIT_get_inlined_method(JIT_Handle jit, InlineInfoPtr ptr,
     return 0;
 }
 
+/**
+ * Inlining is unsupported by Jitrino.JET.
+ * @return 0
+ */
+extern "C" JITEXPORT
+uint16 JIT_get_inlined_bc(JIT_Handle jit, InlineInfoPtr ptr,
+                                     uint32 offset, uint32 inline_depth)
+{
+    return 0;
+}
+
 extern "C" JITEXPORT
 Boolean JIT_can_enumerate(JIT_Handle jit, Method_Handle method,
                           NativeCodePtr eip)

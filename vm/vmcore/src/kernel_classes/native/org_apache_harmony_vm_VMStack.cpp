@@ -371,10 +371,11 @@ JNIEXPORT jobjectArray JNICALL Java_org_apache_harmony_vm_VMStack_getStackTrace
     for(unsigned i = skip; i < size; i++) {
         Method_Handle method = frames[i].method;
         NativeCodePtr ip = frames[i].ip;
+        int inl_depth = frames[i].depth;
         int lineNumber;
         const char* fileName;
 
-        get_file_and_line(method, ip, true, &fileName, &lineNumber);
+        get_file_and_line(method, ip, true, inl_depth, &fileName, &lineNumber);
         jstring strFileName;
         if (fileName != NULL) {
             strFileName = jenv->NewStringUTF(fileName);
@@ -493,10 +494,11 @@ JNIEXPORT jobjectArray JNICALL Java_org_apache_harmony_vm_VMStack_getThreadStack
     for(unsigned i = 0; i < size; i++) {
         Method_Handle method = frames[i].method;
         NativeCodePtr ip = frames[i].ip;
+        int inl_depth = frames[i].depth;
         int lineNumber;
         const char* fileName;
 
-        get_file_and_line(method, ip, true, &fileName, &lineNumber);
+        get_file_and_line(method, ip, true, inl_depth, &fileName, &lineNumber);
         if (fileName == NULL) fileName = "";
 
         jstring strFileName = jenv->NewStringUTF(fileName);

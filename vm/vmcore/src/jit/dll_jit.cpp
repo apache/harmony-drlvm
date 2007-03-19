@@ -107,6 +107,9 @@ lib_handle(NULL)
     GET_OPTIONAL_FUNCTION(fn, handle, "JIT_get_inlined_method");
     _get_inlined_method = (Method_Handle (*)(JIT_Handle, InlineInfoPtr, uint32, uint32)) fn;
 
+    GET_OPTIONAL_FUNCTION(fn, handle, "JIT_get_inlined_bc");
+    _get_inlined_bc = (uint16 (*)(JIT_Handle, InlineInfoPtr, uint32, uint32)) fn;
+
     GET_FUNCTION(fn, handle, "JIT_unwind_stack_frame");
     _unwind_stack_frame = (void (*)(JIT_Handle, Method_Handle, JitFrameContext *)) fn;
 
