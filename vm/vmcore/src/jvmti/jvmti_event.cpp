@@ -148,6 +148,33 @@ void remove_event_from_global(jvmtiEnv *env, jvmtiEvent event_type)
     p_env->global_events[event_type - JVMTI_MIN_EVENT_TYPE_VAL] = false;
 }
 
+// disable all events except VM_DEATH
+static void disable_all_events(TIEnv* p_env)
+{
+    for (jvmtiEvent event_type = JVMTI_MIN_EVENT_TYPE_VAL; 
+            event_type <= JVMTI_MAX_EVENT_TYPE_VAL ; 
+            event_type = (jvmtiEvent) (event_type + 1)) {
+        // skip VM_DEATH
+        if (JVMTI_EVENT_VM_DEATH == event_type)
+            continue;
+
+        // disable environment global events
+        p_env->global_events[event_type - JVMTI_MIN_EVENT_TYPE_VAL] = false;
+
+        // disable thread specific events
+        TIEventThread* et = p_env->event_threads[event_type - JVMTI_MIN_EVENT_TYPE_VAL];
+        p_env->event_threads[event_type - JVMTI_MIN_EVENT_TYPE_VAL] = NULL;
+
+        while (NULL != et) {
+            TIEventThread* next_et = et->next;
+
+            _deallocate((unsigned char*) et);
+
+            et = next_et;
+        }
+    }
+}
+
 /**
  * Return true if event is enabled in any of TI environments even for one
  * thread.
@@ -2073,6 +2100,10 @@ void jvmti_send_vm_death_event()
     TIEnv *next_env;
     while (NULL != ti_env)
     {
+        // VM_DEATH must be the latest event.
+        // Disable all events except VM_DEATH
+        disable_all_events(ti_env);
+
         next_env = ti_env->next;
         if (ti_env->global_events[JVMTI_EVENT_VM_DEATH - JVMTI_MIN_EVENT_TYPE_VAL])
         {

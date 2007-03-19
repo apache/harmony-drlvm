@@ -190,19 +190,17 @@ jint vm_destroy(JavaVM_Internal * java_vm, jthread java_thread)
         exn_raise_object(uncaught_exception);
     }
 
-    // Stop all (except current) java and native threads
-    // before destroying VM-wide data.
-
-    // Stop java threads
-    vm_shutdown_stop_java_threads(java_vm->vm_env);
-
-    // TODO: ups we don't stop native threads as well :-((
-    // We are lucky! Currently, there are no such threads.
-
     // Send VM_Death event and switch to DEAD phase.
     // This should be the last event sent by VM.
     // This event should be sent before Agent_OnUnload called.
     jvmti_send_vm_death_event();
+
+    // Stop all (except current) java threads
+    // before destroying VM-wide data.
+    vm_shutdown_stop_java_threads(java_vm->vm_env);
+
+    // TODO: ups we don't stop native threads as well :-((
+    // We are lucky! Currently, there are no such threads.
 
     // Detach current thread.
     status = jthread_detach(java_thread);
